@@ -1,0 +1,711 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>종운 업무체크</title>
+<meta name="theme-color" content="#0F5132">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icon-192.png">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<style>
+  :root{
+    --bg:#F4F7F5;
+    --card:#ffffff;
+    --brand:#1A9A6B;
+    --brand-dark:#0F5132;
+    --amber:#C77B1E;
+    --text:#16212B;
+    --sub:#5B6B66;
+    --line:#E3EAE6;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",-apple-system,BlinkMacSystemFont,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+  }
+  #app{
+    max-width:560px;
+    margin:0 auto;
+    padding:16px 16px 48px;
+  }
+  header.topbar{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:4px 2px 14px;
+  }
+  header.topbar h1{
+    font-size:18px;
+    margin:0;
+    font-weight:700;
+  }
+  .gear-btn{
+    width:38px;height:38px;
+    border-radius:10px;
+    border:1px solid var(--line);
+    background:var(--card);
+    font-size:18px;
+    display:flex;align-items:center;justify-content:center;
+    cursor:pointer;
+  }
+  .summary-card{
+    background:linear-gradient(135deg, var(--brand-dark), var(--brand));
+    color:#fff;
+    border-radius:16px;
+    padding:18px 18px 16px;
+    margin-bottom:18px;
+    box-shadow:0 6px 16px rgba(15,81,50,0.25);
+  }
+  .summary-date{
+    font-size:13px;
+    opacity:0.85;
+    margin-bottom:12px;
+  }
+  .summary-grid{
+    display:grid;
+    grid-template-columns:repeat(5,1fr);
+    gap:8px;
+  }
+  .summary-item{
+    text-align:center;
+  }
+  .summary-item .num{
+    font-size:22px;
+    font-weight:800;
+    line-height:1.1;
+  }
+  .summary-item .lbl{
+    font-size:11px;
+    opacity:0.85;
+    margin-top:2px;
+  }
+  .offline-banner{
+    background:#FFF3E0;
+    color:#9A5B00;
+    border:1px solid #F3D9A8;
+    border-radius:10px;
+    padding:10px 12px;
+    font-size:13px;
+    margin-bottom:14px;
+    display:none;
+  }
+  .offline-banner.show{display:block;}
+  section.group{
+    margin-bottom:20px;
+  }
+  section.group h2{
+    font-size:14px;
+    font-weight:700;
+    color:var(--brand-dark);
+    margin:0 0 8px 4px;
+  }
+  .card{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:14px;
+    overflow:hidden;
+  }
+  .item{
+    display:flex;
+    align-items:flex-start;
+    gap:12px;
+    padding:12px 14px;
+    border-bottom:1px solid var(--line);
+    cursor:pointer;
+  }
+  .item:last-child{border-bottom:none;}
+  .item:active{background:#F7FAF8;}
+  .check-box{
+    width:24px;height:24px;
+    min-width:24px;
+    border-radius:7px;
+    border:2px solid #C7D3CD;
+    margin-top:1px;
+    display:flex;align-items:center;justify-content:center;
+    font-size:14px;
+    color:#fff;
+    transition:background .15s, border-color .15s;
+  }
+  .item.checked .check-box{
+    background:var(--brand);
+    border-color:var(--brand);
+  }
+  .item-body{flex:1;min-width:0;}
+  .item-title{
+    font-size:14px;
+    line-height:1.4;
+    font-weight:600;
+  }
+  .item.checked .item-title{
+    color:#6C7A75;
+    text-decoration:line-through;
+    text-decoration-color:#B9C4BF;
+  }
+  .item-meta{
+    font-size:12px;
+    color:var(--sub);
+    margin-top:3px;
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px;
+    align-items:center;
+  }
+  .badge{
+    display:inline-block;
+    font-size:11px;
+    padding:1px 7px;
+    border-radius:999px;
+    background:#FCEFDD;
+    color:var(--amber);
+    font-weight:700;
+    border:1px solid #F1D3A8;
+  }
+  .past-note{
+    font-size:11.5px;
+    color:#A85B00;
+  }
+  .checked-date{
+    font-size:11.5px;
+    color:var(--brand-dark);
+    font-weight:700;
+  }
+  .info-card{
+    background:#EFF5F2;
+    border:1px dashed #BFD5CB;
+    border-radius:14px;
+    padding:10px 14px;
+  }
+  .info-card .item{
+    border-bottom:1px solid #DCE8E1;
+    cursor:default;
+    padding:10px 0;
+  }
+  .info-card .item:last-child{border-bottom:none;}
+  .info-card .item-title{font-size:13px;font-weight:500;color:var(--sub);}
+
+  /* 토큰/설정 모달 */
+  .modal-backdrop{
+    position:fixed;inset:0;
+    background:rgba(22,33,27,0.45);
+    display:none;
+    align-items:center;justify-content:center;
+    padding:20px;
+    z-index:50;
+  }
+  .modal-backdrop.show{display:flex;}
+  .modal{
+    background:#fff;
+    border-radius:16px;
+    padding:22px;
+    width:100%;
+    max-width:400px;
+  }
+  .modal h3{margin:0 0 8px;font-size:16px;}
+  .modal p{margin:0 0 16px;font-size:13px;color:var(--sub);line-height:1.5;}
+  .modal input{
+    width:100%;
+    padding:12px 12px;
+    border-radius:10px;
+    border:1px solid var(--line);
+    font-size:14px;
+    margin-bottom:10px;
+  }
+  .modal .err{
+    color:#C0392B;
+    font-size:12.5px;
+    margin:-4px 0 10px;
+    display:none;
+  }
+  .modal .err.show{display:block;}
+  .modal button.primary{
+    width:100%;
+    padding:13px;
+    border:none;
+    border-radius:10px;
+    background:var(--brand-dark);
+    color:#fff;
+    font-size:15px;
+    font-weight:700;
+    cursor:pointer;
+  }
+  .modal button.secondary{
+    width:100%;
+    padding:11px;
+    border:none;
+    background:transparent;
+    color:var(--sub);
+    font-size:13px;
+    margin-top:6px;
+    cursor:pointer;
+  }
+  .loading{
+    text-align:center;
+    color:var(--sub);
+    font-size:13px;
+    padding:40px 0;
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <header class="topbar">
+    <h1>종운 업무체크</h1>
+    <button class="gear-btn" id="gearBtn" aria-label="설정">⚙</button>
+  </header>
+
+  <div class="offline-banner" id="offlineBanner">오프라인 — 연결되면 자동 저장</div>
+
+  <div id="summaryHost"></div>
+
+  <div id="listHost">
+    <div class="loading">불러오는 중…</div>
+  </div>
+
+  <section class="group">
+    <h2>수시</h2>
+    <div class="info-card">
+      <div class="item"><div class="item-body"><div class="item-title">사고 발생 → 수시 위험성평가 + 사고 보고 (JW-05-006)</div></div></div>
+      <div class="item"><div class="item-body"><div class="item-title">신규 입사 → JW-06-011로 일괄 처리</div></div></div>
+      <div class="item"><div class="item-body"><div class="item-title">밀폐공간 · 석면 투입 전 → JW-06-012 · 특별교육</div></div></div>
+    </div>
+  </section>
+</div>
+
+<div class="modal-backdrop" id="tokenBackdrop">
+  <div class="modal">
+    <h3>앱 토큰 입력</h3>
+    <p>관리자에게 받은 앱 토큰 입력</p>
+    <div class="err" id="tokenErr">토큰이 올바르지 않습니다. 다시 입력해 주세요.</div>
+    <input type="password" id="tokenInput" placeholder="토큰 붙여넣기" autocomplete="off">
+    <button class="primary" id="tokenSave">저장하고 시작</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  var DATA_OWNER = "ngi6442-afk";
+  var DATA_REPO = "jongwoon-appdata";
+  var DATA_PATH = "data/checklist.json";
+  var API_BASE = "https://api.github.com/repos/" + DATA_OWNER + "/" + DATA_REPO + "/contents/" + DATA_PATH;
+
+  var TOKEN_KEY = "jw_app_token";
+  var CACHE_KEY = "jw_app_data_cache";
+
+  // ---- 체크리스트 정의 (JW-05-011) ----
+  var GROUPS = [
+    {
+      type: "weekly", title: "매주 (월요일)",
+      items: [
+        {id:"w1", title:"일일점검표 지난주 작성분 수거, 이상(유) 항목 조치 확인", who:"나경일→관리자", form:"JW-06-013", approve:false}
+      ]
+    },
+    {
+      type: "monthly", title: "월간",
+      items: [
+        {id:"m1", title:"월별 안전교육 실시 · 교육일지 작성", who:"김정아·나경일", form:"JW-06-015", approve:true},
+        {id:"m2", title:"임금 지급 · 임금대장 · 4대보험 처리 확인", who:"관리자", form:"임금대장", approve:false},
+        {id:"m3", title:"사고 · 민원 접수분 처리 상태 리뷰", who:"관리자", form:"JW-06-006", approve:false}
+      ]
+    },
+    {
+      type: "quarterly", title: "분기",
+      items: [
+        {id:"q1", title:"정기 안전보건교육 (관리부 3h, 운송·현장 6h)", who:"김정아", form:"JW-03-008·06-015", approve:true},
+        {id:"q2", title:"차량 정기검사 도래분 확인 · 예약", who:"관리자", form:"JW-05-005", approve:false}
+      ]
+    },
+    {
+      type: "half", title: "반기 (6월·12월 일괄 가능)",
+      items: [
+        {id:"h1", title:"종사자 의견 청취 회의 (중처법 4조7호)", who:"관리자 주관", form:"JW-06-016", approve:true},
+        {id:"h2", title:"위험성평가 절차 · 기록 점검 (4조3호)", who:"김정아", form:"JW-03-007·06-014", approve:true},
+        {id:"h3", title:"안전보건 담당자 업무수행 평가 (4조5호)", who:"대표", form:"평가 기록", approve:true},
+        {id:"h4", title:"비상대응 · 보고 절차 점검 (4조8호)", who:"관리자", form:"JW-05-006", approve:false},
+        {id:"h5", title:"협력업체 안전 점검 (4조9호)", who:"관리자", form:"JW-06-009", approve:true},
+        {id:"h6", title:"밀폐공간 비상 구조훈련 (6개월 주기)", who:"나경일", form:"JW-06-015 특별교육", approve:true}
+      ]
+    },
+    {
+      type: "yearly", title: "연간",
+      items: [
+        {id:"y1", title:"위험성평가 정기평가, 4개 부서 (상반기)", who:"김정아+부서별", form:"JW-06-014", approve:true},
+        {id:"y2", title:"경영방침 · 추진목표 점검 · 갱신 (1월)", who:"대표+관리자", form:"JW-03-002", approve:true},
+        {id:"y3", title:"안전보건 예산 편성, 1인당 2만원 이상 (1월)", who:"대표", form:"JW-03-007 예산표", approve:true},
+        {id:"y4", title:"차년도 안전보건교육계획 수립 (12월)", who:"김정아", form:"JW-03-008", approve:true},
+        {id:"y5", title:"건강진단(비사무직 연 1회) · 특수건진 대상 확인", who:"관리자", form:"검진 결과", approve:false},
+        {id:"y6", title:"관리감독자 교육 연 16시간", who:"나경일·김혁", form:"수료증", approve:false},
+        {id:"y7", title:"인허가 만료 · 보수교육 전수 점검 (1월)", who:"관리자", form:"JW-04-001", approve:false},
+        {id:"y8", title:"차량 보험 갱신 · 검사 전수 확인 (갱신월)", who:"관리자", form:"JW-05-005", approve:false},
+        {id:"y9", title:"규정 · 문서대장 정비 검토 (12월)", who:"관리자", form:"JW-05-001", approve:false},
+        {id:"y10", title:"최저임금 인상 · 근로계약 반영 (1월)", who:"관리자+노무사", form:"JW-02-002", approve:false}
+      ]
+    }
+  ];
+
+  var TYPE_LABEL = {weekly:"주간", monthly:"월간", quarterly:"분기", half:"반기", yearly:"연간"};
+
+  // ---- 상태 ----
+  var records = {};      // {type: {periodKey: {itemId: "YYYY-MM-DD"}}}
+  var currentSha = null;
+  var saveTimer = null;
+  var isOffline = false;
+  var pendingSave = false;
+
+  // ---- 유틸 ----
+  function pad(n){ return n < 10 ? "0" + n : "" + n; }
+
+  function fmtDate(d){
+    return d.getFullYear() + "-" + pad(d.getMonth()+1) + "-" + pad(d.getDate());
+  }
+
+  function todayStr(){ return fmtDate(new Date()); }
+
+  function mondayOfWeek(d){
+    var day = d.getDay();
+    var diff = (day === 0 ? -6 : 1 - day);
+    var monday = new Date(d);
+    monday.setDate(d.getDate() + diff);
+    return monday;
+  }
+
+  function periodKeys(now){
+    var weekly = fmtDate(mondayOfWeek(now));
+    var monthly = now.getFullYear() + "-" + pad(now.getMonth()+1);
+    var q = Math.floor(now.getMonth() / 3) + 1;
+    var quarterly = now.getFullYear() + "-Q" + q;
+    var half = now.getFullYear() + "-H" + (now.getMonth() < 6 ? 1 : 2);
+    var yearly = "" + now.getFullYear();
+    return {weekly:weekly, monthly:monthly, quarterly:quarterly, half:half, yearly:yearly};
+  }
+
+  var CURRENT_KEYS = periodKeys(new Date());
+
+  function b64DecodeUnicode(str){
+    var binary = atob(str.replace(/\n/g, ""));
+    var bytes = new Uint8Array(binary.length);
+    for (var i=0;i<binary.length;i++){ bytes[i] = binary.charCodeAt(i); }
+    return new TextDecoder("utf-8").decode(bytes);
+  }
+
+  function b64EncodeUnicode(str){
+    var bytes = new TextEncoder().encode(str);
+    var binary = "";
+    for (var i=0;i<bytes.length;i++){ binary += String.fromCharCode(bytes[i]); }
+    return btoa(binary);
+  }
+
+  function getToken(){ return localStorage.getItem(TOKEN_KEY); }
+  function setToken(t){ localStorage.setItem(TOKEN_KEY, t); }
+  function clearToken(){ localStorage.removeItem(TOKEN_KEY); }
+
+  function saveCache(){
+    try{
+      localStorage.setItem(CACHE_KEY, JSON.stringify({sha: currentSha, records: records}));
+    }catch(e){}
+  }
+
+  function loadCache(){
+    try{
+      var raw = localStorage.getItem(CACHE_KEY);
+      if (!raw) return null;
+      return JSON.parse(raw);
+    }catch(e){ return null; }
+  }
+
+  function lastCheckedBefore(type, itemId, currentKey){
+    var periods = records[type] || {};
+    var last = null;
+    for (var k in periods){
+      if (!periods.hasOwnProperty(k)) continue;
+      if (k === currentKey) continue;
+      var val = periods[k][itemId];
+      if (val && (!last || val > last)) last = val;
+    }
+    return last;
+  }
+
+  function fmtMD(dateStr){
+    var parts = dateStr.split("-");
+    return parseInt(parts[1],10) + "/" + parseInt(parts[2],10);
+  }
+
+  // ---- 렌더 ----
+  function setOffline(state){
+    isOffline = state;
+    var b = document.getElementById("offlineBanner");
+    if (state) b.classList.add("show"); else b.classList.remove("show");
+  }
+
+  function renderSummary(){
+    var host = document.getElementById("summaryHost");
+    var dateStr = todayStr();
+    var cells = GROUPS.map(function(g){
+      var key = CURRENT_KEYS[g.type];
+      var checkedObj = (records[g.type] && records[g.type][key]) || {};
+      var checkedCount = 0;
+      g.items.forEach(function(it){ if (checkedObj[it.id]) checkedCount++; });
+      var remaining = g.items.length - checkedCount;
+      return '<div class="summary-item"><div class="num">' + remaining + '</div><div class="lbl">' + TYPE_LABEL[g.type] + ' 남음</div></div>';
+    }).join("");
+    host.innerHTML =
+      '<div class="summary-card">' +
+        '<div class="summary-date">' + dateStr + '</div>' +
+        '<div class="summary-grid">' + cells + '</div>' +
+      '</div>';
+  }
+
+  function renderList(){
+    var host = document.getElementById("listHost");
+    var html = "";
+    GROUPS.forEach(function(g){
+      var key = CURRENT_KEYS[g.type];
+      var checkedObj = (records[g.type] && records[g.type][key]) || {};
+      html += '<section class="group"><h2>' + g.title + '</h2><div class="card">';
+      g.items.forEach(function(it){
+        var checkedDate = checkedObj[it.id];
+        var isChecked = !!checkedDate;
+        var metaBits = [];
+        metaBits.push('<span>' + it.who + '</span>');
+        metaBits.push('<span>' + it.form + '</span>');
+        if (it.approve) metaBits.push('<span class="badge">결재</span>');
+        if (isChecked){
+          metaBits.push('<span class="checked-date">✓ ' + checkedDate + '</span>');
+        } else {
+          var prev = lastCheckedBefore(g.type, it.id, key);
+          if (prev) metaBits.push('<span class="past-note">지난 확인 ' + fmtMD(prev) + '</span>');
+        }
+        html +=
+          '<div class="item' + (isChecked ? ' checked' : '') + '" data-type="' + g.type + '" data-id="' + it.id + '">' +
+            '<div class="check-box">' + (isChecked ? '✓' : '') + '</div>' +
+            '<div class="item-body">' +
+              '<div class="item-title">' + it.title + '</div>' +
+              '<div class="item-meta">' + metaBits.join('') + '</div>' +
+            '</div>' +
+          '</div>';
+      });
+      html += '</div></section>';
+    });
+    host.innerHTML = html;
+
+    Array.prototype.forEach.call(host.querySelectorAll(".item"), function(el){
+      el.addEventListener("click", function(){
+        toggleItem(el.getAttribute("data-type"), el.getAttribute("data-id"));
+      });
+    });
+  }
+
+  function render(){
+    renderSummary();
+    renderList();
+  }
+
+  function toggleItem(type, itemId){
+    var key = CURRENT_KEYS[type];
+    if (!records[type]) records[type] = {};
+    if (!records[type][key]) records[type][key] = {};
+    if (records[type][key][itemId]){
+      delete records[type][key][itemId];
+    } else {
+      records[type][key][itemId] = todayStr();
+    }
+    saveCache();
+    render();
+    scheduleSave();
+  }
+
+  // ---- 저장(디바운스 + 충돌 병합) ----
+  function scheduleSave(){
+    pendingSave = true;
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(function(){
+      saveTimer = null;
+      doSave();
+    }, 1500);
+  }
+
+  function mergeRecords(local, remote){
+    var merged = {};
+    var types = {};
+    Object.keys(local || {}).forEach(function(t){ types[t]=1; });
+    Object.keys(remote || {}).forEach(function(t){ types[t]=1; });
+    Object.keys(types).forEach(function(type){
+      merged[type] = {};
+      var lp = (local && local[type]) || {};
+      var rp = (remote && remote[type]) || {};
+      var keys = {};
+      Object.keys(lp).forEach(function(k){ keys[k]=1; });
+      Object.keys(rp).forEach(function(k){ keys[k]=1; });
+      Object.keys(keys).forEach(function(periodKey){
+        merged[type][periodKey] = {};
+        var lo = lp[periodKey] || {};
+        var ro = rp[periodKey] || {};
+        var ids = {};
+        Object.keys(lo).forEach(function(id){ ids[id]=1; });
+        Object.keys(ro).forEach(function(id){ ids[id]=1; });
+        Object.keys(ids).forEach(function(id){
+          var lv = lo[id];
+          var rv = ro[id];
+          if (lv && rv){
+            merged[type][periodKey][id] = (lv >= rv) ? lv : rv; // 최신값 우선
+          } else {
+            merged[type][periodKey][id] = lv || rv;
+          }
+        });
+      });
+    });
+    return merged;
+  }
+
+  function ghHeaders(){
+    return {
+      "Authorization": "token " + getToken(),
+      "Accept": "application/vnd.github+json"
+    };
+  }
+
+  function fetchRemote(){
+    return fetch(API_BASE, {headers: ghHeaders()});
+  }
+
+  function doLoad(){
+    var token = getToken();
+    if (!token){
+      showTokenScreen(false);
+      return;
+    }
+    fetchRemote().then(function(resp){
+      if (resp.status === 401){
+        clearToken();
+        showTokenScreen(true);
+        return;
+      }
+      if (!resp.ok){
+        throw new Error("HTTP " + resp.status);
+      }
+      return resp.json().then(function(json){
+        currentSha = json.sha;
+        var decoded = b64DecodeUnicode(json.content);
+        var parsed = JSON.parse(decoded);
+        records = parsed.records || {};
+        setOffline(false);
+        saveCache();
+        render();
+      });
+    }).catch(function(err){
+      // 네트워크 실패 -> 로컬 캐시로 표시
+      var cache = loadCache();
+      if (cache){
+        currentSha = cache.sha;
+        records = cache.records || {};
+        setOffline(true);
+        render();
+      } else {
+        document.getElementById("listHost").innerHTML =
+          '<div class="loading">오프라인 상태이며 저장된 기록이 없습니다.<br>네트워크 연결 후 새로고침 해주세요.</div>';
+        setOffline(true);
+      }
+    });
+  }
+
+  function doSave(){
+    var token = getToken();
+    if (!token) return;
+    var body = JSON.stringify({records: records});
+    var payload = {
+      message: "check: 업데이트",
+      content: b64EncodeUnicode(body),
+      branch: "main"
+    };
+    if (currentSha) payload.sha = currentSha;
+
+    fetch(API_BASE, {
+      method: "PUT",
+      headers: Object.assign({"Content-Type":"application/json"}, ghHeaders()),
+      body: JSON.stringify(payload)
+    }).then(function(resp){
+      if (resp.status === 401){
+        clearToken();
+        showTokenScreen(true);
+        return;
+      }
+      if (resp.status === 409 || resp.status === 422){
+        return resolveConflictAndRetry();
+      }
+      if (!resp.ok){
+        throw new Error("HTTP " + resp.status);
+      }
+      return resp.json().then(function(json){
+        currentSha = json.content && json.content.sha;
+        setOffline(false);
+        saveCache();
+        pendingSave = false;
+      });
+    }).catch(function(){
+      setOffline(true);
+      // 온라인 복귀 시 재시도 대기
+    });
+  }
+
+  function resolveConflictAndRetry(){
+    return fetchRemote().then(function(resp){
+      return resp.json();
+    }).then(function(json){
+      var remoteRecords = {};
+      try{
+        remoteRecords = JSON.parse(b64DecodeUnicode(json.content)).records || {};
+      }catch(e){}
+      records = mergeRecords(records, remoteRecords);
+      currentSha = json.sha;
+      saveCache();
+      render();
+      return doSave();
+    });
+  }
+
+  window.addEventListener("online", function(){
+    if (isOffline || pendingSave){
+      doLoad();
+    }
+  });
+
+  // ---- 토큰 / 설정 UI ----
+  function showTokenScreen(isError){
+    document.getElementById("tokenErr").classList.toggle("show", !!isError);
+    document.getElementById("tokenBackdrop").classList.add("show");
+  }
+  function hideTokenScreen(){
+    document.getElementById("tokenBackdrop").classList.remove("show");
+  }
+
+  document.getElementById("tokenSave").addEventListener("click", function(){
+    var val = document.getElementById("tokenInput").value.trim();
+    if (!val) return;
+    setToken(val);
+    document.getElementById("tokenInput").value = "";
+    hideTokenScreen();
+    doLoad();
+  });
+
+  document.getElementById("gearBtn").addEventListener("click", function(){
+    showTokenScreen(false);
+  });
+
+  // ---- 시작 ----
+  if ("serviceWorker" in navigator){
+    window.addEventListener("load", function(){
+      navigator.serviceWorker.register("./sw.js").catch(function(){});
+    });
+  }
+
+  doLoad();
+})();
+</script>
+</body>
+</html>
