@@ -13,5 +13,11 @@
 
 ## 모듈 현황
 - M0 주기 업무 체크(checklist.json): 운영 중, 함부로 손대지 않는다.
-- M1 업무 전달(tasks.json) → M2 차량 만기(vehicles.json) → M3 수금(receivables.json) → M4 인허가(licenses.json): JW-05-014의 3~4장 스키마·완료 기준을 따른다.
+- M1 업무 전달(tasks.json): **구현 완료(P1, 2026-07-07)**. 앱 상단 `지시` 탭. 등록(내용·담당·기한, 지시자=로그인 이름 자동)·완료(완료자 기록)·보류·삭제(soft del=1). 기한순 정렬, 경과 빨강, 완료 이력. 기존 checklist.json의 deadlines를 tasks.json으로 이관하고(유실 0, id 보존) checklist에서 deadlines 키 제거. 이관 스크립트: `~/jongwoon/migrate_deadlines_to_tasks.py`(dry-run 기본, `--apply`로 적용).
+- M2 차량 만기(vehicles.json) → M3 수금(receivables.json) → M4 인허가(licenses.json): JW-05-014의 3~4장 스키마·완료 기준을 따른다.
 - 단계 완료 시 이 파일과 가이드를 실태에 맞게 갱신한다.
+
+## 앱 구조 메모 (M1 반영)
+- 탭: `지시`(tasks.json) / `주기 체크`(checklist.json). 기본 탭은 `지시`.
+- 데이터 파일별로 독립 로드·저장·충돌병합(sha 기반 PUT, 409/422 시 재조회 후 id 병합). tasks 병합 키는 item.id, del=1 우선.
+- SW 셸 캐시는 cache-first이므로 index.html 변경 시 sw.js의 `SHELL_CACHE` 버전을 반드시 올린다(현재 jw-shell-v3).

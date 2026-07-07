@@ -53,6 +53,49 @@
     display:flex;align-items:center;justify-content:center;
     cursor:pointer;
   }
+  /* 탭 */
+  .tabbar{
+    display:flex;
+    gap:6px;
+    background:#E9EFEC;
+    border-radius:12px;
+    padding:4px;
+    margin-bottom:16px;
+  }
+  .tab-btn{
+    flex:1;
+    border:none;
+    background:transparent;
+    padding:9px 0;
+    border-radius:9px;
+    font-size:14px;
+    font-weight:700;
+    color:var(--sub);
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:6px;
+  }
+  .tab-btn.active{
+    background:#fff;
+    color:var(--brand-dark);
+    box-shadow:0 1px 3px rgba(15,81,50,0.12);
+  }
+  .tab-badge{
+    min-width:18px;height:18px;
+    padding:0 5px;
+    border-radius:999px;
+    background:#C9D6D0;
+    color:#fff;
+    font-size:11px;font-weight:800;
+    display:inline-flex;align-items:center;justify-content:center;
+  }
+  .tab-badge.red{background:#B0332A;}
+  .tab-badge.hide{display:none;}
+  .view{display:none;}
+  .view.active{display:block;}
+
   .summary-card{
     background:linear-gradient(135deg, var(--brand-dark), var(--brand));
     color:#fff;
@@ -291,6 +334,15 @@
     color:var(--brand-dark);
     font-weight:600;
   }
+  .from-chip{
+    display:inline-block;
+    font-size:11px;
+    padding:1px 8px;
+    border-radius:999px;
+    background:#F0EDE6;
+    color:#7A6A3A;
+    font-weight:600;
+  }
   .del-x{
     margin-left:auto;
     width:22px;height:22px;
@@ -314,11 +366,6 @@
   }
   .dday.amber{background:#FCEFDD;color:var(--amber);}
   .dday.red{background:#FBE7E3;color:#B0332A;}
-  .deadline-item.checked .item-title{
-    color:#6C7A75;
-    text-decoration:line-through;
-    text-decoration-color:#B9C4BF;
-  }
   .link-btn{
     display:block;
     width:100%;
@@ -329,6 +376,54 @@
     font-size:12.5px;
     padding:8px 0 4px;
     cursor:pointer;
+  }
+
+  /* 지시(업무 전달) 모듈 */
+  .task-item .item-title{font-size:14px;}
+  .task-detail{
+    font-size:12px;
+    color:var(--sub);
+    margin-top:2px;
+    line-height:1.4;
+    white-space:pre-wrap;
+  }
+  .task-item.checked .item-title{
+    color:#6C7A75;
+    text-decoration:line-through;
+    text-decoration-color:#B9C4BF;
+  }
+  .task-item.hold .item-title{color:#6C7A75;}
+  .hold-chip{
+    display:inline-block;
+    font-size:11px;
+    padding:1px 8px;
+    border-radius:999px;
+    background:#ECECEC;
+    color:#7A7A7A;
+    font-weight:700;
+  }
+  .done-by{
+    font-size:11.5px;
+    color:var(--brand-dark);
+    font-weight:600;
+  }
+  .task-ctrl{
+    display:flex;
+    flex-direction:column;
+    align-items:flex-end;
+    gap:6px;
+    flex-shrink:0;
+  }
+  .mini-btn{
+    border:1px solid var(--line);
+    background:#fff;
+    color:var(--sub);
+    border-radius:7px;
+    font-size:11px;
+    font-weight:700;
+    padding:3px 8px;
+    cursor:pointer;
+    white-space:nowrap;
   }
 </style>
 </head>
@@ -341,34 +436,45 @@
 
   <div class="offline-banner" id="offlineBanner">오프라인 — 연결되면 자동 저장</div>
 
-  <div id="summaryHost"></div>
+  <nav class="tabbar">
+    <button class="tab-btn active" data-tab="tasks" id="tabTasksBtn">지시 <span class="tab-badge hide" id="taskTabBadge">0</span></button>
+    <button class="tab-btn" data-tab="check" id="tabCheckBtn">주기 체크</button>
+  </nav>
 
-  <section class="group" id="deadlineSection">
-    <h2>기한 업무</h2>
+  <!-- 지시(업무 전달) -->
+  <section class="view active" id="view-tasks">
     <div class="card">
       <div class="add-row">
-        <input type="text" id="deadlineText" placeholder="업무 내용">
-        <input type="date" id="deadlineDue">
-        <button id="deadlineAddBtn">추가</button>
+        <input type="text" id="taskTitle" placeholder="지시 내용">
+        <input type="date" id="taskDue">
+      </div>
+      <div class="add-row" style="padding-top:0;">
+        <input type="text" id="taskWho" placeholder="담당 (예: 김정아)">
+        <button id="taskAddBtn">지시 등록</button>
       </div>
     </div>
-    <div class="card" id="deadlineList" style="margin-top:10px;"></div>
-    <button class="link-btn" id="doneToggleBtn"></button>
-    <div class="card" id="deadlineDoneList" style="display:none;margin-top:6px;"></div>
-  </section>
-
-  <div id="listHost">
-    <div class="loading">불러오는 중…</div>
-  </div>
-
-  <section class="group">
-    <h2>수시</h2>
-    <div class="info-card">
-      <div class="item"><div class="item-body"><div class="item-title">사고 발생 → 수시 위험성평가 + 사고 보고 (JW-05-006)</div></div></div>
-      <div class="item"><div class="item-body"><div class="item-title">신규 입사 → JW-06-011로 일괄 처리</div></div></div>
-      <div class="item"><div class="item-body"><div class="item-title">밀폐공간 · 석면 투입 전 → JW-06-012 · 특별교육</div></div></div>
+    <div class="card" id="taskList" style="margin-top:10px;">
+      <div class="loading">불러오는 중…</div>
     </div>
+    <button class="link-btn" id="taskDoneToggle"></button>
+    <div class="card" id="taskDoneList" style="display:none;margin-top:6px;"></div>
   </section>
+
+  <!-- 주기 체크 -->
+  <div class="view" id="view-check">
+    <div id="summaryHost"></div>
+    <div id="listHost">
+      <div class="loading">불러오는 중…</div>
+    </div>
+    <section class="group">
+      <h2>수시</h2>
+      <div class="info-card">
+        <div class="item"><div class="item-body"><div class="item-title">사고 발생 → 수시 위험성평가 + 사고 보고 (JW-05-006)</div></div></div>
+        <div class="item"><div class="item-body"><div class="item-title">신규 입사 → JW-06-011로 일괄 처리</div></div></div>
+        <div class="item"><div class="item-body"><div class="item-title">밀폐공간 · 석면 투입 전 → JW-06-012 · 특별교육</div></div></div>
+      </div>
+    </section>
+  </div>
 </div>
 
 <div class="modal-backdrop" id="tokenBackdrop">
@@ -388,12 +494,16 @@
 
   var DATA_OWNER = "ngi6442-afk";
   var DATA_REPO = "jongwoon-appdata";
-  var DATA_PATH = "data/checklist.json";
-  var API_BASE = "https://api.github.com/repos/" + DATA_OWNER + "/" + DATA_REPO + "/contents/" + DATA_PATH;
+  var API_ROOT = "https://api.github.com/repos/" + DATA_OWNER + "/" + DATA_REPO + "/contents/";
+  var CHECK_PATH = "data/checklist.json";
+  var TASKS_PATH = "data/tasks.json";
+  var CHECK_API = API_ROOT + CHECK_PATH;
+  var TASKS_API = API_ROOT + TASKS_PATH;
 
   var TOKEN_KEY = "jw_app_token";
   var USER_KEY = "jw_app_user";
   var CACHE_KEY = "jw_app_data_cache";
+  var TASKS_CACHE_KEY = "jw_app_tasks_cache";
 
   // ---- 체크리스트 정의 (JW-05-011) ----
   var GROUPS = [
@@ -451,12 +561,17 @@
   // ---- 상태 ----
   var records = {};      // {type: {periodKey: {itemId: "YYYY-MM-DD"}}}
   var customItems = {};  // {type: {itemId: {t,who,del,created,updated}}}
-  var deadlines = {};    // {itemId: {t,due,who,done,del,created,updated}}
   var currentSha = null;
   var saveTimer = null;
   var isOffline = false;
   var pendingSave = false;
-  var showDone = false;
+
+  var tasks = [];        // [{id,title,detail,who,from,due,status,done_at,done_by,created,updated,del}]
+  var tasksSha = null;
+  var tasksSaveTimer = null;
+  var tasksPending = false;
+  var showTaskDone = false;
+  var currentTab = "tasks";
 
   // ---- 유틸 ----
   function pad(n){ return n < 10 ? "0" + n : "" + n; }
@@ -511,6 +626,12 @@
     return prefix + Date.now().toString(36) + Math.random().toString(36).slice(2,7);
   }
 
+  function esc(s){
+    return String(s == null ? "" : s)
+      .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+      .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+  }
+
   function ddayInfo(due){
     var todayD = new Date(todayStr() + "T00:00:00");
     var dueD = new Date(due + "T00:00:00");
@@ -522,13 +643,27 @@
 
   function saveCache(){
     try{
-      localStorage.setItem(CACHE_KEY, JSON.stringify({sha: currentSha, records: records, custom: customItems, deadlines: deadlines}));
+      localStorage.setItem(CACHE_KEY, JSON.stringify({sha: currentSha, records: records, custom: customItems}));
     }catch(e){}
   }
 
   function loadCache(){
     try{
       var raw = localStorage.getItem(CACHE_KEY);
+      if (!raw) return null;
+      return JSON.parse(raw);
+    }catch(e){ return null; }
+  }
+
+  function saveTasksCache(){
+    try{
+      localStorage.setItem(TASKS_CACHE_KEY, JSON.stringify({sha: tasksSha, items: tasks}));
+    }catch(e){}
+  }
+
+  function loadTasksCache(){
+    try{
+      var raw = localStorage.getItem(TASKS_CACHE_KEY);
       if (!raw) return null;
       return JSON.parse(raw);
     }catch(e){ return null; }
@@ -551,15 +686,27 @@
     return parseInt(parts[1],10) + "/" + parseInt(parts[2],10);
   }
 
-  // ---- 렌더 ----
+  // ---- 렌더: 공통 ----
   function setOffline(state){
     isOffline = state;
     var b = document.getElementById("offlineBanner");
     if (state) b.classList.add("show"); else b.classList.remove("show");
   }
 
+  function render(){
+    renderSummary();
+    renderList();
+    renderTasks();
+  }
+
+  // ---- 지시(업무 전달) ----
+  function liveTasks(){
+    return tasks.filter(function(t){ return t && t.del !== 1; });
+  }
+
   function renderSummary(){
     var host = document.getElementById("summaryHost");
+    if (!host) return;
     var dateStr = todayStr();
     var cells = GROUPS.map(function(g){
       var key = CURRENT_KEYS[g.type];
@@ -574,22 +721,214 @@
     }).join("");
 
     var todayD = todayStr();
-    var deadlineUndone = 0, hasOverdue = false;
-    Object.keys(deadlines).forEach(function(id){
-      var d = deadlines[id];
-      if (!d || d.del === 1 || d.done) return;
-      deadlineUndone++;
-      if (d.due < todayD) hasOverdue = true;
+    var taskUndone = 0, hasOverdue = false;
+    liveTasks().forEach(function(t){
+      if (t.status === "done") return;
+      taskUndone++;
+      if (t.status === "open" && t.due && t.due < todayD) hasOverdue = true;
     });
-    var deadlineCell = '<div class="summary-item"><div class="num"' + (hasOverdue ? ' style="color:#FFD3CC;"' : '') + '>' + deadlineUndone + '</div><div class="lbl">기한 남음</div></div>';
+    var taskCell = '<div class="summary-item"><div class="num"' + (hasOverdue ? ' style="color:#FFD3CC;"' : '') + '>' + taskUndone + '</div><div class="lbl">지시 남음</div></div>';
 
     host.innerHTML =
       '<div class="summary-card">' +
         '<div class="summary-date">' + dateStr + '</div>' +
-        '<div class="summary-grid">' + deadlineCell + cells + '</div>' +
+        '<div class="summary-grid">' + taskCell + cells + '</div>' +
       '</div>';
   }
 
+  function updateTaskBadge(){
+    var badge = document.getElementById("taskTabBadge");
+    if (!badge) return;
+    var todayD = todayStr();
+    var open = 0, overdue = false;
+    liveTasks().forEach(function(t){
+      if (t.status === "open"){
+        open++;
+        if (t.due && t.due < todayD) overdue = true;
+      }
+    });
+    badge.textContent = open;
+    badge.classList.toggle("hide", open === 0);
+    badge.classList.toggle("red", overdue);
+  }
+
+  function taskRowHtml(t, isDone){
+    var metaBits = [];
+    metaBits.push('<span class="author-chip">담당 ' + esc(t.who || "미지정") + '</span>');
+    if (t.from) metaBits.push('<span class="from-chip">지시 ' + esc(t.from) + '</span>');
+    if (t.due) metaBits.push('<span>' + esc(t.due) + '</span>');
+    if (t.status === "hold") metaBits.push('<span class="hold-chip">보류</span>');
+    if (isDone){
+      var byTxt = t.done_by ? (" · " + esc(t.done_by)) : "";
+      metaBits.push('<span class="done-by">✓ ' + esc(t.done_at || "") + byTxt + '</span>');
+    }
+
+    var detailHtml = t.detail ? '<div class="task-detail">' + esc(t.detail) + '</div>' : '';
+
+    var ctrl = "";
+    if (isDone){
+      ctrl = '<div class="task-ctrl">' +
+        '<button class="mini-btn" data-task-reopen="' + t.id + '">되돌리기</button>' +
+      '</div>';
+    } else {
+      var ddayBadge = "";
+      if (t.status === "open"){
+        var dd = ddayInfo(t.due);
+        if (t.due) ddayBadge = '<span class="dday' + (dd.cls ? ' ' + dd.cls : '') + '">' + dd.text + '</span>';
+      }
+      var holdBtn = (t.status === "hold")
+        ? '<button class="mini-btn" data-task-resume="' + t.id + '">재개</button>'
+        : '<button class="mini-btn" data-task-hold="' + t.id + '">보류</button>';
+      ctrl = '<div class="task-ctrl">' + ddayBadge + holdBtn + '</div>';
+    }
+
+    var cls = "item task-item" + (isDone ? " checked" : "") + (t.status === "hold" ? " hold" : "");
+    return '<div class="' + cls + '" data-task-toggle="' + t.id + '">' +
+        '<div class="check-box">' + (isDone ? '✓' : '') + '</div>' +
+        '<div class="item-body">' +
+          '<div class="item-title">' + esc(t.title) + '</div>' +
+          detailHtml +
+          '<div class="item-meta">' + metaBits.join('') + '</div>' +
+        '</div>' +
+        ctrl +
+        '<button class="del-x" data-task-del="' + t.id + '">×</button>' +
+      '</div>';
+  }
+
+  function renderTasks(){
+    var listHost = document.getElementById("taskList");
+    var doneHost = document.getElementById("taskDoneList");
+    var toggleBtn = document.getElementById("taskDoneToggle");
+    if (!listHost) return;
+
+    var active = [];
+    var done = [];
+    liveTasks().forEach(function(t){
+      if (t.status === "done") done.push(t); else active.push(t);
+    });
+
+    active.sort(function(a, b){
+      var ah = a.status === "hold" ? 1 : 0, bh = b.status === "hold" ? 1 : 0;
+      if (ah !== bh) return ah - bh;
+      var ad = a.due || "9999-99-99", bd = b.due || "9999-99-99";
+      return ad < bd ? -1 : (ad > bd ? 1 : 0);
+    });
+    done.sort(function(a, b){ return (b.done_at || "").localeCompare(a.done_at || ""); });
+    done = done.slice(0, 20);
+
+    listHost.innerHTML = active.length
+      ? active.map(function(t){ return taskRowHtml(t, false); }).join("")
+      : '<div class="loading" style="padding:18px 0;">등록된 지시가 없습니다.</div>';
+
+    toggleBtn.textContent = showTaskDone ? "완료 숨기기" : ("완료 보기 (" + done.length + ")");
+    doneHost.style.display = showTaskDone ? "block" : "none";
+    doneHost.innerHTML = done.map(function(t){ return taskRowHtml(t, true); }).join("");
+
+    bindTaskHandlers(listHost);
+    bindTaskHandlers(doneHost);
+    updateTaskBadge();
+  }
+
+  function bindTaskHandlers(host){
+    Array.prototype.forEach.call(host.querySelectorAll("[data-task-toggle]"), function(el){
+      el.addEventListener("click", function(e){
+        if (e.target.getAttribute("data-task-del") !== null && e.target.classList.contains("del-x")) return;
+        if (e.target.classList.contains("mini-btn")) return;
+        if (e.target.classList.contains("del-x")) return;
+        toggleTaskDone(el.getAttribute("data-task-toggle"));
+      });
+    });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-task-del]"), function(el){
+      el.addEventListener("click", function(e){ e.stopPropagation(); deleteTask(el.getAttribute("data-task-del")); });
+    });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-task-hold]"), function(el){
+      el.addEventListener("click", function(e){ e.stopPropagation(); setTaskStatus(el.getAttribute("data-task-hold"), "hold"); });
+    });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-task-resume]"), function(el){
+      el.addEventListener("click", function(e){ e.stopPropagation(); setTaskStatus(el.getAttribute("data-task-resume"), "open"); });
+    });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-task-reopen]"), function(el){
+      el.addEventListener("click", function(e){ e.stopPropagation(); toggleTaskDone(el.getAttribute("data-task-reopen")); });
+    });
+  }
+
+  function findTask(id){
+    for (var i=0;i<tasks.length;i++){ if (tasks[i].id === id) return tasks[i]; }
+    return null;
+  }
+
+  function addTask(){
+    var titleEl = document.getElementById("taskTitle");
+    var whoEl = document.getElementById("taskWho");
+    var dueEl = document.getElementById("taskDue");
+    var title = titleEl.value.trim();
+    if (!title) return;
+    var today = todayStr();
+    tasks.push({
+      id: genId("t"),
+      title: title,
+      detail: "",
+      who: whoEl.value.trim(),
+      from: getUser(),
+      due: dueEl.value || "",
+      status: "open",
+      done_at: null,
+      done_by: null,
+      created: today,
+      updated: today
+    });
+    titleEl.value = "";
+    whoEl.value = "";
+    dueEl.value = "";
+    saveTasksCache();
+    renderTasks();
+    renderSummary();
+    scheduleTasksSave();
+  }
+
+  function toggleTaskDone(id){
+    var t = findTask(id);
+    if (!t) return;
+    if (t.status === "done"){
+      t.status = "open";
+      t.done_at = null;
+      t.done_by = null;
+    } else {
+      t.status = "done";
+      t.done_at = todayStr();
+      t.done_by = getUser() || "익명";
+    }
+    t.updated = todayStr();
+    saveTasksCache();
+    renderTasks();
+    renderSummary();
+    scheduleTasksSave();
+  }
+
+  function setTaskStatus(id, status){
+    var t = findTask(id);
+    if (!t) return;
+    t.status = status;
+    if (status !== "done"){ t.done_at = null; t.done_by = null; }
+    t.updated = todayStr();
+    saveTasksCache();
+    renderTasks();
+    renderSummary();
+    scheduleTasksSave();
+  }
+
+  function deleteTask(id){
+    var t = findTask(id);
+    if (!t) return;
+    t.del = 1;
+    t.updated = todayStr();
+    saveTasksCache();
+    renderTasks();
+    renderSummary();
+    scheduleTasksSave();
+  }
+
+  // ---- 렌더: 주기 체크 ----
   function liveCustom(type){
     var map = customItems[type] || {};
     var out = [];
@@ -603,6 +942,7 @@
 
   function renderList(){
     var host = document.getElementById("listHost");
+    if (!host) return;
     var html = "";
     GROUPS.forEach(function(g){
       var key = CURRENT_KEYS[g.type];
@@ -635,7 +975,7 @@
         var checkedDate = checkedObj[it.id];
         var isChecked = !!checkedDate;
         var metaBits = [];
-        metaBits.push('<span class="author-chip">' + it.who + '</span>');
+        metaBits.push('<span class="author-chip">' + esc(it.who) + '</span>');
         if (isChecked){
           metaBits.push('<span class="checked-date">✓ ' + checkedDate + '</span>');
         } else {
@@ -646,7 +986,7 @@
           '<div class="item custom-item' + (isChecked ? ' checked' : '') + '" data-type="' + g.type + '" data-id="' + it.id + '">' +
             '<div class="check-box">' + (isChecked ? '✓' : '') + '</div>' +
             '<div class="item-body">' +
-              '<div class="item-title">' + it.title + '</div>' +
+              '<div class="item-title">' + esc(it.title) + '</div>' +
               '<div class="item-meta">' + metaBits.join('') + '</div>' +
             '</div>' +
             '<button class="del-x" data-del-type="' + g.type + '" data-del-id="' + it.id + '">×</button>' +
@@ -697,7 +1037,8 @@
     customItems[type][id] = {t:text, who:(getUser() || "익명"), created:Date.now(), updated:Date.now()};
     input.value = "";
     saveCache();
-    render();
+    renderList();
+    renderSummary();
     scheduleSave();
   }
 
@@ -706,107 +1047,9 @@
     customItems[type][id].del = 1;
     customItems[type][id].updated = Date.now();
     saveCache();
-    render();
-    scheduleSave();
-  }
-
-  function renderDeadlines(){
-    var listHost = document.getElementById("deadlineList");
-    var doneHost = document.getElementById("deadlineDoneList");
-    var toggleBtn = document.getElementById("doneToggleBtn");
-    if (!listHost) return;
-
-    var todayD = todayStr();
-    var undone = [];
-    var done = [];
-    Object.keys(deadlines).forEach(function(id){
-      var d = deadlines[id];
-      if (!d || d.del === 1) return;
-      var entry = Object.assign({id:id}, d);
-      if (d.done) done.push(entry); else undone.push(entry);
-    });
-    undone.sort(function(a,b){ return a.due < b.due ? -1 : (a.due > b.due ? 1 : 0); });
-    done.sort(function(a,b){ return (b.done||"").localeCompare(a.done||""); });
-    done = done.slice(0,20);
-
-    function rowHtml(d, isDone){
-      var dd = ddayInfo(d.due);
-      var metaBits = [];
-      metaBits.push('<span class="author-chip">' + d.who + '</span>');
-      metaBits.push('<span>' + d.due + '</span>');
-      var ddayBadge = isDone ? '' : ('<span class="dday' + (dd.cls ? ' ' + dd.cls : '') + '">' + dd.text + '</span>');
-      return '<div class="item deadline-item' + (isDone ? ' checked' : '') + '" data-deadline-id="' + d.id + '">' +
-        '<div class="check-box">' + (isDone ? '✓' : '') + '</div>' +
-        '<div class="item-body">' +
-          '<div class="item-title">' + d.t + '</div>' +
-          '<div class="item-meta">' + metaBits.join('') + '</div>' +
-        '</div>' +
-        ddayBadge +
-        '<button class="del-x" data-del-deadline="' + d.id + '">×</button>' +
-      '</div>';
-    }
-
-    listHost.innerHTML = undone.length
-      ? undone.map(function(d){ return rowHtml(d, false); }).join("")
-      : '<div class="loading" style="padding:18px 0;">등록된 기한 업무가 없습니다.</div>';
-
-    toggleBtn.textContent = showDone ? "완료 숨기기" : ("완료 보기 (" + done.length + ")");
-    doneHost.style.display = showDone ? "block" : "none";
-    doneHost.innerHTML = done.map(function(d){ return rowHtml(d, true); }).join("");
-
-    Array.prototype.forEach.call(document.querySelectorAll("[data-deadline-id]"), function(el){
-      el.addEventListener("click", function(e){
-        if (e.target.classList.contains("del-x")) return;
-        toggleDeadlineDone(el.getAttribute("data-deadline-id"));
-      });
-    });
-    Array.prototype.forEach.call(document.querySelectorAll("[data-del-deadline]"), function(el){
-      el.addEventListener("click", function(e){
-        e.stopPropagation();
-        deleteDeadline(el.getAttribute("data-del-deadline"));
-      });
-    });
-  }
-
-  function toggleDeadlineDone(id){
-    var d = deadlines[id];
-    if (!d) return;
-    d.done = d.done ? null : todayStr();
-    d.updated = Date.now();
-    saveCache();
-    render();
-    scheduleSave();
-  }
-
-  function deleteDeadline(id){
-    var d = deadlines[id];
-    if (!d) return;
-    d.del = 1;
-    d.updated = Date.now();
-    saveCache();
-    render();
-    scheduleSave();
-  }
-
-  function addDeadline(){
-    var textEl = document.getElementById("deadlineText");
-    var dueEl = document.getElementById("deadlineDue");
-    var text = textEl.value.trim();
-    var due = dueEl.value;
-    if (!text || !due) return;
-    var id = genId("d");
-    deadlines[id] = {t:text, due:due, who:(getUser() || "익명"), done:null, created:Date.now(), updated:Date.now()};
-    textEl.value = "";
-    dueEl.value = "";
-    saveCache();
-    render();
-    scheduleSave();
-  }
-
-  function render(){
-    renderSummary();
-    renderDeadlines();
     renderList();
+    renderSummary();
+    scheduleSave();
   }
 
   function toggleItem(type, itemId){
@@ -819,11 +1062,20 @@
       records[type][key][itemId] = todayStr();
     }
     saveCache();
-    render();
+    renderList();
+    renderSummary();
     scheduleSave();
   }
 
-  // ---- 저장(디바운스 + 충돌 병합) ----
+  // ---- GitHub 공통 ----
+  function ghHeaders(){
+    return {
+      "Authorization": "token " + getToken(),
+      "Accept": "application/vnd.github+json"
+    };
+  }
+
+  // ---- 저장: 체크리스트 (디바운스 + 충돌 병합) ----
   function scheduleSave(){
     pendingSave = true;
     if (saveTimer) clearTimeout(saveTimer);
@@ -904,15 +1156,8 @@
     return merged;
   }
 
-  function ghHeaders(){
-    return {
-      "Authorization": "token " + getToken(),
-      "Accept": "application/vnd.github+json"
-    };
-  }
-
   function fetchRemote(){
-    return fetch(API_BASE, {headers: ghHeaders()});
+    return fetch(CHECK_API, {headers: ghHeaders()});
   }
 
   function doLoad(){
@@ -936,21 +1181,20 @@
         var parsed = JSON.parse(decoded);
         records = parsed.records || {};
         customItems = parsed.custom || {};
-        deadlines = parsed.deadlines || {};
         setOffline(false);
         saveCache();
-        render();
+        renderList();
+        renderSummary();
       });
     }).catch(function(err){
-      // 네트워크 실패 -> 로컬 캐시로 표시
       var cache = loadCache();
       if (cache){
         currentSha = cache.sha;
         records = cache.records || {};
         customItems = cache.custom || {};
-        deadlines = cache.deadlines || {};
         setOffline(true);
-        render();
+        renderList();
+        renderSummary();
       } else {
         document.getElementById("listHost").innerHTML =
           '<div class="loading">오프라인 상태이며 저장된 기록이 없습니다.<br>네트워크 연결 후 새로고침 해주세요.</div>';
@@ -962,7 +1206,7 @@
   function doSave(){
     var token = getToken();
     if (!token) return;
-    var body = JSON.stringify({records: records, custom: customItems, deadlines: deadlines});
+    var body = JSON.stringify({records: records, custom: customItems});
     var payload = {
       message: "check: 업데이트",
       content: b64EncodeUnicode(body),
@@ -970,7 +1214,7 @@
     };
     if (currentSha) payload.sha = currentSha;
 
-    fetch(API_BASE, {
+    fetch(CHECK_API, {
       method: "PUT",
       headers: Object.assign({"Content-Type":"application/json"}, ghHeaders()),
       body: JSON.stringify(payload)
@@ -994,7 +1238,6 @@
       });
     }).catch(function(){
       setOffline(true);
-      // 온라인 복귀 시 재시도 대기
     });
   }
 
@@ -1008,19 +1251,168 @@
       }catch(e){}
       records = mergeRecords(records, remoteParsed.records || {});
       customItems = mergeCustom(customItems, remoteParsed.custom || {});
-      deadlines = mergeKV(deadlines, remoteParsed.deadlines || {});
       currentSha = json.sha;
       saveCache();
-      render();
+      renderList();
+      renderSummary();
       return doSave();
     });
   }
 
+  // ---- 저장: 지시(tasks.json) ----
+  function scheduleTasksSave(){
+    tasksPending = true;
+    if (tasksSaveTimer) clearTimeout(tasksSaveTimer);
+    tasksSaveTimer = setTimeout(function(){
+      tasksSaveTimer = null;
+      doSaveTasks();
+    }, 1500);
+  }
+
+  function mergeTasks(local, remote){
+    var byId = {};
+    (local || []).forEach(function(t){ if (t && t.id) byId[t.id] = t; });
+    (remote || []).forEach(function(r){
+      if (!r || !r.id) return;
+      var cur = byId[r.id];
+      if (!cur){
+        byId[r.id] = r;
+      } else {
+        var winner = (r.updated || "") >= (cur.updated || "") ? r : cur;
+        var merged = {};
+        Object.keys(winner).forEach(function(f){ merged[f] = winner[f]; });
+        if (cur.del === 1 || r.del === 1) merged.del = 1; // del=1 항상 우선
+        byId[r.id] = merged;
+      }
+    });
+    var out = [];
+    Object.keys(byId).forEach(function(id){ out.push(byId[id]); });
+    out.sort(function(a, b){
+      var ac = a.created || "", bc = b.created || "";
+      if (ac !== bc) return ac < bc ? -1 : 1;
+      return a.id < b.id ? -1 : (a.id > b.id ? 1 : 0);
+    });
+    return out;
+  }
+
+  function loadTasks(){
+    var token = getToken();
+    if (!token) return;
+    fetch(TASKS_API, {headers: ghHeaders()}).then(function(resp){
+      if (resp.status === 401){
+        clearToken();
+        showTokenScreen(true);
+        return;
+      }
+      if (resp.status === 404){
+        // 아직 파일이 없으면 빈 목록으로 시작(첫 저장 때 생성)
+        tasksSha = null;
+        tasks = [];
+        saveTasksCache();
+        renderTasks();
+        renderSummary();
+        return;
+      }
+      if (!resp.ok){
+        throw new Error("HTTP " + resp.status);
+      }
+      return resp.json().then(function(json){
+        tasksSha = json.sha;
+        var parsed = JSON.parse(b64DecodeUnicode(json.content));
+        tasks = (parsed && parsed.items) || [];
+        setOffline(false);
+        saveTasksCache();
+        renderTasks();
+        renderSummary();
+      });
+    }).catch(function(){
+      var cache = loadTasksCache();
+      if (cache){
+        tasksSha = cache.sha;
+        tasks = cache.items || [];
+        setOffline(true);
+        renderTasks();
+        renderSummary();
+      } else {
+        var lh = document.getElementById("taskList");
+        if (lh) lh.innerHTML = '<div class="loading" style="padding:18px 0;">오프라인 상태이며 저장된 지시가 없습니다.</div>';
+        setOffline(true);
+      }
+    });
+  }
+
+  function doSaveTasks(){
+    var token = getToken();
+    if (!token) return;
+    var body = JSON.stringify({schema: 1, items: tasks});
+    var payload = {
+      message: "tasks: 업데이트",
+      content: b64EncodeUnicode(body),
+      branch: "main"
+    };
+    if (tasksSha) payload.sha = tasksSha;
+
+    fetch(TASKS_API, {
+      method: "PUT",
+      headers: Object.assign({"Content-Type":"application/json"}, ghHeaders()),
+      body: JSON.stringify(payload)
+    }).then(function(resp){
+      if (resp.status === 401){
+        clearToken();
+        showTokenScreen(true);
+        return;
+      }
+      if (resp.status === 409 || resp.status === 422){
+        return resolveTasksConflictAndRetry();
+      }
+      if (!resp.ok){
+        throw new Error("HTTP " + resp.status);
+      }
+      return resp.json().then(function(json){
+        tasksSha = json.content && json.content.sha;
+        setOffline(false);
+        saveTasksCache();
+        tasksPending = false;
+      });
+    }).catch(function(){
+      setOffline(true);
+    });
+  }
+
+  function resolveTasksConflictAndRetry(){
+    return fetch(TASKS_API, {headers: ghHeaders()}).then(function(resp){
+      if (resp.status === 404) return null;
+      return resp.json();
+    }).then(function(json){
+      if (json){
+        var remoteParsed = {};
+        try{ remoteParsed = JSON.parse(b64DecodeUnicode(json.content)) || {}; }catch(e){}
+        tasks = mergeTasks(tasks, remoteParsed.items || []);
+        tasksSha = json.sha;
+      }
+      saveTasksCache();
+      renderTasks();
+      renderSummary();
+      return doSaveTasks();
+    });
+  }
+
   window.addEventListener("online", function(){
-    if (isOffline || pendingSave){
+    if (isOffline || pendingSave || tasksPending){
       doLoad();
+      loadTasks();
     }
   });
+
+  // ---- 탭 ----
+  function switchTab(name){
+    currentTab = name;
+    Array.prototype.forEach.call(document.querySelectorAll(".tab-btn"), function(b){
+      b.classList.toggle("active", b.getAttribute("data-tab") === name);
+    });
+    document.getElementById("view-tasks").classList.toggle("active", name === "tasks");
+    document.getElementById("view-check").classList.toggle("active", name === "check");
+  }
 
   // ---- 토큰 / 설정 UI ----
   function showTokenScreen(isError){
@@ -1040,6 +1432,7 @@
     document.getElementById("tokenInput").value = "";
     hideTokenScreen();
     doLoad();
+    loadTasks();
   });
 
   document.getElementById("gearBtn").addEventListener("click", function(){
@@ -1048,12 +1441,17 @@
     showTokenScreen(false);
   });
 
-  document.getElementById("deadlineAddBtn").addEventListener("click", addDeadline);
-  document.getElementById("deadlineDue").addEventListener("keydown", function(e){ if (e.key === "Enter") addDeadline(); });
-  document.getElementById("deadlineText").addEventListener("keydown", function(e){ if (e.key === "Enter") addDeadline(); });
-  document.getElementById("doneToggleBtn").addEventListener("click", function(){
-    showDone = !showDone;
-    renderDeadlines();
+  document.getElementById("taskAddBtn").addEventListener("click", addTask);
+  document.getElementById("taskTitle").addEventListener("keydown", function(e){ if (e.key === "Enter") addTask(); });
+  document.getElementById("taskWho").addEventListener("keydown", function(e){ if (e.key === "Enter") addTask(); });
+  document.getElementById("taskDue").addEventListener("keydown", function(e){ if (e.key === "Enter") addTask(); });
+  document.getElementById("taskDoneToggle").addEventListener("click", function(){
+    showTaskDone = !showTaskDone;
+    renderTasks();
+  });
+
+  Array.prototype.forEach.call(document.querySelectorAll(".tab-btn"), function(b){
+    b.addEventListener("click", function(){ switchTab(b.getAttribute("data-tab")); });
   });
 
   // ---- 시작 ----
@@ -1064,6 +1462,7 @@
   }
 
   doLoad();
+  loadTasks();
 })();
 </script>
 </body>
