@@ -14,10 +14,16 @@
 ## 모듈 현황
 - M0 주기 업무 체크(checklist.json): 운영 중, 함부로 손대지 않는다.
 - M1 업무 전달(tasks.json): **구현 완료(P1, 2026-07-07)**. 앱 상단 `지시` 탭. 등록(내용·담당·기한, 지시자=로그인 이름 자동)·완료(완료자 기록)·보류·삭제(soft del=1). 기한순 정렬, 경과 빨강, 완료 이력. 기존 checklist.json의 deadlines를 tasks.json으로 이관하고(유실 0, id 보존) checklist에서 deadlines 키 제거. 이관 스크립트: `~/jongwoon/migrate_deadlines_to_tasks.py`(dry-run 기본, `--apply`로 적용).
-- M2 차량 만기(vehicles.json) → M3 수금(receivables.json) → M4 인허가(licenses.json): JW-05-017의 3~4장 스키마·완료 기준을 따른다.
+- M2 차량·자산 만기(vehicles.json): **구현 완료(P2, 2026-07-07)**. `차량` 탭 + 통합 `대시보드`(첫 화면). vehicles.json은 assets 현황표에서 파생(읽기 전용, 연락처 제외·차주명까지만). 검사/보험 D-day 색상(경과 빨강·30일 주황·90일 노랑·말소예정·매각 회색), 만기 임박순 정렬. 추출 스크립트: `~/jongwoon/extract_vehicles.py`(dry-run 기본). 갱신은 분기 1회 세션에서 현황표 대조.
+- M3 수금(receivables.json) → M4 인허가(licenses.json): JW-05-017의 3~4장 스키마·완료 기준을 따른다.
 - 단계 완료 시 이 파일과 가이드를 실태에 맞게 갱신한다.
 
-## 앱 구조 메모 (M1 반영)
-- 탭: `지시`(tasks.json) / `주기 체크`(checklist.json). 기본 탭은 `지시`.
-- 데이터 파일별로 독립 로드·저장·충돌병합(sha 기반 PUT, 409/422 시 재조회 후 id 병합). tasks 병합 키는 item.id, del=1 우선.
-- SW 셸 캐시는 cache-first이므로 index.html 변경 시 sw.js의 `SHELL_CACHE` 버전을 반드시 올린다(현재 jw-shell-v3).
+## 알람: 캘린더(.ics) 연동
+- 요구된 "iOS·안드로이드 자동 알람"은 **기기 기본 캘린더 연동**으로 구현(가이드 §5 "푸시 알림 인프라" 금지 준수, 서버 0).
+- 만기·지시 행의 `캘린더` 버튼 → `data:text/calendar` .ics 다운로드(VEVENT + VALARM -P7D·-P1D). 폰 기본 캘린더가 네이티브 알람을 울린다.
+- 앱 자체는 푸시/백그라운드 알림을 하지 않는다(정적 PWA 한계·가이드 준수). 자동 갱신 구독(webcal) 원하면 추후 GitHub Actions로 .ics 피드 생성.
+
+## 앱 구조 메모
+- 탭: `대시보드`(기본, 첫 화면) / `지시`(tasks.json) / `차량`(vehicles.json) / `체크`(checklist.json).
+- 데이터 파일별로 독립 로드·저장·충돌병합(sha 기반 PUT, 409/422 시 재조회 후 id 병합). tasks 병합 키는 item.id, del=1 우선. vehicles는 읽기 전용(저장 없음).
+- SW 셸 캐시는 cache-first이므로 index.html 변경 시 sw.js의 `SHELL_CACHE` 버전을 반드시 올린다(현재 jw-shell-v4).

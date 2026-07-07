@@ -425,6 +425,39 @@
     cursor:pointer;
     white-space:nowrap;
   }
+  .cal-btn{
+    border:1px solid #CFE0D8;
+    background:#F1F7F4;
+    color:var(--brand-dark);
+    border-radius:7px;
+    font-size:11px;
+    font-weight:700;
+    padding:3px 9px;
+    cursor:pointer;
+    white-space:nowrap;
+  }
+
+  /* 만기 D-day 색상 (차량) */
+  .dday.orange{background:#FCEBD8;color:#B5651D;}
+  .dday.yellow{background:#FBF4D6;color:#8A7A1E;}
+  .dday.grey{background:#EEF0EF;color:#9AA4A0;}
+
+  /* 대시보드 */
+  .dash-sec{margin-bottom:18px;}
+  .dash-sec h2{
+    font-size:14px;font-weight:700;color:var(--brand-dark);
+    margin:0 0 8px 4px;display:flex;justify-content:space-between;align-items:baseline;
+  }
+  .dash-sec h2 .cnt{font-size:12px;font-weight:700;color:var(--sub);}
+  .empty-line{color:var(--sub);font-size:13px;padding:16px;text-align:center;}
+
+  /* 차량 */
+  .own-badge{display:inline-block;font-size:11px;padding:1px 7px;border-radius:999px;font-weight:700;}
+  .own-badge.self{background:#E6F0EA;color:var(--brand-dark);}
+  .own-badge.lease{background:#EDE9F2;color:#5B4B85;}
+  .veh-item{align-items:flex-start;cursor:default;}
+  .veh-due{display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
+  .due-tag{font-size:12px;color:var(--sub);}
 </style>
 </head>
 <body>
@@ -437,12 +470,19 @@
   <div class="offline-banner" id="offlineBanner">오프라인 — 연결되면 자동 저장</div>
 
   <nav class="tabbar">
-    <button class="tab-btn active" data-tab="tasks" id="tabTasksBtn">지시 <span class="tab-badge hide" id="taskTabBadge">0</span></button>
-    <button class="tab-btn" data-tab="check" id="tabCheckBtn">주기 체크</button>
+    <button class="tab-btn active" data-tab="dash" id="tabDashBtn">대시보드</button>
+    <button class="tab-btn" data-tab="tasks" id="tabTasksBtn">지시 <span class="tab-badge hide" id="taskTabBadge">0</span></button>
+    <button class="tab-btn" data-tab="veh" id="tabVehBtn">차량</button>
+    <button class="tab-btn" data-tab="check" id="tabCheckBtn">체크</button>
   </nav>
 
+  <!-- 통합 대시보드 (첫 화면) -->
+  <div class="view active" id="view-dash">
+    <div id="dashHost"><div class="loading">불러오는 중…</div></div>
+  </div>
+
   <!-- 지시(업무 전달) -->
-  <section class="view active" id="view-tasks">
+  <section class="view" id="view-tasks">
     <div class="card">
       <div class="add-row">
         <input type="text" id="taskTitle" placeholder="지시 내용">
@@ -458,6 +498,16 @@
     </div>
     <button class="link-btn" id="taskDoneToggle"></button>
     <div class="card" id="taskDoneList" style="display:none;margin-top:6px;"></div>
+  </section>
+
+  <!-- 차량·자산 만기 -->
+  <section class="view" id="view-veh">
+    <div class="dash-sec" style="margin-bottom:8px;">
+      <h2>차량·자산 만기 <span class="cnt" id="vehHead"></span></h2>
+    </div>
+    <div class="card" id="vehList">
+      <div class="loading">불러오는 중…</div>
+    </div>
   </section>
 
   <!-- 주기 체크 -->
@@ -497,13 +547,16 @@
   var API_ROOT = "https://api.github.com/repos/" + DATA_OWNER + "/" + DATA_REPO + "/contents/";
   var CHECK_PATH = "data/checklist.json";
   var TASKS_PATH = "data/tasks.json";
+  var VEH_PATH = "data/vehicles.json";
   var CHECK_API = API_ROOT + CHECK_PATH;
   var TASKS_API = API_ROOT + TASKS_PATH;
+  var VEH_API = API_ROOT + VEH_PATH;
 
   var TOKEN_KEY = "jw_app_token";
   var USER_KEY = "jw_app_user";
   var CACHE_KEY = "jw_app_data_cache";
   var TASKS_CACHE_KEY = "jw_app_tasks_cache";
+  var VEH_CACHE_KEY = "jw_app_veh_cache";
 
   // ---- 체크리스트 정의 (JW-05-011) ----
   var GROUPS = [
@@ -571,7 +624,10 @@
   var tasksSaveTimer = null;
   var tasksPending = false;
   var showTaskDone = false;
-  var currentTab = "tasks";
+  var currentTab = "dash";
+
+  var vehicles = [];     // [{id,no,type,own,permit,driver,insp_due,ins_due,insurer,state,note}]
+  var vehSha = null;
 
   // ---- 유틸 ----
   function pad(n){ return n < 10 ? "0" + n : "" + n; }
@@ -697,6 +753,8 @@
     renderSummary();
     renderList();
     renderTasks();
+    renderDashboard();
+    renderVehicles();
   }
 
   // ---- 지시(업무 전달) ----
@@ -779,7 +837,8 @@
       var holdBtn = (t.status === "hold")
         ? '<button class="mini-btn" data-task-resume="' + t.id + '">재개</button>'
         : '<button class="mini-btn" data-task-hold="' + t.id + '">보류</button>';
-      ctrl = '<div class="task-ctrl">' + ddayBadge + holdBtn + '</div>';
+      var calBtn = t.due ? '<button class="cal-btn" data-cal-task="' + t.id + '">캘린더</button>' : '';
+      ctrl = '<div class="task-ctrl">' + ddayBadge + holdBtn + calBtn + '</div>';
     }
 
     var cls = "item task-item" + (isDone ? " checked" : "") + (t.status === "hold" ? " hold" : "");
@@ -826,15 +885,16 @@
 
     bindTaskHandlers(listHost);
     bindTaskHandlers(doneHost);
+    bindCalHandlers(listHost);
+    bindCalHandlers(doneHost);
     updateTaskBadge();
   }
 
   function bindTaskHandlers(host){
     Array.prototype.forEach.call(host.querySelectorAll("[data-task-toggle]"), function(el){
       el.addEventListener("click", function(e){
-        if (e.target.getAttribute("data-task-del") !== null && e.target.classList.contains("del-x")) return;
-        if (e.target.classList.contains("mini-btn")) return;
-        if (e.target.classList.contains("del-x")) return;
+        var cl = e.target.classList;
+        if (cl.contains("del-x") || cl.contains("mini-btn") || cl.contains("cal-btn")) return;
         toggleTaskDone(el.getAttribute("data-task-toggle"));
       });
     });
@@ -1401,6 +1461,7 @@
     if (isOffline || pendingSave || tasksPending){
       doLoad();
       loadTasks();
+      loadVehicles();
     }
   });
 
@@ -1410,7 +1471,9 @@
     Array.prototype.forEach.call(document.querySelectorAll(".tab-btn"), function(b){
       b.classList.toggle("active", b.getAttribute("data-tab") === name);
     });
+    document.getElementById("view-dash").classList.toggle("active", name === "dash");
     document.getElementById("view-tasks").classList.toggle("active", name === "tasks");
+    document.getElementById("view-veh").classList.toggle("active", name === "veh");
     document.getElementById("view-check").classList.toggle("active", name === "check");
   }
 
@@ -1433,6 +1496,7 @@
     hideTokenScreen();
     doLoad();
     loadTasks();
+    loadVehicles();
   });
 
   document.getElementById("gearBtn").addEventListener("click", function(){
@@ -1454,6 +1518,243 @@
     b.addEventListener("click", function(){ switchTab(b.getAttribute("data-tab")); });
   });
 
+  // ---- 차량(vehicles.json, 읽기 전용) ----
+  function liveVehicles(){ return vehicles.filter(function(v){ return v && v.del !== 1; }); }
+  function findVeh(id){ for (var i=0;i<vehicles.length;i++){ if (vehicles[i].id === id) return vehicles[i]; } return null; }
+  function isGreyState(v){ return v.state === "말소예정" || v.state === "매각"; }
+
+  function vehDday(dateStr){
+    var today = new Date(todayStr() + "T00:00:00");
+    var due = new Date(dateStr + "T00:00:00");
+    var diff = Math.round((due - today) / 86400000);
+    var cls = "";
+    if (diff < 0) cls = "red";
+    else if (diff <= 30) cls = "orange";
+    else if (diff <= 90) cls = "yellow";
+    return {diff: diff, cls: cls, text: diff < 0 ? "D+" + (-diff) : "D-" + diff};
+  }
+
+  function vehNearest(v){
+    var ds = [];
+    if (v.insp_due) ds.push(vehDday(v.insp_due).diff);
+    if (v.ins_due) ds.push(vehDday(v.ins_due).diff);
+    return ds.length ? Math.min.apply(null, ds) : 99999;
+  }
+
+  function saveVehiclesCache(){
+    try{ localStorage.setItem(VEH_CACHE_KEY, JSON.stringify({sha: vehSha, items: vehicles})); }catch(e){}
+  }
+  function loadVehiclesCache(){
+    try{ var r = localStorage.getItem(VEH_CACHE_KEY); return r ? JSON.parse(r) : null; }catch(e){ return null; }
+  }
+
+  function loadVehicles(){
+    var token = getToken();
+    if (!token) return;
+    fetch(VEH_API, {headers: ghHeaders()}).then(function(resp){
+      if (resp.status === 401){ clearToken(); showTokenScreen(true); return; }
+      if (resp.status === 404){
+        vehSha = null; vehicles = []; saveVehiclesCache(); renderVehicles(); renderDashboard(); return;
+      }
+      if (!resp.ok) throw new Error("HTTP " + resp.status);
+      return resp.json().then(function(json){
+        vehSha = json.sha;
+        var parsed = JSON.parse(b64DecodeUnicode(json.content));
+        vehicles = (parsed && parsed.items) || [];
+        setOffline(false); saveVehiclesCache(); renderVehicles(); renderDashboard();
+      });
+    }).catch(function(){
+      var c = loadVehiclesCache();
+      if (c){ vehSha = c.sha; vehicles = c.items || []; setOffline(true); renderVehicles(); renderDashboard(); }
+      else {
+        var lh = document.getElementById("vehList");
+        if (lh) lh.innerHTML = '<div class="empty-line">오프라인 상태이며 저장된 차량 데이터가 없습니다.</div>';
+      }
+    });
+  }
+
+  function dueChipHtml(label, dateStr, grey){
+    if (!dateStr) return '<span class="due-tag">' + label + ' -</span>';
+    var dd = vehDday(dateStr);
+    var cls = grey ? "grey" : (dd.cls || "");
+    return '<span class="due-tag">' + label + ' ' + dateStr + '</span>' +
+      '<span class="dday' + (cls ? ' ' + cls : '') + '">' + dd.text + '</span>';
+  }
+
+  function vehRowHtml(v){
+    var grey = isGreyState(v);
+    var ownCls = v.own === "지입" ? "lease" : "self";
+    var meta = [];
+    meta.push('<span class="own-badge ' + ownCls + '">' + esc(v.own) + '</span>');
+    if (v.permit) meta.push('<span>' + esc(v.permit) + '</span>');
+    if (v.driver) meta.push('<span class="author-chip">' + esc(v.driver) + '</span>');
+    if (v.insurer) meta.push('<span>' + esc(v.insurer) + '</span>');
+    if (v.state && v.state !== "운행") meta.push('<span class="hold-chip">' + esc(v.state) + '</span>');
+    var cal = "";
+    if (!grey){
+      if (v.insp_due) cal += '<button class="cal-btn" data-cal-veh-insp="' + v.id + '">검사 캘린더</button>';
+      if (v.ins_due) cal += '<button class="cal-btn" data-cal-veh-ins="' + v.id + '">보험 캘린더</button>';
+    }
+    return '<div class="item veh-item">' +
+        '<div class="item-body">' +
+          '<div class="item-title">' + esc(v.no) + ' · ' + esc(v.type) + '</div>' +
+          '<div class="item-meta">' + meta.join('') + '</div>' +
+          '<div class="veh-due" style="margin-top:5px;">' + dueChipHtml("검사", v.insp_due, grey) + '</div>' +
+          '<div class="veh-due" style="margin-top:3px;">' + dueChipHtml("보험", v.ins_due, grey) + '</div>' +
+          (v.note ? '<div class="task-detail">' + esc(v.note) + '</div>' : '') +
+          (cal ? '<div class="veh-due" style="margin-top:7px;gap:8px;">' + cal + '</div>' : '') +
+        '</div>' +
+      '</div>';
+  }
+
+  function renderVehicles(){
+    var host = document.getElementById("vehList");
+    if (!host) return;
+    var list = liveVehicles().slice();
+    list.sort(function(a, b){
+      var ag = isGreyState(a) ? 1 : 0, bg = isGreyState(b) ? 1 : 0;
+      if (ag !== bg) return ag - bg;
+      return vehNearest(a) - vehNearest(b);
+    });
+    var head = document.getElementById("vehHead");
+    if (head) head.textContent = list.length ? ("총 " + list.length + "대 · 만기 임박순") : "";
+    host.innerHTML = list.length ? list.map(vehRowHtml).join("") : '<div class="empty-line">차량 데이터가 없습니다.</div>';
+    bindCalHandlers(host);
+  }
+
+  // ---- 대시보드 (통합 첫 화면) ----
+  function renderDashboard(){
+    var host = document.getElementById("dashHost");
+    if (!host) return;
+    var today = todayStr();
+
+    var urgent = [];
+    liveVehicles().forEach(function(v){
+      if (isGreyState(v)) return;
+      [["검사", v.insp_due], ["보험", v.ins_due]].forEach(function(p){
+        if (!p[1]) return;
+        var dd = vehDday(p[1]);
+        if (dd.diff <= 30) urgent.push({v: v, kind: p[0], date: p[1], dd: dd});
+      });
+    });
+    urgent.sort(function(a, b){ return a.dd.diff - b.dd.diff; });
+
+    var openTasks = liveTasks().filter(function(t){ return t.status !== "done"; });
+    openTasks.sort(function(a, b){
+      var ad = a.due || "9999-99-99", bd = b.due || "9999-99-99";
+      return ad < bd ? -1 : (ad > bd ? 1 : 0);
+    });
+
+    var overdueVeh = urgent.filter(function(x){ return x.dd.diff < 0; }).length;
+
+    var html = '<div class="summary-card"><div class="summary-date">' + today + '</div>' +
+      '<div class="summary-grid" style="grid-template-columns:repeat(3,1fr);">' +
+        '<div class="summary-item"><div class="num"' + (overdueVeh ? ' style="color:#FFD3CC;"' : '') + '>' + overdueVeh + '</div><div class="lbl">만기 경과</div></div>' +
+        '<div class="summary-item"><div class="num">' + urgent.length + '</div><div class="lbl">만기 임박</div></div>' +
+        '<div class="summary-item"><div class="num">' + openTasks.length + '</div><div class="lbl">미완료 지시</div></div>' +
+      '</div></div>';
+
+    html += '<div class="dash-sec"><h2>만기 임박·경과 (차량) <span class="cnt">' + urgent.length + '</span></h2><div class="card">';
+    if (urgent.length){
+      html += urgent.map(function(x){
+        var v = x.v;
+        var kindAttr = x.kind === "검사" ? "insp" : "ins";
+        return '<div class="item veh-item">' +
+          '<div class="item-body">' +
+            '<div class="item-title">' + esc(v.no) + ' · ' + esc(v.type) + '</div>' +
+            '<div class="item-meta"><span>' + x.kind + ' 만기 ' + x.date + '</span>' +
+              (v.own === "지입" && v.driver ? '<span class="author-chip">' + esc(v.driver) + '</span>' : '') + '</div>' +
+          '</div>' +
+          '<div class="task-ctrl">' +
+            '<span class="dday' + (x.dd.cls ? ' ' + x.dd.cls : '') + '">' + x.dd.text + '</span>' +
+            '<button class="cal-btn" data-cal-veh-' + kindAttr + '="' + v.id + '">캘린더</button>' +
+          '</div>' +
+        '</div>';
+      }).join("");
+    } else {
+      html += '<div class="empty-line">30일 이내 만기 차량이 없습니다.</div>';
+    }
+    html += '</div></div>';
+
+    html += '<div class="dash-sec"><h2>미완료 지시 <span class="cnt">' + openTasks.length + '</span></h2><div class="card">';
+    html += openTasks.length
+      ? openTasks.map(function(t){ return taskRowHtml(t, false); }).join("")
+      : '<div class="empty-line">미완료 지시가 없습니다.</div>';
+    html += '</div></div>';
+
+    host.innerHTML = html;
+    bindTaskHandlers(host);
+    bindCalHandlers(host);
+  }
+
+  // ---- 캘린더 .ics (기기 기본 캘린더 알람 연동) ----
+  function icsEscape(s){
+    return String(s == null ? "" : s)
+      .replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\n/g, "\\n");
+  }
+  function icsAllDay(dateStr){ return dateStr.replace(/-/g, ""); }
+  function icsAllDayPlus1(dateStr){
+    var d = new Date(dateStr + "T00:00:00"); d.setDate(d.getDate() + 1);
+    return fmtDate(d).replace(/-/g, "");
+  }
+  function icsStamp(){
+    var d = new Date();
+    function p(n){ return n < 10 ? "0" + n : "" + n; }
+    return d.getUTCFullYear() + p(d.getUTCMonth() + 1) + p(d.getUTCDate()) + "T" +
+      p(d.getUTCHours()) + p(d.getUTCMinutes()) + p(d.getUTCSeconds()) + "Z";
+  }
+  function downloadICS(uid, title, dateStr, desc, filename){
+    if (!dateStr) return;
+    var ics = [
+      "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//jongwoon//app//KR", "CALSCALE:GREGORIAN", "METHOD:PUBLISH",
+      "BEGIN:VEVENT",
+      "UID:" + uid,
+      "DTSTAMP:" + icsStamp(),
+      "DTSTART;VALUE=DATE:" + icsAllDay(dateStr),
+      "DTEND;VALUE=DATE:" + icsAllDayPlus1(dateStr),
+      "SUMMARY:" + icsEscape(title),
+      "DESCRIPTION:" + icsEscape(desc || ""),
+      "BEGIN:VALARM", "TRIGGER:-P7D", "ACTION:DISPLAY", "DESCRIPTION:" + icsEscape(title), "END:VALARM",
+      "BEGIN:VALARM", "TRIGGER:-P1D", "ACTION:DISPLAY", "DESCRIPTION:" + icsEscape(title), "END:VALARM",
+      "END:VEVENT", "END:VCALENDAR"
+    ].join("\r\n");
+    var uri = "data:text/calendar;charset=utf-8," + encodeURIComponent(ics);
+    var a = document.createElement("a");
+    a.href = uri;
+    a.download = filename || "일정.ics";
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function(){ if (a.parentNode) a.parentNode.removeChild(a); }, 0);
+  }
+
+  function bindCalHandlers(host){
+    Array.prototype.forEach.call(host.querySelectorAll("[data-cal-veh-insp]"), function(el){
+      el.addEventListener("click", function(e){
+        e.stopPropagation();
+        var v = findVeh(el.getAttribute("data-cal-veh-insp"));
+        if (v) downloadICS(v.id + "-insp@jongwoon", v.no + " 정기검사 만기", v.insp_due,
+          v.type + " " + (v.driver || v.own) + " 검사 만기", v.no + "_검사만기.ics");
+      });
+    });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-cal-veh-ins]"), function(el){
+      el.addEventListener("click", function(e){
+        e.stopPropagation();
+        var v = findVeh(el.getAttribute("data-cal-veh-ins"));
+        if (v) downloadICS(v.id + "-ins@jongwoon", v.no + " 보험 만기", v.ins_due,
+          v.type + " " + (v.insurer || "") + " 보험 만기", v.no + "_보험만기.ics");
+      });
+    });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-cal-task]"), function(el){
+      el.addEventListener("click", function(e){
+        e.stopPropagation();
+        var t = findTask(el.getAttribute("data-cal-task"));
+        if (t && t.due) downloadICS(t.id + "-task@jongwoon", "[지시] " + t.title, t.due,
+          (t.who ? "담당 " + t.who : "") + (t.from ? " / 지시 " + t.from : ""),
+          "지시_" + String(t.title).slice(0, 10) + ".ics");
+      });
+    });
+  }
+
   // ---- 시작 ----
   if ("serviceWorker" in navigator){
     window.addEventListener("load", function(){
@@ -1463,6 +1764,7 @@
 
   doLoad();
   loadTasks();
+  loadVehicles();
 })();
 </script>
 </body>
