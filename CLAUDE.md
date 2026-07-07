@@ -1,6 +1,6 @@
 # CLAUDE.md — jongwoon-app 작업 규칙
 
-이 레포는 종운환경·종운건설의 업무 앱(설치형 PWA)이다. 상세 설계는 **jongwoon-docs/05_규정/JW-05-014_ERP설계구축가이드.md**를 먼저 정독할 것. 문서 체계 일반 규칙은 jongwoon-docs/05_규정/JW-05-013의 0장.
+이 레포는 종운환경·종운건설의 업무 앱(설치형 PWA)이다. 상세 설계는 **jongwoon-docs/05_규정/JW-05-017_ERP설계구축가이드.md**를 먼저 정독할 것(구 JW-05-014, 문서번호 충돌로 017 재배정). 문서 체계 일반 규칙은 jongwoon-docs/05_규정/JW-05-013의 0장.
 
 ## 불변 원칙
 - 단일 `index.html` PWA. 외부 CDN·프레임워크·빌드체인·node_modules 금지.
@@ -14,7 +14,7 @@
 ## 모듈 현황
 - M0 주기 업무 체크(checklist.json): 운영 중, 함부로 손대지 않는다.
 - M1 업무 전달(tasks.json): **구현 완료(P1, 2026-07-07)**. 앱 상단 `지시` 탭. 등록(내용·담당·기한, 지시자=로그인 이름 자동)·완료(완료자 기록)·보류·삭제(soft del=1). 기한순 정렬, 경과 빨강, 완료 이력. 기존 checklist.json의 deadlines를 tasks.json으로 이관하고(유실 0, id 보존) checklist에서 deadlines 키 제거. 이관 스크립트: `~/jongwoon/migrate_deadlines_to_tasks.py`(dry-run 기본, `--apply`로 적용).
-- M2 차량 만기(vehicles.json) → M3 수금(receivables.json) → M4 인허가(licenses.json): JW-05-014의 3~4장 스키마·완료 기준을 따른다.
+- M2 차량 만기(vehicles.json) → M3 수금(receivables.json) → M4 인허가(licenses.json): JW-05-017의 3~4장 스키마·완료 기준을 따른다.
 - 단계 완료 시 이 파일과 가이드를 실태에 맞게 갱신한다.
 
 ## 앱 구조 메모 (M1 반영)
