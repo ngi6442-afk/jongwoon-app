@@ -68,14 +68,14 @@
   }
   .summary-grid{
     display:grid;
-    grid-template-columns:repeat(5,1fr);
-    gap:8px;
+    grid-template-columns:repeat(6,1fr);
+    gap:6px;
   }
   .summary-item{
     text-align:center;
   }
   .summary-item .num{
-    font-size:22px;
+    font-size:18px;
     font-weight:800;
     line-height:1.1;
   }
@@ -249,6 +249,87 @@
     font-size:13px;
     padding:40px 0;
   }
+
+  .add-row{
+    display:flex;
+    gap:8px;
+    padding:10px 14px;
+    align-items:center;
+  }
+  .add-row input[type="text"]{
+    flex:1;
+    min-width:0;
+    padding:9px 10px;
+    border-radius:9px;
+    border:1px solid var(--line);
+    font-size:13px;
+  }
+  .add-row input[type="date"]{
+    padding:9px 8px;
+    border-radius:9px;
+    border:1px solid var(--line);
+    font-size:12.5px;
+    color:var(--text);
+  }
+  .add-row button{
+    padding:9px 14px;
+    border:none;
+    border-radius:9px;
+    background:var(--brand-dark);
+    color:#fff;
+    font-size:13px;
+    font-weight:700;
+    cursor:pointer;
+    white-space:nowrap;
+  }
+  .author-chip{
+    display:inline-block;
+    font-size:11px;
+    padding:1px 8px;
+    border-radius:999px;
+    background:#EAF3EF;
+    color:var(--brand-dark);
+    font-weight:600;
+  }
+  .del-x{
+    margin-left:auto;
+    width:22px;height:22px;
+    border-radius:7px;
+    border:none;
+    background:transparent;
+    color:#B0483A;
+    font-size:15px;
+    cursor:pointer;
+    flex-shrink:0;
+  }
+  .item.custom-item{align-items:center;}
+  .dday{
+    font-size:11.5px;
+    font-weight:800;
+    padding:1px 8px;
+    border-radius:999px;
+    background:#EEF2F0;
+    color:var(--sub);
+    white-space:nowrap;
+  }
+  .dday.amber{background:#FCEFDD;color:var(--amber);}
+  .dday.red{background:#FBE7E3;color:#B0332A;}
+  .deadline-item.checked .item-title{
+    color:#6C7A75;
+    text-decoration:line-through;
+    text-decoration-color:#B9C4BF;
+  }
+  .link-btn{
+    display:block;
+    width:100%;
+    text-align:center;
+    background:transparent;
+    border:none;
+    color:var(--sub);
+    font-size:12.5px;
+    padding:8px 0 4px;
+    cursor:pointer;
+  }
 </style>
 </head>
 <body>
@@ -261,6 +342,20 @@
   <div class="offline-banner" id="offlineBanner">오프라인 — 연결되면 자동 저장</div>
 
   <div id="summaryHost"></div>
+
+  <section class="group" id="deadlineSection">
+    <h2>기한 업무</h2>
+    <div class="card">
+      <div class="add-row">
+        <input type="text" id="deadlineText" placeholder="업무 내용">
+        <input type="date" id="deadlineDue">
+        <button id="deadlineAddBtn">추가</button>
+      </div>
+    </div>
+    <div class="card" id="deadlineList" style="margin-top:10px;"></div>
+    <button class="link-btn" id="doneToggleBtn"></button>
+    <div class="card" id="deadlineDoneList" style="display:none;margin-top:6px;"></div>
+  </section>
 
   <div id="listHost">
     <div class="loading">불러오는 중…</div>
@@ -281,6 +376,7 @@
     <h3>앱 토큰 입력</h3>
     <p>관리자에게 받은 앱 토큰 입력</p>
     <div class="err" id="tokenErr">토큰이 올바르지 않습니다. 다시 입력해 주세요.</div>
+    <input type="text" id="nameInput" placeholder="이름 (예: 나종운)" autocomplete="off">
     <input type="password" id="tokenInput" placeholder="토큰 붙여넣기" autocomplete="off">
     <button class="primary" id="tokenSave">저장하고 시작</button>
   </div>
@@ -296,6 +392,7 @@
   var API_BASE = "https://api.github.com/repos/" + DATA_OWNER + "/" + DATA_REPO + "/contents/" + DATA_PATH;
 
   var TOKEN_KEY = "jw_app_token";
+  var USER_KEY = "jw_app_user";
   var CACHE_KEY = "jw_app_data_cache";
 
   // ---- 체크리스트 정의 (JW-05-011) ----
@@ -353,10 +450,13 @@
 
   // ---- 상태 ----
   var records = {};      // {type: {periodKey: {itemId: "YYYY-MM-DD"}}}
+  var customItems = {};  // {type: {itemId: {t,who,del,created,updated}}}
+  var deadlines = {};    // {itemId: {t,due,who,done,del,created,updated}}
   var currentSha = null;
   var saveTimer = null;
   var isOffline = false;
   var pendingSave = false;
+  var showDone = false;
 
   // ---- 유틸 ----
   function pad(n){ return n < 10 ? "0" + n : "" + n; }
@@ -404,10 +504,25 @@
   function getToken(){ return localStorage.getItem(TOKEN_KEY); }
   function setToken(t){ localStorage.setItem(TOKEN_KEY, t); }
   function clearToken(){ localStorage.removeItem(TOKEN_KEY); }
+  function getUser(){ return localStorage.getItem(USER_KEY) || ""; }
+  function setUser(u){ localStorage.setItem(USER_KEY, u); }
+
+  function genId(prefix){
+    return prefix + Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+  }
+
+  function ddayInfo(due){
+    var todayD = new Date(todayStr() + "T00:00:00");
+    var dueD = new Date(due + "T00:00:00");
+    var diff = Math.round((dueD - todayD) / 86400000);
+    if (diff < 0) return {text:"D+" + (-diff), cls:"red", diff:diff};
+    if (diff <= 3) return {text:"D-" + diff, cls:"amber", diff:diff};
+    return {text:"D-" + diff, cls:"", diff:diff};
+  }
 
   function saveCache(){
     try{
-      localStorage.setItem(CACHE_KEY, JSON.stringify({sha: currentSha, records: records}));
+      localStorage.setItem(CACHE_KEY, JSON.stringify({sha: currentSha, records: records, custom: customItems, deadlines: deadlines}));
     }catch(e){}
   }
 
@@ -449,16 +564,41 @@
     var cells = GROUPS.map(function(g){
       var key = CURRENT_KEYS[g.type];
       var checkedObj = (records[g.type] && records[g.type][key]) || {};
+      var customList = liveCustom(g.type);
       var checkedCount = 0;
       g.items.forEach(function(it){ if (checkedObj[it.id]) checkedCount++; });
-      var remaining = g.items.length - checkedCount;
+      customList.forEach(function(it){ if (checkedObj[it.id]) checkedCount++; });
+      var totalCount = g.items.length + customList.length;
+      var remaining = totalCount - checkedCount;
       return '<div class="summary-item"><div class="num">' + remaining + '</div><div class="lbl">' + TYPE_LABEL[g.type] + ' 남음</div></div>';
     }).join("");
+
+    var todayD = todayStr();
+    var deadlineUndone = 0, hasOverdue = false;
+    Object.keys(deadlines).forEach(function(id){
+      var d = deadlines[id];
+      if (!d || d.del === 1 || d.done) return;
+      deadlineUndone++;
+      if (d.due < todayD) hasOverdue = true;
+    });
+    var deadlineCell = '<div class="summary-item"><div class="num"' + (hasOverdue ? ' style="color:#FFD3CC;"' : '') + '>' + deadlineUndone + '</div><div class="lbl">기한 남음</div></div>';
+
     host.innerHTML =
       '<div class="summary-card">' +
         '<div class="summary-date">' + dateStr + '</div>' +
-        '<div class="summary-grid">' + cells + '</div>' +
+        '<div class="summary-grid">' + deadlineCell + cells + '</div>' +
       '</div>';
+  }
+
+  function liveCustom(type){
+    var map = customItems[type] || {};
+    var out = [];
+    Object.keys(map).forEach(function(id){
+      var it = map[id];
+      if (it && it.del !== 1) out.push({id:id, title:it.t, who:it.who});
+    });
+    out.sort(function(a,b){ return (map[a.id].created||0) - (map[b.id].created||0); });
+    return out;
   }
 
   function renderList(){
@@ -490,19 +630,182 @@
             '</div>' +
           '</div>';
       });
+
+      liveCustom(g.type).forEach(function(it){
+        var checkedDate = checkedObj[it.id];
+        var isChecked = !!checkedDate;
+        var metaBits = [];
+        metaBits.push('<span class="author-chip">' + it.who + '</span>');
+        if (isChecked){
+          metaBits.push('<span class="checked-date">✓ ' + checkedDate + '</span>');
+        } else {
+          var prev = lastCheckedBefore(g.type, it.id, key);
+          if (prev) metaBits.push('<span class="past-note">지난 확인 ' + fmtMD(prev) + '</span>');
+        }
+        html +=
+          '<div class="item custom-item' + (isChecked ? ' checked' : '') + '" data-type="' + g.type + '" data-id="' + it.id + '">' +
+            '<div class="check-box">' + (isChecked ? '✓' : '') + '</div>' +
+            '<div class="item-body">' +
+              '<div class="item-title">' + it.title + '</div>' +
+              '<div class="item-meta">' + metaBits.join('') + '</div>' +
+            '</div>' +
+            '<button class="del-x" data-del-type="' + g.type + '" data-del-id="' + it.id + '">×</button>' +
+          '</div>';
+      });
+
+      html +=
+        '<div class="add-row">' +
+          '<input type="text" class="custom-add-input" data-add-type="' + g.type + '" placeholder="+ 항목 추가">' +
+          '<button class="custom-add-btn" data-add-type="' + g.type + '">추가</button>' +
+        '</div>';
+
       html += '</div></section>';
     });
     host.innerHTML = html;
 
     Array.prototype.forEach.call(host.querySelectorAll(".item"), function(el){
-      el.addEventListener("click", function(){
+      el.addEventListener("click", function(e){
+        if (e.target.classList.contains("del-x")) return;
         toggleItem(el.getAttribute("data-type"), el.getAttribute("data-id"));
+      });
+    });
+    Array.prototype.forEach.call(host.querySelectorAll(".del-x"), function(el){
+      el.addEventListener("click", function(e){
+        e.stopPropagation();
+        deleteCustomItem(el.getAttribute("data-del-type"), el.getAttribute("data-del-id"));
+      });
+    });
+    Array.prototype.forEach.call(host.querySelectorAll(".custom-add-btn"), function(el){
+      el.addEventListener("click", function(){
+        addCustomItem(el.getAttribute("data-add-type"));
+      });
+    });
+    Array.prototype.forEach.call(host.querySelectorAll(".custom-add-input"), function(el){
+      el.addEventListener("keydown", function(e){
+        if (e.key === "Enter") addCustomItem(el.getAttribute("data-add-type"));
       });
     });
   }
 
+  function addCustomItem(type){
+    var input = document.querySelector('.custom-add-input[data-add-type="' + type + '"]');
+    if (!input) return;
+    var text = input.value.trim();
+    if (!text) return;
+    var id = genId("c");
+    if (!customItems[type]) customItems[type] = {};
+    customItems[type][id] = {t:text, who:(getUser() || "익명"), created:Date.now(), updated:Date.now()};
+    input.value = "";
+    saveCache();
+    render();
+    scheduleSave();
+  }
+
+  function deleteCustomItem(type, id){
+    if (!customItems[type] || !customItems[type][id]) return;
+    customItems[type][id].del = 1;
+    customItems[type][id].updated = Date.now();
+    saveCache();
+    render();
+    scheduleSave();
+  }
+
+  function renderDeadlines(){
+    var listHost = document.getElementById("deadlineList");
+    var doneHost = document.getElementById("deadlineDoneList");
+    var toggleBtn = document.getElementById("doneToggleBtn");
+    if (!listHost) return;
+
+    var todayD = todayStr();
+    var undone = [];
+    var done = [];
+    Object.keys(deadlines).forEach(function(id){
+      var d = deadlines[id];
+      if (!d || d.del === 1) return;
+      var entry = Object.assign({id:id}, d);
+      if (d.done) done.push(entry); else undone.push(entry);
+    });
+    undone.sort(function(a,b){ return a.due < b.due ? -1 : (a.due > b.due ? 1 : 0); });
+    done.sort(function(a,b){ return (b.done||"").localeCompare(a.done||""); });
+    done = done.slice(0,20);
+
+    function rowHtml(d, isDone){
+      var dd = ddayInfo(d.due);
+      var metaBits = [];
+      metaBits.push('<span class="author-chip">' + d.who + '</span>');
+      metaBits.push('<span>' + d.due + '</span>');
+      var ddayBadge = isDone ? '' : ('<span class="dday' + (dd.cls ? ' ' + dd.cls : '') + '">' + dd.text + '</span>');
+      return '<div class="item deadline-item' + (isDone ? ' checked' : '') + '" data-deadline-id="' + d.id + '">' +
+        '<div class="check-box">' + (isDone ? '✓' : '') + '</div>' +
+        '<div class="item-body">' +
+          '<div class="item-title">' + d.t + '</div>' +
+          '<div class="item-meta">' + metaBits.join('') + '</div>' +
+        '</div>' +
+        ddayBadge +
+        '<button class="del-x" data-del-deadline="' + d.id + '">×</button>' +
+      '</div>';
+    }
+
+    listHost.innerHTML = undone.length
+      ? undone.map(function(d){ return rowHtml(d, false); }).join("")
+      : '<div class="loading" style="padding:18px 0;">등록된 기한 업무가 없습니다.</div>';
+
+    toggleBtn.textContent = showDone ? "완료 숨기기" : ("완료 보기 (" + done.length + ")");
+    doneHost.style.display = showDone ? "block" : "none";
+    doneHost.innerHTML = done.map(function(d){ return rowHtml(d, true); }).join("");
+
+    Array.prototype.forEach.call(document.querySelectorAll("[data-deadline-id]"), function(el){
+      el.addEventListener("click", function(e){
+        if (e.target.classList.contains("del-x")) return;
+        toggleDeadlineDone(el.getAttribute("data-deadline-id"));
+      });
+    });
+    Array.prototype.forEach.call(document.querySelectorAll("[data-del-deadline]"), function(el){
+      el.addEventListener("click", function(e){
+        e.stopPropagation();
+        deleteDeadline(el.getAttribute("data-del-deadline"));
+      });
+    });
+  }
+
+  function toggleDeadlineDone(id){
+    var d = deadlines[id];
+    if (!d) return;
+    d.done = d.done ? null : todayStr();
+    d.updated = Date.now();
+    saveCache();
+    render();
+    scheduleSave();
+  }
+
+  function deleteDeadline(id){
+    var d = deadlines[id];
+    if (!d) return;
+    d.del = 1;
+    d.updated = Date.now();
+    saveCache();
+    render();
+    scheduleSave();
+  }
+
+  function addDeadline(){
+    var textEl = document.getElementById("deadlineText");
+    var dueEl = document.getElementById("deadlineDue");
+    var text = textEl.value.trim();
+    var due = dueEl.value;
+    if (!text || !due) return;
+    var id = genId("d");
+    deadlines[id] = {t:text, due:due, who:(getUser() || "익명"), done:null, created:Date.now(), updated:Date.now()};
+    textEl.value = "";
+    dueEl.value = "";
+    saveCache();
+    render();
+    scheduleSave();
+  }
+
   function render(){
     renderSummary();
+    renderDeadlines();
     renderList();
   }
 
@@ -563,6 +866,44 @@
     return merged;
   }
 
+  function mergeKV(localMap, remoteMap){
+    var merged = {};
+    var ids = {};
+    Object.keys(localMap || {}).forEach(function(id){ ids[id]=1; });
+    Object.keys(remoteMap || {}).forEach(function(id){ ids[id]=1; });
+    Object.keys(ids).forEach(function(id){
+      var lo = (localMap || {})[id];
+      var ro = (remoteMap || {})[id];
+      if (lo && ro){
+        var winner = (lo.updated || 0) >= (ro.updated || 0) ? lo : ro;
+        var loser = (winner === lo) ? ro : lo;
+        var out = {};
+        var fields = {};
+        Object.keys(lo).forEach(function(f){ fields[f]=1; });
+        Object.keys(ro).forEach(function(f){ fields[f]=1; });
+        Object.keys(fields).forEach(function(f){
+          out[f] = (winner[f] !== undefined) ? winner[f] : loser[f];
+        });
+        if (lo.del === 1 || ro.del === 1) out.del = 1; // del=1 항상 우선
+        merged[id] = out;
+      } else {
+        merged[id] = lo || ro;
+      }
+    });
+    return merged;
+  }
+
+  function mergeCustom(local, remote){
+    var merged = {};
+    var types = {};
+    Object.keys(local || {}).forEach(function(t){ types[t]=1; });
+    Object.keys(remote || {}).forEach(function(t){ types[t]=1; });
+    Object.keys(types).forEach(function(type){
+      merged[type] = mergeKV((local || {})[type], (remote || {})[type]);
+    });
+    return merged;
+  }
+
   function ghHeaders(){
     return {
       "Authorization": "token " + getToken(),
@@ -594,6 +935,8 @@
         var decoded = b64DecodeUnicode(json.content);
         var parsed = JSON.parse(decoded);
         records = parsed.records || {};
+        customItems = parsed.custom || {};
+        deadlines = parsed.deadlines || {};
         setOffline(false);
         saveCache();
         render();
@@ -604,6 +947,8 @@
       if (cache){
         currentSha = cache.sha;
         records = cache.records || {};
+        customItems = cache.custom || {};
+        deadlines = cache.deadlines || {};
         setOffline(true);
         render();
       } else {
@@ -617,7 +962,7 @@
   function doSave(){
     var token = getToken();
     if (!token) return;
-    var body = JSON.stringify({records: records});
+    var body = JSON.stringify({records: records, custom: customItems, deadlines: deadlines});
     var payload = {
       message: "check: 업데이트",
       content: b64EncodeUnicode(body),
@@ -657,11 +1002,13 @@
     return fetchRemote().then(function(resp){
       return resp.json();
     }).then(function(json){
-      var remoteRecords = {};
+      var remoteParsed = {};
       try{
-        remoteRecords = JSON.parse(b64DecodeUnicode(json.content)).records || {};
+        remoteParsed = JSON.parse(b64DecodeUnicode(json.content)) || {};
       }catch(e){}
-      records = mergeRecords(records, remoteRecords);
+      records = mergeRecords(records, remoteParsed.records || {});
+      customItems = mergeCustom(customItems, remoteParsed.custom || {});
+      deadlines = mergeKV(deadlines, remoteParsed.deadlines || {});
       currentSha = json.sha;
       saveCache();
       render();
@@ -685,16 +1032,28 @@
   }
 
   document.getElementById("tokenSave").addEventListener("click", function(){
-    var val = document.getElementById("tokenInput").value.trim();
-    if (!val) return;
-    setToken(val);
+    var tokenVal = document.getElementById("tokenInput").value.trim();
+    var nameVal = document.getElementById("nameInput").value.trim();
+    if (!tokenVal) return;
+    setToken(tokenVal);
+    if (nameVal) setUser(nameVal);
     document.getElementById("tokenInput").value = "";
     hideTokenScreen();
     doLoad();
   });
 
   document.getElementById("gearBtn").addEventListener("click", function(){
+    document.getElementById("nameInput").value = getUser();
+    document.getElementById("tokenInput").value = "";
     showTokenScreen(false);
+  });
+
+  document.getElementById("deadlineAddBtn").addEventListener("click", addDeadline);
+  document.getElementById("deadlineDue").addEventListener("keydown", function(e){ if (e.key === "Enter") addDeadline(); });
+  document.getElementById("deadlineText").addEventListener("keydown", function(e){ if (e.key === "Enter") addDeadline(); });
+  document.getElementById("doneToggleBtn").addEventListener("click", function(){
+    showDone = !showDone;
+    renderDeadlines();
   });
 
   // ---- 시작 ----
