@@ -458,6 +458,12 @@
   .veh-item{align-items:flex-start;cursor:default;}
   .veh-due{display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
   .due-tag{font-size:12px;color:var(--sub);}
+
+  /* 수금 */
+  .rec-item{align-items:flex-start;cursor:default;}
+  .rec-amt{font-weight:700;color:var(--text);}
+  .rec-item.checked .item-title{color:#6C7A75;}
+  .overdue-bill{color:#B0332A;font-weight:700;}
 </style>
 </head>
 <body>
@@ -473,6 +479,7 @@
     <button class="tab-btn active" data-tab="dash" id="tabDashBtn">대시보드</button>
     <button class="tab-btn" data-tab="tasks" id="tabTasksBtn">지시 <span class="tab-badge hide" id="taskTabBadge">0</span></button>
     <button class="tab-btn" data-tab="veh" id="tabVehBtn">차량</button>
+    <button class="tab-btn" data-tab="rec" id="tabRecBtn">수금</button>
     <button class="tab-btn" data-tab="check" id="tabCheckBtn">체크</button>
   </nav>
 
@@ -508,6 +515,25 @@
     <div class="card" id="vehList">
       <div class="loading">불러오는 중…</div>
     </div>
+  </section>
+
+  <!-- 수금·기성 -->
+  <section class="view" id="view-rec">
+    <div class="card">
+      <div class="add-row">
+        <input type="text" id="recClient" placeholder="거래처 (예: 포스코)">
+        <input type="text" id="recDesc" placeholder="내역 (예: 6월 기성)">
+      </div>
+      <div class="add-row" style="padding-top:0;">
+        <input type="text" id="recAmount" placeholder="금액(선택)" inputmode="numeric">
+        <input type="date" id="recBilled">
+        <button id="recAddBtn">청구 등록</button>
+      </div>
+    </div>
+    <div class="dash-sec" style="margin:14px 0 6px;"><h2>미수 <span class="cnt" id="recHead"></span></h2></div>
+    <div class="card" id="recList"><div class="loading">불러오는 중…</div></div>
+    <button class="link-btn" id="recPaidToggle"></button>
+    <div class="card" id="recPaidList" style="display:none;margin-top:6px;"></div>
   </section>
 
   <!-- 주기 체크 -->
@@ -548,15 +574,18 @@
   var CHECK_PATH = "data/checklist.json";
   var TASKS_PATH = "data/tasks.json";
   var VEH_PATH = "data/vehicles.json";
+  var REC_PATH = "data/receivables.json";
   var CHECK_API = API_ROOT + CHECK_PATH;
   var TASKS_API = API_ROOT + TASKS_PATH;
   var VEH_API = API_ROOT + VEH_PATH;
+  var REC_API = API_ROOT + REC_PATH;
 
   var TOKEN_KEY = "jw_app_token";
   var USER_KEY = "jw_app_user";
   var CACHE_KEY = "jw_app_data_cache";
   var TASKS_CACHE_KEY = "jw_app_tasks_cache";
   var VEH_CACHE_KEY = "jw_app_veh_cache";
+  var REC_CACHE_KEY = "jw_app_rec_cache";
 
   // ---- 체크리스트 정의 (JW-05-011) ----
   var GROUPS = [
@@ -628,6 +657,12 @@
 
   var vehicles = [];     // [{id,no,type,own,permit,driver,insp_due,ins_due,insurer,state,note}]
   var vehSha = null;
+
+  var receivables = [];  // [{id,client,site,desc,amount,billed,invoice,paid,due_hint,note,created,updated,del}]
+  var recSha = null;
+  var recSaveTimer = null;
+  var recPending = false;
+  var showRecPaid = false;
 
   // ---- 유틸 ----
   function pad(n){ return n < 10 ? "0" + n : "" + n; }
@@ -753,8 +788,9 @@
     renderSummary();
     renderList();
     renderTasks();
-    renderDashboard();
     renderVehicles();
+    renderReceivables();
+    renderDashboard();
   }
 
   // ---- 지시(업무 전달) ----
@@ -1458,10 +1494,11 @@
   }
 
   window.addEventListener("online", function(){
-    if (isOffline || pendingSave || tasksPending){
+    if (isOffline || pendingSave || tasksPending || recPending){
       doLoad();
       loadTasks();
       loadVehicles();
+      loadReceivables();
     }
   });
 
@@ -1474,6 +1511,7 @@
     document.getElementById("view-dash").classList.toggle("active", name === "dash");
     document.getElementById("view-tasks").classList.toggle("active", name === "tasks");
     document.getElementById("view-veh").classList.toggle("active", name === "veh");
+    document.getElementById("view-rec").classList.toggle("active", name === "rec");
     document.getElementById("view-check").classList.toggle("active", name === "check");
   }
 
@@ -1497,6 +1535,7 @@
     doLoad();
     loadTasks();
     loadVehicles();
+    loadReceivables();
   });
 
   document.getElementById("gearBtn").addEventListener("click", function(){
@@ -1514,6 +1553,16 @@
     renderTasks();
   });
 
+  document.getElementById("recAddBtn").addEventListener("click", addReceivable);
+  document.getElementById("recClient").addEventListener("keydown", function(e){ if (e.key === "Enter") addReceivable(); });
+  document.getElementById("recDesc").addEventListener("keydown", function(e){ if (e.key === "Enter") addReceivable(); });
+  document.getElementById("recAmount").addEventListener("keydown", function(e){ if (e.key === "Enter") addReceivable(); });
+  document.getElementById("recBilled").addEventListener("keydown", function(e){ if (e.key === "Enter") addReceivable(); });
+  document.getElementById("recPaidToggle").addEventListener("click", function(){
+    showRecPaid = !showRecPaid;
+    renderReceivables();
+  });
+
   Array.prototype.forEach.call(document.querySelectorAll(".tab-btn"), function(b){
     b.addEventListener("click", function(){ switchTab(b.getAttribute("data-tab")); });
   });
@@ -1521,7 +1570,7 @@
   // ---- 차량(vehicles.json, 읽기 전용) ----
   function liveVehicles(){ return vehicles.filter(function(v){ return v && v.del !== 1; }); }
   function findVeh(id){ for (var i=0;i<vehicles.length;i++){ if (vehicles[i].id === id) return vehicles[i]; } return null; }
-  function isGreyState(v){ return v.state === "말소예정" || v.state === "매각"; }
+  function isGreyState(v){ return v.state === "말소예정" || v.state === "매각" || v.state === "검사보류"; }
 
   function vehDday(dateStr){
     var today = new Date(todayStr() + "T00:00:00");
@@ -1646,12 +1695,14 @@
     });
 
     var overdueVeh = urgent.filter(function(x){ return x.dd.diff < 0; }).length;
+    var unpaid = unpaidReceivables();
 
     var html = '<div class="summary-card"><div class="summary-date">' + today + '</div>' +
-      '<div class="summary-grid" style="grid-template-columns:repeat(3,1fr);">' +
+      '<div class="summary-grid" style="grid-template-columns:repeat(4,1fr);">' +
         '<div class="summary-item"><div class="num"' + (overdueVeh ? ' style="color:#FFD3CC;"' : '') + '>' + overdueVeh + '</div><div class="lbl">만기 경과</div></div>' +
         '<div class="summary-item"><div class="num">' + urgent.length + '</div><div class="lbl">만기 임박</div></div>' +
         '<div class="summary-item"><div class="num">' + openTasks.length + '</div><div class="lbl">미완료 지시</div></div>' +
+        '<div class="summary-item"><div class="num">' + unpaid.length + '</div><div class="lbl">미수</div></div>' +
       '</div></div>';
 
     html += '<div class="dash-sec"><h2>만기 임박·경과 (차량) <span class="cnt">' + urgent.length + '</span></h2><div class="card">';
@@ -1682,9 +1733,196 @@
       : '<div class="empty-line">미완료 지시가 없습니다.</div>';
     html += '</div></div>';
 
+    html += '<div class="dash-sec"><h2>미수 (오래된 순) <span class="cnt">' + unpaid.length + '</span></h2><div class="card">';
+    html += unpaid.length
+      ? unpaid.map(function(r){ return recRowHtml(r, false); }).join("")
+      : '<div class="empty-line">미수 건이 없습니다.</div>';
+    html += '</div></div>';
+
     host.innerHTML = html;
     bindTaskHandlers(host);
     bindCalHandlers(host);
+    bindRecHandlers(host);
+  }
+
+  // ---- 수금·기성(receivables.json) ----
+  function liveRec(){ return receivables.filter(function(r){ return r && r.del !== 1; }); }
+  function findRec(id){ for (var i=0;i<receivables.length;i++){ if (receivables[i].id === id) return receivables[i]; } return null; }
+  function fmtAmount(n){
+    var s = String(n == null ? "" : n).replace(/[^0-9]/g, "");
+    if (!s || s === "0") return "";
+    return s.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  }
+
+  function saveRecCache(){ try{ localStorage.setItem(REC_CACHE_KEY, JSON.stringify({sha: recSha, items: receivables})); }catch(e){} }
+  function loadRecCache(){ try{ var r = localStorage.getItem(REC_CACHE_KEY); return r ? JSON.parse(r) : null; }catch(e){ return null; } }
+
+  function loadReceivables(){
+    var token = getToken();
+    if (!token) return;
+    fetch(REC_API, {headers: ghHeaders()}).then(function(resp){
+      if (resp.status === 401){ clearToken(); showTokenScreen(true); return; }
+      if (resp.status === 404){ recSha = null; receivables = []; saveRecCache(); renderReceivables(); renderDashboard(); return; }
+      if (!resp.ok) throw new Error("HTTP " + resp.status);
+      return resp.json().then(function(json){
+        recSha = json.sha;
+        var parsed = JSON.parse(b64DecodeUnicode(json.content));
+        receivables = (parsed && parsed.items) || [];
+        setOffline(false); saveRecCache(); renderReceivables(); renderDashboard();
+      });
+    }).catch(function(){
+      var c = loadRecCache();
+      if (c){ recSha = c.sha; receivables = c.items || []; setOffline(true); renderReceivables(); renderDashboard(); }
+    });
+  }
+
+  function scheduleRecSave(){
+    recPending = true;
+    if (recSaveTimer) clearTimeout(recSaveTimer);
+    recSaveTimer = setTimeout(function(){ recSaveTimer = null; doSaveRec(); }, 1500);
+  }
+
+  function mergeRec(local, remote){
+    var byId = {};
+    (local || []).forEach(function(r){ if (r && r.id) byId[r.id] = r; });
+    (remote || []).forEach(function(x){
+      if (!x || !x.id) return;
+      var cur = byId[x.id];
+      if (!cur){ byId[x.id] = x; }
+      else {
+        var w = (x.updated || "") >= (cur.updated || "") ? x : cur;
+        var m = {}; Object.keys(w).forEach(function(f){ m[f] = w[f]; });
+        if (cur.del === 1 || x.del === 1) m.del = 1;
+        byId[x.id] = m;
+      }
+    });
+    var out = []; Object.keys(byId).forEach(function(id){ out.push(byId[id]); });
+    out.sort(function(a, b){ var ac = a.created || "", bc = b.created || ""; if (ac !== bc) return ac < bc ? -1 : 1; return a.id < b.id ? -1 : (a.id > b.id ? 1 : 0); });
+    return out;
+  }
+
+  function doSaveRec(){
+    var token = getToken();
+    if (!token) return;
+    var body = JSON.stringify({schema: 1, items: receivables});
+    var payload = {message: "receivables: 업데이트", content: b64EncodeUnicode(body), branch: "main"};
+    if (recSha) payload.sha = recSha;
+    fetch(REC_API, {method: "PUT", headers: Object.assign({"Content-Type":"application/json"}, ghHeaders()), body: JSON.stringify(payload)}).then(function(resp){
+      if (resp.status === 401){ clearToken(); showTokenScreen(true); return; }
+      if (resp.status === 409 || resp.status === 422){ return resolveRecConflictAndRetry(); }
+      if (!resp.ok) throw new Error("HTTP " + resp.status);
+      return resp.json().then(function(json){ recSha = json.content && json.content.sha; setOffline(false); saveRecCache(); recPending = false; });
+    }).catch(function(){ setOffline(true); });
+  }
+
+  function resolveRecConflictAndRetry(){
+    return fetch(REC_API, {headers: ghHeaders()}).then(function(resp){ if (resp.status === 404) return null; return resp.json(); }).then(function(json){
+      if (json){ var rp = {}; try{ rp = JSON.parse(b64DecodeUnicode(json.content)) || {}; }catch(e){} receivables = mergeRec(receivables, rp.items || []); recSha = json.sha; }
+      saveRecCache(); renderReceivables(); renderDashboard(); return doSaveRec();
+    });
+  }
+
+  function addReceivable(){
+    var clientEl = document.getElementById("recClient");
+    var descEl = document.getElementById("recDesc");
+    var amtEl = document.getElementById("recAmount");
+    var billedEl = document.getElementById("recBilled");
+    var client = clientEl.value.trim();
+    if (!client) return;
+    var today = todayStr();
+    var amt = parseInt(String(amtEl.value).replace(/[^0-9]/g, ""), 10);
+    receivables.push({
+      id: genId("r"), client: client, site: "", desc: descEl.value.trim(),
+      amount: isNaN(amt) ? 0 : amt, billed: billedEl.value || today,
+      invoice: false, paid: null, due_hint: "", note: "",
+      created: today, updated: today
+    });
+    clientEl.value = ""; descEl.value = ""; amtEl.value = ""; billedEl.value = "";
+    saveRecCache(); renderReceivables(); renderDashboard(); scheduleRecSave();
+  }
+  function toggleRecPaid(id){
+    var r = findRec(id); if (!r) return;
+    r.paid = r.paid ? null : todayStr(); r.updated = todayStr();
+    saveRecCache(); renderReceivables(); renderDashboard(); scheduleRecSave();
+  }
+  function toggleRecInvoice(id){
+    var r = findRec(id); if (!r) return;
+    r.invoice = !r.invoice; r.updated = todayStr();
+    saveRecCache(); renderReceivables(); renderDashboard(); scheduleRecSave();
+  }
+  function deleteReceivable(id){
+    var r = findRec(id); if (!r) return;
+    r.del = 1; r.updated = todayStr();
+    saveRecCache(); renderReceivables(); renderDashboard(); scheduleRecSave();
+  }
+
+  function recRowHtml(r, isPaid){
+    var meta = [];
+    if (r.amount) meta.push('<span class="rec-amt">' + fmtAmount(r.amount) + '원</span>');
+    meta.push('<span>청구 ' + esc(r.billed || "-") + '</span>');
+    if (r.invoice) meta.push('<span class="author-chip">계산서</span>');
+    if (r.due_hint) meta.push('<span class="from-chip">' + esc(r.due_hint) + '</span>');
+    if (isPaid) meta.push('<span class="done-by">✓ 입금 ' + esc(r.paid) + '</span>');
+    var ctrl;
+    if (isPaid){
+      ctrl = '<div class="task-ctrl"><button class="mini-btn" data-rec-unpay="' + r.id + '">미수전환</button></div>';
+    } else {
+      var invBtn = '<button class="mini-btn" data-rec-inv="' + r.id + '">' + (r.invoice ? "계산서 취소" : "계산서 발행") + '</button>';
+      ctrl = '<div class="task-ctrl">' + invBtn + '<button class="cal-btn" data-rec-pay="' + r.id + '">입금완료</button></div>';
+    }
+    var title = esc(r.client) + (r.desc ? ' · ' + esc(r.desc) : '');
+    return '<div class="item rec-item' + (isPaid ? ' checked' : '') + '">' +
+        '<div class="item-body">' +
+          '<div class="item-title">' + title + '</div>' +
+          '<div class="item-meta">' + meta.join('') + '</div>' +
+        '</div>' +
+        ctrl +
+        '<button class="del-x" data-rec-del="' + r.id + '">×</button>' +
+      '</div>';
+  }
+
+  function unpaidReceivables(){
+    var u = liveRec().filter(function(r){ return !r.paid; });
+    u.sort(function(a, b){ var ad = a.billed || "9999-99-99", bd = b.billed || "9999-99-99"; return ad < bd ? -1 : (ad > bd ? 1 : 0); });
+    return u;
+  }
+
+  function renderReceivables(){
+    var listHost = document.getElementById("recList");
+    var paidHost = document.getElementById("recPaidList");
+    var toggleBtn = document.getElementById("recPaidToggle");
+    if (!listHost) return;
+    var unpaid = unpaidReceivables();
+    var paid = liveRec().filter(function(r){ return r.paid; });
+    paid.sort(function(a, b){ return (b.paid || "").localeCompare(a.paid || ""); });
+    paid = paid.slice(0, 30);
+
+    var head = document.getElementById("recHead");
+    if (head){
+      var sum = 0; unpaid.forEach(function(r){ sum += (r.amount || 0); });
+      head.textContent = unpaid.length ? (unpaid.length + "건" + (sum ? " · " + fmtAmount(sum) + "원" : "")) : "";
+    }
+    listHost.innerHTML = unpaid.length ? unpaid.map(function(r){ return recRowHtml(r, false); }).join("") : '<div class="empty-line">미수 건이 없습니다.</div>';
+    toggleBtn.textContent = showRecPaid ? "수금 완료 숨기기" : ("수금 완료 보기 (" + paid.length + ")");
+    paidHost.style.display = showRecPaid ? "block" : "none";
+    paidHost.innerHTML = paid.map(function(r){ return recRowHtml(r, true); }).join("");
+    bindRecHandlers(listHost);
+    bindRecHandlers(paidHost);
+  }
+
+  function bindRecHandlers(host){
+    Array.prototype.forEach.call(host.querySelectorAll("[data-rec-pay]"), function(el){
+      el.addEventListener("click", function(e){ e.stopPropagation(); toggleRecPaid(el.getAttribute("data-rec-pay")); });
+    });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-rec-unpay]"), function(el){
+      el.addEventListener("click", function(e){ e.stopPropagation(); toggleRecPaid(el.getAttribute("data-rec-unpay")); });
+    });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-rec-inv]"), function(el){
+      el.addEventListener("click", function(e){ e.stopPropagation(); toggleRecInvoice(el.getAttribute("data-rec-inv")); });
+    });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-rec-del]"), function(el){
+      el.addEventListener("click", function(e){ e.stopPropagation(); deleteReceivable(el.getAttribute("data-rec-del")); });
+    });
   }
 
   // ---- 캘린더 .ics (기기 기본 캘린더 알람 연동) ----
@@ -1765,6 +2003,7 @@
   doLoad();
   loadTasks();
   loadVehicles();
+  loadReceivables();
 })();
 </script>
 </body>

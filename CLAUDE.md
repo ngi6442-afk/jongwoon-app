@@ -14,8 +14,9 @@
 ## 모듈 현황
 - M0 주기 업무 체크(checklist.json): 운영 중, 함부로 손대지 않는다.
 - M1 업무 전달(tasks.json): **구현 완료(P1, 2026-07-07)**. 앱 상단 `지시` 탭. 등록(내용·담당·기한, 지시자=로그인 이름 자동)·완료(완료자 기록)·보류·삭제(soft del=1). 기한순 정렬, 경과 빨강, 완료 이력. 기존 checklist.json의 deadlines를 tasks.json으로 이관하고(유실 0, id 보존) checklist에서 deadlines 키 제거. 이관 스크립트: `~/jongwoon/migrate_deadlines_to_tasks.py`(dry-run 기본, `--apply`로 적용).
-- M2 차량·자산 만기(vehicles.json): **구현 완료(P2, 2026-07-07)**. `차량` 탭 + 통합 `대시보드`(첫 화면). vehicles.json은 assets 현황표에서 파생(읽기 전용, 연락처 제외·차주명까지만). 검사/보험 D-day 색상(경과 빨강·30일 주황·90일 노랑·말소예정·매각 회색), 만기 임박순 정렬. 추출 스크립트: `~/jongwoon/extract_vehicles.py`(dry-run 기본). 갱신은 분기 1회 세션에서 현황표 대조.
-- M3 수금(receivables.json) → M4 인허가(licenses.json): JW-05-017의 3~4장 스키마·완료 기준을 따른다.
+- M2 차량·자산 만기(vehicles.json): **구현 완료(P2, 2026-07-07)**. `차량` 탭 + 통합 `대시보드`(첫 화면). vehicles.json은 assets 현황표에서 파생(읽기 전용, 연락처 제외·차주명까지만). 검사/보험 D-day 색상(경과 빨강·30일 주황·90일 노랑·**말소예정·매각·검사보류 회색**), 만기 임박순 정렬. 추출 스크립트: `~/jongwoon/extract_vehicles.py`(dry-run 기본). 갱신은 분기 1회 세션에서 현황표 대조. state 중 `검사보류`는 "검사 의도적 스킵" 차량(회색·대시보드 제외), 추출 시 노트 키워드로 자동 분류.
+- M3 수금·기성(receivables.json): **구현 완료(P3, 2026-07-07)**. `수금` 탭. 청구 등록(거래처·내역·금액선택·청구일)·계산서 발행 토글·입금완료(paid=날짜)·미수전환·삭제(soft del). 미수 목록은 청구일 오래된 순, 미수 합계 표시. 대시보드에 미수 건수·목록 통합. 은행 연동 없음(수기 체크 층).
+- M4 인허가(licenses.json): JW-05-017의 3~4장 스키마·완료 기준을 따른다.
 - 단계 완료 시 이 파일과 가이드를 실태에 맞게 갱신한다.
 
 ## 알람: 캘린더(.ics) 연동
@@ -24,6 +25,6 @@
 - 앱 자체는 푸시/백그라운드 알림을 하지 않는다(정적 PWA 한계·가이드 준수). 자동 갱신 구독(webcal) 원하면 추후 GitHub Actions로 .ics 피드 생성.
 
 ## 앱 구조 메모
-- 탭: `대시보드`(기본, 첫 화면) / `지시`(tasks.json) / `차량`(vehicles.json) / `체크`(checklist.json).
-- 데이터 파일별로 독립 로드·저장·충돌병합(sha 기반 PUT, 409/422 시 재조회 후 id 병합). tasks 병합 키는 item.id, del=1 우선. vehicles는 읽기 전용(저장 없음).
-- SW 셸 캐시는 cache-first이므로 index.html 변경 시 sw.js의 `SHELL_CACHE` 버전을 반드시 올린다(현재 jw-shell-v4).
+- 탭: `대시보드`(기본, 첫 화면) / `지시`(tasks.json) / `차량`(vehicles.json) / `수금`(receivables.json) / `체크`(checklist.json).
+- 데이터 파일별로 독립 로드·저장·충돌병합(sha 기반 PUT, 409/422 시 재조회 후 id 병합). tasks·receivables 병합 키는 item.id, del=1 우선. vehicles는 읽기 전용(저장 없음).
+- SW 셸 캐시는 cache-first이므로 index.html 변경 시 sw.js의 `SHELL_CACHE` 버전을 반드시 올린다(현재 jw-shell-v5).
