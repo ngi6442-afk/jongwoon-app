@@ -508,6 +508,12 @@
   .perm-row{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
   .perm-row .plabel{flex:1;font-size:13px;color:var(--text);}
   .perm-row select{width:112px;margin:0;padding:8px;}
+  /* 공개 대상 회원 체크 */
+  .mchecks{max-height:150px;overflow-y:auto;border:1px solid var(--line);border-radius:10px;padding:6px 10px;margin-bottom:10px;}
+  .mcheck{display:flex;align-items:center;gap:8px;padding:5px 2px;font-size:13px;color:var(--text);}
+  .mcheck input{width:auto;margin:0;}
+  .mcheck .mrole2{color:var(--sub);font-size:11px;}
+  .scope-chip{display:inline-block;font-size:11px;padding:1px 8px;border-radius:999px;background:#EDE9F2;color:#5B4B85;font-weight:600;}
 
   /* 반응형: 모바일=상단 탭, PC=좌측 세로 사이드바 */
   .views{min-width:0;}
@@ -673,9 +679,26 @@
     <input type="date" id="licEdu">
     <input type="text" id="licCycle" placeholder="주기 메모 (예: 3년)" autocomplete="off">
     <input type="text" id="licNote" placeholder="메모 (선택)" autocomplete="off">
+    <span class="fld-label">공개 대상 직원 (비우면 전체 공개)</span>
+    <div class="mchecks" id="licScope"></div>
     <button class="primary" id="licSave">저장</button>
     <button class="danger" id="licDelete">삭제</button>
     <button class="secondary" id="licCancel">취소</button>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="taskEditBackdrop">
+  <div class="modal">
+    <h3>지시 수정</h3>
+    <input type="text" id="teTitle" placeholder="지시 내용" autocomplete="off">
+    <input type="text" id="teWho" placeholder="담당 (회원명)" list="memberNames" autocomplete="off">
+    <span class="fld-label">기한</span>
+    <input type="date" id="teDue">
+    <input type="text" id="teDetail" placeholder="상세 (선택)" autocomplete="off">
+    <span class="fld-label">공개 대상 직원 (비우면 전체 공개)</span>
+    <div class="mchecks" id="teScope"></div>
+    <button class="primary" id="teSave">저장</button>
+    <button class="secondary" id="teCancel">취소</button>
   </div>
 </div>
 
@@ -1061,6 +1084,36 @@
     return !!(me && t && (t.who || "").trim() === me);
   }
 
+  // 지시 수정(관리자 전용): 제목·담당·기한·상세·공개범위
+  var editingTaskId = null;
+  function openTaskModal(id){
+    if (!canDo("tasks")) return;
+    var t = findTask(id); if (!t) return;
+    editingTaskId = id;
+    document.getElementById("teTitle").value = t.title || "";
+    document.getElementById("teWho").value = t.who || "";
+    document.getElementById("teDue").value = isDate(t.due) ? t.due : "";
+    document.getElementById("teDetail").value = t.detail || "";
+    if (typeof populateMemberNames === "function") populateMemberNames();
+    renderMemberChecks("teScope", t.scope || []);
+    document.getElementById("taskEditBackdrop").classList.add("show");
+  }
+  function closeTaskModal(){ document.getElementById("taskEditBackdrop").classList.remove("show"); editingTaskId = null; }
+  function saveTaskModal(){
+    if (!canDo("tasks")) return;
+    var t = findTask(editingTaskId); if (!t){ closeTaskModal(); return; }
+    var title = document.getElementById("teTitle").value.trim();
+    if (!title) return;
+    t.title = title;
+    t.who = document.getElementById("teWho").value.trim();
+    t.due = document.getElementById("teDue").value || "";
+    t.detail = document.getElementById("teDetail").value.trim();
+    t.scope = getCheckedMembers("teScope");
+    t.updated = todayStr();
+    closeTaskModal();
+    saveTasksCache(); renderTasks(); renderDashboard(); renderMyTasks(); scheduleTasksSave();
+  }
+
   function renderSummary(){
     var host = document.getElementById("summaryHost");
     if (!host) return;
@@ -1115,6 +1168,7 @@
     if (t.from) metaBits.push('<span class="from-chip">지시 ' + esc(t.from) + '</span>');
     if (t.due) metaBits.push('<span>' + esc(t.due) + '</span>');
     if (t.status === "hold") metaBits.push('<span class="hold-chip">보류</span>');
+    if (t.scope && t.scope.length) metaBits.push('<span class="scope-chip">공개 ' + esc(scopeNames(t.scope)) + '</span>');
     if (isDone){
       var byTxt = t.done_by ? (" · " + esc(t.done_by)) : "";
       metaBits.push('<span class="done-by">✓ ' + esc(t.done_at || "") + byTxt + '</span>');
@@ -1137,7 +1191,8 @@
         ? '<button class="mini-btn" data-task-resume="' + t.id + '">재개</button>'
         : '<button class="mini-btn" data-task-hold="' + t.id + '">보류</button>');
       var calBtn = t.due ? '<button class="cal-btn" data-cal-task="' + t.id + '">캘린더</button>' : '';
-      ctrl = '<div class="task-ctrl">' + ddayBadge + holdBtn + calBtn + '</div>';
+      var editBtn = canDo("tasks") ? '<button class="mini-btn" data-task-edit="' + t.id + '">수정</button>' : '';
+      ctrl = '<div class="task-ctrl">' + ddayBadge + holdBtn + editBtn + calBtn + '</div>';
     }
 
     var cls = "item task-item" + (isDone ? " checked" : "") + (t.status === "hold" ? " hold" : "");
@@ -1161,7 +1216,7 @@
 
     var active = [];
     var done = [];
-    liveTasks().forEach(function(t){
+    liveTasks().filter(taskVisible).forEach(function(t){
       if (t.status === "done") done.push(t); else active.push(t);
     });
 
@@ -1262,6 +1317,9 @@
     });
     Array.prototype.forEach.call(host.querySelectorAll("[data-task-reopen]"), function(el){
       el.addEventListener("click", function(e){ e.stopPropagation(); toggleTaskDone(el.getAttribute("data-task-reopen")); });
+    });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-task-edit]"), function(el){
+      el.addEventListener("click", function(e){ e.stopPropagation(); openTaskModal(el.getAttribute("data-task-edit")); });
     });
   }
 
@@ -1929,6 +1987,10 @@
   document.getElementById("licCancel").addEventListener("click", closeLicModal);
   document.getElementById("licBackdrop").addEventListener("click", function(e){ if (e.target === this) closeLicModal(); });
 
+  document.getElementById("teSave").addEventListener("click", saveTaskModal);
+  document.getElementById("teCancel").addEventListener("click", closeTaskModal);
+  document.getElementById("taskEditBackdrop").addEventListener("click", function(e){ if (e.target === this) closeTaskModal(); });
+
   document.getElementById("vehSave").addEventListener("click", saveVehFromModal);
   document.getElementById("vehCancel").addEventListener("click", closeVehModal);
   document.getElementById("vehBackdrop").addEventListener("click", function(e){ if (e.target === this) closeVehModal(); });
@@ -2141,7 +2203,7 @@
     });
     urgent.sort(function(a, b){ return a.dd.diff - b.dd.diff; });
 
-    var openTasks = liveTasks().filter(function(t){ return t.status !== "done"; });
+    var openTasks = liveTasks().filter(function(t){ return t.status !== "done" && taskVisible(t); });
     openTasks.sort(function(a, b){
       var ad = a.due || "9999-99-99", bd = b.due || "9999-99-99";
       return ad < bd ? -1 : (ad > bd ? 1 : 0);
@@ -2497,6 +2559,7 @@
     if (l.issued) meta.push('<span>발급 ' + esc(l.issued) + '</span>');
     if (l.license_no) meta.push('<span>' + esc(l.license_no) + '</span>');
     if (l.edu_cycle) meta.push('<span class="from-chip">주기 ' + esc(l.edu_cycle) + '</span>');
+    if (l.scope && l.scope.length) meta.push('<span class="scope-chip">공개 ' + esc(scopeNames(l.scope)) + '</span>');
     var cal = "";
     if (isDate(l.expiry)) cal += '<button class="cal-btn" data-cal-lic-exp="' + l.id + '">만료 캘린더</button>';
     if (isDate(l.edu_due)) cal += '<button class="cal-btn" data-cal-lic-edu="' + l.id + '">교육 캘린더</button>';
@@ -2517,7 +2580,7 @@
   function renderLicenses(){
     var host = document.getElementById("licList");
     if (!host) return;
-    var list = liveLic().slice();
+    var list = liveLic().filter(licVisible);
     list.sort(function(a, b){ return licNearest(a) - licNearest(b); });
     var head = document.getElementById("licHead");
     if (head){
@@ -2539,7 +2602,7 @@
 
   function urgentLicenses(){
     var out = [];
-    liveLic().forEach(function(l){
+    liveLic().filter(licVisible).forEach(function(l){
       [["만료", l.expiry], ["보수교육", l.edu_due]].forEach(function(p){
         if (!isDate(p[1])) return;
         var dd = vehDday(p[1]);
@@ -2563,6 +2626,7 @@
     document.getElementById("licEdu").value = (l && isDate(l.edu_due)) ? l.edu_due : "";
     document.getElementById("licCycle").value = l ? (l.edu_cycle || "") : "";
     document.getElementById("licNote").value = l ? (l.note || "") : "";
+    renderMemberChecks("licScope", l ? l.scope : []);
     document.getElementById("licDelete").style.display = l ? "block" : "none";
     document.getElementById("licBackdrop").classList.add("show");
   }
@@ -2582,6 +2646,7 @@
       edu_due: document.getElementById("licEdu").value || null,
       edu_cycle: document.getElementById("licCycle").value.trim(),
       note: document.getElementById("licNote").value.trim(),
+      scope: getCheckedMembers("licScope"),
       updated: today
     };
     if (editingLicId){
@@ -2712,6 +2777,39 @@
   function canDo(mod){ return permOf(mod) === "do"; }
   function canSee(mod){ return permOf(mod) !== "hide"; }
   function isAdmin(){ var m = curMember(); return !!(m && m.admin); }
+
+  // 공개 대상(scope) — member id 배열. 비면 전체 공개.
+  function renderMemberChecks(hostId, selectedIds){
+    var host = document.getElementById(hostId);
+    if (!host) return;
+    var sel = selectedIds || [];
+    host.innerHTML = liveMembers().map(function(m){
+      var c = sel.indexOf(m.id) >= 0 ? " checked" : "";
+      return '<label class="mcheck"><input type="checkbox" data-mid="' + m.id + '"' + c + '> ' + esc(m.name) + ' <span class="mrole2">' + esc(m.role||"") + '</span></label>';
+    }).join("") || '<div class="mrole2" style="padding:4px;">회원이 없습니다.</div>';
+  }
+  function getCheckedMembers(hostId){
+    var out = [];
+    var host = document.getElementById(hostId);
+    if (host) Array.prototype.forEach.call(host.querySelectorAll("[data-mid]"), function(cb){ if (cb.checked) out.push(cb.getAttribute("data-mid")); });
+    return out;
+  }
+  function scopeNames(ids){
+    if (!ids || !ids.length) return "";
+    return ids.map(function(id){ var m = findMember(id); return m ? m.name : null; }).filter(Boolean).join(", ");
+  }
+  function taskVisible(t){
+    if (isAdmin()) return true;
+    var me = myName();
+    if (me && (t.who || "").trim() === me) return true;
+    if (!t.scope || !t.scope.length) return true;
+    return t.scope.indexOf(getMemberId()) >= 0;
+  }
+  function licVisible(l){
+    if (isAdmin()) return true;
+    if (!l.scope || !l.scope.length) return true;
+    return l.scope.indexOf(getMemberId()) >= 0;
+  }
 
   function applyPerms(){
     MODULES.forEach(function(mod){

@@ -28,6 +28,7 @@
 - **현재 사용자 표시**: 좌상단 헤더 우측에 `curUserBtn`(현재 회원명, 없으면 "로그인"). 탭하면 로그인/전환 모달. `updateUserChip()`가 `applyPerms`에서 갱신.
 - **PIN 관리**(2026-07-08): 로그인 모달 `내 PIN 변경`으로 각자 본인 PIN 변경. 기본 PIN 0000으로 로그인하면 변경 모달을 자동으로 띄워 유도(`openChangePin(true)`).
 - 앱 내 `도움말`(로그인 모달 → 도움말).
+- **건별 공개범위(2026-07-08)**: 지시·인허가 각 건에 `scope`(회원 id 배열). 비면 전체 공개, 지정 시 그 직원(+관리자, 지시는 담당 본인)만 목록에서 봄. 관리자는 전부 보고 `공개 …` 칩으로 대상 표시. 인허가 수정 모달 + **지시 수정 모달 신설**(제목·담당·기한·상세·공개대상, 관리자 전용)에서 설정. 헬퍼 `taskVisible`/`licVisible`/`renderMemberChecks`/`getCheckedMembers`. renderTasks·renderLicenses·대시보드에서 필터. (UI 구분이지 하드보안 아님)
 
 ## 알람: 캘린더(.ics) 연동
 - 요구된 "iOS·안드로이드 자동 알람"은 **기기 기본 캘린더 연동**으로 구현(가이드 §5 "푸시 알림 인프라" 금지 준수, 서버 0).
@@ -40,5 +41,5 @@
 - **반응형**: 모바일=상단 가로 탭(세그먼트), PC(≥860px)=좌측 세로 사이드바 + 우측 콘텐츠. `.layout`(flex)/`.tabbar`/`.views` 구조, 미디어쿼리로 전환.
 - 데이터 파일별로 독립 로드·저장·충돌병합(sha 기반 PUT, 409/422 시 재조회 후 id 병합). tasks·receivables·licenses·vehicles 모두 병합 키 item.id, del=1 우선. (vehicles도 이제 편집 저장)
 - 대시보드 만기(경과·임박)는 차량 + 인허가를 합산. 만기·지시 행의 `캘린더` 버튼은 .ics 알람 연동.
-- SW 셸 캐시는 cache-first이므로 index.html 변경 시 sw.js의 `SHELL_CACHE` 버전을 반드시 올린다(현재 jw-shell-v13).
+- SW 셸 캐시는 cache-first이므로 index.html 변경 시 sw.js의 `SHELL_CACHE` 버전을 반드시 올린다(현재 jw-shell-v14).
 - 지시 등록 `담당` 입력칸은 회원명 datalist(`#memberNames`, `populateMemberNames()`) 자동완성 — 오타로 "내게 온 지시" 매칭이 깨지지 않게. 자유 입력도 유지.
