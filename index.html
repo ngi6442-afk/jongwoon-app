@@ -616,6 +616,18 @@
         <button id="recAddBtn">청구 등록</button>
       </div>
     </div>
+    <div class="card" id="recImportCard">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+        <div>
+          <div style="font-weight:600;">홈택스 매출 목록 불러오기</div>
+          <div style="font-size:12px;opacity:.7;margin-top:2px;">홈택스·위하고에서 내려받은 매출 세금계산서 목록(.xlsx)</div>
+        </div>
+        <button type="button" id="recFilePick" class="mini-btn">파일 선택</button>
+      </div>
+      <div id="recDrop" style="margin-top:10px;padding:16px;border:2px dashed rgba(128,128,128,.4);border-radius:8px;text-align:center;font-size:13px;opacity:.75;">여기로 .xlsx 파일을 끌어놓으세요</div>
+      <input type="file" id="recFile" accept=".xlsx" style="display:none">
+      <div id="recImpMsg" style="margin-top:8px;font-size:13px;"></div>
+    </div>
     <div class="dash-sec" style="margin:14px 0 6px;"><h2>미수 <span class="cnt" id="recHead"></span></h2></div>
     <div class="card" id="recList"><div class="loading">불러오는 중…</div></div>
     <button class="link-btn" id="recPaidToggle"></button>
@@ -716,6 +728,16 @@
     <div class="mchecks" id="reScope"></div>
     <button class="primary" id="reSave">저장</button>
     <button class="secondary" id="reCancel">취소</button>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="recImpBackdrop">
+  <div class="modal">
+    <h3>기성 불러오기 미리보기</h3>
+    <div id="recImpSummary" style="font-size:14px;margin-bottom:8px;"></div>
+    <div id="recImpPreview" style="max-height:40vh;overflow:auto;font-size:13px;border:1px solid rgba(128,128,128,.25);border-radius:8px;padding:8px;margin-bottom:12px;"></div>
+    <button class="primary" id="recImpConfirm">반영</button>
+    <button class="secondary" id="recImpCancel">취소</button>
   </div>
 </div>
 
@@ -2046,6 +2068,19 @@
     showRecPaid = !showRecPaid;
     renderReceivables();
   });
+  (function(){
+    var fp=document.getElementById("recFilePick"), fi=document.getElementById("recFile"), dz=document.getElementById("recDrop");
+    if(fp&&fi){ fp.addEventListener("click", function(){ fi.click(); }); fi.addEventListener("change", function(){ if(fi.files&&fi.files[0]) handleRecImportFile(fi.files[0]); fi.value=""; }); }
+    if(dz){
+      dz.addEventListener("dragover", function(e){ e.preventDefault(); dz.style.opacity="1"; });
+      dz.addEventListener("dragleave", function(){ dz.style.opacity=".75"; });
+      dz.addEventListener("drop", function(e){ e.preventDefault(); dz.style.opacity=".75"; var f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0]; if(f) handleRecImportFile(f); });
+    }
+    var cf=document.getElementById("recImpConfirm"), cc=document.getElementById("recImpCancel"), bd=document.getElementById("recImpBackdrop");
+    if(cf) cf.addEventListener("click", confirmRecImport);
+    if(cc) cc.addEventListener("click", function(){ pendingImport=null; bd.classList.remove("show"); });
+    if(bd) bd.addEventListener("click", function(e){ if(e.target===this){ pendingImport=null; bd.classList.remove("show"); } });
+  })();
 
   document.getElementById("licAddBtn").addEventListener("click", function(){ openLicModal(null); });
   document.getElementById("licSave").addEventListener("click", saveLicFromModal);
@@ -2356,6 +2391,166 @@
     var s = String(n == null ? "" : n).replace(/[^0-9]/g, "");
     if (!s || s === "0") return "";
     return s.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  }
+
+  // ---- 홈택스 매출목록(.xlsx) 불러오기 → 미수 대사 (라이브러리 없이 순수 JS) ----
+  var pendingImport = null;
+  function impEsc(s){ return String(s==null?"":s).replace(/[&<>]/g, function(c){ return c==="&"?"&amp;":(c==="<"?"&lt;":"&gt;"); }); }
+  function xlsxUnescape(s){
+    return String(s).replace(/&(#x?[0-9a-fA-F]+|amp|lt|gt|quot|apos);/g, function(m,e){
+      if(e==="amp")return "&"; if(e==="lt")return "<"; if(e==="gt")return ">";
+      if(e==="quot")return '"'; if(e==="apos")return "'";
+      if(e.charAt(0)==="#"){ var c=e.charAt(1)==="x"?parseInt(e.slice(2),16):parseInt(e.slice(1),10); return String.fromCharCode(c); }
+      return m;
+    });
+  }
+  function xlsxCol(col){ var n=0; for(var i=0;i<col.length;i++) n=n*26+(col.charCodeAt(i)-64); return n-1; }
+  function xlsxZip(u8){
+    var dv=new DataView(u8.buffer,u8.byteOffset,u8.byteLength), eocd=-1, lim=Math.max(0,u8.length-22-65536);
+    for(var i=u8.length-22;i>=lim;i--){ if(dv.getUint32(i,true)===0x06054b50){ eocd=i; break; } }
+    if(eocd<0) throw new Error("올바른 엑셀 파일이 아닙니다");
+    var count=dv.getUint16(eocd+10,true), p=dv.getUint32(eocd+16,true), td=new TextDecoder(), ents={};
+    for(var n=0;n<count;n++){
+      if(dv.getUint32(p,true)!==0x02014b50) break;
+      var method=dv.getUint16(p+10,true), compSize=dv.getUint32(p+20,true);
+      var fnLen=dv.getUint16(p+28,true), exLen=dv.getUint16(p+30,true), cmLen=dv.getUint16(p+32,true);
+      var lho=dv.getUint32(p+42,true), name=td.decode(u8.subarray(p+46,p+46+fnLen));
+      ents[name]={method:method,compSize:compSize,lho:lho}; p+=46+fnLen+exLen+cmLen;
+    }
+    return {u8:u8,dv:dv,ents:ents};
+  }
+  function xlsxEntry(zip,name){
+    var e=zip.ents[name]; if(!e) return Promise.resolve(null);
+    var dv=zip.dv,u8=zip.u8, fnLen=dv.getUint16(e.lho+26,true), exLen=dv.getUint16(e.lho+28,true);
+    var start=e.lho+30+fnLen+exLen, data=u8.subarray(start,start+e.compSize);
+    if(e.method===0) return Promise.resolve(data);
+    if(typeof DecompressionStream!=="undefined"){
+      var ds=new DecompressionStream("deflate-raw");
+      return new Response(new Blob([data]).stream().pipeThrough(ds)).arrayBuffer().then(function(ab){ return new Uint8Array(ab); });
+    }
+    return Promise.reject(new Error("이 브라우저는 압축된 엑셀을 지원하지 않습니다"));
+  }
+  function xlsxSS(xml){ var out=[], re=/<si\b[^>]*>([\s\S]*?)<\/si>/g, m; while((m=re.exec(xml))){ var t="", tr=/<t\b[^>]*>([\s\S]*?)<\/t>/g, tm; while((tm=tr.exec(m[1]))) t+=tm[1]; out.push(xlsxUnescape(t)); } return out; }
+  function xlsxSheet(xml,shared){
+    var rows=[], rre=/<row\b[^>]*>([\s\S]*?)<\/row>/g, rm;
+    while((rm=rre.exec(xml))){
+      var arr=[], cre=/<c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g, cm;
+      while((cm=cre.exec(rm[1]))){
+        var attrs=cm[1]||"", body=cm[2]||"", r2=attrs.match(/\br="([A-Z]+)\d+"/), ci=r2?xlsxCol(r2[1]):arr.length;
+        var t2=attrs.match(/\bt="([^"]+)"/), t=t2?t2[1]:"", val="";
+        if(t==="s"){ var vi=body.match(/<v>([\s\S]*?)<\/v>/); val=vi?(shared[parseInt(vi[1],10)]||""):""; }
+        else if(t==="inlineStr"){ var is="", ir=/<t\b[^>]*>([\s\S]*?)<\/t>/g, im; while((im=ir.exec(body))) is+=im[1]; val=xlsxUnescape(is); }
+        else { var vv=body.match(/<v>([\s\S]*?)<\/v>/); val=vv?xlsxUnescape(vv[1]):""; }
+        arr[ci]=val;
+      }
+      rows.push(arr);
+    }
+    return rows;
+  }
+  function xlsxRows(arrayBuffer){
+    var zip=xlsxZip(new Uint8Array(arrayBuffer)), td=new TextDecoder();
+    return xlsxEntry(zip,"xl/sharedStrings.xml").then(function(ss){
+      var shared=ss?xlsxSS(td.decode(ss)):[];
+      var names=Object.keys(zip.ents).filter(function(n){return /^xl\/worksheets\/sheet\d+\.xml$/.test(n);}).sort();
+      if(!names.length) throw new Error("워크시트가 없습니다");
+      return xlsxEntry(zip,names[0]).then(function(sb){ return xlsxSheet(td.decode(sb),shared); });
+    });
+  }
+  function recImportMap(rows){
+    var hIdx=-1;
+    for(var i=0;i<rows.length;i++){ var r=rows[i]||[]; if(r.indexOf("신고번호")>=0 && r.indexOf("합계액")>=0){ hIdx=i; break; } }
+    if(hIdx<0) throw new Error("머리글(신고번호·합계액)을 찾지 못했습니다. 홈택스 매출 목록 파일이 맞는지 확인하세요.");
+    var header=rows[hIdx].map(function(x){return (x==null?"":String(x)).trim();});
+    var grpRaw=(hIdx>0?rows[hIdx-1]:[]).map(function(x){return (x==null?"":String(x)).trim();});
+    var group=[], last=""; for(var g=0;g<header.length;g++){ if(grpRaw[g]) last=grpRaw[g]; group.push(last); }
+    function gidx(name,grp){ for(var k=0;k<header.length;k++){ if(header[k]===name && (grp==null||group[k]===grp)) return k; } return -1; }
+    var col={ nts:gidx("신고번호"), docno:gidx("문서번호"), wdate:gidx("작성일자"), item:gidx("대표품목"),
+      supply:gidx("공급가액"), tax:gidx("세액"), total:gidx("합계액"), status:gidx("상태"), purpose:gidx("영수/청구"),
+      client:gidx("상호명","공급받는자 정보"), client_num:gidx("사업자번호","공급받는자 정보") };
+    if(col.total<0||col.client<0) throw new Error("필수 컬럼(합계액·공급받는자 상호명)을 찾지 못했습니다");
+    function cell(r,i){ return (i>=0&&r[i]!=null)?String(r[i]).trim():""; }
+    function num(s){ var n=parseInt(String(s).replace(/[^0-9-]/g,""),10); return isNaN(n)?0:n; }
+    var out=[];
+    for(var d=hIdx+1;d<rows.length;d++){
+      var r=rows[d]||[], docno=cell(r,col.docno), nts=cell(r,col.nts);
+      if(!docno&&!nts) continue;
+      var st=cell(r,col.status);
+      out.push({ nts:nts, docno:docno, client:cell(r,col.client), client_num:cell(r,col.client_num),
+        desc:cell(r,col.item), amount:num(cell(r,col.total)), supply:num(cell(r,col.supply)), tax:num(cell(r,col.tax)),
+        billed:cell(r,col.wdate), purpose:cell(r,col.purpose), status:st, cancelled:(st==="취소") });
+    }
+    return out;
+  }
+  function recImportPlan(cands){
+    var byNts={}; receivables.forEach(function(r){ if(r&&r.nts) byNts[r.nts]=r; });
+    var plan={add:[],upd:[],cancel:[],dup:0};
+    cands.forEach(function(c){
+      var ex=c.nts?byNts[c.nts]:null;
+      if(c.cancelled){ if(ex&&!ex.paid&&ex.del!==1) plan.cancel.push(c); return; }
+      if(ex){
+        var changed=ex.del===1||ex.client!==c.client||((ex.desc||"")!==c.desc)||((ex.amount||0)!==c.amount);
+        if(changed) plan.upd.push(c); else plan.dup++;
+      } else plan.add.push(c);
+    });
+    return plan;
+  }
+  function recImportApply(cands){
+    var byNts={}; receivables.forEach(function(r){ if(r&&r.nts) byNts[r.nts]=r; });
+    var today=todayStr(), res={add:0,upd:0,cancel:0};
+    cands.forEach(function(c){
+      var ex=c.nts?byNts[c.nts]:null;
+      if(c.cancelled){ if(ex&&!ex.paid&&ex.del!==1){ ex.del=1; ex.updated=today; removeRecTask(ex); res.cancel++; } return; }
+      if(ex){
+        var ch=false;
+        if(ex.del===1){ ex.del=0; ch=true; }
+        if(ex.client!==c.client){ ex.client=c.client; ch=true; }
+        if((ex.desc||"")!==c.desc){ ex.desc=c.desc; ch=true; }
+        if((ex.amount||0)!==c.amount){ ex.amount=c.amount; if(ex.paid) ex.recheck=1; ch=true; }
+        if(ch){ ex.updated=today; res.upd++; }
+      } else {
+        var it={ id:genId("r"), nts:c.nts, docno:c.docno, client:c.client, client_num:c.client_num, site:"",
+          desc:c.desc, amount:c.amount, supply:c.supply, tax:c.tax, billed:c.billed||today, purpose:c.purpose,
+          invoice:true, paid:null, due_hint:"", note:"", assignee:"", scope:[], task_id:null, mismatch:false,
+          src:"hometax", created:today, updated:today };
+        receivables.push(it); if(c.nts) byNts[c.nts]=it; res.add++;
+      }
+    });
+    return res;
+  }
+  function handleRecImportFile(file){
+    var msg=document.getElementById("recImpMsg");
+    function err(t){ if(msg){ msg.style.color="#c0392b"; msg.textContent=t; } }
+    if(!canDo("rec")) return err("기성 수행 권한이 없습니다.");
+    if(!file) return;
+    if(!/\.xlsx$/i.test(file.name)) return err(".xlsx 파일만 지원합니다.");
+    if(msg){ msg.style.color=""; msg.textContent="파일 읽는 중…"; }
+    file.arrayBuffer().then(xlsxRows).then(function(rows){
+      var cands=recImportMap(rows);
+      pendingImport=cands;
+      showRecImportPreview(recImportPlan(cands));
+      if(msg) msg.textContent="";
+    }).catch(function(e){ err("읽기 실패: "+(e&&e.message||e)); });
+  }
+  function showRecImportPreview(plan){
+    var addTotal=plan.add.reduce(function(a,c){return a+c.amount;},0);
+    document.getElementById("recImpSummary").innerHTML="신규 <b>"+plan.add.length+"</b>건 · 갱신 <b>"+plan.upd.length+"</b>건 · 취소반영 <b>"+plan.cancel.length+"</b>건 · 이미있음 "+plan.dup+"건<br>신규 미수 합계 <b>"+fmtAmount(addTotal)+"원</b>";
+    function line(c,tag){ return '<div style="padding:4px 0;border-bottom:1px solid rgba(128,128,128,.12);">'+tag+" <b>"+impEsc(c.client)+"</b> · "+impEsc(c.desc||"")+" · "+fmtAmount(c.amount)+"원</div>"; }
+    var html="";
+    plan.add.forEach(function(c){ html+=line(c,'<span style="color:#27ae60;">신규</span>'); });
+    plan.upd.forEach(function(c){ html+=line(c,'<span style="color:#e67e22;">갱신</span>'); });
+    plan.cancel.forEach(function(c){ html+=line(c,'<span style="color:#c0392b;">취소</span>'); });
+    if(!html) html='<div style="opacity:.6;">반영할 변경이 없습니다 (모두 이미 등록됨).</div>';
+    document.getElementById("recImpPreview").innerHTML=html;
+    document.getElementById("recImpBackdrop").classList.add("show");
+  }
+  function confirmRecImport(){
+    var bd=document.getElementById("recImpBackdrop");
+    if(!pendingImport){ bd.classList.remove("show"); return; }
+    var res=recImportApply(pendingImport);
+    pendingImport=null; bd.classList.remove("show");
+    saveRecCache(); renderReceivables(); renderDashboard(); scheduleRecSave();
+    var msg=document.getElementById("recImpMsg");
+    if(msg){ msg.style.color="#27ae60"; msg.textContent="반영 완료 — 신규 "+res.add+" · 갱신 "+res.upd+" · 취소 "+res.cancel; }
   }
 
   function saveRecCache(){ try{ localStorage.setItem(REC_CACHE_KEY, JSON.stringify({sha: recSha, items: receivables})); }catch(e){} }
