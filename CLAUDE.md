@@ -17,7 +17,7 @@
 - M2 차량·자산 만기(vehicles.json): **구현 완료(P2, 2026-07-07 / 갱신기능 2026-07-08)**. `차량` 탭 + 통합 `대시보드`(첫 화면). 검사/보험 D-day 색상(경과 빨강·30일 주황·90일 노랑·**말소예정·매각·검사보류 회색**), 만기 임박순 정렬. **차량은 편집형(RW)**: 각 행 `수정` → 검사/보험 만기·상태·보험사·메모 편집, `검사/보험 갱신(+1년)` 버튼으로 다음 만기 세팅. `~/jongwoon/extract_vehicles.py`는 이제 **최초 시드/신규차량 확인용**(연락처 제외·차주명까지만); **재추출 시 앱 편집분을 덮어쓰므로 주의**(현황표는 백업 성격). state `검사보류`는 검사 의도적 스킵(회색·대시보드 제외).
 - M3 수금·기성(receivables.json): **구현 완료(P3, 2026-07-07 / 업무연동·공개범위 2026-07-08)**. `기성` 탭(구 수금). 청구 등록·계산서 발행·입금완료·미수전환·삭제. 미수 오래된 순·합계, 대시보드 통합. 은행 연동 없음.
   - **건별 공개범위**: 기성 수정 모달(거래처·내역·금액·청구일·**담당(assignee)**·**공개대상 scope**). `recVisible`=관리자·담당·scope 포함·전체공개. 비회원은 안 보임.
-  - **업무 연동**: 계산서 발행 → "입금확인: {거래처}…" 지시 자동 생성(who=담당, rec_id 링크, scope 동기화). 입금완료 → 연동 지시 자동 완료. 미수전환 → 재개. 계산서 취소 → 미완료 연동 지시 제거. **금액 불일치** 토글 → `mismatch` 플래그·불일치 칩·연동 지시에 "금액 불일치" 메모. 헬퍼: `createRecTask/completeRecTask/reopenRecTask/removeRecTask/findRecTask`.
+  - **파이프라인(stage: receivable→paid, mismatch)**: 진입점 = **`계산서 발행`**(엔트리 폼). 발행하면 자동으로 **미수 등록(stage receivable) + "입금확인: {거래처}…" 지시 자동 생성**(who=담당, rec_id 링크, scope 동기화). **입금완료** → stage paid + 연동 지시 자동 완료. 미수전환 → 재개. **금액 불일치** → stage mismatch·불일치 칩·연동 지시 "금액 불일치" 메모. 화면 2섹션(미수=입금전 / 완료). `recStage` 폴백으로 구 데이터(invoice=false)는 billed로 보여 `계산서 발행` 버튼 제공. 헬퍼: `recIssueInvoice/recMarkPaid/recUnpay/recToggleMismatch` + `createRecTask/completeRecTask/reopenRecTask/removeRecTask/findRecTask`.
 - M4 인허가·보수교육(licenses.json): **구현 완료(P4, 2026-07-08)**. `인허가` 탭(편집형). JW-04-001 인허가 13건을 시드로 넣되, **원천에 만료일이 비어 있어** 만료일·보수교육 예정일은 앱에서 직접 입력·수정(수정 모달). 만료일은 날짜/`해당없음`/미정(null) 지원. 날짜 입력 시 M2와 동일한 D-day 색상·대시보드·캘린더 알람 작동. 법정 만기일은 지어내지 않음(PM 입력).
 - 단계 완료 시 이 파일과 가이드를 실태에 맞게 갱신한다.
 
@@ -43,5 +43,5 @@
 - **반응형**: 모바일=상단 가로 탭(세그먼트), PC(≥860px)=좌측 세로 사이드바 + 우측 콘텐츠. `.layout`(flex)/`.tabbar`/`.views` 구조, 미디어쿼리로 전환.
 - 데이터 파일별로 독립 로드·저장·충돌병합(sha 기반 PUT, 409/422 시 재조회 후 id 병합). tasks·receivables·licenses·vehicles 모두 병합 키 item.id, del=1 우선. (vehicles도 이제 편집 저장)
 - 대시보드 만기(경과·임박)는 차량 + 인허가를 합산. 만기·지시 행의 `캘린더` 버튼은 .ics 알람 연동.
-- SW 셸 캐시는 cache-first이므로 index.html 변경 시 sw.js의 `SHELL_CACHE` 버전을 반드시 올린다(현재 jw-shell-v15).
+- SW 셸 캐시는 cache-first이므로 index.html 변경 시 sw.js의 `SHELL_CACHE` 버전을 반드시 올린다(현재 jw-shell-v16).
 - 지시 등록 `담당` 입력칸은 회원명 datalist(`#memberNames`, `populateMemberNames()`) 자동완성 — 오타로 "내게 온 지시" 매칭이 깨지지 않게. 자유 입력도 유지.
