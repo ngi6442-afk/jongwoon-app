@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>종운 업무체크</title>
+<title>종운 그룹웨어</title>
 <meta name="theme-color" content="#0F5132">
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="icon" href="./icon-192.png">
@@ -64,18 +64,20 @@
   }
   .tab-btn{
     flex:1;
+    min-width:0;
     border:none;
     background:transparent;
-    padding:9px 0;
+    padding:9px 2px;
     border-radius:9px;
-    font-size:14px;
+    font-size:12.5px;
     font-weight:700;
     color:var(--sub);
     cursor:pointer;
     display:flex;
     align-items:center;
     justify-content:center;
-    gap:6px;
+    gap:4px;
+    white-space:nowrap;
   }
   .tab-btn.active{
     background:#fff;
@@ -473,25 +475,55 @@
   .modal button.danger{width:100%;padding:11px;border:none;background:transparent;color:#B0332A;font-size:13px;font-weight:700;margin-top:2px;cursor:pointer;}
   .modal select{width:100%;padding:12px;border-radius:10px;border:1px solid var(--line);font-size:14px;margin-bottom:10px;background:#fff;}
   .modal .mini-btn{margin:-4px 0 12px 2px;}
+
+  /* 반응형: 모바일=상단 탭, PC=좌측 세로 사이드바 */
+  .views{min-width:0;}
+  @media (min-width: 860px){
+    #app{max-width:1060px;padding:16px 22px 48px;}
+    .layout{display:flex;align-items:flex-start;gap:24px;}
+    .tabbar{
+      flex-direction:column;
+      width:184px;
+      flex-shrink:0;
+      gap:5px;
+      background:transparent;
+      padding:0;
+      position:sticky;
+      top:16px;
+    }
+    .tab-btn{
+      justify-content:flex-start;
+      padding:12px 15px;
+      font-size:14.5px;
+      background:var(--card);
+      border:1px solid var(--line);
+      border-radius:10px;
+    }
+    .tab-btn.active{background:var(--brand-dark);color:#fff;box-shadow:0 2px 6px rgba(15,81,50,0.2);}
+    .tab-btn .tab-badge{margin-left:auto;}
+    .views{flex:1;}
+  }
 </style>
 </head>
 <body>
 <div id="app">
   <header class="topbar">
-    <h1>종운 업무체크</h1>
+    <h1>종운환경 · 종운건설</h1>
     <button class="gear-btn" id="gearBtn" aria-label="설정">⚙</button>
   </header>
 
   <div class="offline-banner" id="offlineBanner">오프라인 — 연결되면 자동 저장</div>
 
+  <div class="layout">
   <nav class="tabbar">
     <button class="tab-btn active" data-tab="dash" id="tabDashBtn">홈</button>
     <button class="tab-btn" data-tab="tasks" id="tabTasksBtn">지시 <span class="tab-badge hide" id="taskTabBadge">0</span></button>
     <button class="tab-btn" data-tab="veh" id="tabVehBtn">차량</button>
-    <button class="tab-btn" data-tab="rec" id="tabRecBtn">수금</button>
+    <button class="tab-btn" data-tab="rec" id="tabRecBtn">기성</button>
     <button class="tab-btn" data-tab="lic" id="tabLicBtn">인허가</button>
-    <button class="tab-btn" data-tab="check" id="tabCheckBtn">체크</button>
+    <button class="tab-btn" data-tab="check" id="tabCheckBtn">주기업무</button>
   </nav>
+  <div class="views">
 
   <!-- 통합 대시보드 (첫 화면) -->
   <div class="view active" id="view-dash">
@@ -571,6 +603,8 @@
         <div class="item"><div class="item-body"><div class="item-title">밀폐공간 · 석면 투입 전 → JW-06-012 · 특별교육</div></div></div>
       </div>
     </section>
+  </div>
+  </div>
   </div>
 </div>
 
@@ -2094,7 +2128,7 @@
       head.textContent = unpaid.length ? (unpaid.length + "건" + (sum ? " · " + fmtAmount(sum) + "원" : "")) : "";
     }
     listHost.innerHTML = unpaid.length ? unpaid.map(function(r){ return recRowHtml(r, false); }).join("") : '<div class="empty-line">미수 건이 없습니다.</div>';
-    toggleBtn.textContent = showRecPaid ? "수금 완료 숨기기" : ("수금 완료 보기 (" + paid.length + ")");
+    toggleBtn.textContent = showRecPaid ? "입금 완료 숨기기" : ("입금 완료 보기 (" + paid.length + ")");
     paidHost.style.display = showRecPaid ? "block" : "none";
     paidHost.innerHTML = paid.map(function(r){ return recRowHtml(r, true); }).join("");
     bindRecHandlers(listHost);

@@ -25,7 +25,9 @@
 - 앱 자체는 푸시/백그라운드 알림을 하지 않는다(정적 PWA 한계·가이드 준수). 자동 갱신 구독(webcal) 원하면 추후 GitHub Actions로 .ics 피드 생성.
 
 ## 앱 구조 메모
-- 탭: `홈`(대시보드·기본) / `지시`(tasks) / `차량`(vehicles) / `수금`(receivables) / `인허가`(licenses) / `체크`(checklist).
+- 앱 명칭: **종운 그룹웨어**(manifest/title). 좌상단 헤더는 `종운환경 · 종운건설`.
+- 탭: `홈`(대시보드·기본) / `지시`(tasks) / `차량`(vehicles) / `기성`(receivables·구 수금) / `인허가`(licenses) / `주기업무`(checklist·구 체크).
+- **반응형**: 모바일=상단 가로 탭(세그먼트), PC(≥860px)=좌측 세로 사이드바 + 우측 콘텐츠. `.layout`(flex)/`.tabbar`/`.views` 구조, 미디어쿼리로 전환.
 - 데이터 파일별로 독립 로드·저장·충돌병합(sha 기반 PUT, 409/422 시 재조회 후 id 병합). tasks·receivables·licenses·vehicles 모두 병합 키 item.id, del=1 우선. (vehicles도 이제 편집 저장)
 - 대시보드 만기(경과·임박)는 차량 + 인허가를 합산. 만기·지시 행의 `캘린더` 버튼은 .ics 알람 연동.
-- SW 셸 캐시는 cache-first이므로 index.html 변경 시 sw.js의 `SHELL_CACHE` 버전을 반드시 올린다(현재 jw-shell-v7).
+- SW 셸 캐시는 cache-first이므로 index.html 변경 시 sw.js의 `SHELL_CACHE` 버전을 반드시 올린다(현재 jw-shell-v8).
