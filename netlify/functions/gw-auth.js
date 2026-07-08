@@ -135,6 +135,19 @@ async function handleSetPin(st, event, d, R) {
   return jr(200, { status: 'OK', request_id: R });
 }
 
+// 데이터 리셋(테스트 정리용). env GW_ALLOW_RESET='1' 일 때만. gw_users + gw_data 전체 삭제.
+async function handleReset(R) {
+  if (process.env.GW_ALLOW_RESET !== '1') return jr(403, { status: 'FORBIDDEN', error_code: 'RESET_DISABLED', request_id: R });
+  const { blobDelete } = require('./_lib/blobs');
+  let n = 0;
+  for (const storeName of [USERS, 'gw_data']) {
+    const st = store(storeName);
+    const { blobs } = await st.list();
+    for (const b of (blobs || [])) { await blobDelete(st, b.key); n++; }
+  }
+  return jr(200, { status: 'OK', deleted: n, request_id: R });
+}
+
 async function handler(event) {
   const R = rid();
   if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: CORS, body: '' };
@@ -145,6 +158,7 @@ async function handler(event) {
   const st = store(USERS);
   try {
     switch (d && d.action) {
+      case 'reset': return await handleReset(R);
       case 'bootstrap': return await handleBootstrap(st, d, R);
       case 'names': { const ms = await listMembers(st); return jr(200, { status: 'OK', names: ms.map(function (m) { return m.name; }), count: ms.length, request_id: R }); }
       case 'login': return await handleLogin(st, d, R);

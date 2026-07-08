@@ -986,10 +986,63 @@
     return btoa(binary);
   }
 
-  function getToken(){ return localStorage.getItem(TOKEN_KEY); }
-  function setToken(t){ localStorage.setItem(TOKEN_KEY, t); }
-  function clearToken(){ localStorage.removeItem(TOKEN_KEY); }
-  function getUser(){ return localStorage.getItem(USER_KEY) || ""; }
+  // ---- 백엔드(그룹웨어 Netlify Functions) ----
+  var FN_BASE = (location.hostname === "localhost" || location.hostname === "127.0.0.1")
+    ? "https://jongwoon-app.netlify.app/.netlify/functions" : "/.netlify/functions";
+  var GW_TOKEN_KEY = "jw_gw_token";
+  var curMemberObj = null;
+  function gwToken(){ try{ return sessionStorage.getItem(GW_TOKEN_KEY) || localStorage.getItem(GW_TOKEN_KEY); }catch(e){ return null; } }
+  function setGwToken(t, persist){
+    try{
+      if (!t){ sessionStorage.removeItem(GW_TOKEN_KEY); localStorage.removeItem(GW_TOKEN_KEY); return; }
+      if (persist){ localStorage.setItem(GW_TOKEN_KEY, t); sessionStorage.removeItem(GW_TOKEN_KEY); }
+      else { sessionStorage.setItem(GW_TOKEN_KEY, t); localStorage.removeItem(GW_TOKEN_KEY); }
+    }catch(e){}
+  }
+  var _rawFetch = window.fetch.bind(window);
+  function gwCall(fn, body){
+    return _rawFetch(FN_BASE + "/" + fn, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + (gwToken() || "") },
+      body: JSON.stringify(body || {})
+    }).then(function(r){ return r.json().then(function(j){ return { status: r.status, body: j }; }).catch(function(){ return { status: r.status, body: {} }; }); });
+  }
+  function _ghResp(status, obj){ return Promise.resolve({ status: status, ok: status >= 200 && status < 300, json: function(){ return Promise.resolve(obj); } }); }
+  function emptyDoc(col){ return col === "checklist" ? { records: {}, custom: {} } : { schema: 1, items: [] }; }
+  function _urlCollection(u){
+    if (u.indexOf("checklist.json") >= 0) return "checklist";
+    if (u.indexOf("tasks.json") >= 0) return "tasks";
+    if (u.indexOf("vehicles.json") >= 0) return "vehicles";
+    if (u.indexOf("receivables.json") >= 0) return "receivables";
+    if (u.indexOf("licenses.json") >= 0) return "licenses";
+    return null;
+  }
+  function onSessionInvalid(){ setGwToken(null); curMemberObj = null; if (typeof showMemberLogin === "function") showMemberLogin(); }
+  // 기존 모듈의 GitHub Contents API 호출을 gw-data로 라우팅(모듈 코드 그대로 재사용)
+  window.fetch = function(url, opts){
+    url = String(url); opts = opts || {};
+    var col = (url.indexOf("api.github.com") >= 0) ? _urlCollection(url) : null;
+    if (col === null) return _rawFetch(url, opts);
+    var method = (opts.method || "GET").toUpperCase();
+    if (method === "GET"){
+      return gwCall("gw-data", { action: "get", collection: col }).then(function(res){
+        if (res.status === 401){ onSessionInvalid(); return _ghResp(401, {}); }
+        var doc = (res.status === 200 && res.body && res.body.doc) ? res.body.doc : emptyDoc(col);
+        return _ghResp(200, { sha: "gw", content: b64EncodeUnicode(JSON.stringify(doc)) });
+      });
+    }
+    var body = {}; try{ body = JSON.parse(opts.body); }catch(e){}
+    var doc = {}; try{ doc = JSON.parse(b64DecodeUnicode(body.content)); }catch(e){}
+    return gwCall("gw-data", { action: "save", collection: col, doc: doc }).then(function(res){
+      if (res.status === 401){ onSessionInvalid(); return _ghResp(401, {}); }
+      return _ghResp(200, { content: { sha: "gw" } });   // 403(쓰기권한 없음)도 조용히: 서버가 이미 막음
+    });
+  };
+
+  function getToken(){ return gwToken(); }
+  function setToken(t){ setGwToken(t, false); }
+  function clearToken(){ setGwToken(null); }
+  function getUser(){ return (curMemberObj && curMemberObj.name) || localStorage.getItem(USER_KEY) || ""; }
   function setUser(u){ localStorage.setItem(USER_KEY, u); }
 
   function genId(prefix){
@@ -1918,13 +1971,9 @@
   }
 
   // ---- 토큰 / 설정 UI ----
-  function showTokenScreen(isError){
-    document.getElementById("tokenErr").classList.toggle("show", !!isError);
-    document.getElementById("tokenBackdrop").classList.add("show");
-  }
-  function hideTokenScreen(){
-    document.getElementById("tokenBackdrop").classList.remove("show");
-  }
+  // 옛 앱토큰 화면은 폐기 — 이제 이름+PIN 백엔드 로그인으로 대체.
+  function showTokenScreen(isError){ if (typeof showMemberLogin === "function") showMemberLogin(); }
+  function hideTokenScreen(){ var el = document.getElementById("tokenBackdrop"); if (el) el.classList.remove("show"); }
 
   document.getElementById("tokenSave").addEventListener("click", function(){
     var tokenVal = document.getElementById("tokenInput").value.trim();
@@ -2887,10 +2936,9 @@
       else { sessionStorage.setItem(MEMBER_KEY, id); localStorage.removeItem(MEMBER_KEY); }
     }catch(e){}
   }
-  function curMember(){ var m = findMember(getMemberId()); return (m && m.del !== 1) ? m : null; }
+  function curMember(){ return curMemberObj; }
 
   function permOf(mod){
-    if (!liveMembers().length) return "do";
     var m = curMember();
     if (!m) return "hide";
     if (m.admin) return "do";
@@ -2947,30 +2995,7 @@
   function saveUsersCache(){ try{ localStorage.setItem(USERS_CACHE_KEY, JSON.stringify({sha: usersSha, members: members})); }catch(e){} }
   function loadUsersCache(){ try{ var r = localStorage.getItem(USERS_CACHE_KEY); return r ? JSON.parse(r) : null; }catch(e){ return null; } }
 
-  function loadUsers(){
-    var token = getToken(); if (!token) return;
-    fetch(USERS_API, {headers: ghHeaders()}).then(function(resp){
-      if (resp.status === 401){ clearToken(); showTokenScreen(true); return; }
-      if (resp.status === 404){ usersSha = null; members = []; saveUsersCache(); afterUsers(); return; }
-      if (!resp.ok) throw new Error("HTTP " + resp.status);
-      return resp.json().then(function(json){
-        usersSha = json.sha;
-        var parsed = JSON.parse(b64DecodeUnicode(json.content));
-        members = (parsed && parsed.members) || [];
-        setOffline(false); saveUsersCache(); afterUsers();
-      });
-    }).catch(function(){
-      var c = loadUsersCache();
-      if (c){ usersSha = c.sha; members = c.members || []; setOffline(true); }
-      afterUsers();
-    });
-  }
-  function afterUsers(){
-    if (liveMembers().length && !curMember()) showMemberLogin();
-    else hideMemberLogin();
-    applyPerms();
-    render();
-  }
+  function loadUsers(){ loadMembers(); }   // 백엔드: 회원목록은 gw-auth member_list
 
   function scheduleUsersSave(){
     usersPending = true;
@@ -3010,27 +3035,46 @@
 
   function showMemberLogin(){
     var sel = document.getElementById("memberSelect");
-    sel.innerHTML = liveMembers().map(function(m){ return '<option value="' + m.id + '">' + esc(m.name) + ' (' + esc(m.role||"") + ')</option>'; }).join("");
     var cm = curMember();
     document.getElementById("memberCurrent").textContent = cm ? ("현재: " + cm.name + " · 전환하려면 다시 로그인") : "이름 선택 후 PIN 입력";
     document.getElementById("memberErr").classList.remove("show");
     document.getElementById("memberPin").value = "";
     document.getElementById("memberManageBtn").style.display = isAdmin() ? "block" : "none";
     document.getElementById("memberPinBtn").style.display = cm ? "block" : "none";
-    try{ document.getElementById("memberKeep").checked = !!localStorage.getItem(MEMBER_KEY); }catch(e){}
+    try{ document.getElementById("memberKeep").checked = !!localStorage.getItem(GW_TOKEN_KEY); }catch(e){}
+    sel.innerHTML = '<option value="">불러오는 중…</option>';
     document.getElementById("memberBackdrop").classList.add("show");
+    gwCall("gw-auth", { action: "names" }).then(function(res){
+      var names = (res.body && res.body.names) || [];
+      if (!names.length){ sel.innerHTML = '<option value="">(회원 없음 — 최초 설정 필요)</option>'; return; }
+      sel.innerHTML = names.map(function(n){ return '<option value="' + esc(n) + '">' + esc(n) + '</option>'; }).join("");
+    });
   }
   function hideMemberLogin(){ document.getElementById("memberBackdrop").classList.remove("show"); }
   function doMemberLogin(){
-    var id = document.getElementById("memberSelect").value;
+    var name = document.getElementById("memberSelect").value;
     var pin = document.getElementById("memberPin").value.trim();
-    var m = findMember(id);
-    if (!m || m.del === 1 || (m.pin || "") !== pin){ document.getElementById("memberErr").classList.add("show"); return; }
+    if (!name || !pin){ document.getElementById("memberErr").classList.add("show"); return; }
     var keep = document.getElementById("memberKeep").checked;
-    setMemberId(id, keep);
-    hideMemberLogin();
-    applyPerms(); render();
-    if ((m.pin || "") === "0000") openChangePin(true);   // 기본 PIN이면 변경 유도
+    gwCall("gw-auth", { action: "login", name: name, pin: pin }).then(function(res){
+      if (res.status !== 200 || !res.body || !res.body.token){ document.getElementById("memberErr").classList.add("show"); return; }
+      setGwToken(res.body.token, keep);
+      curMemberObj = res.body.member;
+      hideMemberLogin();
+      afterLogin();
+    });
+  }
+  // 로그인 성공 후: 권한 적용 + 데이터 로드 + (관리자면) 회원목록 로드
+  function afterLogin(){
+    applyPerms();
+    doLoad(); loadTasks(); loadVehicles(); loadReceivables(); loadLicenses();
+    if (isAdmin()) loadMembers();
+    render();
+  }
+  function loadMembers(){
+    gwCall("gw-auth", { action: "member_list" }).then(function(res){
+      if (res.status === 200 && res.body && Array.isArray(res.body.members)) members = res.body.members;
+    });
   }
 
   function updateUserChip(){
@@ -3055,13 +3099,22 @@
   function saveChangePin(){
     var m = curMember(); if (!m) return;
     var np = document.getElementById("pinNew").value.trim();
-    if (!/^\d{4}$/.test(np)){ document.getElementById("pinErr").classList.add("show"); return; }
-    m.pin = np; m.updated = todayStr();
-    closeChangePin();
-    saveUsersCache(); scheduleUsersSave();
+    if (!/^\d{4,}$/.test(np)){ document.getElementById("pinErr").classList.add("show"); return; }
+    gwCall("gw-auth", { action: "set_pin", pin: np }).then(function(res){
+      if (res.status !== 200){ document.getElementById("pinErr").classList.add("show"); return; }
+      closeChangePin();
+    });
   }
 
-  function showUsersManage(){ if (!isAdmin()) return; renderUsersList(); document.getElementById("usersBackdrop").classList.add("show"); }
+  function showUsersManage(){
+    if (!isAdmin()) return;
+    document.getElementById("usersBackdrop").classList.add("show");
+    document.getElementById("usersList").innerHTML = '<div class="empty-line">불러오는 중…</div>';
+    gwCall("gw-auth", { action: "member_list" }).then(function(res){
+      if (res.status === 200 && res.body && Array.isArray(res.body.members)) members = res.body.members;
+      renderUsersList();
+    });
+  }
   function renderUsersList(){
     var host = document.getElementById("usersList");
     host.innerHTML = liveMembers().map(function(m){
@@ -3080,7 +3133,8 @@
     document.getElementById("memberEditTitle").textContent = m ? "회원 수정" : "회원 추가";
     document.getElementById("meErr").classList.remove("show");
     document.getElementById("meName").value = m ? (m.name||"") : "";
-    document.getElementById("mePin").value = m ? (m.pin||"") : "";
+    document.getElementById("mePin").value = "";
+    document.getElementById("mePin").placeholder = m ? "PIN (변경 시만 입력)" : "PIN 4자리 숫자";
     document.getElementById("meRole").value = m ? (m.role||"직원") : "직원";
     var perms = m ? (m.perms||{}) : ROLE_PRESET["직원"].perms;
     document.getElementById("mePerms").innerHTML = MODULES.map(function(mod){
@@ -3090,7 +3144,7 @@
         '<option value="view"' + (v==="view"?" selected":"") + '>보기</option>' +
         '<option value="hide"' + (v==="hide"?" selected":"") + '>숨김</option></select></div>';
     }).join("");
-    document.getElementById("meDelete").style.display = (m && m.id !== "uadmin") ? "block" : "none";
+    document.getElementById("meDelete").style.display = (m && curMember() && m.id !== curMember().id) ? "block" : "none";
     document.getElementById("memberEditBackdrop").classList.add("show");
   }
   function closeMemberEdit(){ document.getElementById("memberEditBackdrop").classList.remove("show"); editingMemberId = null; }
@@ -3101,28 +3155,28 @@
   function saveMemberEdit(){
     var name = document.getElementById("meName").value.trim();
     var pin = document.getElementById("mePin").value.trim();
-    if (!name || !/^\d{4}$/.test(pin)){ document.getElementById("meErr").classList.add("show"); return; }
+    var isNew = !editingMemberId;
+    if (!name || (isNew && !/^\d{4,}$/.test(pin))){ document.getElementById("meErr").classList.add("show"); return; }
     var role = document.getElementById("meRole").value;
     var admin = !!(ROLE_PRESET[role] && ROLE_PRESET[role].admin);
     var perms = {};
     Array.prototype.forEach.call(document.querySelectorAll("#mePerms [data-perm]"), function(sel){ perms[sel.getAttribute("data-perm")] = sel.value; });
-    var today = todayStr();
-    if (editingMemberId){
-      var m = findMember(editingMemberId);
-      if (m){ m.name = name; m.pin = pin; m.role = role; m.admin = admin; m.perms = perms; m.updated = today; }
-    } else {
-      members.push({id: genId("u"), name: name, pin: pin, role: role, admin: admin, perms: perms, created: today, updated: today});
-    }
-    closeMemberEdit();
-    saveUsersCache(); renderUsersList(); applyPerms(); render(); scheduleUsersSave();
+    var payload = { action: "member_upsert", name: name, role: role, admin: admin, perms: perms };
+    if (editingMemberId) payload.id = editingMemberId;
+    if (pin && /^\d{4,}$/.test(pin)) payload.pin = pin;
+    gwCall("gw-auth", payload).then(function(res){
+      if (res.status !== 200){ document.getElementById("meErr").classList.add("show"); return; }
+      closeMemberEdit();
+      showUsersManage();
+    });
   }
   function deleteMemberEdit(){
-    if (!editingMemberId || editingMemberId === "uadmin") return;
-    var m = findMember(editingMemberId);
-    if (m){ m.del = 1; m.updated = todayStr(); }
-    if (getMemberId() === editingMemberId) setMemberId(null);
-    closeMemberEdit();
-    saveUsersCache(); renderUsersList(); applyPerms(); render(); scheduleUsersSave();
+    if (!editingMemberId) return;
+    if (curMember() && editingMemberId === curMember().id) return;  // 본인 삭제 금지
+    gwCall("gw-auth", { action: "member_delete", id: editingMemberId }).then(function(){
+      closeMemberEdit();
+      showUsersManage();
+    });
   }
 
   // ---- 시작 ----
@@ -3132,12 +3186,14 @@
     });
   }
 
-  doLoad();
-  loadTasks();
-  loadVehicles();
-  loadReceivables();
-  loadLicenses();
-  loadUsers();
+  // 시작: 세션 검증 → 유효하면 데이터 로드, 아니면 로그인
+  (function boot(){
+    if (!gwToken()){ showMemberLogin(); return; }
+    gwCall("gw-auth", { action: "verify" }).then(function(res){
+      if (res.status === 200 && res.body && res.body.valid){ curMemberObj = res.body.member; afterLogin(); }
+      else { setGwToken(null); showMemberLogin(); }
+    }).catch(function(){ showMemberLogin(); });
+  })();
 })();
 </script>
 </body>
