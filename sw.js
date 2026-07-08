@@ -1,4 +1,4 @@
-const SHELL_CACHE = 'jw-shell-v18';
+const SHELL_CACHE = 'jw-shell-v19';
 const SHELL_FILES = [
   './',
   './index.html',
@@ -36,7 +36,21 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 
-  // 앱 셸은 cache-first
+  // HTML(내비게이션)은 네트워크 우선 → 배포 즉시 반영. 오프라인이면 캐시 폴백.
+  const isHtml = e.request.mode === 'navigate' ||
+    url.pathname === '/' || url.pathname.endsWith('/index.html');
+  if (isHtml) {
+    e.respondWith(
+      fetch(e.request).then((res) => {
+        const copy = res.clone();
+        caches.open(SHELL_CACHE).then((c) => c.put('./index.html', copy)).catch(() => {});
+        return res;
+      }).catch(() => caches.match('./index.html').then((c) => c || caches.match('./')))
+    );
+    return;
+  }
+
+  // 그 외 셸 자산은 cache-first
   e.respondWith(
     caches.match(e.request).then((cached) => cached || fetch(e.request))
   );
