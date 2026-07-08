@@ -476,6 +476,22 @@
   .modal select{width:100%;padding:12px;border-radius:10px;border:1px solid var(--line);font-size:14px;margin-bottom:10px;background:#fff;}
   .modal .mini-btn{margin:-4px 0 12px 2px;}
 
+  /* 권한(회원) */
+  .view.readonly .add-row,
+  .view.readonly .del-x,
+  .view.readonly .mini-btn,
+  .view.readonly .link-btn{display:none !important;}
+  .tab-btn.perm-hidden{display:none !important;}
+  #usersList{margin-bottom:12px;}
+  .member-row{display:flex;align-items:center;gap:8px;padding:10px 2px;border-bottom:1px solid var(--line);}
+  .member-row:last-child{border-bottom:none;}
+  .member-row .minfo{flex:1;min-width:0;}
+  .member-row .mname{font-weight:700;font-size:14px;}
+  .member-row .mrole{font-size:12px;color:var(--sub);}
+  .perm-row{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+  .perm-row .plabel{flex:1;font-size:13px;color:var(--text);}
+  .perm-row select{width:112px;margin:0;padding:8px;}
+
   /* 반응형: 모바일=상단 탭, PC=좌측 세로 사이드바 */
   .views{min-width:0;}
   @media (min-width: 860px){
@@ -662,6 +678,62 @@
   </div>
 </div>
 
+<div class="modal-backdrop" id="memberBackdrop">
+  <div class="modal">
+    <h3>사용자 로그인</h3>
+    <p id="memberCurrent"></p>
+    <div class="err" id="memberErr">PIN이 올바르지 않습니다.</div>
+    <select id="memberSelect"></select>
+    <input type="password" id="memberPin" placeholder="PIN 4자리" inputmode="numeric" autocomplete="off">
+    <button class="primary" id="memberLogin">로그인</button>
+    <button class="secondary" id="memberManageBtn" style="display:none;">회원 관리</button>
+    <button class="secondary" id="memberTokenBtn">기기 토큰 재설정</button>
+    <button class="secondary" id="helpBtn">도움말</button>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="helpBackdrop">
+  <div class="modal">
+    <h3>도움말</h3>
+    <p style="text-align:left;line-height:1.7;">
+      · <b>홈</b>: 만기·미수·지시를 한눈에<br>
+      · <b>지시</b>: 업무 지시 등록 → 담당 → 완료<br>
+      · <b>차량·인허가</b>: 검사/보험/만기 관리. <b>캘린더</b> 버튼으로 폰 기본 캘린더에 알람 등록<br>
+      · <b>기성</b>: 미수 기록층(실제 입금 확인은 은행에서)<br>
+      · <b>주기업무</b>: 주기별 체크리스트<br><br>
+      · 로그인: ⚙ → 이름 선택 + PIN. 관리자는 ⚙에서 <b>회원 관리</b>.<br>
+      · <b>보기</b> 권한이면 수정·완료 버튼이 보이지 않습니다.<br>
+      · 앱은 기록 층입니다. 은행·세무·현장 종이 점검표는 그대로 씁니다.
+    </p>
+    <button class="secondary" id="helpClose">닫기</button>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="usersBackdrop">
+  <div class="modal">
+    <h3>회원 관리</h3>
+    <div id="usersList"></div>
+    <button class="primary" id="userAddBtn">+ 회원 추가</button>
+    <button class="secondary" id="usersClose">닫기</button>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="memberEditBackdrop">
+  <div class="modal">
+    <h3 id="memberEditTitle">회원 수정</h3>
+    <div class="err" id="meErr">이름과 PIN(4자리)을 확인하세요.</div>
+    <input type="text" id="meName" placeholder="이름" autocomplete="off">
+    <input type="text" id="mePin" placeholder="PIN 4자리 숫자" inputmode="numeric" autocomplete="off">
+    <span class="fld-label">역할</span>
+    <select id="meRole"><option value="대표">대표</option><option value="관리자">관리자</option><option value="직원">직원</option></select>
+    <span class="fld-label">모듈별 권한 (수행/보기/숨김)</span>
+    <div id="mePerms"></div>
+    <button class="primary" id="meSave">저장</button>
+    <button class="danger" id="meDelete">삭제</button>
+    <button class="secondary" id="meCancel">취소</button>
+  </div>
+</div>
+
 <script>
 (function(){
   "use strict";
@@ -674,11 +746,13 @@
   var VEH_PATH = "data/vehicles.json";
   var REC_PATH = "data/receivables.json";
   var LIC_PATH = "data/licenses.json";
+  var USERS_PATH = "data/users.json";
   var CHECK_API = API_ROOT + CHECK_PATH;
   var TASKS_API = API_ROOT + TASKS_PATH;
   var VEH_API = API_ROOT + VEH_PATH;
   var REC_API = API_ROOT + REC_PATH;
   var LIC_API = API_ROOT + LIC_PATH;
+  var USERS_API = API_ROOT + USERS_PATH;
 
   var TOKEN_KEY = "jw_app_token";
   var USER_KEY = "jw_app_user";
@@ -687,6 +761,17 @@
   var VEH_CACHE_KEY = "jw_app_veh_cache";
   var REC_CACHE_KEY = "jw_app_rec_cache";
   var LIC_CACHE_KEY = "jw_app_lic_cache";
+  var USERS_CACHE_KEY = "jw_app_users_cache";
+  var MEMBER_KEY = "jw_app_member";
+
+  var MODULES = ["tasks", "veh", "rec", "lic", "check"];
+  var MODULE_TAB = {tasks:"tabTasksBtn", veh:"tabVehBtn", rec:"tabRecBtn", lic:"tabLicBtn", check:"tabCheckBtn"};
+  var MODULE_VIEW = {tasks:"view-tasks", veh:"view-veh", rec:"view-rec", lic:"view-lic", check:"view-check"};
+  var ROLE_PRESET = {
+    "대표":   {admin:true,  perms:{tasks:"do", veh:"do", rec:"do", lic:"do", check:"do"}},
+    "관리자": {admin:true,  perms:{tasks:"do", veh:"do", rec:"do", lic:"do", check:"do"}},
+    "직원":   {admin:false, perms:{tasks:"do", veh:"view", rec:"view", lic:"view", check:"do"}}
+  };
 
   // ---- 체크리스트 정의 (JW-05-011) ----
   var GROUPS = [
@@ -773,6 +858,12 @@
   var licSaveTimer = null;
   var licPending = false;
   var editingLicId = null;
+
+  var members = [];      // [{id,name,pin,role,admin,perms:{tasks,veh,rec,lic,check},created,updated,del}]
+  var usersSha = null;
+  var usersSaveTimer = null;
+  var usersPending = false;
+  var editingMemberId = null;
 
   // ---- 유틸 ----
   function pad(n){ return n < 10 ? "0" + n : "" + n; }
@@ -973,7 +1064,7 @@
     var ctrl = "";
     if (isDone){
       ctrl = '<div class="task-ctrl">' +
-        '<button class="mini-btn" data-task-reopen="' + t.id + '">되돌리기</button>' +
+        (canDo("tasks") ? '<button class="mini-btn" data-task-reopen="' + t.id + '">되돌리기</button>' : '') +
       '</div>';
     } else {
       var ddayBadge = "";
@@ -981,9 +1072,9 @@
         var dd = ddayInfo(t.due);
         if (t.due) ddayBadge = '<span class="dday' + (dd.cls ? ' ' + dd.cls : '') + '">' + dd.text + '</span>';
       }
-      var holdBtn = (t.status === "hold")
+      var holdBtn = !canDo("tasks") ? "" : ((t.status === "hold")
         ? '<button class="mini-btn" data-task-resume="' + t.id + '">재개</button>'
-        : '<button class="mini-btn" data-task-hold="' + t.id + '">보류</button>';
+        : '<button class="mini-btn" data-task-hold="' + t.id + '">보류</button>');
       var calBtn = t.due ? '<button class="cal-btn" data-cal-task="' + t.id + '">캘린더</button>' : '';
       ctrl = '<div class="task-ctrl">' + ddayBadge + holdBtn + calBtn + '</div>';
     }
@@ -997,7 +1088,7 @@
           '<div class="item-meta">' + metaBits.join('') + '</div>' +
         '</div>' +
         ctrl +
-        '<button class="del-x" data-task-del="' + t.id + '">×</button>' +
+        (canDo("tasks") ? '<button class="del-x" data-task-del="' + t.id + '">×</button>' : '') +
       '</div>';
   }
 
@@ -1065,6 +1156,7 @@
   }
 
   function addTask(){
+    if (!canDo("tasks")) return;
     var titleEl = document.getElementById("taskTitle");
     var whoEl = document.getElementById("taskWho");
     var dueEl = document.getElementById("taskDue");
@@ -1094,6 +1186,7 @@
   }
 
   function toggleTaskDone(id){
+    if (!canDo("tasks")) return;
     var t = findTask(id);
     if (!t) return;
     if (t.status === "done"){
@@ -1113,6 +1206,7 @@
   }
 
   function setTaskStatus(id, status){
+    if (!canDo("tasks")) return;
     var t = findTask(id);
     if (!t) return;
     t.status = status;
@@ -1125,6 +1219,7 @@
   }
 
   function deleteTask(id){
+    if (!canDo("tasks")) return;
     var t = findTask(id);
     if (!t) return;
     t.del = 1;
@@ -1235,6 +1330,7 @@
   }
 
   function addCustomItem(type){
+    if (!canDo("check")) return;
     var input = document.querySelector('.custom-add-input[data-add-type="' + type + '"]');
     if (!input) return;
     var text = input.value.trim();
@@ -1250,6 +1346,7 @@
   }
 
   function deleteCustomItem(type, id){
+    if (!canDo("check")) return;
     if (!customItems[type] || !customItems[type][id]) return;
     customItems[type][id].del = 1;
     customItems[type][id].updated = Date.now();
@@ -1260,6 +1357,7 @@
   }
 
   function toggleItem(type, itemId){
+    if (!canDo("check")) return;
     var key = CURRENT_KEYS[type];
     if (!records[type]) records[type] = {};
     if (!records[type][key]) records[type][key] = {};
@@ -1605,12 +1703,13 @@
   }
 
   window.addEventListener("online", function(){
-    if (isOffline || pendingSave || tasksPending || recPending || licPending || vehPending){
+    if (isOffline || pendingSave || tasksPending || recPending || licPending || vehPending || usersPending){
       doLoad();
       loadTasks();
       loadVehicles();
       loadReceivables();
       loadLicenses();
+      loadUsers();
     }
   });
 
@@ -1650,13 +1749,37 @@
     loadVehicles();
     loadReceivables();
     loadLicenses();
+    loadUsers();
   });
 
   document.getElementById("gearBtn").addEventListener("click", function(){
+    if (liveMembers().length){
+      showMemberLogin();
+    } else {
+      document.getElementById("nameInput").value = getUser();
+      document.getElementById("tokenInput").value = "";
+      showTokenScreen(false);
+    }
+  });
+
+  document.getElementById("memberLogin").addEventListener("click", doMemberLogin);
+  document.getElementById("memberPin").addEventListener("keydown", function(e){ if (e.key === "Enter") doMemberLogin(); });
+  document.getElementById("memberManageBtn").addEventListener("click", function(){ hideMemberLogin(); showUsersManage(); });
+  document.getElementById("memberTokenBtn").addEventListener("click", function(){
+    hideMemberLogin();
     document.getElementById("nameInput").value = getUser();
     document.getElementById("tokenInput").value = "";
     showTokenScreen(false);
   });
+  document.getElementById("usersClose").addEventListener("click", function(){ document.getElementById("usersBackdrop").classList.remove("show"); });
+  document.getElementById("userAddBtn").addEventListener("click", function(){ openMemberEdit(null); });
+  document.getElementById("meSave").addEventListener("click", saveMemberEdit);
+  document.getElementById("meDelete").addEventListener("click", deleteMemberEdit);
+  document.getElementById("meCancel").addEventListener("click", closeMemberEdit);
+  document.getElementById("meRole").addEventListener("change", applyRolePreset);
+  document.getElementById("helpBtn").addEventListener("click", function(){ document.getElementById("helpBackdrop").classList.add("show"); });
+  document.getElementById("helpClose").addEventListener("click", function(){ document.getElementById("helpBackdrop").classList.remove("show"); });
+  document.getElementById("memberBackdrop").addEventListener("click", function(e){ if (e.target === this && curMember()) hideMemberLogin(); });
 
   document.getElementById("taskAddBtn").addEventListener("click", addTask);
   document.getElementById("taskTitle").addEventListener("keydown", function(e){ if (e.key === "Enter") addTask(); });
@@ -1853,6 +1976,7 @@
   }
 
   function openVehModal(id){
+    if (!canDo("veh")) return;
     var v = findVeh(id); if (!v) return;
     editingVehId = id;
     document.getElementById("vehModalTitle").textContent = v.no + " 수정";
@@ -2048,6 +2172,7 @@
   }
 
   function addReceivable(){
+    if (!canDo("rec")) return;
     var clientEl = document.getElementById("recClient");
     var descEl = document.getElementById("recDesc");
     var amtEl = document.getElementById("recAmount");
@@ -2066,16 +2191,19 @@
     saveRecCache(); renderReceivables(); renderDashboard(); scheduleRecSave();
   }
   function toggleRecPaid(id){
+    if (!canDo("rec")) return;
     var r = findRec(id); if (!r) return;
     r.paid = r.paid ? null : todayStr(); r.updated = todayStr();
     saveRecCache(); renderReceivables(); renderDashboard(); scheduleRecSave();
   }
   function toggleRecInvoice(id){
+    if (!canDo("rec")) return;
     var r = findRec(id); if (!r) return;
     r.invoice = !r.invoice; r.updated = todayStr();
     saveRecCache(); renderReceivables(); renderDashboard(); scheduleRecSave();
   }
   function deleteReceivable(id){
+    if (!canDo("rec")) return;
     var r = findRec(id); if (!r) return;
     r.del = 1; r.updated = todayStr();
     saveRecCache(); renderReceivables(); renderDashboard(); scheduleRecSave();
@@ -2088,12 +2216,14 @@
     if (r.invoice) meta.push('<span class="author-chip">계산서</span>');
     if (r.due_hint) meta.push('<span class="from-chip">' + esc(r.due_hint) + '</span>');
     if (isPaid) meta.push('<span class="done-by">✓ 입금 ' + esc(r.paid) + '</span>');
-    var ctrl;
-    if (isPaid){
-      ctrl = '<div class="task-ctrl"><button class="mini-btn" data-rec-unpay="' + r.id + '">미수전환</button></div>';
-    } else {
-      var invBtn = '<button class="mini-btn" data-rec-inv="' + r.id + '">' + (r.invoice ? "계산서 취소" : "계산서 발행") + '</button>';
-      ctrl = '<div class="task-ctrl">' + invBtn + '<button class="cal-btn" data-rec-pay="' + r.id + '">입금완료</button></div>';
+    var ctrl = "";
+    if (canDo("rec")){
+      if (isPaid){
+        ctrl = '<div class="task-ctrl"><button class="mini-btn" data-rec-unpay="' + r.id + '">미수전환</button></div>';
+      } else {
+        var invBtn = '<button class="mini-btn" data-rec-inv="' + r.id + '">' + (r.invoice ? "계산서 취소" : "계산서 발행") + '</button>';
+        ctrl = '<div class="task-ctrl">' + invBtn + '<button class="cal-btn" data-rec-pay="' + r.id + '">입금완료</button></div>';
+      }
     }
     var title = esc(r.client) + (r.desc ? ' · ' + esc(r.desc) : '');
     return '<div class="item rec-item' + (isPaid ? ' checked' : '') + '">' +
@@ -2102,7 +2232,7 @@
           '<div class="item-meta">' + meta.join('') + '</div>' +
         '</div>' +
         ctrl +
-        '<button class="del-x" data-rec-del="' + r.id + '">×</button>' +
+        (canDo("rec") ? '<button class="del-x" data-rec-del="' + r.id + '">×</button>' : '') +
       '</div>';
   }
 
@@ -2298,6 +2428,7 @@
   }
 
   function openLicModal(id){
+    if (!canDo("lic")) return;
     editingLicId = id || null;
     var l = id ? findLic(id) : null;
     document.getElementById("licModalTitle").textContent = l ? "인허가 수정" : "인허가 추가";
@@ -2432,6 +2563,183 @@
     });
   }
 
+  // ---- 회원·권한(users.json) ----
+  function liveMembers(){ return members.filter(function(m){ return m && m.del !== 1; }); }
+  function findMember(id){ for (var i=0;i<members.length;i++){ if (members[i].id === id) return members[i]; } return null; }
+  function getMemberId(){ return localStorage.getItem(MEMBER_KEY); }
+  function setMemberId(id){ if (id) localStorage.setItem(MEMBER_KEY, id); else localStorage.removeItem(MEMBER_KEY); }
+  function curMember(){ var m = findMember(getMemberId()); return (m && m.del !== 1) ? m : null; }
+
+  function permOf(mod){
+    if (!liveMembers().length) return "do";
+    var m = curMember();
+    if (!m) return "hide";
+    if (m.admin) return "do";
+    return (m.perms && m.perms[mod]) || "view";
+  }
+  function canDo(mod){ return permOf(mod) === "do"; }
+  function canSee(mod){ return permOf(mod) !== "hide"; }
+  function isAdmin(){ var m = curMember(); return !!(m && m.admin); }
+
+  function applyPerms(){
+    MODULES.forEach(function(mod){
+      var btn = document.getElementById(MODULE_TAB[mod]);
+      if (btn) btn.classList.toggle("perm-hidden", !canSee(mod));
+      var view = document.getElementById(MODULE_VIEW[mod]);
+      if (view) view.classList.toggle("readonly", permOf(mod) === "view");
+    });
+    if (currentTab !== "dash" && MODULES.indexOf(currentTab) >= 0 && !canSee(currentTab)) switchTab("dash");
+  }
+
+  function saveUsersCache(){ try{ localStorage.setItem(USERS_CACHE_KEY, JSON.stringify({sha: usersSha, members: members})); }catch(e){} }
+  function loadUsersCache(){ try{ var r = localStorage.getItem(USERS_CACHE_KEY); return r ? JSON.parse(r) : null; }catch(e){ return null; } }
+
+  function loadUsers(){
+    var token = getToken(); if (!token) return;
+    fetch(USERS_API, {headers: ghHeaders()}).then(function(resp){
+      if (resp.status === 401){ clearToken(); showTokenScreen(true); return; }
+      if (resp.status === 404){ usersSha = null; members = []; saveUsersCache(); afterUsers(); return; }
+      if (!resp.ok) throw new Error("HTTP " + resp.status);
+      return resp.json().then(function(json){
+        usersSha = json.sha;
+        var parsed = JSON.parse(b64DecodeUnicode(json.content));
+        members = (parsed && parsed.members) || [];
+        setOffline(false); saveUsersCache(); afterUsers();
+      });
+    }).catch(function(){
+      var c = loadUsersCache();
+      if (c){ usersSha = c.sha; members = c.members || []; setOffline(true); }
+      afterUsers();
+    });
+  }
+  function afterUsers(){
+    if (liveMembers().length && !curMember()) showMemberLogin();
+    else hideMemberLogin();
+    applyPerms();
+    render();
+  }
+
+  function scheduleUsersSave(){
+    usersPending = true;
+    if (usersSaveTimer) clearTimeout(usersSaveTimer);
+    usersSaveTimer = setTimeout(function(){ usersSaveTimer = null; doSaveUsers(); }, 1200);
+  }
+  function mergeMembers(local, remote){
+    var byId = {};
+    (local || []).forEach(function(m){ if (m && m.id) byId[m.id] = m; });
+    (remote || []).forEach(function(x){
+      if (!x || !x.id) return;
+      var cur = byId[x.id];
+      if (!cur){ byId[x.id] = x; }
+      else { var w = (x.updated || "") >= (cur.updated || "") ? x : cur; var mm = {}; Object.keys(w).forEach(function(f){ mm[f] = w[f]; }); if (cur.del===1||x.del===1) mm.del=1; byId[x.id]=mm; }
+    });
+    var out = []; Object.keys(byId).forEach(function(id){ out.push(byId[id]); });
+    return out;
+  }
+  function doSaveUsers(){
+    var token = getToken(); if (!token) return;
+    var body = JSON.stringify({schema: 1, members: members});
+    var payload = {message: "users: 업데이트", content: b64EncodeUnicode(body), branch: "main"};
+    if (usersSha) payload.sha = usersSha;
+    fetch(USERS_API, {method: "PUT", headers: Object.assign({"Content-Type":"application/json"}, ghHeaders()), body: JSON.stringify(payload)}).then(function(resp){
+      if (resp.status === 401){ clearToken(); showTokenScreen(true); return; }
+      if (resp.status === 409 || resp.status === 422){ return resolveUsersConflictAndRetry(); }
+      if (!resp.ok) throw new Error("HTTP " + resp.status);
+      return resp.json().then(function(json){ usersSha = json.content && json.content.sha; setOffline(false); saveUsersCache(); usersPending = false; });
+    }).catch(function(){ setOffline(true); });
+  }
+  function resolveUsersConflictAndRetry(){
+    return fetch(USERS_API, {headers: ghHeaders()}).then(function(resp){ if (resp.status === 404) return null; return resp.json(); }).then(function(json){
+      if (json){ var up = {}; try{ up = JSON.parse(b64DecodeUnicode(json.content)) || {}; }catch(e){} members = mergeMembers(members, up.members || []); usersSha = json.sha; }
+      saveUsersCache(); return doSaveUsers();
+    });
+  }
+
+  function showMemberLogin(){
+    var sel = document.getElementById("memberSelect");
+    sel.innerHTML = liveMembers().map(function(m){ return '<option value="' + m.id + '">' + esc(m.name) + ' (' + esc(m.role||"") + ')</option>'; }).join("");
+    var cm = curMember();
+    document.getElementById("memberCurrent").textContent = cm ? ("현재: " + cm.name + " · 전환하려면 다시 로그인") : "이름 선택 후 PIN 입력";
+    document.getElementById("memberErr").classList.remove("show");
+    document.getElementById("memberPin").value = "";
+    document.getElementById("memberManageBtn").style.display = isAdmin() ? "block" : "none";
+    document.getElementById("memberBackdrop").classList.add("show");
+  }
+  function hideMemberLogin(){ document.getElementById("memberBackdrop").classList.remove("show"); }
+  function doMemberLogin(){
+    var id = document.getElementById("memberSelect").value;
+    var pin = document.getElementById("memberPin").value.trim();
+    var m = findMember(id);
+    if (!m || m.del === 1 || (m.pin || "") !== pin){ document.getElementById("memberErr").classList.add("show"); return; }
+    setMemberId(id);
+    hideMemberLogin();
+    applyPerms(); render();
+  }
+
+  function showUsersManage(){ if (!isAdmin()) return; renderUsersList(); document.getElementById("usersBackdrop").classList.add("show"); }
+  function renderUsersList(){
+    var host = document.getElementById("usersList");
+    host.innerHTML = liveMembers().map(function(m){
+      return '<div class="member-row"><div class="minfo"><div class="mname">' + esc(m.name) + (m.admin ? ' 👑' : '') + '</div><div class="mrole">' + esc(m.role||"") + '</div></div>' +
+        '<button class="mini-btn" data-user-edit="' + m.id + '">수정</button></div>';
+    }).join("") || '<div class="empty-line">회원이 없습니다.</div>';
+    Array.prototype.forEach.call(host.querySelectorAll("[data-user-edit]"), function(el){
+      el.addEventListener("click", function(){ openMemberEdit(el.getAttribute("data-user-edit")); });
+    });
+  }
+
+  var MOD_LABEL = {tasks:"지시", veh:"차량", rec:"기성", lic:"인허가", check:"주기업무"};
+  function openMemberEdit(id){
+    editingMemberId = id || null;
+    var m = id ? findMember(id) : null;
+    document.getElementById("memberEditTitle").textContent = m ? "회원 수정" : "회원 추가";
+    document.getElementById("meErr").classList.remove("show");
+    document.getElementById("meName").value = m ? (m.name||"") : "";
+    document.getElementById("mePin").value = m ? (m.pin||"") : "";
+    document.getElementById("meRole").value = m ? (m.role||"직원") : "직원";
+    var perms = m ? (m.perms||{}) : ROLE_PRESET["직원"].perms;
+    document.getElementById("mePerms").innerHTML = MODULES.map(function(mod){
+      var v = perms[mod] || "view";
+      return '<div class="perm-row"><span class="plabel">' + MOD_LABEL[mod] + '</span><select data-perm="' + mod + '">' +
+        '<option value="do"' + (v==="do"?" selected":"") + '>수행</option>' +
+        '<option value="view"' + (v==="view"?" selected":"") + '>보기</option>' +
+        '<option value="hide"' + (v==="hide"?" selected":"") + '>숨김</option></select></div>';
+    }).join("");
+    document.getElementById("meDelete").style.display = (m && m.id !== "uadmin") ? "block" : "none";
+    document.getElementById("memberEditBackdrop").classList.add("show");
+  }
+  function closeMemberEdit(){ document.getElementById("memberEditBackdrop").classList.remove("show"); editingMemberId = null; }
+  function applyRolePreset(){
+    var p = ROLE_PRESET[document.getElementById("meRole").value]; if (!p) return;
+    Array.prototype.forEach.call(document.querySelectorAll("#mePerms [data-perm]"), function(sel){ sel.value = p.perms[sel.getAttribute("data-perm")] || "view"; });
+  }
+  function saveMemberEdit(){
+    var name = document.getElementById("meName").value.trim();
+    var pin = document.getElementById("mePin").value.trim();
+    if (!name || !/^\d{4}$/.test(pin)){ document.getElementById("meErr").classList.add("show"); return; }
+    var role = document.getElementById("meRole").value;
+    var admin = !!(ROLE_PRESET[role] && ROLE_PRESET[role].admin);
+    var perms = {};
+    Array.prototype.forEach.call(document.querySelectorAll("#mePerms [data-perm]"), function(sel){ perms[sel.getAttribute("data-perm")] = sel.value; });
+    var today = todayStr();
+    if (editingMemberId){
+      var m = findMember(editingMemberId);
+      if (m){ m.name = name; m.pin = pin; m.role = role; m.admin = admin; m.perms = perms; m.updated = today; }
+    } else {
+      members.push({id: genId("u"), name: name, pin: pin, role: role, admin: admin, perms: perms, created: today, updated: today});
+    }
+    closeMemberEdit();
+    saveUsersCache(); renderUsersList(); applyPerms(); render(); scheduleUsersSave();
+  }
+  function deleteMemberEdit(){
+    if (!editingMemberId || editingMemberId === "uadmin") return;
+    var m = findMember(editingMemberId);
+    if (m){ m.del = 1; m.updated = todayStr(); }
+    if (getMemberId() === editingMemberId) setMemberId(null);
+    closeMemberEdit();
+    saveUsersCache(); renderUsersList(); applyPerms(); render(); scheduleUsersSave();
+  }
+
   // ---- 시작 ----
   if ("serviceWorker" in navigator){
     window.addEventListener("load", function(){
@@ -2444,6 +2752,7 @@
   loadVehicles();
   loadReceivables();
   loadLicenses();
+  loadUsers();
 })();
 </script>
 </body>
