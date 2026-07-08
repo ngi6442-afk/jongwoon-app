@@ -482,6 +482,14 @@
   .rec-item{align-items:flex-start;cursor:default;}
   .rec-amt{font-weight:700;color:var(--text);}
   .rec-item.checked .item-title{color:#6C7A75;}
+  /* 기성 미수 행: 거래처+금액만, 크게, 촘촘하게 */
+  .rec-item{align-items:center;padding:9px 12px;gap:10px;}
+  .rec-item .rec-main{flex:1;min-width:0;display:flex;align-items:baseline;gap:12px;}
+  .rec-item .rec-client{font-size:19px;font-weight:700;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .rec-item .rec-amt2{margin-left:auto;font-size:19px;font-weight:800;color:var(--brand);white-space:nowrap;}
+  .rec-item.checked .rec-client{color:#6C7A75;text-decoration:line-through;text-decoration-color:#B9C4BF;}
+  .rec-item.checked .rec-amt2{color:#9AA8A2;}
+  .rec-item .rec-actions{display:flex;align-items:center;gap:6px;flex-shrink:0;}
   .overdue-bill{color:#B0332A;font-weight:700;}
 
   /* 인허가 */
@@ -2751,30 +2759,20 @@
   }
 
   function recRowHtml(r, isPaid){
-    var meta = [];
-    if (r.amount) meta.push('<span class="rec-amt">' + fmtAmount(r.amount) + '원</span>');
-    meta.push('<span>청구 ' + esc(r.billed || "-") + '</span>');
-    if (r.assignee) meta.push('<span class="author-chip">담당 ' + esc(r.assignee) + '</span>');
-    if (r.invoice) meta.push('<span class="from-chip">계산서</span>');
-    if (r.mismatch) meta.push('<span class="mismatch-chip">금액 불일치</span>');
-    if (r.scope && r.scope.length) meta.push('<span class="scope-chip">공개 ' + esc(scopeNames(r.scope)) + '</span>');
-    if (isPaid) meta.push('<span class="done-by">✓ 입금 ' + esc(r.paid) + '</span>');
     var ctrl = "";
     if (canDo("rec")){
       var recEditBtn = '<button class="mini-btn" data-rec-edit="' + r.id + '">수정</button>';
       if (isPaid){
-        ctrl = '<div class="task-ctrl"><button class="mini-btn" data-rec-unpay="' + r.id + '">미수전환</button>' + recEditBtn + '</div>';
+        ctrl = '<div class="rec-actions"><button class="mini-btn" data-rec-unpay="' + r.id + '">미수전환</button>' + recEditBtn + '</div>';
       } else {
-        var invBtn = '<button class="mini-btn" data-rec-inv="' + r.id + '">' + (r.invoice ? "계산서 취소" : "계산서 발행") + '</button>';
-        var misBtn = '<button class="mini-btn" data-rec-mismatch="' + r.id + '">' + (r.mismatch ? "불일치 해제" : "불일치") + '</button>';
-        ctrl = '<div class="task-ctrl">' + invBtn + '<button class="cal-btn" data-rec-pay="' + r.id + '">입금완료</button>' + misBtn + recEditBtn + '</div>';
+        ctrl = '<div class="rec-actions"><button class="cal-btn" data-rec-pay="' + r.id + '">입금완료</button>' + recEditBtn + '</div>';
       }
     }
-    var title = esc(r.client) + (r.desc ? ' · ' + esc(r.desc) : '');
+    var amt = r.amount ? (fmtAmount(r.amount) + '원') : '';
     return '<div class="item rec-item' + (isPaid ? ' checked' : '') + '">' +
-        '<div class="item-body">' +
-          '<div class="item-title">' + title + '</div>' +
-          '<div class="item-meta">' + meta.join('') + '</div>' +
+        '<div class="rec-main">' +
+          '<span class="rec-client">' + esc(r.client || "-") + '</span>' +
+          (amt ? '<span class="rec-amt2">' + amt + '</span>' : '') +
         '</div>' +
         ctrl +
         (canDo("rec") ? '<button class="del-x" data-rec-del="' + r.id + '">×</button>' : '') +
