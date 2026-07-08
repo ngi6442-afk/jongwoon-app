@@ -12,8 +12,9 @@ const USERS = 'gw_users';
 // 컬렉션 → 권한키
 const COL = { tasks: 'tasks', vehicles: 'veh', receivables: 'rec', licenses: 'lic', checklist: 'check' };
 
+const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, content-type', 'Access-Control-Allow-Methods': 'POST, OPTIONS' };
 function rid() { return crypto.randomBytes(8).toString('hex'); }
-function jr(statusCode, body) { return { statusCode, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }; }
+function jr(statusCode, body) { return { statusCode, headers: Object.assign({ 'Content-Type': 'application/json' }, CORS), body: JSON.stringify(body) }; }
 function colKey(c) { return `col:${c}`; }
 
 async function currentMember(event) {
@@ -47,8 +48,8 @@ async function handleSave(event, d, R) {
   const col = d.collection;
   if (!COL[col]) return jr(400, { status: 'REJECTED', error_code: 'UNKNOWN_COLLECTION', request_id: R });
   if (permOf(c.member, col) !== 'do') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_WRITE', request_id: R });
-  if (!d.doc || !Array.isArray(d.doc.items)) return jr(400, { status: 'REJECTED', error_code: 'INVALID_DOC', request_id: R });
-  const doc = { schema: d.doc.schema || 1, items: d.doc.items, updated_by: c.member.id, updated_at: Date.now() };
+  if (!d.doc || typeof d.doc !== 'object') return jr(400, { status: 'REJECTED', error_code: 'INVALID_DOC', request_id: R });
+  const doc = Object.assign({}, d.doc, { updated_by: c.member.id, updated_at: Date.now() });
   const w = await blobSet(store(DATA), colKey(col), doc);
   if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
   return jr(200, { status: 'OK', request_id: R });
@@ -56,7 +57,7 @@ async function handleSave(event, d, R) {
 
 async function handler(event) {
   const R = rid();
-  if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: { Allow: 'POST, OPTIONS' }, body: '' };
+  if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: CORS, body: '' };
   if (event.httpMethod !== 'POST') return jr(405, { status: 'REJECTED', error_code: 'METHOD_NOT_ALLOWED', request_id: R });
   setupBlobContext(event);
   let d;

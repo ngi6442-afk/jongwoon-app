@@ -12,8 +12,9 @@ const { issueSession, verifyToken, bearer } = require('./_lib/session');
 const USERS = 'gw_users';
 const MODULES = ['tasks', 'veh', 'rec', 'lic', 'check'];
 
+const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, content-type', 'Access-Control-Allow-Methods': 'POST, OPTIONS' };
 function rid() { return crypto.randomBytes(8).toString('hex'); }
-function jr(statusCode, body) { return { statusCode, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }; }
+function jr(statusCode, body) { return { statusCode, headers: Object.assign({ 'Content-Type': 'application/json' }, CORS), body: JSON.stringify(body) }; }
 function memberKey(id) { return `member:${id}`; }
 function nameKey(name) { return `name:${String(name).trim().toLowerCase()}`; }
 function genId() { return 'u' + crypto.randomBytes(5).toString('hex'); }
@@ -136,7 +137,7 @@ async function handleSetPin(st, event, d, R) {
 
 async function handler(event) {
   const R = rid();
-  if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: { Allow: 'POST, OPTIONS' }, body: '' };
+  if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: CORS, body: '' };
   if (event.httpMethod !== 'POST') return jr(405, { status: 'REJECTED', error_code: 'METHOD_NOT_ALLOWED', request_id: R });
   setupBlobContext(event);
   let d;
@@ -145,6 +146,7 @@ async function handler(event) {
   try {
     switch (d && d.action) {
       case 'bootstrap': return await handleBootstrap(st, d, R);
+      case 'names': { const ms = await listMembers(st); return jr(200, { status: 'OK', names: ms.map(function (m) { return m.name; }), count: ms.length, request_id: R }); }
       case 'login': return await handleLogin(st, d, R);
       case 'verify': return await handleVerify(st, event, R);
       case 'member_list': return await handleMemberList(st, event, R);
