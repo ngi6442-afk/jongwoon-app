@@ -53,6 +53,23 @@
     display:flex;align-items:center;justify-content:center;
     cursor:pointer;
   }
+  .topbar-right{display:flex;align-items:center;gap:8px;}
+  .user-chip{
+    max-width:120px;
+    height:38px;
+    padding:0 12px;
+    border-radius:10px;
+    border:1px solid var(--line);
+    background:var(--card);
+    color:var(--brand-dark);
+    font-size:13px;
+    font-weight:700;
+    cursor:pointer;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .user-chip.empty{color:var(--sub);font-weight:600;}
   /* 탭 */
   .tabbar{
     display:flex;
@@ -525,7 +542,10 @@
 <div id="app">
   <header class="topbar">
     <h1>종운환경 · 종운건설</h1>
-    <button class="gear-btn" id="gearBtn" aria-label="설정">⚙</button>
+    <div class="topbar-right">
+      <button class="user-chip" id="curUserBtn"></button>
+      <button class="gear-btn" id="gearBtn" aria-label="설정">⚙</button>
+    </div>
   </header>
 
   <div class="offline-banner" id="offlineBanner">오프라인 — 연결되면 자동 저장</div>
@@ -690,6 +710,7 @@
     <div class="err" id="memberErr">PIN이 올바르지 않습니다.</div>
     <select id="memberSelect"></select>
     <input type="password" id="memberPin" placeholder="PIN 4자리" inputmode="numeric" autocomplete="off">
+    <label class="chk" style="justify-content:flex-start;"><input type="checkbox" id="memberKeep"> 이 기기에서 로그인 유지(개인 PC만)</label>
     <button class="primary" id="memberLogin">로그인</button>
     <button class="secondary" id="memberPinBtn" style="display:none;">내 PIN 변경</button>
     <button class="secondary" id="memberManageBtn" style="display:none;">회원 관리</button>
@@ -1856,6 +1877,10 @@
     }
   });
 
+  document.getElementById("curUserBtn").addEventListener("click", function(){
+    if (liveMembers().length) showMemberLogin();
+    else { document.getElementById("nameInput").value = getUser(); document.getElementById("tokenInput").value = ""; showTokenScreen(false); }
+  });
   document.getElementById("memberLogin").addEventListener("click", doMemberLogin);
   document.getElementById("memberPin").addEventListener("keydown", function(e){ if (e.key === "Enter") doMemberLogin(); });
   document.getElementById("memberManageBtn").addEventListener("click", function(){ hideMemberLogin(); showUsersManage(); });
@@ -2664,8 +2689,17 @@
   // ---- 회원·권한(users.json) ----
   function liveMembers(){ return members.filter(function(m){ return m && m.del !== 1; }); }
   function findMember(id){ for (var i=0;i<members.length;i++){ if (members[i].id === id) return members[i]; } return null; }
-  function getMemberId(){ return localStorage.getItem(MEMBER_KEY); }
-  function setMemberId(id){ if (id) localStorage.setItem(MEMBER_KEY, id); else localStorage.removeItem(MEMBER_KEY); }
+  // 자동로그인 기본 OFF: 세션 저장이 기본, "로그인 유지" 체크 시에만 localStorage 영구 저장.
+  function getMemberId(){
+    try{ return sessionStorage.getItem(MEMBER_KEY) || localStorage.getItem(MEMBER_KEY); }catch(e){ return null; }
+  }
+  function setMemberId(id, persist){
+    try{
+      if (!id){ sessionStorage.removeItem(MEMBER_KEY); localStorage.removeItem(MEMBER_KEY); return; }
+      if (persist){ localStorage.setItem(MEMBER_KEY, id); sessionStorage.removeItem(MEMBER_KEY); }
+      else { sessionStorage.setItem(MEMBER_KEY, id); localStorage.removeItem(MEMBER_KEY); }
+    }catch(e){}
+  }
   function curMember(){ var m = findMember(getMemberId()); return (m && m.del !== 1) ? m : null; }
 
   function permOf(mod){
@@ -2687,6 +2721,7 @@
       if (view) view.classList.toggle("readonly", permOf(mod) === "view");
     });
     if (currentTab !== "dash" && MODULES.indexOf(currentTab) >= 0 && !canSee(currentTab)) switchTab("dash");
+    updateUserChip();
   }
 
   function saveUsersCache(){ try{ localStorage.setItem(USERS_CACHE_KEY, JSON.stringify({sha: usersSha, members: members})); }catch(e){} }
@@ -2762,6 +2797,7 @@
     document.getElementById("memberPin").value = "";
     document.getElementById("memberManageBtn").style.display = isAdmin() ? "block" : "none";
     document.getElementById("memberPinBtn").style.display = cm ? "block" : "none";
+    try{ document.getElementById("memberKeep").checked = !!localStorage.getItem(MEMBER_KEY); }catch(e){}
     document.getElementById("memberBackdrop").classList.add("show");
   }
   function hideMemberLogin(){ document.getElementById("memberBackdrop").classList.remove("show"); }
@@ -2770,10 +2806,19 @@
     var pin = document.getElementById("memberPin").value.trim();
     var m = findMember(id);
     if (!m || m.del === 1 || (m.pin || "") !== pin){ document.getElementById("memberErr").classList.add("show"); return; }
-    setMemberId(id);
+    var keep = document.getElementById("memberKeep").checked;
+    setMemberId(id, keep);
     hideMemberLogin();
     applyPerms(); render();
     if ((m.pin || "") === "0000") openChangePin(true);   // 기본 PIN이면 변경 유도
+  }
+
+  function updateUserChip(){
+    var btn = document.getElementById("curUserBtn");
+    if (!btn) return;
+    var m = curMember();
+    btn.textContent = m ? m.name : "로그인";
+    btn.classList.toggle("empty", !m);
   }
 
   function openChangePin(nudge){
