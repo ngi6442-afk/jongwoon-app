@@ -554,7 +554,8 @@
         <input type="date" id="taskDue">
       </div>
       <div class="add-row" style="padding-top:0;">
-        <input type="text" id="taskWho" placeholder="담당 (예: 김정아)">
+        <input type="text" id="taskWho" placeholder="담당 (회원 선택 권장)" list="memberNames" autocomplete="off">
+        <datalist id="memberNames"></datalist>
         <button id="taskAddBtn">지시 등록</button>
       </div>
     </div>
@@ -989,7 +990,18 @@
     if (state) b.classList.add("show"); else b.classList.remove("show");
   }
 
+  // 지시 담당 입력칸 자동완성: 회원명 목록 채우기(오타로 인박스 매칭 실패 방지)
+  function populateMemberNames(){
+    var dl = document.getElementById("memberNames");
+    if (!dl) return;
+    var names = (typeof liveMembers === "function" ? liveMembers() : []).map(function(m){ return m.name; });
+    var seen = {}, opts = "";
+    names.forEach(function(n){ if (n && !seen[n]){ seen[n] = 1; opts += '<option value="' + esc(n) + '"></option>'; } });
+    dl.innerHTML = opts;
+  }
+
   function render(){
+    populateMemberNames();
     renderSummary();
     renderList();
     renderTasks();
