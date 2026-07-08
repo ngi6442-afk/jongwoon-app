@@ -537,7 +537,7 @@
     <button class="tab-btn" data-tab="veh" id="tabVehBtn">차량</button>
     <button class="tab-btn" data-tab="rec" id="tabRecBtn">기성</button>
     <button class="tab-btn" data-tab="lic" id="tabLicBtn">인허가</button>
-    <button class="tab-btn" data-tab="check" id="tabCheckBtn">주기업무</button>
+    <button class="tab-btn" data-tab="check" id="tabCheckBtn">업무</button>
   </nav>
   <div class="views">
 
@@ -607,6 +607,10 @@
 
   <!-- 주기 체크 -->
   <div class="view" id="view-check">
+    <section class="group" id="myTaskGroup">
+      <h2>내게 온 지시</h2>
+      <div id="myTaskHost"><div class="loading" style="padding:14px 0;">불러오는 중…</div></div>
+    </section>
     <div id="summaryHost"></div>
     <div id="listHost">
       <div class="loading">불러오는 중…</div>
@@ -700,7 +704,7 @@
       · <b>지시</b>: 업무 지시 등록 → 담당 → 완료<br>
       · <b>차량·인허가</b>: 검사/보험/만기 관리. <b>캘린더</b> 버튼으로 폰 기본 캘린더에 알람 등록<br>
       · <b>기성</b>: 미수 기록층(실제 입금 확인은 은행에서)<br>
-      · <b>주기업무</b>: 주기별 체크리스트<br><br>
+      · <b>업무</b>: 내게 온 지시(담당=본인)를 탭해서 완료 + 주기별 체크리스트<br><br>
       · 로그인: ⚙ → 이름 선택 + PIN. 관리자는 ⚙에서 <b>회원 관리</b>.<br>
       · <b>보기</b> 권한이면 수정·완료 버튼이 보이지 않습니다.<br>
       · 앱은 기록 층입니다. 은행·세무·현장 종이 점검표는 그대로 씁니다.
@@ -1000,6 +1004,18 @@
     return tasks.filter(function(t){ return t && t.del !== 1; });
   }
 
+  // 현재 사용자 이름(회원 로그인 우선, 없으면 토큰 화면 이름)
+  function myName(){
+    var m = (typeof curMember === "function") ? curMember() : null;
+    return (m && m.name) || getUser() || "";
+  }
+  // 지시를 완료/보류할 수 있는가: 관리자(do)이거나 본인 담당이면 가능
+  function canActTask(t){
+    if (canDo("tasks")) return true;
+    var me = myName();
+    return !!(me && t && (t.who || "").trim() === me);
+  }
+
   function renderSummary(){
     var host = document.getElementById("summaryHost");
     if (!host) return;
@@ -1126,6 +1142,60 @@
     bindCalHandlers(listHost);
     bindCalHandlers(doneHost);
     updateTaskBadge();
+    renderMyTasks();
+  }
+
+  // 업무 탭: 내게 온 지시(담당=본인, 미완료) 기한순
+  function myOpenTasks(){
+    var me = myName();
+    if (!me) return [];
+    return liveTasks().filter(function(t){
+      return t.status !== "done" && (t.who || "").trim() === me;
+    }).sort(function(a, b){
+      var ah = a.status === "hold" ? 1 : 0, bh = b.status === "hold" ? 1 : 0;
+      if (ah !== bh) return ah - bh;
+      var ad = a.due || "9999-99-99", bd = b.due || "9999-99-99";
+      return ad < bd ? -1 : (ad > bd ? 1 : 0);
+    });
+  }
+  function myTaskRowHtml(t){
+    var metaBits = [];
+    if (t.from) metaBits.push('<span class="from-chip">지시 ' + esc(t.from) + '</span>');
+    if (t.due) metaBits.push('<span>' + esc(t.due) + '</span>');
+    if (t.status === "hold") metaBits.push('<span class="hold-chip">보류</span>');
+    var dd = (t.status === "open" && t.due) ? ddayInfo(t.due) : null;
+    var ddayBadge = dd ? '<span class="dday' + (dd.cls ? ' ' + dd.cls : '') + '">' + dd.text + '</span>' : '';
+    var calBtn = t.due ? '<button class="cal-btn" data-cal-task="' + t.id + '">캘린더</button>' : '';
+    var detailHtml = t.detail ? '<div class="task-detail">' + esc(t.detail) + '</div>' : '';
+    return '<div class="item task-item' + (t.status === "hold" ? " hold" : "") + '" data-mytask="' + t.id + '">' +
+        '<div class="check-box"></div>' +
+        '<div class="item-body">' +
+          '<div class="item-title">' + esc(t.title) + '</div>' +
+          detailHtml +
+          '<div class="item-meta">' + metaBits.join('') + '</div>' +
+        '</div>' +
+        '<div class="task-ctrl">' + ddayBadge + calBtn + '</div>' +
+      '</div>';
+  }
+  function renderMyTasks(){
+    var host = document.getElementById("myTaskHost");
+    if (!host) return;
+    var me = myName();
+    if (!me){
+      host.innerHTML = '<div class="loading" style="padding:14px 0;">로그인하면 내게 배정된 지시가 여기 모입니다.</div>';
+      return;
+    }
+    var list = myOpenTasks();
+    host.innerHTML = list.length
+      ? list.map(myTaskRowHtml).join("")
+      : '<div class="loading" style="padding:14px 0;">내게 온 지시가 없습니다.</div>';
+    Array.prototype.forEach.call(host.querySelectorAll("[data-mytask]"), function(el){
+      el.addEventListener("click", function(e){
+        if (e.target.classList.contains("cal-btn")) return;
+        toggleTaskDone(el.getAttribute("data-mytask"));
+      });
+    });
+    bindCalHandlers(host);
   }
 
   function bindTaskHandlers(host){
@@ -1186,9 +1256,9 @@
   }
 
   function toggleTaskDone(id){
-    if (!canDo("tasks")) return;
     var t = findTask(id);
     if (!t) return;
+    if (!canActTask(t)) return;
     if (t.status === "done"){
       t.status = "open";
       t.done_at = null;
@@ -1196,7 +1266,7 @@
     } else {
       t.status = "done";
       t.done_at = todayStr();
-      t.done_by = getUser() || "익명";
+      t.done_by = myName() || "익명";
     }
     t.updated = todayStr();
     saveTasksCache();
@@ -1206,9 +1276,9 @@
   }
 
   function setTaskStatus(id, status){
-    if (!canDo("tasks")) return;
     var t = findTask(id);
     if (!t) return;
+    if (!canActTask(t)) return;
     t.status = status;
     if (status !== "done"){ t.done_at = null; t.done_by = null; }
     t.updated = todayStr();
@@ -2688,7 +2758,7 @@
     });
   }
 
-  var MOD_LABEL = {tasks:"지시", veh:"차량", rec:"기성", lic:"인허가", check:"주기업무"};
+  var MOD_LABEL = {tasks:"지시", veh:"차량", rec:"기성", lic:"인허가", check:"업무"};
   function openMemberEdit(id){
     editingMemberId = id || null;
     var m = id ? findMember(id) : null;
