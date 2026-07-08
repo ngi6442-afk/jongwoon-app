@@ -24,6 +24,8 @@
 - 로그인: ⚙ → 이름 선택 + PIN. `jw_app_member`(localStorage)에 현재 회원. 관리자만 ⚙에서 `회원 관리`(추가/수정/삭제, 역할 프리셋 대표/관리자/직원).
 - 게이팅: `hide`=탭 자체 안 보임, `view`=탭은 보이되 `.readonly` 클래스로 추가·수정·완료·삭제 버튼 숨김 + 모든 mutating 함수 시작에 `canDo(mod)` 가드. 대시보드 공유 행(taskRowHtml/recRowHtml)도 canDo로 버튼 제거.
 - ⚠️ **UI 권한(실수 방지·역할 구분)이지 하드 보안이 아니다** — 공용 토큰이 브라우저에 있어 기술자는 우회 가능. 하드 보안은 JW-05-017 §7의 1단계(백엔드)에서. 권한 모델은 그때 서버측 강제로 승격.
+- **자동 로그인**: `jw_app_member`가 기기(브라우저)에 남아 새로고침·재실행해도 유지 — 각 직원 PC에 배포하면 1회 로그인으로 계속. 전환은 ⚙ → 이름+PIN.
+- **PIN 관리**(2026-07-08): 로그인 모달 `내 PIN 변경`으로 각자 본인 PIN 변경. 기본 PIN 0000으로 로그인하면 변경 모달을 자동으로 띄워 유도(`openChangePin(true)`).
 - 앱 내 `도움말`(로그인 모달 → 도움말).
 
 ## 알람: 캘린더(.ics) 연동
@@ -37,5 +39,5 @@
 - **반응형**: 모바일=상단 가로 탭(세그먼트), PC(≥860px)=좌측 세로 사이드바 + 우측 콘텐츠. `.layout`(flex)/`.tabbar`/`.views` 구조, 미디어쿼리로 전환.
 - 데이터 파일별로 독립 로드·저장·충돌병합(sha 기반 PUT, 409/422 시 재조회 후 id 병합). tasks·receivables·licenses·vehicles 모두 병합 키 item.id, del=1 우선. (vehicles도 이제 편집 저장)
 - 대시보드 만기(경과·임박)는 차량 + 인허가를 합산. 만기·지시 행의 `캘린더` 버튼은 .ics 알람 연동.
-- SW 셸 캐시는 cache-first이므로 index.html 변경 시 sw.js의 `SHELL_CACHE` 버전을 반드시 올린다(현재 jw-shell-v11).
+- SW 셸 캐시는 cache-first이므로 index.html 변경 시 sw.js의 `SHELL_CACHE` 버전을 반드시 올린다(현재 jw-shell-v12).
 - 지시 등록 `담당` 입력칸은 회원명 datalist(`#memberNames`, `populateMemberNames()`) 자동완성 — 오타로 "내게 온 지시" 매칭이 깨지지 않게. 자유 입력도 유지.

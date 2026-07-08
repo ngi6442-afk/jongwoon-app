@@ -691,9 +691,21 @@
     <select id="memberSelect"></select>
     <input type="password" id="memberPin" placeholder="PIN 4자리" inputmode="numeric" autocomplete="off">
     <button class="primary" id="memberLogin">로그인</button>
+    <button class="secondary" id="memberPinBtn" style="display:none;">내 PIN 변경</button>
     <button class="secondary" id="memberManageBtn" style="display:none;">회원 관리</button>
     <button class="secondary" id="memberTokenBtn">기기 토큰 재설정</button>
     <button class="secondary" id="helpBtn">도움말</button>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="pinBackdrop">
+  <div class="modal">
+    <h3>내 PIN 변경</h3>
+    <p id="pinMsg"></p>
+    <div class="err" id="pinErr">PIN은 숫자 4자리여야 합니다.</div>
+    <input type="password" id="pinNew" placeholder="새 PIN 4자리" inputmode="numeric" autocomplete="off">
+    <button class="primary" id="pinSave">변경</button>
+    <button class="secondary" id="pinCancel">취소</button>
   </div>
 </div>
 
@@ -1861,6 +1873,10 @@
   document.getElementById("meRole").addEventListener("change", applyRolePreset);
   document.getElementById("helpBtn").addEventListener("click", function(){ document.getElementById("helpBackdrop").classList.add("show"); });
   document.getElementById("helpClose").addEventListener("click", function(){ document.getElementById("helpBackdrop").classList.remove("show"); });
+  document.getElementById("memberPinBtn").addEventListener("click", function(){ openChangePin(false); });
+  document.getElementById("pinSave").addEventListener("click", saveChangePin);
+  document.getElementById("pinNew").addEventListener("keydown", function(e){ if (e.key === "Enter") saveChangePin(); });
+  document.getElementById("pinCancel").addEventListener("click", closeChangePin);
   document.getElementById("memberBackdrop").addEventListener("click", function(e){ if (e.target === this && curMember()) hideMemberLogin(); });
 
   document.getElementById("taskAddBtn").addEventListener("click", addTask);
@@ -2745,6 +2761,7 @@
     document.getElementById("memberErr").classList.remove("show");
     document.getElementById("memberPin").value = "";
     document.getElementById("memberManageBtn").style.display = isAdmin() ? "block" : "none";
+    document.getElementById("memberPinBtn").style.display = cm ? "block" : "none";
     document.getElementById("memberBackdrop").classList.add("show");
   }
   function hideMemberLogin(){ document.getElementById("memberBackdrop").classList.remove("show"); }
@@ -2756,6 +2773,27 @@
     setMemberId(id);
     hideMemberLogin();
     applyPerms(); render();
+    if ((m.pin || "") === "0000") openChangePin(true);   // 기본 PIN이면 변경 유도
+  }
+
+  function openChangePin(nudge){
+    var m = curMember(); if (!m) return;
+    hideMemberLogin();
+    document.getElementById("pinMsg").textContent = nudge
+      ? (m.name + "님, 기본 PIN(0000)입니다. 본인만 아는 PIN으로 바꿔주세요.")
+      : ("현재 사용자: " + m.name);
+    document.getElementById("pinErr").classList.remove("show");
+    document.getElementById("pinNew").value = "";
+    document.getElementById("pinBackdrop").classList.add("show");
+  }
+  function closeChangePin(){ document.getElementById("pinBackdrop").classList.remove("show"); }
+  function saveChangePin(){
+    var m = curMember(); if (!m) return;
+    var np = document.getElementById("pinNew").value.trim();
+    if (!/^\d{4}$/.test(np)){ document.getElementById("pinErr").classList.add("show"); return; }
+    m.pin = np; m.updated = todayStr();
+    closeChangePin();
+    saveUsersCache(); scheduleUsersSave();
   }
 
   function showUsersManage(){ if (!isAdmin()) return; renderUsersList(); document.getElementById("usersBackdrop").classList.add("show"); }
