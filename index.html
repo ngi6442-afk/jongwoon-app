@@ -464,6 +464,13 @@
   .rec-amt{font-weight:700;color:var(--text);}
   .rec-item.checked .item-title{color:#6C7A75;}
   .overdue-bill{color:#B0332A;font-weight:700;}
+
+  /* 인허가 */
+  .lic-item{align-items:flex-start;cursor:pointer;}
+  .modal .fld-label{display:block;font-size:12px;color:var(--sub);margin:0 0 3px 2px;}
+  .modal .chk{display:flex;align-items:center;gap:8px;margin:-2px 0 12px 2px;font-size:13px;color:var(--text);}
+  .modal .chk input{width:auto;margin:0;}
+  .modal button.danger{width:100%;padding:11px;border:none;background:transparent;color:#B0332A;font-size:13px;font-weight:700;margin-top:2px;cursor:pointer;}
 </style>
 </head>
 <body>
@@ -476,10 +483,11 @@
   <div class="offline-banner" id="offlineBanner">오프라인 — 연결되면 자동 저장</div>
 
   <nav class="tabbar">
-    <button class="tab-btn active" data-tab="dash" id="tabDashBtn">대시보드</button>
+    <button class="tab-btn active" data-tab="dash" id="tabDashBtn">홈</button>
     <button class="tab-btn" data-tab="tasks" id="tabTasksBtn">지시 <span class="tab-badge hide" id="taskTabBadge">0</span></button>
     <button class="tab-btn" data-tab="veh" id="tabVehBtn">차량</button>
     <button class="tab-btn" data-tab="rec" id="tabRecBtn">수금</button>
+    <button class="tab-btn" data-tab="lic" id="tabLicBtn">인허가</button>
     <button class="tab-btn" data-tab="check" id="tabCheckBtn">체크</button>
   </nav>
 
@@ -536,6 +544,17 @@
     <div class="card" id="recPaidList" style="display:none;margin-top:6px;"></div>
   </section>
 
+  <!-- 인허가·보수교육 만기 -->
+  <section class="view" id="view-lic">
+    <div class="dash-sec" style="margin-bottom:8px;">
+      <h2>인허가·보수교육 <span class="cnt" id="licHead"></span></h2>
+    </div>
+    <div class="card" id="licList">
+      <div class="loading">불러오는 중…</div>
+    </div>
+    <button class="link-btn" id="licAddBtn">+ 인허가 추가</button>
+  </section>
+
   <!-- 주기 체크 -->
   <div class="view" id="view-check">
     <div id="summaryHost"></div>
@@ -564,6 +583,25 @@
   </div>
 </div>
 
+<div class="modal-backdrop" id="licBackdrop">
+  <div class="modal">
+    <h3 id="licModalTitle">인허가 수정</h3>
+    <input type="text" id="licName" placeholder="인허가명" autocomplete="off">
+    <input type="text" id="licOrg" placeholder="법인 (종운환경 / 종운건설)" autocomplete="off">
+    <input type="text" id="licNo" placeholder="허가번호 (선택)" autocomplete="off">
+    <span class="fld-label">만료일</span>
+    <input type="date" id="licExpiry">
+    <label class="chk"><input type="checkbox" id="licNoExpiry"> 만료 없음 (해당없음)</label>
+    <span class="fld-label">보수교육·점검 다음 예정일</span>
+    <input type="date" id="licEdu">
+    <input type="text" id="licCycle" placeholder="주기 메모 (예: 3년)" autocomplete="off">
+    <input type="text" id="licNote" placeholder="메모 (선택)" autocomplete="off">
+    <button class="primary" id="licSave">저장</button>
+    <button class="danger" id="licDelete">삭제</button>
+    <button class="secondary" id="licCancel">취소</button>
+  </div>
+</div>
+
 <script>
 (function(){
   "use strict";
@@ -575,10 +613,12 @@
   var TASKS_PATH = "data/tasks.json";
   var VEH_PATH = "data/vehicles.json";
   var REC_PATH = "data/receivables.json";
+  var LIC_PATH = "data/licenses.json";
   var CHECK_API = API_ROOT + CHECK_PATH;
   var TASKS_API = API_ROOT + TASKS_PATH;
   var VEH_API = API_ROOT + VEH_PATH;
   var REC_API = API_ROOT + REC_PATH;
+  var LIC_API = API_ROOT + LIC_PATH;
 
   var TOKEN_KEY = "jw_app_token";
   var USER_KEY = "jw_app_user";
@@ -586,6 +626,7 @@
   var TASKS_CACHE_KEY = "jw_app_tasks_cache";
   var VEH_CACHE_KEY = "jw_app_veh_cache";
   var REC_CACHE_KEY = "jw_app_rec_cache";
+  var LIC_CACHE_KEY = "jw_app_lic_cache";
 
   // ---- 체크리스트 정의 (JW-05-011) ----
   var GROUPS = [
@@ -663,6 +704,12 @@
   var recSaveTimer = null;
   var recPending = false;
   var showRecPaid = false;
+
+  var licenses = [];     // [{id,name,org,issued,license_no,expiry,edu_due,edu_cycle,note,created,updated,del}]
+  var licSha = null;
+  var licSaveTimer = null;
+  var licPending = false;
+  var editingLicId = null;
 
   // ---- 유틸 ----
   function pad(n){ return n < 10 ? "0" + n : "" + n; }
@@ -790,6 +837,7 @@
     renderTasks();
     renderVehicles();
     renderReceivables();
+    renderLicenses();
     renderDashboard();
   }
 
@@ -1494,11 +1542,12 @@
   }
 
   window.addEventListener("online", function(){
-    if (isOffline || pendingSave || tasksPending || recPending){
+    if (isOffline || pendingSave || tasksPending || recPending || licPending){
       doLoad();
       loadTasks();
       loadVehicles();
       loadReceivables();
+      loadLicenses();
     }
   });
 
@@ -1512,6 +1561,7 @@
     document.getElementById("view-tasks").classList.toggle("active", name === "tasks");
     document.getElementById("view-veh").classList.toggle("active", name === "veh");
     document.getElementById("view-rec").classList.toggle("active", name === "rec");
+    document.getElementById("view-lic").classList.toggle("active", name === "lic");
     document.getElementById("view-check").classList.toggle("active", name === "check");
   }
 
@@ -1536,6 +1586,7 @@
     loadTasks();
     loadVehicles();
     loadReceivables();
+    loadLicenses();
   });
 
   document.getElementById("gearBtn").addEventListener("click", function(){
@@ -1562,6 +1613,12 @@
     showRecPaid = !showRecPaid;
     renderReceivables();
   });
+
+  document.getElementById("licAddBtn").addEventListener("click", function(){ openLicModal(null); });
+  document.getElementById("licSave").addEventListener("click", saveLicFromModal);
+  document.getElementById("licDelete").addEventListener("click", deleteLicFromModal);
+  document.getElementById("licCancel").addEventListener("click", closeLicModal);
+  document.getElementById("licBackdrop").addEventListener("click", function(e){ if (e.target === this) closeLicModal(); });
 
   Array.prototype.forEach.call(document.querySelectorAll(".tab-btn"), function(b){
     b.addEventListener("click", function(){ switchTab(b.getAttribute("data-tab")); });
@@ -1694,13 +1751,15 @@
       return ad < bd ? -1 : (ad > bd ? 1 : 0);
     });
 
-    var overdueVeh = urgent.filter(function(x){ return x.dd.diff < 0; }).length;
+    var urgentLic = urgentLicenses();
+    var overdueTot = urgent.filter(function(x){ return x.dd.diff < 0; }).length + urgentLic.filter(function(x){ return x.dd.diff < 0; }).length;
+    var imminentTot = urgent.length + urgentLic.length;
     var unpaid = unpaidReceivables();
 
     var html = '<div class="summary-card"><div class="summary-date">' + today + '</div>' +
       '<div class="summary-grid" style="grid-template-columns:repeat(4,1fr);">' +
-        '<div class="summary-item"><div class="num"' + (overdueVeh ? ' style="color:#FFD3CC;"' : '') + '>' + overdueVeh + '</div><div class="lbl">만기 경과</div></div>' +
-        '<div class="summary-item"><div class="num">' + urgent.length + '</div><div class="lbl">만기 임박</div></div>' +
+        '<div class="summary-item"><div class="num"' + (overdueTot ? ' style="color:#FFD3CC;"' : '') + '>' + overdueTot + '</div><div class="lbl">만기 경과</div></div>' +
+        '<div class="summary-item"><div class="num">' + imminentTot + '</div><div class="lbl">만기 임박</div></div>' +
         '<div class="summary-item"><div class="num">' + openTasks.length + '</div><div class="lbl">미완료 지시</div></div>' +
         '<div class="summary-item"><div class="num">' + unpaid.length + '</div><div class="lbl">미수</div></div>' +
       '</div></div>';
@@ -1726,6 +1785,23 @@
       html += '<div class="empty-line">30일 이내 만기 차량이 없습니다.</div>';
     }
     html += '</div></div>';
+
+    if (urgentLic.length){
+      html += '<div class="dash-sec"><h2>인허가·보수교육 만기 <span class="cnt">' + urgentLic.length + '</span></h2><div class="card">';
+      html += urgentLic.map(function(x){
+        var l = x.lic;
+        var kindAttr = x.kind === "만료" ? "exp" : "edu";
+        return '<div class="item veh-item">' +
+          '<div class="item-body">' +
+            '<div class="item-title">' + esc(l.name) + '</div>' +
+            '<div class="item-meta"><span>' + x.kind + ' ' + x.date + '</span><span class="own-badge ' + (l.org === "종운건설" ? "lease" : "self") + '">' + esc(l.org || "") + '</span></div>' +
+          '</div>' +
+          '<div class="task-ctrl"><span class="dday' + (x.dd.cls ? ' ' + x.dd.cls : '') + '">' + x.dd.text + '</span>' +
+            '<button class="cal-btn" data-cal-lic-' + kindAttr + '="' + l.id + '">캘린더</button></div>' +
+        '</div>';
+      }).join("");
+      html += '</div></div>';
+    }
 
     html += '<div class="dash-sec"><h2>미완료 지시 <span class="cnt">' + openTasks.length + '</span></h2><div class="card">';
     html += openTasks.length
@@ -1925,6 +2001,204 @@
     });
   }
 
+  // ---- 인허가·보수교육(licenses.json, 편집형) ----
+  function liveLic(){ return licenses.filter(function(l){ return l && l.del !== 1; }); }
+  function findLic(id){ for (var i=0;i<licenses.length;i++){ if (licenses[i].id === id) return licenses[i]; } return null; }
+  function isDate(v){ return typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v); }
+
+  function licNearest(l){
+    var ds = [];
+    if (isDate(l.expiry)) ds.push(vehDday(l.expiry).diff);
+    if (isDate(l.edu_due)) ds.push(vehDday(l.edu_due).diff);
+    return ds.length ? Math.min.apply(null, ds) : 99999;
+  }
+
+  function saveLicCache(){ try{ localStorage.setItem(LIC_CACHE_KEY, JSON.stringify({sha: licSha, items: licenses})); }catch(e){} }
+  function loadLicCache(){ try{ var r = localStorage.getItem(LIC_CACHE_KEY); return r ? JSON.parse(r) : null; }catch(e){ return null; } }
+
+  function loadLicenses(){
+    var token = getToken(); if (!token) return;
+    fetch(LIC_API, {headers: ghHeaders()}).then(function(resp){
+      if (resp.status === 401){ clearToken(); showTokenScreen(true); return; }
+      if (resp.status === 404){ licSha = null; licenses = []; saveLicCache(); renderLicenses(); renderDashboard(); return; }
+      if (!resp.ok) throw new Error("HTTP " + resp.status);
+      return resp.json().then(function(json){
+        licSha = json.sha;
+        var parsed = JSON.parse(b64DecodeUnicode(json.content));
+        licenses = (parsed && parsed.items) || [];
+        setOffline(false); saveLicCache(); renderLicenses(); renderDashboard();
+      });
+    }).catch(function(){
+      var c = loadLicCache();
+      if (c){ licSha = c.sha; licenses = c.items || []; setOffline(true); renderLicenses(); renderDashboard(); }
+    });
+  }
+
+  function scheduleLicSave(){
+    licPending = true;
+    if (licSaveTimer) clearTimeout(licSaveTimer);
+    licSaveTimer = setTimeout(function(){ licSaveTimer = null; doSaveLic(); }, 1500);
+  }
+  function mergeLic(local, remote){
+    var byId = {};
+    (local || []).forEach(function(l){ if (l && l.id) byId[l.id] = l; });
+    (remote || []).forEach(function(x){
+      if (!x || !x.id) return;
+      var cur = byId[x.id];
+      if (!cur){ byId[x.id] = x; }
+      else {
+        var w = (x.updated || "") >= (cur.updated || "") ? x : cur;
+        var m = {}; Object.keys(w).forEach(function(f){ m[f] = w[f]; });
+        if (cur.del === 1 || x.del === 1) m.del = 1;
+        byId[x.id] = m;
+      }
+    });
+    var out = []; Object.keys(byId).forEach(function(id){ out.push(byId[id]); });
+    out.sort(function(a, b){ var ac = a.created || "", bc = b.created || ""; if (ac !== bc) return ac < bc ? -1 : 1; return a.id < b.id ? -1 : (a.id > b.id ? 1 : 0); });
+    return out;
+  }
+  function doSaveLic(){
+    var token = getToken(); if (!token) return;
+    var body = JSON.stringify({schema: 1, items: licenses});
+    var payload = {message: "licenses: 업데이트", content: b64EncodeUnicode(body), branch: "main"};
+    if (licSha) payload.sha = licSha;
+    fetch(LIC_API, {method: "PUT", headers: Object.assign({"Content-Type":"application/json"}, ghHeaders()), body: JSON.stringify(payload)}).then(function(resp){
+      if (resp.status === 401){ clearToken(); showTokenScreen(true); return; }
+      if (resp.status === 409 || resp.status === 422){ return resolveLicConflictAndRetry(); }
+      if (!resp.ok) throw new Error("HTTP " + resp.status);
+      return resp.json().then(function(json){ licSha = json.content && json.content.sha; setOffline(false); saveLicCache(); licPending = false; });
+    }).catch(function(){ setOffline(true); });
+  }
+  function resolveLicConflictAndRetry(){
+    return fetch(LIC_API, {headers: ghHeaders()}).then(function(resp){ if (resp.status === 404) return null; return resp.json(); }).then(function(json){
+      if (json){ var lp = {}; try{ lp = JSON.parse(b64DecodeUnicode(json.content)) || {}; }catch(e){} licenses = mergeLic(licenses, lp.items || []); licSha = json.sha; }
+      saveLicCache(); renderLicenses(); renderDashboard(); return doSaveLic();
+    });
+  }
+
+  function licExpiryChip(l){
+    if (l.expiry === "해당없음") return '<span class="dday grey">만료 해당없음</span>';
+    if (!isDate(l.expiry)) return '<span class="dday grey">만료 미정</span>';
+    var dd = vehDday(l.expiry);
+    return '<span class="due-tag">만료 ' + l.expiry + '</span><span class="dday' + (dd.cls ? ' ' + dd.cls : '') + '">' + dd.text + '</span>';
+  }
+  function licEduChip(l){
+    if (!isDate(l.edu_due)) return "";
+    var dd = vehDday(l.edu_due);
+    return '<span class="due-tag">보수교육 ' + l.edu_due + '</span><span class="dday' + (dd.cls ? ' ' + dd.cls : '') + '">' + dd.text + '</span>';
+  }
+
+  function licRowHtml(l){
+    var meta = [];
+    var orgCls = l.org === "종운건설" ? "lease" : "self";
+    meta.push('<span class="own-badge ' + orgCls + '">' + esc(l.org || "") + '</span>');
+    if (l.issued) meta.push('<span>발급 ' + esc(l.issued) + '</span>');
+    if (l.license_no) meta.push('<span>' + esc(l.license_no) + '</span>');
+    if (l.edu_cycle) meta.push('<span class="from-chip">주기 ' + esc(l.edu_cycle) + '</span>');
+    var cal = "";
+    if (isDate(l.expiry)) cal += '<button class="cal-btn" data-cal-lic-exp="' + l.id + '">만료 캘린더</button>';
+    if (isDate(l.edu_due)) cal += '<button class="cal-btn" data-cal-lic-edu="' + l.id + '">교육 캘린더</button>';
+    var eduChip = licEduChip(l);
+    return '<div class="item lic-item" data-lic-edit="' + l.id + '">' +
+        '<div class="item-body">' +
+          '<div class="item-title">' + esc(l.name) + '</div>' +
+          '<div class="item-meta">' + meta.join('') + '</div>' +
+          '<div class="veh-due" style="margin-top:5px;">' + licExpiryChip(l) + '</div>' +
+          (eduChip ? '<div class="veh-due" style="margin-top:3px;">' + eduChip + '</div>' : '') +
+          (l.note ? '<div class="task-detail">' + esc(l.note) + '</div>' : '') +
+          (cal ? '<div class="veh-due" style="margin-top:7px;gap:8px;">' + cal + '</div>' : '') +
+        '</div>' +
+        '<div class="task-ctrl"><button class="mini-btn" data-lic-edit-btn="' + l.id + '">수정</button></div>' +
+      '</div>';
+  }
+
+  function renderLicenses(){
+    var host = document.getElementById("licList");
+    if (!host) return;
+    var list = liveLic().slice();
+    list.sort(function(a, b){ return licNearest(a) - licNearest(b); });
+    var head = document.getElementById("licHead");
+    if (head){
+      var withDate = list.filter(function(l){ return isDate(l.expiry) || isDate(l.edu_due); }).length;
+      head.textContent = list.length ? ("총 " + list.length + "건 · 만기입력 " + withDate) : "";
+    }
+    host.innerHTML = list.length ? list.map(licRowHtml).join("") : '<div class="empty-line">등록된 인허가가 없습니다.</div>';
+    Array.prototype.forEach.call(host.querySelectorAll("[data-lic-edit]"), function(el){
+      el.addEventListener("click", function(e){
+        if (e.target.classList.contains("cal-btn") || e.target.classList.contains("mini-btn")) return;
+        openLicModal(el.getAttribute("data-lic-edit"));
+      });
+    });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-lic-edit-btn]"), function(el){
+      el.addEventListener("click", function(e){ e.stopPropagation(); openLicModal(el.getAttribute("data-lic-edit-btn")); });
+    });
+    bindCalHandlers(host);
+  }
+
+  function urgentLicenses(){
+    var out = [];
+    liveLic().forEach(function(l){
+      [["만료", l.expiry], ["보수교육", l.edu_due]].forEach(function(p){
+        if (!isDate(p[1])) return;
+        var dd = vehDday(p[1]);
+        if (dd.diff <= 30) out.push({lic: l, kind: p[0], date: p[1], dd: dd});
+      });
+    });
+    out.sort(function(a, b){ return a.dd.diff - b.dd.diff; });
+    return out;
+  }
+
+  function openLicModal(id){
+    editingLicId = id || null;
+    var l = id ? findLic(id) : null;
+    document.getElementById("licModalTitle").textContent = l ? "인허가 수정" : "인허가 추가";
+    document.getElementById("licName").value = l ? (l.name || "") : "";
+    document.getElementById("licOrg").value = l ? (l.org || "") : "종운환경";
+    document.getElementById("licNo").value = l ? (l.license_no || "") : "";
+    document.getElementById("licExpiry").value = (l && isDate(l.expiry)) ? l.expiry : "";
+    document.getElementById("licNoExpiry").checked = !!(l && l.expiry === "해당없음");
+    document.getElementById("licEdu").value = (l && isDate(l.edu_due)) ? l.edu_due : "";
+    document.getElementById("licCycle").value = l ? (l.edu_cycle || "") : "";
+    document.getElementById("licNote").value = l ? (l.note || "") : "";
+    document.getElementById("licDelete").style.display = l ? "block" : "none";
+    document.getElementById("licBackdrop").classList.add("show");
+  }
+  function closeLicModal(){ document.getElementById("licBackdrop").classList.remove("show"); editingLicId = null; }
+
+  function saveLicFromModal(){
+    var name = document.getElementById("licName").value.trim();
+    if (!name) return;
+    var noExp = document.getElementById("licNoExpiry").checked;
+    var expVal = document.getElementById("licExpiry").value;
+    var today = todayStr();
+    var fields = {
+      name: name,
+      org: document.getElementById("licOrg").value.trim(),
+      license_no: document.getElementById("licNo").value.trim(),
+      expiry: noExp ? "해당없음" : (expVal || null),
+      edu_due: document.getElementById("licEdu").value || null,
+      edu_cycle: document.getElementById("licCycle").value.trim(),
+      note: document.getElementById("licNote").value.trim(),
+      updated: today
+    };
+    if (editingLicId){
+      var l = findLic(editingLicId);
+      if (l) Object.keys(fields).forEach(function(k){ l[k] = fields[k]; });
+    } else {
+      fields.id = genId("l"); fields.issued = ""; fields.created = today;
+      licenses.push(fields);
+    }
+    closeLicModal();
+    saveLicCache(); renderLicenses(); renderDashboard(); scheduleLicSave();
+  }
+  function deleteLicFromModal(){
+    if (!editingLicId) return;
+    var l = findLic(editingLicId);
+    if (l){ l.del = 1; l.updated = todayStr(); }
+    closeLicModal();
+    saveLicCache(); renderLicenses(); renderDashboard(); scheduleLicSave();
+  }
+
   // ---- 캘린더 .ics (기기 기본 캘린더 알람 연동) ----
   function icsEscape(s){
     return String(s == null ? "" : s)
@@ -1991,6 +2265,22 @@
           "지시_" + String(t.title).slice(0, 10) + ".ics");
       });
     });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-cal-lic-exp]"), function(el){
+      el.addEventListener("click", function(e){
+        e.stopPropagation();
+        var l = findLic(el.getAttribute("data-cal-lic-exp"));
+        if (l && isDate(l.expiry)) downloadICS(l.id + "-exp@jongwoon", l.name + " 인허가 만료", l.expiry,
+          (l.org || "") + " 인허가 만료", l.name + "_만료.ics");
+      });
+    });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-cal-lic-edu]"), function(el){
+      el.addEventListener("click", function(e){
+        e.stopPropagation();
+        var l = findLic(el.getAttribute("data-cal-lic-edu"));
+        if (l && isDate(l.edu_due)) downloadICS(l.id + "-edu@jongwoon", l.name + " 보수교육", l.edu_due,
+          (l.org || "") + " 보수교육·점검", l.name + "_보수교육.ics");
+      });
+    });
   }
 
   // ---- 시작 ----
@@ -2004,6 +2294,7 @@
   loadTasks();
   loadVehicles();
   loadReceivables();
+  loadLicenses();
 })();
 </script>
 </body>
