@@ -471,6 +471,8 @@
   .modal .chk{display:flex;align-items:center;gap:8px;margin:-2px 0 12px 2px;font-size:13px;color:var(--text);}
   .modal .chk input{width:auto;margin:0;}
   .modal button.danger{width:100%;padding:11px;border:none;background:transparent;color:#B0332A;font-size:13px;font-weight:700;margin-top:2px;cursor:pointer;}
+  .modal select{width:100%;padding:12px;border-radius:10px;border:1px solid var(--line);font-size:14px;margin-bottom:10px;background:#fff;}
+  .modal .mini-btn{margin:-4px 0 12px 2px;}
 </style>
 </head>
 <body>
@@ -602,6 +604,30 @@
   </div>
 </div>
 
+<div class="modal-backdrop" id="vehBackdrop">
+  <div class="modal">
+    <h3 id="vehModalTitle">차량 수정</h3>
+    <span class="fld-label">검사 만기</span>
+    <input type="date" id="vehInsp">
+    <button class="mini-btn" id="vehInspRenew" type="button">검사 갱신(+1년)</button>
+    <span class="fld-label">보험 만기</span>
+    <input type="date" id="vehIns">
+    <button class="mini-btn" id="vehInsRenew" type="button">보험 갱신(+1년)</button>
+    <span class="fld-label">상태</span>
+    <select id="vehState">
+      <option value="운행">운행</option>
+      <option value="정비">정비</option>
+      <option value="검사보류">검사보류</option>
+      <option value="말소예정">말소예정</option>
+      <option value="매각">매각</option>
+    </select>
+    <input type="text" id="vehInsurer" placeholder="보험사 (선택)" autocomplete="off">
+    <input type="text" id="vehNote" placeholder="메모 (선택)" autocomplete="off">
+    <button class="primary" id="vehSave">저장</button>
+    <button class="secondary" id="vehCancel">취소</button>
+  </div>
+</div>
+
 <script>
 (function(){
   "use strict";
@@ -696,8 +722,11 @@
   var showTaskDone = false;
   var currentTab = "dash";
 
-  var vehicles = [];     // [{id,no,type,own,permit,driver,insp_due,ins_due,insurer,state,note}]
+  var vehicles = [];     // [{id,no,type,own,permit,driver,insp_due,ins_due,insurer,state,note,updated,del}]
   var vehSha = null;
+  var vehSaveTimer = null;
+  var vehPending = false;
+  var editingVehId = null;
 
   var receivables = [];  // [{id,client,site,desc,amount,billed,invoice,paid,due_hint,note,created,updated,del}]
   var recSha = null;
@@ -1542,7 +1571,7 @@
   }
 
   window.addEventListener("online", function(){
-    if (isOffline || pendingSave || tasksPending || recPending || licPending){
+    if (isOffline || pendingSave || tasksPending || recPending || licPending || vehPending){
       doLoad();
       loadTasks();
       loadVehicles();
@@ -1619,6 +1648,16 @@
   document.getElementById("licDelete").addEventListener("click", deleteLicFromModal);
   document.getElementById("licCancel").addEventListener("click", closeLicModal);
   document.getElementById("licBackdrop").addEventListener("click", function(e){ if (e.target === this) closeLicModal(); });
+
+  document.getElementById("vehSave").addEventListener("click", saveVehFromModal);
+  document.getElementById("vehCancel").addEventListener("click", closeVehModal);
+  document.getElementById("vehBackdrop").addEventListener("click", function(e){ if (e.target === this) closeVehModal(); });
+  document.getElementById("vehInspRenew").addEventListener("click", function(){
+    document.getElementById("vehInsp").value = addYears(document.getElementById("vehInsp").value, 1);
+  });
+  document.getElementById("vehInsRenew").addEventListener("click", function(){
+    document.getElementById("vehIns").value = addYears(document.getElementById("vehIns").value, 1);
+  });
 
   Array.prototype.forEach.call(document.querySelectorAll(".tab-btn"), function(b){
     b.addEventListener("click", function(){ switchTab(b.getAttribute("data-tab")); });
@@ -1710,6 +1749,7 @@
           (v.note ? '<div class="task-detail">' + esc(v.note) + '</div>' : '') +
           (cal ? '<div class="veh-due" style="margin-top:7px;gap:8px;">' + cal + '</div>' : '') +
         '</div>' +
+        '<div class="task-ctrl"><button class="mini-btn" data-veh-edit="' + v.id + '">수정</button></div>' +
       '</div>';
   }
 
@@ -1726,6 +1766,81 @@
     if (head) head.textContent = list.length ? ("총 " + list.length + "대 · 만기 임박순") : "";
     host.innerHTML = list.length ? list.map(vehRowHtml).join("") : '<div class="empty-line">차량 데이터가 없습니다.</div>';
     bindCalHandlers(host);
+    Array.prototype.forEach.call(host.querySelectorAll("[data-veh-edit]"), function(el){
+      el.addEventListener("click", function(e){ e.stopPropagation(); openVehModal(el.getAttribute("data-veh-edit")); });
+    });
+  }
+
+  // ---- 차량 편집·갱신(vehicles.json 저장) ----
+  function addYears(dateStr, n){
+    var base = isDate(dateStr) ? new Date(dateStr + "T00:00:00") : new Date(todayStr() + "T00:00:00");
+    base.setFullYear(base.getFullYear() + n);
+    return fmtDate(base);
+  }
+  function scheduleVehSave(){
+    vehPending = true;
+    if (vehSaveTimer) clearTimeout(vehSaveTimer);
+    vehSaveTimer = setTimeout(function(){ vehSaveTimer = null; doSaveVeh(); }, 1500);
+  }
+  function mergeVeh(local, remote){
+    var byId = {};
+    (local || []).forEach(function(v){ if (v && v.id) byId[v.id] = v; });
+    (remote || []).forEach(function(x){
+      if (!x || !x.id) return;
+      var cur = byId[x.id];
+      if (!cur){ byId[x.id] = x; }
+      else {
+        var w = (x.updated || "") >= (cur.updated || "") ? x : cur;
+        var m = {}; Object.keys(w).forEach(function(f){ m[f] = w[f]; });
+        if (cur.del === 1 || x.del === 1) m.del = 1;
+        byId[x.id] = m;
+      }
+    });
+    var out = []; Object.keys(byId).forEach(function(id){ out.push(byId[id]); });
+    return out;
+  }
+  function doSaveVeh(){
+    var token = getToken(); if (!token) return;
+    var body = JSON.stringify({schema: 1, items: vehicles});
+    var payload = {message: "vehicles: 업데이트", content: b64EncodeUnicode(body), branch: "main"};
+    if (vehSha) payload.sha = vehSha;
+    fetch(VEH_API, {method: "PUT", headers: Object.assign({"Content-Type":"application/json"}, ghHeaders()), body: JSON.stringify(payload)}).then(function(resp){
+      if (resp.status === 401){ clearToken(); showTokenScreen(true); return; }
+      if (resp.status === 409 || resp.status === 422){ return resolveVehConflictAndRetry(); }
+      if (!resp.ok) throw new Error("HTTP " + resp.status);
+      return resp.json().then(function(json){ vehSha = json.content && json.content.sha; setOffline(false); saveVehiclesCache(); vehPending = false; });
+    }).catch(function(){ setOffline(true); });
+  }
+  function resolveVehConflictAndRetry(){
+    return fetch(VEH_API, {headers: ghHeaders()}).then(function(resp){ if (resp.status === 404) return null; return resp.json(); }).then(function(json){
+      if (json){ var vp = {}; try{ vp = JSON.parse(b64DecodeUnicode(json.content)) || {}; }catch(e){} vehicles = mergeVeh(vehicles, vp.items || []); vehSha = json.sha; }
+      saveVehiclesCache(); renderVehicles(); renderDashboard(); return doSaveVeh();
+    });
+  }
+
+  function openVehModal(id){
+    var v = findVeh(id); if (!v) return;
+    editingVehId = id;
+    document.getElementById("vehModalTitle").textContent = v.no + " 수정";
+    document.getElementById("vehInsp").value = isDate(v.insp_due) ? v.insp_due : "";
+    document.getElementById("vehIns").value = isDate(v.ins_due) ? v.ins_due : "";
+    document.getElementById("vehState").value = v.state || "운행";
+    document.getElementById("vehInsurer").value = v.insurer || "";
+    document.getElementById("vehNote").value = v.note || "";
+    document.getElementById("vehBackdrop").classList.add("show");
+  }
+  function closeVehModal(){ document.getElementById("vehBackdrop").classList.remove("show"); editingVehId = null; }
+  function saveVehFromModal(){
+    var v = findVeh(editingVehId);
+    if (!v){ closeVehModal(); return; }
+    v.insp_due = document.getElementById("vehInsp").value || null;
+    v.ins_due = document.getElementById("vehIns").value || null;
+    v.state = document.getElementById("vehState").value;
+    v.insurer = document.getElementById("vehInsurer").value.trim();
+    v.note = document.getElementById("vehNote").value.trim();
+    v.updated = todayStr();
+    closeVehModal();
+    saveVehiclesCache(); renderVehicles(); renderDashboard(); scheduleVehSave();
   }
 
   // ---- 대시보드 (통합 첫 화면) ----
