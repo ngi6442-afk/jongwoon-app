@@ -514,6 +514,7 @@
   .mcheck input{width:auto;margin:0;}
   .mcheck .mrole2{color:var(--sub);font-size:11px;}
   .scope-chip{display:inline-block;font-size:11px;padding:1px 8px;border-radius:999px;background:#EDE9F2;color:#5B4B85;font-weight:600;}
+  .mismatch-chip{display:inline-block;font-size:11px;padding:1px 8px;border-radius:999px;background:#FBE7E3;color:#B0332A;font-weight:700;}
 
   /* 반응형: 모바일=상단 탭, PC=좌측 세로 사이드바 */
   .views{min-width:0;}
@@ -699,6 +700,22 @@
     <div class="mchecks" id="teScope"></div>
     <button class="primary" id="teSave">저장</button>
     <button class="secondary" id="teCancel">취소</button>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="recEditBackdrop">
+  <div class="modal">
+    <h3>기성 수정</h3>
+    <input type="text" id="reClient" placeholder="거래처" autocomplete="off">
+    <input type="text" id="reDesc" placeholder="내역 (예: 6월 기성)" autocomplete="off">
+    <input type="text" id="reAmount" placeholder="금액 (선택)" inputmode="numeric" autocomplete="off">
+    <span class="fld-label">청구일</span>
+    <input type="date" id="reBilled">
+    <input type="text" id="reAssignee" placeholder="담당 (입금확인 담당자)" list="memberNames" autocomplete="off">
+    <span class="fld-label">공개 대상 직원 (비우면 전체 공개)</span>
+    <div class="mchecks" id="reScope"></div>
+    <button class="primary" id="reSave">저장</button>
+    <button class="secondary" id="reCancel">취소</button>
   </div>
 </div>
 
@@ -1991,6 +2008,10 @@
   document.getElementById("teCancel").addEventListener("click", closeTaskModal);
   document.getElementById("taskEditBackdrop").addEventListener("click", function(e){ if (e.target === this) closeTaskModal(); });
 
+  document.getElementById("reSave").addEventListener("click", saveRecModal);
+  document.getElementById("reCancel").addEventListener("click", closeRecModal);
+  document.getElementById("recEditBackdrop").addEventListener("click", function(e){ if (e.target === this) closeRecModal(); });
+
   document.getElementById("vehSave").addEventListener("click", saveVehFromModal);
   document.getElementById("vehCancel").addEventListener("click", closeVehModal);
   document.getElementById("vehBackdrop").addEventListener("click", function(e){ if (e.target === this) closeVehModal(); });
@@ -2356,6 +2377,49 @@
     });
   }
 
+  function recVisible(r){
+    if (isAdmin()) return true;
+    var me = myName();
+    if (me && (r.assignee || "").trim() === me) return true;
+    if (!r.scope || !r.scope.length) return true;
+    return r.scope.indexOf(getMemberId()) >= 0;
+  }
+
+  // 기성 ↔ 업무(지시) 연동
+  function findRecTask(rec){
+    if (rec.task_id){ var t = findTask(rec.task_id); if (t && t.del !== 1) return t; }
+    for (var i=0;i<tasks.length;i++){ if (tasks[i].rec_id === rec.id && tasks[i].del !== 1) return tasks[i]; }
+    return null;
+  }
+  function createRecTask(rec){
+    if (findRecTask(rec)) return;
+    var today = todayStr();
+    var t = {
+      id: genId("t"),
+      title: "입금확인: " + rec.client + (rec.desc ? " " + rec.desc : "") + (rec.amount ? " " + fmtAmount(rec.amount) + "원" : ""),
+      detail: "", who: rec.assignee || "", from: "기성", due: rec.billed || "",
+      status: "open", done_at: null, done_by: null,
+      scope: (rec.scope || []).slice(), rec_id: rec.id,
+      created: today, updated: today
+    };
+    tasks.push(t);
+    rec.task_id = t.id;
+    saveTasksCache(); scheduleTasksSave(); renderTasks(); renderMyTasks();
+  }
+  function completeRecTask(rec){
+    var t = findRecTask(rec);
+    if (t && t.status !== "done"){ t.status = "done"; t.done_at = todayStr(); t.done_by = myName() || "익명"; t.updated = todayStr(); saveTasksCache(); scheduleTasksSave(); renderTasks(); renderMyTasks(); }
+  }
+  function reopenRecTask(rec){
+    var t = findRecTask(rec);
+    if (t && t.status === "done"){ t.status = "open"; t.done_at = null; t.done_by = null; t.updated = todayStr(); saveTasksCache(); scheduleTasksSave(); renderTasks(); renderMyTasks(); }
+  }
+  function removeRecTask(rec){
+    var t = findRecTask(rec);
+    if (t && t.status !== "done"){ t.del = 1; t.updated = todayStr(); saveTasksCache(); scheduleTasksSave(); renderTasks(); renderMyTasks(); }
+    rec.task_id = null;
+  }
+
   function addReceivable(){
     if (!canDo("rec")) return;
     var clientEl = document.getElementById("recClient");
@@ -2370,6 +2434,7 @@
       id: genId("r"), client: client, site: "", desc: descEl.value.trim(),
       amount: isNaN(amt) ? 0 : amt, billed: billedEl.value || today,
       invoice: false, paid: null, due_hint: "", note: "",
+      assignee: "", scope: [], task_id: null, mismatch: false,
       created: today, updated: today
     });
     clientEl.value = ""; descEl.value = ""; amtEl.value = ""; billedEl.value = "";
@@ -2378,19 +2443,66 @@
   function toggleRecPaid(id){
     if (!canDo("rec")) return;
     var r = findRec(id); if (!r) return;
-    r.paid = r.paid ? null : todayStr(); r.updated = todayStr();
+    if (r.paid){ r.paid = null; reopenRecTask(r); }            // 미수전환 → 연동 업무 재개
+    else { r.paid = todayStr(); r.mismatch = false; completeRecTask(r); }  // 입금완료 → 연동 업무 완료
+    r.updated = todayStr();
     saveRecCache(); renderReceivables(); renderDashboard(); scheduleRecSave();
   }
   function toggleRecInvoice(id){
     if (!canDo("rec")) return;
     var r = findRec(id); if (!r) return;
     r.invoice = !r.invoice; r.updated = todayStr();
+    if (r.invoice) createRecTask(r);                            // 계산서 발행 → 입금확인 업무 생성
+    else removeRecTask(r);                                      // 계산서 취소 → 미완료 연동 업무 제거
+    saveRecCache(); renderReceivables(); renderDashboard(); scheduleRecSave();
+  }
+  function toggleRecMismatch(id){
+    if (!canDo("rec")) return;
+    var r = findRec(id); if (!r) return;
+    r.mismatch = !r.mismatch; r.updated = todayStr();
+    var t = findRecTask(r);
+    if (t){ t.detail = r.mismatch ? "금액 불일치 — 확인 필요" : ""; t.updated = todayStr(); saveTasksCache(); scheduleTasksSave(); renderTasks(); renderMyTasks(); }
     saveRecCache(); renderReceivables(); renderDashboard(); scheduleRecSave();
   }
   function deleteReceivable(id){
     if (!canDo("rec")) return;
     var r = findRec(id); if (!r) return;
     r.del = 1; r.updated = todayStr();
+    removeRecTask(r);
+    saveRecCache(); renderReceivables(); renderDashboard(); scheduleRecSave();
+  }
+
+  var editingRecId = null;
+  function openRecModal(id){
+    if (!canDo("rec")) return;
+    var r = findRec(id); if (!r) return;
+    editingRecId = id;
+    document.getElementById("reClient").value = r.client || "";
+    document.getElementById("reDesc").value = r.desc || "";
+    document.getElementById("reAmount").value = r.amount ? fmtAmount(r.amount) : "";
+    document.getElementById("reBilled").value = isDate(r.billed) ? r.billed : "";
+    document.getElementById("reAssignee").value = r.assignee || "";
+    if (typeof populateMemberNames === "function") populateMemberNames();
+    renderMemberChecks("reScope", r.scope || []);
+    document.getElementById("recEditBackdrop").classList.add("show");
+  }
+  function closeRecModal(){ document.getElementById("recEditBackdrop").classList.remove("show"); editingRecId = null; }
+  function saveRecModal(){
+    if (!canDo("rec")) return;
+    var r = findRec(editingRecId); if (!r){ closeRecModal(); return; }
+    var client = document.getElementById("reClient").value.trim();
+    if (!client) return;
+    r.client = client;
+    r.desc = document.getElementById("reDesc").value.trim();
+    var amt = parseInt(String(document.getElementById("reAmount").value).replace(/[^0-9]/g, ""), 10);
+    r.amount = isNaN(amt) ? 0 : amt;
+    r.billed = document.getElementById("reBilled").value || r.billed;
+    r.assignee = document.getElementById("reAssignee").value.trim();
+    r.scope = getCheckedMembers("reScope");
+    r.updated = todayStr();
+    var t = findRecTask(r);
+    if (t){ t.who = r.assignee || ""; t.scope = (r.scope || []).slice(); t.updated = todayStr(); saveTasksCache(); scheduleTasksSave(); renderTasks(); renderMyTasks(); }
+    closeRecModal();
     saveRecCache(); renderReceivables(); renderDashboard(); scheduleRecSave();
   }
 
@@ -2398,16 +2510,20 @@
     var meta = [];
     if (r.amount) meta.push('<span class="rec-amt">' + fmtAmount(r.amount) + '원</span>');
     meta.push('<span>청구 ' + esc(r.billed || "-") + '</span>');
-    if (r.invoice) meta.push('<span class="author-chip">계산서</span>');
-    if (r.due_hint) meta.push('<span class="from-chip">' + esc(r.due_hint) + '</span>');
+    if (r.assignee) meta.push('<span class="author-chip">담당 ' + esc(r.assignee) + '</span>');
+    if (r.invoice) meta.push('<span class="from-chip">계산서</span>');
+    if (r.mismatch) meta.push('<span class="mismatch-chip">금액 불일치</span>');
+    if (r.scope && r.scope.length) meta.push('<span class="scope-chip">공개 ' + esc(scopeNames(r.scope)) + '</span>');
     if (isPaid) meta.push('<span class="done-by">✓ 입금 ' + esc(r.paid) + '</span>');
     var ctrl = "";
     if (canDo("rec")){
+      var recEditBtn = '<button class="mini-btn" data-rec-edit="' + r.id + '">수정</button>';
       if (isPaid){
-        ctrl = '<div class="task-ctrl"><button class="mini-btn" data-rec-unpay="' + r.id + '">미수전환</button></div>';
+        ctrl = '<div class="task-ctrl"><button class="mini-btn" data-rec-unpay="' + r.id + '">미수전환</button>' + recEditBtn + '</div>';
       } else {
         var invBtn = '<button class="mini-btn" data-rec-inv="' + r.id + '">' + (r.invoice ? "계산서 취소" : "계산서 발행") + '</button>';
-        ctrl = '<div class="task-ctrl">' + invBtn + '<button class="cal-btn" data-rec-pay="' + r.id + '">입금완료</button></div>';
+        var misBtn = '<button class="mini-btn" data-rec-mismatch="' + r.id + '">' + (r.mismatch ? "불일치 해제" : "불일치") + '</button>';
+        ctrl = '<div class="task-ctrl">' + invBtn + '<button class="cal-btn" data-rec-pay="' + r.id + '">입금완료</button>' + misBtn + recEditBtn + '</div>';
       }
     }
     var title = esc(r.client) + (r.desc ? ' · ' + esc(r.desc) : '');
@@ -2422,7 +2538,7 @@
   }
 
   function unpaidReceivables(){
-    var u = liveRec().filter(function(r){ return !r.paid; });
+    var u = liveRec().filter(function(r){ return !r.paid && recVisible(r); });
     u.sort(function(a, b){ var ad = a.billed || "9999-99-99", bd = b.billed || "9999-99-99"; return ad < bd ? -1 : (ad > bd ? 1 : 0); });
     return u;
   }
@@ -2433,7 +2549,7 @@
     var toggleBtn = document.getElementById("recPaidToggle");
     if (!listHost) return;
     var unpaid = unpaidReceivables();
-    var paid = liveRec().filter(function(r){ return r.paid; });
+    var paid = liveRec().filter(function(r){ return r.paid && recVisible(r); });
     paid.sort(function(a, b){ return (b.paid || "").localeCompare(a.paid || ""); });
     paid = paid.slice(0, 30);
 
@@ -2462,6 +2578,12 @@
     });
     Array.prototype.forEach.call(host.querySelectorAll("[data-rec-del]"), function(el){
       el.addEventListener("click", function(e){ e.stopPropagation(); deleteReceivable(el.getAttribute("data-rec-del")); });
+    });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-rec-mismatch]"), function(el){
+      el.addEventListener("click", function(e){ e.stopPropagation(); toggleRecMismatch(el.getAttribute("data-rec-mismatch")); });
+    });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-rec-edit]"), function(el){
+      el.addEventListener("click", function(e){ e.stopPropagation(); openRecModal(el.getAttribute("data-rec-edit")); });
     });
   }
 
