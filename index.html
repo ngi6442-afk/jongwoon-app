@@ -71,8 +71,9 @@
     text-overflow:ellipsis;
   }
   .user-chip.empty{color:var(--sub);font-weight:600;}
-  .brand{display:flex;align-items:center;gap:9px;min-width:0;}
-  .brand-logo{width:33px;height:33px;display:block;flex-shrink:0;}
+  .brand{display:flex;align-items:center;gap:8px;min-width:0;}
+  .brand-logo{width:31px;height:31px;display:block;flex-shrink:0;}
+  .brand h1{font-size:17px;font-weight:800;color:var(--brand-dark);letter-spacing:-0.01em;line-height:1.1;}
   .nav-group{display:none;}
   /* 탭 */
   .tabbar{
@@ -118,6 +119,16 @@
   .tab-badge.hide{display:none;}
   .view{display:none;}
   .view.active{display:block;}
+  /* 홈 KPI 타일 (clobe식) */
+  .dash-date{font-size:12.5px;color:var(--sub);font-weight:600;margin:2px 2px 10px;}
+  .stat-row{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:18px;}
+  .stat-tile{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:13px 15px;box-shadow:0 1px 2px rgba(16,33,43,0.03);}
+  .stat-tile .lbl{font-size:12px;color:var(--sub);font-weight:600;margin-bottom:6px;}
+  .stat-tile .val{font-size:23px;font-weight:800;color:var(--text);letter-spacing:-0.02em;line-height:1.05;}
+  .stat-tile .val.money{font-size:19px;}
+  .stat-tile .unit{font-size:13px;font-weight:600;color:var(--sub);margin-left:2px;}
+  .stat-tile.alert .val{color:#B0332A;}
+  @media (min-width:640px){ .stat-row{grid-template-columns:repeat(4,1fr);} }
 
   .summary-card{
     background:linear-gradient(135deg, var(--brand-dark), var(--brand));
@@ -2498,13 +2509,14 @@
     var imminentTot = urgent.length + urgentLic.length;
     var unpaid = unpaidReceivables();
 
-    var html = '<div class="summary-card"><div class="summary-date">' + today + '</div>' +
-      '<div class="summary-grid" style="grid-template-columns:repeat(4,1fr);">' +
-        '<div class="summary-item"><div class="num"' + (overdueTot ? ' style="color:#FFD3CC;"' : '') + '>' + overdueTot + '</div><div class="lbl">만기 경과</div></div>' +
-        '<div class="summary-item"><div class="num">' + imminentTot + '</div><div class="lbl">만기 임박</div></div>' +
-        '<div class="summary-item"><div class="num">' + openTasks.length + '</div><div class="lbl">미완료 지시</div></div>' +
-        '<div class="summary-item"><div class="num">' + unpaid.length + '</div><div class="lbl">미수</div></div>' +
-      '</div></div>';
+    var reviewCount = liveTasks().filter(function(t){ return t.status === "review" && taskVisible(t); }).length;
+    var unpaidSum = 0; unpaid.forEach(function(r){ unpaidSum += (r.amount || 0); });
+    var tiles = '';
+    if (canSee("rec")) tiles += '<div class="stat-tile"><div class="lbl">미수</div><div class="val money">' + (unpaidSum ? (fmtAmount(unpaidSum) + '<span class="unit">원</span>') : (unpaid.length + '<span class="unit">건</span>')) + '</div></div>';
+    tiles += '<div class="stat-tile' + (overdueTot ? ' alert' : '') + '"><div class="lbl">만기 임박</div><div class="val">' + imminentTot + '<span class="unit">건</span></div></div>';
+    tiles += '<div class="stat-tile"><div class="lbl">미완료 지시</div><div class="val">' + openTasks.length + '<span class="unit">건</span></div></div>';
+    tiles += '<div class="stat-tile"><div class="lbl">결재 대기</div><div class="val">' + reviewCount + '<span class="unit">건</span></div></div>';
+    var html = '<div class="dash-date">' + today + '</div><div class="stat-row">' + tiles + '</div>';
 
     html += '<div class="dash-sec"><h2>만기 임박·경과 (차량) <span class="cnt">' + urgent.length + '</span></h2><div class="card">';
     if (urgent.length){
