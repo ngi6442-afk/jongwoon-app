@@ -1207,6 +1207,7 @@
   function _ghResp(status, obj){ return Promise.resolve({ status: status, ok: status >= 200 && status < 300, json: function(){ return Promise.resolve(obj); } }); }
   function emptyDoc(col){ return col === "checklist" ? { records: {}, custom: {} } : { schema: 1, items: [] }; }
   function _urlCollection(u){
+    if (u.indexOf("mytasks.json") >= 0) return "mytasks";
     if (u.indexOf("checklist.json") >= 0) return "checklist";
     if (u.indexOf("tasks.json") >= 0) return "tasks";
     if (u.indexOf("vehicles.json") >= 0) return "vehicles";
@@ -1214,7 +1215,6 @@
     if (u.indexOf("licenses.json") >= 0) return "licenses";
     if (u.indexOf("documents.json") >= 0) return "documents";
     if (u.indexOf("clients.json") >= 0) return "clients";
-    if (u.indexOf("mytasks.json") >= 0) return "mytasks";
     return null;
   }
   function onSessionInvalid(){ setGwToken(null); curMemberObj = null; if (typeof showMemberLogin === "function") showMemberLogin(); }
