@@ -605,6 +605,8 @@
     <button class="tab-btn" data-tab="lic" id="tabLicBtn">인허가</button>
     <div class="nav-group">정산</div>
     <button class="tab-btn" data-tab="rec" id="tabRecBtn">기성</button>
+    <div class="nav-group">거래처</div>
+    <button class="tab-btn" data-tab="cli" id="tabCliBtn">거래처</button>
     <div class="nav-group">문서</div>
     <button class="tab-btn" data-tab="doc" id="tabDocBtn">문서함</button>
   </nav>
@@ -690,6 +692,14 @@
     <button class="link-btn" id="licAddBtn">+ 인허가 추가</button>
   </section>
 
+  <!-- 거래처 -->
+  <section class="view" id="view-cli">
+    <div class="dash-sec" style="margin-bottom:8px;"><h2>거래처 <span class="cnt" id="cliHead"></span></h2></div>
+    <input type="search" id="cliSearch" placeholder="거래처 검색(상호·사업자번호)" autocomplete="off" style="width:100%;padding:9px 12px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;font-size:14px;box-sizing:border-box;">
+    <div class="card" id="cliList"><div class="loading">불러오는 중…</div></div>
+    <button class="link-btn" id="cliAddBtn">+ 거래처 추가</button>
+  </section>
+
   <!-- 문서함 -->
   <section class="view" id="view-doc">
     <div class="dash-sec" style="margin-bottom:8px;"><h2>문서함 <span class="cnt" id="docHead"></span></h2></div>
@@ -725,6 +735,22 @@
     <input type="text" id="nameInput" placeholder="이름 (예: 나종운)" autocomplete="off">
     <input type="password" id="tokenInput" placeholder="토큰 붙여넣기" autocomplete="off">
     <button class="primary" id="tokenSave">저장하고 시작</button>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="cliBackdrop">
+  <div class="modal">
+    <h3 id="cliModalTitle">거래처 추가</h3>
+    <input type="text" id="cliName" placeholder="상호(거래처명)" autocomplete="off">
+    <input type="text" id="cliBizNo" placeholder="사업자번호 (선택)" autocomplete="off">
+    <input type="text" id="cliContact" placeholder="담당자 (선택)" autocomplete="off">
+    <input type="text" id="cliPhone" placeholder="연락처 (선택)" autocomplete="off">
+    <input type="text" id="cliEmail" placeholder="이메일 (선택)" autocomplete="off">
+    <input type="text" id="cliAddr" placeholder="주소 (선택)" autocomplete="off">
+    <input type="text" id="cliNote" placeholder="메모 (선택)" autocomplete="off">
+    <button class="primary" id="cliSave">저장</button>
+    <button class="danger" id="cliDelete">삭제</button>
+    <button class="secondary" id="cliCancel">취소</button>
   </div>
 </div>
 
@@ -949,6 +975,7 @@
   var REC_PATH = "data/receivables.json";
   var LIC_PATH = "data/licenses.json";
   var DOC_PATH = "data/documents.json";
+  var CLIENT_PATH = "data/clients.json";
   var USERS_PATH = "data/users.json";
   var CHECK_API = API_ROOT + CHECK_PATH;
   var TASKS_API = API_ROOT + TASKS_PATH;
@@ -956,6 +983,7 @@
   var REC_API = API_ROOT + REC_PATH;
   var LIC_API = API_ROOT + LIC_PATH;
   var DOC_API = API_ROOT + DOC_PATH;
+  var CLIENT_API = API_ROOT + CLIENT_PATH;
   var USERS_API = API_ROOT + USERS_PATH;
 
   var TOKEN_KEY = "jw_app_token";
@@ -1160,6 +1188,7 @@
     if (u.indexOf("receivables.json") >= 0) return "receivables";
     if (u.indexOf("licenses.json") >= 0) return "licenses";
     if (u.indexOf("documents.json") >= 0) return "documents";
+    if (u.indexOf("clients.json") >= 0) return "clients";
     return null;
   }
   function onSessionInvalid(){ setGwToken(null); curMemberObj = null; if (typeof showMemberLogin === "function") showMemberLogin(); }
@@ -2222,6 +2251,7 @@
     document.getElementById("view-lic").classList.toggle("active", name === "lic");
     document.getElementById("view-check").classList.toggle("active", name === "check");
     document.getElementById("view-doc").classList.toggle("active", name === "doc");
+    document.getElementById("view-cli").classList.toggle("active", name === "cli");
   }
 
   // ---- 토큰 / 설정 UI ----
@@ -2322,6 +2352,12 @@
   document.getElementById("docCancel").addEventListener("click", closeDocModal);
   document.getElementById("docBackdrop").addEventListener("click", function(e){ if (e.target === this) closeDocModal(); });
   document.getElementById("docSearch").addEventListener("input", function(){ docSearchTerm = this.value.toLowerCase().trim(); renderDocuments(); });
+  document.getElementById("cliAddBtn").addEventListener("click", function(){ openCliModal(null); });
+  document.getElementById("cliSave").addEventListener("click", saveCliModal);
+  document.getElementById("cliDelete").addEventListener("click", deleteCliFromModal);
+  document.getElementById("cliCancel").addEventListener("click", closeCliModal);
+  document.getElementById("cliBackdrop").addEventListener("click", function(e){ if (e.target === this) closeCliModal(); });
+  document.getElementById("cliSearch").addEventListener("input", function(){ cliSearchTerm = this.value.toLowerCase().trim(); renderClients(); });
   document.getElementById("licSave").addEventListener("click", saveLicFromModal);
   document.getElementById("licDelete").addEventListener("click", deleteLicFromModal);
   document.getElementById("licCancel").addEventListener("click", closeLicModal);
@@ -2754,6 +2790,110 @@
     if (!canDo("doc") || !editingDocId) return;
     var d = findDoc(editingDocId); if (d){ d.del = 1; d.updated = todayStr(); }
     closeDocModal(); renderDocuments(); saveDocuments();
+  }
+
+  // ---- 거래처(clients.json) — 미수 자동 연동 ----
+  var clients = [];
+  var cliSha = null;
+  var cliSearchTerm = "";
+  var editingCliId = null;
+  function findCli(id){ for (var i=0;i<clients.length;i++){ if (clients[i].id === id) return clients[i]; } return null; }
+  function loadClients(){
+    var token = getToken(); if (!token) return;
+    fetch(CLIENT_API, {headers: ghHeaders()}).then(function(resp){
+      if (resp.status === 404){ cliSha = null; clients = []; renderClients(); return; }
+      if (!resp.ok) throw new Error("HTTP " + resp.status);
+      return resp.json().then(function(json){ cliSha = json.sha; var p = JSON.parse(b64DecodeUnicode(json.content)); clients = (p && p.items) || []; renderClients(); });
+    }).catch(function(){ renderClients(); });
+  }
+  function saveClients(){
+    var token = getToken(); if (!token) return;
+    var body = JSON.stringify({schema: 1, items: clients});
+    var payload = {message: "clients: 업데이트", content: b64EncodeUnicode(body), branch: "main"};
+    if (cliSha) payload.sha = cliSha;
+    fetch(CLIENT_API, {method: "PUT", headers: Object.assign({"Content-Type":"application/json"}, ghHeaders()), body: JSON.stringify(payload)}).then(function(resp){
+      if (resp.status === 401) return;
+      return resp.json().then(function(json){ cliSha = json.content && json.content.sha; });
+    }).catch(function(){});
+  }
+  function cliUnpaid(cli){
+    var digits = function(s){ return String(s||"").replace(/[^0-9]/g,""); };
+    var bn = digits(cli.biz_no), nm = (cli.name||"").trim();
+    return liveRec().filter(function(r){
+      if (r.paid || !recVisible(r)) return false;
+      if (bn && r.client_num && digits(r.client_num) === bn) return true;
+      return nm !== "" && (r.client||"").trim() === nm;
+    });
+  }
+  function renderClients(){
+    var host = document.getElementById("cliList"); if (!host) return;
+    var admin = canDo("client");
+    var addBtn = document.getElementById("cliAddBtn"); if (addBtn) addBtn.style.display = admin ? "block" : "none";
+    var seeRec = canSee("rec");
+    var list = clients.filter(function(c){
+      if (!c || c.del === 1) return false;
+      if (!cliSearchTerm) return true;
+      return ((c.name||"") + " " + (c.biz_no||"") + " " + (c.contact||"")).toLowerCase().indexOf(cliSearchTerm) >= 0;
+    });
+    list.sort(function(a,b){ return (a.name||"") < (b.name||"") ? -1 : ((a.name||"") > (b.name||"") ? 1 : 0); });
+    var head = document.getElementById("cliHead"); if (head) head.textContent = list.length ? (list.length + "곳") : "";
+    host.innerHTML = list.length ? list.map(function(c){
+      var meta = [];
+      if (c.biz_no) meta.push('<span>' + esc(c.biz_no) + '</span>');
+      if (c.contact) meta.push('<span class="author-chip">' + esc(c.contact) + (c.phone ? ' ' + esc(c.phone) : '') + '</span>');
+      else if (c.phone) meta.push('<span>' + esc(c.phone) + '</span>');
+      var due = "";
+      if (seeRec){
+        var un = cliUnpaid(c);
+        if (un.length){ var sum = 0; un.forEach(function(r){ sum += (r.amount||0); }); due = '<span class="rec-amt2" style="font-size:14px;">미수 ' + fmtAmount(sum) + '원 · ' + un.length + '건</span>'; }
+      }
+      return '<div class="item"><div class="item-body"><div class="item-title">' + esc(c.name || "(상호없음)") + '</div>' +
+        (meta.length ? '<div class="item-meta">' + meta.join('') + '</div>' : '') +
+        (due ? '<div class="item-meta" style="margin-top:4px;">' + due + '</div>' : '') +
+        (c.note ? '<div class="task-detail">' + esc(c.note) + '</div>' : '') +
+        '</div>' + (admin ? '<div class="task-ctrl"><button class="mini-btn" data-cli-edit="' + c.id + '">수정</button></div>' : '') + '</div>';
+    }).join("") : '<div class="empty-line">등록된 거래처가 없습니다.</div>';
+    Array.prototype.forEach.call(host.querySelectorAll("[data-cli-edit]"), function(el){
+      el.addEventListener("click", function(){ openCliModal(el.getAttribute("data-cli-edit")); });
+    });
+  }
+  function openCliModal(id){
+    if (!canDo("client")) return;
+    editingCliId = id || null;
+    var c = id ? findCli(id) : null;
+    document.getElementById("cliModalTitle").textContent = c ? "거래처 수정" : "거래처 추가";
+    document.getElementById("cliName").value = c ? (c.name||"") : "";
+    document.getElementById("cliBizNo").value = c ? (c.biz_no||"") : "";
+    document.getElementById("cliContact").value = c ? (c.contact||"") : "";
+    document.getElementById("cliPhone").value = c ? (c.phone||"") : "";
+    document.getElementById("cliEmail").value = c ? (c.email||"") : "";
+    document.getElementById("cliAddr").value = c ? (c.address||"") : "";
+    document.getElementById("cliNote").value = c ? (c.note||"") : "";
+    document.getElementById("cliDelete").style.display = c ? "block" : "none";
+    document.getElementById("cliBackdrop").classList.add("show");
+  }
+  function closeCliModal(){ document.getElementById("cliBackdrop").classList.remove("show"); editingCliId = null; }
+  function saveCliModal(){
+    if (!canDo("client")) return;
+    var name = document.getElementById("cliName").value.trim();
+    if (!name){ document.getElementById("cliName").focus(); return; }
+    var c = editingCliId ? findCli(editingCliId) : null;
+    var today = todayStr();
+    if (!c){ c = {id: genId("cl"), created: today}; clients.push(c); }
+    c.name = name;
+    c.biz_no = document.getElementById("cliBizNo").value.trim();
+    c.contact = document.getElementById("cliContact").value.trim();
+    c.phone = document.getElementById("cliPhone").value.trim();
+    c.email = document.getElementById("cliEmail").value.trim();
+    c.address = document.getElementById("cliAddr").value.trim();
+    c.note = document.getElementById("cliNote").value.trim();
+    c.updated = today;
+    closeCliModal(); renderClients(); saveClients();
+  }
+  function deleteCliFromModal(){
+    if (!canDo("client") || !editingCliId) return;
+    var c = findCli(editingCliId); if (c){ c.del = 1; c.updated = todayStr(); }
+    closeCliModal(); renderClients(); saveClients();
   }
 
   // ---- 홈택스 매출목록(.xlsx) 불러오기 → 미수 대사 (라이브러리 없이 순수 JS) ----
@@ -3625,7 +3765,7 @@
   // 로그인 성공 후: 권한 적용 + 데이터 로드 + (관리자면) 회원목록 로드
   function afterLogin(){
     applyPerms();
-    doLoad(); loadTasks(); loadVehicles(); loadReceivables(); loadLicenses(); loadDocuments();
+    doLoad(); loadTasks(); loadVehicles(); loadReceivables(); loadLicenses(); loadDocuments(); loadClients();
     if (isAdmin()) loadMembers();
     render();
   }
