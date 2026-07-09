@@ -490,14 +490,17 @@
   .own-badge{display:inline-block;font-size:11px;padding:1px 7px;border-radius:999px;font-weight:700;}
   .own-badge.self{background:#E6F0EA;color:var(--brand-dark);}
   .own-badge.lease{background:#EDE9F2;color:#5B4B85;}
-  .veh-item{align-items:flex-start;cursor:default;border-left:4px solid transparent;}
+  .veh-item{display:flex;align-items:flex-start;gap:12px;padding:14px 16px;cursor:default;border-left:4px solid transparent;}
   .veh-item.self{background:#F3F9F5;border-left-color:var(--brand);}
   .veh-item.lease{background:#F6F4FA;border-left-color:#7A68A8;}
-  .veh-item .item-title{font-size:16px;font-weight:700;}
-  .veh-item .dday{font-size:13px;padding:2px 10px;}
-  .veh-item .mini-btn,.veh-item .cal-btn{font-size:13px;padding:7px 13px;border-radius:9px;}
-  .veh-due{display:flex;gap:7px;align-items:center;flex-wrap:wrap;}
-  .due-tag{font-size:13px;color:var(--sub);font-weight:600;}
+  .veh-main{flex:1;min-width:0;}
+  .veh-no{font-size:18px;font-weight:800;line-height:1.2;margin:5px 0 3px;word-break:keep-all;}
+  .veh-sub{font-size:13px;color:var(--sub);display:flex;flex-wrap:wrap;gap:6px;align-items:center;}
+  .veh-right{flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:6px;}
+  .veh-due-line{font-size:13px;color:var(--sub);font-weight:700;white-space:nowrap;}
+  .veh-due-line .dday{font-size:15px;padding:2px 10px;margin-left:4px;}
+  .veh-btns{display:flex;gap:6px;margin-top:2px;}
+  .veh-btns .mini-btn{font-size:13px;padding:7px 13px;border-radius:9px;}
 
   /* 수금 */
   .rec-item{align-items:flex-start;cursor:default;}
@@ -2540,20 +2543,32 @@
   function vehRowHtml(v){
     var grey = isGreyState(v);
     var ownCls = v.own === "지입" ? "lease" : "self";
-    var meta = [];
-    meta.push('<span class="own-badge ' + ownCls + '">' + esc(v.own) + '</span>');
-    if (v.driver) meta.push('<span class="author-chip">' + esc(v.driver) + '</span>');
-    if (v.state && v.state !== "운행") meta.push('<span class="hold-chip">' + esc(v.state) + '</span>');
-    if (v.history && v.history.length) meta.push('<span class="ref-chip">이력 ' + v.history.length + '</span>');
+    var sub = [];
+    if (v.type || v.kind) sub.push('<span>' + esc(v.type || v.kind) + '</span>');
+    if (v.insurer) sub.push('<span>' + esc(v.insurer) + '</span>');
+    if (v.driver) sub.push('<span class="author-chip">' + esc(v.driver) + '</span>');
+    if (v.state && v.state !== "운행") sub.push('<span class="hold-chip">' + esc(v.state) + '</span>');
+    if (v.history && v.history.length) sub.push('<span class="ref-chip">이력 ' + v.history.length + '</span>');
+    var showNote = v.note && v.note.trim() && v.note.trim() !== (v.insurer || "").trim();
     return '<div class="item veh-item ' + ownCls + '">' +
-        '<div class="item-body">' +
-          '<div class="item-title">' + esc(v.no) + ((v.type || v.kind) ? ' · ' + esc(v.type || v.kind) : '') + '</div>' +
-          '<div class="item-meta">' + meta.join('') + '</div>' +
-          '<div class="veh-due" style="margin-top:5px;">' + dueChipHtml("검사", v.insp_due, grey) + dueChipHtml("보험", v.ins_due, grey) + '</div>' +
-          (v.note ? '<div class="task-detail">' + esc(v.note) + '</div>' : '') +
+        '<div class="veh-main">' +
+          '<div><span class="own-badge ' + ownCls + '">' + esc(v.own) + '</span></div>' +
+          '<div class="veh-no">' + esc(v.no) + '</div>' +
+          (sub.length ? '<div class="veh-sub">' + sub.join('') + '</div>' : '') +
+          (showNote ? '<div class="task-detail" style="margin-top:5px;">' + esc(v.note) + '</div>' : '') +
         '</div>' +
-        '<div class="task-ctrl"><button class="mini-btn" data-veh-hist="' + v.id + '">이력</button><button class="mini-btn" data-veh-edit="' + v.id + '">수정</button></div>' +
+        '<div class="veh-right">' +
+          vehDdayLine("검사", v.insp_due, grey) +
+          vehDdayLine("보험", v.ins_due, grey) +
+          '<div class="veh-btns"><button class="mini-btn" data-veh-hist="' + v.id + '">이력</button><button class="mini-btn" data-veh-edit="' + v.id + '">수정</button></div>' +
+        '</div>' +
       '</div>';
+  }
+  function vehDdayLine(label, dateStr, grey){
+    if (!dateStr) return '<div class="veh-due-line">' + label + ' <span class="dday grey">-</span></div>';
+    var dd = vehDday(dateStr);
+    var cls = grey ? "grey" : (dd.cls || "");
+    return '<div class="veh-due-line">' + label + ' <span class="dday ' + cls + '" title="' + esc(dateStr) + '">' + dd.text + '</span></div>';
   }
 
   var vehSearchTerm = "";
