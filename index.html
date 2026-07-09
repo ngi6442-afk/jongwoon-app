@@ -715,6 +715,11 @@
       <h2>내게 온 지시</h2>
       <div id="myTaskHost"><div class="loading" style="padding:14px 0;">불러오는 중…</div></div>
     </section>
+    <section class="group" id="myTodoGroup">
+      <h2>내가 할 일 <span style="font-size:11px;font-weight:600;color:var(--sub);">· 나만 보기</span></h2>
+      <div class="add-row" style="padding:0 0 8px;"><input type="text" id="myTodoInput" placeholder="+ 내 할 일 추가" autocomplete="off"><button id="myTodoAddBtn">추가</button></div>
+      <div id="myTodoHost"></div>
+    </section>
     <div id="listHost">
       <div class="loading">불러오는 중…</div>
     </div>
@@ -993,6 +998,7 @@
   var LIC_PATH = "data/licenses.json";
   var DOC_PATH = "data/documents.json";
   var CLIENT_PATH = "data/clients.json";
+  var MYTASKS_PATH = "data/mytasks.json";
   var USERS_PATH = "data/users.json";
   var CHECK_API = API_ROOT + CHECK_PATH;
   var TASKS_API = API_ROOT + TASKS_PATH;
@@ -1001,6 +1007,7 @@
   var LIC_API = API_ROOT + LIC_PATH;
   var DOC_API = API_ROOT + DOC_PATH;
   var CLIENT_API = API_ROOT + CLIENT_PATH;
+  var MYTASKS_API = API_ROOT + MYTASKS_PATH;
   var USERS_API = API_ROOT + USERS_PATH;
 
   var TOKEN_KEY = "jw_app_token";
@@ -1206,6 +1213,7 @@
     if (u.indexOf("licenses.json") >= 0) return "licenses";
     if (u.indexOf("documents.json") >= 0) return "documents";
     if (u.indexOf("clients.json") >= 0) return "clients";
+    if (u.indexOf("mytasks.json") >= 0) return "mytasks";
     return null;
   }
   function onSessionInvalid(){ setGwToken(null); curMemberObj = null; if (typeof showMemberLogin === "function") showMemberLogin(); }
@@ -2375,6 +2383,8 @@
   document.getElementById("cliCancel").addEventListener("click", closeCliModal);
   document.getElementById("cliBackdrop").addEventListener("click", function(e){ if (e.target === this) closeCliModal(); });
   document.getElementById("cliSearch").addEventListener("input", function(){ cliSearchTerm = this.value.toLowerCase().trim(); renderClients(); });
+  document.getElementById("myTodoAddBtn").addEventListener("click", addMyTodo);
+  document.getElementById("myTodoInput").addEventListener("keydown", function(e){ if (e.key === "Enter") addMyTodo(); });
   document.getElementById("licSave").addEventListener("click", saveLicFromModal);
   document.getElementById("licDelete").addEventListener("click", deleteLicFromModal);
   document.getElementById("licCancel").addEventListener("click", closeLicModal);
@@ -2968,6 +2978,68 @@
     if (!canDo("client") || !editingCliId) return;
     var c = findCli(editingCliId); if (c){ c.del = 1; c.updated = todayStr(); }
     closeCliModal(); renderClients(); saveClients();
+  }
+
+  // ---- 내가 할 일(mytasks) — 사용자별 비공개(서버가 본인 것만 저장/반환) ----
+  var myTodos = [];
+  var myTodoSha = null;
+  function loadMyTasks(){
+    var token = getToken(); if (!token) return;
+    fetch(MYTASKS_API, {headers: ghHeaders()}).then(function(resp){
+      if (resp.status === 404){ myTodoSha = null; myTodos = []; renderMyTodos(); return; }
+      if (!resp.ok) throw new Error("HTTP " + resp.status);
+      return resp.json().then(function(json){ myTodoSha = json.sha; var p = JSON.parse(b64DecodeUnicode(json.content)); myTodos = (p && p.items) || []; renderMyTodos(); });
+    }).catch(function(){ renderMyTodos(); });
+  }
+  function saveMyTasks(){
+    var token = getToken(); if (!token) return;
+    var body = JSON.stringify({schema: 1, items: myTodos});
+    var payload = {message: "mytasks", content: b64EncodeUnicode(body), branch: "main"};
+    if (myTodoSha) payload.sha = myTodoSha;
+    fetch(MYTASKS_API, {method: "PUT", headers: Object.assign({"Content-Type":"application/json"}, ghHeaders()), body: JSON.stringify(payload)}).then(function(resp){
+      if (resp.status === 401) return;
+      return resp.json().then(function(json){ myTodoSha = json.content && json.content.sha; });
+    }).catch(function(){});
+  }
+  function myTodoRow(t, done){
+    return '<div class="item task-item' + (done ? ' checked' : '') + '" data-todo-toggle="' + t.id + '">' +
+      '<div class="check-box">' + (done ? '✓' : '') + '</div>' +
+      '<div class="item-body"><div class="item-title">' + esc(t.title) + '</div></div>' +
+      '<button class="del-x" data-todo-del="' + t.id + '">×</button></div>';
+  }
+  function renderMyTodos(){
+    var host = document.getElementById("myTodoHost"); if (!host) return;
+    if (!myName()){ host.innerHTML = ""; return; }
+    var live = myTodos.filter(function(t){ return t && t.del !== 1; });
+    var open = live.filter(function(t){ return !t.done; });
+    var done = live.filter(function(t){ return t.done; });
+    open.sort(function(a,b){ return (a.created||"") < (b.created||"") ? -1 : 1; });
+    var rows = open.map(function(t){ return myTodoRow(t, false); });
+    done.slice(-10).forEach(function(t){ rows.push(myTodoRow(t, true)); });
+    host.innerHTML = rows.length ? rows.join("") : '<div class="empty-line" style="padding:10px;">할 일이 없습니다.</div>';
+    Array.prototype.forEach.call(host.querySelectorAll("[data-todo-toggle]"), function(el){
+      el.addEventListener("click", function(e){ if (e.target.classList.contains("del-x")) return; toggleMyTodo(el.getAttribute("data-todo-toggle")); });
+    });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-todo-del]"), function(el){
+      el.addEventListener("click", function(e){ e.stopPropagation(); delMyTodo(el.getAttribute("data-todo-del")); });
+    });
+  }
+  function addMyTodo(){
+    var el = document.getElementById("myTodoInput");
+    var title = el.value.trim(); if (!title) return;
+    myTodos.push({ id: genId("td"), title: title, done: false, created: todayStr() });
+    el.value = "";
+    renderMyTodos(); saveMyTasks();
+  }
+  function toggleMyTodo(id){
+    var t = null; for (var i=0;i<myTodos.length;i++){ if (myTodos[i].id === id){ t = myTodos[i]; break; } }
+    if (!t) return;
+    t.done = !t.done; t.updated = todayStr();
+    renderMyTodos(); saveMyTasks();
+  }
+  function delMyTodo(id){
+    for (var i=0;i<myTodos.length;i++){ if (myTodos[i].id === id){ myTodos[i].del = 1; break; } }
+    renderMyTodos(); saveMyTasks();
   }
 
   // ---- 홈택스 매출목록(.xlsx) 불러오기 → 미수 대사 (라이브러리 없이 순수 JS) ----
@@ -3839,7 +3911,7 @@
   // 로그인 성공 후: 권한 적용 + 데이터 로드 + (관리자면) 회원목록 로드
   function afterLogin(){
     applyPerms();
-    doLoad(); loadTasks(); loadVehicles(); loadReceivables(); loadLicenses(); loadDocuments(); loadClients();
+    doLoad(); loadTasks(); loadVehicles(); loadReceivables(); loadLicenses(); loadDocuments(); loadClients(); loadMyTasks();
     if (isAdmin()) loadMembers();
     render();
   }
