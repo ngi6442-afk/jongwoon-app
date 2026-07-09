@@ -71,6 +71,9 @@
     text-overflow:ellipsis;
   }
   .user-chip.empty{color:var(--sub);font-weight:600;}
+  .brand{display:flex;align-items:center;gap:9px;min-width:0;}
+  .brand-logo{width:30px;height:30px;border-radius:8px;display:block;flex-shrink:0;}
+  .nav-group{display:none;}
   /* 탭 */
   .tabbar{
     display:flex;
@@ -554,6 +557,7 @@
     }
     .tab-btn.active{background:var(--brand-dark);color:#fff;box-shadow:0 2px 6px rgba(15,81,50,0.2);}
     .tab-btn .tab-badge{margin-left:auto;}
+    .nav-group{display:block;font-size:11px;font-weight:800;color:var(--sub);letter-spacing:.02em;padding:14px 8px 4px;}
     .views{flex:1;}
   }
 </style>
@@ -561,7 +565,7 @@
 <body>
 <div id="app">
   <header class="topbar">
-    <h1>종운환경 · 종운건설</h1>
+    <div class="brand"><img src="./icon-192.png" alt="" class="brand-logo"><h1>종운환경 · 종운건설</h1></div>
     <div class="topbar-right">
       <button class="user-chip" id="curUserBtn"></button>
       <button class="gear-btn" id="gearBtn" aria-label="설정">⚙</button>
@@ -573,11 +577,14 @@
   <div class="layout">
   <nav class="tabbar">
     <button class="tab-btn active" data-tab="dash" id="tabDashBtn">홈</button>
+    <div class="nav-group">업무</div>
     <button class="tab-btn" data-tab="tasks" id="tabTasksBtn">지시 <span class="tab-badge hide" id="taskTabBadge">0</span></button>
-    <button class="tab-btn" data-tab="veh" id="tabVehBtn">차량</button>
-    <button class="tab-btn" data-tab="rec" id="tabRecBtn">기성</button>
-    <button class="tab-btn" data-tab="lic" id="tabLicBtn">인허가</button>
     <button class="tab-btn" data-tab="check" id="tabCheckBtn">업무</button>
+    <div class="nav-group">현장·자산</div>
+    <button class="tab-btn" data-tab="veh" id="tabVehBtn">차량</button>
+    <button class="tab-btn" data-tab="lic" id="tabLicBtn">인허가</button>
+    <div class="nav-group">정산</div>
+    <button class="tab-btn" data-tab="rec" id="tabRecBtn">기성</button>
   </nav>
   <div class="views">
 
