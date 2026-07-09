@@ -514,7 +514,7 @@
   /* 지시 승인제 */
   .review-chip{display:inline-block;font-size:11px;padding:1px 8px;border-radius:999px;background:#FFF3D4;color:#8A6410;font-weight:700;}
   .appr-btn{background:var(--brand);color:#fff;border-color:var(--brand);}
-  .task-item.review .check-box{background:#F1A400;border-color:#F1A400;color:#fff;font-size:13px;line-height:1;}
+  .task-item.review .check-box, .item.review .check-box{background:#F1A400;border-color:#F1A400;color:#fff;font-size:13px;line-height:1;}
   .ref-chip{display:inline-block;font-size:11px;padding:1px 8px;border-radius:999px;background:var(--bg);color:var(--sub);font-weight:600;}
   .doc-link{color:var(--brand-dark);text-decoration:none;font-weight:700;}
   .doc-link:hover{text-decoration:underline;}
@@ -1094,6 +1094,7 @@
   var customItems = {};  // {type: {itemId: {t,who,del,created,updated}}}
   var checkScopes = {};  // {itemId: [memberId...]} 비면 전체 공개(관리자만 편집)
   var checkAssignee = {};  // {itemId: memberId} 주기업무 담당(관리자만 편집)
+  var checkReview = {};    // {type: {periodKey: {itemId: {by,date}}}} 승인 대기(하드코딩 항목)
   var currentSha = null;
   var saveTimer = null;
   var isOffline = false;
@@ -1266,7 +1267,7 @@
 
   function saveCache(){
     try{
-      localStorage.setItem(CACHE_KEY, JSON.stringify({sha: currentSha, records: records, custom: customItems, scopes: checkScopes, assignee: checkAssignee}));
+      localStorage.setItem(CACHE_KEY, JSON.stringify({sha: currentSha, records: records, custom: customItems, scopes: checkScopes, assignee: checkAssignee, review: checkReview}));
     }catch(e){}
   }
 
@@ -1785,24 +1786,30 @@
         if (!checkItemVisible(it.id)) return;
         var checkedDate = checkedObj[it.id];
         var isChecked = !!checkedDate;
+        var reviewEntry = getReview(g.type, key, it.id);
+        var isReview = !isChecked && !!reviewEntry;
         var metaBits = [];
         if (it.form) metaBits.push('<span class="ref-chip">참조 ' + esc(it.form) + '</span>');
         if (checkAssignee[it.id]) metaBits.push('<span class="author-chip">담당 ' + esc(scopeNames([checkAssignee[it.id]])) + '</span>');
         if (checkScopes[it.id] && checkScopes[it.id].length) metaBits.push('<span class="scope-chip">공개 ' + esc(scopeNames(checkScopes[it.id])) + '</span>');
         if (isChecked){
           metaBits.push('<span class="checked-date">✓ ' + checkedDate + '</span>');
+        } else if (isReview){
+          metaBits.push('<span class="review-chip">승인 대기' + (reviewEntry.by ? ' · ' + esc(reviewEntry.by) : '') + '</span>');
         } else {
           var prev = lastCheckedBefore(g.type, it.id, key);
           if (prev) metaBits.push('<span class="past-note">지난 확인 ' + fmtMD(prev) + '</span>');
         }
+        var ctrl = "";
+        if (isReview && isAdmin()) ctrl += '<button class="mini-btn appr-btn" data-chk-approve="' + g.type + '|' + it.id + '">승인</button><button class="mini-btn" data-chk-reject="' + g.type + '|' + it.id + '">반려</button>';
+        if (isAdmin()) ctrl += '<button class="mini-btn chk-scope" data-scope-id="' + it.id + '" data-scope-title="' + esc(it.title) + '">공개</button>';
         html +=
-          '<div class="item' + (isChecked ? ' checked' : '') + '" data-type="' + g.type + '" data-id="' + it.id + '">' +
-            '<div class="check-box">' + (isChecked ? '✓' : '') + '</div>' +
+          '<div class="item' + (isChecked ? ' checked' : '') + (isReview ? ' review' : '') + '" data-type="' + g.type + '" data-id="' + it.id + '">' +
+            '<div class="check-box">' + (isChecked ? '✓' : (isReview ? '⋯' : '')) + '</div>' +
             '<div class="item-body">' +
               '<div class="item-title">' + it.title + '</div>' +
               '<div class="item-meta">' + metaBits.join('') + '</div>' +
-            '</div>' +
-            (isAdmin() ? '<button class="mini-btn chk-scope" data-scope-id="' + it.id + '" data-scope-title="' + esc(it.title) + '">공개</button>' : '') +
+            '</div>' + ctrl +
           '</div>';
       });
 
@@ -1853,6 +1860,12 @@
         e.stopPropagation();
         openCheckScope(el.getAttribute("data-scope-id"), el.getAttribute("data-scope-title"));
       });
+    });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-chk-approve]"), function(el){
+      el.addEventListener("click", function(e){ e.stopPropagation(); var p = el.getAttribute("data-chk-approve").split("|"); approveCheck(p[0], p[1]); });
+    });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-chk-reject]"), function(el){
+      el.addEventListener("click", function(e){ e.stopPropagation(); var p = el.getAttribute("data-chk-reject").split("|"); rejectCheck(p[0], p[1]); });
     });
     Array.prototype.forEach.call(host.querySelectorAll(".del-x"), function(el){
       el.addEventListener("click", function(e){
@@ -1911,20 +1924,42 @@
     scheduleSave();
   }
 
+  function getReview(type, key, id){ return (checkReview[type] && checkReview[type][key] && checkReview[type][key][id]) || null; }
+  function setReview(type, key, id){ if (!checkReview[type]) checkReview[type] = {}; if (!checkReview[type][key]) checkReview[type][key] = {}; checkReview[type][key][id] = { by: myName() || "", date: todayStr() }; }
+  function clearReview(type, key, id){ if (checkReview[type] && checkReview[type][key]) delete checkReview[type][key][id]; }
   function toggleItem(type, itemId){
-    if (!canDo("check")) return;
+    var isAssignee = checkAssignee[itemId] && checkAssignee[itemId] === getMemberId();
+    if (!canDo("check") && !isAssignee) return;
     var key = CURRENT_KEYS[type];
     if (!records[type]) records[type] = {};
     if (!records[type][key]) records[type][key] = {};
-    if (records[type][key][itemId]){
-      delete records[type][key][itemId];
+    var isCustom = customItems[type] && customItems[type][itemId] && customItems[type][itemId].del !== 1;
+    if (isCustom || isAdmin()){
+      // 직접 추가 항목 or 관리자 → 즉시 완료/해제 (승인 불필요)
+      if (records[type][key][itemId]) delete records[type][key][itemId];
+      else records[type][key][itemId] = todayStr();
+      clearReview(type, key, itemId);
     } else {
-      records[type][key][itemId] = todayStr();
+      // 하드코딩 항목 + 비관리자 → 승인 대기 흐름
+      if (records[type][key][itemId]) delete records[type][key][itemId];   // 완료 되돌리기
+      else if (getReview(type, key, itemId)) clearReview(type, key, itemId); // 완료 요청 취소
+      else setReview(type, key, itemId);                                    // 완료 요청 → 승인 대기
     }
-    saveCache();
-    renderList();
-    renderSummary();
-    scheduleSave();
+    saveCache(); renderList(); renderSummary(); scheduleSave();
+  }
+  function approveCheck(type, id){
+    if (!isAdmin()) return;
+    var key = CURRENT_KEYS[type];
+    if (!records[type]) records[type] = {};
+    if (!records[type][key]) records[type][key] = {};
+    records[type][key][id] = todayStr();
+    clearReview(type, key, id);
+    saveCache(); renderList(); renderSummary(); scheduleSave();
+  }
+  function rejectCheck(type, id){
+    if (!isAdmin()) return;
+    clearReview(type, CURRENT_KEYS[type], id);
+    saveCache(); renderList(); renderSummary(); scheduleSave();
   }
 
   // ---- GitHub 공통 ----
@@ -2043,6 +2078,7 @@
         customItems = parsed.custom || {};
         checkScopes = parsed.scopes || {};
         checkAssignee = parsed.assignee || {};
+        checkReview = parsed.review || {};
         setOffline(false);
         saveCache();
         renderList();
@@ -2056,6 +2092,7 @@
         customItems = cache.custom || {};
         checkScopes = cache.scopes || {};
         checkAssignee = cache.assignee || {};
+        checkReview = cache.review || {};
         setOffline(true);
         renderList();
         renderSummary();
@@ -2070,7 +2107,7 @@
   function doSave(){
     var token = getToken();
     if (!token) return;
-    var body = JSON.stringify({records: records, custom: customItems, scopes: checkScopes, assignee: checkAssignee});
+    var body = JSON.stringify({records: records, custom: customItems, scopes: checkScopes, assignee: checkAssignee, review: checkReview});
     var payload = {
       message: "check: 업데이트",
       content: b64EncodeUnicode(body),
@@ -2117,6 +2154,7 @@
       customItems = mergeCustom(customItems, remoteParsed.custom || {});
       checkScopes = Object.assign({}, remoteParsed.scopes || {}, checkScopes);
       checkAssignee = Object.assign({}, remoteParsed.assignee || {}, checkAssignee);
+      checkReview = Object.assign({}, remoteParsed.review || {}, checkReview);
       currentSha = json.sha;
       saveCache();
       renderList();
