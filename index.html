@@ -662,21 +662,17 @@
 
   <!-- 주기 체크 -->
   <div class="view" id="view-check">
+    <div id="summaryHost"></div>
     <section class="group" id="myTaskGroup">
       <h2>내게 온 지시</h2>
       <div id="myTaskHost"><div class="loading" style="padding:14px 0;">불러오는 중…</div></div>
     </section>
-    <div id="summaryHost"></div>
     <div id="listHost">
       <div class="loading">불러오는 중…</div>
     </div>
     <section class="group">
       <h2>수시</h2>
-      <div class="info-card">
-        <div class="item"><div class="item-body"><div class="item-title">사고 발생 → 수시 위험성평가 + 사고 보고 (JW-05-006)</div></div></div>
-        <div class="item"><div class="item-body"><div class="item-title">신규 입사 → JW-06-011로 일괄 처리</div></div></div>
-        <div class="item"><div class="item-body"><div class="item-title">밀폐공간 · 석면 투입 전 → JW-06-012 · 특별교육</div></div></div>
-      </div>
+      <div class="info-card" id="sudsiHost"></div>
     </section>
   </div>
   </div>
@@ -955,6 +951,11 @@
   ];
 
   var TYPE_LABEL = {weekly:"주간", monthly:"월간", quarterly:"분기", half:"반기", yearly:"연간"};
+  var SUDSI = [
+    {id:"su1", title:"사고 발생 → 수시 위험성평가 + 사고 보고 (JW-05-006)"},
+    {id:"su2", title:"신규 입사 → JW-06-011로 일괄 처리"},
+    {id:"su3", title:"밀폐공간 · 석면 투입 전 → JW-06-012 · 특별교육"}
+  ];
 
   // ---- 상태 ----
   var records = {};      // {type: {periodKey: {itemId: "YYYY-MM-DD"}}}
@@ -1694,6 +1695,18 @@
       el.addEventListener("keydown", function(e){
         if (e.key === "Enter") addCustomItem(el.getAttribute("data-add-type"));
       });
+    });
+    renderSudsi();
+  }
+  function renderSudsi(){
+    var host = document.getElementById("sudsiHost");
+    if (!host) return;
+    host.innerHTML = SUDSI.filter(function(it){ return checkItemVisible(it.id); }).map(function(it){
+      var chip = (checkScopes[it.id] && checkScopes[it.id].length) ? '<div class="item-meta"><span class="scope-chip">공개 ' + esc(scopeNames(checkScopes[it.id])) + '</span></div>' : '';
+      return '<div class="item"><div class="item-body"><div class="item-title">' + esc(it.title) + '</div>' + chip + '</div>' + (isAdmin() ? '<button class="mini-btn chk-scope" data-scope-id="' + it.id + '" data-scope-title="' + esc(it.title) + '">공개</button>' : '') + '</div>';
+    }).join("");
+    Array.prototype.forEach.call(host.querySelectorAll(".chk-scope"), function(el){
+      el.addEventListener("click", function(e){ e.stopPropagation(); openCheckScope(el.getAttribute("data-scope-id"), el.getAttribute("data-scope-title")); });
     });
   }
 
@@ -3242,7 +3255,8 @@
   function findMember(id){ for (var i=0;i<members.length;i++){ if (members[i].id === id) return members[i]; } return null; }
   // 자동로그인 기본 OFF: 세션 저장이 기본, "로그인 유지" 체크 시에만 localStorage 영구 저장.
   function getMemberId(){
-    try{ return sessionStorage.getItem(MEMBER_KEY) || localStorage.getItem(MEMBER_KEY); }catch(e){ return null; }
+    var m = curMember();
+    return (m && m.id) || null;
   }
   function setMemberId(id, persist){
     try{
