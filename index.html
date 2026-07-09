@@ -3206,8 +3206,12 @@
   }
   function recImportPlan(cands){
     var byNts={}; receivables.forEach(function(r){ if(r&&r.nts) byNts[r.nts]=r; });
-    var plan={add:[],upd:[],cancel:[],dup:0};
+    var plan={add:[],upd:[],cancel:[],dup:0,filedup:[]};
+    var fileSeen={};
     cands.forEach(function(c){
+      // 파일 안에서 같은 승인번호가 또 나옴 → 중복 의심(그대로 추가 후 상단 노출)
+      if(c.nts && fileSeen[c.nts]){ if(!c.cancelled) plan.filedup.push(c); return; }
+      if(c.nts) fileSeen[c.nts]=1;
       var ex=c.nts?byNts[c.nts]:null;
       if(c.cancelled){ if(ex&&!ex.paid&&ex.del!==1) plan.cancel.push(c); return; }
       if(ex){
@@ -3217,10 +3221,20 @@
     });
     return plan;
   }
+  function recNewRec(c, today){
+    return { id:genId("r"), nts:c.nts, docno:c.docno, client:c.client, client_num:c.client_num, site:"",
+      desc:c.desc, amount:c.amount, supply:c.supply, tax:c.tax, billed:c.billed||today, purpose:c.purpose,
+      invoice:true, paid:null, due_hint:"", note:"", assignee:"", scope:[], task_id:null, mismatch:false,
+      src:"hometax", created:today, updated:today };
+  }
   function recImportApply(cands){
     var byNts={}; receivables.forEach(function(r){ if(r&&r.nts) byNts[r.nts]=r; });
-    var today=todayStr(), res={add:0,upd:0,cancel:0};
+    var today=todayStr(), res={add:0,upd:0,cancel:0,dup:0};
+    var fileSeen={};
     cands.forEach(function(c){
+      // 파일 안에서 같은 승인번호가 또 나오면 → 병합하지 않고 별도 항목으로 추가(목록 상단에 '중복 의심'으로 노출, 담당자가 확인·삭제)
+      if(c.nts && fileSeen[c.nts]){ if(!c.cancelled){ receivables.push(recNewRec(c,today)); res.dup++; } return; }
+      if(c.nts) fileSeen[c.nts]=1;
       var ex=c.nts?byNts[c.nts]:null;
       if(c.cancelled){ if(ex&&!ex.paid&&ex.del!==1){ ex.del=1; ex.updated=today; removeRecTask(ex); res.cancel++; } return; }
       if(ex){
@@ -3231,10 +3245,7 @@
         if((ex.amount||0)!==c.amount){ ex.amount=c.amount; if(ex.paid) ex.recheck=1; ch=true; }
         if(ch){ ex.updated=today; res.upd++; }
       } else {
-        var it={ id:genId("r"), nts:c.nts, docno:c.docno, client:c.client, client_num:c.client_num, site:"",
-          desc:c.desc, amount:c.amount, supply:c.supply, tax:c.tax, billed:c.billed||today, purpose:c.purpose,
-          invoice:true, paid:null, due_hint:"", note:"", assignee:"", scope:[], task_id:null, mismatch:false,
-          src:"hometax", created:today, updated:today };
+        var it=recNewRec(c,today);
         receivables.push(it); if(c.nts) byNts[c.nts]=it; res.add++;
       }
     });
@@ -3256,11 +3267,13 @@
   }
   function showRecImportPreview(plan){
     var addTotal=plan.add.reduce(function(a,c){return a+c.amount;},0);
-    document.getElementById("recImpSummary").innerHTML="신규 <b>"+plan.add.length+"</b>건 · 갱신 <b>"+plan.upd.length+"</b>건 · 취소반영 <b>"+plan.cancel.length+"</b>건 · 이미있음 "+plan.dup+"건<br>신규 미수 합계 <b>"+fmtAmount(addTotal)+"원</b>";
+    var fdup=(plan.filedup||[]).length;
+    document.getElementById("recImpSummary").innerHTML="신규 <b>"+plan.add.length+"</b>건 · 갱신 <b>"+plan.upd.length+"</b>건 · 취소반영 <b>"+plan.cancel.length+"</b>건 · 이미있음 "+plan.dup+"건"+(fdup?" · <span style=\"color:#b0332a;\">중복 의심 <b>"+fdup+"</b>건</span>":"")+"<br>신규 미수 합계 <b>"+fmtAmount(addTotal)+"원</b>"+(fdup?"<br><span style=\"color:#b0332a;font-size:12px;\">※ 파일 안에 승인번호가 겹치는 행입니다. 그대로 추가한 뒤 목록 상단에 빨간 '중복 의심'으로 표시되니 확인 후 삭제하세요.</span>":"");
     function line(c,tag){ return '<div style="padding:4px 0;border-bottom:1px solid rgba(128,128,128,.12);">'+tag+" <b>"+impEsc(c.client)+"</b> · "+impEsc(c.desc||"")+" · "+fmtAmount(c.amount)+"원</div>"; }
     var html="";
     plan.add.forEach(function(c){ html+=line(c,'<span style="color:#27ae60;">신규</span>'); });
     plan.upd.forEach(function(c){ html+=line(c,'<span style="color:#e67e22;">갱신</span>'); });
+    (plan.filedup||[]).forEach(function(c){ html+=line(c,'<span style="color:#b0332a;">중복의심</span>'); });
     plan.cancel.forEach(function(c){ html+=line(c,'<span style="color:#c0392b;">취소</span>'); });
     if(!html) html='<div style="opacity:.6;">반영할 변경이 없습니다 (모두 이미 등록됨).</div>';
     document.getElementById("recImpPreview").innerHTML=html;
@@ -3273,7 +3286,7 @@
     pendingImport=null; bd.classList.remove("show");
     saveRecCache(); renderReceivables(); renderDashboard(); scheduleRecSave();
     var msg=document.getElementById("recImpMsg");
-    if(msg){ msg.style.color="#27ae60"; msg.textContent="반영 완료 — 신규 "+res.add+" · 갱신 "+res.upd+" · 취소 "+res.cancel; }
+    if(msg){ msg.style.color=res.dup?"#b0332a":"#27ae60"; msg.textContent="반영 완료 — 신규 "+res.add+" · 갱신 "+res.upd+" · 취소 "+res.cancel+(res.dup?" · 중복 의심 "+res.dup+"건(상단 확인 후 삭제)":""); }
   }
 
   function saveRecCache(){ try{ localStorage.setItem(REC_CACHE_KEY, JSON.stringify({sha: recSha, items: receivables})); }catch(e){} }
@@ -3515,7 +3528,7 @@
     var unpaid = unpaidReceivables();
     // 중복 의심(같은 승인번호 또는 같은 거래처+금액+청구일)을 표시하고 상단으로
     var keyCount = {};
-    unpaid.forEach(function(r){ var k = r.nts ? ("n:" + r.nts) : ((r.client||"").trim() + "|" + (r.amount||0) + "|" + (r.billed||"")); r._dupkey = k; keyCount[k] = (keyCount[k]||0) + 1; });
+    unpaid.forEach(function(r){ var k = (r.client||"").trim() + "|" + (r.amount||0) + "|" + (r.billed||""); r._dupkey = k; keyCount[k] = (keyCount[k]||0) + 1; });
     unpaid.forEach(function(r){ r._dup = keyCount[r._dupkey] >= 2; });
     unpaid.sort(function(a, b){ if (!!a._dup !== !!b._dup) return a._dup ? -1 : 1; return 0; });
     var paid = liveRec().filter(function(r){ return r.paid && recVisible(r) && recMatchesSearch(r); });
