@@ -514,6 +514,8 @@
   .rec-item.checked .rec-client{color:#6C7A75;text-decoration:line-through;text-decoration-color:#B9C4BF;}
   .rec-item.checked .rec-amt2{color:#9AA8A2;}
   .rec-item .rec-actions{display:flex;align-items:center;gap:6px;flex-shrink:0;}
+  .dup-chip{display:inline-block;font-size:11px;padding:1px 8px;border-radius:999px;background:#FBE7E3;color:#B0332A;font-weight:800;flex-shrink:0;}
+  .rec-item.rec-dup{background:#FEF6F5;}
   /* 지시 승인제 */
   .review-chip{display:inline-block;font-size:11px;padding:1px 8px;border-radius:999px;background:#FFF3D4;color:#8A6410;font-weight:700;}
   .appr-btn{background:var(--brand);color:#fff;border-color:var(--brand);}
@@ -3432,6 +3434,7 @@
   function deleteReceivable(id){
     if (!canDo("rec")) return;
     var r = findRec(id); if (!r) return;
+    if (!confirm("이 미수를 삭제할까요?\n" + (r.client || "") + " " + (r.amount ? fmtAmount(r.amount) + "원" : ""))) return;
     r.del = 1; r.updated = todayStr();
     removeRecTask(r);
     saveRecCache(); renderReceivables(); renderDashboard(); scheduleRecSave();
@@ -3482,9 +3485,10 @@
       }
     }
     var amt = r.amount ? (fmtAmount(r.amount) + '원') : '';
-    return '<div class="item rec-item' + (isPaid ? ' checked' : '') + '">' +
+    return '<div class="item rec-item' + (isPaid ? ' checked' : '') + (r._dup ? ' rec-dup' : '') + '">' +
         '<div class="rec-main">' +
           '<span class="rec-client">' + esc(r.client || "-") + '</span>' +
+          (r._dup ? '<span class="dup-chip">중복 의심</span>' : '') +
           (amt ? '<span class="rec-amt2">' + amt + '</span>' : '') +
         '</div>' +
         ctrl +
@@ -3509,6 +3513,11 @@
     var toggleBtn = document.getElementById("recPaidToggle");
     if (!listHost) return;
     var unpaid = unpaidReceivables();
+    // 중복 의심(같은 승인번호 또는 같은 거래처+금액+청구일)을 표시하고 상단으로
+    var keyCount = {};
+    unpaid.forEach(function(r){ var k = r.nts ? ("n:" + r.nts) : ((r.client||"").trim() + "|" + (r.amount||0) + "|" + (r.billed||"")); r._dupkey = k; keyCount[k] = (keyCount[k]||0) + 1; });
+    unpaid.forEach(function(r){ r._dup = keyCount[r._dupkey] >= 2; });
+    unpaid.sort(function(a, b){ if (!!a._dup !== !!b._dup) return a._dup ? -1 : 1; return 0; });
     var paid = liveRec().filter(function(r){ return r.paid && recVisible(r) && recMatchesSearch(r); });
     paid.sort(function(a, b){ return (b.paid || "").localeCompare(a.paid || ""); });
     paid = paid.slice(0, 30);
