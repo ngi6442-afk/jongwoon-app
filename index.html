@@ -516,6 +516,8 @@
   .appr-btn{background:var(--brand);color:#fff;border-color:var(--brand);}
   .task-item.review .check-box{background:#F1A400;border-color:#F1A400;color:#fff;font-size:13px;line-height:1;}
   .ref-chip{display:inline-block;font-size:11px;padding:1px 8px;border-radius:999px;background:var(--bg);color:var(--sub);font-weight:600;}
+  .doc-link{color:var(--brand-dark);text-decoration:none;font-weight:700;}
+  .doc-link:hover{text-decoration:underline;}
   .overdue-bill{color:#B0332A;font-weight:700;}
 
   /* 인허가 */
@@ -603,6 +605,8 @@
     <button class="tab-btn" data-tab="lic" id="tabLicBtn">인허가</button>
     <div class="nav-group">정산</div>
     <button class="tab-btn" data-tab="rec" id="tabRecBtn">기성</button>
+    <div class="nav-group">문서</div>
+    <button class="tab-btn" data-tab="doc" id="tabDocBtn">문서함</button>
   </nav>
   <div class="views">
 
@@ -686,6 +690,14 @@
     <button class="link-btn" id="licAddBtn">+ 인허가 추가</button>
   </section>
 
+  <!-- 문서함 -->
+  <section class="view" id="view-doc">
+    <div class="dash-sec" style="margin-bottom:8px;"><h2>문서함 <span class="cnt" id="docHead"></span></h2></div>
+    <input type="search" id="docSearch" placeholder="문서 검색(제목·번호)" autocomplete="off" style="width:100%;padding:9px 12px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;font-size:14px;box-sizing:border-box;">
+    <div class="card" id="docList"><div class="loading">불러오는 중…</div></div>
+    <button class="link-btn" id="docAddBtn">+ 문서 추가</button>
+  </section>
+
   <!-- 주기 체크 -->
   <div class="view" id="view-check">
     <div id="summaryHost"></div>
@@ -713,6 +725,24 @@
     <input type="text" id="nameInput" placeholder="이름 (예: 나종운)" autocomplete="off">
     <input type="password" id="tokenInput" placeholder="토큰 붙여넣기" autocomplete="off">
     <button class="primary" id="tokenSave">저장하고 시작</button>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="docBackdrop">
+  <div class="modal">
+    <h3 id="docModalTitle">문서 추가</h3>
+    <input type="text" id="docTitle" placeholder="제목" autocomplete="off">
+    <input type="text" id="docNo" placeholder="문서번호 (예: JW-06-013, 선택)" autocomplete="off">
+    <span class="fld-label">카테고리</span>
+    <select id="docCat"><option value="양식">양식</option><option value="계약">계약</option><option value="매뉴얼">매뉴얼</option><option value="교육">교육</option><option value="기타">기타</option></select>
+    <input type="text" id="docVer" placeholder="버전 (예: v1, 선택)" autocomplete="off">
+    <span class="fld-label">개정일 (선택)</span>
+    <input type="date" id="docRevised">
+    <input type="text" id="docUrl" placeholder="링크 URL (구글드라이브 등)" autocomplete="off">
+    <input type="text" id="docNote" placeholder="메모 (선택)" autocomplete="off">
+    <button class="primary" id="docSave">저장</button>
+    <button class="danger" id="docDelete">삭제</button>
+    <button class="secondary" id="docCancel">취소</button>
   </div>
 </div>
 
@@ -918,12 +948,14 @@
   var VEH_PATH = "data/vehicles.json";
   var REC_PATH = "data/receivables.json";
   var LIC_PATH = "data/licenses.json";
+  var DOC_PATH = "data/documents.json";
   var USERS_PATH = "data/users.json";
   var CHECK_API = API_ROOT + CHECK_PATH;
   var TASKS_API = API_ROOT + TASKS_PATH;
   var VEH_API = API_ROOT + VEH_PATH;
   var REC_API = API_ROOT + REC_PATH;
   var LIC_API = API_ROOT + LIC_PATH;
+  var DOC_API = API_ROOT + DOC_PATH;
   var USERS_API = API_ROOT + USERS_PATH;
 
   var TOKEN_KEY = "jw_app_token";
@@ -1127,6 +1159,7 @@
     if (u.indexOf("vehicles.json") >= 0) return "vehicles";
     if (u.indexOf("receivables.json") >= 0) return "receivables";
     if (u.indexOf("licenses.json") >= 0) return "licenses";
+    if (u.indexOf("documents.json") >= 0) return "documents";
     return null;
   }
   function onSessionInvalid(){ setGwToken(null); curMemberObj = null; if (typeof showMemberLogin === "function") showMemberLogin(); }
@@ -2188,6 +2221,7 @@
     document.getElementById("view-rec").classList.toggle("active", name === "rec");
     document.getElementById("view-lic").classList.toggle("active", name === "lic");
     document.getElementById("view-check").classList.toggle("active", name === "check");
+    document.getElementById("view-doc").classList.toggle("active", name === "doc");
   }
 
   // ---- 토큰 / 설정 UI ----
@@ -2282,6 +2316,12 @@
   })();
 
   document.getElementById("licAddBtn").addEventListener("click", function(){ openLicModal(null); });
+  document.getElementById("docAddBtn").addEventListener("click", function(){ openDocModal(null); });
+  document.getElementById("docSave").addEventListener("click", saveDocModal);
+  document.getElementById("docDelete").addEventListener("click", deleteDocFromModal);
+  document.getElementById("docCancel").addEventListener("click", closeDocModal);
+  document.getElementById("docBackdrop").addEventListener("click", function(e){ if (e.target === this) closeDocModal(); });
+  document.getElementById("docSearch").addEventListener("input", function(){ docSearchTerm = this.value.toLowerCase().trim(); renderDocuments(); });
   document.getElementById("licSave").addEventListener("click", saveLicFromModal);
   document.getElementById("licDelete").addEventListener("click", deleteLicFromModal);
   document.getElementById("licCancel").addEventListener("click", closeLicModal);
@@ -2621,6 +2661,99 @@
     var s = String(n == null ? "" : n).replace(/[^0-9]/g, "");
     if (!s || s === "0") return "";
     return s.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  }
+
+  // ---- 문서함(documents.json) — 목록+링크, 관리자 편집·전원 열람 ----
+  var documents = [];
+  var docSha = null;
+  var docSearchTerm = "";
+  var editingDocId = null;
+  function findDoc(id){ for (var i=0;i<documents.length;i++){ if (documents[i].id === id) return documents[i]; } return null; }
+  function loadDocuments(){
+    var token = getToken(); if (!token) return;
+    fetch(DOC_API, {headers: ghHeaders()}).then(function(resp){
+      if (resp.status === 404){ docSha = null; documents = []; renderDocuments(); return; }
+      if (!resp.ok) throw new Error("HTTP " + resp.status);
+      return resp.json().then(function(json){ docSha = json.sha; var p = JSON.parse(b64DecodeUnicode(json.content)); documents = (p && p.items) || []; renderDocuments(); });
+    }).catch(function(){ renderDocuments(); });
+  }
+  function saveDocuments(){
+    var token = getToken(); if (!token) return;
+    var body = JSON.stringify({schema: 1, items: documents});
+    var payload = {message: "documents: 업데이트", content: b64EncodeUnicode(body), branch: "main"};
+    if (docSha) payload.sha = docSha;
+    fetch(DOC_API, {method: "PUT", headers: Object.assign({"Content-Type":"application/json"}, ghHeaders()), body: JSON.stringify(payload)}).then(function(resp){
+      if (resp.status === 401) return;
+      return resp.json().then(function(json){ docSha = json.content && json.content.sha; });
+    }).catch(function(){});
+  }
+  function renderDocuments(){
+    var host = document.getElementById("docList"); if (!host) return;
+    var admin = canDo("doc");
+    var addBtn = document.getElementById("docAddBtn"); if (addBtn) addBtn.style.display = admin ? "block" : "none";
+    var list = documents.filter(function(d){
+      if (!d || d.del === 1) return false;
+      if (!docSearchTerm) return true;
+      return ((d.title||"") + " " + (d.no||"") + " " + (d.category||"")).toLowerCase().indexOf(docSearchTerm) >= 0;
+    });
+    list.sort(function(a,b){ var ac=(a.category||"")+"|"+(a.title||""), bc=(b.category||"")+"|"+(b.title||""); return ac<bc?-1:(ac>bc?1:0); });
+    var head = document.getElementById("docHead"); if (head) head.textContent = list.length ? (list.length + "건") : "";
+    host.innerHTML = list.length ? list.map(function(d){
+      var t = esc(d.title || "(제목없음)");
+      var titleHtml = d.url ? '<a href="' + esc(d.url) + '" target="_blank" rel="noopener" class="doc-link">' + t + ' ↗</a>' : t;
+      var meta = [];
+      if (d.category) meta.push('<span class="own-badge self">' + esc(d.category) + '</span>');
+      if (d.no) meta.push('<span>' + esc(d.no) + '</span>');
+      if (d.version) meta.push('<span>' + esc(d.version) + '</span>');
+      if (d.revised) meta.push('<span>' + esc(d.revised) + '</span>');
+      return '<div class="item"><div class="item-body"><div class="item-title">' + titleHtml + '</div>' +
+        (meta.length ? '<div class="item-meta">' + meta.join('') + '</div>' : '') +
+        (d.note ? '<div class="task-detail">' + esc(d.note) + '</div>' : '') +
+        '</div>' + (admin ? '<div class="task-ctrl"><button class="mini-btn" data-doc-edit="' + d.id + '">수정</button></div>' : '') + '</div>';
+    }).join("") : '<div class="empty-line">등록된 문서가 없습니다.</div>';
+    Array.prototype.forEach.call(host.querySelectorAll("[data-doc-edit]"), function(el){
+      el.addEventListener("click", function(){ openDocModal(el.getAttribute("data-doc-edit")); });
+    });
+  }
+  function openDocModal(id){
+    if (!canDo("doc")) return;
+    editingDocId = id || null;
+    var d = id ? findDoc(id) : null;
+    document.getElementById("docModalTitle").textContent = d ? "문서 수정" : "문서 추가";
+    document.getElementById("docTitle").value = d ? (d.title||"") : "";
+    document.getElementById("docNo").value = d ? (d.no||"") : "";
+    document.getElementById("docCat").value = (d && d.category) || "양식";
+    document.getElementById("docVer").value = d ? (d.version||"") : "";
+    document.getElementById("docRevised").value = (d && isDate(d.revised)) ? d.revised : "";
+    document.getElementById("docUrl").value = d ? (d.url||"") : "";
+    document.getElementById("docNote").value = d ? (d.note||"") : "";
+    document.getElementById("docDelete").style.display = d ? "block" : "none";
+    document.getElementById("docBackdrop").classList.add("show");
+  }
+  function closeDocModal(){ document.getElementById("docBackdrop").classList.remove("show"); editingDocId = null; }
+  function saveDocModal(){
+    if (!canDo("doc")) return;
+    var title = document.getElementById("docTitle").value.trim();
+    if (!title){ document.getElementById("docTitle").focus(); return; }
+    var d = editingDocId ? findDoc(editingDocId) : null;
+    var today = todayStr();
+    if (!d){ d = {id: genId("doc"), created: today}; documents.push(d); }
+    d.title = title;
+    d.no = document.getElementById("docNo").value.trim();
+    d.category = document.getElementById("docCat").value;
+    d.version = document.getElementById("docVer").value.trim();
+    d.revised = document.getElementById("docRevised").value || "";
+    var url = document.getElementById("docUrl").value.trim();
+    if (url && !/^https?:\/\//i.test(url)) url = "https://" + url;
+    d.url = url;
+    d.note = document.getElementById("docNote").value.trim();
+    d.updated = today;
+    closeDocModal(); renderDocuments(); saveDocuments();
+  }
+  function deleteDocFromModal(){
+    if (!canDo("doc") || !editingDocId) return;
+    var d = findDoc(editingDocId); if (d){ d.del = 1; d.updated = todayStr(); }
+    closeDocModal(); renderDocuments(); saveDocuments();
   }
 
   // ---- 홈택스 매출목록(.xlsx) 불러오기 → 미수 대사 (라이브러리 없이 순수 JS) ----
@@ -3492,7 +3625,7 @@
   // 로그인 성공 후: 권한 적용 + 데이터 로드 + (관리자면) 회원목록 로드
   function afterLogin(){
     applyPerms();
-    doLoad(); loadTasks(); loadVehicles(); loadReceivables(); loadLicenses();
+    doLoad(); loadTasks(); loadVehicles(); loadReceivables(); loadLicenses(); loadDocuments();
     if (isAdmin()) loadMembers();
     render();
   }

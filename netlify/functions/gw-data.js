@@ -10,7 +10,7 @@ const { verifyToken, bearer } = require('./_lib/session');
 const DATA = 'gw_data';
 const USERS = 'gw_users';
 // 컬렉션 → 권한키
-const COL = { tasks: 'tasks', vehicles: 'veh', receivables: 'rec', licenses: 'lic', checklist: 'check' };
+const COL = { tasks: 'tasks', vehicles: 'veh', receivables: 'rec', licenses: 'lic', checklist: 'check', documents: 'doc' };
 
 const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, content-type, x-device-id, x-device-label', 'Access-Control-Allow-Methods': 'POST, OPTIONS' };
 function rid() { return crypto.randomBytes(8).toString('hex'); }
