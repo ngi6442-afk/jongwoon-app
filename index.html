@@ -865,6 +865,23 @@
   </div>
 </div>
 
+<div class="modal-backdrop" id="vehHistBackdrop">
+  <div class="modal">
+    <h3 id="vehHistTitle">점검·수리 이력</h3>
+    <div id="vehHistList" style="max-height:38vh;overflow:auto;margin-bottom:10px;"></div>
+    <div id="vehHistForm" style="border-top:1px solid var(--line);padding-top:10px;">
+      <span class="fld-label">이력 추가</span>
+      <input type="date" id="vhDate">
+      <select id="vhKind"><option value="수리">수리</option><option value="점검">점검</option><option value="사고">사고</option><option value="기타">기타</option></select>
+      <input type="text" id="vhContent" placeholder="내용 (예: 엔진오일 교체)" autocomplete="off">
+      <input type="text" id="vhCost" placeholder="비용(원, 선택)" inputmode="numeric" autocomplete="off">
+      <input type="text" id="vhVendor" placeholder="정비소/업체 (선택)" autocomplete="off">
+      <button class="primary" id="vhAdd">이력 추가</button>
+    </div>
+    <button class="secondary" id="vehHistClose">닫기</button>
+  </div>
+</div>
+
 <div class="modal-backdrop" id="vehBackdrop">
   <div class="modal">
     <h3 id="vehModalTitle">차량 수정</h3>
@@ -2381,6 +2398,9 @@
   document.getElementById("vehBackdrop").addEventListener("click", function(e){ if (e.target === this) closeVehModal(); });
   document.getElementById("vehAddBtn").addEventListener("click", function(){ openVehModal(null); });
   document.getElementById("vehAddBtnTop").addEventListener("click", function(){ openVehModal(null); });
+  document.getElementById("vhAdd").addEventListener("click", addVehHistory);
+  document.getElementById("vehHistClose").addEventListener("click", function(){ document.getElementById("vehHistBackdrop").classList.remove("show"); histVehId = null; });
+  document.getElementById("vehHistBackdrop").addEventListener("click", function(e){ if (e.target === this){ this.classList.remove("show"); histVehId = null; } });
   document.getElementById("vehInspRenew").addEventListener("click", function(){
     document.getElementById("vehInsp").value = addYears(document.getElementById("vehInsp").value, 1);
   });
@@ -2464,6 +2484,7 @@
     if (v.driver) meta.push('<span class="author-chip">' + esc(v.driver) + '</span>');
     if (v.insurer) meta.push('<span>' + esc(v.insurer) + '</span>');
     if (v.state && v.state !== "운행") meta.push('<span class="hold-chip">' + esc(v.state) + '</span>');
+    if (v.history && v.history.length) meta.push('<span class="ref-chip">이력 ' + v.history.length + '</span>');
     var cal = "";
     if (!grey){
       if (v.insp_due) cal += '<button class="cal-btn" data-cal-veh-insp="' + v.id + '">검사 캘린더</button>';
@@ -2478,7 +2499,7 @@
           (v.note ? '<div class="task-detail">' + esc(v.note) + '</div>' : '') +
           (cal ? '<div class="veh-due" style="margin-top:7px;gap:8px;">' + cal + '</div>' : '') +
         '</div>' +
-        '<div class="task-ctrl"><button class="mini-btn" data-veh-edit="' + v.id + '">수정</button></div>' +
+        '<div class="task-ctrl"><button class="mini-btn" data-veh-hist="' + v.id + '">이력</button><button class="mini-btn" data-veh-edit="' + v.id + '">수정</button></div>' +
       '</div>';
   }
 
@@ -2498,6 +2519,59 @@
     Array.prototype.forEach.call(host.querySelectorAll("[data-veh-edit]"), function(el){
       el.addEventListener("click", function(e){ e.stopPropagation(); openVehModal(el.getAttribute("data-veh-edit")); });
     });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-veh-hist]"), function(el){
+      el.addEventListener("click", function(e){ e.stopPropagation(); openVehHistory(el.getAttribute("data-veh-hist")); });
+    });
+  }
+
+  // ---- 차량 점검·수리 이력 (차량 객체 내 history 배열) ----
+  var histVehId = null;
+  function openVehHistory(id){
+    var v = findVeh(id); if (!v) return;
+    histVehId = id;
+    document.getElementById("vehHistTitle").textContent = (v.no || "") + " 점검·수리 이력";
+    document.getElementById("vhDate").value = todayStr();
+    document.getElementById("vhKind").value = "수리";
+    document.getElementById("vhContent").value = "";
+    document.getElementById("vhCost").value = "";
+    document.getElementById("vhVendor").value = "";
+    document.getElementById("vehHistForm").style.display = canDo("veh") ? "block" : "none";
+    renderVehHistory(v);
+    document.getElementById("vehHistBackdrop").classList.add("show");
+  }
+  function renderVehHistory(v){
+    var host = document.getElementById("vehHistList"); if (!host) return;
+    var canEdit = canDo("veh");
+    var hist = (v.history || []).slice().sort(function(a,b){ return (b.date||"").localeCompare(a.date||""); });
+    var total = 0; hist.forEach(function(h){ total += (h.cost||0); });
+    host.innerHTML = (total ? '<div style="font-size:13px;color:var(--sub);margin-bottom:6px;">누적 수리비 <b>' + fmtAmount(total) + '원</b></div>' : '') +
+      (hist.length ? hist.map(function(h){
+        return '<div class="item" style="padding:9px 4px;"><div class="item-body"><div class="item-title" style="font-size:14px;">' + esc(h.content||"") + ' <span class="hold-chip">' + esc(h.kind||"") + '</span></div><div class="item-meta"><span>' + esc(h.date||"") + '</span>' + (h.cost ? '<span class="rec-amt">' + fmtAmount(h.cost) + '원</span>' : '') + (h.vendor ? '<span>' + esc(h.vendor) + '</span>' : '') + '</div></div>' + (canEdit ? '<button class="del-x" data-vh-del="' + esc(h.id) + '">×</button>' : '') + '</div>';
+      }).join("") : '<div class="empty-line">이력이 없습니다.</div>');
+    Array.prototype.forEach.call(host.querySelectorAll("[data-vh-del]"), function(el){
+      el.addEventListener("click", function(){ deleteVehHistory(el.getAttribute("data-vh-del")); });
+    });
+  }
+  function addVehHistory(){
+    if (!canDo("veh")) return;
+    var v = findVeh(histVehId); if (!v) return;
+    var content = document.getElementById("vhContent").value.trim();
+    if (!content){ document.getElementById("vhContent").focus(); return; }
+    if (!v.history) v.history = [];
+    var cost = parseInt(String(document.getElementById("vhCost").value).replace(/[^0-9]/g,""), 10);
+    v.history.push({ id: genId("h"), date: document.getElementById("vhDate").value || todayStr(), kind: document.getElementById("vhKind").value, content: content, cost: isNaN(cost)?0:cost, vendor: document.getElementById("vhVendor").value.trim(), created: todayStr() });
+    v.updated = todayStr();
+    document.getElementById("vhContent").value = ""; document.getElementById("vhCost").value = ""; document.getElementById("vhVendor").value = "";
+    renderVehHistory(v); renderVehicles();
+    saveVehiclesCache(); scheduleVehSave();
+  }
+  function deleteVehHistory(hid){
+    if (!canDo("veh")) return;
+    var v = findVeh(histVehId); if (!v || !v.history) return;
+    v.history = v.history.filter(function(h){ return h.id !== hid; });
+    v.updated = todayStr();
+    renderVehHistory(v); renderVehicles();
+    saveVehiclesCache(); scheduleVehSave();
   }
 
   // ---- 차량 편집·갱신(vehicles.json 저장) ----
