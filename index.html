@@ -773,8 +773,10 @@
 
 <div class="modal-backdrop" id="checkScopeBackdrop">
   <div class="modal">
-    <h3>공개 대상</h3>
+    <h3>항목 설정</h3>
     <p id="csTitle" style="font-size:13px;color:var(--sub);margin:0 0 8px;text-align:left;"></p>
+    <span class="fld-label">담당 (선택)</span>
+    <select id="csAssignee"></select>
     <span class="fld-label">이 항목을 볼 직원 (비우면 전체 공개)</span>
     <div class="mchecks" id="csScope"></div>
     <button class="primary" id="csSave">저장</button>
@@ -999,6 +1001,7 @@
   var records = {};      // {type: {periodKey: {itemId: "YYYY-MM-DD"}}}
   var customItems = {};  // {type: {itemId: {t,who,del,created,updated}}}
   var checkScopes = {};  // {itemId: [memberId...]} 비면 전체 공개(관리자만 편집)
+  var checkAssignee = {};  // {itemId: memberId} 주기업무 담당(관리자만 편집)
   var currentSha = null;
   var saveTimer = null;
   var isOffline = false;
@@ -1168,7 +1171,7 @@
 
   function saveCache(){
     try{
-      localStorage.setItem(CACHE_KEY, JSON.stringify({sha: currentSha, records: records, custom: customItems, scopes: checkScopes}));
+      localStorage.setItem(CACHE_KEY, JSON.stringify({sha: currentSha, records: records, custom: customItems, scopes: checkScopes, assignee: checkAssignee}));
     }catch(e){}
   }
 
@@ -1627,15 +1630,31 @@
 
   function checkItemVisible(id){
     if (isAdmin()) return true;
+    if (checkAssignee[id] && checkAssignee[id] === getMemberId()) return true;
     var sc = checkScopes[id];
     if (!sc || !sc.length) return true;
     return sc.indexOf(getMemberId()) >= 0;
+  }
+  function myCheckCount(){
+    var meId = getMemberId();
+    if (!meId) return 0;
+    var n = 0;
+    GROUPS.forEach(function(g){
+      var key = CURRENT_KEYS[g.type];
+      var checkedObj = (records[g.type] && records[g.type][key]) || {};
+      g.items.forEach(function(it){ if (checkAssignee[it.id] === meId && !checkedObj[it.id]) n++; });
+      liveCustom(g.type).forEach(function(it){ if (checkAssignee[it.id] === meId && !checkedObj[it.id]) n++; });
+    });
+    return n;
   }
   var editingCheckItem = null;
   function openCheckScope(id, title){
     if (!isAdmin()) return;
     editingCheckItem = id;
     document.getElementById("csTitle").textContent = title || "";
+    var sel = document.getElementById("csAssignee");
+    sel.innerHTML = '<option value="">(담당 없음)</option>' + liveMembers().map(function(m){ return '<option value="' + m.id + '">' + esc(m.name) + '</option>'; }).join("");
+    sel.value = checkAssignee[id] || "";
     renderMemberChecks("csScope", checkScopes[id] || []);
     document.getElementById("checkScopeBackdrop").classList.add("show");
   }
@@ -1644,8 +1663,10 @@
     if (!editingCheckItem) return closeCheckScope();
     var ids = getCheckedMembers("csScope");
     if (ids.length) checkScopes[editingCheckItem] = ids; else delete checkScopes[editingCheckItem];
+    var asg = document.getElementById("csAssignee").value;
+    if (asg) checkAssignee[editingCheckItem] = asg; else delete checkAssignee[editingCheckItem];
     closeCheckScope();
-    saveCache(); renderList(); renderSummary(); scheduleSave();
+    saveCache(); renderList(); renderSummary(); renderDashboard(); scheduleSave();
   }
   function renderList(){
     var host = document.getElementById("listHost");
@@ -1663,6 +1684,7 @@
         metaBits.push('<span>' + it.who + '</span>');
         metaBits.push('<span>' + it.form + '</span>');
         if (it.approve) metaBits.push('<span class="badge">결재</span>');
+        if (checkAssignee[it.id]) metaBits.push('<span class="author-chip">담당 ' + esc(scopeNames([checkAssignee[it.id]])) + '</span>');
         if (checkScopes[it.id] && checkScopes[it.id].length) metaBits.push('<span class="scope-chip">공개 ' + esc(scopeNames(checkScopes[it.id])) + '</span>');
         if (isChecked){
           metaBits.push('<span class="checked-date">✓ ' + checkedDate + '</span>');
@@ -1687,6 +1709,7 @@
         var isChecked = !!checkedDate;
         var metaBits = [];
         metaBits.push('<span class="author-chip">' + esc(it.who) + '</span>');
+        if (checkAssignee[it.id]) metaBits.push('<span class="author-chip">담당 ' + esc(scopeNames([checkAssignee[it.id]])) + '</span>');
         if (checkScopes[it.id] && checkScopes[it.id].length) metaBits.push('<span class="scope-chip">공개 ' + esc(scopeNames(checkScopes[it.id])) + '</span>');
         if (isChecked){
           metaBits.push('<span class="checked-date">✓ ' + checkedDate + '</span>');
@@ -1916,6 +1939,7 @@
         records = parsed.records || {};
         customItems = parsed.custom || {};
         checkScopes = parsed.scopes || {};
+        checkAssignee = parsed.assignee || {};
         setOffline(false);
         saveCache();
         renderList();
@@ -1928,6 +1952,7 @@
         records = cache.records || {};
         customItems = cache.custom || {};
         checkScopes = cache.scopes || {};
+        checkAssignee = cache.assignee || {};
         setOffline(true);
         renderList();
         renderSummary();
@@ -1942,7 +1967,7 @@
   function doSave(){
     var token = getToken();
     if (!token) return;
-    var body = JSON.stringify({records: records, custom: customItems, scopes: checkScopes});
+    var body = JSON.stringify({records: records, custom: customItems, scopes: checkScopes, assignee: checkAssignee});
     var payload = {
       message: "check: 업데이트",
       content: b64EncodeUnicode(body),
@@ -1988,6 +2013,7 @@
       records = mergeRecords(records, remoteParsed.records || {});
       customItems = mergeCustom(customItems, remoteParsed.custom || {});
       checkScopes = Object.assign({}, remoteParsed.scopes || {}, checkScopes);
+      checkAssignee = Object.assign({}, remoteParsed.assignee || {}, checkAssignee);
       currentSha = json.sha;
       saveCache();
       renderList();
@@ -2487,6 +2513,7 @@
     if (!host) return;
     var today = todayStr();
     var seeVeh = canSee("veh"), seeLic = canSee("lic"), seeTasks = canSee("tasks"), seeRec = canSee("rec");
+    var me = myName();
 
     var urgent = [];
     if (seeVeh) liveVehicles().forEach(function(v){
@@ -2499,7 +2526,7 @@
     });
     urgent.sort(function(a, b){ return a.dd.diff - b.dd.diff; });
 
-    var openTasks = seeTasks ? liveTasks().filter(function(t){ return t.status !== "done" && taskVisible(t); }) : [];
+    var openTasks = liveTasks().filter(function(t){ return (t.status === "open" || t.status === "hold") && (seeTasks ? taskVisible(t) : ((t.who || "").trim() === me)); });
     openTasks.sort(function(a, b){
       var ad = a.due || "9999-99-99", bd = b.due || "9999-99-99";
       return ad < bd ? -1 : (ad > bd ? 1 : 0);
@@ -2510,13 +2537,15 @@
     var imminentTot = urgent.length + urgentLic.length;
     var unpaid = unpaidReceivables();
 
-    var reviewCount = liveTasks().filter(function(t){ return t.status === "review" && taskVisible(t); }).length;
+    var reviewCount = liveTasks().filter(function(t){ return t.status === "review" && (canApproveTask(t) || (t.who || "").trim() === me); }).length;
     var unpaidSum = 0; unpaid.forEach(function(r){ unpaidSum += (r.amount || 0); });
     var tiles = '';
     if (seeRec) tiles += '<div class="stat-tile"><div class="lbl">미수</div><div class="val money">' + (unpaidSum ? (fmtAmount(unpaidSum) + '<span class="unit">원</span>') : (unpaid.length + '<span class="unit">건</span>')) + '</div></div>';
     if (seeVeh || seeLic) tiles += '<div class="stat-tile' + (overdueTot ? ' alert' : '') + '"><div class="lbl">만기 임박</div><div class="val">' + imminentTot + '<span class="unit">건</span></div></div>';
-    if (seeTasks) tiles += '<div class="stat-tile"><div class="lbl">미완료 지시</div><div class="val">' + openTasks.length + '<span class="unit">건</span></div></div>';
-    if (seeTasks) tiles += '<div class="stat-tile"><div class="lbl">결재 대기</div><div class="val">' + reviewCount + '<span class="unit">건</span></div></div>';
+    tiles += '<div class="stat-tile"><div class="lbl">미완료 지시</div><div class="val">' + openTasks.length + '<span class="unit">건</span></div></div>';
+    tiles += '<div class="stat-tile"><div class="lbl">결재 대기</div><div class="val">' + reviewCount + '<span class="unit">건</span></div></div>';
+    var myChecks = myCheckCount();
+    if (canSee("check") || myChecks) tiles += '<div class="stat-tile"><div class="lbl">주기업무</div><div class="val">' + myChecks + '<span class="unit">건</span></div></div>';
     var html = '<div class="dash-date">' + today + '</div>' + (tiles ? '<div class="stat-row">' + tiles + '</div>' : '');
 
     if (seeVeh){
@@ -2560,13 +2589,11 @@
       html += '</div></div>';
     }
 
-    if (seeTasks){
     html += '<div class="dash-sec"><h2>미완료 지시 <span class="cnt">' + openTasks.length + '</span></h2><div class="card">';
     html += openTasks.length
       ? openTasks.map(function(t){ return taskRowHtml(t, false); }).join("")
       : '<div class="empty-line">미완료 지시가 없습니다.</div>';
     html += '</div></div>';
-    }
 
     if (seeRec){
     html += '<div class="dash-sec"><h2>미수 (오래된 순) <span class="cnt">' + unpaid.length + '</span></h2><div class="card">';
