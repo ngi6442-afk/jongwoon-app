@@ -635,6 +635,7 @@
     </div>
     <button class="link-btn" id="taskDoneToggle"></button>
     <div class="card" id="taskDoneList" style="display:none;margin-top:6px;"></div>
+    <button class="link-btn" id="taskRestoreBtn" style="display:none;color:#B0332A;">삭제된 지시 복구</button>
   </section>
 
   <!-- 차량·자산 만기 -->
@@ -1521,6 +1522,9 @@
     bindTaskHandlers(doneHost);
     bindCalHandlers(listHost);
     bindCalHandlers(doneHost);
+    var delCount = tasks.filter(function(t){ return t.del === 1; }).length;
+    var rb = document.getElementById("taskRestoreBtn");
+    if (rb){ rb.style.display = (canDo("tasks") && delCount) ? "block" : "none"; rb.textContent = "삭제된 지시 복구 (" + delCount + "건)"; }
     updateTaskBadge();
     renderMyTasks();
   }
@@ -1616,6 +1620,13 @@
   function findTask(id){
     for (var i=0;i<tasks.length;i++){ if (tasks[i].id === id) return tasks[i]; }
     return null;
+  }
+  function restoreDeletedTasks(){
+    if (!canDo("tasks")) return;
+    var n = 0;
+    tasks.forEach(function(t){ if (t.del === 1){ t.del = 0; t.updated = todayStr(); n++; } });
+    saveTasksCache(); renderTasks(); renderSummary(); renderDashboard(); scheduleTasksSave();
+    alert(n ? (n + "건 복구했습니다.") : "복구할 삭제 지시가 없습니다.");
   }
 
   function addTask(){
@@ -2342,6 +2353,7 @@
     showTaskDone = !showTaskDone;
     renderTasks();
   });
+  document.getElementById("taskRestoreBtn").addEventListener("click", function(){ if (confirm("삭제된 지시를 모두 복구할까요?")) restoreDeletedTasks(); });
 
   document.getElementById("recAddBtn").addEventListener("click", addReceivable);
   document.getElementById("recClient").addEventListener("keydown", function(e){ if (e.key === "Enter") addReceivable(); });
