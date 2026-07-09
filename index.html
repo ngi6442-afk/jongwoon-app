@@ -785,7 +785,7 @@
     <p id="memberCurrent"></p>
     <div class="err" id="memberErr">PIN이 올바르지 않습니다.</div>
     <select id="memberSelect"></select>
-    <input type="password" id="memberPin" placeholder="PIN 4자리" inputmode="numeric" autocomplete="off">
+    <input type="password" id="memberPin" placeholder="PIN 또는 비밀번호" autocomplete="off">
     <label class="chk" style="justify-content:flex-start;"><input type="checkbox" id="memberKeep"> 이 기기에서 로그인 유지(개인 PC만)</label>
     <button class="primary" id="memberLogin">로그인</button>
     <button class="secondary" id="memberPinBtn" style="display:none;">내 PIN 변경</button>
@@ -3295,7 +3295,9 @@
     if (!name || !pin){ document.getElementById("memberErr").classList.add("show"); return; }
     var keep = document.getElementById("memberKeep").checked;
     gwCall("gw-auth", { action: "login", name: name, pin: pin }).then(function(res){
-      if (res.status !== 200 || !res.body || !res.body.token){ document.getElementById("memberErr").classList.add("show"); return; }
+      var errEl = document.getElementById("memberErr");
+      if (res.status === 429){ errEl.textContent = "로그인 시도가 많아 계정이 잠겼습니다. " + (res.body && res.body.retry_after ? Math.ceil(res.body.retry_after/60) + "분 " : "") + "후 다시 시도하세요."; errEl.classList.add("show"); return; }
+      if (res.status !== 200 || !res.body || !res.body.token){ errEl.textContent = "PIN(비밀번호)이 올바르지 않습니다."; errEl.classList.add("show"); return; }
       setGwToken(res.body.token, keep);
       curMemberObj = res.body.member;
       hideMemberLogin();
@@ -3330,16 +3332,21 @@
       ? (m.name + "님, 기본 PIN(0000)입니다. 본인만 아는 PIN으로 바꿔주세요.")
       : ("현재 사용자: " + m.name);
     document.getElementById("pinErr").classList.remove("show");
-    document.getElementById("pinNew").value = "";
+    var npEl0 = document.getElementById("pinNew");
+    npEl0.value = "";
+    npEl0.placeholder = m.admin ? "새 비밀번호 8자 이상" : "새 PIN 4자리";
+    npEl0.inputMode = m.admin ? "text" : "numeric";
     document.getElementById("pinBackdrop").classList.add("show");
   }
   function closeChangePin(){ document.getElementById("pinBackdrop").classList.remove("show"); }
   function saveChangePin(){
     var m = curMember(); if (!m) return;
     var np = document.getElementById("pinNew").value.trim();
-    if (!/^\d{4,}$/.test(np)){ document.getElementById("pinErr").classList.add("show"); return; }
+    var errEl = document.getElementById("pinErr");
+    var ok = m.admin ? (np.length >= 8) : /^\d{4,}$/.test(np);
+    if (!ok){ errEl.textContent = m.admin ? "관리자는 비밀번호 8자 이상이 필요합니다." : "PIN은 4자리 이상 숫자입니다."; errEl.classList.add("show"); return; }
     gwCall("gw-auth", { action: "set_pin", pin: np }).then(function(res){
-      if (res.status !== 200){ document.getElementById("pinErr").classList.add("show"); return; }
+      if (res.status !== 200){ errEl.textContent = "변경 실패 — " + (m.admin ? "비밀번호 8자 이상 확인." : "PIN 형식 확인."); errEl.classList.add("show"); return; }
       closeChangePin();
     });
   }
@@ -3396,6 +3403,8 @@
       sel.disabled = adminRole;
       sel.style.opacity = adminRole ? "0.45" : "";
     });
+    var pinEl = document.getElementById("mePin");
+    if (pinEl) pinEl.placeholder = adminRole ? "비밀번호 8자 이상 (변경 시만)" : "PIN 4자리 숫자 (변경 시만)";
   }
   function applyRolePreset(){
     var p = ROLE_PRESET[document.getElementById("meRole").value];
@@ -3406,14 +3415,19 @@
     var name = document.getElementById("meName").value.trim();
     var pin = document.getElementById("mePin").value.trim();
     var isNew = !editingMemberId;
-    if (!name || (isNew && !/^\d{4,}$/.test(pin))){ document.getElementById("meErr").classList.add("show"); return; }
     var role = document.getElementById("meRole").value;
     var admin = !!(ROLE_PRESET[role] && ROLE_PRESET[role].admin);
+    var pinOk = admin ? (pin.length >= 8) : /^\d{4,}$/.test(pin);
+    var errEl = document.getElementById("meErr");
+    if (!name || (isNew && !pinOk) || (pin && !pinOk)){
+      errEl.textContent = admin ? "관리자는 비밀번호 8자 이상이 필요합니다." : "이름과 PIN(4자리 숫자)을 확인하세요.";
+      errEl.classList.add("show"); return;
+    }
     var perms = {};
     Array.prototype.forEach.call(document.querySelectorAll("#mePerms [data-perm]"), function(sel){ perms[sel.getAttribute("data-perm")] = sel.value; });
     var payload = { action: "member_upsert", name: name, role: role, admin: admin, perms: perms };
     if (editingMemberId) payload.id = editingMemberId;
-    if (pin && /^\d{4,}$/.test(pin)) payload.pin = pin;
+    if (pin && pinOk) payload.pin = pin;
     gwCall("gw-auth", payload).then(function(res){
       if (res.status !== 200){ document.getElementById("meErr").classList.add("show"); return; }
       closeMemberEdit();
