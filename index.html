@@ -614,6 +614,7 @@
     <div class="card" id="vehList">
       <div class="loading">불러오는 중…</div>
     </div>
+    <button class="link-btn" id="vehAddBtn">+ 차량 추가</button>
   </section>
 
   <!-- 수금·기성 -->
@@ -769,6 +770,8 @@
 <div class="modal-backdrop" id="vehBackdrop">
   <div class="modal">
     <h3 id="vehModalTitle">차량 수정</h3>
+    <input type="text" id="vehNo" placeholder="차량번호 (예: 12가3456)" autocomplete="off">
+    <input type="text" id="vehKind" placeholder="종류/용도 (예: 준설차, 선택)" autocomplete="off">
     <span class="fld-label">검사 만기</span>
     <input type="date" id="vehInsp">
     <button class="mini-btn" id="vehInspRenew" type="button">검사 갱신(+1년)</button>
@@ -786,6 +789,7 @@
     <input type="text" id="vehInsurer" placeholder="보험사 (선택)" autocomplete="off">
     <input type="text" id="vehNote" placeholder="메모 (선택)" autocomplete="off">
     <button class="primary" id="vehSave">저장</button>
+    <button class="danger" id="vehDelete">삭제</button>
     <button class="secondary" id="vehCancel">취소</button>
   </div>
 </div>
@@ -2201,8 +2205,10 @@
   document.getElementById("recEditBackdrop").addEventListener("click", function(e){ if (e.target === this) closeRecModal(); });
 
   document.getElementById("vehSave").addEventListener("click", saveVehFromModal);
+  document.getElementById("vehDelete").addEventListener("click", deleteVehFromModal);
   document.getElementById("vehCancel").addEventListener("click", closeVehModal);
   document.getElementById("vehBackdrop").addEventListener("click", function(e){ if (e.target === this) closeVehModal(); });
+  document.getElementById("vehAddBtn").addEventListener("click", function(){ openVehModal(null); });
   document.getElementById("vehInspRenew").addEventListener("click", function(){
     document.getElementById("vehInsp").value = addYears(document.getElementById("vehInsp").value, 1);
   });
@@ -2371,26 +2377,41 @@
 
   function openVehModal(id){
     if (!canDo("veh")) return;
-    var v = findVeh(id); if (!v) return;
-    editingVehId = id;
-    document.getElementById("vehModalTitle").textContent = v.no + " 수정";
-    document.getElementById("vehInsp").value = isDate(v.insp_due) ? v.insp_due : "";
-    document.getElementById("vehIns").value = isDate(v.ins_due) ? v.ins_due : "";
-    document.getElementById("vehState").value = v.state || "운행";
-    document.getElementById("vehInsurer").value = v.insurer || "";
-    document.getElementById("vehNote").value = v.note || "";
+    editingVehId = id || null;
+    var v = id ? findVeh(id) : null;
+    document.getElementById("vehModalTitle").textContent = v ? (v.no + " 수정") : "차량 추가";
+    document.getElementById("vehNo").value = v ? (v.no || "") : "";
+    document.getElementById("vehKind").value = v ? (v.kind || "") : "";
+    document.getElementById("vehInsp").value = (v && isDate(v.insp_due)) ? v.insp_due : "";
+    document.getElementById("vehIns").value = (v && isDate(v.ins_due)) ? v.ins_due : "";
+    document.getElementById("vehState").value = (v && v.state) || "운행";
+    document.getElementById("vehInsurer").value = (v && v.insurer) || "";
+    document.getElementById("vehNote").value = (v && v.note) || "";
+    document.getElementById("vehDelete").style.display = v ? "block" : "none";
     document.getElementById("vehBackdrop").classList.add("show");
   }
   function closeVehModal(){ document.getElementById("vehBackdrop").classList.remove("show"); editingVehId = null; }
   function saveVehFromModal(){
-    var v = findVeh(editingVehId);
-    if (!v){ closeVehModal(); return; }
+    if (!canDo("veh")) return;
+    var no = document.getElementById("vehNo").value.trim();
+    if (!no){ document.getElementById("vehNo").focus(); return; }   // 차량번호 필수
+    var v = editingVehId ? findVeh(editingVehId) : null;
+    if (!v){ v = { id: genId("v"), created: todayStr() }; vehicles.push(v); }
+    v.no = no;
+    v.kind = document.getElementById("vehKind").value.trim();
     v.insp_due = document.getElementById("vehInsp").value || null;
     v.ins_due = document.getElementById("vehIns").value || null;
     v.state = document.getElementById("vehState").value;
     v.insurer = document.getElementById("vehInsurer").value.trim();
     v.note = document.getElementById("vehNote").value.trim();
     v.updated = todayStr();
+    closeVehModal();
+    saveVehiclesCache(); renderVehicles(); renderDashboard(); scheduleVehSave();
+  }
+  function deleteVehFromModal(){
+    if (!canDo("veh") || !editingVehId) return;
+    var v = findVeh(editingVehId);
+    if (v){ v.del = 1; v.updated = todayStr(); }
     closeVehModal();
     saveVehiclesCache(); renderVehicles(); renderDashboard(); scheduleVehSave();
   }
