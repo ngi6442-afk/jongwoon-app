@@ -16,8 +16,29 @@ const LOCK_MS = 15 * 60 * 1000;           // 잠금 시간(15분)
 function lockKey(name) { return `lock:${String(name).trim().toLowerCase()}`; }
 // 관리자는 8자 이상 비밀번호, 직원은 4자리+ 숫자 PIN
 function validSecret(s, isAdmin) { s = String(s || '').trim(); return isAdmin ? s.length >= 8 : /^\d{4,}$/.test(s); }
+function deviceKey(id) { return `device:${id}`; }
+function deviceOf(event) {
+  const h = (event && event.headers) || {};
+  const id = String(h['x-device-id'] || '').trim();
+  let label = String(h['x-device-label'] || '');
+  try { label = decodeURIComponent(label); } catch (e) {}
+  return { id: id, label: label };
+}
+// 기기 등록/갱신. 관리자 기기는 자동 승인, 직원 새 기기는 대기. 상태 반환.
+async function registerDevice(st, event, member) {
+  const dv = deviceOf(event);
+  if (!dv.id) return 'approved';   // 기기정보 없으면(구버전) 통과
+  const now = Date.now();
+  const dr = await blobGet(st, deviceKey(dv.id));
+  const dev = (dr.ok && dr.data) ? dr.data : { id: dv.id, status: 'pending', created: now };
+  if (dv.label) dev.label = dv.label;
+  dev.member_name = member.name; dev.member_id = member.id; dev.last_seen = now;
+  if (member.admin) dev.status = 'approved';
+  await blobSet(st, deviceKey(dv.id), dev);
+  return dev.status;
+}
 
-const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, content-type', 'Access-Control-Allow-Methods': 'POST, OPTIONS' };
+const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, content-type, x-device-id, x-device-label', 'Access-Control-Allow-Methods': 'POST, OPTIONS' };
 function rid() { return crypto.randomBytes(8).toString('hex'); }
 function jr(statusCode, body) { return { statusCode, headers: Object.assign({ 'Content-Type': 'application/json' }, CORS), body: JSON.stringify(body) }; }
 function memberKey(id) { return `member:${id}`; }
@@ -61,7 +82,7 @@ async function handleBootstrap(st, d, R) {
   return jr(200, { status: 'OK', token: s.token, expires_at: s.expires_at, member: safeMember(m), request_id: R });
 }
 
-async function handleLogin(st, d, R) {
+async function handleLogin(st, d, R, event) {
   const GEN = () => jr(401, { status: 'UNAUTHORIZED', error_code: 'INVALID_CREDENTIALS', request_id: R });
   const name = (d.name || '').trim();
   const pin = (d.pin || '').trim();
@@ -85,15 +106,17 @@ async function handleLogin(st, d, R) {
   if (!mr.data || mr.data.del === 1) return fail();
   if (!verifySecret(pin, mr.data.pin_salt, mr.data.pin_hash)) return fail();
   if (lk.ok && lk.data) await blobSet(st, lockKey(name), null);  // 성공 → 잠금 해제
+  const deviceStatus = await registerDevice(st, event, mr.data);
   const s = issueSession(mr.data);
   if (!s.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: s.code, request_id: R });
-  return jr(200, { status: 'OK', token: s.token, expires_at: s.expires_at, member: safeMember(mr.data), request_id: R });
+  return jr(200, { status: 'OK', token: s.token, expires_at: s.expires_at, member: safeMember(mr.data), device_status: deviceStatus, request_id: R });
 }
 
 async function handleVerify(st, event, R) {
   const c = await currentMember(st, event);
   if (!c.ok) return jr(401, { valid: false, reason: c.reason, request_id: R });
-  return jr(200, { valid: true, member: safeMember(c.member), request_id: R });
+  const device_status = await registerDevice(st, event, c.member);
+  return jr(200, { valid: true, member: safeMember(c.member), device_status: device_status, request_id: R });
 }
 
 async function handleMemberList(st, event, R) {
@@ -156,6 +179,27 @@ async function handleSetPin(st, event, d, R) {
   return jr(200, { status: 'OK', request_id: R });
 }
 
+async function handleDeviceList(st, event, R) {
+  const c = await currentMember(st, event);
+  if (!c.ok || !c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
+  const { blobs } = await st.list({ prefix: 'device:' });
+  const out = [];
+  for (const b of (blobs || [])) { const r = await blobGet(st, b.key); if (r.ok && r.data) out.push(r.data); }
+  return jr(200, { status: 'OK', devices: out, request_id: R });
+}
+async function handleDeviceSet(st, event, d, R, status) {
+  const c = await currentMember(st, event);
+  if (!c.ok || !c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
+  const id = String(d.device || '').trim();
+  if (!id) return jr(400, { status: 'REJECTED', error_code: 'INVALID_INPUT', request_id: R });
+  if (status === null) { await blobSet(st, deviceKey(id), null); return jr(200, { status: 'OK', request_id: R }); }
+  const r = await blobGet(st, deviceKey(id));
+  const dev = (r.ok && r.data) ? r.data : { id: id, created: Date.now() };
+  dev.status = status; dev.updated = Date.now();
+  await blobSet(st, deviceKey(id), dev);
+  return jr(200, { status: 'OK', request_id: R });
+}
+
 // 데이터 리셋(테스트 정리용). env GW_ALLOW_RESET='1' 일 때만. gw_users + gw_data 전체 삭제.
 async function handleReset(R) {
   if (process.env.GW_ALLOW_RESET !== '1') return jr(403, { status: 'FORBIDDEN', error_code: 'RESET_DISABLED', request_id: R });
@@ -182,8 +226,12 @@ async function handler(event) {
       case 'reset': return await handleReset(R);
       case 'bootstrap': return await handleBootstrap(st, d, R);
       case 'names': { const ms = await listMembers(st); return jr(200, { status: 'OK', names: ms.map(function (m) { return m.name; }), count: ms.length, request_id: R }); }
-      case 'login': return await handleLogin(st, d, R);
+      case 'login': return await handleLogin(st, d, R, event);
       case 'verify': return await handleVerify(st, event, R);
+      case 'device_list': return await handleDeviceList(st, event, R);
+      case 'device_approve': return await handleDeviceSet(st, event, d, R, 'approved');
+      case 'device_revoke': return await handleDeviceSet(st, event, d, R, 'pending');
+      case 'device_delete': return await handleDeviceSet(st, event, d, R, null);
       case 'member_list': return await handleMemberList(st, event, R);
       case 'member_upsert': return await handleMemberUpsert(st, event, d, R);
       case 'member_delete': return await handleMemberDelete(st, event, d, R);

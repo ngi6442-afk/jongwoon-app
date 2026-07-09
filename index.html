@@ -611,6 +611,7 @@
     <div class="dash-sec" style="margin-bottom:8px;">
       <h2>차량·자산 만기 <span class="cnt" id="vehHead"></span></h2>
     </div>
+    <button class="link-btn" id="vehAddBtnTop">+ 차량 추가</button>
     <div class="card" id="vehList">
       <div class="loading">불러오는 중…</div>
     </div>
@@ -763,6 +764,24 @@
   </div>
 </div>
 
+<div class="modal-backdrop" id="devicePendingBackdrop">
+  <div class="modal">
+    <h3>기기 승인 필요</h3>
+    <p style="text-align:left;line-height:1.6;">이 기기는 아직 관리자 승인을 받지 않았습니다.<br>관리자에게 승인을 요청하고, 승인되면 새로고침(F5) 하세요.</p>
+    <p id="devPendInfo" style="font-size:12px;color:var(--sub);text-align:left;"></p>
+    <button class="secondary" id="devPendLogout">다른 계정으로 로그인</button>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="devicesBackdrop">
+  <div class="modal">
+    <h3>기기 관리</h3>
+    <p style="font-size:12px;color:var(--sub);text-align:left;margin:0 0 8px;">직원 기기는 승인해야 사용 가능합니다. 관리자 기기는 자동 승인됩니다.</p>
+    <div id="devicesList"><div class="empty-line">불러오는 중…</div></div>
+    <button class="secondary" id="devicesClose">닫기</button>
+  </div>
+</div>
+
 <div class="modal-backdrop" id="vehBackdrop">
   <div class="modal">
     <h3 id="vehModalTitle">차량 수정</h3>
@@ -801,6 +820,7 @@
     <button class="primary" id="memberLogin">로그인</button>
     <button class="secondary" id="memberPinBtn" style="display:none;">내 PIN 변경</button>
     <button class="secondary" id="memberManageBtn" style="display:none;">회원 관리</button>
+    <button class="secondary" id="memberDevicesBtn" style="display:none;">기기 관리</button>
     <button class="secondary" id="helpBtn">도움말</button>
   </div>
 </div>
@@ -1044,7 +1064,17 @@
   var FN_BASE = (location.hostname === "localhost" || location.hostname === "127.0.0.1")
     ? "https://jongwoon-app.netlify.app/.netlify/functions" : "/.netlify/functions";
   var GW_TOKEN_KEY = "jw_gw_token";
+  var DEVICE_KEY = "jw_device_id";
   var curMemberObj = null;
+  function deviceId(){
+    try{ var d = localStorage.getItem(DEVICE_KEY); if(!d){ d = "d" + Math.random().toString(36).slice(2,10) + Date.now().toString(36); localStorage.setItem(DEVICE_KEY, d); } return d; }catch(e){ return "d0"; }
+  }
+  function deviceLabel(){
+    var ua = navigator.userAgent || "";
+    var os = /Windows/.test(ua)?"Windows":/Android/.test(ua)?"Android":/iPhone|iPad|iPod/.test(ua)?"iOS":/Mac/.test(ua)?"Mac":"기타";
+    var br = /Edg/.test(ua)?"Edge":/OPR|Opera/.test(ua)?"Opera":/Chrome/.test(ua)?"Chrome":/Firefox/.test(ua)?"Firefox":/Safari/.test(ua)?"Safari":"브라우저";
+    return br + "/" + os;
+  }
   function gwToken(){ try{ return sessionStorage.getItem(GW_TOKEN_KEY) || localStorage.getItem(GW_TOKEN_KEY); }catch(e){ return null; } }
   function setGwToken(t, persist){
     try{
@@ -1057,7 +1087,7 @@
   function gwCall(fn, body){
     return _rawFetch(FN_BASE + "/" + fn, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + (gwToken() || "") },
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + (gwToken() || ""), "X-Device-Id": deviceId(), "X-Device-Label": encodeURIComponent(deviceLabel()) },
       body: JSON.stringify(body || {})
     }).then(function(r){ return r.json().then(function(j){ return { status: r.status, body: j }; }).catch(function(){ return { status: r.status, body: {} }; }); });
   }
@@ -2149,6 +2179,9 @@
   document.getElementById("memberLogin").addEventListener("click", doMemberLogin);
   document.getElementById("memberPin").addEventListener("keydown", function(e){ if (e.key === "Enter") doMemberLogin(); });
   document.getElementById("memberManageBtn").addEventListener("click", function(){ hideMemberLogin(); showUsersManage(); });
+  document.getElementById("memberDevicesBtn").addEventListener("click", function(){ hideMemberLogin(); showDevicesManage(); });
+  document.getElementById("devicesClose").addEventListener("click", function(){ document.getElementById("devicesBackdrop").classList.remove("show"); });
+  document.getElementById("devPendLogout").addEventListener("click", function(){ setGwToken(null); curMemberObj = null; document.getElementById("devicePendingBackdrop").classList.remove("show"); showMemberLogin(); });
   document.getElementById("usersClose").addEventListener("click", function(){ document.getElementById("usersBackdrop").classList.remove("show"); });
   document.getElementById("userAddBtn").addEventListener("click", function(){ openMemberEdit(null); });
   document.getElementById("meSave").addEventListener("click", saveMemberEdit);
@@ -2222,6 +2255,7 @@
   document.getElementById("vehCancel").addEventListener("click", closeVehModal);
   document.getElementById("vehBackdrop").addEventListener("click", function(e){ if (e.target === this) closeVehModal(); });
   document.getElementById("vehAddBtn").addEventListener("click", function(){ openVehModal(null); });
+  document.getElementById("vehAddBtnTop").addEventListener("click", function(){ openVehModal(null); });
   document.getElementById("vehInspRenew").addEventListener("click", function(){
     document.getElementById("vehInsp").value = addYears(document.getElementById("vehInsp").value, 1);
   });
@@ -3369,6 +3403,7 @@
     document.getElementById("memberErr").classList.remove("show");
     document.getElementById("memberPin").value = "";
     document.getElementById("memberManageBtn").style.display = isAdmin() ? "block" : "none";
+    document.getElementById("memberDevicesBtn").style.display = isAdmin() ? "block" : "none";
     document.getElementById("memberPinBtn").style.display = cm ? "block" : "none";
     try{ document.getElementById("memberKeep").checked = !!localStorage.getItem(GW_TOKEN_KEY); }catch(e){}
     sel.innerHTML = '<option value="">불러오는 중…</option>';
@@ -3392,6 +3427,7 @@
       setGwToken(res.body.token, keep);
       curMemberObj = res.body.member;
       hideMemberLogin();
+      if (res.body.device_status && res.body.device_status !== "approved" && !curMemberObj.admin){ showDevicePending(); return; }
       afterLogin();
     });
   }
@@ -3442,6 +3478,41 @@
     });
   }
 
+  function showDevicePending(){
+    var info = document.getElementById("devPendInfo");
+    if (info) info.textContent = "이 기기: " + deviceLabel() + " · ID " + deviceId().slice(0, 12);
+    document.getElementById("devicePendingBackdrop").classList.add("show");
+  }
+  function showDevicesManage(){
+    if (!isAdmin()) return;
+    document.getElementById("devicesBackdrop").classList.add("show");
+    var host = document.getElementById("devicesList");
+    host.innerHTML = '<div class="empty-line">불러오는 중…</div>';
+    gwCall("gw-auth", { action: "device_list" }).then(function(res){
+      var devs = (res.body && res.body.devices) || [];
+      if (!devs.length){ host.innerHTML = '<div class="empty-line">등록된 기기가 없습니다.</div>'; return; }
+      devs.sort(function(a,b){ return (b.last_seen||0) - (a.last_seen||0); });
+      host.innerHTML = devs.map(function(dv){
+        var badge = dv.status === "approved" ? '<span class="from-chip">승인됨</span>' : '<span class="review-chip">대기</span>';
+        var self = (dv.id === deviceId()) ? ' <span class="scope-chip">이 기기</span>' : '';
+        var act = dv.status === "approved"
+          ? '<button class="mini-btn" data-dev-revoke="' + esc(dv.id) + '">해제</button>'
+          : '<button class="mini-btn appr-btn" data-dev-approve="' + esc(dv.id) + '">승인</button>';
+        return '<div class="item"><div class="item-body"><div class="item-title">' + esc(dv.label || dv.id) + ' ' + badge + self + '</div><div class="item-meta"><span class="author-chip">' + esc(dv.member_name || "-") + '</span><span>' + esc(String(dv.id).slice(0,12)) + '</span></div></div><div class="task-ctrl">' + act + '<button class="del-x" data-dev-del="' + esc(dv.id) + '">×</button></div></div>';
+      }).join("");
+      bindDeviceButtons(host);
+    });
+  }
+  function bindDeviceButtons(host){
+    function wire(attr, action){
+      Array.prototype.forEach.call(host.querySelectorAll("[" + attr + "]"), function(el){
+        el.addEventListener("click", function(){ gwCall("gw-auth", { action: action, device: el.getAttribute(attr) }).then(function(){ showDevicesManage(); }); });
+      });
+    }
+    wire("data-dev-approve", "device_approve");
+    wire("data-dev-revoke", "device_revoke");
+    wire("data-dev-del", "device_delete");
+  }
   function showUsersManage(){
     if (!isAdmin()) return;
     document.getElementById("usersBackdrop").classList.add("show");
@@ -3545,7 +3616,7 @@
   (function boot(){
     if (!gwToken()){ showMemberLogin(); return; }
     gwCall("gw-auth", { action: "verify" }).then(function(res){
-      if (res.status === 200 && res.body && res.body.valid){ curMemberObj = res.body.member; afterLogin(); }
+      if (res.status === 200 && res.body && res.body.valid){ curMemberObj = res.body.member; if (res.body.device_status && res.body.device_status !== "approved" && !curMemberObj.admin){ showDevicePending(); return; } afterLogin(); }
       else { setGwToken(null); showMemberLogin(); }
     }).catch(function(){ showMemberLogin(); });
   })();

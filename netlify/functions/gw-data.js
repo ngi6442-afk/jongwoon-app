@@ -12,7 +12,7 @@ const USERS = 'gw_users';
 // 컬렉션 → 권한키
 const COL = { tasks: 'tasks', vehicles: 'veh', receivables: 'rec', licenses: 'lic', checklist: 'check' };
 
-const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, content-type', 'Access-Control-Allow-Methods': 'POST, OPTIONS' };
+const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, content-type, x-device-id, x-device-label', 'Access-Control-Allow-Methods': 'POST, OPTIONS' };
 function rid() { return crypto.randomBytes(8).toString('hex'); }
 function jr(statusCode, body) { return { statusCode, headers: Object.assign({ 'Content-Type': 'application/json' }, CORS), body: JSON.stringify(body) }; }
 function colKey(c) { return `col:${c}`; }
@@ -29,10 +29,20 @@ function permOf(member, col) {
   const key = COL[col];
   return (member.perms && member.perms[key]) || 'view';
 }
+// 인가된 기기만 데이터 접근. 관리자는 항상 허용.
+async function deviceApproved(event, member) {
+  if (member.admin) return true;
+  const h = (event && event.headers) || {};
+  const id = String(h['x-device-id'] || '').trim();
+  if (!id) return false;
+  const r = await blobGet(store(USERS), `device:${id}`);
+  return !!(r.ok && r.data && r.data.status === 'approved');
+}
 
 async function handleGet(event, d, R) {
   const c = await currentMember(event);
   if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (!(await deviceApproved(event, c.member))) return jr(403, { status: 'FORBIDDEN', error_code: 'DEVICE_NOT_APPROVED', request_id: R });
   const col = d.collection;
   if (!COL[col]) return jr(400, { status: 'REJECTED', error_code: 'UNKNOWN_COLLECTION', request_id: R });
   if (permOf(c.member, col) === 'hide') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_ACCESS', request_id: R });
@@ -45,6 +55,7 @@ async function handleGet(event, d, R) {
 async function handleSave(event, d, R) {
   const c = await currentMember(event);
   if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (!(await deviceApproved(event, c.member))) return jr(403, { status: 'FORBIDDEN', error_code: 'DEVICE_NOT_APPROVED', request_id: R });
   const col = d.collection;
   if (!COL[col]) return jr(400, { status: 'REJECTED', error_code: 'UNKNOWN_COLLECTION', request_id: R });
   if (permOf(c.member, col) !== 'do') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_WRITE', request_id: R });
