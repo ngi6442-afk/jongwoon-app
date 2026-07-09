@@ -644,6 +644,7 @@
       <h2>차량·자산 만기 <span class="cnt" id="vehHead"></span></h2>
     </div>
     <button class="link-btn" id="vehAddBtnTop">+ 차량 추가</button>
+    <input type="search" id="vehSearch" placeholder="차량 검색(번호·종류·기사)" autocomplete="off" style="width:100%;padding:9px 12px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;font-size:14px;box-sizing:border-box;">
     <div class="card" id="vehList">
       <div class="loading">불러오는 중…</div>
     </div>
@@ -2461,6 +2462,7 @@
   document.getElementById("vhAdd").addEventListener("click", addVehHistory);
   document.getElementById("vehHistClose").addEventListener("click", function(){ document.getElementById("vehHistBackdrop").classList.remove("show"); histVehId = null; });
   document.getElementById("vehHistBackdrop").addEventListener("click", function(e){ if (e.target === this){ this.classList.remove("show"); histVehId = null; } });
+  document.getElementById("vehSearch").addEventListener("input", function(){ vehSearchTerm = this.value.toLowerCase().trim(); renderVehicles(); });
   document.getElementById("vehInspRenew").addEventListener("click", function(){
     document.getElementById("vehInsp").value = addYears(document.getElementById("vehInsp").value, 1);
   });
@@ -2540,33 +2542,29 @@
     var ownCls = v.own === "지입" ? "lease" : "self";
     var meta = [];
     meta.push('<span class="own-badge ' + ownCls + '">' + esc(v.own) + '</span>');
-    if (v.permit) meta.push('<span>' + esc(v.permit) + '</span>');
     if (v.driver) meta.push('<span class="author-chip">' + esc(v.driver) + '</span>');
-    if (v.insurer) meta.push('<span>' + esc(v.insurer) + '</span>');
     if (v.state && v.state !== "운행") meta.push('<span class="hold-chip">' + esc(v.state) + '</span>');
     if (v.history && v.history.length) meta.push('<span class="ref-chip">이력 ' + v.history.length + '</span>');
-    var cal = "";
-    if (!grey){
-      if (v.insp_due) cal += '<button class="cal-btn" data-cal-veh-insp="' + v.id + '">검사 캘린더</button>';
-      if (v.ins_due) cal += '<button class="cal-btn" data-cal-veh-ins="' + v.id + '">보험 캘린더</button>';
-    }
     return '<div class="item veh-item ' + ownCls + '">' +
         '<div class="item-body">' +
-          '<div class="item-title">' + esc(v.no) + ' · ' + esc(v.type) + '</div>' +
+          '<div class="item-title">' + esc(v.no) + ((v.type || v.kind) ? ' · ' + esc(v.type || v.kind) : '') + '</div>' +
           '<div class="item-meta">' + meta.join('') + '</div>' +
-          '<div class="veh-due" style="margin-top:5px;">' + dueChipHtml("검사", v.insp_due, grey) + '</div>' +
-          '<div class="veh-due" style="margin-top:3px;">' + dueChipHtml("보험", v.ins_due, grey) + '</div>' +
+          '<div class="veh-due" style="margin-top:5px;">' + dueChipHtml("검사", v.insp_due, grey) + dueChipHtml("보험", v.ins_due, grey) + '</div>' +
           (v.note ? '<div class="task-detail">' + esc(v.note) + '</div>' : '') +
-          (cal ? '<div class="veh-due" style="margin-top:7px;gap:8px;">' + cal + '</div>' : '') +
         '</div>' +
         '<div class="task-ctrl"><button class="mini-btn" data-veh-hist="' + v.id + '">이력</button><button class="mini-btn" data-veh-edit="' + v.id + '">수정</button></div>' +
       '</div>';
   }
 
+  var vehSearchTerm = "";
+  function vehMatchesSearch(v){
+    if (!vehSearchTerm) return true;
+    return ((v.no||"") + " " + (v.type||"") + " " + (v.kind||"") + " " + (v.driver||"") + " " + (v.own||"")).toLowerCase().indexOf(vehSearchTerm) >= 0;
+  }
   function renderVehicles(){
     var host = document.getElementById("vehList");
     if (!host) return;
-    var list = liveVehicles().slice();
+    var list = liveVehicles().filter(vehMatchesSearch);
     list.sort(function(a, b){
       var ag = isGreyState(a) ? 1 : 0, bg = isGreyState(b) ? 1 : 0;
       if (ag !== bg) return ag - bg;
@@ -2701,6 +2699,8 @@
     if (!canDo("veh")) return;
     var no = document.getElementById("vehNo").value.trim();
     if (!no){ document.getElementById("vehNo").focus(); return; }   // 차량번호 필수
+    var dupV = vehicles.filter(function(x){ return x && x.del !== 1 && x.id !== editingVehId && (x.no||"").trim() === no; });
+    if (dupV.length){ alert("이미 등록된 차량번호입니다: " + no); return; }
     var v = editingVehId ? findVeh(editingVehId) : null;
     if (!v){ v = { id: genId("v"), created: todayStr() }; vehicles.push(v); }
     v.no = no;
@@ -2717,9 +2717,16 @@
   function deleteVehFromModal(){
     if (!canDo("veh") || !editingVehId) return;
     var v = findVeh(editingVehId);
+    if (!confirm("이 차량을 삭제할까요?\n" + (v ? (v.no || "") + " " + (v.kind || "") : ""))) return;
     if (v){ v.del = 1; v.updated = todayStr(); }
     closeVehModal();
     saveVehiclesCache(); renderVehicles(); renderDashboard(); scheduleVehSave();
+  }
+  function restoreDeletedVehicles(){
+    if (!canDo("veh")) return;
+    var n = 0; vehicles.forEach(function(v){ if (v.del === 1){ v.del = 0; v.updated = todayStr(); n++; } });
+    saveVehiclesCache(); renderVehicles(); renderDashboard(); scheduleVehSave();
+    alert(n ? (n + "대 복구했습니다.") : "복구할 삭제 차량이 없습니다.");
   }
 
   // ---- 대시보드 (통합 첫 화면) ----
