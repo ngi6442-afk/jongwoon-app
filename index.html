@@ -509,6 +509,7 @@
   .review-chip{display:inline-block;font-size:11px;padding:1px 8px;border-radius:999px;background:#FFF3D4;color:#8A6410;font-weight:700;}
   .appr-btn{background:var(--brand);color:#fff;border-color:var(--brand);}
   .task-item.review .check-box{background:#F1A400;border-color:#F1A400;color:#fff;font-size:13px;line-height:1;}
+  .ref-chip{display:inline-block;font-size:11px;padding:1px 8px;border-radius:999px;background:var(--bg);color:var(--sub);font-weight:600;}
   .overdue-bill{color:#B0332A;font-weight:700;}
 
   /* 인허가 */
@@ -1681,8 +1682,7 @@
         var checkedDate = checkedObj[it.id];
         var isChecked = !!checkedDate;
         var metaBits = [];
-        metaBits.push('<span>' + it.form + '</span>');
-        if (it.approve) metaBits.push('<span class="badge">결재</span>');
+        if (it.form) metaBits.push('<span class="ref-chip">참조 ' + esc(it.form) + '</span>');
         if (checkAssignee[it.id]) metaBits.push('<span class="author-chip">담당 ' + esc(scopeNames([checkAssignee[it.id]])) + '</span>');
         if (checkScopes[it.id] && checkScopes[it.id].length) metaBits.push('<span class="scope-chip">공개 ' + esc(scopeNames(checkScopes[it.id])) + '</span>');
         if (isChecked){
