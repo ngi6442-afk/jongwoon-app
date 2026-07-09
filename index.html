@@ -755,6 +755,17 @@
   </div>
 </div>
 
+<div class="modal-backdrop" id="checkScopeBackdrop">
+  <div class="modal">
+    <h3>공개 대상</h3>
+    <p id="csTitle" style="font-size:13px;color:var(--sub);margin:0 0 8px;text-align:left;"></p>
+    <span class="fld-label">이 항목을 볼 직원 (비우면 전체 공개)</span>
+    <div class="mchecks" id="csScope"></div>
+    <button class="primary" id="csSave">저장</button>
+    <button class="secondary" id="csCancel">취소</button>
+  </div>
+</div>
+
 <div class="modal-backdrop" id="vehBackdrop">
   <div class="modal">
     <h3 id="vehModalTitle">차량 수정</h3>
@@ -900,7 +911,8 @@
       items: [
         {id:"m1", title:"월별 안전교육 실시 · 교육일지 작성", who:"김정아·나경일", form:"JW-06-015", approve:true},
         {id:"m2", title:"임금 지급 · 임금대장 · 4대보험 처리 확인", who:"관리자", form:"임금대장", approve:false},
-        {id:"m3", title:"사고 · 민원 접수분 처리 상태 리뷰", who:"관리자", form:"JW-06-006", approve:false}
+        {id:"m3", title:"사고 · 민원 접수분 처리 상태 리뷰", who:"관리자", form:"JW-06-006", approve:false},
+        {id:"m4", title:"위하고 매출목록(.xlsx) 내려받아 기성 미수 업로드", who:"관리자", form:"기성 탭", approve:false}
       ]
     },
     {
@@ -943,6 +955,7 @@
   // ---- 상태 ----
   var records = {};      // {type: {periodKey: {itemId: "YYYY-MM-DD"}}}
   var customItems = {};  // {type: {itemId: {t,who,del,created,updated}}}
+  var checkScopes = {};  // {itemId: [memberId...]} 비면 전체 공개(관리자만 편집)
   var currentSha = null;
   var saveTimer = null;
   var isOffline = false;
@@ -1102,7 +1115,7 @@
 
   function saveCache(){
     try{
-      localStorage.setItem(CACHE_KEY, JSON.stringify({sha: currentSha, records: records, custom: customItems}));
+      localStorage.setItem(CACHE_KEY, JSON.stringify({sha: currentSha, records: records, custom: customItems, scopes: checkScopes}));
     }catch(e){}
   }
 
@@ -1229,9 +1242,11 @@
       var checkedObj = (records[g.type] && records[g.type][key]) || {};
       var customList = liveCustom(g.type);
       var checkedCount = 0;
-      g.items.forEach(function(it){ if (checkedObj[it.id]) checkedCount++; });
-      customList.forEach(function(it){ if (checkedObj[it.id]) checkedCount++; });
-      var totalCount = g.items.length + customList.length;
+      var visItems = g.items.filter(function(it){ return checkItemVisible(it.id); });
+      var visCustom = customList.filter(function(it){ return checkItemVisible(it.id); });
+      visItems.forEach(function(it){ if (checkedObj[it.id]) checkedCount++; });
+      visCustom.forEach(function(it){ if (checkedObj[it.id]) checkedCount++; });
+      var totalCount = visItems.length + visCustom.length;
       var remaining = totalCount - checkedCount;
       return '<div class="summary-item"><div class="num">' + remaining + '</div><div class="lbl">' + TYPE_LABEL[g.type] + ' 남음</div></div>';
     }).join("");
@@ -1557,6 +1572,28 @@
     return out;
   }
 
+  function checkItemVisible(id){
+    if (isAdmin()) return true;
+    var sc = checkScopes[id];
+    if (!sc || !sc.length) return true;
+    return sc.indexOf(getMemberId()) >= 0;
+  }
+  var editingCheckItem = null;
+  function openCheckScope(id, title){
+    if (!isAdmin()) return;
+    editingCheckItem = id;
+    document.getElementById("csTitle").textContent = title || "";
+    renderMemberChecks("csScope", checkScopes[id] || []);
+    document.getElementById("checkScopeBackdrop").classList.add("show");
+  }
+  function closeCheckScope(){ document.getElementById("checkScopeBackdrop").classList.remove("show"); editingCheckItem = null; }
+  function saveCheckScope(){
+    if (!editingCheckItem) return closeCheckScope();
+    var ids = getCheckedMembers("csScope");
+    if (ids.length) checkScopes[editingCheckItem] = ids; else delete checkScopes[editingCheckItem];
+    closeCheckScope();
+    saveCache(); renderList(); renderSummary(); scheduleSave();
+  }
   function renderList(){
     var host = document.getElementById("listHost");
     if (!host) return;
@@ -1566,12 +1603,14 @@
       var checkedObj = (records[g.type] && records[g.type][key]) || {};
       html += '<section class="group"><h2>' + g.title + '</h2><div class="card">';
       g.items.forEach(function(it){
+        if (!checkItemVisible(it.id)) return;
         var checkedDate = checkedObj[it.id];
         var isChecked = !!checkedDate;
         var metaBits = [];
         metaBits.push('<span>' + it.who + '</span>');
         metaBits.push('<span>' + it.form + '</span>');
         if (it.approve) metaBits.push('<span class="badge">결재</span>');
+        if (checkScopes[it.id] && checkScopes[it.id].length) metaBits.push('<span class="scope-chip">공개 ' + esc(scopeNames(checkScopes[it.id])) + '</span>');
         if (isChecked){
           metaBits.push('<span class="checked-date">✓ ' + checkedDate + '</span>');
         } else {
@@ -1585,14 +1624,17 @@
               '<div class="item-title">' + it.title + '</div>' +
               '<div class="item-meta">' + metaBits.join('') + '</div>' +
             '</div>' +
+            (isAdmin() ? '<button class="mini-btn chk-scope" data-scope-id="' + it.id + '" data-scope-title="' + esc(it.title) + '">공개</button>' : '') +
           '</div>';
       });
 
       liveCustom(g.type).forEach(function(it){
+        if (!checkItemVisible(it.id)) return;
         var checkedDate = checkedObj[it.id];
         var isChecked = !!checkedDate;
         var metaBits = [];
         metaBits.push('<span class="author-chip">' + esc(it.who) + '</span>');
+        if (checkScopes[it.id] && checkScopes[it.id].length) metaBits.push('<span class="scope-chip">공개 ' + esc(scopeNames(checkScopes[it.id])) + '</span>');
         if (isChecked){
           metaBits.push('<span class="checked-date">✓ ' + checkedDate + '</span>');
         } else {
@@ -1606,6 +1648,7 @@
               '<div class="item-title">' + esc(it.title) + '</div>' +
               '<div class="item-meta">' + metaBits.join('') + '</div>' +
             '</div>' +
+            (isAdmin() ? '<button class="mini-btn chk-scope" data-scope-id="' + it.id + '" data-scope-title="' + esc(it.title) + '">공개</button>' : '') +
             '<button class="del-x" data-del-type="' + g.type + '" data-del-id="' + it.id + '">×</button>' +
           '</div>';
       });
@@ -1622,8 +1665,14 @@
 
     Array.prototype.forEach.call(host.querySelectorAll(".item"), function(el){
       el.addEventListener("click", function(e){
-        if (e.target.classList.contains("del-x")) return;
+        if (e.target.classList.contains("del-x") || e.target.classList.contains("chk-scope")) return;
         toggleItem(el.getAttribute("data-type"), el.getAttribute("data-id"));
+      });
+    });
+    Array.prototype.forEach.call(host.querySelectorAll(".chk-scope"), function(el){
+      el.addEventListener("click", function(e){
+        e.stopPropagation();
+        openCheckScope(el.getAttribute("data-scope-id"), el.getAttribute("data-scope-title"));
       });
     });
     Array.prototype.forEach.call(host.querySelectorAll(".del-x"), function(el){
@@ -1801,6 +1850,7 @@
         var parsed = JSON.parse(decoded);
         records = parsed.records || {};
         customItems = parsed.custom || {};
+        checkScopes = parsed.scopes || {};
         setOffline(false);
         saveCache();
         renderList();
@@ -1812,6 +1862,7 @@
         currentSha = cache.sha;
         records = cache.records || {};
         customItems = cache.custom || {};
+        checkScopes = cache.scopes || {};
         setOffline(true);
         renderList();
         renderSummary();
@@ -1826,7 +1877,7 @@
   function doSave(){
     var token = getToken();
     if (!token) return;
-    var body = JSON.stringify({records: records, custom: customItems});
+    var body = JSON.stringify({records: records, custom: customItems, scopes: checkScopes});
     var payload = {
       message: "check: 업데이트",
       content: b64EncodeUnicode(body),
@@ -1871,6 +1922,7 @@
       }catch(e){}
       records = mergeRecords(records, remoteParsed.records || {});
       customItems = mergeCustom(customItems, remoteParsed.custom || {});
+      checkScopes = Object.assign({}, remoteParsed.scopes || {}, checkScopes);
       currentSha = json.sha;
       saveCache();
       renderList();
@@ -2135,6 +2187,10 @@
   document.getElementById("licDelete").addEventListener("click", deleteLicFromModal);
   document.getElementById("licCancel").addEventListener("click", closeLicModal);
   document.getElementById("licBackdrop").addEventListener("click", function(e){ if (e.target === this) closeLicModal(); });
+
+  document.getElementById("csSave").addEventListener("click", saveCheckScope);
+  document.getElementById("csCancel").addEventListener("click", closeCheckScope);
+  document.getElementById("checkScopeBackdrop").addEventListener("click", function(e){ if (e.target === this) closeCheckScope(); });
 
   document.getElementById("teSave").addEventListener("click", saveTaskModal);
   document.getElementById("teCancel").addEventListener("click", closeTaskModal);
