@@ -1681,7 +1681,6 @@
         var checkedDate = checkedObj[it.id];
         var isChecked = !!checkedDate;
         var metaBits = [];
-        metaBits.push('<span>' + it.who + '</span>');
         metaBits.push('<span>' + it.form + '</span>');
         if (it.approve) metaBits.push('<span class="badge">결재</span>');
         if (checkAssignee[it.id]) metaBits.push('<span class="author-chip">담당 ' + esc(scopeNames([checkAssignee[it.id]])) + '</span>');
