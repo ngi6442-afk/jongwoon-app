@@ -6,7 +6,8 @@
 <title>종운 그룹웨어</title>
 <meta name="theme-color" content="#0F5132">
 <link rel="manifest" href="./manifest.webmanifest">
-<link rel="icon" href="./icon-192.png">
+<link rel="icon" href="./favicon.ico" sizes="any">
+<link rel="icon" type="image/png" href="./favicon-32.png">
 <link rel="apple-touch-icon" href="./icon-192.png">
 <style>
   :root{
@@ -490,6 +491,10 @@
   .rec-item.checked .rec-client{color:#6C7A75;text-decoration:line-through;text-decoration-color:#B9C4BF;}
   .rec-item.checked .rec-amt2{color:#9AA8A2;}
   .rec-item .rec-actions{display:flex;align-items:center;gap:6px;flex-shrink:0;}
+  /* 지시 승인제 */
+  .review-chip{display:inline-block;font-size:11px;padding:1px 8px;border-radius:999px;background:#FFF3D4;color:#8A6410;font-weight:700;}
+  .appr-btn{background:var(--brand);color:#fff;border-color:var(--brand);}
+  .task-item.review .check-box{background:#F1A400;border-color:#F1A400;color:#fff;font-size:13px;line-height:1;}
   .overdue-bill{color:#B0332A;font-weight:700;}
 
   /* 인허가 */
@@ -637,6 +642,7 @@
       <div id="recImpMsg" style="margin-top:8px;font-size:13px;"></div>
     </div>
     <div class="dash-sec" style="margin:14px 0 6px;"><h2>미수 <span class="cnt" id="recHead"></span></h2></div>
+    <input type="search" id="recSearch" placeholder="거래처·내역 검색" autocomplete="off" style="width:100%;padding:9px 12px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;font-size:14px;box-sizing:border-box;">
     <div class="card" id="recList"><div class="loading">불러오는 중…</div></div>
     <button class="link-btn" id="recPaidToggle"></button>
     <div class="card" id="recPaidList" style="display:none;margin-top:6px;"></div>
@@ -784,7 +790,6 @@
     <button class="primary" id="memberLogin">로그인</button>
     <button class="secondary" id="memberPinBtn" style="display:none;">내 PIN 변경</button>
     <button class="secondary" id="memberManageBtn" style="display:none;">회원 관리</button>
-    <button class="secondary" id="memberTokenBtn">기기 토큰 재설정</button>
     <button class="secondary" id="helpBtn">도움말</button>
   </div>
 </div>
@@ -835,6 +840,7 @@
     <span class="fld-label">역할</span>
     <select id="meRole"><option value="대표">대표</option><option value="관리자">관리자</option><option value="직원">직원</option></select>
     <span class="fld-label">모듈별 권한 (수행/보기/숨김)</span>
+    <div id="mePermNote" style="display:none;font-size:12px;color:#8A6410;background:#FFF3D4;border-radius:6px;padding:6px 9px;margin-bottom:6px;">관리자·대표는 모든 모듈을 <b>수행</b>합니다(개별 설정 무시). 모듈별로 제한하려면 역할을 <b>직원</b>으로 하세요.</div>
     <div id="mePerms"></div>
     <button class="primary" id="meSave">저장</button>
     <button class="danger" id="meDelete">삭제</button>
@@ -1268,6 +1274,7 @@
     if (t.from) metaBits.push('<span class="from-chip">지시 ' + esc(t.from) + '</span>');
     if (t.due) metaBits.push('<span>' + esc(t.due) + '</span>');
     if (t.status === "hold") metaBits.push('<span class="hold-chip">보류</span>');
+    if (t.status === "review") metaBits.push('<span class="review-chip">승인 대기중' + (t.done_by ? ' · ' + esc(t.done_by) : '') + '</span>');
     if (t.scope && t.scope.length) metaBits.push('<span class="scope-chip">공개 ' + esc(scopeNames(t.scope)) + '</span>');
     if (isDone){
       var byTxt = t.done_by ? (" · " + esc(t.done_by)) : "";
@@ -1281,6 +1288,12 @@
       ctrl = '<div class="task-ctrl">' +
         (canDo("tasks") ? '<button class="mini-btn" data-task-reopen="' + t.id + '">되돌리기</button>' : '') +
       '</div>';
+    } else if (t.status === "review"){
+      var apr = canApproveTask(t)
+        ? '<button class="mini-btn appr-btn" data-task-approve="' + t.id + '">승인</button><button class="mini-btn" data-task-reject="' + t.id + '">반려</button>'
+        : '';
+      var cancelBtn = canActTask(t) ? '<button class="mini-btn" data-task-cancel="' + t.id + '">완료취소</button>' : '';
+      ctrl = '<div class="task-ctrl">' + apr + cancelBtn + '</div>';
     } else {
       var ddayBadge = "";
       if (t.status === "open"){
@@ -1295,9 +1308,11 @@
       ctrl = '<div class="task-ctrl">' + ddayBadge + holdBtn + editBtn + calBtn + '</div>';
     }
 
-    var cls = "item task-item" + (isDone ? " checked" : "") + (t.status === "hold" ? " hold" : "");
-    return '<div class="' + cls + '" data-task-toggle="' + t.id + '">' +
-        '<div class="check-box">' + (isDone ? '✓' : '') + '</div>' +
+    var boxContent = isDone ? '✓' : (t.status === "review" ? '⋯' : '');
+    var cls = "item task-item" + (isDone ? " checked" : "") + (t.status === "hold" ? " hold" : "") + (t.status === "review" ? " review" : "");
+    var toggleAttr = (t.status === "review") ? "" : (' data-task-toggle="' + t.id + '"');
+    return '<div class="' + cls + '"' + toggleAttr + '>' +
+        '<div class="check-box">' + boxContent + '</div>' +
         '<div class="item-body">' +
           '<div class="item-title">' + esc(t.title) + '</div>' +
           detailHtml +
@@ -1363,12 +1378,13 @@
     if (t.from) metaBits.push('<span class="from-chip">지시 ' + esc(t.from) + '</span>');
     if (t.due) metaBits.push('<span>' + esc(t.due) + '</span>');
     if (t.status === "hold") metaBits.push('<span class="hold-chip">보류</span>');
+    if (t.status === "review") metaBits.push('<span class="review-chip">승인 대기중</span>');
     var dd = (t.status === "open" && t.due) ? ddayInfo(t.due) : null;
     var ddayBadge = dd ? '<span class="dday' + (dd.cls ? ' ' + dd.cls : '') + '">' + dd.text + '</span>' : '';
     var calBtn = t.due ? '<button class="cal-btn" data-cal-task="' + t.id + '">캘린더</button>' : '';
     var detailHtml = t.detail ? '<div class="task-detail">' + esc(t.detail) + '</div>' : '';
-    return '<div class="item task-item' + (t.status === "hold" ? " hold" : "") + '" data-mytask="' + t.id + '">' +
-        '<div class="check-box"></div>' +
+    return '<div class="item task-item' + (t.status === "hold" ? " hold" : "") + (t.status === "review" ? " review" : "") + '" data-mytask="' + t.id + '">' +
+        '<div class="check-box">' + (t.status === "review" ? '⋯' : '') + '</div>' +
         '<div class="item-body">' +
           '<div class="item-title">' + esc(t.title) + '</div>' +
           detailHtml +
@@ -1421,6 +1437,15 @@
     Array.prototype.forEach.call(host.querySelectorAll("[data-task-edit]"), function(el){
       el.addEventListener("click", function(e){ e.stopPropagation(); openTaskModal(el.getAttribute("data-task-edit")); });
     });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-task-approve]"), function(el){
+      el.addEventListener("click", function(e){ e.stopPropagation(); approveTask(el.getAttribute("data-task-approve")); });
+    });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-task-reject]"), function(el){
+      el.addEventListener("click", function(e){ e.stopPropagation(); rejectTask(el.getAttribute("data-task-reject")); });
+    });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-task-cancel]"), function(el){
+      el.addEventListener("click", function(e){ e.stopPropagation(); toggleTaskDone(el.getAttribute("data-task-cancel")); });
+    });
   }
 
   function findTask(id){
@@ -1442,6 +1467,7 @@
       detail: "",
       who: whoEl.value.trim(),
       from: getUser(),
+      by: getUser(),
       due: dueEl.value || "",
       status: "open",
       done_at: null,
@@ -1458,24 +1484,40 @@
     scheduleTasksSave();
   }
 
+  function canApproveTask(t){
+    if (!t) return false;
+    if (isAdmin()) return true;
+    var me = myName();
+    return !!(me && me === (t.by || t.from));
+  }
   function toggleTaskDone(id){
     var t = findTask(id);
     if (!t) return;
     if (!canActTask(t)) return;
-    if (t.status === "done"){
-      t.status = "open";
-      t.done_at = null;
-      t.done_by = null;
-    } else {
-      t.status = "done";
-      t.done_at = todayStr();
-      t.done_by = myName() || "익명";
+    if (t.status === "done"){                 // 완료 되돌리기 → 열림
+      t.status = "open"; t.done_at = null; t.done_by = null; t.approved_by = null; t.approved_at = null;
+    } else if (t.status === "review"){        // 완료요청 취소 → 열림
+      t.status = "open"; t.done_at = null; t.done_by = null;
+    } else {                                  // 담당자 완료 체크 → 승인 대기
+      t.status = "review"; t.done_at = todayStr(); t.done_by = myName() || "익명";
     }
     t.updated = todayStr();
     saveTasksCache();
     renderTasks();
     renderSummary();
     scheduleTasksSave();
+  }
+  function approveTask(id){
+    var t = findTask(id);
+    if (!t || t.status !== "review" || !canApproveTask(t)) return;
+    t.status = "done"; t.approved_by = myName() || "관리자"; t.approved_at = todayStr(); t.updated = todayStr();
+    saveTasksCache(); renderTasks(); renderSummary(); scheduleTasksSave();
+  }
+  function rejectTask(id){
+    var t = findTask(id);
+    if (!t || t.status !== "review" || !canApproveTask(t)) return;
+    t.status = "open"; t.done_at = null; t.done_by = null; t.updated = todayStr();
+    saveTasksCache(); renderTasks(); renderSummary(); scheduleTasksSave();
   }
 
   function setTaskStatus(id, status){
@@ -2038,12 +2080,6 @@
   document.getElementById("memberLogin").addEventListener("click", doMemberLogin);
   document.getElementById("memberPin").addEventListener("keydown", function(e){ if (e.key === "Enter") doMemberLogin(); });
   document.getElementById("memberManageBtn").addEventListener("click", function(){ hideMemberLogin(); showUsersManage(); });
-  document.getElementById("memberTokenBtn").addEventListener("click", function(){
-    hideMemberLogin();
-    document.getElementById("nameInput").value = getUser();
-    document.getElementById("tokenInput").value = "";
-    showTokenScreen(false);
-  });
   document.getElementById("usersClose").addEventListener("click", function(){ document.getElementById("usersBackdrop").classList.remove("show"); });
   document.getElementById("userAddBtn").addEventListener("click", function(){ openMemberEdit(null); });
   document.getElementById("meSave").addEventListener("click", saveMemberEdit);
@@ -2074,6 +2110,10 @@
   document.getElementById("recBilled").addEventListener("keydown", function(e){ if (e.key === "Enter") addReceivable(); });
   document.getElementById("recPaidToggle").addEventListener("click", function(){
     showRecPaid = !showRecPaid;
+    renderReceivables();
+  });
+  document.getElementById("recSearch").addEventListener("input", function(){
+    recSearchTerm = this.value.toLowerCase().trim();
     renderReceivables();
   });
   (function(){
@@ -2779,8 +2819,13 @@
       '</div>';
   }
 
+  var recSearchTerm = "";
+  function recMatchesSearch(r){
+    if (!recSearchTerm) return true;
+    return ((r.client || "") + " " + (r.desc || "") + " " + (r.nts || "")).toLowerCase().indexOf(recSearchTerm) >= 0;
+  }
   function unpaidReceivables(){
-    var u = liveRec().filter(function(r){ return !r.paid && recVisible(r); });
+    var u = liveRec().filter(function(r){ return !r.paid && recVisible(r) && recMatchesSearch(r); });
     u.sort(function(a, b){ var ad = a.billed || "9999-99-99", bd = b.billed || "9999-99-99"; return ad < bd ? -1 : (ad > bd ? 1 : 0); });
     return u;
   }
@@ -2791,7 +2836,7 @@
     var toggleBtn = document.getElementById("recPaidToggle");
     if (!listHost) return;
     var unpaid = unpaidReceivables();
-    var paid = liveRec().filter(function(r){ return r.paid && recVisible(r); });
+    var paid = liveRec().filter(function(r){ return r.paid && recVisible(r) && recMatchesSearch(r); });
     paid.sort(function(a, b){ return (b.paid || "").localeCompare(a.paid || ""); });
     paid = paid.slice(0, 30);
 
@@ -3337,13 +3382,25 @@
         '<option value="view"' + (v==="view"?" selected":"") + '>보기</option>' +
         '<option value="hide"' + (v==="hide"?" selected":"") + '>숨김</option></select></div>';
     }).join("");
+    updatePermLock();
     document.getElementById("meDelete").style.display = (m && curMember() && m.id !== curMember().id) ? "block" : "none";
     document.getElementById("memberEditBackdrop").classList.add("show");
   }
   function closeMemberEdit(){ document.getElementById("memberEditBackdrop").classList.remove("show"); editingMemberId = null; }
+  function updatePermLock(){
+    var role = document.getElementById("meRole").value;
+    var adminRole = !!(ROLE_PRESET[role] && ROLE_PRESET[role].admin);
+    var note = document.getElementById("mePermNote");
+    if (note) note.style.display = adminRole ? "block" : "none";
+    Array.prototype.forEach.call(document.querySelectorAll("#mePerms [data-perm]"), function(sel){
+      sel.disabled = adminRole;
+      sel.style.opacity = adminRole ? "0.45" : "";
+    });
+  }
   function applyRolePreset(){
-    var p = ROLE_PRESET[document.getElementById("meRole").value]; if (!p) return;
-    Array.prototype.forEach.call(document.querySelectorAll("#mePerms [data-perm]"), function(sel){ sel.value = p.perms[sel.getAttribute("data-perm")] || "view"; });
+    var p = ROLE_PRESET[document.getElementById("meRole").value];
+    if (p) Array.prototype.forEach.call(document.querySelectorAll("#mePerms [data-perm]"), function(sel){ sel.value = p.perms[sel.getAttribute("data-perm")] || "view"; });
+    updatePermLock();
   }
   function saveMemberEdit(){
     var name = document.getElementById("meName").value.trim();
