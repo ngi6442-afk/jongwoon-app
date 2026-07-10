@@ -1436,7 +1436,7 @@
     ["taskWho","conWho","reAssignee","teWho"].forEach(function(idn){ var s=document.getElementById(idn); if(s) fillMemberSelect(s, s.value); });
     ["taskScope"].forEach(function(idn){ var s=document.getElementById(idn); if(s) fillScopeSelect(s, s.value); });
   }
-  // 이 지시가 "내게 온 지시"인가: 담당=본인 / 전사 / 공개범위(scope)에 본인. (지시자는 제외 — 지시자는 홈 전체 리스트로 봄)
+  // 이 지시가 "내게 온 지시"인가: 담당=본인 / 전사(전사 지시는 지시자 본인 포함) / 공개범위(scope)에 본인.
   function taskForMe(t){
     if(!t) return false;
     if(t.who_id==="__all__") return true;
