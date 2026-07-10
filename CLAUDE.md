@@ -45,3 +45,4 @@
 - 대시보드 만기(경과·임박)는 차량 + 인허가를 합산. 만기·지시 행의 `캘린더` 버튼은 .ics 알람 연동.
 - SW 셸 캐시는 cache-first이므로 index.html 변경 시 sw.js의 `SHELL_CACHE` 버전을 반드시 올린다(현재 jw-shell-v15).
 - 지시 등록 `담당` 입력칸은 회원명 datalist(`#memberNames`, `populateMemberNames()`) 자동완성 — 오타로 "내게 온 지시" 매칭이 깨지지 않게. 자유 입력도 유지.
+- **선택 복구(2026-07-10)**: 지시·차량·기성 각 탭에 `삭제된 N 보기` 토글 → soft-delete(del=1) 항목을 개별 `복구` 버튼으로 되돌림. 공통 헬퍼 `renderDeletedList({items,can,toggleId,listId,show,noun,labelFn,onRestore})` + `restoreOneTask/Veh/Rec`. 각 render 함수 말미에서 호출. 옛 지시 "전체 복구"(restoreDeletedTasks)와 미연결 restoreDeletedVehicles 제거. 토글은 `canDo(mod)`일 때만 노출.

@@ -640,7 +640,8 @@
     </div>
     <button class="link-btn" id="taskDoneToggle"></button>
     <div class="card" id="taskDoneList" style="display:none;margin-top:6px;"></div>
-    <button class="link-btn" id="taskRestoreBtn" style="display:none;color:#B0332A;">삭제된 지시 복구</button>
+    <button class="link-btn" id="taskDeletedToggle" style="display:none;color:#B0332A;"></button>
+    <div class="card" id="taskDeletedList" style="display:none;margin-top:6px;"></div>
   </section>
 
   <!-- 차량·자산 만기 -->
@@ -654,6 +655,8 @@
       <div class="loading">불러오는 중…</div>
     </div>
     <button class="link-btn" id="vehAddBtn">+ 차량 추가</button>
+    <button class="link-btn" id="vehDeletedToggle" style="display:none;color:#B0332A;"></button>
+    <div class="card" id="vehDeletedList" style="display:none;margin-top:6px;"></div>
   </section>
 
   <!-- 수금·기성 -->
@@ -686,6 +689,8 @@
     <div class="card" id="recList"><div class="loading">불러오는 중…</div></div>
     <button class="link-btn" id="recPaidToggle"></button>
     <div class="card" id="recPaidList" style="display:none;margin-top:6px;"></div>
+    <button class="link-btn" id="recDeletedToggle" style="display:none;color:#B0332A;"></button>
+    <div class="card" id="recDeletedList" style="display:none;margin-top:6px;"></div>
   </section>
 
   <!-- 인허가·보수교육 만기 -->
@@ -1111,6 +1116,9 @@
   var tasksSaveTimer = null;
   var tasksPending = false;
   var showTaskDone = false;
+  var showDeletedTasks = false;
+  var showDeletedVeh = false;
+  var showDeletedRec = false;
   var currentTab = "dash";
 
   var vehicles = [];     // [{id,no,type,own,permit,driver,insp_due,ins_due,insurer,state,note,updated,del}]
@@ -1333,6 +1341,53 @@
     dl.innerHTML = opts;
   }
 
+  // 삭제된 항목 선택 복구: 토글 버튼 + 개별 복구 목록(모듈 공통)
+  function renderDeletedList(opts){
+    var toggle = document.getElementById(opts.toggleId);
+    var host = document.getElementById(opts.listId);
+    if (!toggle || !host) return;
+    var del = (opts.items || []).filter(function(x){ return x && x.del === 1; });
+    if (!opts.can || !del.length){
+      toggle.style.display = "none";
+      host.style.display = "none";
+      host.innerHTML = "";
+      return;
+    }
+    toggle.style.display = "block";
+    toggle.textContent = opts.show
+      ? ("삭제된 " + opts.noun + " 숨기기")
+      : ("삭제된 " + opts.noun + " 보기 (" + del.length + ")");
+    host.style.display = opts.show ? "block" : "none";
+    if (!opts.show){ host.innerHTML = ""; return; }
+    host.innerHTML = del.map(function(x){
+      return '<div class="item" style="opacity:.72;">' +
+          '<div class="item-body"><div class="item-title" style="font-size:14px;">' + esc(opts.labelFn(x)) + '</div></div>' +
+          '<button class="mini-btn" data-restore="' + esc(x.id) + '">복구</button>' +
+        '</div>';
+    }).join("");
+    Array.prototype.forEach.call(host.querySelectorAll("[data-restore]"), function(el){
+      el.addEventListener("click", function(){ opts.onRestore(el.getAttribute("data-restore")); });
+    });
+  }
+  function restoreOneTask(id){
+    if (!canDo("tasks")) return;
+    var t = findTask(id); if (!t) return;
+    t.del = 0; t.updated = todayStr();
+    saveTasksCache(); renderTasks(); renderSummary(); renderDashboard(); scheduleTasksSave();
+  }
+  function restoreOneVeh(id){
+    if (!canDo("veh")) return;
+    var v = findVeh(id); if (!v) return;
+    v.del = 0; v.updated = todayStr();
+    saveVehiclesCache(); renderVehicles(); renderDashboard(); scheduleVehSave();
+  }
+  function restoreOneRec(id){
+    if (!canDo("rec")) return;
+    var r = findRec(id); if (!r) return;
+    r.del = 0; r.updated = todayStr();
+    saveRecCache(); renderReceivables(); renderDashboard(); scheduleRecSave();
+  }
+
   function render(){
     populateMemberNames();
     renderSummary();
@@ -1529,9 +1584,12 @@
     bindTaskHandlers(doneHost);
     bindCalHandlers(listHost);
     bindCalHandlers(doneHost);
-    var delCount = tasks.filter(function(t){ return t.del === 1; }).length;
-    var rb = document.getElementById("taskRestoreBtn");
-    if (rb){ rb.style.display = (canDo("tasks") && delCount) ? "block" : "none"; rb.textContent = "삭제된 지시 복구 (" + delCount + "건)"; }
+    renderDeletedList({
+      items: tasks, can: canDo("tasks"), toggleId: "taskDeletedToggle", listId: "taskDeletedList",
+      show: showDeletedTasks, noun: "지시",
+      labelFn: function(t){ return (t.title || "제목없음") + (t.who ? " · 담당 " + t.who : "") + (t.due ? " · " + t.due : ""); },
+      onRestore: restoreOneTask
+    });
     updateTaskBadge();
     renderMyTasks();
   }
@@ -1628,14 +1686,6 @@
     for (var i=0;i<tasks.length;i++){ if (tasks[i].id === id) return tasks[i]; }
     return null;
   }
-  function restoreDeletedTasks(){
-    if (!canDo("tasks")) return;
-    var n = 0;
-    tasks.forEach(function(t){ if (t.del === 1){ t.del = 0; t.updated = todayStr(); n++; } });
-    saveTasksCache(); renderTasks(); renderSummary(); renderDashboard(); scheduleTasksSave();
-    alert(n ? (n + "건 복구했습니다.") : "복구할 삭제 지시가 없습니다.");
-  }
-
   function addTask(){
     if (!canDo("tasks")) return;
     var titleEl = document.getElementById("taskTitle");
@@ -2397,7 +2447,7 @@
     showTaskDone = !showTaskDone;
     renderTasks();
   });
-  document.getElementById("taskRestoreBtn").addEventListener("click", function(){ if (confirm("삭제된 지시를 모두 복구할까요?")) restoreDeletedTasks(); });
+  document.getElementById("taskDeletedToggle").addEventListener("click", function(){ showDeletedTasks = !showDeletedTasks; renderTasks(); });
 
   document.getElementById("recAddBtn").addEventListener("click", addReceivable);
   document.getElementById("recClient").addEventListener("keydown", function(e){ if (e.key === "Enter") addReceivable(); });
@@ -2408,6 +2458,7 @@
     showRecPaid = !showRecPaid;
     renderReceivables();
   });
+  document.getElementById("recDeletedToggle").addEventListener("click", function(){ showDeletedRec = !showDeletedRec; renderReceivables(); });
   document.getElementById("recSearch").addEventListener("input", function(){
     recSearchTerm = this.value.toLowerCase().trim();
     renderReceivables();
@@ -2464,6 +2515,7 @@
   document.getElementById("vehBackdrop").addEventListener("click", function(e){ if (e.target === this) closeVehModal(); });
   document.getElementById("vehAddBtn").addEventListener("click", function(){ openVehModal(null); });
   document.getElementById("vehAddBtnTop").addEventListener("click", function(){ openVehModal(null); });
+  document.getElementById("vehDeletedToggle").addEventListener("click", function(){ showDeletedVeh = !showDeletedVeh; renderVehicles(); });
   document.getElementById("vhAdd").addEventListener("click", addVehHistory);
   document.getElementById("vehHistClose").addEventListener("click", function(){ document.getElementById("vehHistBackdrop").classList.remove("show"); histVehId = null; });
   document.getElementById("vehHistBackdrop").addEventListener("click", function(e){ if (e.target === this){ this.classList.remove("show"); histVehId = null; } });
@@ -2596,6 +2648,12 @@
     });
     Array.prototype.forEach.call(host.querySelectorAll("[data-veh-hist]"), function(el){
       el.addEventListener("click", function(e){ e.stopPropagation(); openVehHistory(el.getAttribute("data-veh-hist")); });
+    });
+    renderDeletedList({
+      items: vehicles, can: canDo("veh"), toggleId: "vehDeletedToggle", listId: "vehDeletedList",
+      show: showDeletedVeh, noun: "차량",
+      labelFn: function(v){ return (v.no || "번호없음") + (v.kind || v.type ? " · " + (v.kind || v.type) : "") + (v.state ? " · " + v.state : ""); },
+      onRestore: restoreOneVeh
     });
   }
 
@@ -2738,12 +2796,6 @@
     if (v){ v.del = 1; v.updated = todayStr(); }
     closeVehModal();
     saveVehiclesCache(); renderVehicles(); renderDashboard(); scheduleVehSave();
-  }
-  function restoreDeletedVehicles(){
-    if (!canDo("veh")) return;
-    var n = 0; vehicles.forEach(function(v){ if (v.del === 1){ v.del = 0; v.updated = todayStr(); n++; } });
-    saveVehiclesCache(); renderVehicles(); renderDashboard(); scheduleVehSave();
-    alert(n ? (n + "대 복구했습니다.") : "복구할 삭제 차량이 없습니다.");
   }
 
   // ---- 대시보드 (통합 첫 화면) ----
@@ -3546,6 +3598,12 @@
     paidHost.innerHTML = paid.map(function(r){ return recRowHtml(r, true); }).join("");
     bindRecHandlers(listHost);
     bindRecHandlers(paidHost);
+    renderDeletedList({
+      items: receivables, can: canDo("rec"), toggleId: "recDeletedToggle", listId: "recDeletedList",
+      show: showDeletedRec, noun: "기성",
+      labelFn: function(r){ return (r.client || "거래처없음") + (r.desc ? " · " + r.desc : "") + (r.amount ? " · " + fmtAmount(r.amount) + "원" : "") + (r.billed ? " · " + r.billed : ""); },
+      onRestore: restoreOneRec
+    });
   }
 
   function bindRecHandlers(host){
