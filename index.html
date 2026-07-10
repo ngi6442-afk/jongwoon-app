@@ -642,7 +642,7 @@
         <button id="taskAddBtn">지시 등록</button>
       </div>
     </div>
-    <div class="sel-bar" id="taskSelBar" style="display:none;"></div>
+    <div class="sel-bar" id="tasksSelBar" style="display:none;"></div>
     <div class="card" id="taskList" style="margin-top:10px;">
       <div class="loading">불러오는 중…</div>
     </div>
@@ -1376,6 +1376,7 @@
   // ---- 다중 선택(체크박스) 삭제/복구: 지시·차량·기성 공통 ----
   var selSets = { tasks:{}, veh:{}, rec:{} };
   var delSelSets = { tasks:{}, veh:{}, rec:{} };
+  var selMode = { tasks:false, veh:false, rec:false };
   var recSort = "billed_asc";
   var REC_SORTS = [["billed_asc","청구일 오래된순"],["billed_desc","청구일 최신순"],["amount_desc","금액 큰순"],["client","거래처명"]];
   function fillRecSort(sel){ sel.innerHTML = REC_SORTS.map(function(o){ return '<option value="'+o[0]+'"'+(o[0]===recSort?" selected":"")+'>'+o[1]+'</option>'; }).join(""); }
@@ -1410,22 +1411,40 @@
       });
     });
   }
+  function toggleSelId(mod, id){ var s=selSets[mod]; if(s[id]) delete s[id]; else s[id]=1; renderModuleList(mod); }
   function renderSelBar(mod){
     var bar=document.getElementById(mod+"SelBar"); if(!bar) return;
     var live=moduleLive(mod);
-    if(!moduleCan(mod) || !live.length){ bar.style.display="none"; bar.innerHTML=""; return; }
-    var set=selSets[mod];
+    if(!moduleCan(mod) || !live.length){ bar.style.display="none"; bar.innerHTML=""; selMode[mod]=false; selSets[mod]={}; return; }
+    bar.style.display="flex";
+    var on=selMode[mod], set=selSets[mod];
     var n=selCount(mod,false);
     var allOn=live.every(function(x){ return set[x.id]; });
-    bar.style.display="flex";
-    var extra=(mod==="rec")?'<select class="rec-sort" id="recSortSel"></select>':'';
-    bar.innerHTML='<label class="sel-all"><input type="checkbox" class="selall-box"'+(allOn?" checked":"")+'> 전체선택</label>'+extra+
-      (n?'<button class="mini-btn danger seldel-btn">선택 삭제 ('+n+')</button>':'');
+    var sortSel=(mod==="rec")?'<select class="rec-sort" id="recSortSel"></select>':'';
+    var html=sortSel+'<button class="mini-btn selmode-btn">'+(on?"✕ 선택취소":"☑ 선택")+'</button>';
+    if(on){
+      html+='<label class="sel-all"><input type="checkbox" class="selall-box"'+(allOn?" checked":"")+'> 전체선택</label>'+
+        (n?'<button class="mini-btn danger seldel-btn">선택 삭제 ('+n+')</button>':'');
+    }
+    bar.innerHTML=html;
+    if(mod==="rec"){ var ss=bar.querySelector("#recSortSel"); if(ss){ fillRecSort(ss); ss.addEventListener("change", function(){ recSort=ss.value; renderReceivables(); }); } }
+    var mb=bar.querySelector(".selmode-btn");
+    if(mb) mb.addEventListener("click", function(){ selMode[mod]=!selMode[mod]; if(!selMode[mod]) selSets[mod]={}; renderModuleList(mod); });
     var sa=bar.querySelector(".selall-box");
     if(sa) sa.addEventListener("change", function(){ if(sa.checked){ live.forEach(function(x){ set[x.id]=1; }); } else { selSets[mod]={}; } renderModuleList(mod); });
     var sd=bar.querySelector(".seldel-btn");
     if(sd) sd.addEventListener("click", function(){ bulkDelete(mod); });
-    if(mod==="rec"){ var ss=bar.querySelector("#recSortSel"); if(ss){ fillRecSort(ss); ss.addEventListener("change", function(){ recSort=ss.value; renderReceivables(); }); } }
+  }
+  function hardDelete(mod){
+    if(!moduleCan(mod)) return;
+    var set=delSelSets[mod]; var ids=Object.keys(set).filter(function(id){return set[id];});
+    if(!ids.length) return;
+    if(!confirm("선택한 "+ids.length+"건을 영구 삭제합니다.\n복구 불가! 계속할까요?")) return;
+    var arr=moduleArr(mod), idset={}; ids.forEach(function(id){ idset[id]=1; });
+    var kept=arr.filter(function(x){ return !(x && idset[x.id]); });
+    arr.length=0; Array.prototype.push.apply(arr, kept);
+    delSelSets[mod]={};
+    saveModule(mod); scheduleModuleSave(mod); renderModule(mod);
   }
   function bulkDelete(mod){
     if(!moduleCan(mod)) return;
@@ -1460,7 +1479,7 @@
     var n=selCount(mod,true);
     var allOn=del.every(function(x){ return set[x.id]; });
     var bar='<div class="sel-bar"><label class="sel-all"><input type="checkbox" class="delall-box"'+(allOn?" checked":"")+'> 전체선택</label>'+
-      (n?'<button class="mini-btn delrestore-btn">선택 복구 ('+n+')</button>':'')+'</div>';
+      (n?'<button class="mini-btn delrestore-btn">선택 복구 ('+n+')</button><button class="mini-btn danger delpurge-btn">영구삭제 ('+n+')</button>':'')+'</div>';
     var rows=del.map(function(x){
       return '<div class="item" style="opacity:.78;">'+selBoxHtml(mod,x.id,true)+
         '<div class="item-body"><div class="item-title" style="font-size:14px;">'+esc(labelFn(x))+'</div></div></div>';
@@ -1471,6 +1490,8 @@
     if(da) da.addEventListener("change", function(){ if(da.checked){ del.forEach(function(x){ set[x.id]=1; }); } else { delSelSets[mod]={}; } renderModuleList(mod); });
     var rb=host.querySelector(".delrestore-btn");
     if(rb) rb.addEventListener("click", function(){ bulkRestore(mod); });
+    var pb=host.querySelector(".delpurge-btn");
+    if(pb) pb.addEventListener("click", function(){ hardDelete(mod); });
   }
 
   function render(){
@@ -1657,7 +1678,7 @@
     done.sort(function(a, b){ return (b.done_at || "").localeCompare(a.done_at || ""); });
     done = done.slice(0, 20);
 
-    var selT = canDo("tasks");
+    var selT = canDo("tasks") && selMode.tasks;
     listHost.innerHTML = active.length
       ? active.map(function(t){ return taskRowHtml(t, false, selT); }).join("")
       : '<div class="loading" style="padding:18px 0;">등록된 지시가 없습니다.</div>';
@@ -1737,7 +1758,8 @@
     Array.prototype.forEach.call(host.querySelectorAll("[data-task-toggle]"), function(el){
       el.addEventListener("click", function(e){
         var cl = e.target.classList;
-        if (cl.contains("del-x") || cl.contains("mini-btn") || cl.contains("cal-btn")) return;
+        if (cl.contains("mini-btn") || cl.contains("cal-btn") || cl.contains("sel-box")) return;
+        if (selMode.tasks){ toggleSelId("tasks", el.getAttribute("data-task-toggle")); return; }
         toggleTaskDone(el.getAttribute("data-task-toggle"));
       });
     });
@@ -2695,7 +2717,7 @@
     if (v.state && v.state !== "운행") sub.push('<span class="hold-chip">' + esc(v.state) + '</span>');
     if (v.history && v.history.length) sub.push('<span class="ref-chip">이력 ' + v.history.length + '</span>');
     var showNote = v.note && v.note.trim() && v.note.trim() !== (v.insurer || "").trim();
-    return '<div class="item veh-item ' + ownCls + '">' +
+    return '<div class="item veh-item ' + ownCls + '" data-veh-row="' + v.id + '">' +
         (sel ? selBoxHtml("veh", v.id, false) : '') +
         '<div class="veh-main">' +
           '<div><span class="own-badge ' + ownCls + '">' + esc(v.own) + '</span></div>' +
@@ -2733,7 +2755,7 @@
     });
     var head = document.getElementById("vehHead");
     if (head) head.textContent = list.length ? ("총 " + list.length + "대 · 만기 임박순") : "";
-    var selV = canDo("veh");
+    var selV = canDo("veh") && selMode.veh;
     host.innerHTML = list.length ? list.map(function(v){ return vehRowHtml(v, selV); }).join("") : '<div class="empty-line">차량 데이터가 없습니다.</div>';
     bindCalHandlers(host);
     bindSelBoxes(host);
@@ -2743,6 +2765,15 @@
     Array.prototype.forEach.call(host.querySelectorAll("[data-veh-hist]"), function(el){
       el.addEventListener("click", function(e){ e.stopPropagation(); openVehHistory(el.getAttribute("data-veh-hist")); });
     });
+    if (selMode.veh){
+      Array.prototype.forEach.call(host.querySelectorAll(".veh-item[data-veh-row]"), function(el){
+        el.addEventListener("click", function(e){
+          var t=e.target;
+          if (t.closest && (t.closest("button") || t.closest("input"))) return;
+          toggleSelId("veh", el.getAttribute("data-veh-row"));
+        });
+      });
+    }
     renderSelBar("veh");
     renderDeletedList("veh", "vehDeletedToggle", "vehDeletedList", showDeletedVeh, "차량",
       function(v){ return (v.no || "번호없음") + (v.kind || v.type ? " · " + (v.kind || v.type) : "") + (v.state ? " · " + v.state : ""); });
@@ -3766,7 +3797,7 @@
       var sum = 0; unpaid.forEach(function(r){ sum += (r.amount || 0); });
       head.textContent = unpaid.length ? (unpaid.length + "건" + (sum ? " · " + fmtAmount(sum) + "원" : "")) : "";
     }
-    var selR = canDo("rec");
+    var selR = canDo("rec") && selMode.rec;
     listHost.innerHTML = unpaid.length ? unpaid.map(function(r){ return recRowHtml(r, false, selR); }).join("") : '<div class="empty-line">미수 건이 없습니다.</div>';
     toggleBtn.textContent = showRecPaid ? "입금 완료 숨기기" : ("입금 완료 보기 (" + paid.length + ")");
     paidHost.style.display = showRecPaid ? "block" : "none";
@@ -3796,11 +3827,12 @@
     Array.prototype.forEach.call(host.querySelectorAll("[data-rec-edit]"), function(el){
       el.addEventListener("click", function(e){ e.stopPropagation(); openRecModal(el.getAttribute("data-rec-edit")); });
     });
-    // 행 본문 탭 → 하이라이트 토글(버튼·체크박스 제외)
+    // 행 본문 탭 → (선택 모드면 선택 토글, 아니면 하이라이트)
     Array.prototype.forEach.call(host.querySelectorAll(".rec-item[data-rec-row]"), function(el){
       el.addEventListener("click", function(e){
         var t = e.target;
         if (t.closest && (t.closest("button") || t.closest("input") || t.closest("label"))) return;
+        if (selMode.rec){ toggleSelId("rec", el.getAttribute("data-rec-row")); return; }
         toggleRecHl(el.getAttribute("data-rec-row"));
       });
     });
