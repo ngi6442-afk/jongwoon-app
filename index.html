@@ -766,7 +766,7 @@
 
   <!-- 주기 체크 -->
   <div class="view" id="view-check">
-    <div id="summaryHost"></div>
+    <div id="summaryHost" class="check-only"></div>
     <section class="group" id="myTaskGroup">
       <h2>내게 온 지시</h2>
       <div id="myTaskHost"><div class="loading" style="padding:14px 0;">불러오는 중…</div></div>
@@ -776,10 +776,10 @@
       <div class="add-row" style="padding:0 0 8px;"><input type="text" id="myTodoInput" placeholder="+ 내 할 일 추가" autocomplete="off"><button id="myTodoAddBtn">추가</button></div>
       <div id="myTodoHost"></div>
     </section>
-    <div id="listHost">
+    <div id="listHost" class="check-only">
       <div class="loading">불러오는 중…</div>
     </div>
-    <section class="group">
+    <section class="group check-only">
       <h2>수시</h2>
       <div class="info-card" id="sudsiHost"></div>
     </section>
@@ -1107,13 +1107,14 @@
   var USERS_CACHE_KEY = "jw_app_users_cache";
   var MEMBER_KEY = "jw_app_member";
 
-  var MODULES = ["tasks", "veh", "rec", "lic", "check"];
-  var MODULE_TAB = {tasks:"tabTasksBtn", veh:"tabVehBtn", rec:"tabRecBtn", lic:"tabLicBtn", check:"tabCheckBtn"};
-  var MODULE_VIEW = {tasks:"view-tasks", veh:"view-veh", rec:"view-rec", lic:"view-lic", check:"view-check"};
+  // 모듈 레지스트리 — 신규 탭 추가 시 여기 5곳(MODULES/MODULE_TAB/MODULE_VIEW/MOD_LABEL/ROLE_PRESET)에 등록하면 권한관리 UI·게이팅에 자동 반영. 모듈 id = 백엔드 gw-data COL 권한키와 일치시킬 것.
+  var MODULES = ["tasks", "veh", "rec", "lic", "check", "con", "cli", "doc"];
+  var MODULE_TAB = {tasks:"tabTasksBtn", veh:"tabVehBtn", rec:"tabRecBtn", lic:"tabLicBtn", check:"tabCheckBtn", con:"tabConBtn", cli:"tabCliBtn", doc:"tabDocBtn"};
+  var MODULE_VIEW = {tasks:"view-tasks", veh:"view-veh", rec:"view-rec", lic:"view-lic", check:"view-check", con:"view-con", cli:"view-cli", doc:"view-doc"};
   var ROLE_PRESET = {
-    "대표":   {admin:true,  perms:{tasks:"do", veh:"do", rec:"do", lic:"do", check:"do"}},
-    "관리자": {admin:true,  perms:{tasks:"do", veh:"do", rec:"do", lic:"do", check:"do"}},
-    "직원":   {admin:false, perms:{tasks:"do", veh:"view", rec:"view", lic:"view", check:"do"}}
+    "대표":   {admin:true,  perms:{tasks:"do", veh:"do", rec:"do", lic:"do", check:"do", con:"do", cli:"do", doc:"do"}},
+    "관리자": {admin:true,  perms:{tasks:"do", veh:"do", rec:"do", lic:"do", check:"do", con:"do", cli:"do", doc:"do"}},
+    "직원":   {admin:false, perms:{tasks:"do", veh:"view", rec:"view", lic:"view", check:"do", con:"view", cli:"view", doc:"view"}}
   };
 
   // ---- 체크리스트 정의 (JW-05-011) ----
@@ -1552,6 +1553,7 @@
 
   // 현재 사용자 이름(회원 로그인 우선, 없으면 토큰 화면 이름)
   function myName(){
+    if (typeof curMemberObj !== "undefined" && curMemberObj && curMemberObj.name) return curMemberObj.name;
     var m = (typeof curMember === "function") ? curMember() : null;
     return (m && m.name) || getUser() || "";
   }
@@ -1738,12 +1740,13 @@
     renderMyTasks();
   }
 
-  // 업무 탭: 내게 온 지시(담당=본인, 미완료) 기한순
+  // 업무 탭: 내게 온 지시(담당=본인 OR 지시자=본인, 미완료) 기한순
   function myOpenTasks(){
     var me = myName();
     if (!me) return [];
     return liveTasks().filter(function(t){
-      return t.status !== "done" && (t.who || "").trim() === me;
+      if (t.status === "done") return false;
+      return (t.who || "").trim() === me || (t.from || "").trim() === me;
     }).sort(function(a, b){
       var ah = a.status === "hold" ? 1 : 0, bh = b.status === "hold" ? 1 : 0;
       if (ah !== bh) return ah - bh;
@@ -3265,7 +3268,7 @@
   function pipeLabel(k){ return k==="waste" ? "폐기물" : "본"; }
   function renderContracts(){
     var host=document.getElementById("conList"); if(!host) return;
-    var startBtn=document.getElementById("conStartBtn"); if(startBtn) startBtn.style.display = canDo("lic") ? "block" : "none";
+    var startBtn=document.getElementById("conStartBtn"); if(startBtn) startBtn.style.display = canDo("con") ? "block" : "none";
     var active=liveContracts().filter(function(c){return c.status!=="done";});
     var done=liveContracts().filter(function(c){return c.status==="done";});
     var head=document.getElementById("conHead"); if(head) head.textContent = active.length ? (active.length+" 진행중") : "";
@@ -3286,7 +3289,7 @@
           '<div class="item-meta">'+(c.site?'<span>'+esc(c.site)+'</span>':'')+'<span>시작 '+esc(c.start||"")+'</span>'+(c.who?'<span class="author-chip">'+esc(c.who)+'</span>':'')+(c.status==="done"?'<span class="done-by">✓ 완료</span>':'')+'</div>'+
           pipes+
         '</div>'+
-        (canDo("lic")?'<div class="task-ctrl"><button class="mini-btn danger" data-con-del="'+c.id+'">삭제</button></div>':'')+
+        (canDo("con")?'<div class="task-ctrl"><button class="mini-btn danger" data-con-del="'+c.id+'">삭제</button></div>':'')+
       '</div>';
     }).join("");
     Array.prototype.forEach.call(host.querySelectorAll("[data-con-del]"), function(el){
@@ -3294,13 +3297,13 @@
     });
   }
   function delContract(id){
-    if(!canDo("lic")) return;
+    if(!canDo("con")) return;
     var c=findProc(id); if(!c) return;
     if(!confirm("이 계약을 삭제할까요? (이미 생성된 지시는 남습니다)")) return;
     c.del=1; c.updated=todayStr(); scheduleContractSave(); renderContracts();
   }
   function openConStart(){
-    if(!canDo("lic")) return;
+    if(!canDo("con")) return;
     document.getElementById("conType").value="asbestos";
     document.getElementById("conClient").value="";
     document.getElementById("conSite").value="";
@@ -3309,7 +3312,7 @@
     document.getElementById("conStartBackdrop").classList.add("show");
   }
   function saveConStart(){
-    if(!canDo("lic")) return;
+    if(!canDo("con")) return;
     var type=document.getElementById("conType").value;
     var client=document.getElementById("conClient").value.trim();
     var site=document.getElementById("conSite").value.trim();
@@ -4403,11 +4406,15 @@
   function applyPerms(){
     MODULES.forEach(function(mod){
       var btn = document.getElementById(MODULE_TAB[mod]);
-      if (btn) btn.classList.toggle("perm-hidden", !canSee(mod));
+      // 업무(check) 탭은 개인 인박스("내게 온 지시")·"내가 할 일" 때문에 항상 표시
+      if (btn) btn.classList.toggle("perm-hidden", mod !== "check" && !canSee(mod));
       var view = document.getElementById(MODULE_VIEW[mod]);
       if (view) view.classList.toggle("readonly", permOf(mod) === "view");
     });
-    if (currentTab !== "dash" && MODULES.indexOf(currentTab) >= 0 && !canSee(currentTab)) switchTab("dash");
+    // 주기 체크리스트 영역만 check 권한으로 표시/숨김(인박스·내 할 일은 항상 노출)
+    var showCheck = canSee("check");
+    Array.prototype.forEach.call(document.querySelectorAll(".check-only"), function(el){ el.style.display = showCheck ? "" : "none"; });
+    if (currentTab !== "dash" && currentTab !== "check" && MODULES.indexOf(currentTab) >= 0 && !canSee(currentTab)) switchTab("dash");
     updateUserChip();
   }
 
@@ -4589,7 +4596,7 @@
     });
   }
 
-  var MOD_LABEL = {tasks:"지시", veh:"차량", rec:"기성", lic:"인허가", check:"업무"};
+  var MOD_LABEL = {tasks:"지시", veh:"차량", rec:"기성", lic:"인허가", check:"업무", con:"계약", cli:"거래처", doc:"문서함"};
   function openMemberEdit(id){
     editingMemberId = id || null;
     var m = id ? findMember(id) : null;
