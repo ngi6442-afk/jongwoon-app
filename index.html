@@ -338,6 +338,15 @@
   }
   .who-sel{padding:10px 12px;border:1px solid var(--line);border-radius:8px;font-size:14px;background:var(--card);color:inherit;box-sizing:border-box;}
   .add-row .who-sel{flex:1;min-width:0;}
+  /* 공개범위(공지) 체크박스 드롭다운 */
+  .scope-dd{position:relative;flex:1;min-width:0;}
+  .scope-btn{width:100%;text-align:left;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .scope-panel{display:none;position:absolute;z-index:40;top:calc(100% + 4px);left:0;right:0;min-width:180px;max-height:260px;overflow:auto;background:var(--card);border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.18);padding:6px;}
+  .scope-dd.open .scope-panel{display:block;}
+  .scope-panel .mcheck{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;font-size:14px;cursor:pointer;}
+  .scope-panel .mcheck:hover{background:var(--soft,rgba(0,0,0,.05));}
+  .scope-panel .scope-hint{padding:6px 10px 8px;font-size:12px;color:var(--sub);border-bottom:1px solid var(--line);margin-bottom:4px;}
+  .scope-panel .mrole2{font-size:11px;color:var(--sub);}
   .modal .who-sel{width:100%;margin-bottom:8px;}
   .add-row input[type="text"]{
     flex:1;
@@ -657,7 +666,10 @@
       </div>
       <div class="add-row" style="padding-top:0;">
         <select id="taskWho" class="who-sel"></select>
-        <select id="taskScope" class="who-sel"></select>
+        <div class="scope-dd" id="taskScopeDD">
+          <button type="button" id="taskScopeBtn" class="who-sel scope-btn">전체공개 ▾</button>
+          <div class="scope-panel" id="taskScopePanel"></div>
+        </div>
         <datalist id="memberNames"></datalist>
         <button id="taskAddBtn">지시 등록</button>
       </div>
@@ -1416,25 +1428,55 @@
   function memberName(id){ if(!id) return ""; if(id==="__all__") return "전사"; var m=findMember(id); return m?m.name:""; }
   function memberIdByName(nm){ nm=(nm||"").trim(); if(!nm||nm==="전사") return nm==="전사"?"__all__":""; var ms=(typeof liveMembers==="function"?liveMembers():[]); for(var i=0;i<ms.length;i++){ if(ms[i].name===nm) return ms[i].id; } return ""; }
   function myId(){ if(curMemberObj && curMemberObj.id) return curMemberObj.id; var m=(typeof curMember==="function")?curMember():null; return (m&&m.id)||""; }
+  // 표시용 존칭: 대표(나종운)는 지시·담당·공개범위 등 화면 표기에서 '대표님'으로. 데이터에는 원래 이름 유지.
+  function isBossMember(m){ return !!(m && (m.role === "대표" || m.name === "나종운")); }
+  function dispName(name){
+    if(!name) return "";
+    if(name === "전사") return name;
+    var ms = (typeof liveMembers==="function"?liveMembers():[]);
+    for(var i=0;i<ms.length;i++){ if(ms[i].name === name){ return isBossMember(ms[i]) ? "대표님" : name; } }
+    if(name === "나종운") return "대표님";
+    return name;
+  }
+  function dispNameById(id){ if(!id) return ""; if(id==="__all__") return "전사"; var m=findMember(id); return m ? (isBossMember(m) ? "대표님" : m.name) : ""; }
   function fillMemberSelect(sel, selId){
     if(!sel) return;
     var html = '<option value="">담당 선택…</option><option value="__all__">전사 (전 직원)</option>';
-    html += (typeof liveMembers==="function"?liveMembers():[]).map(function(m){ return '<option value="'+m.id+'">'+esc(m.name)+'</option>'; }).join("");
+    html += (typeof liveMembers==="function"?liveMembers():[]).map(function(m){ return '<option value="'+m.id+'">'+esc(isBossMember(m)?"대표님":m.name)+'</option>'; }).join("");
     sel.innerHTML = html;
     sel.value = selId || "";
   }
-  // 공지(공개범위/scope) 드롭다운 — 비면 전체공개, 특정 직원 지정 시 그 직원(+관리자·담당)만
-  function fillScopeSelect(sel, selId){
-    if(!sel) return;
-    var html = '<option value="">공지: 전체공개</option>';
-    html += (typeof liveMembers==="function"?liveMembers():[]).map(function(m){ return '<option value="'+m.id+'">공지: '+esc(m.name)+'</option>'; }).join("");
-    sel.innerHTML = html;
-    sel.value = selId || "";
+  // 공개범위(공지) 체크박스 드롭다운 — 비면 전체공개. 관리자·각 직원을 체크로 지정.
+  function renderTaskScopePanel(){
+    var panel = document.getElementById("taskScopePanel");
+    if(!panel) return;
+    var checked = getCheckedMembers("taskScopePanel");
+    var ms = (typeof liveMembers==="function"?liveMembers():[]);
+    panel.innerHTML = '<div class="scope-hint">비우면 전체공개 · 체크한 사람만 공개</div>' +
+      ms.map(function(m){
+        var c = checked.indexOf(m.id) >= 0 ? " checked" : "";
+        var nm = isBossMember(m) ? "대표님" : m.name;
+        return '<label class="mcheck"><input type="checkbox" data-mid="'+m.id+'"'+c+'> '+esc(nm)+' <span class="mrole2">'+esc(m.role||"")+'</span></label>';
+      }).join("") || '<div class="scope-hint">회원이 없습니다.</div>';
+    updateScopeBtn();
+  }
+  function updateScopeBtn(){
+    var btn = document.getElementById("taskScopeBtn");
+    if(!btn) return;
+    var ids = getCheckedMembers("taskScopePanel");
+    if(!ids.length){ btn.textContent = "전체공개 ▾"; return; }
+    btn.textContent = "공개: " + ids.map(dispNameById).filter(Boolean).join(", ") + " ▾";
+  }
+  function resetTaskScope(){
+    var panel = document.getElementById("taskScopePanel");
+    if(panel) Array.prototype.forEach.call(panel.querySelectorAll("[data-mid]"), function(cb){ cb.checked = false; });
+    var dd = document.getElementById("taskScopeDD"); if(dd) dd.classList.remove("open");
+    updateScopeBtn();
   }
   // 담당 드롭다운(회원 id 기반) 채우기 — 자연어 매칭 폐기
   function populateMemberNames(){
     ["taskWho","conWho","reAssignee","teWho"].forEach(function(idn){ var s=document.getElementById(idn); if(s) fillMemberSelect(s, s.value); });
-    ["taskScope"].forEach(function(idn){ var s=document.getElementById(idn); if(s) fillScopeSelect(s, s.value); });
+    renderTaskScopePanel();
   }
   // 이 지시가 "내게 온 지시"인가: 담당=본인 / 전사(전사 지시는 지시자 본인 포함) / 공개범위(scope)에 본인.
   function taskForMe(t){
@@ -1678,11 +1720,11 @@
 
   function taskRowHtml(t, isDone, sel){
     var metaBits = [];
-    metaBits.push('<span class="author-chip">담당 ' + esc(t.who || "미지정") + '</span>');
-    if (t.from) metaBits.push('<span class="from-chip">지시 ' + esc(t.from) + '</span>');
+    metaBits.push('<span class="author-chip">담당 ' + esc(t.who ? dispName(t.who) : "미지정") + '</span>');
+    if (t.from) metaBits.push('<span class="from-chip">지시 ' + esc(dispName(t.from)) + '</span>');
     if (t.due) metaBits.push('<span>' + esc(t.due) + '</span>');
     if (t.status === "hold") metaBits.push('<span class="hold-chip">보류</span>');
-    if (t.status === "review") metaBits.push('<span class="review-chip">승인 대기중' + (t.done_by ? ' · ' + esc(t.done_by) : '') + '</span>');
+    if (t.status === "review") metaBits.push('<span class="review-chip">승인 대기중' + (t.done_by ? ' · ' + esc(dispName(t.done_by)) : '') + '</span>');
     if (t.scope && t.scope.length) metaBits.push('<span class="scope-chip">공개 ' + esc(scopeNames(t.scope)) + '</span>');
     if (t.proc_id) metaBits.push(procChipHtml(t));
     if (isDone){
@@ -1767,7 +1809,7 @@
     bindSelBoxes(doneHost);
     renderSelBar("tasks");
     renderDeletedList("tasks", "taskDeletedToggle", "taskDeletedList", showDeletedTasks, "지시",
-      function(t){ return (t.title || "제목없음") + (t.who ? " · 담당 " + t.who : "") + (t.due ? " · " + t.due : ""); });
+      function(t){ return (t.title || "제목없음") + (t.who ? " · 담당 " + dispName(t.who) : "") + (t.due ? " · " + t.due : ""); });
     updateTaskBadge();
     renderMyTasks();
   }
@@ -1787,7 +1829,7 @@
   }
   function myTaskRowHtml(t){
     var metaBits = [];
-    if (t.from) metaBits.push('<span class="from-chip">지시 ' + esc(t.from) + '</span>');
+    if (t.from) metaBits.push('<span class="from-chip">지시 ' + esc(dispName(t.from)) + '</span>');
     if (t.due) metaBits.push('<span>' + esc(t.due) + '</span>');
     if (t.status === "hold") metaBits.push('<span class="hold-chip">보류</span>');
     if (t.status === "review") metaBits.push('<span class="review-chip">승인 대기중</span>');
@@ -1873,8 +1915,7 @@
     if (!title) return;
     var today = todayStr();
     var whoId = whoEl.value;
-    var scopeEl = document.getElementById("taskScope");
-    var scope = (scopeEl && scopeEl.value) ? [scopeEl.value] : [];
+    var scope = getCheckedMembers("taskScopePanel");
     tasks.push({
       id: genId("t"),
       title: title,
@@ -1894,7 +1935,7 @@
     });
     titleEl.value = "";
     whoEl.value = "";
-    if (scopeEl) scopeEl.value = "";
+    resetTaskScope();
     dueEl.value = "";
     saveTasksCache();
     renderTasks();
@@ -2001,7 +2042,7 @@
     editingCheckItem = id;
     document.getElementById("csTitle").textContent = title || "";
     var sel = document.getElementById("csAssignee");
-    sel.innerHTML = '<option value="">(담당 없음)</option>' + liveMembers().map(function(m){ return '<option value="' + m.id + '">' + esc(m.name) + '</option>'; }).join("");
+    sel.innerHTML = '<option value="">(담당 없음)</option>' + liveMembers().map(function(m){ return '<option value="' + m.id + '">' + esc(isBossMember(m)?"대표님":m.name) + '</option>'; }).join("");
     sel.value = checkAssignee[id] || "";
     renderMemberChecks("csScope", checkScopes[id] || []);
     document.getElementById("checkScopeBackdrop").classList.add("show");
@@ -2627,6 +2668,14 @@
   document.getElementById("memberBackdrop").addEventListener("click", function(e){ if (e.target === this && curMember()) hideMemberLogin(); });
 
   document.getElementById("taskAddBtn").addEventListener("click", addTask);
+  (function(){
+    var btn = document.getElementById("taskScopeBtn");
+    var dd = document.getElementById("taskScopeDD");
+    var panel = document.getElementById("taskScopePanel");
+    if(btn && dd){ btn.addEventListener("click", function(e){ e.stopPropagation(); dd.classList.toggle("open"); }); }
+    if(panel){ panel.addEventListener("change", updateScopeBtn); panel.addEventListener("click", function(e){ e.stopPropagation(); }); }
+    document.addEventListener("click", function(){ if(dd) dd.classList.remove("open"); });
+  })();
   document.getElementById("taskTitle").addEventListener("keydown", function(e){ if (e.key === "Enter") addTask(); });
   document.getElementById("taskWho").addEventListener("keydown", function(e){ if (e.key === "Enter") addTask(); });
   document.getElementById("taskDue").addEventListener("keydown", function(e){ if (e.key === "Enter") addTask(); });
@@ -4416,7 +4465,7 @@
     var sel = selectedIds || [];
     host.innerHTML = liveMembers().map(function(m){
       var c = sel.indexOf(m.id) >= 0 ? " checked" : "";
-      return '<label class="mcheck"><input type="checkbox" data-mid="' + m.id + '"' + c + '> ' + esc(m.name) + ' <span class="mrole2">' + esc(m.role||"") + '</span></label>';
+      return '<label class="mcheck"><input type="checkbox" data-mid="' + m.id + '"' + c + '> ' + esc(isBossMember(m)?"대표님":m.name) + ' <span class="mrole2">' + esc(m.role||"") + '</span></label>';
     }).join("") || '<div class="mrole2" style="padding:4px;">회원이 없습니다.</div>';
   }
   function getCheckedMembers(hostId){
@@ -4427,7 +4476,7 @@
   }
   function scopeNames(ids){
     if (!ids || !ids.length) return "";
-    return ids.map(function(id){ var m = findMember(id); return m ? m.name : null; }).filter(Boolean).join(", ");
+    return ids.map(function(id){ var m = findMember(id); return m ? (isBossMember(m) ? "대표님" : m.name) : null; }).filter(Boolean).join(", ");
   }
   function taskVisible(t){
     if (isAdmin()) return true;
@@ -4554,7 +4603,7 @@
     var btn = document.getElementById("curUserBtn");
     if (!btn) return;
     var m = curMember();
-    btn.textContent = m ? m.name : "로그인";
+    btn.textContent = m ? (isBossMember(m) ? "대표님" : m.name) : "로그인";
     btn.classList.toggle("empty", !m);
   }
 

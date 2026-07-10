@@ -37,6 +37,7 @@
 - **현재 사용자 표시**: 좌상단 헤더 우측에 `curUserBtn`(현재 회원명, 없으면 "로그인"). 탭하면 로그인/전환 모달. `updateUserChip()`가 `applyPerms`에서 갱신.
 - **PIN 관리**(2026-07-08): 로그인 모달 `내 PIN 변경`으로 각자 본인 PIN 변경. 기본 PIN 0000으로 로그인하면 변경 모달을 자동으로 띄워 유도(`openChangePin(true)`).
 - 앱 내 `도움말`(로그인 모달 → 도움말).
+- **공개범위 UI·존칭(2026-07-10)**: 지시 등록행 `공개(공지) 선택`은 단일 셀렉트가 아니라 **체크박스 드롭다운**(`#taskScopeDD/#taskScopeBtn/#taskScopePanel`, `renderTaskScopePanel/updateScopeBtn/resetTaskScope`) — 비우면 **전체공개**(기본), 관리자·각 직원을 체크로 지정. `addTask`는 `getCheckedMembers("taskScopePanel")`로 scope 저장. **대표(나종운) 표시 존칭**: 화면 표기(지시자·담당·공개범위 칩, 담당/공개 드롭다운·체크박스, 헤더 사용자칩)는 `dispName/dispNameById/isBossMember`로 `role==="대표"`(또는 이름 나종운)를 **"대표님"**으로 표시 — 데이터(who/from/id)는 원래 이름 유지, 회원관리 목록은 실명 유지.
 - **건별 공개범위(2026-07-08)**: 지시·인허가 각 건에 `scope`(회원 id 배열). 비면 전체 공개, 지정 시 그 직원(+관리자, 지시는 담당 본인)만 목록에서 봄. 관리자는 전부 보고 `공개 …` 칩으로 대상 표시. 인허가 수정 모달 + **지시 수정 모달 신설**(제목·담당·기한·상세·공개대상, 관리자 전용)에서 설정. 헬퍼 `taskVisible`/`licVisible`/`renderMemberChecks`/`getCheckedMembers`. renderTasks·renderLicenses·대시보드에서 필터. (UI 구분이지 하드보안 아님)
 
 ## 계약·프로세스 파이프라인 엔진 (M6, 2026-07-10~ 구축 중)
