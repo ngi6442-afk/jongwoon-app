@@ -516,6 +516,13 @@
   .rec-item .rec-actions{display:flex;align-items:center;gap:6px;flex-shrink:0;}
   .dup-chip{display:inline-block;font-size:11px;padding:1px 8px;border-radius:999px;background:#FBE7E3;color:#B0332A;font-weight:800;flex-shrink:0;}
   .rec-item.rec-dup{background:#FEF6F5;}
+  .sel-bar{display:flex;align-items:center;gap:12px;padding:6px 4px 8px;flex-wrap:wrap;}
+  .sel-all{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--sub);cursor:pointer;user-select:none;}
+  .sel-box{width:18px;height:18px;flex:none;cursor:pointer;margin-top:3px;accent-color:var(--brand);}
+  .mini-btn.danger{color:#c0392b;border-color:#E2B6B0;}
+  .rec-item.rec-hl{background:#FFF7CC;}
+  .rec-item.rec-hl.rec-dup{background:#FBEFC6;}
+  .rec-sort{font-size:13px;padding:5px 8px;border:1px solid var(--line);border-radius:7px;background:transparent;color:inherit;}
   /* 지시 승인제 */
   .review-chip{display:inline-block;font-size:11px;padding:1px 8px;border-radius:999px;background:#FFF3D4;color:#8A6410;font-weight:700;}
   .appr-btn{background:var(--brand);color:#fff;border-color:var(--brand);}
@@ -635,6 +642,7 @@
         <button id="taskAddBtn">지시 등록</button>
       </div>
     </div>
+    <div class="sel-bar" id="taskSelBar" style="display:none;"></div>
     <div class="card" id="taskList" style="margin-top:10px;">
       <div class="loading">불러오는 중…</div>
     </div>
@@ -651,6 +659,7 @@
     </div>
     <button class="link-btn" id="vehAddBtnTop">+ 차량 추가</button>
     <input type="search" id="vehSearch" placeholder="차량 검색(번호·종류·기사)" autocomplete="off" style="width:100%;padding:9px 12px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;font-size:14px;box-sizing:border-box;">
+    <div class="sel-bar" id="vehSelBar" style="display:none;"></div>
     <div class="card" id="vehList">
       <div class="loading">불러오는 중…</div>
     </div>
@@ -697,6 +706,7 @@
     </div>
     <div class="dash-sec" style="margin:14px 0 6px;"><h2>미수 <span class="cnt" id="recHead"></span></h2></div>
     <input type="search" id="recSearch" placeholder="거래처·내역 검색" autocomplete="off" style="width:100%;padding:9px 12px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;font-size:14px;box-sizing:border-box;">
+    <div class="sel-bar" id="recSelBar" style="display:none;"></div>
     <div class="card" id="recList"><div class="loading">불러오는 중…</div></div>
     <button class="link-btn" id="recPaidToggle"></button>
     <div class="card" id="recPaidList" style="display:none;margin-top:6px;"></div>
@@ -1363,50 +1373,104 @@
   }
 
   // 삭제된 항목 선택 복구: 토글 버튼 + 개별 복구 목록(모듈 공통)
-  function renderDeletedList(opts){
-    var toggle = document.getElementById(opts.toggleId);
-    var host = document.getElementById(opts.listId);
-    if (!toggle || !host) return;
-    var del = (opts.items || []).filter(function(x){ return x && x.del === 1; });
-    if (!opts.can || !del.length){
-      toggle.style.display = "none";
-      host.style.display = "none";
-      host.innerHTML = "";
-      return;
-    }
-    toggle.style.display = "block";
-    toggle.textContent = opts.show
-      ? ("삭제된 " + opts.noun + " 숨기기")
-      : ("삭제된 " + opts.noun + " 보기 (" + del.length + ")");
-    host.style.display = opts.show ? "block" : "none";
-    if (!opts.show){ host.innerHTML = ""; return; }
-    host.innerHTML = del.map(function(x){
-      return '<div class="item" style="opacity:.72;">' +
-          '<div class="item-body"><div class="item-title" style="font-size:14px;">' + esc(opts.labelFn(x)) + '</div></div>' +
-          '<button class="mini-btn" data-restore="' + esc(x.id) + '">복구</button>' +
-        '</div>';
-    }).join("");
-    Array.prototype.forEach.call(host.querySelectorAll("[data-restore]"), function(el){
-      el.addEventListener("click", function(){ opts.onRestore(el.getAttribute("data-restore")); });
+  // ---- 다중 선택(체크박스) 삭제/복구: 지시·차량·기성 공통 ----
+  var selSets = { tasks:{}, veh:{}, rec:{} };
+  var delSelSets = { tasks:{}, veh:{}, rec:{} };
+  var recSort = "billed_asc";
+  var REC_SORTS = [["billed_asc","청구일 오래된순"],["billed_desc","청구일 최신순"],["amount_desc","금액 큰순"],["client","거래처명"]];
+  function fillRecSort(sel){ sel.innerHTML = REC_SORTS.map(function(o){ return '<option value="'+o[0]+'"'+(o[0]===recSort?" selected":"")+'>'+o[1]+'</option>'; }).join(""); }
+  function recSortCmp(a,b){
+    if(recSort==="billed_desc") return (b.billed||"").localeCompare(a.billed||"");
+    if(recSort==="amount_desc") return (b.amount||0)-(a.amount||0);
+    if(recSort==="client") return (a.client||"").localeCompare(b.client||"");
+    return (a.billed||"").localeCompare(b.billed||"");
+  }
+  function moduleArr(mod){ return mod==="tasks"?tasks:(mod==="veh"?vehicles:receivables); }
+  function moduleLive(mod){ return moduleArr(mod).filter(function(x){ return x && x.del !== 1; }); }
+  function moduleDeleted(mod){ return moduleArr(mod).filter(function(x){ return x && x.del === 1; }); }
+  function moduleCan(mod){ return canDo(mod); }
+  function moduleFind(mod,id){ return mod==="tasks"?findTask(id):(mod==="veh"?findVeh(id):findRec(id)); }
+  function saveModule(mod){ if(mod==="tasks")saveTasksCache(); else if(mod==="veh")saveVehiclesCache(); else saveRecCache(); }
+  function scheduleModuleSave(mod){ if(mod==="tasks")scheduleTasksSave(); else if(mod==="veh")scheduleVehSave(); else scheduleRecSave(); }
+  function renderModuleList(mod){ if(mod==="tasks"){ renderTasks(); } else if(mod==="veh"){ renderVehicles(); } else { renderReceivables(); } }
+  function renderModule(mod){ renderModuleList(mod); if(mod==="tasks") renderSummary(); renderDashboard(); }
+  function selCount(mod,deleted){ var s=(deleted?delSelSets:selSets)[mod]; return Object.keys(s).filter(function(id){return s[id];}).length; }
+  function selBoxHtml(mod,id,deleted){
+    var on=(deleted?delSelSets:selSets)[mod][id]?" checked":"";
+    return '<input type="checkbox" class="sel-box" data-selmod="'+mod+'" data-selid="'+esc(id)+'"'+(deleted?' data-seldel="1"':'')+on+'>';
+  }
+  function bindSelBoxes(host){
+    Array.prototype.forEach.call(host.querySelectorAll(".sel-box"), function(cb){
+      cb.addEventListener("click", function(e){ e.stopPropagation(); });
+      cb.addEventListener("change", function(){
+        var mod=cb.getAttribute("data-selmod"), id=cb.getAttribute("data-selid"), del=cb.getAttribute("data-seldel");
+        var set=(del?delSelSets:selSets)[mod];
+        if(cb.checked) set[id]=1; else delete set[id];
+        renderModuleList(mod);
+      });
     });
   }
-  function restoreOneTask(id){
-    if (!canDo("tasks")) return;
-    var t = findTask(id); if (!t) return;
-    t.del = 0; t.updated = todayStr();
-    saveTasksCache(); renderTasks(); renderSummary(); renderDashboard(); scheduleTasksSave();
+  function renderSelBar(mod){
+    var bar=document.getElementById(mod+"SelBar"); if(!bar) return;
+    var live=moduleLive(mod);
+    if(!moduleCan(mod) || !live.length){ bar.style.display="none"; bar.innerHTML=""; return; }
+    var set=selSets[mod];
+    var n=selCount(mod,false);
+    var allOn=live.every(function(x){ return set[x.id]; });
+    bar.style.display="flex";
+    var extra=(mod==="rec")?'<select class="rec-sort" id="recSortSel"></select>':'';
+    bar.innerHTML='<label class="sel-all"><input type="checkbox" class="selall-box"'+(allOn?" checked":"")+'> 전체선택</label>'+extra+
+      (n?'<button class="mini-btn danger seldel-btn">선택 삭제 ('+n+')</button>':'');
+    var sa=bar.querySelector(".selall-box");
+    if(sa) sa.addEventListener("change", function(){ if(sa.checked){ live.forEach(function(x){ set[x.id]=1; }); } else { selSets[mod]={}; } renderModuleList(mod); });
+    var sd=bar.querySelector(".seldel-btn");
+    if(sd) sd.addEventListener("click", function(){ bulkDelete(mod); });
+    if(mod==="rec"){ var ss=bar.querySelector("#recSortSel"); if(ss){ fillRecSort(ss); ss.addEventListener("change", function(){ recSort=ss.value; renderReceivables(); }); } }
   }
-  function restoreOneVeh(id){
-    if (!canDo("veh")) return;
-    var v = findVeh(id); if (!v) return;
-    v.del = 0; v.updated = todayStr();
-    saveVehiclesCache(); renderVehicles(); renderDashboard(); scheduleVehSave();
+  function bulkDelete(mod){
+    if(!moduleCan(mod)) return;
+    var set=selSets[mod]; var ids=Object.keys(set).filter(function(id){return set[id];});
+    if(!ids.length) return;
+    if(!confirm(ids.length+"건을 삭제할까요? (나중에 복구 가능)")) return;
+    var today=todayStr();
+    ids.forEach(function(id){ var it=moduleFind(mod,id); if(!it||it.del===1) return; it.del=1; it.updated=today; if(mod==="rec"&&typeof removeRecTask==="function") removeRecTask(it); });
+    selSets[mod]={};
+    saveModule(mod); scheduleModuleSave(mod); renderModule(mod);
   }
-  function restoreOneRec(id){
-    if (!canDo("rec")) return;
-    var r = findRec(id); if (!r) return;
-    r.del = 0; r.updated = todayStr();
-    saveRecCache(); renderReceivables(); renderDashboard(); scheduleRecSave();
+  function bulkRestore(mod){
+    if(!moduleCan(mod)) return;
+    var set=delSelSets[mod]; var ids=Object.keys(set).filter(function(id){return set[id];});
+    if(!ids.length) return;
+    var today=todayStr();
+    ids.forEach(function(id){ var it=moduleFind(mod,id); if(!it) return; it.del=0; it.updated=today; });
+    delSelSets[mod]={};
+    saveModule(mod); scheduleModuleSave(mod); renderModule(mod);
+  }
+  // 삭제된 목록: 체크박스 선택 복구(3모듈 공통)
+  function renderDeletedList(mod, toggleId, listId, show, noun, labelFn){
+    var toggle=document.getElementById(toggleId), host=document.getElementById(listId);
+    if(!toggle||!host) return;
+    var del=moduleDeleted(mod);
+    if(!moduleCan(mod) || !del.length){ toggle.style.display="none"; host.style.display="none"; host.innerHTML=""; delSelSets[mod]={}; return; }
+    toggle.style.display="block";
+    toggle.textContent = show ? ("삭제된 "+noun+" 숨기기") : ("삭제된 "+noun+" 보기 ("+del.length+")");
+    host.style.display = show ? "block" : "none";
+    if(!show){ host.innerHTML=""; return; }
+    var set=delSelSets[mod];
+    var n=selCount(mod,true);
+    var allOn=del.every(function(x){ return set[x.id]; });
+    var bar='<div class="sel-bar"><label class="sel-all"><input type="checkbox" class="delall-box"'+(allOn?" checked":"")+'> 전체선택</label>'+
+      (n?'<button class="mini-btn delrestore-btn">선택 복구 ('+n+')</button>':'')+'</div>';
+    var rows=del.map(function(x){
+      return '<div class="item" style="opacity:.78;">'+selBoxHtml(mod,x.id,true)+
+        '<div class="item-body"><div class="item-title" style="font-size:14px;">'+esc(labelFn(x))+'</div></div></div>';
+    }).join("");
+    host.innerHTML=bar+rows;
+    bindSelBoxes(host);
+    var da=host.querySelector(".delall-box");
+    if(da) da.addEventListener("change", function(){ if(da.checked){ del.forEach(function(x){ set[x.id]=1; }); } else { delSelSets[mod]={}; } renderModuleList(mod); });
+    var rb=host.querySelector(".delrestore-btn");
+    if(rb) rb.addEventListener("click", function(){ bulkRestore(mod); });
   }
 
   function render(){
@@ -1517,7 +1581,7 @@
     badge.classList.toggle("red", overdue);
   }
 
-  function taskRowHtml(t, isDone){
+  function taskRowHtml(t, isDone, sel){
     var metaBits = [];
     metaBits.push('<span class="author-chip">담당 ' + esc(t.who || "미지정") + '</span>');
     if (t.from) metaBits.push('<span class="from-chip">지시 ' + esc(t.from) + '</span>');
@@ -1561,6 +1625,7 @@
     var cls = "item task-item" + (isDone ? " checked" : "") + (t.status === "hold" ? " hold" : "") + (t.status === "review" ? " review" : "");
     var toggleAttr = (t.status === "review") ? "" : (' data-task-toggle="' + t.id + '"');
     return '<div class="' + cls + '"' + toggleAttr + '>' +
+        (sel ? selBoxHtml("tasks", t.id, false) : '') +
         '<div class="check-box">' + boxContent + '</div>' +
         '<div class="item-body">' +
           '<div class="item-title">' + esc(t.title) + '</div>' +
@@ -1568,7 +1633,6 @@
           '<div class="item-meta">' + metaBits.join('') + '</div>' +
         '</div>' +
         ctrl +
-        (canDo("tasks") ? '<button class="del-x" data-task-del="' + t.id + '">×</button>' : '') +
       '</div>';
   }
 
@@ -1593,24 +1657,24 @@
     done.sort(function(a, b){ return (b.done_at || "").localeCompare(a.done_at || ""); });
     done = done.slice(0, 20);
 
+    var selT = canDo("tasks");
     listHost.innerHTML = active.length
-      ? active.map(function(t){ return taskRowHtml(t, false); }).join("")
+      ? active.map(function(t){ return taskRowHtml(t, false, selT); }).join("")
       : '<div class="loading" style="padding:18px 0;">등록된 지시가 없습니다.</div>';
 
     toggleBtn.textContent = showTaskDone ? "완료 숨기기" : ("완료 보기 (" + done.length + ")");
     doneHost.style.display = showTaskDone ? "block" : "none";
-    doneHost.innerHTML = done.map(function(t){ return taskRowHtml(t, true); }).join("");
+    doneHost.innerHTML = done.map(function(t){ return taskRowHtml(t, true, selT); }).join("");
 
     bindTaskHandlers(listHost);
     bindTaskHandlers(doneHost);
     bindCalHandlers(listHost);
     bindCalHandlers(doneHost);
-    renderDeletedList({
-      items: tasks, can: canDo("tasks"), toggleId: "taskDeletedToggle", listId: "taskDeletedList",
-      show: showDeletedTasks, noun: "지시",
-      labelFn: function(t){ return (t.title || "제목없음") + (t.who ? " · 담당 " + t.who : "") + (t.due ? " · " + t.due : ""); },
-      onRestore: restoreOneTask
-    });
+    bindSelBoxes(listHost);
+    bindSelBoxes(doneHost);
+    renderSelBar("tasks");
+    renderDeletedList("tasks", "taskDeletedToggle", "taskDeletedList", showDeletedTasks, "지시",
+      function(t){ return (t.title || "제목없음") + (t.who ? " · 담당 " + t.who : "") + (t.due ? " · " + t.due : ""); });
     updateTaskBadge();
     renderMyTasks();
   }
@@ -1676,9 +1740,6 @@
         if (cl.contains("del-x") || cl.contains("mini-btn") || cl.contains("cal-btn")) return;
         toggleTaskDone(el.getAttribute("data-task-toggle"));
       });
-    });
-    Array.prototype.forEach.call(host.querySelectorAll("[data-task-del]"), function(el){
-      el.addEventListener("click", function(e){ e.stopPropagation(); deleteTask(el.getAttribute("data-task-del")); });
     });
     Array.prototype.forEach.call(host.querySelectorAll("[data-task-hold]"), function(el){
       el.addEventListener("click", function(e){ e.stopPropagation(); setTaskStatus(el.getAttribute("data-task-hold"), "hold"); });
@@ -2624,7 +2685,7 @@
       '<span class="dday' + (cls ? ' ' + cls : '') + '" title="' + esc(dateStr) + '">' + dd.text + '</span>';
   }
 
-  function vehRowHtml(v){
+  function vehRowHtml(v, sel){
     var grey = isGreyState(v);
     var ownCls = v.own === "지입" ? "lease" : "self";
     var sub = [];
@@ -2635,6 +2696,7 @@
     if (v.history && v.history.length) sub.push('<span class="ref-chip">이력 ' + v.history.length + '</span>');
     var showNote = v.note && v.note.trim() && v.note.trim() !== (v.insurer || "").trim();
     return '<div class="item veh-item ' + ownCls + '">' +
+        (sel ? selBoxHtml("veh", v.id, false) : '') +
         '<div class="veh-main">' +
           '<div><span class="own-badge ' + ownCls + '">' + esc(v.own) + '</span></div>' +
           '<div class="veh-no">' + esc(v.no) + '</div>' +
@@ -2671,20 +2733,19 @@
     });
     var head = document.getElementById("vehHead");
     if (head) head.textContent = list.length ? ("총 " + list.length + "대 · 만기 임박순") : "";
-    host.innerHTML = list.length ? list.map(vehRowHtml).join("") : '<div class="empty-line">차량 데이터가 없습니다.</div>';
+    var selV = canDo("veh");
+    host.innerHTML = list.length ? list.map(function(v){ return vehRowHtml(v, selV); }).join("") : '<div class="empty-line">차량 데이터가 없습니다.</div>';
     bindCalHandlers(host);
+    bindSelBoxes(host);
     Array.prototype.forEach.call(host.querySelectorAll("[data-veh-edit]"), function(el){
       el.addEventListener("click", function(e){ e.stopPropagation(); openVehModal(el.getAttribute("data-veh-edit")); });
     });
     Array.prototype.forEach.call(host.querySelectorAll("[data-veh-hist]"), function(el){
       el.addEventListener("click", function(e){ e.stopPropagation(); openVehHistory(el.getAttribute("data-veh-hist")); });
     });
-    renderDeletedList({
-      items: vehicles, can: canDo("veh"), toggleId: "vehDeletedToggle", listId: "vehDeletedList",
-      show: showDeletedVeh, noun: "차량",
-      labelFn: function(v){ return (v.no || "번호없음") + (v.kind || v.type ? " · " + (v.kind || v.type) : "") + (v.state ? " · " + v.state : ""); },
-      onRestore: restoreOneVeh
-    });
+    renderSelBar("veh");
+    renderDeletedList("veh", "vehDeletedToggle", "vehDeletedList", showDeletedVeh, "차량",
+      function(v){ return (v.no || "번호없음") + (v.kind || v.type ? " · " + (v.kind || v.type) : "") + (v.state ? " · " + v.state : ""); });
   }
 
   // ---- 차량 점검·수리 이력 (차량 객체 내 history 배열) ----
@@ -3645,7 +3706,7 @@
     saveRecCache(); renderReceivables(); renderDashboard(); scheduleRecSave();
   }
 
-  function recRowHtml(r, isPaid){
+  function recRowHtml(r, isPaid, sel){
     var ctrl = "";
     if (canDo("rec")){
       var recEditBtn = '<button class="mini-btn" data-rec-edit="' + r.id + '">수정</button>';
@@ -3656,14 +3717,16 @@
       }
     }
     var amt = r.amount ? (fmtAmount(r.amount) + '원') : '';
-    return '<div class="item rec-item' + (isPaid ? ' checked' : '') + (r._dup ? ' rec-dup' : '') + '">' +
+    var cls = 'item rec-item' + (isPaid ? ' checked' : '') + (r._dup ? ' rec-dup' : '') + (r.mismatch ? ' rec-mm' : '') + (r.hl ? ' rec-hl' : '');
+    return '<div class="' + cls + '" data-rec-row="' + r.id + '">' +
+        (sel ? selBoxHtml("rec", r.id, false) : '') +
         '<div class="rec-main">' +
           '<span class="rec-client">' + esc(r.client || "-") + '</span>' +
           (r._dup ? '<span class="dup-chip">중복 의심</span>' : '') +
+          (r.mismatch ? '<span class="dup-chip" style="background:#EAE2FB;color:#5B3FA6;">불일치</span>' : '') +
           (amt ? '<span class="rec-amt2">' + amt + '</span>' : '') +
         '</div>' +
         ctrl +
-        (canDo("rec") ? '<button class="del-x" data-rec-del="' + r.id + '">×</button>' : '') +
       '</div>';
   }
 
@@ -3688,7 +3751,12 @@
     var keyCount = {};
     unpaid.forEach(function(r){ var k = (r.client||"").trim() + "|" + (r.amount||0) + "|" + (r.billed||""); r._dupkey = k; keyCount[k] = (keyCount[k]||0) + 1; });
     unpaid.forEach(function(r){ r._dup = keyCount[r._dupkey] >= 2; });
-    unpaid.sort(function(a, b){ if (!!a._dup !== !!b._dup) return a._dup ? -1 : 1; return 0; });
+    // 정렬: 중복 의심 맨 위, 불일치 맨 아래, 그 사이는 선택 정렬(recSort)
+    unpaid.sort(function(a, b){
+      var ag = a._dup ? 0 : (a.mismatch ? 2 : 1), bg = b._dup ? 0 : (b.mismatch ? 2 : 1);
+      if (ag !== bg) return ag - bg;
+      return recSortCmp(a, b);
+    });
     var paid = liveRec().filter(function(r){ return r.paid && recVisible(r) && recMatchesSearch(r); });
     paid.sort(function(a, b){ return (b.paid || "").localeCompare(a.paid || ""); });
     paid = paid.slice(0, 30);
@@ -3698,18 +3766,18 @@
       var sum = 0; unpaid.forEach(function(r){ sum += (r.amount || 0); });
       head.textContent = unpaid.length ? (unpaid.length + "건" + (sum ? " · " + fmtAmount(sum) + "원" : "")) : "";
     }
-    listHost.innerHTML = unpaid.length ? unpaid.map(function(r){ return recRowHtml(r, false); }).join("") : '<div class="empty-line">미수 건이 없습니다.</div>';
+    var selR = canDo("rec");
+    listHost.innerHTML = unpaid.length ? unpaid.map(function(r){ return recRowHtml(r, false, selR); }).join("") : '<div class="empty-line">미수 건이 없습니다.</div>';
     toggleBtn.textContent = showRecPaid ? "입금 완료 숨기기" : ("입금 완료 보기 (" + paid.length + ")");
     paidHost.style.display = showRecPaid ? "block" : "none";
-    paidHost.innerHTML = paid.map(function(r){ return recRowHtml(r, true); }).join("");
+    paidHost.innerHTML = paid.map(function(r){ return recRowHtml(r, true, selR); }).join("");
     bindRecHandlers(listHost);
     bindRecHandlers(paidHost);
-    renderDeletedList({
-      items: receivables, can: canDo("rec"), toggleId: "recDeletedToggle", listId: "recDeletedList",
-      show: showDeletedRec, noun: "기성",
-      labelFn: function(r){ return (r.client || "거래처없음") + (r.desc ? " · " + r.desc : "") + (r.amount ? " · " + fmtAmount(r.amount) + "원" : "") + (r.billed ? " · " + r.billed : ""); },
-      onRestore: restoreOneRec
-    });
+    bindSelBoxes(listHost);
+    bindSelBoxes(paidHost);
+    renderSelBar("rec");
+    renderDeletedList("rec", "recDeletedToggle", "recDeletedList", showDeletedRec, "기성",
+      function(r){ return (r.client || "거래처없음") + (r.desc ? " · " + r.desc : "") + (r.amount ? " · " + fmtAmount(r.amount) + "원" : "") + (r.billed ? " · " + r.billed : ""); });
   }
 
   function bindRecHandlers(host){
@@ -3722,15 +3790,26 @@
     Array.prototype.forEach.call(host.querySelectorAll("[data-rec-inv]"), function(el){
       el.addEventListener("click", function(e){ e.stopPropagation(); toggleRecInvoice(el.getAttribute("data-rec-inv")); });
     });
-    Array.prototype.forEach.call(host.querySelectorAll("[data-rec-del]"), function(el){
-      el.addEventListener("click", function(e){ e.stopPropagation(); deleteReceivable(el.getAttribute("data-rec-del")); });
-    });
     Array.prototype.forEach.call(host.querySelectorAll("[data-rec-mismatch]"), function(el){
       el.addEventListener("click", function(e){ e.stopPropagation(); toggleRecMismatch(el.getAttribute("data-rec-mismatch")); });
     });
     Array.prototype.forEach.call(host.querySelectorAll("[data-rec-edit]"), function(el){
       el.addEventListener("click", function(e){ e.stopPropagation(); openRecModal(el.getAttribute("data-rec-edit")); });
     });
+    // 행 본문 탭 → 하이라이트 토글(버튼·체크박스 제외)
+    Array.prototype.forEach.call(host.querySelectorAll(".rec-item[data-rec-row]"), function(el){
+      el.addEventListener("click", function(e){
+        var t = e.target;
+        if (t.closest && (t.closest("button") || t.closest("input") || t.closest("label"))) return;
+        toggleRecHl(el.getAttribute("data-rec-row"));
+      });
+    });
+  }
+  function toggleRecHl(id){
+    if (!canDo("rec")) return;
+    var r = findRec(id); if (!r) return;
+    r.hl = r.hl ? 0 : 1; r.updated = todayStr();
+    saveRecCache(); renderReceivables(); scheduleRecSave();
   }
 
   // ---- 인허가·보수교육(licenses.json, 편집형) ----
