@@ -190,20 +190,20 @@
   }
   .item{
     display:flex;
-    align-items:flex-start;
-    gap:12px;
-    padding:13px 16px;
+    align-items:center;
+    gap:10px;
+    padding:9px 14px;
     border-bottom:1px solid var(--line);
     cursor:pointer;
   }
   .item:last-child{border-bottom:none;}
   .item:active{background:#F7FAF8;}
   .check-box{
-    width:24px;height:24px;
-    min-width:24px;
-    border-radius:7px;
+    width:20px;height:20px;
+    min-width:20px;
+    border-radius:6px;
     border:2px solid #C7D3CD;
-    margin-top:1px;
+    margin-top:0;
     display:flex;align-items:center;justify-content:center;
     font-size:14px;
     color:#fff;
@@ -414,7 +414,8 @@
   }
 
   /* 지시(업무 전달) 모듈 */
-  .task-item .item-title{font-size:14px;}
+  .task-item .item-title{font-size:15px;font-weight:600;line-height:1.3;}
+  .item-meta{font-size:12px;}
   .task-detail{
     font-size:12px;
     color:var(--sub);
@@ -444,11 +445,15 @@
   }
   .task-ctrl{
     display:flex;
-    flex-direction:column;
-    align-items:flex-end;
+    flex-direction:row;
+    flex-wrap:wrap;
+    justify-content:flex-end;
+    align-items:center;
     gap:6px;
     flex-shrink:0;
+    max-width:190px;
   }
+  .task-ctrl .mini-btn{font-size:12px;padding:5px 11px;border-radius:8px;}
   .mini-btn{
     border:1px solid var(--line);
     background:#fff;
@@ -490,17 +495,17 @@
   .own-badge{display:inline-block;font-size:11px;padding:1px 7px;border-radius:999px;font-weight:700;}
   .own-badge.self{background:#E6F0EA;color:var(--brand-dark);}
   .own-badge.lease{background:#EDE9F2;color:#5B4B85;}
-  .veh-item{display:flex;align-items:flex-start;gap:12px;padding:14px 16px;cursor:default;border-left:4px solid transparent;}
+  .veh-item{display:flex;align-items:flex-start;gap:10px;padding:8px 12px;cursor:default;border-left:4px solid transparent;}
   .veh-item.self{background:#F3F9F5;border-left-color:var(--brand);}
   .veh-item.lease{background:#F6F4FA;border-left-color:#7A68A8;}
   .veh-main{flex:1;min-width:0;}
-  .veh-no{font-size:18px;font-weight:800;line-height:1.2;margin:5px 0 3px;word-break:keep-all;}
-  .veh-sub{font-size:13px;color:var(--sub);display:flex;flex-wrap:wrap;gap:6px;align-items:center;}
-  .veh-right{flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:6px;}
-  .veh-due-line{font-size:13px;color:var(--sub);font-weight:700;white-space:nowrap;}
-  .veh-due-line .dday{font-size:15px;padding:2px 10px;margin-left:4px;}
-  .veh-btns{display:flex;gap:6px;margin-top:2px;}
-  .veh-btns .mini-btn{font-size:13px;padding:7px 13px;border-radius:9px;}
+  .veh-line{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .veh-no{font-size:18px;font-weight:800;line-height:1.2;word-break:keep-all;}
+  .veh-sub{font-size:12px;color:var(--sub);display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:3px;}
+  .veh-due{font-size:12px;color:var(--sub);font-weight:700;white-space:nowrap;}
+  .veh-due .dday{font-size:13px;padding:1px 8px;margin-left:3px;}
+  .veh-acts{margin-left:auto;display:flex;gap:6px;flex-shrink:0;}
+  .veh-acts .mini-btn{font-size:12px;padding:5px 10px;border-radius:8px;}
 
   /* 수금 */
   .rec-item{align-items:flex-start;cursor:default;}
@@ -516,10 +521,11 @@
   .rec-item .rec-actions{display:flex;align-items:center;gap:6px;flex-shrink:0;}
   .dup-chip{display:inline-block;font-size:11px;padding:1px 8px;border-radius:999px;background:#FBE7E3;color:#B0332A;font-weight:800;flex-shrink:0;}
   .rec-item.rec-dup{background:#FEF6F5;}
-  .sel-bar{display:flex;align-items:center;gap:12px;padding:6px 4px 8px;flex-wrap:wrap;}
-  .sel-all{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--sub);cursor:pointer;user-select:none;}
-  .sel-box{width:18px;height:18px;flex:none;cursor:pointer;margin-top:3px;accent-color:var(--brand);}
+  .sel-bar{display:flex;align-items:center;justify-content:flex-start;gap:10px;padding:8px 14px;flex-wrap:wrap;}
+  .sel-box{width:18px;height:18px;flex:none;cursor:pointer;margin:0;accent-color:var(--brand);}
   .mini-btn.danger{color:#c0392b;border-color:#E2B6B0;}
+  .mini-btn:disabled{opacity:.4;cursor:default;}
+  .rec-sort{margin-left:auto;}
   .rec-item.rec-hl{background:#FFF7CC;}
   .rec-item.rec-hl.rec-dup{background:#FBEFC6;}
   .rec-sort{font-size:13px;padding:5px 8px;border:1px solid var(--line);border-radius:7px;background:transparent;color:inherit;}
@@ -1376,7 +1382,6 @@
   // ---- 다중 선택(체크박스) 삭제/복구: 지시·차량·기성 공통 ----
   var selSets = { tasks:{}, veh:{}, rec:{} };
   var delSelSets = { tasks:{}, veh:{}, rec:{} };
-  var selMode = { tasks:false, veh:false, rec:false };
   var recSort = "billed_asc";
   var REC_SORTS = [["billed_asc","청구일 오래된순"],["billed_desc","청구일 최신순"],["amount_desc","금액 큰순"],["client","거래처명"]];
   function fillRecSort(sel){ sel.innerHTML = REC_SORTS.map(function(o){ return '<option value="'+o[0]+'"'+(o[0]===recSort?" selected":"")+'>'+o[1]+'</option>'; }).join(""); }
@@ -1411,29 +1416,21 @@
       });
     });
   }
-  function toggleSelId(mod, id){ var s=selSets[mod]; if(s[id]) delete s[id]; else s[id]=1; renderModuleList(mod); }
   function renderSelBar(mod){
     var bar=document.getElementById(mod+"SelBar"); if(!bar) return;
     var live=moduleLive(mod);
-    if(!moduleCan(mod) || !live.length){ bar.style.display="none"; bar.innerHTML=""; selMode[mod]=false; selSets[mod]={}; return; }
-    bar.style.display="flex";
-    var on=selMode[mod], set=selSets[mod];
-    var n=selCount(mod,false);
+    if(!moduleCan(mod) || !live.length){ bar.style.display="none"; bar.innerHTML=""; return; }
+    var set=selSets[mod], n=selCount(mod,false);
     var allOn=live.every(function(x){ return set[x.id]; });
+    bar.style.display="flex";
     var sortSel=(mod==="rec")?'<select class="rec-sort" id="recSortSel"></select>':'';
-    var html=sortSel+'<button class="mini-btn selmode-btn">'+(on?"✕ 선택취소":"☑ 선택")+'</button>';
-    if(on){
-      html+='<label class="sel-all"><input type="checkbox" class="selall-box"'+(allOn?" checked":"")+'> 전체선택</label>'+
-        (n?'<button class="mini-btn danger seldel-btn">선택 삭제 ('+n+')</button>':'');
-    }
-    bar.innerHTML=html;
-    if(mod==="rec"){ var ss=bar.querySelector("#recSortSel"); if(ss){ fillRecSort(ss); ss.addEventListener("change", function(){ recSort=ss.value; renderReceivables(); }); } }
-    var mb=bar.querySelector(".selmode-btn");
-    if(mb) mb.addEventListener("click", function(){ selMode[mod]=!selMode[mod]; if(!selMode[mod]) selSets[mod]={}; renderModuleList(mod); });
+    bar.innerHTML='<input type="checkbox" class="sel-box selall-box"'+(allOn?" checked":"")+' title="전체 선택">'+
+      '<button class="mini-btn danger seldel-btn"'+(n?"":" disabled")+'>선택 삭제'+(n?" ("+n+")":"")+'</button>'+sortSel;
     var sa=bar.querySelector(".selall-box");
     if(sa) sa.addEventListener("change", function(){ if(sa.checked){ live.forEach(function(x){ set[x.id]=1; }); } else { selSets[mod]={}; } renderModuleList(mod); });
     var sd=bar.querySelector(".seldel-btn");
     if(sd) sd.addEventListener("click", function(){ bulkDelete(mod); });
+    if(mod==="rec"){ var ss=bar.querySelector("#recSortSel"); if(ss){ fillRecSort(ss); ss.addEventListener("change", function(){ recSort=ss.value; renderReceivables(); }); } }
   }
   function hardDelete(mod){
     if(!moduleCan(mod)) return;
@@ -1478,8 +1475,9 @@
     var set=delSelSets[mod];
     var n=selCount(mod,true);
     var allOn=del.every(function(x){ return set[x.id]; });
-    var bar='<div class="sel-bar"><label class="sel-all"><input type="checkbox" class="delall-box"'+(allOn?" checked":"")+'> 전체선택</label>'+
-      (n?'<button class="mini-btn delrestore-btn">선택 복구 ('+n+')</button><button class="mini-btn danger delpurge-btn">영구삭제 ('+n+')</button>':'')+'</div>';
+    var bar='<div class="sel-bar"><input type="checkbox" class="sel-box delall-box"'+(allOn?" checked":"")+' title="전체 선택">'+
+      '<button class="mini-btn delrestore-btn"'+(n?"":" disabled")+'>선택 복구'+(n?" ("+n+")":"")+'</button>'+
+      '<button class="mini-btn danger delpurge-btn"'+(n?"":" disabled")+'>영구삭제'+(n?" ("+n+")":"")+'</button></div>';
     var rows=del.map(function(x){
       return '<div class="item" style="opacity:.78;">'+selBoxHtml(mod,x.id,true)+
         '<div class="item-body"><div class="item-title" style="font-size:14px;">'+esc(labelFn(x))+'</div></div></div>';
@@ -1637,17 +1635,14 @@
       var holdBtn = !canDo("tasks") ? "" : ((t.status === "hold")
         ? '<button class="mini-btn" data-task-resume="' + t.id + '">재개</button>'
         : '<button class="mini-btn" data-task-hold="' + t.id + '">보류</button>');
-      var calBtn = t.due ? '<button class="cal-btn" data-cal-task="' + t.id + '">캘린더</button>' : '';
+      var doneBtn = canActTask(t) ? '<button class="mini-btn appr-btn" data-task-done="' + t.id + '">완료</button>' : '';
       var editBtn = canDo("tasks") ? '<button class="mini-btn" data-task-edit="' + t.id + '">수정</button>' : '';
-      ctrl = '<div class="task-ctrl">' + ddayBadge + holdBtn + editBtn + calBtn + '</div>';
+      ctrl = '<div class="task-ctrl">' + ddayBadge + doneBtn + holdBtn + editBtn + '</div>';
     }
 
-    var boxContent = isDone ? '✓' : (t.status === "review" ? '⋯' : '');
     var cls = "item task-item" + (isDone ? " checked" : "") + (t.status === "hold" ? " hold" : "") + (t.status === "review" ? " review" : "");
-    var toggleAttr = (t.status === "review") ? "" : (' data-task-toggle="' + t.id + '"');
-    return '<div class="' + cls + '"' + toggleAttr + '>' +
+    return '<div class="' + cls + '">' +
         (sel ? selBoxHtml("tasks", t.id, false) : '') +
-        '<div class="check-box">' + boxContent + '</div>' +
         '<div class="item-body">' +
           '<div class="item-title">' + esc(t.title) + '</div>' +
           detailHtml +
@@ -1678,7 +1673,7 @@
     done.sort(function(a, b){ return (b.done_at || "").localeCompare(a.done_at || ""); });
     done = done.slice(0, 20);
 
-    var selT = canDo("tasks") && selMode.tasks;
+    var selT = canDo("tasks");
     listHost.innerHTML = active.length
       ? active.map(function(t){ return taskRowHtml(t, false, selT); }).join("")
       : '<div class="loading" style="padding:18px 0;">등록된 지시가 없습니다.</div>';
@@ -1721,7 +1716,7 @@
     if (t.status === "review") metaBits.push('<span class="review-chip">승인 대기중</span>');
     var dd = (t.status === "open" && t.due) ? ddayInfo(t.due) : null;
     var ddayBadge = dd ? '<span class="dday' + (dd.cls ? ' ' + dd.cls : '') + '">' + dd.text + '</span>' : '';
-    var calBtn = t.due ? '<button class="cal-btn" data-cal-task="' + t.id + '">캘린더</button>' : '';
+    var calBtn = '';
     var detailHtml = t.detail ? '<div class="task-detail">' + esc(t.detail) + '</div>' : '';
     return '<div class="item task-item' + (t.status === "hold" ? " hold" : "") + (t.status === "review" ? " review" : "") + '" data-mytask="' + t.id + '">' +
         '<div class="check-box">' + (t.status === "review" ? '⋯' : '') + '</div>' +
@@ -1759,7 +1754,6 @@
       el.addEventListener("click", function(e){
         var cl = e.target.classList;
         if (cl.contains("mini-btn") || cl.contains("cal-btn") || cl.contains("sel-box")) return;
-        if (selMode.tasks){ toggleSelId("tasks", el.getAttribute("data-task-toggle")); return; }
         toggleTaskDone(el.getAttribute("data-task-toggle"));
       });
     });
@@ -1771,6 +1765,9 @@
     });
     Array.prototype.forEach.call(host.querySelectorAll("[data-task-reopen]"), function(el){
       el.addEventListener("click", function(e){ e.stopPropagation(); toggleTaskDone(el.getAttribute("data-task-reopen")); });
+    });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-task-done]"), function(el){
+      el.addEventListener("click", function(e){ e.stopPropagation(); toggleTaskDone(el.getAttribute("data-task-done")); });
     });
     Array.prototype.forEach.call(host.querySelectorAll("[data-task-edit]"), function(el){
       el.addEventListener("click", function(e){ e.stopPropagation(); openTaskModal(el.getAttribute("data-task-edit")); });
@@ -2720,23 +2717,23 @@
     return '<div class="item veh-item ' + ownCls + '" data-veh-row="' + v.id + '">' +
         (sel ? selBoxHtml("veh", v.id, false) : '') +
         '<div class="veh-main">' +
-          '<div><span class="own-badge ' + ownCls + '">' + esc(v.own) + '</span></div>' +
-          '<div class="veh-no">' + esc(v.no) + '</div>' +
+          '<div class="veh-line">' +
+            '<span class="own-badge ' + ownCls + '">' + esc(v.own) + '</span>' +
+            '<span class="veh-no">' + esc(v.no) + '</span>' +
+            vehDdayLine("검사", v.insp_due, grey) +
+            vehDdayLine("보험", v.ins_due, grey) +
+            '<span class="veh-acts"><button class="mini-btn" data-veh-hist="' + v.id + '">이력</button><button class="mini-btn" data-veh-edit="' + v.id + '">수정</button></span>' +
+          '</div>' +
           (sub.length ? '<div class="veh-sub">' + sub.join('') + '</div>' : '') +
-          (showNote ? '<div class="task-detail" style="margin-top:5px;">' + esc(v.note) + '</div>' : '') +
-        '</div>' +
-        '<div class="veh-right">' +
-          vehDdayLine("검사", v.insp_due, grey) +
-          vehDdayLine("보험", v.ins_due, grey) +
-          '<div class="veh-btns"><button class="mini-btn" data-veh-hist="' + v.id + '">이력</button><button class="mini-btn" data-veh-edit="' + v.id + '">수정</button></div>' +
+          (showNote ? '<div class="task-detail" style="margin-top:3px;">' + esc(v.note) + '</div>' : '') +
         '</div>' +
       '</div>';
   }
   function vehDdayLine(label, dateStr, grey){
-    if (!dateStr) return '<div class="veh-due-line">' + label + ' <span class="dday grey">-</span></div>';
+    if (!dateStr) return '<span class="veh-due">' + label + ' <span class="dday grey">-</span></span>';
     var dd = vehDday(dateStr);
     var cls = grey ? "grey" : (dd.cls || "");
-    return '<div class="veh-due-line">' + label + ' <span class="dday ' + cls + '" title="' + esc(dateStr) + '">' + dd.text + '</span></div>';
+    return '<span class="veh-due">' + label + ' <span class="dday ' + cls + '" title="' + esc(dateStr) + '">' + dd.text + '</span></span>';
   }
 
   var vehSearchTerm = "";
@@ -2755,7 +2752,7 @@
     });
     var head = document.getElementById("vehHead");
     if (head) head.textContent = list.length ? ("총 " + list.length + "대 · 만기 임박순") : "";
-    var selV = canDo("veh") && selMode.veh;
+    var selV = canDo("veh");
     host.innerHTML = list.length ? list.map(function(v){ return vehRowHtml(v, selV); }).join("") : '<div class="empty-line">차량 데이터가 없습니다.</div>';
     bindCalHandlers(host);
     bindSelBoxes(host);
@@ -2765,15 +2762,6 @@
     Array.prototype.forEach.call(host.querySelectorAll("[data-veh-hist]"), function(el){
       el.addEventListener("click", function(e){ e.stopPropagation(); openVehHistory(el.getAttribute("data-veh-hist")); });
     });
-    if (selMode.veh){
-      Array.prototype.forEach.call(host.querySelectorAll(".veh-item[data-veh-row]"), function(el){
-        el.addEventListener("click", function(e){
-          var t=e.target;
-          if (t.closest && (t.closest("button") || t.closest("input"))) return;
-          toggleSelId("veh", el.getAttribute("data-veh-row"));
-        });
-      });
-    }
     renderSelBar("veh");
     renderDeletedList("veh", "vehDeletedToggle", "vehDeletedList", showDeletedVeh, "차량",
       function(v){ return (v.no || "번호없음") + (v.kind || v.type ? " · " + (v.kind || v.type) : "") + (v.state ? " · " + v.state : ""); });
@@ -2975,7 +2963,6 @@
           '</div>' +
           '<div class="task-ctrl">' +
             '<span class="dday' + (x.dd.cls ? ' ' + x.dd.cls : '') + '">' + x.dd.text + '</span>' +
-            '<button class="cal-btn" data-cal-veh-' + kindAttr + '="' + v.id + '">캘린더</button>' +
           '</div>' +
         '</div>';
       }).join("");
@@ -2995,8 +2982,7 @@
             '<div class="item-title">' + esc(l.name) + '</div>' +
             '<div class="item-meta"><span>' + x.kind + ' ' + x.date + '</span><span class="own-badge ' + (l.org === "종운건설" ? "lease" : "self") + '">' + esc(l.org || "") + '</span></div>' +
           '</div>' +
-          '<div class="task-ctrl"><span class="dday' + (x.dd.cls ? ' ' + x.dd.cls : '') + '">' + x.dd.text + '</span>' +
-            '<button class="cal-btn" data-cal-lic-' + kindAttr + '="' + l.id + '">캘린더</button></div>' +
+          '<div class="task-ctrl"><span class="dday' + (x.dd.cls ? ' ' + x.dd.cls : '') + '">' + x.dd.text + '</span></div>' +
         '</div>';
       }).join("");
       html += '</div></div>';
@@ -3797,7 +3783,7 @@
       var sum = 0; unpaid.forEach(function(r){ sum += (r.amount || 0); });
       head.textContent = unpaid.length ? (unpaid.length + "건" + (sum ? " · " + fmtAmount(sum) + "원" : "")) : "";
     }
-    var selR = canDo("rec") && selMode.rec;
+    var selR = canDo("rec");
     listHost.innerHTML = unpaid.length ? unpaid.map(function(r){ return recRowHtml(r, false, selR); }).join("") : '<div class="empty-line">미수 건이 없습니다.</div>';
     toggleBtn.textContent = showRecPaid ? "입금 완료 숨기기" : ("입금 완료 보기 (" + paid.length + ")");
     paidHost.style.display = showRecPaid ? "block" : "none";
@@ -3832,7 +3818,6 @@
       el.addEventListener("click", function(e){
         var t = e.target;
         if (t.closest && (t.closest("button") || t.closest("input") || t.closest("label"))) return;
-        if (selMode.rec){ toggleSelId("rec", el.getAttribute("data-rec-row")); return; }
         toggleRecHl(el.getAttribute("data-rec-row"));
       });
     });
@@ -3940,8 +3925,6 @@
     if (l.edu_cycle) meta.push('<span class="from-chip">주기 ' + esc(l.edu_cycle) + '</span>');
     if (l.scope && l.scope.length) meta.push('<span class="scope-chip">공개 ' + esc(scopeNames(l.scope)) + '</span>');
     var cal = "";
-    if (isDate(l.expiry)) cal += '<button class="cal-btn" data-cal-lic-exp="' + l.id + '">만료 캘린더</button>';
-    if (isDate(l.edu_due)) cal += '<button class="cal-btn" data-cal-lic-edu="' + l.id + '">교육 캘린더</button>';
     var eduChip = licEduChip(l);
     return '<div class="item lic-item" data-lic-edit="' + l.id + '">' +
         '<div class="item-body">' +
