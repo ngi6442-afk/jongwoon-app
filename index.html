@@ -537,6 +537,8 @@
   /* 지시 승인제 */
   .review-chip{display:inline-block;font-size:11px;padding:1px 8px;border-radius:999px;background:#FFF3D4;color:#8A6410;font-weight:700;}
   .proc-chip{display:inline-block;font-size:11px;padding:1px 8px;border-radius:999px;background:#E3EFF9;color:#1B5A8A;font-weight:700;}
+  .con-pipe{font-size:12px;color:var(--sub);margin-top:3px;font-weight:600;}
+  .con-item{align-items:flex-start;}
   .need-due{display:inline-block;font-size:11px;padding:1px 8px;border-radius:999px;background:#FBE7E3;color:#B0332A;font-weight:700;}
   .appr-btn{background:var(--brand);color:#fff;border-color:var(--brand);}
   .task-item.review .check-box, .item.review .check-box{background:#F1A400;border-color:#F1A400;color:#fff;font-size:13px;line-height:1;}
@@ -628,6 +630,7 @@
     <div class="nav-group">현장·자산</div>
     <button class="tab-btn" data-tab="veh" id="tabVehBtn">차량</button>
     <button class="tab-btn" data-tab="lic" id="tabLicBtn">인허가</button>
+    <button class="tab-btn" data-tab="con" id="tabConBtn">계약</button>
     <div class="nav-group">정산</div>
     <button class="tab-btn" data-tab="rec" id="tabRecBtn">기성</button>
     <div class="nav-group">거래처</div>
@@ -736,6 +739,13 @@
       <div class="loading">불러오는 중…</div>
     </div>
     <button class="link-btn" id="licAddBtn">+ 인허가 추가</button>
+  </section>
+
+  <!-- 계약·프로세스 -->
+  <section class="view" id="view-con">
+    <div class="dash-sec" style="margin-bottom:8px;"><h2>계약·프로세스 <span class="cnt" id="conHead"></span></h2></div>
+    <button class="link-btn" id="conStartBtn">+ 계약 시작</button>
+    <div class="card" id="conList"><div class="loading">불러오는 중…</div></div>
   </section>
 
   <!-- 거래처 -->
@@ -872,6 +882,25 @@
     <div class="mchecks" id="reScope"></div>
     <button class="primary" id="reSave">저장</button>
     <button class="secondary" id="reCancel">취소</button>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="conStartBackdrop">
+  <div class="modal">
+    <h3>계약 시작</h3>
+    <span class="fld-label">유형</span>
+    <select id="conType">
+      <option value="asbestos">석면철거</option>
+      <option value="demolition">건축물철거</option>
+      <option value="waste">폐기물 수집운반</option>
+    </select>
+    <input type="text" id="conClient" placeholder="거래처/발주처" autocomplete="off">
+    <input type="text" id="conSite" placeholder="현장 (선택)" autocomplete="off">
+    <span class="fld-label">시작일</span>
+    <input type="date" id="conStart">
+    <input type="text" id="conWho" placeholder="담당 (회원 선택 권장)" list="memberNames" autocomplete="off">
+    <button class="primary" id="conStartSave">시작</button>
+    <button class="secondary" id="conStartCancel">취소</button>
   </div>
 </div>
 
@@ -1508,6 +1537,7 @@
     populateMemberNames();
     renderSummary();
     renderList();
+    renderContracts();
     renderTasks();
     renderVehicles();
     renderReceivables();
@@ -2497,6 +2527,7 @@
     document.getElementById("view-check").classList.toggle("active", name === "check");
     document.getElementById("view-doc").classList.toggle("active", name === "doc");
     document.getElementById("view-cli").classList.toggle("active", name === "cli");
+    document.getElementById("view-con").classList.toggle("active", name === "con");
   }
 
   // ---- 토큰 / 설정 UI ----
@@ -2602,6 +2633,10 @@
   })();
 
   document.getElementById("licAddBtn").addEventListener("click", function(){ openLicModal(null); });
+  document.getElementById("conStartBtn").addEventListener("click", openConStart);
+  document.getElementById("conStartSave").addEventListener("click", saveConStart);
+  document.getElementById("conStartCancel").addEventListener("click", function(){ document.getElementById("conStartBackdrop").classList.remove("show"); });
+  document.getElementById("conStartBackdrop").addEventListener("click", function(e){ if(e.target===this) this.classList.remove("show"); });
   document.getElementById("docAddBtn").addEventListener("click", function(){ openDocModal(null); });
   document.getElementById("docSave").addEventListener("click", saveDocModal);
   document.getElementById("docDelete").addEventListener("click", deleteDocFromModal);
@@ -3140,7 +3175,7 @@
     fetch(CONTRACT_API, {headers: ghHeaders()}).then(function(resp){
       if(resp.status===404){ contractSha=null; contracts=[]; return; }
       if(!resp.ok) throw new Error("HTTP "+resp.status);
-      return resp.json().then(function(json){ contractSha=json.sha; var p=JSON.parse(b64DecodeUnicode(json.content)); contracts=(p&&p.items)||[]; renderTasks(); });
+      return resp.json().then(function(json){ contractSha=json.sha; var p=JSON.parse(b64DecodeUnicode(json.content)); contracts=(p&&p.items)||[]; renderContracts(); renderTasks(); });
     }).catch(function(){});
   }
   function scheduleContractSave(){ if(contractSaveTimer) clearTimeout(contractSaveTimer); contractSaveTimer=setTimeout(doSaveContracts, 1400); }
@@ -3205,7 +3240,7 @@
     contracts.push(c);
     c.pipes.forEach(function(p){ materializeStage(c, p, c.start); });
     scheduleContractSave();
-    renderTasks(); renderSummary(); renderDashboard();
+    renderTasks(); renderSummary(); renderDashboard(); renderContracts();
     return c;
   }
   function advanceProc(t){
@@ -3219,13 +3254,73 @@
     if(pipe.cur < pipe.stages.length){ materializeStage(c, pipe, todayStr()); }
     c.status = c.pipes.every(function(p){ return p.cur >= p.stages.length; }) ? "done" : "active";
     c.updated=todayStr();
-    scheduleContractSave();
+    scheduleContractSave(); renderContracts();
   }
   function procChipHtml(t){
     if(!t.proc_id) return "";
     var chip = '<span class="proc-chip">' + esc(t.proc_label||"진행") + ' ' + ((t.stage_i||0)+1) + '/' + (t.stage_total||"?") + ' · ' + esc(t.stage_name||"") + '</span>';
     if(!t.due) chip += '<span class="need-due">기한 입력</span>';
     return chip;
+  }
+  function pipeLabel(k){ return k==="waste" ? "폐기물" : "본"; }
+  function renderContracts(){
+    var host=document.getElementById("conList"); if(!host) return;
+    var startBtn=document.getElementById("conStartBtn"); if(startBtn) startBtn.style.display = canDo("lic") ? "block" : "none";
+    var active=liveContracts().filter(function(c){return c.status!=="done";});
+    var done=liveContracts().filter(function(c){return c.status==="done";});
+    var head=document.getElementById("conHead"); if(head) head.textContent = active.length ? (active.length+" 진행중") : "";
+    var list=active.concat(done);
+    if(!list.length){ host.innerHTML='<div class="empty-line">진행 중인 계약이 없습니다.</div>'; return; }
+    host.innerHTML=list.map(function(c){
+      var pipes=c.pipes.map(function(p){
+        var atEnd=p.cur>=p.stages.length;
+        var s=atEnd?null:p.stages[p.cur];
+        var pos=Math.min(p.cur+(atEnd?0:1), p.stages.length)+"/"+p.stages.length;
+        var taskDue = (s && s.task_id) ? ((findTask(s.task_id)||{}).due||"") : "";
+        var dueBit = s ? (taskDue?' · '+esc(taskDue):' · <span class="need-due">기한 입력</span>') : '';
+        return '<div class="con-pipe">'+(c.pipes.length>1?'<b>'+pipeLabel(p.key)+'</b> ':'')+pos+' · '+esc(s?s.name:"완료")+dueBit+'</div>';
+      }).join("");
+      return '<div class="item con-item'+(c.status==="done"?' checked':'')+'">'+
+        '<div class="item-body">'+
+          '<div class="item-title">'+esc(c.label)+(c.client?' · '+esc(c.client):'')+'</div>'+
+          '<div class="item-meta">'+(c.site?'<span>'+esc(c.site)+'</span>':'')+'<span>시작 '+esc(c.start||"")+'</span>'+(c.who?'<span class="author-chip">'+esc(c.who)+'</span>':'')+(c.status==="done"?'<span class="done-by">✓ 완료</span>':'')+'</div>'+
+          pipes+
+        '</div>'+
+        (canDo("lic")?'<div class="task-ctrl"><button class="mini-btn danger" data-con-del="'+c.id+'">삭제</button></div>':'')+
+      '</div>';
+    }).join("");
+    Array.prototype.forEach.call(host.querySelectorAll("[data-con-del]"), function(el){
+      el.addEventListener("click", function(){ delContract(el.getAttribute("data-con-del")); });
+    });
+  }
+  function delContract(id){
+    if(!canDo("lic")) return;
+    var c=findProc(id); if(!c) return;
+    if(!confirm("이 계약을 삭제할까요? (이미 생성된 지시는 남습니다)")) return;
+    c.del=1; c.updated=todayStr(); scheduleContractSave(); renderContracts();
+  }
+  function openConStart(){
+    if(!canDo("lic")) return;
+    document.getElementById("conType").value="asbestos";
+    document.getElementById("conClient").value="";
+    document.getElementById("conSite").value="";
+    document.getElementById("conStart").value=todayStr();
+    document.getElementById("conWho").value="";
+    document.getElementById("conStartBackdrop").classList.add("show");
+  }
+  function saveConStart(){
+    if(!canDo("lic")) return;
+    var type=document.getElementById("conType").value;
+    var client=document.getElementById("conClient").value.trim();
+    var site=document.getElementById("conSite").value.trim();
+    var start=document.getElementById("conStart").value||todayStr();
+    var who=document.getElementById("conWho").value.trim();
+    if(!client && !site){ alert("거래처 또는 현장을 입력하세요."); return; }
+    startProcess(type, {client:client, site:site, start:start, who:who});
+    document.getElementById("conStartBackdrop").classList.remove("show");
+    renderContracts();
+    switchTab("tasks");
+    alert("계약 시작 — 각 파이프라인 첫 단계 지시가 생성되었습니다.");
   }
 
   // ---- 거래처(clients.json) — 미수 자동 연동 ----

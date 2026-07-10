@@ -38,7 +38,7 @@
 - **템플릿**(`PROC_TEMPLATES`): lic_change(변경지시→접수→완료), waste, asbestos(석면철거: main + 백본 지정5일), demolition(건축물철거: main + 백본 건설3일). 공용 `WASTE_BACKBONE`(신고접수→필증인수(auto)→올바로등록→배차→처리→확인서인수), 행정처리기한 지정/석면 5일·건설 3일 자동.
 - **엔진**: `startProcess(type,{client,site,start,who,lic_id})`→계약레코드+각 pipe 첫 단계 지시 생성. 단계 done(**승인 시점** `approveTask`에서 `advanceProc`)→다음 단계 자동 open, auto 기한은 완료일+N일. manual 기한 미입력이면 지시에 `기한 입력` 칩. 진행 `proc-chip`(라벨 i/total·단계명).
 - **조건부 단계**(석면 없음 등)는 담당자가 그냥 완료로 스킵(조건 로직 없음).
-- **UI 현황**: 인허가 행 `변경` 버튼(→lic_change) 구현·검증 완료. **TODO**: `계약 시작` UI(유형·거래처·시작일 선택 → waste/asbestos/demolition), 계약 목록/진행 탭, 그리고 (백엔드 단계) PDF 파싱·서류 생성.
+- **UI 현황**: 인허가 행 `변경` 버튼(→lic_change) + **`계약` 탭 신설**(`계약 시작` 모달: 유형 석면철거/건축물철거/폐기물 + 거래처·현장·시작일·담당 → startProcess). 계약 목록에 파이프별 현재 단계·기한(지시 due 조회)·삭제. 석면/철거는 본+폐기물 2파이프 동시 생성 검증 완료(headless). **TODO(백엔드 단계)**: PDF 파싱(AI)·오기입 확인·서류 생성 → `info/docs` 슬롯 사용.
 
 ## 알람: 캘린더(.ics) 연동
 - 요구된 "iOS·안드로이드 자동 알람"은 **기기 기본 캘린더 연동**으로 구현(가이드 §5 "푸시 알림 인프라" 금지 준수, 서버 0).
