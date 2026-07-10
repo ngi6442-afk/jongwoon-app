@@ -536,6 +536,8 @@
   .rec-sort{font-size:13px;padding:5px 8px;border:1px solid var(--line);border-radius:7px;background:transparent;color:inherit;}
   /* 지시 승인제 */
   .review-chip{display:inline-block;font-size:11px;padding:1px 8px;border-radius:999px;background:#FFF3D4;color:#8A6410;font-weight:700;}
+  .proc-chip{display:inline-block;font-size:11px;padding:1px 8px;border-radius:999px;background:#E3EFF9;color:#1B5A8A;font-weight:700;}
+  .need-due{display:inline-block;font-size:11px;padding:1px 8px;border-radius:999px;background:#FBE7E3;color:#B0332A;font-weight:700;}
   .appr-btn{background:var(--brand);color:#fff;border-color:var(--brand);}
   .task-item.review .check-box, .item.review .check-box{background:#F1A400;border-color:#F1A400;color:#fff;font-size:13px;line-height:1;}
   .ref-chip{display:inline-block;font-size:11px;padding:1px 8px;border-radius:999px;background:var(--bg);color:var(--sub);font-weight:600;}
@@ -1052,6 +1054,7 @@
   var LIC_PATH = "data/licenses.json";
   var DOC_PATH = "data/documents.json";
   var CLIENT_PATH = "data/clients.json";
+  var CONTRACT_PATH = "data/contracts.json";
   var MYTASKS_PATH = "data/mytasks.json";
   var USERS_PATH = "data/users.json";
   var CHECK_API = API_ROOT + CHECK_PATH;
@@ -1061,6 +1064,7 @@
   var LIC_API = API_ROOT + LIC_PATH;
   var DOC_API = API_ROOT + DOC_PATH;
   var CLIENT_API = API_ROOT + CLIENT_PATH;
+  var CONTRACT_API = API_ROOT + CONTRACT_PATH;
   var MYTASKS_API = API_ROOT + MYTASKS_PATH;
   var USERS_API = API_ROOT + USERS_PATH;
 
@@ -1272,6 +1276,7 @@
     if (u.indexOf("licenses.json") >= 0) return "licenses";
     if (u.indexOf("documents.json") >= 0) return "documents";
     if (u.indexOf("clients.json") >= 0) return "clients";
+    if (u.indexOf("contracts.json") >= 0) return "contracts";
     return null;
   }
   function onSessionInvalid(){ setGwToken(null); curMemberObj = null; if (typeof showMemberLogin === "function") showMemberLogin(); }
@@ -1615,6 +1620,7 @@
     if (t.status === "hold") metaBits.push('<span class="hold-chip">보류</span>');
     if (t.status === "review") metaBits.push('<span class="review-chip">승인 대기중' + (t.done_by ? ' · ' + esc(t.done_by) : '') + '</span>');
     if (t.scope && t.scope.length) metaBits.push('<span class="scope-chip">공개 ' + esc(scopeNames(t.scope)) + '</span>');
+    if (t.proc_id) metaBits.push(procChipHtml(t));
     if (isDone){
       var byTxt = t.done_by ? (" · " + esc(t.done_by)) : "";
       metaBits.push('<span class="done-by">✓ ' + esc(t.done_at || "") + byTxt + '</span>');
@@ -1852,6 +1858,7 @@
     var t = findTask(id);
     if (!t || t.status !== "review" || !canApproveTask(t)) return;
     t.status = "done"; t.approved_by = myName() || "관리자"; t.approved_at = todayStr(); t.updated = todayStr();
+    advanceProc(t);
     saveTasksCache(); renderTasks(); renderSummary(); scheduleTasksSave();
   }
   function rejectTask(id){
@@ -3118,6 +3125,109 @@
     closeDocModal(); renderDocuments(); saveDocuments();
   }
 
+  // ---- 계약·프로세스 파이프라인 엔진(contracts.json) ----
+  var contracts = [];
+  var contractSha = null, contractSaveTimer = null;
+  function addDays(dateStr, n){
+    var d = new Date((dateStr || todayStr()) + "T00:00:00");
+    d.setDate(d.getDate() + n);
+    return fmtDate(d);
+  }
+  function findProc(id){ for(var i=0;i<contracts.length;i++){ if(contracts[i].id===id) return contracts[i]; } return null; }
+  function liveContracts(){ return contracts.filter(function(c){ return c && c.del!==1; }); }
+  function loadContracts(){
+    var token = getToken(); if(!token) return;
+    fetch(CONTRACT_API, {headers: ghHeaders()}).then(function(resp){
+      if(resp.status===404){ contractSha=null; contracts=[]; return; }
+      if(!resp.ok) throw new Error("HTTP "+resp.status);
+      return resp.json().then(function(json){ contractSha=json.sha; var p=JSON.parse(b64DecodeUnicode(json.content)); contracts=(p&&p.items)||[]; renderTasks(); });
+    }).catch(function(){});
+  }
+  function scheduleContractSave(){ if(contractSaveTimer) clearTimeout(contractSaveTimer); contractSaveTimer=setTimeout(doSaveContracts, 1400); }
+  function mergeContracts(local, remote){
+    var byId={}; (local||[]).forEach(function(c){ if(c&&c.id) byId[c.id]=c; });
+    (remote||[]).forEach(function(x){ if(!x||!x.id) return; var cur=byId[x.id]; if(!cur){ byId[x.id]=x; } else { var w=(x.updated||"")>=(cur.updated||"")?x:cur; if(cur.del===1||x.del===1) w.del=1; byId[x.id]=w; } });
+    return Object.keys(byId).map(function(k){ return byId[k]; });
+  }
+  function doSaveContracts(){
+    var token=getToken(); if(!token) return;
+    var body=JSON.stringify({schema:1, items:contracts});
+    var payload={message:"contracts: 업데이트", content:b64EncodeUnicode(body), branch:"main"};
+    if(contractSha) payload.sha=contractSha;
+    fetch(CONTRACT_API, {method:"PUT", headers:Object.assign({"Content-Type":"application/json"}, ghHeaders()), body:JSON.stringify(payload)}).then(function(resp){
+      if(resp.status===401) return;
+      if(resp.status===409||resp.status===422){ return fetch(CONTRACT_API,{headers:ghHeaders()}).then(function(r){return r.status===404?null:r.json();}).then(function(j){ if(j){ var up={}; try{up=JSON.parse(b64DecodeUnicode(j.content))||{};}catch(e){} contracts=mergeContracts(contracts, up.items||[]); contractSha=j.sha; } return doSaveContracts(); }); }
+      return resp.json().then(function(json){ contractSha=json.content&&json.content.sha; });
+    }).catch(function(){});
+  }
+  var WASTE_BACKBONE = [
+    {name:"신고접수",due:"manual"},
+    {name:"필증인수",due:"auto",kindDays:{"건설":3,"지정":5,"석면":5}},
+    {name:"올바로등록",due:"manual"},
+    {name:"배차",due:"manual"},
+    {name:"처리",due:"manual"},
+    {name:"확인서인수",due:"manual"}
+  ];
+  function backbone(kind){ return WASTE_BACKBONE.map(function(s){ var o={name:s.name,due:s.due}; if(s.due==="auto"){ o.days=(s.kindDays&&s.kindDays[kind])||5; } return o; }); }
+  var PROC_TEMPLATES = {
+    lic_change: { label:"인허가 변경", pipes:[{key:"main", stages:[{name:"변경지시",due:"manual"},{name:"접수",due:"manual"},{name:"완료",due:"manual"}]}] },
+    waste: { label:"폐기물 수집운반", pipes:[{key:"main", stages:[{name:"계약",due:"manual"}].concat(backbone("지정")).concat([{name:"완료",due:"manual"}])}] },
+    asbestos: { label:"석면철거", pipes:[
+      {key:"main", stages:[{name:"조사",due:"manual"},{name:"계약",due:"manual"},{name:"노동부신고(해체제거)",due:"manual"},{name:"필증인수",due:"manual"},{name:"작업",due:"manual"},{name:"완료",due:"manual"},{name:"완료신고",due:"manual"}]},
+      {key:"waste", stages:backbone("지정")}
+    ]},
+    demolition: { label:"건축물철거", pipes:[
+      {key:"main", stages:[{name:"석면조사",due:"manual"},{name:"계약",due:"manual"},{name:"노동부신고",due:"manual"},{name:"필증인수(노동부신고필증)",due:"manual"},{name:"철거신고",due:"manual"},{name:"작업",due:"auto",days:3},{name:"완료",due:"manual"},{name:"완료신고",due:"manual"}]},
+      {key:"waste", stages:backbone("건설")}
+    ]}
+  };
+  function procStageTitle(c, sname){ var who=(c.client||c.site||"").trim(); return "[" + c.label + "] " + (who?who+" · ":"") + sname; }
+  function materializeStage(c, pipe, baseDate){
+    if(pipe.cur >= pipe.stages.length) return;
+    var s = pipe.stages[pipe.cur];
+    var due = "";
+    if(s.due==="auto" && s.days){ due = addDays(baseDate||todayStr(), s.days); }
+    var t = { id:genId("t"), title:procStageTitle(c, s.name), detail:"", who:c.who||"", from:myName()||"", by:myName()||"",
+      due:due, status:"open", done_at:null, done_by:null, created:todayStr(), updated:todayStr(),
+      proc_id:c.id, proc_label:c.label, pipe:pipe.key, stage_i:pipe.cur, stage_name:s.name, stage_total:pipe.stages.length, stage_auto:(s.due==="auto") };
+    tasks.push(t);
+    s.status="open"; s.task_id=t.id;
+    saveTasksCache(); scheduleTasksSave();
+  }
+  function startProcess(type, opts){
+    var tpl = PROC_TEMPLATES[type]; if(!tpl) return null;
+    opts = opts || {};
+    var today = todayStr();
+    var c = { id:genId("c"), type:type, label:tpl.label, client:opts.client||"", site:opts.site||"", start:opts.start||today,
+      lic_id:opts.lic_id||null, info:{}, review:{missing:[],suspect:[],ok:false}, docs:[],
+      pipes:tpl.pipes.map(function(p){ return {key:p.key, cur:0, stages:p.stages.map(function(s){ return {name:s.name,due:s.due,days:s.days||null,status:"pending",task_id:null,done_at:null}; })}; }),
+      status:"active", who:opts.who||"", created:today, updated:today };
+    contracts.push(c);
+    c.pipes.forEach(function(p){ materializeStage(c, p, c.start); });
+    scheduleContractSave();
+    renderTasks(); renderSummary(); renderDashboard();
+    return c;
+  }
+  function advanceProc(t){
+    if(!t || !t.proc_id) return;
+    var c = findProc(t.proc_id); if(!c) return;
+    var pipe=null; for(var i=0;i<c.pipes.length;i++){ if(c.pipes[i].key===t.pipe){ pipe=c.pipes[i]; break; } }
+    if(!pipe) return;
+    var s = pipe.stages[t.stage_i]; if(!s || s.status==="done") return;
+    s.status="done"; s.done_at=todayStr();
+    pipe.cur = t.stage_i + 1;
+    if(pipe.cur < pipe.stages.length){ materializeStage(c, pipe, todayStr()); }
+    c.status = c.pipes.every(function(p){ return p.cur >= p.stages.length; }) ? "done" : "active";
+    c.updated=todayStr();
+    scheduleContractSave();
+  }
+  function procChipHtml(t){
+    if(!t.proc_id) return "";
+    var chip = '<span class="proc-chip">' + esc(t.proc_label||"진행") + ' ' + ((t.stage_i||0)+1) + '/' + (t.stage_total||"?") + ' · ' + esc(t.stage_name||"") + '</span>';
+    if(!t.due) chip += '<span class="need-due">기한 입력</span>';
+    return chip;
+  }
+
   // ---- 거래처(clients.json) — 미수 자동 연동 ----
   var clients = [];
   var cliSha = null;
@@ -3943,8 +4053,19 @@
           (l.note ? '<div class="task-detail">' + esc(l.note) + '</div>' : '') +
           (cal ? '<div class="veh-due" style="margin-top:7px;gap:8px;">' + cal + '</div>' : '') +
         '</div>' +
-        '<div class="task-ctrl"><button class="mini-btn" data-lic-edit-btn="' + l.id + '">수정</button></div>' +
+        '<div class="task-ctrl">' +
+          (canDo("lic") ? '<button class="mini-btn appr-btn" data-lic-change="' + l.id + '">변경</button>' : '') +
+          '<button class="mini-btn" data-lic-edit-btn="' + l.id + '">수정</button>' +
+        '</div>' +
       '</div>';
+  }
+  function startLicChange(id){
+    if(!canDo("lic")) return;
+    var l = findLic(id); if(!l) return;
+    if(!confirm("'" + (l.name||"") + "' 변경 절차를 시작할까요?\n변경지시 → 접수 → 완료 지시가 순차로 생성됩니다.")) return;
+    startProcess("lic_change", {lic_id:id, client:l.name, who:""});
+    switchTab("tasks");
+    alert("변경 절차 시작 — 지시 탭에 '변경지시'가 생성되었습니다. 담당·기한을 지정하세요.");
   }
 
   function renderLicenses(){
@@ -3963,6 +4084,9 @@
         if (e.target.classList.contains("cal-btn") || e.target.classList.contains("mini-btn")) return;
         openLicModal(el.getAttribute("data-lic-edit"));
       });
+    });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-lic-change]"), function(el){
+      el.addEventListener("click", function(e){ e.stopPropagation(); startLicChange(el.getAttribute("data-lic-change")); });
     });
     Array.prototype.forEach.call(host.querySelectorAll("[data-lic-edit-btn]"), function(el){
       el.addEventListener("click", function(e){ e.stopPropagation(); openLicModal(el.getAttribute("data-lic-edit-btn")); });
@@ -4271,7 +4395,7 @@
   // 로그인 성공 후: 권한 적용 + 데이터 로드 + (관리자면) 회원목록 로드
   function afterLogin(){
     applyPerms();
-    doLoad(); loadTasks(); loadVehicles(); loadReceivables(); loadLicenses(); loadDocuments(); loadClients(); loadMyTasks();
+    doLoad(); loadTasks(); loadVehicles(); loadReceivables(); loadLicenses(); loadDocuments(); loadClients(); loadContracts(); loadMyTasks();
     if (isAdmin()) loadMembers();
     render();
   }

@@ -10,7 +10,7 @@ const { verifyToken, bearer } = require('./_lib/session');
 const DATA = 'gw_data';
 const USERS = 'gw_users';
 // 컬렉션 → 권한키
-const COL = { tasks: 'tasks', vehicles: 'veh', receivables: 'rec', licenses: 'lic', checklist: 'check', documents: 'doc', clients: 'client' };
+const COL = { tasks: 'tasks', vehicles: 'veh', receivables: 'rec', licenses: 'lic', checklist: 'check', documents: 'doc', clients: 'client', contracts: 'contracts' };
 // 사용자별 비공개 컬렉션(본인만 접근, 회원 id로 분리 저장)
 const PRIVATE_COL = { mytasks: true };
 

@@ -32,6 +32,14 @@
 - 앱 내 `도움말`(로그인 모달 → 도움말).
 - **건별 공개범위(2026-07-08)**: 지시·인허가 각 건에 `scope`(회원 id 배열). 비면 전체 공개, 지정 시 그 직원(+관리자, 지시는 담당 본인)만 목록에서 봄. 관리자는 전부 보고 `공개 …` 칩으로 대상 표시. 인허가 수정 모달 + **지시 수정 모달 신설**(제목·담당·기한·상세·공개대상, 관리자 전용)에서 설정. 헬퍼 `taskVisible`/`licVisible`/`renderMemberChecks`/`getCheckedMembers`. renderTasks·renderLicenses·대시보드에서 필터. (UI 구분이지 하드보안 아님)
 
+## 계약·프로세스 파이프라인 엔진 (M6, 2026-07-10~ 구축 중)
+- **목적**: 인허가 변경·단발계약(석면철거·건축물철거·폐기물)을 **단계 파이프라인**으로 관리 → 각 단계가 처리기한과 함께 `지시`에 순차 생성. 미래 **계약서 PDF 파싱→서류 자동생성** 확장 대비 구조화 레코드 유지.
+- **저장**: `data/contracts.json`(신설 컬렉션). 백엔드 `gw-data.js` COL에 `contracts` 추가함. 계약 레코드 = `{id,type,label,client,site,start,lic_id,info{},review{missing,suspect,ok},docs[],pipes[{key,cur,stages[{name,due,days,status,task_id,done_at}]}],status,who}`. `info`·`docs`는 서류생성용 **빈 슬롯**(지금 미사용).
+- **템플릿**(`PROC_TEMPLATES`): lic_change(변경지시→접수→완료), waste, asbestos(석면철거: main + 백본 지정5일), demolition(건축물철거: main + 백본 건설3일). 공용 `WASTE_BACKBONE`(신고접수→필증인수(auto)→올바로등록→배차→처리→확인서인수), 행정처리기한 지정/석면 5일·건설 3일 자동.
+- **엔진**: `startProcess(type,{client,site,start,who,lic_id})`→계약레코드+각 pipe 첫 단계 지시 생성. 단계 done(**승인 시점** `approveTask`에서 `advanceProc`)→다음 단계 자동 open, auto 기한은 완료일+N일. manual 기한 미입력이면 지시에 `기한 입력` 칩. 진행 `proc-chip`(라벨 i/total·단계명).
+- **조건부 단계**(석면 없음 등)는 담당자가 그냥 완료로 스킵(조건 로직 없음).
+- **UI 현황**: 인허가 행 `변경` 버튼(→lic_change) 구현·검증 완료. **TODO**: `계약 시작` UI(유형·거래처·시작일 선택 → waste/asbestos/demolition), 계약 목록/진행 탭, 그리고 (백엔드 단계) PDF 파싱·서류 생성.
+
 ## 알람: 캘린더(.ics) 연동
 - 요구된 "iOS·안드로이드 자동 알람"은 **기기 기본 캘린더 연동**으로 구현(가이드 §5 "푸시 알림 인프라" 금지 준수, 서버 0).
 - 만기·지시 행의 `캘린더` 버튼 → `data:text/calendar` .ics 다운로드(VEVENT + VALARM -P7D·-P1D). 폰 기본 캘린더가 네이티브 알람을 울린다.
