@@ -340,7 +340,12 @@
   .add-row .who-sel{flex:1;min-width:0;}
   /* 공개범위(공지) 체크박스 드롭다운 */
   .scope-dd{position:relative;flex:1;min-width:0;}
-  .scope-btn{width:100%;text-align:left;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  /* .add-row button(초록 제출버튼) 스타일을 이기고 셀렉트처럼 보이게 (specificity 우선) */
+  .add-row .scope-btn{width:100%;text-align:left;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:inherit;font-size:14px;font-weight:400;box-sizing:border-box;}
+  .add-row .scope-dd.open .scope-btn{border-color:var(--brand-dark);}
+  /* 이 카드만 overflow 허용 — 아니면 .card{overflow:hidden}가 드롭다운 패널을 잘라 안 보임 */
+  .card.scope-host{overflow:visible;}
   .scope-panel{display:none;position:absolute;z-index:40;top:calc(100% + 4px);left:0;right:0;min-width:180px;max-height:260px;overflow:auto;background:var(--card);border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.18);padding:6px;}
   .scope-dd.open .scope-panel{display:block;}
   .scope-panel .mcheck{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;font-size:14px;cursor:pointer;}
@@ -659,7 +664,7 @@
 
   <!-- 지시(업무 전달) -->
   <section class="view" id="view-tasks">
-    <div class="card">
+    <div class="card scope-host">
       <div class="add-row">
         <input type="text" id="taskTitle" placeholder="지시 내용">
         <input type="date" id="taskDue">
