@@ -658,12 +658,12 @@
     <button class="link-btn" id="vehDeletedToggle" style="display:none;color:#B0332A;"></button>
     <div class="card" id="vehDeletedList" style="display:none;margin-top:6px;"></div>
     <div class="card" id="vehInsImportCard" style="margin-top:10px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
-        <div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+        <div style="min-width:0;flex:1 1 180px;">
           <div style="font-weight:600;">보험사 일괄 대조 (현황표 .xlsx)</div>
-          <div style="font-size:12px;opacity:.7;margin-top:2px;">차량보유 현황표(자차 시트) 파일로 차량별 보험사 채우기·정정. 전화번호는 무시하고 회사명만 반영.</div>
+          <div style="font-size:12px;opacity:.7;margin-top:2px;word-break:keep-all;">차량보유 현황표(자차 시트) 파일로 차량별 보험사 채우기·정정. 전화번호는 무시하고 회사명만 반영.</div>
         </div>
-        <button type="button" id="vehInsFilePick" class="mini-btn">파일 선택</button>
+        <button type="button" id="vehInsFilePick" class="mini-btn" style="flex:none;">파일 선택</button>
       </div>
       <input type="file" id="vehInsFile" accept=".xlsx" style="display:none">
       <div id="vehInsMsg" style="margin-top:8px;font-size:13px;"></div>
@@ -684,12 +684,12 @@
       </div>
     </div>
     <div class="card" id="recImportCard">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
-        <div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+        <div style="min-width:0;flex:1 1 180px;">
           <div style="font-weight:600;">홈택스 매출 목록 불러오기</div>
-          <div style="font-size:12px;opacity:.7;margin-top:2px;">홈택스·위하고에서 내려받은 매출 세금계산서 목록(.xlsx)</div>
+          <div style="font-size:12px;opacity:.7;margin-top:2px;word-break:keep-all;">홈택스·위하고에서 내려받은 매출 세금계산서 목록(.xlsx)</div>
         </div>
-        <button type="button" id="recFilePick" class="mini-btn">파일 선택</button>
+        <button type="button" id="recFilePick" class="mini-btn" style="flex:none;">파일 선택</button>
       </div>
       <div id="recDrop" style="margin-top:10px;padding:16px;border:2px dashed rgba(128,128,128,.4);border-radius:8px;text-align:center;font-size:13px;opacity:.75;">여기로 .xlsx 파일을 끌어놓으세요</div>
       <input type="file" id="recFile" accept=".xlsx" style="display:none">
