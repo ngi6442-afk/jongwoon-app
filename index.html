@@ -657,6 +657,7 @@
       </div>
       <div class="add-row" style="padding-top:0;">
         <select id="taskWho" class="who-sel"></select>
+        <select id="taskScope" class="who-sel"></select>
         <datalist id="memberNames"></datalist>
         <button id="taskAddBtn">지시 등록</button>
       </div>
@@ -1417,24 +1418,35 @@
   function myId(){ if(curMemberObj && curMemberObj.id) return curMemberObj.id; var m=(typeof curMember==="function")?curMember():null; return (m&&m.id)||""; }
   function fillMemberSelect(sel, selId){
     if(!sel) return;
-    var html = '<option value="">(담당 없음)</option><option value="__all__">전사 (전 직원)</option>';
+    var html = '<option value="">담당 선택…</option><option value="__all__">전사 (전 직원)</option>';
     html += (typeof liveMembers==="function"?liveMembers():[]).map(function(m){ return '<option value="'+m.id+'">'+esc(m.name)+'</option>'; }).join("");
+    sel.innerHTML = html;
+    sel.value = selId || "";
+  }
+  // 공지(공개범위/scope) 드롭다운 — 비면 전체공개, 특정 직원 지정 시 그 직원(+관리자·담당)만
+  function fillScopeSelect(sel, selId){
+    if(!sel) return;
+    var html = '<option value="">공지: 전체공개</option>';
+    html += (typeof liveMembers==="function"?liveMembers():[]).map(function(m){ return '<option value="'+m.id+'">공지: '+esc(m.name)+'</option>'; }).join("");
     sel.innerHTML = html;
     sel.value = selId || "";
   }
   // 담당 드롭다운(회원 id 기반) 채우기 — 자연어 매칭 폐기
   function populateMemberNames(){
     ["taskWho","conWho","reAssignee","teWho"].forEach(function(idn){ var s=document.getElementById(idn); if(s) fillMemberSelect(s, s.value); });
+    ["taskScope"].forEach(function(idn){ var s=document.getElementById(idn); if(s) fillScopeSelect(s, s.value); });
   }
-  // 이 지시가 내게 오는가: 담당 id=본인 / 전사 / 지시자 id=본인 (구데이터는 이름 호환)
+  // 이 지시가 "내게 온 지시"인가: 담당=본인 / 전사 / 공개범위(scope)에 본인. (지시자는 제외 — 지시자는 홈 전체 리스트로 봄)
   function taskForMe(t){
-    var meId=myId(), meName=myName();
-    var wid=t.who_id||"";
-    if(wid==="__all__") return true;
-    if(wid && meId && wid===meId) return true;
-    if(t.from_id && meId && t.from_id===meId) return true;
-    if(!wid && meName && (t.who||"").trim()===meName) return true;
-    if(meName && (t.from||"").trim()===meName) return true;
+    if(!t) return false;
+    if(t.who_id==="__all__") return true;
+    var meId=myId();
+    if(meId){
+      if(t.who_id===meId) return true;
+      if(t.scope && t.scope.length && t.scope.indexOf(meId)>=0) return true;
+    }
+    // 구 데이터(이름 기반 담당) 호환
+    if(!t.who_id && myName() && (t.who||"").trim()===myName()) return true;
     return false;
   }
 
@@ -1861,12 +1873,15 @@
     if (!title) return;
     var today = todayStr();
     var whoId = whoEl.value;
+    var scopeEl = document.getElementById("taskScope");
+    var scope = (scopeEl && scopeEl.value) ? [scopeEl.value] : [];
     tasks.push({
       id: genId("t"),
       title: title,
       detail: "",
       who_id: whoId,
       who: memberName(whoId),
+      scope: scope,
       from: getUser(),
       from_id: myId(),
       by: getUser(),
@@ -1879,6 +1894,7 @@
     });
     titleEl.value = "";
     whoEl.value = "";
+    if (scopeEl) scopeEl.value = "";
     dueEl.value = "";
     saveTasksCache();
     renderTasks();
@@ -3002,7 +3018,9 @@
     });
     urgent.sort(function(a, b){ return a.dd.diff - b.dd.diff; });
 
-    var openTasks = liveTasks().filter(function(t){ return (t.status === "open" || t.status === "hold") && (seeTasks ? taskVisible(t) : taskForMe(t)); });
+    // 지시자(관리자·지시 등록권자)=전체 미완료 지시, 직원=본인 담당/전사/공개범위만
+    var canIssue = canDo("tasks");
+    var openTasks = liveTasks().filter(function(t){ return (t.status === "open" || t.status === "hold") && (canIssue ? true : taskForMe(t)); });
     openTasks.sort(function(a, b){
       var ad = a.due || "9999-99-99", bd = b.due || "9999-99-99";
       return ad < bd ? -1 : (ad > bd ? 1 : 0);
@@ -4518,12 +4536,17 @@
   function afterLogin(){
     applyPerms();
     doLoad(); loadTasks(); loadVehicles(); loadReceivables(); loadLicenses(); loadDocuments(); loadClients(); loadContracts(); loadMyTasks();
-    if (isAdmin()) loadMembers();
+    loadMembers();   // 담당 배정 드롭다운용 — 관리자·직원 모두
     render();
   }
   function loadMembers(){
     gwCall("gw-auth", { action: "member_list" }).then(function(res){
-      if (res.status === 200 && res.body && Array.isArray(res.body.members)) members = res.body.members;
+      if (res.status === 200 && res.body && Array.isArray(res.body.members)){
+        members = res.body.members;
+        try{ saveUsersCache(); }catch(e){}
+        populateMemberNames();   // 회원 도착 후 담당/공지 드롭다운 다시 채움
+        render();
+      }
     });
   }
 

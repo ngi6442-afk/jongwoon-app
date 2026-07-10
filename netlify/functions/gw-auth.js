@@ -121,7 +121,8 @@ async function handleVerify(st, event, R) {
 
 async function handleMemberList(st, event, R) {
   const c = await currentMember(st, event);
-  if (!c.ok || !c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: 'NO_SESSION', request_id: R });
+  // 회원 목록(이름·역할, pin 제외 safeMember)은 담당 배정 드롭다운용으로 로그인 회원 누구나 조회 가능
   const members = (await listMembers(st)).map(safeMember);
   return jr(200, { status: 'OK', members, request_id: R });
 }
