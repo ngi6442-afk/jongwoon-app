@@ -336,6 +336,9 @@
     padding:10px 14px;
     align-items:center;
   }
+  .who-sel{padding:10px 12px;border:1px solid var(--line);border-radius:8px;font-size:14px;background:var(--card);color:inherit;box-sizing:border-box;}
+  .add-row .who-sel{flex:1;min-width:0;}
+  .modal .who-sel{width:100%;margin-bottom:8px;}
   .add-row input[type="text"]{
     flex:1;
     min-width:0;
@@ -653,7 +656,7 @@
         <input type="date" id="taskDue">
       </div>
       <div class="add-row" style="padding-top:0;">
-        <input type="text" id="taskWho" placeholder="담당 (회원 선택 권장)" list="memberNames" autocomplete="off">
+        <select id="taskWho" class="who-sel"></select>
         <datalist id="memberNames"></datalist>
         <button id="taskAddBtn">지시 등록</button>
       </div>
@@ -858,7 +861,7 @@
   <div class="modal">
     <h3>지시 수정</h3>
     <input type="text" id="teTitle" placeholder="지시 내용" autocomplete="off">
-    <input type="text" id="teWho" placeholder="담당 (회원명)" list="memberNames" autocomplete="off">
+    <select id="teWho" class="who-sel"></select>
     <span class="fld-label">기한</span>
     <input type="date" id="teDue">
     <input type="text" id="teDetail" placeholder="상세 (선택)" autocomplete="off">
@@ -877,7 +880,7 @@
     <input type="text" id="reAmount" placeholder="금액 (선택)" inputmode="numeric" autocomplete="off">
     <span class="fld-label">청구일</span>
     <input type="date" id="reBilled">
-    <input type="text" id="reAssignee" placeholder="담당 (입금확인 담당자)" list="memberNames" autocomplete="off">
+    <select id="reAssignee" class="who-sel"></select>
     <span class="fld-label">공개 대상 직원 (비우면 전체 공개)</span>
     <div class="mchecks" id="reScope"></div>
     <button class="primary" id="reSave">저장</button>
@@ -898,7 +901,7 @@
     <input type="text" id="conSite" placeholder="현장 (선택)" autocomplete="off">
     <span class="fld-label">시작일</span>
     <input type="date" id="conStart">
-    <input type="text" id="conWho" placeholder="담당 (회원 선택 권장)" list="memberNames" autocomplete="off">
+    <select id="conWho" class="who-sel"></select>
     <button class="primary" id="conStartSave">시작</button>
     <button class="secondary" id="conStartCancel">취소</button>
   </div>
@@ -1409,13 +1412,30 @@
   }
 
   // 지시 담당 입력칸 자동완성: 회원명 목록 채우기(오타로 인박스 매칭 실패 방지)
+  function memberName(id){ if(!id) return ""; if(id==="__all__") return "전사"; var m=findMember(id); return m?m.name:""; }
+  function memberIdByName(nm){ nm=(nm||"").trim(); if(!nm||nm==="전사") return nm==="전사"?"__all__":""; var ms=(typeof liveMembers==="function"?liveMembers():[]); for(var i=0;i<ms.length;i++){ if(ms[i].name===nm) return ms[i].id; } return ""; }
+  function myId(){ if(curMemberObj && curMemberObj.id) return curMemberObj.id; var m=(typeof curMember==="function")?curMember():null; return (m&&m.id)||""; }
+  function fillMemberSelect(sel, selId){
+    if(!sel) return;
+    var html = '<option value="">(담당 없음)</option><option value="__all__">전사 (전 직원)</option>';
+    html += (typeof liveMembers==="function"?liveMembers():[]).map(function(m){ return '<option value="'+m.id+'">'+esc(m.name)+'</option>'; }).join("");
+    sel.innerHTML = html;
+    sel.value = selId || "";
+  }
+  // 담당 드롭다운(회원 id 기반) 채우기 — 자연어 매칭 폐기
   function populateMemberNames(){
-    var dl = document.getElementById("memberNames");
-    if (!dl) return;
-    var names = (typeof liveMembers === "function" ? liveMembers() : []).map(function(m){ return m.name; });
-    var seen = {}, opts = "";
-    names.forEach(function(n){ if (n && !seen[n]){ seen[n] = 1; opts += '<option value="' + esc(n) + '"></option>'; } });
-    dl.innerHTML = opts;
+    ["taskWho","conWho","reAssignee","teWho"].forEach(function(idn){ var s=document.getElementById(idn); if(s) fillMemberSelect(s, s.value); });
+  }
+  // 이 지시가 내게 오는가: 담당 id=본인 / 전사 / 지시자 id=본인 (구데이터는 이름 호환)
+  function taskForMe(t){
+    var meId=myId(), meName=myName();
+    var wid=t.who_id||"";
+    if(wid==="__all__") return true;
+    if(wid && meId && wid===meId) return true;
+    if(t.from_id && meId && t.from_id===meId) return true;
+    if(!wid && meName && (t.who||"").trim()===meName) return true;
+    if(meName && (t.from||"").trim()===meName) return true;
+    return false;
   }
 
   // 삭제된 항목 선택 복구: 토글 버튼 + 개별 복구 목록(모듈 공통)
@@ -1560,8 +1580,7 @@
   // 지시를 완료/보류할 수 있는가: 관리자(do)이거나 본인 담당이면 가능
   function canActTask(t){
     if (canDo("tasks")) return true;
-    var me = myName();
-    return !!(me && t && (t.who || "").trim() === me);
+    return !!(t && taskForMe(t));
   }
 
   // 지시 수정(관리자 전용): 제목·담당·기한·상세·공개범위
@@ -1571,10 +1590,10 @@
     var t = findTask(id); if (!t) return;
     editingTaskId = id;
     document.getElementById("teTitle").value = t.title || "";
-    document.getElementById("teWho").value = t.who || "";
+    if (typeof populateMemberNames === "function") populateMemberNames();
+    document.getElementById("teWho").value = t.who_id || memberIdByName(t.who) || "";
     document.getElementById("teDue").value = isDate(t.due) ? t.due : "";
     document.getElementById("teDetail").value = t.detail || "";
-    if (typeof populateMemberNames === "function") populateMemberNames();
     renderMemberChecks("teScope", t.scope || []);
     document.getElementById("taskEditBackdrop").classList.add("show");
   }
@@ -1585,7 +1604,8 @@
     var title = document.getElementById("teTitle").value.trim();
     if (!title) return;
     t.title = title;
-    t.who = document.getElementById("teWho").value.trim();
+    var whoId = document.getElementById("teWho").value;
+    t.who_id = whoId; t.who = memberName(whoId);
     t.due = document.getElementById("teDue").value || "";
     t.detail = document.getElementById("teDetail").value.trim();
     t.scope = getCheckedMembers("teScope");
@@ -1742,11 +1762,10 @@
 
   // 업무 탭: 내게 온 지시(담당=본인 OR 지시자=본인, 미완료) 기한순
   function myOpenTasks(){
-    var me = myName();
-    if (!me) return [];
+    if (!myId() && !myName()) return [];
     return liveTasks().filter(function(t){
       if (t.status === "done") return false;
-      return (t.who || "").trim() === me || (t.from || "").trim() === me;
+      return taskForMe(t);
     }).sort(function(a, b){
       var ah = a.status === "hold" ? 1 : 0, bh = b.status === "hold" ? 1 : 0;
       if (ah !== bh) return ah - bh;
@@ -1841,12 +1860,15 @@
     var title = titleEl.value.trim();
     if (!title) return;
     var today = todayStr();
+    var whoId = whoEl.value;
     tasks.push({
       id: genId("t"),
       title: title,
       detail: "",
-      who: whoEl.value.trim(),
+      who_id: whoId,
+      who: memberName(whoId),
       from: getUser(),
+      from_id: myId(),
       by: getUser(),
       due: dueEl.value || "",
       status: "open",
@@ -2980,7 +3002,7 @@
     });
     urgent.sort(function(a, b){ return a.dd.diff - b.dd.diff; });
 
-    var openTasks = liveTasks().filter(function(t){ return (t.status === "open" || t.status === "hold") && (seeTasks ? taskVisible(t) : ((t.who || "").trim() === me)); });
+    var openTasks = liveTasks().filter(function(t){ return (t.status === "open" || t.status === "hold") && (seeTasks ? taskVisible(t) : taskForMe(t)); });
     openTasks.sort(function(a, b){
       var ad = a.due || "9999-99-99", bd = b.due || "9999-99-99";
       return ad < bd ? -1 : (ad > bd ? 1 : 0);
@@ -2991,7 +3013,7 @@
     var imminentTot = urgent.length + urgentLic.length;
     var unpaid = unpaidReceivables();
 
-    var reviewCount = liveTasks().filter(function(t){ return t.status === "review" && (canApproveTask(t) || (t.who || "").trim() === me); }).length;
+    var reviewCount = liveTasks().filter(function(t){ return t.status === "review" && (canApproveTask(t) || taskForMe(t)); }).length;
     var unpaidSum = 0; unpaid.forEach(function(r){ unpaidSum += (r.amount || 0); });
     var tiles = '';
     if (seeRec) tiles += '<div class="stat-tile"><div class="lbl">미수</div><div class="val money">' + (unpaidSum ? (fmtAmount(unpaidSum) + '<span class="unit">원</span>') : (unpaid.length + '<span class="unit">건</span>')) + '</div></div>';
@@ -3225,7 +3247,7 @@
     var s = pipe.stages[pipe.cur];
     var due = "";
     if(s.due==="auto" && s.days){ due = addDays(baseDate||todayStr(), s.days); }
-    var t = { id:genId("t"), title:procStageTitle(c, s.name), detail:"", who:c.who||"", from:myName()||"", by:myName()||"",
+    var t = { id:genId("t"), title:procStageTitle(c, s.name), detail:"", who_id:c.who_id||"", who:memberName(c.who_id||""), from:myName()||"", from_id:myId(), by:myName()||"",
       due:due, status:"open", done_at:null, done_by:null, created:todayStr(), updated:todayStr(),
       proc_id:c.id, proc_label:c.label, pipe:pipe.key, stage_i:pipe.cur, stage_name:s.name, stage_total:pipe.stages.length, stage_auto:(s.due==="auto") };
     tasks.push(t);
@@ -3239,7 +3261,7 @@
     var c = { id:genId("c"), type:type, label:tpl.label, client:opts.client||"", site:opts.site||"", start:opts.start||today,
       lic_id:opts.lic_id||null, info:{}, review:{missing:[],suspect:[],ok:false}, docs:[],
       pipes:tpl.pipes.map(function(p){ return {key:p.key, cur:0, stages:p.stages.map(function(s){ return {name:s.name,due:s.due,days:s.days||null,status:"pending",task_id:null,done_at:null}; })}; }),
-      status:"active", who:opts.who||"", created:today, updated:today };
+      status:"active", who_id:opts.who||"", who:memberName(opts.who||""), created:today, updated:today };
     contracts.push(c);
     c.pipes.forEach(function(p){ materializeStage(c, p, c.start); });
     scheduleContractSave();
@@ -3308,7 +3330,7 @@
     document.getElementById("conClient").value="";
     document.getElementById("conSite").value="";
     document.getElementById("conStart").value=todayStr();
-    document.getElementById("conWho").value="";
+    fillMemberSelect(document.getElementById("conWho"), "");
     document.getElementById("conStartBackdrop").classList.add("show");
   }
   function saveConStart(){
@@ -3811,10 +3833,9 @@
 
   function recVisible(r){
     if (isAdmin()) return true;
-    var me = myName();
-    if (me && (r.assignee || "").trim() === me) return true;
+    if (myId() && r.assignee === myId()) return true;
     if (!r.scope || !r.scope.length) return true;
-    return r.scope.indexOf(getMemberId()) >= 0;
+    return r.scope.indexOf(myId()) >= 0;
   }
 
   // 기성 ↔ 업무(지시) 연동
@@ -3829,7 +3850,7 @@
     var t = {
       id: genId("t"),
       title: "입금확인: " + rec.client + (rec.desc ? " " + rec.desc : "") + (rec.amount ? " " + fmtAmount(rec.amount) + "원" : ""),
-      detail: "", who: rec.assignee || "", from: "기성", due: rec.billed || "",
+      detail: "", who_id: rec.assignee || "", who: memberName(rec.assignee || ""), from: "기성", from_id: myId(), due: rec.billed || "",
       status: "open", done_at: null, done_by: null,
       scope: (rec.scope || []).slice(), rec_id: rec.id,
       created: today, updated: today
@@ -3914,8 +3935,8 @@
     document.getElementById("reDesc").value = r.desc || "";
     document.getElementById("reAmount").value = r.amount ? fmtAmount(r.amount) : "";
     document.getElementById("reBilled").value = isDate(r.billed) ? r.billed : "";
-    document.getElementById("reAssignee").value = r.assignee || "";
     if (typeof populateMemberNames === "function") populateMemberNames();
+    document.getElementById("reAssignee").value = r.assignee || "";
     renderMemberChecks("reScope", r.scope || []);
     document.getElementById("recEditBackdrop").classList.add("show");
   }
@@ -3930,11 +3951,11 @@
     var amt = parseInt(String(document.getElementById("reAmount").value).replace(/[^0-9]/g, ""), 10);
     r.amount = isNaN(amt) ? 0 : amt;
     r.billed = document.getElementById("reBilled").value || r.billed;
-    r.assignee = document.getElementById("reAssignee").value.trim();
+    r.assignee = document.getElementById("reAssignee").value;
     r.scope = getCheckedMembers("reScope");
     r.updated = todayStr();
     var t = findRecTask(r);
-    if (t){ t.who = r.assignee || ""; t.scope = (r.scope || []).slice(); t.updated = todayStr(); saveTasksCache(); scheduleTasksSave(); renderTasks(); renderMyTasks(); }
+    if (t){ t.who_id = r.assignee || ""; t.who = memberName(r.assignee || ""); t.scope = (r.scope || []).slice(); t.updated = todayStr(); saveTasksCache(); scheduleTasksSave(); renderTasks(); renderMyTasks(); }
     closeRecModal();
     saveRecCache(); renderReceivables(); renderDashboard(); scheduleRecSave();
   }
@@ -4392,10 +4413,9 @@
   }
   function taskVisible(t){
     if (isAdmin()) return true;
-    var me = myName();
-    if (me && (t.who || "").trim() === me) return true;
+    if (taskForMe(t)) return true;
     if (!t.scope || !t.scope.length) return true;
-    return t.scope.indexOf(getMemberId()) >= 0;
+    return t.scope.indexOf(myId()) >= 0;
   }
   function licVisible(l){
     if (isAdmin()) return true;

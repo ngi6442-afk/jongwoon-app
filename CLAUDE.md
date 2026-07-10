@@ -25,6 +25,7 @@
 - **탭을 새로 만들면 반드시 모듈 레지스트리에 등록**해 권한관리·게이팅에 자동 반영한다. 등록 위치 5곳: `MODULES` 배열 + `MODULE_TAB`(탭버튼 id) + `MODULE_VIEW`(뷰 id) + `MOD_LABEL`(한글명) + `ROLE_PRESET`(대표/관리자=do, 직원=기본값). 권한관리 UI(`#mePerms`)는 `MODULES.map(MOD_LABEL[mod])`로 자동 생성되므로 등록만 하면 셀렉트가 자동 추가된다.
 - **모듈 id = 백엔드 `gw-data.js`의 `COL` 권한키와 반드시 일치**시킨다(예: 계약 con, 거래처 cli, 문서함 doc). 데이터 컬렉션이 있으면 `COL`에 `컬렉션명:'모듈id'` 추가 + 프런트 `_urlCollection`에 매핑.
 - **탭 내 mutating 동작은 `canDo("모듈id")` 가드**, 뷰는 `MODULE_VIEW` readonly로 자동 게이팅.
+- **담당/지시 배정은 회원 id로 매칭(자연어 이름 금지)**: 담당 입력칸(taskWho/teWho/conWho/reAssignee)은 **회원 드롭다운(`fillMemberSelect`, value=회원 id, `__all__`=전사, ""=담당없음)**. 태스크는 `who_id`(+표시용 `who`=이름)·`from_id`를 저장. 인박스/가시성은 `taskForMe(t)`(담당 id=본인 OR 전사 OR 지시자 id=본인, 구데이터는 이름 호환)로 판정. 신규 직원도 id 매칭이라 자동 동작. 이름 문자열 매칭은 폐기(오타·동명이인으로 전달 깨짐).
 - ⚠️ **개인 인박스("내게 온 지시")·"내가 할 일"은 권한과 무관하게 항상 노출**: 업무(check) 탭은 `applyPerms`에서 절대 숨기지 않으며(특례), 그 안의 주기 체크리스트만 `.check-only`로 check 권한 게이팅. 지시(tasks) 권한이 hide여도 담당/지시자에게 배정된 미완료 지시는 반드시 보여야 한다.
 
 ## 회원·권한 (P5, 2026-07-08)
