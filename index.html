@@ -657,6 +657,17 @@
     <button class="link-btn" id="vehAddBtn">+ 차량 추가</button>
     <button class="link-btn" id="vehDeletedToggle" style="display:none;color:#B0332A;"></button>
     <div class="card" id="vehDeletedList" style="display:none;margin-top:6px;"></div>
+    <div class="card" id="vehInsImportCard" style="margin-top:10px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+        <div>
+          <div style="font-weight:600;">보험사 일괄 대조 (현황표 .xlsx)</div>
+          <div style="font-size:12px;opacity:.7;margin-top:2px;">차량보유 현황표(자차 시트) 파일로 차량별 보험사 채우기·정정. 전화번호는 무시하고 회사명만 반영.</div>
+        </div>
+        <button type="button" id="vehInsFilePick" class="mini-btn">파일 선택</button>
+      </div>
+      <input type="file" id="vehInsFile" accept=".xlsx" style="display:none">
+      <div id="vehInsMsg" style="margin-top:8px;font-size:13px;"></div>
+    </div>
   </section>
 
   <!-- 수금·기성 -->
@@ -838,6 +849,16 @@
     <div class="mchecks" id="reScope"></div>
     <button class="primary" id="reSave">저장</button>
     <button class="secondary" id="reCancel">취소</button>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="vehInsBackdrop">
+  <div class="modal">
+    <h3>보험사 대조 미리보기</h3>
+    <div id="vehInsSummary" style="font-size:14px;margin-bottom:8px;"></div>
+    <div id="vehInsPreview" style="max-height:44vh;overflow:auto;font-size:13px;border:1px solid rgba(128,128,128,.25);border-radius:8px;padding:8px;margin-bottom:12px;"></div>
+    <button class="primary" id="vehInsConfirm">적용</button>
+    <button class="secondary" id="vehInsCancel">취소</button>
   </div>
 </div>
 
@@ -2477,6 +2498,15 @@
     if(bd) bd.addEventListener("click", function(e){ if(e.target===this){ pendingImport=null; bd.classList.remove("show"); } });
   })();
 
+  (function(){
+    var fp=document.getElementById("vehInsFilePick"), fi=document.getElementById("vehInsFile");
+    if(fp&&fi){ fp.addEventListener("click", function(){ fi.click(); }); fi.addEventListener("change", function(){ if(fi.files&&fi.files[0]) handleVehInsFile(fi.files[0]); fi.value=""; }); }
+    var cf=document.getElementById("vehInsConfirm"), cc=document.getElementById("vehInsCancel"), bd=document.getElementById("vehInsBackdrop");
+    if(cf) cf.addEventListener("click", confirmVehInsImport);
+    if(cc) cc.addEventListener("click", function(){ vehInsPending=null; bd.classList.remove("show"); });
+    if(bd) bd.addEventListener("click", function(e){ if(e.target===this){ vehInsPending=null; bd.classList.remove("show"); } });
+  })();
+
   document.getElementById("licAddBtn").addEventListener("click", function(){ openLicModal(null); });
   document.getElementById("docAddBtn").addEventListener("click", function(){ openDocModal(null); });
   document.getElementById("docSave").addEventListener("click", saveDocModal);
@@ -3339,6 +3369,82 @@
     saveRecCache(); renderReceivables(); renderDashboard(); scheduleRecSave();
     var msg=document.getElementById("recImpMsg");
     if(msg){ msg.style.color=res.dup?"#b0332a":"#27ae60"; msg.textContent="반영 완료 — 신규 "+res.add+" · 갱신 "+res.upd+" · 취소 "+res.cancel+(res.dup?" · 중복 의심 "+res.dup+"건(상단 확인 후 삭제)":""); }
+  }
+
+  // ---- 차량 보험사 일괄 대조 (차량보유 현황표 xlsx, 자차 시트) ----
+  var vehInsPending = null;
+  function normVehNo(s){ return String(s==null?"":s).replace(/\s+/g,""); }
+  function cleanInsurerName(v){ if(v==null) return ""; return String(v).split(/[\n(（]/)[0].replace(/\s+/g," ").trim(); }
+  function vehInsurerMap(rows){
+    var noCol=-1, insCol=-1, hRow=-1;
+    for(var i=0;i<rows.length;i++){
+      var r=rows[i]||[]; var nc=r.indexOf("차량번호");
+      if(nc>=0){ noCol=nc; hRow=i; var ic=r.indexOf("보험사"); if(ic<0 && rows[i+1]) ic=(rows[i+1]||[]).indexOf("보험사"); insCol=ic; break; }
+    }
+    if(noCol<0) throw new Error("'차량번호' 머리글을 찾지 못했습니다. 차량보유 현황표(자차) 시트가 첫 시트인지 확인하세요.");
+    if(insCol<0) throw new Error("'보험사' 열을 찾지 못했습니다(자차 시트여야 함).");
+    var out=[], seen={};
+    for(var d=hRow+1; d<rows.length; d++){
+      var r=rows[d]||[]; var no=normVehNo(r[noCol]); var ins=cleanInsurerName(r[insCol]);
+      if(!no || no==="등록번호") continue;
+      if(!ins) continue;
+      if(seen[no]) continue; seen[no]=1;
+      out.push({no:no, insurer:ins});
+    }
+    return out;
+  }
+  function vehInsurerPlan(map){
+    var byNo={}; vehicles.forEach(function(v){ if(v && v.del!==1) byNo[normVehNo(v.no)]=v; });
+    var plan={fill:[], fix:[], same:0, nomatch:[]};
+    map.forEach(function(m){
+      var v=byNo[m.no];
+      if(!v){ plan.nomatch.push(m); return; }
+      var cur=(v.insurer||"").trim();
+      if(!cur) plan.fill.push({v:v, from:cur, to:m.insurer});
+      else if(cur!==m.insurer) plan.fix.push({v:v, from:cur, to:m.insurer});
+      else plan.same++;
+    });
+    return plan;
+  }
+  function vehInsurerApply(plan){
+    var today=todayStr(), n=0;
+    plan.fill.concat(plan.fix).forEach(function(c){ c.v.insurer=c.to; c.v.updated=today; n++; });
+    return n;
+  }
+  function handleVehInsFile(file){
+    var msg=document.getElementById("vehInsMsg");
+    function err(t){ if(msg){ msg.style.color="#c0392b"; msg.textContent=t; } }
+    if(!canDo("veh")) return err("차량 수행 권한이 없습니다.");
+    if(!file) return;
+    if(!/\.xlsx$/i.test(file.name)) return err(".xlsx 파일만 지원합니다.");
+    if(msg){ msg.style.color=""; msg.textContent="파일 읽는 중…"; }
+    file.arrayBuffer().then(xlsxRows).then(function(rows){
+      var map=vehInsurerMap(rows);
+      vehInsPending=vehInsurerPlan(map);
+      showVehInsPreview(vehInsPending, map.length);
+      if(msg) msg.textContent="";
+    }).catch(function(e){ err("읽기 실패: "+(e&&e.message||e)); });
+  }
+  function showVehInsPreview(plan, total){
+    document.getElementById("vehInsSummary").innerHTML =
+      "표 <b>"+total+"</b>대 중 · 채움 <b>"+plan.fill.length+"</b> · 정정 <b>"+plan.fix.length+"</b> · 동일 "+plan.same+" · 미매칭 "+plan.nomatch.length;
+    function line(c,tag){ return '<div style="padding:4px 0;border-bottom:1px solid rgba(128,128,128,.12);">'+tag+' <b>'+esc(c.v.no)+'</b> · '+(c.from?esc(c.from)+' → ':'')+esc(c.to)+'</div>'; }
+    var html="";
+    plan.fill.forEach(function(c){ html+=line(c,'<span style="color:#27ae60;">채움</span>'); });
+    plan.fix.forEach(function(c){ html+=line(c,'<span style="color:#e67e22;">정정</span>'); });
+    if(plan.nomatch.length){ html+='<div style="margin-top:6px;font-size:12px;color:#b0332a;">미매칭(표엔 있으나 앱에 없는 번호): '+plan.nomatch.map(function(m){return esc(m.no);}).join(", ")+'</div>'; }
+    if(!plan.fill.length && !plan.fix.length) html='<div style="opacity:.6;">변경할 보험사가 없습니다.</div>'+html;
+    document.getElementById("vehInsPreview").innerHTML=html;
+    document.getElementById("vehInsBackdrop").classList.add("show");
+  }
+  function confirmVehInsImport(){
+    var bd=document.getElementById("vehInsBackdrop");
+    if(!vehInsPending){ bd.classList.remove("show"); return; }
+    var n=vehInsurerApply(vehInsPending);
+    vehInsPending=null; bd.classList.remove("show");
+    saveVehiclesCache(); renderVehicles(); renderDashboard(); if(n) scheduleVehSave();
+    var msg=document.getElementById("vehInsMsg");
+    if(msg){ msg.style.color=n?"#27ae60":""; msg.textContent = n ? ("보험사 "+n+"대 반영 완료.") : "변경 사항이 없습니다."; }
   }
 
   function saveRecCache(){ try{ localStorage.setItem(REC_CACHE_KEY, JSON.stringify({sha: recSha, items: receivables})); }catch(e){} }

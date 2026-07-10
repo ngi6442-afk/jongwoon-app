@@ -46,3 +46,4 @@
 - SW 셸 캐시는 cache-first이므로 index.html 변경 시 sw.js의 `SHELL_CACHE` 버전을 반드시 올린다(현재 jw-shell-v15).
 - 지시 등록 `담당` 입력칸은 회원명 datalist(`#memberNames`, `populateMemberNames()`) 자동완성 — 오타로 "내게 온 지시" 매칭이 깨지지 않게. 자유 입력도 유지.
 - **선택 복구(2026-07-10)**: 지시·차량·기성 각 탭에 `삭제된 N 보기` 토글 → soft-delete(del=1) 항목을 개별 `복구` 버튼으로 되돌림. 공통 헬퍼 `renderDeletedList({items,can,toggleId,listId,show,noun,labelFn,onRestore})` + `restoreOneTask/Veh/Rec`. 각 render 함수 말미에서 호출. 옛 지시 "전체 복구"(restoreDeletedTasks)와 미연결 restoreDeletedVehicles 제거. 토글은 `canDo(mod)`일 때만 노출.
+- **차량 보험사 일괄 대조(2026-07-10)**: 차량 탭 하단 `보험사 일괄 대조(xlsx)` — 차량보유 현황표(자차 시트) 업로드 → 차량번호(공백 무시 정규화) 매칭 → 보험사 **채움/정정** 미리보기 후 적용(저장은 기존 경로=백엔드/Blobs). 회사명만 반영(전화 제거: `\n`·`(` 앞까지). 기성 홈택스 임포트의 순수 JS xlsx 파서(`xlsxRows/xlsxSheet/xlsxZip`, DecompressionStream) 재사용. 헬퍼 `vehInsurerMap/Plan/Apply`, `handleVehInsFile`, `showVehInsPreview`, `confirmVehInsImport`. 지입 시트엔 보험사 컬럼 없음(대상=자차).
