@@ -51,11 +51,14 @@ async function handleGet(event, d, R) {
   }
   const col = d.collection;
   if (!COL[col]) return jr(400, { status: 'REJECTED', error_code: 'UNKNOWN_COLLECTION', request_id: R });
-  if (permOf(c.member, col) === 'hide') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_ACCESS', request_id: R });
+  const p = permOf(c.member, col);
+  // tasks: 개인 인박스('내게 온 지시')·홈 미완료지시는 권한과 무관하게 노출해야 하므로 hide여도 읽기 허용.
+  // 가시성(담당/전사/공개범위) 필터는 프런트에서. 쓰기는 여전히 'do' 필요.
+  if (p === 'hide' && col !== 'tasks') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_ACCESS', request_id: R });
   const r = await blobGet(store(DATA), colKey(col));
   if (!r.ok) return jr(500, { status: 'ERROR', error_code: r.code, request_id: R });
   const doc = r.data || { schema: 1, items: [] };
-  return jr(200, { status: 'OK', collection: col, doc, can_write: permOf(c.member, col) === 'do', request_id: R });
+  return jr(200, { status: 'OK', collection: col, doc, can_write: p === 'do', request_id: R });
 }
 
 async function handleSave(event, d, R) {
