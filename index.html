@@ -3238,9 +3238,8 @@
     });
     urgent.sort(function(a, b){ return a.dd.diff - b.dd.diff; });
 
-    // 지시자(관리자·지시 등록권자)=전체 미완료 지시, 직원=본인 담당/전사/공개범위만
-    var canIssue = canDo("tasks");
-    var openTasks = liveTasks().filter(function(t){ return (t.status === "open" || t.status === "hold") && (canIssue ? true : taskForMe(t)); });
+    // 관리자=전체 미완료 지시, 나머지=본인 담당/전사/공개범위(지시 탭과 동일 기준: taskVisible)
+    var openTasks = liveTasks().filter(function(t){ return (t.status === "open" || t.status === "hold") && taskVisible(t); });
     openTasks.sort(function(a, b){
       var ad = a.due || "9999-99-99", bd = b.due || "9999-99-99";
       return ad < bd ? -1 : (ad > bd ? 1 : 0);
