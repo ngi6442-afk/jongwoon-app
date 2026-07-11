@@ -1151,10 +1151,14 @@
     <div class="err" id="meErr">이름과 PIN(4자리)을 확인하세요.</div>
     <input type="text" id="meName" placeholder="이름" autocomplete="off">
     <input type="text" id="mePin" placeholder="PIN 4자리 숫자" inputmode="numeric" autocomplete="off">
-    <span class="fld-label">역할</span>
-    <select id="meRole"><option value="대표">대표</option><option value="관리자">관리자</option><option value="직원">직원</option></select>
+    <span class="fld-label">직책 (권한)</span>
+    <select id="meRole"><option value="대표">대표</option><option value="관리자">관리자</option><option value="팀장">팀장</option><option value="직원">직원</option><option value="현장직">현장직</option></select>
+    <span class="fld-label">직급</span>
+    <select id="meRank"><option value="">- 선택 -</option><option value="대표">대표</option><option value="이사">이사</option><option value="부장">부장</option><option value="차장">차장</option><option value="과장">과장</option><option value="대리">대리</option><option value="주임">주임</option><option value="사원">사원</option></select>
+    <span class="fld-label">부서</span>
+    <select id="meDept"><option value="">- 선택 -</option><option value="관리부">관리부</option><option value="운영부">운영부</option><option value="준설팀">준설팀</option><option value="폐기물팀">폐기물팀</option></select>
     <span class="fld-label">모듈별 권한 (수행/보기/숨김)</span>
-    <div id="mePermNote" style="display:none;font-size:12px;color:#8A6410;background:#FFF3D4;border-radius:6px;padding:6px 9px;margin-bottom:6px;">관리자·대표는 모든 모듈을 <b>수행</b>합니다(개별 설정 무시). 모듈별로 제한하려면 역할을 <b>직원</b>으로 하세요.</div>
+    <div id="mePermNote" style="display:none;font-size:12px;color:#8A6410;background:#FFF3D4;border-radius:6px;padding:6px 9px;margin-bottom:6px;">대표·관리자는 모든 모듈을 <b>수행</b>합니다(개별 설정 무시). 모듈별로 제한하려면 직책을 <b>팀장·직원·현장직</b>으로 하세요.</div>
     <div id="mePerms"></div>
     <button class="primary" id="meSave">저장</button>
     <button class="danger" id="meDelete">삭제</button>
@@ -1207,8 +1211,14 @@
   var ROLE_PRESET = {
     "대표":   {admin:true,  perms:{tasks:"do", veh:"do", rec:"do", lic:"do", check:"do", con:"do", cli:"do", doc:"do"}},
     "관리자": {admin:true,  perms:{tasks:"do", veh:"do", rec:"do", lic:"do", check:"do", con:"do", cli:"do", doc:"do"}},
-    "직원":   {admin:false, perms:{tasks:"do", veh:"view", rec:"view", lic:"view", check:"do", con:"view", cli:"view", doc:"view"}}
+    "팀장":   {admin:false, perms:{tasks:"do", veh:"do", rec:"do", lic:"do", check:"do", con:"view", cli:"view", doc:"view"}},
+    "직원":   {admin:false, perms:{tasks:"do", veh:"view", rec:"view", lic:"view", check:"do", con:"view", cli:"view", doc:"view"}},
+    "현장직": {admin:false, perms:{tasks:"do", veh:"view", rec:"hide", lic:"hide", check:"do", con:"hide", cli:"hide", doc:"view"}}
   };
+  // 직급(정보용)·부서 목록 — 서열 순서(공개범위·결재라인에서 사용)
+  var RANK_LIST = ["대표","이사","부장","차장","과장","대리","주임","사원"];
+  var ROLE_ORDER = ["대표","관리자","팀장","직원","현장직"];
+  var DEPT_LIST = ["관리부","운영부","준설팀","폐기물팀"];
 
   // ---- 체크리스트 정의 (JW-05-011) ----
   var GROUPS = [
@@ -1308,7 +1318,7 @@
   var licPending = false;
   var editingLicId = null;
 
-  var members = [];      // [{id,name,pin,role,admin,perms:{tasks,veh,rec,lic,check},created,updated,del}]
+  var members = [];      // [{id,name,pin,role,rank,dept,admin,perms:{tasks,veh,rec,lic,check},created,updated,del}] — role=직책(권한), rank=직급(정보), dept=부서
   var usersSha = null;
   var usersSaveTimer = null;
   var usersPending = false;
@@ -4841,7 +4851,8 @@
   function renderUsersList(){
     var host = document.getElementById("usersList");
     host.innerHTML = liveMembers().map(function(m){
-      return '<div class="member-row"><div class="minfo"><div class="mname">' + esc(m.name) + (m.admin ? ' 👑' : '') + '</div><div class="mrole">' + esc(m.role||"") + '</div></div>' +
+      var sub = [m.role||"", m.rank||"", m.dept||""].filter(Boolean).join(" · ");
+      return '<div class="member-row"><div class="minfo"><div class="mname">' + esc(m.name) + (m.admin ? ' 👑' : '') + '</div><div class="mrole">' + esc(sub) + '</div></div>' +
         '<button class="mini-btn" data-user-edit="' + m.id + '">수정</button></div>';
     }).join("") || '<div class="empty-line">회원이 없습니다.</div>';
     Array.prototype.forEach.call(host.querySelectorAll("[data-user-edit]"), function(el){
@@ -4859,6 +4870,8 @@
     document.getElementById("mePin").value = "";
     document.getElementById("mePin").placeholder = m ? "PIN (변경 시만 입력)" : "PIN 4자리 숫자";
     document.getElementById("meRole").value = m ? (m.role||"직원") : "직원";
+    document.getElementById("meRank").value = m ? (m.rank||"") : "";
+    document.getElementById("meDept").value = m ? (m.dept||"") : "";
     var perms = m ? (m.perms||{}) : ROLE_PRESET["직원"].perms;
     document.getElementById("mePerms").innerHTML = MODULES.map(function(mod){
       var v = perms[mod] || "view";
@@ -4903,7 +4916,8 @@
     }
     var perms = {};
     Array.prototype.forEach.call(document.querySelectorAll("#mePerms [data-perm]"), function(sel){ perms[sel.getAttribute("data-perm")] = sel.value; });
-    var payload = { action: "member_upsert", name: name, role: role, admin: admin, perms: perms };
+    var payload = { action: "member_upsert", name: name, role: role, admin: admin, perms: perms,
+      rank: document.getElementById("meRank").value, dept: document.getElementById("meDept").value };
     if (editingMemberId) payload.id = editingMemberId;
     if (pin && pinOk) payload.pin = pin;
     gwCall("gw-auth", payload).then(function(res){

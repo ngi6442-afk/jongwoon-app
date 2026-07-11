@@ -1,7 +1,7 @@
 'use strict';
 
 // 그룹웨어 인증 + 회원관리 (서버측). Netlify Blobs 'gw_users' 저장.
-// 회원: member:<id> = {id,name,role,admin,perms,pin_salt,pin_hash,created,updated,del}
+// 회원: member:<id> = {id,name,role,rank,dept,admin,perms,pin_salt,pin_hash,created,updated,del} — role=직책(권한), rank=직급, dept=부서
 //       name:<lower> = id  (이름 인덱스)
 // PIN은 scrypt 해시로만 저장(평문 저장 안 함). 세션은 HMAC 토큰.
 const crypto = require('crypto');
@@ -143,6 +143,8 @@ async function handleMemberUpsert(st, event, d, R) {
   }
   m.role = (d.role || m.role || '직원');
   m.admin = !!d.admin;
+  if (d.rank !== undefined) m.rank = String(d.rank || '');
+  if (d.dept !== undefined) m.dept = String(d.dept || '');
   m.perms = cleanPerms(d.perms || m.perms);
   m.updated = Date.now();
   if (d.pin) {
