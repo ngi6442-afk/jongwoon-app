@@ -661,6 +661,7 @@
     .cal-dots{display:none;}
     .cal-chips{display:flex;}
   }
+  .cal-hint{font-size:12px;color:var(--sub);text-align:right;margin-top:8px;}
   .cal-day-panel{margin-top:12px;}
   .cal-day-head{font-size:13px;font-weight:800;color:var(--text);padding:2px 2px 8px;}
   .cal-day-empty{color:var(--sub);font-size:13px;padding:6px 2px;}
@@ -819,6 +820,7 @@
     </div>
     <div class="cal-week"><div class="cal-sun">일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div class="cal-sat">토</div></div>
     <div class="cal-grid" id="calGrid"></div>
+    <div class="cal-hint" id="calHint"></div>
     <div class="card cal-day-panel" id="calDay"><div class="loading">날짜를 선택하세요</div></div>
   </section>
 
@@ -2719,7 +2721,8 @@
     var startDow = new Date(y, m, 1).getDay();
     var daysInMonth = new Date(y, m+1, 0).getDate();
     var prevDays = new Date(y, m, 0).getDate();
-    var byDate = {}; calEvents().forEach(function(e){ (byDate[e.date] = byDate[e.date] || []).push(e); });
+    var all = calEvents();
+    var byDate = {}; all.forEach(function(e){ (byDate[e.date] = byDate[e.date] || []).push(e); });
     var today = todayStr();
     var t = document.getElementById("calTitle"); if (t) t.textContent = y + "년 " + (m+1) + "월";
     var cells = "";
@@ -2728,6 +2731,10 @@
     var trail = (7 - ((startDow + daysInMonth) % 7)) % 7;
     for (var k = 1; k <= trail; k++){ cells += calCell(y, m+1, k, byDate, today, true); }
     document.getElementById("calGrid").innerHTML = cells;
+    var mkey = y + "-" + pad(m+1);
+    var monthCount = all.filter(function(e){ return e.date.slice(0,7) === mkey; }).length;
+    var hint = document.getElementById("calHint");
+    if (hint) hint.textContent = "이번 달 " + monthCount + "건 · 전체 " + all.length + "건";
     renderCalDay(calState.sel);
   }
   function renderCalDay(ds){
@@ -3202,6 +3209,8 @@
 
   // ---- 대시보드 (통합 첫 화면) ----
   function renderDashboard(){
+    // 데이터 로드/변경 시 캘린더 탭이 열려 있으면 함께 갱신(로그인 직후 빈 배열로 그려진 경우 자동 채움)
+    if (currentTab === "cal" && document.getElementById("calGrid")) renderCalendar();
     var host = document.getElementById("dashHost");
     if (!host) return;
     var today = todayStr();
