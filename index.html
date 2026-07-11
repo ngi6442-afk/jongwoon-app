@@ -648,6 +648,19 @@
   .cal-dot{display:inline-block;width:7px;height:7px;border-radius:50%;flex:0 0 auto;}
   .cal-more{font-size:9px;font-weight:700;color:var(--sub);line-height:7px;}
   .dot-veh{background:#2f6fd0;} .dot-lic{background:#7a4fd0;} .dot-tasks{background:#1A9A6B;} .dot-rec{background:#e0872f;}
+  .cal-chips{display:none;flex-direction:column;gap:2px;width:100%;}
+  .cal-chip{font-size:11px;line-height:1.35;color:#fff;border-radius:4px;padding:1px 5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;}
+  .cal-chip-more{font-size:10px;font-weight:700;color:var(--sub);padding:0 3px;}
+  /* PC: 달력 크게, 도트 대신 일정 텍스트 */
+  @media (min-width:860px){
+    .cal-title{font-size:22px;}
+    .cal-week>div{font-size:13px;padding:4px 0;}
+    .cal-grid{gap:6px;}
+    .cal-cell{min-height:118px;padding:6px 7px;gap:5px;border-radius:12px;}
+    .cal-daynum{font-size:14px;}
+    .cal-dots{display:none;}
+    .cal-chips{display:flex;}
+  }
   .cal-day-panel{margin-top:12px;}
   .cal-day-head{font-size:13px;font-weight:800;color:var(--text);padding:2px 2px 8px;}
   .cal-day-empty{color:var(--sub);font-size:13px;padding:6px 2px;}
@@ -2691,11 +2704,13 @@
   }
   function calCell(y, m, d, byDate, today, other){
     var dObj = new Date(y, m, d), ds = fmtDate(dObj), dow = dObj.getDay();
-    var list = byDate[ds] || [], dots = "";
+    var list = byDate[ds] || [], dots = "", chips = "";
     list.slice(0,5).forEach(function(e){ dots += '<span class="cal-dot dot-'+e.mod+'"></span>'; });
     if (list.length > 5) dots += '<span class="cal-more">+'+(list.length-5)+'</span>';
+    list.slice(0,4).forEach(function(e){ chips += '<div class="cal-chip ev-'+e.mod+'">'+esc(e.label)+'</div>'; });
+    if (list.length > 4) chips += '<div class="cal-chip-more">+'+(list.length-4)+'건</div>';
     var cls = "cal-cell" + (other?" other":"") + (ds===today?" today":"") + (ds===calState.sel?" sel":"") + (dow===0?" sun":"") + (dow===6?" sat":"");
-    return '<div class="'+cls+'" data-cal-date="'+ds+'"><div class="cal-daynum">'+d+'</div><div class="cal-dots">'+dots+'</div></div>';
+    return '<div class="'+cls+'" data-cal-date="'+ds+'"><div class="cal-daynum">'+d+'</div><div class="cal-dots">'+dots+'</div><div class="cal-chips">'+chips+'</div></div>';
   }
   function renderCalendar(){
     if (!document.getElementById("calGrid")) return;
