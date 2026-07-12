@@ -76,6 +76,7 @@
   .brand h1{font-size:17px;font-weight:800;color:var(--brand-dark);letter-spacing:-0.01em;line-height:1.1;}
   .nav-group{display:none;}
   .nav-divider{flex:0 0 1px;align-self:stretch;background:var(--line);margin:2px 4px;border-radius:1px;}
+  .perm-divider{height:1px;background:var(--line);margin:9px 2px;}
   /* 탭 */
   .tabbar{
     display:flex;
@@ -695,20 +696,18 @@
   <div class="layout">
   <nav class="tabbar">
     <button class="tab-btn active" data-tab="dash" id="tabDashBtn">홈</button>
-    <div class="nav-group">권한</div>
+    <div class="nav-group">관리</div>
     <button class="tab-btn" data-tab="tasks" id="tabTasksBtn">지시 <span class="tab-badge hide" id="taskTabBadge">0</span></button>
     <button class="tab-btn" data-tab="rec" id="tabRecBtn">기성</button>
     <button class="tab-btn" data-tab="cli" id="tabCliBtn">거래처</button>
+    <button class="tab-btn perm-hidden" data-tab="hr" id="tabHrBtn">인사</button>
     <div class="nav-divider"></div>
-    <div class="nav-group">담당</div>
     <button class="tab-btn" data-tab="cal" id="tabCalBtn">캘린더</button>
     <button class="tab-btn" data-tab="check" id="tabCheckBtn">업무</button>
     <button class="tab-btn" data-tab="veh" id="tabVehBtn">차량</button>
     <button class="tab-btn" data-tab="lic" id="tabLicBtn">인허가</button>
     <button class="tab-btn" data-tab="con" id="tabConBtn">계약</button>
     <button class="tab-btn" data-tab="doc" id="tabDocBtn">문서함</button>
-    <div class="nav-group perm-hidden" id="navGroupHr">인사</div>
-    <button class="tab-btn perm-hidden" data-tab="hr" id="tabHrBtn">인사</button>
   </nav>
   <div class="views">
 
@@ -4689,9 +4688,8 @@
     if (currentTab !== "dash" && currentTab !== "check" && MODULES.indexOf(currentTab) >= 0 && !canSee(currentTab)) switchTab("dash");
     // 인사 탭: 대표·관리자 전용
     var adminUser = isAdmin();
-    var hrBtn = document.getElementById("tabHrBtn"), hrGrp = document.getElementById("navGroupHr");
+    var hrBtn = document.getElementById("tabHrBtn");
     if (hrBtn) hrBtn.classList.toggle("perm-hidden", !adminUser);
-    if (hrGrp) hrGrp.classList.toggle("perm-hidden", !adminUser);
     if (currentTab === "hr" && !adminUser) switchTab("dash");
     updateUserChip();
   }
@@ -4928,9 +4926,16 @@
     document.getElementById("meRank").value = m ? (m.rank||"") : "";
     document.getElementById("meDept").value = m ? (m.dept||"") : "";
     var perms = m ? (m.perms||{}) : ROLE_PRESET["직원"].perms;
-    document.getElementById("mePerms").innerHTML = MODULES.map(function(mod){
+    // 모듈별 권한 표시 순서 = 사이드바 메뉴 순서(지시·기성·업무·차량·인허가)
+    var permOrder = ["tasks","rec","check","veh","lic"].filter(function(x){ return MODULES.indexOf(x) >= 0; });
+    MODULES.forEach(function(x){ if (permOrder.indexOf(x) < 0) permOrder.push(x); });
+    var manageMods = { tasks:1, rec:1, cli:1, hr:1 };  // 관리 그룹(사이드바와 동일)
+    var dividerDone = false;
+    document.getElementById("mePerms").innerHTML = permOrder.map(function(mod){
+      var line = "";
+      if (!dividerDone && !manageMods[mod]){ line = '<div class="perm-divider"></div>'; dividerDone = true; }
       var v = perms[mod] || "view";
-      return '<div class="perm-row"><span class="plabel">' + MOD_LABEL[mod] + '</span><select data-perm="' + mod + '">' +
+      return line + '<div class="perm-row"><span class="plabel">' + MOD_LABEL[mod] + '</span><select data-perm="' + mod + '">' +
         '<option value="do"' + (v==="do"?" selected":"") + '>수행</option>' +
         '<option value="view"' + (v==="view"?" selected":"") + '>보기</option>' +
         '<option value="hide"' + (v==="hide"?" selected":"") + '>숨김</option></select></div>';
