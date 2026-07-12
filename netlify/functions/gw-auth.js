@@ -152,6 +152,8 @@ async function handleMemberUpsert(st, event, d, R) {
   if (d.loa_days !== undefined) m.loa_days = isNaN(Number(d.loa_days)) ? 0 : Number(d.loa_days);
   if (d.leave_date !== undefined) m.leave_date = String(d.leave_date || '');
   if (d.annual_paid !== undefined) m.annual_paid = !!d.annual_paid;
+  if (d.annual_base !== undefined) { m.annual_base = (d.annual_base === null || isNaN(Number(d.annual_base))) ? null : Number(d.annual_base); }
+  if (d.annual_base_date !== undefined) m.annual_base_date = String(d.annual_base_date || '');
   m.perms = cleanPerms(d.perms || m.perms);
   m.updated = Date.now();
   if (d.pin) {

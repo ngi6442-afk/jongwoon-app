@@ -926,6 +926,11 @@
   <!-- 인사(대표·관리자 전용) -->
   <section class="view" id="view-hr">
     <div class="dash-sec" style="margin-bottom:8px;"><h2>임직원 <span class="cnt" id="hrTotal"></span></h2></div>
+    <div id="hrStartBanner" style="display:none;background:#EAF3EC;border:1px solid #B9D9C2;border-radius:10px;padding:12px 14px;margin-bottom:10px;">
+      <div style="font-weight:700;margin-bottom:4px;">인사업무 시작 준비</div>
+      <div style="font-size:13px;color:var(--sub);line-height:1.5;margin-bottom:10px;">직원 정보(현직원 수정·직원 추가)와 <b>현재 잔여 연차</b> 입력을 마친 뒤 아래 버튼을 누르세요. 누른 날짜를 기준으로 잔여 연차 계산이 시작됩니다. (한 번만 누르면 사라집니다)</div>
+      <button class="primary" id="hrStartBtn" style="width:auto;padding:9px 18px;">인사업무 시작 ▶</button>
+    </div>
     <div class="card" id="hrRoster"><div class="loading">불러오는 중…</div></div>
     <button class="link-btn" id="hrAddBtn">+ 직원 추가</button>
     <button class="link-btn" id="permMgmtBtn">🔑 권한관리</button>
@@ -1349,8 +1354,12 @@
     <span class="fld-label">퇴사일 (재직 중이면 비움)</span>
     <input type="date" id="meLeave">
     <label class="dg-check"><input type="checkbox" id="mePaidAnnual"> 연차수당 포함 근로자 (연차 대신 수당)</label>
-    <span class="fld-label">연차 수동조정 (비우면 입사일 기준 자동계산)</span>
+    <span class="fld-label">현재 잔여 연차 (입력 시 이 값부터 시작 · 비우면 자동 역산)</span>
+    <input type="number" id="meAnnualBase" min="0" step="0.5" placeholder="미입력=자동 역산" autocomplete="off">
+    <div id="meBaseDateNote" style="display:none;font-size:12px;color:var(--sub);margin:-2px 2px 8px;"></div>
+    <span class="fld-label">연차 부여 수동조정 (비우면 취업규칙 자동계산)</span>
     <input type="number" id="meAnnual" min="0" step="0.5" placeholder="자동" autocomplete="off">
+    <div style="font-size:12px;color:var(--sub);margin:-2px 2px 8px;">취업규칙 제26조: 1년 15일, 3년 이상 매 2년 +1일, 최대 25일. 미사용분은 1년 후 소멸.</div>
     <!-- 모듈별 권한은 별도 '권한관리' 화면으로 분리. 기존 권한 보존을 위해 숨김 유지 -->
     <div id="mePermsWrap" style="display:none;">
       <span class="fld-label">모듈별 권한 (수행/보기/숨김)</span>
@@ -3026,6 +3035,7 @@
   document.getElementById("hrAddBtn").addEventListener("click", function(){ openMemberEdit(null); });
   document.getElementById("permMgmtBtn").addEventListener("click", function(){ switchTab("perm"); });
   document.getElementById("permBackBtn").addEventListener("click", function(){ switchTab("hr"); });
+  document.getElementById("hrStartBtn").addEventListener("click", hrStartWork);
   document.getElementById("meSave").addEventListener("click", saveMemberEdit);
   document.getElementById("meDelete").addEventListener("click", deleteMemberEdit);
   document.getElementById("meCancel").addEventListener("click", closeMemberEdit);
@@ -4110,22 +4120,84 @@
     var end=new Date(h.getTime()); end.setFullYear(h.getFullYear()+n+1);
     return { start:fmtYMD(anniv), end:fmtYMD(end) };
   }
+  // 지난 기간(1년 시효 경과)에 소멸한 미사용 연차 누적. hire/fiscal 기준 모두 지원.
+  function annualExpired(memberId){
+    var m=findMember(memberId);
+    if(!m || !isDate(m.hire_date)) return 0;
+    var per=annualPeriod(m); if(!per) return 0;
+    var mine=liveLeaves().filter(function(l){ return l.member_id===memberId && l.status==="approved" && l.type==="annual"; });
+    function usedIn(ps,pe){ var u=0; mine.forEach(function(l){ if(l.start && l.start>=ps && l.start<pe) u+=(l.days||0); }); return u; }
+    var bd = m.annual_base_date || "";   // 계산 시작일 이전 기간은 앱에 이력이 없으므로 소멸 집계 제외
+    var total=0;
+    if((m.annual_basis||"hire")==="fiscal"){
+      var y0=new Date(m.hire_date+"T00:00:00").getFullYear();
+      var curY=parseInt(per.start.slice(0,4),10);
+      for(var yy=y0; yy<curY; yy++){
+        if(bd && (yy+1)+"-01-01" <= bd) continue;        // 시작일 이전 기간 제외
+        var Ek=computeAnnual(m, yy+"-12-31");
+        total += Math.max(0, Ek - usedIn(yy+"-01-01",(yy+1)+"-01-01"));
+      }
+    } else {
+      var h=new Date(m.hire_date+"T00:00:00"), k=0;
+      while(k<60){
+        var pS=new Date(h.getTime()); pS.setFullYear(h.getFullYear()+k);
+        var pE=new Date(h.getTime()); pE.setFullYear(h.getFullYear()+k+1);
+        var ps=fmtYMD(pS), pe=fmtYMD(pE);
+        if(ps>=per.start) break;                         // 현재 기간에 도달하면 종료
+        if(bd && pe <= bd){ k++; continue; }             // 시작일 이전 기간 제외
+        var Ek2 = (typeof m.annual_days==="number") ? m.annual_days
+                : (k<=0 ? 11 : Math.min(15 + Math.floor((k-1)/2), 25));  // 기간 인덱스로 부여량(윤년 경계 오차 방지)
+        total += Math.max(0, Ek2 - usedIn(ps,pe));
+        k++;
+      }
+    }
+    return Math.round(total*10)/10;
+  }
   function leaveRemaining(memberId){
     var m=findMember(memberId);
-    var grant=computeAnnual(m);
     var per=annualPeriod(m);
-    var used=0; liveLeaves().forEach(function(l){
-      if(l.member_id!==memberId || l.status!=="approved" || l.type!=="annual") return;
-      if(per && (!l.start || l.start<per.start || l.start>=per.end)) return;   // 당해 사용기간 밖은 소멸
-      used+=(l.days||0);
-    });
-    return {grant:grant, used:used, left:Math.round((grant-used)*10)/10, period:per};
+    var hasBase = m && typeof m.annual_base === "number";
+    var baseDate = m && m.annual_base_date;
+    var inBasePeriod = hasBase && per && baseDate && baseDate>=per.start && baseDate<per.end;
+    var grant, used=0, expired=0, mode;
+    if(inBasePeriod){
+      // 잔여 입력 직원: 기준값(현재 잔여)부터 시작, 기준일 이후 사용분만 차감
+      grant = m.annual_base; mode = "base";
+      liveLeaves().forEach(function(l){
+        if(l.member_id!==memberId || l.status!=="approved" || l.type!=="annual") return;
+        if(!l.start || l.start<baseDate || l.start>=per.end) return;
+        used+=(l.days||0);
+      });
+    } else {
+      // 역산(기본): 취업규칙 자동 부여 − 당해 사용, 지난 기간 소멸 표시
+      grant = computeAnnual(m); mode = "calc";
+      liveLeaves().forEach(function(l){
+        if(l.member_id!==memberId || l.status!=="approved" || l.type!=="annual") return;
+        if(per && (!l.start || l.start<per.start || l.start>=per.end)) return;   // 당해 사용기간 밖은 소멸
+        used+=(l.days||0);
+      });
+      expired = annualExpired(memberId);
+    }
+    return {grant:grant, used:used, expired:expired, left:Math.round((grant-used)*10)/10, period:per, mode:mode};
   }
   function renderLeaves(){
     var host=document.getElementById("leaveList"); if(!host) return;
     var me=getMemberId();
     var mine=document.getElementById("leaveMine");
-    if(mine){ if(me){ var r=leaveRemaining(me); mine.innerHTML='<div class="leave-bal">내 연차 <b>'+r.left+'</b>일 남음 <span class="lv-sub">(부여 '+r.grant+' · 사용 '+r.used+(r.period?' · 사용기간 '+r.period.start+'~'+r.period.end+' (이후 소멸)':'')+')</span></div>'; } else mine.innerHTML=''; }
+    if(mine){
+      if(me){
+        var mm=findMember(me);
+        if(mm && mm.annual_paid){
+          mine.innerHTML='<div class="leave-bal">연차수당 포함 근로자 <span class="lv-sub">— 연차 사용 불가(수당 정산 대상). 당해 발생 '+computeAnnual(mm)+'일</span></div>';
+        } else {
+          var r=leaveRemaining(me);
+          var sub = (r.mode==="base")
+            ? '(기준값 '+r.grant+' · 사용 '+r.used+(r.period?' · 사용기간 '+r.period.start+'~'+r.period.end:'')+')'
+            : '(부여 '+r.grant+' · 사용 '+r.used+(r.expired?' · 지난 기간 소멸 '+r.expired:'')+(r.period?' · 사용기간 '+r.period.start+'~'+r.period.end:'')+')';
+          mine.innerHTML='<div class="leave-bal">내 연차 <b>'+r.left+'</b>일 남음 <span class="lv-sub">'+sub+'</span></div>';
+        }
+      } else mine.innerHTML='';
+    }
     var all=liveLeaves();
     var visible = isAdmin() ? all.slice() : all.filter(function(l){ return l.member_id===me; });
     visible.sort(function(a,b){ var ap=a.status==="pending"?0:1, bp=b.status==="pending"?0:1; if(ap!==bp) return ap-bp; return (b.start||"").localeCompare(a.start||""); });
@@ -5580,8 +5652,13 @@
         var meta = [m.role || "", m.rank || ""].filter(Boolean).join(" · ");
         var hr = [];
         if(m.hire_date){ var si=serviceInfo(m); hr.push("입사 " + m.hire_date); if(si) hr.push("근속 " + (Math.floor(si.years*10)/10) + "년"); }
-        hr.push("연차 " + computeAnnual(m) + "일" + (typeof m.annual_days==="number" ? "(수동)" : ""));
-        if(m.annual_paid) hr.push("연차수당포함");
+        if(m.annual_paid){
+          hr.push("연차 " + computeAnnual(m) + "일(수당포함·사용불가)" + (typeof m.annual_days==="number" ? "(수동)" : ""));
+        } else {
+          var lr=leaveRemaining(m.id);
+          if(lr.mode==="base") hr.push("연차 잔여 " + lr.left + " (기준값 " + lr.grant + " · 사용 " + lr.used + ")");
+          else hr.push("연차 부여 " + lr.grant + " · 사용 " + lr.used + " · 잔여 " + lr.left + (lr.expired?" · 소멸 "+lr.expired:""));
+        }
         if(m.leave_date) hr.push("퇴사 " + m.leave_date);
         var sev = severanceAnnual(m);
         if(sev) hr.push("퇴직 연차수당 " + sev.days + "일(" + (sev.under1 ? "1년미만" : "1년이상") + ")");
@@ -5600,10 +5677,32 @@
     hrOpenId = null;  // DOM 재생성으로 이전 패널 무효화 → 상태 초기화 후 재오픈
     host.innerHTML = html || '<div class="empty-line">직원이 없습니다.</div>';
     var total = document.getElementById("hrTotal"); if (total) total.textContent = "총 " + mem.length + "명";
+    var banner = document.getElementById("hrStartBanner"); if (banner) banner.style.display = (isAdmin() && !hrStarted()) ? "" : "none";
     Array.prototype.forEach.call(host.querySelectorAll("[data-hr-toggle]"), function(el){
       el.addEventListener("click", function(){ hrToggle(el.getAttribute("data-hr-toggle")); });
     });
     if (reopen && findMember(reopen)) hrToggle(reopen);
+  }
+  function hrStarted(){ return liveMembers().some(function(m){ return !!m.annual_base_date; }); }
+  function hrStartWork(){
+    if (!isAdmin()) return;
+    if (hrStarted()) return;
+    if (!confirm("직원 정보와 현재 잔여 연차 입력을 모두 마치셨나요?\n오늘 날짜(" + todayStr() + ")를 기준으로 연차 계산을 시작합니다. 이 버튼은 사라집니다.")) return;
+    var today = todayStr();
+    var targets = liveMembers();
+    var btn = document.getElementById("hrStartBtn"); if (btn){ btn.disabled = true; btn.textContent = "시작 처리 중…"; }
+    Promise.all(targets.map(function(m){
+      return gwCall("gw-auth", { action:"member_upsert", id:m.id, name:m.name, role:m.role, admin:!!m.admin, annual_base_date:today }).then(function(res){
+        if (res.status===200 && res.body && res.body.member){
+          for (var i=0;i<members.length;i++){ if(members[i].id===res.body.member.id){ members[i]=res.body.member; break; } }
+        }
+      }).catch(function(){});
+    })).then(function(){
+      try{ saveUsersCache(); }catch(e){}
+      if (btn){ btn.disabled=false; btn.textContent="인사업무 시작 ▶"; }
+      drawHrRoster(); render();
+      alert("인사업무를 시작했습니다. 오늘부터 잔여 연차가 계산됩니다.");
+    });
   }
   var hrOpenId = null;
   function hrToggle(id){
@@ -5721,6 +5820,9 @@
     document.getElementById("meLeave").value = m ? (m.leave_date||"") : "";
     document.getElementById("mePaidAnnual").checked = !!(m && m.annual_paid);
     document.getElementById("meAnnual").value = (m && typeof m.annual_days==="number") ? m.annual_days : "";
+    document.getElementById("meAnnualBase").value = (m && typeof m.annual_base==="number") ? m.annual_base : "";
+    var bdNote = document.getElementById("meBaseDateNote");
+    if (bdNote){ if (m && m.annual_base_date){ bdNote.style.display=""; bdNote.textContent = "기준일 " + m.annual_base_date + " · 이후 사용분을 차감해 잔여 계산"; } else { bdNote.style.display="none"; bdNote.textContent=""; } }
     var perms = m ? (m.perms||{}) : ROLE_PRESET["직원"].perms;
     // 모듈별 권한 표시 순서 = 사이드바 메뉴 순서 (관리: 지시·기성·거래처 / 담당: 업무·차량·인허가·계약·문서함)
     var permOrder = ["tasks","rec","cli","check","veh","lic","con","doc"].filter(function(x){ return MODULES.indexOf(x) >= 0; });
@@ -5778,18 +5880,23 @@
       errEl.classList.add("show"); return;
     }
     var annualRaw = document.getElementById("meAnnual").value;
+    var baseRaw = document.getElementById("meAnnualBase").value;
     var loaRaw = document.getElementById("meLoa").value;
     // 모듈별 권한은 '권한관리' 화면에서만 편집. 인사 카드 저장은 기존 권한을 보존(perms 미전송).
     // 신규 회원만 직책 프리셋으로 초기 권한 부여.
     var payload = { action: "member_upsert", name: name, role: role, admin: admin,
       rank: document.getElementById("meRank").value, dept: document.getElementById("meDept").value,
       annual_days: annualRaw === "" ? null : Number(annualRaw),
+      annual_base: baseRaw === "" ? null : Number(baseRaw),
       hire_date: document.getElementById("meHire").value || "",
       emp_type: document.getElementById("meEmp").value,
       annual_basis: document.getElementById("meBasis").value,
       loa_days: loaRaw === "" ? 0 : Number(loaRaw),
       leave_date: document.getElementById("meLeave").value || "",
       annual_paid: document.getElementById("mePaidAnnual").checked };
+    // 잔여값 입력 + 기준일 없음 + 이미 인사업무 시작됨 → 기준일=오늘 자동 스탬프
+    var existM = editingMemberId ? findMember(editingMemberId) : null;
+    if (payload.annual_base !== null && (!existM || !existM.annual_base_date) && hrStarted()) payload.annual_base_date = todayStr();
     if (editingMemberId) payload.id = editingMemberId;
     else if (ROLE_PRESET[role]) payload.perms = ROLE_PRESET[role].perms;   // 신규만 프리셋 권한
     if (pin && pinOk) payload.pin = pin;
