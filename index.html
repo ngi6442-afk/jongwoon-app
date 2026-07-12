@@ -541,6 +541,17 @@
   .rec-item.checked .rec-amt2{color:#9AA8A2;}
   .rec-item .rec-actions{display:flex;align-items:center;gap:6px;flex-shrink:0;}
   .dup-chip{display:inline-block;font-size:11px;padding:1px 8px;border-radius:999px;background:#FBE7E3;color:#B0332A;font-weight:800;flex-shrink:0;}
+  .rec-age{font-size:11px;font-weight:700;border-radius:6px;padding:1px 6px;white-space:nowrap;flex-shrink:0;}
+  .rec-age.age0{background:rgba(128,128,128,.14);color:var(--sub);}
+  .rec-age.age30{background:#FEF3D8;color:#8A6410;}
+  .rec-age.age60{background:#FCE3CF;color:#B4541A;}
+  .rec-age.age90{background:#FBE0DC;color:#B0332A;}
+  .rec-agg-cap{font-size:12px;color:var(--sub);padding:2px 4px 8px;}
+  .rec-agg-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 4px;border-top:1px solid var(--line);font-size:13.5px;}
+  .rec-agg-row .cli{min-width:0;}
+  .rec-agg-row .cnt2{color:var(--sub);font-size:12px;margin-left:4px;}
+  .rec-agg-row .amt{font-weight:800;white-space:nowrap;color:var(--brand);}
+  .rec-agg-row.hot .amt{color:#B0332A;}
   .rec-item.rec-dup{background:#FEF6F5;}
   .sel-bar{display:flex;align-items:center;gap:8px;padding:7px 15px;flex-wrap:nowrap;}
   .sel-box{width:18px;height:18px;flex:none;cursor:pointer;margin:0;accent-color:var(--brand);}
@@ -824,6 +835,8 @@
     <div class="dash-sec" style="margin:14px 0 6px;"><h2>미수 <span class="cnt" id="recHead"></span></h2></div>
     <input type="search" id="recSearch" placeholder="거래처·내역 검색" autocomplete="off" style="width:100%;padding:9px 12px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;font-size:14px;box-sizing:border-box;">
     <div class="sel-bar" id="recSelBar" style="display:none;"></div>
+    <button class="link-btn" id="recAgingToggle" style="display:none;"></button>
+    <div class="card" id="recAgingSummary" style="display:none;margin-bottom:6px;"></div>
     <div class="card" id="recList"><div class="loading">불러오는 중…</div></div>
     <button class="link-btn" id="recPaidToggle"></button>
     <div class="card" id="recPaidList" style="display:none;margin-top:6px;"></div>
@@ -2956,6 +2969,7 @@
     renderReceivables();
   });
   document.getElementById("recDeletedToggle").addEventListener("click", function(){ showDeletedRec = !showDeletedRec; renderReceivables(); });
+  document.getElementById("recAgingToggle").addEventListener("click", function(){ showRecAging = !showRecAging; renderReceivables(); });
   document.getElementById("recSearch").addEventListener("input", function(){
     recSearchTerm = this.value.toLowerCase().trim();
     renderReceivables();
@@ -4523,6 +4537,15 @@
     saveRecCache(); renderReceivables(); renderDashboard(); scheduleRecSave();
   }
 
+  var showRecAging = false;
+  function recAging(billed){
+    if(!isDate(billed)) return null;
+    var t = new Date(todayStr()+"T00:00:00"), b = new Date(billed+"T00:00:00");
+    var days = Math.round((t-b)/86400000);
+    if(days < 0) return null;
+    var cls = days>=90 ? "age90" : (days>=60 ? "age60" : (days>=30 ? "age30" : "age0"));
+    return {days:days, cls:cls};
+  }
   function recRowHtml(r, isPaid, sel){
     var ctrl = "";
     if (canDo("rec")){
@@ -4534,6 +4557,8 @@
       }
     }
     var amt = r.amount ? (fmtAmount(r.amount) + '원') : '';
+    var ageHtml = "";
+    if (!isPaid){ var ag = recAging(r.billed); if (ag) ageHtml = '<span class="rec-age ' + ag.cls + '" title="청구일 ' + esc(r.billed||"") + '">' + ag.days + '일</span>'; }
     var cls = 'item rec-item' + (isPaid ? ' checked' : '') + (r._dup ? ' rec-dup' : '') + (r.mismatch ? ' rec-mm' : '') + (r.hl ? ' rec-hl' : '');
     return '<div class="' + cls + '" data-rec-row="' + r.id + '">' +
         (sel ? selBoxHtml("rec", r.id, false) : '') +
@@ -4541,10 +4566,37 @@
           '<span class="rec-client">' + esc(r.client || "-") + '</span>' +
           (r._dup ? '<span class="dup-chip">중복 의심</span>' : '') +
           (r.mismatch ? '<span class="dup-chip" style="background:#EAE2FB;color:#5B3FA6;">불일치</span>' : '') +
+          ageHtml +
           (amt ? '<span class="rec-amt2">' + amt + '</span>' : '') +
         '</div>' +
         ctrl +
       '</div>';
+  }
+
+  // 거래처별 미수 집계(금액 큰 순, 경과 최대일)
+  function renderRecAging(unpaid){
+    var host = document.getElementById("recAgingSummary");
+    var tog = document.getElementById("recAgingToggle");
+    if (!host || !tog) return;
+    if (!unpaid.length){ tog.style.display = "none"; host.style.display = "none"; return; }
+    var by = {};
+    unpaid.forEach(function(r){
+      var k = (r.client || "-").trim();
+      if (!by[k]) by[k] = { client:k, sum:0, cnt:0, maxDays:0 };
+      by[k].sum += (r.amount || 0); by[k].cnt++;
+      var ag = recAging(r.billed); if (ag && ag.days > by[k].maxDays) by[k].maxDays = ag.days;
+    });
+    var arr = Object.keys(by).map(function(k){ return by[k]; });
+    arr.sort(function(a, b){ return b.sum - a.sum; });
+    var total = 0; arr.forEach(function(x){ total += x.sum; });
+    var rows = arr.slice(0, 20).map(function(x){
+      var cls = x.maxDays>=90?"age90":(x.maxDays>=60?"age60":(x.maxDays>=30?"age30":"age0"));
+      return '<div class="rec-agg-row' + (x.maxDays>=60?' hot':'') + '"><div class="cli"><b>' + esc(x.client) + '</b> <span class="rec-age ' + cls + '">최대 ' + x.maxDays + '일</span> <span class="cnt2">' + x.cnt + '건</span></div><div class="amt">' + fmtAmount(x.sum) + '원</div></div>';
+    }).join("");
+    host.innerHTML = '<div class="rec-agg-cap">거래처 ' + arr.length + '곳 · 합계 ' + fmtAmount(total) + '원 (금액 큰 순)</div>' + rows;
+    tog.textContent = showRecAging ? "거래처별 미수 숨기기" : ("거래처별 미수 집계 (" + arr.length + "곳)");
+    tog.style.display = "block";
+    host.style.display = showRecAging ? "block" : "none";
   }
 
   var recSearchTerm = "";
@@ -4583,6 +4635,7 @@
       var sum = 0; unpaid.forEach(function(r){ sum += (r.amount || 0); });
       head.textContent = unpaid.length ? (unpaid.length + "건" + (sum ? " · " + fmtAmount(sum) + "원" : "")) : "";
     }
+    renderRecAging(unpaid);
     var selR = canDo("rec");
     listHost.innerHTML = unpaid.length ? unpaid.map(function(r){ return recRowHtml(r, false, selR); }).join("") : '<div class="empty-line">미수 건이 없습니다.</div>';
     toggleBtn.textContent = showRecPaid ? "입금 완료 숨기기" : ("입금 완료 보기 (" + paid.length + ")");
