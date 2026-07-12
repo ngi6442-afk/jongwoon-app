@@ -1042,20 +1042,38 @@
 <div class="modal-backdrop" id="docGenBackdrop">
   <div class="modal">
     <h3>서류 출력</h3>
-    <span class="fld-label">배출자 유형</span>
-    <select id="dgParty"><option value="individual">개인</option><option value="business">사업자</option></select>
-    <input type="text" id="dgName" placeholder="이름 / 상호" autocomplete="off">
-    <input type="text" id="dgBiz" placeholder="사업자등록번호" autocomplete="off" style="display:none;">
-    <input type="text" id="dgCeo" placeholder="대표자" autocomplete="off" style="display:none;">
-    <input type="text" id="dgTel" placeholder="연락처" autocomplete="off">
-    <input type="text" id="dgAddr" placeholder="배출장소(주소)" autocomplete="off">
-    <input type="text" id="dgWaste" placeholder="폐기물 종류 (예: 사업장일반, 건설, 지정)" autocomplete="off">
-    <input type="text" id="dgQty" placeholder="물량 (예: 5톤, 3㎥)" autocomplete="off">
+    <span class="fld-label">서류 종류</span>
+    <select id="dgDocType">
+      <option value="waste">폐기물 수집·운반 및 처리 계약서 (종운환경)</option>
+      <option value="demo">석면해체·철거공사 계약서 (종운건설)</option>
+    </select>
+    <div id="dgWasteFields">
+      <span class="fld-label">배출자 유형</span>
+      <select id="dgParty"><option value="individual">개인</option><option value="business">사업자</option></select>
+      <input type="text" id="dgName" placeholder="이름 / 상호" autocomplete="off">
+      <input type="text" id="dgBiz" placeholder="사업자등록번호" autocomplete="off" style="display:none;">
+      <input type="text" id="dgCeo" placeholder="대표자" autocomplete="off" style="display:none;">
+      <input type="text" id="dgTel" placeholder="연락처" autocomplete="off">
+      <input type="text" id="dgAddr" placeholder="배출장소(주소)" autocomplete="off">
+      <input type="text" id="dgWaste" placeholder="폐기물 종류 (예: 사업장일반, 건설, 지정)" autocomplete="off">
+      <input type="text" id="dgQty" placeholder="물량 (예: 5톤, 3㎥)" autocomplete="off">
+    </div>
+    <div id="dgDemoFields" style="display:none;">
+      <input type="text" id="dgWork" placeholder="공사명" autocomplete="off">
+      <input type="text" id="dgSite" placeholder="현장주소" autocomplete="off">
+      <input type="text" id="dgOwner" placeholder="발주처(갑) 상호" autocomplete="off">
+      <input type="text" id="dgOwnerCeo" placeholder="발주처 대표" autocomplete="off">
+      <input type="text" id="dgOwnerBiz" placeholder="발주처 사업자번호" autocomplete="off">
+      <input type="text" id="dgOwnerAddr" placeholder="발주처 주소" autocomplete="off">
+      <input type="text" id="dgOwnerTel" placeholder="발주처 전화" autocomplete="off">
+      <input type="text" id="dgAmount" placeholder="계약금액 (숫자만, VAT 별도)" inputmode="numeric" autocomplete="off">
+      <input type="text" id="dgArea" placeholder="철거·해체 면적 (㎡)" autocomplete="off">
+      <input type="text" id="dgWasteQty" placeholder="예상 폐기물량 (톤)" autocomplete="off">
+      <span class="fld-label">착공일 / 준공일</span>
+      <div style="display:flex;gap:8px;"><input type="date" id="dgStartDate" style="flex:1"><input type="date" id="dgEndDate" style="flex:1"></div>
+    </div>
     <span class="fld-label">계약(작성)일</span>
     <input type="date" id="dgDate">
-    <span class="fld-label">생성 서류</span>
-    <label class="dg-check"><input type="checkbox" id="dgDocContract" checked> 폐기물 수집·운반 및 처리 계약서 (JW-06-003)</label>
-    <label class="dg-check"><input type="checkbox" id="dgDocReport"> 배출자 정보 확인서 (내부)</label>
     <button class="primary" id="dgGenerate">서류 생성 · 미리보기</button>
     <button class="secondary" id="dgCancel">취소</button>
   </div>
@@ -2963,6 +2981,7 @@
   document.getElementById("conStartCancel").addEventListener("click", function(){ document.getElementById("conStartBackdrop").classList.remove("show"); });
   document.getElementById("docGenBtn").addEventListener("click", openDocGen);
   document.getElementById("dgParty").addEventListener("change", dgToggleParty);
+  document.getElementById("dgDocType").addEventListener("change", dgToggleDocType);
   document.getElementById("dgGenerate").addEventListener("click", generateDocs);
   document.getElementById("dgCancel").addEventListener("click", function(){ document.getElementById("docGenBackdrop").classList.remove("show"); });
   document.getElementById("dpPrint").addEventListener("click", function(){ window.print(); });
@@ -3693,13 +3712,53 @@
   function dgDateKo(s){ if(!isDate(s)) return '&nbsp;&nbsp;&nbsp;년&nbsp;&nbsp;&nbsp;월&nbsp;&nbsp;&nbsp;일'; var p=s.split('-'); return p[0]+'년 '+(+p[1])+'월 '+(+p[2])+'일'; }
   function openDocGen(){
     if(!canDo("con")) return;
+    document.getElementById("dgDocType").value="waste";
     document.getElementById("dgParty").value="business";
-    ["dgName","dgBiz","dgCeo","dgTel","dgAddr","dgWaste","dgQty"].forEach(function(id){ document.getElementById(id).value=""; });
+    ["dgName","dgBiz","dgCeo","dgTel","dgAddr","dgWaste","dgQty","dgWork","dgSite","dgOwner","dgOwnerCeo","dgOwnerBiz","dgOwnerAddr","dgOwnerTel","dgAmount","dgArea","dgWasteQty"].forEach(function(id){ var e=document.getElementById(id); if(e) e.value=""; });
     document.getElementById("dgDate").value=todayStr();
-    document.getElementById("dgDocContract").checked=true;
-    document.getElementById("dgDocReport").checked=false;
+    document.getElementById("dgStartDate").value="";
+    document.getElementById("dgEndDate").value="";
     dgToggleParty();
+    dgToggleDocType();
     document.getElementById("docGenBackdrop").classList.add("show");
+  }
+  function dgToggleDocType(){
+    var demo = document.getElementById("dgDocType").value === "demo";
+    document.getElementById("dgWasteFields").style.display = demo ? "none" : "";
+    document.getElementById("dgDemoFields").style.display = demo ? "" : "none";
+  }
+  var JW_CON = { name:"(주)종운건설", biz:"506-81-84827", ceo:"나종운", addr:"포항시 남구 정몽주로 823-10(청림동)", tel:"054-291-1202", biztype:"건설업(비계·구조물해체)", perm1:"건설업 전문면허 경북포항 2013-6-4", perm2:"석면해체·제거업 노동부 제3339호" };
+  function dgDemoData(){
+    function v(id){ return document.getElementById(id).value.trim(); }
+    return { work:v("dgWork"), site:v("dgSite"), owner:v("dgOwner"), ownerCeo:v("dgOwnerCeo"), ownerBiz:v("dgOwnerBiz"), ownerAddr:v("dgOwnerAddr"), ownerTel:v("dgOwnerTel"),
+      amount:v("dgAmount"), area:v("dgArea"), wasteQty:v("dgWasteQty"),
+      date:document.getElementById("dgDate").value||todayStr(), startDate:document.getElementById("dgStartDate").value, endDate:document.getElementById("dgEndDate").value };
+  }
+  function docDemoContract(d){
+    var co = '상호 : '+esc(JW_CON.name)+' &nbsp; 사업자번호 : '+esc(JW_CON.biz)+'<br>주소 : '+esc(JW_CON.addr)+'<br>대표 : '+esc(JW_CON.ceo)+' (인) &nbsp; 전화 : '+esc(JW_CON.tel)+'<br>업종 : '+esc(JW_CON.biztype)+'<br><span style="font-size:11px">※ '+esc(JW_CON.perm1)+' &nbsp; ※ '+esc(JW_CON.perm2)+'</span>';
+    var gap = '상호 : '+dgFill(d.owner)+' &nbsp; 사업자번호 : '+dgFill(d.ownerBiz)+'<br>주소 : '+dgFill(d.ownerAddr)+'<br>대표 : '+dgFill(d.ownerCeo)+' (인) &nbsp; 전화 : '+dgFill(d.ownerTel);
+    var amt = d.amount ? Number(String(d.amount).replace(/[^0-9]/g,"")).toLocaleString() : "";
+    return '<div class="doc-page"><h1 style="letter-spacing:3px;font-size:20px;">석면해체·철거공사 계약서</h1>'+
+      '<table class="doc-tbl">'+
+        '<tr><th style="width:92px">1. 공사명</th><td>'+dgFill(d.work)+'</td></tr>'+
+        '<tr><th>2. 발주처</th><td>'+dgFill(d.owner)+'</td></tr>'+
+        '<tr><th>3. 현장주소</th><td>'+dgFill(d.site)+'</td></tr>'+
+        '<tr><th>4. 계약자 (갑)</th><td>'+gap+'</td></tr>'+
+        '<tr><th>계약자 (을)</th><td>'+co+'</td></tr>'+
+        '<tr><th>5. 계약일자</th><td>'+dgDateKo(d.date)+'</td></tr>'+
+        '<tr><th>6. 착공일자</th><td>'+dgDateKo(d.startDate)+'</td></tr>'+
+        '<tr><th>7. 준공일자</th><td>'+dgDateKo(d.endDate)+'</td></tr>'+
+        '<tr><th>8. 계약금액</th><td>일금 '+dgFill('')+' 원정 (₩ '+(amt||'<span class="doc-fill">________</span>')+') VAT 별도<br>선급금 ₩ '+dgFill('')+' &nbsp; 잔여금 ₩ '+dgFill('')+'</td></tr>'+
+      '</table>'+
+      '<p class="doc-clause"><b>9. 공사내역</b></p>'+
+      '<table class="doc-tbl"><tr><th>종류</th><th>규격</th><th>철거(해체) 면적</th><th>예상 폐기물량</th><th>비고</th></tr>'+
+        '<tr><td>석면해체</td><td></td><td>'+dgFill(d.area)+' ㎡</td><td>'+dgFill(d.wasteQty)+' 톤</td><td rowspan="2">배출신고~<br>실적보고까지</td></tr>'+
+        '<tr><td>건물철거</td><td></td><td>&nbsp; ㎡</td><td>&nbsp; 톤</td></tr></table>'+
+      '<p class="doc-clause">"을"은 위 현장의 철거·해체 후 발생 폐기물을 선별·분리·포장(보양)하여 폐기물관리법에 의거 적정 처리하며, 산업안전보건법에 따라 성실 시공한다.</p>'+
+      '<p class="doc-clause">"갑"과 "을"은 상호 신의로써 성실히 계약하고 책임을 다할 것을 확약하며, 이 계약의 증거로 2부를 작성하여 각 1부씩 보관한다.</p>'+
+      '<div class="doc-date">'+dgDateKo(d.date)+'</div>'+
+      '<div class="doc-sign"><div>(갑) '+dgFill(d.owner)+' &nbsp; 대표 '+dgFill(d.ownerCeo)+' (인)</div><div>(을) 주식회사 종운건설 &nbsp; 대표 나종운 (인)</div></div>'+
+      '</div>';
   }
   function dgToggleParty(){
     var biz = document.getElementById("dgParty").value === "business";
@@ -3756,12 +3815,17 @@
       '</div>';
   }
   function generateDocs(){
-    var d = dgData();
-    if(!d.name){ alert("이름/상호를 입력하세요."); return; }
+    var type = document.getElementById("dgDocType").value;
     var html = "";
-    if(document.getElementById("dgDocContract").checked) html += docContract(d);
-    if(document.getElementById("dgDocReport").checked) html += docReport(d);
-    if(!html){ alert("생성할 서류를 선택하세요."); return; }
+    if(type === "demo"){
+      var dd = dgDemoData();
+      if(!dd.work && !dd.owner && !dd.site){ alert("공사명/발주처/현장 중 하나는 입력하세요."); return; }
+      html = docDemoContract(dd);
+    } else {
+      var d = dgData();
+      if(!d.name){ alert("이름/상호를 입력하세요."); return; }
+      html = docContract(d);
+    }
     document.getElementById("dpContent").innerHTML = html;
     document.getElementById("docGenBackdrop").classList.remove("show");
     document.getElementById("docPrintOverlay").classList.add("show");
