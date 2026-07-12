@@ -146,6 +146,12 @@ async function handleMemberUpsert(st, event, d, R) {
   if (d.rank !== undefined) m.rank = String(d.rank || '');
   if (d.dept !== undefined) m.dept = String(d.dept || '');
   if (d.annual_days !== undefined) { m.annual_days = (d.annual_days === null || isNaN(Number(d.annual_days))) ? null : Number(d.annual_days); }
+  if (d.hire_date !== undefined) m.hire_date = String(d.hire_date || '');
+  if (d.emp_type !== undefined) m.emp_type = String(d.emp_type || '');
+  if (d.annual_basis !== undefined) m.annual_basis = (d.annual_basis === 'fiscal' ? 'fiscal' : 'hire');
+  if (d.loa_days !== undefined) m.loa_days = isNaN(Number(d.loa_days)) ? 0 : Number(d.loa_days);
+  if (d.leave_date !== undefined) m.leave_date = String(d.leave_date || '');
+  if (d.annual_paid !== undefined) m.annual_paid = !!d.annual_paid;
   m.perms = cleanPerms(d.perms || m.perms);
   m.updated = Date.now();
   if (d.pin) {
