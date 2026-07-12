@@ -631,6 +631,20 @@
   .member-row .minfo{flex:1;min-width:0;}
   .member-row .mname{font-weight:700;font-size:14px;}
   .member-row .mrole{font-size:12px;color:var(--sub);}
+  /* 인사탭 아코디언 */
+  .hr-item{border-bottom:1px solid var(--line);}
+  .hr-item:last-child{border-bottom:none;}
+  .hr-head{display:flex;align-items:center;gap:8px;padding:11px 2px;cursor:pointer;user-select:none;}
+  .hr-head:hover{background:rgba(0,0,0,0.02);}
+  .hr-head .minfo{flex:1;min-width:0;}
+  .hr-head .mname{font-weight:700;font-size:14px;}
+  .hr-head .mrole{font-size:12px;color:var(--sub);}
+  .hr-caret{font-size:12px;color:var(--sub);transition:transform .15s;flex:none;}
+  .hr-head.open{background:rgba(0,0,0,0.02);}
+  .hr-head.open .hr-caret{transform:rotate(180deg);}
+  .hr-panel{padding:2px 2px 14px;}
+  .modal.hr-inline{background:transparent;border-radius:0;padding:0;max-width:none;}
+  .modal.hr-inline>h3{display:none;}
   .perm-row{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
   .perm-row .plabel{flex:1;font-size:13px;color:var(--text);}
   .perm-row select{width:112px;margin:0;padding:8px;}
@@ -1287,7 +1301,7 @@
 </div>
 
 <div class="modal-backdrop" id="memberEditBackdrop">
-  <div class="modal">
+  <div class="modal" id="memberEditForm">
     <h3 id="memberEditTitle">회원 수정</h3>
     <div class="err" id="meErr">이름과 PIN(4자리)을 확인하세요.</div>
     <input type="text" id="meName" placeholder="이름" autocomplete="off">
@@ -5482,20 +5496,52 @@
         var sev = severanceAnnual(m);
         if(sev) hr.push("퇴직 연차수당 " + sev.days + "일(" + (sev.under1 ? "1년미만" : "1년이상") + ")");
         var hrLine = '<div class="mrole" style="margin-top:1px;opacity:.9;">' + esc(hr.join(" · ")) + '</div>';
-        html += '<div class="member-row"><div class="minfo"><div class="mname">' + esc(nm) + (m.admin ? ' 👑' : '') + '</div><div class="mrole">' + esc(meta) + '</div>' + hrLine + '</div>' +
-          '<button class="mini-btn" data-user-edit="' + m.id + '">수정</button></div>';
+        html += '<div class="hr-item">' +
+          '<div class="hr-head' + (hrOpenId === m.id ? ' open' : '') + '" data-hr-toggle="' + m.id + '">' +
+            '<div class="minfo"><div class="mname">' + esc(nm) + (m.admin ? ' 👑' : '') + '</div><div class="mrole">' + esc(meta) + '</div>' + hrLine + '</div>' +
+            '<span class="hr-caret">▾</span>' +
+          '</div>' +
+          '<div class="hr-panel" id="hrpanel-' + m.id + '" style="display:none;"></div>' +
+          '</div>';
       });
       html += '</div>';
     });
+    var reopen = hrOpenId;
+    hrOpenId = null;  // DOM 재생성으로 이전 패널 무효화 → 상태 초기화 후 재오픈
     host.innerHTML = html || '<div class="empty-line">직원이 없습니다.</div>';
     var total = document.getElementById("hrTotal"); if (total) total.textContent = "총 " + mem.length + "명";
-    Array.prototype.forEach.call(host.querySelectorAll("[data-user-edit]"), function(el){
-      el.addEventListener("click", function(){ openMemberEdit(el.getAttribute("data-user-edit")); });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-hr-toggle]"), function(el){
+      el.addEventListener("click", function(){ hrToggle(el.getAttribute("data-hr-toggle")); });
     });
+    if (reopen && findMember(reopen)) hrToggle(reopen);
+  }
+  var hrOpenId = null;
+  function hrToggle(id){
+    if (hrOpenId === id){ hrCollapse(); return; }
+    hrCollapse();
+    var panel = document.getElementById("hrpanel-" + id); if (!panel) return;
+    var form = document.getElementById("memberEditForm");
+    form.classList.add("hr-inline");
+    panel.appendChild(form);
+    panel.style.display = "";
+    var head = document.querySelector('[data-hr-toggle="' + id + '"]'); if (head) head.classList.add("open");
+    hrOpenId = id;
+    openMemberEdit(id, true);
+    panel.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }
+  function hrCollapse(){
+    if (hrOpenId == null) return;
+    var form = document.getElementById("memberEditForm");
+    form.classList.remove("hr-inline");
+    document.getElementById("memberEditBackdrop").appendChild(form);  // 숨김 홀더로 복귀
+    var panel = document.getElementById("hrpanel-" + hrOpenId); if (panel){ panel.style.display = "none"; }
+    var head = document.querySelector('[data-hr-toggle="' + hrOpenId + '"]'); if (head) head.classList.remove("open");
+    hrOpenId = null;
   }
 
   var MOD_LABEL = {tasks:"지시", veh:"차량", rec:"기성", lic:"인허가", check:"업무", con:"계약", cli:"거래처", doc:"문서함"};
-  function openMemberEdit(id){
+  function openMemberEdit(id, inline){
+    if (!inline && hrOpenId != null) hrCollapse();  // 모달 경로: 인라인 폼을 홀더로 복귀시킨 뒤 표시
     editingMemberId = id || null;
     var m = id ? findMember(id) : null;
     document.getElementById("memberEditTitle").textContent = m ? "회원 수정" : "회원 추가";
@@ -5533,9 +5579,13 @@
     var devWrap = document.getElementById("meDevicesWrap");
     if (id){ if (devWrap) devWrap.style.display = ""; renderMemberDevices(id); }
     else if (devWrap){ devWrap.style.display = "none"; }
-    document.getElementById("memberEditBackdrop").classList.add("show");
+    if (!inline) document.getElementById("memberEditBackdrop").classList.add("show");
   }
-  function closeMemberEdit(){ document.getElementById("memberEditBackdrop").classList.remove("show"); editingMemberId = null; }
+  function closeMemberEdit(){
+    if (hrOpenId != null) hrCollapse();
+    else document.getElementById("memberEditBackdrop").classList.remove("show");
+    editingMemberId = null;
+  }
   function updatePermLock(){
     var role = document.getElementById("meRole").value;
     var adminRole = !!(ROLE_PRESET[role] && ROLE_PRESET[role].admin);
