@@ -552,6 +552,9 @@
   .rec-agg-row .cnt2{color:var(--sub);font-size:12px;margin-left:4px;}
   .rec-agg-row .amt{font-weight:800;white-space:nowrap;color:var(--brand);}
   .rec-agg-row.hot .amt{color:#B0332A;}
+  .leave-bal{font-size:15px;font-weight:700;}
+  .leave-bal b{color:var(--brand);font-size:19px;}
+  .leave-bal .lv-sub{font-size:12px;color:var(--sub);font-weight:400;margin-left:6px;}
   .rec-item.rec-dup{background:#FEF6F5;}
   .sel-bar{display:flex;align-items:center;gap:8px;padding:7px 15px;flex-wrap:nowrap;}
   .sel-box{width:18px;height:18px;flex:none;cursor:pointer;margin:0;accent-color:var(--brand);}
@@ -741,6 +744,7 @@
     <div class="nav-divider"></div>
     <button class="tab-btn" data-tab="cal" id="tabCalBtn">캘린더</button>
     <button class="tab-btn" data-tab="check" id="tabCheckBtn">업무</button>
+    <button class="tab-btn" data-tab="leave" id="tabLeaveBtn">휴가</button>
     <button class="tab-btn" data-tab="veh" id="tabVehBtn">차량</button>
     <button class="tab-btn" data-tab="lic" id="tabLicBtn">인허가</button>
     <button class="tab-btn" data-tab="con" id="tabConBtn">계약</button>
@@ -908,6 +912,14 @@
     <button class="link-btn" id="hrAddBtn">+ 직원 추가</button>
   </section>
 
+  <!-- 휴가 -->
+  <section class="view" id="view-leave">
+    <div class="dash-sec" style="margin-bottom:8px;"><h2>휴가 <span class="cnt" id="leaveHead"></span></h2></div>
+    <div class="card" id="leaveMine"></div>
+    <button class="link-btn" id="leaveAddBtn">+ 휴가 신청</button>
+    <div class="card" id="leaveList"><div class="loading">불러오는 중…</div></div>
+  </section>
+
   <!-- 주기 체크 -->
   <div class="view" id="view-check">
     <div id="summaryHost" class="check-only"></div>
@@ -1026,6 +1038,26 @@
     <div class="mchecks" id="reScope"></div>
     <button class="primary" id="reSave">저장</button>
     <button class="secondary" id="reCancel">취소</button>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="leaveBackdrop">
+  <div class="modal">
+    <h3>휴가 신청</h3>
+    <span class="fld-label">유형</span>
+    <select id="lvType">
+      <option value="annual">연차</option>
+      <option value="half_am">오전반차</option>
+      <option value="half_pm">오후반차</option>
+      <option value="sick">병가</option>
+      <option value="family">경조</option>
+      <option value="etc">기타</option>
+    </select>
+    <span class="fld-label">기간 (시작 / 종료)</span>
+    <div style="display:flex;gap:8px;"><input type="date" id="lvStart" style="flex:1"><input type="date" id="lvEnd" style="flex:1"></div>
+    <input type="text" id="lvReason" placeholder="사유 (선택)" autocomplete="off">
+    <button class="primary" id="lvSave">신청</button>
+    <button class="secondary" id="lvCancel">취소</button>
   </div>
 </div>
 
@@ -1266,6 +1298,8 @@
     <select id="meRank"><option value="">- 선택 -</option><option value="대표">대표</option><option value="이사">이사</option><option value="부장">부장</option><option value="차장">차장</option><option value="과장">과장</option><option value="대리">대리</option><option value="주임">주임</option><option value="사원">사원</option></select>
     <span class="fld-label">부서</span>
     <select id="meDept"><option value="">- 선택 -</option><option value="관리부">관리부</option><option value="운영부">운영부</option><option value="준설팀">준설팀</option><option value="폐기물팀">폐기물팀</option></select>
+    <span class="fld-label">연차 부여일수</span>
+    <input type="number" id="meAnnual" min="0" step="0.5" placeholder="예: 15" autocomplete="off">
     <span class="fld-label">모듈별 권한 (수행/보기/숨김)</span>
     <div id="mePermNote" style="display:none;font-size:12px;color:#8A6410;background:#FFF3D4;border-radius:6px;padding:6px 9px;margin-bottom:6px;">대표·관리자는 모든 모듈을 <b>수행</b>합니다(개별 설정 무시). 모듈별로 제한하려면 직책을 <b>팀장·직원·현장직</b>으로 하세요.</div>
     <div id="mePerms"></div>
@@ -1295,6 +1329,7 @@
   var CLIENT_PATH = "data/clients.json";
   var CONTRACT_PATH = "data/contracts.json";
   var MYTASKS_PATH = "data/mytasks.json";
+  var LEAVES_PATH = "data/leaves.json";
   var USERS_PATH = "data/users.json";
   var CHECK_API = API_ROOT + CHECK_PATH;
   var TASKS_API = API_ROOT + TASKS_PATH;
@@ -1305,6 +1340,7 @@
   var CLIENT_API = API_ROOT + CLIENT_PATH;
   var CONTRACT_API = API_ROOT + CONTRACT_PATH;
   var MYTASKS_API = API_ROOT + MYTASKS_PATH;
+  var LEAVES_API = API_ROOT + LEAVES_PATH;
   var USERS_API = API_ROOT + USERS_PATH;
 
   var TOKEN_KEY = "jw_app_token";
@@ -1523,6 +1559,7 @@
     if (u.indexOf("documents.json") >= 0) return "documents";
     if (u.indexOf("clients.json") >= 0) return "clients";
     if (u.indexOf("contracts.json") >= 0) return "contracts";
+    if (u.indexOf("leaves.json") >= 0) return "leaves";
     return null;
   }
   function onSessionInvalid(){ setGwToken(null); curMemberObj = null; if (typeof showMemberLogin === "function") showMemberLogin(); }
@@ -2815,8 +2852,10 @@
     document.getElementById("view-con").classList.toggle("active", name === "con");
     document.getElementById("view-cal").classList.toggle("active", name === "cal");
     document.getElementById("view-hr").classList.toggle("active", name === "hr");
+    document.getElementById("view-leave").classList.toggle("active", name === "leave");
     if (name === "cal") renderCalendar();
     if (name === "hr") renderHrRoster();
+    if (name === "leave") renderLeaves();
   }
 
   // ---- 캘린더(통합 만기·마감) ----
@@ -3008,6 +3047,10 @@
   document.getElementById("dgCancel").addEventListener("click", function(){ document.getElementById("docGenBackdrop").classList.remove("show"); });
   document.getElementById("dpPrint").addEventListener("click", function(){ window.print(); });
   document.getElementById("dpClose").addEventListener("click", function(){ document.getElementById("docPrintOverlay").classList.remove("show"); });
+  document.getElementById("leaveAddBtn").addEventListener("click", openLeaveApply);
+  document.getElementById("lvSave").addEventListener("click", saveLeaveApply);
+  document.getElementById("lvCancel").addEventListener("click", function(){ document.getElementById("leaveBackdrop").classList.remove("show"); });
+  document.getElementById("lvType").addEventListener("change", function(){ var half=(this.value==="half_am"||this.value==="half_pm"); var e=document.getElementById("lvEnd"); e.disabled=half; if(half) e.value=document.getElementById("lvStart").value; });
   document.getElementById("conStartBackdrop").addEventListener("click", function(e){ if(e.target===this) this.classList.remove("show"); });
   document.getElementById("docAddBtn").addEventListener("click", function(){ openDocModal(null); });
   document.getElementById("docSave").addEventListener("click", saveDocModal);
@@ -3923,6 +3966,102 @@
     document.getElementById("dpContent").innerHTML = html;
     document.getElementById("docGenBackdrop").classList.remove("show");
     document.getElementById("docPrintOverlay").classList.add("show");
+  }
+
+  // ---- 휴가 (leaves.json) — 신청 → 승인 → 잔여일수 ----
+  var leaves = [];
+  var leavesSha = null, leavesSaveTimer = null;
+  var LEAVE_TYPES = [["annual","연차"],["half_am","오전반차"],["half_pm","오후반차"],["sick","병가"],["family","경조"],["etc","기타"]];
+  function leaveTypeLabel(t){ for(var i=0;i<LEAVE_TYPES.length;i++){ if(LEAVE_TYPES[i][0]===t) return LEAVE_TYPES[i][1]; } return t||""; }
+  function findLeave(id){ for(var i=0;i<leaves.length;i++){ if(leaves[i].id===id) return leaves[i]; } return null; }
+  function liveLeaves(){ return leaves.filter(function(l){ return l && l.del!==1; }); }
+  function loadLeaves(){
+    var token=getToken(); if(!token) return;
+    fetch(LEAVES_API, {headers:ghHeaders()}).then(function(resp){
+      if(resp.status===404){ leavesSha=null; leaves=[]; renderLeaves(); return; }
+      if(!resp.ok) throw new Error("HTTP "+resp.status);
+      return resp.json().then(function(json){ leavesSha=json.sha; var p=JSON.parse(b64DecodeUnicode(json.content)); leaves=(p&&p.items)||[]; renderLeaves(); renderDashboard(); });
+    }).catch(function(){});
+  }
+  function scheduleLeavesSave(){ if(leavesSaveTimer) clearTimeout(leavesSaveTimer); leavesSaveTimer=setTimeout(doSaveLeaves,1200); }
+  function mergeLeaves(local,remote){ var byId={}; (local||[]).forEach(function(l){if(l&&l.id)byId[l.id]=l;}); (remote||[]).forEach(function(x){if(!x||!x.id)return;var c=byId[x.id];if(!c){byId[x.id]=x;}else{var w=(x.updated||"")>=(c.updated||"")?x:c;if(c.del===1||x.del===1)w.del=1;byId[x.id]=w;}}); return Object.keys(byId).map(function(k){return byId[k];}); }
+  function doSaveLeaves(){
+    var token=getToken(); if(!token) return;
+    var body=JSON.stringify({schema:1,items:leaves});
+    var payload={message:"leaves: 업데이트",content:b64EncodeUnicode(body),branch:"main"};
+    if(leavesSha) payload.sha=leavesSha;
+    fetch(LEAVES_API,{method:"PUT",headers:Object.assign({"Content-Type":"application/json"},ghHeaders()),body:JSON.stringify(payload)}).then(function(resp){
+      if(resp.status===401) return;
+      if(resp.status===409||resp.status===422){ return fetch(LEAVES_API,{headers:ghHeaders()}).then(function(r){return r.status===404?null:r.json();}).then(function(j){ if(j){var up={};try{up=JSON.parse(b64DecodeUnicode(j.content))||{};}catch(e){} leaves=mergeLeaves(leaves,up.items||[]); leavesSha=j.sha;} return doSaveLeaves(); }); }
+      return resp.json().then(function(json){ leavesSha=json.content&&json.content.sha; });
+    }).catch(function(){});
+  }
+  function leaveDays(type,start,end){
+    if(type==="half_am"||type==="half_pm") return 0.5;
+    if(!isDate(start)) return 0;
+    var s=new Date(start+"T00:00:00"), e=new Date((isDate(end)?end:start)+"T00:00:00");
+    var d=Math.round((e-s)/86400000)+1; return d>0?d:0;
+  }
+  function leaveRemaining(memberId){
+    var m=findMember(memberId); var grant=(m&&typeof m.annual_days==="number")?m.annual_days:15;
+    var used=0; liveLeaves().forEach(function(l){ if(l.member_id===memberId && l.status==="approved" && l.type==="annual") used+=(l.days||0); });
+    return {grant:grant, used:used, left:Math.round((grant-used)*10)/10};
+  }
+  function renderLeaves(){
+    var host=document.getElementById("leaveList"); if(!host) return;
+    var me=getMemberId();
+    var mine=document.getElementById("leaveMine");
+    if(mine){ if(me){ var r=leaveRemaining(me); mine.innerHTML='<div class="leave-bal">내 연차 <b>'+r.left+'</b>일 남음 <span class="lv-sub">(부여 '+r.grant+' · 사용 '+r.used+')</span></div>'; } else mine.innerHTML=''; }
+    var all=liveLeaves();
+    var visible = isAdmin() ? all.slice() : all.filter(function(l){ return l.member_id===me; });
+    visible.sort(function(a,b){ var ap=a.status==="pending"?0:1, bp=b.status==="pending"?0:1; if(ap!==bp) return ap-bp; return (b.start||"").localeCompare(a.start||""); });
+    var pend=all.filter(function(l){ return l.status==="pending" && (isAdmin()||l.member_id===me); }).length;
+    var head=document.getElementById("leaveHead"); if(head) head.textContent = pend ? (pend+"건 대기") : "";
+    host.innerHTML = visible.length ? visible.map(leaveRowHtml).join("") : '<div class="empty-line">휴가 신청이 없습니다.</div>';
+    bindLeaveHandlers(host);
+  }
+  function leaveRowHtml(l){
+    var nm = dispName(memberName(l.member_id)) || l.member_name || "-";
+    var period = isDate(l.start) ? (l.start + (l.end && l.end!==l.start ? " ~ " + l.end : "")) : "";
+    var chip = l.status==="approved" ? '<span class="from-chip">승인</span>' : (l.status==="rejected" ? '<span class="dup-chip">반려</span>' : '<span class="review-chip">대기</span>');
+    var me=getMemberId(), ctrl="";
+    if(l.status==="pending" && isAdmin()) ctrl += '<button class="mini-btn appr-btn" data-lv-approve="'+l.id+'">승인</button><button class="mini-btn" data-lv-reject="'+l.id+'">반려</button>';
+    if(l.status==="pending" && l.member_id===me) ctrl += '<button class="mini-btn" data-lv-cancel="'+l.id+'">취소</button>';
+    return '<div class="item"><div class="item-body"><div class="item-title">'+esc(nm)+' · '+esc(leaveTypeLabel(l.type))+' '+(l.days||0)+'일 '+chip+'</div><div class="item-meta"><span>'+esc(period)+'</span>'+(l.reason?'<span>'+esc(l.reason)+'</span>':'')+(l.approver?'<span class="author-chip">'+esc(dispName(l.approver))+'</span>':'')+'</div></div><div class="task-ctrl">'+ctrl+'</div></div>';
+  }
+  function bindLeaveHandlers(host){
+    function wire(attr,fn){ Array.prototype.forEach.call(host.querySelectorAll("["+attr+"]"),function(el){ el.addEventListener("click",function(){ fn(el.getAttribute(attr)); }); }); }
+    wire("data-lv-approve", function(id){ setLeaveStatus(id,"approved"); });
+    wire("data-lv-reject", function(id){ if(confirm("이 휴가를 반려할까요?")) setLeaveStatus(id,"rejected"); });
+    wire("data-lv-cancel", function(id){ if(confirm("휴가 신청을 취소할까요?")){ var l=findLeave(id); if(l){ l.del=1; l.updated=todayStr(); scheduleLeavesSave(); renderLeaves(); } } });
+  }
+  function setLeaveStatus(id,status){
+    if(!isAdmin()) return;
+    var l=findLeave(id); if(!l || l.status!=="pending") return;
+    l.status=status; l.approver=myName()||"관리자"; l.approved_at=todayStr(); l.updated=todayStr();
+    scheduleLeavesSave(); renderLeaves(); renderDashboard();
+  }
+  function openLeaveApply(){
+    document.getElementById("lvType").value="annual";
+    document.getElementById("lvStart").value=todayStr();
+    document.getElementById("lvEnd").value=todayStr();
+    document.getElementById("lvReason").value="";
+    document.getElementById("leaveBackdrop").classList.add("show");
+  }
+  function saveLeaveApply(){
+    var me=getMemberId(); if(!me){ alert("로그인 회원 정보가 없습니다."); return; }
+    var type=document.getElementById("lvType").value;
+    var start=document.getElementById("lvStart").value;
+    var end=document.getElementById("lvEnd").value||start;
+    if(!isDate(start)){ alert("시작일을 선택하세요."); return; }
+    if(type==="half_am"||type==="half_pm") end=start;
+    var days=leaveDays(type,start,end);
+    var l={ id:genId("lv"), member_id:me, member_name:myName()||"", type:type, start:start, end:end, days:days,
+      reason:document.getElementById("lvReason").value.trim(), status:"pending", approver:"", applied:todayStr(), updated:todayStr() };
+    leaves.push(l);
+    scheduleLeavesSave();
+    document.getElementById("leaveBackdrop").classList.remove("show");
+    renderLeaves(); renderDashboard();
   }
 
   // ---- 거래처(clients.json) — 미수 자동 연동 ----
@@ -5136,7 +5275,7 @@
   // 로그인 성공 후: 권한 적용 + 데이터 로드 + (관리자면) 회원목록 로드
   function afterLogin(){
     applyPerms();
-    doLoad(); loadTasks(); loadVehicles(); loadReceivables(); loadLicenses(); loadDocuments(); loadClients(); loadContracts(); loadMyTasks();
+    doLoad(); loadTasks(); loadVehicles(); loadReceivables(); loadLicenses(); loadDocuments(); loadClients(); loadContracts(); loadMyTasks(); loadLeaves();
     loadMembers();   // 담당 배정 드롭다운용 — 관리자·직원 모두
     render();
   }
@@ -5314,6 +5453,7 @@
     document.getElementById("meRole").value = m ? (m.role||"직원") : "직원";
     document.getElementById("meRank").value = m ? (m.rank||"") : "";
     document.getElementById("meDept").value = m ? (m.dept||"") : "";
+    document.getElementById("meAnnual").value = (m && typeof m.annual_days==="number") ? m.annual_days : "";
     var perms = m ? (m.perms||{}) : ROLE_PRESET["직원"].perms;
     // 모듈별 권한 표시 순서 = 사이드바 메뉴 순서 (관리: 지시·기성·거래처 / 담당: 업무·차량·인허가·계약·문서함)
     var permOrder = ["tasks","rec","cli","check","veh","lic","con","doc"].filter(function(x){ return MODULES.indexOf(x) >= 0; });
@@ -5368,8 +5508,10 @@
     }
     var perms = {};
     Array.prototype.forEach.call(document.querySelectorAll("#mePerms [data-perm]"), function(sel){ perms[sel.getAttribute("data-perm")] = sel.value; });
+    var annualRaw = document.getElementById("meAnnual").value;
     var payload = { action: "member_upsert", name: name, role: role, admin: admin, perms: perms,
-      rank: document.getElementById("meRank").value, dept: document.getElementById("meDept").value };
+      rank: document.getElementById("meRank").value, dept: document.getElementById("meDept").value,
+      annual_days: annualRaw === "" ? null : Number(annualRaw) };
     if (editingMemberId) payload.id = editingMemberId;
     if (pin && pinOk) payload.pin = pin;
     gwCall("gw-auth", payload).then(function(res){

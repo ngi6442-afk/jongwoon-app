@@ -145,6 +145,7 @@ async function handleMemberUpsert(st, event, d, R) {
   m.admin = !!d.admin;
   if (d.rank !== undefined) m.rank = String(d.rank || '');
   if (d.dept !== undefined) m.dept = String(d.dept || '');
+  if (d.annual_days !== undefined) { m.annual_days = (d.annual_days === null || isNaN(Number(d.annual_days))) ? null : Number(d.annual_days); }
   m.perms = cleanPerms(d.perms || m.perms);
   m.updated = Date.now();
   if (d.pin) {
