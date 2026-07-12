@@ -601,6 +601,7 @@
   .hr-dept-h .cnt{color:var(--sub);font-weight:600;}
   /* 서류 출력 */
   .dg-check{display:flex;align-items:center;gap:8px;font-size:14px;padding:6px 2px;}
+  .dg-check input[type=checkbox]{width:18px;height:18px;flex:none;padding:0;margin:0;}
   #docPrintOverlay{display:none;position:fixed;inset:0;background:#fff;z-index:200;overflow:auto;}
   #docPrintOverlay.show{display:block;}
   .dp-bar{position:sticky;top:0;background:#eef2f0;padding:10px;display:flex;gap:8px;justify-content:center;border-bottom:1px solid #ccc;}
@@ -754,15 +755,18 @@
     <button class="tab-btn" data-tab="tasks" id="tabTasksBtn">지시 <span class="tab-badge hide" id="taskTabBadge">0</span></button>
     <button class="tab-btn" data-tab="rec" id="tabRecBtn">기성</button>
     <button class="tab-btn" data-tab="cli" id="tabCliBtn">거래처</button>
+    <button class="tab-btn" data-tab="con" id="tabConBtn">계약</button>
     <button class="tab-btn perm-hidden" data-tab="hr" id="tabHrBtn">인사</button>
     <div class="nav-divider"></div>
+    <div class="nav-group">업무</div>
     <button class="tab-btn" data-tab="cal" id="tabCalBtn">캘린더</button>
-    <button class="tab-btn" data-tab="check" id="tabCheckBtn">업무</button>
-    <button class="tab-btn" data-tab="leave" id="tabLeaveBtn">휴가</button>
     <button class="tab-btn" data-tab="veh" id="tabVehBtn">차량</button>
     <button class="tab-btn" data-tab="lic" id="tabLicBtn">인허가</button>
-    <button class="tab-btn" data-tab="con" id="tabConBtn">계약</button>
     <button class="tab-btn" data-tab="doc" id="tabDocBtn">문서함</button>
+    <div class="nav-divider"></div>
+    <div class="nav-group">개인</div>
+    <button class="tab-btn" data-tab="check" id="tabCheckBtn">업무</button>
+    <button class="tab-btn" data-tab="leave" id="tabLeaveBtn">휴가</button>
   </nav>
   <div class="views">
 
@@ -924,6 +928,14 @@
     <div class="dash-sec" style="margin-bottom:8px;"><h2>임직원 <span class="cnt" id="hrTotal"></span></h2></div>
     <div class="card" id="hrRoster"><div class="loading">불러오는 중…</div></div>
     <button class="link-btn" id="hrAddBtn">+ 직원 추가</button>
+    <button class="link-btn" id="permMgmtBtn">🔑 권한관리</button>
+  </section>
+
+  <!-- 권한관리 (인사 하위 · 관리자 전용) -->
+  <section class="view" id="view-perm">
+    <div class="dash-sec" style="margin-bottom:8px;"><h2>권한관리 <span class="cnt" id="permTotal"></span></h2></div>
+    <button class="link-btn" id="permBackBtn">← 인사로</button>
+    <div class="card" id="permRoster"><div class="loading">불러오는 중…</div></div>
   </section>
 
   <!-- 휴가 -->
@@ -931,6 +943,7 @@
     <div class="dash-sec" style="margin-bottom:8px;"><h2>휴가 <span class="cnt" id="leaveHead"></span></h2></div>
     <div class="card" id="leaveMine"></div>
     <button class="link-btn" id="leaveAddBtn">+ 휴가 신청</button>
+    <button class="link-btn" id="resignBtn">📄 사직 신청</button>
     <div class="card" id="leaveList"><div class="loading">불러오는 중…</div></div>
   </section>
 
@@ -1072,6 +1085,19 @@
     <input type="text" id="lvReason" placeholder="사유 (선택)" autocomplete="off">
     <button class="primary" id="lvSave">신청</button>
     <button class="secondary" id="lvCancel">취소</button>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="resignBackdrop">
+  <div class="modal">
+    <h3>사직 신청</h3>
+    <p style="margin-bottom:12px;">사직(퇴직) 예정일과 사유를 입력해 신청합니다. 관리자가 승인하면 퇴사일이 인사기록에 자동 반영됩니다.</p>
+    <span class="fld-label">사직 예정일</span>
+    <input type="date" id="rsDate">
+    <span class="fld-label">사유</span>
+    <input type="text" id="rsReason" placeholder="사유 (선택)" autocomplete="off">
+    <button class="primary" id="rsSave">사직 신청</button>
+    <button class="secondary" id="rsCancel">취소</button>
   </div>
 </div>
 
@@ -1325,9 +1351,12 @@
     <label class="dg-check"><input type="checkbox" id="mePaidAnnual"> 연차수당 포함 근로자 (연차 대신 수당)</label>
     <span class="fld-label">연차 수동조정 (비우면 입사일 기준 자동계산)</span>
     <input type="number" id="meAnnual" min="0" step="0.5" placeholder="자동" autocomplete="off">
-    <span class="fld-label">모듈별 권한 (수행/보기/숨김)</span>
-    <div id="mePermNote" style="display:none;font-size:12px;color:#8A6410;background:#FFF3D4;border-radius:6px;padding:6px 9px;margin-bottom:6px;">대표·관리자는 모든 모듈을 <b>수행</b>합니다(개별 설정 무시). 모듈별로 제한하려면 직책을 <b>팀장·직원·현장직</b>으로 하세요.</div>
-    <div id="mePerms"></div>
+    <!-- 모듈별 권한은 별도 '권한관리' 화면으로 분리. 기존 권한 보존을 위해 숨김 유지 -->
+    <div id="mePermsWrap" style="display:none;">
+      <span class="fld-label">모듈별 권한 (수행/보기/숨김)</span>
+      <div id="mePermNote" style="display:none;font-size:12px;color:#8A6410;background:#FFF3D4;border-radius:6px;padding:6px 9px;margin-bottom:6px;">대표·관리자는 모든 모듈을 <b>수행</b>합니다(개별 설정 무시). 모듈별로 제한하려면 직책을 <b>팀장·직원·현장직</b>으로 하세요.</div>
+      <div id="mePerms"></div>
+    </div>
     <div id="meDevicesWrap" style="display:none;">
       <span class="fld-label">등록 기기 (승인/해제/삭제)</span>
       <div id="meDevices"><div class="empty-line">불러오는 중…</div></div>
@@ -2877,9 +2906,11 @@
     document.getElementById("view-con").classList.toggle("active", name === "con");
     document.getElementById("view-cal").classList.toggle("active", name === "cal");
     document.getElementById("view-hr").classList.toggle("active", name === "hr");
+    document.getElementById("view-perm").classList.toggle("active", name === "perm");
     document.getElementById("view-leave").classList.toggle("active", name === "leave");
     if (name === "cal") renderCalendar();
     if (name === "hr") renderHrRoster();
+    if (name === "perm") renderPermMgmt();
     if (name === "leave") renderLeaves();
   }
 
@@ -2993,6 +3024,8 @@
   document.getElementById("usersClose").addEventListener("click", function(){ document.getElementById("usersBackdrop").classList.remove("show"); });
   document.getElementById("userAddBtn").addEventListener("click", function(){ openMemberEdit(null); });
   document.getElementById("hrAddBtn").addEventListener("click", function(){ openMemberEdit(null); });
+  document.getElementById("permMgmtBtn").addEventListener("click", function(){ switchTab("perm"); });
+  document.getElementById("permBackBtn").addEventListener("click", function(){ switchTab("hr"); });
   document.getElementById("meSave").addEventListener("click", saveMemberEdit);
   document.getElementById("meDelete").addEventListener("click", deleteMemberEdit);
   document.getElementById("meCancel").addEventListener("click", closeMemberEdit);
@@ -3073,6 +3106,10 @@
   document.getElementById("dpPrint").addEventListener("click", function(){ window.print(); });
   document.getElementById("dpClose").addEventListener("click", function(){ document.getElementById("docPrintOverlay").classList.remove("show"); });
   document.getElementById("leaveAddBtn").addEventListener("click", openLeaveApply);
+  document.getElementById("resignBtn").addEventListener("click", openResign);
+  document.getElementById("rsSave").addEventListener("click", saveResign);
+  document.getElementById("rsCancel").addEventListener("click", function(){ document.getElementById("resignBackdrop").classList.remove("show"); });
+  document.getElementById("resignBackdrop").addEventListener("click", function(e){ if(e.target===this) this.classList.remove("show"); });
   document.getElementById("lvSave").addEventListener("click", saveLeaveApply);
   document.getElementById("lvCancel").addEventListener("click", function(){ document.getElementById("leaveBackdrop").classList.remove("show"); });
   document.getElementById("lvType").addEventListener("change", function(){ var half=(this.value==="half_am"||this.value==="half_pm"); var e=document.getElementById("lvEnd"); e.disabled=half; if(half) e.value=document.getElementById("lvStart").value; });
@@ -3997,7 +4034,7 @@
   var leaves = [];
   var leavesSha = null, leavesSaveTimer = null;
   var LEAVE_TYPES = [["annual","연차"],["half_am","오전반차"],["half_pm","오후반차"],["sick","병가"],["family","경조"],["etc","기타"]];
-  function leaveTypeLabel(t){ for(var i=0;i<LEAVE_TYPES.length;i++){ if(LEAVE_TYPES[i][0]===t) return LEAVE_TYPES[i][1]; } return t||""; }
+  function leaveTypeLabel(t){ if(t==="resign") return "사직"; for(var i=0;i<LEAVE_TYPES.length;i++){ if(LEAVE_TYPES[i][0]===t) return LEAVE_TYPES[i][1]; } return t||""; }
   function findLeave(id){ for(var i=0;i<leaves.length;i++){ if(leaves[i].id===id) return leaves[i]; } return null; }
   function liveLeaves(){ return leaves.filter(function(l){ return l && l.del!==1; }); }
   function loadLeaves(){
@@ -4060,17 +4097,35 @@
     var under1 = si.years < 1;
     return { under1:under1, days:computeAnnual(m, m.leave_date), tenureY:Math.floor(si.years*10)/10 };
   }
+  function fmtYMD(dt){ return dt.getFullYear()+"-"+("0"+(dt.getMonth()+1)).slice(-2)+"-"+("0"+dt.getDate()).slice(-2); }
+  // 현재 연차 사용기간 [start, end) — 이 기간 발생분만 유효(발생 후 1년 시효, 이월 없음)
+  function annualPeriod(m, asOf){
+    if(!m || !isDate(m.hire_date)) return null;
+    var a=new Date((asOf||todayStr())+"T00:00:00");
+    if((m.annual_basis||"hire")==="fiscal"){ var y=a.getFullYear(); return { start:y+"-01-01", end:(y+1)+"-01-01" }; }
+    var h=new Date(m.hire_date+"T00:00:00");
+    var n=a.getFullYear()-h.getFullYear();
+    var anniv=new Date(h.getTime()); anniv.setFullYear(h.getFullYear()+n);
+    if(anniv>a){ n--; anniv.setFullYear(h.getFullYear()+n); }
+    var end=new Date(h.getTime()); end.setFullYear(h.getFullYear()+n+1);
+    return { start:fmtYMD(anniv), end:fmtYMD(end) };
+  }
   function leaveRemaining(memberId){
     var m=findMember(memberId);
     var grant=computeAnnual(m);
-    var used=0; liveLeaves().forEach(function(l){ if(l.member_id===memberId && l.status==="approved" && l.type==="annual") used+=(l.days||0); });
-    return {grant:grant, used:used, left:Math.round((grant-used)*10)/10};
+    var per=annualPeriod(m);
+    var used=0; liveLeaves().forEach(function(l){
+      if(l.member_id!==memberId || l.status!=="approved" || l.type!=="annual") return;
+      if(per && (!l.start || l.start<per.start || l.start>=per.end)) return;   // 당해 사용기간 밖은 소멸
+      used+=(l.days||0);
+    });
+    return {grant:grant, used:used, left:Math.round((grant-used)*10)/10, period:per};
   }
   function renderLeaves(){
     var host=document.getElementById("leaveList"); if(!host) return;
     var me=getMemberId();
     var mine=document.getElementById("leaveMine");
-    if(mine){ if(me){ var r=leaveRemaining(me); mine.innerHTML='<div class="leave-bal">내 연차 <b>'+r.left+'</b>일 남음 <span class="lv-sub">(부여 '+r.grant+' · 사용 '+r.used+')</span></div>'; } else mine.innerHTML=''; }
+    if(mine){ if(me){ var r=leaveRemaining(me); mine.innerHTML='<div class="leave-bal">내 연차 <b>'+r.left+'</b>일 남음 <span class="lv-sub">(부여 '+r.grant+' · 사용 '+r.used+(r.period?' · 사용기간 '+r.period.start+'~'+r.period.end+' (이후 소멸)':'')+')</span></div>'; } else mine.innerHTML=''; }
     var all=liveLeaves();
     var visible = isAdmin() ? all.slice() : all.filter(function(l){ return l.member_id===me; });
     visible.sort(function(a,b){ var ap=a.status==="pending"?0:1, bp=b.status==="pending"?0:1; if(ap!==bp) return ap-bp; return (b.start||"").localeCompare(a.start||""); });
@@ -4086,7 +4141,11 @@
     var me=getMemberId(), ctrl="";
     if(l.status==="pending" && isAdmin()) ctrl += '<button class="mini-btn appr-btn" data-lv-approve="'+l.id+'">승인</button><button class="mini-btn" data-lv-reject="'+l.id+'">반려</button>';
     if(l.status==="pending" && l.member_id===me) ctrl += '<button class="mini-btn" data-lv-cancel="'+l.id+'">취소</button>';
-    return '<div class="item"><div class="item-body"><div class="item-title">'+esc(nm)+' · '+esc(leaveTypeLabel(l.type))+' '+(l.days||0)+'일 '+chip+'</div><div class="item-meta"><span>'+esc(period)+'</span>'+(l.reason?'<span>'+esc(l.reason)+'</span>':'')+(l.approver?'<span class="author-chip">'+esc(dispName(l.approver))+'</span>':'')+'</div></div><div class="task-ctrl">'+ctrl+'</div></div>';
+    var title = (l.type==="resign")
+      ? esc(nm)+' · <b style="color:#B4232A;">사직 신청</b> '+chip
+      : esc(nm)+' · '+esc(leaveTypeLabel(l.type))+' '+(l.days||0)+'일 '+chip;
+    var metaPeriod = (l.type==="resign") ? ('사직 예정 '+esc(period)) : esc(period);
+    return '<div class="item"><div class="item-body"><div class="item-title">'+title+'</div><div class="item-meta"><span>'+metaPeriod+'</span>'+(l.reason?'<span>'+esc(l.reason)+'</span>':'')+(l.approver?'<span class="author-chip">'+esc(dispName(l.approver))+'</span>':'')+'</div></div><div class="task-ctrl">'+ctrl+'</div></div>';
   }
   function bindLeaveHandlers(host){
     function wire(attr,fn){ Array.prototype.forEach.call(host.querySelectorAll("["+attr+"]"),function(el){ el.addEventListener("click",function(){ fn(el.getAttribute(attr)); }); }); }
@@ -4098,7 +4157,38 @@
     if(!isAdmin()) return;
     var l=findLeave(id); if(!l || l.status!=="pending") return;
     l.status=status; l.approver=myName()||"관리자"; l.approved_at=todayStr(); l.updated=todayStr();
+    // 사직 승인 → 퇴사일 인사기록 자동 반영
+    if(l.type==="resign" && status==="approved" && l.member_id && isDate(l.start)){
+      var mm=findMember(l.member_id);
+      if(mm){
+        gwCall("gw-auth", { action:"member_upsert", id:mm.id, name:mm.name, role:mm.role, admin:!!mm.admin, leave_date:l.start }).then(function(res){
+          if(res.status===200 && res.body && res.body.member){
+            for(var i=0;i<members.length;i++){ if(members[i].id===res.body.member.id){ members[i]=res.body.member; break; } }
+            try{ saveUsersCache(); }catch(e){}
+            render();
+          }
+        });
+      }
+    }
     scheduleLeavesSave(); renderLeaves(); renderDashboard();
+  }
+  function openResign(){
+    var me=getMemberId(); if(!me){ alert("로그인 회원 정보가 없습니다."); return; }
+    document.getElementById("rsDate").value=todayStr();
+    document.getElementById("rsReason").value="";
+    document.getElementById("resignBackdrop").classList.add("show");
+  }
+  function saveResign(){
+    var me=getMemberId(); if(!me){ alert("로그인 회원 정보가 없습니다."); return; }
+    var date=document.getElementById("rsDate").value;
+    if(!isDate(date)){ alert("사직 예정일을 선택하세요."); return; }
+    if(!confirm("사직 신청을 제출할까요? 관리자 승인 시 퇴사일이 인사기록에 반영됩니다.")) return;
+    var l={ id:genId("lv"), member_id:me, member_name:myName()||"", type:"resign", start:date, end:date, days:0,
+      reason:document.getElementById("rsReason").value.trim(), status:"pending", approver:"", applied:todayStr(), updated:todayStr() };
+    leaves.push(l);
+    scheduleLeavesSave();
+    document.getElementById("resignBackdrop").classList.remove("show");
+    switchTab("leave"); renderLeaves(); renderDashboard();
   }
   function openLeaveApply(){
     document.getElementById("lvType").value="annual";
@@ -5540,6 +5630,78 @@
   }
 
   var MOD_LABEL = {tasks:"지시", veh:"차량", rec:"기성", lic:"인허가", check:"업무", con:"계약", cli:"거래처", doc:"문서함"};
+  // 권한관리(별도 화면) — 모듈별 권한만 편집. 사이드바 순서와 동일.
+  var PERM_ORDER = ["tasks","rec","cli","con","veh","lic","doc","check"];
+  var permOpenId = null;
+  function permModList(){ return PERM_ORDER.filter(function(x){ return MODULES.indexOf(x) >= 0; }); }
+  function renderPermMgmt(){
+    if (!isAdmin()){ switchTab("dash"); return; }
+    var host = document.getElementById("permRoster"); if (!host) return;
+    var mem = liveMembers().slice().sort(function(a,b){ return ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role); });
+    var mods = permModList();
+    var html = "";
+    mem.forEach(function(m){
+      var nm = isBossMember(m) ? (m.name + " (대표님)") : m.name;
+      var adminRole = !!m.admin;
+      var sub = adminRole ? "관리자 — 모든 권한" : mods.filter(function(x){ return (m.perms&&m.perms[x])==="do"; }).map(function(x){ return MOD_LABEL[x]; }).join("·") || "수행 권한 없음";
+      html += '<div class="hr-item"><div class="hr-head' + (permOpenId===m.id?' open':'') + '" data-perm-toggle="' + m.id + '">' +
+        '<div class="minfo"><div class="mname">' + esc(nm) + (adminRole?' 👑':'') + '</div><div class="mrole">' + esc((m.role||"")+ (m.dept?" · "+m.dept:"")) + '</div><div class="mrole" style="opacity:.9;margin-top:1px;">수행: ' + esc(sub) + '</div></div>' +
+        (adminRole ? '' : '<span class="hr-caret">▾</span>') + '</div>' +
+        '<div class="hr-panel" id="permpanel-' + m.id + '" style="display:none;"></div></div>';
+    });
+    host.innerHTML = html || '<div class="empty-line">직원이 없습니다.</div>';
+    var t = document.getElementById("permTotal"); if (t) t.textContent = "총 " + mem.length + "명";
+    var reopen = permOpenId; permOpenId = null;
+    Array.prototype.forEach.call(host.querySelectorAll("[data-perm-toggle]"), function(el){
+      el.addEventListener("click", function(){ permToggle(el.getAttribute("data-perm-toggle")); });
+    });
+    if (reopen && findMember(reopen) && !findMember(reopen).admin) permToggle(reopen);
+  }
+  function permToggle(id){
+    if (permOpenId === id){ permCollapse(); return; }
+    permCollapse();
+    var m = findMember(id); if (!m || m.admin) return;
+    var panel = document.getElementById("permpanel-" + id); if (!panel) return;
+    var mods = permModList();
+    var rows = mods.map(function(mod){
+      var v = (m.perms && m.perms[mod]) || "view";
+      return '<div class="perm-row"><span class="plabel">' + MOD_LABEL[mod] + '</span><select data-pm="' + mod + '">' +
+        '<option value="do"' + (v==="do"?" selected":"") + '>수행</option>' +
+        '<option value="view"' + (v==="view"?" selected":"") + '>보기</option>' +
+        '<option value="hide"' + (v==="hide"?" selected":"") + '>숨김</option></select></div>';
+    }).join("");
+    panel.innerHTML = '<div style="padding:4px 2px 2px;">' + rows +
+      '<button class="primary" data-pm-save="' + id + '" style="margin-top:6px;">권한 저장</button></div>';
+    panel.style.display = "";
+    var head = document.querySelector('[data-perm-toggle="' + id + '"]'); if (head) head.classList.add("open");
+    permOpenId = id;
+    panel.querySelector("[data-pm-save]").addEventListener("click", function(){ savePermMember(id); });
+    panel.scrollIntoView({ block:"nearest", behavior:"smooth" });
+  }
+  function permCollapse(){
+    if (permOpenId == null) return;
+    var panel = document.getElementById("permpanel-" + permOpenId); if (panel){ panel.style.display = "none"; panel.innerHTML = ""; }
+    var head = document.querySelector('[data-perm-toggle="' + permOpenId + '"]'); if (head) head.classList.remove("open");
+    permOpenId = null;
+  }
+  function savePermMember(id){
+    var m = findMember(id); if (!m) return;
+    var panel = document.getElementById("permpanel-" + id); if (!panel) return;
+    var perms = {};
+    Array.prototype.forEach.call(panel.querySelectorAll("[data-pm]"), function(sel){ perms[sel.getAttribute("data-pm")] = sel.value; });
+    var btn = panel.querySelector("[data-pm-save]"); if (btn){ btn.disabled = true; btn.textContent = "저장 중…"; }
+    // name·role·admin 함께 전송(백엔드가 admin 미전송 시 false로 덮어씀 방지)
+    gwCall("gw-auth", { action:"member_upsert", id:id, name:m.name, role:m.role, admin:!!m.admin, perms:perms }).then(function(res){
+      if (res.status !== 200){ if(btn){ btn.disabled=false; btn.textContent="권한 저장"; } alert("권한 저장 실패"); return; }
+      if (res.body && res.body.member){
+        for (var i=0;i<members.length;i++){ if(members[i].id===res.body.member.id){ members[i]=res.body.member; break; } }
+        try{ saveUsersCache(); }catch(e){}
+      }
+      permCollapse();
+      renderPermMgmt();
+      render();
+    });
+  }
   function openMemberEdit(id, inline){
     if (!inline && hrOpenId != null) hrCollapse();  // 모달 경로: 인라인 폼을 홀더로 복귀시킨 뒤 표시
     editingMemberId = id || null;
@@ -5615,11 +5777,11 @@
       errEl.textContent = admin ? "관리자는 비밀번호 8자 이상이 필요합니다." : "이름과 PIN(4자리 숫자)을 확인하세요.";
       errEl.classList.add("show"); return;
     }
-    var perms = {};
-    Array.prototype.forEach.call(document.querySelectorAll("#mePerms [data-perm]"), function(sel){ perms[sel.getAttribute("data-perm")] = sel.value; });
     var annualRaw = document.getElementById("meAnnual").value;
     var loaRaw = document.getElementById("meLoa").value;
-    var payload = { action: "member_upsert", name: name, role: role, admin: admin, perms: perms,
+    // 모듈별 권한은 '권한관리' 화면에서만 편집. 인사 카드 저장은 기존 권한을 보존(perms 미전송).
+    // 신규 회원만 직책 프리셋으로 초기 권한 부여.
+    var payload = { action: "member_upsert", name: name, role: role, admin: admin,
       rank: document.getElementById("meRank").value, dept: document.getElementById("meDept").value,
       annual_days: annualRaw === "" ? null : Number(annualRaw),
       hire_date: document.getElementById("meHire").value || "",
@@ -5629,6 +5791,7 @@
       leave_date: document.getElementById("meLeave").value || "",
       annual_paid: document.getElementById("mePaidAnnual").checked };
     if (editingMemberId) payload.id = editingMemberId;
+    else if (ROLE_PRESET[role]) payload.perms = ROLE_PRESET[role].perms;   // 신규만 프리셋 권한
     if (pin && pinOk) payload.pin = pin;
     gwCall("gw-auth", payload).then(function(res){
       if (res.status !== 200){ document.getElementById("meErr").classList.add("show"); return; }
