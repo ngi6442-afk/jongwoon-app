@@ -58,7 +58,7 @@
   }
   .topbar-right{display:flex;align-items:center;gap:8px;}
   .user-chip{
-    max-width:120px;
+    max-width:150px;
     height:38px;
     padding:0 12px;
     border-radius:10px;
@@ -73,7 +73,9 @@
     text-overflow:ellipsis;
   }
   .user-chip.empty{color:var(--sub);font-weight:600;}
+  .nav-toggle{display:none;width:38px;height:38px;border-radius:10px;border:1px solid var(--line);background:var(--card);font-size:17px;cursor:pointer;flex-shrink:0;align-items:center;justify-content:center;color:var(--brand-dark);white-space:nowrap;padding:0 8px;width:auto;min-width:38px;}
   .brand{display:flex;align-items:center;gap:8px;min-width:0;}
+  .layout{position:relative;}
   .brand-logo{width:31px;height:31px;display:block;flex-shrink:0;}
   .brand h1{font-size:17px;font-weight:800;color:var(--brand-dark);letter-spacing:-0.01em;line-height:1.1;}
   .nav-group{display:none;}
@@ -689,6 +691,24 @@
     .views{flex:1;}
   }
 
+  /* 모바일: 탭바를 햄버거 드롭다운으로 */
+  @media (max-width:859px){
+    .nav-toggle{display:inline-flex;}
+    .tabbar{
+      display:none;
+      position:absolute; z-index:70; top:0; left:0; right:0;
+      flex-direction:column; gap:3px;
+      background:var(--card); border:1px solid var(--line);
+      border-radius:12px; box-shadow:0 14px 34px rgba(0,0,0,.22);
+      padding:8px; max-height:80vh; overflow:auto; margin:0;
+    }
+    .tabbar.open{display:flex;}
+    .tabbar .tab-btn{flex:none; justify-content:flex-start; padding:12px 14px; font-size:15px; background:transparent; border-radius:9px;}
+    .tabbar .tab-btn.active{background:var(--brand-dark); color:#fff; box-shadow:none;}
+    .tabbar .nav-group{display:block; font-size:11px; font-weight:800; color:var(--sub); letter-spacing:.02em; padding:10px 8px 2px;}
+    .tabbar .nav-divider{display:none;}
+  }
+
   /* 캘린더 */
   .cal-head{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
   .cal-title{font-size:18px;font-weight:800;color:var(--text);}
@@ -741,7 +761,7 @@
 <body>
 <div id="app">
   <header class="topbar">
-    <div class="brand"><img src="./icon-192.png" alt="" class="brand-logo"><h1>종운환경 · 종운건설</h1></div>
+    <div class="brand"><button class="nav-toggle" id="navToggle" aria-label="메뉴">☰</button><img src="./icon-192.png" alt="" class="brand-logo"><h1>종운환경 · 종운건설</h1></div>
     <div class="topbar-right">
       <button class="user-chip" id="curUserBtn"></button>
       <button class="gear-btn" id="gearBtn" aria-label="설정">⚙</button>
@@ -751,7 +771,7 @@
   <div class="offline-banner" id="offlineBanner">오프라인 — 연결되면 자동 저장</div>
 
   <div class="layout">
-  <nav class="tabbar">
+  <nav class="tabbar" id="tabbar">
     <button class="tab-btn active" data-tab="dash" id="tabDashBtn">홈</button>
     <div class="nav-group">관리</div>
     <button class="tab-btn" data-tab="tasks" id="tabTasksBtn">지시 <span class="tab-badge hide" id="taskTabBadge">0</span></button>
@@ -779,6 +799,7 @@
 
   <!-- 지시(업무 전달) -->
   <section class="view" id="view-tasks">
+    <div class="dash-sec" style="margin-bottom:8px;"><h2>지시 <span class="cnt" id="taskHead"></span></h2></div>
     <div class="card scope-host">
       <div class="add-row">
         <input type="text" id="taskTitle" placeholder="지시 내용">
@@ -807,7 +828,7 @@
   <!-- 차량·자산 만기 -->
   <section class="view" id="view-veh">
     <div class="dash-sec" style="margin-bottom:8px;">
-      <h2>차량·자산 만기 <span class="cnt" id="vehHead"></span></h2>
+      <h2>차량 <span class="cnt" id="vehHead"></span></h2>
     </div>
     <button class="link-btn" id="vehAddBtnTop">+ 차량 추가</button>
     <input type="search" id="vehSearch" placeholder="차량 검색(번호·종류·기사)" autocomplete="off" style="width:100%;padding:9px 12px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;font-size:14px;box-sizing:border-box;">
@@ -833,6 +854,7 @@
 
   <!-- 수금·기성 -->
   <section class="view" id="view-rec">
+    <div class="dash-sec" style="margin-bottom:8px;"><h2>기성 <span class="cnt" id="recTopHead"></span></h2></div>
     <div class="card">
       <div class="add-row">
         <input type="text" id="recClient" placeholder="거래처 (예: 포스코)">
@@ -893,7 +915,7 @@
 
   <section class="view" id="view-lic">
     <div class="dash-sec" style="margin-bottom:8px;">
-      <h2>인허가·보수교육 <span class="cnt" id="licHead"></span></h2>
+      <h2>인허가 <span class="cnt" id="licHead"></span></h2>
     </div>
     <div class="card" id="licList">
       <div class="loading">불러오는 중…</div>
@@ -903,7 +925,7 @@
 
   <!-- 계약·프로세스 -->
   <section class="view" id="view-con">
-    <div class="dash-sec" style="margin-bottom:8px;"><h2>계약·프로세스 <span class="cnt" id="conHead"></span></h2></div>
+    <div class="dash-sec" style="margin-bottom:8px;"><h2>계약 <span class="cnt" id="conHead"></span></h2></div>
     <button class="link-btn" id="conStartBtn">+ 계약 시작</button>
     <button class="link-btn" id="docGenBtn">+ 서류 출력</button>
     <div class="card" id="conList"><div class="loading">불러오는 중…</div></div>
@@ -927,7 +949,7 @@
 
   <!-- 인사(대표·관리자 전용) -->
   <section class="view" id="view-hr">
-    <div class="dash-sec" style="margin-bottom:8px;"><h2>임직원 <span class="cnt" id="hrTotal"></span></h2></div>
+    <div class="dash-sec" style="margin-bottom:8px;"><h2>인사 <span class="cnt" id="hrTotal"></span></h2></div>
     <div id="hrStartBanner" style="display:none;background:#EAF3EC;border:1px solid #B9D9C2;border-radius:10px;padding:12px 14px;margin-bottom:10px;">
       <div style="font-weight:700;margin-bottom:4px;">인사업무 시작 준비</div>
       <div style="font-size:13px;color:var(--sub);line-height:1.5;margin-bottom:10px;">직원 정보(현직원 수정·직원 추가)와 <b>현재 잔여 연차</b> 입력을 마친 뒤 아래 버튼을 누르세요. 누른 날짜를 기준으로 잔여 연차 계산이 시작됩니다. (한 번만 누르면 사라집니다)</div>
@@ -950,8 +972,10 @@
     <div class="dash-sec" style="margin-bottom:8px;"><h2>휴가 <span class="cnt" id="leaveHead"></span></h2></div>
     <div class="card" id="leaveMine"></div>
     <button class="link-btn" id="leaveAddBtn">+ 휴가 신청</button>
-    <button class="link-btn" id="resignBtn">📄 사직 신청</button>
     <div class="card" id="leaveList"><div class="loading">불러오는 중…</div></div>
+    <div style="display:flex;justify-content:flex-end;margin-top:18px;">
+      <button class="mini-btn" id="resignBtn" style="color:#B4232A;border-color:#E4B7B4;">사직 면담 신청</button>
+    </div>
   </section>
 
   <!-- 주기 체크 -->
@@ -1097,13 +1121,13 @@
 
 <div class="modal-backdrop" id="resignBackdrop">
   <div class="modal">
-    <h3>사직 신청</h3>
-    <p style="margin-bottom:12px;">사직(퇴직) 예정일과 사유를 입력해 신청합니다. 관리자가 승인하면 퇴사일이 인사기록에 자동 반영됩니다.</p>
-    <span class="fld-label">사직 예정일</span>
+    <h3>사직 면담 신청</h3>
+    <p style="margin-bottom:12px;line-height:1.6;">절차: <b>①면담 신청</b> → 관리자 <b>②면담완료</b> → 근로자 <b>③사직 본신청</b> → 관리자 <b>④승인</b>(퇴사일 자동 반영).<br>먼저 사직 희망일과 사유를 적어 면담을 신청합니다.</p>
+    <span class="fld-label">사직 희망일</span>
     <input type="date" id="rsDate">
     <span class="fld-label">사유</span>
     <input type="text" id="rsReason" placeholder="사유 (선택)" autocomplete="off">
-    <button class="primary" id="rsSave">사직 신청</button>
+    <button class="primary" id="rsSave">면담 신청</button>
     <button class="secondary" id="rsCancel">취소</button>
   </div>
 </div>
@@ -1339,6 +1363,8 @@
     <div class="err" id="meErr">이름과 PIN(4자리)을 확인하세요.</div>
     <input type="text" id="meName" placeholder="이름" autocomplete="off">
     <input type="text" id="mePin" placeholder="PIN 4자리 숫자" inputmode="numeric" autocomplete="off">
+    <span class="fld-label">연번 (로그인·명부 정렬 순서)</span>
+    <input type="number" id="meSeq" min="1" step="1" placeholder="예: 1" autocomplete="off">
     <span class="fld-label">직책 (권한)</span>
     <select id="meRole"><option value="대표">대표</option><option value="관리자">관리자</option><option value="팀장">팀장</option><option value="직원">직원</option><option value="현장직">현장직</option></select>
     <span class="fld-label">직급</span>
@@ -2895,11 +2921,15 @@
   });
 
   // ---- 탭 ----
+  var TAB_LABELS = {dash:"홈",tasks:"지시",rec:"기성",cli:"거래처",con:"계약",hr:"인사",cal:"캘린더",veh:"차량",lic:"인허가",doc:"문서함",check:"업무",leave:"휴가",perm:"권한관리"};
+  function closeNav(){ var tb=document.getElementById("tabbar"); if(tb) tb.classList.remove("open"); }
+  function updateNavToggle(name){ var nt=document.getElementById("navToggle"); if(nt) nt.textContent = "☰ " + (TAB_LABELS[name]||""); }
   function switchTab(name){
     currentTab = name;
     Array.prototype.forEach.call(document.querySelectorAll(".tab-btn"), function(b){
       b.classList.toggle("active", b.getAttribute("data-tab") === name);
     });
+    closeNav(); updateNavToggle(name);
     document.getElementById("view-dash").classList.toggle("active", name === "dash");
     document.getElementById("view-tasks").classList.toggle("active", name === "tasks");
     document.getElementById("view-veh").classList.toggle("active", name === "veh");
@@ -3172,6 +3202,15 @@
   Array.prototype.forEach.call(document.querySelectorAll(".tab-btn"), function(b){
     b.addEventListener("click", function(){ switchTab(b.getAttribute("data-tab")); });
   });
+  // 모바일 햄버거: 탭바 드롭다운 토글 + 바깥 클릭 닫기
+  (function(){
+    var nt = document.getElementById("navToggle"), tb = document.getElementById("tabbar");
+    if (nt && tb){
+      nt.addEventListener("click", function(e){ e.stopPropagation(); tb.classList.toggle("open"); });
+      document.addEventListener("click", function(e){ if (tb.classList.contains("open") && !tb.contains(e.target) && e.target !== nt) tb.classList.remove("open"); });
+      updateNavToggle(currentTab || "dash");
+    }
+  })();
 
   // 캘린더 상호작용
   (function(){
@@ -4116,12 +4155,14 @@
     var end=new Date(h.getTime()); end.setFullYear(h.getFullYear()+n+1);
     return { start:fmtYMD(anniv), end:fmtYMD(end) };
   }
+  // 연차를 소진하는 사용인가: 연차 + 오전/오후 반차(각 0.5일). 병가·경조·기타는 제외.
+  function isAnnualUse(l){ return l && (l.type==="annual" || l.type==="half_am" || l.type==="half_pm"); }
   // 지난 기간(1년 시효 경과)에 소멸한 미사용 연차 누적. hire/fiscal 기준 모두 지원.
   function annualExpired(memberId){
     var m=findMember(memberId);
     if(!m || !isDate(m.hire_date)) return 0;
     var per=annualPeriod(m); if(!per) return 0;
-    var mine=liveLeaves().filter(function(l){ return l.member_id===memberId && l.status==="approved" && l.type==="annual"; });
+    var mine=liveLeaves().filter(function(l){ return l.member_id===memberId && l.status==="approved" && isAnnualUse(l); });
     function usedIn(ps,pe){ var u=0; mine.forEach(function(l){ if(l.start && l.start>=ps && l.start<pe) u+=(l.days||0); }); return u; }
     var bd = m.annual_base_date || "";   // 계산 시작일 이전 기간은 앱에 이력이 없으므로 소멸 집계 제외
     var total=0;
@@ -4160,7 +4201,7 @@
       // 잔여 입력 직원: 기준값(현재 잔여)부터 시작, 기준일 이후 사용분만 차감
       grant = m.annual_base; mode = "base";
       liveLeaves().forEach(function(l){
-        if(l.member_id!==memberId || l.status!=="approved" || l.type!=="annual") return;
+        if(l.member_id!==memberId || l.status!=="approved" || !isAnnualUse(l)) return;
         if(!l.start || l.start<baseDate || l.start>=per.end) return;
         used+=(l.days||0);
       });
@@ -4168,7 +4209,7 @@
       // 역산(기본): 취업규칙 자동 부여 − 당해 사용, 지난 기간 소멸 표시
       grant = computeAnnual(m); mode = "calc";
       liveLeaves().forEach(function(l){
-        if(l.member_id!==memberId || l.status!=="approved" || l.type!=="annual") return;
+        if(l.member_id!==memberId || l.status!=="approved" || !isAnnualUse(l)) return;
         if(per && (!l.start || l.start<per.start || l.start>=per.end)) return;   // 당해 사용기간 밖은 소멸
         used+=(l.days||0);
       });
@@ -4203,28 +4244,58 @@
     bindLeaveHandlers(host);
   }
   function leaveRowHtml(l){
+    if(l.type==="resign") return resignRowHtml(l);
     var nm = dispName(memberName(l.member_id)) || l.member_name || "-";
     var period = isDate(l.start) ? (l.start + (l.end && l.end!==l.start ? " ~ " + l.end : "")) : "";
     var chip = l.status==="approved" ? '<span class="from-chip">승인</span>' : (l.status==="rejected" ? '<span class="dup-chip">반려</span>' : '<span class="review-chip">대기</span>');
     var me=getMemberId(), ctrl="";
     if(l.status==="pending" && isAdmin()) ctrl += '<button class="mini-btn appr-btn" data-lv-approve="'+l.id+'">승인</button><button class="mini-btn" data-lv-reject="'+l.id+'">반려</button>';
     if(l.status==="pending" && l.member_id===me) ctrl += '<button class="mini-btn" data-lv-cancel="'+l.id+'">취소</button>';
-    var title = (l.type==="resign")
-      ? esc(nm)+' · <b style="color:#B4232A;">사직 신청</b> '+chip
-      : esc(nm)+' · '+esc(leaveTypeLabel(l.type))+' '+(l.days||0)+'일 '+chip;
-    var metaPeriod = (l.type==="resign") ? ('사직 예정 '+esc(period)) : esc(period);
-    return '<div class="item"><div class="item-body"><div class="item-title">'+title+'</div><div class="item-meta"><span>'+metaPeriod+'</span>'+(l.reason?'<span>'+esc(l.reason)+'</span>':'')+(l.approver?'<span class="author-chip">'+esc(dispName(l.approver))+'</span>':'')+'</div></div><div class="task-ctrl">'+ctrl+'</div></div>';
+    var title = esc(nm)+' · '+esc(leaveTypeLabel(l.type))+' '+(l.days||0)+'일 '+chip;
+    return '<div class="item"><div class="item-body"><div class="item-title">'+title+'</div><div class="item-meta"><span>'+esc(period)+'</span>'+(l.reason?'<span>'+esc(l.reason)+'</span>':'')+(l.approver?'<span class="author-chip">'+esc(dispName(l.approver))+'</span>':'')+'</div></div><div class="task-ctrl">'+ctrl+'</div></div>';
+  }
+  // 사직: 근로자 면담신청 → 관리자 면담완료 → 근로자 사직신청 → 관리자 승인(퇴사일 반영)
+  function resignRowHtml(l){
+    var nm = dispName(memberName(l.member_id)) || l.member_name || "-";
+    var period = isDate(l.start) ? l.start : "";
+    var me=getMemberId(), mine=(l.member_id===me), adm=isAdmin();
+    var stg = l.stage || "resign_req";  // 구데이터: stage 없으면 본신청단계로 간주
+    var chip, ctrl="";
+    if(l.status==="approved"){ chip='<span class="from-chip">사직 확정</span>'; }
+    else if(l.status==="rejected"){ chip='<span class="dup-chip">반려</span>'; }
+    else if(stg==="interview_req"){ chip='<span class="review-chip">면담 대기</span>';
+      if(adm) ctrl+='<button class="mini-btn appr-btn" data-rs-interview="'+l.id+'">면담완료</button>';
+      if(mine) ctrl+='<button class="mini-btn" data-lv-cancel="'+l.id+'">취소</button>';
+    }
+    else if(stg==="interview_done"){ chip='<span class="review-chip">본신청 대기</span>';
+      if(mine) ctrl+='<button class="mini-btn appr-btn" data-rs-apply="'+l.id+'">사직 신청</button><button class="mini-btn" data-lv-cancel="'+l.id+'">취소</button>';
+    }
+    else { chip='<span class="review-chip">승인 대기</span>';
+      if(adm) ctrl+='<button class="mini-btn appr-btn" data-rs-approve="'+l.id+'">승인</button><button class="mini-btn" data-rs-reject="'+l.id+'">반려</button>';
+      if(mine) ctrl+='<button class="mini-btn" data-lv-cancel="'+l.id+'">취소</button>';
+    }
+    var meta='<span>사직 예정 '+esc(period)+'</span>';
+    if(l.interview_at) meta+='<span class="author-chip">면담완료 '+esc(l.interview_at)+'</span>';
+    if(l.reason) meta+='<span>'+esc(l.reason)+'</span>';
+    if(l.approver) meta+='<span class="author-chip">'+esc(dispName(l.approver))+'</span>';
+    return '<div class="item"><div class="item-body"><div class="item-title">'+esc(nm)+' · <b style="color:#B4232A;">사직</b> '+chip+'</div><div class="item-meta">'+meta+'</div></div><div class="task-ctrl">'+ctrl+'</div></div>';
   }
   function bindLeaveHandlers(host){
     function wire(attr,fn){ Array.prototype.forEach.call(host.querySelectorAll("["+attr+"]"),function(el){ el.addEventListener("click",function(){ fn(el.getAttribute(attr)); }); }); }
     wire("data-lv-approve", function(id){ setLeaveStatus(id,"approved"); });
     wire("data-lv-reject", function(id){ if(confirm("이 휴가를 반려할까요?")) setLeaveStatus(id,"rejected"); });
-    wire("data-lv-cancel", function(id){ if(confirm("휴가 신청을 취소할까요?")){ var l=findLeave(id); if(l){ l.del=1; l.updated=todayStr(); scheduleLeavesSave(); renderLeaves(); } } });
+    wire("data-lv-cancel", function(id){ if(confirm("신청을 취소할까요?")){ var l=findLeave(id); if(l){ l.del=1; l.updated=todayStr(); scheduleLeavesSave(); renderLeaves(); } } });
+    // 사직 단계 전환
+    wire("data-rs-interview", function(id){ if(!isAdmin()) return; if(!confirm("사직 면담을 완료 처리할까요? 직원이 사직 본신청을 할 수 있게 됩니다.")) return; var l=findLeave(id); if(l&&l.stage==="interview_req"){ l.stage="interview_done"; l.interview_at=todayStr(); l.interviewer=myName()||""; l.updated=todayStr(); scheduleLeavesSave(); renderLeaves(); renderDashboard(); } });
+    wire("data-rs-apply", function(id){ var l=findLeave(id); if(!l||l.member_id!==getMemberId()||l.stage!=="interview_done") return; if(!confirm("사직을 본신청할까요? 관리자 승인 시 퇴사일이 인사기록에 반영됩니다.")) return; l.stage="resign_req"; l.applied_at=todayStr(); l.updated=todayStr(); scheduleLeavesSave(); renderLeaves(); renderDashboard(); });
+    wire("data-rs-approve", function(id){ if(!isAdmin()) return; var l=findLeave(id); if(!l||(l.stage||"resign_req")!=="resign_req") return; if(!confirm("사직을 승인할까요? 퇴사일이 인사기록에 반영됩니다.")) return; setLeaveStatus(id,"approved"); });
+    wire("data-rs-reject", function(id){ if(!isAdmin()) return; if(confirm("사직 신청을 반려할까요?")) setLeaveStatus(id,"rejected"); });
   }
   function setLeaveStatus(id,status){
     if(!isAdmin()) return;
     var l=findLeave(id); if(!l || l.status!=="pending") return;
     l.status=status; l.approver=myName()||"관리자"; l.approved_at=todayStr(); l.updated=todayStr();
+    if(l.type==="resign") l.stage = (status==="approved" ? "resigned" : "rejected");
     // 사직 승인 → 퇴사일 인사기록 자동 반영
     if(l.type==="resign" && status==="approved" && l.member_id && isDate(l.start)){
       var mm=findMember(l.member_id);
@@ -4249,10 +4320,11 @@
   function saveResign(){
     var me=getMemberId(); if(!me){ alert("로그인 회원 정보가 없습니다."); return; }
     var date=document.getElementById("rsDate").value;
-    if(!isDate(date)){ alert("사직 예정일을 선택하세요."); return; }
-    if(!confirm("사직 신청을 제출할까요? 관리자 승인 시 퇴사일이 인사기록에 반영됩니다.")) return;
-    var l={ id:genId("lv"), member_id:me, member_name:myName()||"", type:"resign", start:date, end:date, days:0,
-      reason:document.getElementById("rsReason").value.trim(), status:"pending", approver:"", applied:todayStr(), updated:todayStr() };
+    if(!isDate(date)){ alert("사직 희망일을 선택하세요."); return; }
+    if(!confirm("사직 면담을 신청할까요? 관리자 면담완료 후 사직 본신청이 가능합니다.")) return;
+    var l={ id:genId("lv"), member_id:me, member_name:myName()||"", type:"resign", stage:"interview_req",
+      start:date, end:date, days:0, reason:document.getElementById("rsReason").value.trim(),
+      status:"pending", approver:"", applied:todayStr(), updated:todayStr() };
     leaves.push(l);
     scheduleLeavesSave();
     document.getElementById("resignBackdrop").classList.remove("show");
@@ -5537,7 +5609,7 @@
     var btn = document.getElementById("curUserBtn");
     if (!btn) return;
     var m = curMember();
-    btn.textContent = m ? (isBossMember(m) ? "대표님" : m.name) : "로그인";
+    btn.textContent = m ? (m.name + (m.rank ? " " + m.rank : "")) : "로그인";
     btn.classList.toggle("empty", !m);
   }
 
@@ -5667,10 +5739,14 @@
     var html = "";
     DEPT_LIST.concat(["미지정"]).forEach(function(d){
       var list = groups[d]; if (!list.length) return;
-      list.sort(function(a, b){ return ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role); });
+      list.sort(function(a, b){
+        var sa = (typeof a.seq==="number") ? a.seq : 1e9, sb = (typeof b.seq==="number") ? b.seq : 1e9;
+        if (sa !== sb) return sa - sb;
+        return ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role);
+      });
       html += '<div class="hr-dept"><div class="hr-dept-h">' + esc(d) + ' <span class="cnt">' + list.length + '</span></div>';
       list.forEach(function(m){
-        var nm = isBossMember(m) ? (m.name + " (대표님)") : m.name;
+        var nm = (typeof m.seq==="number" ? m.seq + ". " : "") + (isBossMember(m) ? (m.name + " (대표님)") : m.name);
         var meta = [m.role || "", m.rank || ""].filter(Boolean).join(" · ");
         var hr = [];
         if(m.hire_date){ var si=serviceInfo(m); hr.push("입사 " + m.hire_date); if(si) hr.push("근속 " + (Math.floor(si.years*10)/10) + "년"); }
@@ -5830,6 +5906,7 @@
     document.getElementById("memberEditTitle").textContent = m ? "회원 수정" : "회원 추가";
     document.getElementById("meErr").classList.remove("show");
     document.getElementById("meName").value = m ? (m.name||"") : "";
+    document.getElementById("meSeq").value = (m && typeof m.seq==="number") ? m.seq : "";
     document.getElementById("mePin").value = "";
     document.getElementById("mePin").placeholder = m ? "PIN (변경 시만 입력)" : "PIN 4자리 숫자";
     document.getElementById("meRole").value = m ? (m.role||"직원") : "직원";
@@ -5903,6 +5980,7 @@
     }
     var annualRaw = document.getElementById("meAnnual").value;
     var baseRaw = document.getElementById("meAnnualBase").value;
+    var seqRaw = document.getElementById("meSeq").value;
     var loaRaw = document.getElementById("meLoa").value;
     // 모듈별 권한은 '권한관리' 화면에서만 편집. 인사 카드 저장은 기존 권한을 보존(perms 미전송).
     // 신규 회원만 직책 프리셋으로 초기 권한 부여.
@@ -5910,6 +5988,7 @@
       rank: document.getElementById("meRank").value, dept: document.getElementById("meDept").value,
       annual_days: annualRaw === "" ? null : Number(annualRaw),
       annual_base: baseRaw === "" ? null : Number(baseRaw),
+      seq: seqRaw === "" ? null : Number(seqRaw),
       hire_date: document.getElementById("meHire").value || "",
       emp_type: document.getElementById("meEmp").value,
       annual_basis: document.getElementById("meBasis").value,

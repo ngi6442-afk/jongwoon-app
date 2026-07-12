@@ -54,6 +54,13 @@ async function listMembers(st) {
     const r = await blobGet(st, b.key);
     if (r.ok && r.data && r.data.del !== 1) out.push(r.data);
   }
+  // 연번(seq) 오름차순 → 없는 항목은 뒤로, 동률은 이름순
+  out.sort(function (a, b) {
+    const sa = (typeof a.seq === 'number') ? a.seq : 1e9;
+    const sb = (typeof b.seq === 'number') ? b.seq : 1e9;
+    if (sa !== sb) return sa - sb;
+    return String(a.name || '').localeCompare(String(b.name || ''));
+  });
   return out;
 }
 
@@ -154,6 +161,7 @@ async function handleMemberUpsert(st, event, d, R) {
   if (d.annual_paid !== undefined) m.annual_paid = !!d.annual_paid;
   if (d.annual_base !== undefined) { m.annual_base = (d.annual_base === null || isNaN(Number(d.annual_base))) ? null : Number(d.annual_base); }
   if (d.annual_base_date !== undefined) m.annual_base_date = String(d.annual_base_date || '');
+  if (d.seq !== undefined) { m.seq = (d.seq === null || isNaN(Number(d.seq))) ? null : Number(d.seq); }
   m.perms = cleanPerms(d.perms || m.perms);
   m.updated = Date.now();
   if (d.pin) {
