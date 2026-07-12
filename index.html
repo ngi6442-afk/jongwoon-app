@@ -562,6 +562,18 @@
   .leave-bal b{color:var(--brand);font-size:19px;}
   .leave-bal .lv-sub{font-size:12px;color:var(--sub);font-weight:400;margin-left:6px;}
   .leave-bal .lv-sched{font-size:12px;font-weight:700;color:#C74B7E;background:#FBEAF1;border-radius:999px;padding:1px 8px;margin-left:4px;}
+  /* 거래처 통합 뷰(CRM) */
+  .cli-more{font-size:11px;font-weight:600;color:var(--brand);opacity:.7;}
+  .crm-info{font-size:13px;color:var(--sub);margin-bottom:8px;line-height:1.5;}
+  .crm-sec{margin-top:14px;}
+  .crm-h{font-size:13px;font-weight:800;color:var(--brand-dark);margin-bottom:6px;display:flex;justify-content:space-between;align-items:baseline;}
+  .crm-h span{font-size:12px;font-weight:700;color:var(--sub);}
+  .crm-row{display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:7px 2px;border-bottom:1px solid var(--line);font-size:13px;}
+  .crm-row:last-child{border-bottom:none;}
+  .crm-row-t{min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;}
+  .crm-amt{font-weight:800;color:var(--brand);white-space:nowrap;}
+  .crm-sub{font-size:12px;color:var(--sub);white-space:nowrap;}
+  .crm-empty{font-size:12px;color:var(--sub);padding:4px 2px;}
   .rec-item.rec-dup{background:#FEF6F5;}
   .sel-bar{display:flex;align-items:center;gap:8px;padding:7px 15px;flex-wrap:nowrap;}
   .sel-box{width:18px;height:18px;flex:none;cursor:pointer;margin:0;accent-color:var(--brand);}
@@ -1037,6 +1049,15 @@
     <button class="primary" id="cliSave">저장</button>
     <button class="danger" id="cliDelete">삭제</button>
     <button class="secondary" id="cliCancel">취소</button>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="cliDetailBackdrop">
+  <div class="modal" style="max-width:540px;">
+    <h3 id="cliDetailTitle">거래처</h3>
+    <div id="cliDetailBody" style="max-height:70vh;overflow:auto;"></div>
+    <button class="primary" id="cliDetailEdit" style="display:none;">거래처 정보 수정</button>
+    <button class="secondary" id="cliDetailClose">닫기</button>
   </div>
 </div>
 
@@ -3297,6 +3318,8 @@
   document.getElementById("cliDelete").addEventListener("click", deleteCliFromModal);
   document.getElementById("cliCancel").addEventListener("click", closeCliModal);
   document.getElementById("cliBackdrop").addEventListener("click", function(e){ if (e.target === this) closeCliModal(); });
+  document.getElementById("cliDetailClose").addEventListener("click", function(){ document.getElementById("cliDetailBackdrop").classList.remove("show"); });
+  document.getElementById("cliDetailBackdrop").addEventListener("click", function(e){ if (e.target === this) this.classList.remove("show"); });
   document.getElementById("cliSearch").addEventListener("input", function(){ cliSearchTerm = this.value.toLowerCase().trim(); renderClients(); });
   document.getElementById("myTodoAddBtn").addEventListener("click", addMyTodo);
   document.getElementById("myTodoInput").addEventListener("keydown", function(e){ if (e.key === "Enter") addMyTodo(); });
@@ -4622,6 +4645,62 @@
       return nm !== "" && (r.client||"").trim() === nm;
     });
   }
+  function cliContracts(cli){
+    var nm=(cli.name||"").trim(); if(!nm) return [];
+    return liveContracts().filter(function(c){ return (c.client||"").trim()===nm; });
+  }
+  function cliRelatedDocs(cli){
+    var nm=(cli.name||"").trim(); if(!nm || typeof documents==="undefined") return [];
+    return documents.filter(function(d){ return d && d.del!==1 && (((d.title||"")+" "+(d.category||"")).indexOf(nm)>=0); });
+  }
+  // 거래처 통합 뷰: 미수·계약·관련문서 한눈에
+  function openCliDetail(id){
+    var c=findCli(id); if(!c) return;
+    document.getElementById("cliDetailTitle").textContent = c.name || "거래처";
+    var html="";
+    var info=[];
+    if(c.biz_no) info.push("사업자 "+esc(c.biz_no));
+    if(c.contact) info.push("담당 "+esc(c.contact)+(c.phone?" "+esc(c.phone):""));
+    else if(c.phone) info.push(esc(c.phone));
+    if(c.address) info.push(esc(c.address));
+    if(info.length) html+='<div class="crm-info">'+info.join(" · ")+'</div>';
+    if(c.note) html+='<div class="crm-info" style="opacity:.85;">'+esc(c.note)+'</div>';
+    // 미수
+    if(canSee("rec")){
+      var unpaid=cliUnpaid(c), sum=0; unpaid.forEach(function(r){ sum+=(r.amount||0); });
+      html+='<div class="crm-sec"><div class="crm-h">미수 <span>'+unpaid.length+'건 · '+(sum?fmtAmount(sum)+'원':'0원')+'</span></div>';
+      if(unpaid.length){
+        unpaid.sort(function(a,b){ return (a.billed||"")<(b.billed||"")?-1:1; });
+        html+=unpaid.map(function(r){
+          var ag=r.billed?recAging(r.billed):null;
+          var chip=ag?' <span class="rec-age '+ag.cls+'">'+ag.days+'일</span>':'';
+          return '<div class="crm-row"><span class="crm-row-t">'+esc(r.desc||r.client||"청구")+chip+'</span><span class="crm-amt">'+(r.amount?fmtAmount(r.amount)+'원':'')+'</span></div>';
+        }).join("");
+      } else html+='<div class="crm-empty">미수 없음</div>';
+      html+='</div>';
+    }
+    // 계약
+    var cons=cliContracts(c);
+    html+='<div class="crm-sec"><div class="crm-h">계약 <span>'+cons.length+'건</span></div>';
+    if(cons.length){
+      html+=cons.map(function(x){
+        var st=x.status==="done"?'<span class="from-chip">완료</span>':'<span class="review-chip">진행</span>';
+        return '<div class="crm-row"><span class="crm-row-t">'+esc(x.label||"계약")+' '+st+'</span><span class="crm-sub">'+esc(x.start||"")+'</span></div>';
+      }).join("");
+    } else html+='<div class="crm-empty">계약 없음</div>';
+    html+='</div>';
+    // 관련 문서(상호명 매칭)
+    var docs=cliRelatedDocs(c);
+    if(docs.length){
+      html+='<div class="crm-sec"><div class="crm-h">관련 문서 <span>'+docs.length+'건</span></div>';
+      html+=docs.slice(0,12).map(function(d){ return '<div class="crm-row"><span class="crm-row-t">'+esc(d.title||"-")+'</span><span class="crm-sub">'+esc(d.category||"")+'</span></div>'; }).join("");
+      html+='</div>';
+    }
+    document.getElementById("cliDetailBody").innerHTML=html;
+    var eb=document.getElementById("cliDetailEdit");
+    if(eb){ if(canDo("client")){ eb.style.display=""; eb.onclick=function(){ document.getElementById("cliDetailBackdrop").classList.remove("show"); openCliModal(id); }; } else eb.style.display="none"; }
+    document.getElementById("cliDetailBackdrop").classList.add("show");
+  }
   function renderClients(){
     var host = document.getElementById("cliList"); if (!host) return;
     var admin = canDo("client");
@@ -4644,14 +4723,17 @@
         var un = cliUnpaid(c);
         if (un.length){ var sum = 0; un.forEach(function(r){ sum += (r.amount||0); }); due = '<span class="rec-amt2" style="font-size:14px;">미수 ' + fmtAmount(sum) + '원 · ' + un.length + '건</span>'; }
       }
-      return '<div class="item"><div class="item-body"><div class="item-title">' + esc(c.name || "(상호없음)") + '</div>' +
+      return '<div class="item" data-cli-detail="' + c.id + '" style="cursor:pointer;"><div class="item-body"><div class="item-title">' + esc(c.name || "(상호없음)") + ' <span class="cli-more">상세 ›</span></div>' +
         (meta.length ? '<div class="item-meta">' + meta.join('') + '</div>' : '') +
         (due ? '<div class="item-meta" style="margin-top:4px;">' + due + '</div>' : '') +
         (c.note ? '<div class="task-detail">' + esc(c.note) + '</div>' : '') +
         '</div>' + (admin ? '<div class="task-ctrl"><button class="mini-btn" data-cli-edit="' + c.id + '">수정</button></div>' : '') + '</div>';
     }).join("") : '<div class="empty-line">등록된 거래처가 없습니다.</div>';
+    Array.prototype.forEach.call(host.querySelectorAll("[data-cli-detail]"), function(el){
+      el.addEventListener("click", function(){ openCliDetail(el.getAttribute("data-cli-detail")); });
+    });
     Array.prototype.forEach.call(host.querySelectorAll("[data-cli-edit]"), function(el){
-      el.addEventListener("click", function(){ openCliModal(el.getAttribute("data-cli-edit")); });
+      el.addEventListener("click", function(e){ e.stopPropagation(); openCliModal(el.getAttribute("data-cli-edit")); });
     });
   }
   function openCliModal(id){
