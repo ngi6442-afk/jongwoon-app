@@ -3485,13 +3485,13 @@
   function backbone(kind){ return WASTE_BACKBONE.map(function(s){ var o={name:s.name,due:s.due}; if(s.due==="auto"){ o.days=(s.kindDays&&s.kindDays[kind])||5; } return o; }); }
   var PROC_TEMPLATES = {
     lic_change: { label:"인허가 변경", pipes:[{key:"main", stages:[{name:"변경지시",due:"manual"},{name:"접수",due:"manual"},{name:"완료",due:"manual"}]}] },
-    waste: { label:"폐기물 수집운반", pipes:[{key:"main", stages:[{name:"계약",due:"manual"}].concat(backbone("지정")).concat([{name:"완료",due:"manual"}])}] },
+    waste: { label:"폐기물 수집운반", pipes:[{key:"main", stages:[{name:"계약",due:"manual"},{name:"착수",due:"manual"}].concat(backbone("지정")).concat([{name:"용역완료",due:"manual"}])}] },
     asbestos: { label:"석면철거", pipes:[
-      {key:"main", stages:[{name:"조사",due:"manual"},{name:"계약",due:"manual"},{name:"노동부신고(해체제거)",due:"manual"},{name:"필증인수",due:"manual"},{name:"작업",due:"manual"},{name:"완료",due:"manual"},{name:"완료신고",due:"manual"}]},
+      {key:"main", stages:[{name:"석면조사",due:"manual"},{name:"계약",due:"manual"},{name:"착공",due:"manual"},{name:"노동부신고(해체제거)",due:"manual"},{name:"필증인수",due:"manual"},{name:"작업",due:"manual"},{name:"준공",due:"manual"},{name:"완료신고",due:"manual"}]},
       {key:"waste", stages:backbone("지정")}
     ]},
     demolition: { label:"건축물철거", pipes:[
-      {key:"main", stages:[{name:"석면조사",due:"manual"},{name:"계약",due:"manual"},{name:"노동부신고",due:"manual"},{name:"필증인수(노동부신고필증)",due:"manual"},{name:"철거신고",due:"manual"},{name:"작업",due:"auto",days:3},{name:"완료",due:"manual"},{name:"완료신고",due:"manual"}]},
+      {key:"main", stages:[{name:"석면조사",due:"manual"},{name:"계약",due:"manual"},{name:"착공",due:"manual"},{name:"노동부신고",due:"manual"},{name:"필증인수(노동부신고필증)",due:"manual"},{name:"철거신고",due:"manual"},{name:"작업",due:"auto",days:3},{name:"준공",due:"manual"},{name:"완료신고",due:"manual"}]},
       {key:"waste", stages:backbone("건설")}
     ]}
   };
