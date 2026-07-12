@@ -3524,6 +3524,24 @@
   }
 
   // ---- 대시보드 (통합 첫 화면) ----
+  // 승인 대기함: 현재 사용자가 처리해야 할 결재/조치 목록
+  function approvalInboxItems(){
+    var out=[], me=getMemberId(), admin=isAdmin();
+    liveLeaves().forEach(function(l){
+      var nm=dispName(memberName(l.member_id))||l.member_name||"직원";
+      if(l.type==="resign"){
+        var stg=l.stage||"resign_req";
+        if(admin && l.status==="pending" && stg==="interview_req") out.push({tab:"leave",label:"사직 면담 처리",sub:nm});
+        else if(admin && l.status==="pending" && stg==="resign_req") out.push({tab:"leave",label:"사직 승인",sub:nm+" · 퇴사 "+(l.start||"")});
+        else if(!admin && l.member_id===me && l.status==="pending" && stg==="interview_done") out.push({tab:"leave",label:"사직 본신청 하기",sub:"면담완료 — 본신청 대기"});
+      } else {
+        if(admin && l.status==="pending") out.push({tab:"leave",label:"휴가 승인",sub:nm+" · "+leaveTypeLabel(l.type)+" "+(l.days||0)+"일"});
+        else if(admin && l.status==="approved" && l.cancel_req) out.push({tab:"leave",label:"휴가 취소 승인",sub:nm+" · "+(l.start||"")});
+      }
+    });
+    liveTasks().forEach(function(t){ if(t.status==="review" && canApproveTask(t)) out.push({tab:"tasks",label:"지시 결재",sub:(t.title||"제목없음")+(t.done_by?" · "+dispName(t.done_by):"")}); });
+    return out;
+  }
   function renderDashboard(){
     // 데이터 로드/변경 시 캘린더 탭이 열려 있으면 함께 갱신(로그인 직후 빈 배열로 그려진 경우 자동 채움)
     if (currentTab === "cal" && document.getElementById("calGrid")) renderCalendar();
@@ -3556,7 +3574,8 @@
     var imminentTot = urgent.length + urgentLic.length;
     var unpaid = unpaidReceivables();
 
-    var reviewCount = liveTasks().filter(function(t){ return t.status === "review" && (canApproveTask(t) || taskForMe(t)); }).length;
+    var inbox = approvalInboxItems();
+    var reviewCount = inbox.length;
     var unpaidSum = 0; unpaid.forEach(function(r){ unpaidSum += (r.amount || 0); });
     var tiles = '';
     if (seeRec) tiles += '<div class="stat-tile"><div class="lbl">미수</div><div class="val money">' + (unpaidSum ? (fmtAmount(unpaidSum) + '<span class="unit">원</span>') : (unpaid.length + '<span class="unit">건</span>')) + '</div></div>';
@@ -3566,6 +3585,14 @@
     var myChecks = myCheckCount();
     if (canSee("check") || myChecks) tiles += '<div class="stat-tile"><div class="lbl">주기업무</div><div class="val">' + myChecks + '<span class="unit">건</span></div></div>';
     var html = '<div class="dash-date">' + today + '</div>' + (tiles ? '<div class="stat-row">' + tiles + '</div>' : '');
+
+    if (inbox.length){
+      html += '<div class="dash-sec"><h2>승인 대기함 <span class="cnt">' + inbox.length + '</span></h2><div class="card">';
+      html += inbox.map(function(it){
+        return '<div class="item" data-inbox-go="' + it.tab + '"><div class="item-body"><div class="item-title">' + esc(it.label) + '</div><div class="item-meta"><span>' + esc(it.sub) + '</span></div></div><span class="cal-badge ev-leave">처리 →</span></div>';
+      }).join("");
+      html += '</div></div>';
+    }
 
     if (seeVeh){
     html += '<div class="dash-sec"><h2>만기 임박·경과 (차량) <span class="cnt">' + urgent.length + '</span></h2><div class="card">';
@@ -3624,6 +3651,9 @@
     bindTaskHandlers(host);
     bindCalHandlers(host);
     bindRecHandlers(host);
+    Array.prototype.forEach.call(host.querySelectorAll("[data-inbox-go]"), function(el){
+      el.addEventListener("click", function(){ switchTab(el.getAttribute("data-inbox-go")); });
+    });
   }
 
   // ---- 수금·기성(receivables.json) ----
