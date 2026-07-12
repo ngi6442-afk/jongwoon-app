@@ -733,7 +733,7 @@
   .cal-dots{display:flex;flex-wrap:wrap;gap:3px;align-content:flex-start;}
   .cal-dot{display:inline-block;width:7px;height:7px;border-radius:50%;flex:0 0 auto;}
   .cal-more{font-size:9px;font-weight:700;color:var(--sub);line-height:7px;}
-  .dot-veh{background:#2f6fd0;} .dot-lic{background:#7a4fd0;} .dot-tasks{background:#1A9A6B;} .dot-rec{background:#e0872f;}
+  .dot-veh{background:#2f6fd0;} .dot-lic{background:#7a4fd0;} .dot-tasks{background:#1A9A6B;} .dot-rec{background:#e0872f;} .dot-leave{background:#c74b7e;}
   .cal-chips{display:none;flex-direction:column;gap:2px;width:100%;}
   .cal-chip{font-size:11px;line-height:1.35;color:#fff;border-radius:4px;padding:1px 5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;}
   .cal-chip-more{font-size:10px;font-weight:700;color:var(--sub);padding:0 3px;}
@@ -754,7 +754,7 @@
   .cal-day-item{display:flex;align-items:center;gap:9px;padding:9px 2px;border-top:1px solid var(--line);cursor:pointer;}
   .cal-day-item:active{background:var(--bg);}
   .cal-badge{font-size:11px;font-weight:800;color:#fff;border-radius:6px;padding:3px 8px;white-space:nowrap;flex:0 0 auto;}
-  .ev-veh{background:#2f6fd0;} .ev-lic{background:#7a4fd0;} .ev-tasks{background:#1A9A6B;} .ev-rec{background:#e0872f;}
+  .ev-veh{background:#2f6fd0;} .ev-lic{background:#7a4fd0;} .ev-tasks{background:#1A9A6B;} .ev-rec{background:#e0872f;} .ev-leave{background:#c74b7e;}
   .cal-day-main{flex:1;min-width:0;}
   .cal-day-label{font-size:14px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .cal-day-sub{font-size:12px;color:var(--sub);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
@@ -908,6 +908,7 @@
       <span><i class="cal-dot dot-lic"></i>인허가 만료·교육</span>
       <span><i class="cal-dot dot-tasks"></i>지시 마감</span>
       <span><i class="cal-dot dot-rec"></i>기성 청구</span>
+      <span><i class="cal-dot dot-leave"></i>휴가·사직</span>
     </div>
     <div class="cal-week"><div class="cal-sun">일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div class="cal-sat">토</div></div>
     <div class="cal-grid" id="calGrid"></div>
@@ -2953,7 +2954,23 @@
 
   // ---- 캘린더(통합 만기·마감) ----
   var calState = { y:0, m:0, sel:null };
-  var CAL_LABEL = { veh:"차량", lic:"인허가", tasks:"지시", rec:"기성" };
+  var CAL_LABEL = { veh:"차량", lic:"인허가", tasks:"지시", rec:"기성", leave:"휴가" };
+  // 시작~종료(포함) 각 날짜에 콜백. 잘못된 값·과도한 범위는 방어.
+  function eachDate(start, end, fn){
+    if(!isDate(start)) return;
+    var s=new Date(start+"T00:00:00");
+    var e=isDate(end)?new Date(end+"T00:00:00"):new Date(s.getTime());
+    if(e<s) e=new Date(s.getTime());   // 별도 객체로 클론(s와 참조 공유 금지)
+    for(var i=0;i<400 && s<=e;i++){ fn(fmtDate(s)); s.setDate(s.getDate()+1); }
+  }
+  // 휴가 캘린더 가시성: 관리자=전체, 그 외=본인 + 같은 부서
+  function leaveCalVisible(l){
+    if(isAdmin()) return true;
+    var me=curMember(); if(!me) return false;
+    if(l.member_id===me.id) return true;
+    var lm=findMember(l.member_id);
+    return !!(lm && me.dept && lm.dept===me.dept);
+  }
   function calInit(){ var d = new Date(); calState.y = d.getFullYear(); calState.m = d.getMonth(); if(!calState.sel) calState.sel = todayStr(); }
   function calEvents(){
     var ev = [];
@@ -2962,6 +2979,17 @@
     if (canSee("lic")) licenses.forEach(function(l){ if (l.del === 1 || !licVisible(l)) return; add(l.expiry, "lic", (l.name||"인허가")+" 만료", l.org||""); add(l.edu_due, "lic", (l.name||"인허가")+" 교육", l.org||""); });
     tasks.forEach(function(t){ if (t.del === 1 || t.status === "done") return; if (!taskVisible(t)) return; add(t.due, "tasks", t.title||"지시", dispNameById(t.who)); });
     if (canSee("rec")) receivables.forEach(function(r){ if (r.del === 1 || r.paid || !recVisible(r)) return; add(r.billed, "rec", (r.client||"미수")+" 청구", r.amount ? fmtAmount(r.amount)+"원" : ""); });
+    // 휴가·사직: 승인된 연차/반차는 기간 전체, 사직 확정은 퇴사예정일(관리자만)
+    liveLeaves().forEach(function(l){
+      if(l.type==="annual" || l.type==="half_am" || l.type==="half_pm"){
+        if(l.status!=="approved" || !leaveCalVisible(l)) return;
+        var nm=dispName(memberName(l.member_id))||l.member_name||"";
+        eachDate(l.start, l.end, function(ds){ add(ds, "leave", (nm?nm+" ":"")+leaveTypeLabel(l.type), ""); });
+      } else if(l.type==="resign" && l.status==="approved" && isAdmin()){
+        var nm2=dispName(memberName(l.member_id))||l.member_name||"";
+        add(l.start, "leave", (nm2?nm2+" ":"")+"퇴사예정", "");
+      }
+    });
     return ev;
   }
   function calCell(y, m, d, byDate, today, other){
@@ -3005,7 +3033,7 @@
     var wd = ["일","월","화","수","목","금","토"][new Date(ds+"T00:00:00").getDay()];
     var head = '<div class="cal-day-head">' + ds + ' (' + wd + ') · ' + evs.length + '건</div>';
     if (!evs.length){ panel.innerHTML = head + '<div class="cal-day-empty">일정 없음</div>'; return; }
-    var order = { veh:1, lic:2, tasks:3, rec:4 };
+    var order = { veh:1, lic:2, tasks:3, rec:4, leave:5 };
     evs.sort(function(a,b){ return (order[a.mod]||9) - (order[b.mod]||9); });
     var html = head;
     evs.forEach(function(e){
