@@ -75,6 +75,7 @@
   .brand-logo{width:31px;height:31px;display:block;flex-shrink:0;}
   .brand h1{font-size:17px;font-weight:800;color:var(--brand-dark);letter-spacing:-0.01em;line-height:1.1;}
   .nav-group{display:none;}
+  .nav-divider{flex:0 0 1px;align-self:stretch;background:var(--line);margin:2px 4px;border-radius:1px;}
   /* 탭 */
   .tabbar{
     display:flex;
@@ -626,6 +627,7 @@
     .tab-btn.active{background:var(--brand-dark);color:#fff;box-shadow:0 2px 6px rgba(15,81,50,0.2);}
     .tab-btn .tab-badge{margin-left:auto;}
     .nav-group{display:block;font-size:11px;font-weight:800;color:var(--sub);letter-spacing:.02em;padding:14px 8px 4px;}
+    .nav-divider{flex:none;width:100%;height:1px;align-self:auto;margin:9px 0 3px;}
     .views{flex:1;}
   }
 
@@ -693,20 +695,17 @@
   <div class="layout">
   <nav class="tabbar">
     <button class="tab-btn active" data-tab="dash" id="tabDashBtn">홈</button>
-    <div class="nav-group">일정</div>
-    <button class="tab-btn" data-tab="cal" id="tabCalBtn">캘린더</button>
-    <div class="nav-group">업무</div>
+    <div class="nav-group">권한</div>
     <button class="tab-btn" data-tab="tasks" id="tabTasksBtn">지시 <span class="tab-badge hide" id="taskTabBadge">0</span></button>
+    <button class="tab-btn" data-tab="rec" id="tabRecBtn">기성</button>
+    <button class="tab-btn" data-tab="cli" id="tabCliBtn">거래처</button>
+    <div class="nav-divider"></div>
+    <div class="nav-group">담당</div>
+    <button class="tab-btn" data-tab="cal" id="tabCalBtn">캘린더</button>
     <button class="tab-btn" data-tab="check" id="tabCheckBtn">업무</button>
-    <div class="nav-group">현장·자산</div>
     <button class="tab-btn" data-tab="veh" id="tabVehBtn">차량</button>
     <button class="tab-btn" data-tab="lic" id="tabLicBtn">인허가</button>
     <button class="tab-btn" data-tab="con" id="tabConBtn">계약</button>
-    <div class="nav-group">정산</div>
-    <button class="tab-btn" data-tab="rec" id="tabRecBtn">기성</button>
-    <div class="nav-group">거래처</div>
-    <button class="tab-btn" data-tab="cli" id="tabCliBtn">거래처</button>
-    <div class="nav-group">문서</div>
     <button class="tab-btn" data-tab="doc" id="tabDocBtn">문서함</button>
     <div class="nav-group perm-hidden" id="navGroupHr">인사</div>
     <button class="tab-btn perm-hidden" data-tab="hr" id="tabHrBtn">인사</button>
