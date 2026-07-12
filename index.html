@@ -809,6 +809,12 @@
         <input type="date" id="taskDue">
       </div>
       <div class="add-row" style="padding-top:0;">
+        <select id="taskRecur" class="who-sel" style="flex:0 0 auto;" title="반복 지시(완료 승인 시 다음 회차 자동 생성)">
+          <option value="none">반복 없음</option>
+          <option value="weekly">매주</option>
+          <option value="monthly">매월</option>
+          <option value="yearly">매년</option>
+        </select>
         <select id="taskWho" class="who-sel"></select>
         <div class="scope-dd" id="taskScopeDD">
           <button type="button" id="taskScopeBtn" class="who-sel scope-btn">전체공개 ▾</button>
@@ -2067,6 +2073,8 @@
     if (t.status === "hold") metaBits.push('<span class="hold-chip">보류</span>');
     if (t.status === "review") metaBits.push('<span class="review-chip">승인 대기중' + (t.done_by ? ' · ' + esc(dispName(t.done_by)) : '') + '</span>');
     if (t.scope && t.scope.length) metaBits.push('<span class="scope-chip">공개 ' + esc(scopeNames(t.scope)) + '</span>');
+    if (t.recur) metaBits.push('<span class="from-chip">🔁 ' + (RECUR_LABEL[t.recur] || "반복") + '</span>');
+    if (t.auto_key) metaBits.push('<span class="review-chip">자동 만기</span>');
     if (t.proc_id) metaBits.push(procChipHtml(t));
     if (isDone){
       var byTxt = t.done_by ? (" · " + esc(t.done_by)) : "";
@@ -2257,8 +2265,11 @@
     var today = todayStr();
     var whoId = whoEl.value;
     var scope = getCheckedMembers("taskScopePanel");
-    tasks.push({
-      id: genId("t"),
+    var recurEl = document.getElementById("taskRecur");
+    var recur = recurEl ? recurEl.value : "none";
+    var newId = genId("t");
+    var t = {
+      id: newId,
       title: title,
       detail: "",
       who_id: whoId,
@@ -2273,11 +2284,14 @@
       done_by: null,
       created: today,
       updated: today
-    });
+    };
+    if (recur && recur !== "none"){ t.recur = recur; t.recur_root = newId; }
+    tasks.push(t);
     titleEl.value = "";
     whoEl.value = "";
     resetTaskScope();
     dueEl.value = "";
+    if (recurEl) recurEl.value = "none";
     saveTasksCache();
     renderTasks();
     renderSummary();
@@ -2312,7 +2326,49 @@
     if (!t || t.status !== "review" || !canApproveTask(t)) return;
     t.status = "done"; t.approved_by = myName() || "관리자"; t.approved_at = todayStr(); t.updated = todayStr();
     advanceProc(t);
+    if (t.recur) spawnNextRecur(t);   // 반복 지시: 완료 승인 시 다음 회차 생성
     saveTasksCache(); renderTasks(); renderSummary(); scheduleTasksSave();
+  }
+  var RECUR_LABEL = { weekly:"매주", monthly:"매월", yearly:"매년" };
+  function advanceRecur(dateStr, recur){
+    var d = new Date((isDate(dateStr)?dateStr:todayStr()) + "T00:00:00");
+    if (recur==="weekly") d.setDate(d.getDate()+7);
+    else if (recur==="yearly") d.setFullYear(d.getFullYear()+1);
+    else d.setMonth(d.getMonth()+1);   // 기본 매월
+    return fmtDate(d);
+  }
+  function spawnNextRecur(t){
+    if (!t || !t.recur) return;
+    var root = t.recur_root || t.id;
+    // 같은 반복 체인에 아직 열린(open/review) 회차가 있으면 중복 생성 금지
+    if (liveTasks().some(function(x){ return (x.recur_root||x.id)===root && x.id!==t.id && (x.status==="open"||x.status==="review"); })) return;
+    var next = advanceRecur(t.due, t.recur);
+    tasks.push({ id:genId("t"), title:t.title, detail:t.detail||"", who_id:t.who_id||"", who:t.who||"", scope:(t.scope||[]).slice(),
+      from:t.from||"", from_id:t.from_id||"", by:t.by||t.from||"", due:next, status:"open", done_at:null, done_by:null,
+      recur:t.recur, recur_root:root, created:todayStr(), updated:todayStr() });
+  }
+  // 만기(차량 검사·보험, 인허가 만료·교육) → 지시 자동 생성. auto_key로 중복 방지.
+  var autoGenRan = false;
+  function runAutoTaskGen(){
+    if (autoGenRan || !isAdmin()) return;
+    autoGenRan = true;
+    var today = todayStr(), created = 0;
+    function mk(key, title, due){
+      if (tasks.some(function(t){ return t.auto_key===key; })) return;   // 완료·삭제 포함 전체 중복 검사
+      tasks.push({ id:genId("t"), title:title, detail:"", who_id:"", who:"", scope:[], from:"자동", from_id:"", by:"자동",
+        due:due||"", status:"open", done_at:null, done_by:null, auto_key:key, created:today, updated:today });
+      created++;
+    }
+    liveVehicles().forEach(function(v){
+      if (isGreyState(v)) return;
+      if (isDate(v.insp_due) && vehDday(v.insp_due).diff<=30) mk("veh:"+v.id+":insp:"+v.insp_due, (v.no||"차량")+" 정기검사 갱신", v.insp_due);
+      if (isDate(v.ins_due) && vehDday(v.ins_due).diff<=30) mk("veh:"+v.id+":ins:"+v.ins_due, (v.no||"차량")+" 보험 갱신", v.ins_due);
+    });
+    liveLic().forEach(function(l){
+      if (isDate(l.expiry) && vehDday(l.expiry).diff<=30) mk("lic:"+l.id+":exp:"+l.expiry, (l.name||"인허가")+" 갱신", l.expiry);
+      if (isDate(l.edu_due) && vehDday(l.edu_due).diff<=30) mk("lic:"+l.id+":edu:"+l.edu_due, (l.name||"인허가")+" 보수교육 이수", l.edu_due);
+    });
+    if (created){ saveTasksCache(); scheduleTasksSave(); renderTasks(); renderSummary(); renderDashboard(); }
   }
   function rejectTask(id){
     var t = findTask(id);
@@ -5689,6 +5745,8 @@
     doLoad(); loadTasks(); loadVehicles(); loadReceivables(); loadLicenses(); loadDocuments(); loadClients(); loadContracts(); loadMyTasks(); loadLeaves();
     loadMembers();   // 담당 배정 드롭다운용 — 관리자·직원 모두
     render();
+    // 데이터 로드 후 만기 임박 항목을 지시로 자동 생성(관리자, 세션 1회, 중복 방지)
+    setTimeout(function(){ try{ runAutoTaskGen(); }catch(e){} }, 4500);
   }
   function loadMembers(){
     gwCall("gw-auth", { action: "member_list" }).then(function(res){
