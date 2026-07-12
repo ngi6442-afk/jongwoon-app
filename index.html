@@ -998,6 +998,11 @@
       <option value="demolition">건축물철거</option>
       <option value="waste">폐기물 수집운반</option>
     </select>
+    <span class="fld-label">계약서 성격</span>
+    <select id="conDoc">
+      <option value="public">공문서 (관공서·공기업) — 착공·준공 포함</option>
+      <option value="private">사문서 (일반)</option>
+    </select>
     <input type="text" id="conClient" placeholder="거래처/발주처" autocomplete="off">
     <input type="text" id="conSite" placeholder="현장 (선택)" autocomplete="off">
     <span class="fld-label">시작일</span>
@@ -3485,16 +3490,26 @@
   function backbone(kind){ return WASTE_BACKBONE.map(function(s){ var o={name:s.name,due:s.due}; if(s.due==="auto"){ o.days=(s.kindDays&&s.kindDays[kind])||5; } return o; }); }
   var PROC_TEMPLATES = {
     lic_change: { label:"인허가 변경", pipes:[{key:"main", stages:[{name:"변경지시",due:"manual"},{name:"접수",due:"manual"},{name:"완료",due:"manual"}]}] },
-    waste: { label:"폐기물 수집운반", pipes:[{key:"main", stages:[{name:"계약",due:"manual"},{name:"착수",due:"manual"}].concat(backbone("지정")).concat([{name:"용역완료",due:"manual"}])}] },
+    waste: { label:"폐기물 수집운반", pipes:[{key:"main", stages:[{name:"계약",due:"manual"}].concat(backbone("지정")).concat([{name:"완료",due:"manual"}])}] },
     asbestos: { label:"석면철거", pipes:[
-      {key:"main", stages:[{name:"석면조사",due:"manual"},{name:"계약",due:"manual"},{name:"착공",due:"manual"},{name:"노동부신고(해체제거)",due:"manual"},{name:"필증인수",due:"manual"},{name:"작업",due:"manual"},{name:"준공",due:"manual"},{name:"완료신고",due:"manual"}]},
+      {key:"main", stages:[{name:"석면조사",due:"manual"},{name:"계약",due:"manual"},{name:"노동부신고(해체제거)",due:"manual"},{name:"필증인수",due:"manual"},{name:"작업",due:"manual"},{name:"완료",due:"manual"},{name:"완료신고",due:"manual"}]},
       {key:"waste", stages:backbone("지정")}
     ]},
     demolition: { label:"건축물철거", pipes:[
-      {key:"main", stages:[{name:"석면조사",due:"manual"},{name:"계약",due:"manual"},{name:"착공",due:"manual"},{name:"노동부신고",due:"manual"},{name:"필증인수(노동부신고필증)",due:"manual"},{name:"철거신고",due:"manual"},{name:"작업",due:"auto",days:3},{name:"준공",due:"manual"},{name:"완료신고",due:"manual"}]},
+      {key:"main", stages:[{name:"석면조사",due:"manual"},{name:"계약",due:"manual"},{name:"노동부신고",due:"manual"},{name:"필증인수(노동부신고필증)",due:"manual"},{name:"철거신고",due:"manual"},{name:"작업",due:"auto",days:3},{name:"완료",due:"manual"},{name:"완료신고",due:"manual"}]},
       {key:"waste", stages:backbone("건설")}
     ]}
   };
+  // 공문서(관공서·공기업) 계약만 착공/착수·준공/용역완료 마일스톤 추가(본 파이프라인 한정)
+  var PROC_MILESTONE = { waste:{start:"착수",end:"용역완료"}, asbestos:{start:"착공",end:"준공"}, demolition:{start:"착공",end:"준공"} };
+  function applyPublicMilestones(stages, ms){
+    var out = [];
+    stages.forEach(function(s){
+      out.push({ name:(s.name==="완료"?ms.end:s.name), due:s.due, days:s.days });
+      if(s.name==="계약") out.push({ name:ms.start, due:"manual" });
+    });
+    return out;
+  }
   function procStageTitle(c, sname){ var who=(c.client||c.site||"").trim(); return "[" + c.label + "] " + (who?who+" · ":"") + sname; }
   function materializeStage(c, pipe, baseDate){
     if(pipe.cur >= pipe.stages.length) return;
@@ -3512,9 +3527,14 @@
     var tpl = PROC_TEMPLATES[type]; if(!tpl) return null;
     opts = opts || {};
     var today = todayStr();
-    var c = { id:genId("c"), type:type, label:tpl.label, client:opts.client||"", site:opts.site||"", start:opts.start||today,
+    var docType = opts.docType === "public" ? "public" : "private";
+    var c = { id:genId("c"), type:type, label:tpl.label, docType:docType, client:opts.client||"", site:opts.site||"", start:opts.start||today,
       lic_id:opts.lic_id||null, info:{}, review:{missing:[],suspect:[],ok:false}, docs:[],
-      pipes:tpl.pipes.map(function(p){ return {key:p.key, cur:0, stages:p.stages.map(function(s){ return {name:s.name,due:s.due,days:s.days||null,status:"pending",task_id:null,done_at:null}; })}; }),
+      pipes:tpl.pipes.map(function(p){
+        var st = p.stages;
+        if(docType==="public" && PROC_MILESTONE[type] && p.key==="main") st = applyPublicMilestones(st, PROC_MILESTONE[type]);
+        return {key:p.key, cur:0, stages:st.map(function(s){ return {name:s.name,due:s.due,days:s.days||null,status:"pending",task_id:null,done_at:null}; })};
+      }),
       status:"active", who_id:opts.who||"", who:memberName(opts.who||""), created:today, updated:today };
     contracts.push(c);
     c.pipes.forEach(function(p){ materializeStage(c, p, c.start); });
@@ -3562,7 +3582,7 @@
       return '<div class="item con-item'+(c.status==="done"?' checked':'')+'">'+
         '<div class="item-body">'+
           '<div class="item-title">'+esc(c.label)+(c.client?' · '+esc(c.client):'')+'</div>'+
-          '<div class="item-meta">'+(c.site?'<span>'+esc(c.site)+'</span>':'')+'<span>시작 '+esc(c.start||"")+'</span>'+(c.who?'<span class="author-chip">'+esc(c.who)+'</span>':'')+(c.status==="done"?'<span class="done-by">✓ 완료</span>':'')+'</div>'+
+          '<div class="item-meta">'+(c.docType==="public"?'<span class="from-chip">공문서</span>':'<span class="scope-chip">사문서</span>')+(c.site?'<span>'+esc(c.site)+'</span>':'')+'<span>시작 '+esc(c.start||"")+'</span>'+(c.who?'<span class="author-chip">'+esc(c.who)+'</span>':'')+(c.status==="done"?'<span class="done-by">✓ 완료</span>':'')+'</div>'+
           pipes+
         '</div>'+
         (canDo("con")?'<div class="task-ctrl"><button class="mini-btn danger" data-con-del="'+c.id+'">삭제</button></div>':'')+
@@ -3581,6 +3601,7 @@
   function openConStart(){
     if(!canDo("con")) return;
     document.getElementById("conType").value="asbestos";
+    document.getElementById("conDoc").value="public";
     document.getElementById("conClient").value="";
     document.getElementById("conSite").value="";
     document.getElementById("conStart").value=todayStr();
@@ -3594,8 +3615,9 @@
     var site=document.getElementById("conSite").value.trim();
     var start=document.getElementById("conStart").value||todayStr();
     var who=document.getElementById("conWho").value.trim();
+    var docType=document.getElementById("conDoc").value;
     if(!client && !site){ alert("거래처 또는 현장을 입력하세요."); return; }
-    startProcess(type, {client:client, site:site, start:start, who:who});
+    startProcess(type, {client:client, site:site, start:start, who:who, docType:docType});
     document.getElementById("conStartBackdrop").classList.remove("show");
     renderContracts();
     switchTab("tasks");
