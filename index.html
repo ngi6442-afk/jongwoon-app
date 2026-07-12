@@ -781,7 +781,7 @@
     <button class="tab-btn" data-tab="rec" id="tabRecBtn">기성</button>
     <button class="tab-btn" data-tab="cli" id="tabCliBtn">거래처</button>
     <button class="tab-btn" data-tab="con" id="tabConBtn">계약</button>
-    <button class="tab-btn perm-hidden" data-tab="hr" id="tabHrBtn">인사</button>
+    <button class="tab-btn perm-hidden" data-tab="hr" id="tabHrBtn">인사 <span class="tab-badge hide" id="hrTabBadge">0</span></button>
     <div class="nav-divider"></div>
     <div class="nav-group">업무</div>
     <button class="tab-btn" data-tab="cal" id="tabCalBtn">캘린더</button>
@@ -791,7 +791,7 @@
     <div class="nav-divider"></div>
     <div class="nav-group">개인</div>
     <button class="tab-btn" data-tab="check" id="tabCheckBtn">업무</button>
-    <button class="tab-btn" data-tab="leave" id="tabLeaveBtn">휴가</button>
+    <button class="tab-btn" data-tab="leave" id="tabLeaveBtn">휴가 <span class="tab-badge hide" id="leaveTabBadge">0</span></button>
   </nav>
   <div class="views">
 
@@ -2042,6 +2042,21 @@
     badge.textContent = open;
     badge.classList.toggle("hide", open === 0);
     badge.classList.toggle("red", overdue);
+    updateApprovalBadges();
+  }
+  // 휴가 탭=휴가/취소/사직 대기, 인사 탭=사직 대기(빨간 뱃지). 승인 대기함과 동일 집계.
+  function setTabBadge(id, n){
+    var el = document.getElementById(id); if (!el) return;
+    el.textContent = n;
+    el.classList.toggle("hide", n === 0);
+    el.classList.toggle("red", n > 0);
+  }
+  function updateApprovalBadges(){
+    var items = (typeof approvalInboxItems === "function") ? approvalInboxItems() : [];
+    var leaveN = items.filter(function(it){ return it.tab === "leave"; }).length;
+    var hrN = items.filter(function(it){ return it.tab === "leave" && it.label.indexOf("사직") >= 0; }).length;
+    setTabBadge("leaveTabBadge", leaveN);
+    setTabBadge("hrTabBadge", hrN);
   }
 
   function taskRowHtml(t, isDone, sel){
@@ -3654,6 +3669,7 @@
     Array.prototype.forEach.call(host.querySelectorAll("[data-inbox-go]"), function(el){
       el.addEventListener("click", function(){ switchTab(el.getAttribute("data-inbox-go")); });
     });
+    updateApprovalBadges();
   }
 
   // ---- 수금·기성(receivables.json) ----
@@ -4304,6 +4320,7 @@
     var head=document.getElementById("leaveHead"); if(head) head.textContent = pend ? (pend+"건 대기") : "";
     host.innerHTML = visible.length ? visible.map(leaveRowHtml).join("") : '<div class="empty-line">휴가 신청이 없습니다.</div>';
     bindLeaveHandlers(host);
+    updateApprovalBadges();
   }
   function leaveRowHtml(l){
     if(l.type==="resign") return resignRowHtml(l);
@@ -5589,6 +5606,7 @@
     if (hrBtn) hrBtn.classList.toggle("perm-hidden", !adminUser);
     if (currentTab === "hr" && !adminUser) switchTab("dash");
     updateUserChip();
+    updateApprovalBadges();
   }
 
   function saveUsersCache(){ try{ localStorage.setItem(USERS_CACHE_KEY, JSON.stringify({sha: usersSha, members: members})); }catch(e){} }
