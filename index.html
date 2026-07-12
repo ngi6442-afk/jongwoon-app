@@ -561,6 +561,7 @@
   .leave-bal{font-size:15px;font-weight:700;}
   .leave-bal b{color:var(--brand);font-size:19px;}
   .leave-bal .lv-sub{font-size:12px;color:var(--sub);font-weight:400;margin-left:6px;}
+  .leave-bal .lv-sched{font-size:12px;font-weight:700;color:#C74B7E;background:#FBEAF1;border-radius:999px;padding:1px 8px;margin-left:4px;}
   .rec-item.rec-dup{background:#FEF6F5;}
   .sel-bar{display:flex;align-items:center;gap:8px;padding:7px 15px;flex-wrap:nowrap;}
   .sel-box{width:18px;height:18px;flex:none;cursor:pointer;margin:0;accent-color:var(--brand);}
@@ -4223,29 +4224,27 @@
   function leaveRemaining(memberId){
     var m=findMember(memberId);
     var per=annualPeriod(m);
+    var today=todayStr();
     var hasBase = m && typeof m.annual_base === "number";
     var baseDate = m && m.annual_base_date;
     var inBasePeriod = hasBase && per && baseDate && baseDate>=per.start && baseDate<per.end;
-    var grant, used=0, expired=0, mode;
+    var grant, used=0, scheduled=0, expired=0, mode;
+    // used=휴가일 지난 것(차감), scheduled=아직 안 온 예정분(미차감)
+    function tally(lo){
+      liveLeaves().forEach(function(l){
+        if(l.member_id!==memberId || l.status!=="approved" || !isAnnualUse(l)) return;
+        if(per && (!l.start || l.start<lo || l.start>=per.end)) return;
+        if(l.start<=today) used+=(l.days||0); else scheduled+=(l.days||0);
+      });
+    }
     if(inBasePeriod){
-      // 잔여 입력 직원: 기준값(현재 잔여)부터 시작, 기준일 이후 사용분만 차감
-      grant = m.annual_base; mode = "base";
-      liveLeaves().forEach(function(l){
-        if(l.member_id!==memberId || l.status!=="approved" || !isAnnualUse(l)) return;
-        if(!l.start || l.start<baseDate || l.start>=per.end) return;
-        used+=(l.days||0);
-      });
+      grant = m.annual_base; mode = "base"; tally(baseDate);
     } else {
-      // 역산(기본): 취업규칙 자동 부여 − 당해 사용, 지난 기간 소멸 표시
-      grant = computeAnnual(m); mode = "calc";
-      liveLeaves().forEach(function(l){
-        if(l.member_id!==memberId || l.status!=="approved" || !isAnnualUse(l)) return;
-        if(per && (!l.start || l.start<per.start || l.start>=per.end)) return;   // 당해 사용기간 밖은 소멸
-        used+=(l.days||0);
-      });
+      grant = computeAnnual(m); mode = "calc"; tally(per?per.start:"0000-00-00");
       expired = annualExpired(memberId);
     }
-    return {grant:grant, used:used, expired:expired, left:Math.round((grant-used)*10)/10, period:per, mode:mode};
+    // 차감은 휴가일 이후 → 잔여 = 부여 − 사용(과거). 예정은 별도 표기
+    return {grant:grant, used:Math.round(used*10)/10, scheduled:Math.round(scheduled*10)/10, expired:expired, left:Math.round((grant-used)*10)/10, period:per, mode:mode};
   }
   function renderLeaves(){
     var host=document.getElementById("leaveList"); if(!host) return;
@@ -4258,10 +4257,12 @@
           mine.innerHTML='<div class="leave-bal">연차수당 포함 근로자 <span class="lv-sub">— 연차 사용 불가(수당 정산 대상). 당해 발생 '+computeAnnual(mm)+'일</span></div>';
         } else {
           var r=leaveRemaining(me);
-          var sub = (r.mode==="base")
-            ? '(기준값 '+r.grant+' · 사용 '+r.used+(r.period?' · 사용기간 '+r.period.start+'~'+r.period.end:'')+')'
-            : '(부여 '+r.grant+' · 사용 '+r.used+(r.expired?' · 지난 기간 소멸 '+r.expired:'')+(r.period?' · 사용기간 '+r.period.start+'~'+r.period.end:'')+')';
-          mine.innerHTML='<div class="leave-bal">내 연차 <b>'+r.left+'</b>일 남음 <span class="lv-sub">'+sub+'</span></div>';
+          var grantLabel = (r.mode==="base") ? "기준값" : "부여";
+          var parts = [grantLabel+" "+r.grant, "사용 "+r.used];
+          if(r.scheduled) parts.push("예정 "+r.scheduled);
+          if(r.mode!=="base" && r.expired) parts.push("지난 기간 소멸 "+r.expired);
+          if(r.period) parts.push("사용기간 "+r.period.start+"~"+r.period.end);
+          mine.innerHTML='<div class="leave-bal">내 연차 <b>'+r.left+'</b>일 남음'+(r.scheduled?' <span class="lv-sched">예정 '+r.scheduled+'</span>':'')+' <span class="lv-sub">('+parts.join(" · ")+')</span></div>';
         }
       } else mine.innerHTML='';
     }
@@ -4280,7 +4281,9 @@
     var chip = l.status==="approved" ? '<span class="from-chip">승인</span>' : (l.status==="rejected" ? '<span class="dup-chip">반려</span>' : '<span class="review-chip">대기</span>');
     var me=getMemberId(), ctrl="";
     if(l.status==="pending" && isAdmin()) ctrl += '<button class="mini-btn appr-btn" data-lv-approve="'+l.id+'">승인</button><button class="mini-btn" data-lv-reject="'+l.id+'">반려</button>';
-    if(l.status==="pending" && l.member_id===me) ctrl += '<button class="mini-btn" data-lv-cancel="'+l.id+'">취소</button>';
+    // 본인 취소: 대기중이거나, 승인됐어도 아직 휴가일이 안 지났으면(예정) 취소 가능
+    if(l.member_id===me && (l.status==="pending" || (l.status==="approved" && isDate(l.start) && l.start>todayStr())))
+      ctrl += '<button class="mini-btn" data-lv-cancel="'+l.id+'">취소</button>';
     var title = esc(nm)+' · '+esc(leaveTypeLabel(l.type))+' '+(l.days||0)+'일 '+chip;
     return '<div class="item"><div class="item-body"><div class="item-title">'+title+'</div><div class="item-meta"><span>'+esc(period)+'</span>'+(l.reason?'<span>'+esc(l.reason)+'</span>':'')+(l.approver?'<span class="author-chip">'+esc(dispName(l.approver))+'</span>':'')+'</div></div><div class="task-ctrl">'+ctrl+'</div></div>';
   }
@@ -4314,7 +4317,7 @@
     function wire(attr,fn){ Array.prototype.forEach.call(host.querySelectorAll("["+attr+"]"),function(el){ el.addEventListener("click",function(){ fn(el.getAttribute(attr)); }); }); }
     wire("data-lv-approve", function(id){ setLeaveStatus(id,"approved"); });
     wire("data-lv-reject", function(id){ if(confirm("이 휴가를 반려할까요?")) setLeaveStatus(id,"rejected"); });
-    wire("data-lv-cancel", function(id){ if(confirm("신청을 취소할까요?")){ var l=findLeave(id); if(l){ l.del=1; l.updated=todayStr(); scheduleLeavesSave(); renderLeaves(); } } });
+    wire("data-lv-cancel", function(id){ var l=findLeave(id); if(!l) return; var msg=(l.status==="approved")?"승인된 휴가를 취소할까요? 잔여 연차가 복구됩니다.":"신청을 취소할까요?"; if(confirm(msg)){ l.del=1; l.updated=todayStr(); scheduleLeavesSave(); renderLeaves(); renderDashboard(); if(currentTab==="cal") renderCalendar(); } });
     // 사직 단계 전환
     wire("data-rs-interview", function(id){ if(!isAdmin()) return; if(!confirm("사직 면담을 완료 처리할까요? 직원이 사직 본신청을 할 수 있게 됩니다.")) return; var l=findLeave(id); if(l&&l.stage==="interview_req"){ l.stage="interview_done"; l.interview_at=todayStr(); l.interviewer=myName()||""; l.updated=todayStr(); scheduleLeavesSave(); renderLeaves(); renderDashboard(); } });
     wire("data-rs-apply", function(id){ var l=findLeave(id); if(!l||l.member_id!==getMemberId()||l.stage!=="interview_done") return; if(!confirm("사직을 본신청할까요? 관리자 승인 시 퇴사일이 인사기록에 반영됩니다.")) return; l.stage="resign_req"; l.applied_at=todayStr(); l.updated=todayStr(); scheduleLeavesSave(); renderLeaves(); renderDashboard(); });
@@ -5784,8 +5787,8 @@
           hr.push("연차 " + computeAnnual(m) + "일(수당포함·사용불가)" + (typeof m.annual_days==="number" ? "(수동)" : ""));
         } else {
           var lr=leaveRemaining(m.id);
-          if(lr.mode==="base") hr.push("연차 잔여 " + lr.left + " (기준값 " + lr.grant + " · 사용 " + lr.used + ")");
-          else hr.push("연차 부여 " + lr.grant + " · 사용 " + lr.used + " · 잔여 " + lr.left + (lr.expired?" · 소멸 "+lr.expired:""));
+          var gl=(lr.mode==="base")?"기준값":"부여";
+          hr.push("연차 잔여 " + lr.left + " (" + gl + " " + lr.grant + " · 사용 " + lr.used + (lr.scheduled?" · 예정 "+lr.scheduled:"") + (lr.mode!=="base"&&lr.expired?" · 소멸 "+lr.expired:"") + ")");
         }
         if(m.leave_date) hr.push("퇴사 " + m.leave_date);
         var sev = severanceAnnual(m);
