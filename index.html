@@ -4287,9 +4287,8 @@
     if(l.status==="pending" && isAdmin()) ctrl += '<button class="mini-btn appr-btn" data-lv-approve="'+l.id+'">승인</button><button class="mini-btn" data-lv-reject="'+l.id+'">반려</button>';
     if(l.status==="pending" && l.member_id===me) ctrl += '<button class="mini-btn" data-lv-cancel="'+l.id+'">철회</button>';  // 대기중 본인 철회(승인 불필요)
     if(l.status==="approved"){
-      if(cr){  // 취소 요청됨 → 관리자 승인제
+      if(cr){  // 취소 요청됨 → 관리자 승인제(본인 자가철회 불가, 관리자가 승인/반려)
         if(isAdmin()) ctrl += '<button class="mini-btn appr-btn" data-lv-cxok="'+l.id+'">취소 승인</button><button class="mini-btn" data-lv-cxno="'+l.id+'">취소 반려</button>';
-        if(l.member_id===me) ctrl += '<button class="mini-btn" data-lv-cxwd="'+l.id+'">요청 철회</button>';
       } else if(l.member_id===me){
         // 당일·미래는 항상, 지난 휴가는 휴가일로부터 3일 이내만 취소 요청 가능(추후 규정화 예정)
         var dback = isDate(l.start) ? Math.floor((new Date(todayStr()+"T00:00:00")-new Date(l.start+"T00:00:00"))/86400000) : 999;
@@ -4331,8 +4330,7 @@
     wire("data-lv-reject", function(id){ if(confirm("이 휴가를 반려할까요?")) setLeaveStatus(id,"rejected"); });
     wire("data-lv-cancel", function(id){ var l=findLeave(id); if(!l||l.member_id!==getMemberId()||l.status!=="pending") return; if(confirm("대기중 신청을 철회할까요?")){ l.del=1; l.updated=todayStr(); scheduleLeavesSave(); renderLeaves(); renderDashboard(); if(currentTab==="cal") renderCalendar(); } });
     // 휴가 취소 승인제: 본인 취소 요청 → 관리자 취소 승인/반려
-    wire("data-lv-cxreq", function(id){ var l=findLeave(id); if(!l||l.member_id!==getMemberId()||l.status!=="approved") return; if(confirm("이 휴가의 취소를 요청할까요? 관리자 승인 후 잔여 연차가 복구됩니다.")){ l.cancel_req=true; l.cancel_req_at=todayStr(); l.updated=todayStr(); scheduleLeavesSave(); renderLeaves(); renderDashboard(); } });
-    wire("data-lv-cxwd", function(id){ var l=findLeave(id); if(!l||l.member_id!==getMemberId()||!l.cancel_req) return; l.cancel_req=false; l.updated=todayStr(); scheduleLeavesSave(); renderLeaves(); });
+    wire("data-lv-cxreq", function(id){ var l=findLeave(id); if(!l||l.member_id!==getMemberId()||l.status!=="approved") return; if(confirm("이 휴가의 취소를 요청할까요? 관리자 승인 후 잔여 연차가 복구됩니다. (요청 후에는 관리자가 처리)")){ l.cancel_req=true; l.cancel_req_at=todayStr(); l.updated=todayStr(); scheduleLeavesSave(); renderLeaves(); renderDashboard(); } });
     wire("data-lv-cxok", function(id){ if(!isAdmin()) return; var l=findLeave(id); if(!l||!l.cancel_req) return; if(confirm("휴가 취소를 승인할까요? 잔여 연차가 복구됩니다.")){ l.del=1; l.cancel_req=false; l.cancel_approver=myName()||"관리자"; l.updated=todayStr(); scheduleLeavesSave(); renderLeaves(); renderDashboard(); if(currentTab==="cal") renderCalendar(); } });
     wire("data-lv-cxno", function(id){ if(!isAdmin()) return; var l=findLeave(id); if(!l||!l.cancel_req) return; if(confirm("취소 요청을 반려할까요? 휴가는 유지됩니다.")){ l.cancel_req=false; l.updated=todayStr(); scheduleLeavesSave(); renderLeaves(); renderDashboard(); } });
     // 사직 단계 전환
