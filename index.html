@@ -22,6 +22,8 @@
   }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
+  /* 세로 스크롤바 공간을 항상 예약 → 탭마다(항목 수에 따라) 본문 폭이 달라 보이는 문제 방지 */
+  html{scrollbar-gutter:stable;}
   body{
     background:var(--bg);
     color:var(--text);
