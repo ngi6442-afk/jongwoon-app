@@ -1113,8 +1113,6 @@
     <label class="chk" style="justify-content:flex-start;"><input type="checkbox" id="memberKeep"> 이 기기에서 로그인 유지(개인 PC만)</label>
     <button class="primary" id="memberLogin">로그인</button>
     <button class="secondary" id="memberPinBtn" style="display:none;">내 PIN 변경</button>
-    <button class="secondary" id="memberManageBtn" style="display:none;">회원 관리</button>
-    <button class="secondary" id="memberDevicesBtn" style="display:none;">기기 관리</button>
     <button class="secondary" id="helpBtn">도움말</button>
   </div>
 </div>
@@ -1171,6 +1169,10 @@
     <span class="fld-label">모듈별 권한 (수행/보기/숨김)</span>
     <div id="mePermNote" style="display:none;font-size:12px;color:#8A6410;background:#FFF3D4;border-radius:6px;padding:6px 9px;margin-bottom:6px;">대표·관리자는 모든 모듈을 <b>수행</b>합니다(개별 설정 무시). 모듈별로 제한하려면 직책을 <b>팀장·직원·현장직</b>으로 하세요.</div>
     <div id="mePerms"></div>
+    <div id="meDevicesWrap" style="display:none;">
+      <span class="fld-label">등록 기기 (승인/해제/삭제)</span>
+      <div id="meDevices"><div class="empty-line">불러오는 중…</div></div>
+    </div>
     <button class="primary" id="meSave">저장</button>
     <button class="danger" id="meDelete">삭제</button>
     <button class="secondary" id="meCancel">취소</button>
@@ -2596,6 +2598,7 @@
         saveTasksCache();
         renderTasks();
         renderSummary();
+        renderDashboard();
         return;
       }
       if (!resp.ok){
@@ -2609,6 +2612,7 @@
         saveTasksCache();
         renderTasks();
         renderSummary();
+        renderDashboard();
       });
     }).catch(function(){
       var cache = loadTasksCache();
@@ -2618,6 +2622,7 @@
         setOffline(true);
         renderTasks();
         renderSummary();
+        renderDashboard();
       } else {
         var lh = document.getElementById("taskList");
         if (lh) lh.innerHTML = '<div class="loading" style="padding:18px 0;">오프라인 상태이며 저장된 지시가 없습니다.</div>';
@@ -2819,8 +2824,6 @@
   });
   document.getElementById("memberLogin").addEventListener("click", doMemberLogin);
   document.getElementById("memberPin").addEventListener("keydown", function(e){ if (e.key === "Enter") doMemberLogin(); });
-  document.getElementById("memberManageBtn").addEventListener("click", function(){ hideMemberLogin(); showUsersManage(); });
-  document.getElementById("memberDevicesBtn").addEventListener("click", function(){ hideMemberLogin(); showDevicesManage(); });
   document.getElementById("devicesClose").addEventListener("click", function(){ document.getElementById("devicesBackdrop").classList.remove("show"); });
   document.getElementById("devPendLogout").addEventListener("click", function(){ setGwToken(null); curMemberObj = null; document.getElementById("devicePendingBackdrop").classList.remove("show"); showMemberLogin(); });
   document.getElementById("usersClose").addEventListener("click", function(){ document.getElementById("usersBackdrop").classList.remove("show"); });
@@ -4741,8 +4744,6 @@
     document.getElementById("memberCurrent").textContent = cm ? ("현재: " + cm.name + " · 전환하려면 다시 로그인") : "이름 선택 후 PIN 입력";
     document.getElementById("memberErr").classList.remove("show");
     document.getElementById("memberPin").value = "";
-    document.getElementById("memberManageBtn").style.display = isAdmin() ? "block" : "none";
-    document.getElementById("memberDevicesBtn").style.display = isAdmin() ? "block" : "none";
     document.getElementById("memberPinBtn").style.display = cm ? "block" : "none";
     try{ document.getElementById("memberKeep").checked = !!localStorage.getItem(GW_TOKEN_KEY); }catch(e){}
     sel.innerHTML = '<option value="">불러오는 중…</option>';
@@ -4857,6 +4858,32 @@
     wire("data-dev-revoke", "device_revoke");
     wire("data-dev-del", "device_delete");
   }
+  // 회원 수정창 내 기기 관리(해당 회원 기기만)
+  function renderMemberDevices(memberId){
+    var host = document.getElementById("meDevices"); if (!host) return;
+    host.innerHTML = '<div class="empty-line">불러오는 중…</div>';
+    gwCall("gw-auth", { action: "device_list" }).then(function(res){
+      var devs = ((res.body && res.body.devices) || []).filter(function(d){ return d.member_id === memberId; });
+      if (!devs.length){ host.innerHTML = '<div class="empty-line" style="padding:6px 0;">등록된 기기가 없습니다.</div>'; return; }
+      devs.sort(function(a, b){ return (b.last_seen||0) - (a.last_seen||0); });
+      host.innerHTML = devs.map(function(dv){
+        var badge = dv.status === "approved" ? '<span class="from-chip">승인됨</span>' : '<span class="review-chip">대기</span>';
+        var self = (dv.id === deviceId()) ? ' <span class="scope-chip">이 기기</span>' : '';
+        var act = dv.status === "approved"
+          ? '<button class="mini-btn" data-mdev-revoke="' + esc(dv.id) + '">해제</button>'
+          : '<button class="mini-btn appr-btn" data-mdev-approve="' + esc(dv.id) + '">승인</button>';
+        return '<div class="item"><div class="item-body"><div class="item-title">' + esc(dv.label || dv.id) + ' ' + badge + self + '</div><div class="item-meta"><span>' + esc(String(dv.id).slice(0,12)) + '</span></div></div><div class="task-ctrl">' + act + '<button class="del-x" data-mdev-del="' + esc(dv.id) + '">×</button></div></div>';
+      }).join("");
+      function wire(attr, action){
+        Array.prototype.forEach.call(host.querySelectorAll("[" + attr + "]"), function(el){
+          el.addEventListener("click", function(){ gwCall("gw-auth", { action: action, device: el.getAttribute(attr) }).then(function(){ renderMemberDevices(memberId); }); });
+        });
+      }
+      wire("data-mdev-approve", "device_approve");
+      wire("data-mdev-revoke", "device_revoke");
+      wire("data-mdev-del", "device_delete");
+    });
+  }
   function showUsersManage(){
     if (!isAdmin()) return;
     document.getElementById("usersBackdrop").classList.add("show");
@@ -4942,6 +4969,9 @@
     }).join("");
     updatePermLock();
     document.getElementById("meDelete").style.display = (m && curMember() && m.id !== curMember().id) ? "block" : "none";
+    var devWrap = document.getElementById("meDevicesWrap");
+    if (id){ if (devWrap) devWrap.style.display = ""; renderMemberDevices(id); }
+    else if (devWrap){ devWrap.style.display = "none"; }
     document.getElementById("memberEditBackdrop").classList.add("show");
   }
   function closeMemberEdit(){ document.getElementById("memberEditBackdrop").classList.remove("show"); editingMemberId = null; }
@@ -4982,16 +5012,28 @@
     if (pin && pinOk) payload.pin = pin;
     gwCall("gw-auth", payload).then(function(res){
       if (res.status !== 200){ document.getElementById("meErr").classList.add("show"); return; }
+      // 서버 응답으로 로컬 members 즉시 갱신(재조회 지연/캐시로 저장이 안 된 것처럼 보이던 문제 해결)
+      if (res.body && res.body.member){
+        var mm = res.body.member, found = false;
+        for (var i = 0; i < members.length; i++){ if (members[i].id === mm.id){ members[i] = mm; found = true; break; } }
+        if (!found) members.push(mm);
+        try{ saveUsersCache(); }catch(e){}
+      }
       closeMemberEdit();
-      if (currentTab === "hr") renderHrRoster(); else showUsersManage();
+      drawHrRoster();
+      render();
     });
   }
   function deleteMemberEdit(){
     if (!editingMemberId) return;
     if (curMember() && editingMemberId === curMember().id) return;  // 본인 삭제 금지
-    gwCall("gw-auth", { action: "member_delete", id: editingMemberId }).then(function(){
+    var delId = editingMemberId;
+    gwCall("gw-auth", { action: "member_delete", id: delId }).then(function(){
+      members = members.filter(function(m){ return m.id !== delId; });
+      try{ saveUsersCache(); }catch(e){}
       closeMemberEdit();
-      if (currentTab === "hr") renderHrRoster(); else showUsersManage();
+      drawHrRoster();
+      render();
     });
   }
 

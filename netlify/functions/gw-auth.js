@@ -10,7 +10,7 @@ const { hashSecret, verifySecret } = require('./_lib/password');
 const { issueSession, verifyToken, bearer } = require('./_lib/session');
 
 const USERS = 'gw_users';
-const MODULES = ['tasks', 'veh', 'rec', 'lic', 'check'];
+const MODULES = ['tasks', 'veh', 'rec', 'lic', 'check', 'con', 'cli', 'doc'];
 const LOCK_THRESHOLD = 5;                 // 연속 실패 허용 횟수
 const LOCK_MS = 15 * 60 * 1000;           // 잠금 시간(15분)
 function lockKey(name) { return `lock:${String(name).trim().toLowerCase()}`; }
