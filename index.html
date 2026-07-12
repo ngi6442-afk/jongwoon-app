@@ -2065,10 +2065,12 @@
     setTabBadge("hrTabBadge", hrN);
   }
 
+  // 지시자 표시 숨김(요청). 나중에 되돌리려면 true로.
+  var SHOW_TASK_ISSUER = false;
   function taskRowHtml(t, isDone, sel){
     var metaBits = [];
     metaBits.push('<span class="author-chip">담당 ' + esc(t.who ? dispName(t.who) : "미지정") + '</span>');
-    if (t.from) metaBits.push('<span class="from-chip">지시 ' + esc(dispName(t.from)) + '</span>');
+    if (SHOW_TASK_ISSUER && t.from) metaBits.push('<span class="from-chip">지시 ' + esc(dispName(t.from)) + '</span>');
     if (t.due) metaBits.push('<span>' + esc(t.due) + '</span>');
     if (t.status === "hold") metaBits.push('<span class="hold-chip">보류</span>');
     if (t.status === "review") metaBits.push('<span class="review-chip">승인 대기중' + (t.done_by ? ' · ' + esc(dispName(t.done_by)) : '') + '</span>');
@@ -2178,7 +2180,7 @@
   }
   function myTaskRowHtml(t){
     var metaBits = [];
-    if (t.from) metaBits.push('<span class="from-chip">지시 ' + esc(dispName(t.from)) + '</span>');
+    if (SHOW_TASK_ISSUER && t.from) metaBits.push('<span class="from-chip">지시 ' + esc(dispName(t.from)) + '</span>');
     if (t.due) metaBits.push('<span>' + esc(t.due) + '</span>');
     if (t.status === "hold") metaBits.push('<span class="hold-chip">보류</span>');
     if (t.status === "review") metaBits.push('<span class="review-chip">승인 대기중</span>');
