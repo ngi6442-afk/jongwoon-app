@@ -166,6 +166,9 @@ async function handleMemberUpsert(st, event, d, R) {
   if (d.annual_base !== undefined) { m.annual_base = (d.annual_base === null || isNaN(Number(d.annual_base))) ? null : Number(d.annual_base); }
   if (d.annual_base_date !== undefined) m.annual_base_date = String(d.annual_base_date || '');
   if (d.seq !== undefined) { m.seq = (d.seq === null || isNaN(Number(d.seq))) ? null : Number(d.seq); }
+  if (d.on_loa !== undefined) m.on_loa = !!d.on_loa;
+  if (d.loa_start !== undefined) m.loa_start = String(d.loa_start || '');
+  if (d.loa_end !== undefined) m.loa_end = String(d.loa_end || '');
   m.perms = cleanPerms(d.perms || m.perms);
   m.updated = Date.now();
   if (d.pin) {

@@ -983,7 +983,8 @@
     <div class="card" id="leaveMine"></div>
     <button class="link-btn" id="leaveAddBtn">+ 휴가 신청</button>
     <div class="card" id="leaveList"><div class="loading">불러오는 중…</div></div>
-    <div style="display:flex;justify-content:flex-end;margin-top:18px;">
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:18px;">
+      <button class="mini-btn" id="loaBtn" style="color:#5B3EA6;border-color:#C9BCE6;">휴직 면담 신청</button>
       <button class="mini-btn" id="resignBtn" style="color:#B4232A;border-color:#E4B7B4;">사직 면담 신청</button>
     </div>
   </section>
@@ -1139,6 +1140,21 @@
     <input type="text" id="rsReason" placeholder="사유 (선택)" autocomplete="off">
     <button class="primary" id="rsSave">면담 신청</button>
     <button class="secondary" id="rsCancel">취소</button>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="loaBackdrop">
+  <div class="modal">
+    <h3>휴직 면담 신청</h3>
+    <p style="margin-bottom:12px;line-height:1.6;">절차: <b>①면담 신청</b> → 관리자 <b>②면담완료</b> → 근로자 <b>③휴직 본신청</b> → 관리자 <b>④승인</b>(휴직 상태 반영).<br>휴직 시작·종료 예정일과 사유를 적어 면담을 신청합니다.</p>
+    <span class="fld-label">휴직 시작 예정일</span>
+    <input type="date" id="loaStart">
+    <span class="fld-label">종료 예정일 (미정이면 비움)</span>
+    <input type="date" id="loaEnd">
+    <span class="fld-label">사유</span>
+    <input type="text" id="loaReason" placeholder="사유 (예: 육아휴직·병가·개인)" autocomplete="off">
+    <button class="primary" id="loaSave">면담 신청</button>
+    <button class="secondary" id="loaCancel">취소</button>
   </div>
 </div>
 
@@ -2060,7 +2076,7 @@
   function updateApprovalBadges(){
     var items = (typeof approvalInboxItems === "function") ? approvalInboxItems() : [];
     var leaveN = items.filter(function(it){ return it.tab === "leave"; }).length;
-    var hrN = isAdmin() ? items.filter(function(it){ return it.tab === "leave" && it.label.indexOf("사직") >= 0; }).length : 0;  // 인사 뱃지는 관리자 사직 결재만
+    var hrN = isAdmin() ? items.filter(function(it){ return it.tab === "leave" && (it.label.indexOf("사직") >= 0 || it.label.indexOf("휴직") >= 0); }).length : 0;  // 인사 뱃지=관리자 사직·휴직 결재
     setTabBadge("leaveTabBadge", leaveN);
     setTabBadge("hrTabBadge", hrN);
   }
@@ -3070,6 +3086,10 @@
       } else if(l.type==="resign" && l.status==="approved" && isAdmin()){
         var nm2=dispName(memberName(l.member_id))||l.member_name||"";
         add(l.start, "leave", (nm2?nm2+" ":"")+"퇴사예정", "");
+      } else if(l.type==="loa" && l.status==="approved" && leaveCalVisible(l)){
+        var nm3=dispName(memberName(l.member_id))||l.member_name||"";
+        if(l.end && isDate(l.end)) eachDate(l.start, l.end, function(ds){ add(ds, "leave", (nm3?nm3+" ":"")+"휴직", ""); });
+        else add(l.start, "leave", (nm3?nm3+" ":"")+"휴직 시작", "");
       }
     });
     return ev;
@@ -3258,6 +3278,10 @@
   document.getElementById("rsSave").addEventListener("click", saveResign);
   document.getElementById("rsCancel").addEventListener("click", function(){ document.getElementById("resignBackdrop").classList.remove("show"); });
   document.getElementById("resignBackdrop").addEventListener("click", function(e){ if(e.target===this) this.classList.remove("show"); });
+  document.getElementById("loaBtn").addEventListener("click", openLoa);
+  document.getElementById("loaSave").addEventListener("click", saveLoa);
+  document.getElementById("loaCancel").addEventListener("click", function(){ document.getElementById("loaBackdrop").classList.remove("show"); });
+  document.getElementById("loaBackdrop").addEventListener("click", function(e){ if(e.target===this) this.classList.remove("show"); });
   document.getElementById("lvSave").addEventListener("click", saveLeaveApply);
   document.getElementById("lvCancel").addEventListener("click", function(){ document.getElementById("leaveBackdrop").classList.remove("show"); });
   document.getElementById("lvType").addEventListener("change", function(){ var half=(this.value==="half_am"||this.value==="half_pm"); var e=document.getElementById("lvEnd"); e.disabled=half; if(half) e.value=document.getElementById("lvStart").value; });
@@ -3611,11 +3635,13 @@
     var out=[], me=getMemberId(), admin=isAdmin();
     liveLeaves().forEach(function(l){
       var nm=dispName(memberName(l.member_id))||l.member_name||"직원";
-      if(l.type==="resign"){
+      if(l.type==="resign" || l.type==="loa"){
+        var word=(l.type==="loa")?"휴직":"사직";
         var stg=l.stage||"resign_req";
-        if(admin && l.status==="pending" && stg==="interview_req") out.push({tab:"leave",label:"사직 면담 처리",sub:nm});
-        else if(admin && l.status==="pending" && stg==="resign_req") out.push({tab:"leave",label:"사직 승인",sub:nm+" · 퇴사 "+(l.start||"")});
-        else if(!admin && l.member_id===me && l.status==="pending" && stg==="interview_done") out.push({tab:"leave",label:"사직 본신청 하기",sub:"면담완료 — 본신청 대기"});
+        var when=(l.type==="loa")?((l.start||"")+(l.end?"~"+l.end:"")):("퇴사 "+(l.start||""));
+        if(admin && l.status==="pending" && stg==="interview_req") out.push({tab:"leave",label:word+" 면담 처리",sub:nm});
+        else if(admin && l.status==="pending" && stg==="resign_req") out.push({tab:"leave",label:word+" 승인",sub:nm+" · "+when});
+        else if(!admin && l.member_id===me && l.status==="pending" && stg==="interview_done") out.push({tab:"leave",label:word+" 본신청 하기",sub:"면담완료 — 본신청 대기"});
       } else {
         if(admin && l.status==="pending") out.push({tab:"leave",label:"휴가 승인",sub:nm+" · "+leaveTypeLabel(l.type)+" "+(l.days||0)+"일"});
         else if(admin && l.status==="approved" && l.cancel_req) out.push({tab:"leave",label:"휴가 취소 승인",sub:nm+" · "+(l.start||"")});
@@ -4392,7 +4418,7 @@
     updateApprovalBadges();
   }
   function leaveRowHtml(l){
-    if(l.type==="resign") return resignRowHtml(l);
+    if(l.type==="resign" || l.type==="loa") return reqLineRowHtml(l);
     var nm = dispName(memberName(l.member_id)) || l.member_name || "-";
     var period = isDate(l.start) ? (l.start + (l.end && l.end!==l.start ? " ~ " + l.end : "")) : "";
     var cr = (l.status==="approved" && l.cancel_req);
@@ -4415,31 +4441,44 @@
     var title = esc(nm)+' · '+esc(leaveTypeLabel(l.type))+' '+(l.days||0)+'일 '+chip;
     return '<div class="item"><div class="item-body"><div class="item-title">'+title+'</div><div class="item-meta"><span>'+esc(period)+'</span>'+(l.reason?'<span>'+esc(l.reason)+'</span>':'')+(l.approver?'<span class="author-chip">'+esc(dispName(l.approver))+'</span>':'')+'</div></div><div class="task-ctrl">'+ctrl+'</div></div>';
   }
-  // 사직: 근로자 면담신청 → 관리자 면담완료 → 근로자 사직신청 → 관리자 승인(퇴사일 반영)
-  function resignRowHtml(l){
+  // 사직·휴직 공통 면담 라인: 근로자 면담신청 → 관리자 면담완료 → 근로자 본신청 → 관리자 승인
+  var REQ_LINE = {
+    resign: { word:"사직", color:"#B4232A", predict:"사직 예정", confirmChip:"사직 확정", applyLabel:"사직 신청",
+      interviewConfirm:"사직 면담을 완료 처리할까요? 직원이 사직 본신청을 할 수 있게 됩니다.",
+      applyConfirm:"사직을 본신청할까요? 관리자 승인 시 퇴사일이 인사기록에 반영됩니다.",
+      approveConfirm:"사직을 승인할까요? 퇴사일이 인사기록에 반영됩니다.",
+      rejectConfirm:"사직 신청을 반려할까요?" },
+    loa: { word:"휴직", color:"#7A4FD0", predict:"휴직 기간", confirmChip:"휴직중", applyLabel:"휴직 신청",
+      interviewConfirm:"휴직 면담을 완료 처리할까요? 직원이 휴직 본신청을 할 수 있게 됩니다.",
+      applyConfirm:"휴직을 본신청할까요? 관리자 승인 시 휴직 상태가 인사기록에 반영됩니다.",
+      approveConfirm:"휴직을 승인할까요? 휴직 상태가 인사기록에 반영됩니다.",
+      rejectConfirm:"휴직 신청을 반려할까요?" }
+  };
+  function reqLineRowHtml(l){
+    var cfg = REQ_LINE[l.type] || REQ_LINE.resign;
     var nm = dispName(memberName(l.member_id)) || l.member_name || "-";
-    var period = isDate(l.start) ? l.start : "";
+    var period = isDate(l.start) ? (l.start + (l.end && l.end!==l.start ? " ~ " + l.end : "")) : "";
     var me=getMemberId(), mine=(l.member_id===me), adm=isAdmin();
     var stg = l.stage || "resign_req";  // 구데이터: stage 없으면 본신청단계로 간주
     var chip, ctrl="";
-    if(l.status==="approved"){ chip='<span class="from-chip">사직 확정</span>'; }
+    if(l.status==="approved"){ chip='<span class="from-chip">'+cfg.confirmChip+'</span>'; }
     else if(l.status==="rejected"){ chip='<span class="dup-chip">반려</span>'; }
     else if(stg==="interview_req"){ chip='<span class="review-chip">면담 대기</span>';
       if(adm) ctrl+='<button class="mini-btn appr-btn" data-rs-interview="'+l.id+'">면담완료</button>';
       if(mine) ctrl+='<button class="mini-btn" data-lv-cancel="'+l.id+'">취소</button>';
     }
     else if(stg==="interview_done"){ chip='<span class="review-chip">본신청 대기</span>';
-      if(mine) ctrl+='<button class="mini-btn appr-btn" data-rs-apply="'+l.id+'">사직 신청</button><button class="mini-btn" data-lv-cancel="'+l.id+'">취소</button>';
+      if(mine) ctrl+='<button class="mini-btn appr-btn" data-rs-apply="'+l.id+'">'+cfg.applyLabel+'</button><button class="mini-btn" data-lv-cancel="'+l.id+'">취소</button>';
     }
     else { chip='<span class="review-chip">승인 대기</span>';
       if(adm) ctrl+='<button class="mini-btn appr-btn" data-rs-approve="'+l.id+'">승인</button><button class="mini-btn" data-rs-reject="'+l.id+'">반려</button>';
       if(mine) ctrl+='<button class="mini-btn" data-lv-cancel="'+l.id+'">취소</button>';
     }
-    var meta='<span>사직 예정 '+esc(period)+'</span>';
+    var meta='<span>'+cfg.predict+' '+esc(period)+'</span>';
     if(l.interview_at) meta+='<span class="author-chip">면담완료 '+esc(l.interview_at)+'</span>';
     if(l.reason) meta+='<span>'+esc(l.reason)+'</span>';
     if(l.approver) meta+='<span class="author-chip">'+esc(dispName(l.approver))+'</span>';
-    return '<div class="item"><div class="item-body"><div class="item-title">'+esc(nm)+' · <b style="color:#B4232A;">사직</b> '+chip+'</div><div class="item-meta">'+meta+'</div></div><div class="task-ctrl">'+ctrl+'</div></div>';
+    return '<div class="item"><div class="item-body"><div class="item-title">'+esc(nm)+' · <b style="color:'+cfg.color+';">'+cfg.word+'</b> '+chip+'</div><div class="item-meta">'+meta+'</div></div><div class="task-ctrl">'+ctrl+'</div></div>';
   }
   function bindLeaveHandlers(host){
     function wire(attr,fn){ Array.prototype.forEach.call(host.querySelectorAll("["+attr+"]"),function(el){ el.addEventListener("click",function(){ fn(el.getAttribute(attr)); }); }); }
@@ -4450,17 +4489,27 @@
     wire("data-lv-cxreq", function(id){ var l=findLeave(id); if(!l||l.member_id!==getMemberId()||l.status!=="approved") return; if(confirm("이 휴가의 취소를 요청할까요? 관리자 승인 후 잔여 연차가 복구됩니다. (요청 후에는 관리자가 처리)")){ l.cancel_req=true; l.cancel_req_at=todayStr(); l.updated=todayStr(); scheduleLeavesSave(); renderLeaves(); renderDashboard(); } });
     wire("data-lv-cxok", function(id){ if(!isAdmin()) return; var l=findLeave(id); if(!l||!l.cancel_req) return; if(confirm("휴가 취소를 승인할까요? 잔여 연차가 복구됩니다.")){ l.del=1; l.cancel_req=false; l.cancel_approver=myName()||"관리자"; l.updated=todayStr(); scheduleLeavesSave(); renderLeaves(); renderDashboard(); if(currentTab==="cal") renderCalendar(); } });
     wire("data-lv-cxno", function(id){ if(!isAdmin()) return; var l=findLeave(id); if(!l||!l.cancel_req) return; if(confirm("취소 요청을 반려할까요? 휴가는 유지됩니다.")){ l.cancel_req=false; l.updated=todayStr(); scheduleLeavesSave(); renderLeaves(); renderDashboard(); } });
-    // 사직 단계 전환
-    wire("data-rs-interview", function(id){ if(!isAdmin()) return; if(!confirm("사직 면담을 완료 처리할까요? 직원이 사직 본신청을 할 수 있게 됩니다.")) return; var l=findLeave(id); if(l&&l.stage==="interview_req"){ l.stage="interview_done"; l.interview_at=todayStr(); l.interviewer=myName()||""; l.updated=todayStr(); scheduleLeavesSave(); renderLeaves(); renderDashboard(); } });
-    wire("data-rs-apply", function(id){ var l=findLeave(id); if(!l||l.member_id!==getMemberId()||l.stage!=="interview_done") return; if(!confirm("사직을 본신청할까요? 관리자 승인 시 퇴사일이 인사기록에 반영됩니다.")) return; l.stage="resign_req"; l.applied_at=todayStr(); l.updated=todayStr(); scheduleLeavesSave(); renderLeaves(); renderDashboard(); });
-    wire("data-rs-approve", function(id){ if(!isAdmin()) return; var l=findLeave(id); if(!l||(l.stage||"resign_req")!=="resign_req") return; if(!confirm("사직을 승인할까요? 퇴사일이 인사기록에 반영됩니다.")) return; setLeaveStatus(id,"approved"); });
-    wire("data-rs-reject", function(id){ if(!isAdmin()) return; if(confirm("사직 신청을 반려할까요?")) setLeaveStatus(id,"rejected"); });
+    // 사직·휴직 단계 전환(공통)
+    wire("data-rs-interview", function(id){ if(!isAdmin()) return; var l=findLeave(id); if(!l) return; var cfg=REQ_LINE[l.type]||REQ_LINE.resign; if(!confirm(cfg.interviewConfirm)) return; if(l.stage==="interview_req"){ l.stage="interview_done"; l.interview_at=todayStr(); l.interviewer=myName()||""; l.updated=todayStr(); scheduleLeavesSave(); renderLeaves(); renderDashboard(); } });
+    wire("data-rs-apply", function(id){ var l=findLeave(id); if(!l||l.member_id!==getMemberId()||l.stage!=="interview_done") return; var cfg=REQ_LINE[l.type]||REQ_LINE.resign; if(!confirm(cfg.applyConfirm)) return; l.stage="resign_req"; l.applied_at=todayStr(); l.updated=todayStr(); scheduleLeavesSave(); renderLeaves(); renderDashboard(); });
+    wire("data-rs-approve", function(id){ if(!isAdmin()) return; var l=findLeave(id); if(!l||(l.stage||"resign_req")!=="resign_req") return; var cfg=REQ_LINE[l.type]||REQ_LINE.resign; if(!confirm(cfg.approveConfirm)) return; setLeaveStatus(id,"approved"); });
+    wire("data-rs-reject", function(id){ if(!isAdmin()) return; var l=findLeave(id); if(!l) return; var cfg=REQ_LINE[l.type]||REQ_LINE.resign; if(confirm(cfg.rejectConfirm)) setLeaveStatus(id,"rejected"); });
   }
   function setLeaveStatus(id,status){
     if(!isAdmin()) return;
     var l=findLeave(id); if(!l || l.status!=="pending") return;
     l.status=status; l.approver=myName()||"관리자"; l.approved_at=todayStr(); l.updated=todayStr();
-    if(l.type==="resign") l.stage = (status==="approved" ? "resigned" : "rejected");
+    if(l.type==="resign" || l.type==="loa") l.stage = (status==="approved" ? (l.type==="resign"?"resigned":"onloa") : "rejected");
+    // 휴직 승인 → 휴직 상태 인사기록 반영
+    if(l.type==="loa" && status==="approved" && l.member_id && isDate(l.start)){
+      gwCall("gw-auth", { action:"member_upsert", id:l.member_id, on_loa:true, loa_start:l.start, loa_end:(l.end||"") }).then(function(res){
+        if(res.status===200 && res.body && res.body.member){
+          for(var i=0;i<members.length;i++){ if(members[i].id===res.body.member.id){ members[i]=res.body.member; break; } }
+          try{ saveUsersCache(); }catch(e){}
+          render();
+        } else { alert("휴직은 승인됐지만 인사기록 반영에 실패했습니다. 인사 카드에서 확인해 주세요."); }
+      }).catch(function(){ alert("휴직 승인 중 통신 오류. 인사 카드에서 확인해 주세요."); });
+    }
     // 사직 승인 → 퇴사일 인사기록 자동 반영
     if(l.type==="resign" && status==="approved" && l.member_id && isDate(l.start)){
       // 부분 업데이트: leave_date만 전송(name/role/admin 미전송 → 서버 기존값 보존)
@@ -4493,6 +4542,28 @@
     leaves.push(l);
     scheduleLeavesSave();
     document.getElementById("resignBackdrop").classList.remove("show");
+    switchTab("leave"); renderLeaves(); renderDashboard();
+  }
+  function openLoa(){
+    var me=getMemberId(); if(!me){ alert("로그인 회원 정보가 없습니다."); return; }
+    document.getElementById("loaStart").value=todayStr();
+    document.getElementById("loaEnd").value="";
+    document.getElementById("loaReason").value="";
+    document.getElementById("loaBackdrop").classList.add("show");
+  }
+  function saveLoa(){
+    var me=getMemberId(); if(!me){ alert("로그인 회원 정보가 없습니다."); return; }
+    var start=document.getElementById("loaStart").value;
+    var end=document.getElementById("loaEnd").value;
+    if(!isDate(start)){ alert("휴직 시작 예정일을 선택하세요."); return; }
+    if(end && isDate(end) && end<start){ alert("종료 예정일이 시작일보다 빠릅니다."); return; }
+    if(!confirm("휴직 면담을 신청할까요? 관리자 면담완료 후 휴직 본신청이 가능합니다.")) return;
+    var l={ id:genId("lv"), member_id:me, member_name:myName()||"", type:"loa", stage:"interview_req",
+      start:start, end:(isDate(end)?end:""), days:0, reason:document.getElementById("loaReason").value.trim(),
+      status:"pending", approver:"", applied:todayStr(), updated:todayStr() };
+    leaves.push(l);
+    scheduleLeavesSave();
+    document.getElementById("loaBackdrop").classList.remove("show");
     switchTab("leave"); renderLeaves(); renderDashboard();
   }
   function openLeaveApply(){
@@ -5927,6 +5998,7 @@
           var gl=(lr.mode==="base")?"기준값":"부여";
           hr.push("연차 잔여 " + lr.left + " (" + gl + " " + lr.grant + " · 사용 " + lr.used + (lr.scheduled?" · 예정 "+lr.scheduled:"") + (lr.mode!=="base"&&lr.expired?" · 소멸 "+lr.expired:"") + ")");
         }
+        if(m.on_loa) hr.push("휴직중" + (m.loa_start?" "+m.loa_start:"") + (m.loa_end?"~"+m.loa_end:""));
         if(m.leave_date) hr.push("퇴사 " + m.leave_date);
         var sev = severanceAnnual(m);
         if(sev) hr.push("퇴직 연차수당 " + sev.days + "일(" + (sev.under1 ? "1년미만" : "1년이상") + ")");
