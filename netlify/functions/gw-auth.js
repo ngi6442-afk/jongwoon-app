@@ -138,18 +138,22 @@ async function handleMemberUpsert(st, event, d, R) {
   const c = await currentMember(st, event);
   if (!c.ok || !c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
   const name = (d.name || '').trim();
-  if (!name) return jr(400, { status: 'REJECTED', error_code: 'INVALID_INPUT', request_id: R });
   let m;
   if (d.id) {
+    // 기존 회원: 부분 업데이트 허용. 전달된 필드만 갱신(name/role/admin 미전달 시 기존값 보존)
     const r = await blobGet(st, memberKey(d.id));
     if (!r.ok || !r.data) return jr(404, { status: 'REJECTED', error_code: 'NOT_FOUND', request_id: R });
     m = r.data;
-    if (m.name !== name) { await blobSet(st, nameKey(m.name), null); m.name = name; }
+    if (name && m.name !== name) { await blobSet(st, nameKey(m.name), null); m.name = name; }
+    if (d.role !== undefined) m.role = d.role || m.role || '직원';
+    if (d.admin !== undefined) m.admin = !!d.admin;
   } else {
+    // 신규 회원: 이름 필수, role/admin 기본값
+    if (!name) return jr(400, { status: 'REJECTED', error_code: 'INVALID_INPUT', request_id: R });
     m = { id: genId(), name, created: Date.now() };
+    m.role = (d.role || '직원');
+    m.admin = !!d.admin;
   }
-  m.role = (d.role || m.role || '직원');
-  m.admin = !!d.admin;
   if (d.rank !== undefined) m.rank = String(d.rank || '');
   if (d.dept !== undefined) m.dept = String(d.dept || '');
   if (d.annual_days !== undefined) { m.annual_days = (d.annual_days === null || isNaN(Number(d.annual_days))) ? null : Number(d.annual_days); }

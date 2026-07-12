@@ -2040,9 +2040,9 @@
     var todayD = todayStr();
     var open = 0, overdue = false;
     liveTasks().forEach(function(t){
-      if (t.status === "open"){
-        open++;
-        if (t.due && t.due < todayD) overdue = true;
+      if (t.status === "open" || t.status === "hold"){   // 홈 '미완료 지시'(open+hold)와 동일 집계
+        if (taskVisible(t)) open++;
+        if (t.status === "open" && t.due && t.due < todayD && taskVisible(t)) overdue = true;
       }
     });
     badge.textContent = open;
@@ -2060,7 +2060,7 @@
   function updateApprovalBadges(){
     var items = (typeof approvalInboxItems === "function") ? approvalInboxItems() : [];
     var leaveN = items.filter(function(it){ return it.tab === "leave"; }).length;
-    var hrN = items.filter(function(it){ return it.tab === "leave" && it.label.indexOf("사직") >= 0; }).length;
+    var hrN = isAdmin() ? items.filter(function(it){ return it.tab === "leave" && it.label.indexOf("사직") >= 0; }).length : 0;  // 인사 뱃지는 관리자 사직 결재만
     setTabBadge("leaveTabBadge", leaveN);
     setTabBadge("hrTabBadge", hrN);
   }
@@ -2301,6 +2301,7 @@
   function canApproveTask(t){
     if (!t) return false;
     if (isAdmin()) return true;
+    if (t.from_id && myId() && t.from_id === myId()) return true;  // 지시자(id) — 개명에도 유지
     var me = myName();
     return !!(me && me === (t.by || t.from));
   }
@@ -2349,6 +2350,9 @@
   }
   // 만기(차량 검사·보험, 인허가 만료·교육) → 지시 자동 생성. auto_key로 중복 방지.
   var autoGenRan = false;
+  // 지시·차량·인허가 로드가 모두 끝난 뒤에만 자동생성 실행(로드 전 실행 시 중복 생성 방지)
+  var autoGenReady = {};
+  function markLoadedForAutoGen(k){ autoGenReady[k] = true; if (autoGenReady.tasks && autoGenReady.veh && autoGenReady.lic) runAutoTaskGen(); }
   function runAutoTaskGen(){
     if (autoGenRan || !isAdmin()) return;
     autoGenRan = true;
@@ -2862,9 +2866,9 @@
       if (!cur){
         byId[r.id] = r;
       } else {
-        var winner = (r.updated || "") >= (cur.updated || "") ? r : cur;
-        var merged = {};
-        Object.keys(winner).forEach(function(f){ merged[f] = winner[f]; });
+        var winner = (r.updated || "") > (cur.updated || "") ? r : cur;   // 동률=로컬(cur) 우선(방금 한 변경 보존)
+        var loser = winner === r ? cur : r;
+        var merged = Object.assign({}, loser, winner);                    // 승자 값 우선 + 패자 고유 필드 보존
         if (cur.del === 1 || r.del === 1) merged.del = 1; // del=1 항상 우선
         byId[r.id] = merged;
       }
@@ -2896,6 +2900,7 @@
         renderTasks();
         renderSummary();
         renderDashboard();
+        markLoadedForAutoGen("tasks");
         return;
       }
       if (!resp.ok){
@@ -2904,8 +2909,11 @@
       return resp.json().then(function(json){
         tasksSha = json.sha;
         var parsed = JSON.parse(b64DecodeUnicode(json.content));
-        tasks = (parsed && parsed.items) || [];
+        var remoteItems = (parsed && parsed.items) || [];
+        // 저장 대기 중이면 로컬 낙관적 변경을 보존하기 위해 머지(통째 덮어쓰기 금지)
+        tasks = (tasksPending || pendingSave) ? mergeTasks(tasks, remoteItems) : remoteItems;
         setOffline(false);
+        markLoadedForAutoGen("tasks");
         saveTasksCache();
         renderTasks();
         renderSummary();
@@ -3362,14 +3370,15 @@
     fetch(VEH_API, {headers: ghHeaders()}).then(function(resp){
       if (resp.status === 401){ clearToken(); showTokenScreen(true); return; }
       if (resp.status === 404){
-        vehSha = null; vehicles = []; saveVehiclesCache(); renderVehicles(); renderDashboard(); return;
+        vehSha = null; vehicles = []; saveVehiclesCache(); renderVehicles(); renderDashboard(); markLoadedForAutoGen("veh"); return;
       }
       if (!resp.ok) throw new Error("HTTP " + resp.status);
       return resp.json().then(function(json){
         vehSha = json.sha;
         var parsed = JSON.parse(b64DecodeUnicode(json.content));
-        vehicles = (parsed && parsed.items) || [];
-        setOffline(false); saveVehiclesCache(); renderVehicles(); renderDashboard();
+        var ri = (parsed && parsed.items) || [];
+        vehicles = (vehPending ? mergeVeh(vehicles, ri) : ri);
+        setOffline(false); saveVehiclesCache(); renderVehicles(); renderDashboard(); markLoadedForAutoGen("veh");
       });
     }).catch(function(){
       var c = loadVehiclesCache();
@@ -3522,8 +3531,8 @@
       var cur = byId[x.id];
       if (!cur){ byId[x.id] = x; }
       else {
-        var w = (x.updated || "") >= (cur.updated || "") ? x : cur;
-        var m = {}; Object.keys(w).forEach(function(f){ m[f] = w[f]; });
+        var w = (x.updated || "") > (cur.updated || "") ? x : cur;
+        var m = Object.assign({}, (w===x?cur:x), w);
         if (cur.del === 1 || x.del === 1) m.del = 1;
         byId[x.id] = m;
       }
@@ -3851,7 +3860,7 @@
   function scheduleContractSave(){ if(contractSaveTimer) clearTimeout(contractSaveTimer); contractSaveTimer=setTimeout(doSaveContracts, 1400); }
   function mergeContracts(local, remote){
     var byId={}; (local||[]).forEach(function(c){ if(c&&c.id) byId[c.id]=c; });
-    (remote||[]).forEach(function(x){ if(!x||!x.id) return; var cur=byId[x.id]; if(!cur){ byId[x.id]=x; } else { var w=(x.updated||"")>=(cur.updated||"")?x:cur; if(cur.del===1||x.del===1) w.del=1; byId[x.id]=w; } });
+    (remote||[]).forEach(function(x){ if(!x||!x.id) return; var cur=byId[x.id]; if(!cur){ byId[x.id]=x; } else { var w=(x.updated||"")>(cur.updated||"")?x:cur; var m=Object.assign({},(w===x?cur:x),w); if(cur.del===1||x.del===1) m.del=1; byId[x.id]=m; } });
     return Object.keys(byId).map(function(k){ return byId[k]; });
   }
   function doSaveContracts(){
@@ -4220,11 +4229,12 @@
     fetch(LEAVES_API, {headers:ghHeaders()}).then(function(resp){
       if(resp.status===404){ leavesSha=null; leaves=[]; renderLeaves(); return; }
       if(!resp.ok) throw new Error("HTTP "+resp.status);
-      return resp.json().then(function(json){ leavesSha=json.sha; var p=JSON.parse(b64DecodeUnicode(json.content)); leaves=(p&&p.items)||[]; renderLeaves(); renderDashboard(); });
+      return resp.json().then(function(json){ leavesSha=json.sha; var p=JSON.parse(b64DecodeUnicode(json.content)); var ri=(p&&p.items)||[]; leaves = leavesPending ? mergeLeaves(leaves, ri) : ri; renderLeaves(); renderDashboard(); });
     }).catch(function(){});
   }
-  function scheduleLeavesSave(){ if(leavesSaveTimer) clearTimeout(leavesSaveTimer); leavesSaveTimer=setTimeout(doSaveLeaves,1200); }
-  function mergeLeaves(local,remote){ var byId={}; (local||[]).forEach(function(l){if(l&&l.id)byId[l.id]=l;}); (remote||[]).forEach(function(x){if(!x||!x.id)return;var c=byId[x.id];if(!c){byId[x.id]=x;}else{var w=(x.updated||"")>=(c.updated||"")?x:c;if(c.del===1||x.del===1)w.del=1;byId[x.id]=w;}}); return Object.keys(byId).map(function(k){return byId[k];}); }
+  var leavesPending = false;
+  function scheduleLeavesSave(){ leavesPending=true; if(leavesSaveTimer) clearTimeout(leavesSaveTimer); leavesSaveTimer=setTimeout(doSaveLeaves,1200); }
+  function mergeLeaves(local,remote){ var byId={}; (local||[]).forEach(function(l){if(l&&l.id)byId[l.id]=l;}); (remote||[]).forEach(function(x){if(!x||!x.id)return;var c=byId[x.id];if(!c){byId[x.id]=x;}else{var w=(x.updated||"")>(c.updated||"")?x:c;var m=Object.assign({},(w===x?c:x),w);if(c.del===1||x.del===1)m.del=1;byId[x.id]=m;}}); return Object.keys(byId).map(function(k){return byId[k];}); }
   function doSaveLeaves(){
     var token=getToken(); if(!token) return;
     var body=JSON.stringify({schema:1,items:leaves});
@@ -4233,7 +4243,7 @@
     fetch(LEAVES_API,{method:"PUT",headers:Object.assign({"Content-Type":"application/json"},ghHeaders()),body:JSON.stringify(payload)}).then(function(resp){
       if(resp.status===401) return;
       if(resp.status===409||resp.status===422){ return fetch(LEAVES_API,{headers:ghHeaders()}).then(function(r){return r.status===404?null:r.json();}).then(function(j){ if(j){var up={};try{up=JSON.parse(b64DecodeUnicode(j.content))||{};}catch(e){} leaves=mergeLeaves(leaves,up.items||[]); leavesSha=j.sha;} return doSaveLeaves(); }); }
-      return resp.json().then(function(json){ leavesSha=json.content&&json.content.sha; });
+      return resp.json().then(function(json){ leavesSha=json.content&&json.content.sha; leavesPending=false; });
     }).catch(function(){});
   }
   function leaveDays(type,start,end){
@@ -4342,11 +4352,12 @@
     if(inBasePeriod){
       grant = m.annual_base; mode = "base"; tally(baseDate);
     } else {
-      grant = computeAnnual(m); mode = "calc"; tally(per?per.start:"0000-00-00");
-      expired = annualExpired(memberId);
+      grant = computeAnnual(m); mode = "calc";
+      if(per){ tally(per.start); expired = annualExpired(memberId); }   // 기간(입사일) 없으면 이력 전체 합산 금지(음수 방지)
     }
-    // 차감은 휴가일 이후 → 잔여 = 부여 − 사용(과거). 예정은 별도 표기
-    return {grant:grant, used:Math.round(used*10)/10, scheduled:Math.round(scheduled*10)/10, expired:expired, left:Math.round((grant-used)*10)/10, period:per, mode:mode};
+    // 차감은 휴가일 이후 → 잔여 = 부여 − 사용(과거). 예정은 별도 표기. 음수 방지.
+    var left = Math.max(0, Math.round((grant-used)*10)/10);
+    return {grant:grant, used:Math.round(used*10)/10, scheduled:Math.round(scheduled*10)/10, expired:expired, left:left, period:per, mode:mode};
   }
   function renderLeaves(){
     var host=document.getElementById("leaveList"); if(!host) return;
@@ -4393,9 +4404,10 @@
       if(cr){  // 취소 요청됨 → 관리자 승인제(본인 자가철회 불가, 관리자가 승인/반려)
         if(isAdmin()) ctrl += '<button class="mini-btn appr-btn" data-lv-cxok="'+l.id+'">취소 승인</button><button class="mini-btn" data-lv-cxno="'+l.id+'">취소 반려</button>';
       } else if(l.member_id===me){
-        // 당일·미래는 항상, 지난 휴가는 휴가일로부터 3일 이내만 취소 요청 가능(추후 규정화 예정)
-        var dback = isDate(l.start) ? Math.floor((new Date(todayStr()+"T00:00:00")-new Date(l.start+"T00:00:00"))/86400000) : 999;
-        if(l.start>=todayStr() || dback<=3) ctrl += '<button class="mini-btn" data-lv-cxreq="'+l.id+'">취소 요청</button>';
+        // 진행중·미래는 항상, 종료된 휴가는 종료일로부터 3일 이내만 취소 요청 가능(추후 규정화 예정)
+        var eff = (l.end && isDate(l.end)) ? l.end : l.start;
+        var dback = isDate(eff) ? Math.floor((new Date(todayStr()+"T00:00:00")-new Date(eff+"T00:00:00"))/86400000) : 999;
+        if(eff>=todayStr() || dback<=3) ctrl += '<button class="mini-btn" data-lv-cxreq="'+l.id+'">취소 요청</button>';
       }
     }
     var title = esc(nm)+' · '+esc(leaveTypeLabel(l.type))+' '+(l.days||0)+'일 '+chip;
@@ -4449,16 +4461,16 @@
     if(l.type==="resign") l.stage = (status==="approved" ? "resigned" : "rejected");
     // 사직 승인 → 퇴사일 인사기록 자동 반영
     if(l.type==="resign" && status==="approved" && l.member_id && isDate(l.start)){
-      var mm=findMember(l.member_id);
-      if(mm){
-        gwCall("gw-auth", { action:"member_upsert", id:mm.id, name:mm.name, role:mm.role, admin:!!mm.admin, leave_date:l.start }).then(function(res){
-          if(res.status===200 && res.body && res.body.member){
-            for(var i=0;i<members.length;i++){ if(members[i].id===res.body.member.id){ members[i]=res.body.member; break; } }
-            try{ saveUsersCache(); }catch(e){}
-            render();
-          }
-        });
-      }
+      // 부분 업데이트: leave_date만 전송(name/role/admin 미전송 → 서버 기존값 보존)
+      gwCall("gw-auth", { action:"member_upsert", id:l.member_id, leave_date:l.start }).then(function(res){
+        if(res.status===200 && res.body && res.body.member){
+          for(var i=0;i<members.length;i++){ if(members[i].id===res.body.member.id){ members[i]=res.body.member; break; } }
+          try{ saveUsersCache(); }catch(e){}
+          render();
+        } else {
+          alert("사직은 승인됐지만 퇴사일 인사기록 반영에 실패했습니다. 인사 카드에서 퇴사일을 확인/입력해 주세요.");
+        }
+      }).catch(function(){ alert("사직 승인 중 통신 오류. 인사 카드에서 퇴사일을 확인해 주세요."); });
     }
     scheduleLeavesSave(); renderLeaves(); renderDashboard();
   }
@@ -4955,8 +4967,8 @@
       var cur = byId[x.id];
       if (!cur){ byId[x.id] = x; }
       else {
-        var w = (x.updated || "") >= (cur.updated || "") ? x : cur;
-        var m = {}; Object.keys(w).forEach(function(f){ m[f] = w[f]; });
+        var w = (x.updated || "") > (cur.updated || "") ? x : cur;
+        var m = Object.assign({}, (w===x?cur:x), w);
         if (cur.del === 1 || x.del === 1) m.del = 1;
         byId[x.id] = m;
       }
@@ -5279,13 +5291,14 @@
     var token = getToken(); if (!token) return;
     fetch(LIC_API, {headers: ghHeaders()}).then(function(resp){
       if (resp.status === 401){ clearToken(); showTokenScreen(true); return; }
-      if (resp.status === 404){ licSha = null; licenses = []; saveLicCache(); renderLicenses(); renderDashboard(); return; }
+      if (resp.status === 404){ licSha = null; licenses = []; saveLicCache(); renderLicenses(); renderDashboard(); markLoadedForAutoGen("lic"); return; }
       if (!resp.ok) throw new Error("HTTP " + resp.status);
       return resp.json().then(function(json){
         licSha = json.sha;
         var parsed = JSON.parse(b64DecodeUnicode(json.content));
-        licenses = (parsed && parsed.items) || [];
-        setOffline(false); saveLicCache(); renderLicenses(); renderDashboard();
+        var ri = (parsed && parsed.items) || [];
+        licenses = (licPending ? mergeLic(licenses, ri) : ri);
+        setOffline(false); saveLicCache(); renderLicenses(); renderDashboard(); markLoadedForAutoGen("lic");
       });
     }).catch(function(){
       var c = loadLicCache();
@@ -5306,8 +5319,8 @@
       var cur = byId[x.id];
       if (!cur){ byId[x.id] = x; }
       else {
-        var w = (x.updated || "") >= (cur.updated || "") ? x : cur;
-        var m = {}; Object.keys(w).forEach(function(f){ m[f] = w[f]; });
+        var w = (x.updated || "") > (cur.updated || "") ? x : cur;
+        var m = Object.assign({}, (w===x?cur:x), w);
         if (cur.del === 1 || x.del === 1) m.del = 1;
         byId[x.id] = m;
       }
@@ -5592,6 +5605,7 @@
     if (!m) return false;
     for (var i=0;i<scope.length;i++){
       var tk = scope[i];
+      if (typeof tk !== "string") continue;   // 손상된 토큰 방어(렌더 전체 중단 방지)
       if (tk === m.id) return true;
       if (tk.indexOf("dept:")===0){ if (m.dept && m.dept === tk.slice(5)) return true; }
       else if (tk.indexOf("rank:")===0){
@@ -5637,6 +5651,7 @@
   function taskVisible(t){
     if (isAdmin()) return true;
     if (taskForMe(t)) return true;
+    if (t && ((t.from_id && t.from_id===myId()) || (t.from && t.from===myName()))) return true;  // 지시자는 자기 지시 항상 열람
     return scopeIncludes(t.scope, curMember());
   }
   function licVisible(l){
@@ -5682,7 +5697,7 @@
       if (!x || !x.id) return;
       var cur = byId[x.id];
       if (!cur){ byId[x.id] = x; }
-      else { var w = (x.updated || "") >= (cur.updated || "") ? x : cur; var mm = {}; Object.keys(w).forEach(function(f){ mm[f] = w[f]; }); if (cur.del===1||x.del===1) mm.del=1; byId[x.id]=mm; }
+      else { var w = (x.updated || "") > (cur.updated || "") ? x : cur; var mm = Object.assign({}, (w===x?cur:x), w); if (cur.del===1||x.del===1) mm.del=1; byId[x.id]=mm; }
     });
     var out = []; Object.keys(byId).forEach(function(id){ out.push(byId[id]); });
     return out;
@@ -5745,8 +5760,7 @@
     doLoad(); loadTasks(); loadVehicles(); loadReceivables(); loadLicenses(); loadDocuments(); loadClients(); loadContracts(); loadMyTasks(); loadLeaves();
     loadMembers();   // 담당 배정 드롭다운용 — 관리자·직원 모두
     render();
-    // 데이터 로드 후 만기 임박 항목을 지시로 자동 생성(관리자, 세션 1회, 중복 방지)
-    setTimeout(function(){ try{ runAutoTaskGen(); }catch(e){} }, 4500);
+    // 만기 자동생성은 지시·차량·인허가 로드가 모두 끝난 뒤 markLoadedForAutoGen에서 실행(중복 방지)
   }
   function loadMembers(){
     gwCall("gw-auth", { action: "member_list" }).then(function(res){
@@ -5944,7 +5958,7 @@
     var targets = liveMembers();
     var btn = document.getElementById("hrStartBtn"); if (btn){ btn.disabled = true; btn.textContent = "시작 처리 중…"; }
     Promise.all(targets.map(function(m){
-      return gwCall("gw-auth", { action:"member_upsert", id:m.id, name:m.name, role:m.role, admin:!!m.admin, annual_base_date:today }).then(function(res){
+      return gwCall("gw-auth", { action:"member_upsert", id:m.id, annual_base_date:today }).then(function(res){
         if (res.status===200 && res.body && res.body.member){
           for (var i=0;i<members.length;i++){ if(members[i].id===res.body.member.id){ members[i]=res.body.member; break; } }
         }
@@ -6042,7 +6056,7 @@
     Array.prototype.forEach.call(panel.querySelectorAll("[data-pm]"), function(sel){ perms[sel.getAttribute("data-pm")] = sel.value; });
     var btn = panel.querySelector("[data-pm-save]"); if (btn){ btn.disabled = true; btn.textContent = "저장 중…"; }
     // name·role·admin 함께 전송(백엔드가 admin 미전송 시 false로 덮어씀 방지)
-    gwCall("gw-auth", { action:"member_upsert", id:id, name:m.name, role:m.role, admin:!!m.admin, perms:perms }).then(function(res){
+    gwCall("gw-auth", { action:"member_upsert", id:id, perms:perms }).then(function(res){
       if (res.status !== 200){ if(btn){ btn.disabled=false; btn.textContent="권한 저장"; } alert("권한 저장 실패"); return; }
       if (res.body && res.body.member){
         for (var i=0;i<members.length;i++){ if(members[i].id===res.body.member.id){ members[i]=res.body.member; break; } }
