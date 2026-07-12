@@ -579,6 +579,10 @@
   .view.readonly .mini-btn,
   .view.readonly .link-btn{display:none !important;}
   .tab-btn.perm-hidden{display:none !important;}
+  .nav-group.perm-hidden{display:none !important;}
+  .hr-dept{margin-bottom:14px;}
+  .hr-dept-h{font-size:13px;font-weight:800;color:var(--brand);padding:2px 2px 6px;border-bottom:1px solid var(--line);margin-bottom:4px;}
+  .hr-dept-h .cnt{color:var(--sub);font-weight:600;}
   #usersList{margin-bottom:12px;}
   .member-row{display:flex;align-items:center;gap:8px;padding:10px 2px;border-bottom:1px solid var(--line);}
   .member-row:last-child{border-bottom:none;}
@@ -704,6 +708,8 @@
     <button class="tab-btn" data-tab="cli" id="tabCliBtn">거래처</button>
     <div class="nav-group">문서</div>
     <button class="tab-btn" data-tab="doc" id="tabDocBtn">문서함</button>
+    <div class="nav-group perm-hidden" id="navGroupHr">인사</div>
+    <button class="tab-btn perm-hidden" data-tab="hr" id="tabHrBtn">인사</button>
   </nav>
   <div class="views">
 
@@ -855,6 +861,13 @@
     <input type="search" id="docSearch" placeholder="문서 검색(제목·번호)" autocomplete="off" style="width:100%;padding:9px 12px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;font-size:14px;box-sizing:border-box;">
     <div class="card" id="docList"><div class="loading">불러오는 중…</div></div>
     <button class="link-btn" id="docAddBtn">+ 문서 추가</button>
+  </section>
+
+  <!-- 인사(대표·관리자 전용) -->
+  <section class="view" id="view-hr">
+    <div class="dash-sec" style="margin-bottom:8px;"><h2>임직원 <span class="cnt" id="hrTotal"></span></h2></div>
+    <div class="card" id="hrRoster"><div class="loading">불러오는 중…</div></div>
+    <button class="link-btn" id="hrAddBtn">+ 직원 추가</button>
   </section>
 
   <!-- 주기 체크 -->
@@ -2698,7 +2711,9 @@
     document.getElementById("view-cli").classList.toggle("active", name === "cli");
     document.getElementById("view-con").classList.toggle("active", name === "con");
     document.getElementById("view-cal").classList.toggle("active", name === "cal");
+    document.getElementById("view-hr").classList.toggle("active", name === "hr");
     if (name === "cal") renderCalendar();
+    if (name === "hr") renderHrRoster();
   }
 
   // ---- 캘린더(통합 만기·마감) ----
@@ -2812,6 +2827,7 @@
   document.getElementById("devPendLogout").addEventListener("click", function(){ setGwToken(null); curMemberObj = null; document.getElementById("devicePendingBackdrop").classList.remove("show"); showMemberLogin(); });
   document.getElementById("usersClose").addEventListener("click", function(){ document.getElementById("usersBackdrop").classList.remove("show"); });
   document.getElementById("userAddBtn").addEventListener("click", function(){ openMemberEdit(null); });
+  document.getElementById("hrAddBtn").addEventListener("click", function(){ openMemberEdit(null); });
   document.getElementById("meSave").addEventListener("click", saveMemberEdit);
   document.getElementById("meDelete").addEventListener("click", deleteMemberEdit);
   document.getElementById("meCancel").addEventListener("click", closeMemberEdit);
@@ -4672,6 +4688,12 @@
     var showCheck = canSee("check");
     Array.prototype.forEach.call(document.querySelectorAll(".check-only"), function(el){ el.style.display = showCheck ? "" : "none"; });
     if (currentTab !== "dash" && currentTab !== "check" && MODULES.indexOf(currentTab) >= 0 && !canSee(currentTab)) switchTab("dash");
+    // 인사 탭: 대표·관리자 전용
+    var adminUser = isAdmin();
+    var hrBtn = document.getElementById("tabHrBtn"), hrGrp = document.getElementById("navGroupHr");
+    if (hrBtn) hrBtn.classList.toggle("perm-hidden", !adminUser);
+    if (hrGrp) hrGrp.classList.toggle("perm-hidden", !adminUser);
+    if (currentTab === "hr" && !adminUser) switchTab("dash");
     updateUserChip();
   }
 
@@ -4859,6 +4881,41 @@
     });
   }
 
+  // ---- 인사 탭(대표·관리자 전용): 부서별 직원 명부 ----
+  function renderHrRoster(){
+    var host = document.getElementById("hrRoster");
+    if (!host || !isAdmin()) return;
+    host.innerHTML = '<div class="loading">불러오는 중…</div>';
+    gwCall("gw-auth", { action: "member_list" }).then(function(res){
+      if (res.status === 200 && res.body && Array.isArray(res.body.members)) members = res.body.members;
+      drawHrRoster();
+    });
+  }
+  function drawHrRoster(){
+    var host = document.getElementById("hrRoster"); if (!host) return;
+    var mem = liveMembers();
+    var groups = {}; DEPT_LIST.forEach(function(d){ groups[d] = []; }); groups["미지정"] = [];
+    mem.forEach(function(m){ var d = (m.dept && DEPT_LIST.indexOf(m.dept) >= 0) ? m.dept : "미지정"; groups[d].push(m); });
+    var html = "";
+    DEPT_LIST.concat(["미지정"]).forEach(function(d){
+      var list = groups[d]; if (!list.length) return;
+      list.sort(function(a, b){ return ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role); });
+      html += '<div class="hr-dept"><div class="hr-dept-h">' + esc(d) + ' <span class="cnt">' + list.length + '</span></div>';
+      list.forEach(function(m){
+        var nm = isBossMember(m) ? (m.name + " (대표님)") : m.name;
+        var meta = [m.role || "", m.rank || ""].filter(Boolean).join(" · ");
+        html += '<div class="member-row"><div class="minfo"><div class="mname">' + esc(nm) + (m.admin ? ' 👑' : '') + '</div><div class="mrole">' + esc(meta) + '</div></div>' +
+          '<button class="mini-btn" data-user-edit="' + m.id + '">수정</button></div>';
+      });
+      html += '</div>';
+    });
+    host.innerHTML = html || '<div class="empty-line">직원이 없습니다.</div>';
+    var total = document.getElementById("hrTotal"); if (total) total.textContent = "총 " + mem.length + "명";
+    Array.prototype.forEach.call(host.querySelectorAll("[data-user-edit]"), function(el){
+      el.addEventListener("click", function(){ openMemberEdit(el.getAttribute("data-user-edit")); });
+    });
+  }
+
   var MOD_LABEL = {tasks:"지시", veh:"차량", rec:"기성", lic:"인허가", check:"업무", con:"계약", cli:"거래처", doc:"문서함"};
   function openMemberEdit(id){
     editingMemberId = id || null;
@@ -4922,7 +4979,7 @@
     gwCall("gw-auth", payload).then(function(res){
       if (res.status !== 200){ document.getElementById("meErr").classList.add("show"); return; }
       closeMemberEdit();
-      showUsersManage();
+      if (currentTab === "hr") renderHrRoster(); else showUsersManage();
     });
   }
   function deleteMemberEdit(){
@@ -4930,7 +4987,7 @@
     if (curMember() && editingMemberId === curMember().id) return;  // 본인 삭제 금지
     gwCall("gw-auth", { action: "member_delete", id: editingMemberId }).then(function(){
       closeMemberEdit();
-      showUsersManage();
+      if (currentTab === "hr") renderHrRoster(); else showUsersManage();
     });
   }
 
