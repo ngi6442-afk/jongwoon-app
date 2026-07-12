@@ -73,7 +73,7 @@
     text-overflow:ellipsis;
   }
   .user-chip.empty{color:var(--sub);font-weight:600;}
-  .nav-toggle{display:none;width:38px;height:38px;border-radius:10px;border:1px solid var(--line);background:var(--card);font-size:17px;cursor:pointer;flex-shrink:0;align-items:center;justify-content:center;color:var(--brand-dark);white-space:nowrap;padding:0 8px;width:auto;min-width:38px;}
+  .nav-toggle{display:none;width:38px;height:38px;border-radius:10px;border:1px solid var(--line);background:var(--card);font-size:17px;cursor:pointer;flex-shrink:0;align-items:center;justify-content:center;color:var(--brand-dark);padding:0;}
   .brand{display:flex;align-items:center;gap:8px;min-width:0;}
   .layout{position:relative;}
   .brand-logo{width:31px;height:31px;display:block;flex-shrink:0;}
@@ -194,6 +194,8 @@
     overflow:hidden;
     box-shadow:0 1px 2px rgba(16,33,43,0.04);
   }
+  /* 리스트(.item)·입력줄(.add-row)이 아닌 자유 콘텐츠 카드는 안쪽 여백을 줘 테두리에 붙어 잘리지 않게 */
+  .card:not(:has(> .item)):not(:has(> .add-row)){padding:12px 14px;}
   .item{
     display:flex;
     align-items:center;
@@ -2923,7 +2925,7 @@
   // ---- 탭 ----
   var TAB_LABELS = {dash:"홈",tasks:"지시",rec:"기성",cli:"거래처",con:"계약",hr:"인사",cal:"캘린더",veh:"차량",lic:"인허가",doc:"문서함",check:"업무",leave:"휴가",perm:"권한관리"};
   function closeNav(){ var tb=document.getElementById("tabbar"); if(tb) tb.classList.remove("open"); }
-  function updateNavToggle(name){ var nt=document.getElementById("navToggle"); if(nt) nt.textContent = "☰ " + (TAB_LABELS[name]||""); }
+  function updateNavToggle(name){ var nt=document.getElementById("navToggle"); if(nt) nt.textContent = "☰"; }
   function switchTab(name){
     currentTab = name;
     Array.prototype.forEach.call(document.querySelectorAll(".tab-btn"), function(b){
