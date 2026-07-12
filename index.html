@@ -591,16 +591,17 @@
   #docPrintOverlay.show{display:block;}
   .dp-bar{position:sticky;top:0;background:#eef2f0;padding:10px;display:flex;gap:8px;justify-content:center;border-bottom:1px solid #ccc;}
   #dpContent{max-width:820px;margin:0 auto;padding:20px 16px 60px;}
-  .doc-page{background:#fff;color:#111;padding:34px 36px;margin-bottom:22px;border:1px solid #ddd;box-shadow:0 1px 6px rgba(0,0,0,.08);font-size:13.5px;line-height:1.7;}
-  .doc-page h1{font-size:22px;text-align:center;letter-spacing:7px;margin:0 0 20px;font-weight:800;color:#111;}
-  .doc-tbl{width:100%;border-collapse:collapse;margin:8px 0 16px;}
-  .doc-tbl th,.doc-tbl td{border:1px solid #333;padding:7px 9px;font-size:13px;text-align:left;vertical-align:middle;}
-  .doc-tbl th{background:#f2f2f2;width:118px;white-space:nowrap;font-weight:700;}
-  .doc-clause{margin:2px 0;}
-  .doc-sign{margin-top:24px;display:flex;justify-content:space-between;gap:20px;}
+  /* 문서관리규정 제9조 준수: 굴림체, 제목18pt/본문10pt/표9pt, 배경색 금지(괘선만) */
+  .doc-page{background:#fff;color:#000;font-family:'굴림',Gulim,'맑은 고딕','Malgun Gothic',sans-serif;padding:30px 34px;margin-bottom:22px;border:1px solid #ccc;box-shadow:0 1px 6px rgba(0,0,0,.08);font-size:10pt;line-height:1.6;}
+  .doc-page h1{font-size:18pt;text-align:center;letter-spacing:6px;margin:0 0 16px;font-weight:700;color:#000;}
+  .doc-tbl{width:100%;border-collapse:collapse;margin:7px 0 13px;}
+  .doc-tbl th,.doc-tbl td{border:1px solid #000;padding:5px 8px;font-size:9pt;text-align:left;vertical-align:middle;background:#fff;}
+  .doc-tbl th{width:108px;white-space:nowrap;font-weight:700;}
+  .doc-clause{margin:2px 0;font-size:10pt;}
+  .doc-sign{margin-top:20px;display:flex;justify-content:space-between;gap:20px;font-size:10pt;}
   .doc-sign>div{flex:1;}
-  .doc-date{text-align:center;margin:22px 0 8px;font-size:14px;}
-  .doc-fill{color:#9a9a9a;}
+  .doc-date{text-align:center;margin:18px 0 8px;font-size:11pt;}
+  .doc-fill{color:#888;}
   @media print{
     body>*:not(#docPrintOverlay){display:none!important;}
     #docPrintOverlay{position:static;overflow:visible;}
@@ -1046,6 +1047,8 @@
     <select id="dgDocType">
       <option value="waste">폐기물 수집·운반 및 처리 계약서 (종운환경)</option>
       <option value="demo">석면해체·철거공사 계약서 (종운건설)</option>
+      <option value="quote_env">견적서 (종운환경)</option>
+      <option value="quote_con">견적서 (종운건설)</option>
     </select>
     <div id="dgWasteFields">
       <span class="fld-label">배출자 유형</span>
@@ -1071,6 +1074,10 @@
       <input type="text" id="dgWasteQty" placeholder="예상 폐기물량 (톤)" autocomplete="off">
       <span class="fld-label">착공일 / 준공일</span>
       <div style="display:flex;gap:8px;"><input type="date" id="dgStartDate" style="flex:1"><input type="date" id="dgEndDate" style="flex:1"></div>
+    </div>
+    <div id="dgQuoteFields" style="display:none;">
+      <input type="text" id="dgQClient" placeholder="거래처명 (귀하)" autocomplete="off">
+      <input type="text" id="dgQService" placeholder="용역명" autocomplete="off">
     </div>
     <span class="fld-label">계약(작성)일</span>
     <input type="date" id="dgDate">
@@ -3714,7 +3721,7 @@
     if(!canDo("con")) return;
     document.getElementById("dgDocType").value="waste";
     document.getElementById("dgParty").value="business";
-    ["dgName","dgBiz","dgCeo","dgTel","dgAddr","dgWaste","dgQty","dgWork","dgSite","dgOwner","dgOwnerCeo","dgOwnerBiz","dgOwnerAddr","dgOwnerTel","dgAmount","dgArea","dgWasteQty"].forEach(function(id){ var e=document.getElementById(id); if(e) e.value=""; });
+    ["dgName","dgBiz","dgCeo","dgTel","dgAddr","dgWaste","dgQty","dgWork","dgSite","dgOwner","dgOwnerCeo","dgOwnerBiz","dgOwnerAddr","dgOwnerTel","dgAmount","dgArea","dgWasteQty","dgQClient","dgQService"].forEach(function(id){ var e=document.getElementById(id); if(e) e.value=""; });
     document.getElementById("dgDate").value=todayStr();
     document.getElementById("dgStartDate").value="";
     document.getElementById("dgEndDate").value="";
@@ -3723,9 +3730,11 @@
     document.getElementById("docGenBackdrop").classList.add("show");
   }
   function dgToggleDocType(){
-    var demo = document.getElementById("dgDocType").value === "demo";
-    document.getElementById("dgWasteFields").style.display = demo ? "none" : "";
-    document.getElementById("dgDemoFields").style.display = demo ? "" : "none";
+    var t = document.getElementById("dgDocType").value;
+    var isQuote = (t === "quote_env" || t === "quote_con");
+    document.getElementById("dgWasteFields").style.display = (t === "waste") ? "" : "none";
+    document.getElementById("dgDemoFields").style.display = (t === "demo") ? "" : "none";
+    document.getElementById("dgQuoteFields").style.display = isQuote ? "" : "none";
   }
   var JW_CON = { name:"(주)종운건설", biz:"506-81-84827", ceo:"나종운", addr:"포항시 남구 정몽주로 823-10(청림동)", tel:"054-291-1202", biztype:"건설업(비계·구조물해체)", perm1:"건설업 전문면허 경북포항 2013-6-4", perm2:"석면해체·제거업 노동부 제3339호" };
   function dgDemoData(){
@@ -3752,7 +3761,7 @@
       '</table>'+
       '<p class="doc-clause"><b>9. 공사내역</b></p>'+
       '<table class="doc-tbl"><tr><th>종류</th><th>규격</th><th>철거(해체) 면적</th><th>예상 폐기물량</th><th>비고</th></tr>'+
-        '<tr><td>석면해체</td><td></td><td>'+dgFill(d.area)+' ㎡</td><td>'+dgFill(d.wasteQty)+' 톤</td><td rowspan="2">배출신고~<br>실적보고까지</td></tr>'+
+        '<tr><td>석면해체</td><td></td><td>'+dgFill(d.area)+' ㎡</td><td>'+dgFill(d.wasteQty)+' 톤</td><td rowspan="2">배출신고에서<br>실적보고까지</td></tr>'+
         '<tr><td>건물철거</td><td></td><td>&nbsp; ㎡</td><td>&nbsp; 톤</td></tr></table>'+
       '<p class="doc-clause">"을"은 위 현장의 철거·해체 후 발생 폐기물을 선별·분리·포장(보양)하여 폐기물관리법에 의거 적정 처리하며, 산업안전보건법에 따라 성실 시공한다.</p>'+
       '<p class="doc-clause">"갑"과 "을"은 상호 신의로써 성실히 계약하고 책임을 다할 것을 확약하며, 이 계약의 증거로 2부를 작성하여 각 1부씩 보관한다.</p>'+
@@ -3807,17 +3816,51 @@
   function docReport(d){
     return '<div class="doc-page"><h1>배출자 정보 확인서</h1>'+
       '<p style="color:#999;font-size:11.5px;margin-top:-6px;">※ 내부 확인용 — 관할 신고서식은 실제 양식 확정 후 반영</p>'+
-      '<table class="doc-tbl"><tr><th colspan="4" style="text-align:center;background:#eee;">배출자</th></tr>'+dgPartyRows(d)+'</table>'+
+      '<table class="doc-tbl"><tr><th colspan="4" style="text-align:center;">배출자</th></tr>'+dgPartyRows(d)+'</table>'+
       '<table class="doc-tbl"><tr><th>폐기물 종류</th><td>'+dgFill(d.waste)+'</td><th>물량</th><td>'+dgFill(d.qty)+'</td></tr>'+
         '<tr><th>수집·운반·처리</th><td>'+esc(JW_CO.name)+'</td><th>연락처</th><td>'+esc(JW_CO.tel)+'</td></tr></table>'+
       '<div class="doc-date">'+dgDateKo(d.date)+'</div>'+
       '<div class="doc-sign"><div>배출자 : '+dgFill(d.name)+' &nbsp; (인)</div><div>확인 : '+esc(JW_CO.name)+' &nbsp; (인)</div></div>'+
       '</div>';
   }
+  // 견적서(JW-06-001 종운환경 / JW-06-002 종운건설) 실물 반영
+  var QUOTE_CO = {
+    env: { name:"(유)종운환경", biz:"506-81-48535", ceo:"나 종 운", addr:"포항시 남구 서원재로 1(호동)", biztype:"서비스,운수,제조", item:"종합재활용 폐기물수집·운반", tel:"054)291-1204", fax:"054)291-1214",
+      notes:["처리비 및 운반비 포함 톤당 단가입니다.","1대당 팔레트로 적재하기로 함.","폐기물종합재활용업.","지정폐기물수집운반업.","사업장폐기물수집운반업(액상, 고상).","건설폐기물수집운반업.","상·하수도준설공사업, CCTV촬영, 수밀시험.","건설기계대여업.","화물자동차운송업.","사업장생활계수집운반업.","유해화학물질운송업.","담당자 : 나종운 대표 010-2584-0956"] },
+    con: { name:"(주)종운건설", biz:"506-81-84827", ceo:"나 종 운", addr:"포항시 남구 정몽주로823-10", biztype:"건설업", item:"해체공사업, 석면해체·제거업", tel:"054)291-1202", fax:"054)291-1214",
+      notes:["처리비 및 운반비 포함 톤당 단가입니다.","1대당 팔레트로 적재하기로 함.","구조물해체공사업.","석면해체·제거업 등록.","전문면허 경북포항 2013-6-4.","노동부 제3339호.","담당자 : 나종운 대표 010-2584-0956"] }
+  };
+  function docQuote(key, d){
+    var c = QUOTE_CO[key];
+    var rows = "";
+    for(var i=0;i<6;i++){ rows += '<tr style="height:22px"><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>'; }
+    var notes = c.notes.map(function(n){ return '<div>- '+esc(n)+'</div>'; }).join("");
+    return '<div class="doc-page"><h1 style="letter-spacing:14px">견 적 서</h1>'+
+      '<div style="display:flex;justify-content:space-between;font-size:9pt;margin-bottom:4px"><span>No. 26-000</span><span>'+dgDateKo(d.date)+'</span></div>'+
+      '<p style="margin:2px 0"><b>'+dgFill(d.client)+'</b> 귀하</p>'+
+      '<p style="margin:2px 0 8px">아래와 같이 견적합니다.</p>'+
+      '<table class="doc-tbl">'+
+        '<tr><th rowspan="4" style="width:52px;text-align:center;vertical-align:middle">공급자</th><th>사업자번호</th><td>'+esc(c.biz)+'</td><th>상호</th><td>'+esc(c.name)+'</td></tr>'+
+        '<tr><th>대표자</th><td>'+esc(c.ceo)+' (인)</td><th>업태</th><td>'+esc(c.biztype)+'</td></tr>'+
+        '<tr><th>사업장주소</th><td colspan="3">'+esc(c.addr)+'</td></tr>'+
+        '<tr><th>종목</th><td>'+esc(c.item)+'</td><th>전화 / FAX</th><td>'+esc(c.tel)+' / '+esc(c.fax)+'</td></tr>'+
+      '</table>'+
+      '<table class="doc-tbl">'+
+        '<tr><th style="width:70px">용역명</th><td>'+dgFill(d.service)+'</td></tr>'+
+        '<tr><th>공급가액</th><td>일금 '+dgFill('')+' 원정 ( ₩ '+dgFill('')+' ) 부가세 별도</td></tr></table>'+
+      '<table class="doc-tbl"><tr><th style="width:auto">품 명</th><th style="width:auto">성상</th><th style="width:auto">구분</th><th style="width:auto">단위</th><th style="width:auto">수량</th><th style="width:auto">단가</th><th style="width:auto">금액</th><th style="width:auto">비고</th></tr>'+
+        rows+
+        '<tr><th colspan="6" style="text-align:center">공급가액</th><td></td><td></td></tr></table>'+
+      '<div style="font-size:9pt;line-height:1.55"><b>비 고</b>'+notes+'</div>'+
+      '</div>';
+  }
   function generateDocs(){
     var type = document.getElementById("dgDocType").value;
     var html = "";
-    if(type === "demo"){
+    if(type === "quote_env" || type === "quote_con"){
+      var q = { client:document.getElementById("dgQClient").value.trim(), service:document.getElementById("dgQService").value.trim(), date:document.getElementById("dgDate").value||todayStr() };
+      html = docQuote(type === "quote_con" ? "con" : "env", q);
+    } else if(type === "demo"){
       var dd = dgDemoData();
       if(!dd.work && !dd.owner && !dd.site){ alert("공사명/발주처/현장 중 하나는 입력하세요."); return; }
       html = docDemoContract(dd);
