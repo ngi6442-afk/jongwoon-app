@@ -4926,8 +4926,8 @@
     document.getElementById("meRank").value = m ? (m.rank||"") : "";
     document.getElementById("meDept").value = m ? (m.dept||"") : "";
     var perms = m ? (m.perms||{}) : ROLE_PRESET["직원"].perms;
-    // 모듈별 권한 표시 순서 = 사이드바 메뉴 순서(지시·기성·업무·차량·인허가)
-    var permOrder = ["tasks","rec","check","veh","lic"].filter(function(x){ return MODULES.indexOf(x) >= 0; });
+    // 모듈별 권한 표시 순서 = 사이드바 메뉴 순서 (관리: 지시·기성·거래처 / 담당: 업무·차량·인허가·계약·문서함)
+    var permOrder = ["tasks","rec","cli","check","veh","lic","con","doc"].filter(function(x){ return MODULES.indexOf(x) >= 0; });
     MODULES.forEach(function(x){ if (permOrder.indexOf(x) < 0) permOrder.push(x); });
     var manageMods = { tasks:1, rec:1, cli:1, hr:1 };  // 관리 그룹(사이드바와 동일)
     var dividerDone = false;
