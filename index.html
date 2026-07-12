@@ -1751,13 +1751,7 @@
     var panel = document.getElementById("taskScopePanel");
     if(!panel) return;
     var checked = getCheckedMembers("taskScopePanel");
-    var ms = (typeof liveMembers==="function"?liveMembers():[]);
-    panel.innerHTML = '<div class="scope-hint">비우면 전체공개 · 체크한 사람만 공개</div>' +
-      ms.map(function(m){
-        var c = checked.indexOf(m.id) >= 0 ? " checked" : "";
-        var nm = isBossMember(m) ? "대표님" : m.name;
-        return '<label class="mcheck"><input type="checkbox" data-mid="'+m.id+'"'+c+'> '+esc(nm)+' <span class="mrole2">'+esc(m.role||"")+'</span></label>';
-      }).join("") || '<div class="scope-hint">회원이 없습니다.</div>';
+    panel.innerHTML = scopeCheckboxesHtml(checked);
     updateScopeBtn();
   }
   function updateScopeBtn(){
@@ -1765,11 +1759,11 @@
     if(!btn) return;
     var ids = getCheckedMembers("taskScopePanel");
     if(!ids.length){ btn.textContent = "전체공개 ▾"; return; }
-    btn.textContent = "공개: " + ids.map(dispNameById).filter(Boolean).join(", ") + " ▾";
+    btn.textContent = "공개: " + scopeNames(ids) + " ▾";
   }
   function resetTaskScope(){
     var panel = document.getElementById("taskScopePanel");
-    if(panel) Array.prototype.forEach.call(panel.querySelectorAll("[data-mid]"), function(cb){ cb.checked = false; });
+    if(panel) Array.prototype.forEach.call(panel.querySelectorAll("[data-scope],[data-mid]"), function(cb){ cb.checked = false; });
     var dd = document.getElementById("taskScopeDD"); if(dd) dd.classList.remove("open");
     updateScopeBtn();
   }
@@ -1785,7 +1779,7 @@
     var meId=myId();
     if(meId){
       if(t.who_id===meId) return true;
-      if(t.scope && t.scope.length && t.scope.indexOf(meId)>=0) return true;
+      if(t.scope && t.scope.length && scopeIncludes(t.scope, curMember())) return true;
     }
     // 구 데이터(이름 기반 담당) 호환
     if(!t.who_id && myName() && (t.who||"").trim()===myName()) return true;
@@ -4771,8 +4765,7 @@
   function recVisible(r){
     if (isAdmin()) return true;
     if (myId() && r.assignee === myId()) return true;
-    if (!r.scope || !r.scope.length) return true;
-    return r.scope.indexOf(myId()) >= 0;
+    return scopeIncludes(r.scope, curMember());
   }
 
   // 기성 ↔ 업무(지시) 연동
@@ -5367,36 +5360,63 @@
   function canSee(mod){ return permOf(mod) !== "hide"; }
   function isAdmin(){ var m = curMember(); return !!(m && m.admin); }
 
-  // 공개 대상(scope) — member id 배열. 비면 전체 공개.
+  // 공개 대상(scope) — 토큰 배열. 비면 전체 공개.
+  //  토큰: 회원id(개별) / "dept:부서명"(해당 부서 전원) / "rank:직급명"(그 직급 이상)
+  function scopeIncludes(scope, m){
+    if (!scope || !scope.length) return true;   // 전체공개
+    if (!m) return false;
+    for (var i=0;i<scope.length;i++){
+      var tk = scope[i];
+      if (tk === m.id) return true;
+      if (tk.indexOf("dept:")===0){ if (m.dept && m.dept === tk.slice(5)) return true; }
+      else if (tk.indexOf("rank:")===0){
+        var thr = tk.slice(5), ti = RANK_LIST.indexOf(thr), mi = RANK_LIST.indexOf(m.rank);
+        if (ti>=0 && mi>=0 && mi<=ti) return true;   // RANK_LIST는 상위→하위 순 → 이상 = index 작거나 같음
+      }
+    }
+    return false;
+  }
+  function scopeCheckboxesHtml(sel){
+    sel = sel || [];
+    function box(token, label, sub){
+      var c = sel.indexOf(token) >= 0 ? " checked" : "";
+      return '<label class="mcheck"><input type="checkbox" data-scope="' + esc(token) + '"' + c + '> ' + esc(label) + (sub?' <span class="mrole2">'+esc(sub)+'</span>':'') + '</label>';
+    }
+    var html = '<div class="scope-hint">비우면 전체공개 · 체크한 대상만 공개</div>';
+    html += '<div class="scope-hint">부서</div>' + DEPT_LIST.map(function(d){ return box("dept:"+d, d+" 전체"); }).join("");
+    html += '<div class="scope-hint">직급 이상</div>' + RANK_LIST.map(function(r){ return box("rank:"+r, r+" 이상"); }).join("");
+    var ms = liveMembers();
+    html += '<div class="scope-hint">개별 직원</div>' + (ms.length ? ms.map(function(m){ return box(m.id, isBossMember(m)?"대표님":m.name, m.role||""); }).join("") : '<div class="mrole2" style="padding:4px;">회원이 없습니다.</div>');
+    return html;
+  }
   function renderMemberChecks(hostId, selectedIds){
     var host = document.getElementById(hostId);
     if (!host) return;
-    var sel = selectedIds || [];
-    host.innerHTML = liveMembers().map(function(m){
-      var c = sel.indexOf(m.id) >= 0 ? " checked" : "";
-      return '<label class="mcheck"><input type="checkbox" data-mid="' + m.id + '"' + c + '> ' + esc(isBossMember(m)?"대표님":m.name) + ' <span class="mrole2">' + esc(m.role||"") + '</span></label>';
-    }).join("") || '<div class="mrole2" style="padding:4px;">회원이 없습니다.</div>';
+    host.innerHTML = scopeCheckboxesHtml(selectedIds || []);
   }
   function getCheckedMembers(hostId){
     var out = [];
     var host = document.getElementById(hostId);
-    if (host) Array.prototype.forEach.call(host.querySelectorAll("[data-mid]"), function(cb){ if (cb.checked) out.push(cb.getAttribute("data-mid")); });
+    if (host) Array.prototype.forEach.call(host.querySelectorAll("[data-scope],[data-mid]"), function(cb){ if (cb.checked) out.push(cb.getAttribute("data-scope") || cb.getAttribute("data-mid")); });
     return out;
   }
-  function scopeNames(ids){
-    if (!ids || !ids.length) return "";
-    return ids.map(function(id){ var m = findMember(id); return m ? (isBossMember(m) ? "대표님" : m.name) : null; }).filter(Boolean).join(", ");
+  function scopeNames(tokens){
+    if (!tokens || !tokens.length) return "";
+    return tokens.map(function(tk){
+      if (typeof tk !== "string") return null;
+      if (tk.indexOf("dept:")===0) return tk.slice(5);
+      if (tk.indexOf("rank:")===0) return tk.slice(5) + " 이상";
+      var m = findMember(tk); return m ? (isBossMember(m) ? "대표님" : m.name) : null;
+    }).filter(Boolean).join(", ");
   }
   function taskVisible(t){
     if (isAdmin()) return true;
     if (taskForMe(t)) return true;
-    if (!t.scope || !t.scope.length) return true;
-    return t.scope.indexOf(myId()) >= 0;
+    return scopeIncludes(t.scope, curMember());
   }
   function licVisible(l){
     if (isAdmin()) return true;
-    if (!l.scope || !l.scope.length) return true;
-    return l.scope.indexOf(getMemberId()) >= 0;
+    return scopeIncludes(l.scope, curMember());
   }
 
   function applyPerms(){
