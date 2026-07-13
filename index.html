@@ -1445,6 +1445,7 @@
       <span class="fld-label">등록 기기 (승인/해제/삭제)</span>
       <div id="meDevices"><div class="empty-line">불러오는 중…</div></div>
     </div>
+    <button class="primary" id="meReinstate" style="display:none;background:#5B3EA6;">복직 처리 (휴직 종료)</button>
     <button class="primary" id="meSave">저장</button>
     <button class="danger" id="meDelete">삭제</button>
     <button class="secondary" id="meCancel">취소</button>
@@ -3216,6 +3217,7 @@
   document.getElementById("permBackBtn").addEventListener("click", function(){ switchTab("hr"); });
   document.getElementById("hrStartBtn").addEventListener("click", hrStartWork);
   document.getElementById("meSave").addEventListener("click", saveMemberEdit);
+  document.getElementById("meReinstate").addEventListener("click", doReinstate);
   document.getElementById("meDelete").addEventListener("click", deleteMemberEdit);
   document.getElementById("meCancel").addEventListener("click", closeMemberEdit);
   document.getElementById("meRole").addEventListener("change", applyRolePreset);
@@ -4308,6 +4310,8 @@
     if(!m || !isDate(m.hire_date)) return null;
     var h=new Date(m.hire_date+"T00:00:00"), a=new Date((asOf||todayStr())+"T00:00:00");
     var days=Math.floor((a-h)/86400000) - (m.loa_days||0);
+    // 진행 중 휴직(복직 전)도 근속에서 실시간 제외 — 복직 시 loa_days에 합산되어 이중차감 없음
+    if(m.on_loa && isDate(m.loa_start)){ var od=Math.floor((a-new Date(m.loa_start+"T00:00:00"))/86400000); if(od>0) days-=od; }
     if(days<0) days=0;
     return { days:days, months:Math.floor(days/30), years:days/365 };
   }
@@ -6263,6 +6267,8 @@
     }).join("");
     updatePermLock();
     document.getElementById("meDelete").style.display = (m && curMember() && m.id !== curMember().id) ? "block" : "none";
+    var reBtn = document.getElementById("meReinstate");
+    if (reBtn) reBtn.style.display = (m && m.on_loa && isAdmin()) ? "block" : "none";
     var devWrap = document.getElementById("meDevicesWrap");
     if (id){ if (devWrap) devWrap.style.display = ""; renderMemberDevices(id); }
     else if (devWrap){ devWrap.style.display = "none"; }
@@ -6338,6 +6344,27 @@
       drawHrRoster();
       render();
     });
+  }
+  function doReinstate(){
+    if (!isAdmin() || !editingMemberId) return;
+    var id = editingMemberId, m = findMember(id);
+    if (!m || !m.on_loa) return;
+    var startD = isDate(m.loa_start) ? m.loa_start : "";
+    var days = 0;
+    if (startD){ var s=new Date(startD+"T00:00:00"), t=new Date(todayStr()+"T00:00:00"); days=Math.max(0, Math.round((t-s)/86400000)); }
+    if (!confirm("복직 처리할까요?\n휴직 " + (startD ? startD+"~"+todayStr()+" ("+days+"일)이 근속에서 제외(휴직 누적일수에 가산)" : "기간 정보 없음") + "됩니다.")) return;
+    var newLoa = (Number(m.loa_days)||0) + days;
+    // 휴직 기록도 종료(캘린더 반영)
+    liveLeaves().forEach(function(l){ if(l.member_id===id && l.type==="loa" && l.status==="approved" && (l.stage==="onloa"||!l.stage)){ l.end=todayStr(); l.stage="reinstated"; l.updated=todayStr(); } });
+    scheduleLeavesSave();
+    gwCall("gw-auth", { action:"member_upsert", id:id, on_loa:false, loa_days:newLoa, loa_end:todayStr() }).then(function(res){
+      if (res.status===200 && res.body && res.body.member){
+        for (var i=0;i<members.length;i++){ if(members[i].id===res.body.member.id){ members[i]=res.body.member; break; } }
+        try{ saveUsersCache(); }catch(e){}
+        closeMemberEdit(); drawHrRoster(); render();
+        alert("복직 처리 완료" + (days ? " · 휴직 "+days+"일이 근속에서 제외됐습니다." : "."));
+      } else { alert("복직 처리 실패. 다시 시도해 주세요."); }
+    }).catch(function(){ alert("복직 처리 중 통신 오류."); });
   }
   function deleteMemberEdit(){
     if (!editingMemberId) return;
