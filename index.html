@@ -948,7 +948,7 @@
   <!-- 일감·계약 (영업 파이프라인: 일감 → 참여 → 계약) -->
   <section class="view" id="view-con">
     <div id="bidSection">
-      <div class="dash-sec" style="margin-bottom:8px;display:flex;align-items:baseline;gap:10px;"><h2 style="flex:1;">일감 <span class="cnt" id="bidHead"></span></h2><button class="mini-btn" id="bidRefreshBtn">↻ 지금 수집</button></div>
+      <div class="dash-sec" style="margin-bottom:8px;display:flex;align-items:baseline;gap:10px;"><h2 style="flex:1;">일감 <span class="cnt" id="bidHead"></span></h2><button class="mini-btn" id="bidRefreshBtn">↻ 지금 수집</button><button class="mini-btn" id="bidPurgeBtn" title="미검토 항목을 비우고 새 필터로 다시 수집">🧹 재수집</button></div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;" id="bidFilterBar"></div>
       <input type="search" id="bidSearch" placeholder="일감 검색(공고명·기관)" autocomplete="off" style="width:100%;padding:9px 12px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;font-size:14px;box-sizing:border-box;">
       <div class="card" id="bidList"><div class="loading">불러오는 중…</div></div>
@@ -3287,6 +3287,28 @@
         alert("수집 실패 (" + res.status + ")");
       }
     }).catch(function(){ btn.disabled = false; btn.textContent = "↻ 지금 수집"; alert("통신 오류"); });
+  });
+  document.getElementById("bidPurgeBtn").addEventListener("click", function(){
+    var btn = this;
+    if (btn.disabled) return;
+    if (!confirm("미검토(신규) 일감을 전부 비우고 새 필터로 다시 수집할까요?\n검토·참여·패스 처리한 항목은 보존됩니다.")) return;
+    btn.disabled = true; btn.textContent = "재수집 중…";
+    gwCall("gw-data", { action: "bids_purge", mode: "new" }).then(function(res){
+      if (res.status !== 200){ btn.disabled=false; btn.textContent="🧹 재수집"; alert("비우기 실패 ("+res.status+")"); return; }
+      var removed = (res.body||{}).removed || 0;
+      return gwCall("gw-data", { action: "bids_refresh" }).then(function(r2){
+        btn.disabled = false; btn.textContent = "🧹 재수집";
+        if (r2.status === 200){
+          var b = r2.body || {};
+          alert("재수집 완료 — 비움 " + removed + "건, 신규 " + (b.added||0) + "건");
+        } else if (r2.body && r2.body.error_code === "NO_G2B_KEY"){
+          alert("비움 " + removed + "건 완료. 수집은 Netlify G2B_API_KEY 등록 후 가능합니다.");
+        } else {
+          alert("비움 " + removed + "건 완료, 수집 실패 (" + r2.status + ") — 잠시 후 '지금 수집'을 눌러주세요.");
+        }
+        loadBids();
+      });
+    }).catch(function(){ btn.disabled=false; btn.textContent="🧹 재수집"; alert("통신 오류"); });
   });
   document.getElementById("meSave").addEventListener("click", saveMemberEdit);
   document.getElementById("meReinstate").addEventListener("click", doReinstate);

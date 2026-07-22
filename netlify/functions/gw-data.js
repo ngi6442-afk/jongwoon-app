@@ -241,6 +241,26 @@ async function handleBidsRefresh(event, d, R) {
   return jr(200, { status: 'OK', scanned: found.length, added: m.added, updated: m.updated, total: doc.items.length, request_id: R });
 }
 
+// 일감 비우기(관리자) — mode:'new'=미검토(new)만 제거(검토/참여/패스 보존), 'all'=전체 제거. 재수집용.
+async function handleBidsPurge(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (!c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
+  const st = store(DATA);
+  const r = await blobGet(st, colKey('bids'));
+  const doc = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data : { schema: 1, items: [] };
+  const before = doc.items.length;
+  doc.items = (d.mode === 'all') ? [] : doc.items.filter(function (it) { return it && it.status && it.status !== 'new'; });
+  const removed = before - doc.items.length;
+  doc.updated_by = c.member.id; doc.updated_at = Date.now();
+  const w = await blobSet(st, colKey('bids'), doc);
+  if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
+  // 쿨다운도 해제해 바로 재수집 가능하게
+  try { await blobSet(st, 'bids:lastfetch', { ts: 0 }); } catch (e) {}
+  try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'bids', ev: [{ op: '비우기', id: '', t: (d.mode === 'all' ? '전체' : '미검토') + ' ' + removed + '건 제거' }] }); } catch (e) {}
+  return jr(200, { status: 'OK', removed: removed, total: doc.items.length, request_id: R });
+}
+
 // 감사 로그 조회(관리자 전용). month='YYYY-MM' 미지정 시 이번 달.
 async function handleAudit(event, d, R) {
   const c = await currentMember(event);
@@ -265,6 +285,7 @@ async function handler(event) {
     if (d && d.action === 'audit') return await handleAudit(event, d, R);
     if (d && d.action === 'bids_ingest') return await handleBidsIngest(event, d, R);
     if (d && d.action === 'bids_refresh') return await handleBidsRefresh(event, d, R);
+    if (d && d.action === 'bids_purge') return await handleBidsPurge(event, d, R);
     return jr(400, { status: 'REJECTED', error_code: 'UNKNOWN_ACTION', request_id: R });
   } catch (e) {
     return jr(500, { status: 'ERROR', error_code: 'HANDLER_FAILED', request_id: R });
