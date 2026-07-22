@@ -1204,7 +1204,7 @@
     </select>
     <span class="fld-label">기간 (시작 / 종료)</span>
     <div style="display:flex;gap:8px;"><input type="date" id="lvStart" style="flex:1"><input type="date" id="lvEnd" style="flex:1"></div>
-    <input type="text" id="lvReason" placeholder="사유 (선택)" autocomplete="off">
+    <input type="text" id="lvReason" placeholder="사유 (필수)" autocomplete="off">
     <button class="primary" id="lvSave">신청</button>
     <button class="secondary" id="lvCancel">취소</button>
   </div>
@@ -4730,6 +4730,7 @@
     var start=document.getElementById("lvStart").value;
     var end=document.getElementById("lvEnd").value||start;
     if(!isDate(start)){ alert("시작일을 선택하세요."); return; }
+    if(!document.getElementById("lvReason").value.trim()){ alert("사유를 입력하세요."); return; }
     if(type==="half_am"||type==="half_pm") end=start;
     var days=leaveDays(type,start,end);
     var l={ id:genId("lv"), member_id:me, member_name:myName()||"", type:type, start:start, end:end, days:days,
