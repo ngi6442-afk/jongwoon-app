@@ -1,6 +1,6 @@
 # jongwoon-app 로드맵
 
-## P6. 일감 레이더 (입찰·영업리드 수집) — API 키 발급 대기로 보류
+## P6. 일감 레이더 — A1 나라장터 구현 완료(2026-07-22, v104). 남은 것: 대표가 GitHub secrets(G2B_API_KEY·BIDS_INGEST_KEY)+Netlify 환경변수(BIDS_INGEST_KEY) 등록, A2 건축HUB(키 발급 후), A3 국방·공기업. 원래 설계 메모: ↓
 목적: 대표 수주업무 지원. 여러 소스를 어댑터로 수집해 앱 "일감" 탭에 통합.
 확정 설계(검토 반영):
 - 문서: JW-05-017(구 014 오기)에 P6 절 추가. 대상 앱 = **현행 Netlify 라이브 앱**(claude/gw-backend). 가이드·CLAUDE.md의 stale(GitHub Pages) 아키텍처도 실태로 갱신.
