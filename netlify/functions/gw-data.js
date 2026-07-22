@@ -278,9 +278,15 @@ async function handleBidsRefresh(event, d, R) {
 
 // 일감 비우기(관리자) — mode:'new'=미검토(new)만 제거(검토/참여/패스 보존), 'all'=전체 제거. 재수집용.
 async function handleBidsPurge(event, d, R) {
-  const c = await currentMember(event);
-  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
-  if (!c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
+  // 관리자 세션 또는 수집봇 시크릿(BIDS_INGEST_KEY)로 허용 — 봇의 데이터 정비용
+  const secret = (process.env.BIDS_INGEST_KEY || '').trim();
+  const botOk = secret && String(d.key || '').trim() === secret;
+  let c = { member: { id: 'bot', name: '수집봇' } };
+  if (!botOk) {
+    c = await currentMember(event);
+    if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+    if (!c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
+  }
   const st = store(DATA);
   const r = await blobGet(st, colKey('bids'));
   const doc = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data : { schema: 1, items: [] };
