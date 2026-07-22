@@ -4744,7 +4744,10 @@
   // ---- 일감(bids.json) — 입찰·영업 리드 (수집봇 자동 + 수동 등록) ----
   var bids = [];
   var bidsSha = null, bidsSaveTimer = null, bidsPending = false, bidSearchTerm = "", bidStatusFilter = "all";
-  var BID_STATUSES = [["new","신규"],["검토","검토"],["참여","참여"],["패스","패스"]];
+  var BID_STATUSES = [["new","신규"],["검토","검토"],["응찰","응찰"],["낙찰","낙찰"],["유찰","유찰"],["패스","패스"]];
+  // 단계 진행: 신규→검토→응찰→낙찰/유찰. 패스는 검토 전까지만.
+  var BID_NEXT = { "new":[["검토","검토"],["패스","패스"]], "검토":[["응찰","응찰"],["패스","패스"]], "응찰":[["낙찰","낙찰"],["유찰","유찰"]] };
+  function bidSt(b){ return b.status==="참여" ? "응찰" : (b.status||"new"); }   // 구 '참여' 호환
   function findBid(id){ for(var i=0;i<bids.length;i++){ if(bids[i].id===id) return bids[i]; } return null; }
   function liveBids(){ return bids.filter(function(b){ return b && b.del!==1; }); }
   function loadBids(){
@@ -4774,6 +4777,11 @@
     var b=findBid(id); if(!b) return;
     b.status=st; b.updated=todayStr();
     scheduleBidsSave(); renderBids(); renderDashboard();
+    if(st==="낙찰"){   // 낙찰 → 계약 시작 창(발주처·건명 미리 채움)
+      openConStart();
+      document.getElementById("conClient").value=b.org||"";
+      document.getElementById("conSite").value=b.title||"";
+    }
   }
   function renderBids(){
     var host=document.getElementById("bidList"); if(!host) return;
@@ -4781,7 +4789,7 @@
     // 필터바(상태 칩)
     var fb=document.getElementById("bidFilterBar");
     if(fb){
-      var counts={all:all.filter(function(b){return b.status!=="패스";}).length}; BID_STATUSES.forEach(function(s){ counts[s[0]]=all.filter(function(b){return b.status===s[0];}).length; });
+      var counts={all:all.filter(function(b){return bidSt(b)!=="패스";}).length}; BID_STATUSES.forEach(function(s){ counts[s[0]]=all.filter(function(b){return bidSt(b)===s[0];}).length; });
       var chips=[["all","전체"]].concat(BID_STATUSES);
       fb.innerHTML=chips.map(function(c){
         var on=bidStatusFilter===c[0];
@@ -4790,8 +4798,8 @@
       Array.prototype.forEach.call(fb.querySelectorAll("[data-bid-filter]"),function(el){ el.addEventListener("click",function(){ bidStatusFilter=el.getAttribute("data-bid-filter"); renderBids(); }); });
     }
     var list=all.filter(function(b){
-      if(bidStatusFilter==="all"){ if(b.status==="패스") return false; }   // 전체 보기에서 패스는 숨김(패스 칩에서만)
-      else if(b.status!==bidStatusFilter) return false;
+      if(bidStatusFilter==="all"){ if(bidSt(b)==="패스") return false; }   // 전체 보기에서 패스는 숨김(패스 칩에서만)
+      else if(bidSt(b)!==bidStatusFilter) return false;
       if(!bidSearchTerm) return true;
       return ((b.title||"")+" "+(b.org||"")).toLowerCase().indexOf(bidSearchTerm)>=0;
     });
@@ -4801,7 +4809,8 @@
     if(head) head.textContent = all.length ? ("총 "+all.length+" · 신규 "+bidNewCount()) : "";
     var today=todayStr();
     host.innerHTML = list.length ? list.map(function(b){
-      var isNew=b.status==="new";
+      var st=bidSt(b);
+      var isNew=st==="new";
       var cardBg = b.rgn_ref ? 'background:#FFF8E1;' : (isNew ? 'background:#F3F9F5;' : '');
       var dd = b.due ? ddayInfo(b.due) : null;
       var meta=[];
@@ -4814,10 +4823,10 @@
       if(b.budget) meta.push('<span class="rec-amt">'+fmtAmount(b.budget)+'원</span>');
       var ctrl='';
       if(canDo("bid")){
-        BID_STATUSES.forEach(function(s){ if(s[0]!==b.status && s[0]!=="new") ctrl+='<button class="mini-btn'+(s[0]==="참여"?' appr-btn':'')+'" data-bid-st="'+s[0]+'" data-bid-id="'+b.id+'">'+s[1]+'</button>'; });
+        (BID_NEXT[st]||[]).forEach(function(s){ ctrl+='<button class="mini-btn'+((s[0]==="응찰"||s[0]==="낙찰")?' appr-btn':'')+'" data-bid-st="'+s[0]+'" data-bid-id="'+b.id+'">'+s[1]+'</button>'; });
       }
       if(b.url) ctrl+='<a class="mini-btn" href="'+esc(b.url)+'" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center;">원문↗</a>';
-      var stChip = isNew ? '<span class="review-chip">신규</span>' : (b.status==="참여" ? '<span class="from-chip">참여</span>' : (b.status==="패스" ? '<span class="hold-chip">패스</span>' : '<span class="scope-chip">검토</span>'));
+      var stChip = {"new":'<span class="review-chip">신규</span>',"검토":'<span class="scope-chip">검토</span>',"응찰":'<span class="from-chip">응찰</span>',"낙찰":'<span class="from-chip">낙찰 🏆</span>',"유찰":'<span class="hold-chip">유찰</span>',"패스":'<span class="hold-chip">패스</span>'}[st]||'';
       return '<div class="item" style="'+cardBg+'"><div class="item-body">'+
         '<div class="item-title" style="'+(isNew?'font-weight:800;':'')+'">'+esc(b.title||"-")+' '+stChip+'</div>'+
         '<div class="item-meta">'+meta.join("")+(b.due?'<span>마감 '+esc(b.due)+'</span>':'')+'</div></div>'+
