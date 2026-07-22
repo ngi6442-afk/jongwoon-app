@@ -980,6 +980,7 @@
     <div class="card" id="hrRoster"><div class="loading">불러오는 중…</div></div>
     <button class="link-btn" id="hrAddBtn">+ 직원 추가</button>
     <button class="link-btn" id="permMgmtBtn">🔑 권한관리</button>
+    <button class="link-btn" id="auditBtn">📋 감사 로그</button>
   </section>
 
   <!-- 권한관리 (인사 하위 · 관리자 전용) -->
@@ -1058,6 +1059,21 @@
     <div id="cliDetailBody" style="max-height:70vh;overflow:auto;"></div>
     <button class="primary" id="cliDetailEdit" style="display:none;">거래처 정보 수정</button>
     <button class="secondary" id="cliDetailClose">닫기</button>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="auditBackdrop">
+  <div class="modal" style="max-width:600px;">
+    <h3 style="display:flex;align-items:center;gap:10px;">감사 로그
+      <span style="margin-left:auto;display:flex;gap:6px;align-items:center;">
+        <button class="mini-btn" id="auditPrev">◀</button>
+        <span id="auditMonth" style="font-size:13px;font-weight:700;"></span>
+        <button class="mini-btn" id="auditNext">▶</button>
+      </span>
+    </h3>
+    <p style="margin:0 0 10px;font-size:12px;">서버에 기록된 변경 이력(누가·언제·무엇을). 관리자 열람 전용, 앱에서 수정·삭제 불가.</p>
+    <div id="auditBody" style="max-height:65vh;overflow:auto;"><div class="loading">불러오는 중…</div></div>
+    <button class="secondary" id="auditClose">닫기</button>
   </div>
 </div>
 
@@ -3216,6 +3232,11 @@
   document.getElementById("permMgmtBtn").addEventListener("click", function(){ switchTab("perm"); });
   document.getElementById("permBackBtn").addEventListener("click", function(){ switchTab("hr"); });
   document.getElementById("hrStartBtn").addEventListener("click", hrStartWork);
+  document.getElementById("auditBtn").addEventListener("click", openAudit);
+  document.getElementById("auditClose").addEventListener("click", function(){ document.getElementById("auditBackdrop").classList.remove("show"); });
+  document.getElementById("auditBackdrop").addEventListener("click", function(e){ if(e.target===this) this.classList.remove("show"); });
+  document.getElementById("auditPrev").addEventListener("click", function(){ auditMonthShift(-1); });
+  document.getElementById("auditNext").addEventListener("click", function(){ auditMonthShift(1); });
   document.getElementById("meSave").addEventListener("click", saveMemberEdit);
   document.getElementById("meReinstate").addEventListener("click", doReinstate);
   document.getElementById("meDelete").addEventListener("click", deleteMemberEdit);
@@ -6155,6 +6176,54 @@
   }
 
   var MOD_LABEL = {tasks:"지시", veh:"차량", rec:"기성", lic:"인허가", check:"업무", con:"계약", cli:"거래처", doc:"문서함"};
+  // ---- 감사 로그 뷰어(관리자 전용, 서버 기록 열람) ----
+  var AUDIT_COL_LABEL = {tasks:"지시", vehicles:"차량", receivables:"기성", licenses:"인허가", checklist:"업무", documents:"문서함", clients:"거래처", contracts:"계약", leaves:"휴가", member:"회원", login:"로그인"};
+  var AUDIT_FIELD_LABEL = {status:"상태", title:"제목", who:"담당", who_id:"담당", due:"기한", amount:"금액", paid:"입금", del:"삭제", scope:"공개범위", stage:"단계", cancel_req:"취소요청", name:"이름", role:"직책", rank:"직급", dept:"부서", admin:"관리자", perms:"권한", hire_date:"입사일", leave_date:"퇴사일", seq:"연번", annual_base:"잔여연차기준", annual_base_date:"기준일", annual_days:"연차수동", loa_days:"휴직누적", on_loa:"휴직중", loa_start:"휴직시작", loa_end:"휴직종료", annual_paid:"연차수당포함", emp_type:"고용형태", annual_basis:"연차기준", reason:"사유", approver:"승인자", done_by:"완료자", detail:"상세", recur:"반복", hl:"하이라이트", mismatch:"불일치", PIN:"PIN"};
+  var auditMonthCur = "";
+  function auditMonthShift(delta){
+    var p = auditMonthCur.split("-"), y = +p[0], mo = +p[1] + delta;
+    if (mo < 1){ mo = 12; y--; } if (mo > 12){ mo = 1; y++; }
+    auditMonthCur = y + "-" + ("0" + mo).slice(-2);
+    renderAudit();
+  }
+  function openAudit(){
+    if (!isAdmin()) return;
+    var d = new Date();
+    auditMonthCur = d.getFullYear() + "-" + ("0" + (d.getMonth() + 1)).slice(-2);
+    document.getElementById("auditBackdrop").classList.add("show");
+    renderAudit();
+  }
+  function renderAudit(){
+    var body = document.getElementById("auditBody");
+    document.getElementById("auditMonth").textContent = auditMonthCur;
+    body.innerHTML = '<div class="loading">불러오는 중…</div>';
+    gwCall("gw-data", { action: "audit", month: auditMonthCur }).then(function(res){
+      if (res.status !== 200){ body.innerHTML = '<div class="empty-line">불러오기 실패 (' + res.status + ')</div>'; return; }
+      var items = (res.body && res.body.doc && res.body.doc.items) || [];
+      if (!items.length){ body.innerHTML = '<div class="empty-line">이 달의 기록이 없습니다.</div>'; return; }
+      var html = items.slice().reverse().map(function(a){
+        var dt = new Date(a.ts);
+        var when = (dt.getMonth()+1) + "/" + dt.getDate() + " " + ("0"+dt.getHours()).slice(-2) + ":" + ("0"+dt.getMinutes()).slice(-2);
+        var colNm = AUDIT_COL_LABEL[a.col] || a.col;
+        var evs = (a.ev || []).map(function(e){
+          var line = '<b>' + esc(e.op) + '</b> ' + esc(e.t || e.id || "");
+          if (e.f){
+            var parts = [];
+            Object.keys(e.f).forEach(function(k){
+              var pair = e.f[k] || [];
+              parts.push(esc(AUDIT_FIELD_LABEL[k] || k) + ": " + esc(pair[0] === "" ? "(없음)" : pair[0]) + " → " + esc(pair[1] === "" ? "(없음)" : pair[1]));
+            });
+            line += '<div style="font-size:12px;color:var(--sub);margin-top:1px;word-break:break-all;">' + parts.join(" · ") + '</div>';
+          }
+          return '<div style="padding:2px 0;">' + line + '</div>';
+        }).join("");
+        return '<div class="item" style="cursor:default;"><div class="item-body">' +
+          '<div class="item-meta" style="margin-bottom:2px;"><span>' + when + '</span><span class="author-chip">' + esc(dispName(a.by||"")) + '</span><span class="scope-chip">' + esc(colNm) + '</span></div>' +
+          '<div style="font-size:13px;">' + evs + '</div></div></div>';
+      }).join("");
+      body.innerHTML = html;
+    }).catch(function(){ body.innerHTML = '<div class="empty-line">통신 오류</div>'; });
+  }
   // 권한관리(별도 화면) — 모듈별 권한만 편집. 사이드바 순서와 동일.
   var PERM_ORDER = ["tasks","rec","cli","con","veh","lic","doc","check"];
   var permOpenId = null;

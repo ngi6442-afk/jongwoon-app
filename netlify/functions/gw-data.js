@@ -6,6 +6,7 @@
 const crypto = require('crypto');
 const { setupBlobContext, store, blobGet, blobSet } = require('./_lib/blobs');
 const { verifyToken, bearer } = require('./_lib/session');
+const { appendAudit, auditKey, diffItems } = require('./_lib/audit');
 
 const DATA = 'gw_data';
 const USERS = 'gw_users';
@@ -77,10 +78,29 @@ async function handleSave(event, d, R) {
   // tasks 쓰기는 인증·인가 회원이면 허용(프런트 canActTask로 자기 업무만 조작, UI 권한 구분이지 하드보안 아님).
   if (permOf(c.member, col) !== 'do' && col !== 'tasks' && col !== 'leaves') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_WRITE', request_id: R });
   if (!d.doc || typeof d.doc !== 'object') return jr(400, { status: 'REJECTED', error_code: 'INVALID_DOC', request_id: R });
+  // 감사 로그용 이전 문서(diff 원본) — 읽기 실패해도 저장은 진행
+  let oldItems = [];
+  try { const prev = await blobGet(store(DATA), colKey(col)); if (prev.ok && prev.data && Array.isArray(prev.data.items)) oldItems = prev.data.items; } catch (e) {}
   const doc = Object.assign({}, d.doc, { updated_by: c.member.id, updated_at: Date.now() });
   const w = await blobSet(store(DATA), colKey(col), doc);
   if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
+  // 감사 로그: 누가·언제·무엇을(이전값→새값). 서버측 기록이라 클라이언트 위변조 불가.
+  try {
+    const ev = diffItems(oldItems, Array.isArray(doc.items) ? doc.items : []);
+    if (ev.length) await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: col, ev: ev });
+  } catch (e) {}
   return jr(200, { status: 'OK', request_id: R });
+}
+
+// 감사 로그 조회(관리자 전용). month='YYYY-MM' 미지정 시 이번 달.
+async function handleAudit(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (!c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
+  const key = auditKey(d.month);
+  const r = await blobGet(store(DATA), key);
+  const doc = (r.ok && r.data) ? r.data : { schema: 1, items: [] };
+  return jr(200, { status: 'OK', month: key.slice(6), doc: doc, request_id: R });
 }
 
 async function handler(event) {
@@ -93,6 +113,7 @@ async function handler(event) {
   try {
     if (d && d.action === 'get') return await handleGet(event, d, R);
     if (d && d.action === 'save') return await handleSave(event, d, R);
+    if (d && d.action === 'audit') return await handleAudit(event, d, R);
     return jr(400, { status: 'REJECTED', error_code: 'UNKNOWN_ACTION', request_id: R });
   } catch (e) {
     return jr(500, { status: 'ERROR', error_code: 'HANDLER_FAILED', request_id: R });

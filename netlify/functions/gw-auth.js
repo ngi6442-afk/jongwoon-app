@@ -8,6 +8,7 @@ const crypto = require('crypto');
 const { setupBlobContext, store, blobGet, blobSet } = require('./_lib/blobs');
 const { hashSecret, verifySecret } = require('./_lib/password');
 const { issueSession, verifyToken, bearer } = require('./_lib/session');
+const { appendAudit, short } = require('./_lib/audit');
 
 const USERS = 'gw_users';
 const MODULES = ['tasks', 'veh', 'rec', 'lic', 'check', 'con', 'cli', 'doc'];
@@ -116,6 +117,8 @@ async function handleLogin(st, d, R, event) {
   const deviceStatus = await registerDevice(st, event, mr.data);
   const s = issueSession(mr.data);
   if (!s.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: s.code, request_id: R });
+  // 감사 로그: 로그인 이력(본인성 보강)
+  try { await appendAudit({ ts: Date.now(), by: mr.data.name, bid: mr.data.id, col: 'login', ev: [{ op: '로그인', id: mr.data.id, t: mr.data.name }] }); } catch (e) {}
   return jr(200, { status: 'OK', token: s.token, expires_at: s.expires_at, member: safeMember(mr.data), device_status: deviceStatus, request_id: R });
 }
 
@@ -139,11 +142,13 @@ async function handleMemberUpsert(st, event, d, R) {
   if (!c.ok || !c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
   const name = (d.name || '').trim();
   let m;
+  let before = null;   // 감사 로그용 변경 전 스냅샷
   if (d.id) {
     // 기존 회원: 부분 업데이트 허용. 전달된 필드만 갱신(name/role/admin 미전달 시 기존값 보존)
     const r = await blobGet(st, memberKey(d.id));
     if (!r.ok || !r.data) return jr(404, { status: 'REJECTED', error_code: 'NOT_FOUND', request_id: R });
     m = r.data;
+    before = JSON.parse(JSON.stringify(m));
     if (name && m.name !== name) { await blobSet(st, nameKey(m.name), null); m.name = name; }
     if (d.role !== undefined) m.role = d.role || m.role || '직원';
     if (d.admin !== undefined) m.admin = !!d.admin;
@@ -179,6 +184,22 @@ async function handleMemberUpsert(st, event, d, R) {
   const w1 = await blobSet(st, memberKey(m.id), m);
   const w2 = await blobSet(st, nameKey(m.name), m.id);
   if (!w1.ok || !w2.ok) return jr(500, { status: 'ERROR', error_code: 'STORAGE_WRITE_FAILED', request_id: R });
+  // 감사 로그: 회원 필드 변경(이전값→새값). PIN은 값 미기록('변경'만), 해시·비밀값 제외.
+  try {
+    const f = {};
+    const AUD_FIELDS = ['name','role','admin','rank','dept','annual_days','hire_date','emp_type','annual_basis','loa_days','leave_date','annual_paid','annual_base','annual_base_date','seq','on_loa','loa_start','loa_end'];
+    const b = before || {};
+    for (const k of AUD_FIELDS) {
+      const a = b[k], v = m[k];
+      if ((typeof a === 'object' ? JSON.stringify(a) : a) !== (typeof v === 'object' ? JSON.stringify(v) : v) && !(a == null && v == null)) f[k] = [short(a), short(v)];
+    }
+    if (before && JSON.stringify(before.perms || {}) !== JSON.stringify(m.perms || {})) f.perms = [short(before.perms), short(m.perms)];
+    if (d.pin) f.PIN = ['', '변경'];
+    if (!before || Object.keys(f).length) {
+      await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'member',
+        ev: [{ op: (before ? '수정' : '추가'), id: m.id, t: m.name, f: (Object.keys(f).length ? f : undefined) }] });
+    }
+  } catch (e) {}
   return jr(200, { status: 'OK', member: safeMember(m), request_id: R });
 }
 
@@ -187,7 +208,11 @@ async function handleMemberDelete(st, event, d, R) {
   if (!c.ok || !c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
   if (!d.id || d.id === c.member.id) return jr(400, { status: 'REJECTED', error_code: 'INVALID_INPUT', request_id: R });
   const r = await blobGet(st, memberKey(d.id));
-  if (r.ok && r.data) { r.data.del = 1; r.data.updated = Date.now(); await blobSet(st, memberKey(d.id), r.data); await blobSet(st, nameKey(r.data.name), null); }
+  if (r.ok && r.data) {
+    r.data.del = 1; r.data.updated = Date.now();
+    await blobSet(st, memberKey(d.id), r.data); await blobSet(st, nameKey(r.data.name), null);
+    try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'member', ev: [{ op: '삭제', id: d.id, t: r.data.name }] }); } catch (e) {}
+  }
   return jr(200, { status: 'OK', request_id: R });
 }
 
