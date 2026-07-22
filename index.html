@@ -988,6 +988,7 @@
       <button class="primary" id="hrStartBtn" style="width:auto;padding:9px 18px;">인사업무 시작 ▶</button>
     </div>
     <div class="card" id="hrRoster"><div class="loading">불러오는 중…</div></div>
+    <div class="card" id="hrNewPanel" style="display:none;margin-top:8px;"></div>
     <button class="link-btn" id="hrAddBtn">+ 직원 추가</button>
     <button class="link-btn" id="permMgmtBtn">🔑 권한관리</button>
     <button class="link-btn" id="auditBtn">📋 감사 로그</button>
@@ -3257,7 +3258,7 @@
   document.getElementById("devPendLogout").addEventListener("click", function(){ setGwToken(null); curMemberObj = null; document.getElementById("devicePendingBackdrop").classList.remove("show"); showMemberLogin(); });
   document.getElementById("usersClose").addEventListener("click", function(){ document.getElementById("usersBackdrop").classList.remove("show"); });
   document.getElementById("userAddBtn").addEventListener("click", function(){ openMemberEdit(null); });
-  document.getElementById("hrAddBtn").addEventListener("click", function(){ openMemberEdit(null); });
+  document.getElementById("hrAddBtn").addEventListener("click", function(){ if (hrNewOpen){ hrCloseNew(); } else hrOpenNew(); });
   document.getElementById("permMgmtBtn").addEventListener("click", function(){ switchTab("perm"); });
   document.getElementById("permBackBtn").addEventListener("click", function(){ switchTab("hr"); });
   document.getElementById("hrStartBtn").addEventListener("click", hrStartWork);
@@ -6290,9 +6291,31 @@
     });
   }
   var hrOpenId = null;
+  var hrNewOpen = false;
+  // 직원 추가도 개별 인사업무와 동일한 인라인 패널 UI(모달 아님)
+  function hrOpenNew(){
+    hrCollapse(); hrCloseNew();
+    var panel = document.getElementById("hrNewPanel"); if (!panel) return;
+    var form = document.getElementById("memberEditForm");
+    form.classList.add("hr-inline");
+    panel.innerHTML = '<div class="hr-dept-h">새 직원 등록</div>';
+    panel.appendChild(form);
+    panel.style.display = "";
+    hrNewOpen = true;
+    openMemberEdit(null, true);
+    panel.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }
+  function hrCloseNew(){
+    if (!hrNewOpen) return;
+    var form = document.getElementById("memberEditForm");
+    form.classList.remove("hr-inline");
+    document.getElementById("memberEditBackdrop").appendChild(form);
+    var panel = document.getElementById("hrNewPanel"); if (panel){ panel.style.display = "none"; panel.innerHTML = ""; }
+    hrNewOpen = false;
+  }
   function hrToggle(id){
     if (hrOpenId === id){ hrCollapse(); return; }
-    hrCollapse();
+    hrCollapse(); hrCloseNew();
     var panel = document.getElementById("hrpanel-" + id); if (!panel) return;
     var form = document.getElementById("memberEditForm");
     form.classList.add("hr-inline");
@@ -6435,7 +6458,7 @@
     });
   }
   function openMemberEdit(id, inline){
-    if (!inline && hrOpenId != null) hrCollapse();  // 모달 경로: 인라인 폼을 홀더로 복귀시킨 뒤 표시
+    if (!inline){ if (hrOpenId != null) hrCollapse(); hrCloseNew(); }  // 모달 경로: 인라인 폼을 홀더로 복귀시킨 뒤 표시
     editingMemberId = id || null;
     var m = id ? findMember(id) : null;
     document.getElementById("memberEditTitle").textContent = m ? "회원 수정" : "회원 추가";
@@ -6483,6 +6506,7 @@
   }
   function closeMemberEdit(){
     if (hrOpenId != null) hrCollapse();
+    else if (hrNewOpen) hrCloseNew();
     else document.getElementById("memberEditBackdrop").classList.remove("show");
     editingMemberId = null;
   }
