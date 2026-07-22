@@ -949,7 +949,7 @@
   <section class="view" id="view-con">
     <div id="bidSection">
       <div class="dash-sec" style="margin-bottom:8px;display:flex;align-items:baseline;gap:10px;"><h2 style="flex:1;">일감 <span class="cnt" id="bidHead"></span></h2><button class="mini-btn" id="bidRefreshBtn">↻ 지금 수집</button><button class="mini-btn" id="bidPurgeBtn" title="미검토 항목을 비우고 새 필터로 다시 수집">🧹 재수집</button></div>
-      <div style="font-size:12px;color:var(--sub);margin:-4px 0 8px;">목록의 공고는 지역·업종(보유면허)·낙찰방법 자격 필터를 통과한 <b>참가 가능</b> 건입니다. 📍=발주처가 경북권, ⚠=공고서에서 지역 직접 확인 필요.</div>
+      <div style="font-size:12px;color:var(--sub);margin:-4px 0 8px;">목록의 공고는 지역·업종(보유면허)·낙찰방법 자격 필터를 통과한 <b>참가 가능</b> 건입니다. 칩의 <b>지역</b>=실제 참가제한 내용. <span style="background:#FFF3CD;border-radius:4px;padding:0 5px;">노란 카드</span>=지역이 '공고서 참조'인데 자동 판독으로 확인 못 한 건 — 원문에서 직접 확인.</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;" id="bidFilterBar"></div>
       <input type="search" id="bidSearch" placeholder="일감 검색(공고명·기관)" autocomplete="off" style="width:100%;padding:9px 12px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;font-size:14px;box-sizing:border-box;">
       <div class="card" id="bidList"><div class="loading">불러오는 중…</div></div>
@@ -4772,12 +4772,12 @@
     var today=todayStr();
     host.innerHTML = list.length ? list.map(function(b){
       var isNew=b.status==="new";
+      var cardBg = b.rgn_ref ? 'background:#FFF8E1;' : (isNew ? 'background:#F3F9F5;' : '');
       var dd = b.due ? ddayInfo(b.due) : null;
       var meta=[];
       meta.push('<span class="own-badge '+(b.source==="수동"?"lease":"self")+'">'+esc(b.source||"-")+'</span>');
       if(b.org) meta.push('<span>'+esc(b.org)+'</span>');
-      if(b.region) meta.push('<span class="from-chip">📍 '+esc(b.region)+'</span>');
-      if(b.rgn_ref) meta.push('<span class="review-chip">⚠ 지역 확인필요(공고서)</span>');
+      if(b.region) meta.push('<span class="scope-chip">지역 '+esc(b.region)+'</span>');
       if(b.method) meta.push('<span class="hold-chip">'+esc(b.method)+'</span>');
       if(b.matched&&b.matched.length) meta.push('<span class="from-chip">'+esc(b.matched.join(","))+'</span>');
       if(b.budget) meta.push('<span class="rec-amt">'+fmtAmount(b.budget)+'원</span>');
@@ -4787,7 +4787,7 @@
       }
       if(b.url) ctrl+='<a class="mini-btn" href="'+esc(b.url)+'" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center;">원문↗</a>';
       var stChip = isNew ? '<span class="review-chip">신규</span>' : (b.status==="참여" ? '<span class="from-chip">참여</span>' : (b.status==="패스" ? '<span class="hold-chip">패스</span>' : '<span class="scope-chip">검토</span>'));
-      return '<div class="item" style="'+(isNew?'background:#F3F9F5;':'')+'"><div class="item-body">'+
+      return '<div class="item" style="'+cardBg+'"><div class="item-body">'+
         '<div class="item-title" style="'+(isNew?'font-weight:800;':'')+'">'+esc(b.title||"-")+' '+stChip+'</div>'+
         '<div class="item-meta">'+meta.join("")+(b.due?'<span>마감 '+esc(b.due)+'</span>':'')+'</div></div>'+
         '<div class="task-ctrl">'+(dd?'<span class="dday '+(dd.cls||"")+'">'+dd.text+'</span>':'')+ctrl+'</div></div>';

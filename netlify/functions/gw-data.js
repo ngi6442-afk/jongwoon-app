@@ -203,19 +203,19 @@ async function handleBidsRefresh(event, d, R) {
     (rgnMap[k] = rgnMap[k] || []).push(it.prtcptPsblRgnNm || '');
   }
   function rgnEligible(names) {
-    // 반환 {ok, ref} — '공고서 참조'류는 판별 불가라 수집하고 표시(ref)만.
-    if (!names || !names.length) return { ok: true, ref: false };   // 지역 행 없음 = 전국
+    // 반환 {ok, ref, lbl} — lbl=실제 지역제한 내용(전국/경상북도/포항/공고서 참조)
+    if (!names || !names.length) return { ok: true, ref: false, lbl: '전국' };
     let ref = false;
     for (let nm of names) {
       nm = String(nm || '').trim();
       if (!nm) continue;
       if (nm.indexOf('참조') >= 0 || nm.indexOf('공고서') >= 0) { ref = true; continue; }
-      if (nm.indexOf('전국') >= 0 || nm.indexOf('제한없음') >= 0) return { ok: true, ref: false };
-      if (nm.indexOf('포항') >= 0) return { ok: true, ref: false };
+      if (nm.indexOf('전국') >= 0 || nm.indexOf('제한없음') >= 0) return { ok: true, ref: false, lbl: '전국' };
+      if (nm.indexOf('포항') >= 0) return { ok: true, ref: false, lbl: '포항' };
       const flat = nm.replace(/ /g, '');
-      if (flat === '경상북도' || flat === '경북') return { ok: true, ref: false };   // 도 단위 제한(타 시군 제한은 제외)
+      if (flat === '경상북도' || flat === '경북') return { ok: true, ref: false, lbl: '경상북도' };
     }
-    return ref ? { ok: true, ref: true } : { ok: false, ref: false };
+    return ref ? { ok: true, ref: true, lbl: '공고서 참조' } : { ok: false, ref: false, lbl: '' };
   }
   // 낙찰방법: 수의시담·다자간수의시담·지명경쟁은 지명업체 전용 → 제외
   function mthdEligible(a, b) {
@@ -258,12 +258,10 @@ async function handleBidsRefresh(event, d, R) {
         const rgnChk = rgnEligible(rgnMap[bkey]);
         if (!rgnChk.ok) continue;   // 지역제한 미해당 제외('공고서 참조'는 수집+표시)
         if (!mthdEligible(it.sucsfbidMthdNm, it.cntrctCnclsMthdNm)) continue;   // 시담·지명 제외
-        const regTxt = org + ' ' + (it.rgnLmtBidLocplcNm || '');
-        const reg = BID_REGIONS.find((g) => regTxt.indexOf(g) >= 0) || '';
         let budget = 0; const bp = Number(it.presmptPrce || 0); if (!isNaN(bp)) budget = Math.floor(bp);
         const mlbl = String(it.sucsfbidMthdNm || '').split('-')[0].trim() || String(it.cntrctCnclsMthdNm || '').trim();
         found.push({ id: 'g2b-' + (it.bidNtceNo || '') + '-' + (it.bidNtceOrd || ''), source: '나라장터', kind: '입찰',
-          title: nm, org: org, region: reg, due: String(it.bidClseDt || '').slice(0, 10).replace(/[./]/g, '-'),
+          title: nm, org: org, region: rgnChk.lbl, due: String(it.bidClseDt || '').slice(0, 10).replace(/[./]/g, '-'),
           budget: budget, url: it.bidNtceUrl || it.bidNtceDtlUrl || '', matched: kw.concat(licHits.slice(0, 2).map((h) => '면허:' + h)), method: mlbl, rgn_ref: !!rgnChk.ref });
       }
     }
