@@ -115,6 +115,7 @@ function mergeBidItems(doc, items) {
     } else {
       let ch = false;
       ['title', 'org', 'region', 'due', 'budget', 'url', 'method'].forEach(function (k) { if (n[k] && n[k] !== cur[k]) { cur[k] = n[k]; ch = true; } });
+      if (cur.rgn_ref && n.rgn_ref === false) { cur.rgn_ref = false; ch = true; }   // 공고서 판독 확인 반영
       if (ch) { cur.updated = today; updated++; }
     }
   }
