@@ -11,7 +11,7 @@ const { appendAudit, auditKey, diffItems } = require('./_lib/audit');
 const DATA = 'gw_data';
 const USERS = 'gw_users';
 // 컬렉션 → 권한키
-const COL = { tasks: 'tasks', vehicles: 'veh', receivables: 'rec', licenses: 'lic', checklist: 'check', documents: 'doc', clients: 'cli', contracts: 'con', leaves: 'leaves' };
+const COL = { tasks: 'tasks', vehicles: 'veh', receivables: 'rec', licenses: 'lic', checklist: 'check', documents: 'doc', clients: 'cli', contracts: 'con', leaves: 'leaves', bids: 'bid' };
 // 사용자별 비공개 컬렉션(본인만 접근, 회원 id로 분리 저장)
 const PRIVATE_COL = { mytasks: true };
 
@@ -92,6 +92,44 @@ async function handleSave(event, d, R) {
   return jr(200, { status: 'OK', request_id: R });
 }
 
+// 일감 수집 ingest(수집봇 전용) — 공유 시크릿(BIDS_INGEST_KEY) 인증, 세션 불필요.
+// 새 id만 추가(status=new), 기존 항목은 원천 메타(title/org/region/due/budget/url)만 갱신하고
+// 앱이 관리하는 status·검토 상태는 절대 덮어쓰지 않는다. 삭제 없음.
+async function handleBidsIngest(event, d, R) {
+  const secret = (process.env.BIDS_INGEST_KEY || '').trim();
+  if (!secret || String(d.key || '').trim() !== secret) return jr(403, { status: 'FORBIDDEN', error_code: 'BAD_INGEST_KEY', request_id: R });
+  if (!Array.isArray(d.items)) return jr(400, { status: 'REJECTED', error_code: 'INVALID_ITEMS', request_id: R });
+  const st = store(DATA);
+  const r = await blobGet(st, colKey('bids'));
+  const doc = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data : { schema: 1, items: [] };
+  const byId = {};
+  doc.items.forEach(function (it) { if (it && it.id) byId[it.id] = it; });
+  const today = new Date().toISOString().slice(0, 10);
+  let added = 0, updated = 0;
+  for (const n of d.items) {
+    if (!n || !n.id) continue;
+    const cur = byId[n.id];
+    if (!cur) {
+      doc.items.push({ id: n.id, source: n.source || '', kind: n.kind || '입찰', title: n.title || '', org: n.org || '',
+        region: n.region || '', due: n.due || '', budget: n.budget || 0, url: n.url || '',
+        matched: Array.isArray(n.matched) ? n.matched : [], status: 'new', created: today, updated: today });
+      byId[n.id] = doc.items[doc.items.length - 1];
+      added++;
+    } else {
+      let ch = false;
+      ['title', 'org', 'region', 'due', 'budget', 'url'].forEach(function (k) { if (n[k] && n[k] !== cur[k]) { cur[k] = n[k]; ch = true; } });
+      if (ch) { cur.updated = today; updated++; }
+    }
+  }
+  if (added || updated) {
+    doc.updated_by = 'bids-bot'; doc.updated_at = Date.now();
+    const w = await blobSet(st, colKey('bids'), doc);
+    if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
+    try { await appendAudit({ ts: Date.now(), by: '수집봇', bid: 'bot', col: 'bids', ev: [{ op: '수집', id: '', t: '신규 ' + added + ' · 갱신 ' + updated }] }); } catch (e) {}
+  }
+  return jr(200, { status: 'OK', added: added, updated: updated, total: doc.items.length, request_id: R });
+}
+
 // 감사 로그 조회(관리자 전용). month='YYYY-MM' 미지정 시 이번 달.
 async function handleAudit(event, d, R) {
   const c = await currentMember(event);
@@ -114,6 +152,7 @@ async function handler(event) {
     if (d && d.action === 'get') return await handleGet(event, d, R);
     if (d && d.action === 'save') return await handleSave(event, d, R);
     if (d && d.action === 'audit') return await handleAudit(event, d, R);
+    if (d && d.action === 'bids_ingest') return await handleBidsIngest(event, d, R);
     return jr(400, { status: 'REJECTED', error_code: 'UNKNOWN_ACTION', request_id: R });
   } catch (e) {
     return jr(500, { status: 'ERROR', error_code: 'HANDLER_FAILED', request_id: R });

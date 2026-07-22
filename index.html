@@ -793,6 +793,7 @@
     <button class="tab-btn" data-tab="rec" id="tabRecBtn">기성</button>
     <button class="tab-btn" data-tab="cli" id="tabCliBtn">거래처</button>
     <button class="tab-btn" data-tab="con" id="tabConBtn">계약</button>
+    <button class="tab-btn" data-tab="bid" id="tabBidBtn">일감 <span class="tab-badge hide" id="bidTabBadge">0</span></button>
     <button class="tab-btn perm-hidden" data-tab="hr" id="tabHrBtn">인사 <span class="tab-badge hide" id="hrTabBadge">0</span></button>
     <div class="nav-divider"></div>
     <div class="nav-group">업무</div>
@@ -969,6 +970,15 @@
     <button class="link-btn" id="docAddBtn">+ 문서 추가</button>
   </section>
 
+  <!-- 일감(입찰·영업 리드) -->
+  <section class="view" id="view-bid">
+    <div class="dash-sec" style="margin-bottom:8px;"><h2>일감 <span class="cnt" id="bidHead"></span></h2></div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;" id="bidFilterBar"></div>
+    <input type="search" id="bidSearch" placeholder="일감 검색(공고명·기관)" autocomplete="off" style="width:100%;padding:9px 12px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;font-size:14px;box-sizing:border-box;">
+    <div class="card" id="bidList"><div class="loading">불러오는 중…</div></div>
+    <button class="link-btn" id="bidAddBtn">+ 수동 등록 (사기업·기타)</button>
+  </section>
+
   <!-- 인사(대표·관리자 전용) -->
   <section class="view" id="view-hr">
     <div class="dash-sec" style="margin-bottom:8px;"><h2>인사 <span class="cnt" id="hrTotal"></span></h2></div>
@@ -1059,6 +1069,20 @@
     <div id="cliDetailBody" style="max-height:70vh;overflow:auto;"></div>
     <button class="primary" id="cliDetailEdit" style="display:none;">거래처 정보 수정</button>
     <button class="secondary" id="cliDetailClose">닫기</button>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="bidAddBackdrop">
+  <div class="modal">
+    <h3>일감 수동 등록</h3>
+    <p style="margin-bottom:10px;">사기업·협력사 포털 등 자동수집이 안 되는 건을 직접 등록합니다.</p>
+    <input type="text" id="baTitle" placeholder="공고명·건명" autocomplete="off">
+    <input type="text" id="baOrg" placeholder="발주처" autocomplete="off">
+    <span class="fld-label">마감일</span>
+    <input type="date" id="baDue">
+    <input type="text" id="baUrl" placeholder="원문 링크 (선택)" autocomplete="off">
+    <button class="primary" id="baSave">등록</button>
+    <button class="secondary" id="baCancel">취소</button>
   </div>
 </div>
 
@@ -1486,6 +1510,7 @@
   var MYTASKS_PATH = "data/mytasks.json";
   var LEAVES_PATH = "data/leaves.json";
   var USERS_PATH = "data/users.json";
+  var BIDS_PATH = "data/bids.json";
   var CHECK_API = API_ROOT + CHECK_PATH;
   var TASKS_API = API_ROOT + TASKS_PATH;
   var VEH_API = API_ROOT + VEH_PATH;
@@ -1497,6 +1522,7 @@
   var MYTASKS_API = API_ROOT + MYTASKS_PATH;
   var LEAVES_API = API_ROOT + LEAVES_PATH;
   var USERS_API = API_ROOT + USERS_PATH;
+  var BIDS_API = API_ROOT + BIDS_PATH;
 
   var TOKEN_KEY = "jw_app_token";
   var USER_KEY = "jw_app_user";
@@ -1509,15 +1535,15 @@
   var MEMBER_KEY = "jw_app_member";
 
   // 모듈 레지스트리 — 신규 탭 추가 시 여기 5곳(MODULES/MODULE_TAB/MODULE_VIEW/MOD_LABEL/ROLE_PRESET)에 등록하면 권한관리 UI·게이팅에 자동 반영. 모듈 id = 백엔드 gw-data COL 권한키와 일치시킬 것.
-  var MODULES = ["tasks", "veh", "rec", "lic", "check", "con", "cli", "doc"];
-  var MODULE_TAB = {tasks:"tabTasksBtn", veh:"tabVehBtn", rec:"tabRecBtn", lic:"tabLicBtn", check:"tabCheckBtn", con:"tabConBtn", cli:"tabCliBtn", doc:"tabDocBtn"};
-  var MODULE_VIEW = {tasks:"view-tasks", veh:"view-veh", rec:"view-rec", lic:"view-lic", check:"view-check", con:"view-con", cli:"view-cli", doc:"view-doc"};
+  var MODULES = ["tasks", "veh", "rec", "lic", "check", "con", "cli", "doc", "bid"];
+  var MODULE_TAB = {tasks:"tabTasksBtn", veh:"tabVehBtn", rec:"tabRecBtn", lic:"tabLicBtn", check:"tabCheckBtn", con:"tabConBtn", cli:"tabCliBtn", doc:"tabDocBtn", bid:"tabBidBtn"};
+  var MODULE_VIEW = {tasks:"view-tasks", veh:"view-veh", rec:"view-rec", lic:"view-lic", check:"view-check", con:"view-con", cli:"view-cli", doc:"view-doc", bid:"view-bid"};
   var ROLE_PRESET = {
-    "대표":   {admin:true,  perms:{tasks:"do", veh:"do", rec:"do", lic:"do", check:"do", con:"do", cli:"do", doc:"do"}},
-    "관리자": {admin:true,  perms:{tasks:"do", veh:"do", rec:"do", lic:"do", check:"do", con:"do", cli:"do", doc:"do"}},
-    "팀장":   {admin:false, perms:{tasks:"do", veh:"do", rec:"do", lic:"do", check:"do", con:"view", cli:"view", doc:"view"}},
-    "직원":   {admin:false, perms:{tasks:"do", veh:"view", rec:"view", lic:"view", check:"do", con:"view", cli:"view", doc:"view"}},
-    "현장직": {admin:false, perms:{tasks:"do", veh:"view", rec:"hide", lic:"hide", check:"do", con:"hide", cli:"hide", doc:"view"}}
+    "대표":   {admin:true,  perms:{tasks:"do", veh:"do", rec:"do", lic:"do", check:"do", con:"do", cli:"do", doc:"do", bid:"do"}},
+    "관리자": {admin:true,  perms:{tasks:"do", veh:"do", rec:"do", lic:"do", check:"do", con:"do", cli:"do", doc:"do", bid:"do"}},
+    "팀장":   {admin:false, perms:{tasks:"do", veh:"do", rec:"do", lic:"do", check:"do", con:"view", cli:"view", doc:"view", bid:"hide"}},
+    "직원":   {admin:false, perms:{tasks:"do", veh:"view", rec:"view", lic:"view", check:"do", con:"view", cli:"view", doc:"view", bid:"hide"}},
+    "현장직": {admin:false, perms:{tasks:"do", veh:"view", rec:"hide", lic:"hide", check:"do", con:"hide", cli:"hide", doc:"view", bid:"hide"}}
   };
   // 직급(정보용)·부서 목록 — 서열 순서(공개범위·결재라인에서 사용)
   var RANK_LIST = ["대표","이사","부장","차장","과장","대리","주임","사원"];
@@ -1715,6 +1741,7 @@
     if (u.indexOf("clients.json") >= 0) return "clients";
     if (u.indexOf("contracts.json") >= 0) return "contracts";
     if (u.indexOf("leaves.json") >= 0) return "leaves";
+    if (u.indexOf("bids.json") >= 0) return "bids";
     return null;
   }
   function onSessionInvalid(){ setGwToken(null); curMemberObj = null; if (typeof showMemberLogin === "function") showMemberLogin(); }
@@ -3082,10 +3109,12 @@
     document.getElementById("view-hr").classList.toggle("active", name === "hr");
     document.getElementById("view-perm").classList.toggle("active", name === "perm");
     document.getElementById("view-leave").classList.toggle("active", name === "leave");
+    document.getElementById("view-bid").classList.toggle("active", name === "bid");
     if (name === "cal") renderCalendar();
     if (name === "hr") renderHrRoster();
     if (name === "perm") renderPermMgmt();
     if (name === "leave") renderLeaves();
+    if (name === "bid") renderBids();
   }
 
   // ---- 캘린더(통합 만기·마감) ----
@@ -3237,6 +3266,11 @@
   document.getElementById("auditBackdrop").addEventListener("click", function(e){ if(e.target===this) this.classList.remove("show"); });
   document.getElementById("auditPrev").addEventListener("click", function(){ auditMonthShift(-1); });
   document.getElementById("auditNext").addEventListener("click", function(){ auditMonthShift(1); });
+  document.getElementById("bidAddBtn").addEventListener("click", openBidAdd);
+  document.getElementById("baSave").addEventListener("click", saveBidAdd);
+  document.getElementById("baCancel").addEventListener("click", function(){ document.getElementById("bidAddBackdrop").classList.remove("show"); });
+  document.getElementById("bidAddBackdrop").addEventListener("click", function(e){ if(e.target===this) this.classList.remove("show"); });
+  document.getElementById("bidSearch").addEventListener("input", function(){ bidSearchTerm=this.value.toLowerCase().trim(); renderBids(); });
   document.getElementById("meSave").addEventListener("click", saveMemberEdit);
   document.getElementById("meReinstate").addEventListener("click", doReinstate);
   document.getElementById("meDelete").addEventListener("click", deleteMemberEdit);
@@ -3736,6 +3770,7 @@
     if (seeVeh || seeLic) tiles += '<div class="stat-tile' + (overdueTot ? ' alert' : '') + '"><div class="lbl">만기 임박</div><div class="val">' + imminentTot + '<span class="unit">건</span></div></div>';
     tiles += '<div class="stat-tile"><div class="lbl">미완료 지시</div><div class="val">' + openTasks.length + '<span class="unit">건</span></div></div>';
     tiles += '<div class="stat-tile"><div class="lbl">결재 대기</div><div class="val">' + reviewCount + '<span class="unit">건</span></div></div>';
+    if (canSee("bid")){ var bidN = bidNewCount(); if (bidN) tiles += '<div class="stat-tile alert"><div class="lbl">새 일감</div><div class="val">' + bidN + '<span class="unit">건</span></div></div>'; }
     var myChecks = myCheckCount();
     if (canSee("check") || myChecks) tiles += '<div class="stat-tile"><div class="lbl">주기업무</div><div class="val">' + myChecks + '<span class="unit">건</span></div></div>';
     var html = '<div class="dash-date">' + today + '</div>' + (tiles ? '<div class="stat-row">' + tiles + '</div>' : '');
@@ -4635,6 +4670,109 @@
     scheduleLeavesSave();
     document.getElementById("leaveBackdrop").classList.remove("show");
     renderLeaves(); renderDashboard();
+  }
+
+  // ---- 일감(bids.json) — 입찰·영업 리드 (수집봇 자동 + 수동 등록) ----
+  var bids = [];
+  var bidsSha = null, bidsSaveTimer = null, bidsPending = false, bidSearchTerm = "", bidStatusFilter = "all";
+  var BID_STATUSES = [["new","신규"],["검토","검토"],["참여","참여"],["패스","패스"]];
+  function findBid(id){ for(var i=0;i<bids.length;i++){ if(bids[i].id===id) return bids[i]; } return null; }
+  function liveBids(){ return bids.filter(function(b){ return b && b.del!==1; }); }
+  function loadBids(){
+    var token=getToken(); if(!token) return;
+    fetch(BIDS_API, {headers:ghHeaders()}).then(function(resp){
+      if(resp.status===404){ bidsSha=null; bids=[]; renderBids(); return; }
+      if(!resp.ok) throw new Error("HTTP "+resp.status);
+      return resp.json().then(function(json){ bidsSha=json.sha; var p=JSON.parse(b64DecodeUnicode(json.content)); var ri=(p&&p.items)||[]; bids = bidsPending ? mergeBidsLocal(bids, ri) : ri; renderBids(); renderDashboard(); });
+    }).catch(function(){});
+  }
+  function scheduleBidsSave(){ bidsPending=true; if(bidsSaveTimer) clearTimeout(bidsSaveTimer); bidsSaveTimer=setTimeout(doSaveBids,1200); }
+  function mergeBidsLocal(local,remote){ var byId={}; (local||[]).forEach(function(b){if(b&&b.id)byId[b.id]=b;}); (remote||[]).forEach(function(x){if(!x||!x.id)return;var c=byId[x.id];if(!c){byId[x.id]=x;}else{var w=(x.updated||"")>(c.updated||"")?x:c;var m=Object.assign({},(w===x?c:x),w);if(c.del===1||x.del===1)m.del=1;byId[x.id]=m;}}); return Object.keys(byId).map(function(k){return byId[k];}); }
+  function doSaveBids(){
+    var token=getToken(); if(!token) return;
+    var body=JSON.stringify({schema:1,items:bids});
+    var payload={message:"bids: 업데이트",content:b64EncodeUnicode(body),branch:"main"};
+    if(bidsSha) payload.sha=bidsSha;
+    fetch(BIDS_API,{method:"PUT",headers:Object.assign({"Content-Type":"application/json"},ghHeaders()),body:JSON.stringify(payload)}).then(function(resp){
+      if(resp.status===401) return;
+      if(resp.status===409||resp.status===422){ return fetch(BIDS_API,{headers:ghHeaders()}).then(function(r){return r.status===404?null:r.json();}).then(function(j){ if(j){var up={};try{up=JSON.parse(b64DecodeUnicode(j.content))||{};}catch(e){} bids=mergeBidsLocal(bids,up.items||[]); bidsSha=j.sha;} return doSaveBids(); }); }
+      return resp.json().then(function(json){ bidsSha=json.content&&json.content.sha; bidsPending=false; });
+    }).catch(function(){});
+  }
+  function bidNewCount(){ return liveBids().filter(function(b){ return b.status==="new"; }).length; }
+  function setBidStatus(id, st){
+    if(!canDo("bid")) return;
+    var b=findBid(id); if(!b) return;
+    b.status=st; b.updated=todayStr();
+    scheduleBidsSave(); renderBids(); renderDashboard();
+  }
+  function renderBids(){
+    var host=document.getElementById("bidList"); if(!host) return;
+    var all=liveBids();
+    // 필터바(상태 칩)
+    var fb=document.getElementById("bidFilterBar");
+    if(fb){
+      var counts={all:all.length}; BID_STATUSES.forEach(function(s){ counts[s[0]]=all.filter(function(b){return b.status===s[0];}).length; });
+      var chips=[["all","전체"]].concat(BID_STATUSES);
+      fb.innerHTML=chips.map(function(c){
+        var on=bidStatusFilter===c[0];
+        return '<button class="mini-btn'+(on?' appr-btn':'')+'" data-bid-filter="'+c[0]+'">'+c[1]+' '+(counts[c[0]]||0)+'</button>';
+      }).join("");
+      Array.prototype.forEach.call(fb.querySelectorAll("[data-bid-filter]"),function(el){ el.addEventListener("click",function(){ bidStatusFilter=el.getAttribute("data-bid-filter"); renderBids(); }); });
+    }
+    var list=all.filter(function(b){
+      if(bidStatusFilter!=="all" && b.status!==bidStatusFilter) return false;
+      if(!bidSearchTerm) return true;
+      return ((b.title||"")+" "+(b.org||"")).toLowerCase().indexOf(bidSearchTerm)>=0;
+    });
+    // 정렬: 지역 가중 우선 → 마감 임박순(마감 없음은 뒤)
+    list.sort(function(a,b){
+      var ar=a.region?0:1, br=b.region?0:1; if(ar!==br) return ar-br;
+      return (a.due||"9999-99-99") < (b.due||"9999-99-99") ? -1 : 1;
+    });
+    var head=document.getElementById("bidHead");
+    if(head) head.textContent = all.length ? ("총 "+all.length+" · 신규 "+bidNewCount()) : "";
+    var today=todayStr();
+    host.innerHTML = list.length ? list.map(function(b){
+      var isNew=b.status==="new";
+      var dd = b.due ? ddayInfo(b.due) : null;
+      var meta=[];
+      meta.push('<span class="own-badge '+(b.source==="수동"?"lease":"self")+'">'+esc(b.source||"-")+'</span>');
+      if(b.org) meta.push('<span>'+esc(b.org)+'</span>');
+      if(b.region) meta.push('<span class="scope-chip">★ '+esc(b.region)+'</span>');
+      if(b.matched&&b.matched.length) meta.push('<span class="from-chip">'+esc(b.matched.join(","))+'</span>');
+      if(b.budget) meta.push('<span class="rec-amt">'+fmtAmount(b.budget)+'원</span>');
+      var ctrl='';
+      if(canDo("bid")){
+        BID_STATUSES.forEach(function(s){ if(s[0]!==b.status && s[0]!=="new") ctrl+='<button class="mini-btn'+(s[0]==="참여"?' appr-btn':'')+'" data-bid-st="'+s[0]+'" data-bid-id="'+b.id+'">'+s[1]+'</button>'; });
+      }
+      if(b.url) ctrl+='<a class="mini-btn" href="'+esc(b.url)+'" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center;">원문↗</a>';
+      var stChip = isNew ? '<span class="review-chip">신규</span>' : (b.status==="참여" ? '<span class="from-chip">참여</span>' : (b.status==="패스" ? '<span class="hold-chip">패스</span>' : '<span class="scope-chip">검토</span>'));
+      return '<div class="item" style="'+(isNew?'background:#F3F9F5;':'')+'"><div class="item-body">'+
+        '<div class="item-title" style="'+(isNew?'font-weight:800;':'')+'">'+esc(b.title||"-")+' '+stChip+'</div>'+
+        '<div class="item-meta">'+meta.join("")+(b.due?'<span>마감 '+esc(b.due)+'</span>':'')+'</div></div>'+
+        '<div class="task-ctrl">'+(dd?'<span class="dday '+(dd.cls||"")+'">'+dd.text+'</span>':'')+ctrl+'</div></div>';
+    }).join("") : '<div class="empty-line">'+(all.length?'조건에 맞는 일감이 없습니다.':'수집된 일감이 없습니다. (평일 아침 자동 수집)')+'</div>';
+    Array.prototype.forEach.call(host.querySelectorAll("[data-bid-st]"),function(el){
+      el.addEventListener("click",function(){ setBidStatus(el.getAttribute("data-bid-id"), el.getAttribute("data-bid-st")); });
+    });
+    var badge=document.getElementById("bidTabBadge");
+    if(badge){ var n=bidNewCount(); badge.textContent=n; badge.classList.toggle("hide",n===0||!canSee("bid")); badge.classList.toggle("red",n>0); }
+  }
+  function openBidAdd(){
+    if(!canDo("bid")) return;
+    document.getElementById("baTitle").value=""; document.getElementById("baOrg").value="";
+    document.getElementById("baDue").value=""; document.getElementById("baUrl").value="";
+    document.getElementById("bidAddBackdrop").classList.add("show");
+  }
+  function saveBidAdd(){
+    var t=document.getElementById("baTitle").value.trim(); if(!t){ alert("공고명을 입력하세요."); return; }
+    bids.push({ id:genId("bid"), source:"수동", kind:"입찰", title:t, org:document.getElementById("baOrg").value.trim(),
+      region:"", due:document.getElementById("baDue").value||"", budget:0, url:document.getElementById("baUrl").value.trim(),
+      matched:[], status:"new", created:todayStr(), updated:todayStr() });
+    scheduleBidsSave();
+    document.getElementById("bidAddBackdrop").classList.remove("show");
+    renderBids(); renderDashboard();
   }
 
   // ---- 거래처(clients.json) — 미수 자동 연동 ----
@@ -5937,7 +6075,7 @@
   // 로그인 성공 후: 권한 적용 + 데이터 로드 + (관리자면) 회원목록 로드
   function afterLogin(){
     applyPerms();
-    doLoad(); loadTasks(); loadVehicles(); loadReceivables(); loadLicenses(); loadDocuments(); loadClients(); loadContracts(); loadMyTasks(); loadLeaves();
+    doLoad(); loadTasks(); loadVehicles(); loadReceivables(); loadLicenses(); loadDocuments(); loadClients(); loadContracts(); loadMyTasks(); loadLeaves(); loadBids();
     loadMembers();   // 담당 배정 드롭다운용 — 관리자·직원 모두
     render();
     // 만기 자동생성은 지시·차량·인허가 로드가 모두 끝난 뒤 markLoadedForAutoGen에서 실행(중복 방지)
@@ -6175,7 +6313,7 @@
     hrOpenId = null;
   }
 
-  var MOD_LABEL = {tasks:"지시", veh:"차량", rec:"기성", lic:"인허가", check:"업무", con:"계약", cli:"거래처", doc:"문서함"};
+  var MOD_LABEL = {tasks:"지시", veh:"차량", rec:"기성", lic:"인허가", check:"업무", con:"계약", cli:"거래처", doc:"문서함", bid:"일감"};
   // ---- 감사 로그 뷰어(관리자 전용, 서버 기록 열람) ----
   var AUDIT_COL_LABEL = {tasks:"지시", vehicles:"차량", receivables:"기성", licenses:"인허가", checklist:"업무", documents:"문서함", clients:"거래처", contracts:"계약", leaves:"휴가", member:"회원", login:"로그인"};
   var AUDIT_FIELD_LABEL = {status:"상태", title:"제목", who:"담당", who_id:"담당", due:"기한", amount:"금액", paid:"입금", del:"삭제", scope:"공개범위", stage:"단계", cancel_req:"취소요청", name:"이름", role:"직책", rank:"직급", dept:"부서", admin:"관리자", perms:"권한", hire_date:"입사일", leave_date:"퇴사일", seq:"연번", annual_base:"잔여연차기준", annual_base_date:"기준일", annual_days:"연차수동", loa_days:"휴직누적", on_loa:"휴직중", loa_start:"휴직시작", loa_end:"휴직종료", annual_paid:"연차수당포함", emp_type:"고용형태", annual_basis:"연차기준", reason:"사유", approver:"승인자", done_by:"완료자", detail:"상세", recur:"반복", hl:"하이라이트", mismatch:"불일치", PIN:"PIN"};
@@ -6225,7 +6363,7 @@
     }).catch(function(){ body.innerHTML = '<div class="empty-line">통신 오류</div>'; });
   }
   // 권한관리(별도 화면) — 모듈별 권한만 편집. 사이드바 순서와 동일.
-  var PERM_ORDER = ["tasks","rec","cli","con","veh","lic","doc","check"];
+  var PERM_ORDER = ["tasks","rec","cli","con","bid","veh","lic","doc","check"];
   var permOpenId = null;
   function permModList(){ return PERM_ORDER.filter(function(x){ return MODULES.indexOf(x) >= 0; }); }
   function renderPermMgmt(){
