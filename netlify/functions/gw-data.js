@@ -169,26 +169,38 @@ async function handleBidsRefresh(event, d, R) {
   // 최근 1일(버튼은 당일 신규 확인용 — 3일 창은 아침 cron이 커버). 함수 시간제한 대비 페이지 상한.
   function fmt(t) { const dt = new Date(t); const p = (n) => String(n).padStart(2, '0'); return '' + dt.getFullYear() + p(dt.getMonth() + 1) + p(dt.getDate()); }
   const bgn = fmt(now - 1 * 86400000) + '0000', end = fmt(now) + '2359';
-  // 참가가능지역 맵(행 없음=전국). 우리(경북 포항) 자격 있는 공고만 수집.
+  // 함수 시간제한(10s) 대비 — 모든 G2B 호출을 병렬로 실행
+  async function g2bFetch(op, page) {
+    const q = new URLSearchParams({ serviceKey: key, inqryDiv: '1', type: 'json', inqryBgnDt: bgn, inqryEndDt: end, pageNo: String(page), numOfRows: '999' });
+    const resp = await fetch(G2B_BASE + op + '?' + q.toString());
+    if (!resp.ok) throw new Error('G2B HTTP ' + resp.status);
+    const j = await resp.json();
+    const body = ((j || {}).response || {}).body || {};
+    let items = body.items || [];
+    if (items && items.item) items = items.item;
+    if (!Array.isArray(items)) items = items ? [items] : [];
+    return { items: items, total: Number(body.totalCount || 0) };
+  }
+  async function g2bAll(op, maxPages) {
+    const first = await g2bFetch(op, 1);
+    let items = first.items;
+    const pages = Math.min(maxPages, Math.ceil(first.total / 999));
+    const rest = [];
+    for (let p = 2; p <= pages; p++) rest.push(g2bFetch(op, p));
+    (await Promise.all(rest)).forEach(function (r) { items = items.concat(r.items); });
+    return items;
+  }
+  const [rgnRows, licAllRows, servcItems, cnstwkItems] = await Promise.all([
+    g2bAll('getBidPblancListInfoPrtcptPsblRgn', 4),
+    g2bAll('getBidPblancListInfoLicenseLimit', 4),
+    g2bAll('getBidPblancListInfoServc', 3),
+    g2bAll('getBidPblancListInfoCnstwk', 3),
+  ]);
+  // 참가가능지역 맵(행 없음=전국)
   const rgnMap = {};
-  {
-    let page = 1;
-    while (page <= 4) {
-      const q = new URLSearchParams({ serviceKey: key, inqryDiv: '1', type: 'json', inqryBgnDt: bgn, inqryEndDt: end, pageNo: String(page), numOfRows: '999' });
-      const resp = await fetch(G2B_BASE + 'getBidPblancListInfoPrtcptPsblRgn?' + q.toString());
-      if (!resp.ok) break;
-      const j = await resp.json();
-      const body = ((j || {}).response || {}).body || {};
-      let items = body.items || [];
-      if (items && items.item) items = items.item;
-      if (!Array.isArray(items)) items = items ? [items] : [];
-      for (const it of items) {
-        const k = (it.bidNtceNo || '') + '-' + (it.bidNtceOrd || '');
-        (rgnMap[k] = rgnMap[k] || []).push(it.prtcptPsblRgnNm || '');
-      }
-      if (page * 999 >= Number(body.totalCount || 0)) break;
-      page++;
-    }
+  for (const it of rgnRows) {
+    const k = (it.bidNtceNo || '') + '-' + (it.bidNtceOrd || '');
+    (rgnMap[k] = rgnMap[k] || []).push(it.prtcptPsblRgnNm || '');
   }
   function rgnEligible(names) {
     // 반환 {ok, ref} — '공고서 참조'류는 판별 불가라 수집하고 표시(ref)만.
@@ -225,37 +237,14 @@ async function handleBidsRefresh(event, d, R) {
   }
   // 면허제한 맵
   const licMap = {};
-  {
-    let page = 1;
-    while (page <= 4) {
-      const q = new URLSearchParams({ serviceKey: key, inqryDiv: '1', type: 'json', inqryBgnDt: bgn, inqryEndDt: end, pageNo: String(page), numOfRows: '999' });
-      const resp = await fetch(G2B_BASE + 'getBidPblancListInfoLicenseLimit?' + q.toString());
-      if (!resp.ok) break;
-      const j = await resp.json();
-      const body = ((j || {}).response || {}).body || {};
-      let items = body.items || [];
-      if (items && items.item) items = items.item;
-      if (!Array.isArray(items)) items = items ? [items] : [];
-      for (const it of items) {
-        const k = (it.bidNtceNo || '') + '-' + (it.bidNtceOrd || '');
-        (licMap[k] = licMap[k] || []).push(String(it.lcnsLmtNm || '') + ' ' + String(it.permsnIndstrytyList || ''));
-      }
-      if (page * 999 >= Number(body.totalCount || 0)) break;
-      page++;
-    }
+  for (const it of licAllRows) {
+    const k = (it.bidNtceNo || '') + '-' + (it.bidNtceOrd || '');
+    (licMap[k] = licMap[k] || []).push(String(it.lcnsLmtNm || '') + ' ' + String(it.permsnIndstrytyList || ''));
   }
   const found = [];
-  for (const op of G2B_OPS) {
-    let page = 1;
-    while (page <= 3) {
-      const q = new URLSearchParams({ serviceKey: key, inqryDiv: '1', type: 'json', inqryBgnDt: bgn, inqryEndDt: end, pageNo: String(page), numOfRows: '999' });
-      const resp = await fetch(G2B_BASE + op + '?' + q.toString());
-      if (!resp.ok) throw new Error('G2B HTTP ' + resp.status);
-      const j = await resp.json();
-      const body = ((j || {}).response || {}).body || {};
-      let items = body.items || [];
-      if (items && items.item) items = items.item;
-      if (!Array.isArray(items)) items = items ? [items] : [];
+  {
+    {
+      const items = servcItems.concat(cnstwkItems);
       for (const it of items) {
         const nm = it.bidNtceNm || '';
         const org = it.ntceInsttNm || it.dminsttNm || '';
@@ -277,9 +266,6 @@ async function handleBidsRefresh(event, d, R) {
           title: nm, org: org, region: reg, due: String(it.bidClseDt || '').slice(0, 10).replace(/[./]/g, '-'),
           budget: budget, url: it.bidNtceUrl || it.bidNtceDtlUrl || '', matched: kw.concat(licHits.slice(0, 2).map((h) => '면허:' + h)), method: mlbl, rgn_ref: !!rgnChk.ref });
       }
-      const total = Number(body.totalCount || 0);
-      if (page * 999 >= total) break;
-      page++;
     }
   }
   const r = await blobGet(st, colKey('bids'));
