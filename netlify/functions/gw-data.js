@@ -167,6 +167,39 @@ async function handleBidsRefresh(event, d, R) {
   // 최근 1일(버튼은 당일 신규 확인용 — 3일 창은 아침 cron이 커버). 함수 시간제한 대비 페이지 상한.
   function fmt(t) { const dt = new Date(t); const p = (n) => String(n).padStart(2, '0'); return '' + dt.getFullYear() + p(dt.getMonth() + 1) + p(dt.getDate()); }
   const bgn = fmt(now - 1 * 86400000) + '0000', end = fmt(now) + '2359';
+  // 참가가능지역 맵(행 없음=전국). 우리(경북 포항) 자격 있는 공고만 수집.
+  const rgnMap = {};
+  {
+    let page = 1;
+    while (page <= 4) {
+      const q = new URLSearchParams({ serviceKey: key, inqryDiv: '1', type: 'json', inqryBgnDt: bgn, inqryEndDt: end, pageNo: String(page), numOfRows: '999' });
+      const resp = await fetch(G2B_BASE + 'getBidPblancListInfoPrtcptPsblRgn?' + q.toString());
+      if (!resp.ok) break;
+      const j = await resp.json();
+      const body = ((j || {}).response || {}).body || {};
+      let items = body.items || [];
+      if (items && items.item) items = items.item;
+      if (!Array.isArray(items)) items = items ? [items] : [];
+      for (const it of items) {
+        const k = (it.bidNtceNo || '') + '-' + (it.bidNtceOrd || '');
+        (rgnMap[k] = rgnMap[k] || []).push(it.prtcptPsblRgnNm || '');
+      }
+      if (page * 999 >= Number(body.totalCount || 0)) break;
+      page++;
+    }
+  }
+  function rgnEligible(names) {
+    if (!names || !names.length) return true;   // 지역 행 없음 = 전국
+    for (let nm of names) {
+      nm = String(nm || '').trim();
+      if (!nm) continue;
+      if (nm.indexOf('전국') >= 0 || nm.indexOf('제한없음') >= 0) return true;
+      if (nm.indexOf('포항') >= 0) return true;
+      const flat = nm.replace(/ /g, '');
+      if (flat === '경상북도' || flat === '경북') return true;   // 도 단위 제한(타 시군 제한은 제외)
+    }
+    return false;
+  }
   const found = [];
   for (const op of G2B_OPS) {
     let page = 1;
@@ -185,6 +218,7 @@ async function handleBidsRefresh(event, d, R) {
         const flat = nm.replace(/ /g, '');
         const kw = BID_KEYWORDS.filter((k) => flat.indexOf(k) >= 0);
         if (!kw.length) continue;
+        if (!rgnEligible(rgnMap[(it.bidNtceNo || '') + '-' + (it.bidNtceOrd || '')])) continue;   // 지역제한 미해당 제외
         const regTxt = org + ' ' + (it.rgnLmtBidLocplcNm || '');
         const reg = BID_REGIONS.find((g) => regTxt.indexOf(g) >= 0) || '';
         let budget = 0; const bp = Number(it.presmptPrce || 0); if (!isNaN(bp)) budget = Math.floor(bp);
