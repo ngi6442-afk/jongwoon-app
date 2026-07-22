@@ -4752,7 +4752,7 @@
     // 필터바(상태 칩)
     var fb=document.getElementById("bidFilterBar");
     if(fb){
-      var counts={all:all.length}; BID_STATUSES.forEach(function(s){ counts[s[0]]=all.filter(function(b){return b.status===s[0];}).length; });
+      var counts={all:all.filter(function(b){return b.status!=="패스";}).length}; BID_STATUSES.forEach(function(s){ counts[s[0]]=all.filter(function(b){return b.status===s[0];}).length; });
       var chips=[["all","전체"]].concat(BID_STATUSES);
       fb.innerHTML=chips.map(function(c){
         var on=bidStatusFilter===c[0];
@@ -4761,7 +4761,8 @@
       Array.prototype.forEach.call(fb.querySelectorAll("[data-bid-filter]"),function(el){ el.addEventListener("click",function(){ bidStatusFilter=el.getAttribute("data-bid-filter"); renderBids(); }); });
     }
     var list=all.filter(function(b){
-      if(bidStatusFilter!=="all" && b.status!==bidStatusFilter) return false;
+      if(bidStatusFilter==="all"){ if(b.status==="패스") return false; }   // 전체 보기에서 패스는 숨김(패스 칩에서만)
+      else if(b.status!==bidStatusFilter) return false;
       if(!bidSearchTerm) return true;
       return ((b.title||"")+" "+(b.org||"")).toLowerCase().indexOf(bidSearchTerm)>=0;
     });
