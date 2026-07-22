@@ -792,8 +792,7 @@
     <button class="tab-btn" data-tab="tasks" id="tabTasksBtn">지시 <span class="tab-badge hide" id="taskTabBadge">0</span></button>
     <button class="tab-btn" data-tab="rec" id="tabRecBtn">기성</button>
     <button class="tab-btn" data-tab="cli" id="tabCliBtn">거래처</button>
-    <button class="tab-btn" data-tab="con" id="tabConBtn">계약</button>
-    <button class="tab-btn" data-tab="bid" id="tabBidBtn">일감 <span class="tab-badge hide" id="bidTabBadge">0</span></button>
+    <button class="tab-btn" data-tab="con" id="tabConBtn">일감·계약 <span class="tab-badge hide" id="bidTabBadge">0</span></button>
     <button class="tab-btn perm-hidden" data-tab="hr" id="tabHrBtn">인사 <span class="tab-badge hide" id="hrTabBadge">0</span></button>
     <div class="nav-divider"></div>
     <div class="nav-group">업무</div>
@@ -946,9 +945,16 @@
     <button class="link-btn" id="licAddBtn">+ 인허가 추가</button>
   </section>
 
-  <!-- 계약·프로세스 -->
+  <!-- 일감·계약 (영업 파이프라인: 일감 → 참여 → 계약) -->
   <section class="view" id="view-con">
-    <div class="dash-sec" style="margin-bottom:8px;"><h2>계약 <span class="cnt" id="conHead"></span></h2></div>
+    <div id="bidSection">
+      <div class="dash-sec" style="margin-bottom:8px;"><h2>일감 <span class="cnt" id="bidHead"></span></h2></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;" id="bidFilterBar"></div>
+      <input type="search" id="bidSearch" placeholder="일감 검색(공고명·기관)" autocomplete="off" style="width:100%;padding:9px 12px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;font-size:14px;box-sizing:border-box;">
+      <div class="card" id="bidList"><div class="loading">불러오는 중…</div></div>
+      <button class="link-btn" id="bidAddBtn">+ 수동 등록 (사기업·기타)</button>
+    </div>
+    <div class="dash-sec" style="margin:14px 0 8px;"><h2>계약 <span class="cnt" id="conHead"></span></h2></div>
     <button class="link-btn" id="conStartBtn">+ 계약 시작</button>
     <button class="link-btn" id="docGenBtn">+ 서류 출력</button>
     <div class="card" id="conList"><div class="loading">불러오는 중…</div></div>
@@ -968,15 +974,6 @@
     <input type="search" id="docSearch" placeholder="문서 검색(제목·번호)" autocomplete="off" style="width:100%;padding:9px 12px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;font-size:14px;box-sizing:border-box;">
     <div class="card" id="docList"><div class="loading">불러오는 중…</div></div>
     <button class="link-btn" id="docAddBtn">+ 문서 추가</button>
-  </section>
-
-  <!-- 일감(입찰·영업 리드) -->
-  <section class="view" id="view-bid">
-    <div class="dash-sec" style="margin-bottom:8px;"><h2>일감 <span class="cnt" id="bidHead"></span></h2></div>
-    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;" id="bidFilterBar"></div>
-    <input type="search" id="bidSearch" placeholder="일감 검색(공고명·기관)" autocomplete="off" style="width:100%;padding:9px 12px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;font-size:14px;box-sizing:border-box;">
-    <div class="card" id="bidList"><div class="loading">불러오는 중…</div></div>
-    <button class="link-btn" id="bidAddBtn">+ 수동 등록 (사기업·기타)</button>
   </section>
 
   <!-- 인사(대표·관리자 전용) -->
@@ -1537,8 +1534,8 @@
 
   // 모듈 레지스트리 — 신규 탭 추가 시 여기 5곳(MODULES/MODULE_TAB/MODULE_VIEW/MOD_LABEL/ROLE_PRESET)에 등록하면 권한관리 UI·게이팅에 자동 반영. 모듈 id = 백엔드 gw-data COL 권한키와 일치시킬 것.
   var MODULES = ["tasks", "veh", "rec", "lic", "check", "con", "cli", "doc", "bid"];
-  var MODULE_TAB = {tasks:"tabTasksBtn", veh:"tabVehBtn", rec:"tabRecBtn", lic:"tabLicBtn", check:"tabCheckBtn", con:"tabConBtn", cli:"tabCliBtn", doc:"tabDocBtn", bid:"tabBidBtn"};
-  var MODULE_VIEW = {tasks:"view-tasks", veh:"view-veh", rec:"view-rec", lic:"view-lic", check:"view-check", con:"view-con", cli:"view-cli", doc:"view-doc", bid:"view-bid"};
+  var MODULE_TAB = {tasks:"tabTasksBtn", veh:"tabVehBtn", rec:"tabRecBtn", lic:"tabLicBtn", check:"tabCheckBtn", con:"tabConBtn", cli:"tabCliBtn", doc:"tabDocBtn"};  // bid는 계약 탭 내 섹션(자체 탭 없음)
+  var MODULE_VIEW = {tasks:"view-tasks", veh:"view-veh", rec:"view-rec", lic:"view-lic", check:"view-check", con:"view-con", cli:"view-cli", doc:"view-doc"};  // bid 섹션은 applyPerms에서 canSee로 표시
   var ROLE_PRESET = {
     "대표":   {admin:true,  perms:{tasks:"do", veh:"do", rec:"do", lic:"do", check:"do", con:"do", cli:"do", doc:"do", bid:"do"}},
     "관리자": {admin:true,  perms:{tasks:"do", veh:"do", rec:"do", lic:"do", check:"do", con:"do", cli:"do", doc:"do", bid:"do"}},
@@ -3088,7 +3085,7 @@
   });
 
   // ---- 탭 ----
-  var TAB_LABELS = {dash:"홈",tasks:"지시",rec:"기성",cli:"거래처",con:"계약",hr:"인사",cal:"캘린더",veh:"차량",lic:"인허가",doc:"문서함",check:"업무",leave:"휴가",perm:"권한관리"};
+  var TAB_LABELS = {dash:"홈",tasks:"지시",rec:"기성",cli:"거래처",con:"일감·계약",hr:"인사",cal:"캘린더",veh:"차량",lic:"인허가",doc:"문서함",check:"업무",leave:"휴가",perm:"권한관리"};
   function closeNav(){ var tb=document.getElementById("tabbar"); if(tb) tb.classList.remove("open"); }
   function updateNavToggle(name){ var nt=document.getElementById("navToggle"); if(nt) nt.textContent = "☰"; }
   function switchTab(name){
@@ -3110,12 +3107,12 @@
     document.getElementById("view-hr").classList.toggle("active", name === "hr");
     document.getElementById("view-perm").classList.toggle("active", name === "perm");
     document.getElementById("view-leave").classList.toggle("active", name === "leave");
-    document.getElementById("view-bid").classList.toggle("active", name === "bid");
+    
     if (name === "cal") renderCalendar();
     if (name === "hr") renderHrRoster();
     if (name === "perm") renderPermMgmt();
     if (name === "leave") renderLeaves();
-    if (name === "bid") renderBids();
+    if (name === "con") renderBids();
   }
 
   // ---- 캘린더(통합 만기·마감) ----
@@ -5990,6 +5987,9 @@
     var showCheck = canSee("check");
     Array.prototype.forEach.call(document.querySelectorAll(".check-only"), function(el){ el.style.display = showCheck ? "" : "none"; });
     if (currentTab !== "dash" && currentTab !== "check" && MODULES.indexOf(currentTab) >= 0 && !canSee(currentTab)) switchTab("dash");
+    // 일감 섹션(계약 탭 내): bid 권한으로 표시 게이팅
+    var bidSec = document.getElementById("bidSection");
+    if (bidSec) bidSec.style.display = canSee("bid") ? "" : "none";
     // 인사 탭: 대표·관리자 전용
     var adminUser = isAdmin();
     var hrBtn = document.getElementById("tabHrBtn");
