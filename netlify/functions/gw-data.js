@@ -337,6 +337,7 @@ async function handler(event) {
     if (d && d.action === 'bids_ingest') return await handleBidsIngest(event, d, R);
     if (d && d.action === 'bids_refresh') return await handleBidsRefresh(event, d, R);
     if (d && d.action === 'bids_purge') return await handleBidsPurge(event, d, R);
+    if (d && d.action === 'bids_export') return await handleBidsExport(event, d, R);
     return jr(400, { status: 'REJECTED', error_code: 'UNKNOWN_ACTION', request_id: R });
   } catch (e) {
     return jr(500, { status: 'ERROR', error_code: 'HANDLER_FAILED', request_id: R });
