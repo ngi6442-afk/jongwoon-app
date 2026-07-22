@@ -11,7 +11,7 @@ const { appendAudit, auditKey, diffItems } = require('./_lib/audit');
 const DATA = 'gw_data';
 const USERS = 'gw_users';
 // 컬렉션 → 권한키
-const COL = { tasks: 'tasks', vehicles: 'veh', receivables: 'rec', licenses: 'lic', checklist: 'check', documents: 'doc', clients: 'cli', contracts: 'con', leaves: 'leaves', bids: 'bid' };
+const COL = { tasks: 'tasks', vehicles: 'veh', receivables: 'rec', licenses: 'lic', checklist: 'check', documents: 'doc', clients: 'cli', contracts: 'con', leaves: 'leaves', bids: 'bid', onbid: 'bid' };  // onbid=공매·부동산(관리자 전용)
 // 사용자별 비공개 컬렉션(본인만 접근, 회원 id로 분리 저장)
 const PRIVATE_COL = { mytasks: true };
 
@@ -52,8 +52,8 @@ async function handleGet(event, d, R) {
   }
   const col = d.collection;
   if (!COL[col]) return jr(400, { status: 'REJECTED', error_code: 'UNKNOWN_COLLECTION', request_id: R });
-  // 일감(bids)은 관리자 전용 — 개별 권한과 무관하게 서버측 강제
-  if (col === 'bids' && !c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
+  // 일감(bids)·공매(onbid)는 관리자 전용 — 개별 권한과 무관하게 서버측 강제
+  if ((col === 'bids' || col === 'onbid') && !c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
   const p = permOf(c.member, col);
   // tasks: 개인 인박스('내게 온 지시')·홈 미완료지시는 권한과 무관하게 노출해야 하므로 hide여도 읽기 허용.
   // 가시성(담당/전사/공개범위) 필터는 프런트에서. 쓰기는 여전히 'do' 필요.
@@ -78,7 +78,7 @@ async function handleSave(event, d, R) {
   if (!COL[col]) return jr(400, { status: 'REJECTED', error_code: 'UNKNOWN_COLLECTION', request_id: R });
   // tasks: 직원(권한 do 아님)도 '내게 온 지시'를 완료(→승인대기)/보류하려면 저장이 필요 → 승인제 성립.
   // tasks 쓰기는 인증·인가 회원이면 허용(프런트 canActTask로 자기 업무만 조작, UI 권한 구분이지 하드보안 아님).
-  if (col === 'bids' && !c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
+  if ((col === 'bids' || col === 'onbid') && !c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
   if (permOf(c.member, col) !== 'do' && col !== 'tasks' && col !== 'leaves') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_WRITE', request_id: R });
   if (!d.doc || typeof d.doc !== 'object') return jr(400, { status: 'REJECTED', error_code: 'INVALID_DOC', request_id: R });
   // 감사 로그용 이전 문서(diff 원본) — 읽기 실패해도 저장은 진행
@@ -108,13 +108,13 @@ function mergeBidItems(doc, items) {
     if (!cur) {
       doc.items.push({ id: n.id, source: n.source || '', kind: n.kind || '입찰', title: n.title || '', org: n.org || '',
         region: n.region || '', due: n.due || '', budget: n.budget || 0, url: n.url || '',
-        matched: Array.isArray(n.matched) ? n.matched : [], method: n.method || '', rgn_ref: !!n.rgn_ref,
+        matched: Array.isArray(n.matched) ? n.matched : [], method: n.method || '', rgn_ref: !!n.rgn_ref, appr: n.appr || 0,
         status: (n.status === '패스' ? '패스' : 'new'), auto_pass: !!n.auto_pass, created: today, updated: today });
       byId[n.id] = doc.items[doc.items.length - 1];
       added++;
     } else {
       let ch = false;
-      ['title', 'org', 'region', 'due', 'budget', 'url', 'method'].forEach(function (k) { if (n[k] && n[k] !== cur[k]) { cur[k] = n[k]; ch = true; } });
+      ['title', 'org', 'region', 'due', 'budget', 'url', 'method', 'appr', 'kind'].forEach(function (k) { if (n[k] && n[k] !== cur[k]) { cur[k] = n[k]; ch = true; } });
       if (cur.rgn_ref && n.rgn_ref === false) { cur.rgn_ref = false; ch = true; }   // 공고서 판독 확인 반영
       if (ch) { cur.updated = today; updated++; }
     }
@@ -134,13 +134,16 @@ async function handleBidsIngest(event, d, R) {
   const secret = (process.env.BIDS_INGEST_KEY || '').trim();
   if (!secret || String(d.key || '').trim() !== secret) return jr(403, { status: 'FORBIDDEN', error_code: 'BAD_INGEST_KEY', request_id: R });
   if (!Array.isArray(d.items)) return jr(400, { status: 'REJECTED', error_code: 'INVALID_ITEMS', request_id: R });
+  const target = (d.col === 'onbid') ? 'onbid' : 'bids';
   const st = store(DATA);
-  const r = await blobGet(st, colKey('bids'));
+  const r = await blobGet(st, colKey(target));
   const doc = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data : { schema: 1, items: [] };
   const m = mergeBidItems(doc, d.items);
   if (m.added || m.updated) {
-    const err = await saveBidsDoc(st, doc, '수집봇', m.added, m.updated, R);
-    if (err) return err;
+    doc.updated_by = '수집봇'; doc.updated_at = Date.now();
+    const w = await blobSet(st, colKey(target), doc);
+    if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
+    try { await appendAudit({ ts: Date.now(), by: '수집봇', bid: 'bot', col: target, ev: [{ op: '수집', id: '', t: '신규 ' + m.added + ' · 갱신 ' + m.updated }] }); } catch (e) {}
   }
   return jr(200, { status: 'OK', added: m.added, updated: m.updated, total: doc.items.length, request_id: R });
 }

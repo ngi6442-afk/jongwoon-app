@@ -959,6 +959,14 @@
     <button class="link-btn" id="conStartBtn">+ 계약 시작</button>
     <button class="link-btn" id="docGenBtn">+ 서류 출력</button>
     <div class="card" id="conList"><div class="loading">불러오는 중…</div></div>
+    <div id="onbidSection">
+      <div class="dash-sec" style="margin:18px 0 8px;"><h2>공매·부동산 (온비드) <span class="cnt" id="obHead"></span></h2></div>
+      <div style="font-size:12px;color:var(--sub);margin:-4px 0 8px;">전국 · 매각 · 감정가 5억~50억 · 토지/공장·산업/상가·업무. 마감 임박순, 150건씩 표시.</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;" id="obFilterBar"></div>
+      <input type="search" id="obSearch" placeholder="소재지·물건 검색 (예: 포항, 경상북도)" autocomplete="off" style="width:100%;padding:9px 12px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;font-size:14px;box-sizing:border-box;">
+      <div class="card" id="obList"><div class="loading">불러오는 중…</div></div>
+      <button class="link-btn" id="obMoreBtn" style="display:none;">더보기</button>
+    </div>
   </section>
 
   <!-- 거래처 -->
@@ -1510,6 +1518,7 @@
   var LEAVES_PATH = "data/leaves.json";
   var USERS_PATH = "data/users.json";
   var BIDS_PATH = "data/bids.json";
+  var ONBID_PATH = "data/onbid.json";
   var CHECK_API = API_ROOT + CHECK_PATH;
   var TASKS_API = API_ROOT + TASKS_PATH;
   var VEH_API = API_ROOT + VEH_PATH;
@@ -1522,6 +1531,7 @@
   var LEAVES_API = API_ROOT + LEAVES_PATH;
   var USERS_API = API_ROOT + USERS_PATH;
   var BIDS_API = API_ROOT + BIDS_PATH;
+  var ONBID_API = API_ROOT + ONBID_PATH;
 
   var TOKEN_KEY = "jw_app_token";
   var USER_KEY = "jw_app_user";
@@ -1741,6 +1751,7 @@
     if (u.indexOf("contracts.json") >= 0) return "contracts";
     if (u.indexOf("leaves.json") >= 0) return "leaves";
     if (u.indexOf("bids.json") >= 0) return "bids";
+    if (u.indexOf("onbid.json") >= 0) return "onbid";
     return null;
   }
   function onSessionInvalid(){ setGwToken(null); curMemberObj = null; if (typeof showMemberLogin === "function") showMemberLogin(); }
@@ -3113,7 +3124,7 @@
     if (name === "hr") renderHrRoster();
     if (name === "perm") renderPermMgmt();
     if (name === "leave") renderLeaves();
-    if (name === "con") renderBids();
+    if (name === "con"){ renderBids(); renderOnbid(); }
   }
 
   // ---- 캘린더(통합 만기·마감) ----
@@ -3270,6 +3281,8 @@
   document.getElementById("baCancel").addEventListener("click", function(){ document.getElementById("bidAddBackdrop").classList.remove("show"); });
   document.getElementById("bidAddBackdrop").addEventListener("click", function(e){ if(e.target===this) this.classList.remove("show"); });
   document.getElementById("bidSearch").addEventListener("input", function(){ bidSearchTerm=this.value.toLowerCase().trim(); renderBids(); });
+  document.getElementById("obSearch").addEventListener("input", function(){ obSearchTerm=this.value.toLowerCase().trim(); obShow=150; renderOnbid(); });
+  document.getElementById("obMoreBtn").addEventListener("click", function(){ obShow+=150; renderOnbid(); });
   document.getElementById("bidRefreshBtn").addEventListener("click", function(){
     var btn = this;
     if (btn.disabled) return;
@@ -4816,6 +4829,90 @@
     renderBids(); renderDashboard();
   }
 
+  // ---- 공매·부동산(onbid.json) — 온비드, 일감과 분리 ----
+  var onbids = [];
+  var onbidSha = null, onbidSaveTimer = null, onbidPending = false, obSearchTerm = "", obStatusFilter = "all", obKindFilter = "all", obShow = 150;
+  function findOb(id){ for(var i=0;i<onbids.length;i++){ if(onbids[i].id===id) return onbids[i]; } return null; }
+  function liveObs(){ return onbids.filter(function(b){ return b && b.del!==1; }); }
+  function loadOnbid(){
+    var token=getToken(); if(!token) return;
+    fetch(ONBID_API, {headers:ghHeaders()}).then(function(resp){
+      if(resp.status===404){ onbidSha=null; onbids=[]; renderOnbid(); return; }
+      if(!resp.ok) throw new Error("HTTP "+resp.status);
+      return resp.json().then(function(json){ onbidSha=json.sha; var p=JSON.parse(b64DecodeUnicode(json.content)); var ri=(p&&p.items)||[]; onbids = onbidPending ? mergeBidsLocal(onbids, ri) : ri; renderOnbid(); });
+    }).catch(function(){});
+  }
+  function scheduleOnbidSave(){ onbidPending=true; if(onbidSaveTimer) clearTimeout(onbidSaveTimer); onbidSaveTimer=setTimeout(doSaveOnbid,1200); }
+  function doSaveOnbid(){
+    var token=getToken(); if(!token) return;
+    var body=JSON.stringify({schema:1,items:onbids});
+    var payload={message:"onbid: 업데이트",content:b64EncodeUnicode(body),branch:"main"};
+    if(onbidSha) payload.sha=onbidSha;
+    fetch(ONBID_API,{method:"PUT",headers:Object.assign({"Content-Type":"application/json"},ghHeaders()),body:JSON.stringify(payload)}).then(function(resp){
+      if(resp.status===401) return;
+      if(resp.status===409||resp.status===422){ return fetch(ONBID_API,{headers:ghHeaders()}).then(function(r){return r.status===404?null:r.json();}).then(function(j){ if(j){var up={};try{up=JSON.parse(b64DecodeUnicode(j.content))||{};}catch(e){} onbids=mergeBidsLocal(onbids,up.items||[]); onbidSha=j.sha;} return doSaveOnbid(); }); }
+      return resp.json().then(function(json){ onbidSha=json.content&&json.content.sha; onbidPending=false; });
+    }).catch(function(){});
+  }
+  function setObStatus(id, st){
+    if(!isAdmin()) return;
+    var b=findOb(id); if(!b) return;
+    b.status=st; b.updated=todayStr();
+    scheduleOnbidSave(); renderOnbid();
+  }
+  function renderOnbid(){
+    var host=document.getElementById("obList"); if(!host) return;
+    var sec=document.getElementById("onbidSection");
+    if(sec) sec.style.display = isAdmin() ? "" : "none";
+    if(!isAdmin()) return;
+    var all=liveObs();
+    var fb=document.getElementById("obFilterBar");
+    if(fb){
+      var sts=[["all","전체"],["new","신규"],["검토","검토"],["참여","참여"],["패스","패스"]];
+      var kinds=[["all","용도전체"],["토지","토지"],["공장·산업","공장·산업"],["상가·업무","상가·업무"]];
+      function cnt(st){ if(st==="all") return all.filter(function(b){return b.status!=="패스";}).length; return all.filter(function(b){return b.status===st;}).length; }
+      fb.innerHTML = sts.map(function(c){ return '<button class="mini-btn'+(obStatusFilter===c[0]?' appr-btn':'')+'" data-ob-st-f="'+c[0]+'">'+c[1]+' '+cnt(c[0])+'</button>'; }).join("")
+        + '<span style="width:8px"></span>'
+        + kinds.map(function(c){ return '<button class="mini-btn'+(obKindFilter===c[0]?' appr-btn':'')+'" data-ob-kd-f="'+c[0]+'">'+c[1]+'</button>'; }).join("");
+      Array.prototype.forEach.call(fb.querySelectorAll("[data-ob-st-f]"),function(el){ el.addEventListener("click",function(){ obStatusFilter=el.getAttribute("data-ob-st-f"); obShow=150; renderOnbid(); }); });
+      Array.prototype.forEach.call(fb.querySelectorAll("[data-ob-kd-f]"),function(el){ el.addEventListener("click",function(){ obKindFilter=el.getAttribute("data-ob-kd-f"); obShow=150; renderOnbid(); }); });
+    }
+    var list=all.filter(function(b){
+      if(obStatusFilter==="all"){ if(b.status==="패스") return false; }
+      else if(b.status!==obStatusFilter) return false;
+      if(obKindFilter!=="all" && b.kind!==obKindFilter) return false;
+      if(!obSearchTerm) return true;
+      return ((b.title||"")+" "+(b.region||"")).toLowerCase().indexOf(obSearchTerm)>=0;
+    });
+    list.sort(function(a,b){ return (a.due||"9999-99-99") < (b.due||"9999-99-99") ? -1 : 1; });
+    var head=document.getElementById("obHead");
+    if(head) head.textContent = all.length ? ("총 "+all.length+" · 표시 "+Math.min(obShow,list.length)+"/"+list.length) : "";
+    var shown=list.slice(0, obShow);
+    host.innerHTML = shown.length ? shown.map(function(b){
+      var isNew=b.status==="new";
+      var dd = b.due ? ddayInfo(b.due) : null;
+      var meta=[];
+      meta.push('<span class="own-badge lease">'+esc(b.kind||"-")+'</span>');
+      if(b.org) meta.push('<span>'+esc(b.org)+'</span>');
+      if(b.appr) meta.push('<span>감정 '+fmtAmount(b.appr)+'원</span>');
+      if(b.budget) meta.push('<span class="rec-amt">최저 '+fmtAmount(b.budget)+'원</span>');
+      if(b.method) meta.push('<span class="hold-chip">'+esc(b.method)+'</span>');
+      var ctrl='';
+      ["검토","참여","패스"].forEach(function(st){ if(st!==b.status) ctrl+='<button class="mini-btn'+(st==="참여"?' appr-btn':'')+'" data-ob-st="'+st+'" data-ob-id="'+b.id+'">'+st+'</button>'; });
+      if(b.url) ctrl+='<a class="mini-btn" href="'+esc(b.url)+'" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center;">원문↗</a>';
+      var stChip = isNew ? '<span class="review-chip">신규</span>' : (b.status==="참여" ? '<span class="from-chip">참여</span>' : (b.status==="패스" ? '<span class="hold-chip">패스</span>' : '<span class="scope-chip">검토</span>'));
+      return '<div class="item" style="'+(isNew?'background:#F3F9F5;':'')+'"><div class="item-body">'+
+        '<div class="item-title" style="'+(isNew?'font-weight:800;':'')+'">'+esc(b.title||"-")+' '+stChip+'</div>'+
+        '<div class="item-meta">'+meta.join("")+(b.due?'<span>마감 '+esc(b.due)+'</span>':'')+'</div></div>'+
+        '<div class="task-ctrl">'+(dd?'<span class="dday '+(dd.cls||"")+'">'+dd.text+'</span>':'')+ctrl+'</div></div>';
+    }).join("") : '<div class="empty-line">'+(all.length?'조건에 맞는 물건이 없습니다.':'수집된 물건이 없습니다. (아침 자동 수집)')+'</div>';
+    Array.prototype.forEach.call(host.querySelectorAll("[data-ob-st]"),function(el){
+      el.addEventListener("click",function(){ setObStatus(el.getAttribute("data-ob-id"), el.getAttribute("data-ob-st")); });
+    });
+    var more=document.getElementById("obMoreBtn");
+    if(more){ more.style.display = (list.length>obShow) ? "" : "none"; }
+  }
+
   // ---- 거래처(clients.json) — 미수 자동 연동 ----
   var clients = [];
   var cliSha = null;
@@ -6033,6 +6130,8 @@
     // 일감 섹션(계약 탭 내): bid 권한으로 표시 게이팅
     var bidSec = document.getElementById("bidSection");
     if (bidSec) bidSec.style.display = isAdmin() ? "" : "none";   // 일감은 관리자 전용(서버도 강제)
+    var obSec = document.getElementById("onbidSection");
+    if (obSec) obSec.style.display = isAdmin() ? "" : "none";     // 공매·부동산도 관리자 전용
     // 인사 탭: 대표·관리자 전용
     var adminUser = isAdmin();
     var hrBtn = document.getElementById("tabHrBtn");
@@ -6119,7 +6218,7 @@
   // 로그인 성공 후: 권한 적용 + 데이터 로드 + (관리자면) 회원목록 로드
   function afterLogin(){
     applyPerms();
-    doLoad(); loadTasks(); loadVehicles(); loadReceivables(); loadLicenses(); loadDocuments(); loadClients(); loadContracts(); loadMyTasks(); loadLeaves(); loadBids();
+    doLoad(); loadTasks(); loadVehicles(); loadReceivables(); loadLicenses(); loadDocuments(); loadClients(); loadContracts(); loadMyTasks(); loadLeaves(); loadBids(); loadOnbid();
     loadMembers();   // 담당 배정 드롭다운용 — 관리자·직원 모두
     render();
     // 만기 자동생성은 지시·차량·인허가 로드가 모두 끝난 뒤 markLoadedForAutoGen에서 실행(중복 방지)
