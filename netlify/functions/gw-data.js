@@ -193,11 +193,53 @@ async function handleBidsRefresh(event, d, R) {
     (await Promise.all(rest)).forEach(function (r) { items = items.concat(r.items); });
     return items;
   }
-  const [rgnRows, licAllRows, servcItems, cnstwkItems] = await Promise.all([
+  // 공동주택(K-apt) — 사이트 목록 직접 조회(공식 API는 2024-02에서 멈춘 폐물). 경북 소재, 최근 3일.
+  async function kaptFetch() {
+    const LIST = 'https://www.k-apt.go.kr/bid/bidList.do';
+    const r1 = await fetch(LIST, { headers: { 'User-Agent': 'Mozilla/5.0 (jongwoon-app)' } });
+    const html1 = await r1.text();
+    const mc = html1.match(/name="_csrf" content="([^"]+)"/);
+    if (!mc) return [];
+    const setc = (typeof r1.headers.getSetCookie === 'function') ? r1.headers.getSetCookie() : (r1.headers.get('set-cookie') ? [r1.headers.get('set-cookie')] : []);
+    const cookie = setc.map((s) => String(s).split(';')[0]).join('; ');
+    const iso = (t) => { const dt = new Date(t); const p = (n) => String(n).padStart(2, '0'); return dt.getFullYear() + '-' + p(dt.getMonth() + 1) + '-' + p(dt.getDate()); };
+    const body = new URLSearchParams({ pageSelect: '100', searchBidGb: 'bid_gb_1', bidTitle: '', aptName: '',
+      searchDateGb: 'reg', dateStart: iso(now - 3 * 86400000), dateEnd: iso(now), dateArea: '3',
+      bidState: '', codeAuth: '', codeWay: '', codeAuthSub: '', codeSucWay: '',
+      codeClassifyType1: '', codeClassifyType2: '', codeClassifyType3: '',
+      pageNo: '1', type: '4', bidArea: '47', bidNum: '', bidNo: '', mainKaptCode: '', aptCode: '', _csrf: mc[1] });
+    const r2 = await fetch(LIST, { method: 'POST', body: body.toString(),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8', 'X-CSRF-TOKEN': mc[1], 'Cookie': cookie, 'Referer': LIST, 'User-Agent': 'Mozilla/5.0 (jongwoon-app)' } });
+    const html2 = await r2.text();
+    const out = [];
+    const trRe = /<tr[^>]*class="notice-row"[^>]*dataId="([^"]+)"[^>]*>([\s\S]*?)<\/tr>/g;
+    const today = iso(now);
+    let m;
+    while ((m = trRe.exec(html2))) {
+      const tds = [];
+      const tdRe = /<td[^>]*>([\s\S]*?)<\/td>/g; let t;
+      while ((t = tdRe.exec(m[2]))) tds.push(t[1].replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim());
+      if (tds.length < 8) continue;
+      const title = tds[3].replace(/^\[[^\]]+\]\s*/, '');
+      const due = (tds[4] || '').slice(0, 10);
+      if (due && due < today) continue;
+      const flat = title.replace(/ /g, '');
+      const kw = BID_KEYWORDS.filter((k) => flat.indexOf(k) >= 0);
+      if (!kw.length) continue;
+      if (!mthdEligible(tds[2], '')) continue;
+      out.push({ id: 'kapt-' + m[1], source: '공동주택', kind: '공사·용역', title: title, org: tds[6],
+        region: '경북(소재)', due: due, budget: 0,
+        url: 'https://www.k-apt.go.kr/bid/bidDetail.do?type=4&bidNum=' + encodeURIComponent(m[1]),
+        matched: kw, method: tds[2] + (tds[5] ? '·' + tds[5] : ''), rgn_ref: false });
+    }
+    return out;
+  }
+  const [rgnRows, licAllRows, servcItems, cnstwkItems, kaptItems] = await Promise.all([
     g2bAll('getBidPblancListInfoPrtcptPsblRgn', 4),
     g2bAll('getBidPblancListInfoLicenseLimit', 4),
     g2bAll('getBidPblancListInfoServc', 3),
     g2bAll('getBidPblancListInfoCnstwk', 3),
+    kaptFetch().catch(function () { return []; }),   // K-apt 실패해도 나라장터 수집은 계속
   ]);
   // 참가가능지역 맵(행 없음=전국)
   const rgnMap = {};
@@ -269,6 +311,7 @@ async function handleBidsRefresh(event, d, R) {
       }
     }
   }
+  for (const it of kaptItems) found.push(it);
   const r = await blobGet(st, colKey('bids'));
   const doc = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data : { schema: 1, items: [] };
   const m = mergeBidItems(doc, found);
