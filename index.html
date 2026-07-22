@@ -794,9 +794,13 @@
     <button class="tab-btn" data-tab="cli" id="tabCliBtn">거래처</button>
     <button class="tab-btn perm-hidden" data-tab="hr" id="tabHrBtn">인사 <span class="tab-badge hide" id="hrTabBadge">0</span></button>
     <div class="nav-divider"></div>
+    <div class="nav-group">수주</div>
+    <button class="tab-btn perm-hidden" data-tab="bid" id="tabBidBtn">입찰 <span class="tab-badge hide" id="bidTabBadge">0</span></button>
+    <button class="tab-btn" data-tab="con" id="tabConBtn">계약</button>
+    <button class="tab-btn perm-hidden" data-tab="onbid" id="tabOnbidBtn">부동산</button>
+    <div class="nav-divider"></div>
     <div class="nav-group">업무</div>
     <button class="tab-btn" data-tab="cal" id="tabCalBtn">캘린더</button>
-    <button class="tab-btn" data-tab="con" id="tabConBtn">일감·계약 <span class="tab-badge hide" id="bidTabBadge">0</span></button>
     <button class="tab-btn" data-tab="veh" id="tabVehBtn">차량</button>
     <button class="tab-btn" data-tab="lic" id="tabLicBtn">인허가</button>
     <button class="tab-btn" data-tab="doc" id="tabDocBtn">문서함</button>
@@ -945,22 +949,30 @@
     <button class="link-btn" id="licAddBtn">+ 인허가 추가</button>
   </section>
 
-  <!-- 일감·계약 (영업 파이프라인: 일감 → 참여 → 계약) -->
-  <section class="view" id="view-con">
+  <!-- 입찰(공고 수집) — 관리자 전용 -->
+  <section class="view" id="view-bid">
     <div id="bidSection">
-      <div class="dash-sec" style="margin-bottom:8px;display:flex;align-items:baseline;gap:10px;"><h2 style="flex:1;">일감 <span class="cnt" id="bidHead"></span></h2><button class="mini-btn" id="bidRefreshBtn">↻ 지금 수집</button><button class="mini-btn" id="bidPurgeBtn" title="미검토 항목을 비우고 새 필터로 다시 수집">🧹 재수집</button></div>
-      <div style="font-size:12px;color:var(--sub);margin:-4px 0 8px;">목록의 공고는 지역·업종(보유면허)·낙찰방법 자격 필터를 통과한 <b>참가 가능</b> 건입니다. 칩의 <b>지역</b>=실제 참가제한 내용. <span style="background:#FFF3CD;border-radius:4px;padding:0 5px;">노란 카드</span>=지역이 '공고서 참조'인데 자동 판독으로 확인 못 한 건 — 원문에서 직접 확인.</div>
+      <div class="dash-sec" style="margin-bottom:8px;display:flex;align-items:baseline;gap:10px;"><h2 style="flex:1;">입찰 <span class="cnt" id="bidHead"></span></h2><button class="mini-btn" id="bidRefreshBtn">↻ 지금 수집</button><button class="mini-btn" id="bidPurgeBtn" title="미검토 항목을 비우고 새 필터로 다시 수집">🧹 재수집</button></div>
+      <div style="font-size:12px;color:var(--sub);margin:-4px 0 8px;">입찰 공고는 지역·업종(보유면허)·낙찰방법 자격 필터를 통과한 <b>참가 가능</b> 건입니다. 칩의 <b>지역</b>=실제 참가제한 내용. <span style="background:#FFF3CD;border-radius:4px;padding:0 5px;">노란 카드</span>=지역이 '공고서 참조'인데 자동 판독으로 확인 못 한 건 — 원문에서 직접 확인.</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;" id="bidFilterBar"></div>
-      <input type="search" id="bidSearch" placeholder="일감 검색(공고명·기관)" autocomplete="off" style="width:100%;padding:9px 12px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;font-size:14px;box-sizing:border-box;">
+      <input type="search" id="bidSearch" placeholder="공고 검색(공고명·기관)" autocomplete="off" style="width:100%;padding:9px 12px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;font-size:14px;box-sizing:border-box;">
       <div class="card" id="bidList"><div class="loading">불러오는 중…</div></div>
       <button class="link-btn" id="bidAddBtn">+ 수동 등록 (사기업·기타)</button>
     </div>
-    <div class="dash-sec" style="margin:14px 0 8px;"><h2>계약 <span class="cnt" id="conHead"></span></h2></div>
+  </section>
+
+  <!-- 계약·프로세스 -->
+  <section class="view" id="view-con">
+    <div class="dash-sec" style="margin-bottom:8px;"><h2>계약 <span class="cnt" id="conHead"></span></h2></div>
     <button class="link-btn" id="conStartBtn">+ 계약 시작</button>
     <button class="link-btn" id="docGenBtn">+ 서류 출력</button>
     <div class="card" id="conList"><div class="loading">불러오는 중…</div></div>
+  </section>
+
+  <!-- 부동산(온비드 공매) — 관리자 전용 -->
+  <section class="view" id="view-onbid">
     <div id="onbidSection">
-      <div class="dash-sec" style="margin:18px 0 8px;"><h2>공매·부동산 (온비드) <span class="cnt" id="obHead"></span></h2></div>
+      <div class="dash-sec" style="margin-bottom:8px;"><h2>부동산 (온비드 공매) <span class="cnt" id="obHead"></span></h2></div>
       <div style="font-size:12px;color:var(--sub);margin:-4px 0 8px;">전국 · 매각 · 감정가 5억~50억 · 토지/공장·산업/상가·업무. 마감 임박순, 150건씩 표시.</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;" id="obFilterBar"></div>
       <input type="search" id="obSearch" placeholder="소재지·물건 검색 (예: 포항, 경상북도)" autocomplete="off" style="width:100%;padding:9px 12px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;font-size:14px;box-sizing:border-box;">
@@ -1081,7 +1093,7 @@
 
 <div class="modal-backdrop" id="bidAddBackdrop">
   <div class="modal">
-    <h3>일감 수동 등록</h3>
+    <h3>입찰 수동 등록</h3>
     <p style="margin-bottom:10px;">사기업·협력사 포털 등 자동수집이 안 되는 건을 직접 등록합니다.</p>
     <input type="text" id="baTitle" placeholder="공고명·건명" autocomplete="off">
     <input type="text" id="baOrg" placeholder="발주처" autocomplete="off">
@@ -3097,7 +3109,7 @@
   });
 
   // ---- 탭 ----
-  var TAB_LABELS = {dash:"홈",tasks:"지시",rec:"기성",cli:"거래처",con:"일감·계약",hr:"인사",cal:"캘린더",veh:"차량",lic:"인허가",doc:"문서함",check:"업무",leave:"휴가",perm:"권한관리"};
+  var TAB_LABELS = {dash:"홈",tasks:"지시",rec:"기성",cli:"거래처",bid:"입찰",con:"계약",onbid:"부동산",hr:"인사",cal:"캘린더",veh:"차량",lic:"인허가",doc:"문서함",check:"업무",leave:"휴가",perm:"권한관리"};
   function closeNav(){ var tb=document.getElementById("tabbar"); if(tb) tb.classList.remove("open"); }
   function updateNavToggle(name){ var nt=document.getElementById("navToggle"); if(nt) nt.textContent = "☰"; }
   function switchTab(name){
@@ -3116,6 +3128,8 @@
     document.getElementById("view-cli").classList.toggle("active", name === "cli");
     document.getElementById("view-con").classList.toggle("active", name === "con");
     document.getElementById("view-cal").classList.toggle("active", name === "cal");
+    document.getElementById("view-bid").classList.toggle("active", name === "bid");
+    document.getElementById("view-onbid").classList.toggle("active", name === "onbid");
     document.getElementById("view-hr").classList.toggle("active", name === "hr");
     document.getElementById("view-perm").classList.toggle("active", name === "perm");
     document.getElementById("view-leave").classList.toggle("active", name === "leave");
@@ -3124,7 +3138,8 @@
     if (name === "hr") renderHrRoster();
     if (name === "perm") renderPermMgmt();
     if (name === "leave") renderLeaves();
-    if (name === "con"){ renderBids(); renderOnbid(); }
+    if (name === "bid") renderBids();
+    if (name === "onbid") renderOnbid();
   }
 
   // ---- 캘린더(통합 만기·마감) ----
@@ -3305,7 +3320,7 @@
   document.getElementById("bidPurgeBtn").addEventListener("click", function(){
     var btn = this;
     if (btn.disabled) return;
-    if (!confirm("미검토(신규) 일감을 전부 비우고 새 필터로 다시 수집할까요?\n검토·참여·패스 처리한 항목은 보존됩니다.")) return;
+    if (!confirm("미검토(신규) 공고를 전부 비우고 새 필터로 다시 수집할까요?\n검토·참여·패스 처리한 항목은 보존됩니다.")) return;
     btn.disabled = true; btn.textContent = "재수집 중…";
     gwCall("gw-data", { action: "bids_purge", mode: "new" }).then(function(res){
       if (res.status !== 200){ btn.disabled=false; btn.textContent="🧹 재수집"; alert("비우기 실패 ("+res.status+")"); return; }
@@ -3823,7 +3838,7 @@
     if (seeVeh || seeLic) tiles += '<div class="stat-tile' + (overdueTot ? ' alert' : '') + '"><div class="lbl">만기 임박</div><div class="val">' + imminentTot + '<span class="unit">건</span></div></div>';
     tiles += '<div class="stat-tile"><div class="lbl">미완료 지시</div><div class="val">' + openTasks.length + '<span class="unit">건</span></div></div>';
     tiles += '<div class="stat-tile"><div class="lbl">결재 대기</div><div class="val">' + reviewCount + '<span class="unit">건</span></div></div>';
-    if (isAdmin()){ var bidN = bidNewCount(); if (bidN) tiles += '<div class="stat-tile alert"><div class="lbl">새 일감</div><div class="val">' + bidN + '<span class="unit">건</span></div></div>'; }
+    if (isAdmin()){ var bidN = bidNewCount(); if (bidN) tiles += '<div class="stat-tile alert"><div class="lbl">새 입찰</div><div class="val">' + bidN + '<span class="unit">건</span></div></div>'; }
     var myChecks = myCheckCount();
     if (canSee("check") || myChecks) tiles += '<div class="stat-tile"><div class="lbl">주기업무</div><div class="val">' + myChecks + '<span class="unit">건</span></div></div>';
     var html = '<div class="dash-date">' + today + '</div>' + (tiles ? '<div class="stat-row">' + tiles + '</div>' : '');
@@ -4806,7 +4821,7 @@
         '<div class="item-title" style="'+(isNew?'font-weight:800;':'')+'">'+esc(b.title||"-")+' '+stChip+'</div>'+
         '<div class="item-meta">'+meta.join("")+(b.due?'<span>마감 '+esc(b.due)+'</span>':'')+'</div></div>'+
         '<div class="task-ctrl">'+(dd?'<span class="dday '+(dd.cls||"")+'">'+dd.text+'</span>':'')+ctrl+'</div></div>';
-    }).join("") : '<div class="empty-line">'+(all.length?'조건에 맞는 일감이 없습니다.':'수집된 일감이 없습니다. (평일 아침 자동 수집)')+'</div>';
+    }).join("") : '<div class="empty-line">'+(all.length?'조건에 맞는 공고가 없습니다.':'수집된 공고가 없습니다. (평일 아침 자동 수집)')+'</div>';
     Array.prototype.forEach.call(host.querySelectorAll("[data-bid-st]"),function(el){
       el.addEventListener("click",function(){ setBidStatus(el.getAttribute("data-bid-id"), el.getAttribute("data-bid-st")); });
     });
@@ -6132,6 +6147,11 @@
     if (bidSec) bidSec.style.display = isAdmin() ? "" : "none";   // 일감은 관리자 전용(서버도 강제)
     var obSec = document.getElementById("onbidSection");
     if (obSec) obSec.style.display = isAdmin() ? "" : "none";     // 공매·부동산도 관리자 전용
+    var bidTab = document.getElementById("tabBidBtn");
+    if (bidTab) bidTab.classList.toggle("perm-hidden", !isAdmin());
+    var obTab = document.getElementById("tabOnbidBtn");
+    if (obTab) obTab.classList.toggle("perm-hidden", !isAdmin());
+    if ((currentTab === "bid" || currentTab === "onbid") && !isAdmin()) switchTab("dash");
     // 인사 탭: 대표·관리자 전용
     var adminUser = isAdmin();
     var hrBtn = document.getElementById("tabHrBtn");
@@ -6478,7 +6498,7 @@
     hrOpenId = null;
   }
 
-  var MOD_LABEL = {tasks:"지시", veh:"차량", rec:"기성", lic:"인허가", check:"업무", con:"계약", cli:"거래처", doc:"문서함", bid:"일감"};
+  var MOD_LABEL = {tasks:"지시", veh:"차량", rec:"기성", lic:"인허가", check:"업무", con:"계약", cli:"거래처", doc:"문서함", bid:"입찰"};
   // ---- 감사 로그 뷰어(관리자 전용, 서버 기록 열람) ----
   var AUDIT_COL_LABEL = {tasks:"지시", vehicles:"차량", receivables:"기성", licenses:"인허가", checklist:"업무", documents:"문서함", clients:"거래처", contracts:"계약", leaves:"휴가", member:"회원", login:"로그인"};
   var AUDIT_FIELD_LABEL = {status:"상태", title:"제목", who:"담당", who_id:"담당", due:"기한", amount:"금액", paid:"입금", del:"삭제", scope:"공개범위", stage:"단계", cancel_req:"취소요청", name:"이름", role:"직책", rank:"직급", dept:"부서", admin:"관리자", perms:"권한", hire_date:"입사일", leave_date:"퇴사일", seq:"연번", annual_base:"잔여연차기준", annual_base_date:"기준일", annual_days:"연차수동", loa_days:"휴직누적", on_loa:"휴직중", loa_start:"휴직시작", loa_end:"휴직종료", annual_paid:"연차수당포함", emp_type:"고용형태", annual_basis:"연차기준", reason:"사유", approver:"승인자", done_by:"완료자", detail:"상세", recur:"반복", hl:"하이라이트", mismatch:"불일치", PIN:"PIN"};
