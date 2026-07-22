@@ -4779,6 +4779,7 @@
       if(b.org) meta.push('<span>'+esc(b.org)+'</span>');
       if(b.region) meta.push('<span class="scope-chip">지역 '+esc(b.region)+'</span>');
       if(b.method) meta.push('<span class="hold-chip">'+esc(b.method)+'</span>');
+      if(b.auto_pass) meta.push('<span class="hold-chip">자동패스(학습)</span>');
       if(b.matched&&b.matched.length) meta.push('<span class="from-chip">'+esc(b.matched.join(","))+'</span>');
       if(b.budget) meta.push('<span class="rec-amt">'+fmtAmount(b.budget)+'원</span>');
       var ctrl='';

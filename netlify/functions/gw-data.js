@@ -109,7 +109,7 @@ function mergeBidItems(doc, items) {
       doc.items.push({ id: n.id, source: n.source || '', kind: n.kind || '입찰', title: n.title || '', org: n.org || '',
         region: n.region || '', due: n.due || '', budget: n.budget || 0, url: n.url || '',
         matched: Array.isArray(n.matched) ? n.matched : [], method: n.method || '', rgn_ref: !!n.rgn_ref,
-        status: 'new', created: today, updated: today });
+        status: (n.status === '패스' ? '패스' : 'new'), auto_pass: !!n.auto_pass, created: today, updated: today });
       byId[n.id] = doc.items[doc.items.length - 1];
       added++;
     } else {
@@ -300,6 +300,16 @@ async function handleBidsPurge(event, d, R) {
   try { await blobSet(st, 'bids:lastfetch', { ts: 0 }); } catch (e) {}
   try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'bids', ev: [{ op: '비우기', id: '', t: (d.mode === 'all' ? '전체' : '미검토') + ' ' + removed + '건 제거' }] }); } catch (e) {}
   return jr(200, { status: 'OK', removed: removed, total: doc.items.length, request_id: R });
+}
+
+// 일감 이력 export(수집봇) — 학습 필터용(패스 패턴). 경량 필드만 반환.
+async function handleBidsExport(event, d, R) {
+  const secret = (process.env.BIDS_INGEST_KEY || '').trim();
+  if (!secret || String(d.key || '').trim() !== secret) return jr(403, { status: 'FORBIDDEN', error_code: 'BAD_INGEST_KEY', request_id: R });
+  const r = await blobGet(store(DATA), colKey('bids'));
+  const items = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data.items : [];
+  const lite = items.map(function (it) { return { id: it.id, status: it.status, title: it.title, org: it.org, source: it.source, auto_pass: !!it.auto_pass }; });
+  return jr(200, { status: 'OK', items: lite, request_id: R });
 }
 
 // 감사 로그 조회(관리자 전용). month='YYYY-MM' 미지정 시 이번 달.
