@@ -210,6 +210,40 @@ async function handleBidsRefresh(event, d, R) {
     for (const nm of [a, b]) { const s = String(nm || ''); if (s.indexOf('시담') >= 0 || s.indexOf('지명') >= 0) return false; }
     return true;
   }
+  // 업종(면허)제한 — 종운 보유 9종 대조. 제한 있는데 우리 업종 없으면 참가 불가.
+  const OUR_LIC = [['1226','폐기물수집운반'],['1227','폐기물수집운반'],['1229','폐기물수집운반(지정)'],['4996','상하수도설비'],['6728','건설폐기물수운'],['6786','폐기물종합재활용'],['0012','구조물해체비계'],['4995','구조물해체비계'],['5652','석면해체제거']];
+  const LIC_KEYS = ['폐기물수집','상하수도설비','건설폐기물','폐기물종합재활용','구조물해체','비계','석면해체'];
+  function licMatch(names) {
+    const hits = [];
+    for (const nm of (names || [])) {
+      const raw = String(nm || '');
+      const flat = raw.replace(/[·ㆍ•. ]/g, '');
+      for (const [code, label] of OUR_LIC) { if (raw.indexOf('/' + code) >= 0 && hits.indexOf(label) < 0) hits.push(label); }
+      for (const k of LIC_KEYS) { if (flat.indexOf(k) >= 0 && hits.indexOf(k) < 0) hits.push(k); }
+    }
+    return hits;
+  }
+  // 면허제한 맵
+  const licMap = {};
+  {
+    let page = 1;
+    while (page <= 4) {
+      const q = new URLSearchParams({ serviceKey: key, inqryDiv: '1', type: 'json', inqryBgnDt: bgn, inqryEndDt: end, pageNo: String(page), numOfRows: '999' });
+      const resp = await fetch(G2B_BASE + 'getBidPblancListInfoLicenseLimit?' + q.toString());
+      if (!resp.ok) break;
+      const j = await resp.json();
+      const body = ((j || {}).response || {}).body || {};
+      let items = body.items || [];
+      if (items && items.item) items = items.item;
+      if (!Array.isArray(items)) items = items ? [items] : [];
+      for (const it of items) {
+        const k = (it.bidNtceNo || '') + '-' + (it.bidNtceOrd || '');
+        (licMap[k] = licMap[k] || []).push(String(it.lcnsLmtNm || '') + ' ' + String(it.permsnIndstrytyList || ''));
+      }
+      if (page * 999 >= Number(body.totalCount || 0)) break;
+      page++;
+    }
+  }
   const found = [];
   for (const op of G2B_OPS) {
     let page = 1;
@@ -227,8 +261,12 @@ async function handleBidsRefresh(event, d, R) {
         const org = it.ntceInsttNm || it.dminsttNm || '';
         const flat = nm.replace(/ /g, '');
         const kw = BID_KEYWORDS.filter((k) => flat.indexOf(k) >= 0);
-        if (!kw.length) continue;
-        const rgnChk = rgnEligible(rgnMap[(it.bidNtceNo || '') + '-' + (it.bidNtceOrd || '')]);
+        const bkey = (it.bidNtceNo || '') + '-' + (it.bidNtceOrd || '');
+        const licRows = licMap[bkey];
+        const licHits = licMatch(licRows);
+        if (licRows && licRows.length && !licHits.length) continue;   // 업종제한 미해당 → 참가 불가
+        if (!kw.length && !licHits.length) continue;                   // 키워드 OR 우리 업종 제한
+        const rgnChk = rgnEligible(rgnMap[bkey]);
         if (!rgnChk.ok) continue;   // 지역제한 미해당 제외('공고서 참조'는 수집+표시)
         if (!mthdEligible(it.sucsfbidMthdNm, it.cntrctCnclsMthdNm)) continue;   // 시담·지명 제외
         const regTxt = org + ' ' + (it.rgnLmtBidLocplcNm || '');
@@ -237,7 +275,7 @@ async function handleBidsRefresh(event, d, R) {
         const mlbl = String(it.sucsfbidMthdNm || '').split('-')[0].trim() || String(it.cntrctCnclsMthdNm || '').trim();
         found.push({ id: 'g2b-' + (it.bidNtceNo || '') + '-' + (it.bidNtceOrd || ''), source: '나라장터', kind: '입찰',
           title: nm, org: org, region: reg, due: String(it.bidClseDt || '').slice(0, 10).replace(/[./]/g, '-'),
-          budget: budget, url: it.bidNtceUrl || it.bidNtceDtlUrl || '', matched: kw, method: mlbl, rgn_ref: !!rgnChk.ref });
+          budget: budget, url: it.bidNtceUrl || it.bidNtceDtlUrl || '', matched: kw.concat(licHits.slice(0, 2).map((h) => '면허:' + h)), method: mlbl, rgn_ref: !!rgnChk.ref });
       }
       const total = Number(body.totalCount || 0);
       if (page * 999 >= total) break;
