@@ -4779,6 +4779,8 @@
       meta.push('<span class="own-badge '+(b.source==="수동"?"lease":"self")+'">'+esc(b.source||"-")+'</span>');
       if(b.org) meta.push('<span>'+esc(b.org)+'</span>');
       if(b.region) meta.push('<span class="scope-chip">★ '+esc(b.region)+'</span>');
+      if(b.rgn_ref) meta.push('<span class="review-chip">지역 공고서참조</span>');
+      if(b.method) meta.push('<span class="hold-chip">'+esc(b.method)+'</span>');
       if(b.matched&&b.matched.length) meta.push('<span class="from-chip">'+esc(b.matched.join(","))+'</span>');
       if(b.budget) meta.push('<span class="rec-amt">'+fmtAmount(b.budget)+'원</span>');
       var ctrl='';

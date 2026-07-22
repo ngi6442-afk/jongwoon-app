@@ -108,12 +108,13 @@ function mergeBidItems(doc, items) {
     if (!cur) {
       doc.items.push({ id: n.id, source: n.source || '', kind: n.kind || '입찰', title: n.title || '', org: n.org || '',
         region: n.region || '', due: n.due || '', budget: n.budget || 0, url: n.url || '',
-        matched: Array.isArray(n.matched) ? n.matched : [], status: 'new', created: today, updated: today });
+        matched: Array.isArray(n.matched) ? n.matched : [], method: n.method || '', rgn_ref: !!n.rgn_ref,
+        status: 'new', created: today, updated: today });
       byId[n.id] = doc.items[doc.items.length - 1];
       added++;
     } else {
       let ch = false;
-      ['title', 'org', 'region', 'due', 'budget', 'url'].forEach(function (k) { if (n[k] && n[k] !== cur[k]) { cur[k] = n[k]; ch = true; } });
+      ['title', 'org', 'region', 'due', 'budget', 'url', 'method'].forEach(function (k) { if (n[k] && n[k] !== cur[k]) { cur[k] = n[k]; ch = true; } });
       if (ch) { cur.updated = today; updated++; }
     }
   }
@@ -189,16 +190,24 @@ async function handleBidsRefresh(event, d, R) {
     }
   }
   function rgnEligible(names) {
-    if (!names || !names.length) return true;   // 지역 행 없음 = 전국
+    // 반환 {ok, ref} — '공고서 참조'류는 판별 불가라 수집하고 표시(ref)만.
+    if (!names || !names.length) return { ok: true, ref: false };   // 지역 행 없음 = 전국
+    let ref = false;
     for (let nm of names) {
       nm = String(nm || '').trim();
       if (!nm) continue;
-      if (nm.indexOf('전국') >= 0 || nm.indexOf('제한없음') >= 0) return true;
-      if (nm.indexOf('포항') >= 0) return true;
+      if (nm.indexOf('참조') >= 0 || nm.indexOf('공고서') >= 0) { ref = true; continue; }
+      if (nm.indexOf('전국') >= 0 || nm.indexOf('제한없음') >= 0) return { ok: true, ref: false };
+      if (nm.indexOf('포항') >= 0) return { ok: true, ref: false };
       const flat = nm.replace(/ /g, '');
-      if (flat === '경상북도' || flat === '경북') return true;   // 도 단위 제한(타 시군 제한은 제외)
+      if (flat === '경상북도' || flat === '경북') return { ok: true, ref: false };   // 도 단위 제한(타 시군 제한은 제외)
     }
-    return false;
+    return ref ? { ok: true, ref: true } : { ok: false, ref: false };
+  }
+  // 낙찰방법: 수의시담·다자간수의시담·지명경쟁은 지명업체 전용 → 제외
+  function mthdEligible(a, b) {
+    for (const nm of [a, b]) { const s = String(nm || ''); if (s.indexOf('시담') >= 0 || s.indexOf('지명') >= 0) return false; }
+    return true;
   }
   const found = [];
   for (const op of G2B_OPS) {
@@ -218,13 +227,16 @@ async function handleBidsRefresh(event, d, R) {
         const flat = nm.replace(/ /g, '');
         const kw = BID_KEYWORDS.filter((k) => flat.indexOf(k) >= 0);
         if (!kw.length) continue;
-        if (!rgnEligible(rgnMap[(it.bidNtceNo || '') + '-' + (it.bidNtceOrd || '')])) continue;   // 지역제한 미해당 제외
+        const rgnChk = rgnEligible(rgnMap[(it.bidNtceNo || '') + '-' + (it.bidNtceOrd || '')]);
+        if (!rgnChk.ok) continue;   // 지역제한 미해당 제외('공고서 참조'는 수집+표시)
+        if (!mthdEligible(it.sucsfbidMthdNm, it.cntrctCnclsMthdNm)) continue;   // 시담·지명 제외
         const regTxt = org + ' ' + (it.rgnLmtBidLocplcNm || '');
         const reg = BID_REGIONS.find((g) => regTxt.indexOf(g) >= 0) || '';
         let budget = 0; const bp = Number(it.presmptPrce || 0); if (!isNaN(bp)) budget = Math.floor(bp);
+        const mlbl = String(it.sucsfbidMthdNm || '').split('-')[0].trim() || String(it.cntrctCnclsMthdNm || '').trim();
         found.push({ id: 'g2b-' + (it.bidNtceNo || '') + '-' + (it.bidNtceOrd || ''), source: '나라장터', kind: '입찰',
           title: nm, org: org, region: reg, due: String(it.bidClseDt || '').slice(0, 10).replace(/[./]/g, '-'),
-          budget: budget, url: it.bidNtceUrl || it.bidNtceDtlUrl || '', matched: kw });
+          budget: budget, url: it.bidNtceUrl || it.bidNtceDtlUrl || '', matched: kw, method: mlbl, rgn_ref: !!rgnChk.ref });
       }
       const total = Number(body.totalCount || 0);
       if (page * 999 >= total) break;
