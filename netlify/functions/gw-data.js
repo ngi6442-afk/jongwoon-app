@@ -52,6 +52,8 @@ async function handleGet(event, d, R) {
   }
   const col = d.collection;
   if (!COL[col]) return jr(400, { status: 'REJECTED', error_code: 'UNKNOWN_COLLECTION', request_id: R });
+  // 일감(bids)은 관리자 전용 — 개별 권한과 무관하게 서버측 강제
+  if (col === 'bids' && !c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
   const p = permOf(c.member, col);
   // tasks: 개인 인박스('내게 온 지시')·홈 미완료지시는 권한과 무관하게 노출해야 하므로 hide여도 읽기 허용.
   // 가시성(담당/전사/공개범위) 필터는 프런트에서. 쓰기는 여전히 'do' 필요.
@@ -76,6 +78,7 @@ async function handleSave(event, d, R) {
   if (!COL[col]) return jr(400, { status: 'REJECTED', error_code: 'UNKNOWN_COLLECTION', request_id: R });
   // tasks: 직원(권한 do 아님)도 '내게 온 지시'를 완료(→승인대기)/보류하려면 저장이 필요 → 승인제 성립.
   // tasks 쓰기는 인증·인가 회원이면 허용(프런트 canActTask로 자기 업무만 조작, UI 권한 구분이지 하드보안 아님).
+  if (col === 'bids' && !c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
   if (permOf(c.member, col) !== 'do' && col !== 'tasks' && col !== 'leaves') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_WRITE', request_id: R });
   if (!d.doc || typeof d.doc !== 'object') return jr(400, { status: 'REJECTED', error_code: 'INVALID_DOC', request_id: R });
   // 감사 로그용 이전 문서(diff 원본) — 읽기 실패해도 저장은 진행
@@ -92,21 +95,14 @@ async function handleSave(event, d, R) {
   return jr(200, { status: 'OK', request_id: R });
 }
 
-// 일감 수집 ingest(수집봇 전용) — 공유 시크릿(BIDS_INGEST_KEY) 인증, 세션 불필요.
-// 새 id만 추가(status=new), 기존 항목은 원천 메타(title/org/region/due/budget/url)만 갱신하고
-// 앱이 관리하는 status·검토 상태는 절대 덮어쓰지 않는다. 삭제 없음.
-async function handleBidsIngest(event, d, R) {
-  const secret = (process.env.BIDS_INGEST_KEY || '').trim();
-  if (!secret || String(d.key || '').trim() !== secret) return jr(403, { status: 'FORBIDDEN', error_code: 'BAD_INGEST_KEY', request_id: R });
-  if (!Array.isArray(d.items)) return jr(400, { status: 'REJECTED', error_code: 'INVALID_ITEMS', request_id: R });
-  const st = store(DATA);
-  const r = await blobGet(st, colKey('bids'));
-  const doc = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data : { schema: 1, items: [] };
+// ---- 일감 수집 공통 ----
+// 병합 원칙: 새 id만 추가(status=new). 기존 항목은 원천 메타만 갱신, 앱이 관리하는 status는 절대 보존. 삭제 없음.
+function mergeBidItems(doc, items) {
   const byId = {};
   doc.items.forEach(function (it) { if (it && it.id) byId[it.id] = it; });
   const today = new Date().toISOString().slice(0, 10);
   let added = 0, updated = 0;
-  for (const n of d.items) {
+  for (const n of (items || [])) {
     if (!n || !n.id) continue;
     const cur = byId[n.id];
     if (!cur) {
@@ -121,13 +117,94 @@ async function handleBidsIngest(event, d, R) {
       if (ch) { cur.updated = today; updated++; }
     }
   }
-  if (added || updated) {
-    doc.updated_by = 'bids-bot'; doc.updated_at = Date.now();
-    const w = await blobSet(st, colKey('bids'), doc);
-    if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
-    try { await appendAudit({ ts: Date.now(), by: '수집봇', bid: 'bot', col: 'bids', ev: [{ op: '수집', id: '', t: '신규 ' + added + ' · 갱신 ' + updated }] }); } catch (e) {}
+  return { added: added, updated: updated };
+}
+async function saveBidsDoc(st, doc, by, added, updated, R) {
+  doc.updated_by = by; doc.updated_at = Date.now();
+  const w = await blobSet(st, colKey('bids'), doc);
+  if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
+  try { await appendAudit({ ts: Date.now(), by: by, bid: 'bot', col: 'bids', ev: [{ op: '수집', id: '', t: '신규 ' + added + ' · 갱신 ' + updated }] }); } catch (e) {}
+  return null;
+}
+
+// 일감 수집 ingest(수집봇 전용) — 공유 시크릿(BIDS_INGEST_KEY) 인증, 세션 불필요.
+async function handleBidsIngest(event, d, R) {
+  const secret = (process.env.BIDS_INGEST_KEY || '').trim();
+  if (!secret || String(d.key || '').trim() !== secret) return jr(403, { status: 'FORBIDDEN', error_code: 'BAD_INGEST_KEY', request_id: R });
+  if (!Array.isArray(d.items)) return jr(400, { status: 'REJECTED', error_code: 'INVALID_ITEMS', request_id: R });
+  const st = store(DATA);
+  const r = await blobGet(st, colKey('bids'));
+  const doc = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data : { schema: 1, items: [] };
+  const m = mergeBidItems(doc, d.items);
+  if (m.added || m.updated) {
+    const err = await saveBidsDoc(st, doc, '수집봇', m.added, m.updated, R);
+    if (err) return err;
   }
-  return jr(200, { status: 'OK', added: added, updated: updated, total: doc.items.length, request_id: R });
+  return jr(200, { status: 'OK', added: m.added, updated: m.updated, total: doc.items.length, request_id: R });
+}
+
+// 지금 수집(관리자 버튼) — 서버가 나라장터 API를 직접 조회해 병합. G2B_API_KEY(Netlify env) 필요. 10분 쿨다운.
+const BID_KEYWORDS = ["준설","퇴적토","하상","관로","관거","차집","맨홀","상수도","하수","급수","배수지","정수장","취수","가압장","누수",
+  "CCTV조사","불명수","석면","슬레이트","해체","철거","폐기물","수집운반","운반"];
+const BID_REGIONS = ["포항","경북","경상북도","경주","영덕","울진","대구","경산","영천","구미","안동","김천","문경","상주",
+  "의성","청송","영양","봉화","예천","성주","칠곡","고령","청도","울릉"];
+const G2B_BASE = "https://apis.data.go.kr/1230000/ad/BidPublicInfoService/";
+const G2B_OPS = ["getBidPblancListInfoServc", "getBidPblancListInfoCnstwk"];   // 용역, 공사
+async function handleBidsRefresh(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (!c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
+  const key = (process.env.G2B_API_KEY || '').trim();
+  if (!key) return jr(400, { status: 'REJECTED', error_code: 'NO_G2B_KEY', request_id: R });
+  const st = store(DATA);
+  const now = Date.now();
+  const COOLDOWN = 10 * 60 * 1000;
+  const cd = await blobGet(st, 'bids:lastfetch');
+  if (cd.ok && cd.data && cd.data.ts && (now - cd.data.ts) < COOLDOWN) {
+    return jr(429, { status: 'COOLDOWN', retry_after: Math.ceil((COOLDOWN - (now - cd.data.ts)) / 1000), request_id: R });
+  }
+  await blobSet(st, 'bids:lastfetch', { ts: now });
+  // 최근 1일(버튼은 당일 신규 확인용 — 3일 창은 아침 cron이 커버). 함수 시간제한 대비 페이지 상한.
+  function fmt(t) { const dt = new Date(t); const p = (n) => String(n).padStart(2, '0'); return '' + dt.getFullYear() + p(dt.getMonth() + 1) + p(dt.getDate()); }
+  const bgn = fmt(now - 1 * 86400000) + '0000', end = fmt(now) + '2359';
+  const found = [];
+  for (const op of G2B_OPS) {
+    let page = 1;
+    while (page <= 3) {
+      const q = new URLSearchParams({ serviceKey: key, inqryDiv: '1', type: 'json', inqryBgnDt: bgn, inqryEndDt: end, pageNo: String(page), numOfRows: '999' });
+      const resp = await fetch(G2B_BASE + op + '?' + q.toString());
+      if (!resp.ok) throw new Error('G2B HTTP ' + resp.status);
+      const j = await resp.json();
+      const body = ((j || {}).response || {}).body || {};
+      let items = body.items || [];
+      if (items && items.item) items = items.item;
+      if (!Array.isArray(items)) items = items ? [items] : [];
+      for (const it of items) {
+        const nm = it.bidNtceNm || '';
+        const org = it.ntceInsttNm || it.dminsttNm || '';
+        const flat = nm.replace(/ /g, '');
+        const kw = BID_KEYWORDS.filter((k) => flat.indexOf(k) >= 0);
+        if (!kw.length) continue;
+        const regTxt = org + ' ' + (it.rgnLmtBidLocplcNm || '');
+        const reg = BID_REGIONS.find((g) => regTxt.indexOf(g) >= 0) || '';
+        let budget = 0; const bp = Number(it.presmptPrce || 0); if (!isNaN(bp)) budget = Math.floor(bp);
+        found.push({ id: 'g2b-' + (it.bidNtceNo || '') + '-' + (it.bidNtceOrd || ''), source: '나라장터', kind: '입찰',
+          title: nm, org: org, region: reg, due: String(it.bidClseDt || '').slice(0, 10).replace(/[./]/g, '-'),
+          budget: budget, url: it.bidNtceUrl || it.bidNtceDtlUrl || '', matched: kw });
+      }
+      const total = Number(body.totalCount || 0);
+      if (page * 999 >= total) break;
+      page++;
+    }
+  }
+  const r = await blobGet(st, colKey('bids'));
+  const doc = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data : { schema: 1, items: [] };
+  const m = mergeBidItems(doc, found);
+  if (m.added || m.updated) {
+    const err = await saveBidsDoc(st, doc, c.member.name, m.added, m.updated, R);
+    if (err) return err;
+  }
+  return jr(200, { status: 'OK', scanned: found.length, added: m.added, updated: m.updated, total: doc.items.length, request_id: R });
 }
 
 // 감사 로그 조회(관리자 전용). month='YYYY-MM' 미지정 시 이번 달.
@@ -153,6 +230,7 @@ async function handler(event) {
     if (d && d.action === 'save') return await handleSave(event, d, R);
     if (d && d.action === 'audit') return await handleAudit(event, d, R);
     if (d && d.action === 'bids_ingest') return await handleBidsIngest(event, d, R);
+    if (d && d.action === 'bids_refresh') return await handleBidsRefresh(event, d, R);
     return jr(400, { status: 'REJECTED', error_code: 'UNKNOWN_ACTION', request_id: R });
   } catch (e) {
     return jr(500, { status: 'ERROR', error_code: 'HANDLER_FAILED', request_id: R });

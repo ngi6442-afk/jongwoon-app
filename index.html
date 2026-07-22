@@ -792,11 +792,11 @@
     <button class="tab-btn" data-tab="tasks" id="tabTasksBtn">지시 <span class="tab-badge hide" id="taskTabBadge">0</span></button>
     <button class="tab-btn" data-tab="rec" id="tabRecBtn">기성</button>
     <button class="tab-btn" data-tab="cli" id="tabCliBtn">거래처</button>
-    <button class="tab-btn" data-tab="con" id="tabConBtn">일감·계약 <span class="tab-badge hide" id="bidTabBadge">0</span></button>
     <button class="tab-btn perm-hidden" data-tab="hr" id="tabHrBtn">인사 <span class="tab-badge hide" id="hrTabBadge">0</span></button>
     <div class="nav-divider"></div>
     <div class="nav-group">업무</div>
     <button class="tab-btn" data-tab="cal" id="tabCalBtn">캘린더</button>
+    <button class="tab-btn" data-tab="con" id="tabConBtn">일감·계약 <span class="tab-badge hide" id="bidTabBadge">0</span></button>
     <button class="tab-btn" data-tab="veh" id="tabVehBtn">차량</button>
     <button class="tab-btn" data-tab="lic" id="tabLicBtn">인허가</button>
     <button class="tab-btn" data-tab="doc" id="tabDocBtn">문서함</button>
@@ -948,7 +948,7 @@
   <!-- 일감·계약 (영업 파이프라인: 일감 → 참여 → 계약) -->
   <section class="view" id="view-con">
     <div id="bidSection">
-      <div class="dash-sec" style="margin-bottom:8px;"><h2>일감 <span class="cnt" id="bidHead"></span></h2></div>
+      <div class="dash-sec" style="margin-bottom:8px;display:flex;align-items:baseline;gap:10px;"><h2 style="flex:1;">일감 <span class="cnt" id="bidHead"></span></h2><button class="mini-btn" id="bidRefreshBtn">↻ 지금 수집</button></div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;" id="bidFilterBar"></div>
       <input type="search" id="bidSearch" placeholder="일감 검색(공고명·기관)" autocomplete="off" style="width:100%;padding:9px 12px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;font-size:14px;box-sizing:border-box;">
       <div class="card" id="bidList"><div class="loading">불러오는 중…</div></div>
@@ -1533,15 +1533,15 @@
   var MEMBER_KEY = "jw_app_member";
 
   // 모듈 레지스트리 — 신규 탭 추가 시 여기 5곳(MODULES/MODULE_TAB/MODULE_VIEW/MOD_LABEL/ROLE_PRESET)에 등록하면 권한관리 UI·게이팅에 자동 반영. 모듈 id = 백엔드 gw-data COL 권한키와 일치시킬 것.
-  var MODULES = ["tasks", "veh", "rec", "lic", "check", "con", "cli", "doc", "bid"];
+  var MODULES = ["tasks", "veh", "rec", "lic", "check", "con", "cli", "doc"];  // 일감(bid)은 관리자 전용 고정이라 권한 목록에서 제외
   var MODULE_TAB = {tasks:"tabTasksBtn", veh:"tabVehBtn", rec:"tabRecBtn", lic:"tabLicBtn", check:"tabCheckBtn", con:"tabConBtn", cli:"tabCliBtn", doc:"tabDocBtn"};  // bid는 계약 탭 내 섹션(자체 탭 없음)
   var MODULE_VIEW = {tasks:"view-tasks", veh:"view-veh", rec:"view-rec", lic:"view-lic", check:"view-check", con:"view-con", cli:"view-cli", doc:"view-doc"};  // bid 섹션은 applyPerms에서 canSee로 표시
   var ROLE_PRESET = {
-    "대표":   {admin:true,  perms:{tasks:"do", veh:"do", rec:"do", lic:"do", check:"do", con:"do", cli:"do", doc:"do", bid:"do"}},
-    "관리자": {admin:true,  perms:{tasks:"do", veh:"do", rec:"do", lic:"do", check:"do", con:"do", cli:"do", doc:"do", bid:"do"}},
-    "팀장":   {admin:false, perms:{tasks:"do", veh:"do", rec:"do", lic:"do", check:"do", con:"view", cli:"view", doc:"view", bid:"hide"}},
-    "직원":   {admin:false, perms:{tasks:"do", veh:"view", rec:"view", lic:"view", check:"do", con:"view", cli:"view", doc:"view", bid:"hide"}},
-    "현장직": {admin:false, perms:{tasks:"do", veh:"view", rec:"hide", lic:"hide", check:"do", con:"hide", cli:"hide", doc:"view", bid:"hide"}}
+    "대표":   {admin:true,  perms:{tasks:"do", veh:"do", rec:"do", lic:"do", check:"do", con:"do", cli:"do", doc:"do"}},
+    "관리자": {admin:true,  perms:{tasks:"do", veh:"do", rec:"do", lic:"do", check:"do", con:"do", cli:"do", doc:"do"}},
+    "팀장":   {admin:false, perms:{tasks:"do", veh:"do", rec:"do", lic:"do", check:"do", con:"view", cli:"view", doc:"view"}},
+    "직원":   {admin:false, perms:{tasks:"do", veh:"view", rec:"view", lic:"view", check:"do", con:"view", cli:"view", doc:"view"}},
+    "현장직": {admin:false, perms:{tasks:"do", veh:"view", rec:"hide", lic:"hide", check:"do", con:"hide", cli:"hide", doc:"view"}}
   };
   // 직급(정보용)·부서 목록 — 서열 순서(공개범위·결재라인에서 사용)
   var RANK_LIST = ["대표","이사","부장","차장","과장","대리","주임","사원"];
@@ -3269,6 +3269,25 @@
   document.getElementById("baCancel").addEventListener("click", function(){ document.getElementById("bidAddBackdrop").classList.remove("show"); });
   document.getElementById("bidAddBackdrop").addEventListener("click", function(e){ if(e.target===this) this.classList.remove("show"); });
   document.getElementById("bidSearch").addEventListener("input", function(){ bidSearchTerm=this.value.toLowerCase().trim(); renderBids(); });
+  document.getElementById("bidRefreshBtn").addEventListener("click", function(){
+    var btn = this;
+    if (btn.disabled) return;
+    btn.disabled = true; btn.textContent = "수집 중…";
+    gwCall("gw-data", { action: "bids_refresh" }).then(function(res){
+      btn.disabled = false; btn.textContent = "↻ 지금 수집";
+      if (res.status === 200){
+        var b = res.body || {};
+        alert("수집 완료 — 신규 " + (b.added||0) + "건 · 갱신 " + (b.updated||0) + "건 (스캔 " + (b.scanned||0) + ")");
+        loadBids();
+      } else if (res.status === 429){
+        alert("잠시 후 다시 시도하세요 (쿨다운 " + Math.ceil(((res.body||{}).retry_after||0)/60) + "분 남음)");
+      } else if (res.body && res.body.error_code === "NO_G2B_KEY"){
+        alert("Netlify 환경변수 G2B_API_KEY가 아직 등록되지 않았습니다.");
+      } else {
+        alert("수집 실패 (" + res.status + ")");
+      }
+    }).catch(function(){ btn.disabled = false; btn.textContent = "↻ 지금 수집"; alert("통신 오류"); });
+  });
   document.getElementById("meSave").addEventListener("click", saveMemberEdit);
   document.getElementById("meReinstate").addEventListener("click", doReinstate);
   document.getElementById("meDelete").addEventListener("click", deleteMemberEdit);
@@ -3768,7 +3787,7 @@
     if (seeVeh || seeLic) tiles += '<div class="stat-tile' + (overdueTot ? ' alert' : '') + '"><div class="lbl">만기 임박</div><div class="val">' + imminentTot + '<span class="unit">건</span></div></div>';
     tiles += '<div class="stat-tile"><div class="lbl">미완료 지시</div><div class="val">' + openTasks.length + '<span class="unit">건</span></div></div>';
     tiles += '<div class="stat-tile"><div class="lbl">결재 대기</div><div class="val">' + reviewCount + '<span class="unit">건</span></div></div>';
-    if (canSee("bid")){ var bidN = bidNewCount(); if (bidN) tiles += '<div class="stat-tile alert"><div class="lbl">새 일감</div><div class="val">' + bidN + '<span class="unit">건</span></div></div>'; }
+    if (isAdmin()){ var bidN = bidNewCount(); if (bidN) tiles += '<div class="stat-tile alert"><div class="lbl">새 일감</div><div class="val">' + bidN + '<span class="unit">건</span></div></div>'; }
     var myChecks = myCheckCount();
     if (canSee("check") || myChecks) tiles += '<div class="stat-tile"><div class="lbl">주기업무</div><div class="val">' + myChecks + '<span class="unit">건</span></div></div>';
     var html = '<div class="dash-date">' + today + '</div>' + (tiles ? '<div class="stat-row">' + tiles + '</div>' : '');
@@ -4755,7 +4774,7 @@
       el.addEventListener("click",function(){ setBidStatus(el.getAttribute("data-bid-id"), el.getAttribute("data-bid-st")); });
     });
     var badge=document.getElementById("bidTabBadge");
-    if(badge){ var n=bidNewCount(); badge.textContent=n; badge.classList.toggle("hide",n===0||!canSee("bid")); badge.classList.toggle("red",n>0); }
+    if(badge){ var n=bidNewCount(); badge.textContent=n; badge.classList.toggle("hide",n===0||!isAdmin()); badge.classList.toggle("red",n>0); }
   }
   function openBidAdd(){
     if(!canDo("bid")) return;
@@ -5989,7 +6008,7 @@
     if (currentTab !== "dash" && currentTab !== "check" && MODULES.indexOf(currentTab) >= 0 && !canSee(currentTab)) switchTab("dash");
     // 일감 섹션(계약 탭 내): bid 권한으로 표시 게이팅
     var bidSec = document.getElementById("bidSection");
-    if (bidSec) bidSec.style.display = canSee("bid") ? "" : "none";
+    if (bidSec) bidSec.style.display = isAdmin() ? "" : "none";   // 일감은 관리자 전용(서버도 강제)
     // 인사 탭: 대표·관리자 전용
     var adminUser = isAdmin();
     var hrBtn = document.getElementById("tabHrBtn");
@@ -6386,7 +6405,7 @@
     }).catch(function(){ body.innerHTML = '<div class="empty-line">통신 오류</div>'; });
   }
   // 권한관리(별도 화면) — 모듈별 권한만 편집. 사이드바 순서와 동일.
-  var PERM_ORDER = ["tasks","rec","cli","con","bid","veh","lic","doc","check"];
+  var PERM_ORDER = ["tasks","rec","cli","con","veh","lic","doc","check"];
   var permOpenId = null;
   function permModList(){ return PERM_ORDER.filter(function(x){ return MODULES.indexOf(x) >= 0; }); }
   function renderPermMgmt(){
