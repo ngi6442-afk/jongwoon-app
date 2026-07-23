@@ -109,12 +109,14 @@ function mergeBidItems(doc, items) {
       doc.items.push({ id: n.id, source: n.source || '', kind: n.kind || '입찰', title: n.title || '', org: n.org || '',
         region: n.region || '', due: n.due || '', budget: n.budget || 0, url: n.url || '',
         matched: Array.isArray(n.matched) ? n.matched : [], method: n.method || '', rgn_ref: !!n.rgn_ref, appr: n.appr || 0,
+        no: n.no || '', posted: n.posted || '', docs: Array.isArray(n.docs) ? n.docs : [],
         status: (n.status === '패스' ? '패스' : 'new'), auto_pass: !!n.auto_pass, created: today, updated: today });
       byId[n.id] = doc.items[doc.items.length - 1];
       added++;
     } else {
       let ch = false;
-      ['title', 'org', 'region', 'due', 'budget', 'url', 'method', 'appr', 'kind'].forEach(function (k) { if (n[k] && n[k] !== cur[k]) { cur[k] = n[k]; ch = true; } });
+      ['title', 'org', 'region', 'due', 'budget', 'url', 'method', 'appr', 'kind', 'no', 'posted'].forEach(function (k) { if (n[k] && n[k] !== cur[k]) { cur[k] = n[k]; ch = true; } });
+      if (Array.isArray(n.docs) && n.docs.length && JSON.stringify(n.docs) !== JSON.stringify(cur.docs || [])) { cur.docs = n.docs; ch = true; }
       if (cur.rgn_ref && n.rgn_ref === false) { cur.rgn_ref = false; ch = true; }   // 공고서 판독 확인 반영
       if (ch) { cur.updated = today; updated++; }
     }
@@ -230,7 +232,8 @@ async function handleBidsRefresh(event, d, R) {
       out.push({ id: 'kapt-' + m[1], source: '공동주택', kind: '공사·용역', title: title, org: tds[6],
         region: '경북(소재)', due: due, budget: 0,
         url: 'https://www.k-apt.go.kr/bid/bidDetail.do?type=4&bidNum=' + encodeURIComponent(m[1]),
-        matched: kw, method: tds[2] + (tds[5] ? '·' + tds[5] : ''), rgn_ref: false });
+        matched: kw, method: tds[2] + (tds[5] ? '·' + tds[5] : ''), rgn_ref: false,
+        no: m[1], posted: (tds[7] || '').slice(0, 10) });
     }
     return out;
   }
@@ -305,9 +308,15 @@ async function handleBidsRefresh(event, d, R) {
         if (!mthdEligible(it.sucsfbidMthdNm, it.cntrctCnclsMthdNm)) continue;   // 시담·지명 제외
         let budget = 0; const bp = Number(it.presmptPrce || 0); if (!isNaN(bp)) budget = Math.floor(bp);
         const mlbl = String(it.sucsfbidMthdNm || '').split('-')[0].trim() || String(it.cntrctCnclsMthdNm || '').trim();
+        const docs = [];
+        for (let di = 1; di <= 10; di++) {
+          const du = it['ntceSpecDocUrl' + di], dn = String(it['ntceSpecFileNm' + di] || '').trim();
+          if (du && dn && docs.length < 5) docs.push({ n: dn, u: du });
+        }
         found.push({ id: 'g2b-' + (it.bidNtceNo || '') + '-' + (it.bidNtceOrd || ''), source: '나라장터', kind: '입찰',
           title: nm, org: org, region: rgnChk.lbl, due: String(it.bidClseDt || '').slice(0, 10).replace(/[./]/g, '-'),
-          budget: budget, url: it.bidNtceUrl || it.bidNtceDtlUrl || '', matched: kw.concat(licHits.slice(0, 2).map((h) => '면허:' + h)), method: mlbl, rgn_ref: !!rgnChk.ref });
+          budget: budget, url: it.bidNtceUrl || it.bidNtceDtlUrl || '', matched: kw.concat(licHits.slice(0, 2).map((h) => '면허:' + h)), method: mlbl, rgn_ref: !!rgnChk.ref,
+          no: (it.bidNtceNo || '') + '-' + (it.bidNtceOrd || ''), posted: String(it.bidNtceDt || '').slice(0, 10).replace(/[./]/g, '-'), docs: docs });
       }
     }
   }
