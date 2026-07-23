@@ -2245,6 +2245,7 @@
           '<div class="item-title">' + esc(t.title) + '</div>' +
           detailHtml +
           '<div class="item-meta">' + metaBits.join('') + '</div>' +
+          attachHtml +
         '</div>' +
         ctrl +
       '</div>';
@@ -2357,6 +2358,18 @@
     });
     Array.prototype.forEach.call(host.querySelectorAll("[data-task-doc]"), function(el){
       el.addEventListener("click", function(e){ e.stopPropagation(); openDocFromContract(el.getAttribute("data-task-doc"), el.getAttribute("data-task-doc-stage")||""); });
+    });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-att-add]"), function(el){
+      el.addEventListener("click", function(e){ e.stopPropagation(); pickAttachFor(el.getAttribute("data-att-add")); });
+    });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-att-del]"), function(el){
+      el.addEventListener("click", function(e){ e.preventDefault(); e.stopPropagation(); delAttach(el.getAttribute("data-att-del"), +el.getAttribute("data-att-i")); });
+    });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-att-drop]"), function(el){
+      el.addEventListener("dragover", function(e){ e.preventDefault(); el.style.background="#EEF5FF"; });
+      el.addEventListener("dragleave", function(){ el.style.background=""; });
+      el.addEventListener("drop", function(e){ e.preventDefault(); el.style.background="";
+        var f=e.dataTransfer && e.dataTransfer.files; if(f&&f.length) addAttachFiles(el.getAttribute("data-att-drop"), f); });
     });
     Array.prototype.forEach.call(host.querySelectorAll("[data-task-hold]"), function(el){
       el.addEventListener("click", function(e){ e.stopPropagation(); setTaskStatus(el.getAttribute("data-task-hold"), "hold"); });
@@ -4054,6 +4067,46 @@
     return fmtDate(d);
   }
   function findProc(id){ for(var i=0;i<contracts.length;i++){ if(contracts[i].id===id) return contracts[i]; } return null; }
+
+  // ---- 단계별 서류 첨부(버튼·드래그) — 참고자료로 보관, 판독 시 값 추출 ----
+  var ATT_MAX = 6 * 1024 * 1024;   // 개별 6MB 상한(용량·개인정보 최소화)
+  function findTask(id){ for(var i=0;i<tasks.length;i++){ if(tasks[i].id===id) return tasks[i]; } return null; }
+  function pickAttachFor(taskId){
+    var inp=document.createElement("input"); inp.type="file"; inp.multiple=true;
+    inp.accept=".pdf,.hwp,.hwpx,.xlsx,.xls,.jpg,.jpeg,.png";
+    inp.addEventListener("change", function(){ if(inp.files&&inp.files.length) addAttachFiles(taskId, inp.files); });
+    inp.click();
+  }
+  function addAttachFiles(taskId, files){
+    var t=findTask(taskId); if(!t||!t.proc_id) return;
+    var c=findProc(t.proc_id); if(!c) return;
+    if(!c.attachments) c.attachments={};
+    var key=t.stage_name||"기타";
+    if(!c.attachments[key]) c.attachments[key]=[];
+    var arr=c.attachments[key], pending=0;
+    Array.prototype.forEach.call(files, function(f){
+      if(f.size>ATT_MAX){ alert('"'+f.name+'"는 6MB를 넘어 첨부할 수 없습니다.'); return; }
+      pending++;
+      var r=new FileReader();
+      r.onload=function(){
+        arr.push({ name:f.name, size:f.size, type:f.type||"", data:r.result, parsed:"", added:todayStr() });
+        pending--; scheduleContractSave(); renderTasks();
+        parseAttach(arr[arr.length-1], c, key);   // 판독 시도(가능 형식만)
+      };
+      r.readAsDataURL(f);
+    });
+    if(!pending) renderTasks();
+  }
+  function delAttach(taskId, i){
+    var t=findTask(taskId); if(!t||!t.proc_id) return;
+    var c=findProc(t.proc_id); if(!c||!c.attachments) return;
+    var key=t.stage_name||"기타", arr=c.attachments[key];
+    if(arr && i>=0 && i<arr.length){ arr.splice(i,1); scheduleContractSave(); renderTasks(); }
+  }
+  // 판독 훅 — 형식별 텍스트 추출 후 값 스캔(현재: 파일명 기반 라벨, PDF 본문판독은 서버 경유 예정)
+  function parseAttach(att, c, stageKey){
+    // 자리표시: 실제 값 추출(석면조사서 PDF 등)은 판독 파이프라인 연결 시 채움
+  }
   function liveContracts(){ return contracts.filter(function(c){ return c && c.del!==1; }); }
   function loadContracts(){
     var token = getToken(); if(!token) return;

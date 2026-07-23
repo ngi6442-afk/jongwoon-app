@@ -4,7 +4,7 @@
 // 'gw_data' 저장: col:tasks / col:vehicles / col:receivables / col:licenses / col:checklist
 // 권한은 'gw_users'의 회원 레코드(perms)에서 확인. 관리자는 전부 허용.
 const crypto = require('crypto');
-const { setupBlobContext, store, blobGet, blobSet } = require('./_lib/blobs');
+const { setupBlobContext, store, blobGet, blobSet, blobDelete } = require('./_lib/blobs');
 const { verifyToken, bearer } = require('./_lib/session');
 const { appendAudit, auditKey, diffItems } = require('./_lib/audit');
 
@@ -478,6 +478,121 @@ async function handleBidsResults(event, d, R) {
   return jr(200, { status: 'OK', applied: applied, request_id: R });
 }
 
+// ---- 계약 첨부파일(석면조사서 등) — Blobs 저장 + 서버측 텍스트 추출 ----
+// 파일 바이트는 별도 스토어(gw_files)에 base64로, 메타는 계약(con)에 저장(목록 로드 시 바이트 미포함).
+const FILES = 'gw_files';
+const ATT_MAX = 8 * 1024 * 1024;   // 8MB(base64 기준)
+
+// PDF 텍스트 근사 추출 — 라이브러리 없이 스트림의 BT..ET / Tj·TJ 텍스트만 긁는다.
+function pdfExtractText(buf) {
+  let s = buf.toString('latin1');
+  const out = [];
+  // FlateDecode 스트림은 복원 불가(무압축 텍스트만) — (…)Tj, [(…)…]TJ 패턴 수집
+  const re = /\(((?:\\.|[^()\\])*)\)\s*T[jJ]/g;
+  let m;
+  while ((m = re.exec(s)) && out.length < 20000) {
+    const t = m[1].replace(/\\([()\\])/g, '$1').replace(/\\n/g, ' ');
+    if (t.trim()) out.push(t);
+  }
+  return out.join(' ');
+}
+
+// HWPX(zip+xml) 텍스트 — zlib inflate로 Contents/*.xml 태그 제거. HWP(구형 OLE)는 미지원.
+function hwpxExtractText(buf) {
+  try {
+    const zlib = require('zlib');
+    let s = '';
+    // 로컬 파일 헤더(PK\x03\x04) 순회 — Deflate(방법8)만 처리
+    let i = 0;
+    const sig = buf.indexOf(Buffer.from([0x50, 0x4b, 0x03, 0x04]));
+    if (sig < 0) return '';
+    // 간이 파서: 각 로컬헤더에서 압축크기·이름·데이터 오프셋 계산
+    let p = 0;
+    while (p + 30 <= buf.length) {
+      if (buf.readUInt32LE(p) !== 0x04034b50) break;
+      const method = buf.readUInt16LE(p + 8);
+      const compSize = buf.readUInt32LE(p + 18);
+      const nameLen = buf.readUInt16LE(p + 26);
+      const extraLen = buf.readUInt16LE(p + 28);
+      const name = buf.slice(p + 30, p + 30 + nameLen).toString('utf8');
+      const dataStart = p + 30 + nameLen + extraLen;
+      const data = buf.slice(dataStart, dataStart + compSize);
+      if (/Contents\/.*\.xml$/i.test(name) || /section\d+\.xml$/i.test(name)) {
+        try {
+          const xml = (method === 8 ? zlib.inflateRawSync(data) : data).toString('utf8');
+          s += ' ' + xml.replace(/<[^>]+>/g, ' ');
+        } catch (e) {}
+      }
+      p = dataStart + compSize;
+      if (compSize === 0) break;
+    }
+    return s.replace(/\s+/g, ' ');
+  } catch (e) { return ''; }
+}
+
+function extractAttText(name, buf) {
+  const ext = (name || '').toLowerCase().split('.').pop();
+  if (ext === 'pdf') return pdfExtractText(buf);
+  if (ext === 'hwpx') return hwpxExtractText(buf);
+  if (ext === 'txt') return buf.toString('utf8');
+  return '';
+}
+
+// 석면조사서 텍스트에서 신고대상 판정값 추출(시행령 제94조 근거) — 있는 것만
+function parseAsbestos(text) {
+  const flat = (text || '').replace(/\s+/g, '');
+  const out = {};
+  const num = (re) => { const m = flat.match(re); return m ? parseFloat(m[1].replace(/,/g, '')) : null; };
+  // 자재별 면적(㎡) — "천장재…50㎡", "벽체…" 등 근사
+  const spray = /(분무재|내화피복재)/.test(flat);
+  if (spray) out.spray = 1;
+  const wall = num(/(?:벽체|바닥|천장|지붕)[^\d]{0,20}([\d,.]+)\s*(?:㎡|m2|제곱)/);
+  if (wall != null) out.wallArea = wall;
+  const insul = num(/(?:단열재|보온재|개스킷|패킹|실링)[^\d]{0,20}([\d,.]+)\s*(?:㎡|m2|제곱)/);
+  if (insul != null) out.insulArea = insul;
+  const pipe = num(/(?:파이프|배관)[^\d]{0,20}([\d,.]+)\s*(?:m|미터)/);
+  if (pipe != null) out.pipeLen = pipe;
+  return out;
+}
+
+async function handleAttPut(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (permOf(c.member, 'contracts') !== 'do') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_WRITE', request_id: R });
+  const name = String(d.name || '').slice(0, 120);
+  const b64 = String(d.data || '');
+  if (!name || !b64) return jr(400, { status: 'REJECTED', error_code: 'INVALID_FILE', request_id: R });
+  if (b64.length > ATT_MAX) return jr(413, { status: 'REJECTED', error_code: 'FILE_TOO_LARGE', request_id: R });
+  const id = 'att_' + crypto.randomBytes(8).toString('hex');
+  const w = await blobSet(store(FILES), id, { name: name, type: String(d.type || ''), data: b64, by: c.member.name, ts: Date.now() });
+  if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
+  // 서버측 텍스트 추출 + (석면조사서면) 판정값 파싱
+  let text = '', parsed = null;
+  try {
+    const buf = Buffer.from(b64, 'base64');
+    text = extractAttText(name, buf).slice(0, 200000);
+    if (d.kind === 'asbestos' || /석면|사전조사|조사서/.test(name)) parsed = parseAsbestos(text);
+  } catch (e) {}
+  return jr(200, { status: 'OK', id: id, name: name, size: b64.length, has_text: text.length > 0, parsed: parsed, request_id: R });
+}
+
+async function handleAttGet(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (permOf(c.member, 'contracts') === 'hide') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_ACCESS', request_id: R });
+  const r = await blobGet(store(FILES), String(d.id || ''));
+  if (!r.ok || !r.data) return jr(404, { status: 'REJECTED', error_code: 'NOT_FOUND', request_id: R });
+  return jr(200, { status: 'OK', name: r.data.name, type: r.data.type, data: r.data.data, request_id: R });
+}
+
+async function handleAttDel(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (permOf(c.member, 'contracts') !== 'do') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_WRITE', request_id: R });
+  await blobDelete(store(FILES), String(d.id || ''));
+  return jr(200, { status: 'OK', request_id: R });
+}
+
 // 감사 로그 조회(관리자 전용). month='YYYY-MM' 미지정 시 이번 달.
 async function handleAudit(event, d, R) {
   const c = await currentMember(event);
@@ -505,6 +620,9 @@ async function handler(event) {
     if (d && d.action === 'bids_purge') return await handleBidsPurge(event, d, R);
     if (d && d.action === 'bids_export') return await handleBidsExport(event, d, R);
     if (d && d.action === 'bids_results') return await handleBidsResults(event, d, R);
+    if (d && d.action === 'att_put') return await handleAttPut(event, d, R);
+    if (d && d.action === 'att_get') return await handleAttGet(event, d, R);
+    if (d && d.action === 'att_del') return await handleAttDel(event, d, R);
     return jr(400, { status: 'REJECTED', error_code: 'UNKNOWN_ACTION', request_id: R });
   } catch (e) {
     return jr(500, { status: 'ERROR', error_code: 'HANDLER_FAILED', request_id: R });
