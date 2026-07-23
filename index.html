@@ -4837,6 +4837,18 @@
     mo.textContent=msg;
   }
   function bcBand(v){ v=parseFloat(v)||0; if(v<2e8) return "2억미만"; if(v<1e9) return "2~10억"; if(v<5e9) return "10~50억"; return "50억이상"; }
+  // 투찰 범위(낙찰하한가 최소~최대) — 산출요소가 공고문·공식 공개값으로 전부 확보된 공고만
+  function bidFloorRange(b){
+    var e=b.ext||{};
+    var bss=parseFloat(e.bss)||0, lwlt=parseFloat(e.lwlt)||0;
+    var m=String(e.rng||"").match(/(-?[\d.]+)\s*%\s*~\s*\+?(-?[\d.]+)\s*%/);
+    if(!bss||!lwlt||!m) return null;
+    if(e.a && !e.aamt) return null;   // A값 방식 명기인데 금액 미확보 → 범위 미표시
+    var low=parseFloat(m[1]), high=parseFloat(m[2]);
+    var a=(e.a&&e.aamt)?parseFloat(e.aamt):0;
+    var f=function(p){ return a ? (p-a)*lwlt/100+a : p*lwlt/100; };
+    return { lo: Math.round(f(bss*(1+low/100))), hi: Math.round(f(bss*(1+high/100))), a: a };
+  }
   function bcRefLines(org, kind, aFlag){
     // 실측 참고선 — 최근 개찰 데이터(예정가 대비 낙찰 투찰률). 예규 하한율은 공고문 확인 사항.
     var el=document.getElementById("bcRef"); if(!el) return;
@@ -4933,6 +4945,8 @@
       if(b.auto_pass) meta.push('<span class="hold-chip">자동패스(학습)</span>');
       if(b.matched&&b.matched.length) meta.push('<span class="from-chip">'+esc(b.matched.join(","))+'</span>');
       if(b.budget) meta.push('<span class="rec-amt">'+fmtAmount(b.budget)+'원</span>');
+      var fr=bidFloorRange(b);
+      if(fr) meta.push('<span class="rec-amt" title="낙찰하한가 범위(예가 추첨에 따라) — 이 위에서 투찰'+(fr.a?' · A값 반영':'')+'">투찰≥ '+fmtAmount(fr.lo)+'~'+fmtAmount(fr.hi)+'원</span>');
       var ctrl='';
       if(canDo("bid")){
         (BID_NEXT[st]||[]).forEach(function(s){ ctrl+='<button class="mini-btn'+((s[0]==="응찰"||s[0]==="낙찰")?' appr-btn':'')+'" data-bid-st="'+s[0]+'" data-bid-id="'+b.id+'">'+s[1]+'</button>'; });
@@ -4971,7 +4985,8 @@
         var t2 = tbl([
           ["기초금액", (ext.bss?fmtAmount(ext.bss)+"원":"")], ["추정가격", (b.budget?fmtAmount(b.budget)+"원":"")],
           ["예가범위", (esc(ext.rng||"")+(ext.prc_m?" ("+esc(ext.prc_m)+")":""))], ["낙찰하한율", (ext.lwlt?esc(ext.lwlt)+"%":"")],
-          ["A값(합산)", ((ext.a&&ext.aamt)?fmtAmount(ext.aamt)+"원":"")]
+          ["A값(합산)", ((ext.a&&ext.aamt)?fmtAmount(ext.aamt)+"원":"")],
+          ["투찰범위(하한)", (function(){ var fr=bidFloorRange(b); return fr ? (fmtAmount(fr.lo)+" ~ "+fmtAmount(fr.hi)+"원 <span style='color:#888;'>(예가 추첨 범위"+(fr.a?" · A값 반영":"")+" — 최대값 이상이면 항상 통과)</span>") : ""; })()]
         ]);
         if(t2 && (ext.bss||b.budget)) t2 += '<button class="mini-btn" data-bid-calc="'+b.id+'" style="margin-top:4px;">🧮 이 공고로 계산</button>';
         var t3 = tbl([
