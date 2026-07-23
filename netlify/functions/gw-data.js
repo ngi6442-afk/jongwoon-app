@@ -117,7 +117,10 @@ function mergeBidItems(doc, items) {
       let ch = false;
       ['title', 'org', 'region', 'due', 'budget', 'url', 'method', 'appr', 'kind', 'no', 'posted'].forEach(function (k) { if (n[k] && n[k] !== cur[k]) { cur[k] = n[k]; ch = true; } });
       if (Array.isArray(n.docs) && n.docs.length && JSON.stringify(n.docs) !== JSON.stringify(cur.docs || [])) { cur.docs = n.docs; ch = true; }
-      if (n.ext && typeof n.ext === 'object' && Object.keys(n.ext).length && JSON.stringify(n.ext) !== JSON.stringify(cur.ext || {})) { cur.ext = n.ext; ch = true; }
+      if (n.ext && typeof n.ext === 'object' && Object.keys(n.ext).length) {
+        const mergedExt = Object.assign({}, cur.ext || {}, n.ext);   // 키 단위 병합 — 공고문 파싱값 보존
+        if (JSON.stringify(mergedExt) !== JSON.stringify(cur.ext || {})) { cur.ext = mergedExt; ch = true; }
+      }
       if (cur.rgn_ref && n.rgn_ref === false) { cur.rgn_ref = false; ch = true; }   // 공고서 판독 확인 반영
       if (ch) { cur.updated = today; updated++; }
     }
@@ -151,7 +154,23 @@ async function handleBidsIngest(event, d, R) {
       }) };
     hasHealth = true;
   }
-  if (m.added || m.updated || hasHealth) {
+  // 낙찰 투찰률 실측 통계(계산기 참고선) — 용역/공사 사분위 + 기관별 중앙값
+  let hasAwards = false;
+  if (target === 'bids' && d.awards && typeof d.awards === 'object') {
+    const a = d.awards, aw = { ts: Number(a.ts) || Date.now(), basis: String(a.basis || '').slice(0, 80) };
+    ['servc', 'cnstwk'].forEach(function (k) {
+      if (a[k] && typeof a[k] === 'object') aw[k] = { n: Number(a[k].n) || 0, q1: Number(a[k].q1) || 0, med: Number(a[k].med) || 0, q3: Number(a[k].q3) || 0 };
+    });
+    aw.orgs = {};
+    if (a.orgs && typeof a.orgs === 'object') {
+      Object.keys(a.orgs).slice(0, 80).forEach(function (org) {
+        const o = a.orgs[org] || {};
+        aw.orgs[String(org).slice(0, 40)] = { n: Number(o.n) || 0, med: Number(o.med) || 0 };
+      });
+    }
+    doc.awards = aw; hasAwards = true;
+  }
+  if (m.added || m.updated || hasHealth || hasAwards) {
     doc.updated_by = '수집봇'; doc.updated_at = Date.now();
     const w = await blobSet(st, colKey(target), doc);
     if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
