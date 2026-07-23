@@ -4656,6 +4656,7 @@
       document.getElementById("dgOwner").value = c.client || "";
       document.getElementById("dgSite").value = c.site || "";
       document.getElementById("dgWork").value = svc;
+      if(c.asb_survey && c.asb_survey.area) document.getElementById("dgArea").value = c.asb_survey.area;   // 검수 조사서 면적 자동
     } else if(dt==="waste"){
       document.getElementById("dgParty").value = "business";
       document.getElementById("dgName").value = c.client || "";
@@ -4666,7 +4667,8 @@
     if(h){
       h.textContent = (stage ? "["+c.label+" · "+stage+" 단계] " : "") + (c.docType==="public"
         ? "공문서 계약 — 계약 확정 후 견적서 작성. (계약서는 발주처가 발급)"
-        : "사문서 계약 — 견적서 먼저 고객 확인 후 계약. 지금은 계약 확정 → 계약서 발행.");
+        : "사문서 계약 — 견적서 먼저 고객 확인 후 계약. 지금은 계약 확정 → 계약서 발행.")
+        + (c.asb_survey ? " · 석면조사서 "+c.asb_survey.area+"㎡ "+(c.asb_survey.confirmed?"(검수됨)":"(미검수 — 검수 후 사용)")+(c.asb_survey.target?" · 노동부 신고대상":"") : "");
       h.style.display = "";
     }
   }
