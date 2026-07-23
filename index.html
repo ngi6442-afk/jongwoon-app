@@ -2230,7 +2230,8 @@
         : '<button class="mini-btn" data-task-hold="' + t.id + '">보류</button>');
       var doneBtn = canActTask(t) ? '<button class="mini-btn appr-btn" data-task-done="' + t.id + '">완료</button>' : '';
       var editBtn = canDo("tasks") ? '<button class="mini-btn" data-task-edit="' + t.id + '">수정</button>' : '';
-      ctrl = '<div class="task-ctrl">' + ddayBadge + doneBtn + holdBtn + editBtn + '</div>';
+      var docBtn = (t.proc_id && canDo("con")) ? '<button class="mini-btn" data-task-doc="' + t.proc_id + '" data-task-doc-stage="' + esc(t.stage_name||"") + '">📄 서류</button>' : '';
+      ctrl = '<div class="task-ctrl">' + ddayBadge + doneBtn + docBtn + holdBtn + editBtn + '</div>';
     }
 
     var cls = "item task-item" + (isDone ? " checked" : "") + (t.status === "hold" ? " hold" : "") + (t.status === "review" ? " review" : "");
@@ -2349,6 +2350,9 @@
         if (cl.contains("mini-btn") || cl.contains("cal-btn") || cl.contains("sel-box")) return;
         toggleTaskDone(el.getAttribute("data-task-toggle"));
       });
+    });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-task-doc]"), function(el){
+      el.addEventListener("click", function(e){ e.stopPropagation(); openDocFromContract(el.getAttribute("data-task-doc"), el.getAttribute("data-task-doc-stage")||""); });
     });
     Array.prototype.forEach.call(host.querySelectorAll("[data-task-hold]"), function(el){
       el.addEventListener("click", function(e){ e.stopPropagation(); setTaskStatus(el.getAttribute("data-task-hold"), "hold"); });
@@ -4238,12 +4242,15 @@
     document.getElementById("docGenBackdrop").classList.add("show");
   }
   // 계약에서 서류 생성: 계약 정보 자동 반영 + 성격별 기본 서류/타이밍 안내
-  function openDocFromContract(id){
+  // stage(단계명)를 주면 단계에 맞는 서류를 우선 선택(견적/계약서), 힌트에 단계 표기
+  function openDocFromContract(id, stage){
     var c = findProc(id); if(!c) return;
     openDocGen();
     var isDemo = (c.type==="asbestos" || c.type==="demolition");
     var dt;
-    if(c.docType==="public") dt = isDemo ? "quote_con" : "quote_env";   // 공문서: 계약 확정 후 견적서
+    if(stage && stage.indexOf("견적")>=0) dt = isDemo ? "quote_con" : "quote_env";
+    else if(stage && stage.indexOf("계약")>=0 && c.docType!=="public") dt = isDemo ? "demo" : "waste";
+    else if(c.docType==="public") dt = isDemo ? "quote_con" : "quote_env";   // 공문서: 계약 확정 후 견적서
     else dt = isDemo ? "demo" : "waste";                                 // 사문서: 계약 확정 -> 계약서(견적은 계약 전)
     document.getElementById("dgDocType").value = dt;
     dgToggleDocType();
@@ -4263,9 +4270,9 @@
     }
     var h = document.getElementById("dgHint");
     if(h){
-      h.textContent = c.docType==="public"
+      h.textContent = (stage ? "["+c.label+" · "+stage+" 단계] " : "") + (c.docType==="public"
         ? "공문서 계약 — 계약 확정 후 견적서 작성. (계약서는 발주처가 발급)"
-        : "사문서 계약 — 견적서 먼저 고객 확인 후 계약. 지금은 계약 확정 → 계약서 발행.";
+        : "사문서 계약 — 견적서 먼저 고객 확인 후 계약. 지금은 계약 확정 → 계약서 발행.");
       h.style.display = "";
     }
   }
