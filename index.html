@@ -4077,35 +4077,186 @@
     inp.addEventListener("change", function(){ if(inp.files&&inp.files.length) addAttachFiles(taskId, inp.files); });
     inp.click();
   }
+  // 첨부: 원본은 서버 blob(att_put), 계약엔 참조·판독결과만. 석면 단계면 Claude 판독.
   function addAttachFiles(taskId, files){
     var t=findTask(taskId); if(!t||!t.proc_id) return;
     var c=findProc(t.proc_id); if(!c) return;
     if(!c.attachments) c.attachments={};
     var key=t.stage_name||"기타";
     if(!c.attachments[key]) c.attachments[key]=[];
-    var arr=c.attachments[key], pending=0;
+    var arr=c.attachments[key];
+    var isAsb = /석면/.test(key) || (c.elems&&c.elems.asb);
     Array.prototype.forEach.call(files, function(f){
       if(f.size>ATT_MAX){ alert('"'+f.name+'"는 6MB를 넘어 첨부할 수 없습니다.'); return; }
-      pending++;
       var r=new FileReader();
       r.onload=function(){
-        arr.push({ name:f.name, size:f.size, type:f.type||"", data:r.result, parsed:"", added:todayStr() });
-        pending--; scheduleContractSave(); renderTasks();
-        parseAttach(arr[arr.length-1], c, key);   // 판독 시도(가능 형식만)
+        var entry={ name:f.name, size:f.size, type:f.type||"", id:"", parsed:"판독 중…", added:todayStr() };
+        arr.push(entry); renderTasks();
+        gwCall("gw-data", { action:"att_put", name:f.name, type:f.type||"", data:String(r.result).split(",")[1]||"", kind:(isAsb?"asbestos":"") })
+          .then(function(res){
+            entry.id=res.id||"";
+            var p=res.parsed;
+            if(!p){ entry.parsed=""; }
+            else if(p.error){ entry.parsed="판독 실패("+p.error+") — 수동 확인"; }
+            else if(p.judge){
+              var area=(p.rows||[]).reduce(function(s,x){return s+(x.area||0);},0);
+              entry.parsed="석면 "+(p.rows||[]).length+"행·"+ (Math.round(area*100)/100) +"㎡ · 신고대상 "+(p.judge.target?"예":"아니오");
+              entry.asb=p;
+              c.asb_survey={org:p.org||"", area:Math.round(area*100)/100, target:p.judge.target, reasons:p.judge.reasons, rows:p.rows||[], from:f.name, checked:todayStr(), confirmed:false};
+              if(p.judge.target) setTimeout(function(){ alert("석면조사서 판독 — 노동부 신고대상입니다.\n\n"+p.judge.reasons.join("\n")+"\n\n※ 판독값은 검수 후 확정하세요. '노동부신고' 단계가 없으면 추가하세요."); },100);
+            } else { entry.parsed="판독됨"; }
+            scheduleContractSave(); renderTasks();
+          })
+          .catch(function(){ entry.parsed="업로드 실패"; renderTasks(); });
       };
       r.readAsDataURL(f);
     });
-    if(!pending) renderTasks();
   }
   function delAttach(taskId, i){
     var t=findTask(taskId); if(!t||!t.proc_id) return;
     var c=findProc(t.proc_id); if(!c||!c.attachments) return;
     var key=t.stage_name||"기타", arr=c.attachments[key];
-    if(arr && i>=0 && i<arr.length){ arr.splice(i,1); scheduleContractSave(); renderTasks(); }
+    if(arr && i>=0 && i<arr.length){
+      var att=arr[i];
+      if(att.id) gwCall("gw-data", { action:"att_del", id:att.id }).catch(function(){});
+      arr.splice(i,1); scheduleContractSave(); renderTasks();
+    }
   }
-  // 판독 훅 — 형식별 텍스트 추출 후 값 스캔(현재: 파일명 기반 라벨, PDF 본문판독은 서버 경유 예정)
-  function parseAttach(att, c, stageKey){
-    // 자리표시: 실제 값 추출(석면조사서 PDF 등)은 판독 파이프라인 연결 시 채움
+  // ---- xlsx 파싱(브라우저 내장 DecompressionStream, 외부 라이브러리 없음) ----
+  function dataUrlToBytes(durl){
+    var b=atob((durl||"").split(",")[1]||""); var a=new Uint8Array(b.length);
+    for(var i=0;i<b.length;i++) a[i]=b.charCodeAt(i); return a;
+  }
+  async function inflateRaw(bytes){
+    var ds=new DecompressionStream("deflate-raw");
+    var s=new Blob([bytes]).stream().pipeThrough(ds);
+    return new Uint8Array(await new Response(s).arrayBuffer());
+  }
+  async function unzip(bytes){
+    // ZIP central directory 파싱 → {name: Uint8Array}
+    var dv=new DataView(bytes.buffer); var files={};
+    // EOCD 찾기
+    var i=bytes.length-22;
+    while(i>=0 && dv.getUint32(i,true)!==0x06054b50) i--;
+    if(i<0) return files;
+    var cdOff=dv.getUint32(i+16,true), n=dv.getUint16(i+10,true), p=cdOff;
+    for(var k=0;k<n;k++){
+      if(dv.getUint32(p,true)!==0x02014b50) break;
+      var method=dv.getUint16(p+10,true), csize=dv.getUint32(p+20,true);
+      var nlen=dv.getUint16(p+28,true), elen=dv.getUint16(p+30,true), clen=dv.getUint16(p+32,true);
+      var lho=dv.getUint32(p+42,true);
+      var name=new TextDecoder().decode(bytes.subarray(p+46,p+46+nlen));
+      // local header에서 실제 데이터 오프셋
+      var lnlen=dv.getUint16(lho+26,true), lelen=dv.getUint16(lho+28,true);
+      var dstart=lho+30+lnlen+lelen;
+      var comp=bytes.subarray(dstart,dstart+csize);
+      files[name]={method:method,comp:comp};
+      p+=46+nlen+elen+clen;
+    }
+    return files;
+  }
+  async function readXlsx(dataUrl){
+    var files=await unzip(dataUrlToBytes(dataUrl));
+    async function txt(name){
+      var f=files[name]; if(!f) return "";
+      var raw = f.method===0 ? f.comp : await inflateRaw(f.comp);
+      return new TextDecoder().decode(raw);
+    }
+    // 공유문자열
+    var shared=[]; var ss=await txt("xl/sharedStrings.xml");
+    if(ss){ var m=ss.match(/<si[\s>][\s\S]*?<\/si>/g)||[]; shared=m.map(function(si){
+      return (si.match(/<t[^>]*>([\s\S]*?)<\/t>/g)||[]).map(function(t){ return t.replace(/<[^>]+>/g,""); }).join("")
+        .replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&amp;/g,"&"); }); }
+    // 시트 목록(workbook.xml 순서)
+    var wbx=await txt("xl/workbook.xml");
+    var names=(wbx.match(/<sheet [^>]*name="([^"]+)"/g)||[]).map(function(s){ return s.match(/name="([^"]+)"/)[1]; });
+    // 각 시트 → 2D 배열
+    var sheets=[];
+    for(var si=1; si<=names.length; si++){
+      var sx=await txt("xl/worksheets/sheet"+si+".xml"); if(!sx) continue;
+      var grid=[];
+      (sx.match(/<row[\s>][\s\S]*?<\/row>/g)||[]).forEach(function(rowxml){
+        var rn=(rowxml.match(/<row[^>]*r="(\d+)"/)||[])[1]; rn=rn?+rn-1:grid.length;
+        var arr=grid[rn]=grid[rn]||[];
+        (rowxml.match(/<c[\s>][\s\S]*?(?:<\/c>|\/>)/g)||[]).forEach(function(cxml){
+          var ref=(cxml.match(/r="([A-Z]+)\d+"/)||[])[1]; if(!ref) return;
+          var col=0; for(var j=0;j<ref.length;j++) col=col*26+(ref.charCodeAt(j)-64); col--;
+          var isStr=/t="s"/.test(cxml);
+          var vm=cxml.match(/<v[^>]*>([\s\S]*?)<\/v>/); var isM=/t="inlineStr"/.test(cxml);
+          var val="";
+          if(isM){ var tm=cxml.match(/<t[^>]*>([\s\S]*?)<\/t>/); val=tm?tm[1]:""; }
+          else if(vm){ val = isStr ? (shared[+vm[1]]||"") : vm[1]; }
+          arr[col]=val;
+        });
+      });
+      sheets.push({name:names[si-1]||("Sheet"+si), grid:grid});
+    }
+    return sheets;
+  }
+
+  // ---- 석면조사 표 헤더 탐지(위치 무관) + §94 신고대상 판정 ----
+  var ASB_HDR={ mat:["자재종류","석면함유자재","자재명","품명","함유자재"], loc:["위치","부위"],
+    area:["범위","면적","㎡","수량"], cnt:["함유율"] };
+  function asbNorm(s){ return String(s==null?"":s).replace(/\s+/g,""); }
+  function asbFindTable(grid){
+    for(var r=0;r<Math.min(grid.length,60);r++){
+      var row=grid[r]||[], cols={};
+      for(var c=0;c<row.length;c++){
+        var v=asbNorm(row[c]);
+        for(var key in ASB_HDR){ if(!(key in cols)){ for(var k=0;k<ASB_HDR[key].length;k++){ if(v.indexOf(ASB_HDR[key][k])>=0){ cols[key]=c; break; } } } }
+      }
+      if("mat" in cols && "area" in cols) return {hr:r, cols:cols};
+    }
+    return null;
+  }
+  var ASB_PLANE=["천정","천장","벽","바닥","지붕","슬레이트","텍스"], ASB_INSUL=["단열","보온","개스킷","패킹","실링"], ASB_SPRAY=["분무","내화"];
+  function asbExtract(sheets){
+    for(var s=0;s<sheets.length;s++){
+      var t=asbFindTable(sheets[s].grid); if(!t) continue;
+      var grid=sheets[s].grid, rows=[];
+      for(var r=t.hr+1;r<grid.length;r++){
+        var g=grid[r]||[]; var a=parseFloat(String(g[t.cols.area]||"").replace(/,/g,""));
+        if(!(a>0)) continue;
+        var mat=String(g[t.cols.mat]||"").trim(), loc=("loc" in t.cols)?String(g[t.cols.loc]||"").trim():"";
+        if(!mat && !loc) continue;   // 합계행 제외
+        rows.push({mat:mat, loc:loc, area:a});
+      }
+      if(rows.length) return {sheet:sheets[s].name, rows:rows};
+    }
+    return null;
+  }
+  function asbJudge(rows){
+    var plane=0,insul=0,spray=false;
+    rows.forEach(function(r){ var t=r.mat+r.loc;
+      if(ASB_SPRAY.some(function(k){return t.indexOf(k)>=0;})) spray=true;
+      if(ASB_PLANE.some(function(k){return t.indexOf(k)>=0;})) plane+=r.area;
+      if(ASB_INSUL.some(function(k){return t.indexOf(k)>=0;})) insul+=r.area;
+    });
+    var reasons=[], target=false;
+    if(spray){ target=true; reasons.push("분무재/내화피복재 사용 → §94조2호(면적무관)"); }
+    if(plane>=50){ target=true; reasons.push("벽체·천장·바닥·지붕재 "+(Math.round(plane*10)/10)+"㎡ ≥ 50㎡ → §94조1호"); }
+    if(insul>=15){ target=true; reasons.push("단열·보온재 등 "+(Math.round(insul*10)/10)+"㎡ ≥ 15㎡ → §94조3호"); }
+    return {target:target, reasons:reasons};
+  }
+
+  // 판독 훅 — 석면 관련 단계에 xlsx 첨부 시 조사표 파싱→신고대상 판정
+  async function parseAttach(att, c, stageKey){
+    if(!att || !/\.(xlsx|xls)$/i.test(att.name||"")) return;
+    try{
+      var sheets=await readXlsx(att.data);
+      var ex=asbExtract(sheets);
+      if(!ex){ att.parsed="표 인식 실패 — 수동 확인"; scheduleContractSave(); renderTasks(); return; }
+      var j=asbJudge(ex.rows);
+      var area=Math.round(ex.rows.reduce(function(s,r){return s+r.area;},0)*100)/100;
+      att.parsed="석면 "+ex.rows.length+"행·면적합 "+area+"㎡ · 신고대상 "+(j.target?"예":"아니오");
+      att.asb={rows:ex.rows, judge:j};
+      // 신고대상이면 계약에 표시(자동 요소 반영은 검수 후)
+      c.asb_survey={area:area, target:j.target, reasons:j.reasons, from:att.name, checked:todayStr()};
+      scheduleContractSave(); renderTasks();
+      if(j.target){
+        setTimeout(function(){ alert("석면조사서 판독 — 노동부 신고대상입니다.\n\n"+j.reasons.join("\n")+"\n\n(계약 단계에 '노동부신고'가 없으면 추가하세요. 판독값은 검수 후 확정하세요.)"); }, 100);
+      }
+    }catch(e){ att.parsed="판독 오류"; scheduleContractSave(); renderTasks(); }
   }
   function liveContracts(){ return contracts.filter(function(c){ return c && c.del!==1; }); }
   function loadContracts(){

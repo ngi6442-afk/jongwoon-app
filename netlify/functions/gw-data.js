@@ -538,21 +538,65 @@ function extractAttText(name, buf) {
   return '';
 }
 
-// 석면조사서 텍스트에서 신고대상 판정값 추출(시행령 제94조 근거) — 있는 것만
-function parseAsbestos(text) {
-  const flat = (text || '').replace(/\s+/g, '');
-  const out = {};
-  const num = (re) => { const m = flat.match(re); return m ? parseFloat(m[1].replace(/,/g, '')) : null; };
-  // 자재별 면적(㎡) — "천장재…50㎡", "벽체…" 등 근사
-  const spray = /(분무재|내화피복재)/.test(flat);
-  if (spray) out.spray = 1;
-  const wall = num(/(?:벽체|바닥|천장|지붕)[^\d]{0,20}([\d,.]+)\s*(?:㎡|m2|제곱)/);
-  if (wall != null) out.wallArea = wall;
-  const insul = num(/(?:단열재|보온재|개스킷|패킹|실링)[^\d]{0,20}([\d,.]+)\s*(?:㎡|m2|제곱)/);
-  if (insul != null) out.insulArea = insul;
-  const pipe = num(/(?:파이프|배관)[^\d]{0,20}([\d,.]+)\s*(?:m|미터)/);
-  if (pipe != null) out.pipeLen = pipe;
-  return out;
+// §94조 신고대상 판정 — 자재 행(위치·면적)을 법 기준에 대조(판정은 코드가 확정)
+function judgeAsbestos94(rows) {
+  const PLANE = ['천장', '천정', '벽', '바닥', '지붕', '슬레이트', '텍스'];
+  const INSUL = ['단열', '보온', '개스킷', '패킹', '실링'];
+  const SPRAY = ['분무', '내화'];
+  let plane = 0, insul = 0, pipe = 0, spray = false;
+  (rows || []).forEach(function (r) {
+    const t = String(r.mat || '') + String(r.loc || '');
+    const a = Number(r.area) || 0;
+    if (SPRAY.some(function (k) { return t.indexOf(k) >= 0; })) spray = true;
+    if (PLANE.some(function (k) { return t.indexOf(k) >= 0; })) plane += a;
+    else if (INSUL.some(function (k) { return t.indexOf(k) >= 0; })) insul += a;
+    if (/파이프|배관|보온/.test(t) && r.len) pipe += Number(r.len) || 0;
+  });
+  const reasons = []; let target = false;
+  if (spray) { target = true; reasons.push('분무재/내화피복재 사용 → 시행령 §94조2호(면적무관)'); }
+  if (plane >= 50) { target = true; reasons.push('벽체·천장·바닥·지붕재 ' + Math.round(plane * 10) / 10 + '㎡ ≥ 50㎡ → §94조1호'); }
+  if (insul >= 15) { target = true; reasons.push('단열·보온재 등 ' + Math.round(insul * 10) / 10 + '㎡ ≥ 15㎡ → §94조3호'); }
+  if (pipe >= 80) { target = true; reasons.push('파이프 보온재 ' + Math.round(pipe) + 'm ≥ 80m → §94조4호'); }
+  return { target: target, reasons: reasons, plane: Math.round(plane * 100) / 100, insul: Math.round(insul * 100) / 100 };
+}
+
+// Claude 비전 판독 — PDF/이미지(스캔본 포함)에서 석면 자재표 값만 추출. 판정은 코드(judgeAsbestos94)가.
+// ANTHROPIC_API_KEY(Netlify env) 필요. 없으면 null 반환(첨부·저장은 정상, 판독만 생략).
+async function claudeExtractAsbestos(buf, name, type) {
+  const key = (process.env.ANTHROPIC_API_KEY || '').trim();
+  if (!key) return null;
+  const model = (process.env.CLAUDE_PARSE_MODEL || 'claude-sonnet-5').trim();
+  const ext = (name || '').toLowerCase().split('.').pop();
+  const b64 = buf.toString('base64');
+  let media;
+  if (ext === 'pdf') media = { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: b64 } };
+  else if (['jpg', 'jpeg', 'png', 'gif', 'webp'].indexOf(ext) >= 0) {
+    const mt = ext === 'jpg' ? 'jpeg' : ext;
+    media = { type: 'image', source: { type: 'base64', media_type: 'image/' + mt, data: b64 } };
+  } else return null;
+  const prompt = '이 문서는 석면(건축물석면) 조사결과서다. 석면함유자재 표에서 각 행을 그대로 추출하라. '
+    + '각 행: 동·층(bldg), 자재성상/종류(mat, 예: 갈매기무늬텍스·다공성텍스·분무재·보온재), 위치/부위(loc, 예: 천장·벽체·바닥·지붕·파이프), 면적㎡(area, 숫자만), 파이프길이m(len, 있으면). '
+    + '판정·합산·해석은 하지 말고 표에 적힌 값만 JSON으로. 표를 못 찾으면 {"rows":[],"note":"이유"}. '
+    + '형식: {"org":"조사기관명","site":"소재지","summary_area":숫자,"rows":[{"bldg":"","mat":"","loc":"","area":0,"len":0}]}';
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+      body: JSON.stringify({ model: model, max_tokens: 4096,
+        messages: [{ role: 'user', content: [media, { type: 'text', text: prompt }] }] })
+    });
+    if (!resp.ok) return { error: 'CLAUDE_' + resp.status };
+    const j = await resp.json();
+    const txt = ((j.content || []).find(function (b) { return b.type === 'text'; }) || {}).text || '';
+    const m = txt.match(/\{[\s\S]*\}/);
+    if (!m) return { error: 'NO_JSON' };
+    const data = JSON.parse(m[0]);
+    const rows = Array.isArray(data.rows) ? data.rows.map(function (r) {
+      return { bldg: String(r.bldg || '').slice(0, 40), mat: String(r.mat || '').slice(0, 40), loc: String(r.loc || '').slice(0, 20), area: Number(r.area) || 0, len: Number(r.len) || 0 };
+    }) : [];
+    return { org: String(data.org || '').slice(0, 60), site: String(data.site || '').slice(0, 80),
+      summary_area: Number(data.summary_area) || 0, rows: rows, judge: judgeAsbestos94(rows) };
+  } catch (e) { return { error: 'PARSE_FAILED' }; }
 }
 
 async function handleAttPut(event, d, R) {
@@ -566,14 +610,14 @@ async function handleAttPut(event, d, R) {
   const id = 'att_' + crypto.randomBytes(8).toString('hex');
   const w = await blobSet(store(FILES), id, { name: name, type: String(d.type || ''), data: b64, by: c.member.name, ts: Date.now() });
   if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
-  // 서버측 텍스트 추출 + (석면조사서면) 판정값 파싱
-  let text = '', parsed = null;
+  // 석면조사서면 Claude 비전 판독(스캔·이미지·압축PDF 모두) — 값 추출은 Claude, §94 판정은 코드
+  let parsed = null;
   try {
-    const buf = Buffer.from(b64, 'base64');
-    text = extractAttText(name, buf).slice(0, 200000);
-    if (d.kind === 'asbestos' || /석면|사전조사|조사서/.test(name)) parsed = parseAsbestos(text);
+    if (d.kind === 'asbestos' || /석면|사전조사|조사서/.test(name)) {
+      parsed = await claudeExtractAsbestos(Buffer.from(b64, 'base64'), name, String(d.type || ''));
+    }
   } catch (e) {}
-  return jr(200, { status: 'OK', id: id, name: name, size: b64.length, has_text: text.length > 0, parsed: parsed, request_id: R });
+  return jr(200, { status: 'OK', id: id, name: name, size: b64.length, parsed: parsed, request_id: R });
 }
 
 async function handleAttGet(event, d, R) {
