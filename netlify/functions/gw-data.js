@@ -280,7 +280,12 @@ async function handleBidsRefresh(event, d, R) {
   for (const it of bsisServc.concat(bsisCnstwk)) {
     const k = (it.bidNtceNo || '') + '-' + (it.bidNtceOrd || '');
     const b = String(it.rsrvtnPrceRngBgnRate || '').trim(), e2 = String(it.rsrvtnPrceRngEndRate || '').trim();
-    bsisMap[k] = { bss: Math.floor(Number(it.bssamt || 0)) || 0, rng: (b || e2) ? (b + '% ~ ' + e2 + '%') : '' };
+    let aamt = 0;
+    if (String(it.bidPrceCalclAYn || '') === 'Y') {
+      ['npnInsrprm', 'mrfnHealthInsrprm', 'odsnLngtrmrcprInsrprm', 'rtrfundNon', 'sftyMngcst', 'sftyChckMngcst', 'qltyMngcst', 'envCnsrvcst', 'scontrctPayprcePayGrntyFee']
+        .forEach(function (f) { aamt += Math.floor(Number(it[f] || 0)) || 0; });
+    }
+    bsisMap[k] = { bss: Math.floor(Number(it.bssamt || 0)) || 0, rng: (b || e2) ? (b + '% ~ ' + e2 + '%') : '', aamt: aamt };
   }
   // 참가가능지역 맵(행 없음=전국)
   const rgnMap = {};
@@ -368,6 +373,7 @@ async function handleBidsRefresh(event, d, R) {
         put('joint', String(it.cmmnSpldmdMethdNm || ''));
         if (bs.bss) ext.bss = bs.bss;
         put('rng', bs.rng);
+        if (bs.aamt) { ext.aamt = bs.aamt; ext.a = 1; }
         put('lwlt', String(it.sucsfbidLwltRt || ''));
         put('prc_m', String(it.prearngPrceDcsnMthdNm || ''));
         put('dmin', String(it.dminsttNm || ''));

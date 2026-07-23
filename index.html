@@ -4849,16 +4849,17 @@
       for(var k in a.orgs){ if(org.indexOf(k)>=0||k.indexOf(org)>=0){ parts.push("이 기관("+k+") 최근 중앙값 "+a.orgs[k].med+"% (n="+a.orgs[k].n+")"); break; } }
     }
     var html = parts.length ? "📊 "+parts.join("<br>📊 ") : "";
-    if(aFlag) html += (html?"<br>":"")+'<span style="color:#B7791F;">⚠ 이 공고는 A값 감액 방식 — 공고문 기초금액 산출내역의 A값(보험료 등 합산액)을 아래 칸에 입력하면 정확한 하한가로 계산됩니다.</span>';
+    if(aFlag==="auto") html += (html?"<br>":"")+'<span style="color:#2E7D32;">✓ A값 자동 입력됨(나라장터 기초금액 공개 항목 합산) — 공고문 산출내역과 대조 권장.</span>';
+    else if(aFlag) html += (html?"<br>":"")+'<span style="color:#B7791F;">⚠ 이 공고는 A값 감액 방식인데 API에 금액이 없습니다 — 공고문 기초금액 산출내역의 A값을 아래 칸에 입력하세요.</span>';
     el.innerHTML = html;
   }
   function openBidCalc(pre){
     pre=pre||{};
-    document.getElementById("bcA").value="";
+    document.getElementById("bcA").value=pre.aamt||"";   // A값 자동 합산(API) — 수정 가능
     if(pre.bss) document.getElementById("bcBss").value=pre.bss;
     if(pre.rng){ var m=String(pre.rng).match(/(-?[\d.]+)\s*%\s*~\s*\+?(-?[\d.]+)\s*%/); if(m){ document.getElementById("bcLow").value=m[1]; document.getElementById("bcHigh").value=m[2]; } }
     if(pre.lwlt) document.getElementById("bcLwlt").value=parseFloat(pre.lwlt)||"";
-    bcRefLines(pre.org||"", pre.kind||"", !!pre.a);
+    bcRefLines(pre.org||"", pre.kind||"", (pre.aamt?"auto":!!pre.a));
     bcCalc();
     document.getElementById("bidCalcBackdrop").classList.add("show");
   }
@@ -4959,7 +4960,8 @@
         ]);
         var t2 = tbl([
           ["기초금액", (ext.bss?fmtAmount(ext.bss)+"원":"")], ["추정가격", (b.budget?fmtAmount(b.budget)+"원":"")],
-          ["예가범위", (esc(ext.rng||"")+(ext.prc_m?" ("+esc(ext.prc_m)+")":""))], ["낙찰하한율", (ext.lwlt?esc(ext.lwlt)+"%":"")]
+          ["예가범위", (esc(ext.rng||"")+(ext.prc_m?" ("+esc(ext.prc_m)+")":""))], ["낙찰하한율", (ext.lwlt?esc(ext.lwlt)+"%":"")],
+          ["A값(합산)", (ext.aamt?fmtAmount(ext.aamt)+"원":"")]
         ]);
         if(t2 && (ext.bss||b.budget)) t2 += '<button class="mini-btn" data-bid-calc="'+b.id+'" style="margin-top:4px;">🧮 이 공고로 계산</button>';
         var t3 = tbl([
@@ -4996,7 +4998,7 @@
       el.addEventListener("click",function(){
         var b=findBid(el.getAttribute("data-bid-calc")); if(!b) return;
         var ext=b.ext||{};
-        openBidCalc({bss: ext.bss||b.budget||"", rng: ext.rng||"", lwlt: ext.lwlt||"", org: b.org||"", kind: (b.kind||"")+(b.title||""), a: ext.a});
+        openBidCalc({bss: ext.bss||b.budget||"", rng: ext.rng||"", lwlt: ext.lwlt||"", org: b.org||"", kind: (b.kind||"")+(b.title||""), a: ext.a, aamt: ext.aamt||0});
       });
     });
     Array.prototype.forEach.call(host.querySelectorAll("[data-bid-con]"),function(el){
