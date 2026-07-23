@@ -4849,8 +4849,9 @@
       for(var k in a.orgs){ if(org.indexOf(k)>=0||k.indexOf(org)>=0){ parts.push("이 기관("+k+") 최근 중앙값 "+a.orgs[k].med+"% (n="+a.orgs[k].n+")"); break; } }
     }
     var html = parts.length ? "📊 "+parts.join("<br>📊 ") : "";
-    if(aFlag==="auto") html += (html?"<br>":"")+'<span style="color:#2E7D32;">✓ A값 자동 입력됨(나라장터 기초금액 공개 항목 합산) — 공고문 산출내역과 대조 권장.</span>';
-    else if(aFlag) html += (html?"<br>":"")+'<span style="color:#B7791F;">⚠ 이 공고는 A값 감액 방식인데 API에 금액이 없습니다 — 공고문 기초금액 산출내역의 A값을 아래 칸에 입력하세요.</span>';
+    if(aFlag==="auto") html += (html?"<br>":"")+'<span style="color:#2E7D32;">✓ 공고문에 A값 감액 방식 명기 — 금액 자동 입력됨(공고문 명기값 우선, 없으면 공식 공개항목 합산).</span>';
+    else if(aFlag) html += (html?"<br>":"")+'<span style="color:#B7791F;">⚠ 공고문에 A값 감액 방식이 명기됐는데 금액을 찾지 못했습니다 — 공고문 산출내역의 A값을 입력하세요.</span>';
+    if(arguments[3]) html += (html?"<br>":"")+'<span style="color:#5A6472;">산출방식: '+arguments[3]+' 위임(공고문 명기) — 하한율은 해당 기준 원문 확인.</span>';
     el.innerHTML = html;
   }
   function openBidCalc(pre){
@@ -4860,7 +4861,7 @@
     if(pre.bss) document.getElementById("bcBss").value=pre.bss;
     if(pre.rng){ var m=String(pre.rng).match(/(-?[\d.]+)\s*%\s*~\s*\+?(-?[\d.]+)\s*%/); if(m){ document.getElementById("bcLow").value=m[1]; document.getElementById("bcHigh").value=m[2]; } }
     if(pre.lwlt) document.getElementById("bcLwlt").value=parseFloat(pre.lwlt)||"";
-    bcRefLines(pre.org||"", pre.kind||"", (pre.a ? (pre.aamt?"auto":true) : false));
+    bcRefLines(pre.org||"", pre.kind||"", (pre.a ? (pre.aamt?"auto":true) : false), pre.src?esc(pre.src):"");
     bcCalc();
     document.getElementById("bidCalcBackdrop").classList.add("show");
   }
@@ -4954,6 +4955,7 @@
           ["낙찰방법", esc(b.method||"")], ["공고일", esc(b.posted||"")],
           ["지역제한", (esc(ext.rgns||b.region||"")+(b.rgn_ref?' <span style="color:#B7791F;">(공고서 확인 필요)</span>':''))], ["업종제한", esc(ext.lics||"")],
           ["결정방식", (esc(ext.decide||"")+(ext.a?" · A값 감액 방식":""))],
+          ["산출근거", (ext.src?esc(ext.src)+" 위임(공고문 명기)":"")],
           ["입찰서접수", ((ext.begin?esc(ext.begin)+" ~ ":"")+esc(ext.close||b.due||""))],
           ["개찰일시", (esc(ext.openg||"")+(ext.openg_p?" · "+esc(ext.openg_p):""))],
           ["참가등록마감", esc(ext.reg_due||"")], ["현장(소재지)", esc(ext.site||"")],
@@ -4999,7 +5001,7 @@
       el.addEventListener("click",function(){
         var b=findBid(el.getAttribute("data-bid-calc")); if(!b) return;
         var ext=b.ext||{};
-        openBidCalc({bss: ext.bss||b.budget||"", rng: ext.rng||"", lwlt: ext.lwlt||"", org: b.org||"", kind: (b.kind||"")+(b.title||""), a: ext.a, aamt: ext.aamt||0});
+        openBidCalc({bss: ext.bss||b.budget||"", rng: ext.rng||"", lwlt: ext.lwlt||"", org: b.org||"", kind: (b.kind||"")+(b.title||""), a: ext.a, aamt: ext.aamt||0, src: ext.src||""});
       });
     });
     Array.prototype.forEach.call(host.querySelectorAll("[data-bid-con]"),function(el){
