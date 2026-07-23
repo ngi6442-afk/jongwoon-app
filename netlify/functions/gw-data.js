@@ -564,7 +564,7 @@ function judgeAsbestos94(rows) {
 // ANTHROPIC_API_KEY(Netlify env) 필요. 없으면 null 반환(첨부·저장은 정상, 판독만 생략).
 async function claudeExtractAsbestos(buf, name, type) {
   const key = (process.env.ANTHROPIC_API_KEY || '').trim();
-  if (!key) return null;
+  if (!key) return { error: 'NO_API_KEY(Netlify 환경변수 ANTHROPIC_API_KEY 확인)' };
   const model = (process.env.CLAUDE_PARSE_MODEL || 'claude-sonnet-5').trim();
   const ext = (name || '').toLowerCase().split('.').pop();
   const b64 = buf.toString('base64');
