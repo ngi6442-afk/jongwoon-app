@@ -282,8 +282,9 @@ async function handleBidsRefresh(event, d, R) {
     const b = String(it.rsrvtnPrceRngBgnRate || '').trim(), e2 = String(it.rsrvtnPrceRngEndRate || '').trim();
     let aamt = 0;
     if (String(it.bidPrceCalclAYn || '') === 'Y') {
-      ['npnInsrprm', 'mrfnHealthInsrprm', 'odsnLngtrmrcprInsrprm', 'rtrfundNon', 'sftyMngcst', 'sftyChckMngcst', 'qltyMngcst', 'envCnsrvcst', 'scontrctPayprcePayGrntyFee']
-        .forEach(function (f) { aamt += Math.floor(Number(it[f] || 0)) || 0; });
+      const fs = ['npnInsrprm', 'mrfnHealthInsrprm', 'odsnLngtrmrcprInsrprm', 'rtrfundNon', 'sftyMngcst', 'sftyChckMngcst', 'envCnsrvcst', 'scontrctPayprcePayGrntyFee'];
+      if (String(it.qltyMngcstAObjYn || '') === 'Y') fs.push('qltyMngcst');   // 품질관리비는 별도 플래그
+      fs.forEach(function (f) { aamt += Math.floor(Number(it[f] || 0)) || 0; });
     }
     bsisMap[k] = { bss: Math.floor(Number(it.bssamt || 0)) || 0, rng: (b || e2) ? (b + '% ~ ' + e2 + '%') : '', aamt: aamt };
   }
