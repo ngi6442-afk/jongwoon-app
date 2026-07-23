@@ -952,7 +952,7 @@
   <!-- 입찰(공고 수집) — 관리자 전용 -->
   <section class="view" id="view-bid">
     <div id="bidSection">
-      <div class="dash-sec" style="margin-bottom:8px;display:flex;align-items:baseline;gap:10px;"><h2 style="flex:1;">입찰 <span class="cnt" id="bidHead"></span></h2><button class="mini-btn" id="bidRefreshBtn">↻ 지금 수집</button><button class="mini-btn" id="bidPurgeBtn" title="미검토 항목을 비우고 새 필터로 다시 수집">🧹 재수집</button></div>
+      <div class="dash-sec" style="margin-bottom:8px;display:flex;align-items:baseline;gap:10px;"><h2 style="flex:1;">입찰 <span class="cnt" id="bidHead"></span></h2><button class="mini-btn" id="bidRefreshBtn">↻ 지금 수집</button><button class="mini-btn" id="bidPurgeBtn" title="미검토 항목을 비우고 새 필터로 다시 수집">🧹 재수집</button><button class="mini-btn" id="bidCalcBtn" title="기초금액·예가범위·낙찰하한율로 투찰 범위 계산">🧮 계산기</button></div>
       <div style="font-size:12px;color:var(--sub);margin:-4px 0 8px;">입찰 공고는 지역·업종(보유면허)·낙찰방법 자격 필터를 통과한 <b>참가 가능</b> 건입니다. 칩의 <b>지역</b>=실제 참가제한 내용. <span style="background:#FFF3CD;border-radius:4px;padding:0 5px;">노란 카드</span>=지역이 '공고서 참조'인데 자동 판독으로 확인 못 한 건 — 원문에서 직접 확인.</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;" id="bidFilterBar"></div>
       <input type="search" id="bidSearch" placeholder="공고 검색(공고명·기관)" autocomplete="off" style="width:100%;padding:9px 12px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;font-size:14px;box-sizing:border-box;">
@@ -1187,6 +1187,23 @@
     <div class="mchecks" id="reScope"></div>
     <button class="primary" id="reSave">저장</button>
     <button class="secondary" id="reCancel">취소</button>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="bidCalcBackdrop">
+  <div class="modal">
+    <h3>낙찰하한가 계산기</h3>
+    <span class="fld-label">기초금액 (원)</span>
+    <input type="text" id="bcBss" inputmode="numeric" placeholder="예: 1238500000" autocomplete="off">
+    <span class="fld-label">예가범위 (%)</span>
+    <div style="display:flex;gap:8px;align-items:center;"><input type="number" id="bcLow" value="-3" step="0.5" style="flex:1"><span>~</span><input type="number" id="bcHigh" value="3" step="0.5" style="flex:1"></div>
+    <span class="fld-label">낙찰하한율 (%)</span>
+    <input type="number" id="bcLwlt" value="87.995" step="0.001" autocomplete="off">
+    <div id="bcOut" style="font-size:13px;border:1px solid #E4E7EA;border-radius:8px;padding:8px 10px;display:grid;gap:4px;"></div>
+    <span class="fld-label">투찰 예정금액 (원) — 선택</span>
+    <input type="text" id="bcMy" inputmode="numeric" placeholder="입력하면 통과 여유를 계산" autocomplete="off">
+    <div id="bcMyOut" style="font-size:13px;color:#5A6472;"></div>
+    <button class="secondary" id="bcClose">닫기</button>
   </div>
 </div>
 
@@ -4774,6 +4791,49 @@
     }).catch(function(){});
   }
   function bidNewCount(){ return liveBids().filter(function(b){ return b.status==="new"; }).length; }
+  // ---- 낙찰하한가 계산기 ----
+  function bcNum(id){ return parseFloat(String(document.getElementById(id).value).replace(/[,\s]/g,""))||0; }
+  function bcCalc(){
+    var bss=bcNum("bcBss");
+    var low=parseFloat(document.getElementById("bcLow").value)||0;
+    var high=parseFloat(document.getElementById("bcHigh").value)||0;
+    var lwlt=parseFloat(document.getElementById("bcLwlt").value)||0;
+    var out=document.getElementById("bcOut"), mo=document.getElementById("bcMyOut");
+    if(!bss||!lwlt){ out.innerHTML='<span style="color:#888;">기초금액과 낙찰하한율을 입력하세요.</span>'; mo.textContent=""; return; }
+    var pmin=bss*(1+low/100), pmax=bss*(1+high/100);
+    var lmin=pmin*lwlt/100, lmid=bss*lwlt/100, lmax=pmax*lwlt/100;
+    out.innerHTML =
+      '<div style="font-weight:700;">예정가격 범위</div>'+
+      '<div>'+fmtAmount(Math.round(pmin))+' ~ '+fmtAmount(Math.round(pmax))+'원</div>'+
+      '<div style="font-weight:700;margin-top:4px;">낙찰하한가</div>'+
+      '<div>최소(사정률 '+low+'%): '+fmtAmount(Math.round(lmin))+'원</div>'+
+      '<div>기초 기준(0%): '+fmtAmount(Math.round(lmid))+'원</div>'+
+      '<div>최대(+'+high+'%): <b>'+fmtAmount(Math.round(lmax))+'원</b> — 이 이상 투찰하면 모든 예가에서 하한 통과</div>';
+    var my=bcNum("bcMy");
+    if(!my){ mo.textContent=""; return; }
+    var rate=my/bss*100;
+    var t=(my/(bss*lwlt/100)-1)*100;   // 하한 통과 임계 사정률: 예정가 ≤ 투찰/하한율
+    var msg="기초 대비 투찰률 "+rate.toFixed(3)+"%. ";
+    if(t>=high) msg+="모든 예가 시나리오에서 낙찰하한 통과.";
+    else if(t<low) msg+="어떤 예가에서도 하한 미달(무효 투찰).";
+    else{
+      var p=(t-low)/(high-low)*100;
+      msg+="추첨 사정률이 "+t.toFixed(3)+"% 이하면 통과 — 참고용 근사 확률 "+p.toFixed(0)+"% (예가 균등 가정).";
+    }
+    mo.textContent=msg;
+  }
+  function openBidCalc(pre){
+    pre=pre||{};
+    if(pre.bss) document.getElementById("bcBss").value=pre.bss;
+    if(pre.rng){ var m=String(pre.rng).match(/(-?[\d.]+)\s*%\s*~\s*\+?(-?[\d.]+)\s*%/); if(m){ document.getElementById("bcLow").value=m[1]; document.getElementById("bcHigh").value=m[2]; } }
+    if(pre.lwlt) document.getElementById("bcLwlt").value=parseFloat(pre.lwlt)||document.getElementById("bcLwlt").value;
+    bcCalc();
+    document.getElementById("bidCalcBackdrop").classList.add("show");
+  }
+  ["bcBss","bcLow","bcHigh","bcLwlt","bcMy"].forEach(function(id){ document.getElementById(id).addEventListener("input", bcCalc); });
+  document.getElementById("bcClose").addEventListener("click", function(){ document.getElementById("bidCalcBackdrop").classList.remove("show"); });
+  document.getElementById("bidCalcBtn").addEventListener("click", function(){ openBidCalc({}); });
+
   function setBidStatus(id, st){
     if(!canDo("bid")) return;
     var b=findBid(id); if(!b) return;
@@ -4868,6 +4928,7 @@
           ["기초금액", (ext.bss?fmtAmount(ext.bss)+"원":"")], ["추정가격", (b.budget?fmtAmount(b.budget)+"원":"")],
           ["예가범위", (esc(ext.rng||"")+(ext.prc_m?" ("+esc(ext.prc_m)+")":""))], ["낙찰하한율", (ext.lwlt?esc(ext.lwlt)+"%":"")]
         ]);
+        if(t2 && (ext.bss||b.budget)) t2 += '<button class="mini-btn" data-bid-calc="'+b.id+'" style="margin-top:4px;">🧮 이 공고로 계산</button>';
         var t3 = tbl([
           ["공고기관", esc(b.org||"")], ["수요기관", esc(ext.dmin||"")],
           ["담당자", esc(ext.ofcl||"")], ["전화번호", esc(ext.tel||"")]
@@ -4897,6 +4958,13 @@
     }).join("") : '<div class="empty-line">'+(all.length?'조건에 맞는 공고가 없습니다.':'수집된 공고가 없습니다. (평일 아침 자동 수집)')+'</div>');
     Array.prototype.forEach.call(host.querySelectorAll("[data-bid-st]"),function(el){
       el.addEventListener("click",function(){ setBidStatus(el.getAttribute("data-bid-id"), el.getAttribute("data-bid-st")); });
+    });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-bid-calc]"),function(el){
+      el.addEventListener("click",function(){
+        var b=findBid(el.getAttribute("data-bid-calc")); if(!b) return;
+        var ext=b.ext||{};
+        openBidCalc({bss: ext.bss||b.budget||"", rng: ext.rng||"", lwlt: ext.lwlt||""});
+      });
     });
     Array.prototype.forEach.call(host.querySelectorAll("[data-bid-con]"),function(el){
       el.addEventListener("click",function(){
