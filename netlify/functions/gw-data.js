@@ -142,11 +142,20 @@ async function handleBidsIngest(event, d, R) {
   const r = await blobGet(st, colKey(target));
   const doc = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data : { schema: 1, items: [] };
   const m = mergeBidItems(doc, d.items);
-  if (m.added || m.updated) {
+  // 수집 헬스(실패 어댑터·마지막 실행시각) — 변경 없어도 항상 갱신해 앱 배너가 최신을 보게
+  let hasHealth = false;
+  if (target === 'bids' && d.health && typeof d.health === 'object' && Array.isArray(d.health.adapters)) {
+    doc.health = { ts: Number(d.health.ts) || Date.now(),
+      adapters: d.health.adapters.slice(0, 20).map(function (a) {
+        return { name: String(a.name || '').slice(0, 30), ok: !!a.ok, count: Number(a.count) || 0, error: String(a.error || '').slice(0, 160) };
+      }) };
+    hasHealth = true;
+  }
+  if (m.added || m.updated || hasHealth) {
     doc.updated_by = '수집봇'; doc.updated_at = Date.now();
     const w = await blobSet(st, colKey(target), doc);
     if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
-    try { await appendAudit({ ts: Date.now(), by: '수집봇', bid: 'bot', col: target, ev: [{ op: '수집', id: '', t: '신규 ' + m.added + ' · 갱신 ' + m.updated }] }); } catch (e) {}
+    if (m.added || m.updated) { try { await appendAudit({ ts: Date.now(), by: '수집봇', bid: 'bot', col: target, ev: [{ op: '수집', id: '', t: '신규 ' + m.added + ' · 갱신 ' + m.updated }] }); } catch (e) {} }
   }
   return jr(200, { status: 'OK', added: m.added, updated: m.updated, total: doc.items.length, request_id: R });
 }

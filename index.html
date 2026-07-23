@@ -4745,6 +4745,7 @@
   var bids = [];
   var bidsSha = null, bidsSaveTimer = null, bidsPending = false, bidSearchTerm = "", bidStatusFilter = "all";
   var bidExpanded = {};   // 카드 아코디언 펼침 상태(id → bool)
+  var bidsHealth = null;  // 수집 헬스(실패 어댑터·마지막 실행) — 경고 배너용
   var BID_STATUSES = [["new","신규"],["검토","검토"],["응찰","응찰"],["낙찰","낙찰"],["유찰","유찰"],["패스","패스"]];
   // 단계 진행: 신규→검토→응찰→낙찰/유찰. 패스는 검토 전까지만.
   var BID_NEXT = { "new":[["검토","검토"],["패스","패스"]], "검토":[["응찰","응찰"],["패스","패스"]], "응찰":[["낙찰","낙찰"],["유찰","유찰"]] };
@@ -4756,7 +4757,7 @@
     fetch(BIDS_API, {headers:ghHeaders()}).then(function(resp){
       if(resp.status===404){ bidsSha=null; bids=[]; renderBids(); return; }
       if(!resp.ok) throw new Error("HTTP "+resp.status);
-      return resp.json().then(function(json){ bidsSha=json.sha; var p=JSON.parse(b64DecodeUnicode(json.content)); var ri=(p&&p.items)||[]; bids = bidsPending ? mergeBidsLocal(bids, ri) : ri; renderBids(); renderDashboard(); });
+      return resp.json().then(function(json){ bidsSha=json.sha; var p=JSON.parse(b64DecodeUnicode(json.content)); var ri=(p&&p.items)||[]; bidsHealth=(p&&p.health)||null; bids = bidsPending ? mergeBidsLocal(bids, ri) : ri; renderBids(); renderDashboard(); });
     }).catch(function(){});
   }
   function scheduleBidsSave(){ bidsPending=true; if(bidsSaveTimer) clearTimeout(bidsSaveTimer); bidsSaveTimer=setTimeout(doSaveBids,1200); }
@@ -4808,8 +4809,16 @@
     list.sort(function(a,b){ return (a.due||"9999-99-99") < (b.due||"9999-99-99") ? -1 : 1; });
     var head=document.getElementById("bidHead");
     if(head) head.textContent = all.length ? ("총 "+all.length+" · 신규 "+bidNewCount()) : "";
+    // 수집 헬스 배너 — 어댑터 실패(API·사이트 변경 의심) 또는 자동수집 장기 미실행 경고
+    var banner="";
+    if(bidsHealth){
+      var hFails=(bidsHealth.adapters||[]).filter(function(a){ return !a.ok; });
+      var ageDays=(Date.now()-(bidsHealth.ts||0))/86400000;
+      if(ageDays>3.5) banner+='<div style="background:#FDECEA;border:1px solid #F5C6CB;color:#842029;border-radius:8px;padding:8px 12px;margin-bottom:8px;font-size:13px;">⚠️ 자동 수집이 '+Math.floor(ageDays)+'일째 실행되지 않았습니다. 수집 시스템 점검이 필요합니다.</div>';
+      if(hFails.length) banner+='<div style="background:#FFF8E1;border:1px solid #F0E3B2;color:#7A5E00;border-radius:8px;padding:8px 12px;margin-bottom:8px;font-size:13px;">⚠️ 수집 실패: <b>'+hFails.map(function(a){ return esc(a.name); }).join(", ")+'</b> — API 기준이나 사이트 구조가 바뀌었을 수 있습니다.<br><span style="font-size:12px;">'+hFails.map(function(a){ return esc(a.name)+": "+esc((a.error||"").slice(0,80)); }).join(" · ")+' (마지막 시도 '+new Date(bidsHealth.ts).toLocaleString("ko-KR")+')</span></div>';
+    }
     var today=todayStr();
-    host.innerHTML = list.length ? list.map(function(b){
+    host.innerHTML = banner + (list.length ? list.map(function(b){
       var st=bidSt(b);
       var isNew=st==="new";
       var cardBg = b.rgn_ref ? 'background:#FFF8E1;' : (isNew ? 'background:#F3F9F5;' : '');
@@ -4878,7 +4887,7 @@
         '<div class="item-title" style="'+(isNew?'font-weight:800;':'')+'">'+(exp?'▾ ':'▸ ')+esc(b.title||"-")+' '+stChip+'</div>'+
         '<div class="item-meta">'+meta.join("")+(b.due?'<span>마감 '+esc(b.due)+'</span>':'')+'</div>'+detail+'</div>'+
         '<div class="task-ctrl">'+(dd?'<span class="dday '+(dd.cls||"")+'">'+dd.text+'</span>':'')+ctrl+'</div></div>';
-    }).join("") : '<div class="empty-line">'+(all.length?'조건에 맞는 공고가 없습니다.':'수집된 공고가 없습니다. (평일 아침 자동 수집)')+'</div>';
+    }).join("") : '<div class="empty-line">'+(all.length?'조건에 맞는 공고가 없습니다.':'수집된 공고가 없습니다. (평일 아침 자동 수집)')+'</div>');
     Array.prototype.forEach.call(host.querySelectorAll("[data-bid-st]"),function(el){
       el.addEventListener("click",function(){ setBidStatus(el.getAttribute("data-bid-id"), el.getAttribute("data-bid-st")); });
     });
