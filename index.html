@@ -4834,6 +4834,7 @@
       var ctrl='';
       if(canDo("bid")){
         (BID_NEXT[st]||[]).forEach(function(s){ ctrl+='<button class="mini-btn'+((s[0]==="응찰"||s[0]==="낙찰")?' appr-btn':'')+'" data-bid-st="'+s[0]+'" data-bid-id="'+b.id+'">'+s[1]+'</button>'; });
+        if(st==="낙찰") ctrl+='<button class="mini-btn appr-btn" data-bid-con="'+b.id+'">계약 시작</button>';
       }
       if(b.url) ctrl+='<a class="mini-btn" href="'+esc(b.url)+'" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center;">원문↗</a>';
       var stChip = {"new":'<span class="review-chip">신규</span>',"검토":'<span class="scope-chip">검토</span>',"응찰":'<span class="from-chip">응찰</span>',"낙찰":'<span class="from-chip">낙찰 🏆</span>',"유찰":'<span class="hold-chip">유찰</span>',"패스":'<span class="hold-chip">패스</span>'}[st]||'';
@@ -4871,13 +4872,19 @@
           ["공고기관", esc(b.org||"")], ["수요기관", esc(ext.dmin||"")],
           ["담당자", esc(ext.ofcl||"")], ["전화번호", esc(ext.tel||"")]
         ]);
+        var rs = b.result || null;
+        var t4 = rs ? tbl([
+          ["결과", esc(rs.state||"")], ["확인일", esc(rs.checked||"")],
+          ["낙찰자", esc(rs.winner||"")], ["낙찰금액", (rs.amt?fmtAmount(rs.amt)+"원":"")],
+          ["투찰률", (rs.rate?esc(rs.rate)+"%":"")], ["참여업체", (rs.bidders?rs.bidders+"개사":"")]
+        ]) : '';
         var docsHtml = '';
         if(b.docs && b.docs.length){
           docsHtml = b.docs.map(function(d){ return '<a href="'+esc(d.u)+'" target="_blank" rel="noopener" style="display:block;">📄 '+esc(d.n)+'</a>'; }).join("");
         }
         if(b.url) docsHtml += '<a href="'+esc(b.url)+'" target="_blank" rel="noopener" style="display:block;">🔗 원문 페이지'+(b.no?' (공고번호 '+esc(b.no)+')':'')+'</a>';
         detail = '<div style="margin-top:8px;padding-top:6px;border-top:1px solid #E4E7EA;font-size:13px;">'
-          + sect('입찰정보', t1) + sect('금액정보', t2) + sect('기관정보', t3)
+          + sect('개찰결과', t4) + sect('입찰정보', t1) + sect('금액정보', t2) + sect('기관정보', t3)
           + '<div style="font-weight:700;font-size:13px;margin-top:8px;">공고서</div>'
           + '<div style="border:1px solid #E4E7EA;border-radius:6px;padding:6px 10px;margin-top:2px;display:grid;gap:3px;">'
           + (docsHtml||'<span style="color:#888;">첨부 정보 없음 — 원문 페이지에서 확인</span>')
@@ -4890,6 +4897,14 @@
     }).join("") : '<div class="empty-line">'+(all.length?'조건에 맞는 공고가 없습니다.':'수집된 공고가 없습니다. (평일 아침 자동 수집)')+'</div>');
     Array.prototype.forEach.call(host.querySelectorAll("[data-bid-st]"),function(el){
       el.addEventListener("click",function(){ setBidStatus(el.getAttribute("data-bid-id"), el.getAttribute("data-bid-st")); });
+    });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-bid-con]"),function(el){
+      el.addEventListener("click",function(){
+        var b=findBid(el.getAttribute("data-bid-con")); if(!b) return;
+        openConStart();
+        document.getElementById("conClient").value=b.org||"";
+        document.getElementById("conSite").value=b.title||"";
+      });
     });
     Array.prototype.forEach.call(host.querySelectorAll("[data-bid-exp]"),function(el){
       el.addEventListener("click",function(e){

@@ -404,8 +404,45 @@ async function handleBidsExport(event, d, R) {
   if (!secret || String(d.key || '').trim() !== secret) return jr(403, { status: 'FORBIDDEN', error_code: 'BAD_INGEST_KEY', request_id: R });
   const r = await blobGet(store(DATA), colKey('bids'));
   const items = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data.items : [];
-  const lite = items.map(function (it) { return { id: it.id, status: it.status, title: it.title, org: it.org, source: it.source, auto_pass: !!it.auto_pass }; });
+  const lite = items.map(function (it) { return { id: it.id, status: it.status, title: it.title, org: it.org, source: it.source, auto_pass: !!it.auto_pass, no: it.no || '', due: it.due || '', url: it.url || '' }; });
   return jr(200, { status: 'OK', items: lite, request_id: R });
+}
+
+// 개찰결과 수신(수집봇 전용) — 응찰 건의 낙찰/유찰 결과를 카드에 반영.
+// status는 현재 응찰(구 참여)일 때만 자동 변경 — 사람이 정한 다른 상태는 건드리지 않는다.
+async function handleBidsResults(event, d, R) {
+  const secret = (process.env.BIDS_INGEST_KEY || '').trim();
+  if (!secret || String(d.key || '').trim() !== secret) return jr(403, { status: 'FORBIDDEN', error_code: 'BAD_INGEST_KEY', request_id: R });
+  if (!Array.isArray(d.results)) return jr(400, { status: 'REJECTED', error_code: 'INVALID_RESULTS', request_id: R });
+  const st = store(DATA);
+  const r = await blobGet(st, colKey('bids'));
+  const doc = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data : { schema: 1, items: [] };
+  const byId = {};
+  doc.items.forEach(function (it) { if (it && it.id) byId[it.id] = it; });
+  const today = new Date().toISOString().slice(0, 10);
+  let applied = 0;
+  const ev = [];
+  for (const n of d.results.slice(0, 100)) {
+    const cur = n && n.id ? byId[n.id] : null;
+    if (!cur) continue;
+    if (n.result && typeof n.result === 'object') {
+      cur.result = { state: String(n.result.state || '').slice(0, 20), winner: String(n.result.winner || '').slice(0, 60),
+        amt: Number(n.result.amt) || 0, rate: String(n.result.rate || '').slice(0, 12),
+        bidders: Number(n.result.bidders) || 0, checked: today };
+    }
+    if ((n.status === '낙찰' || n.status === '유찰') && (cur.status === '응찰' || cur.status === '참여')) {
+      cur.status = n.status;
+      ev.push({ op: '개찰결과', id: cur.id, t: cur.title.slice(0, 30) + ' → ' + n.status });
+    }
+    cur.updated = today; applied++;
+  }
+  if (applied) {
+    doc.updated_by = '수집봇'; doc.updated_at = Date.now();
+    const w = await blobSet(st, colKey('bids'), doc);
+    if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
+    if (ev.length) { try { await appendAudit({ ts: Date.now(), by: '수집봇', bid: 'bot', col: 'bids', ev: ev }); } catch (e) {} }
+  }
+  return jr(200, { status: 'OK', applied: applied, request_id: R });
 }
 
 // 감사 로그 조회(관리자 전용). month='YYYY-MM' 미지정 시 이번 달.
@@ -434,6 +471,7 @@ async function handler(event) {
     if (d && d.action === 'bids_refresh') return await handleBidsRefresh(event, d, R);
     if (d && d.action === 'bids_purge') return await handleBidsPurge(event, d, R);
     if (d && d.action === 'bids_export') return await handleBidsExport(event, d, R);
+    if (d && d.action === 'bids_results') return await handleBidsResults(event, d, R);
     return jr(400, { status: 'REJECTED', error_code: 'UNKNOWN_ACTION', request_id: R });
   } catch (e) {
     return jr(500, { status: 'ERROR', error_code: 'HANDLER_FAILED', request_id: R });
