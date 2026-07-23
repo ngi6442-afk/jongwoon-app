@@ -4855,11 +4855,12 @@
   }
   function openBidCalc(pre){
     pre=pre||{};
-    document.getElementById("bcA").value=pre.aamt||"";   // A값 자동 합산(API) — 수정 가능
+    // A값은 공고문 산출방식에 감액이 명기된 공고만 자동 입력(금액 출처는 API 합산)
+    document.getElementById("bcA").value=(pre.a&&pre.aamt)?pre.aamt:"";
     if(pre.bss) document.getElementById("bcBss").value=pre.bss;
     if(pre.rng){ var m=String(pre.rng).match(/(-?[\d.]+)\s*%\s*~\s*\+?(-?[\d.]+)\s*%/); if(m){ document.getElementById("bcLow").value=m[1]; document.getElementById("bcHigh").value=m[2]; } }
     if(pre.lwlt) document.getElementById("bcLwlt").value=parseFloat(pre.lwlt)||"";
-    bcRefLines(pre.org||"", pre.kind||"", (pre.aamt?"auto":!!pre.a));
+    bcRefLines(pre.org||"", pre.kind||"", (pre.a ? (pre.aamt?"auto":true) : false));
     bcCalc();
     document.getElementById("bidCalcBackdrop").classList.add("show");
   }
@@ -4961,7 +4962,7 @@
         var t2 = tbl([
           ["기초금액", (ext.bss?fmtAmount(ext.bss)+"원":"")], ["추정가격", (b.budget?fmtAmount(b.budget)+"원":"")],
           ["예가범위", (esc(ext.rng||"")+(ext.prc_m?" ("+esc(ext.prc_m)+")":""))], ["낙찰하한율", (ext.lwlt?esc(ext.lwlt)+"%":"")],
-          ["A값(합산)", (ext.aamt?fmtAmount(ext.aamt)+"원":"")]
+          ["A값(합산)", ((ext.a&&ext.aamt)?fmtAmount(ext.aamt)+"원":"")]
         ]);
         if(t2 && (ext.bss||b.budget)) t2 += '<button class="mini-btn" data-bid-calc="'+b.id+'" style="margin-top:4px;">🧮 이 공고로 계산</button>';
         var t3 = tbl([

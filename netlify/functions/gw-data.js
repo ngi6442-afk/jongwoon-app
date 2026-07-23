@@ -374,7 +374,7 @@ async function handleBidsRefresh(event, d, R) {
         put('joint', String(it.cmmnSpldmdMethdNm || ''));
         if (bs.bss) ext.bss = bs.bss;
         put('rng', bs.rng);
-        if (bs.aamt) { ext.aamt = bs.aamt; ext.a = 1; }
+        if (bs.aamt) ext.aamt = bs.aamt;   // 후보 금액만 — 적용(a)은 공고문 명기 확인 시
         put('lwlt', String(it.sucsfbidLwltRt || ''));
         put('prc_m', String(it.prearngPrceDcsnMthdNm || ''));
         put('dmin', String(it.dminsttNm || ''));
