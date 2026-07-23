@@ -4836,6 +4836,7 @@
     }
     mo.textContent=msg;
   }
+  function bcBand(v){ v=parseFloat(v)||0; if(v<2e8) return "2억미만"; if(v<1e9) return "2~10억"; if(v<5e9) return "10~50억"; return "50억이상"; }
   function bcRefLines(org, kind, aFlag){
     // 실측 참고선 — 최근 개찰 데이터(예정가 대비 낙찰 투찰률). 예규 하한율은 공고문 확인 사항.
     var el=document.getElementById("bcRef"); if(!el) return;
@@ -4847,6 +4848,12 @@
     if(a[ty]&&a[ty].n) parts.push("실측 "+lbl+" 낙찰 투찰률(예정가 대비): 중앙값 "+a[ty].med+"% · 상하위 "+a[ty].q1+"~"+a[ty].q3+"% (n="+a[ty].n+")");
     if(org && a.orgs){
       for(var k in a.orgs){ if(org.indexOf(k)>=0||k.indexOf(org)>=0){ parts.push("이 기관("+k+") 최근 중앙값 "+a.orgs[k].med+"% (n="+a.orgs[k].n+")"); break; } }
+    }
+    // 명기 하한율 참고 — 같은 유형·금액구간 공고들의 공고문 명기값 최빈치
+    if(a.lwlt && !document.getElementById("bcLwlt").value){
+      var key=lbl+"·"+bcBand(document.getElementById("bcBss").value);
+      var lo=a.lwlt[key];
+      if(lo && lo.n>=3) parts.push("유사 조건("+key+") 공고 명기 하한율 최빈값 "+lo.mode+"% (n="+lo.n+") — 참고용, 이 공고문 확인 필수");
     }
     var html = parts.length ? "📊 "+parts.join("<br>📊 ") : "";
     if(aFlag==="auto") html += (html?"<br>":"")+'<span style="color:#2E7D32;">✓ 공고문에 A값 감액 방식 명기 — 금액 자동 입력됨(공고문 명기값 우선, 없으면 공식 공개항목 합산).</span>';

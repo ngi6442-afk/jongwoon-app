@@ -168,6 +168,13 @@ async function handleBidsIngest(event, d, R) {
         aw.orgs[String(org).slice(0, 40)] = { n: Number(o.n) || 0, med: Number(o.med) || 0 };
       });
     }
+    aw.lwlt = {};
+    if (a.lwlt && typeof a.lwlt === 'object') {   // 명기 하한율 최빈값(유형·금액구간별)
+      Object.keys(a.lwlt).slice(0, 20).forEach(function (k) {
+        const o = a.lwlt[k] || {};
+        aw.lwlt[String(k).slice(0, 20)] = { mode: String(o.mode || '').slice(0, 8), n: Number(o.n) || 0 };
+      });
+    }
     doc.awards = aw; hasAwards = true;
   }
   if (m.added || m.updated || hasHealth || hasAwards) {
