@@ -4126,8 +4126,10 @@
         arr.push(entry); renderTasks();
         gwCall("gw-data", { action:"att_put", name:f.name, type:f.type||"", data:String(r.result).split(",")[1]||"", kind:(isAsb?"asbestos":"") })
           .then(function(res){
-            entry.id=res.id||"";
-            var p=res.parsed;
+            var b=(res&&res.body)||{};
+            if(!res || res.status!==200){ entry.parsed="업로드 실패("+((b&&b.error_code)||res.status||"네트워크")+")"; renderTasks(); return; }
+            entry.id=b.id||"";
+            var p=b.parsed;
             if(!p){ entry.parsed=""; }
             else if(p.error){ entry.parsed="판독 실패("+p.error+") — 수동 확인"; }
             else if(p.judge){
