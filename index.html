@@ -1265,13 +1265,17 @@
     <select id="conType">
       <option value="asbestos">석면철거</option>
       <option value="demolition">건축물철거</option>
-      <option value="waste">폐기물 수집운반</option>
+      <option value="waste">폐기물 수집·운반</option>
+      <option value="dredge">준설·시설공사</option>
     </select>
     <span class="fld-label">계약서 성격</span>
     <select id="conDoc">
       <option value="public">공문서 (관공서·공기업) — 착공·준공 포함</option>
       <option value="private">사문서 (일반)</option>
     </select>
+    <span class="fld-label">시나리오 구성 — 해당 요소 체크 (조합대로 단계가 만들어짐)</span>
+    <div id="conElems" style="display:grid;grid-template-columns:1fr 1fr;gap:2px 8px;font-size:13px;border:1px solid #E4E7EA;border-radius:8px;padding:8px 10px;margin-bottom:4px;"></div>
+    <div id="conStagePreview" style="font-size:12px;color:#5A6472;margin-bottom:8px;"></div>
     <input type="text" id="conClient" placeholder="거래처/발주처" autocomplete="off">
     <input type="text" id="conSite" placeholder="현장 (선택)" autocomplete="off">
     <span class="fld-label">시작일</span>
@@ -3435,6 +3439,7 @@
   document.getElementById("licAddBtn").addEventListener("click", function(){ openLicModal(null); });
   document.getElementById("conStartBtn").addEventListener("click", openConStart);
   document.getElementById("conStartSave").addEventListener("click", saveConStart);
+  document.getElementById("conType").addEventListener("change", function(){ renderConElems(CON_TYPE_ELEMS[this.value]||{}); });
   document.getElementById("conStartCancel").addEventListener("click", function(){ document.getElementById("conStartBackdrop").classList.remove("show"); });
   document.getElementById("docGenBtn").addEventListener("click", openDocGen);
   document.getElementById("dgParty").addEventListener("change", dgToggleParty);
@@ -4098,6 +4103,82 @@
   };
   // 공문서(관공서·공기업) 계약만 착공/착수·준공/용역완료 마일스톤 추가(본 파이프라인 한정)
   var PROC_MILESTONE = { waste:{start:"착수",end:"용역완료"}, asbestos:{start:"착공",end:"준공"}, demolition:{start:"착공",end:"준공"} };
+
+  // ---- 시나리오 조립(원드라이브 실서류 기반, 2026-07-23) ----
+  // 스테이지는 시나리오 요소 조합이 결정 — 발주처(공/사문서)와 무관하게 동일.
+  var CON_ELEMS = [
+    ["asb","석면철거"], ["labor","노동부신고 대상"],
+    ["demo","일반(건축물)철거"], ["permit","대형철거(허가건)"],
+    ["wst","폐기물 운반·처리"], ["dredge","준설·시설공사"],
+    ["qual","적격심사(공공 낙찰건)"]
+  ];
+  var CON_TYPE_ELEMS = {   // 유형 선택 시 기본 체크
+    asbestos:{asb:1,labor:1,wst:1}, demolition:{demo:1,wst:1},
+    waste:{wst:1}, dredge:{dredge:1}
+  };
+  function conBuildStages(el){
+    var st=[];
+    if(el.qual) st.push("적격심사");
+    st.push("계약","착공");
+    if(el.asb) st.push("석면조사");
+    if(el.asb&&el.labor) st.push("노동부신고","필증인수");
+    if(el.permit) st.push("해체허가");
+    else if(el.demo) st.push("철거신고");
+    st.push("작업");
+    if(el.wst) st.push("폐기물 처리");
+    if(el.permit) st.push("감리");
+    st.push("준공");
+    if(el.asb&&el.labor) st.push("완료신고");
+    st.push("청구");
+    return st;
+  }
+  // 단계별 서류 체크리스트 — [작성]=우리가 서류출력으로 생성, [수령]=받아서 확인·보관
+  var STAGE_DOCS = {
+    "적격심사":"[작성] 적격심사신청서·자기평가심사표·신인도자료·사용인감계 / [수령] 안전성평가결과·신용평가확인서·인력보유증빙·등기부·사업자등록증명·면허증·인감증명",
+    "계약":"[작성] 견적서·계약구비서류·계약이행서약서·내역서(해당시 공동수급협정·수의계약확인서·안전보건확약서) / [수령] 계약서·통장사본",
+    "착공":"[작성] 착공계·예정공정표·안전관리비 사용계획서·노무비구분관리(해당시 선급금신청·안전보건관리계획서) / [수령] 경력확인서",
+    "석면조사":"[수령] 석면조사결과서·석면지도·건축물대장",
+    "노동부신고":"[작성] 석면해체계획서·해체제거신고서·음압기산출·보양지도 / [수령] 작업자 인적사항·이수증·검진표",
+    "필증인수":"[수령] 노동부 신고필증",
+    "해체허가":"[작성] 해체계획서·허가신청 / [수령] 허가서·감리지정",
+    "철거신고":"[작성] 해체(철거)신고서 / [수령] 신고필증",
+    "작업":"[작성] 작업 사진대지 / [수령] 농도·비산 측정결과보고서(석면건)",
+    "폐기물 처리":"[작성] 올바로 인계·운반서류(군부대: 배출신고) / [수령] 위수탁계약서",
+    "감리":"[수령] 감리완료보고서",
+    "준공":"[작성] 준공계·준공사진첩·정산서",
+    "완료신고":"[작성] 석면해체·제거 완료신고(노동부)",
+    "청구":"[작성] 대금청구서·임금지불확인서·세금계산서 / [수령] 국세·지방세·4대보험 완납증명·하도급지킴이"
+  };
+  function conElemChecked(){
+    var el={};
+    CON_ELEMS.forEach(function(e){ var c=document.getElementById("ce_"+e[0]); if(c&&c.checked) el[e[0]]=1; });
+    return el;
+  }
+  function conStagePreview(){
+    var p=document.getElementById("conStagePreview");
+    if(p) p.textContent="단계: "+conBuildStages(conElemChecked()).join(" → ");
+  }
+  function renderConElems(preset){
+    preset=preset||{};
+    var host=document.getElementById("conElems"); if(!host) return;
+    host.innerHTML=CON_ELEMS.map(function(e){
+      return '<label style="display:flex;gap:6px;align-items:center;"><input type="checkbox" id="ce_'+e[0]+'"'+(preset[e[0]]?' checked':'')+'> '+e[1]+'</label>';
+    }).join("");
+    CON_ELEMS.forEach(function(e){ document.getElementById("ce_"+e[0]).addEventListener("change", conStagePreview); });
+    conStagePreview();
+  }
+  // 제목 키워드로 요소 제안(낙찰→계약 유입 시) — 학습 전 초기 제안
+  function suggestConElems(text, decide){
+    var t=(text||"").replace(/\s+/g,"");
+    var el={};
+    if(t.indexOf("석면")>=0||t.indexOf("슬레이트")>=0){ el.asb=1; el.labor=1; }
+    if(t.indexOf("철거")>=0||t.indexOf("해체")>=0){ if(!el.asb||t.indexOf("지장물")>=0||t.indexOf("건축물")>=0) el.demo=1; }
+    if(t.indexOf("폐기물")>=0||t.indexOf("운반")>=0||t.indexOf("처리")>=0) el.wst=1;
+    if(t.indexOf("준설")>=0||t.indexOf("관로")>=0||t.indexOf("하수")>=0||t.indexOf("상수도")>=0) el.dredge=1;
+    if((decide||"").indexOf("적격")>=0) el.qual=1;
+    return el;
+  }
+  var lastBidForCon = null;   // 낙찰→계약 유입 공고(제안·학습 기록용)
   function applyPublicMilestones(stages, ms){
     var out = [];
     stages.forEach(function(s){
@@ -4112,7 +4193,7 @@
     var s = pipe.stages[pipe.cur];
     var due = "";
     if(s.due==="auto" && s.days){ due = addDays(baseDate||todayStr(), s.days); }
-    var t = { id:genId("t"), title:procStageTitle(c, s.name), detail:"", who_id:c.who_id||"", who:memberName(c.who_id||""), from:myName()||"", from_id:myId(), by:myName()||"",
+    var t = { id:genId("t"), title:procStageTitle(c, s.name), detail:(STAGE_DOCS[s.name]||""), who_id:c.who_id||"", who:memberName(c.who_id||""), from:myName()||"", from_id:myId(), by:myName()||"",
       due:due, status:"open", done_at:null, done_by:null, created:todayStr(), updated:todayStr(),
       proc_id:c.id, proc_label:c.label, pipe:pipe.key, stage_i:pipe.cur, stage_name:s.name, stage_total:pipe.stages.length, stage_auto:(s.due==="auto") };
     tasks.push(t);
@@ -4124,13 +4205,21 @@
     opts = opts || {};
     var today = todayStr();
     var docType = opts.docType === "public" ? "public" : "private";
-    var c = { id:genId("c"), type:type, label:tpl.label, docType:docType, client:opts.client||"", site:opts.site||"", start:opts.start||today,
-      lic_id:opts.lic_id||null, info:{}, review:{missing:[],suspect:[],ok:false}, docs:[],
-      pipes:tpl.pipes.map(function(p){
+    var pipes;
+    if(opts.stages && opts.stages.length){
+      // 시나리오 조립 방식 — 요소 조합이 결정한 단계 그대로(발주처 무관 동일)
+      pipes=[{key:"main", cur:0, stages:opts.stages.map(function(n){ return {name:n,due:"manual",days:null,status:"pending",task_id:null,done_at:null}; })}];
+    } else {
+      pipes=tpl.pipes.map(function(p){
         var st = p.stages;
         if(docType==="public" && PROC_MILESTONE[type] && p.key==="main") st = applyPublicMilestones(st, PROC_MILESTONE[type]);
         return {key:p.key, cur:0, stages:st.map(function(s){ return {name:s.name,due:s.due,days:s.days||null,status:"pending",task_id:null,done_at:null}; })};
-      }),
+      });
+    }
+    var c = { id:genId("c"), type:type, label:tpl.label, docType:docType, client:opts.client||"", site:opts.site||"", start:opts.start||today,
+      lic_id:opts.lic_id||null, info:{}, review:{missing:[],suspect:[],ok:false}, docs:[],
+      elems:opts.elems||null, bid_id:opts.bid_id||"",
+      pipes:pipes,
       status:"active", who_id:opts.who||"", who:memberName(opts.who||""), created:today, updated:today };
     contracts.push(c);
     c.pipes.forEach(function(p){ materializeStage(c, p, c.start); });
@@ -4200,12 +4289,14 @@
   }
   function openConStart(){
     if(!canDo("con")) return;
+    lastBidForCon=null;
     document.getElementById("conType").value="asbestos";
     document.getElementById("conDoc").value="public";
     document.getElementById("conClient").value="";
     document.getElementById("conSite").value="";
     document.getElementById("conStart").value=todayStr();
     fillMemberSelect(document.getElementById("conWho"), "");
+    renderConElems(CON_TYPE_ELEMS.asbestos);
     document.getElementById("conStartBackdrop").classList.add("show");
   }
   function saveConStart(){
@@ -4217,7 +4308,9 @@
     var who=document.getElementById("conWho").value.trim();
     var docType=document.getElementById("conDoc").value;
     if(!client && !site){ alert("거래처 또는 현장을 입력하세요."); return; }
-    startProcess(type, {client:client, site:site, start:start, who:who, docType:docType});
+    var elems=conElemChecked();
+    startProcess(type, {client:client, site:site, start:start, who:who, docType:docType,
+      stages:conBuildStages(elems), elems:elems, bid_id:(lastBidForCon?lastBidForCon.id:"")});
     document.getElementById("conStartBackdrop").classList.remove("show");
     renderContracts();
     switchTab("tasks");
@@ -4900,10 +4993,17 @@
     var b=findBid(id); if(!b) return;
     b.status=st; b.updated=todayStr();
     scheduleBidsSave(); renderBids(); renderDashboard();
-    if(st==="낙찰"){   // 낙찰 → 계약 시작 창(발주처·건명 미리 채움)
+    if(st==="낙찰"){   // 낙찰 → 계약 시작 창(발주처·건명·시나리오 요소 제안까지 채움)
       openConStart();
       document.getElementById("conClient").value=b.org||"";
       document.getElementById("conSite").value=b.title||"";
+      lastBidForCon=b;
+      var sug=suggestConElems(b.title, (b.ext||{}).decide||"");
+      if(sug.asb) document.getElementById("conType").value="asbestos";
+      else if(sug.demo) document.getElementById("conType").value="demolition";
+      else if(sug.dredge) document.getElementById("conType").value="dredge";
+      else document.getElementById("conType").value="waste";
+      renderConElems(sug);
     }
   }
   function renderBids(){
@@ -5039,6 +5139,13 @@
         openConStart();
         document.getElementById("conClient").value=b.org||"";
         document.getElementById("conSite").value=b.title||"";
+        lastBidForCon=b;
+        var sug=suggestConElems(b.title, (b.ext||{}).decide||"");
+        if(sug.asb) document.getElementById("conType").value="asbestos";
+        else if(sug.demo) document.getElementById("conType").value="demolition";
+        else if(sug.dredge) document.getElementById("conType").value="dredge";
+        else document.getElementById("conType").value="waste";
+        renderConElems(sug);
       });
     });
     Array.prototype.forEach.call(host.querySelectorAll("[data-bid-exp]"),function(el){
