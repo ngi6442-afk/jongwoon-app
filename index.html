@@ -1199,6 +1199,8 @@
     <div style="display:flex;gap:8px;align-items:center;"><input type="number" id="bcLow" value="-3" step="0.5" style="flex:1"><span>~</span><input type="number" id="bcHigh" value="3" step="0.5" style="flex:1"></div>
     <span class="fld-label">낙찰하한율 (%) — 공고문 적격심사 기준에서 확인</span>
     <input type="number" id="bcLwlt" step="0.001" placeholder="공고문 확인 (예규상 공종·구간별 상이)" autocomplete="off">
+    <span class="fld-label">A값 (원) — 공고문 기초금액 산출내역의 보험료 등 합산액 (없으면 0)</span>
+    <input type="text" id="bcA" inputmode="numeric" placeholder="A값 방식 공고만 입력 · 하한가=(예정가격−A)×하한율+A" autocomplete="off">
     <div id="bcRef" style="font-size:12px;color:#5A6472;"></div>
     <div id="bcOut" style="font-size:13px;border:1px solid #E4E7EA;border-radius:8px;padding:8px 10px;display:grid;gap:4px;"></div>
     <span class="fld-label">투찰 예정금액 (원) — 선택</span>
@@ -4808,19 +4810,23 @@
       mo.textContent=""; return;
     }
     if(!bss||!lwlt){ out.innerHTML='<span style="color:#888;">기초금액을 입력하세요.</span>'; mo.textContent=""; return; }
+    var aVal=bcNum("bcA");
+    var floorOf=function(p){ return aVal ? (p-aVal)*lwlt/100+aVal : p*lwlt/100; };   // A값 방식: (예정가격−A)×하한율+A
     var pmin=bss*(1+low/100), pmax=bss*(1+high/100);
-    var lmin=pmin*lwlt/100, lmid=bss*lwlt/100, lmax=pmax*lwlt/100;
+    var lmin=floorOf(pmin), lmid=floorOf(bss), lmax=floorOf(pmax);
     out.innerHTML =
       '<div style="font-weight:700;">예정가격 범위</div>'+
       '<div>'+fmtAmount(Math.round(pmin))+' ~ '+fmtAmount(Math.round(pmax))+'원</div>'+
-      '<div style="font-weight:700;margin-top:4px;">낙찰하한가</div>'+
+      '<div style="font-weight:700;margin-top:4px;">낙찰하한가'+(aVal?' <span style="color:#2E7D32;">(A값 '+fmtAmount(aVal)+'원 반영)</span>':'')+'</div>'+
       '<div>최소(사정률 '+low+'%): '+fmtAmount(Math.round(lmin))+'원</div>'+
       '<div>기초 기준(0%): '+fmtAmount(Math.round(lmid))+'원</div>'+
       '<div>최대(+'+high+'%): <b>'+fmtAmount(Math.round(lmax))+'원</b> — 이 이상 투찰하면 모든 예가에서 하한 통과</div>';
     var my=bcNum("bcMy");
     if(!my){ mo.textContent=""; return; }
     var rate=my/bss*100;
-    var t=(my/(bss*lwlt/100)-1)*100;   // 하한 통과 임계 사정률: 예정가 ≤ 투찰/하한율
+    // 하한 통과 임계 사정률: floorOf(예정가) ≤ 투찰 → 예정가 상한 역산
+    var pLimit = aVal ? ((my-aVal)/(lwlt/100)+aVal) : (my/(lwlt/100));
+    var t=(pLimit/bss-1)*100;
     var msg="기초 대비 투찰률 "+rate.toFixed(3)+"%. ";
     if(t>=high) msg+="모든 예가 시나리오에서 낙찰하한 통과.";
     else if(t<low) msg+="어떤 예가에서도 하한 미달(무효 투찰).";
@@ -4843,11 +4849,12 @@
       for(var k in a.orgs){ if(org.indexOf(k)>=0||k.indexOf(org)>=0){ parts.push("이 기관("+k+") 최근 중앙값 "+a.orgs[k].med+"% (n="+a.orgs[k].n+")"); break; } }
     }
     var html = parts.length ? "📊 "+parts.join("<br>📊 ") : "";
-    if(aFlag) html += (html?"<br>":"")+'<span style="color:#B7791F;">⚠ 이 공고는 A값(보험료 등) 감액 방식 — 실제 하한가는 (예정가격−A)×하한율+A라 아래 단순 계산과 차이가 있습니다. 공고문 확인.</span>';
+    if(aFlag) html += (html?"<br>":"")+'<span style="color:#B7791F;">⚠ 이 공고는 A값 감액 방식 — 공고문 기초금액 산출내역의 A값(보험료 등 합산액)을 아래 칸에 입력하면 정확한 하한가로 계산됩니다.</span>';
     el.innerHTML = html;
   }
   function openBidCalc(pre){
     pre=pre||{};
+    document.getElementById("bcA").value="";
     if(pre.bss) document.getElementById("bcBss").value=pre.bss;
     if(pre.rng){ var m=String(pre.rng).match(/(-?[\d.]+)\s*%\s*~\s*\+?(-?[\d.]+)\s*%/); if(m){ document.getElementById("bcLow").value=m[1]; document.getElementById("bcHigh").value=m[2]; } }
     if(pre.lwlt) document.getElementById("bcLwlt").value=parseFloat(pre.lwlt)||"";
@@ -4855,7 +4862,7 @@
     bcCalc();
     document.getElementById("bidCalcBackdrop").classList.add("show");
   }
-  ["bcBss","bcLow","bcHigh","bcLwlt","bcMy"].forEach(function(id){ document.getElementById(id).addEventListener("input", bcCalc); });
+  ["bcBss","bcLow","bcHigh","bcLwlt","bcA","bcMy"].forEach(function(id){ document.getElementById(id).addEventListener("input", bcCalc); });
   document.getElementById("bcClose").addEventListener("click", function(){ document.getElementById("bidCalcBackdrop").classList.remove("show"); });
   document.getElementById("bidCalcBtn").addEventListener("click", function(){ openBidCalc({}); });
 
