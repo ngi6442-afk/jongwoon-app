@@ -3,7 +3,7 @@
 // 호출 즉시 202 반환, 완료 시 blob 'parse:<attId>'에 결과 저장 → 앱이 att_parse_status로 폴링.
 const { setupBlobContext, store, blobGet, blobSet } = require('./_lib/blobs');
 const { verifyToken, bearer } = require('./_lib/session');
-const { claudeExtractAsbestos } = require('./_lib/asbestos');
+const { parseAttachment } = require('./_lib/asbestos');
 
 const FILES = 'gw_files';
 const USERS = 'gw_users';
@@ -22,7 +22,7 @@ exports.handler = async function (event, context) {
     const r = await blobGet(store(FILES), id);
     if (!r.ok || !r.data) { await blobSet(store(FILES), 'parse:' + id, { ts: Date.now(), result: { error: 'NOT_FOUND' } }); return; }
     let parsed = null;
-    try { parsed = await claudeExtractAsbestos(Buffer.from(r.data.data, 'base64'), r.data.name, r.data.type); }
+    try { parsed = await parseAttachment(r.data); }
     catch (e) { parsed = { error: 'PARSE_FAILED' }; }
     await blobSet(store(FILES), 'parse:' + id, { ts: Date.now(), result: parsed });
   } catch (e) { /* 백그라운드 — 응답 무의미 */ }

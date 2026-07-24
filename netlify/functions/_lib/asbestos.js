@@ -67,4 +67,51 @@ async function claudeExtractAsbestos(buf, name, type) {
   } catch (e) { return { error: 'PARSE_FAILED' }; }
 }
 
-module.exports = { judgeAsbestos94, claudeExtractAsbestos };
+// 계약서 판독 — 공사명·금액·계약/착공/준공일·발주자·현장주소(명기값만)
+async function claudeExtractContract(buf, name) {
+  const key = (process.env.ANTHROPIC_API_KEY || '').trim();
+  if (!key) return { error: 'NO_API_KEY(Netlify 환경변수 ANTHROPIC_API_KEY 확인)' };
+  const model = (process.env.CLAUDE_PARSE_MODEL || 'claude-sonnet-5').trim();
+  const ext = (name || '').toLowerCase().split('.').pop();
+  const b64 = buf.toString('base64');
+  let media;
+  if (ext === 'pdf') media = { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: b64 } };
+  else if (['jpg', 'jpeg', 'png', 'gif', 'webp'].indexOf(ext) >= 0) {
+    const mt = ext === 'jpg' ? 'jpeg' : ext;
+    media = { type: 'image', source: { type: 'base64', media_type: 'image/' + mt, data: b64 } };
+  } else return null;
+  const prompt = '이 문서는 공사·용역 계약서(또는 계약 관련 서류 묶음)다. 문서에 명기된 값만 추출하라(추정 금지, 없으면 빈값). '
+    + 'title 공사명/계약명, amount 계약금액(숫자만, 원 단위·부가세 포함액 우선), date_contract 계약(체결)일 YYYY-MM-DD, date_start 착공일 YYYY-MM-DD, date_end 준공(예정)일 YYYY-MM-DD, '
+    + 'client 발주자/도급인 기관·업체명, site 현장(공사) 주소, guarantee 계약보증금액(숫자만, 있으면). '
+    + '형식: {"title":"","amount":0,"date_contract":"","date_start":"","date_end":"","client":"","site":"","guarantee":0} JSON만 출력.';
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+      body: JSON.stringify({ model: model, max_tokens: 1024,
+        messages: [{ role: 'user', content: [media, { type: 'text', text: prompt }] }] })
+    });
+    if (!resp.ok) return { error: 'CLAUDE_' + resp.status };
+    const j = await resp.json();
+    const txt = ((j.content || []).find(function (b) { return b.type === 'text'; }) || {}).text || '';
+    const m = txt.match(/\{[\s\S]*\}/);
+    if (!m) return { error: 'NO_JSON' };
+    const data = JSON.parse(m[0]);
+    const dt = function (s) { s = String(s || ''); return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : ''; };
+    return { doc: 'contract', title: String(data.title || '').slice(0, 100), amount: Number(data.amount) || 0,
+      date_contract: dt(data.date_contract), date_start: dt(data.date_start), date_end: dt(data.date_end),
+      client: String(data.client || '').slice(0, 60), site: String(data.site || '').slice(0, 100), guarantee: Number(data.guarantee) || 0 };
+  } catch (e) { return { error: 'PARSE_FAILED' }; }
+}
+
+// 첨부 레코드 → 문서종류별 판독 라우팅 (kind 우선, 없으면 파일명)
+async function parseAttachment(rec) {
+  const name = rec.name || '';
+  let kind = rec.kind || '';
+  if (!kind) kind = /계약/.test(name) ? 'contract' : 'asbestos';
+  const buf = Buffer.from(rec.data, 'base64');
+  if (kind === 'contract') return await claudeExtractContract(buf, name);
+  return await claudeExtractAsbestos(buf, name, rec.type);
+}
+
+module.exports = { judgeAsbestos94, claudeExtractAsbestos, claudeExtractContract, parseAttachment };

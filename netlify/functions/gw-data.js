@@ -538,7 +538,7 @@ function extractAttText(name, buf) {
   return '';
 }
 
-const { claudeExtractAsbestos } = require('./_lib/asbestos');
+const { parseAttachment } = require('./_lib/asbestos');
 
 async function handleAttPut(event, d, R) {
   const c = await currentMember(event);
@@ -549,10 +549,11 @@ async function handleAttPut(event, d, R) {
   if (!name || !b64) return jr(400, { status: 'REJECTED', error_code: 'INVALID_FILE', request_id: R });
   if (b64.length > ATT_MAX) return jr(413, { status: 'REJECTED', error_code: 'FILE_TOO_LARGE', request_id: R });
   const id = 'att_' + crypto.randomBytes(8).toString('hex');
-  const w = await blobSet(store(FILES), id, { name: name, type: String(d.type || ''), data: b64, by: c.member.name, ts: Date.now() });
+  const kind = ['asbestos', 'contract'].indexOf(String(d.kind || '')) >= 0 ? String(d.kind) : '';
+  const w = await blobSet(store(FILES), id, { name: name, type: String(d.type || ''), kind: kind, data: b64, by: c.member.name, ts: Date.now() });
   if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
   // 판독은 백그라운드 함수(gw-parse-background)에서 — 첨부는 즉시 완료(타임아웃 방지)
-  const wantParse = (d.kind === 'asbestos' || /석면|사전조사|조사서/.test(name));
+  const wantParse = !!kind || /석면|사전조사|조사서|계약서/.test(name);
   return jr(200, { status: 'OK', id: id, name: name, size: b64.length, parse_pending: wantParse, request_id: R });
 }
 
@@ -565,7 +566,7 @@ async function handleAttParse(event, d, R) {
   const r = await blobGet(store(FILES), id);
   if (!r.ok || !r.data) return jr(404, { status: 'REJECTED', error_code: 'NOT_FOUND', request_id: R });
   let parsed = null;
-  try { parsed = await claudeExtractAsbestos(Buffer.from(r.data.data, 'base64'), r.data.name, r.data.type); } catch (e) { parsed = { error: 'PARSE_FAILED' }; }
+  try { parsed = await parseAttachment(r.data); } catch (e) { parsed = { error: 'PARSE_FAILED' }; }
   await blobSet(store(FILES), 'parse:' + id, { ts: Date.now(), result: parsed });
   return jr(200, { status: 'OK', parsed: parsed, request_id: R });
 }

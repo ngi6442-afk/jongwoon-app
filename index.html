@@ -4144,11 +4144,13 @@
     var isAsb = !!(c.elems&&c.elems.asb);
     Array.prototype.forEach.call(files, function(f){
       if(f.size>ATT_MAX){ alert('"'+f.name+'"는 6MB를 넘어 첨부할 수 없습니다.'); return; }
+      // 문서종류: 파일명 우선(계약서→계약 판독, 석면·조사→조사서 판독), 그 외 석면 계약이면 조사서로
+      var kind = /계약/.test(f.name) ? "contract" : (/석면|조사/.test(f.name) ? "asbestos" : "");   // 그 외 파일은 판독 없이 보관만
       var r=new FileReader();
       r.onload=function(){
         var entry={ name:f.name, size:f.size, type:f.type||"", id:"", parsed:"올리는 중…", added:todayStr() };
         arr.push(entry); renderContracts();
-        gwCall("gw-data", { action:"att_put", name:f.name, type:f.type||"", data:String(r.result).split(",")[1]||"", kind:(isAsb?"asbestos":"") })
+        gwCall("gw-data", { action:"att_put", name:f.name, type:f.type||"", data:String(r.result).split(",")[1]||"", kind:kind })
           .then(function(res){
             var b=(res&&res.body)||{};
             if(!res || res.status!==200){ entry.parsed="업로드 실패("+((b&&b.error_code)||res.status||"네트워크")+")"; renderContracts(); return; }
@@ -4162,10 +4164,20 @@
       r.readAsDataURL(f);
     });
   }
-  // 판독 결과 반영(백그라운드·동기 공용)
+  // 판독 결과 반영(백그라운드·동기 공용) — 조사서/계약서 분기
   function applyAsbParse(entry, c, p){
     if(!p){ entry.parsed="판독 결과 없음"; }
     else if(p.error){ entry.parsed="판독 실패("+p.error+") — 수동 확인"; }
+    else if(p.doc==="contract"){
+      entry.parsed="계약서: "+(p.title||"공사명?")+(p.amount?" · "+Number(p.amount).toLocaleString()+"원":"")+(p.date_contract?" · "+p.date_contract:"");
+      entry.con=p;
+      c.contract_info={title:p.title||"", amount:p.amount||0, d1:p.date_contract||"", d2:p.date_start||"", d3:p.date_end||"",
+        client:p.client||"", site:p.site||"", guarantee:p.guarantee||0, from:entry.name, checked:todayStr()};
+      // 계약에 비어 있는 기본 정보는 채움(기존 값은 보존)
+      if(!c.title && p.title) c.title=p.title;
+      if(!c.client && p.client) c.client=p.client;
+      if(!c.site && p.site) c.site=p.site;
+    }
     else if(p.judge){
       var area=(p.rows||[]).reduce(function(s,x){return s+(x.area||0);},0);
       entry.parsed="석면 "+(p.rows||[]).length+"행·"+ (Math.round(area*100)/100) +"㎡ · 신고대상 "+(p.judge.target?"예":"아니오");
@@ -4534,14 +4546,14 @@
     xgCtx={id:conId};
     document.getElementById("xgHint").textContent="["+(c.label||"계약")+(c.site?" · "+c.site:"")+"] 등록된 양식 원본에 값을 채워 xlsx로 내려받습니다.";
     var isAsb=!!(c.elems&&c.elems.asb);
-    var s=c.asb_survey||{};   // 조사서 판독값으로 자동 채움(계약값 우선, 없으면 조사서)
+    var s=c.asb_survey||{}, ci=c.contract_info||{};   // 자동 채움: 계약값 → 계약서 판독 → 조사서 판독 순
     document.getElementById("xgKind").value = isAsb ? "asb_plan" : "work_start";
-    document.getElementById("xgTitle").value = c.title||c.label|| (s.bldg? s.bldg+" 석면해체 공사":"");
-    document.getElementById("xgSite").value = c.site||s.site||"";
-    document.getElementById("xgClient").value = c.client||s.owner||"";
-    document.getElementById("xgAmount").value="";
-    document.getElementById("xgD1").value = c.start||"";
-    document.getElementById("xgD2").value=""; document.getElementById("xgD3").value="";
+    document.getElementById("xgTitle").value = c.title||ci.title||c.label|| (s.bldg? s.bldg+" 석면해체 공사":"");
+    document.getElementById("xgSite").value = c.site||ci.site||s.site||"";
+    document.getElementById("xgClient").value = c.client||ci.client||s.owner||"";
+    document.getElementById("xgAmount").value = ci.amount||"";
+    document.getElementById("xgD1").value = ci.d1||c.start||"";
+    document.getElementById("xgD2").value = ci.d2||""; document.getElementById("xgD3").value = ci.d3||"";
     document.getElementById("xgOwner").value = /교육/.test(s.owner||"") ? "경상북도 교육감" : "";
     xgToggle();
     document.getElementById("xlsxGenBackdrop").classList.add("show");
