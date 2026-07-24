@@ -4174,7 +4174,8 @@
               var area=(p.rows||[]).reduce(function(s,x){return s+(x.area||0);},0);
               entry.parsed="석면 "+(p.rows||[]).length+"행·"+ (Math.round(area*100)/100) +"㎡ · 신고대상 "+(p.judge.target?"예":"아니오");
               entry.asb=p;
-              c.asb_survey={org:p.org||"", area:Math.round(area*100)/100, target:p.judge.target, reasons:p.judge.reasons, rows:p.rows||[], from:f.name, checked:todayStr(), confirmed:false};
+              c.asb_survey={org:p.org||"", site:p.site||"", bldg:p.bldg_name||"", owner:p.owner||"", year:p.year||"", struct:p.struct||"", use:p.use||"", total_floor:p.total_floor||0,
+                area:Math.round(area*100)/100, target:p.judge.target, reasons:p.judge.reasons, rows:p.rows||[], from:f.name, checked:todayStr(), confirmed:false};
               if(p.judge.target) setTimeout(function(){ alert("석면조사서 판독 — 노동부 신고대상입니다.\n\n"+p.judge.reasons.join("\n")+"\n\n※ 판독값은 검수 후 확정하세요. '노동부신고' 단계가 없으면 추가하세요."); },100);
             } else { entry.parsed="판독됨"; }
             scheduleContractSave(); renderTasks();
@@ -4402,10 +4403,11 @@
   function asbReviewRowHtml(r, i){
     return '<div style="display:flex;gap:4px;margin:2px 0;" data-asb-row="'+i+'">'
       +'<input type="text" data-f="bldg" value="'+esc(r.bldg||"")+'" placeholder="동·층" style="flex:1.1;min-width:0;">'
-      +'<input type="text" data-f="mat" value="'+esc(r.mat||"")+'" placeholder="자재" style="flex:1.4;min-width:0;">'
-      +'<input type="text" data-f="loc" value="'+esc(r.loc||"")+'" placeholder="위치" style="flex:0.9;min-width:0;">'
-      +'<input type="number" data-f="area" value="'+(r.area||"")+'" placeholder="㎡" step="0.01" style="flex:0.9;min-width:0;">'
-      +'<input type="number" data-f="len" value="'+(r.len||"")+'" placeholder="m" step="0.1" style="flex:0.7;min-width:0;">'
+      +'<input type="text" data-f="mat" value="'+esc(r.mat||"")+'" placeholder="자재" style="flex:1.3;min-width:0;">'
+      +'<input type="text" data-f="loc" value="'+esc(r.loc||"")+'" placeholder="위치" style="flex:0.8;min-width:0;">'
+      +'<input type="number" data-f="area" value="'+(r.area||"")+'" placeholder="㎡" step="0.01" style="flex:0.8;min-width:0;">'
+      +'<input type="text" data-f="cnt" value="'+esc(r.cnt||"")+'" placeholder="함유율" style="flex:0.9;min-width:0;">'
+      +'<input type="number" data-f="len" value="'+(r.len||"")+'" placeholder="m" step="0.1" style="flex:0.6;min-width:0;">'
       +'<button class="mini-btn" data-asb-del="'+i+'">✕</button></div>';
   }
   function asbReviewRead(){
@@ -4422,7 +4424,7 @@
   }
   function asbReviewRender(rows){
     document.getElementById("asbReviewRows").innerHTML =
-      '<div style="display:flex;gap:4px;font-size:12px;color:#888;"><span style="flex:1.1;">동·층</span><span style="flex:1.4;">자재</span><span style="flex:0.9;">위치</span><span style="flex:0.9;">면적㎡</span><span style="flex:0.7;">길이m</span><span style="width:28px;"></span></div>'
+      '<div style="display:flex;gap:4px;font-size:12px;color:#888;"><span style="flex:1.1;">동·층</span><span style="flex:1.3;">자재</span><span style="flex:0.8;">위치</span><span style="flex:0.8;">면적㎡</span><span style="flex:0.9;">함유율</span><span style="flex:0.6;">길이m</span><span style="width:28px;"></span></div>'
       + rows.map(asbReviewRowHtml).join('');
     asbReviewJudgeShow();
     Array.prototype.forEach.call(document.querySelectorAll("[data-asb-del]"), function(el){
@@ -4518,14 +4520,15 @@
     xgCtx={id:conId};
     document.getElementById("xgHint").textContent="["+(c.label||"계약")+(c.site?" · "+c.site:"")+"] 등록된 양식 원본에 값을 채워 xlsx로 내려받습니다.";
     var isAsb=!!(c.elems&&c.elems.asb);
+    var s=c.asb_survey||{};   // 조사서 판독값으로 자동 채움(계약값 우선, 없으면 조사서)
     document.getElementById("xgKind").value = isAsb ? "asb_plan" : "work_start";
-    document.getElementById("xgTitle").value = c.title||c.label||"";
-    document.getElementById("xgSite").value = c.site||"";
-    document.getElementById("xgClient").value = c.client||"";
+    document.getElementById("xgTitle").value = c.title||c.label|| (s.bldg? s.bldg+" 석면해체 공사":"");
+    document.getElementById("xgSite").value = c.site||s.site||"";
+    document.getElementById("xgClient").value = c.client||s.owner||"";
     document.getElementById("xgAmount").value="";
     document.getElementById("xgD1").value = c.start||"";
     document.getElementById("xgD2").value=""; document.getElementById("xgD3").value="";
-    document.getElementById("xgOwner").value="";
+    document.getElementById("xgOwner").value = /교육/.test(s.owner||"") ? "경상북도 교육감" : "";
     xgToggle();
     document.getElementById("xlsxGenBackdrop").classList.add("show");
   }

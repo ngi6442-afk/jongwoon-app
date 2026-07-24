@@ -574,11 +574,12 @@ async function claudeExtractAsbestos(buf, name, type) {
     const mt = ext === 'jpg' ? 'jpeg' : ext;
     media = { type: 'image', source: { type: 'base64', media_type: 'image/' + mt, data: b64 } };
   } else return null;
-  const prompt = '이 문서는 석면(건축물석면) 조사결과서다. 석면함유자재 표에서 각 행을 그대로 추출하라. '
-    + '각 행: 동·층(bldg), 자재성상/종류(mat, 예: 갈매기무늬텍스·다공성텍스·분무재·보온재), 위치/부위(loc, 예: 천장·벽체·바닥·지붕·파이프), 면적㎡(area, 숫자만), 파이프길이m(len, 있으면). '
-    + '제외할 행: ①합계·"계"·소계 행(중복 합산 방지) ②석면 불검출 자재(석면검출 N·불검출·"-"), 석면 검출(Y) 자재만. '
-    + '같은 자재가 요약표와 상세표에 중복되면 한 번만(요약표 우선). 판정·합산·해석은 하지 말고 표에 적힌 값만 JSON으로. 표를 못 찾으면 {"rows":[],"note":"이유"}. '
-    + '형식: {"org":"조사기관명","site":"소재지","summary_area":숫자,"rows":[{"bldg":"","mat":"","loc":"","area":0,"len":0}]}';
+  const prompt = '이 문서는 석면(건축물석면) 조사결과서다. 문서에 명기된 값만 추출하라(추정·해석 금지, 없으면 빈값). '
+    + '① 개요: 조사기관명(org), 건축물 소재지(site), 건축물명(bldg_name), 의뢰인/발주자 기관명(owner), 건축년도(year), 구조(struct), 용도(use), 연면적㎡(total_floor, 숫자만), 석면함유 자재면적 합계㎡(summary_area, 숫자만). '
+    + '② 석면함유자재 표의 각 행: 동·층(bldg), 자재성상/종류(mat, 예: 갈매기무늬텍스·다공성텍스·분무재·보온재), 위치/부위(loc, 예: 천장·벽체·바닥·지붕·파이프), 면적㎡(area, 숫자만), 석면 종류·함유율 표기 그대로(cnt, 예: "백석면 5%"), 파이프길이m(len, 있으면). '
+    + '행 제외: 합계·"계"·소계 행(중복 합산 방지), 석면 불검출(N·불검출·"-") 자재 — 검출(Y) 자재만. 같은 자재가 요약표와 상세표에 중복되면 한 번만(요약표 우선). '
+    + '표를 못 찾으면 {"rows":[],"note":"이유"}. '
+    + '형식: {"org":"","site":"","bldg_name":"","owner":"","year":"","struct":"","use":"","total_floor":0,"summary_area":0,"rows":[{"bldg":"","mat":"","loc":"","area":0,"cnt":"","len":0}]}';
   try {
     const resp = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -593,9 +594,12 @@ async function claudeExtractAsbestos(buf, name, type) {
     if (!m) return { error: 'NO_JSON' };
     const data = JSON.parse(m[0]);
     const rows = Array.isArray(data.rows) ? data.rows.map(function (r) {
-      return { bldg: String(r.bldg || '').slice(0, 40), mat: String(r.mat || '').slice(0, 40), loc: String(r.loc || '').slice(0, 20), area: Number(r.area) || 0, len: Number(r.len) || 0 };
+      return { bldg: String(r.bldg || '').slice(0, 40), mat: String(r.mat || '').slice(0, 40), loc: String(r.loc || '').slice(0, 20), area: Number(r.area) || 0, cnt: String(r.cnt || '').slice(0, 30), len: Number(r.len) || 0 };
     }) : [];
     return { org: String(data.org || '').slice(0, 60), site: String(data.site || '').slice(0, 80),
+      bldg_name: String(data.bldg_name || '').slice(0, 60), owner: String(data.owner || '').slice(0, 60),
+      year: String(data.year || '').slice(0, 12), struct: String(data.struct || '').slice(0, 40), use: String(data.use || '').slice(0, 40),
+      total_floor: Number(data.total_floor) || 0,
       summary_area: Number(data.summary_area) || 0, rows: rows, judge: judgeAsbestos94(rows) };
   } catch (e) { return { error: 'PARSE_FAILED' }; }
 }
