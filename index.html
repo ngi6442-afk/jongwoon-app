@@ -966,6 +966,7 @@
     <div class="dash-sec" style="margin-bottom:8px;"><h2>계약 <span class="cnt" id="conHead"></span></h2></div>
     <button class="link-btn" id="conStartBtn">+ 계약 시작</button>
     <button class="link-btn" id="docGenBtn">+ 서류 출력</button>
+    <button class="link-btn" id="tplManageBtn" style="display:none;">+ 양식 등록</button>
     <div class="card" id="conList"><div class="loading">불러오는 중…</div></div>
   </section>
 
@@ -1102,6 +1103,43 @@
     <input type="text" id="baUrl" placeholder="원문 링크 (선택)" autocomplete="off">
     <button class="primary" id="baSave">등록</button>
     <button class="secondary" id="baCancel">취소</button>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="tplBackdrop">
+  <div class="modal">
+    <h3>서류 양식 등록 (관리자)</h3>
+    <p style="margin-bottom:8px;color:#888;font-size:13px;">원본 양식 xlsx를 서버에 영구 보관합니다. 생성할 때마다 원본을 복사해 채우므로 양식이 오염되지 않습니다. 재등록하면 교체됩니다.</p>
+    <div id="tplRows"></div>
+    <button class="secondary" id="tplClose" style="margin-top:8px;">닫기</button>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="xlsxGenBackdrop">
+  <div class="modal">
+    <h3>서류 생성</h3>
+    <p id="xgHint" style="margin-bottom:8px;color:#888;font-size:13px;"></p>
+    <span class="fld-label">서류 종류</span>
+    <select id="xgKind">
+      <option value="work_start">착공계</option>
+      <option value="work_complete">준공계</option>
+      <option value="asb_plan">석면해체계획서</option>
+    </select>
+    <input type="text" id="xgTitle" placeholder="공사명" autocomplete="off">
+    <input type="text" id="xgSite" placeholder="현장 주소" autocomplete="off">
+    <input type="text" id="xgClient" placeholder="발주자" autocomplete="off">
+    <div id="xgMoneyFields">
+      <input type="text" id="xgAmount" placeholder="금액(숫자만 — 착공: 계약금액 / 준공: 준공금액)" autocomplete="off" inputmode="numeric">
+      <span class="fld-label">계약일</span><input type="date" id="xgD1">
+      <span class="fld-label">착공일</span><input type="date" id="xgD2">
+      <span class="fld-label">준공예정일</span><input type="date" id="xgD3">
+    </div>
+    <div id="xgAsbFields" style="display:none;">
+      <input type="text" id="xgOwner" placeholder="소유주 (예: 경상북도 교육감)" autocomplete="off">
+      <div id="xgAsbInfo" style="font-size:13px;color:#888;margin:4px 0;"></div>
+    </div>
+    <button class="primary" id="xgGo">생성·다운로드</button>
+    <button class="secondary" id="xgCancel">취소</button>
   </div>
 </div>
 
@@ -4228,6 +4266,89 @@
     return sheets;
   }
 
+  // ---- xlsx 양식 채움 엔진: 대상 셀 XML만 수술 교체, 재압축은 무압축(STORE) — 서식·도형·인쇄 100% 보존 ----
+  var CRC_T=(function(){ var t=[],c; for(var n=0;n<256;n++){ c=n; for(var k=0;k<8;k++) c=(c&1)?(0xEDB88320^(c>>>1)):(c>>>1); t[n]=c>>>0; } return t; })();
+  function crc32(u8){ var c=0xFFFFFFFF; for(var i=0;i<u8.length;i++) c=CRC_T[(c^u8[i])&0xFF]^(c>>>8); return (c^0xFFFFFFFF)>>>0; }
+  function zipStore(files){   // files: [{name, data(Uint8Array)}] → Blob(zip, 무압축)
+    var enc=new TextEncoder(), parts=[], central=[], off=0;
+    files.forEach(function(f){
+      var nb=enc.encode(f.name), crc=crc32(f.data), sz=f.data.length;
+      var lh=new DataView(new ArrayBuffer(30));
+      lh.setUint32(0,0x04034b50,true); lh.setUint16(4,20,true); lh.setUint16(6,0x0800,true); lh.setUint16(8,0,true);
+      lh.setUint32(14,crc,true); lh.setUint32(18,sz,true); lh.setUint32(22,sz,true); lh.setUint16(26,nb.length,true);
+      parts.push(new Uint8Array(lh.buffer), nb, f.data);
+      var ch=new DataView(new ArrayBuffer(46));
+      ch.setUint32(0,0x02014b50,true); ch.setUint16(4,20,true); ch.setUint16(6,20,true); ch.setUint16(8,0x0800,true); ch.setUint16(10,0,true);
+      ch.setUint32(16,crc,true); ch.setUint32(20,sz,true); ch.setUint32(24,sz,true); ch.setUint16(28,nb.length,true);
+      ch.setUint32(42,off,true);
+      central.push(new Uint8Array(ch.buffer), nb);
+      off+=30+nb.length+sz;
+    });
+    var cdSize=central.reduce(function(s,p){return s+p.length;},0);
+    var eo=new DataView(new ArrayBuffer(22));
+    eo.setUint32(0,0x06054b50,true); eo.setUint16(8,files.length,true); eo.setUint16(10,files.length,true);
+    eo.setUint32(12,cdSize,true); eo.setUint32(16,off,true);
+    return new Blob(parts.concat(central,[new Uint8Array(eo.buffer)]), {type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+  }
+  function xmlEsc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+  function xlsxSetCell(xml, ref, val, kind){   // kind: s=문자열 n=숫자 b=공란 — 원본에 없는 셀은 건너뜀
+    var re=new RegExp('<c r="'+ref+'"([^>]*?)(/>|>[\\s\\S]*?</c>)');
+    var m=re.exec(xml); if(!m) return xml;
+    var sm=/\ss="\d+"/.exec(m[1]); var s=sm?sm[0]:"";
+    var nw;
+    if(kind==="b") nw='<c r="'+ref+'"'+s+'/>';
+    else if(kind==="n") nw='<c r="'+ref+'"'+s+'><v>'+val+'</v></c>';
+    else nw='<c r="'+ref+'"'+s+' t="inlineStr"><is><t xml:space="preserve">'+xmlEsc(val)+'</t></is></c>';
+    return xml.slice(0,m.index)+nw+xml.slice(m.index+m[0].length);
+  }
+  // b64 양식 + 시트별 편집 → 채워진 xlsx Blob. edits: {"시트명":[["C7","값","s"],...]}
+  async function fillXlsxTemplate(b64, edits){
+    var bytes=dataUrlToBytes("x,"+b64);
+    var files=await unzip(bytes);
+    var dec=new TextDecoder(), enc=new TextEncoder();
+    var raw={};   // 전 항목 원본 바이트(무압축 재조립용)
+    for(var name in files){ raw[name]= files[name].method===0 ? files[name].comp : await inflateRaw(files[name].comp); }
+    var wbx=dec.decode(raw["xl/workbook.xml"]);
+    var rels=dec.decode(raw["xl/_rels/workbook.xml.rels"]);
+    var rid2t={}; rels.replace(/Id="([^"]+)"[^>]*Target="([^"]+)"/g, function(_,a,b){ rid2t[a]=b; return _; });
+    var name2xml={}; wbx.replace(/<sheet name="([^"]+)"[^>]*r:id="([^"]+)"/g, function(_,nm,rid){ name2xml[nm]="xl/"+rid2t[rid]; return _; });
+    for(var sheet in edits){
+      var path=name2xml[sheet]; if(!path||!raw[path]) continue;
+      var xml=dec.decode(raw[path]);
+      edits[sheet].forEach(function(e){ xml=xlsxSetCell(xml, e[0], e[1], e[2]); });
+      raw[path]=enc.encode(xml);
+    }
+    // 수식 강제 재계산(기본정보→서식 수식 갱신)
+    if(/<calcPr /.test(wbx) && wbx.indexOf("fullCalcOnLoad")<0) wbx=wbx.replace("<calcPr ", '<calcPr fullCalcOnLoad="1" ');
+    else if(!/<calcPr/.test(wbx)) wbx=wbx.replace("</workbook>", '<calcPr fullCalcOnLoad="1"/></workbook>');
+    raw["xl/workbook.xml"]=enc.encode(wbx);
+    var list=Object.keys(raw).map(function(n){ return {name:n, data:raw[n]}; });
+    return zipStore(list);
+  }
+  function downloadBlob(name, blob){
+    var a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=name;
+    document.body.appendChild(a); a.click();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 3000);
+  }
+  // 한글 금액: 19525000 → 일금 일천구백오십이만오천원 정(￦ 19,525,000)
+  function koAmount(n){
+    n=Math.round(Number(n)||0); if(n<=0) return "";
+    var D=["","일","이","삼","사","오","육","칠","팔","구"], U=["","십","백","천"], G=["","만","억","조"];
+    var s="", num=n, gi=0;
+    while(num>0){
+      var part=num%10000, ps="";
+      for(var i=0;i<4;i++){ var d=Math.floor(part/Math.pow(10,3-i))%10; if(d) ps+=D[d]+U[3-i]; }
+      if(ps) s=ps+G[gi]+s;
+      num=Math.floor(num/10000); gi++;
+    }
+    return "일금 "+s+"원 정(￦ "+n.toLocaleString()+")";
+  }
+  function dateSerial(iso){   // 'YYYY-MM-DD' → 엑셀 날짜 시리얼
+    if(!iso||!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return null;
+    var p=iso.split("-");
+    return Math.round((Date.UTC(+p[0],+p[1]-1,+p[2])-Date.UTC(1899,11,30))/86400000);
+  }
+
   // ---- 석면조사 표 헤더 탐지(위치 무관) + §94 신고대상 판정 ----
   var ASB_HDR={ mat:["자재종류","석면함유자재","자재명","품명","함유자재"], loc:["위치","부위"],
     area:["범위","면적","㎡","수량"], cnt:["함유율"] };
@@ -4353,6 +4474,137 @@
           alert("요소가 추가되었습니다. 단계 반영은 계약 수정 화면에서 확인하세요.");
         }
       }
+    });
+  })();
+  // ---- 서류 양식 등록/생성 ----
+  var TPL_LABELS={asb_plan:"석면해체계획서", work_start:"착공계", work_complete:"준공계"};
+  function openTplManage(){
+    if(!isAdmin()) return;
+    var host=document.getElementById("tplRows");
+    host.innerHTML='<div style="color:#888;">불러오는 중…</div>';
+    document.getElementById("tplBackdrop").classList.add("show");
+    gwCall("gw-data",{action:"tpl_list"}).then(function(res){
+      var t=(res.body&&res.body.templates)||{};
+      host.innerHTML=Object.keys(TPL_LABELS).map(function(k){
+        var cur=t[k];
+        return '<div style="display:flex;align-items:center;gap:8px;margin:6px 0;">'
+          +'<b style="width:110px;">'+TPL_LABELS[k]+'</b>'
+          +'<span style="flex:1;font-size:12px;color:'+(cur?'#1A9A6B':'#c0392b')+';">'+(cur?('등록됨 · '+esc(cur.name||"")):'미등록')+'</span>'
+          +'<button class="mini-btn" data-tpl-up="'+k+'">'+(cur?'교체':'등록')+'</button></div>';
+      }).join("");
+      Array.prototype.forEach.call(host.querySelectorAll("[data-tpl-up]"), function(el){
+        el.addEventListener("click", function(){
+          var key=el.getAttribute("data-tpl-up");
+          var inp=document.createElement("input"); inp.type="file"; inp.accept=".xlsx";
+          inp.addEventListener("change", function(){
+            var f=inp.files&&inp.files[0]; if(!f) return;
+            var r=new FileReader();
+            r.onload=function(){
+              el.textContent="올리는 중…";
+              gwCall("gw-data",{action:"tpl_put", key:key, name:f.name, data:String(r.result).split(",")[1]||""})
+                .then(function(res){ if(res.status===200){ openTplManage(); } else { alert("등록 실패: "+((res.body&&res.body.error_code)||res.status)); el.textContent="등록"; } })
+                .catch(function(){ alert("등록 실패(네트워크)"); el.textContent="등록"; });
+            };
+            r.readAsDataURL(f);
+          });
+          inp.click();
+        });
+      });
+    }).catch(function(){ host.innerHTML='<div style="color:#c0392b;">목록을 불러오지 못했습니다.</div>'; });
+  }
+  var xgCtx=null;
+  function openXlsxGen(conId){
+    var c=findProc(conId); if(!c) return;
+    xgCtx={id:conId};
+    document.getElementById("xgHint").textContent="["+(c.label||"계약")+(c.site?" · "+c.site:"")+"] 등록된 양식 원본에 값을 채워 xlsx로 내려받습니다.";
+    var isAsb=!!(c.elems&&c.elems.asb);
+    document.getElementById("xgKind").value = isAsb ? "asb_plan" : "work_start";
+    document.getElementById("xgTitle").value = c.title||c.label||"";
+    document.getElementById("xgSite").value = c.site||"";
+    document.getElementById("xgClient").value = c.client||"";
+    document.getElementById("xgAmount").value="";
+    document.getElementById("xgD1").value = c.start||"";
+    document.getElementById("xgD2").value=""; document.getElementById("xgD3").value="";
+    document.getElementById("xgOwner").value="";
+    xgToggle();
+    document.getElementById("xlsxGenBackdrop").classList.add("show");
+  }
+  function xgToggle(){
+    var k=document.getElementById("xgKind").value;
+    document.getElementById("xgMoneyFields").style.display = (k==="asb_plan") ? "none" : "";
+    document.getElementById("xgAsbFields").style.display = (k==="asb_plan") ? "" : "none";
+    if(k==="asb_plan" && xgCtx){
+      var c=findProc(xgCtx.id);
+      var s=c&&c.asb_survey;
+      document.getElementById("xgAsbInfo").textContent = s
+        ? ("석면조사 검수값: "+(s.rows||[]).length+"행·"+s.area+"㎡"+(s.confirmed?" (검수됨)":" (미검수 — 검수 후 권장)"))
+        : "석면조사 판독값 없음 — 자재표는 공란으로 생성됩니다.";
+    }
+  }
+  // 양식별 편집표 구성 — 좌표는 등록 양식 기준(구룡포 (1)본·자체 착공/준공계)
+  function xgBuildEdits(kind, c){
+    var $=function(id){ return document.getElementById(id).value.trim(); };
+    var title=$("xgTitle"), site=$("xgSite"), client=$("xgClient");
+    if(kind==="asb_plan"){
+      var rows=(c.asb_survey&&c.asb_survey.rows)||[];
+      var total=Math.round(rows.reduce(function(s,r){return s+(Number(r.area)||0);},0)*100)/100;
+      var e1=[["C7",title,"s"],["C8","","b"],["H8","","b"],["C9","","b"],["H9","","b"],
+        ["C10",site,"s"],["C11",$("xgOwner"),$("xgOwner")?"s":"b"],
+        ["C12",client,"s"],["C15",client,"s"],
+        ["H11","","b"],["H13","","b"],["H16","","b"],["H23","","b"],["C24","","b"],["C20","","b"],["H20","","b"],
+        ["A34",site,"s"]];
+      for(var i=0;i<5;i++){
+        var r=34+i;
+        if(i<rows.length){
+          var w=rows[i];
+          e1.push(["B"+r,(w.bldg||""),"s"],["C"+r,(w.mat||""),"s"],["D"+r,(w.loc||""),"s"],["E"+r,(Number(w.area)||0),"n"],["F"+r,(w.cnt||""),w.cnt?"s":"b"]);
+        } else {
+          e1.push(["B"+r,"","b"],["C"+r,"","b"],["D"+r,"","b"],["E"+r,"","b"],["F"+r,"","b"]);
+        }
+      }
+      var today=todayStr().split("-");
+      var e3=[["B99",site,"s"],["E99",title,"s"],["H99",total,"n"],["K99","","b"],["H100",total,"n"],
+        ["E70","","b"],["G23","","b"],["G90","","b"],["J77","","b"],["L77","","b"],["E153","","b"],["D155","","b"]];
+      var r2;
+      for(r2=11;r2<23;r2++) e3.push(["C"+r2,"","b"]);
+      for(r2=32;r2<44;r2++){ e3.push(["G"+r2,"","b"],["L"+r2,"","b"]); }
+      for(r2=78;r2<90;r2++){ e3.push(["G"+r2,"","b"],["J"+r2,"","b"],["L"+r2,"","b"]); }
+      for(r2=141;r2<153;r2++) e3.push(["C"+r2,"","b"]);
+      var edits={"1.공사개요":e1, "2":[["F7",today[0]+"년 "+(+today[1])+"월","s"]], "3":e3};
+      if(rows.length>5) alert("자재 행이 "+rows.length+"개인데 양식 슬롯은 5행입니다. 5행까지만 들어가니 나머지는 수동 추가하세요.");
+      return edits;
+    }
+    // 착공계/준공계 — '기본정보 입력' 시트만 채우면 수식이 전 서식에 전파
+    var amt=Number($("xgAmount").replace(/[^0-9]/g,""))||0;
+    var ed=[["B1",title,"s"],["B2",site,"s"]];
+    if(amt) ed.push(["B3",koAmount(amt),"s"]);
+    [["B4","xgD1"],["B5","xgD2"],["B6","xgD3"]].forEach(function(p){
+      var sn=dateSerial(document.getElementById(p[1]).value);
+      if(sn) ed.push([p[0],sn,"n"]);
+    });
+    if(client) ed.push(["B11",client,"s"]);
+    return {"기본정보 입력":ed};
+  }
+  (function(){
+    var $=function(id){return document.getElementById(id);};
+    if($("tplManageBtn")) $("tplManageBtn").addEventListener("click", openTplManage);
+    if($("tplClose")) $("tplClose").addEventListener("click", function(){ $("tplBackdrop").classList.remove("show"); });
+    if($("xgKind")) $("xgKind").addEventListener("change", xgToggle);
+    if($("xgCancel")) $("xgCancel").addEventListener("click", function(){ $("xlsxGenBackdrop").classList.remove("show"); xgCtx=null; });
+    if($("xgGo")) $("xgGo").addEventListener("click", function(){
+      if(!xgCtx) return;
+      var c=findProc(xgCtx.id); if(!c) return;
+      var kind=$("xgKind").value;
+      $("xgGo").textContent="생성 중…"; $("xgGo").disabled=true;
+      gwCall("gw-data",{action:"tpl_get", key:kind}).then(function(res){
+        if(res.status!==200){ alert(res.status===404?("'"+TPL_LABELS[kind]+"' 양식이 미등록입니다. [+ 양식 등록]에서 먼저 등록하세요."):"양식 로드 실패"); return; }
+        return fillXlsxTemplate(res.body.data, xgBuildEdits(kind, c)).then(function(blob){
+          var nm=($("xgTitle").value.trim()||c.label||"서류")+"_"+TPL_LABELS[kind]+".xlsx";
+          downloadBlob(nm, blob);
+          $("xlsxGenBackdrop").classList.remove("show"); xgCtx=null;
+        });
+      }).catch(function(e){ alert("생성 실패: "+e); })
+        .finally(function(){ $("xgGo").textContent="생성·다운로드"; $("xgGo").disabled=false; });
     });
   })();
   function liveContracts(){ return contracts.filter(function(c){ return c && c.del!==1; }); }
@@ -4553,6 +4805,7 @@
     var host=document.getElementById("conList"); if(!host) return;
     var startBtn=document.getElementById("conStartBtn"); if(startBtn) startBtn.style.display = canDo("con") ? "block" : "none";
     var dgBtn=document.getElementById("docGenBtn"); if(dgBtn) dgBtn.style.display = canDo("con") ? "block" : "none";
+    var tmBtn=document.getElementById("tplManageBtn"); if(tmBtn) tmBtn.style.display = isAdmin() ? "block" : "none";
     var active=liveContracts().filter(function(c){return c.status!=="done";});
     var done=liveContracts().filter(function(c){return c.status==="done";});
     var head=document.getElementById("conHead"); if(head) head.textContent = active.length ? (active.length+" 진행중") : "";
@@ -4573,7 +4826,7 @@
           '<div class="item-meta">'+(c.docType==="public"?'<span class="from-chip">공문서</span>':'<span class="scope-chip">사문서</span>')+(c.site?'<span>'+esc(c.site)+'</span>':'')+'<span>시작 '+esc(c.start||"")+'</span>'+(c.who?'<span class="author-chip">'+esc(c.who)+'</span>':'')+(c.status==="done"?'<span class="done-by">✓ 완료</span>':'')+'</div>'+
           pipes+
         '</div>'+
-        (canDo("con")?'<div class="task-ctrl"><button class="mini-btn" data-con-doc="'+c.id+'">서류</button><button class="mini-btn danger" data-con-del="'+c.id+'">삭제</button></div>':'')+
+        (canDo("con")?'<div class="task-ctrl"><button class="mini-btn" data-con-xlsx="'+c.id+'">생성</button><button class="mini-btn" data-con-doc="'+c.id+'">서류</button><button class="mini-btn danger" data-con-del="'+c.id+'">삭제</button></div>':'')+
       '</div>';
     }).join("");
     Array.prototype.forEach.call(host.querySelectorAll("[data-con-del]"), function(el){
@@ -4581,6 +4834,9 @@
     });
     Array.prototype.forEach.call(host.querySelectorAll("[data-con-doc]"), function(el){
       el.addEventListener("click", function(){ openDocFromContract(el.getAttribute("data-con-doc")); });
+    });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-con-xlsx]"), function(el){
+      el.addEventListener("click", function(){ openXlsxGen(el.getAttribute("data-con-xlsx")); });
     });
   }
   function delContract(id){

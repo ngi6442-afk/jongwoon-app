@@ -621,6 +621,39 @@ async function handleAttPut(event, d, R) {
   return jr(200, { status: 'OK', id: id, name: name, size: b64.length, parsed: parsed, request_id: R });
 }
 
+// ---- 서류 양식(템플릿) 보관 — 관리자 등록, 영구 보관. 생성 시 원본 복사라 오염 없음 ----
+const TPL_KEYS = { asb_plan: '석면해체계획서', work_start: '착공계', work_complete: '준공계' };
+async function handleTplPut(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (!c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
+  const key = String(d.key || '');
+  if (!TPL_KEYS[key]) return jr(400, { status: 'REJECTED', error_code: 'BAD_TPL_KEY', request_id: R });
+  const b64 = String(d.data || '');
+  if (!b64 || b64.length > ATT_MAX) return jr(400, { status: 'REJECTED', error_code: 'INVALID_FILE', request_id: R });
+  const w = await blobSet(store(FILES), 'tpl:' + key, { name: String(d.name || '').slice(0, 120), data: b64, by: c.member.name, ts: Date.now() });
+  if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
+  return jr(200, { status: 'OK', key: key, request_id: R });
+}
+async function handleTplGet(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (permOf(c.member, 'contracts') === 'hide') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_ACCESS', request_id: R });
+  const r = await blobGet(store(FILES), 'tpl:' + String(d.key || ''));
+  if (!r.ok || !r.data) return jr(404, { status: 'REJECTED', error_code: 'NOT_FOUND', request_id: R });
+  return jr(200, { status: 'OK', name: r.data.name, data: r.data.data, request_id: R });
+}
+async function handleTplList(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  const out = {};
+  for (const key of Object.keys(TPL_KEYS)) {
+    const r = await blobGet(store(FILES), 'tpl:' + key);
+    out[key] = (r.ok && r.data) ? { name: r.data.name, ts: r.data.ts, by: r.data.by } : null;
+  }
+  return jr(200, { status: 'OK', templates: out, labels: TPL_KEYS, request_id: R });
+}
+
 async function handleAttGet(event, d, R) {
   const c = await currentMember(event);
   if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
@@ -665,6 +698,9 @@ async function handler(event) {
     if (d && d.action === 'bids_purge') return await handleBidsPurge(event, d, R);
     if (d && d.action === 'bids_export') return await handleBidsExport(event, d, R);
     if (d && d.action === 'bids_results') return await handleBidsResults(event, d, R);
+    if (d && d.action === 'tpl_put') return await handleTplPut(event, d, R);
+    if (d && d.action === 'tpl_get') return await handleTplGet(event, d, R);
+    if (d && d.action === 'tpl_list') return await handleTplList(event, d, R);
     if (d && d.action === 'att_put') return await handleAttPut(event, d, R);
     if (d && d.action === 'att_get') return await handleAttGet(event, d, R);
     if (d && d.action === 'att_del') return await handleAttDel(event, d, R);
