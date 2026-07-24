@@ -2263,22 +2263,6 @@
 
     var detailHtml = t.detail ? '<div class="task-detail">' + esc(t.detail) + '</div>' : '';
 
-    // 계약 단계 지시: 서류 첨부 영역(버튼+드래그) + 판독상태 + 검수
-    var attachHtml = "";
-    if (t.proc_id){
-      var apc = findProc(t.proc_id);
-      var akey = t.stage_name || "기타";
-      var aarr = (apc && apc.attachments && apc.attachments[akey]) || [];
-      var arows = aarr.map(function(a, ai){
-        var badge = a.parsed ? ' <span style="color:' + (/실패|오류|수동/.test(a.parsed) ? '#c0392b' : '#1A9A6B') + ';font-size:12px;">' + esc(a.parsed) + '</span>' : '';
-        var rev = a.asb ? ' <button class="mini-btn" data-att-review="' + t.id + '" data-att-i="' + ai + '">검수</button>' : '';
-        var del = canDo("con") ? ' <button class="mini-btn" data-att-del="' + t.id + '" data-att-i="' + ai + '">✕</button>' : '';
-        return '<div style="margin:2px 0;">📎 ' + esc(a.name) + ' <span style="color:#888;font-size:12px;">(' + Math.round((a.size || 0) / 1024) + 'KB)</span>' + badge + rev + del + '</div>';
-      }).join('');
-      var aadd = (canDo("con") && !isDone) ? '<button class="mini-btn" data-att-add="' + t.id + '">📎 첨부</button> <span style="color:#888;font-size:12px;">(끌어다 놓기 가능)</span>' : '';
-      if (arows || aadd) attachHtml = '<div data-att-drop="' + t.id + '" style="margin-top:6px;padding:6px 8px;border:1px dashed #bbb;border-radius:6px;">' + arows + aadd + '</div>';
-    }
-
     var ctrl = "";
     if (isDone){
       ctrl = '<div class="task-ctrl">' +
@@ -2312,7 +2296,6 @@
           '<div class="item-title">' + esc(t.title) + '</div>' +
           detailHtml +
           '<div class="item-meta">' + metaBits.join('') + '</div>' +
-          attachHtml +
         '</div>' +
         ctrl +
       '</div>';
@@ -2425,21 +2408,6 @@
     });
     Array.prototype.forEach.call(host.querySelectorAll("[data-task-doc]"), function(el){
       el.addEventListener("click", function(e){ e.stopPropagation(); openDocFromContract(el.getAttribute("data-task-doc"), el.getAttribute("data-task-doc-stage")||""); });
-    });
-    Array.prototype.forEach.call(host.querySelectorAll("[data-att-add]"), function(el){
-      el.addEventListener("click", function(e){ e.stopPropagation(); pickAttachFor(el.getAttribute("data-att-add")); });
-    });
-    Array.prototype.forEach.call(host.querySelectorAll("[data-att-del]"), function(el){
-      el.addEventListener("click", function(e){ e.preventDefault(); e.stopPropagation(); delAttach(el.getAttribute("data-att-del"), +el.getAttribute("data-att-i")); });
-    });
-    Array.prototype.forEach.call(host.querySelectorAll("[data-att-review]"), function(el){
-      el.addEventListener("click", function(e){ e.preventDefault(); e.stopPropagation(); openAsbReview(el.getAttribute("data-att-review"), +el.getAttribute("data-att-i")); });
-    });
-    Array.prototype.forEach.call(host.querySelectorAll("[data-att-drop]"), function(el){
-      el.addEventListener("dragover", function(e){ e.preventDefault(); el.style.background="#EEF5FF"; });
-      el.addEventListener("dragleave", function(){ el.style.background=""; });
-      el.addEventListener("drop", function(e){ e.preventDefault(); el.style.background="";
-        var f=e.dataTransfer && e.dataTransfer.files; if(f&&f.length) addAttachFiles(el.getAttribute("data-att-drop"), f); });
     });
     Array.prototype.forEach.call(host.querySelectorAll("[data-task-hold]"), function(el){
       el.addEventListener("click", function(e){ e.stopPropagation(); setTaskStatus(el.getAttribute("data-task-hold"), "hold"); });
@@ -4138,40 +4106,58 @@
   }
   function findProc(id){ for(var i=0;i<contracts.length;i++){ if(contracts[i].id===id) return contracts[i]; } return null; }
 
-  // ---- 단계별 서류 첨부(버튼·드래그) — 참고자료로 보관, 판독 시 값 추출 ----
+  // ---- 계약 서류함(첨부·드래그) — 계약 단위로 통합 보관, 판독 시 값 추출. 담당자(계약 권한)가 첨부 ----
   var ATT_MAX = 6 * 1024 * 1024;   // 개별 6MB 상한(용량·개인정보 최소화)
   function findTask(id){ for(var i=0;i<tasks.length;i++){ if(tasks[i].id===id) return tasks[i]; } return null; }
-  function pickAttachFor(taskId){
+  // 기존 단계별 첨부(구버전 데이터)도 합쳐서 [{key,i,a}]로
+  function conAttList(c){
+    var out=[]; var att=(c&&c.attachments)||{};
+    Object.keys(att).forEach(function(k){ (att[k]||[]).forEach(function(a,i){ out.push({key:k,i:i,a:a}); }); });
+    return out;
+  }
+  // 계약 카드 서류함 HTML — 전체 첨부(구버전 단계별 포함) + 추가·검수·삭제
+  function conAttBoxHtml(c){
+    var list=conAttList(c);
+    var rows=list.map(function(x){
+      var a=x.a;
+      var badge = a.parsed ? ' <span style="color:'+(/실패|오류|수동|초과/.test(a.parsed)?'#c0392b':'#1A9A6B')+';font-size:12px;">'+esc(a.parsed)+'</span>' : '';
+      var rev = a.asb ? ' <button class="mini-btn" data-catt-rev="'+c.id+'|'+esc(x.key)+'|'+x.i+'">검수</button>' : '';
+      var del = canDo("con") ? ' <button class="mini-btn" data-catt-del="'+c.id+'|'+esc(x.key)+'|'+x.i+'">✕</button>' : '';
+      return '<div style="margin:2px 0;">📎 '+esc(a.name)+' <span style="color:#888;font-size:12px;">('+Math.round((a.size||0)/1024)+'KB)</span>'+badge+rev+del+'</div>';
+    }).join('');
+    var add = (canDo("con") && c.status!=="done") ? '<button class="mini-btn" data-catt-add="'+c.id+'">📎 서류 첨부</button> <span style="color:#888;font-size:12px;">(끌어다 놓기 가능 — 석면조사서는 자동 판독)</span>' : '';
+    if(!rows && !add) return '';
+    return '<div data-catt-drop="'+c.id+'" style="margin-top:6px;padding:6px 8px;border:1px dashed #bbb;border-radius:6px;">'+rows+add+'</div>';
+  }
+  function conPickAttach(conId){
     var inp=document.createElement("input"); inp.type="file"; inp.multiple=true;
     inp.accept=".pdf,.hwp,.hwpx,.xlsx,.xls,.jpg,.jpeg,.png";
-    inp.addEventListener("change", function(){ if(inp.files&&inp.files.length) addAttachFiles(taskId, inp.files); });
+    inp.addEventListener("change", function(){ if(inp.files&&inp.files.length) conAddAttach(conId, inp.files); });
     inp.click();
   }
-  // 첨부: 원본은 서버 blob(att_put), 계약엔 참조·판독결과만. 석면 단계면 Claude 판독.
-  function addAttachFiles(taskId, files){
-    var t=findTask(taskId); if(!t||!t.proc_id) return;
-    var c=findProc(t.proc_id); if(!c) return;
+  // 첨부: 원본은 서버 blob(att_put), 계약엔 참조·판독결과만. 석면 계약이면 Claude 판독.
+  function conAddAttach(conId, files){
+    var c=findProc(conId); if(!c) return;
     if(!c.attachments) c.attachments={};
-    var key=t.stage_name||"기타";
-    if(!c.attachments[key]) c.attachments[key]=[];
-    var arr=c.attachments[key];
-    var isAsb = /석면/.test(key) || (c.elems&&c.elems.asb);
+    if(!c.attachments["서류함"]) c.attachments["서류함"]=[];
+    var arr=c.attachments["서류함"];
+    var isAsb = !!(c.elems&&c.elems.asb);
     Array.prototype.forEach.call(files, function(f){
       if(f.size>ATT_MAX){ alert('"'+f.name+'"는 6MB를 넘어 첨부할 수 없습니다.'); return; }
       var r=new FileReader();
       r.onload=function(){
-        var entry={ name:f.name, size:f.size, type:f.type||"", id:"", parsed:"판독 중…", added:todayStr() };
-        arr.push(entry); renderTasks();
+        var entry={ name:f.name, size:f.size, type:f.type||"", id:"", parsed:"올리는 중…", added:todayStr() };
+        arr.push(entry); renderContracts();
         gwCall("gw-data", { action:"att_put", name:f.name, type:f.type||"", data:String(r.result).split(",")[1]||"", kind:(isAsb?"asbestos":"") })
           .then(function(res){
             var b=(res&&res.body)||{};
-            if(!res || res.status!==200){ entry.parsed="업로드 실패("+((b&&b.error_code)||res.status||"네트워크")+")"; renderTasks(); return; }
+            if(!res || res.status!==200){ entry.parsed="업로드 실패("+((b&&b.error_code)||res.status||"네트워크")+")"; renderContracts(); return; }
             entry.id=b.id||"";
             if(b.parse_pending){ entry.parsed="판독 중…(수 분 걸릴 수 있음)"; asbBgParse(entry, c); }
             else entry.parsed="";
-            scheduleContractSave(); renderTasks();
+            scheduleContractSave(); renderContracts();
           })
-          .catch(function(){ entry.parsed="업로드 실패"; renderTasks(); });
+          .catch(function(){ entry.parsed="업로드 실패"; renderContracts(); });
       };
       r.readAsDataURL(f);
     });
@@ -4188,12 +4174,12 @@
         area:Math.round(area*100)/100, target:p.judge.target, reasons:p.judge.reasons, rows:p.rows||[], from:entry.name, checked:todayStr(), confirmed:false};
       if(p.judge.target) setTimeout(function(){ alert("석면조사서 판독 — 노동부 신고대상입니다.\n\n"+p.judge.reasons.join("\n")+"\n\n※ 판독값은 검수 후 확정하세요. '노동부신고' 단계가 없으면 추가하세요."); },100);
     } else { entry.parsed="판독됨"; }
-    scheduleContractSave(); renderTasks();
+    scheduleContractSave(); renderContracts();
   }
   // 백그라운드 판독 트리거 + 폴링(5초 간격 최대 3분). 백그라운드 미지원(404)이면 동기 폴백.
   function asbBgParse(entry, c){
     function poll(n){
-      if(n>36){ entry.parsed="판독 시간 초과 — 첨부를 지웠다 다시 올려보세요"; renderTasks(); return; }
+      if(n>36){ entry.parsed="판독 시간 초과 — 첨부를 지웠다 다시 올려보세요"; renderContracts(); return; }
       setTimeout(function(){
         gwCall("gw-data",{action:"att_parse_status", id:entry.id}).then(function(res){
           if(res.body && res.body.status==="OK"){ applyAsbParse(entry, c, res.body.parsed); }
@@ -4212,14 +4198,15 @@
     }).then(function(done){ if(done!=="done") poll(0); })
       .catch(function(){ poll(0); });
   }
-  function delAttach(taskId, i){
-    var t=findTask(taskId); if(!t||!t.proc_id) return;
-    var c=findProc(t.proc_id); if(!c||!c.attachments) return;
-    var key=t.stage_name||"기타", arr=c.attachments[key];
+  function conDelAttach(conId, key, i){
+    var c=findProc(conId); if(!c||!c.attachments) return;
+    var arr=c.attachments[key];
     if(arr && i>=0 && i<arr.length){
       var att=arr[i];
       if(att.id) gwCall("gw-data", { action:"att_del", id:att.id }).catch(function(){});
-      arr.splice(i,1); scheduleContractSave(); renderTasks();
+      arr.splice(i,1);
+      if(!arr.length) delete c.attachments[key];
+      scheduleContractSave(); renderContracts();
     }
   }
   // ---- xlsx 파싱(브라우저 내장 DecompressionStream, 외부 라이브러리 없음) ----
@@ -4468,12 +4455,11 @@
       "면적합 "+area+"㎡ · 노동부 신고대상 <span style='color:"+(j.target?"#c0392b":"#1A9A6B")+";'>"+(j.target?"예":"아니오")+"</span>"
       + (j.reasons.length?'<div style="font-weight:400;font-size:12px;color:#888;">'+j.reasons.join("<br>")+'</div>':"");
   }
-  function openAsbReview(taskId, i){
-    var t=findTask(taskId); if(!t||!t.proc_id) return;
-    var c=findProc(t.proc_id); if(!c) return;
-    var key=t.stage_name||"기타", arr=(c.attachments&&c.attachments[key])||[];
+  function openAsbReview(conId, key, i){
+    var c=findProc(conId); if(!c) return;
+    var arr=(c.attachments&&c.attachments[key])||[];
     var att=arr[i]; if(!att||!att.asb) return;
-    asbReviewCtx={taskId:taskId, i:i};
+    asbReviewCtx={conId:conId, key:key, i:i};
     document.getElementById("asbReviewMeta").innerHTML =
       "📎 "+esc(att.name)+(att.asb.org?' · 조사기관 <b>'+esc(att.asb.org)+'</b>':'')+(att.asb.site?' · '+esc(att.asb.site):'');
     asbReviewRender((att.asb.rows||[]).slice());
@@ -4481,21 +4467,22 @@
   }
   (function(){
     var $=function(id){return document.getElementById(id);};
-    $("asbRowAdd").addEventListener("click", function(){ var rs=asbReviewRead(); rs.push({bldg:"",mat:"",loc:"",area:0,len:0}); asbReviewRender(rs); });
+    $("asbRowAdd").addEventListener("click", function(){ var rs=asbReviewRead(); rs.push({bldg:"",mat:"",loc:"",area:0,cnt:"",len:0}); asbReviewRender(rs); });
     $("asbReviewCancel").addEventListener("click", function(){ $("asbReviewBackdrop").classList.remove("show"); asbReviewCtx=null; });
     $("asbReviewSave").addEventListener("click", function(){
       if(!asbReviewCtx) return;
-      var t=findTask(asbReviewCtx.taskId); if(!t) return;
-      var c=findProc(t.proc_id); if(!c) return;
-      var key=t.stage_name||"기타", arr=(c.attachments&&c.attachments[key])||[];
+      var c=findProc(asbReviewCtx.conId); if(!c) return;
+      var arr=(c.attachments&&c.attachments[asbReviewCtx.key])||[];
       var att=arr[asbReviewCtx.i]; if(!att) return;
       var rows=asbReviewRead(), j=asbJudge(rows);
       var area=Math.round(rows.reduce(function(s,r){return s+(r.area||0);},0)*100)/100;
       att.asb.rows=rows; att.asb.judge=j;
       att.parsed="석면 "+rows.length+"행·"+area+"㎡ · 신고대상 "+(j.target?"예":"아니오")+" ✓검수됨";
-      c.asb_survey={org:(att.asb.org||""), area:area, target:j.target, reasons:j.reasons, rows:rows, from:att.name, checked:todayStr(), confirmed:true, confirmed_by:myName()||""};
+      var pv=att.asb;
+      c.asb_survey={org:(pv.org||""), site:(pv.site||""), bldg:(pv.bldg_name||""), owner:(pv.owner||""), year:(pv.year||""), struct:(pv.struct||""), use:(pv.use||""), total_floor:(pv.total_floor||0),
+        area:area, target:j.target, reasons:j.reasons, rows:rows, from:att.name, checked:todayStr(), confirmed:true, confirmed_by:myName()||""};
       $("asbReviewBackdrop").classList.remove("show"); asbReviewCtx=null;
-      scheduleContractSave(); renderTasks();
+      scheduleContractSave(); renderContracts();
       if(j.target && !(c.elems&&c.elems.labor)){
         if(confirm("검수 결과 노동부 신고대상입니다.\n이 계약에 '노동부신고 대상' 요소를 추가할까요?\n(단계에 노동부신고·필증인수가 반영됩니다)")){
           if(!c.elems) c.elems={};
@@ -4855,6 +4842,7 @@
           '<div class="item-title">'+esc(c.label)+(c.client?' · '+esc(c.client):'')+'</div>'+
           '<div class="item-meta">'+(c.docType==="public"?'<span class="from-chip">공문서</span>':'<span class="scope-chip">사문서</span>')+(c.site?'<span>'+esc(c.site)+'</span>':'')+'<span>시작 '+esc(c.start||"")+'</span>'+(c.who?'<span class="author-chip">'+esc(c.who)+'</span>':'')+(c.status==="done"?'<span class="done-by">✓ 완료</span>':'')+'</div>'+
           pipes+
+          conAttBoxHtml(c)+
         '</div>'+
         (canDo("con")?'<div class="task-ctrl"><button class="mini-btn" data-con-xlsx="'+c.id+'">생성</button><button class="mini-btn" data-con-doc="'+c.id+'">서류</button><button class="mini-btn danger" data-con-del="'+c.id+'">삭제</button></div>':'')+
       '</div>';
@@ -4867,6 +4855,23 @@
     });
     Array.prototype.forEach.call(host.querySelectorAll("[data-con-xlsx]"), function(el){
       el.addEventListener("click", function(){ openXlsxGen(el.getAttribute("data-con-xlsx")); });
+    });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-catt-add]"), function(el){
+      el.addEventListener("click", function(e){ e.stopPropagation(); conPickAttach(el.getAttribute("data-catt-add")); });
+    });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-catt-del]"), function(el){
+      el.addEventListener("click", function(e){ e.preventDefault(); e.stopPropagation();
+        var p=el.getAttribute("data-catt-del").split("|"); conDelAttach(p[0], p[1], +p[2]); });
+    });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-catt-rev]"), function(el){
+      el.addEventListener("click", function(e){ e.preventDefault(); e.stopPropagation();
+        var p=el.getAttribute("data-catt-rev").split("|"); openAsbReview(p[0], p[1], +p[2]); });
+    });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-catt-drop]"), function(el){
+      el.addEventListener("dragover", function(e){ e.preventDefault(); el.style.background="#EEF5FF"; });
+      el.addEventListener("dragleave", function(){ el.style.background=""; });
+      el.addEventListener("drop", function(e){ e.preventDefault(); el.style.background="";
+        var f=e.dataTransfer && e.dataTransfer.files; if(f&&f.length) conAddAttach(el.getAttribute("data-catt-drop"), f); });
     });
   }
   function delContract(id){
