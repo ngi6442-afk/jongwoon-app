@@ -4164,6 +4164,27 @@
       r.readAsDataURL(f);
     });
   }
+  // 현재 단계(이름 패턴 일치)를 완료 처리 — 승인권 있으면 완료+다음 단계 생성, 없으면 완료요청까지
+  function completeStageNow(c, pat){
+    for(var i=0;i<(c.pipes||[]).length;i++){
+      var p=c.pipes[i];
+      if(p.cur>=p.stages.length) continue;
+      var s=p.stages[p.cur];
+      if(!pat.test(s.name||"")) continue;
+      var t=s.task_id?findTask(s.task_id):null;
+      if(!t || t.status==="done") return "none";
+      if(canApproveTask(t)){
+        t.status="done"; t.done_at=todayStr(); t.done_by=myName()||"자동"; t.approved_by=myName()||""; t.approved_at=todayStr(); t.updated=todayStr();
+        advanceProc(t);
+        saveTasksCache(); scheduleTasksSave(); renderTasks(); renderSummary(); renderContracts();
+        return "done";
+      }
+      t.status="review"; t.done_at=todayStr(); t.done_by=myName()||""; t.updated=todayStr();
+      saveTasksCache(); scheduleTasksSave(); renderTasks(); renderSummary();
+      return "review";
+    }
+    return "none";
+  }
   // 판독 결과 반영(백그라운드·동기 공용) — 조사서/계약서 분기
   function applyAsbParse(entry, c, p){
     if(!p){ entry.parsed="판독 결과 없음"; }
@@ -4177,6 +4198,16 @@
       if(!c.title && p.title) c.title=p.title;
       if(!c.client && p.client) c.client=p.client;
       if(!c.site && p.site) c.site=p.site;
+      // 계약서 확보 = 계약 단계 완료 조건 → 확인 후 다음 단계(착공)로 진행 + 착공계 작성 제안
+      setTimeout(function(){
+        var sum=(p.title||entry.name)+(p.amount?" · "+Number(p.amount).toLocaleString()+"원":"")+(p.date_contract?" · 계약일 "+p.date_contract:"");
+        if(!confirm("계약서 판독 완료\n"+sum+"\n\n계약 단계를 완료하고 다음 단계로 진행할까요?")) return;
+        var r=completeStageNow(c, /계약/);
+        if(r==="done"){
+          if(confirm("착공 단계로 넘어갔습니다. 착공계를 지금 작성할까요? (판독값 자동 입력)")) openXlsxGen(c.id, "work_start", "착공");
+        } else if(r==="review"){ alert("완료 요청으로 올렸습니다 — 승인권자가 승인하면 다음 단계가 생성됩니다."); }
+        else { alert("현재 단계가 '계약'이 아니라 자동 진행하지 않았습니다. 지시 탭에서 진행하세요."); }
+      }, 200);
     }
     else if(p.judge){
       var area=(p.rows||[]).reduce(function(s,x){return s+(x.area||0);},0);
