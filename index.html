@@ -4678,6 +4678,9 @@
       {key:"main", stages:[{name:"석면조사",due:"manual"},{name:"계약",due:"manual"},{name:"노동부신고(해체제거)",due:"manual"},{name:"필증인수",due:"manual"},{name:"작업",due:"manual"},{name:"완료",due:"manual"},{name:"완료신고",due:"manual"}]},
       {key:"waste", stages:backbone("지정")}
     ]},
+    dredge: { label:"준설·시설공사", pipes:[
+      {key:"main", stages:[{name:"계약",due:"manual"},{name:"착공",due:"manual"},{name:"작업",due:"manual"},{name:"준공",due:"manual"},{name:"청구",due:"manual"},{name:"수금확인",due:"manual"}]}
+    ]},
     demolition: { label:"건축물철거", pipes:[
       {key:"main", stages:[{name:"석면조사",due:"manual"},{name:"계약",due:"manual"},{name:"노동부신고",due:"manual"},{name:"필증인수(노동부신고필증)",due:"manual"},{name:"철거신고",due:"manual"},{name:"작업",due:"auto",days:3},{name:"완료",due:"manual"},{name:"완료신고",due:"manual"}]},
       {key:"waste", stages:backbone("건설")}
@@ -4923,9 +4926,10 @@
       bcinfo={ title:lb.title||"", amount:((lb.result&&lb.result.amt)||0), d1:"", d2:"", d3:"",
         client:lb.org||"", site:"", guarantee:0, from:"낙찰 공고("+(lb.no||lb.id||"")+")", checked:todayStr() };
     }
-    startProcess(type, {client:client, site:site, start:start, who:who, docType:docType,
+    var nc=startProcess(type, {client:client, site:site, start:start, who:who, docType:docType,
       title:btitle, cinfo:bcinfo,
       stages:conBuildStages(elems), elems:elems, bid_id:(lastBidForCon?lastBidForCon.id:"")});
+    if(!nc){ alert("계약 생성 실패 — 유형 템플릿(" + type + ") 누락. 관리자에게 문의."); return; }
     document.getElementById("conStartBackdrop").classList.remove("show");
     renderContracts();
     switchTab("tasks");
