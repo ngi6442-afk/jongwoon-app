@@ -4800,6 +4800,7 @@
       });
     }
     var c = { id:genId("c"), type:type, label:tpl.label, docType:docType, client:opts.client||"", site:opts.site||"", start:opts.start||today,
+      title:opts.title||"", contract_info:opts.cinfo||null,
       lic_id:opts.lic_id||null, info:{}, review:{missing:[],suspect:[],ok:false}, docs:[],
       elems:opts.elems||null, bid_id:opts.bid_id||"",
       pipes:pipes,
@@ -4914,7 +4915,16 @@
     var docType=document.getElementById("conDoc").value;
     if(!client && !site){ alert("거래처 또는 현장을 입력하세요."); return; }
     var elems=conElemChecked();
+    // 공개입찰 낙찰건: 공고명·기관·낙찰금액을 계약서 없이도 자동 반영(계약서 판독값과 같은 자리)
+    var bcinfo=null, btitle="";
+    if(lastBidForCon){
+      var lb=lastBidForCon;
+      btitle=lb.title||"";
+      bcinfo={ title:lb.title||"", amount:((lb.result&&lb.result.amt)||0), d1:"", d2:"", d3:"",
+        client:lb.org||"", site:"", guarantee:0, from:"낙찰 공고("+(lb.no||lb.id||"")+")", checked:todayStr() };
+    }
     startProcess(type, {client:client, site:site, start:start, who:who, docType:docType,
+      title:btitle, cinfo:bcinfo,
       stages:conBuildStages(elems), elems:elems, bid_id:(lastBidForCon?lastBidForCon.id:"")});
     document.getElementById("conStartBackdrop").classList.remove("show");
     renderContracts();
