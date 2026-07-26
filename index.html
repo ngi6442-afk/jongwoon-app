@@ -856,6 +856,7 @@
       <h2>차량 <span class="cnt" id="vehHead"></span></h2>
     </div>
     <button class="link-btn" id="vehAddBtnTop">+ 차량 추가</button>
+    <button class="link-btn" id="vehXlsxBtn">엑셀 다운로드</button>
     <input type="search" id="vehSearch" placeholder="차량 검색(번호·종류·기사)" autocomplete="off" style="width:100%;padding:9px 12px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;font-size:14px;box-sizing:border-box;">
     <div class="sel-bar" id="vehSelBar" style="display:none;"></div>
     <div class="card" id="vehList">
@@ -1455,8 +1456,8 @@
     <div id="vehHistForm" style="border-top:1px solid var(--line);padding-top:10px;">
       <span class="fld-label">이력 추가</span>
       <input type="date" id="vhDate">
-      <select id="vhKind"><option value="수리">수리</option><option value="점검">점검</option><option value="사고">사고</option><option value="기타">기타</option></select>
-      <input type="text" id="vhContent" placeholder="내용 (예: 엔진오일 교체)" autocomplete="off">
+      <select id="vhKind"><option value="수리">수리</option><option value="점검">점검</option><option value="현장">현장(출동일)</option><option value="사고">사고</option><option value="기타">기타</option></select>
+      <input type="text" id="vhContent" placeholder="내용 (예: 엔진오일 교체 / 현장이면 현장명)" autocomplete="off">
       <input type="text" id="vhCost" placeholder="비용(원, 선택)" inputmode="numeric" autocomplete="off">
       <input type="text" id="vhVendor" placeholder="정비소/업체 (선택)" autocomplete="off">
       <button class="primary" id="vhAdd">이력 추가</button>
@@ -3249,7 +3250,8 @@
   function calEvents(){
     var ev = [];
     function add(date, mod, label, sub){ if (isDate(date)) ev.push({ date:date, mod:mod, label:label, sub:sub||"" }); }
-    if (canSee("veh")) vehicles.forEach(function(v){ if (v.del === 1) return; add(v.insp_due, "veh", (v.no||"차량")+" 검사 만기", v.driver||""); add(v.ins_due, "veh", (v.no||"차량")+" 보험 만기", v.insurer||""); });
+    if (canSee("veh")) vehicles.forEach(function(v){ if (v.del === 1) return; add(v.insp_due, "veh", (v.no||"차량")+" 검사 만기", v.driver||""); add(v.ins_due, "veh", (v.no||"차량")+" 보험 만기", v.insurer||"");
+      (v.history||[]).forEach(function(h){ if(h.kind==="현장") add(h.date, "veh", "🚚 "+(v.no||"차량")+" 현장", h.content||""); }); });
     if (canSee("lic")) licenses.forEach(function(l){ if (l.del === 1 || !licVisible(l)) return; add(l.expiry, "lic", (l.name||"인허가")+" 만료", l.org||""); add(l.edu_due, "lic", (l.name||"인허가")+" 교육", l.org||""); });
     tasks.forEach(function(t){ if (t.del === 1 || t.status === "done") return; if (!taskVisible(t)) return; add(t.due, "tasks", t.title||"지시", dispNameById(t.who)); });
     if (canSee("rec")) receivables.forEach(function(r){ if (r.del === 1 || r.paid || !recVisible(r)) return; add(r.billed, "rec", (r.client||"미수")+" 청구", r.amount ? fmtAmount(r.amount)+"원" : ""); });
@@ -3558,6 +3560,7 @@
   document.getElementById("vehAddBtnTop").addEventListener("click", function(){ openVehModal(null); });
   document.getElementById("vehDeletedToggle").addEventListener("click", function(){ showDeletedVeh = !showDeletedVeh; renderVehicles(); });
   document.getElementById("vhAdd").addEventListener("click", addVehHistory);
+  document.getElementById("vehXlsxBtn").addEventListener("click", vehExportXlsx);
   document.getElementById("vehHistClose").addEventListener("click", function(){ document.getElementById("vehHistBackdrop").classList.remove("show"); histVehId = null; });
   document.getElementById("vehHistBackdrop").addEventListener("click", function(e){ if (e.target === this){ this.classList.remove("show"); histVehId = null; } });
   document.getElementById("vehSearch").addEventListener("input", function(){ vehSearchTerm = this.value.toLowerCase().trim(); renderVehicles(); });
@@ -3721,12 +3724,21 @@
       function(v){ return (v.no || "번호없음") + (v.kind || v.type ? " · " + (v.kind || v.type) : "") + (v.state ? " · " + v.state : ""); });
   }
 
+  // 차량 리스트 엑셀 다운로드(현재 등록분 전체, 누적수리비 포함)
+  function vehExportXlsx(){
+    var rows=[["차량번호","종류","소속","허가","운전자","정기검사 만기","보험 만기","보험사","상태","비고","누적수리비"]];
+    liveVehicles().forEach(function(v){
+      var cost=0; (v.history||[]).forEach(function(h){ cost+=(h.cost||0); });
+      rows.push([v.no||"", v.kind||v.type||"", v.own||"", v.permit||"", v.driver||"", v.insp_due||"", v.ins_due||"", v.insurer||"", v.state||"", v.note||"", cost||""]);
+    });
+    downloadBlob("차량목록_"+todayStr()+".xlsx", buildSimpleXlsx("차량", rows));
+  }
   // ---- 차량 점검·수리 이력 (차량 객체 내 history 배열) ----
   var histVehId = null;
   function openVehHistory(id){
     var v = findVeh(id); if (!v) return;
     histVehId = id;
-    document.getElementById("vehHistTitle").textContent = (v.no || "") + " 점검·수리 이력";
+    document.getElementById("vehHistTitle").textContent = (v.no || "") + " 이력(점검·수리·현장)";
     document.getElementById("vhDate").value = todayStr();
     document.getElementById("vhKind").value = "수리";
     document.getElementById("vhContent").value = "";
@@ -4392,6 +4404,28 @@
     var a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=name;
     document.body.appendChild(a); a.click();
     setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 3000);
+  }
+  // 단순 표 → 새 xlsx 생성(리스트 내보내기용) — 템플릿 없이 최소 구성
+  function buildSimpleXlsx(sheetName, rows){
+    var enc=new TextEncoder();
+    function colL(n){ var s=""; n++; while(n>0){ var m=(n-1)%26; s=String.fromCharCode(65+m)+s; n=Math.floor((n-1)/26); } return s; }
+    var rowsXml=rows.map(function(row,ri){
+      var cells=row.map(function(v,ci){
+        if(v==null||v==="") return "";
+        var ref=colL(ci)+(ri+1);
+        if(typeof v==="number"&&isFinite(v)) return '<c r="'+ref+'"><v>'+v+'</v></c>';
+        return '<c r="'+ref+'" t="inlineStr"><is><t xml:space="preserve">'+xmlEsc(v)+'</t></is></c>';
+      }).join("");
+      return '<row r="'+(ri+1)+'">'+cells+'</row>';
+    }).join("");
+    var P='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+    return zipStore([
+      {name:"[Content_Types].xml", data:enc.encode(P+'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>')},
+      {name:"_rels/.rels", data:enc.encode(P+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>')},
+      {name:"xl/workbook.xml", data:enc.encode(P+'<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="'+xmlEsc(sheetName)+'" sheetId="1" r:id="rId1"/></sheets></workbook>')},
+      {name:"xl/_rels/workbook.xml.rels", data:enc.encode(P+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>')},
+      {name:"xl/worksheets/sheet1.xml", data:enc.encode(P+'<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>'+rowsXml+'</sheetData></worksheet>')}
+    ]);
   }
   // 한글 금액: 19525000 → 일금 일천구백오십이만오천원 정(￦ 19,525,000)
   function koAmount(n){
