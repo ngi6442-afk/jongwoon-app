@@ -60,7 +60,14 @@ async function handleGet(event, d, R) {
   if (p === 'hide' && col !== 'tasks') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_ACCESS', request_id: R });
   const r = await blobGet(store(DATA), colKey(col));
   if (!r.ok) return jr(500, { status: 'ERROR', error_code: r.code, request_id: R });
-  const doc = r.data || { schema: 1, items: [] };
+  let doc = r.data || { schema: 1, items: [] };
+  // 차량 취득가액·무자료금액은 관리자 전용 — 비관리자에겐 서버에서 제거(클라이언트 숨김이 아닌 하드 차단)
+  if (col === 'vehicles' && !c.member.admin && Array.isArray(doc.items)) {
+    doc = Object.assign({}, doc, { items: doc.items.map(function (v) {
+      if (!v || (v.acq_price == null && v.nodoc_amt == null)) return v;
+      const s = Object.assign({}, v); delete s.acq_price; delete s.nodoc_amt; return s;
+    }) });
+  }
   return jr(200, { status: 'OK', collection: col, doc, can_write: p === 'do', request_id: R });
 }
 
@@ -85,6 +92,19 @@ async function handleSave(event, d, R) {
   let oldItems = [];
   try { const prev = await blobGet(store(DATA), colKey(col)); if (prev.ok && prev.data && Array.isArray(prev.data.items)) oldItems = prev.data.items; } catch (e) {}
   const doc = Object.assign({}, d.doc, { updated_by: c.member.id, updated_at: Date.now() });
+  // 차량 관리자 전용 필드 보존 — 비관리자는 값을 받은 적이 없으므로(get에서 제거) 저장 시 기존값 복원
+  if (col === 'vehicles' && !c.member.admin && Array.isArray(doc.items)) {
+    const oldById = {};
+    oldItems.forEach(function (o) { if (o && o.id) oldById[o.id] = o; });
+    doc.items = doc.items.map(function (v) {
+      const o = v && v.id ? oldById[v.id] : null;
+      if (!o) return v;
+      const s = Object.assign({}, v);
+      if (o.acq_price != null) s.acq_price = o.acq_price;
+      if (o.nodoc_amt != null) s.nodoc_amt = o.nodoc_amt;
+      return s;
+    });
+  }
   const w = await blobSet(store(DATA), colKey(col), doc);
   if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
   // 감사 로그: 누가·언제·무엇을(이전값→새값). 서버측 기록이라 클라이언트 위변조 불가.

@@ -856,7 +856,7 @@
       <h2>차량 <span class="cnt" id="vehHead"></span></h2>
     </div>
     <button class="link-btn" id="vehAddBtnTop">+ 차량 추가</button>
-    <button class="link-btn" id="vehXlsxBtn">엑셀 다운로드</button>
+    <button class="link-btn" id="vehXlsxBtn" style="display:none;">엑셀 다운로드 (관리자)</button>
     <input type="search" id="vehSearch" placeholder="차량 검색(번호·종류·기사)" autocomplete="off" style="width:100%;padding:9px 12px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;font-size:14px;box-sizing:border-box;">
     <div class="sel-bar" id="vehSelBar" style="display:none;"></div>
     <div class="card" id="vehList">
@@ -1487,6 +1487,11 @@
     </select>
     <input type="text" id="vehInsurer" placeholder="보험사 (선택)" autocomplete="off">
     <input type="text" id="vehNote" placeholder="메모 (선택)" autocomplete="off">
+    <div id="vehAdminFields" style="display:none;border-top:1px dashed var(--line);padding-top:8px;margin-top:4px;">
+      <span class="fld-label">관리자 전용 (직원에게 표시되지 않음)</span>
+      <input type="text" id="vehAcq" placeholder="취득가액(원)" inputmode="numeric" autocomplete="off">
+      <input type="text" id="vehNodoc" placeholder="무자료금액(원)" inputmode="numeric" autocomplete="off">
+    </div>
     <button class="primary" id="vehSave">저장</button>
     <button class="danger" id="vehDelete">삭제</button>
     <button class="secondary" id="vehCancel">취소</button>
@@ -3709,6 +3714,7 @@
     });
     var head = document.getElementById("vehHead");
     if (head) head.textContent = list.length ? ("총 " + list.length + "대 · 만기 임박순") : "";
+    var xb = document.getElementById("vehXlsxBtn"); if (xb) xb.style.display = isAdmin() ? "block" : "none";
     var selV = canDo("veh");
     host.innerHTML = list.length ? list.map(function(v){ return vehRowHtml(v, selV); }).join("") : '<div class="empty-line">차량 데이터가 없습니다.</div>';
     bindCalHandlers(host);
@@ -3724,12 +3730,14 @@
       function(v){ return (v.no || "번호없음") + (v.kind || v.type ? " · " + (v.kind || v.type) : "") + (v.state ? " · " + v.state : ""); });
   }
 
-  // 차량 리스트 엑셀 다운로드(현재 등록분 전체, 누적수리비 포함)
+  // 차량 리스트 엑셀 다운로드 — 관리자 전용(취득가액·무자료금액 포함)
   function vehExportXlsx(){
-    var rows=[["차량번호","종류","소속","허가","운전자","정기검사 만기","보험 만기","보험사","상태","비고","누적수리비"]];
+    if(!isAdmin()){ alert("관리자 전용 기능입니다."); return; }
+    var rows=[["차량번호","종류","소속","허가","운전자","정기검사 만기","보험 만기","보험사","상태","비고","누적수리비","취득가액","무자료금액"]];
     liveVehicles().forEach(function(v){
       var cost=0; (v.history||[]).forEach(function(h){ cost+=(h.cost||0); });
-      rows.push([v.no||"", v.kind||v.type||"", v.own||"", v.permit||"", v.driver||"", v.insp_due||"", v.ins_due||"", v.insurer||"", v.state||"", v.note||"", cost||""]);
+      rows.push([v.no||"", v.kind||v.type||"", v.own||"", v.permit||"", v.driver||"", v.insp_due||"", v.ins_due||"", v.insurer||"", v.state||"", v.note||"", cost||"",
+        (v.acq_price!=null?v.acq_price:""), (v.nodoc_amt!=null?v.nodoc_amt:"")]);
     });
     downloadBlob("차량목록_"+todayStr()+".xlsx", buildSimpleXlsx("차량", rows));
   }
@@ -3842,6 +3850,9 @@
     document.getElementById("vehState").value = (v && v.state) || "운행";
     document.getElementById("vehInsurer").value = (v && v.insurer) || "";
     document.getElementById("vehNote").value = (v && v.note) || "";
+    document.getElementById("vehAdminFields").style.display = isAdmin() ? "block" : "none";
+    document.getElementById("vehAcq").value = (v && v.acq_price != null) ? v.acq_price : "";
+    document.getElementById("vehNodoc").value = (v && v.nodoc_amt != null) ? v.nodoc_amt : "";
     document.getElementById("vehDelete").style.display = v ? "block" : "none";
     document.getElementById("vehBackdrop").classList.add("show");
   }
@@ -3861,6 +3872,12 @@
     v.state = document.getElementById("vehState").value;
     v.insurer = document.getElementById("vehInsurer").value.trim();
     v.note = document.getElementById("vehNote").value.trim();
+    if (isAdmin()){   // 관리자 전용 필드 — 비관리자 저장은 서버가 기존값 보존
+      var acq = parseInt(String(document.getElementById("vehAcq").value).replace(/[^0-9]/g,""), 10);
+      var nod = parseInt(String(document.getElementById("vehNodoc").value).replace(/[^0-9]/g,""), 10);
+      if (!isNaN(acq)) v.acq_price = acq; else delete v.acq_price;
+      if (!isNaN(nod)) v.nodoc_amt = nod; else delete v.nodoc_amt;
+    }
     v.updated = todayStr();
     closeVehModal();
     saveVehiclesCache(); renderVehicles(); renderDashboard(); scheduleVehSave();
