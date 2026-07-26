@@ -4598,7 +4598,9 @@
     var isAsb=!!(c.elems&&c.elems.asb);
     var s=c.asb_survey||{}, ci=c.contract_info||{};   // 자동 채움: 계약값 → 계약서 판독 → 조사서 판독 순
     document.getElementById("xgKind").value = presetKind || (isAsb ? "asb_plan" : "work_start");
-    document.getElementById("xgCo").value = (c.type==="asbestos"||c.type==="demolition") ? "con" : "env";
+    // 시행 회사: 단계 기준 — 철거·석면 내라도 폐기물 신고·운반 서류는 종운환경
+    document.getElementById("xgCo").value = (stage && /폐기물|배출|운반/.test(stage)) ? "env"
+      : ((c.type==="asbestos"||c.type==="demolition") ? "con" : "env");
     document.getElementById("xgTitle").value = c.title||ci.title||c.label|| (s.bldg? s.bldg+" 석면해체 공사":"");
     document.getElementById("xgSite").value = c.site||ci.site||s.site||"";
     document.getElementById("xgClient").value = c.client||ci.client||s.owner||"";
@@ -5067,7 +5069,8 @@
     openDocGen();
     var isDemo = (c.type==="asbestos" || c.type==="demolition");
     var dt;
-    if(stage && stage.indexOf("견적")>=0) dt = isDemo ? "quote_con" : "quote_env";
+    if(stage && /폐기물|배출|운반/.test(stage)) dt = "waste";   // 철거·석면 내 폐기물 서류 = 종운환경
+    else if(stage && stage.indexOf("견적")>=0) dt = isDemo ? "quote_con" : "quote_env";
     else if(stage && stage.indexOf("계약")>=0 && c.docType!=="public") dt = isDemo ? "demo" : "waste";
     else if(c.docType==="public") dt = isDemo ? "quote_con" : "quote_env";   // 공문서: 계약 확정 후 견적서
     else dt = isDemo ? "demo" : "waste";                                 // 사문서: 계약 확정 -> 계약서(견적은 계약 전)
