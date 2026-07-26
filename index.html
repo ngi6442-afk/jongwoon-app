@@ -2407,7 +2407,7 @@
       });
     });
     Array.prototype.forEach.call(host.querySelectorAll("[data-task-doc]"), function(el){
-      el.addEventListener("click", function(e){ e.stopPropagation(); openDocFromContract(el.getAttribute("data-task-doc"), el.getAttribute("data-task-doc-stage")||""); });
+      el.addEventListener("click", function(e){ e.stopPropagation(); openStageDoc(el.getAttribute("data-task-doc"), el.getAttribute("data-task-doc-stage")||""); });
     });
     Array.prototype.forEach.call(host.querySelectorAll("[data-task-hold]"), function(el){
       el.addEventListener("click", function(e){ e.stopPropagation(); setTaskStatus(el.getAttribute("data-task-hold"), "hold"); });
@@ -4540,14 +4540,28 @@
       });
     }).catch(function(){ host.innerHTML='<div style="color:#c0392b;">목록을 불러오지 못했습니다.</div>'; });
   }
+  // 단계 → 서류 라우팅: 단계가 서류를 이끈다(입찰: 적격심사→계약서류→착공→신고→준공 / 비입찰: 계약서 작성·첨부→착공→…)
+  function stageXlsxKind(stage){
+    var s=String(stage||"");
+    if(/착공|착수/.test(s)) return "work_start";
+    if(/준공/.test(s)) return "work_complete";
+    if(/노동부신고/.test(s) && !/완료/.test(s)) return "asb_plan";
+    return null;
+  }
+  function openStageDoc(procId, stage){
+    var c=findProc(procId); if(!c) return;
+    var k=stageXlsxKind(stage);
+    if(k){ openXlsxGen(procId, k, stage); return; }   // 착공·준공·노동부신고 → 등록 양식 xlsx 자동 생성
+    openDocFromContract(procId, stage);               // 계약(비입찰 계약서 작성)·견적 등 → 서류출력 폼
+  }
   var xgCtx=null;
-  function openXlsxGen(conId){
+  function openXlsxGen(conId, presetKind, stage){
     var c=findProc(conId); if(!c) return;
     xgCtx={id:conId};
-    document.getElementById("xgHint").textContent="["+(c.label||"계약")+(c.site?" · "+c.site:"")+"] 등록된 양식 원본에 값을 채워 xlsx로 내려받습니다.";
+    document.getElementById("xgHint").textContent="["+(c.label||"계약")+(c.site?" · "+c.site:"")+(stage?" · "+stage+" 단계":"")+"] 등록된 양식 원본에 값을 채워 xlsx로 내려받습니다.";
     var isAsb=!!(c.elems&&c.elems.asb);
     var s=c.asb_survey||{}, ci=c.contract_info||{};   // 자동 채움: 계약값 → 계약서 판독 → 조사서 판독 순
-    document.getElementById("xgKind").value = isAsb ? "asb_plan" : "work_start";
+    document.getElementById("xgKind").value = presetKind || (isAsb ? "asb_plan" : "work_start");
     document.getElementById("xgTitle").value = c.title||ci.title||c.label|| (s.bldg? s.bldg+" 석면해체 공사":"");
     document.getElementById("xgSite").value = c.site||ci.site||s.site||"";
     document.getElementById("xgClient").value = c.client||ci.client||s.owner||"";
