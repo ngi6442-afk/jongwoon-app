@@ -4648,7 +4648,7 @@
       if(rows.length>5) alert("자재 행이 "+rows.length+"개인데 양식 슬롯은 5행입니다. 5행까지만 들어가니 나머지는 수동 추가하세요.");
       return edits;
     }
-    // 착공계/준공계 — '기본정보 입력' 시트만 채우면 수식이 전 서식에 전파
+    // 착공계/준공계 — '기본정보 입력' 시트 + 수식 미연결 하드코딩 셀(공문 본문·문서번호·공정표 기간) 재작성
     var amt=Number($("xgAmount").replace(/[^0-9]/g,""))||0;
     var ed=[["B1",title,"s"],["B2",site,"s"]];
     if(amt) ed.push(["B3",koAmount(amt),"s"]);
@@ -4657,7 +4657,32 @@
       if(sn) ed.push([p[0],sn,"n"]);
     });
     if(client) ed.push(["B11",client,"s"]);
-    return {"기본정보 입력":ed};
+    var edits={"기본정보 입력":ed};
+    var d2=document.getElementById("xgD2").value, d3=document.getElementById("xgD3").value;
+    var ko=function(iso){ if(!/^\d{4}-\d{2}-\d{2}$/.test(iso||"")) return ""; var p=iso.split("-"); return p[0]+"년 "+p[1]+"월 "+p[2]+"일"; };
+    var yy=function(iso){ if(!/^\d{4}-\d{2}-\d{2}$/.test(iso||"")) return ""; var p=iso.split("-"); return p[0].slice(2)+"."+p[1]+"."+p[2]; };
+    var today=todayStr(), ty=today.split("-");
+    var docNo="(유)종운환경 제 "+today.replace(/-/g,"")+"-01 호";
+    var sendDt=ty[0]+"년 "+ty[1]+"월   일";
+    if(kind==="work_start"){
+      var gm=[["B6",docNo,"s"],["B7",sendDt,"s"]];
+      if(title&&d2) gm.push(["B14",'2. 귀 청과 체결한 "'+title+'"를 '+ko(d2)+'부로',"s"]);
+      edits["공문"]=gm;
+      var gt=[];
+      if(d2&&d3){
+        var days=Math.round((new Date(d3+"T00:00:00")-new Date(d2+"T00:00:00"))/86400000)+1;
+        gt.push(["F11",ko(d2)+" ~ "+ko(d3),"s"],["F12","착수일로부터 "+days+"일간","s"],
+                ["F13",yy(d2)+" ~ "+yy(d3),"s"],["J13",yy(d3),"s"]);
+      }
+      if(title) gt.push(["C14",title,"s"]);
+      edits["공사예정공정표"]=gt;
+    } else if(kind==="work_complete"){
+      var gm2=[["B6",docNo,"s"],["B7",sendDt,"s"]];
+      if(title&&d3) gm2.push(["B14",'2. 귀 청과 체결한 "'+title+'"을 '+ko(d3)+' 부로',"s"]);
+      edits["공문"]=gm2;
+      edits["청구서"]=[["B16",sendDt,"s"]];
+    }
+    return edits;
   }
   (function(){
     var $=function(id){return document.getElementById(id);};
