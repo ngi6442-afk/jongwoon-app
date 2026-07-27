@@ -5770,6 +5770,20 @@
   document.getElementById("bcClose").addEventListener("click", function(){ document.getElementById("bidCalcBackdrop").classList.remove("show"); });
   document.getElementById("bidCalcBtn").addEventListener("click", function(){ openBidCalc({}); });
 
+  // 되돌리기: 직전 단계로 — 반드시 재확인 후(오조작 복구용)
+  var BID_PREV={"검토":"new","응찰":"검토","낙찰":"응찰","유찰":"응찰","패스":"new"};
+  var BID_LABEL={"new":"신규","검토":"검토","응찰":"응찰","낙찰":"낙찰","유찰":"유찰","패스":"패스"};
+  function undoBidStatus(id){
+    if(!canDo("bid")) return;
+    var b=findBid(id); if(!b) return;
+    var cur=bidSt(b), prev=BID_PREV[cur];
+    if(!prev) return;
+    var extra = (cur==="낙찰" && b.id && contracts.some(function(c){return c&&c.del!==1&&c.bid_id===b.id;}))
+      ? "\n※ 이 낙찰로 만든 계약은 그대로 남습니다(필요 시 계약 탭에서 삭제)." : "";
+    if(!confirm('"'+(b.title||"공고")+'"\n상태를 '+BID_LABEL[cur]+' → '+BID_LABEL[prev]+'(으)로 되돌릴까요?'+extra)) return;
+    b.status=prev; b.updated=todayStr();
+    scheduleBidsSave(); renderBids(); renderDashboard();
+  }
   function setBidStatus(id, st){
     if(!canDo("bid")) return;
     var b=findBid(id); if(!b) return;
@@ -5839,6 +5853,7 @@
       var ctrl='';
       if(canDo("bid")){
         (BID_NEXT[st]||[]).forEach(function(s){ ctrl+='<button class="mini-btn'+((s[0]==="응찰"||s[0]==="낙찰")?' appr-btn':'')+'" data-bid-st="'+s[0]+'" data-bid-id="'+b.id+'">'+s[1]+'</button>'; });
+        if(BID_PREV[st]) ctrl+='<button class="mini-btn" data-bid-undo="'+b.id+'" title="'+BID_LABEL[BID_PREV[st]]+'(으)로 되돌리기">↩</button>';
         if(st==="낙찰") ctrl+='<button class="mini-btn appr-btn" data-bid-con="'+b.id+'">계약 시작</button>';
       }
       if(b.url) ctrl+='<a class="mini-btn" href="'+esc(b.url)+'" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center;">원문↗</a>';
@@ -5907,6 +5922,9 @@
     }).join("") : '<div class="empty-line">'+(all.length?'조건에 맞는 공고가 없습니다.':'수집된 공고가 없습니다. (평일 아침 자동 수집)')+'</div>');
     Array.prototype.forEach.call(host.querySelectorAll("[data-bid-st]"),function(el){
       el.addEventListener("click",function(){ setBidStatus(el.getAttribute("data-bid-id"), el.getAttribute("data-bid-st")); });
+    });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-bid-undo]"),function(el){
+      el.addEventListener("click",function(e){ e.stopPropagation(); undoBidStatus(el.getAttribute("data-bid-undo")); });
     });
     Array.prototype.forEach.call(host.querySelectorAll("[data-bid-calc]"),function(el){
       el.addEventListener("click",function(){
