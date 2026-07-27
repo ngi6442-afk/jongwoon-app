@@ -603,19 +603,30 @@ async function handleAttParseStatus(event, d, R) {
 // ---- 건축물대장 자동 조회(건축HUB) — 주소 → 법정동코드 → 표제부. 키는 data.go.kr 계정 공용(G2B_API_KEY) ----
 const BJD = require('./_lib/bjd.json');   // 법정동명 → 10자리 코드(행정표준코드 전체자료, 현존만)
 const SIDO_ALIAS = { '서울': '서울특별시', '부산': '부산광역시', '대구': '대구광역시', '인천': '인천광역시', '광주': '광주광역시', '대전': '대전광역시', '울산': '울산광역시', '세종': '세종특별자치시', '경기': '경기도', '강원': '강원특별자치도', '강원도': '강원특별자치도', '충북': '충청북도', '충남': '충청남도', '전북': '전북특별자치도', '전라북도': '전북특별자치도', '전남': '전라남도', '경북': '경상북도', '경남': '경상남도', '제주': '제주특별자치도', '제주도': '제주특별자치도' };
-function bldgParseAddr(addr) {
-  let a = String(addr || '').replace(/\(.*?\)/g, ' ').replace(/\s+/g, ' ').trim();
-  const first = a.split(' ')[0];
-  if (SIDO_ALIAS[first]) a = SIDO_ALIAS[first] + a.slice(first.length);
-  // 가장 긴 법정동명 접두 일치
+const SIDO_FULL = ['서울특별시', '부산광역시', '대구광역시', '인천광역시', '광주광역시', '대전광역시', '울산광역시', '세종특별자치시', '경기도', '강원특별자치도', '충청북도', '충청남도', '전북특별자치도', '전라남도', '경상북도', '경상남도', '제주특별자치도'];
+function bldgMatchBjd(a) {
   let best = '', bestCode = '';
   for (const name in BJD) {
     if (a.indexOf(name) === 0 && name.length > best.length) { best = name; bestCode = BJD[name]; }
   }
-  if (!bestCode) return null;
-  const rest = a.slice(best.length);
+  return bestCode ? { best, bestCode, a } : null;
+}
+function bldgParseAddr(addr) {
+  let a = String(addr || '').replace(/\(.*?\)/g, ' ').replace(/\s+/g, ' ').trim();
+  const first = a.split(' ')[0];
+  if (SIDO_ALIAS[first]) a = SIDO_ALIAS[first] + a.slice(first.length);
+  // 가장 긴 법정동명 접두 일치 — 시도 생략 주소("영천시 …")는 시도를 붙여 재시도
+  let hit = bldgMatchBjd(a);
+  if (!hit) {
+    for (const sd of SIDO_FULL) {
+      hit = bldgMatchBjd(sd + ' ' + a);
+      if (hit) break;
+    }
+  }
+  if (!hit) return null;
+  const rest = hit.a.slice(hit.best.length);
   const m = rest.match(/^\s*(산)?\s*(\d{1,4})(?:-(\d{1,4}))?/);
-  return { name: best, code: bestCode, san: !!(m && m[1]), bun: m ? m[2] : '', ji: (m && m[3]) || '' };
+  return { name: hit.best, code: hit.bestCode, san: !!(m && m[1]), bun: m ? m[2] : '', ji: (m && m[3]) || '' };
 }
 async function handleBldgLookup(event, d, R) {
   const c = await currentMember(event);

@@ -4791,13 +4791,13 @@
     xgCtx={id:conId};
     document.getElementById("xgHint").textContent="["+(c.label||"계약")+(c.site?" · "+c.site:"")+(stage?" · "+stage+" 단계":"")+"] 등록된 양식 원본에 값을 채워 xlsx로 내려받습니다.";
     var isAsb=!!(c.elems&&c.elems.asb);
-    var s=c.asb_survey||{}, ci=c.contract_info||{};   // 자동 채움: 계약값 → 계약서 판독 → 조사서 판독 순
+    var s=c.asb_survey||{}, ci=c.contract_info||{}, bi=c.bldg_info||{};   // 자동 채움: 계약값 → 계약서 → 조사서 → 대장 (하드리딩 우선, 없는 값만 확인요망)
     document.getElementById("xgKind").value = presetKind || (isAsb ? "asb_plan" : "work_start");
     // 시행 회사: 단계 기준 — 철거·석면 내라도 폐기물 신고·운반 서류는 종운환경
     document.getElementById("xgCo").value = (stage && /폐기물|배출|운반/.test(stage)) ? "env"
       : ((c.type==="asbestos"||c.type==="demolition") ? "con" : "env");
     document.getElementById("xgTitle").value = c.title||ci.title||c.label|| (s.bldg? s.bldg+" 석면해체 공사":"");
-    document.getElementById("xgSite").value = c.site||ci.site||s.site||"";
+    document.getElementById("xgSite").value = c.site||ci.site||s.site||bi.site||"";
     document.getElementById("xgClient").value = c.client||ci.client||s.owner||"";
     document.getElementById("xgAmount").value = ci.amount||"";
     document.getElementById("xgD1").value = ci.d1||c.start||"";
@@ -4975,6 +4975,18 @@
       if(!xgCtx) return;
       var c=findProc(xgCtx.id); if(!c) return;
       var kind=$("xgKind").value;
+      // 하드리딩 원칙: 원문(계약서·조사서·대장)에서 못 채운 값만 확인요망으로 사람에게 확인
+      var missing=[];
+      if(!$("xgTitle").value.trim()) missing.push("공사명");
+      if(!$("xgSite").value.trim()) missing.push("현장 주소");
+      if(!$("xgClient").value.trim()) missing.push("발주자");
+      if(kind!=="asb_plan"){
+        if(!$("xgAmount").value.trim()) missing.push("금액");
+        if(!$("xgD1").value) missing.push("계약일");
+        if(kind==="work_start"&&!$("xgD2").value) missing.push("착공일");
+        if(!$("xgD3").value) missing.push(kind==="work_start"?"준공예정일":"준공일");
+      } else if(!$("xgOwner").value.trim()) missing.push("소유주");
+      if(missing.length && !confirm("⚠ 확인요망 — 원문(계약서·조사서·대장)에서 찾지 못한 값:\n· "+missing.join("\n· ")+"\n\n빈칸(수기 기입)으로 두고 생성할까요?\n(값을 아신다면 취소 후 입력하거나, 해당 서류를 서류함에 첨부하면 자동으로 채워집니다)")) return;
       $("xgGo").textContent="생성 중…"; $("xgGo").disabled=true;
       gwCall("gw-data",{action:"tpl_get", key:kind}).then(function(res){
         if(res.status!==200){ alert(res.status===404?("'"+TPL_LABELS[kind]+"' 양식이 미등록입니다. [+ 양식 등록]에서 먼저 등록하세요."):"양식 로드 실패"); return; }
