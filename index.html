@@ -1165,6 +1165,12 @@
       <span class="fld-label">계약일</span><input type="date" id="xgD1">
       <span class="fld-label">착공일</span><input type="date" id="xgD2">
       <span class="fld-label">준공예정일</span><input type="date" id="xgD3">
+      <div id="xgAgentWrap" style="display:none;">
+        <span class="fld-label">현장대리인 (미선택 시 나종운 — 양식 기본값 유지)</span>
+        <select id="xgAgent"><option value="">나종운 (기본)</option></select>
+        <input type="text" id="xgAgentRrn" placeholder="대리인 주민등록번호 (선택 — 비우면 수기 기입)" autocomplete="off">
+        <input type="text" id="xgAgentLic" placeholder="대리인 자격증명 (선택, 예: 거푸집기능사)" autocomplete="off">
+      </div>
     </div>
     <div id="xgAsbFields" style="display:none;">
       <input type="text" id="xgOwner" placeholder="소유주 (예: 경상북도 교육감)" autocomplete="off">
@@ -4697,6 +4703,8 @@
       ? '<span class="fld-label">투입 인력 선택 — 명단 4곳·인원수 자동 기입 (관리자 나종운 자동 포함)</span>'
         + list.map(function(w){ return '<label style="display:inline-flex;gap:4px;align-items:center;margin:2px 10px 2px 0;font-size:13px;"><input type="checkbox" data-xgw="'+w.id+'"> '+esc(w.name)+(w.role==="반장"?" (반장)":"")+'</label>'; }).join("")
       : '<div style="font-size:12px;color:#888;">일용직 명부가 비어 있습니다 — 인사 탭에서 등록하면 명단을 자동 기입합니다. (미선택 시 명단은 공란)</div>';
+    var aw=document.getElementById("xgAgentWrap");
+    if(aw && aw.style.display!=="none") xgToggle();   // 대리인 후보 목록 동기 갱신
   }
 
   // ---- 서류 양식 등록/생성 ----
@@ -4775,6 +4783,14 @@
     var k=document.getElementById("xgKind").value;
     document.getElementById("xgMoneyFields").style.display = (k==="asb_plan") ? "none" : "";
     document.getElementById("xgAsbFields").style.display = (k==="asb_plan") ? "" : "none";
+    document.getElementById("xgAgentWrap").style.display = (k==="work_start") ? "" : "none";
+    if(k==="work_start"){   // 현장대리인 후보 = 일용직 명부(기본 나종운)
+      var sel=document.getElementById("xgAgent"), cur=sel.value;
+      sel.innerHTML='<option value="">나종운 (기본)</option>'+sortedWorkers().map(function(w){
+        return '<option value="'+w.id+'">'+esc(w.name)+(w.role==="반장"?" (반장)":"")+'</option>';
+      }).join("");
+      sel.value=cur||"";
+    }
     if(k==="asb_plan" && xgCtx){
       var c=findProc(xgCtx.id);
       var s=c&&c.asb_survey;
@@ -4896,6 +4912,18 @@
         ds.push(["A"+(15+di), isWork?(" "+(di+1)+". "+wn):"", isWork?"s":"b"]);
       }
       edits["건설공사 직접시공계획서"]=ds;
+      // 현장대리인 — 일용직 명부에서 선택 시 현장대리인계·재직증명서 교체(미상 항목은 공란=수기 기입)
+      var agId=document.getElementById("xgAgent").value;
+      if(agId){
+        var ag=findWk(agId);
+        if(ag){
+          var rrn=document.getElementById("xgAgentRrn").value.trim();
+          var lic=document.getElementById("xgAgentLic").value.trim();
+          edits["현장대리인계"]=[["E12","","b"],["E13",ag.name,"s"],["F13",rrn,rrn?"s":"b"],
+                                 ["E14",(ag.role||"인부"),"s"],["F14",lic,lic?"s":"b"]];
+          edits["재직증명서"]=[["E5",ag.name,"s"],["I6",rrn,rrn?"s":"b"],["E6","","b"],["E7","","b"],["E8","","b"]];
+        }
+      }
     } else if(kind==="work_complete"){
       var gm2=[["B6",docNo,"s"],["B7",sendDt,"s"]].concat(gmCo);
       if(client) gm2.push(["B8",client,"s"]);   // 수신처(준공계 공문은 하드코딩)
