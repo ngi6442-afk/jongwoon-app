@@ -642,7 +642,7 @@ async function handleBldgLookup(event, d, R) {
     + (p.bun ? ('&platGbCd=' + (p.san ? 1 : 0) + '&bun=' + pad4(p.bun) + '&ji=' + pad4(p.ji)) : '')
     + '&numOfRows=50&pageNo=1&_type=json';
   try {
-    const resp = await fetch('https://apis.data.go.kr/1613000/BldRgstHubService/getBrTitleInfo?' + q);
+    const resp = await fetch('https://apis.data.go.kr/1613000/BldRgstHubService/getBrTitleInfo?' + q, { headers: { 'Accept': 'application/json' } });
     const j = await resp.json();
     const body = ((j || {}).response || {}).body || {};
     let items = (body.items || {}).item || [];
