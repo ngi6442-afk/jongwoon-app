@@ -1400,18 +1400,23 @@
       <input type="text" id="dgQty" placeholder="물량 (예: 5톤, 3㎥)" autocomplete="off">
     </div>
     <div id="dgDemoFields" style="display:none;">
-      <input type="text" id="dgWork" placeholder="공사명" autocomplete="off">
+      <label style="display:flex;gap:6px;align-items:center;margin-bottom:6px;"><input type="checkbox" id="dgSimple"> 간편 입력(개인·영세) — 발주처·현장주소·계약금액만</label>
+      <div class="dg-full"><input type="text" id="dgWork" placeholder="공사명" autocomplete="off"></div>
       <input type="text" id="dgSite" placeholder="현장주소" autocomplete="off">
-      <input type="text" id="dgOwner" placeholder="발주처(갑) 상호" autocomplete="off">
-      <input type="text" id="dgOwnerCeo" placeholder="발주처 대표" autocomplete="off">
-      <input type="text" id="dgOwnerBiz" placeholder="발주처 사업자번호" autocomplete="off">
-      <input type="text" id="dgOwnerAddr" placeholder="발주처 주소" autocomplete="off">
-      <input type="text" id="dgOwnerTel" placeholder="발주처 전화" autocomplete="off">
+      <input type="text" id="dgOwner" placeholder="발주처(갑) 성명·상호" autocomplete="off">
+      <div class="dg-full">
+        <input type="text" id="dgOwnerCeo" placeholder="발주처 대표" autocomplete="off">
+        <input type="text" id="dgOwnerBiz" placeholder="발주처 사업자번호(개인은 생년월일)" autocomplete="off">
+        <input type="text" id="dgOwnerAddr" placeholder="발주처 주소" autocomplete="off">
+        <input type="text" id="dgOwnerTel" placeholder="발주처 전화" autocomplete="off">
+      </div>
       <input type="text" id="dgAmount" placeholder="계약금액 (숫자만, VAT 별도)" inputmode="numeric" autocomplete="off">
-      <input type="text" id="dgArea" placeholder="철거·해체 면적 (㎡)" autocomplete="off">
-      <input type="text" id="dgWasteQty" placeholder="예상 폐기물량 (톤)" autocomplete="off">
-      <span class="fld-label">착공일 / 준공일</span>
-      <div style="display:flex;gap:8px;"><input type="date" id="dgStartDate" style="flex:1"><input type="date" id="dgEndDate" style="flex:1"></div>
+      <div class="dg-full">
+        <div style="display:flex;gap:8px;"><input type="text" id="dgArea" placeholder="석면해체 면적(㎡)" style="flex:1" autocomplete="off"><input type="text" id="dgWasteQty" placeholder="석면 폐기물량(톤)" style="flex:1" autocomplete="off"></div>
+        <div style="display:flex;gap:8px;"><input type="text" id="dgArea2" placeholder="건물철거 면적(㎡)" style="flex:1" autocomplete="off"><input type="text" id="dgWasteQty2" placeholder="철거 폐기물량(톤)" style="flex:1" autocomplete="off"></div>
+        <span class="fld-label">착공일 / 준공일</span>
+        <div style="display:flex;gap:8px;"><input type="date" id="dgStartDate" style="flex:1"><input type="date" id="dgEndDate" style="flex:1"></div>
+      </div>
     </div>
     <div id="dgQuoteFields" style="display:none;">
       <input type="text" id="dgQClient" placeholder="거래처명 (귀하)" autocomplete="off">
@@ -3544,6 +3549,10 @@
   document.getElementById("dgParty").addEventListener("change", dgToggleParty);
   document.getElementById("dgDocType").addEventListener("change", dgToggleDocType);
   document.getElementById("dgGenerate").addEventListener("click", generateDocs);
+  document.getElementById("dgSimple").addEventListener("change", function(){
+    var on=this.checked;   // 간편(개인·영세): 발주처·현장주소·계약금액만 노출
+    Array.prototype.forEach.call(document.querySelectorAll("#dgDemoFields .dg-full"), function(el){ el.style.display=on?"none":""; });
+  });
   document.getElementById("dgCancel").addEventListener("click", function(){ document.getElementById("docGenBackdrop").classList.remove("show"); });
   document.getElementById("dpPrint").addEventListener("click", function(){ window.print(); });
   document.getElementById("dpClose").addEventListener("click", function(){ document.getElementById("docPrintOverlay").classList.remove("show"); });
@@ -4831,11 +4840,17 @@
       });
     });
   }
-  // 계약서 확정 후 후속 서류 일괄 생성(와라라락) — 석면 계획서는 조사서 검수 확정 시 별도 제안
-  function conGenPacket(c){
-    var kinds=["work_start"];
+  // 후속 서류 목록 — 개인(사문서) 건은 착공계·준공계 미작성(대표 확정 규칙)
+  function conPacketKinds(c){
+    var kinds=[];
+    if(c.docType==="public") kinds.push("work_start");
     if(c.elems&&(c.elems.demo||c.elems.permit)) kinds.push("demo_report");
     if(c.elems&&c.elems.asb&&c.asb_survey&&c.asb_survey.confirmed) kinds.push("asb_plan");
+    return kinds;
+  }
+  // 계약서 확정 후 후속 서류 일괄 생성(와라라락) — 석면 계획서는 조사서 검수 확정 시 별도 제안
+  function conGenPacket(c){
+    var kinds=conPacketKinds(c);
     var done=[], fail=[];
     var i=0;
     (function next(){
@@ -5407,6 +5422,8 @@
     document.getElementById("dgDate").value=todayStr();
     document.getElementById("dgStartDate").value="";
     document.getElementById("dgEndDate").value="";
+    var dgS=document.getElementById("dgSimple"); if(dgS){ dgS.checked=false; Array.prototype.forEach.call(document.querySelectorAll("#dgDemoFields .dg-full"), function(el){ el.style.display=""; }); }
+    var dgA2=document.getElementById("dgArea2"); if(dgA2){ dgA2.value=""; document.getElementById("dgWasteQty2").value=""; }
     dgToggleParty();
     dgToggleDocType();
     var h=document.getElementById("dgHint"); if(h){ h.textContent=""; h.style.display="none"; }
@@ -5467,15 +5484,23 @@
   var JW_CON = { name:"(주)종운건설", biz:"506-81-84827", ceo:"나종운", addr:"포항시 남구 정몽주로 823-10(청림동)", tel:"054-291-1202", biztype:"건설업(비계·구조물해체)", perm1:"건설업 전문면허 경북포항 2013-6-4", perm2:"석면해체·제거업 노동부 제3339호" };
   function dgDemoData(){
     function v(id){ return document.getElementById(id).value.trim(); }
-    return { work:v("dgWork"), site:v("dgSite"), owner:v("dgOwner"), ownerCeo:v("dgOwnerCeo"), ownerBiz:v("dgOwnerBiz"), ownerAddr:v("dgOwnerAddr"), ownerTel:v("dgOwnerTel"),
-      amount:v("dgAmount"), area:v("dgArea"), wasteQty:v("dgWasteQty"),
+    return { simple:document.getElementById("dgSimple").checked,
+      work:v("dgWork"), site:v("dgSite"), owner:v("dgOwner"), ownerCeo:v("dgOwnerCeo"), ownerBiz:v("dgOwnerBiz"), ownerAddr:v("dgOwnerAddr"), ownerTel:v("dgOwnerTel"),
+      amount:v("dgAmount"), area:v("dgArea"), wasteQty:v("dgWasteQty"), area2:v("dgArea2"), wasteQty2:v("dgWasteQty2"),
       date:document.getElementById("dgDate").value||todayStr(), startDate:document.getElementById("dgStartDate").value, endDate:document.getElementById("dgEndDate").value };
   }
-  function docDemoContract(d){
+  // flags: {asb, demo} — 제목 체크박스(석면해체/철거공사 두 줄 + 계약서)
+  function docDemoContract(d, flags){
+    flags=flags||{asb:true, demo:true};
+    var bx=function(on){ return '<span style="font-family:inherit">'+(on?'☑':'☐')+'</span>'; };
+    var title='<div style="text-align:center;margin-bottom:14px;">'
+      +'<div style="font-size:20px;letter-spacing:6px;font-weight:700;">'+bx(!!flags.asb)+' 석 면 해 체</div>'
+      +'<div style="font-size:20px;letter-spacing:6px;font-weight:700;">'+bx(!!flags.demo)+' 철 거 공 사</div>'
+      +'<div style="font-size:20px;letter-spacing:14px;font-weight:700;margin-top:2px;">계 약 서</div></div>';
     var co = '상호 : '+esc(JW_CON.name)+' &nbsp; 사업자번호 : '+esc(JW_CON.biz)+'<br>주소 : '+esc(JW_CON.addr)+'<br>대표 : '+esc(JW_CON.ceo)+' (인) &nbsp; 전화 : '+esc(JW_CON.tel)+'<br>업종 : '+esc(JW_CON.biztype)+'<br><span style="font-size:11px">※ '+esc(JW_CON.perm1)+' &nbsp; ※ '+esc(JW_CON.perm2)+'</span>';
     var gap = '상호 : '+dgFill(d.owner)+' &nbsp; 사업자번호 : '+dgFill(d.ownerBiz)+'<br>주소 : '+dgFill(d.ownerAddr)+'<br>대표 : '+dgFill(d.ownerCeo)+' (인) &nbsp; 전화 : '+dgFill(d.ownerTel);
     var amt = d.amount ? Number(String(d.amount).replace(/[^0-9]/g,"")).toLocaleString() : "";
-    return '<div class="doc-page"><h1 style="letter-spacing:3px;font-size:20px;">석면해체·철거공사 계약서</h1>'+
+    return '<div class="doc-page">'+title+
       '<table class="doc-tbl">'+
         '<tr><th style="width:92px">1. 공사명</th><td>'+dgFill(d.work)+'</td></tr>'+
         '<tr><th>2. 발주처</th><td>'+dgFill(d.owner)+'</td></tr>'+
@@ -5490,7 +5515,7 @@
       '<p class="doc-clause"><b>9. 공사내역</b></p>'+
       '<table class="doc-tbl"><tr><th>종류</th><th>규격</th><th>철거(해체) 면적</th><th>예상 폐기물량</th><th>비고</th></tr>'+
         '<tr><td>석면해체</td><td></td><td>'+dgFill(d.area)+' ㎡</td><td>'+dgFill(d.wasteQty)+' 톤</td><td rowspan="2">배출신고에서<br>실적보고까지</td></tr>'+
-        '<tr><td>건물철거</td><td></td><td>&nbsp; ㎡</td><td>&nbsp; 톤</td></tr></table>'+
+        '<tr><td>건물철거</td><td></td><td>'+dgFill(d.area2)+' ㎡</td><td>'+dgFill(d.wasteQty2)+' 톤</td></tr></table>'+
       '<p class="doc-clause">"을"은 위 현장의 철거·해체 후 발생 폐기물을 선별·분리·포장(보양)하여 폐기물관리법에 의거 적정 처리하며, 산업안전보건법에 따라 성실 시공한다.</p>'+
       '<p class="doc-clause">"갑"과 "을"은 상호 신의로써 성실히 계약하고 책임을 다할 것을 확약하며, 이 계약의 증거로 2부를 작성하여 각 1부씩 보관한다.</p>'+
       '<div class="doc-date">'+dgDateKo(d.date)+'</div>'+
@@ -5590,8 +5615,14 @@
       html = docQuote(type === "quote_con" ? "con" : "env", q);
     } else if(type === "demo"){
       var dd = dgDemoData();
-      if(!dd.work && !dd.owner && !dd.site){ alert("공사명/발주처/현장 중 하나는 입력하세요."); return; }
-      html = docDemoContract(dd);
+      if(dd.simple){
+        if(!dd.owner || !dd.site || !dd.amount){ alert("간편 입력은 발주처·현장주소·계약금액이 필요합니다."); return; }
+      } else if(!dd.work && !dd.owner && !dd.site){ alert("공사명/발주처/현장 중 하나는 입력하세요."); return; }
+      var cc0 = dgConId ? findProc(dgConId) : null;
+      var fl = (cc0&&cc0.elems) ? {asb:!!cc0.elems.asb, demo:!!(cc0.elems.demo||cc0.elems.permit)} : {asb:true, demo:true};
+      if(!fl.asb && !fl.demo){ fl={asb:true, demo:true}; }
+      if(dd.simple && !dd.work) dd.work=(fl.asb?"석면해체":"")+((fl.asb&&fl.demo)?"·":"")+(fl.demo?"철거":"")+" 공사("+dd.site+")";
+      html = docDemoContract(dd, fl);
       // 계약서 작성 = 계약 데이터의 원천 — 입력값을 계약에 저장하고 후속 서류로 연쇄
       var cc = dgConId ? findProc(dgConId) : null;
       if(cc){
@@ -5604,10 +5635,12 @@
         scheduleContractSave(); renderContracts();
         if(cc.elems&&(cc.elems.asb||cc.elems.demo||cc.elems.permit)&&dd.site&&!cc.bldg_info) conBldgLookup(cc.id, dd.site, true);   // 대장 자동
         setTimeout(function(){
-          if(confirm("계약서 내용을 계약에 저장했습니다.\n계약 단계를 완료하고 후속 서류(착공계"
-            +((cc.elems&&(cc.elems.demo||cc.elems.permit))?"·해체신고서":"")+")를 일괄 생성할까요?")){
+          var pk=conPacketKinds(cc);
+          var pkTxt=pk.map(function(k){return TPL_LABELS[k];}).join("·");
+          if(confirm("계약서 내용을 계약에 저장했습니다.\n계약 단계를 완료"+(pkTxt?"하고 후속 서류("+pkTxt+")를 일괄 생성":"")+"할까요?"
+            +(cc.docType!=="public"?"\n(개인·사문서 건 — 착공계·준공계는 작성하지 않습니다)":""))){
             completeStageNow(cc, /계약/);
-            conGenPacket(cc);
+            if(pk.length) conGenPacket(cc);
           }
         }, 400);
       }
