@@ -5299,6 +5299,23 @@
     c.status = c.pipes.every(function(p){ return p.cur >= p.stages.length; }) ? "done" : "active";
     c.updated=todayStr();
     scheduleContractSave(); renderContracts();
+    if(/청구/.test(t.stage_name||"")) setTimeout(function(){ conBillToRec(c); }, 150);   // 청구 완료 → 기성(미수) 연동
+  }
+  // 청구 단계 완료 → 기성(미수)에 청구 건 자동 등록(중복 방지: c.rec_id)
+  function conBillToRec(c){
+    if(!canDo("rec")) return;   // 기성 권한 없으면 담당자가 기성 탭에서 등록
+    if(c.rec_id && receivables.some(function(r){ return r.id===c.rec_id && r.del!==1; })) return;
+    var ci=c.contract_info||{};
+    var amt=ci.amount||0;
+    if(!confirm("청구 단계 완료 — 기성(미수)에 청구 건을 등록할까요?\n"+(c.client||"발주처?")+" · "+(c.title||c.label)+(amt?" · "+fmtAmount(amt)+"원":" · 금액 미확인(기성에서 입력)"))) return;
+    var today=todayStr();
+    var r={ id:genId("r"), client:c.client||"", site:c.site||"", desc:(c.title||c.label||""),
+      amount:amt, billed:today, invoice:false, paid:null, due_hint:"", note:"계약 연동", con_id:c.id,
+      assignee:"", scope:[], task_id:null, mismatch:false, created:today, updated:today };
+    receivables.push(r);
+    c.rec_id=r.id; scheduleContractSave();
+    saveRecCache(); renderReceivables(); renderDashboard(); scheduleRecSave();
+    alert("기성(미수)에 등록되었습니다 — 입금되면 기성에서 입금 처리하세요(수금확인 단계가 자동 제안됩니다).");
   }
   function procChipHtml(t){
     if(!t.proc_id) return "";
@@ -5329,7 +5346,7 @@
       return '<div class="item con-item'+(c.status==="done"?' checked':'')+'">'+
         '<div class="item-body">'+
           '<div class="item-title">'+esc(c.label)+(c.client?' · '+esc(c.client):'')+'</div>'+
-          '<div class="item-meta">'+(c.docType==="public"?'<span class="from-chip">공문서</span>':'<span class="scope-chip">사문서</span>')+(c.site?'<span>'+esc(c.site)+'</span>':'')+'<span>시작 '+esc(c.start||"")+'</span>'+(c.who?'<span class="author-chip">'+esc(c.who)+'</span>':'')+(c.bldg_info?'<span class="scope-chip">🏢 대장 '+c.bldg_info.total_floor+'㎡·'+c.bldg_info.dongs+'동</span>':'')+(c.status==="done"?'<span class="done-by">✓ 완료</span>':'')+'</div>'+
+          '<div class="item-meta">'+(c.docType==="public"?'<span class="from-chip">공문서</span>':'<span class="scope-chip">사문서</span>')+(c.site?'<span>'+esc(c.site)+'</span>':'')+'<span>시작 '+esc(c.start||"")+'</span>'+(c.who?'<span class="author-chip">'+esc(c.who)+'</span>':'')+(c.bldg_info?'<span class="scope-chip">🏢 대장 '+c.bldg_info.total_floor+'㎡·'+c.bldg_info.dongs+'동</span>':'')+(c.rec_id?(function(){ var rr=findRec(c.rec_id); return rr&&rr.del!==1?(rr.paid?'<span class="from-chip">💰 수금완료 '+esc(rr.paid)+'</span>':'<span class="hold-chip">미수'+(rr.amount?' '+fmtAmount(rr.amount)+'원':'')+'</span>'):''; })():'')+(c.status==="done"?'<span class="done-by">✓ 완료</span>':'')+'</div>'+
           pipes+
           conAttBoxHtml(c)+
         '</div>'+
@@ -7038,7 +7055,19 @@
     if (!canDo("rec")) return;
     var r = findRec(id); if (!r) return;
     if (r.paid){ r.paid = null; reopenRecTask(r); }            // 미수전환 → 연동 업무 재개
-    else { r.paid = todayStr(); r.mismatch = false; completeRecTask(r); }  // 입금완료 → 연동 업무 완료
+    else {
+      r.paid = todayStr(); r.mismatch = false; completeRecTask(r);  // 입금완료 → 연동 업무 완료
+      if (r.con_id){                                            // 계약 연동 건 → 수금확인 단계 완료 제안
+        var cc = findProc(r.con_id);
+        if (cc && cc.status !== "done") setTimeout(function(){
+          if (confirm("입금 처리 완료 — 연동된 계약 [" + (cc.title||cc.label) + "]의 수금확인 단계를 완료할까요?")){
+            var res = completeStageNow(cc, /수금확인/);
+            if (res === "none") alert("현재 단계가 수금확인이 아니라 자동 완료하지 않았습니다. 지시 탭에서 진행하세요.");
+            else if (res === "review") alert("완료 요청으로 올렸습니다 — 승인권자 승인 후 종결됩니다.");
+          }
+        }, 100);
+      }
+    }
     r.updated = todayStr();
     saveRecCache(); renderReceivables(); renderDashboard(); scheduleRecSave();
   }
