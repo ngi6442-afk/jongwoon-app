@@ -4224,7 +4224,8 @@
     Array.prototype.forEach.call(files, function(f){
       if(f.size>ATT_MAX){ alert('"'+f.name+'"는 6MB를 넘어 첨부할 수 없습니다.'); return; }
       // 문서종류: 파일명 우선(계약서→계약 판독, 석면·조사→조사서 판독), 그 외 석면 계약이면 조사서로
-      var kind = /대장/.test(f.name) ? "bldg" : (/계약/.test(f.name) ? "contract" : (/석면|조사/.test(f.name) ? "asbestos" : ""));   // 그 외 파일은 판독 없이 보관만
+      var kind = /등록증|신분증|면허증/.test(f.name) ? "biz"
+        : (/대장/.test(f.name) ? "bldg" : (/계약/.test(f.name) ? "contract" : (/석면|조사/.test(f.name) ? "asbestos" : "")));   // 그 외 파일은 판독 없이 보관만
       var r=new FileReader();
       r.onload=function(){
         var entry={ name:f.name, size:f.size, type:f.type||"", id:"", parsed:"올리는 중…", added:todayStr() };
@@ -4268,6 +4269,14 @@
   function applyAsbParse(entry, c, p){
     if(!p){ entry.parsed="판독 결과 없음"; }
     else if(p.error){ entry.parsed="판독 실패("+p.error+") — 수동 확인"; }
+    else if(p.doc==="biz"){
+      entry.parsed=(p.doc_kind||"증빙")+": "+(p.name||"?")+(p.biz_no?" · "+p.biz_no:(p.birth?" · "+p.birth:""));
+      entry.biz=p;
+      // 발주처(갑) 정보 — 개인은 생년월일이 사업자번호 자리
+      c.owner_info={kind:p.doc_kind||"", name:p.name||"", ceo:(p.ceo||p.name||""), biz_no:(p.biz_no||p.birth||""),
+        addr:p.addr||"", from:entry.name, checked:todayStr()};
+      if(!c.client && p.name) c.client=p.name;
+    }
     else if(p.doc==="contract"){
       entry.parsed="계약서: "+(p.title||"공사명?")+(p.amount?" · "+Number(p.amount).toLocaleString()+"원":"")+(p.date_contract?" · "+p.date_contract:"");
       entry.con=p;
@@ -5449,16 +5458,21 @@
       document.getElementById("dgQClient").value = c.client || "";
       document.getElementById("dgQService").value = svc;
     } else if(dt==="demo"){
-      var dci=c.contract_info||{};
-      document.getElementById("dgOwner").value = c.client || dci.client || "";
+      // 우선순위: ①저장된 자동 데이터(판독·조회) → ②이 폼에서 수기(최후)
+      var dci=c.contract_info||{}, doi=c.owner_info||{};
+      document.getElementById("dgOwner").value = c.client || dci.client || doi.name || "";
+      document.getElementById("dgOwnerCeo").value = doi.ceo || "";
+      document.getElementById("dgOwnerBiz").value = doi.biz_no || "";
+      document.getElementById("dgOwnerAddr").value = doi.addr || "";
       document.getElementById("dgSite").value = c.site || dci.site || "";
       document.getElementById("dgWork").value = c.title || dci.title || svc;
       if(dci.amount) document.getElementById("dgAmount").value = dci.amount;
       if(dci.d1) document.getElementById("dgDate").value = dci.d1;
       if(dci.d2) document.getElementById("dgStartDate").value = dci.d2;
       if(dci.d3) document.getElementById("dgEndDate").value = dci.d3;
-      if(c.asb_survey && c.asb_survey.area) document.getElementById("dgArea").value = c.asb_survey.area;   // 검수 조사서 면적 자동
-      else if(c.bldg_info && c.bldg_info.total_floor) document.getElementById("dgArea").value = c.bldg_info.total_floor;   // 없으면 대장 연면적
+      // 공사내역: 석면 면적=조사서 검수값, 철거 면적=대장 연면적 (폐기물량은 환산 기준 확정 후 자동화)
+      if(c.asb_survey && c.asb_survey.area) document.getElementById("dgArea").value = c.asb_survey.area;
+      if(c.bldg_info && c.bldg_info.total_floor) document.getElementById("dgArea2").value = c.bldg_info.total_floor;
     } else if(dt==="waste"){
       document.getElementById("dgParty").value = "business";
       document.getElementById("dgName").value = c.client || "";

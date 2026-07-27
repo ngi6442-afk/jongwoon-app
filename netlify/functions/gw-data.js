@@ -569,11 +569,11 @@ async function handleAttPut(event, d, R) {
   if (!name || !b64) return jr(400, { status: 'REJECTED', error_code: 'INVALID_FILE', request_id: R });
   if (b64.length > ATT_MAX) return jr(413, { status: 'REJECTED', error_code: 'FILE_TOO_LARGE', request_id: R });
   const id = 'att_' + crypto.randomBytes(8).toString('hex');
-  const kind = ['asbestos', 'contract', 'bldg'].indexOf(String(d.kind || '')) >= 0 ? String(d.kind) : '';
+  const kind = ['asbestos', 'contract', 'bldg', 'biz'].indexOf(String(d.kind || '')) >= 0 ? String(d.kind) : '';
   const w = await blobSet(store(FILES), id, { name: name, type: String(d.type || ''), kind: kind, data: b64, by: c.member.name, ts: Date.now() });
   if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
   // 판독은 백그라운드 함수(gw-parse-background)에서 — 첨부는 즉시 완료(타임아웃 방지)
-  const wantParse = !!kind || /석면|사전조사|조사서|계약서|대장/.test(name);
+  const wantParse = !!kind || /석면|사전조사|조사서|계약서|대장|등록증|신분증|면허증/.test(name);
   return jr(200, { status: 'OK', id: id, name: name, size: b64.length, parse_pending: wantParse, request_id: R });
 }
 

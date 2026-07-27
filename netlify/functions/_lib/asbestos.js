@@ -142,15 +142,54 @@ async function claudeExtractBldg(buf, name) {
   } catch (e) { return { error: 'PARSE_FAILED' }; }
 }
 
+// 사업자등록증·신분증 판독 — 발주처(갑) 정보 자동 입력용. 주민등록번호는 추출하지 않음(생년월일만)
+async function claudeExtractBiz(buf, name) {
+  const key = (process.env.ANTHROPIC_API_KEY || '').trim();
+  if (!key) return { error: 'NO_API_KEY(Netlify 환경변수 ANTHROPIC_API_KEY 확인)' };
+  const model = (process.env.CLAUDE_PARSE_MODEL || 'claude-sonnet-5').trim();
+  const ext = (name || '').toLowerCase().split('.').pop();
+  const b64 = buf.toString('base64');
+  let media;
+  if (ext === 'pdf') media = { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: b64 } };
+  else if (['jpg', 'jpeg', 'png', 'gif', 'webp'].indexOf(ext) >= 0) {
+    const mt = ext === 'jpg' ? 'jpeg' : ext;
+    media = { type: 'image', source: { type: 'base64', media_type: 'image/' + mt, data: b64 } };
+  } else return null;
+  const prompt = '이 문서는 사업자등록증 또는 신분증(주민등록증·운전면허증)이다. 명기된 값만 추출하라(추정 금지, 없으면 빈값). '
+    + 'doc_kind("사업자등록증"|"신분증"), name(상호 또는 성명), ceo(대표자 — 사업자등록증만), '
+    + 'biz_no(사업자등록번호 — 사업자등록증만), birth(생년월일 YYYY-MM-DD — 신분증만. 주민등록번호 뒷자리는 절대 출력 금지), '
+    + 'addr(사업장 소재지 또는 주소). '
+    + '형식: {"doc_kind":"","name":"","ceo":"","biz_no":"","birth":"","addr":""} JSON만 출력.';
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+      body: JSON.stringify({ model: model, max_tokens: 512,
+        messages: [{ role: 'user', content: [media, { type: 'text', text: prompt }] }] })
+    });
+    if (!resp.ok) return { error: 'CLAUDE_' + resp.status };
+    const j = await resp.json();
+    const txt = ((j.content || []).find(function (b) { return b.type === 'text'; }) || {}).text || '';
+    const m = txt.match(/\{[\s\S]*\}/);
+    if (!m) return { error: 'NO_JSON' };
+    const data = JSON.parse(m[0]);
+    return { doc: 'biz', doc_kind: String(data.doc_kind || '').slice(0, 12), name: String(data.name || '').slice(0, 60),
+      ceo: String(data.ceo || '').slice(0, 30), biz_no: String(data.biz_no || '').slice(0, 20),
+      birth: String(data.birth || '').slice(0, 12), addr: String(data.addr || '').slice(0, 100) };
+  } catch (e) { return { error: 'PARSE_FAILED' }; }
+}
+
 // 첨부 레코드 → 문서종류별 판독 라우팅 (kind 우선, 없으면 파일명)
 async function parseAttachment(rec) {
   const name = rec.name || '';
   let kind = rec.kind || '';
-  if (!kind) kind = /대장/.test(name) ? 'bldg' : (/계약/.test(name) ? 'contract' : 'asbestos');
+  if (!kind) kind = /등록증|신분증|면허증/.test(name) ? 'biz'
+    : (/대장/.test(name) ? 'bldg' : (/계약/.test(name) ? 'contract' : 'asbestos'));
   const buf = Buffer.from(rec.data, 'base64');
+  if (kind === 'biz') return await claudeExtractBiz(buf, name);
   if (kind === 'bldg') return await claudeExtractBldg(buf, name);
   if (kind === 'contract') return await claudeExtractContract(buf, name);
   return await claudeExtractAsbestos(buf, name, rec.type);
 }
 
-module.exports = { judgeAsbestos94, claudeExtractAsbestos, claudeExtractContract, claudeExtractBldg, parseAttachment };
+module.exports = { judgeAsbestos94, claudeExtractAsbestos, claudeExtractContract, claudeExtractBldg, claudeExtractBiz, parseAttachment };
