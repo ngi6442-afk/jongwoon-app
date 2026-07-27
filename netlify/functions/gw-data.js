@@ -11,7 +11,7 @@ const { appendAudit, auditKey, diffItems } = require('./_lib/audit');
 const DATA = 'gw_data';
 const USERS = 'gw_users';
 // 컬렉션 → 권한키
-const COL = { tasks: 'tasks', vehicles: 'veh', receivables: 'rec', licenses: 'lic', checklist: 'check', documents: 'doc', clients: 'cli', contracts: 'con', leaves: 'leaves', bids: 'bid', onbid: 'bid', workers: 'leaves' };  // onbid=공매·부동산(관리자 전용), workers=일용직 명부(인사 권한)
+const COL = { tasks: 'tasks', vehicles: 'veh', receivables: 'rec', licenses: 'lic', checklist: 'check', documents: 'doc', clients: 'cli', contracts: 'con', leaves: 'leaves', bids: 'bid', onbid: 'bid', workers: 'wk' };  // onbid=공매·부동산(관리자 전용), workers=일용직 명부(wk 권한으로 개별 설정)
 // 사용자별 비공개 컬렉션(본인만 접근, 회원 id로 분리 저장)
 const PRIVATE_COL = { mytasks: true };
 

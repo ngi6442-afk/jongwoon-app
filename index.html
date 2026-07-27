@@ -792,7 +792,8 @@
     <button class="tab-btn" data-tab="tasks" id="tabTasksBtn">지시 <span class="tab-badge hide" id="taskTabBadge">0</span></button>
     <button class="tab-btn" data-tab="rec" id="tabRecBtn">기성</button>
     <button class="tab-btn" data-tab="cli" id="tabCliBtn">거래처</button>
-    <button class="tab-btn perm-hidden" data-tab="hr" id="tabHrBtn">인사 <span class="tab-badge hide" id="hrTabBadge">0</span></button>
+    <button class="tab-btn perm-hidden" data-tab="hr" id="tabHrBtn">인사·직원 <span class="tab-badge hide" id="hrTabBadge">0</span></button>
+    <button class="tab-btn perm-hidden" data-tab="workers" id="tabWkBtn">인사·일용직</button>
     <div class="nav-divider"></div>
     <div class="nav-group">수주</div>
     <button class="tab-btn perm-hidden" data-tab="bid" id="tabBidBtn">입찰 <span class="tab-badge hide" id="bidTabBadge">0</span></button>
@@ -1001,7 +1002,7 @@
 
   <!-- 인사(대표·관리자 전용) -->
   <section class="view" id="view-hr">
-    <div class="dash-sec" style="margin-bottom:8px;"><h2>인사 <span class="cnt" id="hrTotal"></span></h2></div>
+    <div class="dash-sec" style="margin-bottom:8px;"><h2>직원 <span class="cnt" id="hrTotal"></span></h2></div>
     <div id="hrStartBanner" style="display:none;background:#EAF3EC;border:1px solid #B9D9C2;border-radius:10px;padding:12px 14px;margin-bottom:10px;">
       <div style="font-weight:700;margin-bottom:4px;">인사업무 시작 준비</div>
       <div style="font-size:13px;color:var(--sub);line-height:1.5;margin-bottom:10px;">직원 정보(현직원 수정·직원 추가)와 <b>현재 잔여 연차</b> 입력을 마친 뒤 아래 버튼을 누르세요. 누른 날짜를 기준으로 잔여 연차 계산이 시작됩니다. (한 번만 누르면 사라집니다)</div>
@@ -1012,7 +1013,11 @@
     <button class="link-btn" id="hrAddBtn">+ 직원 추가</button>
     <button class="link-btn" id="permMgmtBtn">🔑 권한관리</button>
     <button class="link-btn" id="auditBtn">📋 감사 로그</button>
-    <div class="dash-sec" style="margin:18px 0 8px;"><h2>일용직 <span class="cnt" id="wkHead"></span></h2></div>
+  </section>
+
+  <!-- 인사·일용직 (권한 설정 가능) -->
+  <section class="view" id="view-workers">
+    <div class="dash-sec" style="margin-bottom:8px;"><h2>일용직 <span class="cnt" id="wkHead"></span></h2></div>
     <div style="font-size:13px;color:var(--sub);margin-bottom:6px;">석면·철거 투입 인력 명부 — 해체계획서 명단 자동 기입에 사용됩니다.</div>
     <div class="card" id="wkList"><div class="loading">불러오는 중…</div></div>
     <button class="link-btn" id="wkAddBtn">+ 일용직 추가</button>
@@ -1664,15 +1669,15 @@
   var MEMBER_KEY = "jw_app_member";
 
   // 모듈 레지스트리 — 신규 탭 추가 시 여기 5곳(MODULES/MODULE_TAB/MODULE_VIEW/MOD_LABEL/ROLE_PRESET)에 등록하면 권한관리 UI·게이팅에 자동 반영. 모듈 id = 백엔드 gw-data COL 권한키와 일치시킬 것.
-  var MODULES = ["tasks", "veh", "rec", "lic", "check", "con", "cli", "doc"];  // 일감(bid)은 관리자 전용 고정이라 권한 목록에서 제외
-  var MODULE_TAB = {tasks:"tabTasksBtn", veh:"tabVehBtn", rec:"tabRecBtn", lic:"tabLicBtn", check:"tabCheckBtn", con:"tabConBtn", cli:"tabCliBtn", doc:"tabDocBtn"};  // bid는 계약 탭 내 섹션(자체 탭 없음)
-  var MODULE_VIEW = {tasks:"view-tasks", veh:"view-veh", rec:"view-rec", lic:"view-lic", check:"view-check", con:"view-con", cli:"view-cli", doc:"view-doc"};  // bid 섹션은 applyPerms에서 canSee로 표시
+  var MODULES = ["tasks", "veh", "rec", "lic", "check", "con", "cli", "doc", "wk"];  // 일감(bid)은 관리자 전용 고정이라 권한 목록에서 제외
+  var MODULE_TAB = {tasks:"tabTasksBtn", veh:"tabVehBtn", rec:"tabRecBtn", lic:"tabLicBtn", check:"tabCheckBtn", con:"tabConBtn", cli:"tabCliBtn", doc:"tabDocBtn", wk:"tabWkBtn"};  // bid는 계약 탭 내 섹션(자체 탭 없음)
+  var MODULE_VIEW = {tasks:"view-tasks", veh:"view-veh", rec:"view-rec", lic:"view-lic", check:"view-check", con:"view-con", cli:"view-cli", doc:"view-doc", wk:"view-workers"};  // bid 섹션은 applyPerms에서 canSee로 표시
   var ROLE_PRESET = {
-    "대표":   {admin:true,  perms:{tasks:"do", veh:"do", rec:"do", lic:"do", check:"do", con:"do", cli:"do", doc:"do"}},
-    "관리자": {admin:true,  perms:{tasks:"do", veh:"do", rec:"do", lic:"do", check:"do", con:"do", cli:"do", doc:"do"}},
-    "팀장":   {admin:false, perms:{tasks:"do", veh:"do", rec:"do", lic:"do", check:"do", con:"view", cli:"view", doc:"view"}},
-    "직원":   {admin:false, perms:{tasks:"do", veh:"view", rec:"view", lic:"view", check:"do", con:"view", cli:"view", doc:"view"}},
-    "현장직": {admin:false, perms:{tasks:"do", veh:"view", rec:"hide", lic:"hide", check:"do", con:"hide", cli:"hide", doc:"view"}}
+    "대표":   {admin:true,  perms:{tasks:"do", veh:"do", rec:"do", lic:"do", check:"do", con:"do", cli:"do", doc:"do", wk:"do"}},
+    "관리자": {admin:true,  perms:{tasks:"do", veh:"do", rec:"do", lic:"do", check:"do", con:"do", cli:"do", doc:"do", wk:"do"}},
+    "팀장":   {admin:false, perms:{tasks:"do", veh:"do", rec:"do", lic:"do", check:"do", con:"view", cli:"view", doc:"view", wk:"do"}},
+    "직원":   {admin:false, perms:{tasks:"do", veh:"view", rec:"view", lic:"view", check:"do", con:"view", cli:"view", doc:"view", wk:"view"}},
+    "현장직": {admin:false, perms:{tasks:"do", veh:"view", rec:"hide", lic:"hide", check:"do", con:"hide", cli:"hide", doc:"view", wk:"hide"}}
   };
   // 직급(정보용)·부서 목록 — 서열 순서(공개범위·결재라인에서 사용)
   var RANK_LIST = ["대표","이사","부장","차장","과장","대리","주임","사원"];
@@ -3243,11 +3248,13 @@
     document.getElementById("view-bid").classList.toggle("active", name === "bid");
     document.getElementById("view-onbid").classList.toggle("active", name === "onbid");
     document.getElementById("view-hr").classList.toggle("active", name === "hr");
+    document.getElementById("view-workers").classList.toggle("active", name === "workers");
     document.getElementById("view-perm").classList.toggle("active", name === "perm");
     document.getElementById("view-leave").classList.toggle("active", name === "leave");
-    
+
     if (name === "cal") renderCalendar();
-    if (name === "hr"){ renderHrRoster(); loadWorkers(); }
+    if (name === "hr") renderHrRoster();
+    if (name === "workers"){ renderWorkers(); loadWorkers(); }
     if (name === "perm") renderPermMgmt();
     if (name === "leave") renderLeaves();
     if (name === "bid") renderBids();
@@ -4620,7 +4627,7 @@
   function loadWorkers(){
     gwCall("gw-data",{action:"get",collection:"workers"}).then(function(res){
       if(res.status===200){ workers=(res.body&&res.body.doc&&res.body.doc.items)||[]; renderWorkers(); renderXgWorkers(); }
-      else if(res.status===403){ var h=document.getElementById("wkList"); if(h) h.innerHTML='<div class="empty-line">권한이 없습니다(인사·휴가 권한 필요).</div>'; }
+      else if(res.status===403){ var h=document.getElementById("wkList"); if(h) h.innerHTML='<div class="empty-line">권한이 없습니다 — 권한관리에서 [일용직]을 열어주세요.</div>'; }
     }).catch(function(){});
   }
   function scheduleWorkersSave(){
@@ -4635,7 +4642,7 @@
     var host=document.getElementById("wkList"); if(!host) return;
     var list=sortedWorkers();
     var head=document.getElementById("wkHead"); if(head) head.textContent=list.length?(list.length+"명"):"";
-    var can=canDo("leaves")||isAdmin();
+    var can=canDo("wk");
     var addBtn=document.getElementById("wkAddBtn"); if(addBtn) addBtn.style.display=can?"block":"none";
     host.innerHTML=list.length?list.map(function(w){
       return '<div class="item"><div class="item-body"><div class="item-title">'+esc(w.name||"")+' <span class="'+(w.role==="반장"?"from-chip":"scope-chip")+'">'+esc(w.role||"인부")+'</span></div>'
@@ -7411,11 +7418,12 @@
     var obTab = document.getElementById("tabOnbidBtn");
     if (obTab) obTab.classList.toggle("perm-hidden", !isAdmin());
     if ((currentTab === "bid" || currentTab === "onbid") && !isAdmin()) switchTab("dash");
-    // 인사 탭: 대표·관리자 전용
+    // 인사·직원 탭: 대표·관리자 전용 / 인사·일용직은 wk 권한(모듈 루프에서 처리)
     var adminUser = isAdmin();
     var hrBtn = document.getElementById("tabHrBtn");
     if (hrBtn) hrBtn.classList.toggle("perm-hidden", !adminUser);
     if (currentTab === "hr" && !adminUser) switchTab("dash");
+    if (currentTab === "workers" && !canSee("wk")) switchTab("dash");
     updateUserChip();
     updateApprovalBadges();
   }
@@ -7757,7 +7765,7 @@
     hrOpenId = null;
   }
 
-  var MOD_LABEL = {tasks:"지시", veh:"차량", rec:"기성", lic:"인허가", check:"업무", con:"계약", cli:"거래처", doc:"문서함", bid:"입찰"};
+  var MOD_LABEL = {tasks:"지시", veh:"차량", rec:"기성", lic:"인허가", check:"업무", con:"계약", cli:"거래처", doc:"문서함", bid:"입찰", wk:"일용직"};
   // ---- 감사 로그 뷰어(관리자 전용, 서버 기록 열람) ----
   var AUDIT_COL_LABEL = {tasks:"지시", vehicles:"차량", receivables:"기성", licenses:"인허가", checklist:"업무", documents:"문서함", clients:"거래처", contracts:"계약", leaves:"휴가", member:"회원", login:"로그인"};
   var AUDIT_FIELD_LABEL = {status:"상태", title:"제목", who:"담당", who_id:"담당", due:"기한", amount:"금액", paid:"입금", del:"삭제", scope:"공개범위", stage:"단계", cancel_req:"취소요청", name:"이름", role:"직책", rank:"직급", dept:"부서", admin:"관리자", perms:"권한", hire_date:"입사일", leave_date:"퇴사일", seq:"연번", annual_base:"잔여연차기준", annual_base_date:"기준일", annual_days:"연차수동", loa_days:"휴직누적", on_loa:"휴직중", loa_start:"휴직시작", loa_end:"휴직종료", annual_paid:"연차수당포함", emp_type:"고용형태", annual_basis:"연차기준", reason:"사유", approver:"승인자", done_by:"완료자", detail:"상세", recur:"반복", hl:"하이라이트", mismatch:"불일치", PIN:"PIN"};
