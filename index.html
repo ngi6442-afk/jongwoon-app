@@ -4624,9 +4624,14 @@
         if(confirm("검수 결과 노동부 신고대상입니다.\n이 계약에 '노동부신고 대상' 요소를 추가할까요?\n(단계에 노동부신고·필증인수가 반영됩니다)")){
           if(!c.elems) c.elems={};
           c.elems.labor=1; scheduleContractSave();
-          alert("요소가 추가되었습니다. 단계 반영은 계약 수정 화면에서 확인하세요.");
         }
       }
+      // 조사서 검수 확정 → 노동부신고서류(석면해체계획서) 바로 생성 제안
+      setTimeout(function(){
+        if(confirm("검수 확정 완료 — 석면해체계획서(노동부신고서류)를 지금 생성할까요?\n(검수 자재표·대장 정보 자동 반영. 투입 인력까지 넣으려면 취소 후 [생성]에서 인력 체크)")){
+          xgAutoGenerate(c.id, "asb_plan").catch(function(e){ alert("생성 실패: "+e); });
+        }
+      }, 200);
     });
   })();
   // ---- 일용직 명부(석면·철거 투입 인력) — 해체계획서 명단 자동 기입용 ----
@@ -4788,8 +4793,9 @@
     openDocFromContract(procId, stage);               // 계약(비입찰 계약서 작성)·견적 등 → 서류출력 폼
   }
   var xgCtx=null;
-  function openXlsxGen(conId, presetKind, stage){
-    var c=findProc(conId); if(!c) return;
+  // 프리필(하드리딩 체인) — 모달 표시 없이 필드만 채움(일괄 생성에서도 사용)
+  function xgPrefill(conId, presetKind, stage){
+    var c=findProc(conId); if(!c) return null;
     xgCtx={id:conId};
     document.getElementById("xgHint").textContent="["+(c.label||"계약")+(c.site?" · "+c.site:"")+(stage?" · "+stage+" 단계":"")+"] 등록된 양식 원본에 값을 채워 xlsx로 내려받습니다.";
     var isAsb=!!(c.elems&&c.elems.asb);
@@ -4807,7 +4813,42 @@
     document.getElementById("xgOwner").value = /교육/.test(s.owner||"") ? "경상북도 교육감" : "";
     if(!workers.length) loadWorkers(); else renderXgWorkers();
     xgToggle();
+    return c;
+  }
+  function openXlsxGen(conId, presetKind, stage){
+    if(!xgPrefill(conId, presetKind, stage)) return;
     document.getElementById("xlsxGenBackdrop").classList.add("show");
+  }
+  // 일괄·자동 생성 — 저장된 원문 데이터로 모달 없이 생성(확인요망 없이, 빈칸은 수기)
+  function xgAutoGenerate(conId, kind){
+    var c=xgPrefill(conId, kind, "");
+    if(!c) return Promise.reject("계약 없음");
+    return gwCall("gw-data",{action:"tpl_get", key:kind}).then(function(res){
+      if(res.status!==200) throw (res.status===404 ? "'"+TPL_LABELS[kind]+"' 양식 미등록" : "양식 로드 실패");
+      return fillXlsxTemplate(res.body.data, xgBuildEdits(kind, c)).then(function(blob){
+        downloadBlob((document.getElementById("xgTitle").value.trim()||c.label||"서류")+"_"+TPL_LABELS[kind]+".xlsx", blob);
+        return kind;
+      });
+    });
+  }
+  // 계약서 확정 후 후속 서류 일괄 생성(와라라락) — 석면 계획서는 조사서 검수 확정 시 별도 제안
+  function conGenPacket(c){
+    var kinds=["work_start"];
+    if(c.elems&&(c.elems.demo||c.elems.permit)) kinds.push("demo_report");
+    if(c.elems&&c.elems.asb&&c.asb_survey&&c.asb_survey.confirmed) kinds.push("asb_plan");
+    var done=[], fail=[];
+    var i=0;
+    (function next(){
+      if(i>=kinds.length){
+        alert("일괄 생성 완료: "+(done.map(function(k){return TPL_LABELS[k];}).join("·")||"없음")
+          +(fail.length?"\n실패: "+fail.join(" / "):"")
+          +((c.elems&&c.elems.asb&&!(c.asb_survey&&c.asb_survey.confirmed))?"\n※ 석면해체계획서는 조사서 첨부·검수 확정 시 자동 제안됩니다.":""));
+        return;
+      }
+      var kind=kinds[i++];
+      xgAutoGenerate(c.id, kind).then(function(k){ done.push(k); next(); })
+        .catch(function(e){ fail.push(TPL_LABELS[kind]+"("+e+")"); next(); });
+    })();
   }
   function xgToggle(){
     var k=document.getElementById("xgKind").value;
@@ -5356,8 +5397,10 @@
   var JW_CO = { name:"(유)종운환경", ceo:"나종운", addr:"포항시 남구 서원재로 1", tel:"054-291-1202" };
   function dgFill(v){ return v ? esc(v) : '<span class="doc-fill">(________)</span>'; }
   function dgDateKo(s){ if(!isDate(s)) return '&nbsp;&nbsp;&nbsp;년&nbsp;&nbsp;&nbsp;월&nbsp;&nbsp;&nbsp;일'; var p=s.split('-'); return p[0]+'년 '+(+p[1])+'월 '+(+p[2])+'일'; }
+  var dgConId=null;   // 서류출력이 어느 계약에서 열렸는지 — 계약서 작성 시 입력값을 계약에 저장
   function openDocGen(){
     if(!canDo("con")) return;
+    dgConId=null;
     document.getElementById("dgDocType").value="waste";
     document.getElementById("dgParty").value="business";
     ["dgName","dgBiz","dgCeo","dgTel","dgAddr","dgWaste","dgQty","dgWork","dgSite","dgOwner","dgOwnerCeo","dgOwnerBiz","dgOwnerAddr","dgOwnerTel","dgAmount","dgArea","dgWasteQty","dgQClient","dgQService"].forEach(function(id){ var e=document.getElementById(id); if(e) e.value=""; });
@@ -5374,6 +5417,7 @@
   function openDocFromContract(id, stage){
     var c = findProc(id); if(!c) return;
     openDocGen();
+    dgConId=id;
     var isDemo = (c.type==="asbestos" || c.type==="demolition");
     var dt;
     if(stage && /폐기물|배출|운반/.test(stage)) dt = "waste";   // 철거·석면 내 폐기물 서류 = 종운환경
@@ -5388,9 +5432,14 @@
       document.getElementById("dgQClient").value = c.client || "";
       document.getElementById("dgQService").value = svc;
     } else if(dt==="demo"){
-      document.getElementById("dgOwner").value = c.client || "";
-      document.getElementById("dgSite").value = c.site || "";
-      document.getElementById("dgWork").value = svc;
+      var dci=c.contract_info||{};
+      document.getElementById("dgOwner").value = c.client || dci.client || "";
+      document.getElementById("dgSite").value = c.site || dci.site || "";
+      document.getElementById("dgWork").value = c.title || dci.title || svc;
+      if(dci.amount) document.getElementById("dgAmount").value = dci.amount;
+      if(dci.d1) document.getElementById("dgDate").value = dci.d1;
+      if(dci.d2) document.getElementById("dgStartDate").value = dci.d2;
+      if(dci.d3) document.getElementById("dgEndDate").value = dci.d3;
       if(c.asb_survey && c.asb_survey.area) document.getElementById("dgArea").value = c.asb_survey.area;   // 검수 조사서 면적 자동
       else if(c.bldg_info && c.bldg_info.total_floor) document.getElementById("dgArea").value = c.bldg_info.total_floor;   // 없으면 대장 연면적
     } else if(dt==="waste"){
@@ -5543,6 +5592,25 @@
       var dd = dgDemoData();
       if(!dd.work && !dd.owner && !dd.site){ alert("공사명/발주처/현장 중 하나는 입력하세요."); return; }
       html = docDemoContract(dd);
+      // 계약서 작성 = 계약 데이터의 원천 — 입력값을 계약에 저장하고 후속 서류로 연쇄
+      var cc = dgConId ? findProc(dgConId) : null;
+      if(cc){
+        var camt=Number(String(dd.amount).replace(/[^0-9]/g,""))||0;
+        cc.contract_info={title:dd.work||"", amount:camt, d1:dd.date||"", d2:dd.startDate||"", d3:dd.endDate||"",
+          client:dd.owner||"", site:dd.site||"", guarantee:0, from:"계약서 작성 툴", checked:todayStr()};
+        if(!cc.title&&dd.work) cc.title=dd.work;
+        if(!cc.client&&dd.owner) cc.client=dd.owner;
+        if(!cc.site&&dd.site) cc.site=dd.site;
+        scheduleContractSave(); renderContracts();
+        if(cc.elems&&(cc.elems.asb||cc.elems.demo||cc.elems.permit)&&dd.site&&!cc.bldg_info) conBldgLookup(cc.id, dd.site, true);   // 대장 자동
+        setTimeout(function(){
+          if(confirm("계약서 내용을 계약에 저장했습니다.\n계약 단계를 완료하고 후속 서류(착공계"
+            +((cc.elems&&(cc.elems.demo||cc.elems.permit))?"·해체신고서":"")+")를 일괄 생성할까요?")){
+            completeStageNow(cc, /계약/);
+            conGenPacket(cc);
+          }
+        }, 400);
+      }
     } else {
       var d = dgData();
       if(!d.name){ alert("이름/상호를 입력하세요."); return; }
