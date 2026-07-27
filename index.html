@@ -4050,6 +4050,30 @@
       html += '</div></div>';
     }
 
+    // 계약 파이프라인 보드 — 진행 계약의 현재 단계·기한·미수 한눈에
+    if (canSee("con")){
+      var actCons = (typeof liveContracts==="function" ? liveContracts() : []).filter(function(c){ return c.status !== "done"; });
+      if (actCons.length){
+        html += '<div class="dash-sec"><h2>계약 진행 <span class="cnt">' + actCons.length + '</span></h2><div class="card">';
+        html += actCons.map(function(c){
+          var p = c.pipes && c.pipes[0], s = p && p.cur < p.stages.length ? p.stages[p.cur] : null;
+          var pos = p ? (Math.min(p.cur + (s?1:0), p.stages.length) + "/" + p.stages.length) : "";
+          var overdue = "", dueTxt = "";
+          if (s && s.task_id){
+            var st = findTask(s.task_id);
+            if (st && st.due){ dueTxt = st.due; if (st.status !== "done" && st.due < todayStr()) overdue = ' <span class="dday over">지연</span>'; }
+          }
+          var rr = c.rec_id ? findRec(c.rec_id) : null;
+          var recChip = rr && rr.del !== 1 ? (rr.paid ? '<span class="from-chip">💰수금</span>' : '<span class="hold-chip">미수</span>') : '';
+          return '<div class="item" data-inbox-go="con" style="cursor:pointer;">' +
+            '<div class="item-body"><div class="item-title">' + esc(c.label) + (c.client ? ' · ' + esc(c.client) : '') + '</div>' +
+            '<div class="item-meta"><span class="proc-chip">' + pos + ' · ' + esc(s ? s.name : "완료 대기") + '</span>' + (dueTxt ? '<span>' + esc(dueTxt) + '</span>' : '<span class="need-due">기한 입력</span>') + recChip + '</div></div>' +
+            '<div class="task-ctrl">' + overdue + '</div></div>';
+        }).join("");
+        html += '</div></div>';
+      }
+    }
+
     html += '<div class="dash-sec"><h2>미완료 지시 <span class="cnt">' + openTasks.length + '</span></h2><div class="card">';
     html += openTasks.length
       ? openTasks.map(function(t){ return taskRowHtml(t, false); }).join("")
