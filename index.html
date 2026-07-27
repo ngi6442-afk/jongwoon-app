@@ -969,6 +969,7 @@
     <button class="link-btn" id="conStartBtn">+ 계약 시작</button>
     <button class="link-btn" id="docGenBtn">+ 서류 출력</button>
     <button class="link-btn" id="tplManageBtn" style="display:none;">+ 양식 등록</button>
+    <button class="link-btn" id="conPerfBtn" style="display:none;">실적 다운로드</button>
     <div class="card" id="conList"><div class="loading">불러오는 중…</div></div>
   </section>
 
@@ -4733,6 +4734,25 @@
     if(aw && aw.style.display!=="none") xgToggle();   // 대리인 후보 목록 동기 갱신
   }
 
+  // ---- 실적 다운로드 — 완료 계약을 실적증명·기술평가 근거용 엑셀로 (로드맵 P9 연계) ----
+  function conExportPerf(){
+    if(!canDo("con")) return;
+    var done=liveContracts().filter(function(c){ return c.status==="done"; });
+    if(!done.length){ alert("완료된 계약이 없습니다 — 계약이 수금확인까지 종결되면 실적으로 잡힙니다."); return; }
+    var rows=[["공사명","발주처","공종","시나리오 요소","현장","계약금액","착공일","준공일","수금일","시행회사","연면적(대장)"]];
+    done.sort(function(a,b){ return (a.updated||"").localeCompare(b.updated||""); });
+    done.forEach(function(c){
+      var ci=c.contract_info||{};
+      var el=c.elems||{}; var elTxt=CON_ELEMS.filter(function(e){return el[e[0]];}).map(function(e){return e[1];}).join("·");
+      var rr=c.rec_id?findRec(c.rec_id):null;
+      var co=(c.type==="asbestos"||c.type==="demolition")?"㈜종운건설":"(유)종운환경";
+      rows.push([c.title||c.label||"", c.client||"", c.label||"", elTxt, c.site||"",
+        (ci.amount||""), (ci.d2||c.start||""), (ci.d3||""), (rr&&rr.paid)||"", co,
+        (c.bldg_info&&c.bldg_info.total_floor)||""]);
+    });
+    downloadBlob("실적목록_"+todayStr()+".xlsx", buildSimpleXlsx("실적", rows));
+  }
+
   // ---- 건축물대장 자동 조회(건축HUB) — 주소로 표제부 조회 → 계약 bldg_info 저장 ----
   function conBldgLookup(conId, addr, silent){
     var c=findProc(conId); if(!c) return;
@@ -5069,6 +5089,7 @@
   (function(){
     var $=function(id){return document.getElementById(id);};
     if($("tplManageBtn")) $("tplManageBtn").addEventListener("click", openTplManage);
+    if($("conPerfBtn")) $("conPerfBtn").addEventListener("click", conExportPerf);
     if($("tplClose")) $("tplClose").addEventListener("click", function(){ $("tplBackdrop").classList.remove("show"); });
     if($("xgKind")) $("xgKind").addEventListener("change", xgToggle);
     if($("xgCancel")) $("xgCancel").addEventListener("click", function(){ $("xlsxGenBackdrop").classList.remove("show"); xgCtx=null; });
@@ -5329,6 +5350,7 @@
     var startBtn=document.getElementById("conStartBtn"); if(startBtn) startBtn.style.display = canDo("con") ? "block" : "none";
     var dgBtn=document.getElementById("docGenBtn"); if(dgBtn) dgBtn.style.display = canDo("con") ? "block" : "none";
     var tmBtn=document.getElementById("tplManageBtn"); if(tmBtn) tmBtn.style.display = isAdmin() ? "block" : "none";
+    var pfBtn=document.getElementById("conPerfBtn"); if(pfBtn) pfBtn.style.display = canDo("con") ? "block" : "none";
     var active=liveContracts().filter(function(c){return c.status!=="done";});
     var done=liveContracts().filter(function(c){return c.status==="done";});
     var head=document.getElementById("conHead"); if(head) head.textContent = active.length ? (active.length+" 진행중") : "";
