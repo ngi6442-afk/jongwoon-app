@@ -4267,6 +4267,8 @@
       if(!c.title && p.title) c.title=p.title;
       if(!c.client && p.client) c.client=p.client;
       if(!c.site && p.site) c.site=p.site;
+      // 철거·석면 건은 주소로 건축물대장 자동 조회(조용히 저장 — 카드에 🏢 칩 표시)
+      if(c.elems && (c.elems.asb||c.elems.demo||c.elems.permit) && (p.site||c.site) && !c.bldg_info) conBldgLookup(c.id, p.site||c.site, true);
       // 계약서 확보 = 계약 단계 완료 조건 → 확인 후 다음 단계(착공)로 진행 + 착공계 작성 제안
       setTimeout(function(){
         var sum=(p.title||entry.name)+(p.amount?" · "+Number(p.amount).toLocaleString()+"원":"")+(p.date_contract?" · 계약일 "+p.date_contract:"");
@@ -4705,6 +4707,32 @@
       : '<div style="font-size:12px;color:#888;">일용직 명부가 비어 있습니다 — 인사 탭에서 등록하면 명단을 자동 기입합니다. (미선택 시 명단은 공란)</div>';
     var aw=document.getElementById("xgAgentWrap");
     if(aw && aw.style.display!=="none") xgToggle();   // 대리인 후보 목록 동기 갱신
+  }
+
+  // ---- 건축물대장 자동 조회(건축HUB) — 주소로 표제부 조회 → 계약 bldg_info 저장 ----
+  function conBldgLookup(conId, addr, silent){
+    var c=findProc(conId); if(!c) return;
+    addr=(addr||"").trim(); if(!addr) return;
+    gwCall("gw-data",{action:"bldg_lookup", addr:addr}).then(function(res){
+      var b=(res&&res.body)||{};
+      if(res.status!==200 || b.status!=="OK"){
+        if(!silent) alert("대장 조회 실패: "+(b.error_code||res.status)+(b.hint?"\n"+b.hint:""));
+        return;
+      }
+      var rows=b.rows||[];
+      if(!rows.length){ if(!silent) alert("해당 지번의 건축물대장이 없습니다.\n(주소: "+addr+" → "+((b.parsed||{}).name||"")+")"); return; }
+      var tot=rows.reduce(function(s,r){return s+(r.total_floor||0);},0);
+      var rep=rows[0];
+      c.bldg_info={ site:rep.site||addr, use:rep.use, struct:rep.struct, floors:rep.floors, approved:rep.approved,
+        total_floor:Math.round(tot*100)/100, dongs:rows.length, rows:rows.slice(0,20), checked:todayStr() };
+      scheduleContractSave(); renderContracts();
+      if(!silent){
+        alert("건축물대장 조회 완료 — "+rows.length+"개 동\n"
+          + rows.slice(0,6).map(function(r){ return "· "+(r.dong||r.bldg_name||"동")+" "+r.use+" · "+r.struct+" · "+r.total_floor+"㎡ · "+r.floors+(r.approved?" · 승인 "+r.approved:""); }).join("\n")
+          + (rows.length>6?"\n…외 "+(rows.length-6)+"동":"")
+          + "\n연면적 합계 "+(Math.round(tot*100)/100)+"㎡");
+      }
+    }).catch(function(){ if(!silent) alert("대장 조회 실패(네트워크)"); });
   }
 
   // ---- 서류 양식 등록/생성 ----
@@ -5179,11 +5207,11 @@
       return '<div class="item con-item'+(c.status==="done"?' checked':'')+'">'+
         '<div class="item-body">'+
           '<div class="item-title">'+esc(c.label)+(c.client?' · '+esc(c.client):'')+'</div>'+
-          '<div class="item-meta">'+(c.docType==="public"?'<span class="from-chip">공문서</span>':'<span class="scope-chip">사문서</span>')+(c.site?'<span>'+esc(c.site)+'</span>':'')+'<span>시작 '+esc(c.start||"")+'</span>'+(c.who?'<span class="author-chip">'+esc(c.who)+'</span>':'')+(c.status==="done"?'<span class="done-by">✓ 완료</span>':'')+'</div>'+
+          '<div class="item-meta">'+(c.docType==="public"?'<span class="from-chip">공문서</span>':'<span class="scope-chip">사문서</span>')+(c.site?'<span>'+esc(c.site)+'</span>':'')+'<span>시작 '+esc(c.start||"")+'</span>'+(c.who?'<span class="author-chip">'+esc(c.who)+'</span>':'')+(c.bldg_info?'<span class="scope-chip">🏢 대장 '+c.bldg_info.total_floor+'㎡·'+c.bldg_info.dongs+'동</span>':'')+(c.status==="done"?'<span class="done-by">✓ 완료</span>':'')+'</div>'+
           pipes+
           conAttBoxHtml(c)+
         '</div>'+
-        (canDo("con")?'<div class="task-ctrl"><button class="mini-btn" data-con-xlsx="'+c.id+'">생성</button><button class="mini-btn" data-con-doc="'+c.id+'">서류</button><button class="mini-btn danger" data-con-del="'+c.id+'">삭제</button></div>':'')+
+        (canDo("con")?'<div class="task-ctrl"><button class="mini-btn" data-con-bldg="'+c.id+'">대장</button><button class="mini-btn" data-con-xlsx="'+c.id+'">생성</button><button class="mini-btn" data-con-doc="'+c.id+'">서류</button><button class="mini-btn danger" data-con-del="'+c.id+'">삭제</button></div>':'')+
       '</div>';
     }).join("");
     Array.prototype.forEach.call(host.querySelectorAll("[data-con-del]"), function(el){
@@ -5194,6 +5222,14 @@
     });
     Array.prototype.forEach.call(host.querySelectorAll("[data-con-xlsx]"), function(el){
       el.addEventListener("click", function(){ openXlsxGen(el.getAttribute("data-con-xlsx")); });
+    });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-con-bldg]"), function(el){
+      el.addEventListener("click", function(){
+        var c=findProc(el.getAttribute("data-con-bldg")); if(!c) return;
+        var def=c.site||((c.contract_info||{}).site)||((c.asb_survey||{}).site)||"";
+        var addr=prompt("건축물대장 조회 — 지번 주소를 입력하세요\n(예: 경북 안동시 풍산읍 하리리 247 / 번지 없이 리·동까지만 넣으면 전체 목록)", def);
+        if(addr) conBldgLookup(c.id, addr, false);
+      });
     });
     Array.prototype.forEach.call(host.querySelectorAll("[data-catt-add]"), function(el){
       el.addEventListener("click", function(e){ e.stopPropagation(); conPickAttach(el.getAttribute("data-catt-add")); });

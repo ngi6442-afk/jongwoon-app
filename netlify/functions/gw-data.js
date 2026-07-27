@@ -600,6 +600,54 @@ async function handleAttParseStatus(event, d, R) {
   return jr(200, { status: 'OK', parsed: r.data.result, request_id: R });
 }
 
+// ---- 건축물대장 자동 조회(건축HUB) — 주소 → 법정동코드 → 표제부. 키는 data.go.kr 계정 공용(G2B_API_KEY) ----
+const BJD = require('./_lib/bjd.json');   // 법정동명 → 10자리 코드(행정표준코드 전체자료, 현존만)
+const SIDO_ALIAS = { '서울': '서울특별시', '부산': '부산광역시', '대구': '대구광역시', '인천': '인천광역시', '광주': '광주광역시', '대전': '대전광역시', '울산': '울산광역시', '세종': '세종특별자치시', '경기': '경기도', '강원': '강원특별자치도', '강원도': '강원특별자치도', '충북': '충청북도', '충남': '충청남도', '전북': '전북특별자치도', '전라북도': '전북특별자치도', '전남': '전라남도', '경북': '경상북도', '경남': '경상남도', '제주': '제주특별자치도', '제주도': '제주특별자치도' };
+function bldgParseAddr(addr) {
+  let a = String(addr || '').replace(/\(.*?\)/g, ' ').replace(/\s+/g, ' ').trim();
+  const first = a.split(' ')[0];
+  if (SIDO_ALIAS[first]) a = SIDO_ALIAS[first] + a.slice(first.length);
+  // 가장 긴 법정동명 접두 일치
+  let best = '', bestCode = '';
+  for (const name in BJD) {
+    if (a.indexOf(name) === 0 && name.length > best.length) { best = name; bestCode = BJD[name]; }
+  }
+  if (!bestCode) return null;
+  const rest = a.slice(best.length);
+  const m = rest.match(/^\s*(산)?\s*(\d{1,4})(?:-(\d{1,4}))?/);
+  return { name: best, code: bestCode, san: !!(m && m[1]), bun: m ? m[2] : '', ji: (m && m[3]) || '' };
+}
+async function handleBldgLookup(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (permOf(c.member, 'contracts') === 'hide') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_ACCESS', request_id: R });
+  const key = (process.env.BLDG_API_KEY || process.env.G2B_API_KEY || '').trim();
+  if (!key) return jr(500, { status: 'ERROR', error_code: 'NO_BLDG_KEY', request_id: R });
+  const p = bldgParseAddr(d.addr);
+  if (!p) return jr(200, { status: 'REJECTED', error_code: 'ADDR_PARSE_FAILED', hint: '지번 주소(예: 경북 안동시 풍산읍 하리리 247)로 입력하세요', request_id: R });
+  const pad4 = function (s) { return String(s || '0').replace(/^0+/, '').padStart(4, '0'); };
+  const q = 'serviceKey=' + encodeURIComponent(key)
+    + '&sigunguCd=' + p.code.slice(0, 5) + '&bjdongCd=' + p.code.slice(5)
+    + (p.bun ? ('&platGbCd=' + (p.san ? 1 : 0) + '&bun=' + pad4(p.bun) + '&ji=' + pad4(p.ji)) : '')
+    + '&numOfRows=50&pageNo=1&_type=json';
+  try {
+    const resp = await fetch('https://apis.data.go.kr/1613000/BldRgstHubService/getBrTitleInfo?' + q);
+    const j = await resp.json();
+    const body = ((j || {}).response || {}).body || {};
+    let items = (body.items || {}).item || [];
+    if (!Array.isArray(items)) items = [items];
+    const rows = items.map(function (it) {
+      return { dong: String(it.dongNm || '').trim(), bldg_name: String(it.bldNm || '').trim(),
+        use: String(it.mainPurpsCdNm || '').trim(), struct: String(it.strctCdNm || '').trim(),
+        total_floor: Number(it.totArea) || 0, area_bldg: Number(it.archArea) || 0,
+        floors: '지상' + (Number(it.grndFlrCnt) || 0) + (Number(it.ugrndFlrCnt) ? '/지하' + Number(it.ugrndFlrCnt) : ''),
+        approved: String(it.useAprDay || '').replace(/^(\d{4})(\d{2})(\d{2})$/, '$1-$2-$3'),
+        site: String(it.platPlc || '').trim() };
+    });
+    return jr(200, { status: 'OK', parsed: p, total: Number(body.totalCount) || rows.length, rows: rows, request_id: R });
+  } catch (e) { return jr(500, { status: 'ERROR', error_code: 'BLDG_API_FAILED', request_id: R }); }
+}
+
 // ---- 백업 내보내기 — appdata GitHub Actions(cron)가 서버 시크릿으로 호출, git에 스냅샷 보관 ----
 const BACKUP_STORES = { gw_data: 1, gw_users: 1, gw_files: 1 };
 function backupAuthed(d) {
@@ -701,6 +749,7 @@ async function handler(event) {
     if (d && d.action === 'bids_purge') return await handleBidsPurge(event, d, R);
     if (d && d.action === 'bids_export') return await handleBidsExport(event, d, R);
     if (d && d.action === 'bids_results') return await handleBidsResults(event, d, R);
+    if (d && d.action === 'bldg_lookup') return await handleBldgLookup(event, d, R);
     if (d && d.action === 'backup_list') return await handleBackupList(event, d, R);
     if (d && d.action === 'backup_get') return await handleBackupGet(event, d, R);
     if (d && d.action === 'tpl_put') return await handleTplPut(event, d, R);
