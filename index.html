@@ -1012,6 +1012,10 @@
     <button class="link-btn" id="hrAddBtn">+ 직원 추가</button>
     <button class="link-btn" id="permMgmtBtn">🔑 권한관리</button>
     <button class="link-btn" id="auditBtn">📋 감사 로그</button>
+    <div class="dash-sec" style="margin:18px 0 8px;"><h2>일용직 <span class="cnt" id="wkHead"></span></h2></div>
+    <div style="font-size:13px;color:var(--sub);margin-bottom:6px;">석면·철거 투입 인력 명부 — 해체계획서 명단 자동 기입에 사용됩니다.</div>
+    <div class="card" id="wkList"><div class="loading">불러오는 중…</div></div>
+    <button class="link-btn" id="wkAddBtn">+ 일용직 추가</button>
   </section>
 
   <!-- 권한관리 (인사 하위 · 관리자 전용) -->
@@ -1107,6 +1111,23 @@
   </div>
 </div>
 
+<div class="modal-backdrop" id="wkBackdrop">
+  <div class="modal">
+    <h3 id="wkModalTitle">일용직 추가</h3>
+    <input type="text" id="wkName" placeholder="이름" autocomplete="off">
+    <input type="text" id="wkBirth" placeholder="생년월일 (예: 81.08.17)" autocomplete="off">
+    <span class="fld-label">직책</span>
+    <select id="wkRole"><option value="반장">반장</option><option value="인부" selected>인부</option></select>
+    <input type="text" id="wkPhone" placeholder="연락처 (선택)" autocomplete="off">
+    <span class="fld-label">건강진단일 (선택)</span>
+    <input type="date" id="wkExam">
+    <input type="text" id="wkNote" placeholder="비고 (선택 — 교육이수 등)" autocomplete="off">
+    <button class="primary" id="wkSave">저장</button>
+    <button class="danger" id="wkDelete" style="display:none;">삭제</button>
+    <button class="secondary" id="wkCancel">취소</button>
+  </div>
+</div>
+
 <div class="modal-backdrop" id="tplBackdrop">
   <div class="modal">
     <h3>서류 양식 등록 (관리자)</h3>
@@ -1143,6 +1164,7 @@
     <div id="xgAsbFields" style="display:none;">
       <input type="text" id="xgOwner" placeholder="소유주 (예: 경상북도 교육감)" autocomplete="off">
       <div id="xgAsbInfo" style="font-size:13px;color:#888;margin:4px 0;"></div>
+      <div id="xgWorkers" style="margin:6px 0;"></div>
     </div>
     <button class="primary" id="xgGo">생성·다운로드</button>
     <button class="secondary" id="xgCancel">취소</button>
@@ -3225,7 +3247,7 @@
     document.getElementById("view-leave").classList.toggle("active", name === "leave");
     
     if (name === "cal") renderCalendar();
-    if (name === "hr") renderHrRoster();
+    if (name === "hr"){ renderHrRoster(); loadWorkers(); }
     if (name === "perm") renderPermMgmt();
     if (name === "leave") renderLeaves();
     if (name === "bid") renderBids();
@@ -4591,6 +4613,85 @@
       }
     });
   })();
+  // ---- 일용직 명부(석면·철거 투입 인력) — 해체계획서 명단 자동 기입용 ----
+  var workers=[], wkEditId=null, wkSaveTimer=null;
+  function liveWorkers(){ return workers.filter(function(w){ return w && w.del!==1; }); }
+  function sortedWorkers(){ return liveWorkers().sort(function(a,b){ return ((a.role==="반장"?0:1)-(b.role==="반장"?0:1)) || (a.name||"").localeCompare(b.name||""); }); }
+  function loadWorkers(){
+    gwCall("gw-data",{action:"get",collection:"workers"}).then(function(res){
+      if(res.status===200){ workers=(res.body&&res.body.doc&&res.body.doc.items)||[]; renderWorkers(); renderXgWorkers(); }
+      else if(res.status===403){ var h=document.getElementById("wkList"); if(h) h.innerHTML='<div class="empty-line">권한이 없습니다(인사·휴가 권한 필요).</div>'; }
+    }).catch(function(){});
+  }
+  function scheduleWorkersSave(){
+    if(wkSaveTimer) clearTimeout(wkSaveTimer);
+    wkSaveTimer=setTimeout(function(){
+      gwCall("gw-data",{action:"save",collection:"workers",doc:{schema:1,items:workers}}).catch(function(){});
+    },1200);
+  }
+  function wkLabel(w){ return (w.name||"")+(w.birth?"("+w.birth+")":""); }
+  function findWk(id){ for(var i=0;i<workers.length;i++){ if(workers[i].id===id) return workers[i]; } return null; }
+  function renderWorkers(){
+    var host=document.getElementById("wkList"); if(!host) return;
+    var list=sortedWorkers();
+    var head=document.getElementById("wkHead"); if(head) head.textContent=list.length?(list.length+"명"):"";
+    var can=canDo("leaves")||isAdmin();
+    var addBtn=document.getElementById("wkAddBtn"); if(addBtn) addBtn.style.display=can?"block":"none";
+    host.innerHTML=list.length?list.map(function(w){
+      return '<div class="item"><div class="item-body"><div class="item-title">'+esc(w.name||"")+' <span class="'+(w.role==="반장"?"from-chip":"scope-chip")+'">'+esc(w.role||"인부")+'</span></div>'
+        +'<div class="item-meta">'+(w.birth?'<span>'+esc(w.birth)+'</span>':'')+(w.phone?'<span>'+esc(w.phone)+'</span>':'')+(w.exam?'<span>검진 '+esc(w.exam)+'</span>':'')+(w.note?'<span>'+esc(w.note)+'</span>':'')+'</div></div>'
+        +(can?'<div class="task-ctrl"><button class="mini-btn" data-wk-edit="'+w.id+'">수정</button></div>':'')+'</div>';
+    }).join(""):'<div class="empty-line">등록된 일용직이 없습니다.</div>';
+    Array.prototype.forEach.call(host.querySelectorAll("[data-wk-edit]"),function(el){
+      el.addEventListener("click",function(){ openWkModal(el.getAttribute("data-wk-edit")); });
+    });
+  }
+  function openWkModal(id){
+    wkEditId=id||null;
+    var w=id?findWk(id):null;
+    document.getElementById("wkModalTitle").textContent=w?(w.name+" 수정"):"일용직 추가";
+    document.getElementById("wkName").value=w?(w.name||""):"";
+    document.getElementById("wkBirth").value=w?(w.birth||""):"";
+    document.getElementById("wkRole").value=(w&&w.role)||"인부";
+    document.getElementById("wkPhone").value=w?(w.phone||""):"";
+    document.getElementById("wkExam").value=(w&&isDate(w.exam))?w.exam:"";
+    document.getElementById("wkNote").value=w?(w.note||""):"";
+    document.getElementById("wkDelete").style.display=w?"block":"none";
+    document.getElementById("wkBackdrop").classList.add("show");
+  }
+  (function(){
+    var $=function(id){return document.getElementById(id);};
+    if(!$("wkAddBtn")) return;
+    $("wkAddBtn").addEventListener("click",function(){ openWkModal(null); });
+    $("wkCancel").addEventListener("click",function(){ $("wkBackdrop").classList.remove("show"); wkEditId=null; });
+    $("wkSave").addEventListener("click",function(){
+      var name=$("wkName").value.trim(); if(!name){ $("wkName").focus(); return; }
+      var w=wkEditId?findWk(wkEditId):null;
+      if(!w){ w={id:genId("w"), created:todayStr()}; workers.push(w); }
+      w.name=name; w.birth=$("wkBirth").value.trim(); w.role=$("wkRole").value;
+      w.phone=$("wkPhone").value.trim(); w.exam=$("wkExam").value||""; w.note=$("wkNote").value.trim();
+      w.updated=todayStr();
+      $("wkBackdrop").classList.remove("show"); wkEditId=null;
+      scheduleWorkersSave(); renderWorkers(); renderXgWorkers();
+    });
+    $("wkDelete").addEventListener("click",function(){
+      var w=wkEditId?findWk(wkEditId):null; if(!w) return;
+      if(!confirm(w.name+" 님을 명부에서 삭제할까요?")) return;
+      w.del=1; w.updated=todayStr();
+      $("wkBackdrop").classList.remove("show"); wkEditId=null;
+      scheduleWorkersSave(); renderWorkers(); renderXgWorkers();
+    });
+  })();
+  // 생성 모달의 투입 인력 체크 리스트
+  function renderXgWorkers(){
+    var host=document.getElementById("xgWorkers"); if(!host) return;
+    var list=sortedWorkers();
+    host.innerHTML = list.length
+      ? '<span class="fld-label">투입 인력 선택 — 명단 4곳·인원수 자동 기입 (관리자 나종운 자동 포함)</span>'
+        + list.map(function(w){ return '<label style="display:inline-flex;gap:4px;align-items:center;margin:2px 10px 2px 0;font-size:13px;"><input type="checkbox" data-xgw="'+w.id+'"> '+esc(w.name)+(w.role==="반장"?" (반장)":"")+'</label>'; }).join("")
+      : '<div style="font-size:12px;color:#888;">일용직 명부가 비어 있습니다 — 인사 탭에서 등록하면 명단을 자동 기입합니다. (미선택 시 명단은 공란)</div>';
+  }
+
   // ---- 서류 양식 등록/생성 ----
   var TPL_LABELS={asb_plan:"석면해체계획서", work_start:"착공계", work_complete:"준공계"};
   function openTplManage(){
@@ -4659,6 +4760,7 @@
     document.getElementById("xgD1").value = ci.d1||c.start||"";
     document.getElementById("xgD2").value = ci.d2||""; document.getElementById("xgD3").value = ci.d3||"";
     document.getElementById("xgOwner").value = /교육/.test(s.owner||"") ? "경상북도 교육감" : "";
+    if(!workers.length) loadWorkers(); else renderXgWorkers();
     xgToggle();
     document.getElementById("xlsxGenBackdrop").classList.add("show");
   }
@@ -4684,7 +4786,7 @@
       var e1=[["C7",title,"s"],["C8","","b"],["H8","","b"],["C9","","b"],["H9","","b"],
         ["C10",site,"s"],["C11",$("xgOwner"),$("xgOwner")?"s":"b"],
         ["C12",client,"s"],["C15",client,"s"],
-        ["H11","","b"],["H13","","b"],["H16","","b"],["H23","","b"],["C24","","b"],["C20","","b"],["H20","","b"],
+        ["H11","","b"],["H13","","b"],["H16","","b"],["H23","","b"],["C24","","b"],
         ["A34",site,"s"]];
       for(var i=0;i<5;i++){
         var r=34+i;
@@ -4696,13 +4798,39 @@
         }
       }
       var today=todayStr().split("-");
+      // 투입 인력(일용직 명부에서 체크) — 명단 4곳·인원수 자동 기입. 미선택이면 공란
+      var sel=[];
+      Array.prototype.forEach.call(document.querySelectorAll("[data-xgw]:checked"),function(inp){
+        var w=findWk(inp.getAttribute("data-xgw")); if(w) sel.push(w);
+      });
+      sel.sort(function(a,b){ return ((a.role==="반장"?0:1)-(b.role==="반장"?0:1)) || (a.name||"").localeCompare(b.name||""); });
+      if(sel.length>12){ alert("인력이 "+sel.length+"명인데 양식 슬롯은 12명입니다. 12명까지만 들어갑니다."); sel=sel.slice(0,12); }
+      var nAll=sel.length?sel.length+1:0;   // +관리자 나종운
+      var cntTxt=nAll?nAll+"명":"";
+      // 근로자수(기본정보) — 인력 선택 시 자동
+      e1.push(["C20",cntTxt,cntTxt?"s":"b"],["H20",cntTxt,cntTxt?"s":"b"]);
+      var foreman=(sel.filter(function(w){return w.role==="반장";})[0]||null);
       var e3=[["B99",site,"s"],["E99",title,"s"],["H99",total,"n"],["K99","","b"],["H100",total,"n"],
-        ["E70","","b"],["G23","","b"],["G90","","b"],["J77","","b"],["L77","","b"],["E153","","b"],["D155","","b"]];
-      var r2;
-      for(r2=11;r2<23;r2++) e3.push(["C"+r2,"","b"]);
-      for(r2=32;r2<44;r2++){ e3.push(["G"+r2,"","b"],["L"+r2,"","b"]); }
-      for(r2=78;r2<90;r2++){ e3.push(["G"+r2,"","b"],["J"+r2,"","b"],["L"+r2,"","b"]); }
-      for(r2=141;r2<153;r2++) e3.push(["C"+r2,"","b"]);
+        ["E70",(foreman?foreman.name:""),(foreman?"s":"b")],
+        ["G23",cntTxt,cntTxt?"s":"b"],["G90",cntTxt,cntTxt?"s":"b"],["J77","","b"],["L77","","b"],
+        ["E153",cntTxt,cntTxt?"s":"b"],["D155","","b"]];
+      var r2, wi;
+      for(r2=11,wi=0; r2<23; r2++,wi++){                                  // ①배포명단(관리자는 R10 고정)
+        var w1=sel[wi]; e3.push(["C"+r2,(w1?wkLabel(w1):""),(w1?"s":"b")]);
+      }
+      for(r2=32,wi=0; r2<44; r2++,wi++){                                  // ②조직표(작업자+연락처)
+        var w2=sel[wi];
+        e3.push(["G"+r2,(w2?wkLabel(w2):""),(w2?"s":"b")],["L"+r2,(w2&&w2.phone?w2.phone:""),(w2&&w2.phone?"s":"b")]);
+      }
+      for(r2=78,wi=0; r2<90; r2++,wi++){                                  // ③건강진단(성명·유무·검진일)
+        var w3=sel[wi];
+        e3.push(["G"+r2,(w3?w3.name:""),(w3?"s":"b")],
+                ["J"+r2,(w3&&w3.exam?"유":""),(w3&&w3.exam?"s":"b")],
+                ["L"+r2,(w3&&w3.exam?w3.exam:""),(w3&&w3.exam?"s":"b")]);
+      }
+      for(r2=141,wi=0; r2<153; r2++,wi++){                                // ④교육 참석자(관리자는 R140 고정)
+        var w4=sel[wi]; e3.push(["C"+r2,(w4?w4.name:""),(w4?"s":"b")]);
+      }
       var edits={"1.공사개요":e1, "2":[["F7",today[0]+"년 "+(+today[1])+"월","s"]], "3":e3};
       if(rows.length>5) alert("자재 행이 "+rows.length+"개인데 양식 슬롯은 5행입니다. 5행까지만 들어가니 나머지는 수동 추가하세요.");
       return edits;
