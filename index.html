@@ -4821,10 +4821,11 @@
     }
     if(k==="asb_plan" && xgCtx){
       var c=findProc(xgCtx.id);
-      var s=c&&c.asb_survey;
-      document.getElementById("xgAsbInfo").textContent = s
+      var s=c&&c.asb_survey, bi=c&&c.bldg_info;
+      document.getElementById("xgAsbInfo").textContent = (s
         ? ("석면조사 검수값: "+(s.rows||[]).length+"행·"+s.area+"㎡"+(s.confirmed?" (검수됨)":" (미검수 — 검수 후 권장)"))
-        : "석면조사 판독값 없음 — 자재표는 공란으로 생성됩니다.";
+        : "석면조사 판독값 없음 — 자재표는 공란으로 생성됩니다.")
+        + (bi ? " · 대장: "+bi.use+" "+bi.total_floor+"㎡"+(bi.approved?" (승인 "+bi.approved+" → 준공일자 자동)":"") : "");
     }
   }
   // 양식별 편집표 구성 — 좌표는 등록 양식 기준(구룡포 (1)본·자체 착공/준공계)
@@ -4834,8 +4835,10 @@
     if(kind==="asb_plan"){
       var rows=(c.asb_survey&&c.asb_survey.rows)||[];
       var total=Math.round(rows.reduce(function(s,r){return s+(Number(r.area)||0);},0)*100)/100;
+      var bi2=c.bldg_info||{};
       var e1=[["C7",title,"s"],["C8","","b"],["H8","","b"],["C9","","b"],["H9","","b"],
         ["C10",site,"s"],["C11",$("xgOwner"),$("xgOwner")?"s":"b"],
+        ["H10",(bi2.approved||""),(bi2.approved?"s":"b")],   // 준공일자 ← 건축물대장 사용승인일
         ["C12",client,"s"],["C15",client,"s"],
         ["H11","","b"],["H13","","b"],["H16","","b"],["H23","","b"],["C24","","b"],
         ["A34",site,"s"]];
@@ -5347,6 +5350,7 @@
       document.getElementById("dgSite").value = c.site || "";
       document.getElementById("dgWork").value = svc;
       if(c.asb_survey && c.asb_survey.area) document.getElementById("dgArea").value = c.asb_survey.area;   // 검수 조사서 면적 자동
+      else if(c.bldg_info && c.bldg_info.total_floor) document.getElementById("dgArea").value = c.bldg_info.total_floor;   // 없으면 대장 연면적
     } else if(dt==="waste"){
       document.getElementById("dgParty").value = "business";
       document.getElementById("dgName").value = c.client || "";
