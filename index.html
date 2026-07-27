@@ -845,6 +845,8 @@
     <div class="card" id="taskList" style="margin-top:10px;">
       <div class="loading">불러오는 중…</div>
     </div>
+    <button class="link-btn" id="taskAutoToggle" style="display:none;"></button>
+    <div class="card" id="taskAutoList" style="display:none;margin-top:6px;"></div>
     <button class="link-btn" id="taskDoneToggle"></button>
     <div class="card" id="taskDoneList" style="display:none;margin-top:6px;"></div>
     <button class="link-btn" id="taskDeletedToggle" style="display:none;color:#B0332A;"></button>
@@ -1772,6 +1774,7 @@
   var tasksSaveTimer = null;
   var tasksPending = false;
   var showTaskDone = false;
+  var showTaskAuto = false;   // 자동 만기 지시 접이식(기본 접힘)
   var showDeletedTasks = false;
   var showDeletedVeh = false;
   var showDeletedRec = false;
@@ -2359,17 +2362,22 @@
     if (!listHost) return;
 
     var active = [];
+    var autos = [];   // 자동 만기 지시(차량 검사·보험 등) — 접이식 별도 구역
     var done = [];
     liveTasks().filter(taskVisible).forEach(function(t){
-      if (t.status === "done") done.push(t); else active.push(t);
+      if (t.status === "done") done.push(t);
+      else if (t.auto_key) autos.push(t);
+      else active.push(t);
     });
 
-    active.sort(function(a, b){
+    var byDue = function(a, b){
       var ah = a.status === "hold" ? 1 : 0, bh = b.status === "hold" ? 1 : 0;
       if (ah !== bh) return ah - bh;
       var ad = a.due || "9999-99-99", bd = b.due || "9999-99-99";
       return ad < bd ? -1 : (ad > bd ? 1 : 0);
-    });
+    };
+    active.sort(byDue);
+    autos.sort(byDue);
     done.sort(function(a, b){ return (b.done_at || "").localeCompare(a.done_at || ""); });
     done = done.slice(0, 20);
 
@@ -2378,16 +2386,28 @@
       ? active.map(function(t){ return taskRowHtml(t, false, selT); }).join("")
       : '<div class="loading" style="padding:18px 0;">등록된 지시가 없습니다.</div>';
 
+    var autoToggle = document.getElementById("taskAutoToggle");
+    var autoHost = document.getElementById("taskAutoList");
+    if (autoToggle){
+      autoToggle.style.display = autos.length ? "block" : "none";
+      var autoOver = autos.some(function(t){ return t.status === "open" && t.due && t.due < todayStr(); });
+      autoToggle.textContent = (showTaskAuto ? "자동 만기 숨기기" : "자동 만기 보기 (" + autos.length + ")") + (autoOver ? " ⚠" : "");
+      autoHost.style.display = (showTaskAuto && autos.length) ? "block" : "none";
+      autoHost.innerHTML = autos.map(function(t){ return taskRowHtml(t, false, selT); }).join("");
+    }
+
     toggleBtn.textContent = showTaskDone ? "완료 숨기기" : ("완료 보기 (" + done.length + ")");
     doneHost.style.display = showTaskDone ? "block" : "none";
     doneHost.innerHTML = done.map(function(t){ return taskRowHtml(t, true, selT); }).join("");
 
     bindTaskHandlers(listHost);
     bindTaskHandlers(doneHost);
+    if (autoHost) bindTaskHandlers(autoHost);
     bindCalHandlers(listHost);
     bindCalHandlers(doneHost);
     bindSelBoxes(listHost);
     bindSelBoxes(doneHost);
+    if (autoHost) bindSelBoxes(autoHost);
     renderSelBar("tasks");
     renderDeletedList("tasks", "taskDeletedToggle", "taskDeletedList", showDeletedTasks, "지시",
       function(t){ return (t.title || "제목없음") + (t.who ? " · 담당 " + dispName(t.who) : "") + (t.due ? " · " + t.due : ""); });
@@ -3499,6 +3519,10 @@
   document.getElementById("taskDue").addEventListener("keydown", function(e){ if (e.key === "Enter") addTask(); });
   document.getElementById("taskDoneToggle").addEventListener("click", function(){
     showTaskDone = !showTaskDone;
+    renderTasks();
+  });
+  document.getElementById("taskAutoToggle").addEventListener("click", function(){
+    showTaskAuto = !showTaskAuto;
     renderTasks();
   });
   document.getElementById("taskDeletedToggle").addEventListener("click", function(){ showDeletedTasks = !showDeletedTasks; renderTasks(); });
