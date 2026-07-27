@@ -1151,6 +1151,7 @@
       <option value="work_start">착공계</option>
       <option value="work_complete">준공계</option>
       <option value="asb_plan">석면해체계획서</option>
+      <option value="demo_report">해체신고서(완료신고 포함)</option>
     </select>
     <span class="fld-label">시행 회사</span>
     <select id="xgCo">
@@ -4736,7 +4737,7 @@
   }
 
   // ---- 서류 양식 등록/생성 ----
-  var TPL_LABELS={asb_plan:"석면해체계획서", work_start:"착공계", work_complete:"준공계"};
+  var TPL_LABELS={asb_plan:"석면해체계획서", work_start:"착공계", work_complete:"준공계", demo_report:"해체신고서"};
   function openTplManage(){
     if(!isAdmin()) return;
     var host=document.getElementById("tplRows");
@@ -4777,6 +4778,7 @@
     if(/착공|착수/.test(s)) return "work_start";
     if(/준공/.test(s)) return "work_complete";
     if(/노동부신고/.test(s) && !/완료/.test(s)) return "asb_plan";
+    if(/철거신고|해체허가|해체신고/.test(s)) return "demo_report";
     return null;
   }
   function openStageDoc(procId, stage){
@@ -4889,6 +4891,34 @@
       if(rows.length>5) alert("자재 행이 "+rows.length+"개인데 양식 슬롯은 5행입니다. 5행까지만 들어가니 나머지는 수동 추가하세요.");
       return edits;
     }
+    if(kind==="demo_report"){
+      // 건축물 해체(완료)신고 — '건축물해체신고서' 시트가 허브(위임장·계획서·완료신고가 수식 참조), 동별 개요 ← 대장 조회
+      var bi3=c.bldg_info||{};
+      var dR2=document.getElementById("xgD2").value, dR3=document.getElementById("xgD3").value;
+      var tyR=todayStr().split("-");
+      var eh=[["C7",client,client?"s":"b"],["E8","","b"],["C9","","b"],   // 관리자(소유자) 성명·생년월일·주소 — 없는 값은 확인요망
+        ["C21",site,site?"s":"b"],
+        ["B24",(bi3.total_floor||""),(bi3.total_floor?"n":"b")],
+        ["H24",(bi3.dongs||""),(bi3.dongs?"n":"b")],
+        ["C29",(dateSerial(dR2)||""),(dR2?"n":"b")],["E29",(dateSerial(dR3)||""),(dR3?"n":"b")],
+        ["F39",tyR[0]+"년"+tyR[1]+"월   일","s"]];
+      var eo=[];
+      var brows=(bi3.rows||[]).slice(0,10);
+      for(var b5=0;b5<10;b5++){
+        var r5=5+b5, w5=brows[b5];
+        if(w5){
+          eo.push(["A"+r5,"주"+(b5+1),"s"],["B"+r5,(w5.dong||w5.bldg_name||w5.use||("건물"+(b5+1))),"s"],
+                  ["C"+r5,(w5.floors||""),(w5.floors?"s":"b")],
+                  ["E"+r5,(w5.area_bldg?w5.area_bldg+"㎡":""),(w5.area_bldg?"s":"b")],
+                  ["F"+r5,(w5.total_floor||""),(w5.total_floor?"n":"b")],
+                  ["H"+r5,(w5.struct||""),(w5.struct?"s":"b")]);
+        } else {
+          eo.push(["A"+r5,"","b"],["B"+r5,"","b"],["C"+r5,"","b"],["E"+r5,"","b"],["F"+r5,"","b"],["H"+r5,"","b"]);
+        }
+      }
+      if(brows.length>10) alert("대장 동수가 "+bi3.rows.length+"개인데 개요 슬롯은 10행입니다. 10동까지만 들어갑니다.");
+      return {"건축물해체신고서":eh, "건축물해체신고서1":eo};
+    }
     // 착공계/준공계 — '기본정보 입력' + 수식 미연결 하드코딩 셀(공문·제출일·직접시공계획서·청구서·회사) 재작성
     var amt=Number($("xgAmount").replace(/[^0-9]/g,""))||0;
     // 시행 회사(석면·철거=㈜종운건설 / 폐기물·준설=(유)종운환경) — 주소·우편은 실물 서류값
@@ -4980,15 +5010,24 @@
       var kind=$("xgKind").value;
       // 하드리딩 원칙: 원문(계약서·조사서·대장)에서 못 채운 값만 확인요망으로 사람에게 확인
       var missing=[];
-      if(!$("xgTitle").value.trim()) missing.push("공사명");
-      if(!$("xgSite").value.trim()) missing.push("현장 주소");
-      if(!$("xgClient").value.trim()) missing.push("발주자");
-      if(kind!=="asb_plan"){
-        if(!$("xgAmount").value.trim()) missing.push("금액");
-        if(!$("xgD1").value) missing.push("계약일");
-        if(kind==="work_start"&&!$("xgD2").value) missing.push("착공일");
-        if(!$("xgD3").value) missing.push(kind==="work_start"?"준공예정일":"준공일");
-      } else if(!$("xgOwner").value.trim()) missing.push("소유주");
+      if(kind==="demo_report"){
+        if(!$("xgClient").value.trim()) missing.push("관리자(소유자) 성명");
+        if(!$("xgSite").value.trim()) missing.push("건축물 위치(지번)");
+        if(!(findProc(xgCtx.id)||{}).bldg_info) missing.push("건축물대장(카드 [대장] 버튼으로 조회)");
+        if(!$("xgD2").value) missing.push("해체 착수일");
+        if(!$("xgD3").value) missing.push("해체 완료일");
+        missing.push("관리자 생년월일·주소·석면함유재 체크(수기)");
+      } else {
+        if(!$("xgTitle").value.trim()) missing.push("공사명");
+        if(!$("xgSite").value.trim()) missing.push("현장 주소");
+        if(!$("xgClient").value.trim()) missing.push("발주자");
+        if(kind!=="asb_plan"){
+          if(!$("xgAmount").value.trim()) missing.push("금액");
+          if(!$("xgD1").value) missing.push("계약일");
+          if(kind==="work_start"&&!$("xgD2").value) missing.push("착공일");
+          if(!$("xgD3").value) missing.push(kind==="work_start"?"준공예정일":"준공일");
+        } else if(!$("xgOwner").value.trim()) missing.push("소유주");
+      }
       if(missing.length && !confirm("⚠ 확인요망 — 원문(계약서·조사서·대장)에서 찾지 못한 값:\n· "+missing.join("\n· ")+"\n\n빈칸(수기 기입)으로 두고 생성할까요?\n(값을 아신다면 취소 후 입력하거나, 해당 서류를 서류함에 첨부하면 자동으로 채워집니다)")) return;
       $("xgGo").textContent="생성 중…"; $("xgGo").disabled=true;
       gwCall("gw-data",{action:"tpl_get", key:kind}).then(function(res){
