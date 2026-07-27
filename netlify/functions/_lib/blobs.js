@@ -61,4 +61,13 @@ async function blobDelete(st, key) {
   }
 }
 
-module.exports = { setupBlobContext, store, blobGet, blobSet, blobDelete };
+async function blobList(st) {
+  try {
+    const res = await st.list();
+    return { ok: true, keys: (res && res.blobs ? res.blobs.map(function (b) { return b.key; }) : []) };
+  } catch (e) {
+    return { ok: false, code: 'STORAGE_LIST_FAILED', error_name: e && e.constructor && e.constructor.name };
+  }
+}
+
+module.exports = { setupBlobContext, store, blobGet, blobSet, blobDelete, blobList };

@@ -4,7 +4,7 @@
 // 'gw_data' 저장: col:tasks / col:vehicles / col:receivables / col:licenses / col:checklist
 // 권한은 'gw_users'의 회원 레코드(perms)에서 확인. 관리자는 전부 허용.
 const crypto = require('crypto');
-const { setupBlobContext, store, blobGet, blobSet, blobDelete } = require('./_lib/blobs');
+const { setupBlobContext, store, blobGet, blobSet, blobDelete, blobList } = require('./_lib/blobs');
 const { verifyToken, bearer } = require('./_lib/session');
 const { appendAudit, auditKey, diffItems } = require('./_lib/audit');
 
@@ -569,11 +569,11 @@ async function handleAttPut(event, d, R) {
   if (!name || !b64) return jr(400, { status: 'REJECTED', error_code: 'INVALID_FILE', request_id: R });
   if (b64.length > ATT_MAX) return jr(413, { status: 'REJECTED', error_code: 'FILE_TOO_LARGE', request_id: R });
   const id = 'att_' + crypto.randomBytes(8).toString('hex');
-  const kind = ['asbestos', 'contract'].indexOf(String(d.kind || '')) >= 0 ? String(d.kind) : '';
+  const kind = ['asbestos', 'contract', 'bldg'].indexOf(String(d.kind || '')) >= 0 ? String(d.kind) : '';
   const w = await blobSet(store(FILES), id, { name: name, type: String(d.type || ''), kind: kind, data: b64, by: c.member.name, ts: Date.now() });
   if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
   // 판독은 백그라운드 함수(gw-parse-background)에서 — 첨부는 즉시 완료(타임아웃 방지)
-  const wantParse = !!kind || /석면|사전조사|조사서|계약서/.test(name);
+  const wantParse = !!kind || /석면|사전조사|조사서|계약서|대장/.test(name);
   return jr(200, { status: 'OK', id: id, name: name, size: b64.length, parse_pending: wantParse, request_id: R });
 }
 
@@ -598,6 +598,29 @@ async function handleAttParseStatus(event, d, R) {
   const r = await blobGet(store(FILES), 'parse:' + String(d.id || ''));
   if (!r.ok || !r.data) return jr(200, { status: 'PENDING', request_id: R });
   return jr(200, { status: 'OK', parsed: r.data.result, request_id: R });
+}
+
+// ---- 백업 내보내기 — appdata GitHub Actions(cron)가 서버 시크릿으로 호출, git에 스냅샷 보관 ----
+const BACKUP_STORES = { gw_data: 1, gw_users: 1, gw_files: 1 };
+function backupAuthed(d) {
+  const secret = (process.env.BIDS_INGEST_KEY || '').trim();
+  return !!secret && String(d.secret || '') === secret;
+}
+async function handleBackupList(event, d, R) {
+  if (!backupAuthed(d)) return jr(403, { status: 'FORBIDDEN', error_code: 'BAD_SECRET', request_id: R });
+  const sn = String(d.store || '');
+  if (!BACKUP_STORES[sn]) return jr(400, { status: 'REJECTED', error_code: 'BAD_STORE', request_id: R });
+  const r = await blobList(store(sn));
+  if (!r.ok) return jr(500, { status: 'ERROR', error_code: r.code, request_id: R });
+  return jr(200, { status: 'OK', keys: r.keys, request_id: R });
+}
+async function handleBackupGet(event, d, R) {
+  if (!backupAuthed(d)) return jr(403, { status: 'FORBIDDEN', error_code: 'BAD_SECRET', request_id: R });
+  const sn = String(d.store || '');
+  if (!BACKUP_STORES[sn]) return jr(400, { status: 'REJECTED', error_code: 'BAD_STORE', request_id: R });
+  const r = await blobGet(store(sn), String(d.key || ''));
+  if (!r.ok) return jr(500, { status: 'ERROR', error_code: r.code, request_id: R });
+  return jr(200, { status: 'OK', key: String(d.key || ''), data: r.data, request_id: R });
 }
 
 // ---- 서류 양식(템플릿) 보관 — 관리자 등록, 영구 보관. 생성 시 원본 복사라 오염 없음 ----
@@ -678,6 +701,8 @@ async function handler(event) {
     if (d && d.action === 'bids_purge') return await handleBidsPurge(event, d, R);
     if (d && d.action === 'bids_export') return await handleBidsExport(event, d, R);
     if (d && d.action === 'bids_results') return await handleBidsResults(event, d, R);
+    if (d && d.action === 'backup_list') return await handleBackupList(event, d, R);
+    if (d && d.action === 'backup_get') return await handleBackupGet(event, d, R);
     if (d && d.action === 'tpl_put') return await handleTplPut(event, d, R);
     if (d && d.action === 'tpl_get') return await handleTplGet(event, d, R);
     if (d && d.action === 'tpl_list') return await handleTplList(event, d, R);

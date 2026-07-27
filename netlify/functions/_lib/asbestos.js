@@ -104,14 +104,53 @@ async function claudeExtractContract(buf, name) {
   } catch (e) { return { error: 'PARSE_FAILED' }; }
 }
 
+// 건축물대장 판독 — 대지위치·용도·구조·연면적·층수·사용승인일(명기값만). 철거·해체 서류의 기준자료
+async function claudeExtractBldg(buf, name) {
+  const key = (process.env.ANTHROPIC_API_KEY || '').trim();
+  if (!key) return { error: 'NO_API_KEY(Netlify 환경변수 ANTHROPIC_API_KEY 확인)' };
+  const model = (process.env.CLAUDE_PARSE_MODEL || 'claude-sonnet-5').trim();
+  const ext = (name || '').toLowerCase().split('.').pop();
+  const b64 = buf.toString('base64');
+  let media;
+  if (ext === 'pdf') media = { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: b64 } };
+  else if (['jpg', 'jpeg', 'png', 'gif', 'webp'].indexOf(ext) >= 0) {
+    const mt = ext === 'jpg' ? 'jpeg' : ext;
+    media = { type: 'image', source: { type: 'base64', media_type: 'image/' + mt, data: b64 } };
+  } else return null;
+  const prompt = '이 문서는 건축물대장(일반/총괄표제부 등)이다. 명기된 값만 추출하라(추정 금지, 없으면 빈값). '
+    + 'site 대지위치(도로명 우선), bldg_name 건물명, use 주용도, struct 주구조, total_floor 연면적㎡(숫자만), '
+    + 'floors 층수(예: "지상3/지하1"), approved 사용승인일 YYYY-MM-DD(연도만 있으면 YYYY), area_bldg 건축면적㎡(숫자만), owner 소유자명(최근). '
+    + '동이 여럿이면 표제부 기준 대표값. 형식: {"site":"","bldg_name":"","use":"","struct":"","total_floor":0,"floors":"","approved":"","area_bldg":0,"owner":""} JSON만.';
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+      body: JSON.stringify({ model: model, max_tokens: 1024,
+        messages: [{ role: 'user', content: [media, { type: 'text', text: prompt }] }] })
+    });
+    if (!resp.ok) return { error: 'CLAUDE_' + resp.status };
+    const j = await resp.json();
+    const txt = ((j.content || []).find(function (b) { return b.type === 'text'; }) || {}).text || '';
+    const m = txt.match(/\{[\s\S]*\}/);
+    if (!m) return { error: 'NO_JSON' };
+    const data = JSON.parse(m[0]);
+    return { doc: 'bldg', site: String(data.site || '').slice(0, 100), bldg_name: String(data.bldg_name || '').slice(0, 60),
+      use: String(data.use || '').slice(0, 40), struct: String(data.struct || '').slice(0, 40),
+      total_floor: Number(data.total_floor) || 0, floors: String(data.floors || '').slice(0, 20),
+      approved: String(data.approved || '').slice(0, 12), area_bldg: Number(data.area_bldg) || 0,
+      owner: String(data.owner || '').slice(0, 60) };
+  } catch (e) { return { error: 'PARSE_FAILED' }; }
+}
+
 // 첨부 레코드 → 문서종류별 판독 라우팅 (kind 우선, 없으면 파일명)
 async function parseAttachment(rec) {
   const name = rec.name || '';
   let kind = rec.kind || '';
-  if (!kind) kind = /계약/.test(name) ? 'contract' : 'asbestos';
+  if (!kind) kind = /대장/.test(name) ? 'bldg' : (/계약/.test(name) ? 'contract' : 'asbestos');
   const buf = Buffer.from(rec.data, 'base64');
+  if (kind === 'bldg') return await claudeExtractBldg(buf, name);
   if (kind === 'contract') return await claudeExtractContract(buf, name);
   return await claudeExtractAsbestos(buf, name, rec.type);
 }
 
-module.exports = { judgeAsbestos94, claudeExtractAsbestos, claudeExtractContract, parseAttachment };
+module.exports = { judgeAsbestos94, claudeExtractAsbestos, claudeExtractContract, claudeExtractBldg, parseAttachment };

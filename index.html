@@ -4214,7 +4214,7 @@
     Array.prototype.forEach.call(files, function(f){
       if(f.size>ATT_MAX){ alert('"'+f.name+'"는 6MB를 넘어 첨부할 수 없습니다.'); return; }
       // 문서종류: 파일명 우선(계약서→계약 판독, 석면·조사→조사서 판독), 그 외 석면 계약이면 조사서로
-      var kind = /계약/.test(f.name) ? "contract" : (/석면|조사/.test(f.name) ? "asbestos" : "");   // 그 외 파일은 판독 없이 보관만
+      var kind = /대장/.test(f.name) ? "bldg" : (/계약/.test(f.name) ? "contract" : (/석면|조사/.test(f.name) ? "asbestos" : ""));   // 그 외 파일은 판독 없이 보관만
       var r=new FileReader();
       r.onload=function(){
         var entry={ name:f.name, size:f.size, type:f.type||"", id:"", parsed:"올리는 중…", added:todayStr() };
