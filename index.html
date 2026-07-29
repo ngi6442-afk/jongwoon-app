@@ -1090,6 +1090,7 @@
     <input type="text" id="cliEmail" placeholder="이메일 (선택)" autocomplete="off">
     <input type="text" id="cliAddr" placeholder="주소 (선택)" autocomplete="off">
     <input type="text" id="cliNote" placeholder="메모 (선택)" autocomplete="off">
+    <label style="display:flex;gap:6px;align-items:center;margin:6px 0;font-size:14px;"><input type="checkbox" id="cliWasteProc"> 폐기물 처리업소 (배출신고서 처리업체 후보로 표시)</label>
     <button class="primary" id="cliSave">저장</button>
     <button class="danger" id="cliDelete">삭제</button>
     <button class="secondary" id="cliCancel">취소</button>
@@ -1188,6 +1189,8 @@
         <input type="text" id="xgTon1" placeholder="폐석면 (톤/년)" inputmode="decimal" style="flex:1" autocomplete="off">
         <input type="text" id="xgTon2" placeholder="부자재-비닐·마스크 등 (톤/년, 예: 0.05)" inputmode="decimal" style="flex:1" autocomplete="off">
       </div>
+      <span class="fld-label">처리업소 (거래처에서 "폐기물 처리업소" 체크한 곳이 후보로 뜸)</span>
+      <select id="xgProc"></select>
     </div>
     <button class="primary" id="xgGo">생성·다운로드</button>
     <button class="secondary" id="xgCancel">취소</button>
@@ -4957,7 +4960,15 @@
     document.getElementById("xgMoneyFields").style.display = (k==="asb_plan"||k==="waste_report") ? "none" : "";
     document.getElementById("xgAsbFields").style.display = (k==="asb_plan") ? "" : "none";
     document.getElementById("xgWasteWrap").style.display = (k==="waste_report") ? "" : "none";
-    if(k==="waste_report") document.getElementById("xgCo").value="env";   // 폐기물 서류=종운환경 고정 규칙
+    if(k==="waste_report"){
+      document.getElementById("xgCo").value="env";   // 폐기물 서류=종운환경 고정 규칙
+      // 처리업소 후보: 거래처(폐기물 처리업소 체크) — 석면 기본 그린바이로(양식값, 최신 정보는 확인요망)
+      var ps=document.getElementById("xgProc"), cur=ps.value;
+      var procs=clients.filter(function(x){ return x && x.del!==1 && x.waste_proc; }).map(function(x){ return x.name; });
+      if(procs.indexOf("㈜그린바이로")<0) procs.unshift("㈜그린바이로");
+      ps.innerHTML=procs.map(function(n){ return '<option value="'+esc(n)+'">'+esc(n)+(n==="㈜그린바이로"?" (석면 기본 — 업체정보 변동 확인요망)":"")+'</option>'; }).join("");
+      ps.value=cur&&procs.indexOf(cur)>=0?cur:"㈜그린바이로";
+    }
     document.getElementById("xgAgentWrap").style.display = (k==="work_start") ? "" : "none";
     if(k==="work_start"){   // 현장대리인 후보 = 일용직 명부(기본 나종운)
       var sel=document.getElementById("xgAgent"), cur=sel.value;
@@ -5088,6 +5099,8 @@
         ["E20",t1,(t1?"n":"b")],["E21",t2,(t2?"n":"b")],
         ["K26",tyW[0]+"년   "+tyW[1]+" 월   일","s"],
         ["B29",recv,(recv?"s":"b")]];
+      var proc=$("xgProc");
+      if(proc){ eN.push(["K20",proc,"s"],["K21",proc,"s"]); }   // 처리업소(드롭다운 — 거래처 연동)
       return {"신고서":eN,
         "종운수탁1p":[["H10",(!isBiz&&oi.biz_no)?oi.biz_no:"",(!isBiz&&oi.biz_no)?"s":"b"]],   // 잔재 생년월일 재작성
         "종운수탁2p":[["J8",t2,(t2?"n":"b")],["L6",(t1?t1+", 1":""),(t1?"s":"b")],["L8",(t2?t2+", 1":""),(t2?"s":"b")]],
@@ -6701,6 +6714,7 @@
     document.getElementById("cliEmail").value = c ? (c.email||"") : "";
     document.getElementById("cliAddr").value = c ? (c.address||"") : "";
     document.getElementById("cliNote").value = c ? (c.note||"") : "";
+    document.getElementById("cliWasteProc").checked = !!(c && c.waste_proc);
     document.getElementById("cliDelete").style.display = c ? "block" : "none";
     document.getElementById("cliBackdrop").classList.add("show");
   }
@@ -6719,6 +6733,7 @@
     c.email = document.getElementById("cliEmail").value.trim();
     c.address = document.getElementById("cliAddr").value.trim();
     c.note = document.getElementById("cliNote").value.trim();
+    c.waste_proc = document.getElementById("cliWasteProc").checked ? 1 : 0;
     c.updated = today;
     closeCliModal(); renderClients(); saveClients();
   }
