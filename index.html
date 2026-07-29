@@ -1155,6 +1155,7 @@
       <option value="work_complete">준공계</option>
       <option value="asb_plan">석면해체계획서</option>
       <option value="demo_report">해체신고서(완료신고 포함)</option>
+      <option value="waste_report">폐기물배출신고서(수탁확인 포함)</option>
     </select>
     <span class="fld-label">시행 회사</span>
     <select id="xgCo">
@@ -1180,6 +1181,13 @@
       <input type="text" id="xgOwner" placeholder="소유주 (예: 경상북도 교육감)" autocomplete="off">
       <div id="xgAsbInfo" style="font-size:13px;color:#888;margin:4px 0;"></div>
       <div id="xgWorkers" style="margin:6px 0;"></div>
+    </div>
+    <div id="xgWasteWrap" style="display:none;">
+      <span class="fld-label">발주자 정보는 신분증·사업자등록증 첨부 판독값 사용 (없으면 확인요망)</span>
+      <div style="display:flex;gap:8px;">
+        <input type="text" id="xgTon1" placeholder="폐석면 (톤/년)" inputmode="decimal" style="flex:1" autocomplete="off">
+        <input type="text" id="xgTon2" placeholder="부자재-비닐·마스크 등 (톤/년, 예: 0.05)" inputmode="decimal" style="flex:1" autocomplete="off">
+      </div>
     </div>
     <button class="primary" id="xgGo">생성·다운로드</button>
     <button class="secondary" id="xgCancel">취소</button>
@@ -4829,7 +4837,7 @@
   }
 
   // ---- 서류 양식 등록/생성 ----
-  var TPL_LABELS={asb_plan:"석면해체계획서", work_start:"착공계", work_complete:"준공계", demo_report:"해체신고서"};
+  var TPL_LABELS={asb_plan:"석면해체계획서", work_start:"착공계", work_complete:"준공계", demo_report:"해체신고서", waste_report:"폐기물배출신고서"};
   function openTplManage(){
     if(!isAdmin()) return;
     var host=document.getElementById("tplRows");
@@ -4871,6 +4879,7 @@
     if(/준공/.test(s)) return "work_complete";
     if(/노동부신고/.test(s) && !/완료/.test(s)) return "asb_plan";
     if(/철거신고|해체허가|해체신고/.test(s)) return "demo_report";
+    if(/폐기물|배출|신고접수/.test(s)) return "waste_report";
     return null;
   }
   function openStageDoc(procId, stage){
@@ -4945,8 +4954,10 @@
   }
   function xgToggle(){
     var k=document.getElementById("xgKind").value;
-    document.getElementById("xgMoneyFields").style.display = (k==="asb_plan") ? "none" : "";
+    document.getElementById("xgMoneyFields").style.display = (k==="asb_plan"||k==="waste_report") ? "none" : "";
     document.getElementById("xgAsbFields").style.display = (k==="asb_plan") ? "" : "none";
+    document.getElementById("xgWasteWrap").style.display = (k==="waste_report") ? "" : "none";
+    if(k==="waste_report") document.getElementById("xgCo").value="env";   // 폐기물 서류=종운환경 고정 규칙
     document.getElementById("xgAgentWrap").style.display = (k==="work_start") ? "" : "none";
     if(k==="work_start"){   // 현장대리인 후보 = 일용직 명부(기본 나종운)
       var sel=document.getElementById("xgAgent"), cur=sel.value;
@@ -5056,6 +5067,32 @@
               ["A33",(dR3? dR3.split("-")[0]+"년 "+dR3.split("-")[1]+"월     일":""),(dR3?"s":"b")]];
       return {"건축물해체신고서":eh, "건축물해체신고서1":eo, "해체완료신고":ec};
     }
+    if(kind==="waste_report"){
+      // 폐기물 처리계획서(별지12호) — '신고서' 시트가 허브(수탁확인서 1·2p·유해성자료가 수식 참조)
+      var oi=c.owner_info||{};
+      var isBiz=(oi.kind==="사업자등록증");
+      var t1=parseFloat($("xgTon1"))||0, t2=parseFloat($("xgTon2"))||0;
+      var tyW=todayStr().split("-");
+      // 수신처: 현장 주소에서 시(→시장)/군(→군수) 추출
+      var recv="";
+      var mSi=(site||"").match(/([가-힣]{1,6}시)(?=\s|$|[가-힣]{0,3}[구군읍면])/);
+      var mGun=(site||"").match(/([가-힣]{1,6}군)(?=\s)/);
+      if(mSi) recv=mSi[1]+"장"; else if(mGun) recv=mGun[1]+"수";
+      var eN=[["E8",(isBiz?(oi.name||client):"개인"),"s"],
+        ["I8",(isBiz?oi.biz_no:""),(isBiz&&oi.biz_no)?"s":"b"],
+        ["E10",(isBiz?(oi.ceo||oi.name):(oi.name||client)),(oi.name||client)?"s":"b"],
+        ["I11",(!isBiz&&oi.biz_no)?oi.biz_no:"",(!isBiz&&oi.biz_no)?"s":"b"],
+        ["E12",oi.addr||"",(oi.addr)?"s":"b"],
+        ["L13","","b"],
+        ["E16","- 용역명 : "+(title||"")+"\n- 현장주소 : "+(site||""),"s"],
+        ["E20",t1,(t1?"n":"b")],["E21",t2,(t2?"n":"b")],
+        ["K26",tyW[0]+"년   "+tyW[1]+" 월   일","s"],
+        ["B29",recv,(recv?"s":"b")]];
+      return {"신고서":eN,
+        "종운수탁1p":[["H10",(!isBiz&&oi.biz_no)?oi.biz_no:"",(!isBiz&&oi.biz_no)?"s":"b"]],   // 잔재 생년월일 재작성
+        "종운수탁2p":[["J8",t2,(t2?"n":"b")],["L6",(t1?t1+", 1":""),(t1?"s":"b")],["L8",(t2?t2+", 1":""),(t2?"s":"b")]],
+        "유해성 정보자료 (2)":[["E9",site||"",(site?"s":"b")]]};
+    }
     // 착공계/준공계 — '기본정보 입력' + 수식 미연결 하드코딩 셀(공문·제출일·직접시공계획서·청구서·회사) 재작성
     var amt=Number($("xgAmount").replace(/[^0-9]/g,""))||0;
     // 시행 회사(석면·철거=㈜종운건설 / 폐기물·준설=(유)종운환경) — 주소·우편은 실물 서류값
@@ -5148,7 +5185,16 @@
       var kind=$("xgKind").value;
       // 하드리딩 원칙: 원문(계약서·조사서·대장)에서 못 채운 값만 확인요망으로 사람에게 확인
       var missing=[];
-      if(kind==="demo_report"){
+      if(kind==="waste_report"){
+        var cW=findProc(xgCtx.id)||{}, oiW=cW.owner_info||{};
+        if(!oiW.name && !$("xgClient").value.trim()) missing.push("발주자(신분증/사업자등록증 첨부 시 자동)");
+        if(!oiW.addr) missing.push("발주자 주소(증빙 첨부 시 자동)");
+        if(!$("xgTitle").value.trim()) missing.push("용역명");
+        if(!$("xgSite").value.trim()) missing.push("현장주소");
+        if(!$("xgTon1").value.trim()) missing.push("폐석면 톤수");
+        if(!$("xgTon2").value.trim()) missing.push("부자재 톤수");
+        missing.push("발주자 전화번호·처리업소 확인(수기)");
+      } else if(kind==="demo_report"){
         if(!$("xgClient").value.trim()) missing.push("관리자(소유자) 성명");
         if(!$("xgSite").value.trim()) missing.push("건축물 위치(지번)");
         if(!(findProc(xgCtx.id)||{}).bldg_info) missing.push("건축물대장(카드 [대장] 버튼으로 조회)");
