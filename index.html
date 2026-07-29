@@ -1219,6 +1219,10 @@
         <input type="text" id="xqPre" placeholder="예정가격(숫자만 — 개찰결과 공개값)" inputmode="numeric" style="flex:1" autocomplete="off">
       </div>
       <input type="text" id="xqA" placeholder="A값 — 보험료 등 7종 합산(숫자만, 공고에 있으면 자동)" inputmode="numeric" autocomplete="off">
+      <select id="xqBasis" title="적용 세부기준">
+        <option value="gbe">기준: 경북교육청 석면해체공사(2023.7.10)</option>
+        <option value="lg7">기준: 지자체 시설공사 2억 미만(행안부 예규 별표7)</option>
+      </select>
       <div style="display:flex;gap:8px;">
         <select id="xqTier" style="flex:1" title="추정가격 구간">
           <option value="mid">추정가격 1~3억</option>
@@ -4645,22 +4649,33 @@
     lo: {perf:[[5000,5],[3500,4.5],[2000,4],[0,3.5]], mgmt:{t1:5,t2:4.8,t3:4.5,t4:3}, price:90, priceEx:85, ability:10,
          safety:{S:1,A:0.5,B:0,C:-0.5,D:-4,none_old:-0.5,none_new:0}, local:0.5, shinCap:2}
   };
-  function qualScores(v){   // v={tier,perf,credit,safety,local,pledge,tax,bid,pre,a}
-    var cfg=QUAL_CFG[v.tier]||QUAL_CFG.mid;
+  // 지자체 시설공사 2억 미만(행안부 예규 제373호 별표7, 2026.7.1 시행 — 원문 실측):
+  // 시공경험 4점(전문·실적무제한·영업4년↑: 5년 실적÷추정가격 비율 60/50/40/30%↑ → 5.0~1.0 ×4/5),
+  // 경영(신용) 5점(BB°↑=5.0, BB−=4.9, B급=4.8, CCC+↓=3.0), 접근성(관할 소재) 1점, 특별신인도 +1(여성·장애인·인구감소 — 해당없음)
+  // 입찰가격 90점: 90−20×|90−(입−A)/(예−A)×100|, 90.25%↑=85점, 최저 2점
+  var QUAL_LG7={ perf:[[60,5],[50,4],[40,3],[30,2],[0,1]], perfScale:4/5, mgmt:{t1:5,t2:5,t3:4.8,t4:3}, mgmtNone:3,
+    price:90, priceEx:85, exRate:0.9025, pivot:0.90, ability:10, local:1 };
+  function qualScores(v){   // v={basis,tier,perf,credit,safety,local,pledge,tax,bid,pre,a}
+    var lg=v.basis==="lg7";
+    var cfg=lg?QUAL_LG7:(QUAL_CFG[v.tier]||QUAL_CFG.mid);
     var sPerf=null;
-    if(v.perf>0){ for(var i=0;i<cfg.perf.length;i++){ if(v.perf>=cfg.perf[i][0]){ sPerf=cfg.perf[i][1]; break; } } }
-    var sMgmt=(v.credit&&cfg.mgmt[v.credit]!==undefined)?cfg.mgmt[v.credit]:cfg.mgmt.t4;   // 미제출=최저등급(제6조)
-    var sShin=Math.min((v.local?cfg.local:0)+(v.pledge?0.5:0)+(v.tax?0.5:0), cfg.shinCap);
-    var sSafety=cfg.safety[v.safety]!==undefined?cfg.safety[v.safety]:0;
-    var sPrice=null, r=null;
+    if(v.perf>0){
+      for(var i=0;i<cfg.perf.length;i++){ if(v.perf>=cfg.perf[i][0]){ sPerf=cfg.perf[i][1]; break; } }
+      if(sPerf!=null&&cfg.perfScale) sPerf=Math.round(sPerf*cfg.perfScale*100)/100;
+    }
+    var sMgmt=(v.credit&&cfg.mgmt[v.credit]!==undefined)?cfg.mgmt[v.credit]:(lg?cfg.mgmtNone:cfg.mgmt.t4);   // 교육청: 미제출=최저등급(제6조)
+    var sShin=lg ? (v.local?cfg.local:0)   // 별표7: 접근성 1점(관할 소재). 확약서·모범납세 항목 없음
+                 : Math.min((v.local?cfg.local:0)+(v.pledge?0.5:0)+(v.tax?0.5:0), cfg.shinCap);
+    var sSafety=lg?0:(cfg.safety[v.safety]!==undefined?cfg.safety[v.safety]:0);
+    var sPrice=null, r=null, pivot=cfg.pivot||0.88, exRate=cfg.exRate||0.8825;
     if(v.bid>0&&v.pre>0&&v.bid<=v.pre){
       var a=v.a||0;
       r=Math.round((v.bid-a)/(v.pre-a)*10000)/10000;   // 소수점 다섯째자리에서 반올림
-      sPrice=(r>=0.8825)?cfg.priceEx:Math.max(2, cfg.price-2000*Math.abs(0.88-r));
+      sPrice=(r>=exRate)?cfg.priceEx:Math.max(2, cfg.price-2000*Math.abs(pivot-r));
       sPrice=Math.round(sPrice*100)/100;
     }
     var sub=Math.min((sPerf||0)+sMgmt+sShin, cfg.ability);
-    return {perf:sPerf, mgmt:sMgmt, shin:sShin, safety:sSafety, price:sPrice,
+    return {perf:sPerf, mgmt:sMgmt, shin:sShin, safety:sSafety, price:sPrice, pivot:pivot, cfg:cfg,
       sub:Math.round(sub*100)/100, total:Math.round((sub+(sPrice||0)+sSafety)*100)/100, rate:r};
   }
   // 회사 실측 등급(증빙 하드리딩 — 만료 지나면 자동 폴백. 갱신 시 여기와 인허가 탭 함께 갱신)
@@ -4671,29 +4686,42 @@
   var QUAL_DEF={ con:{ safety:{v:"D", until:"2026-12-31", fallback:"none_old"}, credit:{v:"t3", until:"2027-05-10", fallback:""} },
                  env:{ safety:{v:"none_new", until:"9999-12-31", fallback:"none_new"}, credit:{v:"t2", until:"2027-06-29", fallback:""} } };
   function qualApplyDefaults(){
-    var d=QUAL_DEF[document.getElementById("xgCo").value]; if(!d) return;
+    var co=document.getElementById("xgCo").value;
+    document.getElementById("xqBasis").value=(co==="env")?"lg7":"gbe";   // 환경=지자체 별표7, 건설=경북교육청 석면
+    qualBasisToggle();
+    var d=QUAL_DEF[co]; if(!d) return;
     if(d.safety) document.getElementById("xqSafety").value=(todayStr()<=d.safety.until)?d.safety.v:d.safety.fallback;
     if(d.credit) document.getElementById("xqCredit").value=(todayStr()<=d.credit.until)?d.credit.v:d.credit.fallback;
+    if(co==="env") document.getElementById("xqLocal").checked=true;   // 포항 소재 — 포항시 발주 접근성 1점(타 지자체면 해제)
   }
   function qualNum(x){ return x==null?"":String(Math.round(x*100)/100); }
   function qualSign(x){ if(x==null) return ""; if(x>0) return "+"+qualNum(x); return qualNum(x); }
   function qualCollect(){
     var g=function(id){ return document.getElementById(id); };
     var num=function(id){ return parseFloat((g(id).value||"").replace(/[^0-9.]/g,""))||0; };
-    return { tier:g("xqTier").value, perf:num("xqPerf"), credit:g("xqCredit").value, safety:g("xqSafety").value,
+    return { basis:g("xqBasis").value, tier:g("xqTier").value, perf:num("xqPerf"), credit:g("xqCredit").value, safety:g("xqSafety").value,
       local:g("xqLocal").checked, pledge:g("xqPledge").checked, tax:g("xqTax").checked,
       bid:num("xqBid"), pre:num("xqPre"), a:num("xqA") };
+  }
+  function qualBasisToggle(){   // 기준 세트별 입력 필드 전환
+    var lg=document.getElementById("xqBasis").value==="lg7";
+    document.getElementById("xqTier").style.display=lg?"none":"";
+    document.getElementById("xqSafety").style.display=lg?"none":"";
+    document.getElementById("xqPerf").placeholder=lg
+      ? "시공경험 비율% (최근5년 실적금액÷추정가격×100 — 전문·무제한·영업4년↑ 기준)"
+      : "시공경험 면적(㎡ — 최근3년, 학교100%+기타70% 환산 후)";
+    document.getElementById("xqLocal").parentNode.childNodes[1].textContent=lg?" 관할 시·군 소재(접근성 1점)":" 지역업체(현장 관할구역 소재)";
   }
   function qualRefresh(){
     var host=document.getElementById("xqScore"); if(!host) return;
     var s=qualScores(qualCollect());
-    // 통과에 필요한 입찰가격 평점 → 최소 투찰비율 역산(산식: 배점−2000×|0.88−r|)
-    var cfg=QUAL_CFG[qualCollect().tier]||QUAL_CFG.mid;
+    // 통과에 필요한 입찰가격 평점 → 최소 투찰비율 역산(산식: 배점−2000×|기준−r|)
+    var cfg=s.cfg, pv=s.pivot;
     var need=Math.round((95-s.sub-s.safety)*100)/100, floorTxt="";
     if(need>cfg.price) floorTxt=' · <span style="color:#c0392b">현 등급·실적으로는 통과 불가(필요 입찰가격 평점 '+need+' > 배점 '+cfg.price+')</span>';
     else if(need>2){
-      var rMin=Math.round((0.88-(cfg.price-need)/2000)*1000000)/10000;
-      floorTxt=' · 통과선: 입찰가격 평점 '+need+'점↑ = 투찰비율(A값 반영) 약 '+rMin+'%~88% 구간';
+      var rMin=Math.round((pv-(cfg.price-need)/2000)*1000000)/10000;
+      floorTxt=' · 통과선: 입찰가격 평점 '+need+'점↑ = 투찰비율(A값 반영) 약 '+rMin+'%~'+(pv*100)+'% 구간';
     }
     host.innerHTML='<b>자기평점 미리보기</b> — 계 <b>'+(s.total||0)+'</b>점 (통과 95)'
       +'<br>소계 '+qualNum(s.sub)+' = 시공경험 '+(s.perf==null?'<span style="color:#c0392b">면적입력</span>':qualNum(s.perf))
@@ -5459,6 +5487,7 @@
       if($(id)) $(id).addEventListener("input", qualRefresh);
       if($(id)) $(id).addEventListener("change", qualRefresh);
     });
+    if($("xqBasis")) $("xqBasis").addEventListener("change", function(){ qualBasisToggle(); qualRefresh(); });
     if($("xgCo")) $("xgCo").addEventListener("change", function(){
       if($("xgKind").value==="qual_packet"){ qualApplyDefaults(); qualRefresh(); }   // 회사 전환 시 그 회사 실측 등급으로
     });
@@ -5526,7 +5555,7 @@
         if(!qv.perf) qm.push("시공경험 면적(최근3년 환산)");
         if(!qv.credit) qm.push("신용평가등급(미제출=최저등급 처리됨)");
         if(qm.length && !confirm("⚠ 확인요망 — 비어 있는 값:\n· "+qm.join("\n· ")+"\n\n빈 값은 공란(수기 기입), 점수는 입력된 값만으로 계산됩니다. 진행할까요?")) return;
-        if($("xgCo").value==="env" && !confirm("⚠ 등록된 적격심사 템플릿·점수 기준은 경상북도교육청(석면해체공사) 서식입니다.\n지자체(준설·폐기물 등) 적격심사는 발주처 세부기준·서식이 다를 수 있습니다 — 해당 공고 첨부 기준을 확인하세요.\n그대로 진행할까요?")) return;
+        if(qv.basis==="lg7" && !confirm("⚠ 점수는 지자체 별표7 기준으로 계산했지만, 등록된 hwpx 템플릿은 경상북도교육청(석면) 서식입니다.\n지자체 제출 서식은 해당 공고 첨부 별지를 쓰세요(점수 참고용으로만 생성).\n그대로 진행할까요?")) return;
         var tp=todayStr().split("-");
         var qd=$("xqDate").value?$("xqDate").value.split("-"):null;
         var qTokens={
