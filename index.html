@@ -4667,7 +4667,9 @@
   // ㈜종운건설 안전성평가: 2025년 평가 D등급, 유효 2026-01-01~2026-12-31(공단 통보서 2026.1.2) → 만료 후 무등급(등록 2년↑)
   // ㈜종운건설 신용평가: B°(NICE D&B 확인서, 평가 2026-05-11, 유효 ~2027-05-10) = B+~B− 군 → 만료 후 미제출(최저)
   // ※ (유)종운환경 BB°(~2027-06-29)는 별도 명의 — 석면(건설) 적격심사에 사용 금지
-  var QUAL_DEF={ con:{ safety:{v:"D", until:"2026-12-31", fallback:"none_old"}, credit:{v:"t3", until:"2027-05-10", fallback:""} } };
+  // (유)종운환경 신용평가: BB°(NICE D&B 확인서, 유효 ~2027-06-29) = BBB−~BB− 군. 안전성평가는 석면해체업 대상이라 환경은 무등급(0점 취급)
+  var QUAL_DEF={ con:{ safety:{v:"D", until:"2026-12-31", fallback:"none_old"}, credit:{v:"t3", until:"2027-05-10", fallback:""} },
+                 env:{ safety:{v:"none_new", until:"9999-12-31", fallback:"none_new"}, credit:{v:"t2", until:"2027-06-29", fallback:""} } };
   function qualApplyDefaults(){
     var d=QUAL_DEF[document.getElementById("xgCo").value]; if(!d) return;
     if(d.safety) document.getElementById("xqSafety").value=(todayStr()<=d.safety.until)?d.safety.v:d.safety.fallback;
@@ -5195,7 +5197,7 @@
     }
     if(k==="qual_packet"){
       document.getElementById("xgMoneyFields").style.display="none";
-      document.getElementById("xgCo").value="con";   // 석면공사 적격심사=㈜종운건설
+      // 시행 회사는 고정하지 않음 — 계약 유형 규칙(석면·철거=건설, 운반·폐기물·준설=환경)대로 프리필된 값 유지
       var cQ=xgCtx?findProc(xgCtx.id):null, bQ=(cQ&&cQ.bid_id)?findBid(cQ.bid_id):null;
       var gv=function(id){ return document.getElementById(id); };
       if(bQ){   // ①앱 자동: 낙찰 공고에서 프리필(하드리딩 우선)
@@ -5457,6 +5459,9 @@
       if($(id)) $(id).addEventListener("input", qualRefresh);
       if($(id)) $(id).addEventListener("change", qualRefresh);
     });
+    if($("xgCo")) $("xgCo").addEventListener("change", function(){
+      if($("xgKind").value==="qual_packet"){ qualApplyDefaults(); qualRefresh(); }   // 회사 전환 시 그 회사 실측 등급으로
+    });
     if($("xgRateFromBid")) $("xgRateFromBid").addEventListener("click", function(){
       var c=xgCtx?findProc(xgCtx.id):null; if(!c||!c.bid_id) return;
       var btn=this; btn.textContent="불러오는 중…"; btn.disabled=true;
@@ -5521,6 +5526,7 @@
         if(!qv.perf) qm.push("시공경험 면적(최근3년 환산)");
         if(!qv.credit) qm.push("신용평가등급(미제출=최저등급 처리됨)");
         if(qm.length && !confirm("⚠ 확인요망 — 비어 있는 값:\n· "+qm.join("\n· ")+"\n\n빈 값은 공란(수기 기입), 점수는 입력된 값만으로 계산됩니다. 진행할까요?")) return;
+        if($("xgCo").value==="env" && !confirm("⚠ 등록된 적격심사 템플릿·점수 기준은 경상북도교육청(석면해체공사) 서식입니다.\n지자체(준설·폐기물 등) 적격심사는 발주처 세부기준·서식이 다를 수 있습니다 — 해당 공고 첨부 기준을 확인하세요.\n그대로 진행할까요?")) return;
         var tp=todayStr().split("-");
         var qd=$("xqDate").value?$("xqDate").value.split("-"):null;
         var qTokens={
