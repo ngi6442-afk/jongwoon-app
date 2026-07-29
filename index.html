@@ -883,13 +883,14 @@
 
   <!-- 수금·기성 -->
   <section class="view" id="view-rec">
-    <div class="dash-sec" style="margin-bottom:8px;"><h2>기성 <span class="cnt" id="recTopHead"></span></h2></div>
+    <div class="dash-sec" style="margin-bottom:8px;display:flex;align-items:center;gap:8px;"><h2 style="margin:0;">기성 <span class="cnt" id="recTopHead"></span></h2><button class="mini-btn" id="recTaxBtn" style="margin-left:auto;">📤 세무 내보내기(월)</button></div>
     <div class="card">
       <div class="add-row">
         <input type="text" id="recClient" placeholder="거래처 (예: 포스코)">
         <input type="text" id="recDesc" placeholder="내역 (예: 6월 기성)">
       </div>
       <div class="add-row" style="padding-top:0;">
+        <select id="recCo" style="flex:none;width:120px;"><option value="">회사?</option><option value="env">종운환경</option><option value="con">종운건설</option></select>
         <input type="text" id="recAmount" placeholder="금액(선택)" inputmode="numeric">
         <input type="date" id="recBilled">
         <button id="recAddBtn">청구 등록</button>
@@ -901,6 +902,7 @@
           <div style="font-weight:600;">홈택스 매출 목록 불러오기</div>
           <div style="font-size:12px;opacity:.7;margin-top:2px;word-break:keep-all;">홈택스·위하고에서 내려받은 매출 세금계산서 목록(.xlsx)</div>
         </div>
+        <select id="recImpCo" style="flex:none;width:110px;" title="이 파일의 공급자(우리 회사) — 홈택스는 회사별 파일"><option value="env">종운환경</option><option value="con">종운건설</option></select>
         <button type="button" id="recFilePick" class="mini-btn" style="flex:none;">파일 선택</button>
       </div>
       <div id="recDrop" style="margin-top:10px;padding:16px;border:2px dashed rgba(128,128,128,.4);border-radius:8px;text-align:center;font-size:13px;opacity:.75;">여기로 .xlsx 파일을 끌어놓으세요</div>
@@ -1355,6 +1357,7 @@
 <div class="modal-backdrop" id="recEditBackdrop">
   <div class="modal">
     <h3>기성 수정</h3>
+    <select id="reCo"><option value="">회사 미지정</option><option value="env">(유)종운환경</option><option value="con">㈜종운건설</option></select>
     <input type="text" id="reClient" placeholder="거래처" autocomplete="off">
     <input type="text" id="reDesc" placeholder="내역 (예: 6월 기성)" autocomplete="off">
     <input type="text" id="reAmount" placeholder="금액 (선택)" inputmode="numeric" autocomplete="off">
@@ -3619,6 +3622,7 @@
   document.getElementById("taskDeletedToggle").addEventListener("click", function(){ showDeletedTasks = !showDeletedTasks; renderTasks(); });
 
   document.getElementById("recAddBtn").addEventListener("click", addReceivable);
+  document.getElementById("recTaxBtn").addEventListener("click", recTaxExport);
   document.getElementById("recClient").addEventListener("keydown", function(e){ if (e.key === "Enter") addReceivable(); });
   document.getElementById("recDesc").addEventListener("keydown", function(e){ if (e.key === "Enter") addReceivable(); });
   document.getElementById("recAmount").addEventListener("keydown", function(e){ if (e.key === "Enter") addReceivable(); });
@@ -5873,6 +5877,7 @@
     if(!confirm("청구 단계 완료 — 기성(미수)에 청구 건을 등록할까요?\n"+(c.client||"발주처?")+" · "+(c.title||c.label)+(amt?" · "+fmtAmount(amt)+"원":" · 금액 미확인(기성에서 입력)"))) return;
     var today=todayStr();
     var r={ id:genId("r"), client:c.client||"", site:c.site||"", desc:(c.title||c.label||""),
+      co:((c.type==="asbestos"||c.type==="demolition")?"con":"env"),   // 두 회사 규칙: 석면·철거=건설, 운반·폐기물·준설=환경
       amount:amt, billed:today, invoice:false, paid:null, due_hint:"", note:"계약 연동", con_id:c.id,
       assignee:"", scope:[], task_id:null, mismatch:false, created:today, updated:today };
     receivables.push(r);
@@ -7346,8 +7351,9 @@
     return plan;
   }
   function recNewRec(c, today){
+    var impCo=document.getElementById("recImpCo");   // 홈택스 파일은 회사별 다운로드 — 업로드 시 선택한 공급자
     return { id:genId("r"), nts:c.nts, docno:c.docno, client:c.client, client_num:c.client_num, site:"",
-      desc:c.desc, amount:c.amount, supply:c.supply, tax:c.tax, billed:c.billed||today, purpose:c.purpose,
+      co:(impCo&&impCo.value)||"", desc:c.desc, amount:c.amount, supply:c.supply, tax:c.tax, billed:c.billed||today, purpose:c.purpose,
       invoice:true, paid:null, due_hint:"", note:"", assignee:"", scope:[], task_id:null, mismatch:false,
       src:"hometax", created:today, updated:today };
   }
@@ -7598,6 +7604,42 @@
     rec.task_id = null;
   }
 
+  // 세무사 전달용 월별 매출(기성) 장부 xlsx — 회사(환경/건설) 구분·소계 포함. 값은 앱에 있는 그대로(추정 계산 없음).
+  function recTaxExport(){
+    if (!canDo("rec")) return;
+    var last = new Date(); last.setMonth(last.getMonth()-1);
+    var def = last.getFullYear()+"-"+String(last.getMonth()+1).padStart(2,"0");
+    var ym = prompt("내보낼 월 (YYYY-MM)", def);
+    if (!ym) return;
+    ym = ym.trim();
+    if (!/^\d{4}-\d{2}$/.test(ym)){ alert("형식: YYYY-MM (예: "+def+")"); return; }
+    var rows = liveRec().filter(function(r){ return (r.billed||"").indexOf(ym)===0; });
+    if (!rows.length){ alert(ym+" 청구(작성)일 기준 건이 없습니다."); return; }
+    var coName = { env:"(유)종운환경", con:"㈜종운건설", "":"미지정" };
+    var order = { env:0, con:1, "":2 };
+    rows.sort(function(a,b){
+      var ca=order[a.co||""], cb=order[b.co||""];
+      if (ca!==cb) return ca-cb;
+      return (a.billed||"") < (b.billed||"") ? -1 : 1;
+    });
+    var out = [["회사","거래처","사업자번호","내역","공급가액","세액","합계(금액)","작성/청구일","계산서","입금일","승인번호"]];
+    var missing = 0;
+    function pushSub(co, sum, cnt){ out.push([coName[co]+" 소계 ("+cnt+"건)","","","","","",sum,"","","",""]); out.push([]); }
+    var curCo=null, sum=0, cnt=0, total=0;
+    rows.forEach(function(r){
+      var co = r.co||"";
+      if (curCo!==null && co!==curCo){ pushSub(curCo, sum, cnt); sum=0; cnt=0; }
+      curCo=co;
+      if (!r.co) missing++;
+      out.push([coName[co], r.client||"", r.client_num||"", r.desc||"", r.supply||"", r.tax||"", r.amount||0,
+        r.billed||"", r.invoice?"발행":"", r.paid||"", r.nts||""]);
+      sum+=(r.amount||0); cnt++; total+=(r.amount||0);
+    });
+    pushSub(curCo, sum, cnt);
+    out.push(["총계 ("+rows.length+"건)","","","","","",total,"","","",""]);
+    downloadBlob("세무_매출_"+ym+".xlsx", buildSimpleXlsx("매출 "+ym, out));
+    if (missing) alert("⚠ 회사 미지정 "+missing+"건이 포함되어 있습니다 — 기성에서 [수정]으로 회사를 지정한 뒤 다시 내보내는 걸 권합니다.");
+  }
   function addReceivable(){
     if (!canDo("rec")) return;
     var clientEl = document.getElementById("recClient");
@@ -7610,6 +7652,7 @@
     var amt = parseInt(String(amtEl.value).replace(/[^0-9]/g, ""), 10);
     receivables.push({
       id: genId("r"), client: client, site: "", desc: descEl.value.trim(),
+      co: document.getElementById("recCo").value || "",
       amount: isNaN(amt) ? 0 : amt, billed: billedEl.value || today,
       invoice: false, paid: null, due_hint: "", note: "",
       assignee: "", scope: [], task_id: null, mismatch: false,
@@ -7668,6 +7711,7 @@
     if (!canDo("rec")) return;
     var r = findRec(id); if (!r) return;
     editingRecId = id;
+    document.getElementById("reCo").value = r.co || "";
     document.getElementById("reClient").value = r.client || "";
     document.getElementById("reDesc").value = r.desc || "";
     document.getElementById("reAmount").value = r.amount ? fmtAmount(r.amount) : "";
@@ -7684,6 +7728,7 @@
     var client = document.getElementById("reClient").value.trim();
     if (!client) return;
     r.client = client;
+    r.co = document.getElementById("reCo").value || "";
     r.desc = document.getElementById("reDesc").value.trim();
     var amt = parseInt(String(document.getElementById("reAmount").value).replace(/[^0-9]/g, ""), 10);
     r.amount = isNaN(amt) ? 0 : amt;
@@ -7724,6 +7769,7 @@
         (sel ? selBoxHtml("rec", r.id, false) : '') +
         '<div class="rec-main">' +
           '<span class="rec-client">' + esc(r.client || "-") + '</span>' +
+          (r.co ? '<span class="dup-chip" style="background:'+(r.co==="con"?"#E3EDFB;color:#2B5EA7":"#E2F5EA;color:#1A7A4B")+';">'+(r.co==="con"?"건설":"환경")+'</span>' : '') +
           (r._dup ? '<span class="dup-chip">중복 의심</span>' : '') +
           (r.mismatch ? '<span class="dup-chip" style="background:#EAE2FB;color:#5B3FA6;">불일치</span>' : '') +
           ageHtml +
