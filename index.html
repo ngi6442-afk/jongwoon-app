@@ -4641,15 +4641,13 @@
   }
   // 회사 실측 등급(증빙 하드리딩 — 만료 지나면 자동 폴백. 갱신 시 여기와 인허가 탭 함께 갱신)
   // ㈜종운건설 안전성평가: 2025년 평가 D등급, 유효 2026-01-01~2026-12-31(공단 통보서 2026.1.2) → 만료 후 무등급(등록 2년↑)
-  // 신용평가: BB°(NICE D&B, ~2027-06-29)는 (유)종운환경 명의 — ㈜종운건설 명의 확인서 미확보(확인요망)
-  var QUAL_DEF={ con:{ safety:{v:"D", until:"2026-12-31", fallback:"none_old"}, credit:"" } };
+  // ㈜종운건설 신용평가: B°(NICE D&B 확인서, 평가 2026-05-11, 유효 ~2027-05-10) = B+~B− 군 → 만료 후 미제출(최저)
+  // ※ (유)종운환경 BB°(~2027-06-29)는 별도 명의 — 석면(건설) 적격심사에 사용 금지
+  var QUAL_DEF={ con:{ safety:{v:"D", until:"2026-12-31", fallback:"none_old"}, credit:{v:"t3", until:"2027-05-10", fallback:""} } };
   function qualApplyDefaults(){
     var d=QUAL_DEF[document.getElementById("xgCo").value]; if(!d) return;
-    if(d.safety){
-      var s=(todayStr()<=d.safety.until)?d.safety.v:d.safety.fallback;
-      document.getElementById("xqSafety").value=s;
-    }
-    document.getElementById("xqCredit").value=d.credit||"";
+    if(d.safety) document.getElementById("xqSafety").value=(todayStr()<=d.safety.until)?d.safety.v:d.safety.fallback;
+    if(d.credit) document.getElementById("xqCredit").value=(todayStr()<=d.credit.until)?d.credit.v:d.credit.fallback;
   }
   function qualNum(x){ return x==null?"":String(Math.round(x*100)/100); }
   function qualSign(x){ if(x==null) return ""; if(x>0) return "+"+qualNum(x); return qualNum(x); }
