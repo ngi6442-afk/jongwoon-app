@@ -1634,6 +1634,7 @@
     <label class="chk" style="justify-content:flex-start;"><input type="checkbox" id="memberKeep"> 이 기기에서 로그인 유지(개인 PC만)</label>
     <button class="primary" id="memberLogin">로그인</button>
     <button class="secondary" id="memberPinBtn" style="display:none;">내 PIN 변경</button>
+    <button class="secondary" id="pushBtn" style="display:none;">🔔 이 기기 알림 켜기</button>
     <button class="secondary" id="helpBtn">도움말</button>
   </div>
 </div>
@@ -2635,6 +2636,11 @@
     renderTasks();
     renderSummary();
     scheduleTasksSave();
+    // 담당자에게 웹푸시(구독한 기기만 수신 — 실패 무시)
+    if (whoId && whoId !== myId()){
+      gwCall("gw-data",{action:"push_send", to:whoId, title:"새 지시: "+title.slice(0,40),
+        body:(t.due?("기한 "+t.due+" · "):"")+"지시자 "+getUser(), tag:"task-"+newId}).catch(function(){});
+    }
   }
 
   function canApproveTask(t){
@@ -3514,6 +3520,7 @@
     else { document.getElementById("nameInput").value = getUser(); document.getElementById("tokenInput").value = ""; showTokenScreen(false); }
   });
   document.getElementById("memberLogin").addEventListener("click", doMemberLogin);
+  document.getElementById("pushBtn").addEventListener("click", pushToggle);
   document.getElementById("memberPin").addEventListener("keydown", function(e){ if (e.key === "Enter") doMemberLogin(); });
   document.getElementById("devicesClose").addEventListener("click", function(){ document.getElementById("devicesBackdrop").classList.remove("show"); });
   document.getElementById("devPendLogout").addEventListener("click", function(){ setGwToken(null); curMemberObj = null; document.getElementById("devicePendingBackdrop").classList.remove("show"); showMemberLogin(); });
@@ -8295,6 +8302,51 @@
     });
   }
 
+  // ---- 웹푸시 구독(기기별) — 지시 배정·개찰결과 알림. VAPID 공개키는 서버(push_pubkey)에서 ----
+  function urlB64ToU8(s){
+    var pad="=".repeat((4-s.length%4)%4);
+    var b=(s+pad).replace(/-/g,"+").replace(/_/g,"/");
+    var raw=atob(b), arr=new Uint8Array(raw.length);
+    for(var i=0;i<raw.length;i++) arr[i]=raw.charCodeAt(i);
+    return arr;
+  }
+  function pushSupported(){ return "serviceWorker" in navigator && "PushManager" in window && "Notification" in window; }
+  function pushRefreshBtn(){
+    var b=document.getElementById("pushBtn"); if(!b) return;
+    if(!pushSupported() || !getToken()){ b.style.display="none"; return; }
+    b.style.display="block";
+    navigator.serviceWorker.ready.then(function(reg){ return reg.pushManager.getSubscription(); }).then(function(s){
+      b.textContent = s ? "🔔 알림 켜짐 — 이 기기 알림 끄기" : "🔔 이 기기 알림 켜기";
+      b.dataset.on = s ? "1" : "";
+    }).catch(function(){});
+  }
+  function pushToggle(){
+    var b=document.getElementById("pushBtn");
+    if(!pushSupported()){ alert("이 브라우저는 웹 알림을 지원하지 않습니다."); return; }
+    if(b.dataset.on){   // 끄기
+      navigator.serviceWorker.ready.then(function(reg){ return reg.pushManager.getSubscription(); }).then(function(s){
+        if(!s) return null;
+        var ep=s.endpoint;
+        return s.unsubscribe().then(function(){ return gwCall("gw-data",{action:"push_unsub", endpoint:ep}); });
+      }).then(function(){ pushRefreshBtn(); }).catch(function(){ alert("알림 해제 실패"); });
+      return;
+    }
+    Notification.requestPermission().then(function(perm){
+      if(perm!=="granted"){ alert("브라우저 알림 권한이 거부되었습니다. 주소창 자물쇠 아이콘에서 허용으로 바꿔주세요."); return; }
+      gwCall("gw-data",{action:"push_pubkey"}).then(function(res){
+        if(res.status!==200) throw "키 로드 실패";
+        return navigator.serviceWorker.ready.then(function(reg){
+          return reg.pushManager.subscribe({ userVisibleOnly:true, applicationServerKey:urlB64ToU8(res.body.publicKey) });
+        });
+      }).then(function(sub){
+        return gwCall("gw-data",{action:"push_sub", sub:sub.toJSON()});
+      }).then(function(res){
+        if(res.status!==200) throw "구독 저장 실패";
+        pushRefreshBtn();
+        gwCall("gw-data",{action:"push_send", self:true, title:"알림 켜짐", body:"이 기기로 지시·개찰결과 알림을 받습니다."}).catch(function(){});
+      }).catch(function(e){ alert("알림 켜기 실패: "+e); });
+    });
+  }
   function showMemberLogin(){
     var sel = document.getElementById("memberSelect");
     var cm = curMember();
@@ -8304,6 +8356,7 @@
     document.getElementById("memberPinBtn").style.display = cm ? "block" : "none";
     try{ document.getElementById("memberKeep").checked = !!localStorage.getItem(GW_TOKEN_KEY); }catch(e){}
     sel.innerHTML = '<option value="">불러오는 중…</option>';
+    pushRefreshBtn();
     document.getElementById("memberBackdrop").classList.add("show");
     gwCall("gw-auth", { action: "names" }).then(function(res){
       var names = (res.body && res.body.names) || [];

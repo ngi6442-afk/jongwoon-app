@@ -1,4 +1,4 @@
-const SHELL_CACHE = 'jw-shell-v180';
+const SHELL_CACHE = 'jw-shell-v181';
 const SHELL_FILES = [
   './',
   './index.html',
@@ -25,6 +25,27 @@ self.addEventListener('activate', (e) => {
     )
   );
   self.clients.claim();
+});
+
+// 웹푸시: 지시 배정·개찰결과 알림 표시, 클릭 시 앱 포커스/열기
+self.addEventListener('push', (e) => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; } catch (err) {}
+  e.waitUntil(self.registration.showNotification(d.title || '종운 업무', {
+    body: d.body || '',
+    tag: d.tag || undefined,
+    data: { url: d.url || './' },
+    icon: './icon-192.png',
+    badge: './icon-192.png'
+  }));
+});
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  const url = (e.notification.data && e.notification.data.url) || './';
+  e.waitUntil(clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+    for (const c of list) { if ('focus' in c) return c.focus(); }
+    return clients.openWindow(url);
+  }));
 });
 
 self.addEventListener('fetch', (e) => {

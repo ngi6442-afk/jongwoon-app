@@ -7,6 +7,7 @@ const crypto = require('crypto');
 const { setupBlobContext, store, blobGet, blobSet, blobDelete, blobList } = require('./_lib/blobs');
 const { verifyToken, bearer } = require('./_lib/session');
 const { appendAudit, auditKey, diffItems } = require('./_lib/audit');
+const push = require('./_lib/push');
 
 const DATA = 'gw_data';
 const USERS = 'gw_users';
@@ -494,8 +495,62 @@ async function handleBidsResults(event, d, R) {
     const w = await blobSet(st, colKey('bids'), doc);
     if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
     if (ev.length) { try { await appendAudit({ ts: Date.now(), by: '수집봇', bid: 'bot', col: 'bids', ev: ev }); } catch (e) {} }
+    // 낙찰/유찰 확정 → 관리자 웹푸시(실패해도 수신 처리는 성공으로)
+    if (ev.length) {
+      try {
+        const ids = await push.adminIds();
+        if (ids.length) await push.sendTo(ids, { title: '개찰결과 ' + ev.length + '건',
+          body: ev.map(function (x) { return x.t; }).join('\n').slice(0, 300), url: './', tag: 'bids-result' });
+      } catch (e) {}
+    }
   }
   return jr(200, { status: 'OK', applied: applied, request_id: R });
+}
+
+// ---- 웹푸시: 구독 관리 + 발송(지시 배정 등 클라이언트 트리거) ----
+async function handlePushPubkey(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  try {
+    const k = await push.getKeys();
+    return jr(200, { status: 'OK', publicKey: k.publicKey, request_id: R });
+  } catch (e) { return jr(500, { status: 'ERROR', error_code: 'PUSH_KEYS_FAILED', request_id: R }); }
+}
+async function handlePushSub(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  const s = d.sub;
+  if (!s || typeof s !== 'object' || !s.endpoint || String(s.endpoint).length > 1000) return jr(400, { status: 'REJECTED', error_code: 'INVALID_SUB', request_id: R });
+  const doc = await push.getSubs();
+  const mine = (doc.members[c.member.id] || []).filter(function (x) { return x && x.sub && x.sub.endpoint !== s.endpoint; });
+  mine.push({ sub: { endpoint: s.endpoint, expirationTime: s.expirationTime || null, keys: s.keys || {} }, ts: Date.now() });
+  doc.members[c.member.id] = mine.slice(-5);   // 기기 5개까지
+  const w = await push.saveSubs(doc);
+  if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
+  return jr(200, { status: 'OK', devices: doc.members[c.member.id].length, request_id: R });
+}
+async function handlePushUnsub(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  const ep = String(d.endpoint || '');
+  const doc = await push.getSubs();
+  const mine = (doc.members[c.member.id] || []).filter(function (x) { return x && x.sub && x.sub.endpoint !== ep; });
+  if (mine.length) doc.members[c.member.id] = mine; else delete doc.members[c.member.id];
+  await push.saveSubs(doc);
+  return jr(200, { status: 'OK', request_id: R });
+}
+async function handlePushSend(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (!(await deviceApproved(event, c.member))) return jr(403, { status: 'FORBIDDEN', error_code: 'DEVICE_NOT_APPROVED', request_id: R });
+  const to = String(d.to || '');
+  if (!to && d.self !== true) return jr(400, { status: 'REJECTED', error_code: 'NO_TARGET', request_id: R });
+  const payload = { title: String(d.title || '알림').slice(0, 60), body: String(d.body || '').slice(0, 200),
+    url: './', tag: String(d.tag || '').slice(0, 40) || undefined };
+  try {
+    const rres = await push.sendTo([d.self === true ? c.member.id : to], payload);
+    return jr(200, { status: 'OK', sent: rres.sent, request_id: R });
+  } catch (e) { return jr(500, { status: 'ERROR', error_code: 'PUSH_SEND_FAILED', request_id: R }); }
 }
 
 // ---- 계약 첨부파일(석면조사서 등) — Blobs 저장 + 서버측 텍스트 추출 ----
@@ -793,6 +848,10 @@ async function handler(event) {
     if (d && d.action === 'att_parse_status') return await handleAttParseStatus(event, d, R);
     if (d && d.action === 'att_get') return await handleAttGet(event, d, R);
     if (d && d.action === 'att_del') return await handleAttDel(event, d, R);
+    if (d && d.action === 'push_pubkey') return await handlePushPubkey(event, d, R);
+    if (d && d.action === 'push_sub') return await handlePushSub(event, d, R);
+    if (d && d.action === 'push_unsub') return await handlePushUnsub(event, d, R);
+    if (d && d.action === 'push_send') return await handlePushSend(event, d, R);
     return jr(400, { status: 'REJECTED', error_code: 'UNKNOWN_ACTION', request_id: R });
   } catch (e) {
     return jr(500, { status: 'ERROR', error_code: 'HANDLER_FAILED', request_id: R });
