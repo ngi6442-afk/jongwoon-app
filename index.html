@@ -1157,6 +1157,7 @@
       <option value="asb_plan">석면해체계획서</option>
       <option value="demo_report">해체신고서(완료신고 포함)</option>
       <option value="waste_report">폐기물배출신고서(수탁확인 포함)</option>
+      <option value="qual_packet">적격심사 패킷(신청서·심사표·각서·확약서 hwp)</option>
       <option value="bid_rate">내역서 낙찰률 적용(발주처 내역서 → 낙찰가)</option>
     </select>
     <span class="fld-label">시행 회사</span>
@@ -1201,6 +1202,55 @@
       <input type="text" id="xgRateBase" placeholder="기초금액/원본 도급액 (숫자만, VAT 포함)" inputmode="numeric" autocomplete="off">
       <input type="text" id="xgRateTarget" placeholder="낙찰금액 (숫자만, VAT 포함)" inputmode="numeric" autocomplete="off">
       <div style="font-size:12px;color:#888;margin:4px 0;">단가 전체에 낙찰률을 곱해 원 단위로 맞춥니다. 파일을 열면 수식이 재계산되니 도급액이 낙찰가와 1원~수백원 차이 나면 관행대로 합계만 보정하세요.</div>
+    </div>
+    <div id="xgQualWrap" style="display:none;">
+      <div style="display:flex;gap:8px;">
+        <input type="text" id="xqNo" placeholder="공고번호 (예: 20231116587-00)" style="flex:1" autocomplete="off">
+        <input type="date" id="xqDate" title="입찰일시" style="flex:1">
+      </div>
+      <div style="display:flex;gap:8px;">
+        <input type="text" id="xqDue" placeholder="제출기한 (예: 2026.8.)" style="flex:1" autocomplete="off">
+        <input type="text" id="xqPeriod" placeholder="공사기간 (예: 착공일로부터 90일)" style="flex:1" autocomplete="off">
+      </div>
+      <input type="text" id="xqRecv" placeholder="수신처 (예: ○○교육지원청(분임)재무관 — 수요기관에서 자동 제안)" autocomplete="off">
+      <div style="display:flex;gap:8px;">
+        <input type="text" id="xqBid" placeholder="입찰금액(숫자만)" inputmode="numeric" style="flex:1" autocomplete="off">
+        <input type="text" id="xqPre" placeholder="예정가격(숫자만 — 개찰결과 공개값)" inputmode="numeric" style="flex:1" autocomplete="off">
+      </div>
+      <input type="text" id="xqA" placeholder="A값 — 보험료 등 7종 합산(숫자만, 공고에 있으면 자동)" inputmode="numeric" autocomplete="off">
+      <div style="display:flex;gap:8px;">
+        <select id="xqTier" style="flex:1" title="추정가격 구간">
+          <option value="mid">추정가격 1~3억</option>
+          <option value="hi">추정가격 3억 이상</option>
+          <option value="lo">추정가격 1억 미만</option>
+        </select>
+        <input type="text" id="xqPerf" placeholder="시공경험 면적(㎡ — 최근3년, 학교100%+기타70% 환산 후)" inputmode="decimal" style="flex:2" autocomplete="off">
+      </div>
+      <div style="display:flex;gap:8px;">
+        <select id="xqCredit" style="flex:1" title="신용평가등급">
+          <option value="">신용등급 미제출(최저)</option>
+          <option value="t1">BBB° 이상 (A3°/AAA~BBB°)</option>
+          <option value="t2">BBB− ~ BB− (A3−~B°)</option>
+          <option value="t3">B+ ~ B− (B−)</option>
+          <option value="t4">CCC+ 이하 (C 이하)</option>
+        </select>
+        <select id="xqSafety" style="flex:1" title="안전성평가 등급(고용노동부)">
+          <option value="B">안전성 B등급</option>
+          <option value="S">안전성 S등급</option>
+          <option value="A">안전성 A등급</option>
+          <option value="C">안전성 C등급</option>
+          <option value="D">안전성 D등급</option>
+          <option value="none_old">무등급(등록 2년 이상)</option>
+          <option value="none_new">무등급(신설·평가중 — 0점)</option>
+        </select>
+      </div>
+      <div style="display:flex;gap:14px;font-size:13px;margin:4px 0;">
+        <label><input type="checkbox" id="xqLocal"> 지역업체(현장 관할구역 소재)</label>
+        <label><input type="checkbox" id="xqPledge" checked> 이행확약서 제출(+0.5)</label>
+        <label><input type="checkbox" id="xqTax"> 모범납세자(+0.5)</label>
+      </div>
+      <div id="xqScore" style="font-size:13px;background:var(--panel-bg,#f4f6f8);border-radius:6px;padding:8px;margin:4px 0;"></div>
+      <div style="font-size:12px;color:#888;">점수는 경상북도교육청 세부기준(2023.7.10 시행)으로 계산합니다. 등급·만료일은 인허가 탭에 등록하면 만기 30일 전 자동 지시가 생깁니다.</div>
     </div>
     <button class="primary" id="xgGo">생성·다운로드</button>
     <button class="secondary" id="xgCancel">취소</button>
@@ -4544,6 +4594,70 @@
     var list=Object.keys(raw).map(function(n){ return {name:n, data:raw[n]}; });
     return zipStore(list);
   }
+  // ---- hwpx 양식 채움: xlsx와 같은 수술 방식 — Contents/*.xml의 {{토큰}} 전역 교체(좌표 불필요) ----
+  async function fillHwpxTemplate(b64, tokens){
+    var bytes=dataUrlToBytes("x,"+b64);
+    var files=await unzip(bytes);
+    var dec=new TextDecoder(), enc=new TextEncoder();
+    var raw={};
+    for(var name in files){ raw[name]= files[name].method===0 ? files[name].comp : await inflateRaw(files[name].comp); }
+    for(var n2 in raw){
+      if(!/^Contents\/.*\.xml$/.test(n2)) continue;
+      var xml=dec.decode(raw[n2]);
+      for(var k in tokens){ xml=xml.split("{{"+k+"}}").join(xmlEsc(tokens[k]==null?"":String(tokens[k]))); }
+      raw[n2]=enc.encode(xml);
+    }
+    // hwpx 규격: mimetype이 첫 엔트리·무압축 — zipStore는 전항목 STORE라 순서만 맞추면 됨
+    var names=Object.keys(raw); names.sort(function(a,b){ return a==="mimetype"?-1:(b==="mimetype"?1:0); });
+    return zipStore(names.map(function(n){ return {name:n, data:raw[n]}; }));
+  }
+  // ---- 적격심사 점수(경상북도교육청 세부기준 2023.7.10 시행 — 별표1·2) ----
+  // 입찰가격 산식은 세부기준 원문 그대로: 배점−20×|88−(입찰가격−A)/(예정가격−A)×100| (비율 소수5자리 반올림, 88.25%↑=예외점, 최저 2점)
+  var QUAL_CFG={
+    hi: {perf:[[11000,10],[9500,9],[8000,8],[0,7]], mgmt:{t1:10,t2:9.5,t3:9,t4:6}, price:80, priceEx:75, ability:20,
+         safety:{S:4,A:2,B:0,C:-2,D:-4,none_old:-2,none_new:0}, local:1, shinCap:2},
+    mid:{perf:[[8000,5],[6500,4.5],[5000,4],[0,3.5]], mgmt:{t1:5,t2:4.8,t3:4.5,t4:3}, price:90, priceEx:85, ability:10,
+         safety:{S:2,A:1,B:0,C:-1,D:-4,none_old:-1,none_new:0}, local:0.5, shinCap:1.5},
+    lo: {perf:[[5000,5],[3500,4.5],[2000,4],[0,3.5]], mgmt:{t1:5,t2:4.8,t3:4.5,t4:3}, price:90, priceEx:85, ability:10,
+         safety:{S:1,A:0.5,B:0,C:-0.5,D:-4,none_old:-0.5,none_new:0}, local:0.5, shinCap:2}
+  };
+  function qualScores(v){   // v={tier,perf,credit,safety,local,pledge,tax,bid,pre,a}
+    var cfg=QUAL_CFG[v.tier]||QUAL_CFG.mid;
+    var sPerf=null;
+    if(v.perf>0){ for(var i=0;i<cfg.perf.length;i++){ if(v.perf>=cfg.perf[i][0]){ sPerf=cfg.perf[i][1]; break; } } }
+    var sMgmt=(v.credit&&cfg.mgmt[v.credit]!==undefined)?cfg.mgmt[v.credit]:cfg.mgmt.t4;   // 미제출=최저등급(제6조)
+    var sShin=Math.min((v.local?cfg.local:0)+(v.pledge?0.5:0)+(v.tax?0.5:0), cfg.shinCap);
+    var sSafety=cfg.safety[v.safety]!==undefined?cfg.safety[v.safety]:0;
+    var sPrice=null, r=null;
+    if(v.bid>0&&v.pre>0&&v.bid<=v.pre){
+      var a=v.a||0;
+      r=Math.round((v.bid-a)/(v.pre-a)*10000)/10000;   // 소수점 다섯째자리에서 반올림
+      sPrice=(r>=0.8825)?cfg.priceEx:Math.max(2, cfg.price-2000*Math.abs(0.88-r));
+      sPrice=Math.round(sPrice*100)/100;
+    }
+    var sub=Math.min((sPerf||0)+sMgmt+sShin, cfg.ability);
+    return {perf:sPerf, mgmt:sMgmt, shin:sShin, safety:sSafety, price:sPrice,
+      sub:Math.round(sub*100)/100, total:Math.round((sub+(sPrice||0)+sSafety)*100)/100, rate:r};
+  }
+  function qualNum(x){ return x==null?"":String(Math.round(x*100)/100); }
+  function qualSign(x){ if(x==null) return ""; if(x>0) return "+"+qualNum(x); return qualNum(x); }
+  function qualCollect(){
+    var g=function(id){ return document.getElementById(id); };
+    var num=function(id){ return parseFloat((g(id).value||"").replace(/[^0-9.]/g,""))||0; };
+    return { tier:g("xqTier").value, perf:num("xqPerf"), credit:g("xqCredit").value, safety:g("xqSafety").value,
+      local:g("xqLocal").checked, pledge:g("xqPledge").checked, tax:g("xqTax").checked,
+      bid:num("xqBid"), pre:num("xqPre"), a:num("xqA") };
+  }
+  function qualRefresh(){
+    var host=document.getElementById("xqScore"); if(!host) return;
+    var s=qualScores(qualCollect());
+    host.innerHTML='<b>자기평점 미리보기</b> — 계 <b>'+(s.total||0)+'</b>점 (통과 95)'
+      +'<br>소계 '+qualNum(s.sub)+' = 시공경험 '+(s.perf==null?'<span style="color:#c0392b">면적입력</span>':qualNum(s.perf))
+      +' + 경영 '+qualNum(s.mgmt)+' + 신인도 '+qualSign(s.shin)
+      +' · 입찰가격 '+(s.price==null?'<span style="color:#c0392b">금액입력</span>':qualNum(s.price))
+      +(s.rate!=null?' (비율 '+(s.rate*100).toFixed(2)+'%)':'')
+      +' · 안전성 '+qualSign(s.safety);
+  }
   function downloadBlob(name, blob){
     var a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=name;
     document.body.appendChild(a); a.click();
@@ -4850,7 +4964,8 @@
   }
 
   // ---- 서류 양식 등록/생성 ----
-  var TPL_LABELS={asb_plan:"석면해체계획서", work_start:"착공계", work_complete:"준공계", demo_report:"해체신고서", waste_report:"폐기물배출신고서"};
+  var TPL_LABELS={asb_plan:"석면해체계획서", work_start:"착공계", work_complete:"준공계", demo_report:"해체신고서", waste_report:"폐기물배출신고서", qual_packet:"적격심사 패킷"};
+  var TPL_EXT={qual_packet:".hwpx"};   // 기본 .xlsx, hwpx 양식만 예외
   function openTplManage(){
     if(!isAdmin()) return;
     var host=document.getElementById("tplRows");
@@ -4868,7 +4983,7 @@
       Array.prototype.forEach.call(host.querySelectorAll("[data-tpl-up]"), function(el){
         el.addEventListener("click", function(){
           var key=el.getAttribute("data-tpl-up");
-          var inp=document.createElement("input"); inp.type="file"; inp.accept=".xlsx";
+          var inp=document.createElement("input"); inp.type="file"; inp.accept=TPL_EXT[key]||".xlsx";
           inp.addEventListener("change", function(){
             var f=inp.files&&inp.files[0]; if(!f) return;
             var r=new FileReader();
@@ -4888,6 +5003,7 @@
   // 단계 → 서류 라우팅: 단계가 서류를 이끈다(입찰: 적격심사→계약서류→착공→신고→준공 / 비입찰: 계약서 작성·첨부→착공→…)
   function stageXlsxKind(stage){
     var s=String(stage||"");
+    if(/적격심사/.test(s)) return "qual_packet";
     if(/착공|착수/.test(s)) return "work_start";
     if(/준공/.test(s)) return "work_complete";
     if(/노동부신고/.test(s) && !/완료/.test(s)) return "asb_plan";
@@ -5025,6 +5141,27 @@
     document.getElementById("xgAsbFields").style.display = (k==="asb_plan") ? "" : "none";
     document.getElementById("xgWasteWrap").style.display = (k==="waste_report") ? "" : "none";
     document.getElementById("xgRateWrap").style.display = (k==="bid_rate") ? "" : "none";
+    document.getElementById("xgQualWrap").style.display = (k==="qual_packet") ? "" : "none";
+    if(k==="qual_packet"){
+      document.getElementById("xgMoneyFields").style.display="none";
+      document.getElementById("xgCo").value="con";   // 석면공사 적격심사=㈜종운건설
+      var cQ=xgCtx?findProc(xgCtx.id):null, bQ=(cQ&&cQ.bid_id)?findBid(cQ.bid_id):null;
+      var gv=function(id){ return document.getElementById(id); };
+      if(bQ){   // ①앱 자동: 낙찰 공고에서 프리필(하드리딩 우선)
+        var extQ=bQ.ext||{};
+        if(!gv("xqNo").value && bQ.no) gv("xqNo").value=bQ.no;
+        if(!gv("xqDate").value && /^\d{4}-\d{2}-\d{2}/.test(bQ.due||"")) gv("xqDate").value=String(bQ.due).slice(0,10);
+        if(!gv("xqBid").value && bQ.result && bQ.result.amt) gv("xqBid").value=bQ.result.amt;
+        if(!gv("xqA").value && extQ.aamt) gv("xqA").value=extQ.aamt;
+        var bud=bQ.budget||0;   // 추정가격 → 구간 자동
+        if(bud) gv("xqTier").value = bud>=300000000?"hi":(bud>=100000000?"mid":"lo");
+      }
+      if(!gv("xqRecv").value){   // 수신처 제안: 수요기관에서 파생(교육지원청 패턴만 — 아니면 수기)
+        var mR=/([가-힣]+교육지원청)/.exec(document.getElementById("xgClient").value||"");
+        if(mR) gv("xqRecv").value=mR[1]+"(분임)재무관";
+      }
+      qualRefresh();
+    }
     if(k==="bid_rate"){
       document.getElementById("xgMoneyFields").style.display="none";
       var cR=xgCtx?findProc(xgCtx.id):null, ciR=(cR&&cR.contract_info)||{};
@@ -5264,6 +5401,10 @@
     if($("conPerfBtn")) $("conPerfBtn").addEventListener("click", conExportPerf);
     if($("tplClose")) $("tplClose").addEventListener("click", function(){ $("tplBackdrop").classList.remove("show"); });
     if($("xgKind")) $("xgKind").addEventListener("change", xgToggle);
+    ["xqTier","xqPerf","xqCredit","xqSafety","xqLocal","xqPledge","xqTax","xqBid","xqPre","xqA"].forEach(function(id){
+      if($(id)) $(id).addEventListener("input", qualRefresh);
+      if($(id)) $(id).addEventListener("change", qualRefresh);
+    });
     if($("xgRateFromBid")) $("xgRateFromBid").addEventListener("click", function(){
       var c=xgCtx?findProc(xgCtx.id):null; if(!c||!c.bid_id) return;
       var btn=this; btn.textContent="불러오는 중…"; btn.disabled=true;
@@ -5310,6 +5451,45 @@
           fr.onload=function(){ run(new Uint8Array(fr.result)); };
           fr.readAsArrayBuffer(fEl.files[0]);
         } else run(xgRateFetched.bytes);
+        return;
+      }
+      if(kind==="qual_packet"){   // hwpx 토큰 교체 — 점수는 세부기준 산식으로 계산(추정·거짓 기입 금지)
+        var qv=qualCollect(), qs=qualScores(qv);
+        var qm=[];
+        if(!$("xgTitle").value.trim()) qm.push("공고명");
+        if(!$("xgClient").value.trim()) qm.push("수요기관");
+        if(!$("xqRecv").value.trim()) qm.push("수신처(재무관)");
+        if(!$("xqNo").value.trim()) qm.push("공고번호");
+        if(!$("xqDate").value) qm.push("입찰일시");
+        if(!$("xqDue").value.trim()) qm.push("제출기한");
+        if(!$("xqPeriod").value.trim()) qm.push("공사기간");
+        if(!qv.bid) qm.push("입찰금액");
+        if(!qv.pre) qm.push("예정가격(개찰결과 공개값)");
+        if(!qv.a) qm.push("A값 — 보험료 등 7종 합산(공고 산출내역 확인)");
+        if(!qv.perf) qm.push("시공경험 면적(최근3년 환산)");
+        if(!qv.credit) qm.push("신용평가등급(미제출=최저등급 처리됨)");
+        if(qm.length && !confirm("⚠ 확인요망 — 비어 있는 값:\n· "+qm.join("\n· ")+"\n\n빈 값은 공란(수기 기입), 점수는 입력된 값만으로 계산됩니다. 진행할까요?")) return;
+        var tp=todayStr().split("-");
+        var qd=$("xqDate").value?$("xqDate").value.split("-"):null;
+        var qTokens={
+          "공고명":$("xgTitle").value.trim(), "수요기관":$("xgClient").value.trim(), "수신처":$("xqRecv").value.trim(),
+          "공고번호":$("xqNo").value.trim(), "입찰일":qd?(+qd[0])+"."+(+qd[1])+"."+(+qd[2]):"",
+          "제출기한":$("xqDue").value.trim(), "공사기간":$("xqPeriod").value.trim(),
+          "입찰금액":qv.bid?qv.bid.toLocaleString():"", "예정가격":qv.pre?qv.pre.toLocaleString():"",
+          "제출일":(+tp[0])+". "+(+tp[1])+". "+(+tp[2])+".", "제출일자":(+tp[0])+"년 "+(+tp[1])+"월 "+(+tp[2])+"일",
+          "점수계":qualNum(qs.total), "점수소계":qualNum(qs.sub), "점수실적":qualNum(qs.perf),
+          "점수경영":qualNum(qs.mgmt), "점수신인도":qualSign(qs.shin), "점수입찰가":qualNum(qs.price), "점수안전":qualSign(qs.safety)
+        };
+        $("xgGo").textContent="생성 중…"; $("xgGo").disabled=true;
+        gwCall("gw-data",{action:"tpl_get", key:"qual_packet"}).then(function(res){
+          if(res.status!==200){ alert(res.status===404?"'적격심사 패킷' 양식이 미등록입니다. [+ 양식 등록]에서 hwpx 템플릿을 등록하세요.":"양식 로드 실패"); return; }
+          return fillHwpxTemplate(res.body.data, qTokens).then(function(blob){
+            downloadBlob(($("xgTitle").value.trim()||c.label||"서류")+"_적격심사패킷.hwpx", blob);
+            alert("적격심사 패킷 생성 — 자기평점 계 "+qualNum(qs.total)+"점.\n※ 입찰가격 산식은 실전 1건으로 검증 전입니다. 한컴에서 열어 값·점수를 확인하고 제출하세요.");
+            $("xlsxGenBackdrop").classList.remove("show"); xgCtx=null;
+          });
+        }).catch(function(e){ alert("생성 실패: "+e); })
+          .finally(function(){ $("xgGo").textContent="생성·다운로드"; $("xgGo").disabled=false; });
         return;
       }
       // 하드리딩 원칙: 원문(계약서·조사서·대장)에서 못 채운 값만 확인요망으로 사람에게 확인
