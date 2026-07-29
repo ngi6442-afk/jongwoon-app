@@ -659,6 +659,27 @@ async function handleBldgLookup(event, d, R) {
   } catch (e) { return jr(500, { status: 'ERROR', error_code: 'BLDG_API_FAILED', request_id: R }); }
 }
 
+// ---- 공고 첨부 내역서 가져오기 — 낙찰 연동 계약의 낙찰률 적용용(URL은 서버 저장 공고 데이터에서만 — SSRF 차단) ----
+async function handleBidSheet(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (permOf(c.member, 'contracts') === 'hide') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_ACCESS', request_id: R });
+  const r = await blobGet(store(DATA), colKey('bids'));
+  const items = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data.items : [];
+  const b = items.find(function (it) { return it && it.id === String(d.bid_id || ''); });
+  if (!b) return jr(404, { status: 'REJECTED', error_code: 'BID_NOT_FOUND', request_id: R });
+  const docs = (b.docs || []).filter(function (x) { return /내역|물량/.test(x.n || ''); });
+  if (!docs.length) return jr(200, { status: 'NONE', request_id: R });
+  const doc = docs.find(function (x) { return /\.xlsx$/i.test(x.n || ''); }) || docs[0];
+  try {
+    const resp = await fetch(doc.u, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+    if (!resp.ok) return jr(502, { status: 'ERROR', error_code: 'DOC_FETCH_' + resp.status, request_id: R });
+    const buf = Buffer.from(await resp.arrayBuffer());
+    if (buf.length > 8 * 1024 * 1024) return jr(413, { status: 'REJECTED', error_code: 'DOC_TOO_LARGE', request_id: R });
+    return jr(200, { status: 'OK', name: String(doc.n || '내역서'), data: buf.toString('base64'), request_id: R });
+  } catch (e) { return jr(502, { status: 'ERROR', error_code: 'DOC_FETCH_FAILED', request_id: R }); }
+}
+
 // ---- 백업 내보내기 — appdata GitHub Actions(cron)가 서버 시크릿으로 호출, git에 스냅샷 보관 ----
 const BACKUP_STORES = { gw_data: 1, gw_users: 1, gw_files: 1 };
 function backupAuthed(d) {
@@ -761,6 +782,7 @@ async function handler(event) {
     if (d && d.action === 'bids_export') return await handleBidsExport(event, d, R);
     if (d && d.action === 'bids_results') return await handleBidsResults(event, d, R);
     if (d && d.action === 'bldg_lookup') return await handleBldgLookup(event, d, R);
+    if (d && d.action === 'bid_sheet') return await handleBidSheet(event, d, R);
     if (d && d.action === 'backup_list') return await handleBackupList(event, d, R);
     if (d && d.action === 'backup_get') return await handleBackupGet(event, d, R);
     if (d && d.action === 'tpl_put') return await handleTplPut(event, d, R);

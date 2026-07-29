@@ -1194,7 +1194,9 @@
       <select id="xgProc"></select>
     </div>
     <div id="xgRateWrap" style="display:none;">
-      <span class="fld-label">발주처 내역서 파일(xlsx — 구형 xls는 엑셀에서 xlsx로 저장 후)</span>
+      <button class="mini-btn" id="xgRateFromBid" style="display:none;margin-bottom:4px;">📎 공고 첨부 내역서 불러오기</button>
+      <span id="xgRateSrc" style="font-size:12px;color:#1A9A6B;display:block;"></span>
+      <span class="fld-label">또는 내역서 파일 직접 선택(xlsx — 구형 xls는 엑셀에서 xlsx로 저장 후)</span>
       <input type="file" id="xgRateFile" accept=".xlsx">
       <input type="text" id="xgRateBase" placeholder="기초금액/원본 도급액 (숫자만, VAT 포함)" inputmode="numeric" autocomplete="off">
       <input type="text" id="xgRateTarget" placeholder="낙찰금액 (숫자만, VAT 포함)" inputmode="numeric" autocomplete="off">
@@ -4899,11 +4901,14 @@
     if(k){ openXlsxGen(procId, k, stage); return; }   // 착공·준공·노동부신고 → 등록 양식 xlsx 자동 생성
     openDocFromContract(procId, stage);               // 계약(비입찰 계약서 작성)·견적 등 → 서류출력 폼
   }
-  var xgCtx=null;
+  var xgCtx=null, xgRateFetched=null;   // xgRateFetched: 공고 첨부에서 불러온 내역서 {name, bytes}
   // 프리필(하드리딩 체인) — 모달 표시 없이 필드만 채움(일괄 생성에서도 사용)
   function xgPrefill(conId, presetKind, stage){
     var c=findProc(conId); if(!c) return null;
     xgCtx={id:conId};
+    xgRateFetched=null;
+    var xrs=document.getElementById("xgRateSrc"); if(xrs) xrs.textContent="";
+    var xrb=document.getElementById("xgRateBase"); if(xrb){ xrb.value=""; document.getElementById("xgRateTarget").value=""; document.getElementById("xgRateFile").value=""; }
     document.getElementById("xgHint").textContent="["+(c.label||"계약")+(c.site?" · "+c.site:"")+(stage?" · "+stage+" 단계":"")+"] 등록된 양식 원본에 값을 채워 xlsx로 내려받습니다.";
     var isAsb=!!(c.elems&&c.elems.asb);
     var s=c.asb_survey||{}, ci=c.contract_info||{}, bi=c.bldg_info||{};   // 자동 채움: 계약값 → 계약서 → 조사서 → 대장 (하드리딩 우선, 없는 값만 확인요망)
@@ -5017,7 +5022,14 @@
     document.getElementById("xgAsbFields").style.display = (k==="asb_plan") ? "" : "none";
     document.getElementById("xgWasteWrap").style.display = (k==="waste_report") ? "" : "none";
     document.getElementById("xgRateWrap").style.display = (k==="bid_rate") ? "" : "none";
-    if(k==="bid_rate") document.getElementById("xgMoneyFields").style.display="none";
+    if(k==="bid_rate"){
+      document.getElementById("xgMoneyFields").style.display="none";
+      var cR=xgCtx?findProc(xgCtx.id):null, ciR=(cR&&cR.contract_info)||{};
+      // 우선순위 ①: 낙찰 연동 건이면 공고 첨부에서 자동, 기초·낙찰금액 프리필
+      document.getElementById("xgRateFromBid").style.display=(cR&&cR.bid_id)?"":"none";
+      if(ciR.base && !document.getElementById("xgRateBase").value) document.getElementById("xgRateBase").value=ciR.base;
+      if(ciR.amount && !document.getElementById("xgRateTarget").value) document.getElementById("xgRateTarget").value=ciR.amount;
+    }
     if(k==="waste_report"){
       document.getElementById("xgCo").value="env";   // 폐기물 서류=종운환경 고정 규칙
       // 처리업소 후보: 거래처(폐기물 처리업소 체크) — 석면 기본 그린바이로(양식값, 최신 정보는 확인요망)
@@ -5249,31 +5261,52 @@
     if($("conPerfBtn")) $("conPerfBtn").addEventListener("click", conExportPerf);
     if($("tplClose")) $("tplClose").addEventListener("click", function(){ $("tplBackdrop").classList.remove("show"); });
     if($("xgKind")) $("xgKind").addEventListener("change", xgToggle);
+    if($("xgRateFromBid")) $("xgRateFromBid").addEventListener("click", function(){
+      var c=xgCtx?findProc(xgCtx.id):null; if(!c||!c.bid_id) return;
+      var btn=this; btn.textContent="불러오는 중…"; btn.disabled=true;
+      gwCall("gw-data",{action:"bid_sheet", bid_id:c.bid_id}).then(function(res){
+        var b=(res&&res.body)||{};
+        if(res.status===200 && b.status==="OK" && b.data){
+          xgRateFetched={name:b.name, bytes:dataUrlToBytes("x,"+b.data)};
+          document.getElementById("xgRateSrc").textContent="✓ 공고 첨부: "+b.name+(/\.xls$/i.test(b.name)?" — 구형 xls라 적용 불가, 엑셀에서 xlsx 저장 후 직접 선택하세요":"");
+        } else if(b.status==="NONE"){
+          document.getElementById("xgRateSrc").textContent="공고 첨부에 내역서가 없습니다 — 발주처에서 받은 파일을 직접 선택하세요.";
+        } else {
+          document.getElementById("xgRateSrc").textContent="불러오기 실패("+(b.error_code||res.status)+") — 파일을 직접 선택하세요.";
+        }
+      }).catch(function(){ document.getElementById("xgRateSrc").textContent="불러오기 실패(네트워크)"; })
+        .finally(function(){ btn.textContent="📎 공고 첨부 내역서 불러오기"; btn.disabled=false; });
+    });
     if($("xgCancel")) $("xgCancel").addEventListener("click", function(){ $("xlsxGenBackdrop").classList.remove("show"); xgCtx=null; });
     if($("xgGo")) $("xgGo").addEventListener("click", function(){
       if(!xgCtx) return;
       var c=findProc(xgCtx.id); if(!c) return;
       var kind=$("xgKind").value;
-      if(kind==="bid_rate"){   // 내역서 낙찰률 적용 — 양식이 아니라 건별 파일 처리
+      if(kind==="bid_rate"){   // 내역서 낙찰률 적용 — ①공고 첨부 자동 ②파일 직접 선택
         var fEl=$("xgRateFile");
         var base=parseInt(($("xgRateBase").value||"").replace(/[^0-9]/g,""),10)||0;
         var tgt=parseInt(($("xgRateTarget").value||"").replace(/[^0-9]/g,""),10)||0;
-        if(!fEl.files||!fEl.files.length){ alert("발주처 내역서 xlsx 파일을 선택하세요."); return; }
+        var hasFile=fEl.files&&fEl.files.length;
+        if(!hasFile && !xgRateFetched){ alert("공고 첨부 내역서를 불러오거나 파일을 직접 선택하세요."); return; }
         if(!base||!tgt){ alert("기초금액과 낙찰금액을 입력하세요."); return; }
         if(tgt>=base && !confirm("낙찰금액이 기초금액 이상입니다. 그대로 진행할까요?")) return;
         var rate=tgt/base;
-        $("xgGo").textContent="적용 중…"; $("xgGo").disabled=true;
-        var fr=new FileReader();
-        fr.onload=function(){
-          bidRateApply(new Uint8Array(fr.result), rate).then(function(res){
+        var srcName=hasFile?fEl.files[0].name:xgRateFetched.name;
+        var run=function(bytes){
+          bidRateApply(bytes, rate).then(function(res){
             if(!res.changed){ alert("조정할 단가를 찾지 못했습니다 — '단가' 헤더가 있는 시트의 숫자 단가만 조정합니다.\n(구형 .xls면 엑셀에서 .xlsx로 저장 후 다시)"); return; }
-            downloadBlob(fEl.files[0].name.replace(/\.xlsx$/i,"")+"_낙찰률적용.xlsx", res.blob);
+            downloadBlob(srcName.replace(/\.(xlsx|xls)$/i,"")+"_낙찰률적용.xlsx", res.blob);
             alert("낙찰률 "+(rate*100).toFixed(4)+"% 적용 — 단가 "+res.changed+"개 조정("+res.sheets+"개 시트).\n파일을 열어 도급액이 낙찰가와 일치하는지 확인하고, 1원~수백원 차이는 관행대로 합계 보정하세요.");
-            $("xlsxGenBackdrop").classList.remove("show"); xgCtx=null;
+            $("xlsxGenBackdrop").classList.remove("show"); xgCtx=null; xgRateFetched=null;
           }).catch(function(e){ alert("적용 실패: "+e); })
             .finally(function(){ $("xgGo").textContent="생성·다운로드"; $("xgGo").disabled=false; });
         };
-        fr.readAsArrayBuffer(fEl.files[0]);
+        $("xgGo").textContent="적용 중…"; $("xgGo").disabled=true;
+        if(hasFile){
+          var fr=new FileReader();
+          fr.onload=function(){ run(new Uint8Array(fr.result)); };
+          fr.readAsArrayBuffer(fEl.files[0]);
+        } else run(xgRateFetched.bytes);
         return;
       }
       // 하드리딩 원칙: 원문(계약서·조사서·대장)에서 못 채운 값만 확인요망으로 사람에게 확인
@@ -5632,6 +5665,7 @@
       var lb=lastBidForCon;
       btitle=lb.title||"";
       bcinfo={ title:lb.title||"", amount:((lb.result&&lb.result.amt)||0), d1:"", d2:"", d3:"",
+        base:((lb.ext&&lb.ext.bss)||lb.budget||0),   // 기초금액 — 내역서 낙찰률 적용 프리필용
         client:lb.org||"", site:"", guarantee:0, from:"낙찰 공고("+(lb.no||lb.id||"")+")", checked:todayStr() };
     }
     var nc=startProcess(type, {client:client, site:site, start:start, who:who, docType:docType,
