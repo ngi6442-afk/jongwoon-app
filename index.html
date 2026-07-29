@@ -1157,6 +1157,7 @@
       <option value="asb_plan">석면해체계획서</option>
       <option value="demo_report">해체신고서(완료신고 포함)</option>
       <option value="waste_report">폐기물배출신고서(수탁확인 포함)</option>
+      <option value="bid_rate">내역서 낙찰률 적용(발주처 내역서 → 낙찰가)</option>
     </select>
     <span class="fld-label">시행 회사</span>
     <select id="xgCo">
@@ -1191,6 +1192,13 @@
       </div>
       <span class="fld-label">처리업소 (거래처에서 "폐기물 처리업소" 체크한 곳이 후보로 뜸)</span>
       <select id="xgProc"></select>
+    </div>
+    <div id="xgRateWrap" style="display:none;">
+      <span class="fld-label">발주처 내역서 파일(xlsx — 구형 xls는 엑셀에서 xlsx로 저장 후)</span>
+      <input type="file" id="xgRateFile" accept=".xlsx">
+      <input type="text" id="xgRateBase" placeholder="기초금액/원본 도급액 (숫자만, VAT 포함)" inputmode="numeric" autocomplete="off">
+      <input type="text" id="xgRateTarget" placeholder="낙찰금액 (숫자만, VAT 포함)" inputmode="numeric" autocomplete="off">
+      <div style="font-size:12px;color:#888;margin:4px 0;">단가 전체에 낙찰률을 곱해 원 단위로 맞춥니다. 파일을 열면 수식이 재계산되니 도급액이 낙찰가와 1원~수백원 차이 나면 관행대로 합계만 보정하세요.</div>
     </div>
     <button class="primary" id="xgGo">생성·다운로드</button>
     <button class="secondary" id="xgCancel">취소</button>
@@ -4938,6 +4946,54 @@
     if(c.elems&&c.elems.asb&&c.asb_survey&&c.asb_survey.confirmed) kinds.push("asb_plan");
     return kinds;
   }
+  // 내역서 낙찰률 적용 — '단가' 헤더 열의 숫자 상수 셀만 ×낙찰률(반올림). 수식·문자열은 보존 → 열면 자동 재계산
+  async function bidRateApply(bytes, rate){
+    var files=await unzip(bytes);
+    var dec=new TextDecoder(), enc=new TextEncoder();
+    var raw={};
+    for(var name in files){ raw[name]= files[name].method===0 ? files[name].comp : await inflateRaw(files[name].comp); }
+    var shared=[];
+    if(raw["xl/sharedStrings.xml"]){
+      var ss=dec.decode(raw["xl/sharedStrings.xml"]);
+      (ss.match(/<si[\s>][\s\S]*?<\/si>/g)||[]).forEach(function(si){
+        shared.push((si.match(/<t[^>]*>([\s\S]*?)<\/t>/g)||[]).map(function(t){ return t.replace(/<[^>]+>/g,""); }).join(""));
+      });
+    }
+    function colNum(ref){ var s=ref.match(/^([A-Z]+)/)[1], n=0; for(var i=0;i<s.length;i++) n=n*26+(s.charCodeAt(i)-64); return n; }
+    var changed=0, sheets=0;
+    for(var name2 in raw){
+      if(!/^xl\/worksheets\/sheet\d+\.xml$/.test(name2)) continue;
+      var xml=dec.decode(raw[name2]);
+      var hdrCols={}, m, reC=/<c r="([A-Z]+)(\d+)"([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g;
+      while((m=reC.exec(xml))){
+        if(/t="s"/.test(m[3]||"")){
+          var vm=(m[4]||"").match(/<v>(\d+)<\/v>/);
+          if(vm && String(shared[+vm[1]]||"").replace(/\s+/g,"")==="단가") hdrCols[colNum(m[1])]=+m[2];
+        }
+      }
+      if(!Object.keys(hdrCols).length) continue;
+      sheets++;
+      // 자기닫힘(<c .../>)은 1번 분기로 소비해 교체식이 다음 셀을 삼키지 않게 함
+      xml=xml.replace(/<c r="([A-Z]+)(\d+)"([^>]*?)\/>|<c r="([A-Z]+)(\d+)"([^>]*?)>([\s\S]*?)<\/c>/g, function(whole, c1,r1,a1, col,row,attrs,inner){
+        if(c1) return whole;                          // 빈 셀
+        var hr=hdrCols[colNum(col)];
+        if(hr===undefined || +row<=hr) return whole;
+        if(/t="/.test(attrs)) return whole;          // 문자열 제외
+        if(inner.indexOf("<f")>=0) return whole;      // 수식 제외(합계·전파는 재계산이 처리)
+        var vm2=inner.match(/<v>(-?[\d.]+)<\/v>/);
+        if(!vm2 || !parseFloat(vm2[1])) return whole;
+        changed++;
+        return '<c r="'+col+row+'"'+attrs+'><v>'+Math.round(parseFloat(vm2[1])*rate)+'</v></c>';
+      });
+      raw[name2]=enc.encode(xml);
+    }
+    var wbx=dec.decode(raw["xl/workbook.xml"]);
+    if(/<calcPr /.test(wbx) && wbx.indexOf("fullCalcOnLoad")<0) wbx=wbx.replace("<calcPr ", '<calcPr fullCalcOnLoad="1" ');
+    else if(!/<calcPr/.test(wbx)) wbx=wbx.replace("</workbook>", '<calcPr fullCalcOnLoad="1"/></workbook>');
+    raw["xl/workbook.xml"]=enc.encode(wbx);
+    return { blob: zipStore(Object.keys(raw).map(function(n){ return {name:n, data:raw[n]}; })), changed:changed, sheets:sheets };
+  }
+
   // 계약서 확정 후 후속 서류 일괄 생성(와라라락) — 석면 계획서는 조사서 검수 확정 시 별도 제안
   function conGenPacket(c){
     var kinds=conPacketKinds(c);
@@ -4960,6 +5016,8 @@
     document.getElementById("xgMoneyFields").style.display = (k==="asb_plan"||k==="waste_report") ? "none" : "";
     document.getElementById("xgAsbFields").style.display = (k==="asb_plan") ? "" : "none";
     document.getElementById("xgWasteWrap").style.display = (k==="waste_report") ? "" : "none";
+    document.getElementById("xgRateWrap").style.display = (k==="bid_rate") ? "" : "none";
+    if(k==="bid_rate") document.getElementById("xgMoneyFields").style.display="none";
     if(k==="waste_report"){
       document.getElementById("xgCo").value="env";   // 폐기물 서류=종운환경 고정 규칙
       // 처리업소 후보: 거래처(폐기물 처리업소 체크) — 석면 기본 그린바이로(양식값, 최신 정보는 확인요망)
@@ -5196,6 +5254,28 @@
       if(!xgCtx) return;
       var c=findProc(xgCtx.id); if(!c) return;
       var kind=$("xgKind").value;
+      if(kind==="bid_rate"){   // 내역서 낙찰률 적용 — 양식이 아니라 건별 파일 처리
+        var fEl=$("xgRateFile");
+        var base=parseInt(($("xgRateBase").value||"").replace(/[^0-9]/g,""),10)||0;
+        var tgt=parseInt(($("xgRateTarget").value||"").replace(/[^0-9]/g,""),10)||0;
+        if(!fEl.files||!fEl.files.length){ alert("발주처 내역서 xlsx 파일을 선택하세요."); return; }
+        if(!base||!tgt){ alert("기초금액과 낙찰금액을 입력하세요."); return; }
+        if(tgt>=base && !confirm("낙찰금액이 기초금액 이상입니다. 그대로 진행할까요?")) return;
+        var rate=tgt/base;
+        $("xgGo").textContent="적용 중…"; $("xgGo").disabled=true;
+        var fr=new FileReader();
+        fr.onload=function(){
+          bidRateApply(new Uint8Array(fr.result), rate).then(function(res){
+            if(!res.changed){ alert("조정할 단가를 찾지 못했습니다 — '단가' 헤더가 있는 시트의 숫자 단가만 조정합니다.\n(구형 .xls면 엑셀에서 .xlsx로 저장 후 다시)"); return; }
+            downloadBlob(fEl.files[0].name.replace(/\.xlsx$/i,"")+"_낙찰률적용.xlsx", res.blob);
+            alert("낙찰률 "+(rate*100).toFixed(4)+"% 적용 — 단가 "+res.changed+"개 조정("+res.sheets+"개 시트).\n파일을 열어 도급액이 낙찰가와 일치하는지 확인하고, 1원~수백원 차이는 관행대로 합계 보정하세요.");
+            $("xlsxGenBackdrop").classList.remove("show"); xgCtx=null;
+          }).catch(function(e){ alert("적용 실패: "+e); })
+            .finally(function(){ $("xgGo").textContent="생성·다운로드"; $("xgGo").disabled=false; });
+        };
+        fr.readAsArrayBuffer(fEl.files[0]);
+        return;
+      }
       // 하드리딩 원칙: 원문(계약서·조사서·대장)에서 못 채운 값만 확인요망으로 사람에게 확인
       var missing=[];
       if(kind==="waste_report"){
