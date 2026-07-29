@@ -2653,6 +2653,11 @@
     var me = myName();
     return !!(me && me === (t.by || t.from));
   }
+  // 웹푸시 발송 헬퍼 — 구독 기기 없으면 서버가 조용히 0건 처리, 실패 무시
+  function pushNotify(to, title, body, tag){
+    if(!to) return;
+    gwCall("gw-data",{action:"push_send", to:to, title:String(title).slice(0,60), body:String(body||"").slice(0,200), tag:tag||""}).catch(function(){});
+  }
   function toggleTaskDone(id){
     var t = findTask(id);
     if (!t) return;
@@ -2663,6 +2668,9 @@
       t.status = "open"; t.done_at = null; t.done_by = null;
     } else {                                  // 담당자 완료 체크 → 승인 대기
       t.status = "review"; t.done_at = todayStr(); t.done_by = myName() || "익명";
+      // 승인권자에게 푸시: 지시자 우선, 없거나 본인이면 관리자 전원
+      var apv=(t.from_id && t.from_id!==myId()) ? t.from_id : "__admins__";
+      pushNotify(apv, "승인요청: "+(t.title||"").slice(0,40), (t.done_by||"")+" 완료 요청", "task-rv-"+t.id);
     }
     t.updated = todayStr();
     saveTasksCache();
@@ -2674,6 +2682,7 @@
     var t = findTask(id);
     if (!t || t.status !== "review" || !canApproveTask(t)) return;
     t.status = "done"; t.approved_by = myName() || "관리자"; t.approved_at = todayStr(); t.updated = todayStr();
+    if (t.who_id && t.who_id !== myId()) pushNotify(t.who_id, "승인됨: "+(t.title||"").slice(0,40), "승인자 "+(t.approved_by||""), "task-ok-"+t.id);
     advanceProc(t);
     if (t.recur) spawnNextRecur(t);   // 반복 지시: 완료 승인 시 다음 회차 생성
     saveTasksCache(); renderTasks(); renderSummary(); scheduleTasksSave();
@@ -2720,12 +2729,16 @@
       if (isDate(l.expiry) && vehDday(l.expiry).diff<=30) mk("lic:"+l.id+":exp:"+l.expiry, (l.name||"인허가")+" 갱신", l.expiry);
       if (isDate(l.edu_due) && vehDday(l.edu_due).diff<=30) mk("lic:"+l.id+":edu:"+l.edu_due, (l.name||"인허가")+" 보수교육 이수", l.edu_due);
     });
-    if (created){ saveTasksCache(); scheduleTasksSave(); renderTasks(); renderSummary(); renderDashboard(); }
+    if (created){
+      saveTasksCache(); scheduleTasksSave(); renderTasks(); renderSummary(); renderDashboard();
+      pushNotify("__admins__", "만기 임박 "+created+"건", "차량·인허가 만기 지시가 자동 생성되었습니다", "auto-due");
+    }
   }
   function rejectTask(id){
     var t = findTask(id);
     if (!t || t.status !== "review" || !canApproveTask(t)) return;
     t.status = "open"; t.done_at = null; t.done_by = null; t.updated = todayStr();
+    if (t.who_id && t.who_id !== myId()) pushNotify(t.who_id, "반려: "+(t.title||"").slice(0,40), "다시 확인 후 진행해주세요", "task-rj-"+t.id);
     saveTasksCache(); renderTasks(); renderSummary(); scheduleTasksSave();
   }
 
@@ -4405,6 +4418,7 @@
         return "done";
       }
       t.status="review"; t.done_at=todayStr(); t.done_by=myName()||""; t.updated=todayStr();
+      pushNotify((t.from_id && t.from_id!==myId())?t.from_id:"__admins__", "승인요청: "+(t.title||"").slice(0,40), (t.done_by||"")+" 단계 완료 요청", "task-rv-"+t.id);
       saveTasksCache(); scheduleTasksSave(); renderTasks(); renderSummary();
       return "review";
     }

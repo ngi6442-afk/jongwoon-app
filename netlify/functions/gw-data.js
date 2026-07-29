@@ -548,7 +548,12 @@ async function handlePushSend(event, d, R) {
   const payload = { title: String(d.title || '알림').slice(0, 60), body: String(d.body || '').slice(0, 200),
     url: './', tag: String(d.tag || '').slice(0, 40) || undefined };
   try {
-    const rres = await push.sendTo([d.self === true ? c.member.id : to], payload);
+    let ids;
+    if (d.self === true) ids = [c.member.id];
+    else if (to === '__admins__') ids = (await push.adminIds()).filter(function (id) { return id !== c.member.id; });   // 본인 행동 알림은 본인 제외
+    else ids = [to];
+    if (!ids.length) return jr(200, { status: 'OK', sent: 0, request_id: R });
+    const rres = await push.sendTo(ids, payload);
     return jr(200, { status: 'OK', sent: rres.sent, request_id: R });
   } catch (e) { return jr(500, { status: 'ERROR', error_code: 'PUSH_SEND_FAILED', request_id: R }); }
 }
