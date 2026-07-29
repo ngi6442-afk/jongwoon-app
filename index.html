@@ -4610,6 +4610,7 @@
   function xlsxSetCell(xml, ref, val, kind){   // kind: s=문자열 n=숫자 b=공란 — 원본에 없는 셀은 건너뜀
     var re=new RegExp('<c r="'+ref+'"([^>]*?)(/>|>[\\s\\S]*?</c>)');
     var m=re.exec(xml); if(!m) return xml;
+    if(m[0].indexOf("<f")>=0) return xml;   // 수식 셀 보호 — 덮으면 calcChain 고아로 파일이 안 열림(실측: 공정표 B26)
     var sm=/\ss="\d+"/.exec(m[1]); var s=sm?sm[0]:"";
     var nw;
     if(kind==="b") nw='<c r="'+ref+'"'+s+'/>';
@@ -4629,11 +4630,16 @@
     var rid2t={}; rels.replace(/Id="([^"]+)"[^>]*Target="([^"]+)"/g, function(_,a,b){ rid2t[a]=b; return _; });
     var name2xml={}; wbx.replace(/<sheet name="([^"]+)"[^>]*r:id="([^"]+)"/g, function(_,nm,rid){ name2xml[nm]="xl/"+rid2t[rid]; return _; });
     for(var sheet in edits){
+      if(sheet==="__drop_drawings__") continue;   // 예약키: 시트의 도형(옛 막대 등 잔재) 제거 지시
       var path=name2xml[sheet]; if(!path||!raw[path]) continue;
       var xml=dec.decode(raw[path]);
       edits[sheet].forEach(function(e){ xml=xlsxSetCell(xml, e[0], e[1], e[2]); });
       raw[path]=enc.encode(xml);
     }
+    (edits["__drop_drawings__"]||[]).forEach(function(sn){
+      var p2=name2xml[sn]; if(!p2||!raw[p2]) return;
+      raw[p2]=enc.encode(dec.decode(raw[p2]).replace(/<drawing\b[^>]*\/>/g,""));
+    });
     // 수식 강제 재계산(기본정보→서식 수식 갱신)
     if(/<calcPr /.test(wbx) && wbx.indexOf("fullCalcOnLoad")<0) wbx=wbx.replace("<calcPr ", '<calcPr fullCalcOnLoad="1" ');
     else if(!/<calcPr/.test(wbx)) wbx=wbx.replace("</workbook>", '<calcPr fullCalcOnLoad="1"/></workbook>');
@@ -5482,10 +5488,25 @@
                   waste:["수집·운반","처리(인계)","준  공"],
                   dredge:["준설 작업","준  공"] };
       var gsts=GANTT[c.type]||[(title||"작업"),"준  공"];
-      for(var gi=0; gi<4; gi++){
-        gt.push(["C"+(14+gi), gi<gsts.length?gsts[gi]:"", gi<gsts.length?"s":"b"]);
+      // 공정표는 양식 설계대로 공종 2행(C14·C15)만 사용 — 옛 4행 기입은 표 밖으로 밀렸음(실측).
+      // 옛 화살표 도형 잔재 2개 제거 + B26 옛 이름 잔재 제거 + 기간 텍스트(F열) 자동 2분할(세부 조정은 엑셀에서).
+      var GANTT2={ asbestos:["보양·밀폐 및 석면 해체·제거","폐기물 상차·반출 및 정리"],
+                   demolition:["가설·보양 및 구조물 해체","폐기물 반출·정리"],
+                   waste:["수집·운반","처리(인계)·정리"],
+                   dredge:["준설 작업","정리·복구"] };
+      var g2=GANTT2[c.type]||[(title||"작업"),"정리"];
+      gt.push(["C14",g2[0],"s"],["C15",g2[1],"s"],["C16","","b"],["C17","","b"]);   // B26은 발주자 수식 셀 — 건드리지 않음
+      if(d2&&d3){
+        var md=function(dt){ return String(dt.getMonth()+1).padStart(2,"0")+"."+String(dt.getDate()).padStart(2,"0"); };
+        var t0=new Date(d2+"T00:00:00"), t1=new Date(d3+"T00:00:00");
+        var total=Math.round((t1-t0)/86400000)+1;
+        var cut1=Math.max(1, Math.round(total*0.6));   // 앞 공정 60%, 뒤 공정 40% 배분
+        var b1=new Date(t0.getTime()+(cut1-1)*86400000);
+        var a2=new Date(Math.min(t1.getTime(), t0.getTime()+cut1*86400000));
+        gt.push(["F14", md(t0)+" ~ "+md(b1), "s"], ["F15", md(a2)+" ~ "+md(t1), "s"]);
       }
       edits["공사예정공정표"]=gt;
+      edits["__drop_drawings__"]=["공사예정공정표"];
       // 직접시공계획서 — 옛 현장·발주·날짜·공종·수급인 재작성
       var DS_KIND={asbestos:"석면해체·제거", demolition:"철거", waste:"수집·운반", dredge:"준설"};
       var ds=[["G3",site,"s"],["C5",client,"s"],["A30",sendDt,"s"],
