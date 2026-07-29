@@ -4639,6 +4639,18 @@
     return {perf:sPerf, mgmt:sMgmt, shin:sShin, safety:sSafety, price:sPrice,
       sub:Math.round(sub*100)/100, total:Math.round((sub+(sPrice||0)+sSafety)*100)/100, rate:r};
   }
+  // 회사 실측 등급(증빙 하드리딩 — 만료 지나면 자동 폴백. 갱신 시 여기와 인허가 탭 함께 갱신)
+  // ㈜종운건설 안전성평가: 2025년 평가 D등급, 유효 2026-01-01~2026-12-31(공단 통보서 2026.1.2) → 만료 후 무등급(등록 2년↑)
+  // 신용평가: BB°(NICE D&B, ~2027-06-29)는 (유)종운환경 명의 — ㈜종운건설 명의 확인서 미확보(확인요망)
+  var QUAL_DEF={ con:{ safety:{v:"D", until:"2026-12-31", fallback:"none_old"}, credit:"" } };
+  function qualApplyDefaults(){
+    var d=QUAL_DEF[document.getElementById("xgCo").value]; if(!d) return;
+    if(d.safety){
+      var s=(todayStr()<=d.safety.until)?d.safety.v:d.safety.fallback;
+      document.getElementById("xqSafety").value=s;
+    }
+    document.getElementById("xqCredit").value=d.credit||"";
+  }
   function qualNum(x){ return x==null?"":String(Math.round(x*100)/100); }
   function qualSign(x){ if(x==null) return ""; if(x>0) return "+"+qualNum(x); return qualNum(x); }
   function qualCollect(){
@@ -4651,12 +4663,21 @@
   function qualRefresh(){
     var host=document.getElementById("xqScore"); if(!host) return;
     var s=qualScores(qualCollect());
+    // 통과에 필요한 입찰가격 평점 → 최소 투찰비율 역산(산식: 배점−2000×|0.88−r|)
+    var cfg=QUAL_CFG[qualCollect().tier]||QUAL_CFG.mid;
+    var need=Math.round((95-s.sub-s.safety)*100)/100, floorTxt="";
+    if(need>cfg.price) floorTxt=' · <span style="color:#c0392b">현 등급·실적으로는 통과 불가(필요 입찰가격 평점 '+need+' > 배점 '+cfg.price+')</span>';
+    else if(need>2){
+      var rMin=Math.round((0.88-(cfg.price-need)/2000)*1000000)/10000;
+      floorTxt=' · 통과선: 입찰가격 평점 '+need+'점↑ = 투찰비율(A값 반영) 약 '+rMin+'%~88% 구간';
+    }
     host.innerHTML='<b>자기평점 미리보기</b> — 계 <b>'+(s.total||0)+'</b>점 (통과 95)'
       +'<br>소계 '+qualNum(s.sub)+' = 시공경험 '+(s.perf==null?'<span style="color:#c0392b">면적입력</span>':qualNum(s.perf))
       +' + 경영 '+qualNum(s.mgmt)+' + 신인도 '+qualSign(s.shin)
       +' · 입찰가격 '+(s.price==null?'<span style="color:#c0392b">금액입력</span>':qualNum(s.price))
       +(s.rate!=null?' (비율 '+(s.rate*100).toFixed(2)+'%)':'')
-      +' · 안전성 '+qualSign(s.safety);
+      +' · 안전성 '+qualSign(s.safety)
+      +floorTxt;
   }
   function downloadBlob(name, blob){
     var a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=name;
@@ -5160,6 +5181,7 @@
         var mR=/([가-힣]+교육지원청)/.exec(document.getElementById("xgClient").value||"");
         if(mR) gv("xqRecv").value=mR[1]+"(분임)재무관";
       }
+      qualApplyDefaults();   // 실측 등급 기본값(만료 자동 폴백)
       qualRefresh();
     }
     if(k==="bid_rate"){
