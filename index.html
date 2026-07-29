@@ -4988,7 +4988,10 @@
         var vm2=inner.match(/<v>(-?[\d.]+)<\/v>/);
         if(!vm2 || !parseFloat(vm2[1])) return whole;
         changed++;
-        return '<c r="'+col+row+'"'+attrs+'><v>'+Math.round(parseFloat(vm2[1])*rate)+'</v></c>';
+        // 원본이 정수면 원 단위, 소수면 소수 2자리 유지(일위대가·단가대비표 정밀 단가 보존)
+        var ov=parseFloat(vm2[1]);
+        var nv=(ov===Math.trunc(ov)) ? Math.round(ov*rate) : Math.round(ov*rate*100)/100;
+        return '<c r="'+col+row+'"'+attrs+'><v>'+nv+'</v></c>';
       });
       raw[name2]=enc.encode(xml);
     }
