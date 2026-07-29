@@ -1158,6 +1158,7 @@
       <option value="demo_report">해체신고서(완료신고 포함)</option>
       <option value="waste_report">폐기물배출신고서(수탁확인 포함)</option>
       <option value="qual_packet">적격심사 패킷(신청서·심사표·각서·확약서 hwp)</option>
+      <option value="con_docs">계약서류(서약서+사용인감계 hwp)</option>
       <option value="bid_rate">내역서 낙찰률 적용(발주처 내역서 → 낙찰가)</option>
     </select>
     <span class="fld-label">시행 회사</span>
@@ -1251,6 +1252,14 @@
       </div>
       <div id="xqScore" style="font-size:13px;background:var(--panel-bg,#f4f6f8);border-radius:6px;padding:8px;margin:4px 0;"></div>
       <div style="font-size:12px;color:#888;">점수는 경상북도교육청 세부기준(2023.7.10 시행)으로 계산합니다. 등급·만료일은 인허가 탭에 등록하면 만기 30일 전 자동 지시가 생깁니다.</div>
+    </div>
+    <div id="xgConDocsWrap" style="display:none;">
+      <input type="text" id="xcRecv" placeholder="수신처 (예: 포항시 맑은물사업본부 관리자(기업출납원))" autocomplete="off">
+      <div style="display:flex;gap:8px;">
+        <input type="text" id="xcRate" placeholder="계약보증금률 % (기본 5)" inputmode="decimal" style="flex:1" autocomplete="off">
+        <span style="flex:2;font-size:12px;color:#888;align-self:center;">보증기간=계약일~준공예정일, 보증금액=계약금액×률 자동</span>
+      </div>
+      <div style="font-size:12px;color:#888;">포항시 양식 기준. 서약서 6·7번 체크는 수의계약 기준(예/아니오) — <b>입찰(적격심사) 건은 인쇄 후 '해당없음'으로 수정</b>하세요. 타 발주처 양식은 별도 등록 필요.</div>
     </div>
     <button class="primary" id="xgGo">생성·다운로드</button>
     <button class="secondary" id="xgCancel">취소</button>
@@ -4601,10 +4610,25 @@
     var dec=new TextDecoder(), enc=new TextEncoder();
     var raw={};
     for(var name in files){ raw[name]= files[name].method===0 ? files[name].comp : await inflateRaw(files[name].comp); }
+    var tokVal=function(k){ return xmlEsc(tokens[k]==null?"":String(tokens[k])); };
     for(var n2 in raw){
       if(!/^Contents\/.*\.xml$/.test(n2)) continue;
       var xml=dec.decode(raw[n2]);
-      for(var k in tokens){ xml=xml.split("{{"+k+"}}").join(xmlEsc(tokens[k]==null?"":String(tokens[k]))); }
+      // 토큰이 든 최내곽 문단만 교체+줄배치 캐시(lineseg) 1줄로 축소.
+      // 이유: 교체로 문단 길이가 변하면 옛 캐시 textpos가 텍스트 범위를 벗어나 한컴이 열기를 거부(실측: 토큰이 여러 줄로 감긴 셀).
+      // 전체 문단을 건드리면 긴 고정 문단 렌더가 뭉개지므로(실측) 토큰 문단만 국소 처리 — 값 셀은 짧아 1줄이면 충분.
+      xml=xml.replace(/<hp:p\b[^>]*>(?:(?!<hp:p[\s>])[\s\S])*?<\/hp:p>/g, function(para){
+        if(para.indexOf("{{")<0) return para;
+        for(var k in tokens){ para=para.split("{{"+k+"}}").join(tokVal(k)); }
+        para=para.replace(/<hp:linesegarray>([\s\S]*?)<\/hp:linesegarray>/g, function(w, inner){
+          var m=inner.match(/<hp:lineseg\b[^>]*\/>/);
+          if(!m) return w;
+          return '<hp:linesegarray>'+m[0].replace(/textpos="\d+"/,'textpos="0"')+'</hp:linesegarray>';
+        });
+        return para;
+      });
+      // 중첩 문단 등 남은 토큰 폴백(캐시 축소 없이)
+      for(var k2 in tokens){ if(xml.indexOf("{{"+k2+"}}")>=0) xml=xml.split("{{"+k2+"}}").join(tokVal(k2)); }
       raw[n2]=enc.encode(xml);
     }
     // hwpx 규격: mimetype이 첫 엔트리·무압축 — zipStore는 전항목 STORE라 순서만 맞추면 됨
@@ -4983,8 +5007,8 @@
   }
 
   // ---- 서류 양식 등록/생성 ----
-  var TPL_LABELS={asb_plan:"석면해체계획서", work_start:"착공계", work_complete:"준공계", demo_report:"해체신고서", waste_report:"폐기물배출신고서", qual_packet:"적격심사 패킷"};
-  var TPL_EXT={qual_packet:".hwpx"};   // 기본 .xlsx, hwpx 양식만 예외
+  var TPL_LABELS={asb_plan:"석면해체계획서", work_start:"착공계", work_complete:"준공계", demo_report:"해체신고서", waste_report:"폐기물배출신고서", qual_packet:"적격심사 패킷", contract_pledge:"계약이행서약서", seal_reg:"사용인감계"};
+  var TPL_EXT={qual_packet:".hwpx", contract_pledge:".hwpx", seal_reg:".hwpx"};   // 기본 .xlsx, hwpx 양식만 예외
   function openTplManage(){
     if(!isAdmin()) return;
     var host=document.getElementById("tplRows");
@@ -5023,6 +5047,7 @@
   function stageXlsxKind(stage){
     var s=String(stage||"");
     if(/적격심사/.test(s)) return "qual_packet";
+    if(/계약서류|계약체결/.test(s)) return "con_docs";
     if(/착공|착수/.test(s)) return "work_start";
     if(/준공/.test(s)) return "work_complete";
     if(/노동부신고/.test(s) && !/완료/.test(s)) return "asb_plan";
@@ -5161,6 +5186,13 @@
     document.getElementById("xgWasteWrap").style.display = (k==="waste_report") ? "" : "none";
     document.getElementById("xgRateWrap").style.display = (k==="bid_rate") ? "" : "none";
     document.getElementById("xgQualWrap").style.display = (k==="qual_packet") ? "" : "none";
+    document.getElementById("xgConDocsWrap").style.display = (k==="con_docs") ? "" : "none";
+    if(k==="con_docs"){
+      document.getElementById("xgAgentWrap").style.display="none";
+      var cD=xgCtx?findProc(xgCtx.id):null;
+      if(!document.getElementById("xcRecv").value && cD && /맑은물사업본부/.test(cD.client||""))
+        document.getElementById("xcRecv").value=(cD.client||"").trim()+" 관리자(기업출납원)";
+    }
     if(k==="qual_packet"){
       document.getElementById("xgMoneyFields").style.display="none";
       document.getElementById("xgCo").value="con";   // 석면공사 적격심사=㈜종운건설
@@ -5508,6 +5540,50 @@
             alert("적격심사 패킷 생성 — 자기평점 계 "+qualNum(qs.total)+"점.\n※ 입찰가격 산식은 실전 1건으로 검증 전입니다. 한컴에서 열어 값·점수를 확인하고 제출하세요.");
             $("xlsxGenBackdrop").classList.remove("show"); xgCtx=null;
           });
+        }).catch(function(e){ alert("생성 실패: "+e); })
+          .finally(function(){ $("xgGo").textContent="생성·다운로드"; $("xgGo").disabled=false; });
+        return;
+      }
+      if(kind==="con_docs"){   // 계약서류: 서약서+사용인감계 hwpx 2종 (포항시 양식)
+        var CD_CO={ env:{name:"유한회사 종운환경", tel:"054-291-1204", addr:"경북 포항시 남구 서원재로 1(호동)", biz:"506-81-48535"},
+                    con:{name:"주식회사 종운건설", tel:"054-291-1202", addr:"포항시 남구 정몽주로 823-10", biz:"506-81-84827"} };
+        var cdCo=CD_CO[$("xgCo").value]||CD_CO.env;
+        var cdAmt=parseInt(($("xgAmount").value||"").replace(/[^0-9]/g,""),10)||0;
+        var cdRate=parseFloat($("xcRate").value)||5;
+        var cdM=[];
+        if(!$("xgTitle").value.trim()) cdM.push("계약명");
+        if(!cdAmt) cdM.push("계약금액");
+        if(!$("xgD1").value) cdM.push("계약일(보증기간 시작·작성일)");
+        if(!$("xgD3").value) cdM.push("준공예정일(보증기간 끝)");
+        if(!$("xcRecv").value.trim()) cdM.push("수신처");
+        if(cdM.length && !confirm("⚠ 확인요망 — 비어 있는 값:\n· "+cdM.join("\n· ")+"\n\n빈칸(수기 기입)으로 두고 생성할까요?")) return;
+        var cdF=function(iso){ if(!/^\d{4}-\d{2}-\d{2}$/.test(iso||"")) return ""; var p=iso.split("-"); return p[0]+"."+p[1]+"."+p[2]+"."; };
+        var cdKo=""; if(cdAmt){ var ks=koAmount(cdAmt); cdKo=ks.slice(0,ks.indexOf("원")+1).replace(/\s/g,""); }
+        var cdBond=cdAmt?Math.round(cdAmt*cdRate/100):0;
+        var tp2=todayStr().split("-");
+        var pledgeTokens={ "계약명":$("xgTitle").value.trim(),
+          "보증기간":(cdF($("xgD1").value)&&cdF($("xgD3").value))?cdF($("xgD1").value)+"~"+cdF($("xgD3").value):"",
+          "업체명":cdCo.name, "연락처":cdCo.tel, "사업자번호":cdCo.biz,
+          "금액한글":cdKo, "금액숫자":cdAmt?cdAmt.toLocaleString():"",
+          "보증금률":cdRate+"%", "보증금액":cdBond?cdBond.toLocaleString():"",
+          "작성일":cdF($("xgD1").value)||cdF(todayStr()), "수신처":$("xcRecv").value.trim() };
+        var sealTokens={ "작성일":(+tp2[0])+"년  "+tp2[1]+"월    일", "업체명":cdCo.name, "주소":cdCo.addr };
+        var cdName=$("xgTitle").value.trim()||c.label||"계약";
+        $("xgGo").textContent="생성 중…"; $("xgGo").disabled=true;
+        gwCall("gw-data",{action:"tpl_get", key:"contract_pledge"}).then(function(r1){
+          if(r1.status!==200) throw (r1.status===404?"'계약이행서약서' 양식 미등록 — [+ 양식 등록]":"양식 로드 실패");
+          return fillHwpxTemplate(r1.body.data, pledgeTokens);
+        }).then(function(b1){
+          downloadBlob(cdName+"_계약이행서약서.hwpx", b1);
+          return gwCall("gw-data",{action:"tpl_get", key:"seal_reg"});
+        }).then(function(r2){
+          if(r2.status!==200) throw (r2.status===404?"'사용인감계' 양식 미등록 — [+ 양식 등록]":"양식 로드 실패");
+          return fillHwpxTemplate(r2.body.data, sealTokens);
+        }).then(function(b2){
+          downloadBlob(cdName+"_사용인감계.hwpx", b2);
+          alert("계약서류 2종 생성 완료."+((c&&c.bid_id)?"\n※ 입찰(적격심사) 건 — 서약서 6·7번을 '해당없음'으로 체크 수정 후 날인하세요.":"")
+            +"\n※ 포항시 외 발주처는 양식이 다를 수 있으니 확인 후 제출하세요.");
+          $("xlsxGenBackdrop").classList.remove("show"); xgCtx=null;
         }).catch(function(e){ alert("생성 실패: "+e); })
           .finally(function(){ $("xgGo").textContent="생성·다운로드"; $("xgGo").disabled=false; });
         return;
