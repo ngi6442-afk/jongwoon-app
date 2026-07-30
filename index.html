@@ -7212,12 +7212,16 @@
   function mergeBidsLocal(local,remote){ var byId={}; (local||[]).forEach(function(b){if(b&&b.id)byId[b.id]=b;}); (remote||[]).forEach(function(x){if(!x||!x.id)return;var c=byId[x.id];if(!c){byId[x.id]=x;}else{var w=(x.updated||"")>(c.updated||"")?x:c;var m=Object.assign({},(w===x?c:x),w);if(c.del===1||x.del===1)m.del=1;byId[x.id]=m;}}); return Object.keys(byId).map(function(k){return byId[k];}); }
   function doSaveBids(){
     var token=getToken(); if(!token) return;
-    var body=JSON.stringify({schema:1,items:bids});
+    // 수집봇이 심어둔 health·awards(계산기 실측선)는 앱 저장 시 보존 — 안 넣으면 다음 저장에 날아간다
+    var bdoc={schema:1,items:bids};
+    if(bidsHealth) bdoc.health=bidsHealth;
+    if(bidsAwards) bdoc.awards=bidsAwards;
+    var body=JSON.stringify(bdoc);
     var payload={message:"bids: 업데이트",content:b64EncodeUnicode(body),branch:"main"};
     if(bidsSha) payload.sha=bidsSha;
     fetch(BIDS_API,{method:"PUT",headers:Object.assign({"Content-Type":"application/json"},ghHeaders()),body:JSON.stringify(payload)}).then(function(resp){
       if(resp.status===401) return;
-      if(resp.status===409||resp.status===422){ return fetch(BIDS_API,{headers:ghHeaders()}).then(function(r){return r.status===404?null:r.json();}).then(function(j){ if(j){var up={};try{up=JSON.parse(b64DecodeUnicode(j.content))||{};}catch(e){} bids=mergeBidsLocal(bids,up.items||[]); bidsSha=j.sha;} return doSaveBids(); }); }
+      if(resp.status===409||resp.status===422){ return fetch(BIDS_API,{headers:ghHeaders()}).then(function(r){return r.status===404?null:r.json();}).then(function(j){ if(j){var up={};try{up=JSON.parse(b64DecodeUnicode(j.content))||{};}catch(e){} bids=mergeBidsLocal(bids,up.items||[]); if(up.health) bidsHealth=up.health; if(up.awards) bidsAwards=up.awards; bidsSha=j.sha;} return doSaveBids(); }); }
       return resp.json().then(function(json){ bidsSha=json.content&&json.content.sha; bidsPending=false; });
     }).catch(function(){});
   }

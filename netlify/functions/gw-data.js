@@ -182,6 +182,13 @@ async function handleBidsIngest(event, d, R) {
     ['servc', 'cnstwk'].forEach(function (k) {
       if (a[k] && typeof a[k] === 'object') aw[k] = { n: Number(a[k].n) || 0, q1: Number(a[k].q1) || 0, med: Number(a[k].med) || 0, q3: Number(a[k].q3) || 0 };
     });
+    aw.cats = {};
+    if (a.cats && typeof a.cats === 'object') {   // 관심 공종(석면·준설·철거·해체) 분포
+      Object.keys(a.cats).slice(0, 8).forEach(function (k) {
+        const o = a.cats[k] || {};
+        aw.cats[String(k).slice(0, 12)] = { n: Number(o.n) || 0, q1: Number(o.q1) || 0, med: Number(o.med) || 0, q3: Number(o.q3) || 0 };
+      });
+    }
     aw.orgs = {};
     if (a.orgs && typeof a.orgs === 'object') {
       Object.keys(a.orgs).slice(0, 80).forEach(function (org) {
