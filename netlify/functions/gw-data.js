@@ -515,6 +515,23 @@ async function handleBidsResults(event, d, R) {
   return jr(200, { status: 'OK', applied: applied, request_id: R });
 }
 
+// 봇 알림(정기업무 크론 전용) — 공유 시크릿 인증. 관리자 접속과 무관하게 만기·미수 알림이 나가야 한다.
+async function handleBotNotify(event, d, R) {
+  const secret = (process.env.BIDS_INGEST_KEY || '').trim();
+  if (!secret || String(d.key || '').trim() !== secret) return jr(403, { status: 'FORBIDDEN', error_code: 'BAD_INGEST_KEY', request_id: R });
+  const title = String(d.title || '알림').slice(0, 60);
+  const body = String(d.body || '').slice(0, 300);
+  const tag = String(d.tag || 'bot-notify').slice(0, 30);
+  let sent = 0;
+  try {
+    const ids = await push.adminIds();
+    if (ids.length) { await push.sendTo(ids, { title: title, body: body, url: './', tag: tag }); sent = ids.length; }
+  } catch (e) {
+    return jr(200, { status: 'OK', sent: 0, note: 'push 실패(무시)', request_id: R });
+  }
+  return jr(200, { status: 'OK', sent: sent, request_id: R });
+}
+
 // ---- 적격심사 증빙 보관함: 반복 제출하는 고정 증빙(등기부·확인서·등록증 등)을 서버 보관, 생성 시 일괄 다운로드 ----
 function proofSlug(s) { return String(s || '').replace(/[^0-9A-Za-z가-힣._-]/g, '_').slice(0, 80); }
 async function handleProofPut(event, d, R) {
@@ -918,6 +935,7 @@ async function handler(event) {
     if (d && d.action === 'save') return await handleSave(event, d, R);
     if (d && d.action === 'audit') return await handleAudit(event, d, R);
     if (d && d.action === 'bids_ingest') return await handleBidsIngest(event, d, R);
+    if (d && d.action === 'bot_notify') return await handleBotNotify(event, d, R);
     if (d && d.action === 'bids_refresh') return await handleBidsRefresh(event, d, R);
     if (d && d.action === 'bids_purge') return await handleBidsPurge(event, d, R);
     if (d && d.action === 'bids_export') return await handleBidsExport(event, d, R);
