@@ -28,6 +28,7 @@ function XTest($name, $file, $checks){
 try {
   XTest '착공계' 'R_착공계.xlsx' @(@('공사예정공정표','C14','가설·보양'),@('공사예정공정표','F14','08.01'))
   XTest '폐기물신고서' 'R_폐기물신고서.xlsx' @(@('신고서','E8','회귀테스트상호'),@('신고서','E16','회귀 용역명'))
+  XTest '해체신고서' 'R_해체신고서.xlsx' @(@('건축물해체신고서','C7','회귀테스트소유자'),@('건축물해체신고서','C21','회귀 테스트 지번'))
   # 낙찰률: 재계산 후 단가 실물 대조(내림)
   $wb=$xl.Workbooks.Open((Join-Path $out 'R_낙찰률.xlsx'))
   $xl.CalculateFullRebuild()

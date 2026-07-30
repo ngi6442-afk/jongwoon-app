@@ -44,6 +44,11 @@ await run('폐기물배출신고서', async () => {
   const edits = { '신고서': [['E8', '회귀테스트상호', 's'], ['E16', '회귀 용역명', 's'], ['E20', 2.95, 'n'], ['E21', 0.05, 'n']] };
   await save('R_폐기물신고서.xlsx', await fillXlsxTemplate(b64of(DATA + '/6. 자료/폐기물배출 신고서.xlsx'), edits));
 });
+// 2.5) 해체신고서 — 허브 시트 채움(생성 로직과 동일 좌표)
+await run('해체신고서', async () => {
+  const edits = { '건축물해체신고서': [['C7', '회귀테스트소유자', 's'], ['C21', '회귀 테스트 지번', 's'], ['F39', '2099년01월   일', 's']] };
+  await save('R_해체신고서.xlsx', await fillXlsxTemplate(b64of(DATA + '/건축물 해체 및 해체 완료 신고.xlsx'), edits));
+});
 // 3) 낙찰률 v2 — 철강공단 원본, 실물 rate
 await run('낙찰률적용', async () => {
   const bytes = new Uint8Array(readFileSync(DATA + '/준설분석/내역_원본.xlsx'));
