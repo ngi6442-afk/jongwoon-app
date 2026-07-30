@@ -7509,7 +7509,38 @@
     var p = best.split("|");
     return { low: p[0], high: p[1], n: cnt[best], tot: tot };
   }
+  // 통과선 역산 — 등록된 등급(인허가)·실적으로 실제 계산. 하드코딩 문구를 대체한다.
+  // 산식은 적격심사 모달과 동일: 필요 입찰가격 평점 = 95 − 수행능력 소계 − 안전성, r = 피벗 − (배점−필요)/2000
+  function bcQualFloor(){
+    try{
+      if(typeof qualScores!=="function"||typeof qualCollect!=="function") return null;
+      var basisEl=document.getElementById("xqBasis");
+      var prevBasis=basisEl?basisEl.value:null;
+      // 발주기관으로 기준 세트 추정(교육청 계열=2023 세부기준, 그 외=지자체 별표7)
+      var isEdu=/교육/.test(bcQualKind||"");
+      if(basisEl){ basisEl.value=isEdu?"gbe":"lg7"; if(typeof qualBasisToggle==="function") qualBasisToggle(); }
+      var s=qualScores(qualCollect());
+      if(basisEl && prevBasis!=null){ basisEl.value=prevBasis; if(typeof qualBasisToggle==="function") qualBasisToggle(); }
+      if(!s||!s.cfg) return null;
+      var need=Math.round((95-s.sub-s.safety)*100)/100;
+      return { need:need, cfg:s.cfg, pivot:s.pivot, sub:s.sub, safety:s.safety, edu:isEdu,
+        rMin:(need>s.cfg.price)?null:Math.round((s.pivot-(s.cfg.price-need)/2000)*1000000)/10000 };
+    }catch(e){ return null; }
+  }
   function bcQualLine(lwlt){
+    var f=bcQualFloor();
+    if(f){
+      var head='<div style="margin-top:6px;padding-top:6px;border-top:1px dashed var(--line);font-size:13px;">';
+      var basis=f.edu?"교육청 2023 세부기준":"지자체 별표7";
+      if(f.rMin==null)
+        return head+'<span style="color:#c0392b">⚠ <b>현 등급·실적으로는 통과 불가</b>('+basis+') — 필요 입찰가격 평점 '
+          +f.need+'점 &gt; 배점 '+f.cfg.price+'점. 수행능력 소계 '+qualNum(f.sub)+(f.safety?' · 안전성 '+qualSign(f.safety):'')+'</span></div>';
+      return head+'<span style="color:#B03A2E">🎯 <b>우리 통과선('+basis+', 등록 등급 기준)</b>: 투찰비율(A값 반영) <b>약 '
+        +f.rMin+'% ~ '+(f.pivot*100)+'%</b> 구간만 통과'
+        +(lwlt&&parseFloat(lwlt)<f.rMin?' — 하한율('+lwlt+'%)로 투찰하면 <b>적격 탈락</b>':'')
+        +'<br><span style="color:#666">수행능력 소계 '+qualNum(f.sub)+(f.safety?' · 안전성 '+qualSign(f.safety):'')
+        +' → 필요 입찰가격 평점 '+f.need+'점. 정확한 값은 적격심사 [점수 미리보기]로.</span></span></div>';
+    }
     var isAsb=/석면/.test(bcQualKind||"");
     if(isAsb){
       // 경북교육청 2023 기준(88 피벗)·현 등급(B° 4.5+안전성 D −4)·확약 +0.5, 실적 4.0 가정 → 소계 9.0 → 필요 평점 90 = 만점 → 88.00% 저격
