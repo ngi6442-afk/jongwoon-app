@@ -1170,6 +1170,7 @@
       <option value="waste_report">폐기물배출신고서(수탁확인 포함)</option>
       <option value="qual_packet">적격심사 패킷(신청서·심사표·각서·확약서 hwp)</option>
       <option value="con_docs">계약서류(서약서+사용인감계 hwp)</option>
+      <option value="quote_docs">견적서(회사별 양식 hwp)</option>
       <option value="bid_rate">내역서 낙찰률 적용(발주처 내역서 → 낙찰가)</option>
     </select>
     <span class="fld-label">시행 회사</span>
@@ -1285,6 +1286,26 @@
         <span style="flex:2;font-size:12px;color:#888;align-self:center;">보증기간=계약일~준공예정일, 보증금액=계약금액×률 자동</span>
       </div>
       <div style="font-size:12px;color:#888;">포항시 양식 기준. 서약서 6·7번 체크는 수의계약 기준(예/아니오) — <b>입찰(적격심사) 건은 인쇄 후 '해당없음'으로 수정</b>하세요. 타 발주처 양식은 별도 등록 필요.</div>
+    </div>
+    <div id="xgQuoteWrap" style="display:none;">
+      <input type="text" id="xqtRecv" placeholder="수신처 (예: 포항시 맑은물사업본부)" autocomplete="off">
+      <div style="display:flex;gap:8px;">
+        <input type="text" id="xqtNo" placeholder="견적번호 (예: 202607-01 — 일련번호만 채우세요)" style="flex:1" autocomplete="off">
+        <input type="text" id="xqtDate" placeholder="견적일자" style="flex:1" autocomplete="off">
+        <select id="xqtVat" style="flex:1"><option value="부가세 포함">부가세 포함</option><option value="부가세 별도">부가세 별도</option></select>
+      </div>
+      <span class="fld-label">품목 1행 — 2행째부터는 한컴에서 수기, 합계는 자동합산</span>
+      <div style="display:flex;gap:8px;">
+        <input type="text" id="xqtItem" placeholder="품명 (예: ○○아파트 하수박스 준설공사)" style="flex:2" autocomplete="off">
+        <input type="text" id="xqtSang" placeholder="성상" style="flex:1" autocomplete="off">
+        <input type="text" id="xqtGubun" placeholder="구분" style="flex:1" autocomplete="off">
+      </div>
+      <div style="display:flex;gap:8px;">
+        <input type="text" id="xqtUnit" placeholder="단위 (톤/식)" style="flex:1" autocomplete="off">
+        <input type="text" id="xqtQty" placeholder="수량" inputmode="decimal" style="flex:1" autocomplete="off">
+        <input type="text" id="xqtPrice" placeholder="단가 (숫자만)" inputmode="numeric" style="flex:1" autocomplete="off">
+      </div>
+      <div style="font-size:12px;color:#888;">금액=수량×단가 자동(부가세 구분은 표기만). 준설·폐기물=환경, 석면·철거=건설 양식으로 생성됩니다.</div>
     </div>
     <button class="primary" id="xgGo">생성·다운로드</button>
     <button class="secondary" id="xgCancel">취소</button>
@@ -5233,8 +5254,8 @@
   }
 
   // ---- 서류 양식 등록/생성 ----
-  var TPL_LABELS={asb_plan:"석면해체계획서", work_start:"착공계", work_complete:"준공계", demo_report:"해체신고서", waste_report:"폐기물배출신고서", qual_packet:"적격심사 패킷", contract_pledge:"계약이행서약서", seal_reg:"사용인감계", bond_waiver:"채권포기각서", labor_exempt:"노무비제외신청서"};
-  var TPL_EXT={qual_packet:".hwpx", contract_pledge:".hwpx", seal_reg:".hwpx", bond_waiver:".hwpx", labor_exempt:".hwpx"};   // 기본 .xlsx, hwpx 양식만 예외
+  var TPL_LABELS={asb_plan:"석면해체계획서", work_start:"착공계", work_complete:"준공계", demo_report:"해체신고서", waste_report:"폐기물배출신고서", qual_packet:"적격심사 패킷", contract_pledge:"계약이행서약서", seal_reg:"사용인감계", bond_waiver:"채권포기각서", labor_exempt:"노무비제외신청서", quote_env:"견적서(환경)", quote_con:"견적서(건설)"};
+  var TPL_EXT={qual_packet:".hwpx", contract_pledge:".hwpx", seal_reg:".hwpx", bond_waiver:".hwpx", labor_exempt:".hwpx", quote_env:".hwpx", quote_con:".hwpx"};   // 기본 .xlsx, hwpx 양식만 예외
   function openTplManage(){
     if(!isAdmin()) return;
     var host=document.getElementById("tplRows");
@@ -5327,6 +5348,7 @@
   function stageXlsxKind(stage){
     var s=String(stage||"");
     if(/적격심사/.test(s)) return "qual_packet";
+    if(/견적/.test(s)) return "quote_docs";
     if(/계약서류|계약체결/.test(s)) return "con_docs";
     if(/착공|착수/.test(s)) return "work_start";
     if(/준공/.test(s)) return "work_complete";
@@ -5476,6 +5498,17 @@
     document.getElementById("xgRateWrap").style.display = (k==="bid_rate") ? "" : "none";
     document.getElementById("xgQualWrap").style.display = (k==="qual_packet") ? "" : "none";
     document.getElementById("xgConDocsWrap").style.display = (k==="con_docs") ? "" : "none";
+    document.getElementById("xgQuoteWrap").style.display = (k==="quote_docs") ? "" : "none";
+    if(k==="quote_docs"){
+      document.getElementById("xgMoneyFields").style.display="none";
+      var qd0=new Date(), qm0=("0"+(qd0.getMonth()+1)).slice(-2);
+      if(!document.getElementById("xqtRecv").value) document.getElementById("xqtRecv").value=(document.getElementById("xgClient").value||"").trim();
+      if(!document.getElementById("xqtNo").value) document.getElementById("xqtNo").value=qd0.getFullYear()+qm0+"-";
+      if(!document.getElementById("xqtDate").value) document.getElementById("xqtDate").value=qd0.getFullYear()+"년 "+qm0+"월 "+("0"+qd0.getDate()).slice(-2)+"일";
+      if(!document.getElementById("xqtSang").value) document.getElementById("xqtSang").value="고상";
+      if(!document.getElementById("xqtGubun").value) document.getElementById("xqtGubun").value="일반";
+      if(!document.getElementById("xqtUnit").value) document.getElementById("xqtUnit").value="톤";
+    }
     if(k==="con_docs"){
       document.getElementById("xgAgentWrap").style.display="none";
       var cD=xgCtx?findProc(xgCtx.id):null;
@@ -5924,6 +5957,37 @@
           .finally(function(){ $("xgGo").textContent="생성·다운로드"; $("xgGo").disabled=false; });
         return;
       }
+      if(kind==="quote_docs"){   // 견적서: 회사별 hwpx 양식(JW-06-001 환경 / JW-06-002 건설)
+        var qtQty=parseFloat(($("xqtQty").value||"").replace(/[^0-9.]/g,""))||0;
+        var qtPrice=parseInt(($("xqtPrice").value||"").replace(/[^0-9]/g,""),10)||0;
+        var qtAmt=Math.round(qtQty*qtPrice);
+        var qtM=[];
+        if(!$("xgTitle").value.trim()) qtM.push("용역명(공사명 칸)");
+        if(!$("xqtRecv").value.trim()) qtM.push("수신처");
+        if(!$("xqtItem").value.trim()) qtM.push("품명");
+        if(!qtAmt) qtM.push("수량·단가(금액=수량×단가 자동)");
+        if(qtM.length && !confirm("⚠ 확인요망 — 비어 있는 값:\n· "+qtM.join("\n· ")+"\n\n빈칸(수기 기입)으로 두고 생성할까요?")) return;
+        var qtKo=""; if(qtAmt){ var qks=koAmount(qtAmt); qtKo=qks.slice(0,qks.indexOf("원")).replace(/\s/g,""); }
+        var qtTokens={ "견적번호":$("xqtNo").value.trim().replace(/-$/,"-01"),
+          "견적일자":$("xqtDate").value.trim(), "수신처":$("xqtRecv").value.trim(),
+          "용역명":$("xgTitle").value.trim(),
+          "금액한글":qtKo, "금액숫자":qtAmt?qtAmt.toLocaleString():"", "부가세구분":$("xqtVat").value,
+          "품명":$("xqtItem").value.trim(), "성상":$("xqtSang").value.trim(), "구분":$("xqtGubun").value.trim(),
+          "단위":$("xqtUnit").value.trim(), "수량":qtQty?String(qtQty):"", "단가":qtPrice?qtPrice.toLocaleString():"",
+          "금액":qtAmt?qtAmt.toLocaleString():"" };
+        var qtKey=($("xgCo").value==="con")?"quote_con":"quote_env";
+        $("xgGo").textContent="생성 중…"; $("xgGo").disabled=true;
+        gwCall("gw-data",{action:"tpl_get", key:qtKey}).then(function(rq){
+          if(rq.status!==200){ alert(rq.status===404?("'"+TPL_LABELS[qtKey]+"' 양식이 미등록입니다. [+ 양식 등록]에서 hwpx 템플릿을 등록하세요."):"양식 로드 실패"); return; }
+          return fillHwpxTemplate(rq.body.data, qtTokens).then(function(bq){
+            downloadBlob(($("xgTitle").value.trim()||c.label||"견적")+"_견적서.hwpx", bq);
+            alert("견적서 생성 완료 — 품목 2행째부터는 한컴에서 수기 기입(합계는 자동합산). 제출 전 값 확인하세요.");
+            $("xlsxGenBackdrop").classList.remove("show"); xgCtx=null;
+          });
+        }).catch(function(e){ alert("생성 실패: "+e); })
+          .finally(function(){ $("xgGo").textContent="생성·다운로드"; $("xgGo").disabled=false; });
+        return;
+      }
       // 하드리딩 원칙: 원문(계약서·조사서·대장)에서 못 채운 값만 확인요망으로 사람에게 확인
       var missing=[];
       if(kind==="waste_report"){
@@ -6025,7 +6089,7 @@
     ["asb","석면철거"], ["labor","노동부신고 대상"],
     ["demo","일반(건축물)철거"], ["permit","대형철거(허가건)"],
     ["wst","폐기물 운반·처리"], ["dredge","준설·시설공사"],
-    ["qual","적격심사(공공 낙찰건)"]
+    ["qual","적격심사(공공 낙찰건)"], ["est","수의계약(견적 제출)"]
   ];
   var CON_TYPE_ELEMS = {   // 유형 선택 시 기본 체크
     asbestos:{asb:1,labor:1,wst:1}, demolition:{demo:1,wst:1},
@@ -6034,6 +6098,7 @@
   function conBuildStages(el){
     var st=[];
     if(el.qual) st.push("적격심사");
+    if(el.est) st.push("견적");   // 수의계약: 견적 제출 → 계약
     st.push("계약","착공");
     if(el.asb) st.push("석면조사");
     if(el.asb&&el.labor) st.push("노동부신고","필증인수");
@@ -6049,6 +6114,7 @@
   }
   // 단계별 서류 체크리스트 — [작성]=우리가 생성, [수정]=받아서 금액 등 수정, [수령]=받아서 확인·보관
   var STAGE_DOCS = {
+    "견적":"[작성] 견적서(회사별 양식 — [서류] 버튼으로 자동 생성) / [수령] 견적 요청(지명) 공문·과업내용",
     "적격심사":"[작성] 적격심사신청서·자기평가심사표·신인도자료·사용인감계 / [수령] 안전성평가결과·신용평가확인서·인력보유증빙·등기부·사업자등록증명·면허증·인감증명",
     "계약":"[작성] 견적서·계약구비서류·계약이행통합서약서·사용인감계(해당시 공동수급협정·수의계약확인서·안전보건확약서) / [수정] 설계내역서→낙찰금액 반영 / [수령] 계약서·계약이행보증증권·통장사본",
     "착공":"[작성] 공문·착공계·직접시공계획서·예정공정표·현장대리인계(재직증명+자격증)·착공내역서·원가계산서·안전관리비 사용계획서·노무비구분관리(해당시 선급금신청·안전보건관리계획서) / [수령] 보험가입증명원·경력확인서",

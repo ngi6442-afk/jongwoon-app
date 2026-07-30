@@ -82,5 +82,14 @@ await run('채권포기각서', async () => {
 await run('노무비제외신청서', async () => {
   await save('R_노무비신청서.hwpx', await fillHwpxTemplate(b64of(DATA + '/6. 자료/계약서류분석/노무비제외신청서_템플릿.hwpx'), {}));
 });
+const QT = { '견적번호': '209901-01', '견적일자': '2099년 01월 01일', '수신처': '포항시 맑은물사업본부',
+  '용역명': '회귀테스트 하수관로 준설공사', '금액한글': '일천만', '금액숫자': '10,000,000', '부가세구분': '부가세 포함',
+  '품명': '회귀테스트 하수박스 준설공사', '성상': '고상', '구분': '일반', '단위': '식', '수량': '1', '단가': '10,000,000', '금액': '10,000,000' };
+await run('견적서(환경)', async () => {
+  await save('R_견적서_환경.hwpx', await fillHwpxTemplate(b64of(DATA + '/6. 자료/계약서류분석/견적서_템플릿_환경.hwpx'), QT));
+});
+await run('견적서(건설)', async () => {
+  await save('R_견적서_건설.hwpx', await fillHwpxTemplate(b64of(DATA + '/6. 자료/계약서류분석/견적서_템플릿_건설.hwpx'), QT));
+});
 
 console.log(JSON.stringify(results));

@@ -838,7 +838,7 @@ async function handleBackupGet(event, d, R) {
 }
 
 // ---- 서류 양식(템플릿) 보관 — 관리자 등록, 영구 보관. 생성 시 원본 복사라 오염 없음 ----
-const TPL_KEYS = { asb_plan: '석면해체계획서', work_start: '착공계', work_complete: '준공계', demo_report: '해체신고서(완료신고 포함)', waste_report: '폐기물배출신고서(수탁확인 포함)', qual_packet: '적격심사 패킷(신청서·심사표·각서·확약서 hwpx)', contract_pledge: '계약이행 통합서약서(hwpx)', seal_reg: '사용인감계(hwpx)', bond_waiver: '지역개발채권 포기각서(hwpx)', labor_exempt: '노무비 적용제외 신청서(hwpx·수기서식)' };
+const TPL_KEYS = { asb_plan: '석면해체계획서', work_start: '착공계', work_complete: '준공계', demo_report: '해체신고서(완료신고 포함)', waste_report: '폐기물배출신고서(수탁확인 포함)', qual_packet: '적격심사 패킷(신청서·심사표·각서·확약서 hwpx)', contract_pledge: '계약이행 통합서약서(hwpx)', seal_reg: '사용인감계(hwpx)', bond_waiver: '지역개발채권 포기각서(hwpx)', labor_exempt: '노무비 적용제외 신청서(hwpx·수기서식)', quote_env: '견적서 — (유)종운환경(hwpx)', quote_con: '견적서 — ㈜종운건설(hwpx)' };
 async function handleTplPut(event, d, R) {
   const c = await currentMember(event);
   if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
