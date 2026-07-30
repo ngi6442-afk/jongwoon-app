@@ -865,6 +865,34 @@ async function handleBackupGet(event, d, R) {
   return jr(200, { status: 'OK', key: String(d.key || ''), data: r.data, request_id: R });
 }
 
+// 백업 복원 — 백업 스냅샷(gw_backup.json)의 한 키를 Blobs로 되돌린다.
+// git 이력 시점복구가 못 덮는 영역(양식 템플릿·증빙 보관함·푸시 구독·입찰 데이터·오류 로그)이 대상.
+// 사람 확인 원칙: dry=true로 먼저 미리보기(현재 vs 복원본 건수), confirm=true 없으면 쓰지 않는다.
+function _bkCount(v) {
+  if (!v || typeof v !== 'object') return null;
+  if (Array.isArray(v)) return { kind: 'array', n: v.length };
+  if (Array.isArray(v.items)) return { kind: 'items', n: v.items.length };
+  return { kind: 'object', n: Object.keys(v).length };
+}
+async function handleBackupPut(event, d, R) {
+  let ok = backupAuthed(d);
+  if (!ok) { const c = await currentMember(event); ok = c.ok && !!c.member.admin; }
+  if (!ok) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_OR_SECRET_ONLY', request_id: R });
+  const sn = String(d.store || '');
+  if (!BACKUP_STORES[sn]) return jr(400, { status: 'REJECTED', error_code: 'BAD_STORE', request_id: R });
+  const key = String(d.key || '');
+  if (!key) return jr(400, { status: 'REJECTED', error_code: 'NO_KEY', request_id: R });
+  if (d.data === undefined || d.data === null) return jr(400, { status: 'REJECTED', error_code: 'NO_DATA', request_id: R });
+  const cur = await blobGet(store(sn), key);
+  const preview = { exists: !!cur.ok, current: _bkCount(cur.ok ? cur.data : null), restore: _bkCount(d.data) };
+  if (d.dry) return jr(200, { status: 'OK', dry: true, store: sn, key: key, preview: preview, request_id: R });
+  if (d.confirm !== true) return jr(400, { status: 'REJECTED', error_code: 'NEED_CONFIRM', preview: preview, request_id: R });
+  const w = await blobSet(store(sn), key, d.data);
+  if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
+  try { await appendAudit({ ts: Date.now(), by: '복원', bid: 'restore', col: sn, ev: [{ op: '백업복원', id: key, t: JSON.stringify(preview).slice(0, 120) }] }); } catch (e) {}
+  return jr(200, { status: 'OK', store: sn, key: key, preview: preview, request_id: R });
+}
+
 // ---- 서류 양식(템플릿) 보관 — 관리자 등록, 영구 보관. 생성 시 원본 복사라 오염 없음 ----
 const TPL_KEYS = { asb_plan: '석면해체계획서', work_start: '착공계', work_complete: '준공계', demo_report: '해체신고서(완료신고 포함)', waste_report: '폐기물배출신고서(수탁확인 포함)', qual_packet: '적격심사 패킷(신청서·심사표·각서·확약서 hwpx)', contract_pledge: '계약이행 통합서약서(hwpx)', seal_reg: '사용인감계(hwpx)', bond_waiver: '지역개발채권 포기각서(hwpx)', labor_exempt: '노무비 적용제외 신청서(hwpx·수기서식)', quote_env: '견적서 — (유)종운환경(hwpx)', quote_con: '견적서 — ㈜종운건설(hwpx)', adv_pay: '선금지급신청 세트(공문+별첨2~5, hwpx)' };
 async function handleTplPut(event, d, R) {
@@ -948,6 +976,7 @@ async function handler(event) {
     if (d && d.action === 'bid_sheet') return await handleBidSheet(event, d, R);
     if (d && d.action === 'backup_list') return await handleBackupList(event, d, R);
     if (d && d.action === 'backup_get') return await handleBackupGet(event, d, R);
+    if (d && d.action === 'backup_put') return await handleBackupPut(event, d, R);
     if (d && d.action === 'tpl_put') return await handleTplPut(event, d, R);
     if (d && d.action === 'tpl_get') return await handleTplGet(event, d, R);
     if (d && d.action === 'tpl_list') return await handleTplList(event, d, R);
