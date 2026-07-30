@@ -5429,6 +5429,7 @@
         if(!gv("xqNo").value && bQ.no) gv("xqNo").value=bQ.no;
         if(!gv("xqDate").value && /^\d{4}-\d{2}-\d{2}/.test(bQ.due||"")) gv("xqDate").value=String(bQ.due).slice(0,10);
         if(!gv("xqBid").value && bQ.result && bQ.result.amt) gv("xqBid").value=bQ.result.amt;
+        if(!gv("xqPre").value && bQ.result && bQ.result.pre) gv("xqPre").value=bQ.result.pre;   // 개찰 예정가격 정확값(수집봇 plnprc)
         if(!gv("xqA").value && extQ.aamt) gv("xqA").value=extQ.aamt;
         var bud=bQ.budget||0;   // 추정가격 → 구간 자동
         if(bud) gv("xqTier").value = bud>=300000000?"hi":(bud>=100000000?"mid":"lo");

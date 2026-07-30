@@ -482,6 +482,7 @@ async function handleBidsResults(event, d, R) {
     if (n.result && typeof n.result === 'object') {
       cur.result = { state: String(n.result.state || '').slice(0, 20), winner: String(n.result.winner || '').slice(0, 60),
         amt: Number(n.result.amt) || 0, rate: String(n.result.rate || '').slice(0, 12),
+        pre: Number(n.result.pre) || 0, bss: Number(n.result.bss) || 0,   // 예정가격·기초금액(낙찰 건, 적격심사 프리필용)
         bidders: Number(n.result.bidders) || 0, checked: today };
     }
     if ((n.status === '낙찰' || n.status === '유찰') && (cur.status === '응찰' || cur.status === '참여')) {
