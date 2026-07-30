@@ -7291,6 +7291,12 @@
     if(org && a.orgs){
       for(var k in a.orgs){ if(org.indexOf(k)>=0||k.indexOf(org)>=0){ parts.push("이 기관("+k+") 최근 중앙값 "+a.orgs[k].med+"% (n="+a.orgs[k].n+")"); break; } }
     }
+    // 동일 공종 실측선(석면/준설/철거·해체) — 6개월 백필 포함
+    if(a.cats){
+      var bcCat=/석면/.test(kind)?"asb":(/준설/.test(kind)?"dredge":(/철거|해체/.test(kind)?"demo":""));
+      var BC_CATL={asb:"석면", dredge:"준설", demo:"철거·해체"};
+      if(bcCat && a.cats[bcCat]) parts.push("동일 공종("+BC_CATL[bcCat]+") 실측: 중앙값 "+a.cats[bcCat].med+"% · 상하위 "+a.cats[bcCat].q1+"~"+a.cats[bcCat].q3+"% (n="+a.cats[bcCat].n+")");
+    }
     // 명기 하한율 참고 — 같은 유형·금액구간 공고들의 공고문 명기값 최빈치
     if(a.lwlt && !document.getElementById("bcLwlt").value){
       var key=lbl+"·"+bcBand(document.getElementById("bcBss").value);
