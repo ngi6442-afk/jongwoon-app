@@ -7490,6 +7490,25 @@
   var bcQualKind="";   // 계산기를 연 공고의 공종·제목(적격 통과선 안내용)
   function bcNum(id){ return parseFloat(String(document.getElementById(id).value).replace(/[,\s]/g,""))||0; }
   // 적격심사 통과선 안내 — 하한 통과 ≠ 적격 통과. 산식(어제 검증분)으로 최소 투찰비율 역산해 경고
+  var bcAutoSrc = [];   // 자동 채움 출처(추정치 표시용)
+  // 사정률 범위 최빈값 — 수집한 공고 이력에서(공고문에 명기된 rng만 사용, 추정 없음)
+  function bcModeRng(kindTxt){
+    var cnt = {}, tot = 0;
+    liveBids().forEach(function(b){
+      var e = b.ext||{}; if(!e.rng) return;
+      var isCn = /공사/.test((b.kind||"")+(b.title||"")) ? "공사" : "용역";
+      if(isCn !== kindTxt) return;
+      var m = String(e.rng).match(/(-?[\d.]+)\s*%\s*~\s*\+?(-?[\d.]+)\s*%/);
+      if(!m) return;
+      var k = m[1]+"|"+m[2];
+      cnt[k] = (cnt[k]||0)+1; tot++;
+    });
+    var best = null;
+    for(var k in cnt){ if(!best || cnt[k]>cnt[best]) best = k; }
+    if(!best || cnt[best] < 3) return null;
+    var p = best.split("|");
+    return { low: p[0], high: p[1], n: cnt[best], tot: tot };
+  }
   function bcQualLine(lwlt){
     var isAsb=/석면/.test(bcQualKind||"");
     if(isAsb){
@@ -7583,6 +7602,8 @@
     if(aFlag==="auto") html += (html?"<br>":"")+'<span style="color:#2E7D32;">✓ 공고문에 A값 감액 방식 명기 — 금액 자동 입력됨(공고문 명기값 우선, 없으면 공식 공개항목 합산).</span>';
     else if(aFlag) html += (html?"<br>":"")+'<span style="color:#B7791F;">⚠ 공고문에 A값 감액 방식이 명기됐는데 금액을 찾지 못했습니다 — 공고문 산출내역의 A값을 입력하세요.</span>';
     if(arguments[3]) html += (html?"<br>":"")+'<span style="color:#5A6472;">산출방식: '+arguments[3]+' 위임(공고문 명기) — 하한율은 해당 기준 원문 확인.</span>';
+    if(bcAutoSrc && bcAutoSrc.length)
+      html += (html?"<br>":"")+'<span style="color:#B7791F;">✎ <b>자동 채움(추정)</b>: '+esc(bcAutoSrc.join(" · "))+' — 공고문 값이 확인되면 덮어쓰세요.</span>';
     el.innerHTML = html;
   }
   function openBidCalc(pre){
@@ -7593,6 +7614,28 @@
     if(pre.rng){ var m=String(pre.rng).match(/(-?[\d.]+)\s*%\s*~\s*\+?(-?[\d.]+)\s*%/); if(m){ document.getElementById("bcLow").value=m[1]; document.getElementById("bcHigh").value=m[2]; } }
     if(pre.lwlt) document.getElementById("bcLwlt").value=parseFloat(pre.lwlt)||"";
     bcQualKind=pre.kind||"";
+    // 공고문 판독이 못 뽑은 값은 실측 통계로 자동 채운다(빈칸으로 두면 계산 자체가 안 됨 — 실측 63%가 빈칸이었음).
+    // 채운 값은 추정치이므로 출처를 표시하고, 공고문 확인 후 덮어쓰도록 안내한다.
+    bcAutoSrc = [];
+    var _kindTxt = (pre.kind||"")+(pre.org||"");
+    var _isCn = /공사/.test(_kindTxt) ? "공사" : "용역";
+    if(!document.getElementById("bcBss").value && pre.budget) {
+      document.getElementById("bcBss").value = pre.budget;   // 기초금액 없으면 추정가격으로
+      bcAutoSrc.push("기초금액=추정가격");
+    }
+    if(!document.getElementById("bcLwlt").value && bidsAwards && bidsAwards.lwlt){
+      var _k = _isCn+"·"+bcBand(document.getElementById("bcBss").value);
+      var _lo = bidsAwards.lwlt[_k];
+      if(_lo && _lo.n>=3 && parseFloat(_lo.mode)){
+        document.getElementById("bcLwlt").value = parseFloat(_lo.mode);
+        bcAutoSrc.push("하한율="+_lo.mode+"%(유사공고 "+_lo.n+"건 최빈)");
+      }
+    }
+    if(!document.getElementById("bcLow").value && !document.getElementById("bcHigh").value){
+      var _r = bcModeRng(_isCn);   // 우리 공고 이력에서 사정률 범위 최빈값
+      if(_r){ document.getElementById("bcLow").value=_r.low; document.getElementById("bcHigh").value=_r.high;
+        bcAutoSrc.push("사정률="+_r.low+"~+"+_r.high+"%(이력 "+_r.n+"건 최빈)"); }
+    }
     bcRefLines(pre.org||"", pre.kind||"", (pre.a ? (pre.aamt?"auto":true) : false), pre.src?esc(pre.src):"");
     bcCalc();
     document.getElementById("bidCalcBackdrop").classList.add("show");
