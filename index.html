@@ -1648,6 +1648,7 @@
     <button class="primary" id="memberLogin">로그인</button>
     <button class="secondary" id="memberPinBtn" style="display:none;">내 PIN 변경</button>
     <button class="secondary" id="pushBtn" style="display:none;">🔔 이 기기 알림 켜기</button>
+    <a href="./MANUAL.html" target="_blank" rel="noopener" style="display:block;text-align:center;font-size:13px;margin-top:6px;">📖 사용 안내</a>
     <button class="secondary" id="helpBtn">도움말</button>
   </div>
 </div>
@@ -4457,6 +4458,10 @@
       if(!c.site && p.site) c.site=p.site;
       // 철거·석면 건은 주소로 건축물대장 자동 조회(조용히 저장 — 카드에 🏢 칩 표시)
       if(c.elems && (c.elems.asb||c.elems.demo||c.elems.permit) && (p.site||c.site) && !c.bldg_info) conBldgLookup(c.id, p.site||c.site, true);
+      // 공사명 키워드로 요소 누락 의심 알림(자동 변경 없음 — 사람 확인 원칙)
+      var kwEl=[["asb",/석면/,"석면"],["demo",/철거|해체/,"철거"],["waste",/폐기물/,"폐기물"],["dredge",/준설/,"준설"]];
+      var missEl=kwEl.filter(function(k){ return k[1].test(p.title||"") && !(c.elems&&c.elems[k[0]]); }).map(function(k){ return k[2]; });
+      if(missEl.length) alert("⚠ 공사명에 '"+missEl.join("·")+"' 키워드가 있는데 이 계약의 공사 요소에는 빠져 있습니다.\n요소가 누락되면 해당 서류 단계가 생성되지 않으니 계약 설정을 확인하세요.");
       // 계약서 확보 = 계약 단계 완료 조건 → 확인 후 다음 단계(착공)로 진행 + 착공계 작성 제안
       setTimeout(function(){
         var sum=(p.title||entry.name)+(p.amount?" · "+Number(p.amount).toLocaleString()+"원":"")+(p.date_contract?" · 계약일 "+p.date_contract:"");
