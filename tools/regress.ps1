@@ -40,9 +40,41 @@ try {
 } finally { $xl.Quit(); [System.Runtime.Interopservices.Marshal]::ReleaseComObject($xl) | Out-Null }
 
 Write-Output "== 3단계: 한글 COM 검증 =="
+# 표준 래퍼: 복구플래그 클리어(비정상 종료 후 복구창 방지) + 메시지박스 자동응답 + 대화상자 워치독
+try { Set-ItemProperty 'HKCU:\SOFTWARE\HNC\Hwp\9.0\HwpFrame\AppState' -Name MruTempFileFlag -Value 0 -ErrorAction Stop } catch {}
+$wd = Start-Job -ScriptBlock {
+  Add-Type @'
+using System; using System.Text; using System.Runtime.InteropServices;
+public class WDR {
+  [DllImport("user32.dll")] public static extern bool EnumWindows(EnumProc cb, IntPtr lp);
+  [DllImport("user32.dll")] public static extern int GetWindowText(IntPtr h, StringBuilder s, int n);
+  [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
+  [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr h);
+  [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr h, uint m, IntPtr w, IntPtr l);
+  public delegate bool EnumProc(IntPtr h, IntPtr lp);
+}
+'@
+  while($true){
+    $hwpPids=(Get-Process Hwp -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Id)
+    if($hwpPids){
+      [WDR]::EnumWindows({ param($h,$lp)
+        $o=[uint32]0; [WDR]::GetWindowThreadProcessId($h,[ref]$o) | Out-Null
+        if($hwpPids -contains [int]$o -and [WDR]::IsWindowVisible($h)){
+          $sb=New-Object System.Text.StringBuilder 256
+          [WDR]::GetWindowText($h,$sb,256) | Out-Null
+          if($sb.ToString() -eq '한글'){
+            [WDR]::PostMessage($h,0x100,[IntPtr]0x0D,[IntPtr]0) | Out-Null
+            [WDR]::PostMessage($h,0x101,[IntPtr]0x0D,[IntPtr]0) | Out-Null
+          }
+        }
+        return $true
+      },[IntPtr]::Zero) | Out-Null
+    }
+    Start-Sleep -Seconds 2
+  }
+}
 $hwp = New-Object -ComObject HWPFrame.HwpObject
 try {
-  try { $hwp.RegisterModule("FilePathCheckDLL","FilePathCheckerModule") | Out-Null } catch {}
   try { $hwp.SetMessageBoxMode(0x10001) | Out-Null } catch {}
   $htests = @(
     @('적격패킷','R_적격패킷.hwpx',@('회귀테스트 석면철거공사','123,456,789','95.5')),
@@ -60,6 +92,7 @@ try {
 } finally {
   try { $hwp.Quit() } catch {}
   [System.Runtime.Interopservices.Marshal]::ReleaseComObject($hwp) | Out-Null
+  Stop-Job $wd -ErrorAction SilentlyContinue; Remove-Job $wd -Force -ErrorAction SilentlyContinue
 }
 
 Write-Output "== 결과 =="
