@@ -1171,6 +1171,7 @@
       <option value="qual_packet">적격심사 패킷(신청서·심사표·각서·확약서 hwp)</option>
       <option value="con_docs">계약서류(서약서+사용인감계 hwp)</option>
       <option value="quote_docs">견적서(회사별 양식 hwp)</option>
+      <option value="adv_pay">선금지급신청 세트(공문+별첨2~5 hwp)</option>
       <option value="bid_rate">내역서 낙찰률 적용(발주처 내역서 → 낙찰가)</option>
     </select>
     <span class="fld-label">시행 회사</span>
@@ -1306,6 +1307,35 @@
         <input type="text" id="xqtPrice" placeholder="단가 (숫자만)" inputmode="numeric" style="flex:1" autocomplete="off">
       </div>
       <div style="font-size:12px;color:#888;">금액=수량×단가 자동(부가세 구분은 표기만). 준설·폐기물=환경, 석면·철거=건설 양식으로 생성됩니다.</div>
+    </div>
+    <div id="xgAdvWrap" style="display:none;">
+      <input type="text" id="xadOrg" placeholder="발주기관 (예: 경상북도김천교육지원청)" autocomplete="off">
+      <div style="display:flex;gap:8px;">
+        <input type="text" id="xadRecv" placeholder="수신 (예: 김천교육지원청 (분임)재무관)" style="flex:2" autocomplete="off">
+        <input type="text" id="xadRef" placeholder="참조 (예: 재정지원담당)" style="flex:1" autocomplete="off">
+      </div>
+      <div style="display:flex;gap:8px;">
+        <input type="text" id="xadDocNo" placeholder="문서번호" style="flex:1" autocomplete="off">
+        <input type="text" id="xadDate" placeholder="시행일자(=작성일)" style="flex:1" autocomplete="off">
+      </div>
+      <div style="display:flex;gap:8px;">
+        <input type="text" id="xadLabor" placeholder="직접노무비 B (숫자 — 내역서 원가계산서)" inputmode="numeric" style="flex:1" autocomplete="off">
+        <input type="text" id="xadReq" placeholder="선금신청액 E (숫자)" inputmode="numeric" style="flex:1" autocomplete="off">
+      </div>
+      <div id="xadCalc" style="font-size:13px;color:#1A9A6B;margin:2px 0;"></div>
+      <span class="fld-label">선금사용계획 4항목(공급가액 기준 — 합계가 소계와 일치해야, 비우면 수기)</span>
+      <div style="display:flex;gap:8px;">
+        <input type="text" id="xadU1" placeholder="노무비" inputmode="numeric" style="flex:1" autocomplete="off">
+        <input type="text" id="xadU2" placeholder="재료비" inputmode="numeric" style="flex:1" autocomplete="off">
+        <input type="text" id="xadU3" placeholder="사급자재" inputmode="numeric" style="flex:1" autocomplete="off">
+        <input type="text" id="xadU4" placeholder="경비" inputmode="numeric" style="flex:1" autocomplete="off">
+      </div>
+      <div style="display:flex;gap:8px;">
+        <input type="text" id="xadBank" placeholder="은행명" style="flex:1" autocomplete="off">
+        <input type="text" id="xadAcctType" placeholder="예금종류" style="flex:1" autocomplete="off">
+        <input type="text" id="xadAcct" placeholder="계좌번호 (하도급지킴이 계정 — 발주처 안내 확인)" style="flex:2" autocomplete="off">
+      </div>
+      <div style="font-size:12px;color:#888;">김천서부초 제출 실물 기반(교육청 계열 서식). 계약금액·계약일·착공일·준공예정일은 위 공통 칸 사용. 차액·요율·잔액·부가세·한글금액은 자동 계산. <b>타 발주처는 계약 시 배포 서식과 대조 후 제출.</b></div>
     </div>
     <button class="primary" id="xgGo">생성·다운로드</button>
     <button class="secondary" id="xgCancel">취소</button>
@@ -5254,8 +5284,8 @@
   }
 
   // ---- 서류 양식 등록/생성 ----
-  var TPL_LABELS={asb_plan:"석면해체계획서", work_start:"착공계", work_complete:"준공계", demo_report:"해체신고서", waste_report:"폐기물배출신고서", qual_packet:"적격심사 패킷", contract_pledge:"계약이행서약서", seal_reg:"사용인감계", bond_waiver:"채권포기각서", labor_exempt:"노무비제외신청서", quote_env:"견적서(환경)", quote_con:"견적서(건설)"};
-  var TPL_EXT={qual_packet:".hwpx", contract_pledge:".hwpx", seal_reg:".hwpx", bond_waiver:".hwpx", labor_exempt:".hwpx", quote_env:".hwpx", quote_con:".hwpx"};   // 기본 .xlsx, hwpx 양식만 예외
+  var TPL_LABELS={asb_plan:"석면해체계획서", work_start:"착공계", work_complete:"준공계", demo_report:"해체신고서", waste_report:"폐기물배출신고서", qual_packet:"적격심사 패킷", contract_pledge:"계약이행서약서", seal_reg:"사용인감계", bond_waiver:"채권포기각서", labor_exempt:"노무비제외신청서", quote_env:"견적서(환경)", quote_con:"견적서(건설)", adv_pay:"선금지급신청 세트"};
+  var TPL_EXT={qual_packet:".hwpx", contract_pledge:".hwpx", seal_reg:".hwpx", bond_waiver:".hwpx", labor_exempt:".hwpx", quote_env:".hwpx", quote_con:".hwpx", adv_pay:".hwpx"};   // 기본 .xlsx, hwpx 양식만 예외
   function openTplManage(){
     if(!isAdmin()) return;
     var host=document.getElementById("tplRows");
@@ -5349,6 +5379,7 @@
     var s=String(stage||"");
     if(/적격심사/.test(s)) return "qual_packet";
     if(/견적/.test(s)) return "quote_docs";
+    if(/선급금|선금/.test(s)) return "adv_pay";
     if(/계약서류|계약체결/.test(s)) return "con_docs";
     if(/착공|착수/.test(s)) return "work_start";
     if(/준공/.test(s)) return "work_complete";
@@ -5364,6 +5395,19 @@
     openDocFromContract(procId, stage);               // 계약(비입찰 계약서 작성)·견적 등 → 서류출력 폼
   }
   var xgCtx=null, xgRateFetched=null;   // xgRateFetched: 공고 첨부에서 불러온 내역서 {name, bytes}
+  var xadBound=false;   // 선금 계산 리스너 1회 바인딩 가드
+  function xadNum(id){ return parseInt((document.getElementById(id).value||"").replace(/[^0-9]/g,""),10)||0; }
+  function xadCalcUpd(){
+    var A=xadNum("xgAmount"), B=xadNum("xadLabor"), E=xadNum("xadReq");
+    var out=document.getElementById("xadCalc"); if(!out) return;
+    if(!A){ out.textContent="계약금액(위 금액 칸)을 입력하면 차액·요율·잔액이 자동 계산됩니다."; return; }
+    var C=A-B, sub=E?Math.floor(E/1.1):0, vat=E?E-sub:0;
+    var D=(C>0&&E)?(E*100/C):0;
+    out.textContent="차액 C=A-B: "+C.toLocaleString()+" · 적용요율 D=E/C: "+(D?D.toFixed(2)+"%":"—")
+      +" · 잔액: "+(E?(A-E).toLocaleString():"—")+" · 사용계획 소계 "+(sub?sub.toLocaleString():"—")+" + 부가세 "+(vat?vat.toLocaleString():"—");
+    out.style.color = (D>50) ? "#C0392B" : "#1A9A6B";
+    if(D>50) out.textContent += " ⚠ 요율 50% 초과 — 발주처 승인 여부 확인";
+  }
   // 프리필(하드리딩 체인) — 모달 표시 없이 필드만 채움(일괄 생성에서도 사용)
   function xgPrefill(conId, presetKind, stage){
     var c=findProc(conId); if(!c) return null;
@@ -5499,6 +5543,21 @@
     document.getElementById("xgQualWrap").style.display = (k==="qual_packet") ? "" : "none";
     document.getElementById("xgConDocsWrap").style.display = (k==="con_docs") ? "" : "none";
     document.getElementById("xgQuoteWrap").style.display = (k==="quote_docs") ? "" : "none";
+    document.getElementById("xgAdvWrap").style.display = (k==="adv_pay") ? "" : "none";
+    if(k==="adv_pay"){
+      document.getElementById("xgAgentWrap").style.display="none";
+      var ad0=new Date(), adDot=ad0.getFullYear()+"."+("0"+(ad0.getMonth()+1)).slice(-2)+"."+("0"+ad0.getDate()).slice(-2);
+      if(!document.getElementById("xadOrg").value) document.getElementById("xadOrg").value=(document.getElementById("xgClient").value||"").trim();
+      if(!document.getElementById("xadDate").value) document.getElementById("xadDate").value=adDot;
+      if(!document.getElementById("xadDocNo").value) document.getElementById("xadDocNo").value=String(ad0.getFullYear())+("0"+(ad0.getMonth()+1)).slice(-2)+"-";
+      if(!document.getElementById("xadBank").value) document.getElementById("xadBank").value="대구은행";
+      if(!document.getElementById("xadAcctType").value) document.getElementById("xadAcctType").value="하도급지킴이";
+      if(!xadBound){
+        xadBound=true;
+        ["xgAmount","xadLabor","xadReq"].forEach(function(id){ document.getElementById(id).addEventListener("input", xadCalcUpd); });
+      }
+      xadCalcUpd();
+    }
     if(k==="quote_docs"){
       document.getElementById("xgMoneyFields").style.display="none";
       var qd0=new Date(), qm0=("0"+(qd0.getMonth()+1)).slice(-2);
@@ -5953,6 +6012,58 @@
           alert("계약서류 생성 완료(등록된 양식 전부)."+((c&&c.bid_id)?"\n※ 입찰(적격심사) 건 — 서약서 6·7번을 '해당없음'으로 체크 수정 후 날인하세요.":"")
             +"\n※ 노무비제외신청서는 빈 서식(수기 기입, 착공 시 제출). 포항시 외 발주처는 양식 확인 후 제출하세요.");
           $("xlsxGenBackdrop").classList.remove("show"); xgCtx=null;
+        }).catch(function(e){ alert("생성 실패: "+e); })
+          .finally(function(){ $("xgGo").textContent="생성·다운로드"; $("xgGo").disabled=false; });
+        return;
+      }
+      if(kind==="adv_pay"){   // 선금지급신청 세트: 공문+별첨2~5+지급조건 (김천서부초 실물 역산 템플릿)
+        var AD_CO={ env:{name:"유한회사 종운환경", addr:"경북 포항시 남구 서원재로 1(호동)"},
+                    con:{name:"주식회사 종운건설", addr:"경북 포항시 남구 정몽주로 823-10"} };
+        var adCo=AD_CO[$("xgCo").value]||AD_CO.con;
+        var adA=xadNum("xgAmount"), adB=xadNum("xadLabor"), adE=xadNum("xadReq");
+        var adC=adA-adB, adSub=adE?Math.floor(adE/1.1):0, adVat=adE?adE-adSub:0;
+        var adD=(adC>0&&adE)?(adE*100/adC):0;
+        var adU=[xadNum("xadU1"),xadNum("xadU2"),xadNum("xadU3"),xadNum("xadU4")];
+        var adUsum=adU[0]+adU[1]+adU[2]+adU[3];
+        var adM=[];
+        if(!$("xgTitle").value.trim()) adM.push("계약건명(공사명 칸)");
+        if(!$("xadOrg").value.trim()) adM.push("발주기관");
+        if(!adA) adM.push("계약금액(금액 칸)");
+        if(!adB) adM.push("직접노무비");
+        if(!adE) adM.push("선금신청액");
+        if(!$("xgD1").value) adM.push("계약일"); if(!$("xgD2").value) adM.push("착공일"); if(!$("xgD3").value) adM.push("준공예정일");
+        if(!$("xadAcct").value.trim()) adM.push("계좌번호(하도급지킴이)");
+        if(adUsum && adSub && adUsum!==adSub) adM.push("사용계획 합계 "+adUsum.toLocaleString()+" ≠ 소계 "+adSub.toLocaleString()+" (원단위 맞춤 필요)");
+        if(adM.length && !confirm("⚠ 확인요망:\n· "+adM.join("\n· ")+"\n\n이대로 생성할까요? (빈 값은 수기 기입)")) return;
+        var adKo=function(n){ if(!n) return ""; var k=koAmount(n); return k.slice(0,k.indexOf("원")).replace(/^일금\s*/,"").replace(/\s/g,""); };
+        var adF=function(iso){ if(!/^\d{4}-\d{2}-\d{2}$/.test(iso||"")) return ""; var p=iso.split("-"); return p[0]+"."+p[1]+"."+p[2]+"."; };
+        var adTokens={ "발주기관":$("xadOrg").value.trim(), "수신":$("xadRecv").value.trim(), "참조":$("xadRef").value.trim(),
+          "문서번호":$("xadDocNo").value.trim().replace(/-$/,"-01"), "시행일자":$("xadDate").value.trim(),
+          "작성일":($("xadDate").value.trim()||adF(todayStr())), "담당자":"나경일 과장", "이메일":"jongwoon1202@daum.net",
+          "전화":"054)291-1204", "팩스":"054)291-1214",
+          "계약건명":$("xgTitle").value.trim(), "상호":adCo.name, "주소":adCo.addr, "대표자":"나 종 운",
+          "계약기간":(adF($("xgD1").value)&&adF($("xgD3").value))?adF($("xgD1").value)+" ～ "+adF($("xgD3").value):"",
+          "계약일":adF($("xgD1").value), "착공일":adF($("xgD2").value), "준공예정일":adF($("xgD3").value),
+          "계약금액한글":adKo(adA), "계약금액":adA?adA.toLocaleString():"",
+          "선금신청액한글":adKo(adE), "선금신청액":adE?adE.toLocaleString():"",
+          "잔액한글":adKo(adA-adE), "잔액":(adA&&adE)?(adA-adE).toLocaleString():"",
+          "직접노무비한글":adKo(adB), "직접노무비":adB?adB.toLocaleString():"",
+          "차액한글":adKo(adC), "차액":(adA&&adB)?adC.toLocaleString():"",
+          "적용요율":adD?adD.toFixed(2):"",
+          "노무비":adU[0]?adU[0].toLocaleString():"", "재료비":adU[1]?adU[1].toLocaleString():"",
+          "사급자재":adU[2]?adU[2].toLocaleString():"", "경비":adU[3]?adU[3].toLocaleString():"",
+          "소계":adSub?adSub.toLocaleString():"", "부가세":adVat?adVat.toLocaleString():"",
+          "은행명":$("xadBank").value.trim(), "예금종류":$("xadAcctType").value.trim(), "계좌번호":$("xadAcct").value.trim() };
+        $("xgGo").textContent="생성 중…"; $("xgGo").disabled=true;
+        gwCall("gw-data",{action:"tpl_get", key:"adv_pay"}).then(function(ra){
+          if(ra.status!==200){ alert(ra.status===404?"'선금지급신청 세트' 양식이 미등록입니다. [+ 양식 등록]에서 hwpx 템플릿을 등록하세요.":"양식 로드 실패"); return; }
+          return fillHwpxTemplate(ra.body.data, adTokens).then(function(ba){
+            downloadBlob(($("xgTitle").value.trim()||c.label||"선금")+"_선금지급신청.hwpx", ba);
+            alert("선금지급신청 세트 생성 완료 — 공문·별첨2(신청서)·별첨3(각서)·별첨4(사용계획)·별첨5(청구서)·지급조건 일체."
+              +(adD?"\n적용요율 "+adD.toFixed(2)+"%"+(adD>50?" ⚠ 50% 초과 — 발주처 승인 확인":""):"")
+              +"\n※ 김천 교육청 계열 서식 기반 — 타 발주처는 배포 서식과 대조 후 제출. 선금지급보증서(보증기관)는 별도 발급.");
+            $("xlsxGenBackdrop").classList.remove("show"); xgCtx=null;
+          });
         }).catch(function(e){ alert("생성 실패: "+e); })
           .finally(function(){ $("xgGo").textContent="생성·다운로드"; $("xgGo").disabled=false; });
         return;
