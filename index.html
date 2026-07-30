@@ -2841,6 +2841,27 @@
       saveTasksCache(); scheduleTasksSave(); renderTasks(); renderSummary(); renderDashboard();
       pushNotify("__admins__", "만기 임박 "+created+"건", "차량·인허가 만기 지시가 자동 생성되었습니다", "auto-due");
     }
+    recOverdueGen();
+  }
+  // 미수 장기화(청구 45일 경과·미입금) → 관리자 지시 자동 생성. rec별 1회(auto_key).
+  function recOverdueGen(){
+    if (!isAdmin() || !autoGenRan || !receivables.length) return;
+    var today = todayStr(), made = 0;
+    liveRec().forEach(function(r){
+      if (r.paid || !isDate(r.billed)) return;
+      var ag = recAging(r.billed);
+      if (!ag || ag.days < 45) return;
+      var key = "rec:"+r.id+":over45";
+      if (tasks.some(function(t){ return t.auto_key===key; })) return;
+      tasks.push({ id:genId("t"), title:"미수 확인: "+(r.client||"거래처")+" "+((r.amount||0)?Number(r.amount).toLocaleString()+"원":""),
+        detail:"청구 "+ag.days+"일 경과 — 입금 확인·독촉 여부 판단"+(r.desc?" · "+r.desc:""), who_id:"", who:"", scope:[],
+        from:"자동", from_id:"", by:"자동", due:"", status:"open", done_at:null, done_by:null, auto_key:key, created:today, updated:today });
+      made++;
+    });
+    if (made){
+      saveTasksCache(); scheduleTasksSave(); renderTasks(); renderSummary(); renderDashboard();
+      pushNotify("__admins__", "미수 장기화 "+made+"건", "청구 45일 경과 미수 확인 지시가 생성되었습니다", "rec-over");
+    }
   }
   function rejectTask(id){
     var t = findTask(id);
@@ -8020,6 +8041,7 @@
         var parsed = JSON.parse(b64DecodeUnicode(json.content));
         receivables = (parsed && parsed.items) || [];
         setOffline(false); saveRecCache(); renderReceivables(); renderDashboard();
+        recOverdueGen();   // 미수 장기화 자동 지시(만기 자동생성이 먼저 돈 경우 보충)
       });
     }).catch(function(){
       var c = loadRecCache();
