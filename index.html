@@ -2852,9 +2852,21 @@
       if (isDate(l.expiry) && vehDday(l.expiry).diff<=30) mk("lic:"+l.id+":exp:"+l.expiry, (l.name||"인허가")+" 갱신", l.expiry);
       if (isDate(l.edu_due) && vehDday(l.edu_due).diff<=30) mk("lic:"+l.id+":edu:"+l.edu_due, (l.name||"인허가")+" 보수교육 이수", l.edu_due);
     });
+    // 증명서 갱신 루틴(20일 주기) — 유효기간 30일 + 행정처리 지연 감안(발주처가 재발급 요구하는 사례 방지)
+    var certEpoch=new Date("2026-01-01T00:00:00"), certNow=new Date(today+"T00:00:00");
+    var certCycle=Math.floor((certNow-certEpoch)/(20*86400000));
+    var certDue=new Date(certEpoch.getTime()+(certCycle+1)*20*86400000).toISOString().slice(0,10);
+    var certKey="cert:c"+certCycle;
+    if (!tasks.some(function(t){ return t.auto_key===certKey; })){
+      tasks.push({ id:genId("t"), title:"증명서 갱신 발급 — 납세·지방세·4대보험 완납증명",
+        detail:"홈택스(납세증명)·위택스(지방세)·정부24(4대보험 완납) 발급 후 증빙 보관함에 업로드. 20일 주기(유효기간 30일·행정처리 지연 감안). 등기부등본은 보관본이 제출처 인정기간 내면 재사용, 지났을 때만 인터넷등기소 발급(유료). 인감증명서는 무인발급기/등기소.",
+        who_id:"", who:"", scope:[], from:"자동", from_id:"", by:"자동", due:certDue,
+        status:"open", done_at:null, done_by:null, auto_key:certKey, created:today, updated:today });
+      created++;
+    }
     if (created){
       saveTasksCache(); scheduleTasksSave(); renderTasks(); renderSummary(); renderDashboard();
-      pushNotify("__admins__", "만기 임박 "+created+"건", "차량·인허가 만기 지시가 자동 생성되었습니다", "auto-due");
+      pushNotify("__admins__", "만기 임박 "+created+"건", "차량·인허가 만기·증명서 갱신 지시가 자동 생성되었습니다", "auto-due");
     }
     recOverdueGen();
   }
