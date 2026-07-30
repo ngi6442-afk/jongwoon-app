@@ -189,6 +189,29 @@ async function handleBidsIngest(event, d, R) {
         aw.cats[String(k).slice(0, 12)] = { n: Number(o.n) || 0, q1: Number(o.q1) || 0, med: Number(o.med) || 0, q3: Number(o.q3) || 0 };
       });
     }
+    // 경북권 분포·슬레이트 기준선 — 전국 중앙값은 우리 참여 가능 물량과 다르다(실측)
+    aw.gb = {};
+    if (a.gb && typeof a.gb === 'object') {
+      Object.keys(a.gb).slice(0, 8).forEach(function (k) {
+        const o = a.gb[k] || {};
+        aw.gb[String(k).slice(0, 12)] = { n: Number(o.n) || 0, q1: Number(o.q1) || 0, med: Number(o.med) || 0, q3: Number(o.q3) || 0 };
+      });
+    }
+    if (a.slate && typeof a.slate === 'object') {
+      aw.slate = {};
+      ['all', 'gb'].forEach(function (k) {
+        const o = a.slate[k];
+        if (o && typeof o === 'object') aw.slate[k] = { n: Number(o.n) || 0, q1: Number(o.q1) || 0, med: Number(o.med) || 0, q3: Number(o.q3) || 0 };
+      });
+    }
+    aw.gb_orgs = {};
+    if (a.gb_orgs && typeof a.gb_orgs === 'object') {
+      Object.keys(a.gb_orgs).slice(0, 30).forEach(function (org) {
+        const o = a.gb_orgs[org] || {}, cats = {};
+        if (o.cats && typeof o.cats === 'object') Object.keys(o.cats).slice(0, 4).forEach(function (c) { cats[String(c).slice(0, 8)] = Number(o.cats[c]) || 0; });
+        aw.gb_orgs[String(org).slice(0, 40)] = { n: Number(o.n) || 0, q1: Number(o.q1) || 0, med: Number(o.med) || 0, q3: Number(o.q3) || 0, cats: cats };
+      });
+    }
     aw.orgs = {};
     if (a.orgs && typeof a.orgs === 'object') {
       Object.keys(a.orgs).slice(0, 80).forEach(function (org) {
