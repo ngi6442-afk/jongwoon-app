@@ -3753,10 +3753,12 @@
   var RS_COLLS=[
     ["tasks","지시",TASKS_PATH], ["contracts","계약",CONTRACT_PATH], ["receivables","기성(미수)",REC_PATH],
     ["clients","거래처",CLIENT_PATH], ["vehicles","차량",VEH_PATH], ["licenses","인허가",LIC_PATH],
-    ["documents","문서함",DOC_PATH], ["mytasks","개인업무",MYTASKS_PATH], ["leaves","휴가",LEAVES_PATH]
+    ["documents","문서함",DOC_PATH], ["mytasks","개인업무",MYTASKS_PATH], ["leaves","휴가",LEAVES_PATH],
+    ["quotes","견적서",QUOTE_PATH]
   ];
   var RS_LOADERS={tasks:loadTasks, contracts:loadContracts, receivables:loadReceivables, clients:loadClients,
-    vehicles:loadVehicles, licenses:loadLicenses, documents:loadDocuments, mytasks:loadMyTasks, leaves:loadLeaves};
+    vehicles:loadVehicles, licenses:loadLicenses, documents:loadDocuments, mytasks:loadMyTasks, leaves:loadLeaves,
+    quotes:loadQuotes};
   var rsPick=null;   // {path,label,ref,date,msg,rawContent(b64),liveCnt,totCnt}
   function rsCnt(b64){ try{ var p=JSON.parse(b64DecodeUnicode(b64))||{}; var it=p.items||[]; return {tot:it.length, live:it.filter(function(x){return x&&x.del!==1;}).length}; }catch(e){ return null; } }
   document.getElementById("restoreBtn").addEventListener("click", function(){
