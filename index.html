@@ -5673,6 +5673,59 @@
     return { blob: zipStore(Object.keys(raw).map(function(n){ return {name:n, data:raw[n]}; })), changed:changed, sheets:sheets };
   }
 
+  // ---- 준공 정산(사후정산) 엔진 ----
+  // 근거: 행안부예규 제372호 제1장 제9절(보험료 사후정산) 4-다-1) 납입확인서 납입금액으로 정산,
+  //       4-나-3) 정산 기준금액 = 해당 보험료 + 그에 대한 일반관리비·이윤·부가세.
+  // 감액 불가: 산재보험료(산재법 제6조 사업단위 당연가입)·고용보험료(고용보험법 시행령 제3조②2 일용근로자 적용).
+  // 실물 검증: 김천서부초 최종본(정산 99,188,000 / 감액 9,051,210 / 이윤 조정요율 0.149992155) 재현 — tools/settletest.mjs
+  var SETTLE_NO_CUT = ["sanjae", "goyong"];   // 감액 대상 아님(당연가입)
+  function settleCalc(inp){
+    var mat=+inp.mat||0, labor=+inp.labor||0, mach=+inp.mach||0, waste=+inp.waste||0;
+    var indirect=Math.floor(labor*(inp.indirectRate!=null?inp.indirectRate:0.125));
+    var laborTot=labor+indirect;
+    var items=(inp.items||[]).map(function(it){
+      var base=+it.base||0, actual=(it.deductible? (+it.actual||0) : base);
+      return { key:it.key, label:it.label, base:base, actual:actual, deductible:!!it.deductible, cut:Math.max(0, base-actual) };
+    });
+    var expBase=mach, expSub=mach;
+    items.forEach(function(it){ expBase+=it.base; expSub+=it.actual; });
+    var sum=mat+laborTot+expSub;                       // 계(순공사원가, 정산)
+    var gmRate=(inp.gmRate!=null?inp.gmRate:0.06), vatRate=(inp.vatRate!=null?inp.vatRate:0.1);
+    var gm=sum*gmRate;                                  // 일반관리비
+    var pBase=laborTot+expSub+gm;                       // 이윤 기준액
+    var profitRate=(inp.profitRate!=null?inp.profitRate:0.15);
+    // 목표 정산액이 있으면 이윤 조정 요율을 역산(실물 관행 — 발주처 합의 금액에 정확 안착)
+    if(inp.target){
+      var t=+inp.target;
+      var profitNeed=t/(1+vatRate)-sum-gm-waste;
+      if(pBase>0) profitRate=profitNeed/pBase;
+    }
+    var profit=pBase*profitRate;
+    var supply=sum+gm+profit+waste;                     // 공급가액
+    var vat=supply*vatRate;                             // 부가세
+    var total=Math.round(supply+vat);                   // 도급액(정산)
+    var origSum=mat+laborTot+expBase, origGm=origSum*gmRate;
+    var origProfit=(laborTot+expBase+origGm)*(inp.origProfitRate!=null?inp.origProfitRate:profitRate);
+    var origSupply=origSum+origGm+origProfit+waste;
+    var orig=(inp.origTotal!=null)?+inp.origTotal:Math.round(origSupply*(1+vatRate));
+    var cutItems=items.filter(function(it){ return it.cut>0; });
+    var warn=[];
+    items.forEach(function(it){
+      if(it.deductible && SETTLE_NO_CUT.indexOf(it.key)>=0)
+        warn.push(it.label+"는 감액 대상이 아닙니다 — 산재는 사업 단위 당연가입, 고용보험은 일용근로자도 적용(총공사금액 2천만원 미만 등 예외만 미발생)");
+      if(it.actual>it.base)
+        warn.push(it.label+" 실지급액이 계상액을 초과 — 증액 정산은 불가(예규 제1장 제9절 4-나-2)");
+    });
+    if(cutItems.length) warn.push("감액분은 계약목적물 이행이나 다른 비목으로 전용할 수 없습니다(예규 5-나)");
+    var reason=cutItems.length
+      ? cutItems.map(function(c){ return c.label; }).join(", ")+((cutItems.filter(function(c){return c.actual>0;}).length)?" 미가입·일부 미사용":" 미가입")
+      : "";
+    return { indirect:indirect, laborTot:laborTot, expBase:expBase, expSub:expSub, sum:sum, gm:gm,
+      profit:profit, profitRate:profitRate, supply:supply, vat:vat, total:total,
+      orig:orig, cut:orig-total, cutItems:cutItems, items:items, reason:reason, warn:warn };
+  }
+  // ---- 정산 끝 ----
+
   // 정밀 안착: 총원가 G를 낙찰가에 맞게 역산해 이윤 수정값 제시(실물 관행 실측: 발주처도 기초금액을 이윤 단수 조정으로 안착)
   // 도급액 = G + 부가세, 부가세 = 절사(G/10) 기준(절사로 안 풀리면 반올림 규칙도 시도)
   function bidRateLand(target, gNow, fNow){

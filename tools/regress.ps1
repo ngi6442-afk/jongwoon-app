@@ -106,6 +106,10 @@ Write-Output "== 4단계: 세금계산서 목록 파서(위하고 실물) =="
 node tools/rectest.mjs
 if($LASTEXITCODE -ne 0){ $fails += '세금계산서파서' }
 
+Write-Output "== 5단계: 준공 정산 엔진(김천 실물 재현) =="
+node tools/settletest.mjs
+if($LASTEXITCODE -ne 0){ $fails += '정산엔진' }
+
 Write-Output "== 결과 =="
 if($fails.Count){ Write-Output ("실패 " + $fails.Count + "건: " + ($fails -join ', ')); exit 1 }
 Write-Output "전 항목 통과"
