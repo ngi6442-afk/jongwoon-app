@@ -798,6 +798,7 @@
     <div class="nav-group">수주</div>
     <button class="tab-btn perm-hidden" data-tab="bid" id="tabBidBtn">입찰 <span class="tab-badge hide" id="bidTabBadge">0</span></button>
     <button class="tab-btn" data-tab="con" id="tabConBtn">계약</button>
+    <button class="tab-btn" data-tab="quote" id="tabQuoteBtn">견적서</button>
     <button class="tab-btn perm-hidden" data-tab="onbid" id="tabOnbidBtn">부동산</button>
     <div class="nav-divider"></div>
     <div class="nav-group">업무</div>
@@ -1021,6 +1022,14 @@
     <button class="link-btn" id="errLogBtn">🐞 오류 로그</button>
     <button class="link-btn" id="exportAllBtn">💾 전체 백업(xlsx)</button>
     <button class="link-btn" id="restoreBtn">⏪ 시점 복구</button>
+  </section>
+
+  <!-- 견적서 (문서번호 관리·발행 이력) -->
+  <section class="view" id="view-quote">
+    <div class="dash-sec" style="margin-bottom:8px;"><h2>견적서 <span class="cnt" id="qtHead"></span></h2></div>
+    <div style="font-size:13px;color:var(--sub);margin-bottom:6px;">계약 파이프라인과 별개로 발행하는 견적서 — 견적번호를 이 목록에서 채번·관리합니다. 발행 후 계약으로 승격할 수 있습니다.</div>
+    <button class="link-btn" id="qtNewBtn">+ 견적서 발행</button>
+    <div class="card" id="qtList"><div class="loading">불러오는 중…</div></div>
   </section>
 
   <!-- 인사·일용직 (권한 설정 가능) -->
@@ -1340,6 +1349,37 @@
     </div>
     <button class="primary" id="xgGo">생성·다운로드</button>
     <button class="secondary" id="xgCancel">취소</button>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="qtEditBackdrop">
+  <div class="modal">
+    <h3 id="qtEditTitle">견적서 발행</h3>
+    <p style="margin-bottom:8px;color:#888;font-size:13px;">견적번호는 자동 채번됩니다(연월-일련). 저장하면 이력에 남고, hwpx는 목록에서 언제든 다시 받을 수 있습니다.</p>
+    <div style="display:flex;gap:8px;">
+      <input type="text" id="qtNo" placeholder="견적번호(자동)" style="flex:1" autocomplete="off">
+      <input type="date" id="qtDate" style="flex:1">
+      <select id="qtCo" style="flex:1"><option value="env">(유)종운환경</option><option value="con">㈜종운건설</option></select>
+    </div>
+    <input type="text" id="qtRecv" placeholder="수신처 (예: 포항시 맑은물사업본부)" autocomplete="off">
+    <input type="text" id="qtTitle" placeholder="용역명 / 공사명" autocomplete="off">
+    <span class="fld-label">품목 1행 — 2행째부터는 한컴에서 수기(합계 자동합산)</span>
+    <div style="display:flex;gap:8px;">
+      <input type="text" id="qtItem" placeholder="품명" style="flex:2" autocomplete="off">
+      <input type="text" id="qtSang" placeholder="성상" style="flex:1" autocomplete="off">
+      <input type="text" id="qtGubun" placeholder="구분" style="flex:1" autocomplete="off">
+    </div>
+    <div style="display:flex;gap:8px;">
+      <input type="text" id="qtUnit" placeholder="단위" style="flex:1" autocomplete="off">
+      <input type="text" id="qtQty" placeholder="수량" inputmode="decimal" style="flex:1" autocomplete="off">
+      <input type="text" id="qtPrice" placeholder="단가(숫자만)" inputmode="numeric" style="flex:1" autocomplete="off">
+      <select id="qtVat" style="flex:1"><option value="부가세 포함">부가세 포함</option><option value="부가세 별도">부가세 별도</option></select>
+    </div>
+    <div id="qtSum" style="font-size:13px;color:#1A9A6B;margin:2px 0;"></div>
+    <input type="text" id="qtNote" placeholder="내부 메모(선택 — 목록에만 표시)" autocomplete="off">
+    <button class="primary" id="qtSave">저장 + hwpx 생성</button>
+    <button class="secondary" id="qtSaveOnly">저장만</button>
+    <button class="secondary" id="qtCancel">취소</button>
   </div>
 </div>
 
@@ -1841,6 +1881,7 @@
   var USERS_PATH = "data/users.json";
   var BIDS_PATH = "data/bids.json";
   var ONBID_PATH = "data/onbid.json";
+  var QUOTE_PATH = "data/quotes.json";
   var CHECK_API = API_ROOT + CHECK_PATH;
   var TASKS_API = API_ROOT + TASKS_PATH;
   var VEH_API = API_ROOT + VEH_PATH;
@@ -1854,6 +1895,7 @@
   var USERS_API = API_ROOT + USERS_PATH;
   var BIDS_API = API_ROOT + BIDS_PATH;
   var ONBID_API = API_ROOT + ONBID_PATH;
+  var QUOTE_API = API_ROOT + QUOTE_PATH;
 
   var TOKEN_KEY = "jw_app_token";
   var USER_KEY = "jw_app_user";
@@ -3546,6 +3588,8 @@
     document.getElementById("view-workers").classList.toggle("active", name === "workers");
     document.getElementById("view-perm").classList.toggle("active", name === "perm");
     document.getElementById("view-leave").classList.toggle("active", name === "leave");
+    document.getElementById("view-quote").classList.toggle("active", name === "quote");
+    if (name === "quote"){ renderQuotes(); loadQuotes(); }
 
     if (name === "cal") renderCalendar();
     if (name === "hr") renderHrRoster();
@@ -7226,6 +7270,167 @@
     }).catch(function(){});
   }
   function bidNewCount(){ return liveBids().filter(function(b){ return b.status==="new"; }).length; }
+
+  // ---- 견적서 탭 (파이프라인과 별개 발행 · 문서번호 채번·이력) ----
+  var quotes=[], quoteSha=null, quoteSaveTimer=null, quotePending=false, qtEditId=null;
+  function liveQuotes(){ return quotes.filter(function(q){ return q && q.del!==1; }); }
+  function loadQuotes(){
+    var token=getToken(); if(!token) return;
+    fetch(QUOTE_API,{headers:ghHeaders()}).then(function(resp){
+      if(resp.status===404){ quoteSha=null; quotes=[]; renderQuotes(); return; }
+      if(!resp.ok) throw new Error("HTTP "+resp.status);
+      return resp.json().then(function(json){
+        quoteSha=json.sha; var p=JSON.parse(b64DecodeUnicode(json.content));
+        var ri=(p&&p.items)||[];
+        quotes = quotePending ? mergeQuotes(quotes, ri) : ri;
+        renderQuotes();
+      });
+    }).catch(function(){});
+  }
+  function mergeQuotes(local,remote){
+    var byId={}; (local||[]).forEach(function(q){ if(q&&q.id) byId[q.id]=q; });
+    (remote||[]).forEach(function(x){ if(!x||!x.id) return; var c=byId[x.id];
+      if(!c){ byId[x.id]=x; } else { var w=(x.updated||"")>(c.updated||"")?x:c; var m=Object.assign({},(w===x?c:x),w); if(c.del===1||x.del===1) m.del=1; byId[x.id]=m; } });
+    return Object.keys(byId).map(function(k){ return byId[k]; });
+  }
+  function scheduleQuoteSave(){ quotePending=true; if(quoteSaveTimer) clearTimeout(quoteSaveTimer); quoteSaveTimer=setTimeout(doSaveQuotes,1200); }
+  function doSaveQuotes(){
+    var token=getToken(); if(!token) return;
+    var payload={message:"quotes: 업데이트",content:b64EncodeUnicode(JSON.stringify({schema:1,items:quotes})),branch:"main"};
+    if(quoteSha) payload.sha=quoteSha;
+    fetch(QUOTE_API,{method:"PUT",headers:Object.assign({"Content-Type":"application/json"},ghHeaders()),body:JSON.stringify(payload)}).then(function(resp){
+      if(resp.status===401) return;
+      if(resp.status===409||resp.status===422){ return fetch(QUOTE_API,{headers:ghHeaders()}).then(function(r){ return r.status===404?null:r.json(); }).then(function(j){ if(j){ var up={}; try{ up=JSON.parse(b64DecodeUnicode(j.content))||{}; }catch(e){} quotes=mergeQuotes(quotes,up.items||[]); quoteSha=j.sha; } return doSaveQuotes(); }); }
+      return resp.json().then(function(json){ quoteSha=json.content&&json.content.sha; quotePending=false; renderQuotes(); });
+    }).catch(function(){});
+  }
+  // 채번: YYYYMM-NN (해당 월 발행분 중 최대 일련 +1). 수동 수정도 허용.
+  function quoteNextNo(dateIso){
+    var d=(dateIso||todayStr()).slice(0,7).replace("-","");
+    var mx=0;
+    liveQuotes().forEach(function(q){
+      var m=/^(\d{6})-(\d+)$/.exec(String(q.no||""));
+      if(m && m[1]===d){ var n=parseInt(m[2],10)||0; if(n>mx) mx=n; }
+    });
+    return d+"-"+("0"+(mx+1)).slice(-2);
+  }
+  function qtAmt(q){ var n=Math.round((parseFloat(q.qty)||0)*(parseInt(q.price,10)||0)); return n||0; }
+  function renderQuotes(){
+    var host=document.getElementById("qtList"); if(!host) return;
+    var head=document.getElementById("qtHead");
+    var list=liveQuotes().slice().sort(function(a,b){ return (b.no||"").localeCompare(a.no||""); });
+    if(head) head.textContent = list.length ? ("총 "+list.length+"건") : "";
+    if(!list.length){ host.innerHTML='<div class="empty-line">발행한 견적서가 없습니다. [+ 견적서 발행]으로 시작하세요.</div>'; return; }
+    host.innerHTML=list.map(function(q){
+      var amt=qtAmt(q);
+      return '<div class="item-row"><div class="item-main"><div class="item-title">'+esc(q.no||"(번호없음)")+' · '+esc(q.title||"(용역명 없음)")+'</div>'
+        +'<div class="item-meta"><span>'+esc(q.date||"")+'</span><span>'+esc(q.recv||"")+'</span>'
+        +'<span>'+(q.co==="con"?"㈜종운건설":"(유)종운환경")+'</span>'
+        +(amt?'<span>'+fmtAmount(amt)+'원 '+esc(q.vat||"")+'</span>':'')
+        +(q.con_id?'<span class="review-chip">계약 연결</span>':'')
+        +(q.note?'<span>'+esc(q.note)+'</span>':'')+'</div></div>'
+        +'<div class="item-actions">'
+        +'<button class="mini-btn" data-qt-gen="'+q.id+'">📄 hwpx</button>'
+        +'<button class="mini-btn" data-qt-edit="'+q.id+'">수정</button>'
+        +(q.con_id?'':'<button class="mini-btn" data-qt-con="'+q.id+'">계약 생성</button>')
+        +'<button class="mini-btn" data-qt-del="'+q.id+'">삭제</button>'
+        +'</div></div>';
+    }).join("");
+    Array.prototype.forEach.call(host.querySelectorAll("[data-qt-gen]"), function(b){ b.addEventListener("click", function(){ quoteGen(b.getAttribute("data-qt-gen")); }); });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-qt-edit]"), function(b){ b.addEventListener("click", function(){ openQuoteEdit(b.getAttribute("data-qt-edit")); }); });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-qt-con]"), function(b){ b.addEventListener("click", function(){ quoteToContract(b.getAttribute("data-qt-con")); }); });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-qt-del]"), function(b){ b.addEventListener("click", function(){
+      var q=liveQuotes().filter(function(x){return x.id===b.getAttribute("data-qt-del");})[0]; if(!q) return;
+      if(!confirm("["+(q.no||"")+"] 견적서를 삭제할까요?\n(이력에서 숨김 처리 — 시점 복구로 되살릴 수 있습니다)")) return;
+      q.del=1; q.updated=todayStr(); renderQuotes(); scheduleQuoteSave();
+    }); });
+  }
+  function openQuoteEdit(id){
+    qtEditId=id||null;
+    var q=id?liveQuotes().filter(function(x){return x.id===id;})[0]:null;
+    document.getElementById("qtEditTitle").textContent = q?"견적서 수정":"견적서 발행";
+    var g=function(k){ return document.getElementById(k); };
+    g("qtDate").value = (q&&q.date)||todayStr();
+    g("qtNo").value = (q&&q.no)||quoteNextNo(g("qtDate").value);
+    g("qtCo").value = (q&&q.co)||"env";
+    g("qtRecv").value=(q&&q.recv)||""; g("qtTitle").value=(q&&q.title)||"";
+    g("qtItem").value=(q&&q.item)||""; g("qtSang").value=(q&&q.sang)||"고상";
+    g("qtGubun").value=(q&&q.gubun)||"일반"; g("qtUnit").value=(q&&q.unit)||"톤";
+    g("qtQty").value=(q&&q.qty)||""; g("qtPrice").value=(q&&q.price)||"";
+    g("qtVat").value=(q&&q.vat)||"부가세 별도"; g("qtNote").value=(q&&q.note)||"";
+    qtSumUpd();
+    document.getElementById("qtEditBackdrop").classList.add("show");
+  }
+  function qtSumUpd(){
+    var qty=parseFloat((document.getElementById("qtQty").value||"").replace(/[^0-9.]/g,""))||0;
+    var pr=parseInt((document.getElementById("qtPrice").value||"").replace(/[^0-9]/g,""),10)||0;
+    var n=Math.round(qty*pr);
+    document.getElementById("qtSum").textContent = n ? ("금액 "+n.toLocaleString()+"원 · "+koAmount(n)) : "수량×단가를 입력하면 금액·한글금액이 자동 계산됩니다.";
+  }
+  function qtCollect(){
+    var g=function(k){ return document.getElementById(k).value; };
+    return { no:g("qtNo").trim(), date:g("qtDate"), co:g("qtCo"), recv:g("qtRecv").trim(), title:g("qtTitle").trim(),
+      item:g("qtItem").trim(), sang:g("qtSang").trim(), gubun:g("qtGubun").trim(), unit:g("qtUnit").trim(),
+      qty:g("qtQty").trim(), price:(g("qtPrice")||"").replace(/[^0-9]/g,""), vat:g("qtVat"), note:g("qtNote").trim() };
+  }
+  function qtSaveRec(){
+    var f=qtCollect();
+    if(!f.no){ alert("견적번호를 입력하세요."); return null; }
+    if(!f.title){ alert("용역명(공사명)을 입력하세요."); return null; }
+    var dup=liveQuotes().filter(function(x){ return x.no===f.no && x.id!==qtEditId; });
+    if(dup.length && !confirm("견적번호 "+f.no+" 가 이미 있습니다. 그대로 저장할까요?")) return null;
+    var rec;
+    if(qtEditId){ rec=liveQuotes().filter(function(x){return x.id===qtEditId;})[0]; if(!rec) return null; Object.assign(rec,f); rec.updated=todayStr(); }
+    else { rec=Object.assign({id:genId("q"), created:todayStr(), updated:todayStr(), by:myName()||"", con_id:""}, f); quotes.push(rec); }
+    renderQuotes(); scheduleQuoteSave();
+    return rec;
+  }
+  function quoteGen(id){
+    var q=liveQuotes().filter(function(x){return x.id===id;})[0]; if(!q) return;
+    var amt=qtAmt(q), ko="";
+    if(amt){ var ks=koAmount(amt); ko=ks.slice(0,ks.indexOf("원")).replace(/^일금\s*/,"").replace(/\s/g,""); }
+    var dp=(q.date||todayStr()).split("-");
+    var tokens={ "견적번호":q.no||"", "견적일자":dp[0]+"년 "+dp[1]+"월 "+dp[2]+"일", "수신처":q.recv||"",
+      "용역명":q.title||"", "금액한글":ko, "금액숫자":amt?amt.toLocaleString():"", "부가세구분":q.vat||"부가세 별도",
+      "품명":q.item||"", "성상":q.sang||"", "구분":q.gubun||"", "단위":q.unit||"",
+      "수량":q.qty||"", "단가":q.price?Number(q.price).toLocaleString():"", "금액":amt?amt.toLocaleString():"" };
+    var key=(q.co==="con")?"quote_con":"quote_env";
+    gwCall("gw-data",{action:"tpl_get", key:key}).then(function(r){
+      if(r.status!==200){ alert(r.status===404?("'"+TPL_LABELS[key]+"' 양식이 미등록입니다. [+ 양식 등록]에서 등록하세요."):"양식 로드 실패"); return; }
+      return fillHwpxTemplate(r.body.data, tokens).then(function(b){
+        downloadBlob((q.no||"견적")+"_"+(q.title||"견적서")+".hwpx", b);
+      });
+    }).catch(function(e){ alert("생성 실패: "+e); });
+  }
+  function quoteToContract(id){
+    var q=liveQuotes().filter(function(x){return x.id===id;})[0]; if(!q) return;
+    if(!confirm("["+(q.no||"")+"] 견적서를 계약으로 승격할까요?\n견적 단계는 완료 처리하고 계약 단계부터 시작합니다.")) return;
+    var type=(q.co==="con")?"asbestos":"dredge";
+    var elems=(q.co==="con")?{asb:1,labor:1,wst:1}:{dredge:1};
+    var amt=qtAmt(q);
+    var nc=startProcess(type, {client:q.recv||"", site:"", start:q.date||todayStr(), who:"", docType:"public",
+      title:q.title||"", cinfo:{ title:q.title||"", amount:amt, d1:"", d2:"", d3:"", client:q.recv||"", site:"",
+        guarantee:0, from:"견적서("+(q.no||"")+")", checked:todayStr() },
+      stages:conBuildStages(elems), elems:elems, bid_id:""});
+    if(!nc){ alert("계약 생성 실패 — 유형 템플릿 누락. 관리자에게 문의."); return; }
+    q.con_id=nc.id; q.updated=todayStr(); renderQuotes(); scheduleQuoteSave();
+    renderContracts(); switchTab("tasks");
+    alert("계약 생성 완료 — 지시 탭에서 첫 단계를 확인하세요.");
+  }
+  document.getElementById("qtNewBtn").addEventListener("click", function(){ openQuoteEdit(null); });
+  document.getElementById("qtCancel").addEventListener("click", function(){ document.getElementById("qtEditBackdrop").classList.remove("show"); qtEditId=null; });
+  ["qtQty","qtPrice"].forEach(function(k){ document.getElementById(k).addEventListener("input", qtSumUpd); });
+  document.getElementById("qtDate").addEventListener("change", function(){
+    if(!qtEditId) document.getElementById("qtNo").value=quoteNextNo(this.value);
+  });
+  document.getElementById("qtSaveOnly").addEventListener("click", function(){
+    if(qtSaveRec()){ document.getElementById("qtEditBackdrop").classList.remove("show"); qtEditId=null; }
+  });
+  document.getElementById("qtSave").addEventListener("click", function(){
+    var rec=qtSaveRec(); if(!rec) return;
+    document.getElementById("qtEditBackdrop").classList.remove("show"); qtEditId=null;
+    quoteGen(rec.id);
+  });
   // ---- 낙찰하한가 계산기 ----
   var bcQualKind="";   // 계산기를 연 공고의 공종·제목(적격 통과선 안내용)
   function bcNum(id){ return parseFloat(String(document.getElementById(id).value).replace(/[,\s]/g,""))||0; }
