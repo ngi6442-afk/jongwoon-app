@@ -507,6 +507,28 @@ async function handleBidsResults(event, d, R) {
   return jr(200, { status: 'OK', applied: applied, request_id: R });
 }
 
+// ---- 오류 텔레메트리: 클라이언트 오류를 서버에 축적(최근 200건), 관리자 조회 ----
+async function handleErrLog(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  const st = store(DATA);
+  const r = await blobGet(st, 'err:log');
+  const doc = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data : { schema: 1, items: [] };
+  doc.items.push({ ts: Date.now(), by: c.member.name, msg: String(d.msg || '').slice(0, 300),
+    src: String(d.src || '').slice(0, 200), stack: String(d.stack || '').slice(0, 600), ua: String(d.ua || '').slice(0, 120) });
+  if (doc.items.length > 200) doc.items = doc.items.slice(-200);
+  await blobSet(st, 'err:log', doc);
+  return jr(200, { status: 'OK', request_id: R });
+}
+async function handleErrList(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (!c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
+  const r = await blobGet(store(DATA), 'err:log');
+  const items = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data.items : [];
+  return jr(200, { status: 'OK', items: items.slice(-100).reverse(), request_id: R });
+}
+
 // ---- 웹푸시: 구독 관리 + 발송(지시 배정 등 클라이언트 트리거) ----
 async function handlePushPubkey(event, d, R) {
   const c = await currentMember(event);
@@ -853,6 +875,8 @@ async function handler(event) {
     if (d && d.action === 'att_parse_status') return await handleAttParseStatus(event, d, R);
     if (d && d.action === 'att_get') return await handleAttGet(event, d, R);
     if (d && d.action === 'att_del') return await handleAttDel(event, d, R);
+    if (d && d.action === 'err_log') return await handleErrLog(event, d, R);
+    if (d && d.action === 'err_list') return await handleErrList(event, d, R);
     if (d && d.action === 'push_pubkey') return await handlePushPubkey(event, d, R);
     if (d && d.action === 'push_sub') return await handlePushSub(event, d, R);
     if (d && d.action === 'push_unsub') return await handlePushUnsub(event, d, R);

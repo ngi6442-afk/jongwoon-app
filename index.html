@@ -1018,6 +1018,8 @@
     <button class="link-btn" id="hrAddBtn">+ 직원 추가</button>
     <button class="link-btn" id="permMgmtBtn">🔑 권한관리</button>
     <button class="link-btn" id="auditBtn">📋 감사 로그</button>
+    <button class="link-btn" id="errLogBtn">🐞 오류 로그</button>
+    <button class="link-btn" id="exportAllBtn">💾 전체 백업(xlsx)</button>
   </section>
 
   <!-- 인사·일용직 (권한 설정 가능) -->
@@ -1292,6 +1294,14 @@
     <div id="asbReviewJudge" style="margin:8px 0;font-weight:600;"></div>
     <button class="primary" id="asbReviewSave">확정</button>
     <button class="secondary" id="asbReviewCancel">취소</button>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="errLogBackdrop">
+  <div class="modal" style="max-width:640px;">
+    <h3>🐞 오류 로그 (최근 100건)</h3>
+    <div id="errLogList" style="max-height:60vh;overflow:auto;font-size:12px;"></div>
+    <button class="secondary" id="errLogClose" style="margin-top:8px;">닫기</button>
   </div>
 </div>
 
@@ -2664,6 +2674,35 @@
     var me = myName();
     return !!(me && me === (t.by || t.from));
   }
+  // 오류 텔레메트리 — 세션당 동일 메시지 1회·최대 10건, 실패 무시(오류 보고가 또 오류 내지 않게)
+  var errSent={}, errCount=0;
+  function reportErr(msg, src, stack){
+    try{
+      if(!getToken() || errCount>=10) return;
+      var k=String(msg).slice(0,80);
+      if(errSent[k]) return;
+      errSent[k]=1; errCount++;
+      gwCall("gw-data",{action:"err_log", msg:String(msg).slice(0,300), src:src||"", stack:stack||"", ua:navigator.userAgent}).catch(function(){});
+    }catch(e){}
+  }
+  window.addEventListener("error", function(e){ reportErr(e.message||"script error", (e.filename||"").split("/").pop()+":"+(e.lineno||"?"), (e.error&&e.error.stack)||""); });
+  window.addEventListener("unhandledrejection", function(e){ var r=e.reason||{}; reportErr(r.message||String(r), "promise", r.stack||""); });
+  function openErrLog(){
+    if(!isAdmin()) return;
+    var host=document.getElementById("errLogList");
+    host.innerHTML='<div style="color:#888;">불러오는 중…</div>';
+    document.getElementById("errLogBackdrop").classList.add("show");
+    gwCall("gw-data",{action:"err_list"}).then(function(res){
+      var items=(res.body&&res.body.items)||[];
+      if(!items.length){ host.innerHTML='<div style="color:#888;">기록된 오류가 없습니다 🎉</div>'; return; }
+      host.innerHTML=items.map(function(it){
+        var d=new Date(it.ts); var dt=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")+" "+String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");
+        return '<div style="border-bottom:1px solid var(--line);padding:6px 2px;">'
+          +'<b>'+esc(it.msg||"")+'</b><br><span style="color:#888;">'+dt+' · '+esc(it.by||"")+' · '+esc(it.src||"")+'</span>'
+          +(it.stack?'<pre style="white-space:pre-wrap;font-size:11px;color:#999;margin:3px 0 0;">'+esc(it.stack)+'</pre>':'')+'</div>';
+      }).join("");
+    }).catch(function(){ host.innerHTML='<div style="color:#c0392b;">로드 실패</div>'; });
+  }
   // 웹푸시 발송 헬퍼 — 구독 기기 없으면 서버가 조용히 0건 처리, 실패 무시
   function pushNotify(to, title, body, tag){
     if(!to) return;
@@ -3558,6 +3597,9 @@
   document.getElementById("permBackBtn").addEventListener("click", function(){ switchTab("hr"); });
   document.getElementById("hrStartBtn").addEventListener("click", hrStartWork);
   document.getElementById("auditBtn").addEventListener("click", openAudit);
+  document.getElementById("errLogBtn").addEventListener("click", openErrLog);
+  document.getElementById("exportAllBtn").addEventListener("click", adminExportAll);
+  document.getElementById("errLogClose").addEventListener("click", function(){ document.getElementById("errLogBackdrop").classList.remove("show"); });
   document.getElementById("auditClose").addEventListener("click", function(){ document.getElementById("auditBackdrop").classList.remove("show"); });
   document.getElementById("auditBackdrop").addEventListener("click", function(e){ if(e.target===this) this.classList.remove("show"); });
   document.getElementById("auditPrev").addEventListener("click", function(){ auditMonthShift(-1); });
@@ -4853,6 +4895,55 @@
       {name:"xl/_rels/workbook.xml.rels", data:enc.encode(P+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>')},
       {name:"xl/worksheets/sheet1.xml", data:enc.encode(P+'<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>'+rowsXml+'</sheetData></worksheet>')}
     ]);
+  }
+  // 멀티시트 xlsx(전 데이터 백업용) — buildSimpleXlsx의 N시트 버전
+  function buildMultiXlsx(sheets){
+    var enc=new TextEncoder();
+    function colL(n){ var s=""; n++; while(n>0){ var m=(n-1)%26; s=String.fromCharCode(65+m)+s; n=Math.floor((n-1)/26); } return s; }
+    function sheetXml(rows){
+      var rowsXml=rows.map(function(row,ri){
+        var cells=row.map(function(v,ci){
+          if(v==null||v==="") return "";
+          var ref=colL(ci)+(ri+1);
+          if(typeof v==="number"&&isFinite(v)) return '<c r="'+ref+'"><v>'+v+'</v></c>';
+          return '<c r="'+ref+'" t="inlineStr"><is><t xml:space="preserve">'+xmlEsc(String(v))+'</t></is></c>';
+        }).join("");
+        return '<row r="'+(ri+1)+'">'+cells+'</row>';
+      }).join("");
+      return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>'+rowsXml+'</sheetData></worksheet>';
+    }
+    var P='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+    var overrides=sheets.map(function(_,i){ return '<Override PartName="/xl/worksheets/sheet'+(i+1)+'.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'; }).join("");
+    var sheetTags=sheets.map(function(s,i){ return '<sheet name="'+xmlEsc(s.name.slice(0,30))+'" sheetId="'+(i+1)+'" r:id="rId'+(i+1)+'"/>'; }).join("");
+    var relTags=sheets.map(function(_,i){ return '<Relationship Id="rId'+(i+1)+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet'+(i+1)+'.xml"/>'; }).join("");
+    var files=[
+      {name:"[Content_Types].xml", data:enc.encode(P+'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'+overrides+'</Types>')},
+      {name:"_rels/.rels", data:enc.encode(P+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>')},
+      {name:"xl/workbook.xml", data:enc.encode(P+'<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>'+sheetTags+'</sheets></workbook>')},
+      {name:"xl/_rels/workbook.xml.rels", data:enc.encode(P+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+relTags+'</Relationships>')}
+    ];
+    sheets.forEach(function(s,i){ files.push({name:"xl/worksheets/sheet"+(i+1)+".xml", data:enc.encode(sheetXml(s.rows))}); });
+    return zipStore(files);
+  }
+  // 전 데이터 일괄 백업(관리자) — 메모리에 로드된 컬렉션을 컬럼 자동 구성으로 시트별 내보내기
+  function adminExportAll(){
+    if(!isAdmin()) return;
+    function toRows(items){
+      var live=(items||[]).filter(function(x){ return x && x.del!==1; });
+      if(!live.length) return [["(비어 있음)"]];
+      var keys=[]; live.forEach(function(it){ Object.keys(it).forEach(function(k){ if(keys.indexOf(k)<0) keys.push(k); }); });
+      var rows=[keys];
+      live.forEach(function(it){ rows.push(keys.map(function(k){ var v=it[k]; if(v==null) return ""; if(typeof v==="object") return JSON.stringify(v).slice(0,500); return v; })); });
+      return rows;
+    }
+    var sheets=[
+      {name:"계약", rows:toRows(contracts)}, {name:"기성", rows:toRows(receivables)},
+      {name:"지시", rows:toRows(tasks)}, {name:"차량", rows:toRows(vehicles)},
+      {name:"인허가", rows:toRows(licenses)}, {name:"거래처", rows:toRows(clients)},
+      {name:"일용직", rows:toRows(workers)}, {name:"입찰", rows:toRows(bids)}
+    ];
+    downloadBlob("전체백업_"+todayStr()+".xlsx", buildMultiXlsx(sheets));
+    alert("전 데이터 백업 파일을 내려받았습니다 — 외부 유출 주의(개인정보·금액 포함). 서버 자동 백업(매일 05:30)과 별개의 로컬 보관용입니다.");
   }
   // 한글 금액: 19525000 → 일금 일천구백오십이만오천원 정(￦ 19,525,000)
   function koAmount(n){
@@ -7533,6 +7624,9 @@
         if(ex.client!==c.client){ ex.client=c.client; ch=true; }
         if((ex.desc||"")!==c.desc){ ex.desc=c.desc; ch=true; }
         if((ex.amount||0)!==c.amount){ ex.amount=c.amount; if(ex.paid) ex.recheck=1; ch=true; }
+        // 회사 소급: 미지정 건은 이번 업로드에서 선택한 공급자로 채움(홈택스 파일=회사별 — 재업로드로 일괄 소급 가능)
+        var impCo=document.getElementById("recImpCo");
+        if(!ex.co && impCo && impCo.value){ ex.co=impCo.value; ch=true; }
         if(ch){ ex.updated=today; res.upd++; }
       } else {
         var it=recNewRec(c,today);
