@@ -5224,8 +5224,8 @@
   }
 
   // ---- 서류 양식 등록/생성 ----
-  var TPL_LABELS={asb_plan:"석면해체계획서", work_start:"착공계", work_complete:"준공계", demo_report:"해체신고서", waste_report:"폐기물배출신고서", qual_packet:"적격심사 패킷", contract_pledge:"계약이행서약서", seal_reg:"사용인감계"};
-  var TPL_EXT={qual_packet:".hwpx", contract_pledge:".hwpx", seal_reg:".hwpx"};   // 기본 .xlsx, hwpx 양식만 예외
+  var TPL_LABELS={asb_plan:"석면해체계획서", work_start:"착공계", work_complete:"준공계", demo_report:"해체신고서", waste_report:"폐기물배출신고서", qual_packet:"적격심사 패킷", contract_pledge:"계약이행서약서", seal_reg:"사용인감계", bond_waiver:"채권포기각서", labor_exempt:"노무비제외신청서"};
+  var TPL_EXT={qual_packet:".hwpx", contract_pledge:".hwpx", seal_reg:".hwpx", bond_waiver:".hwpx", labor_exempt:".hwpx"};   // 기본 .xlsx, hwpx 양식만 예외
   function openTplManage(){
     if(!isAdmin()) return;
     var host=document.getElementById("tplRows");
@@ -5839,8 +5839,21 @@
           return fillHwpxTemplate(r2.body.data, sealTokens);
         }).then(function(b2){
           downloadBlob(cdName+"_사용인감계.hwpx", b2);
-          alert("계약서류 2종 생성 완료."+((c&&c.bid_id)?"\n※ 입찰(적격심사) 건 — 서약서 6·7번을 '해당없음'으로 체크 수정 후 날인하세요.":"")
-            +"\n※ 포항시 외 발주처는 양식이 다를 수 있으니 확인 후 제출하세요.");
+          // 3·4번째: 채권포기각서(토큰 채움) + 노무비 적용제외 신청서(수기 서식 — 착공 시 제출). 미등록이면 조용히 건너뜀
+          var waiverTokens={ "계약명":$("xgTitle").value.trim(),
+            "계약기간":(cdF($("xgD1").value)&&cdF($("xgD3").value))?cdF($("xgD1").value)+"~"+cdF($("xgD3").value):"",
+            "작성일":(function(){ var d=($("xgD1").value||todayStr()).split("-"); return d[0]+"년 "+d[1]+"월 "+d[2]+"일"; })(),
+            "업체명":cdCo.name, "주소":cdCo.addr, "수신처":$("xcRecv").value.trim() };
+          return gwCall("gw-data",{action:"tpl_get", key:"bond_waiver"}).then(function(r3){
+            if(r3.status!==200) return null;
+            return fillHwpxTemplate(r3.body.data, waiverTokens).then(function(b3){ downloadBlob(cdName+"_채권포기각서.hwpx", b3); });
+          }).then(function(){ return gwCall("gw-data",{action:"tpl_get", key:"labor_exempt"}); }).then(function(r4){
+            if(r4.status!==200) return null;
+            return fillHwpxTemplate(r4.body.data, {}).then(function(b4){ downloadBlob(cdName+"_노무비제외신청서.hwpx", b4); });
+          });
+        }).then(function(){
+          alert("계약서류 생성 완료(등록된 양식 전부)."+((c&&c.bid_id)?"\n※ 입찰(적격심사) 건 — 서약서 6·7번을 '해당없음'으로 체크 수정 후 날인하세요.":"")
+            +"\n※ 노무비제외신청서는 빈 서식(수기 기입, 착공 시 제출). 포항시 외 발주처는 양식 확인 후 제출하세요.");
           $("xlsxGenBackdrop").classList.remove("show"); xgCtx=null;
         }).catch(function(e){ alert("생성 실패: "+e); })
           .finally(function(){ $("xgGo").textContent="생성·다운로드"; $("xgGo").disabled=false; });

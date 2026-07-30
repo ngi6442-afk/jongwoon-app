@@ -74,5 +74,13 @@ await run('사용인감계', async () => {
   await save('R_인감계.hwpx', await fillHwpxTemplate(b64of(DATA + '/6. 자료/계약서류분석/사용인감계_템플릿.hwpx'),
     { '작성일': '2099년  01월    일', '업체명': '주식회사 종운건설', '주소': '포항시 남구 정몽주로 823-10' }));
 });
+await run('채권포기각서', async () => {
+  await save('R_포기각서.hwpx', await fillHwpxTemplate(b64of(DATA + '/6. 자료/계약서류분석/채권포기각서_템플릿.hwpx'),
+    { '계약명': '회귀테스트 준설공사', '계약기간': '2099.01.01.~2099.02.01.', '작성일': '2099년 01월 01일',
+      '업체명': '유한회사 종운환경', '주소': '경북 포항시 남구 서원재로 1', '수신처': '포항시 맑은물사업본부 관리자(기업출납원)' }));
+});
+await run('노무비제외신청서', async () => {
+  await save('R_노무비신청서.hwpx', await fillHwpxTemplate(b64of(DATA + '/6. 자료/계약서류분석/노무비제외신청서_템플릿.hwpx'), {}));
+});
 
 console.log(JSON.stringify(results));

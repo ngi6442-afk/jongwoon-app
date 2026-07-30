@@ -77,10 +77,13 @@ public class WDR {
 $hwp = New-Object -ComObject HWPFrame.HwpObject
 try {
   try { $hwp.SetMessageBoxMode(0x10001) | Out-Null } catch {}
+  try { $hwp.RegisterModule("FilePathCheckDLL","FilePathCheckerModuleExample") | Out-Null } catch {}   # 공식 보안모듈(설치됨) — 무창 오픈
   $htests = @(
     @('적격패킷','R_적격패킷.hwpx',@('회귀테스트 석면철거공사','123,456,789','95.5')),
     @('서약서','R_서약서.hwpx',@('회귀테스트 준설공사','500,000','일금일천만원')),
-    @('인감계','R_인감계.hwpx',@('주식회사 종운건설','2099년  01월'))
+    @('인감계','R_인감계.hwpx',@('주식회사 종운건설','2099년  01월')),
+    @('포기각서','R_포기각서.hwpx',@('회귀테스트 준설공사','포기함을 확인합니다','기업출납원')),
+    @('노무비신청서','R_노무비신청서.hwpx',@('상용근로자만','회사 상용근로자 명단'))
   )
   foreach($t in $htests){
     $okOpen=$hwp.Open((Join-Path $out $t[1]),'','forceopen:true')
