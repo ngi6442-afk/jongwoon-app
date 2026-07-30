@@ -508,6 +508,57 @@ async function handleBidsResults(event, d, R) {
   return jr(200, { status: 'OK', applied: applied, request_id: R });
 }
 
+// ---- 적격심사 증빙 보관함: 반복 제출하는 고정 증빙(등기부·확인서·등록증 등)을 서버 보관, 생성 시 일괄 다운로드 ----
+function proofSlug(s) { return String(s || '').replace(/[^0-9A-Za-z가-힣._-]/g, '_').slice(0, 80); }
+async function handleProofPut(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (!c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
+  const name = proofSlug(d.name);
+  const b64 = String(d.data || '');
+  if (!name || !b64 || b64.length > ATT_MAX) return jr(400, { status: 'REJECTED', error_code: 'INVALID_FILE', request_id: R });
+  const st = store(FILES);
+  const w = await blobSet(st, 'proof:' + name, { name: String(d.name || '').slice(0, 120), data: b64, by: c.member.name, ts: Date.now() });
+  if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
+  const idx = await blobGet(st, 'proof:__index__');
+  const list = (idx.ok && idx.data && Array.isArray(idx.data.names)) ? idx.data.names : [];
+  if (list.indexOf(name) < 0) list.push(name);
+  await blobSet(st, 'proof:__index__', { names: list });
+  return jr(200, { status: 'OK', name: name, request_id: R });
+}
+async function handleProofList(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  const st = store(FILES);
+  const idx = await blobGet(st, 'proof:__index__');
+  const names = (idx.ok && idx.data && Array.isArray(idx.data.names)) ? idx.data.names : [];
+  const out = [];
+  for (const n of names) {
+    const r = await blobGet(st, 'proof:' + n);
+    if (r.ok && r.data) out.push({ name: n, file: r.data.name, ts: r.data.ts, size: (r.data.data || '').length });
+  }
+  return jr(200, { status: 'OK', items: out, request_id: R });
+}
+async function handleProofGet(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  const r = await blobGet(store(FILES), 'proof:' + proofSlug(d.name));
+  if (!r.ok || !r.data) return jr(404, { status: 'NOT_FOUND', request_id: R });
+  return jr(200, { status: 'OK', file: r.data.name, data: r.data.data, request_id: R });
+}
+async function handleProofDel(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (!c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
+  const name = proofSlug(d.name);
+  const st = store(FILES);
+  await blobDelete(st, 'proof:' + name);
+  const idx = await blobGet(st, 'proof:__index__');
+  const list = ((idx.ok && idx.data && Array.isArray(idx.data.names)) ? idx.data.names : []).filter(function (n) { return n !== name; });
+  await blobSet(st, 'proof:__index__', { names: list });
+  return jr(200, { status: 'OK', request_id: R });
+}
+
 // ---- 오류 텔레메트리: 클라이언트 오류를 서버에 축적(최근 200건), 관리자 조회 ----
 async function handleErrLog(event, d, R) {
   const c = await currentMember(event);
@@ -876,6 +927,10 @@ async function handler(event) {
     if (d && d.action === 'att_parse_status') return await handleAttParseStatus(event, d, R);
     if (d && d.action === 'att_get') return await handleAttGet(event, d, R);
     if (d && d.action === 'att_del') return await handleAttDel(event, d, R);
+    if (d && d.action === 'proof_put') return await handleProofPut(event, d, R);
+    if (d && d.action === 'proof_list') return await handleProofList(event, d, R);
+    if (d && d.action === 'proof_get') return await handleProofGet(event, d, R);
+    if (d && d.action === 'proof_del') return await handleProofDel(event, d, R);
     if (d && d.action === 'err_log') return await handleErrLog(event, d, R);
     if (d && d.action === 'err_list') return await handleErrList(event, d, R);
     if (d && d.action === 'push_pubkey') return await handlePushPubkey(event, d, R);
@@ -884,6 +939,16 @@ async function handler(event) {
     if (d && d.action === 'push_send') return await handlePushSend(event, d, R);
     return jr(400, { status: 'REJECTED', error_code: 'UNKNOWN_ACTION', request_id: R });
   } catch (e) {
+    // 서버 예외도 오류 로그에 축적(클라 err_log와 같은 저장소) — 기록 실패는 무시
+    try {
+      const st = store(DATA);
+      const r0 = await blobGet(st, 'err:log');
+      const doc = (r0.ok && r0.data && Array.isArray(r0.data.items)) ? r0.data : { schema: 1, items: [] };
+      doc.items.push({ ts: Date.now(), by: '서버', msg: 'action=' + ((d && d.action) || '?') + ' : ' + String((e && e.message) || e).slice(0, 200),
+        src: 'gw-data', stack: String((e && e.stack) || '').slice(0, 600), ua: '' });
+      if (doc.items.length > 200) doc.items = doc.items.slice(-200);
+      await blobSet(st, 'err:log', doc);
+    } catch (e2) {}
     return jr(500, { status: 'ERROR', error_code: 'HANDLER_FAILED', request_id: R });
   }
 }

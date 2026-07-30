@@ -1146,6 +1146,13 @@
     <h3>서류 양식 등록 (관리자)</h3>
     <p style="margin-bottom:8px;color:#888;font-size:13px;">원본 양식 xlsx를 서버에 영구 보관합니다. 생성할 때마다 원본을 복사해 채우므로 양식이 오염되지 않습니다. 재등록하면 교체됩니다.</p>
     <div id="tplRows"></div>
+    <div style="border-top:1px dashed var(--line);margin-top:10px;padding-top:8px;">
+      <b style="font-size:13px;">적격심사 증빙 보관함</b>
+      <div style="font-size:12px;color:#888;margin:2px 0 6px;">반복 제출하는 고정 증빙(등기부·신용확인서·안전성통보서·등록증·자격증 등 PDF)을 올려두면 적격심사 생성 때 일괄 다운로드됩니다. 갱신되면 같은 파일명으로 재업로드.</div>
+      <button class="mini-btn" id="proofUpBtn">📎 증빙 올리기(여러 개 가능)</button>
+      <input type="file" id="proofFile" accept=".pdf,.jpg,.jpeg,.png" multiple style="display:none;">
+      <div id="proofRows" style="margin-top:6px;font-size:12px;"></div>
+    </div>
     <button class="secondary" id="tplClose" style="margin-top:8px;">닫기</button>
   </div>
 </div>
@@ -3599,6 +3606,8 @@
   document.getElementById("auditBtn").addEventListener("click", openAudit);
   document.getElementById("errLogBtn").addEventListener("click", openErrLog);
   document.getElementById("exportAllBtn").addEventListener("click", adminExportAll);
+  document.getElementById("proofUpBtn").addEventListener("click", function(){ document.getElementById("proofFile").click(); });
+  document.getElementById("proofFile").addEventListener("change", function(){ proofUpload(this.files); this.value=""; });
   document.getElementById("errLogClose").addEventListener("click", function(){ document.getElementById("errLogBackdrop").classList.remove("show"); });
   document.getElementById("auditClose").addEventListener("click", function(){ document.getElementById("auditBackdrop").classList.remove("show"); });
   document.getElementById("auditBackdrop").addEventListener("click", function(e){ if(e.target===this) this.classList.remove("show"); });
@@ -5230,6 +5239,7 @@
     if(!isAdmin()) return;
     var host=document.getElementById("tplRows");
     host.innerHTML='<div style="color:#888;">불러오는 중…</div>';
+    proofRefresh();
     document.getElementById("tplBackdrop").classList.add("show");
     gwCall("gw-data",{action:"tpl_list"}).then(function(res){
       var t=(res.body&&res.body.templates)||{};
@@ -5259,6 +5269,59 @@
         });
       });
     }).catch(function(){ host.innerHTML='<div style="color:#c0392b;">목록을 불러오지 못했습니다.</div>'; });
+  }
+  // 적격심사 증빙 보관함 — 관리자 업로드·목록·삭제 + 생성 시 일괄 다운로드
+  function proofRefresh(){
+    var host=document.getElementById("proofRows"); if(!host) return;
+    gwCall("gw-data",{action:"proof_list"}).then(function(res){
+      var items=(res.body&&res.body.items)||[];
+      if(!items.length){ host.innerHTML='<span style="color:#888;">보관된 증빙 없음</span>'; return; }
+      host.innerHTML=items.map(function(it){
+        return '<div style="display:flex;align-items:center;gap:6px;padding:2px 0;"><span style="flex:1;">'+esc(it.file||it.name)+' <span style="color:#aaa;">('+Math.round(it.size*3/4/1024)+'KB)</span></span>'
+          +'<button class="mini-btn" data-proof-del="'+esc(it.name)+'">삭제</button></div>';
+      }).join("");
+      Array.prototype.forEach.call(host.querySelectorAll("[data-proof-del]"),function(el){
+        el.addEventListener("click",function(){
+          if(!confirm("증빙 삭제: "+el.getAttribute("data-proof-del")+" — 맞습니까?")) return;
+          gwCall("gw-data",{action:"proof_del", name:el.getAttribute("data-proof-del")}).then(proofRefresh);
+        });
+      });
+    }).catch(function(){ host.innerHTML='<span style="color:#c0392b;">목록 로드 실패</span>'; });
+  }
+  function proofUpload(files){
+    var arr=Array.prototype.slice.call(files||[]);
+    if(!arr.length) return;
+    var i=0;
+    (function next(){
+      if(i>=arr.length){ proofRefresh(); return; }
+      var f=arr[i++];
+      var r=new FileReader();
+      r.onload=function(){
+        gwCall("gw-data",{action:"proof_put", name:f.name, data:String(r.result).split(",")[1]||""})
+          .then(next).catch(function(){ alert("업로드 실패: "+f.name); next(); });
+      };
+      r.readAsDataURL(f);
+    })();
+  }
+  // 적격심사 생성 직후 호출 — 보관 증빙 일괄 다운로드 제안
+  function proofBundleOffer(){
+    gwCall("gw-data",{action:"proof_list"}).then(function(res){
+      var items=(res.body&&res.body.items)||[];
+      if(!items.length) return;
+      if(!confirm("보관함의 증빙 "+items.length+"종도 함께 내려받을까요?\n("+items.map(function(x){return x.file||x.name;}).slice(0,5).join(", ")+(items.length>5?" 외":"")+")")) return;
+      var i=0;
+      (function next(){
+        if(i>=items.length) return;
+        var it=items[i++];
+        gwCall("gw-data",{action:"proof_get", name:it.name}).then(function(r2){
+          if(r2.status===200&&r2.body.data){
+            var bytes=dataUrlToBytes("x,"+r2.body.data);
+            downloadBlob(r2.body.file||it.name, new Blob([bytes]));
+          }
+          setTimeout(next,300);
+        }).catch(function(){ setTimeout(next,300); });
+      })();
+    }).catch(function(){});
   }
   // 단계 → 서류 라우팅: 단계가 서류를 이끈다(입찰: 적격심사→계약서류→착공→신고→준공 / 비입찰: 계약서 작성·첨부→착공→…)
   function stageXlsxKind(stage){
@@ -5796,8 +5859,9 @@
           if(res.status!==200){ alert(res.status===404?"'적격심사 패킷' 양식이 미등록입니다. [+ 양식 등록]에서 hwpx 템플릿을 등록하세요.":"양식 로드 실패"); return; }
           return fillHwpxTemplate(res.body.data, qTokens).then(function(blob){
             downloadBlob(($("xgTitle").value.trim()||c.label||"서류")+"_적격심사패킷.hwpx", blob);
-            alert("적격심사 패킷 생성 — 자기평점 계 "+qualNum(qs.total)+"점.\n※ 입찰가격 산식은 실전 1건으로 검증 전입니다. 한컴에서 열어 값·점수를 확인하고 제출하세요.");
+            alert("적격심사 패킷 생성 — 자기평점 계 "+qualNum(qs.total)+"점.\n(산식은 김천서부초 실물 심사표로 검증 완료 — 그래도 한컴에서 값 확인 후 제출)");
             $("xlsxGenBackdrop").classList.remove("show"); xgCtx=null;
+            proofBundleOffer();   // 보관함 증빙 일괄 다운로드 제안
           });
         }).catch(function(e){ alert("생성 실패: "+e); })
           .finally(function(){ $("xgGo").textContent="생성·다운로드"; $("xgGo").disabled=false; });
@@ -7173,7 +7237,8 @@
       if(tasks.some(function(t){ return t.auto_key===key; })) return;
       var base=(b.result&&isDate(b.result.checked))?b.result.checked:today;
       tasks.push({ id:genId("t"), title:"적격심사 서류 제출: "+(b.title||"").slice(0,40),
-        detail:(b.org||"")+" · 낙찰 확인 "+base+" — 통보일 기준 7일 이내 제출(세부기준 제5조). 계약 카드 생성 후 적격심사 단계 [서류]로 작성",
+        detail:(b.org||"")+" · 낙찰 확인 "+base+" — 통보일 기준 7일 이내 제출(세부기준 제5조). 계약 카드 생성 후 적격심사 단계 [서류]로 작성"
+          +"\n제출물(별표3): ①신청서·심사표·각서·확약서(앱 생성) ②실적증명서+증빙 ③안전성평가 결과통보서 ④신용평가등급 확인서 ⑤인력보유 증빙(4대보험·자격증·교육이수) ⑥법인등기부 ⑦사업자등록증명원 ⑧석면해체제거업 등록증 ⑨모범납세자(해당시)",
         who_id:"", who:"", scope:[], from:"자동", from_id:"", by:"자동",
         due:addDaysStr(base,7), status:"open", done_at:null, done_by:null, auto_key:key, created:today, updated:today });
       created++;
