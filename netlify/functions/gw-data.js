@@ -522,14 +522,18 @@ async function handleBotNotify(event, d, R) {
   const title = String(d.title || '알림').slice(0, 60);
   const body = String(d.body || '').slice(0, 300);
   const tag = String(d.tag || 'bot-notify').slice(0, 30);
-  let sent = 0;
+  // 반환값은 실제 발송 결과(sent=성공한 기기 수). 관리자 수와 혼동하면 안 된다(과거 오보 원인).
   try {
     const ids = await push.adminIds();
-    if (ids.length) { await push.sendTo(ids, { title: title, body: body, url: './', tag: tag }); sent = ids.length; }
+    const subs = await push.getSubs();
+    const devices = ids.reduce(function (n, id) { return n + ((subs.members[id] || []).length); }, 0);
+    if (!ids.length) return jr(200, { status: 'OK', sent: 0, admins: 0, devices: 0, note: '관리자 없음', request_id: R });
+    if (!devices) return jr(200, { status: 'OK', sent: 0, admins: ids.length, devices: 0, note: '구독 기기 없음 — 각 기기에서 [알림 켜기] 필요', request_id: R });
+    const r = await push.sendTo(ids, { title: title, body: body, url: './', tag: tag });
+    return jr(200, { status: 'OK', sent: r.sent, removed: r.removed, admins: ids.length, devices: devices, request_id: R });
   } catch (e) {
-    return jr(200, { status: 'OK', sent: 0, note: 'push 실패(무시)', request_id: R });
+    return jr(200, { status: 'OK', sent: 0, note: 'push 예외: ' + String(e && e.message || e).slice(0, 80), request_id: R });
   }
-  return jr(200, { status: 'OK', sent: sent, request_id: R });
 }
 
 // ---- 적격심사 증빙 보관함: 반복 제출하는 고정 증빙(등기부·확인서·등록증 등)을 서버 보관, 생성 시 일괄 다운로드 ----
