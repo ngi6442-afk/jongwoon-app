@@ -901,7 +901,7 @@
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
         <div style="min-width:0;flex:1 1 180px;">
           <div style="font-weight:600;">홈택스 매출 목록 불러오기</div>
-          <div style="font-size:12px;opacity:.7;margin-top:2px;word-break:keep-all;">홈택스·위하고에서 내려받은 매출 세금계산서 목록(.xlsx)</div>
+          <div style="font-size:12px;opacity:.7;margin-top:2px;word-break:keep-all;">홈택스·위하고에서 내려받은 세금계산서 목록(.xlsx) — 공급자 사업자번호로 회사 자동 판별, 매입분 자동 제외</div>
         </div>
         <select id="recImpCo" style="flex:none;width:110px;" title="이 파일의 공급자(우리 회사) — 홈택스는 회사별 파일"><option value="env">종운환경</option><option value="con">종운건설</option></select>
         <button type="button" id="recFilePick" class="mini-btn" style="flex:none;">파일 선택</button>
@@ -8161,18 +8161,24 @@
     function gidx(name,grp){ for(var k=0;k<header.length;k++){ if(header[k]===name && (grp==null||group[k]===grp)) return k; } return -1; }
     var col={ nts:gidx("신고번호"), docno:gidx("문서번호"), wdate:gidx("작성일자"), item:gidx("대표품목"),
       supply:gidx("공급가액"), tax:gidx("세액"), total:gidx("합계액"), status:gidx("상태"), purpose:gidx("영수/청구"),
-      client:gidx("상호명","공급받는자 정보"), client_num:gidx("사업자번호","공급받는자 정보") };
+      client:gidx("상호명","공급받는자 정보"), client_num:gidx("사업자번호","공급받는자 정보"),
+      sup_num:gidx("사업자번호","공급자 정보"), io:gidx("입/출구분") };
     if(col.total<0||col.client<0) throw new Error("필수 컬럼(합계액·공급받는자 상호명)을 찾지 못했습니다");
     function cell(r,i){ return (i>=0&&r[i]!=null)?String(r[i]).trim():""; }
     function num(s){ var n=parseInt(String(s).replace(/[^0-9-]/g,""),10); return isNaN(n)?0:n; }
+    // 공급자 사업자번호로 시행 회사 자동 판별(위하고·홈택스 공통) — 없으면 업로드 시 선택값 사용
+    var CO_BIZ={ "5068148535":"env", "5068184827":"con" };
     var out=[];
     for(var d=hIdx+1;d<rows.length;d++){
       var r=rows[d]||[], docno=cell(r,col.docno), nts=cell(r,col.nts);
       if(!docno&&!nts) continue;
+      var io=cell(r,col.io);
+      if(io && io.indexOf("매입")>=0) continue;   // 매입분은 미수(매출)와 무관 — 제외
       var st=cell(r,col.status);
       out.push({ nts:nts, docno:docno, client:cell(r,col.client), client_num:cell(r,col.client_num),
         desc:cell(r,col.item), amount:num(cell(r,col.total)), supply:num(cell(r,col.supply)), tax:num(cell(r,col.tax)),
-        billed:cell(r,col.wdate), purpose:cell(r,col.purpose), status:st, cancelled:(st==="취소") });
+        billed:cell(r,col.wdate), purpose:cell(r,col.purpose), status:st, cancelled:(st==="취소"),
+        io:io, co:(CO_BIZ[cell(r,col.sup_num).replace(/[^0-9]/g,"")]||"") });
     }
     return out;
   }
@@ -8194,9 +8200,9 @@
     return plan;
   }
   function recNewRec(c, today){
-    var impCo=document.getElementById("recImpCo");   // 홈택스 파일은 회사별 다운로드 — 업로드 시 선택한 공급자
+    var impCo=document.getElementById("recImpCo");   // 공급자 사업자번호가 있으면 행별 자동 판별, 없으면 업로드 시 선택값
     return { id:genId("r"), nts:c.nts, docno:c.docno, client:c.client, client_num:c.client_num, site:"",
-      co:(impCo&&impCo.value)||"", desc:c.desc, amount:c.amount, supply:c.supply, tax:c.tax, billed:c.billed||today, purpose:c.purpose,
+      co:c.co||((impCo&&impCo.value)||""), desc:c.desc, amount:c.amount, supply:c.supply, tax:c.tax, billed:c.billed||today, purpose:c.purpose,
       invoice:true, paid:null, due_hint:"", note:"", assignee:"", scope:[], task_id:null, mismatch:false,
       src:"hometax", created:today, updated:today };
   }
@@ -8216,9 +8222,11 @@
         if(ex.client!==c.client){ ex.client=c.client; ch=true; }
         if((ex.desc||"")!==c.desc){ ex.desc=c.desc; ch=true; }
         if((ex.amount||0)!==c.amount){ ex.amount=c.amount; if(ex.paid) ex.recheck=1; ch=true; }
-        // 회사 소급: 미지정 건은 이번 업로드에서 선택한 공급자로 채움(홈택스 파일=회사별 — 재업로드로 일괄 소급 가능)
+        // 회사 소급: 파일의 공급자 사업자번호(자동 판별) 우선, 없으면 업로드 시 선택값 — 재업로드로 일괄 소급 가능
         var impCo=document.getElementById("recImpCo");
-        if(!ex.co && impCo && impCo.value){ ex.co=impCo.value; ch=true; }
+        var coNew=c.co||((impCo&&impCo.value)||"");
+        if(!ex.co && coNew){ ex.co=coNew; ch=true; }
+        else if(c.co && ex.co!==c.co){ ex.co=c.co; ch=true; }   // 파일이 명시한 공급자와 다르면 파일 기준으로 교정
         if(ch){ ex.updated=today; res.upd++; }
       } else {
         var it=recNewRec(c,today);
