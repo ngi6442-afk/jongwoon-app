@@ -1293,8 +1293,8 @@
     <div id="xgConDocsWrap" style="display:none;">
       <input type="text" id="xcRecv" placeholder="수신처 (예: 포항시 맑은물사업본부 관리자(기업출납원))" autocomplete="off">
       <div style="display:flex;gap:8px;">
-        <input type="text" id="xcRate" placeholder="계약보증금률 % (기본 5)" inputmode="decimal" style="flex:1" autocomplete="off">
-        <span style="flex:2;font-size:12px;color:#888;align-self:center;">보증기간=계약일~준공예정일, 보증금액=계약금액×률 자동</span>
+        <input type="text" id="xcRate" placeholder="계약보증금률 %" inputmode="decimal" style="flex:1" autocomplete="off">
+        <span style="flex:2;font-size:12px;color:#888;align-self:center;">보증기간=계약일~준공예정일, 보증금액=계약금액×률 자동 · 입찰(관급) 기본 10%(지방계약법령)·수의 5% — 공고·계약서와 다르면 수정</span>
       </div>
       <div style="font-size:12px;color:#888;">포항시 양식 기준. 서약서 6·7번 체크는 수의계약 기준(예/아니오) — <b>입찰(적격심사) 건은 인쇄 후 '해당없음'으로 수정</b>하세요. 타 발주처 양식은 별도 등록 필요.</div>
     </div>
@@ -4641,6 +4641,8 @@
     return fmtDate(d);
   }
   function findProc(id){ for(var i=0;i<contracts.length;i++){ if(contracts[i].id===id) return contracts[i]; } return null; }
+  // 건축물이 있는 계약만 [대장](건축물대장 조회) 노출 — 준설·폐기물 단독 건은 대상 아님
+  function conHasBldg(c){ return !!(c && (c.type==="asbestos"||c.type==="demolition"||(c.elems&&(c.elems.asb||c.elems.demo))||c.bldg_info)); }
 
   // ---- 계약 서류함(첨부·드래그) — 계약 단위로 통합 보관, 판독 시 값 추출. 담당자(계약 권한)가 첨부 ----
   var ATT_MAX = 6 * 1024 * 1024;   // 개별 6MB 상한(용량·개인정보 최소화)
@@ -5416,7 +5418,7 @@
       var rr=c.rec_id?findRec(c.rec_id):null;
       var co=(c.type==="asbestos"||c.type==="demolition")?"㈜종운건설":"(유)종운환경";
       rows.push([c.title||c.label||"", c.client||"", c.label||"", elTxt, c.site||"",
-        (ci.amount||""), (ci.d2||c.start||""), (ci.d3||""), (rr&&rr.paid)||"", co,
+        (conAmt(c)||""), (ci.d2||c.start||""), (ci.d3||""), (rr&&rr.paid)||"", co,
         (c.bldg_info&&c.bldg_info.total_floor)||""]);
     });
     downloadBlob("실적목록_"+todayStr()+".xlsx", buildSimpleXlsx("실적", rows));
@@ -5590,7 +5592,7 @@
     document.getElementById("xgTitle").value = c.title||ci.title||c.label|| (s.bldg? s.bldg+" 석면해체 공사":"");
     document.getElementById("xgSite").value = c.site||ci.site||s.site||bi.site||"";
     document.getElementById("xgClient").value = c.client||ci.client||s.owner||"";
-    document.getElementById("xgAmount").value = ci.amount||"";
+    document.getElementById("xgAmount").value = conAmt(c)||"";   // 계약값 없으면 연동 공고 낙찰금액 폴백
     document.getElementById("xgD1").value = ci.d1||c.start||"";
     document.getElementById("xgD2").value = ci.d2||""; document.getElementById("xgD3").value = ci.d3||"";
     document.getElementById("xgOwner").value = /교육/.test(s.owner||"") ? "경상북도 교육감" : "";
@@ -5791,6 +5793,9 @@
       var cD=xgCtx?findProc(xgCtx.id):null;
       if(!document.getElementById("xcRecv").value && cD && /맑은물사업본부/.test(cD.client||""))
         document.getElementById("xcRecv").value=(cD.client||"").trim()+" 관리자(기업출납원)";
+      // 계약보증금률 자동: 관급 입찰 건=10%(지방계약법 시행령 §51 기준), 그 외(수의·포항시 양식 실측)=5% — 수정 가능
+      var xcr=document.getElementById("xcRate");
+      if(xcr && !xcr.value) xcr.value=(cD&&cD.bid_id)?"10":"5";
     }
     if(k==="qual_packet"){
       document.getElementById("xgMoneyFields").style.display="none";
@@ -5820,7 +5825,8 @@
       // 우선순위 ①: 낙찰 연동 건이면 공고 첨부에서 자동, 기초·낙찰금액 프리필
       document.getElementById("xgRateFromBid").style.display=(cR&&cR.bid_id)?"":"none";
       if(ciR.base && !document.getElementById("xgRateBase").value) document.getElementById("xgRateBase").value=ciR.base;
-      if(ciR.amount && !document.getElementById("xgRateTarget").value) document.getElementById("xgRateTarget").value=ciR.amount;
+      var rAmt=conAmt(cR);
+      if(rAmt && !document.getElementById("xgRateTarget").value) document.getElementById("xgRateTarget").value=rAmt;
     }
     if(k==="waste_report"){
       document.getElementById("xgCo").value="env";   // 폐기물 서류=종운환경 고정 규칙
@@ -6363,9 +6369,9 @@
   function loadContracts(){
     var token = getToken(); if(!token) return;
     fetch(CONTRACT_API, {headers: ghHeaders()}).then(function(resp){
-      if(resp.status===404){ contractSha=null; contracts=[]; return; }
+      if(resp.status===404){ contractSha=null; contracts=[]; autoGenReady.con=true; runAwardAutoCon(); return; }
       if(!resp.ok) throw new Error("HTTP "+resp.status);
-      return resp.json().then(function(json){ contractSha=json.sha; var p=JSON.parse(b64DecodeUnicode(json.content)); contracts=(p&&p.items)||[]; renderContracts(); renderTasks(); });
+      return resp.json().then(function(json){ contractSha=json.sha; var p=JSON.parse(b64DecodeUnicode(json.content)); contracts=(p&&p.items)||[]; renderContracts(); renderTasks(); autoGenReady.con=true; runAwardAutoCon(); });
     }).catch(function(){});
   }
   function scheduleContractSave(){ if(contractSaveTimer) clearTimeout(contractSaveTimer); contractSaveTimer=setTimeout(doSaveContracts, 1400); }
@@ -6558,7 +6564,7 @@
     if(!canDo("rec")) return;   // 기성 권한 없으면 담당자가 기성 탭에서 등록
     if(c.rec_id && receivables.some(function(r){ return r.id===c.rec_id && r.del!==1; })) return;
     var ci=c.contract_info||{};
-    var amt=ci.amount||0;
+    var amt=conAmt(c);
     if(!confirm("청구 단계 완료 — 기성(미수)에 청구 건을 등록할까요?\n"+(c.client||"발주처?")+" · "+(c.title||c.label)+(amt?" · "+fmtAmount(amt)+"원":" · 금액 미확인(기성에서 입력)"))) return;
     var today=todayStr();
     var r={ id:genId("r"), client:c.client||"", site:c.site||"", desc:(c.title||c.label||""),
@@ -6604,7 +6610,7 @@
           pipes+
           conAttBoxHtml(c)+
         '</div>'+
-        (canDo("con")?'<div class="task-ctrl"><button class="mini-btn" data-con-bldg="'+c.id+'">대장</button><button class="mini-btn" data-con-xlsx="'+c.id+'">생성</button><button class="mini-btn" data-con-doc="'+c.id+'">서류</button><button class="mini-btn danger" data-con-del="'+c.id+'">삭제</button></div>':'')+
+        (canDo("con")?'<div class="task-ctrl">'+(conHasBldg(c)?'<button class="mini-btn" data-con-bldg="'+c.id+'">대장</button>':'')+'<button class="mini-btn" data-con-xlsx="'+c.id+'">생성</button><button class="mini-btn" data-con-doc="'+c.id+'">서류</button><button class="mini-btn danger" data-con-del="'+c.id+'">삭제</button></div>':'')+
       '</div>';
     }).join("");
     Array.prototype.forEach.call(host.querySelectorAll("[data-con-del]"), function(el){
@@ -6619,7 +6625,9 @@
     Array.prototype.forEach.call(host.querySelectorAll("[data-con-bldg]"), function(el){
       el.addEventListener("click", function(){
         var c=findProc(el.getAttribute("data-con-bldg")); if(!c) return;
-        var def=c.site||((c.contract_info||{}).site)||((c.asb_survey||{}).site)||"";
+        // 낙찰 연동 건은 c.site=공고명(주소 아님) — 판독된 주소값만 기본값으로, 없으면 빈칸
+        var def=c.bid_id ? (((c.contract_info||{}).site)||((c.asb_survey||{}).site)||"")
+          : (c.site||((c.contract_info||{}).site)||((c.asb_survey||{}).site)||"");
         var addr=prompt("건축물대장 조회 — 지번 주소를 입력하세요\n(예: 경북 안동시 풍산읍 하리리 247 / 번지 없이 리·동까지만 넣으면 전체 목록)", def);
         if(addr) conBldgLookup(c.id, addr, false);
       });
@@ -6651,6 +6659,7 @@
   function openConStart(){
     if(!canDo("con")) return;
     lastBidForCon=null;
+    var csh=document.getElementById("conStartBackdrop").querySelector("h3"); if(csh) csh.textContent="계약 시작";   // 낙찰 자동오픈 제목 잔상 제거
     document.getElementById("conType").value="asbestos";
     document.getElementById("conDoc").value="public";
     document.getElementById("conClient").value="";
@@ -6738,7 +6747,7 @@
       document.getElementById("dgOwnerAddr").value = doi.addr || "";
       document.getElementById("dgSite").value = c.site || dci.site || "";
       document.getElementById("dgWork").value = c.title || dci.title || svc;
-      if(dci.amount) document.getElementById("dgAmount").value = dci.amount;
+      if(conAmt(c)) document.getElementById("dgAmount").value = conAmt(c);
       if(dci.d1) document.getElementById("dgDate").value = dci.d1;
       if(dci.d2) document.getElementById("dgStartDate").value = dci.d2;
       if(dci.d3) document.getElementById("dgEndDate").value = dci.d3;
@@ -7298,13 +7307,16 @@
   var BID_NEXT = { "new":[["검토","검토"],["패스","패스"]], "검토":[["응찰","응찰"],["패스","패스"]], "응찰":[["낙찰","낙찰"],["유찰","유찰"]] };
   function bidSt(b){ return b.status==="참여" ? "응찰" : (b.status||"new"); }   // 구 '참여' 호환
   function findBid(id){ for(var i=0;i<bids.length;i++){ if(bids[i].id===id) return bids[i]; } return null; }
+  // 연동 공고의 낙찰금액 — 계약 생성 시점에 개찰결과가 아직 없어 contract_info.amount=0으로 굳는 케이스의 폴백
+  function conBidAmt(c){ if(!c||!c.bid_id) return 0; var b=findBid(c.bid_id); return (b&&b.result&&b.result.amt)||0; }
+  function conAmt(c){ return ((c&&c.contract_info&&c.contract_info.amount)||0) || conBidAmt(c); }
   function liveBids(){ return bids.filter(function(b){ return b && b.del!==1; }); }
   function loadBids(){
     var token=getToken(); if(!token) return;
     fetch(BIDS_API, {headers:ghHeaders()}).then(function(resp){
       if(resp.status===404){ bidsSha=null; bids=[]; renderBids(); return; }
       if(!resp.ok) throw new Error("HTTP "+resp.status);
-      return resp.json().then(function(json){ bidsSha=json.sha; var p=JSON.parse(b64DecodeUnicode(json.content)); var ri=(p&&p.items)||[]; bidsHealth=(p&&p.health)||null; bidsAwards=(p&&p.awards)||null; bids = bidsPending ? mergeBidsLocal(bids, ri) : ri; renderBids(); renderDashboard(); runBidQualGen(); });
+      return resp.json().then(function(json){ bidsSha=json.sha; var p=JSON.parse(b64DecodeUnicode(json.content)); var ri=(p&&p.items)||[]; bidsHealth=(p&&p.health)||null; bidsAwards=(p&&p.awards)||null; bids = bidsPending ? mergeBidsLocal(bids, ri) : ri; renderBids(); renderDashboard(); runBidQualGen(); autoGenReady.bids=true; runAwardAutoCon(); });
     }).catch(function(){});
   }
   function scheduleBidsSave(){ bidsPending=true; if(bidsSaveTimer) clearTimeout(bidsSaveTimer); bidsSaveTimer=setTimeout(doSaveBids,1200); }
@@ -7920,6 +7932,23 @@
       saveTasksCache(); scheduleTasksSave(); renderTasks(); renderSummary(); renderDashboard();
       pushNotify("__admins__","낙찰 "+created+"건 — 적격심사 준비","제출기한 7일 지시가 생성되었습니다","bid-qual");
     }
+  }
+  // 낙찰 자동 감지(수집봇이 상태를 바꾼 경우) → 계약 시작 창 자동 오픈 — 수동 낙찰(setBidStatus)과 동일 UX.
+  // 세션당 공고별 1회(창을 닫으면 이번 세션엔 다시 안 띄움 — 배너·카드의 [계약 시작]은 계속 사용 가능).
+  function runAwardAutoCon(){
+    if(!isAdmin() || !autoGenReady.bids || !autoGenReady.con) return;
+    if(document.querySelector(".modal-backdrop.show")) return;   // 다른 모달 작업 중엔 방해하지 않음(다음 로드 때 재시도)
+    var b=liveBids().filter(function(x){
+      if(bidSt(x)!=="낙찰") return false;
+      if(liveContracts().some(function(c){ return c.bid_id===x.id; })) return false;   // 이미 계약 연결됨
+      try{ if(sessionStorage.getItem("jw_award_auto_"+x.id)) return false; }catch(e){}
+      return true;
+    })[0];
+    if(!b) return;
+    try{ sessionStorage.setItem("jw_award_auto_"+b.id,"1"); }catch(e){}
+    bidToContract(b.id);
+    var hint=document.getElementById("conStartBackdrop").querySelector("h3");
+    if(hint) hint.textContent="계약 시작 — 🏆 낙찰: "+(b.title||"").slice(0,30);
   }
   function openBidAdd(){
     if(!canDo("bid")) return;
