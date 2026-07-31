@@ -5558,8 +5558,11 @@
   function openStageDoc(procId, stage){
     var c=findProc(procId); if(!c) return;
     var k=stageXlsxKind(stage);
+    // 계약 단계: 공문서·낙찰 건 = 계약서류(서약서·인감계·포기각서·노무비 hwpx 자동생성).
+    // 사문서(개인)만 계약서 작성 툴(서류출력)로 — "계약서류가 없어졌다" 혼선의 원인 수정
+    if(!k && /계약/.test(stage||"") && (c.bid_id || c.docType==="public")) k="con_docs";
     if(k){ openXlsxGen(procId, k, stage); return; }   // 착공·준공·노동부신고 → 등록 양식 xlsx 자동 생성
-    openDocFromContract(procId, stage);               // 계약(비입찰 계약서 작성)·견적 등 → 서류출력 폼
+    openDocFromContract(procId, stage);               // 계약(개인 사문서 계약서 작성)·기타 → 서류출력 폼
   }
   var xgCtx=null, xgRateFetched=null;   // xgRateFetched: 공고 첨부에서 불러온 내역서 {name, bytes}
   var xadBound=false;   // 선금 계산 리스너 1회 바인딩 가드
@@ -6679,6 +6682,13 @@
     var docType=document.getElementById("conDoc").value;
     if(!client && !site){ alert("거래처 또는 현장을 입력하세요."); return; }
     var elems=conElemChecked();
+    // 중복 가드: 같은 낙찰 공고에 이미 계약이 연결돼 있으면 생성 차단(관리자 2명 동시 접속 시 자동오픈 중복 방지)
+    if(lastBidForCon && liveContracts().some(function(c){ return c.bid_id===lastBidForCon.id; })){
+      alert("이 낙찰 공고("+(lastBidForCon.title||"").slice(0,30)+")는 이미 계약이 연결되어 있습니다.\n계약 탭에서 기존 계약을 확인하세요.");
+      document.getElementById("conStartBackdrop").classList.remove("show");
+      renderContracts();
+      return;
+    }
     // 공개입찰 낙찰건: 공고명·기관·낙찰금액을 계약서 없이도 자동 반영(계약서 판독값과 같은 자리)
     var bcinfo=null, btitle="";
     if(lastBidForCon){
