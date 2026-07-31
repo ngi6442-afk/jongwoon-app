@@ -4643,6 +4643,27 @@
   function findProc(id){ for(var i=0;i<contracts.length;i++){ if(contracts[i].id===id) return contracts[i]; } return null; }
   // 건축물이 있는 계약만 [대장](건축물대장 조회) 노출 — 준설·폐기물 단독 건은 대상 아님
   function conHasBldg(c){ return !!(c && (c.type==="asbestos"||c.type==="demolition"||(c.elems&&(c.elems.asb||c.elems.demo))||c.bldg_info)); }
+  function conNeedsBldg(c){ return !!(c && !c.bldg_info && (c.type==="asbestos"||c.type==="demolition"||(c.elems&&(c.elems.asb||c.elems.demo||c.elems.permit)))); }
+  // 지번 추출 — 계약 텍스트(현장·공고명 괄호 안 포함)에서 "OO동 1007-3" 패턴을 찾아 대장 자동 조회에 쓴다
+  function conBldgAddrGuess(c){
+    var texts=[c.site, (c.contract_info||{}).site, (c.asb_survey||{}).site, c.title, c.label, (c.contract_info||{}).title];
+    var jibun=null;
+    for(var i=0;i<texts.length;i++){
+      var m=/([가-힣]{1,10}(?:동|리|가))\s*(산?\d{1,5}(?:-\d{1,4})?)/.exec(String(texts[i]||""));   // 화리 같은 2글자 리명 포함
+      if(m){ jibun=m[1]+" "+m[2]; break; }
+    }
+    if(!jibun) return "";
+    var rg=/([가-힣]{2,10}(?:시|군))/.exec((c.client||"")+" "+((c.contract_info||{}).client||""));
+    return (rg?rg[1]+" ":"")+jibun;
+  }
+  // 대장 완전 자동화: 석면·철거 건은 사람이 버튼 누르기 전에 앱이 먼저 조회 시도(세션당 건별 1회).
+  // 실패하면 카드에 "대장 필요" 칩이 남고, [대장](주소 입력) 또는 서류함에 대장 첨부로 해결.
+  function conBldgAutoTry(c){
+    if(!conNeedsBldg(c)) return;
+    try{ if(sessionStorage.getItem("jw_bldg_try_"+c.id)) return; sessionStorage.setItem("jw_bldg_try_"+c.id,"1"); }catch(e){}
+    var addr=conBldgAddrGuess(c);
+    if(addr) conBldgLookup(c.id, addr, true);
+  }
 
   // ---- 계약 서류함(첨부·드래그) — 계약 단위로 통합 보관, 판독 시 값 추출. 담당자(계약 권한)가 첨부 ----
   var ATT_MAX = 6 * 1024 * 1024;   // 개별 6MB 상한(용량·개인정보 최소화)
@@ -6374,7 +6395,7 @@
     fetch(CONTRACT_API, {headers: ghHeaders()}).then(function(resp){
       if(resp.status===404){ contractSha=null; contracts=[]; autoGenReady.con=true; runAwardAutoCon(); return; }
       if(!resp.ok) throw new Error("HTTP "+resp.status);
-      return resp.json().then(function(json){ contractSha=json.sha; var p=JSON.parse(b64DecodeUnicode(json.content)); contracts=(p&&p.items)||[]; renderContracts(); renderTasks(); autoGenReady.con=true; runAwardAutoCon(); });
+      return resp.json().then(function(json){ contractSha=json.sha; var p=JSON.parse(b64DecodeUnicode(json.content)); contracts=(p&&p.items)||[]; renderContracts(); renderTasks(); autoGenReady.con=true; runAwardAutoCon(); liveContracts().forEach(conBldgAutoTry); });
     }).catch(function(){});
   }
   function scheduleContractSave(){ if(contractSaveTimer) clearTimeout(contractSaveTimer); contractSaveTimer=setTimeout(doSaveContracts, 1400); }
@@ -6609,7 +6630,7 @@
       return '<div class="item con-item'+(c.status==="done"?' checked':'')+'">'+
         '<div class="item-body">'+
           '<div class="item-title">'+esc(c.label)+(c.client?' · '+esc(c.client):'')+'</div>'+
-          '<div class="item-meta">'+(c.docType==="public"?'<span class="from-chip">공문서</span>':'<span class="scope-chip">사문서</span>')+(c.site?'<span>'+esc(c.site)+'</span>':'')+'<span>시작 '+esc(c.start||"")+'</span>'+(c.who?'<span class="author-chip">'+esc(c.who)+'</span>':'')+(c.bldg_info?'<span class="scope-chip">🏢 대장 '+c.bldg_info.total_floor+'㎡·'+c.bldg_info.dongs+'동</span>':'')+(c.rec_id?(function(){ var rr=findRec(c.rec_id); return rr&&rr.del!==1?(rr.paid?'<span class="from-chip">💰 수금완료 '+esc(rr.paid)+'</span>':'<span class="hold-chip">미수'+(rr.amount?' '+fmtAmount(rr.amount)+'원':'')+'</span>'):''; })():'')+(c.status==="done"?'<span class="done-by">✓ 완료</span>':'')+'</div>'+
+          '<div class="item-meta">'+(c.docType==="public"?'<span class="from-chip">공문서</span>':'<span class="scope-chip">사문서</span>')+(c.site?'<span>'+esc(c.site)+'</span>':'')+'<span>시작 '+esc(c.start||"")+'</span>'+(c.who?'<span class="author-chip">'+esc(c.who)+'</span>':'')+(c.bldg_info?'<span class="scope-chip">🏢 대장 '+c.bldg_info.total_floor+'㎡·'+c.bldg_info.dongs+'동</span>':(conNeedsBldg(c)?'<span class="hold-chip" title="자동 조회로 지번을 찾지 못했습니다 — [대장]에 지번 주소를 입력하거나, 서류함에 건축물대장 파일을 첨부하면 자동 판독됩니다">🏢 대장 필요</span>':''))+(c.rec_id?(function(){ var rr=findRec(c.rec_id); return rr&&rr.del!==1?(rr.paid?'<span class="from-chip">💰 수금완료 '+esc(rr.paid)+'</span>':'<span class="hold-chip">미수'+(rr.amount?' '+fmtAmount(rr.amount)+'원':'')+'</span>'):''; })():'')+(c.status==="done"?'<span class="done-by">✓ 완료</span>':'')+'</div>'+
           pipes+
           conAttBoxHtml(c)+
         '</div>'+
