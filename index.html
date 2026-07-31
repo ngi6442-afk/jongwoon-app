@@ -7501,6 +7501,7 @@
   // ---- 낙찰하한가 계산기 ----
   var bcQualKind="";   // 계산기를 연 공고의 공종·제목(적격 통과선 안내용)
   var bcQualMethod=""; // 낙찰방법(sucsfbidMthdNm) — 산식 분기 기준. 없으면 통과선을 내지 않는다.
+  var bcQualBudget=0;  // 추정가격 — 교육청 기준 구간(tier) 판정용
   function bcNum(id){ return parseFloat(String(document.getElementById(id).value).replace(/[,\s]/g,""))||0; }
   // 적격심사 통과선 안내 — 하한 통과 ≠ 적격 통과. 산식(어제 검증분)으로 최소 투찰비율 역산해 경고
   var bcAutoSrc = [];   // 자동 채움 출처(추정치 표시용)
@@ -7539,19 +7540,27 @@
     return "other";
   }
   function bcQualFloor(){
+    // 모달 DOM을 읽지 않는다 — 모달을 연 적 없으면 빈 값이라 "미제출 등급·실적 0"으로 오계산됐던 결함(v204)의 수정.
+    // 등급은 QUAL_DEF(실측·만료 폴백)에서 직접, 실적은 만점 가정(가정임을 화면에 명시).
     try{
       if(bcMethodKind()!=="qual") return null;   // 적격심사 건만 통과선 계산
-      if(typeof qualScores!=="function"||typeof qualCollect!=="function") return null;
-      var basisEl=document.getElementById("xqBasis");
-      var prevBasis=basisEl?basisEl.value:null;
-      // 발주기관으로 기준 세트 추정(교육청 계열=2023 세부기준, 그 외=지자체 별표7)
+      if(typeof qualScores!=="function"||typeof QUAL_DEF==="undefined") return null;
       var isEdu=/교육/.test(bcQualKind||"");
-      if(basisEl){ basisEl.value=isEdu?"gbe":"lg7"; if(typeof qualBasisToggle==="function") qualBasisToggle(); }
-      var s=qualScores(qualCollect());
-      if(basisEl && prevBasis!=null){ basisEl.value=prevBasis; if(typeof qualBasisToggle==="function") qualBasisToggle(); }
+      var co=/석면|철거|해체/.test(bcQualKind||"")?"con":"env";   // 두 회사 규칙
+      var dd=QUAL_DEF[co], today=todayStr();
+      var credit=(dd.credit.until>=today)?dd.credit.v:dd.credit.fallback;
+      var safety=(dd.safety.until>=today)?dd.safety.v:dd.safety.fallback;
+      var bud=+bcQualBudget||0;
+      var v={ basis:isEdu?"gbe":"lg7", tier:bud>=300000000?"hi":(bud>=100000000?"mid":"lo"),
+        perf:1e9,                       // 실적 만점 가정 — 실제 실적 미달이면 통과선이 더 높아진다(화면에 가정 명시)
+        credit:credit, safety:safety,
+        // 별표7은 접근성(관할 소재) 1점 없이는 수행능력 만점이 불가능 → 관할 건 가정(경북 위주 응찰 실태). 교육청은 확약 +0.5만.
+        local:!isEdu, pledge:isEdu, tax:false, bid:0, pre:0, a:0 };
+      var s=qualScores(v);
       if(!s||!s.cfg) return null;
       var need=Math.round((95-s.sub-s.safety)*100)/100;
-      return { need:need, cfg:s.cfg, pivot:s.pivot, sub:s.sub, safety:s.safety, edu:isEdu,
+      return { need:need, cfg:s.cfg, pivot:s.pivot, sub:s.sub, safety:s.safety, edu:isEdu, co:co,
+        assume:isEdu?"실적 만점·확약서 제출 가정(지역가점 제외)":"실적 만점·관할 시군 소재 가정",
         rMin:(need>s.cfg.price)?null:Math.round((s.pivot-(s.cfg.price-need)/2000)*1000000)/10000 };
     }catch(e){ return null; }
   }
@@ -7563,11 +7572,11 @@
       if(f.rMin==null)
         return head+'<span style="color:#c0392b">⚠ <b>현 등급·실적으로는 통과 불가</b>('+basis+') — 필요 입찰가격 평점 '
           +f.need+'점 &gt; 배점 '+f.cfg.price+'점. 수행능력 소계 '+qualNum(f.sub)+(f.safety?' · 안전성 '+qualSign(f.safety):'')+'</span></div>';
-      return head+'<span style="color:#B03A2E">🎯 <b>우리 통과선('+basis+', 등록 등급 기준)</b>: 투찰비율(A값 반영) <b>약 '
+      return head+'<span style="color:#B03A2E">🎯 <b>우리 통과선('+basis+' · '+(f.co==="con"?"종운건설":"종운환경")+' 등급)</b>: 투찰비율(A값 반영) <b>약 '
         +f.rMin+'% ~ '+(f.pivot*100)+'%</b> 구간만 통과'
         +(lwlt&&parseFloat(lwlt)<f.rMin?' — 하한율('+lwlt+'%)로 투찰하면 <b>적격 탈락</b>':'')
         +'<br><span style="color:#666">수행능력 소계 '+qualNum(f.sub)+(f.safety?' · 안전성 '+qualSign(f.safety):'')
-        +' → 필요 입찰가격 평점 '+f.need+'점. 정확한 값은 적격심사 [점수 미리보기]로.</span></span></div>';
+        +' → 필요 입찰가격 평점 '+f.need+'점 ('+esc(f.assume)+' — 실적이 만점 미달이면 통과선이 더 좁아집니다). 정확한 값은 적격심사 [점수 미리보기]로.</span></span></div>';
     }
     // 적격심사 건이 아니면 통과선을 내지 않는다 — 방법마다 산식이 다르다
     var mk=bcMethodKind();
@@ -7690,6 +7699,7 @@
     if(pre.lwlt) document.getElementById("bcLwlt").value=parseFloat(pre.lwlt)||"";
     bcQualKind=pre.kind||"";
     bcQualMethod=pre.method||"";
+    bcQualBudget=pre.budget||0;
     // 공고문 판독이 못 뽑은 값은 실측 통계로 자동 채운다(빈칸으로 두면 계산 자체가 안 됨 — 실측 63%가 빈칸이었음).
     // 채운 값은 추정치이므로 출처를 표시하고, 공고문 확인 후 덮어쓰도록 안내한다.
     bcAutoSrc = [];
