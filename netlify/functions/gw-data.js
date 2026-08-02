@@ -883,9 +883,17 @@ async function handleBackupGet(event, d, R) {
   if (!backupAuthed(d)) return jr(403, { status: 'FORBIDDEN', error_code: 'BAD_SECRET', request_id: R });
   const sn = String(d.store || '');
   if (!BACKUP_STORES[sn]) return jr(400, { status: 'REJECTED', error_code: 'BAD_STORE', request_id: R });
-  const r = await blobGet(store(sn), String(d.key || ''));
+  const key = String(d.key || '');
+  // 민감키 반출 금지 — 백업 인증이 수집키(BIDS_INGEST_KEY) 겸용이라, 키 유출 = VAPID 개인키·PIN 해시 유출로 번지던 것 차단
+  if (sn === 'gw_data' && key === 'push:keys') return jr(403, { status: 'FORBIDDEN', error_code: 'SENSITIVE_KEY', request_id: R });
+  const r = await blobGet(store(sn), key);
   if (!r.ok) return jr(500, { status: 'ERROR', error_code: r.code, request_id: R });
-  return jr(200, { status: 'OK', key: String(d.key || ''), data: r.data, request_id: R });
+  let data = r.data;
+  if (sn === 'gw_users' && data && typeof data === 'object' && !Array.isArray(data)) {
+    // PIN 해시·salt는 백업에 싣지 않는다(git 스냅샷에 매일 커밋되던 것 포함 차단) — 복원 시엔 서버가 기존 값을 보존한다
+    data = Object.assign({}, data); delete data.pin_salt; delete data.pin_hash;
+  }
+  return jr(200, { status: 'OK', key: key, data: data, request_id: R });
 }
 
 // 백업 복원 — 백업 스냅샷(gw_backup.json)의 한 키를 Blobs로 되돌린다.
@@ -906,11 +914,21 @@ async function handleBackupPut(event, d, R) {
   const key = String(d.key || '');
   if (!key) return jr(400, { status: 'REJECTED', error_code: 'NO_KEY', request_id: R });
   if (d.data === undefined || d.data === null) return jr(400, { status: 'REJECTED', error_code: 'NO_DATA', request_id: R });
+  if (sn === 'gw_data' && key === 'push:keys') return jr(403, { status: 'FORBIDDEN', error_code: 'SENSITIVE_KEY', request_id: R });
   const cur = await blobGet(store(sn), key);
   const preview = { exists: !!cur.ok, current: _bkCount(cur.ok ? cur.data : null), restore: _bkCount(d.data) };
   if (d.dry) return jr(200, { status: 'OK', dry: true, store: sn, key: key, preview: preview, request_id: R });
   if (d.confirm !== true) return jr(400, { status: 'REJECTED', error_code: 'NEED_CONFIRM', preview: preview, request_id: R });
-  const w = await blobSet(store(sn), key, d.data);
+  let payload = d.data;
+  if (sn === 'gw_users' && key.indexOf('member:') === 0 && payload && typeof payload === 'object' && !Array.isArray(payload)) {
+    // 회원 복원이 권한 상승 통로가 되지 않게 — PIN·admin은 백업본으로 못 덮는다.
+    // 기존 레코드 있으면 그 값 보존(복원 후에도 로그인 그대로), 없으면 admin 해제·PIN 없음(관리자가 member_upsert로 재설정)
+    payload = Object.assign({}, payload);
+    const prev = (cur.ok && cur.data && typeof cur.data === 'object' && !Array.isArray(cur.data)) ? cur.data : null;
+    if (prev) { payload.pin_salt = prev.pin_salt; payload.pin_hash = prev.pin_hash; payload.admin = prev.admin; }
+    else { delete payload.pin_salt; delete payload.pin_hash; payload.admin = false; }
+  }
+  const w = await blobSet(store(sn), key, payload);
   if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
   try { await appendAudit({ ts: Date.now(), by: '복원', bid: 'restore', col: sn, ev: [{ op: '백업복원', id: key, t: JSON.stringify(preview).slice(0, 120) }] }); } catch (e) {}
   return jr(200, { status: 'OK', store: sn, key: key, preview: preview, request_id: R });
