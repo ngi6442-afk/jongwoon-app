@@ -2484,6 +2484,7 @@
     var taskUndone = 0, hasOverdue = false;
     liveTasks().forEach(function(t){
       if (t.status === "done") return;
+      if (!taskVisible(t)) return;   // 지시 탭·뱃지와 동일 기준 — 없으면 비공개 지시 건수가 전 직원 요약 카드에 새어 나간다
       taskUndone++;
       if (t.status === "open" && t.due && t.due < todayD) hasOverdue = true;
     });
@@ -2988,7 +2989,7 @@
     if (checkAssignee[id] && checkAssignee[id] === getMemberId()) return true;
     var sc = checkScopes[id];
     if (!sc || !sc.length) return true;
-    return sc.indexOf(getMemberId()) >= 0;
+    return scopeIncludes(sc, curMember());   // dept:/rank: 토큰 해석 — 원시 id 비교만 하면 "관리부 전체" 지정 시 대상자에게도 항목이 사라졌다
   }
   function myCheckCount(){
     var meId = getMemberId();
@@ -3632,7 +3633,7 @@
     if (canSee("veh")) vehicles.forEach(function(v){ if (v.del === 1) return; add(v.insp_due, "veh", (v.no||"차량")+" 검사 만기", v.driver||""); add(v.ins_due, "veh", (v.no||"차량")+" 보험 만기", v.insurer||"");
       (v.history||[]).forEach(function(h){ if(h.kind==="현장") add(h.date, "veh", "🚚 "+(v.no||"차량")+" 현장", h.content||""); }); });
     if (canSee("lic")) licenses.forEach(function(l){ if (l.del === 1 || !licVisible(l)) return; add(l.expiry, "lic", (l.name||"인허가")+" 만료", l.org||""); add(l.edu_due, "lic", (l.name||"인허가")+" 교육", l.org||""); });
-    tasks.forEach(function(t){ if (t.del === 1 || t.status === "done") return; if (!taskVisible(t)) return; add(t.due, "tasks", t.title||"지시", dispNameById(t.who)); });
+    tasks.forEach(function(t){ if (t.del === 1 || t.status === "done") return; if (!taskVisible(t)) return; add(t.due, "tasks", t.title||"지시", t.who_id==="__all__" ? "전사" : (t.who_id ? dispNameById(t.who_id) : dispName(t.who||""))); });   // who는 이름 문자열 — id 조회에 넣으면 담당자가 항상 공백이었음
     if (canSee("rec")) receivables.forEach(function(r){ if (r.del === 1 || r.paid || !recVisible(r)) return; add(r.billed, "rec", (r.client||"미수")+" 청구", r.amount ? fmtAmount(r.amount)+"원" : ""); });
     // 휴가·사직: 승인된 연차/반차는 기간 전체, 사직 확정은 퇴사예정일(관리자만)
     liveLeaves().forEach(function(l){
@@ -4111,7 +4112,7 @@
       });
     }).catch(function(){
       var c = loadVehiclesCache();
-      if (c){ vehSha = c.sha; vehicles = c.items || []; setOffline(true); renderVehicles(); renderDashboard(); }
+      if (c){ vehSha = c.sha; vehicles = c.items || []; setOffline(true); renderVehicles(); renderDashboard(); markLoadedForAutoGen("veh"); }   // 캐시 폴백도 로드 완료로 — 없으면 이 세션 내내 만기 자동생성 미실행
       else {
         var lh = document.getElementById("vehList");
         if (lh) lh.innerHTML = '<div class="empty-line">오프라인 상태이며 저장된 차량 데이터가 없습니다.</div>';
@@ -4405,7 +4406,7 @@
     var urgentLic = seeLic ? urgentLicenses() : [];
     var overdueTot = urgent.filter(function(x){ return x.dd.diff < 0; }).length + urgentLic.filter(function(x){ return x.dd.diff < 0; }).length;
     var imminentTot = urgent.length + urgentLic.length;
-    var unpaid = unpaidReceivables();
+    var unpaid = unpaidReceivables(true);
 
     var inbox = approvalInboxItems();
     var reviewCount = inbox.length;
@@ -5114,7 +5115,8 @@
     if(need>cfg.price) floorTxt=' · <span style="color:#c0392b">현 등급·실적으로는 통과 불가(필요 입찰가격 평점 '+need+' > 배점 '+cfg.price+')</span>';
     else if(need>2){
       var rMin=Math.round((pv-(cfg.price-need)/2000)*1000000)/10000;
-      floorTxt=' · 통과선: 입찰가격 평점 '+need+'점↑ = 투찰비율(A값 반영) 약 '+rMin+'%~'+(pv*100)+'% 구간';
+      var rMax=Math.round((pv+(cfg.price-need)/2000)*1000000)/10000;   // 산식 대칭 — 상단도 역산
+      floorTxt=' · 통과선: 입찰가격 평점 '+need+'점↑ = 투찰비율(A값 반영) 약 '+rMin+'%~'+rMax+'% 구간';
     }
     host.innerHTML='<b>자기평점 미리보기</b> — 계 <b>'+(s.total||0)+'</b>점 (통과 95)'
       +'<br>소계 '+qualNum(s.sub)+' = 시공경험 '+(s.perf==null?'<span style="color:#c0392b">면적입력</span>':qualNum(s.perf))
@@ -6313,9 +6315,9 @@
           "계약일":adF($("xgD1").value), "착공일":adF($("xgD2").value), "준공예정일":adF($("xgD3").value),
           "계약금액한글":adKo(adA), "계약금액":adA?adA.toLocaleString():"",
           "선금신청액한글":adKo(adE), "선금신청액":adE?adE.toLocaleString():"",
-          "잔액한글":adKo(adA-adE), "잔액":(adA&&adE)?(adA-adE).toLocaleString():"",
+          "잔액한글":(adA&&adE)?adKo(adA-adE):"", "잔액":(adA&&adE)?(adA-adE).toLocaleString():"",
           "직접노무비한글":adKo(adB), "직접노무비":adB?adB.toLocaleString():"",
-          "차액한글":adKo(adC), "차액":(adA&&adB)?adC.toLocaleString():"",
+          "차액한글":(adA&&adB)?adKo(adC):"", "차액":(adA&&adB)?adC.toLocaleString():"",   // 숫자칸과 동일 가드 — 값 없이 생성하면 한글칸만 전액 인쇄되던 불일치 방지
           "적용요율":adD?adD.toFixed(2):"",
           "노무비":adU[0]?adU[0].toLocaleString():"", "재료비":adU[1]?adU[1].toLocaleString():"",
           "사급자재":adU[2]?adU[2].toLocaleString():"", "경비":adU[3]?adU[3].toLocaleString():"",
@@ -6414,10 +6416,11 @@
     fetch(CONTRACT_API, {headers: ghHeaders()}).then(function(resp){
       if(resp.status===404){ contractSha=null; contracts=[]; autoGenReady.con=true; runAwardAutoCon(); return; }
       if(!resp.ok) throw new Error("HTTP "+resp.status);
-      return resp.json().then(function(json){ contractSha=json.sha; var p=JSON.parse(b64DecodeUnicode(json.content)); contracts=(p&&p.items)||[]; renderContracts(); renderTasks(); autoGenReady.con=true; runAwardAutoCon(); liveContracts().forEach(conBldgAutoTry); });
+      return resp.json().then(function(json){ contractSha=json.sha; var p=JSON.parse(b64DecodeUnicode(json.content)); var cr=(p&&p.items)||[]; contracts = contractsPending ? mergeContracts(contracts, cr) : cr; renderContracts(); renderTasks(); autoGenReady.con=true; runAwardAutoCon(); liveContracts().forEach(conBldgAutoTry); });
     }).catch(function(){});
   }
-  function scheduleContractSave(){ if(contractSaveTimer) clearTimeout(contractSaveTimer); contractSaveTimer=setTimeout(doSaveContracts, 1400); }
+  var contractsPending=false;   // 저장 디바운스(1.4s) 사이 재로드가 편집을 덮지 않게 — bids/quotes와 동일 패턴
+  function scheduleContractSave(){ contractsPending=true; if(contractSaveTimer) clearTimeout(contractSaveTimer); contractSaveTimer=setTimeout(doSaveContracts, 1400); }
   function mergeContracts(local, remote){
     var byId={}; (local||[]).forEach(function(c){ if(c&&c.id) byId[c.id]=c; });
     (remote||[]).forEach(function(x){ if(!x||!x.id) return; var cur=byId[x.id]; if(!cur){ byId[x.id]=x; } else { var w=(x.updated||"")>(cur.updated||"")?x:cur; var m=Object.assign({},(w===x?cur:x),w); if(cur.del===1||x.del===1) m.del=1; byId[x.id]=m; } });
@@ -6431,7 +6434,7 @@
     fetch(CONTRACT_API, {method:"PUT", headers:Object.assign({"Content-Type":"application/json"}, ghHeaders()), body:JSON.stringify(payload)}).then(function(resp){
       if(resp.status===401) return;
       if(resp.status===409||resp.status===422){ return fetch(CONTRACT_API,{headers:ghHeaders()}).then(function(r){return r.status===404?null:r.json();}).then(function(j){ if(j){ var up={}; try{up=JSON.parse(b64DecodeUnicode(j.content))||{};}catch(e){} contracts=mergeContracts(contracts, up.items||[]); contractSha=j.sha; } return doSaveContracts(); }); }
-      return resp.json().then(function(json){ contractSha=json.content&&json.content.sha; });
+      return resp.json().then(function(json){ contractSha=json.content&&json.content.sha; contractsPending=false; });
     }).catch(function(){});
   }
   var WASTE_BACKBONE = [
@@ -7611,7 +7614,9 @@
       var need=Math.round((95-s.sub-s.safety)*100)/100;
       return { need:need, cfg:s.cfg, pivot:s.pivot, sub:s.sub, safety:s.safety, edu:isEdu, co:co,
         assume:isEdu?"실적 만점·확약서 제출 가정(지역가점 제외)":"실적 만점·관할 시군 소재 가정",
-        rMin:(need>s.cfg.price)?null:Math.round((s.pivot-(s.cfg.price-need)/2000)*1000000)/10000 };
+        // 입찰가격 산식은 배점−2000×|기준−r|로 좌우 대칭 — 상단도 pivot+여유로 역산(pivot 고정 표기는 통과 가능한 상단을 탈락으로 안내했음)
+        rMin:(need>s.cfg.price)?null:Math.round((s.pivot-(s.cfg.price-need)/2000)*1000000)/10000,
+        rMax:(need>s.cfg.price)?null:Math.round((s.pivot+(s.cfg.price-need)/2000)*1000000)/10000 };
     }catch(e){ return null; }
   }
   function bcQualLine(lwlt){
@@ -7623,7 +7628,7 @@
         return head+'<span style="color:#c0392b">⚠ <b>현 등급·실적으로는 통과 불가</b>('+basis+') — 필요 입찰가격 평점 '
           +f.need+'점 &gt; 배점 '+f.cfg.price+'점. 수행능력 소계 '+qualNum(f.sub)+(f.safety?' · 안전성 '+qualSign(f.safety):'')+'</span></div>';
       return head+'<span style="color:#B03A2E">🎯 <b>우리 통과선('+basis+' · '+(f.co==="con"?"종운건설":"종운환경")+' 등급)</b>: 투찰비율(A값 반영) <b>약 '
-        +f.rMin+'% ~ '+(f.pivot*100)+'%</b> 구간만 통과'
+        +f.rMin+'% ~ '+f.rMax+'%</b> 구간만 통과'
         +(lwlt&&parseFloat(lwlt)<f.rMin?' — 하한율('+lwlt+'%)로 투찰하면 <b>적격 탈락</b>':'')
         +'<br><span style="color:#666">수행능력 소계 '+qualNum(f.sub)+(f.safety?' · 안전성 '+qualSign(f.safety):'')
         +' → 필요 입찰가격 평점 '+f.need+'점 ('+esc(f.assume)+' — 실적이 만점 미달이면 통과선이 더 좁아집니다). 정확한 값은 적격심사 [점수 미리보기]로.</span></span></div>';
@@ -7765,7 +7770,7 @@
     // 공고문 판독이 못 뽑은 값은 실측 통계로 자동 채운다(빈칸으로 두면 계산 자체가 안 됨 — 실측 63%가 빈칸이었음).
     // 채운 값은 추정치이므로 출처를 표시하고, 공고문 확인 후 덮어쓰도록 안내한다.
     bcAutoSrc = [];
-    var _kindTxt = (pre.kind||"")+(pre.org||"");
+    var _kindTxt = (pre.kind||"");   // 발주처명 섞으면 "○○공사"(기관)가 공사 공고로 오분류 — 카드 칩(lwltMode)과 동일 기준 유지
     var _isCn = /공사/.test(_kindTxt) ? "공사" : "용역";
     if(!document.getElementById("bcBss").value && pre.budget) {
       document.getElementById("bcBss").value = pre.budget;   // 기초금액 없으면 추정가격으로
@@ -8209,12 +8214,12 @@
     }
     document.getElementById("cliDetailBody").innerHTML=html;
     var eb=document.getElementById("cliDetailEdit");
-    if(eb){ if(canDo("client")){ eb.style.display=""; eb.onclick=function(){ document.getElementById("cliDetailBackdrop").classList.remove("show"); openCliModal(id); }; } else eb.style.display="none"; }
+    if(eb){ if(canDo("cli")){ eb.style.display=""; eb.onclick=function(){ document.getElementById("cliDetailBackdrop").classList.remove("show"); openCliModal(id); }; } else eb.style.display="none"; }
     document.getElementById("cliDetailBackdrop").classList.add("show");
   }
   function renderClients(){
     var host = document.getElementById("cliList"); if (!host) return;
-    var admin = canDo("client");
+    var admin = canDo("cli");
     var addBtn = document.getElementById("cliAddBtn"); if (addBtn) addBtn.style.display = admin ? "block" : "none";
     var seeRec = canSee("rec");
     var list = clients.filter(function(c){
@@ -8248,7 +8253,7 @@
     });
   }
   function openCliModal(id){
-    if (!canDo("client")) return;
+    if (!canDo("cli")) return;
     editingCliId = id || null;
     var c = id ? findCli(id) : null;
     document.getElementById("cliModalTitle").textContent = c ? "거래처 수정" : "거래처 추가";
@@ -8265,7 +8270,7 @@
   }
   function closeCliModal(){ document.getElementById("cliBackdrop").classList.remove("show"); editingCliId = null; }
   function saveCliModal(){
-    if (!canDo("client")) return;
+    if (!canDo("cli")) return;
     var name = document.getElementById("cliName").value.trim();
     if (!name){ document.getElementById("cliName").focus(); return; }
     var c = editingCliId ? findCli(editingCliId) : null;
@@ -8283,7 +8288,7 @@
     closeCliModal(); renderClients(); saveClients();
   }
   function deleteCliFromModal(){
-    if (!canDo("client") || !editingCliId) return;
+    if (!canDo("cli") || !editingCliId) return;
     var c = findCli(editingCliId); if (c){ c.del = 1; c.updated = todayStr(); }
     closeCliModal(); renderClients(); saveClients();
   }
@@ -8624,7 +8629,8 @@
       return resp.json().then(function(json){
         recSha = json.sha;
         var parsed = JSON.parse(b64DecodeUnicode(json.content));
-        receivables = (parsed && parsed.items) || [];
+        var recRemote = (parsed && parsed.items) || [];
+        receivables = recPending ? mergeRec(receivables, recRemote) : recRemote;   // 오프라인 편집(pending) 병합 — tasks/veh/lic와 동일(없으면 online 복귀 때 입금 처리분 증발)
         setOffline(false); saveRecCache(); renderReceivables(); renderDashboard();
         recOverdueGen();   // 미수 장기화 자동 지시(만기 자동생성이 먼저 돈 경우 보충)
       });
@@ -8927,8 +8933,9 @@
     if (!recSearchTerm) return true;
     return ((r.client || "") + " " + (r.desc || "") + " " + (r.nts || "")).toLowerCase().indexOf(recSearchTerm) >= 0;
   }
-  function unpaidReceivables(){
-    var u = liveRec().filter(function(r){ return !r.paid && recVisible(r) && recMatchesSearch(r); });
+  function unpaidReceivables(all){
+    // all=true(대시보드): 기성 탭 검색어를 무시 — 검색 상태가 남아 홈 미수 합계·목록이 검색 결과로 오염되던 문제
+    var u = liveRec().filter(function(r){ return !r.paid && recVisible(r) && (all || recMatchesSearch(r)); });
     u.sort(function(a, b){ var ad = a.billed || "9999-99-99", bd = b.billed || "9999-99-99"; return ad < bd ? -1 : (ad > bd ? 1 : 0); });
     return u;
   }
@@ -9035,7 +9042,7 @@
       });
     }).catch(function(){
       var c = loadLicCache();
-      if (c){ licSha = c.sha; licenses = c.items || []; setOffline(true); renderLicenses(); renderDashboard(); }
+      if (c){ licSha = c.sha; licenses = c.items || []; setOffline(true); renderLicenses(); renderDashboard(); markLoadedForAutoGen("lic"); }   // 캐시 폴백도 로드 완료로(차량과 동일)
     });
   }
 
