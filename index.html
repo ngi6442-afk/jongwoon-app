@@ -1781,6 +1781,7 @@
     <h3>내 PIN 변경</h3>
     <p id="pinMsg"></p>
     <div class="err" id="pinErr">PIN은 숫자 4자리여야 합니다.</div>
+    <input type="password" id="pinCur" placeholder="현재 PIN" inputmode="numeric" autocomplete="off">
     <input type="password" id="pinNew" placeholder="새 PIN 4자리" inputmode="numeric" autocomplete="off">
     <button class="primary" id="pinSave">변경</button>
     <button class="secondary" id="pinCancel">취소</button>
@@ -9585,6 +9586,10 @@
       ? (m.name + "님, 기본 PIN(0000)입니다. 본인만 아는 PIN으로 바꿔주세요.")
       : ("현재 사용자: " + m.name);
     document.getElementById("pinErr").classList.remove("show");
+    var cpEl0 = document.getElementById("pinCur");
+    cpEl0.value = "";
+    cpEl0.placeholder = m.admin ? "현재 비밀번호" : "현재 PIN";
+    cpEl0.inputMode = m.admin ? "text" : "numeric";
     var npEl0 = document.getElementById("pinNew");
     npEl0.value = "";
     npEl0.placeholder = m.admin ? "새 비밀번호 8자 이상" : "새 PIN 4자리";
@@ -9594,12 +9599,19 @@
   function closeChangePin(){ document.getElementById("pinBackdrop").classList.remove("show"); }
   function saveChangePin(){
     var m = curMember(); if (!m) return;
+    var cp = document.getElementById("pinCur").value.trim();
     var np = document.getElementById("pinNew").value.trim();
     var errEl = document.getElementById("pinErr");
+    if (!cp){ errEl.textContent = "현재 " + (m.admin ? "비밀번호" : "PIN") + "를 입력하세요."; errEl.classList.add("show"); return; }
     var ok = m.admin ? (np.length >= 8) : /^\d{4,}$/.test(np);
     if (!ok){ errEl.textContent = m.admin ? "관리자는 비밀번호 8자 이상이 필요합니다." : "PIN은 4자리 이상 숫자입니다."; errEl.classList.add("show"); return; }
-    gwCall("gw-auth", { action: "set_pin", pin: np }).then(function(res){
-      if (res.status !== 200){ errEl.textContent = "변경 실패 — " + (m.admin ? "비밀번호 8자 이상 확인." : "PIN 형식 확인."); errEl.classList.add("show"); return; }
+    gwCall("gw-auth", { action: "set_pin", pin: np, cur: cp }).then(function(res){
+      if (res.status !== 200){
+        var code = res.body && res.body.error_code;
+        errEl.textContent = code === "PIN_MISMATCH" ? ("현재 " + (m.admin ? "비밀번호" : "PIN") + "가 일치하지 않습니다.")
+          : ("변경 실패 — " + (m.admin ? "비밀번호 8자 이상 확인." : "PIN 형식 확인."));
+        errEl.classList.add("show"); return;
+      }
       closeChangePin();
     });
   }
@@ -9864,7 +9876,7 @@
     }).catch(function(){ body.innerHTML = '<div class="empty-line">통신 오류</div>'; });
   }
   // 권한관리(별도 화면) — 모듈별 권한만 편집. 사이드바 순서와 동일.
-  var PERM_ORDER = ["tasks","rec","cli","con","veh","lic","doc","check"];
+  var PERM_ORDER = ["tasks","rec","cli","con","veh","lic","doc","check","wk"];   // wk 누락 시 권한관리 UI에 일용직이 안 떠 저장에서 통째로 빠짐(서버 MODULES와 일치)
   var permOpenId = null;
   function permModList(){ return PERM_ORDER.filter(function(x){ return MODULES.indexOf(x) >= 0; }); }
   function renderPermMgmt(){

@@ -47,12 +47,12 @@ async function handleGet(event, d, R) {
   const c = await currentMember(event);
   if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
   if (!(await deviceApproved(event, c.member))) return jr(403, { status: 'FORBIDDEN', error_code: 'DEVICE_NOT_APPROVED', request_id: R });
-  if (PRIVATE_COL[d.collection]) {
+  if (Object.prototype.hasOwnProperty.call(PRIVATE_COL, d.collection)) {   // 'constructor' 등 상속 키 우회 방지
     const pr = await blobGet(store(DATA), `priv:${c.member.id}:${d.collection}`);
     return jr(200, { status: 'OK', collection: d.collection, doc: (pr.ok && pr.data) ? pr.data : { schema: 1, items: [] }, can_write: true, request_id: R });
   }
   const col = d.collection;
-  if (!COL[col]) return jr(400, { status: 'REJECTED', error_code: 'UNKNOWN_COLLECTION', request_id: R });
+  if (!Object.prototype.hasOwnProperty.call(COL, col)) return jr(400, { status: 'REJECTED', error_code: 'UNKNOWN_COLLECTION', request_id: R });
   // 일감(bids)·공매(onbid)는 관리자 전용 — 개별 권한과 무관하게 서버측 강제
   if ((col === 'bids' || col === 'onbid') && !c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
   const p = permOf(c.member, col);
@@ -76,23 +76,37 @@ async function handleSave(event, d, R) {
   const c = await currentMember(event);
   if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
   if (!(await deviceApproved(event, c.member))) return jr(403, { status: 'FORBIDDEN', error_code: 'DEVICE_NOT_APPROVED', request_id: R });
-  if (PRIVATE_COL[d.collection]) {
+  if (Object.prototype.hasOwnProperty.call(PRIVATE_COL, d.collection)) {   // 'constructor' 등 상속 키 우회 방지
     if (!d.doc || typeof d.doc !== 'object') return jr(400, { status: 'REJECTED', error_code: 'INVALID_DOC', request_id: R });
     const pw = await blobSet(store(DATA), `priv:${c.member.id}:${d.collection}`, Object.assign({}, d.doc, { updated_at: Date.now() }));
     if (!pw.ok) return jr(500, { status: 'ERROR', error_code: pw.code, request_id: R });
     return jr(200, { status: 'OK', request_id: R });
   }
   const col = d.collection;
-  if (!COL[col]) return jr(400, { status: 'REJECTED', error_code: 'UNKNOWN_COLLECTION', request_id: R });
+  if (!Object.prototype.hasOwnProperty.call(COL, col)) return jr(400, { status: 'REJECTED', error_code: 'UNKNOWN_COLLECTION', request_id: R });
   // tasks: 직원(권한 do 아님)도 '내게 온 지시'를 완료(→승인대기)/보류하려면 저장이 필요 → 승인제 성립.
   // tasks 쓰기는 인증·인가 회원이면 허용(프런트 canActTask로 자기 업무만 조작, UI 권한 구분이지 하드보안 아님).
   if ((col === 'bids' || col === 'onbid') && !c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
   if (permOf(c.member, col) !== 'do' && col !== 'tasks' && col !== 'leaves') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_WRITE', request_id: R });
   if (!d.doc || typeof d.doc !== 'object') return jr(400, { status: 'REJECTED', error_code: 'INVALID_DOC', request_id: R });
   // 감사 로그용 이전 문서(diff 원본) — 읽기 실패해도 저장은 진행
-  let oldItems = [];
-  try { const prev = await blobGet(store(DATA), colKey(col)); if (prev.ok && prev.data && Array.isArray(prev.data.items)) oldItems = prev.data.items; } catch (e) {}
+  let oldItems = [], prevDoc = null;
+  try { const prev = await blobGet(store(DATA), colKey(col)); if (prev.ok && prev.data) { prevDoc = prev.data; if (Array.isArray(prev.data.items)) oldItems = prev.data.items; } } catch (e) {}
   const doc = Object.assign({}, d.doc, { updated_by: c.member.id, updated_at: Date.now() });
+  // 휴가: 신청 저장은 전 직원 필요하지만, 비관리자 저장은 서버가 재구성 — 타인 항목은 서버 원본 유지(클라이언트 사본으로 못 덮음),
+  // 본인 항목만 반영, 승인 상태는 스스로 못 올림. (종전엔 전면 면제라 임의 직원이 전사 휴가 문서를 통째로 조작할 수 있었다.
+  // 거부(403) 방식이 아니라 재구성인 이유: 낡은 사본으로 저장해도 타인 신청이 유실되지 않게)
+  if (col === 'leaves' && !c.member.admin && Array.isArray(doc.items)) {
+    const mine = c.member.id;
+    const others = oldItems.filter(function (o) { return o && o.member_id !== mine; });
+    const oldBy = {}; oldItems.forEach(function (o) { if (o && o.id) oldBy[o.id] = o; });
+    const own = doc.items.filter(function (x) { return x && x.member_id === mine; }).map(function (b) {
+      const a = oldBy[b.id];
+      if (b.status === 'approved' && !(a && a.status === 'approved')) { b = Object.assign({}, b); b.status = a ? a.status : 'pending'; }
+      return b;
+    });
+    doc.items = others.concat(own);
+  }
   // 차량 관리자 전용 필드 보존 — 비관리자는 값을 받은 적이 없으므로(get에서 제거) 저장 시 기존값 복원
   if (col === 'vehicles' && !c.member.admin && Array.isArray(doc.items)) {
     const oldById = {};
@@ -110,7 +124,15 @@ async function handleSave(event, d, R) {
   if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
   // 감사 로그: 누가·언제·무엇을(이전값→새값). 서버측 기록이라 클라이언트 위변조 불가.
   try {
-    const ev = diffItems(oldItems, Array.isArray(doc.items) ? doc.items : []);
+    let ev;
+    if (col === 'checklist') {
+      // checklist는 {records,custom} 스키마라 diffItems가 항상 빈 배열 — 체크 개수 변화라도 남긴다(M0 운영 모듈 무기록 방지)
+      const cnt = function (dc) { let n = 0; const rec = (dc && dc.records) || {}; Object.keys(rec).forEach(function (t) { const ks = rec[t] || {}; Object.keys(ks).forEach(function (k) { n += Object.keys(ks[k] || {}).length; }); }); return n; };
+      const c0 = cnt(prevDoc), c1 = cnt(doc);
+      ev = (c0 === c1) ? [] : [{ op: '체크저장', id: '-', t: '체크 ' + c0 + '→' + c1 }];
+    } else {
+      ev = diffItems(oldItems, Array.isArray(doc.items) ? doc.items : []);
+    }
     if (ev.length) await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: col, ev: ev });
   } catch (e) {}
   return jr(200, { status: 'OK', request_id: R });
@@ -517,7 +539,7 @@ async function handleBidsResults(event, d, R) {
     }
     if ((n.status === '낙찰' || n.status === '유찰') && (cur.status === '응찰' || cur.status === '참여')) {
       cur.status = n.status;
-      ev.push({ op: '개찰결과', id: cur.id, t: cur.title.slice(0, 30) + ' → ' + n.status });
+      ev.push({ op: '개찰결과', id: cur.id, t: String(cur.title||'').slice(0,30) + ' → ' + n.status });
     }
     cur.updated = today; applied++;
   }
@@ -567,10 +589,11 @@ async function handleProofPut(event, d, R) {
   if (!c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
   const name = proofSlug(d.name);
   const b64 = String(d.data || '');
-  if (!name || !b64 || b64.length > ATT_MAX) return jr(400, { status: 'REJECTED', error_code: 'INVALID_FILE', request_id: R });
+  if (!name || name === '__index__' || !b64 || b64.length > ATT_MAX) return jr(400, { status: 'REJECTED', error_code: 'INVALID_FILE', request_id: R });   // __index__ 이름 충돌 시 색인 자기파괴 방지
   const st = store(FILES);
   const w = await blobSet(st, 'proof:' + name, { name: String(d.name || '').slice(0, 120), data: b64, by: c.member.name, ts: Date.now() });
   if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
+  try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'files', ev: [{ op: '증빙등록', id: name.slice(0, 40), t: '' }] }); } catch (e) {}
   const idx = await blobGet(st, 'proof:__index__');
   const list = (idx.ok && idx.data && Array.isArray(idx.data.names)) ? idx.data.names : [];
   if (list.indexOf(name) < 0) list.push(name);
@@ -602,11 +625,13 @@ async function handleProofDel(event, d, R) {
   if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
   if (!c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
   const name = proofSlug(d.name);
+  if (!name || name === '__index__') return jr(400, { status: 'REJECTED', error_code: 'INVALID_FILE', request_id: R });
   const st = store(FILES);
   await blobDelete(st, 'proof:' + name);
   const idx = await blobGet(st, 'proof:__index__');
   const list = ((idx.ok && idx.data && Array.isArray(idx.data.names)) ? idx.data.names : []).filter(function (n) { return n !== name; });
   await blobSet(st, 'proof:__index__', { names: list });
+  try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'files', ev: [{ op: '증빙삭제', id: name.slice(0, 40), t: '' }] }); } catch (e) {}
   return jr(200, { status: 'OK', request_id: R });
 }
 
@@ -757,6 +782,7 @@ async function handleAttPut(event, d, R) {
   const kind = ['asbestos', 'contract', 'bldg', 'biz'].indexOf(String(d.kind || '')) >= 0 ? String(d.kind) : '';
   const w = await blobSet(store(FILES), id, { name: name, type: String(d.type || ''), kind: kind, data: b64, by: c.member.name, ts: Date.now() });
   if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
+  try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'files', ev: [{ op: '첨부등록', id: id, t: name.slice(0, 60) }] }); } catch (e) {}
   // 판독은 백그라운드 함수(gw-parse-background)에서 — 첨부는 즉시 완료(타임아웃 방지)
   const wantParse = !!kind || /석면|사전조사|조사서|계약서|대장|등록증|신분증|면허증/.test(name);
   return jr(200, { status: 'OK', id: id, name: name, size: b64.length, parse_pending: wantParse, request_id: R });
@@ -946,6 +972,7 @@ async function handleTplPut(event, d, R) {
   if (!b64 || b64.length > ATT_MAX) return jr(400, { status: 'REJECTED', error_code: 'INVALID_FILE', request_id: R });
   const w = await blobSet(store(FILES), 'tpl:' + key, { name: String(d.name || '').slice(0, 120), data: b64, by: c.member.name, ts: Date.now() });
   if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
+  try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'files', ev: [{ op: '양식등록', id: key, t: String(d.name || '').slice(0, 60) }] }); } catch (e) {}   // 양식 교체=서류 위조 벡터 — 무기록 금지
   return jr(200, { status: 'OK', key: key, request_id: R });
 }
 async function handleTplGet(event, d, R) {
@@ -986,6 +1013,7 @@ async function handleAttDel(event, d, R) {
   if (String(d.id || '').indexOf('att_') !== 0) return jr(400, { status: 'REJECTED', error_code: 'BAD_ID', request_id: R });
   await blobDelete(store(FILES), String(d.id || ''));
   await blobDelete(store(FILES), 'parse:' + String(d.id || ''));
+  try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'files', ev: [{ op: '첨부삭제', id: String(d.id || '').slice(0, 30), t: '' }] }); } catch (e) {}
   return jr(200, { status: 'OK', request_id: R });
 }
 

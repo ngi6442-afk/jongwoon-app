@@ -11,7 +11,7 @@ const { issueSession, verifyToken, bearer } = require('./_lib/session');
 const { appendAudit, short } = require('./_lib/audit');
 
 const USERS = 'gw_users';
-const MODULES = ['tasks', 'veh', 'rec', 'lic', 'check', 'con', 'cli', 'doc'];
+const MODULES = ['tasks', 'veh', 'rec', 'lic', 'check', 'con', 'cli', 'doc', 'wk'];   // wk(일용직) 누락으로 cleanPerms가 매 저장마다 버려 숨김·수행 설정이 불가능했음(프런트 레지스트리와 일치 필수)
 const LOCK_THRESHOLD = 5;                 // 연속 실패 허용 횟수
 const LOCK_MS = 15 * 60 * 1000;           // 잠금 시간(15분)
 function lockKey(name) { return `lock:${String(name).trim().toLowerCase()}`; }
@@ -104,6 +104,8 @@ async function handleLogin(st, d, R, event) {
     const fails = (lk.ok && lk.data && lk.data.fails ? lk.data.fails : 0) + 1;
     const rec = fails >= LOCK_THRESHOLD ? { fails: 0, until: now + LOCK_MS } : { fails: fails };
     await blobSet(st, lockKey(name), rec);
+    // Blobs엔 원자적 증가가 없어 병렬 대량 시도가 잠금 카운터를 우회한다 — 실패마다 고정 지연으로 완전탐색 비용을 올림
+    await new Promise(function (r) { setTimeout(r, 600); });
     return GEN();
   }
   const idx = await blobGet(st, nameKey(name));
@@ -132,8 +134,12 @@ async function handleVerify(st, event, R) {
 async function handleMemberList(st, event, R) {
   const c = await currentMember(st, event);
   if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: 'NO_SESSION', request_id: R });
-  // 회원 목록(이름·역할, pin 제외 safeMember)은 담당 배정 드롭다운용으로 로그인 회원 누구나 조회 가능
-  const members = (await listMembers(st)).map(safeMember);
+  // 회원 목록은 담당 배정 드롭다운용 — 비관리자에겐 표시용 필드만(입사일·연차·휴직 등 인사정보는 관리자와 본인 것만.
+  // 종전엔 safeMember 전체가 나가 현장직 계정으로 전사 입사일·연차 조회가 가능했다)
+  const members = (await listMembers(st)).map(function (m) {
+    if (c.member.admin || m.id === c.member.id) return safeMember(m);
+    return { id: m.id, name: m.name, role: m.role, rank: m.rank, dept: m.dept, seq: m.seq, admin: m.admin, on_loa: m.on_loa, del: m.del };
+  });
   return jr(200, { status: 'OK', members, request_id: R });
 }
 
@@ -223,11 +229,21 @@ async function handleSetPin(st, event, d, R) {
   const pin = (d.pin || '').trim();
   const r = await blobGet(st, memberKey(targetId));
   if (!r.ok || !r.data) return jr(404, { status: 'REJECTED', error_code: 'NOT_FOUND', request_id: R });
+  // 본인 변경은 현재 PIN 검증 필수 — 세션 토큰 탈취만으로 계정을 영구 장악하는 통로 차단(관리자의 타인 재설정은 예외)
+  if (targetId === c.member.id) {
+    const cur = (d.cur || '').trim();
+    if (!cur) return jr(400, { status: 'REJECTED', error_code: 'NEED_CURRENT_PIN', request_id: R });
+    if (!verifySecret(cur, r.data.pin_salt, r.data.pin_hash)) {
+      await new Promise(function (rr) { setTimeout(rr, 600); });
+      return jr(403, { status: 'FORBIDDEN', error_code: 'PIN_MISMATCH', request_id: R });
+    }
+  }
   if (!validSecret(pin, !!r.data.admin)) return jr(400, { status: 'REJECTED', error_code: 'WEAK_SECRET', request_id: R });
   const h = hashSecret(pin);
   r.data.pin_salt = h.salt; r.data.pin_hash = h.hash; r.data.updated = Date.now();
   const w = await blobSet(st, memberKey(targetId), r.data);
   if (!w.ok) return jr(500, { status: 'ERROR', error_code: 'STORAGE_WRITE_FAILED', request_id: R });
+  try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'login', ev: [{ op: 'PIN변경', id: targetId, t: targetId === c.member.id ? '본인' : '관리자 재설정' }] }); } catch (e) {}
   return jr(200, { status: 'OK', request_id: R });
 }
 
@@ -244,11 +260,12 @@ async function handleDeviceSet(st, event, d, R, status) {
   if (!c.ok || !c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
   const id = String(d.device || '').trim();
   if (!id) return jr(400, { status: 'REJECTED', error_code: 'INVALID_INPUT', request_id: R });
-  if (status === null) { await blobSet(st, deviceKey(id), null); return jr(200, { status: 'OK', request_id: R }); }
+  if (status === null) { await blobSet(st, deviceKey(id), null); try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'login', ev: [{ op: '기기삭제', id: id.slice(0, 20), t: '' }] }); } catch (e) {} return jr(200, { status: 'OK', request_id: R }); }
   const r = await blobGet(st, deviceKey(id));
   const dev = (r.ok && r.data) ? r.data : { id: id, created: Date.now() };
   dev.status = status; dev.updated = Date.now();
   await blobSet(st, deviceKey(id), dev);
+  try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'login', ev: [{ op: status === 'approved' ? '기기승인' : '기기승인취소', id: id.slice(0, 20), t: String(dev.label || dev.member_name || '') }] }); } catch (e) {}
   return jr(200, { status: 'OK', request_id: R });
 }
 
