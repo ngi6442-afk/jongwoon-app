@@ -2078,6 +2078,7 @@
   var GW_TOKEN_KEY = "jw_gw_token";
   var DEVICE_KEY = "jw_device_id";
   var curMemberObj = null;
+  var _colBase = {};   // 컬렉션별 낙관적 락 base(마지막으로 본 서버 문서의 updated_at)
   function deviceId(){
     try{ var d = localStorage.getItem(DEVICE_KEY); if(!d){ d = "d" + Math.random().toString(36).slice(2,10) + Date.now().toString(36); localStorage.setItem(DEVICE_KEY, d); } return d; }catch(e){ return "d0"; }
   }
@@ -2135,15 +2136,18 @@
         if (res.status === 403) return _ghResp(200, { sha: "gw", content: b64EncodeUnicode(JSON.stringify(emptyDoc(col))) });
         var doc = (res.status === 200 && res.body && res.body.doc) ? res.body.doc : null;
         if (!doc) return _ghResp(res.status >= 400 ? res.status : 502, {});
+        _colBase[col] = doc.updated_at || 0;   // 낙관적 락 base — 이 시각 이후 남이 저장했으면 내 저장은 409로 튕겨 병합 경로를 탄다
         return _ghResp(200, { sha: "gw", content: b64EncodeUnicode(JSON.stringify(doc)) });
       });
     }
     var body = {}; try{ body = JSON.parse(opts.body); }catch(e){}
     var doc = {}; try{ doc = JSON.parse(b64DecodeUnicode(body.content)); }catch(e){}
-    return gwCall("gw-data", { action: "save", collection: col, doc: doc }).then(function(res){
+    return gwCall("gw-data", { action: "save", collection: col, doc: doc, base: _colBase[col] }).then(function(res){
       if (res.status === 401){ onSessionInvalid(); return _ghResp(401, {}); }
       if (res.status === 403) return _ghResp(200, { content: { sha: "gw" } });   // 쓰기권한 없음은 조용히: 서버가 이미 막음
+      if (res.status === 409) return _ghResp(409, {});   // 동시 저장 충돌 — 각 컬렉션의 기존 409 재조회·병합·재시도 경로로
       if (res.status !== 200) return _ghResp(res.status, {});   // 저장 실패를 성공으로 위조하면 pending이 풀려 편집이 유실된다
+      _colBase[col] = (res.body && res.body.updated_at) || Date.now();
       return _ghResp(200, { content: { sha: "gw" } });
     });
   };
@@ -2157,6 +2161,11 @@
   function genId(prefix){
     return prefix + Date.now().toString(36) + Math.random().toString(36).slice(2,7);
   }
+  // 병합용 수정시각 — updated_ts(ms, 삭제·복구 시 스탬프)가 있으면 그것, 없으면 updated 날짜(일 단위)
+  function mTime(o){ return (o && o.updated_ts) || (o && o.updated ? (Date.parse(o.updated) || 0) : 0); }
+  // del 병합 규칙: 더 최근에 수정된 쪽의 del을 따르고, 동시각이면 삭제 우선 —
+  // 종전 'del=1 무조건 우선'은 복구(del=0)가 병합을 절대 못 이겨 조용히 삭제로 되돌아갔다
+  function mergeDel(a, b){ var ta=mTime(a), tb=mTime(b); if(ta===tb) return (a.del===1||b.del===1)?1:0; return (ta>tb?a:b).del===1?1:0; }
 
   function esc(s){
     return String(s == null ? "" : s)
@@ -2359,7 +2368,7 @@
     if(!ids.length) return;
     if(!confirm(ids.length+"건을 삭제할까요? (나중에 복구 가능)")) return;
     var today=todayStr();
-    ids.forEach(function(id){ var it=moduleFind(mod,id); if(!it||it.del===1) return; it.del=1; it.updated=today; if(mod==="rec"&&typeof removeRecTask==="function") removeRecTask(it); });
+    ids.forEach(function(id){ var it=moduleFind(mod,id); if(!it||it.del===1) return; it.del=1; it.updated=today; it.updated_ts=Date.now(); if(mod==="rec"&&typeof removeRecTask==="function") removeRecTask(it); });
     selSets[mod]={};
     saveModule(mod); scheduleModuleSave(mod); renderModule(mod);
   }
@@ -2368,7 +2377,7 @@
     var set=delSelSets[mod]; var ids=Object.keys(set).filter(function(id){return set[id];});
     if(!ids.length) return;
     var today=todayStr();
-    ids.forEach(function(id){ var it=moduleFind(mod,id); if(!it) return; it.del=0; it.updated=today; });
+    ids.forEach(function(id){ var it=moduleFind(mod,id); if(!it) return; it.del=0; it.updated=today; it.updated_ts=Date.now(); });
     delSelSets[mod]={};
     saveModule(mod); scheduleModuleSave(mod); renderModule(mod);
   }
@@ -3282,7 +3291,7 @@
         Object.keys(fields).forEach(function(f){
           out[f] = (winner[f] !== undefined) ? winner[f] : loser[f];
         });
-        if (lo.del === 1 || ro.del === 1) out.del = 1; // del=1 항상 우선
+        if (lo.del === 1 || ro.del === 1) out.del = mergeDel(lo, ro);
         merged[id] = out;
       } else {
         merged[id] = lo || ro;
@@ -3325,11 +3334,20 @@
         currentSha = json.sha;
         var decoded = b64DecodeUnicode(json.content);
         var parsed = JSON.parse(decoded);
-        records = parsed.records || {};
-        customItems = parsed.custom || {};
-        checkScopes = parsed.scopes || {};
-        checkAssignee = parsed.assignee || {};
-        checkReview = parsed.review || {};
+        if (pendingSave){
+          // 미저장 편집(오프라인 체크 등) 보존 — 통째 교체하면 online 복귀 재로드가 체크를 덮어 증발시켰다(충돌 병합과 동일 규칙)
+          records = mergeRecords(records, parsed.records || {});
+          customItems = mergeCustom(customItems, parsed.custom || {});
+          checkScopes = Object.assign({}, parsed.scopes || {}, checkScopes);
+          checkAssignee = Object.assign({}, parsed.assignee || {}, checkAssignee);
+          checkReview = Object.assign({}, parsed.review || {}, checkReview);
+        } else {
+          records = parsed.records || {};
+          customItems = parsed.custom || {};
+          checkScopes = parsed.scopes || {};
+          checkAssignee = parsed.assignee || {};
+          checkReview = parsed.review || {};
+        }
         setOffline(false);
         saveCache();
         renderList();
@@ -3436,7 +3454,7 @@
         var winner = (r.updated || "") > (cur.updated || "") ? r : cur;   // 동률=로컬(cur) 우선(방금 한 변경 보존)
         var loser = winner === r ? cur : r;
         var merged = Object.assign({}, loser, winner);                    // 승자 값 우선 + 패자 고유 필드 보존
-        if (cur.del === 1 || r.del === 1) merged.del = 1; // del=1 항상 우선
+        if (cur.del === 1 || r.del === 1) merged.del = mergeDel(cur, r);
         byId[r.id] = merged;
       }
     });
@@ -4276,7 +4294,7 @@
       else {
         var w = (x.updated || "") > (cur.updated || "") ? x : cur;
         var m = Object.assign({}, (w===x?cur:x), w);
-        if (cur.del === 1 || x.del === 1) m.del = 1;
+        if (cur.del === 1 || x.del === 1) m.del = mergeDel(cur, x);
         byId[x.id] = m;
       }
     });
@@ -6424,7 +6442,7 @@
   function scheduleContractSave(){ contractsPending=true; if(contractSaveTimer) clearTimeout(contractSaveTimer); contractSaveTimer=setTimeout(doSaveContracts, 1400); }
   function mergeContracts(local, remote){
     var byId={}; (local||[]).forEach(function(c){ if(c&&c.id) byId[c.id]=c; });
-    (remote||[]).forEach(function(x){ if(!x||!x.id) return; var cur=byId[x.id]; if(!cur){ byId[x.id]=x; } else { var w=(x.updated||"")>(cur.updated||"")?x:cur; var m=Object.assign({},(w===x?cur:x),w); if(cur.del===1||x.del===1) m.del=1; byId[x.id]=m; } });
+    (remote||[]).forEach(function(x){ if(!x||!x.id) return; var cur=byId[x.id]; if(!cur){ byId[x.id]=x; } else { var w=(x.updated||"")>(cur.updated||"")?x:cur; var m=Object.assign({},(w===x?cur:x),w); if(cur.del===1||x.del===1) m.del=mergeDel(cur,x); byId[x.id]=m; } });
     return Object.keys(byId).map(function(k){ return byId[k]; });
   }
   function doSaveContracts(){
@@ -7020,7 +7038,7 @@
   }
   var leavesPending = false;
   function scheduleLeavesSave(){ leavesPending=true; if(leavesSaveTimer) clearTimeout(leavesSaveTimer); leavesSaveTimer=setTimeout(doSaveLeaves,1200); }
-  function mergeLeaves(local,remote){ var byId={}; (local||[]).forEach(function(l){if(l&&l.id)byId[l.id]=l;}); (remote||[]).forEach(function(x){if(!x||!x.id)return;var c=byId[x.id];if(!c){byId[x.id]=x;}else{var w=(x.updated||"")>(c.updated||"")?x:c;var m=Object.assign({},(w===x?c:x),w);if(c.del===1||x.del===1)m.del=1;byId[x.id]=m;}}); return Object.keys(byId).map(function(k){return byId[k];}); }
+  function mergeLeaves(local,remote){ var byId={}; (local||[]).forEach(function(l){if(l&&l.id)byId[l.id]=l;}); (remote||[]).forEach(function(x){if(!x||!x.id)return;var c=byId[x.id];if(!c){byId[x.id]=x;}else{var w=(x.updated||"")>(c.updated||"")?x:c;var m=Object.assign({},(w===x?c:x),w);if(c.del===1||x.del===1)m.del=mergeDel(c,x);byId[x.id]=m;}}); return Object.keys(byId).map(function(k){return byId[k];}); }
   function doSaveLeaves(){
     var token=getToken(); if(!token) return;
     var body=JSON.stringify({schema:1,items:leaves});
@@ -7374,7 +7392,7 @@
     }).catch(function(){});
   }
   function scheduleBidsSave(){ bidsPending=true; if(bidsSaveTimer) clearTimeout(bidsSaveTimer); bidsSaveTimer=setTimeout(doSaveBids,1200); }
-  function mergeBidsLocal(local,remote){ var byId={}; (local||[]).forEach(function(b){if(b&&b.id)byId[b.id]=b;}); (remote||[]).forEach(function(x){if(!x||!x.id)return;var c=byId[x.id];if(!c){byId[x.id]=x;}else{var w=(x.updated||"")>(c.updated||"")?x:c;var m=Object.assign({},(w===x?c:x),w);if(c.del===1||x.del===1)m.del=1;byId[x.id]=m;}}); return Object.keys(byId).map(function(k){return byId[k];}); }
+  function mergeBidsLocal(local,remote){ var byId={}; (local||[]).forEach(function(b){if(b&&b.id)byId[b.id]=b;}); (remote||[]).forEach(function(x){if(!x||!x.id)return;var c=byId[x.id];if(!c){byId[x.id]=x;}else{var w=(x.updated||"")>(c.updated||"")?x:c;var m=Object.assign({},(w===x?c:x),w);if(c.del===1||x.del===1)m.del=mergeDel(c,x);byId[x.id]=m;}}); return Object.keys(byId).map(function(k){return byId[k];}); }
   function doSaveBids(){
     var token=getToken(); if(!token) return;
     // 수집봇이 심어둔 health·awards(계산기 실측선)는 앱 저장 시 보존 — 안 넣으면 다음 저장에 날아간다
@@ -7411,7 +7429,7 @@
   function mergeQuotes(local,remote){
     var byId={}; (local||[]).forEach(function(q){ if(q&&q.id) byId[q.id]=q; });
     (remote||[]).forEach(function(x){ if(!x||!x.id) return; var c=byId[x.id];
-      if(!c){ byId[x.id]=x; } else { var w=(x.updated||"")>(c.updated||"")?x:c; var m=Object.assign({},(w===x?c:x),w); if(c.del===1||x.del===1) m.del=1; byId[x.id]=m; } });
+      if(!c){ byId[x.id]=x; } else { var w=(x.updated||"")>(c.updated||"")?x:c; var m=Object.assign({},(w===x?c:x),w); if(c.del===1||x.del===1) m.del=mergeDel(c,x); byId[x.id]=m; } });
     return Object.keys(byId).map(function(k){ return byId[k]; });
   }
   function scheduleQuoteSave(){ quotePending=true; if(quoteSaveTimer) clearTimeout(quoteSaveTimer); quoteSaveTimer=setTimeout(doSaveQuotes,1200); }
@@ -8657,7 +8675,7 @@
       else {
         var w = (x.updated || "") > (cur.updated || "") ? x : cur;
         var m = Object.assign({}, (w===x?cur:x), w);
-        if (cur.del === 1 || x.del === 1) m.del = 1;
+        if (cur.del === 1 || x.del === 1) m.del = mergeDel(cur, x);
         byId[x.id] = m;
       }
     });
@@ -9062,7 +9080,7 @@
       else {
         var w = (x.updated || "") > (cur.updated || "") ? x : cur;
         var m = Object.assign({}, (w===x?cur:x), w);
-        if (cur.del === 1 || x.del === 1) m.del = 1;
+        if (cur.del === 1 || x.del === 1) m.del = mergeDel(cur, x);
         byId[x.id] = m;
       }
     });
@@ -9449,7 +9467,7 @@
       if (!x || !x.id) return;
       var cur = byId[x.id];
       if (!cur){ byId[x.id] = x; }
-      else { var w = (x.updated || "") > (cur.updated || "") ? x : cur; var mm = Object.assign({}, (w===x?cur:x), w); if (cur.del===1||x.del===1) mm.del=1; byId[x.id]=mm; }
+      else { var w = (x.updated || "") > (cur.updated || "") ? x : cur; var mm = Object.assign({}, (w===x?cur:x), w); if (cur.del===1||x.del===1) mm.del=mergeDel(cur,x); byId[x.id]=mm; }
     });
     var out = []; Object.keys(byId).forEach(function(id){ out.push(byId[id]); });
     return out;
@@ -9547,6 +9565,7 @@
       if (res.status !== 200 || !res.body || !res.body.token){ errEl.textContent = "PIN(비밀번호)이 올바르지 않습니다."; errEl.classList.add("show"); return; }
       setGwToken(res.body.token, keep);
       curMemberObj = res.body.member;
+      try{ localStorage.setItem("jw_member_cache", JSON.stringify(res.body.member)); }catch(e){}   // 오프라인 콜드스타트 부팅용
       hideMemberLogin();
       if (res.body.device_status && res.body.device_status !== "approved" && !curMemberObj.admin){ showDevicePending(); return; }
       afterLogin();
@@ -10111,9 +10130,15 @@
   (function boot(){
     if (!gwToken()){ showMemberLogin(); return; }
     gwCall("gw-auth", { action: "verify" }).then(function(res){
-      if (res.status === 200 && res.body && res.body.valid){ curMemberObj = res.body.member; if (res.body.device_status && res.body.device_status !== "approved" && !curMemberObj.admin){ showDevicePending(); return; } afterLogin(); }
+      if (res.status === 200 && res.body && res.body.valid){ curMemberObj = res.body.member; try{ localStorage.setItem("jw_member_cache", JSON.stringify(res.body.member)); }catch(e){} if (res.body.device_status && res.body.device_status !== "approved" && !curMemberObj.admin){ showDevicePending(); return; } afterLogin(); }
       else { setGwToken(null); showMemberLogin(); }
-    }).catch(function(){ showMemberLogin(); });
+    }).catch(function(){
+      // 네트워크 자체 실패(오프라인 콜드스타트) — 캐시 회원으로 부팅해 각 load*의 캐시 폴백이 돌게 한다.
+      // 종전엔 로그인 모달만 떠서 설치형 PWA인데 비행기모드에서 캐시된 지시·차량을 못 봤다. (HTTP 오류는 위 then에서 처리)
+      var mc = null; try{ mc = JSON.parse(localStorage.getItem("jw_member_cache") || "null"); }catch(e){}
+      if (mc && gwToken()){ curMemberObj = mc; setOffline(true); afterLogin(); }
+      else showMemberLogin();
+    });
   })();
 })();
 </script>

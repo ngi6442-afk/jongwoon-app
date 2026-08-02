@@ -92,6 +92,10 @@ async function handleSave(event, d, R) {
   // 감사 로그용 이전 문서(diff 원본) — 읽기 실패해도 저장은 진행
   let oldItems = [], prevDoc = null;
   try { const prev = await blobGet(store(DATA), colKey(col)); if (prev.ok && prev.data) { prevDoc = prev.data; if (Array.isArray(prev.data.items)) oldItems = prev.data.items; } } catch (e) {}
+  // 낙관적 락: 클라이언트가 로드했던 문서 시각(base)과 서버 현재가 다르면 409 → 프런트의 기존 충돌 병합 경로가 재조회·병합·재시도.
+  // 종전엔 감지 자체가 없어 두 관리자 동시 저장 시 늦은 쪽이 앞선 수정을 통째로 덮었다. base 미전송(구버전 캐시)·첫 저장은 종전대로.
+  if (d.base !== undefined && prevDoc && prevDoc.updated_at && Number(d.base) !== Number(prevDoc.updated_at))
+    return jr(409, { status: 'CONFLICT', error_code: 'STALE_BASE', request_id: R });
   const doc = Object.assign({}, d.doc, { updated_by: c.member.id, updated_at: Date.now() });
   // 휴가: 신청 저장은 전 직원 필요하지만, 비관리자 저장은 서버가 재구성 — 타인 항목은 서버 원본 유지(클라이언트 사본으로 못 덮음),
   // 본인 항목만 반영, 승인 상태는 스스로 못 올림. (종전엔 전면 면제라 임의 직원이 전사 휴가 문서를 통째로 조작할 수 있었다.
@@ -135,7 +139,7 @@ async function handleSave(event, d, R) {
     }
     if (ev.length) await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: col, ev: ev });
   } catch (e) {}
-  return jr(200, { status: 'OK', request_id: R });
+  return jr(200, { status: 'OK', updated_at: doc.updated_at, request_id: R });
 }
 
 // ---- 일감 수집 공통 ----
