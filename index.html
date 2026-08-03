@@ -7981,6 +7981,16 @@
     var f=function(p){ return a ? (p-a)*lwlt/100+a : p*lwlt/100; };
     return { lo: Math.round(f(bss*(1+low/100))), hi: Math.round(f(bss*(1+high/100))), a: a, est: est, lwlt: lwlt };
   }
+  // 발주처 실측 칩(S3) — 이 기관의 최근 낙찰 투찰률 분포. 경북 상세(gb_orgs, 사분위 포함) 우선, 없으면 전국(orgs) 중앙값.
+  // 표본 3건 미만은 비표시(lwlt 최빈값과 동일 정책). 매칭은 계산기 참고선(bcRefLines)과 같은 양방향 부분일치.
+  function orgStatChip(org){
+    if(!org||!bidsAwards) return null;
+    var a=bidsAwards, hit=null, nm=null, k;
+    if(a.gb_orgs){ for(k in a.gb_orgs){ if(org.indexOf(k)>=0||k.indexOf(org)>=0){ hit=a.gb_orgs[k]; nm=k; break; } } }
+    if(!hit && a.orgs){ for(k in a.orgs){ if(org.indexOf(k)>=0||k.indexOf(org)>=0){ hit=a.orgs[k]; nm=k; break; } } }
+    if(!hit||!(hit.n>=3)||!hit.med) return null;
+    return { med:hit.med, q1:hit.q1||0, q3:hit.q3||0, n:hit.n, name:nm, low:hit.med<89.5 };
+  }
   function bcRefLines(org, kind, aFlag){
     // 실측 참고선 — 최근 개찰 데이터(예정가 대비 낙찰 투찰률). 예규 하한율은 공고문 확인 사항.
     var el=document.getElementById("bcRef"); if(!el) return;
@@ -8227,6 +8237,8 @@
       if(b.org) meta.push('<span>'+esc(b.org)+'</span>');
       if(b.region) meta.push('<span class="scope-chip">지역 '+esc(b.region)+'</span>');
       if(b.method) meta.push('<span class="hold-chip">'+esc(b.method)+'</span>');
+      var osc=orgStatChip(b.org);
+      if(osc) meta.push('<span class="from-chip" title="이 발주처 최근 낙찰 투찰률(예정가 대비) 실측 — '+esc(osc.name)+' 표본 '+osc.n+'건'+(osc.q1?' · Q1~Q3 '+osc.q1+'~'+osc.q3+'%':'')+(osc.low?' · 88%대 저가 경쟁 발주처, 공고문 하한율 필수 확인':'')+'">📊 기관실측 '+osc.med+'%'+(osc.low?' ⚠':'')+' <span style="opacity:.7;">n='+osc.n+'</span></span>');
       if(b.auto_pass) meta.push('<span class="hold-chip">자동패스(학습)</span>');
       if(b.matched&&b.matched.length) meta.push('<span class="from-chip">'+esc(b.matched.join(","))+'</span>');
       if(b.budget) meta.push('<span class="rec-amt">'+fmtAmount(b.budget)+'원</span>');
@@ -8278,7 +8290,8 @@
         if(t2 && (ext.bss||b.budget)) t2 += '<button class="mini-btn" data-bid-calc="'+b.id+'" style="margin-top:4px;">🧮 이 공고로 계산</button>';
         var t3 = tbl([
           ["공고기관", esc(b.org||"")], ["수요기관", esc(ext.dmin||"")],
-          ["담당자", esc(ext.ofcl||"")], ["전화번호", esc(ext.tel||"")]
+          ["담당자", esc(ext.ofcl||"")], ["전화번호", esc(ext.tel||"")],
+          ["최근 낙찰투찰률", (function(){ var o=orgStatChip(b.org); return o ? (o.med+"% 중앙값"+(o.q1?" · Q1~Q3 "+o.q1+"~"+o.q3+"%":"")+" · n="+o.n+" <span style='color:#888;'>(예정가 대비 실측"+(o.low?" · 88%대 저가 경쟁 — 하한율 확인":"")+")</span>") : ""; })()]
         ]);
         var rs = b.result || null;
         var t4 = rs ? tbl([
