@@ -110,6 +110,11 @@ Write-Output "== 5단계: 준공 정산 엔진(김천 실물 재현) =="
 node tools/settletest.mjs
 if($LASTEXITCODE -ne 0){ $fails += '정산엔진' }
 
+
+Write-Output "== 6단계: gw-data 서버 액션 테스트 =="
+node tools/servertest.mjs
+if($LASTEXITCODE -ne 0){ $fails += '서버테스트' }
+
 Write-Output "== 결과 =="
 if($fails.Count){ Write-Output ("실패 " + $fails.Count + "건: " + ($fails -join ', ')); exit 1 }
 Write-Output "전 항목 통과"
