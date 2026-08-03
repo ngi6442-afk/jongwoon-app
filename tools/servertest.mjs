@@ -112,5 +112,31 @@ T('quotes 조회 왕복(no 보존)', r.code === 200 && r.body.doc && (r.body.doc
 r = await call({ action: 'save', collection: 'quotes', doc: { schema: 1, items: [] } }, tokW, 'dev1');
 T('quotes: con 권한 없는 직원 쓰기 → 403 NO_WRITE', r.code === 403 && r.body.error_code === 'NO_WRITE');
 
+// 15 버전 링 + 시점 복구(구 git 이력 복구가 Blobs 전환으로 무효가 된 자리 — S1-B)
+mem.gw_data['col:clients'] = { schema: 1, items: [{ id: 'c1', name: '원본' }, { id: 'c2', del: 1 }], updated_at: 5000 };
+r = await call({ action: 'save', collection: 'clients', base: 5000, doc: { schema: 1, items: [{ id: 'c1', name: '수정' }] } }, tokA);
+T('저장 시 직전 문서 스냅샷 생성', r.code === 200 && Object.keys(mem.gw_data).some((k) => k.indexOf('ver:clients:') === 0));
+r = await call({ action: 'ver_list', collection: 'clients' }, tokA);
+T('ver_list → 1건 + 카운트(전체2·사용1)', r.code === 200 && r.body.items.length === 1 && r.body.items[0].tot === 2 && r.body.items[0].live === 1, JSON.stringify(r.body.items));
+const vts = r.body.items[0].ts;
+r = await call({ action: 'ver_list', collection: 'clients' }, tokW, 'dev1');
+T('ver_list 비관리자 → 403', r.code === 403);
+r = await call({ action: 'ver_get', collection: 'clients', ts: vts }, tokA);
+T('ver_get → 복구본/현재 카운트', r.code === 200 && r.body.ver.tot === 2 && r.body.cur.tot === 1, JSON.stringify(r.body));
+r = await call({ action: 'ver_restore', collection: 'clients', ts: vts }, tokA);
+T('ver_restore → 문서 되돌림(c1=원본)', r.code === 200 && mem.gw_data['col:clients'].items.length === 2 && mem.gw_data['col:clients'].items[0].name === '원본');
+r = await call({ action: 'ver_list', collection: 'clients' }, tokA);
+T('복구 전 상태 자동보존(이력 2건)', r.code === 200 && r.body.items.length === 2);
+r = await call({ action: 'ver_restore', collection: 'clients', ts: 12345 }, tokA);
+T('ver_restore 없는 버전 → 404', r.code === 404);
+// 16 봇 스냅샷: 같은 날 두 번째 ingest는 스냅샷 안 만듦(일 1개)
+mem.gw_data['col:bids'] = { schema: 1, items: [{ id: 'b1', status: 'new' }], updated_at: 1 };
+r = await call({ action: 'bids_ingest', key: 'test-ingest-key', items: [{ id: 'b2', title: 't' }] });
+r = await call({ action: 'bids_ingest', key: 'test-ingest-key', items: [{ id: 'b3', title: 't' }] });
+{
+  const vers = Object.keys(mem.gw_data).filter((k) => k.indexOf('ver:bids:') === 0);
+  T('봇 ingest 스냅샷 일 1개', r.code === 200 && vers.length === 1, vers.length + '개');
+}
+
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');
 process.exit(fail ? 1 : 0);

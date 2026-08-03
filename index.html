@@ -1420,7 +1420,7 @@
     <p style="margin-bottom:8px;color:#888;font-size:13px;">모든 저장은 이력으로 남습니다. 컬렉션·시점을 고르면 그 시점 내용으로 되돌립니다. 복구 실행도 이력에 남으므로 재복구 가능합니다.</p>
     <span class="fld-label">컬렉션</span>
     <select id="rsColl"></select>
-    <button class="mini-btn" id="rsLoad" style="margin:6px 0;">이력 불러오기 (최근 20개 저장)</button>
+    <button class="mini-btn" id="rsLoad" style="margin:6px 0;">이력 불러오기 (최근 20개 + 하루 1개×30일)</button>
     <div id="rsList" style="max-height:30vh;overflow:auto;"></div>
     <div id="rsPreview" style="font-size:13px;margin:6px 0;"></div>
     <button class="primary" id="rsGo" disabled>복구 실행</button>
@@ -3829,18 +3829,18 @@
   document.getElementById("auditBtn").addEventListener("click", openAudit);
   document.getElementById("errLogBtn").addEventListener("click", openErrLog);
   document.getElementById("exportAllBtn").addEventListener("click", adminExportAll);
-  // ---- 시점 복구(관리자): 컬렉션 JSON의 git 이력에서 버전 선택 → 미리보기 → 사람 확인 후 되돌리기 ----
+  // ---- 시점 복구(관리자): 서버 버전 링(veridx/ver_*)에서 버전 선택 → 미리보기 → 사람 확인 후 되돌리기 ----
+  // 구버전은 리포 git 이력을 봤지만 저장이 Blobs로 이관되며 무효(세션 토큰이라 401 + 이력 자체가 스테일).
+  // mytasks는 개인별(priv) 저장이라 버전 링 대상이 아니므로 목록에서 제외.
   var RS_COLLS=[
-    ["tasks","지시",TASKS_PATH], ["contracts","계약",CONTRACT_PATH], ["receivables","기성(미수)",REC_PATH],
-    ["clients","거래처",CLIENT_PATH], ["vehicles","차량",VEH_PATH], ["licenses","인허가",LIC_PATH],
-    ["documents","문서함",DOC_PATH], ["mytasks","개인업무",MYTASKS_PATH], ["leaves","휴가",LEAVES_PATH],
-    ["quotes","견적서",QUOTE_PATH]
+    ["tasks","지시"], ["contracts","계약"], ["receivables","기성(미수)"],
+    ["clients","거래처"], ["vehicles","차량"], ["licenses","인허가"],
+    ["documents","문서함"], ["leaves","휴가"], ["quotes","견적서"]
   ];
   var RS_LOADERS={tasks:loadTasks, contracts:loadContracts, receivables:loadReceivables, clients:loadClients,
-    vehicles:loadVehicles, licenses:loadLicenses, documents:loadDocuments, mytasks:loadMyTasks, leaves:loadLeaves,
+    vehicles:loadVehicles, licenses:loadLicenses, documents:loadDocuments, leaves:loadLeaves,
     quotes:loadQuotes};
-  var rsPick=null;   // {path,label,ref,date,msg,rawContent(b64),liveCnt,totCnt}
-  function rsCnt(b64){ try{ var p=JSON.parse(b64DecodeUnicode(b64))||{}; var it=p.items||[]; return {tot:it.length, live:it.filter(function(x){return x&&x.del!==1;}).length}; }catch(e){ return null; } }
+  var rsPick=null;   // {key,label,ts,date,tot,live}
   document.getElementById("restoreBtn").addEventListener("click", function(){
     if(!isAdmin()) return;
     var sel=document.getElementById("rsColl");
@@ -3856,46 +3856,37 @@
     var host=document.getElementById("rsList");
     host.innerHTML='<div class="loading">이력 불러오는 중…</div>';
     document.getElementById("rsGo").disabled=true; rsPick=null; document.getElementById("rsPreview").textContent="";
-    fetch("https://api.github.com/repos/"+DATA_OWNER+"/"+DATA_REPO+"/commits?path="+encodeURIComponent(cc[2])+"&per_page=20",{headers:ghHeaders()})
-      .then(function(r){ if(!r.ok) throw new Error("HTTP "+r.status); return r.json(); })
-      .then(function(list){
-        if(!list.length){ host.innerHTML='<div class="empty-line">저장 이력이 없습니다.</div>'; return; }
-        host.innerHTML=list.map(function(cm,i){
-          var d=(cm.commit&&cm.commit.committer&&cm.commit.committer.date||"").replace("T"," ").slice(0,16);
-          var m=((cm.commit&&cm.commit.message)||"").split("\n")[0].slice(0,40);
-          return '<button class="mini-btn" style="display:block;width:100%;text-align:left;margin:2px 0;" data-ref="'+cm.sha+'" data-date="'+d+'">'+d+' · '+esc(m)+(i===0?' (현재)':'')+'</button>';
-        }).join("");
-        Array.prototype.forEach.call(host.querySelectorAll("button[data-ref]"), function(b){
-          b.addEventListener("click", function(){
-            var ref=this.getAttribute("data-ref"), dt=this.getAttribute("data-date");
-            document.getElementById("rsPreview").textContent="버전 내용 확인 중…";
-            fetch(API_ROOT+cc[2]+"?ref="+ref,{headers:ghHeaders()}).then(function(r){ if(!r.ok) throw new Error("HTTP "+r.status); return r.json(); })
-              .then(function(j){
-                var cnt=rsCnt(j.content);
-                if(!cnt){ document.getElementById("rsPreview").textContent="이 버전을 해석할 수 없습니다."; return; }
-                var curTot="?", curLive="?";
-                fetch(API_ROOT+cc[2],{headers:ghHeaders()}).then(function(r2){ return r2.ok?r2.json():null; }).then(function(j2){
-                  if(j2){ var c2=rsCnt(j2.content); if(c2){ curTot=c2.tot; curLive=c2.live; } }
-                  rsPick={path:cc[2], label:cc[1], key:key, ref:ref, date:dt, raw:j.content, tot:cnt.tot, live:cnt.live};
-                  document.getElementById("rsPreview").innerHTML="현재: 전체 "+curTot+"건(사용 "+curLive+") → <b>복구본("+dt+"): 전체 "+cnt.tot+"건(사용 "+cnt.live+")</b>";
-                  document.getElementById("rsGo").disabled=false;
-                });
-              }).catch(function(e){ document.getElementById("rsPreview").textContent="버전 로드 실패: "+e; });
+    gwCall("gw-data",{action:"ver_list",collection:key}).then(function(res){
+      if(res.status!==200){ host.innerHTML='<div class="empty-line">이력 로드 실패 ('+res.status+')</div>'; return; }
+      var list=(res.body&&res.body.items)||[];
+      if(!list.length){ host.innerHTML='<div class="empty-line">저장 이력이 아직 없습니다.<br>저장할 때마다 직전 상태가 자동 보존됩니다(최근 20개 + 하루 1개 × 30일).</div>'; return; }
+      host.innerHTML=list.map(function(v){
+        var d=new Date(v.ts);
+        var dt=d.getFullYear()+"-"+("0"+(d.getMonth()+1)).slice(-2)+"-"+("0"+d.getDate()).slice(-2)+" "+("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2);
+        return '<button class="mini-btn" style="display:block;width:100%;text-align:left;margin:2px 0;" data-ts="'+v.ts+'" data-date="'+dt+'">'+dt+' · '+esc(v.by||"")+' · 전체 '+v.tot+'건(사용 '+v.live+')</button>';
+      }).join("");
+      Array.prototype.forEach.call(host.querySelectorAll("button[data-ts]"), function(b){
+        b.addEventListener("click", function(){
+          var ts=Number(this.getAttribute("data-ts")), dt=this.getAttribute("data-date");
+          document.getElementById("rsPreview").textContent="버전 내용 확인 중…";
+          gwCall("gw-data",{action:"ver_get",collection:key,ts:ts}).then(function(r2){
+            if(r2.status!==200){ document.getElementById("rsPreview").textContent="버전 로드 실패 ("+r2.status+")"; return; }
+            var v=(r2.body&&r2.body.ver)||{}, cur=(r2.body&&r2.body.cur)||{};
+            rsPick={key:key, label:cc[1], ts:ts, date:dt, tot:v.tot, live:v.live};
+            document.getElementById("rsPreview").innerHTML="현재: 전체 "+cur.tot+"건(사용 "+cur.live+") → <b>복구본("+dt+"): 전체 "+v.tot+"건(사용 "+v.live+")</b>";
+            document.getElementById("rsGo").disabled=false;
           });
         });
-      }).catch(function(e){ host.innerHTML='<div class="empty-line">이력 로드 실패: '+esc(String(e))+'</div>'; });
+      });
+    });
   });
   document.getElementById("rsGo").addEventListener("click", function(){
     if(!rsPick || !isAdmin()) return;
-    if(!confirm("⚠ ["+rsPick.label+"] 컬렉션을 "+rsPick.date+" 시점(전체 "+rsPick.tot+"건)으로 되돌립니다.\n그 이후의 변경은 사라집니다(이력에는 남음). 계속할까요?")) return;
+    if(!confirm("⚠ ["+rsPick.label+"] 컬렉션을 "+rsPick.date+" 시점(전체 "+rsPick.tot+"건)으로 되돌립니다.\n지금 상태도 이력에 자동 보존되므로 복구 자체를 되돌릴 수 있습니다. 계속할까요?")) return;
     if(prompt('최종 확인 — 진행하려면 "복구" 를 입력하세요')!=="복구") return;
     var btn=this; btn.disabled=true; btn.textContent="복구 중…";
-    fetch(API_ROOT+rsPick.path,{headers:ghHeaders()}).then(function(r){ return r.ok?r.json():null; }).then(function(cur){
-      var payload={ message:"시점 복구: "+rsPick.label+" ← "+rsPick.date, content:rsPick.raw.replace(/\n/g,"") };
-      if(cur&&cur.sha) payload.sha=cur.sha;
-      return fetch(API_ROOT+rsPick.path,{method:"PUT",headers:Object.assign({"Content-Type":"application/json"},ghHeaders()),body:JSON.stringify(payload)});
-    }).then(function(r){
-      if(!r.ok) throw new Error("HTTP "+r.status);
+    gwCall("gw-data",{action:"ver_restore",collection:rsPick.key,ts:rsPick.ts}).then(function(res){
+      if(res.status!==200) throw new Error("HTTP "+res.status);
       alert("복구 완료 — ["+rsPick.label+"] "+rsPick.date+" 시점으로 되돌렸습니다.");
       var ld=RS_LOADERS[rsPick.key]; if(ld) ld();
       document.getElementById("restoreBackdrop").classList.remove("show");

@@ -43,6 +43,37 @@ async function deviceApproved(event, member) {
   return !!(r.ok && r.data && r.data.status === 'approved');
 }
 
+// ---- 버전 링(시점 복구) ----
+// 덮어쓰기 직전 문서를 ver:<col>:<ts>로 보존, 목록은 veridx:<col>. 리포 git 이력 기반이던 구 시점복구가
+// Blobs 전환으로 무효가 된 자리를 대체. 정책: 최근 VER_RECENT개 전부 + 그보다 오래된 건 일 1개 × VER_DAYS일.
+// 스냅샷 실패가 저장 본선을 막으면 안 된다(전체 try). priv(개인) 컬렉션은 대상 아님.
+const VER_RECENT = 20, VER_DAYS = 30;
+function verDay(ts) { return new Date(ts + 9 * 3600000).toISOString().slice(0, 10); }   // KST 일자
+async function verSnapshot(col, prevDoc, byName, dailyOnly) {
+  if (!prevDoc || typeof prevDoc !== 'object') return;
+  try {
+    const st = store(DATA);
+    const ir = await blobGet(st, `veridx:${col}`);
+    const idx = (ir.ok && ir.data && Array.isArray(ir.data.items)) ? ir.data.items : [];
+    let now = Date.now();
+    idx.forEach(function (e) { if (e && e.ts >= now) now = e.ts + 1; });   // 같은 ms 연속 저장 시 키 충돌 방지
+    if (dailyOnly && idx.some(function (e) { return e && verDay(e.ts) === verDay(now); })) return;
+    const items = Array.isArray(prevDoc.items) ? prevDoc.items : [];
+    await blobSet(st, `ver:${col}:${now}`, { ts: now, by: byName || '', doc: prevDoc });
+    idx.push({ ts: now, by: byName || '', day: verDay(now), tot: items.length, live: items.filter(function (x) { return x && x.del !== 1; }).length });
+    idx.sort(function (a, b) { return b.ts - a.ts; });
+    const keep = [], seenDay = {};
+    for (let i = 0; i < idx.length; i++) {
+      const e = idx[i];
+      const fresh = i < VER_RECENT;
+      const daily = !seenDay[e.day] && (now - e.ts) <= VER_DAYS * 86400000;
+      if (fresh || daily) { keep.push(e); seenDay[e.day] = 1; continue; }
+      await blobDelete(st, `ver:${col}:${e.ts}`);
+    }
+    await blobSet(st, `veridx:${col}`, { items: keep });
+  } catch (e) {}
+}
+
 async function handleGet(event, d, R) {
   const c = await currentMember(event);
   if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
@@ -124,6 +155,7 @@ async function handleSave(event, d, R) {
       return s;
     });
   }
+  await verSnapshot(col, prevDoc, c.member.name, false);   // 사람 저장은 매번 직전 상태 보존(시점 복구용)
   const w = await blobSet(store(DATA), colKey(col), doc);
   if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
   // 감사 로그: 누가·언제·무엇을(이전값→새값). 서버측 기록이라 클라이언트 위변조 불가.
@@ -191,6 +223,7 @@ async function handleBidsIngest(event, d, R) {
   const st = store(DATA);
   const r = await blobGet(st, colKey(target));
   const doc = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data : { schema: 1, items: [] };
+  await verSnapshot(target, doc, '수집봇', true);   // 병합이 doc를 제자리 변형하므로 반드시 병합 전에(봇은 일 1개)
   const m = mergeBidItems(doc, d.items);
   // 수집 헬스(실패 어댑터·마지막 실행시각) — 변경 없어도 항상 갱신해 앱 배너가 최신을 보게
   let hasHealth = false;
@@ -474,6 +507,7 @@ async function handleBidsRefresh(event, d, R) {
   for (const it of kaptItems) found.push(it);
   const r = await blobGet(st, colKey('bids'));
   const doc = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data : { schema: 1, items: [] };
+  await verSnapshot('bids', doc, c.member.name, true);   // 수동 수집도 병합 전 보존(일 1개)
   const m = mergeBidItems(doc, found);
   if (m.added || m.updated) {
     const err = await saveBidsDoc(st, doc, c.member.name, m.added, m.updated, R);
@@ -496,6 +530,7 @@ async function handleBidsPurge(event, d, R) {
   const st = store(DATA);
   const r = await blobGet(st, colKey('bids'));
   const doc = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data : { schema: 1, items: [] };
+  await verSnapshot('bids', doc, c.member.name, false);   // 비우기는 파괴적 — 변형 전 항상 보존
   const before = doc.items.length;
   doc.items = (d.mode === 'all') ? [] : doc.items.filter(function (it) { return it && it.status && it.status !== 'new'; });
   const removed = before - doc.items.length;
@@ -527,6 +562,7 @@ async function handleBidsResults(event, d, R) {
   const st = store(DATA);
   const r = await blobGet(st, colKey('bids'));
   const doc = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data : { schema: 1, items: [] };
+  await verSnapshot('bids', doc, '수집봇', true);   // 결과 반영이 항목을 제자리 변형하므로 변형 전에(일 1개)
   const byId = {};
   doc.items.forEach(function (it) { if (it && it.id) byId[it.id] = it; });
   const today = new Date().toISOString().slice(0, 10);
@@ -1045,6 +1081,46 @@ async function handleAudit(event, d, R) {
   return jr(200, { status: 'OK', month: key.slice(6), doc: doc, request_id: R });
 }
 
+// ---- 시점 복구(관리자 전용): 버전 목록 / 미리보기 카운트 / 되돌리기 ----
+async function verGate(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return { err: jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R }) };
+  if (!c.member.admin) return { err: jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R }) };
+  if (!Object.prototype.hasOwnProperty.call(COL, d.collection)) return { err: jr(400, { status: 'REJECTED', error_code: 'UNKNOWN_COLLECTION', request_id: R }) };
+  return { c };
+}
+function verCnt(dc) { const it = (dc && Array.isArray(dc.items)) ? dc.items : []; return { tot: it.length, live: it.filter(function (x) { return x && x.del !== 1; }).length }; }
+async function handleVerList(event, d, R) {
+  const g = await verGate(event, d, R); if (g.err) return g.err;
+  const ir = await blobGet(store(DATA), `veridx:${d.collection}`);
+  return jr(200, { status: 'OK', items: (ir.ok && ir.data && Array.isArray(ir.data.items)) ? ir.data.items : [], request_id: R });
+}
+async function handleVerGet(event, d, R) {
+  const g = await verGate(event, d, R); if (g.err) return g.err;
+  const ts = Number(d.ts) || 0;
+  const vr = await blobGet(store(DATA), `ver:${d.collection}:${ts}`);
+  if (!vr.ok || !vr.data || !vr.data.doc) return jr(404, { status: 'NOT_FOUND', error_code: 'NO_VERSION', request_id: R });
+  const cur = await blobGet(store(DATA), colKey(d.collection));
+  return jr(200, { status: 'OK', ver: Object.assign({ ts: vr.data.ts, by: vr.data.by }, verCnt(vr.data.doc)), cur: verCnt(cur.ok ? cur.data : null), request_id: R });
+}
+async function handleVerRestore(event, d, R) {
+  const g = await verGate(event, d, R); if (g.err) return g.err;
+  const col = d.collection, ts = Number(d.ts) || 0;
+  const vr = await blobGet(store(DATA), `ver:${col}:${ts}`);
+  if (!vr.ok || !vr.data || !vr.data.doc) return jr(404, { status: 'NOT_FOUND', error_code: 'NO_VERSION', request_id: R });
+  // 복구 직전 현재 상태도 보존 — 복구 자체를 되돌릴 수 있게
+  const cur = await blobGet(store(DATA), colKey(col));
+  if (cur.ok && cur.data) await verSnapshot(col, cur.data, g.c.member.name + '(복구 전 자동보존)', false);
+  const doc = Object.assign({}, vr.data.doc, { updated_by: g.c.member.id, updated_at: Date.now() });
+  const w = await blobSet(store(DATA), colKey(col), doc);
+  if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
+  try {
+    const when = new Date(vr.data.ts + 9 * 3600000).toISOString().replace('T', ' ').slice(0, 16);
+    await appendAudit({ ts: Date.now(), by: g.c.member.name, bid: g.c.member.id, col: col, ev: [{ op: '시점복구', id: '-', t: '← ' + when + ' (전체 ' + verCnt(vr.data.doc).tot + '건)' }] });
+  } catch (e) {}
+  return jr(200, { status: 'OK', updated_at: doc.updated_at, request_id: R });
+}
+
 async function handler(event) {
   const R = rid();
   if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: CORS, body: '' };
@@ -1056,6 +1132,9 @@ async function handler(event) {
     if (d && d.action === 'get') return await handleGet(event, d, R);
     if (d && d.action === 'save') return await handleSave(event, d, R);
     if (d && d.action === 'audit') return await handleAudit(event, d, R);
+    if (d && d.action === 'ver_list') return await handleVerList(event, d, R);
+    if (d && d.action === 'ver_get') return await handleVerGet(event, d, R);
+    if (d && d.action === 'ver_restore') return await handleVerRestore(event, d, R);
     if (d && d.action === 'bids_ingest') return await handleBidsIngest(event, d, R);
     if (d && d.action === 'bot_notify') return await handleBotNotify(event, d, R);
     if (d && d.action === 'bids_refresh') return await handleBidsRefresh(event, d, R);
