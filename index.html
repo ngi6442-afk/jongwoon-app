@@ -2150,6 +2150,7 @@
     if (u.indexOf("leaves.json") >= 0) return "leaves";
     if (u.indexOf("bids.json") >= 0) return "bids";
     if (u.indexOf("onbid.json") >= 0) return "onbid";
+    if (u.indexOf("quotes.json") >= 0) return "quotes";
     return null;
   }
   function onSessionInvalid(){ setGwToken(null); curMemberObj = null; if (typeof showMemberLogin === "function") showMemberLogin(); }

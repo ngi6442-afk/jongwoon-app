@@ -104,5 +104,13 @@ T('bot_notify 잘못된 키 → 403', r.code === 403);
 r = await call({ action: 'bot_notify', key: 'test-ingest-key', title: '테스트', body: 'b' });
 T('bot_notify → sent=실발송 수', r.code === 200 && r.body.sent === 1 && pushMock.calls.length === 1, JSON.stringify(r.body));
 
+// 14 quotes 서버 편입(견적 탭 GitHub 직행→저장 유실 실사고의 회귀 방지)
+r = await call({ action: 'save', collection: 'quotes', doc: { schema: 1, items: [{ id: 'q1', no: '202608-01' }] } }, tokA);
+T('quotes 저장 → 200', r.code === 200, r.code + '/' + r.body.error_code);
+r = await call({ action: 'get', collection: 'quotes' }, tokA);
+T('quotes 조회 왕복(no 보존)', r.code === 200 && r.body.doc && (r.body.doc.items || []).length === 1 && r.body.doc.items[0].no === '202608-01');
+r = await call({ action: 'save', collection: 'quotes', doc: { schema: 1, items: [] } }, tokW, 'dev1');
+T('quotes: con 권한 없는 직원 쓰기 → 403 NO_WRITE', r.code === 403 && r.body.error_code === 'NO_WRITE');
+
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');
 process.exit(fail ? 1 : 0);
