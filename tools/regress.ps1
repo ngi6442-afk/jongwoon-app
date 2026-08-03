@@ -3,6 +3,10 @@
 $ErrorActionPreference='Stop'
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location (Join-Path $here '..')
+Write-Output "== 0단계: UI 정적 스모크(배선·레지스트리·sw버전) =="
+node tools/uismoke.mjs
+if($LASTEXITCODE -ne 0){ Write-Output '스모크 실패 — 중단'; exit 1 }
+
 Write-Output "== 1단계: 엔진 채움 =="
 $fill = node tools/regress_fill.mjs
 Write-Output $fill
