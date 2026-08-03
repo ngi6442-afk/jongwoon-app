@@ -778,6 +778,7 @@
   <header class="topbar">
     <div class="brand"><button class="nav-toggle" id="navToggle" aria-label="메뉴">☰</button><img src="./icon-192.png" alt="" class="brand-logo"><h1>종운환경 · 종운건설</h1></div>
     <div class="topbar-right">
+      <button class="gear-btn" id="gsBtn" aria-label="전역 검색" title="전역 검색 — 계약·지시·거래처·미수·견적·차량·인허가 한 번에">🔍</button>
       <button class="user-chip" id="curUserBtn"></button>
       <button class="gear-btn" id="gearBtn" aria-label="설정">⚙</button>
     </div>
@@ -1355,6 +1356,15 @@
     <div id="xgSettleWrap" style="display:none;"></div>
     <button class="primary" id="xgGo">생성·다운로드</button>
     <button class="secondary" id="xgCancel">취소</button>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="gsBackdrop">
+  <div class="modal" style="max-width:560px;">
+    <h3>전역 검색</h3>
+    <input type="search" id="gsInput" placeholder="계약·지시·거래처·미수·견적·차량·인허가 검색 (2자 이상)" autocomplete="off">
+    <div id="gsOut" style="max-height:55vh;overflow:auto;font-size:13px;"></div>
+    <button class="secondary" id="gsClose">닫기</button>
   </div>
 </div>
 
@@ -8043,6 +8053,63 @@
     }
     host.innerHTML=h;
   }
+  // ---- 전역 검색(P6) — 로드된 컬렉션을 권한 범위 안에서 한 번에. 클릭 = 해당 탭 이동(+탭 검색창 주입) ----
+  function gsSources(){
+    var S=[];
+    var add=function(tab,label,ok,list,title,sub,searchId){ if(ok) S.push({tab:tab,label:label,list:list,title:title,sub:sub,searchId:searchId||null}); };
+    add("con","계약",canSee("con"),function(){return liveContracts();},function(x){return (x.title||x.label||"")+(x.client?" · "+x.client:"");},function(x){return x.site||"";});
+    add("tasks","지시",canSee("tasks"),function(){return tasks.filter(function(t){return t&&t.del!==1&&t.status!=="done";});},function(x){return x.title||"";},function(x){return (x.who||"")+(x.due?" · 기한 "+x.due:"");});
+    add("cli","거래처",canSee("cli"),function(){return clients.filter(function(c){return c&&c.del!==1;});},function(x){return x.name||"";},function(x){return x.biz_no||"";},"cliSearch");
+    add("rec","기성·미수",canSee("rec"),function(){return liveRec();},function(x){return (x.client||"")+(x.amount?" · "+fmtAmount(x.amount)+"원":"");},function(x){return (x.desc||"")+(x.paid?" · 수금 "+x.paid:" · 미수");},"recSearch");
+    add("quote","견적서",canSee("con"),function(){return liveQuotes();},function(x){return (x.no||"")+" · "+(x.title||"");},function(x){return x.recv||"";});
+    add("veh","차량",canSee("veh"),function(){return liveVehicles();},function(x){return (x.no||"")+" · "+(x.type||"");},function(x){return x.driver||x.own||"";},"vehSearch");
+    add("lic","인허가",canSee("lic"),function(){return liveLic();},function(x){return x.name||"";},function(x){return (x.org||"")+(x.expiry?" · 만료 "+x.expiry:"");});
+    add("doc","문서함",canSee("doc"),function(){return (typeof documents!=="undefined"?documents:[]).filter(function(d){return d&&d.del!==1;});},function(x){return x.title||x.name||x.doc_no||"(제목 없음)";},function(x){return x.doc_no||"";},"docSearch");
+    add("bid","입찰",isAdmin(),function(){return liveBids();},function(x){return x.title||"";},function(x){return (x.org||"")+(x.due?" · 마감 "+x.due:"");},"bidSearch");
+    return S;
+  }
+  function gsRun(){
+    var q=(document.getElementById("gsInput").value||"").trim().toLowerCase();
+    var out=document.getElementById("gsOut");
+    if(q.length<2){ out.innerHTML='<div style="color:#888;padding:8px 2px;">2자 이상 입력하면 전 모듈을 검색합니다.</div>'; return; }
+    var html="", total=0;
+    gsSources().forEach(function(s){
+      var hits=[];
+      try{
+        s.list().forEach(function(x){
+          if(hits.length>=8) return;
+          var hay=(s.title(x)+" "+s.sub(x)+" "+(x.detail||"")+" "+(x.site||"")).toLowerCase();
+          if(hay.indexOf(q)>=0) hits.push(x);
+        });
+      }catch(e){}
+      if(!hits.length) return;
+      total+=hits.length;
+      html+='<div style="font-weight:700;margin:8px 0 2px;">'+s.label+' <span style="color:#888;font-weight:400;">'+hits.length+'</span></div>';
+      hits.forEach(function(x){
+        html+='<div class="gs-hit" data-gs-tab="'+s.tab+'"'+(s.searchId?' data-gs-sid="'+s.searchId+'"':'')
+          +' style="padding:5px 6px;border-bottom:1px solid var(--line);cursor:pointer;border-radius:6px;">'
+          +'<b>'+esc(String(s.title(x)).slice(0,70))+'</b>'
+          +(s.sub(x)?'<br><span style="color:#888;">'+esc(String(s.sub(x)).slice(0,80))+'</span>':'')+'</div>';
+      });
+    });
+    out.innerHTML = html || '<div style="color:#888;padding:8px 2px;">"'+esc(q)+'" 검색 결과 없음</div>';
+    Array.prototype.forEach.call(out.querySelectorAll(".gs-hit"), function(el){
+      el.addEventListener("click", function(){
+        var tab=el.getAttribute("data-gs-tab"), sid=el.getAttribute("data-gs-sid");
+        document.getElementById("gsBackdrop").classList.remove("show");
+        switchTab(tab);
+        if(sid){ var si=document.getElementById(sid); if(si){ si.value=document.getElementById("gsInput").value.trim(); si.dispatchEvent(new Event("input")); } }
+      });
+    });
+  }
+  var gsTimer=null;
+  document.getElementById("gsBtn").addEventListener("click", function(){
+    document.getElementById("gsBackdrop").classList.add("show");
+    var inp=document.getElementById("gsInput"); inp.value=""; gsRun();
+    setTimeout(function(){ inp.focus(); },50);
+  });
+  document.getElementById("gsClose").addEventListener("click", function(){ document.getElementById("gsBackdrop").classList.remove("show"); });
+  document.getElementById("gsInput").addEventListener("input", function(){ if(gsTimer) clearTimeout(gsTimer); gsTimer=setTimeout(gsRun,200); });
   document.getElementById("bidStatsBtn").addEventListener("click", function(){
     var w=document.getElementById("bidStatsWrap");
     var show=w.style.display==="none";
