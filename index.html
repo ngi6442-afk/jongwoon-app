@@ -1298,7 +1298,7 @@
         <input type="text" id="xcRate" placeholder="계약보증금률 %" inputmode="decimal" style="flex:1" autocomplete="off">
         <span style="flex:2;font-size:12px;color:#888;align-self:center;">보증기간=계약일~준공예정일, 보증금액=계약금액×률 자동 · 입찰(관급) 기본 10%(지방계약법령)·수의 5% — 공고·계약서와 다르면 수정</span>
       </div>
-      <div style="font-size:12px;color:#888;">포항시 양식 기준. 서약서 6·7번 체크는 수의계약 기준(예/아니오) — <b>입찰(적격심사) 건은 인쇄 후 '해당없음'으로 수정</b>하세요. 타 발주처 양식은 별도 등록 필요.</div>
+      <div style="font-size:12px;color:#888;">포항시 양식 기준. 서약서 6·7번 체크: 수의 건=아니오, <b>입찰(낙찰 연동) 건=해당없음 자동</b>. 타 발주처 양식은 별도 등록 필요.</div>
     </div>
     <div id="xgQuoteWrap" style="display:none;">
       <input type="text" id="xqtRecv" placeholder="수신처 (예: 포항시 맑은물사업본부)" autocomplete="off">
@@ -4995,7 +4995,7 @@
     return zipStore(list);
   }
   // ---- hwpx 양식 채움: xlsx와 같은 수술 방식 — Contents/*.xml의 {{토큰}} 전역 교체(좌표 불필요) ----
-  async function fillHwpxTemplate(b64, tokens){
+  async function fillHwpxTemplate(b64, tokens, rawEdits){   // rawEdits: [[RegExp, 치환문자열]] — 체크박스 등 토큰 아닌 조건부 텍스트(문단 길이 불변 치환만 허용)
     var bytes=dataUrlToBytes("x,"+b64);
     var files=await unzip(bytes);
     var dec=new TextDecoder(), enc=new TextEncoder();
@@ -5005,6 +5005,8 @@
     for(var n2 in raw){
       if(!/^Contents\/.*\.xml$/.test(n2)) continue;
       var xml=dec.decode(raw[n2]);
+      // 조건부 텍스트 치환(체크 표기 등) — 같은 길이 치환이라 lineseg 무해
+      if(rawEdits) rawEdits.forEach(function(e){ xml=xml.replace(e[0], e[1]); });
       // 토큰이 든 최내곽 문단만 교체+줄배치 캐시(lineseg) 1줄로 축소.
       // 이유: 교체로 문단 길이가 변하면 옛 캐시 textpos가 텍스트 범위를 벗어나 한컴이 열기를 거부(실측: 토큰이 여러 줄로 감긴 셀).
       // 전체 문단을 건드리면 긴 고정 문단 렌더가 뭉개지므로(실측) 토큰 문단만 국소 처리 — 값 셀은 짧아 1줄이면 충분.
@@ -6337,7 +6339,10 @@
         $("xgGo").textContent="생성 중…"; $("xgGo").disabled=true;
         gwCall("gw-data",{action:"tpl_get", key:"contract_pledge"}).then(function(r1){
           if(r1.status!==200) throw (r1.status===404?"'계약이행서약서' 양식 미등록 — [+ 양식 등록]":"양식 로드 실패");
-          return fillHwpxTemplate(r1.body.data, pledgeTokens);
+          // 입찰(적격심사) 건: 6·7번(수의 결격사유) 소항목의 [아니오] 체크를 풀고 [해당없음]에 체크 — 짝 단위 치환이라
+          // 임금체불 항목(별개 조건, [ v] 예 형태)은 걸리지 않는다. 같은 길이 치환(lineseg 무해).
+          var pledgeRaw=(c&&c.bid_id)?[[/(\[  \] 예 \[ )v(\] 아니오[\s\S]{0,600}?\[)  (\] 해당없음)/g, "$1 $2 v$3"]]:null;
+          return fillHwpxTemplate(r1.body.data, pledgeTokens, pledgeRaw);
         }).then(function(b1){
           downloadBlob(cdName+"_계약이행서약서.hwpx", b1);
           return gwCall("gw-data",{action:"tpl_get", key:"seal_reg"});
@@ -6359,7 +6364,7 @@
             return fillHwpxTemplate(r4.body.data, {}).then(function(b4){ downloadBlob(cdName+"_노무비제외신청서.hwpx", b4); });
           });
         }).then(function(){
-          alert("계약서류 생성 완료(등록된 양식 전부)."+((c&&c.bid_id)?"\n※ 입찰(적격심사) 건 — 서약서 6·7번을 '해당없음'으로 체크 수정 후 날인하세요.":"")
+          alert("계약서류 생성 완료(등록된 양식 전부)."+((c&&c.bid_id)?"\n※ 입찰 건 — 서약서 6·7번(수의 결격사유)은 '해당없음'으로 자동 체크했습니다. 생성본에서 확인만 하세요.":"")
             +"\n※ 노무비제외신청서는 빈 서식(수기 기입, 착공 시 제출). 포항시 외 발주처는 양식 확인 후 제출하세요.");
           $("xlsxGenBackdrop").classList.remove("show"); xgCtx=null;
         }).catch(function(e){ alert("생성 실패: "+e); })
