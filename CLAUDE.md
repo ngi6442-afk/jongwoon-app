@@ -1,5 +1,9 @@
 # CLAUDE.md — jongwoon-app 작업 규칙
 
+> **⚠ 먼저 `HANDOFF.md`를 정독할 것** — 세션 간 운영 헌장(금지/해제 대장·의도된 설계·검증 의무·현재 큐).
+> 아래 "배포=main push→GitHub Pages" 등 일부 서술은 구식이며, 충돌 시 HANDOFF.md가 우선한다.
+> 현행: **배포 = Netlify가 `claude/gw-backend`를 배포. 앱 작업은 gw-backend 기반. 라이브 데이터는 Netlify Blobs.**
+
 이 레포는 종운환경·종운건설의 업무 앱(설치형 PWA)이다. 상세 설계는 **jongwoon-docs/05_규정/JW-05-017_ERP설계구축가이드.md**를 먼저 정독할 것(구 JW-05-014, 문서번호 충돌로 017 재배정). 문서 체계 일반 규칙은 jongwoon-docs/05_규정/JW-05-013의 0장.
 
 ## 불변 원칙
