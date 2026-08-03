@@ -1183,6 +1183,7 @@
       <option value="con_docs">계약서류(서약서+사용인감계 hwp)</option>
       <option value="quote_docs">견적서(회사별 양식 hwp)</option>
       <option value="adv_pay">선금지급신청 세트(공문+별첨2~5 hwp)</option>
+      <option value="settle_doc">준공 정산합의서(사후정산 xlsx)</option>
       <option value="bid_rate">내역서 낙찰률 적용(발주처 내역서 → 낙찰가)</option>
     </select>
     <span class="fld-label">시행 회사</span>
@@ -1348,6 +1349,7 @@
       </div>
       <div style="font-size:12px;color:#888;">김천서부초 제출 실물 기반(교육청 계열 서식). 계약금액·계약일·착공일·준공예정일은 위 공통 칸 사용. 차액·요율·잔액·부가세·한글금액은 자동 계산. <b>타 발주처는 계약 시 배포 서식과 대조 후 제출.</b></div>
     </div>
+    <div id="xgSettleWrap" style="display:none;"></div>
     <button class="primary" id="xgGo">생성·다운로드</button>
     <button class="secondary" id="xgCancel">취소</button>
   </div>
@@ -5502,7 +5504,7 @@
   }
 
   // ---- 서류 양식 등록/생성 ----
-  var TPL_LABELS={asb_plan:"석면해체계획서", work_start:"착공계", work_complete:"준공계", demo_report:"해체신고서", waste_report:"폐기물배출신고서", qual_packet:"적격심사 패킷", contract_pledge:"계약이행서약서", seal_reg:"사용인감계", bond_waiver:"채권포기각서", labor_exempt:"노무비제외신청서", quote_env:"견적서(환경)", quote_con:"견적서(건설)", adv_pay:"선금지급신청 세트"};
+  var TPL_LABELS={asb_plan:"석면해체계획서", work_start:"착공계", work_complete:"준공계", demo_report:"해체신고서", waste_report:"폐기물배출신고서", qual_packet:"적격심사 패킷", contract_pledge:"계약이행서약서", seal_reg:"사용인감계", bond_waiver:"채권포기각서", labor_exempt:"노무비제외신청서", quote_env:"견적서(환경)", quote_con:"견적서(건설)", adv_pay:"선금지급신청 세트", settle_doc:"준공 정산합의서"};
   var TPL_EXT={qual_packet:".hwpx", contract_pledge:".hwpx", seal_reg:".hwpx", bond_waiver:".hwpx", labor_exempt:".hwpx", quote_env:".hwpx", quote_con:".hwpx", adv_pay:".hwpx"};   // 기본 .xlsx, hwpx 양식만 예외
   function openTplManage(){
     if(!isAdmin()) return;
@@ -5819,6 +5821,63 @@
         .catch(function(e){ fail.push(TPL_LABELS[kind]+"("+e+")"); next(); });
     })();
   }
+  // ---- 준공 정산합의서 UI(settle_doc) — settleCalc 엔진(실물 검증) 연결 ----
+  // 항목·순서는 엔진 회귀(tools/settletest.mjs)와 동일. 템플릿 셀: 감액항목 F14~F19·F22 + 조정 이윤율 L26.
+  var XST_ITEMS=[
+    ["sanjae","산재보험료",false,null], ["goyong","고용보험료",false,null],
+    ["health","국민건강보험료",true,"F14"], ["pension","국민연금보험료",true,"F15"],
+    ["care","노인장기요양보험료",true,"F16"], ["retire","퇴직공제부금비",true,"F17"],
+    ["safety","산업안전보건관리비",true,"F18"], ["env","환경보전비",true,"F19"],
+    ["etc","기타경비",false,null], ["mach_bond","건설기계대여금 지급보증수수료",true,"F22"]
+  ];
+  var xstBuilt=false;
+  function xstBuild(){
+    if(xstBuilt) return; xstBuilt=true;
+    var h='<div style="font-size:12px;color:#888;margin-bottom:6px;">원가계산서 계상액과 실지급액을 넣으면 감액·일반관리비 6%·이윤·부가세 연쇄 재계산과 조정 이윤율까지 자동입니다(김천 실물 원단위 재현 검증). '
+      +'<b>실지급 빈칸 = 전액 감액.</b> 산재·고용·기타경비는 당연가입·비정산이라 감액 불가(예규 제1장 제9절). 당초 도급액은 위 금액 칸.</div>'
+      +'<div style="display:flex;gap:8px;">'
+      +'<input type="text" id="xstMat" placeholder="직접재료비" inputmode="numeric" style="flex:1" autocomplete="off">'
+      +'<input type="text" id="xstLabor" placeholder="직접노무비" inputmode="numeric" style="flex:1" autocomplete="off">'
+      +'<input type="text" id="xstMach" placeholder="기계경비" inputmode="numeric" style="flex:1" autocomplete="off">'
+      +'<input type="text" id="xstWaste" placeholder="폐기물처리비" inputmode="numeric" style="flex:1" autocomplete="off"></div>'
+      +'<span class="fld-label">경비 항목 — 계상액 / 실지급액(감액 대상만)</span>';
+    XST_ITEMS.forEach(function(it){
+      h+='<div style="display:flex;gap:8px;align-items:center;margin:2px 0;">'
+        +'<span style="flex:1.4;font-size:13px;">'+it[1]+(it[2]?'':' <span style="color:#888;">(감액 불가)</span>')+'</span>'
+        +'<input type="text" id="xstB_'+it[0]+'" placeholder="계상액" inputmode="numeric" style="flex:1" autocomplete="off">'
+        +(it[2]?'<input type="text" id="xstA_'+it[0]+'" placeholder="실지급(빈칸=0)" inputmode="numeric" style="flex:1" autocomplete="off">'
+               :'<span style="flex:1;font-size:12px;color:#888;">계상액 그대로</span>')
+        +'</div>';
+    });
+    h+='<input type="text" id="xstTarget" placeholder="목표 정산액 (선택 — 발주처 합의 라운드 금액이면 이윤율을 역산해 정확 안착)" inputmode="numeric" autocomplete="off">'
+      +'<button class="mini-btn" id="xstCalcBtn" style="margin:6px 0;">Σ 미리 계산</button>'
+      +'<div id="xstOut" style="font-size:13px;"></div>'
+      +'<div style="font-size:12px;color:#888;margin-top:4px;">xlsx 생성은 등록된 <b>정산합의서 양식</b>의 정산 시트 F열(변경)과 이윤율 셀만 교체 — 표지·한글금액·감액계는 워크북 수식이 자동 연동. '
+      +'양식은 <b>그 계약의 원 내역서로 만든 정산 워크북</b>이어야 당초 열이 맞습니다(등록본이 다른 계약 것이면 계산 요약만 쓰고 수기 반영).</div>';
+    document.getElementById("xgSettleWrap").innerHTML=h;
+    document.getElementById("xstCalcBtn").addEventListener("click", function(){ xstRun(true); });
+  }
+  function xstNum(id){ var el=document.getElementById(id); return el?(parseInt((el.value||"").replace(/[^0-9]/g,""),10)||0):0; }
+  function xstRun(show){
+    var items=XST_ITEMS.map(function(it){
+      var base=xstNum("xstB_"+it[0]);
+      var a=it[2]?xstNum("xstA_"+it[0]):base;
+      return { key:it[0], label:it[1], base:base, actual:a, deductible:it[2] };
+    });
+    items.push({ key:"zero", label:"(0% 항목)", base:0, actual:0, deductible:false });
+    var inp={ mat:xstNum("xstMat"), labor:xstNum("xstLabor"), mach:xstNum("xstMach"), waste:xstNum("xstWaste"),
+      items:items, origTotal:parseInt((document.getElementById("xgAmount").value||"").replace(/[^0-9]/g,""),10)||undefined,
+      target:xstNum("xstTarget")||undefined };
+    var r=settleCalc(inp);
+    if(show){
+      var o=document.getElementById("xstOut");
+      o.innerHTML='<b>정산액 '+Math.round(r.total).toLocaleString()+'원</b> (당초 '+Math.round(r.orig).toLocaleString()+' → 감액 <b style="color:#B03A2E">'+Math.round(r.cut).toLocaleString()+'</b>)'
+        +'<br>경비 소계 '+Math.round(r.expSub).toLocaleString()+' · 계 '+Math.round(r.sum).toLocaleString()+' · 일반관리비 '+r.gm.toFixed(2)+' · 이윤 '+r.profit.toFixed(2)+(inp.target?' (조정 이윤율 '+r.profitRate.toFixed(9)+')':'')
+        +'<br>정산사유: '+esc(r.reason||"감액 항목 없음")
+        +(r.warn.length?'<br><span style="color:#B7791F;">⚠ '+r.warn.map(esc).join('<br>⚠ ')+'</span>':'');
+    }
+    return r;
+  }
   function xgToggle(){
     var k=document.getElementById("xgKind").value;
     document.getElementById("xgMoneyFields").style.display = (k==="asb_plan"||k==="waste_report") ? "none" : "";
@@ -5829,6 +5888,8 @@
     document.getElementById("xgConDocsWrap").style.display = (k==="con_docs") ? "" : "none";
     document.getElementById("xgQuoteWrap").style.display = (k==="quote_docs") ? "" : "none";
     document.getElementById("xgAdvWrap").style.display = (k==="adv_pay") ? "" : "none";
+    document.getElementById("xgSettleWrap").style.display = (k==="settle_doc") ? "" : "none";
+    if(k==="settle_doc"){ document.getElementById("xgAgentWrap").style.display="none"; xstBuild(); }
     if(k==="adv_pay"){
       document.getElementById("xgAgentWrap").style.display="none";
       var ad0=new Date(), adDot=ad0.getFullYear()+"."+("0"+(ad0.getMonth()+1)).slice(-2)+"."+("0"+ad0.getDate()).slice(-2);
@@ -6301,6 +6362,31 @@
           alert("계약서류 생성 완료(등록된 양식 전부)."+((c&&c.bid_id)?"\n※ 입찰(적격심사) 건 — 서약서 6·7번을 '해당없음'으로 체크 수정 후 날인하세요.":"")
             +"\n※ 노무비제외신청서는 빈 서식(수기 기입, 착공 시 제출). 포항시 외 발주처는 양식 확인 후 제출하세요.");
           $("xlsxGenBackdrop").classList.remove("show"); xgCtx=null;
+        }).catch(function(e){ alert("생성 실패: "+e); })
+          .finally(function(){ $("xgGo").textContent="생성·다운로드"; $("xgGo").disabled=false; });
+        return;
+      }
+      if(kind==="settle_doc"){   // 준공 정산합의서: settleCalc(실물 검증) → 정산 시트 F열·이윤율 셀 교체
+        var sr=xstRun(true);
+        if(!sr.cutItems.length && !confirm("감액 항목이 없습니다(계상액=실지급). 그래도 생성할까요?")) return;
+        if(!confirm("정산액 "+Math.round(sr.total).toLocaleString()+"원 · 감액 "+Math.round(sr.cut).toLocaleString()+"원\n"
+          +"사유: "+(sr.reason||"없음")+(sr.warn.length?"\n⚠ "+sr.warn.join("\n⚠ "):"")
+          +"\n\n등록된 정산합의서 양식에 반영해 생성할까요?\n(양식이 이 계약의 원 내역서 기반이 아니면 취소하고 계산 요약만 쓰세요)")) return;
+        var stEdits=[];
+        XST_ITEMS.forEach(function(it){
+          if(!it[3]) return;
+          var itm=sr.items.filter(function(x){ return x.key===it[0]; })[0];
+          if(itm) stEdits.push([it[3], itm.actual, 'n']);
+        });
+        stEdits.push(['L26', sr.profitRate, 'n']);   // 조정 이윤율 — 표지·감액계는 워크북 수식이 자동 연동
+        $("xgGo").textContent="생성 중…"; $("xgGo").disabled=true;
+        gwCall("gw-data",{action:"tpl_get", key:"settle_doc"}).then(function(rs){
+          if(rs.status!==200){ alert(rs.status===404?"'준공 정산합의서' 양식이 미등록입니다. [+ 양식 등록]에서 이 계약의 정산 워크북(xlsx)을 등록하세요.":"양식 로드 실패"); return; }
+          return fillXlsxTemplate(rs.body.data, {'원가계산서 (정산)': stEdits}).then(function(bs){
+            downloadBlob(($("xgTitle").value.trim()||c.label||"정산")+"_정산합의서.xlsx", bs);
+            alert("정산합의서 생성 완료 — 엑셀에서 열어 표지 금액·한글금액이 정산액과 일치하는지 확인 후 제출하세요.");
+            $("xlsxGenBackdrop").classList.remove("show"); xgCtx=null;
+          });
         }).catch(function(e){ alert("생성 실패: "+e); })
           .finally(function(){ $("xgGo").textContent="생성·다운로드"; $("xgGo").disabled=false; });
         return;
