@@ -1264,6 +1264,7 @@
           <option value="lo">추정가격 1억 미만</option>
         </select>
         <input type="text" id="xqPerf" placeholder="시공경험 면적(㎡ — 최근3년, 학교100%+기타70% 환산 후)" inputmode="decimal" style="flex:2" autocomplete="off">
+        <div id="xqPerfAuto" style="flex-basis:100%;font-size:12px;color:#1A9A6B;"></div>
         <button class="mini-btn" id="xqPerfCalc" style="flex:none;" title="앱에 기록된 종결 계약에서 환산 합계 계산">실적계산</button>
       </div>
       <div style="display:flex;gap:8px;">
@@ -5136,6 +5137,44 @@
   }
   function qualNum(x){ return x==null?"":String(Math.round(x*100)/100); }
   function qualSign(x){ if(x==null) return ""; if(x>0) return "+"+qualNum(x); return qualNum(x); }
+  // P5b 실적 자동 합산 — 실적 DB(준공일 등록된 계약)에서 기준 세트별 시공경험을 계산해 프리필.
+  // 교육청(gbe): 최근 3년 석면 건 연면적 환산합(학교 100% + 기타 70% — 입력칸 규칙 그대로)
+  // 별표7(lg7): 최근 5년 같은 공종 실적금액 합 ÷ 추정가격(낙찰 공고 budget) × 100
+  function qualPerfPrefill(){
+    var out=document.getElementById("xqPerfAuto"); if(!out) return;
+    var perfEl=document.getElementById("xqPerf");
+    var lg=document.getElementById("xqBasis").value==="lg7";
+    var years=lg?5:3;
+    var cutoff=new Date(todayStr()+"T00:00:00"); cutoff.setFullYear(cutoff.getFullYear()-years);
+    var cur=xgCtx?findProc(xgCtx.id):null;
+    var done=liveContracts().filter(function(x){
+      var d3=(x.contract_info||{}).d3||"";
+      return isDate(d3) && new Date(d3+"T00:00:00")>=cutoff;
+    });
+    if(lg){
+      var ty=cur?cur.type:null, sum=0, n=0;
+      done.forEach(function(x){ if(ty&&x.type!==ty) return; var a=conAmt(x); if(a>0){ sum+=a; n++; } });
+      if(!n){ out.textContent="실적 자동 합산 0건 — 준공일이 등록된 같은 공종 계약이 없습니다(수기 입력)"; return; }
+      var bQ2=(cur&&cur.bid_id)?findBid(cur.bid_id):null;
+      var bud=(bQ2&&bQ2.budget)||0;
+      if(!bud){ out.textContent="최근 "+years+"년 실적 "+n+"건 합계 "+sum.toLocaleString()+"원 — 추정가격이 없어 비율 계산 불가(비율은 수기)"; return; }
+      var ratio=Math.round(sum/bud*10000)/100;
+      if(perfEl && !perfEl.value) perfEl.value=ratio;
+      out.textContent="✓ 자동 합산: 최근 "+years+"년 실적 "+n+"건 "+sum.toLocaleString()+"원 ÷ 추정 "+bud.toLocaleString()+" = "+ratio+"% (수정 가능)";
+      return;
+    }
+    var sch=0, oth=0, n2=0;
+    done.forEach(function(x){
+      if(!((x.type==="asbestos")||(x.elems&&x.elems.asb))) return;
+      var ar=parseFloat((x.bldg_info||{}).total_floor)||0; if(!ar) return;
+      if(/학교|초등|중학교|고등학교|교육/.test((x.client||"")+" "+(x.title||""))) sch+=ar; else oth+=ar;
+      n2++;
+    });
+    if(!n2){ out.textContent="실적 자동 합산 0건 — 준공일·대장(연면적)이 등록된 석면 계약이 없습니다(수기 입력)"; return; }
+    var conv=Math.round((sch+oth*0.7)*100)/100;
+    if(perfEl && !perfEl.value) perfEl.value=conv;
+    out.textContent="✓ 자동 합산: 최근 3년 석면 "+n2+"건 — 학교 "+sch.toLocaleString()+"㎡ + 기타 "+oth.toLocaleString()+"㎡×70% = "+conv.toLocaleString()+"㎡ (수정 가능)";
+  }
   function qualCollect(){
     var g=function(id){ return document.getElementById(id); };
     var num=function(id){ return parseFloat((g(id).value||"").replace(/[^0-9.]/g,""))||0; };
@@ -5967,6 +6006,7 @@
         if(mR) gv("xqRecv").value=mR[1]+"(분임)재무관";
       }
       qualApplyDefaults();   // 실측 등급 기본값(만료 자동 폴백)
+      qualPerfPrefill();     // P5b: 실적 DB(종결 계약)에서 3·5년 실적 자동 합산 프리필
       qualRefresh();
     }
     if(k==="bid_rate"){
@@ -6239,7 +6279,7 @@
       if($(id)) $(id).addEventListener("input", qualRefresh);
       if($(id)) $(id).addEventListener("change", qualRefresh);
     });
-    if($("xqBasis")) $("xqBasis").addEventListener("change", function(){ qualBasisToggle(); qualRefresh(); });
+    if($("xqBasis")) $("xqBasis").addEventListener("change", function(){ qualBasisToggle(); qualPerfPrefill(); qualRefresh(); });
     if($("xqPerfCalc")) $("xqPerfCalc").addEventListener("click", qualPerfCalc);
     if($("xgCo")) $("xgCo").addEventListener("change", function(){
       if($("xgKind").value==="qual_packet"){ qualApplyDefaults(); qualRefresh(); }   // 회사 전환 시 그 회사 실측 등급으로
