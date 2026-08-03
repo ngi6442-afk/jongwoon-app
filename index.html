@@ -2830,12 +2830,34 @@
     gwCall("gw-data",{action:"err_list"}).then(function(res){
       var items=(res.body&&res.body.items)||[];
       if(!items.length){ host.innerHTML='<div style="color:#888;">기록된 오류가 없습니다 🎉</div>'; return; }
-      host.innerHTML=items.map(function(it){
-        var d=new Date(it.ts); var dt=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")+" "+String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");
+      var fmt=function(ts){ var d=new Date(ts); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")+" "+String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0"); };
+      // 집계: 같은 메시지끼리 묶어 건수·최근 시각·발생 회원(기기) 목록 — 반복 오류가 한눈에 보이게
+      var grp={}, order=[];
+      items.forEach(function(it){
+        var k=String(it.msg||"(메시지 없음)").slice(0,140);
+        if(!grp[k]){ grp[k]={n:0, last:0, first:9e15, by:{}, src:{}, stack:""}; order.push(k); }
+        var g=grp[k]; g.n++;
+        if(it.ts>g.last) g.last=it.ts;
+        if(it.ts<g.first) g.first=it.ts;
+        if(it.by) g.by[it.by]=(g.by[it.by]||0)+1;
+        if(it.src) g.src[String(it.src).slice(0,40)]=1;
+        if(!g.stack && it.stack) g.stack=it.stack;
+      });
+      order.sort(function(a,b){ return grp[b].last-grp[a].last; });
+      var today=new Date(); today.setHours(0,0,0,0);
+      var todayN=items.filter(function(it){ return it.ts>=today.getTime(); }).length;
+      var h='<div style="color:#888;margin-bottom:6px;">총 '+items.length+'건(최근 100) · 오늘 '+todayN+'건 · 유형 '+order.length+'개 — 유형별 묶음, 최근 발생순</div>';
+      h+=order.map(function(k,i){
+        var g=grp[k];
+        var who=Object.keys(g.by).map(function(b){ return esc(b)+"×"+g.by[b]; }).join(" · ")||"익명";
         return '<div style="border-bottom:1px solid var(--line);padding:6px 2px;">'
-          +'<b>'+esc(it.msg||"")+'</b><br><span style="color:#888;">'+dt+' · '+esc(it.by||"")+' · '+esc(it.src||"")+'</span>'
-          +(it.stack?'<pre style="white-space:pre-wrap;font-size:11px;color:#999;margin:3px 0 0;">'+esc(it.stack)+'</pre>':'')+'</div>';
+          +'<b>'+esc(k)+'</b> <span style="background:'+(g.n>=3?'#F8D7DA':'#EEE')+';border-radius:8px;padding:0 7px;font-size:12px;">'+g.n+'회</span>'
+          +'<br><span style="color:#888;">최근 '+fmt(g.last)+(g.n>1?' · 최초 '+fmt(g.first):'')+' · 회원: '+who
+          +(Object.keys(g.src).length?' · 위치: '+esc(Object.keys(g.src).join(", ")):'')+'</span>'
+          +(g.stack?'<details style="margin-top:2px;"><summary style="font-size:12px;color:#999;cursor:pointer;">스택</summary><pre style="white-space:pre-wrap;font-size:11px;color:#999;margin:3px 0 0;">'+esc(g.stack)+'</pre></details>':'')
+          +'</div>';
       }).join("");
+      host.innerHTML=h;
     }).catch(function(){ host.innerHTML='<div style="color:#c0392b;">로드 실패</div>'; });
   }
   // 웹푸시 발송 헬퍼 — 구독 기기 없으면 서버가 조용히 0건 처리, 실패 무시
