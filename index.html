@@ -959,7 +959,8 @@
   <!-- 입찰(공고 수집) — 관리자 전용 -->
   <section class="view" id="view-bid">
     <div id="bidSection">
-      <div class="dash-sec" style="margin-bottom:8px;display:flex;align-items:baseline;gap:10px;"><h2 style="flex:1;">입찰 <span class="cnt" id="bidHead"></span></h2><button class="mini-btn" id="bidRefreshBtn">↻ 지금 수집</button><button class="mini-btn" id="bidPurgeBtn" title="미검토 항목을 비우고 새 필터로 다시 수집">🧹 재수집</button><button class="mini-btn" id="bidCalcBtn" title="기초금액·예가범위·낙찰하한율로 투찰 범위 계산">🧮 계산기</button></div>
+      <div class="dash-sec" style="margin-bottom:8px;display:flex;align-items:baseline;gap:10px;"><h2 style="flex:1;">입찰 <span class="cnt" id="bidHead"></span></h2><button class="mini-btn" id="bidRefreshBtn">↻ 지금 수집</button><button class="mini-btn" id="bidPurgeBtn" title="미검토 항목을 비우고 새 필터로 다시 수집">🧹 재수집</button><button class="mini-btn" id="bidCalcBtn" title="기초금액·예가범위·낙찰하한율로 투찰 범위 계산">🧮 계산기</button><button class="mini-btn" id="bidStatsBtn" title="낙찰 투찰률 실측 분포 — 공종·경북·발주처·슬레이트">📊 통계</button></div>
+      <div class="card" id="bidStatsWrap" style="display:none;padding:12px;font-size:13px;"></div>
       <div style="font-size:12px;color:var(--sub);margin:-4px 0 8px;">입찰 공고는 지역·업종(보유면허)·낙찰방법 자격 필터를 통과한 <b>참가 가능</b> 건입니다. 칩의 <b>지역</b>=실제 참가제한 내용. <span style="background:#FFF3CD;border-radius:4px;padding:0 5px;">노란 카드</span>=지역이 '공고서 참조'인데 자동 판독으로 확인 못 한 건 — 원문에서 직접 확인.</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;" id="bidFilterBar"></div>
       <input type="search" id="bidSearch" placeholder="공고 검색(공고명·기관)" autocomplete="off" style="width:100%;padding:9px 12px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;font-size:14px;box-sizing:border-box;">
@@ -7815,6 +7816,43 @@
   ["bcBss","bcLow","bcHigh","bcLwlt","bcA","bcMy"].forEach(function(id){ document.getElementById(id).addEventListener("input", bcCalc); });
   document.getElementById("bcClose").addEventListener("click", function(){ document.getElementById("bidCalcBackdrop").classList.remove("show"); });
   document.getElementById("bidCalcBtn").addEventListener("click", function(){ openBidCalc({}); });
+  // ---- 낙찰 통계(R2): 수집봇 실측 분포 — 공종(전국/경북)·슬레이트·경북 발주처 ----
+  function renderBidStats(){
+    var host=document.getElementById("bidStatsWrap"); if(!host) return;
+    var a=bidsAwards;
+    if(!a){ host.innerHTML='<div class="empty-line">통계 데이터가 아직 없습니다 — 수집봇이 다음 실행 때 채웁니다.</div>'; return; }
+    var CATL={asb:"석면", dredge:"준설", demo:"철거·해체"};
+    var q=function(o){ return o?("<b>"+o.med+"%</b> <span style='color:#888'>("+o.q1+"~"+o.q3+" · n="+o.n+")</span>"):"<span style='color:#888'>표본 부족</span>"; };
+    var h='<div style="font-weight:700;margin-bottom:6px;">📊 낙찰 투찰률 실측 분포 <span style="font-weight:400;color:#888;">'+esc(a.basis||"")+'</span></div>';
+    h+='<table style="width:100%;border-collapse:collapse;margin-bottom:10px;"><tr style="color:#888;text-align:left;"><th style="padding:2px 6px;">공종</th><th>전국 중앙값</th><th>경북권</th></tr>';
+    ["asb","dredge","demo"].forEach(function(c){
+      h+='<tr><td style="padding:2px 6px;">'+CATL[c]+'</td><td>'+q(a.cats&&a.cats[c])+'</td><td>'+q(a.gb&&a.gb[c])+'</td></tr>';
+    });
+    h+='</table>';
+    if(a.slate&&a.slate.all){
+      h+='<div style="margin-bottom:10px;">🏠 <b>슬레이트 지원사업</b>(권역별 발주): 전국 '+q(a.slate.all)
+        +(a.slate.gb?' · 경북 '+q(a.slate.gb):' · <span style="color:#888">경북 표본 3건 미만 — 쌓이면 자동 표시</span>')
+        +' — 일반 공종보다 높은 대역, 별도 기준선으로 볼 것</div>';
+    }
+    if(a.gb_orgs && Object.keys(a.gb_orgs).length){
+      h+='<div style="font-weight:700;margin:6px 0 4px;">경북권 발주처 (발주 많은 순 — 실제 참여 가능 물량)</div>';
+      h+='<table style="width:100%;border-collapse:collapse;"><tr style="color:#888;text-align:left;"><th style="padding:2px 6px;">발주처</th><th>건수</th><th>중앙값</th><th>Q1~Q3</th><th>공종</th></tr>';
+      Object.keys(a.gb_orgs).slice(0,15).forEach(function(org){
+        var o=a.gb_orgs[org];
+        var cats=Object.keys(o.cats||{}).map(function(c){ return CATL[c]+" "+o.cats[c]; }).join(" · ");
+        var warn=(o.med&&o.med<89.5)?' style="color:#B03A2E;font-weight:700;"':'';
+        h+='<tr><td style="padding:2px 6px;">'+esc(org)+'</td><td>'+o.n+'</td><td'+warn+'>'+o.med+'%</td><td style="color:#888;">'+o.q1+'~'+o.q3+'</td><td style="color:#888;">'+esc(cats)+'</td></tr>';
+      });
+      h+='</table><div style="color:#888;margin-top:4px;">붉은 중앙값 = 하한율이 낮은 발주처(88%대) — 공고문 하한율 반드시 확인. 공종 표기: 석면/준설/철거·해체 건수</div>';
+    }
+    host.innerHTML=h;
+  }
+  document.getElementById("bidStatsBtn").addEventListener("click", function(){
+    var w=document.getElementById("bidStatsWrap");
+    var show=w.style.display==="none";
+    w.style.display=show?"":"none";
+    if(show) renderBidStats();
+  });
 
   // 되돌리기: 직전 단계로 — 반드시 재확인 후(오조작 복구용)
   var BID_PREV={"검토":"new","응찰":"검토","낙찰":"응찰","유찰":"응찰","패스":"new"};
