@@ -1910,7 +1910,6 @@
   var CONTRACT_PATH = "data/contracts.json";
   var MYTASKS_PATH = "data/mytasks.json";
   var LEAVES_PATH = "data/leaves.json";
-  var USERS_PATH = "data/users.json";
   var BIDS_PATH = "data/bids.json";
   var ONBID_PATH = "data/onbid.json";
   var QUOTE_PATH = "data/quotes.json";
@@ -1924,12 +1923,11 @@
   var CONTRACT_API = API_ROOT + CONTRACT_PATH;
   var MYTASKS_API = API_ROOT + MYTASKS_PATH;
   var LEAVES_API = API_ROOT + LEAVES_PATH;
-  var USERS_API = API_ROOT + USERS_PATH;
   var BIDS_API = API_ROOT + BIDS_PATH;
   var ONBID_API = API_ROOT + ONBID_PATH;
   var QUOTE_API = API_ROOT + QUOTE_PATH;
 
-  var TOKEN_KEY = "jw_app_token";
+  try{ localStorage.removeItem("jw_app_token"); }catch(e){}   // 구 GitHub PAT 잔재 청소(S1-C) — 앱은 PAT를 더 이상 쓰지 않는다(전 호출이 서버 경유)
   var USER_KEY = "jw_app_user";
   var CACHE_KEY = "jw_app_data_cache";
   var TASKS_CACHE_KEY = "jw_app_tasks_cache";
@@ -2055,9 +2053,6 @@
   var editingLicId = null;
 
   var members = [];      // [{id,name,pin,role,rank,dept,admin,perms:{tasks,veh,rec,lic,check},created,updated,del}] — role=직책(권한), rank=직급(정보), dept=부서
-  var usersSha = null;
-  var usersSaveTimer = null;
-  var usersPending = false;
   var editingMemberId = null;
 
   // ---- 유틸 ----
@@ -3632,7 +3627,7 @@
   }
 
   window.addEventListener("online", function(){
-    if (isOffline || pendingSave || tasksPending || recPending || licPending || vehPending || usersPending){
+    if (isOffline || pendingSave || tasksPending || recPending || licPending || vehPending){
       doLoad();
       loadTasks();
       loadVehicles();
@@ -9791,46 +9786,11 @@
     updateApprovalBadges();
   }
 
-  function saveUsersCache(){ try{ localStorage.setItem(USERS_CACHE_KEY, JSON.stringify({sha: usersSha, members: members})); }catch(e){} }
-  function loadUsersCache(){ try{ var r = localStorage.getItem(USERS_CACHE_KEY); return r ? JSON.parse(r) : null; }catch(e){ return null; } }
+  function saveUsersCache(){ try{ localStorage.setItem(USERS_CACHE_KEY, JSON.stringify({members: members})); }catch(e){} }
 
   function loadUsers(){ loadMembers(); }   // 백엔드: 회원목록은 gw-auth member_list
 
-  function scheduleUsersSave(){
-    usersPending = true;
-    if (usersSaveTimer) clearTimeout(usersSaveTimer);
-    usersSaveTimer = setTimeout(function(){ usersSaveTimer = null; doSaveUsers(); }, 1200);
-  }
-  function mergeMembers(local, remote){
-    var byId = {};
-    (local || []).forEach(function(m){ if (m && m.id) byId[m.id] = m; });
-    (remote || []).forEach(function(x){
-      if (!x || !x.id) return;
-      var cur = byId[x.id];
-      if (!cur){ byId[x.id] = x; }
-      else { var w = (x.updated || "") > (cur.updated || "") ? x : cur; var mm = Object.assign({}, (w===x?cur:x), w); if (cur.del===1||x.del===1) mm.del=mergeDel(cur,x); byId[x.id]=mm; }
-    });
-    var out = []; Object.keys(byId).forEach(function(id){ out.push(byId[id]); });
-    return out;
-  }
-  function doSaveUsers(){
-    var token = getToken(); if (!token) return;
-    var body = JSON.stringify({schema: 1, members: members});
-    var payload = {message: "users: 업데이트", content: b64EncodeUnicode(body), branch: "main"};
-    if (usersSha) payload.sha = usersSha;
-    fetch(USERS_API, {method: "PUT", headers: Object.assign({"Content-Type":"application/json"}, ghHeaders()), body: JSON.stringify(payload)}).then(function(resp){
-      if (resp.status === 401){ clearToken(); showTokenScreen(true); return; }
-      if (resp.status === 409 || resp.status === 422){ return resolveUsersConflictAndRetry(); }
-      if (!resp.ok) throw new Error("HTTP " + resp.status);
-      return resp.json().then(function(json){ usersSha = json.content && json.content.sha; setOffline(false); saveUsersCache(); usersPending = false; });
-    }).catch(function(){ setOffline(true); });
-  }
-  function resolveUsersConflictAndRetry(){
-    return fetch(USERS_API, {headers: ghHeaders()}).then(function(resp){ if (resp.status === 404) return null; return resp.json(); }).then(function(json){
-      if (json){ var up = {}; try{ up = JSON.parse(b64DecodeUnicode(json.content)) || {}; }catch(e){} members = mergeMembers(members, up.members || []); usersSha = json.sha; }
-      saveUsersCache(); return doSaveUsers();
-    });
-  }
+  // (구 users.json 직접 저장 로직 제거 — 회원 관리는 gw-auth member_* 액션으로 완전 이관: S1-C)
 
   // ---- 웹푸시 구독(기기별) — 지시 배정·개찰결과 알림. VAPID 공개키는 서버(push_pubkey)에서 ----
   function urlB64ToU8(s){

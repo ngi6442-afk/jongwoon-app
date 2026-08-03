@@ -48,9 +48,9 @@ T('권한 레지스트리 auth↔data 일치', !dm.length && !dx.length, 'auth �
 
 // 4b) 저장 경로 완전성: 앱이 선언한 data/*.json 경로는 전부 fetch 인터셉터(_urlCollection)에 매핑되고,
 //     매핑된 컬렉션은 서버(COL·PRIVATE_COL)가 알아야 한다 — quotes 누락으로 견적 탭이 GitHub 직행(401)해
-//     개설 이래 저장 0건이던 실사고의 재발 방지. (users.json은 레거시 죽은 코드 — S1-C에서 코드째 제거)
+//     개설 이래 저장 0건이던 실사고의 재발 방지.
 {
-  const LEGACY_UNMAPPED = new Set(['users.json']);
+  const LEGACY_UNMAPPED = new Set();
   const declared = [...html.matchAll(/var \w+_PATH = "data\/([\w.]+)"/g)].map((m) => m[1]);
   const segIC = html.slice(html.indexOf('function _urlCollection'), html.indexOf('return null;', html.indexOf('function _urlCollection')));
   const mapped = {};   // 파일명 → 컬렉션명

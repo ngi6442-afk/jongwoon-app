@@ -7,8 +7,9 @@
 ## 0. 기본 사실 (오해 금지)
 - **배포 = Netlify가 `claude/gw-backend` 브랜치를 배포**한다. main은 참고용 미러일 뿐. 앱 작업은 반드시 gw-backend 기반.
 - index.html 수정 시 **sw.js SHELL_CACHE 버전업 필수**(현재 vNNN — sw.js 1행 확인).
-- 라이브 데이터 = **Netlify Blobs**(회원·권한·템플릿·증빙·푸시·입찰). jongwoon-appdata의 `data/*.json` 중 users·tasks 등은 **구식 시드**이며(라이브 아님), bids·awards·health만 수집봇이 계속 갱신한다.
+- 라이브 데이터 = **Netlify Blobs**(회원·권한·템플릿·증빙·푸시·입찰). jongwoon-appdata의 `data/*.json`은 **전부 스테일 미러**(라이브 아님) — 살아있는 건 `data/backup/` 일일 스냅샷뿐.
 - 컬렉션 저장은 낙관적 락(base/409) — v215. 서버 권한 강제.
+- **단일 원천(S1, v224~226)**: 전 컬렉션이 서버(gw-data) 경유. 클라이언트에 GitHub PAT 없음(jw_app_token 부팅 시 자동 삭제). 시점 복구 = Blobs 버전 링(ver_list/ver_get/ver_restore) — 리포 git 이력을 다시 보게 만들지 말 것.
 
 ## 1. 금지 (전 세션 공통 — PM이 대화로 해제하지 않는 한 유지)
 - 사용자의 실제 Chrome(claude-in-chrome) 사용 금지. 사용자 PC에 다운로드 창을 띄우는 행위 금지.
@@ -45,8 +46,9 @@
 
 ## 5. 현재 큐 (이어받을 것 — 완료된 걸 다시 하지 말 것)
 - 진행 순서: ~~R2 낙찰 통계 화면~~(✅ v216) → ~~정산 UI~~(✅ v217 — settle_doc, F14~19·F22+L26 매핑) → ~~R3 API 경보~~(✅ appdata awards.py api0_streak) → ~~서약서 6·7 자동~~(✅ v218 — 입찰 건 해당없음 자동체크) → ~~gw-data 서버 테스트~~(✅ tools/servertest.mjs, 회귀 6단계) → ~~오류로그 뷰~~(✅ v219 — 유형별 집계·회원별 횟수) → ~~P5b 실적 자동합산~~(✅ v220 — qualPerfPrefill) → ~~P5c 등급확인서 판독~~(✅ v221 — grade_parse·인허가 자동반영·만료 연동) → ~~P6 전역 검색~~(✅ v222 — 헤더 🔍, 권한 범위 내 9개 모듈) → ~~P7 대시보드~~(✅ 시안 B 채택·v223 구현) → ~~P8 스모크·TESTLIST 대조~~(✅ tools/uismoke.mjs — 회귀 0단계, 전 페이즈 마감)
+- S1 단일 원천 승격(✅ v224~226): quotes 서버 편입(견적 저장 유실 수리)·Blobs 버전 링 시점복구·PAT 잔재 청소·uismoke 매핑 완전성 검사. 다음: S2 직원 온보딩 → S3 경북 실탄(발주처 통과선 칩·과거 실적 임포트·8월 어댑터)
 - 외부 대기: 공공데이터포털 활용신청 4건(**8월 개편 후** — 15058826 LH·15129458 누리·15059177 K-apt·15057180 LH예가), LH·누리·K-apt 어댑터는 사양 확정 상태(scratchpad 아님, 커밋된 awardprobe.py 참조)
-- PM 대기: 두호천 실사용 확인, PIN 변경(4명), 나경일 중복 계정 정리 답변
+- PM 대기: **GitHub PAT 폐기**(S1 배포 검증 후 — github.com/설정/Developer settings/Personal access tokens에서 jongwoon-appdata용 토큰 Revoke, 앱은 더 이상 안 씀), 두호천 실사용 확인, PIN 변경(4명), 나경일 중복 계정 정리 답변
 - 최근 배포 이력: v206(낙찰 자동오픈·conAmt 폴백) v207(통과선 등록등급 실계산) v208(계약 라우팅·중복가드) v209(A값 항상) v210(하한율 항상·≈) v211(대장 자동) v212~215(경화·낙관적 락)
 
 ## 6. 세션 시작 절차 (PM 프롬프트 한 줄이면 됨)
