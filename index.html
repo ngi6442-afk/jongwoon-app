@@ -504,6 +504,21 @@
     white-space:nowrap;
   }
 
+  /* 대시보드 파이프라인 보드(시안 B) */
+  .pipe-board{display:grid;gap:8px;margin-bottom:12px}
+  .pipe-col{background:var(--card,#131c17);border:1px solid var(--line);border-radius:12px;padding:8px;min-height:90px}
+  .pipe-col h3{font-size:13px;color:var(--sub);padding:2px 4px 8px;display:flex;justify-content:space-between;font-weight:700}
+  .pipe-col h3 span{font-weight:400;opacity:.7}
+  .pipe-card{border:1px solid var(--line);border-radius:9px;padding:8px;margin-bottom:6px;font-size:13px;cursor:pointer}
+  .pipe-card b{display:block;margin-bottom:2px}
+  .pipe-card .s{color:var(--sub);font-size:11px}
+  .pipe-card.hot{border-color:#c0392b}
+  .pipe-card.hot .s{color:#e05b4d}
+  .pipe-card.win{border-color:#1A9A6B}
+  @media(max-width:640px){.pipe-board{grid-template-columns:repeat(2,1fr) !important}}
+  .dash-feed{font-size:12px;color:var(--sub)}
+  .dash-feed .f{padding:4px 0;border-bottom:1px solid var(--line)}
+  .dash-feed time{opacity:.6;margin-right:8px}
   /* 만기 D-day 색상 (차량) */
   .dday.orange{background:#FCEBD8;color:#B5651D;}
   .dday.yellow{background:#FBF4D6;color:#8A7A1E;}
@@ -4503,34 +4518,69 @@
     var inbox = approvalInboxItems();
     var reviewCount = inbox.length;
     var unpaidSum = 0; unpaid.forEach(function(r){ unpaidSum += (r.amount || 0); });
+    // KPI 4타일(시안 B) — 진행 계약(금액) / 낙찰 대기 / 미수(45일↑) / 이번 주 기한·만기
+    var actCons = (typeof liveContracts==="function" ? liveContracts() : []).filter(function(c){ return c.status !== "done"; });
+    var actSum = 0; actCons.forEach(function(c){ actSum += conAmt(c)||0; });
+    var awarded = isAdmin() ? liveBids().filter(function(b){ return b.status==="낙찰" && !liveContracts().some(function(c){ return c.bid_id===b.id; }); }) : [];
+    var over45 = unpaid.filter(function(r){ var ag=recAging(r.billed); return ag && ag.days>=45; }).length;
+    var week7 = openTasks.filter(function(t){ return t.due && vehDday(t.due).diff<=7; }).length
+      + urgent.filter(function(x){ return x.dd.diff<=7; }).length + urgentLic.filter(function(x){ return x.dd.diff<=7; }).length;
     var tiles = '';
-    if (seeRec) tiles += '<div class="stat-tile"><div class="lbl">미수</div><div class="val money">' + (unpaidSum ? (fmtAmount(unpaidSum) + '<span class="unit">원</span>') : (unpaid.length + '<span class="unit">건</span>')) + '</div></div>';
-    if (seeVeh || seeLic) tiles += '<div class="stat-tile' + (overdueTot ? ' alert' : '') + '"><div class="lbl">만기 임박</div><div class="val">' + imminentTot + '<span class="unit">건</span></div></div>';
-    tiles += '<div class="stat-tile"><div class="lbl">미완료 지시</div><div class="val">' + openTasks.length + '<span class="unit">건</span></div></div>';
+    if (canSee("con")) tiles += '<div class="stat-tile"><div class="lbl">진행 계약</div><div class="val">' + actCons.length + '<span class="unit">건' + (actSum?' · '+fmtAmount(actSum)+'원':'') + '</span></div></div>';
+    if (isAdmin() && awarded.length) tiles += '<div class="stat-tile alert"><div class="lbl">🏆 낙찰 — 계약 대기</div><div class="val">' + awarded.length + '<span class="unit">건</span></div></div>';
+    if (seeRec) tiles += '<div class="stat-tile' + (over45 ? ' alert' : '') + '"><div class="lbl">미수 ' + unpaid.length + '건' + (over45?' (45일↑ '+over45+')':'') + '</div><div class="val money">' + (unpaidSum ? (fmtAmount(unpaidSum) + '<span class="unit">원</span>') : '0') + '</div></div>';
+    tiles += '<div class="stat-tile' + (overdueTot ? ' alert' : '') + '"><div class="lbl">이번 주 기한·만기</div><div class="val">' + week7 + '<span class="unit">건</span></div></div>';
     tiles += '<div class="stat-tile"><div class="lbl">결재 대기</div><div class="val">' + reviewCount + '<span class="unit">건</span></div></div>';
-    if (isAdmin()){ var bidN = bidNewCount(); if (bidN) tiles += '<div class="stat-tile alert"><div class="lbl">새 입찰</div><div class="val">' + bidN + '<span class="unit">건</span></div></div>'; }
+    if (isAdmin()){ var bidN = bidNewCount(); if (bidN) tiles += '<div class="stat-tile"><div class="lbl">새 입찰</div><div class="val">' + bidN + '<span class="unit">건</span></div></div>'; }
     var myChecks = myCheckCount();
     if (canSee("check") || myChecks) tiles += '<div class="stat-tile"><div class="lbl">주기업무</div><div class="val">' + myChecks + '<span class="unit">건</span></div></div>';
     var html = '<div class="dash-date">' + today + '</div>' + (tiles ? '<div class="stat-row">' + tiles + '</div>' : '');
 
-    // 낙찰 배너(관리자) — 적격심사 7일 기한 + 계약 미연결 건 원클릭 전환
-    if (isAdmin()){
-      var awarded = liveBids().filter(function(b){ return b.status==="낙찰" && !liveContracts().some(function(c){ return c.bid_id===b.id; }); });
-      if (awarded.length){
-        html += '<div class="dash-sec"><h2>🏆 낙찰 — 적격심사·계약 준비 <span class="cnt">' + awarded.length + '</span></h2><div class="card">';
-        html += awarded.map(function(b){
+    // 파이프라인 보드(시안 B) — 수주 → 계약·서류 → 시공 중 → 청구·수금
+    (function(){
+      var STAGE_COL = function(name){
+        if(/청구|수금/.test(name)) return 3;
+        if(/작업|폐기물|감리|준공|완료신고/.test(name)) return 2;
+        return 1;   // 견적·적격심사·계약·착공·조사·신고·허가·필증
+      };
+      var cols=[{t:"수주",sub:"",cards:[]},{t:"계약·서류",sub:"",cards:[]},{t:"시공 중",sub:"",cards:[]},{t:"청구·수금",sub:"",cards:[]}];
+      if(isAdmin()){
+        awarded.forEach(function(b){
           var base=(b.result&&isDate(b.result.checked))?b.result.checked:today;
-          var due=addDaysStr(base,7);
-          var dd=vehDday(due);
-          return '<div class="item"><div class="item-body"><div class="item-title">' + esc(b.title||"") + '</div>' +
-            '<div class="item-meta"><span>' + esc(b.org||"") + '</span><span>적격심사 기한 ' + due + '</span>' +
-            '<span class="dday' + (dd.cls?' '+dd.cls:'') + '">' + dd.text + '</span></div></div>' +
-            '<button class="mini-btn appr-btn" data-award-con="' + b.id + '">계약 시작</button></div>';
-        }).join("");
-        html += '</div></div>';
-      }
-    }
+          var due=addDaysStr(base,7), dd=vehDday(due);
+          cols[0].cards.push('<div class="pipe-card win"><b>🏆 '+esc((b.title||"").slice(0,34))+'</b><div class="s">낙찰 · 적격심사 기한 '+due+' ('+dd.text+')</div>'
+            +'<button class="mini-btn appr-btn" data-award-con="'+b.id+'" style="margin-top:4px;">계약 시작</button></div>');
+        });
+        liveBids().filter(function(b){ return bidSt(b)==="응찰"; }).slice(0,4).forEach(function(b){
+          var fr=bidFloorRange(b);
+          cols[0].cards.push('<div class="pipe-card" data-inbox-go="bid"><b>'+esc((b.title||"").slice(0,34))+'</b><div class="s">응찰'+(b.due?' · 마감 '+esc(b.due):'')+(fr?' · 투찰≥'+(fr.est?'≈':'')+fmtAmount(fr.lo):'')+'</div></div>');
+        });
+        cols[0].sub=(awarded.length?("낙찰 "+awarded.length+" · "):"")+"응찰 "+liveBids().filter(function(b){return bidSt(b)==="응찰";}).length;
+      } else { cols[0].sub="관리자 전용"; }
+      if(canSee("con")) actCons.forEach(function(c){
+        var p=c.pipes&&c.pipes[0], s=p&&p.cur<p.stages.length?p.stages[p.cur]:null;
+        var ci=STAGE_COL(s?s.name:"청구");
+        var overdue=false, dueTxt="";
+        if(s&&s.task_id){ var st=findTask(s.task_id); if(st&&st.due){ dueTxt=st.due; if(st.status!=="done"&&st.due<today) overdue=true; } }
+        var rr=c.rec_id?findRec(c.rec_id):null;
+        cols[ci].cards.push('<div class="pipe-card'+(overdue?' hot':'')+'" data-inbox-go="con"><b>'+esc((c.title||c.label||"").slice(0,34))+'</b>'
+          +'<div class="s">'+esc(s?s.name:"완료 대기")+(dueTxt?' · '+(overdue?'기한 '+dueTxt+' 지연 ⚠':'기한 '+dueTxt):'')
+          +(rr&&rr.del!==1&&!rr.paid?' · 미수':'')+'</div></div>');
+      });
+      cols[1].sub=String(cols[1].cards.length); cols[2].sub=String(cols[2].cards.length);
+      cols[3].sub="미수 "+unpaid.length;
+      if(seeRec) unpaid.slice(0,3).forEach(function(r){
+        var ag=recAging(r.billed);
+        cols[3].cards.push('<div class="pipe-card'+(ag&&ag.days>=45?' hot':'')+'" data-inbox-go="rec"><b>'+esc((r.client||"")+(r.amount?' · '+fmtAmount(r.amount)+'원':''))+'</b>'
+          +'<div class="s">'+esc((r.desc||"").slice(0,30))+(ag?' · 청구 '+ag.days+'일 경과':'')+'</div></div>');
+      });
+      var shown=isAdmin()?cols:cols.slice(1);
+      html+='<div class="pipe-board" style="grid-template-columns:repeat('+shown.length+',1fr);">'
+        +shown.map(function(c){ return '<div class="pipe-col"><h3>'+c.t+' <span>'+c.sub+'</span></h3>'+(c.cards.join("")||'<div class="s" style="color:var(--sub);padding:4px;">없음</div>')+'</div>'; }).join("")
+        +'</div>';
+    })();
 
+    // (낙찰 배너는 보드 '수주' 열로 통합 — 시안 B)
     if (inbox.length){
       html += '<div class="dash-sec"><h2>승인 대기함 <span class="cnt">' + inbox.length + '</span></h2><div class="card">';
       html += inbox.map(function(it){
@@ -4578,30 +4628,7 @@
       html += '</div></div>';
     }
 
-    // 계약 파이프라인 보드 — 진행 계약의 현재 단계·기한·미수 한눈에
-    if (canSee("con")){
-      var actCons = (typeof liveContracts==="function" ? liveContracts() : []).filter(function(c){ return c.status !== "done"; });
-      if (actCons.length){
-        html += '<div class="dash-sec"><h2>계약 진행 <span class="cnt">' + actCons.length + '</span></h2><div class="card">';
-        html += actCons.map(function(c){
-          var p = c.pipes && c.pipes[0], s = p && p.cur < p.stages.length ? p.stages[p.cur] : null;
-          var pos = p ? (Math.min(p.cur + (s?1:0), p.stages.length) + "/" + p.stages.length) : "";
-          var overdue = "", dueTxt = "";
-          if (s && s.task_id){
-            var st = findTask(s.task_id);
-            if (st && st.due){ dueTxt = st.due; if (st.status !== "done" && st.due < todayStr()) overdue = ' <span class="dday over">지연</span>'; }
-          }
-          var rr = c.rec_id ? findRec(c.rec_id) : null;
-          var recChip = rr && rr.del !== 1 ? (rr.paid ? '<span class="from-chip">💰수금</span>' : '<span class="hold-chip">미수</span>') : '';
-          return '<div class="item" data-inbox-go="con" style="cursor:pointer;">' +
-            '<div class="item-body"><div class="item-title">' + esc(c.label) + (c.client ? ' · ' + esc(c.client) : '') + '</div>' +
-            '<div class="item-meta"><span class="proc-chip">' + pos + ' · ' + esc(s ? s.name : "완료 대기") + '</span>' + (dueTxt ? '<span>' + esc(dueTxt) + '</span>' : '<span class="need-due">기한 입력</span>') + recChip + '</div></div>' +
-            '<div class="task-ctrl">' + overdue + '</div></div>';
-        }).join("");
-        html += '</div></div>';
-      }
-    }
-
+    // (계약 진행 리스트는 상단 파이프라인 보드로 통합 — 시안 B)
     html += '<div class="dash-sec"><h2>미완료 지시 <span class="cnt">' + openTasks.length + '</span></h2><div class="card">';
     html += openTasks.length
       ? openTasks.map(function(t){ return taskRowHtml(t, false); }).join("")
@@ -4615,6 +4642,27 @@
       : '<div class="empty-line">미수 건이 없습니다.</div>';
     html += '</div></div>';
     }
+
+    // 오늘 흐름(자동 활동 피드 — 시안 B): 수집·개찰·정기업무·수금이 오늘 한 일
+    (function(){
+      var f=[];
+      if(isAdmin()&&bidsHealth&&bidsHealth.ts){
+        var ht=new Date(bidsHealth.ts), okN=(bidsHealth.adapters||[]).filter(function(a){return a.ok;}).length, badN=(bidsHealth.adapters||[]).length-okN;
+        f.push([bidsHealth.ts,"일감 수집 "+okN+"소스 정상"+(badN?" · 실패 "+badN+" ⚠":"")]);
+      }
+      if(isAdmin()) liveBids().forEach(function(b){
+        if(b.result&&b.result.checked===today&&(b.status==="낙찰"||b.status==="유찰"))
+          f.push([Date.now(),"개찰봇: "+(b.title||"").slice(0,30)+" → "+b.status]);
+      });
+      var autoN=liveTasks().filter(function(t){ return t.auto_key && t.created===today; }).length;
+      if(autoN) f.push([Date.now(),"정기업무: 자동 지시 "+autoN+"건 생성"]);
+      if(seeRec) liveRec().forEach(function(r){ if(r.paid===today) f.push([Date.now(),"수금: "+(r.client||"")+(r.amount?" "+fmtAmount(r.amount)+"원":"")]); });
+      if(f.length){
+        html+='<div class="dash-sec"><h2>오늘 흐름</h2><div class="card dash-feed">'
+          +f.slice(0,6).map(function(x){ var d=new Date(x[0]); return '<div class="f"><time>'+String(d.getHours()).padStart(2,"0")+':'+String(d.getMinutes()).padStart(2,"0")+'</time>'+esc(x[1])+'</div>'; }).join("")
+          +'</div></div>';
+      }
+    })();
 
     host.innerHTML = html;
     bindTaskHandlers(host);
