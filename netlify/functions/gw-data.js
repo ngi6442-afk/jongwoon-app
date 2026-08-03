@@ -772,7 +772,20 @@ function extractAttText(name, buf) {
   return '';
 }
 
-const { parseAttachment } = require('./_lib/asbestos');
+const { parseAttachment, claudeExtractGrade } = require('./_lib/asbestos');
+
+// 등급확인서 판독(P5c) — 관리자 전용, 저장 없음(결과만 반환 — 인허가 반영은 클라이언트에서 사람 확인 후)
+async function handleGradeParse(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (!c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
+  const b64 = String(d.data || '');
+  if (!b64 || b64.length > ATT_MAX) return jr(400, { status: 'REJECTED', error_code: 'INVALID_FILE', request_id: R });
+  const out = await claudeExtractGrade(Buffer.from(b64, 'base64'), String(d.name || ''));
+  if (!out) return jr(400, { status: 'REJECTED', error_code: 'UNSUPPORTED_TYPE', request_id: R });
+  if (out.error) return jr(200, { status: 'OK', error: out.error, request_id: R });
+  return jr(200, { status: 'OK', result: out, request_id: R });
+}
 
 async function handleAttPut(event, d, R) {
   const c = await currentMember(event);
@@ -1068,6 +1081,7 @@ async function handler(event) {
     if (d && d.action === 'proof_del') return await handleProofDel(event, d, R);
     if (d && d.action === 'err_log') return await handleErrLog(event, d, R);
     if (d && d.action === 'err_list') return await handleErrList(event, d, R);
+    if (d && d.action === 'grade_parse') return await handleGradeParse(event, d, R);
     if (d && d.action === 'push_pubkey') return await handlePushPubkey(event, d, R);
     if (d && d.action === 'push_sub') return await handlePushSub(event, d, R);
     if (d && d.action === 'push_unsub') return await handlePushUnsub(event, d, R);

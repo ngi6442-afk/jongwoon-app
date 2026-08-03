@@ -179,6 +179,44 @@ async function claudeExtractBiz(buf, name) {
   } catch (e) { return { error: 'PARSE_FAILED' }; }
 }
 
+// 등급확인서(신용평가·안전성평가) — 적격심사 등급·유효기간을 인허가 탭에 자동 반영하기 위한 판독(P5c)
+async function claudeExtractGrade(buf, name) {
+  const key = (process.env.ANTHROPIC_API_KEY || '').trim();
+  if (!key) return { error: 'NO_API_KEY(Netlify 환경변수 ANTHROPIC_API_KEY 확인)' };
+  const model = (process.env.CLAUDE_PARSE_MODEL || 'claude-sonnet-5').trim();
+  const ext = (name || '').toLowerCase().split('.').pop();
+  const b64 = buf.toString('base64');
+  let media;
+  if (ext === 'pdf') media = { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: b64 } };
+  else if (['jpg', 'jpeg', 'png', 'gif', 'webp'].indexOf(ext) >= 0) {
+    const mt = ext === 'jpg' ? 'jpeg' : ext;
+    media = { type: 'image', source: { type: 'base64', media_type: 'image/' + mt, data: b64 } };
+  } else return null;
+  const prompt = '이 문서는 신용평가등급확인서(NICE 등) 또는 산업안전보건공단 안전성평가 결과 통보서다. '
+    + '명기된 값만 추출하라(추정 금지, 없으면 빈값). '
+    + 'doc_kind("신용평가확인서"|"안전성평가"), company(업체명 그대로), '
+    + 'grade(등급 표기 그대로 — 예: B°, BB°, D. 기호° 포함해 원문 그대로), '
+    + 'valid_from(유효기간 시작 YYYY-MM-DD), valid_until(유효기간 종료 YYYY-MM-DD), issued(평가일 또는 발급일 YYYY-MM-DD). '
+    + '형식: {"doc_kind":"","company":"","grade":"","valid_from":"","valid_until":"","issued":""} JSON만 출력.';
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+      body: JSON.stringify({ model: model, max_tokens: 512,
+        messages: [{ role: 'user', content: [media, { type: 'text', text: prompt }] }] })
+    });
+    if (!resp.ok) return { error: 'CLAUDE_' + resp.status };
+    const j = await resp.json();
+    const txt = ((j.content || []).find(function (b) { return b.type === 'text'; }) || {}).text || '';
+    const m = txt.match(/\{[\s\S]*\}/);
+    if (!m) return { error: 'NO_JSON' };
+    const data = JSON.parse(m[0]);
+    return { doc: 'grade', doc_kind: String(data.doc_kind || '').slice(0, 12), company: String(data.company || '').slice(0, 40),
+      grade: String(data.grade || '').slice(0, 10), valid_from: String(data.valid_from || '').slice(0, 10),
+      valid_until: String(data.valid_until || '').slice(0, 10), issued: String(data.issued || '').slice(0, 10) };
+  } catch (e) { return { error: 'PARSE_FAILED' }; }
+}
+
 // 첨부 레코드 → 문서종류별 판독 라우팅 (kind 우선, 없으면 파일명)
 async function parseAttachment(rec) {
   const name = rec.name || '';
@@ -192,4 +230,4 @@ async function parseAttachment(rec) {
   return await claudeExtractAsbestos(buf, name, rec.type);
 }
 
-module.exports = { judgeAsbestos94, claudeExtractAsbestos, claudeExtractContract, claudeExtractBldg, claudeExtractBiz, parseAttachment };
+module.exports = { judgeAsbestos94, claudeExtractAsbestos, claudeExtractContract, claudeExtractBldg, claudeExtractBiz, claudeExtractGrade, parseAttachment };

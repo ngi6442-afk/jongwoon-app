@@ -954,6 +954,8 @@
       <div class="loading">불러오는 중…</div>
     </div>
     <button class="link-btn" id="licAddBtn">+ 인허가 추가</button>
+    <button class="link-btn" id="licGradeBtn" title="신용평가확인서·안전성평가 통보서(pdf/이미지)를 판독해 등급·만료일을 인허가에 자동 반영">🧠 등급확인서 판독</button>
+    <input type="file" id="licGradeFile" accept=".pdf,.jpg,.jpeg,.png,.webp" style="display:none;">
   </section>
 
   <!-- 입찰(공고 수집) — 관리자 전용 -->
@@ -4004,6 +4006,41 @@
   })();
 
   document.getElementById("licAddBtn").addEventListener("click", function(){ openLicModal(null); });
+  // P5c 등급확인서 판독 → 인허가 자동 반영(사람 확인 후). 등급 문자가 기존과 다르면 점수 계수(QUAL_DEF)도 갱신 필요하다고 경고.
+  document.getElementById("licGradeBtn").addEventListener("click", function(){ if(isAdmin()) document.getElementById("licGradeFile").click(); });
+  document.getElementById("licGradeFile").addEventListener("change", function(){
+    var f=this.files&&this.files[0]; this.value=""; if(!f) return;
+    if(f.size>6*1024*1024){ alert("6MB 이하 파일만 가능합니다."); return; }
+    var btn=document.getElementById("licGradeBtn");
+    btn.disabled=true; btn.textContent="🧠 판독 중…(30초~1분)";
+    var rd=new FileReader();
+    rd.onload=function(){
+      var b64=String(rd.result).split(",")[1]||"";
+      gwCall("gw-data",{action:"grade_parse", name:f.name, data:b64}).then(function(res){
+        var r=(res.body||{}).result;
+        if(!r){ alert("판독 실패: "+((res.body||{}).error||"결과 없음")); return; }
+        if(!r.grade||!r.valid_until){ alert("판독은 됐지만 등급 또는 유효기간을 찾지 못했습니다.\n등급: "+(r.grade||"?")+" / 유효: "+(r.valid_until||"?")+"\n원문 확인 후 인허가를 수기 갱신하세요."); return; }
+        var isSafety=/안전성/.test(r.doc_kind||"");
+        var isCon=/건설/.test(r.company||"");
+        var id=isSafety?"lgrade_safe":(isCon?"lgrade_con":"lgrade_env");
+        var ex=liveLic().filter(function(l){ return l.id===id; })[0];
+        var newName=isSafety?("안전성평가 등급 "+r.grade):("시공능력 신용평가 "+r.grade+(isCon?"(건설)":"(환경)"));
+        var gradeChanged=ex&&ex.name.indexOf(r.grade)<0;
+        if(!confirm((r.doc_kind||"등급확인서")+" 판독 결과\n업체: "+(r.company||"?")+"\n등급: "+r.grade+" · 유효 ~"+r.valid_until
+          +"\n\n인허가 ["+(ex?ex.name:newName)+"] "+(ex?"을 갱신":"을 신규 등록")+"할까요?"
+          +(gradeChanged?"\n\n⚠ 등급이 기존("+ex.name+")과 다릅니다 — 반영 후 적격 점수 계수(QUAL_DEF)도 함께 갱신해야 정확합니다.":""))) return;
+        var today=todayStr();
+        if(ex){ ex.name=newName; ex.expiry=r.valid_until; if(r.issued) ex.issued=r.issued; ex.updated=today;
+          ex.note=(ex.note||"").replace(/\s*\[판독 갱신[^\]]*\]/,"")+" [판독 갱신 "+today+"]"; }
+        else licenses.push({ id:id, name:newName, org:isCon?"종운건설":"종운환경", issued:r.issued||"", license_no:"",
+          expiry:r.valid_until, edu_due:null, edu_cycle:"", note:"등급확인서 판독으로 등록 ["+today+"]", created:today, updated:today });
+        scheduleLicSave(); renderLicenses();
+        alert("반영 완료 — 만기 30일 전 자동 지시가 붙고, 적격심사 만료 폴백도 이 날짜를 따릅니다."+(gradeChanged?"\n⚠ 등급 변경 건은 QUAL_DEF 갱신을 지시로 남기세요.":""));
+      }).catch(function(e){ alert("판독 요청 실패: "+e); })
+        .finally(function(){ btn.disabled=false; btn.textContent="🧠 등급확인서 판독"; });
+    };
+    rd.readAsDataURL(f);
+  });
   document.getElementById("conStartBtn").addEventListener("click", openConStart);
   document.getElementById("conStartSave").addEventListener("click", saveConStart);
   document.getElementById("conType").addEventListener("change", function(){ renderConElems(CON_TYPE_ELEMS[this.value]||{}); });
@@ -5102,8 +5139,14 @@
     document.getElementById("xqBasis").value=(co==="env")?"lg7":"gbe";   // 환경=지자체 별표7, 건설=경북교육청 석면
     qualBasisToggle();
     var d=QUAL_DEF[co]; if(!d) return;
-    if(d.safety) document.getElementById("xqSafety").value=(todayStr()<=d.safety.until)?d.safety.v:d.safety.fallback;
-    if(d.credit) document.getElementById("xqCredit").value=(todayStr()<=d.credit.until)?d.credit.v:d.credit.fallback;
+    // P5c: 만료일은 인허가 탭(lgrade_*)이 진실 — 등급확인서 판독으로 갱신되면 여기도 자동 반영.
+    // 등급 문자 자체가 바뀌면(승급 등) QUAL_DEF 계수도 함께 갱신해야 하므로 불일치 시 경고만.
+    var licById={}; liveLic().forEach(function(l){ licById[l.id]=l; });
+    var safeLic=licById["lgrade_safe"], credLic=licById[co==="con"?"lgrade_con":"lgrade_env"];
+    var safeUntil=(co==="con"&&safeLic&&isDate(safeLic.expiry))?safeLic.expiry:d.safety.until;
+    var credUntil=(credLic&&isDate(credLic.expiry))?credLic.expiry:d.credit.until;
+    if(d.safety) document.getElementById("xqSafety").value=(todayStr()<=safeUntil)?d.safety.v:d.safety.fallback;
+    if(d.credit) document.getElementById("xqCredit").value=(todayStr()<=credUntil)?d.credit.v:d.credit.fallback;
     if(co==="env") document.getElementById("xqLocal").checked=true;   // 포항 소재 — 포항시 발주 접근성 1점(타 지자체면 해제)
   }
   // 시공경험 면적 자동 산출(경북교육청 기준) — 앱에 기록된 종결 계약만 집계(학교 100%·기타 70%, 분무재 실적은 수기 가산).
@@ -5166,7 +5209,7 @@
     var sch=0, oth=0, n2=0;
     done.forEach(function(x){
       if(!((x.type==="asbestos")||(x.elems&&x.elems.asb))) return;
-      var ar=parseFloat((x.bldg_info||{}).total_floor)||0; if(!ar) return;
+      var ar=parseFloat((x.asb_survey||{}).area)||parseFloat((x.bldg_info||{}).total_floor)||0; if(!ar) return;   // 조사서 면적 우선(실측), 없으면 대장 연면적
       if(/학교|초등|중학교|고등학교|교육/.test((x.client||"")+" "+(x.title||""))) sch+=ar; else oth+=ar;
       n2++;
     });
