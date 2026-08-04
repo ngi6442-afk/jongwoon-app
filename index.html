@@ -4046,14 +4046,22 @@
       gwCall("gw-data",{action:"grade_parse", name:f.name, data:b64}).then(function(res){
         var r=(res.body||{}).result;
         if(!r){ alert("판독 실패: "+((res.body||{}).error||"결과 없음")); return; }
-        if(!r.grade||!r.valid_until){ alert("판독은 됐지만 등급 또는 유효기간을 찾지 못했습니다.\n등급: "+(r.grade||"?")+" / 유효: "+(r.valid_until||"?")+"\n원문 확인 후 인허가를 수기 갱신하세요."); return; }
         var isSafety=/안전성/.test(r.doc_kind||"");
+        // 안전성평가 통보서에는 유효기간이 없을 수 있음 — 평가주기로 만료일 제안.
+        // 주기: S=3년 / A·B·C=2년 / D=1년 (KOSHA 석면해체·제거작업 안전성 평가 실시 공고 기준, 2026-08-04 원문 확인)
+        if(r.grade && !r.valid_until && isSafety && r.issued){
+          var gy={S:3,A:2,B:2,C:2,D:1}[String(r.grade).charAt(0).toUpperCase()];
+          var bd=new Date(String(r.issued).slice(0,10)+"T00:00:00");
+          if(gy && !isNaN(bd)){ bd.setFullYear(bd.getFullYear()+gy); r.valid_until=fmtDate(bd); r._cycleY=gy; }
+        }
+        if(!r.grade||!r.valid_until){ alert("판독은 됐지만 등급 또는 유효기간을 찾지 못했습니다.\n등급: "+(r.grade||"?")+" / 유효: "+(r.valid_until||"?")+"\n원문 확인 후 인허가를 수기 갱신하세요."); return; }
         var isCon=/건설/.test(r.company||"");
         var id=isSafety?"lgrade_safe":(isCon?"lgrade_con":"lgrade_env");
         var ex=liveLic().filter(function(l){ return l.id===id; })[0];
         var newName=isSafety?("안전성평가 등급 "+r.grade):("시공능력 신용평가 "+r.grade+(isCon?"(건설)":"(환경)"));
         var gradeChanged=ex&&ex.name.indexOf(r.grade)<0;
         if(!confirm((r.doc_kind||"등급확인서")+" 판독 결과\n업체: "+(r.company||"?")+"\n등급: "+r.grade+" · 유효 ~"+r.valid_until
+          +(r._cycleY?"\n(유효기간은 통보서에 없어 평가주기 "+r._cycleY+"년으로 계산한 제안값 — 원문과 다르면 수기 수정)":"")
           +"\n\n인허가 ["+(ex?ex.name:newName)+"] "+(ex?"을 갱신":"을 신규 등록")+"할까요?"
           +(gradeChanged?"\n\n⚠ 등급이 기존("+ex.name+")과 다릅니다 — 반영 후 적격 점수 계수(QUAL_DEF)도 함께 갱신해야 정확합니다.":""))) return;
         var today=todayStr();
