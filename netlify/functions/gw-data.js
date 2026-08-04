@@ -317,6 +317,45 @@ async function handleBidsIngest(event, d, R) {
   return jr(200, { status: 'OK', added: m.added, updated: m.updated, total: doc.items.length, request_id: R });
 }
 
+// 정기업무 봇 ingest(autotask 크론 전용) — S1 단일 원천 이후 리포 tasks.json이 스테일 미러가 되어
+// 크론 생성 지시(만기·미수·증명서)가 앱에 도달하지 않던 사고(2026-08-04 발견)의 수리.
+// auto_key로 중복 방지 병합(앱 생성분과 동일 키 체계), hide_keys=자기정정(회색 차량 등) 숨김.
+async function handleAutotaskIngest(event, d, R) {
+  const secret = (process.env.BIDS_INGEST_KEY || '').trim();
+  if (!secret || String(d.key || '').trim() !== secret) return jr(403, { status: 'FORBIDDEN', error_code: 'BAD_INGEST_KEY', request_id: R });
+  const items = Array.isArray(d.items) ? d.items : [];
+  const hideKeys = Array.isArray(d.hide_keys) ? d.hide_keys.map(String) : [];
+  const st = store(DATA);
+  const r = await blobGet(st, colKey('tasks'));
+  const doc = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data : { schema: 1, items: [] };
+  await verSnapshot('tasks', doc, '정기봇', true);
+  const today = new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);
+  const have = {};
+  doc.items.forEach(function (t) { if (t && t.auto_key) have[t.auto_key] = t; });
+  let made = 0, fixed = 0;
+  for (const n of items.slice(0, 100)) {
+    const k = String((n && n.auto_key) || '');
+    if (!k || have[k]) continue;
+    doc.items.push({ id: 't' + crypto.randomBytes(6).toString('hex'), title: String(n.title || '').slice(0, 120),
+      detail: String(n.detail || '').slice(0, 500), who_id: '', who: '', scope: [],
+      from: '자동', from_id: '', by: '자동', due: String(n.due || '').slice(0, 10), status: 'open',
+      done_at: null, done_by: null, auto_key: k, created: today, updated: today });
+    have[k] = doc.items[doc.items.length - 1];
+    made++;
+  }
+  hideKeys.slice(0, 200).forEach(function (k) {
+    const t = have[k];
+    if (t && t.del !== 1) { t.del = 1; t.updated = today; fixed++; }
+  });
+  if (made || fixed) {
+    doc.updated_by = '정기봇'; doc.updated_at = Date.now();
+    const w = await blobSet(st, colKey('tasks'), doc);
+    if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
+    try { await appendAudit({ ts: Date.now(), by: '정기봇', bid: 'bot', col: 'tasks', ev: [{ op: '정기업무', id: '', t: '신규 ' + made + ' · 정정 ' + fixed }] }); } catch (e) {}
+  }
+  return jr(200, { status: 'OK', made: made, fixed: fixed, request_id: R });
+}
+
 // 지금 수집(관리자 버튼) — 서버가 나라장터 API를 직접 조회해 병합. G2B_API_KEY(Netlify env) 필요. 10분 쿨다운.
 const BID_KEYWORDS = ["준설","퇴적토","하상","관로","관거","차집","맨홀","상수도","하수","급수","배수지","정수장","취수","가압장","누수",
   "CCTV조사","불명수","석면","슬레이트","해체","철거","폐기물","수집운반","운반"];
@@ -1157,6 +1196,7 @@ async function handler(event) {
     if (d && d.action === 'ver_get') return await handleVerGet(event, d, R);
     if (d && d.action === 'ver_restore') return await handleVerRestore(event, d, R);
     if (d && d.action === 'bids_ingest') return await handleBidsIngest(event, d, R);
+    if (d && d.action === 'autotask_ingest') return await handleAutotaskIngest(event, d, R);
     if (d && d.action === 'bot_notify') return await handleBotNotify(event, d, R);
     if (d && d.action === 'bids_refresh') return await handleBidsRefresh(event, d, R);
     if (d && d.action === 'bids_purge') return await handleBidsPurge(event, d, R);

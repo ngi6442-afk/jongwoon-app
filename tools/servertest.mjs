@@ -160,6 +160,22 @@ r = await call({ action: 'save', collection: 'receivables', base: 7000, doc: { s
 r = await call({ action: 'save', collection: 'receivables', doc: { schema: 1, items: [{ id: 'r1', client: '갑', amount: 100, paid: '2026-08-04', invoice: false }, { id: 'r2', client: '을', amount: 200, paid: null, invoice: false }] } }, tokA);
 T('기성: 관리자는 입금 처리 가능', r.code === 200 && mem.gw_data['col:receivables'].items.find((x) => x.id === 'r1').paid === '2026-08-04');
 
+// 15d 정기업무 봇 ingest(autotask — S1 이후 리포 tasks.json 스테일 사고의 수리 경로)
+mem.gw_data['col:tasks'] = { schema: 1, items: [
+  { id: 'ta', title: '기존 자동지시', auto_key: 'veh:v9:insp:2026-09-01', status: 'open' },
+  { id: 'tb', title: '회색차 잘못 생성', auto_key: 'veh:vGrey:ins:2026-09-01', status: 'open' }
+], updated_at: 8000 };
+r = await call({ action: 'autotask_ingest', key: 'wrong', items: [] });
+T('autotask_ingest 잘못된 키 → 403', r.code === 403);
+r = await call({ action: 'autotask_ingest', key: 'test-ingest-key',
+  items: [ { auto_key: 'veh:v9:insp:2026-09-01', title: '중복이라 무시' }, { auto_key: 'cert:c11', title: '증명서 갱신 발급', due: '2026-08-14' } ],
+  hide_keys: ['veh:vGrey:ins:2026-09-01'] });
+{
+  const its = mem.gw_data['col:tasks'].items;
+  T('autotask: auto_key 중복 무시 + 신규 1건 생성', r.code === 200 && r.body.made === 1 && its.some((t) => t.auto_key === 'cert:c11' && t.status === 'open'), JSON.stringify(r.body));
+  T('autotask: hide_keys 자기정정(회색차 지시 숨김)', r.body.fixed === 1 && its.find((t) => t.id === 'tb').del === 1);
+}
+
 // 16 봇 스냅샷: 같은 날 두 번째 ingest는 스냅샷 안 만듦(일 1개)
 mem.gw_data['col:bids'] = { schema: 1, items: [{ id: 'b1', status: 'new' }], updated_at: 1 };
 r = await call({ action: 'bids_ingest', key: 'test-ingest-key', items: [{ id: 'b2', title: 't' }] });
