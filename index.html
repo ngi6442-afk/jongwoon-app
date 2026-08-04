@@ -9266,7 +9266,7 @@
     saveRecCache(); renderReceivables(); renderDashboard(); scheduleRecSave();
   }
   function toggleRecPaid(id){
-    if (!canDo("rec")) return;
+    if (!isAdmin()) return;   // 입금·미수전환=관리부 전용(서버도 강제) — 공무는 청구 등록·수정까지
     var r = findRec(id); if (!r) return;
     if (r.paid){ r.paid = null; reopenRecTask(r); }            // 미수전환 → 연동 업무 재개
     else {
@@ -9288,7 +9288,7 @@
     saveRecCache(); renderReceivables(); renderDashboard(); scheduleRecSave();
   }
   function toggleRecInvoice(id){
-    if (!canDo("rec")) return;
+    if (!isAdmin()) return;   // 발행 기록도 관리부 전용(서버 강제와 동일)
     var r = findRec(id); if (!r) return;
     r.invoice = !r.invoice; r.updated = todayStr();
     if (r.invoice) createRecTask(r);                            // 계산서 발행 → 입금확인 업무 생성
@@ -9361,12 +9361,12 @@
     var ctrl = "";
     if (canDo("rec")){
       var recEditBtn = '<button class="mini-btn" data-rec-edit="' + r.id + '">수정</button>';
-      // 간이 검수(발행 전 청구만) — 검수자=관리자 전체. 검수 이력은 칩에 표시
+      // 간이 검수(발행 전 청구만) — 검수자=관리자 전체. 입금·미수전환도 관리자 전용(서버 하드 차단과 동일 절단선 — 공무는 청구 등록·수정까지)
       var rvBtn = (!isPaid && !r.invoice && !r.reviewed && isAdmin()) ? '<button class="mini-btn appr-btn" data-rec-review="' + r.id + '">검수</button>' : '';
       if (isPaid){
-        ctrl = '<div class="rec-actions"><button class="mini-btn" data-rec-unpay="' + r.id + '">미수전환</button>' + recEditBtn + '</div>';
+        ctrl = '<div class="rec-actions">' + (isAdmin() ? '<button class="mini-btn" data-rec-unpay="' + r.id + '">미수전환</button>' : '') + recEditBtn + '</div>';
       } else {
-        ctrl = '<div class="rec-actions">' + rvBtn + '<button class="cal-btn" data-rec-pay="' + r.id + '">입금완료</button>' + recEditBtn + '</div>';
+        ctrl = '<div class="rec-actions">' + rvBtn + (isAdmin() ? '<button class="cal-btn" data-rec-pay="' + r.id + '">입금완료</button>' : '') + recEditBtn + '</div>';
       }
     }
     var amt = r.amount ? (fmtAmount(r.amount) + '원') : '';

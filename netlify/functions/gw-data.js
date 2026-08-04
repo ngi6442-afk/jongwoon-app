@@ -148,6 +148,20 @@ async function handleSave(event, d, R) {
     });
     doc.items = others.concat(own);
   }
+  // 기성 돈 상태 3종(입금 paid·검수 reviewed·발행 invoice)은 관리자 전용 — 비관리자 저장은 서버가 기존값 강제 복원.
+  // 분장 근거(용어집 v1): 공무는 청구 등록·수정까지, 상태 전환은 관리부. 화면 숨김은 안내일 뿐, 여기가 하드 차단(콘솔 우회 무력화)
+  if (col === 'receivables' && !c.member.admin && Array.isArray(doc.items)) {
+    const oldRecById = {};
+    oldItems.forEach(function (o) { if (o && o.id) oldRecById[o.id] = o; });
+    doc.items = doc.items.map(function (x) {
+      if (!x) return x;
+      const o = x.id ? oldRecById[x.id] : null;
+      const s = Object.assign({}, x);
+      if (o) { s.paid = (o.paid != null) ? o.paid : null; s.invoice = !!o.invoice; if (o.reviewed) s.reviewed = o.reviewed; else delete s.reviewed; }
+      else { s.paid = null; s.invoice = false; delete s.reviewed; }   // 신규 청구는 항상 미입금·미발행·미검수로 시작
+      return s;
+    });
+  }
   // 차량 관리자 전용 필드 보존 — 비관리자는 값을 받은 적이 없으므로(get에서 제거) 저장 시 기존값 복원
   if (col === 'vehicles' && !c.member.admin && Array.isArray(doc.items)) {
     const oldById = {};

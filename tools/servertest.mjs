@@ -34,7 +34,7 @@ const gwd = require(join(FN, 'gw-data.js'));
 
 // ---- seed ----
 const ADMIN = { id: 'uadmin', name: '관리자', admin: true, perms: {} };
-const WORKER = { id: 'uwork', name: '직원', admin: false, perms: { tasks: 'do', veh: 'do', leaves: 'do' } };
+const WORKER = { id: 'uwork', name: '직원', admin: false, perms: { tasks: 'do', veh: 'do', leaves: 'do', rec: 'do' } };
 mem.gw_users = { 'member:uadmin': ADMIN, 'member:uwork': WORKER, 'device:dev1': { status: 'approved' } };
 mem.gw_data = {};
 const tokA = issueSession(ADMIN).token, tokW = issueSession(WORKER).token;
@@ -137,6 +137,21 @@ T('퇴사일 지난 회원 → 401 NO_MEMBER', r.code === 401 && r.body.error_co
 mem.gw_users['member:uret'].leave_date = '2999-12-31';
 r = await call({ action: 'get', collection: 'tasks' }, issueSession(RETIRED).token, 'dev1');
 T('퇴사일 미도래 회원 → 접근 가능', r.code === 200);
+
+// 15c 기성 돈 상태 서버 강제(간이 검수 게이트): rec 수행 직원도 paid·reviewed·invoice는 못 바꿈
+mem.gw_data['col:receivables'] = { schema: 1, items: [{ id: 'r1', client: '갑', amount: 100, paid: null, invoice: false }], updated_at: 7000 };
+r = await call({ action: 'save', collection: 'receivables', base: 7000, doc: { schema: 1, items: [
+  { id: 'r1', client: '갑', amount: 100, paid: '2026-08-04', invoice: true, reviewed: { by: '직원', date: '2026-08-04' } },
+  { id: 'r2', client: '을', amount: 200, paid: '2026-08-04', invoice: true, reviewed: { by: '직원', date: '2026-08-04' } }
+] } }, tokW, 'dev1');
+{
+  const its = mem.gw_data['col:receivables'].items;
+  const r1 = its.find((x) => x.id === 'r1'), r2 = its.find((x) => x.id === 'r2');
+  T('기성: 직원이 기존 건 입금·발행·검수 조작 → 서버가 복원', r.code === 200 && r1 && r1.paid === null && r1.invoice === false && !r1.reviewed, JSON.stringify(r1));
+  T('기성: 직원 신규 청구는 미입금·미발행·미검수로 강제', r2 && r2.paid === null && r2.invoice === false && !r2.reviewed && r2.amount === 200, JSON.stringify(r2));
+}
+r = await call({ action: 'save', collection: 'receivables', doc: { schema: 1, items: [{ id: 'r1', client: '갑', amount: 100, paid: '2026-08-04', invoice: false }, { id: 'r2', client: '을', amount: 200, paid: null, invoice: false }] } }, tokA);
+T('기성: 관리자는 입금 처리 가능', r.code === 200 && mem.gw_data['col:receivables'].items.find((x) => x.id === 'r1').paid === '2026-08-04');
 
 // 16 봇 스냅샷: 같은 날 두 번째 ingest는 스냅샷 안 만듦(일 1개)
 mem.gw_data['col:bids'] = { schema: 1, items: [{ id: 'b1', status: 'new' }], updated_at: 1 };
