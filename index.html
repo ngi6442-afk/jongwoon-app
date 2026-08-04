@@ -4642,9 +4642,9 @@
         });
         liveBids().filter(function(b){ return bidSt(b)==="응찰"; }).slice(0,4).forEach(function(b){
           var fr=bidFloorRange(b);
-          cols[0].cards.push('<div class="pipe-card" data-inbox-go="bid"><b>'+esc((b.title||"").slice(0,34))+'</b><div class="s">응찰'+(b.due?' · 마감 '+esc(b.due):'')+(fr?' · 투찰≥'+(fr.est?'≈':'')+fmtAmount(fr.lo):'')+'</div></div>');
+          cols[0].cards.push('<div class="pipe-card" data-inbox-go="bid"><b>'+esc((b.title||"").slice(0,34))+'</b><div class="s">투찰'+(b.due?' · 마감 '+esc(b.due):'')+(fr?' · 투찰≥'+(fr.est?'≈':'')+fmtAmount(fr.lo):'')+'</div></div>');
         });
-        cols[0].sub=(awarded.length?("낙찰 "+awarded.length+" · "):"")+"응찰 "+liveBids().filter(function(b){return bidSt(b)==="응찰";}).length;
+        cols[0].sub=(awarded.length?("낙찰 "+awarded.length+" · "):"")+"투찰 "+liveBids().filter(function(b){return bidSt(b)==="응찰";}).length;
       } else { cols[0].sub="관리자 전용"; }
       if(canSee("con")) actCons.forEach(function(c){
         var p=c.pipes&&c.pipes[0], s=p&&p.cur<p.stages.length?p.stages[p.cur]:null;
@@ -7718,9 +7718,9 @@
   var bidExpanded = {};   // 카드 아코디언 펼침 상태(id → bool)
   var bidsHealth = null;  // 수집 헬스(실패 어댑터·마지막 실행) — 경고 배너용
   var bidsAwards = null;  // 낙찰 투찰률 실측 통계(용역/공사·기관별) — 계산기 참고선
-  var BID_STATUSES = [["new","신규"],["검토","검토"],["응찰","응찰"],["낙찰","낙찰"],["유찰","유찰"],["패스","패스"]];
+  var BID_STATUSES = [["new","신규"],["검토","검토"],["응찰","투찰"],["낙찰","낙찰"],["유찰","유찰"],["패스","패스"]];   // 값 "응찰"은 저장 데이터 호환용 유지, 표시만 나라장터 공식어 "투찰"(용어집 결정 D)
   // 단계 진행: 신규→검토→응찰→낙찰/유찰. 패스는 검토 전까지만.
-  var BID_NEXT = { "new":[["검토","검토"],["패스","패스"]], "검토":[["응찰","응찰"],["패스","패스"]], "응찰":[["낙찰","낙찰"],["유찰","유찰"]] };
+  var BID_NEXT = { "new":[["검토","검토"],["패스","패스"]], "검토":[["응찰","투찰"],["패스","패스"]], "응찰":[["낙찰","낙찰"],["유찰","유찰"]] };
   function bidSt(b){ return b.status==="참여" ? "응찰" : (b.status||"new"); }   // 구 '참여' 호환
   function findBid(id){ for(var i=0;i<bids.length;i++){ if(bids[i].id===id) return bids[i]; } return null; }
   // 연동 공고의 낙찰금액 — 계약 생성 시점에 개찰결과가 아직 없어 contract_info.amount=0으로 굳는 케이스의 폴백
@@ -8266,7 +8266,7 @@
 
   // 되돌리기: 직전 단계로 — 반드시 재확인 후(오조작 복구용)
   var BID_PREV={"검토":"new","응찰":"검토","낙찰":"응찰","유찰":"응찰","패스":"new"};
-  var BID_LABEL={"new":"신규","검토":"검토","응찰":"응찰","낙찰":"낙찰","유찰":"유찰","패스":"패스"};
+  var BID_LABEL={"new":"신규","검토":"검토","응찰":"투찰","낙찰":"낙찰","유찰":"유찰","패스":"패스"};
   function undoBidStatus(id){
     if(!canDo("bid")) return;
     var b=findBid(id); if(!b) return;
@@ -8353,7 +8353,7 @@
         if(st==="낙찰") ctrl+='<button class="mini-btn appr-btn" data-bid-con="'+b.id+'">계약 시작</button>';
       }
       if(b.url) ctrl+='<a class="mini-btn" href="'+esc(b.url)+'" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center;">원문↗</a>';
-      var stChip = {"new":'<span class="review-chip">신규</span>',"검토":'<span class="scope-chip">검토</span>',"응찰":'<span class="from-chip">응찰</span>',"낙찰":'<span class="from-chip">낙찰 🏆</span>',"유찰":'<span class="hold-chip">유찰</span>',"패스":'<span class="hold-chip">패스</span>'}[st]||'';
+      var stChip = {"new":'<span class="review-chip">신규</span>',"검토":'<span class="scope-chip">검토</span>',"응찰":'<span class="from-chip">투찰</span>',"낙찰":'<span class="from-chip">낙찰 🏆</span>',"유찰":'<span class="hold-chip">유찰</span>',"패스":'<span class="hold-chip">패스</span>'}[st]||'';
       // 아코디언 상세(한빛입찰식): 입찰정보 / 금액정보 / 기관정보 / 공고서 — 4열 표
       var exp = !!bidExpanded[b.id];
       var detail = '';
