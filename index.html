@@ -7803,7 +7803,7 @@
       return '<div class="item-row"><div class="item-main"><div class="item-title">'+esc(q.no||"(번호없음)")+' · '+esc(q.title||"(용역명 없음)")+'</div>'
         +'<div class="item-meta"><span>'+esc(q.date||"")+'</span><span>'+esc(q.recv||"")+'</span>'
         +'<span>'+(q.co==="con"?"㈜종운건설":"(유)종운환경")+'</span>'
-        +(amt?'<span>'+fmtAmount(amt)+'원 '+esc(q.vat||"")+'</span>':'')
+        +(amt?'<span>'+((parseFloat(q.qty)&&parseInt(q.price,10))?esc(q.qty)+esc(q.unit||"")+' × '+fmtAmount(parseInt(q.price,10))+'원 = ':'')+fmtAmount(amt)+'원 '+esc(q.vat||"")+'</span>':'')
         +(q.con_id?'<span class="review-chip">계약 연결</span>':'')
         +(q.note?'<span>'+esc(q.note)+'</span>':'')+'</div></div>'
         +'<div class="item-actions">'
