@@ -65,12 +65,20 @@ async function listMembers(st) {
   return out;
 }
 
+// 퇴사자 차단(S2-A) — 퇴사일(leave_date)이 지난 계정은 로그인·기존 세션 모두 거부. 퇴사일 당일까지는 허용.
+// del=1(삭제)과 별개: 인사 기록(연차·근속)은 남기고 접근만 끊는다.
+function retired(m) {
+  const ld = m && m.leave_date;
+  if (!ld) return false;
+  return String(ld) < new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);   // KST 일자 비교
+}
+
 // 세션 → 현재 회원(최신 perms 포함). { ok, member } 또는 { ok:false }
 async function currentMember(st, event) {
   const v = verifyToken(bearer(event));
   if (!v.ok) return { ok: false, reason: v.reason };
   const r = await blobGet(st, memberKey(v.payload.mid));
-  if (!r.ok || !r.data || r.data.del === 1) return { ok: false, reason: 'NO_MEMBER' };
+  if (!r.ok || !r.data || r.data.del === 1 || retired(r.data)) return { ok: false, reason: 'NO_MEMBER' };
   return { ok: true, member: r.data };
 }
 
@@ -113,7 +121,7 @@ async function handleLogin(st, d, R, event) {
   if (!idx.data) return fail();
   const mr = await blobGet(st, memberKey(idx.data));
   if (!mr.ok) return jr(500, { status: 'ERROR', error_code: mr.code, request_id: R });
-  if (!mr.data || mr.data.del === 1) return fail();
+  if (!mr.data || mr.data.del === 1 || retired(mr.data)) return fail();
   if (!verifySecret(pin, mr.data.pin_salt, mr.data.pin_hash)) return fail();
   if (lk.ok && lk.data) await blobSet(st, lockKey(name), null);  // 성공 → 잠금 해제
   const deviceStatus = await registerDevice(st, event, mr.data);
@@ -294,7 +302,7 @@ async function handler(event) {
     switch (d && d.action) {
       case 'reset': return await handleReset(R);
       case 'bootstrap': return await handleBootstrap(st, d, R);
-      case 'names': { const ms = await listMembers(st); return jr(200, { status: 'OK', names: ms.map(function (m) { return m.name; }), count: ms.length, request_id: R }); }
+      case 'names': { const ms = (await listMembers(st)).filter(function (m) { return !retired(m); }); return jr(200, { status: 'OK', names: ms.map(function (m) { return m.name; }), count: ms.length, request_id: R }); }
       case 'login': return await handleLogin(st, d, R, event);
       case 'verify': return await handleVerify(st, event, R);
       case 'device_list': return await handleDeviceList(st, event, R);

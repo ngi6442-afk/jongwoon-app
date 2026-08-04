@@ -21,11 +21,17 @@ function rid() { return crypto.randomBytes(8).toString('hex'); }
 function jr(statusCode, body) { return { statusCode, headers: Object.assign({ 'Content-Type': 'application/json' }, CORS), body: JSON.stringify(body) }; }
 function colKey(c) { return `col:${c}`; }
 
+// 퇴사자 차단(S2-A) — gw-auth와 동일 규칙: 퇴사일(leave_date)이 지나면 기존 세션도 데이터 접근 불가
+function retired(m) {
+  const ld = m && m.leave_date;
+  if (!ld) return false;
+  return String(ld) < new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);   // KST 일자 비교
+}
 async function currentMember(event) {
   const v = verifyToken(bearer(event));
   if (!v.ok) return { ok: false, reason: v.reason };
   const r = await blobGet(store(USERS), `member:${v.payload.mid}`);
-  if (!r.ok || !r.data || r.data.del === 1) return { ok: false, reason: 'NO_MEMBER' };
+  if (!r.ok || !r.data || r.data.del === 1 || retired(r.data)) return { ok: false, reason: 'NO_MEMBER' };
   return { ok: true, member: r.data };
 }
 function permOf(member, col) {

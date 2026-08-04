@@ -129,6 +129,15 @@ r = await call({ action: 'ver_list', collection: 'clients' }, tokA);
 T('복구 전 상태 자동보존(이력 2건)', r.code === 200 && r.body.items.length === 2);
 r = await call({ action: 'ver_restore', collection: 'clients', ts: 12345 }, tokA);
 T('ver_restore 없는 버전 → 404', r.code === 404);
+// 15b 퇴사자 차단(S2-A): 퇴사일 지난 회원은 유효 세션이 있어도 데이터 접근 불가
+const RETIRED = { id: 'uret', name: '퇴사자', admin: false, perms: { tasks: 'do' }, leave_date: '2020-01-01' };
+mem.gw_users['member:uret'] = RETIRED;
+r = await call({ action: 'get', collection: 'tasks' }, issueSession(RETIRED).token, 'dev1');
+T('퇴사일 지난 회원 → 401 NO_MEMBER', r.code === 401 && r.body.error_code === 'NO_MEMBER', r.code + '/' + r.body.error_code);
+mem.gw_users['member:uret'].leave_date = '2999-12-31';
+r = await call({ action: 'get', collection: 'tasks' }, issueSession(RETIRED).token, 'dev1');
+T('퇴사일 미도래 회원 → 접근 가능', r.code === 200);
+
 // 16 봇 스냅샷: 같은 날 두 번째 ingest는 스냅샷 안 만듦(일 1개)
 mem.gw_data['col:bids'] = { schema: 1, items: [{ id: 'b1', status: 'new' }], updated_at: 1 };
 r = await call({ action: 'bids_ingest', key: 'test-ingest-key', items: [{ id: 'b2', title: 't' }] });
