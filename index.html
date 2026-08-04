@@ -1472,7 +1472,7 @@
         <button class="mini-btn" id="auditNext">▶</button>
       </span>
     </h3>
-    <p style="margin:0 0 10px;font-size:12px;">서버에 기록된 변경 이력(누가·언제·무엇을). 관리자 열람 전용, 앱에서 수정·삭제 불가.</p>
+    <p style="margin:0 0 10px;font-size:12px;">서버에 기록된 변경 이력(누가·언제·무엇을). 관리자 보기 전용, 앱에서 수정·삭제 불가.</p>
     <div id="auditBody" style="max-height:65vh;overflow:auto;"><div class="loading">불러오는 중…</div></div>
     <button class="secondary" id="auditClose">닫기</button>
   </div>
@@ -2896,7 +2896,7 @@
           +'</div>';
       }).join("");
       host.innerHTML=h;
-    }).catch(function(){ host.innerHTML='<div style="color:#c0392b;">로드 실패</div>'; });
+    }).catch(function(){ host.innerHTML='<div style="color:#c0392b;">불러오기 실패</div>'; });
   }
   // 웹푸시 발송 헬퍼 — 구독 기기 없으면 서버가 조용히 0건 처리, 실패 무시
   function pushNotify(to, title, body, tag){
@@ -3866,7 +3866,7 @@
     host.innerHTML='<div class="loading">이력 불러오는 중…</div>';
     document.getElementById("rsGo").disabled=true; rsPick=null; document.getElementById("rsPreview").textContent="";
     gwCall("gw-data",{action:"ver_list",collection:key}).then(function(res){
-      if(res.status!==200){ host.innerHTML='<div class="empty-line">이력 로드 실패 ('+res.status+')</div>'; return; }
+      if(res.status!==200){ host.innerHTML='<div class="empty-line">이력 불러오기 실패 ('+res.status+')</div>'; return; }
       var list=(res.body&&res.body.items)||[];
       if(!list.length){ host.innerHTML='<div class="empty-line">저장 이력이 아직 없습니다.<br>저장할 때마다 직전 상태가 자동 보존됩니다(최근 20개 + 하루 1개 × 30일).</div>'; return; }
       host.innerHTML=list.map(function(v){
@@ -3879,7 +3879,7 @@
           var ts=Number(this.getAttribute("data-ts")), dt=this.getAttribute("data-date");
           document.getElementById("rsPreview").textContent="버전 내용 확인 중…";
           gwCall("gw-data",{action:"ver_get",collection:key,ts:ts}).then(function(r2){
-            if(r2.status!==200){ document.getElementById("rsPreview").textContent="버전 로드 실패 ("+r2.status+")"; return; }
+            if(r2.status!==200){ document.getElementById("rsPreview").textContent="버전 불러오기 실패 ("+r2.status+")"; return; }
             var v=(r2.body&&r2.body.ver)||{}, cur=(r2.body&&r2.body.cur)||{};
             rsPick={key:key, label:cc[1], ts:ts, date:dt, tot:v.tot, live:v.live};
             document.getElementById("rsPreview").innerHTML="현재: 전체 "+cur.tot+"건(사용 "+cur.live+") → <b>복구본("+dt+"): 전체 "+v.tot+"건(사용 "+v.live+")</b>";
@@ -4944,13 +4944,13 @@
         gwCall("gw-data", { action:"att_put", name:f.name, type:f.type||"", data:String(r.result).split(",")[1]||"", kind:kind })
           .then(function(res){
             var b=(res&&res.body)||{};
-            if(!res || res.status!==200){ entry.parsed="업로드 실패("+((b&&b.error_code)||res.status||"네트워크")+")"; renderContracts(); return; }
+            if(!res || res.status!==200){ entry.parsed="업불러오기 실패("+((b&&b.error_code)||res.status||"네트워크")+")"; renderContracts(); return; }
             entry.id=b.id||"";
             if(b.parse_pending){ entry.parsed="판독 중…(수 분 걸릴 수 있음)"; asbBgParse(entry, c); }
             else entry.parsed="";
             scheduleContractSave(); renderContracts();
           })
-          .catch(function(){ entry.parsed="업로드 실패"; renderContracts(); });
+          .catch(function(){ entry.parsed="업불러오기 실패"; renderContracts(); });
       };
       r.readAsDataURL(f);
     });
@@ -5804,7 +5804,7 @@
           gwCall("gw-data",{action:"proof_del", name:el.getAttribute("data-proof-del")}).then(proofRefresh);
         });
       });
-    }).catch(function(){ host.innerHTML='<span style="color:#c0392b;">목록 로드 실패</span>'; });
+    }).catch(function(){ host.innerHTML='<span style="color:#c0392b;">목록 불러오기 실패</span>'; });
   }
   function proofUpload(files){
     var arr=Array.prototype.slice.call(files||[]);
@@ -5816,7 +5816,7 @@
       var r=new FileReader();
       r.onload=function(){
         gwCall("gw-data",{action:"proof_put", name:f.name, data:String(r.result).split(",")[1]||""})
-          .then(next).catch(function(){ alert("업로드 실패: "+f.name); next(); });
+          .then(next).catch(function(){ alert("업불러오기 실패: "+f.name); next(); });
       };
       r.readAsDataURL(f);
     })();
@@ -5923,7 +5923,7 @@
     var c=xgPrefill(conId, kind, "");
     if(!c) return Promise.reject("계약 없음");
     return gwCall("gw-data",{action:"tpl_get", key:kind}).then(function(res){
-      if(res.status!==200) throw (res.status===404 ? "'"+TPL_LABELS[kind]+"' 양식 미등록" : "양식 로드 실패");
+      if(res.status!==200) throw (res.status===404 ? "'"+TPL_LABELS[kind]+"' 양식 미등록" : "양식 불러오기 실패");
       return fillXlsxTemplate(res.body.data, xgBuildEdits(kind, c)).then(function(blob){
         downloadBlob((document.getElementById("xgTitle").value.trim()||c.label||"서류")+"_"+TPL_LABELS[kind]+".xlsx", blob);
         return kind;
@@ -6546,7 +6546,7 @@
         };
         $("xgGo").textContent="생성 중…"; $("xgGo").disabled=true;
         gwCall("gw-data",{action:"tpl_get", key:"qual_packet"}).then(function(res){
-          if(res.status!==200){ alert(res.status===404?"'적격심사 패킷' 양식이 미등록입니다. [+ 양식 등록]에서 hwpx 템플릿을 등록하세요.":"양식 로드 실패"); return; }
+          if(res.status!==200){ alert(res.status===404?"'적격심사 패킷' 양식이 미등록입니다. [+ 양식 등록]에서 hwpx 템플릿을 등록하세요.":"양식 불러오기 실패"); return; }
           return fillHwpxTemplate(res.body.data, qTokens).then(function(blob){
             downloadBlob(($("xgTitle").value.trim()||c.label||"서류")+"_적격심사패킷.hwpx", blob);
             alert("적격심사 패킷 생성 — 자기평점 계 "+qualNum(qs.total)+"점.\n(산식은 김천서부초 실물 심사표로 검증 완료 — 그래도 한컴에서 값 확인 후 제출)");
@@ -6584,7 +6584,7 @@
         var cdName=$("xgTitle").value.trim()||c.label||"계약";
         $("xgGo").textContent="생성 중…"; $("xgGo").disabled=true;
         gwCall("gw-data",{action:"tpl_get", key:"contract_pledge"}).then(function(r1){
-          if(r1.status!==200) throw (r1.status===404?"'계약이행서약서' 양식 미등록 — [+ 양식 등록]":"양식 로드 실패");
+          if(r1.status!==200) throw (r1.status===404?"'계약이행서약서' 양식 미등록 — [+ 양식 등록]":"양식 불러오기 실패");
           // 입찰(적격심사) 건: 6·7번(수의 결격사유) 소항목의 [아니오] 체크를 풀고 [해당없음]에 체크 — 짝 단위 치환이라
           // 임금체불 항목(별개 조건, [ v] 예 형태)은 걸리지 않는다. 같은 길이 치환(lineseg 무해).
           var pledgeRaw=(c&&c.bid_id)?[[/(\[  \] 예 \[ )v(\] 아니오[\s\S]{0,600}?\[)  (\] 해당없음)/g, "$1 $2 v$3"]]:null;
@@ -6593,7 +6593,7 @@
           downloadBlob(cdName+"_계약이행서약서.hwpx", b1);
           return gwCall("gw-data",{action:"tpl_get", key:"seal_reg"});
         }).then(function(r2){
-          if(r2.status!==200) throw (r2.status===404?"'사용인감계' 양식 미등록 — [+ 양식 등록]":"양식 로드 실패");
+          if(r2.status!==200) throw (r2.status===404?"'사용인감계' 양식 미등록 — [+ 양식 등록]":"양식 불러오기 실패");
           return fillHwpxTemplate(r2.body.data, sealTokens);
         }).then(function(b2){
           downloadBlob(cdName+"_사용인감계.hwpx", b2);
@@ -6632,7 +6632,7 @@
         stEdits.push(['L26', sr.profitRate, 'n']);   // 조정 이윤율 — 표지·감액계는 워크북 수식이 자동 연동
         $("xgGo").textContent="생성 중…"; $("xgGo").disabled=true;
         gwCall("gw-data",{action:"tpl_get", key:"settle_doc"}).then(function(rs){
-          if(rs.status!==200){ alert(rs.status===404?"'준공 정산합의서' 양식이 미등록입니다. [+ 양식 등록]에서 이 계약의 정산 워크북(xlsx)을 등록하세요.":"양식 로드 실패"); return; }
+          if(rs.status!==200){ alert(rs.status===404?"'준공 정산합의서' 양식이 미등록입니다. [+ 양식 등록]에서 이 계약의 정산 워크북(xlsx)을 등록하세요.":"양식 불러오기 실패"); return; }
           return fillXlsxTemplate(rs.body.data, {'원가계산서 (정산)': stEdits}).then(function(bs){
             downloadBlob(($("xgTitle").value.trim()||c.label||"정산")+"_정산합의서.xlsx", bs);
             alert("정산합의서 생성 완료 — 엑셀에서 열어 표지 금액·한글금액이 정산액과 일치하는지 확인 후 제출하세요.");
@@ -6682,7 +6682,7 @@
           "은행명":$("xadBank").value.trim(), "예금종류":$("xadAcctType").value.trim(), "계좌번호":$("xadAcct").value.trim() };
         $("xgGo").textContent="생성 중…"; $("xgGo").disabled=true;
         gwCall("gw-data",{action:"tpl_get", key:"adv_pay"}).then(function(ra){
-          if(ra.status!==200){ alert(ra.status===404?"'선금지급신청 세트' 양식이 미등록입니다. [+ 양식 등록]에서 hwpx 템플릿을 등록하세요.":"양식 로드 실패"); return; }
+          if(ra.status!==200){ alert(ra.status===404?"'선금지급신청 세트' 양식이 미등록입니다. [+ 양식 등록]에서 hwpx 템플릿을 등록하세요.":"양식 불러오기 실패"); return; }
           return fillHwpxTemplate(ra.body.data, adTokens).then(function(ba){
             downloadBlob(($("xgTitle").value.trim()||c.label||"선금")+"_선금지급신청.hwpx", ba);
             alert("선금지급신청 세트 생성 완료 — 공문·별첨2(신청서)·별첨3(각서)·별첨4(사용계획)·별첨5(청구서)·지급조건 일체."
@@ -6715,7 +6715,7 @@
         var qtKey=($("xgCo").value==="con")?"quote_con":"quote_env";
         $("xgGo").textContent="생성 중…"; $("xgGo").disabled=true;
         gwCall("gw-data",{action:"tpl_get", key:qtKey}).then(function(rq){
-          if(rq.status!==200){ alert(rq.status===404?("'"+TPL_LABELS[qtKey]+"' 양식이 미등록입니다. [+ 양식 등록]에서 hwpx 템플릿을 등록하세요."):"양식 로드 실패"); return; }
+          if(rq.status!==200){ alert(rq.status===404?("'"+TPL_LABELS[qtKey]+"' 양식이 미등록입니다. [+ 양식 등록]에서 hwpx 템플릿을 등록하세요."):"양식 불러오기 실패"); return; }
           return fillHwpxTemplate(rq.body.data, qtTokens).then(function(bq){
             downloadBlob(($("xgTitle").value.trim()||c.label||"견적")+"_견적서.hwpx", bq);
             alert("견적서 생성 완료 — 품목 2행째부터는 한컴에서 수기 기입(합계는 자동합산). 제출 전 값 확인하세요.");
@@ -6757,7 +6757,7 @@
       if(missing.length && !confirm("⚠ 확인요망 — 원문(계약서·조사서·대장)에서 찾지 못한 값:\n· "+missing.join("\n· ")+"\n\n빈칸(수기 기입)으로 두고 생성할까요?\n(값을 아신다면 취소 후 입력하거나, 해당 서류를 서류함에 첨부하면 자동으로 채워집니다)")) return;
       $("xgGo").textContent="생성 중…"; $("xgGo").disabled=true;
       gwCall("gw-data",{action:"tpl_get", key:kind}).then(function(res){
-        if(res.status!==200){ alert(res.status===404?("'"+TPL_LABELS[kind]+"' 양식이 미등록입니다. [+ 양식 등록]에서 먼저 등록하세요."):"양식 로드 실패"); return; }
+        if(res.status!==200){ alert(res.status===404?("'"+TPL_LABELS[kind]+"' 양식이 미등록입니다. [+ 양식 등록]에서 먼저 등록하세요."):"양식 불러오기 실패"); return; }
         return fillXlsxTemplate(res.body.data, xgBuildEdits(kind, c)).then(function(blob){
           var nm=($("xgTitle").value.trim()||c.label||"서류")+"_"+TPL_LABELS[kind]+".xlsx";
           downloadBlob(nm, blob);
@@ -7873,7 +7873,7 @@
       "수량":q.qty||"", "단가":q.price?Number(q.price).toLocaleString():"", "금액":amt?amt.toLocaleString():"" };
     var key=(q.co==="con")?"quote_con":"quote_env";
     gwCall("gw-data",{action:"tpl_get", key:key}).then(function(r){
-      if(r.status!==200){ alert(r.status===404?("'"+TPL_LABELS[key]+"' 양식이 미등록입니다. [+ 양식 등록]에서 등록하세요."):"양식 로드 실패"); return; }
+      if(r.status!==200){ alert(r.status===404?("'"+TPL_LABELS[key]+"' 양식이 미등록입니다. [+ 양식 등록]에서 등록하세요."):"양식 불러오기 실패"); return; }
       return fillHwpxTemplate(r.body.data, tokens).then(function(b){
         downloadBlob((q.no||"견적")+"_"+(q.title||"견적서")+".hwpx", b);
       });
@@ -9948,7 +9948,7 @@
     Notification.requestPermission().then(function(perm){
       if(perm!=="granted"){ alert("브라우저 알림 권한이 거부되었습니다. 주소창 자물쇠 아이콘에서 허용으로 바꿔주세요."); return; }
       gwCall("gw-data",{action:"push_pubkey"}).then(function(res){
-        if(res.status!==200) throw "키 로드 실패";
+        if(res.status!==200) throw "키 불러오기 실패";
         return navigator.serviceWorker.ready.then(function(reg){
           return reg.pushManager.subscribe({ userVisibleOnly:true, applicationServerKey:urlB64ToU8(res.body.publicKey) });
         });
