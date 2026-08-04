@@ -824,7 +824,7 @@
     <button class="tab-btn" data-tab="doc" id="tabDocBtn">문서함</button>
     <div class="nav-divider"></div>
     <div class="nav-group">개인</div>
-    <button class="tab-btn" data-tab="check" id="tabCheckBtn">업무</button>
+    <button class="tab-btn" data-tab="check" id="tabCheckBtn">내 업무</button>
     <button class="tab-btn" data-tab="leave" id="tabLeaveBtn">휴가 <span class="tab-badge hide" id="leaveTabBadge">0</span></button>
   </nav>
   <div class="views">
@@ -1059,8 +1059,22 @@
     <button class="link-btn" id="wkAddBtn">+ 일용직 추가</button>
   </section>
 
-  <!-- 권한관리 (인사 하위 · 관리자 전용) -->
+  <!-- 권한관리 (인사 하위 · 관리자 전용) — 매트릭스: 셀 클릭마다 수행→보기→숨김 순환, 사람 단위 자동 저장 -->
   <section class="view" id="view-perm">
+    <style>
+      .pm-scroll{overflow-x:auto}
+      .pm-table{border-collapse:collapse;width:100%;font-size:13px}
+      .pm-table th,.pm-table td{border:1px solid rgba(128,148,138,.25);padding:5px 6px;text-align:center}
+      .pm-table th{color:var(--sub,#7d948a);font-weight:600;white-space:nowrap}
+      .pm-nm{text-align:left!important;white-space:nowrap}
+      .pm-sub{font-size:11.5px;color:var(--sub,#7d948a);font-weight:400}
+      .pm-stat{font-size:11px;color:#1A9A6B;min-height:13px}
+      .pm-admin{color:var(--sub,#7d948a)}
+      .pm-cell{border:none;border-radius:8px;padding:5px 10px;font-size:12.5px;cursor:pointer;min-width:46px}
+      .pm-do{background:#1A9A6B;color:#fff}
+      .pm-view{background:#4a5a6d;color:#dbe7f5}
+      .pm-hide{background:#5d3a3a;color:#e8caca}
+    </style>
     <div class="dash-sec" style="margin-bottom:8px;"><h2>권한관리 <span class="cnt" id="permTotal"></span></h2></div>
     <button class="link-btn" id="permBackBtn">← 인사로</button>
     <div class="card" id="permRoster"><div class="loading">불러오는 중…</div></div>
@@ -3638,7 +3652,7 @@
   });
 
   // ---- 탭 ----
-  var TAB_LABELS = {dash:"홈",tasks:"지시",rec:"기성",cli:"거래처",bid:"입찰",con:"계약",onbid:"부동산",hr:"인사",cal:"캘린더",veh:"차량",lic:"인허가",doc:"문서함",check:"업무",leave:"휴가",perm:"권한관리"};
+  var TAB_LABELS = {dash:"홈",tasks:"지시",rec:"기성",cli:"거래처",bid:"입찰",con:"계약",onbid:"부동산",hr:"인사",cal:"캘린더",veh:"차량",lic:"인허가",doc:"문서함",check:"내 업무",leave:"휴가",perm:"권한관리"};
   function closeNav(){ var tb=document.getElementById("tabbar"); if(tb) tb.classList.remove("open"); }
   function updateNavToggle(name){ var nt=document.getElementById("navToggle"); if(nt) nt.textContent = "☰"; }
   function switchTab(name){
@@ -4469,11 +4483,93 @@
     liveTasks().forEach(function(t){ if(t.status==="review" && canApproveTask(t)) out.push({tab:"tasks",label:"지시 결재",sub:(t.title||"제목없음")+(t.done_by?" · "+dispName(t.done_by):"")}); });
     return out;
   }
+  // ---- 직원 홈(S2-B, 시안 승인 2026-08-04): 비관리자는 "오늘 내 것" 한 판 ----
+  // 기능 재구현 없음 — 지시(toggleTaskDone 승인제)·체크(toggleItem 승인 흐름)·할 일(myTodos)의 기존 로직을 그대로 호출.
+  // 권한에 자동 연동: 숨김 모듈은 여기에도 안 나타난다(내게 온 지시·체크·할 일·휴가는 전원 사용 영역).
+  function renderStaffHome(host){
+    var meId = getMemberId();
+    var mine = myOpenTasks();   // 담당·전사·공개범위 — 지시 탭 인박스와 동일 기준
+    var html = '<div class="dash-date">' + todayStr() + ' · 오늘 내 것만 모았습니다</div>';
+    html += '<div class="dash-sec"><h2>📌 내게 온 지시 <span class="cnt">' + mine.length + '</span></h2><div class="card">'
+      + (mine.length ? mine.slice(0, 8).map(myTaskRowHtml).join("") : '<div class="empty-line">내게 온 지시가 없습니다.</div>')
+      + (mine.length > 8 ? '<div class="empty-line" style="cursor:pointer;" data-home-go="check">전체 ' + mine.length + '건 보기 →</div>' : '')
+      + '</div></div>';
+    var checks = [];
+    if (meId){
+      GROUPS.forEach(function(g){
+        var key = CURRENT_KEYS[g.type];
+        var co = (records[g.type] && records[g.type][key]) || {};
+        var scan = function(it){
+          if (checkAssignee[it.id] !== meId) return;
+          checks.push({ type: g.type, id: it.id, title: it.title, done: !!co[it.id], review: !!getReview(g.type, key, it.id) });
+        };
+        g.items.forEach(scan);
+        liveCustom(g.type).forEach(scan);
+      });
+    }
+    if (checks.length){
+      var doneN = checks.filter(function(c){ return c.done; }).length;
+      var open = checks.filter(function(c){ return !c.done; });
+      html += '<div class="dash-sec"><h2>✅ 이번 주기 체크 <span class="cnt">' + doneN + '/' + checks.length + '</span></h2><div class="card">'
+        + (open.length ? open.slice(0, 8).map(function(c){
+            return '<div class="item task-item' + (c.review ? ' review' : '') + '" data-home-check="' + c.type + ':' + c.id + '">'
+              + '<div class="check-box">' + (c.review ? '⋯' : '') + '</div>'
+              + '<div class="item-body"><div class="item-title">' + esc(c.title) + '</div>'
+              + (c.review ? '<div class="item-meta"><span class="review-chip">승인 대기중</span></div>' : '') + '</div></div>';
+          }).join("") : '<div class="empty-line">이번 주기 몫은 전부 완료 ✓</div>')
+        + '</div></div>';
+    }
+    var todosLive = myTodos.filter(function(t){ return t && t.del !== 1; });
+    var tOpen = todosLive.filter(function(t){ return !t.done; });
+    html += '<div class="dash-sec"><h2>🗒 내 할 일 <span class="cnt">' + tOpen.length + '</span></h2><div class="card">'
+      + (tOpen.length ? tOpen.map(function(t){ return myTodoRow(t, false); }).join("") : '<div class="empty-line">할 일이 없습니다.</div>')
+      + '<div class="add-row"><input type="text" id="dashTodoInput" placeholder="할 일 추가 (본인만 보임)"><button id="dashTodoAdd">추가</button></div>'
+      + '</div></div>';
+    var lvTxt = "";
+    if (meId){
+      var mm = findMember(meId);
+      if (mm && mm.annual_paid) lvTxt = "연차수당 포함";
+      else if (mm){ try{ lvTxt = "잔여 연차 " + leaveRemaining(meId).left + "일"; }catch(e){} }
+    }
+    html += '<div class="stat-row" style="margin-top:4px;">'
+      + '<div class="stat-tile" data-home-go="leave" style="cursor:pointer;"><div class="lbl">🏖 휴가 신청</div><div class="val" style="font-size:15px;">' + esc(lvTxt || "신청하기") + '</div></div>'
+      + '<div class="stat-tile" data-home-go="cal" style="cursor:pointer;"><div class="lbl">📅 캘린더</div><div class="val" style="font-size:15px;">일정 보기</div></div>'
+      + '</div>';
+    host.innerHTML = html;
+    Array.prototype.forEach.call(host.querySelectorAll("[data-mytask]"), function(el){
+      el.addEventListener("click", function(){ toggleTaskDone(el.getAttribute("data-mytask")); renderDashboard(); });
+    });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-home-check]"), function(el){
+      el.addEventListener("click", function(){
+        var p = el.getAttribute("data-home-check").split(":");
+        toggleItem(p[0], p[1]); renderDashboard();
+      });
+    });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-todo-toggle]"), function(el){
+      el.addEventListener("click", function(e){ if (e.target.classList.contains("del-x")) return; toggleMyTodo(el.getAttribute("data-todo-toggle")); renderDashboard(); });
+    });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-todo-del]"), function(el){
+      el.addEventListener("click", function(e){ e.stopPropagation(); delMyTodo(el.getAttribute("data-todo-del")); renderDashboard(); });
+    });
+    var ti = document.getElementById("dashTodoInput"), tb = document.getElementById("dashTodoAdd");
+    function dashAddTodo(){
+      var v = (ti.value || "").trim(); if (!v) return;
+      myTodos.push({ id: genId("td"), title: v, done: false, created: todayStr() });
+      saveMyTasks(); renderMyTodos(); renderDashboard();
+    }
+    if (tb) tb.addEventListener("click", dashAddTodo);
+    if (ti) ti.addEventListener("keydown", function(e){ if (e.key === "Enter") dashAddTodo(); });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-home-go]"), function(el){
+      el.addEventListener("click", function(){ switchTab(el.getAttribute("data-home-go")); });
+    });
+  }
+
   function renderDashboard(){
     // 데이터 로드/변경 시 캘린더 탭이 열려 있으면 함께 갱신(로그인 직후 빈 배열로 그려진 경우 자동 채움)
     if (currentTab === "cal" && document.getElementById("calGrid")) renderCalendar();
     var host = document.getElementById("dashHost");
     if (!host) return;
+    if (curMemberObj && !isAdmin()){ renderStaffHome(host); return; }   // 직원 홈(S2-B) — 관리자 홈은 아래 현행 그대로
     var today = todayStr();
     var seeVeh = canSee("veh"), seeLic = canSee("lic"), seeTasks = canSee("tasks"), seeRec = canSee("rec");
     var me = myName();
@@ -8704,6 +8800,8 @@
     Array.prototype.forEach.call(host.querySelectorAll("[data-todo-del]"), function(el){
       el.addEventListener("click", function(e){ e.stopPropagation(); delMyTodo(el.getAttribute("data-todo-del")); });
     });
+    // 직원 홈이 열려 있으면 할 일 로드/변경을 홈에도 반영(S2-B) — renderStaffHome은 이 함수를 부르지 않아 순환 없음
+    if (curMemberObj && !isAdmin() && currentTab === "dash") renderDashboard();
   }
   function addMyTodo(){
     var el = document.getElementById("myTodoInput");
@@ -9795,6 +9893,19 @@
     if (hrBtn) hrBtn.classList.toggle("perm-hidden", !adminUser);
     if (currentTab === "hr" && !adminUser) switchTab("dash");
     if (currentTab === "workers" && !canSee("wk")) switchTab("dash");
+    // 빈 그룹 숨김(S2-B): 권한으로 탭이 전부 사라진 사이드바 그룹은 제목·구분선도 숨긴다 — 직원 화면 뼈대 정리
+    (function(){
+      var bar = document.getElementById("tabbar"); if (!bar) return;
+      var segs = [], seg = null;
+      Array.prototype.forEach.call(bar.children, function(el){
+        if (el.classList.contains("nav-group")){
+          seg = { g: el, d: (el.previousElementSibling && el.previousElementSibling.classList.contains("nav-divider")) ? el.previousElementSibling : null, vis: false };
+          segs.push(seg); return;
+        }
+        if (seg && el.classList.contains("tab-btn") && !el.classList.contains("perm-hidden")) seg.vis = true;
+      });
+      segs.forEach(function(s){ s.g.style.display = s.vis ? "" : "none"; if (s.d) s.d.style.display = s.vis ? "" : "none"; });
+    })();
     updateUserChip();
     updateApprovalBadges();
   }
@@ -10159,7 +10270,7 @@
     hrOpenId = null;
   }
 
-  var MOD_LABEL = {tasks:"지시", veh:"차량", rec:"기성", lic:"인허가", check:"업무", con:"계약", cli:"거래처", doc:"문서함", bid:"입찰", wk:"일용직"};
+  var MOD_LABEL = {tasks:"지시", veh:"차량", rec:"기성", lic:"인허가", check:"내 업무", con:"계약", cli:"거래처", doc:"문서함", bid:"입찰", wk:"일용직"};
   // ---- 감사 로그 뷰어(관리자 전용, 서버 기록 열람) ----
   var AUDIT_COL_LABEL = {tasks:"지시", vehicles:"차량", receivables:"기성", licenses:"인허가", checklist:"업무", documents:"문서함", clients:"거래처", contracts:"계약", leaves:"휴가", member:"회원", login:"로그인"};
   var AUDIT_FIELD_LABEL = {status:"상태", title:"제목", who:"담당", who_id:"담당", due:"기한", amount:"금액", paid:"입금", del:"삭제", scope:"공개범위", stage:"단계", cancel_req:"취소요청", name:"이름", role:"직책", rank:"직급", dept:"부서", admin:"관리자", perms:"권한", hire_date:"입사일", leave_date:"퇴사일", seq:"연번", annual_base:"잔여연차기준", annual_base_date:"기준일", annual_days:"연차수동", loa_days:"휴직누적", on_loa:"휴직중", loa_start:"휴직시작", loa_end:"휴직종료", annual_paid:"연차수당포함", emp_type:"고용형태", annual_basis:"연차기준", reason:"사유", approver:"승인자", done_by:"완료자", detail:"상세", recur:"반복", hl:"하이라이트", mismatch:"불일치", PIN:"PIN"};
@@ -10208,76 +10319,65 @@
       body.innerHTML = html;
     }).catch(function(){ body.innerHTML = '<div class="empty-line">통신 오류</div>'; });
   }
-  // 권한관리(별도 화면) — 모듈별 권한만 편집. 사이드바 순서와 동일.
+  // 권한관리(별도 화면) — 매트릭스 표(S2-C, PM 지시): 셀 클릭마다 수행→보기→숨김 순환, 사람 단위 디바운스 자동 저장.
+  // 구 아코디언(사람 펼침 → 드롭다운 → 저장 버튼)은 클릭 수가 많아 폐기 — 시안 표와 형태 일치.
   var PERM_ORDER = ["tasks","rec","cli","con","veh","lic","doc","check","wk"];   // wk 누락 시 권한관리 UI에 일용직이 안 떠 저장에서 통째로 빠짐(서버 MODULES와 일치)
-  var permOpenId = null;
+  var PM_TXT = { do: "수행", view: "보기", hide: "숨김" };
+  var PM_NEXT = { do: "view", view: "hide", hide: "do" };
+  var pmSaveTimers = {};
   function permModList(){ return PERM_ORDER.filter(function(x){ return MODULES.indexOf(x) >= 0; }); }
   function renderPermMgmt(){
     if (!isAdmin()){ switchTab("dash"); return; }
     var host = document.getElementById("permRoster"); if (!host) return;
     var mem = liveMembers().slice().sort(function(a,b){ return ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role); });
     var mods = permModList();
-    var html = "";
-    mem.forEach(function(m){
+    var head = '<tr><th class="pm-nm">이름</th>' + mods.map(function(x){ return '<th>' + MOD_LABEL[x] + '</th>'; }).join("") + '</tr>';
+    var rows = mem.map(function(m){
       var nm = isBossMember(m) ? (m.name + " (대표님)") : m.name;
-      var adminRole = !!m.admin;
-      var sub = adminRole ? "관리자 — 모든 권한" : mods.filter(function(x){ return (m.perms&&m.perms[x])==="do"; }).map(function(x){ return MOD_LABEL[x]; }).join("·") || "수행 권한 없음";
-      html += '<div class="hr-item"><div class="hr-head' + (permOpenId===m.id?' open':'') + '" data-perm-toggle="' + m.id + '">' +
-        '<div class="minfo"><div class="mname">' + esc(nm) + (adminRole?' 👑':'') + '</div><div class="mrole">' + esc((m.role||"")+ (m.dept?" · "+m.dept:"")) + '</div><div class="mrole" style="opacity:.9;margin-top:1px;">수행: ' + esc(sub) + '</div></div>' +
-        (adminRole ? '' : '<span class="hr-caret">▾</span>') + '</div>' +
-        '<div class="hr-panel" id="permpanel-' + m.id + '" style="display:none;"></div></div>';
-    });
-    host.innerHTML = html || '<div class="empty-line">직원이 없습니다.</div>';
-    var t = document.getElementById("permTotal"); if (t) t.textContent = "총 " + mem.length + "명";
-    var reopen = permOpenId; permOpenId = null;
-    Array.prototype.forEach.call(host.querySelectorAll("[data-perm-toggle]"), function(el){
-      el.addEventListener("click", function(){ permToggle(el.getAttribute("data-perm-toggle")); });
-    });
-    if (reopen && findMember(reopen) && !findMember(reopen).admin) permToggle(reopen);
-  }
-  function permToggle(id){
-    if (permOpenId === id){ permCollapse(); return; }
-    permCollapse();
-    var m = findMember(id); if (!m || m.admin) return;
-    var panel = document.getElementById("permpanel-" + id); if (!panel) return;
-    var mods = permModList();
-    var rows = mods.map(function(mod){
-      var v = (m.perms && m.perms[mod]) || "view";
-      return '<div class="perm-row"><span class="plabel">' + MOD_LABEL[mod] + '</span><select data-pm="' + mod + '">' +
-        '<option value="do"' + (v==="do"?" selected":"") + '>수행</option>' +
-        '<option value="view"' + (v==="view"?" selected":"") + '>보기</option>' +
-        '<option value="hide"' + (v==="hide"?" selected":"") + '>숨김</option></select></div>';
+      var info = '<td class="pm-nm">' + esc(nm) + (m.admin ? ' 👑' : '') +
+        '<div class="pm-sub">' + esc((m.role||"") + (m.dept ? " · " + m.dept : "")) + '</div>' +
+        (m.admin ? '' : '<div class="pm-stat" id="pmstat-' + m.id + '"></div>') + '</td>';
+      if (m.admin) return '<tr>' + info + '<td colspan="' + mods.length + '" class="pm-admin">관리자 — 모든 권한 고정</td></tr>';
+      return '<tr>' + info + mods.map(function(mod){
+        var v = (m.perms && m.perms[mod]) || "view";
+        return '<td><button type="button" class="pm-cell pm-' + v + '" data-pm-cyc="' + m.id + ':' + mod + '">' + PM_TXT[v] + '</button></td>';
+      }).join("") + '</tr>';
     }).join("");
-    panel.innerHTML = '<div style="padding:4px 2px 2px;">' + rows +
-      '<button class="primary" data-pm-save="' + id + '" style="margin-top:6px;">권한 저장</button></div>';
-    panel.style.display = "";
-    var head = document.querySelector('[data-perm-toggle="' + id + '"]'); if (head) head.classList.add("open");
-    permOpenId = id;
-    panel.querySelector("[data-pm-save]").addEventListener("click", function(){ savePermMember(id); });
-    panel.scrollIntoView({ block:"nearest", behavior:"smooth" });
+    host.innerHTML = '<div class="pm-scroll"><table class="pm-table">' + head + rows + '</table></div>'
+      + '<div class="empty-line" style="margin-top:6px;">칸을 누를 때마다 수행 → 보기 → 숨김 순환 · 사람 단위로 1초 뒤 자동 저장</div>';
+    var t = document.getElementById("permTotal"); if (t) t.textContent = "총 " + mem.length + "명";
+    Array.prototype.forEach.call(host.querySelectorAll("[data-pm-cyc]"), function(btn){
+      btn.addEventListener("click", function(){
+        var p = btn.getAttribute("data-pm-cyc").split(":");
+        pmCycle(p[0], p[1], btn);
+      });
+    });
   }
-  function permCollapse(){
-    if (permOpenId == null) return;
-    var panel = document.getElementById("permpanel-" + permOpenId); if (panel){ panel.style.display = "none"; panel.innerHTML = ""; }
-    var head = document.querySelector('[data-perm-toggle="' + permOpenId + '"]'); if (head) head.classList.remove("open");
-    permOpenId = null;
+  function pmCycle(id, mod, btn){
+    var m = findMember(id); if (!m || m.admin) return;
+    if (!m.perms) m.perms = {};
+    var v = PM_NEXT[m.perms[mod] || "view"];
+    m.perms[mod] = v;
+    btn.className = "pm-cell pm-" + v; btn.textContent = PM_TXT[v];
+    var st = document.getElementById("pmstat-" + id); if (st) st.textContent = "변경 — 저장 대기";
+    if (pmSaveTimers[id]) clearTimeout(pmSaveTimers[id]);
+    pmSaveTimers[id] = setTimeout(function(){ pmSave(id, false); }, 1000);
   }
-  function savePermMember(id){
+  function pmSave(id, isRetry){
     var m = findMember(id); if (!m) return;
-    var panel = document.getElementById("permpanel-" + id); if (!panel) return;
-    var perms = {};
-    Array.prototype.forEach.call(panel.querySelectorAll("[data-pm]"), function(sel){ perms[sel.getAttribute("data-pm")] = sel.value; });
-    var btn = panel.querySelector("[data-pm-save]"); if (btn){ btn.disabled = true; btn.textContent = "저장 중…"; }
-    // name·role·admin 함께 전송(백엔드가 admin 미전송 시 false로 덮어씀 방지)
-    gwCall("gw-auth", { action:"member_upsert", id:id, perms:perms }).then(function(res){
-      if (res.status !== 200){ if(btn){ btn.disabled=false; btn.textContent="권한 저장"; } alert("권한 저장 실패"); return; }
+    var st = document.getElementById("pmstat-" + id); if (st) st.textContent = "저장 중…";
+    // perms만 부분 전송 — member_upsert가 미전송 필드를 보존(부분 업데이트 설계)
+    gwCall("gw-auth", { action: "member_upsert", id: id, perms: m.perms }).then(function(res){
+      if (res.status !== 200) throw new Error("HTTP " + res.status);
       if (res.body && res.body.member){
-        for (var i=0;i<members.length;i++){ if(members[i].id===res.body.member.id){ members[i]=res.body.member; break; } }
+        for (var i = 0; i < members.length; i++){ if (members[i].id === res.body.member.id){ members[i] = res.body.member; break; } }
         try{ saveUsersCache(); }catch(e){}
       }
-      permCollapse();
-      renderPermMgmt();
+      if (st){ st.textContent = "저장됨 ✓"; setTimeout(function(){ var s2 = document.getElementById("pmstat-" + id); if (s2 && s2.textContent === "저장됨 ✓") s2.textContent = ""; }, 1600); }
       render();
+    }).catch(function(){
+      if (!isRetry){ if (st) st.textContent = "재시도 중…"; setTimeout(function(){ pmSave(id, true); }, 2500); return; }
+      if (st) st.textContent = "⚠ 저장 실패 — 네트워크 확인 후 아무 칸이나 다시 누르세요";
     });
   }
   function openMemberEdit(id, inline){
