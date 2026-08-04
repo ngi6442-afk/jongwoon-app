@@ -4481,6 +4481,12 @@
       }
     });
     liveTasks().forEach(function(t){ if(t.status==="review" && canApproveTask(t)) out.push({tab:"tasks",label:"지시 결재",sub:(t.title||"제목없음")+(t.done_by?" · "+dispName(t.done_by):"")}); });
+    // 청구 검수 대기(간이 검수 게이트, 용어집 결정 B) — 발행 전 청구(invoice=false) 중 미검수 건. 검수자=관리자 전체(PM 확정)
+    if (admin){
+      var rvw = liveRec().filter(function(r){ return !r.paid && !r.invoice && !r.reviewed && recVisible(r); });
+      if (rvw.length) out.push({ tab:"rec", label:"청구 검수 " + rvw.length + "건",
+        sub:"검수 후 계산서 발행 — " + rvw.slice(0,3).map(function(r){ return r.client||"-"; }).join(", ") + (rvw.length>3?" 외":"") });
+    }
     return out;
   }
   // ---- 직원 홈(S2-B, 시안 승인 2026-08-04): 비관리자는 "오늘 내 것" 한 판 ----
@@ -9250,11 +9256,22 @@
     clientEl.value = ""; descEl.value = ""; amtEl.value = ""; billedEl.value = "";
     saveRecCache(); renderReceivables(); renderDashboard(); scheduleRecSave();
   }
+  // 간이 검수 토글(관리자 전체) — 검수자·일자 기록, 해제는 확인 후
+  function toggleRecReview(id){
+    if (!isAdmin()) return;
+    var r = findRec(id); if (!r) return;
+    if (r.reviewed){ if (!confirm("검수를 해제할까요? (" + (r.reviewed.by||"") + " · " + (r.reviewed.date||"") + ")")) return; r.reviewed = null; }
+    else r.reviewed = { by: myName() || "관리자", date: todayStr() };
+    r.updated = todayStr();
+    saveRecCache(); renderReceivables(); renderDashboard(); scheduleRecSave();
+  }
   function toggleRecPaid(id){
     if (!canDo("rec")) return;
     var r = findRec(id); if (!r) return;
     if (r.paid){ r.paid = null; reopenRecTask(r); }            // 미수전환 → 연동 업무 재개
     else {
+      // 검수 게이트(간이): 발행 전 청구가 검수 없이 입금 처리되면 경고 — 차단은 안 함(간이 단계)
+      if (!r.invoice && !r.reviewed && !confirm("이 청구는 관리부 검수 전입니다. 검수 없이 입금 처리할까요?")) return;
       r.paid = todayStr(); r.mismatch = false; completeRecTask(r);  // 입금완료 → 연동 업무 완료
       if (r.con_id){                                            // 계약 연동 건 → 수금확인 단계 완료 제안
         var cc = findProc(r.con_id);
@@ -9344,10 +9361,12 @@
     var ctrl = "";
     if (canDo("rec")){
       var recEditBtn = '<button class="mini-btn" data-rec-edit="' + r.id + '">수정</button>';
+      // 간이 검수(발행 전 청구만) — 검수자=관리자 전체. 검수 이력은 칩에 표시
+      var rvBtn = (!isPaid && !r.invoice && !r.reviewed && isAdmin()) ? '<button class="mini-btn appr-btn" data-rec-review="' + r.id + '">검수</button>' : '';
       if (isPaid){
         ctrl = '<div class="rec-actions"><button class="mini-btn" data-rec-unpay="' + r.id + '">미수전환</button>' + recEditBtn + '</div>';
       } else {
-        ctrl = '<div class="rec-actions"><button class="cal-btn" data-rec-pay="' + r.id + '">입금완료</button>' + recEditBtn + '</div>';
+        ctrl = '<div class="rec-actions">' + rvBtn + '<button class="cal-btn" data-rec-pay="' + r.id + '">입금완료</button>' + recEditBtn + '</div>';
       }
     }
     var amt = r.amount ? (fmtAmount(r.amount) + '원') : '';
@@ -9361,6 +9380,9 @@
           (r.co ? '<span class="dup-chip" style="background:'+(r.co==="con"?"#E3EDFB;color:#2B5EA7":"#E2F5EA;color:#1A7A4B")+';">'+(r.co==="con"?"건설":"환경")+'</span>' : '') +
           (r._dup ? '<span class="dup-chip">중복 의심</span>' : '') +
           (r.mismatch ? '<span class="dup-chip" style="background:#EAE2FB;color:#5B3FA6;">불일치</span>' : '') +
+          (!isPaid && !r.invoice ? (r.reviewed
+            ? '<span class="dup-chip" style="background:#E2F5EA;color:#1A7A4B;" title="검수 ' + esc(r.reviewed.by||"") + ' · ' + esc(r.reviewed.date||"") + '"' + (isAdmin()?' data-rec-review="' + r.id + '"':'') + '>검수 ✓</span>'
+            : '<span class="dup-chip" style="background:#FFF3D6;color:#8A6100;">검수 대기</span>') : '') +
           ageHtml +
           (amt ? '<span class="rec-amt2">' + amt + '</span>' : '') +
         '</div>' +
@@ -9458,6 +9480,9 @@
     });
     Array.prototype.forEach.call(host.querySelectorAll("[data-rec-mismatch]"), function(el){
       el.addEventListener("click", function(e){ e.stopPropagation(); toggleRecMismatch(el.getAttribute("data-rec-mismatch")); });
+    });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-rec-review]"), function(el){
+      el.addEventListener("click", function(e){ e.stopPropagation(); toggleRecReview(el.getAttribute("data-rec-review")); });
     });
     Array.prototype.forEach.call(host.querySelectorAll("[data-rec-edit]"), function(el){
       el.addEventListener("click", function(e){ e.stopPropagation(); openRecModal(el.getAttribute("data-rec-edit")); });
