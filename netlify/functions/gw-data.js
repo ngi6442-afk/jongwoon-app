@@ -12,7 +12,7 @@ const push = require('./_lib/push');
 const DATA = 'gw_data';
 const USERS = 'gw_users';
 // 컬렉션 → 권한키
-const COL = { tasks: 'tasks', vehicles: 'veh', receivables: 'rec', licenses: 'lic', checklist: 'check', documents: 'doc', clients: 'cli', contracts: 'con', leaves: 'leaves', bids: 'bid', onbid: 'bid', workers: 'wk', quotes: 'con' };  // onbid=공매·부동산(관리자 전용), workers=일용직 명부(wk 권한으로 개별 설정), quotes=견적서(계약 권한과 동일 그룹)
+const COL = { tasks: 'tasks', vehicles: 'veh', receivables: 'rec', licenses: 'lic', checklist: 'check', documents: 'doc', clients: 'cli', contracts: 'con', leaves: 'leaves', bids: 'bid', onbid: 'bid', workers: 'wk', quotes: 'quote' };  // onbid=공매·부동산(관리자 전용), workers=일용직 명부(wk), quotes=견적서 탭 독립 권한(영업 문서 — 계약 파이프라인의 견적 "서류" 생성은 별개로 con 권한)
 // 사용자별 비공개 컬렉션(본인만 접근, 회원 id로 분리 저장)
 const PRIVATE_COL = { mytasks: true };
 
@@ -37,7 +37,8 @@ async function currentMember(event) {
 function permOf(member, col) {
   if (member.admin) return 'do';
   const key = COL[col];
-  return (member.perms && member.perms[key]) || 'view';
+  // 견적서는 기본 숨김(닫고 시작 — 영업 직렬에게만 명시 부여). 다른 모듈 기본은 보기
+  return (member.perms && member.perms[key]) || (key === 'quote' ? 'hide' : 'view');
 }
 // 인가된 기기만 데이터 접근. 관리자는 항상 허용.
 async function deviceApproved(event, member) {

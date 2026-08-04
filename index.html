@@ -1952,15 +1952,15 @@
   var MEMBER_KEY = "jw_app_member";
 
   // 모듈 레지스트리 — 신규 탭 추가 시 여기 5곳(MODULES/MODULE_TAB/MODULE_VIEW/MOD_LABEL/ROLE_PRESET)에 등록하면 권한관리 UI·게이팅에 자동 반영. 모듈 id = 백엔드 gw-data COL 권한키와 일치시킬 것.
-  var MODULES = ["tasks", "veh", "rec", "lic", "check", "con", "cli", "doc", "wk"];  // 일감(bid)은 관리자 전용 고정이라 권한 목록에서 제외
-  var MODULE_TAB = {tasks:"tabTasksBtn", veh:"tabVehBtn", rec:"tabRecBtn", lic:"tabLicBtn", check:"tabCheckBtn", con:"tabConBtn", cli:"tabCliBtn", doc:"tabDocBtn", wk:"tabWkBtn"};  // bid는 계약 탭 내 섹션(자체 탭 없음)
-  var MODULE_VIEW = {tasks:"view-tasks", veh:"view-veh", rec:"view-rec", lic:"view-lic", check:"view-check", con:"view-con", cli:"view-cli", doc:"view-doc", wk:"view-workers"};  // bid 섹션은 applyPerms에서 canSee로 표시
+  var MODULES = ["tasks", "veh", "rec", "lic", "check", "con", "cli", "doc", "wk", "quote"];  // 일감(bid)은 관리자 전용 고정이라 권한 목록에서 제외. quote=견적서 탭(기본 숨김)
+  var MODULE_TAB = {tasks:"tabTasksBtn", veh:"tabVehBtn", rec:"tabRecBtn", lic:"tabLicBtn", check:"tabCheckBtn", con:"tabConBtn", cli:"tabCliBtn", doc:"tabDocBtn", wk:"tabWkBtn", quote:"tabQuoteBtn"};  // bid는 계약 탭 내 섹션(자체 탭 없음)
+  var MODULE_VIEW = {tasks:"view-tasks", veh:"view-veh", rec:"view-rec", lic:"view-lic", check:"view-check", con:"view-con", cli:"view-cli", doc:"view-doc", wk:"view-workers", quote:"view-quote"};  // bid 섹션은 applyPerms에서 canSee로 표시
   var ROLE_PRESET = {
-    "대표":   {admin:true,  perms:{tasks:"do", veh:"do", rec:"do", lic:"do", check:"do", con:"do", cli:"do", doc:"do", wk:"do"}},
-    "관리자": {admin:true,  perms:{tasks:"do", veh:"do", rec:"do", lic:"do", check:"do", con:"do", cli:"do", doc:"do", wk:"do"}},
-    "팀장":   {admin:false, perms:{tasks:"do", veh:"do", rec:"do", lic:"do", check:"do", con:"view", cli:"view", doc:"view", wk:"do"}},
-    "직원":   {admin:false, perms:{tasks:"do", veh:"view", rec:"view", lic:"view", check:"do", con:"view", cli:"view", doc:"view", wk:"view"}},
-    "현장직": {admin:false, perms:{tasks:"do", veh:"view", rec:"hide", lic:"hide", check:"do", con:"hide", cli:"hide", doc:"view", wk:"hide"}}
+    "대표":   {admin:true,  perms:{tasks:"do", veh:"do", rec:"do", lic:"do", check:"do", con:"do", cli:"do", doc:"do", wk:"do", quote:"do"}},
+    "관리자": {admin:true,  perms:{tasks:"do", veh:"do", rec:"do", lic:"do", check:"do", con:"do", cli:"do", doc:"do", wk:"do", quote:"do"}},
+    "팀장":   {admin:false, perms:{tasks:"do", veh:"do", rec:"do", lic:"do", check:"do", con:"view", cli:"view", doc:"view", wk:"do", quote:"hide"}},
+    "직원":   {admin:false, perms:{tasks:"do", veh:"view", rec:"view", lic:"view", check:"do", con:"view", cli:"view", doc:"view", wk:"view", quote:"hide"}},
+    "현장직": {admin:false, perms:{tasks:"do", veh:"view", rec:"hide", lic:"hide", check:"do", con:"hide", cli:"hide", doc:"view", wk:"hide", quote:"hide"}}
   };
   // 직급(정보용)·부서 목록 — 서열 순서(공개범위·결재라인에서 사용)
   var RANK_LIST = ["대표","이사","부장","차장","과장","대리","주임","사원"];
@@ -8209,7 +8209,7 @@
     add("tasks","지시",canSee("tasks"),function(){return tasks.filter(function(t){return t&&t.del!==1&&t.status!=="done";});},function(x){return x.title||"";},function(x){return (x.who||"")+(x.due?" · 기한 "+x.due:"");});
     add("cli","거래처",canSee("cli"),function(){return clients.filter(function(c){return c&&c.del!==1;});},function(x){return x.name||"";},function(x){return x.biz_no||"";},"cliSearch");
     add("rec","기성·미수",canSee("rec"),function(){return liveRec();},function(x){return (x.client||"")+(x.amount?" · "+fmtAmount(x.amount)+"원":"");},function(x){return (x.desc||"")+(x.paid?" · 수금 "+x.paid:" · 미수");},"recSearch");
-    add("quote","견적서",canSee("con"),function(){return liveQuotes();},function(x){return (x.no||"")+" · "+(x.title||"");},function(x){return x.recv||"";});
+    add("quote","견적서",canSee("quote"),function(){return liveQuotes();},function(x){return (x.no||"")+" · "+(x.title||"");},function(x){return x.recv||"";});
     add("veh","차량",canSee("veh"),function(){return liveVehicles();},function(x){return (x.no||"")+" · "+(x.type||"");},function(x){return x.driver||x.own||"";},"vehSearch");
     add("lic","인허가",canSee("lic"),function(){return liveLic();},function(x){return x.name||"";},function(x){return (x.org||"")+(x.expiry?" · 만료 "+x.expiry:"");});
     add("doc","문서함",canSee("doc"),function(){return (typeof documents!=="undefined"?documents:[]).filter(function(d){return d&&d.del!==1;});},function(x){return x.title||x.name||x.doc_no||"(제목 없음)";},function(x){return x.doc_no||"";},"docSearch");
@@ -9824,7 +9824,8 @@
     var m = curMember();
     if (!m) return "hide";
     if (m.admin) return "do";
-    return (m.perms && m.perms[mod]) || "view";
+    // 견적서는 기본 숨김(닫고 시작 — 영업 직렬에게만 명시 부여, 서버 permOf와 동일 규칙)
+    return (m.perms && m.perms[mod]) || (mod === "quote" ? "hide" : "view");
   }
   function canDo(mod){ return permOf(mod) === "do"; }
   function canSee(mod){ return permOf(mod) !== "hide"; }
@@ -10296,7 +10297,7 @@
     hrOpenId = null;
   }
 
-  var MOD_LABEL = {tasks:"지시", veh:"차량", rec:"기성·수금", lic:"인허가", check:"주기 체크", con:"계약", cli:"거래처", doc:"문서함", bid:"입찰", wk:"일용직"};   // check 권한은 주기 체크리스트 영역만 제어(내게 온 지시·내 할 일은 전원) — 탭 이름(내 업무)과 구분
+  var MOD_LABEL = {tasks:"지시", veh:"차량", rec:"기성·수금", lic:"인허가", check:"주기 체크", con:"계약", cli:"거래처", doc:"문서함", bid:"입찰", wk:"일용직", quote:"견적서"};   // check 권한은 주기 체크리스트 영역만 제어(내게 온 지시·내 할 일은 전원) — 탭 이름(내 업무)과 구분
   // ---- 감사 로그 뷰어(관리자 전용, 서버 기록 열람) ----
   var AUDIT_COL_LABEL = {tasks:"지시", vehicles:"차량", receivables:"기성", licenses:"인허가", checklist:"업무", documents:"문서함", clients:"거래처", contracts:"계약", leaves:"휴가", member:"회원", login:"로그인"};
   var AUDIT_FIELD_LABEL = {status:"상태", title:"제목", who:"담당", who_id:"담당", due:"기한", amount:"금액", paid:"입금", del:"삭제", scope:"공개범위", stage:"단계", cancel_req:"취소요청", name:"이름", role:"직책", rank:"직급", dept:"부서", admin:"관리자", perms:"권한", hire_date:"입사일", leave_date:"퇴사일", seq:"연번", annual_base:"잔여연차기준", annual_base_date:"기준일", annual_days:"연차수동", loa_days:"휴직누적", on_loa:"휴직중", loa_start:"휴직시작", loa_end:"휴직종료", annual_paid:"연차수당포함", emp_type:"고용형태", annual_basis:"연차기준", reason:"사유", approver:"승인자", done_by:"완료자", detail:"상세", recur:"반복", hl:"하이라이트", mismatch:"불일치", PIN:"PIN"};
@@ -10347,7 +10348,8 @@
   }
   // 권한관리(별도 화면) — 매트릭스 표(S2-C, PM 지시): 셀 클릭마다 수행→보기→숨김 순환, 사람 단위 디바운스 자동 저장.
   // 구 아코디언(사람 펼침 → 드롭다운 → 저장 버튼)은 클릭 수가 많아 폐기 — 시안 표와 형태 일치.
-  var PERM_ORDER = ["tasks","rec","cli","con","veh","lic","doc","check","wk"];   // wk 누락 시 권한관리 UI에 일용직이 안 떠 저장에서 통째로 빠짐(서버 MODULES와 일치)
+  var PERM_ORDER = ["tasks","rec","cli","con","quote","veh","lic","doc","check","wk"];   // wk 누락 시 권한관리 UI에 일용직이 안 떠 저장에서 통째로 빠짐(서버 MODULES와 일치)
+  function pmVal(m, mod){ return (m.perms && m.perms[mod]) || (mod === "quote" ? "hide" : "view"); }   // 표시·순환 기본값 = permOf와 동일 규칙
   var PM_TXT = { do: "수행", view: "보기", hide: "숨김" };
   var PM_NEXT = { do: "view", view: "hide", hide: "do" };
   var pmSaveTimers = {};
@@ -10365,7 +10367,7 @@
         (m.admin ? '' : '<div class="pm-stat" id="pmstat-' + m.id + '"></div>') + '</td>';
       if (m.admin) return '<tr>' + info + '<td colspan="' + mods.length + '" class="pm-admin">관리자 — 모든 권한 고정</td></tr>';
       return '<tr>' + info + mods.map(function(mod){
-        var v = (m.perms && m.perms[mod]) || "view";
+        var v = pmVal(m, mod);
         return '<td><button type="button" class="pm-cell pm-' + v + '" data-pm-cyc="' + m.id + ':' + mod + '">' + PM_TXT[v] + '</button></td>';
       }).join("") + '</tr>';
     }).join("");
@@ -10382,7 +10384,7 @@
   function pmCycle(id, mod, btn){
     var m = findMember(id); if (!m || m.admin) return;
     if (!m.perms) m.perms = {};
-    var v = PM_NEXT[m.perms[mod] || "view"];
+    var v = PM_NEXT[pmVal(m, mod)];
     m.perms[mod] = v;
     btn.className = "pm-cell pm-" + v; btn.textContent = PM_TXT[v];
     var st = document.getElementById("pmstat-" + id); if (st) st.textContent = "변경 — 저장 대기";

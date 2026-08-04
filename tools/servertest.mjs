@@ -110,7 +110,14 @@ T('quotes 저장 → 200', r.code === 200, r.code + '/' + r.body.error_code);
 r = await call({ action: 'get', collection: 'quotes' }, tokA);
 T('quotes 조회 왕복(no 보존)', r.code === 200 && r.body.doc && (r.body.doc.items || []).length === 1 && r.body.doc.items[0].no === '202608-01');
 r = await call({ action: 'save', collection: 'quotes', doc: { schema: 1, items: [] } }, tokW, 'dev1');
-T('quotes: con 권한 없는 직원 쓰기 → 403 NO_WRITE', r.code === 403 && r.body.error_code === 'NO_WRITE');
+T('quotes: 권한 미부여 직원 쓰기 → 403 NO_WRITE', r.code === 403 && r.body.error_code === 'NO_WRITE');
+// 견적서 독립 권한(영업 직렬 전용): 기본값 숨김 — 명시 부여 없으면 읽기도 차단
+r = await call({ action: 'get', collection: 'quotes' }, tokW, 'dev1');
+T('quotes: 기본 숨김 → 읽기도 403 NO_ACCESS', r.code === 403 && r.body.error_code === 'NO_ACCESS', r.code + '/' + r.body.error_code);
+const SALES = { id: 'usales', name: '영업', admin: false, perms: { quote: 'do' } };
+mem.gw_users['member:usales'] = SALES;
+r = await call({ action: 'save', collection: 'quotes', doc: { schema: 1, items: [{ id: 'q9', no: '202608-09' }] } }, issueSession(SALES).token, 'dev1');
+T('quotes: 견적서 수행(영업) 부여 시 쓰기 가능', r.code === 200);
 
 // 15 버전 링 + 시점 복구(구 git 이력 복구가 Blobs 전환으로 무효가 된 자리 — S1-B)
 mem.gw_data['col:clients'] = { schema: 1, items: [{ id: 'c1', name: '원본' }, { id: 'c2', del: 1 }], updated_at: 5000 };
