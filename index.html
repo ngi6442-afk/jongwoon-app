@@ -806,7 +806,7 @@
     <button class="tab-btn active" data-tab="dash" id="tabDashBtn">홈</button>
     <div class="nav-group">관리</div>
     <button class="tab-btn" data-tab="tasks" id="tabTasksBtn">지시 <span class="tab-badge hide" id="taskTabBadge">0</span></button>
-    <button class="tab-btn" data-tab="rec" id="tabRecBtn">기성</button>
+    <button class="tab-btn" data-tab="rec" id="tabRecBtn">기성·미수</button>
     <button class="tab-btn" data-tab="cli" id="tabCliBtn">거래처</button>
     <button class="tab-btn perm-hidden" data-tab="hr" id="tabHrBtn">인사·직원 <span class="tab-badge hide" id="hrTabBadge">0</span></button>
     <button class="tab-btn perm-hidden" data-tab="workers" id="tabWkBtn">인사·일용직</button>
@@ -3652,7 +3652,7 @@
   });
 
   // ---- 탭 ----
-  var TAB_LABELS = {dash:"홈",tasks:"지시",rec:"기성",cli:"거래처",bid:"입찰",con:"계약",onbid:"부동산",hr:"인사",cal:"캘린더",veh:"차량",lic:"인허가",doc:"문서함",check:"내 업무",leave:"휴가",perm:"권한관리"};
+  var TAB_LABELS = {dash:"홈",tasks:"지시",rec:"기성·미수",cli:"거래처",bid:"입찰",con:"계약",onbid:"부동산",hr:"인사",cal:"캘린더",veh:"차량",lic:"인허가",doc:"문서함",check:"내 업무",leave:"휴가",perm:"권한관리"};
   function closeNav(){ var tb=document.getElementById("tabbar"); if(tb) tb.classList.remove("open"); }
   function updateNavToggle(name){ var nt=document.getElementById("navToggle"); if(nt) nt.textContent = "☰"; }
   function switchTab(name){
@@ -3842,7 +3842,7 @@
   // 구버전은 리포 git 이력을 봤지만 저장이 Blobs로 이관되며 무효(세션 토큰이라 401 + 이력 자체가 스테일).
   // mytasks는 개인별(priv) 저장이라 버전 링 대상이 아니므로 목록에서 제외.
   var RS_COLLS=[
-    ["tasks","지시"], ["contracts","계약"], ["receivables","기성(미수)"],
+    ["tasks","지시"], ["contracts","계약"], ["receivables","기성·미수"],
     ["clients","거래처"], ["vehicles","차량"], ["licenses","인허가"],
     ["documents","문서함"], ["leaves","휴가"], ["quotes","견적서"]
   ];
@@ -10270,7 +10270,7 @@
     hrOpenId = null;
   }
 
-  var MOD_LABEL = {tasks:"지시", veh:"차량", rec:"기성", lic:"인허가", check:"주기 체크", con:"계약", cli:"거래처", doc:"문서함", bid:"입찰", wk:"일용직"};   // check 권한은 주기 체크리스트 영역만 제어(내게 온 지시·내 할 일은 전원) — 탭 이름(내 업무)과 구분
+  var MOD_LABEL = {tasks:"지시", veh:"차량", rec:"기성·미수", lic:"인허가", check:"주기 체크", con:"계약", cli:"거래처", doc:"문서함", bid:"입찰", wk:"일용직"};   // check 권한은 주기 체크리스트 영역만 제어(내게 온 지시·내 할 일은 전원) — 탭 이름(내 업무)과 구분
   // ---- 감사 로그 뷰어(관리자 전용, 서버 기록 열람) ----
   var AUDIT_COL_LABEL = {tasks:"지시", vehicles:"차량", receivables:"기성", licenses:"인허가", checklist:"업무", documents:"문서함", clients:"거래처", contracts:"계약", leaves:"휴가", member:"회원", login:"로그인"};
   var AUDIT_FIELD_LABEL = {status:"상태", title:"제목", who:"담당", who_id:"담당", due:"기한", amount:"금액", paid:"입금", del:"삭제", scope:"공개범위", stage:"단계", cancel_req:"취소요청", name:"이름", role:"직책", rank:"직급", dept:"부서", admin:"관리자", perms:"권한", hire_date:"입사일", leave_date:"퇴사일", seq:"연번", annual_base:"잔여연차기준", annual_base_date:"기준일", annual_days:"연차수동", loa_days:"휴직누적", on_loa:"휴직중", loa_start:"휴직시작", loa_end:"휴직종료", annual_paid:"연차수당포함", emp_type:"고용형태", annual_basis:"연차기준", reason:"사유", approver:"승인자", done_by:"완료자", detail:"상세", recur:"반복", hl:"하이라이트", mismatch:"불일치", PIN:"PIN"};
