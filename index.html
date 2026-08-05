@@ -10726,14 +10726,25 @@
   function renderPermMgmt(){
     if (!isAdmin()){ switchTab("dash"); return; }
     var host = document.getElementById("permRoster"); if (!host) return;
-    var mem = liveMembers().slice().sort(function(a,b){ return ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role); });
+    // 퇴사자는 맨 아래 구분선 밑으로(서버가 접근을 이미 차단하므로 설정 대상이 아님 — 이력 보존용 표시만, PM 지시 2026-08-05)
+    var pmRetired = function(m){ return !!(m.leave_date && String(m.leave_date) <= todayStr()); };
+    var mem = liveMembers().slice().sort(function(a,b){
+      var ra = pmRetired(a) ? 1 : 0, rb = pmRetired(b) ? 1 : 0;
+      if (ra !== rb) return ra - rb;
+      return ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role);
+    });
     var mods = permModList();
     var head = '<tr><th class="pm-nm">이름</th>' + mods.map(function(x){ return '<th>' + MOD_LABEL[x] + '</th>'; }).join("") + '</tr>';
+    var retDivDone = false;
     var rows = mem.map(function(m){
+      var ret = pmRetired(m);
+      var div = "";
+      if (ret && !retDivDone){ retDivDone = true; div = '<tr><td colspan="' + (mods.length + 1) + '" style="color:var(--sub);font-size:12px;padding:8px 6px 4px;border-top:2px solid rgba(128,148,138,.35);">퇴사자 — 서버가 로그인·데이터 접근을 차단 중(설정 불필요, 이력 보존용)</td></tr>'; }
       var nm = isBossMember(m) ? (m.name + " (대표님)") : m.name;
-      var info = '<td class="pm-nm">' + esc(nm) + (m.admin ? ' 👑' : '') +
-        '<div class="pm-sub">' + esc((m.role||"") + (m.dept ? " · " + m.dept : "")) + '</div>' +
-        (m.admin ? '' : '<div class="pm-stat" id="pmstat-' + m.id + '"></div>') + '</td>';
+      var info = '<td class="pm-nm"' + (ret ? ' style="opacity:.55;"' : '') + '>' + esc(nm) + (m.admin ? ' 👑' : '') +
+        '<div class="pm-sub">' + esc((m.role||"") + (m.dept ? " · " + m.dept : "") + (ret ? " · 퇴사 " + m.leave_date : "")) + '</div>' +
+        (m.admin || ret ? '' : '<div class="pm-stat" id="pmstat-' + m.id + '"></div>') + '</td>';
+      if (ret) return div + '<tr>' + info + '<td colspan="' + mods.length + '" class="pm-admin" style="opacity:.55;">퇴사 — 접근 차단됨</td></tr>';
       if (m.admin) return '<tr>' + info + '<td colspan="' + mods.length + '" class="pm-admin">관리자 — 모든 권한 고정</td></tr>';
       return '<tr>' + info + mods.map(function(mod){
         var v = pmVal(m, mod);
