@@ -10717,8 +10717,8 @@
   }
   // 권한관리(별도 화면) — 매트릭스 표(S2-C, PM 지시): 셀 클릭마다 수행→보기→숨김 순환, 사람 단위 디바운스 자동 저장.
   // 구 아코디언(사람 펼침 → 드롭다운 → 저장 버튼)은 클릭 수가 많아 폐기 — 시안 표와 형태 일치.
-  var PERM_ORDER = ["tasks","rec","cli","con","quote","veh","lic","doc","check","wk"];   // wk 누락 시 권한관리 UI에 일용직이 안 떠 저장에서 통째로 빠짐(서버 MODULES와 일치)
-  function pmVal(m, mod){ return (m.perms && m.perms[mod]) || (mod === "quote" ? "hide" : "view"); }   // 표시·순환 기본값 = permOf와 동일 규칙
+  var PERM_ORDER = ["tasks","rec","cli","con","quote","promo","veh","lic","doc","check","wk"];   // MODULES와 반드시 일치(uismoke가 검사) — wk·promo 누락 사고 2회
+  function pmVal(m, mod){ return (m.perms && m.perms[mod]) || ((mod === "quote" || mod === "promo") ? "hide" : "view"); }   // 표시·순환 기본값 = permOf와 동일 규칙
   var PM_TXT = { do: "수행", view: "보기", hide: "숨김" };
   var PM_NEXT = { do: "view", view: "hide", hide: "do" };
   var pmSaveTimers = {};
