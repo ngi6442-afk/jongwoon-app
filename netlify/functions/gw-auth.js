@@ -11,7 +11,7 @@ const { issueSession, verifyToken, bearer } = require('./_lib/session');
 const { appendAudit, short } = require('./_lib/audit');
 
 const USERS = 'gw_users';
-const MODULES = ['tasks', 'veh', 'rec', 'lic', 'check', 'con', 'cli', 'doc', 'wk', 'quote'];   // wk(일용직) 누락으로 cleanPerms가 매 저장마다 버려 숨김·수행 설정이 불가능했음(프런트 레지스트리와 일치 필수). quote=견적서 탭(영업 문서 — 기본 숨김)
+const MODULES = ['tasks', 'veh', 'rec', 'lic', 'check', 'con', 'cli', 'doc', 'wk', 'quote', 'promo'];   // wk(일용직) 누락으로 cleanPerms가 매 저장마다 버려 숨김·수행 설정이 불가능했음(프런트 레지스트리와 일치 필수). quote=견적서·promo=홍보(둘 다 기본 숨김 — 명시 부여만)
 const LOCK_THRESHOLD = 5;                 // 연속 실패 허용 횟수
 const LOCK_MS = 15 * 60 * 1000;           // 잠금 시간(15분)
 function lockKey(name) { return `lock:${String(name).trim().toLowerCase()}`; }

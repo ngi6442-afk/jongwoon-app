@@ -12,7 +12,7 @@ const push = require('./_lib/push');
 const DATA = 'gw_data';
 const USERS = 'gw_users';
 // 컬렉션 → 권한키
-const COL = { tasks: 'tasks', vehicles: 'veh', receivables: 'rec', licenses: 'lic', checklist: 'check', documents: 'doc', clients: 'cli', contracts: 'con', leaves: 'leaves', bids: 'bid', onbid: 'bid', workers: 'wk', quotes: 'quote' };  // onbid=공매·부동산(관리자 전용), workers=일용직 명부(wk), quotes=견적서 탭 독립 권한(영업 문서 — 계약 파이프라인의 견적 "서류" 생성은 별개로 con 권한)
+const COL = { tasks: 'tasks', vehicles: 'veh', receivables: 'rec', licenses: 'lic', checklist: 'check', documents: 'doc', clients: 'cli', contracts: 'con', leaves: 'leaves', bids: 'bid', onbid: 'bid', workers: 'wk', quotes: 'quote', promo: 'promo' };  // onbid=공매·부동산(관리자 전용), workers=일용직 명부(wk), quotes=견적서 탭 독립 권한(영업 문서 — 계약 파이프라인의 견적 "서류" 생성은 별개로 con 권한), promo=홍보(현장 기록→블로그·갤러리)
 // 사용자별 비공개 컬렉션(본인만 접근, 회원 id로 분리 저장)
 const PRIVATE_COL = { mytasks: true };
 
@@ -37,8 +37,8 @@ async function currentMember(event) {
 function permOf(member, col) {
   if (member.admin) return 'do';
   const key = COL[col];
-  // 견적서는 기본 숨김(닫고 시작 — 영업 직렬에게만 명시 부여). 다른 모듈 기본은 보기
-  return (member.perms && member.perms[key]) || (key === 'quote' ? 'hide' : 'view');
+  // 견적서·홍보는 기본 숨김(닫고 시작 — 명시 부여만). 다른 모듈 기본은 보기
+  return (member.perms && member.perms[key]) || ((key === 'quote' || key === 'promo') ? 'hide' : 'view');
 }
 // 인가된 기기만 데이터 접근. 관리자는 항상 허용.
 async function deviceApproved(event, member) {
@@ -886,18 +886,18 @@ async function handleGradeParse(event, d, R) {
 async function handleAttPut(event, d, R) {
   const c = await currentMember(event);
   if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
-  if (permOf(c.member, 'contracts') !== 'do') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_WRITE', request_id: R });
+  if (permOf(c.member, 'contracts') !== 'do' && permOf(c.member, 'promo') !== 'do') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_WRITE', request_id: R });
   const name = String(d.name || '').slice(0, 120);
   const b64 = String(d.data || '');
   if (!name || !b64) return jr(400, { status: 'REJECTED', error_code: 'INVALID_FILE', request_id: R });
   if (b64.length > ATT_MAX) return jr(413, { status: 'REJECTED', error_code: 'FILE_TOO_LARGE', request_id: R });
   const id = 'att_' + crypto.randomBytes(8).toString('hex');
-  const kind = ['asbestos', 'contract', 'bldg', 'biz'].indexOf(String(d.kind || '')) >= 0 ? String(d.kind) : '';
+  const kind = ['asbestos', 'contract', 'bldg', 'biz', 'promo'].indexOf(String(d.kind || '')) >= 0 ? String(d.kind) : '';
   const w = await blobSet(store(FILES), id, { name: name, type: String(d.type || ''), kind: kind, data: b64, by: c.member.name, ts: Date.now() });
   if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
   try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'files', ev: [{ op: '첨부등록', id: id, t: name.slice(0, 60) }] }); } catch (e) {}
-  // 판독은 백그라운드 함수(gw-parse-background)에서 — 첨부는 즉시 완료(타임아웃 방지)
-  const wantParse = !!kind || /석면|사전조사|조사서|계약서|대장|등록증|신분증|면허증/.test(name);
+  // 판독은 백그라운드 함수(gw-parse-background)에서 — 첨부는 즉시 완료(타임아웃 방지). promo(현장 사진)는 판독 대상 아님
+  const wantParse = (!!kind && kind !== 'promo') || (kind !== 'promo' && /석면|사전조사|조사서|계약서|대장|등록증|신분증|면허증/.test(name));
   return jr(200, { status: 'OK', id: id, name: name, size: b64.length, parse_pending: wantParse, request_id: R });
 }
 
@@ -981,6 +981,28 @@ async function handleBldgLookup(event, d, R) {
     });
     return jr(200, { status: 'OK', parsed: p, total: Number(body.totalCount) || rows.length, rows: rows, request_id: R });
   } catch (e) { return jr(500, { status: 'ERROR', error_code: 'BLDG_API_FAILED', request_id: R }); }
+}
+
+// ---- 홍보: 사진 GPS 좌표 → 동 단위 지역명 (OSM Nominatim 역지오코딩, 좌표는 숫자만 통과 — SSRF 차단) ----
+async function handlePromoGeo(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (permOf(c.member, 'promo') === 'hide') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_ACCESS', request_id: R });
+  const lat = Number(d.lat), lon = Number(d.lon);
+  if (!isFinite(lat) || !isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) return jr(400, { status: 'REJECTED', error_code: 'BAD_COORD', request_id: R });
+  try {
+    const ac = new AbortController();
+    const tm = setTimeout(function () { ac.abort(); }, 6000);
+    const resp = await fetch('https://nominatim.openstreetmap.org/reverse?lat=' + lat + '&lon=' + lon + '&format=json&accept-language=ko&zoom=14',
+      { headers: { 'User-Agent': 'jongwoon-app/1.0 (promo; contact ngi6442@gmail.com)' }, signal: ac.signal });
+    clearTimeout(tm);
+    if (!resp.ok) return jr(502, { status: 'ERROR', error_code: 'GEO_' + resp.status, request_id: R });
+    const j = await resp.json();
+    const a = (j && j.address) || {};
+    const dong = String(a.suburb || a.quarter || a.village || a.town || a.borough || '').trim();
+    const city = String(a.city || a.county || '').trim();
+    return jr(200, { status: 'OK', dong: dong, city: city, full: String(j.display_name || '').slice(0, 200), request_id: R });
+  } catch (e) { return jr(502, { status: 'ERROR', error_code: 'GEO_FAILED', request_id: R }); }
 }
 
 // ---- 공고 첨부 내역서 가져오기 — 낙찰 연동 계약의 낙찰률 적용용(URL은 서버 저장 공고 데이터에서만 — SSRF 차단) ----
@@ -1203,6 +1225,7 @@ async function handler(event) {
     if (d && d.action === 'bids_export') return await handleBidsExport(event, d, R);
     if (d && d.action === 'bids_results') return await handleBidsResults(event, d, R);
     if (d && d.action === 'bldg_lookup') return await handleBldgLookup(event, d, R);
+    if (d && d.action === 'promo_geo') return await handlePromoGeo(event, d, R);
     if (d && d.action === 'bid_sheet') return await handleBidSheet(event, d, R);
     if (d && d.action === 'backup_list') return await handleBackupList(event, d, R);
     if (d && d.action === 'backup_get') return await handleBackupGet(event, d, R);

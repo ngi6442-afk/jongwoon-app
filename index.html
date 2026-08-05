@@ -815,6 +815,7 @@
     <button class="tab-btn perm-hidden" data-tab="bid" id="tabBidBtn">입찰 <span class="tab-badge hide" id="bidTabBadge">0</span></button>
     <button class="tab-btn" data-tab="con" id="tabConBtn">계약</button>
     <button class="tab-btn" data-tab="quote" id="tabQuoteBtn">견적서</button>
+    <button class="tab-btn perm-hidden" data-tab="promo" id="tabPromoBtn">홍보</button>
     <button class="tab-btn perm-hidden" data-tab="onbid" id="tabOnbidBtn">부동산</button>
     <div class="nav-divider"></div>
     <div class="nav-group">업무</div>
@@ -1051,6 +1052,15 @@
     <div class="card" id="qtList"><div class="loading">불러오는 중…</div></div>
   </section>
 
+  <!-- 홍보 — 현장 기록 → 블로그 초안·게시 추적 (시안 B 보드 + A 입력 결합, 2026-08-05 승인) -->
+  <section class="view" id="view-promo">
+    <div class="dash-sec" style="margin-bottom:8px;"><h2>홍보 <span class="cnt" id="promoHead"></span></h2></div>
+    <div style="font-size:13px;color:var(--sub);margin-bottom:6px;">현장 사진+정보 한 건 입력 → 블로그 초안 자동 생성(제목 5공식·본문 4틀 회전) → 관리자 검수 → 게시 추적. 사진은 <b>원본 화질</b>로 받아야 GPS 지역 자동 인식.</div>
+    <button class="link-btn" id="promoNewBtn">+ 현장 기록</button>
+    <div class="pipe-board" id="promoBoard" style="grid-template-columns:repeat(4,1fr);"></div>
+    <div class="card" style="font-size:12px;color:var(--sub);" id="promoVarState"></div>
+  </section>
+
   <!-- 인사·일용직 (권한 설정 가능) -->
   <section class="view" id="view-workers">
     <div class="dash-sec" style="margin-bottom:8px;"><h2>일용직 <span class="cnt" id="wkHead"></span></h2></div>
@@ -1181,6 +1191,51 @@
     <button class="primary" id="wkSave">저장</button>
     <button class="danger" id="wkDelete" style="display:none;">삭제</button>
     <button class="secondary" id="wkCancel">취소</button>
+  </div>
+</div>
+
+<!-- 홍보: 현장 기록 입력 -->
+<div class="modal-backdrop" id="promoAddBackdrop">
+  <div class="modal" style="max-width:560px;">
+    <h3>현장 기록</h3>
+    <p style="margin-bottom:8px;color:#888;font-size:13px;">사진을 넣으면 GPS로 지역(동 단위)을 자동 인식합니다 — 카톡 사진은 <b>원본 화질</b>로 받은 것만 GPS가 살아 있습니다. 저장하면 블로그 초안이 자동 생성되고 관리자 검수 대기로 들어갑니다.</p>
+    <button class="mini-btn" id="promoPhotoBtn">📷 사진 선택 (10~20장 권장)</button>
+    <input type="file" id="promoPhotoFile" accept=".jpg,.jpeg,.png" multiple style="display:none;">
+    <div id="promoPhotoInfo" style="font-size:12px;color:var(--sub);margin:6px 0;"></div>
+    <div id="promoThumbs" style="display:grid;grid-template-columns:repeat(6,1fr);gap:4px;margin-bottom:8px;"></div>
+    <span class="fld-label">지역 (동 단위)</span>
+    <input type="text" id="promoRegion" placeholder="사진 GPS로 자동 인식 — 없으면 직접 입력 (예: 포항 효곡동)" autocomplete="off">
+    <span class="fld-label">시설·대상</span>
+    <input type="text" id="promoFacility" placeholder="예: 상가 하수구 / 아파트 집수정 / 공장 배수로" autocomplete="off">
+    <span class="fld-label">문제·상황</span>
+    <input type="text" id="promoProblem" placeholder="예: 역류 / 침전물 퇴적 / 악취 민원" autocomplete="off">
+    <span class="fld-label">수치 (선택)</span>
+    <input type="text" id="promoMetric" placeholder="예: 침전물 3톤 / 관로 120m" autocomplete="off">
+    <div id="promoAddStat" style="font-size:12px;color:#1A9A6B;min-height:14px;"></div>
+    <button class="primary" id="promoSave">저장 → 초안 생성</button>
+    <button class="secondary" id="promoAddCancel">취소</button>
+  </div>
+</div>
+
+<!-- 홍보: 기록 상세·검수 -->
+<div class="modal-backdrop" id="promoDetailBackdrop">
+  <div class="modal" style="max-width:640px;">
+    <h3 id="promoDetTitle">기록 상세</h3>
+    <div id="promoDetMeta" style="font-size:12px;color:var(--sub);margin-bottom:8px;"></div>
+    <span class="fld-label">블로그 제목 (검수 시 수정 가능)</span>
+    <input type="text" id="promoDetBlogTitle" autocomplete="off">
+    <span class="fld-label">블로그 본문 초안</span>
+    <textarea id="promoDetBody" rows="12" style="width:100%;font-size:13px;"></textarea>
+    <div id="promoDetStat" style="font-size:12px;color:#1A9A6B;min-height:14px;"></div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;">
+      <button class="mini-btn" id="promoCopyBtn">📋 제목+본문 복사</button>
+      <button class="primary" id="promoApproveBtn" style="display:none;">검수 승인</button>
+      <button class="danger" id="promoRejectBtn" style="display:none;">반려</button>
+      <button class="primary" id="promoPostedBtn" style="display:none;">블로그 게시 완료로 표시</button>
+      <button class="mini-btn" id="promoResubmitBtn" style="display:none;">수정 후 재검수 요청</button>
+      <button class="danger" id="promoDelBtn" style="display:none;">기록 삭제</button>
+      <button class="secondary" id="promoDetClose">닫기</button>
+    </div>
   </div>
 </div>
 
@@ -1927,6 +1982,7 @@
   var BIDS_PATH = "data/bids.json";
   var ONBID_PATH = "data/onbid.json";
   var QUOTE_PATH = "data/quotes.json";
+  var PROMO_PATH = "data/promo.json";
   var CHECK_API = API_ROOT + CHECK_PATH;
   var TASKS_API = API_ROOT + TASKS_PATH;
   var VEH_API = API_ROOT + VEH_PATH;
@@ -1940,6 +1996,7 @@
   var BIDS_API = API_ROOT + BIDS_PATH;
   var ONBID_API = API_ROOT + ONBID_PATH;
   var QUOTE_API = API_ROOT + QUOTE_PATH;
+  var PROMO_API = API_ROOT + PROMO_PATH;
 
   try{ localStorage.removeItem("jw_app_token"); }catch(e){}   // 구 GitHub PAT 잔재 청소(S1-C) — 앱은 PAT를 더 이상 쓰지 않는다(전 호출이 서버 경유)
   var USER_KEY = "jw_app_user";
@@ -1952,15 +2009,15 @@
   var MEMBER_KEY = "jw_app_member";
 
   // 모듈 레지스트리 — 신규 탭 추가 시 여기 5곳(MODULES/MODULE_TAB/MODULE_VIEW/MOD_LABEL/ROLE_PRESET)에 등록하면 권한관리 UI·게이팅에 자동 반영. 모듈 id = 백엔드 gw-data COL 권한키와 일치시킬 것.
-  var MODULES = ["tasks", "veh", "rec", "lic", "check", "con", "cli", "doc", "wk", "quote"];  // 일감(bid)은 관리자 전용 고정이라 권한 목록에서 제외. quote=견적서 탭(기본 숨김)
-  var MODULE_TAB = {tasks:"tabTasksBtn", veh:"tabVehBtn", rec:"tabRecBtn", lic:"tabLicBtn", check:"tabCheckBtn", con:"tabConBtn", cli:"tabCliBtn", doc:"tabDocBtn", wk:"tabWkBtn", quote:"tabQuoteBtn"};  // bid는 계약 탭 내 섹션(자체 탭 없음)
-  var MODULE_VIEW = {tasks:"view-tasks", veh:"view-veh", rec:"view-rec", lic:"view-lic", check:"view-check", con:"view-con", cli:"view-cli", doc:"view-doc", wk:"view-workers", quote:"view-quote"};  // bid 섹션은 applyPerms에서 canSee로 표시
+  var MODULES = ["tasks", "veh", "rec", "lic", "check", "con", "cli", "doc", "wk", "quote", "promo"];  // 일감(bid)은 관리자 전용 고정이라 권한 목록에서 제외. quote=견적서·promo=홍보(둘 다 기본 숨김)
+  var MODULE_TAB = {tasks:"tabTasksBtn", veh:"tabVehBtn", rec:"tabRecBtn", lic:"tabLicBtn", check:"tabCheckBtn", con:"tabConBtn", cli:"tabCliBtn", doc:"tabDocBtn", wk:"tabWkBtn", quote:"tabQuoteBtn", promo:"tabPromoBtn"};  // bid는 계약 탭 내 섹션(자체 탭 없음)
+  var MODULE_VIEW = {tasks:"view-tasks", veh:"view-veh", rec:"view-rec", lic:"view-lic", check:"view-check", con:"view-con", cli:"view-cli", doc:"view-doc", wk:"view-workers", quote:"view-quote", promo:"view-promo"};  // bid 섹션은 applyPerms에서 canSee로 표시
   var ROLE_PRESET = {
-    "대표":   {admin:true,  perms:{tasks:"do", veh:"do", rec:"do", lic:"do", check:"do", con:"do", cli:"do", doc:"do", wk:"do", quote:"do"}},
-    "관리자": {admin:true,  perms:{tasks:"do", veh:"do", rec:"do", lic:"do", check:"do", con:"do", cli:"do", doc:"do", wk:"do", quote:"do"}},
-    "팀장":   {admin:false, perms:{tasks:"do", veh:"do", rec:"do", lic:"do", check:"do", con:"view", cli:"view", doc:"view", wk:"do", quote:"hide"}},
-    "직원":   {admin:false, perms:{tasks:"do", veh:"view", rec:"view", lic:"view", check:"do", con:"view", cli:"view", doc:"view", wk:"view", quote:"hide"}},
-    "현장직": {admin:false, perms:{tasks:"do", veh:"view", rec:"hide", lic:"hide", check:"do", con:"hide", cli:"hide", doc:"view", wk:"hide", quote:"hide"}}
+    "대표":   {admin:true,  perms:{tasks:"do", veh:"do", rec:"do", lic:"do", check:"do", con:"do", cli:"do", doc:"do", wk:"do", quote:"do", promo:"do"}},
+    "관리자": {admin:true,  perms:{tasks:"do", veh:"do", rec:"do", lic:"do", check:"do", con:"do", cli:"do", doc:"do", wk:"do", quote:"do", promo:"do"}},
+    "팀장":   {admin:false, perms:{tasks:"do", veh:"do", rec:"do", lic:"do", check:"do", con:"view", cli:"view", doc:"view", wk:"do", quote:"hide", promo:"hide"}},
+    "직원":   {admin:false, perms:{tasks:"do", veh:"view", rec:"view", lic:"view", check:"do", con:"view", cli:"view", doc:"view", wk:"view", quote:"hide", promo:"hide"}},
+    "현장직": {admin:false, perms:{tasks:"do", veh:"view", rec:"hide", lic:"hide", check:"do", con:"hide", cli:"hide", doc:"view", wk:"hide", quote:"hide", promo:"hide"}}
   };
   // 직급(정보용)·부서 목록 — 서열 순서(공개범위·결재라인에서 사용)
   var RANK_LIST = ["대표","이사","부장","차장","과장","대리","주임","사원"];
@@ -2161,6 +2218,7 @@
     if (u.indexOf("bids.json") >= 0) return "bids";
     if (u.indexOf("onbid.json") >= 0) return "onbid";
     if (u.indexOf("quotes.json") >= 0) return "quotes";
+    if (u.indexOf("promo.json") >= 0) return "promo";
     return null;
   }
   function onSessionInvalid(){ setGwToken(null); curMemberObj = null; if (typeof showMemberLogin === "function") showMemberLogin(); }
@@ -3680,6 +3738,8 @@
     document.getElementById("view-leave").classList.toggle("active", name === "leave");
     document.getElementById("view-quote").classList.toggle("active", name === "quote");
     if (name === "quote"){ renderQuotes(); loadQuotes(); }
+    document.getElementById("view-promo").classList.toggle("active", name === "promo");
+    if (name === "promo"){ renderPromo(); loadPromo(); }
 
     if (name === "cal") renderCalendar();
     if (name === "hr") renderHrRoster();
@@ -7923,6 +7983,307 @@
     document.getElementById("qtEditBackdrop").classList.remove("show"); qtEditId=null;
     quoteGen(rec.id);
   });
+  // ---- 홍보(promo): 현장 기록 → 블로그 초안 자동 생성(변주) → 검수 → 게시 추적 (시안 A+B 결합, 2026-08-05 승인) ----
+  // 유사문서 재발 방지가 핵심 사양: 제목 5공식 × 본문 4틀을 직전 기록과 다른 조합으로 강제 회전(블로그_작성지침_v1).
+  // 사진은 클라이언트에서 EXIF GPS 추출(원본 화질 전송본만 생존 — 실측 2026-08-05) 후 1600px 리사이즈해 서버 첨부(kind:promo).
+  var promoItems=[], promoSha=null, promoSaveTimer=null, promoPending=false, promoDetId=null;
+  var promoUpload={ photos:[], gps:null, busy:false };
+  function livePromo(){ return promoItems.filter(function(p){ return p && p.del!==1; }); }
+  function promoLast(){ var l=livePromo().slice().sort(function(a,b){ return (b.ts||0)-(a.ts||0); }); return l[0]||null; }
+
+  var PROMO_TITLE_NAMES=["지역+시설+해결","질문형","시기 훅","숫자·기록형","체크리스트형"];
+  var PROMO_BODY_NAMES=["이야기형","문답형","체크리스트형","기록형"];
+  function promoSeasonHook(){
+    var m=new Date().getMonth()+1;
+    if(m>=6&&m<=8) return "장마철";
+    if(m>=3&&m<=5) return "봄철";
+    if(m>=9&&m<=10) return "환절기";
+    return "겨울철";
+  }
+  var PROMO_TITLES=[
+    function(s){ return s.region+" "+s.facility+" "+s.problem+", 현장에서 이렇게 잡았습니다"; },
+    function(s){ return s.facility+" "+s.problem+"는 왜 생길까요? "+s.region+" 현장에서 본 원인"; },
+    function(s){ return promoSeasonHook()+" "+s.facility+" 점검을 미루면 생기는 일 — "+s.region+" 작업기"; },
+    function(s){ return (s.metric? s.metric+" 처리한 날":"오늘의 현장")+" — "+s.region+" "+s.facility+" "+s.problem+" 기록"; },
+    function(s){ return s.facility+" "+s.problem+" 맡기기 전 확인할 4가지 ("+s.region+" 현장 사진)"; }
+  ];
+  var PROMO_BODIES=[
+    function(s,n){ return "얼마 전 "+s.region+"의 한 현장에서 연락을 받았습니다. "+s.facility+"에 "+s.problem+" 문제가 생겼다는 내용이었습니다.\n\n[사진 1~2: 작업 전 상태]\n\n현장에 도착해 상태를 확인해 보니, 이런 경우 원인은 대체로 내부에 쌓인 침전물과 이물질입니다. 방치하면 증상이 반복되고 피해 범위가 넓어집니다.\n\n[사진 3~"+Math.max(3,n-2)+": 작업 과정]\n\n장비를 투입해 구간별로 작업을 진행했습니다."+(s.metric?" 이번 현장에서는 "+s.metric+"을 처리했습니다.":"")+"\n\n[사진 "+Math.max(4,n-1)+"~"+n+": 작업 후 상태]\n\n작업 후에는 같은 증상이 재발하지 않도록 상태를 확인하고 마무리했습니다. 비슷한 증상이 보이면 커지기 전에 점검을 받아보시길 권합니다.\n\n"; },
+    function(s,n){ return "Q. "+s.facility+"에 "+s.problem+"이(가) 생기는 이유는?\n내부에 쌓이는 침전물·이물질이 가장 흔한 원인입니다. 눈에 보이지 않는 구간에서 진행되기 때문에 증상이 나타났을 때는 이미 상당히 진행된 경우가 많습니다.\n\n[사진: 작업 전 상태]\n\nQ. 방치하면 어떻게 되나요?\n증상이 반복되고, 주변 구간까지 번져 처리 범위와 비용이 커집니다.\n\nQ. 어떻게 해결하나요?\n"+s.region+" 현장에서 진행한 이번 작업처럼 장비로 구간을 훑어 원인물을 제거하는 것이 기본입니다."+(s.metric?" 이번 작업 처리량은 "+s.metric+"입니다.":"")+"\n\n[사진: 작업 과정과 작업 후]\n\n증상이 의심되면 사진 몇 장으로도 초기 판단이 가능하니 문의 주시면 됩니다.\n\n"; },
+    function(s,n){ return s.facility+" "+s.problem+", 업체를 부르기 전에 이 네 가지를 먼저 확인해 보세요.\n\n1. 증상이 언제부터, 얼마나 자주 나타나는지\n2. 주변 구간에도 같은 증상이 있는지\n3. 마지막 점검·청소가 언제였는지\n4. 현장 접근로와 작업 공간이 확보되는지\n\n[사진: 이번 현장 상태]\n\n"+s.region+"의 이번 현장은 위 항목을 미리 확인해 주셔서 작업 판단이 빨랐습니다."+(s.metric?" 처리량은 "+s.metric+".":"")+"\n\n[사진: 작업 과정·작업 후]\n\n같은 상황이라면 참고가 되도록 작업 과정을 사진으로 남깁니다.\n\n"; },
+    function(s,n){ return s.region+" "+s.facility+" "+s.problem+" 작업 기록입니다.\n\n오전 — 현장 도착, 상태 확인\n[사진 1~2]\n증상 원인 파악 후 작업 구간을 정했습니다.\n\n작업 — 장비 투입\n[사진 3~"+Math.max(3,n-2)+"]\n구간별로 순차 작업."+(s.metric?" 처리량 "+s.metric+".":"")+"\n\n마무리 — 상태 확인\n[사진 "+Math.max(4,n-1)+"~"+n+"]\n작업 후 재발 요인이 없는지 확인하고 철수했습니다.\n\n비슷한 현장의 판단 자료가 되도록 기록을 남깁니다.\n\n"; }
+  ];
+  function promoDraft(s,photosN,fi,bi){
+    return { title:PROMO_TITLES[fi](s), body:PROMO_BODIES[bi](s,Math.max(photosN,4)) };
+  }
+
+  // JPEG EXIF에서 GPS만 추출(외부 라이브러리 없이). PNG·EXIF 없음·GPS 없음은 null.
+  function promoJpegGps(buf){
+    try{
+      var v=new DataView(buf);
+      if(v.byteLength<12 || v.getUint16(0)!==0xFFD8) return null;
+      var off=2;
+      while(off+4<=v.byteLength){
+        if(v.getUint8(off)!==0xFF) break;
+        var marker=v.getUint8(off+1);
+        if(marker===0xD8 || marker===0x01 || (marker>=0xD0&&marker<=0xD7)){ off+=2; continue; }
+        if(marker===0xDA) break;
+        var len=v.getUint16(off+2);
+        if(marker===0xE1 && len>=16 && v.getUint32(off+4)===0x45786966 && v.getUint16(off+8)===0){
+          var t=off+10;
+          var le=v.getUint16(t)===0x4949;
+          var u16=function(p){ return v.getUint16(p,le); }, u32=function(p){ return v.getUint32(p,le); };
+          if(u16(t+2)!==42) return null;
+          var ifd=t+u32(t+4), n=u16(ifd), gpsOff=0;
+          for(var i=0;i<n;i++){ var e=ifd+2+i*12; if(u16(e)===0x8825) gpsOff=t+u32(e+8); }
+          if(!gpsOff || gpsOff+2>v.byteLength) return null;
+          var rat=function(p){ var d=u32(p+4); return d? u32(p)/d : 0; };
+          var dms=function(p){ return rat(p)+rat(p+8)/60+rat(p+16)/3600; };
+          var lat=null,lon=null,latR="N",lonR="E",gn=u16(gpsOff);
+          for(var j=0;j<gn;j++){
+            var g=gpsOff+2+j*12, tag=u16(g);
+            if(tag===1) latR=String.fromCharCode(v.getUint8(g+8));
+            else if(tag===3) lonR=String.fromCharCode(v.getUint8(g+8));
+            else if(tag===2) lat=dms(t+u32(g+8));
+            else if(tag===4) lon=dms(t+u32(g+8));
+          }
+          if(lat===null || lon===null) return null;
+          if(latR==="S") lat=-lat;
+          if(lonR==="W") lon=-lon;
+          if(!isFinite(lat)||!isFinite(lon)||(lat===0&&lon===0)) return null;
+          return {lat:lat, lon:lon};
+        }
+        off+=2+len;
+      }
+    }catch(e){}
+    return null;
+  }
+  function promoResize(file){
+    return new Promise(function(res,rej){
+      var url=URL.createObjectURL(file), img=new Image();
+      img.onload=function(){
+        var mx=1600, sc=Math.min(1, mx/Math.max(img.width,img.height));
+        var c=document.createElement("canvas");
+        c.width=Math.max(1,Math.round(img.width*sc)); c.height=Math.max(1,Math.round(img.height*sc));
+        c.getContext("2d").drawImage(img,0,0,c.width,c.height);
+        URL.revokeObjectURL(url);
+        var du=c.toDataURL("image/jpeg",0.82);
+        res({ b64:du.slice(du.indexOf(",")+1), thumb:c });
+      };
+      img.onerror=function(){ URL.revokeObjectURL(url); rej(new Error("read")); };
+      img.src=url;
+    });
+  }
+  function promoThumbAdd(canvas){
+    var t=document.createElement("canvas"); t.width=72; t.height=72;
+    var s=Math.max(72/canvas.width,72/canvas.height);
+    t.getContext("2d").drawImage(canvas,(72-canvas.width*s)/2,(72-canvas.height*s)/2,canvas.width*s,canvas.height*s);
+    var img=document.createElement("img");
+    img.src=t.toDataURL("image/jpeg",0.6);
+    img.style.cssText="width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px;border:1px solid var(--line);";
+    document.getElementById("promoThumbs").appendChild(img);
+  }
+  function promoPhotoPick(files){
+    if(promoUpload.busy) return;
+    var list=Array.prototype.slice.call(files||[]).slice(0,20);
+    if(!list.length) return;
+    promoUpload.busy=true;
+    var info=document.getElementById("promoPhotoInfo");
+    var done=0, gpsHit=0;
+    var chain=Promise.resolve();
+    list.forEach(function(f){
+      chain=chain.then(function(){
+        info.textContent="사진 처리 중… "+(done+1)+"/"+list.length;
+        var isJpg=/\.jpe?g$/i.test(f.name)||f.type==="image/jpeg";
+        var gpsP = isJpg ? f.arrayBuffer().then(promoJpegGps).catch(function(){ return null; }) : Promise.resolve(null);
+        return gpsP.then(function(gps){
+          if(gps && !promoUpload.gps){ promoUpload.gps=gps; }
+          if(gps) gpsHit++;
+          return promoResize(f).then(function(r){
+            return gwCall("gw-data",{action:"att_put",name:f.name,type:"image/jpeg",kind:"promo",data:r.b64}).then(function(res){
+              if(res.status===200 && res.body && res.body.id){
+                promoUpload.photos.push({id:res.body.id, name:f.name, gps:!!gps});
+                promoThumbAdd(r.thumb);
+              }
+              done++;
+            });
+          });
+        }).catch(function(){ done++; });
+      });
+    });
+    chain.then(function(){
+      promoUpload.busy=false;
+      info.textContent="사진 "+promoUpload.photos.length+"장 업로드 · GPS 있는 사진 "+gpsHit+"장"+(gpsHit? "":" — 원본 화질 전송본인지 확인하세요");
+      var rg=document.getElementById("promoRegion");
+      if(promoUpload.gps && !rg.value.trim()){
+        gwCall("gw-data",{action:"promo_geo",lat:promoUpload.gps.lat,lon:promoUpload.gps.lon}).then(function(res){
+          if(res.status===200 && res.body && (res.body.dong||res.body.city)){
+            var city=String(res.body.city||"").replace(/시$/,"");
+            rg.value=(city? city+" ":"")+(res.body.dong||"");
+            rg.dataset.src="gps";
+          }
+        });
+      }
+    });
+  }
+
+  function loadPromo(){
+    var token=getToken(); if(!token) return;
+    fetch(PROMO_API,{headers:ghHeaders()}).then(function(resp){
+      if(resp.status===404){ promoSha=null; promoItems=[]; renderPromo(); return; }
+      if(!resp.ok) throw new Error("HTTP "+resp.status);
+      return resp.json().then(function(json){
+        promoSha=json.sha; var p=JSON.parse(b64DecodeUnicode(json.content));
+        var ri=(p&&p.items)||[];
+        promoItems = promoPending ? mergePromo(promoItems, ri) : ri;
+        renderPromo();
+      });
+    }).catch(function(){});
+  }
+  function mergePromo(local,remote){
+    var byId={}; (local||[]).forEach(function(q){ if(q&&q.id) byId[q.id]=q; });
+    (remote||[]).forEach(function(x){ if(!x||!x.id) return; var c=byId[x.id];
+      if(!c){ byId[x.id]=x; } else { var w=mTime(x)>mTime(c)?x:c; var m=Object.assign({},(w===x?c:x),w); if(c.del===1||x.del===1) m.del=mergeDel(c,x); byId[x.id]=m; } });
+    return Object.keys(byId).map(function(k){ return byId[k]; });
+  }
+  function schedulePromoSave(){ promoPending=true; if(promoSaveTimer) clearTimeout(promoSaveTimer); promoSaveTimer=setTimeout(doSavePromo,1200); }
+  function doSavePromo(){
+    var token=getToken(); if(!token) return;
+    var payload={message:"promo: 업데이트",content:b64EncodeUnicode(JSON.stringify({schema:1,items:promoItems})),branch:"main"};
+    if(promoSha) payload.sha=promoSha;
+    fetch(PROMO_API,{method:"PUT",headers:Object.assign({"Content-Type":"application/json"},ghHeaders()),body:JSON.stringify(payload)}).then(function(resp){
+      if(resp.status===401) return;
+      if(resp.status===409||resp.status===422){ return fetch(PROMO_API,{headers:ghHeaders()}).then(function(r){ return r.status===404?null:r.json(); }).then(function(j){ if(j){ var up={}; try{ up=JSON.parse(b64DecodeUnicode(j.content))||{}; }catch(e){} promoItems=mergePromo(promoItems,up.items||[]); promoSha=j.sha; } return doSavePromo(); }); }
+      return resp.json().then(function(json){ promoSha=json.content&&json.content.sha; promoPending=false; renderPromo(); });
+    }).catch(function(){});
+  }
+
+  var PROMO_COLS=[["review","검수 대기"],["rejected","반려"],["approved","게시 대기"],["posted","게시 완료"]];
+  function promoStamp(p){ p.updated=todayStr(); p.updated_ts=Date.now(); }
+  function renderPromo(){
+    var host=document.getElementById("promoBoard"); if(!host) return;
+    var head=document.getElementById("promoHead");
+    var list=livePromo();
+    if(head) head.textContent=list.length? ("총 "+list.length+"건") : "";
+    var btn=document.getElementById("promoNewBtn");
+    if(btn) btn.style.display = canDo("promo") ? "" : "none";
+    host.innerHTML=PROMO_COLS.map(function(col){
+      var items=list.filter(function(p){ return (p.status||"review")===col[0]; }).sort(function(a,b){ return (b.ts||0)-(a.ts||0); });
+      var shown=col[0]==="posted"? items.slice(0,10) : items;
+      return '<div class="pipe-col"><h3>'+col[1]+' <span>'+items.length+'</span></h3>'
+        + (shown.length? shown.map(function(p){
+            return '<div class="pipe-card" data-pr="'+esc(p.id)+'"><b>'+esc(p.title||"(제목 없음)")+'</b>'
+              +'<div class="s">'+esc(p.region||"지역 미정")+' · '+esc(p.facility||"")+' · 사진 '+((p.photos||[]).length)+'장</div>'
+              +'<div class="s">'+esc(PROMO_TITLE_NAMES[p.fi]||"")+' · '+esc(PROMO_BODY_NAMES[p.bi]||"")+' · '+esc(p.by||"")+' '+esc((p.updated||""))+(p.note?' · 반려: '+esc(p.note):'')+'</div></div>';
+          }).join("") : '<div class="s" style="color:var(--sub);padding:4px;">없음</div>')
+        + '</div>';
+    }).join("");
+    Array.prototype.forEach.call(host.querySelectorAll(".pipe-card"),function(el){
+      el.addEventListener("click",function(){ promoOpenDetail(el.getAttribute("data-pr")); });
+    });
+    var vs=document.getElementById("promoVarState");
+    if(vs){
+      var last=promoLast();
+      var nf=last? (last.fi+1)%5 : 0, nb=last? (last.bi+1)%4 : 0;
+      vs.innerHTML="변주 상태 — 직전: "+(last? esc(PROMO_TITLE_NAMES[last.fi]||"")+" · "+esc(PROMO_BODY_NAMES[last.bi]||"") : "없음")
+        +" / 다음 기록: <b>"+esc(PROMO_TITLE_NAMES[nf])+" · "+esc(PROMO_BODY_NAMES[nb])+"</b> (직전과 같은 조합 자동 회피 · 발행 시각 분산은 붙여넣는 사람이 지킬 것)";
+    }
+  }
+  function promoFind(id){ return promoItems.filter(function(p){ return p&&p.id===id; })[0]||null; }
+  function promoOpenDetail(id){
+    var p=promoFind(id); if(!p) return;
+    promoDetId=id;
+    document.getElementById("promoDetTitle").textContent="기록 상세 — "+(PROMO_COLS.filter(function(c){return c[0]===(p.status||"review");})[0]||["","기록"])[1];
+    document.getElementById("promoDetMeta").textContent=(p.region||"지역 미정")+" · "+(p.facility||"")+" · "+(p.problem||"")+(p.metric?" · "+p.metric:"")+" · 사진 "+((p.photos||[]).length)+"장 · "+(p.by||"")+" · "+(p.updated||"")+(p.gps? " · GPS 자동":" · 지역 수동");
+    document.getElementById("promoDetBlogTitle").value=p.title||"";
+    document.getElementById("promoDetBody").value=p.body||"";
+    document.getElementById("promoDetStat").textContent="";
+    var st=p.status||"review";
+    document.getElementById("promoApproveBtn").style.display=(isAdmin()&&st==="review")?"":"none";
+    document.getElementById("promoRejectBtn").style.display=(isAdmin()&&st==="review")?"":"none";
+    document.getElementById("promoPostedBtn").style.display=(canDo("promo")&&st==="approved")?"":"none";
+    document.getElementById("promoResubmitBtn").style.display=(canDo("promo")&&st==="rejected")?"":"none";
+    document.getElementById("promoDelBtn").style.display=isAdmin()?"":"none";
+    document.getElementById("promoDetailBackdrop").classList.add("show");
+  }
+  function promoDetApplyEdits(p){
+    p.title=document.getElementById("promoDetBlogTitle").value.trim()||p.title;
+    p.body=document.getElementById("promoDetBody").value;
+  }
+  document.getElementById("promoNewBtn").addEventListener("click",function(){
+    if(!canDo("promo")) return;
+    promoUpload={ photos:[], gps:null, busy:false };
+    document.getElementById("promoThumbs").innerHTML="";
+    document.getElementById("promoPhotoInfo").textContent="";
+    document.getElementById("promoAddStat").textContent="";
+    ["promoRegion","promoFacility","promoProblem","promoMetric"].forEach(function(i){ var el=document.getElementById(i); el.value=""; delete el.dataset.src; });
+    document.getElementById("promoAddBackdrop").classList.add("show");
+  });
+  document.getElementById("promoPhotoBtn").addEventListener("click",function(){ document.getElementById("promoPhotoFile").click(); });
+  document.getElementById("promoPhotoFile").addEventListener("change",function(){ promoPhotoPick(this.files); this.value=""; });
+  document.getElementById("promoAddCancel").addEventListener("click",function(){ document.getElementById("promoAddBackdrop").classList.remove("show"); });
+  document.getElementById("promoSave").addEventListener("click",function(){
+    var stat=document.getElementById("promoAddStat");
+    if(promoUpload.busy){ stat.textContent="사진 업로드가 끝날 때까지 잠시만요."; return; }
+    var region=document.getElementById("promoRegion").value.trim();
+    var facility=document.getElementById("promoFacility").value.trim();
+    var problem=document.getElementById("promoProblem").value.trim();
+    var metric=document.getElementById("promoMetric").value.trim();
+    if(!region||!facility||!problem){ stat.textContent="지역·시설·문제는 필수입니다."; return; }
+    if(!promoUpload.photos.length){ stat.textContent="사진을 1장 이상 넣어주세요."; return; }
+    var last=promoLast();
+    var fi=last? (last.fi+1)%5 : 0, bi=last? (last.bi+1)%4 : 0;
+    var d=promoDraft({region:region,facility:facility,problem:problem,metric:metric},promoUpload.photos.length,fi,bi);
+    var item={ id:genId("pr"), ts:Date.now(), by:getUser(), region:region,
+      regionSrc:(document.getElementById("promoRegion").dataset.src==="gps"?"gps":"manual"),
+      facility:facility, problem:problem, metric:metric,
+      photos:promoUpload.photos.slice(), gps:promoUpload.gps, fi:fi, bi:bi,
+      title:d.title, body:d.body, status:"review", note:"" };
+    promoStamp(item);
+    promoItems.push(item);
+    schedulePromoSave(); renderPromo();
+    document.getElementById("promoAddBackdrop").classList.remove("show");
+  });
+  document.getElementById("promoDetClose").addEventListener("click",function(){ document.getElementById("promoDetailBackdrop").classList.remove("show"); promoDetId=null; });
+  document.getElementById("promoCopyBtn").addEventListener("click",function(){
+    var t=document.getElementById("promoDetBlogTitle").value, b=document.getElementById("promoDetBody").value;
+    var ok=function(){ document.getElementById("promoDetStat").textContent="복사됨 — 블로그 글쓰기에 붙여넣고 사진을 [사진] 자리에 배치하세요."; };
+    if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(t+"\n\n"+b).then(ok); }
+    else{ var ta=document.createElement("textarea"); ta.value=t+"\n\n"+b; document.body.appendChild(ta); ta.select(); try{ document.execCommand("copy"); ok(); }catch(e){} document.body.removeChild(ta); }
+  });
+  document.getElementById("promoApproveBtn").addEventListener("click",function(){
+    var p=promoFind(promoDetId); if(!p||!isAdmin()) return;
+    promoDetApplyEdits(p); p.status="approved"; p.note=""; promoStamp(p);
+    schedulePromoSave(); renderPromo();
+    document.getElementById("promoDetailBackdrop").classList.remove("show");
+  });
+  document.getElementById("promoRejectBtn").addEventListener("click",function(){
+    var p=promoFind(promoDetId); if(!p||!isAdmin()) return;
+    var why=prompt("반려 사유 (작성자에게 표시됩니다)"); if(why===null) return;
+    promoDetApplyEdits(p); p.status="rejected"; p.note=String(why||"").slice(0,120); promoStamp(p);
+    schedulePromoSave(); renderPromo();
+    document.getElementById("promoDetailBackdrop").classList.remove("show");
+  });
+  document.getElementById("promoPostedBtn").addEventListener("click",function(){
+    var p=promoFind(promoDetId); if(!p||!canDo("promo")) return;
+    promoDetApplyEdits(p); p.status="posted"; promoStamp(p);
+    schedulePromoSave(); renderPromo();
+    document.getElementById("promoDetailBackdrop").classList.remove("show");
+  });
+  document.getElementById("promoResubmitBtn").addEventListener("click",function(){
+    var p=promoFind(promoDetId); if(!p||!canDo("promo")) return;
+    promoDetApplyEdits(p); p.status="review"; p.note=""; promoStamp(p);
+    schedulePromoSave(); renderPromo();
+    document.getElementById("promoDetailBackdrop").classList.remove("show");
+  });
+  document.getElementById("promoDelBtn").addEventListener("click",function(){
+    var p=promoFind(promoDetId); if(!p||!isAdmin()) return;
+    if(!confirm("이 기록을 삭제할까요? (사진 첨부는 서버에 남습니다)")) return;
+    p.del=1; promoStamp(p);
+    schedulePromoSave(); renderPromo();
+    document.getElementById("promoDetailBackdrop").classList.remove("show");
+  });
+
   // ---- 낙찰하한가 계산기 ----
   var bcQualKind="";   // 계산기를 연 공고의 공종·제목(적격 통과선 안내용)
   var bcQualMethod=""; // 낙찰방법(sucsfbidMthdNm) — 산식 분기 기준. 없으면 통과선을 내지 않는다.
@@ -10305,7 +10666,7 @@
     hrOpenId = null;
   }
 
-  var MOD_LABEL = {tasks:"지시", veh:"차량", rec:"기성·수금", lic:"인허가", check:"주기 체크", con:"계약", cli:"거래처", doc:"문서함", bid:"입찰", wk:"일용직", quote:"견적서"};   // check 권한은 주기 체크리스트 영역만 제어(내게 온 지시·내 할 일은 전원) — 탭 이름(내 업무)과 구분
+  var MOD_LABEL = {tasks:"지시", veh:"차량", rec:"기성·수금", lic:"인허가", check:"주기 체크", con:"계약", cli:"거래처", doc:"문서함", bid:"입찰", wk:"일용직", quote:"견적서", promo:"홍보"};   // check 권한은 주기 체크리스트 영역만 제어(내게 온 지시·내 할 일은 전원) — 탭 이름(내 업무)과 구분
   // ---- 감사 로그 뷰어(관리자 전용, 서버 기록 열람) ----
   var AUDIT_COL_LABEL = {tasks:"지시", vehicles:"차량", receivables:"기성", licenses:"인허가", checklist:"업무", documents:"문서함", clients:"거래처", contracts:"계약", leaves:"휴가", member:"회원", login:"로그인"};
   var AUDIT_FIELD_LABEL = {status:"상태", title:"제목", who:"담당", who_id:"담당", due:"기한", amount:"금액", paid:"입금", del:"삭제", scope:"공개범위", stage:"단계", cancel_req:"취소요청", name:"이름", role:"직책", rank:"직급", dept:"부서", admin:"관리자", perms:"권한", hire_date:"입사일", leave_date:"퇴사일", seq:"연번", annual_base:"잔여연차기준", annual_base_date:"기준일", annual_days:"연차수동", loa_days:"휴직누적", on_loa:"휴직중", loa_start:"휴직시작", loa_end:"휴직종료", annual_paid:"연차수당포함", emp_type:"고용형태", annual_basis:"연차기준", reason:"사유", approver:"승인자", done_by:"완료자", detail:"상세", recur:"반복", hl:"하이라이트", mismatch:"불일치", PIN:"PIN"};
