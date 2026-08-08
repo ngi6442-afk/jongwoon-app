@@ -37,8 +37,8 @@ h2{font-size:13px;margin-bottom:8px}
 
 <div class="view on" id="v-home">
   <h1>진척도</h1><span class="date">2026-08-08 · 추정 · 클릭=상세</span>
-  <div class="hero">59%<small>큰틀 4개 평균</small></div>
-  <div class="row" onclick="go('v1')"><b>1&nbsp; 업무플랫폼</b><div class="track"><div class="fillb" style="width:75%"></div><span>75</span></div></div>
+  <div class="hero">58%<small>큰틀 4개 평균</small></div>
+  <div class="row" onclick="go('v1')"><b>1&nbsp; 업무플랫폼</b><div class="track"><div class="fillb" style="width:73%"></div><span>73</span></div></div>
   <div class="row focus" onclick="go('v2')"><b>2&nbsp; 인증·자격 &nbsp;◀ 오늘</b><div class="track"><div class="fillb" style="width:45%"></div><span>45</span></div></div>
   <div class="row" onclick="go('v3')"><b>3&nbsp; 홍보·검색노출</b><div class="track"><div class="fillb" style="width:65%"></div><span>65</span></div></div>
   <div class="row" onclick="go('v4')"><b>4&nbsp; 경영 기반</b><div class="track"><div class="fillb" style="width:50%"></div><span>50</span></div></div>
@@ -49,14 +49,14 @@ h2{font-size:13px;margin-bottom:8px}
   <div class="item"><span class="m">☐</span>2. 점검 2건(주소 상세·투자합) → [설립신고제출] · PM</div>
   <div class="item"><span class="m">☐</span>3. 화관법 봇 실전 1건(--submit --max 1, 참관) — 통과 시 매일 4~6건 수작업 소멸 · PM+AI</div>
   <div class="item"><span class="m">☐</span>4. 직원 PIN 발급·안내문 배포 — 플랫폼 병목(30) 해소 관문 · PM</div>
-  <div class="item"><span class="m">☐</span>5. 블로그 첫 글 소재(직원 사진 1장) — 홍보 병목=콘텐츠, 30일 타이머 미시작 · PM→직원</div>
+  <div class="item"><span class="m">☐</span>5. 블로그 최근 글 확인 → 30일 타이머 상태 재판정 (게시됨 — 뭘로 올렸는지 파악) · PM/AI</div>
   <div class="item"><span class="m">☐</span>6. 활용신청·포털 변경신청 승인 확인 — 수주 어댑터 대기 · 외부</div>
   <div class="foot">갱신: "진척도 갱신해" · 문서판: 진척도_큰틀.html</div>
 </div>
 
 <div class="view" id="v1">
   <span class="back" onclick="go('v-home')">← 큰틀로</span>
-  <h1>1 업무플랫폼 — 75%</h1>
+  <h1>1 업무플랫폼 — 73%</h1>
   <div class="row" onclick="go('v1-1')" style="margin-top:10px"><b>데이터·보안</b><div class="track"><div class="fillb t" style="width:98%"></div><span>98</span></div></div>
   <div class="row" onclick="go('v1-2')"><b>돈 (기성·미수)</b><div class="track"><div class="fillb t" style="width:90%"></div><span>90</span></div></div>
   <div class="row" onclick="go('v1-3')"><b>운영 모듈</b><div class="track"><div class="fillb t" style="width:90%"></div><span>90</span></div></div>
@@ -67,13 +67,16 @@ h2{font-size:13px;margin-bottom:8px}
   <div class="row" onclick="go('v1-8')"><b>실적·자격 DB (기능)</b><div class="track"><div class="fillb c" style="width:40%"></div><span>40</span></div></div>
   <div class="row focus" onclick="go('v1-9')"><b>직원 실사용 확산 &nbsp;◀ 병목</b><div class="track"><div class="fillb c" style="width:30%"></div><span>30</span></div></div>
   <div class="row" onclick="go('v1-10')"><b>외부신고 자동화 (화관법 운반계획서) &nbsp;· 실전 1건 대기</b><div class="track"><div class="fillb t" style="width:90%"></div><span>90</span></div></div>
+  <div class="row" onclick="go('v1-11')"><b>운행일지·배차 자동화 &nbsp;· 신규</b><div class="track"><div class="fillb c" style="width:15%"></div><span>15</span></div></div>
+  <div class="row" onclick="go('v1-12')"><b>기기·표면 배치도 → 대표 자동보고 &nbsp;· 키스톤</b><div class="track"><div class="fillb c" style="width:8%"></div><span>8</span></div></div>
   <hr>
-  <h2>지금 중요한 순서 — 업무플랫폼 (상위 5)</h2>
+  <h2>지금 중요한 순서 — 업무플랫폼 (상위 6)</h2>
   <div class="item now"><span class="m">▶</span>1. 화관법 봇 실전 1건 테스트(참관) — dry-run 완성, 이 1건이 완성 관문 · PM+AI</div>
-  <div class="item"><span class="m">☐</span>2. 직원 PIN 발급 (인사 카드) — 병목 해소 관문 · PM</div>
-  <div class="item"><span class="m">☐</span>3. 안내문 배포 → 기기승인 → 첫 주 수집 — 실직원 검증 0건 상태 · PM</div>
-  <div class="item"><span class="m">☐</span>4. 활용신청 승인 확인 → 승인분부터 어댑터 각 30분 · 외부→AI</div>
-  <div class="item"><span class="m">☐</span>5. 포털 변경신청 승인 대기 — 수집 사활, 죽으면 이것부터 의심 · 외부</div>
+  <div class="item"><span class="m">☐</span>2. 기기·표면 배치도 확정 — 자동 팝업/파이프라인 前 선행(키스톤) · PM+AI</div>
+  <div class="item"><span class="m">☐</span>3. 운행일지·배차 — 올바로 HAR+엑셀·권민지 양식 오면 착수(2-3일) · PM+권민지</div>
+  <div class="item"><span class="m">☐</span>4. 직원 PIN 발급 (인사 카드) — 병목 해소 관문 · PM</div>
+  <div class="item"><span class="m">☐</span>5. 안내문 배포 → 기기승인 → 첫 주 수집 — 실직원 검증 0건 상태 · PM</div>
+  <div class="item"><span class="m">☐</span>6. 활용신청·포털 변경신청 승인 확인 — 수집 사활 · 외부</div>
 </div>
 
 <div class="view" id="v1-1"><span class="back" onclick="go('v1')">← 업무플랫폼</span>
@@ -165,6 +168,26 @@ h2{font-size:13px;margin-bottom:8px}
   <div class="note">상세=화관법_자동화\진행상태.md · 대안=Tampermonkey 유저스크립트(설치_사용안내.md)</div>
 </div>
 
+<div class="view" id="v1-11"><span class="back" onclick="go('v1')">← 업무플랫폼</span>
+  <h1>운행일지·배차 자동화 — 15 (신규)</h1>
+  <div class="item done" style="margin-top:10px"><span class="m">☑</span>일일운반일지 결과물 시안 완성 (08_앱_시안\일일운반일지_시안.html)</div>
+  <div class="item done"><span class="m">☑</span>운행기록 입력 탭 시안 완성 (08_앱_시안\운행기록_탭_시안.html)</div>
+  <div class="item done"><span class="m">☑</span>경로 확정 — 올바로 로그인=ID/PW(인증서는 작성용만), EDI/API는 과함 판정 → 엑셀 다운 방식 유지</div>
+  <div class="item now"><span class="m">▶</span>올바로 운반인계서 내역 → 일일운반일지(한 장) · 이 문서가 대표 결재 대상 · 현행=매일 수기</div>
+  <div class="item"><span class="m">☐</span>일반 화물 운송(비폐기물=신고대상 아님) 수기 입력 → 같은 일지에 합본</div>
+  <div class="item"><span class="m">☐</span>미래 피벗: 기사 앱에서 운행 시작/종료 버튼 → 올바로 안 기다리고 즉시 일지 (GPS 수행완료 연계)</div>
+  <div class="item"><span class="m">☐</span>대기: 권민지 원본 양식 · PM 올바로 HAR+엑셀 샘플 · 인증서 창 여부 · 실무 작성절차 면밀 확인</div>
+  <div class="note">방법론=화관법 봇과 동일(HAR→파서→로컬 secret.json). 2-3일 딜레이 허용은 대표 확인 필요(현행 매일).</div>
+</div>
+<div class="view" id="v1-12"><span class="back" onclick="go('v1')">← 업무플랫폼</span>
+  <h1>기기·표면 배치도 → 대표 자동보고 — 8 (키스톤)</h1>
+  <div class="item now" style="margin-top:10px"><span class="m">▶</span>키스톤: "누가 어느 기기서 무엇을" 배치도 먼저 정의·확정 (PM 3기기·대표 3기기·직원 2기기·현장 폰) — 자동 팝업 前 선행</div>
+  <div class="item done"><span class="m">☑</span>첫 사례 = 진척도 4표면(집벽지·폰위젯·랩탑벽지·상세) + 원격조종 세팅 완료(8/8)</div>
+  <div class="item"><span class="m">☐</span>대표 오피스 더블모니터: 일일운행일지 자동 생성·보고 팝업 (또는 전원 인가 시 자동 실행)</div>
+  <div class="item"><span class="m">☐</span>종이 보고서류 전부 → 대표 홈오피스·사장실·개인전화 디지털 수신</div>
+  <div class="note">배치도 확정 → 그 위에 자동 팝업/파이프라인 설계. 진척도에만 유지, 착수는 지시로. 상세=메모리 device-surface-topology.</div>
+</div>
+
 <div class="view" id="v2">
   <span class="back" onclick="go('v-home')">← 큰틀로</span>
   <h1>2 인증·자격 — 45% · 오늘</h1>
@@ -254,6 +277,7 @@ h2{font-size:13px;margin-bottom:8px}
   <div class="item"><span class="m">☐</span>색인요청은 위 반영 후에만 유효 — 그 전 요청은 무한반복</div>
   <div class="item"><span class="m">☐</span>구글 비즈니스 프로필 — 사장님 대면 시 처리(전화 인증 필요) · 외부 대기</div>
   <div class="item done"><span class="m">☑</span>서치어드바이저 이슈 판독(8/7) — 실이슈 description 3건 PR #306 해소, 나머지 의도된 것</div>
+  <div class="item now"><span class="m">▶</span>최근 블로그 글 게시 확인 — 뭘로 작성·게시했는지 파악(첫 새 공식 글이면 30일 회복 타이머 트리거 — "미시작" 상태 재판정) · PM/AI</div>
   <div class="item"><span class="m">☐</span>블로그 회복 추적 — 기존 44건 보존, 새 공식 30일 후 검색 유입 판정</div>
   <div class="item"><span class="m">☐</span>보조 완료(8/7): 재수집 8URL 제출 · 진단 판독(실이슈=description 3건→PR #306 라이브 해소, 나머지 의도된 것) · 디렉토리 조사→후보.md</div>
   <div class="note">디렉토리 백링크(상공회의소·협회)는 장기 레버 · 지침: 05_홍보_검색노출\블로그_작성지침_v1.md</div>
