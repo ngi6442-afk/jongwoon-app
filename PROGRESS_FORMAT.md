@@ -35,9 +35,9 @@
 - **색 = 의미**: teal ≥85 / amber 50~84 / coral <50. 3계열만.
 - **병목이 주인공** — 요약 문장은 "무엇이 끌어내리는가"로 시작.
 - **수치는 추정 명기** + 산정 근거 한 줄. 정밀화 요청 시에만 전수 카운트.
-- 렌더링(2026-08-06 PM 확정, B안): `Desktop\작업\00_진척도\`의 **HTML 6종**이 기본 — 진척도_큰틀.html(허브)·상세 4종 + **wallpaper.html**(다크·우측 패널 640px·시작점 36vh 고정(아래로만 성장)·클릭 시 같은 페이지 안에서 층 전환·90초 자동 reload). 벽지 층 구성: 홈=큰틀 4바+**전체 가중치 상위 6** / 2층=분류 바+**그 큰틀 가중치 상위 5**(번호·담당 표기) / 3층=분류별 완전 상세(버전·경로·금지사항 포함). 가중치 기준: 마감 임박 > 병목 해소 관문 > 외부 대기 추적 > 장기. wallpaper.html은 **Lively Wallpaper**(설치됨)가 바탕화면에 라이브 렌더. "진척도 갱신해" 시 HTML 6종만 다시 쓰면 벽지 자동 반영. 벽지_진척도.png(+벽지생성.py)는 Lively 꺼졌을 때 정적 폴백.
+- 렌더링(2026-08-06 PM 확정, B안): `Desktop\work\00_진척도\`의 **HTML 6종**이 기본 — 진척도_큰틀.html(허브)·상세 4종 + **wallpaper.html**(다크·우측 패널 640px·시작점 36vh 고정(아래로만 성장)·클릭 시 같은 페이지 안에서 층 전환·90초 자동 reload). 벽지 층 구성: 홈=큰틀 4바+**전체 가중치 상위 6** / 2층=분류 바+**그 큰틀 가중치 상위 5**(번호·담당 표기) / 3층=분류별 완전 상세(버전·경로·금지사항 포함). 가중치 기준: 마감 임박 > 병목 해소 관문 > 외부 대기 추적 > 장기. wallpaper.html은 **Lively Wallpaper**(설치됨)가 바탕화면에 라이브 렌더. "진척도 갱신해" 시 HTML 6종만 다시 쓰면 벽지 자동 반영. 벽지_진척도.png(+벽지생성.py)는 Lively 꺼졌을 때 정적 폴백.
 - Lively 연결 세부(재설정 시 참고): 라이브러리 항목 `%LOCALAPPDATA%\Lively Wallpaper\Library\wallpapers\jinchokdo.claude\LivelyInfo.json`(Type 1, FileName=`C:\jw-progress\wallpaper.html`, IsAbsolutePath true — `C:\jw-progress`는 00_진척도로의 정션). **주의: WallpaperLayout.json의 LivelyInfoPath는 json이 아니라 폴더 경로, 화면 키는 `Display`**(v2.2.1 스키마 — LivelyScreen·json경로로 쓰면 "LivelyInfo.json not found"로 조용히 실패). 대화 내 위젯은 보조.
-- 갱신 원천: FEATURES.md + HANDOFF.md §5 — 어긋나면 그 둘이 맞다. 인증·홍보·경영은 메모리와 Desktop\작업\01~13 폴더 산출물 기준.
+- 갱신 원천: FEATURES.md + HANDOFF.md §5 — 어긋나면 그 둘이 맞다. 인증·홍보·경영은 메모리와 Desktop\work\01~13 폴더 산출물 기준.
 
 ## 현재 기준값 (2026-08-06 오후 — 갱신 시 이 표를 고칠 것)
 
