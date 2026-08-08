@@ -13,6 +13,14 @@ h1{font-size:19px;display:inline}
 .row b{color:#e8e8e4;font-weight:400}
 .row.focus b{font-weight:700}
 .row:hover b{color:#fff;text-decoration:underline}
+/* 한 줄형(항목 많은 층용) — 라벨|막대|숫자 */
+.rowc{cursor:pointer;display:flex;align-items:center;gap:9px;margin:7px 0;font-size:12.5px;color:#96968f}
+.rowc b{color:#e8e8e4;font-weight:400;flex:none;width:212px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rowc .track2{flex:1;background:#30323a;border-radius:4px;height:8px;overflow:hidden}
+.rowc .track2 .fillb{height:8px}
+.rowc .pv{flex:none;width:24px;text-align:right;font-weight:700;color:#e8e8e4;font-size:12px}
+.rowc:hover b{color:#fff;text-decoration:underline}
+.rowc.focus b{font-weight:700}
 .track{background:#30323a;border-radius:4px;height:10px;margin-top:5px;position:relative;width:calc(100% - 46px)}
 .fillb{height:10px;border-radius:4px;background:#EF9F27}
 .fillb.t{background:#1D9E75}.fillb.c{background:#D85A30}
@@ -57,18 +65,18 @@ h2{font-size:13px;margin-bottom:8px}
 <div class="view" id="v1">
   <span class="back" onclick="go('v-home')">← 큰틀로</span>
   <h1>1 업무플랫폼 — 73%</h1>
-  <div class="row" onclick="go('v1-1')" style="margin-top:10px"><b>데이터·보안</b><div class="track"><div class="fillb t" style="width:98%"></div><span>98</span></div></div>
-  <div class="row" onclick="go('v1-2')"><b>돈 (기성·미수)</b><div class="track"><div class="fillb t" style="width:90%"></div><span>90</span></div></div>
-  <div class="row" onclick="go('v1-3')"><b>운영 모듈</b><div class="track"><div class="fillb t" style="width:90%"></div><span>90</span></div></div>
-  <div class="row" onclick="go('v1-4')"><b>인사·권한</b><div class="track"><div class="fillb t" style="width:90%"></div><span>90</span></div></div>
-  <div class="row" onclick="go('v1-5')"><b>계약·서류 자동화</b><div class="track"><div class="fillb t" style="width:85%"></div><span>85</span></div></div>
-  <div class="row" onclick="go('v1-6')"><b>수주 레이더·계산기</b><div class="track"><div class="fillb" style="width:80%"></div><span>80</span></div></div>
-  <div class="row" onclick="go('v1-7')"><b>디자인·UX</b><div class="track"><div class="fillb" style="width:60%"></div><span>60</span></div></div>
-  <div class="row" onclick="go('v1-8')"><b>실적·자격 DB (기능)</b><div class="track"><div class="fillb c" style="width:40%"></div><span>40</span></div></div>
-  <div class="row focus" onclick="go('v1-9')"><b>직원 실사용 확산 &nbsp;◀ 병목</b><div class="track"><div class="fillb c" style="width:30%"></div><span>30</span></div></div>
-  <div class="row" onclick="go('v1-10')"><b>외부신고 자동화 (화관법 운반계획서) &nbsp;· 실전 1건 대기</b><div class="track"><div class="fillb t" style="width:90%"></div><span>90</span></div></div>
-  <div class="row" onclick="go('v1-11')"><b>운행일지·배차 자동화 &nbsp;· 신규</b><div class="track"><div class="fillb c" style="width:15%"></div><span>15</span></div></div>
-  <div class="row" onclick="go('v1-12')"><b>기기·표면 배치도 → 대표 자동보고 &nbsp;· 키스톤</b><div class="track"><div class="fillb c" style="width:8%"></div><span>8</span></div></div>
+  <div class="rowc" onclick="go('v1-1')" style="margin-top:10px"><b>데이터·보안</b><div class="track2"><div class="fillb t" style="width:98%"></div></div><span class="pv">98</span></div>
+  <div class="rowc" onclick="go('v1-2')"><b>돈 (기성·미수)</b><div class="track2"><div class="fillb t" style="width:90%"></div></div><span class="pv">90</span></div>
+  <div class="rowc" onclick="go('v1-3')"><b>운영 모듈</b><div class="track2"><div class="fillb t" style="width:90%"></div></div><span class="pv">90</span></div>
+  <div class="rowc" onclick="go('v1-4')"><b>인사·권한</b><div class="track2"><div class="fillb t" style="width:90%"></div></div><span class="pv">90</span></div>
+  <div class="rowc" onclick="go('v1-5')"><b>계약·서류 자동화</b><div class="track2"><div class="fillb t" style="width:85%"></div></div><span class="pv">85</span></div>
+  <div class="rowc" onclick="go('v1-6')"><b>수주 레이더·계산기</b><div class="track2"><div class="fillb" style="width:80%"></div></div><span class="pv">80</span></div>
+  <div class="rowc" onclick="go('v1-7')"><b>디자인·UX</b><div class="track2"><div class="fillb" style="width:60%"></div></div><span class="pv">60</span></div>
+  <div class="rowc" onclick="go('v1-8')"><b>실적·자격 DB (기능)</b><div class="track2"><div class="fillb c" style="width:40%"></div></div><span class="pv">40</span></div>
+  <div class="rowc focus" onclick="go('v1-9')"><b>직원 실사용 확산 ◀ 병목</b><div class="track2"><div class="fillb c" style="width:30%"></div></div><span class="pv">30</span></div>
+  <div class="rowc" onclick="go('v1-10')"><b>화관법 자동화 · 실전 1건 대기</b><div class="track2"><div class="fillb t" style="width:90%"></div></div><span class="pv">90</span></div>
+  <div class="rowc" onclick="go('v1-11')"><b>운행일지·배차 · 신규</b><div class="track2"><div class="fillb c" style="width:15%"></div></div><span class="pv">15</span></div>
+  <div class="rowc" onclick="go('v1-12')"><b>기기·표면 배치도 · 키스톤</b><div class="track2"><div class="fillb c" style="width:8%"></div></div><span class="pv">8</span></div>
   <hr>
   <h2>지금 중요한 순서 — 업무플랫폼 (상위 3 · 전체는 상세판)</h2>
   <div class="item now"><span class="m">▶</span>1. 화관법 봇 실전 1건 테스트(참관) — 이 1건이 완성 관문 · PM+AI</div>
