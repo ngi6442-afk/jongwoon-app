@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="ko"><head><meta charset="utf-8"><title>진척도 대시보드</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Malgun Gothic',sans-serif;background:#181920;color:#e8e8e4;width:100vw;height:100vh;overflow:hidden}
+#panel{position:absolute;right:60px;top:36vh;width:640px;max-height:calc(64vh - 50px);background:#1f2026;border:1px solid #30323a;border-radius:14px;padding:26px 32px;overflow-y:auto}
+@media (max-width:1200px){#panel{position:static;width:100%;max-height:none;border:0;border-radius:0;padding:24px 28px}}
+h1{font-size:19px;display:inline}
+.date{color:#696964;font-size:12px;margin-left:10px}
+.hero{font-size:38px;font-weight:700;margin:12px 0 8px}
+.hero small{font-size:12px;font-weight:400;color:#96968f;margin-left:10px}
+.row{cursor:pointer;color:#96968f;margin:10px 0;font-size:13px}
+.row b{color:#e8e8e4;font-weight:400}
+.row.focus b{font-weight:700}
+.row:hover b{color:#fff;text-decoration:underline}
+.track{background:#30323a;border-radius:4px;height:10px;margin-top:5px;position:relative;width:calc(100% - 46px)}
+.fillb{height:10px;border-radius:4px;background:#EF9F27}
+.fillb.t{background:#1D9E75}.fillb.c{background:#D85A30}
+.track span{position:absolute;right:-38px;top:-4px;font-size:13px;font-weight:700;color:#e8e8e4}
+.lane{color:#696964;font-size:11px;margin:12px 0}
+hr{border:0;border-top:1px solid #30323a;margin:12px 0}
+h2{font-size:13px;margin-bottom:8px}
+.item{display:flex;gap:9px;align-items:baseline;font-size:12px;color:#96968f;margin:7px 0}
+.item.done{color:#696964;text-decoration:line-through}
+.item.done .m{color:#1D9E75;text-decoration:none}
+.item.now{background:#3a3019;border-radius:6px;padding:5px 9px;color:#e8e8e4;font-weight:700}
+.item.now .m{color:#EF9F27}
+.sub{font-size:11px;color:#696964;margin:-3px 0 7px 21px}
+.note{font-size:11px;color:#696964;margin:10px 0 0}
+.back{cursor:pointer;color:#7aa7d8;font-size:12px;margin-bottom:10px;display:inline-block}
+.back:hover{text-decoration:underline}
+.view{display:none}.view.on{display:block}
+.foot{font-size:12px;color:#55554f;margin-top:12px}
+.warn{font-size:11px;color:#c8795a;background:#33231d;border-radius:6px;padding:7px 10px;margin-top:10px}
+</style></head><body>
+<div id="panel">
+
+<div class="view on" id="v-home">
+  <h1>진척도</h1><span class="date">2026-08-08 · 추정 · 클릭=상세</span>
+  <div class="hero">59%<small>큰틀 4개 평균</small></div>
+  <div class="row" onclick="go('v1')"><b>1&nbsp; 업무플랫폼</b><div class="track"><div class="fillb" style="width:75%"></div><span>75</span></div></div>
+  <div class="row focus" onclick="go('v2')"><b>2&nbsp; 인증·자격 &nbsp;◀ 오늘</b><div class="track"><div class="fillb" style="width:45%"></div><span>45</span></div></div>
+  <div class="row" onclick="go('v3')"><b>3&nbsp; 홍보·검색노출</b><div class="track"><div class="fillb" style="width:65%"></div><span>65</span></div></div>
+  <div class="row" onclick="go('v4')"><b>4&nbsp; 경영 기반</b><div class="track"><div class="fillb" style="width:50%"></div><span>50</span></div></div>
+  <div class="lane">상시 · 공사·입찰 실무 — 안전성 재평가 대기 1건</div>
+  <hr>
+  <h2>지금 중요한 순서 — 전체 (가중치 상위 6)</h2>
+  <div class="item now"><span class="m">▶</span>1. KOITA 잔여 3종 — 내부·현판 사진, 기준검토표 (임시저장 상태) · PM</div>
+  <div class="item"><span class="m">☐</span>2. 점검 2건(주소 상세·투자합) → [설립신고제출] · PM</div>
+  <div class="item"><span class="m">☐</span>3. 화관법 봇 실전 1건(--submit --max 1, 참관) — 통과 시 매일 4~6건 수작업 소멸 · PM+AI</div>
+  <div class="item"><span class="m">☐</span>4. 직원 PIN 발급·안내문 배포 — 플랫폼 병목(30) 해소 관문 · PM</div>
+  <div class="item"><span class="m">☐</span>5. 블로그 첫 글 소재(직원 사진 1장) — 홍보 병목=콘텐츠, 30일 타이머 미시작 · PM→직원</div>
+  <div class="item"><span class="m">☐</span>6. 활용신청·포털 변경신청 승인 확인 — 수주 어댑터 대기 · 외부</div>
+  <div class="foot">갱신: "진척도 갱신해" · 문서판: 진척도_큰틀.html</div>
+</div>
+
+<div class="view" id="v1">
+  <span class="back" onclick="go('v-home')">← 큰틀로</span>
+  <h1>1 업무플랫폼 — 75%</h1>
+  <div class="row" onclick="go('v1-1')" style="margin-top:10px"><b>데이터·보안</b><div class="track"><div class="fillb t" style="width:98%"></div><span>98</span></div></div>
+  <div class="row" onclick="go('v1-2')"><b>돈 (기성·미수)</b><div class="track"><div class="fillb t" style="width:90%"></div><span>90</span></div></div>
+  <div class="row" onclick="go('v1-3')"><b>운영 모듈</b><div class="track"><div class="fillb t" style="width:90%"></div><span>90</span></div></div>
+  <div class="row" onclick="go('v1-4')"><b>인사·권한</b><div class="track"><div class="fillb t" style="width:90%"></div><span>90</span></div></div>
+  <div class="row" onclick="go('v1-5')"><b>계약·서류 자동화</b><div class="track"><div class="fillb t" style="width:85%"></div><span>85</span></div></div>
+  <div class="row" onclick="go('v1-6')"><b>수주 레이더·계산기</b><div class="track"><div class="fillb" style="width:80%"></div><span>80</span></div></div>
+  <div class="row" onclick="go('v1-7')"><b>디자인·UX</b><div class="track"><div class="fillb" style="width:60%"></div><span>60</span></div></div>
+  <div class="row" onclick="go('v1-8')"><b>실적·자격 DB (기능)</b><div class="track"><div class="fillb c" style="width:40%"></div><span>40</span></div></div>
+  <div class="row focus" onclick="go('v1-9')"><b>직원 실사용 확산 &nbsp;◀ 병목</b><div class="track"><div class="fillb c" style="width:30%"></div><span>30</span></div></div>
+  <div class="row" onclick="go('v1-10')"><b>외부신고 자동화 (화관법 운반계획서) &nbsp;· 실전 1건 대기</b><div class="track"><div class="fillb t" style="width:90%"></div><span>90</span></div></div>
+  <hr>
+  <h2>지금 중요한 순서 — 업무플랫폼 (상위 5)</h2>
+  <div class="item now"><span class="m">▶</span>1. 화관법 봇 실전 1건 테스트(참관) — dry-run 완성, 이 1건이 완성 관문 · PM+AI</div>
+  <div class="item"><span class="m">☐</span>2. 직원 PIN 발급 (인사 카드) — 병목 해소 관문 · PM</div>
+  <div class="item"><span class="m">☐</span>3. 안내문 배포 → 기기승인 → 첫 주 수집 — 실직원 검증 0건 상태 · PM</div>
+  <div class="item"><span class="m">☐</span>4. 활용신청 승인 확인 → 승인분부터 어댑터 각 30분 · 외부→AI</div>
+  <div class="item"><span class="m">☐</span>5. 포털 변경신청 승인 대기 — 수집 사활, 죽으면 이것부터 의심 · 외부</div>
+</div>
+
+<div class="view" id="v1-1"><span class="back" onclick="go('v1')">← 업무플랫폼</span>
+  <h1>데이터·보안 — 98</h1>
+  <div class="item done" style="margin-top:10px"><span class="m">☑</span>S1 단일 원천 승격 (v224~226) — 전 컬렉션 fetch 인터셉터 → gw-data(Blobs)</div>
+  <div class="item done"><span class="m">☑</span>침묵 사고 3건 수리 — 미러 스테일 경고·3h 스냅샷·백업 무소식 경보</div>
+  <div class="item done"><span class="m">☑</span>PAT(JW_APP_DATA) 청산 · 관리자 PIN 8자 재설정 (구 4자리 무력)</div>
+  <div class="item done"><span class="m">☑</span>시점복구 = Blobs 버전 링 (v225)</div>
+  <div class="item"><span class="m">☐</span>수용 위험 3건 재검토 — 수리할지 수용 유지할지 판단</div>
+  <div class="item"><span class="m">☐</span>기기게이트 마감</div>
+  <div class="note">주의: member-relay(홈페이지 CMS)·AI_BUILD_GITHUB_TOKEN은 사용 중 — 지우면 안 됨</div>
+</div>
+<div class="view" id="v1-2"><span class="back" onclick="go('v1')">← 업무플랫폼</span>
+  <h1>돈 (기성·미수) — 90</h1>
+  <div class="item done" style="margin-top:10px"><span class="m">☑</span>돈 절단선 확정 — 공무=청구 등록·수정까지 / 관리부=검수→발행→수금→미수</div>
+  <div class="item done"><span class="m">☑</span>간이 검수 게이트 + 돈 상태 3종(paid·reviewed·invoice) 서버 하드 차단</div>
+  <div class="item done"><span class="m">☑</span>정산 UI (v217 — settle_doc, F14~19·F22+L26 매핑)</div>
+  <div class="item now"><span class="m">▶</span>매입 세무 확인</div>
+  <div class="note">기성 미수 = 홈택스 xlsx 업로드 경로 (팝빌 유료 API 보류)</div>
+</div>
+<div class="view" id="v1-3"><span class="back" onclick="go('v1')">← 업무플랫폼</span>
+  <h1>운영 모듈 — 90</h1>
+  <div class="item done" style="margin-top:10px"><span class="m">☑</span>지시(승인제)·차량·인허가·캘린더·감사로그·거래처·서류출력 완료</div>
+  <div class="item done"><span class="m">☑</span>전역 검색 (v222 — 헤더 🔍, 권한 범위 내 9개 모듈)</div>
+  <div class="item now"><span class="m">▶</span>문서함 세분화</div>
+  <div class="sub">분류별 권한(E)은 백로그 — 직원 실사용 후 설계</div>
+</div>
+<div class="view" id="v1-4"><span class="back" onclick="go('v1')">← 업무플랫폼</span>
+  <h1>인사·권한 — 90</h1>
+  <div class="item done" style="margin-top:10px"><span class="m">☑</span>권한 매트릭스 (v228~229) + 퇴사자 차단 + 직원 홈/내 업무 개명</div>
+  <div class="item done"><span class="m">☑</span>권한 원칙 확정(8/4) — "직원에겐 자기 것만": 지시·기성·수금·거래처 전 직원 숨김, 관리자 3인 전용</div>
+  <div class="item done"><span class="m">☑</span>운영부(김정아·권민지)=계약·차량·인허가 수행, 김정아 일용직 / 현장=차량 보기+주기 체크</div>
+  <div class="item done"><span class="m">☑</span>견적서 독립 모듈·기본 숨김 (v238 — 리허설 중 발견 수리)</div>
+  <div class="item"><span class="m">☐</span>실사용 검증 — 첫 주 권한 구멍 확인</div>
+  <div class="note">"보정 6칸" 권고는 철회됨(8/4) — 다시 꺼내지 말 것 · "내게 온 지시" 홈/내업무 중복 표시는 의도된 결정</div>
+</div>
+<div class="view" id="v1-5"><span class="back" onclick="go('v1')">← 업무플랫폼</span>
+  <h1>계약·서류 자동화 — 85</h1>
+  <div class="item done" style="margin-top:10px"><span class="m">☑</span>계약 파이프라인 (시나리오 조립형) + 계약 라우팅·중복가드 (v208)</div>
+  <div class="item done"><span class="m">☑</span>서약서 6·7 자동 (v218) · 내역서 낙찰률 적용·공정표·서약서 양식 (8/4 완료 실측 — 유령 킵 청소)</div>
+  <div class="item done"><span class="m">☑</span>서류출력 골격 (hwpx 수술 + 한컴 COM 1회 토큰화 경로)</div>
+  <div class="item"><span class="m">☐</span>실제 킵: 폐기물량 톤수 환산(기준 확정 대기) · 건설 청구계좌 등록 확인 · 군부대 변형 학습(실물 대기)</div>
+  <div class="item"><span class="m">☐</span>청구 공문 — 보류(8/6 PM: 통상 청구서만 내고 공문 불요, 군부대 건만 불확실) · 군부대 실물 재료 나올 때 같이 판단</div>
+</div>
+<div class="view" id="v1-6"><span class="back" onclick="go('v1')">← 업무플랫폼</span>
+  <h1>수주 레이더·계산기 — 80</h1>
+  <div class="item done" style="margin-top:10px"><span class="m">☑</span>레이더 P6 (소스 10+1) · 낙찰 통계 (v216) · 통과선 실계산 (v207)</div>
+  <div class="item done"><span class="m">☑</span>R3 API 경보 (awards.py api0_streak — 0건 2연속→푸시) · 발주처 실측 칩 (v227)</div>
+  <div class="item now"><span class="m">▶</span>활용신청 승인 확인 — LH 2건·누리·K-apt 2건(하나는 기승인, awardprobe 탐침 판정 중) → 승인분부터 어댑터 각 30분</div>
+  <div class="item"><span class="m">☐</span>나라장터 API 변경신청 승인 대기 — 포털 AI 활용관리 사건(8/4). 수집 죽으면 이것부터 의심</div>
+  <div class="item"><span class="m">☐</span>차세대 이주 — 격하됨: 구 API 중단 공지 시 15129394 계열 전환 30분</div>
+  <div class="item"><span class="m">☐</span>사정률 분석·투찰 포지션 추천 v2 — 보류(8/6 PM) · 진척도에만 유지, 착수는 지시로</div>
+  <div class="note">일감 학습 필터: (같은 기관+유사 제목) 재공고만 자동패스 — 기관 단위 금지</div>
+</div>
+<div class="view" id="v1-7"><span class="back" onclick="go('v1')">← 업무플랫폼</span>
+  <h1>디자인·UX — 60</h1>
+  <div class="item done" style="margin-top:10px"><span class="m">☑</span>용어 표준화 앱 반영 (v230~236) — 탭=기성·수금, 표시=투찰(저장값 응찰 유지)</div>
+  <div class="item done"><span class="m">☑</span>일관성 감사 1차 · 대시보드 시안B 채택 (v223)</div>
+  <div class="item"><span class="m">☐</span>모바일 폴리싱</div>
+  <div class="item"><span class="m">☐</span>중복 인박스 정리 — 직원 첫 주 실사용 후 제거 여부 결정</div>
+  <div class="item"><span class="m">☐</span>문서함 2차</div>
+  <div class="note">근거 표기: 관리자/직원/모바일/일관성 쪼개서 산정 (규격)</div>
+</div>
+<div class="view" id="v1-8"><span class="back" onclick="go('v1')">← 업무플랫폼</span>
+  <h1>실적·자격 DB (기능) — 40</h1>
+  <div class="item done" style="margin-top:10px"><span class="m">☑</span>P5b 실적 자동합산 (v220 — qualPerfPrefill)</div>
+  <div class="item done"><span class="m">☑</span>P5c 등급확인서 판독 (v221 — grade_parse·인허가 자동반영·만료 연동) + 만료일 자동 제안 (v239)</div>
+  <div class="item now"><span class="m">▶</span>과거 실적 입력 — PM 파일 대기</div>
+  <div class="note">인증 취득 활동(신고·심사)은 큰틀 2 소속 — 별도 대장 금지(8/4), 진척도 층위만 분리(8/6)</div>
+</div>
+<div class="view" id="v1-9"><span class="back" onclick="go('v1')">← 업무플랫폼</span>
+  <h1>직원 실사용 확산 — 30</h1>
+  <div class="item done" style="margin-top:10px"><span class="m">☑</span>온보딩 리허설 전 구간 통과 (8/4, 김호태 계정 — 단 실행자는 PM: 실직원 검증은 아직 0건)</div>
+  <div class="item now"><span class="m">▶</span>나머지 직원 PIN 발급 — 인사 카드에서 · PM</div>
+  <div class="item"><span class="m">☐</span>안내문 배포 — 08_앱_시안\직원온보딩_안내.html</div>
+  <div class="item"><span class="m">☐</span>로그인 들어오는 대로 기기승인</div>
+  <div class="item"><span class="m">☐</span>첫 주 불편 수집 → 중복 인박스·개방 항목 결정</div>
+  <div class="item"><span class="m">☐</span>두호천 실사용 확인</div>
+  <div class="item"><span class="m">☐</span>TESTLIST 사람 테스트 120건(v171~202) — 계속 보류·쌓아두기(8/6 PM), 착수는 지시로</div>
+</div>
+<div class="view" id="v1-10"><span class="back" onclick="go('v1')">← 업무플랫폼</span>
+  <h1>외부신고 자동화 — 화관법 운반계획서 (90, 실전 1건 대기)</h1>
+  <div class="item done" style="margin-top:10px"><span class="m">☑</span>기반 완료(8/8 오전) — 실태·로그인 API·HAR 확보·103건 판독(노선 3종)·봇 본체(bulk_submit.py)</div>
+  <div class="item done"><span class="m">☑</span>3난제 돌파(8/8 오후) — ①목록 0건/500=세션맥락(부모페이지 GET+popForm 5필드) ②복제의 시각·경로 리셋=원본 제출본 view에서 덮어쓰기 ③안내문(routeGuideRpt)=routeGuide에서 재구성, HAR 원본과 바이트 일치 검증</div>
+  <div class="item done"><span class="m">☑</span>dry-run 13건 전건 완전 조립 · 시각표 실측(베페 03:49부터 ~3시간 7회전 / 스틸 3대 05시·11시 2회전) · 기제출 8/8~12 = 0건 확인</div>
+  <div class="item now"><span class="m">▶</span>남은 관문 1개: 실전 1건 — PM 참관 하 --submit --max 1 (미래날짜) → 사이트 확인 → 정상이면 전량</div>
+  <div class="item"><span class="m">☐</span>이후: GitHub Actions 정기화 · secret.json 시크릿 이전·HAR 삭제</div>
+  <div class="item"><span class="m">☐</span>확인요망(김정아): 요일별 변동 · 베페 일건수 7~9 규칙 (시각 간격은 실측 완료)</div>
+  <div class="note">상세=화관법_자동화\진행상태.md · 대안=Tampermonkey 유저스크립트(설치_사용안내.md)</div>
+</div>
+
+<div class="view" id="v2">
+  <span class="back" onclick="go('v-home')">← 큰틀로</span>
+  <h1>2 인증·자격 — 45% · 오늘</h1>
+  <div class="row focus" onclick="go('v2-1')" style="margin-top:10px"><b>연구전담부서 (KOITA) &nbsp;◀ 오늘</b><div class="track"><div class="fillb t" style="width:85%"></div><span>85</span></div></div>
+  <div class="row" onclick="go('v2-2')"><b>위험성평가 인정 (KOSHA)</b><div class="track"><div class="fillb c" style="width:20%"></div><span>20</span></div></div>
+  <div class="row" onclick="go('v2-3')"><b>안전성평가 등급</b><div class="track"><div class="fillb" style="width:60%"></div><span>60</span></div></div>
+  <div class="row" onclick="go('v2-5')"><b>가족친화인증 (2027.4 신청)</b><div class="track"><div class="fillb c" style="width:15%"></div><span>15</span></div></div>
+  <div class="row" onclick="go('v2-4')"><b>벤처확인 — 전담부서 인정 후 재검토 (8/6)</b></div>
+  <div class="lane">후보 풀(조사 완료·착수 전): ISO 45001(기관 후보조사 7/7 완료) · 이노비즈 · 고용 선정제 3종 · 하도급 모범업체 — 착수는 PM 지시로</div>
+  <hr>
+  <h2>지금 중요한 순서 — 인증·자격 (상위 5)</h2>
+  <div class="item now"><span class="m">▶</span>1. 연구실 내부 사진 — PC 배송 대기 · 도착 후 촬영 · PM</div>
+  <div class="item"><span class="m">☐</span>2. 현판 출력·부착 → 현판 사진 (시안 완성됨) · PM</div>
+  <div class="item"><span class="m">☐</span>3. 기준검토표(법인세 서류철) — 확인서는 발급 완료 · PM</div>
+  <div class="item"><span class="m">☐</span>4. 점검 2건(주소 상세·투자합) → [설립신고제출] — 현재 임시저장 · PM</div>
+  <div class="item"><span class="m">☐</span>5. KOSHA 업종 분류 확정 — 보험료 20% 감면 좌우 · PM+AI</div>
+</div>
+
+<div class="view" id="v2-1"><span class="back" onclick="go('v2')">← 인증·자격</span>
+  <h1>연구전담부서 (rnd.or.kr) — 85</h1>
+  <div class="item done" style="margin-top:10px"><span class="m">☑</span>연구과제 3건 입력 — ①공공입찰 데이터 수주 지능화 ②현장 영상·위치정보 작업기록 자동화 ③전사 업무 데이터 단일화 AI 플랫폼 (2026-08~2027-07, 전부 실제 진행 중인 것)</div>
+  <div class="item done"><span class="m">☑</span>연구공간 = 본사 2동 2층 舊 창고 구획 45.75㎡ 신고</div>
+  <div class="item done"><span class="m">☑</span>첨부 3종 가공 — 조직도 · 지적도(1동 라벨·경계 보정) · 소재지 평면도 (01_연구소신고\)</div>
+  <div class="item done"><span class="m">☑</span>소재지 평면도·조직도 슬롯 업로드 (8/6 오후)</div>
+  <div class="item done"><span class="m">☑</span>잔여 슬롯 확인(8/6) — 자격증 사본 확보, 현재 [임시저장] 상태</div>
+  <div class="item now"><span class="m">▶</span>연구실 내부 사진 — PC 배송 대기 중(도착 후 구색·촬영)</div>
+  <div class="item done"><span class="m">☑</span>현판 시안 완성 (01_연구소신고\현판_기술개발부연구실.pdf — A4 출력용)</div>
+  <div class="item"><span class="m">☐</span>현판 출력·부착 → 현판 사진 촬영 · PM</div>
+  <div class="item done"><span class="m">☑</span>중소기업확인서 발급 (8/6 — 6. 중소기업확인서.pdf)</div>
+  <div class="item"><span class="m">☐</span>중소기업 등 기준검토표 — 법인세 신고 서류철(세무사 작성분)</div>
+  <div class="item"><span class="m">☐</span>점검①: 주소 상세 "본사 2동 2층 기술개발부 연구실" ②: 투자 총액=과제 3건 합</div>
+  <div class="item"><span class="m">☐</span>[설립신고제출] → 실사 대비 연구실 실물 유지</div>
+  <div class="item"><span class="m">☐</span>인정 후 사후관리 — 매년 4월 연구개발활동조사(미제출 시 취소) → 앱 주기 체크(연간) 등록</div>
+  <div class="warn">리스크 소멸(8/6): 요원 고용·산재 이미 가입 확인 — 직계비속 적용제외 이슈 자체가 없음, 사전체크 6번 사실대로 "예" 통과 · 세액공제는 세무사 협의</div>
+</div>
+<div class="view" id="v2-2"><span class="back" onclick="go('v2')">← 인증·자격</span>
+  <h1>위험성평가 인정 (KOSHA) — 20</h1>
+  <div class="item done" style="margin-top:10px"><span class="m">☑</span>착수 승인 (PM "1,2 ㄱ" 8/4) — 효과: 감독유예 3년</div>
+  <div class="item now"><span class="m">▶</span>업종 분류 확정 — 38120 지정폐기물 수집운반 = 위생및유사서비스 계열 유력 (보험료 20% 감면은 건설업 제외라 이 분류에 달림 · 42201 공사계열은 제외 확인됨)</div>
+  <div class="item"><span class="m">☐</span>사업장 위험성평가 체계 정리 + 신청서 — AI 초안</div>
+  <div class="item"><span class="m">☐</span>KOSHA 신청 → 심사 대응</div>
+</div>
+<div class="view" id="v2-3"><span class="back" onclick="go('v2')">← 인증·자격</span>
+  <h1>안전성평가 등급 — 60</h1>
+  <div class="item now" style="margin-top:10px"><span class="m">▶</span>재평가 결과 대기 — 현재 D등급 = 1년 주기</div>
+  <div class="item"><span class="m">☐</span>등급확인서 수령 → 앱 업로드 (P5c가 판독·만료일 자동 반영, 유효기간 없으면 발급일+주기 제안 v239)</div>
+  <div class="note">주기 원문 확정(8/4): S=3년 / A·B·C=2년 / D=1년 — KOSHA 석면해체·제거작업 안전성 평가 공고. PM 기억(A3/B2/C1)과 달랐음</div>
+</div>
+<div class="view" id="v2-5"><span class="back" onclick="go('v2')">← 인증·자격</span>
+  <h1>가족친화인증 (여가부) — 15</h1>
+  <div class="item done" style="margin-top:10px"><span class="m">☑</span>요건 전수 + 설명회 책자 125쪽 해부 (8/4 밤) — 득점 시나리오 63점 &gt; 통과선 60</div>
+  <div class="item"><span class="m">☐</span>지금 시작 5종 가동(전부 대표 결재): ①시차출퇴근 규정+3명 실사용 ②연차 70% 관리(앱 증빙) ③교육 연 1회+일지 ④조기퇴근제 월 1회 ⑤건강검진비 규정화</div>
+  <div class="item"><span class="m">☐</span>예비인증 검토 — 30/70점이면 인정, 득점 항목 신규인증 승계</div>
+  <div class="item"><span class="m">☐</span>2027.4 신규 신청 (ffsb.kr) — 실적 평가기간 = 2026년 1~12월</div>
+  <div class="note">이득: 조달청 용역 적격심사 가점 2.0 — 준설·폐기물 용역 입찰 직결 · 중소기업확인서(확보됨) = 심사비 지원 요건</div>
+</div>
+<div class="view" id="v2-4"><span class="back" onclick="go('v2')">← 인증·자격</span>
+  <h1>벤처확인 — 인정 후 재검토</h1>
+  <div class="note" style="margin-top:10px">PM 결정(8/6): 연구전담부서 인정이 나오면 재검토. 이유 — 벤처 확인 시 상장 경영성과 문턱이 절반(이익 20→10억·자본 30→15억)이고, 전담부서가 연구개발유형 벤처의 발판. 트리거 = KOITA 인정서 수령</div>
+</div>
+
+<div class="view" id="v3">
+  <span class="back" onclick="go('v-home')">← 큰틀로</span>
+  <h1>3 홍보·검색노출 — 65%</h1>
+  <div class="row focus" onclick="go('v3-1')" style="margin-top:10px"><b>검색 등록 &nbsp;◀ 병목</b><div class="track"><div class="fillb c" style="width:40%"></div><span>40</span></div></div>
+  <div class="row" onclick="go('v3-2')"><b>홍보모듈 정착 (v240)</b><div class="track"><div class="fillb" style="width:70%"></div><span>70</span></div></div>
+  <div class="row" onclick="go('v3-3')"><b>홈페이지</b><div class="track"><div class="fillb" style="width:85%"></div><span>85</span></div></div>
+  <hr>
+  <h2>지금 중요한 순서 — 홍보·검색노출 (상위 5)</h2>
+  <div class="item done"><span class="m">☑</span>1. 홈페이지 배포 + 구글 연결 (8/6 완료)</div>
+  <div class="item now"><span class="m">▶</span>2. 플레이스 서비스 칸 + 구글 비즈니스 프로필 · PM</div>
+  <div class="item"><span class="m">☐</span>3. 블로그 첫 새 공식 글 — 현장 사진 소재 나오면 AI 초안 (30일 타이머 트리거)</div>
+  <div class="item"><span class="m">☐</span>4. 기종별 GPS 검증 — 권한은 부여 완료(8/7 서버 실측) · PM</div>
+  <div class="item"><span class="m">☐</span>5. 첫 실게시 사이클 완주 + 블로그 30일 회복 추적 · 권민지+PM</div>
+</div>
+
+<div class="view" id="v3-1"><span class="back" onclick="go('v3')">← 홍보·검색노출</span>
+  <h1>검색·노출 — 55</h1>
+  <div class="item done" style="margin-top:10px"><span class="m">☑</span>진단 정정(8/5 실측): 네이버 등록·소유확인·사이트맵·수집 전부 정상 — 색인 20p·노출 21~74/일·클릭 0~2. 병목은 등록이 아니라 콘텐츠·플레이스</div>
+  <div class="item done"><span class="m">☑</span>비가시 SEO 개선 병합 (PR #302 — 사이트맵 cctv 제거·JSON-LD 2법인)</div>
+  <div class="item done"><span class="m">☑</span>홈페이지 배포 Publish (8/6 밤 — cctv 제거·JSON-LD 라이브 실측)</div>
+  <div class="item done"><span class="m">☑</span>구글 SC API 연결 (서비스 계정, 조회 전용) — 첫 실측: "종운" 노출 14·클릭 0</div>
+  <div class="item done"><span class="m">☑</span>구글 서치콘솔 — 등록돼 있었음 확인(8/6 실측: 도메인 속성, 3개월 클릭 11회·색인 6p)</div>
+  <div class="item done"><span class="m">☑</span>구글 미색인 원인 확정(8/8 재실측) — 서비스 6p 원본 HTML이 빈 껍데기(본문 54~58자), 내용은 json에만 → 구글 "내용없음" 판정. 색인요청 반복해도 매번 탈락(무한반복의 정체)</div>
+  <div class="item done"><span class="m">☑</span>플레이스(8/7) 마감: 환경·건설 상세설명 + 가격정보 환경3·건설6건(변동가격) 등록 완료 — 반영 1일 내</div>
+  <div class="item now"><span class="m">▶</span>해결 보류(방식 미결정): ①프리렌더 빌드주입(시범 성공: 준설 57→3259자, 브라우저와 완전일치 검증) ②엣지함수(추천) → 06_홈페이지\색인_프리렌더_보류\상태.md</div>
+  <div class="item"><span class="m">☐</span>색인요청은 위 반영 후에만 유효 — 그 전 요청은 무한반복</div>
+  <div class="item"><span class="m">☐</span>구글 비즈니스 프로필 — 사장님 대면 시 처리(전화 인증 필요) · 외부 대기</div>
+  <div class="item done"><span class="m">☑</span>서치어드바이저 이슈 판독(8/7) — 실이슈 description 3건 PR #306 해소, 나머지 의도된 것</div>
+  <div class="item"><span class="m">☐</span>블로그 회복 추적 — 기존 44건 보존, 새 공식 30일 후 검색 유입 판정</div>
+  <div class="item"><span class="m">☐</span>보조 완료(8/7): 재수집 8URL 제출 · 진단 판독(실이슈=description 3건→PR #306 라이브 해소, 나머지 의도된 것) · 디렉토리 조사→후보.md</div>
+  <div class="note">디렉토리 백링크(상공회의소·협회)는 장기 레버 · 지침: 05_홍보_검색노출\블로그_작성지침_v1.md</div>
+</div>
+<div class="view" id="v3-2"><span class="back" onclick="go('v3')">← 홍보·검색노출</span>
+  <h1>홍보모듈 정착 — 70</h1>
+  <div class="item done" style="margin-top:10px"><span class="m">☑</span>promo 탭 v240 배포 (8/5) — 현장 기록→블로그 초안 변주(제목5×본문4 강제 회전)→검수→게시 추적</div>
+  <div class="item done"><span class="m">☑</span>GPS 자동 지역 — 원본 화질 전송만 생존 (실측)</div>
+  <div class="item done"><span class="m">☑</span>권민지 홍보=수행 부여 — 8/7 서버 백업으로 실측 확인(김정아도 수행)</div>
+  <div class="item now"><span class="m">▶</span>기종별 GPS 검증 — 아이폰·구버전 안드로이드 원본 전송 사진 수집</div>
+  <div class="item"><span class="m">☐</span>첫 실게시 사이클 완주 — 기록→초안→검수→게시 (권민지+PM)</div>
+  <div class="item"><span class="m">☐</span>후속 킵: 사진대지 hwpx · 갤러리 member-relay 연결</div>
+  <div class="note">블로그 작성지침 v1 (05_홍보_검색노출\) — 유사문서 억제·제목 공식 반영본</div>
+</div>
+<div class="view" id="v3-3"><span class="back" onclick="go('v3')">← 홍보·검색노출</span>
+  <h1>홈페이지 — 80</h1>
+  <div class="item" style="margin-top:10px"><span class="m">☐</span>변경은 staging→PR→PM 머지만 — main 직접 금지 · 보이는 요소 임의 변경 금지</div>
+  <div class="item"><span class="m">☐</span>갤러리 CMS(member-relay) 연동은 홍보모듈 킵과 묶어 진행</div>
+  <div class="note">브랜드 그린 #1A9A6B · 원조 패턴 레포 = jongwoon-website</div>
+</div>
+
+<div class="view" id="v4">
+  <span class="back" onclick="go('v-home')">← 큰틀로</span>
+  <h1>4 경영 기반 — 50%</h1>
+  <div class="row" onclick="go('v4-1')" style="margin-top:10px"><b>용어·규정</b><div class="track"><div class="fillb t" style="width:90%"></div><span>90</span></div></div>
+  <div class="row" onclick="go('v4-2')"><b>조직·인사 제도</b><div class="track"><div class="fillb" style="width:60%"></div><span>60</span></div></div>
+  <div class="row" onclick="go('v4-3')"><b>문서 체계</b><div class="track"><div class="fillb" style="width:55%"></div><span>55</span></div></div>
+  <div class="row focus" onclick="go('v4-4')"><b>상장요건 &nbsp;◀ 병목</b><div class="track"><div class="fillb c" style="width:15%"></div><span>15</span></div></div>
+  <hr>
+  <h2>지금 중요한 순서 — 경영 기반 (상위 5)</h2>
+  <div class="item"><span class="m">☐</span>1. 사규 문서화 — 앱 구현분(연차·승인제·권한) 역정리 · AI 초안→PM</div>
+  <div class="item"><span class="m">☐</span>2. 직무기술서 확정 — v0.1 초안 검토 · PM</div>
+  <div class="item"><span class="m">☐</span>3. 문서대장 최신화 (jongwoon-docs) · AI</div>
+  <div class="item"><span class="m">☐</span>4. 상장요건 갭 분석 — 착수 시점 PM 결정 · 대기</div>
+  <div class="item"><span class="m">☐</span>5. 인증-상장 기여 매핑 — 연구전담부서 인정 후가 효율적 · 대기</div>
+</div>
+
+<div class="view" id="v4-1"><span class="back" onclick="go('v4')">← 경영 기반</span>
+  <h1>용어·규정 — 90</h1>
+  <div class="item done" style="margin-top:10px"><span class="m">☑</span>용어집 v1.0 확정 — 게이트 1~3 조사 + 결정 A~E (09_조사_문서\용어집_시안_v1.md)</div>
+  <div class="item done"><span class="m">☑</span>핵심 결정 — 운영부=공무(부서명 유지) · 돈 절단선 · 탭=기성·수금 · 표시=투찰 · 차량 유지</div>
+  <div class="item done"><span class="m">☑</span>앱 반영 완료 (v230~236)</div>
+  <div class="item"><span class="m">☐</span>이후 용어 변경은 용어집 기준 + PM 승인으로만</div>
+</div>
+<div class="view" id="v4-2"><span class="back" onclick="go('v4')">← 경영 기반</span>
+  <h1>조직·인사 제도 — 60</h1>
+  <div class="item done" style="margin-top:10px"><span class="m">☑</span>연차(소멸·이월X)·권한 분리·사직 신청 앱 구현</div>
+  <div class="item done"><span class="m">☑</span>임직원 등급 세분화 · 인사 업무 신설 (7/11)</div>
+  <div class="item"><span class="m">☐</span>사규 문서화 — 앱 구현분(연차·승인제·권한)을 규정 문서로 역정리 (AI 초안 → PM)</div>
+  <div class="item"><span class="m">☐</span>직무기술서 확정 — v0.1 초안: 09_조사_문서\직무기술서_나경일_시안_v0.1.md</div>
+</div>
+<div class="view" id="v4-3"><span class="back" onclick="go('v4')">← 경영 기반</span>
+  <h1>문서 체계 — 55</h1>
+  <div class="item" style="margin-top:10px"><span class="m">☐</span>jongwoon-docs 규정·양식 원천 정리 계속 (문서대장.md 최신화 포함)</div>
+  <div class="item"><span class="m">☐</span>ERP설계구축가이드(JW-05-017)와 실구현 정합 점검</div>
+  <div class="note">문서 작성 기준: 실물 양식과 완전 동일 — 굴림체·배경색·물결표 금지</div>
+</div>
+<div class="view" id="v4-4"><span class="back" onclick="go('v4')">← 경영 기반</span>
+  <h1>상장요건 — 15</h1>
+  <div class="item done" style="margin-top:10px"><span class="m">☑</span>요건 조사 [실측] — 최소 관문 = 이익 20억+자기자본 30억 (벤처 확인 시 10억+15억으로 절반)</div>
+  <div class="item"><span class="m">☐</span>대표와 목표 문구 합의 → 사업계획 문서 개정 · PM</div>
+  <div class="item"><span class="m">☐</span>"상장 준비도 점검" 연 1회 주기 체크 등록 여부 · PM 판단</div>
+  <div class="item"><span class="m">☐</span>요건 vs 현재 갭 분석 — 매출·감사·지배구조 (착수 미정)</div>
+  <div class="item"><span class="m">☐</span>벤처확인 재검토 — 전담부서 인정 수령 시 (8/6 PM 확정)</div>
+</div>
+
+</div>
+<script>
+function go(id){
+  document.querySelectorAll('.view').forEach(function(v){v.classList.remove('on')});
+  document.getElementById(id).classList.add('on');
+  try{localStorage.setItem('jwview', id)}catch(e){}
+}
+try{
+  var s = localStorage.getItem('jwview');
+  if(s && document.getElementById(s)) go(s);
+}catch(e){}
+setTimeout(function(){location.reload()}, 90000);
+</script>
+</body></html>
