@@ -53,6 +53,19 @@ function cleanText(s) {
 }
 function nameKey(name) { return `name:${cleanText(name).toLowerCase()}`; }
 function nameKeyRaw(name) { return `name:${String(name).trim().toLowerCase()}`; }  // 구 색인 조회용(하위호환)
+
+// ── 개발자 등급(계정·기기·권한 = 시스템 영역) ──────────────────────────
+// 업무 서열(대표>관리자)과 별개 축이다. 관리자는 업무 데이터를, 개발자는 시스템을 맡는다.
+// 개발자 전용: 회원 생성·삭제, 관리자 지정, 타인 PIN/아이디 재설정, 기기 승인, 권한(perms) 편집.
+function isDev(m) { return !!(m && m.dev); }
+// 아직 아무도 개발자가 아니면 관리자를 개발자로 인정한다(첫 지정 전 잠김 방지).
+// 개발자가 한 명이라도 생기는 순간 이 통로는 닫힌다 — 배포 직후 아무도 못 들어가는 사고를 막는 자기부팅 장치.
+async function devAllowed(st, member) {
+  if (isDev(member)) return true;
+  if (!member || !member.admin) return false;
+  const all = await listMembers(st);
+  return !all.some(isDev);
+}
 // ── 계정 분리 이사 스위치 ───────────────────────────────────────────────
 // true  = 아이디·이름 둘 다로 로그인(이사 기간). 아이디 미발급자도 못 잠긴다.
 // false = 아이디로만 로그인. 이름 목록(names) 조회도 막힌다.
@@ -200,6 +213,11 @@ async function handleMemberList(st, event, R) {
 async function handleMemberUpsert(st, event, d, R) {
   const c = await currentMember(st, event);
   if (!c.ok || !c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
+  // 시스템 영역(계정 생성·관리자 지정·개발자 지정·권한 편집)은 개발자만.
+  // 인사 정보(연차·입사일 등) 수정은 종전대로 관리자도 가능 — 경리·인사 업무가 막히지 않게.
+  const canDev = await devAllowed(st, c.member);
+  const touchesSystem = (!d.id) || d.admin !== undefined || d.dev !== undefined || d.perms !== undefined || d.uid !== undefined;
+  if (touchesSystem && !canDev) return jr(403, { status: 'FORBIDDEN', error_code: 'DEV_ONLY', request_id: R });
   const name = cleanText(d.name);   // 저장 시점에 NFC 통일 — 타이핑 로그인이 깨지지 않게
   let m;
   let before = null;   // 감사 로그용 변경 전 스냅샷
@@ -212,6 +230,15 @@ async function handleMemberUpsert(st, event, d, R) {
     if (name && m.name !== name) { await blobSet(st, nameKey(m.name), null); m.name = name; }
     if (d.role !== undefined) m.role = d.role || m.role || '직원';
     if (d.admin !== undefined) m.admin = !!d.admin;
+    if (d.dev !== undefined) {
+      // 마지막 개발자는 스스로 강등할 수 없다 — 시스템을 아무도 못 만지는 상태 방지
+      if (!d.dev && isDev(m)) {
+        const devs = (await listMembers(st)).filter(isDev);
+        if (devs.length <= 1) return jr(409, { status: 'REJECTED', error_code: 'LAST_DEV', request_id: R });
+      }
+      m.dev = !!d.dev;
+      if (m.dev) m.admin = true;   // 개발자는 관리자 권한을 포함한다
+    }
   } else {
     // 신규 회원: 이름 필수, role/admin 기본값
     if (!name) return jr(400, { status: 'REJECTED', error_code: 'INVALID_INPUT', request_id: R });
@@ -261,7 +288,7 @@ async function handleMemberUpsert(st, event, d, R) {
   // 감사 로그: 회원 필드 변경(이전값→새값). PIN은 값 미기록('변경'만), 해시·비밀값 제외.
   try {
     const f = {};
-    const AUD_FIELDS = ['name','uid','role','admin','rank','dept','annual_days','hire_date','emp_type','annual_basis','loa_days','leave_date','annual_paid','annual_base','annual_base_date','seq','on_loa','loa_start','loa_end'];
+    const AUD_FIELDS = ['name','uid','role','admin','dev','rank','dept','annual_days','hire_date','emp_type','annual_basis','loa_days','leave_date','annual_paid','annual_base','annual_base_date','seq','on_loa','loa_start','loa_end'];
     const b = before || {};
     for (const k of AUD_FIELDS) {
       const a = b[k], v = m[k];
@@ -280,8 +307,14 @@ async function handleMemberUpsert(st, event, d, R) {
 async function handleMemberDelete(st, event, d, R) {
   const c = await currentMember(st, event);
   if (!c.ok || !c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
+  if (!(await devAllowed(st, c.member))) return jr(403, { status: 'FORBIDDEN', error_code: 'DEV_ONLY', request_id: R });
   if (!d.id || d.id === c.member.id) return jr(400, { status: 'REJECTED', error_code: 'INVALID_INPUT', request_id: R });
   const r = await blobGet(st, memberKey(d.id));
+  // 마지막 개발자 계정은 삭제 불가 — 시스템 관리 주체가 사라지는 것 방지
+  if (r.ok && r.data && isDev(r.data)) {
+    const devs = (await listMembers(st)).filter(isDev);
+    if (devs.length <= 1) return jr(409, { status: 'REJECTED', error_code: 'LAST_DEV', request_id: R });
+  }
   if (r.ok && r.data) {
     r.data.del = 1; r.data.updated = Date.now();
     await blobSet(st, memberKey(d.id), r.data); await blobSet(st, nameKey(r.data.name), null);
@@ -296,7 +329,10 @@ async function handleMemberDelete(st, event, d, R) {
 async function handleSetUid(st, event, d, R) {
   const c = await currentMember(st, event);
   if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: 'NO_SESSION', request_id: R });
-  const targetId = (d.id && c.member.admin) ? d.id : c.member.id;
+  // 타인 아이디 지정도 개발자만 — 아이디는 로그인 식별자라 계정 탈취로 이어질 수 있다.
+  const wantOtherUid = !!(d.id && d.id !== c.member.id);
+  if (wantOtherUid && !(await devAllowed(st, c.member))) return jr(403, { status: 'FORBIDDEN', error_code: 'DEV_ONLY', request_id: R });
+  const targetId = wantOtherUid ? d.id : c.member.id;
   const uid = normUid(d.uid);
   if (!validUid(uid)) return jr(400, { status: 'REJECTED', error_code: 'INVALID_UID', request_id: R });
 
@@ -338,7 +374,10 @@ async function uidTaken(st, uid, selfId) {
 async function handleSetPin(st, event, d, R) {
   const c = await currentMember(st, event);
   if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: 'NO_SESSION', request_id: R });
-  const targetId = d.id && c.member.admin ? d.id : c.member.id;  // 본인 또는 관리자가 지정
+  // 타인 PIN 재설정은 개발자만(계정 탈취 통로). 본인 변경은 누구나 가능.
+  const wantOther = !!(d.id && d.id !== c.member.id);
+  if (wantOther && !(await devAllowed(st, c.member))) return jr(403, { status: 'FORBIDDEN', error_code: 'DEV_ONLY', request_id: R });
+  const targetId = wantOther ? d.id : c.member.id;
   const pin = (d.pin || '').trim();
   const r = await blobGet(st, memberKey(targetId));
   if (!r.ok || !r.data) return jr(404, { status: 'REJECTED', error_code: 'NOT_FOUND', request_id: R });
@@ -371,6 +410,8 @@ async function handleDeviceList(st, event, R) {
 async function handleDeviceSet(st, event, d, R, status) {
   const c = await currentMember(st, event);
   if (!c.ok || !c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
+  // 기기 승인·해제·삭제는 시스템 영역 — 개발자만. (승인된 기기 = 데이터 접근 열쇠)
+  if (!(await devAllowed(st, c.member))) return jr(403, { status: 'FORBIDDEN', error_code: 'DEV_ONLY', request_id: R });
   const id = String(d.device || '').trim();
   if (!id) return jr(400, { status: 'REJECTED', error_code: 'INVALID_INPUT', request_id: R });
   if (status === null) { await blobSet(st, deviceKey(id), null); try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'login', ev: [{ op: '기기삭제', id: id.slice(0, 20), t: '' }] }); } catch (e) {} return jr(200, { status: 'OK', request_id: R }); }

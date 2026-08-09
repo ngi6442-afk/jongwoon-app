@@ -1939,7 +1939,7 @@
     <span class="fld-label">연번 (로그인·명부 정렬 순서)</span>
     <input type="number" id="meSeq" min="1" step="1" placeholder="예: 1" autocomplete="off">
     <span class="fld-label">직책 (권한)</span>
-    <select id="meRole"><option value="대표">대표</option><option value="관리자">관리자</option><option value="팀장">팀장</option><option value="직원">직원</option><option value="현장직">현장직</option></select>
+    <select id="meRole"><option value="개발자">개발자 (시스템)</option><option value="대표">대표</option><option value="관리자">관리자</option><option value="팀장">팀장</option><option value="직원">직원</option><option value="현장직">현장직</option></select>
     <span class="fld-label">직급</span>
     <select id="meRank"><option value="">- 선택 -</option><option value="대표">대표</option><option value="이사">이사</option><option value="부장">부장</option><option value="차장">차장</option><option value="과장">과장</option><option value="대리">대리</option><option value="주임">주임</option><option value="사원">사원</option></select>
     <span class="fld-label">부서</span>
@@ -2029,6 +2029,8 @@
   var MODULE_TAB = {tasks:"tabTasksBtn", veh:"tabVehBtn", rec:"tabRecBtn", lic:"tabLicBtn", check:"tabCheckBtn", con:"tabConBtn", cli:"tabCliBtn", doc:"tabDocBtn", wk:"tabWkBtn", quote:"tabQuoteBtn", promo:"tabPromoBtn"};  // bid는 계약 탭 내 섹션(자체 탭 없음)
   var MODULE_VIEW = {tasks:"view-tasks", veh:"view-veh", rec:"view-rec", lic:"view-lic", check:"view-check", con:"view-con", cli:"view-cli", doc:"view-doc", wk:"view-workers", quote:"view-quote", promo:"view-promo"};  // bid 섹션은 applyPerms에서 canSee로 표시
   var ROLE_PRESET = {
+    // 개발자 = 시스템 영역(계정·기기·권한·복원) 담당. 업무 서열과 별개 축이라 대표를 대체하지 않는다.
+    "개발자": {admin:true,  dev:true, perms:{tasks:"do", veh:"do", rec:"do", lic:"do", check:"do", con:"do", cli:"do", doc:"do", wk:"do", quote:"do", promo:"do"}},
     "대표":   {admin:true,  perms:{tasks:"do", veh:"do", rec:"do", lic:"do", check:"do", con:"do", cli:"do", doc:"do", wk:"do", quote:"do", promo:"do"}},
     "관리자": {admin:true,  perms:{tasks:"do", veh:"do", rec:"do", lic:"do", check:"do", con:"do", cli:"do", doc:"do", wk:"do", quote:"do", promo:"do"}},
     "팀장":   {admin:false, perms:{tasks:"do", veh:"do", rec:"do", lic:"do", check:"do", con:"view", cli:"view", doc:"view", wk:"do", quote:"hide", promo:"hide"}},
@@ -2037,7 +2039,7 @@
   };
   // 직급(정보용)·부서 목록 — 서열 순서(공개범위·결재라인에서 사용)
   var RANK_LIST = ["대표","이사","부장","차장","과장","대리","주임","사원"];
-  var ROLE_ORDER = ["대표","관리자","팀장","직원","현장직"];
+  var ROLE_ORDER = ["개발자","대표","관리자","팀장","직원","현장직"];
   var DEPT_LIST = ["관리부","운영부","준설팀","폐기물팀"];
 
   // ---- 체크리스트 정의 (JW-05-011) ----
@@ -10220,6 +10222,10 @@
   function canDo(mod){ return permOf(mod) === "do"; }
   function canSee(mod){ return permOf(mod) !== "hide"; }
   function isAdmin(){ var m = curMember(); return !!(m && m.admin); }
+  // 개발자 = 계정·기기·권한 등 시스템 영역 담당. 아직 아무도 지정 안 됐으면 관리자를 임시 인정(서버 devAllowed와 동일 규칙).
+  function isDev(){ var m = curMember(); if (!m) return false; if (m.dev) return true;
+    var ms = (typeof liveMembers==="function") ? liveMembers() : [];
+    return !!m.admin && !ms.some(function(x){ return x && x.dev; }); }
 
   // 공개 대상(scope) — 토큰 배열. 비면 전체 공개.
   //  토큰: 회원id(개별) / "dept:부서명"(해당 부서 전원) / "rank:직급명"(그 직급 이상)
@@ -10930,6 +10936,7 @@
     var isNew = !editingMemberId;
     var role = document.getElementById("meRole").value;
     var admin = !!(ROLE_PRESET[role] && ROLE_PRESET[role].admin);
+    var devRole = !!(ROLE_PRESET[role] && ROLE_PRESET[role].dev);
     var pinOk = admin ? (pin.length >= 8) : /^\d{4,}$/.test(pin);
     var errEl = document.getElementById("meErr");
     if (!name || (isNew && !pinOk) || (pin && !pinOk)){
@@ -10946,7 +10953,9 @@
     if (uidRaw && !/^[a-z0-9._-]{4,20}$/.test(uidRaw)){
       errEl.textContent = "아이디는 영문소문자·숫자·. _ - 로 4~20자입니다."; errEl.classList.add("show"); return;
     }
-    var payload = { action: "member_upsert", name: name, role: role, admin: admin, uid: uidRaw,
+    // 시스템 필드(admin·dev·uid)는 개발자만 전송 — 개발자가 아닌 관리자도 인사 정보는 계속 고칠 수 있어야 한다.
+    // (서버가 이 필드들이 오면 개발자 권한을 요구하므로, 안 보내면 인사 수정이 정상 통과)
+    var payload = { action: "member_upsert", name: name, role: role,
       rank: document.getElementById("meRank").value, dept: document.getElementById("meDept").value,
       annual_days: annualRaw === "" ? null : Number(annualRaw),
       annual_base: baseRaw === "" ? null : Number(baseRaw),
@@ -10957,6 +10966,9 @@
       loa_days: loaRaw === "" ? 0 : Number(loaRaw),
       leave_date: document.getElementById("meLeave").value || "",
       annual_paid: document.getElementById("mePaidAnnual").checked };
+    if (isDev() || !editingMemberId){          // 신규 생성은 어차피 개발자만 가능(서버가 막음)
+      payload.admin = admin; payload.dev = devRole; payload.uid = uidRaw;
+    }
     // 잔여값 입력 + 기준일 없음 + 이미 인사업무 시작됨 → 기준일=오늘 자동 스탬프
     var existM = editingMemberId ? findMember(editingMemberId) : null;
     if (payload.annual_base !== null && (!existM || !existM.annual_base_date) && hrStarted()) payload.annual_base_date = todayStr();
