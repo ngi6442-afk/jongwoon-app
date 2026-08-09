@@ -76,11 +76,11 @@ h2{font-size:13px;margin-bottom:8px}
   <div class="rowc focus" onclick="go('v1-9')"><b>직원 실사용 확산 ◀ 병목</b><div class="track2"><div class="fillb c" style="width:30%"></div></div><span class="pv">30</span></div>
   <div class="rowc" onclick="go('v1-10')"><b>화관법 자동화 · 실전 1건 대기</b><div class="track2"><div class="fillb t" style="width:90%"></div></div><span class="pv">90</span></div>
   <div class="rowc" onclick="go('v1-11')"><b>운행일지·배차 · 신규</b><div class="track2"><div class="fillb c" style="width:15%"></div></div><span class="pv">15</span></div>
-  <div class="rowc" onclick="go('v1-12')"><b>기기·표면 배치도 · 키스톤</b><div class="track2"><div class="fillb c" style="width:8%"></div></div><span class="pv">8</span></div>
+  <div class="rowc" onclick="go('v1-12')"><b>기기·표면 배치도 · 키스톤</b><div class="track2"><div class="fillb c" style="width:30%"></div></div><span class="pv">30</span></div>
   <hr>
   <h2>지금 중요한 순서 — 업무플랫폼 (상위 3 · 전체는 상세판)</h2>
   <div class="item now"><span class="m">▶</span>1. 화관법 봇 실전 1건 테스트(참관) — 이 1건이 완성 관문 · PM+AI</div>
-  <div class="item"><span class="m">☐</span>2. 기기·표면 배치도 확정 — 자동 팝업 前 선행(키스톤) · PM+AI</div>
+  <div class="item"><span class="m">☐</span>2. 배치도 PM 결정 6종 → 확정 (v1 2종 작성됨, 핵심=알림 표면 규칙) · PM</div>
   <div class="item"><span class="m">☐</span>3. 운행일지·배차 — 올바로 HAR+엑셀·권민지 양식 오면 착수 · PM+권민지</div>
 </div>
 
@@ -185,12 +185,14 @@ h2{font-size:13px;margin-bottom:8px}
   <div class="note">방법론=화관법 봇과 동일(HAR→파서→로컬 secret.json). 2-3일 딜레이 허용은 대표 확인 필요(현행 매일).</div>
 </div>
 <div class="view" id="v1-12"><span class="back" onclick="go('v1')">← 업무플랫폼</span>
-  <h1>기기·표면 배치도 → 대표 자동보고 — 8 (키스톤)</h1>
-  <div class="item now" style="margin-top:10px"><span class="m">▶</span>키스톤: "누가 어느 기기서 무엇을" 배치도 먼저 정의·확정 (PM 3기기·대표 3기기·직원 2기기·현장 폰) — 자동 팝업 前 선행</div>
+  <h1>기기·표면 배치도 → 대표 자동보고 — 30 (키스톤)</h1>
+  <div class="item done" style="margin-top:10px"><span class="m">☑</span>배치도 2종 v1 작성(8/9) — ①플랫폼 배치도(인프라 4계층, 코드 실측) ②역할×워크플로우 매트릭스(누가 어느 기기서 무엇을). 둘 다 09_조사_문서\</div>
   <div class="item done"><span class="m">☑</span>첫 사례 = 진척도 4표면(집벽지·폰위젯·랩탑벽지·상세) + 원격조종 세팅 완료(8/8)</div>
+  <div class="item now"><span class="m">▶</span>PM 결정 6종 → 배치도 확정. 핵심=③"여러 기기 가진 사람 알림: 전 기기 동시 vs 우선기기 1개"(전 팝업 로직 좌우)</div>
+  <div class="item"><span class="m">☐</span>①운행일지 대표 결재 표면 ②종이서류 수신 우선표면·업로드 주체 ④지시 승인라인에 대표 ⑤다표면 vs 단일표면 구분 ⑥전원인가 자동실행 적용처</div>
   <div class="item"><span class="m">☐</span>대표 오피스 더블모니터: 일일운행일지 자동 생성·보고 팝업 (또는 전원 인가 시 자동 실행)</div>
   <div class="item"><span class="m">☐</span>종이 보고서류 전부 → 대표 홈오피스·사장실·개인전화 디지털 수신</div>
-  <div class="note">배치도 확정 → 그 위에 자동 팝업/파이프라인 설계. 진척도에만 유지, 착수는 지시로. 상세=메모리 device-surface-topology.</div>
+  <div class="note">인프라 배치도=무엇이 어디서 도는가(서버리스라 물리장비 없음, SPOF=Blobs 단일원천) · 운영 매트릭스=자동 팝업 규칙의 출처. 착수는 지시로.</div>
 </div>
 
 <div class="view" id="v2">
