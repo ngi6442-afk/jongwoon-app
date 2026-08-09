@@ -43,7 +43,16 @@ const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers
 function rid() { return crypto.randomBytes(8).toString('hex'); }
 function jr(statusCode, body) { return { statusCode, headers: Object.assign({ 'Content-Type': 'application/json' }, CORS), body: JSON.stringify(body) }; }
 function memberKey(id) { return `member:${id}`; }
-function nameKey(name) { return `name:${String(name).trim().toLowerCase()}`; }
+// 입력 정리: 한글 조합형(NFD)·제로폭문자 때문에 "같아 보이는데 키가 다른" 사고가 난다.
+// 드롭다운 시절엔 저장된 문자열을 그대로 넘겨 안 드러났지만, 직접 타이핑하면 로그인이 실패했다(2026-08-09 실측).
+function cleanText(s) {
+  return String(s == null ? '' : s)
+    .normalize('NFC')                      // 조합형 → 완성형 통일
+    .replace(/[​-‍﻿]/g, '')  // 제로폭 공백·조이너·BOM 제거
+    .trim();
+}
+function nameKey(name) { return `name:${cleanText(name).toLowerCase()}`; }
+function nameKeyRaw(name) { return `name:${String(name).trim().toLowerCase()}`; }  // 구 색인 조회용(하위호환)
 // ── 계정 분리 이사 스위치 ───────────────────────────────────────────────
 // true  = 아이디·이름 둘 다로 로그인(이사 기간). 아이디 미발급자도 못 잠긴다.
 // false = 아이디로만 로그인. 이름 목록(names) 조회도 막힌다.
@@ -53,7 +62,7 @@ const ALLOW_NAME_LOGIN = String(process.env.GW_ALLOW_NAME_LOGIN || '').toLowerCa
 
 // 개인 아이디 로그인(계정 분리, 2026-08-09). 이름 드롭다운을 대체하며 이사 기간엔 이름 로그인과 병행.
 function uidKey(uid) { return `uid:${normUid(uid)}`; }
-function normUid(uid) { return String(uid == null ? '' : uid).trim().toLowerCase(); }
+function normUid(uid) { return cleanText(uid).toLowerCase(); }
 // 영문소문자·숫자·._- 만 4~20자. 한글 금지 — 이름 형태를 아이디로 못 잡게 해 이름 색인 가로채기를 원천 차단.
 function validUid(uid) { return /^[a-z0-9._-]{4,20}$/.test(normUid(uid)); }
 function genId() { return 'u' + crypto.randomBytes(5).toString('hex'); }
@@ -98,7 +107,7 @@ async function handleBootstrap(st, d, R) {
   // 회원이 하나도 없을 때만: 최초 관리자 생성(무인증). 이후엔 거부.
   const existing = await listMembers(st);
   if (existing.length > 0) return jr(409, { status: 'REJECTED', error_code: 'ALREADY_INITIALIZED', request_id: R });
-  const name = (d.name || '').trim();
+  const name = cleanText(d.name);
   const pin = (d.pin || '').trim();
   if (!name || !validSecret(pin, true)) return jr(400, { status: 'REJECTED', error_code: 'WEAK_SECRET', request_id: R });
   const { salt, hash } = hashSecret(pin);
@@ -133,9 +142,17 @@ async function handleLogin(st, d, R, event) {
   }
   // ① 아이디 색인 우선 → ② (이사 기간에 한해) 이름 색인.
   // 순서가 중요: 아이디는 영문·숫자만 허용하므로 한글 이름을 아이디로 선점해 남의 로그인을 가로챌 수 없다.
+  // 이름은 정리키(NFC) → 원문키 순으로 조회 — 예전에 저장된 색인이 조합형일 수 있어 하위호환이 필요하다.
   let idx = { ok: true, data: null };
+  let healName = null;   // 구 색인으로 찾았을 때 새 키를 만들어 스스로 고침
   if (validUid(ident)) idx = await blobGet(st, uidKey(ident));
-  if (idx.ok && !idx.data && ALLOW_NAME_LOGIN) idx = await blobGet(st, nameKey(ident));
+  if (idx.ok && !idx.data && ALLOW_NAME_LOGIN) {
+    idx = await blobGet(st, nameKey(ident));
+    if (idx.ok && !idx.data && nameKeyRaw(ident) !== nameKey(ident)) {
+      idx = await blobGet(st, nameKeyRaw(ident));
+      if (idx.ok && idx.data) healName = ident;
+    }
+  }
   if (!idx.ok) return jr(500, { status: 'ERROR', error_code: idx.code, request_id: R });
   if (!idx.data) return fail();
   const mr = await blobGet(st, memberKey(idx.data));
@@ -143,6 +160,8 @@ async function handleLogin(st, d, R, event) {
   if (!mr.data || mr.data.del === 1 || retired(mr.data)) return fail();
   if (!verifySecret(pin, mr.data.pin_salt, mr.data.pin_hash)) return fail();
   if (lk.ok && lk.data) await blobSet(st, lockKey(name), null);  // 성공 → 잠금 해제
+  // 구 색인으로 들어온 경우 정리키 색인을 추가로 심어 다음부터는 타이핑으로도 바로 찾히게 한다(자가 치유).
+  if (healName) { try { await blobSet(st, nameKey(healName), idx.data); } catch (e) {} }
   const deviceStatus = await registerDevice(st, event, mr.data);
   const s = issueSession(mr.data);
   if (!s.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: s.code, request_id: R });
@@ -173,7 +192,7 @@ async function handleMemberList(st, event, R) {
 async function handleMemberUpsert(st, event, d, R) {
   const c = await currentMember(st, event);
   if (!c.ok || !c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
-  const name = (d.name || '').trim();
+  const name = cleanText(d.name);   // 저장 시점에 NFC 통일 — 타이핑 로그인이 깨지지 않게
   let m;
   let before = null;   // 감사 로그용 변경 전 스냅샷
   if (d.id) {

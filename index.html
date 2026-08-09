@@ -10378,6 +10378,13 @@
       }).catch(function(e){ alert("알림 켜기 실패: "+e); });
     });
   }
+  // 로그인 식별자 정리 — 서버 cleanText()와 같은 규칙(NFC 통일 + 제로폭문자 제거 + 공백 정리)
+  function cleanIdent(s){
+    return String(s == null ? "" : s)
+      .normalize("NFC")
+      .replace(/[​-‍﻿]/g, "")
+      .trim();
+  }
   function showMemberLogin(){
     var cm = curMember();
     document.getElementById("memberCurrent").textContent = cm ? ("현재: " + cm.name + " · 전환하려면 다시 로그인") : "아이디와 PIN 입력";
@@ -10399,7 +10406,9 @@
   function hideMemberLogin(){ document.getElementById("memberBackdrop").classList.remove("show"); }
   function doMemberLogin(){
     // 입력칸 하나로 아이디·이름 모두 받는다(이사 기간). 서버가 아이디 색인 → 이름 색인 순으로 해석.
-    var ident = document.getElementById("memberUid").value.trim();
+    // 한글은 조합형(NFD)으로 들어올 수 있어 NFC로 통일하고 제로폭문자를 털어낸다 —
+    // 드롭다운 때는 안 드러났지만 직접 타이핑하면 로그인이 실패하던 원인(2026-08-09 실측).
+    var ident = cleanIdent(document.getElementById("memberUid").value);
     var pin = document.getElementById("memberPin").value.trim();
     if (!ident || !pin){ document.getElementById("memberErr").classList.add("show"); return; }
     var keep = document.getElementById("memberKeep").checked;
@@ -10476,7 +10485,7 @@
   }
   function saveSetUid(){
     var m = curMember(); if (!m) return;
-    var uid = document.getElementById("uidNew").value.trim().toLowerCase();
+    var uid = cleanIdent(document.getElementById("uidNew").value).toLowerCase();
     var cur = document.getElementById("uidCur").value.trim();
     var errEl = document.getElementById("uidErr");
     if (!/^[a-z0-9._-]{4,20}$/.test(uid)){ errEl.textContent = "아이디는 영문소문자·숫자·. _ - 로 4~20자입니다."; errEl.classList.add("show"); return; }
@@ -10931,7 +10940,7 @@
     var loaRaw = document.getElementById("meLoa").value;
     // 모듈별 권한은 '권한관리' 화면에서만 편집. 인사 카드 저장은 기존 권한을 보존(perms 미전송).
     // 신규 회원만 직책 프리셋으로 초기 권한 부여.
-    var uidRaw = (document.getElementById("meUid").value || "").trim().toLowerCase();
+    var uidRaw = cleanIdent(document.getElementById("meUid").value).toLowerCase();
     if (uidRaw && !/^[a-z0-9._-]{4,20}$/.test(uidRaw)){
       errEl.textContent = "아이디는 영문소문자·숫자·. _ - 로 4~20자입니다."; errEl.classList.add("show"); return;
     }
