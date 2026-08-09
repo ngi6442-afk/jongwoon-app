@@ -44,6 +44,18 @@ function rid() { return crypto.randomBytes(8).toString('hex'); }
 function jr(statusCode, body) { return { statusCode, headers: Object.assign({ 'Content-Type': 'application/json' }, CORS), body: JSON.stringify(body) }; }
 function memberKey(id) { return `member:${id}`; }
 function nameKey(name) { return `name:${String(name).trim().toLowerCase()}`; }
+// ── 계정 분리 이사 스위치 ───────────────────────────────────────────────
+// true  = 아이디·이름 둘 다로 로그인(이사 기간). 아이디 미발급자도 못 잠긴다.
+// false = 아이디로만 로그인. 이름 목록(names) 조회도 막힌다.
+// **전원 아이디 발급·첫 로그인 확인 후 false 로 바꾸고 배포하면 "완전 이사" 완료.**
+// (환경변수 GW_ALLOW_NAME_LOGIN=off 로도 즉시 차단 가능 — 코드 수정 없이 잠글 때)
+const ALLOW_NAME_LOGIN = String(process.env.GW_ALLOW_NAME_LOGIN || '').toLowerCase() !== 'off';
+
+// 개인 아이디 로그인(계정 분리, 2026-08-09). 이름 드롭다운을 대체하며 이사 기간엔 이름 로그인과 병행.
+function uidKey(uid) { return `uid:${normUid(uid)}`; }
+function normUid(uid) { return String(uid == null ? '' : uid).trim().toLowerCase(); }
+// 영문소문자·숫자·._- 만 4~20자. 한글 금지 — 이름 형태를 아이디로 못 잡게 해 이름 색인 가로채기를 원천 차단.
+function validUid(uid) { return /^[a-z0-9._-]{4,20}$/.test(normUid(uid)); }
 function genId() { return 'u' + crypto.randomBytes(5).toString('hex'); }
 function safeMember(m) { if (!m) return null; const { pin_salt, pin_hash, ...s } = m; return s; }
 function cleanPerms(p) { const out = {}; MODULES.forEach(function (k) { out[k] = (p && (p[k] === 'do' || p[k] === 'view' || p[k] === 'hide')) ? p[k] : 'view'; }); return out; }
@@ -100,9 +112,12 @@ async function handleBootstrap(st, d, R) {
 
 async function handleLogin(st, d, R, event) {
   const GEN = () => jr(401, { status: 'UNAUTHORIZED', error_code: 'INVALID_CREDENTIALS', request_id: R });
-  const name = (d.name || '').trim();
+  // 계정 분리(2026-08-09): 입력칸 하나로 아이디 우선, 없으면 이름으로 해석(이사 기간 병행).
+  // 전원 아이디 발급이 끝나면 ALLOW_NAME_LOGIN=false 로 이름 경로를 닫는다.
+  const ident = (d.uid || d.name || '').trim();
   const pin = (d.pin || '').trim();
-  if (!name || !pin) return GEN();
+  if (!ident || !pin) return GEN();
+  const name = ident;   // 잠금 카운터 키는 입력값 기준(아래 lockKey에서 사용)
   const now = Date.now();
   const lk = await blobGet(st, lockKey(name));
   if (lk.ok && lk.data && lk.data.until && lk.data.until > now) {
@@ -116,7 +131,11 @@ async function handleLogin(st, d, R, event) {
     await new Promise(function (r) { setTimeout(r, 600); });
     return GEN();
   }
-  const idx = await blobGet(st, nameKey(name));
+  // ① 아이디 색인 우선 → ② (이사 기간에 한해) 이름 색인.
+  // 순서가 중요: 아이디는 영문·숫자만 허용하므로 한글 이름을 아이디로 선점해 남의 로그인을 가로챌 수 없다.
+  let idx = { ok: true, data: null };
+  if (validUid(ident)) idx = await blobGet(st, uidKey(ident));
+  if (idx.ok && !idx.data && ALLOW_NAME_LOGIN) idx = await blobGet(st, nameKey(ident));
   if (!idx.ok) return jr(500, { status: 'ERROR', error_code: idx.code, request_id: R });
   if (!idx.data) return fail();
   const mr = await blobGet(st, memberKey(idx.data));
@@ -173,6 +192,19 @@ async function handleMemberUpsert(st, event, d, R) {
     m.role = (d.role || '직원');
     m.admin = !!d.admin;
   }
+  // 아이디(계정 분리) — 관리자가 인사 카드에서 발급/변경. 중복·이름충돌은 거부.
+  if (d.uid !== undefined) {
+    const nu = normUid(d.uid);
+    if (nu === '') {
+      if (m.uid) { await blobSet(st, uidKey(m.uid), null); delete m.uid; }
+    } else {
+      if (!validUid(nu)) return jr(400, { status: 'REJECTED', error_code: 'INVALID_UID', request_id: R });
+      const dup = await uidTaken(st, nu, m.id);
+      if (dup) return jr(409, { status: 'REJECTED', error_code: dup, request_id: R });
+      if (m.uid && normUid(m.uid) !== nu) await blobSet(st, uidKey(m.uid), null);
+      m.uid = nu;
+    }
+  }
   if (d.rank !== undefined) m.rank = String(d.rank || '');
   if (d.dept !== undefined) m.dept = String(d.dept || '');
   if (d.annual_days !== undefined) { m.annual_days = (d.annual_days === null || isNaN(Number(d.annual_days))) ? null : Number(d.annual_days); }
@@ -197,11 +229,12 @@ async function handleMemberUpsert(st, event, d, R) {
   }
   const w1 = await blobSet(st, memberKey(m.id), m);
   const w2 = await blobSet(st, nameKey(m.name), m.id);
+  if (m.uid) await blobSet(st, uidKey(m.uid), m.id);   // 아이디 색인 유지
   if (!w1.ok || !w2.ok) return jr(500, { status: 'ERROR', error_code: 'STORAGE_WRITE_FAILED', request_id: R });
   // 감사 로그: 회원 필드 변경(이전값→새값). PIN은 값 미기록('변경'만), 해시·비밀값 제외.
   try {
     const f = {};
-    const AUD_FIELDS = ['name','role','admin','rank','dept','annual_days','hire_date','emp_type','annual_basis','loa_days','leave_date','annual_paid','annual_base','annual_base_date','seq','on_loa','loa_start','loa_end'];
+    const AUD_FIELDS = ['name','uid','role','admin','rank','dept','annual_days','hire_date','emp_type','annual_basis','loa_days','leave_date','annual_paid','annual_base','annual_base_date','seq','on_loa','loa_start','loa_end'];
     const b = before || {};
     for (const k of AUD_FIELDS) {
       const a = b[k], v = m[k];
@@ -225,9 +258,54 @@ async function handleMemberDelete(st, event, d, R) {
   if (r.ok && r.data) {
     r.data.del = 1; r.data.updated = Date.now();
     await blobSet(st, memberKey(d.id), r.data); await blobSet(st, nameKey(r.data.name), null);
+    if (r.data.uid) await blobSet(st, uidKey(r.data.uid), null);   // 아이디 색인도 회수 — 안 지우면 그 아이디가 영구 점유된다
     try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'member', ev: [{ op: '삭제', id: d.id, t: r.data.name }] }); } catch (e) {}
   }
   return jr(200, { status: 'OK', request_id: R });
+}
+
+// 아이디 설정 — 본인(현재 PIN 확인) 또는 관리자(타인 지정).
+// 계정 분리 이사에서 직원이 스스로 아이디를 정하는 경로.
+async function handleSetUid(st, event, d, R) {
+  const c = await currentMember(st, event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: 'NO_SESSION', request_id: R });
+  const targetId = (d.id && c.member.admin) ? d.id : c.member.id;
+  const uid = normUid(d.uid);
+  if (!validUid(uid)) return jr(400, { status: 'REJECTED', error_code: 'INVALID_UID', request_id: R });
+
+  const r = await blobGet(st, memberKey(targetId));
+  if (!r.ok || !r.data) return jr(404, { status: 'REJECTED', error_code: 'NOT_FOUND', request_id: R });
+
+  // 본인 변경은 현재 PIN 확인 — 토큰 탈취만으로 아이디를 바꿔 계정을 흔드는 통로 차단(set_pin과 동일 원칙)
+  if (targetId === c.member.id) {
+    const cur = (d.cur || '').trim();
+    if (!cur) return jr(400, { status: 'REJECTED', error_code: 'NEED_CURRENT_PIN', request_id: R });
+    if (!verifySecret(cur, r.data.pin_salt, r.data.pin_hash)) {
+      await new Promise(function (rr) { setTimeout(rr, 600); });
+      return jr(403, { status: 'FORBIDDEN', error_code: 'PIN_MISMATCH', request_id: R });
+    }
+  }
+
+  const dup = await uidTaken(st, uid, targetId);
+  if (dup) return jr(409, { status: 'REJECTED', error_code: dup, request_id: R });
+
+  const prev = normUid(r.data.uid);
+  if (prev && prev !== uid) await blobSet(st, uidKey(prev), null);   // 옛 아이디 색인 회수
+  r.data.uid = uid; r.data.updated = Date.now();
+  const w1 = await blobSet(st, memberKey(targetId), r.data);
+  const w2 = await blobSet(st, uidKey(uid), targetId);
+  if (!w1.ok || !w2.ok) return jr(500, { status: 'ERROR', error_code: 'STORAGE_WRITE_FAILED', request_id: R });
+  try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'login', ev: [{ op: '아이디설정', id: targetId, t: uid }] }); } catch (e) {}
+  return jr(200, { status: 'OK', uid: uid, request_id: R });
+}
+
+// 아이디 중복 검사. 남의 아이디는 물론 **남의 이름과도 겹치면 거부** — 이사 기간에 이름 로그인을 가로채는 것을 막는다.
+async function uidTaken(st, uid, selfId) {
+  const hit = await blobGet(st, uidKey(uid));
+  if (hit.ok && hit.data && hit.data !== selfId) return 'UID_TAKEN';
+  const nm = await blobGet(st, nameKey(uid));
+  if (nm.ok && nm.data && nm.data !== selfId) return 'UID_TAKEN';
+  return null;
 }
 
 async function handleSetPin(st, event, d, R) {
@@ -302,7 +380,13 @@ async function handler(event) {
     switch (d && d.action) {
       case 'reset': return await handleReset(R);
       case 'bootstrap': return await handleBootstrap(st, d, R);
-      case 'names': { const ms = (await listMembers(st)).filter(function (m) { return !retired(m); }); return jr(200, { status: 'OK', names: ms.map(function (m) { return m.name; }), count: ms.length, request_id: R }); }
+      // 이사 완료(ALLOW_NAME_LOGIN=false) 후엔 이름 목록을 아예 내주지 않는다 — 로그인 화면에서 전 직원 명단이 보이던 노출을 닫는 것이 이번 변경의 목적.
+      case 'names': {
+        if (!ALLOW_NAME_LOGIN) return jr(200, { status: 'OK', names: [], count: 0, migrated: true, request_id: R });
+        const ms = (await listMembers(st)).filter(function (m) { return !retired(m); });
+        return jr(200, { status: 'OK', names: ms.map(function (m) { return m.name; }), count: ms.length, migrated: false, request_id: R });
+      }
+      case 'set_uid': return await handleSetUid(st, event, d, R);
       case 'login': return await handleLogin(st, d, R, event);
       case 'verify': return await handleVerify(st, event, R);
       case 'device_list': return await handleDeviceList(st, event, R);
