@@ -145,6 +145,7 @@ async function handleLogin(st, d, R, event) {
   // 이름은 정리키(NFC) → 원문키 순으로 조회 — 예전에 저장된 색인이 조합형일 수 있어 하위호환이 필요하다.
   let idx = { ok: true, data: null };
   let healName = null;   // 구 색인으로 찾았을 때 새 키를 만들어 스스로 고침
+  let viaName = false;   // 이름으로 찾았는지 — 아이디 보유자의 이름 로그인을 막기 위해 표시
   if (validUid(ident)) idx = await blobGet(st, uidKey(ident));
   if (idx.ok && !idx.data && ALLOW_NAME_LOGIN) {
     idx = await blobGet(st, nameKey(ident));
@@ -152,12 +153,19 @@ async function handleLogin(st, d, R, event) {
       idx = await blobGet(st, nameKeyRaw(ident));
       if (idx.ok && idx.data) healName = ident;
     }
+    if (idx.ok && idx.data) viaName = true;
   }
   if (!idx.ok) return jr(500, { status: 'ERROR', error_code: idx.code, request_id: R });
   if (!idx.data) return fail();
   const mr = await blobGet(st, memberKey(idx.data));
   if (!mr.ok) return jr(500, { status: 'ERROR', error_code: mr.code, request_id: R });
   if (!mr.data || mr.data.del === 1 || retired(mr.data)) return fail();
+  // ★개인별 자동 이사: 아이디를 만든 사람은 그 순간부터 이름 로그인이 닫힌다.
+  // 전원 완료를 기다릴 필요 없이 각자 아이디를 만드는 즉시 이름 경로가 사라진다.
+  // (PIN 검증 전에 막아 무작위 대입에 이름 경로를 쓰지 못하게 한다)
+  if (viaName && mr.data.uid) {
+    return jr(401, { status: 'UNAUTHORIZED', error_code: 'USE_UID', request_id: R });
+  }
   if (!verifySecret(pin, mr.data.pin_salt, mr.data.pin_hash)) return fail();
   if (lk.ok && lk.data) await blobSet(st, lockKey(name), null);  // 성공 → 잠금 해제
   // 구 색인으로 들어온 경우 정리키 색인을 추가로 심어 다음부터는 타이핑으로도 바로 찾히게 한다(자가 치유).

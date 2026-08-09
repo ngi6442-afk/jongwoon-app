@@ -10415,6 +10415,8 @@
     gwCall("gw-auth", { action: "login", uid: ident, pin: pin }).then(function(res){
       var errEl = document.getElementById("memberErr");
       if (res.status === 429){ errEl.textContent = "로그인 시도가 많아 계정이 잠겼습니다. " + (res.body && res.body.retry_after ? Math.ceil(res.body.retry_after/60) + "분 " : "") + "후 다시 시도하세요."; errEl.classList.add("show"); return; }
+      // 아이디를 만든 사람이 이름으로 시도한 경우 — 헤매지 않게 명확히 안내
+      if (res.body && res.body.error_code === "USE_UID"){ errEl.textContent = "아이디가 발급된 계정입니다. 이름 대신 아이디로 로그인하세요."; errEl.classList.add("show"); return; }
       if (res.status !== 200 || !res.body || !res.body.token){ errEl.textContent = "아이디 또는 PIN이 올바르지 않습니다."; errEl.classList.add("show"); return; }
       try{ localStorage.setItem("jw_last_uid", ident); }catch(e){}
       setGwToken(res.body.token, keep);
