@@ -10870,7 +10870,20 @@
     document.getElementById("meSeq").value = (m && typeof m.seq==="number") ? m.seq : "";
     document.getElementById("mePin").value = "";
     document.getElementById("mePin").placeholder = m ? "PIN (변경 시만 입력)" : "PIN 4자리 숫자";
+    // 개발자 지정은 개발자만 — 관리자에겐 선택지 자체를 숨긴다(골랐다가 403으로 튕기는 혼란 방지).
+    // 단 이미 개발자인 사람을 열어볼 땐 표시해야 값이 안 뭉개진다.
+    var devOpt = document.querySelector('#meRole option[value="개발자"]');
+    if (devOpt) devOpt.hidden = !(isDev() || (m && m.dev));
     document.getElementById("meRole").value = m ? (m.role||"직원") : "직원";
+    // 아이디·PIN 재설정은 개발자 영역 — 관리자에겐 읽기 전용으로 잠근다.
+    var meUidEl = document.getElementById("meUid");
+    var mePinEl = document.getElementById("mePin");
+    var sysLocked = !isDev() && !!m;
+    meUidEl.readOnly = sysLocked;
+    mePinEl.readOnly = sysLocked;
+    meUidEl.style.opacity = sysLocked ? "0.6" : "";
+    mePinEl.style.opacity = sysLocked ? "0.6" : "";
+    if (sysLocked) mePinEl.placeholder = "PIN 재설정은 개발자만";
     document.getElementById("meRank").value = m ? (m.rank||"") : "";
     document.getElementById("meDept").value = m ? (m.dept||"") : "";
     document.getElementById("meHire").value = m ? (m.hire_date||"") : "";
@@ -10976,7 +10989,15 @@
     else if (ROLE_PRESET[role]) payload.perms = ROLE_PRESET[role].perms;   // 신규만 프리셋 권한
     if (pin && pinOk) payload.pin = pin;
     gwCall("gw-auth", payload).then(function(res){
-      if (res.status !== 200){ document.getElementById("meErr").classList.add("show"); return; }
+      if (res.status !== 200){
+        var e2 = document.getElementById("meErr");
+        var ec = res.body && res.body.error_code;
+        if (ec === "DEV_ONLY") e2.textContent = "계정·권한 변경은 개발자만 가능합니다.";
+        else if (ec === "LAST_DEV") e2.textContent = "마지막 개발자는 강등·삭제할 수 없습니다.";
+        else if (ec === "UID_TAKEN") e2.textContent = "이미 사용 중인 아이디입니다.";
+        else if (ec === "INVALID_UID") e2.textContent = "아이디는 영문소문자·숫자·. _ - 로 4~20자입니다.";
+        e2.classList.add("show"); return;
+      }
       // 서버 응답으로 로컬 members 즉시 갱신(재조회 지연/캐시로 저장이 안 된 것처럼 보이던 문제 해결)
       if (res.body && res.body.member){
         var mm = res.body.member, found = false;
