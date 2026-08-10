@@ -532,6 +532,9 @@
   }
   .dash-sec h2 .cnt{font-size:12px;font-weight:700;color:var(--sub);}
   .empty-line{color:var(--sub);font-size:13px;padding:16px;text-align:center;}
+  /* 만기 미등록 경고 — 값이 비면 자동지시·캘린더가 통째로 안 도는데 종전엔 표시가 없었다 */
+  .lic-nodate{background:#FBF3DF;border:1px solid #E5D3A4;color:#7a5b12;border-radius:8px;
+    padding:9px 12px;margin-bottom:10px;font-size:13px;line-height:1.5;}
 
   /* 차량 */
   .own-badge{display:inline-block;font-size:11px;padding:1px 7px;border-radius:999px;font-weight:700;}
@@ -10023,12 +10026,17 @@
     if (!host) return;
     var list = liveLic().filter(licVisible);
     list.sort(function(a, b){ return licNearest(a) - licNearest(b); });
+    var noDate = list.filter(function(l){ return !isDate(l.expiry) && !isDate(l.edu_due); });
     var head = document.getElementById("licHead");
     if (head){
-      var withDate = list.filter(function(l){ return isDate(l.expiry) || isDate(l.edu_due); }).length;
-      head.textContent = list.length ? ("총 " + list.length + "건 · 만기입력 " + withDate) : "";
+      head.textContent = list.length ? ("총 " + list.length + "건 · 만기입력 " + (list.length - noDate.length)) : "";
     }
-    host.innerHTML = list.length ? list.map(licRowHtml).join("") : '<div class="empty-line">등록된 인허가가 없습니다.</div>';
+    // 만기일이 비어 있으면 D-30 자동지시·캘린더·대시보드가 그 건에 대해 아무 것도 못 한다.
+    // 종전엔 헤더 숫자로만 알려서 아무도 눈치채지 못했다(13건 전부 공란인 채 방치) — 눈에 띄는 줄로 승격.
+    var banner = noDate.length
+      ? '<div class="lic-nodate">만료일 미등록 <b>' + noDate.length + '건</b> — 입력해야 만기 30일 전 자동 지시·캘린더가 켜집니다. 아래 항목을 눌러 입력하세요.</div>'
+      : '';
+    host.innerHTML = list.length ? (banner + list.map(licRowHtml).join("")) : '<div class="empty-line">등록된 인허가가 없습니다.</div>';
     Array.prototype.forEach.call(host.querySelectorAll("[data-lic-edit]"), function(el){
       el.addEventListener("click", function(e){
         if (e.target.classList.contains("cal-btn") || e.target.classList.contains("mini-btn")) return;

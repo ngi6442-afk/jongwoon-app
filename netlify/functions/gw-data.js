@@ -55,9 +55,15 @@ async function deviceApproved(event, member) {
 // Blobs 전환으로 무효가 된 자리를 대체. 정책: 최근 VER_RECENT개 전부 + 그보다 오래된 건 일 1개 × VER_DAYS일.
 // 스냅샷 실패가 저장 본선을 막으면 안 된다(전체 try). priv(개인) 컬렉션은 대상 아님.
 const VER_RECENT = 20, VER_DAYS = 30;
+// 스냅샷 제외(2026-08-10 실측). 입찰·온비드가 저장의 89%(11.93MB 중 10.6MB)인데 내용은
+// 수집봇이 다시 만들 수 있는 기계 데이터라 시점복구 가치가 낮다. 반면 카드 상태를 한 번 바꿀 때마다
+// 전체 문서를 한 벌 더 쓰게 돼 최다 사용자(대표)의 체감 속도를 직접 깎았다.
+// 단 '비우기' 같은 파괴적 작업은 force=true로 계속 남긴다 — 재수집으로 되돌릴 수 없는 사람 판단이 섞이므로.
+const VER_SKIP = { bids: 1, onbid: 1 };
 function verDay(ts) { return new Date(ts + 9 * 3600000).toISOString().slice(0, 10); }   // KST 일자
-async function verSnapshot(col, prevDoc, byName, dailyOnly) {
+async function verSnapshot(col, prevDoc, byName, dailyOnly, force) {
   if (!prevDoc || typeof prevDoc !== 'object') return;
+  if (VER_SKIP[col] && !force) return;
   try {
     const st = store(DATA);
     const ir = await blobGet(st, `veridx:${col}`);
@@ -590,7 +596,7 @@ async function handleBidsPurge(event, d, R) {
   const st = store(DATA);
   const r = await blobGet(st, colKey('bids'));
   const doc = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data : { schema: 1, items: [] };
-  await verSnapshot('bids', doc, c.member.name, false);   // 비우기는 파괴적 — 변형 전 항상 보존
+  await verSnapshot('bids', doc, c.member.name, false, true);   // 비우기는 파괴적 — 제외 대상이어도 강제 보존
   const before = doc.items.length;
   doc.items = (d.mode === 'all') ? [] : doc.items.filter(function (it) { return it && it.status && it.status !== 'new'; });
   const removed = before - doc.items.length;
@@ -1177,6 +1183,27 @@ async function handleVerList(event, d, R) {
   const ir = await blobGet(store(DATA), `veridx:${d.collection}`);
   return jr(200, { status: 'OK', items: (ir.ok && ir.data && Array.isArray(ir.data.items)) ? ir.data.items : [], request_id: R });
 }
+// 제외 컬렉션(입찰·온비드)에 이미 쌓인 스냅샷 청소. 규칙만 바꾸면 앞으로만 안 쌓일 뿐,
+// 지금 저장의 89%를 먹고 있는 과거분은 그대로 남는다. 관리자가 1회 실행해 회수한다.
+async function handleVerPurge(event, d, R) {
+  const g = await verGate(event, d, R); if (g.err) return g.err;
+  const col = String(d.collection || '');
+  if (!VER_SKIP[col]) return jr(400, { status: 'REJECTED', error_code: 'NOT_PURGEABLE', request_id: R });
+  const st = store(DATA);
+  const ir = await blobGet(st, `veridx:${col}`);
+  const items = (ir.ok && ir.data && Array.isArray(ir.data.items)) ? ir.data.items : [];
+  // 가장 최근 1개는 남긴다 — 되돌릴 여지를 완전히 없애지 않기 위해
+  const sorted = items.slice().sort(function (a, b) { return b.ts - a.ts; });
+  const keep = sorted.slice(0, 1), drop = sorted.slice(1);
+  let removed = 0;
+  for (const e of drop) {
+    const r = await blobDelete(st, `ver:${col}:${e.ts}`);
+    if (r && r.ok !== false) removed++;
+  }
+  await blobSet(st, `veridx:${col}`, { items: keep });
+  try { await appendAudit({ ts: Date.now(), by: g.c.member.name, bid: g.c.member.id, col: 'admin', ev: [{ op: '스냅샷정리', id: col, t: removed + '건 삭제' }] }); } catch (e) {}
+  return jr(200, { status: 'OK', collection: col, removed, kept: keep.length, request_id: R });
+}
 async function handleVerGet(event, d, R) {
   const g = await verGate(event, d, R); if (g.err) return g.err;
   const ts = Number(d.ts) || 0;
@@ -1217,6 +1244,7 @@ async function handler(event) {
     if (d && d.action === 'ver_list') return await handleVerList(event, d, R);
     if (d && d.action === 'ver_get') return await handleVerGet(event, d, R);
     if (d && d.action === 'ver_restore') return await handleVerRestore(event, d, R);
+    if (d && d.action === 'ver_purge') return await handleVerPurge(event, d, R);
     if (d && d.action === 'bids_ingest') return await handleBidsIngest(event, d, R);
     if (d && d.action === 'autotask_ingest') return await handleAutotaskIngest(event, d, R);
     if (d && d.action === 'bot_notify') return await handleBotNotify(event, d, R);
