@@ -35,6 +35,9 @@ h2{font-size:13px;margin-bottom:8px}
 .item.now .m{color:#EF9F27}
 .sub{font-size:11px;color:#696964;margin:-3px 0 7px 21px}
 .note{font-size:11px;color:#696964;margin:10px 0 0}
+/* 체크리스트 → 실제 문서 바로가기 */
+.doc{color:#7aa7d8;text-decoration:none;font-size:11px;margin-left:6px;white-space:nowrap}
+.doc:hover{text-decoration:underline;color:#a8c8ea}
 .back{cursor:pointer;color:#7aa7d8;font-size:12px;margin-bottom:10px;display:inline-block}
 .back:hover{text-decoration:underline}
 .view{display:none}.view.on{display:block}
@@ -44,7 +47,7 @@ h2{font-size:13px;margin-bottom:8px}
 <div id="panel">
 
 <div class="view on" id="v-home">
-  <h1>진척도</h1><span class="date">2026-08-09 · 추정 · 클릭=상세</span>
+  <h1>진척도</h1><span class="date">2026-08-10 · 추정 · 클릭=상세</span>
   <div class="hero">59%<small>큰틀 4개 평균</small></div>
   <div class="row" onclick="go('v1')"><b>1&nbsp; 업무플랫폼</b><div class="track"><div class="fillb" style="width:75%"></div><span>75</span></div></div>
   <div class="row focus" onclick="go('v2')"><b>2&nbsp; 인증·자격 &nbsp;◀ 오늘</b><div class="track"><div class="fillb" style="width:45%"></div><span>45</span></div></div>
@@ -56,7 +59,7 @@ h2{font-size:13px;margin-bottom:8px}
   <div class="item now"><span class="m">▶</span>1. KOITA 잔여 3종 — 내부·현판 사진, 기준검토표 (임시저장 상태) · PM</div>
   <div class="item"><span class="m">☐</span>2. 점검 2건(주소 상세·투자합) → [설립신고제출] · PM</div>
   <div class="item"><span class="m">☐</span>3. 화관법 봇 실전 1건(--submit --max 1, 참관) — 통과 시 매일 4~6건 수작업 소멸 · PM+AI</div>
-  <div class="item"><span class="m">☐</span>4. 직원 로그인·아이디 발급 — 계정 분리 완료(8/9), 실사용이 플랫폼 병목(30) · PM</div>
+  <div class="item"><span class="m">☐</span>4. 계정 암호·자동잠금(무료 5분) → 대표·나수진 기기점검 → 구매 결정 · PM</div>
   <div class="item"><span class="m">☐</span>5. 블로그 최근 글 확인 → 30일 타이머 상태 재판정 (게시됨 — 뭘로 올렸는지 파악) · PM/AI</div>
   <div class="item"><span class="m">☐</span>6. 활용신청·포털 변경신청 승인 확인 — 수주 어댑터 대기 · 외부</div>
   <div class="foot">갱신: "진척도 갱신해" · 문서판: 진척도_큰틀.html</div>
@@ -77,10 +80,10 @@ h2{font-size:13px;margin-bottom:8px}
   <div class="rowc" onclick="go('v1-10')"><b>화관법 자동화 · 실전 1건 대기</b><div class="track2"><div class="fillb t" style="width:90%"></div></div><span class="pv">90</span></div>
   <div class="rowc" onclick="go('v1-11')"><b>운행일지·배차 · 신규</b><div class="track2"><div class="fillb c" style="width:15%"></div></div><span class="pv">15</span></div>
   <div class="rowc" onclick="go('v1-12')"><b>대표 업무유연성 · 배치도 · 키스톤</b><div class="track2"><div class="fillb c" style="width:35%"></div></div><span class="pv">35</span></div>
-  <div class="rowc" onclick="go('v1-13')"><b>관리자 기기 보안 · 신규</b><div class="track2"><div class="fillb c" style="width:10%"></div></div><span class="pv">10</span></div>
+  <div class="rowc focus" onclick="go('v1-13')"><b>관리자 기기 보안 ◀ 지금</b><div class="track2"><div class="fillb c" style="width:25%"></div></div><span class="pv">25</span></div>
   <hr>
   <h2>지금 중요한 순서 — 업무플랫폼 (상위 3 · 전체는 상세판)</h2>
-  <div class="item now"><span class="m">▶</span>1. 관리자 기기 보안 — PC에 방화벽뿐. 실태 점검→방어 설계 · PM+AI</div>
+  <div class="item now"><span class="m">▶</span>1. 계정 암호·자동잠금(무료 5분) → 대표·나수진 기기점검 → 구매 결정 · PM</div>
   <div class="item"><span class="m">☐</span>2. 배치도 결정 6종 → 확정 → 대표 결재함 구현 · PM</div>
   <div class="item"><span class="m">☐</span>3. 화관법 봇 실전 1건 테스트(참관) — 이 1건이 완성 관문 · PM+AI</div>
 </div>
@@ -179,8 +182,8 @@ h2{font-size:13px;margin-bottom:8px}
 
 <div class="view" id="v1-11"><span class="back" onclick="go('v1')">← 업무플랫폼</span>
   <h1>운행일지·배차 자동화 — 15 (신규)</h1>
-  <div class="item done" style="margin-top:10px"><span class="m">☑</span>일일운반일지 결과물 시안 완성 (08_앱_시안\일일운반일지_시안.html)</div>
-  <div class="item done"><span class="m">☑</span>운행기록 입력 탭 시안 완성 (08_앱_시안\운행기록_탭_시안.html)</div>
+  <div class="item done" style="margin-top:10px"><span class="m">☑</span>일일운반일지 결과물 시안 완성 <a class="doc" href="https://claude.ai/code/artifact/bea6af8d-c3be-4c3d-bf62-ad3d31c1ead7" target="_blank">📄 시안</a></div>
+  <div class="item done"><span class="m">☑</span>운행기록 입력 탭 시안 완성 <a class="doc" href="https://claude.ai/code/artifact/bbbab94f-81d4-4e16-a5f1-34ef9d883111" target="_blank">📄 시안</a></div>
   <div class="item done"><span class="m">☑</span>경로 확정 — 올바로 로그인=ID/PW(인증서는 작성용만), EDI/API는 과함 판정 → 엑셀 다운 방식 유지</div>
   <div class="item now"><span class="m">▶</span>올바로 운반인계서 내역 → 일일운반일지(한 장) · 이 문서가 대표 결재 대상 · 현행=매일 수기</div>
   <div class="item"><span class="m">☐</span>일반 화물 운송(비폐기물=신고대상 아님) 수기 입력 → 같은 일지에 합본</div>
@@ -190,9 +193,9 @@ h2{font-size:13px;margin-bottom:8px}
 </div>
 <div class="view" id="v1-12"><span class="back" onclick="go('v1')">← 업무플랫폼</span>
   <h1>대표 업무유연성 · 기기 배치도 — 35 (키스톤)</h1>
-  <div class="item done" style="margin-top:10px"><span class="m">☑</span>배치도 2종 v1(8/9) — ①플랫폼 배치도(인프라 4계층, 코드 실측) ②역할×워크플로우 매트릭스. 09_조사_문서\</div>
+  <div class="item done" style="margin-top:10px"><span class="m">☑</span>배치도 2종 v1(8/9) <a class="doc" href="https://claude.ai/code/artifact/7b5702be-92a5-49c4-8240-516220186fb4" target="_blank">📄 인프라</a> <a class="doc" href="https://claude.ai/code/artifact/dbf72617-921c-4a5d-ba32-aad4dd65562a" target="_blank">📄 역할×기기</a></div>
   <div class="item done"><span class="m">☑</span><b>병목 진단(8/9)</b> — 앱엔 승인함·푸시가 이미 있는데 결재감(운행일지·사규·가족친화·계좌확인)이 앱 밖이라 "사장님 대면 시"로 쌓임. 진짜 대면 필요는 전화인증 1건뿐</div>
-  <div class="item done"><span class="m">☑</span>대표 결재함 시안(08_앱_시안\대표_결재함_시안.html) — 폰 주력+PC 동일, 항목당 [보기][반려][결재]</div>
+  <div class="item done"><span class="m">☑</span>대표 결재함 시안 — 폰 주력+PC 동일, 항목당 [보기][반려][결재] <a class="doc" href="https://claude.ai/code/artifact/ef49fdb7-ca09-400c-9ae7-bb397465ff7d" target="_blank">📄 시안</a></div>
   <div class="item done"><span class="m">☑</span>선행조건 해소 = 계정 분리·개발자 등급(v243~247) — 기기별 자동로그인의 전제</div>
   <div class="item now"><span class="m">▶</span>PM 결정 6종 → 배치도 확정. 핵심=③"여러 기기 보유자 알림: 전 기기 동시 vs 우선기기 1개"(전 팝업 로직 좌우)</div>
   <div class="item"><span class="m">☐</span>결재함 구현 — 앱 밖 결재감(운행일지·사규·가족친화)을 승인 대기함으로 편입 + 대표 폰 푸시</div>
@@ -201,13 +204,16 @@ h2{font-size:13px;margin-bottom:8px}
   <div class="note">순서: 계정(완료) → 배치도 확정 → 결재함 편입 → 자동실행. 인프라 SPOF=Blobs 단일원천(외장 복제 미결).</div>
 </div>
 <div class="view" id="v1-13"><span class="back" onclick="go('v1')">← 업무플랫폼</span>
-  <h1>관리자 기기 보안 — 10 (신규)</h1>
+  <h1>관리자 기기 보안 — 25 (신규)</h1>
   <div class="item done" style="margin-top:10px"><span class="m">☑</span>앱 계층은 확보(8/9) — 개인 아이디·PIN·세션토큰·기기승인·개발자 등급·감사로그</div>
-  <div class="item now"><span class="m">▶</span><b>실태(PM 8/9): 관리자 PC에 윈도우 방화벽 외 보안 없음.</b> 기기가 뚫리면 앱 보안이 무의미 — 승인된 기기가 곧 열쇠라서</div>
-  <div class="item"><span class="m">☐</span>현황 실측 → 방어 설계: 디스크 암호화(BitLocker)·로그인 잠금·백신/EDR·자동 화면잠금·USB·업데이트</div>
-  <div class="item"><span class="m">☐</span>대상 3인 기기: PM 3대(홈·오피스·폰) · 대표 3대 · 나수진 2대. 폰은 후순위</div>
-  <div class="item"><span class="m">☐</span>중국산 SW 금지 원칙 준수 — 도입 전 원산지 확인 필수</div>
-  <div class="note">앱을 아무리 잠가도 관리자 PC가 뚫리면 로그인 세션·데이터가 통째 노출. 계정 분리(완료) 다음 단계.</div>
+  <div class="item done"><span class="m">☑</span>홈오피스 PC 실측(8/10) — 방화벽·Defender·RDP차단은 <b>정상</b>. 구멍 5개: <b>계정 암호 없음·자동잠금 없음·디스크 암호화 없음·Win10 Home·지원종료</b></div>
+  <div class="item done"><span class="m">☑</span>Win11 판정 — CPU가 Ryzen 5 2600X라 <b>업그레이드 불가</b>(공식 목록은 Ryzen 3000부터). 교체 외 방법 없음</div>
+  <div class="item done"><span class="m">☑</span>PC 교체 견적 작성 <a class="doc" href="https://claude.ai/code/artifact/91e31083-8e61-4b6d-b4aa-329d52368010" target="_blank">📄 견적서</a> · 기기점검 스크립트 완성(09_조사_문서\기기점검.ps1)</div>
+  <div class="item now"><span class="m">▶</span>계정 암호 + 자동 화면잠금 설정 — 무료·5분. 지금은 PC 열면 앱 세션이 그대로 열림 · PM</div>
+  <div class="item"><span class="m">☐</span>대표·나수진 기기에 기기점검.ps1 실행 → Win11 되면 무료 업그레이드(0원), 안 되면 교체</div>
+  <div class="item"><span class="m">☐</span>ESU 등록(2026-10-13까지) — 교체 전 시간 벌기 · PM</div>
+  <div class="item"><span class="m">☐</span>구매 실행: 최소 145만(PM 1대) / 중간 220만 / 전체 330만 — 점검 결과로 결정</div>
+  <div class="note">Win11 <b>Pro</b> 필수(BitLocker는 Pro 전용, Home은 로컬계정이면 무보호) · 중국산 원산지 확인 원칙 준수 · 유료백신은 불필요(Defender 최신 정상)</div>
 </div>
 
 <div class="view" id="v2">
