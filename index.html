@@ -824,6 +824,7 @@
     <div class="nav-group">업무</div>
     <button class="tab-btn" data-tab="cal" id="tabCalBtn">캘린더</button>
     <button class="tab-btn" data-tab="veh" id="tabVehBtn">차량</button>
+    <button class="tab-btn" data-tab="hwakwan" id="tabHwakwanBtn">화관법</button>
     <button class="tab-btn" data-tab="lic" id="tabLicBtn">인허가</button>
     <button class="tab-btn" data-tab="doc" id="tabDocBtn">문서함</button>
     <div class="nav-divider"></div>
@@ -900,6 +901,46 @@
       <input type="file" id="vehInsFile" accept=".xlsx" style="display:none">
       <div id="vehInsMsg" style="margin-top:8px;font-size:13px;"></div>
     </div>
+  </section>
+
+  <!-- 화관법 — 유해화학물질 운반계획서 (제품=크론 자동, 폐기물=3단계 입력 제출) -->
+  <section class="view" id="view-hwakwan">
+    <style>
+      /* 화관법 전용 선택 타일 — 앱 팔레트 변수 재사용, hw- 접두어로 격리(권한관리 pm-* 관례) */
+      .hw-opts{display:flex;gap:8px;flex-wrap:wrap;}
+      .hw-opt{flex:1;min-width:110px;border:1.5px solid var(--line);background:var(--card);border-radius:10px;
+        padding:10px 12px;cursor:pointer;text-align:center;font-size:13px;font-weight:700;color:var(--text);}
+      .hw-opt small{display:block;font-weight:400;color:var(--sub);font-size:11px;margin-top:2px;}
+      .hw-opt.sel{border-color:var(--brand);background:#EAF3EF;color:var(--brand-dark);}
+      .hw-opt.sel small{color:var(--brand-dark);}
+      .hw-step{font-size:11px;font-weight:700;color:var(--brand-dark);letter-spacing:.03em;margin:12px 0 6px;}
+      .hw-step:first-child{margin-top:2px;}
+      .hw-prev{background:#EFF5F2;border-radius:10px;padding:10px 12px;margin-top:12px;font-size:13px;line-height:1.7;}
+      .hw-prev .r{display:flex;justify-content:space-between;gap:10px;}
+      .hw-prev .r span:first-child{color:var(--sub);flex-shrink:0;}
+      .hw-prev .r b{text-align:right;word-break:keep-all;}
+      .hw-submit{width:100%;padding:12px;border:none;border-radius:10px;background:var(--brand-dark);color:#fff;
+        font-size:15px;font-weight:700;margin-top:12px;cursor:pointer;}
+      .hw-submit:disabled{opacity:.45;cursor:default;}
+      .hw-note{font-size:12px;color:var(--sub);background:#EFF5F2;border-radius:8px;padding:8px 11px;margin-top:10px;line-height:1.5;}
+      .hw-warn{background:#FBF3DF;border:1px solid #E5D3A4;color:#7a5b12;border-radius:8px;padding:9px 12px;font-size:13px;line-height:1.5;margin-top:8px;}
+      .hw-ok{background:#E6F0EA;border:1px solid #B9D9C2;color:var(--brand-dark);border-radius:8px;padding:9px 12px;font-size:13px;line-height:1.6;margin-top:10px;word-break:break-all;}
+      .hw-err{background:#FBE7E3;border:1px solid #E4B7B4;color:#B0332A;border-radius:8px;padding:9px 12px;font-size:13px;line-height:1.6;margin-top:10px;}
+      .hw-run-day{padding:6px 0;border-top:1px solid var(--line);font-size:13px;}
+      .hw-run-day{border-top:none;}
+      .hw-run-day + .hw-run-day{border-top:1px solid var(--line);}
+      input.hw-in{padding:9px 10px;border-radius:9px;border:1px solid var(--line);font-size:14px;background:var(--card);color:var(--text);box-sizing:border-box;}
+    </style>
+    <div class="dash-sec" style="margin-bottom:8px;display:flex;align-items:center;gap:8px;">
+      <h2 style="margin:0;flex:1;">화관법 <span class="cnt" id="hwHead"></span></h2>
+      <button class="mini-btn" id="hwRefreshBtn">↻ 새로고침</button>
+      <button class="mini-btn" id="hwRunNowBtn" style="display:none;" title="제품 노선 자동 제출을 지금 실행 (관리자·개발자 전용)">▶ 지금 실행</button>
+    </div>
+    <div style="font-size:13px;color:var(--sub);margin-bottom:6px;">유해화학물질 운반계획서(화관법민원24) — 제품 노선은 평일 07:30 자동 제출, 폐기물 노선은 아래 3단계로 접수합니다. <b>정부 민원이라 제출 후 되돌릴 수 없습니다.</b></div>
+    <div class="dash-sec" style="margin:10px 0 6px;"><h2>제품 자동 현황</h2></div>
+    <div class="card" id="hwAutoCard"><div class="loading">불러오는 중…</div></div>
+    <div class="dash-sec" style="margin:14px 0 6px;"><h2>폐기물 운반계획서 작성</h2></div>
+    <div class="card" id="hwWasteCard"><div class="loading">불러오는 중…</div></div>
   </section>
 
   <!-- 수금·기성 -->
@@ -3732,7 +3773,7 @@
   });
 
   // ---- 탭 ----
-  var TAB_LABELS = {dash:"홈",tasks:"지시",rec:"기성·수금",cli:"거래처",bid:"입찰",con:"계약",onbid:"부동산",hr:"인사",cal:"캘린더",veh:"차량",lic:"인허가",doc:"문서함",check:"내 업무",leave:"휴가",perm:"권한관리"};
+  var TAB_LABELS = {dash:"홈",tasks:"지시",rec:"기성·수금",cli:"거래처",bid:"입찰",con:"계약",onbid:"부동산",hr:"인사",cal:"캘린더",veh:"차량",hwakwan:"화관법",lic:"인허가",doc:"문서함",check:"내 업무",leave:"휴가",perm:"권한관리"};
   function closeNav(){ var tb=document.getElementById("tabbar"); if(tb) tb.classList.remove("open"); }
   function updateNavToggle(name){ var nt=document.getElementById("navToggle"); if(nt) nt.textContent = "☰"; }
   function switchTab(name){
@@ -3761,6 +3802,8 @@
     if (name === "quote"){ renderQuotes(); loadQuotes(); }
     document.getElementById("view-promo").classList.toggle("active", name === "promo");
     if (name === "promo"){ renderPromo(); loadPromo(); }
+    document.getElementById("view-hwakwan").classList.toggle("active", name === "hwakwan");
+    if (name === "hwakwan") renderHwakwan();
 
     if (name === "cal") renderCalendar();
     if (name === "hr") renderHrRoster();
@@ -10202,6 +10245,311 @@
       });
     });
   }
+
+  // ---- 화관법(유해화학물질 운반계획서 — gw-hwakwan) ----
+  // 제품 노선은 크론이 자동 제출(hw_status로 현황만 조회), 폐기물 노선은 3단계 입력 → hw_waste_submit →
+  // hw_job 폴링(2초 간격 · 최대 3분). 정부 민원 제출은 되돌릴 수 없으므로 실패·미확인 시 재제출을 부추기지 않는다.
+  var HW_DRIVERS = { "경북98사5749": "강문철", "경북98사1743": "최원규" };
+  var HW_FALLBACK_SCEN = {   // hw_status 도착 전 표시용 — 제출값은 서버 화이트리스트가 최종 검증
+    tk_still:  { label: "특강 → 스틸싸이클",   from: "특강",   to: "스틸싸이클" },
+    tk_vefesa: { label: "특강 → 베페사",       from: "특강",   to: "베페사" },
+    yk:        { label: "YK스틸 → 스틸싸이클", from: "YK스틸", to: "스틸싸이클" },
+    taewoong:  { label: "태웅 → 스틸싸이클",   from: "태웅",   to: "스틸싸이클" }
+  };
+  var hwStatus = null;          // hw_status 응답 {ok, env_ready, lastrun, scenarios, vehicles} 또는 {error}
+  var hwStatusLoading = false;
+  var hwSel = { vehicleNo: "", scenario: "", date: "", time: "" };
+  var hwJob = { polling: false, id: "", kind: "", tries: 0, timeout: false, done: null };   // kind: 'waste'|'daily'
+  var hwWasteResult = null;     // 마지막 폐기물 제출 결과 {kind:'ok'|'warn'|'err', ...}
+
+  function hwPlusDays(n){ var d = new Date(); d.setDate(d.getDate() + n); return fmtDate(d); }
+  function hwFmtTs(ts){
+    var d = new Date(ts); if (isNaN(d.getTime())) return "";
+    return fmtDate(d) + " " + pad(d.getHours()) + ":" + pad(d.getMinutes());
+  }
+  function hwScenarios(){ return (hwStatus && hwStatus.scenarios) || HW_FALLBACK_SCEN; }
+  function hwVehicles(){
+    return (hwStatus && Array.isArray(hwStatus.vehicles) && hwStatus.vehicles.length)
+      ? hwStatus.vehicles : Object.keys(HW_DRIVERS);
+  }
+  function hwEnvReady(){ return !(hwStatus && hwStatus.ok && hwStatus.env_ready === false); }
+  function hwDateOk(ds){ return isDate(ds) && ds >= todayStr() && ds <= hwPlusDays(14); }   // 서버와 동일: 오늘~+14일
+  function hwFormReady(){
+    return !!(hwSel.vehicleNo && hwSel.scenario && hwDateOk(hwSel.date) && /^([01]\d|2[0-3]):[0-5]\d$/.test(hwSel.time));
+  }
+  // 접수 확인 행 — 문자열(verifyFiled)일 수도, parseRows 객체일 수도 있어 둘 다 사람이 읽게 변환
+  function hwRowText(row){
+    if (row == null) return "";
+    if (typeof row === "string") return row;
+    if (typeof row === "object"){
+      var parts = [];
+      ["pre","seq","date","from","to","chem","vhcle"].forEach(function(k){ if (row[k] != null && row[k] !== "") parts.push(row[k]); });
+      if (!parts.length){ for (var k2 in row){ if (row.hasOwnProperty(k2) && typeof row[k2] !== "object") parts.push(row[k2]); } }
+      return parts.join(" · ");
+    }
+    return String(row);
+  }
+  // 실패 코드 → 사람 말 안내(계약서 문구)
+  function hwFailText(code, detail){
+    if (code === "NO_TEMPLATE") return "이 조합(차량·노선)의 과거 제출본이 없습니다 — 첫 건은 화관법민원24에서 수동 제출한 뒤부터 사용할 수 있습니다.";
+    if (code === "ENV_MISSING") return "관리자 설정 필요 — Netlify 환경변수(GW_ICIS_ID·GW_ICIS_PW)가 설정되지 않았습니다.";
+    var t = "제출이 확인되지 않았습니다. 화관법민원24 접수내역에서 접수 여부를 먼저 확인한 뒤, 접수가 없을 때만 다시 제출하세요.";
+    if (detail) t += " (" + detail + ")";
+    return t;
+  }
+
+  function loadHwStatus(){
+    if (hwStatusLoading) return;
+    hwStatusLoading = true;
+    renderHwakwan();
+    gwCall("gw-hwakwan", { action: "hw_status" }).then(function(res){
+      hwStatusLoading = false;
+      if (res.status === 401){ onSessionInvalid(); return; }
+      if (res.status === 200 && res.body && res.body.ok) hwStatus = res.body;
+      else if (res.status === 404) hwStatus = { error: "백엔드 함수(gw-hwakwan)가 아직 배포되지 않았습니다." };
+      else hwStatus = { error: (res.body && (res.body.error || res.body.code)) || ("HTTP " + res.status) };
+      renderHwakwan();
+    }).catch(function(){
+      hwStatusLoading = false;
+      hwStatus = { error: "네트워크 오류 — 연결 상태를 확인하세요." };
+      renderHwakwan();
+    });
+  }
+
+  // hw_job 응답에서 잡 블롭 꺼내기 — {status,..} 그대로일 수도, {ok, job:{...}} 래핑일 수도 있어 둘 다 수용
+  function hwJobBlob(body){
+    if (!body || typeof body !== "object") return null;
+    if (typeof body.status === "string") return body;
+    if (body.job && typeof body.job === "object" && typeof body.job.status === "string") return body.job;
+    return null;
+  }
+
+  function hwStartPoll(jobId, kind){
+    hwJob = { polling: true, id: jobId, kind: kind, tries: 0, timeout: false, done: null };
+    renderHwakwan();
+    function step(){
+      if (!hwJob.polling || hwJob.id !== jobId) return;   // 새 작업이 시작되면 이전 폴링은 조용히 종료
+      hwJob.tries++;
+      if (hwJob.tries > 90){   // 2초 × 90회 = 3분
+        hwJob.polling = false; hwJob.timeout = true;
+        if (kind === "waste") hwWasteResult = { kind: "warn",
+          text: "결과 확인 시간 초과(3분) — 제출 결과를 받지 못했습니다. 재제출 전에 반드시 ‘새로고침’ 또는 화관법민원24 접수내역에서 접수 여부를 확인하세요(중복 접수 위험)." };
+        renderHwakwan();
+        return;
+      }
+      gwCall("gw-hwakwan", { action: "hw_job", job: jobId }).then(function(res){
+        if (!hwJob.polling || hwJob.id !== jobId) return;
+        if (res.status === 401){ hwJob.polling = false; renderHwakwan(); onSessionInvalid(); return; }
+        var blob = (res.status === 200) ? hwJobBlob(res.body) : null;
+        if (blob && (blob.status === "done" || blob.status === "fail")){
+          hwJob.polling = false; hwJob.done = blob;
+          if (kind === "waste") hwWasteResult = hwWasteOutcome(blob);
+          if (kind === "daily") loadHwStatus();   // 실행 결과가 lastrun에 반영됨
+          renderHwakwan();
+          return;
+        }
+        // 아직 running(또는 블롭 미생성) — 경과 표시만 부분 갱신하고 계속 대기
+        // (전체 재렌더는 날짜·시간 입력 포커스를 파괴하므로 span만 교체 — V3 검토)
+        var el = document.getElementById("hwPollElapsed");
+        if (el) el.textContent = (hwJob.tries * 2) + "초 경과";
+        setTimeout(step, 2000);
+      }).catch(function(){ setTimeout(step, 2000); });
+    }
+    setTimeout(step, 2000);
+  }
+
+  // 폐기물 잡 블롭 → 화면 표시용 결과
+  function hwWasteOutcome(blob){
+    var r = (blob && blob.results) || {};
+    if (blob && blob.status === "done" && r && r.ok !== false && (r.sn || r.row)){
+      return { kind: "ok", sn: r.sn || "", label: r.label || "", row: hwRowText(r.row) };
+    }
+    if (blob && blob.status === "done"){
+      return { kind: "warn", text: "작업은 끝났지만 접수번호를 받지 못했습니다 — 화관법민원24 접수내역에서 접수 여부를 확인하세요." };
+    }
+    var code = (r && r.code) || (blob && blob.code) || "";
+    var detail = (r && r.detail) || (blob && blob.detail) || (blob && blob.error) || "";
+    if (!detail && blob && Array.isArray(blob.log) && blob.log.length) detail = String(blob.log[blob.log.length - 1]).slice(0, 160);
+    return { kind: "err", text: hwFailText(code, detail) };
+  }
+
+  function hwSubmitWaste(){
+    if (hwJob.polling) return;
+    if (!hwEnvReady()){ alert("관리자 설정 필요 — Netlify 환경변수(GW_ICIS_ID·GW_ICIS_PW)가 설정되기 전에는 제출할 수 없습니다."); return; }
+    var dEl = document.getElementById("hwDate"), tEl = document.getElementById("hwTime");
+    if (dEl) hwSel.date = dEl.value; if (tEl) hwSel.time = tEl.value;
+    if (!hwSel.vehicleNo || !hwSel.scenario){ alert("차량과 시나리오를 먼저 선택하세요."); return; }
+    if (!hwDateOk(hwSel.date)){ alert("날짜는 오늘부터 14일 이내로 선택하세요."); return; }
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(hwSel.time)){ alert("출발시간을 HH:MM 형식으로 입력하세요."); return; }
+    var scen = hwScenarios()[hwSel.scenario] || {};
+    var drv = HW_DRIVERS[hwSel.vehicleNo] || "";
+    if (!confirm("운반계획서를 제출할까요?\n\n차량  " + hwSel.vehicleNo + (drv ? " (" + drv + ")" : "") +
+      "\n노선  " + (scen.label || hwSel.scenario) +
+      "\n출발  " + hwSel.date + " " + hwSel.time +
+      "\n\n정부 민원 제출이라 되돌릴 수 없습니다.")) return;
+    hwWasteResult = null;
+    hwJob = { polling: true, id: "", kind: "waste", tries: 0, timeout: false, done: null };   // 요청 중에도 버튼 비활성
+    renderHwakwan();
+    gwCall("gw-hwakwan", { action: "hw_waste_submit", vehicleNo: hwSel.vehicleNo, scenario: hwSel.scenario, date: hwSel.date, time: hwSel.time }).then(function(res){
+      if (res.status === 401){ hwJob.polling = false; renderHwakwan(); onSessionInvalid(); return; }
+      if (res.status === 200 && res.body && res.body.ok && res.body.job){ hwStartPoll(res.body.job, "waste"); return; }
+      hwJob.polling = false;
+      hwWasteResult = { kind: "err", text: hwFailText((res.body && res.body.code) || "", (res.body && res.body.error) || ("HTTP " + res.status)) };
+      renderHwakwan();
+    }).catch(function(){
+      hwJob.polling = false;
+      hwWasteResult = { kind: "err", text: "요청을 보내지 못했습니다(네트워크). 제출 여부가 불확실하면 화관법민원24 접수내역을 먼저 확인하세요." };
+      renderHwakwan();
+    });
+  }
+
+  function hwRunNow(){
+    if (!(isAdmin() || isDev())) return;
+    if (hwJob.polling){ alert("이미 진행 중인 작업이 있습니다. 끝난 뒤 다시 시도하세요."); return; }
+    if (!hwEnvReady()){ alert("관리자 설정 필요 — Netlify 환경변수(GW_ICIS_ID·GW_ICIS_PW)가 설정되기 전에는 실행할 수 없습니다."); return; }
+    if (!confirm("제품 노선 자동 제출을 지금 실행할까요?\n\n이미 접수된 건은 건너뛰지만, 정부 민원 제출이라 되돌릴 수 없습니다.")) return;
+    hwJob = { polling: true, id: "", kind: "daily", tries: 0, timeout: false, done: null };
+    renderHwakwan();
+    gwCall("gw-hwakwan", { action: "hw_run_now" }).then(function(res){
+      if (res.status === 401){ hwJob.polling = false; renderHwakwan(); onSessionInvalid(); return; }
+      if (res.status === 200 && res.body && res.body.ok && res.body.job){ hwStartPoll(res.body.job, "daily"); return; }
+      hwJob.polling = false;
+      renderHwakwan();
+      alert("실행 요청 실패: " + ((res.body && (res.body.error || res.body.code)) || ("HTTP " + res.status)));
+    }).catch(function(){ hwJob.polling = false; renderHwakwan(); alert("실행 요청을 보내지 못했습니다(네트워크)."); });
+  }
+
+  function renderHwAuto(){
+    var host = document.getElementById("hwAutoCard");
+    if (!host) return;
+    if (!hwStatus){ host.innerHTML = '<div class="loading">불러오는 중…</div>'; return; }
+    var h = "";
+    if (hwStatus.error){
+      h += '<div class="hw-warn" style="margin-top:0;">현황을 불러오지 못했습니다 — ' + esc(hwStatus.error) + '</div>';
+      host.innerHTML = h; return;
+    }
+    if (!hwEnvReady()){
+      h += '<div class="hw-warn" style="margin-top:0;">⚠ 관리자 설정 필요(Netlify 환경변수) — GW_ICIS_ID·GW_ICIS_PW가 없어 자동·수동 제출이 실행되지 않습니다.</div>';
+    }
+    var lr = hwStatus.lastrun || null;
+    if (hwJob.kind === "daily" && hwJob.polling){
+      h += '<div class="hw-note">▶ 제품 자동 제출 실행 중… 접수 확인까지 최대 3분 (<span id="hwPollElapsed">' + (hwJob.tries * 2) + '초 경과</span>)</div>';
+    } else if (hwJob.kind === "daily" && hwJob.timeout){
+      h += '<div class="hw-warn">실행 결과 확인 시간 초과 — 잠시 후 ‘새로고침’으로 마지막 실행 기록을 확인하세요.</div>';
+    }
+    if (!lr){
+      h += '<div class="empty-line">아직 자동 실행 기록이 없습니다. 평일 07:30(KST)에 제품 노선 D+2 운반계획서를 자동 제출합니다.</div>';
+    } else {
+      var when = lr.ts ? hwFmtTs(lr.ts) : "";
+      var okTxt = (lr.ok === false) ? '<span style="color:#B0332A;font-weight:700;">실패</span>' : '<span style="color:var(--brand-dark);font-weight:700;">정상</span>';
+      h += '<div style="font-size:13px;margin:2px 0 6px;">마지막 자동 실행 ' + (when ? "<b>" + esc(when) + "</b> · " : "") + okTxt + '</div>';
+      var days = Array.isArray(lr.days) ? lr.days : (lr.result && Array.isArray(lr.result.days) ? lr.result.days : []);
+      if (days.length){
+        days.forEach(function(d){
+          if (!d) return;
+          var sub = Array.isArray(d.submitted) ? d.submitted : [];
+          var skp = Array.isArray(d.skipped) ? d.skipped : [];
+          h += '<div class="hw-run-day"><b>' + esc(d.day || "") + '</b> — 제출 ' + sub.length + '건 · 건너뜀(기접수) ' + skp.length + '건';
+          if (sub.length){
+            h += '<div style="font-size:12px;color:var(--sub);margin-top:2px;">' +
+              sub.map(function(s){ return esc((s && s.label) || "") + ((s && s.sn) ? ' <span style="color:var(--brand-dark);">' + esc(s.sn) + '</span>' : ""); }).join(" · ") + '</div>';
+          }
+          h += '</div>';
+        });
+      } else if (lr.error){
+        h += '<div class="hw-err">' + esc(String(lr.error).slice(0, 200)) + '</div>';
+      }
+    }
+    h += '<div class="hw-note">제품 노선(베페사징크코리아·스틸싸이클 출발)은 평일 아침 자동으로 D+2 제출됩니다(금요일엔 주말분 포함). 이 카드는 기록 조회용이라 눌러도 제출되지 않습니다.</div>';
+    host.innerHTML = h;
+  }
+
+  function renderHwWaste(){
+    var host = document.getElementById("hwWasteCard");
+    if (!host) return;
+    var scens = hwScenarios();
+    var wastePolling = hwJob.polling && hwJob.kind === "waste";
+    var h = '<div class="hw-step">① 차량 선택</div><div class="hw-opts">';
+    hwVehicles().forEach(function(no){
+      var drv = HW_DRIVERS[no] || "";
+      h += '<button type="button" class="hw-opt' + (hwSel.vehicleNo === no ? " sel" : "") + '" data-hw-veh="' + esc(no) + '">' +
+        esc(no) + (drv ? '<small>' + esc(drv) + '</small>' : '') + '</button>';
+    });
+    h += '</div><div class="hw-step">② 시나리오 선택</div><div class="hw-opts">';
+    Object.keys(scens).forEach(function(key){
+      var sc = scens[key] || {};
+      h += '<button type="button" class="hw-opt' + (hwSel.scenario === key ? " sel" : "") + '" data-hw-scen="' + esc(key) + '">' +
+        esc(sc.from || sc.label || key) + '<small>' + esc((sc.from || "?") + " → " + (sc.to || "?")) + '</small></button>';
+    });
+    h += '</div><div class="hw-step">③ 날짜 · 출발시간</div>';
+    h += '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
+      '<input type="date" id="hwDate" class="hw-in" style="flex:1;min-width:140px;" value="' + esc(hwSel.date) + '" min="' + esc(todayStr()) + '" max="' + esc(hwPlusDays(14)) + '">' +
+      '<input type="time" id="hwTime" class="hw-in" style="flex:1;min-width:110px;" value="' + esc(hwSel.time) + '">' +
+      '</div>';
+    var scSel = scens[hwSel.scenario] || null;
+    h += '<div class="hw-prev">' +
+      '<div class="r"><span>차량</span><b id="hwPvVeh">' + (hwSel.vehicleNo ? esc(hwSel.vehicleNo + (HW_DRIVERS[hwSel.vehicleNo] ? " (" + HW_DRIVERS[hwSel.vehicleNo] + ")" : "")) : "—") + '</b></div>' +
+      '<div class="r"><span>노선</span><b id="hwPvScen">' + (scSel ? esc(scSel.label || hwSel.scenario) : "—") + '</b></div>' +
+      '<div class="r"><span>출발</span><b id="hwPvWhen">' + ((hwSel.date && hwSel.time) ? esc(hwSel.date + " " + hwSel.time) : "—") + '</b></div>' +
+      '<div class="r"><span>내용물·수량</span><span style="color:var(--sub);">같은 조합의 최근 접수본 복제(시각만 변경)</span></div>' +
+      '</div>';
+    if (wastePolling){
+      h += '<div class="hw-note">⏳ 제출 후 정부 접수내역으로 검증 중… 최대 3분 걸립니다 (<span id="hwPollElapsed">' + (hwJob.tries * 2) + '초 경과</span>). 이 화면을 닫아도 제출은 계속됩니다.</div>';
+    }
+    if (hwWasteResult){
+      if (hwWasteResult.kind === "ok"){
+        h += '<div class="hw-ok">✅ <b>접수 완료</b>' + (hwWasteResult.label ? ' — ' + esc(hwWasteResult.label) : '') +
+          (hwWasteResult.sn ? '<br>접수번호 <b>' + esc(hwWasteResult.sn) + '</b>' : '') +
+          (hwWasteResult.row ? '<br><span style="font-size:12px;">접수행: ' + esc(hwWasteResult.row) + '</span>' : '') + '</div>';
+      } else {
+        h += '<div class="' + (hwWasteResult.kind === "warn" ? "hw-warn" : "hw-err") + '">' + esc(hwWasteResult.text || "") + '</div>';
+      }
+    }
+    var disabled = wastePolling || !hwFormReady() || !hwEnvReady();
+    h += '<button type="button" id="hwSubmitBtn" class="hw-submit"' + (disabled ? " disabled" : "") + '>' +
+      (wastePolling ? "제출 중 — 접수 확인까지 최대 3분" : "운반계획서 제출") + '</button>';
+    if (!hwEnvReady()) h += '<div class="hw-warn">관리자 설정 필요(Netlify 환경변수) — 설정 전에는 제출 버튼이 열리지 않습니다.</div>';
+    host.innerHTML = h;
+
+    // 이벤트 연결(재렌더 때마다 새 노드)
+    Array.prototype.forEach.call(host.querySelectorAll("[data-hw-veh]"), function(el){
+      el.addEventListener("click", function(){ if (hwJob.polling && hwJob.kind === "waste") return; hwSel.vehicleNo = el.getAttribute("data-hw-veh"); renderHwWaste(); });
+    });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-hw-scen]"), function(el){
+      el.addEventListener("click", function(){ if (hwJob.polling && hwJob.kind === "waste") return; hwSel.scenario = el.getAttribute("data-hw-scen"); renderHwWaste(); });
+    });
+    var dEl = document.getElementById("hwDate"), tEl = document.getElementById("hwTime");
+    if (dEl) dEl.addEventListener("input", function(){ hwSel.date = dEl.value; hwSyncPreview(); });
+    if (tEl) tEl.addEventListener("input", function(){ hwSel.time = tEl.value; hwSyncPreview(); });
+    var sb = document.getElementById("hwSubmitBtn");
+    if (sb) sb.addEventListener("click", hwSubmitWaste);
+  }
+
+  // 날짜·시간 타이핑 중에는 전체 재렌더 대신 미리보기·버튼만 갱신(입력 포커스 유지)
+  function hwSyncPreview(){
+    var pw = document.getElementById("hwPvWhen");
+    if (pw) pw.textContent = (hwSel.date && hwSel.time) ? (hwSel.date + " " + hwSel.time) : "—";
+    var sb = document.getElementById("hwSubmitBtn");
+    if (sb) sb.disabled = (hwJob.polling && hwJob.kind === "waste") || !hwFormReady() || !hwEnvReady();
+  }
+
+  function renderHwakwan(){
+    var head = document.getElementById("hwHead");
+    if (head) head.textContent = "폐기물 " + hwVehicles().length + "대 · 노선 " + Object.keys(hwScenarios()).length;
+    var runBtn = document.getElementById("hwRunNowBtn");
+    if (runBtn) runBtn.style.display = (isAdmin() || isDev()) ? "" : "none";
+    if (!hwSel.date) hwSel.date = hwPlusDays(2);   // 기본 D+2
+    renderHwAuto();
+    renderHwWaste();
+    if (!hwStatus && !hwStatusLoading) loadHwStatus();
+  }
+
+  (function(){
+    var rf = document.getElementById("hwRefreshBtn");
+    if (rf) rf.addEventListener("click", function(){ loadHwStatus(); });
+    var rn = document.getElementById("hwRunNowBtn");
+    if (rn) rn.addEventListener("click", hwRunNow);
+  })();
 
   // ---- 회원·권한(users.json) ----
   function liveMembers(){ return members.filter(function(m){ return m && m.del !== 1; }); }

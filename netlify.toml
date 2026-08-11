@@ -5,4 +5,9 @@
 [functions]
   node_bundler = "esbuild"
 
+# 화관법 제품 노선 자동 제출 — UTC 22:30 = KST 익일 07:30, UTC 일~목 = KST 월~금.
+# 요일 규칙(월~목 D+2, 금 D+2~4, 주말 스킵)은 함수 내부에서 KST로 재계산(이중 방어).
+[functions."gw-hwakwan-cron"]
+  schedule = "30 22 * * 0-4"
+
 # 정적 파일은 그대로 서빙, /.netlify/functions/* 는 서버리스 함수로.
