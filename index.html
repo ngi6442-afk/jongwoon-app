@@ -10428,11 +10428,19 @@
     var keep = document.getElementById("memberKeep").checked;
     gwCall("gw-auth", { action: "login", uid: ident, pin: pin }).then(function(res){
       var errEl = document.getElementById("memberErr");
-      if (res.status === 429){ errEl.textContent = "로그인 시도가 많아 계정이 잠겼습니다. " + (res.body && res.body.retry_after ? Math.ceil(res.body.retry_after/60) + "분 " : "") + "후 다시 시도하세요."; errEl.classList.add("show"); return; }
-      // 아이디를 만든 사람이 이름으로 시도한 경우 — 헤매지 않게 명확히 안내
-      if (res.body && res.body.error_code === "USE_UID"){ errEl.textContent = "아이디가 발급된 계정입니다. 이름 대신 아이디로 로그인하세요."; errEl.classList.add("show"); return; }
+      if (res.status === 429){
+        errEl.textContent = "시도가 많아 " + (res.body && res.body.retry_after ? Math.ceil(res.body.retry_after/60) + "분간 " : "잠시 ")
+          + "잠겼습니다. 잠금은 입력한 값 기준이라, 아이디가 기억나지 않으면 지금 바로 이름으로 로그인하세요(로그인 후 본인 아이디를 알려드립니다).";
+        errEl.classList.add("show"); return;
+      }
       if (res.status !== 200 || !res.body || !res.body.token){ errEl.textContent = "아이디 또는 PIN이 올바르지 않습니다."; errEl.classList.add("show"); return; }
-      try{ localStorage.setItem("jw_last_uid", ident); }catch(e){}
+      // 이름으로 들어왔는데 아이디가 있으면 알려준다 — 아이디를 잊어 못 들어오던 상황의 해소책
+      if (res.body.uid_hint){
+        try{ localStorage.setItem("jw_last_uid", res.body.uid_hint); }catch(e){}
+        setTimeout(function(){ alert("이 계정의 아이디는 \"" + res.body.uid_hint + "\" 입니다.\n다음부터는 이 아이디로 로그인하세요.\n(바꾸려면 로그인 창의 [내 아이디 설정])"); }, 300);
+      } else {
+        try{ localStorage.setItem("jw_last_uid", ident); }catch(e){}
+      }
       setGwToken(res.body.token, keep);
       curMemberObj = res.body.member;
       try{ localStorage.setItem("jw_member_cache", JSON.stringify(res.body.member)); }catch(e){}   // 오프라인 콜드스타트 부팅용
@@ -10511,6 +10519,10 @@
       if (res.status === 403){ errEl.textContent = (m.admin ? "비밀번호" : "PIN") + "가 올바르지 않습니다."; errEl.classList.add("show"); return; }
       if (res.status !== 200){ errEl.textContent = "저장 실패 (" + ((res.body && res.body.error_code) || res.status) + ")"; errEl.classList.add("show"); return; }
       if (curMemberObj) curMemberObj.uid = uid;
+      // 회원 목록도 같이 갱신 — 안 하면 인사 카드가 낡은 값(아이디 없음)으로 열려
+      // 그대로 저장 시 방금 만든 아이디가 지워졌다(2026-08-11 사고 원인).
+      for (var mi = 0; mi < members.length; mi++){ if (members[mi] && members[mi].id === m.id) members[mi].uid = uid; }
+      try{ saveUsersCache(); }catch(e){}
       try{ localStorage.setItem("jw_last_uid", uid); localStorage.setItem("jw_member_cache", JSON.stringify(curMemberObj)); }catch(e){}
       document.getElementById("uidBackdrop").classList.remove("show");
       alert("아이디가 설정되었습니다: " + uid + "\n다음 로그인부터 이 아이디를 사용하세요.");

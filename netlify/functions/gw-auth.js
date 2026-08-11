@@ -173,12 +173,12 @@ async function handleLogin(st, d, R, event) {
   const mr = await blobGet(st, memberKey(idx.data));
   if (!mr.ok) return jr(500, { status: 'ERROR', error_code: mr.code, request_id: R });
   if (!mr.data || mr.data.del === 1 || retired(mr.data)) return fail();
-  // ★개인별 자동 이사: 아이디를 만든 사람은 그 순간부터 이름 로그인이 닫힌다.
-  // 전원 완료를 기다릴 필요 없이 각자 아이디를 만드는 즉시 이름 경로가 사라진다.
-  // (PIN 검증 전에 막아 무작위 대입에 이름 경로를 쓰지 못하게 한다)
-  if (viaName && mr.data.uid) {
-    return jr(401, { status: 'UNAUTHORIZED', error_code: 'USE_UID', request_id: R });
-  }
+  // 이름 로그인은 이사 기간(ALLOW_NAME_LOGIN) 동안 **아이디 보유자에게도 열어 둔다.**
+  // 종전엔 아이디가 있으면 이름 경로를 막았는데(v245), 아이디를 잊는 순간 본인도 관리자도
+  // 풀 수 없는 잠금이 됐다(2026-08-11 PM 실사고 — 개발자가 1명이라 대신 풀어줄 사람도 없음).
+  // 명단 노출 차단이라는 원래 목적은 드롭다운 제거로 이미 달성됐고, 이름 차단은 그 목적에
+  // 기여하지 않으면서 복구 불가 위험만 만들었다. 전원 폐쇄는 ALLOW_NAME_LOGIN=off 하나로 한다.
+  // 대신 로그인 성공 시 본인 아이디를 돌려줘 다음부터 아이디를 쓰도록 안내한다(아래 uid_hint).
   if (!verifySecret(pin, mr.data.pin_salt, mr.data.pin_hash)) return fail();
   if (lk.ok && lk.data) await blobSet(st, lockKey(name), null);  // 성공 → 잠금 해제
   // 구 색인으로 들어온 경우 정리키 색인을 추가로 심어 다음부터는 타이핑으로도 바로 찾히게 한다(자가 치유).
@@ -187,8 +187,11 @@ async function handleLogin(st, d, R, event) {
   const s = issueSession(mr.data);
   if (!s.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: s.code, request_id: R });
   // 감사 로그: 로그인 이력(본인성 보강)
-  try { await appendAudit({ ts: Date.now(), by: mr.data.name, bid: mr.data.id, col: 'login', ev: [{ op: '로그인', id: mr.data.id, t: mr.data.name }] }); } catch (e) {}
-  return jr(200, { status: 'OK', token: s.token, expires_at: s.expires_at, member: safeMember(mr.data), device_status: deviceStatus, request_id: R });
+  try { await appendAudit({ ts: Date.now(), by: mr.data.name, bid: mr.data.id, col: 'login', ev: [{ op: '로그인', id: mr.data.id, t: mr.data.name + (viaName ? '(이름)' : '(아이디)') }] }); } catch (e) {}
+  // 이름으로 들어왔는데 아이디가 있으면 그 아이디를 알려준다 — 아이디를 잊어 못 들어오던 상황의 해소책.
+  // 본인 인증(PIN)을 통과한 뒤에만 나가므로 아이디가 외부로 새지 않는다.
+  const uidHint = (viaName && mr.data.uid) ? mr.data.uid : undefined;
+  return jr(200, { status: 'OK', token: s.token, expires_at: s.expires_at, member: safeMember(mr.data), device_status: deviceStatus, uid_hint: uidHint, request_id: R });
 }
 
 async function handleVerify(st, event, R) {
@@ -247,17 +250,18 @@ async function handleMemberUpsert(st, event, d, R) {
     m.admin = !!d.admin;
   }
   // 아이디(계정 분리) — 관리자가 인사 카드에서 발급/변경. 중복·이름충돌은 거부.
-  if (d.uid !== undefined) {
+  // **빈 문자열은 '변경 없음'으로 본다.** 종전엔 '지워라'로 해석해서, 화면이 낡은 목록으로
+  // 아이디 칸을 비운 채 저장하면 로그인 아이디가 통째로 날아갔다(2026-08-11 PM 실제 사고).
+  // 아이디를 정말 회수할 때만 uid_clear:true를 명시한다.
+  if (d.uid_clear === true) {
+    if (m.uid) { await blobSet(st, uidKey(m.uid), null); delete m.uid; }
+  } else if (d.uid !== undefined && normUid(d.uid) !== '') {
     const nu = normUid(d.uid);
-    if (nu === '') {
-      if (m.uid) { await blobSet(st, uidKey(m.uid), null); delete m.uid; }
-    } else {
-      if (!validUid(nu)) return jr(400, { status: 'REJECTED', error_code: 'INVALID_UID', request_id: R });
-      const dup = await uidTaken(st, nu, m.id);
-      if (dup) return jr(409, { status: 'REJECTED', error_code: dup, request_id: R });
-      if (m.uid && normUid(m.uid) !== nu) await blobSet(st, uidKey(m.uid), null);
-      m.uid = nu;
-    }
+    if (!validUid(nu)) return jr(400, { status: 'REJECTED', error_code: 'INVALID_UID', request_id: R });
+    const dup = await uidTaken(st, nu, m.id);
+    if (dup) return jr(409, { status: 'REJECTED', error_code: dup, request_id: R });
+    if (m.uid && normUid(m.uid) !== nu) await blobSet(st, uidKey(m.uid), null);
+    m.uid = nu;
   }
   if (d.rank !== undefined) m.rank = String(d.rank || '');
   if (d.dept !== undefined) m.dept = String(d.dept || '');
