@@ -84,7 +84,7 @@ exports.handler = async function (event, context) {
       try {
         const ids = await push.adminIds();
         if (ids.length) {
-          if (r.ok) await push.sendTo(ids, { title: '화관법 D+2 접수', body: nSub + '건 접수' + (nSkip ? ' · ' + nSkip + '건 건너뜀' : ''), url: './', tag: 'hwakwan' });
+          if (r.ok) await push.sendTo(ids, { title: '화관법 자동 접수', body: nSub + '건 접수' + (nSkip ? ' · ' + nSkip + '건 건너뜀' : ''), url: './', tag: 'hwakwan' });
           else await push.sendTo(ids, { title: '화관법 자동제출 실패', body: failSummary(rec.log), url: './', tag: 'hwakwan' });
         }
       } catch (e) {}

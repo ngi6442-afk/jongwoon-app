@@ -80,10 +80,10 @@ async function kickBackground(job, mode, params) {
 
 function newJobId(kind) { return 'hw_' + kind + '_' + Date.now().toString(36) + '_' + crypto.randomBytes(4).toString('hex'); }
 
-// 크론과 같은 요일 규칙(월~목 [D+2], 금 [D+2,D+3,D+4]). 수동 실행이 주말에 눌리면 [D+2] 하나로.
+// 크론과 같은 요일 규칙(D+3 — PM 정정 8/11 밤: 월~목 [D+3], 금 [D+3,D+4,D+5]). 주말 수동 실행은 [D+3] 하나로.
 function defaultTargetDays() {
   const day = new Date(Date.now() + 9 * 3600000).getUTCDay();   // KST 요일: 0=일 … 6=토
-  const offs = (day === 5) ? [2, 3, 4] : [2];
+  const offs = (day === 5) ? [3, 4, 5] : [3];
   return offs.map(kstDate);
 }
 

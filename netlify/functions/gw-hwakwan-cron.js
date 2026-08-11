@@ -3,7 +3,7 @@
 // 화관법 제품 노선 자동 제출 크론 — netlify.toml schedule = "30 22 * * 0-4"
 // (UTC 22:30 = KST 익일 07:30, UTC 일~목 = KST 월~금).
 // 여기서는 KST 요일 재계산·대상일 산출·백그라운드 기동만 한다(실제 제출은 15분 한도 워커가).
-// 요일 규칙(파이썬 원본과 동일): 월~목 → [D+2] / 금 → [D+2, D+3, D+4] / 토·일 → 실행 안 함.
+// 요일 규칙(PM 지시 8/11 밤 정정 — D+3): 월~목 → [D+3] / 금 → [D+3, D+4, D+5 = 월·화·수] / 토·일 → 실행 안 함.
 // 스케줄이 이미 주말을 빼지만 함수 안에서 한 번 더 거른다(이중 방어 — 크론 표기 실수·수동 트리거 대비).
 const { issueSession } = require('./_lib/session');
 
@@ -15,7 +15,7 @@ exports.handler = async function () {
   if (kstDay === 0 || kstDay === 6) {
     return { statusCode: 200, body: JSON.stringify({ ok: true, skipped: 'weekend' }) };
   }
-  const offs = (kstDay === 5) ? [2, 3, 4] : [2];   // 금요일만 주말분(D+3·D+4)까지 미리 제출
+  const offs = (kstDay === 5) ? [3, 4, 5] : [3];   // 금요일만 주말 실행분(월·화)+수요일분까지 미리 제출
   const targetDays = offs.map(kstDate);
   const job = 'hw_cron_' + kstDate(0);   // 같은 날 재실행 시 같은 작업 키에 덮어씀(중복 blob 방지)
 

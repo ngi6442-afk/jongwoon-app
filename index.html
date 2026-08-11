@@ -10438,7 +10438,7 @@
       h += '<div class="hw-warn">실행 결과 확인 시간 초과 — 잠시 후 ‘새로고침’으로 마지막 실행 기록을 확인하세요.</div>';
     }
     if (!lr){
-      h += '<div class="empty-line">아직 자동 실행 기록이 없습니다. 평일 07:30(KST)에 제품 노선 D+2 운반계획서를 자동 제출합니다.</div>';
+      h += '<div class="empty-line">아직 자동 실행 기록이 없습니다. 평일 07:30(KST)에 제품 노선 D+3 운반계획서를 자동 제출합니다.</div>';
     } else {
       var when = lr.ts ? hwFmtTs(lr.ts) : "";
       var okTxt = (lr.ok === false) ? '<span style="color:#B0332A;font-weight:700;">실패</span>' : '<span style="color:var(--brand-dark);font-weight:700;">정상</span>';
@@ -10460,7 +10460,7 @@
         h += '<div class="hw-err">' + esc(String(lr.error).slice(0, 200)) + '</div>';
       }
     }
-    h += '<div class="hw-note">제품 노선(베페사징크코리아·스틸싸이클 출발)은 평일 아침 자동으로 D+2 제출됩니다(금요일엔 주말분 포함). 이 카드는 기록 조회용이라 눌러도 제출되지 않습니다.</div>';
+    h += '<div class="hw-note">제품 노선(베페사징크코리아·스틸싸이클 출발)은 평일 아침 자동으로 D+3 제출됩니다(금요일엔 월·화·수 3일치). 이 카드는 기록 조회용이라 눌러도 제출되지 않습니다.</div>';
     host.innerHTML = h;
   }
 
@@ -10538,7 +10538,7 @@
     if (head) head.textContent = "폐기물 " + hwVehicles().length + "대 · 노선 " + Object.keys(hwScenarios()).length;
     var runBtn = document.getElementById("hwRunNowBtn");
     if (runBtn) runBtn.style.display = (isAdmin() || isDev()) ? "" : "none";
-    if (!hwSel.date) hwSel.date = hwPlusDays(2);   // 기본 D+2
+    if (!hwSel.date) hwSel.date = hwPlusDays(3);   // 기본 D+3(제품 노선과 같은 리듬)
     renderHwAuto();
     renderHwWaste();
     if (!hwStatus && !hwStatusLoading) loadHwStatus();
