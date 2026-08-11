@@ -1270,6 +1270,8 @@
     <input type="text" id="promoDetBlogTitle" autocomplete="off">
     <span class="fld-label">블로그 본문 초안</span>
     <textarea id="promoDetBody" rows="12" style="width:100%;font-size:13px;"></textarea>
+    <span class="fld-label">사진 — 본문의 [사진 N] 번호와 같은 순서입니다. 눌러서 저장한 뒤 그 자리에 넣으세요.</span>
+    <div id="promoDetPhotos" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:6px;margin-bottom:8px;"></div>
     <div id="promoDetStat" style="font-size:12px;color:#1A9A6B;min-height:14px;"></div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;">
       <button class="mini-btn" id="promoCopyBtn">📋 제목+본문 복사</button>
@@ -9610,7 +9612,39 @@
     document.getElementById("promoPostedBtn").style.display=(canDo("promo")&&st==="approved")?"":"none";
     document.getElementById("promoResubmitBtn").style.display=(canDo("promo")&&st==="rejected")?"":"none";
     document.getElementById("promoDelBtn").style.display=isAdmin()?"":"none";
+    promoRenderDetPhotos(p);
     document.getElementById("promoDetailBackdrop").classList.add("show");
+  }
+  // 검수 화면 사진 — 본문의 [사진 N] 번호와 같은 순서로 띄운다. 네이버에는 API로 못 올리니
+  // 사람이 붙여넣어야 하는데, 사진이 앱 안에만 있으면 어느 사진이 몇 번인지 알 수가 없다.
+  function promoRenderDetPhotos(p){
+    var host=document.getElementById("promoDetPhotos");
+    if(!host) return;
+    var list=(p.photos||[]);
+    host.innerHTML = list.length? '<div style="grid-column:1/-1;font-size:12px;color:var(--sub);">불러오는 중… ('+list.length+'장)</div>'
+                                : '<div style="grid-column:1/-1;font-size:12px;color:var(--sub);">첨부된 사진이 없습니다.</div>';
+    if(!list.length) return;
+    var boxes=[];
+    list.forEach(function(ph,i){
+      var d=document.createElement("div");
+      d.style.cssText="position:relative;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:var(--bg2);aspect-ratio:1;";
+      d.innerHTML='<div style="position:absolute;left:3px;top:3px;z-index:2;background:rgba(0,0,0,.62);color:#fff;font-size:11px;font-weight:700;border-radius:4px;padding:1px 5px;">'+(i+1)+'</div>';
+      boxes.push(d);
+    });
+    host.innerHTML="";
+    boxes.forEach(function(d){ host.appendChild(d); });
+    list.forEach(function(ph,i){
+      gwCall("gw-data",{action:"att_get",id:ph.id}).then(function(res){
+        if(res.status!==200||!res.body||!res.body.data) return;
+        var url="data:"+(res.body.type||"image/jpeg")+";base64,"+res.body.data;
+        var a=document.createElement("a");
+        a.href=url; a.download=(String(i+1).length<2?"0":"")+(i+1)+"_"+(ph.name||"photo.jpg");
+        a.title="눌러서 저장 — 본문 [사진 "+(i+1)+"] 자리";
+        a.style.cssText="display:block;width:100%;height:100%;";
+        a.innerHTML='<img src="'+url+'" style="width:100%;height:100%;object-fit:cover;display:block;">';
+        boxes[i].appendChild(a);
+      }).catch(function(){});
+    });
   }
   function promoDetApplyEdits(p){
     p.title=document.getElementById("promoDetBlogTitle").value.trim()||p.title;
@@ -11714,7 +11748,7 @@
     if (!hwEnvReady()){ alert("관리자 설정 필요 — Netlify 환경변수(GW_ICIS_ID·GW_ICIS_PW)가 설정되기 전에는 제출할 수 없습니다."); return; }
     var dEl = document.getElementById("hwDate"), tEl = document.getElementById("hwTime");
     if (dEl) hwSel.date = dEl.value; if (tEl) hwSel.time = tEl.value;
-    if (!hwSel.vehicleNo || !hwSel.scenario){ alert("차량과 시나리오를 먼저 선택하세요."); return; }
+    if (!hwSel.vehicleNo || !hwSel.scenario){ alert("차량과 경로를 먼저 선택하세요."); return; }
     if (!hwDateOk(hwSel.date)){ alert("날짜는 오늘부터 14일 이내로 선택하세요."); return; }
     if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(hwSel.time)){ alert("출발시간을 HH:MM 형식으로 입력하세요."); return; }
     var scen = hwScenarios()[hwSel.scenario] || {};
@@ -11811,7 +11845,7 @@
       h += '<button type="button" class="hw-opt' + (hwSel.vehicleNo === no ? " sel" : "") + '" data-hw-veh="' + esc(no) + '">' +
         esc(no) + (drv ? '<small>' + esc(drv) + '</small>' : '') + '</button>';
     });
-    h += '</div><div class="hw-step">② 시나리오 선택</div><div class="hw-opts">';
+    h += '</div><div class="hw-step">② 경로 선택</div><div class="hw-opts">';
     Object.keys(scens).forEach(function(key){
       var sc = scens[key] || {};
       h += '<button type="button" class="hw-opt' + (hwSel.scenario === key ? " sel" : "") + '" data-hw-scen="' + esc(key) + '">' +
