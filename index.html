@@ -836,6 +836,7 @@
     <button class="tab-btn" data-tab="cal" id="tabCalBtn">캘린더</button>
     <button class="tab-btn" data-tab="veh" id="tabVehBtn">차량</button>
     <button class="tab-btn" data-tab="hwakwan" id="tabHwakwanBtn">화관법</button>
+    <button class="tab-btn" data-tab="allbaro" id="tabAllbaroBtn">운반일지</button>
     <button class="tab-btn" data-tab="lic" id="tabLicBtn">인허가</button>
     <button class="tab-btn" data-tab="doc" id="tabDocBtn">문서함</button>
     <div class="nav-divider"></div>
@@ -952,6 +953,42 @@
     <div class="card" id="hwAutoCard"><div class="loading">불러오는 중…</div></div>
     <div class="dash-sec" style="margin:14px 0 6px;"><h2>폐기물 운반계획서 작성</h2></div>
     <div class="card" id="hwWasteCard"><div class="loading">불러오는 중…</div></div>
+  </section>
+
+  <!-- 운반일지 — 올바로 인계서 일일 집계 (조회 전용, gw-allbaro) -->
+  <section class="view" id="view-allbaro">
+    <style>
+      /* 운반일지 전용 — 앱 팔레트 변수 재사용, ab- 접두어로 격리(화관법 hw-* 관례).
+         목록은 기존 .item/.task-ctrl/.dday를 그대로 써서 v254 모바일 규칙이 자동 적용되게 한다. */
+      /* 카드 안쪽 여백을 직접 잡는다 — .item 목록과 자유 텍스트가 한 카드에 섞여
+         `.card:not(:has(> .item))` 자동 패딩이 목록 유무에 따라 오락가락하는 것을 막는다 */
+      #abStatusCard, #abDayCard{padding:0;}
+      .ab-pad{padding:12px 14px;}
+      .ab-pad > :first-child{margin-top:0;}
+      .item.ab-sel{background:#EFF5F2;}
+      .ab-note{font-size:12px;color:var(--sub);background:#EFF5F2;border-radius:8px;padding:8px 11px;margin-top:10px;line-height:1.5;}
+      .ab-warn{background:#FBF3DF;border:1px solid #E5D3A4;color:#7a5b12;border-radius:8px;padding:9px 12px;font-size:13px;line-height:1.5;margin-top:8px;}
+      .ab-err{background:#FBE7E3;border:1px solid #E4B7B4;color:#B0332A;border-radius:8px;padding:9px 12px;font-size:13px;line-height:1.6;margin-top:10px;}
+      .ab-sum{font-size:13px;margin:2px 0 6px;}
+      .ab-tot{font-size:13px;font-weight:700;color:var(--brand-dark);padding:9px 14px;border-top:1px solid var(--line);}
+      .ab-unm-head{font-weight:700;margin-bottom:4px;}
+      .ab-unm-row{font-size:13px;line-height:1.6;}
+      input.ab-in{padding:7px 9px;border-radius:8px;border:1px solid var(--line);font-size:13px;background:var(--card);color:var(--text);box-sizing:border-box;}
+    </style>
+    <div class="dash-sec" style="margin-bottom:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+      <h2 style="margin:0;flex:1;min-width:120px;">운반일지 <span class="cnt" id="abHead"></span></h2>
+      <button class="mini-btn" id="abRefreshBtn">↻ 새로고침</button>
+      <button class="mini-btn" id="abRunNowBtn" style="display:none;" title="올바로 인계서 수집을 지금 실행 (관리자·개발자 전용)">▶ 지금 수집</button>
+    </div>
+    <div style="font-size:13px;color:var(--sub);margin-bottom:6px;">올바로 인계서 진행상황을 매일 아침 08:00(KST)에 자동 수집해 노선별 회수를 집계합니다. <b>조회 전용</b>이라 올바로에 등록·수정하지 않습니다. 처리자 인수 등록이 늦게 올라오면 과거 날짜 집계도 다시 덮어씁니다.</div>
+    <div class="dash-sec" style="margin:10px 0 6px;"><h2>수집 현황</h2></div>
+    <div class="card" id="abStatusCard"><div class="loading">불러오는 중…</div></div>
+    <div class="dash-sec" style="margin:14px 0 6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+      <h2 style="margin:0;flex:1;min-width:120px;">날짜별 상세</h2>
+      <input type="date" id="abDate" class="ab-in" style="min-width:140px;">
+      <button class="mini-btn" id="abDateBtn">조회</button>
+    </div>
+    <div class="card" id="abDayCard"><div class="empty-line">날짜를 선택하면 그날의 노선별 회수를 보여줍니다.</div></div>
   </section>
 
   <!-- 수금·기성 -->
@@ -3788,7 +3825,7 @@
   });
 
   // ---- 탭 ----
-  var TAB_LABELS = {dash:"홈",tasks:"지시",rec:"기성·수금",cli:"거래처",bid:"입찰",con:"계약",onbid:"부동산",hr:"인사",cal:"캘린더",veh:"차량",hwakwan:"화관법",lic:"인허가",doc:"문서함",check:"내 업무",leave:"휴가",perm:"권한관리"};
+  var TAB_LABELS = {dash:"홈",tasks:"지시",rec:"기성·수금",cli:"거래처",bid:"입찰",con:"계약",onbid:"부동산",hr:"인사",cal:"캘린더",veh:"차량",hwakwan:"화관법",allbaro:"운반일지",lic:"인허가",doc:"문서함",check:"내 업무",leave:"휴가",perm:"권한관리"};
   function closeNav(){ var tb=document.getElementById("tabbar"); if(tb) tb.classList.remove("open"); }
   function updateNavToggle(name){ var nt=document.getElementById("navToggle"); if(nt) nt.textContent = "☰"; }
   function switchTab(name){
@@ -3819,6 +3856,8 @@
     if (name === "promo"){ renderPromo(); loadPromo(); }
     document.getElementById("view-hwakwan").classList.toggle("active", name === "hwakwan");
     if (name === "hwakwan") renderHwakwan();
+    document.getElementById("view-allbaro").classList.toggle("active", name === "allbaro");
+    if (name === "allbaro") renderAllbaro();
 
     if (name === "cal") renderCalendar();
     if (name === "hr") renderHrRoster();
@@ -11954,6 +11993,315 @@
     if (rf) rf.addEventListener("click", function(){ loadHwStatus(); });
     var rn = document.getElementById("hwRunNowBtn");
     if (rn) rn.addEventListener("click", hwRunNow);
+  })();
+
+  // ---- 운반일지(올바로 인계서 일일 집계 — gw-allbaro) ----
+  // 크론이 매일 08:00(KST)에 최근 7일을 다시 읽어 덮어쓴다(처리자 인수 등록이 며칠 늦게 올라와 과거 집계가 바뀐다).
+  // 이 화면은 조회 전용 — [지금 수집]은 관리자·개발자만 보이고, 결과는 ab_job 폴링(2초 × 90회 = 3분)으로 확인한다.
+  var abStatus = null;          // ab_status 응답 {ok, env_ready, lastrun, days:[{day,total,unmatched_n}]} 또는 {error}
+  var abStatusLoading = false;
+  var abDay = { day: "", data: null, loading: false, error: "" };          // 선택한 날짜의 ab_day 결과
+  var abJob = { polling: false, id: "", tries: 0, timeout: false, failText: "" };
+
+  // 서버(blob 키·ab_status)가 KST 기준이라 클라이언트도 KST로 맞춘다.
+  // 기기 시간대가 KST가 아니면 최신 행 날짜가 로컬 '오늘'보다 미래가 되어 조회가 막혔다.
+  function abShiftDays(n){ return new Date(Date.now() + 9*3600000 + (n||0)*86400000).toISOString().slice(0,10); }
+  function abFmtTs(ts){
+    var d = new Date(ts); if (isNaN(d.getTime())) return "";
+    return fmtDate(d) + " " + pad(d.getHours()) + ":" + pad(d.getMinutes());
+  }
+  function abDow(ds){
+    var d = new Date(ds + "T00:00:00");
+    return isNaN(d.getTime()) ? "" : ["일","월","화","수","목","금","토"][d.getDay()];
+  }
+  function abEnvReady(){ return !(abStatus && abStatus.ok && abStatus.env_ready === false); }
+  function abDayOk(ds){ return isDate(ds) && ds >= abShiftDays(-60) && ds <= abShiftDays(0); }   // 서버와 동일 범위(KST 오늘−60일 ~ 오늘)
+
+  // ab_day 응답에서 집계 블롭 꺼내기 — 블롭 그대로일 수도, {ok, day:{…}} 래핑일 수도 있어 둘 다 수용
+  function abDayBlob(body){
+    if (!body || typeof body !== "object") return null;
+    if (Array.isArray(body.counts)) return body;
+    if (body.day && typeof body.day === "object" && Array.isArray(body.day.counts)) return body.day;
+    if (body.data && typeof body.data === "object" && Array.isArray(body.data.counts)) return body.data;
+    return null;
+  }
+  // ab_job 응답에서 잡 블롭 꺼내기 — {status,…} 그대로일 수도, {ok, job:{…}} 래핑일 수도 있어 둘 다 수용
+  function abJobBlob(body){
+    if (!body || typeof body !== "object") return null;
+    if (typeof body.status === "string") return body;
+    if (body.job && typeof body.job === "object" && typeof body.job.status === "string") return body.job;
+    return null;
+  }
+  // 서버(gw-allbaro·워커) 코드 → 사람 말. 모르는 코드는 그대로 노출해 문의 때 실마리가 되게 둔다.
+  var AB_CODE_TEXT = {
+    ENV_MISSING: "관리자 설정 필요 — Netlify 환경변수(GW_ALLBARO_ID·GW_ALLBARO_PW)가 설정되지 않았습니다.",
+    ADMIN_ONLY: "관리자·개발자만 수집을 실행할 수 있습니다.",
+    DEVICE_NOT_APPROVED: "승인되지 않은 기기입니다 — 관리자에게 기기 승인을 요청하세요.",
+    BAD_DAY: "날짜 형식이 올바르지 않습니다.",
+    BAD_DAYS: "수집할 날짜 목록이 올바르지 않습니다(최대 14일).",
+    DAYS_RANGE: "수집 범위를 벗어났습니다 — 오늘부터 60일 이내만 가능합니다.",
+    DAY_NOT_FOUND: "이 날짜는 아직 수집된 기록이 없습니다.",
+    JOB_NOT_FOUND: "작업 기록을 찾지 못했습니다.",
+    COLLECT_THREW: "올바로 접속·수집 중 오류가 났습니다.",
+    COLLECT_FAILED: "올바로 수집이 끝까지 완료되지 못했습니다.",
+    WORKER_THREW: "수집 작업이 비정상 종료됐습니다."
+  };
+  function abCodeText(code, fallback){
+    var c = String(code || "");
+    return AB_CODE_TEXT[c] || fallback || c || "알 수 없는 오류";
+  }
+  function abFailText(blob){
+    var code = (blob && blob.code) || "";
+    if (code === "ENV_MISSING") return AB_CODE_TEXT.ENV_MISSING;   // 재시도해도 소용없는 건 재시도를 권하지 않는다
+    var detail = (blob && (blob.error || blob.detail)) || "";
+    if (!detail && blob && Array.isArray(blob.log) && blob.log.length) detail = String(blob.log[blob.log.length - 1]).slice(0, 160);
+    return abCodeText(code, "수집에 실패했습니다.") + " 잠시 후 다시 시도하고, 계속 실패하면 관리자에게 알려주세요." + (detail ? " (" + detail + ")" : "");
+  }
+
+  function loadAbStatus(){
+    if (abStatusLoading) return;
+    abStatusLoading = true;
+    renderAllbaro();
+    gwCall("gw-allbaro", { action: "ab_status" }).then(function(res){
+      abStatusLoading = false;
+      if (res.status === 401){ onSessionInvalid(); return; }
+      if (res.status === 200 && res.body && res.body.ok) abStatus = res.body;
+      else if (res.status === 404) abStatus = { error: "백엔드 함수(gw-allbaro)가 아직 배포되지 않았습니다." };
+      else abStatus = { error: abCodeText(res.body && res.body.code, (res.body && res.body.error) || ("HTTP " + res.status)) };
+      renderAllbaro();
+    }).catch(function(){
+      abStatusLoading = false;
+      abStatus = { error: "네트워크 오류 — 연결 상태를 확인하세요." };
+      renderAllbaro();
+    });
+  }
+
+  function loadAbDay(day){
+    if (!abDayOk(day)){
+      abDay = { day: "", data: null, loading: false, error: "" };
+      alert("날짜는 오늘부터 60일 이내(과거)로 선택하세요.");
+      renderAbDay(); abMarkSel(); return;
+    }
+    abDay = { day: day, data: null, loading: true, error: "" };
+    var el = document.getElementById("abDate");
+    if (el && el.value !== day) el.value = day;
+    renderAbDay(); abMarkSel();
+    gwCall("gw-allbaro", { action: "ab_day", day: day }).then(function(res){
+      if (abDay.day !== day) return;   // 그 사이 다른 날짜를 눌렀으면 늦게 온 응답은 버린다
+      abDay.loading = false;
+      // 세션 만료는 '집계 없음'과 다르다 — 선택을 비워 재로그인 후 빈 화면에 오해가 남지 않게 한다
+      if (res.status === 401){ abDay = { day: "", data: null, loading: false, error: "" }; renderAbDay(); onSessionInvalid(); return; }
+      if (res.status === 200) abDay.data = abDayBlob(res.body);
+      if (!abDay.data){
+        if (res.status === 404) abDay.error = AB_CODE_TEXT.DAY_NOT_FOUND;
+        else if (res.status === 200) abDay.error = "집계 응답 형식을 알 수 없습니다.";
+        else abDay.error = abCodeText(res.body && res.body.code, (res.body && res.body.error) || ("HTTP " + res.status));
+      }
+      renderAbDay();
+    }).catch(function(){
+      if (abDay.day !== day) return;
+      abDay.loading = false;
+      abDay.error = "네트워크 오류 — 연결 상태를 확인하세요.";
+      renderAbDay();
+    });
+  }
+
+  function abStartPoll(jobId){
+    abJob = { polling: true, id: jobId, tries: 0, timeout: false, failText: "" };
+    renderAllbaro();
+    function step(){
+      if (!abJob.polling || abJob.id !== jobId) return;   // 새 작업이 시작되면 이전 폴링은 조용히 종료
+      abJob.tries++;
+      if (abJob.tries > 90){   // 2초 × 90회 = 3분
+        abJob.polling = false; abJob.timeout = true;
+        renderAllbaro();
+        return;
+      }
+      gwCall("gw-allbaro", { action: "ab_job", job: jobId }).then(function(res){
+        if (!abJob.polling || abJob.id !== jobId) return;
+        if (res.status === 401){ abJob.polling = false; renderAllbaro(); onSessionInvalid(); return; }
+        var blob = (res.status === 200) ? abJobBlob(res.body) : null;
+        if (blob && (blob.status === "done" || blob.status === "fail")){
+          abJob.polling = false;
+          abJob.failText = (blob.status === "fail") ? abFailText(blob) : "";
+          renderAllbaro();
+          loadAbStatus();                          // 새 집계가 lastrun·days에 반영됨
+          if (abDay.day) loadAbDay(abDay.day);     // 보고 있던 날짜도 다시 읽는다(덮어쓰기 반영)
+          return;
+        }
+        // 아직 running(또는 블롭 미생성) — 경과 표시만 부분 갱신(전체 재렌더는 날짜 입력 포커스를 깬다)
+        var el = document.getElementById("abPollElapsed");
+        if (el) el.textContent = (abJob.tries * 2) + "초 경과";
+        setTimeout(step, 2000);
+      }).catch(function(){ setTimeout(step, 2000); });
+    }
+    setTimeout(step, 2000);
+  }
+
+  function abRunNow(){
+    if (!(isAdmin() || isDev())) return;
+    if (abJob.polling){ alert("이미 진행 중인 수집이 있습니다. 끝난 뒤 다시 시도하세요."); return; }
+    if (!abEnvReady()){ alert("관리자 설정 필요 — Netlify 환경변수(GW_ALLBARO_ID·GW_ALLBARO_PW)가 설정되기 전에는 수집할 수 없습니다."); return; }
+    if (!confirm("올바로 인계서를 지금 수집할까요?\n\n최근 7일(오늘 포함)을 다시 읽어 집계를 덮어씁니다.\n조회만 하므로 올바로에 등록·수정되는 것은 없습니다.")) return;
+    abJob = { polling: true, id: "", tries: 0, timeout: false, failText: "" };   // 요청 중에도 중복 실행 차단
+    renderAllbaro();
+    gwCall("gw-allbaro", { action: "ab_run_now" }).then(function(res){
+      if (res.status === 401){ abJob.polling = false; renderAllbaro(); onSessionInvalid(); return; }
+      if (res.status === 200 && res.body && res.body.ok && res.body.job){ abStartPoll(res.body.job); return; }
+      abJob.polling = false;
+      renderAllbaro();
+      alert("수집 요청 실패 — " + abCodeText(res.body && res.body.code, (res.body && res.body.error) || ("HTTP " + res.status)));
+    }).catch(function(){ abJob.polling = false; renderAllbaro(); alert("수집 요청을 보내지 못했습니다(네트워크)."); });
+  }
+
+  // 선택한 날짜 강조만 갱신(현황 카드를 통째로 다시 그리지 않는다)
+  function abMarkSel(){
+    var host = document.getElementById("abStatusCard");
+    if (!host) return;
+    Array.prototype.forEach.call(host.querySelectorAll("[data-ab-day]"), function(el){
+      el.classList.toggle("ab-sel", el.getAttribute("data-ab-day") === abDay.day);
+    });
+  }
+
+  function renderAbStatus(){
+    var host = document.getElementById("abStatusCard");
+    if (!host) return;
+    if (!abStatus){ host.innerHTML = '<div class="loading">불러오는 중…</div>'; return; }
+    if (abStatus.error){
+      host.innerHTML = '<div class="ab-pad"><div class="ab-warn">현황을 불러오지 못했습니다 — ' + esc(abStatus.error) + '</div></div>';
+      return;
+    }
+    var top = "";
+    if (!abEnvReady()) top += '<div class="ab-warn">⚠ 관리자 설정 필요(Netlify 환경변수) — GW_ALLBARO_ID·GW_ALLBARO_PW가 없어 자동 수집이 실행되지 않습니다.</div>';
+    if (abJob.polling){
+      top += '<div class="ab-note">▶ 수집 실행 중… 최대 3분 (<span id="abPollElapsed">' + (abJob.tries * 2) + '초 경과</span>)</div>';
+    } else if (abJob.timeout){
+      top += '<div class="ab-warn">수집 결과 확인 시간 초과(3분) — 잠시 후 ‘새로고침’으로 마지막 수집 기록을 확인하세요.</div>';
+    } else if (abJob.failText){
+      top += '<div class="ab-err">' + esc(abJob.failText) + '</div>';
+    }
+    var lr = abStatus.lastrun || null;
+    if (lr){
+      var when = lr.ts ? abFmtTs(lr.ts) : "";
+      var okTxt = (lr.ok === false) ? '<span style="color:#B0332A;font-weight:700;">실패</span>' : '<span style="color:var(--brand-dark);font-weight:700;">정상</span>';
+      top += '<div class="ab-sum">마지막 수집 ' + (when ? '<b>' + esc(when) + '</b> · ' : '') + okTxt +
+        ((typeof lr.unmatched_total === "number" && lr.unmatched_total > 0) ? ' · 미매칭 <b>' + lr.unmatched_total + '건</b>' : '') + '</div>';
+      // 워커 lastrun은 error가 아니라 code를 남긴다 — 코드도 사람 말로 바꿔 보여준다
+      if (lr.ok === false) top += '<div class="ab-err">' + esc(abCodeText(lr.code, lr.error ? String(lr.error).slice(0, 200) : "마지막 자동 수집이 실패했습니다.")) + '</div>';
+    } else {
+      top += '<div class="ab-sum">아직 수집 기록이 없습니다 — 매일 아침 08:00(KST)에 최근 7일을 자동 수집합니다.</div>';
+    }
+    var h = '<div class="ab-pad">' + top + '</div>';
+    var days = (abStatus && Array.isArray(abStatus.days)) ? abStatus.days.slice() : [];
+    days.sort(function(a, b){ return String((b && b.day) || "").localeCompare(String((a && a.day) || "")); });   // 최신 날짜 먼저
+    if (!days.length){
+      h += '<div class="empty-line">최근 14일 집계가 없습니다.</div>';
+    } else {
+      days.forEach(function(d){
+        if (!d || !d.day) return;
+        var un = Number(d.unmatched_n || 0), tot = Number(d.total || 0), wd = abDow(d.day);
+        h += '<div class="item' + (abDay.day === d.day ? ' ab-sel' : '') + '" data-ab-day="' + esc(d.day) + '">' +
+          '<div class="item-body">' +
+            '<div class="item-title">' + esc(d.day) + (wd ? ' (' + wd + ')' : '') + '</div>' +
+            '<div class="item-meta"><span>' + tot + '건</span></div>' +
+          '</div>' +
+          '<div class="task-ctrl">' + (un > 0 ? '<span class="dday red">미매칭 ' + un + '</span>' : '') + '</div>' +
+          '</div>';
+      });
+      h += '<div class="ab-note" style="margin:0;border-radius:0;">날짜를 누르면 아래에 그날의 노선별 회수가 나옵니다.</div>';
+    }
+    host.innerHTML = h;
+    Array.prototype.forEach.call(host.querySelectorAll("[data-ab-day]"), function(el){
+      el.addEventListener("click", function(){ loadAbDay(el.getAttribute("data-ab-day")); });
+    });
+  }
+
+  function renderAbDay(){
+    var host = document.getElementById("abDayCard");
+    if (!host) return;
+    if (!abDay.day){ host.innerHTML = '<div class="empty-line">날짜를 선택하면 그날의 노선별 회수를 보여줍니다.</div>'; return; }
+    if (abDay.loading){ host.innerHTML = '<div class="loading">불러오는 중…</div>'; return; }
+    var wd = abDow(abDay.day);
+    var head = '<div class="ab-sum" style="font-weight:700;">' + esc(abDay.day) + (wd ? ' (' + wd + ')' : '') + '</div>';
+    if (abDay.error){
+      host.innerHTML = '<div class="ab-pad">' + head + '<div class="ab-warn">' + esc(abDay.error) + '</div></div>';
+      return;
+    }
+    var d = abDay.data || {};
+    var counts = Array.isArray(d.counts) ? d.counts.slice() : [];
+    var unm = Array.isArray(d.unmatched) ? d.unmatched : [];
+    var sumN = function(list){ var s = 0; list.forEach(function(x){ s += Number((x && x.n) || 0); }); return s; };
+    var total = (typeof d.total === "number") ? d.total : sumN(counts);
+    var unmN = sumN(unm);
+    var h = '<div class="ab-pad">' + head;
+    if (unm.length){
+      h += '<div class="ab-warn"><div class="ab-unm-head">⚠ 노선표에 없는 조합입니다 — 관리자에게 알려주세요 (' + unm.length + '종 · ' + unmN + '회)</div>';
+      unm.forEach(function(u){
+        if (!u) return;
+        h += '<div class="ab-unm-row">' + esc(u.from || "?") + ' → ' + esc(u.to || "?") +
+          (u.item ? ' · ' + esc(u.item) : '') + ' <b>' + Number(u.n || 0) + '회</b></div>';
+      });
+      h += '</div>';
+    }
+    h += '</div>';
+    if (!counts.length){
+      h += '<div class="empty-line">이 날짜에 집계된 인계서가 없습니다.</div>';
+    } else {
+      // 양식 행 순서(route.row)대로 — 노선표에 없는 건은 맨 뒤
+      counts.sort(function(a, b){
+        var ar = (a && a.route && typeof a.route.row === "number") ? a.route.row : 99999;
+        var br = (b && b.route && typeof b.route.row === "number") ? b.route.row : 99999;
+        if (ar !== br) return ar - br;
+        return String((a && a.from) || "").localeCompare(String((b && b.from) || ""));
+      });
+      counts.forEach(function(c){
+        if (!c) return;
+        var noRoute = !c.route;
+        h += '<div class="item" style="cursor:default;">' +
+          '<div class="item-body">' +
+            '<div class="item-title">' + esc(c.from || "?") + ' → ' + esc(c.to || "?") + '</div>' +
+            '<div class="item-meta"><span>' + esc(c.item || "-") + '</span>' +
+              (noRoute ? '<span style="color:#B0332A;font-weight:700;">노선표 없음</span>' : '') + '</div>' +
+          '</div>' +
+          '<div class="task-ctrl"><span class="dday' + (noRoute ? ' red' : '') + '">' + Number(c.n || 0) + '회</span></div>' +
+          '</div>';
+      });
+      // counts에는 미매칭 조합도 route:null로 섞여 있다 — 노선 수는 매칭분만 세고, 단위도 '종'으로 통일
+      var routeN = Math.max(0, counts.length - unm.length);
+      h += '<div class="ab-tot">합계 ' + total + '회 · 노선 ' + routeN + '종' + (unm.length ? ' · 미매칭 ' + unm.length + '종 ' + unmN + '회' : '') + '</div>';
+    }
+    host.innerHTML = h;
+  }
+
+  function renderAllbaro(){
+    var head = document.getElementById("abHead");
+    if (head){
+      var ds = (abStatus && Array.isArray(abStatus.days)) ? abStatus.days : [];
+      var un = 0;
+      ds.forEach(function(d){ un += Number((d && d.unmatched_n) || 0); });
+      head.textContent = ds.length ? ("최근 " + ds.length + "일 · 미매칭 " + un + "건") : "";
+    }
+    var runBtn = document.getElementById("abRunNowBtn");
+    if (runBtn) runBtn.style.display = (isAdmin() || isDev()) ? "" : "none";
+    var dEl = document.getElementById("abDate");
+    if (dEl){
+      dEl.min = abShiftDays(-60); dEl.max = todayStr();
+      if (!dEl.value) dEl.value = abDay.day || todayStr();
+    }
+    renderAbStatus();
+    renderAbDay();
+    if (!abStatus && !abStatusLoading) loadAbStatus();
+  }
+
+  (function(){
+    var rf = document.getElementById("abRefreshBtn");
+    if (rf) rf.addEventListener("click", function(){ loadAbStatus(); if (abDay.day) loadAbDay(abDay.day); });
+    var rn = document.getElementById("abRunNowBtn");
+    if (rn) rn.addEventListener("click", abRunNow);
+    var dIn = document.getElementById("abDate"), dBtn = document.getElementById("abDateBtn");
+    function pickDay(){ var v = dIn ? dIn.value : ""; if (v) loadAbDay(v); }
+    if (dBtn) dBtn.addEventListener("click", pickDay);
+    if (dIn) dIn.addEventListener("change", pickDay);
   })();
 
   // ---- 회원·권한(users.json) ----

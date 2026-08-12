@@ -10,4 +10,10 @@
 [functions."gw-hwakwan-cron"]
   schedule = "30 22 * * 0-4"
 
+# 올바로 일일운반일지 자동 수집 — UTC 23:00 = KST 익일 08:00, 매일(주말 포함).
+# 수집 창은 오늘(KST) 포함 최근 7일: 처리자 인수 등록이 며칠 늦게 올라와 과거 집계가
+# 뒤늦게 바뀌므로 창을 두고 매일 덮어쓴다(대상일 계산은 함수 내부에서 KST 기준으로).
+[functions."gw-allbaro-cron"]
+  schedule = "0 23 * * *"
+
 # 정적 파일은 그대로 서빙, /.netlify/functions/* 는 서버리스 함수로.
