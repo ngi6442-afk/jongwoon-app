@@ -7884,6 +7884,9 @@
   function conBidAmt(c){ if(!c||!c.bid_id) return 0; var b=findBid(c.bid_id); return (b&&b.result&&b.result.amt)||0; }
   function conAmt(c){ return ((c&&c.contract_info&&c.contract_info.amount)||0) || conBidAmt(c); }
   function liveBids(){ return bids.filter(function(b){ return b && b.del!==1; }); }
+  // 마감이 지났는데 아직 판단 전(신규·검토)인 공고 = 죽은 건. 기본 화면에서 숨기고 '지남' 칩에 몬다.
+  // 투찰(응찰)한 건은 개찰결과(낙찰/유찰) 대기라 마감이 지나도 남긴다. 삭제는 안 한다(사람 확인 원칙).
+  function bidExpired(b){ var st=bidSt(b); return !!(b.due && b.due<todayStr() && (st==="new"||st==="검토")); }
   function loadBids(){
     var token=getToken(); if(!token) return;
     fetch(BIDS_API, {headers:ghHeaders()}).then(function(resp){
@@ -7909,7 +7912,7 @@
       return resp.json().then(function(json){ bidsSha=json.content&&json.content.sha; bidsPending=false; });
     }).catch(function(){});
   }
-  function bidNewCount(){ return liveBids().filter(function(b){ return b.status==="new"; }).length; }
+  function bidNewCount(){ return liveBids().filter(function(b){ return b.status==="new" && !bidExpired(b); }).length; }
 
   // ---- 견적서 탭 (파이프라인과 별개 발행 · 문서번호 채번·이력) ----
   var quotes=[], quoteSha=null, quoteSaveTimer=null, quotePending=false, qtEditId=null;
@@ -10128,8 +10131,10 @@
     // 필터바(상태 칩)
     var fb=document.getElementById("bidFilterBar");
     if(fb){
-      var counts={all:all.filter(function(b){return bidSt(b)!=="패스";}).length}; BID_STATUSES.forEach(function(s){ counts[s[0]]=all.filter(function(b){return bidSt(b)===s[0];}).length; });
-      var chips=[["all","전체"]].concat(BID_STATUSES);
+      var counts={all:all.filter(function(b){return bidSt(b)!=="패스" && !bidExpired(b);}).length,
+                  expired:all.filter(bidExpired).length};
+      BID_STATUSES.forEach(function(s){ counts[s[0]]=all.filter(function(b){return bidSt(b)===s[0] && !bidExpired(b);}).length; });
+      var chips=[["all","전체"]].concat(BID_STATUSES).concat([["expired","지남"]]);
       fb.innerHTML=chips.map(function(c){
         var on=bidStatusFilter===c[0];
         return '<button class="mini-btn'+(on?' appr-btn':'')+'" data-bid-filter="'+c[0]+'">'+c[1]+' '+(counts[c[0]]||0)+'</button>';
@@ -10137,7 +10142,10 @@
       Array.prototype.forEach.call(fb.querySelectorAll("[data-bid-filter]"),function(el){ el.addEventListener("click",function(){ bidStatusFilter=el.getAttribute("data-bid-filter"); renderBids(); }); });
     }
     var list=all.filter(function(b){
-      if(bidStatusFilter==="all"){ if(bidSt(b)==="패스") return false; }   // 전체 보기에서 패스는 숨김(패스 칩에서만)
+      // 마감 지난 미판단 건은 '지남' 칩에서만 — 다른 모든 화면에서 숨김(2026-08-12 PM 지적)
+      if(bidStatusFilter==="expired"){ if(!bidExpired(b)) return false; }
+      else if(bidExpired(b)) return false;
+      else if(bidStatusFilter==="all"){ if(bidSt(b)==="패스") return false; }   // 전체 보기에서 패스는 숨김(패스 칩에서만)
       else if(bidSt(b)!==bidStatusFilter) return false;
       if(!bidSearchTerm) return true;
       return ((b.title||"")+" "+(b.org||"")).toLowerCase().indexOf(bidSearchTerm)>=0;
@@ -10145,7 +10153,8 @@
     // 정렬: 마감 임박순(마감 없음은 뒤). 지역 가중은 ★ 칩 표시로만.
     list.sort(function(a,b){ return (a.due||"9999-99-99") < (b.due||"9999-99-99") ? -1 : 1; });
     var head=document.getElementById("bidHead");
-    if(head) head.textContent = all.length ? ("총 "+all.length+" · 신규 "+bidNewCount()) : "";
+    if(head){ var nExp=all.filter(bidExpired).length;
+      head.textContent = all.length ? ("총 "+all.length+" · 신규 "+bidNewCount()+(nExp?" · 지남 "+nExp:"")) : ""; }
     // 수집 헬스 배너 — 어댑터 실패(API·사이트 변경 의심) 또는 자동수집 장기 미실행 경고
     var banner="";
     if(bidsHealth){
@@ -10345,6 +10354,8 @@
   var onbidSha = null, onbidSaveTimer = null, onbidPending = false, obSearchTerm = "", obStatusFilter = "all", obKindFilter = "all", obShow = 150;
   function findOb(id){ for(var i=0;i<onbids.length;i++){ if(onbids[i].id===id) return onbids[i]; } return null; }
   function liveObs(){ return onbids.filter(function(b){ return b && b.del!==1; }); }
+  // 입찰과 같은 규칙: 마감 지난 미판단(신규·검토) 물건은 기본 화면에서 숨김. 참여한 건은 결과 확인 때까지 유지.
+  function obExpired(b){ return !!(b.due && b.due<todayStr() && (b.status==="new"||b.status==="검토")); }
   function loadOnbid(){
     var token=getToken(); if(!token) return;
     fetch(ONBID_API, {headers:ghHeaders()}).then(function(resp){
@@ -10379,9 +10390,13 @@
     var all=liveObs();
     var fb=document.getElementById("obFilterBar");
     if(fb){
-      var sts=[["all","전체"],["new","신규"],["검토","검토"],["참여","참여"],["패스","패스"]];
+      var sts=[["all","전체"],["new","신규"],["검토","검토"],["참여","참여"],["패스","패스"],["expired","지남"]];
       var kinds=[["all","용도전체"],["토지","토지"],["공장·산업","공장·산업"],["상가·업무","상가·업무"]];
-      function cnt(st){ if(st==="all") return all.filter(function(b){return b.status!=="패스";}).length; return all.filter(function(b){return b.status===st;}).length; }
+      function cnt(st){
+        if(st==="expired") return all.filter(obExpired).length;
+        if(st==="all") return all.filter(function(b){return b.status!=="패스" && !obExpired(b);}).length;
+        return all.filter(function(b){return b.status===st && !obExpired(b);}).length;
+      }
       fb.innerHTML = sts.map(function(c){ return '<button class="mini-btn'+(obStatusFilter===c[0]?' appr-btn':'')+'" data-ob-st-f="'+c[0]+'">'+c[1]+' '+cnt(c[0])+'</button>'; }).join("")
         + '<span style="width:8px"></span>'
         + kinds.map(function(c){ return '<button class="mini-btn'+(obKindFilter===c[0]?' appr-btn':'')+'" data-ob-kd-f="'+c[0]+'">'+c[1]+'</button>'; }).join("");
@@ -10389,7 +10404,10 @@
       Array.prototype.forEach.call(fb.querySelectorAll("[data-ob-kd-f]"),function(el){ el.addEventListener("click",function(){ obKindFilter=el.getAttribute("data-ob-kd-f"); obShow=150; renderOnbid(); }); });
     }
     var list=all.filter(function(b){
-      if(obStatusFilter==="all"){ if(b.status==="패스") return false; }
+      // 마감 지난 미판단 물건은 '지남' 칩에서만(2026-08-12 PM 지적)
+      if(obStatusFilter==="expired"){ if(!obExpired(b)) return false; }
+      else if(obExpired(b)) return false;
+      else if(obStatusFilter==="all"){ if(b.status==="패스") return false; }
       else if(b.status!==obStatusFilter) return false;
       if(obKindFilter!=="all" && b.kind!==obKindFilter) return false;
       if(!obSearchTerm) return true;
