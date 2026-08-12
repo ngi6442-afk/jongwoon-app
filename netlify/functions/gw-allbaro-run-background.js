@@ -21,6 +21,8 @@ const MAX_DAYS = 14;      // 한 실행당 최대 날짜 수(기동측과 동일
 const BACK_DAYS = 61;     // 소급 허용(기동측 60 + 하루 여유 — KST 자정 경계에서 정상 요청이 잘리지 않게)
 const MAX_LOG_LINES = 200;
 const MAX_LOG_CHARS = 500;
+const MAX_VEHICLES = 500;   // 차량현황 상한(실사용 수십 대) — 이상 비대해진 문서로 워커가 붙들리지 않게
+const MAX_LEARNED = 500;    // 학습 지정 상한(gw-allbaro의 저장 상한과 동일)
 
 // 달력 왕복 검증 — 2026-02-30 같은 불가능 날짜가 blob 키로 흘러가는 것을 차단
 function validDay(s) {
@@ -59,6 +61,75 @@ function countsTotal(counts) {
     return a + (Number.isFinite(v) && v > 0 ? v : 0);
   }, 0);
 }
+// counts에서 톤 합계 되계산(라이브러리 total_qty_ton이 없거나 이상할 때의 보정)
+function countsQty(counts) {
+  if (!Array.isArray(counts)) return 0;
+  const s = counts.reduce(function (a, c) {
+    const v = Number(c && c.qty_ton);
+    return a + (Number.isFinite(v) && v > 0 ? v : 0);
+  }, 0);
+  return Math.round(s * 1000) / 1000;
+}
+// counts에서 '단위 미상' 건수 되계산 — 0으로 뭉개지 말고 그대로 드러낸다(계약 A-4).
+function countsQtyUnknown(counts) {
+  if (!Array.isArray(counts)) return 0;
+  return counts.reduce(function (a, c) {
+    const v = Number(c && c.qty_unknown);
+    return a + (Number.isFinite(v) && v > 0 ? Math.floor(v) : 0);
+  }, 0);
+}
+
+// 차량현황(앱 blob col:vehicles) → [{no, type}]. 삭제(del=1)·차량번호 없는 항목 제외.
+// 차량번호에 섞인 괄호 주석·공백 정규화는 _lib/allbaro.js가 한다 — 여기서는 원본을 그대로 넘긴다.
+// 조회 실패는 빈 배열(수집은 계속). 차량을 모르면 차량으로 갈리는 줄은 라이브러리가 미매칭으로 드러낸다.
+async function readVehicles(st, log) {
+  try {
+    const r = await blobGet(st, 'col:vehicles');
+    if (!r.ok) { log.push('[차량] 조회 실패 ' + (r.code || '') + ' — 차량 판정 없이 진행'); return []; }
+    const items = (r.data && Array.isArray(r.data.items)) ? r.data.items : [];
+    const out = [];
+    let capped = false;
+    for (const v of items) {
+      if (!v || v.del === 1) continue;
+      const no = String(v.no == null ? '' : v.no).trim();
+      if (!no) continue;
+      if (out.length >= MAX_VEHICLES) { capped = true; break; }
+      out.push({ no: no, type: String(v.type == null ? '' : v.type).trim() });
+    }
+    log.push('[차량] ' + out.length + '대' + (capped ? ' (상한 ' + MAX_VEHICLES + '대까지만)' : ''));
+    return out;
+  } catch (e) {
+    log.push('[차량] 조회 예외 — 차량 판정 없이 진행');
+    return [];
+  }
+}
+
+// 학습 사전(allbaro:learned) → [{from,to,item,side,row}]. 사람이 [노선 지정]으로 넣은 대응.
+// 형태가 깨진 항목은 넘기지 않는다(라이브러리에서 조용히 오배정될 여지를 만들지 않는다).
+async function readLearned(st, log) {
+  try {
+    const r = await blobGet(st, 'allbaro:learned');
+    if (!r.ok) { log.push('[학습] 조회 실패 ' + (r.code || '') + ' — 학습 지정 없이 진행'); return []; }
+    const items = (r.data && Array.isArray(r.data.items)) ? r.data.items : [];
+    const out = [];
+    let bad = 0;
+    for (const it of items) {
+      const side = String((it && it.side) || '').trim().toUpperCase();
+      const row = Number(it && it.row);
+      const from = String((it && it.from) || '').trim();
+      const to = String((it && it.to) || '').trim();
+      if ((side !== 'L' && side !== 'R') || !Number.isInteger(row) || row <= 0 || !from || !to) { bad++; continue; }
+      if (out.length >= MAX_LEARNED) break;
+      out.push({ from: from, to: to, item: String((it && it.item) || '').trim(), side: side, row: row });
+    }
+    if (out.length || bad) log.push('[학습] ' + out.length + '건 적용' + (bad ? ' · 형식 오류 ' + bad + '건 제외' : ''));
+    return out;
+  } catch (e) {
+    log.push('[학습] 조회 예외 — 학습 지정 없이 진행');
+    return [];
+  }
+}
+
 // 실패 요약 — 푸시 본문용. 로그 끝부분(원인 근처)을 우선. 이미 scrub된 로그만 넘길 것.
 function failSummary(log) {
   const lines = (Array.isArray(log) ? log : []).map(String).filter(Boolean);
@@ -113,11 +184,20 @@ exports.handler = async function (event, context) {
     }
     const creds = { id: process.env.GW_ALLBARO_ID, pw: process.env.GW_ALLBARO_PW };
 
+    // 매칭 정밀화 입력(계약 B-1) — 차량현황·학습사전을 앱 blob에서 읽어 aggregate까지 그대로 넘긴다.
+    // 둘 다 실패해도 수집은 계속한다(빈 배열). 값이 비면 판정이 헐거워질 뿐, 조용한 오배정은
+    // 라이브러리 규칙(후보 여럿 → 미매칭)이 막는다.
+    const preLog = [];
+    const vehicles = await readVehicles(st, preLog);
+    const learned = await readLearned(st, preLog);
+
     let r;
-    try { r = await collectDays(creds, days); }
+    try { r = await collectDays(creds, days, { vehicles: vehicles, learned: learned }); }
     catch (e) { r = { ok: false, code: 'COLLECT_THREW', days: [], log: ['COLLECT_THREW: ' + String((e && e.message) || e)] }; }
 
-    const log = (Array.isArray(r && r.log) ? r.log : []).map(scrub).slice(-MAX_LOG_LINES);
+    const log = preLog.map(scrub)
+      .concat((Array.isArray(r && r.log) ? r.log : []).map(scrub))
+      .slice(-MAX_LOG_LINES);
 
     // 날짜별 저장 — 덮어쓰기(늦게 올라온 인계서가 반영되도록).
     // 요청한 날짜 집합에 있는 값만 키로 쓴다(라이브러리가 이상한 day를 돌려줘도 키 오염 없음).
@@ -135,9 +215,15 @@ exports.handler = async function (event, context) {
       // 실패한 실행이 과거의 정상 집계를 0건으로 덮어쓰지 않게 — 빈 결과 + 전체 실패면 보존
       if (!(r && r.ok) && total === 0) { log.push('[보존] ' + day + ' 빈 결과 — 기존 집계 유지'); continue; }
       const un = unmatchedCount(unmatched);
-      const w = await blobSet(st, dayKey(day), { schema: 1, day: day, total: total, counts: counts, unmatched: unmatched, ts: Date.now(), job: job });
+      // 수량(계약 A-4) — 라이브러리 값이 없거나 이상하면 counts에서 되계산한다.
+      const qRaw = Number(dd.total_qty_ton);
+      const qty = (Number.isFinite(qRaw) && qRaw >= 0) ? Math.round(qRaw * 1000) / 1000 : countsQty(counts);
+      const quRaw = Number(dd.qty_unknown);
+      const qtyUnknown = (Number.isFinite(quRaw) && quRaw >= 0) ? Math.floor(quRaw) : countsQtyUnknown(counts);
+      // schema 2 = 수량 필드 추가(1단계 문서와 구분). 소비자는 필드별로 방어적으로 읽는다.
+      const w = await blobSet(st, dayKey(day), { schema: 2, day: day, total: total, total_qty_ton: qty, qty_unknown: qtyUnknown, counts: counts, unmatched: unmatched, ts: Date.now(), job: job });
       if (!w.ok) { writeFail++; log.push('[저장실패] ' + day + ' ' + (w.code || '')); continue; }
-      saved.push({ day: day, total: total, unmatched_n: un });
+      saved.push({ day: day, total: total, qty_ton: qty, unmatched_n: un });
       unmatchedTotal += un;
       if (un > 0) unmatchedDays.push(day + ' ' + un + '건');
     }
@@ -191,8 +277,14 @@ exports.handler = async function (event, context) {
       }
     } catch (e2) {}
   } finally {
-    // 동시 실행 잠금 해제 — 성공·실패·예외 어느 경로로 끝나도 반드시 푼다.
-    // (해제 못 해도 10분 뒤 만료되지만, 그동안 [지금 수집]이 막히는 건 불편이다)
-    try { if (st) await blobSet(st, 'allbaro:lock', { ts: 0, job: '' }); } catch (e3) {}
+    // 동시 실행 잠금 해제 — 성공·실패·예외 어느 경로로 끝나도 시도한다.
+    // 단, '자기 job의 잠금'일 때만 푼다(계약 B-minor). 다른 job(뒤이어 붙은 다른 워커·수동수집)이
+    // 이미 잠금을 가져갔다면 남의 잠금을 풀지 않는다. 해제 못 해도 10분 뒤 만료되므로 영구 잠금은 없다.
+    try {
+      if (st && job) {
+        const cur = await blobGet(st, 'allbaro:lock');
+        if (cur.ok && cur.data && cur.data.job === job) await blobSet(st, 'allbaro:lock', { ts: 0, job: '' });
+      }
+    } catch (e3) {}
   }
 };
