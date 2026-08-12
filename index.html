@@ -481,6 +481,17 @@
   }
   .task-ctrl .mini-btn{font-size:12px;padding:5px 11px;border-radius:8px;white-space:nowrap;}
   .task-ctrl .dday{flex-shrink:0;}
+  /* 모바일 잘림 해소(2026-08-12 PM 지적): .item은 가로 flex인데 .task-ctrl이 flex-shrink:0이라
+     버튼이 많은 목록(온비드 D-day+검토+참여+패스+원문 = 5개)에서 본문 폭을 다 뺏겨
+     제목·감정가·마감이 "경…", "감정 2," 로 잘렸다. 본문에 최소 62%를 보장해
+     컨트롤이 안 들어가면 자동으로 아랫줄로 내려가게 한다(버튼 1~2개면 그대로 한 줄 유지). */
+  @media (max-width:640px){
+    .item{flex-wrap:wrap;}
+    .item-body{flex:1 1 62%;}
+    .task-ctrl{flex-wrap:wrap;justify-content:flex-start;}
+    .item-title{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+    .item-meta{white-space:normal;}
+  }
   .mini-btn{
     border:1px solid var(--line);
     background:#fff;
@@ -1678,6 +1689,8 @@
       <option value="annual">연차</option>
       <option value="half_am">오전반차</option>
       <option value="half_pm">오후반차</option>
+      <option value="quarter_am">오전 반반차</option>
+      <option value="quarter_pm">오후 반반차</option>
       <option value="sick">병가</option>
       <option value="family">경조</option>
       <option value="etc">기타</option>
@@ -2002,10 +2015,10 @@
     <input type="date" id="meLeave">
     <label class="dg-check"><input type="checkbox" id="mePaidAnnual"> 연차수당 포함 근로자 (연차 대신 수당)</label>
     <span class="fld-label">현재 잔여 연차 (입력 시 이 값부터 시작 · 비우면 자동 역산)</span>
-    <input type="number" id="meAnnualBase" min="0" step="0.5" placeholder="미입력=자동 역산" autocomplete="off">
+    <input type="number" id="meAnnualBase" min="0" step="0.25" placeholder="미입력=자동 역산" autocomplete="off">
     <div id="meBaseDateNote" style="display:none;font-size:12px;color:var(--sub);margin:-2px 2px 8px;"></div>
     <span class="fld-label">연차 부여 수동조정 (비우면 취업규칙 자동계산)</span>
-    <input type="number" id="meAnnual" min="0" step="0.5" placeholder="자동" autocomplete="off">
+    <input type="number" id="meAnnual" min="0" step="0.25" placeholder="자동" autocomplete="off">
     <div style="font-size:12px;color:var(--sub);margin:-2px 2px 8px;">취업규칙 제26조: 1년 15일, 3년 이상 매 2년 +1일, 최대 25일. 미사용분은 1년 후 소멸.</div>
     <!-- 모듈별 권한은 별도 '권한관리' 화면으로 분리. 기존 권한 보존을 위해 숨김 유지 -->
     <div id="mePermsWrap" style="display:none;">
@@ -3846,7 +3859,7 @@
     if (canSee("rec")) receivables.forEach(function(r){ if (r.del === 1 || r.paid || !recVisible(r)) return; add(r.billed, "rec", (r.client||"미수")+" 청구", r.amount ? fmtAmount(r.amount)+"원" : ""); });
     // 휴가·사직: 승인된 연차/반차는 기간 전체, 사직 확정은 퇴사예정일(관리자만)
     liveLeaves().forEach(function(l){
-      if(l.type==="annual" || l.type==="half_am" || l.type==="half_pm"){
+      if(l.type==="annual" || isPartialLeave(l.type)){
         if(l.status!=="approved" || !leaveCalVisible(l)) return;
         var nm=dispName(memberName(l.member_id))||l.member_name||"";
         eachDate(l.start, l.end, function(ds){ add(ds, "leave", (nm?nm+" ":"")+leaveTypeLabel(l.type), ""); });
@@ -4233,7 +4246,7 @@
   document.getElementById("loaBackdrop").addEventListener("click", function(e){ if(e.target===this) this.classList.remove("show"); });
   document.getElementById("lvSave").addEventListener("click", saveLeaveApply);
   document.getElementById("lvCancel").addEventListener("click", function(){ document.getElementById("leaveBackdrop").classList.remove("show"); });
-  document.getElementById("lvType").addEventListener("change", function(){ var half=(this.value==="half_am"||this.value==="half_pm"); var e=document.getElementById("lvEnd"); e.disabled=half; if(half) e.value=document.getElementById("lvStart").value; });
+  document.getElementById("lvType").addEventListener("change", function(){ var half=isPartialLeave(this.value); var e=document.getElementById("lvEnd"); e.disabled=half; if(half) e.value=document.getElementById("lvStart").value; });
   document.getElementById("conStartBackdrop").addEventListener("click", function(e){ if(e.target===this) this.classList.remove("show"); });
   document.getElementById("docAddBtn").addEventListener("click", function(){ openDocModal(null); });
   document.getElementById("docSave").addEventListener("click", saveDocModal);
@@ -7508,7 +7521,11 @@
   // ---- 휴가 (leaves.json) — 신청 → 승인 → 잔여일수 ----
   var leaves = [];
   var leavesSha = null, leavesSaveTimer = null;
-  var LEAVE_TYPES = [["annual","연차"],["half_am","오전반차"],["half_pm","오후반차"],["sick","병가"],["family","경조"],["etc","기타"]];
+  var LEAVE_TYPES = [["annual","연차"],["half_am","오전반차"],["half_pm","오후반차"],["quarter_am","오전 반반차"],["quarter_pm","오후 반반차"],["sick","병가"],["family","경조"],["etc","기타"]];
+  // 하루보다 작은 단위로 쓰는 유형 → 소진일수. 반차 0.5 / 반반차 0.25 (PM 지시 2026-08-12).
+  // 판정이 여러 곳에 흩어져 있어 한 유형을 추가할 때마다 빠지는 자리가 생겼다 — 이 표 하나로 모은다.
+  var LEAVE_PARTIAL = { half_am:0.5, half_pm:0.5, quarter_am:0.25, quarter_pm:0.25 };
+  function isPartialLeave(t){ return Object.prototype.hasOwnProperty.call(LEAVE_PARTIAL, t); }
   function leaveTypeLabel(t){ if(t==="resign") return "사직"; for(var i=0;i<LEAVE_TYPES.length;i++){ if(LEAVE_TYPES[i][0]===t) return LEAVE_TYPES[i][1]; } return t||""; }
   function findLeave(id){ for(var i=0;i<leaves.length;i++){ if(leaves[i].id===id) return leaves[i]; } return null; }
   function liveLeaves(){ return leaves.filter(function(l){ return l && l.del!==1; }); }
@@ -7535,7 +7552,7 @@
     }).catch(function(){});
   }
   function leaveDays(type,start,end){
-    if(type==="half_am"||type==="half_pm") return 0.5;
+    if(isPartialLeave(type)) return LEAVE_PARTIAL[type];
     if(!isDate(start)) return 0;
     var s=new Date(start+"T00:00:00"), e=new Date((isDate(end)?end:start)+"T00:00:00");
     var d=Math.round((e-s)/86400000)+1; return d>0?d:0;
@@ -7588,8 +7605,8 @@
     var end=new Date(h.getTime()); end.setFullYear(h.getFullYear()+n+1);
     return { start:fmtYMD(anniv), end:fmtYMD(end) };
   }
-  // 연차를 소진하는 사용인가: 연차 + 오전/오후 반차(각 0.5일). 병가·경조·기타는 제외.
-  function isAnnualUse(l){ return l && (l.type==="annual" || l.type==="half_am" || l.type==="half_pm"); }
+  // 연차를 소진하는 사용인가: 연차 + 반차(0.5) + 반반차(0.25). 병가·경조·기타는 제외.
+  function isAnnualUse(l){ return !!l && (l.type==="annual" || isPartialLeave(l.type)); }
   // 지난 기간(1년 시효 경과)에 소멸한 미사용 연차 누적. hire/fiscal 기준 모두 지원.
   function annualExpired(memberId){
     var m=findMember(memberId);
@@ -7842,7 +7859,7 @@
     var end=document.getElementById("lvEnd").value||start;
     if(!isDate(start)){ alert("시작일을 선택하세요."); return; }
     if(!document.getElementById("lvReason").value.trim()){ alert("사유를 입력하세요."); return; }
-    if(type==="half_am"||type==="half_pm") end=start;
+    if(isPartialLeave(type)) end=start;
     var days=leaveDays(type,start,end);
     var l={ id:genId("lv"), member_id:me, member_name:myName()||"", type:type, start:start, end:end, days:days,
       reason:document.getElementById("lvReason").value.trim(), status:"pending", approver:"", applied:todayStr(), updated:todayStr() };
