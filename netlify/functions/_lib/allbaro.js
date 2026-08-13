@@ -140,6 +140,12 @@ const TD = {
   trtm: 25,         // 처리자(하차지)
   trtmQty: 28,      // 처리자 인수량
   writer: 41,       // 작성자명
+  // 시각 필드(2026-08-13) — EP더스트 조업일 규칙(당일 06시~익일 06시, PM 지시)용.
+  // 실측 형식 'YYYYMMDD HH:MM:SS'. 어느 시각이 실제 조업을 반영하는지는 inspect로 확인.
+  reservedAt: 10,   // 배출자 예약등록일시
+  confirmedAt: 11,  // 배출자 확정등록일시
+  tranWorkAt: 19,   // 운반자 작업일시
+  trtmWorkAt: 27,   // 처리자 인수작업일시
 };
 const TD_MIN = 43;  // 실측 열 수. 이보다 짧은 TR은 데이터 행이 아니다.
 
@@ -504,6 +510,11 @@ function parseSheetXml(xml) {
       trtm: td[TD.trtm],
       trtmQty: td[TD.trtmQty],
       writer: td[TD.writer],
+      // 시각 4종 — EP더스트 조업일 판정·inspect용
+      reservedAt: td[TD.reservedAt],
+      confirmedAt: td[TD.confirmedAt],
+      tranWorkAt: td[TD.tranWorkAt],
+      trtmWorkAt: td[TD.trtmWorkAt],
     });
   }
   return out;

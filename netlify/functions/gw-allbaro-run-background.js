@@ -149,7 +149,44 @@ exports.handler = async function (event, context) {
     job = String(d.job || '').trim();
     const mode = String(d.mode || '').trim();
     if (!RE_JOB.test(job)) return;
-    if (mode !== 'collect') return;
+    if (mode !== 'collect' && mode !== 'inspect') return;
+
+    // ---- inspect: 하루치 원시 행(시각 포함)을 그대로 반환 — EP더스트 조업일 규칙 실측용.
+    // 조회 전용·내부 토큰 전용. 집계·저장(allbaro:day)은 건드리지 않는다.
+    if (mode === 'inspect') {
+      st = store(DATA);
+      rec = { ts: Date.now(), status: 'running', mode: 'inspect', log: [], results: null };
+      await blobSet(st, jobKey(job), rec);
+      try {
+        const day = String((d.params && d.params.day) || '').trim();
+        if (!RE_DATE.test(day) || !validDay(day)) { rec.status = 'fail'; rec.code = 'BAD_DAY'; }
+        else if (!process.env.GW_ALLBARO_ID || !process.env.GW_ALLBARO_PW) { rec.status = 'fail'; rec.code = 'ENV_MISSING'; }
+        else {
+          const A = require('./_lib/allbaro');
+          const S = A.createSession({ id: process.env.GW_ALLBARO_ID, pw: process.env.GW_ALLBARO_PW });
+          await S.login();
+          const rows = await A.searchManifests(S, day, day);
+          const emisLike = String((d.params && d.params.emisLike) || '');
+          const wasteLike = String((d.params && d.params.wasteLike) || '');
+          const hit = rows.filter(function (r) {
+            return (!emisLike || String(r.emis).indexOf(emisLike) >= 0)
+              && (!wasteLike || String(r.wasteName).indexOf(wasteLike) >= 0);
+          }).map(function (r) {
+            return { manf: r.manf, emis: r.emis, trtm: r.trtm, wasteName: r.wasteName,
+              date: r.date, reservedAt: r.reservedAt, confirmedAt: r.confirmedAt,
+              tranWorkAt: r.tranWorkAt, trtmWorkAt: r.trtmWorkAt,
+              tranVehicle: r.tranVehicle, qty: r.tranQty };
+          });
+          rec.status = 'done'; rec.results = { day: day, total: rows.length, hit: hit.slice(0, 120) };
+        }
+      } catch (e) {
+        rec.status = 'fail'; rec.code = rec.code || 'INSPECT_FAILED';
+        rec.detail = scrub(String((e && e.message) || e));
+      }
+      rec.ts = Date.now();
+      await blobSet(st, jobKey(job), rec);
+      return;
+    }
 
     // 날짜 재검증(심층 방어) — 형식·달력·범위를 모두 통과한 값만 blob 키가 된다.
     const lo = kstDate(-BACK_DAYS), hi = kstDate(1);   // 상한도 하루 여유(KST 자정 경계)
