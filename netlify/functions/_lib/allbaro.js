@@ -567,6 +567,27 @@ function round3(n) { return Math.round(n * 1000) / 1000; }
 // rows(파싱된 인계서 행) -> 상차지·하차지·품목별 건수·수량 + 노선 배정.
 // day='YYYY-MM-DD'면 그 인계일자만. opts = { vehicles:[{no,type}], learned:[{from,to,item,side,row}] }
 // (기존 2인자 호출도 그대로 동작한다 — opts 생략 시 차량·학습 없이 매칭한다.)
+// 포스코 구내운송 EP더스트 판정 — 배출자가 포스코이고 폐기물이 제철공정분진/EP더스트.
+// (양식은 (주)포스코 → 구내운송, 품목칸에 'EP 더스트 (레스코/피앤알)' 병기. 올바로 표기는
+//  emis='주식회사포스코', wasteName='제철공정분진(고상)' — 실측 2026-08-13.)
+function isEpDust(from, item) {
+  const f = String(from || '');
+  const w = String(item || '');
+  if (f.indexOf('포스코') < 0) return false;
+  return w.indexOf('제철공정분진') >= 0 || w.indexOf('EP') >= 0 || w.indexOf('더스트') >= 0;
+}
+
+// 'YYYYMMDD HH:MM:SS' 처리인수시각 → 조업일 'YYYYMMDD'. 06시 이전은 전날로 당긴다
+// (06시~익일06시 = 당일). 시각이 없으면 빈 문자열('') — 아직 처리인수 전이라 어느 날에도 안 잡힌다.
+function opDayFromTrtm(t) {
+  const m = /^(\d{4})(\d{2})(\d{2})\s+(\d{2}):(\d{2})/.exec(String(t || '').trim());
+  if (!m) return '';
+  const ms = Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]) - 6 * 3600000;
+  const dt = new Date(ms);
+  const p = (n) => String(n).padStart(2, '0');
+  return '' + dt.getUTCFullYear() + p(dt.getUTCMonth() + 1) + p(dt.getUTCDate());
+}
+
 function aggregate(rows, day, opts) {
   // 형식이 틀린 기준일을 조용히 0건으로 넘기면 그날 일지가 통째로 비어 버린다 — 시끄럽게 중단한다.
   if (day != null && day !== '' && !validDay(day)) throw new Error('집계 기준일 형식 오류: ' + String(day));
@@ -584,7 +605,11 @@ function aggregate(rows, day, opts) {
     const to = cleanText(r.trtm);
     const item = cleanText(r.wasteName);
     if (!from || !to) continue;                       // 배출자·처리자 둘 다 있어야 한 건(파이썬 동일)
-    const d = String(r.date == null ? '' : r.date).slice(0, 8);
+    // 조업일 기준(PM 지시 2026-08-13): 포스코 구내운송 EP더스트는 24시간 조업이라
+    // '처리인수시각'의 06시~익일06시를 하루로 본다(인계일자가 아니라). 그 외 노선은 인계일자.
+    const d = isEpDust(from, item)
+      ? opDayFromTrtm(r.trtmWorkAt)
+      : String(r.date == null ? '' : r.date).slice(0, 8);
     if (dayKey && d !== dayKey) continue;
     const key = JSON.stringify([from, to, item]);   // 충돌 없는 합성 키
     let v = map.get(key);
@@ -887,6 +912,18 @@ async function searchManifests(S, sDate, eDate) {
 // 날짜 목록 수집 → 날짜별 집계. days=['YYYY-MM-DD', ...]
 // opts = { vehicles:[{no,type}], learned:[{from,to,item,side,row}] } — aggregate에 그대로 넘긴다.
 // 실패는 예외로 터뜨리지 않고 {ok:false, code, detail}로 돌려준다(워커가 job에 기록).
+// EP더스트 지연분을 잡기 위한 인계일자 소급 일수(처리인수 지연 실측 최대 +2일 → 여유 4일).
+const EP_WINDOW_BACK = 4;
+
+// 'YYYY-MM-DD' − n일 → 'YYYY-MM-DD'
+function dayMinus(day, n) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(day));
+  if (!m) return day;
+  const dt = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]) - n * 86400000);
+  const p = (x) => String(x).padStart(2, '0');
+  return dt.getUTCFullYear() + '-' + p(dt.getUTCMonth() + 1) + '-' + p(dt.getUTCDate());
+}
+
 async function collectDays(creds, days, opts) {
   const log = [];
   const out = [];
@@ -912,12 +949,17 @@ async function collectDays(creds, days, opts) {
   const badDays = [];
   for (const day of list) {
     try {
-      const rows = await searchManifests(S, day, day);
+      // EP더스트는 조업일(처리인수 기준)이 인계일자보다 며칠 늦다(실측 최대 +2일) — 넉넉히 4일 소급해
+      // 인계일자 [day-4, day] 창을 긁는다. aggregate가 EP는 조업일로, 그 외는 인계일자로 골라낸다.
+      // (인계일자 day-4..day-1의 비EP 행은 aggregate가 버린다. 넓게 긁고 정확히 거른다.)
+      const wideFrom = dayMinus(day, EP_WINDOW_BACK);
+      const rows = await searchManifests(S, wideFrom, day);
       const agg = aggregate(rows, day, opts);
-      // 하루짜리 조회는 그날 행만 온다(실측) — 행은 왔는데 집계가 0이면 열이 밀린 것이다.
-      // 이 빈 결과를 저장하면 그날 일지가 통째로 사라지므로 저장 전에 터뜨린다.
-      if (rows.length > 0 && agg.total === 0) {
-        throw new Error('집계 0건(파싱 ' + rows.length + '행) — 응답 열 구조 변경 의심');
+      // 열이 밀리면(로그인 만료·응답 구조 변경) 날짜 칸이 회사명 등으로 깨진다 — 직접 탐지한다.
+      // (창 조회라 '집계 0'만으론 판단 불가: 명절 등 그날 실적이 0이면 정상적으로 0이다.)
+      const malformed = rows.filter((r) => !/^\d{8}/.test(String(r.date == null ? '' : r.date).trim())).length;
+      if (rows.length >= 5 && malformed > rows.length / 2) {
+        throw new Error('날짜 칸 ' + malformed + '/' + rows.length + '행 손상 — 응답 열 구조 변경 의심');
       }
       out.push(agg);
       log.push('[' + day + '] ' + agg.total + '건 · ' + agg.total_qty_ton + '톤 · 노선 '
@@ -954,6 +996,7 @@ module.exports = {
   normName, normItem, itemHit, matchRoute, matchRouteEx,
   vehicleTagOf, vehicleTagOk, normVehNo, buildVehicleIndex, vehicleTypeOf,
   parseSheetXml, sheetTotal, aggregate, validDay, toSlash, kstTodayISO,
+  isEpDust, opDayFromTrtm, dayMinus,
   // 세션·네트워크(테스트 금지 — 리뷰로만 검증)
   createSession, searchManifests, collectDays,
 };

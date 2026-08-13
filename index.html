@@ -1327,6 +1327,9 @@
     <input type="text" id="promoProblem" placeholder="예: 역류 / 침전물 퇴적 / 악취 민원" autocomplete="off">
     <span class="fld-label">수치 (선택)</span>
     <input type="text" id="promoMetric" placeholder="예: 침전물 3톤 / 관로 120m" autocomplete="off">
+    <span class="fld-label">관련 계약 (선택)</span>
+    <select id="promoContract"><option value="">선택 안 함</option></select>
+    <div id="promoContractNote" style="display:none;font-size:12px;color:var(--sub);margin:-4px 2px 10px;">이 계약의 공종·시설 정보만 참고합니다. 금액·발주처는 전송되지 않습니다.</div>
     <div id="promoAddStat" style="font-size:12px;color:#1A9A6B;min-height:14px;"></div>
     <button class="primary" id="promoSave">저장 → 초안 생성</button>
     <button class="secondary" id="promoAddCancel">취소</button>
@@ -1344,8 +1347,12 @@
     <textarea id="promoDetBody" rows="12" style="width:100%;font-size:13px;"></textarea>
     <span class="fld-label">사진 — 본문의 [사진 N] 번호와 같은 순서입니다. 눌러서 저장한 뒤 그 자리에 넣으세요.</span>
     <div id="promoDetPhotos" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:6px;margin-bottom:8px;"></div>
+    <div id="promoAiNote" style="display:none;font-size:12px;color:var(--sub);margin-bottom:6px;"></div>
     <div id="promoDetStat" style="font-size:12px;color:#1A9A6B;min-height:14px;"></div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;">
+      <button class="mini-btn" id="promoAiBtn" style="display:none;">✍ 사진으로 다시 쓰기</button>
+      <button class="mini-btn" id="promoAiApplyBtn" style="display:none;">AI 초안 적용</button>
+      <button class="mini-btn" id="promoAiUndoBtn" style="display:none;">되돌리기</button>
       <button class="mini-btn" id="promoCopyBtn">📋 제목+본문 복사</button>
       <button class="primary" id="promoApproveBtn" style="display:none;">검수 승인</button>
       <button class="danger" id="promoRejectBtn" style="display:none;">반려</button>
@@ -8143,6 +8150,11 @@
   // 사진은 클라이언트에서 EXIF GPS 추출(원본 화질 전송본만 생존 — 실측 2026-08-05) 후 1600px 리사이즈해 서버 첨부(kind:promo).
   var promoItems=[], promoSha=null, promoSaveTimer=null, promoPending=false, promoDetId=null;
   var promoUpload={ photos:[], gps:null, busy:false };
+  // 사진 기반 AI 재작성(계약서 C절, 2026-08-13) 상태 — 함수 본체는 아래 "홍보 AI" 절.
+  // renderPromo가 paResults를 참조하므로 선언은 여기(promo 상태 옆)에 둔다.
+  var paJob={ polling:false, id:"", promo:"", tries:0 };   // 동시에 1건만 생성(비용·혼선 방지)
+  var paResults={};    // promo_id → 도착한 결과 {title,body,used_tokens,model,applied} — 사람이 저장하기 전까지 보관
+  var paUndo=null;     // {promo,title,body} — AI 초안 적용 직전의 화면 내용(예비 생성기 초안) 복구용
   function livePromo(){ return promoItems.filter(function(p){ return p && p.del!==1; }); }
   function promoLast(){ var l=livePromo().slice().sort(function(a,b){ return (b.ts||0)-(a.ts||0); }); return l[0]||null; }
 
@@ -10210,7 +10222,8 @@
         + (shown.length? shown.map(function(p){
             return '<div class="pipe-card" data-pr="'+esc(p.id)+'"><b>'+esc(p.title||"(제목 없음)")+'</b>'
               +'<div class="s">'+esc(p.region||"지역 미정")+' · '+esc(p.facility||"")+' · 사진 '+((p.photos||[]).length)+'장</div>'
-              +'<div class="s">'+esc(promoGenLabel(p))+' · '+esc(p.by||"")+' '+esc((p.updated||""))+(p.note?' · 반려: '+esc(p.note):'')+'</div></div>';
+              +'<div class="s">'+esc(promoGenLabel(p))+' · '+esc(p.by||"")+' '+esc((p.updated||""))+(p.note?' · 반려: '+esc(p.note):'')
+              +(paResults[p.id]?' · <b>AI 초안 도착</b>':'')+'</div></div>';
           }).join("") : '<div class="s" style="color:var(--sub);padding:4px;">없음</div>')
         + '</div>';
     }).join("");
@@ -10230,7 +10243,8 @@
     var p=promoFind(id); if(!p) return;
     promoDetId=id;
     document.getElementById("promoDetTitle").textContent="기록 상세 — "+(PROMO_COLS.filter(function(c){return c[0]===(p.status||"review");})[0]||["","기록"])[1];
-    document.getElementById("promoDetMeta").textContent=(p.region||"지역 미정")+" · "+(p.facility||"")+" · "+(p.problem||"")+(p.metric?" · "+p.metric:"")+" · 사진 "+((p.photos||[]).length)+"장 · "+(p.by||"")+" · "+(p.updated||"")+(p.gps? " · GPS 자동":" · 지역 수동");
+    var conTxt=paContractLabel(p.contract_id);
+    document.getElementById("promoDetMeta").textContent=(p.region||"지역 미정")+" · "+(p.facility||"")+" · "+(p.problem||"")+(p.metric?" · "+p.metric:"")+" · 사진 "+((p.photos||[]).length)+"장 · "+(p.by||"")+" · "+(p.updated||"")+(p.gps? " · GPS 자동":" · 지역 수동")+(conTxt? " · 계약: "+conTxt : "");
     document.getElementById("promoDetBlogTitle").value=p.title||"";
     document.getElementById("promoDetBody").value=p.body||"";
     document.getElementById("promoDetStat").textContent="";
@@ -10240,6 +10254,10 @@
     document.getElementById("promoPostedBtn").style.display=(canDo("promo")&&st==="approved")?"":"none";
     document.getElementById("promoResubmitBtn").style.display=(canDo("promo")&&st==="rejected")?"":"none";
     document.getElementById("promoDelBtn").style.display=isAdmin()?"":"none";
+    // 다시 연 화면은 저장된 기록에서 다시 채워졌으므로, 보관 중인 AI 결과는 "아직 적용 안 함"으로 되돌린다.
+    if(paResults[id]) paResults[id].applied=false;
+    if(paUndo && paUndo.promo!==id) paUndo=null;
+    paRenderBtns();
     promoRenderDetPhotos(p);
     document.getElementById("promoDetailBackdrop").classList.add("show");
   }
@@ -10277,6 +10295,7 @@
   function promoDetApplyEdits(p){
     p.title=document.getElementById("promoDetBlogTitle").value.trim()||p.title;
     p.body=document.getElementById("promoDetBody").value;
+    paClear(p.id);   // 화면 내용이 기록에 반영되는 시점 — 보관 중인 AI 결과·되돌리기 자료는 역할이 끝난다
   }
   document.getElementById("promoNewBtn").addEventListener("click",function(){
     if(!canDo("promo")) return;
@@ -10285,6 +10304,7 @@
     document.getElementById("promoPhotoInfo").textContent="";
     document.getElementById("promoAddStat").textContent="";
     ["promoRegion","promoFacility","promoProblem","promoMetric"].forEach(function(i){ var el=document.getElementById(i); el.value=""; delete el.dataset.src; });
+    promoFillConSelect("");
     document.getElementById("promoAddBackdrop").classList.add("show");
   });
   document.getElementById("promoPhotoBtn").addEventListener("click",function(){ document.getElementById("promoPhotoFile").click(); });
@@ -10304,9 +10324,12 @@
     // (실측 사고: 12월에 찍은 현장 글에 '장마철' 문구가 들어갔다)
     if(promoUpload.shot){ var sm=parseInt(promoUpload.shot.slice(5,7),10); if(sm>=1&&sm<=12) gen.mo=sm; }
     var d=promoDraft({region:region,facility:facility,problem:problem,metric:metric},promoUpload.photos.length,gen,gen.mo);
+    // 관련 계약은 id 문자열 하나만 기록한다(계약 레코드 복사 금지) — 금액·발주처는 애초에 이 기록에 들어오지 않는다.
+    var conSel=document.getElementById("promoContract");
+    var conId=(conSel && PA_ID_RE.test(String(conSel.value||"")))? String(conSel.value) : "";
     var item={ id:genId("pr"), ts:Date.now(), by:getUser(), region:region,
       regionSrc:(document.getElementById("promoRegion").dataset.src==="gps"?"gps":"manual"),
-      facility:facility, problem:problem, metric:metric,
+      facility:facility, problem:problem, metric:metric, contract_id:conId,
       photos:promoUpload.photos.slice(), gps:promoUpload.gps, shot_at:promoUpload.shot||"", gen:gen,
       title:d.title, body:d.body, status:"review", note:"" };
     promoStamp(item);
@@ -10349,9 +10372,188 @@
   document.getElementById("promoDelBtn").addEventListener("click",function(){
     var p=promoFind(promoDetId); if(!p||!isAdmin()) return;
     if(!confirm("이 기록을 삭제할까요? (사진 첨부는 서버에 남습니다)")) return;
-    p.del=1; promoStamp(p);
+    p.del=1; promoStamp(p); paClear(p.id);
     schedulePromoSave(); renderPromo();
     document.getElementById("promoDetailBackdrop").classList.remove("show");
+  });
+
+  // ---- 홍보 AI — 사진으로 다시 쓰기 (계약서 C절, 2026-08-13) ----
+  // 골격은 화관법·올바로와 동일: 요청 → job id → pa_job 2초 폴링(최대 3분) → 결과.
+  // ⚠ 계약 차단선: 이 화면이 서버로 보내는 것은 기록 id와 계약 id, 문자열 두 개뿐이다.
+  //   계약 레코드(금액·발주처·입찰번호·단계·기한)를 페이로드 객체에 담는 코드는 여기에 없어야 하며,
+  //   외부 API로 나갈 값의 화이트리스트(공종·시설·시·동)는 서버가 계약 레코드에서 직접 뽑는다.
+  //   ※ contract_id는 우리 서버(gw-promo-ai)로만 가는 내부 키다 — 외부 API 페이로드와는 다른 경계.
+  // ⚠ 결과는 화면(입력칸)에만 채운다. 저장은 사람이 [검수 승인]·[수정 후 재검수 요청]을 눌러야 일어난다.
+  // 기존 변형 생성기는 예비로 그대로 둔다 — API 미설정·실패 시 지금 초안이 그대로 쓰인다.
+  var PA_ID_RE=/^[A-Za-z0-9_-]{1,40}$/;
+  function paBody(promoId, contractId){
+    // 값 두 개짜리 리터럴 고정. 객체 전개(Object.assign·스프레드)나 레코드 참조를 여기에 넣지 말 것.
+    var b={ action:"pa_generate", promo_id:String(promoId||"") };
+    if(contractId && PA_ID_RE.test(String(contractId))) b.contract_id=String(contractId);
+    return b;
+  }
+  function promoConLabel(c){
+    if(!c) return "";
+    return (c.label||c.type||"계약")+(c.client? " · "+c.client : "")+(c.site? " · "+c.site : "");
+  }
+  function paContractLabel(cid){
+    if(!cid || typeof liveContracts!=="function") return "";
+    var c=liveContracts().filter(function(x){ return x && x.id===cid; })[0];
+    return c? promoConLabel(c) : "";
+  }
+  // [관련 계약 선택] — 선택사항. 진행 중 계약을 위로, 그 안에서 시작일 최신순.
+  function promoFillConSelect(selId){
+    var sel=document.getElementById("promoContract"); if(!sel) return;
+    var list=(typeof liveContracts==="function"? liveContracts() : []).slice().sort(function(a,b){
+      var da=(a.status==="done")?1:0, db=(b.status==="done")?1:0;
+      if(da!==db) return da-db;
+      return String(b.start||"").localeCompare(String(a.start||""));
+    });
+    sel.innerHTML='<option value="">선택 안 함</option>'+list.map(function(c){
+      return '<option value="'+esc(c.id)+'">'+esc(promoConLabel(c))+(c.status==="done"?" (완료)":"")+'</option>';
+    }).join("");
+    sel.value=selId||"";
+    promoConNote();
+  }
+  function promoConNote(){
+    var sel=document.getElementById("promoContract"), note=document.getElementById("promoContractNote");
+    if(!sel||!note) return;
+    note.style.display = sel.value ? "" : "none";
+  }
+  function paClear(id){
+    if(!id) return;
+    if(paResults[id]) delete paResults[id];
+    if(paUndo && paUndo.promo===id) paUndo=null;
+  }
+  function paStat(msg, err){
+    var el=document.getElementById("promoDetStat"); if(!el) return;
+    el.style.color = err ? "#C0392B" : "#1A9A6B";
+    el.textContent = msg||"";
+  }
+  // 실패 코드 → 사람 말. 키가 없거나 함수가 아직 없어도 앱은 그대로 돌아간다(예비 생성기 초안 사용).
+  function paFailText(code, detail){
+    if(code==="ENV_MISSING") return "관리자 설정 필요 — Netlify 환경변수(GW_ANTHROPIC_KEY)가 아직 없습니다. 설정 전까지는 지금 초안(변형 생성기)을 그대로 쓰시면 됩니다.";
+    if(code==="NO_PHOTO") return "이 기록에 사진이 없어 사진으로 다시 쓸 수 없습니다.";
+    if(code==="BLOCKED"||code==="SCRUB") return "계약 세부정보(금액·발주처 등)가 섞여 들어와 생성을 중단했습니다. 관리자에게 알려주세요.";
+    if(code==="NOT_FOUND") return "기록을 서버에서 찾지 못했습니다. 저장이 끝난 뒤 다시 시도하세요.";
+    if(code==="FORBIDDEN") return "이 작업을 할 권한이 없습니다.";
+    var t="AI 초안을 만들지 못했습니다. 잠시 뒤 다시 시도하거나, 지금 초안(변형 생성기)을 그대로 쓰세요.";
+    if(detail) t+=" ("+String(detail).slice(0,160)+")";
+    return t;
+  }
+  // pa_job 응답에서 잡 블롭 꺼내기 — {status,…} 그대로일 수도, {ok, job:{…}} 래핑일 수도 있어 둘 다 수용
+  function paJobBlob(body){
+    if(!body || typeof body!=="object") return null;
+    if(typeof body.status==="string") return body;
+    if(body.job && typeof body.job==="object" && typeof body.job.status==="string") return body.job;
+    return null;
+  }
+  function paRenderBtns(){
+    var p=promoDetId? promoFind(promoDetId) : null;
+    var st=p? (p.status||"review") : "";
+    var can=!!(p && canDo("promo") && (st==="review"||st==="rejected"));
+    var busy=!!(p && paJob.polling && paJob.promo===p.id);
+    var b=document.getElementById("promoAiBtn");
+    if(b){
+      b.style.display=(can && (p.photos||[]).length) ? "" : "none";
+      b.disabled=paJob.polling;
+      b.textContent= busy ? ("다시 쓰는 중… "+(paJob.tries*2)+"초") : "✍ 사진으로 다시 쓰기";
+    }
+    var ap=document.getElementById("promoAiApplyBtn");
+    if(ap) ap.style.display=(can && paResults[p.id] && !paResults[p.id].applied) ? "" : "none";
+    var un=document.getElementById("promoAiUndoBtn");
+    if(un) un.style.display=(p && paUndo && paUndo.promo===p.id) ? "" : "none";
+    var nt=document.getElementById("promoAiNote");
+    if(nt){
+      var lbl=p? paContractLabel(p.contract_id) : "";
+      nt.style.display = can ? "" : "none";
+      nt.textContent = !can ? "" : (lbl
+        ? ("관련 계약 — "+lbl+" · 이 계약의 공종·시설 정보만 참고합니다. 금액·발주처는 전송되지 않습니다.")
+        : "사진과 이 기록의 지역·시설·문제만 보고 새로 씁니다. (기록 입력 때 관련 계약을 고르면 공종·시설 정보만 함께 참고합니다)");
+    }
+  }
+  function paGenerate(){
+    var p=promoDetId? promoFind(promoDetId) : null;
+    if(!p || !canDo("promo")) return;
+    if(paJob.polling){ paStat("이미 생성 중입니다. 끝난 뒤 다시 시도하세요.", true); return; }
+    var n=(p.photos||[]).length;
+    if(!n){ paStat("이 기록에 사진이 없습니다.", true); return; }
+    if(!confirm("사진 "+Math.min(n,10)+"장을 보고 글을 새로 씁니다"+(n>10? " (비용 상한 — 앞 10장만)":"")+".\n\n지금 화면의 제목·본문은 [되돌리기]로 복구할 수 있고,\n[검수 승인] 또는 [수정 후 재검수 요청]을 눌러야 저장됩니다.\n\n계속할까요?")) return;
+    paJob={ polling:true, id:"", promo:p.id, tries:0 };   // 요청 중에도 버튼 잠금
+    paStat("사진으로 다시 쓰는 중… 최대 3분 걸립니다.");
+    paRenderBtns();
+    gwCall("gw-promo-ai", paBody(p.id, p.contract_id)).then(function(res){
+      if(res.status===401){ paJob.polling=false; paRenderBtns(); onSessionInvalid(); return; }
+      if(res.status===200 && res.body && res.body.ok && res.body.job){ paStartPoll(res.body.job, p.id); return; }
+      paJob.polling=false; paRenderBtns();
+      if(res.status===404){ paStat("백엔드 함수(gw-promo-ai)가 아직 배포되지 않았습니다. 지금 초안(변형 생성기)을 그대로 쓰세요.", true); return; }
+      paStat(paFailText((res.body&&res.body.code)||"", (res.body&&res.body.error)||("HTTP "+res.status)), true);
+    }).catch(function(){
+      paJob.polling=false; paRenderBtns();
+      paStat("요청을 보내지 못했습니다(네트워크). 연결을 확인하고 다시 시도하세요.", true);
+    });
+  }
+  function paStartPoll(jobId, promoId){
+    paJob={ polling:true, id:jobId, promo:promoId, tries:0 };
+    paRenderBtns();
+    function step(){
+      if(!paJob.polling || paJob.id!==jobId) return;   // 새 작업이 시작되면 이전 폴링은 조용히 종료
+      paJob.tries++;
+      if(paJob.tries>90){   // 2초 × 90회 = 3분
+        paJob.polling=false; paRenderBtns();
+        if(promoDetId===promoId) paStat("3분 안에 끝나지 않았습니다. 잠시 뒤 다시 시도하거나, 지금 초안을 그대로 쓰세요.", true);
+        return;
+      }
+      gwCall("gw-promo-ai", {action:"pa_job", job:jobId}).then(function(res){
+        if(!paJob.polling || paJob.id!==jobId) return;
+        if(res.status===401){ paJob.polling=false; paRenderBtns(); onSessionInvalid(); return; }
+        var blob=(res.status===200)? paJobBlob(res.body) : null;
+        if(blob && (blob.status==="done" || blob.status==="fail")){
+          paJob.polling=false; paFinish(blob, promoId); return;
+        }
+        if(promoDetId===promoId) paStat("사진으로 다시 쓰는 중… "+(paJob.tries*2)+"초 경과 (최대 3분)");
+        paRenderBtns();
+        setTimeout(step, 2000);
+      }).catch(function(){ setTimeout(step, 2000); });
+    }
+    setTimeout(step, 2000);
+  }
+  function paFinish(blob, promoId){
+    var r=(blob && (blob.result || blob.results)) || blob || {};
+    var title=String(r.title||""), body=String(r.body||"");
+    if(blob && blob.status==="done" && title && body){
+      paResults[promoId]={ title:title, body:body, used_tokens:r.used_tokens||blob.used_tokens||0, model:r.model||blob.model||"", applied:false };
+      paRenderBtns();
+      // 화면이 그 기록을 열고 있으면 바로 채우고, 아니면 보드에 "AI 초안 도착"으로 남겨 둔다(비용 낭비 방지).
+      if(promoDetId===promoId) paApply(promoId);
+      else renderPromo();
+      return;
+    }
+    var code=(r && r.code) || (blob && blob.code) || "";
+    var detail=(r && r.detail) || (blob && (blob.error || blob.detail)) || "";
+    paRenderBtns();
+    if(promoDetId===promoId) paStat(paFailText(code, detail), true);
+  }
+  function paApply(promoId){
+    var p=promoFind(promoId), r=paResults[promoId];
+    if(!p || !r) return;
+    var tEl=document.getElementById("promoDetBlogTitle"), bEl=document.getElementById("promoDetBody");
+    paUndo={ promo:promoId, title:tEl.value, body:bEl.value };   // 예비 생성기 초안(또는 사람 편집분) 보관
+    tEl.value=r.title; bEl.value=r.body;
+    r.applied=true;
+    paRenderBtns(); renderPromo();
+    paStat("사진 기반 초안으로 바꿨습니다"+(r.used_tokens? " (토큰 "+r.used_tokens+")":"")+" — 내용을 확인하고 [검수 승인] 또는 [수정 후 재검수 요청]을 눌러야 저장됩니다.");
+  }
+  document.getElementById("promoContract").addEventListener("change", promoConNote);
+  document.getElementById("promoAiBtn").addEventListener("click", paGenerate);
+  document.getElementById("promoAiApplyBtn").addEventListener("click", function(){ if(promoDetId) paApply(promoDetId); });
+  document.getElementById("promoAiUndoBtn").addEventListener("click", function(){
+    if(!paUndo || paUndo.promo!==promoDetId) return;
+    document.getElementById("promoDetBlogTitle").value=paUndo.title;
+    document.getElementById("promoDetBody").value=paUndo.body;
+    if(paResults[promoDetId]) paResults[promoDetId].applied=false;
+    paUndo=null; paRenderBtns();
+    paStat("이전 초안으로 되돌렸습니다.");
   });
 
   // ---- 낙찰하한가 계산기 ----
