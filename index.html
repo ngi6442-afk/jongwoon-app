@@ -7948,7 +7948,18 @@
   var BID_STATUSES = [["new","신규"],["검토","검토"],["응찰","투찰"],["낙찰","낙찰"],["유찰","유찰"],["패스","패스"]];   // 값 "응찰"은 저장 데이터 호환용 유지, 표시만 나라장터 공식어 "투찰"(용어집 결정 D)
   // 단계 진행: 신규→검토→응찰→낙찰/유찰. 패스는 검토 전까지만.
   var BID_NEXT = { "new":[["검토","검토"],["패스","패스"]], "검토":[["응찰","투찰"],["패스","패스"]], "응찰":[["낙찰","낙찰"],["유찰","유찰"]] };
-  function bidSt(b){ return b.status==="참여" ? "응찰" : (b.status||"new"); }   // 구 '참여' 호환
+  function bidSt(b){ return b.status==="참여" ? "응찰" : (b.status||"new"); }
+  // 공고별 딥링크가 실제로 되는 출처인지 — 안 되는 곳은 '사이트↗'로 표시하고 번호복사를 붙인다.
+  // (수자원·한수원·포스코 전자조달은 SPA/로그인이라 URL이 공고를 가리키지 못한다 — 실측 2026-08-13)
+  var BID_NO_DEEPLINK = ["수자원공사","한수원","포스코"];
+  function bidHasDeepLink(b){ return BID_NO_DEEPLINK.indexOf(String(b.source||""))<0; }
+  // 공고번호 — 수집기가 no에 담고, 없으면 method 뒤쪽('계약방법·공고번호')에서 뽑는다.
+  function bidNoOf(b){
+    if(b.no) return String(b.no);
+    var m=String(b.method||"").split("·");
+    var last=m[m.length-1]||"";
+    return /^[A-Za-z0-9\-]{6,}$/.test(last.trim()) ? last.trim() : "";
+  }   // 구 '참여' 호환
   function findBid(id){ for(var i=0;i<bids.length;i++){ if(bids[i].id===id) return bids[i]; } return null; }
   // 연동 공고의 낙찰금액 — 계약 생성 시점에 개찰결과가 아직 없어 contract_info.amount=0으로 굳는 케이스의 폴백
   function conBidAmt(c){ if(!c||!c.bid_id) return 0; var b=findBid(c.bid_id); return (b&&b.result&&b.result.amt)||0; }
@@ -11000,7 +11011,15 @@
         if(BID_PREV[st]) ctrl+='<button class="mini-btn" data-bid-undo="'+b.id+'" title="'+BID_LABEL[BID_PREV[st]]+'(으)로 되돌리기">↩</button>';
         if(st==="낙찰") ctrl+='<button class="mini-btn appr-btn" data-bid-con="'+b.id+'">계약 시작</button>';
       }
-      if(b.url) ctrl+='<a class="mini-btn" href="'+esc(b.url)+'" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center;">원문↗</a>';
+      // 수자원공사·한수원·포스코는 전자조달이 WebSquare SPA/로그인 방식이라 공고별 딥링크가 없다
+      // (실측 2026-08-13: 상세를 열어도 URL이 index.xml 그대로). 이 경우 '원문'을 눌러도 홈만 열리므로
+      // 버튼 이름을 '사이트'로 바꾸고, 공고번호 복사 버튼을 붙여 검색창에 붙여넣게 한다.
+      if(b.url && bidHasDeepLink(b)) ctrl+='<a class="mini-btn" href="'+esc(b.url)+'" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center;">원문↗</a>';
+      else if(b.url){
+        ctrl+='<a class="mini-btn" href="'+esc(b.url)+'" target="_blank" rel="noopener" title="이 기관은 공고별 링크가 없어 사이트 홈으로 갑니다 — 공고번호를 복사해 검색하세요" style="text-decoration:none;display:inline-flex;align-items:center;">사이트↗</a>';
+        var bno=bidNoOf(b);
+        if(bno) ctrl+='<button class="mini-btn" data-bid-copyno="'+esc(bno)+'" title="공고번호 복사 → 사이트 검색창에 붙여넣기">번호복사</button>';
+      }
       var stChip = {"new":'<span class="review-chip">신규</span>',"검토":'<span class="scope-chip">검토</span>',"응찰":'<span class="from-chip">투찰</span>',"낙찰":'<span class="from-chip">낙찰 🏆</span>',"유찰":'<span class="hold-chip">유찰</span>',"패스":'<span class="hold-chip">패스</span>'}[st]||'';
       // 아코디언 상세(한빛입찰식): 입찰정보 / 금액정보 / 기관정보 / 공고서 — 4열 표
       var exp = !!bidExpanded[b.id];
@@ -11071,6 +11090,17 @@
     });
     Array.prototype.forEach.call(host.querySelectorAll("[data-bid-undo]"),function(el){
       el.addEventListener("click",function(e){ e.stopPropagation(); undoBidStatus(el.getAttribute("data-bid-undo")); });
+    });
+    // 공고번호 복사 — 딥링크가 없는 기관(수자원·한수원·포스코)에서 검색창에 붙여넣기용
+    Array.prototype.forEach.call(host.querySelectorAll("[data-bid-copyno]"),function(el){
+      el.addEventListener("click",function(e){
+        e.stopPropagation();
+        var no=el.getAttribute("data-bid-copyno")||"";
+        var done=function(){ var t=el.textContent; el.textContent="복사됨"; setTimeout(function(){ el.textContent=t; },1200); };
+        if(navigator.clipboard && navigator.clipboard.writeText){
+          navigator.clipboard.writeText(no).then(done,function(){ window.prompt("공고번호(복사하세요)", no); });
+        } else window.prompt("공고번호(복사하세요)", no);
+      });
     });
     Array.prototype.forEach.call(host.querySelectorAll("[data-bid-calc]"),function(el){
       el.addEventListener("click",function(){
