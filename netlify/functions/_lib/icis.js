@@ -715,41 +715,59 @@ async function runDaily(creds, targetDays, opts) {
       const dayMs = parseDateMs(day);
       if (dayMs === null) return fail('BAD_DAY', '날짜 형식 오류: ' + day);
       const shiftMs = dayMs - baseMs;
+      const dayNext = new Date(dayMs + 86400000).toISOString().slice(0, 10);
       const rec = { day: day, base: base, submitted: [], skipped: [] };
       days.push(rec);
       // 제출 모드에서만 그날 기제출 건을 미리 읽어 중복을 건너뛴다(조회 비용 아끼려 dry엔 생략).
       const already = dry ? new Set() : await filedKeys(S, day);
       if (already.size) log.push('[중복확인] ' + day + ' 기제출 ' + already.size + '건 — 겹치는 배차는 건너뜁니다');
+      let alreadyNext = null;   // T+1 이월분(00시 회전) 중복확인 — 필요할 때 1회만 조회
 
       for (const r of targets) {
-        const label = day + ' ' + shortLoc(r.from) + '→' + shortLoc(r.to) + ' [' + r.vhcle + ']';
         // 원본 제출본의 실제 값(시각·경로) 확보
         const ro = await readOrig(S, r.pre);
         if (!ro) return fail('BAD_ORIG', '원본 판독 실패(' + r.pre + '): 출발시각/경로 없음 — 중단');
-        // 같은 (차량, 출발 분)이 이미 그날 존재하면 건너뛴다 — 중복 제출 방지
-        const key = r.vhcle.replace(/ /g, '') + '|'
-          + shiftDt(String(ro.od.carerBeginDt).trim(), shiftMs).slice(0, 16);
-        if (already.has(key)) {
-          rec.skipped.push(label);
-          log.push('   건너뜀(기제출): ' + label);
-          continue;
+        const begRaw = String(ro.od.carerBeginDt).trim();
+
+        // 하루 단위 = 03시~익일 00시(PM 지시 2026-08-13, 5955 24시간 8회전 기준).
+        // 00시 회전은 대상일 T와 T+1 두 번 시도한다:
+        //   평시 — T의 00시는 어제 실행이 이미 냈으므로 중복확인이 건너뛰고, T+1 00시만 제출된다.
+        //   전환 첫날(8/14) — T(8/17)의 00시가 아직 없어 실제로 제출된다(다리). 전환 코드가 따로 없다.
+        const passes = [{ day: day, ms: shiftMs, set: already }];
+        if (begRaw.slice(11, 13) === '00') {
+          if (!dry && alreadyNext === null) {
+            alreadyNext = await filedKeys(S, dayNext);
+            if (alreadyNext.size) log.push('[중복확인] ' + dayNext + '(이월분) 기제출 ' + alreadyNext.size + '건');
+          }
+          passes.push({ day: dayNext, ms: shiftMs + 86400000, set: alreadyNext || new Set() });
         }
-        if (dry) {
-          rec.submitted.push({ sn: null, label: label, row: null });
-          log.push('[dry] ' + label);
-          continue;
+
+        for (const p of passes) {
+          const label = p.day + ' ' + shortLoc(r.from) + '→' + shortLoc(r.to) + ' [' + r.vhcle + ']';
+          // 같은 (차량, 출발 분)이 이미 그날 존재하면 건너뛴다 — 중복 제출 방지
+          const key = r.vhcle.replace(/ /g, '') + '|' + shiftDt(begRaw, p.ms).slice(0, 16);
+          if (p.set.has(key)) {
+            rec.skipped.push(label);
+            log.push('   건너뜀(기제출): ' + label);
+            continue;
+          }
+          if (dry) {
+            rec.submitted.push({ sn: null, label: label, row: null });
+            log.push('[dry] ' + label);
+            continue;
+          }
+          // 매 건마다 새 계획서 맥락 + 불러오기(첨부·행 sn 등 서버 상태는 복제본 것 유지)
+          const sn = await S.newDraft();
+          await S.copyFrom(sn, r.pre);
+          const baseVals = formValues(await S.view(sn));
+          const form = composeForm(baseVals, ro.orig, p.ms);
+          const done = await submitOne(S, sn, form);
+          if (done.code) return fail(done.code, label + ' — ' + done.detail);
+          rec.submitted.push({ sn: sn, label: label, row: done.row });
+          log.push('[제출] ' + label + ' (접수번호 ' + sn + ')');
+          log.push('      [접수확인] ' + done.row.slice(0, 110));
+          await sleep(1000); // 제출 1건마다 1초 대기
         }
-        // 매 건마다 새 계획서 맥락 + 불러오기(첨부·행 sn 등 서버 상태는 복제본 것 유지)
-        const sn = await S.newDraft();
-        await S.copyFrom(sn, r.pre);
-        const baseVals = formValues(await S.view(sn));
-        const form = composeForm(baseVals, ro.orig, shiftMs);
-        const done = await submitOne(S, sn, form);
-        if (done.code) return fail(done.code, label + ' — ' + done.detail);
-        rec.submitted.push({ sn: sn, label: label, row: done.row });
-        log.push('[제출] ' + label + ' (접수번호 ' + sn + ')');
-        log.push('      [접수확인] ' + done.row.slice(0, 110));
-        await sleep(1000); // 제출 1건마다 1초 대기
       }
     }
     return { ok: true, days: days, log: log };
