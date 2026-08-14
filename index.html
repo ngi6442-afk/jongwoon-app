@@ -1327,6 +1327,8 @@
     <input type="text" id="promoProblem" placeholder="예: 역류 / 침전물 퇴적 / 악취 민원" autocomplete="off">
     <span class="fld-label">수치 (선택)</span>
     <input type="text" id="promoMetric" placeholder="예: 침전물 3톤 / 관로 120m" autocomplete="off">
+    <label for="promoNote" style="display:block;margin-top:10px;font-size:13px;color:var(--sub);">현장 메모 (아는 대로 편하게 — 글 완성도가 크게 올라갑니다)</label>
+    <textarea id="promoNote" rows="4" placeholder="예: 가로수 낙엽이 주원인. 작년에도 같은 구간 민원 있었음. 관 입구까지 막혀서 물이 안 빠지는 상태였음. 담당자가 겨울에도 해야 하냐고 물어봄." style="width:100%;resize:vertical;"></textarea>
     <span class="fld-label">관련 계약 (선택)</span>
     <select id="promoContract"><option value="">선택 안 함</option></select>
     <div id="promoContractNote" style="display:none;font-size:12px;color:var(--sub);margin:-4px 2px 10px;">이 계약의 공종·시설 정보만 참고합니다. 금액·발주처는 전송되지 않습니다.</div>
@@ -10332,6 +10334,7 @@
     var facility=document.getElementById("promoFacility").value.trim();
     var problem=document.getElementById("promoProblem").value.trim();
     var metric=document.getElementById("promoMetric").value.trim();
+    var note=document.getElementById("promoNote").value.trim();
     if(!region||!facility||!problem){ stat.textContent="지역·시설·문제는 필수입니다."; return; }
     if(!promoUpload.photos.length){ stat.textContent="사진을 1장 이상 넣어주세요."; return; }
     var gen=promoNextGen(promoLastGen(promoLast()), livePromo().length, facility, problem);
@@ -10344,7 +10347,7 @@
     var conId=(conSel && PA_ID_RE.test(String(conSel.value||"")))? String(conSel.value) : "";
     var item={ id:genId("pr"), ts:Date.now(), by:getUser(), region:region,
       regionSrc:(document.getElementById("promoRegion").dataset.src==="gps"?"gps":"manual"),
-      facility:facility, problem:problem, metric:metric, contract_id:conId,
+      facility:facility, problem:problem, metric:metric, note:note, contract_id:conId,
       photos:promoUpload.photos.slice(), gps:promoUpload.gps, shot_at:promoUpload.shot||"", gen:gen,
       title:d.title, body:d.body, status:"review", note:"" };
     promoStamp(item);
@@ -10359,6 +10362,27 @@
   // 네이버를 프로그램이 조작하지 않는다 — 사람이 페이지를 복사해 사람이 붙여넣는 통상 사용.
   var PROMO_MARK_RE=/^\s*\[\s*사진\s*(\d+)\s*(?:[~\-–]\s*(\d+))?\s*(?::[^\]]*)?\]\s*$/;
   function promoEscHtml(s){ return String(s).replace(/[&<>]/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c]; }); }
+  // 글 꼬리 — 기존 자사 글에는 있는데 AI 글에는 빠져 있던 유입 장치(2026-08-14 실측 대조).
+  // 명함을 이미지로 올리면 검색엔진이 못 읽는다. 상호·주소·사업영역을 글자로 풀어 색인되게 한다.
+  // ※ 전화번호는 값을 확인한 뒤 PROMO_TEL에 넣는다. 비어 있으면 그 줄만 빠진다(빈칸·가짜번호 금지).
+  var PROMO_TEL = "";
+  var PROMO_SITE = "jongwoon.co.kr";
+  var PROMO_ORG = {
+    env:  { name:"(유)종운환경", addr:"경북 포항시 남구 서원재로 1", biz:"우수받이·맨홀·관로·집수정 준설, 폐기물 수집운반" },
+    con:  { name:"(주)종운건설", addr:"경북 포항시 남구 정몽주로 823-10", biz:"석면 해체·제거, 건축물 철거" }
+  };
+  function promoTailHtml(){
+    // 어느 회사 글인지는 본문이 정한다 — 석면·철거면 건설, 그 외는 환경(계약서 규칙과 동일)
+    var b=(document.getElementById("promoDetBody")||{}).value||"";
+    var o=/석면|철거|해체/.test(b) ? PROMO_ORG.con : PROMO_ORG.env;
+    var L=[];
+    L.push('<p style="margin:26px 0 6px;font-weight:700;">'+promoEscHtml(o.name)+'</p>');
+    L.push('<p style="margin:2px 0;">'+promoEscHtml(o.biz)+'</p>');
+    L.push('<p style="margin:2px 0;">'+promoEscHtml(o.addr)+'</p>');
+    if(PROMO_TEL) L.push('<p style="margin:2px 0;">문의 '+promoEscHtml(PROMO_TEL)+'</p>');
+    L.push('<p style="margin:2px 0;"><a href="https://'+PROMO_SITE+'">'+PROMO_SITE+'</a></p>');
+    return L.join("");
+  }
   function promoBuildPostHtml(title, body, imgs){
     // imgs[i] = {url,name} (i는 0-based, 마커 번호는 1-based)
     var used={}, out=[], lines=String(body||"").split(/\r?\n/);
@@ -10381,7 +10405,7 @@
     var rest=[];
     imgs.forEach(function(im,i){ if(!used[i]) rest.push(imgTag(i)); });
     if(rest.length) out.push('<p style="margin:18px 0 6px;color:#888;font-size:13px;">(본문 마커에 없던 사진 '+rest.length+'장)</p>', rest.join(""));
-    return '<h2 style="font-size:20px;margin:0 0 16px;">'+promoEscHtml(title)+'</h2>'+out.join("");
+    return '<h2 style="font-size:20px;margin:0 0 16px;">'+promoEscHtml(title)+'</h2>'+out.join("")+promoTailHtml();
   }
   function promoOpenPost(){
     var p=promoDetId? promoFind(promoDetId) : null; if(!p) return;
@@ -10419,11 +10443,19 @@
       var innerData = promoBuildPostHtml(title, body, got);
       var inner = innerWeb || innerData;
       var miss=0; got.forEach(function(g){ if(!g) miss++; });
+      // 태그 — 모델이 낸 tags(기록에 저장됨). 본문과 따로 두고 태그칸에 따로 붙여넣는다.
+      var tg=(p.tags&&p.tags.length)? p.tags : ((paResults[p.id]&&paResults[p.id].tags)||[]);
+      var tagBox = tg.length
+        ? '<div style="margin-top:22px;padding:12px 14px;border:1px solid #ddd;border-radius:8px;">'
+          +'<div style="font-size:13px;color:#555;margin-bottom:6px;">태그 '+tg.length+'개 — 네이버 태그칸에 붙여넣기</div>'
+          +'<textarea id="tags" readonly style="width:100%;height:56px;font:13px/1.5 ui-monospace,Consolas,monospace;">'
+          +promoEscHtml(tg.map(function(t){ return '#'+String(t).replace(/^#/,""); }).join(" "))+'</textarea>'
+          +'<button id="ct" style="margin-top:6px;font-size:13px;padding:6px 12px;border:1px solid #bbb;background:#fff;border-radius:6px;cursor:pointer;">태그 복사</button></div>'
+        : '<div style="margin-top:22px;font-size:13px;color:#8a6d1f;">태그가 없습니다 — [사진으로 다시 쓰기]로 새로 뽑으면 태그도 함께 생성됩니다.</div>';
       var head='<div id="bar" style="position:sticky;top:0;background:#fff;border-bottom:1px solid #ddd;padding:10px 0;margin-bottom:14px;">'
         +'<button id="cp" style="font-size:14px;padding:8px 14px;border:1px solid #1A9A6B;background:#1A9A6B;color:#fff;border-radius:6px;cursor:pointer;">전체 복사</button> '
         +'<button id="dl" style="font-size:14px;padding:8px 14px;border:1px solid #bbb;background:#fff;border-radius:6px;cursor:pointer;">문서로 저장(.doc)</button> '
-        +'<button id="hp" style="font-size:14px;padding:8px 14px;border:1px solid #1A9A6B;background:#fff;color:#1A9A6B;border-radius:6px;cursor:pointer;">도우미로 보내기</button> '
-        +(innerWeb? '<button id="sw" style="font-size:13px;padding:8px 12px;border:1px solid #bbb;background:#fff;border-radius:6px;cursor:pointer;">사진이 안 붙었다면 여기</button> ':'')
+                +(innerWeb? '<button id="sw" style="font-size:13px;padding:8px 12px;border:1px solid #bbb;background:#fff;border-radius:6px;cursor:pointer;">사진이 안 붙었다면 여기</button> ':'')
         +'<span id="msg" style="font-size:13px;color:#555;margin-left:8px;">[전체 복사] → 네이버 글쓰기에서 붙여넣기(Ctrl+V)</span>'
         +(miss? '<div style="color:#a5382c;font-size:13px;margin-top:6px;">사진 '+miss+'장을 불러오지 못했습니다 — 새로고침 후 다시 시도하세요.</div>':'')
         +(innerWeb? '':'<div style="color:#8a6d1f;font-size:13px;margin-top:6px;">공개 주소 발급에 실패해 내장 이미지로 만들었습니다 — 붙여넣기에서 사진이 빠지면 사진은 따로 올려주세요.</div>')
@@ -10432,7 +10464,7 @@
         w.document.open();
         w.document.write('<!doctype html><meta charset="utf-8"><title>'+promoEscHtml(title)+'</title>'
           +'<body style="font-family:\'Malgun Gothic\',sans-serif;max-width:760px;margin:0 auto;padding:16px;">'
-          +head+'<div id="post">'+inner+'</div></body>');
+          +head+'<div id="post">'+inner+'</div>'+tagBox+'</body>');
         w.document.close();
         var d=w.document;
         d.getElementById("cp").onclick=function(){
@@ -10451,25 +10483,11 @@
           a.download=(title||"블로그글").replace(/[\\\/:*?"<>|]/g,"_")+".doc";
           d.body.appendChild(a); a.click(); d.body.removeChild(a);
         };
-        // 도우미로 보내기 — 이 PC에서 도는 게시 도우미(127.0.0.1:8787)에 원고를 넘긴다.
-        // 도우미가 네이버 글쓰기에 붙여넣는 데까지 하고, 발행은 사람이 누른다.
-        d.getElementById("hp").onclick=function(){
-          var msg=d.getElementById("msg");
-          // 사진을 내장(base64)한 판은 수 MB라 전송이 사실상 멈춘다 — 공개 주소판(수십 KB)을 보낸다.
-          // 네이버도 주소에서 직접 가져가는 쪽을 잘 받으므로 붙여넣기 생존율도 이쪽이 높다.
-          var send = innerWeb || d.getElementById("post").innerHTML;
-          var heavy = !innerWeb;
-          msg.textContent = heavy ? "도우미로 보내는 중… (사진 내장판이라 시간이 걸립니다)" : "도우미로 보내는 중…";
-          var ctl = (typeof w.AbortController==="function") ? new w.AbortController() : null;
-          var to = w.setTimeout(function(){ if(ctl) ctl.abort(); }, 20000);   // 20초 넘으면 끊고 알린다(무한 대기 금지)
-          var opt = { method:"POST", headers:{"Content-Type":"application/json"},
-                      body: JSON.stringify({ title:title, html:send }) };
-          if(ctl) opt.signal = ctl.signal;
-          w.fetch("http://127.0.0.1:8787/post", opt)
-            .then(function(r){ return r.ok? r.json() : Promise.reject(); })
-            .then(function(){ w.clearTimeout(to); msg.textContent="도우미로 보냈습니다 — 도우미 창에서 [글쓰기 화면 열기] → 제목칸 클릭 → [제목 붙여넣기] → 본문 클릭 → [본문 붙여넣기]"; })
-            .catch(function(){ w.clearTimeout(to);
-              msg.textContent="도우미로 보내지 못했습니다. 도우미가 켜져 있는지 확인하세요. (안 되면 [전체 복사]로 직접 붙여넣기)"; });
+        var ctBtn=d.getElementById("ct");
+        if(ctBtn) ctBtn.onclick=function(){
+          var ta=d.getElementById("tags"); ta.focus(); ta.select();
+          var ok=false; try{ ok=d.execCommand("copy"); }catch(e){}
+          d.getElementById("msg").textContent = ok? "태그를 복사했습니다 — 네이버 태그칸에 붙여넣기." : "태그 복사 실패 — 태그 상자를 직접 드래그해 복사하세요.";
         };
         // 붙여넣기에서 사진이 빠졌을 때: 내장 이미지 판으로 바꿔 한 번 더 시도(두 방식 중 하나는 통한다)
         var swBtn=d.getElementById("sw");
@@ -10682,7 +10700,7 @@
     if(blob && blob.status==="done" && title && body){
       // warn = 서버가 붙인 규칙 위반 경고(분량 미달·마커 누락 등). 자동 적용 경로라 사람 눈에 보여야 한다.
       var wn=(blob.warn||r.warn||[]); if(!Array.isArray(wn)) wn=[];
-      paResults[promoId]={ title:title, body:body, used_tokens:r.used_tokens||blob.used_tokens||0, model:r.model||blob.model||"", warn:wn, applied:false };
+      paResults[promoId]={ title:title, body:body, tags:(Array.isArray(blob.tags)?blob.tags:(r.tags||[])), used_tokens:r.used_tokens||blob.used_tokens||0, model:r.model||blob.model||"", warn:wn, applied:false };
       paRenderBtns();
       // 화면이 그 기록을 열고 있으면 입력칸에 채우고, 아니면 기록 자체에 싣는다
       // (PM 확정 8/14: 검수는 앱이 아니라 게시 직전 화면에서 — 사람 조작 없이 초안이 완성돼 있어야 한다).
@@ -10714,6 +10732,7 @@
     if(!p.pre_ai) p.pre_ai={ title:String(p.title||""), body:String(p.body||"") };
     p.title=r.title; p.body=r.body;
     p.ai={ model:r.model||"", tokens:r.used_tokens||0, ts:Date.now() };
+    if(r.tags&&r.tags.length) p.tags=r.tags.slice(0,25);
     r.applied=true;
     promoStamp(p); schedulePromoSave(); renderPromo();
   }

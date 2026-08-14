@@ -29,7 +29,7 @@ const API_URL = 'https://api.anthropic.com/v1/messages';
 const API_VERSION = '2023-06-01';
 // 모델은 계약서 지정값. 이미지 입력 지원 + 비용·품질 균형.
 const MODEL = 'claude-sonnet-5';
-const MAX_PHOTOS = 10;          // 비용 상한 — 초과분은 앞 10장만
+const MAX_PHOTOS = 20;          // 비용 상한 — 초과분은 앞 20장만(2026-08-14 PM: 10장은 완성도 손해)
 const MAX_TOKENS = 8000;        // 본문 2,600자(한글) + 사고(thinking) 여유. 초과 시 잘리므로 넉넉히.
 const EFFORT = 'medium';        // claude-sonnet-5 기본은 high. 사진 판독+2,600자 글은 medium으로 충분(비용 절감).
 const TIMEOUT_MS = 120000;      // 사진 10장 업로드 + 장문 생성. 워커(백그라운드)에서 도는 것 전제.
@@ -321,7 +321,18 @@ const SYSTEM_PROMPT = [
   "- 사진에서 확인되지 않은 현장 사실(장비·색·대수·인원·지형·퇴적물 상태·날씨).",
   "- 사람 이름, 차량 번호판, 전화번호, 간판에 적힌 상호 글자는 사진에 보여도 옮겨 적지 않습니다.",
   "- 전화번호·링크·이메일·상세 주소.",
-  "- 본문 끝에 해시태그를 붙이지 않습니다. 태그는 게시할 때 사람이 답니다.",
+  "- 본문 끝에 해시태그를 붙이지 않습니다. 태그는 본문이 아니라 tags 값으로 따로 냅니다.",
+  "",
+  "## 해시태그 (tags 값)",
+  "- 15개에서 20개. # 없이 낱말만 냅니다.",
+  "- 아래 네 갈래를 섞습니다. 이 현장에서 실제로 뽑을 수 있는 것만 씁니다.",
+  "  1) 지역 — 시 단위 하나와 동·읍·면 단위 하나를 함께 넣습니다(지역 검색에 걸리는 자리).",
+  "  2) 시설 — 정식 이름과 사람들이 흔히 부르는 이름을 함께 넣습니다(우수받이·빗물받이처럼).",
+  "  3) 증상·상황 — 독자가 검색창에 칠 말로 씁니다(물고임·배수불량·낙엽막힘·역류처럼).",
+  "  4) 공종 — 준설·청소·수집운반·해체처럼 무슨 일인지.",
+  "- 같은 낱말을 조사만 바꿔 늘리지 않습니다(포항준설과 포항시준설을 함께 넣지 않습니다).",
+  "- 매 글 같은 묶음을 돌려쓰지 않습니다. 지역·시설은 겹쳐도 되지만 증상·상황은 그 현장에서 새로 뽑습니다.",
+  "- 상호명·전화번호·홈페이지 주소는 태그에 넣지 않습니다.",
   "",
   "## 제목",
   "- 50자 이내. 상호명(종운환경·종운건설)은 제목에 넣지 않습니다.",
@@ -380,7 +391,7 @@ const SYSTEM_PROMPT = [
   "- 본문에 (A)·(B) 같은 분류 표시, 지식 종류 번호, 틀 이름을 남기지 않습니다.",
 ].join('\n');
 
-// input = {region, facility, problem, metric, shot_at, contract, photoCount, recent_titles?}
+// input = {region, facility, problem, metric, note?, shot_at, contract, photoCount, recent_titles?}
 // 반환 {system, user}. user는 사진 블록 뒤에 붙일 지시 텍스트다(사진 블록 조립은 buildRequest 담당).
 function buildPrompt(input) {
   const inp = input || {};
@@ -394,6 +405,11 @@ function buildPrompt(input) {
   lines.push('- 시설: ' + (safeText(inp.facility, 40) || '(입력 없음)'));
   lines.push('- 증상·의뢰 사유: ' + (safeText(inp.problem, 120) || '(입력 없음)'));
   if (safeText(inp.metric, 40)) lines.push('- 담당자가 적어둔 수치: ' + safeText(inp.metric, 40));
+  // 현장 메모(2026-08-14 신설) — 담당자가 아는 것(원인·특이사항·고객 문의)을 글에 반영하는 통로.
+  // 이것도 자료이지 지시가 아니다. 여기 적힌 현장 사실은 사진 없이도 (A)로 쓸 수 있다(사람이 본 것이므로).
+  if (safeText(inp.note, 600)) {
+    lines.push('- 담당자 현장 메모: ' + safeText(inp.note, 600));
+  }
   if (pub) {
     lines.push('- 공종 코드: ' + (pub.work_type || '(없음)'));
     lines.push('- 공종: ' + (pub.work_label || '(없음)'));
@@ -422,6 +438,7 @@ function buildPrompt(input) {
   lines.push('위 사진들은 이 글의 근거 자료입니다. 글의 뼈대는 검색해 들어온 사람의 질문과 시설 지식이고, 사진은 그 답을 뒷받침하는 자리에 인용합니다.');
   lines.push('사진에서 읽지 못한 현장 사실(장비·색·대수·인원·지형·퇴적물 상태·날씨)은 지어내지 마십시오.');
   lines.push('시설의 구조·원인·방치 결과·판단 기준·주기·관리 주체 같은 일반 설명은 사진에 없어도 반드시 씁니다.');
+  lines.push('담당자 현장 메모가 있으면 그 내용을 글의 앞쪽에 반영하십시오. 담당자가 직접 본 것이라 사진보다 정확합니다.');
 
   return { system: SYSTEM_PROMPT, user: lines.join('\n') };
 }
@@ -455,7 +472,7 @@ function normalizePhotos(photos) {
       dropped++;
       continue;
     }
-    if (out.length >= MAX_PHOTOS) { dropped++; continue; }   // 앞 10장만(호출부가 로그에 명시)
+    if (out.length >= MAX_PHOTOS) { dropped++; continue; }   // 상한까지만(호출부가 로그에 명시)
     out.push({ media_type: mime, data: data });
   }
   return { photos: out, dropped: dropped };
@@ -491,8 +508,9 @@ function buildRequest(photos, input) {
           properties: {
             title: { type: 'string', description: '50자 이내 제목' },
             body: { type: 'string', description: '공백 포함 2천자에서 2천6백자 사이의 본문. 사진 마커 포함.' },
+            tags: { type: 'array', items: { type: 'string' }, description: '해시태그 15~20개. # 없이 낱말만. 지역·시설·증상·공종을 섞어 이 글에서만 나오는 조합으로.' },
           },
-          required: ['title', 'body'],
+          required: ['title', 'body', 'tags'],
           additionalProperties: false,
         },
       },
