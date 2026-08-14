@@ -1353,7 +1353,8 @@
       <button class="mini-btn" id="promoAiBtn" style="display:none;">✍ 사진으로 다시 쓰기</button>
       <button class="mini-btn" id="promoAiApplyBtn" style="display:none;">AI 초안 적용</button>
       <button class="mini-btn" id="promoAiUndoBtn" style="display:none;">되돌리기</button>
-      <button class="mini-btn" id="promoCopyBtn">📋 제목+본문 복사</button>
+      <button class="mini-btn" id="promoPostBtn">🖼 완성본 만들기 (사진까지 한 번에)</button>
+      <button class="mini-btn" id="promoCopyBtn">📋 글만 복사</button>
       <button class="primary" id="promoApproveBtn" style="display:none;">검수 승인</button>
       <button class="danger" id="promoRejectBtn" style="display:none;">반려</button>
       <button class="primary" id="promoPostedBtn" style="display:none;">블로그 게시 완료로 표시</button>
@@ -10353,6 +10354,94 @@
     schedulePromoSave(); renderPromo();
     document.getElementById("promoAddBackdrop").classList.remove("show");
   });
+  // ---- 완성본 한 장 (2026-08-14 PM 요구: 사진까지 배치된 결과물을 한 번에 복붙) ----
+  // 본문의 [사진 n~m : …] 마커 자리에 실제 사진을 끼워 렌더한 뒤, 통째로 복사하거나 문서로 저장한다.
+  // 네이버를 프로그램이 조작하지 않는다 — 사람이 페이지를 복사해 사람이 붙여넣는 통상 사용.
+  var PROMO_MARK_RE=/^\s*\[\s*사진\s*(\d+)\s*(?:[~\-–]\s*(\d+))?\s*(?::[^\]]*)?\]\s*$/;
+  function promoEscHtml(s){ return String(s).replace(/[&<>]/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c]; }); }
+  function promoBuildPostHtml(title, body, imgs){
+    // imgs[i] = {url,name} (i는 0-based, 마커 번호는 1-based)
+    var used={}, out=[], lines=String(body||"").split(/\r?\n/);
+    function imgTag(i){
+      var im=imgs[i]; if(!im) return "";
+      used[i]=1;
+      return '<p style="margin:14px 0;"><img src="'+im.url+'" alt="'+promoEscHtml(im.name||("사진 "+(i+1)))+'" style="max-width:100%;height:auto;display:block;"></p>';
+    }
+    lines.forEach(function(ln){
+      var m=ln.match(PROMO_MARK_RE);
+      if(m){
+        var a=parseInt(m[1],10), b=m[2]? parseInt(m[2],10) : a;
+        if(b<a){ var t=a; a=b; b=t; }
+        for(var n=a;n<=b;n++) out.push(imgTag(n-1));
+        return;
+      }
+      if(ln.trim()) out.push('<p style="margin:12px 0;line-height:1.8;">'+promoEscHtml(ln.trim())+'</p>');
+    });
+    // 마커에 안 잡힌 사진은 뒤에 붙인다(누락 방지 — 조용히 버리지 않는다)
+    var rest=[];
+    imgs.forEach(function(im,i){ if(!used[i]) rest.push(imgTag(i)); });
+    if(rest.length) out.push('<p style="margin:18px 0 6px;color:#888;font-size:13px;">(본문 마커에 없던 사진 '+rest.length+'장)</p>', rest.join(""));
+    return '<h2 style="font-size:20px;margin:0 0 16px;">'+promoEscHtml(title)+'</h2>'+out.join("");
+  }
+  function promoOpenPost(){
+    var p=promoDetId? promoFind(promoDetId) : null; if(!p) return;
+    var title=document.getElementById("promoDetBlogTitle").value||p.title||"";
+    var body=document.getElementById("promoDetBody").value||p.body||"";
+    var list=(p.photos||[]);
+    var w=window.open("","_blank");
+    if(!w){ document.getElementById("promoDetStat").textContent="팝업이 막혔습니다 — 이 사이트의 팝업 허용 후 다시 눌러주세요."; return; }
+    w.document.write('<!doctype html><meta charset="utf-8"><title>'+promoEscHtml(title)+'</title>'
+      +'<body style="font-family:\'Malgun Gothic\',sans-serif;max-width:760px;margin:0 auto;padding:16px;">'
+      +'<div id="s" style="padding:10px;background:#eef5f1;border-radius:8px;font-size:13px;">사진 '+list.length+'장 불러오는 중…</div></body>');
+    w.document.close();
+    var got=[];
+    var seq=Promise.resolve();
+    list.forEach(function(ph,i){
+      seq=seq.then(function(){
+        return gwCall("gw-data",{action:"att_get",id:ph.id}).then(function(res){
+          if(res.status===200&&res.body&&res.body.data){
+            got[i]={ url:"data:"+(res.body.type||"image/jpeg")+";base64,"+res.body.data, name:ph.name||"" };
+          }
+          try{ w.document.getElementById("s").textContent="사진 불러오는 중… "+(i+1)+"/"+list.length; }catch(e){}
+        }).catch(function(){});
+      });
+    });
+    seq.then(function(){
+      var inner=promoBuildPostHtml(title, body, got);
+      var miss=0; got.forEach(function(g){ if(!g) miss++; });
+      var head='<div id="bar" style="position:sticky;top:0;background:#fff;border-bottom:1px solid #ddd;padding:10px 0;margin-bottom:14px;">'
+        +'<button id="cp" style="font-size:14px;padding:8px 14px;border:1px solid #1A9A6B;background:#1A9A6B;color:#fff;border-radius:6px;cursor:pointer;">전체 복사</button> '
+        +'<button id="dl" style="font-size:14px;padding:8px 14px;border:1px solid #bbb;background:#fff;border-radius:6px;cursor:pointer;">문서로 저장(.doc)</button> '
+        +'<span id="msg" style="font-size:13px;color:#555;margin-left:8px;">[전체 복사] → 네이버 글쓰기에서 붙여넣기(Ctrl+V)</span>'
+        +(miss? '<div style="color:#a5382c;font-size:13px;margin-top:6px;">사진 '+miss+'장을 불러오지 못했습니다 — 새로고침 후 다시 시도하세요.</div>':'')
+        +'</div>';
+      try{
+        w.document.open();
+        w.document.write('<!doctype html><meta charset="utf-8"><title>'+promoEscHtml(title)+'</title>'
+          +'<body style="font-family:\'Malgun Gothic\',sans-serif;max-width:760px;margin:0 auto;padding:16px;">'
+          +head+'<div id="post">'+inner+'</div></body>');
+        w.document.close();
+        var d=w.document;
+        d.getElementById("cp").onclick=function(){
+          var r=d.createRange(); r.selectNodeContents(d.getElementById("post"));
+          var sel=w.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+          var ok=false; try{ ok=d.execCommand("copy"); }catch(e){}
+          d.getElementById("msg").textContent = ok
+            ? "복사됐습니다 — 네이버 글쓰기에서 Ctrl+V. 제목은 위 첫 줄을 제목칸에 따로 넣으세요."
+            : "복사 실패 — 본문을 직접 드래그해 Ctrl+C 하세요.";
+        };
+        d.getElementById("dl").onclick=function(){
+          var doc='<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">'
+            +'<head><meta charset="utf-8"></head><body>'+d.getElementById("post").innerHTML+'</body></html>';
+          var b=new Blob(["﻿"+doc],{type:"application/msword"});
+          var a=d.createElement("a"); a.href=URL.createObjectURL(b);
+          a.download=(title||"블로그글").replace(/[\\\/:*?"<>|]/g,"_")+".doc";
+          d.body.appendChild(a); a.click(); d.body.removeChild(a);
+        };
+      }catch(e){}
+    });
+  }
+  document.getElementById("promoPostBtn").addEventListener("click", promoOpenPost);
   document.getElementById("promoDetClose").addEventListener("click",function(){ document.getElementById("promoDetailBackdrop").classList.remove("show"); promoDetId=null; });
   document.getElementById("promoCopyBtn").addEventListener("click",function(){
     var t=document.getElementById("promoDetBlogTitle").value, b=document.getElementById("promoDetBody").value;
