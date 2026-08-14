@@ -10422,6 +10422,7 @@
       var head='<div id="bar" style="position:sticky;top:0;background:#fff;border-bottom:1px solid #ddd;padding:10px 0;margin-bottom:14px;">'
         +'<button id="cp" style="font-size:14px;padding:8px 14px;border:1px solid #1A9A6B;background:#1A9A6B;color:#fff;border-radius:6px;cursor:pointer;">전체 복사</button> '
         +'<button id="dl" style="font-size:14px;padding:8px 14px;border:1px solid #bbb;background:#fff;border-radius:6px;cursor:pointer;">문서로 저장(.doc)</button> '
+        +'<button id="hp" style="font-size:14px;padding:8px 14px;border:1px solid #1A9A6B;background:#fff;color:#1A9A6B;border-radius:6px;cursor:pointer;">도우미로 보내기</button> '
         +(innerWeb? '<button id="sw" style="font-size:13px;padding:8px 12px;border:1px solid #bbb;background:#fff;border-radius:6px;cursor:pointer;">사진이 안 붙었다면 여기</button> ':'')
         +'<span id="msg" style="font-size:13px;color:#555;margin-left:8px;">[전체 복사] → 네이버 글쓰기에서 붙여넣기(Ctrl+V)</span>'
         +(miss? '<div style="color:#a5382c;font-size:13px;margin-top:6px;">사진 '+miss+'장을 불러오지 못했습니다 — 새로고침 후 다시 시도하세요.</div>':'')
@@ -10449,6 +10450,17 @@
           var a=d.createElement("a"); a.href=URL.createObjectURL(b);
           a.download=(title||"블로그글").replace(/[\\\/:*?"<>|]/g,"_")+".doc";
           d.body.appendChild(a); a.click(); d.body.removeChild(a);
+        };
+        // 도우미로 보내기 — 이 PC에서 도는 게시 도우미(127.0.0.1:8787)에 원고를 넘긴다.
+        // 도우미가 네이버 글쓰기에 붙여넣는 데까지 하고, 발행은 사람이 누른다.
+        d.getElementById("hp").onclick=function(){
+          var msg=d.getElementById("msg");
+          msg.textContent="도우미로 보내는 중…";
+          var body=JSON.stringify({ title:title, html:d.getElementById("post").innerHTML });
+          w.fetch("http://127.0.0.1:8787/post",{method:"POST",headers:{"Content-Type":"application/json"},body:body})
+            .then(function(r){ return r.ok? r.json() : Promise.reject(); })
+            .then(function(){ msg.textContent="도우미로 보냈습니다 — 도우미 창에서 [글쓰기 화면 열기] → [본문 붙여넣기]"; })
+            .catch(function(){ msg.textContent="도우미가 실행 중이 아닙니다. 종운 블로그 도우미를 켠 뒤 다시 누르세요. (없으면 [전체 복사]로 직접 붙여넣기)"; });
         };
         // 붙여넣기에서 사진이 빠졌을 때: 내장 이미지 판으로 바꿔 한 번 더 시도(두 방식 중 하나는 통한다)
         var swBtn=d.getElementById("sw");
