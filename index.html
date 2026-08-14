@@ -8166,6 +8166,7 @@
   var paJob={ polling:false, id:"", promo:"", tries:0 };   // 동시에 1건만 생성(비용·혼선 방지)
   var paResults={};    // promo_id → 도착한 결과 {title,body,used_tokens,model,applied} — 사람이 저장하기 전까지 보관
   var paUndo=null;     // {promo,title,body} — AI 초안 적용 직전의 화면 내용(예비 생성기 초안) 복구용
+  var paAutoWait="";   // 기록 저장 완료를 기다렸다가 자동 생성할 promo id (PM 확정 8/14: 사진 올리면 버튼 없이 자동)
   function livePromo(){ return promoItems.filter(function(p){ return p && p.del!==1; }); }
   function promoLast(){ var l=livePromo().slice().sort(function(a,b){ return (b.ts||0)-(a.ts||0); }); return l[0]||null; }
 
@@ -10213,7 +10214,9 @@
     fetch(PROMO_API,{method:"PUT",headers:Object.assign({"Content-Type":"application/json"},ghHeaders()),body:JSON.stringify(payload)}).then(function(resp){
       if(resp.status===401) return;
       if(resp.status===409||resp.status===422){ return fetch(PROMO_API,{headers:ghHeaders()}).then(function(r){ return r.status===404?null:r.json(); }).then(function(j){ if(j){ var up={}; try{ up=JSON.parse(b64DecodeUnicode(j.content))||{}; }catch(e){} promoItems=mergePromo(promoItems,up.items||[]); promoSha=j.sha; } return doSavePromo(); }); }
-      return resp.json().then(function(json){ promoSha=json.content&&json.content.sha; promoPending=false; renderPromo(); });
+      return resp.json().then(function(json){ promoSha=json.content&&json.content.sha; promoPending=false; renderPromo();
+        if(paAutoWait){ var w=paAutoWait; paAutoWait=""; paKick(w, true); }   // 새 기록이 서버에 실린 뒤에만 자동 생성
+      });
     }).catch(function(){});
   }
 
@@ -10345,6 +10348,8 @@
       title:d.title, body:d.body, status:"review", note:"" };
     promoStamp(item);
     promoItems.push(item);
+    // 사진이 있으면 저장 완료 직후 사진AI 자동 실행 — 서버가 기록의 사진을 읽어야 하므로 저장이 먼저다(doSavePromo 성공 시 발화).
+    paAutoWait=item.id;
     schedulePromoSave(); renderPromo();
     document.getElementById("promoAddBackdrop").classList.remove("show");
   });
@@ -10473,7 +10478,7 @@
     var ap=document.getElementById("promoAiApplyBtn");
     if(ap) ap.style.display=(can && paResults[p.id] && !paResults[p.id].applied) ? "" : "none";
     var un=document.getElementById("promoAiUndoBtn");
-    if(un) un.style.display=(p && paUndo && paUndo.promo===p.id) ? "" : "none";
+    if(un) un.style.display=(p && ((paUndo && paUndo.promo===p.id) || (can && p.pre_ai))) ? "" : "none";   // 자동 적용분도 되돌릴 수 있게
     var nt=document.getElementById("promoAiNote");
     if(nt){
       var lbl=p? paContractLabel(p.contract_id) : "";
@@ -10483,6 +10488,27 @@
         : "사진과 이 기록의 지역·시설·문제만 보고 새로 씁니다. (기록 입력 때 관련 계약을 고르면 공종·시설 정보만 함께 참고합니다)");
     }
   }
+  // 생성 요청 본체 — 수동(버튼)·자동(기록 저장 직후) 공용. auto면 실패를 조용히 넘긴다(예비 초안이 이미 있고, 검수 화면 버튼으로 재시도 가능).
+  function paKick(promoId, auto){
+    var p=promoFind(promoId);
+    if(!p || !canDo("promo")) return;
+    if(paJob.polling){ if(!auto) paStat("이미 생성 중입니다. 끝난 뒤 다시 시도하세요.", true); return; }
+    if(!(p.photos||[]).length){ if(!auto) paStat("이 기록에 사진이 없습니다.", true); return; }
+    paJob={ polling:true, id:"", promo:p.id, tries:0 };   // 요청 중에도 버튼 잠금
+    if(promoDetId===p.id) paStat("사진으로 다시 쓰는 중… 최대 3분 걸립니다.");
+    paRenderBtns();
+    gwCall("gw-promo-ai", paBody(p.id, p.contract_id)).then(function(res){
+      if(res.status===401){ paJob.polling=false; paRenderBtns(); onSessionInvalid(); return; }
+      if(res.status===200 && res.body && res.body.ok && res.body.job){ paStartPoll(res.body.job, p.id); return; }
+      paJob.polling=false; paRenderBtns();
+      if(auto){ renderPromo(); return; }
+      if(res.status===404){ paStat("백엔드 함수(gw-promo-ai)가 아직 배포되지 않았습니다. 지금 초안(변형 생성기)을 그대로 쓰세요.", true); return; }
+      paStat(paFailText((res.body&&res.body.code)||"", (res.body&&res.body.error)||("HTTP "+res.status)), true);
+    }).catch(function(){
+      paJob.polling=false; paRenderBtns();
+      if(!auto) paStat("요청을 보내지 못했습니다(네트워크). 연결을 확인하고 다시 시도하세요.", true);
+    });
+  }
   function paGenerate(){
     var p=promoDetId? promoFind(promoDetId) : null;
     if(!p || !canDo("promo")) return;
@@ -10490,19 +10516,7 @@
     var n=(p.photos||[]).length;
     if(!n){ paStat("이 기록에 사진이 없습니다.", true); return; }
     if(!confirm("사진 "+Math.min(n,10)+"장을 보고 글을 새로 씁니다"+(n>10? " (비용 상한 — 앞 10장만)":"")+".\n\n지금 화면의 제목·본문은 [되돌리기]로 복구할 수 있고,\n[검수 승인] 또는 [수정 후 재검수 요청]을 눌러야 저장됩니다.\n\n계속할까요?")) return;
-    paJob={ polling:true, id:"", promo:p.id, tries:0 };   // 요청 중에도 버튼 잠금
-    paStat("사진으로 다시 쓰는 중… 최대 3분 걸립니다.");
-    paRenderBtns();
-    gwCall("gw-promo-ai", paBody(p.id, p.contract_id)).then(function(res){
-      if(res.status===401){ paJob.polling=false; paRenderBtns(); onSessionInvalid(); return; }
-      if(res.status===200 && res.body && res.body.ok && res.body.job){ paStartPoll(res.body.job, p.id); return; }
-      paJob.polling=false; paRenderBtns();
-      if(res.status===404){ paStat("백엔드 함수(gw-promo-ai)가 아직 배포되지 않았습니다. 지금 초안(변형 생성기)을 그대로 쓰세요.", true); return; }
-      paStat(paFailText((res.body&&res.body.code)||"", (res.body&&res.body.error)||("HTTP "+res.status)), true);
-    }).catch(function(){
-      paJob.polling=false; paRenderBtns();
-      paStat("요청을 보내지 못했습니다(네트워크). 연결을 확인하고 다시 시도하세요.", true);
-    });
+    paKick(p.id, false);
   }
   function paStartPoll(jobId, promoId){
     paJob={ polling:true, id:jobId, promo:promoId, tries:0 };
@@ -10535,9 +10549,10 @@
     if(blob && blob.status==="done" && title && body){
       paResults[promoId]={ title:title, body:body, used_tokens:r.used_tokens||blob.used_tokens||0, model:r.model||blob.model||"", applied:false };
       paRenderBtns();
-      // 화면이 그 기록을 열고 있으면 바로 채우고, 아니면 보드에 "AI 초안 도착"으로 남겨 둔다(비용 낭비 방지).
+      // 화면이 그 기록을 열고 있으면 입력칸에 채우고, 아니면 기록 자체에 싣는다
+      // (PM 확정 8/14: 검수는 앱이 아니라 게시 직전 화면에서 — 사람 조작 없이 초안이 완성돼 있어야 한다).
       if(promoDetId===promoId) paApply(promoId);
-      else renderPromo();
+      else paApplyToRecord(promoId);
       return;
     }
     var code=(r && r.code) || (blob && blob.code) || "";
@@ -10555,16 +10570,36 @@
     paRenderBtns(); renderPromo();
     paStat("사진 기반 초안으로 바꿨습니다"+(r.used_tokens? " (토큰 "+r.used_tokens+")":"")+" — 내용을 확인하고 [검수 승인] 또는 [수정 후 재검수 요청]을 눌러야 저장됩니다.");
   }
+  // 자동 생성 결과를 기록에 바로 싣는다 — 변형 생성기 초안은 pre_ai로 보존(검수 화면 [되돌리기]가 사용).
+  function paApplyToRecord(promoId){
+    var p=promoFind(promoId), r=paResults[promoId];
+    if(!p || !r || r.applied) return;
+    if(!p.pre_ai) p.pre_ai={ title:String(p.title||""), body:String(p.body||"") };
+    p.title=r.title; p.body=r.body;
+    p.ai={ model:r.model||"", tokens:r.used_tokens||0, ts:Date.now() };
+    r.applied=true;
+    promoStamp(p); schedulePromoSave(); renderPromo();
+  }
   document.getElementById("promoContract").addEventListener("change", promoConNote);
   document.getElementById("promoAiBtn").addEventListener("click", paGenerate);
   document.getElementById("promoAiApplyBtn").addEventListener("click", function(){ if(promoDetId) paApply(promoDetId); });
   document.getElementById("promoAiUndoBtn").addEventListener("click", function(){
-    if(!paUndo || paUndo.promo!==promoDetId) return;
-    document.getElementById("promoDetBlogTitle").value=paUndo.title;
-    document.getElementById("promoDetBody").value=paUndo.body;
-    if(paResults[promoDetId]) paResults[promoDetId].applied=false;
-    paUndo=null; paRenderBtns();
-    paStat("이전 초안으로 되돌렸습니다.");
+    if(paUndo && paUndo.promo===promoDetId){
+      document.getElementById("promoDetBlogTitle").value=paUndo.title;
+      document.getElementById("promoDetBody").value=paUndo.body;
+      if(paResults[promoDetId]) paResults[promoDetId].applied=false;
+      paUndo=null; paRenderBtns();
+      paStat("이전 초안으로 되돌렸습니다.");
+      return;
+    }
+    // 자동 적용분(pre_ai) 복구 — 입력칸만 되돌리고, 저장은 승인/재검수 버튼이 한다
+    var p=promoDetId? promoFind(promoDetId) : null;
+    if(p && p.pre_ai){
+      document.getElementById("promoDetBlogTitle").value=p.pre_ai.title;
+      document.getElementById("promoDetBody").value=p.pre_ai.body;
+      paRenderBtns();
+      paStat("변형 생성기 초안으로 되돌렸습니다 — [검수 승인] 또는 [수정 후 재검수 요청]을 눌러야 저장됩니다.");
+    }
   });
 
   // ---- 낙찰하한가 계산기 ----
