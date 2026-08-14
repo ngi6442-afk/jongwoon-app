@@ -10455,12 +10455,21 @@
         // 도우미가 네이버 글쓰기에 붙여넣는 데까지 하고, 발행은 사람이 누른다.
         d.getElementById("hp").onclick=function(){
           var msg=d.getElementById("msg");
-          msg.textContent="도우미로 보내는 중…";
-          var body=JSON.stringify({ title:title, html:d.getElementById("post").innerHTML });
-          w.fetch("http://127.0.0.1:8787/post",{method:"POST",headers:{"Content-Type":"application/json"},body:body})
+          // 사진을 내장(base64)한 판은 수 MB라 전송이 사실상 멈춘다 — 공개 주소판(수십 KB)을 보낸다.
+          // 네이버도 주소에서 직접 가져가는 쪽을 잘 받으므로 붙여넣기 생존율도 이쪽이 높다.
+          var send = innerWeb || d.getElementById("post").innerHTML;
+          var heavy = !innerWeb;
+          msg.textContent = heavy ? "도우미로 보내는 중… (사진 내장판이라 시간이 걸립니다)" : "도우미로 보내는 중…";
+          var ctl = (typeof w.AbortController==="function") ? new w.AbortController() : null;
+          var to = w.setTimeout(function(){ if(ctl) ctl.abort(); }, 20000);   // 20초 넘으면 끊고 알린다(무한 대기 금지)
+          var opt = { method:"POST", headers:{"Content-Type":"application/json"},
+                      body: JSON.stringify({ title:title, html:send }) };
+          if(ctl) opt.signal = ctl.signal;
+          w.fetch("http://127.0.0.1:8787/post", opt)
             .then(function(r){ return r.ok? r.json() : Promise.reject(); })
-            .then(function(){ msg.textContent="도우미로 보냈습니다 — 도우미 창에서 [글쓰기 화면 열기] → [본문 붙여넣기]"; })
-            .catch(function(){ msg.textContent="도우미가 실행 중이 아닙니다. 종운 블로그 도우미를 켠 뒤 다시 누르세요. (없으면 [전체 복사]로 직접 붙여넣기)"; });
+            .then(function(){ w.clearTimeout(to); msg.textContent="도우미로 보냈습니다 — 도우미 창에서 [글쓰기 화면 열기] → 제목칸 클릭 → [제목 붙여넣기] → 본문 클릭 → [본문 붙여넣기]"; })
+            .catch(function(){ w.clearTimeout(to);
+              msg.textContent="도우미로 보내지 못했습니다. 도우미가 켜져 있는지 확인하세요. (안 되면 [전체 복사]로 직접 붙여넣기)"; });
         };
         // 붙여넣기에서 사진이 빠졌을 때: 내장 이미지 판으로 바꿔 한 번 더 시도(두 방식 중 하나는 통한다)
         var swBtn=d.getElementById("sw");
