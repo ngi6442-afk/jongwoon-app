@@ -10394,8 +10394,14 @@
       +'<body style="font-family:\'Malgun Gothic\',sans-serif;max-width:760px;margin:0 auto;padding:16px;">'
       +'<div id="s" style="padding:10px;background:#eef5f1;border-radius:8px;font-size:13px;">사진 '+list.length+'장 불러오는 중…</div></body>');
     w.document.close();
-    var got=[];
-    var seq=Promise.resolve();
+    // 사진 주소는 두 벌을 만든다:
+    //   data URI = 인터넷 없이도 보이고 문서 저장에 강함. 단 에디터가 붙여넣기에서 버리는 일이 잦다.
+    //   공개 주소(gw-promo-img, 24시간·추측불가 토큰) = 붙여넣는 쪽이 직접 가져갈 수 있어 생존율이 높다.
+    // 기본은 공개 주소, 발급 실패하면 data URI로 자동 폴백. 창에서 버튼으로 전환도 가능.
+    var got=[], share="";
+    var seq=gwCall("gw-promo-img",{action:"share_make",promo_id:p.id}).then(function(res){
+      if(res.status===200&&res.body&&res.body.share) share=res.body.share;
+    }).catch(function(){});
     list.forEach(function(ph,i){
       seq=seq.then(function(){
         return gwCall("gw-data",{action:"att_get",id:ph.id}).then(function(res){
@@ -10407,13 +10413,19 @@
       });
     });
     seq.then(function(){
-      var inner=promoBuildPostHtml(title, body, got);
+      var base=(location.origin+location.pathname).replace(/\/[^\/]*$/,"")+"/.netlify/functions/gw-promo-img";
+      var webImgs=share? got.map(function(g,i){ return g? { url:base+"?s="+share+"&i="+i, name:g.name } : null; }) : null;
+      var innerWeb = webImgs? promoBuildPostHtml(title, body, webImgs) : "";
+      var innerData = promoBuildPostHtml(title, body, got);
+      var inner = innerWeb || innerData;
       var miss=0; got.forEach(function(g){ if(!g) miss++; });
       var head='<div id="bar" style="position:sticky;top:0;background:#fff;border-bottom:1px solid #ddd;padding:10px 0;margin-bottom:14px;">'
         +'<button id="cp" style="font-size:14px;padding:8px 14px;border:1px solid #1A9A6B;background:#1A9A6B;color:#fff;border-radius:6px;cursor:pointer;">전체 복사</button> '
         +'<button id="dl" style="font-size:14px;padding:8px 14px;border:1px solid #bbb;background:#fff;border-radius:6px;cursor:pointer;">문서로 저장(.doc)</button> '
+        +(innerWeb? '<button id="sw" style="font-size:13px;padding:8px 12px;border:1px solid #bbb;background:#fff;border-radius:6px;cursor:pointer;">사진이 안 붙었다면 여기</button> ':'')
         +'<span id="msg" style="font-size:13px;color:#555;margin-left:8px;">[전체 복사] → 네이버 글쓰기에서 붙여넣기(Ctrl+V)</span>'
         +(miss? '<div style="color:#a5382c;font-size:13px;margin-top:6px;">사진 '+miss+'장을 불러오지 못했습니다 — 새로고침 후 다시 시도하세요.</div>':'')
+        +(innerWeb? '':'<div style="color:#8a6d1f;font-size:13px;margin-top:6px;">공개 주소 발급에 실패해 내장 이미지로 만들었습니다 — 붙여넣기에서 사진이 빠지면 사진은 따로 올려주세요.</div>')
         +'</div>';
       try{
         w.document.open();
@@ -10438,6 +10450,17 @@
           a.download=(title||"블로그글").replace(/[\\\/:*?"<>|]/g,"_")+".doc";
           d.body.appendChild(a); a.click(); d.body.removeChild(a);
         };
+        // 붙여넣기에서 사진이 빠졌을 때: 내장 이미지 판으로 바꿔 한 번 더 시도(두 방식 중 하나는 통한다)
+        var swBtn=d.getElementById("sw");
+        if(swBtn){
+          var onWeb=true;
+          swBtn.onclick=function(){
+            onWeb=!onWeb;
+            d.getElementById("post").innerHTML = onWeb? innerWeb : innerData;
+            swBtn.textContent = onWeb? "사진이 안 붙었다면 여기" : "원래 방식으로";
+            d.getElementById("msg").textContent = (onWeb? "공개 주소 방식" : "내장 이미지 방식")+"으로 바꿨습니다 — [전체 복사] 다시 누르고 붙여넣어 보세요.";
+          };
+        }
       }catch(e){}
     });
   }
