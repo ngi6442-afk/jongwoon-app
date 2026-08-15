@@ -368,7 +368,9 @@ const SYSTEM_PROMPT = [
   "- 마커 다음 문장으로 사진을 묘사하지 않습니다. 그 자리에는 그것이 무슨 작업이고 왜 그렇게 하는지를 씁니다. [무엇을 한다] 한 문장 + [왜 그렇게 한다] 한 문장이 기본 꼴입니다.",
   "- 마커와 마커 사이에는 사진과 무관한 지식 덩어리를 최소 하나 둡니다.",
   "- 도입부와 마무리(시기·신호·관리 주체)에는 마커를 넣지 않습니다.",
-  "- 글의 순서는 사진 번호가 정하지 않습니다. 먼저 질문 순서로 답의 순서를 정하고, 각 답에 어울리는 사진 구간을 배정한 뒤, 배정이 오름차순이 되도록 그룹의 경계만 조정합니다. 답의 순서를 사진에 맞춰 바꾸지 않습니다.",
+  "- 사진 배치 순서는 번호 순서가 아니라 독자가 현장을 따라가는 순서입니다. 장면 그룹을 이 차례로 배열합니다: 증상·현장 상태 → 안전조치·준비 → 뚜껑 개방·내부 확인 → 본작업 → 마무리·정리. 안전조치 사진이 본작업 사진보다 뒤에 오면 잘못 배치한 것입니다.",
+  "- 한 마커에는 한 장면만 담습니다. 차량 정차와 흡입 작업처럼 서로 다른 장면을 한 마커에 섞지 않습니다. 같은 장면을 여러 지점에서 찍어 번호가 떨어져 있어도(예: 8, 11, 14) 같은 마커에 묶는 것은 괜찮습니다.",
+  "- 글 틀(질문 순서)은 그대로 두되, 작업 과정을 다루는 소제목들의 순서만큼은 실제 작업 순서와 어긋나지 않게 잡습니다.",
   "",
   "## 입력이 부족할 때",
   "- 담당자가 주는 것은 보통 지역·시설·증상 세 값과 사진뿐입니다. 그것만으로 글이 성립하도록 (B)로 뼈대를 세웁니다.",
@@ -593,7 +595,7 @@ function parseDraft(text) {
 // 정규식·번호 해석은 클라이언트 index.html(PROMO_MARK_RE/PROMO_MARK_NB_RE/promoMarkNums)과
 // 자구까지 동일해야 한다(tools/uismoke.mjs가 대조). 콜론은 전각(：)도 받고 — parseDraft가
 // 이미 [:：]를 받는 이유와 같다 — 스펙은 숫자로 시작해야 마커다(번호 없는 줄 삼킴 방지).
-const RE_MARK_BR = /\[\s*사진\s*([0-9][0-9,\s~\-–·과번]*?)\s*(?:[:：][^\]]*)?\]/g;
+const RE_MARK_BR = /\[\s*사진\s*([0-9][0-9,\s~\-–·과번]*?)\s*(?:[:：]([^\]]*))?\]/g;
 const RE_MARK_NB = /^\s*[-*•]?\s*사진\s*([0-9][0-9,\s~\-–·과번]*?)\s*[:：](.*)$/;
 function pushSpec(spec, out) {
   // 한국어 나열(3과 4·3·4·4번)은 쉼표로 통일하고, 범위 주변 공백을 붙인 뒤("1 ~ 3"→"1~3")
@@ -644,10 +646,23 @@ function draftWarnings(draft, photoCount) {
 
   const used = {};
   let maxNo = 0;
+  const marks = [];   // 등장 순서대로 {nums, cap} — 순서·장면 검사가 설명 텍스트를 본다
   String(draft.body).split(/\r?\n/).forEach(function (ln) {
-    const nums = markerNums(ln);
-    if (!nums) return;
-    nums.forEach(function (k) { used[k] = (used[k] || 0) + 1; if (k > maxNo) maxNo = k; });
+    let found = false;
+    RE_MARK_BR.lastIndex = 0;
+    let m;
+    while ((m = RE_MARK_BR.exec(ln)) !== null) {
+      found = true;
+      const nums = []; pushSpec(m[1], nums);
+      marks.push({ nums: nums, cap: String(m[2] || '') });
+    }
+    if (!found) {
+      const nb = RE_MARK_NB.exec(ln);
+      if (nb) { const nums = []; pushSpec(nb[1], nums); marks.push({ nums: nums, cap: String(nb[2] || '') }); }
+    }
+  });
+  marks.forEach(function (mk) {
+    mk.nums.forEach(function (k) { used[k] = (used[k] || 0) + 1; if (k > maxNo) maxNo = k; });
   });
   if (!maxNo) w.push('사진 배치 마커가 없습니다');
   else {
@@ -658,6 +673,17 @@ function draftWarnings(draft, photoCount) {
     const dup = Object.keys(used).filter(function (k) { return used[k] > 1; });
     if (dup.length) w.push('중복 사용된 사진 번호: ' + dup.join(','));
   }
+  // 장면·순서 검사(2026-08-15 PM "순서가 이상해") — 기준은 자사 기존 게시글의 사진 배열
+  // (준비→작업→마무리, 8/14 전수 판독 실측). 마커 설명 낱말로만 보는 휴리스틱이라
+  // 차단이 아니라 사람 판단용 경고다. 프롬프트의 장면 순서 규칙과 같은 기준.
+  const RE_PREP = /안전|표지|라바콘|통제|준비|진입/;
+  const RE_WORK = /흡입|준설|작업|제거|해체|절단|세척|철거|투입/;
+  let workSeen = false;
+  marks.forEach(function (mk) {
+    if (mk.nums.length > 6) w.push('마커 한 개에 사진 ' + mk.nums.length + '장(' + mk.nums.join(',') + ') — 장면을 나눠야 합니다');
+    if (RE_WORK.test(mk.cap) && !RE_PREP.test(mk.cap)) { workSeen = true; return; }
+    if (RE_PREP.test(mk.cap) && workSeen) w.push('안전조치·준비 사진(' + mk.nums.join(',') + ')이 본작업 사진 뒤에 있습니다 — 작업 순서 역행');
+  });
   return w;
 }
 
