@@ -10404,7 +10404,7 @@
     // 마커에 안 잡힌 사진은 뒤에 붙인다(누락 방지 — 조용히 버리지 않는다)
     var rest=[];
     imgs.forEach(function(im,i){ if(!used[i]) rest.push(imgTag(i)); });
-    if(rest.length) out.push('<p style="margin:18px 0 6px;color:#888;font-size:13px;">(본문 마커에 없던 사진 '+rest.length+'장)</p>', rest.join(""));
+    if(rest.length) out.push('<p style="margin:18px 0 6px;color:#a5382c;font-size:13px;">⚠ 본문에 자리를 못 받은 사진 '+rest.length+'장 — 글 중간 알맞은 곳으로 옮기거나 [사진으로 다시 쓰기]로 새로 뽑으세요.</p>', rest.join(""));
     return '<h2 style="font-size:20px;margin:0 0 16px;">'+promoEscHtml(title)+'</h2>'+out.join("")+promoTailHtml();
   }
   function promoOpenPost(){
@@ -10553,7 +10553,7 @@
   // ⚠ 결과는 화면(입력칸)에만 채운다. 저장은 사람이 [검수 승인]·[수정 후 재검수 요청]을 눌러야 일어난다.
   // 기존 변형 생성기는 예비로 그대로 둔다 — API 미설정·실패 시 지금 초안이 그대로 쓰인다.
   var PA_ID_RE=/^[A-Za-z0-9_-]{1,40}$/;
-  var PA_MAX_PHOTOS=20;   // 서버 _lib/promoai.js MAX_PHOTOS와 같은 값으로 유지할 것(어긋나면 안내 문구만 거짓말을 한다)
+  var PA_MAX_PHOTOS=30;   // 서버 _lib/promoai.js MAX_PHOTOS와 같은 값으로 유지할 것(어긋나면 안내 문구만 거짓말을 한다)
   function paBody(promoId, contractId){
     // 값 두 개짜리 리터럴 고정. 객체 전개(Object.assign·스프레드)나 레코드 참조를 여기에 넣지 말 것.
     var b={ action:"pa_generate", promo_id:String(promoId||"") };
