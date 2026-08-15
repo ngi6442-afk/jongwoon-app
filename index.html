@@ -10360,7 +10360,27 @@
   // ---- 완성본 한 장 (2026-08-14 PM 요구: 사진까지 배치된 결과물을 한 번에 복붙) ----
   // 본문의 [사진 n~m : …] 마커 자리에 실제 사진을 끼워 렌더한 뒤, 통째로 복사하거나 문서로 저장한다.
   // 네이버를 프로그램이 조작하지 않는다 — 사람이 페이지를 복사해 사람이 붙여넣는 통상 사용.
-  var PROMO_MARK_RE=/^\s*\[\s*사진\s*(\d+)\s*(?:[~\-–]\s*(\d+))?\s*(?::[^\]]*)?\]\s*$/;
+  // 마커는 모델이 여러 형태로 쓴다: [사진 5] · [사진 1~3] · [사진 3, 4, 9] · [사진 1~3, 7].
+  // 범위 표기만 받던 파서가 쉼표 나열을 통째로 놓쳐 사진이 전부 꼬리로 밀린 사고가 있었다(2026-08-15).
+  // 그래서 번호 목록 전체를 문자열로 받아 promoMarkNums가 풀어낸다.
+  var PROMO_MARK_RE=/^\s*\[\s*사진\s*([0-9,\s~\-–]+?)\s*(?::[^\]]*)?\]\s*$/;
+  function promoMarkNums(spec){
+    var out=[], parts=String(spec||"").split(",");
+    for(var i=0;i<parts.length;i++){
+      var q=parts[i].replace(/\s+/g,"");
+      if(!q) continue;
+      var m=q.match(/^(\d+)[~\-–](\d+)$/);
+      if(m){
+        var a=parseInt(m[1],10), b=parseInt(m[2],10);
+        if(b<a){ var t=a; a=b; b=t; }
+        if(b-a>200) continue;                 // 오탈자 방어(예: 1~9999)
+        for(var n=a;n<=b;n++) out.push(n);
+        continue;
+      }
+      if(/^\d+$/.test(q)) out.push(parseInt(q,10));
+    }
+    return out;
+  }
   function promoEscHtml(s){ return String(s).replace(/[&<>]/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c]; }); }
   // 글 꼬리 — 기존 자사 글에는 있는데 AI 글에는 빠져 있던 유입 장치(2026-08-14 실측 대조).
   // 명함을 이미지로 올리면 검색엔진이 못 읽는다. 상호·주소·사업영역을 글자로 풀어 색인되게 한다.
@@ -10386,6 +10406,7 @@
   function promoBuildPostHtml(title, body, imgs){
     // imgs[i] = {url,name} (i는 0-based, 마커 번호는 1-based)
     var used={}, out=[], lines=String(body||"").split(/\r?\n/);
+    var lastImgAt=-1;   // 마지막으로 사진이 들어간 위치 — 남은 사진을 그 뒤에 이어 붙인다
     function imgTag(i){
       var im=imgs[i]; if(!im) return "";
       used[i]=1;
@@ -10394,9 +10415,19 @@
     lines.forEach(function(ln){
       var m=ln.match(PROMO_MARK_RE);
       if(m){
-        var a=parseInt(m[1],10), b=m[2]? parseInt(m[2],10) : a;
-        if(b<a){ var t=a; a=b; b=t; }
-        for(var n=a;n<=b;n++) out.push(imgTag(n-1));
+        var nums=promoMarkNums(m[1]);
+        if(nums.length){
+          var seen={};
+          for(var k=0;k<nums.length;k++){
+            var n=nums[k];
+            if(seen[n]) continue;             // 같은 마커 안 중복 번호는 한 번만
+            seen[n]=1;
+            var tag=imgTag(n-1);
+            if(tag){ out.push(tag); lastImgAt=out.length-1; }
+          }
+          return;
+        }
+        // 번호를 못 읽은 마커는 조용히 삼키지 않고 본문에서 지운다(빈 줄로 남김)
         return;
       }
       if(ln.trim()) out.push('<p style="margin:12px 0;line-height:1.8;">'+promoEscHtml(ln.trim())+'</p>');
@@ -10404,7 +10435,13 @@
     // 마커에 안 잡힌 사진은 뒤에 붙인다(누락 방지 — 조용히 버리지 않는다)
     var rest=[];
     imgs.forEach(function(im,i){ if(!used[i]) rest.push(imgTag(i)); });
-    if(rest.length) out.push('<p style="margin:18px 0 6px;color:#a5382c;font-size:13px;">⚠ 본문에 자리를 못 받은 사진 '+rest.length+'장 — 글 중간 알맞은 곳으로 옮기거나 [사진으로 다시 쓰기]로 새로 뽑으세요.</p>', rest.join(""));
+    // 남은 사진은 글 끝 무더기로 두지 않고 마지막 사진 묶음 바로 뒤에 이어 붙인다.
+    // 자리를 못 받았어도 본문 흐름 안에 있는 편이 낫고, 사람이 옮기기도 쉽다.
+    if(rest.length){
+      var note='<p style="margin:14px 0 6px;color:#a5382c;font-size:13px;">⚠ 자동 배치를 못 받아 여기에 이어 붙인 사진 '+rest.length+'장 — 알맞은 자리로 옮기거나 [사진으로 다시 쓰기]로 새로 뽑으세요.</p>';
+      if(lastImgAt>=0) out.splice(lastImgAt+1, 0, note, rest.join(""));
+      else out.push(note, rest.join(""));
+    }
     return '<h2 style="font-size:20px;margin:0 0 16px;">'+promoEscHtml(title)+'</h2>'+out.join("")+promoTailHtml();
   }
   function promoOpenPost(){
