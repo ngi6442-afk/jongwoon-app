@@ -542,6 +542,11 @@ function buildRequest(photos, input) {
   });
   content.push({ type: 'text', text: pr.user });
 
+  // 이 요청의 확정 분량을 스키마 설명에도 박는다 — 모델이 출력 직전에 읽는 자리라
+  // 일반 규칙보다 세게 먹힌다(분량 미달 반복 사고의 3중 방어: system 규칙·user 꼬리·여기).
+  const bb = bodyBounds(norm.photos.length);
+  const bodyDesc = '본문(사진 마커 포함). 공백 포함 ' + koNum(bb.min) + ' 자에서 ' + koNum(bb.max) + ' 자 사이(마커 줄 제외). 이보다 짧으면 안 됩니다.';
+
   return {
     model: MODEL,
     max_tokens: MAX_TOKENS,
@@ -555,7 +560,7 @@ function buildRequest(photos, input) {
           type: 'object',
           properties: {
             title: { type: 'string', description: '50자 이내 제목' },
-            body: { type: 'string', description: '본문(사진 마커 포함). 길이는 사진 한 장당 이백오십에서 삼백오십 자, 사진 일곱 장 이하면 2천자에서 2천6백자.' },
+            body: { type: 'string', description: bodyDesc },
             tags: { type: 'array', items: { type: 'string' }, description: '해시태그 15~20개. # 없이 낱말만. 지역·시설·증상·공종을 섞어 이 글에서만 나오는 조합으로.' },
           },
           required: ['title', 'body', 'tags'],
@@ -722,11 +727,13 @@ function draftWarnings(draft, photoCount) {
   let workSeen = false;
   marks.forEach(function (mk) {
     if (mk.nums.length > 2) w.push('마커 한 개에 사진 ' + mk.nums.length + '장(' + mk.nums.join(',') + ') — 한두 장씩 나눠야 합니다(상위 글 실측: 1장씩, 2장은 전후 비교만)');
-    // "준설 전 침전물"·"작업 후 내부" 같은 상태 캡션의 공정 낱말은 장면이 아니다 — 떼고 판정한다
-    // (이걸 안 떼면 "준설 전" 상태 컷이 본작업으로 잡혀 멀쩡한 순서에 역행 오탐이 났다. 2026-08-16 실물)
-    const cap = String(mk.cap).replace(/(준설|작업|세척|흡입|청소|해체|철거)\s*[전후]/g, '');
-    if (RE_WORK.test(cap) && !RE_PREP.test(cap)) { workSeen = true; return; }
-    if (RE_PREP.test(cap) && workSeen) w.push('안전조치·준비 사진(' + mk.nums.join(',') + ')이 본작업 사진 뒤에 있습니다 — 작업 순서 역행');
+    // 공정 낱말이 사물·장소·상태를 꾸미는 꼴은 장면이 아니다 — 떼고 판정한다. 실물 오탐 두 번:
+    // "준설 전 침전물"(상태)이 본작업으로, "준설차량이 정차"(사물)가 본작업으로 잡혀
+    // 멀쩡한 순서에 역행 경고가 났다(2026-08-16 1·2차). 안전+작업이 섞인 캡션은 판정 보류.
+    const cap = String(mk.cap).replace(/(준설|작업|세척|흡입|살수|청소|해체|철거)\s*(전|후|차량|차|지점|구간)/g, '');
+    const isWork = RE_WORK.test(cap), isPrep = RE_PREP.test(cap);
+    if (isWork && !isPrep) { workSeen = true; return; }
+    if (isPrep && !isWork && workSeen) w.push('안전조치·준비 사진(' + mk.nums.join(',') + ')이 본작업 사진 뒤에 있습니다 — 작업 순서 역행');
   });
   return w;
 }
