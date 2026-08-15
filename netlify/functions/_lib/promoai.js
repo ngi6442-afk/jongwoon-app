@@ -356,6 +356,7 @@ const SYSTEM_PROMPT = [
   "- 형식은 정확히 다음과 같습니다.",
   "    [사진 1~3 : 짧은 설명]",
   "  한 장이면 [사진 4 : 설명] 처럼 씁니다.",
+  "- 마커는 줄 하나를 통째로 차지합니다. 대괄호를 빼지 않고, 마커와 같은 줄에 본문 문장을 잇지 않습니다. 마커 앞뒤로 줄을 바꿉니다.",
   "- 번호는 실제로 받은 사진 번호입니다. 오름차순이고, 같은 번호를 두 번 쓰지 않으며, 마지막 사진 번호까지 모두 사용합니다.",
   "- 비슷한 장면은 한 마커로 묶습니다. 사진 한 장마다 문단을 만들지 않습니다.",
   "- 마커 개수는 사진 장수에 맞춥니다. 열 장 안팎이면 세 개에서 다섯 개, 스무 장이 넘으면 다섯 개에서 여덟 개로 늘립니다.",
@@ -585,16 +586,20 @@ function parseDraft(text) {
 }
 
 // 마커 줄 인식 — 클라이언트(index.html promoMarkNums)와 같은 문법을 봐야 경고가 사실이 된다.
-// 모델이 실제로 쓴 변형 전부: [사진 5] · [사진 1~3 : 설명] · [사진 3, 4, 9 : 설명] ·
-// 사진 8 : 설명(대괄호 생략 — 2026-08-15 실물). 대괄호 없는 꼴은 산문 오인 방지로 콜론을 요구한다.
-const RE_MARK_BR = /^\s*\[\s*사진\s*([0-9,\s~\-–]+?)\s*(?::[^\]]*)?\]\s*$/;
-const RE_MARK_NB = /^\s*사진\s*([0-9,\s~\-–]+?)\s*:.*$/;
-function markerNums(line) {
-  const m = RE_MARK_BR.exec(line) || RE_MARK_NB.exec(line);
-  if (!m) return null;
-  const out = [];
-  m[1].split(',').forEach(function (part) {
-    const q = part.replace(/\s+/g, '');
+// 모델이 실제로 쓴 변형 전부(2026-08-15 하루에 셋): [사진 3, 4, 9 : 설명](쉼표 나열) ·
+// 사진 8 : 설명(대괄호 생략) · [사진 3, 4, 9 : 설명] 격자 위로…(마커 뒤 같은 줄에 본문).
+// 대괄호 마커는 줄 안 어디에 몇 개가 있어도 전부 잡고, 대괄호 없는 꼴만
+// 산문("사진 2처럼 …") 오인 방지로 줄 전체+콜론을 요구한다.
+// 정규식·번호 해석은 클라이언트 index.html(PROMO_MARK_RE/PROMO_MARK_NB_RE/promoMarkNums)과
+// 자구까지 동일해야 한다(tools/uismoke.mjs가 대조). 콜론은 전각(：)도 받고 — parseDraft가
+// 이미 [:：]를 받는 이유와 같다 — 스펙은 숫자로 시작해야 마커다(번호 없는 줄 삼킴 방지).
+const RE_MARK_BR = /\[\s*사진\s*([0-9][0-9,\s~\-–·과번]*?)\s*(?:[:：][^\]]*)?\]/g;
+const RE_MARK_NB = /^\s*[-*•]?\s*사진\s*([0-9][0-9,\s~\-–·과번]*?)\s*[:：](.*)$/;
+function pushSpec(spec, out) {
+  // 한국어 나열(3과 4·3·4·4번)은 쉼표로 통일하고, 범위 주변 공백을 붙인 뒤("1 ~ 3"→"1~3")
+  // 공백도 쉼표와 같은 구분자로 본다 — 쉼표를 빠뜨린 "3 4 9"가 "349"로 합체되던 사고 방지.
+  const norm = String(spec || '').replace(/[·과]/g, ',').replace(/번/g, '').replace(/\s*([~\-–])\s*/g, '$1');
+  norm.split(/[,\s]+/).forEach(function (q) {
     if (!q) return;
     const r = /^(\d+)[~\-–](\d+)$/.exec(q);
     if (r) {
@@ -606,13 +611,32 @@ function markerNums(line) {
     }
     if (/^\d+$/.test(q)) out.push(+q);
   });
-  return out;
+}
+function markerNums(line) {
+  const s = String(line || '');
+  const out = [];
+  let found = false;
+  RE_MARK_BR.lastIndex = 0;
+  let m;
+  while ((m = RE_MARK_BR.exec(s)) !== null) { found = true; pushSpec(m[1], out); }
+  if (!found) {
+    const nb = RE_MARK_NB.exec(s);
+    if (nb) { found = true; pushSpec(nb[1], out); }
+  }
+  return found ? out : null;
 }
 
 // 검수 화면에 띄울 경고(실패가 아니라 사람 판단용).
 function draftWarnings(draft, photoCount) {
   const w = [];
-  const len = draft.body.replace(/\r/g, '').length;
+  // 글자수는 프롬프트 지시와 같은 기준(마커 제외)으로 센다 — 마커 포함으로 세면
+  // 지시를 정확히 지킨 글에 가짜 '초과' 경고가 뜬다(2026-08-15 수색 적발).
+  const len = String(draft.body).replace(/\r/g, '').split('\n').map(function (ln) {
+    RE_MARK_BR.lastIndex = 0;
+    const hasBr = RE_MARK_BR.test(ln);
+    if (!hasBr && RE_MARK_NB.test(ln)) return '';
+    return ln.replace(RE_MARK_BR, '');   // replace는 /g여도 항상 처음부터 훑는다(lastIndex 무관)
+  }).join('\n').length;
   if (len < BODY_MIN) w.push('본문 ' + len + '자 — 목표 ' + BODY_MIN + '자 미만');
   if (len > BODY_MAX + 200) w.push('본문 ' + len + '자 — 목표 ' + BODY_MAX + '자 초과');
   if (draft.title.length > 50) w.push('제목 ' + draft.title.length + '자 — 50자 초과');

@@ -10360,16 +10360,24 @@
   // ---- 완성본 한 장 (2026-08-14 PM 요구: 사진까지 배치된 결과물을 한 번에 복붙) ----
   // 본문의 [사진 n~m : …] 마커 자리에 실제 사진을 끼워 렌더한 뒤, 통째로 복사하거나 문서로 저장한다.
   // 네이버를 프로그램이 조작하지 않는다 — 사람이 페이지를 복사해 사람이 붙여넣는 통상 사용.
-  // 마커는 모델이 여러 형태로 쓴다: [사진 5] · [사진 1~3] · [사진 3, 4, 9] · 사진 8 : 설명(대괄호 생략).
-  // 범위 표기만 받던 파서가 쉼표 나열을 놓친 사고(2026-08-15 1차)에 이어, 같은 날 모델이 대괄호를
-  // 빼고 써서 또 전부 꼬리로 밀렸다(2차). 형식을 프롬프트로만 강제하는 건 두 번 실패했으므로
-  // 파서가 변형을 다 받는다. 대괄호 없는 꼴은 산문("사진 2처럼 …") 오인 방지로 콜론을 요구한다.
-  var PROMO_MARK_RE=/^\s*\[\s*사진\s*([0-9,\s~\-–]+?)\s*(?::[^\]]*)?\]\s*$/;
-  var PROMO_MARK_NB_RE=/^\s*사진\s*([0-9,\s~\-–]+?)\s*:.*$/;
+  // 마커는 모델이 매번 다른 형태로 쓴다: [사진 5] · [사진 1~3] · [사진 3, 4, 9] ·
+  // 사진 8 : 설명(대괄호 생략) · [사진 3, 4, 9 : 설명] 격자 위로…(마커 뒤 같은 줄에 본문).
+  // 쉼표 나열 놓침(1차) → 대괄호 생략(2차) → 줄 공유(3차, 전부 2026-08-15)로 세 번 전멸한 뒤의 결론:
+  // 형식을 프롬프트로 강제하는 건 계속 실패하니, 파서가 줄 안 어디에 있어도 대괄호 마커를 찾아내고
+  // 마커 앞뒤 글은 그대로 살린다. 대괄호 없는 꼴만 산문("사진 2처럼 …") 오인 방지로
+  // "줄 전체 + 콜론"을 요구한다.
+  // 정규식·번호 해석은 서버 promoai.js(RE_MARK_BR/RE_MARK_NB/pushSpec)와 자구까지 동일해야 한다(uismoke가 대조).
+  // 콜론은 전각(：)도 받는다 — 같은 모델이 제목 구분자로 전각 콜론을 낸 전력이 parseDraft에 박제돼 있다.
+  // 스펙은 숫자로 시작해야 마커다 — "사진 : 참고용" 같은 번호 없는 줄을 삼켜 조용히 지우는 사고 방지.
+  var PROMO_MARK_RE=/\[\s*사진\s*([0-9][0-9,\s~\-–·과번]*?)\s*(?:[:：][^\]]*)?\]/g;
+  var PROMO_MARK_NB_RE=/^\s*[-*•]?\s*사진\s*([0-9][0-9,\s~\-–·과번]*?)\s*[:：](.*)$/;
   function promoMarkNums(spec){
-    var out=[], parts=String(spec||"").split(",");
+    // 한국어 나열(3과 4·3·4·4번)은 쉼표로 통일하고, 범위 주변 공백을 붙인 뒤("1 ~ 3"→"1~3")
+    // 공백도 쉼표와 같은 구분자로 본다 — 쉼표를 빠뜨린 "3 4 9"가 "349"로 합체되던 사고 방지.
+    var norm=String(spec||"").replace(/[·과]/g,",").replace(/번/g,"").replace(/\s*([~\-–])\s*/g,"$1");
+    var out=[], parts=norm.split(/[,\s]+/);
     for(var i=0;i<parts.length;i++){
-      var q=parts[i].replace(/\s+/g,"");
+      var q=parts[i];
       if(!q) continue;
       var m=q.match(/^(\d+)[~\-–](\d+)$/);
       if(m){
@@ -10408,31 +10416,53 @@
   function promoBuildPostHtml(title, body, imgs){
     // imgs[i] = {url,name} (i는 0-based, 마커 번호는 1-based)
     var used={}, out=[], lines=String(body||"").split(/\r?\n/);
-    var lastImgAt=-1;   // 마지막으로 사진이 들어간 위치 — 남은 사진을 그 뒤에 이어 붙인다
+    var imgCount=0;     // 들어간 사진 수 — 줄 단위로 늘었는지 보고 고아 삽입점을 정한다
+    var orphanAt=-1;    // 남은 사진을 끼울 위치 — 마지막 사진이 든 "줄의 처리가 끝난 지점".
+                        // 사진 바로 뒤(lastImgAt+1)에 끼우면 마커와 같은 줄에 이어진 설명 문장이
+                        // 고아 무더기에 밀려 사진과 갈라진다(2026-08-15 리뷰 적발).
     function imgTag(i){
       var im=imgs[i]; if(!im) return "";
       used[i]=1;
       return '<p style="margin:14px 0;"><img src="'+im.url+'" alt="'+promoEscHtml(im.name||("사진 "+(i+1)))+'" style="max-width:100%;height:auto;display:block;"></p>';
     }
-    lines.forEach(function(ln){
-      var m=ln.match(PROMO_MARK_RE)||ln.match(PROMO_MARK_NB_RE);
-      if(m){
-        var nums=promoMarkNums(m[1]);
-        if(nums.length){
-          var seen={};
-          for(var k=0;k<nums.length;k++){
-            var n=nums[k];
-            if(seen[n]) continue;             // 같은 마커 안 중복 번호는 한 번만
-            seen[n]=1;
-            var tag=imgTag(n-1);
-            if(tag){ out.push(tag); lastImgAt=out.length-1; }
-          }
-          return;
-        }
-        // 번호를 못 읽은 마커는 조용히 삼키지 않고 본문에서 지운다(빈 줄로 남김)
+    function pushText(t){ t=String(t||"").trim(); if(t) out.push('<p style="margin:12px 0;line-height:1.8;">'+promoEscHtml(t)+'</p>'); }
+    function pushNums(nums){
+      var seen={};
+      for(var k=0;k<nums.length;k++){
+        var n=nums[k];
+        if(seen[n]) continue;               // 같은 마커 안 중복 번호는 한 번만
+        seen[n]=1;
+        var tag=imgTag(n-1);
+        if(tag){ out.push(tag); imgCount++; }
+      }
+    }
+    function handleLine(ln){
+      // 대괄호 마커 — 줄 안 어디에 있어도, 몇 개가 있어도 그 자리마다 사진을 끼우고 앞뒤 글은 살린다
+      PROMO_MARK_RE.lastIndex=0;
+      var m, idx=0, any=false;
+      while((m=PROMO_MARK_RE.exec(ln))){
+        any=true;
+        pushText(ln.slice(idx,m.index));
+        pushNums(promoMarkNums(m[1]));
+        idx=m.index+m[0].length;
+      }
+      if(any){ pushText(ln.slice(idx)); return; }
+      // 대괄호 없는 마커 — 산문 오인을 막기 위해 줄 전체가 마커 꼴일 때만
+      var nb=ln.match(PROMO_MARK_NB_RE);
+      if(nb){
+        pushNums(promoMarkNums(nb[1]));
+        // 콜론 뒤는 원래 설명이지만, 모델이 설명에 이어 본문 문장을 붙이기도 한다.
+        // 첫 마침표까지만 설명으로 보고 그 뒤는 본문으로 살린다 — 문장이 통째로 증발하는 사고 방지.
+        var tail=String(nb[2]||""), dot=tail.indexOf(".");
+        if(dot>=0 && dot<tail.length-1) pushText(tail.slice(dot+1));
         return;
       }
-      if(ln.trim()) out.push('<p style="margin:12px 0;line-height:1.8;">'+promoEscHtml(ln.trim())+'</p>');
+      pushText(ln);
+    }
+    lines.forEach(function(ln){
+      var before=imgCount;
+      handleLine(ln);
+      if(imgCount>before) orphanAt=out.length;   // 이 줄에서 사진이 들어갔다 — 줄 끝(설명 문장 포함) 뒤가 삽입점
     });
     // 마커에 안 잡힌 사진은 뒤에 붙인다(누락 방지 — 조용히 버리지 않는다)
     var rest=[];
@@ -10441,7 +10471,7 @@
     // 자리를 못 받았어도 본문 흐름 안에 있는 편이 낫고, 사람이 옮기기도 쉽다.
     if(rest.length){
       var note='<p style="margin:14px 0 6px;color:#a5382c;font-size:13px;">⚠ 자동 배치를 못 받아 여기에 이어 붙인 사진 '+rest.length+'장 — 알맞은 자리로 옮기거나 [사진으로 다시 쓰기]로 새로 뽑으세요.</p>';
-      if(lastImgAt>=0) out.splice(lastImgAt+1, 0, note, rest.join(""));
+      if(orphanAt>=0) out.splice(orphanAt, 0, note, rest.join(""));
       else out.push(note, rest.join(""));
     }
     return '<h2 style="font-size:20px;margin:0 0 16px;">'+promoEscHtml(title)+'</h2>'+out.join("")+promoTailHtml();

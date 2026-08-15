@@ -112,6 +112,17 @@ try {
     `라이브러리 ${nLib} / 워커 ${nWk} / 화면 ${nUi} / 디스패처 ${nDsp} — 네 값이 같아야 모델이 전부 받는다`);
   T('사진 장수를 화면에 하드코딩하지 않음', !/앞 10장만|Math\.min\(n,\s*10\)/.test(idx),
     'index.html에 사진 장수가 숫자로 박혀 있다 — PA_MAX_PHOTOS를 쓸 것');
+
+  // 7a) 마커 문법 동률: 앱(PROMO_MARK_RE·PROMO_MARK_NB_RE) ↔ 서버(RE_MARK_BR·RE_MARK_NB).
+  //     서버 경고(draftWarnings)는 앱과 같은 문법을 봐야 사실을 말한다 — 마커 형식 3연속 변형
+  //     사고(2026-08-15) 때 두 벌을 손으로 맞췄는데, 한쪽만 고치는 편집을 여기서 잡는다.
+  const rx = (s, re) => { const m = s.match(re); return m ? m[1] : null; };
+  const cBr = rx(idx, /var PROMO_MARK_RE=(\/.+?\/g);/);
+  const cNb = rx(idx, /var PROMO_MARK_NB_RE=(\/.+?\/);/);
+  const sBr = rx(lib, /const RE_MARK_BR = (\/.+?\/g);/);
+  const sNb = rx(lib, /const RE_MARK_NB = (\/.+?\/);/);
+  T('마커 정규식 앱↔서버 동률', !!cBr && !!cNb && cBr === sBr && cNb === sNb,
+    `대괄호: 앱 ${cBr} vs 서버 ${sBr} / 무괄호: 앱 ${cNb} vs 서버 ${sNb}`);
 } catch (e) { console.log('  (사진 상한 대조 생략 — 파일 읽기 실패)'); }
 
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
