@@ -47,6 +47,28 @@ function bodyBounds(photoCount) {
   if (n <= 7) return { min: BODY_MIN, max: BODY_MAX };
   return { min: n * 250, max: n * 350 };
 }
+// 숫자 → 한자어 수사("사천오백"). 프롬프트에 아라비아 숫자를 쓰면 계약금액 차단(scrubPayload)과
+// 충돌해 생성이 통째로 막힌 전력이 있어(2026-08-14 실사고), 프롬프트행 숫자는 전부 이걸 거친다.
+function koNum(num) {
+  const n = Math.max(0, Math.floor(Number(num) || 0));
+  if (n === 0) return '영';
+  const D = ['', '일', '이', '삼', '사', '오', '육', '칠', '팔', '구'];
+  const U = ['', '십', '백', '천'];
+  const chunk = function (x) {
+    let s = '';
+    for (let p = 3; p >= 0; p--) {
+      const d = Math.floor(x / Math.pow(10, p)) % 10;
+      if (!d) continue;
+      s += (d === 1 && p > 0 ? '' : D[d]) + U[p];
+    }
+    return s;
+  };
+  const man = Math.floor(n / 10000), rest = n % 10000;
+  let out = '';
+  if (man) out += (man === 1 ? '' : chunk(man)) + '만';
+  if (rest) out += chunk(rest);
+  return out;
+}
 
 // 시설 키워드 사전 — facility_hint는 이 사전에 있는 단어만 나간다(원문 복사 금지).
 // 발주처를 특정할 수 있는 낱말(학교·유치원·시청·군청·사업소·공단…)은 일부러 뺐다.
@@ -457,6 +479,14 @@ function buildPrompt(input) {
   lines.push('사진에서 읽지 못한 현장 사실(장비·색·대수·인원·지형·퇴적물 상태·날씨)은 지어내지 마십시오.');
   lines.push('시설의 구조·원인·방치 결과·판단 기준·주기·관리 주체 같은 일반 설명은 사진에 없어도 반드시 씁니다.');
   lines.push('담당자 현장 메모가 있으면 그 내용을 글의 앞쪽에 반영하십시오. 담당자가 직접 본 것이라 사진보다 정확합니다.');
+  if (n > 0) {
+    // 이 요청의 실측 목표를 숫자로 확정해 마지막에 읽힌다 — 규칙만으로는 분량 미달·번호 누락이
+    // 반복됐다(2026-08-16 실물: 18장에 2,369자·2장 누락). 숫자는 koNum으로(계약금액 차단 충돌 방지).
+    const bb = bodyBounds(n);
+    lines.push('이번 글의 필수 조건 두 가지입니다.');
+    lines.push('하나. 사진 ' + koNum(n) + ' 장을 받았습니다. 1번부터 ' + koNum(n) + '번까지 한 장도 빠짐없이 마커에 넣으십시오. 마커 하나에 사진 한 장이 기본이고, 전후 비교나 연속 동작 짝일 때만 두 장입니다.');
+    lines.push('둘. 본문은 공백 포함 ' + koNum(bb.min) + ' 자에서 ' + koNum(bb.max) + ' 자 사이여야 합니다(마커 줄 제외). 짧으면 채우기 문장이 아니라 지식 덩어리를 늘려 채우십시오.');
+  }
 
   return { system: SYSTEM_PROMPT, user: lines.join('\n') };
 }
@@ -692,8 +722,11 @@ function draftWarnings(draft, photoCount) {
   let workSeen = false;
   marks.forEach(function (mk) {
     if (mk.nums.length > 2) w.push('마커 한 개에 사진 ' + mk.nums.length + '장(' + mk.nums.join(',') + ') — 한두 장씩 나눠야 합니다(상위 글 실측: 1장씩, 2장은 전후 비교만)');
-    if (RE_WORK.test(mk.cap) && !RE_PREP.test(mk.cap)) { workSeen = true; return; }
-    if (RE_PREP.test(mk.cap) && workSeen) w.push('안전조치·준비 사진(' + mk.nums.join(',') + ')이 본작업 사진 뒤에 있습니다 — 작업 순서 역행');
+    // "준설 전 침전물"·"작업 후 내부" 같은 상태 캡션의 공정 낱말은 장면이 아니다 — 떼고 판정한다
+    // (이걸 안 떼면 "준설 전" 상태 컷이 본작업으로 잡혀 멀쩡한 순서에 역행 오탐이 났다. 2026-08-16 실물)
+    const cap = String(mk.cap).replace(/(준설|작업|세척|흡입|청소|해체|철거)\s*[전후]/g, '');
+    if (RE_WORK.test(cap) && !RE_PREP.test(cap)) { workSeen = true; return; }
+    if (RE_PREP.test(cap) && workSeen) w.push('안전조치·준비 사진(' + mk.nums.join(',') + ')이 본작업 사진 뒤에 있습니다 — 작업 순서 역행');
   });
   return w;
 }
@@ -837,7 +870,7 @@ async function generateDraft(apiKey, photos, input, opts) {
 
 module.exports = {
   // 상수
-  MODEL, MAX_PHOTOS, MAX_TOKENS, BODY_MIN, BODY_MAX, bodyBounds, ALLOWED_MIME, SYSTEM_PROMPT,
+  MODEL, MAX_PHOTOS, MAX_TOKENS, BODY_MIN, BODY_MAX, bodyBounds, koNum, ALLOWED_MIME, SYSTEM_PROMPT,
   // 계약 차단(순수 함수 — 테스트 대상)
   contractPublicView, contractForbidden, scrubPayload,
   // 프롬프트·요청 조립(순수 함수 — 테스트 대상)
