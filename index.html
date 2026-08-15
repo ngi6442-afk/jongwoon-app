@@ -10553,6 +10553,7 @@
   // ⚠ 결과는 화면(입력칸)에만 채운다. 저장은 사람이 [검수 승인]·[수정 후 재검수 요청]을 눌러야 일어난다.
   // 기존 변형 생성기는 예비로 그대로 둔다 — API 미설정·실패 시 지금 초안이 그대로 쓰인다.
   var PA_ID_RE=/^[A-Za-z0-9_-]{1,40}$/;
+  var PA_MAX_PHOTOS=20;   // 서버 _lib/promoai.js MAX_PHOTOS와 같은 값으로 유지할 것(어긋나면 안내 문구만 거짓말을 한다)
   function paBody(promoId, contractId){
     // 값 두 개짜리 리터럴 고정. 객체 전개(Object.assign·스프레드)나 레코드 참조를 여기에 넣지 말 것.
     var b={ action:"pa_generate", promo_id:String(promoId||"") };
@@ -10666,7 +10667,8 @@
     if(paJob.polling){ paStat("이미 생성 중입니다. 끝난 뒤 다시 시도하세요.", true); return; }
     var n=(p.photos||[]).length;
     if(!n){ paStat("이 기록에 사진이 없습니다.", true); return; }
-    if(!confirm("사진 "+Math.min(n,10)+"장을 보고 글을 새로 씁니다"+(n>10? " (비용 상한 — 앞 10장만)":"")+".\n\n지금 화면의 제목·본문은 [되돌리기]로 복구할 수 있고,\n[검수 승인] 또는 [수정 후 재검수 요청]을 눌러야 저장됩니다.\n\n계속할까요?")) return;
+    // 상한은 서버(_lib/promoai.js MAX_PHOTOS)가 정한다. 여기 숫자를 따로 박으면 서버를 올려도 화면만 옛말을 한다(2026-08-14 사고).
+    if(!confirm("사진 "+Math.min(n,PA_MAX_PHOTOS)+"장을 보고 글을 새로 씁니다"+(n>PA_MAX_PHOTOS? " (비용 상한 — 앞 "+PA_MAX_PHOTOS+"장만)":"")+".\n\n지금 화면의 제목·본문은 [되돌리기]로 복구할 수 있고,\n[검수 승인] 또는 [수정 후 재검수 요청]을 눌러야 저장됩니다.\n\n계속할까요?")) return;
     paKick(p.id, false);
   }
   function paStartPoll(jobId, promoId){
