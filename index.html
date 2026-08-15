@@ -10737,7 +10737,7 @@
     var n=(p.photos||[]).length;
     if(!n){ paStat("이 기록에 사진이 없습니다.", true); return; }
     // 상한은 서버(_lib/promoai.js MAX_PHOTOS)가 정한다. 여기 숫자를 따로 박으면 서버를 올려도 화면만 옛말을 한다(2026-08-14 사고).
-    if(!confirm("사진 "+Math.min(n,PA_MAX_PHOTOS)+"장을 보고 글을 새로 씁니다"+(n>PA_MAX_PHOTOS? " (비용 상한 — 앞 "+PA_MAX_PHOTOS+"장만)":"")+".\n\n지금 화면의 제목·본문은 [되돌리기]로 복구할 수 있고,\n[검수 승인] 또는 [수정 후 재검수 요청]을 눌러야 저장됩니다.\n\n계속할까요?")) return;
+    if(!confirm("사진 "+Math.min(n,PA_MAX_PHOTOS)+"장을 보고 글을 새로 씁니다"+(n>PA_MAX_PHOTOS? " (비용 상한 — 앞 "+PA_MAX_PHOTOS+"장만)":"")+".\n\n결과는 기록에 바로 저장됩니다(새로고침해도 유지).\n지금 화면의 제목·본문은 [되돌리기]로 복구할 수 있습니다.\n\n계속할까요?")) return;
     paKick(p.id, false);
   }
   function paStartPoll(jobId, promoId){
@@ -10789,12 +10789,19 @@
     if(!p || !r) return;
     var tEl=document.getElementById("promoDetBlogTitle"), bEl=document.getElementById("promoDetBody");
     paUndo={ promo:promoId, title:tEl.value, body:bEl.value };   // 예비 생성기 초안(또는 사람 편집분) 보관
+    // 입력칸에만 채우면 새로고침에 유료 초안이 증발해 재생성 비용이 또 든다(2026-08-15 실사고).
+    // 자동 경로(paApplyToRecord)와 같게 기록에도 싣는다 — 이전 초안은 pre_ai·paUndo가 들고 있고 [되돌리기]가 복구한다.
+    if(!p.pre_ai) p.pre_ai={ title:String(p.title||""), body:String(p.body||"") };
+    p.title=r.title; p.body=r.body;
+    p.ai={ model:r.model||"", tokens:r.used_tokens||0, ts:Date.now() };
+    if(r.tags&&r.tags.length) p.tags=r.tags.slice(0,25);
     tEl.value=r.title; bEl.value=r.body;
     r.applied=true;
+    promoStamp(p); schedulePromoSave();
     paRenderBtns(); renderPromo();
-    paStat("사진 기반 초안으로 바꿨습니다"+(r.used_tokens? " (토큰 "+r.used_tokens+")":"")
+    paStat("사진 기반 초안으로 바꿔 저장했습니다"+(r.used_tokens? " (토큰 "+r.used_tokens+")":"")
       +((r.warn&&r.warn.length)? " · 점검: "+r.warn.join(" / ") : "")
-      +" — 내용을 확인하고 [검수 승인] 또는 [수정 후 재검수 요청]을 눌러야 저장됩니다.", !!(r.warn&&r.warn.length));
+      +" — [되돌리기]로 이전 초안을 복구할 수 있습니다.", !!(r.warn&&r.warn.length));
   }
   // 자동 생성 결과를 기록에 바로 싣는다 — 변형 생성기 초안은 pre_ai로 보존(검수 화면 [되돌리기]가 사용).
   function paApplyToRecord(promoId){
@@ -10811,22 +10818,25 @@
   document.getElementById("promoAiBtn").addEventListener("click", paGenerate);
   document.getElementById("promoAiApplyBtn").addEventListener("click", function(){ if(promoDetId) paApply(promoDetId); });
   document.getElementById("promoAiUndoBtn").addEventListener("click", function(){
-    if(paUndo && paUndo.promo===promoDetId){
-      document.getElementById("promoDetBlogTitle").value=paUndo.title;
-      document.getElementById("promoDetBody").value=paUndo.body;
-      if(paResults[promoDetId]) paResults[promoDetId].applied=false;
-      paUndo=null; paRenderBtns();
-      paStat("이전 초안으로 되돌렸습니다.");
-      return;
-    }
-    // 자동 적용분(pre_ai) 복구 — 입력칸만 되돌리고, 저장은 승인/재검수 버튼이 한다
+    // 복구도 저장까지 — 입력칸만 바꾸면 새로고침에 다시 AI판으로 돌아가 헛갈린다(적용이 저장되므로 대칭이어야 한다)
     var p=promoDetId? promoFind(promoDetId) : null;
-    if(p && p.pre_ai){
-      document.getElementById("promoDetBlogTitle").value=p.pre_ai.title;
-      document.getElementById("promoDetBody").value=p.pre_ai.body;
-      paRenderBtns();
-      paStat("변형 생성기 초안으로 되돌렸습니다 — [검수 승인] 또는 [수정 후 재검수 요청]을 눌러야 저장됩니다.");
+    if(!p) return;
+    var t=null, b=null, msg="";
+    if(paUndo && paUndo.promo===promoDetId){
+      t=paUndo.title; b=paUndo.body; paUndo=null;
+      if(paResults[promoDetId]) paResults[promoDetId].applied=false;
+      msg="이전 초안으로 되돌려 저장했습니다.";
+    } else if(p.pre_ai){
+      t=p.pre_ai.title; b=p.pre_ai.body;
+      msg="변형 생성기 초안으로 되돌려 저장했습니다.";
     }
+    if(t===null) return;
+    document.getElementById("promoDetBlogTitle").value=t;
+    document.getElementById("promoDetBody").value=b;
+    p.title=t; p.body=b;
+    promoStamp(p); schedulePromoSave();
+    paRenderBtns(); renderPromo();
+    paStat(msg);
   });
 
   // ---- 낙찰하한가 계산기 ----
