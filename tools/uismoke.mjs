@@ -95,17 +95,21 @@ try {
   console.log('  ℹ TESTLIST: 사람 테스트 미완 ' + un + '건 / 완료 ' + done + '건 — ' + (pend.length ? '미완 버전: ' + pend.slice(0, 12).join(' ') + (pend.length > 12 ? ' 외' : '') : '전부 완료'));
 } catch (e) { console.log('  (TESTLIST 읽기 실패)'); }
 
-// 7) 화면 안내 문구가 서버 상한과 어긋나지 않는지 — 서버를 올려놓고 화면만 옛말을 하던 사고 재발 방지(2026-08-14)
+// 7) 화면 안내 문구가 서버 상한과 어긋나지 않는지 — 서버를 올려놓고 화면만 옛말을 하던 사고 재발 방지(2026-08-14).
+//    디스패처(gw-promo-ai.js)가 빠져 있어 워커에 max_photos:10을 넘기는 바람에 상한을 30으로
+//    올리고도 모델이 앞 10장만 받던 실사고(2026-08-15)의 재발 방지 — 네 파일 전부 대조한다.
 try {
   const idx = readFileSync(join(ROOT, 'index.html'), 'utf8');
   const lib = readFileSync(join(ROOT, 'netlify/functions/_lib/promoai.js'), 'utf8');
   const wk = readFileSync(join(ROOT, 'netlify/functions/gw-promo-ai-run-background.js'), 'utf8');
+  const dsp = readFileSync(join(ROOT, 'netlify/functions/gw-promo-ai.js'), 'utf8');
   const num = (s, re) => { const m = s.match(re); return m ? parseInt(m[1], 10) : NaN; };
   const nLib = num(lib, /const MAX_PHOTOS = (\d+)/);
   const nWk = num(wk, /const MAX_PHOTOS = (\d+)/);
   const nUi = num(idx, /var PA_MAX_PHOTOS\s*=\s*(\d+)/);
-  T('사진 상한 일치(화면·라이브러리·워커)', nLib === nUi && nLib === nWk,
-    `라이브러리 ${nLib} / 워커 ${nWk} / 화면 ${nUi} — 세 값이 같아야 안내 문구가 사실이 된다`);
+  const nDsp = num(dsp, /const MAX_PHOTOS = (\d+)/);
+  T('사진 상한 일치(화면·라이브러리·워커·디스패처)', nLib === nUi && nLib === nWk && nLib === nDsp,
+    `라이브러리 ${nLib} / 워커 ${nWk} / 화면 ${nUi} / 디스패처 ${nDsp} — 네 값이 같아야 모델이 전부 받는다`);
   T('사진 장수를 화면에 하드코딩하지 않음', !/앞 10장만|Math\.min\(n,\s*10\)/.test(idx),
     'index.html에 사진 장수가 숫자로 박혀 있다 — PA_MAX_PHOTOS를 쓸 것');
 } catch (e) { console.log('  (사진 상한 대조 생략 — 파일 읽기 실패)'); }

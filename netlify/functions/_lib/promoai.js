@@ -574,12 +574,39 @@ function parseDraft(text) {
   try {
     const j = JSON.parse(s);
     if (j && typeof j.title === 'string' && typeof j.body === 'string') {
-      return { title: j.title.trim(), body: j.body.trim() };
+      // tags를 여기서 흘리면 스키마가 강제한 값이 그대로 증발한다 — "태그가 없습니다" 실사고(2026-08-15)
+      const tags = Array.isArray(j.tags) ? j.tags.filter(function (t) { return typeof t === 'string' && t.trim(); }) : [];
+      return { title: j.title.trim(), body: j.body.trim(), tags: tags };
     }
   } catch (e) { /* 아래 폴백 */ }
   const m = /^\s*(?:제목|title)\s*[:：]\s*(.+?)\s*\n([\s\S]+)$/i.exec(s);
-  if (m) return { title: m[1].trim(), body: m[2].trim() };
+  if (m) return { title: m[1].trim(), body: m[2].trim(), tags: [] };
   return null;
+}
+
+// 마커 줄 인식 — 클라이언트(index.html promoMarkNums)와 같은 문법을 봐야 경고가 사실이 된다.
+// 모델이 실제로 쓴 변형 전부: [사진 5] · [사진 1~3 : 설명] · [사진 3, 4, 9 : 설명] ·
+// 사진 8 : 설명(대괄호 생략 — 2026-08-15 실물). 대괄호 없는 꼴은 산문 오인 방지로 콜론을 요구한다.
+const RE_MARK_BR = /^\s*\[\s*사진\s*([0-9,\s~\-–]+?)\s*(?::[^\]]*)?\]\s*$/;
+const RE_MARK_NB = /^\s*사진\s*([0-9,\s~\-–]+?)\s*:.*$/;
+function markerNums(line) {
+  const m = RE_MARK_BR.exec(line) || RE_MARK_NB.exec(line);
+  if (!m) return null;
+  const out = [];
+  m[1].split(',').forEach(function (part) {
+    const q = part.replace(/\s+/g, '');
+    if (!q) return;
+    const r = /^(\d+)[~\-–](\d+)$/.exec(q);
+    if (r) {
+      let a = +r[1], b = +r[2];
+      if (b < a) { const t = a; a = b; b = t; }
+      if (b - a > 200) return;               // 오탈자 방어(예: 1~9999)
+      for (let n = a; n <= b; n++) out.push(n);
+      return;
+    }
+    if (/^\d+$/.test(q)) out.push(+q);
+  });
+  return out;
 }
 
 // 검수 화면에 띄울 경고(실패가 아니라 사람 판단용).
@@ -593,12 +620,11 @@ function draftWarnings(draft, photoCount) {
 
   const used = {};
   let maxNo = 0;
-  const re = /\[사진\s*(\d{1,2})\s*(?:~\s*(\d{1,2})\s*)?:/g;
-  let m;
-  while ((m = re.exec(draft.body)) !== null) {
-    const a = +m[1], b = m[2] ? +m[2] : +m[1];
-    for (let k = a; k <= b; k++) { used[k] = (used[k] || 0) + 1; if (k > maxNo) maxNo = k; }
-  }
+  String(draft.body).split(/\r?\n/).forEach(function (ln) {
+    const nums = markerNums(ln);
+    if (!nums) return;
+    nums.forEach(function (k) { used[k] = (used[k] || 0) + 1; if (k > maxNo) maxNo = k; });
+  });
   if (!maxNo) w.push('사진 배치 마커가 없습니다');
   else {
     if (maxNo > photoCount) w.push('사진 ' + photoCount + '장인데 마커가 ' + maxNo + '번까지 있습니다');
@@ -732,6 +758,7 @@ async function generateDraft(apiKey, photos, input, opts) {
       ok: true,
       title: draft.title,
       body: draft.body,
+      tags: draft.tags || [],
       used_tokens: used,
       model: (json && json.model) || MODEL,
       usage: {
@@ -756,7 +783,7 @@ module.exports = {
   buildPrompt, buildRequest, requestScrubView, wireBody, normalizePhotos,
   safeText, shotInfo, facilityHint, regionWide,
   // 응답 처리(순수 함수)
-  parseDraft, responseText, draftWarnings,
+  parseDraft, responseText, draftWarnings, markerNums,
   // 네트워크(테스트 금지 — 리뷰로만 검증)
   generateDraft, callApi,
 };
