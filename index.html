@@ -10470,7 +10470,8 @@
     // 남은 사진은 글 끝 무더기로 두지 않고 마지막 사진 묶음 바로 뒤에 이어 붙인다.
     // 자리를 못 받았어도 본문 흐름 안에 있는 편이 낫고, 사람이 옮기기도 쉽다.
     if(rest.length){
-      var note='<p style="margin:14px 0 6px;color:#a5382c;font-size:13px;">⚠ 자동 배치를 못 받아 여기에 이어 붙인 사진 '+rest.length+'장 — 알맞은 자리로 옮기거나 [사진으로 다시 쓰기]로 새로 뽑으세요.</p>';
+      // jw-nocopy: 화면 안내용 — [전체 복사]·[문서로 저장]에서는 빠진다(경고문이 네이버 게시글에 실리는 사고 방지)
+      var note='<p class="jw-nocopy" style="margin:14px 0 6px;color:#a5382c;font-size:13px;">⚠ 자동 배치를 못 받아 여기에 이어 붙인 사진 '+rest.length+'장 — 알맞은 자리로 옮기거나 [사진으로 다시 쓰기]로 새로 뽑으세요.</p>';
       if(orphanAt>=0) out.splice(orphanAt, 0, note, rest.join(""));
       else out.push(note, rest.join(""));
     }
@@ -10536,17 +10537,28 @@
           +head+'<div id="post">'+inner+'</div>'+tagBox+'</body>');
         w.document.close();
         var d=w.document;
+        // 화면 안내(.jw-nocopy — 고아 사진 경고 등)는 복사·저장 결과물에서 뺀다. 게시글에 경고문이 실리면 안 된다.
+        function withoutNotices(fn){
+          var nodes=[].slice.call(d.querySelectorAll(".jw-nocopy"));
+          var marks=nodes.map(function(n){ var ph=d.createComment("nc"); n.parentNode.replaceChild(ph,n); return {n:n,ph:ph}; });
+          try{ fn(); } finally { marks.forEach(function(m){ m.ph.parentNode.replaceChild(m.n,m.ph); }); }
+        }
         d.getElementById("cp").onclick=function(){
-          var r=d.createRange(); r.selectNodeContents(d.getElementById("post"));
-          var sel=w.getSelection(); sel.removeAllRanges(); sel.addRange(r);
-          var ok=false; try{ ok=d.execCommand("copy"); }catch(e){}
+          var ok=false;
+          withoutNotices(function(){
+            var r=d.createRange(); r.selectNodeContents(d.getElementById("post"));
+            var sel=w.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+            try{ ok=d.execCommand("copy"); }catch(e){}
+          });
           d.getElementById("msg").textContent = ok
             ? "복사됐습니다 — 네이버 글쓰기에서 Ctrl+V. 제목은 위 첫 줄을 제목칸에 따로 넣으세요."
             : "복사 실패 — 본문을 직접 드래그해 Ctrl+C 하세요.";
         };
         d.getElementById("dl").onclick=function(){
+          var cl=d.getElementById("post").cloneNode(true);
+          [].slice.call(cl.querySelectorAll(".jw-nocopy")).forEach(function(n){ n.parentNode.removeChild(n); });
           var doc='<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">'
-            +'<head><meta charset="utf-8"></head><body>'+d.getElementById("post").innerHTML+'</body></html>';
+            +'<head><meta charset="utf-8"></head><body>'+cl.innerHTML+'</body></html>';
           var b=new Blob(["﻿"+doc],{type:"application/msword"});
           var a=d.createElement("a"); a.href=URL.createObjectURL(b);
           a.download=(title||"블로그글").replace(/[\\\/:*?"<>|]/g,"_")+".doc";
