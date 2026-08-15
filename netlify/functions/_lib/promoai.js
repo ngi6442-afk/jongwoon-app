@@ -69,6 +69,16 @@ function koNum(num) {
   if (rest) out += chunk(rest);
   return out;
 }
+// 세는 자리(장·개) 전용 — "십팔 장"이 아니라 "열여덟 장"이 되게. 100 이상은 koNum으로 넘긴다.
+function koCount(num) {
+  const n = Math.max(0, Math.floor(Number(num) || 0));
+  if (n === 0) return '영';
+  if (n >= 100) return koNum(n);
+  if (n === 20) return '스무';
+  const NAT = ['', '한', '두', '세', '네', '다섯', '여섯', '일곱', '여덟', '아홉'];
+  const TENS = ['', '열', '스물', '서른', '마흔', '쉰', '예순', '일흔', '여든', '아흔'];
+  return TENS[Math.floor(n / 10)] + NAT[n % 10];
+}
 
 // 시설 키워드 사전 — facility_hint는 이 사전에 있는 단어만 나간다(원문 복사 금지).
 // 발주처를 특정할 수 있는 낱말(학교·유치원·시청·군청·사업소·공단…)은 일부러 뺐다.
@@ -281,9 +291,10 @@ const SYSTEM_PROMPT = [
   "(B)를 빼고 사진 묘사로 분량을 채운 글이 가장 나쁜 결과입니다.",
   "",
   "## 지식 덩어리 — 이 글의 뼈대",
-  "- (B)는 한곳에 몰지 않고 덩어리로 나눠 넣습니다. 덩어리 하나는 150~250자이고, 글 전체에 네 개 이상 여섯 개 이하로 둡니다.",
+  "- (B)는 한곳에 몰지 않고 덩어리로 나눠 넣습니다. 덩어리 하나는 150~250자입니다.",
+  "- 덩어리 개수는 사진 장수를 따라갑니다. 사진이 일곱 장 이하면 네 개에서 여섯 개, 그보다 많으면 사진 두세 장마다 한 개꼴로 늘립니다. 요청 끝의 필수 조건에 이번 글의 최소 개수가 옵니다.",
   "- 본문의 3분의 1 이상이 (B)여야 합니다.",
-  "- 아래 여덟 종류에서 골라 씁니다. 같은 종류를 두 번 쓰지 않습니다.",
+  "- 아래 여덟 종류에서 골라 씁니다. 여덟 종류를 다 쓰기 전에는 같은 종류를 되풀이하지 않고, 그 뒤로는 같은 종류라도 내용이 겹치지 않으면 더 써도 됩니다.",
   "  1) 구조·목적 — 그 시설이 무엇이고 어떻게 생겼고 왜 있는가",
   "  2) 원인 — 그 증상이 생기는 실제 경로",
   "  3) 방치 결과 — 그대로 두면 무엇이 따라오는가(악취·해충·결빙·역류·비산·오염 확산·작업 범위 확대 등 그 시설에 맞는 것)",
@@ -417,7 +428,7 @@ const SYSTEM_PROMPT = [
   "## 출력 전 자기 점검 (출력하기 전에 스스로 확인하고, 점검 결과는 출력하지 않습니다)",
   "1. 문단의 첫 문장이 사진 묘사인 곳이 있는가. 있으면 원리 문장으로 바꿉니다.",
   "2. 사진 마커를 전부 지워도 글이 답으로 성립하는가.",
-  "3. 지식 덩어리가 네 개 이상이고 본문의 3분의 1 이상인가. 전체 분량이 사진 한 장당 이백오십에서 삼백오십 자 기준에 맞는가(사진 일곱 장 이하면 2천자에서 2천6백자).",
+  "3. 지식 덩어리가 요청 끝 필수 조건의 개수 이상이고 본문의 3분의 1 이상인가. 전체 분량이 사진 한 장당 이백오십에서 삼백오십 자 기준에 맞는가(사진 일곱 장 이하면 2천자에서 2천6백자).",
   "4. 사진에서 확인되지 않은 현장 사실(장비·색·대수·인원·지형·퇴적물 상태·날씨)을 쓴 곳이 있는가. 있으면 지웁니다.",
   "5. 질문형 소제목이 세 개 이상이고 서로 다른 것을 묻는가.",
   "6. 금액·발주처·계약·입찰, 조문 번호·과태료 금액·기준 수치가 없는가. 마크다운 기호가 없는가.",
@@ -483,9 +494,15 @@ function buildPrompt(input) {
     // 이 요청의 실측 목표를 숫자로 확정해 마지막에 읽힌다 — 규칙만으로는 분량 미달·번호 누락이
     // 반복됐다(2026-08-16 실물: 18장에 2,369자·2장 누락). 숫자는 koNum으로(계약금액 차단 충돌 방지).
     const bb = bodyBounds(n);
-    lines.push('이번 글의 필수 조건 두 가지입니다.');
-    lines.push('하나. 사진 ' + koNum(n) + ' 장을 받았습니다. 1번부터 ' + koNum(n) + '번까지 한 장도 빠짐없이 마커에 넣으십시오. 마커 하나에 사진 한 장이 기본이고, 전후 비교나 연속 동작 짝일 때만 두 장입니다.');
-    lines.push('둘. 본문은 공백 포함 ' + koNum(bb.min) + ' 자에서 ' + koNum(bb.max) + ' 자 사이여야 합니다(마커 줄 제외). 짧으면 채우기 문장이 아니라 지식 덩어리를 늘려 채우십시오.');
+    // 분량은 글자 수 지시만으로 안 지켜진다(실측 3연속 미달) — 모델은 구조 개수에 복종하므로
+    // 분량을 구조 할당량(덩어리·소제목·사진당 문장 수)으로 번역해 함께 준다. 합이 목표에 이르는 산수:
+    // 도입 300 + 사진 n장×문단 130자 + 덩어리(n/2.5)개×200자 + 마무리 400 ≈ n×300.
+    const blocks = Math.max(4, Math.round(n / 2.5));
+    const heads = Math.max(3, Math.round(n / 3.5));
+    lines.push('이번 글의 필수 조건 세 가지입니다.');
+    lines.push('하나. 사진 ' + koCount(n) + ' 장을 받았습니다. 1번부터 ' + koNum(n) + '번까지 한 장도 빠짐없이 마커에 넣으십시오. 마커 하나에 사진 한 장이 기본이고, 전후 비교나 연속 동작 짝일 때만 두 장입니다.');
+    lines.push('둘. 지식 덩어리를 ' + koCount(blocks) + ' 개 이상, 질문형 소제목을 ' + koCount(heads) + ' 개 이상 두고, 사진 한 장마다 그 아래 본문 문단을 세 문장 이상 씁니다.');
+    lines.push('셋. 위 둘을 지키면 본문은 자연히 공백 포함 ' + koNum(bb.min) + ' 자에서 ' + koNum(bb.max) + ' 자 사이가 됩니다(마커 줄 제외). 이보다 짧으면 지식 덩어리가 모자란 것이니 더 넣으십시오.');
   }
 
   return { system: SYSTEM_PROMPT, user: lines.join('\n') };
@@ -553,7 +570,8 @@ function buildRequest(photos, input) {
     system: pr.system,
     // claude-sonnet-5: temperature/top_p/top_k는 거부된다. thinking은 생략 시 adaptive(기본).
     output_config: {
-      effort: EFFORT,
+      // 사진이 많은 요청(=긴 글 조립)은 high — 18장 구성을 medium으로 시키면 분량·전수 배치가 헐거워진다
+      effort: norm.photos.length > 7 ? 'high' : EFFORT,
       format: {
         type: 'json_schema',
         schema: {
@@ -877,7 +895,7 @@ async function generateDraft(apiKey, photos, input, opts) {
 
 module.exports = {
   // 상수
-  MODEL, MAX_PHOTOS, MAX_TOKENS, BODY_MIN, BODY_MAX, bodyBounds, koNum, ALLOWED_MIME, SYSTEM_PROMPT,
+  MODEL, MAX_PHOTOS, MAX_TOKENS, BODY_MIN, BODY_MAX, bodyBounds, koNum, koCount, ALLOWED_MIME, SYSTEM_PROMPT,
   // 계약 차단(순수 함수 — 테스트 대상)
   contractPublicView, contractForbidden, scrubPayload,
   // 프롬프트·요청 조립(순수 함수 — 테스트 대상)
