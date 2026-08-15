@@ -30,9 +30,12 @@ const API_VERSION = '2023-06-01';
 // 모델은 계약서 지정값. 이미지 입력 지원 + 비용·품질 균형.
 const MODEL = 'claude-sonnet-5';
 const MAX_PHOTOS = 30;          // 첨부분은 전부 모델이 보고 제자리에 배치해야 한다(2026-08-15 PM)
-const MAX_TOKENS = 16000;       // 본문이 사진 장수에 비례(30장≈9천 자) + 사고(thinking) 여유. 초과 시 잘리므로 넉넉히.
+const MAX_TOKENS = 24000;       // 본문이 사진 장수에 비례(30장≈9천 자≈1만 토큰) + high effort 사고(thinking)도
+                                // 이 상한 안에서 소비된다. 초과 시 잘리므로 넉넉히.
 const EFFORT = 'medium';        // claude-sonnet-5 기본은 high. 사진 판독+2,600자 글은 medium으로 충분(비용 절감).
-const TIMEOUT_MS = 120000;      // 사진 10장 업로드 + 장문 생성. 워커(백그라운드)에서 도는 것 전제.
+const TIMEOUT_MS = 600000;      // 10분. 사진 30장 + high effort + 9천 자 생성은 수 분 걸린다(2026-08-16 실사고:
+                                // 2분 컷에 잘려 "aborted" — 끊어도 서버 생성은 계속돼 요금만 나간다).
+                                // 워커(백그라운드 15분 상한)에서 도는 것 전제라 10분까지 안전.
 const RETRIES = 1;              // 계약서: 실패 시 재시도 1회
 
 const ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
@@ -785,7 +788,9 @@ async function callApi(apiKey, body, timeoutMs) {
     });
   } catch (e) {
     const aborted = e && (e.name === 'AbortError' || /abort/i.test(String(e.message || '')));
-    throw new ApiError(aborted ? 'TIMEOUT' : 'NETWORK', String((e && e.message) || e), true);
+    // TIMEOUT은 재시도하지 않는다 — 10분짜리를 한 번 더 돌리면 백그라운드 15분 상한을 뚫고,
+    // 끊긴 요청도 서버 생성은 계속돼 요금이 두 배로 나간다. NETWORK(즉시 실패)만 재시도.
+    throw new ApiError(aborted ? 'TIMEOUT' : 'NETWORK', String((e && e.message) || e), !aborted);
   } finally {
     clearTimeout(timer);
   }
