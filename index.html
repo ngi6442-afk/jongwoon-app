@@ -10426,15 +10426,19 @@
       return '<p style="margin:14px 0;"><img src="'+im.url+'" alt="'+promoEscHtml(im.name||("사진 "+(i+1)))+'" style="max-width:100%;height:auto;display:block;"></p>';
     }
     function pushText(t){ t=String(t||"").trim(); if(t) out.push('<p style="margin:12px 0;line-height:1.8;">'+promoEscHtml(t)+'</p>'); }
-    function pushNums(nums){
-      var seen={};
+    function pushNums(nums, cap){
+      var seen={}, any=false;
       for(var k=0;k<nums.length;k++){
         var n=nums[k];
         if(seen[n]) continue;               // 같은 마커 안 중복 번호는 한 번만
         seen[n]=1;
         var tag=imgTag(n-1);
-        if(tag){ out.push(tag); imgCount++; }
+        if(tag){ out.push(tag); imgCount++; any=true; }
       }
+      // 마커 설명은 버리지 않고 사진 밑 캡션으로 싣는다 — 네이버 공식 가이드(이미지 아래 부연 설명이
+      // 일반적)와 상위 노출 글 실측(서술형 캡션)에 맞춘 것(2026-08-16 외부조사).
+      cap=String(cap||"").trim();
+      if(any && cap) out.push('<p style="margin:-8px 0 14px;color:#777;font-size:13px;">'+promoEscHtml(cap)+'</p>');
     }
     function handleLine(ln){
       // 대괄호 마커 — 줄 안 어디에 있어도, 몇 개가 있어도 그 자리마다 사진을 끼우고 앞뒤 글은 살린다
@@ -10443,17 +10447,17 @@
       while((m=PROMO_MARK_RE.exec(ln))){
         any=true;
         pushText(ln.slice(idx,m.index));
-        pushNums(promoMarkNums(m[1]));
+        pushNums(promoMarkNums(m[1]), m[2]);
         idx=m.index+m[0].length;
       }
       if(any){ pushText(ln.slice(idx)); return; }
       // 대괄호 없는 마커 — 산문 오인을 막기 위해 줄 전체가 마커 꼴일 때만
       var nb=ln.match(PROMO_MARK_NB_RE);
       if(nb){
-        pushNums(promoMarkNums(nb[1]));
         // 콜론 뒤는 원래 설명이지만, 모델이 설명에 이어 본문 문장을 붙이기도 한다.
-        // 첫 마침표까지만 설명으로 보고 그 뒤는 본문으로 살린다 — 문장이 통째로 증발하는 사고 방지.
+        // 첫 마침표까지만 설명(캡션)으로 보고 그 뒤는 본문으로 살린다 — 문장 증발 방지.
         var tail=String(nb[2]||""), dot=tail.indexOf(".");
+        pushNums(promoMarkNums(nb[1]), dot>=0? tail.slice(0,dot) : tail);
         if(dot>=0 && dot<tail.length-1) pushText(tail.slice(dot+1));
         return;
       }
