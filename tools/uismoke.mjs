@@ -125,5 +125,26 @@ try {
     `대괄호: 앱 ${cBr} vs 서버 ${sBr} / 무괄호: 앱 ${cNb} vs 서버 ${sNb}`);
 } catch (e) { console.log('  (사진 상한 대조 생략 — 파일 읽기 실패)'); }
 
+// 8) 크론 등록 ↔ 함수 파일 대조 — 감시 설계 1단계(2026-08-19). netlify.toml의 schedule 선언과
+//    실제 *-cron.js 파일이 어긋나면(파일 개명·블록 삭제·오타) 크론이 소리 없이 사라진다.
+//    Netlify는 프로덕션 배포의 netlify.toml만 읽으므로, 배포 전에 여기서 잡는 게 마지막 방어선이다.
+try {
+  const toml = readFileSync(join(ROOT, 'netlify.toml'), 'utf8');
+  const declared = [...toml.matchAll(/\[functions\."([\w-]+)"\]\s*\r?\n\s*schedule\s*=\s*"([^"]+)"/g)]
+    .map((m) => ({ fn: m[1], cron: m[2] }));
+  const missing = declared.filter((d) => {
+    try { readFileSync(join(ROOT, 'netlify', 'functions', d.fn + '.js'), 'utf8'); return false; }
+    catch (e) { return true; }
+  });
+  T('스케줄 선언 ' + declared.length + '건 전부 함수 파일 존재', missing.length === 0,
+    '선언만 있고 파일 없음: ' + missing.map((d) => d.fn).join(', '));
+  const cronFiles = ['gw-hwakwan-cron', 'gw-allbaro-cron'];
+  const undeclared = cronFiles.filter((f) => !declared.some((d) => d.fn === f));
+  T('크론 함수 전부 스케줄 선언됨', undeclared.length === 0,
+    '파일은 있는데 netlify.toml 선언 없음(크론 미등록): ' + undeclared.join(', '));
+  T('크론 표현식 5필드 형식', declared.every((d) => d.cron.trim().split(/\s+/).length === 5),
+    '깨진 표현식: ' + declared.filter((d) => d.cron.trim().split(/\s+/).length !== 5).map((d) => d.fn + '=' + d.cron).join(', '));
+} catch (e) { console.log('  (크론 대조 생략 — netlify.toml 읽기 실패)'); }
+
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
