@@ -30,8 +30,9 @@ const API_VERSION = '2023-06-01';
 // 모델은 계약서 지정값. 이미지 입력 지원 + 비용·품질 균형.
 const MODEL = 'claude-sonnet-5';
 const MAX_PHOTOS = 30;          // 첨부분은 전부 모델이 보고 제자리에 배치해야 한다(2026-08-15 PM)
-const MAX_TOKENS = 24000;       // 본문이 사진 장수에 비례(30장≈9천 자≈1만 토큰) + high effort 사고(thinking)도
-                                // 이 상한 안에서 소비된다. 초과 시 잘리므로 넉넉히.
+const MAX_TOKENS = 40000;       // 본문이 사진 장수에 비례(30장≈9천 자≈1만 토큰)에 high effort 사고(thinking)까지
+                                // 이 상한을 같이 쓴다. 24000으로는 사고+본문이 잘렸다(2026-08-18 실사고
+                                // TRUNCATED). 초과분은 청구 안 되는 상한일 뿐이니 넉넉히 잡는다.
 const EFFORT = 'medium';        // claude-sonnet-5 기본은 high. 사진 판독+2,600자 글은 medium으로 충분(비용 절감).
 const TIMEOUT_MS = 600000;      // 10분. 사진 30장 + high effort + 9천 자 생성은 수 분 걸린다(2026-08-16 실사고:
                                 // 2분 컷에 잘려 "aborted" — 끊어도 서버 생성은 계속돼 요금만 나간다).
@@ -857,9 +858,9 @@ async function generateDraft(apiKey, photos, input, opts) {
       + (usage.cache_creation_input_tokens || 0) + (usage.cache_read_input_tokens || 0);
 
     if (json && json.stop_reason === 'max_tokens') {
-      last = { ok: false, code: 'TRUNCATED', detail: '응답이 길이 제한에서 잘렸습니다.', used_tokens: used };
-      if (attempt < RETRIES) continue;
-      return last;
+      // 잘림은 재시도하지 않는다 — 같은 요청은 같은 자리서 또 잘릴 확률이 높아 요금만 두 배다
+      // (2026-08-18 실사고: 상한 24000 시절 재시도 포함 이중 과금). 상한을 키우는 게 수리다.
+      return { ok: false, code: 'TRUNCATED', detail: '응답이 길이 제한에서 잘렸습니다.', used_tokens: used };
     }
 
     const draft = parseDraft(responseText(json));
