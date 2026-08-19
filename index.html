@@ -1043,6 +1043,17 @@
       <input type="file" id="recFile" accept=".xlsx" style="display:none">
       <div id="recImpMsg" style="margin-top:8px;font-size:13px;"></div>
     </div>
+    <div class="card" id="recAbCard">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <div style="min-width:0;flex:1 1 200px;">
+          <div style="font-weight:600;">운반 실적 참고 <span style="font-size:11px;color:var(--brand);border:1px solid var(--brand);border-radius:5px;padding:1px 6px;margin-left:4px;">올바로 자동 집계</span></div>
+          <div style="font-size:12px;opacity:.7;margin-top:2px;word-break:keep-all;">청구·검수와 무관한 읽기 전용 참고 — 월별 상차지·품목별 건수/톤. 수동추가분 미포함</div>
+        </div>
+        <input type="month" id="recAbMonth" style="flex:none;">
+        <button type="button" class="mini-btn" id="recAbLoad" style="flex:none;">불러오기</button>
+      </div>
+      <div id="recAbBody" style="margin-top:10px;font-size:13px;"></div>
+    </div>
     <div class="dash-sec" style="margin:14px 0 6px;"><h2>미수 <span class="cnt" id="recHead"></span></h2></div>
     <input type="search" id="recSearch" placeholder="거래처·내역 검색" autocomplete="off" style="width:100%;padding:9px 12px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;font-size:14px;box-sizing:border-box;">
     <div class="sel-bar" id="recSelBar" style="display:none;"></div>
@@ -4226,6 +4237,40 @@
     recSearchTerm = this.value.toLowerCase().trim();
     renderReceivables();
   });
+  // 혁신②(2026-08-20): 올바로 월 합산을 정산 참고 카드로 — 읽기 전용, 돈 상태 3종과 완전 무관.
+  // 서버(ab_month)가 그 달 일자 집계를 전부 읽어 합치므로 버튼 클릭 시에만 부른다(자동 로드 안 함).
+  (function(){
+    var mEl=document.getElementById("recAbMonth"), btn=document.getElementById("recAbLoad"), body=document.getElementById("recAbBody");
+    if(!mEl||!btn||!body) return;
+    mEl.value=new Date().toISOString().slice(0,7);
+    btn.addEventListener("click", function(){
+      var month=mEl.value;
+      if(!/^\d{4}-\d{2}$/.test(month)){ body.textContent="월을 선택하세요."; return; }
+      body.textContent="집계 중…";
+      gwCall("gw-allbaro",{action:"ab_month",month:month}).then(function(res){
+        if(res.status===401){ onSessionInvalid(); return; }
+        var b=res.body||{};
+        if(res.status!==200||!b.ok){ body.textContent="집계 실패 — "+(b.code||("HTTP "+res.status)); return; }
+        if(!b.rows||!b.rows.length){ body.textContent=month+" 집계 자료 없음 (수집 "+(b.days_n||0)+"일)."; return; }
+        var h='<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12.5px;">'
+          +'<tr style="text-align:left;opacity:.7;"><th style="padding:4px 6px;">상차지 → 하차지</th><th style="padding:4px 6px;">품목</th><th style="padding:4px 6px;text-align:right;">건</th><th style="padding:4px 6px;text-align:right;">톤</th></tr>';
+        b.rows.forEach(function(r){
+          h+='<tr style="border-top:1px solid var(--line);"><td style="padding:4px 6px;word-break:keep-all;">'+esc(r.from)+' → '+esc(r.to)+'</td>'
+            +'<td style="padding:4px 6px;">'+esc(r.item)+'</td>'
+            +'<td style="padding:4px 6px;text-align:right;">'+r.n+'</td>'
+            +'<td style="padding:4px 6px;text-align:right;">'+(r.ton||0)+(r.ton_unknown?'<span title="단위를 못 읽어 합산에서 빠진 행이 있는 묶음">*</span>':'')+'</td></tr>';
+        });
+        h+='<tr style="border-top:2px solid var(--line);font-weight:700;"><td style="padding:5px 6px;">합계 ('+b.days_n+'일 수집)</td><td></td>'
+          +'<td style="padding:5px 6px;text-align:right;">'+b.total_n+'</td><td style="padding:5px 6px;text-align:right;">'+b.total_ton+'</td></tr></table></div>';
+        var notes=[];
+        if(b.unmatched_n) notes.push("미매칭 "+b.unmatched_n+"건 — 운반일지 탭에서 지정하면 반영");
+        if(b.excluded_n) notes.push("계수 제외 "+b.excluded_n+"건(미실행·타사)");
+        if(b.days_failed) notes.push("⚠ 읽기 실패 "+b.days_failed+"일 — 숫자가 실제보다 적을 수 있음");
+        if(notes.length) h+='<div style="margin-top:6px;font-size:12px;opacity:.7;">'+notes.join(" · ")+'</div>';
+        body.innerHTML=h;
+      }).catch(function(){ body.textContent="네트워크 오류 — 다시 시도하세요."; });
+    });
+  })();
   (function(){
     var fp=document.getElementById("recFilePick"), fi=document.getElementById("recFile"), dz=document.getElementById("recDrop");
     if(fp&&fi){ fp.addEventListener("click", function(){ fi.click(); }); fi.addEventListener("change", function(){ if(fi.files&&fi.files[0]) handleRecImportFile(fi.files[0]); fi.value=""; }); }

@@ -11,7 +11,7 @@ const crypto = require('crypto');
 const { setupBlobContext, store, blobGet, blobSet } = require('./_lib/blobs');
 const { issueSession, verifyToken, bearer } = require('./_lib/session');
 const { appendAudit } = require('./_lib/audit');
-const { ROUTES, normName, normItem } = require('./_lib/allbaro');   // 노선표(양식 줄) + 이름·품목 정규화(learnKey를 라이브러리 매칭과 같은 기준으로)
+const { ROUTES, normName, normItem, mergeMonthCounts } = require('./_lib/allbaro');   // 노선표(양식 줄) + 이름·품목 정규화(learnKey를 라이브러리 매칭과 같은 기준으로) + 월 합산(혁신②)
 
 const DATA = 'gw_data';
 const USERS = 'gw_users';
@@ -449,6 +449,29 @@ async function handleJob(st, d, R) {
   return jr(200, Object.assign({ ok: true, request_id: R }, r.data));
 }
 
+// 월별 정산 참고(혁신②) — 그 달의 일자 집계를 전부 읽어 (상차지,하차지,품목) 합산.
+// 읽기 전용 참고 카드용: 돈 상태 3종(paid·reviewed·invoice)은 여기서 절대 건드리지 않는다.
+const RE_MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
+async function handleMonth(st, d, R) {
+  const month = cleanStr(d.month);
+  if (!RE_MONTH.test(month)) return jr(400, { ok: false, code: 'BAD_MONTH', request_id: R });
+  const y = +month.slice(0, 4), m = +month.slice(5, 7);
+  const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const days = [];
+  for (let i = 1; i <= last; i++) days.push(month + '-' + String(i).padStart(2, '0'));
+  const reads = await Promise.all(days.map(function (day) { return blobGet(st, dayKey(day)); }));
+  const docs = [];
+  let failed = 0;
+  reads.forEach(function (r) {
+    if (!r.ok) { failed++; return; }        // 읽기 실패는 '없음'과 다르다 — 수만 세서 드러낸다
+    if (r.data) docs.push(r.data);
+  });
+  const merged = mergeMonthCounts(docs);
+  merged.month = month;
+  merged.days_failed = failed;
+  return jr(200, Object.assign({ ok: true, request_id: R }, merged));
+}
+
 async function handler(event) {
   const R = rid();
   if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: CORS, body: '' };
@@ -464,6 +487,7 @@ async function handler(event) {
     switch (d && d.action) {
       case 'ab_status': return await handleStatus(st, R);
       case 'ab_day': return await handleDay(st, d, R);
+      case 'ab_month': return await handleMonth(st, d, R);
       case 'ab_run_now': return await handleRunNow(st, c, d, R);
       case 'ab_job': return await handleJob(st, d, R);
       case 'ab_learn': return await handleLearn(st, c, d, R);

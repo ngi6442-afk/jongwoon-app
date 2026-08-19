@@ -1012,6 +1012,33 @@ async function collectDays(creds, days, opts) {
   return { ok: true, days: out, log: log };
 }
 
+// 월별 정산 참고 합산(혁신②, 2026-08-20) — 일자 집계 문서들을 (상차지,하차지,품목)으로 묶어
+// 건수·톤을 합친다. 읽기 전용 참고용이라 돈 상태(paid·reviewed·invoice)와는 완전히 무관하다.
+// 못 읽은 날은 조용히 0으로 뭉개지 않고 days_failed로 센다(무음 축소 금지 — 계약 B-major1과 같은 원칙).
+function mergeMonthCounts(dayDocs) {
+  const map = new Map();
+  let totalN = 0, totalTon = 0, unmatchedN = 0, excludedN = 0, daysN = 0;
+  for (const doc of dayDocs || []) {
+    if (!doc || !Array.isArray(doc.counts)) continue;
+    daysN += 1;
+    for (const c of doc.counts) {
+      const key = JSON.stringify([c.from || '', c.to || '', c.item || '']);
+      let v = map.get(key);
+      if (!v) { v = { from: c.from || '', to: c.to || '', item: c.item || '', n: 0, ton: 0, ton_unknown: 0 }; map.set(key, v); }
+      const n = Number(c.n) || 0;
+      const t = Number(c.qty_ton) || 0;
+      v.n += n; v.ton += t;
+      v.ton_unknown += Number(c.qty_unknown) || 0;
+      totalN += n; totalTon += t;
+    }
+    for (const u of (doc.unmatched || [])) unmatchedN += Number(u.n) || 0;
+    excludedN += (doc.excluded || []).length;
+  }
+  const rows = Array.from(map.values()).map(function (v) { v.ton = Math.round(v.ton * 1000) / 1000; return v; });
+  rows.sort(function (a, b) { return b.ton - a.ton || b.n - a.n || (a.from < b.from ? -1 : 1); });
+  return { rows: rows, total_n: totalN, total_ton: Math.round(totalTon * 1000) / 1000, unmatched_n: unmatchedN, excluded_n: excludedN, days_n: daysN };
+}
+
 module.exports = {
   // 상수
   ROUTES, ALIAS, ITEM_ALIAS, VEHICLE_TAGS, UNIT_FACTOR, BASE, ENTN, ENTN_NAME, TD,
@@ -1019,7 +1046,7 @@ module.exports = {
   normName, normItem, itemHit, matchRoute, matchRouteEx,
   vehicleTagOf, vehicleTagOk, normVehNo, buildVehicleIndex, vehicleTypeOf,
   parseSheetXml, sheetTotal, aggregate, validDay, toSlash, kstTodayISO,
-  isEpDust, opDayFromTrtm, dayMinus,
+  isEpDust, opDayFromTrtm, dayMinus, mergeMonthCounts,
   // 세션·네트워크(테스트 금지 — 리뷰로만 검증)
   createSession, searchManifests, collectDays,
 };
