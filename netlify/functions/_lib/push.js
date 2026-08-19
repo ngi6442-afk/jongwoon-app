@@ -49,7 +49,9 @@ async function sendTo(memberIds, payload) {
     const subs = doc.members[mid] || [];
     for (let i = subs.length - 1; i >= 0; i--) {
       try {
-        await webpush.sendNotification(subs[i].sub, body, { TTL: 3600 });
+        // TTL 24시간(감시 2단계, 2026-08-19) — 1시간이던 시절엔 밤새 꺼둔 폰이 아침 경보를
+        // 통째로 놓쳤다(09시 발송 → 10시 폐기). 기기가 하루 안에만 켜지면 경보가 닿는다.
+        await webpush.sendNotification(subs[i].sub, body, { TTL: 86400 });
         sent++;
       } catch (e) {
         const sc = e && e.statusCode;
