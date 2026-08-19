@@ -38,8 +38,10 @@ const ROUTES = [
   { side: "L", row: 8, from: "동일산업", to: "스틸싸이클㈜", item: "EAFD", count_col: 5 },
   { side: "L", row: 9, from: "동일산업", to: "건영환경", item: "폐주물사", count_col: 5 },
   { side: "L", row: 10, from: "동일산업", to: "대화산업", item: "분진", count_col: 5 },
-  { side: "L", row: 11, from: "동일산업", to: "폐유고상", item: "네이처", count_col: 5 },
-  { side: "L", row: 12, from: "동일산업", to: "폐페인트", item: "네이처", count_col: 5 },
+  // L11·L12는 양식 원본의 하차지·품목 칸이 서로 뒤바뀌어 있던 것을 교정한 값(2026-08-19 PM 지시).
+  // 양식(운반일지_양식_원본.xlsx)·로컬 노선사전.json도 같은 날 함께 교정 — L15~17 정상 패턴 기준.
+  { side: "L", row: 11, from: "동일산업", to: "네이처", item: "폐유고상", count_col: 5 },
+  { side: "L", row: 12, from: "동일산업", to: "네이처", item: "폐페인트", count_col: 5 },
   { side: "L", row: 13, from: "동일산업", to: "SP성보", item: "폐수오니", count_col: 5 },
   { side: "L", row: 14, from: "동일산업", to: "SP성보", item: "공정오니", count_col: 5 },
   { side: "L", row: 15, from: "동일산업(봉강)", to: "네이처", item: "폐페인트", count_col: 5 },
