@@ -46,7 +46,7 @@ h2{font-size:13px;margin-bottom:8px}
 <div class="view on" id="v-home">
   <h1>진척도</h1><span class="date">2026-08-20 · 클릭=상세</span>
   <div class="hero">68%<small>큰틀 4개 평균</small></div>
-  <div class="row focus" onclick="go('v1')"><b>1&nbsp; 업무플랫폼 &nbsp;◀ 오늘</b><div class="track"><div class="fillb" style="width:82%"></div><span>82</span></div></div>
+  <div class="row" onclick="go('v1')"><b>1&nbsp; 업무플랫폼 &nbsp;◀ 지금</b><div class="track"><div class="fillb" style="width:82%"></div><span>82</span></div></div>
   <div class="row" onclick="go('v2')"><b>2&nbsp; 인증·자격 &nbsp;◀ 정지 14일</b><div class="track"><div class="fillb c" style="width:45%"></div><span>45</span></div></div>
   <div class="row" onclick="go('v3')"><b>3&nbsp; 홍보·검색노출</b><div class="track"><div class="fillb" style="width:82%"></div><span>82</span></div></div>
   <div class="row" onclick="go('v4')"><b>4&nbsp; 경영 기반 &nbsp;◀ 정지 14일</b><div class="track"><div class="fillb" style="width:50%"></div><span>50</span></div></div>
@@ -66,7 +66,7 @@ h2{font-size:13px;margin-bottom:8px}
 
 <div class="view" id="v1">
   <span class="back" onclick="go('v-home')">← 큰틀로</span>
-  <h1>1 업무플랫폼 — 82% · 오늘</h1>
+  <h1>1 업무플랫폼 — 82% · 지금</h1>
   <div class="rowc" onclick="go('v1-1')" style="margin-top:10px"><b>데이터·보안</b><div class="track2"><div class="fillb t" style="width:98%"></div></div><span class="pv">98</span></div>
   <div class="rowc" onclick="go('v1-2')"><b>돈 (기성·미수)</b><div class="track2"><div class="fillb t" style="width:90%"></div></div><span class="pv">90</span></div>
   <div class="rowc" onclick="go('v1-3')"><b>운영 모듈</b><div class="track2"><div class="fillb t" style="width:90%"></div></div><span class="pv">90</span></div>
@@ -82,14 +82,12 @@ h2{font-size:13px;margin-bottom:8px}
   <div class="rowc focus" onclick="go('v1-13')"><b>관리자 기기 보안 ◀ 지금</b><div class="track2"><div class="fillb c" style="width:25%"></div></div><span class="pv">25</span></div>
   <hr>
   <h2>지금 중요한 순서 — 업무플랫폼</h2>
-  <div class="item done" style="margin-top:10px"><span class="m">☑</span>화관법 무인 운전 지속 — 8/17 크론 접수번호(W6009-260070257/8) 실측, 8/21분 14건 선제출 확인. 직원 수동 제출 중단 공지 완료(8/14)</div>
-  <div class="item done"><span class="m">☑</span>김과장 아이폰 제출 불가 — 종결(8/19). 원인=iOS가 날짜·시간 휠에서 input 이벤트를 안 쏴 버튼 영구 비활성, v283 수리·실기기 확인</div>
-  <div class="item done"><span class="m">☑</span>운반일지 클라우드 수집 + 2단계 매칭(v256·v258) — PC 꺼져도 매일 자동, 파이썬 교차검증 27건·687.02톤·미매칭 0</div>
-  <div class="item done"><span class="m">☑</span>운반일지 PM 확인 5건 전부 종결(8/19) — BCT=차종·L11·12 교정·오타·광재·별칭. 계수 가드(미실행·타사 제외)도 같은 날 배포</div>
-  <div class="item done"><span class="m">☑</span>자동화 감시 1단계 가동(8/19) — 매일 09/16시 앱 밖에서 화관법·올바로·입찰 무음 감지, 웹푸시 유효 24h. 무음 구멍 봉인</div>
-  <div class="item"><span class="m">☐</span>업무 데이터 미입력이 진짜 병목 — 완주계약 0·미수 0·응찰표시 0·인허가만기 13건 공란 · PM</div>
+  <div class="item" style="margin-top:10px"><span class="m">☐</span>업무 데이터 미입력이 진짜 병목 — 완주계약 0·미수 0·응찰표시 0·인허가만기 13건 공란 · PM</div>
   <div class="item"><span class="m">☐</span>인허가 만기 13건 입력 → D-30 자동지시·캘린더 즉시 켜짐(코드 5줄) · 권민지</div>
   <div class="item"><span class="m">☐</span>계정 암호·자동잠금(5분) → 기기점검 → 구매 결정 · PM</div>
+  <div class="item"><span class="m">☐</span>배치도 결정 6종 → 확정 → 대표 결재함 구현 · PM</div>
+  <div class="item"><span class="m">☐</span>화관법 로컬 폴백 스케줄러 제거 — 현재 07:50 병행(무인 3일 연속 확인 후) · AI</div>
+  <div class="item"><span class="m">☐</span>활용신청·포털 변경신청 승인 확인 — 수집 사활 · 외부</div>
 </div>
 
 <div class="view" id="v1-1"><span class="back" onclick="go('v1')">← 업무플랫폼</span>
@@ -100,6 +98,7 @@ h2{font-size:13px;margin-bottom:8px}
   <div class="item done"><span class="m">☑</span>시점복구 = Blobs 버전 링 (v225)</div>
   <div class="item done"><span class="m">☑</span>백업 크론 8/14 06:09 정상 — 그룹웨어 스냅샷 매일 생성 확인</div>
   <div class="item done"><span class="m">☑</span>네이버 로그인 세션 포함 HAR을 리포에서 제거(8/13) — 로컬 분석용만 보관</div>
+  <div class="item done"><span class="m">☑</span>자동화 감시 1단계 가동(8/19) — 매일 09/16시 앱 밖에서 화관법·올바로·입찰 무음 감지, 웹푸시 유효 24h</div>
   <div class="item"><span class="m">☐</span>수용 위험 3건 재검토 — 수리할지 수용 유지할지 판단</div>
   <div class="item"><span class="m">☐</span>기기게이트 마감</div>
   <div class="note">주의: member-relay(홈페이지 CMS)·AI_BUILD_GITHUB_TOKEN은 사용 중 — 지우면 안 됨</div>
@@ -110,8 +109,8 @@ h2{font-size:13px;margin-bottom:8px}
   <div class="item done" style="margin-top:10px"><span class="m">☑</span>돈 절단선 확정 — 공무=청구 등록·수정까지 / 관리부=검수→발행→수금→미수</div>
   <div class="item done"><span class="m">☑</span>간이 검수 게이트 + 돈 상태 3종(paid·reviewed·invoice) 서버 하드 차단</div>
   <div class="item done"><span class="m">☑</span>정산 UI (v217 — settle_doc, F14~19·F22+L26 매핑)</div>
-  <div class="item now"><span class="m">▶</span>매입 세무 확인</div>
   <div class="item done"><span class="m">☑</span>혁신② 완료(v284, 8/20) — 기성·수금 탭 [운반 실적 참고] 카드: 월별 상차지·품목 건수/톤, 미매칭·제외·읽기실패 주석까지. 돈 상태 3종 불변</div>
+  <div class="item now"><span class="m">▶</span>매입 세무 확인</div>
   <div class="note">기성 미수 = 홈택스 xlsx 업로드 경로 (팝빌 유료 API 보류)</div>
 </div>
 
@@ -314,13 +313,10 @@ h2{font-size:13px;margin-bottom:8px}
   <div class="rowc focus" onclick="go('v3-1')" style="margin-top:10px"><b>검색 등록·노출 ◀ 병목</b><div class="track2"><div class="fillb" style="width:55%"></div></div><span class="pv">55</span></div>
   <div class="rowc" onclick="go('v3-2')"><b>홍보모듈 정착</b><div class="track2"><div class="fillb t" style="width:90%"></div></div><span class="pv">90</span></div>
   <div class="rowc" onclick="go('v3-3')"><b>홈페이지</b><div class="track2"><div class="fillb t" style="width:85%"></div></div><span class="pv">85</span></div>
+  <div class="lane">★첫 실게시 8/19(용흥동, 권민지) — 30일 회복 타이머 가동, 판정 9/18경. 엔진 v283 완성·이관 완료(상세는 홍보모듈)</div>
   <hr>
   <h2>지금 중요한 순서 — 홍보·검색노출</h2>
-  <div class="item done" style="margin-top:10px"><span class="m">☑</span>★첫 실게시 완료(8/19, 권민지) — 용흥동 우수받이 준설 글. 30일 회복 타이머 시작, 판정 9/18경. blog.naver.com/jongwoon1204/224383320322</div>
-  <div class="item done"><span class="m">☑</span>블로그AI 엔진 완성 v261~v283(실물 5회 왕복) — 자동 실행·마커 파서 관용·사진 1~2장 교차·캡션·길이 연동·구조 할당량·생성 10분. 게시 안내서로 권민지 이관 완료</div>
-  <div class="item done"><span class="m">☑</span>외부 실측 조사(8/16) — 네이버 공식 원문 11건 + 상위 노출 동종업체 6편 전수 파싱으로 규칙 교정. '체류시간 반영'은 공식 근거 없음(전언) 확정</div>
-  <div class="item done"><span class="m">☑</span>자동 게시 트랙 종결 — 도우미 폐기(v267). 완성본 한 장 복붙이 최종 경로</div>
-  <div class="item now"><span class="m">▶</span>현장 글 사이클 가동 — 이제 기록 올리면 자동 생성→검수→복붙 게시. 다음 현장부터 권민지 단독 운영 · 권민지</div>
+  <div class="item now" style="margin-top:10px"><span class="m">▶</span>현장 글 사이클 가동 — 이제 기록 올리면 자동 생성→검수→복붙 게시. 다음 현장부터 권민지 단독 운영 · 권민지</div>
   <div class="item"><span class="m">☐</span>색인 프리렌더 방식 결정 — 이게 되기 전 색인요청은 무한반복 · PM</div>
   <div class="item"><span class="m">☐</span>구글 비즈니스 프로필 — 전화 인증이라 대면 필요 · 외부</div>
 </div>
@@ -348,12 +344,13 @@ h2{font-size:13px;margin-bottom:8px}
   <div class="item done"><span class="m">☑</span>계절을 사진 EXIF 촬영일시로 판정 — v259(8/13), 추측 제거. 유사도 43%→29%</div>
   <div class="item done"><span class="m">☑</span>사진 기반 AI 생성 코어 v260(8/13) — promoai.js·gw-promo-ai + 백그라운드 워커. 계약 세부는 화이트리스트 4필드만 전송, 결과 본문도 금액·발주처 포함 여부 재검사</div>
   <div class="item done"><span class="m">☑</span>사진AI 실전 왕복 4회(8/15~16) — 18장 전수 배치·캡션·장면 순서 실물 검증. 실패 원인 3종(파서→프롬프트 상한→시간 상한)을 각각 수리</div>
+  <div class="item done"><span class="m">☑</span>외부 실측 조사(8/16) — 네이버 공식 11건+상위 동종 6편 전수 파싱으로 규칙 교정. '체류시간 반영'은 공식 근거 없음 확정</div>
   <div class="item done"><span class="m">☑</span>완성본 한 장(v262~) — 사진 끼운 완성 글 새 창 → [전체 복사] 한 번. 태그 20개 생성 + [태그 복사], 명함 해체 꼬리(전화번호만 대기)</div>
   <div class="item done"><span class="m">☑</span>자동 게시 트랙 종결 — 도우미 폐기(v267). 봇탐지 우회는 안 만든다는 경계 확정, 복붙이 최종 경로</div>
   <div class="item done"><span class="m">☑</span>재생성 관문 통과(8/19) → 그 판이 첫 게시본으로 발행 완료 — 사이클 완주(기록→초안→검수→게시)</div>
   <div class="item"><span class="m">☐</span>기종별 GPS 검증 — 아이폰·구버전 안드로이드 원본 전송 사진 수집</div>
   <div class="item"><span class="m">☐</span>학습 시스템(승인글·직원 메모·검색자료 재료) — 품질 우선 완료 후 착수(PM 8/14)</div>
-  <div class="item"><span class="m">☐</span>혁신⑥ 갤러리 동시 게시 — 시안 승인·사양 확정(8/19 밤: 대표 3장·블로그 링크·발행 확인 후). 구현 대기, 사양=08_앱_시안혁신2차_확정사양.md · AI</div>
+  <div class="item"><span class="m">☐</span>혁신⑥ 갤러리 동시 게시 — 시안 승인·사양 확정(8/19 밤: 대표 3장·블로그 링크·발행 확인 후). 구현 대기, 사양=08_앱_시안\혁신2차_확정사양.md · AI</div>
   <div class="item"><span class="m">☐</span>후속 킵: 사진대지 hwpx · PROMO_TEL 전화번호 확정</div>
   <div class="note">계약 차단 규칙: 프롬프트로 말리지 않고 애초에 안 보낸다 — CONTRACT_사진AI.md</div>
 </div>
