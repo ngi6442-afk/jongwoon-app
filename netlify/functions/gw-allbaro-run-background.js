@@ -257,8 +257,14 @@ exports.handler = async function (event, context) {
       const qty = (Number.isFinite(qRaw) && qRaw >= 0) ? Math.round(qRaw * 1000) / 1000 : countsQty(counts);
       const quRaw = Number(dd.qty_unknown);
       const qtyUnknown = (Number.isFinite(quRaw) && quRaw >= 0) ? Math.floor(quRaw) : countsQtyUnknown(counts);
+      // 계수 제외(타사 운반·미실행 예약건, 2026-08-19 신설) — 기록에 싣고 로그로도 드러낸다.
+      const excluded = Array.isArray(dd.excluded) ? dd.excluded : [];
+      if (excluded.length) {
+        log.push('[' + day + '] 계수 제외 ' + excluded.length + '건 — ' +
+          excluded.map(function (e) { return (e.manf || '?') + '(' + (e.why || '') + ')'; }).join(', ').slice(0, 200));
+      }
       // schema 2 = 수량 필드 추가(1단계 문서와 구분). 소비자는 필드별로 방어적으로 읽는다.
-      const w = await blobSet(st, dayKey(day), { schema: 2, day: day, total: total, total_qty_ton: qty, qty_unknown: qtyUnknown, counts: counts, unmatched: unmatched, ts: Date.now(), job: job });
+      const w = await blobSet(st, dayKey(day), { schema: 2, day: day, total: total, total_qty_ton: qty, qty_unknown: qtyUnknown, counts: counts, unmatched: unmatched, excluded: excluded, ts: Date.now(), job: job });
       if (!w.ok) { writeFail++; log.push('[저장실패] ' + day + ' ' + (w.code || '')); continue; }
       saved.push({ day: day, total: total, qty_ton: qty, unmatched_n: un });
       unmatchedTotal += un;

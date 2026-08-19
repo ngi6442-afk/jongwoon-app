@@ -600,6 +600,7 @@ function aggregate(rows, day, opts) {
   const mopts = { learnedIndex: prepLearned(o.learned, notes), notes: notes };
   const dayKey = day ? String(day).replace(/-/g, '') : null;
   const map = new Map();
+  const excluded = [];   // 계수에서 뺀 행(타사 운반·미실행) — 조용한 제외 금지, 일지에서 사람이 본다
   let total = 0;
   let totalSubstituted = 0;   // 인수량이 비어 위탁량으로 '실제 대체된' 행 수(A-minor2 카운터)
   for (const r of rows || []) {
@@ -613,6 +614,24 @@ function aggregate(rows, day, opts) {
       ? opDayFromTrtm(r.trtmWorkAt)
       : String(r.date == null ? '' : r.date).slice(0, 8);
     if (dayKey && d !== dayKey) continue;
+    // 실행되지 않은·남의 인계서 계수 금지(2026-08-19 실사고: 피앤알 3건 "아예 안 했는데 올라옴",
+    // 동일산업 2회 했는데 3회 — 처리상태·운반자를 안 보고 전 행을 실적으로 세고 있었다).
+    // ① 운반자 업체명이 있는데 종운이 아니면 남의 운반(포스코 구내운송처럼 여러 사가 뛰는 배출처).
+    // ② 운반자 인수량·작업일시가 둘 다 비면 미실행(예약·확정 단계) — 실행 실측은 27/27 인수량 존재.
+    // 제외는 조용히 버리지 않고 excluded에 인계번호·사유를 남긴다(일지에서 사람이 확인).
+    const tranFirm = cleanText(r.tranFirm);
+    const ranQty = String(r.tranQty == null ? '' : r.tranQty).trim();
+    const ranAt = String(r.tranWorkAt == null ? '' : r.tranWorkAt).trim();
+    if (tranFirm && tranFirm.indexOf('종운') < 0) {
+      excluded.push({ manf: String(r.manf == null ? '' : r.manf), from: from, to: to, item: item,
+        why: '타사 운반(' + tranFirm + ')', state: cleanText(r.state) });
+      continue;
+    }
+    if (!ranQty && !ranAt) {
+      excluded.push({ manf: String(r.manf == null ? '' : r.manf), from: from, to: to, item: item,
+        why: '미실행(예약·확정 단계)', state: cleanText(r.state) });
+      continue;
+    }
     const key = JSON.stringify([from, to, item]);   // 충돌 없는 합성 키
     let v = map.get(key);
     if (!v) { v = { from: from, to: to, item: item, rows: [] }; map.set(key, v); }
@@ -722,6 +741,8 @@ function aggregate(rows, day, opts) {
     total_qty_unknown: totalUnknown,
     // 인수량이 비어 위탁량으로 대체된 행 수(조용한 대체를 드러내는 카운터, A-minor2).
     qty_substituted: totalSubstituted,
+    // 계수에서 뺀 행(타사 운반·미실행 예약건) — 2026-08-19 실사고 후 신설. 인계번호·사유 포함.
+    excluded: excluded,
     counts: counts,
     unmatched: unmatched,
     notes: notes,
