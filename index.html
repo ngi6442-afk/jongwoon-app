@@ -13061,9 +13061,13 @@
     Array.prototype.forEach.call(host.querySelectorAll("[data-hw-scen]"), function(el){
       el.addEventListener("click", function(){ if (hwJob.polling && hwJob.kind === "waste") return; hwSel.scenario = el.getAttribute("data-hw-scen"); renderHwWaste(); });
     });
+    // input+change 둘 다 듣는다 — 아이폰 사파리는 날짜·시간 휠 선택에서 input을 안 쏘고 change만 쏜다.
+    // input만 듣던 탓에 폰에서는 날짜를 골라도 상태 반영이 안 돼 제출 버튼이 영구 비활성이었다(2026-08-19 김과장 실사고).
     var dEl = document.getElementById("hwDate"), tEl = document.getElementById("hwTime");
-    if (dEl) dEl.addEventListener("input", function(){ hwSel.date = dEl.value; hwSyncPreview(); });
-    if (tEl) tEl.addEventListener("input", function(){ hwSel.time = tEl.value; hwSyncPreview(); });
+    ["input", "change"].forEach(function(ev){
+      if (dEl) dEl.addEventListener(ev, function(){ hwSel.date = dEl.value; hwSyncPreview(); });
+      if (tEl) tEl.addEventListener(ev, function(){ hwSel.time = tEl.value; hwSyncPreview(); });
+    });
     var sb = document.getElementById("hwSubmitBtn");
     if (sb) sb.addEventListener("click", hwSubmitWaste);
   }
