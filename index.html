@@ -2024,6 +2024,7 @@
     <button class="secondary" id="memberUidBtn" style="display:none;">내 아이디 설정</button>
     <button class="secondary" id="memberPinBtn" style="display:none;">내 PIN 변경</button>
     <button class="secondary" id="pushBtn" style="display:none;">🔔 이 기기 알림 켜기</button>
+    <button class="secondary" id="pushTestBtn" style="display:none;">📨 알림 테스트 보내기</button>
     <a href="./MANUAL.html" target="_blank" rel="noopener" style="display:block;text-align:center;font-size:13px;margin-top:6px;">📖 사용 안내</a>
     <button class="secondary" id="helpBtn">도움말</button>
   </div>
@@ -4060,6 +4061,14 @@
   });
   document.getElementById("memberLogin").addEventListener("click", doMemberLogin);
   document.getElementById("pushBtn").addEventListener("click", pushToggle);
+  document.getElementById("pushTestBtn").addEventListener("click", function(){
+    var b=document.getElementById("pushTestBtn"); b.disabled=true; b.textContent="📨 보내는 중...";
+    gwCall("gw-data",{action:"push_send", self:true, title:"알림 테스트", body:"알림함과 팝업 동작 확인용입니다."}).then(function(res){
+      b.disabled=false; b.textContent="📨 알림 테스트 보내기";
+      if(res.status===200 && res.body && res.body.sent>0) alert("보냈습니다. 잠시 후 팝업이 뜨고, 헤더 🔔 알림함에도 남습니다.");
+      else alert("발송 결과를 확인하지 못했습니다. 이 기기 알림이 켜져 있는지 확인하세요.");
+    }).catch(function(){ b.disabled=false; b.textContent="📨 알림 테스트 보내기"; alert("요청 실패 — 네트워크를 확인하세요."); });
+  });
   document.getElementById("memberPin").addEventListener("keydown", function(e){ if (e.key === "Enter") doMemberLogin(); });
   document.getElementById("devicesClose").addEventListener("click", function(){ document.getElementById("devicesBackdrop").classList.remove("show"); });
   document.getElementById("devPendLogout").addEventListener("click", function(){ setGwToken(null); curMemberObj = null; document.getElementById("devicePendingBackdrop").classList.remove("show"); showMemberLogin(); });
@@ -14345,6 +14354,7 @@
     navigator.serviceWorker.ready.then(function(reg){ return reg.pushManager.getSubscription(); }).then(function(s){
       b.textContent = s ? "🔔 알림 켜짐 — 이 기기 알림 끄기" : "🔔 이 기기 알림 켜기";
       b.dataset.on = s ? "1" : "";
+      var tb=document.getElementById("pushTestBtn"); if(tb) tb.style.display = s ? "block" : "none";
     }).catch(function(){});
   }
   function pushToggle(){
