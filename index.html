@@ -808,6 +808,7 @@
     <div class="brand"><button class="nav-toggle" id="navToggle" aria-label="메뉴">☰</button><img src="./icon-192.png" alt="" class="brand-logo"><h1>종운환경 · 종운건설</h1></div>
     <div class="topbar-right">
       <button class="gear-btn" id="gsBtn" aria-label="전역 검색" title="전역 검색 — 계약·지시·거래처·미수·견적·차량·인허가 한 번에">🔍</button>
+      <button class="gear-btn" id="ntfBtn" aria-label="알림함" title="알림함 — 받은 알림 이력">🔔</button>
       <button class="user-chip" id="curUserBtn"></button>
       <button class="gear-btn" id="gearBtn" aria-label="설정">⚙</button>
     </div>
@@ -1588,6 +1589,15 @@
     <input type="search" id="gsInput" placeholder="계약·지시·거래처·미수·견적·차량·인허가 검색 (2자 이상)" autocomplete="off">
     <div id="gsOut" style="max-height:55vh;overflow:auto;font-size:13px;"></div>
     <button class="secondary" id="gsClose">닫기</button>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="ntfBackdrop">
+  <div class="modal" style="max-width:560px;">
+    <h3>알림함</h3>
+    <p style="margin:0 0 8px;color:#888;font-size:12px;">앱이 보낸 푸시 알림의 이력입니다. 폰 팝업을 놓쳐도 여기서 다시 볼 수 있습니다(최근 50건).</p>
+    <div id="ntfOut" style="max-height:55vh;overflow:auto;font-size:13px;"></div>
+    <button class="secondary" id="ntfClose">닫기</button>
   </div>
 </div>
 
@@ -11249,6 +11259,28 @@
     setTimeout(function(){ inp.focus(); },50);
   });
   document.getElementById("gsClose").addEventListener("click", function(){ document.getElementById("gsBackdrop").classList.remove("show"); });
+  document.getElementById("ntfBtn").addEventListener("click", function(){
+    document.getElementById("ntfBackdrop").classList.add("show");
+    var out=document.getElementById("ntfOut");
+    out.innerHTML='<div style="color:#888;padding:8px;">불러오는 중...</div>';
+    gwCall("gw-data", { action: "push_log" }).then(function(res){
+      if(res.status!==200 || !res.body || res.body.status!=="OK"){ out.innerHTML='<div style="color:#c00;padding:8px;">이력을 불러오지 못했습니다.</div>'; return; }
+      var items=res.body.items||[];
+      if(!items.length){ out.innerHTML='<div style="color:#888;padding:8px;">알림 이력이 없습니다. (이력은 오늘부터 쌓입니다)</div>'; return; }
+      out.innerHTML=items.map(function(it){
+        var d=new Date(it.ts||0);
+        var pad=function(n){return (n<10?"0":"")+n;};
+        var when=(d.getMonth()+1)+"/"+d.getDate()+" "+pad(d.getHours())+":"+pad(d.getMinutes());
+        return '<div style="padding:8px 6px;border-bottom:1px solid var(--line,#eee);">'
+          +'<div style="display:flex;gap:8px;align-items:baseline;"><b style="flex:1;">'+esc(it.title||"알림")+'</b>'
+          +'<span style="color:#888;font-size:11px;white-space:nowrap;">'+when+'</span></div>'
+          +(it.body?'<div style="color:#555;margin-top:2px;">'+esc(it.body)+'</div>':"")
+          +(it.tag?'<div style="color:#aaa;font-size:11px;margin-top:2px;">'+esc(it.tag)+'</div>':"")
+          +'</div>';
+      }).join("");
+    });
+  });
+  document.getElementById("ntfClose").addEventListener("click", function(){ document.getElementById("ntfBackdrop").classList.remove("show"); });
   document.getElementById("gsInput").addEventListener("input", function(){ if(gsTimer) clearTimeout(gsTimer); gsTimer=setTimeout(gsRun,200); });
   document.getElementById("bidStatsBtn").addEventListener("click", function(){
     var w=document.getElementById("bidStatsWrap");

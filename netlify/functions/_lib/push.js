@@ -40,6 +40,16 @@ async function adminIds() {
 
 // payload: {title, body, url, tag}
 async function sendTo(memberIds, payload) {
+  // 알림함(push:log) — 폰 팝업이 지나가면 다시 볼 곳이 없다는 PM 지적(2026-08-20).
+  // 발송 전에 남기고(구독이 없어도 이력은 남게), 이력 실패가 발송을 막지 않는다. 최근 100건 링.
+  try {
+    const lr = await blobGet(store(DATA), 'push:log');
+    const ldoc = (lr.ok && lr.data && Array.isArray(lr.data.items)) ? lr.data : { schema: 1, items: [] };
+    ldoc.items.push({ ts: Date.now(), title: String(payload.title || ''), body: String(payload.body || ''),
+      url: String(payload.url || ''), tag: String(payload.tag || ''), to: memberIds.slice(0, 30) });
+    if (ldoc.items.length > 100) ldoc.items = ldoc.items.slice(-100);
+    await blobSet(store(DATA), 'push:log', ldoc);
+  } catch (e) {}
   const keys = await getKeys();
   webpush.setVapidDetails('mailto:ngi6442@gmail.com', keys.publicKey, keys.privateKey);
   const doc = await getSubs();

@@ -814,6 +814,23 @@ async function handlePushSend(event, d, R) {
   } catch (e) { return jr(500, { status: 'ERROR', error_code: 'PUSH_SEND_FAILED', request_id: R }); }
 }
 
+// 알림함 — 발송 이력 조회. 관리자·개발자는 전체, 일반 직원은 자기 앞으로 온 것만.
+async function handlePushLog(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  const lr = await blobGet(store('gw_data'), 'push:log');
+  const items = (lr.ok && lr.data && Array.isArray(lr.data.items)) ? lr.data.items : [];
+  const wide = !!(c.member.admin || c.member.dev);
+  const mine = items.filter(function (it) {
+    return wide || (Array.isArray(it.to) && it.to.indexOf(c.member.id) >= 0);
+  });
+  // 최신이 위로, to(수신자 목록)는 노출하지 않는다(명단 최소화).
+  const out = mine.slice(-50).reverse().map(function (it) {
+    return { ts: it.ts, title: it.title, body: it.body, tag: it.tag };
+  });
+  return jr(200, { status: 'OK', items: out, request_id: R });
+}
+
 // ---- 계약 첨부파일(석면조사서 등) — Blobs 저장 + 서버측 텍스트 추출 ----
 // 파일 바이트는 별도 스토어(gw_files)에 base64로, 메타는 계약(con)에 저장(목록 로드 시 바이트 미포함).
 const FILES = 'gw_files';
@@ -1277,6 +1294,7 @@ async function handler(event) {
     if (d && d.action === 'push_sub') return await handlePushSub(event, d, R);
     if (d && d.action === 'push_unsub') return await handlePushUnsub(event, d, R);
     if (d && d.action === 'push_send') return await handlePushSend(event, d, R);
+    if (d && d.action === 'push_log') return await handlePushLog(event, d, R);
     return jr(400, { status: 'REJECTED', error_code: 'UNKNOWN_ACTION', request_id: R });
   } catch (e) {
     // 서버 예외도 오류 로그에 축적(클라 err_log와 같은 저장소) — 기록 실패는 무시
