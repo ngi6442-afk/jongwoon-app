@@ -569,18 +569,15 @@ function round3(n) { return Math.round(n * 1000) / 1000; }
 // rows(파싱된 인계서 행) -> 상차지·하차지·품목별 건수·수량 + 노선 배정.
 // day='YYYY-MM-DD'면 그 인계일자만. opts = { vehicles:[{no,type}], learned:[{from,to,item,side,row}] }
 // (기존 2인자 호출도 그대로 동작한다 — opts 생략 시 차량·학습 없이 매칭한다.)
-// 포스코 구내운송 EP더스트 판정 — 배출자가 포스코이고 폐기물이 제철공정분진/EP더스트.
-// (양식은 (주)포스코 → 구내운송, 품목칸에 'EP 더스트 (레스코/피앤알)' 병기. 올바로 표기는
-//  emis='주식회사포스코', wasteName='제철공정분진(고상)' — 실측 2026-08-13.)
-function isEpDust(from, item) {
-  const f = String(from || '');
-  const w = String(item || '');
-  if (f.indexOf('포스코') < 0) return false;
-  return w.indexOf('제철공정분진') >= 0 || w.indexOf('EP') >= 0 || w.indexOf('더스트') >= 0;
+// 포스코 조업일 판정 — 배출자가 포스코면 품목 불문 조업일 기준(PM 지시 2026-08-20:
+// "포스코는 배출자 확정등록일자 기준, 6시~익일 6시" — 종전 EP더스트 한정·처리인수시각 기준을 대체).
+// 확정등록일시는 배출자 확정 시점에 채워져 처리인수(며칠 지연)를 기다리지 않는다.
+function isPosco(from) {
+  return String(from || '').indexOf('포스코') >= 0;
 }
 
-// 'YYYYMMDD HH:MM:SS' 처리인수시각 → 조업일 'YYYYMMDD'. 06시 이전은 전날로 당긴다
-// (06시~익일06시 = 당일). 시각이 없으면 빈 문자열('') — 아직 처리인수 전이라 어느 날에도 안 잡힌다.
+// 'YYYYMMDD HH:MM:SS' 시각 → 조업일 'YYYYMMDD'. 06시 이전은 전날로 당긴다
+// (06시~익일06시 = 당일). 시각이 없으면 빈 문자열('') — 아직 그 단계 전이라 어느 날에도 안 잡힌다.
 function opDayFromTrtm(t) {
   const m = /^(\d{4})(\d{2})(\d{2})\s+(\d{2}):(\d{2})/.exec(String(t || '').trim());
   if (!m) return '';
@@ -608,10 +605,10 @@ function aggregate(rows, day, opts) {
     const to = cleanText(r.trtm);
     const item = cleanText(r.wasteName);
     if (!from || !to) continue;                       // 배출자·처리자 둘 다 있어야 한 건(파이썬 동일)
-    // 조업일 기준(PM 지시 2026-08-13): 포스코 구내운송 EP더스트는 24시간 조업이라
-    // '처리인수시각'의 06시~익일06시를 하루로 본다(인계일자가 아니라). 그 외 노선은 인계일자.
-    const d = isEpDust(from, item)
-      ? opDayFromTrtm(r.trtmWorkAt)
+    // 조업일 기준(PM 지시 2026-08-20): 포스코 배출분은 '배출자 확정등록일시'의
+    // 06시~익일06시를 하루로 본다(24시간 조업). 그 외 배출자는 인계일자(PM 재확인 8/20).
+    const d = isPosco(from)
+      ? opDayFromTrtm(r.confirmedAt)
       : String(r.date == null ? '' : r.date).slice(0, 8);
     if (dayKey && d !== dayKey) continue;
     // 실행되지 않은·남의 인계서 계수 금지(2026-08-19 실사고: 피앤알 3건 "아예 안 했는데 올라옴",
@@ -1047,7 +1044,7 @@ module.exports = {
   normName, normItem, itemHit, matchRoute, matchRouteEx,
   vehicleTagOf, vehicleTagOk, normVehNo, buildVehicleIndex, vehicleTypeOf,
   parseSheetXml, sheetTotal, aggregate, validDay, toSlash, kstTodayISO,
-  isEpDust, opDayFromTrtm, dayMinus, mergeMonthCounts,
+  isPosco, opDayFromTrtm, dayMinus, mergeMonthCounts,
   // 세션·네트워크(테스트 금지 — 리뷰로만 검증)
   createSession, searchManifests, collectDays,
 };
