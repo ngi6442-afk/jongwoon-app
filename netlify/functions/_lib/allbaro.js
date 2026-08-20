@@ -617,19 +617,20 @@ function aggregate(rows, day, opts) {
     // 실행되지 않은·남의 인계서 계수 금지(2026-08-19 실사고: 피앤알 3건 "아예 안 했는데 올라옴",
     // 동일산업 2회 했는데 3회 — 처리상태·운반자를 안 보고 전 행을 실적으로 세고 있었다).
     // ① 운반자 업체명이 있는데 종운이 아니면 남의 운반(포스코 구내운송처럼 여러 사가 뛰는 배출처).
-    // ② 운반자 인수량·작업일시가 둘 다 비면 미실행(예약·확정 단계) — 실행 실측은 27/27 인수량 존재.
-    // 제외는 조용히 버리지 않고 excluded에 인계번호·사유를 남긴다(일지에서 사람이 확인).
+    // ② 미실행 판정은 처리상태로만 한다: 예약·확정(운반자 인수 전)·취소만 제외.
+    //    '운반중'은 운반자가 인수해 실행된 건 — 인수량·작업일시는 다음날에야 채워지므로
+    //    공란 기준을 쓰면 어제 일지가 통째로 0건이 된다(2026-08-20 실사고: 19일 26건 전멸).
+    // 제외는 조용히 버리지 않고 excluded에 인계번호·사유·상태를 남긴다(일지에서 사람이 확인).
     const tranFirm = cleanText(r.tranFirm);
-    const ranQty = String(r.tranQty == null ? '' : r.tranQty).trim();
-    const ranAt = String(r.tranWorkAt == null ? '' : r.tranWorkAt).trim();
+    const state = cleanText(r.state);
     if (tranFirm && tranFirm.indexOf('종운') < 0) {
       excluded.push({ manf: String(r.manf == null ? '' : r.manf), from: from, to: to, item: item,
-        why: '타사 운반(' + tranFirm + ')', state: cleanText(r.state) });
+        why: '타사 운반(' + tranFirm + ')', state: state });
       continue;
     }
-    if (!ranQty && !ranAt) {
+    if (state === '예약' || state === '확정' || state.indexOf('취소') >= 0) {
       excluded.push({ manf: String(r.manf == null ? '' : r.manf), from: from, to: to, item: item,
-        why: '미실행(예약·확정 단계)', state: cleanText(r.state) });
+        why: '미실행(' + state + ')', state: state });
       continue;
     }
     const key = JSON.stringify([from, to, item]);   // 충돌 없는 합성 키
