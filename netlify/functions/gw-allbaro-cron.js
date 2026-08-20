@@ -10,7 +10,7 @@ const { setupBlobContext, store, blobGet, blobSet } = require('./_lib/blobs');
 const { issueSession } = require('./_lib/session');
 
 const DATA = 'gw_data';
-const WINDOW_DAYS = 7;
+const WINDOW_DAYS = 9;  // 8/20 조업일 규칙 개정의 경계(8/13 이전) 복구 겸 여유 — 안정되면 7로 복귀 가능
 const LOCK_KEY = 'allbaro:lock';        // 동시 실행 잠금(gw-allbaro.handleRunNow·워커와 공용 키·형식)
 const LOCK_TTL_MS = 10 * 60 * 1000;     // 10분 뒤 자동 만료(워커가 죽어도 영구 잠금 없음) — handleRunNow와 동일
 function jobKey(id) { return `allbaro:job:${id}`; }

@@ -934,7 +934,8 @@ async function searchManifests(S, sDate, eDate) {
 // opts = { vehicles:[{no,type}], learned:[{from,to,item,side,row}] } — aggregate에 그대로 넘긴다.
 // 실패는 예외로 터뜨리지 않고 {ok:false, code, detail}로 돌려준다(워커가 job에 기록).
 // EP더스트 지연분을 잡기 위한 인계일자 소급 일수(처리인수 지연 실측 최대 +2일 → 여유 4일).
-const EP_WINDOW_BACK = 4;
+const EP_WINDOW_BACK = 4;   // 인계일자가 조업일보다 이른 경우(배출자 확정을 늦게 등록) 소급 조회
+const CONFIRM_WINDOW_FWD = 2; // 인계일자가 조업일보다 늦은 경우(확정등록이 이름, 8/20 규칙) 선행 조회
 
 // 'YYYY-MM-DD' − n일 → 'YYYY-MM-DD'
 function dayMinus(day, n) {
@@ -970,11 +971,13 @@ async function collectDays(creds, days, opts) {
   const badDays = [];
   for (const day of list) {
     try {
-      // EP더스트는 조업일(처리인수 기준)이 인계일자보다 며칠 늦다(실측 최대 +2일) — 넉넉히 4일 소급해
-      // 인계일자 [day-4, day] 창을 긁는다. aggregate가 EP는 조업일로, 그 외는 인계일자로 골라낸다.
-      // (인계일자 day-4..day-1의 비EP 행은 aggregate가 버린다. 넓게 긁고 정확히 거른다.)
+      // 조업일(포스코=확정등록 06시 기준)과 인계일자는 양방향으로 어긋날 수 있다:
+      // 확정을 늦게 등록하면 인계<조업일 조회 필요(소급 4일), 확정이 이르면 인계>조업일(전방 2일 —
+      // 8/20 규칙 개정 때 전방 조회가 없어 9건이 어느 날짜에도 안 잡히는 사고 실측).
+      // 인계일자 [day-4, day+2] 창을 긁고 aggregate가 조업일==day 행만 골라낸다(넓게 긁고 정확히 거른다).
       const wideFrom = dayMinus(day, EP_WINDOW_BACK);
-      const rows = await searchManifests(S, wideFrom, day);
+      const wideTo = dayMinus(day, -CONFIRM_WINDOW_FWD);
+      const rows = await searchManifests(S, wideFrom, wideTo);
       const agg = aggregate(rows, day, opts);
       // 열이 밀리면(로그인 만료·응답 구조 변경) 날짜 칸이 회사명 등으로 깨진다 — 직접 탐지한다.
       // (창 조회라 '집계 0'만으론 판단 불가: 명절 등 그날 실적이 0이면 정상적으로 0이다.)
