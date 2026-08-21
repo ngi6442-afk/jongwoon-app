@@ -8,7 +8,7 @@
 //
 // 노출 범위를 좁히는 장치(설계 의도 — 임의로 완화하지 말 것):
 //   ① 발급은 로그인+홍보 수행 권한자만(share_make). ② 대상은 그 기록의 사진(kind:'promo')뿐.
-//   ③ 토큰은 32바이트 난수(추측 불가), ④ 24시간 뒤 자동 만료, ⑤ 인덱스로만 접근(첨부 id 비노출).
+//   ③ 토큰은 32바이트 난수(추측 불가), ④ 72시간 뒤 자동 만료, ⑤ 인덱스로만 접근(첨부 id 비노출).
 // 애초에 공개 블로그에 실릴 사진이라 성격상 공개 대상이지만, 그래도 기간·범위를 묶어 둔다.
 const crypto = require('crypto');
 const { setupBlobContext, store, blobGet, blobSet } = require('./_lib/blobs');
@@ -25,7 +25,7 @@ function jr(statusCode, body) { return { statusCode, headers: Object.assign({ 'C
 const RE_ATT = /^att_[a-f0-9]{16}$/i;
 const RE_SHARE = /^[a-f0-9]{64}$/;
 const RE_REC_ID = /^[A-Za-z0-9_-]{2,48}$/;
-const SHARE_TTL_MS = 24 * 3600 * 1000;
+const SHARE_TTL_MS = 72 * 3600 * 1000;   // 24h→72h(8/21): 복사 다음날 발행하는 실사용 패턴에서 만료 깨짐 실사고
 const MAX_IMGS = 40;                         // 한 기록의 사진 상한(현행 업로드 상한 20장의 두 배 여유)
 function shareKey(s) { return `promo:share:${s}`; }
 
