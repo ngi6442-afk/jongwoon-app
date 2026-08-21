@@ -1012,7 +1012,7 @@
     <div class="card" id="abFootCard"><div class="loading">불러오는 중…</div></div>
     <div style="margin:10px 0 0;display:flex;gap:8px;flex-wrap:wrap;">
       <button class="mini-btn" id="abRunNowBtn" style="display:none;" title="올바로 인계서 수집을 지금 실행 (관리자·개발자 전용)">▶ 지금 수집</button>
-      <button class="mini-btn" id="abXlsxBtn" disabled title="3단계에서 제공합니다">⬇ 엑셀 내려받기(준비 중)</button>
+      <button class="mini-btn" id="abXlsxBtn" title="회사 양식 그대로 채운 일지 — 매일 아침 08:25 생성분">⬇ 엑셀 내려받기</button>
     </div>
   </section>
 
@@ -11291,6 +11291,23 @@
     });
   });
   document.getElementById("ntfClose").addEventListener("click", function(){ document.getElementById("ntfBackdrop").classList.remove("show"); });
+  document.getElementById("abXlsxBtn").addEventListener("click", function(){
+    var day=(document.getElementById("abDate")||{}).value||"";
+    if(!day){ alert("날짜를 먼저 선택하세요."); return; }
+    var b=document.getElementById("abXlsxBtn"); b.disabled=true;
+    gwCall("gw-allbaro",{action:"ab_xlsx", day:day}).then(function(res){
+      b.disabled=false;
+      if(res.status===404){ alert("이 날짜의 일지 파일이 아직 없습니다. 매일 아침 08:25에 최근 7일치가 생성됩니다."); return; }
+      if(res.status!==200||!res.body||!res.body.b64){ alert("내려받기 실패 — 잠시 후 다시 시도하세요."); return; }
+      try{
+        var bin=atob(res.body.b64), arr=new Uint8Array(bin.length);
+        for(var i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i);
+        var blob=new Blob([arr],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+        var a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=res.body.name||("운반일지_"+day+".xlsx");
+        document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },1000);
+      }catch(e){ alert("파일 변환 실패"); }
+    }).catch(function(){ b.disabled=false; alert("요청 실패 — 네트워크를 확인하세요."); });
+  });
   document.getElementById("gsInput").addEventListener("input", function(){ if(gsTimer) clearTimeout(gsTimer); gsTimer=setTimeout(gsRun,200); });
   document.getElementById("bidStatsBtn").addEventListener("click", function(){
     var w=document.getElementById("bidStatsWrap");

@@ -472,6 +472,17 @@ async function handleMonth(st, d, R) {
   return jr(200, Object.assign({ ok: true, request_id: R }, merged));
 }
 
+// 일일운반일지 엑셀 내려받기 — 매일 08:25 액션즈가 회사 양식으로 생성해 올린 파일(allbaro:xlsx:날짜).
+async function handleXlsx(st, d, R) {
+  const day = cleanStr(d.day);
+  if (!RE_DATE.test(day) || !validDay(day)) return jr(400, { ok: false, code: 'BAD_DAY', request_id: R });
+  const r = await blobGet(st, 'allbaro:xlsx:' + day);
+  if (!r.ok) return jr(500, { ok: false, code: r.code, request_id: R });
+  if (!r.data || !r.data.b64) return jr(404, { ok: false, code: 'NO_XLSX', request_id: R });
+  return jr(200, { ok: true, name: String(r.data.name || ('운반일지_' + day + '.xlsx')),
+    b64: String(r.data.b64), ts: r.data.ts || null, total: r.data.total, request_id: R });
+}
+
 async function handler(event) {
   const R = rid();
   if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: CORS, body: '' };
@@ -487,6 +498,7 @@ async function handler(event) {
     switch (d && d.action) {
       case 'ab_status': return await handleStatus(st, R);
       case 'ab_day': return await handleDay(st, d, R);
+      case 'ab_xlsx': return await handleXlsx(st, d, R);
       case 'ab_month': return await handleMonth(st, d, R);
       case 'ab_run_now': return await handleRunNow(st, c, d, R);
       case 'ab_job': return await handleJob(st, d, R);
