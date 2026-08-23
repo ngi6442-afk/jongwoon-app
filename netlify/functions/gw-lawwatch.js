@@ -32,7 +32,8 @@ exports.handler = async (event) => {
 
   const nLaw = alerts.filter((a) => a.indexOf('[법령 개정 감지]') === 0 || a.indexOf('[포털 변동 감지]') === 0).length;
   const nStaff = alerts.filter((a) => a.indexOf('[선임 의무]') === 0 || a.indexOf('[문턱 접근 예고]') === 0).length;
-  const title = '법령 워치 — ' + (nLaw ? '개정 ' + nLaw + '건' : '') + (nLaw && nStaff ? ' · ' : '') + (nStaff ? '선임 ' + nStaff + '건' : '') || '경보';
+  const autoTitle = '법령 워치 — ' + (nLaw ? '개정 ' + nLaw + '건' : '') + (nLaw && nStaff ? ' · ' : '') + (nStaff ? '선임 ' + nStaff + '건' : '') || '경보';
+  const title = d.title ? String(d.title).slice(0, 60) : autoTitle; // 수집기 공용화(adwatch 등)
   const body = alerts.slice(0, 3).join('\n').slice(0, 280) + (alerts.length > 3 ? ' 외 ' + (alerts.length - 3) + '건' : '');
 
   const ids = await push.adminIds();
