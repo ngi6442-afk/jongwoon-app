@@ -12,7 +12,7 @@ const push = require('./_lib/push');
 const DATA = 'gw_data';
 const USERS = 'gw_users';
 // 컬렉션 → 권한키
-const COL = { tasks: 'tasks', vehicles: 'veh', receivables: 'rec', licenses: 'lic', checklist: 'check', documents: 'doc', clients: 'cli', contracts: 'con', leaves: 'leaves', bids: 'bid', onbid: 'bid', workers: 'wk', quotes: 'quote', promo: 'promo' };  // onbid=공매·부동산(관리자 전용), workers=일용직 명부(wk), quotes=견적서 탭 독립 권한(영업 문서 — 계약 파이프라인의 견적 "서류" 생성은 별개로 con 권한), promo=홍보(현장 기록→블로그·갤러리)
+const COL = { tasks: 'tasks', vehicles: 'veh', receivables: 'rec', licenses: 'lic', checklist: 'check', documents: 'doc', clients: 'cli', contracts: 'con', leaves: 'leaves', bids: 'bid', onbid: 'bid', workers: 'wk', quotes: 'quote', promo: 'promo', family: 'fam' };  // onbid=공매·부동산(관리자 전용), workers=일용직 명부(wk), quotes=견적서 탭 독립 권한(영업 문서 — 계약 파이프라인의 견적 "서류" 생성은 별개로 con 권한), promo=홍보(현장 기록→블로그·갤러리), family=가족친화 실적 대장(혁신⑧ — bids처럼 관리자 전용 서버 강제)
 // 사용자별 비공개 컬렉션(본인만 접근, 회원 id로 분리 저장)
 const PRIVATE_COL = { mytasks: true };
 
@@ -97,8 +97,8 @@ async function handleGet(event, d, R) {
   }
   const col = d.collection;
   if (!Object.prototype.hasOwnProperty.call(COL, col)) return jr(400, { status: 'REJECTED', error_code: 'UNKNOWN_COLLECTION', request_id: R });
-  // 일감(bids)·공매(onbid)는 관리자 전용 — 개별 권한과 무관하게 서버측 강제
-  if ((col === 'bids' || col === 'onbid') && !c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
+  // 일감(bids)·공매(onbid)·가족친화 대장(family)은 관리자 전용 — 개별 권한과 무관하게 서버측 강제
+  if ((col === 'bids' || col === 'onbid' || col === 'family') && !c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
   const p = permOf(c.member, col);
   // tasks: 개인 인박스('내게 온 지시')·홈 미완료지시는 권한과 무관하게 노출해야 하므로 hide여도 읽기 허용.
   // 가시성(담당/전사/공개범위) 필터는 프런트에서. 쓰기는 여전히 'do' 필요.
@@ -130,7 +130,7 @@ async function handleSave(event, d, R) {
   if (!Object.prototype.hasOwnProperty.call(COL, col)) return jr(400, { status: 'REJECTED', error_code: 'UNKNOWN_COLLECTION', request_id: R });
   // tasks: 직원(권한 do 아님)도 '내게 온 지시'를 완료(→승인대기)/보류하려면 저장이 필요 → 승인제 성립.
   // tasks 쓰기는 인증·인가 회원이면 허용(프런트 canActTask로 자기 업무만 조작, UI 권한 구분이지 하드보안 아님).
-  if ((col === 'bids' || col === 'onbid') && !c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
+  if ((col === 'bids' || col === 'onbid' || col === 'family') && !c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
   if (permOf(c.member, col) !== 'do' && col !== 'tasks' && col !== 'leaves') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_WRITE', request_id: R });
   if (!d.doc || typeof d.doc !== 'object') return jr(400, { status: 'REJECTED', error_code: 'INVALID_DOC', request_id: R });
   // 감사 로그용 이전 문서(diff 원본) — 읽기 실패해도 저장은 진행

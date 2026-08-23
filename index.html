@@ -1166,6 +1166,7 @@
     <div class="card" id="hrNewPanel" style="display:none;margin-top:8px;"></div>
     <button class="link-btn" id="hrAddBtn">+ 직원 추가</button>
     <button class="link-btn" id="permMgmtBtn">🔑 권한관리</button>
+    <button class="link-btn" id="famBtn">👪 가족친화 실적</button>
     <button class="link-btn" id="auditBtn">📋 감사 로그</button>
     <button class="link-btn" id="errLogBtn">🐞 오류 로그</button>
     <button class="link-btn" id="exportAllBtn">💾 전체 백업(xlsx)</button>
@@ -1216,6 +1217,58 @@
     <div class="dash-sec" style="margin-bottom:8px;"><h2>권한관리 <span class="cnt" id="permTotal"></span></h2></div>
     <button class="link-btn" id="permBackBtn">← 인사로</button>
     <div class="card" id="permRoster"><div class="loading">불러오는 중…</div></div>
+  </section>
+
+  <!-- 가족친화인증 실적 (인사 하위 · 관리자 전용) — 혁신⑧ 확정사양(2026-08-19): 관리자 대장 4종 기록 + 분기 리포트. 연차 소진율은 휴가 데이터 자동 집계 -->
+  <section class="view" id="view-fam">
+    <style>
+      .fam-table{border-collapse:collapse;width:100%;font-size:13px;}
+      .fam-table th,.fam-table td{border-bottom:1px solid var(--line);padding:7px 8px;text-align:left;vertical-align:middle;}
+      .fam-table th{color:var(--sub);font-weight:600;font-size:12px;white-space:nowrap;}
+      .fam-table td.num,.fam-table th.num{text-align:right;white-space:nowrap;}
+      .fam-table td.c,.fam-table th.c{text-align:center;}
+      .fam-table tr:last-child td{border-bottom:none;}
+      .fam-table tr.fam-total td{font-weight:800;border-top:2px solid var(--line);}
+      .fam-bar{display:inline-block;width:52px;height:6px;background:#EEF2F0;border-radius:4px;vertical-align:2px;margin-right:6px;overflow:hidden;}
+      .fam-bar > i{display:block;height:100%;background:var(--brand);}
+      .fam-bar > i.low{background:#D9822B;}
+      .fam-q-nav{display:flex;align-items:center;gap:8px;margin:2px 2px 8px;flex-wrap:wrap;}
+      .fam-q-nav b{font-size:15px;}
+      .fam-sec-h{font-size:13.5px;font-weight:700;margin:16px 2px 6px;padding-left:8px;border-left:3px solid var(--brand);}
+      .fam-scroll{overflow-x:auto;}
+    </style>
+    <div class="dash-sec" style="margin-bottom:8px;"><h2>가족친화인증 실적 <span class="cnt" id="famHead"></span></h2></div>
+    <button class="link-btn" id="famBackBtn">← 인사로</button>
+    <div style="font-size:13px;color:var(--sub);margin-bottom:6px;">관리자 대장 — 4종 제도(시차출퇴근 · 조기퇴근 · 가족친화 교육 · 건강검진비 지원)만 기록합니다. 연차 소진율은 휴가 데이터에서 자동 집계(반차 0.5 · 반반차 0.25)되어 입력이 없습니다.</div>
+    <div class="card">
+      <div class="add-row" style="padding-bottom:0;">
+        <select id="famType" class="who-sel">
+          <option value="stagger">시차출퇴근</option>
+          <option value="early">조기퇴근 (가족사랑의 날)</option>
+          <option value="edu">가족친화 교육</option>
+          <option value="checkup">건강검진비 지원</option>
+        </select>
+        <input type="date" id="famDate">
+      </div>
+      <div class="add-row" style="padding-bottom:0;">
+        <select id="famWho" class="who-sel"><option value="">대상 직원</option></select>
+      </div>
+      <div class="add-row">
+        <input type="text" id="famNote" placeholder="메모 (선택 — 근무유형·교육명·지급액 등)" autocomplete="off">
+        <button id="famAddBtn">기록</button>
+      </div>
+    </div>
+    <div style="font-size:12px;color:var(--sub);margin:6px 2px 10px;">조기퇴근은 대표 결재를 <b>수기 확인</b>한 뒤 기록합니다(결재함 구현 전까지). 기록자가 확인자로 남습니다.</div>
+    <div class="card" id="famList"><div class="loading">불러오는 중…</div></div>
+
+    <div class="dash-sec" style="margin:20px 0 6px;"><h2>분기 리포트</h2></div>
+    <div class="fam-q-nav">
+      <button class="mini-btn" id="famQPrev">◀</button>
+      <b id="famQLabel"></b>
+      <button class="mini-btn" id="famQNext">▶</button>
+      <span id="famQRangeTxt" style="font-size:12px;color:var(--sub);"></span>
+    </div>
+    <div id="famReport"></div>
   </section>
 
   <!-- 휴가 -->
@@ -3881,7 +3934,7 @@
   });
 
   // ---- 탭 ----
-  var TAB_LABELS = {dash:"홈",tasks:"지시",rec:"기성·수금",cli:"거래처",bid:"입찰",con:"계약",onbid:"부동산",hr:"인사",cal:"캘린더",veh:"차량",hwakwan:"화관법",allbaro:"운반일지",lic:"인허가",doc:"문서함",check:"내 업무",leave:"휴가",perm:"권한관리"};
+  var TAB_LABELS = {dash:"홈",tasks:"지시",rec:"기성·수금",cli:"거래처",bid:"입찰",con:"계약",onbid:"부동산",hr:"인사",cal:"캘린더",veh:"차량",hwakwan:"화관법",allbaro:"운반일지",lic:"인허가",doc:"문서함",check:"내 업무",leave:"휴가",perm:"권한관리",fam:"가족친화 실적"};
   function closeNav(){ var tb=document.getElementById("tabbar"); if(tb) tb.classList.remove("open"); }
   function updateNavToggle(name){ var nt=document.getElementById("navToggle"); if(nt) nt.textContent = "☰"; }
   function switchTab(name){
@@ -3905,6 +3958,7 @@
     document.getElementById("view-hr").classList.toggle("active", name === "hr");
     document.getElementById("view-workers").classList.toggle("active", name === "workers");
     document.getElementById("view-perm").classList.toggle("active", name === "perm");
+    document.getElementById("view-fam").classList.toggle("active", name === "fam");
     document.getElementById("view-leave").classList.toggle("active", name === "leave");
     document.getElementById("view-quote").classList.toggle("active", name === "quote");
     if (name === "quote"){ renderQuotes(); loadQuotes(); }
@@ -3919,6 +3973,7 @@
     if (name === "hr") renderHrRoster();
     if (name === "workers"){ renderWorkers(); loadWorkers(); }
     if (name === "perm") renderPermMgmt();
+    if (name === "fam"){ renderFam(); loadFam(); }
     if (name === "leave") renderLeaves();
     if (name === "bid") renderBids();
     if (name === "onbid") renderOnbid();
@@ -4077,6 +4132,8 @@
   document.getElementById("hrAddBtn").addEventListener("click", function(){ if (hrNewOpen){ hrCloseNew(); } else hrOpenNew(); });
   document.getElementById("permMgmtBtn").addEventListener("click", function(){ switchTab("perm"); });
   document.getElementById("permBackBtn").addEventListener("click", function(){ switchTab("hr"); });
+  document.getElementById("famBtn").addEventListener("click", function(){ switchTab("fam"); });
+  document.getElementById("famBackBtn").addEventListener("click", function(){ switchTab("hr"); });
   document.getElementById("hrStartBtn").addEventListener("click", hrStartWork);
   document.getElementById("auditBtn").addEventListener("click", openAudit);
   document.getElementById("errLogBtn").addEventListener("click", openErrLog);
@@ -4087,11 +4144,11 @@
   var RS_COLLS=[
     ["tasks","지시"], ["contracts","계약"], ["receivables","기성·수금"],
     ["clients","거래처"], ["vehicles","차량"], ["licenses","인허가"],
-    ["documents","문서함"], ["leaves","휴가"], ["quotes","견적서"]
+    ["documents","문서함"], ["leaves","휴가"], ["quotes","견적서"], ["family","가족친화"]
   ];
   var RS_LOADERS={tasks:loadTasks, contracts:loadContracts, receivables:loadReceivables, clients:loadClients,
     vehicles:loadVehicles, licenses:loadLicenses, documents:loadDocuments, leaves:loadLeaves,
-    quotes:loadQuotes};
+    quotes:loadQuotes, family:loadFam};
   var rsPick=null;   // {key,label,ts,date,tot,live}
   document.getElementById("restoreBtn").addEventListener("click", function(){
     if(!isAdmin()) return;
@@ -8005,6 +8062,168 @@
     document.getElementById("leaveBackdrop").classList.remove("show");
     renderLeaves(); renderDashboard();
   }
+
+  // ---- 가족친화인증 실적 대장 (family) — 혁신⑧ 확정사양(2026-08-19): 관리자 대장 + 분기 리포트 ----
+  // 4종 유형만 기록(시차출퇴근/조기퇴근/교육/건강검진비). 연차 소진율은 휴가(leaves)에서 자동 집계 — 입력 없음.
+  // 조기퇴근 대표 결재: 결재함 구현 전까지 수기 확인 전제(기록 관리자=확인자). 서버(gw-data)가 관리자 전용 강제.
+  var fam = [];
+  var famPending = false, famSaveTimer = null, famBase = 0;
+  var FAM_TYPES = [["stagger","시차출퇴근"],["early","조기퇴근"],["edu","가족친화 교육"],["checkup","건강검진비 지원"]];
+  var FAM_CHIP = { stagger:"author-chip", early:"from-chip", edu:"review-chip", checkup:"scope-chip" };
+  function famTypeLabel(t){ for(var i=0;i<FAM_TYPES.length;i++){ if(FAM_TYPES[i][0]===t) return FAM_TYPES[i][1]; } return t||""; }
+  function liveFam(){ return fam.filter(function(r){ return r && r.del!==1; }); }
+  function findFam(id){ for(var i=0;i<fam.length;i++){ if(fam[i].id===id) return fam[i]; } return null; }
+  function famName(x){ return dispName(memberName(x.member_id))||x.member_name||"-"; }
+  function mergeFam(local,remote){ var byId={}; (local||[]).forEach(function(r){if(r&&r.id)byId[r.id]=r;}); (remote||[]).forEach(function(x){if(!x||!x.id)return;var c=byId[x.id];if(!c){byId[x.id]=x;}else{var w=(x.updated||"")>(c.updated||"")?x:c;var m=Object.assign({},(w===x?c:x),w);if(c.del===1||x.del===1)m.del=mergeDel(c,x);byId[x.id]=m;}}); return Object.keys(byId).map(function(k){return byId[k];}); }
+  function loadFam(){
+    if(!isAdmin()) return;
+    gwCall("gw-data",{action:"get",collection:"family"}).then(function(res){
+      if(res.status!==200) return;
+      var doc=(res.body&&res.body.doc)||{};
+      var ri=Array.isArray(doc.items)?doc.items:[];
+      fam = famPending ? mergeFam(fam, ri) : ri;   // 저장 대기 중 로드 덮어쓰기 금지 — 로컬 우선 병합
+      famBase = doc.updated_at||0;
+      renderFam();
+    }).catch(function(){});
+  }
+  function scheduleFamSave(){ famPending=true; if(famSaveTimer) clearTimeout(famSaveTimer); famSaveTimer=setTimeout(doSaveFam,1200); }
+  function doSaveFam(){
+    gwCall("gw-data",{action:"save",collection:"family",doc:{schema:1,items:fam},base:famBase}).then(function(res){
+      if(res.status===409){   // 동시 저장 충돌 — 재조회·병합·재시도(휴가와 같은 규칙)
+        return gwCall("gw-data",{action:"get",collection:"family"}).then(function(r2){
+          if(r2.status===200){ var doc=(r2.body&&r2.body.doc)||{}; fam=mergeFam(fam,Array.isArray(doc.items)?doc.items:[]); famBase=doc.updated_at||0; }
+          return doSaveFam();
+        });
+      }
+      if(res.status===200){ famBase=(res.body&&res.body.updated_at)||Date.now(); famPending=false; }
+    }).catch(function(){});
+  }
+  // 분기 선택 상태 + 기간 계산
+  var famQ = null;   // {y,q}
+  function famQInit(){ if(famQ) return; var d=new Date(); famQ={y:d.getFullYear(), q:Math.floor(d.getMonth()/3)+1}; }
+  function famQShift(d){ famQInit(); famQ.q+=d; if(famQ.q<1){famQ.q=4;famQ.y--;} if(famQ.q>4){famQ.q=1;famQ.y++;} renderFamReport(); }
+  function famQRange(){
+    famQInit();
+    var y=famQ.y, q=famQ.q, sm=(q-1)*3+1, em=q*3;
+    return { y:y, q:q, start:y+"-"+pad(sm)+"-01", end:y+"-"+pad(em)+"-"+pad(new Date(y,em,0).getDate()),
+      months:[y+"-"+pad(sm), y+"-"+pad(sm+1), y+"-"+pad(em)] };
+  }
+  // 연차 소진 가중일수 — 반차 0.5·반반차 0.25(확정사양). 저장된 days 우선, 없으면 재계산
+  function famLeaveDays(l){ if(isPartialLeave(l.type)) return LEAVE_PARTIAL[l.type]; return (typeof l.days==="number") ? l.days : leaveDays(l.type,l.start,l.end); }
+  // 직원별 연차 소진율 — 평가연도 1/1 ~ 분기말 누적 사용 / 현재 부여량(leaveRemaining 재사용)
+  function famAnnualRows(r){
+    var y0=r.y+"-01-01", rows=[], tg=0, tu=0, paid=0;
+    liveMembers().forEach(function(m){
+      if(m.leave_date && m.leave_date < y0) return;              // 평가연도 이전 퇴사자 제외
+      if(m.annual_paid){ paid++; return; }                       // 연차수당 포함 근로자 — 사용 불가라 소진율 대상 아님
+      var grant=leaveRemaining(m.id).grant, used=0;
+      liveLeaves().forEach(function(l){
+        if(l.member_id!==m.id || l.status!=="approved" || !isAnnualUse(l)) return;
+        if(!l.start || l.start<y0 || l.start>r.end) return;
+        used+=famLeaveDays(l);
+      });
+      used=Math.round(used*100)/100;
+      rows.push({m:m, grant:grant, used:used, pct:grant>0?Math.round(used/grant*100):0});
+      tg+=grant; tu+=used;
+    });
+    return {rows:rows, tg:Math.round(tg*100)/100, tu:Math.round(tu*100)/100, tpct:tg>0?Math.round(tu/tg*100):0, paid:paid};
+  }
+  function famBarHtml(pct){ return '<span class="fam-bar"><i'+(pct<50?' class="low"':'')+' style="width:'+Math.min(100,pct)+'%"></i></span>'+pct+'%'; }
+  function renderFamReport(){
+    var host=document.getElementById("famReport"); if(!host || !isAdmin()) return;
+    var r=famQRange();
+    var lbl=document.getElementById("famQLabel"); if(lbl) lbl.textContent=r.y+"년 "+r.q+"분기";
+    var rng=document.getElementById("famQRangeTxt"); if(rng) rng.textContent=r.start+" ~ "+r.end;
+    var recs=liveFam().filter(function(x){ return x.date && x.date>=r.start && x.date<=r.end; });
+    // (1) 4종 유형별 실시 건수 — 기간·건수·대상이 한눈에(인증 증빙용)
+    var h='<div class="fam-sec-h">제도별 실시 건수 — '+r.start+' ~ '+r.end+'</div>'
+      +'<div class="card fam-scroll" style="padding:4px 12px;"><table class="fam-table"><tr><th>제도</th><th class="num">건수</th><th class="num">대상 인원</th><th>실시 내역 (날짜 · 대상)</th></tr>';
+    FAM_TYPES.forEach(function(t){
+      var list=recs.filter(function(x){ return x.type===t[0]; }).sort(function(a,b){ return (a.date||"").localeCompare(b.date||""); });
+      var uniq={}; list.forEach(function(x){ if(x.member_id) uniq[x.member_id]=1; });
+      var det=list.map(function(x){ return esc((x.date||"").slice(5))+" "+esc(famName(x)); }).join(" · ");
+      h+='<tr><td style="white-space:nowrap;">'+t[1]+'</td><td class="num">'+list.length+'건</td><td class="num">'+Object.keys(uniq).length+'명</td><td style="font-size:12px;color:var(--sub);">'+(det||"—")+'</td></tr>';
+    });
+    h+='</table></div>';
+    // (2) 연차 소진율 — 직원별·전사(휴가 데이터 자동, 반차 0.5·반반차 0.25)
+    var an=famAnnualRows(r);
+    h+='<div class="fam-sec-h">연차 소진율 — '+r.y+'-01-01 ~ '+r.end+' 누적 사용 (반차 0.5 · 반반차 0.25 자동 반영)</div>'
+      +'<div class="card fam-scroll" style="padding:4px 12px;"><table class="fam-table"><tr><th>직원</th><th>부서</th><th class="num">발생</th><th class="num">사용</th><th>소진율</th></tr>';
+    if(an.rows.length){
+      an.rows.forEach(function(x){
+        h+='<tr><td style="white-space:nowrap;">'+esc(dispName(x.m.name))+'</td><td>'+esc(x.m.dept||"")+'</td><td class="num">'+x.grant+'일</td><td class="num">'+x.used+'일</td><td style="white-space:nowrap;">'+famBarHtml(x.pct)+'</td></tr>';
+      });
+      h+='<tr class="fam-total"><td>전사</td><td></td><td class="num">'+an.tg+'일</td><td class="num">'+an.tu+'일</td><td style="white-space:nowrap;">'+famBarHtml(an.tpct)+'</td></tr>';
+    } else h+='<tr><td colspan="5" style="color:var(--sub);">집계 대상 직원이 없습니다.</td></tr>';
+    h+='</table></div>';
+    if(an.paid) h+='<div style="font-size:12px;color:var(--sub);margin:4px 2px 0;">연차수당 포함 근로자 '+an.paid+'명은 연차 사용이 없어 소진율 집계에서 제외했습니다.</div>';
+    // (3) 조기퇴근 월 1회 충족 여부(가족사랑의 날)
+    h+='<div class="fam-sec-h">조기퇴근(가족사랑의 날) — 월 1회 충족 여부</div>'
+      +'<div class="card fam-scroll" style="padding:4px 12px;"><table class="fam-table"><tr><th>직원</th>';
+    r.months.forEach(function(mo){ h+='<th class="c">'+parseInt(mo.slice(5),10)+'월</th>'; });
+    h+='<th class="c">충족</th></tr>';
+    var mem=liveMembers().filter(function(m){ return !(m.leave_date && m.leave_date < r.start); });
+    mem.forEach(function(m){
+      var got=0, cells="";
+      r.months.forEach(function(mo){
+        var hit=recs.some(function(x){ return x.type==="early" && x.member_id===m.id && x.date && x.date.slice(0,7)===mo; });
+        if(hit) got++;
+        cells+='<td class="c">'+(hit?'<b style="color:var(--brand);">○</b>':'<span style="color:var(--sub);">—</span>')+'</td>';
+      });
+      h+='<tr><td style="white-space:nowrap;">'+esc(dispName(m.name))+'</td>'+cells+'<td class="c">'+(got===3?'<b style="color:var(--brand);">3/3</b>':got+'/3')+'</td></tr>';
+    });
+    if(!mem.length) h+='<tr><td colspan="5" style="color:var(--sub);">대상 직원이 없습니다.</td></tr>';
+    h+='</table></div>';
+    h+='<div style="font-size:12px;color:var(--sub);margin:6px 2px 0;">가족친화인증 증빙용 화면 — 인쇄는 브라우저 인쇄(Ctrl+P)로 합니다.</div>';
+    host.innerHTML=h;
+  }
+  function renderFam(){
+    if(!isAdmin()) return;
+    var fd=document.getElementById("famDate"); if(fd && !fd.value) fd.value=todayStr();
+    var sel=document.getElementById("famWho");
+    if(sel){
+      var cur=sel.value;
+      var mem=liveMembers().filter(function(m){ return !m.leave_date || m.leave_date>=todayStr(); });
+      sel.innerHTML='<option value="">대상 직원</option>'+mem.map(function(m){ return '<option value="'+esc(m.id)+'">'+esc(dispName(m.name))+(m.dept?" · "+esc(m.dept):"")+'</option>'; }).join("");
+      if(cur) sel.value=cur;
+    }
+    var host=document.getElementById("famList");
+    if(host){
+      var list=liveFam().slice().sort(function(a,b){ return (b.date||"").localeCompare(a.date||"") || (b.created||"").localeCompare(a.created||""); });
+      var head=document.getElementById("famHead"); if(head) head.textContent=list.length?("총 "+list.length+"건"):"";
+      host.innerHTML=list.length?list.map(function(x){
+        var chip=FAM_CHIP[x.type]||"from-chip";
+        return '<div class="item"><div class="item-body"><div class="item-title">'+esc(famName(x))+' <span class="'+chip+'">'+esc(famTypeLabel(x.type))+'</span></div>'
+          +'<div class="item-meta"><span>'+esc(x.date||"")+'</span>'+(x.note?'<span>'+esc(x.note)+'</span>':'')+(x.by?'<span class="author-chip">기록 '+esc(dispName(x.by))+'</span>':'')+'</div></div>'
+          +'<div class="task-ctrl"><button class="mini-btn danger" data-fam-del="'+x.id+'">삭제</button></div></div>';
+      }).join(""):'<div class="empty-line">기록이 없습니다 — 위 입력줄로 첫 실적을 기록하세요.</div>';
+      Array.prototype.forEach.call(host.querySelectorAll("[data-fam-del]"),function(el){
+        el.addEventListener("click",function(){
+          var x=findFam(el.getAttribute("data-fam-del")); if(!x) return;
+          if(!confirm(famTypeLabel(x.type)+" · "+famName(x)+" ("+(x.date||"")+") 기록을 삭제할까요?")) return;   // 삭제는 사람 확인
+          x.del=1; x.updated=todayStr();
+          scheduleFamSave(); renderFam();
+        });
+      });
+    }
+    renderFamReport();
+  }
+  (function(){
+    var $=function(id){return document.getElementById(id);};
+    if(!$("famAddBtn")) return;
+    $("famAddBtn").addEventListener("click",function(){
+      if(!isAdmin()) return;
+      var type=$("famType").value, date=$("famDate").value, who=$("famWho").value;
+      if(!isDate(date)){ alert("날짜를 선택하세요."); return; }
+      if(!who){ alert("대상 직원을 선택하세요."); return; }
+      fam.push({ id:genId("fm"), type:type, date:date, member_id:who, member_name:memberName(who)||"",
+        note:$("famNote").value.trim(), by:myName()||"", created:todayStr(), updated:todayStr() });
+      $("famNote").value="";
+      scheduleFamSave(); renderFam();
+    });
+    $("famQPrev").addEventListener("click",function(){ famQShift(-1); });
+    $("famQNext").addEventListener("click",function(){ famQShift(1); });
+  })();
 
   // ---- 일감(bids.json) — 입찰·영업 리드 (수집봇 자동 + 수동 등록) ----
   var bids = [];
@@ -14332,6 +14551,7 @@
     var hrBtn = document.getElementById("tabHrBtn");
     if (hrBtn) hrBtn.classList.toggle("perm-hidden", !adminUser);
     if (currentTab === "hr" && !adminUser) switchTab("dash");
+    if (currentTab === "fam" && !adminUser) switchTab("dash");   // 가족친화 대장 — 인사 하위, 관리자 전용(서버도 강제)
     if (currentTab === "workers" && !canSee("wk")) switchTab("dash");
     // 빈 그룹 숨김(S2-B): 권한으로 탭이 전부 사라진 사이드바 그룹은 제목·구분선도 숨긴다 — 직원 화면 뼈대 정리
     (function(){
@@ -14769,7 +14989,7 @@
 
   var MOD_LABEL = {tasks:"지시", veh:"차량", rec:"기성·수금", lic:"인허가", check:"주기 체크", con:"계약", cli:"거래처", doc:"문서함", bid:"입찰", wk:"일용직", quote:"견적서", promo:"홍보"};   // check 권한은 주기 체크리스트 영역만 제어(내게 온 지시·내 할 일은 전원) — 탭 이름(내 업무)과 구분
   // ---- 감사 로그 뷰어(관리자 전용, 서버 기록 열람) ----
-  var AUDIT_COL_LABEL = {tasks:"지시", vehicles:"차량", receivables:"기성", licenses:"인허가", checklist:"업무", documents:"문서함", clients:"거래처", contracts:"계약", leaves:"휴가", member:"회원", login:"로그인"};
+  var AUDIT_COL_LABEL = {tasks:"지시", vehicles:"차량", receivables:"기성", licenses:"인허가", checklist:"업무", documents:"문서함", clients:"거래처", contracts:"계약", leaves:"휴가", family:"가족친화", member:"회원", login:"로그인"};
   var AUDIT_FIELD_LABEL = {status:"상태", title:"제목", who:"담당", who_id:"담당", due:"기한", amount:"금액", paid:"입금", del:"삭제", scope:"공개범위", stage:"단계", cancel_req:"취소요청", name:"이름", role:"직책", rank:"직급", dept:"부서", admin:"관리자", perms:"권한", hire_date:"입사일", leave_date:"퇴사일", seq:"연번", annual_base:"잔여연차기준", annual_base_date:"기준일", annual_days:"연차수동", loa_days:"휴직누적", on_loa:"휴직중", loa_start:"휴직시작", loa_end:"휴직종료", annual_paid:"연차수당포함", emp_type:"고용형태", annual_basis:"연차기준", reason:"사유", approver:"승인자", done_by:"완료자", detail:"상세", recur:"반복", hl:"하이라이트", mismatch:"불일치", PIN:"PIN"};
   var auditMonthCur = "";
   function auditMonthShift(delta){
