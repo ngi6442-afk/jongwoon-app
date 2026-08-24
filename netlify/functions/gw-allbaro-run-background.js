@@ -270,8 +270,10 @@ exports.handler = async function (event, context) {
         log.push('[' + day + '] 잠정(확정 전) ' + pendingRows.length + '건 — ' +
           pendingRows.map(function (p) { return p.manf || '?'; }).join(', ').slice(0, 200));
       }
+      // 차량번호별 합계(2026-08-24) — 주는돈(지입차 지급) 마감 정산 참고. 일지에는 안 싣는다.
+      const vehTotals = Array.isArray(dd.veh_totals) ? dd.veh_totals : [];
       // schema 2 = 수량 필드 추가(1단계 문서와 구분). 소비자는 필드별로 방어적으로 읽는다.
-      const w = await blobSet(st, dayKey(day), { schema: 2, day: day, total: total, total_qty_ton: qty, qty_unknown: qtyUnknown, counts: counts, unmatched: unmatched, excluded: excluded, pending: pendingRows, ts: Date.now(), job: job });
+      const w = await blobSet(st, dayKey(day), { schema: 2, day: day, total: total, total_qty_ton: qty, qty_unknown: qtyUnknown, counts: counts, unmatched: unmatched, excluded: excluded, pending: pendingRows, veh_totals: vehTotals, ts: Date.now(), job: job });
       if (!w.ok) { writeFail++; log.push('[저장실패] ' + day + ' ' + (w.code || '')); continue; }
       saved.push({ day: day, total: total, qty_ton: qty, unmatched_n: un });
       unmatchedTotal += un;

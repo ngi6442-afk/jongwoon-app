@@ -619,6 +619,9 @@ function aggregate(rows, day, opts) {
                          // 제외하면 8/20 사고(공란 기준으로 하루 전멸)를 재현하므로 제외하지 않는다.
   let total = 0;
   let totalSubstituted = 0;   // 인수량이 비어 위탁량으로 '실제 대체된' 행 수(A-minor2 카운터)
+  // 차량번호별 합계(PM 지시 2026-08-24) — 주는돈(지입차주 지급) 마감 정산 참고용.
+  // 차량번호는 '일지'에는 싣지 않는다(PM: "일지 입력X, 정산업무에만") — 월 정산 카드만 소비한다.
+  const vehTotals = new Map();
   for (const r of rows || []) {
     const from = cleanText(r.emis);
     const to = cleanText(r.trtm);
@@ -661,6 +664,12 @@ function aggregate(rows, day, opts) {
     const q = measureRow(r);
     // 인수량이 비어 위탁량으로 대체됐고 그 값이 실제로 합산에 쓰인 행만 센다.
     if (q.sub && q.ton !== null) totalSubstituted += 1;
+    // 차량번호별 누적 — 운반차량이 비면 배출차량(실측 27/27 동일 번호). 둘 다 없으면 미상으로 드러낸다.
+    const vno = normVehNo(r.tranVehicle || r.emisVehicle) || '(차량 미상)';
+    let vt = vehTotals.get(vno);
+    if (!vt) { vt = { no: vno, n: 0, ton: 0, unknown: 0 }; vehTotals.set(vno, vt); }
+    vt.n += 1;
+    if (q.ton === null) vt.unknown += 1; else vt.ton += q.ton;
     // 운반차량이 비면 배출차량으로 대체한다(실측 27/27 동일 번호).
     v.rows.push({
       manf: String(r.manf == null ? '' : r.manf),
@@ -776,6 +785,10 @@ function aggregate(rows, day, opts) {
     total_pending: pending.length,
     counts: counts,
     unmatched: unmatched,
+    // 차량번호별 합계 — 주는돈(지입차 지급) 정산 참고. 일지·노선 배정과 무관한 병렬 집계.
+    veh_totals: Array.from(vehTotals.values())
+      .map((v) => ({ no: v.no, n: v.n, ton: round3(v.ton), ton_unknown: v.unknown }))
+      .sort((a, b) => b.ton - a.ton || b.n - a.n || cmpStr(a.no, b.no)),
     notes: notes,
   };
 }
@@ -1052,11 +1065,21 @@ async function collectDays(creds, days, opts) {
 // 못 읽은 날은 조용히 0으로 뭉개지 않고 days_failed로 센다(무음 축소 금지 — 계약 B-major1과 같은 원칙).
 function mergeMonthCounts(dayDocs) {
   const map = new Map();
+  const vmap = new Map();   // 차량번호별 월 합계 — 주는돈(지입차 지급) 마감 참고(PM 2026-08-24)
   let totalN = 0, totalTon = 0, unmatchedN = 0, excludedN = 0, pendingN = 0, daysN = 0;
   for (const doc of dayDocs || []) {
     if (!doc || !Array.isArray(doc.counts)) continue;
     daysN += 1;
     pendingN += (Array.isArray(doc.pending) ? doc.pending.length : 0);
+    for (const vt of (Array.isArray(doc.veh_totals) ? doc.veh_totals : [])) {
+      if (!vt || !vt.no) continue;
+      const no = String(vt.no);
+      let vv = vmap.get(no);
+      if (!vv) { vv = { no: no, n: 0, ton: 0, ton_unknown: 0 }; vmap.set(no, vv); }
+      vv.n += Number(vt.n) || 0;
+      vv.ton += Number(vt.ton) || 0;
+      vv.ton_unknown += Number(vt.ton_unknown) || 0;
+    }
     for (const c of doc.counts) {
       const key = JSON.stringify([c.from || '', c.to || '', c.item || '']);
       let v = map.get(key);
@@ -1072,7 +1095,9 @@ function mergeMonthCounts(dayDocs) {
   }
   const rows = Array.from(map.values()).map(function (v) { v.ton = Math.round(v.ton * 1000) / 1000; return v; });
   rows.sort(function (a, b) { return b.ton - a.ton || b.n - a.n || (a.from < b.from ? -1 : 1); });
-  return { rows: rows, total_n: totalN, total_ton: Math.round(totalTon * 1000) / 1000, unmatched_n: unmatchedN, excluded_n: excludedN, pending_n: pendingN, days_n: daysN };
+  const vehRows = Array.from(vmap.values()).map(function (v) { v.ton = Math.round(v.ton * 1000) / 1000; return v; });
+  vehRows.sort(function (a, b) { return b.ton - a.ton || b.n - a.n || (a.no < b.no ? -1 : 1); });
+  return { rows: rows, veh_rows: vehRows, total_n: totalN, total_ton: Math.round(totalTon * 1000) / 1000, unmatched_n: unmatchedN, excluded_n: excludedN, pending_n: pendingN, days_n: daysN };
 }
 
 module.exports = {

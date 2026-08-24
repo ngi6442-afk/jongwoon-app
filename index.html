@@ -4339,6 +4339,18 @@
         });
         h+='<tr style="border-top:2px solid var(--line);font-weight:700;"><td style="padding:5px 6px;">합계 ('+b.days_n+'일 수집)</td><td></td>'
           +'<td style="padding:5px 6px;text-align:right;">'+b.total_n+'</td><td style="padding:5px 6px;text-align:right;">'+b.total_ton+'</td></tr></table></div>';
+        // 차량번호별 — 주는돈(지입차 지급) 마감 참고(PM 지시 8/24: 차량번호는 일지 말고 정산에만).
+        if(Array.isArray(b.veh_rows)&&b.veh_rows.length){
+          h+='<div style="margin-top:12px;font-weight:700;font-size:13px;">차량별 합계 — 주는돈(지입차 지급) 마감 참고</div>'
+            +'<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12.5px;">'
+            +'<tr style="text-align:left;opacity:.7;"><th style="padding:4px 6px;">차량번호</th><th style="padding:4px 6px;text-align:right;">건</th><th style="padding:4px 6px;text-align:right;">톤</th></tr>';
+          b.veh_rows.forEach(function(v){
+            h+='<tr style="border-top:1px solid var(--line);"><td style="padding:4px 6px;">'+esc(v.no)+'</td>'
+              +'<td style="padding:4px 6px;text-align:right;">'+v.n+'</td>'
+              +'<td style="padding:4px 6px;text-align:right;">'+(v.ton||0)+(v.ton_unknown?'<span title="단위를 못 읽어 합산에서 빠진 행이 있는 차량">*</span>':'')+'</td></tr>';
+          });
+          h+='</table></div>';
+        }
         var notes=[];
         if(b.unmatched_n) notes.push("미매칭 "+b.unmatched_n+"건 — 운반일지 탭에서 지정하면 반영");
         if(b.excluded_n) notes.push("계수 제외 "+b.excluded_n+"건(미실행·타사)");
