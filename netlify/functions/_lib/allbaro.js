@@ -32,49 +32,46 @@ const ONE_PAGE_ROWS = '500';
 // ---------- 노선사전(노선사전.json routes 66개 임베드) ----------
 // 회수 기입: L측=E열(count_col 5), R측=K열(count_col 11).
 const ROUTES = [
+  // 2026-08-24 배출자 가나다순 전면 재정렬(PM 지시) + 신설 3행 — 양식 원본도 같은 날 재배열.
+  // 영문 배출자(SMC·TCC·YK)는 한글 뒤 알파벳순. 이전 행번호·이력 주석은 git 이력 참조.
   { side: "L", row: 5, from: "거성산업", to: "네이처", item: "폐합성수지", count_col: 5 },
-  { side: "L", row: 6, from: "동국제강", to: "베페사", item: "지정분진", count_col: 5 },
-  { side: "L", row: 7, from: "동국제강", to: "황조", item: "지정분진", count_col: 5 },
-  { side: "L", row: 8, from: "동일산업", to: "스틸싸이클㈜", item: "EAFD", count_col: 5 },
-  { side: "L", row: 9, from: "동일산업", to: "건영환경", item: "폐주물사", count_col: 5 },
-  { side: "L", row: 10, from: "동일산업", to: "대화산업", item: "분진", count_col: 5 },
-  // L11·L12는 양식 원본의 하차지·품목 칸이 서로 뒤바뀌어 있던 것을 교정한 값(2026-08-19 PM 지시).
-  // 양식(운반일지_양식_원본.xlsx)·로컬 노선사전.json도 같은 날 함께 교정 — L15~17 정상 패턴 기준.
-  { side: "L", row: 11, from: "동일산업", to: "네이처", item: "폐유고상", count_col: 5 },
-  { side: "L", row: 12, from: "동일산업", to: "네이처", item: "폐페인트", count_col: 5 },
-  { side: "L", row: 13, from: "동일산업", to: "SP성보", item: "폐수오니", count_col: 5 },
-  { side: "L", row: 14, from: "동일산업", to: "SP성보", item: "공정오니", count_col: 5 },
-  { side: "L", row: 15, from: "동일산업(봉강)", to: "네이처", item: "폐페인트", count_col: 5 },
-  { side: "L", row: 16, from: "동일산업(봉강)", to: "네이처", item: "폐합성수지", count_col: 5 },
-  { side: "L", row: 17, from: "동일산업(봉강)", to: "네이처", item: "폐유고상", count_col: 5 },
-  { side: "L", row: 18, from: "동일산업(봉강)", to: "포항그린", item: "폐수처리오니", count_col: 5 },
-  { side: "L", row: 19, from: "동연스틸", to: "경일이앤티", item: "폐수처리오니", count_col: 5 },
-  { side: "L", row: 20, from: "동연스틸 ㈜명례공장", to: "네이처(경주)", item: "하수처리오니", count_col: 5 },
-  { side: "L", row: 21, from: "대성메탈", to: "거성산업㈜", item: "분진", count_col: 5 },
-  { side: "L", row: 22, from: "대화산업", to: "네이처", item: "폐합성수지", count_col: 5 },
+  { side: "L", row: 6, from: "대성메탈", to: "거성산업㈜", item: "분진", count_col: 5 },
+  { side: "L", row: 7, from: "대화산업", to: "네이처", item: "폐합성수지", count_col: 5 },
+  { side: "L", row: 8, from: "동국제강", to: "베페사", item: "지정분진", count_col: 5 },
+  { side: "L", row: 9, from: "동국제강", to: "황조", item: "지정분진", count_col: 5 },
+  { side: "L", row: 10, from: "동연스틸", to: "경일이앤티", item: "폐수처리오니", count_col: 5 },
+  { side: "L", row: 11, from: "동연스틸 ㈜명례공장", to: "네이처(경주)", item: "하수처리오니", count_col: 5 },
+  { side: "L", row: 12, from: "동일산업", to: "스틸싸이클㈜", item: "EAFD", count_col: 5 },
+  { side: "L", row: 13, from: "동일산업", to: "건영환경", item: "폐주물사", count_col: 5 },
+  { side: "L", row: 14, from: "동일산업", to: "대화산업", item: "분진", count_col: 5 },
+  { side: "L", row: 15, from: "동일산업", to: "네이처", item: "폐유고상", count_col: 5 },
+  { side: "L", row: 16, from: "동일산업", to: "네이처", item: "폐페인트", count_col: 5 },
+  { side: "L", row: 17, from: "동일산업", to: "SP성보", item: "폐수오니", count_col: 5 },
+  { side: "L", row: 18, from: "동일산업", to: "SP성보", item: "공정오니", count_col: 5 },
+  { side: "L", row: 19, from: "동일산업(봉강)", to: "네이처", item: "폐페인트", count_col: 5 },
+  { side: "L", row: 20, from: "동일산업(봉강)", to: "네이처", item: "폐합성수지", count_col: 5 },
+  { side: "L", row: 21, from: "동일산업(봉강)", to: "네이처", item: "폐유고상", count_col: 5 },
+  { side: "L", row: 22, from: "동일산업(봉강)", to: "포항그린", item: "폐수처리오니", count_col: 5 },
   { side: "L", row: 23, from: "베페사", to: "동일산업", item: "환원철", count_col: 5 },
   { side: "L", row: 24, from: "베페사(포항)", to: "베페사", item: "폐수오니", count_col: 5 },
-  { side: "L", row: 25, from: "심팩", to: "베페사", item: "지정분진", count_col: 5 },
-  { side: "L", row: 26, from: "스틸싸이클㈜", to: "포항그린", item: "광재", count_col: 5 },
-  { side: "L", row: 27, from: "스틸싸이클㈜", to: "씨엔텍경주", item: "광재", count_col: 5 },
-  { side: "L", row: 28, from: "스틸싸이클㈜", to: "(유)종운환경", item: "광재", count_col: 5 },
-  { side: "L", row: 29, from: "스틸싸이클㈜", to: "영내작업", item: "영내작업", count_col: 5 },
-  { side: "L", row: 30, from: "스틸싸이클㈜", to: "네이처이앤티㈜", item: "폐유성페인트", count_col: 5 },
+  { side: "L", row: 25, from: "스틸싸이클㈜", to: "포항그린", item: "광재", count_col: 5 },
+  { side: "L", row: 26, from: "스틸싸이클㈜", to: "씨엔텍경주", item: "광재", count_col: 5 },
+  { side: "L", row: 27, from: "스틸싸이클㈜", to: "(유)종운환경", item: "광재", count_col: 5 },
+  { side: "L", row: 28, from: "스틸싸이클㈜", to: "영내작업", item: "영내작업", count_col: 5 },
+  { side: "L", row: 29, from: "스틸싸이클㈜", to: "네이처이앤티㈜", item: "폐유성페인트", count_col: 5 },
+  { side: "L", row: 30, from: "심팩", to: "베페사", item: "지정분진", count_col: 5 },
   { side: "L", row: 31, from: "심팩리스텍비즈", to: "스틸싸이클", item: "분진", count_col: 5 },
   { side: "L", row: 32, from: "심팩포항1공장", to: "베페사", item: "분진", count_col: 5 },
-  { side: "L", row: 33, from: "욱성화학", to: "포항그린", item: "비산재", count_col: 5 },
-  { side: "L", row: 34, from: "케이에스피", to: "포항그린", item: "폐유리섬유", count_col: 5 },
-  { side: "L", row: 35, from: "태광산업", to: "태흥산업", item: "석고", count_col: 5 },
-  { side: "L", row: 36, from: "에코프로 씨엔지", to: "네이처(경주)", item: "폐광물류", count_col: 5 },
-  { side: "L", row: 37, from: "㈜SMC", to: "렘코㈜ 재활용1공장", item: "광재", count_col: 5 },
-  // L38·L39 = 에코프로 신규 노선(PM 지시 2026-08-24 "다 등재") — 양식 원본에도 같은 날 행 삽입
-  // (appdata 운반일지_양식_원본.xlsx 38·39행, 광재 구역은 2행 밀림). 올바로 배출자 표기 실측:
-  // '주식회사 에코프로비엠'·'에코프로비엠(CAM4)'(둘 다 L38에 부분 일치)·'주식회사 에코프로이엠'.
-  { side: "L", row: 38, from: "에코프로비엠", to: "에코프로 씨엔지", item: "폐양극활물질", count_col: 5 },
-  { side: "L", row: 39, from: "에코프로이엠", to: "에코프로 씨엔지", item: "폐양극활물질", count_col: 5 },
-  { side: "R", row: 5, from: "태웅제강", to: "스틸싸이클", item: "EAFD (BCT차량)", count_col: 11 },
-  { side: "R", row: 6, from: "태웅제강", to: "스틸싸이클", item: "EAFD(덤프)", count_col: 11 },
-  { side: "R", row: 7, from: "풍전비철", to: "스틸싸이클", item: "분진", count_col: 11 },
+  { side: "L", row: 33, from: "안동댐 상류하천 양안 광물찌꺼기 처리사업", to: "포항그린", item: "광재", count_col: 5 },
+  { side: "L", row: 34, from: "에코프로비엠", to: "에코프로 씨엔지", item: "폐양극활물질", count_col: 5 },
+  { side: "L", row: 35, from: "에코프로 씨엔지", to: "네이처(경주)", item: "폐광물류", count_col: 5 },
+  { side: "L", row: 36, from: "에코프로이엠", to: "에코프로 씨엔지", item: "폐양극활물질", count_col: 5 },
+  { side: "L", row: 37, from: "욱성화학", to: "포항그린", item: "비산재", count_col: 5 },
+  { side: "L", row: 38, from: "케이에스피", to: "포항그린", item: "폐유리섬유", count_col: 5 },
+  { side: "L", row: 39, from: "클린코리아 안강공장", to: "포항그린", item: "유기성오니", count_col: 5 },
+  { side: "R", row: 5, from: "태광산업", to: "태흥산업", item: "석고", count_col: 11 },
+  { side: "R", row: 6, from: "태웅제강", to: "스틸싸이클", item: "EAFD (BCT차량)", count_col: 11 },
+  { side: "R", row: 7, from: "태웅제강", to: "스틸싸이클", item: "EAFD(덤프)", count_col: 11 },
   { side: "R", row: 8, from: "(주)포스코", to: "구내운송", item: "EP 더스트 (레스코)", count_col: 11 },
   { side: "R", row: 9, from: "(주)포스코", to: "구내운송", item: "EP 더스트 (피앤알)", count_col: 11 },
   { side: "R", row: 10, from: "(주)포스코", to: "구내운송", item: "CIP", count_col: 11 },
@@ -87,22 +84,25 @@ const ROUTES = [
   { side: "R", row: 17, from: "㈜포스코퓨처엠 포항양극재공장", to: "포스코HY 클린메탈㈜", item: "유해화학물질", count_col: 11 },
   { side: "R", row: 18, from: "(주)포스코퓨처엠 포항화학사업부", to: "HS효성첨단소재㈜울산공장", item: "공정오니", count_col: 11 },
   { side: "R", row: 19, from: "(주)포스코퓨처엠 포항화학사업부", to: "코스모화학", item: "공정오니", count_col: 11 },
-  { side: "R", row: 20, from: "㈜한국특강", to: "스틸싸이클㈜", item: "EAFD (BCT차량)", count_col: 11 },
-  { side: "R", row: 21, from: "㈜한국특강", to: "베페사", item: "EAFD (BCT차량)", count_col: 11 },
-  { side: "R", row: 22, from: "한일철강제2공장", to: "거성산업", item: "분진", count_col: 11 },
-  { side: "R", row: 23, from: "항성메탈", to: "베페사", item: "지정분진", count_col: 11 },
-  { side: "R", row: 24, from: "현대종합금속", to: "거성산업", item: "공정오니", count_col: 11 },
-  { side: "R", row: 25, from: "현대종합금속", to: "대화산업", item: "공정오니", count_col: 11 },
-  { side: "R", row: 26, from: "현대종합금속", to: "주식회사 시온", item: "폐수처리오니", count_col: 11 },
-  { side: "R", row: 27, from: "현대종합금속2공장", to: "거성산업", item: "폐수처리오니", count_col: 11 },
-  { side: "R", row: 28, from: "현대종합금속2공장", to: "거성산업", item: "공정오니", count_col: 11 },
-  { side: "R", row: 29, from: "현대종합금속2공장", to: "대화산업", item: "공정오니", count_col: 11 },
-  { side: "R", row: 30, from: "현대종합금속2공장", to: "대화산업", item: "폐수처리오니", count_col: 11 },
-  { side: "R", row: 31, from: "현대제철 포항1공장", to: "황조", item: "분진", count_col: 11 },
-  { side: "R", row: 32, from: "YK스틸", to: "스틸싸이클㈜", item: "EAFD", count_col: 11 },
-  { side: "R", row: 33, from: "TCC스틸", to: "성진kp", item: "폐수오니", count_col: 11 },
-  { side: "R", row: 34, from: "TCC스틸", to: "포항그린", item: "폐수오니", count_col: 11 },
-  { side: "R", row: 35, from: "안동댐 상류하천 양안 광물찌꺼기 처리사업", to: "포항그린", item: "광재", count_col: 11 },
+  { side: "R", row: 20, from: "풍전비철", to: "스틸싸이클", item: "분진", count_col: 11 },
+  { side: "R", row: 21, from: "㈜한국특강", to: "스틸싸이클㈜", item: "EAFD (BCT차량)", count_col: 11 },
+  { side: "R", row: 22, from: "㈜한국특강", to: "베페사", item: "EAFD (BCT차량)", count_col: 11 },
+  { side: "R", row: 23, from: "한일철강제2공장", to: "거성산업", item: "분진", count_col: 11 },
+  { side: "R", row: 24, from: "항성메탈", to: "베페사", item: "지정분진", count_col: 11 },
+  { side: "R", row: 25, from: "현대오토솔루션", to: "SP성보", item: "분진", count_col: 11 },
+  { side: "R", row: 26, from: "현대제철 포항1공장", to: "황조", item: "분진", count_col: 11 },
+  { side: "R", row: 27, from: "현대종합금속", to: "거성산업", item: "공정오니", count_col: 11 },
+  { side: "R", row: 28, from: "현대종합금속", to: "대화산업", item: "공정오니", count_col: 11 },
+  { side: "R", row: 29, from: "현대종합금속", to: "주식회사 시온", item: "폐수처리오니", count_col: 11 },
+  { side: "R", row: 30, from: "현대종합금속2공장", to: "거성산업", item: "폐수처리오니", count_col: 11 },
+  { side: "R", row: 31, from: "현대종합금속2공장", to: "거성산업", item: "공정오니", count_col: 11 },
+  { side: "R", row: 32, from: "현대종합금속2공장", to: "대화산업", item: "공정오니", count_col: 11 },
+  { side: "R", row: 33, from: "현대종합금속2공장", to: "대화산업", item: "폐수처리오니", count_col: 11 },
+  { side: "R", row: 34, from: "㈜SMC", to: "렘코㈜ 재활용1공장", item: "광재", count_col: 11 },
+  { side: "R", row: 35, from: "㈜SMC", to: "렘코㈜ 재활용1공장", item: "분진", count_col: 11 },
+  { side: "R", row: 36, from: "TCC스틸", to: "성진kp", item: "폐수오니", count_col: 11 },
+  { side: "R", row: 37, from: "TCC스틸", to: "포항그린", item: "폐수오니", count_col: 11 },
+  { side: "R", row: 38, from: "YK스틸", to: "스틸싸이클㈜", item: "EAFD", count_col: 11 },
 ];
 
 // ---------- 별칭사전(별칭사전.json 11개 임베드, _설명 키 제외) ----------
@@ -121,6 +121,8 @@ const ALIAS = {
   // 네이처이앤티(주) ↔ 양식 '네이처(경주)'·'네이처' — '네이처'로 줄이면 두 표기 모두에 부분 일치).
   '경일이엔티': '경일이앤티',
   '네이처이앤티': '네이처',
+  // 올바로 '(주)에스엠씨' ↔ 양식 '㈜SMC'(2026-08-24 신설 행과 함께 등재 — 광재/분진 두 줄은 품목으로 갈린다)
+  '에스엠씨': 'SMC',
 };
 
 // 별칭 치환 순서는 JSON 기재 순서(파이썬 dict 순회와 동일) — 문자열 키라 삽입 순서가 보존된다.
@@ -245,8 +247,8 @@ function hit(a, b) {
 // 올바로 법정 분류명 ↔ 양식 현장 약칭. normName과 같은 방식(부분 문자열 치환)이되 품목에만 쓴다.
 // 양쪽(올바로 품목·노선표 품목)에 똑같이 적용하므로 표기 방향은 상관없다.
 // 추측 금지 — 8/10 실측 27건과 계약서 A-3 테스트 명세에서 확인된 것만 넣는다:
-//   '분진(고상)' ↔ 'EAFD' 는 실측 3건(동일산업→스틸싸이클 L8 · 한국특강→베페사 R21 ·
-//   YK스틸→스틸싸이클 R32)과 계약서의 태웅제강 R5/R6 단언이 같은 대응을 가리킨다.
+//   '분진(고상)' ↔ 'EAFD' 는 실측 3건(동일산업→스틸싸이클 L12 · 한국특강→베페사 R22 ·
+//   YK스틸→스틸싸이클 R38)과 계약서의 태웅제강 R6/R7 단언이 같은 대응을 가리킨다(가나다 재정렬 후 좌표).
 const ITEM_ALIAS = {
   '그 밖의 공정오니(무기성)': '공정오니',
   '그 밖의 광재류': '광재',
@@ -255,7 +257,7 @@ const ITEM_ALIAS = {
   // 양식에 '폐수오니'와 '폐수처리오니' 두 표기가 다 있다 — 한쪽으로 모아 서로 매칭되게 한다.
   '폐수처리오니': '폐수오니',
   EAFD: '분진',
-  // 올바로 '그 밖의 폐광물유[…]' ↔ 양식 L36 '폐광물류'(유/류 표기차, 2026-08-24 실측 등재).
+  // 올바로 '그 밖의 폐광물유[…]' ↔ 양식 L35 '폐광물류'(유/류 표기차, 2026-08-24 실측 등재).
   '폐광물유': '폐광물류',
 };
 const ITEM_ALIAS_PAIRS = Object.keys(ITEM_ALIAS)
@@ -278,7 +280,7 @@ function itemHit(a, b) { return hit(normItem(a), normItem(b)); }
 // ---------- A-2. 차량 종류 판정 ----------
 
 // 양식 품목칸에 병기된 차량 표기 → 허용되는 차량현황 type.
-// 지금 걸리는 줄은 4개(R5·R6·R20·R21)뿐이지만 표기를 문자열에서 뽑는 일반 규칙으로 둔다.
+// 지금 걸리는 줄은 4개(R6·R7·R21·R22)뿐이지만 표기를 문자열에서 뽑는 일반 규칙으로 둔다.
 // BCT차량 = 트랙터(전용 BOX/벌크 트레일러를 끈다) — 계약서 실측.
 const VEHICLE_TAGS = [
   ['BCT', ['트랙터', 'BOX', '벌크']],
