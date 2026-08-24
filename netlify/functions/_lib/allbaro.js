@@ -569,11 +569,15 @@ function round3(n) { return Math.round(n * 1000) / 1000; }
 // rows(파싱된 인계서 행) -> 상차지·하차지·품목별 건수·수량 + 노선 배정.
 // day='YYYY-MM-DD'면 그 인계일자만. opts = { vehicles:[{no,type}], learned:[{from,to,item,side,row}] }
 // (기존 2인자 호출도 그대로 동작한다 — opts 생략 시 차량·학습 없이 매칭한다.)
-// 포스코 조업일 판정 — 배출자가 포스코면 품목 불문 조업일 기준(PM 지시 2026-08-20:
+// 포스코 조업일 판정 — 배출자가 포스코 '본체'면 품목 불문 조업일 기준(PM 지시 2026-08-20:
 // "포스코는 배출자 확정등록일자 기준, 6시~익일 6시" — 종전 EP더스트 한정·처리인수시각 기준을 대체).
 // 확정등록일시는 배출자 확정 시점에 채워져 처리인수(며칠 지연)를 기다리지 않는다.
+// 본체 한정 이유(2026-08-24 실측 사고): 부분 문자열 '포스코'는 (주)포스코퓨처엠까지 물었고,
+// 퓨처엠은 확정등록이 새벽·아침에 찍혀(05:37 실측) 06시컷이 조업일을 하루씩 밀었다
+// (효성 22일분→23일, 코스모 21일분→20일). 퓨처엠 실제 조업일 = 인계일자(PM 실측과 일치).
+// 올바로 배출자 표기 실측: 본체='주식회사포스코' → normName 후 '포스코' 정확 일치만 참.
 function isPosco(from) {
-  return String(from || '').indexOf('포스코') >= 0;
+  return normName(from) === '포스코';
 }
 
 // 'YYYYMMDD HH:MM:SS' 시각 → 조업일 'YYYYMMDD'. 06시 이전은 전날로 당긴다
@@ -598,6 +602,10 @@ function aggregate(rows, day, opts) {
   const dayKey = day ? String(day).replace(/-/g, '') : null;
   const map = new Map();
   const excluded = [];   // 계수에서 뺀 행(타사 운반·미실행) — 조용한 제외 금지, 일지에서 사람이 본다
+  const pending = [];    // 잠정(배출자 확정 전) — 계수에는 넣되 표시한다. 2026-08-24 실측:
+                         // 예약이 밀리면 인계일자만 남고 확정등록이 공란인 채 '운반중'으로 보인다
+                         // (동일산업 2건이 인계일자 21·22로 계수됐다가 나중에 24로 밀림 — 유령 계수).
+                         // 제외하면 8/20 사고(공란 기준으로 하루 전멸)를 재현하므로 제외하지 않는다.
   let total = 0;
   let totalSubstituted = 0;   // 인수량이 비어 위탁량으로 '실제 대체된' 행 수(A-minor2 카운터)
   for (const r of rows || []) {
@@ -605,9 +613,10 @@ function aggregate(rows, day, opts) {
     const to = cleanText(r.trtm);
     const item = cleanText(r.wasteName);
     if (!from || !to) continue;                       // 배출자·처리자 둘 다 있어야 한 건(파이썬 동일)
-    // 조업일 기준(PM 지시 2026-08-20): 포스코 배출분은 '배출자 확정등록일시'의
-    // 06시~익일06시를 하루로 본다(24시간 조업). 그 외 배출자는 인계일자(PM 재확인 8/20).
-    const d = isPosco(from)
+    // 조업일 기준(PM 지시 2026-08-20): 포스코 본체 배출분은 '배출자 확정등록일시'의
+    // 06시~익일06시를 하루로 본다(24시간 조업). 그 외 배출자(퓨처엠 포함)는 인계일자(8/24 실측 확정).
+    const isP = isPosco(from);
+    const d = isP
       ? opDayFromTrtm(r.confirmedAt)
       : String(r.date == null ? '' : r.date).slice(0, 8);
     if (dayKey && d !== dayKey) continue;
@@ -630,6 +639,11 @@ function aggregate(rows, day, opts) {
         why: '미실행(' + state + ')', state: state });
       continue;
     }
+    // 잠정 판정 — 비포스코 건인데 배출자 확정등록일시가 아직 공란이면 '예약만 있고 상차 전'일 수
+    // 있다(실행된 건은 당일 확정이 찍힌다 — 8/24 실측: 실행 757733=당일 16:39 확정, 유령 2건=공란).
+    // 운반자 작업일시는 판정에 쓰지 않는다 — 사후 일괄 등록이라(8/24 14시대에 수십 건) 실측 무의미.
+    const pend = !isP && !/^\d{8}/.test(String(r.confirmedAt == null ? '' : r.confirmedAt).trim());
+    if (pend) pending.push({ manf: String(r.manf == null ? '' : r.manf), from: from, to: to, item: item, state: state });
     const key = JSON.stringify([from, to, item]);   // 충돌 없는 합성 키
     let v = map.get(key);
     if (!v) { v = { from: from, to: to, item: item, rows: [] }; map.set(key, v); }
@@ -641,6 +655,7 @@ function aggregate(rows, day, opts) {
       manf: String(r.manf == null ? '' : r.manf),
       vtype: vehicleTypeOf(vehIdx, r.tranVehicle || r.emisVehicle),
       q: q,
+      pend: pend,
     });
     total += 1;
   }
@@ -652,10 +667,12 @@ function aggregate(rows, day, opts) {
   const emit = (g, list, dec, vtype) => {
     let ton = 0;
     let unknown = 0;
+    let nPend = 0;
     let fromEmis = false;
     const manfNums = [];
     for (const row of list) {
       manfNums.push(row.manf);
+      if (row.pend) nPend += 1;
       if (row.q.ton === null) unknown += 1;
       else { ton += row.q.ton; if (row.q.src === 'emis') fromEmis = true; }
     }
@@ -664,6 +681,7 @@ function aggregate(rows, day, opts) {
     const c = {
       from: g.from, to: g.to, item: g.item, n: list.length, manf_nums: manfNums,
       qty_ton: round3(ton), qty_unknown: unknown, qty_src: fromEmis ? 'emis' : 'tran',
+      n_pending: nPend,
       route: dec.route
         ? { side: dec.route.side, row: dec.route.row, count_col: dec.route.count_col, item: dec.route.item }
         : null,
@@ -741,6 +759,10 @@ function aggregate(rows, day, opts) {
     qty_substituted: totalSubstituted,
     // 계수에서 뺀 행(타사 운반·미실행 예약건) — 2026-08-19 실사고 후 신설. 인계번호·사유 포함.
     excluded: excluded,
+    // 잠정(배출자 확정 전) 행 — 계수에는 포함돼 있다. 예약이 밀린 유령일 수 있으니 일지에서
+    // 사람이 본다. 확정·인계일자 갱신이 올라오면 창 내 일일 재수집이 자동으로 정리한다(8/24 신설).
+    pending: pending,
+    total_pending: pending.length,
     counts: counts,
     unmatched: unmatched,
     notes: notes,
@@ -989,7 +1011,8 @@ async function collectDays(creds, days, opts) {
       log.push('[' + day + '] ' + agg.total + '건 · ' + agg.total_qty_ton + '톤 · 노선 '
         + agg.counts.length + '종 · 미매칭 ' + agg.unmatched.length + '건'
         + (agg.total_qty_unknown ? ' · 수량 미상 ' + agg.total_qty_unknown + '건' : '')
-        + (agg.qty_substituted ? ' · 위탁량 대체 ' + agg.qty_substituted + '건' : ''));
+        + (agg.qty_substituted ? ' · 위탁량 대체 ' + agg.qty_substituted + '건' : '')
+        + (agg.total_pending ? ' · 잠정(확정 전) ' + agg.total_pending + '건' : ''));
       for (const u of agg.unmatched) {
         log.push('   미매칭(' + (u.reason === 'NO_ROUTE' ? '노선표에 없음' : '어느 줄인지 모호') + '): '
           + u.from + ' → ' + u.to + ' · ' + u.item + ' · ' + u.n + '건');
@@ -1018,10 +1041,11 @@ async function collectDays(creds, days, opts) {
 // 못 읽은 날은 조용히 0으로 뭉개지 않고 days_failed로 센다(무음 축소 금지 — 계약 B-major1과 같은 원칙).
 function mergeMonthCounts(dayDocs) {
   const map = new Map();
-  let totalN = 0, totalTon = 0, unmatchedN = 0, excludedN = 0, daysN = 0;
+  let totalN = 0, totalTon = 0, unmatchedN = 0, excludedN = 0, pendingN = 0, daysN = 0;
   for (const doc of dayDocs || []) {
     if (!doc || !Array.isArray(doc.counts)) continue;
     daysN += 1;
+    pendingN += (Array.isArray(doc.pending) ? doc.pending.length : 0);
     for (const c of doc.counts) {
       const key = JSON.stringify([c.from || '', c.to || '', c.item || '']);
       let v = map.get(key);
@@ -1037,7 +1061,7 @@ function mergeMonthCounts(dayDocs) {
   }
   const rows = Array.from(map.values()).map(function (v) { v.ton = Math.round(v.ton * 1000) / 1000; return v; });
   rows.sort(function (a, b) { return b.ton - a.ton || b.n - a.n || (a.from < b.from ? -1 : 1); });
-  return { rows: rows, total_n: totalN, total_ton: Math.round(totalTon * 1000) / 1000, unmatched_n: unmatchedN, excluded_n: excludedN, days_n: daysN };
+  return { rows: rows, total_n: totalN, total_ton: Math.round(totalTon * 1000) / 1000, unmatched_n: unmatchedN, excluded_n: excludedN, pending_n: pendingN, days_n: daysN };
 }
 
 module.exports = {

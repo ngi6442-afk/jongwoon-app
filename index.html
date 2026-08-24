@@ -4342,6 +4342,7 @@
         var notes=[];
         if(b.unmatched_n) notes.push("미매칭 "+b.unmatched_n+"건 — 운반일지 탭에서 지정하면 반영");
         if(b.excluded_n) notes.push("계수 제외 "+b.excluded_n+"건(미실행·타사)");
+        if(b.pending_n) notes.push("잠정 "+b.pending_n+"건(배출자 확정 전 — 확정되면 자동 정리)");
         if(b.days_failed) notes.push("⚠ 읽기 실패 "+b.days_failed+"일 — 숫자가 실제보다 적을 수 있음");
         if(notes.length) h+='<div style="margin-top:6px;font-size:12px;opacity:.7;">'+notes.join(" · ")+'</div>';
         body.innerHTML=h;
@@ -13959,11 +13960,12 @@
   function abTotals(){
     var d = abDay.data || {};
     var counts = Array.isArray(d.counts) ? d.counts : [];
-    var autoN = 0, autoTon = 0, tonSeen = false, unk = 0, unmN = 0, i, c;
+    var autoN = 0, autoTon = 0, tonSeen = false, unk = 0, unmN = 0, pendN = 0, i, c;
     for (i = 0; i < counts.length; i++){
       c = counts[i]; if (!c) continue;
       var n = abInt(c.n);
       unk += abInt(c.qty_unknown);                       // 단위 미상은 배정 여부와 무관한 원자료 문제 — 미배정 줄 것도 센다
+      pendN += abInt(c.n_pending);                       // 잠정(배출자 확정 전) — 계수엔 포함, 따로 세어 드러낸다
       if (!c.route){ unmN += n; continue; }              // 미배정은 자동분 합계에서 빼고 따로 센다
       autoN += n;
       if (typeof c.qty_ton === "number" && isFinite(c.qty_ton)){ autoTon += c.qty_ton; tonSeen = true; }
@@ -13976,7 +13978,7 @@
       if (en <= 0 && eq <= 0) continue;
       manN += en; manTon += eq;
     }
-    return { autoN: autoN, autoTon: autoTon, tonSeen: tonSeen, unk: unk, unmN: unmN,
+    return { autoN: autoN, autoTon: autoTon, tonSeen: tonSeen, unk: unk, unmN: unmN, pendN: pendN,
              manN: manN, manTon: manTon, totN: autoN + manN, totTon: autoTon + manTon };
   }
   function abTotalsText(){
@@ -13987,6 +13989,7 @@
     else s += " · 톤 미집계";
     if (t.unmN > 0) s += " · 미배정 " + t.unmN + "회";
     if (t.unk > 0) s += " · 단위미상 " + t.unk + "건";
+    if (t.pendN > 0) s += " · 잠정 " + t.pendN + "회";
     return s;
   }
   function abUnmKey(u){ return String((u && u.from) || "") + "|" + String((u && u.to) || "") + "|" + String((u && u.item) || ""); }
@@ -14183,6 +14186,7 @@
               '<div class="item-meta"><span>' + esc(c.item || "-") + '</span>' +
                 (lab ? '<span class="ab-rowno">' + esc(lab) + '</span>' : '') +
                 (c.weak ? '<span class="dday amber" title="상차지·하차지는 맞지만 품목 표기가 다릅니다 — 후보 줄이 하나뿐이라 배정했습니다. 확인해 주세요.">품목 확인</span>' : '') +
+                (abInt(c.n_pending) ? '<span class="dday amber" title="배출자 확정등록 전입니다 — 예약이 밀린 건이면 확정 후 자동으로 해당 날짜로 정리됩니다.">잠정 ' + abInt(c.n_pending) + '</span>' : '') +
                 (abInt(c.qty_unknown) ? '<span class="dday red" title="단위를 알 수 없어 톤 합계에서 뺐습니다">단위미상 ' + abInt(c.qty_unknown) + '</span>' : '') +
                 ((c.qty_src === "emis") ? '<span class="dday amber" title="운반자 인수량이 비어 배출자 위탁량으로 대신했습니다">위탁량</span>' : '') +
               '</div>' +
