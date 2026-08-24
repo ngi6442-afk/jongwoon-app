@@ -8455,6 +8455,7 @@
   var paUndo=null;     // {promo,title,body} — AI 초안 적용 직전의 화면 내용(예비 생성기 초안) 복구용
   var paAutoWait="";   // 기록 저장 완료를 기다렸다가 자동 생성할 promo id (PM 확정 8/14: 사진 올리면 버튼 없이 자동)
   var galWait="";      // 혁신⑥ — 게시 완료 저장이 서버에 실린 뒤 홈페이지 갤러리로 보낼 promo id (서버가 저장된 기록으로 검증하므로 저장이 먼저다)
+  var mapWait=false;   // 혁신⑦ — 게시 완료(posted) 저장이 서버에 실린 뒤 시공 지도 데이터를 재빌드할지 (id 불필요 — 서버가 전량 재빌드)
   function livePromo(){ return promoItems.filter(function(p){ return p && p.del!==1; }); }
   function promoLast(){ var l=livePromo().slice().sort(function(a,b){ return (b.ts||0)-(a.ts||0); }); return l[0]||null; }
 
@@ -10505,6 +10506,7 @@
       return resp.json().then(function(json){ promoSha=json.content&&json.content.sha; promoPending=false; renderPromo();
         if(paAutoWait){ var w=paAutoWait; paAutoWait=""; paKick(w, true); }   // 새 기록이 서버에 실린 뒤에만 자동 생성
         if(galWait){ var g=galWait; galWait=""; galleryRelaySend(g); }        // 혁신⑥ — posted 저장이 서버에 실린 뒤에만 갤러리 전송
+        if(mapWait){ mapWait=false; mapRelaySend(); }                         // 혁신⑦ — posted 저장이 서버에 실린 뒤 시공 지도 재빌드(무음)
       });
     }).catch(function(){});
   }
@@ -10907,6 +10909,7 @@
     if(u && !/^https?:\/\//.test(u)){ paStat("주소 형식이 아닙니다 — http(s)://로 시작하는 블로그 글 주소를 넣어주세요.", true); return; }
     promoDetApplyEdits(p); p.status="posted"; if(u) p.blog_url=u; promoStamp(p);
     if(u) galWait=p.id;   // 서버가 저장된 기록(posted+blog_url)으로 검증하므로 저장 완료 후에 전송
+    mapWait=true;         // 혁신⑦ — 주소 유무와 무관하게 posted가 되면 시공 지도 대상(GPS 자동 축적분)
     schedulePromoSave(); renderPromo();
     if(!u){ document.getElementById("promoDetailBackdrop").classList.remove("show"); return; }
     document.getElementById("promoPostedBtn").style.display="none";
@@ -10938,6 +10941,12 @@
       if(promoDetId===id) paStat("갤러리 전송 실패(네트워크) — [홈페이지 갤러리 전송]으로 다시 시도하세요.", true);
     });
   }
+  // 혁신⑦ 포항 시공 지도 — 게시 완료(posted) 기록의 GPS 동·읍 데이터를 서버(gw-map-relay)가
+  // 전량 재빌드해 홈페이지 data/map.json PR을 만든다(머지는 PM). 좌표·번지·발주처는 서버가 내보내지 않는다.
+  // 무음 동작: 실패해도 다음 게시 완료 저장·갤러리 전송 때 전량 재빌드로 따라잡고, 내용이 같으면 서버가 PR을 생략한다.
+  function mapRelaySend(){
+    gwCall("gw-map-relay",{action:"map_publish"}).catch(function(){});
+  }
   // 재시도·상태 확인 겸용 — 서버가 중복을 걸러 주므로 몇 번을 눌러도 카드·PR이 두 번 생기지 않는다.
   document.getElementById("promoGalleryBtn").addEventListener("click",function(){
     var p=promoFind(promoDetId); if(!p||!canDo("promo")) return;
@@ -10947,12 +10956,13 @@
       if(u===null) return;
       u=String(u).trim();
       if(!/^https?:\/\//.test(u)){ paStat("주소 형식이 아닙니다 — http(s)://로 시작하는 블로그 글 주소를 넣어주세요.", true); return; }
-      p.blog_url=u; promoStamp(p); galWait=p.id;
+      p.blog_url=u; promoStamp(p); galWait=p.id; mapWait=true;
       schedulePromoSave();
       paStat("블로그 주소 저장 중… 저장되면 홈페이지 갤러리로 자동 전송합니다.");
       return;
     }
     galleryRelaySend(p.id);
+    mapRelaySend();   // 혁신⑦ — 재시도 경로에서도 지도 데이터를 같이 따라잡는다(내용 동일 시 서버가 PR 생략)
   });
   document.getElementById("promoResubmitBtn").addEventListener("click",function(){
     var p=promoFind(promoDetId); if(!p||!canDo("promo")) return;
