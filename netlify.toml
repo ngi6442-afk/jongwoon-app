@@ -17,3 +17,13 @@
   schedule = "0 23 * * *"
 
 # 정적 파일은 그대로 서빙, /.netlify/functions/* 는 서버리스 함수로.
+
+# 진척도 벽지·위젯 — 캐시 금지.
+# 배경(2026-08-25 실사고): 벽지가 90초마다 스스로 새로고침하는데도 화면이 몇 시간 전 판에
+# 머물렀다. 서버는 최신을 주고 있었고(실측), Lively 웹뷰가 자기 캐시에서 옛 판을 꺼내 쓴 것.
+# max-age=0,must-revalidate로는 임베디드 브라우저가 재검증을 건너뛰는 경우가 있어 no-store로 못박는다.
+[[headers]]
+  for = "/w/*"
+  [headers.values]
+    Cache-Control = "no-store, no-cache, must-revalidate, max-age=0"
+    Pragma = "no-cache"
