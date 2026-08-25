@@ -7846,7 +7846,9 @@
         k++;
       }
     }
-    return Math.round(total*10)/10;
+    // 반차 0.5·반반차 0.25가 섞이므로 소수 둘째 자리까지 정확히 — 한 자리 반올림은
+    // 0.25를 0.3으로, 8.25를 8.3으로 보이게 했다(2026-08-25 직원 실지적: "2시간 썼는데 0.3").
+    return Math.round(total*100)/100;
   }
   function leaveRemaining(memberId){
     var m=findMember(memberId);
@@ -7871,8 +7873,9 @@
       if(per){ tally(per.start); expired = annualExpired(memberId); }   // 기간(입사일) 없으면 이력 전체 합산 금지(음수 방지)
     }
     // 차감은 휴가일 이후 → 잔여 = 부여 − 사용(과거). 예정은 별도 표기. 음수 방지.
-    var left = Math.max(0, Math.round((grant-used)*10)/10);
-    return {grant:grant, used:Math.round(used*10)/10, scheduled:Math.round(scheduled*10)/10, expired:expired, left:left, period:per, mode:mode};
+    // 0.25 단위(반반차)가 정확히 보이도록 소수 둘째 자리 반올림(한 자리면 0.25→0.3 왜곡).
+    var left = Math.max(0, Math.round((grant-used)*100)/100);
+    return {grant:grant, used:Math.round(used*100)/100, scheduled:Math.round(scheduled*100)/100, expired:expired, left:left, period:per, mode:mode};
   }
   function renderLeaves(){
     var host=document.getElementById("leaveList"); if(!host) return;
