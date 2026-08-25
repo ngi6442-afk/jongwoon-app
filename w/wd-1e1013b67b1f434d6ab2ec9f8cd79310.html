@@ -56,7 +56,7 @@ h2{font-size:13px;margin-bottom:8px}
   <div class="item now" style="margin-top:10px"><span class="m">▶</span>①KOSHA 마무리 주간 — ★대표 사업주 교육 수료 완료(8/25) · 권민지 담당자 16h 내일~모레(8/26~27) 수강 → 남은 것: 평가표 서명·예산 기입·검수 보류분 → 포털 인정심사 신청 · PM+사무실</div>
   <div class="item now"><span class="m">▶</span>②동일산업 적격심사 — 마감 8/24 경과, 제출 결과·접수증 확인(문서는 8/23 완결·대표님 제출 진행분) · PM</div>
   <div class="item done"><span class="m">☑</span>③홈페이지 프리렌더 main 머지 완료(8/25 15:55, PR #311) — 8/8부터 막혀 있던 구글 '내용 없음' 미색인 해소. 이제 색인요청이 유효하다</div>
-  <div class="item now"><span class="m">▶</span>★근본안-나 설치 3단계(사람 몫) — ①웹사이트 Netlify에 빌드 훅 생성 → 앱 환경변수 GW_SITE_BUILD_HOOK ②양쪽 사이트에 GW_GALLERY_FEED_KEY 같은 값 ③staging→main PR 1회 머지. 끝나면 게시=자동 반영(PR 0) · PM</div>
+  <div class="item now"><span class="m">▶</span>★근본안-나 설치 — AI가 CLI로 훅·키 설정 완료(8/25 저녁, 앱 재배포·피드 실측까지). **남은 건 staging→main PR 1회 머지뿐** — 머지되면 게시=자동 반영(PR 0). 그 전까지 게시하면 '재빌드 요청' 문구는 뜨나 갤러리는 머지 후부터 갱신 · PM</div>
   <div class="item done"><span class="m">☑</span>⑥⑦ 자동 PR 토큰 등록 완료(8/25 13:00) — GW_GALLERY_GITHUB_TOKEN 반영, 갤러리·시공지도 릴레이 활성화. 8/25 오전까지 사람 몫이던 항목 해소</div>
   <div class="item done"><span class="m">☑</span>★인허가 만기·주기 전수 조사 + 2차 재검증 완주(8/25) — 9종 전부 '허가 자체 만기 없음' 확정(재검증에도 결론 변동 0). 법제처 원문 대조 일치 140/불일치 31/확인불가 4, 불일치 전건 문서 반영. 남은 것은 사람이 채울 실물값(허가일자·차량 구분·시설 용량)</div>
   <div class="item done"><span class="m">☑</span>★혁신⑦ 완료·머지(8/25, PR #309) — 포항 시공 지도(정적 SVG·동 단위 핀·블로그 연결) 운영 라이브. 혁신 2차 전체 완주</div>
@@ -411,7 +411,7 @@ h2{font-size:13px;margin-bottom:8px}
   <div class="item"><span class="m">☐</span>변경은 staging→PR→PM 머지만 — main 직접 금지 · 보이는 요소 임의 변경 금지</div>
   <div class="item done"><span class="m">☑</span>★혁신⑦ 완료·머지(8/25, PR #309) — map.html 정적 SVG 동·읍 핀 4색+최근 시공 목록. 앱 릴레이가 게시마다 지도 자동 PR(토큰 등록 완료로 가동)</div>
   <div class="item done"><span class="m">☑</span>★프리렌더 main 머지(8/25, PR #311) + 내비 시공지도 등재(PR #310)</div>
-  <div class="item now"><span class="m">▶</span>★근본안-나 코드 완성(8/25, v299) — gw-gallery-feed(빌드용 읽기 피드)·gw-site-build(빌드 훅 호출)·build-gallery.js·netlify.toml. 배포 실측: 키 없으면 403, POST 전용 405 정상. 빌드 스크립트는 앱이 죽어도 exit 0(커밋된 갤러리 유지) 3경로 실측. 남은 건 사람 몫 3단계 · PM</div>
+  <div class="item now"><span class="m">▶</span>★근본안-나 설치 완료(8/25 저녁) — 코드(v299: 피드·훅 함수·빌드 스크립트·netlify.toml) + AI가 CLI로 훅 생성·키 3곳 설정·앱 재배포. 실키 검증: 피드 카드 1장+사진 JPEG 정상. 옛 기록 2건(blog_url 없음)이 피드에 안 실리는 것 발견 → 빌드가 기존 카드 보존(머지)하게 수리, 3장 확인. 남은 것 = staging→main PR 머지 1회 · PM</div>
   <div class="item done"><span class="m">☑</span>내비에 '시공 지도' 등재 머지(8/25, PR #310) — 고객센터 열, 현장갤러리 다음(데스크톱·모바일)</div>
   <div class="item now"><span class="m">▶</span>프리렌더 빌드주입 — staging 대기 중(13:28 커밋). 다음 PR로 main 올릴 것 · PM</div>
   <div class="item"><span class="m">☐</span>혁신⑥ 갤러리 CMS(member-relay) 연동 — 블로그 사진 동시 게시와 한 묶음</div>
