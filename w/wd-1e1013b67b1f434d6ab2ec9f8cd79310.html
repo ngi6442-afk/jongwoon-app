@@ -50,7 +50,7 @@ h2{font-size:13px;margin-bottom:8px}
   <div class="row" onclick="go('v2')"><b>2&nbsp; 인증·자격 &nbsp;◀ KOSHA 가속</b><div class="track"><div class="fillb" style="width:60%"></div><span>60</span></div></div>
   <div class="row" onclick="go('v3')"><b>3&nbsp; 홍보·검색노출</b><div class="track"><div class="fillb t" style="width:85%"></div><span>85</span></div></div>
   <div class="row" onclick="go('v4')"><b>4&nbsp; 경영 기반 &nbsp;◀ 결재 대기</b><div class="track"><div class="fillb" style="width:57%"></div><span>57</span></div></div>
-  <div class="lane">오늘(8/25 화) 저녁 기준: ①근본안-나 설치 3단계(빌드 훅·피드 키·PR 1회) ②동일산업 제출 결과 확인 ③권민지 16h 수강(8/26~27). 오늘 완료: 대표 교육 수료·프리렌더 main 머지(색인 해소)·⑥⑦ 토큰 등록·사규 초안 5건·인허가 조사 9종 + 재검증 2·3차(지적 64건 전건 반영)·등재표 73행</div>
+  <div class="lane">8/25 밤 기준: ★KOITA 보완요청 수신(D-9/4 자동반려) — 8건 중 사람 몫이 6건이라 이게 이번 주 최우선. ②동일산업 결과 확인 ③권민지 16h(8/26~27). 오늘 완료: 게시=자동반영 완결(PR 소멸)·KOSHA 점수계산(실행 4건 남음)·대표 교육 수료·프리렌더 머지·인허가 재검증 완주</div>
   <hr>
   <h2>지금 중요한 순서 — 전체 (상위 8)</h2>
   <div class="item now" style="margin-top:10px"><span class="m">▶</span>①KOSHA 마무리 주간 — ★대표 사업주 교육 수료 완료(8/25) · 권민지 담당자 16h 내일~모레(8/26~27) 수강 → 남은 것: 평가표 서명·예산 기입·검수 보류분 → 포털 인정심사 신청 · PM+사무실</div>
@@ -231,6 +231,7 @@ h2{font-size:13px;margin-bottom:8px}
   <div class="item done"><span class="m">☑</span>★노선표 배출자 가나다순 전면 재정렬(8/24, v296) — 69행 재번호·양식 재작성·좌표 세대 방어 신설. 3원천 일치·등가검증·8월 재수집·엑셀 24일치 재생성까지</div>
   <div class="item done"><span class="m">☑</span>엑셀 이중 매칭 제거(8/24) — 앱 배정(학습·차량분리)을 그대로 통과전달, 앱 보류 건은 재매칭 금지·미매칭 시트</div>
   <div class="item done"><span class="m">☑</span>★엑셀 [직접 추가]분 병합(8/25, PM ㄱ) — 수동 입력만 있는 날도 일지 엑셀이 생성되도록. 자동 수집분과 한 장으로 합본</div>
+  <div class="item now"><span class="m">▶</span>★PM 실측 2건 접수(8/25 밤, 조사 담당 가동 중) — ①수기입력: 포스코 건조장 건만 제대로 입력 안 됨(원인 조사) ②엑셀: 신규 작성 행 정렬이 기존과 안 맞음(생성기 서식 수리) · AI</div>
   <div class="item"><span class="m">☐</span>웹푸시 잔여 — 경보 태그 분리·클릭 시 해당 화면 이동 · AI</div>
   <div class="item"><span class="m">☐</span>일반 화물 운송(비폐기물) 수기 입력 → 같은 일지에 합본</div>
   <div class="item"><span class="m">☐</span>대표 결재 대상 문서 — 결재함 편입과 묶어 진행</div>
@@ -278,29 +279,31 @@ h2{font-size:13px;margin-bottom:8px}
 <div class="view" id="v2">
   <span class="back" onclick="go('v-home')">← 큰틀로</span>
   <h1>2 인증·자격 — 60% · KOSHA 가속</h1>
-  <div class="rowc focus" onclick="go('v2-1')" style="margin-top:10px"><b>연구전담부서 (KOITA) ◀ 인정 대기</b><div class="track2"><div class="fillb t" style="width:95%"></div></div><span class="pv">95</span></div>
+  <div class="rowc focus" onclick="go('v2-1')" style="margin-top:10px"><b>연구전담부서 (KOITA) ◀ D-9/4</b><div class="track2"><div class="fillb" style="width:80%"></div></div><span class="pv">80</span></div>
   <div class="rowc focus" onclick="go('v2-2')"><b>위험성평가 인정 (KOSHA) ◀ 지금</b><div class="track2"><div class="fillb t" style="width:85%"></div></div><span class="pv">85</span></div>
   <div class="rowc" onclick="go('v2-3')"><b>안전성평가 등급</b><div class="track2"><div class="fillb" style="width:60%"></div></div><span class="pv">60</span></div>
   <div class="rowc" onclick="go('v2-5')"><b>가족친화인증 (여가부)</b><div class="track2"><div class="fillb c" style="width:20%"></div></div><span class="pv">20</span></div>
   <div class="rowc" onclick="go('v2-4')"><b>벤처확인</b><div class="track2"><div class="fillb c" style="width:0%"></div></div><span class="pv">—</span></div>
-  <div class="lane">이 큰틀은 8/6 이후 산출물 변화 0 — 앱이 달리는 동안 인증만 정지해 있다. 남은 건 전부 사람 손(사진·서류·제출)</div>
+  <div class="lane">★KOITA 보완요청(D-9/4)과 KOSHA 실행 4건이 이번 주 인증 트랙의 전부 — 둘 다 사람 손(서명·발급·발주·실측)이 병목</div>
   <hr>
   <h2>지금 중요한 순서 — 인증·자격</h2>
   <div class="item now" style="margin-top:10px"><span class="m">▶</span>연구실 내부 사진 — PC 대기가 풀렸다(8/18 PM: 연구실=현 상무실에 컴퓨터 1대, 구매 보류). 구색 잡고 촬영하면 됨 · PM</div>
   <div class="item"><span class="m">☐</span>현판 출력·부착 → 현판 사진 (시안은 완성돼 있음) · PM</div>
   <div class="item"><span class="m">☐</span>기준검토표(법인세 서류철) — 확인서는 발급 완료 · PM</div>
   <div class="item"><span class="m">☐</span>점검 2건(주소 상세·투자합) → [설립신고제출] — 현재 임시저장 · PM</div>
-  <div class="item now"><span class="m">▶</span>KOSHA — 문서 완료. 대표 교육 오늘 14시·권민지 8/26~27 수강. 남은 것 = 평가표 서명·예산 기입·검수 보류분·포털 신청 · PM+사무실</div>
+  <div class="item now"><span class="m">▶</span>KOSHA — 점수계산 완료(8/25): 실행 4건 끝내면 93.8~96.3 인정권, 지금 신청하면 Ⅱ 70 미달 탈락. 실행 4건 = 평가표 실서명·운송 갱신 확정·이행증빙/교육기록·예산 기입 · PM+사무실</div>
 </div>
 
 <div class="view" id="v2-1"><span class="back" onclick="go('v2')">← 인증·자격</span>
-  <h1>연구전담부서 (KOITA) — 95 · 인정 대기</h1>
+  <h1>연구전담부서 (KOITA) — 80 · D-9/4</h1>
   <div class="item done" style="margin-top:10px"><span class="m">☑</span>연구과제 3건 입력 (2026-08~2027-07, 전부 실제 진행 중)</div>
   <div class="item done"><span class="m">☑</span>연구공간 = 본사 2동 2층 舊 창고 구획 45.75㎡ 신고</div>
   <div class="item done"><span class="m">☑</span>첨부 3종 가공 — 조직도 · 지적도 · 소재지 평면도 (임시저장 상태)</div>
   <div class="item done"><span class="m">☑</span>현판 시안 완성 (01_연구소신고\현판_기술개발부연구실.pdf) · 중소기업확인서 발급(8/6)</div>
   <div class="item done"><span class="m">☑</span>연구실 사진·현판 부착 완료(8/21) — 내부 3장+기술개발부연구실 현판 문 사진</div>
-  <div class="item done"><span class="m">☑</span>현판 출력·부착 완료(8/21)</div>
+  <div class="item done"><span class="m">☑</span>현판 출력·부착 완료(8/21) — ※8/25 보완요청으로 종이 재질 불인정 확정, 재제작 필요</div>
+  <div class="item now"><span class="m">▶</span>★보완요청 8건(8/25 수신, 기한 9/4 자동반려 — 검증실행표 = 01_연구소신고\10번): ①KSIC 38220 정정 ②세무사 명판 날인본 ③개업년월일 2003-04-11 정정 ④4insure 통합 가입자명부 ⑤조직도 재작성(명부 후 AI) ⑥도면 보완(실측 후 AI) ⑦현판 스테인리스/아크릴 재제작+근접·측면 2컷 ⑧기자재 목록·실물 위치 정리 · PM+사무실+권민지</div>
+  <div class="item"><span class="m">☐</span>불시 대면/비대면 확인 경고 — 연구실 실물(책상·PC·현판) 상시 유지, 나경일 자리·업무를 신고 내용과 일치 · PM</div>
   <div class="item"><span class="m">☐</span>중소기업 등 기준검토표 — 법인세 신고 서류철(세무사 작성분)</div>
   <div class="item"><span class="m">☐</span>점검①: 주소 상세 표기 ②: 투자 총액=과제 3건 합</div>
   <div class="item"><span class="m">☐</span>[설립신고제출] → 실사 대비 연구실 실물 유지</div>
@@ -324,6 +327,7 @@ h2{font-size:13px;margin-bottom:8px}
   <div class="item done"><span class="m">☑</span>★재해율 증빙 확보(8/23) — 종운환경 명의 산업재해율 조회결과: 2025·2026 1분기 전부 0.00(무재해 100점+교육 50% 감면 입증). 4-1 슬롯 배치</div>
   <div class="item done"><span class="m">☑</span>★교육 체계 최적화(8/23) — 감면 시간 교육일지 명기(사무직 반기 3h·현장 6h) + TBM=현장교육 정기교육 산입 근거 원문 확정(고시 제2025-77호 제2조①13·제3조의2④, 양식 각주). 현장직 잔여 의무를 TBM 누적(회당 최소시간 규정 없음)으로 충당 가능 — 별도 교육 세션 부담 최소화</div>
   <div class="item done"><span class="m">☑</span>★대표 사업주 교육 수료 완료(8/25) — 실행 체크 6 중 하나 종결</div>
+  <div class="item done"><span class="m">☑</span>★인정심사 점수계산(8/25, 0-4번 문서) — 실행 4건(평가표 실서명·운송 갱신 확정·이행증빙/교육기록·예산 기입) 완료 시 93.8~96.3점 인정권 / 지금 그대로 신청하면 Ⅱ 62점 항목 미달 탈락. 당락 변수 = 감소대책 근원성(±6점)·면담(Ⅲ 70 미달 시 단독 탈락)</div>
   <div class="item now"><span class="m">▶</span>권민지 담당자 16h 집체 8/26~27 수강 — 수료 후 포털 신청 요건 충족 · PM</div>
   <div class="item"><span class="m">☐</span>검수 보류분(운송 갱신안 3종·준설·재활용) · 재해율확인서 발급 · 실행 체크 6(서명·게시·예산 기입·포상 결재) · PM+사무실</div>
   <div class="item"><span class="m">☐</span>포털 인정심사 신청(신청서+실시규정+평가표 — 공식 제출서류 확정) → 현장심사 1개월 내(면담 — 브리핑 배포) → 심의 → 인정</div>
