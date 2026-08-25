@@ -2149,7 +2149,7 @@
     <span class="fld-label">직급</span>
     <select id="meRank"><option value="">- 선택 -</option><option value="대표">대표</option><option value="이사">이사</option><option value="부장">부장</option><option value="차장">차장</option><option value="과장">과장</option><option value="대리">대리</option><option value="주임">주임</option><option value="사원">사원</option></select>
     <span class="fld-label">부서</span>
-    <select id="meDept"><option value="">- 선택 -</option><option value="관리부">관리부</option><option value="운영부">운영부</option><option value="준설팀">준설팀</option><option value="폐기물팀">폐기물팀</option></select>
+    <select id="meDept"><option value="">- 선택 -</option><option value="관리부">관리부</option><option value="운영부">운영부</option><option value="준설팀">준설팀</option><option value="폐기물팀">폐기물팀</option><option value="기술개발부">기술개발부</option></select>
     <span class="fld-label">입사일</span>
     <input type="date" id="meHire">
     <span class="fld-label">고용형태</span>
@@ -2246,7 +2246,9 @@
   // 직급(정보용)·부서 목록 — 서열 순서(공개범위·결재라인에서 사용)
   var RANK_LIST = ["대표","이사","부장","차장","과장","대리","주임","사원"];
   var ROLE_ORDER = ["개발자","대표","관리자","팀장","직원","현장직"];
-  var DEPT_LIST = ["관리부","운영부","준설팀","폐기물팀"];
+  // 기술개발부 = 연구개발전담부서(KOITA 설립신고 2026-08-21). 신고서상 소속과 앱 소속이 다르면
+  // 불시 확인 시 '연구원 겸직'으로 읽혀 인정취소 사유가 된다 — 앱 부서를 신고 내용에 맞춰 둔다.
+  var DEPT_LIST = ["관리부","운영부","준설팀","폐기물팀","기술개발부"];
 
   // ---- 체크리스트 정의 (JW-05-011) ----
   var GROUPS = [
