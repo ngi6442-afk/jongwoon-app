@@ -10923,7 +10923,9 @@
     if(u===null) return;   // 취소 — 상태 변경 없음
     u=String(u).trim();
     if(u && !/^https?:\/\//.test(u)){ paStat("주소 형식이 아닙니다 — http(s)://로 시작하는 블로그 글 주소를 넣어주세요.", true); return; }
-    promoDetApplyEdits(p); p.status="posted"; if(u) p.blog_url=u; promoStamp(p);
+    promoDetApplyEdits(p); p.status="posted"; if(u) p.blog_url=u;
+    if(!p.posted_at) p.posted_at=todayStr();   // 갤러리 카드 날짜 = 게시일(PM 결정 8/25). 재전송해도 최초 게시일이 유지된다
+    promoStamp(p);
     if(u) galWait=p.id;   // 서버가 저장된 기록(posted+blog_url)으로 검증하므로 저장 완료 후에 전송
     mapWait=true;         // 혁신⑦ — 주소 유무와 무관하게 posted가 되면 시공 지도 대상(GPS 자동 축적분)
     schedulePromoSave(); renderPromo();

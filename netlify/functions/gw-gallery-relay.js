@@ -136,8 +136,10 @@ async function pickImages(rec, pid) {
 function clamp(v, n) { const s = String(v == null ? '' : v); return s.length > n ? s.slice(0, n) : s; }
 
 // 갤러리 카드 항목 — website 데이터 모델(batch4-b1) 그대로: title/date/tag/description/images(경로 문자열 배열)/url
+// 카드 날짜 = 게시일(PM 결정 2026-08-25). 사진 EXIF 촬영일(shot_at)을 쓰면 겨울 현장 사진으로 쓴 글이
+// 1월 날짜를 달고 목록 맨 아래로 내려간다(갤러리는 date 내림차순 정렬) — 첫 자동 카드에서 실제로 발생.
 function buildItem(rec, imagePaths) {
-  const date = /^\d{4}-\d{2}-\d{2}/.test(String(rec.shot_at || '')) ? String(rec.shot_at).slice(0, 10)
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(String(rec.posted_at || '')) ? String(rec.posted_at)
     : (/^\d{4}-\d{2}-\d{2}$/.test(String(rec.updated || '')) ? String(rec.updated) : kstDate(0));
   const descParts = [clamp(rec.region, 60), clamp(rec.facility, 80), clamp(rec.problem, 80)].filter(Boolean);
   return {
