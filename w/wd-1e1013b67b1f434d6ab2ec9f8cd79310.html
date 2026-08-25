@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ko"><head><meta charset="utf-8"><title>진척도 대시보드</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -45,28 +45,28 @@ h2{font-size:13px;margin-bottom:8px}
 
 <div class="view on" id="v-home">
   <h1>진척도</h1><span class="date">2026-08-25 · 클릭=상세</span>
-  <div class="hero">77%<small>큰틀 4개 평균</small></div>
-  <div class="row" onclick="go('v1')"><b>1&nbsp; 업무플랫폼 &nbsp;◀ 지금</b><div class="track"><div class="fillb" style="width:82%"></div><span>82</span></div></div>
+  <div class="hero">79%<small>큰틀 4개 평균</small></div>
+  <div class="row" onclick="go('v1')"><b>1&nbsp; 업무플랫폼 &nbsp;◀ 지금</b><div class="track"><div class="fillb" style="width:83%"></div><span>83</span></div></div>
   <div class="row" onclick="go('v2')"><b>2&nbsp; 인증·자격 &nbsp;◀ KOSHA 가속</b><div class="track"><div class="fillb" style="width:60%"></div><span>60</span></div></div>
-  <div class="row" onclick="go('v3')"><b>3&nbsp; 홍보·검색노출</b><div class="track"><div class="fillb" style="width:82%"></div><span>82</span></div></div>
-  <div class="row" onclick="go('v4')"><b>4&nbsp; 경영 기반 &nbsp;◀ 정지 14일</b><div class="track"><div class="fillb" style="width:50%"></div><span>50</span></div></div>
-  <div class="lane">오늘(8/25 화): ①KOSHA 마무리 주간(대표 교육 오늘 14시) ②동일산업 제출 결과 확인 ③⑥⑦ 자동 PR 토큰 등록(사람 몫). 최근 완료: ★혁신 2차 완주(⑦ 시공 지도 머지로 마감)·운반일지 대수술·갤러리 공개+테트리스·수집창 7일</div>
+  <div class="row" onclick="go('v3')"><b>3&nbsp; 홍보·검색노출</b><div class="track"><div class="fillb t" style="width:85%"></div><span>85</span></div></div>
+  <div class="row" onclick="go('v4')"><b>4&nbsp; 경영 기반 &nbsp;◀ 결재 대기</b><div class="track"><div class="fillb" style="width:57%"></div><span>57</span></div></div>
+  <div class="lane">오늘(8/25 화) 오후 기준: ①KOSHA 대표 교육(14시) 이수 확인 ②동일산업 제출 결과 확인 ③홈페이지 프리렌더 main 머지 결재. 오후 완료: ⑥⑦ 릴레이 토큰 등록·프리렌더 빌드주입(staging)·사규 초안 5건·인허가 만기/주기 전수조사 9종</div>
   <hr>
   <h2>지금 중요한 순서 — 전체 (상위 8)</h2>
-  <div class="item now" style="margin-top:10px"><span class="m">▶</span>①KOSHA 마무리 주간 — 대표 사업주 교육 오늘 14시 · 권민지 담당자 16h 내일~모레(8/26~27) 수강 → 남은 것: 평가표 서명·예산 기입·검수 보류분 → 포털 인정심사 신청 · PM+사무실</div>
+  <div class="item now" style="margin-top:10px"><span class="m">▶</span>①KOSHA 마무리 주간 — 대표 사업주 교육 오늘 14시 이수 여부 확인 · 권민지 담당자 16h 내일~모레(8/26~27) 수강 → 남은 것: 평가표 서명·예산 기입·검수 보류분 → 포털 인정심사 신청 · PM+사무실</div>
   <div class="item now"><span class="m">▶</span>②동일산업 적격심사 — 마감 8/24 경과, 제출 결과·접수증 확인(문서는 8/23 완결·대표님 제출 진행분) · PM</div>
+  <div class="item now"><span class="m">▶</span>③홈페이지 프리렌더 빌드주입 — staging 완료(8/25 13:28). main 머지는 PM 결재 몫이고, 머지돼야 8/8부터 막혀 있던 구글 '내용 없음' 미색인이 풀린다 · PM</div>
+  <div class="item done"><span class="m">☑</span>⑥⑦ 자동 PR 토큰 등록 완료(8/25 13:00) — GW_GALLERY_GITHUB_TOKEN 반영, 갤러리·시공지도 릴레이 활성화. 8/25 오전까지 사람 몫이던 항목 해소</div>
+  <div class="item now"><span class="m">▶</span>인허가 만기·주기 전수 조사 9종 완료(8/25) — 결론: 9종 전부 '허가 자체 만기 없음', 대신 주기 의무가 다수(적합성확인 5년·정기검사·교육·실적보고 등). 인용 재검증 진행 중 · AI</div>
   <div class="item done"><span class="m">☑</span>★혁신⑦ 완료·머지(8/25, PR #309) — 포항 시공 지도(정적 SVG·동 단위 핀·블로그 연결) 운영 라이브. 혁신 2차 전체 완주</div>
   <div class="item done"><span class="m">☑</span>④순환자원 수집 복구(8/25) — 진범=간헐 타임아웃(러너 복불복)×3일 창. 수집창 7일 배포+30일 백필. 유입 재개 실측(8/23~24 신규 4건)</div>
-  <div class="item now"><span class="m">▶</span>⑥⑦ 자동 PR 토큰 등록 — 앱 Netlify에 GW_GALLERY_GITHUB_TOKEN(파인그레인드, jongwoon-website contents+PR 쓰기) 없으면 갤러리·지도 자동 갱신이 안 나감 · PM</div>
-  <div class="item done"><span class="m">☑</span>★운반일지 대수술 완결(8/24) — 조업일 수리(06시컷=포스코 본체만·잠정 표시)·미매칭 전건 등재·노선표 69행 가나다 재정렬·8월 전체 재수집, 24일치 미매칭 0</div>
-  <div class="item done"><span class="m">☑</span>★혁신⑥⑧ 완료 — ⑧가족친화 실적(v290)·⑥갤러리 자동 PR+실게시 2장. 갤러리 무대 공개+테트리스 배치(PR #307·#308 머지)</div>
-  <div class="item done"><span class="m">☑</span>③RnD — KOITA 설립신고 제출(8/21). 인정서 수령 대기 → 벤처확인 재검토·연구노트(⑨) 트리거</div>
+  <div class="item done"><span class="m">☑</span>★운반일지 대수술 완결(8/24~25) — 조업일 수리·미매칭 전건 등재·노선표 69행 재정렬에 더해 엑셀 [직접 추가]분 병합(8/25 13:36)까지</div>
   <div class="foot">갱신: "진척도 갱신해"(모바일 D → 이 벽지 자동 생성) · 이 판 생성 기준: 2026-08-25</div>
 </div>
 
 <div class="view" id="v1">
   <span class="back" onclick="go('v-home')">← 큰틀로</span>
-  <h1>1 업무플랫폼 — 82% · 지금</h1>
+  <h1>1 업무플랫폼 — 83% · 지금</h1>
   <div class="rowc" onclick="go('v1-1')" style="margin-top:10px"><b>데이터·보안</b><div class="track2"><div class="fillb t" style="width:98%"></div></div><span class="pv">98</span></div>
   <div class="rowc" onclick="go('v1-2')"><b>돈 (기성·미수)</b><div class="track2"><div class="fillb t" style="width:92%"></div></div><span class="pv">92</span></div>
   <div class="rowc" onclick="go('v1-3')"><b>운영 모듈</b><div class="track2"><div class="fillb t" style="width:90%"></div></div><span class="pv">90</span></div>
@@ -83,8 +83,8 @@ h2{font-size:13px;margin-bottom:8px}
   <div class="rowc focus" onclick="go('v1-13')"><b>관리자 기기 보안 ◀ 지금</b><div class="track2"><div class="fillb c" style="width:25%"></div></div><span class="pv">25</span></div>
   <hr>
   <h2>지금 중요한 순서 — 업무플랫폼</h2>
-  <div class="item" style="margin-top:10px"><span class="m">☐</span>업무 데이터 미입력이 진짜 병목 — 완주계약 0·미수 0·응찰표시 0·인허가만기 13건 공란 · PM</div>
-  <div class="item"><span class="m">☐</span>인허가 만기 13건 입력 → D-30 자동지시·캘린더 즉시 켜짐(코드 5줄) · 권민지</div>
+  <div class="item" style="margin-top:10px"><span class="m">☐</span>업무 데이터 미입력이 진짜 병목 — 완주계약 0·미수 0·응찰표시 0·인허가 주기 의무 공란 · PM</div>
+  <div class="item"><span class="m">☐</span>인허가 주기 의무 등재(법령 조사 8/25 완료분) → D-30 자동지시·캘린더 즉시 켜짐(코드 5줄) · 권민지</div>
   <div class="item"><span class="m">☐</span>계정 암호·자동잠금(5분) → 기기점검 → 구매 결정 · PM</div>
   <div class="item"><span class="m">☐</span>배치도 결정 6종 → 확정 → 대표 결재함 구현 · PM</div>
   <div class="item"><span class="m">☐</span>화관법 로컬 폴백 스케줄러 제거 — 현재 07:50 병행(무인 3일 연속 확인 후) · AI</div>
@@ -120,6 +120,8 @@ h2{font-size:13px;margin-bottom:8px}
   <h1>운영 모듈 — 90</h1>
   <div class="item done" style="margin-top:10px"><span class="m">☑</span>지시(승인제)·차량·인허가·캘린더·감사로그·거래처·서류출력 완료</div>
   <div class="item done"><span class="m">☑</span>전역 검색 (v222 — 헤더 🔍, 권한 범위 내 9개 모듈)</div>
+  <div class="item done"><span class="m">☑</span>★인허가 만기·주기 법령 전수조사 9종(8/25) — 화물운송·건설기계대여·석면해체·태양광발전·폐기물 5건·구조물해체비계·상하수도설비·유해화학물질운반·대기배출. 9종 전부 허가 만기 없음 확정, 대신 주기 의무 다수를 조문 근거로 정리(09_조사_문서\인허가_만기주기_조사_20260825.md)</div>
+  <div class="item now"><span class="m">▶</span>인용 재검증 9섹션 — 법제처 원문 재대조 진행 중(1차 조사는 사용량 한도로 재검증 미실시분) · AI</div>
   <div class="item now"><span class="m">▶</span>문서함 세분화</div>
   <div class="note">분류별 권한(E)은 백로그 — 직원 실사용 후 설계</div>
 </div>
@@ -132,6 +134,7 @@ h2{font-size:13px;margin-bottom:8px}
   <div class="item done"><span class="m">☑</span>타이핑 로그인 실패 버그 수리(v244) — 한글 조합형(NFD)·제로폭문자. 하위호환+자가치유</div>
   <div class="item done"><span class="m">☑</span>개발자 등급 신설(v246~247) — 관리자(업무)/개발자(시스템) 축 분리. PM 단독</div>
   <div class="item done"><span class="m">☑</span>연차 반반차(0.25일) 신설 — v254(8/12)</div>
+  <div class="item done"><span class="m">☑</span>연차 표시 0.25 단위 정확화 — v297(8/25). 반반차가 0.3으로 왜곡되던 반올림 수리</div>
   <div class="item now"><span class="m">▶</span>직원 각자 [내 아이디 설정] 발급 → 전원 완료 시 GW_ALLOW_NAME_LOGIN=off 하나만 끄면 이사 끝 · PM</div>
   <div class="item"><span class="m">☐</span>실사용 검증 — 권한 구멍 확인</div>
   <div class="note">개발자 1인 체제 확정(기기 3대라 복구 가능) — 재론 금지</div>
@@ -156,7 +159,8 @@ h2{font-size:13px;margin-bottom:8px}
   <div class="item done"><span class="m">☑</span>온비드 원문 링크 404 수리 + 탐침 재시도 6회(러너 IP 복불복 대응) — 8/13</div>
   <div class="item now"><span class="m">▶</span>활용신청 승인 확인 — LH 2건·누리·K-apt 2건 → 승인분부터 어댑터 각 30분</div>
   <div class="item"><span class="m">☐</span>나라장터 API 변경신청 승인 대기 — 수집 죽으면 이것부터 의심</div>
-  <div class="item now"><span class="m">▶</span>순환자원(re.or.kr) 8/4 두절 — 원인 확정(8/25): 깃허브 러너(해외 IP)만 타임아웃, 국내 IP 즉답 = IP 차단 추정. 로컬 경유 수집 전환 필요 · AI</div>
+  <div class="item done"><span class="m">☑</span>순환자원(re.or.kr) 8/4 두절 복구(8/25) — 진범은 IP 차단이 아니라 러너 간헐 타임아웃×3일 수집창. 수집창 3→7일 배포+30일 백필로 봉합</div>
+  <div class="item done"><span class="m">☑</span>낙찰통계 경보 오탐 수리(8/25) — 타임아웃을 '응답 0건'과 구분해 스트릭에 미집계</div>
   <div class="item"><span class="m">☐</span>사정률 분석·투찰 포지션 추천 v2 — 보류(착수는 지시로)</div>
   <div class="note">일감 학습 필터: (같은 기관+유사 제목) 재공고만 자동패스 — 기관 단위 금지</div>
 </div>
@@ -221,6 +225,7 @@ h2{font-size:13px;margin-bottom:8px}
   <div class="item done"><span class="m">☑</span>★미매칭 전건 등재(8/24) — 에코프로 2행 신설+클린코리아·현대오토솔루션·SMC분진 3행 신설+학습 2건(동연오토텍·봉강)+별칭 4건. 8월 24일치 미매칭 0</div>
   <div class="item done"><span class="m">☑</span>★노선표 배출자 가나다순 전면 재정렬(8/24, v296) — 69행 재번호·양식 재작성·좌표 세대 방어 신설. 3원천 일치·등가검증·8월 재수집·엑셀 24일치 재생성까지</div>
   <div class="item done"><span class="m">☑</span>엑셀 이중 매칭 제거(8/24) — 앱 배정(학습·차량분리)을 그대로 통과전달, 앱 보류 건은 재매칭 금지·미매칭 시트</div>
+  <div class="item done"><span class="m">☑</span>★엑셀 [직접 추가]분 병합(8/25, PM ㄱ) — 수동 입력만 있는 날도 일지 엑셀이 생성되도록. 자동 수집분과 한 장으로 합본</div>
   <div class="item"><span class="m">☐</span>웹푸시 잔여 — 경보 태그 분리·클릭 시 해당 화면 이동 · AI</div>
   <div class="item"><span class="m">☐</span>일반 화물 운송(비폐기물) 수기 입력 → 같은 일지에 합본</div>
   <div class="item"><span class="m">☐</span>대표 결재 대상 문서 — 결재함 편입과 묶어 진행</div>
@@ -313,7 +318,7 @@ h2{font-size:13px;margin-bottom:8px}
   <div class="item done"><span class="m">☑</span>★결재 6건 정본화 완료(8/23) — 신규 3(조직도 JW-03-012·제안포상 JW-03-013·보호구대장 JW-06-022) + 개정 3(실시규정 v3·교육계획서 v2·평가표양식 v2). 문서대장 등재·정본 푸시까지. 실시규정은 3년 만에 소재불명→전산 정본</div>
   <div class="item done"><span class="m">☑</span>★재해율 증빙 확보(8/23) — 종운환경 명의 산업재해율 조회결과: 2025·2026 1분기 전부 0.00(무재해 100점+교육 50% 감면 입증). 4-1 슬롯 배치</div>
   <div class="item done"><span class="m">☑</span>★교육 체계 최적화(8/23) — 감면 시간 교육일지 명기(사무직 반기 3h·현장 6h) + TBM=현장교육 정기교육 산입 근거 원문 확정(고시 제2025-77호 제2조①13·제3조의2④, 양식 각주). 현장직 잔여 의무를 TBM 누적(회당 최소시간 규정 없음)으로 충당 가능 — 별도 교육 세션 부담 최소화</div>
-  <div class="item now"><span class="m">▶</span>대표 사업주 교육 오늘 8/25 화 14시 · 권민지 담당자 16h 집체 8/26~27 수강 확정 · PM</div>
+  <div class="item now"><span class="m">▶</span>대표 사업주 교육 8/25(오늘) 14시 — 이수 여부 확인 필요 · 권민지 담당자 16h 집체 8/26~27 수강 확정 · PM</div>
   <div class="item"><span class="m">☐</span>검수 보류분(운송 갱신안 3종·준설·재활용) · 재해율확인서 발급 · 실행 체크 6(서명·게시·예산 기입·포상 결재) · PM+사무실</div>
   <div class="item"><span class="m">☐</span>포털 인정심사 신청(신청서+실시규정+평가표 — 공식 제출서류 확정) → 현장심사 1개월 내(면담 — 브리핑 배포) → 심의 → 인정</div>
   <div class="note">신청 경로 실측(8/22): 산업안전포털 portal.kosha.or.kr로 KRAS 통합. 제출서류 = 신청서+실시규정 1부+실시결과(표) 1부(포털 공식 명시). 근거 전부 원문: 고시 제2024-76호·처리규칙 제1164호·고용부 안전보건교육 안내서</div>
@@ -323,7 +328,7 @@ h2{font-size:13px;margin-bottom:8px}
   <h1>안전성평가 등급 — 60</h1>
   <div class="item now" style="margin-top:10px"><span class="m">▶</span>재평가 결과 대기 — 현재 D등급 = 1년 주기</div>
   <div class="item"><span class="m">☐</span>등급확인서 수령 → 앱 업로드 (P5c가 판독·만료일 자동 반영)</div>
-  <div class="note">주기 원문 확정(8/4): S=3년 / A·B·C=2년 / D=1년</div>
+  <div class="note">주기 원문 확정(8/4) — S=3년 / A·B·C=2년 / D=1년. 8/25 인허가 전수조사에서 고시 제2022-9호 원문으로 재확인(연속 3회 미수검 시 최하위 강등 조항 포함)</div>
 </div>
 
 <div class="view" id="v2-5"><span class="back" onclick="go('v2')">← 인증·자격</span>
@@ -344,20 +349,20 @@ h2{font-size:13px;margin-bottom:8px}
 
 <div class="view" id="v3">
   <span class="back" onclick="go('v-home')">← 큰틀로</span>
-  <h1>3 홍보·검색노출 — 82%</h1>
-  <div class="rowc focus" onclick="go('v3-1')" style="margin-top:10px"><b>검색 등록·노출 ◀ 병목</b><div class="track2"><div class="fillb" style="width:60%"></div></div><span class="pv">60</span></div>
+  <h1>3 홍보·검색노출 — 85%</h1>
+  <div class="rowc focus" onclick="go('v3-1')" style="margin-top:10px"><b>검색 등록·노출 ◀ 머지 대기</b><div class="track2"><div class="fillb" style="width:75%"></div></div><span class="pv">75</span></div>
   <div class="rowc" onclick="go('v3-2')"><b>홍보모듈 정착</b><div class="track2"><div class="fillb t" style="width:90%"></div></div><span class="pv">90</span></div>
-  <div class="rowc" onclick="go('v3-3')"><b>홈페이지</b><div class="track2"><div class="fillb t" style="width:92%"></div></div><span class="pv">92</span></div>
+  <div class="rowc" onclick="go('v3-3')"><b>홈페이지</b><div class="track2"><div class="fillb t" style="width:94%"></div></div><span class="pv">94</span></div>
   <div class="lane">★첫 실게시 8/19 — 4일차 실측(8/23): 네이버 '포항 준설' 블로그 탭 1위(PC·모바일 동시), 사진 10장 정상. 통합검색은 광고 점유. 30일 판정 9/18경</div>
   <hr>
   <h2>지금 중요한 순서 — 홍보·검색노출</h2>
-  <div class="item now" style="margin-top:10px"><span class="m">▶</span>현장 글 사이클 가동 — 이제 기록 올리면 자동 생성→검수→복붙 게시. 다음 현장부터 권민지 단독 운영 · 권민지</div>
-  <div class="item"><span class="m">☐</span>색인 프리렌더 방식 결정 — 이게 되기 전 색인요청은 무한반복 · PM</div>
+  <div class="item now" style="margin-top:10px"><span class="m">▶</span>프리렌더 빌드주입 staging 완료(8/25 13:28) — main 머지 결재만 남았다. 머지 후에야 색인요청이 유효해진다 · PM</div>
+  <div class="item now"><span class="m">▶</span>현장 글 사이클 가동 — 이제 기록 올리면 자동 생성→검수→복붙 게시. 다음 현장부터 권민지 단독 운영 · 권민지</div>
   <div class="item"><span class="m">☐</span>구글 비즈니스 프로필 — 전화 인증이라 대면 필요 · 외부</div>
 </div>
 
 <div class="view" id="v3-1"><span class="back" onclick="go('v3')">← 홍보·검색노출</span>
-  <h1>검색 등록·노출 — 60 · 병목</h1>
+  <h1>검색 등록·노출 — 75 · 머지 대기</h1>
   <div class="item done" style="margin-top:10px"><span class="m">☑</span>★8/23 노출 실측 — 네이버 '포항 준설' 블로그 탭 1위(PC·모바일, 게시 4일차·장량동 글)·썸네일 10장 정상(핫링크 유효). 통합검색 첫 화면은 광고 3개 점유·블로그 섹션 미노출. 구글(GSC API): 28일 노출 68·클릭 4·'종운' 브랜드만, 서비스 6p 여전히 미크롤</div>
   <div class="item"><span class="m">☐</span>파워링크 — 키워드·예산안 초안 완료 + 주간 성과 수집기(adwatch) 대기 모드 배치(API 키 등록되면 자동 가동). 집행 여부 PM 결정 · PM+AI</div>
   <div class="item done"><span class="m">☑</span>진단 정정(8/5 실측): 네이버 등록·사이트맵·수집 전부 정상 — 병목은 등록이 아니라 콘텐츠·플레이스</div>
@@ -365,8 +370,9 @@ h2{font-size:13px;margin-bottom:8px}
   <div class="item done"><span class="m">☑</span>구글 SC API 연결(서비스 계정, 조회 전용) — 노출 14·클릭 0</div>
   <div class="item done"><span class="m">☑</span>구글 미색인 원인 확정(8/8) — 서비스 6p 원본 HTML이 빈 껍데기(본문 54~58자) → 내용없음 판정</div>
   <div class="item done"><span class="m">☑</span>플레이스(8/7) 마감: 환경·건설 상세설명 + 가격정보 등록 완료</div>
-  <div class="item now"><span class="m">▶</span>해결 방식 미결정(8/8부터 그대로): ①프리렌더 빌드주입(시범 성공: 준설 57→3259자) ②엣지함수(추천)</div>
-  <div class="item"><span class="m">☐</span>색인요청은 위 반영 후에만 유효</div>
+  <div class="item done"><span class="m">☑</span>★해결 방식 확정·구현(8/25) — ①프리렌더 빌드주입 채택. 서비스 5페이지 본문을 빌드 시 원본 HTML에 주입해 '내용 없음' 판정 해소. staging 반영 완료(13:28)</div>
+  <div class="item now"><span class="m">▶</span>main 머지 결재 — 홈페이지는 staging→PR→PM 머지만 가능. 머지 전까지 구글에는 여전히 빈 껍데기가 보인다 · PM</div>
+  <div class="item"><span class="m">☐</span>색인요청은 main 머지·배포 확인 후에만 유효</div>
   <div class="item"><span class="m">☐</span>구글 비즈니스 프로필 — 전화 인증 필요(대면)</div>
   <div class="item"><span class="m">☐</span>블로그 회복 추적 — 기존 44건 보존, 새 공식 글 30일 후 판정</div>
   <div class="note">디렉토리 백링크(상공회의소·협회)는 장기 레버 · 지침: 05_홍보_검색노출\블로그_작성지침_v1.md</div>
@@ -387,30 +393,33 @@ h2{font-size:13px;margin-bottom:8px}
   <div class="item done"><span class="m">☑</span>재생성 관문 통과(8/19) → 그 판이 첫 게시본으로 발행 완료 — 사이클 완주(기록→초안→검수→게시)</div>
   <div class="item"><span class="m">☐</span>기종별 GPS 검증 — 아이폰·구버전 안드로이드 원본 전송 사진 수집</div>
   <div class="item"><span class="m">☐</span>학습 시스템(승인글·직원 메모·검색자료 재료) — 품질 우선 완료 후 착수(PM 8/14)</div>
-  <div class="item done"><span class="m">☑</span>★혁신⑥ 완료(8/24) — 갤러리 자동 PR 파이프라인(gw-gallery-relay: 발행 확인→홈페이지 카드 자동 PR)+첫 2장 실게시(용흥동·장량동, AI 대표사진 3장씩 영구 핫링크). 남은 사람 몫: GW_GALLERY_GITHUB_TOKEN 등록</div>
+  <div class="item done"><span class="m">☑</span>★혁신⑥ 완료(8/24) — 갤러리 자동 PR 파이프라인(gw-gallery-relay: 발행 확인→홈페이지 카드 자동 PR)+첫 2장 실게시(용흥동·장량동, AI 대표사진 3장씩 영구 핫링크)</div>
+  <div class="item done"><span class="m">☑</span>GW_GALLERY_GITHUB_TOKEN 등록 완료(8/25 13:00) — ⑥갤러리·⑦지도 릴레이가 실제로 PR을 내보내는 상태가 됨</div>
   <div class="item"><span class="m">☐</span>후속 킵: 사진대지 hwpx · PROMO_TEL 전화번호 확정</div>
   <div class="note">계약 차단 규칙: 프롬프트로 말리지 않고 애초에 안 보낸다 — CONTRACT_사진AI.md</div>
 </div>
 
 <div class="view" id="v3-3"><span class="back" onclick="go('v3')">← 홍보·검색노출</span>
-  <h1>홈페이지 — 92</h1>
+  <h1>홈페이지 — 94</h1>
   <div class="item done" style="margin-top:10px"><span class="m">☑</span>★현장 갤러리 공개(8/24, PR #307·#308 머지) — 준비중 게이트 제거·카드 2장·태그 필터·테트리스(masonry) 배치</div>
   <div class="item"><span class="m">☐</span>변경은 staging→PR→PM 머지만 — main 직접 금지 · 보이는 요소 임의 변경 금지</div>
-  <div class="item done"><span class="m">☑</span>★혁신⑦ 완료·머지(8/25, PR #309) — map.html 정적 SVG 동·읍 핀 4색+최근 시공 목록. 앱 릴레이가 게시마다 지도 자동 PR(토큰 등록 후 가동)</div>
+  <div class="item done"><span class="m">☑</span>★혁신⑦ 완료·머지(8/25, PR #309) — map.html 정적 SVG 동·읍 핀 4색+최근 시공 목록. 앱 릴레이가 게시마다 지도 자동 PR(토큰 등록 완료로 가동)</div>
+  <div class="item done"><span class="m">☑</span>내비에 '시공 지도' 등재 머지(8/25, PR #310) — 고객센터 열, 현장갤러리 다음(데스크톱·모바일)</div>
+  <div class="item now"><span class="m">▶</span>프리렌더 빌드주입 — staging 대기 중(13:28 커밋). 다음 PR로 main 올릴 것 · PM</div>
   <div class="item"><span class="m">☐</span>혁신⑥ 갤러리 CMS(member-relay) 연동 — 블로그 사진 동시 게시와 한 묶음</div>
   <div class="note">브랜드 그린 #1A9A6B · 원조 패턴 레포 = jongwoon-website</div>
 </div>
 
 <div class="view" id="v4">
   <span class="back" onclick="go('v-home')">← 큰틀로</span>
-  <h1>4 경영 기반 — 50% · 정지 14일</h1>
+  <h1>4 경영 기반 — 57% · 결재 대기</h1>
   <div class="rowc" onclick="go('v4-1')" style="margin-top:10px"><b>용어·규정</b><div class="track2"><div class="fillb t" style="width:90%"></div></div><span class="pv">90</span></div>
-  <div class="rowc" onclick="go('v4-2')"><b>조직·인사 제도</b><div class="track2"><div class="fillb" style="width:60%"></div></div><span class="pv">60</span></div>
+  <div class="rowc" onclick="go('v4-2')"><b>조직·인사 제도</b><div class="track2"><div class="fillb" style="width:72%"></div></div><span class="pv">72</span></div>
   <div class="rowc" onclick="go('v4-3')"><b>문서 체계</b><div class="track2"><div class="fillb" style="width:65%"></div></div><span class="pv">65</span></div>
   <div class="rowc focus" onclick="go('v4-4')"><b>상장요건 ◀ 병목</b><div class="track2"><div class="fillb c" style="width:15%"></div></div><span class="pv">15</span></div>
   <hr>
   <h2>지금 중요한 순서 — 경영 기반</h2>
-  <div class="item" style="margin-top:10px"><span class="m">☐</span>사규 문서화 — 앱 구현분(연차·승인제·권한) 역정리. 8/6 이후 진척 없음 · AI 초안→PM</div>
+  <div class="item now" style="margin-top:10px"><span class="m">▶</span>사규 초안 5건 결재 — 8/25 작성 완료(휴가운영세칙 JW-02-006·그룹웨어 운영권한 JW-05-018·업무지시결재 JW-05-019·자동화운영 JW-05-020 + 취업규칙 대조표). 결재 전·문서대장 미등재 상태 · PM</div>
   <div class="item"><span class="m">☐</span>직무기술서 확정 — v0.1 초안 검토 · PM</div>
   <div class="item"><span class="m">☐</span>문서대장 최신화 (jongwoon-docs) · AI</div>
   <div class="item"><span class="m">☐</span>상장요건 갭 분석 — 착수 시점 PM 결정 · 대기</div>
@@ -426,11 +435,12 @@ h2{font-size:13px;margin-bottom:8px}
 </div>
 
 <div class="view" id="v4-2"><span class="back" onclick="go('v4')">← 경영 기반</span>
-  <h1>조직·인사 제도 — 60</h1>
+  <h1>조직·인사 제도 — 72</h1>
   <div class="item done" style="margin-top:10px"><span class="m">☑</span>연차(소멸·이월X)·권한 분리·사직 신청 앱 구현</div>
   <div class="item done"><span class="m">☑</span>임직원 등급 세분화 · 인사 업무 신설 (7/11)</div>
-  <div class="item done"><span class="m">☑</span>반반차(0.25일) 제도 앱 반영 — v254(8/12)</div>
-  <div class="item"><span class="m">☐</span>사규 문서화 — 앱 구현분을 규정 문서로 역정리 (AI 초안 → PM)</div>
+  <div class="item done"><span class="m">☑</span>반반차(0.25일) 제도 앱 반영 — v254(8/12) · 표시 0.25 단위 정확화 v297(8/25)</div>
+  <div class="item done"><span class="m">☑</span>★사규 문서화 초안 5건(8/25) — 휴가운영세칙 JW-02-006 · 그룹웨어 운영권한관리규정 JW-05-018 · 업무지시결재 운영규정 JW-05-019 · 자동화 운영규정 JW-05-020 · 취업규칙 대조표. 앱 구현분(연차·승인제·권한·자동화)을 규정으로 역정리</div>
+  <div class="item now"><span class="m">▶</span>위 5건 PM 결재 → 문서대장 등재 → 정본화. 취업규칙 본문 개정은 노무사 경유(AI는 대조까지만) · PM</div>
   <div class="item"><span class="m">☐</span>직무기술서 확정 — 09_조사_문서\직무기술서_나경일_시안_v0.1.md</div>
 </div>
 
