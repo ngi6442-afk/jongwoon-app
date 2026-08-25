@@ -266,6 +266,12 @@ async function handleMemberUpsert(st, event, d, R) {
   if (d.rank !== undefined) m.rank = String(d.rank || '');
   if (d.dept !== undefined) m.dept = String(d.dept || '');
   if (d.annual_days !== undefined) { m.annual_days = (d.annual_days === null || isNaN(Number(d.annual_days))) ? null : Number(d.annual_days); }
+  // 생년월일 — 나이로 갈리는 법정 주기(운수종사자 자격유지검사 65/70세, 조종사 정기적성검사 65세) 계산용.
+  // 형식이 어긋난 값은 조용히 버린다(잘못된 날짜로 만기를 계산하면 조용히 틀린다).
+  if (d.birth !== undefined) {
+    const b = String(d.birth || '');
+    m.birth = /^\d{4}-\d{2}-\d{2}$/.test(b) ? b : '';
+  }
   if (d.hire_date !== undefined) m.hire_date = String(d.hire_date || '');
   if (d.emp_type !== undefined) m.emp_type = String(d.emp_type || '');
   if (d.annual_basis !== undefined) m.annual_basis = (d.annual_basis === 'fiscal' ? 'fiscal' : 'hire');
@@ -292,7 +298,7 @@ async function handleMemberUpsert(st, event, d, R) {
   // 감사 로그: 회원 필드 변경(이전값→새값). PIN은 값 미기록('변경'만), 해시·비밀값 제외.
   try {
     const f = {};
-    const AUD_FIELDS = ['name','uid','role','admin','dev','rank','dept','annual_days','hire_date','emp_type','annual_basis','loa_days','leave_date','annual_paid','annual_base','annual_base_date','seq','on_loa','loa_start','loa_end'];
+    const AUD_FIELDS = ['name','uid','role','admin','dev','rank','dept','annual_days','birth','hire_date','emp_type','annual_basis','loa_days','leave_date','annual_paid','annual_base','annual_base_date','seq','on_loa','loa_start','loa_end'];
     const b = before || {};
     for (const k of AUD_FIELDS) {
       const a = b[k], v = m[k];
