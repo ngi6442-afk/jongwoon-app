@@ -485,14 +485,6 @@ function go(id){
 </script>
 
 <script>
-(function(){
-  // 90초마다 새 주소로 다시 읽는다(캐시 우회). 화면이 다시 보일 때도 1분 지났으면 갱신.
-  var born = Date.now();
-  function fresh(){ location.replace(location.pathname + '?t=' + Date.now()); }
-  setTimeout(fresh, 90000);
-  document.addEventListener('visibilitychange', function(){
-    if (!document.hidden && Date.now() - born > 60000) fresh();
-  });
-})();
+setTimeout(function(){location.reload()}, 90000);
 </script>
 </body></html>
