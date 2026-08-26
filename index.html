@@ -1100,6 +1100,14 @@
     </div>
     <button class="link-btn" id="licAddBtn">+ 인허가 추가</button>
     <button class="link-btn" id="licGradeBtn" title="신용평가확인서·안전성평가 통보서(pdf/이미지)를 판독해 등급·만료일을 인허가에 자동 반영">🧠 등급확인서 판독</button>
+
+    <!-- 석면 작업 이력 대장 — 산안법 제164조⑥ 30년 보존 + 안전성평가 항목3(전산화 정도).
+         인허가 탭 안에 두어 lic 권한을 공유한다(PM 결정 2026-08-26). -->
+    <div class="dash-sec" style="margin:22px 0 8px;">
+      <h2>석면 작업 이력 <span class="cnt" id="asbHead"></span></h2>
+    </div>
+    <div class="card" id="asbList"><div class="loading">불러오는 중…</div></div>
+    <button class="link-btn" id="asbAddBtn">+ 석면 작업 추가</button>
     <input type="file" id="licGradeFile" accept=".pdf,.jpg,.jpeg,.png,.webp" style="display:none;">
   </section>
 
@@ -1772,6 +1780,40 @@
     <button class="primary" id="licSave">저장</button>
     <button class="danger" id="licDelete">삭제</button>
     <button class="secondary" id="licCancel">취소</button>
+  </div>
+</div>
+
+<!-- 석면 작업 이력 — 입력칸은 산안법 제164조⑥·규칙 제241조⑥의 30년 보존 항목 그대로.
+     신고 마감(착수 7일 전)과 보존 만료(종료일 +30년)는 사람이 넣지 않고 날짜에서 파생한다. -->
+<div class="modal-backdrop" id="asbBackdrop">
+  <div class="modal">
+    <h3 id="asbModalTitle">석면 작업</h3>
+    <input type="text" id="asbTitle" placeholder="공사명" autocomplete="off">
+    <input type="text" id="asbClient" placeholder="발주처" autocomplete="off">
+    <input type="text" id="asbSite" placeholder="작업장 소재지" autocomplete="off">
+    <span class="fld-label">작업 시작일</span>
+    <input type="date" id="asbStart">
+    <span class="fld-label">작업 종료일</span>
+    <input type="date" id="asbEnd">
+    <div id="asbDerived" class="empty-line" style="margin:-2px 2px 8px;"></div>
+    <input type="text" id="asbMaterial" placeholder="자재 종류 (예: 천장텍스, 슬레이트)" autocomplete="off">
+    <input type="text" id="asbArea" placeholder="면적 (㎡)" inputmode="decimal" autocomplete="off">
+    <span class="fld-label">진행 상태</span>
+    <select id="asbStatus">
+      <option value="plan">예정</option>
+      <option value="run">작업중</option>
+      <option value="done">종결</option>
+    </select>
+    <input type="text" id="asbConc" placeholder="공기 중 석면농도 결과 (개/㎤ · 기준 0.01 이하)" autocomplete="off">
+    <input type="text" id="asbWaste" placeholder="폐기물 인계번호 (올바로)" autocomplete="off">
+    <span class="fld-label">투입 근로자 — 직원</span>
+    <div class="mchecks" id="asbMembers"></div>
+    <span class="fld-label">투입 근로자 — 일용직</span>
+    <div class="mchecks" id="asbWorkers"></div>
+    <input type="text" id="asbNote" placeholder="메모 (선택)" autocomplete="off">
+    <button class="primary" id="asbSave">저장</button>
+    <button class="danger" id="asbDelete">삭제</button>
+    <button class="secondary" id="asbCancel">취소</button>
   </div>
 </div>
 
@@ -3976,6 +4018,8 @@
     if (name === "allbaro") renderAllbaro();
 
     if (name === "cal") renderCalendar();
+    // 석면 대장은 인허가 탭 안에 있고, 투입 근로자 이름을 일용직 명부에서 끌어오므로 둘을 같이 읽는다
+    if (name === "lic"){ renderAsb(); loadAsb(); if(canSee("wk")) loadWorkers(); }
     if (name === "hr") renderHrRoster();
     if (name === "workers"){ renderWorkers(); loadWorkers(); }
     if (name === "perm") renderPermMgmt();
@@ -4011,6 +4055,14 @@
     if (canSee("veh")) vehicles.forEach(function(v){ if (v.del === 1) return; add(v.insp_due, "veh", (v.no||"차량")+" 검사 만기", v.driver||""); add(v.ins_due, "veh", (v.no||"차량")+" 보험 만기", v.insurer||"");
       (v.history||[]).forEach(function(h){ if(h.kind==="현장") add(h.date, "veh", "🚚 "+(v.no||"차량")+" 현장", h.content||""); }); });
     if (canSee("lic")) licenses.forEach(function(l){ if (l.del === 1 || !licVisible(l)) return; add(l.expiry, "lic", (l.name||"인허가")+" 만료", l.org||""); add(l.edu_due, "lic", (l.name||"인허가")+" 교육", l.org||""); });
+    // 석면 작업 — 날짜 하나(시작일)에서 신고 마감까지 파생시킨다. 사람이 따로 넣지 않는다.
+    if (canSee("lic")) liveAsb().forEach(function(r){
+      var nm = r.title || "석면 작업";
+      add(r.start, "lic", "🦺 "+nm+" 착수", r.site||"");
+      add(r.end,   "lic", "🦺 "+nm+" 종료", r.site||"");
+      if (r.status !== "done") add(asbNotifyDue(r), "lic", "⚠ "+nm+" 작업신고 마감", "착수 7일 전");
+      if (isDate(r.end) && !r.conc) add(r.end, "lic", "🧪 "+nm+" 농도측정", "완료 후 지체 없이");
+    });
     tasks.forEach(function(t){ if (t.del === 1 || t.status === "done") return; if (!taskVisible(t)) return; add(t.due, "tasks", t.title||"지시", t.who_id==="__all__" ? "전사" : (t.who_id ? dispNameById(t.who_id) : dispName(t.who||""))); });   // who는 이름 문자열 — id 조회에 넣으면 담당자가 항상 공백이었음
     if (canSee("rec")) receivables.forEach(function(r){ if (r.del === 1 || r.paid || !recVisible(r)) return; add(r.billed, "rec", (r.client||"미수")+" 청구", r.amount ? fmtAmount(r.amount)+"원" : ""); });
     // 휴가·사직: 승인된 연차/반차는 기간 전체, 사직 확정은 퇴사예정일(관리자만)
@@ -4390,6 +4442,12 @@
   })();
 
   document.getElementById("licAddBtn").addEventListener("click", function(){ openLicModal(null); });
+  document.getElementById("asbAddBtn").addEventListener("click", function(){ openAsb(null); });
+  document.getElementById("asbSave").addEventListener("click", saveAsb);
+  document.getElementById("asbDelete").addEventListener("click", deleteAsb);
+  document.getElementById("asbCancel").addEventListener("click", closeAsb);
+  document.getElementById("asbStart").addEventListener("change", asbUpdateDerived);
+  document.getElementById("asbEnd").addEventListener("change", asbUpdateDerived);
   // P5c 등급확인서 판독 → 인허가 자동 반영(사람 확인 후). 등급 문자가 기존과 다르면 점수 계수(QUAL_DEF)도 갱신 필요하다고 경고.
   document.getElementById("licGradeBtn").addEventListener("click", function(){ if(isAdmin()) document.getElementById("licGradeFile").click(); });
   document.getElementById("licGradeFile").addEventListener("change", function(){
@@ -8124,6 +8182,157 @@
   var famQ = null;   // {y,q}
   function famQInit(){ if(famQ) return; var d=new Date(); famQ={y:d.getFullYear(), q:Math.floor(d.getMonth()/3)+1}; }
   function famQShift(d){ famQInit(); famQ.q+=d; if(famQ.q<1){famQ.q=4;famQ.y--;} if(famQ.q>4){famQ.q=1;famQ.y++;} renderFamReport(); }
+  // ═══ 석면 작업 이력 대장 ═══════════════════════════════════════════════
+  // 왜 이 컬럼들인가: 산안법 제164조제6항·시행규칙 제241조제6항이 30년 보존을 요구하는 항목
+  // (작업장 명칭·소재지, 근로자 인적사항, 작업 내용·기간)을 그대로 입력칸으로 잡았다.
+  // 그래야 이 화면 자체가 보존 의무의 이행이자 안전성평가 항목3(전산화 정도)의 증빙이 된다.
+  // 날짜는 하나만 받는다 — 신고 마감(착수 7일 전)·보존 만료(종료 +30년)는 파생값이라
+  // 사람이 넣으면 서로 어긋난다.
+  var asb = [], asbBase = 0, asbPending = false, asbSaveTimer = null, asbEditId = null;
+  var ASB_STATUS = { plan:"예정", run:"작업중", done:"종결" };
+  function liveAsb(){ return asb.filter(function(r){ return r && r.del !== 1; }); }
+  function findAsb(id){ for (var i=0;i<asb.length;i++){ if (asb[i].id===id) return asb[i]; } return null; }
+  function asbNotifyDue(r){ return isDate(r.start) ? addDays(r.start, -7) : ""; }      // 작업신고: 착수 7일 전(법 제122조③)
+  function asbKeepUntil(r){ if(!isDate(r.end)) return ""; var d=new Date(r.end+"T00:00:00"); d.setFullYear(d.getFullYear()+30); return fmtDate(d); }
+  function mergeAsb(local, remote){
+    var byId = {}; (local||[]).forEach(function(r){ if(r&&r.id) byId[r.id]=r; });
+    (remote||[]).forEach(function(x){
+      if(!x||!x.id) return; var c=byId[x.id];
+      if(!c){ byId[x.id]=x; return; }
+      var w=(x.updated||"")>(c.updated||"")?x:c;
+      var m=Object.assign({},(w===x?c:x),w);
+      if(c.del===1||x.del===1) m.del=mergeDel(c,x);
+      byId[x.id]=m;
+    });
+    return Object.keys(byId).map(function(k){ return byId[k]; });
+  }
+  function loadAsb(){
+    if(!canSee("lic")) return;
+    gwCall("gw-data",{action:"get",collection:"asbestos"}).then(function(res){
+      if(res.status!==200) return;
+      var doc=(res.body&&res.body.doc)||{};
+      var ri=Array.isArray(doc.items)?doc.items:[];
+      asb = asbPending ? mergeAsb(asb, ri) : ri;   // 저장 대기 중이면 로컬 우선(로드 덮어쓰기 금지)
+      asbBase = doc.updated_at||0;
+      renderAsb(); renderCalendar();
+    }).catch(function(){});
+  }
+  function scheduleAsbSave(){ asbPending=true; if(asbSaveTimer) clearTimeout(asbSaveTimer); asbSaveTimer=setTimeout(doSaveAsb,1200); }
+  function doSaveAsb(){
+    return gwCall("gw-data",{action:"save",collection:"asbestos",doc:{schema:1,items:asb},base:asbBase}).then(function(res){
+      if(res.status===409){
+        return gwCall("gw-data",{action:"get",collection:"asbestos"}).then(function(r2){
+          if(r2.status===200){ var doc=(r2.body&&r2.body.doc)||{}; asb=mergeAsb(asb,Array.isArray(doc.items)?doc.items:[]); asbBase=doc.updated_at||0; }
+          return doSaveAsb();
+        });
+      }
+      if(res.status===200){ asbBase=(res.body&&res.body.updated_at)||Date.now(); asbPending=false; }
+    }).catch(function(){});
+  }
+  function asbWorkerNames(r){
+    var out=[];
+    (r.member_ids||[]).forEach(function(id){ var n=dispName(memberName(id)); if(n) out.push(n); });
+    (r.worker_ids||[]).forEach(function(id){ for(var i=0;i<workers.length;i++){ if(workers[i].id===id && workers[i].del!==1){ out.push(workers[i].name||""); break; } } });
+    return out.filter(Boolean);
+  }
+  function renderAsb(){
+    var host=document.getElementById("asbList"); if(!host) return;
+    var list=liveAsb().slice().sort(function(a,b){ return (b.start||"").localeCompare(a.start||""); });
+    var head=document.getElementById("asbHead");
+    if(head) head.textContent = list.length ? ("총 "+list.length+"건") : "";
+    if(!list.length){ host.innerHTML='<div class="empty-line">등록된 석면 작업이 없습니다. 아래 [+ 석면 작업 추가]로 시작하세요.</div>'; return; }
+    var today=todayStr(), html="";
+    list.forEach(function(r){
+      var due=asbNotifyDue(r), hot=(r.status!=="done" && isDate(due) && due>=today && due<=addDays(today,7));
+      var chip='<span class="scope-chip">'+esc(ASB_STATUS[r.status]||"예정")+'</span>';
+      if(hot) chip='<span class="from-chip">신고 D-'+Math.max(0,Math.round((new Date(due+"T00:00:00")-new Date(today+"T00:00:00"))/86400000))+'</span>';
+      var names=asbWorkerNames(r);
+      html+='<div class="item"><div class="item-body">'
+        + '<div class="item-title">'+esc(r.title||"(공사명 없음)")+' '+chip+'</div>'
+        + '<div class="item-sub">'+esc(r.client||"")+(r.site?" · "+esc(r.site):"")+'</div>'
+        + '<div class="item-sub">'+esc(r.start||"?")+" ~ "+esc(r.end||"?")+(r.material?" · "+esc(r.material):"")+(r.area?" · "+esc(r.area)+"㎡":"")+'</div>'
+        + (isDate(due)&&r.status!=="done" ? '<div class="item-sub">작업신고 마감 '+esc(due)+' (착수 7일 전)</div>' : "")
+        + (names.length ? '<div class="item-sub">투입 '+names.length+'명 · '+esc(names.slice(0,6).join(", "))+(names.length>6?" 외":"")+'</div>' : '<div class="item-sub">투입 근로자 미지정</div>')
+        + (r.conc ? '<div class="item-sub">농도 '+esc(r.conc)+' 개/㎤</div>' : "")
+        + (asbKeepUntil(r) ? '<div class="item-sub">기록 보존 만료 '+esc(asbKeepUntil(r))+'</div>' : "")
+        + '</div><div class="item-actions"><button class="link-btn" data-asb-edit="'+esc(r.id)+'">수정</button></div></div>';
+    });
+    host.innerHTML=html;
+    host.querySelectorAll("[data-asb-edit]").forEach(function(b){
+      b.addEventListener("click", function(){ openAsb(b.getAttribute("data-asb-edit")); });
+    });
+  }
+  function asbRenderWorkerChecks(sel){
+    var host=document.getElementById("asbWorkers"); if(!host) return;
+    var live=workers.filter(function(w){ return w && w.del!==1; });
+    if(!live.length){ host.innerHTML='<div class="empty-line">등록된 일용직이 없습니다 — [인사·일용직] 탭에서 먼저 등록하세요.</div>'; return; }
+    host.innerHTML=live.map(function(w){
+      var on=(sel||[]).indexOf(w.id)>=0;
+      return '<label class="chk"><input type="checkbox" data-asb-wk="'+esc(w.id)+'"'+(on?" checked":"")+'> '+esc(w.name||"")+(w.role?' <span class="scope-chip">'+esc(w.role)+'</span>':"")+'</label>';
+    }).join("");
+  }
+  function asbGetCheckedWorkers(){
+    var out=[]; document.querySelectorAll("[data-asb-wk]").forEach(function(el){ if(el.checked) out.push(el.getAttribute("data-asb-wk")); });
+    return out;
+  }
+  function asbUpdateDerived(){
+    var host=document.getElementById("asbDerived"); if(!host) return;
+    var s=document.getElementById("asbStart").value, e=document.getElementById("asbEnd").value;
+    var bits=[];
+    if(isDate(s)) bits.push("작업신고 마감 "+addDays(s,-7)+" (착수 7일 전)");
+    if(isDate(e)){ var d=new Date(e+"T00:00:00"); d.setFullYear(d.getFullYear()+30); bits.push("기록 보존 만료 "+fmtDate(d)+" (30년)"); }
+    host.textContent = bits.length ? bits.join(" · ") : "날짜를 넣으면 신고 마감과 보존 만료가 자동으로 계산됩니다.";
+  }
+  function openAsb(id){
+    asbEditId=id||null;
+    var r=id?findAsb(id):null;
+    document.getElementById("asbModalTitle").textContent = r ? "석면 작업 수정" : "석면 작업 추가";
+    document.getElementById("asbTitle").value = r ? (r.title||"") : "";
+    document.getElementById("asbClient").value = r ? (r.client||"") : "";
+    document.getElementById("asbSite").value = r ? (r.site||"") : "";
+    document.getElementById("asbStart").value = r ? (r.start||"") : "";
+    document.getElementById("asbEnd").value = r ? (r.end||"") : "";
+    document.getElementById("asbMaterial").value = r ? (r.material||"") : "";
+    document.getElementById("asbArea").value = r ? (r.area||"") : "";
+    document.getElementById("asbStatus").value = r ? (r.status||"plan") : "plan";
+    document.getElementById("asbConc").value = r ? (r.conc||"") : "";
+    document.getElementById("asbWaste").value = r ? (r.waste_no||"") : "";
+    document.getElementById("asbNote").value = r ? (r.note||"") : "";
+    renderMemberChecks("asbMembers", r ? (r.member_ids||[]) : []);
+    asbRenderWorkerChecks(r ? (r.worker_ids||[]) : []);
+    asbUpdateDerived();
+    document.getElementById("asbDelete").style.display = r ? "" : "none";
+    document.getElementById("asbBackdrop").classList.add("show");
+  }
+  function closeAsb(){ document.getElementById("asbBackdrop").classList.remove("show"); asbEditId=null; }
+  function saveAsb(){
+    var title=document.getElementById("asbTitle").value.trim();
+    if(!title){ alert("공사명을 입력하세요."); return; }
+    var r=asbEditId?findAsb(asbEditId):null, isNew=!r;
+    if(isNew){ r={ id:genId("asb"), created:todayStr() }; asb.push(r); }
+    r.title=title;
+    r.client=document.getElementById("asbClient").value.trim();
+    r.site=document.getElementById("asbSite").value.trim();
+    r.start=document.getElementById("asbStart").value||"";
+    r.end=document.getElementById("asbEnd").value||"";
+    r.material=document.getElementById("asbMaterial").value.trim();
+    r.area=document.getElementById("asbArea").value.trim();
+    r.status=document.getElementById("asbStatus").value||"plan";
+    r.conc=document.getElementById("asbConc").value.trim();
+    r.waste_no=document.getElementById("asbWaste").value.trim();
+    r.note=document.getElementById("asbNote").value.trim();
+    r.member_ids=getCheckedMembers("asbMembers");
+    r.worker_ids=asbGetCheckedWorkers();
+    r.updated=todayStr();
+    scheduleAsbSave(); renderAsb(); renderCalendar(); closeAsb();
+  }
+  function deleteAsb(){
+    var r=asbEditId?findAsb(asbEditId):null; if(!r) return;
+    if(!confirm("이 석면 작업 기록을 삭제할까요?\n(기록은 30년 보존 대상입니다 — 잘못 만든 것만 지우세요)")) return;
+    r.del=1; r.updated=todayStr();
+    scheduleAsbSave(); renderAsb(); renderCalendar(); closeAsb();
+  }
+
   function famQRange(){
     famQInit();
     var y=famQ.y, q=famQ.q, sm=(q-1)*3+1, em=q*3;
