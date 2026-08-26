@@ -1173,6 +1173,13 @@
     <div class="card" id="hrRoster"><div class="loading">불러오는 중…</div></div>
     <div class="card" id="hrNewPanel" style="display:none;margin-top:8px;"></div>
     <button class="link-btn" id="hrAddBtn">+ 직원 추가</button>
+
+    <div class="dash-sec" style="margin:22px 0 8px;">
+      <h2>교육·건강진단 이력 <span class="cnt" id="eduHrHead"></span></h2>
+    </div>
+    <div class="card" id="eduHrList"><div class="loading">불러오는 중…</div></div>
+    <button class="link-btn" id="eduHrAddBtn">+ 이력 추가</button>
+
     <button class="link-btn" id="permMgmtBtn">🔑 권한관리</button>
     <button class="link-btn" id="famBtn">👪 가족친화 실적</button>
     <button class="link-btn" id="auditBtn">📋 감사 로그</button>
@@ -1204,6 +1211,12 @@
     <div style="font-size:13px;color:var(--sub);margin-bottom:6px;">석면·철거 투입 인력 명부 — 해체계획서 명단 자동 기입에 사용됩니다.</div>
     <div class="card" id="wkList"><div class="loading">불러오는 중…</div></div>
     <button class="link-btn" id="wkAddBtn">+ 일용직 추가</button>
+
+    <div class="dash-sec" style="margin:22px 0 8px;" id="eduWkSec">
+      <h2>교육·건강진단 이력 <span class="cnt" id="eduWkHead"></span></h2>
+    </div>
+    <div class="card" id="eduWkList"><div class="loading">불러오는 중…</div></div>
+    <button class="link-btn" id="eduWkAddBtn">+ 이력 추가</button>
   </section>
 
   <!-- 권한관리 (인사 하위 · 관리자 전용) — 매트릭스: 셀 클릭마다 수행→보기→숨김 순환, 사람 단위 자동 저장 -->
@@ -1814,6 +1827,29 @@
     <button class="primary" id="asbSave">저장</button>
     <button class="danger" id="asbDelete">삭제</button>
     <button class="secondary" id="asbCancel">취소</button>
+  </div>
+</div>
+
+<!-- 교육·건강진단 이력 — 다음 예정일은 종류별 주기로 자동 계산한다.
+     석면 관리자교육은 현행 고시에 보수교육 조항이 없어 다음 예정일을 만들지 않는다(인력 교체 시 후임자 이수만). -->
+<div class="modal-backdrop" id="eduBackdrop">
+  <div class="modal">
+    <h3 id="eduModalTitle">교육·건강진단 이력</h3>
+    <span class="fld-label">대상</span>
+    <select id="eduPerson"></select>
+    <span class="fld-label">종류</span>
+    <select id="eduKind"></select>
+    <div id="eduKindNote" class="empty-line" style="margin:-2px 2px 8px;"></div>
+    <span class="fld-label">이수·실시일</span>
+    <input type="date" id="eduDate">
+    <input type="text" id="eduHours" placeholder="시간 (예: 16)" inputmode="decimal" autocomplete="off">
+    <span class="fld-label">다음 예정일</span>
+    <input type="date" id="eduNext">
+    <div id="eduNextNote" class="empty-line" style="margin:-2px 2px 8px;"></div>
+    <input type="text" id="eduNote" placeholder="기관·비고 (선택)" autocomplete="off">
+    <button class="primary" id="eduSave">저장</button>
+    <button class="danger" id="eduDelete">삭제</button>
+    <button class="secondary" id="eduCancel">취소</button>
   </div>
 </div>
 
@@ -4019,9 +4055,9 @@
 
     if (name === "cal") renderCalendar();
     // 석면 대장은 인허가 탭 안에 있고, 투입 근로자 이름을 일용직 명부에서 끌어오므로 둘을 같이 읽는다
-    if (name === "lic"){ renderAsb(); loadAsb(); if(canSee("wk")) loadWorkers(); }
-    if (name === "hr") renderHrRoster();
-    if (name === "workers"){ renderWorkers(); loadWorkers(); }
+    if (name === "lic"){ renderAsb(); loadAsb(); loadEdu(); if(canSee("wk")) loadWorkers(); }
+    if (name === "hr"){ renderHrRoster(); renderEdu(); loadEdu(); if(canSee("wk")) loadWorkers(); }
+    if (name === "workers"){ renderWorkers(); loadWorkers(); renderEdu(); loadEdu(); }
     if (name === "perm") renderPermMgmt();
     if (name === "fam"){ renderFam(); loadFam(); }
     if (name === "leave") renderLeaves();
@@ -4062,6 +4098,10 @@
       add(r.end,   "lic", "🦺 "+nm+" 종료", r.site||"");
       if (r.status !== "done") add(asbNotifyDue(r), "lic", "⚠ "+nm+" 작업신고 마감", "착수 7일 전");
       if (isDate(r.end) && !r.conc) add(r.end, "lic", "🧪 "+nm+" 농도측정", "완료 후 지체 없이");
+    });
+    // 교육·건강진단 다음 예정일 — 주기가 없는 종류(관리자교육·배치전진단)는 next가 비어 있어 뜨지 않는다
+    if (canSee("hr")) liveEdu().forEach(function(r){
+      add(r.next, "hr", "📚 "+eduPersonName(r)+" "+eduKindLabel(r.kind), "다음 예정");
     });
     tasks.forEach(function(t){ if (t.del === 1 || t.status === "done") return; if (!taskVisible(t)) return; add(t.due, "tasks", t.title||"지시", t.who_id==="__all__" ? "전사" : (t.who_id ? dispNameById(t.who_id) : dispName(t.who||""))); });   // who는 이름 문자열 — id 조회에 넣으면 담당자가 항상 공백이었음
     if (canSee("rec")) receivables.forEach(function(r){ if (r.del === 1 || r.paid || !recVisible(r)) return; add(r.billed, "rec", (r.client||"미수")+" 청구", r.amount ? fmtAmount(r.amount)+"원" : ""); });
@@ -4448,6 +4488,13 @@
   document.getElementById("asbCancel").addEventListener("click", closeAsb);
   document.getElementById("asbStart").addEventListener("change", asbUpdateDerived);
   document.getElementById("asbEnd").addEventListener("change", asbUpdateDerived);
+  document.getElementById("eduHrAddBtn").addEventListener("click", function(){ openEdu(null, "member"); });
+  document.getElementById("eduWkAddBtn").addEventListener("click", function(){ openEdu(null, "worker"); });
+  document.getElementById("eduSave").addEventListener("click", saveEdu);
+  document.getElementById("eduDelete").addEventListener("click", deleteEdu);
+  document.getElementById("eduCancel").addEventListener("click", closeEdu);
+  document.getElementById("eduKind").addEventListener("change", function(){ eduUpdateNotes(); eduAutoNext(); });
+  document.getElementById("eduDate").addEventListener("change", eduAutoNext);
   // P5c 등급확인서 판독 → 인허가 자동 반영(사람 확인 후). 등급 문자가 기존과 다르면 점수 계수(QUAL_DEF)도 갱신 필요하다고 경고.
   document.getElementById("licGradeBtn").addEventListener("click", function(){ if(isAdmin()) document.getElementById("licGradeFile").click(); });
   document.getElementById("licGradeFile").addEventListener("change", function(){
@@ -8235,6 +8282,16 @@
     (r.worker_ids||[]).forEach(function(id){ for(var i=0;i<workers.length;i++){ if(workers[i].id===id && workers[i].del!==1){ out.push(workers[i].name||""); break; } } });
     return out.filter(Boolean);
   }
+  // 배치 전 특별교육 미이수자 — 안전성평가 항목1(작업기준 준수)에서 바로 깎이는 지점이라 목록에 띄운다
+  function asbNoSpecial(r){
+    var out=[];
+    (r.member_ids||[]).forEach(function(id){ if(!eduHasValidSpecial("member",id)){ var n=dispName(memberName(id)); if(n) out.push(n); } });
+    (r.worker_ids||[]).forEach(function(id){
+      if(eduHasValidSpecial("worker",id)) return;
+      for(var i=0;i<workers.length;i++){ if(workers[i].id===id && workers[i].del!==1){ out.push(workers[i].name||""); break; } }
+    });
+    return out.filter(Boolean);
+  }
   function renderAsb(){
     var host=document.getElementById("asbList"); if(!host) return;
     var list=liveAsb().slice().sort(function(a,b){ return (b.start||"").localeCompare(a.start||""); });
@@ -8253,6 +8310,7 @@
         + '<div class="item-sub">'+esc(r.start||"?")+" ~ "+esc(r.end||"?")+(r.material?" · "+esc(r.material):"")+(r.area?" · "+esc(r.area)+"㎡":"")+'</div>'
         + (isDate(due)&&r.status!=="done" ? '<div class="item-sub">작업신고 마감 '+esc(due)+' (착수 7일 전)</div>' : "")
         + (names.length ? '<div class="item-sub">투입 '+names.length+'명 · '+esc(names.slice(0,6).join(", "))+(names.length>6?" 외":"")+'</div>' : '<div class="item-sub">투입 근로자 미지정</div>')
+        + (function(){ var m=asbNoSpecial(r); return m.length ? '<div class="item-sub" style="color:#B3261E;">특별교육 미이수 '+m.length+'명 — '+esc(m.slice(0,4).join(", "))+(m.length>4?" 외":"")+' (배치 전 이수 필요)</div>' : ""; })()
         + (r.conc ? '<div class="item-sub">농도 '+esc(r.conc)+' 개/㎤</div>' : "")
         + (asbKeepUntil(r) ? '<div class="item-sub">기록 보존 만료 '+esc(asbKeepUntil(r))+'</div>' : "")
         + '</div><div class="item-actions"><button class="link-btn" data-asb-edit="'+esc(r.id)+'">수정</button></div></div>';
@@ -8331,6 +8389,173 @@
     if(!confirm("이 석면 작업 기록을 삭제할까요?\n(기록은 30년 보존 대상입니다 — 잘못 만든 것만 지우세요)")) return;
     r.del=1; r.updated=todayStr();
     scheduleAsbSave(); renderAsb(); renderCalendar(); closeAsb();
+  }
+
+  // ═══ 교육·건강진단 이력 ════════════════════════════════════════════════
+  // 주기는 전부 원문 확정분이다(인허가_만기주기_조사 석면 섹션, 2·3차 재검증 완료).
+  // months=0 은 "주기 없음" — 석면 관리자교육은 현행 고시에 보수교육 조항이 없어
+  // 다음 예정일을 만들면 있지도 않은 만기를 만드는 셈이 된다.
+  var EDU_KINDS = [
+    { k:"special",   n:"석면 특별교육",         months:0,  hint:"배치 전 1회. 상용직 16시간(최초 4h+12h는 3개월 내 분할), 단기간·간헐적 작업이나 일용직은 2시간" },
+    { k:"regular",   n:"정기교육(근로자)",       months:6,  hint:"매반기 12시간 이상(비사무직)" },
+    { k:"super",     n:"정기교육(관리감독자)",   months:12, hint:"연간 16시간 이상 — 근로자와 달리 연 단위" },
+    { k:"manager",   n:"석면해체·제거관리자교육", months:0,  hint:"신규 18시간(이론10·실습8). 현행 고시에 보수교육 조항 없음 — 인력 교체 시 후임자만 이수" },
+    { k:"pre_med",   n:"배치전건강진단",         months:0,  hint:"배치 전 실시. 다른 사업장에서 12개월 내 받았고 개인표를 내면 면제" },
+    { k:"spec_med",  n:"특수건강진단",           months:12, hint:"배치 후 12개월 이내 최초, 이후 12개월마다. 노출기준 초과 등에 해당하면 다음 회에 한해 6개월" }
+  ];
+  function eduKindDef(k){ for(var i=0;i<EDU_KINDS.length;i++){ if(EDU_KINDS[i].k===k) return EDU_KINDS[i]; } return null; }
+  function eduKindLabel(k){ var d=eduKindDef(k); return d?d.n:(k||""); }
+  var edu = [], eduBase = 0, eduPending = false, eduSaveTimer = null, eduEditId = null, eduScope = "member";
+  function liveEdu(){ return edu.filter(function(r){ return r && r.del!==1; }); }
+  function findEdu(id){ for(var i=0;i<edu.length;i++){ if(edu[i].id===id) return edu[i]; } return null; }
+  function mergeEdu(local, remote){
+    var byId={}; (local||[]).forEach(function(r){ if(r&&r.id) byId[r.id]=r; });
+    (remote||[]).forEach(function(x){
+      if(!x||!x.id) return; var c=byId[x.id];
+      if(!c){ byId[x.id]=x; return; }
+      var w=(x.updated||"")>(c.updated||"")?x:c;
+      var m=Object.assign({},(w===x?c:x),w);
+      if(c.del===1||x.del===1) m.del=mergeDel(c,x);
+      byId[x.id]=m;
+    });
+    return Object.keys(byId).map(function(k){ return byId[k]; });
+  }
+  function loadEdu(){
+    if(!canSee("hr")) return;
+    gwCall("gw-data",{action:"get",collection:"edu"}).then(function(res){
+      if(res.status!==200) return;
+      var doc=(res.body&&res.body.doc)||{};
+      var ri=Array.isArray(doc.items)?doc.items:[];
+      edu = eduPending ? mergeEdu(edu, ri) : ri;
+      eduBase = doc.updated_at||0;
+      renderEdu(); renderCalendar(); renderAsb();
+    }).catch(function(){});
+  }
+  function scheduleEduSave(){ eduPending=true; if(eduSaveTimer) clearTimeout(eduSaveTimer); eduSaveTimer=setTimeout(doSaveEdu,1200); }
+  function doSaveEdu(){
+    return gwCall("gw-data",{action:"save",collection:"edu",doc:{schema:1,items:edu},base:eduBase}).then(function(res){
+      if(res.status===409){
+        return gwCall("gw-data",{action:"get",collection:"edu"}).then(function(r2){
+          if(r2.status===200){ var doc=(r2.body&&r2.body.doc)||{}; edu=mergeEdu(edu,Array.isArray(doc.items)?doc.items:[]); eduBase=doc.updated_at||0; }
+          return doSaveEdu();
+        });
+      }
+      if(res.status===200){ eduBase=(res.body&&res.body.updated_at)||Date.now(); eduPending=false; }
+    }).catch(function(){});
+  }
+  function eduPersonName(r){
+    if(r.ptype==="worker"){ for(var i=0;i<workers.length;i++){ if(workers[i].id===r.pid) return workers[i].name||"(일용직)"; } return "(삭제된 일용직)"; }
+    return dispName(memberName(r.pid)) || "(퇴사자)";
+  }
+  // 같은 사람·같은 종류에서 가장 최근 이수분만 만기 판정에 쓴다(과거 이력은 보존하되 중복 경보를 내지 않게)
+  function eduLatest(ptype, pid, kind){
+    var best=null;
+    liveEdu().forEach(function(r){
+      if(r.ptype!==ptype||r.pid!==pid||r.kind!==kind) return;
+      if(!best || (r.date||"")>(best.date||"")) best=r;
+    });
+    return best;
+  }
+  function eduHasValidSpecial(ptype, pid){ return !!eduLatest(ptype, pid, "special"); }
+  function renderEduInto(hostId, headId, scope){
+    var host=document.getElementById(hostId); if(!host) return;
+    var list=liveEdu().filter(function(r){ return r.ptype===scope; });
+    list.sort(function(a,b){ return (a.next||"9999").localeCompare(b.next||"9999"); });
+    var head=document.getElementById(headId);
+    var today=todayStr(), soon=addDays(today,30);
+    var over=list.filter(function(r){ return isDate(r.next) && r.next<today; }).length;
+    if(head) head.textContent = list.length ? ("총 "+list.length+"건"+(over?" · 경과 "+over:"")) : "";
+    if(!list.length){ host.innerHTML='<div class="empty-line">등록된 이력이 없습니다. 아래 [+ 이력 추가]로 시작하세요.</div>'; return; }
+    var html="";
+    list.forEach(function(r){
+      var chip="";
+      if(isDate(r.next)){
+        if(r.next<today) chip=' <span class="from-chip">기한 경과</span>';
+        else if(r.next<=soon) chip=' <span class="review-chip">D-'+Math.round((new Date(r.next+"T00:00:00")-new Date(today+"T00:00:00"))/86400000)+'</span>';
+      }
+      html+='<div class="item"><div class="item-body">'
+        + '<div class="item-title">'+esc(eduPersonName(r))+' · '+esc(eduKindLabel(r.kind))+chip+'</div>'
+        + '<div class="item-sub">이수 '+esc(r.date||"-")+(r.hours?" · "+esc(r.hours)+"시간":"")+(isDate(r.next)?" · 다음 "+esc(r.next):" · 주기 없음")+'</div>'
+        + (r.note?'<div class="item-sub">'+esc(r.note)+'</div>':"")
+        + '</div><div class="item-actions"><button class="link-btn" data-edu-edit="'+esc(r.id)+'">수정</button></div></div>';
+    });
+    host.innerHTML=html;
+    host.querySelectorAll("[data-edu-edit]").forEach(function(b){
+      b.addEventListener("click", function(){ openEdu(b.getAttribute("data-edu-edit")); });
+    });
+  }
+  function renderEdu(){
+    renderEduInto("eduHrList","eduHrHead","member");
+    renderEduInto("eduWkList","eduWkHead","worker");
+  }
+  function eduFillPersons(scope, sel){
+    var s=document.getElementById("eduPerson"); if(!s) return;
+    var opts="";
+    if(scope==="worker"){
+      workers.filter(function(w){ return w&&w.del!==1; }).forEach(function(w){
+        opts+='<option value="worker:'+esc(w.id)+'"'+((sel==="worker:"+w.id)?" selected":"")+'>'+esc(w.name||"")+' (일용직)</option>';
+      });
+    } else {
+      liveMembers().forEach(function(m){
+        opts+='<option value="member:'+esc(m.id)+'"'+((sel==="member:"+m.id)?" selected":"")+'>'+esc(dispName(m.name)||m.name||"")+'</option>';
+      });
+    }
+    s.innerHTML = opts || '<option value="">(대상 없음)</option>';
+  }
+  function eduUpdateNotes(){
+    var k=document.getElementById("eduKind").value, d=eduKindDef(k);
+    var note=document.getElementById("eduKindNote");
+    if(note) note.textContent = d ? d.hint : "";
+    var nn=document.getElementById("eduNextNote");
+    if(nn) nn.textContent = d ? (d.months ? ("이수일을 넣으면 "+d.months+"개월 뒤로 자동 계산됩니다. 필요하면 직접 고치세요.") : "이 교육은 법정 재이수 주기가 없습니다 — 다음 예정일을 비워 두세요.") : "";
+  }
+  function eduAutoNext(){
+    var k=document.getElementById("eduKind").value, d=eduKindDef(k);
+    var base=document.getElementById("eduDate").value;
+    if(!d||!d.months||!isDate(base)) return;
+    var dt=new Date(base+"T00:00:00"); dt.setMonth(dt.getMonth()+d.months);
+    document.getElementById("eduNext").value=fmtDate(dt);
+  }
+  function openEdu(id, scope){
+    eduEditId=id||null;
+    var r=id?findEdu(id):null;
+    eduScope = r ? r.ptype : (scope||"member");
+    document.getElementById("eduModalTitle").textContent = r ? "이력 수정" : "이력 추가";
+    document.getElementById("eduKind").innerHTML = EDU_KINDS.map(function(d){
+      return '<option value="'+d.k+'"'+((r&&r.kind===d.k)?" selected":"")+'>'+esc(d.n)+'</option>';
+    }).join("");
+    eduFillPersons(eduScope, r ? (r.ptype+":"+r.pid) : null);
+    document.getElementById("eduDate").value = r ? (r.date||"") : "";
+    document.getElementById("eduHours").value = r ? (r.hours||"") : "";
+    document.getElementById("eduNext").value = r ? (r.next||"") : "";
+    document.getElementById("eduNote").value = r ? (r.note||"") : "";
+    eduUpdateNotes();
+    document.getElementById("eduDelete").style.display = r ? "" : "none";
+    document.getElementById("eduBackdrop").classList.add("show");
+  }
+  function closeEdu(){ document.getElementById("eduBackdrop").classList.remove("show"); eduEditId=null; }
+  function saveEdu(){
+    var pv=document.getElementById("eduPerson").value||"";
+    if(!pv){ alert("대상을 선택하세요."); return; }
+    var date=document.getElementById("eduDate").value;
+    if(!isDate(date)){ alert("이수·실시일을 입력하세요."); return; }
+    var parts=pv.split(":");
+    var r=eduEditId?findEdu(eduEditId):null, isNew=!r;
+    if(isNew){ r={ id:genId("edu"), created:todayStr() }; edu.push(r); }
+    r.ptype=parts[0]; r.pid=parts.slice(1).join(":");
+    r.kind=document.getElementById("eduKind").value;
+    r.date=date;
+    r.hours=document.getElementById("eduHours").value.trim();
+    r.next=document.getElementById("eduNext").value||"";
+    r.note=document.getElementById("eduNote").value.trim();
+    r.updated=todayStr();
+    scheduleEduSave(); renderEdu(); renderCalendar(); renderAsb(); closeEdu();
+  }
+  function deleteEdu(){
+    var r=eduEditId?findEdu(eduEditId):null; if(!r) return;
+    if(!confirm("이 이력을 삭제할까요?")) return;
+    r.del=1; r.updated=todayStr();
+    scheduleEduSave(); renderEdu(); renderCalendar(); renderAsb(); closeEdu();
   }
 
   function famQRange(){

@@ -12,7 +12,7 @@ const push = require('./_lib/push');
 const DATA = 'gw_data';
 const USERS = 'gw_users';
 // 컬렉션 → 권한키
-const COL = { tasks: 'tasks', vehicles: 'veh', receivables: 'rec', licenses: 'lic', checklist: 'check', documents: 'doc', clients: 'cli', contracts: 'con', leaves: 'leaves', bids: 'bid', onbid: 'bid', workers: 'wk', quotes: 'quote', promo: 'promo', family: 'fam', asbestos: 'lic' };  // onbid=공매·부동산(관리자 전용), workers=일용직 명부(wk), quotes=견적서 탭 독립 권한(영업 문서 — 계약 파이프라인의 견적 "서류" 생성은 별개로 con 권한), promo=홍보(현장 기록→블로그·갤러리), family=가족친화 실적 대장(혁신⑧ — bids처럼 관리자 전용 서버 강제), asbestos=석면 작업 이력 대장(인허가 탭 안에 두므로 lic 권한을 공유 — 산안법 30년 보존 + 안전성평가 전산화 항목)
+const COL = { tasks: 'tasks', vehicles: 'veh', receivables: 'rec', licenses: 'lic', checklist: 'check', documents: 'doc', clients: 'cli', contracts: 'con', leaves: 'leaves', bids: 'bid', onbid: 'bid', workers: 'wk', quotes: 'quote', promo: 'promo', family: 'fam', asbestos: 'lic', edu: 'hr' };  // onbid=공매·부동산(관리자 전용), workers=일용직 명부(wk), quotes=견적서 탭 독립 권한(영업 문서 — 계약 파이프라인의 견적 "서류" 생성은 별개로 con 권한), promo=홍보(현장 기록→블로그·갤러리), family=가족친화 실적 대장(혁신⑧ — bids처럼 관리자 전용 서버 강제), asbestos=석면 작업 이력 대장(인허가 탭 안에 두므로 lic 권한을 공유 — 산안법 30년 보존 + 안전성평가 전산화 항목)
 // 사용자별 비공개 컬렉션(본인만 접근, 회원 id로 분리 저장)
 const PRIVATE_COL = { mytasks: true };
 
