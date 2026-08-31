@@ -166,7 +166,7 @@ h2{font-size:13px;margin-bottom:8px}
   <div class="item done"><span class="m">☑</span>마감 지난 입찰·온비드 물건 기본 화면에서 숨김 — v255(8/12, PM 지적)</div>
   <div class="item done"><span class="m">☑</span>입찰탭: 딥링크 없는 기관은 [사이트↗]로 표시 + 공고번호 복사 — 8/13(PM 지적)</div>
   <div class="item done"><span class="m">☑</span>온비드 원문 링크 404 수리 + 탐침 재시도 6회(러너 IP 복불복 대응) — 8/13</div>
-  <div class="item now"><span class="m">▶</span>활용신청 승인 — ★탐침 결과(8/31 밤): LH 개찰결과 API = 미승인 확정(SERVICE ACCESS DENIED) → data.go.kr 마이페이지에서 승인 상태·재신청 확인(PM). 누리 낙찰·K-apt 낙찰 = 러너 타임아웃으로 판정 불가 → 낮 시간대 재탐침 예정(AI)</div>
+  <div class="item now"><span class="m">▶</span>★활용신청 — 전부 승인 확정(9/1 PM 실측: 16건 중 승인 15+변경 1, 반려 0). 어제 LH DENIED는 승인분(&quot;전자조달-개찰정보(예정가격)&quot;)과 다른 구 엔드포인트를 찌른 것. 할 일 = 탐침·results.py를 승인 명세로 정렬 + 어댑터 3종(LH 개찰·누리 민간낙찰·K-apt 입찰결과) 각 30분 — AI 착수</div>
   <div class="item"><span class="m">☐</span>나라장터 API 변경신청 승인 대기 — 수집 죽으면 이것부터 의심</div>
   <div class="item done"><span class="m">☑</span>순환자원(re.or.kr) 8/4 두절 복구(8/25) — 진범은 IP 차단이 아니라 러너 간헐 타임아웃×3일 수집창. 수집창 3→7일 배포+30일 백필로 봉합</div>
   <div class="item done"><span class="m">☑</span>낙찰통계 경보 오탐 수리(8/25) — 타임아웃을 '응답 0건'과 구분해 스트릭에 미집계</div>
@@ -236,12 +236,13 @@ h2{font-size:13px;margin-bottom:8px}
   <div class="item done"><span class="m">☑</span>엑셀 이중 매칭 제거(8/24) — 앱 배정(학습·차량분리)을 그대로 통과전달, 앱 보류 건은 재매칭 금지·미매칭 시트</div>
   <div class="item done"><span class="m">☑</span>★엑셀 [직접 추가]분 병합(8/25, PM ㄱ) — 수동 입력만 있는 날도 일지 엑셀이 생성되도록. 자동 수집분과 한 장으로 합본</div>
   <div class="item done"><span class="m">☑</span>★엑셀 정렬 수리(8/25 밤) — 진범은 8/24 가나다 재정렬 커밋이 양식 R측 이름칸 68셀의 굴림체 10·가운데를 떨어뜨린 것([직접 추가] 병합은 무죄). 생성 시 L측 서식을 복사해 복원, 실측 0/68→68/68 + 미매칭 시트 정돈. 다음 정기 가동(09/16시)에 앱 파일 자동 교체</div>
-  <div class="item now"><span class="m">▶</span>★포스코 건조장 진단 완료(8/25 밤) — 입력은 정상(8/21~23 19회 298.93t), 노선표에 '슬러지건조장' 행이 없어 미매칭 시트로 떨어진 것. 8/21부터 보관장 입력이 끊겨 대체 추정. **PM 확정 대기: 별개 노선ⓐ/보관장 대체ⓑ/합산ⓒ** → 답 오면 행 추가·소급 재생성 · PM</div>
+  <div class="item done"><span class="m">☑</span>★포스코 건조장 — 종결(8/28 PM 확정: 별개 노선ⓐ, 반영 완료 확인). 블록 갱신 누락분 9/1 정정</div>
   <div class="item"><span class="m">☐</span>별건: 베페사→동일산업 환원철 수기입력 7일치가 톤수 0(회수만) — 정산에 톤수 쓰이면 사무실 보완 필요 · 사무실</div>
   <div class="item"><span class="m">☐</span>웹푸시 잔여 — 경보 태그 분리·클릭 시 해당 화면 이동 · AI</div>
   <div class="item"><span class="m">☐</span>일반 화물 운송(비폐기물) 수기 입력 → 같은 일지에 합본</div>
   <div class="item"><span class="m">☐</span>대표 결재 대상 문서 — 결재함 편입과 묶어 진행</div>
   <div class="item"><span class="m">☐</span>미래 피벗: 기사 앱 운행 시작/종료 버튼 → 즉시 일지(GPS 연계)</div>
+  <div class="item now"><span class="m">▶</span>★유일한 열린 질문 = 태웅제강→스틸싸이클 EAFD의 BCT차량/덤프 구분 기준(확인대기 1번) — 올바로엔 &quot;분진(고상)&quot; 하나로 와서 품목으론 못 가름. 차량 종류가 기준이면 BCT 차량번호 목록만 받으면 자동 구분 구현. 확정 전까진 미매칭으로 띄움(오배정 차단)</div>
   <div class="note">미확정 노선은 조용히 배정하지 않고 미매칭으로 띄운다(오배정 차단). 확인 문서: 07_운반일지_자동화\확인대기_PM.md</div>
 </div>
 
@@ -275,7 +276,7 @@ h2{font-size:13px;margin-bottom:8px}
   <div class="item done"><span class="m">☑</span>홈오피스 PC 실측(8/10) — 구멍 5개: 계정 암호 없음·자동잠금 없음·디스크 암호화 없음·Win10 Home·지원종료</div>
   <div class="item done"><span class="m">☑</span>Win11 판정 — Ryzen 5 2600X는 공식 지원목록 밖 → 교체 외 방법 없음</div>
   <div class="item done"><span class="m">☑</span>PC 교체 견적 + 기기점검 스크립트 완성 <a class="doc" href="https://claude.ai/code/artifact/91e31083-8e61-4b6d-b4aa-329d52368010" target="_blank">📄 견적서</a></div>
-  <div class="item now"><span class="m">▶</span>계정 암호 + 자동 화면잠금(무료·5분) — 지금은 PC 열면 앱 세션이 그대로 열림. 8/10 이후 그대로 · PM</div>
+  <div class="item now"><span class="m">▶</span>★방향 전환(9/1 PM): 앱 유휴 잠금으로 해결 — 10분 무조작 시 앱 잠금 오버레이 + PIN 재입력. AI 구현 착수. ※PC 계층(계정 암호·BitLocker·Win11 구매)은 별개로 보류 유지 — 도난 시 파일 접근은 앱 잠금이 못 막음</div>
   <div class="item"><span class="m">☐</span>대표·나수진 기기에 기기점검.ps1 실행 → Win11 되면 무료 업그레이드 · PM</div>
   <div class="item"><span class="m">☐</span>ESU 등록(2026-10-13까지) — 교체 전 시간 벌기 · PM</div>
   <div class="item"><span class="m">☐</span>구매 실행: 최소 145만 / 중간 220만 / 전체 330만 · PM</div>
