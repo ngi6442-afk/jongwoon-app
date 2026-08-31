@@ -127,9 +127,9 @@ h2{font-size:13px;margin-bottom:8px}
   <div class="item done"><span class="m">☑</span>★등재표 산출(09_조사_문서\인허가_주기의무_등재표_20260825.md) — 73행·확정 45/조건부 28/미확정 0. [차량단위]5·[개인단위]15 표시로 사업장 단위 대장에 안 들어가는 항목을 분리. 달력 고정 마감 19·이벤트 트리거 32</div>
   <div class="item"><span class="m">☐</span>수집·운반업 4건의 근거 법률 확인 — 하나라도 건설폐기물법이면 폐기물 주기 5개가 통째로 오적용(없는 5년 만기를 넣게 됨). 허가증 4장이면 끝 · 권민지</div>
   <div class="item"><span class="m">☐</span>문서에 없는 인허가 3종 조사 — 건설폐기물 수집운반업·비산먼지 발생사업 신고·특정공사 사전신고(뒤 둘은 연면적 3,000㎡ 이상 해체현장에 동시 발생) · AI</div>
-  <div class="item now"><span class="m">▶</span>문서함 세분화 — ★원기록 대조(8/4 권한 프리셋 시안): 이 항목 = 시안의 E 안건 그 자체. 단순 폴더 나누기가 아니라 문서함을 분류 체계로 나누고 **분류별 열람 권한까지** 설계하는 것(&quot;직원 실사용 후 설계&quot;로 백로그). 현재 문서함은 평면 목록+전원 열람. 실사용이 시작됐으니 착수 가능 — 시안부터</div>
+  <div class="item now"><span class="m">▶</span>문서함 세분화(권한 E) — ★시안 v1 제출(9/1 새벽, 08_앱_시안시안_문서함세분화): 분류 6종 칩+분류별 열람 권한 매트릭스+JW번호 자동 분류. 전원 열람에서 출발, 법인·인허가만 잠금. PM 승인 시 구현</div>
   <div class="item done"><span class="m">☑</span>★인허가 등재 설계 완료(8/26) — 현행은 &quot;사업장 1행 = 만기 2칸&quot; 구조라 73건이 원리상 안 들어간다(대기 1건에 의무 11건). 허가증(9)/의무(73)/인스턴스(대상×회차) 3층 분리안. 주 키 expiry에 넣을 값이 73건 중 0건(허가 9종 전부 유효기간 없음)이라 허가증은 expiry=해당없음으로 비켜가야 함</div>
-  <div class="item"><span class="m">☐</span>선행 확인 2건: ①앱 licenses에 지금 무엇이 등재돼 있는지(중복 관계) ②persons 명부 신설 필요 — 지입차주·운수종사자·조종사 대장 자체가 없고(vehicles.driver 문자열뿐) 직원 명부에 생년월일이 없어 65/70세 전환 계산 불가 · PM</div>
+  <div class="item now"><span class="m">▶</span>인허가 3층 구조 — ★선행 확인 ① 해소(licenses 13건 실측, 전부 만기 해당없음=1층 완성) + ★시안 v1 제출(시안_인허가3층): 허가증13/의무73/인스턴스 3탭+persons 명부. 단계: 의무층→persons→차량 연동. PM 승인 시 구현</div>
   <div class="item done"><span class="m">☑</span>★석면 작업 이력 대장 배포(8/26, v302) — 인허가 탭 안. 입력칸=산안법 30년 보존 항목 그대로, 신고 마감(착수 7일 전)·보존 만료(종료+30년)는 파생값이라 사람이 못 넣게 함. 근로자는 직원+일용직 명부에서 선택, 캘린더에 착수·종료·신고마감·농도측정 자동 표시</div>
   <div class="item done"><span class="m">☑</span>★교육·건강진단 이력 대장 배포(8/26, v303) — 인사·직원/일용직 양쪽. 6종 주기 원문 확정분 반영(특별교육·관리자교육·배치전진단은 주기 없음 → 만기 안 만듦). 석면 대장이 특별교육 미이수자를 붉게 띄움 — 항목1(배점 60%)에서 깎이는 지점</div>
   <div class="note">분류별 권한(E)은 백로그 — 직원 실사용 후 설계</div>
@@ -288,7 +288,7 @@ h2{font-size:13px;margin-bottom:8px}
   <div class="rowc focus" onclick="go('v2-1')" style="margin-top:10px"><b>연구전담부서 (KOITA) ◀ 심사 대기</b><div class="track2"><div class="fillb t" style="width:95%"></div></div><span class="pv">95</span></div>
   <div class="rowc focus" onclick="go('v2-2')"><b>위험성평가 인정 (KOSHA) ◀ 수료증 확보 → 신청</b><div class="track2"><div class="fillb t" style="width:85%"></div></div><span class="pv">85</span></div>
   <div class="rowc focus" onclick="go('v2-3')"><b>안전성평가 등급 ◀ A 사정권</b><div class="track2"><div class="fillb" style="width:70%"></div></div><span class="pv">70</span></div>
-  <div class="rowc" onclick="go('v2-5')"><b>가족친화인증 (여가부)</b><div class="track2"><div class="fillb c" style="width:20%"></div></div><span class="pv">20</span></div>
+  <div class="rowc" onclick="go('v2-5')"><b>가족친화인증 (여가부)</b><div class="track2"><div class="fillb c" style="width:35%"></div></div><span class="pv">35</span></div>
   <div class="rowc" onclick="go('v2-4')"><b>벤처확인</b><div class="track2"><div class="fillb c" style="width:0%"></div></div><span class="pv">—</span></div>
   <div class="lane">★KOITA 보완요청(D-9/4)과 KOSHA 실행 4건이 이번 주 인증 트랙의 전부 — 둘 다 사람 손(서명·발급·발주·실측)이 병목</div>
   <hr>
@@ -352,13 +352,14 @@ h2{font-size:13px;margin-bottom:8px}
 </div>
 
 <div class="view" id="v2-5"><span class="back" onclick="go('v2')">← 인증·자격</span>
-  <h1>가족친화인증 (여가부) — 20</h1>
+  <h1>가족친화인증 (여가부) — 35</h1>
   <div class="item done" style="margin-top:10px"><span class="m">☑</span>요건 전수 + 설명회 책자 125쪽 해부 — 득점 시나리오 63점 &gt; 통과선 60</div>
   <div class="item done"><span class="m">☑</span>★2026 신청안내서 79쪽 전수 판독(8/23) — 2026 접수 종료 확인(4/1~5/29, 데드라인 리스크 소멸)·목표 2027.4. 1순위=취업규칙 15개 필수 기재 대조(배우자 출산휴가 20일 등 미비 시 인증 불가). 강점: 앱 연차 데이터·반반차(가점 유력). 구멍: 실적 부재('규정+실사용자' 쌍 증빙), 건설은 인원 미달 리스크 → 환경 선행 권고. 체크리스트: 09_조사_문서</div>
   <div class="item"><span class="m">☐</span>지금 시작 5종 가동(전부 대표 결재): 시차출퇴근 · 연차 70% · 교육 연1회 · 조기퇴근 월1회 · 건강검진비</div>
   <div class="item done"><span class="m">☑</span>★혁신⑧ 구현·배포(8/23 밤, v290) — 인사 탭 [가족친화 실적]: 4종 대장(관리자 전용·서버 차단) + 분기 리포트(연차 소진율 자동 집계 반차0.5/반반차0.25·조기퇴근 월별 충족). 2026 실적이 곧 2027 인증 점수 — 기록 운영 개시가 다음(김정아·권민지)</div>
   <div class="item"><span class="m">☐</span>예비인증 검토 — 30/70점이면 인정, 득점 항목 신규인증 승계</div>
   <div class="item"><span class="m">☐</span>2027.4 신규 신청 — 실적 평가기간 = 2026년 1~12월</div>
+  <div class="item now"><span class="m">▶</span>★5종 제도화 안건 문서 완성(9/1 새벽, 대표 결재용) — 시차출퇴근 3명(활용률 23%=만점 15)·연차 70%·교육·조기퇴근·검진비. 예비인증 30/70 경로 포함. 결정 3건: ㉮승인 ㉯검진비 한도 ㉰예비인증 선신청</div>
   <div class="note">이득: 조달청 용역 적격심사 가점 2.0 — 준설·폐기물 입찰 직결</div>
 </div>
 
