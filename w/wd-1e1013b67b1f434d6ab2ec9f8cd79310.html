@@ -100,7 +100,7 @@ h2{font-size:13px;margin-bottom:8px}
   <div class="item done"><span class="m">☑</span>백업 크론 8/14 06:09 정상 — 그룹웨어 스냅샷 매일 생성 확인</div>
   <div class="item done"><span class="m">☑</span>네이버 로그인 세션 포함 HAR을 리포에서 제거(8/13) — 로컬 분석용만 보관</div>
   <div class="item done"><span class="m">☑</span>자동화 감시 1단계 가동(8/19) — 매일 09/16시 앱 밖에서 화관법·올바로·입찰 무음 감지, 웹푸시 유효 24h</div>
-  <div class="item"><span class="m">☐</span>수용 위험 3건 재검토 — 수리할지 수용 유지할지 판단</div>
+  <div class="item"><span class="m">☐</span>수용 위험 재검토 — ★원기록에 3건의 내용이 안 적혀 있었음(문서 빚). 현재 열린 보안 수용분으로 재구성(8/31): ①이름 로그인 허용 유지(GW_ALLOW_NAME_LOGIN on — 계정 이사 미완) ②기기게이트 미마감(미등록 기기 여지) ③계정 암호·자동잠금 미도입(무료 5분 잠금, 구매 결정 대기). 각각 수리할지 수용 유지할지 PM 판단</div>
   <div class="item"><span class="m">☐</span>기기게이트 마감</div>
   <div class="note">주의: member-relay(홈페이지 CMS)·AI_BUILD_GITHUB_TOKEN은 사용 중 — 지우면 안 됨</div>
 </div>
@@ -112,7 +112,7 @@ h2{font-size:13px;margin-bottom:8px}
   <div class="item done"><span class="m">☑</span>정산 UI (v217 — settle_doc, F14~19·F22+L26 매핑)</div>
   <div class="item done"><span class="m">☑</span>혁신② 완료(v284, 8/20) — 기성·수금 탭 [운반 실적 참고] 카드: 월별 상차지·품목 건수/톤, 미매칭·제외·읽기실패 주석까지. 돈 상태 3종 불변</div>
   <div class="item done"><span class="m">☑</span>★차량별 합계(8/24, v295) — 주는돈(지입차 지급) 마감 참고: 월별 차량번호→건·톤, 8월 전체 백필. 차량번호는 일지엔 안 싣는다(PM). 담당(김정아/나수진)은 미정</div>
-  <div class="item now"><span class="m">▶</span>매입 세무 확인</div>
+  <div class="item now"><span class="m">▶</span>매입 세무 확인 — (재구성 8/31) 받는돈은 홈택스 매출 xlsx 대사 경로가 있는데, 주는돈(지입차 지급)·기타 매입의 세금계산서 수취 대사는 없음. 홈택스 매입 xlsx로 대칭 구축하는 건. 주는돈 마감 담당 확정(김정아/나수진)과 세트 — ★이 정의가 맞는지 PM 확인</div>
   <div class="note">기성 미수 = 홈택스 xlsx 업로드 경로 (팝빌 유료 API 보류)</div>
 </div>
 
@@ -127,7 +127,7 @@ h2{font-size:13px;margin-bottom:8px}
   <div class="item done"><span class="m">☑</span>★등재표 산출(09_조사_문서\인허가_주기의무_등재표_20260825.md) — 73행·확정 45/조건부 28/미확정 0. [차량단위]5·[개인단위]15 표시로 사업장 단위 대장에 안 들어가는 항목을 분리. 달력 고정 마감 19·이벤트 트리거 32</div>
   <div class="item"><span class="m">☐</span>수집·운반업 4건의 근거 법률 확인 — 하나라도 건설폐기물법이면 폐기물 주기 5개가 통째로 오적용(없는 5년 만기를 넣게 됨). 허가증 4장이면 끝 · 권민지</div>
   <div class="item"><span class="m">☐</span>문서에 없는 인허가 3종 조사 — 건설폐기물 수집운반업·비산먼지 발생사업 신고·특정공사 사전신고(뒤 둘은 연면적 3,000㎡ 이상 해체현장에 동시 발생) · AI</div>
-  <div class="item now"><span class="m">▶</span>문서함 세분화</div>
+  <div class="item now"><span class="m">▶</span>문서함 세분화 — 현재 문서함 탭은 단일 평면 목록+링크(관리자 편집·전원 열람). 문서가 늘어 분류(문서관리규정 제5조 체계: 법인/인사노무/안전보건/인허가/규정/양식)로 나누고 검색·필터를 붙이는 건. ※분류별 권한은 별도 백로그(직원 실사용 후)</div>
   <div class="item done"><span class="m">☑</span>★인허가 등재 설계 완료(8/26) — 현행은 &quot;사업장 1행 = 만기 2칸&quot; 구조라 73건이 원리상 안 들어간다(대기 1건에 의무 11건). 허가증(9)/의무(73)/인스턴스(대상×회차) 3층 분리안. 주 키 expiry에 넣을 값이 73건 중 0건(허가 9종 전부 유효기간 없음)이라 허가증은 expiry=해당없음으로 비켜가야 함</div>
   <div class="item"><span class="m">☐</span>선행 확인 2건: ①앱 licenses에 지금 무엇이 등재돼 있는지(중복 관계) ②persons 명부 신설 필요 — 지입차주·운수종사자·조종사 대장 자체가 없고(vehicles.driver 문자열뿐) 직원 명부에 생년월일이 없어 65/70세 전환 계산 불가 · PM</div>
   <div class="item done"><span class="m">☑</span>★석면 작업 이력 대장 배포(8/26, v302) — 인허가 탭 안. 입력칸=산안법 30년 보존 항목 그대로, 신고 마감(착수 7일 전)·보존 만료(종료+30년)는 파생값이라 사람이 못 넣게 함. 근로자는 직원+일용직 명부에서 선택, 캘린더에 착수·종료·신고마감·농도측정 자동 표시</div>
@@ -166,7 +166,7 @@ h2{font-size:13px;margin-bottom:8px}
   <div class="item done"><span class="m">☑</span>마감 지난 입찰·온비드 물건 기본 화면에서 숨김 — v255(8/12, PM 지적)</div>
   <div class="item done"><span class="m">☑</span>입찰탭: 딥링크 없는 기관은 [사이트↗]로 표시 + 공고번호 복사 — 8/13(PM 지적)</div>
   <div class="item done"><span class="m">☑</span>온비드 원문 링크 404 수리 + 탐침 재시도 6회(러너 IP 복불복 대응) — 8/13</div>
-  <div class="item now"><span class="m">▶</span>활용신청 승인 확인 — LH 2건·누리·K-apt 2건 → 승인분부터 어댑터 각 30분</div>
+  <div class="item"><span class="m">☐</span>★정정(8/31): 활용신청 건 중 누리장터·K-apt·철도공단 어댑터는 이미 가동 중(오늘 수집 로그에 실재 — 항목이 낡아 있었음). 남은 것 = LH 2건 승인 확인(data.go.kr 마이페이지)뿐, 승인 시 어댑터 30분</div>
   <div class="item"><span class="m">☐</span>나라장터 API 변경신청 승인 대기 — 수집 죽으면 이것부터 의심</div>
   <div class="item done"><span class="m">☑</span>순환자원(re.or.kr) 8/4 두절 복구(8/25) — 진범은 IP 차단이 아니라 러너 간헐 타임아웃×3일 수집창. 수집창 3→7일 배포+30일 백필로 봉합</div>
   <div class="item done"><span class="m">☑</span>낙찰통계 경보 오탐 수리(8/25) — 타임아웃을 '응답 0건'과 구분해 스트릭에 미집계</div>
@@ -384,7 +384,7 @@ h2{font-size:13px;margin-bottom:8px}
 <div class="view" id="v3-1"><span class="back" onclick="go('v3')">← 홍보·검색노출</span>
   <h1>검색 등록·노출 — 90 · 색인 반영 대기</h1>
   <div class="item done" style="margin-top:10px"><span class="m">☑</span>★8/23 노출 실측 — 네이버 '포항 준설' 블로그 탭 1위(PC·모바일, 게시 4일차·장량동 글)·썸네일 10장 정상(핫링크 유효). 통합검색 첫 화면은 광고 3개 점유·블로그 섹션 미노출. 구글(GSC API): 28일 노출 68·클릭 4·'종운' 브랜드만, 서비스 6p 여전히 미크롤</div>
-  <div class="item"><span class="m">☐</span>파워링크 집행 여부 — PM 결정 1건(집행 or 보류). 보류로 정하면 이 항목 내림. 준비물(키워드·예산안·수집기)은 완비</div>
+  <div class="item"><span class="m">☐</span>(보류 확정 — PM 8/31) 파워링크 — 현안 유지. 키워드·예산안·수집기(adwatch) 완비 상태로 대기, 집행 결정 시 즉시 가동</div>
   <div class="item done"><span class="m">☑</span>진단 정정(8/5 실측): 네이버 등록·사이트맵·수집 전부 정상 — 병목은 등록이 아니라 콘텐츠·플레이스</div>
   <div class="item done"><span class="m">☑</span>비가시 SEO 개선 병합(PR #302) · 홈페이지 배포 Publish(8/6) · 서치어드바이저 실이슈 3건 해소(PR #306)</div>
   <div class="item done"><span class="m">☑</span>구글 SC API 연결(서비스 계정, 조회 전용) — 노출 14·클릭 0</div>
@@ -396,7 +396,7 @@ h2{font-size:13px;margin-bottom:8px}
   <div class="item done"><span class="m">☑</span>★main 머지·배포 완료 확정(8/25 PR #311) — 8/31 실측: 열린 PR 0건·staging 미머지 커밋 0건. &quot;머지 대기&quot;는 더 이상 없다</div>
   <div class="item done"><span class="m">☑</span>★구글 색인 재요청 완료(8/31 밤, PM) — 서비스 5페이지 전부. 실측 부수확인: 사이트맵 21개 URL 정상 포함·프리렌더 본문 1,216~3,166자 라이브 확인</div>
   <div class="item"><span class="m">☐</span>색인 반영 추적(관망) — 며칠~2주. AI가 SC API로 확인해 보고. 반영되면 &quot;내용 없음&quot; 미색인 건 최종 종결</div>
-  <div class="item"><span class="m">☐</span>(보류) CCTV 페이지 — 본문 71자+noindex+canonical이 준설로 오기(8/31 실측). 살리려면 본문 시안 승인→staging PR→PM 머지. PM &quot;ㄱ&quot; 대기</div>
+  <div class="item"><span class="m">☐</span>(현안 유지 — PM 8/31) CCTV 페이지 — 본문 71자+noindex+canonical 준설 오기. 살릴 때: 본문 시안 승인→staging PR→머지→색인 요청</div>
   <div class="note">디렉토리 백링크(상공회의소·협회)는 장기 레버 · 지침: 05_홍보_검색노출\블로그_작성지침_v1.md</div>
 </div>
 
