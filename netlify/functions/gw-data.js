@@ -87,6 +87,25 @@ async function verSnapshot(col, prevDoc, byName, dailyOnly, force) {
   } catch (e) {}
 }
 
+// 문서함 분류 파생 — cat 필드 우선, 없으면 JW 번호·구 분류 텍스트에서 유도. 클라 docCatOf와 같은 규칙 유지 필수
+const DOC_CAT_SET = { '01': 1, '02': 1, '03': 1, '05': 1, '06': 1, '99': 1 };
+function docCatOf(it) {
+  if (!it) return '99';
+  // cat은 화이트리스트만 신뢰 — 무효값을 그대로 분류로 삼으면 01 보호를 폴스루로 빠져나간다(클라와 동일 규칙)
+  if (it.cat && DOC_CAT_SET[String(it.cat)]) return String(it.cat);
+  const s = String(it.no || '') + ' ' + String(it.title || '');
+  const m = s.match(/JW-?0([12356])/i);
+  if (m) return '0' + m[1];
+  const c = String(it.category || '');
+  if (/법인/.test(c)) return '01';
+  if (/인사|노무/.test(c)) return '02';
+  if (/안전|보건/.test(c)) return '03';
+  if (/규정|지침/.test(c)) return '05';
+  if (/양식|서식/.test(c)) return '06';
+  return '99';
+}
+function docCanSee01(m) { return !!(m && (m.admin || String(m.dept || '') === '관리부')); }
+
 async function handleGet(event, d, R) {
   const c = await currentMember(event);
   if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
@@ -112,6 +131,10 @@ async function handleGet(event, d, R) {
       if (!v || (v.acq_price == null && v.nodoc_amt == null)) return v;
       const s = Object.assign({}, v); delete s.acq_price; delete s.nodoc_amt; return s;
     }) });
+  }
+  // 문서함 01 법인 분류는 관리부·관리자만 열람(서랍형 개편 2026-09-02) — 서버 하드 차단
+  if (col === 'documents' && !docCanSee01(c.member) && Array.isArray(doc.items)) {
+    doc = Object.assign({}, doc, { items: doc.items.filter(function (it) { return docCatOf(it) !== '01'; }) });
   }
   return jr(200, { status: 'OK', collection: col, doc, can_write: p === 'do', request_id: R });
 }
@@ -141,6 +164,8 @@ async function handleSave(event, d, R) {
   if (d.base !== undefined && prevDoc && prevDoc.updated_at && Number(d.base) !== Number(prevDoc.updated_at))
     return jr(409, { status: 'CONFLICT', error_code: 'STALE_BASE', request_id: R });
   const doc = Object.assign({}, d.doc, { updated_by: c.member.id, updated_at: Date.now() });
+  // items형 컬렉션 정규화 — items가 배열이 아니면(콘솔 우회 등) 아래 재구성 가드들이 통째로 건너뛰어진다(리뷰 지적)
+  if (col !== 'checklist' && !Array.isArray(doc.items)) doc.items = [];
   // 휴가: 신청 저장은 전 직원 필요하지만, 비관리자 저장은 서버가 재구성 — 타인 항목은 서버 원본 유지(클라이언트 사본으로 못 덮음),
   // 본인 항목만 반영, 승인 상태는 스스로 못 올림. (종전엔 전면 면제라 임의 직원이 전사 휴가 문서를 통째로 조작할 수 있었다.
   // 거부(403) 방식이 아니라 재구성인 이유: 낡은 사본으로 저장해도 타인 신청이 유실되지 않게)
@@ -154,6 +179,14 @@ async function handleSave(event, d, R) {
       return b;
     });
     doc.items = others.concat(own);
+  }
+  // 문서함: 01 법인 항목은 관리자만 편집 — 비관리자 저장은 서버가 01을 원본으로 재구성.
+  // 판정은 "서버 기준 01이었던 id" 기준(cat만 바꿔 다른 분류로 위장해 내보내는 탈취·중복 id 차단 — 리뷰 high)
+  // + 현재 01 주장 항목도 제거. 열람 필터로 01이 빠진 사본의 저장이 01을 지우는 사고도 이 재구성이 막는다
+  if (col === 'documents' && !c.member.admin && Array.isArray(doc.items)) {
+    const keep01 = oldItems.filter(function (o) { return docCatOf(o) === '01'; });
+    const ids01 = {}; keep01.forEach(function (o) { if (o && o.id) ids01[o.id] = 1; });
+    doc.items = doc.items.filter(function (x) { return x && !ids01[x.id] && docCatOf(x) !== '01'; }).concat(keep01);
   }
   // 기성 돈 상태 3종(입금 paid·검수 reviewed·발행 invoice)은 관리자 전용 — 비관리자 저장은 서버가 기존값 강제 복원.
   // 분장 근거(용어집 v1): 공무는 청구 등록·수정까지, 상태 전환은 관리부. 화면 숨김은 안내일 뿐, 여기가 하드 차단(콘솔 우회 무력화)

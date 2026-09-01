@@ -298,6 +298,13 @@
   .modal-backdrop.show{display:flex;}
   /* 화면 잠금은 뒤 내용이 비치면 안 되므로 불투명 + 다른 모달보다 위 */
   #lockBackdrop,#lockSetBackdrop{background:#16211b;z-index:200;}
+  /* 문서함 서랍형(2026-09-02) */
+  .doc-acc{border:1px solid var(--line);border-radius:12px;margin:8px 0;overflow:hidden;background:#fff}
+  .doc-acc-hd{background:#fafbf9;padding:10px 14px;font-weight:700;font-size:13.5px;cursor:pointer;display:flex;justify-content:space-between;align-items:center}
+  .doc-acc-hd:hover{background:#f0f4ef}
+  .doc-acc-hd .n{color:var(--sub);font-weight:400;font-size:12px}
+  .doc-acc-bd{padding:2px 10px 8px}
+  .doc-lock{font-size:11px;color:#c07f27;background:#faf3e6;border-radius:8px;padding:1px 8px;font-weight:400}
   /* 잠금 중엔 뒤 DOM 자체를 없앤다 — 덮개만으론 Ctrl+P 인쇄·전체선택 복사로 읽혔다(리뷰 지적).
      서류출력 print 규칙(#docPrintOverlay만 남김)도 잠금 중엔 통째로 무효가 되도록 body를 죽인다 */
   body.jw-locked > *:not(#lockBackdrop):not(#lockSetBackdrop){display:none !important;}
@@ -1800,7 +1807,7 @@
     <input type="text" id="docTitle" placeholder="제목" autocomplete="off">
     <input type="text" id="docNo" placeholder="문서번호 (예: JW-06-013, 선택)" autocomplete="off">
     <span class="fld-label">카테고리</span>
-    <select id="docCat"><option value="양식">양식</option><option value="계약">계약</option><option value="매뉴얼">매뉴얼</option><option value="교육">교육</option><option value="기타">기타</option></select>
+    <select id="docCat"><option value="01">01 법인 (관리부·관리자만 열람)</option><option value="02">02 인사노무</option><option value="03">03 안전보건</option><option value="05">05 규정</option><option value="06">06 양식</option><option value="99">미분류</option></select>
     <input type="text" id="docVer" placeholder="버전 (예: v1, 선택)" autocomplete="off">
     <span class="fld-label">개정일 (선택)</span>
     <input type="date" id="docRevised">
@@ -5527,6 +5534,38 @@
       return resp.json().then(function(json){ docSha = json.content && json.content.sha; });
     }).catch(function(){});
   }
+  // ---- 문서함 서랍형(PM 선택 2026-09-02) — 분류 5종 서랍 + 미분류. 인허가는 여기 안 끼움(원장=인허가 탭) ----
+  var DOC_CATS = { "01":"01 법인", "02":"02 인사노무", "03":"03 안전보건", "05":"05 규정", "06":"06 양식", "99":"미분류" };
+  var docOpenCats = {};   // 서랍 펼침 상태(세션 내) — 검색 중엔 결과 있는 서랍이 자동으로 열린다
+  // 분류 파생: cat 필드 우선, 없으면 JW 번호 → 구 분류 텍스트(양식만 확실) → 미분류. 서버 docCatOf와 같은 규칙이어야 한다
+  function docCatOf(d){
+    if (!d) return "99";
+    if (d.cat && DOC_CATS[d.cat]) return d.cat;
+    var s = String(d.no||"") + " " + String(d.title||"");
+    var m = s.match(/JW-?0([12356])/i);
+    if (m) return "0" + m[1];
+    var c = String(d.category||"");
+    if (/법인/.test(c)) return "01";
+    if (/인사|노무/.test(c)) return "02";
+    if (/안전|보건/.test(c)) return "03";
+    if (/규정|지침/.test(c)) return "05";
+    if (/양식|서식/.test(c)) return "06";
+    return "99";
+  }
+  function docRowHtml(d, admin){
+    var t = esc(d.title || "(제목없음)");
+    var titleHtml = d.url ? '<a href="' + esc(d.url) + '" target="_blank" rel="noopener" class="doc-link">' + t + ' ↗</a>' : t;
+    var meta = [];
+    if (d.no) meta.push('<span>' + esc(d.no) + '</span>');
+    if (d.version) meta.push('<span>' + esc(d.version) + '</span>');
+    if (d.revised) meta.push('<span>' + esc(d.revised) + '</span>');
+    if (d.category) meta.push('<span class="own-badge self">' + esc(d.category) + '</span>');
+    var canEdit = admin && (docCatOf(d) !== "01" || isAdmin());   // 01 법인 편집은 관리자만(서버도 강제)
+    return '<div class="item"><div class="item-body"><div class="item-title">' + titleHtml + '</div>' +
+      (meta.length ? '<div class="item-meta">' + meta.join('') + '</div>' : '') +
+      (d.note ? '<div class="task-detail">' + esc(d.note) + '</div>' : '') +
+      '</div>' + (canEdit ? '<div class="task-ctrl"><button class="mini-btn" data-doc-edit="' + d.id + '">수정</button></div>' : '') + '</div>';
+  }
   function renderDocuments(){
     var host = document.getElementById("docList"); if (!host) return;
     var admin = canDo("doc");
@@ -5534,35 +5573,49 @@
     var list = documents.filter(function(d){
       if (!d || d.del === 1) return false;
       if (!docSearchTerm) return true;
-      return ((d.title||"") + " " + (d.no||"") + " " + (d.category||"")).toLowerCase().indexOf(docSearchTerm) >= 0;
+      // 신설 cat 라벨도 검색 대상 — 신규 문서는 category 텍스트가 없어 분류명 검색에서 빠졌다(리뷰 지적)
+      return ((d.title||"") + " " + (d.no||"") + " " + (d.category||"") + " " + (DOC_CATS[docCatOf(d)]||"")).toLowerCase().indexOf(docSearchTerm) >= 0;
     });
-    list.sort(function(a,b){ var ac=(a.category||"")+"|"+(a.title||""), bc=(b.category||"")+"|"+(b.title||""); return ac<bc?-1:(ac>bc?1:0); });
     var head = document.getElementById("docHead"); if (head) head.textContent = list.length ? (list.length + "건") : "";
-    host.innerHTML = list.length ? list.map(function(d){
-      var t = esc(d.title || "(제목없음)");
-      var titleHtml = d.url ? '<a href="' + esc(d.url) + '" target="_blank" rel="noopener" class="doc-link">' + t + ' ↗</a>' : t;
-      var meta = [];
-      if (d.category) meta.push('<span class="own-badge self">' + esc(d.category) + '</span>');
-      if (d.no) meta.push('<span>' + esc(d.no) + '</span>');
-      if (d.version) meta.push('<span>' + esc(d.version) + '</span>');
-      if (d.revised) meta.push('<span>' + esc(d.revised) + '</span>');
-      return '<div class="item"><div class="item-body"><div class="item-title">' + titleHtml + '</div>' +
-        (meta.length ? '<div class="item-meta">' + meta.join('') + '</div>' : '') +
-        (d.note ? '<div class="task-detail">' + esc(d.note) + '</div>' : '') +
-        '</div>' + (admin ? '<div class="task-ctrl"><button class="mini-btn" data-doc-edit="' + d.id + '">수정</button></div>' : '') + '</div>';
-    }).join("") : '<div class="empty-line">등록된 문서가 없습니다.</div>';
+    if (!list.length){ host.innerHTML = '<div class="empty-line">' + (docSearchTerm ? "검색 결과가 없습니다." : "등록된 문서가 없습니다.") + '</div>'; return; }
+    var searching = !!docSearchTerm;
+    var h = "";
+    // 순회는 리터럴 배열로 — Object.keys는 "99"(정수형 키)를 선두로 올려 미분류가 맨 위에 왔다(리뷰 지적)
+    ["01","02","03","05","06","99"].forEach(function(cat){
+      var rows = list.filter(function(d){ return docCatOf(d) === cat; });
+      // 빈 서랍 처리: 미분류는 있을 때만, 01 법인은 서버가 걸러 0건인 사람에겐 서랍 자체를 안 보여줌(존재 노출 방지)
+      if (!rows.length && (cat === "99" || cat === "01")) return;
+      rows.sort(function(a,b){ var at=(a.title||""), bt=(b.title||""); return at<bt?-1:(at>bt?1:0); });
+      var open = searching ? rows.length > 0 : !!docOpenCats[cat];
+      h += '<div class="doc-acc"><div class="doc-acc-hd" data-doc-acc="' + cat + '"><span>' + (open ? "▾" : "▸") + ' ' + DOC_CATS[cat]
+         + (cat === "01" ? ' <span class="doc-lock">🔒 관리부</span>' : '') + '</span><span class="n">' + rows.length + '건</span></div>';
+      if (open){
+        h += '<div class="doc-acc-bd">';
+        h += rows.map(function(d){ return docRowHtml(d, admin); }).join("") || '<div class="empty-line">비어 있음</div>';
+        h += '</div>';
+      }
+      h += '</div>';
+    });
+    host.innerHTML = h;
+    Array.prototype.forEach.call(host.querySelectorAll("[data-doc-acc]"), function(el){
+      el.addEventListener("click", function(){
+        if (docSearchTerm) return;   // 검색 중엔 자동 펼침이 우선 — 토글하면 보이지 않는 상태만 뒤집혀 검색 해제 후 오염(리뷰 지적)
+        var c = el.getAttribute("data-doc-acc"); docOpenCats[c] = !docOpenCats[c]; renderDocuments();
+      });
+    });
     Array.prototype.forEach.call(host.querySelectorAll("[data-doc-edit]"), function(el){
-      el.addEventListener("click", function(){ openDocModal(el.getAttribute("data-doc-edit")); });
+      el.addEventListener("click", function(e){ e.stopPropagation(); openDocModal(el.getAttribute("data-doc-edit")); });
     });
   }
   function openDocModal(id){
     if (!canDo("doc")) return;
-    editingDocId = id || null;
     var d = id ? findDoc(id) : null;
+    if (d && docCatOf(d) === "01" && !isAdmin()){ alert("01 법인 문서는 관리자만 수정할 수 있습니다."); return; }
+    editingDocId = id || null;
     document.getElementById("docModalTitle").textContent = d ? "문서 수정" : "문서 추가";
     document.getElementById("docTitle").value = d ? (d.title||"") : "";
     document.getElementById("docNo").value = d ? (d.no||"") : "";
-    document.getElementById("docCat").value = (d && d.category) || "양식";
+    document.getElementById("docCat").value = d ? docCatOf(d) : "06";
     document.getElementById("docVer").value = d ? (d.version||"") : "";
     document.getElementById("docRevised").value = (d && isDate(d.revised)) ? d.revised : "";
     document.getElementById("docUrl").value = d ? (d.url||"") : "";
@@ -5575,12 +5628,15 @@
     if (!canDo("doc")) return;
     var title = document.getElementById("docTitle").value.trim();
     if (!title){ document.getElementById("docTitle").focus(); return; }
+    var newCat = document.getElementById("docCat").value;
+    // 검증은 전부 push 전에 — 차단 후 return하면 빈 스텁이 배열에 남아 유령 문서로 영속된다(리뷰 지적)
+    if (newCat === "01" && !isAdmin()){ alert("01 법인 분류는 관리자만 지정할 수 있습니다(서버에서도 차단됩니다)."); return; }
     var d = editingDocId ? findDoc(editingDocId) : null;
     var today = todayStr();
     if (!d){ d = {id: genId("doc"), created: today}; documents.push(d); }
     d.title = title;
     d.no = document.getElementById("docNo").value.trim();
-    d.category = document.getElementById("docCat").value;
+    d.cat = newCat;   // 분류 5종+미분류. 구 category 텍스트는 표시용으로만 남긴다
     d.version = document.getElementById("docVer").value.trim();
     d.revised = document.getElementById("docRevised").value || "";
     var url = document.getElementById("docUrl").value.trim();
