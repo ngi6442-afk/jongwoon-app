@@ -286,6 +286,12 @@
     z-index:50;
   }
   .modal-backdrop.show{display:flex;}
+  /* 화면 잠금은 뒤 내용이 비치면 안 되므로 불투명 + 다른 모달보다 위 */
+  #lockBackdrop,#lockSetBackdrop{background:#16211b;z-index:200;}
+  /* 잠금 중엔 뒤 DOM 자체를 없앤다 — 덮개만으론 Ctrl+P 인쇄·전체선택 복사로 읽혔다(리뷰 지적).
+     서류출력 print 규칙(#docPrintOverlay만 남김)도 잠금 중엔 통째로 무효가 되도록 body를 죽인다 */
+  body.jw-locked > *:not(#lockBackdrop):not(#lockSetBackdrop){display:none !important;}
+  @media print{ body.jw-locked{display:none !important;} }
   .modal{
     background:#fff;
     border-radius:16px;
@@ -2174,6 +2180,31 @@
   </div>
 </div>
 
+<!-- 화면 잠금(유휴 10분) — 잠금 PIN으로 해제. 바깥 클릭 닫기 없음(잠금이므로) -->
+<div class="modal-backdrop" id="lockBackdrop">
+  <div class="modal">
+    <h3>🔒 화면 잠금</h3>
+    <p id="lockMsg"></p>
+    <div class="err" id="lockErr">PIN이 올바르지 않습니다.</div>
+    <input type="password" id="lockPin" placeholder="화면 잠금 PIN" inputmode="numeric" autocomplete="off">
+    <button class="primary" id="lockUnlock">잠금 해제</button>
+    <button class="secondary" id="lockRelogin">잠금 PIN을 잊음 — 처음부터 로그인</button>
+  </div>
+</div>
+
+<!-- 화면 잠금 PIN 세팅 — 로그인 직후 이 기기에 잠금 PIN이 없으면 뜬다(건너뛰기 없음) -->
+<div class="modal-backdrop" id="lockSetBackdrop">
+  <div class="modal">
+    <h3>화면 잠금 PIN 세팅</h3>
+    <p>자리를 비우면 10분 뒤 화면이 잠깁니다. 이 기기에서 잠금을 풀 때 쓸 숫자 PIN(4자리 이상)을 정해주세요. 로그인 PIN과 같아도 됩니다.</p>
+    <div class="err" id="lockSetErr">숫자 4자리 이상, 두 번 입력이 같아야 합니다.</div>
+    <input type="password" id="lockSetPin1" placeholder="잠금 PIN (숫자 4자리 이상)" inputmode="numeric" autocomplete="off">
+    <input type="password" id="lockSetPin2" placeholder="한 번 더" inputmode="numeric" autocomplete="off">
+    <button class="primary" id="lockSetSave">저장</button>
+    <button class="secondary" id="lockSetRelogin">처음부터 로그인(로그아웃)</button>
+  </div>
+</div>
+
 <div class="modal-backdrop" id="uidBackdrop">
   <div class="modal">
     <h3>내 아이디 설정</h3>
@@ -2528,7 +2559,15 @@
     if (u.indexOf("promo.json") >= 0) return "promo";
     return null;
   }
-  function onSessionInvalid(){ setGwToken(null); curMemberObj = null; if (typeof showMemberLogin === "function") showMemberLogin(); }
+  function onSessionInvalid(){
+    setGwToken(null); curMemberObj = null;
+    // 잠금·세팅 화면이 떠 있는 중의 세션 만료 — 반투명 로그인 모달로 바꾸면 뒤 내용이 노출되므로
+    // 리로드로 초기화한다(토큰은 이미 지워져 빈 화면 위 로그인만 뜬다. 세팅 중이면 PIN 미저장 = 잃을 것 없음)
+    if ((typeof lockShown !== "undefined" && lockShown) || (typeof lockSetupShown !== "undefined" && lockSetupShown)){
+      location.reload(); return;
+    }
+    if (typeof showMemberLogin === "function") showMemberLogin();
+  }
   // 기존 모듈의 GitHub Contents API 호출을 gw-data로 라우팅(모듈 코드 그대로 재사용)
   window.fetch = function(url, opts){
     url = String(url); opts = opts || {};
@@ -15223,6 +15262,7 @@
       curMemberObj = res.body.member;
       try{ localStorage.setItem("jw_member_cache", JSON.stringify(res.body.member)); }catch(e){}   // 오프라인 콜드스타트 부팅용
       hideMemberLogin();
+      lockFreshLogin();   // 방금 서버 자격증명으로 인증됨 — 남아 있던 화면잠금 플래그·시도횟수 해소
       if (res.body.device_status && res.body.device_status !== "approved" && !curMemberObj.admin){ showDevicePending(); return; }
       afterLogin();
     });
@@ -15233,6 +15273,7 @@
     doLoad(); loadTasks(); loadVehicles(); loadReceivables(); loadLicenses(); loadDocuments(); loadClients(); loadContracts(); loadMyTasks(); loadLeaves(); loadBids(); loadOnbid();
     loadMembers();   // 담당 배정 드롭다운용 — 관리자·직원 모두
     render();
+    lockOnLogin();   // 화면 잠금: 잠금 PIN 미세팅이면 세팅 요구, 유휴 초과 부팅이면 즉시 잠금
     // 만기 자동생성은 지시·차량·인허가 로드가 모두 끝난 뒤 markLoadedForAutoGen에서 실행(중복 방지)
   }
   function loadMembers(){
@@ -15850,6 +15891,176 @@
       navigator.serviceWorker.register("./sw.js").catch(function(){});
     });
   }
+
+  // ── 화면 잠금: 유휴 10분 → 잠금 PIN 재입력 (PM 지시 2026-08-31) ──────────────
+  // 로그인 PIN(서버 자격증명)과 별개인 기기 로컬 잠금 PIN — 관리자는 8자+ 비밀번호를
+  // 10분마다 다시 칠 수 없으므로 "세팅"이 필요하고, 값은 기기솔트 SHA-256 해시로만 저장한다.
+  // 잠금 상태·시도 횟수는 localStorage에 영속 — 새로고침·재실행이 잠금도 5회 제한도 못 푼다.
+  // 5회 오입력 = 잠금 PIN 폐기 후 로그아웃·리로드(서버 자격증명으로만 복귀).
+  var LOCK_IDLE_MS = 10 * 60 * 1000;
+  var LOCK_LAST_KEY = "jw_lock_last";
+  var LOCK_FLAG_KEY = "jw_lock_locked";
+  var LOCK_TRIES_KEY = "jw_lock_tries";
+  var lockShown = false, lockSetupShown = false, lockTries = 0, lockBusy = false;
+  var lockArmed = false;   // lockOnLogin 1회 전엔 act()가 타임스탬프를 못 만진다(부팅 중 터치가 유휴초과 잠금을 지우는 레이스 방지)
+  var lockHadLogin = false;   // 이 페이지 수명 안에서 로그인이 있었나 — 세션만료 후 방치 리로드 판단용
+  function lockPinKey(){ var m = curMember(); return m && m.id ? "jw_lock_pin_" + m.id : null; }
+  function lockHashDjb2(str){ var h = 5381; for (var j = 0; j < str.length; j++) h = ((h << 5) + h + str.charCodeAt(j)) >>> 0; return "djb2:" + h.toString(16); }
+  function lockHash(pin){
+    var str = deviceId() + ":" + pin;
+    if (window.crypto && crypto.subtle && crypto.subtle.digest && window.TextEncoder){
+      try{
+        return crypto.subtle.digest("SHA-256", new TextEncoder().encode(str)).then(function(buf){
+          var a = new Uint8Array(buf), s = "";
+          for (var i = 0; i < a.length; i++) s += ("0" + a[i].toString(16)).slice(-2);
+          return s;
+        }).catch(function(){ return lockHashDjb2(str); });   // digest 거부 환경 — 무음 사망 대신 폴백
+      }catch(e){ return Promise.resolve(lockHashDjb2(str)); }
+    }
+    return Promise.resolve(lockHashDjb2(str));
+  }
+  function lockTouch(){ try{ localStorage.setItem(LOCK_LAST_KEY, String(Date.now())); }catch(e){} }
+  function lockStale(){
+    var t = 0; try{ t = parseInt(localStorage.getItem(LOCK_LAST_KEY) || "0", 10) || 0; }catch(e){}
+    return t > 0 && (Date.now() - t) > LOCK_IDLE_MS;
+  }
+  function lockFlagged(){ try{ return localStorage.getItem(LOCK_FLAG_KEY) === "1"; }catch(e){ return false; } }
+  function showLock(){
+    if (lockShown || lockSetupShown) return;
+    var k = lockPinKey(); if (!k) return;
+    var hash = null; try{ hash = localStorage.getItem(k); }catch(e){}
+    if (!hash){ openLockSetup(); return; }   // 세팅 전에 유휴 초과 — 세팅부터
+    lockShown = true;
+    try{ document.body.classList.add("jw-locked"); }catch(e){}   // 뒤 DOM 숨김(인쇄·복사 차단)
+    try{ localStorage.setItem(LOCK_FLAG_KEY, "1"); }catch(e){}   // 새로고침·재실행해도 잠금 유지
+    try{ lockTries = parseInt(localStorage.getItem(LOCK_TRIES_KEY) || "0", 10) || 0; }catch(e){ lockTries = 0; }
+    var m = curMember();
+    document.getElementById("lockMsg").textContent = (m ? m.name + "님 — " : "") + "10분 넘게 자리를 비워 잠겼습니다.";
+    document.getElementById("lockErr").classList.remove("show");
+    document.getElementById("lockPin").value = "";
+    document.getElementById("lockBackdrop").classList.add("show");
+  }
+  function lockClearState(){
+    lockTries = 0;
+    try{ localStorage.removeItem(LOCK_FLAG_KEY); localStorage.removeItem(LOCK_TRIES_KEY); }catch(e){}
+  }
+  function lockLogout(msg){
+    var k = lockPinKey();
+    if (k){ try{ localStorage.removeItem(k); }catch(e){} }
+    lockClearState();
+    setGwToken(null); curMemberObj = null;
+    // 불투명 잠금 화면을 띄워둔 채 알리고 리로드한다 — 로그인 모달은 반투명이라
+    // 그냥 바꿔 끼우면 뒤에 렌더된 지시·미수금이 비쳐 보였다(리뷰 지적).
+    if (msg) alert(msg);
+    location.reload();
+  }
+  function tryUnlock(){
+    if (lockBusy) return;   // Enter 키 반복·연타가 같은 오입력을 다발 계산해 5회를 삼키는 것 방지
+    var k = lockPinKey(); if (!k){ lockLogout(null); return; }
+    var pin = document.getElementById("lockPin").value.trim();
+    if (!pin) return;
+    lockBusy = true;
+    document.getElementById("lockPin").value = "";   // 즉시 비움 — 해석 중 재제출돼도 빈 값
+    lockHash(pin).then(function(h){
+      lockBusy = false;
+      var saved = null; try{ saved = localStorage.getItem(k); }catch(e){}
+      // 저장 당시와 해시 경로(SHA/폴백)가 달라진 기기도 풀리도록 둘 다 대조
+      if (saved && (h === saved || lockHashDjb2(deviceId() + ":" + pin) === saved)){
+        lockShown = false; lockClearState(); lockTouch();
+        try{ document.body.classList.remove("jw-locked"); }catch(e){}
+        document.getElementById("lockBackdrop").classList.remove("show");
+        return;
+      }
+      lockTries++;
+      try{ localStorage.setItem(LOCK_TRIES_KEY, String(lockTries)); }catch(e){}   // 새로고침으로 카운터 리셋 불가
+      if (lockTries >= 5){ lockLogout("5회 잘못 입력해 로그아웃되었습니다.\n아이디와 PIN(비밀번호)으로 다시 로그인하면 잠금 PIN을 새로 정합니다."); return; }
+      var errEl = document.getElementById("lockErr");
+      errEl.textContent = "PIN이 올바르지 않습니다. (" + lockTries + "/5)";
+      errEl.classList.add("show");
+      document.getElementById("lockPin").value = "";
+    });
+  }
+  function openLockSetup(){
+    if (lockSetupShown || !curMember()) return;
+    lockSetupShown = true;
+    lockTouch();   // 세팅 제한시간의 기점 — 10분 내 미완료면 check()가 로그아웃시킨다
+    try{ document.body.classList.add("jw-locked"); }catch(e){}   // 세팅 모달도 게이트다 — 뒤 DOM 숨김
+    document.getElementById("lockSetErr").classList.remove("show");
+    document.getElementById("lockSetPin1").value = "";
+    document.getElementById("lockSetPin2").value = "";
+    document.getElementById("lockSetBackdrop").classList.add("show");
+  }
+  function saveLockSetup(){
+    var p1 = document.getElementById("lockSetPin1").value.trim();
+    var p2 = document.getElementById("lockSetPin2").value.trim();
+    var errEl = document.getElementById("lockSetErr");
+    if (!/^\d{4,}$/.test(p1) || p1 !== p2){ errEl.classList.add("show"); return; }
+    var k = lockPinKey();
+    if (!k){ lockLogout(null); return; }   // 세팅 도중 세션이 죽은 경우 — 무음 실패 대신 처음부터
+    lockHash(p1).then(function(h){
+      try{ localStorage.setItem(k, h); }catch(e){}
+      var ok = false; try{ ok = localStorage.getItem(k) === h; }catch(e){}
+      if (!ok){ errEl.textContent = "저장 실패 — 브라우저 저장소 상태를 확인하세요."; errEl.classList.add("show"); return; }
+      lockSetupShown = false;
+      try{ document.body.classList.remove("jw-locked"); }catch(e){}
+      document.getElementById("lockSetBackdrop").classList.remove("show");
+      lockTouch();
+    });
+  }
+  // 방금 서버 자격증명으로 로그인 성공 — 이전 잠금 흔적(플래그·카운터)은 해소된 것으로 본다
+  function lockFreshLogin(){ lockShown = false; lockClearState(); lockTouch(); }
+  // 로그인·부팅 직후 진입점 — afterLogin에서 부른다
+  function lockOnLogin(){
+    try{
+      var k = lockPinKey(); if (!k){ lockArmed = true; return; }
+      var hash = null; try{ hash = localStorage.getItem(k); }catch(e){}
+      if (!hash) openLockSetup();                         // 이 기기에 잠금 PIN 없음 → 세팅(건너뛰기 없음)
+      else if (lockFlagged() || lockStale()) showLock();  // 잠근 채 껐거나 유휴 초과 부팅 — 즉시 잠금
+      else lockTouch();
+    }catch(e){}
+    lockArmed = true;
+    lockHadLogin = true;
+  }
+  (function initLock(){
+    var thr = 0;
+    function act(e){
+      if (!lockArmed || lockShown || lockSetupShown) return;   // 부팅 중·잠금 화면 위 입력은 유휴 갱신이 아니다
+      if (!curMember()) return;   // 세션 죽은 뒤의 조작이 타임스탬프를 늘리면 아래 check()의 노출 차단이 무력화된다
+      // 유휴초과 후 30초 interval 틱 전에 도착한 첫 터치가 타임스탬프를 지우면 잠금이 영영 안 걸린다(리뷰 지적)
+      // — 밀린 잠금이 있으면 갱신 대신 그 자리에서 잠그고, 그 이벤트가 뒤 화면 핸들러(Enter=등록 등)까지
+      // 내려가지 않게 전파를 끊는다(passive여도 stopPropagation은 허용)
+      if (lockFlagged() || lockStale()){
+        showLock();
+        try{ e.stopPropagation(); if (e.stopImmediatePropagation) e.stopImmediatePropagation(); }catch(err){}
+        return;
+      }
+      var n = Date.now(); if (n - thr > 10000){ thr = n; lockTouch(); }
+    }
+    ["pointerdown", "keydown", "touchstart", "scroll"].forEach(function(ev){
+      document.addEventListener(ev, act, { passive: true, capture: true });
+    });
+    function check(){
+      if (!lockArmed) return;   // 미장착(기기 승인 대기 포함) 상태에선 잠금 모듈이 나서지 않는다
+      if (!curMember()){
+        // 세션만 죽고(401→반투명 로그인 모달) 데이터가 뒤에 남은 채 10분 방치 — 리로드로 노출 차단.
+        // 리로드 후엔 토큰이 없어 빈 화면 위 로그인만 뜨고, lockArmed=false라 재발동 루프도 없다.
+        if (lockHadLogin && lockStale()) location.reload();
+        return;
+      }
+      // 세팅 모달을 열어둔 채 방치 — PIN이 없어 잠글 수 없으니 10분 지나면 로그아웃(저장된 PIN 없음 = 잃을 것 없음)
+      if (lockSetupShown){ if (lockStale()) lockLogout(null); return; }
+      if (lockFlagged() || lockStale()) showLock();
+    }
+    document.addEventListener("visibilitychange", function(){ if (!document.hidden) check(); });
+    window.addEventListener("focus", check);
+    setInterval(check, 30000);
+    document.getElementById("lockUnlock").addEventListener("click", tryUnlock);
+    document.getElementById("lockPin").addEventListener("keydown", function(e){ if (e.key === "Enter") tryUnlock(); });
+    document.getElementById("lockRelogin").addEventListener("click", function(){ lockLogout(null); });
+    document.getElementById("lockSetSave").addEventListener("click", saveLockSetup);
+    document.getElementById("lockSetRelogin").addEventListener("click", function(){ lockLogout(null); });
+    document.getElementById("lockSetPin2").addEventListener("keydown", function(e){ if (e.key === "Enter") saveLockSetup(); });
+  })();
 
   // 시작: 세션 검증 → 유효하면 데이터 로드, 아니면 로그인
   (function boot(){
