@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>시안 — 문서함 세분화 (권한 E)</title>
+<style>
+:root{--bg:#12141a;--panel:#1b1e27;--line:#2a2e3a;--txt:#e6e6e2;--mut:#9a9a94;--acc:#1A9A6B;--warn:#EF9F27;--red:#d85a30}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.5 'Malgun Gothic',sans-serif;padding:18px}
+h1{font-size:17px;margin:0 0 4px}.sub{color:var(--mut);font-size:12px;margin-bottom:16px}
+.wrap{max-width:860px;margin:0 auto}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0}
+.chip{padding:5px 12px;border:1px solid var(--line);border-radius:16px;font-size:12.5px;color:var(--mut);cursor:pointer}
+.chip.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+.chip .n{opacity:.75;font-size:11px;margin-left:4px}
+.search{width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--txt);margin-bottom:10px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:11px 14px;margin-bottom:8px;display:flex;gap:10px;align-items:center}
+.card .ico{font-size:18px}.card .b{flex:1;min-width:0}
+.card .t{font-weight:700;font-size:13.5px}.card .d{color:var(--mut);font-size:12px;margin-top:2px}
+.badge{font-size:10.5px;padding:2px 8px;border-radius:10px;white-space:nowrap}
+.b-all{background:#233b31;color:#7fd4ae}.b-adm{background:#3b2a23;color:#f0b27f}.b-team{background:#23303b;color:#7fb6d4}
+.sec{margin:22px 0 8px;font-size:13px;color:var(--warn);font-weight:700}
+table{width:100%;border-collapse:collapse;font-size:12.5px;background:var(--panel);border-radius:10px;overflow:hidden}
+th,td{border:1px solid var(--line);padding:7px 9px;text-align:center}th{background:#232733;color:var(--mut);font-weight:700}
+td.l{text-align:left}.ok{color:#7fd4ae}.no{color:#666}.adm{color:#f0b27f}
+.note{color:var(--mut);font-size:12px;margin-top:14px;border-top:1px solid var(--line);padding-top:10px;line-height:1.7}
+.pill{display:inline-block;background:#232733;border-radius:6px;padding:1px 7px;font-size:11px;color:var(--mut);margin-left:6px}
+</style></head><body><div class="wrap">
+<h1>문서함 세분화 — 시안 v1 <span class="pill">권한 프리셋 E 안건</span></h1>
+<div class="sub">현행: 평면 목록 + 전원 열람 · 시안: 문서관리규정 제5조 분류 6종 + 분류별 열람 권한 + 검색</div>
+
+<input class="search" placeholder="🔍 문서 검색 — 제목·분류·메모">
+
+<div class="chips">
+ <span class="chip on">전체 <span class="n">37</span></span>
+ <span class="chip">01 법인 <span class="n">3</span></span>
+ <span class="chip">02 인사노무 <span class="n">5</span></span>
+ <span class="chip">03 안전보건 <span class="n">14</span></span>
+ <span class="chip">04 인허가 <span class="n">4</span></span>
+ <span class="chip">05 규정 <span class="n">6</span></span>
+ <span class="chip">06 양식 <span class="n">5</span></span>
+</div>
+
+<div class="card"><span class="ico">📄</span><div class="b"><div class="t">취업규칙 (JW-02-001)</div><div class="d">02 인사노무 · 2023-02-01 · PDF 링크</div></div><span class="badge b-all">전원 열람</span></div>
+<div class="card"><span class="ico">📄</span><div class="b"><div class="t">석면해체·제거작업 자체 매뉴얼 (JW-03-016)</div><div class="d">03 안전보건 · Rev.0 결재 대기 · 현장 비치본</div></div><span class="badge b-all">전원 열람</span></div>
+<div class="card"><span class="ico">🔒</span><div class="b"><div class="t">주주명부 양식 (JW-01-003)</div><div class="d">01 법인 · 민감 — 분류 권한으로 숨김</div></div><span class="badge b-adm">관리자만</span></div>
+<div class="card"><span class="ico">📄</span><div class="b"><div class="t">위험성평가 실시규정 v3 (JW-03-007)</div><div class="d">03 안전보건 · 2026-08-23 대표 결재</div></div><span class="badge b-all">전원 열람</span></div>
+<div class="card"><span class="ico">👥</span><div class="b"><div class="t">노무 검토 안건 관리표 (JW-02-004)</div><div class="d">02 인사노무 · 수시 갱신</div></div><span class="badge b-team">관리부+인사</span></div>
+
+<div class="sec">분류별 열람 권한 매트릭스 (관리자 화면 — 권한관리 탭에 1줄 추가)</div>
+<table>
+<tr><th style="width:26%">분류</th><th>전 직원</th><th>현장팀</th><th>관리부</th><th>관리자</th></tr>
+<tr><td class="l">01 법인</td><td class="no">—</td><td class="no">—</td><td class="ok">열람</td><td class="adm">편집</td></tr>
+<tr><td class="l">02 인사노무</td><td class="ok">열람</td><td class="ok">열람</td><td class="ok">열람</td><td class="adm">편집</td></tr>
+<tr><td class="l">03 안전보건</td><td class="ok">열람</td><td class="ok">열람</td><td class="ok">열람</td><td class="adm">편집</td></tr>
+<tr><td class="l">04 인허가</td><td class="no">—</td><td class="no">—</td><td class="ok">열람</td><td class="adm">편집</td></tr>
+<tr><td class="l">05 규정 · 06 양식</td><td class="ok">열람</td><td class="ok">열람</td><td class="ok">열람</td><td class="adm">편집</td></tr>
+</table>
+
+<div class="note">
+<b>구현 범위(승인 시)</b><br>
+① documents 항목에 <b>cat</b>(분류) 필드 추가 — 기존 37건은 제목의 JW 번호로 자동 분류(JW-01→법인 …), 번호 없는 건 "미분류" 칩으로 몰아 관리자가 지정<br>
+② 분류 칩 필터 + 검색(이미 있는 전역 검색과 연동) ③ 분류별 열람 권한 — 위 매트릭스 기본값으로 시작, 권한관리 탭에서 조정. 서버(gw-data)에서 하드 차단(클라이언트 숨김 아님)<br>
+④ 기본값 원칙: <b>지금과 동일하게 전원 열람에서 출발</b>하고, 01 법인·04 인허가만 잠금 — 갑자기 문서가 사라지는 혼란 방지<br>
+<b>안 하는 것</b>: 파일 업로드 저장(문서함은 링크 목록 유지 — 원본은 레포·오프라인 보관소 원칙 그대로), 폴더 트리(칩 1층이면 37건 규모에 충분)
+</div>
+</div></body></html>

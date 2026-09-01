@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>시안 — 인허가 3층 구조</title>
+<style>
+:root{--bg:#12141a;--panel:#1b1e27;--line:#2a2e3a;--txt:#e6e6e2;--mut:#9a9a94;--acc:#1A9A6B;--warn:#EF9F27;--red:#d85a30}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.5 'Malgun Gothic',sans-serif;padding:18px}
+.wrap{max-width:900px;margin:0 auto}
+h1{font-size:17px;margin:0 0 4px}.sub{color:var(--mut);font-size:12px;margin-bottom:14px}
+.tabs{display:flex;gap:6px;margin:14px 0 12px}
+.tab{padding:7px 16px;border:1px solid var(--line);border-radius:8px;font-size:13px;color:var(--mut);cursor:pointer}
+.tab.on{background:var(--acc);color:#fff;border-color:var(--acc);font-weight:700}
+.lay{font-size:13px;color:var(--warn);font-weight:700;margin:20px 0 8px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin-bottom:7px;display:flex;gap:10px;align-items:center}
+.card .b{flex:1}.card .t{font-weight:700;font-size:13px}.card .d{color:var(--mut);font-size:11.5px;margin-top:2px}
+.badge{font-size:10.5px;padding:2px 8px;border-radius:10px;white-space:nowrap}
+.b-ok{background:#233b31;color:#7fd4ae}.b-due{background:#3b2a23;color:#f0b27f}.b-red{background:#3b2323;color:#e08b8b}.b-info{background:#23303b;color:#7fb6d4}
+table{width:100%;border-collapse:collapse;font-size:12px;background:var(--panel);border-radius:10px;overflow:hidden;margin-bottom:8px}
+th,td{border:1px solid var(--line);padding:6px 8px;text-align:center}th{background:#232733;color:var(--mut)}td.l{text-align:left}
+.note{color:var(--mut);font-size:12px;margin-top:14px;border-top:1px solid var(--line);padding-top:10px;line-height:1.7}
+.pill{display:inline-block;background:#232733;border-radius:6px;padding:1px 7px;font-size:11px;color:var(--mut);margin-left:6px}
+.flow{background:#171a22;border:1px dashed var(--line);border-radius:10px;padding:10px 14px;font-size:12.5px;color:var(--mut);margin:10px 0}
+</style></head><body><div class="wrap">
+<h1>인허가 3층 구조 — 시안 v1 <span class="pill">설계 8/26 승인분의 화면화</span></h1>
+<div class="sub">현행 한계: "사업장 1행 = 만기 2칸"이라 의무 73행이 원리상 안 들어감(대기 1건에 의무 11개). 층을 나눈다.</div>
+
+<div class="tabs"><span class="tab on">① 허가증 13</span><span class="tab">② 의무 대장 73</span><span class="tab">③ 이번 달 할 일 6</span><span class="tab">명부(persons)</span></div>
+
+<div class="lay">①층 — 허가증 (현행 licenses 13건 그대로 · expiry=해당없음 확정)</div>
+<div class="card"><div class="b"><div class="t">석면해체·제거업 (제3339호)</div><div class="d">종운건설 · 2013-09-04 · 만기 없음 · 연결 의무 8건</div></div><span class="badge b-ok">유효</span></div>
+<div class="card"><div class="b"><div class="t">건설폐기물 수집·운반업</div><div class="d">종운환경 · 근거법률 확인 중(오늘 밤 조사) · 연결 의무 5건</div></div><span class="badge b-due">근거 확인</span></div>
+<div class="card"><div class="b"><div class="t">대기배출시설설치 신고</div><div class="d">종운환경 · 만기 없음 · 연결 의무 11건 — 구조상 현행 화면에 못 담던 대표 사례</div></div><span class="badge b-ok">유효</span></div>
+
+<div class="lay">②층 — 의무 대장 (등재표 73행이 그대로 들어옴 · 허가증/사람/차량에 연결)</div>
+<table>
+<tr><th style="width:31%">의무</th><th>연결</th><th>주기</th><th>다음 회차</th><th>담당</th><th>상태</th></tr>
+<tr><td class="l">자가측정 (대기 4종)</td><td>대기배출신고</td><td>반기</td><td>2026-12-31</td><td>공무</td><td><span class="badge b-ok">여유</span></td></tr>
+<tr><td class="l">기술인력 교육 (폐기물)</td><td>수집·운반업</td><td>3년</td><td>2027-05</td><td>인사</td><td><span class="badge b-ok">여유</span></td></tr>
+<tr><td class="l">자동차 정기검사 (대형 지입)</td><td>차량 12대</td><td>6개월</td><td>차량별</td><td>관리부</td><td><span class="badge b-due">차량단위→③</span></td></tr>
+<tr><td class="l">특수건강진단 (석면)</td><td>persons 7명</td><td>12개월</td><td>사람별</td><td>인사</td><td><span class="badge b-due">개인단위→③</span></td></tr>
+<tr><td class="l">석면 작업 신고</td><td>석면해체업</td><td>이벤트(착수 7일 전)</td><td>수주 시</td><td>공무</td><td><span class="badge b-info">트리거</span></td></tr>
+</table>
+
+<div class="lay">③층 — 인스턴스 (대상 × 회차 자동 생성 → 캘린더·D-30 지시)</div>
+<div class="card"><div class="b"><div class="t">경북02모4315 정기검사</div><div class="d">자동차 정기검사 · 만기 2026-09-14 · 지시 자동 발행됨(관리부)</div></div><span class="badge b-red">D-13</span></div>
+<div class="card"><div class="b"><div class="t">강병구 특수건강진단(석면)</div><div class="d">배치 2026-01-09 기준 · 다음 2027-01-08 · persons 연동</div></div><span class="badge b-ok">여유</span></div>
+<div class="flow">흐름: ②의무(주기 규칙) × 대상(허가증·차량·사람) → ③인스턴스 자동 생성 → 캘린더 표시 + D-30 지시 발행 + 완료 시 다음 회차 자동 생성. 사람이 만기를 손으로 계산하지 않는다.</div>
+
+<div class="lay">persons 명부 (신설 — 인사 탭 하위)</div>
+<table>
+<tr><th>성명</th><th>구분</th><th>생년월일</th><th>연결 의무</th><th>비고</th></tr>
+<tr><td>홍길동</td><td>지입차주</td><td>1961-03-02</td><td>적성검사·65세 전환</td><td><span class="badge b-due">65세 도래 2026-03</span></td></tr>
+<tr><td>강병구</td><td>일용(석면)</td><td>1973-05-06</td><td>특수건강진단·특별교육</td><td>남성초 투입분</td></tr>
+</table>
+
+<div class="note">
+<b>구현 범위(승인 시)</b><br>
+① 허가증층: 현행 licenses 13건 그대로(변경 없음) — expiry 칸은 "해당없음" 고정 표기<br>
+② 의무층: 등재표 73행을 seed로 일괄 등재(확정 45 먼저, 조건부 28은 근거 확정되는 대로) — 각 행에 연결대상 타입(사업장/허가증/차량/사람)<br>
+③ 인스턴스층: 달력고정 19건은 즉시 생성, 이벤트 트리거 32건은 발생 시 생성(석면 대장 v302가 이미 하는 방식의 일반화)<br>
+④ persons: 지입차주·운수종사자·조종사 + 생년월일 — 65/70세 전환·적성검사 자동 계산. 직원·일용직 명부와 별개(교집합은 연결)<br>
+<b>단계</b>: 1차 = 의무층+달력고정 인스턴스(빠름) → 2차 = persons+개인단위 → 3차 = 차량단위 연동(차량탭 기존 관리와 중복 없게 — 차량 만기는 차량탭이 원장, 여기선 참조만)
+</div>
+</div></body></html>
