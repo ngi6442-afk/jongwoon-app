@@ -79,7 +79,7 @@ h2{font-size:13px;margin-bottom:8px}
   <div class="rowc focus" onclick="go('v1-10')"><b>외부신고 자동화 (화관법) ◀ 무인 가동</b><div class="track2"><div class="fillb t" style="width:99%"></div></div><span class="pv">99</span></div>
   <div class="rowc focus" onclick="go('v1-11')"><b>운반일지·배차 자동화 ◀ 무인 가동</b><div class="track2"><div class="fillb t" style="width:92%"></div></div><span class="pv">92</span></div>
   <div class="rowc focus" onclick="go('v1-lawwatch')"><b>법령 워치 (신규 자동화) ◀ 가동</b><div class="track2"><div class="fillb t" style="width:95%"></div></div><span class="pv">95</span></div>
-  <div class="rowc focus" onclick="go('v1-12')"><b>대표 업무유연성 · 기기 배치도 ◀ 결정 5종 회신 대기</b><div class="track2"><div class="fillb c" style="width:35%"></div></div><span class="pv">35</span></div>
+  <div class="rowc focus" onclick="go('v1-12')"><b>대표 업무유연성 · 기기 배치도 ◀ 구현 단계 진입</b><div class="track2"><div class="fillb c" style="width:35%"></div></div><span class="pv">35</span></div>
   <div class="rowc focus" onclick="go('v1-13')"><b>관리자 기기 보안 ◀ 9/1 앱 잠금 배포</b><div class="track2"><div class="fillb c" style="width:25%"></div></div><span class="pv">25</span></div>
   <hr>
   <h2>지금 중요한 순서 — 업무플랫폼</h2>
@@ -171,7 +171,7 @@ h2{font-size:13px;margin-bottom:8px}
   <div class="item done"><span class="m">☑</span>순환자원(re.or.kr) 8/4 두절 복구(8/25) — 진범은 IP 차단이 아니라 러너 간헐 타임아웃×3일 수집창. 수집창 3→7일 배포+30일 백필로 봉합</div>
   <div class="item done"><span class="m">☑</span>낙찰통계 경보 오탐 수리(8/25) — 타임아웃을 '응답 0건'과 구분해 스트릭에 미집계</div>
   <div class="item"><span class="m">☐</span>사정률 분석·투찰 포지션 추천 v2 — 보류(착수는 지시로)</div>
-  <div class="item now"><span class="m">▶</span>LH 개찰 API만 잔여 — 키는 인식되나 권한 거부(코드20, 변형 4종 전수 실측). ★PM 10초: data.go.kr 마이페이지→활용신청에서 LH 2건(개찰정보·예정가격) 상태 캡처 → 승인인데도 20이면 포털 문의 경로</div>
+  <div class="item now"><span class="m">▶</span>LH 개찰 API — ★포털 승인 실증(9/1 PM 캡처: &quot;전자조달-개찰정보(예정가격정보)&quot; [승인] 8/4, 만료 2028-08-04). 그런데 LH 서버는 코드20 거부 = LH측 키 동기화 장애로 확정. 문의 문구 전달(9/1) → PM 접수 대기</div>
   <div class="note">일감 학습 필터: (같은 기관+유사 제목) 재공고만 자동패스 — 기관 단위 금지</div>
 </div>
 
@@ -261,14 +261,15 @@ h2{font-size:13px;margin-bottom:8px}
 </div>
 
 <div class="view" id="v1-12"><span class="back" onclick="go('v1')">← 업무플랫폼</span>
-  <h1>대표 업무유연성 · 기기 배치도 — 35 · 결정 5종 회신 대기</h1>
+  <h1>대표 업무유연성 · 기기 배치도 — 35 · 구현 단계 진입</h1>
   <div class="item done" style="margin-top:10px"><span class="m">☑</span>배치도 2종 v1(8/9) — 인프라 4계층 + 역할×워크플로우 매트릭스 <a class="doc" href="https://claude.ai/code/artifact/7b5702be-92a5-49c4-8240-516220186fb4" target="_blank">📄 인프라</a> <a class="doc" href="https://claude.ai/code/artifact/dbf72617-921c-4a5d-ba32-aad4dd65562a" target="_blank">📄 역할×기기</a></div>
   <div class="item done"><span class="m">☑</span>병목 진단(8/9) — 결재감(운행일지·사규·가족친화·계좌확인)이 앱 밖이라 대면 시로 쌓임</div>
   <div class="item done"><span class="m">☑</span>대표 결재함 시안 — 폰 주력+PC 동일 <a class="doc" href="https://claude.ai/code/artifact/ef49fdb7-ca09-400c-9ae7-bb397465ff7d" target="_blank">📄 결재함 시안</a></div>
-  <div class="item now"><span class="m">▶</span>배치도 확정 — ③확정(9/1, 알림=우선기기1) + ★남은 5종 10초 결정형 한 장 제출(9/1, 09_조사_문서기기배치도_결정5종). PM ○ 회신 대기 → 다 정해지면 결재함 편입·자동팝업 구현 착수</div>
+  <div class="item done"><span class="m">☑</span>★배치도 결정 6종 전부 확정(9/1 PM): ③알림=우선기기1 / ①운반일지 대표결재=오피스PC 팝업+폰 푸시 병행(우선기기 규칙의 명시적 예외) / ②종이서류=폰 우선 수신·공무 업로드(돈 서류만 경리) / ④지시 승인=중요 건만 대표(기준선 별도 확정 필요) / ⑤다표면=진척도만, 나머지 앱 알림함 단일 / ⑥대표 오피스PC=시작프로그램 자동실행(자동로그인→결재함). 8/8 발의 키스톤 완결</div>
   <div class="item"><span class="m">☐</span>결재함 구현 — 앱 밖 결재감 편입 + 대표 폰 푸시</div>
   <div class="item"><span class="m">☐</span>대표 기기 3대 자동로그인 → 자동 실행·보고 팝업</div>
   <div class="item"><span class="m">☐</span>인프라 후속: SPOF=Blobs 단일원천 — 외장/클라우드 복제 결정 · PM</div>
+  <div class="item now"><span class="m">▶</span>다음: 결재함 편입 설계(운반일지·사규·가족친화·계좌확인 → 앱 결재함 + ①⑥ 규칙 반영) — ④ 기준선(대표 승인 문턱) 확정과 병행</div>
   <div class="note">순서: 계정(완료) → 배치도 확정 → 결재함 편입 → 자동실행. 8/9 이후 진척 없음</div>
 </div>
 
