@@ -79,7 +79,7 @@ h2{font-size:13px;margin-bottom:8px}
   <div class="rowc focus" onclick="go('v1-10')"><b>외부신고 자동화 (화관법) ◀ 무인 가동</b><div class="track2"><div class="fillb t" style="width:99%"></div></div><span class="pv">99</span></div>
   <div class="rowc focus" onclick="go('v1-11')"><b>운반일지·배차 자동화 ◀ 무인 가동</b><div class="track2"><div class="fillb t" style="width:92%"></div></div><span class="pv">92</span></div>
   <div class="rowc focus" onclick="go('v1-lawwatch')"><b>법령 워치 (신규 자동화) ◀ 가동</b><div class="track2"><div class="fillb t" style="width:95%"></div></div><span class="pv">95</span></div>
-  <div class="rowc focus" onclick="go('v1-12')"><b>대표 업무유연성 · 기기 배치도 ◀ 구현 단계 진입</b><div class="track2"><div class="fillb c" style="width:35%"></div></div><span class="pv">35</span></div>
+  <div class="rowc focus" onclick="go('v1-12')"><b>대표 업무유연성 · 기기 배치도 ◀ 결재함 1차 배포</b><div class="track2"><div class="fillb c" style="width:35%"></div></div><span class="pv">35</span></div>
   <div class="rowc focus" onclick="go('v1-13')"><b>관리자 기기 보안 ◀ 9/1 앱 잠금 배포</b><div class="track2"><div class="fillb c" style="width:25%"></div></div><span class="pv">25</span></div>
   <hr>
   <h2>지금 중요한 순서 — 업무플랫폼</h2>
@@ -261,7 +261,7 @@ h2{font-size:13px;margin-bottom:8px}
 </div>
 
 <div class="view" id="v1-12"><span class="back" onclick="go('v1')">← 업무플랫폼</span>
-  <h1>대표 업무유연성 · 기기 배치도 — 35 · 구현 단계 진입</h1>
+  <h1>대표 업무유연성 · 기기 배치도 — 35 · 결재함 1차 배포</h1>
   <div class="item done" style="margin-top:10px"><span class="m">☑</span>배치도 2종 v1(8/9) — 인프라 4계층 + 역할×워크플로우 매트릭스 <a class="doc" href="https://claude.ai/code/artifact/7b5702be-92a5-49c4-8240-516220186fb4" target="_blank">📄 인프라</a> <a class="doc" href="https://claude.ai/code/artifact/dbf72617-921c-4a5d-ba32-aad4dd65562a" target="_blank">📄 역할×기기</a></div>
   <div class="item done"><span class="m">☑</span>병목 진단(8/9) — 결재감(운행일지·사규·가족친화·계좌확인)이 앱 밖이라 대면 시로 쌓임</div>
   <div class="item done"><span class="m">☑</span>대표 결재함 시안 — 폰 주력+PC 동일 <a class="doc" href="https://claude.ai/code/artifact/ef49fdb7-ca09-400c-9ae7-bb397465ff7d" target="_blank">📄 결재함 시안</a></div>
@@ -269,7 +269,7 @@ h2{font-size:13px;margin-bottom:8px}
   <div class="item"><span class="m">☐</span>결재함 구현 — 앱 밖 결재감 편입 + 대표 폰 푸시</div>
   <div class="item"><span class="m">☐</span>대표 기기 3대 자동로그인 → 자동 실행·보고 팝업</div>
   <div class="item"><span class="m">☐</span>인프라 후속: SPOF=Blobs 단일원천 — 외장/클라우드 복제 결정 · PM</div>
-  <div class="item now"><span class="m">▶</span>★결재함 = C안 확정(9/1 PM: 층 없음 — 결재 뱃지 탭→한장씩 처리→토스트 복귀). 1차 구현 착수(approvals 컬렉션+뱃지+처리 오버레이+대표상신 토글+감사로그). 시안 여정: v1→10분할→10종→혼합→비3층 3안→C</div>
+  <div class="item done"><span class="m">☑</span>★결재함 C안 1차 배포(9/1 밤) — 상단 결재 뱃지(관리자)→한장씩 처리(승인/반려/보류/건너뛰기)→토스트. 지시에 &quot;대표 상신&quot; 체크 추가(건별 판단형 ④ 구현). 적대 검증 3라운드·지적 17건 수리 후 clean. 2차 대기: 내 상신 목록·우선기기 라우팅·운반일지 자동 기안·PC 팝업 예외</div>
   <div class="note">순서: 계정(완료) → 배치도 확정 → 결재함 편입 → 자동실행. 8/9 이후 진척 없음</div>
 </div>
 
