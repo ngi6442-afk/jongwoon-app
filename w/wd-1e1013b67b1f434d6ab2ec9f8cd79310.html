@@ -166,11 +166,12 @@ h2{font-size:13px;margin-bottom:8px}
   <div class="item done"><span class="m">☑</span>마감 지난 입찰·온비드 물건 기본 화면에서 숨김 — v255(8/12, PM 지적)</div>
   <div class="item done"><span class="m">☑</span>입찰탭: 딥링크 없는 기관은 [사이트↗]로 표시 + 공고번호 복사 — 8/13(PM 지적)</div>
   <div class="item done"><span class="m">☑</span>온비드 원문 링크 404 수리 + 탐침 재시도 6회(러너 IP 복불복 대응) — 8/13</div>
-  <div class="item now"><span class="m">▶</span>★활용신청 — 전부 승인 확정(9/1 PM 실측: 16건 중 승인 15+변경 1, 반려 0). 어제 LH DENIED는 승인분(&quot;전자조달-개찰정보(예정가격)&quot;)과 다른 구 엔드포인트를 찌른 것. 할 일 = 탐침·results.py를 승인 명세로 정렬 + 어댑터 3종(LH 개찰·누리 민간낙찰·K-apt 입찰결과) 각 30분 — AI 착수</div>
+  <div class="item done"><span class="m">☑</span>★낙찰결과 어댑터 승인 명세 정렬(9/1) — 누리 민간낙찰 전용맵 분리(종전 나라장터 묶임=영구 미매칭 수리)·K-apt V3 API 전환(V2 폐기 실측, 크롤링은 폴백). 탐침 3회+실전 1회 검증: 누리 code00·K-apt code00·가동 오류 0</div>
   <div class="item"><span class="m">☐</span>나라장터 API 변경신청 승인 대기 — 수집 죽으면 이것부터 의심</div>
   <div class="item done"><span class="m">☑</span>순환자원(re.or.kr) 8/4 두절 복구(8/25) — 진범은 IP 차단이 아니라 러너 간헐 타임아웃×3일 수집창. 수집창 3→7일 배포+30일 백필로 봉합</div>
   <div class="item done"><span class="m">☑</span>낙찰통계 경보 오탐 수리(8/25) — 타임아웃을 '응답 0건'과 구분해 스트릭에 미집계</div>
   <div class="item"><span class="m">☐</span>사정률 분석·투찰 포지션 추천 v2 — 보류(착수는 지시로)</div>
+  <div class="item now"><span class="m">▶</span>LH 개찰 API만 잔여 — 키는 인식되나 권한 거부(코드20, 변형 4종 전수 실측). ★PM 10초: data.go.kr 마이페이지→활용신청에서 LH 2건(개찰정보·예정가격) 상태 캡처 → 승인인데도 20이면 포털 문의 경로</div>
   <div class="note">일감 학습 필터: (같은 기관+유사 제목) 재공고만 자동패스 — 기관 단위 금지</div>
 </div>
 
