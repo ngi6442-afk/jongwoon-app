@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>문서함 시안 — 5번 검색 우선형</title>
+<style>*{box-sizing:border-box;margin:0}
+body{font-family:'Malgun Gothic',sans-serif;background:#f2f4f1;color:#222;font-size:14px}
+.top{background:#16211b;color:#fff;padding:10px 22px;display:flex;align-items:center;gap:14px}
+.top b{font-size:15px}.top .crumb{color:#9fb3a6;font-size:12.5px}
+.top .who{margin-left:auto;font-size:12px;color:#cfe0d5}
+.page{max-width:1080px;margin:18px auto;padding:0 16px}
+.card{background:#fff;border:1px solid #e2e6e0;border-radius:14px;padding:18px 20px}
+h1{font-size:17px;margin-bottom:12px}
+.search{width:100%;max-width:430px;padding:10px 14px;border:1px solid #d5dad2;border-radius:9px;font-size:13.5px;margin-bottom:12px}
+.chips{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:14px}
+.chip{padding:5px 14px;border:1px solid #d5dad2;border-radius:16px;font-size:12.5px;color:#555;cursor:pointer;background:#fff}
+.chip.on{background:#1A9A6B;border-color:#1A9A6B;color:#fff;font-weight:700}
+.chip .n{opacity:.75;font-size:11px;margin-left:3px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;color:#889086;font-size:11.5px;font-weight:400;border-bottom:1px solid #e2e6e0;padding:6px 10px}
+td{border-bottom:1px solid #eef0ec;padding:9px 10px}
+tr.doc{cursor:pointer}tr.doc:hover td{background:#f6faf7}
+td.mut{color:#889086;font-size:12px}
+.lk{font-size:11px;color:#c07f27;background:#faf3e6;border-radius:8px;padding:1px 8px}
+.empty{color:#889086;padding:26px 0;text-align:center;font-size:13px}
+.foot{color:#a5aaa2;font-size:11.5px;margin:14px 4px}
+
+.sec{font-size:12px;color:#889086;margin-bottom:6px;font-weight:700}</style></head><body>
+<div class="top"><b>종운 그룹웨어</b><span class="crumb">지시 · 차량 · 운반일지 · <u>문서함</u> · 인허가 · 돈</span><span class="who">나종운 대표 · 시안 5번 검색 우선형</span></div>
+<div class="page">
+<div class="card" style="min-height:480px">
+<div style="max-width:640px;margin:26px auto 0;">
+<input class="search" id="q" style="max-width:none;padding:15px 20px;font-size:15px;border:2px solid #1A9A6B;border-radius:13px" placeholder="🔍 문서 이름을 치세요 — &quot;취업&quot; &quot;석면&quot; &quot;견적&quot;…">
+<div id="res"></div>
+<div id="home">
+<div style="display:flex;gap:34px;margin-top:22px">
+<div style="flex:1"><div class="sec">최근 연 문서</div><table><tbody>
+<tr class="doc"><td>📄 석면해체·제거 자체 매뉴얼</td><td class="mut" style="width:70px">오늘</td></tr>
+<tr class="doc"><td>📄 위험성평가 실시규정 v3</td><td class="mut">어제</td></tr>
+<tr class="doc"><td>📄 취업규칙</td><td class="mut">8/30</td></tr>
+</tbody></table></div>
+<div style="flex:1"><div class="sec">자주 여는 문서</div><table><tbody>
+<tr class="doc"><td>📄 견적서 양식 — 환경</td><td class="mut" style="width:70px">주 3회</td></tr>
+<tr class="doc"><td>📄 작업완료확인서 양식</td><td class="mut">주 2회</td></tr>
+<tr class="doc"><td>📄 보호구 지급대장 양식</td><td class="mut">주 1회</td></tr>
+</tbody></table></div>
+</div>
+<div class="chips" style="justify-content:center;margin-top:30px" id="chips"></div>
+</div>
+</div></div></div>
+<div class="foot">시안 — 표시 데이터는 실제 문서대장 기반 샘플 · 분류 5종(인허가 제외) · 🔒=열람권한 제한(서버 차단)</div>
+<script>var CATS={"01":"01 법인","02":"02 인사노무","03":"03 안전보건","05":"05 규정","06":"06 양식"};
+var DOCS=[
+{t:"정관",c:"01",v:"-",d:"2013-09-04",l:1},
+{t:"주주명부 양식 (JW-01-003)",c:"01",v:"-",d:"-",l:1},
+{t:"법인인감 사용대장",c:"01",v:"-",d:"-",l:1},
+{t:"취업규칙 (JW-02-001)",c:"02",v:"v1",d:"2023-02-01",l:0},
+{t:"휴가운영세칙(안)",c:"02",v:"초안",d:"2026-08-25",l:0},
+{t:"노무 검토 안건 관리표 (JW-02-004)",c:"02",v:"수시",d:"2026-08-18",l:0},
+{t:"연차관리 지침",c:"02",v:"v1",d:"2026-07-02",l:0},
+{t:"채용 서류 체크리스트",c:"02",v:"v1",d:"2026-08-11",l:0},
+{t:"석면해체·제거 자체 매뉴얼 (JW-03-016)",c:"03",v:"Rev.0",d:"2026-09-01",l:0},
+{t:"석면작업 관리절차서 (JW-03-015)",c:"03",v:"Rev.0",d:"2026-09-01",l:0},
+{t:"위험성평가 실시규정 (JW-03-007)",c:"03",v:"v3",d:"2026-08-23",l:0},
+{t:"위험성평가표 양식",c:"03",v:"-",d:"2026-08-23",l:0},
+{t:"비상대응체계",c:"03",v:"v1",d:"2026-08-20",l:0},
+{t:"보호구 지급대장 양식",c:"03",v:"-",d:"2026-07-30",l:0},
+{t:"특별교육일지 양식",c:"03",v:"-",d:"2026-07-30",l:0},
+{t:"관리감독자 선임서",c:"03",v:"-",d:"2026-08-28",l:0},
+{t:"장비 이력카드 F09 (5종)",c:"03",v:"-",d:"2026-08-29",l:0},
+{t:"MSDS 목록",c:"03",v:"수시",d:"2026-08-25",l:0},
+{t:"안전보건관리규정",c:"03",v:"v2",d:"2026-06-10",l:0},
+{t:"아차사고 보고 양식",c:"03",v:"-",d:"2026-06-10",l:0},
+{t:"현장 안전점검표",c:"03",v:"-",d:"2026-06-10",l:0},
+{t:"석면 현장사진 대조철",c:"03",v:"수시",d:"2026-08-29",l:0},
+{t:"문서관리규정 (JW-05-001)",c:"05",v:"v1",d:"2026-05-14",l:0},
+{t:"그룹웨어 운영권한 규정(안)",c:"05",v:"초안",d:"2026-08-25",l:0},
+{t:"업무지시결재 규정(안)",c:"05",v:"초안",d:"2026-08-25",l:0},
+{t:"자동화운영 규정(안)",c:"05",v:"초안",d:"2026-08-25",l:0},
+{t:"차량관리 규정",c:"05",v:"v1",d:"2026-04-03",l:0},
+{t:"계약검토 지침",c:"05",v:"v1",d:"2026-04-03",l:0},
+{t:"견적서 양식 — 환경",c:"06",v:"-",d:"2026-07-21",l:0},
+{t:"견적서 양식 — 건설",c:"06",v:"-",d:"2026-07-21",l:0},
+{t:"작업완료확인서 양식",c:"06",v:"-",d:"2026-07-21",l:0},
+{t:"작업착수계 양식",c:"06",v:"-",d:"2026-07-21",l:0},
+{t:"청렴서약서 양식",c:"06",v:"-",d:"2026-07-21",l:0}];
+function icon(x){return x.l?"🔒":"📄"}
+function lockTxt(x){return x.l?'<span class="lk">관리부↑</span>':""}
+
+function render(){
+  var q=(document.getElementById("q").value||"").trim();
+  var home=document.getElementById("home"),res=document.getElementById("res");
+  if(!q){home.style.display="block";res.innerHTML="";buildChips();return;}
+  home.style.display="none";
+  var rows=DOCS.filter(function(x){return x.t.indexOf(q)>=0});
+  var h='<div class="sec" style="margin-top:16px">검색 결과 '+rows.length+'건</div><table><tbody>';
+  rows.forEach(function(x){h+='<tr class="doc"><td>'+icon(x)+' '+x.t+'</td><td class="mut" style="width:130px">'+CATS[x.c]+'</td><td style="width:80px">'+(x.l?'<span class="lk">관리부↑</span>':"")+'</td></tr>'});
+  h+='</tbody></table>';
+  res.innerHTML=rows.length?h:'<div class="empty">"'+q+'" 결과 없음</div>';
+}
+function buildChips(){
+  var ch="";
+  Object.keys(CATS).forEach(function(c){var n=DOCS.filter(function(x){return x.c===c}).length;
+    ch+='<span class="chip" data-c="'+c+'">'+CATS[c]+' <span class="n">'+n+'</span></span>'});
+  document.getElementById("chips").innerHTML=ch;
+  document.querySelectorAll(".chip").forEach(function(el){el.onclick=function(){
+    document.getElementById("q").value=""; // 분류 클릭=그 분류만 나열
+    var c=el.getAttribute("data-c");
+    var rows=DOCS.filter(function(x){return x.c===c});
+    var h='<div class="sec" style="margin-top:16px">'+CATS[c]+' — '+rows.length+'건</div><table><tbody>';
+    rows.forEach(function(x){h+='<tr class="doc"><td>'+(x.l?"🔒":"📄")+' '+x.t+'</td><td class="mut" style="width:90px">'+x.d+'</td></tr>'});
+    document.getElementById("home").style.display="none";
+    document.getElementById("res").innerHTML=h+'</tbody></table>';
+  }});
+}
+document.getElementById("q").addEventListener("input",render);
+render();</script>
+</body></html>
