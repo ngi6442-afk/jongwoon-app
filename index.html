@@ -14881,6 +14881,33 @@
     var l2 = document.getElementById("abTotLine2"); if (l2) l2.textContent = txt;   // 헤더·푸터 두 합계줄을 함께 갱신(한쪽만 갱신돼 어긋나던 것 수정)
   }
 
+  // 운반일지 → 대표 결재 상신(PM 지시 9/1). 완성 시점 규칙: 수기=당일~익일, 올바로 자동=최대 2일 후
+  // — 이틀 안 지난 날짜는 잠정임을 경고하고 사람이 판단해 올린다(자동 기안은 결재 2차에서).
+  var abApprBusy = false;   // 더블클릭이 목록 확인 왕복 사이에 2건을 밀어넣는 것 방지
+  function abApprSubmit(){
+    if (abApprBusy) return;
+    var day = abDay.day; if (!day || !abDay.data) return;
+    if (day > abShiftDays(-2) && !confirm(day + " 일지는 올바로 자동입력이 아직 안 끝났을 수 있습니다(완성은 보통 이틀 뒤).\n잠정 상태로 상신할까요?")) return;
+    var body = abTotalsText();   // 잠정·미배정 수치는 합계 문구가 이미 담는다(따로 세면 숫자 두 벌로 혼동)
+    // 전송 대기 큐부터 확인(오프라인·재시도 잔류분) → 서버 목록 확인. 반려 후 재상신은 허용
+    var meId = myId();
+    if (apprPendingCreates.some(function(p){ return p && p.mid === meId && p.ref === "ab:" + day; })){
+      alert("이 날짜 상신이 이미 전송 대기 중입니다."); return;
+    }
+    abApprBusy = true;
+    gwCall("gw-data", { action: "approvals_list" }).then(function(res){
+      abApprBusy = false;
+      var dupSt = "";
+      if (res.status === 200 && res.body && Array.isArray(res.body.items))
+        res.body.items.forEach(function(x){ if (x && x.ref === "ab:" + day && (x.status === "대기" || x.status === "보류" || x.status === "승인")) dupSt = x.status; });
+      if (dupSt && !confirm("이 날짜는 이미 상신돼 있습니다(" + dupSt + "). 다시 올릴까요?")) return;
+      apprPendingCreates.push({ cid: "c" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8), mid: meId,
+        kind: "운반일지", title: "운반일지 " + day, body: body, ref: "ab:" + day });
+      apprSavePending();
+      apprFlushCreates();
+      apprToastShow("대표 결재로 상신 — 운반일지 " + day);
+    }).catch(function(){ abApprBusy = false; alert("네트워크 오류 — 잠시 후 다시 시도해주세요."); });
+  }
   function renderAbSheet(){
     var host = document.getElementById("abSheetCard");
     if (!host) return;
@@ -14955,8 +14982,11 @@
         h += '</div></div>';
       }
       h += '<div class="ab-tot" id="abTotLine2">' + esc(abTotalsText()) + '</div>';
+      h += '<div class="ab-pad" style="padding-top:6px;"><button id="abApprBtn" class="mini-btn" style="font-size:12.5px;padding:7px 14px;">📋 이 날짜 대표 결재 상신</button></div>';
     }
     host.innerHTML = h;
+    var apb = document.getElementById("abApprBtn");
+    if (apb) apb.addEventListener("click", abApprSubmit);
     // 미매칭 버튼 배선
     Array.prototype.forEach.call(host.querySelectorAll("[data-ab-learn]"), function(b){
       b.addEventListener("click", function(){ abLearnOpen = b.getAttribute("data-ab-learn"); renderAbSheet(); });
