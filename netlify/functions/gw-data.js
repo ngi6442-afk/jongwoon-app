@@ -831,6 +831,133 @@ async function handlePushLog(event, d, R) {
   return jr(200, { status: 'OK', items: out, request_id: R });
 }
 
+// ---- 결재함(C안, 2026-09-01): 전용 화면 없이 뱃지→한 장씩 처리 ----
+// 저장은 col:approvals 규격이지만 COL 맵엔 등록하지 않는다 — 일반 get/save를 열면
+// 임의 직원이 타인 상신을 읽거나 결정 필드(status·decided_by)를 클라 사본으로 덮을 수 있어
+// 전용 액션 3종으로만 접근한다(목록=본인분 필터, 결정=관리자 + 반려 사유 서버 검증).
+async function approvalsDoc(st) {
+  const r = await blobGet(st, colKey('approvals'));
+  // 읽기 실패를 빈 문서로 위조하면 다음 쓰기가 대장 전체를 1건짜리로 덮는다(클라 shim과 같은 원칙) — 실패는 실패로 반환
+  if (!r.ok) return { ok: false, code: r.code };
+  return { ok: true, doc: (r.data && Array.isArray(r.data.items)) ? r.data : { schema: 1, items: [] } };
+}
+async function handleApprovalsList(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (!(await deviceApproved(event, c.member))) return jr(403, { status: 'FORBIDDEN', error_code: 'DEVICE_NOT_APPROVED', request_id: R });
+  const rd = await approvalsDoc(store(DATA));
+  if (!rd.ok) return jr(500, { status: 'ERROR', error_code: rd.code, request_id: R });
+  const doc = rd.doc;
+  const items = c.member.admin ? doc.items : doc.items.filter(function (it) { return it && it.by && it.by.id === c.member.id; });
+  // base = 낙관락 토큰. decide가 이 값을 들고 와야 하며 불일치면 409 APPR_STALE(관리자 2인 동시 결재 유실 방지)
+  return jr(200, { status: 'OK', items: items, base: doc.updated_at || 0, request_id: R });
+}
+async function handleApprovalCreate(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (!(await deviceApproved(event, c.member))) return jr(403, { status: 'FORBIDDEN', error_code: 'DEVICE_NOT_APPROVED', request_id: R });
+  const title = String(d.title || '').trim().slice(0, 120);
+  if (!title) return jr(400, { status: 'REJECTED', error_code: 'NO_TITLE', request_id: R });
+  const st = store(DATA);
+  const rd = await approvalsDoc(st);
+  if (!rd.ok) return jr(500, { status: 'ERROR', error_code: rd.code, request_id: R });
+  const doc = rd.doc;
+  // 멱등키(cid): 클라 재시도(응답 유실)로 같은 상신이 2건 생기는 것을 서버에서 흡수
+  const cid = String(d.cid || '').slice(0, 48);
+  if (cid) {
+    const dup = doc.items.find(function (x) { return x && x.cid === cid; });
+    if (dup) return jr(200, { status: 'OK', id: dup.id, dedup: true, request_id: R });
+  }
+  await verSnapshot('approvals', doc, c.member.name, false);   // 쓰기 전 시점 보존(복구 링 — 다른 컬렉션과 동일)
+  // 레이스 창 축소: verSnapshot 왕복 사이 착지한 동시 결재/상신을 덮지 않게 쓰기 직전 신선본에 얹는다(3차=항목별 키 분리)
+  const rd2 = await approvalsDoc(st);
+  const fresh = rd2.ok ? rd2.doc : doc;
+  if (cid) {
+    const dup2 = fresh.items.find(function (x) { return x && x.cid === cid; });
+    if (dup2) return jr(200, { status: 'OK', id: dup2.id, dedup: true, request_id: R });
+  }
+  const item = { id: 'ap' + crypto.randomBytes(6).toString('hex'), cid: cid || undefined, kind: String(d.kind || '일반').slice(0, 20),
+    title: title, body: String(d.body || '').slice(0, 500), ref: String(d.ref || '').slice(0, 60),
+    by: { id: c.member.id, name: c.member.name }, created: new Date().toISOString(), status: '대기' };
+  fresh.items.push(item);
+  fresh.updated_by = c.member.id; fresh.updated_at = Date.now();
+  const w = await blobSet(st, colKey('approvals'), fresh);
+  if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
+  // 저장소가 조건부 쓰기를 지원하지 않아(무조건 덮어쓰기) 동시 쓰기에 내 항목이 밀릴 수 있다 — 재확인 후 1회 자가복구
+  try {
+    const chk = await blobGet(st, colKey('approvals'));
+    if (chk.ok && chk.data && Array.isArray(chk.data.items) && !chk.data.items.some(function (x) { return x && x.id === item.id; })) {
+      chk.data.items.push(item);
+      chk.data.updated_by = c.member.id; chk.data.updated_at = Date.now();
+      await blobSet(st, colKey('approvals'), chk.data);
+    }
+  } catch (e) {}
+  try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'approvals', ev: [{ op: '상신', id: item.id, t: (item.kind + ' · ' + title).slice(0, 80) }] }); } catch (e) {}
+  // 관리자 웹푸시 — 기안자 본인만 제외(push_send __admins__ 관례와 동일). 발송 실패가 상신을 막지 않는다
+  try {
+    const ids = (await push.adminIds()).filter(function (id) { return id !== c.member.id; });
+    if (ids.length) await push.sendTo(ids, { title: '결재 요청: ' + title.slice(0, 40), body: '[' + item.kind + '] 기안 ' + c.member.name, url: './', tag: 'appr-' + item.id });
+  } catch (e) {}
+  return jr(200, { status: 'OK', id: item.id, request_id: R });
+}
+async function handleApprovalDecide(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (!c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
+  const decision = String(d.decision || '');
+  if (decision !== '승인' && decision !== '반려' && decision !== '보류') return jr(400, { status: 'REJECTED', error_code: 'BAD_DECISION', request_id: R });
+  const reason = String(d.reason || '').trim().slice(0, 300);
+  if (decision === '반려' && !reason) return jr(400, { status: 'REJECTED', error_code: 'REASON_REQUIRED', request_id: R });
+  const st = store(DATA);
+  const rd = await approvalsDoc(st);
+  if (!rd.ok) return jr(500, { status: 'ERROR', error_code: rd.code, request_id: R });
+  // 낙관락(handleSave의 STALE_BASE와 같은 원칙): 목록을 본 시점 이후 문서가 바뀌었으면 늦은 결재를 세운다
+  if (d.base != null && Number(d.base) !== Number(rd.doc.updated_at || 0))
+    return jr(409, { status: 'CONFLICT', error_code: 'APPR_STALE', base: rd.doc.updated_at || 0, request_id: R });
+  const pre = rd.doc.items.find(function (x) { return x && x.id === String(d.id || ''); });
+  if (!pre) return jr(404, { status: 'NOT_FOUND', error_code: 'NO_APPROVAL', request_id: R });
+  // 승인·반려는 종결(재결정 불가). '보류'만 대기 성격을 유지해 재결정 가능
+  if (pre.status === '승인' || pre.status === '반려') return jr(409, { status: 'CONFLICT', error_code: 'ALREADY_DECIDED', base: rd.doc.updated_at || 0, request_id: R });
+  await verSnapshot('approvals', rd.doc, c.member.name, false);   // 변형 전 시점 보존(복구 링)
+  // 레이스 창 축소(리뷰 [A-잔여]): verSnapshot이 블롭 왕복을 끼워 첫 읽기→쓰기 간격이 수백ms로 벌어지고,
+  // 그 사이 착지한 동시 상신을 본선 쓰기가 지울 수 있다 — 쓰기 직전 신선본을 다시 읽어 그 위에 결정을 얹는다.
+  // 완전 폐쇄는 항목별 키 분리(appr:item:<id>)로만 가능 — 결재 3차 TODO.
+  const rd2 = await approvalsDoc(st);
+  const doc = rd2.ok ? rd2.doc : rd.doc;
+  const it = doc.items.find(function (x) { return x && x.id === String(d.id || ''); });
+  if (!it) return jr(404, { status: 'NOT_FOUND', error_code: 'NO_APPROVAL', request_id: R });
+  if (it.status === '승인' || it.status === '반려') return jr(409, { status: 'CONFLICT', error_code: 'ALREADY_DECIDED', base: doc.updated_at || 0, request_id: R });
+  it.status = decision;
+  it.decided_by = { id: c.member.id, name: c.member.name };
+  it.decided_at = new Date().toISOString();
+  it.reason = reason;
+  doc.updated_by = c.member.id; doc.updated_at = Date.now();
+  const w = await blobSet(st, colKey('approvals'), doc);
+  if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
+  // 동시 create의 덮어쓰기가 이 결정을 되돌릴 수 있다 — 재확인 후 1회 재적용(자가복구)
+  let newBase = doc.updated_at;
+  try {
+    const chk = await blobGet(st, colKey('approvals'));
+    if (chk.ok && chk.data && Array.isArray(chk.data.items)) {
+      const cur = chk.data.items.find(function (x) { return x && x.id === it.id; });
+      if (cur && cur.status !== decision) {
+        cur.status = decision; cur.decided_by = it.decided_by; cur.decided_at = it.decided_at; cur.reason = reason;
+        chk.data.updated_by = c.member.id; chk.data.updated_at = Date.now();
+        await blobSet(st, colKey('approvals'), chk.data);
+        newBase = chk.data.updated_at;
+      } else if (chk.data.updated_at) newBase = chk.data.updated_at;
+    }
+  } catch (e) {}
+  try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'approvals', ev: [{ op: '결재', id: it.id, t: (decision + (reason ? ' — ' + reason.slice(0, 40) : '') + ' · ' + String(it.title || '').slice(0, 40)) }] }); } catch (e) {}
+  // 기안자에게 결과+사유 웹푸시 — 본인 상신을 본인이 결재한 경우는 생략
+  try {
+    if (it.by && it.by.id && it.by.id !== c.member.id)
+      await push.sendTo([it.by.id], { title: '결재 ' + decision + ': ' + String(it.title || '').slice(0, 40),
+        body: reason ? '사유: ' + reason.slice(0, 150) : (decision === '승인' ? '승인되었습니다' : ''), url: './', tag: 'appr-' + it.id });
+  } catch (e) {}
+  return jr(200, { status: 'OK', id: it.id, decided: it.status, base: newBase, request_id: R });
+}
+
 // ---- 계약 첨부파일(석면조사서 등) — Blobs 저장 + 서버측 텍스트 추출 ----
 // 파일 바이트는 별도 스토어(gw_files)에 base64로, 메타는 계약(con)에 저장(목록 로드 시 바이트 미포함).
 const FILES = 'gw_files';
@@ -1295,6 +1422,9 @@ async function handler(event) {
     if (d && d.action === 'push_unsub') return await handlePushUnsub(event, d, R);
     if (d && d.action === 'push_send') return await handlePushSend(event, d, R);
     if (d && d.action === 'push_log') return await handlePushLog(event, d, R);
+    if (d && d.action === 'approvals_list') return await handleApprovalsList(event, d, R);
+    if (d && d.action === 'approval_create') return await handleApprovalCreate(event, d, R);
+    if (d && d.action === 'approval_decide') return await handleApprovalDecide(event, d, R);
     return jr(400, { status: 'REJECTED', error_code: 'UNKNOWN_ACTION', request_id: R });
   } catch (e) {
     // 서버 예외도 오류 로그에 축적(클라 err_log와 같은 저장소) — 기록 실패는 무시

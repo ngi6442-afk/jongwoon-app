@@ -73,6 +73,16 @@
     text-overflow:ellipsis;
   }
   .user-chip.empty{color:var(--sub);font-weight:600;}
+  /* 결재 뱃지(C안) — 관리자 전용, 대기 0건이면 JS가 숨긴다 */
+  .appr-badge{width:auto;padding:0 10px;gap:5px;font-weight:700;}
+  .appr-badge-n{min-width:18px;height:18px;border-radius:9px;background:#C0392B;color:#fff;font-size:11.5px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;padding:0 5px;}
+  /* 결재 오버레이 버튼 4종 — .modal 기본(primary 100%폭)과 달리 가로 배치 */
+  .appr-actions{display:flex;gap:8px;}
+  .appr-actions button{flex:1;margin:0;padding:12px 0;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;border:1px solid var(--line);background:#fff;color:var(--sub);}
+  .appr-actions .appr-ok{background:var(--brand-dark);border-color:var(--brand-dark);color:#fff;}
+  .appr-actions .appr-no{border-color:#C0392B;color:#C0392B;}
+  /* 처리 종료 토스트 — 잠금(200)보다 아래, 모달(50)보다 위 */
+  .appr-toast{display:none;position:fixed;left:50%;transform:translateX(-50%);bottom:28px;z-index:60;background:var(--brand-dark);color:#fff;border-radius:10px;padding:10px 18px;font-size:14px;font-weight:700;box-shadow:0 6px 18px rgba(0,0,0,.25);max-width:88vw;}
   .nav-toggle{display:none;width:38px;height:38px;border-radius:10px;border:1px solid var(--line);background:var(--card);font-size:17px;cursor:pointer;flex-shrink:0;align-items:center;justify-content:center;color:var(--brand-dark);padding:0;}
   .brand{display:flex;align-items:center;gap:8px;min-width:0;}
   .layout{position:relative;}
@@ -815,6 +825,7 @@
     <div class="topbar-right">
       <button class="gear-btn" id="gsBtn" aria-label="전역 검색" title="전역 검색 — 계약·지시·거래처·미수·견적·차량·인허가 한 번에">🔍</button>
       <button class="gear-btn" id="ntfBtn" aria-label="알림함" title="알림함 — 받은 알림 이력">🔔</button>
+      <button class="gear-btn appr-badge" id="apprBadge" style="display:none;" aria-label="결재 대기" title="결재 대기 — 탭하면 한 장씩 처리">🧾<span class="appr-badge-n" id="apprBadgeN">0</span></button>
       <button class="user-chip" id="curUserBtn"></button>
       <button class="gear-btn" id="gearBtn" aria-label="설정">⚙</button>
     </div>
@@ -879,6 +890,7 @@
           <div class="scope-panel" id="taskScopePanel"></div>
         </div>
         <datalist id="memberNames"></datalist>
+        <label style="display:flex;align-items:center;gap:5px;font-size:13px;color:var(--sub);flex:0 0 auto;white-space:nowrap;" title="체크하면 지시 저장 후 대표 결재로 올라갑니다(건별 판단 — 누구나 체크 가능)"><input type="checkbox" id="taskApprChk"> 대표 상신</label>
         <button id="taskAddBtn">지시 등록</button>
       </div>
     </div>
@@ -1681,6 +1693,25 @@
     <button class="secondary" id="ntfClose">닫기</button>
   </div>
 </div>
+
+<!-- 결재함(C안): 전용 화면 없음 — 상단 뱃지 탭 → 여기서 한 장씩 처리 → 토스트 후 원래 화면 복귀.
+     z-index는 .modal-backdrop 기본(50) — 화면잠금(#lockBackdrop, 200)보다 항상 아래라 잠금과 충돌 없음 -->
+<div class="modal-backdrop" id="apprBackdrop">
+  <div class="modal" style="max-width:440px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+      <h3 style="margin:0;">결재 <span id="apprCount" style="color:var(--sub);font-size:13px;font-weight:600;"></span></h3>
+      <button class="secondary" id="apprClose" style="width:auto;margin:0;padding:4px 10px;">닫기</button>
+    </div>
+    <div id="apprCard" style="border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:12px;min-height:88px;"></div>
+    <div class="appr-actions">
+      <button class="appr-ok" id="apprOkBtn">승인</button>
+      <button class="appr-no" id="apprNoBtn">반려</button>
+      <button id="apprHoldBtn">보류</button>
+      <button id="apprSkipBtn">건너뛰기</button>
+    </div>
+  </div>
+</div>
+<div class="appr-toast" id="apprToast"></div>
 
 <div class="modal-backdrop" id="qtEditBackdrop">
   <div class="modal">
@@ -2984,6 +3015,175 @@
     setTabBadge("hrTabBadge", hrN);
   }
 
+  // ---- 결재함(C안, PM 승인 2026-09-01): 전용 화면 없음 — 상단 뱃지 → 오버레이 한 장씩 처리 ----
+  // 큐에 '보류'도 포함하는 이유: 1차엔 관리자용 목록 화면이 없어 여기서 빼면 보류 건을 재결정할 통로가 사라진다.
+  // TODO(결재 2차): 직원 "내 상신 목록" 화면 · 우선기기 1발 라우팅 · 운반일지 자동 기안 · PC 팝업 예외.
+  //   1차에선 기안자에게 결과가 웹푸시로만 간다(approval_decide가 서버에서 발송).
+  var apprItems = [];                      // approvals_list 결과(관리자=전체)
+  var apprBase = 0;                        // 목록의 낙관락 토큰 — decide에 동봉(관리자 2인 동시 결재 유실 방지)
+  var apprQueue = [], apprIdx = 0;         // 오버레이 진행용(대기 먼저, 보류는 뒤)
+  var apprDoneN = { ok:0, no:0, hold:0 };
+  var apprPollTimer = null, apprBusy = false;
+  var apprGen = 0;                         // 세션 세대 — 닫힘/재열림 뒤 도착한 늦은 응답이 새 큐를 오염시키지 않게
+  var APPR_KIND_EMOJI = { "지시":"📌", "운반일지":"📋", "사규":"📜", "지입료":"💳", "가족친화":"👨‍👩‍👧" };
+  function apprWaitItems(){ return apprItems.filter(function(it){ return it && it.status === "대기"; }); }
+  function apprHoldItems(){ return apprItems.filter(function(it){ return it && it.status === "보류"; }); }
+  function apprBadgeRender(){
+    var btn = document.getElementById("apprBadge"); if (!btn) return;
+    // 숫자 = 대기만(보류가 매번 숫자를 부풀리는 게 리뷰 실결함 판정). 보류만 남으면 "보"로 표시해 재결정 통로는 유지
+    var w = apprWaitItems().length, hd = apprHoldItems().length;
+    if (!isAdmin() || (!w && !hd)){ btn.style.display = "none"; return; }
+    btn.style.display = "flex";
+    document.getElementById("apprBadgeN").textContent = w > 0 ? w : "보";
+  }
+  function apprRefresh(){
+    if (!curMember() || !isAdmin()){ apprItems = []; apprBadgeRender(); return; }
+    // 오버레이 처리 중엔 목록 교체 금지 — 큐가 물던 참조가 끊겨 뱃지 오집계·409 루프가 났다(리뷰 지적). 끝나면 apprFinish가 1회 재동기
+    var bd = document.getElementById("apprBackdrop");
+    if (bd && bd.classList.contains("show")) return;
+    gwCall("gw-data", { action: "approvals_list" }).then(function(res){
+      if (res.status === 200 && res.body && Array.isArray(res.body.items)){
+        apprItems = res.body.items; apprBase = res.body.base || 0; apprBadgeRender();
+      }
+    }).catch(function(){});
+  }
+  // afterLogin에서 호출 — 즉시 1회 + 5분 간격(재로그인 시 타이머 중복 방지). 상신 대기열 재시도도 여기에 태운다
+  function apprInit(){
+    apprRefresh(); apprFlushCreates();
+    if (apprPollTimer) clearInterval(apprPollTimer);
+    apprPollTimer = setInterval(function(){ apprRefresh(); apprFlushCreates(); }, 5 * 60 * 1000);
+  }
+  function apprDaysAgo(iso){
+    var t = Date.parse(iso || ""); if (isNaN(t)) return "";
+    var d = Math.floor((Date.now() - t) / 86400000);
+    return d <= 0 ? "오늘" : ("D+" + d);
+  }
+  function apprRenderCard(){
+    var it = apprQueue[apprIdx];
+    if (!it){ apprFinish(); return; }
+    document.getElementById("apprCount").textContent = (apprIdx + 1) + "/" + apprQueue.length;
+    var h = '<div style="font-weight:800;font-size:15px;">' + (APPR_KIND_EMOJI[it.kind] || "📄") + ' ' + esc(it.title || "(제목 없음)") + '</div>';
+    if (it.body) h += '<div style="margin-top:6px;font-size:13px;white-space:pre-wrap;">' + esc(it.body) + '</div>';
+    h += '<div style="margin-top:8px;font-size:12.5px;color:var(--sub);">' + esc(it.kind || "일반")
+       + ' · 기안 ' + esc((it.by && it.by.name) || "?")
+       + (it.created ? ' · ' + esc(apprDaysAgo(it.created)) : '')
+       + (it.status === "보류" ? ' · <b style="color:var(--amber);">보류 중' + (it.reason ? " — " + esc(it.reason) : "") + '</b>' : '')
+       + '</div>';
+    // 원 지시가 삭제된 고아 상신 힌트(지시-결재 양방향 동기화는 2차 TODO — 판단은 사람이)
+    if (it.kind === "지시" && it.ref && typeof tasks !== "undefined" && Array.isArray(tasks) && tasks.length
+        && !tasks.some(function(t){ return t && t.id === it.ref; }))
+      h += '<div style="margin-top:6px;font-size:12px;color:var(--amber);">⚠ 원 지시를 찾을 수 없습니다(삭제됐을 수 있음)</div>';
+    document.getElementById("apprCard").innerHTML = h;
+  }
+  function apprOpen(){
+    if (!isAdmin() || apprBusy) return;
+    apprQueue = apprWaitItems().concat(apprHoldItems());   // 대기 먼저, 보류는 뒤로
+    if (!apprQueue.length) return;
+    apprGen++; apprIdx = 0; apprDoneN = { ok:0, no:0, hold:0 };
+    apprRenderCard();
+    document.getElementById("apprBackdrop").classList.add("show");
+  }
+  function apprCloseOverlay(){
+    apprGen++;   // 비행 중 응답이 닫힌 뒤(또는 재열림 뒤)의 진행을 건드리지 않게 무효화
+    document.getElementById("apprBackdrop").classList.remove("show");
+    apprBadgeRender();
+  }
+  var apprToastTimer = null;
+  function apprToastShow(msg){
+    var el = document.getElementById("apprToast"); if (!el) return;
+    el.textContent = msg; el.style.display = "block";
+    if (apprToastTimer) clearTimeout(apprToastTimer);   // 연속 토스트가 앞 타이머에 조기 은폐되지 않게
+    apprToastTimer = setTimeout(function(){ el.style.display = "none"; }, 3000);
+  }
+  function apprNext(){ apprIdx++; if (apprIdx >= apprQueue.length) apprFinish(); else apprRenderCard(); }
+  function apprFinish(){
+    apprCloseOverlay();
+    var parts = ["승인 " + apprDoneN.ok, "반려 " + apprDoneN.no];
+    if (apprDoneN.hold) parts.push("보류 " + apprDoneN.hold);
+    apprToastShow("결재 끝 — " + parts.join(" · "));
+    apprRefresh();   // 처리 중 폴을 막았으므로 여기서 1회 서버 상태로 재동기(뱃지·base 갱신)
+  }
+  function apprDecide(decision, reasonArg, isRetry){
+    if (apprBusy) return;   // 서버 응답 전 연타 방지(같은 건 이중 결재 → 409)
+    var it = apprQueue[apprIdx]; if (!it) return;
+    var reason = reasonArg;
+    if (reason == null){
+      reason = "";
+      if (decision === "반려"){
+        reason = prompt("반려 사유(필수 — 기안자에게 전달됩니다)");
+        if (reason === null) return;   // 취소 — 그 자리에 머묾
+        reason = reason.trim();
+        if (!reason){ alert("반려에는 사유가 필요합니다."); return; }
+      } else if (decision === "보류"){
+        reason = prompt("보류 코멘트(선택)");
+        if (reason === null) return;
+        reason = reason.trim();
+      }
+    }
+    apprBusy = true;
+    var g = apprGen;
+    gwCall("gw-data", { action: "approval_decide", id: it.id, decision: decision, reason: reason, base: apprBase }).then(function(res){
+      apprBusy = false;
+      if (g !== apprGen) return;   // 그 사이 닫힘/재열림 — 늦은 응답은 진행을 건드리지 않는다
+      if (res.body && res.body.base != null) apprBase = res.body.base;
+      if (res.status === 409){
+        var code = res.body && res.body.error_code;
+        // STALE=문서만 낡음(이 카드는 미처리) — 갱신된 base로 같은 카드 1회 자동 재시도.
+        // "먼저 처리된 건"으로 넘겨버리면 관리자가 처리됐다고 믿는다(리뷰 지적)
+        if (code === "APPR_STALE" && !isRetry){ apprDecide(decision, reason, true); return; }
+        apprToastShow("다른 곳에서 먼저 처리된 건 — 건너뜁니다");
+        apprNext(); return;
+      }
+      if (res.status !== 200){ alert("결재 처리 실패 (" + ((res.body && res.body.error_code) || res.status) + ")"); return; }
+      it.status = decision; if (reason) it.reason = reason;   // 폴이 오버레이 중 목록을 안 바꾸므로 참조가 유지된다
+      if (decision === "승인") apprDoneN.ok++; else if (decision === "반려") apprDoneN.no++; else apprDoneN.hold++;
+      apprNext();
+    }).catch(function(){ apprBusy = false; if (g === apprGen) alert("네트워크 오류 — 다시 시도해주세요."); });
+  }
+  // 대표 상신 대기열 — localStorage 영속(새로고침에도 생존) + 직렬 발사.
+  // 병렬 발사가 서버 무조건 덮어쓰기와 만나 동시 상신 유실의 방아쇠였다(리뷰 지적). 멱등키 cid로 재시도 중복도 흡수.
+  var apprPendingCreates = [];
+  try{ apprPendingCreates = JSON.parse(localStorage.getItem("jw_appr_pending") || "[]") || []; }catch(e){}
+  var apprFlushBusy = false;
+  function apprSavePending(){ try{ localStorage.setItem("jw_appr_pending", JSON.stringify(apprPendingCreates)); }catch(e){} }
+  function apprFlushCreates(){
+    if (apprFlushBusy || !apprPendingCreates.length || !curMember()) return;
+    // 사용자 스코프: 공용 PC에서 다른 사람이 남긴 큐를 내 명의로 발사하면 기안자가 위조된다(리뷰 지적)
+    // — 내 것(mid 일치)만 보내고 남의 것은 그 사람이 다시 로그인할 때까지 보존
+    var me = curMember().id, idx = -1;
+    for (var i = 0; i < apprPendingCreates.length; i++){
+      if (apprPendingCreates[i] && apprPendingCreates[i].mid === me){ idx = i; break; }
+    }
+    if (idx < 0) return;
+    apprFlushBusy = true;
+    var p = apprPendingCreates[idx];
+    gwCall("gw-data", { action: "approval_create", kind: p.kind, title: p.title, body: p.body, ref: p.ref, cid: p.cid }).then(function(res){
+      apprFlushBusy = false;
+      if (res.status === 200){
+        apprPendingCreates.splice(idx, 1); apprSavePending();
+        if (isAdmin()) apprRefresh();   // 관리자 본인 상신이면 뱃지 즉시 갱신
+        apprFlushCreates();   // 다음 건 — 직렬
+      } else if (res.status >= 500 || res.status === 401 || res.status === 403 || res.status === 429){
+        // 일시 장애·세션 문제 — 버리면 영속화가 무의미해진다(리뷰 high). 큐 보존, 다음 트리거 때 재시도
+        apprToastShow("상신 대기 중 — 잠시 후 자동 재시도됩니다");
+      } else {
+        // 400대 형식 오류만 재시도 무의미 — 버리고 알린다
+        apprPendingCreates.splice(idx, 1); apprSavePending();
+        alert("대표 상신 실패: " + String(p.title || "").slice(0, 30) + " (" + ((res.body && res.body.error_code) || res.status) + ")");
+        apprFlushCreates();
+      }
+    }).catch(function(){
+      apprFlushBusy = false;   // 네트워크 실패 — 큐 보존(영속). 5분 폴·online 복귀·다음 지시 저장 때 자동 재시도
+      apprToastShow("상신 대기 중 — 연결되면 자동 전송됩니다");
+    });
+  }
+  document.getElementById("apprBadge").addEventListener("click", apprOpen);
+  document.getElementById("apprClose").addEventListener("click", apprCloseOverlay);
+  document.getElementById("apprOkBtn").addEventListener("click", function(){ apprDecide("승인"); });
+  document.getElementById("apprNoBtn").addEventListener("click", function(){ apprDecide("반려"); });
+  document.getElementById("apprHoldBtn").addEventListener("click", function(){ apprDecide("보류"); });
+  document.getElementById("apprSkipBtn").addEventListener("click", function(){ if (apprBusy) return; apprNext(); });   // 비행 중 건너뛰기 = 이중 전진
+
   // 지시자 표시 숨김(요청). 나중에 되돌리려면 true로.
   var SHOW_TASK_ISSUER = false;
   function taskRowHtml(t, isDone, sel){
@@ -3238,6 +3438,16 @@
     renderTasks();
     renderSummary();
     scheduleTasksSave();
+    // 대표 상신(결재함 C안): 체크 시 지시 "저장 성공 후" 상신해야 하므로 큐에만 넣는다(doSaveTasks 성공 시 발사)
+    var apChk = document.getElementById("taskApprChk");
+    if (apChk && apChk.checked){
+      apprPendingCreates.push({ cid: "c" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
+        mid: myId(),   // 사용자 스코프 — 공용 PC에서 남의 큐를 내 명의로 쏘지 않게
+        kind: "지시", title: title,
+        body: "담당 " + (t.who || "미지정") + (t.due ? " · 기한 " + t.due : ""), ref: newId });
+      apprSavePending();   // 새로고침해도 상신이 증발하지 않게 즉시 영속
+      apChk.checked = false;
+    }
     // 담당자에게 웹푸시(구독한 기기만 수신 — 실패 무시)
     if (whoId && whoId !== myId()){
       gwCall("gw-data",{action:"push_send", to:whoId, title:"새 지시: "+title.slice(0,40),
@@ -4021,6 +4231,7 @@
         setOffline(false);
         saveTasksCache();
         tasksPending = false;
+        apprFlushCreates();   // 대표 상신은 지시 저장이 실제로 성공한 뒤에만(결재함 C안)
       });
     }).catch(function(){
       setOffline(true);
@@ -4046,6 +4257,7 @@
   }
 
   window.addEventListener("online", function(){
+    try{ apprFlushCreates(); }catch(e){}   // 밀린 대표 상신 재시도(큐는 localStorage에 살아 있다)
     if (isOffline || pendingSave || tasksPending || recPending || licPending || vehPending){
       doLoad();
       loadTasks();
@@ -15272,6 +15484,7 @@
     applyPerms();
     doLoad(); loadTasks(); loadVehicles(); loadReceivables(); loadLicenses(); loadDocuments(); loadClients(); loadContracts(); loadMyTasks(); loadLeaves(); loadBids(); loadOnbid();
     loadMembers();   // 담당 배정 드롭다운용 — 관리자·직원 모두
+    apprInit();      // 결재함(C안): 뱃지 즉시 갱신 + 5분 주기 폴링(관리자만 실제 조회)
     render();
     lockOnLogin();   // 화면 잠금: 잠금 PIN 미세팅이면 세팅 요구, 유휴 초과 부팅이면 즉시 잠금
     // 만기 자동생성은 지시·차량·인허가 로드가 모두 끝난 뒤 markLoadedForAutoGen에서 실행(중복 방지)
