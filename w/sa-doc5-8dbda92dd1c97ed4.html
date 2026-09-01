@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>문서함 — 시안 5종 비교</title>
+<style>
+:root{--bg:#12141a;--panel:#1b1e27;--line:#2a2e3a;--txt:#e6e6e2;--mut:#9a9a94;--acc:#1A9A6B;--warn:#EF9F27;--red:#d85a30;--blue:#7fb6d4}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.5 'Malgun Gothic',sans-serif;padding:18px}
+.wrap{max-width:960px;margin:0 auto}
+h1{font-size:17px;margin:0 0 4px}.sub{color:var(--mut);font-size:12px;margin-bottom:16px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:14px}
+.variant{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column}
+.variant h2{font-size:13.5px;margin:0 0 2px;color:var(--warn)}
+.variant .tag{font-size:10.5px;color:var(--mut);margin-bottom:8px}
+.phone{background:#0d0f14;border:1px solid #333;border-radius:12px;padding:10px;flex:1;font-size:10.5px;min-height:250px}
+.ph-top{font-size:12px;font-weight:700;margin-bottom:7px;display:flex;justify-content:space-between;align-items:center}
+.pill{font-size:9px;background:#232733;border-radius:8px;padding:1px 6px;color:var(--mut)}
+.search{background:#1b1e27;border:1px solid #2a2e3a;border-radius:8px;padding:5px 9px;color:#696964;font-size:9.5px;margin-bottom:6px}
+.search.big{padding:10px 12px;font-size:11px;border-radius:10px;border-color:var(--acc)}
+.chips{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px}
+.chip{font-size:9px;padding:2px 8px;border-radius:10px;border:1px solid #2a2e3a;color:var(--mut)}
+.chip.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+.chip .n{opacity:.7;margin-left:2px}
+.row{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #22242c;padding:4px 2px;color:#c8c8c2;font-size:10px}
+.row small{color:var(--mut);font-size:8.5px}
+.lock{font-size:8.5px;color:#f0b27f}
+.tree{font-size:10px;line-height:1.9;color:#c8c8c2}
+.tree .b{color:#e6e6e2;font-weight:700}
+.tree .doc{color:#9a9a94;padding-left:16px}
+.tree .doc b{color:#c8c8c2;font-weight:400}
+.acc{border:1px solid #2a2e3a;border-radius:8px;margin:4px 0;overflow:hidden}
+.acc .hd{background:#1b1e27;padding:5px 9px;font-weight:700;font-size:10.5px;display:flex;justify-content:space-between}
+.acc .bd{padding:3px 9px 6px}
+.cardgrid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.dcard{background:#1b1e27;border:1px solid #2a2e3a;border-radius:8px;padding:8px;text-align:center}
+.dcard .ico{font-size:17px}.dcard .t{font-size:9.5px;font-weight:700;margin-top:3px;line-height:1.3}
+.dcard .d{font-size:8.5px;color:var(--mut);margin-top:2px}
+.recent{font-size:9px;color:var(--mut);margin:6px 0 3px}
+.pro{font-size:10.5px;margin-top:8px;line-height:1.55}
+.pro b{color:#7fd4ae}.pro em{color:#e08b8b;font-style:normal}
+.note{color:var(--mut);font-size:12px;margin-top:14px;border-top:1px solid var(--line);padding-top:10px;line-height:1.7}
+.reply{background:#233b31;border-radius:10px;padding:12px 14px;font-size:13px;font-weight:700;margin-top:12px}
+</style></head><body><div class="wrap">
+<h1>문서함 — 시안 5종</h1>
+<div class="sub">같은 내용(문서 33건 · 분류 5종 — ★인허가는 문서함에 안 끼움(9/2 PM): 인허가 문서 원장은 인허가 탭 3층 구조)을 5가지 화면으로. 번호로 골라주시면 그 설계로 구현합니다. 조합 가능.</div>
+<div class="grid">
+
+<div class="variant"><h2>1. 칩 필터형</h2><div class="tag">상단 분류 칩 + 평면 목록 — 원안</div>
+<div class="phone">
+<div class="ph-top">문서함 <span class="pill">33</span></div>
+<div class="search">🔍 제목·분류·메모 검색</div>
+<div class="chips"><span class="chip on">전체 <span class="n">33</span></span><span class="chip">01 법인 <span class="n">3</span></span><span class="chip">02 인사 <span class="n">5</span></span><span class="chip">03 안전 <span class="n">14</span></span><span class="chip">05 규정 <span class="n">6</span></span><span class="chip">06 양식 <span class="n">5</span></span></div>
+<div class="row"><span>📄 취업규칙 (JW-02-001)</span><small>02</small></div>
+<div class="row"><span>📄 석면 자체 매뉴얼 (JW-03-016)</span><small>03</small></div>
+<div class="row"><span>🔒 주주명부 양식</span><small class="lock">관리자</small></div>
+<div class="row"><span>📄 위험성평가 실시규정 v3</span><small>03</small></div>
+</div>
+<div class="pro"><b>장점</b> 한 화면·한 번 탭으로 거르기, 지금 화면에서 변화 최소 <em>단점</em> 문서가 100건 넘어가면 칩+스크롤로는 버거움</div></div>
+
+<div class="variant"><h2>2. 폴더 트리형</h2><div class="tag">탐색기 감각 — 분류가 폴더, 눌러서 들어감</div>
+<div class="phone">
+<div class="ph-top">문서함</div>
+<div class="search">🔍 전체 검색</div>
+<div class="tree">
+<div class="b">📁 01 법인 (3) <span class="lock">🔒 관리부↑</span></div>
+<div class="b">📁 02 인사노무 (5)</div>
+<div class="b">📂 03 안전보건 (14)</div>
+<div class="doc">📄 <b>석면 자체 매뉴얼</b> Rev.0</div>
+<div class="doc">📄 <b>위험성평가 실시규정</b> v3</div>
+<div class="doc">📄 <b>관리절차서</b> JW-03-015</div>
+<div class="b">📁 05 규정 (6) · 📁 06 양식 (5)</div>
+</div>
+</div>
+<div class="pro"><b>장점</b> 서류철 감각 그대로 — 직원 교육 필요 0, 잠긴 폴더가 눈에 보여 권한이 직관적 <em>단점</em> 문서 하나 찾을 때 폴더를 알아야 함(검색으로 보완)</div></div>
+
+<div class="variant"><h2>3. 서랍형 (아코디언)</h2><div class="tag">분류가 접이식 서랍으로 세로 나열 — 펼친 채 훑기</div>
+<div class="phone">
+<div class="ph-top">문서함 <span class="pill">33</span></div>
+<div class="acc"><div class="hd">▸ 01 법인 <span class="lock">🔒 3</span></div></div>
+<div class="acc"><div class="hd">▾ 03 안전보건 <span>14</span></div>
+<div class="bd">
+<div class="row"><span>📄 석면 자체 매뉴얼 Rev.0</span><small>결재완료</small></div>
+<div class="row"><span>📄 위험성평가 실시규정 v3</span><small>8/23</small></div>
+<div class="row"><span>📄 비상대응체계</span><small>양식</small></div>
+</div></div>
+<div class="acc"><div class="hd">▸ 05 규정 <span>6</span></div></div>
+<div class="acc"><div class="hd">▸ 06 양식 <span>5</span></div></div>
+</div>
+<div class="pro"><b>장점</b> 여러 분류를 동시에 펼쳐 비교 가능, 전체 구조가 항상 보임 <em>단점</em> 다 펼치면 스크롤이 매우 길어짐</div></div>
+
+<div class="variant"><h2>4. 표지 카드형</h2><div class="tag">문서가 표지 카드 격자 — 눈으로 찾는 책장</div>
+<div class="phone">
+<div class="ph-top">문서함</div>
+<div class="chips"><span class="chip on">03 안전</span><span class="chip">05 규정</span><span class="chip">06 양식</span></div>
+<div class="cardgrid">
+<div class="dcard"><div class="ico">📕</div><div class="t">석면 자체 매뉴얼</div><div class="d">Rev.0 · 현장 비치</div></div>
+<div class="dcard"><div class="ico">📗</div><div class="t">위험성평가 규정</div><div class="d">v3 · 8/23 결재</div></div>
+<div class="dcard"><div class="ico">📘</div><div class="t">관리절차서</div><div class="d">JW-03-015</div></div>
+<div class="dcard"><div class="ico">📙</div><div class="t">비상대응체계</div><div class="d">양식</div></div>
+</div>
+</div>
+<div class="pro"><b>장점</b> 제목을 몰라도 표지 색·아이콘으로 기억함("그 빨간 매뉴얼"), 태블릿·폰에서 보기 좋음 <em>단점</em> 한 화면 밀도가 낮아 37건도 스크롤 몇 번</div></div>
+
+<div class="variant"><h2>5. 검색 우선형</h2><div class="tag">큰 검색창이 주인공 — 분류는 보조. 최근·자주 연 문서 자동 노출</div>
+<div class="phone">
+<div class="ph-top">문서함</div>
+<div class="search big">🔍 문서 이름을 치세요 — "취업" "석면" "양식"…</div>
+<div class="recent">최근 연 문서</div>
+<div class="row"><span>📄 석면 자체 매뉴얼</span><small>오늘</small></div>
+<div class="row"><span>📄 취업규칙</span><small>어제</small></div>
+<div class="recent">자주 여는 문서</div>
+<div class="row"><span>📄 견적서 양식</span><small>주 3회</small></div>
+<div class="recent">분류로 찾기</div>
+<div class="chips"><span class="chip">01</span><span class="chip">02</span><span class="chip">03</span><span class="chip">05</span><span class="chip">06</span></div>
+</div>
+<div class="pro"><b>장점</b> 쓰는 문서 몇 개가 정해진 실사용 패턴에 최적(양식 찾기 3초), 목록 관리 부담 없음 <em>단점</em> 전체 조망이 약해 "우리한테 무슨 문서가 있더라" 훑기엔 불리</div></div>
+
+</div>
+<div class="note"><b>어느 안이든 공통으로 들어가는 것</b> — 분류 5종(01 법인·02 인사·03 안전·05 규정·06 양식 — JW 번호 자동 분류, ★04 인허가는 인허가 탭이 원장이라 제외) · 분류별 열람권한(01 법인만 잠금 출발, 서버 하드 차단) · 전역 검색 연동 · 문서는 링크 원칙(원본은 레포·오프라인 보관소). 즉 고르시는 건 "찾는 동선"입니다.</div>
+<div class="reply">회신: 번호 하나(예: "2") 또는 조합(예: "5+2 — 검색 위주인데 아래는 폴더"). 그 설계로 구현 착수합니다.</div>
+</div></body></html>
