@@ -3036,6 +3036,8 @@
     btn.style.display = "flex";
     document.getElementById("apprBadgeN").textContent = w > 0 ? w : "보";
   }
+  // ⑥ 대표 PC 시작프로그램용: ?appr=auto 로 열리면 부팅 직후 대기 건이 있을 때 한장씩 처리를 자동으로 띄운다(1회)
+  var apprAutoOpen = /[?&]appr=auto/.test(location.search);
   function apprRefresh(){
     if (!curMember() || !isAdmin()){ apprItems = []; apprBadgeRender(); return; }
     // 오버레이 처리 중엔 목록 교체 금지 — 큐가 물던 참조가 끊겨 뱃지 오집계·409 루프가 났다(리뷰 지적). 끝나면 apprFinish가 1회 재동기
@@ -3044,6 +3046,10 @@
     gwCall("gw-data", { action: "approvals_list" }).then(function(res){
       if (res.status === 200 && res.body && Array.isArray(res.body.items)){
         apprItems = res.body.items; apprBase = res.body.base || 0; apprBadgeRender();
+        if (apprAutoOpen){
+          apprAutoOpen = false;   // 부팅 1회만 — 이후 폴에선 조용히
+          if (apprWaitItems().length || apprHoldItems().length) apprOpen();
+        }
       }
     }).catch(function(){});
   }
