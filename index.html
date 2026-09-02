@@ -569,6 +569,20 @@
   /* 만기 미등록 경고 — 값이 비면 자동지시·캘린더가 통째로 안 도는데 종전엔 표시가 없었다 */
   .lic-nodate{background:#FBF3DF;border:1px solid #E5D3A4;color:#7a5b12;border-radius:8px;
     padding:9px 12px;margin-bottom:10px;font-size:13px;line-height:1.5;}
+  /* 인허가 3층 서브탭(시안 20260901) — 상단 메인 탭바와 혼동되지 않게 알약형으로 구분 */
+  .lsub-bar{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;}
+  .lsub-btn{flex:none;border:1px solid var(--line);background:#fff;border-radius:999px;
+    padding:7px 14px;font-size:13px;font-weight:700;color:var(--sub);cursor:pointer;}
+  .lsub-btn.active{background:var(--brand);border-color:var(--brand);color:#fff;}
+  .duty-group{font-size:12.5px;font-weight:800;color:var(--brand-dark);padding:12px 12px 4px;
+    border-bottom:1px solid var(--line);}
+  .duty-item .item-title{font-size:13.5px;line-height:1.35;}
+  /* 요약은 1줄 고정(시안) — 펼쳐야 전문이 보인다. 버튼 많은 목록의 모바일 잘림 전례(v254) 회피 */
+  .duty-sum{font-size:12px;color:var(--sub);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .duty-badge{display:inline-block;font-size:11px;padding:1px 8px;border-radius:999px;font-weight:700;}
+  .duty-badge.ok{background:#E3F2E9;color:#0F5132;}
+  .duty-badge.pre{background:#FBF3DF;color:#7a5b12;}
+  .duty-badge.unit{background:#E3EFF9;color:#1B5A8A;}
 
   /* 차량 */
   .own-badge{display:inline-block;font-size:11px;padding:1px 7px;border-radius:999px;font-weight:700;}
@@ -1117,6 +1131,15 @@
   </section>
 
   <section class="view" id="view-lic">
+    <!-- 3층 구조 1차(시안_인허가3층_20260901 승인): ①허가증=현행 그대로 ②의무 대장=등재표 ③이번 달 안내.
+         회차 인스턴스 자동생성·persons 명부는 2차 — renderLicMonth 위 TODO 참조. -->
+    <div class="lsub-bar" id="licSubBar">
+      <button class="lsub-btn active" data-lsub="cert">허가증 <span data-lsub-cnt="cert"></span></button>
+      <button class="lsub-btn" data-lsub="duty">의무 대장 <span data-lsub-cnt="duty"></span></button>
+      <button class="lsub-btn" data-lsub="month">이번 달</button>
+    </div>
+
+    <div id="licLayerCert">
     <div class="dash-sec" style="margin-bottom:8px;">
       <h2>인허가 <span class="cnt" id="licHead"></span></h2>
     </div>
@@ -1134,6 +1157,20 @@
     <div class="card" id="asbList"><div class="loading">불러오는 중…</div></div>
     <button class="link-btn" id="asbAddBtn">+ 석면 작업 추가</button>
     <input type="file" id="licGradeFile" accept=".pdf,.jpg,.jpeg,.png,.webp" style="display:none;">
+    </div>
+
+    <div id="licLayerDuty" style="display:none;">
+      <div class="dash-sec" style="margin-bottom:8px;">
+        <h2>의무 대장 <span class="cnt" id="dutyHead"></span></h2>
+      </div>
+      <input type="search" id="dutySearch" placeholder="검색 (의무·인허가명)" autocomplete="off" style="width:100%;padding:9px 12px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;font-size:14px;box-sizing:border-box;">
+      <div class="card" id="dutyList"><div class="loading">불러오는 중…</div></div>
+    </div>
+
+    <div id="licLayerMonth" style="display:none;">
+      <div class="dash-sec" style="margin-bottom:8px;"><h2>이번 달</h2></div>
+      <div class="card" id="licMonthPane"></div>
+    </div>
   </section>
 
   <!-- 입찰(공고 수집) — 관리자 전용 -->
@@ -1840,6 +1877,21 @@
   </div>
 </div>
 
+<!-- 의무 대장 선행확인 — 조건부 행은 이 답·기준일이 채워져야 알림 주기를 확정할 수 있다(등재표 원칙) -->
+<div class="modal-backdrop" id="dutyBackdrop">
+  <div class="modal">
+    <h3 id="dutyModalTitle">선행확인 입력</h3>
+    <div id="dutyModalQ" class="task-detail" style="margin:0 2px 10px;"></div>
+    <span class="fld-label">선행확인 답 (확인한 실물 값·판정)</span>
+    <input type="text" id="dutyPreAns" placeholder="예: 허가일자 2013-09-04, 일반화물" autocomplete="off">
+    <span class="fld-label">기준일 (기산점이 되는 날짜)</span>
+    <input type="date" id="dutyBaseDate">
+    <label class="chk"><input type="checkbox" id="dutyConfirmChk"> 확정도를 '확정'으로 전환 (답·기준일 필수)</label>
+    <button class="primary" id="dutyPreSave">저장</button>
+    <button class="secondary" id="dutyPreCancel">취소</button>
+  </div>
+</div>
+
 <!-- 석면 작업 이력 — 입력칸은 산안법 제164조⑥·규칙 제241조⑥의 30년 보존 항목 그대로.
      신고 마감(착수 7일 전)과 보존 만료(종료일 +30년)는 사람이 넣지 않고 날짜에서 파생한다. -->
 <div class="modal-backdrop" id="asbBackdrop">
@@ -2495,9 +2547,16 @@
   var showRecPaid = false;
 
   var licenses = [];     // [{id,name,org,issued,license_no,expiry,edu_due,edu_cycle,note,created,updated,del}]
+  // 3층 ②의무 대장 — 컬렉션 신설 금지 결정에 따라 licenses 문서에 top-level 배열로 동거.
+  // [{no,lic,duty,cycle,basis,law,confirm('확정'|'조건부'),precheck,unit('사업장'|'차량'|'개인'),precheck_answer,base_date,confirmed_by,confirmed_at,updated}]
+  var duties = [];
+  var licLayer = "cert"; // 인허가 서브탭 상태(cert|duty|month) — 세션 임시
+  var dutyQ = "";
+  var dutyOpen = {};     // {no:true} 상세 펼침 — 세션 임시
   var licSha = null;
   var licSaveTimer = null;
   var licPending = false;
+  var licRemoteOk = false; // 이 세션에서 licenses 원격 GET(200·404)을 실제로 봤는지 — 시드 허용 관문(캐시 폴백은 제외)
   var editingLicId = null;
 
   var members = [];      // [{id,name,pin,role,rank,dept,admin,perms:{tasks,veh,rec,lic,check},created,updated,del}] — role=직책(권한), rank=직급(정보), dept=부서
@@ -4319,7 +4378,7 @@
 
     if (name === "cal") renderCalendar();
     // 석면 대장은 인허가 탭 안에 있고, 투입 근로자 이름을 일용직 명부에서 끌어오므로 둘을 같이 읽는다
-    if (name === "lic"){ renderAsb(); loadAsb(); loadEdu(); if(canSee("wk")) loadWorkers(); }
+    if (name === "lic"){ setLicLayer("cert"); renderAsb(); loadAsb(); loadEdu(); if(canSee("wk")) loadWorkers(); }   // 전역검색·캘린더 점프가 의무/이번달 층 위에 내려앉지 않게 ①층 복귀
     if (name === "hr"){ renderHrRoster(); renderEdu(); loadEdu(); if(canSee("wk")) loadWorkers(); }
     if (name === "workers"){ renderWorkers(); loadWorkers(); renderEdu(); loadEdu(); }
     if (name === "perm") renderPermMgmt();
@@ -4746,6 +4805,13 @@
   })();
 
   document.getElementById("licAddBtn").addEventListener("click", function(){ openLicModal(null); });
+  // 인허가 3층 서브탭·의무 대장 배선
+  Array.prototype.forEach.call(document.querySelectorAll("#licSubBar .lsub-btn"), function(b){
+    b.addEventListener("click", function(){ setLicLayer(b.getAttribute("data-lsub")); });
+  });
+  document.getElementById("dutySearch").addEventListener("input", function(){ dutyQ = this.value.trim(); renderDuties(); });
+  document.getElementById("dutyPreSave").addEventListener("click", saveDutyFromModal);
+  document.getElementById("dutyPreCancel").addEventListener("click", closeDutyModal);
   document.getElementById("asbAddBtn").addEventListener("click", function(){ openAsb(null); });
   document.getElementById("asbSave").addEventListener("click", saveAsb);
   document.getElementById("asbDelete").addEventListener("click", deleteAsb);
@@ -13673,25 +13739,28 @@
     return ds.length ? Math.min.apply(null, ds) : 99999;
   }
 
-  function saveLicCache(){ try{ localStorage.setItem(LIC_CACHE_KEY, JSON.stringify({sha: licSha, items: licenses})); }catch(e){} }
+  function saveLicCache(){ try{ localStorage.setItem(LIC_CACHE_KEY, JSON.stringify({sha: licSha, items: licenses, duties: duties})); }catch(e){} }
   function loadLicCache(){ try{ var r = localStorage.getItem(LIC_CACHE_KEY); return r ? JSON.parse(r) : null; }catch(e){ return null; } }
 
   function loadLicenses(){
     var token = getToken(); if (!token) return;
     fetch(LIC_API, {headers: ghHeaders()}).then(function(resp){
       if (resp.status === 401){ clearToken(); showTokenScreen(true); return; }
-      if (resp.status === 404){ licSha = null; licenses = []; saveLicCache(); renderLicenses(); renderDashboard(); markLoadedForAutoGen("lic"); return; }
+      if (resp.status === 404){ licSha = null; licenses = []; duties = []; licRemoteOk = true; saveLicCache(); renderLicenses(); renderDashboard(); markLoadedForAutoGen("lic"); return; }
       if (!resp.ok) throw new Error("HTTP " + resp.status);
       return resp.json().then(function(json){
         licSha = json.sha;
         var parsed = JSON.parse(b64DecodeUnicode(json.content));
         var ri = (parsed && parsed.items) || [];
         licenses = (licPending ? mergeLic(licenses, ri) : ri);
+        var rd = (parsed && parsed.duties) || [];   // duties도 같은 문서에서 — 로드가 편집을 덮지 않게 pending이면 병합
+        duties = (licPending ? mergeDuties(duties, rd) : rd);
+        licRemoteOk = true;   // 시드 허용 조건 — 캐시 폴백이 아닌 진짜 원격 상태를 봤을 때만(리뷰 high: 폴백 시드가 남의 편집을 덮음)
         setOffline(false); saveLicCache(); renderLicenses(); renderDashboard(); markLoadedForAutoGen("lic");
       });
     }).catch(function(){
       var c = loadLicCache();
-      if (c){ licSha = c.sha; licenses = c.items || []; setOffline(true); renderLicenses(); renderDashboard(); markLoadedForAutoGen("lic"); }   // 캐시 폴백도 로드 완료로(차량과 동일)
+      if (c){ licSha = c.sha; licenses = c.items || []; duties = c.duties || []; setOffline(true); renderLicenses(); renderDashboard(); markLoadedForAutoGen("lic"); }   // 캐시 폴백도 로드 완료로(차량과 동일)
     });
   }
 
@@ -13720,7 +13789,8 @@
   }
   function doSaveLic(){
     var token = getToken(); if (!token) return;
-    var body = JSON.stringify({schema: 1, items: licenses});
+    // duties를 빼먹으면 문서 통째 저장이라 의무 대장이 통째로 증발한다 — items와 반드시 동반
+    var body = JSON.stringify({schema: 1, items: licenses, duties: duties});
     var payload = {message: "licenses: 업데이트", content: b64EncodeUnicode(body), branch: "main"};
     if (licSha) payload.sha = licSha;
     fetch(LIC_API, {method: "PUT", headers: Object.assign({"Content-Type":"application/json"}, ghHeaders()), body: JSON.stringify(payload)}).then(function(resp){
@@ -13732,7 +13802,7 @@
   }
   function resolveLicConflictAndRetry(){
     return fetch(LIC_API, {headers: ghHeaders()}).then(function(resp){ if (resp.status === 404) return null; return resp.json(); }).then(function(json){
-      if (json){ var lp = {}; try{ lp = JSON.parse(b64DecodeUnicode(json.content)) || {}; }catch(e){} licenses = mergeLic(licenses, lp.items || []); licSha = json.sha; }
+      if (json){ var lp = {}; try{ lp = JSON.parse(b64DecodeUnicode(json.content)) || {}; }catch(e){} licenses = mergeLic(licenses, lp.items || []); duties = mergeDuties(duties, lp.duties || []); licSha = json.sha; }
       saveLicCache(); renderLicenses(); renderDashboard(); return doSaveLic();
     });
   }
@@ -13812,6 +13882,9 @@
       el.addEventListener("click", function(e){ e.stopPropagation(); openLicModal(el.getAttribute("data-lic-edit-btn")); });
     });
     bindCalHandlers(host);
+    // 3층 동기 — 허가증·의무 대장은 같은 문서라 로드·저장·병합 경로가 전부 여길 지나므로 여기서 한 번에
+    renderDuties();
+    if (licLayer === "month") renderLicMonth();
   }
 
   function urgentLicenses(){
@@ -13879,6 +13952,225 @@
     if (l){ l.del = 1; l.updated = todayStr(); }
     closeLicModal();
     saveLicCache(); renderLicenses(); renderDashboard(); scheduleLicSave();
+  }
+
+  // ---- 인허가 3층: ②의무 대장 + ③이번 달 (1차 — 시안_인허가3층_20260901) ----
+  function liveDuties(){ return duties.slice().sort(function(a, b){ return (a.no || 0) - (b.no || 0); }); }
+  function findDuty(no){ for (var i=0;i<duties.length;i++){ if (duties[i].no === no) return duties[i]; } return null; }
+  // 병합 키 = no(등재표 번호, 시드가 유일성 보장). updated_ts(ms) 최신 우선 — 날짜 문자열은 같은 날 편집을 구분 못 한다.
+  // ts 없는 구 데이터는 updated 날짜로 폴백, 완전 동률이면 사람 흔적(확정·선행확인 답·기준일) 있는 쪽 우선.
+  function mergeDuties(local, remote){
+    var by = {};
+    function touched(d){ return !!(d.confirmed_by || d.precheck_answer || d.base_date); }
+    (remote || []).forEach(function(d){ if (d && d.no != null) by[d.no] = d; });
+    (local || []).forEach(function(d){
+      if (!d || d.no == null) return;
+      var r = by[d.no];
+      if (!r){ by[d.no] = d; return; }
+      var dt = d.updated_ts || 0, rt = r.updated_ts || 0;
+      if (dt !== rt){ if (dt > rt) by[d.no] = d; return; }
+      if ((d.updated || "") !== (r.updated || "")){ if ((d.updated || "") > (r.updated || "")) by[d.no] = d; return; }
+      if (!(touched(r) && !touched(d))) by[d.no] = d;   // 동률 기본 로컬 — 단, 로컬이 맨몸이고 원격에 사람 흔적이 있으면 원격 유지
+    });
+    var out = []; Object.keys(by).forEach(function(k){ out.push(by[k]); });
+    return out;
+  }
+
+  function setLicLayer(name){
+    licLayer = name;
+    var bar = document.getElementById("licSubBar");
+    if (bar) Array.prototype.forEach.call(bar.querySelectorAll(".lsub-btn"), function(b){
+      b.classList.toggle("active", b.getAttribute("data-lsub") === name);
+    });
+    document.getElementById("licLayerCert").style.display = (name === "cert") ? "" : "none";
+    document.getElementById("licLayerDuty").style.display = (name === "duty") ? "" : "none";
+    document.getElementById("licLayerMonth").style.display = (name === "month") ? "" : "none";
+    if (name === "duty") renderDuties();
+    if (name === "month") renderLicMonth();
+  }
+  function updateLicSubCnt(){
+    var bar = document.getElementById("licSubBar"); if (!bar) return;
+    var c = bar.querySelector('[data-lsub-cnt="cert"]');
+    if (c) c.textContent = String(liveLic().filter(licVisible).length);
+    var d = bar.querySelector('[data-lsub-cnt="duty"]');
+    if (d) d.textContent = duties.length ? String(duties.length) : "";
+  }
+
+  function dutyBadges(d){
+    var h = "";
+    if (d.unit === "차량") h += '<span class="duty-badge unit">차량</span> ';
+    if (d.unit === "개인") h += '<span class="duty-badge unit">개인</span> ';
+    h += (d.confirm === "확정")
+      ? '<span class="duty-badge ok">확정</span>'
+      : '<span class="duty-badge pre">조건부 · 선행확인 필요</span>';
+    return h;
+  }
+  function dutyRowHtml(d, open){
+    var detail = "";
+    if (open){
+      var parts = [];
+      if (d.basis) parts.push("<b>기산점·마감</b>  " + esc(d.basis));
+      if (d.law) parts.push("<b>근거</b>  " + esc(d.law));
+      if (d.precheck) parts.push("<b>선행 확인</b>  " + esc(d.precheck));
+      if (d.precheck_answer) parts.push("<b>선행확인 답</b>  " + esc(d.precheck_answer));
+      if (d.base_date) parts.push("<b>기준일</b>  " + esc(d.base_date));
+      if (d.confirmed_by) parts.push("<b>확정 전환</b>  " + esc(d.confirmed_by) + " · " + esc(d.confirmed_at || ""));
+      detail = '<div class="task-detail" style="margin-top:5px;">' + parts.join("<br>") + '</div>';
+    }
+    var canPre = isAdmin() && (d.confirm === "조건부" || d.precheck_answer || d.confirmed_by);   // 등재·확정은 관리자 전용(서버도 차단) — 사람이 확정한 행은 재열람·회수 가능해야 막다른 길이 없다
+    return '<div class="item duty-item" data-duty-no="' + d.no + '">' +
+        '<div class="item-body">' +
+          '<div class="item-title">' + d.no + '. ' + esc(d.duty) + '</div>' +
+          '<div class="item-meta" style="margin-top:2px;">' + dutyBadges(d) + '</div>' +
+          '<div class="duty-sum">' + esc(d.cycle || "") + (d.basis ? " — " + esc(d.basis) : "") + '</div>' +
+          detail +
+        '</div>' +
+        (canPre ? '<div class="task-ctrl"><button class="mini-btn" data-duty-pre="' + d.no + '">선행확인 입력</button></div>' : '') +
+      '</div>';
+  }
+
+  function renderDuties(){
+    var host = document.getElementById("dutyList");
+    if (!host) return;
+    updateLicSubCnt();
+    var all = liveDuties();
+    var cf = all.filter(function(d){ return d.confirm === "확정"; }).length;
+    var head = document.getElementById("dutyHead");
+    if (head) head.textContent = all.length ? ("총 " + all.length + " · 확정 " + cf + " · 조건부 " + (all.length - cf)) : "";
+    if (!all.length){
+      // 시드는 조용한 자동 주입 금지(설계) — 관리자의 명시적 1회 액션으로만 등재
+      host.innerHTML = '<div class="empty-line">의무 대장이 비어 있습니다.' +
+          (isAdmin() ? "<br>아래 버튼으로 등재표(2026-08-25 조사 + 증보 1)를 불러오세요." : "") + '</div>' +
+        (isAdmin() ? '<div style="text-align:center;padding-bottom:14px;"><button class="primary" style="width:auto;padding:9px 18px;" data-duty-seed="1">등재표 불러오기 (본표 73행 + 증보 25행)</button></div>' : '');
+      var sb = host.querySelector("[data-duty-seed]");
+      if (sb) sb.addEventListener("click", seedDuties);
+      return;
+    }
+    var q = (dutyQ || "").toLowerCase();
+    var list = !q ? all : all.filter(function(d){
+      return ((d.duty || "") + " " + (d.lic || "")).toLowerCase().indexOf(q) >= 0;
+    });
+    // 인허가별 묶음 = 최초 등장 순서 유지 — 등재표에서 같은 인허가가 떨어져 있어도(34·37) 헤더가 중복되지 않게
+    var html = "", groups = {}, order = [];
+    list.forEach(function(d){
+      var k = d.lic || "";
+      if (!groups[k]){ groups[k] = []; order.push(k); }
+      groups[k].push(d);
+    });
+    order.forEach(function(k){
+      html += '<div class="duty-group">' + esc(k) + ' <span style="color:var(--sub);font-weight:600;">' + groups[k].length + '</span></div>';
+      groups[k].forEach(function(d){ html += dutyRowHtml(d, !!dutyOpen[d.no]); });
+    });
+    host.innerHTML = html || '<div class="empty-line">검색 결과가 없습니다.</div>';
+    Array.prototype.forEach.call(host.querySelectorAll("[data-duty-no]"), function(el){
+      el.addEventListener("click", function(e){
+        if (e.target.closest && e.target.closest("button")) return;
+        var no = parseInt(el.getAttribute("data-duty-no"), 10);
+        dutyOpen[no] = !dutyOpen[no];
+        renderDuties();
+      });
+    });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-duty-pre]"), function(el){
+      el.addEventListener("click", function(e){
+        e.stopPropagation();
+        openDutyModal(parseInt(el.getAttribute("data-duty-pre"), 10));
+      });
+    });
+  }
+
+  function seedDuties(){
+    if (!isAdmin()) return;
+    if (duties.length) return;
+    // 원격 원본을 실제로 본 세션에서만 시드 — 캐시 폴백·로딩 중 시드는 남이 채운 duties를 빈 판으로 덮는다(리뷰 high)
+    if (!licRemoteOk){ alert("인허가 원본을 아직 확인하지 못했습니다(오프라인·캐시 상태). 연결된 상태에서 다시 시도하세요."); return; }
+    fetch("data/duties_seed.json").then(function(r){
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    }).then(function(j){
+      var items = (j && j.items) || [];
+      // confirm 값도 필수 검증 — 누락·오타 행은 배지가 조건부로 뜨는데 canPre 정확일치에 안 걸려 영영 편집 불능(리뷰 low)
+      var bad = items.filter(function(d){ return d.no == null || !d.duty || !d.lic || !d.cycle || (d.confirm !== "확정" && d.confirm !== "조건부"); });
+      if (!items.length || bad.length){ alert("시드 파일 검증 실패 — 행 " + items.length + "건, 불량 " + bad.length + "건. 배포 파일을 확인하세요."); return; }
+      var cf = items.filter(function(d){ return d.confirm === "확정"; }).length;
+      if (!confirm("등재표 " + items.length + "행(확정 " + cf + " · 조건부 " + (items.length - cf) + ")을 의무 대장에 등재할까요?\n최초 1회만 실행하는 작업입니다.")) return;
+      if (duties.length){ renderDuties(); return; }   // confirm 대기 중 로드·다른 탭이 채웠으면 중단(재검사)
+      // 세션 간 재시드 차단(리뷰 med) — 다른 관리자가 그사이 등재·확정했으면 낡은 세션의 시드가 ts 승자가 되어
+      // 확정 이력을 통째로 되돌린다. 쓰기 직전 원격을 다시 읽어 duties를 재검사(내부 catch 별도 — 시드파일 오류와 구분)
+      fetch(LIC_API, {headers: ghHeaders()}).then(function(resp){
+        if (resp.status === 404) return null;
+        if (!resp.ok) throw new Error("HTTP " + resp.status);
+        return resp.json();
+      }).then(function(json){
+        var rd = [];
+        if (json){
+          licSha = json.sha;
+          var parsed = JSON.parse(b64DecodeUnicode(json.content));
+          licenses = (licPending ? mergeLic(licenses, (parsed && parsed.items) || []) : ((parsed && parsed.items) || []));
+          rd = (parsed && parsed.duties) || [];
+        }
+        if (rd.length){
+          duties = rd; saveLicCache(); renderLicenses(); renderDuties();
+          alert("이미 등재되어 있습니다 — 원격 대장 " + rd.length + "행을 불러왔습니다.");
+          return;
+        }
+        var today = todayStr(), ts = Date.now();
+        duties = items.map(function(d){ d.updated = today; d.updated_ts = ts; return d; });
+        saveLicCache(); renderLicenses(); renderDuties(); scheduleLicSave();
+      }).catch(function(){ alert("등재 직전 원격 확인에 실패했습니다 — 연결 상태를 확인하고 다시 시도하세요."); });
+    }).catch(function(){ alert("시드 파일을 불러오지 못했습니다 (data/duties_seed.json)."); });
+  }
+
+  var editingDutyNo = null;
+  function openDutyModal(no){
+    if (!isAdmin()) return;
+    var d = findDuty(no); if (!d) return;
+    editingDutyNo = no;
+    document.getElementById("dutyModalTitle").textContent = d.no + ". " + (d.duty || "");
+    document.getElementById("dutyModalQ").textContent = d.precheck
+      ? ("선행 확인: " + d.precheck)
+      : "이 행은 선행확인 항목이 명시되지 않았습니다 — 확인한 값·기준일만 기록해도 됩니다.";
+    document.getElementById("dutyPreAns").value = d.precheck_answer || "";
+    document.getElementById("dutyBaseDate").value = isDate(d.base_date) ? d.base_date : "";
+    document.getElementById("dutyConfirmChk").checked = d.confirm === "확정";
+    document.getElementById("dutyBackdrop").classList.add("show");
+  }
+  function closeDutyModal(){ document.getElementById("dutyBackdrop").classList.remove("show"); editingDutyNo = null; }
+  function saveDutyFromModal(){
+    if (editingDutyNo == null) return;
+    var d = findDuty(editingDutyNo); if (!d){ closeDutyModal(); return; }
+    var ans = document.getElementById("dutyPreAns").value.trim();
+    var bd = document.getElementById("dutyBaseDate").value;
+    var toConfirm = document.getElementById("dutyConfirmChk").checked;
+    // 답·기준일 없는 확정 금지 — 전환뿐 아니라 확정 유지 저장에서도(답만 지우고 저장하면 근거 없는 확정이 남는다)
+    if (toConfirm && (!ans || !bd)){ alert("확정 상태는 선행확인 답과 기준일을 모두 채워야 합니다.\n답을 비우려면 확정 체크를 해제하세요."); return; }
+    d.precheck_answer = ans;
+    d.base_date = bd || null;
+    if (toConfirm && d.confirm !== "확정"){
+      d.confirm = "확정"; d.confirmed_by = getUser(); d.confirmed_at = todayStr();
+    } else if (!toConfirm && d.confirmed_by){
+      // 사람이 전환한 확정만 회수 가능 — 등재표 원본이 확정인 행은 체크 해제로 강등되지 않는다
+      d.confirm = "조건부"; d.confirmed_by = ""; d.confirmed_at = "";
+    }
+    d.updated = todayStr(); d.updated_ts = Date.now();
+    closeDutyModal();
+    saveLicCache(); renderDuties(); scheduleLicSave();
+  }
+
+  // TODO(2차): 의무 × 대상(허가증·차량·persons) 회차 인스턴스 자동 생성 → 캘린더·D-30 지시 발행(시안 ③층).
+  // TODO(2차): persons 명부 신설(지입차주·조종사·석면 근로자 — 생년월일·배치일) 후 [개인단위] 행 연결(인사 탭 하위).
+  // TODO(3차): [차량단위] 행은 차량탭이 만기 원장 — 여기선 참조만(중복 대장 금지, 시안 단계 계획).
+  function renderLicMonth(){
+    var host = document.getElementById("licMonthPane"); if (!host) return;
+    var all = liveDuties();
+    var cf = all.filter(function(d){ return d.confirm === "확정"; }).length;
+    var vh = all.filter(function(d){ return d.unit === "차량"; }).length;
+    var pp = all.filter(function(d){ return d.unit === "개인"; }).length;
+    host.innerHTML =
+      '<div class="lic-nodate" style="margin:12px 12px 4px;">이번 달 할 일(회차 인스턴스) 자동생성은 <b>2차</b> 범위입니다 — 지금은 ②의무 대장을 채우는 단계.</div>' +
+      (all.length
+        ? '<div style="padding:8px 14px 14px;font-size:13.5px;">확정도: <b>확정 ' + cf + '</b> · 조건부 ' + (all.length - cf) + ' / 총 ' + all.length +
+          '<div style="font-size:12px;color:var(--sub);margin-top:5px;line-height:1.6;">조건부 행은 의무 대장의 "선행확인 입력"으로 확정 전환하세요 — 확정이 쌓이면 2차(자동생성)로 넘어갑니다.<br>차량단위 ' + vh + '건·개인단위 ' + pp + '건은 2차에서 차량탭·명부와 연결됩니다.</div></div>'
+        : '<div class="empty-line">의무 대장이 비어 있습니다 — 먼저 ②층에서 등재표를 불러오세요.</div>');
   }
 
   // ---- 캘린더 .ics (기기 기본 캘린더 알람 연동) ----

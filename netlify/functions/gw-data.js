@@ -157,8 +157,8 @@ async function handleSave(event, d, R) {
   if (permOf(c.member, col) !== 'do' && col !== 'tasks' && col !== 'leaves') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_WRITE', request_id: R });
   if (!d.doc || typeof d.doc !== 'object') return jr(400, { status: 'REJECTED', error_code: 'INVALID_DOC', request_id: R });
   // 감사 로그용 이전 문서(diff 원본) — 읽기 실패해도 저장은 진행
-  let oldItems = [], prevDoc = null;
-  try { const prev = await blobGet(store(DATA), colKey(col)); if (prev.ok && prev.data) { prevDoc = prev.data; if (Array.isArray(prev.data.items)) oldItems = prev.data.items; } } catch (e) {}
+  let oldItems = [], prevDoc = null, prevReadFailed = false;
+  try { const prev = await blobGet(store(DATA), colKey(col)); if (prev.ok) { if (prev.data) { prevDoc = prev.data; if (Array.isArray(prev.data.items)) oldItems = prev.data.items; } } else prevReadFailed = true; } catch (e) { prevReadFailed = true; }
   // 낙관적 락: 클라이언트가 로드했던 문서 시각(base)과 서버 현재가 다르면 409 → 프런트의 기존 충돌 병합 경로가 재조회·병합·재시도.
   // 종전엔 감지 자체가 없어 두 관리자 동시 저장 시 늦은 쪽이 앞선 수정을 통째로 덮었다. base 미전송(구버전 캐시)·첫 저장은 종전대로.
   if (d.base !== undefined && prevDoc && prevDoc.updated_at && Number(d.base) !== Number(prevDoc.updated_at))
@@ -179,6 +179,14 @@ async function handleSave(event, d, R) {
       return b;
     });
     doc.items = others.concat(own);
+  }
+  // 인허가 3층(2026-09-02): duties(의무 대장)는 ①구버전 클라·구형 캐시가 모르는 필드라 빠지거나 비어 오면
+  // 저장 한 번에 95행+확정 이력이 통째로 증발한다(리뷰 high) — 서버가 원본을 이월. ②등재·확정 전환은 관리자 전용.
+  if (col === 'licenses') {
+    // 직전 문서를 못 읽으면 이월 판단 자체가 불가 — fail-open이면 원 결함(증발)이 그대로 재발하므로 licenses만 저장 거부(리뷰 med)
+    if (prevReadFailed) return jr(500, { status: 'ERROR', error_code: 'PREV_READ_FAILED', request_id: R });
+    const prevDuties = (prevDoc && Array.isArray(prevDoc.duties)) ? prevDoc.duties : [];
+    if (!c.member.admin || !Array.isArray(doc.duties) || (doc.duties.length === 0 && prevDuties.length > 0)) doc.duties = prevDuties;
   }
   // 문서함: 01 법인 항목은 관리자만 편집 — 비관리자 저장은 서버가 01을 원본으로 재구성.
   // 판정은 "서버 기준 01이었던 id" 기준(cat만 바꿔 다른 분류로 위장해 내보내는 탈취·중복 id 차단 — 리뷰 high)
