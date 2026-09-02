@@ -38,8 +38,11 @@ async function adminIds() {
   return out;
 }
 
-// payload: {title, body, url, tag}
-async function sendTo(memberIds, payload) {
+// payload: {title, body, url, tag} / opts: {primaryOnly}
+// primaryOnly=true(결재 2차, 배치도 결정 ③ "알림=우선기기 1발"): 회원별로 primary 구독이 있으면
+// 그 기기에만 보낸다. primary 미지정 회원은 전 구독 폴백 — 우선기기를 안 정한 사람이
+// 알림을 아예 못 받는 사고 방지. 만료(404/410) 제거는 현행 유지.
+async function sendTo(memberIds, payload, opts) {
   // 알림함(push:log) — 폰 팝업이 지나가면 다시 볼 곳이 없다는 PM 지적(2026-08-20).
   // 발송 전에 남기고(구독이 없어도 이력은 남게), 이력 실패가 발송을 막지 않는다. 최근 100건 링.
   try {
@@ -57,16 +60,26 @@ async function sendTo(memberIds, payload) {
   let sent = 0, removed = 0;
   for (const mid of memberIds) {
     const subs = doc.members[mid] || [];
-    for (let i = subs.length - 1; i >= 0; i--) {
-      try {
-        // TTL 24시간(감시 2단계, 2026-08-19) — 1시간이던 시절엔 밤새 꺼둔 폰이 아침 경보를
-        // 통째로 놓쳤다(09시 발송 → 10시 폐기). 기기가 하루 안에만 켜지면 경보가 닿는다.
-        await webpush.sendNotification(subs[i].sub, body, { TTL: 86400 });
-        sent++;
-      } catch (e) {
-        const sc = e && e.statusCode;
-        if (sc === 404 || sc === 410) { subs.splice(i, 1); removed++; }
+    const wantPrimary = !!(opts && opts.primaryOnly === true) && subs.some(function (x) { return x && x.primary; });
+    // pass 0 = primary 기기만. 한 발도 못 나가면(만료 제거 등) pass 1에서 나머지 구독 폴백 —
+    // 죽은 primary가 그 회원의 알림 1발을 통째로 삼키지 않게(리뷰 low). primary 미지정이면 pass 0에서 전 기기.
+    let mSent = 0;
+    for (let pass = 0; pass < 2; pass++) {
+      const primaryPass = wantPrimary && pass === 0;
+      for (let i = subs.length - 1; i >= 0; i--) {
+        const isPrim = !!(subs[i] && subs[i].primary);
+        if (wantPrimary && (primaryPass ? !isPrim : isPrim)) continue;
+        try {
+          // TTL 24시간(감시 2단계, 2026-08-19) — 1시간이던 시절엔 밤새 꺼둔 폰이 아침 경보를
+          // 통째로 놓쳤다(09시 발송 → 10시 폐기). 기기가 하루 안에만 켜지면 경보가 닿는다.
+          await webpush.sendNotification(subs[i].sub, body, { TTL: 86400 });
+          sent++; mSent++;
+        } catch (e) {
+          const sc = e && e.statusCode;
+          if (sc === 404 || sc === 410) { subs.splice(i, 1); removed++; }
+        }
       }
+      if (!wantPrimary || mSent > 0) break;
     }
     if (subs.length) doc.members[mid] = subs; else delete doc.members[mid];
   }

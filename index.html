@@ -2252,6 +2252,7 @@
     <button class="secondary" id="memberUidBtn" style="display:none;">내 아이디 설정</button>
     <button class="secondary" id="memberPinBtn" style="display:none;">내 PIN 변경</button>
     <button class="secondary" id="pushBtn" style="display:none;">🔔 이 기기 알림 켜기</button>
+    <button class="secondary" id="pushPrimaryBtn" style="display:none;">⭐ 이 기기를 결재알림 우선기기로</button>
     <button class="secondary" id="pushTestBtn" style="display:none;">📨 알림 테스트 보내기</button>
     <a href="./MANUAL.html" target="_blank" rel="noopener" style="display:block;text-align:center;font-size:13px;margin-top:6px;">📖 사용 안내</a>
     <button class="secondary" id="helpBtn">도움말</button>
@@ -3083,8 +3084,7 @@
 
   // ---- 결재함(C안, PM 승인 2026-09-01): 전용 화면 없음 — 상단 뱃지 → 오버레이 한 장씩 처리 ----
   // 큐에 '보류'도 포함하는 이유: 1차엔 관리자용 목록 화면이 없어 여기서 빼면 보류 건을 재결정할 통로가 사라진다.
-  // TODO(결재 2차): 직원 "내 상신 목록" 화면 · 우선기기 1발 라우팅 · 운반일지 자동 기안 · PC 팝업 예외.
-  //   1차에선 기안자에게 결과가 웹푸시로만 간다(approval_decide가 서버에서 발송).
+  // 2차(2026-09-02) 구현: 내 상신 목록(홈 섹션) · 우선기기 1발 라우팅 · 운반일지 자동 기안(워커) · PC 팝업 예외(운반일지=전 기기).
   var apprItems = [];                      // approvals_list 결과(관리자=전체)
   var apprBase = 0;                        // 목록의 낙관락 토큰 — decide에 동봉(관리자 2인 동시 결재 유실 방지)
   var apprQueue = [], apprIdx = 0;         // 오버레이 진행용(대기 먼저, 보류는 뒤)
@@ -3132,6 +3132,8 @@
   }
   // afterLogin에서 호출 — 즉시 1회 + 5분 간격(재로그인 시 타이머 중복 방지). 상신 대기열 재시도도 여기에 태운다
   function apprInit(){
+    // 계정 전환(공용 PC 칩 로그인)마다 '내 상신' 캐시 초기화 — 이전 사용자의 상신·반려 사유가 다음 사용자 홈에 남는다(리뷰 med)
+    myApprItems = []; myApprFetchedAt = 0; myApprInflight = false;
     apprRefresh(); apprFlushCreates();
     if (apprPollTimer) clearInterval(apprPollTimer);
     apprPollTimer = setInterval(function(){ apprRefresh(); apprFlushCreates(); }, 5 * 60 * 1000);
@@ -3206,17 +3208,41 @@
     apprBusy = true;
     var g = apprGen;
     gwCall("gw-data", { action: "approval_decide", id: it.id, decision: decision, reason: reason, base: apprBase }).then(function(res){
-      apprBusy = false;
-      if (g !== apprGen) return;   // 그 사이 닫힘/재열림 — 늦은 응답은 진행을 건드리지 않는다
+      if (g !== apprGen){ apprBusy = false; return; }   // 그 사이 닫힘/재열림 — 늦은 응답은 진행을 건드리지 않는다
       if (res.body && res.body.base != null) apprBase = res.body.base;
       if (res.status === 409){
         var code = res.body && res.body.error_code;
         // STALE=문서만 낡음(이 카드는 미처리) — 갱신된 base로 같은 카드 1회 자동 재시도.
-        // "먼저 처리된 건"으로 넘겨버리면 관리자가 처리됐다고 믿는다(리뷰 지적)
-        if (code === "APPR_STALE" && !isRetry){ apprDecide(decision, reason, true); return; }
+        // "먼저 처리된 건"으로 넘겨버리면 관리자가 처리됐다고 믿는다(리뷰 지적).
+        // 단 정정 상신(2차)으로 열린 카드의 내용이 사후에 바뀔 수 있다 — 재시도 전에 서버본을 다시 읽어
+        // 이 카드가 변했으면 재렌더 후 사람이 다시 결정(안 본 정정본에 결정을 확정하는 사고 방지, 리뷰 med).
+        // apprBusy는 재조회 왕복 내내 유지 — 해제하면 그 창에서 더블클릭이 갱신 base로 정정본에 결재를 꽂거나
+        // [건너뛰기]가 인덱스를 전진시켜 다음 카드에 결정이 붙는다(리뷰 med 회귀)
+        if (code === "APPR_STALE" && !isRetry){
+          gwCall("gw-data", { action: "approvals_list" }).then(function(r2){
+            if (g !== apprGen){ apprBusy = false; return; }
+            var srv = null;
+            if (r2.status === 200 && r2.body && Array.isArray(r2.body.items)){
+              if (r2.body.base != null) apprBase = r2.body.base;
+              for (var i = 0; i < r2.body.items.length; i++){ if (r2.body.items[i] && r2.body.items[i].id === it.id){ srv = r2.body.items[i]; break; } }
+            }
+            if (srv && ((srv.updated || "") !== (it.updated || "") || srv.title !== it.title || srv.body !== it.body)){
+              apprQueue[apprIdx] = srv;   // 정정본으로 교체 — busy 유지로 인덱스·큐가 이 구간에 안 움직였다
+              apprRenderCard();
+              apprBusy = false;
+              apprToastShow("이 카드가 정정되었습니다 — 내용 확인 후 다시 결정해주세요");
+              return;
+            }
+            apprBusy = false;
+            apprDecide(decision, reason, true);   // 동기 연속 호출 — busy 해제와 재진입 사이 입력 창 없음
+          }).catch(function(){ apprBusy = false; if (g === apprGen) alert("네트워크 오류 — 다시 시도해주세요."); });
+          return;
+        }
+        apprBusy = false;
         apprToastShow("다른 곳에서 먼저 처리된 건 — 건너뜁니다");
         apprNext(); return;
       }
+      apprBusy = false;
       if (res.status !== 200){ alert("결재 처리 실패 (" + ((res.body && res.body.error_code) || res.status) + ")"); return; }
       it.status = decision; if (reason) it.reason = reason;   // 폴이 오버레이 중 목록을 안 바꾸므로 참조가 유지된다
       if (decision === "승인") apprDoneN.ok++; else if (decision === "반려") apprDoneN.no++; else apprDoneN.hold++;
@@ -3266,6 +3292,60 @@
   document.getElementById("apprNoBtn").addEventListener("click", function(){ apprDecide("반려"); });
   document.getElementById("apprHoldBtn").addEventListener("click", function(){ apprDecide("보류"); });
   document.getElementById("apprSkipBtn").addEventListener("click", function(){ if (apprBusy) return; apprNext(); });   // 비행 중 건너뛰기 = 이중 전진
+
+  // ---- 내 상신 목록(결재 2차): 상신자가 자기 건의 결과(대기/승인/반려/보류·사유)를 보는 곳 — 홈 섹션으로만 노출 ----
+  // 대표 홈(renderBossHome)은 제외(대표는 결재자). 관리자=apprItems에서 내 것 필터(추가 fetch 없음),
+  // 비관리자=approvals_list 직접 호출(서버가 본인분만 반환) 60초 캐시.
+  var myApprItems = [];
+  var myApprFetchedAt = 0;     // 캐시 시각 — fetch 성공 후 홈 재렌더가 다시 fetch를 부르는 무한루프를 이 타임스탬프가 끊는다
+  var myApprInflight = false;
+  function myApprList(){
+    if (isAdmin()){
+      var me = myId();
+      return apprItems.filter(function(it){ return it && it.by && it.by.id === me; });
+    }
+    return myApprItems;
+  }
+  function myApprEnsure(){
+    // 홈 렌더가 부른다(비관리자만). 실패는 조용히 — 섹션이 생략될 뿐(60초 뒤 다음 렌더에서 재시도)
+    if (isAdmin() || !curMember()) return;
+    if (myApprInflight || (Date.now() - myApprFetchedAt < 60000)) return;
+    myApprInflight = true;
+    var reqMid = curMember().id;   // 비행 중 계정 전환 시 이전 사용자 응답이 다음 사용자 캐시에 착지하지 않게(리뷰 low)
+    gwCall("gw-data", { action: "approvals_list" }).then(function(res){
+      if (!curMember() || curMember().id !== reqMid){ myApprInflight = false; return; }   // 낡은 응답 폐기 — 캐시 시각도 안 건드림
+      myApprInflight = false; myApprFetchedAt = Date.now();
+      if (res.status === 200 && res.body && Array.isArray(res.body.items)){
+        myApprItems = res.body.items;
+        if (currentTab === "dash") renderDashboard();
+      }
+    }).catch(function(){ myApprInflight = false; if (curMember() && curMember().id === reqMid) myApprFetchedAt = Date.now(); });
+  }
+  function myApprSectionHtml(){
+    var list = myApprList().slice();
+    if (!list.length) return "";   // 0건이면 섹션 자체 생략
+    // 대기·보류 먼저(상신 최근순), 그 다음 결정 최근순
+    function isOpen(it){ return it.status === "대기" || it.status === "보류"; }
+    list.sort(function(a, b){
+      var oa = isOpen(a) ? 0 : 1, ob = isOpen(b) ? 0 : 1;
+      if (oa !== ob) return oa - ob;
+      var ka = oa === 0 ? String(a.created || "") : String(a.decided_at || "");
+      var kb = ob === 0 ? String(b.created || "") : String(b.decided_at || "");
+      return ka < kb ? 1 : (ka > kb ? -1 : 0);
+    });
+    var rows = list.slice(0, 10).map(function(it){
+      var st = it.status || "대기";
+      var col = st === "승인" ? "var(--brand)" : (st === "반려" ? "#c0392b" : (st === "보류" ? "var(--amber)" : "var(--sub)"));
+      return '<div class="item"><div class="item-body">'
+        + '<div class="item-title">' + (APPR_KIND_EMOJI[it.kind] || "📄") + ' ' + esc(it.title || "(제목 없음)") + '</div>'
+        + '<div class="item-meta" style="margin-top:2px;">' + esc(it.kind || "일반")
+          + ' · <b style="color:' + col + ';">' + esc(st) + '</b>'
+          + (it.created ? ' · ' + esc(apprDaysAgo(it.created)) : '') + '</div>'
+        + (st === "반려" && it.reason ? '<div class="task-detail" style="color:#c0392b;">사유: ' + esc(it.reason) + '</div>' : '')
+        + '</div></div>';
+    }).join("");
+    return '<div class="dash-sec"><h2>🧾 내 상신 <span class="cnt">' + list.length + '</span></h2><div class="card">' + rows + '</div></div>';
+  }
 
   // 지시자 표시 숨김(요청). 나중에 되돌리려면 true로.
   var SHOW_TASK_ISSUER = false;
@@ -4550,6 +4630,7 @@
   });
   document.getElementById("memberLogin").addEventListener("click", doMemberLogin);
   document.getElementById("pushBtn").addEventListener("click", pushToggle);
+  document.getElementById("pushPrimaryBtn").addEventListener("click", pushPrimaryToggle);
   document.getElementById("pushTestBtn").addEventListener("click", function(){
     var b=document.getElementById("pushTestBtn"); b.disabled=true; b.textContent="📨 보내는 중...";
     gwCall("gw-data",{action:"push_send", self:true, title:"알림 테스트", body:"알림함과 팝업 동작 확인용입니다."}).then(function(res){
@@ -5308,12 +5389,14 @@
   // 권한에 자동 연동: 숨김 모듈은 여기에도 안 나타난다(내게 온 지시·체크·할 일·휴가는 전원 사용 영역).
   function renderStaffHome(host){
     var meId = getMemberId();
+    myApprEnsure();   // 내 상신 캐시(60초) — 성공 시 홈 1회 재렌더, 실패는 조용히 섹션 생략
     var mine = myOpenTasks();   // 담당·전사·공개범위 — 지시 탭 인박스와 동일 기준
     var html = '<div class="dash-date">' + todayStr() + ' · 오늘 내 것만 모았습니다</div>';
     html += '<div class="dash-sec"><h2>📌 내게 온 지시 <span class="cnt">' + mine.length + '</span></h2><div class="card">'
       + (mine.length ? mine.slice(0, 8).map(myTaskRowHtml).join("") : '<div class="empty-line">내게 온 지시가 없습니다.</div>')
       + (mine.length > 8 ? '<div class="empty-line" style="cursor:pointer;" data-home-go="check">전체 ' + mine.length + '건 보기 →</div>' : '')
       + '</div></div>';
+    html += myApprSectionHtml();   // 내 상신(결재 2차) — 1건이라도 있으면 표시, 0건이면 생략
     var checks = [];
     if (meId){
       GROUPS.forEach(function(g){
@@ -5544,6 +5627,7 @@
       }).join("");
       html += '</div></div>';
     }
+    html += myApprSectionHtml();   // 내 상신(결재 2차) — 관리자 본인이 상신한 건의 결과. 0건이면 생략
 
     if (seeVeh){
     html += '<div class="dash-sec"><h2>만기 임박·경과 (차량) <span class="cnt">' + urgent.length + '</span></h2><div class="card">';
@@ -15836,13 +15920,38 @@
   function pushSupported(){ return "serviceWorker" in navigator && "PushManager" in window && "Notification" in window; }
   function pushRefreshBtn(){
     var b=document.getElementById("pushBtn"); if(!b) return;
-    if(!pushSupported() || !getToken()){ b.style.display="none"; return; }
+    var pb=document.getElementById("pushPrimaryBtn");
+    if(!pushSupported() || !getToken()){ b.style.display="none"; if(pb) pb.style.display="none"; return; }
     b.style.display="block";
     navigator.serviceWorker.ready.then(function(reg){ return reg.pushManager.getSubscription(); }).then(function(s){
       b.textContent = s ? "🔔 알림 켜짐 — 이 기기 알림 끄기" : "🔔 이 기기 알림 켜기";
       b.dataset.on = s ? "1" : "";
       var tb=document.getElementById("pushTestBtn"); if(tb) tb.style.display = s ? "block" : "none";
+      // 우선기기 1발(배치도 결정 ③) — 알림 켜진 기기에서만 지정 버튼 노출. 문구는 서버의 primary endpoint와 대조
+      if(pb){
+        if(!s){ pb.style.display="none"; return; }
+        gwCall("gw-data",{action:"push_primary", get:1}).then(function(res){
+          if(res.status!==200 || !res.body){ pb.style.display="none"; return; }
+          pb.dataset.ep = s.endpoint;
+          pushPrimarySetLabel(pb, res.body.primary === s.endpoint);
+          pb.style.display="block";
+        }).catch(function(){ pb.style.display="none"; });
+      }
     }).catch(function(){});
+  }
+  function pushPrimarySetLabel(pb, on){
+    pb.textContent = on ? "⭐ 우선기기 지정됨 — 해제" : "⭐ 이 기기를 결재알림 우선기기로";
+    pb.dataset.on = on ? "1" : "";
+  }
+  function pushPrimaryToggle(){
+    var pb=document.getElementById("pushPrimaryBtn");
+    var ep=pb && pb.dataset.ep; if(!ep){ return; }
+    pb.disabled=true;
+    gwCall("gw-data",{action:"push_primary", endpoint:ep}).then(function(res){
+      pb.disabled=false;
+      if(res.status!==200 || !res.body){ alert("우선기기 설정 실패 ("+((res.body&&res.body.error_code)||res.status)+")"); return; }
+      pushPrimarySetLabel(pb, res.body.primary === ep);   // 토글 응답(현재 primary endpoint 또는 null) 기준
+    }).catch(function(){ pb.disabled=false; alert("네트워크 오류 — 다시 시도해주세요."); });
   }
   function pushToggle(){
     var b=document.getElementById("pushBtn");

@@ -7,8 +7,10 @@
 //   - 요청 본문을 통째로 찍는 코드 없음(로그인 본문에 비밀번호가 들어간다)
 //   - 라이브러리가 돌려준 로그·예외 문구는 scrub()으로 자격증명 문자열을 지운 뒤에만 저장한다(마지막 방어선)
 // 올바로는 조회 전용 — 여기서 등록·수정·삭제 요청을 보내지 않는다(_lib/allbaro.js도 조회만 제공).
+const crypto = require('crypto');
 const { setupBlobContext, store, blobGet, blobSet } = require('./_lib/blobs');
 const { verifyToken, bearer } = require('./_lib/session');
+const { appendAudit } = require('./_lib/audit');
 const push = require('./_lib/push');
 const { collectDays } = require('./_lib/allbaro');
 
@@ -134,6 +136,72 @@ async function readLearned(st, log) {
 function failSummary(log) {
   const lines = (Array.isArray(log) ? log : []).map(String).filter(Boolean);
   return (lines.slice(-3).join(' / ') || '원인 미상 — 작업 로그 확인').slice(0, 280);
+}
+
+// ---- 운반일지 자동 기안(결재 2차, 2026-09-02) — 공무의 매일 수동 상신을 대체 ----
+const APPR_KEY = 'col:approvals';   // gw-data colKey('approvals')와 동일 키(전용 액션 밖의 유일한 쓰기 지점)
+
+// 일자 blob(schema 2)에서 상신 본문 요약 — 클라 abTotalsText와 같은 결. 수기 보충분(abManual)은
+// 서버가 모르므로 자동 수집분만 싣는다(명세: 서버에서 만들 수 있는 만큼만).
+function abSummary(d) {
+  const total = Number(d.total) || 0;
+  let s = '합계 ' + total + '회';
+  const qty = Number(d.total_qty_ton);
+  if (Number.isFinite(qty) && qty > 0) s += ' · ' + (Math.round(qty * 1000) / 1000) + '톤';
+  else s += ' · 톤 미집계';
+  const un = unmatchedCount(d.unmatched);
+  if (un > 0) s += ' · 미배정 ' + un + '회';
+  const unk = Number(d.qty_unknown);
+  if (Number.isFinite(unk) && unk > 0) s += ' · 단위미상 ' + Math.floor(unk) + '건';
+  const pend = Array.isArray(d.pending) ? d.pending.length : 0;
+  if (pend > 0) s += ' · 잠정 ' + pend + '회';
+  return s.slice(0, 500);
+}
+
+// 대상일 = KST 오늘-2(완성 규칙: 올바로 자동입력은 최대 2일 뒤 완성 — 그날 데이터는 확정 상태).
+// 스킵 조건: 운반 0회 / 같은 ref 상신이 상태 불문 존재(수동 상신 존중·반려 재기안 루프 방지) /
+// approvals 읽기 실패(fail-closed — 실패를 빈 문서로 위조하면 다음 쓰기가 대장을 덮는다, gw-data approvalsDoc 원칙).
+async function autoDraftApproval(st) {
+  const day = kstDate(-2);
+  const dr = await blobGet(st, dayKey(day));
+  if (!dr.ok || !dr.data) return;                                  // 그날 수집분 없음 — 기안 대상 아님
+  const total = Number(dr.data.total);
+  if (!Number.isFinite(total) || total <= 0) return;               // 운반 없는 날은 기안 불필요
+  const ar = await blobGet(st, APPR_KEY);
+  if (!ar.ok) return;                                              // fail-closed
+  const doc = (ar.data && Array.isArray(ar.data.items)) ? ar.data : { schema: 1, items: [] };
+  const ref = 'ab:' + day;
+  const cid = 'auto-ab-' + day;   // 멱등 — 같은 날 재실행(수동 수집 등)이 중복 기안하지 않게
+  if (doc.items.some(function (x) { return x && (x.ref === ref || x.cid === cid); })) return;
+  const body = abSummary(dr.data);
+  const item = { id: 'ap' + crypto.randomBytes(6).toString('hex'), cid: cid, kind: '운반일지',
+    title: '운반일지 ' + day, body: body, ref: ref,
+    by: { id: '__system__', name: '자동상신(올바로)' }, created: new Date().toISOString(), status: '대기' };
+  // 쓰기 직전 신선본 재읽기 + ref·cid 재검사(gw-data approval_create의 레이스 창 축소 이식).
+  // verSnapshot(시점 복구 링)은 gw-data.js 내부 함수라 워커에서 못 쓴다 — 스냅샷은 생략, 감사로그만 남긴다.
+  const ar2 = await blobGet(st, APPR_KEY);
+  if (!ar2.ok) return;                                             // fail-closed(재읽기도 동일 원칙)
+  const fresh = (ar2.data && Array.isArray(ar2.data.items)) ? ar2.data : { schema: 1, items: [] };
+  if (fresh.items.some(function (x) { return x && (x.ref === ref || x.cid === cid); })) return;
+  fresh.items.push(item);
+  fresh.updated_by = '__system__'; fresh.updated_at = Date.now();
+  const w = await blobSet(st, APPR_KEY, fresh);
+  if (!w.ok) return;
+  // 저장소가 무조건 덮어쓰기라 동시 쓰기에 내 항목이 밀릴 수 있다 — 재확인 후 1회 자가복구(approval_create와 동일)
+  try {
+    const chk = await blobGet(st, APPR_KEY);
+    if (chk.ok && chk.data && Array.isArray(chk.data.items) && !chk.data.items.some(function (x) { return x && x.id === item.id; })) {
+      chk.data.items.push(item);
+      chk.data.updated_by = '__system__'; chk.data.updated_at = Date.now();
+      await blobSet(st, APPR_KEY, chk.data);
+    }
+  } catch (e) {}
+  try { await appendAudit({ ts: Date.now(), by: '자동상신(올바로)', bid: '__system__', col: 'approvals', ev: [{ op: '상신', id: item.id, t: ('운반일지 · ' + item.title).slice(0, 80) }] }); } catch (e) {}
+  // 관리자 전원 푸시 — 운반일지는 전 기기(배치도 결정 ① 예외: 오피스PC 팝업+폰 병행, primaryOnly 미적용)
+  try {
+    const ids = await push.adminIds();
+    if (ids.length) await push.sendTo(ids, { title: '결재 요청: 운반일지 ' + day, body: body.slice(0, 200), url: './', tag: 'appr-' + item.id });
+  } catch (e) {}
 }
 
 exports.handler = async function (event, context) {
@@ -294,6 +362,9 @@ exports.handler = async function (event, context) {
     const lastrun = { ts: Date.now(), job: job, ok: rec.status === 'done', days: saved, unmatched_total: unmatchedTotal };
     if (rec.code) lastrun.code = rec.code;
     await blobSet(st, 'allbaro:lastrun', lastrun);
+
+    // 운반일지 자동 기안 — 수집이 성공(done)한 실행만. 기안 실패가 수집 결과를 바꾸면 안 되므로 전부 삼킨다.
+    try { if (rec.status === 'done') await autoDraftApproval(st); } catch (e) {}
 
     // 관리자 웹푸시 — 실패는 반드시, 미매칭이 있으면 알림(노선표 손질이 필요하다는 신호).
     // 성공 + 미매칭 0이면 푸시하지 않는다(매일 오는 알림은 소음이다).

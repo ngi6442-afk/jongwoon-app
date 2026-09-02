@@ -819,9 +819,18 @@ async function handlePushSub(event, d, R) {
   const s = d.sub;
   if (!s || typeof s !== 'object' || !s.endpoint || String(s.endpoint).length > 1000) return jr(400, { status: 'REJECTED', error_code: 'INVALID_SUB', request_id: R });
   const doc = await push.getSubs();
-  const mine = (doc.members[c.member.id] || []).filter(function (x) { return x && x.sub && x.sub.endpoint !== s.endpoint; });
-  mine.push({ sub: { endpoint: s.endpoint, expirationTime: s.expirationTime || null, keys: s.keys || {} }, ts: Date.now() });
-  doc.members[c.member.id] = mine.slice(-5);   // 기기 5개까지
+  const old = doc.members[c.member.id] || [];
+  // 같은 endpoint 재등록 시 primary(우선기기, 결재 2차) 보존 — filter로 지우고 다시 넣는 구조라 그냥 두면 지정이 소실된다
+  const prev = old.find(function (x) { return x && x.sub && x.sub.endpoint === s.endpoint; });
+  const mine = old.filter(function (x) { return x && x.sub && x.sub.endpoint !== s.endpoint; });
+  const entry = { sub: { endpoint: s.endpoint, expirationTime: s.expirationTime || null, keys: s.keys || {} }, ts: Date.now() };
+  if (prev && prev.primary) entry.primary = 1;
+  mine.push(entry);
+  let kept = mine.slice(-5);   // 기기 5개까지
+  // 우선기기 지정 구독은 한도에서 밀려나지 않게 보호 — 말없이 탈락하면 사용자가 알 길이 없다(리뷰 low)
+  const prim = mine.find(function (x) { return x && x.primary; });
+  if (prim && kept.indexOf(prim) < 0) kept = [prim].concat(kept.slice(1));
+  doc.members[c.member.id] = kept;
   const w = await push.saveSubs(doc);
   if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
   return jr(200, { status: 'OK', devices: doc.members[c.member.id].length, request_id: R });
@@ -835,6 +844,28 @@ async function handlePushUnsub(event, d, R) {
   if (mine.length) doc.members[c.member.id] = mine; else delete doc.members[c.member.id];
   await push.saveSubs(doc);
   return jr(200, { status: 'OK', request_id: R });
+}
+// 우선기기 1발(결재 2차, 배치도 결정 ③) — 본인 구독 중 endpoint 하나에 primary 표식, 나머지는 제거.
+// 같은 endpoint 재호출이면 해제(토글). d.get=1이면 조회만(클라가 부팅 시 버튼 문구를 그리는 용도).
+async function handlePushPrimary(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  const doc = await push.getSubs();
+  const mine = doc.members[c.member.id] || [];
+  function curPrimary() {
+    const p = mine.find(function (x) { return x && x.primary; });
+    return (p && p.sub && p.sub.endpoint) || null;
+  }
+  if (d.get) return jr(200, { status: 'OK', primary: curPrimary(), request_id: R });
+  const ep = String(d.endpoint || '');
+  const target = mine.find(function (x) { return x && x.sub && x.sub.endpoint === ep; });
+  if (!target) return jr(404, { status: 'NOT_FOUND', error_code: 'NO_SUB', request_id: R });
+  const wasPrimary = !!target.primary;
+  for (const x of mine) { if (x) delete x.primary; }
+  if (!wasPrimary) target.primary = 1;   // 이미 우선기기였으면 해제만(토글)
+  const w = await push.saveSubs(doc);
+  if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
+  return jr(200, { status: 'OK', primary: curPrimary(), request_id: R });
 }
 async function handlePushSend(event, d, R) {
   const c = await currentMember(event);
@@ -909,6 +940,15 @@ async function handleApprovalCreate(event, d, R) {
     const dup = doc.items.find(function (x) { return x && x.cid === cid; });
     if (dup) return jr(200, { status: 'OK', id: dup.id, dedup: true, request_id: R });
   }
+  // 운반일지(ref ab:날짜)는 자동 기안(워커)과 수동 상신이 같은 날짜에 겹친다 — 열린(대기·보류) 동일 ref는
+  // 새 카드를 만들지 않고 기존 카드를 정정본으로 갱신한다(아래 fresh 단계). 조용한 흡수는 자동 기안(자동수집분만)의
+  // body를 수기 포함본으로 고칠 통로를 없앤다(리뷰 med). 승인·반려 종결 건은 통과 → 재상신 경로 보존.
+  // 비관리자는 목록에서 타인·시스템 상신을 못 보므로 클라 중복 검사만으론 못 막는다 — 여기가 최후 방어선
+  const refIn = String(d.ref || '').slice(0, 60);
+  function dupOpenRef(items) {
+    if (refIn.indexOf('ab:') !== 0) return null;
+    return items.find(function (x) { return x && x.ref === refIn && (x.status === '대기' || x.status === '보류'); }) || null;
+  }
   await verSnapshot('approvals', doc, c.member.name, false);   // 쓰기 전 시점 보존(복구 링 — 다른 컬렉션과 동일)
   // 레이스 창 축소: verSnapshot 왕복 사이 착지한 동시 결재/상신을 덮지 않게 쓰기 직전 신선본에 얹는다(3차=항목별 키 분리)
   const rd2 = await approvalsDoc(st);
@@ -916,6 +956,36 @@ async function handleApprovalCreate(event, d, R) {
   if (cid) {
     const dup2 = fresh.items.find(function (x) { return x && x.cid === cid; });
     if (dup2) return jr(200, { status: 'OK', id: dup2.id, dedup: true, request_id: R });
+  }
+  const dr2 = dupOpenRef(fresh.items);
+  if (dr2) {
+    dr2.title = title;
+    dr2.body = String(d.body || '').slice(0, 500);
+    dr2.by = { id: c.member.id, name: c.member.name };   // 정정자가 새 기안자 — 결재 결과 통지·'내 상신'도 이 사람 기준
+    dr2.updated = new Date().toISOString();
+    fresh.updated_by = c.member.id; fresh.updated_at = Date.now();
+    const uw = await blobSet(st, colKey('approvals'), fresh);
+    if (!uw.ok) return jr(500, { status: 'ERROR', error_code: uw.code, request_id: R });
+    // 동시 create·decide의 본선쓰기가 이 정정(내용)을 되돌릴 수 있다 — 재확인 후 1회 재적용(자가복구, 리뷰 low).
+    // 그 사이 결정이 붙었으면(대기·보류 아님) 재적용하지 않는다 — 결재된 카드의 근거를 사후 변조하지 않게
+    try {
+      const chk2 = await blobGet(st, colKey('approvals'));
+      if (chk2.ok && chk2.data && Array.isArray(chk2.data.items)) {
+        const cur2 = chk2.data.items.find(function (x) { return x && x.id === dr2.id; });
+        if (cur2 && cur2.updated !== dr2.updated && (cur2.status === '대기' || cur2.status === '보류')) {
+          cur2.title = dr2.title; cur2.body = dr2.body; cur2.by = dr2.by; cur2.updated = dr2.updated;
+          chk2.data.updated_by = c.member.id; chk2.data.updated_at = Date.now();
+          await blobSet(st, colKey('approvals'), chk2.data);
+        }
+      }
+    } catch (e) {}
+    try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'approvals', ev: [{ op: '상신정정', id: dr2.id, t: (dr2.kind + ' · ' + title).slice(0, 80) }] }); } catch (e) {}
+    try {
+      const uids = (await push.adminIds()).filter(function (id) { return id !== c.member.id; });
+      if (uids.length) await push.sendTo(uids, { title: '결재 요청(정정): ' + title.slice(0, 40), body: '[' + dr2.kind + '] 정정 ' + c.member.name, url: './', tag: 'appr-' + dr2.id },
+        dr2.kind === '운반일지' ? null : { primaryOnly: true });
+    } catch (e) {}
+    return jr(200, { status: 'OK', id: dr2.id, updated: true, request_id: R });
   }
   const item = { id: 'ap' + crypto.randomBytes(6).toString('hex'), cid: cid || undefined, kind: String(d.kind || '일반').slice(0, 20),
     title: title, body: String(d.body || '').slice(0, 500), ref: String(d.ref || '').slice(0, 60),
@@ -934,10 +1004,12 @@ async function handleApprovalCreate(event, d, R) {
     }
   } catch (e) {}
   try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'approvals', ev: [{ op: '상신', id: item.id, t: (item.kind + ' · ' + title).slice(0, 80) }] }); } catch (e) {}
-  // 관리자 웹푸시 — 기안자 본인만 제외(push_send __admins__ 관례와 동일). 발송 실패가 상신을 막지 않는다
+  // 관리자 웹푸시 — 기안자 본인만 제외(push_send __admins__ 관례와 동일). 발송 실패가 상신을 막지 않는다.
+  // 운반일지만 전 기기(배치도 결정 ① 명시 예외 — 오피스PC 팝업+폰 병행), 그 외 종류는 우선기기 1발(결정 ③)
   try {
     const ids = (await push.adminIds()).filter(function (id) { return id !== c.member.id; });
-    if (ids.length) await push.sendTo(ids, { title: '결재 요청: ' + title.slice(0, 40), body: '[' + item.kind + '] 기안 ' + c.member.name, url: './', tag: 'appr-' + item.id });
+    if (ids.length) await push.sendTo(ids, { title: '결재 요청: ' + title.slice(0, 40), body: '[' + item.kind + '] 기안 ' + c.member.name, url: './', tag: 'appr-' + item.id },
+      item.kind === '운반일지' ? null : { primaryOnly: true });
   } catch (e) {}
   return jr(200, { status: 'OK', id: item.id, request_id: R });
 }
@@ -990,10 +1062,16 @@ async function handleApprovalDecide(event, d, R) {
     }
   } catch (e) {}
   try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'approvals', ev: [{ op: '결재', id: it.id, t: (decision + (reason ? ' — ' + reason.slice(0, 40) : '') + ' · ' + String(it.title || '').slice(0, 40)) }] }); } catch (e) {}
-  // 기안자에게 결과+사유 웹푸시 — 본인 상신을 본인이 결재한 경우는 생략
+  // 기안자에게 결과+사유 웹푸시 — 본인 상신을 본인이 결재한 경우는 생략.
+  // 자동 기안(__system__)은 구독이 없어 통지가 증발한다(리뷰 med) — 결정자 제외 관리자 전원에게 라우팅
+  // (반려 후 재기안은 사람 몫인데 그 사람에게 닿는 채널이 이것뿐)
   try {
-    if (it.by && it.by.id && it.by.id !== c.member.id)
-      await push.sendTo([it.by.id], { title: '결재 ' + decision + ': ' + String(it.title || '').slice(0, 40),
+    const isSys = !!(it.by && it.by.id === '__system__');
+    const toIds = isSys
+      ? (await push.adminIds()).filter(function (id) { return id !== c.member.id; })
+      : ((it.by && it.by.id && it.by.id !== c.member.id) ? [it.by.id] : []);
+    if (toIds.length || isSys)   // 자동상신은 대상이 없어도(1인 관리자) 호출 — sendTo가 알림함 이력(push:log)은 남긴다
+      await push.sendTo(toIds, { title: '결재 ' + decision + ': ' + String(it.title || '').slice(0, 40) + (isSys ? ' (자동상신)' : ''),
         body: reason ? '사유: ' + reason.slice(0, 150) : (decision === '승인' ? '승인되었습니다' : ''), url: './', tag: 'appr-' + it.id });
   } catch (e) {}
   return jr(200, { status: 'OK', id: it.id, decided: it.status, base: newBase, request_id: R });
@@ -1461,6 +1539,7 @@ async function handler(event) {
     if (d && d.action === 'push_pubkey') return await handlePushPubkey(event, d, R);
     if (d && d.action === 'push_sub') return await handlePushSub(event, d, R);
     if (d && d.action === 'push_unsub') return await handlePushUnsub(event, d, R);
+    if (d && d.action === 'push_primary') return await handlePushPrimary(event, d, R);
     if (d && d.action === 'push_send') return await handlePushSend(event, d, R);
     if (d && d.action === 'push_log') return await handlePushLog(event, d, R);
     if (d && d.action === 'approvals_list') return await handleApprovalsList(event, d, R);
