@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>대표 화면 v2 — A 아침 브리핑</title>
+<style>*{box-sizing:border-box;margin:0}
+body{font-family:'Malgun Gothic',sans-serif;background:#f2f4f1;color:#222;font-size:14px}
+.top{background:#16211b;color:#fff;padding:12px 22px;display:flex;align-items:center;gap:12px}
+.top b{font-size:15px}
+.appr{margin-left:auto;background:#faf3e6;color:#c07f27;border-radius:14px;padding:4px 13px;font-size:12.5px;font-weight:700}
+.top .who{font-size:12px;color:#cfe0d5}
+.shell{display:flex;max-width:1080px;margin:0 auto}
+.side{width:150px;padding:20px 10px;flex:none}
+.side .mi{background:#fff;border:1px solid #e2e6e0;border-radius:11px;padding:10px 14px;margin-bottom:8px;font-size:13px;cursor:pointer}
+.side .mi.on{background:#16211b;color:#fff;font-weight:700}
+.side .mi.dim{color:#889086;font-size:12px}
+.page{flex:1;margin:20px 8px;min-width:0}
+.card{background:#fff;border:1px solid #e2e6e0;border-radius:14px;padding:18px 20px;margin-bottom:14px}
+h1{font-size:17px;margin-bottom:4px}
+.sub{color:#889086;font-size:12.5px;margin-bottom:12px}
+.row{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #eef0ec;padding:9px 2px;font-size:13.5px}
+.row small{color:#889086}
+.warn{color:#c0392b;font-weight:700}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.tile{background:#fff;border:1px solid #e2e6e0;border-radius:14px;padding:16px;cursor:pointer}
+.tile:hover{box-shadow:0 3px 10px rgba(20,60,40,.12)}
+.tile b{font-size:23px;display:block}
+.tile span{font-size:11.5px;color:#889086}
+.feed{border-left:3px solid #e2e6e0;padding-left:14px;margin-left:6px}
+.ev{margin-bottom:13px;position:relative}
+.ev::before{content:"";position:absolute;left:-20px;top:5px;width:9px;height:9px;border-radius:50%;background:#c9d2cb}
+.ev.hot::before{background:#EF9F27}
+.ev .t{font-weight:700;font-size:13.5px}.ev .d{font-size:12px;color:#889086;margin-top:2px}
+.note{color:#889086;font-size:11.5px;margin:12px auto;max-width:1060px;padding:0 16px;text-align:center}
+@media(max-width:700px){.shell{flex-direction:column}.side{width:100%;display:flex;gap:6px;overflow-x:auto;padding:10px}.side .mi{white-space:nowrap;margin:0}}</style></head><body>
+<div class="top"><b>종운 그룹웨어</b><span class="who">나종운 대표</span><span class="appr">🧾 결재 3</span></div>
+<div class="shell"><div class="side"><div class="mi on">오늘</div><div class="mi">진척도</div><div class="mi">돈</div><div class="mi dim">전체 메뉴 ▾</div></div><div class="page"><div class="card"><h1>9월 2일 화요일</h1><div class="sub">그룹웨어가 매일 아침 자동 작성</div><div style="font-size:14.5px;line-height:2.05">어제 운반은 <b>27건 · 512.4t</b>로 마감했고 미배정·사고는 없습니다.<br>입금 <b>2건</b>이 들어왔고, 미수는 3건 그대로입니다.<br><b>연구개발전담부서 인정</b>이 나왔습니다(41일 만에 완주) — 세액공제 준비에 들어갑니다.<br>석면 방문평가는 <b>9월 21일</b> — 창고 실사와 검교정이 남은 준비입니다.<br>차량은 <span class="warn">검사 경과 1대(86로6039, D+8)</span>가 있습니다. 조치가 필요합니다.</div></div><div class="card"><h1 style="font-size:14px">이번 주 일정</h1><div class="row"><span>차량 검사 만기</span><small>006마8713 (9/15) · 96누4764 (9/17)</small></div><div class="row"><span>석면 방문평가 준비</span><small>창고 실사 예정</small></div></div></div></div>
+<div class="note">시안 v2(A 아침 브리핑) — 결재는 화면에 없음: 우상단 🧾 뱃지(기배포 한장씩 처리)가 전담. 좌측 메뉴는 대표용 3개+전체 메뉴 접힘. 숫자는 샘플.</div></body></html>
