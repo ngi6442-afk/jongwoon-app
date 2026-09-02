@@ -50,7 +50,7 @@ h2{font-size:13px;margin-bottom:8px}
   <div class="row" onclick="go('v2')"><b>2&nbsp; 인증·자격 &nbsp;◀ ★인정 취득</b><div class="track"><div class="fillb" style="width:63%"></div><span>63</span></div></div>
   <div class="row" onclick="go('v3')"><b>3&nbsp; 홍보·검색노출</b><div class="track"><div class="fillb t" style="width:97%"></div><span>97</span></div></div>
   <div class="row" onclick="go('v4')"><b>4&nbsp; 경영 기반 &nbsp;◀ 상장 트랙 가동</b><div class="track"><div class="fillb" style="width:68%"></div><span>68</span></div></div>
-  <div class="lane">★KOITA 인정 취득(9/2, 41일 완주) + 결재함·문서함·잠금 배포 주간. 이번 주 축: ①세액공제 가동(세무사 통보) ②가족친화 대표 결재 ③9/9 과거현장→9/21 방문평가 준비 ④벤처 타진 전화</div>
+  <div class="lane">★KOITA 인정 취득(9/2, 41일 완주) + 결재함·문서함·잠금·인허가 3층·대표 홈 배포 주간. 이번 주 축: ①세액공제 가동(세무사 통보) ②가족친화 대표 결재 ③9/9 과거현장→9/21 방문평가 준비 ④벤처 타진 전화</div>
   <hr>
   <h2>지금 중요한 순서 — 전체 (상위 8)</h2>
   <div class="item" style="margin-top:10px"><span class="m">☐</span>★R&amp;D 세액공제 — ★인건비 산입 확정(9/2 적대검증 완주: 심판례 300건+·집행기준·가이드라인 220면·예규 전수에서 반례 0, 반박 실패). 방어선 2개 상시: ①전담성(연구노트·조직도 — 겸직 부인이 유일한 실전 리스크) ②지분 0 유지(1좌라도 취득 시 즉시 제외 전환). 내일채움공제 기업기여금은 산입 금지(친족 명문 배제). 세무사 문안 v2로 통보</div>
@@ -59,8 +59,8 @@ h2{font-size:13px;margin-bottom:8px}
   <div class="item"><span class="m">☐</span>★석면 안전성평가 — 방문평가 9/21(D-19). ★과거 현장 전수 전산화 완료(9/2): 공무 회신이 9/9 마감보다 먼저 도착 — 2013~2026 131건 대장 일괄 기입, 3.7 소급 관문 해소. 남은 실행 2개: 창고 실사(F09+유효풍량)·검교정 진행. 확인 2문: 시트 × 표기 의미·시트2 이본 기준</div>
   <div class="item"><span class="m">☐</span>결재함·문서함 실사용 안착 — 공무가 운반일지 8/31 &quot;대표 결재 상신&quot; 첫 가동 · 문서함 미분류 서랍 재지정(관리자) · 대표 PC 바로가기 주소에 ?appr=auto 포함 확인</div>
   <div class="item"><span class="m">☐</span>KOSHA 위험성평가 인정 — 수료증 2장(대표·권민지) 확보 → 포털 신청. 실행 4건: 평가표 실서명·운송 갱신 확정·재해율확인서·게시/예산/포상</div>
-  <div class="item"><span class="m">☐</span>대표 UI 전면 재편(9/2 지시, 최우선 개발) — 시안 5종 제출, 번호 선택 대기 → 선택 즉시 대표 전용 홈 구현</div>
-  <div class="item"><span class="m">☐</span>인허가 3층 구현(ㄱ 9/2) — 허가증 13 유지+의무 대장 73행 seed+인스턴스 자동생성(D-30 지시·캘린더)+persons. 대표 UI 다음 순번</div>
+  <div class="item done"><span class="m">☑</span>★대표 홈=결재함 배포(9/2) — PM 방향 확정(&quot;결재함이 대표 UI&quot;) 반영: 대표 계정 홈=대기·보류 카드 목록+결재 시작(기존 한장씩 처리 재사용)+조망 타일 4(진행 계약·미수·이번 주 만기·탭 승인). 시안 여정 5종→보고전용 3종→방향 확정. 건조 판정 3라운드(2+2건 수리) clean, sw v305</div>
+  <div class="item"><span class="m">☐</span>★인허가 3층 1차 배포(9/2) — 서브탭 허가증|의무 대장|이번 달. 등재표 98행 시드(본표 73+증보 25 — 건폐법 3행 복원·본표 4행 범위 정정·근거조문 공란 0)+선행확인 모달(답+기준일 없이 확정 전환 불가)+서버 duties 이월 가드(구버전 클라·비관리자 저장에서 원본 보존)+세션 간 재시드 차단. 건조 판정 3라운드(12+3건 수리) clean. 남은 것: ①PM이 앱 의무 대장에서 &quot;등재표 불러오기&quot; 1회(관리자 전용) ②2차=회차 인스턴스 자동생성(D-30 지시·캘린더)·persons 명부</div>
   <div class="foot">갱신: "진척도 갱신해"(모바일 D → 이 벽지 자동 생성) · 이 판 생성 기준: 2026-09-02</div>
 </div>
 
@@ -79,14 +79,14 @@ h2{font-size:13px;margin-bottom:8px}
   <div class="rowc focus" onclick="go('v1-10')"><b>외부신고 자동화 (화관법) ◀ 무인 가동</b><div class="track2"><div class="fillb t" style="width:99%"></div></div><span class="pv">99</span></div>
   <div class="rowc focus" onclick="go('v1-11')"><b>운반일지·배차 자동화 ◀ 무인 가동</b><div class="track2"><div class="fillb t" style="width:92%"></div></div><span class="pv">92</span></div>
   <div class="rowc focus" onclick="go('v1-lawwatch')"><b>법령 워치 (신규 자동화) ◀ 가동</b><div class="track2"><div class="fillb t" style="width:95%"></div></div><span class="pv">95</span></div>
-  <div class="rowc focus" onclick="go('v1-12')"><b>대표 업무유연성 · 기기 배치도 ◀ 결재함 1차 배포</b><div class="track2"><div class="fillb" style="width:70%"></div></div><span class="pv">70</span></div>
+  <div class="rowc focus" onclick="go('v1-12')"><b>대표 업무유연성 · 기기 배치도 ◀ 결재함 1차+대표 홈 배포</b><div class="track2"><div class="fillb" style="width:80%"></div></div><span class="pv">80</span></div>
   <div class="rowc focus" onclick="go('v1-13')"><b>관리자 기기 보안 ◀ 9/1 앱 잠금 배포</b><div class="track2"><div class="fillb c" style="width:45%"></div></div><span class="pv">45</span></div>
-  <div class="lane">결재함·문서함·잠금·상신 버튼 배포(9/1~2). 남은 축 = 업무 데이터 입력과 결재 2차</div>
+  <div class="lane">결재함·문서함·잠금·상신 버튼·인허가 3층·대표 홈 배포(9/1~2). 남은 축 = 업무 데이터 입력과 결재 2차</div>
   <hr>
   <h2>지금 중요한 순서 — 업무플랫폼</h2>
   <div class="item now" style="margin-top:10px"><span class="m">▶</span>결재함·문서함 실사용 안착 — 첫 상신 가동·미분류 재지정·?appr=auto 확인</div>
-  <div class="item"><span class="m">☐</span>대표 UI 전면 재편 — 시안 5종 선택 대기 → 구현</div>
-  <div class="item"><span class="m">☐</span>인허가 3층 구현 착수(ㄱ) — 의무 73행 등재→D-30 자동지시·캘린더</div>
+  <div class="item done"><span class="m">☑</span>★대표 홈=결재함 배포(9/2) — 대기 카드+결재 시작+조망 타일 4</div>
+  <div class="item now"><span class="m">▶</span>★인허가 3층 1차 배포(9/2) — 98행 시드·선행확인 관문. 남은 것: PM 등재 1회→2차 인스턴스 자동생성</div>
   <div class="item"><span class="m">☐</span>결재함 2차 — 내 상신 목록·우선기기 1발 라우팅·운반일지 자동 기안·PC 팝업 예외</div>
   <div class="item"><span class="m">☐</span>업무 데이터 미입력이 진짜 병목 — 완주계약·미수·응찰표시 공란</div>
   <div class="item"><span class="m">☐</span>화관법 로컬 폴백 제거 — PM 확인 후</div>
@@ -131,7 +131,7 @@ h2{font-size:13px;margin-bottom:8px}
   <div class="item done"><span class="m">☑</span>★인허가 3종 조사 완료(9/1) — 비산먼지 신고(착공 전·공기연장은 종료일 전 변경신고·종료신고 없음)·특정공사 사전신고(3,000㎡ 해체+브레이커=대상, 학교 50m 무관, ★산단 내 제외=포스코 현장 비대상)·건폐법 세트. 등재표 73→약 92행 증보. 원기록: 09_조사_문서인허가_3종조사_20260901.md. 미확인 1: 포항시 조례(학교 50m 소규모)</div>
   <div class="item done"><span class="m">☑</span>★문서함 서랍형 배포(9/2) — 시안 5종 비교→PM 3안 선택. 분류 5종 서랍+미분류(인허가 제외 확정), 검색 자동 펼침, ★01 법인 서버 하드차단(관리부·관리자 열람, id 기준 재구성으로 분류 조작 탈취 차단). 적대 검증 2라운드·지적 8건 수리 후 clean. 남은 손질: 기존 문서 미분류분 재지정(관리자 수작업)</div>
   <div class="item done"><span class="m">☑</span>★인허가 등재 설계 완료(8/26) — 현행은 &quot;사업장 1행 = 만기 2칸&quot; 구조라 73건이 원리상 안 들어간다(대기 1건에 의무 11건). 허가증(9)/의무(73)/인스턴스(대상×회차) 3층 분리안. 주 키 expiry에 넣을 값이 73건 중 0건(허가 9종 전부 유효기간 없음)이라 허가증은 expiry=해당없음으로 비켜가야 함</div>
-  <div class="item now"><span class="m">▶</span>★인허가 3층 구조 — 시안 ㄱ(9/2 PM). 구현 착수: 허가증 13(현행 유지)+의무 대장(등재표 73행 seed)+인스턴스 자동생성(달력고정 19 즉시·트리거 32)+persons 명부. 문서함과 분리 확정(원장=인허가 탭)</div>
+  <div class="item now"><span class="m">▶</span>★인허가 3층 1차 배포(9/2) — 허가증 13(현행 유지)|의무 대장(등재표 98행 시드: 본표 73+건폐법 14+비산먼지 6+특정공사 5, 확정 67·조건부 31, 근거조문 공란 0)|이번 달(2차 예고판). 선행확인 모달=답+기준일 관문·확정 전환 기록(누가·언제)·사람 확정만 회수 가능. 서버 duties 이월 가드+세션 간 재시드 차단+병합 updated_ts 우선. 건조 판정 3라운드 clean. 남은 것: PM 등재 1회 → 2차=인스턴스 자동생성(달력고정 19 즉시·트리거 32)·persons 명부</div>
   <div class="item done"><span class="m">☑</span>★석면 작업 이력 대장 배포(8/26, v302) — 인허가 탭 안. 입력칸=산안법 30년 보존 항목 그대로, 신고 마감(착수 7일 전)·보존 만료(종료+30년)는 파생값이라 사람이 못 넣게 함. 근로자는 직원+일용직 명부에서 선택, 캘린더에 착수·종료·신고마감·농도측정 자동 표시</div>
   <div class="item done"><span class="m">☑</span>★교육·건강진단 이력 대장 배포(8/26, v303) — 인사·직원/일용직 양쪽. 6종 주기 원문 확정분 반영(특별교육·관리자교육·배치전진단은 주기 없음 → 만기 안 만듦). 석면 대장이 특별교육 미이수자를 붉게 띄움 — 항목1(배점 60%)에서 깎이는 지점</div>
   <div class="note">분류별 세분 권한은 백로그(01 법인 하드차단은 서랍형과 함께 배포 9/2) — 직원 실사용 후 확장</div>
@@ -263,16 +263,17 @@ h2{font-size:13px;margin-bottom:8px}
 </div>
 
 <div class="view" id="v1-12"><span class="back" onclick="go('v1')">← 업무플랫폼</span>
-  <h1>대표 업무유연성 · 기기 배치도 — 70 · 결재함 1차 배포</h1>
+  <h1>대표 업무유연성 · 기기 배치도 — 80 · 결재함 1차+대표 홈 배포</h1>
   <div class="item done" style="margin-top:10px"><span class="m">☑</span>배치도 2종 v1(8/9) — 인프라 4계층 + 역할×워크플로우 매트릭스 <a class="doc" href="https://claude.ai/code/artifact/7b5702be-92a5-49c4-8240-516220186fb4" target="_blank">📄 인프라</a> <a class="doc" href="https://claude.ai/code/artifact/dbf72617-921c-4a5d-ba32-aad4dd65562a" target="_blank">📄 역할×기기</a></div>
   <div class="item done"><span class="m">☑</span>병목 진단(8/9) — 결재감(운행일지·사규·가족친화·계좌확인)이 앱 밖이라 대면 시로 쌓임</div>
   <div class="item done"><span class="m">☑</span>대표 결재함 시안 — 폰 주력+PC 동일 <a class="doc" href="https://claude.ai/code/artifact/ef49fdb7-ca09-400c-9ae7-bb397465ff7d" target="_blank">📄 결재함 시안</a></div>
   <div class="item done"><span class="m">☑</span>★배치도 결정 6종 전부 확정(9/1 PM): ③알림=우선기기1 / ①운반일지 대표결재=오피스PC 팝업+폰 푸시 병행(우선기기 규칙의 명시적 예외) / ②종이서류=폰 우선 수신·공무 업로드(돈 서류만 경리) / ④지시 승인=건별 판단형(금액 기준선 없음 확정 — 기본 PM 종결+건별 대표 상신) / ⑤다표면=진척도만, 나머지 앱 알림함 단일 / ⑥대표 오피스PC=시작프로그램 자동실행(자동로그인→결재함). 8/8 발의 키스톤 완결</div>
   <div class="item done"><span class="m">☑</span>결재함 1차 배포(9/1~2) — C안(뱃지→한장씩)+운반일지 상신 버튼+대표상신 토글. 2차: 내 상신·우선기기·자동기안·PC 팝업 예외</div>
+  <div class="item done"><span class="m">☑</span>★대표 홈=결재함 배포(9/2) — PM 확정(&quot;결재함이 대표 UI가 돼야지&quot;): 대표 계정 홈=대기·보류 카드 목록(제목·종류·기안자·경과일)+결재 시작·행 클릭→한장씩 처리+조망 타일 4. 탭 복귀 재렌더(재클릭은 no-op — 직원 홈 입력 보존)·확인 전/실패/0건 구분 표시. 건조 판정 3라운드(2+2건 수리) clean</div>
   <div class="item now"><span class="m">▶</span>대표 기기 자동실행 — 오피스 PC 등록 완료(9/2 실측, ?appr=auto 포함 여부만 확인). 홈오피스 PC 남음(대표 직접)</div>
   <div class="item"><span class="m">☐</span>인프라 후속: SPOF=Blobs 단일원천 — 외장/클라우드 복제 결정 · PM</div>
   <div class="item done"><span class="m">☑</span>★결재함 C안 1차 배포(9/1 밤) — 상단 결재 뱃지(관리자)→한장씩 처리(승인/반려/보류/건너뛰기)→토스트. 지시에 &quot;대표 상신&quot; 체크 추가(건별 판단형 ④ 구현). 적대 검증 3라운드·지적 17건 수리 후 clean. 2차 대기: 내 상신 목록·우선기기 라우팅·운반일지 자동 기안·PC 팝업 예외</div>
-  <div class="note">순서: 계정(완료)→배치도 6종 확정(9/1)→결재함 1차 배포(9/1~2)→자동실행(오피스 9/2). 다음 = 대표 UI 재편·결재 2차·SPOF 복제 결정</div>
+  <div class="note">순서: 계정(완료)→배치도 6종 확정(9/1)→결재함 1차 배포(9/1~2)→자동실행(오피스 9/2)→대표 홈=결재함(9/2). 다음 = 결재 2차(내 상신·우선기기 라우팅·운반일지 자동 기안·PC 팝업 예외)·SPOF 복제 결정</div>
 </div>
 
 <div class="view" id="v1-13"><span class="back" onclick="go('v1')">← 업무플랫폼</span>
