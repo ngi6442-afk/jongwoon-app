@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>대표 화면 시안 — 3번 계기판형</title>
+<style>*{box-sizing:border-box;margin:0}
+body{font-family:'Malgun Gothic',sans-serif;background:#f2f4f1;color:#222;font-size:14px}
+.top{background:#16211b;color:#fff;padding:12px 22px;display:flex;align-items:center;gap:12px}
+.top b{font-size:15px}.top .who{margin-left:auto;font-size:12px;color:#cfe0d5}
+.page{max-width:900px;margin:20px auto;padding:0 16px}
+.card{background:#fff;border:1px solid #e2e6e0;border-radius:14px;padding:18px 20px;margin-bottom:14px}
+h1{font-size:18px;margin-bottom:4px}
+.sub{color:#889086;font-size:12.5px;margin-bottom:12px}
+.big{display:block;width:100%;background:#1A9A6B;color:#fff;border:0;border-radius:12px;padding:15px 0;font-size:15.5px;font-weight:700;cursor:pointer;font-family:inherit}
+.big:hover{background:#157a55}
+.ghost{display:block;width:100%;background:#fff;border:1px solid #d5dad2;border-radius:12px;padding:12px 0;font-size:13.5px;color:#555;cursor:pointer;font-family:inherit;text-align:center;margin-top:8px}
+.row{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #eef0ec;padding:10px 2px;font-size:13.5px}
+.row small{color:#889086}
+.badge{background:#faf3e6;color:#c07f27;border-radius:10px;font-size:11px;padding:2px 9px;font-weight:700}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.tile{background:#fff;border:1px solid #e2e6e0;border-radius:14px;padding:16px;cursor:pointer}
+.tile:hover{box-shadow:0 3px 10px rgba(20,60,40,.12)}
+.tile b{font-size:24px;display:block}
+.tile span{font-size:12px;color:#889086}
+.tile .warn{color:#c0392b}
+.feed{border-left:3px solid #e2e6e0;padding-left:14px;margin-left:6px}
+.ev{margin-bottom:14px;position:relative}
+.ev::before{content:"";position:absolute;left:-20px;top:5px;width:9px;height:9px;border-radius:50%;background:#c9d2cb}
+.ev.hot::before{background:#EF9F27}
+.ev .t{font-weight:700;font-size:13.5px}.ev .d{font-size:12px;color:#889086;margin-top:2px}
+.mini{font-size:12px;padding:5px 13px;border-radius:8px;border:1px solid #d5dad2;background:#fff;cursor:pointer;font-family:inherit;margin:6px 5px 0 0}
+.mini.ok{background:#1A9A6B;color:#fff;border-color:#1A9A6B;font-weight:700}
+.bubble{background:#fff;border:1px solid #e2e6e0;border-radius:14px 14px 14px 4px;padding:12px 15px;margin:10px 0;max-width:82%;font-size:13.5px;line-height:1.6}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:26px;background:#233b31;color:#9fe8c6;border-radius:10px;padding:10px 22px;font-size:13px;display:none;z-index:9}
+.foot{color:#a5aaa2;font-size:11.5px;margin:14px 4px;text-align:center}
+@media(max-width:640px){.page{margin-top:12px}}</style></head><body>
+<div class="top"><b>종운 그룹웨어</b><span class="who">나종운 대표 · 시안 3번 계기판형</span></div>
+<div class="page"><div class="card" style="background:none;border:0;padding:0"><h1 style="margin-bottom:10px">오늘의 회사</h1></div><div class="tiles"><div class="tile" onclick="appr()"><b class="warn">4</b><span>결재 대기</span></div><div class="tile" onclick="toast('운반일지 8/31')"><b>512t</b><span>어제 운반(27건)</span></div><div class="tile" onclick="toast('기성·수금')"><b>3건</b><span>미수금</span></div><div class="tile" onclick="toast('입찰 탭')"><b>1건</b><span>진행 계약(동일산업)</span></div><div class="tile" onclick="toast('차량 탭')"><b>12대</b><span>오늘 가동 차량</span></div><div class="tile" onclick="toast('인사 탭')"><b>0</b><span>휴가·결원</span></div></div><div class="card" style="margin-top:14px"><h1 style="font-size:14px">결재 대기</h1><div class="row"><span>📋 운반일지 8/31 <small>(루틴)</small></span><span class="badge">대기</span></div><div class="row"><span>📜 사규 5건 일괄</span><span class="badge">D+2</span></div><div class="row"><span>👨‍👩‍👧 가족친화 5종 안건</span><span class="badge">D+2</span></div><div class="row"><span>💳 지입료 이체 3건</span><span class="badge">대기</span></div></div><button class="ghost" onclick="toast('전체 메뉴')">전체 메뉴 열기</button></div>
+<div class="foot">시안 — 숫자는 샘플. 어느 안이든 공통: 결재는 기배포 한장씩 오버레이 · 전체 메뉴는 항상 진입 가능 · 폰=1단 접힘</div>
+<div class="toast" id="toast"></div>
+<script>function toast(m){var t=document.getElementById("toast");t.textContent=m;t.style.display="block";setTimeout(function(){t.style.display="none"},2200)}
+function appr(){toast("결재 모드 — 한 장씩 처리(기배포된 결재함 오버레이가 뜹니다)")}
+</script></body></html>

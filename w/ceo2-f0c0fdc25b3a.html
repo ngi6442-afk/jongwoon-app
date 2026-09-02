@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>대표 화면 시안 — 2번 아침 브리핑형</title>
+<style>*{box-sizing:border-box;margin:0}
+body{font-family:'Malgun Gothic',sans-serif;background:#f2f4f1;color:#222;font-size:14px}
+.top{background:#16211b;color:#fff;padding:12px 22px;display:flex;align-items:center;gap:12px}
+.top b{font-size:15px}.top .who{margin-left:auto;font-size:12px;color:#cfe0d5}
+.page{max-width:900px;margin:20px auto;padding:0 16px}
+.card{background:#fff;border:1px solid #e2e6e0;border-radius:14px;padding:18px 20px;margin-bottom:14px}
+h1{font-size:18px;margin-bottom:4px}
+.sub{color:#889086;font-size:12.5px;margin-bottom:12px}
+.big{display:block;width:100%;background:#1A9A6B;color:#fff;border:0;border-radius:12px;padding:15px 0;font-size:15.5px;font-weight:700;cursor:pointer;font-family:inherit}
+.big:hover{background:#157a55}
+.ghost{display:block;width:100%;background:#fff;border:1px solid #d5dad2;border-radius:12px;padding:12px 0;font-size:13.5px;color:#555;cursor:pointer;font-family:inherit;text-align:center;margin-top:8px}
+.row{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #eef0ec;padding:10px 2px;font-size:13.5px}
+.row small{color:#889086}
+.badge{background:#faf3e6;color:#c07f27;border-radius:10px;font-size:11px;padding:2px 9px;font-weight:700}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.tile{background:#fff;border:1px solid #e2e6e0;border-radius:14px;padding:16px;cursor:pointer}
+.tile:hover{box-shadow:0 3px 10px rgba(20,60,40,.12)}
+.tile b{font-size:24px;display:block}
+.tile span{font-size:12px;color:#889086}
+.tile .warn{color:#c0392b}
+.feed{border-left:3px solid #e2e6e0;padding-left:14px;margin-left:6px}
+.ev{margin-bottom:14px;position:relative}
+.ev::before{content:"";position:absolute;left:-20px;top:5px;width:9px;height:9px;border-radius:50%;background:#c9d2cb}
+.ev.hot::before{background:#EF9F27}
+.ev .t{font-weight:700;font-size:13.5px}.ev .d{font-size:12px;color:#889086;margin-top:2px}
+.mini{font-size:12px;padding:5px 13px;border-radius:8px;border:1px solid #d5dad2;background:#fff;cursor:pointer;font-family:inherit;margin:6px 5px 0 0}
+.mini.ok{background:#1A9A6B;color:#fff;border-color:#1A9A6B;font-weight:700}
+.bubble{background:#fff;border:1px solid #e2e6e0;border-radius:14px 14px 14px 4px;padding:12px 15px;margin:10px 0;max-width:82%;font-size:13.5px;line-height:1.6}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:26px;background:#233b31;color:#9fe8c6;border-radius:10px;padding:10px 22px;font-size:13px;display:none;z-index:9}
+.foot{color:#a5aaa2;font-size:11.5px;margin:14px 4px;text-align:center}
+@media(max-width:640px){.page{margin-top:12px}}</style></head><body>
+<div class="top"><b>종운 그룹웨어</b><span class="who">나종운 대표 · 시안 2번 아침 브리핑형</span></div>
+<div class="page"><div class="card"><h1>9월 2일 화요일 아침 보고</h1><div class="sub">그룹웨어가 매일 아침 자동으로 씁니다</div><div style="font-size:14.5px;line-height:2.0">어제 운반은 <b>27건 · 512.4t</b>로 마감했고 미배정은 없습니다.<br>결재 대기가 <b>4건</b> 있습니다 — 사규·가족친화 2건은 이틀째입니다.<br>동일산업 적격심사가 진행 중이고, 석면 방문평가가 <b>9월 21일</b>로 잡혔습니다.<br>미수금은 3건이며 이번 주 입금 예정 1건이 있습니다.</div><div style="margin-top:16px"><button class="big" onclick="appr()">결재 4건 몰아서 처리 →</button></div><button class="ghost" onclick="toast('상세 보고 화면')">상세 숫자 보기</button></div></div>
+<div class="foot">시안 — 숫자는 샘플. 어느 안이든 공통: 결재는 기배포 한장씩 오버레이 · 전체 메뉴는 항상 진입 가능 · 폰=1단 접힘</div>
+<div class="toast" id="toast"></div>
+<script>function toast(m){var t=document.getElementById("toast");t.textContent=m;t.style.display="block";setTimeout(function(){t.style.display="none"},2200)}
+function appr(){toast("결재 모드 — 한 장씩 처리(기배포된 결재함 오버레이가 뜹니다)")}
+</script></body></html>
