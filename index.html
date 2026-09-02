@@ -3095,6 +3095,9 @@
   function apprWaitItems(){ return apprItems.filter(function(it){ return it && it.status === "대기"; }); }
   function apprHoldItems(){ return apprItems.filter(function(it){ return it && it.status === "보류"; }); }
   function apprBadgeRender(){
+    // 대표 홈=결재함 — 결재 목록이 바뀌는 모든 경로(폴 갱신·오버레이 종료·0건 전환)에서 홈도 같이 다시 그린다.
+    // renderBossHome은 apprBadgeRender를 호출하지 않으므로 재귀 없음
+    if (currentTab === "dash" && curMemberObj && isBossMember(curMemberObj) && isAdmin()) renderDashboard();
     var btn = document.getElementById("apprBadge"); if (!btn) return;
     // 숫자 = 대기만(보류가 매번 숫자를 부풀리는 게 리뷰 실결함 판정). 보류만 남으면 "보"로 표시해 재결정 통로는 유지
     var w = apprWaitItems().length, hd = apprHoldItems().length;
@@ -3104,6 +3107,8 @@
   }
   // ⑥ 대표 PC 시작프로그램용: ?appr=auto 로 열리면 부팅 직후 대기 건이 있을 때 한장씩 처리를 자동으로 띄운다(1회)
   var apprAutoOpen = /[?&]appr=auto/.test(location.search);
+  var apprEverLoaded = false;   // 대표 홈이 "0건"과 "아직 확인 전"을 구분해 그리기 위한 플래그
+  var apprLoadFailed = false;   // 첫 확인 실패 시 "확인 중…" 무기한 고착 방지 — 홈에 실패 문구·자동 재시도 안내
   function apprRefresh(){
     if (!curMember() || !isAdmin()){ apprItems = []; apprBadgeRender(); return; }
     // 오버레이 처리 중엔 목록 교체 금지 — 큐가 물던 참조가 끊겨 뱃지 오집계·409 루프가 났다(리뷰 지적). 끝나면 apprFinish가 1회 재동기
@@ -3111,13 +3116,19 @@
     if (bd && bd.classList.contains("show")) return;
     gwCall("gw-data", { action: "approvals_list" }).then(function(res){
       if (res.status === 200 && res.body && Array.isArray(res.body.items)){
-        apprItems = res.body.items; apprBase = res.body.base || 0; apprBadgeRender();
+        apprItems = res.body.items; apprBase = res.body.base || 0; apprEverLoaded = true; apprLoadFailed = false; apprBadgeRender();
         if (apprAutoOpen){
           apprAutoOpen = false;   // 부팅 1회만 — 이후 폴에선 조용히
           if (apprWaitItems().length || apprHoldItems().length) apprOpen();
         }
+      } else if (!apprEverLoaded){
+        // gwCall은 5xx·401도 resolve라 catch를 안 탄다 — HTTP 오류도 첫 확인 실패로 표시(리뷰 low)
+        apprLoadFailed = true; apprBadgeRender();
       }
-    }).catch(function(){});
+    }).catch(function(){
+      // 첫 확인이 실패하면 대표 홈이 "확인 중…"에 무기한 고착 — 실패 문구로 전환(성공 폴이 오면 자동 해제)
+      if (!apprEverLoaded){ apprLoadFailed = true; apprBadgeRender(); }
+    });
   }
   // afterLogin에서 호출 — 즉시 1회 + 5분 간격(재로그인 시 타이머 중복 방지). 상신 대기열 재시도도 여기에 태운다
   function apprInit(){
@@ -4345,6 +4356,7 @@
   function closeNav(){ var tb=document.getElementById("tabbar"); if(tb) tb.classList.remove("open"); }
   function updateNavToggle(name){ var nt=document.getElementById("navToggle"); if(nt) nt.textContent = "☰"; }
   function switchTab(name){
+    var prevTab = currentTab;
     currentTab = name;
     Array.prototype.forEach.call(document.querySelectorAll(".tab-btn"), function(b){
       b.classList.toggle("active", b.getAttribute("data-tab") === name);
@@ -4377,6 +4389,7 @@
     if (name === "allbaro") renderAllbaro();
 
     if (name === "cal") renderCalendar();
+    if (name === "dash" && prevTab !== "dash") renderDashboard();   // 탭 "복귀" 시만 재렌더(타 탭 체류 중 폴 갱신 반영) — 재클릭은 종전대로 no-op(직원 홈 입력 중 유실 방지)
     // 석면 대장은 인허가 탭 안에 있고, 투입 근로자 이름을 일용직 명부에서 끌어오므로 둘을 같이 읽는다
     if (name === "lic"){ setLicLayer("cert"); renderAsb(); loadAsb(); loadEdu(); if(canSee("wk")) loadWorkers(); }   // 전역검색·캘린더 점프가 의무/이번달 층 위에 내려앉지 않게 ①층 복귀
     if (name === "hr"){ renderHrRoster(); renderEdu(); loadEdu(); if(canSee("wk")) loadWorkers(); }
@@ -5371,11 +5384,64 @@
     });
   }
 
+  // 대표 홈=결재함(9/2 PM 확정: "결재함이 대표 UI가 돼야지") — 홈이 곧 결재함.
+  // 위=대기·보류 카드 목록+결재 시작(기배포 한장씩 처리 오버레이 재사용), 아래=조망 타일만. 조작·상세는 기존 탭바로.
+  function renderBossHome(host){
+    var w = apprWaitItems(), hd = apprHoldItems(), n = w.length + hd.length;
+    var html = '<div class="dash-date">' + todayStr() + '</div>';
+    var inner;
+    if (!apprEverLoaded && !n){
+      inner = apprLoadFailed
+        ? '<div class="empty-line">결재함 확인에 실패했습니다 — 연결 상태를 확인해 주세요. 5분 안에 자동으로 다시 시도합니다.</div>'
+        : '<div class="empty-line">결재함을 확인하는 중입니다…</div>';
+    } else if (!n){
+      inner = '<div class="empty-line">결재할 건이 없습니다.</div>';
+    } else {
+      inner = w.concat(hd).map(function(it){
+        return '<div class="item" data-boss-appr="1" style="cursor:pointer;"><div class="item-body">' +
+            '<div class="item-title">' + (APPR_KIND_EMOJI[it.kind] || "📄") + ' ' + esc(it.title || "(제목 없음)") + '</div>' +
+            '<div class="item-meta" style="margin-top:2px;">' + esc(it.kind || "일반") + ' · 기안 ' + esc((it.by && it.by.name) || "?")
+              + (it.created ? ' · ' + esc(apprDaysAgo(it.created)) : '')
+              + (it.status === "보류" ? ' · <b style="color:var(--amber);">보류 중</b>' : '') + '</div>' +
+          '</div></div>';
+      }).join("") +
+      '<div style="text-align:center;padding:12px 0 6px;"><button class="primary" style="width:auto;padding:11px 28px;font-size:15px;" id="bossApprStart">결재 시작 — ' + (w.length ? '대기 ' + w.length + '건' : '보류 ' + hd.length + '건') + '</button></div>';
+    }
+    html += '<div class="dash-sec"><h2>🧾 결재 <span class="cnt">' + n + '</span></h2><div class="card">' + inner + '</div></div>';
+    // 조망 타일 — 관리자 홈과 같은 산식의 부분집합(진행 계약·미수·이번 주 기한·만기·탭 승인)
+    var actCons = (typeof liveContracts === "function" ? liveContracts() : []).filter(function(c){ return c.status !== "done"; });
+    var actSum = 0; actCons.forEach(function(c){ actSum += conAmt(c) || 0; });
+    var unpaid = unpaidReceivables(true);
+    var unpaidSum = 0; unpaid.forEach(function(r){ unpaidSum += (r.amount || 0); });
+    var v7 = 0;
+    liveVehicles().forEach(function(v){
+      if (isGreyState(v)) return;
+      [v.insp_due, v.ins_due].forEach(function(dt){ if (dt && vehDday(dt).diff <= 7) v7++; });
+    });
+    var lic7 = urgentLicenses().filter(function(x){ return x.dd.diff <= 7; }).length;
+    var t7 = liveTasks().filter(function(t){ return (t.status === "open" || t.status === "hold") && !t.auto_key && t.due && vehDday(t.due).diff <= 7; }).length;
+    var week7 = v7 + lic7 + t7;
+    var inboxN = approvalInboxItems().length;
+    html += '<div class="stat-row">' +
+      '<div class="stat-tile"><div class="lbl">진행 계약</div><div class="val">' + actCons.length + '<span class="unit">건' + (actSum ? ' · ' + fmtAmount(actSum) + '원' : '') + '</span></div></div>' +
+      '<div class="stat-tile"><div class="lbl">미수 ' + unpaid.length + '건</div><div class="val money">' + (unpaidSum ? (fmtAmount(unpaidSum) + '<span class="unit">원</span>') : '0') + '</div></div>' +
+      '<div class="stat-tile' + (week7 ? ' alert' : '') + '"><div class="lbl">이번 주 기한·만기</div><div class="val">' + week7 + '<span class="unit">건</span></div></div>' +
+      '<div class="stat-tile"><div class="lbl">탭 승인·확인</div><div class="val">' + inboxN + '<span class="unit">건</span></div></div>' +
+      '</div>';
+    host.innerHTML = html;
+    var sb = document.getElementById("bossApprStart");
+    if (sb) sb.addEventListener("click", apprOpen);
+    Array.prototype.forEach.call(host.querySelectorAll("[data-boss-appr]"), function(el){
+      el.addEventListener("click", apprOpen);
+    });
+  }
+
   function renderDashboard(){
     // 데이터 로드/변경 시 캘린더 탭이 열려 있으면 함께 갱신(로그인 직후 빈 배열로 그려진 경우 자동 채움)
     if (currentTab === "cal" && document.getElementById("calGrid")) renderCalendar();
     var host = document.getElementById("dashHost");
     if (!host) return;
+    if (curMemberObj && isBossMember(curMemberObj) && isAdmin()){ renderBossHome(host); return; }   // 대표 홈=결재함(9/2)
     if (curMemberObj && !isAdmin()){ renderStaffHome(host); return; }   // 직원 홈(S2-B) — 관리자 홈은 아래 현행 그대로
     var today = todayStr();
     var seeVeh = canSee("veh"), seeLic = canSee("lic"), seeTasks = canSee("tasks"), seeRec = canSee("rec");
