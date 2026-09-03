@@ -15940,7 +15940,7 @@
     if (!m) return "hide";
     if (m.admin) return "do";
     // 견적서는 기본 숨김(닫고 시작 — 영업 직렬에게만 명시 부여, 서버 permOf와 동일 규칙)
-    return (m.perms && m.perms[mod]) || (mod === "quote" ? "hide" : "view");
+    return (m.perms && m.perms[mod]) || ((mod === "quote" || mod === "hr") ? "hide" : "view");   // hr=교육·건강진단 대장: 서버와 동일하게 닫고 시작(9/4)
   }
   function canDo(mod){ return permOf(mod) === "do"; }
   function canSee(mod){ return permOf(mod) !== "hide"; }

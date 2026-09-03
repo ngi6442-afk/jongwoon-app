@@ -38,7 +38,7 @@ function permOf(member, col) {
   if (member.admin) return 'do';
   const key = COL[col];
   // 견적서·홍보는 기본 숨김(닫고 시작 — 명시 부여만). 다른 모듈 기본은 보기
-  return (member.perms && member.perms[key]) || ((key === 'quote' || key === 'promo') ? 'hide' : 'view');
+  return (member.perms && member.perms[key]) || ((key === 'quote' || key === 'promo' || key === 'hr') ? 'hide' : 'view');   // hr(교육·건강진단 대장)은 인사 탭이 관리자 전용인데 서버가 view로 열려 있던 구멍(9/4 uismoke 실사고 조사) — 닫고 시작
 }
 // 인가된 기기만 데이터 접근. 관리자는 항상 허용.
 async function deviceApproved(event, member) {

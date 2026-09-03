@@ -37,12 +37,12 @@ const appTpl = grabKeys(html, 'var TPL_LABELS='), svrTpl = grabKeys(gwd, 'const 
 const onlyApp = [...appTpl].filter((k) => !svrTpl.has(k)), onlySvr = [...svrTpl].filter((k) => !appTpl.has(k));
 T('양식 키 앱↔서버 일치(' + appTpl.size + '종)', !onlyApp.length && !onlySvr.length, '앱만: ' + onlyApp + ' / 서버만: ' + onlySvr);
 
-// 4) 권한 레지스트리: gw-auth MODULES == gw-data COL 값 − {leaves(전원 저장 설계), bid(관리자 고정)}
+// 4) 권한 레지스트리: gw-auth MODULES == gw-data COL 값 − {leaves(전원 저장 설계), bid·fam(관리자 고정 — 서버 ADMIN_ONLY)·hr(인사 탭 관리자 전용 — edu는 서버가 비관리자에게 본인분만)}
 //    — 'wk' 누락으로 일용직 권한이 저장마다 증발했던 실사고의 재발 방지
 const mods = new Set((auth.match(/const MODULES = \[([^\]]+)\]/) || [])[1].match(/'(\w+)'/g).map((s) => s.replace(/'/g, '')));
 const colSeg = (gwd.match(/const COL = \{([^}]+)\}/) || [])[1];
 const colVals = new Set([...colSeg.matchAll(/:\s*'(\w+)'/g)].map((m) => m[1]));
-colVals.delete('leaves'); colVals.delete('bid');
+colVals.delete('leaves'); colVals.delete('bid'); colVals.delete('fam'); colVals.delete('hr');
 const dm = [...colVals].filter((v) => !mods.has(v)), dx = [...mods].filter((v) => !colVals.has(v));
 T('권한 레지스트리 auth↔data 일치', !dm.length && !dx.length, 'auth 누락: ' + dm + ' / auth 잉여: ' + dx);
 

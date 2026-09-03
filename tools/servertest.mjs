@@ -65,6 +65,9 @@ T('미지 컬렉션 → 400', r.code === 400);
 // 4 bids 비관리자 차단(기기 승인돼도)
 r = await call({ action: 'get', collection: 'bids' }, tokW, 'dev1');
 T('비관리자 bids → 403 ADMIN_ONLY', r.code === 403 && r.body.error_code === 'ADMIN_ONLY');
+// 4b edu(교육·건강진단 대장)는 인사 탭이 관리자 전용인데 서버 permOf 기본 view라 비관리자가 API로 전 직원 검진 기록을 읽을 수 있던 구멍(9/4) — 닫고 시작
+r = await call({ action: 'get', collection: 'edu' }, tokW, 'dev1');
+T('비관리자 edu(hr) → 403 NO_ACCESS(기본 숨김)', r.code === 403 && r.body.error_code === 'NO_ACCESS', r.code + '/' + r.body.error_code);
 // 5 기기 미승인 차단
 r = await call({ action: 'get', collection: 'tasks' }, tokW, 'devX');
 T('미승인 기기 → 403 DEVICE_NOT_APPROVED', r.code === 403 && r.body.error_code === 'DEVICE_NOT_APPROVED');
@@ -183,13 +186,13 @@ r = await call({ action: 'autotask_ingest', key: 'test-ingest-key',
   T('autotask: hide_keys 자기정정(회색차 지시 숨김)', r.body.fixed === 1 && its.find((t) => t.id === 'tb').del === 1);
 }
 
-// 16 봇 스냅샷: 같은 날 두 번째 ingest는 스냅샷 안 만듦(일 1개)
+// 16 봇 스냅샷: bids는 VER_SKIP(매 수집마다 전체 문서 복제가 대표 체감 속도를 깎아 제외) — 봇 ingest는 스냅샷을 남기지 않는다(비우기 force만 보존). 옛 기대 '일 1개'는 설계 변경 전 잔재였음(9/4 정정)
 mem.gw_data['col:bids'] = { schema: 1, items: [{ id: 'b1', status: 'new' }], updated_at: 1 };
 r = await call({ action: 'bids_ingest', key: 'test-ingest-key', items: [{ id: 'b2', title: 't' }] });
 r = await call({ action: 'bids_ingest', key: 'test-ingest-key', items: [{ id: 'b3', title: 't' }] });
 {
   const vers = Object.keys(mem.gw_data).filter((k) => k.indexOf('ver:bids:') === 0);
-  T('봇 ingest 스냅샷 일 1개', r.code === 200 && vers.length === 1, vers.length + '개');
+  T('봇 ingest 스냅샷 없음(bids=VER_SKIP)', r.code === 200 && vers.length === 0, vers.length + '개');
 }
 
 // 17 결재 3차 — 업무별 등급: 게이트 매트릭스(명세 §4.1) + 생성 스탬프 + ② 단계 전환
