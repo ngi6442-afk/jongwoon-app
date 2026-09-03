@@ -61,9 +61,9 @@ async function blobDelete(st, key) {
   }
 }
 
-async function blobList(st) {
+async function blobList(st, prefix) {
   try {
-    const res = await st.list();
+    const res = await st.list(prefix ? { prefix: String(prefix) } : undefined);   // prefix(선택) — 전체 열거 비용 회피(v310)
     return { ok: true, keys: (res && res.blobs ? res.blobs.map(function (b) { return b.key; }) : []) };
   } catch (e) {
     return { ok: false, code: 'STORAGE_LIST_FAILED', error_name: e && e.constructor && e.constructor.name };

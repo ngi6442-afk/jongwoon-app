@@ -925,7 +925,9 @@ async function handleApprovalsList(event, d, R) {
   const doc = rd.doc;
   const items = c.member.admin ? doc.items : doc.items.filter(function (it) { return it && it.by && it.by.id === c.member.id; });
   // base = 낙관락 토큰. decide가 이 값을 들고 와야 하며 불일치면 409 APPR_STALE(관리자 2인 동시 결재 유실 방지)
-  return jr(200, { status: 'OK', items: items, base: doc.updated_at || 0, request_id: R });
+  // boss_present — 대표 계정 존재 여부(클라 apprCanDecide 폴백용: 대표가 없으면 관리자 전원이 대표 전용 건을 결재). 관리자에게만 계산(회원 블롭 스캔)
+  const bossN = c.member.admin ? (await push.bossIds()).length : 0;
+  return jr(200, { status: 'OK', items: items, base: doc.updated_at || 0, boss_present: bossN > 0, request_id: R });
 }
 async function handleApprovalCreate(event, d, R) {
   const c = await currentMember(event);
@@ -1036,10 +1038,11 @@ async function handleApprovalDecide(event, d, R) {
     return jr(409, { status: 'CONFLICT', error_code: 'APPR_STALE', base: rd.doc.updated_at || 0, request_id: R });
   const pre = rd.doc.items.find(function (x) { return x && x.id === String(d.id || ''); });
   if (!pre) return jr(404, { status: 'NOT_FOUND', error_code: 'NO_APPROVAL', request_id: R });
-  // 대표 전용 건의 승인·반려는 대표만(서버 하드 게이트 — 클라 숨김은 UI일 뿐). 보류는 관리자 누구나(대표 부재 시 대기 유지 통로).
-  if (apprBossOnly(pre) && decision !== '보류' && !push.isBoss(c.member)) return jr(403, { status: 'FORBIDDEN', error_code: 'BOSS_ONLY', request_id: R });
-  // 승인·반려는 종결(재결정 불가). '보류'만 대기 성격을 유지해 재결정 가능
+  // 승인·반려는 종결(재결정 불가). '보류'만 대기 성격을 유지해 재결정 가능 — 이 검사가 BOSS_ONLY보다 앞이어야 구 캐시 클라가 409(건너뜀)를 받는다
   if (pre.status === '승인' || pre.status === '반려') return jr(409, { status: 'CONFLICT', error_code: 'ALREADY_DECIDED', base: rd.doc.updated_at || 0, request_id: R });
+  // 대표 전용 건의 승인·반려는 대표만(서버 하드 게이트 — 클라 숨김은 UI일 뿐). 보류는 관리자 누구나(대표 부재 시 대기 유지 통로).
+  // 대표 계정이 하나도 없으면(role 불일치 등) 관리자 전원에게 연다 — 푸시 폴백(bossOrAdminIds)·클라 boss_present와 같은 축(교착 방지, v310)
+  if (apprBossOnly(pre) && decision !== '보류' && !push.isBoss(c.member) && (await push.bossIds()).length) return jr(403, { status: 'FORBIDDEN', error_code: 'BOSS_ONLY', request_id: R });
   await verSnapshot('approvals', rd.doc, c.member.name, false);   // 변형 전 시점 보존(복구 링)
   // 레이스 창 축소(리뷰 [A-잔여]): verSnapshot이 블롭 왕복을 끼워 첫 읽기→쓰기 간격이 수백ms로 벌어지고,
   // 그 사이 착지한 동시 상신을 본선 쓰기가 지울 수 있다 — 쓰기 직전 신선본을 다시 읽어 그 위에 결정을 얹는다.

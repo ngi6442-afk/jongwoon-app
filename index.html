@@ -683,6 +683,7 @@
   .nav-group.perm-hidden{display:none !important;}
   .prog-frame{display:block;width:100%;height:calc(100vh - 170px);height:calc(100dvh - 170px);min-height:480px;border:1px solid var(--line);border-radius:12px;background:var(--card);}
   .todo-due-in{font-size:12px;padding:3px 6px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);max-width:132px;}
+  #myTodoDue{flex:0 0 auto;width:138px;min-width:0;}
   .hr-dept{margin-bottom:14px;}
   .hr-dept-h{font-size:13px;font-weight:800;color:var(--brand);padding:2px 2px 6px;border-bottom:1px solid var(--line);margin-bottom:4px;}
   .hr-dept-h .cnt{color:var(--sub);font-weight:600;}
@@ -3097,6 +3098,7 @@
   // 2차(2026-09-02) 구현: 내 상신 목록(홈 섹션) · 우선기기 1발 라우팅 · 운반일지 자동 기안(워커) · PC 팝업 예외(운반일지=전 기기).
   var apprItems = [];                      // approvals_list 결과(관리자=전체)
   var apprBase = 0;                        // 목록의 낙관락 토큰 — decide에 동봉(관리자 2인 동시 결재 유실 방지)
+  var apprBossPresent = true;              // 서버 approvals_list의 boss_present — 대표 계정이 없으면 관리자 전원이 대표 전용 건을 결재(교착 방지, v310)
   var apprQueue = [], apprIdx = 0;         // 오버레이 진행용(대기 먼저, 보류는 뒤)
   var apprDoneN = { ok:0, no:0, hold:0 };
   var apprPollTimer = null, apprBusy = false;
@@ -3104,7 +3106,7 @@
   var APPR_KIND_EMOJI = { "지시":"📌", "운반일지":"📋", "사규":"📜", "지입료":"💳", "가족친화":"👨‍👩‍👧" };
   // 대표 전용 건(9/3 PM: 운반일지 결재=대표, 다른 관리자는 알림함 확인만) — 서버 apprBossOnly·워커 to 스탬프와 3중 동일 규칙(to 우선, 구건은 종류로)
   function apprBossOnly(it){ return !!it && (it.to === "boss" || (it.to == null && it.kind === "운반일지")); }
-  function apprCanDecide(it){ return isAdmin() && (!apprBossOnly(it) || !!(curMemberObj && isBossMember(curMemberObj))); }
+  function apprCanDecide(it){ return isAdmin() && (!apprBossOnly(it) || !apprBossPresent || !!(curMemberObj && isBossMember(curMemberObj))); }   // 대표 부재(boss_present=false)면 관리자 전원 — 서버 게이트와 같은 축
   // 아래 두 필터가 뱃지·한장씩 큐·?appr=auto·대표 홈을 한꺼번에 정한다 — 비대표 관리자에겐 대표 전용 건이 대기로 잡히지 않는다
   function apprWaitItems(){ return apprItems.filter(function(it){ return it && it.status === "대기" && apprCanDecide(it); }); }
   function apprHoldItems(){ return apprItems.filter(function(it){ return it && it.status === "보류" && apprCanDecide(it); }); }
@@ -3130,7 +3132,7 @@
     if (bd && bd.classList.contains("show")) return;
     gwCall("gw-data", { action: "approvals_list" }).then(function(res){
       if (res.status === 200 && res.body && Array.isArray(res.body.items)){
-        apprItems = res.body.items; apprBase = res.body.base || 0; apprEverLoaded = true; apprLoadFailed = false; apprBadgeRender();
+        apprItems = res.body.items; apprBase = res.body.base || 0; apprBossPresent = (res.body.boss_present !== false); apprEverLoaded = true; apprLoadFailed = false; apprBadgeRender();
         if (apprAutoOpen){
           apprAutoOpen = false;   // 부팅 1회만 — 이후 폴에선 조용히
           if (apprWaitItems().length || apprHoldItems().length) apprOpen();
@@ -5467,7 +5469,7 @@
         + '</div></div>';
     }
     var todosLive = myTodos.filter(function(t){ return t && t.del !== 1; });
-    var tOpen = todosLive.filter(function(t){ return !t.done; });
+    var tOpen = todosLive.filter(function(t){ return !t.done; }); tOpen.sort(todoOrder);   // 내 업무 탭과 같은 기한순(v310)
     html += '<div class="dash-sec"><h2>🗒 내 할 일 <span class="cnt">' + tOpen.length + '</span></h2><div class="card">'
       + (tOpen.length ? tOpen.map(function(t){ return myTodoRow(t, false); }).join("") : '<div class="empty-line">할 일이 없습니다.</div>')
       + '<div class="add-row"><input type="text" id="dashTodoInput" placeholder="할 일 추가 (본인만 보임)"><button id="dashTodoAdd">추가</button></div>'
@@ -13204,6 +13206,12 @@
     }).catch(function(){});
   }
   // 기한(due, 선택) — 지시와 같은 D-day 배지(경과 빨강·3일 내 주황). 미완료 행에는 인라인 날짜칸으로 기한을 바로 고친다(v309, PM 9/3).
+  // 정렬 — 기한 있는 것부터 기한순, 없는 것은 생성순(내게 온 지시와 같은 규칙). 내 업무 탭·직원 홈 공용
+  function todoOrder(a,b){
+    var ad = a.due || "9999-99-99", bd = b.due || "9999-99-99";
+    if (ad !== bd) return ad < bd ? -1 : 1;
+    return (a.created||"") < (b.created||"") ? -1 : 1;
+  }
   function myTodoRow(t, done){
     var dd = (!done && isDate(t.due)) ? ddayInfo(t.due) : null;
     var meta = t.due ? '<div class="item-meta"><span>기한 ' + esc(t.due) + '</span></div>' : '';
@@ -13218,7 +13226,9 @@
   function bindTodoDueInputs(host){
     Array.prototype.forEach.call(host.querySelectorAll("[data-todo-due]"), function(inp){
       inp.addEventListener("click", function(e){ e.stopPropagation(); });
-      inp.addEventListener("change", function(e){ e.stopPropagation(); setMyTodoDue(inp.getAttribute("data-todo-due"), inp.value); });
+      // change=저장만(재렌더로 피커·포커스가 날아가지 않게), blur=재렌더(배지·정렬 반영) — v310
+      inp.addEventListener("change", function(e){ e.stopPropagation(); setMyTodoDue(inp.getAttribute("data-todo-due"), inp.value, true); });
+      inp.addEventListener("blur", function(){ renderMyTodos(); });
     });
   }
   function renderMyTodos(){
@@ -13227,11 +13237,7 @@
     var live = myTodos.filter(function(t){ return t && t.del !== 1; });
     var open = live.filter(function(t){ return !t.done; });
     var done = live.filter(function(t){ return t.done; });
-    open.sort(function(a,b){   // 기한 있는 것부터 기한순, 없는 것은 생성순(내게 온 지시와 같은 규칙)
-      var ad = a.due || "9999-99-99", bd = b.due || "9999-99-99";
-      if (ad !== bd) return ad < bd ? -1 : 1;
-      return (a.created||"") < (b.created||"") ? -1 : 1;
-    });
+    open.sort(todoOrder);
     var rows = open.map(function(t){ return myTodoRow(t, false); });
     done.slice(-10).forEach(function(t){ rows.push(myTodoRow(t, true)); });
     host.innerHTML = rows.length ? rows.join("") : '<div class="empty-line" style="padding:10px;">할 일이 없습니다.</div>';
@@ -13253,11 +13259,11 @@
     el.value = ""; if (dueEl) dueEl.value = "";
     renderMyTodos(); saveMyTasks();
   }
-  function setMyTodoDue(id, val){
+  function setMyTodoDue(id, val, quiet){
     var t = null; for (var i=0;i<myTodos.length;i++){ if (myTodos[i].id === id){ t = myTodos[i]; break; } }
     if (!t) return;
     t.due = isDate(val) ? val : ""; t.updated = todayStr();
-    renderMyTodos(); saveMyTasks();
+    saveMyTasks(); if (!quiet) renderMyTodos();
   }
   function toggleMyTodo(id){
     var t = null; for (var i=0;i<myTodos.length;i++){ if (myTodos[i].id === id){ t = myTodos[i]; break; } }
