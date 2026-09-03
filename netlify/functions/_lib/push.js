@@ -38,10 +38,12 @@ async function adminIds() {
   return out;
 }
 
-// payload: {title, body, url, tag} / opts: {primaryOnly}
+// payload: {title, body, url, tag} / opts: {primaryOnly, logOnly}
 // primaryOnly=true(결재 2차, 배치도 결정 ③ "알림=우선기기 1발"): 회원별로 primary 구독이 있으면
 // 그 기기에만 보낸다. primary 미지정 회원은 전 구독 폴백 — 우선기기를 안 정한 사람이
 // 알림을 아예 못 받는 사고 방지. 만료(404/410) 제거는 현행 유지.
+// logOnly=true(결재 3차, 명세 §4.2 "알림함만"): push:log 이력만 남기고 웹푸시는 발사하지 않는다 —
+// ②라인 중간 단계(PM 승인 완료)처럼 담당이 할 일이 없는 통지는 기기를 깨우지 않는다는 결정.
 async function sendTo(memberIds, payload, opts) {
   // 알림함(push:log) — 폰 팝업이 지나가면 다시 볼 곳이 없다는 PM 지적(2026-08-20).
   // 발송 전에 남기고(구독이 없어도 이력은 남게), 이력 실패가 발송을 막지 않는다. 최근 100건 링.
@@ -53,6 +55,7 @@ async function sendTo(memberIds, payload, opts) {
     if (ldoc.items.length > 100) ldoc.items = ldoc.items.slice(-100);
     await blobSet(store(DATA), 'push:log', ldoc);
   } catch (e) {}
+  if (opts && opts.logOnly === true) return { sent: 0, removed: 0 };
   const keys = await getKeys();
   webpush.setVapidDetails('mailto:ngi6442@gmail.com', keys.publicKey, keys.privateKey);
   const doc = await getSubs();
@@ -103,5 +106,20 @@ async function bossIds() {
 }
 // 대표 전용 건의 결재 요청 수신자 — 대표가 없으면(계정 role 불일치 등) 관리자 전원으로 폴백해 결재가 끊기지 않게 한다
 async function bossOrAdminIds() { const b = await bossIds(); return b.length ? b : await adminIds(); }
+// PM·관리자(비대표 관리자) id 목록 — 결재 3차(등급) ①·② 1단계 라우팅 전용. bossIds와 같은 축(스캔 1회).
+async function pmIds() {
+  const st = store(USERS);
+  const l = await blobList(st);
+  if (!l.ok) return [];
+  const out = [];
+  for (const k of l.keys) {
+    if (k.indexOf('member:') !== 0) continue;
+    const r = await blobGet(st, k);
+    if (r.ok && r.data && r.data.admin && r.data.del !== 1 && !isBoss(r.data)) out.push(r.data.id);
+  }
+  return out;
+}
+// ①·② 1단계 결재 요청 수신자 — 비대표 관리자가 없으면(1인 관리자=대표뿐 등) 관리자 전원 폴백(교착 방지, bossOrAdminIds와 대칭)
+async function pmOrAdminIds() { const p = await pmIds(); return p.length ? p : await adminIds(); }
 
-module.exports = { getKeys, getSubs, saveSubs, sendTo, adminIds, bossIds, bossOrAdminIds, isBoss };
+module.exports = { getKeys, getSubs, saveSubs, sendTo, adminIds, bossIds, bossOrAdminIds, isBoss, pmIds, pmOrAdminIds };

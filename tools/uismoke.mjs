@@ -138,13 +138,25 @@ try {
   });
   T('스케줄 선언 ' + declared.length + '건 전부 함수 파일 존재', missing.length === 0,
     '선언만 있고 파일 없음: ' + missing.map((d) => d.fn).join(', '));
-  const cronFiles = ['gw-hwakwan-cron', 'gw-allbaro-cron', 'gw-todo-cron'];
+  const cronFiles = ['gw-hwakwan-cron', 'gw-allbaro-cron', 'gw-todo-cron', 'gw-appr-cron'];
   const undeclared = cronFiles.filter((f) => !declared.some((d) => d.fn === f));
   T('크론 함수 전부 스케줄 선언됨', undeclared.length === 0,
     '파일은 있는데 netlify.toml 선언 없음(크론 미등록): ' + undeclared.join(', '));
   T('크론 표현식 5필드 형식', declared.every((d) => d.cron.trim().split(/\s+/).length === 5),
     '깨진 표현식: ' + declared.filter((d) => d.cron.trim().split(/\s+/).length !== 5).map((d) => d.fn + '=' + d.cron).join(', '));
 } catch (e) { console.log('  (크론 대조 생략 — netlify.toml 읽기 실패)'); }
+
+// 9) 결재 등급표 동률(결재 3차) — 서버 기본표(APPR_GRADE_DEFAULTS) 키 ↔ 앱 관리 화면 순서 목록(APPR_GRADE_ORDER).
+//    한쪽에만 종류를 추가하면 화면에서 편집 불가(또는 유령 행)가 된다 — 마커 정규식 동률 검사와 같은 취지.
+try {
+  const svrSeg = (gwd.match(/const APPR_GRADE_DEFAULTS = \{([\s\S]*?)\};/) || ['', ''])[1];
+  const svrKinds = new Set([...svrSeg.matchAll(/'([^']+)'\s*:/g)].map((m) => m[1]));
+  const appSeg = (html.match(/var APPR_GRADE_ORDER = \[([^\]]+)\]/) || ['', ''])[1];
+  const appKinds = new Set([...appSeg.matchAll(/"([^"]+)"/g)].map((m) => m[1]));
+  const onlyS = [...svrKinds].filter((k) => !appKinds.has(k)), onlyA = [...appKinds].filter((k) => !svrKinds.has(k));
+  T('결재 등급표 종류 앱↔서버 일치(' + svrKinds.size + '종)', svrKinds.size > 0 && !onlyS.length && !onlyA.length,
+    '서버만: ' + onlyS.join(',') + ' / 앱만: ' + onlyA.join(','));
+} catch (e) { console.log('  (결재 등급표 대조 생략 — 파싱 실패)'); }
 
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

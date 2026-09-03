@@ -915,7 +915,7 @@
           <div class="scope-panel" id="taskScopePanel"></div>
         </div>
         <datalist id="memberNames"></datalist>
-        <label style="display:flex;align-items:center;gap:5px;font-size:13px;color:var(--sub);flex:0 0 auto;white-space:nowrap;" title="체크하면 지시 저장 후 대표 결재로 올라갑니다(건별 판단 — 누구나 체크 가능)"><input type="checkbox" id="taskApprChk"> 대표 상신</label>
+        <label style="display:flex;align-items:center;gap:5px;font-size:13px;color:var(--sub);flex:0 0 auto;white-space:nowrap;" title="체크하면 이 건만 결재라인(PM 승인 → 대표)으로 격상됩니다(건별 판단 — 누구나 체크 가능. PM이 직접 기안하면 PM 단계 자동통과)"><input type="checkbox" id="taskApprChk"> 대표 상신</label>
         <button id="taskAddBtn">지시 등록</button>
       </div>
     </div>
@@ -1311,6 +1311,9 @@
     <div class="dash-sec" style="margin-bottom:8px;"><h2>권한관리 <span class="cnt" id="permTotal"></span></h2></div>
     <button class="link-btn" id="permBackBtn">← 인사로</button>
     <div class="card" id="permRoster"><div class="loading">불러오는 중…</div></div>
+    <!-- 결재 등급표(결재 3차, 명세 §2) — 업무 종류 × 등급 칩. 변경은 새 상신부터(진행 중 건은 기안 시점 스냅샷), 감사로그 기록 -->
+    <div class="dash-sec" style="margin:16px 0 8px;"><h2>결재 등급표</h2></div>
+    <div class="card" id="apprGradeCard"><div class="loading">불러오는 중…</div></div>
   </section>
 
   <!-- 가족친화인증 실적 (인사 하위 · 관리자 전용) — 혁신⑧ 확정사양(2026-08-19): 관리자 대장 4종 기록 + 분기 리포트. 연차 소진율은 휴가 데이터 자동 집계 -->
@@ -3103,10 +3106,72 @@
   var apprDoneN = { ok:0, no:0, hold:0 };
   var apprPollTimer = null, apprBusy = false;
   var apprGen = 0;                         // 세션 세대 — 닫힘/재열림 뒤 도착한 늦은 응답이 새 큐를 오염시키지 않게
-  var APPR_KIND_EMOJI = { "지시":"📌", "운반일지":"📋", "사규":"📜", "지입료":"💳", "가족친화":"👨‍👩‍👧" };
+  var APPR_KIND_EMOJI = { "지시":"📌", "운반일지":"📋", "사규":"📜", "지입료":"💳", "가족친화":"👨‍👩‍👧",
+    "매뉴얼":"📖", "휴가":"🏖", "사직·휴직":"🚪", "계약 단계":"📝", "청구 검수":"🧾", "문서함 등재":"🗂",
+    "견적":"💰", "인허가 등재":"🏛", "조기퇴근":"🕔", "전결총정리":"🧮" };   // 서버 APPR_GRADE_DEFAULTS 키와 동일해야 등급표 화면·훅이 맞물린다
   // 대표 전용 건(9/3 PM: 운반일지 결재=대표, 다른 관리자는 알림함 확인만) — 서버 apprBossOnly·워커 to 스탬프와 3중 동일 규칙(to 우선, 구건은 종류로)
   function apprBossOnly(it){ return !!it && (it.to === "boss" || (it.to == null && it.kind === "운반일지")); }
-  function apprCanDecide(it){ return isAdmin() && (!apprBossOnly(it) || !apprBossPresent || !!(curMemberObj && isBossMember(curMemberObj))); }   // 대표 부재(boss_present=false)면 관리자 전원 — 서버 게이트와 같은 축
+  // ---- 결재 3차(업무별 등급, 명세 20260903): grade는 기안 시점 스냅샷. 없으면 구건=현행 ----
+  function apprGradeOf(it){
+    if (!it) return 0;
+    if (it.grade === 1 || it.grade === 2 || it.grade === 3) return it.grade;
+    if (it.to === "boss" && it.kind === "운반일지") return 3;   // v308 구건 운반일지=③ 간주(명세 §6 — 마이그레이션 없이)
+    return 0;
+  }
+  var apprPmPresent = true;   // 서버 pm_present — 비대표 관리자가 없으면 ①·② 1단계를 대표에게 연다(서버 PM_ONLY 게이트와 같은 축)
+  // 큐 분리(명세 §4.1): 대표=to boss 건+구건(현행) / 비대표 관리자=to pm 건+구건. ③건은 PM 뱃지·큐에 안 잡힌다(알림함 줄만)
+  function apprCanDecide(it){
+    if (!isAdmin() || !it) return false;
+    var isB = !!(curMemberObj && isBossMember(curMemberObj));
+    var g = apprGradeOf(it);
+    if (!g) return !apprBossOnly(it) || !apprBossPresent || isB;   // 구건: 현행(관리자 전원, 대표 전용 건은 대표 — v310 폴백 유지)
+    if ((it.to || "pm") === "boss") return isB || !apprBossPresent;
+    return !isB || !apprPmPresent;   // ①·② 1단계 = 비대표 관리자만(대표는 건별 관여 없음 — ① 정의)
+  }
+  // 등급 뱃지·단계 줄(시안 문구) — 카드·대표 홈·내 상신 공용
+  function apprGradeBadge(it){
+    var s = 'display:inline-block;font-size:10.5px;padding:1px 7px;border-radius:9px;font-weight:700;vertical-align:1px;';
+    if (it && it.kind === "전결총정리") return '<span style="' + s + 'background:#EAF3FA;color:#2b6c95;">①전결 총정리 · 확인만</span>';
+    var g = apprGradeOf(it);
+    if (g === 3) return '<span style="' + s + 'background:#FAF0E4;color:#a8651f;">③대표 전결</span>';
+    if (g === 2) return '<span style="' + s + 'background:#F1EAFA;color:#6b4f95;">' + (it.escalated ? "②격상 · 대표 상신" : "②결재라인") + '</span>';
+    if (g === 1) return '<span style="' + s + 'background:#EAF3FA;color:#2b6c95;">①PM 전결</span>';
+    return '<span style="' + s + 'background:#EEF1EF;color:#66756d;">등급 미정 · 현행</span>';
+  }
+  function apprChainPm(it){   // ②의 PM 단계 기록(승인·자동통과) — 단계 줄 표시용
+    var ch = (it && it.chain) || [];
+    for (var i = 0; i < ch.length; i++){ if (ch[i] && (ch[i].decision === "승인" || ch[i].decision === "자동통과")) return ch[i]; }
+    return null;
+  }
+  function apprStageLine(it){
+    var g = apprGradeOf(it), q = (it && it.to) || "pm";
+    var s = '<div style="margin-top:5px;font-size:12px;color:var(--sub);">';
+    if (g === 2){
+      if (q === "boss"){
+        var pm = apprChainPm(it);
+        var nm = (pm && pm.by && pm.by.name) ? pm.by.name : "";
+        var at = (pm && pm.at) ? " " + String(pm.at).slice(5, 10) : "";
+        return s + 'PM ' + esc(nm) + ' ' + esc((pm && pm.decision) || "승인") + esc(at) + ' → <b>대표 (2/2)</b></div>';
+      }
+      return s + '1/2단계 (PM) → 대표 · 반려는 기안자 회귀</div>';
+    }
+    if (g === 3 && it.kind !== "전결총정리") return s + '대표 전결 · PM·관리자는 알림함 확인만</div>';
+    if (g === 1) return s + 'PM 전결 — 승인 시 종결 · 월간 총정리로 대표 확인</div>';
+    return "";
+  }
+  // 내 상신 상태 문구(명세 단계 표) — 색은 원 status 기준 그대로
+  function apprStageText(it){
+    var g = apprGradeOf(it), st = (it && it.status) || "대기", q = (it && it.to) || "pm";
+    if (st === "대기" || st === "보류"){
+      var pre = st === "보류" ? "보류 · " : "";
+      if (g === 2) return pre + (q === "boss" ? "PM 승인 완료 · 대표 대기" : "PM 대기 (1/2)");
+      if (g === 3) return pre + "대표 대기";
+      if (g === 1) return pre + "PM 대기";
+      return st;
+    }
+    if (st === "승인" && g === 1) return "승인 · 월간 총정리 포함";
+    return st;
+  }
   // 아래 두 필터가 뱃지·한장씩 큐·?appr=auto·대표 홈을 한꺼번에 정한다 — 비대표 관리자에겐 대표 전용 건이 대기로 잡히지 않는다
   function apprWaitItems(){ return apprItems.filter(function(it){ return it && it.status === "대기" && apprCanDecide(it); }); }
   function apprHoldItems(){ return apprItems.filter(function(it){ return it && it.status === "보류" && apprCanDecide(it); }); }
@@ -3132,7 +3197,7 @@
     if (bd && bd.classList.contains("show")) return;
     gwCall("gw-data", { action: "approvals_list" }).then(function(res){
       if (res.status === 200 && res.body && Array.isArray(res.body.items)){
-        apprItems = res.body.items; apprBase = res.body.base || 0; apprBossPresent = (res.body.boss_present !== false); apprEverLoaded = true; apprLoadFailed = false; apprBadgeRender();
+        apprItems = res.body.items; apprBase = res.body.base || 0; apprBossPresent = (res.body.boss_present !== false); apprPmPresent = (res.body.pm_present !== false); apprEverLoaded = true; apprLoadFailed = false; apprBadgeRender();
         if (apprAutoOpen){
           apprAutoOpen = false;   // 부팅 1회만 — 이후 폴에선 조용히
           if (apprWaitItems().length || apprHoldItems().length) apprOpen();
@@ -3163,18 +3228,26 @@
     var it = apprQueue[apprIdx];
     if (!it){ apprFinish(); return; }
     document.getElementById("apprCount").textContent = (apprIdx + 1) + "/" + apprQueue.length;
-    var h = '<div style="font-weight:800;font-size:15px;">' + (APPR_KIND_EMOJI[it.kind] || "📄") + ' ' + esc(it.title || "(제목 없음)") + '</div>';
+    var h = '<div style="font-weight:800;font-size:15px;">' + (APPR_KIND_EMOJI[it.kind] || "📄") + ' ' + esc(it.title || "(제목 없음)") + ' ' + apprGradeBadge(it) + '</div>';
     if (it.body) h += '<div style="margin-top:6px;font-size:13px;white-space:pre-wrap;">' + esc(it.body) + '</div>';
     h += '<div style="margin-top:8px;font-size:12.5px;color:var(--sub);">' + esc(it.kind || "일반")
        + ' · 기안 ' + esc((it.by && it.by.name) || "?")
        + (it.created ? ' · ' + esc(apprDaysAgo(it.created)) : '')
        + (it.status === "보류" ? ' · <b style="color:var(--amber);">보류 중' + (it.reason ? " — " + esc(it.reason) : "") + '</b>' : '')
        + '</div>';
+    h += apprStageLine(it);   // 등급별 단계 줄(② "PM 승인 → 대표 (2/2)" 등 — 시안 문구)
     // 원 지시가 삭제된 고아 상신 힌트(지시-결재 양방향 동기화는 2차 TODO — 판단은 사람이)
     if (it.kind === "지시" && it.ref && typeof tasks !== "undefined" && Array.isArray(tasks) && tasks.length
         && !tasks.some(function(t){ return t && t.id === it.ref; }))
       h += '<div style="margin-top:6px;font-size:12px;color:var(--amber);">⚠ 원 지시를 찾을 수 없습니다(삭제됐을 수 있음)</div>';
     document.getElementById("apprCard").innerHTML = h;
+    // 버튼 분기(명세 §8): ② 1단계=[승인→대표로/반려](보류 없음) · 전결총정리=[확인]만 · 운반일지=[확인(결재)] 라벨 · 그 외 현행
+    var g = apprGradeOf(it), q = it.to || "pm";
+    var isSum = it.kind === "전결총정리";
+    var okBtn = document.getElementById("apprOkBtn"), noBtn = document.getElementById("apprNoBtn"), holdBtn = document.getElementById("apprHoldBtn");
+    if (okBtn) okBtn.textContent = isSum ? "확인" : (g === 2 && q === "pm" ? "승인 → 대표로" : (it.kind === "운반일지" ? "확인(결재)" : "승인"));
+    if (noBtn) noBtn.style.display = isSum ? "none" : "";
+    if (holdBtn) holdBtn.style.display = (isSum || (g === 2 && q === "pm")) ? "none" : "";
   }
   function apprOpen(){
     if (!isAdmin() || apprBusy) return;
@@ -3207,7 +3280,8 @@
   function apprDecide(decision, reasonArg, isRetry){
     if (apprBusy) return;   // 서버 응답 전 연타 방지(같은 건 이중 결재 → 409)
     var it = apprQueue[apprIdx]; if (!it) return;
-    if (!apprCanDecide(it)){ apprToastShow("대표 결재 건 — 건너뜁니다"); apprNext(); return; }   // 늦은 응답·정정본 교체 대비(서버도 BOSS_ONLY로 거부)
+    if (!apprCanDecide(it)){ apprToastShow("내 단계 결재 건이 아님 — 건너뜁니다"); apprNext(); return; }   // 늦은 응답·정정본 교체 대비(서버도 BOSS_ONLY·PM_ONLY로 거부)
+    if (it.kind === "전결총정리"){ if (decision !== "승인" && decision !== "확인") return; decision = "확인"; }   // 총정리는 [확인]만(서버 결정값 '확인' — §5)
     var reason = reasonArg;
     if (reason == null){
       reason = "";
@@ -3243,7 +3317,7 @@
               if (r2.body.base != null) apprBase = r2.body.base;
               for (var i = 0; i < r2.body.items.length; i++){ if (r2.body.items[i] && r2.body.items[i].id === it.id){ srv = r2.body.items[i]; break; } }
             }
-            if (srv && ((srv.updated || "") !== (it.updated || "") || srv.title !== it.title || srv.body !== it.body)){
+            if (srv && ((srv.updated || "") !== (it.updated || "") || srv.title !== it.title || srv.body !== it.body || (srv.to || "") !== (it.to || ""))){
               apprQueue[apprIdx] = srv;   // 정정본으로 교체 — busy 유지로 인덱스·큐가 이 구간에 안 움직였다
               apprRenderCard();
               apprBusy = false;
@@ -3261,8 +3335,12 @@
       }
       apprBusy = false;
       if (res.status !== 200){ alert("결재 처리 실패 (" + ((res.body && res.body.error_code) || res.status) + ")"); return; }
-      it.status = decision; if (reason) it.reason = reason;   // 폴이 오버레이 중 목록을 안 바꾸므로 참조가 유지된다
-      if (decision === "승인") apprDoneN.ok++; else if (decision === "반려") apprDoneN.no++; else apprDoneN.hold++;
+      // 서버 확정값 반영(폴이 오버레이 중 목록을 안 바꾸므로 참조가 유지된다).
+      // ② 1단계 승인은 종결이 아니라 전환(to:'boss'·status '대기') — 서버 응답의 to/decided를 그대로 얹는다
+      if (res.body && res.body.to) it.to = res.body.to;
+      it.status = (res.body && res.body.decided) || decision;
+      if (reason) it.reason = reason;
+      if (decision === "승인" || decision === "확인") apprDoneN.ok++; else if (decision === "반려") apprDoneN.no++; else apprDoneN.hold++;
       apprNext();
     }).catch(function(){ apprBusy = false; if (g === apprGen) alert("네트워크 오류 — 다시 시도해주세요."); });
   }
@@ -3283,7 +3361,7 @@
     if (idx < 0) return;
     apprFlushBusy = true;
     var p = apprPendingCreates[idx];
-    gwCall("gw-data", { action: "approval_create", kind: p.kind, title: p.title, body: p.body, ref: p.ref, cid: p.cid }).then(function(res){
+    gwCall("gw-data", { action: "approval_create", kind: p.kind, title: p.title, body: p.body, ref: p.ref, cid: p.cid, boss_up: p.boss ? 1 : 0 }).then(function(res){
       apprFlushBusy = false;
       if (res.status === 200){
         apprPendingCreates.splice(idx, 1); apprSavePending();
@@ -3354,9 +3432,9 @@
       var st = it.status || "대기";
       var col = st === "승인" ? "var(--brand)" : (st === "반려" ? "#c0392b" : (st === "보류" ? "var(--amber)" : "var(--sub)"));
       return '<div class="item"><div class="item-body">'
-        + '<div class="item-title">' + (APPR_KIND_EMOJI[it.kind] || "📄") + ' ' + esc(it.title || "(제목 없음)") + '</div>'
+        + '<div class="item-title">' + (APPR_KIND_EMOJI[it.kind] || "📄") + ' ' + esc(it.title || "(제목 없음)") + ' ' + apprGradeBadge(it) + '</div>'
         + '<div class="item-meta" style="margin-top:2px;">' + esc(it.kind || "일반")
-          + ' · <b style="color:' + col + ';">' + esc(st) + '</b>'
+          + ' · <b style="color:' + col + ';">' + esc(apprStageText(it)) + '</b>'   // 단계 문구(결재 3차 — "PM 승인 완료 · 대표 대기" 등)
           + (it.created ? ' · ' + esc(apprDaysAgo(it.created)) : '') + '</div>'
         + (st === "반려" && it.reason ? '<div class="task-detail" style="color:#c0392b;">사유: ' + esc(it.reason) + '</div>' : '')
         + '</div></div>';
@@ -3623,7 +3701,7 @@
     if (apChk && apChk.checked){
       apprPendingCreates.push({ cid: "c" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
         mid: myId(),   // 사용자 스코프 — 공용 PC에서 남의 큐를 내 명의로 쏘지 않게
-        kind: "지시", title: title,
+        kind: "지시", title: title, boss: 1,   // 결재 3차: ①종류의 "대표 상신" 토글 = 그 건만 ② 격상(서버 boss_up — PM 기안은 자동통과로 즉시 대표 큐)
         body: "담당 " + (t.who || "미지정") + (t.due ? " · 기한 " + t.due : ""), ref: newId });
       apprSavePending();   // 새로고침해도 상신이 증발하지 않게 즉시 영속
       apChk.checked = false;
@@ -5529,10 +5607,11 @@
     } else {
       inner = w.concat(hd).map(function(it){
         return '<div class="item" data-boss-appr="1" style="cursor:pointer;"><div class="item-body">' +
-            '<div class="item-title">' + (APPR_KIND_EMOJI[it.kind] || "📄") + ' ' + esc(it.title || "(제목 없음)") + '</div>' +
+            '<div class="item-title">' + (APPR_KIND_EMOJI[it.kind] || "📄") + ' ' + esc(it.title || "(제목 없음)") + ' ' + apprGradeBadge(it) + '</div>' +
             '<div class="item-meta" style="margin-top:2px;">' + esc(it.kind || "일반") + ' · 기안 ' + esc((it.by && it.by.name) || "?")
               + (it.created ? ' · ' + esc(apprDaysAgo(it.created)) : '')
               + (it.status === "보류" ? ' · <b style="color:var(--amber);">보류 중</b>' : '') + '</div>' +
+            apprStageLine(it) +
           '</div></div>';
       }).join("") +
       '<div style="text-align:center;padding:12px 0 6px;"><button class="primary" style="width:auto;padding:11px 28px;font-size:15px;" id="bossApprStart">결재 시작 — ' + (w.length ? '대기 ' + w.length + '건' : '보류 ' + hd.length + '건') + '</button></div>';
@@ -16521,7 +16600,76 @@
         pmCycle(p[0], p[1], btn);
       });
     });
+    renderApprGrades();   // 결재 등급표(결재 3차) — 권한관리 화면 하단
   }
+  // ---- 결재 등급표(결재 3차, 명세 §2) — 종류 × 등급 칩(시안 표 ②). PM=admin만 변경(서버도 강제), 변경 감사로그. ----
+  // 순서·표기는 §2 확정표. 키 문자열은 서버 APPR_GRADE_DEFAULTS와 동일해야 한다(uismoke가 대조).
+  var APPR_GRADE_ORDER = ["운반일지","지시","사규","매뉴얼","가족친화","지입료","휴가","사직·휴직","계약 단계","청구 검수","문서함 등재","견적","인허가 등재","조기퇴근"];
+  var APPR_GRADE_TXT = { 1:"①PM 전결", 2:"②결재라인", 3:"③대표 전결", 0:"현행(미정)" };
+  var APPR_GRADE_ROUTE = { 1:"담당 → PM ✔ (종결) · 월간 총정리로 대표 확인", 2:"담당 → PM ✔ → 대표 ✔", 3:"담당 → 대표 ✔ · PM은 알림함 확인", 0:"현행(관리자 전원 목록 · 대표 상신 토글)" };
+  var apprGradesTbl = null;
+  function apprGradeChipCss(g, on){
+    var base = 'border:1px solid var(--line);border-radius:7px;padding:3px 9px;font-size:11.5px;cursor:pointer;white-space:nowrap;background:transparent;color:var(--sub);';
+    if (!on) return base;
+    if (g === 1) return base + 'background:#EAF3FA;color:#2b6c95;font-weight:700;border-color:#8fb8d4;';
+    if (g === 2) return base + 'background:#F1EAFA;color:#6b4f95;font-weight:700;border-color:#b49fd4;';
+    if (g === 3) return base + 'background:#FAF0E4;color:#a8651f;font-weight:700;border-color:#d4b48f;';
+    return base + 'background:#EEF1EF;color:#3d4a44;font-weight:700;';
+  }
+  function renderApprGrades(){
+    var host = document.getElementById("apprGradeCard"); if (!host) return;
+    gwCall("gw-data", { action: "appr_grades_get" }).then(function(res){
+      if (res.status !== 200 || !res.body || !res.body.grades){
+        host.innerHTML = '<div class="empty-line">등급표를 불러오지 못했습니다 — 새로고침 후 다시 시도해주세요.</div>'; return;
+      }
+      apprGradesTbl = res.body.grades;
+      apprGradesBase = res.body.updated_at || 0;   // 낙관락 토큰 — 동시 변경 유실 방지
+      // 표에 있으나 순서 목록에 없는 키(향후 추가분)도 뒤에 붙여 렌더 — 화면 누락으로 편집 불가가 되지 않게
+      var kinds = APPR_GRADE_ORDER.slice();
+      for (var k in apprGradesTbl){ if (Object.prototype.hasOwnProperty.call(apprGradesTbl, k) && kinds.indexOf(k) < 0) kinds.push(k); }
+      var rows = kinds.map(function(kind){
+        var cur = apprGradesTbl[kind]; if (cur !== 1 && cur !== 2 && cur !== 3) cur = 0;
+        var chips = [1, 2, 3, 0].map(function(g){
+          return '<button type="button" style="' + apprGradeChipCss(g, cur === g) + '" data-ag-set="' + esc(kind) + ':' + g + '">' + APPR_GRADE_TXT[g] + '</button>';
+        }).join(" ");
+        return '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:7px 2px;border-bottom:1px solid var(--line);">'
+          + '<span style="min-width:118px;font-size:13px;font-weight:600;">' + (APPR_KIND_EMOJI[kind] || "📄") + ' ' + esc(kind) + '</span>'
+          + '<span style="display:inline-flex;gap:4px;flex-wrap:wrap;">' + chips + '</span>'
+          + '<span style="flex:1 1 100%;font-size:11.5px;color:var(--sub);padding-left:2px;">' + APPR_GRADE_ROUTE[cur] + '</span>'
+          + '</div>';
+      }).join("");
+      host.innerHTML = rows
+        + '<div class="empty-line" style="margin-top:6px;">변경은 <b>새 상신부터</b> 적용됩니다 — 진행 중인 건은 기안 시점 등급(스냅샷)대로 진행 · 변경은 감사로그에 기록'
+        + '<br>후보 종류(휴가·계약 단계 등)는 각 모듈에 결재 훅이 붙을 때부터 이 표대로 흐릅니다(§3.3)</div>';
+      Array.prototype.forEach.call(host.querySelectorAll("[data-ag-set]"), function(btn){
+        btn.addEventListener("click", function(){
+          var p = btn.getAttribute("data-ag-set").split(":");
+          apprGradeSet(p[0], Number(p[1]));
+        });
+      });
+    }).catch(function(){ host.innerHTML = '<div class="empty-line">등급표를 불러오지 못했습니다(네트워크).</div>'; });
+  }
+  var apprGradeSaving = false;
+  var apprGradesBase = 0;
+  function apprGradeSet(kind, g){
+    if (apprGradeSaving) return;   // 연타 방지 — 저장 순서 꼬임 방지(마지막 클릭만 남는 게 아니라 직렬)
+    if (apprGradesTbl && (apprGradesTbl[kind] || 0) === g) return;
+    apprGradeSaving = true;
+    gwCall("gw-data", { action: "appr_grades_set", kind: kind, grade: g, base: apprGradesBase }).then(function(res){
+      apprGradeSaving = false;
+      if (res.status === 409){
+        apprToastShow("다른 관리자가 방금 등급표를 변경했습니다 — 최신 표를 다시 불러왔습니다");
+        renderApprGrades();   // 재조회로 base 갱신 — 사람이 최신 표를 보고 다시 결정
+        return;
+      }
+      if (res.status !== 200){ alert("등급 저장 실패 (" + ((res.body && res.body.error_code) || res.status) + ")"); return; }
+      if (res.body && res.body.grades) apprGradesTbl = res.body.grades;
+      if (res.body && res.body.updated_at != null) apprGradesBase = res.body.updated_at;
+      apprToastShow("결재 등급 변경 — " + kind + " → " + APPR_GRADE_TXT[g] + " (새 상신부터 적용)");
+      renderApprGrades();
+    }).catch(function(){ apprGradeSaving = false; alert("등급 저장 실패(네트워크) — 다시 시도해주세요."); });
+  }
+
   function pmCycle(id, mod, btn){
     var m = findMember(id); if (!m || m.admin) return;
     if (!m.perms) m.perms = {};

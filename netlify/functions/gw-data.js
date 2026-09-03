@@ -910,6 +910,65 @@ async function handlePushLog(event, d, R) {
 // 대표 전용 건(9/3 PM 결정: 운반일지 결재=대표, 다른 관리자는 확인만) — to 필드 우선, 필드 없는 구건(9/2 이전)은 종류로 판정(하위호환).
 // 같은 규칙이 워커(to 스탬프)·index.html(apprBossOnly)에도 있다 — 바꾸면 3곳 동시에.
 function apprBossOnly(it) { return !!it && (it.to === 'boss' || (it.to == null && it.kind === '운반일지')); }
+
+// ---- 결재 3차(업무별 등급, 명세 20260903): kind → ①PM 전결 / ②결재라인(PM→대표) / ③대표 전결 ----
+// 등급은 "기안 시점 스냅샷"으로 항목(grade)에 박힌다 — 등급표를 나중에 바꿔도 진행 중 건의 경로는 안 바뀐다(§3.1).
+// grade 없는 항목(구건·등급표 밖 kind) = 현행 동작 그대로(관리자 전원 목록·admin 게이트) — 하위호환 §6.
+const APPR_GRADES_KEY = 'settings:approvals';
+// §2 배정표 — 9/3 PM 전량 확정(① 11종 · ② 사직·휴직 · ③ 운반일지·지입료). 기존 결재 종류 5종은 라이브 kind 문자열
+// 그대로, 나머지는 각 모듈에 결재 생성 훅이 붙을 때 이 키와 같은 kind로 상신해야 등급이 먹는다(§3.3).
+const APPR_GRADE_DEFAULTS = {
+  '운반일지': 3, '지입료': 3,
+  '사직·휴직': 2,
+  '지시': 1, '사규': 1, '매뉴얼': 1, '가족친화': 1, '휴가': 1, '계약 단계': 1,
+  '청구 검수': 1, '문서함 등재': 1, '견적': 1, '인허가 등재': 1, '조기퇴근': 1,
+};
+// 병합 규칙: 저장본(관리 화면 변경분)이 기본표 위에 얹힌다. 값 0 = "현행(등급 미정)"으로 되돌린 것.
+// 읽기 실패는 기본표 폴백 — 상신 자체를 막는 것보다 §2 확정표대로 가는 쪽이 안전(변경분 유실은 일시적, 표 변경은 드묾).
+async function apprGrades(st) {
+  try {
+    const r = await blobGet(st, APPR_GRADES_KEY);
+    if (r.ok && r.data && r.data.grades && typeof r.data.grades === 'object')
+      return Object.assign({}, APPR_GRADE_DEFAULTS, r.data.grades);
+  } catch (e) {}
+  return Object.assign({}, APPR_GRADE_DEFAULTS);
+}
+async function handleApprGradesGet(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (!c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
+  const st = store(DATA);
+  const grades = await apprGrades(st);
+  let meta = {};
+  try { const r = await blobGet(st, APPR_GRADES_KEY); if (r.ok && r.data) meta = { updated_at: r.data.updated_at || 0, updated_by: r.data.updated_by || '' }; } catch (e) {}
+  return jr(200, { status: 'OK', grades: grades, defaults: APPR_GRADE_DEFAULTS, updated_at: meta.updated_at || 0, updated_by: meta.updated_by || '', request_id: R });
+}
+async function handleApprGradesSet(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (!c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });   // PM=admin만 변경(명세 §3.2)
+  const kind = String(d.kind || '').trim().slice(0, 20);
+  const grade = Number(d.grade);
+  if (!kind || kind === '전결총정리') return jr(400, { status: 'REJECTED', error_code: 'BAD_KIND', request_id: R });
+  if (grade !== 0 && grade !== 1 && grade !== 2 && grade !== 3) return jr(400, { status: 'REJECTED', error_code: 'BAD_GRADE', request_id: R });
+  const st = store(DATA);
+  // 등록 가능한 kind = 기본표 키 + 이미 저장된 키(임의 문자열로 표가 오염되지 않게)
+  let stored = {}, curAt = 0;
+  try { const r = await blobGet(st, APPR_GRADES_KEY); if (r.ok && r.data) { if (r.data.grades && typeof r.data.grades === 'object') stored = r.data.grades; curAt = r.data.updated_at || 0; } } catch (e) {}
+  // 낙관락 — 두 관리자 동시 변경의 lost-update 방지(리뷰 low). base 미전송(구클라)은 종전대로 last-write
+  if (d.base !== undefined && Number(d.base) !== Number(curAt))
+    return jr(409, { status: 'CONFLICT', error_code: 'GRADES_STALE', request_id: R });
+  if (!Object.prototype.hasOwnProperty.call(APPR_GRADE_DEFAULTS, kind) && !Object.prototype.hasOwnProperty.call(stored, kind))
+    return jr(400, { status: 'REJECTED', error_code: 'UNKNOWN_KIND', request_id: R });
+  const before = Object.prototype.hasOwnProperty.call(stored, kind) ? stored[kind] : APPR_GRADE_DEFAULTS[kind];
+  stored[kind] = grade;
+  const doc = { schema: 1, grades: stored, updated_by: c.member.id, updated_at: Date.now() };
+  const w = await blobSet(st, APPR_GRADES_KEY, doc);
+  if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
+  // 변경 감사로그(명세 §2) — 진행 중 건은 스냅샷이라 영향 없음(항목 grade가 이미 박혀 있다)
+  try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'approvals', ev: [{ op: '등급변경', id: kind, t: kind + ' ' + before + '→' + grade + (grade === 0 ? '(현행)' : '') }] }); } catch (e) {}
+  return jr(200, { status: 'OK', grades: Object.assign({}, APPR_GRADE_DEFAULTS, stored), updated_at: doc.updated_at, request_id: R });
+}
 async function approvalsDoc(st) {
   const r = await blobGet(st, colKey('approvals'));
   // 읽기 실패를 빈 문서로 위조하면 다음 쓰기가 대장 전체를 1건짜리로 덮는다(클라 shim과 같은 원칙) — 실패는 실패로 반환
@@ -926,8 +985,10 @@ async function handleApprovalsList(event, d, R) {
   const items = c.member.admin ? doc.items : doc.items.filter(function (it) { return it && it.by && it.by.id === c.member.id; });
   // base = 낙관락 토큰. decide가 이 값을 들고 와야 하며 불일치면 409 APPR_STALE(관리자 2인 동시 결재 유실 방지)
   // boss_present — 대표 계정 존재 여부(클라 apprCanDecide 폴백용: 대표가 없으면 관리자 전원이 대표 전용 건을 결재). 관리자에게만 계산(회원 블롭 스캔)
+  // pm_present — 비대표 관리자 존재 여부(결재 3차: ①·② 1단계는 비대표 관리자 전용인데, 없으면 대표에게 연다 — 서버 PM_ONLY 게이트와 같은 축)
   const bossN = c.member.admin ? (await push.bossIds()).length : 0;
-  return jr(200, { status: 'OK', items: items, base: doc.updated_at || 0, boss_present: bossN > 0, request_id: R });
+  const pmN = c.member.admin ? (await push.pmIds()).length : 0;
+  return jr(200, { status: 'OK', items: items, base: doc.updated_at || 0, boss_present: bossN > 0, pm_present: pmN > 0, request_id: R });
 }
 async function handleApprovalCreate(event, d, R) {
   const c = await currentMember(event);
@@ -935,6 +996,8 @@ async function handleApprovalCreate(event, d, R) {
   if (!(await deviceApproved(event, c.member))) return jr(403, { status: 'FORBIDDEN', error_code: 'DEVICE_NOT_APPROVED', request_id: R });
   const title = String(d.title || '').trim().slice(0, 120);
   if (!title) return jr(400, { status: 'REJECTED', error_code: 'NO_TITLE', request_id: R });
+  const kind0 = String(d.kind || '일반').slice(0, 20);
+  if (kind0 === '전결총정리') return jr(400, { status: 'REJECTED', error_code: 'SYSTEM_KIND', request_id: R });   // 크론 전용 kind — 사용자 기안 불가(§3.3)
   const st = store(DATA);
   const rd = await approvalsDoc(st);
   if (!rd.ok) return jr(500, { status: 'ERROR', error_code: rd.code, request_id: R });
@@ -994,11 +1057,26 @@ async function handleApprovalCreate(event, d, R) {
     } catch (e) {}
     return jr(200, { status: 'OK', id: dr2.id, updated: true, request_id: R });
   }
-  const kind0 = String(d.kind || '일반').slice(0, 20);
-  // to는 서버가 종류로 정한다(클라 값 불신) — 운반일지=대표 전용
+  // 등급 스탬프(결재 3차 §4.3) — to·grade는 서버가 종류로 정한다(클라 값 불신). 기안 시점 스냅샷이라 이후 표 변경에 영향 없음.
+  const grades = await apprGrades(st);
+  let grade = grades[kind0];
+  if (grade !== 1 && grade !== 2 && grade !== 3) grade = 0;   // 0·미등재 = 등급 미정(현행)
+  let escalated = false;
+  if (grade === 1 && d.boss_up) { grade = 2; escalated = true; }   // "대표 상신" 토글 = ① 건별 ② 격상(§1)
   const item = { id: 'ap' + crypto.randomBytes(6).toString('hex'), cid: cid || undefined, kind: kind0, to: (kind0 === '운반일지' ? 'boss' : undefined),
     title: title, body: String(d.body || '').slice(0, 500), ref: String(d.ref || '').slice(0, 60),
     by: { id: c.member.id, name: c.member.name }, created: new Date().toISOString(), status: '대기' };
+  if (grade) {
+    item.grade = grade;
+    item.to = (grade === 3) ? 'boss' : 'pm';   // ①·② 1단계는 PM 큐, ③은 즉시 대표 큐(v308 운반일지 하드코딩의 일반화)
+    item.chain = [];
+    if (escalated) item.escalated = true;
+    // PM(비대표 관리자) 자기 기안 ②는 PM 단계 자동통과(§1·§4.3) — 자기 결재 단계를 없애고 chain에 명시(감사 논란 방지, §11)
+    if (grade === 2 && c.member.admin && !push.isBoss(c.member)) {
+      item.chain.push({ by: { id: c.member.id, name: c.member.name }, decision: '자동통과', at: item.created });
+      item.to = 'boss';
+    }
+  }
   fresh.items.push(item);
   fresh.updated_by = c.member.id; fresh.updated_at = Date.now();
   const w = await blobSet(st, colKey('approvals'), fresh);
@@ -1013,10 +1091,13 @@ async function handleApprovalCreate(event, d, R) {
     }
   } catch (e) {}
   try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'approvals', ev: [{ op: '상신', id: item.id, t: (item.kind + ' · ' + title).slice(0, 80) }] }); } catch (e) {}
-  // 관리자 웹푸시 — 기안자 본인만 제외(push_send __admins__ 관례와 동일). 발송 실패가 상신을 막지 않는다.
-  // 운반일지만 전 기기(배치도 결정 ① 명시 예외 — 오피스PC 팝업+폰 병행), 그 외 종류는 우선기기 1발(결정 ③)
+  // 결재 요청 웹푸시 — 기안자 본인만 제외(push_send __admins__ 관례와 동일). 발송 실패가 상신을 막지 않는다.
+  // 수신자(결재 3차 §4.3): 대표 큐(③·자동통과 ②·구건 운반일지)=대표(없으면 관리자 폴백) / ①·② 1단계=비대표 관리자(없으면 관리자 폴백) / 구건=관리자 전원(현행).
+  // 운반일지만 전 기기(배치도 결정 ① 명시 예외 — 오피스PC 팝업+폰 병행), 그 외 종류는 우선기기 1발(결정 ③).
+  // ③건의 PM 몫은 별도 발송 없음 — 대표행 발송이 push:log(알림함)에 남고 관리자는 알림함 전체를 보므로 그 줄이 "확인" 줄이 된다(v308 방식).
   try {
-    const ids = (apprBossOnly(item) ? await push.bossOrAdminIds() : await push.adminIds()).filter(function (id) { return id !== c.member.id; });
+    const ids = (apprBossOnly(item) ? await push.bossOrAdminIds()
+      : (item.grade ? await push.pmOrAdminIds() : await push.adminIds())).filter(function (id) { return id !== c.member.id; });
     await push.sendTo(ids, { title: '결재 요청: ' + title.slice(0, 40), body: '[' + item.kind + '] 기안 ' + c.member.name, url: './', tag: 'appr-' + item.id },
       item.kind === '운반일지' ? null : { primaryOnly: true });
   } catch (e) {}
@@ -1027,7 +1108,7 @@ async function handleApprovalDecide(event, d, R) {
   if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
   if (!c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
   const decision = String(d.decision || '');
-  if (decision !== '승인' && decision !== '반려' && decision !== '보류') return jr(400, { status: 'REJECTED', error_code: 'BAD_DECISION', request_id: R });
+  if (decision !== '승인' && decision !== '반려' && decision !== '보류' && decision !== '확인') return jr(400, { status: 'REJECTED', error_code: 'BAD_DECISION', request_id: R });
   const reason = String(d.reason || '').trim().slice(0, 300);
   if (decision === '반려' && !reason) return jr(400, { status: 'REJECTED', error_code: 'REASON_REQUIRED', request_id: R });
   const st = store(DATA);
@@ -1043,6 +1124,16 @@ async function handleApprovalDecide(event, d, R) {
   // 대표 전용 건의 승인·반려는 대표만(서버 하드 게이트 — 클라 숨김은 UI일 뿐). 보류는 관리자 누구나(대표 부재 시 대기 유지 통로).
   // 대표 계정이 하나도 없으면(role 불일치 등) 관리자 전원에게 연다 — 푸시 폴백(bossOrAdminIds)·클라 boss_present와 같은 축(교착 방지, v310)
   if (apprBossOnly(pre) && decision !== '보류' && !push.isBoss(c.member) && (await push.bossIds()).length) return jr(403, { status: 'FORBIDDEN', error_code: 'BOSS_ONLY', request_id: R });
+  // ---- 결재 3차 등급 게이트(명세 §4.1) — 위 BOSS_ONLY(대표 큐)와 함께 게이트 표를 이룬다. 구건(grade 없음)은 여기 전부 통과(현행 admin) ----
+  const preGrade = (pre.grade === 1 || pre.grade === 2 || pre.grade === 3) ? pre.grade : ((pre.to === 'boss' && pre.kind === '운반일지') ? 3 : 0);   // v308 구건 운반일지=③ 간주(§6)
+  const preQ = pre.to || 'pm';
+  // [확인]은 전결총정리 전용(§5 — 승인과 같은 처리·"열람 확인" 성격), 전결총정리는 [확인]만(반려·보류 버튼 없음)
+  if (decision === '확인' && pre.kind !== '전결총정리') return jr(400, { status: 'REJECTED', error_code: 'CONFIRM_ONLY_SUMMARY', request_id: R });
+  if (pre.kind === '전결총정리' && decision !== '확인') return jr(400, { status: 'REJECTED', error_code: 'SUMMARY_CONFIRM_ONLY', request_id: R });
+  // ①·② 1단계(PM 큐)=비대표 관리자만 — 대표는 건별 관여 없음(① 정의). 비대표 관리자가 0명이면 대표에게 연다(교착 방지, BOSS_ONLY 폴백과 대칭)
+  if (preGrade && preQ === 'pm' && push.isBoss(c.member) && (await push.pmIds()).length) return jr(403, { status: 'FORBIDDEN', error_code: 'PM_ONLY', request_id: R });
+  // ②라인 PM 단계는 보류 없음(§12-6 PM 동의) — 미룰 이유가 있으면 반려로 되돌리는 게 빠르다는 판단
+  if (preGrade === 2 && preQ === 'pm' && decision === '보류') return jr(400, { status: 'REJECTED', error_code: 'HOLD_NOT_ALLOWED', request_id: R });
   await verSnapshot('approvals', rd.doc, c.member.name, false);   // 변형 전 시점 보존(복구 링)
   // 레이스 창 축소(리뷰 [A-잔여]): verSnapshot이 블롭 왕복을 끼워 첫 읽기→쓰기 간격이 수백ms로 벌어지고,
   // 그 사이 착지한 동시 상신을 본선 쓰기가 지울 수 있다 — 쓰기 직전 신선본을 다시 읽어 그 위에 결정을 얹는다.
@@ -1052,10 +1143,26 @@ async function handleApprovalDecide(event, d, R) {
   const it = doc.items.find(function (x) { return x && x.id === String(d.id || ''); });
   if (!it) return jr(404, { status: 'NOT_FOUND', error_code: 'NO_APPROVAL', request_id: R });
   if (it.status === '승인' || it.status === '반려') return jr(409, { status: 'CONFLICT', error_code: 'ALREADY_DECIDED', base: doc.updated_at || 0, request_id: R });
-  it.status = decision;
-  it.decided_by = { id: c.member.id, name: c.member.name };
-  it.decided_at = new Date().toISOString();
-  it.reason = reason;
+  // 신선본에서 큐가 이미 넘어갔으면(PM이 방금 승인해 to:'boss') 낡은 결정을 세운다 — 낙관락과 같은 취지의 마지막 방어
+  if ((it.to || 'pm') !== preQ) return jr(409, { status: 'CONFLICT', error_code: 'APPR_STALE', base: doc.updated_at || 0, request_id: R });
+  const nowIso = new Date().toISOString();
+  const itGrade = (it.grade === 1 || it.grade === 2 || it.grade === 3) ? it.grade : ((it.to === 'boss' && it.kind === '운반일지') ? 3 : 0);
+  // ② 1단계 승인 = 종결이 아니라 단계 전환(§4.2): to:'boss'로 넘기고 status는 '대기' 유지, 최종 결과 필드(decided_*)는 비워 둔다
+  const isPmStep = (itGrade === 2 && (it.to || 'pm') === 'pm' && decision === '승인');
+  if (itGrade) {   // 등급 건은 단계별 기록(chain — 카드 표시용, 감사로그는 별도로 계속)
+    if (!Array.isArray(it.chain)) it.chain = [];
+    const ce = { by: { id: c.member.id, name: c.member.name }, decision: decision, at: nowIso };
+    if (reason) ce.reason = reason;
+    it.chain.push(ce);
+  }
+  if (isPmStep) {
+    it.to = 'boss'; it.status = '대기';
+  } else {
+    it.status = (decision === '확인') ? '승인' : decision;   // [확인]=승인과 같은 처리(§5)
+    it.decided_by = { id: c.member.id, name: c.member.name };
+    it.decided_at = nowIso;
+    it.reason = reason;
+  }
   doc.updated_by = c.member.id; doc.updated_at = Date.now();
   const w = await blobSet(st, colKey('approvals'), doc);
   if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
@@ -1065,29 +1172,43 @@ async function handleApprovalDecide(event, d, R) {
     const chk = await blobGet(st, colKey('approvals'));
     if (chk.ok && chk.data && Array.isArray(chk.data.items)) {
       const cur = chk.data.items.find(function (x) { return x && x.id === it.id; });
-      if (cur && cur.status !== decision) {
-        cur.status = decision; cur.decided_by = it.decided_by; cur.decided_at = it.decided_at; cur.reason = reason;
+      // 되돌림 판정: ② 1단계 전환은 to로, 그 외는 최종 status로(전환은 status가 '대기' 그대로라 status 비교만으론 못 잡는다)
+      const drifted = cur && (isPmStep ? cur.to !== 'boss' : cur.status !== it.status);
+      if (drifted) {
+        cur.status = it.status; cur.decided_by = it.decided_by; cur.decided_at = it.decided_at; cur.reason = it.reason;
+        if (it.to) cur.to = it.to;
+        if (Array.isArray(it.chain)) cur.chain = it.chain;
         chk.data.updated_by = c.member.id; chk.data.updated_at = Date.now();
         await blobSet(st, colKey('approvals'), chk.data);
         newBase = chk.data.updated_at;
       } else if (chk.data.updated_at) newBase = chk.data.updated_at;
     }
   } catch (e) {}
-  try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'approvals', ev: [{ op: '결재', id: it.id, t: (decision + (reason ? ' — ' + reason.slice(0, 40) : '') + ' · ' + String(it.title || '').slice(0, 40)) }] }); } catch (e) {}
-  // 기안자에게 결과+사유 웹푸시 — 본인 상신을 본인이 결재한 경우는 생략.
-  // 자동 기안(__system__)은 구독이 없어 통지가 증발한다(리뷰 med) — 결정자 제외 관리자 전원에게 라우팅
-  // (반려 후 재기안은 사람 몫인데 그 사람에게 닿는 채널이 이것뿐)
+  try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'approvals', ev: [{ op: '결재', id: it.id, t: ((isPmStep ? '승인→대표' : (decision === '확인' ? '열람 확인' : decision)) + (reason ? ' — ' + reason.slice(0, 40) : '') + ' · ' + String(it.title || '').slice(0, 40)) }] }); } catch (e) {}
+  // 통지 라우팅(결재 3차 §4.2):
+  //  ② 1단계 승인 → 대표 우선기기 1발(결재 요청) + 기안자는 알림함 줄만(푸시 없음 — 담당이 할 일이 없다)
+  //  전결총정리 [확인] → 푸시 없음(§5 — 기안자가 시스템)
+  //  그 외 최종 결과 → 기안자 1발(현행). 자동 기안(__system__)은 구독이 없어 관리자 전원 라우팅(리뷰 med).
   try {
-    const isSys = !!(it.by && it.by.id === '__system__');
-    const toIds = isSys
-      ? (await push.adminIds()).filter(function (id) { return id !== c.member.id; })
-      : ((it.by && it.by.id && it.by.id !== c.member.id) ? [it.by.id] : []);
-    if (toIds.length || isSys)   // 자동상신은 대상이 없어도(1인 관리자) 호출 — sendTo가 알림함 이력(push:log)은 남긴다
-      await push.sendTo(toIds, { title: '결재 ' + decision + ': ' + String(it.title || '').slice(0, 40) + (isSys ? ' (자동상신)' : ''),
-        body: reason ? '사유: ' + reason.slice(0, 150) : (decision === '승인' ? '승인되었습니다' : ''), url: './', tag: 'appr-' + it.id },
-        isSys ? { primaryOnly: true } : null);   // 자동상신 결과 통지는 확인용 — 우선기기 1발(결정 ③), 결재 요청만 전 기기 예외
+    if (isPmStep) {
+      const bIds = (await push.bossOrAdminIds()).filter(function (id) { return id !== c.member.id; });
+      await push.sendTo(bIds, { title: '결재 요청: ' + String(it.title || '').slice(0, 40),
+        body: '[' + it.kind + '] PM 승인 완료 → 대표 (2/2)', url: './', tag: 'appr-' + it.id }, { primaryOnly: true });
+      if (it.by && it.by.id && it.by.id !== c.member.id && it.by.id !== '__system__')
+        await push.sendTo([it.by.id], { title: '결재 진행: ' + String(it.title || '').slice(0, 40),
+          body: 'PM 승인 완료 · 대표 대기', url: './', tag: 'appr-' + it.id }, { logOnly: true });
+    } else if (it.kind !== '전결총정리') {
+      const isSys = !!(it.by && it.by.id === '__system__');
+      const toIds = isSys
+        ? (await push.adminIds()).filter(function (id) { return id !== c.member.id; })
+        : ((it.by && it.by.id && it.by.id !== c.member.id) ? [it.by.id] : []);
+      if (toIds.length || isSys)   // 자동상신은 대상이 없어도(1인 관리자) 호출 — sendTo가 알림함 이력(push:log)은 남긴다
+        await push.sendTo(toIds, { title: '결재 ' + decision + ': ' + String(it.title || '').slice(0, 40) + (isSys ? ' (자동상신)' : ''),
+          body: reason ? '사유: ' + reason.slice(0, 150) : (decision === '승인' ? '승인되었습니다' : ''), url: './', tag: 'appr-' + it.id },
+          (isSys || itGrade) ? { primaryOnly: true } : null);   // 등급 건·자동상신 결과는 우선기기 1발(결정 ③), 구건은 현행(전 기기)
+    }
   } catch (e) {}
-  return jr(200, { status: 'OK', id: it.id, decided: it.status, base: newBase, request_id: R });
+  return jr(200, { status: 'OK', id: it.id, decided: it.status, to: it.to, base: newBase, request_id: R });
 }
 
 // ---- 계약 첨부파일(석면조사서 등) — Blobs 저장 + 서버측 텍스트 추출 ----
@@ -1558,6 +1679,8 @@ async function handler(event) {
     if (d && d.action === 'approvals_list') return await handleApprovalsList(event, d, R);
     if (d && d.action === 'approval_create') return await handleApprovalCreate(event, d, R);
     if (d && d.action === 'approval_decide') return await handleApprovalDecide(event, d, R);
+    if (d && d.action === 'appr_grades_get') return await handleApprGradesGet(event, d, R);
+    if (d && d.action === 'appr_grades_set') return await handleApprGradesSet(event, d, R);
     return jr(400, { status: 'REJECTED', error_code: 'UNKNOWN_ACTION', request_id: R });
   } catch (e) {
     // 서버 예외도 오류 로그에 축적(클라 err_log와 같은 저장소) — 기록 실패는 무시

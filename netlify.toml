@@ -20,6 +20,12 @@
 [functions."gw-todo-cron"]
   schedule = "0 23 * * *"
 
+# 전결 총정리(결재 3차) — UTC 23:00 = KST 익일 08:00 매일 기동, 함수 내부에서 KST 1일에만 실행(매월 1일 08:00).
+# cron 5필드로는 "매월 1일 KST 08:00"(= UTC 전월 말일 23:00)을 못 쓴다 — 말일 날짜가 달마다 달라서.
+# 전월 ①PM 전결 승인 건 + 휴가 승인(읽기 합산)을 카드 1장으로 대표에게 상신(멱등 summary-YYYY-MM, 0건 미생성).
+[functions."gw-appr-cron"]
+  schedule = "0 23 * * *"
+
 # 정적 파일은 그대로 서빙, /.netlify/functions/* 는 서버리스 함수로.
 
 # 진척도 벽지·위젯 — 캐시 금지.
