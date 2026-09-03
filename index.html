@@ -5925,7 +5925,7 @@
     if (docApprBusy) return;
     var d = findDoc(id); if (!d) return;
     var def = docApprDefaultKind(d);
-    var ans = prompt("결재 종류 번호 — 1 사규 / 2 매뉴얼 / 3 가족친화 / 4 문서함 등재\n(" + esc(d.title || "") + ")", String(def));
+    var ans = prompt("결재 종류 번호 — 1 사규 / 2 매뉴얼 / 3 가족친화 / 4 문서함 등재\n(" + String(d.title || "") + ")", String(def));   // prompt는 텍스트 — HTML 이스케이프 금지(&amp; 노출)
     if (ans === null) return;
     var k = parseInt(String(ans).trim(), 10);
     if (!(k >= 1 && k <= 4)){ alert("1~4 번호로 골라주세요."); return; }
