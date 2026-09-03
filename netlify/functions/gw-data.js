@@ -907,6 +907,9 @@ async function handlePushLog(event, d, R) {
 // 저장은 col:approvals 규격이지만 COL 맵엔 등록하지 않는다 — 일반 get/save를 열면
 // 임의 직원이 타인 상신을 읽거나 결정 필드(status·decided_by)를 클라 사본으로 덮을 수 있어
 // 전용 액션 3종으로만 접근한다(목록=본인분 필터, 결정=관리자 + 반려 사유 서버 검증).
+// 대표 전용 건(9/3 PM 결정: 운반일지 결재=대표, 다른 관리자는 확인만) — to 필드 우선, 필드 없는 구건(9/2 이전)은 종류로 판정(하위호환).
+// 같은 규칙이 워커(to 스탬프)·index.html(apprBossOnly)에도 있다 — 바꾸면 3곳 동시에.
+function apprBossOnly(it) { return !!it && (it.to === 'boss' || (it.to == null && it.kind === '운반일지')); }
 async function approvalsDoc(st) {
   const r = await blobGet(st, colKey('approvals'));
   // 읽기 실패를 빈 문서로 위조하면 다음 쓰기가 대장 전체를 1건짜리로 덮는다(클라 shim과 같은 원칙) — 실패는 실패로 반환
@@ -962,6 +965,7 @@ async function handleApprovalCreate(event, d, R) {
     dr2.title = title;
     dr2.body = String(d.body || '').slice(0, 500);
     dr2.by = { id: c.member.id, name: c.member.name };   // 정정자가 새 기안자 — 결재 결과 통지·'내 상신'도 이 사람 기준
+    if (apprBossOnly(dr2) && dr2.to == null) dr2.to = 'boss';   // 구건 승격 — 판정 규칙이 나중에 to 필드만 보게 바뀌어도 열리지 않게
     dr2.updated = new Date().toISOString();
     fresh.updated_by = c.member.id; fresh.updated_at = Date.now();
     const uw = await blobSet(st, colKey('approvals'), fresh);
@@ -973,7 +977,7 @@ async function handleApprovalCreate(event, d, R) {
       if (chk2.ok && chk2.data && Array.isArray(chk2.data.items)) {
         const cur2 = chk2.data.items.find(function (x) { return x && x.id === dr2.id; });
         if (cur2 && cur2.updated !== dr2.updated && (cur2.status === '대기' || cur2.status === '보류')) {
-          cur2.title = dr2.title; cur2.body = dr2.body; cur2.by = dr2.by; cur2.updated = dr2.updated;
+          cur2.title = dr2.title; cur2.body = dr2.body; cur2.by = dr2.by; cur2.updated = dr2.updated; if (dr2.to) cur2.to = dr2.to;
           chk2.data.updated_by = c.member.id; chk2.data.updated_at = Date.now();
           await blobSet(st, colKey('approvals'), chk2.data);
         }
@@ -981,13 +985,16 @@ async function handleApprovalCreate(event, d, R) {
     } catch (e) {}
     try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'approvals', ev: [{ op: '상신정정', id: dr2.id, t: (dr2.kind + ' · ' + title).slice(0, 80) }] }); } catch (e) {}
     try {
-      const uids = (await push.adminIds()).filter(function (id) { return id !== c.member.id; });
-      if (uids.length) await push.sendTo(uids, { title: '결재 요청(정정): ' + title.slice(0, 40), body: '[' + dr2.kind + '] 정정 ' + c.member.name, url: './', tag: 'appr-' + dr2.id },
+      // 대표 전용 건은 대표에게만(없으면 관리자 폴백). sendTo는 수신자가 없어도 알림함 이력을 남긴다(관리자 확인용)
+      const uids = (apprBossOnly(dr2) ? await push.bossOrAdminIds() : await push.adminIds()).filter(function (id) { return id !== c.member.id; });
+      await push.sendTo(uids, { title: '결재 요청(정정): ' + title.slice(0, 40), body: '[' + dr2.kind + '] 정정 ' + c.member.name, url: './', tag: 'appr-' + dr2.id },
         dr2.kind === '운반일지' ? null : { primaryOnly: true });
     } catch (e) {}
     return jr(200, { status: 'OK', id: dr2.id, updated: true, request_id: R });
   }
-  const item = { id: 'ap' + crypto.randomBytes(6).toString('hex'), cid: cid || undefined, kind: String(d.kind || '일반').slice(0, 20),
+  const kind0 = String(d.kind || '일반').slice(0, 20);
+  // to는 서버가 종류로 정한다(클라 값 불신) — 운반일지=대표 전용
+  const item = { id: 'ap' + crypto.randomBytes(6).toString('hex'), cid: cid || undefined, kind: kind0, to: (kind0 === '운반일지' ? 'boss' : undefined),
     title: title, body: String(d.body || '').slice(0, 500), ref: String(d.ref || '').slice(0, 60),
     by: { id: c.member.id, name: c.member.name }, created: new Date().toISOString(), status: '대기' };
   fresh.items.push(item);
@@ -1007,8 +1014,8 @@ async function handleApprovalCreate(event, d, R) {
   // 관리자 웹푸시 — 기안자 본인만 제외(push_send __admins__ 관례와 동일). 발송 실패가 상신을 막지 않는다.
   // 운반일지만 전 기기(배치도 결정 ① 명시 예외 — 오피스PC 팝업+폰 병행), 그 외 종류는 우선기기 1발(결정 ③)
   try {
-    const ids = (await push.adminIds()).filter(function (id) { return id !== c.member.id; });
-    if (ids.length) await push.sendTo(ids, { title: '결재 요청: ' + title.slice(0, 40), body: '[' + item.kind + '] 기안 ' + c.member.name, url: './', tag: 'appr-' + item.id },
+    const ids = (apprBossOnly(item) ? await push.bossOrAdminIds() : await push.adminIds()).filter(function (id) { return id !== c.member.id; });
+    await push.sendTo(ids, { title: '결재 요청: ' + title.slice(0, 40), body: '[' + item.kind + '] 기안 ' + c.member.name, url: './', tag: 'appr-' + item.id },
       item.kind === '운반일지' ? null : { primaryOnly: true });
   } catch (e) {}
   return jr(200, { status: 'OK', id: item.id, request_id: R });
@@ -1029,6 +1036,8 @@ async function handleApprovalDecide(event, d, R) {
     return jr(409, { status: 'CONFLICT', error_code: 'APPR_STALE', base: rd.doc.updated_at || 0, request_id: R });
   const pre = rd.doc.items.find(function (x) { return x && x.id === String(d.id || ''); });
   if (!pre) return jr(404, { status: 'NOT_FOUND', error_code: 'NO_APPROVAL', request_id: R });
+  // 대표 전용 건의 승인·반려는 대표만(서버 하드 게이트 — 클라 숨김은 UI일 뿐). 보류는 관리자 누구나(대표 부재 시 대기 유지 통로).
+  if (apprBossOnly(pre) && decision !== '보류' && !push.isBoss(c.member)) return jr(403, { status: 'FORBIDDEN', error_code: 'BOSS_ONLY', request_id: R });
   // 승인·반려는 종결(재결정 불가). '보류'만 대기 성격을 유지해 재결정 가능
   if (pre.status === '승인' || pre.status === '반려') return jr(409, { status: 'CONFLICT', error_code: 'ALREADY_DECIDED', base: rd.doc.updated_at || 0, request_id: R });
   await verSnapshot('approvals', rd.doc, c.member.name, false);   // 변형 전 시점 보존(복구 링)
@@ -1072,7 +1081,8 @@ async function handleApprovalDecide(event, d, R) {
       : ((it.by && it.by.id && it.by.id !== c.member.id) ? [it.by.id] : []);
     if (toIds.length || isSys)   // 자동상신은 대상이 없어도(1인 관리자) 호출 — sendTo가 알림함 이력(push:log)은 남긴다
       await push.sendTo(toIds, { title: '결재 ' + decision + ': ' + String(it.title || '').slice(0, 40) + (isSys ? ' (자동상신)' : ''),
-        body: reason ? '사유: ' + reason.slice(0, 150) : (decision === '승인' ? '승인되었습니다' : ''), url: './', tag: 'appr-' + it.id });
+        body: reason ? '사유: ' + reason.slice(0, 150) : (decision === '승인' ? '승인되었습니다' : ''), url: './', tag: 'appr-' + it.id },
+        isSys ? { primaryOnly: true } : null);   // 자동상신 결과 통지는 확인용 — 우선기기 1발(결정 ③), 결재 요청만 전 기기 예외
   } catch (e) {}
   return jr(200, { status: 'OK', id: it.id, decided: it.status, base: newBase, request_id: R });
 }

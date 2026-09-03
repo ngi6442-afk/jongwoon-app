@@ -174,7 +174,8 @@ async function autoDraftApproval(st) {
   const cid = 'auto-ab-' + day;   // 멱등 — 같은 날 재실행(수동 수집 등)이 중복 기안하지 않게
   if (doc.items.some(function (x) { return x && (x.ref === ref || x.cid === cid); })) return;
   const body = abSummary(dr.data);
-  const item = { id: 'ap' + crypto.randomBytes(6).toString('hex'), cid: cid, kind: '운반일지',
+  // to:'boss' = 대표 전용 결재(9/3 PM 결정: 운반일지는 대표가 결재, 다른 관리자는 알림함 확인만). 판정 규칙은 gw-data apprBossOnly·index.html apprBossOnly와 3중 동일.
+  const item = { id: 'ap' + crypto.randomBytes(6).toString('hex'), cid: cid, kind: '운반일지', to: 'boss',
     title: '운반일지 ' + day, body: body, ref: ref,
     by: { id: '__system__', name: '자동상신(올바로)' }, created: new Date().toISOString(), status: '대기' };
   // 쓰기 직전 신선본 재읽기 + ref·cid 재검사(gw-data approval_create의 레이스 창 축소 이식).
@@ -197,10 +198,11 @@ async function autoDraftApproval(st) {
     }
   } catch (e) {}
   try { await appendAudit({ ts: Date.now(), by: '자동상신(올바로)', bid: '__system__', col: 'approvals', ev: [{ op: '상신', id: item.id, t: ('운반일지 · ' + item.title).slice(0, 80) }] }); } catch (e) {}
-  // 관리자 전원 푸시 — 운반일지는 전 기기(배치도 결정 ① 예외: 오피스PC 팝업+폰 병행, primaryOnly 미적용)
+  // 대표 전용 푸시(9/3) — 전 기기 유지(배치도 결정 ① 예외: 오피스PC 팝업+폰 병행, primaryOnly 미적용). 대표 계정이 없으면 관리자 전원 폴백.
+  // sendTo는 수신자가 없어도 알림함(push:log)에 남기므로 관리자 알림함이 '확인용' 이력이 된다.
   try {
-    const ids = await push.adminIds();
-    if (ids.length) await push.sendTo(ids, { title: '결재 요청: 운반일지 ' + day, body: body.slice(0, 200), url: './', tag: 'appr-' + item.id });
+    const ids = await push.bossOrAdminIds();
+    await push.sendTo(ids, { title: '결재 요청: 운반일지 ' + day, body: body.slice(0, 200), url: './', tag: 'appr-' + item.id });
   } catch (e) {}
 }
 

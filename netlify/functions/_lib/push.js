@@ -87,4 +87,21 @@ async function sendTo(memberIds, payload, opts) {
   return { sent, removed };
 }
 
-module.exports = { getKeys, getSubs, saveSubs, sendTo, adminIds };
+// 대표 회원 id — 클라 isBossMember와 같은 축(role '대표' 또는 이름 나종운, admin 한정). 운반일지 결재 라우팅 전용(9/3 PM 결정).
+function isBoss(m) { return !!(m && m.admin && m.del !== 1 && (String(m.role || '') === '대표' || String(m.name || '') === '나종운')); }
+async function bossIds() {
+  const st = store(USERS);
+  const l = await blobList(st);
+  if (!l.ok) return [];
+  const out = [];
+  for (const k of l.keys) {
+    if (k.indexOf('member:') !== 0) continue;
+    const r = await blobGet(st, k);
+    if (r.ok && r.data && isBoss(r.data)) out.push(r.data.id);
+  }
+  return out;
+}
+// 대표 전용 건의 결재 요청 수신자 — 대표가 없으면(계정 role 불일치 등) 관리자 전원으로 폴백해 결재가 끊기지 않게 한다
+async function bossOrAdminIds() { const b = await bossIds(); return b.length ? b : await adminIds(); }
+
+module.exports = { getKeys, getSubs, saveSubs, sendTo, adminIds, bossIds, bossOrAdminIds, isBoss };

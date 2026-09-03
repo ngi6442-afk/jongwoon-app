@@ -3101,8 +3101,12 @@
   var apprPollTimer = null, apprBusy = false;
   var apprGen = 0;                         // 세션 세대 — 닫힘/재열림 뒤 도착한 늦은 응답이 새 큐를 오염시키지 않게
   var APPR_KIND_EMOJI = { "지시":"📌", "운반일지":"📋", "사규":"📜", "지입료":"💳", "가족친화":"👨‍👩‍👧" };
-  function apprWaitItems(){ return apprItems.filter(function(it){ return it && it.status === "대기"; }); }
-  function apprHoldItems(){ return apprItems.filter(function(it){ return it && it.status === "보류"; }); }
+  // 대표 전용 건(9/3 PM: 운반일지 결재=대표, 다른 관리자는 알림함 확인만) — 서버 apprBossOnly·워커 to 스탬프와 3중 동일 규칙(to 우선, 구건은 종류로)
+  function apprBossOnly(it){ return !!it && (it.to === "boss" || (it.to == null && it.kind === "운반일지")); }
+  function apprCanDecide(it){ return isAdmin() && (!apprBossOnly(it) || !!(curMemberObj && isBossMember(curMemberObj))); }
+  // 아래 두 필터가 뱃지·한장씩 큐·?appr=auto·대표 홈을 한꺼번에 정한다 — 비대표 관리자에겐 대표 전용 건이 대기로 잡히지 않는다
+  function apprWaitItems(){ return apprItems.filter(function(it){ return it && it.status === "대기" && apprCanDecide(it); }); }
+  function apprHoldItems(){ return apprItems.filter(function(it){ return it && it.status === "보류" && apprCanDecide(it); }); }
   function apprBadgeRender(){
     // 대표 홈=결재함 — 결재 목록이 바뀌는 모든 경로(폴 갱신·오버레이 종료·0건 전환)에서 홈도 같이 다시 그린다.
     // renderBossHome은 apprBadgeRender를 호출하지 않으므로 재귀 없음
@@ -3200,6 +3204,7 @@
   function apprDecide(decision, reasonArg, isRetry){
     if (apprBusy) return;   // 서버 응답 전 연타 방지(같은 건 이중 결재 → 409)
     var it = apprQueue[apprIdx]; if (!it) return;
+    if (!apprCanDecide(it)){ apprToastShow("대표 결재 건 — 건너뜁니다"); apprNext(); return; }   // 늦은 응답·정정본 교체 대비(서버도 BOSS_ONLY로 거부)
     var reason = reasonArg;
     if (reason == null){
       reason = "";
