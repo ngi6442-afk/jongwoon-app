@@ -5906,7 +5906,46 @@
     return '<div class="item"><div class="item-body"><div class="item-title">' + titleHtml + '</div>' +
       (meta.length ? '<div class="item-meta">' + meta.join('') + '</div>' : '') +
       (d.note ? '<div class="task-detail">' + esc(d.note) + '</div>' : '') +
-      '</div>' + (canEdit ? '<div class="task-ctrl"><button class="mini-btn" data-doc-edit="' + d.id + '">수정</button></div>' : '') + '</div>';
+      '</div>' + (canEdit ? '<div class="task-ctrl"><button class="mini-btn" data-doc-edit="' + d.id + '">수정</button>' +
+        '<button class="mini-btn" data-doc-appr="' + d.id + '" title="이 문서를 결재함에 올립니다(종류별 등급표대로 PM 전결·결재라인·대표 전결)">결재 상신</button></div>' : '') + '</div>';
+  }
+  // 문서 결재 상신(결재 3차 §8 잔여, 9/4) — 문서함 항목을 종류(사규·매뉴얼·가족친화·문서함 등재)로 결재함에 올린다.
+  // 9/1부터 밀린 규정(안)·매뉴얼·가족친화 안건이 전부 문서함에 있는데 지시 종류로밖에 못 올리던 구멍. 종류→등급은 서버 등급표.
+  var DOC_APPR_KINDS = ["사규", "매뉴얼", "가족친화", "문서함 등재"];
+  function docApprDefaultKind(d){
+    var c = docCatOf(d), t = String(d.title || "");
+    if (/가족친화/.test(t)) return 3;
+    if (c === "05") return 1;            // 규정
+    if (c === "03") return 2;            // 안전 — 매뉴얼·절차서
+    if (c === "02" && /세칙|규칙|규정/.test(t)) return 1;
+    return 4;
+  }
+  var docApprBusy = false;
+  function docApprSubmit(id){
+    if (docApprBusy) return;
+    var d = findDoc(id); if (!d) return;
+    var def = docApprDefaultKind(d);
+    var ans = prompt("결재 종류 번호 — 1 사규 / 2 매뉴얼 / 3 가족친화 / 4 문서함 등재\n(" + esc(d.title || "") + ")", String(def));
+    if (ans === null) return;
+    var k = parseInt(String(ans).trim(), 10);
+    if (!(k >= 1 && k <= 4)){ alert("1~4 번호로 골라주세요."); return; }
+    var kind = DOC_APPR_KINDS[k - 1];
+    var ref = "doc:" + d.id, meId = myId();
+    if (apprPendingCreates.some(function(p){ return p && p.mid === meId && p.ref === ref; })){ alert("이 문서 상신이 이미 전송 대기 중입니다."); return; }
+    var body = [d.no ? "문서번호 " + d.no : "", d.version ? "버전 " + d.version : "", d.category ? "분류 " + d.category : "", d.note ? "메모 " + d.note : ""].filter(Boolean).join(" · ").slice(0, 480);
+    docApprBusy = true;
+    gwCall("gw-data", { action: "approvals_list" }).then(function(res){
+      docApprBusy = false;
+      var dupSt = "";
+      if (res.status === 200 && res.body && Array.isArray(res.body.items))
+        res.body.items.forEach(function(x){ if (x && x.ref === ref && (x.status === "대기" || x.status === "보류" || x.status === "승인")) dupSt = x.status; });
+      if (dupSt && !confirm("이 문서는 이미 상신돼 있습니다(" + dupSt + "). 다시 올릴까요?")) return;
+      apprPendingCreates.push({ cid: "c" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8), mid: meId,
+        kind: kind, title: String(d.title || "(제목없음)").slice(0, 120), body: body, ref: ref });
+      apprSavePending();
+      apprFlushCreates();
+      apprToastShow("결재 상신(" + kind + ") — " + String(d.title || "").slice(0, 30));
+    }).catch(function(){ docApprBusy = false; alert("네트워크 오류 — 잠시 후 다시 시도해주세요."); });
   }
   function renderDocuments(){
     var host = document.getElementById("docList"); if (!host) return;
@@ -5947,6 +5986,9 @@
     });
     Array.prototype.forEach.call(host.querySelectorAll("[data-doc-edit]"), function(el){
       el.addEventListener("click", function(e){ e.stopPropagation(); openDocModal(el.getAttribute("data-doc-edit")); });
+    });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-doc-appr]"), function(el){
+      el.addEventListener("click", function(e){ e.stopPropagation(); docApprSubmit(el.getAttribute("data-doc-appr")); });
     });
   }
   function openDocModal(id){
