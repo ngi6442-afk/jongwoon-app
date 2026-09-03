@@ -27,3 +27,20 @@
   [headers.values]
     Cache-Control = "no-store, no-cache, must-revalidate, max-age=0"
     Pragma = "no-cache"
+    X-Robots-Tag = "noindex, nofollow"
+    Referrer-Policy = "no-referrer"
+
+# 진척도 본문·함수 소스의 정적 노출 차단(2026-09-03): publish="."라 /netlify/functions/*.js·_lib/*.json이 그대로 열렸다(실측 200).
+# 재작성은 경로를 문자 그대로 비교해 /NETLIFY/… 같은 변형을 못 막는다(9/3 실측: 정적 서빙은 대소문자·중복 슬래시 무시).
+# 1차 방어 = netlify/edge-functions/guard.ts(경로 정규화 후 404, 아래 [[edge_functions]]), 이 규칙은 2중 방어. 앱은 /.netlify/functions/* 만 호출하므로 무영향.
+[[redirects]]
+  from = "/netlify/*"
+  to = "/.netlify/functions/gw-progress"
+  status = 200
+  force = true
+
+# 정적 노출 가드(Edge, 2026-09-03) — 모든 요청에서 경로를 정규화해 /netlify/*·/tools/*·*.md·package*.json을 404로 끊는다.
+# 통과: index.html·sw.js·manifest·아이콘·/w/*·/data/duties_seed.json·/.netlify/functions/*. 가드 예외 시 통과(앱을 막지 않음).
+[[edge_functions]]
+  path = "/*"
+  function = "guard"

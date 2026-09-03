@@ -681,6 +681,7 @@
   .view.readonly .link-btn{display:none !important;}
   .tab-btn.perm-hidden{display:none !important;}
   .nav-group.perm-hidden{display:none !important;}
+  .prog-frame{display:block;width:100%;height:calc(100vh - 170px);height:calc(100dvh - 170px);min-height:480px;border:1px solid var(--line);border-radius:12px;background:var(--card);}
   .hr-dept{margin-bottom:14px;}
   .hr-dept-h{font-size:13px;font-weight:800;color:var(--brand);padding:2px 2px 6px;border-bottom:1px solid var(--line);margin-bottom:4px;}
   .hr-dept-h .cnt{color:var(--sub);font-weight:600;}
@@ -863,6 +864,7 @@
     <button class="tab-btn" data-tab="cli" id="tabCliBtn">거래처</button>
     <button class="tab-btn perm-hidden" data-tab="hr" id="tabHrBtn">인사·직원 <span class="tab-badge hide" id="hrTabBadge">0</span></button>
     <button class="tab-btn perm-hidden" data-tab="workers" id="tabWkBtn">인사·일용직</button>
+    <button class="tab-btn perm-hidden" data-tab="progress" id="tabProgressBtn">진척도</button>
     <div class="nav-divider"></div>
     <div class="nav-group">수주</div>
     <button class="tab-btn perm-hidden" data-tab="bid" id="tabBidBtn">입찰 <span class="tab-badge hide" id="bidTabBadge">0</span></button>
@@ -1248,6 +1250,13 @@
     <button class="link-btn" id="errLogBtn">🐞 오류 로그</button>
     <button class="link-btn" id="exportAllBtn">💾 전체 백업(xlsx)</button>
     <button class="link-btn" id="restoreBtn">⏪ 시점 복구</button>
+  </section>
+
+  <!-- 진척도 (관리자 전용, 2026-09-03) — 서버 gw-progress가 세션·관리자를 검증한 뒤 HTML을 주고, 여기서는 sandbox iframe(srcdoc)으로만 띄운다.
+       무인증 벽지 경로(/w/)는 참조하지 않는다(파일명이 열쇠인 경로를 UI에 노출하지 않는 원칙). -->
+  <section class="view" id="view-progress">
+    <div class="dash-sec" style="margin-bottom:8px;display:flex;align-items:baseline;gap:10px;"><h2 style="flex:1;">진척도 <span class="cnt" id="progHead"></span></h2><button class="mini-btn" id="progReloadBtn" type="button">↻ 새로고침</button></div>
+    <div id="progHost"><div class="loading">불러오는 중…</div></div>
   </section>
 
   <!-- 견적서 (문서번호 관리·발행 이력) -->
@@ -4432,7 +4441,7 @@
   });
 
   // ---- 탭 ----
-  var TAB_LABELS = {dash:"홈",tasks:"지시",rec:"기성·수금",cli:"거래처",bid:"입찰",con:"계약",onbid:"부동산",hr:"인사",cal:"캘린더",veh:"차량",hwakwan:"화관법",allbaro:"운반일지",lic:"인허가",doc:"문서함",check:"내 업무",leave:"휴가",perm:"권한관리",fam:"가족친화 실적"};
+  var TAB_LABELS = {dash:"홈",tasks:"지시",rec:"기성·수금",cli:"거래처",bid:"입찰",con:"계약",onbid:"부동산",hr:"인사",cal:"캘린더",veh:"차량",hwakwan:"화관법",allbaro:"운반일지",lic:"인허가",doc:"문서함",check:"내 업무",leave:"휴가",perm:"권한관리",fam:"가족친화 실적",progress:"진척도"};
   function closeNav(){ var tb=document.getElementById("tabbar"); if(tb) tb.classList.remove("open"); }
   function updateNavToggle(name){ var nt=document.getElementById("navToggle"); if(nt) nt.textContent = "☰"; }
   function switchTab(name){
@@ -4467,6 +4476,8 @@
     if (name === "hwakwan") renderHwakwan();
     document.getElementById("view-allbaro").classList.toggle("active", name === "allbaro");
     if (name === "allbaro") renderAllbaro();
+    document.getElementById("view-progress").classList.toggle("active", name === "progress");
+    if (name === "progress" && prevTab !== "progress") renderProgress();   // 재클릭은 no-op(iframe 재로드 방지) — 갱신은 새로고침 버튼
 
     if (name === "cal") renderCalendar();
     if (name === "dash" && prevTab !== "dash") renderDashboard();   // 탭 "복귀" 시만 재렌더(타 탭 체류 중 폴 갱신 반영) — 재클릭은 종전대로 no-op(직원 홈 입력 중 유실 방지)
@@ -4480,6 +4491,33 @@
     if (name === "bid") renderBids();
     if (name === "onbid") renderOnbid();
   }
+
+  // ---- 진척도(관리자 전용, 2026-09-03) ----
+  // 서버 gw-progress가 세션+관리자를 검증한 뒤 진척도 HTML을 JSON으로 준다(정적 /w/ 무인증 벽지와 별개 경로).
+  // iframe은 sandbox(allow-scripts·allow-popups·allow-popups-to-escape-sandbox, same-origin 없음)라 앱 origin의 토큰·저장소에 닿지 못한다. 📄 문서 링크(rel=noopener)는 새 창.
+  function renderProgress(){
+    if (!isAdmin()){ switchTab("dash"); return; }
+    var host = document.getElementById("progHost"); if (!host) return;
+    var head = document.getElementById("progHead");
+    if (isOffline || (typeof navigator !== "undefined" && navigator.onLine === false)){ host.innerHTML = '<div class="empty-line">오프라인 — 연결 후 [↻ 새로고침]을 누르세요.</div>'; return; }
+    host.innerHTML = '<div class="loading">불러오는 중…</div>';
+    gwCall("gw-progress", { action: "html" }).then(function(res){
+      if (res.status === 401){ host.innerHTML = '<div class="empty-line">세션 만료 — 다시 로그인한 뒤 [↻ 새로고침]을 누르세요.</div>'; onSessionInvalid(); return; }
+      if (res.status !== 200 || !res.body || !res.body.html){
+        host.innerHTML = '<div class="empty-line">불러오기 실패 (' + ((res.body && res.body.code) || res.status) + ')</div>'; return;
+      }
+      var f = document.createElement("iframe");
+      f.className = "prog-frame";
+      f.setAttribute("sandbox", "allow-scripts allow-popups allow-popups-to-escape-sandbox");
+      f.setAttribute("title", "진척도");
+      f.setAttribute("referrerpolicy", "no-referrer");
+      f.srcdoc = res.body.html;
+      host.innerHTML = "";
+      host.appendChild(f);
+      if (head) head.textContent = res.body.updated ? (res.body.updated + " 기준") : "";
+    }).catch(function(){ host.innerHTML = '<div class="empty-line">요청 실패 — 네트워크를 확인하세요.</div>'; });
+  }
+  (function(){ var b = document.getElementById("progReloadBtn"); if (b) b.addEventListener("click", function(){ renderProgress(); }); })();
 
   // ---- 캘린더(통합 만기·마감) ----
   var calState = { y:0, m:0, sel:null };
@@ -15885,6 +15923,9 @@
     if (hrBtn) hrBtn.classList.toggle("perm-hidden", !adminUser);
     if (currentTab === "hr" && !adminUser) switchTab("dash");
     if (currentTab === "fam" && !adminUser) switchTab("dash");   // 가족친화 대장 — 인사 하위, 관리자 전용(서버도 강제)
+    var pgBtn = document.getElementById("tabProgressBtn");
+    if (pgBtn) pgBtn.classList.toggle("perm-hidden", !adminUser);   // 진척도 — 관리자 전용(서버 gw-progress도 강제)
+    if (currentTab === "progress" && !adminUser) switchTab("dash");
     if (currentTab === "workers" && !canSee("wk")) switchTab("dash");
     // 빈 그룹 숨김(S2-B): 권한으로 탭이 전부 사라진 사이드바 그룹은 제목·구분선도 숨긴다 — 직원 화면 뼈대 정리
     (function(){
@@ -16044,6 +16085,7 @@
     doLoad(); loadTasks(); loadVehicles(); loadReceivables(); loadLicenses(); loadDocuments(); loadClients(); loadContracts(); loadMyTasks(); loadLeaves(); loadBids(); loadOnbid();
     loadMembers();   // 담당 배정 드롭다운용 — 관리자·직원 모두
     apprInit();      // 결재함(C안): 뱃지 즉시 갱신 + 5분 주기 폴링(관리자만 실제 조회)
+    if (currentTab === "progress") renderProgress();   // 진척도 탭에서 세션 만료→재로그인한 경우 화면 복구
     render();
     lockOnLogin();   // 화면 잠금: 잠금 PIN 미세팅이면 세팅 요구, 유휴 초과 부팅이면 즉시 잠금
     // 만기 자동생성은 지시·차량·인허가 로드가 모두 끝난 뒤 markLoadedForAutoGen에서 실행(중복 방지)
@@ -16350,7 +16392,7 @@
 
   var MOD_LABEL = {tasks:"지시", veh:"차량", rec:"기성·수금", lic:"인허가", check:"주기 체크", con:"계약", cli:"거래처", doc:"문서함", bid:"입찰", wk:"일용직", quote:"견적서", promo:"홍보"};   // check 권한은 주기 체크리스트 영역만 제어(내게 온 지시·내 할 일은 전원) — 탭 이름(내 업무)과 구분
   // ---- 감사 로그 뷰어(관리자 전용, 서버 기록 열람) ----
-  var AUDIT_COL_LABEL = {tasks:"지시", vehicles:"차량", receivables:"기성", licenses:"인허가", checklist:"업무", documents:"문서함", clients:"거래처", contracts:"계약", leaves:"휴가", family:"가족친화", member:"회원", login:"로그인"};
+  var AUDIT_COL_LABEL = {tasks:"지시", vehicles:"차량", receivables:"기성", licenses:"인허가", checklist:"업무", documents:"문서함", clients:"거래처", contracts:"계약", leaves:"휴가", family:"가족친화", member:"회원", login:"로그인", progress:"진척도"};
   var AUDIT_FIELD_LABEL = {status:"상태", title:"제목", who:"담당", who_id:"담당", due:"기한", amount:"금액", paid:"입금", del:"삭제", scope:"공개범위", stage:"단계", cancel_req:"취소요청", name:"이름", role:"직책", rank:"직급", dept:"부서", admin:"관리자", perms:"권한", hire_date:"입사일", leave_date:"퇴사일", seq:"연번", annual_base:"잔여연차기준", annual_base_date:"기준일", annual_days:"연차수동", loa_days:"휴직누적", on_loa:"휴직중", loa_start:"휴직시작", loa_end:"휴직종료", annual_paid:"연차수당포함", emp_type:"고용형태", birth:"생년월일", annual_basis:"연차기준", reason:"사유", approver:"승인자", done_by:"완료자", detail:"상세", recur:"반복", hl:"하이라이트", mismatch:"불일치", PIN:"PIN"};
   var auditMonthCur = "";
   function auditMonthShift(delta){
