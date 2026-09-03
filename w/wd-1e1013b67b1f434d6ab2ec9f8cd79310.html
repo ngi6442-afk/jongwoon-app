@@ -55,7 +55,7 @@ h2{font-size:13px;margin-bottom:8px}
   <h2>지금 중요한 순서 — 전체 (상위 8)</h2>
   <div class="item done" style="margin-top:10px"><span class="m">☑</span>★9/3 외부 세션 배포 4건(v307~310) — 진척도 탭(관리자 전용·세션 게이트)+함수 소스·운영문서 정적 노출 차단(Edge 가드, /NETLIFY/ 변형까지 404 실측) · 운반일지=대표 전용 결재(PM 확인만) · 내 할 일 기한+당일 아침 개인 푸시. 적대 검증 3라운드(high 1·med 6 수리 후 배포)</div>
   <div class="item done"><span class="m">☑</span>★일감레이더 &quot;이틀에 한 번 실패&quot; 판정 — 실패 표시 7회차 전부 본 수집 성공(커밋·ingest 200), 원인=재시도 잡 exit 1. verdict 단일 판정자+fail_streak+나라장터 0건 가드 배포(appdata 9c7506a), 크론 07:00→07:23 실험. 검증 회차 #129 결과 확인</div>
-  <div class="item now"><span class="m">▶</span>★결재 3차 = 업무별 등급 3종(①PM 전결→월·분기 총정리를 대표 확인용 상신 ②결재라인 담당→PM→대표 ③대표 전결·PM 확인만) — 시안 2종 제출(08_앱_시안/시안_결재등급_20260903). PM 표기 4개(청구 검수·견적·인허가 등재·가족친화 조기퇴근) 후 1차 구현 · PM→AI</div>
+  <div class="item done"><span class="m">☑</span>★결재 3차 배포(9/3 밤, v311) — 업무별 등급 14종 PM 전량 확정(시안 화면 선택): ①PM 전결 11종(대표는 매월 1~5일 자동 총정리 카드 1장만 확인) ②결재라인 사직·휴직(담당→PM→대표) ③대표 전결 운반일지·지입료. 등급표 관리 UI(권한관리 탭·낙관락)+큐 분리(대표/PM)+2급 전환 게이트+전결 총정리 크론. 건조 판정 2라운드 clean, 테스트 34건 신설. 사양 변경 기록: 사규·매뉴얼·가족친화 안건 ②→①, 조기퇴근 ③→①(8/19 사양 완화)</div>
   <div class="item"><span class="m">☐</span>★R&amp;D 세액공제 — ★인건비 산입 확정(9/2 적대검증 완주: 심판례 300건+·집행기준·가이드라인 220면·예규 전수에서 반례 0, 반박 실패). 방어선 2개 상시: ①전담성(연구노트·조직도 — 겸직 부인이 유일한 실전 리스크) ②지분 0 유지(1좌라도 취득 시 즉시 제외 전환). 내일채움공제 기업기여금은 산입 금지(친족 명문 배제). 세무사 문안 v2로 통보</div>
   <div class="item"><span class="m">☐</span>★가족친화 5종 안건 — ★미결재 확정(9/2 ㄴ). PM이 지시+&quot;대표 상신&quot; 체크로 앱 결재함에 올리면 대표 폰에서 즉시 처리 가능. 승인일=2026 실적 기산일</div>
   <div class="item"><span class="m">☐</span>벤처확인 타진 — 대표가 기보·신보에 &quot;보증연계투자 5천만원&quot; 전화 문의(1주). 성사=평가 없는 투자유형(30일·17.5만) / 불발=혁신성장유형(전담부서 인정서=배점 20% 증빙)</div>
@@ -79,7 +79,7 @@ h2{font-size:13px;margin-bottom:8px}
   <div class="rowc focus" onclick="go('v1-10')"><b>외부신고 자동화 (화관법) ◀ 무인 가동</b><div class="track2"><div class="fillb t" style="width:99%"></div></div><span class="pv">99</span></div>
   <div class="rowc focus" onclick="go('v1-11')"><b>운반일지·배차 자동화 ◀ 무인 가동</b><div class="track2"><div class="fillb t" style="width:92%"></div></div><span class="pv">92</span></div>
   <div class="rowc focus" onclick="go('v1-lawwatch')"><b>법령 워치 (신규 자동화) ◀ 가동</b><div class="track2"><div class="fillb t" style="width:95%"></div></div><span class="pv">95</span></div>
-  <div class="rowc focus" onclick="go('v1-12')"><b>대표 업무유연성 · 기기 배치도 ◀ 결재 3차 시안 대기</b><div class="track2"><div class="fillb t" style="width:92%"></div></div><span class="pv">92</span></div>
+  <div class="rowc focus" onclick="go('v1-12')"><b>대표 업무유연성 · 기기 배치도 ◀ 결재 3차 배포</b><div class="track2"><div class="fillb t" style="width:95%"></div></div><span class="pv">95</span></div>
   <div class="rowc focus" onclick="go('v1-13')"><b>관리자 기기 보안 ◀ 9/3 정적 노출 차단·진척도 탭</b><div class="track2"><div class="fillb" style="width:55%"></div></div><span class="pv">55</span></div>
   <div class="lane">결재함·문서함·잠금·상신 버튼·인허가 3층·대표 홈 배포(9/1~2). 남은 축 = 업무 데이터 입력과 결재 2차</div>
   <hr>
@@ -267,7 +267,7 @@ h2{font-size:13px;margin-bottom:8px}
 </div>
 
 <div class="view" id="v1-12"><span class="back" onclick="go('v1')">← 업무플랫폼</span>
-  <h1>대표 업무유연성 · 기기 배치도 — 92 · 결재 3차 시안 대기</h1>
+  <h1>대표 업무유연성 · 기기 배치도 — 95 · 결재 3차 배포</h1>
   <div class="item done" style="margin-top:10px"><span class="m">☑</span>★운반일지=대표 전용 결재(v308, 9/3 PM &quot;나는 확인만&quot;) — to:boss 스탬프·대표만 푸시(전 기기)·비대표 관리자 뱃지·큐·auto 제외·서버 BOSS_ONLY(보류 예외)·대표 부재 시 관리자 폴백(v310)</div>
   <div class="item now"><span class="m">▶</span>결재 3차 등급 체계 시안 제출(9/3) — PM 표기 4개 대기 → 1차 grade 필드+등급표+게이트+PM 화면 분리 / 2차 라인 2단 / 3차 전결 총정리 크론(매월 1일 08:00) · PM</div>
   <div class="item done"><span class="m">☑</span>배치도 2종 v1(8/9) — 인프라 4계층 + 역할×워크플로우 매트릭스 <a class="doc" href="https://claude.ai/code/artifact/7b5702be-92a5-49c4-8240-516220186fb4" target="_blank">📄 인프라</a> <a class="doc" href="https://claude.ai/code/artifact/dbf72617-921c-4a5d-ba32-aad4dd65562a" target="_blank">📄 역할×기기</a></div>
@@ -279,7 +279,8 @@ h2{font-size:13px;margin-bottom:8px}
   <div class="item now"><span class="m">▶</span>대표 기기 자동실행 — 오피스 PC 등록 완료(9/2 실측, ?appr=auto 포함 여부만 확인). 홈오피스 PC 남음(대표 직접)</div>
   <div class="item"><span class="m">☐</span>인프라 후속: SPOF=Blobs 단일원천 — 외장/클라우드 복제 결정 · PM</div>
   <div class="item done"><span class="m">☑</span>★결재함 C안 1차 배포(9/1 밤) — 상단 결재 뱃지(관리자)→한장씩 처리(승인/반려/보류/건너뛰기)→토스트. 지시에 &quot;대표 상신&quot; 체크 추가(건별 판단형 ④ 구현). 적대 검증 3라운드·지적 17건 수리 후 clean. 2차는 9/2 밤 배포 완료(위 항목) — 3차 대기: 항목별 키 분리(appr:item)</div>
-  <div class="note">순서: 계정(완료)→배치도 6종 확정(9/1)→결재함 1차 배포(9/1~2)→자동실행(오피스 9/2)→대표 홈=결재함(9/2). 결재 2차 배포(9/2 밤) 완료. 다음 = 결재 3차(항목별 키 분리)·SPOF 복제 결정</div>
+  <div class="item done"><span class="m">☑</span>★결재 3차 배포(9/3 밤, v311) — 등급 14종 확정(①11·②사직/휴직·③운반일지/지입료)·등급표 UI·큐 분리·2급 전환·월 총정리 크론(1~5일 복구 창·멱등). 남은 관망: 총정리 첫 실전(10/1~5)·5일 연속 크론 전멸 시 무통지(수용·문서화)</div>
+  <div class="note">순서: 계정(완료)→배치도 6종 확정(9/1)→결재함 1차 배포(9/1~2)→자동실행(오피스 9/2)→대표 홈=결재함(9/2). 결재 2차 배포(9/2 밤) 완료. 결재 3차(등급) 배포 완료(9/3). 다음 = 항목별 키 분리(appr:item)·SPOF 복제 결정</div>
 </div>
 
 <div class="view" id="v1-13"><span class="back" onclick="go('v1')">← 업무플랫폼</span>
