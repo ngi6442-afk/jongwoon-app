@@ -16,6 +16,10 @@
 [functions."gw-allbaro-cron"]
   schedule = "0 23 * * *"
 
+# 내 할 일 기한 알림 — UTC 23:00 = KST 08:00 매일. 회원별 priv:<mid>:mytasks에서 오늘 기한·미완료 항목을 골라 본인에게 1발(항목당 1회, todo:sent:<mid>).
+[functions."gw-todo-cron"]
+  schedule = "0 23 * * *"
+
 # 정적 파일은 그대로 서빙, /.netlify/functions/* 는 서버리스 함수로.
 
 # 진척도 벽지·위젯 — 캐시 금지.

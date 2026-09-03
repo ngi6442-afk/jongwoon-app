@@ -138,7 +138,7 @@ try {
   });
   T('스케줄 선언 ' + declared.length + '건 전부 함수 파일 존재', missing.length === 0,
     '선언만 있고 파일 없음: ' + missing.map((d) => d.fn).join(', '));
-  const cronFiles = ['gw-hwakwan-cron', 'gw-allbaro-cron'];
+  const cronFiles = ['gw-hwakwan-cron', 'gw-allbaro-cron', 'gw-todo-cron'];
   const undeclared = cronFiles.filter((f) => !declared.some((d) => d.fn === f));
   T('크론 함수 전부 스케줄 선언됨', undeclared.length === 0,
     '파일은 있는데 netlify.toml 선언 없음(크론 미등록): ' + undeclared.join(', '));
