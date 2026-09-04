@@ -6256,7 +6256,7 @@
     return "분류 기본" + (def ? "(" + DOC_SCOPE_TXT[def] + ")" : "");
   }
   function docRowHtml(d, admin){
-    var t = esc(d.title || "(제목없음)");
+    var t = (d.no ? "<b>" + esc(d.no) + "</b> " : "") + esc(d.title || "(제목없음)");   // 문서번호를 제목 앞에(PM 9/4)
     var titleHtml = d.url ? '<a href="' + esc(d.url) + '" target="_blank" rel="noopener" class="doc-link">' + t + ' ↗</a>' : t;
     var meta = [];
     if (d.no) meta.push('<span>' + esc(d.no) + '</span>');
@@ -6312,7 +6312,7 @@
       var rows = list.filter(function(d){ return docCatOf(d) === cat; });
       // 빈 서랍 처리: 미분류는 있을 때만, 01 법인은 서버가 걸러 0건인 사람에겐 서랍 자체를 안 보여줌(존재 노출 방지)
       if (!rows.length && (cat === "99" || cat === "01" || !isAdmin())) return;   // 직원에겐 빈 서랍(비공개 분류)을 아예 안 그림 — 12분류 확장 후 빈 서랍 10개 노이즈 방지
-      rows.sort(function(a,b){ var at=(a.title||""), bt=(b.title||""); return at<bt?-1:(at>bt?1:0); });
+      rows.sort(function(a,b){ var an=(a.no||"~"), bn=(b.no||"~"); if (an!==bn) return an<bn?-1:1; var at=(a.title||""), bt=(b.title||""); return at<bt?-1:(at>bt?1:0); });   // 문서번호순(번호 없는 것은 뒤), 같은 번호는 제목순
       var open = searching ? rows.length > 0 : !!docOpenCats[cat];
       h += '<div class="doc-acc"><div class="doc-acc-hd" data-doc-acc="' + cat + '"><span>' + (open ? "▾" : "▸") + ' ' + DOC_CATS[cat]
          + (cat === "01" ? ' <span class="doc-lock">🔒 관리부</span>' : '') + '</span><span class="n">' + rows.length + '건</span></div>';
