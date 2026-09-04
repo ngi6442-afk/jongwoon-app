@@ -542,5 +542,246 @@ mem.gw_data['col:approvals'].items.push({ id: 'aplate', kind: '문서함 등재'
 r = await call({ action: 'approvals_list' }, tokA);
 T('low7: 이미 등재된 문서에 같은 cid의 뒤늦은 반려 → 무시(등재 유지·사유 없음)', r.code === 200 && docItem('dn3').status === '등재' && docItem('dn3').reject_reason === undefined, JSON.stringify(docItem('dn3')));
 
+// 21 직접 기안·전결 종결(v315): 비대표 관리자 ① self_decide = 생성+승인 한 쓰기(승인·decided_by 본인·chain 전결·감사로그 전결·푸시 0·큐 미노출)
+//    / 직원·대표·②·③·격상·미정·제외 종류 → 400(카드 미생성) / cid 멱등 / approvals_list grades 동봉 / 상신만은 기존 라우팅 / 총정리 집계 포함
+mem.gw_data['col:approvals'] = { schema: 1, items: [], updated_at: 0 };
+mem.gw_data['col:documents'] = { schema: 1, items: [{ id: 'd1', title: '취업규칙', cat: '02', status: '등재' }], updated_at: 100 };   // 대기 문서 0 — 관리자 폴의 등재상신복구(med2)가 이 절의 카드 수를 흔들지 않게
+const apprN = () => mem.gw_data['col:approvals'].items.length;
+let pushN0 = pushMock.calls.length;
+r = await call({ action: 'approval_create', kind: '사규', title: '취업규칙 개정 결재', body: '본문', ref: 'doc:d1', cid: 'sd-1', self_decide: true }, tokA);
+const sdId = r.body.id;
+{
+  const it = mem.gw_data['col:approvals'].items.find((x) => x.id === sdId);
+  T('전결 종결: PM ① → 200 decided 승인 · status 승인·decided_by 본인·decided_at=created·self_decided·grade1·chain 전결', r.code === 200 && r.body.decided === '승인' && it && it.status === '승인' && it.decided_by.id === 'uadmin' && it.decided_at === it.created && it.self_decided === true && it.grade === 1 && it.to === 'pm' && it.ref === 'doc:d1' && it.chain.length === 1 && it.chain[0].decision === '전결', JSON.stringify(it).slice(0, 240));
+  T('전결 종결: 감사로그 전결 1건(상신 없음) · 푸시 0(본인 결재)', auditMock.logs.some((l) => l.col === 'approvals' && l.ev[0].op === '전결' && l.ev[0].id === sdId) && !auditMock.logs.some((l) => l.col === 'approvals' && l.ev[0].op === '상신' && l.ev[0].id === sdId) && pushMock.calls.length === pushN0, '푸시 +' + (pushMock.calls.length - pushN0));
+}
+r = await call({ action: 'approval_create', kind: '사규', title: '재시도(응답 유실)', cid: 'sd-1', self_decide: true }, tokA);
+T('전결 종결: cid 멱등 재시도 → 같은 id·dedup·decided 승인·카드 1건', r.code === 200 && r.body.id === sdId && r.body.dedup === true && r.body.decided === '승인' && apprN() === 1, JSON.stringify(r.body));
+r = await call({ action: 'approvals_list' }, tokA);
+T('approvals_list(관리자): grades 동봉 + 전결 건은 승인 상태(대기 큐 아님)', r.code === 200 && r.body.grades && r.body.grades['사규'] === 1 && r.body.items.some((x) => x.id === sdId && x.status === '승인') && !r.body.items.some((x) => x.status === '대기'), JSON.stringify(r.body.grades).slice(0, 80));
+r = await call({ action: 'approvals_list' }, tokW, 'dev1');
+T('approvals_list(직원): grades 동봉(표시용)', r.code === 200 && r.body.grades && r.body.grades['지시'] === 1 && r.body.grades['운반일지'] === 3);
+r = await call({ action: 'approval_create', kind: '사규', title: '직원 전결 시도', self_decide: true }, tokW, 'dev1');
+T('전결 종결: 직원 → 400 SELF_DECIDE_PM_ONLY', r.code === 400 && r.body.error_code === 'SELF_DECIDE_PM_ONLY', r.code + '/' + r.body.error_code);
+r = await call({ action: 'approval_create', kind: '사규', title: '대표 전결 시도', self_decide: true }, tokB, 'dev1');
+T('전결 종결: 대표 → 400 SELF_DECIDE_PM_ONLY(대표는 기안 대상 아님)', r.code === 400 && r.body.error_code === 'SELF_DECIDE_PM_ONLY');
+r = await call({ action: 'approval_create', kind: '사직·휴직', title: '② 전결 시도', self_decide: true }, tokA);
+T('전결 종결: ② → 400 SELF_DECIDE_GRADE1_ONLY', r.code === 400 && r.body.error_code === 'SELF_DECIDE_GRADE1_ONLY');
+r = await call({ action: 'approval_create', kind: '지입료', title: '③ 전결 시도', self_decide: true }, tokA);
+T('전결 종결: ③ → 400 SELF_DECIDE_GRADE1_ONLY', r.code === 400 && r.body.error_code === 'SELF_DECIDE_GRADE1_ONLY');
+r = await call({ action: 'approval_create', kind: '사규', title: '격상 + 전결', boss_up: 1, self_decide: true }, tokA);
+T('전결 종결: ① 격상(대표 상신 토글) → 400 GRADE1_ONLY', r.code === 400 && r.body.error_code === 'SELF_DECIDE_GRADE1_ONLY');
+r = await call({ action: 'approval_create', kind: '일반', title: '등급 미정 전결', self_decide: true }, tokA);
+T('전결 종결: 등급 미정 kind → 400 GRADE1_ONLY', r.code === 400 && r.body.error_code === 'SELF_DECIDE_GRADE1_ONLY');
+r = await call({ action: 'approval_create', kind: '문서함 등재', title: '제외 종류', self_decide: true }, tokA);
+T('전결 종결: 문서함 등재(전용 경로) → 400 SELF_DECIDE_KIND', r.code === 400 && r.body.error_code === 'SELF_DECIDE_KIND');
+r = await call({ action: 'approval_create', kind: '지시', title: '지시 전결 시도', self_decide: true }, tokA);
+T('전결 종결: 지시(지시 탭 전용) → 400 SELF_DECIDE_KIND(low8)', r.code === 400 && r.body.error_code === 'SELF_DECIDE_KIND');
+r = await call({ action: 'approval_create', kind: '휴가', title: '제외 종류', self_decide: true }, tokA);
+T('전결 종결: 휴가(모듈 승인) → 400 SELF_DECIDE_KIND', r.code === 400 && r.body.error_code === 'SELF_DECIDE_KIND');
+r = await call({ action: 'approval_create', kind: '운반일지', title: '제외 종류', ref: 'ab:2026-09-01', self_decide: true }, tokA);
+T('전결 종결: 운반일지 → 400 SELF_DECIDE_KIND', r.code === 400 && r.body.error_code === 'SELF_DECIDE_KIND');
+T('전결 종결 거부 9건 모두 카드 미생성(1건 유지)', apprN() === 1, String(apprN()));
+pushN0 = pushMock.calls.length;
+r = await call({ action: 'approval_create', kind: '사규', title: '상신만', ref: 'doc:d1' }, tokA);
+{
+  const it = mem.gw_data['col:approvals'].items.find((x) => x.id === r.body.id);
+  T('[상신만](self_decide 없음): 기존 라우팅 — 대기·to pm·self_decided 없음·결재 요청 푸시 1', r.code === 200 && !r.body.decided && it && it.status === '대기' && it.to === 'pm' && !it.self_decided && pushMock.calls.length === pushN0 + 1, JSON.stringify(it).slice(0, 160));
+}
+r = await call({ action: 'approval_create', kind: '가족친화', title: '직원 ① 상신', self_decide: false }, tokW, 'dev1');
+T('직원 기안 ①: PM 큐 대기(전결 아님)', r.code === 200 && mem.gw_data['col:approvals'].items.find((x) => x.id === r.body.id).status === '대기');
+// 총정리 집계: 전결 건의 decided_at을 전월(8월 KST)로 옮기고 크론 실행 → ids에 포함(grade1+승인+decided_at 기준이라 별도 로직 없이 잡혀야 한다)
+{
+  const it = mem.gw_data['col:approvals'].items.find((x) => x.id === sdId);
+  it.created = '2026-08-20T05:00:00.000Z'; it.decided_at = '2026-08-20T05:00:00.000Z';
+  cr = await apprCron.runSummary('gw_data', KST_SEP1);
+  const sum = mem.gw_data['col:approvals'].items.find((x) => x.id === 'summary-2026-08');
+  T('총정리 크론: 전결 종결 건 집계 포함(ids·counts 사규 1)', cr.ok && sum && sum.summary.ids.indexOf(sdId) >= 0 && sum.summary.counts['사규'] === 1, JSON.stringify(cr) + ' / ' + (sum && JSON.stringify(sum.summary).slice(0, 160)));
+}
+
+// 22 문서함 파일 첨부(v315): 올리기 권한(관리자·등재 본인·doc 수행) / 확장자·매직바이트·크기 한도 / mime 고정표(high1) / 열기=docVisible(공개범위·타인 대기 404)
+//    / save 재구성 files 원본 고정(위조·삭제 무시)·관리자 직전 읽기 실패 500(med2) / 삭제 관리자 전용(메타·바이트 제거)·att_seq 단조 증가(low4·low7) / att_parse 프리픽스(low6)
+//    / 일괄 등재(관리자·cid 멱등·항목당 1~3·합계 5.5MB·확장자·매직·제목·항목 상한·12분류 cat)
+mem.gw_data['col:documents'] = { schema: 1, items: [
+  { id: 'f1', title: '관리자 문서', cat: '02', scope: 'all', status: '등재' },
+  { id: 'f2', title: '직원 대기 문서', cat: '06', status: '대기', by: { id: 'udocw', name: '문서직원' } },
+  { id: 'f3', title: '비공개 문서', cat: '05', status: '등재' },
+  { id: 'f4', title: '삭제 문서', cat: '06', del: 1 },
+  { id: 'f5', title: '구건(카운터 없음·n 2 잔존)', cat: '06', scope: 'all', status: '등재', files: [{ n: 2, name: '구.pdf', size: 1, mime: 'application/pdf', ts: 1, by: { id: 'uadmin', name: '관리자' } }] },
+  { id: 'f6', title: '카운터만 남은 문서', cat: '06', scope: 'all', status: '등재', att_seq: 5 },
+], updated_at: 100 };
+mem.gw_files = { 'docatt:f5:2': { name: '구.pdf', type: 'application/pdf', data: 'JVBERi0=' } };
+// 매직바이트가 맞는 최소 페이로드 — 서버가 확장자와 내용을 대조한다(high1)
+const b64of = (x) => Buffer.from(x).toString('base64');
+const PDF = b64of('%PDF-1.4 hello!!');                                                   // 16바이트
+const PNG = b64of(Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 13]));
+const JPG = b64of(Buffer.from([0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46]));
+const ZIP = b64of('PK office-ooxml-or-hwpx');
+const HWP = b64of(Buffer.from([0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1, 0, 0]));
+const HTML = b64of('<html><script>alert(1)</script>');
+const fdoc = (id) => mem.gw_data['col:documents'].items.find((x) => x && x.id === id);
+r = await call({ action: 'doc_att_put', id: 'f1', name: '취업규칙.pdf', mime: 'text/html', data: PDF }, tokA);
+T('첨부: 관리자 → 200 n=1 · files 메타(name·size·by) · gw_files docatt:f1:1 · 감사로그 첨부', r.code === 200 && r.body.n === 1 && r.body.files.length === 1 && fdoc('f1').files.length === 1 && fdoc('f1').files[0].name === '취업규칙.pdf' && fdoc('f1').files[0].size === 16 && fdoc('f1').files[0].by.id === 'uadmin' && mem.gw_files['docatt:f1:1'] && mem.gw_files['docatt:f1:1'].data === PDF && auditMock.logs.some((l) => l.col === 'documents' && l.ev[0].op === '첨부' && l.ev[0].id === 'f1'), JSON.stringify(r.body).slice(0, 200));
+T('high1: 클라 mime(text/html) 폐기 — 저장 type·메타 mime 모두 확장자 고정표(application/pdf) · att_seq 1', mem.gw_files['docatt:f1:1'].type === 'application/pdf' && fdoc('f1').files[0].mime === 'application/pdf' && fdoc('f1').att_seq === 1, JSON.stringify([mem.gw_files['docatt:f1:1'].type, fdoc('f1').files[0].mime, fdoc('f1').att_seq]));
+r = await call({ action: 'doc_att_put', id: 'f1', name: '두번째.hwpx', data: ZIP }, tokA);
+T('첨부: 같은 문서 두 번째 → n=2 · att_seq 2 · hwpx=zip 매직 통과', r.code === 200 && r.body.n === 2 && fdoc('f1').files.length === 2 && fdoc('f1').att_seq === 2 && mem.gw_files['docatt:f1:2'] && mem.gw_files['docatt:f1:2'].type === 'application/hwp+zip');
+r = await call({ action: 'doc_att_put', id: 'f1', name: '위장.pdf', data: HTML }, tokA);
+T('high1: pdf 확장자 + HTML 내용 → 400 BAD_MAGIC(위장 파일 저장 거부)', r.code === 400 && r.body.error_code === 'BAD_MAGIC', r.code + '/' + r.body.error_code);
+r = await call({ action: 'doc_att_put', id: 'f1', name: '위장.png', data: JPG }, tokA);
+T('high1: png 확장자 + jpg 바이트 → 400 BAD_MAGIC', r.code === 400 && r.body.error_code === 'BAD_MAGIC');
+r = await call({ action: 'doc_att_put', id: 'f1', name: '위장.docx', data: PDF }, tokA);
+T('high1: docx 확장자 + pdf 바이트 → 400 BAD_MAGIC', r.code === 400 && r.body.error_code === 'BAD_MAGIC');
+r = await call({ action: 'doc_att_put', id: 'f1', name: '한글.hwp', data: HWP }, tokA);
+T('첨부: hwp OLE 매직 통과 → type application/x-hwp · n=3', r.code === 200 && r.body.n === 3 && mem.gw_files['docatt:f1:3'].type === 'application/x-hwp');
+r = await call({ action: 'doc_att_put', id: 'f1', name: '악성.exe', data: PDF }, tokA);
+T('첨부: 확장자 화이트리스트 밖 → 400 BAD_EXT', r.code === 400 && r.body.error_code === 'BAD_EXT');
+r = await call({ action: 'doc_att_put', id: 'f1', name: 'x.constructor', data: PDF }, tokA);
+T('low5: 확장자 프로토타입 키(constructor) → 400 BAD_EXT', r.code === 400 && r.body.error_code === 'BAD_EXT');
+r = await call({ action: 'doc_att_put', id: 'f1', name: '큰파일.pdf', data: 'A'.repeat(6 * 1024 * 1024 + 1) }, tokA);
+T('med3: 문서 첨부 6MB(base64) 초과 → 413 FILE_TOO_LARGE(계약 첨부 8MB와 별개)', r.code === 413 && r.body.error_code === 'FILE_TOO_LARGE');
+r = await call({ action: 'doc_att_put', id: 'nope', name: 'x.pdf', data: PDF }, tokA);
+T('첨부: 없는 문서 → 404 NO_DOC', r.code === 404 && r.body.error_code === 'NO_DOC');
+r = await call({ action: 'doc_att_put', id: 'f4', name: 'x.pdf', data: PDF }, tokA);
+T('첨부: 삭제(del:1) 문서 → 404 NO_DOC', r.code === 404 && r.body.error_code === 'NO_DOC');
+r = await call({ action: 'doc_att_put', id: 'f1', name: 'x.pdf', data: PDF }, tokW, 'dev1');
+T('첨부: doc 수행 권한 없는 직원 → 403 NO_WRITE', r.code === 403 && r.body.error_code === 'NO_WRITE');
+r = await call({ action: 'doc_att_put', id: 'f1', name: 'x.pdf', data: PDF }, tokD, 'dev1');
+T('첨부: doc 수행 직원이 남의 문서(f1) → 403 NOT_OWNER', r.code === 403 && r.body.error_code === 'NOT_OWNER');
+r = await call({ action: 'doc_att_put', id: 'f2', name: '증빙.jpg', mime: 'image/jpeg', data: JPG }, tokD, 'dev1');
+T('첨부: 등재 본인의 대기 문서(f2) → 200(본인은 대기 중에도 첨부)', r.code === 200 && fdoc('f2').files.length === 1 && fdoc('f2').files[0].by.id === 'udocw', r.code + '/' + r.body.error_code);
+r = await call({ action: 'doc_att_put', id: 'f2', name: 'x.pdf', data: PDF }, tokD2, 'dev1');
+T('첨부: 타인(직원2)이 남의 대기 문서 → 403 NOT_OWNER', r.code === 403 && r.body.error_code === 'NOT_OWNER');
+// att_seq(low4·low7): 카운터 없는 구건은 files 최대 n에서 이어가고, files가 비어도 카운터가 남아 있으면 번호를 재사용하지 않는다
+r = await call({ action: 'doc_att_put', id: 'f5', name: '신규.pdf', data: PDF }, tokA);
+T('att_seq: 카운터 없는 구건(files n 2) → n=3 · att_seq 3', r.code === 200 && r.body.n === 3 && fdoc('f5').att_seq === 3);
+r = await call({ action: 'doc_att_put', id: 'f6', name: '신규.pdf', data: PDF }, tokA);
+T('att_seq: files 0·att_seq 5 → n=6(삭제된 번호 재사용 없음)', r.code === 200 && r.body.n === 6 && fdoc('f6').att_seq === 6);
+// 열기(doc_att_get) = docVisible 축: f1(02 scope all) 직원 열람 / f3(05 분류 기본 관리자만) 직원 404 / f2 타인 대기 404·본인 200 / 없는 n 404 / type은 고정표
+r = await call({ action: 'doc_att_put', id: 'f3', name: '비공개.pdf', data: PDF }, tokA);
+r = await call({ action: 'doc_att_get', id: 'f1', n: 1 }, tokD, 'dev1');
+T('열기: 공개(scope all) 문서 → 직원 200 · name·type(고정표)·data', r.code === 200 && r.body.data === PDF && r.body.name === '취업규칙.pdf' && r.body.type === 'application/pdf');
+mem.gw_files['docatt:f1:1'].type = 'text/html';   // 저장값이 오염됐다고 가정(구 데이터·직접 조작) — 응답은 고정표만
+r = await call({ action: 'doc_att_get', id: 'f1', n: 1 }, tokA);
+T('high1: 저장 type이 text/html이어도 응답 type은 확장자 고정표(application/pdf)', r.code === 200 && r.body.type === 'application/pdf', r.body.type);
+r = await call({ action: 'doc_att_get', id: 'f3', n: 1 }, tokD, 'dev1');
+T('열기: 열람 범위 밖(05 분류 기본 관리자만) → 404 NO_DOC(존재 비노출)', r.code === 404 && r.body.error_code === 'NO_DOC', r.code + '/' + r.body.error_code);
+r = await call({ action: 'doc_att_get', id: 'f3', n: 1 }, tokA);
+T('열기: 관리자는 무제한', r.code === 200 && r.body.data === PDF);
+r = await call({ action: 'doc_att_get', id: 'f2', n: 1 }, tokD2, 'dev1');
+T('열기: 타인의 대기 문서 → 404', r.code === 404);
+r = await call({ action: 'doc_att_get', id: 'f2', n: 1 }, tokD, 'dev1');
+T('열기: 본인의 대기 문서 → 200 · type image/jpeg', r.code === 200 && r.body.data === JPG && r.body.type === 'image/jpeg');
+r = await call({ action: 'doc_att_get', id: 'f1', n: 9 }, tokA);
+T('열기: 없는 번호 → 404 NO_FILE', r.code === 404 && r.body.error_code === 'NO_FILE');
+r = await call({ action: 'doc_att_get', id: 'f1', n: 1 }, tokW, 'dev1');
+T('열기: doc 보기 권한(기본 view) 직원도 공개 문서는 열람', r.code === 200);
+r = await call({ action: 'att_parse', id: 'docatt:f1:1' }, tokA);
+T('low6: att_parse에 docatt: 키 → 400 BAD_ID(계약 권한으로 문서함 첨부 판독 차단)', r.code === 400 && r.body.error_code === 'BAD_ID', r.code + '/' + r.body.error_code);
+// save 재구성: 비관리자가 files 위조(f1)·삭제(f2 files 제거) 전송 → 서버 원본 고정. 관리자 낡은 사본(files 없음) 저장에도 이월
+r = await call({ action: 'save', collection: 'documents', doc: { schema: 1, items: [
+  { id: 'f1', title: '관리자 문서', cat: '02', scope: 'all', status: '등재', files: [{ n: 9, name: '위조.pdf', size: 1 }] },
+  { id: 'f2', title: '직원 대기 문서(편집)', cat: '06', status: '대기', by: { id: 'udocw', name: '문서직원' } },
+  { id: 'fn1', title: '신규 with files', cat: '06', files: [{ n: 1, name: '위조.pdf' }] },
+] } }, tokD, 'dev1');
+T('save 재구성(직원): 첨부 메타 위조(f1)·삭제(f2) 무시 — 서버 원본 고정(att_seq 포함), 신규 문서 files·att_seq 제거, 제목 편집만 반영', r.code === 200 && fdoc('f1').files.length === 3 && fdoc('f1').files[0].name === '취업규칙.pdf' && fdoc('f2').files.length === 1 && fdoc('f2').title === '직원 대기 문서(편집)' && fdoc('fn1') && fdoc('fn1').files === undefined && fdoc('f1').att_seq === 3 && fdoc('fn1').att_seq === undefined, JSON.stringify([fdoc('f1').files, fdoc('f1').att_seq, fdoc('f2').files, fdoc('fn1')]).slice(0, 200));
+r = await call({ action: 'save', collection: 'documents', doc: { schema: 1, items: mem.gw_data['col:documents'].items.map((x) => { const s = Object.assign({}, x); delete s.files; return s; }) } }, tokA);
+T('save 재구성(관리자 낡은 사본 — files 없음): 첨부 메타 이월', r.code === 200 && fdoc('f1').files.length === 3 && fdoc('f2').files.length === 1 && fdoc('f3').files.length === 1);
+{
+  // med2: 관리자 저장인데 직전 문서 읽기 실패 → 500(fail-closed) — 종전엔 files 전량 삭제·스냅샷 없이 덮었다
+  const savedDocs = mem.gw_data['col:documents'];
+  delete mem.gw_data['col:documents'];
+  r = await call({ action: 'save', collection: 'documents', doc: { schema: 1, items: savedDocs.items.map((x) => { const s = Object.assign({}, x); delete s.files; return s; }) } }, tokA);
+  const wrote = !!mem.gw_data['col:documents'];
+  mem.gw_data['col:documents'] = savedDocs;
+  T('med2: 관리자 저장 + 직전 읽기 실패 → 500 PREV_READ_FAILED · 미저장', r.code === 500 && r.body.error_code === 'PREV_READ_FAILED' && !wrote, r.code + '/' + r.body.error_code);
+}
+// 삭제: 관리자만 — 메타·바이트 제거, 감사로그 첨부삭제, 이후 열기 404, att_seq 유지
+r = await call({ action: 'doc_att_del', id: 'f1', n: 1 }, tokD, 'dev1');
+T('첨부 삭제: 비관리자 → 403 ADMIN_ONLY', r.code === 403 && r.body.error_code === 'ADMIN_ONLY');
+r = await call({ action: 'doc_att_del', id: 'f1', n: 1 }, tokA);
+T('첨부 삭제: 관리자 → 200 · 메타 2건 남음 · 바이트 삭제 · att_seq 3 유지 · 감사로그 첨부삭제', r.code === 200 && r.body.files.length === 2 && fdoc('f1').files.length === 2 && fdoc('f1').files[0].n === 2 && fdoc('f1').att_seq === 3 && !mem.gw_files['docatt:f1:1'] && auditMock.logs.some((l) => l.col === 'documents' && l.ev[0].op === '첨부삭제' && l.ev[0].id === 'f1'), JSON.stringify([fdoc('f1').files, fdoc('f1').att_seq]));
+r = await call({ action: 'doc_att_get', id: 'f1', n: 1 }, tokA);
+T('첨부 삭제 후 열기 → 404 NO_FILE', r.code === 404 && r.body.error_code === 'NO_FILE');
+r = await call({ action: 'doc_att_del', id: 'f1', n: 9 }, tokA);
+T('첨부 삭제: 없는 번호 → 404', r.code === 404);
+r = await call({ action: 'doc_att_put', id: 'f1', name: '네번째.png', data: PNG }, tokA);
+T('삭제 후 재첨부 번호는 단조 증가(n=4 — 번호 재사용 없음)', r.code === 200 && r.body.n === 4 && fdoc('f1').att_seq === 4);
+// 일괄 등재(doc_bulk_put)
+const bulkItems = [
+  { title: '정본 A 규정', cat: '05', no: 'JW-05-001', version: 'v1', revised: '2026-09-01', note: '정본', files: [{ name: 'a.hwpx', mime: 'text/html', data: ZIP }] },
+  { title: '증빙 B', cat: '02', scope: 'mgmt', files: [{ name: 'b.pdf', data: PDF }, { name: 'b2.png', data: PNG }] },
+  { title: '분류 없음 → 미분류', files: [{ name: 'c.xlsx', data: ZIP }] },
+  { title: '신설 분류 10', cat: '10', files: [{ name: 'd.pdf', data: PDF }] },
+  { title: '표 밖 분류 13 → 99', cat: '13', files: [{ name: 'e.pdf', data: PDF }] },
+  { title: '프로토타입 키 → 99', cat: 'constructor', files: [{ name: 'f.pdf', data: PDF }] },
+];
+const docN0 = mem.gw_data['col:documents'].items.length;
+r = await call({ action: 'doc_bulk_put', cid: 'bulk-1', items: bulkItems }, tokD, 'dev1');
+T('bulk: 비관리자 → 403 ADMIN_ONLY', r.code === 403 && r.body.error_code === 'ADMIN_ONLY');
+r = await call({ action: 'doc_bulk_put', items: bulkItems }, tokA);
+T('bulk: cid 없음 → 400 NO_CID', r.code === 400 && r.body.error_code === 'NO_CID');
+r = await call({ action: 'doc_bulk_put', cid: 'bulk-1', items: bulkItems }, tokA);
+const bulkIds = (r.body.items || []).map((x) => x.id);
+{
+  const a = fdoc(bulkIds[0]), b = fdoc(bulkIds[1]), c = fdoc(bulkIds[2]), d10 = fdoc(bulkIds[3]), d13 = fdoc(bulkIds[4]), dpk = fdoc(bulkIds[5]);
+  T('bulk: 관리자 6건 → 200 count 6 · 전부 즉시 등재(registered_by 관리자·by 관리자) · 메타 이월(no·version·revised·note) · att_seq=첨부 수', r.code === 200 && r.body.count === 6 && bulkIds.length === 6 && a && a.status === '등재' && a.registered_by.id === 'uadmin' && a.by.id === 'uadmin' && a.no === 'JW-05-001' && a.version === 'v1' && a.revised === '2026-09-01' && a.note === '정본' && a.cat === '05' && a.att_seq === 1 && b.att_seq === 2, JSON.stringify(a).slice(0, 240));
+  T('bulk: 첨부 메타 n 1..k + gw_files 바이트 + mime 고정표(클라 text/html 폐기) + scope 정규화(mgmt) + 미지정 분류=99·scope 없음(비공개)', b && b.files.length === 2 && b.files[1].n === 2 && b.files[1].mime === 'image/png' && a.files[0].mime === 'application/hwp+zip' && mem.gw_files['docatt:' + a.id + ':1'].type === 'application/hwp+zip' && mem.gw_files['docatt:' + b.id + ':2'] && mem.gw_files['docatt:' + b.id + ':2'].data === PNG && b.scope === 'mgmt' && c && c.cat === '99' && c.scope === undefined && c.files.length === 1, JSON.stringify([a && a.files, b && b.files, c && c.cat, c && c.scope]).slice(0, 240));
+  T('12분류: bulk cat 10 → 10 그대로 / 13 → 99 강등 / constructor → 99', d10 && d10.cat === '10' && d13 && d13.cat === '99' && dpk && dpk.cat === '99', JSON.stringify([d10 && d10.cat, d13 && d13.cat, dpk && dpk.cat]));
+  T('bulk: 감사로그 일괄등재 6건 · 문서 수 +6 · bulk_cid 스탬프', auditMock.logs.some((l) => l.col === 'documents' && l.ev.length === 6 && l.ev.every((e) => e.op === '일괄등재')) && mem.gw_data['col:documents'].items.length === docN0 + 6 && a.bulk_cid === 'bulk-1');
+}
+r = await call({ action: 'doc_bulk_put', cid: 'bulk-1', items: bulkItems }, tokA);
+T('bulk: 같은 cid 재요청 → dedup·같은 id·문서 수 불변', r.code === 200 && r.body.dedup === true && r.body.items.map((x) => x.id).join() === bulkIds.join() && mem.gw_data['col:documents'].items.length === docN0 + 6, JSON.stringify(r.body).slice(0, 160));
+r = await call({ action: 'doc_bulk_put', cid: 'bulk-2', items: [{ title: '첨부 없음', files: [] }] }, tokA);
+T('bulk: 항목 첨부 0 → 400 BAD_FILE_COUNT(index 0)', r.code === 400 && r.body.error_code === 'BAD_FILE_COUNT' && r.body.index === 0);
+r = await call({ action: 'doc_bulk_put', cid: 'bulk-3', items: [{ title: '첨부 4', files: [1, 2, 3, 4].map((i) => ({ name: 'f' + i + '.pdf', data: PDF })) }] }, tokA);
+T('bulk: 항목 첨부 4 → 400 BAD_FILE_COUNT', r.code === 400 && r.body.error_code === 'BAD_FILE_COUNT');
+r = await call({ action: 'doc_bulk_put', cid: 'bulk-4', items: [{ title: '정상', files: [{ name: 'ok.pdf', data: PDF }] }, { title: '확장자', files: [{ name: 'bad.exe', data: PDF }] }] }, tokA);
+T('bulk: 2번째 항목 확장자 위반 → 400 BAD_EXT(index 1) · 전체 거부(1번째도 미등재)', r.code === 400 && r.body.error_code === 'BAD_EXT' && r.body.index === 1 && mem.gw_data['col:documents'].items.length === docN0 + 6);
+r = await call({ action: 'doc_bulk_put', cid: 'bulk-4m', items: [{ title: '정상', files: [{ name: 'ok.pdf', data: PDF }] }, { title: '위장', files: [{ name: 'ok.pdf', data: PDF }, { name: 'bad.pdf', data: HTML }] }] }, tokA);
+T('high1: bulk 2번째 항목 2번째 파일 매직 불일치 → 400 BAD_MAGIC(index 1·file 1) · 전체 거부', r.code === 400 && r.body.error_code === 'BAD_MAGIC' && r.body.index === 1 && r.body.file === 1 && mem.gw_data['col:documents'].items.length === docN0 + 6, JSON.stringify(r.body));
+r = await call({ action: 'doc_bulk_put', cid: 'bulk-5', items: [{ title: '', files: [{ name: 'ok.pdf', data: PDF }] }] }, tokA);
+T('bulk: 제목 없음 → 400 NO_TITLE', r.code === 400 && r.body.error_code === 'NO_TITLE');
+{
+  const big = b64of('%PDF-1.4 ' + 'A'.repeat(Math.floor(2.2 * 1024 * 1024)));   // ≈2.93MB base64 — 둘이면 5.5MB 초과
+  r = await call({ action: 'doc_bulk_put', cid: 'bulk-6', items: [{ title: '큰 1', files: [{ name: 'x1.pdf', data: big }] }, { title: '큰 2', files: [{ name: 'x2.pdf', data: big }] }] }, tokA);
+  T('med3: bulk 첨부 합계 5.5MB 초과 → 413 BULK_TOO_LARGE(index 1) · 미등재', r.code === 413 && r.body.error_code === 'BULK_TOO_LARGE' && r.body.index === 1 && mem.gw_data['col:documents'].items.length === docN0 + 6 && !Object.keys(mem.gw_files).some((k) => k.indexOf('docatt:') === 0 && mem.gw_files[k].name === 'x1.pdf'), r.code + '/' + r.body.error_code);
+}
+r = await call({ action: 'doc_bulk_put', cid: 'bulk-7', items: Array.from({ length: 101 }, (_, i) => ({ title: 't' + i, files: [{ name: 'a.pdf', data: PDF }] })) }, tokA);
+T('bulk: 항목 101 → 400 TOO_MANY_ITEMS', r.code === 400 && r.body.error_code === 'TOO_MANY_ITEMS');
+r = await call({ action: 'doc_bulk_put', cid: 'bad cid!', items: bulkItems }, tokA);
+T('bulk: cid 형식 위반 → 400 NO_CID', r.code === 400 && r.body.error_code === 'NO_CID');
+r = await call({ action: 'get', collection: 'documents' }, tokM, 'dev1');
+T('bulk 등재 문서 열람: scope mgmt 건은 관리부원에게 보이고 미분류(분류 기본 관리자만)는 비노출', r.code === 200 && (r.body.doc.items || []).some((x) => x.id === bulkIds[1]) && !(r.body.doc.items || []).some((x) => x.id === bulkIds[2]));
+
+// 23 문서함 1층 12분류(개편안 2026-09-04 §5): 설정 기본값(신설 분류 전부 admin=비공개) / BAD_CAT 경계 / docCatOf JW 번호·구 분류 텍스트 파생 → get 필터
+r = await call({ action: 'doc_settings_get' }, tokA);
+{
+  const sd = r.body.settings.scope_default, keys = Object.keys(sd).sort();
+  T('12분류: 설정 기본값 키 02~12·99(12개) · 신설 분류(04·07~12) 전부 관리자만 · 기존 저장값(02 all·03 mgmt) 유지', r.code === 200 && keys.join() === ['02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12', '99'].join() && ['04', '07', '08', '09', '10', '11', '12'].every((c) => sd[c] === 'admin') && sd['02'] === 'all' && sd['03'] === 'mgmt', JSON.stringify(sd));
+}
+r = await call({ action: 'doc_settings_set', cat: '13', scope: 'all' }, tokA);
+T('12분류: 표 밖 분류(13) 설정 → 400 BAD_CAT', r.code === 400 && r.body.error_code === 'BAD_CAT');
+r = await call({ action: 'doc_settings_set', cat: '07', scope: 'constructor' }, tokA);
+T('low5: scope 프로토타입 키(constructor) → 400 BAD_SCOPE', r.code === 400 && r.body.error_code === 'BAD_SCOPE');
+r = await call({ action: 'doc_settings_get' }, tokA);
+r = await call({ action: 'doc_settings_set', cat: '07', scope: 'all', base: r.body.updated_at }, tokA);
+T('12분류: 07 매뉴얼·가이드 → 전원 설정 200', r.code === 200 && r.body.settings.scope_default['07'] === 'all' && r.body.settings.scope_default['11'] === 'admin');
+mem.gw_data['col:documents'].items.push(
+  { id: 'g1', title: '기성청구 매뉴얼', no: 'JW-07-001', status: '등재' },
+  { id: 'g2', title: 'JW-11-002 KOITA 인정서', status: '등재' },
+  { id: 'g3', title: '회사소개서', category: '홍보물', status: '등재' },
+  { id: 'g4', title: '하위번호 문서', no: 'JW-03-016-01', status: '등재' },
+  { id: 'g5', title: 'JW-2026 사업계획', status: '등재' },
+  { id: 'g6', title: '인허가 관리표', category: '인허가', status: '등재', scope: 'all' },
+  { id: 'g7', title: 'cat 위조', cat: 'constructor', no: 'JW-12-001', status: '등재' },
+);
+r = await call({ action: 'get', collection: 'documents' }, tokD, 'dev1');
+{
+  const ids = (r.body.doc.items || []).map((x) => x.id);
+  T('12분류 파생: JW-07 번호(07 전원) 직원 열람 / JW-11·홍보물(12)·JW-2026(99)·하위번호 03(mgmt) 비노출 / 구 분류 텍스트 인허가(04)+scope all 열람 / cat 위조는 no에서 12 파생 → 비노출', r.code === 200 && ids.indexOf('g1') >= 0 && ids.indexOf('g6') >= 0 && ['g2', 'g3', 'g4', 'g5', 'g7'].every((id) => ids.indexOf(id) < 0), ids.join(','));
+}
+r = await call({ action: 'get', collection: 'documents' }, tokM, 'dev1');
+T('12분류 파생: 하위번호 JW-03-016-01 → 03(관리부+관리자) 관리부원 열람', r.code === 200 && (r.body.doc.items || []).some((x) => x.id === 'g4'));
+
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');
 process.exit(fail ? 1 : 0);

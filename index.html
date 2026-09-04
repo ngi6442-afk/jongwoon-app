@@ -850,6 +850,7 @@
       <button class="gear-btn" id="gsBtn" aria-label="전역 검색" title="전역 검색 — 계약·지시·거래처·미수·견적·차량·인허가 한 번에">🔍</button>
       <button class="gear-btn" id="ntfBtn" aria-label="알림함" title="알림함 — 받은 알림 이력">🔔</button>
       <button class="gear-btn appr-badge" id="apprBadge" style="display:none;" aria-label="결재 대기" title="결재 대기 — 탭하면 한 장씩 처리">🧾<span class="appr-badge-n" id="apprBadgeN">0</span></button>
+      <button class="gear-btn" id="apprDraftBtn" style="display:none;" aria-label="기안" title="기안 — 사규·매뉴얼·가족친화 등 결재 올리기(PM은 ① 종류 전결 종결)">✍</button>
       <button class="user-chip" id="curUserBtn"></button>
       <button class="gear-btn" id="gearBtn" aria-label="설정">⚙</button>
     </div>
@@ -1774,6 +1775,28 @@
 </div>
 <div class="appr-toast" id="apprToast"></div>
 
+<!-- 직접 기안(v315): 지시 탭·운반일지·문서함 등재 밖의 종류(사규·매뉴얼·가족친화 등)를 한 화면에서 기안.
+     PM(비대표 관리자)+① 종류면 [전결 종결]=서버 self_decide(생성+승인 한 쓰기). 대표 계정은 버튼 자체가 없다(대표는 기안 대상 아님). -->
+<div class="modal-backdrop" id="apprDraftBackdrop">
+  <div class="modal" style="max-width:440px;">
+    <h3>✍ 기안</h3>
+    <p style="margin-bottom:10px;">종류를 고르면 결재 경로가 아래에 보입니다. 운반일지·문서함 등재·휴가는 각 화면에서 올립니다.</p>
+    <span class="fld-label">종류</span>
+    <select id="apprDraftKind"></select>
+    <div id="apprDraftRoute" style="margin:-4px 0 10px 2px;font-size:12.5px;color:var(--text);line-height:1.5;"></div>
+    <input type="text" id="apprDraftTitle" placeholder="제목(필수)" maxlength="120" autocomplete="off">
+    <textarea id="apprDraftBody" rows="4" maxlength="500" placeholder="내용(선택, 500자)" style="width:100%;padding:12px;border-radius:10px;border:1px solid var(--line);font-size:14px;font-family:inherit;resize:vertical;margin-bottom:2px;box-sizing:border-box;"></textarea>
+    <div id="apprDraftBodyN" style="text-align:right;font-size:11.5px;color:var(--sub);margin:0 2px 8px;">0/500</div>
+    <span class="fld-label">참조 문서(선택 — 문서함 항목)</span>
+    <select id="apprDraftRef"></select>
+    <div id="apprDraftHint" style="display:none;margin:-4px 0 10px 2px;font-size:12px;color:var(--sub);line-height:1.45;"></div>
+    <div class="err" id="apprDraftErr"></div>
+    <button class="primary" id="apprDraftOkBtn">상신</button>
+    <button class="secondary" id="apprDraftSubmitBtn" style="display:none;">상신만(전결 없이 PM 큐에 두기)</button>
+    <button class="secondary" id="apprDraftCancel">취소</button>
+  </div>
+</div>
+
 <div class="modal-backdrop" id="qtEditBackdrop">
   <div class="modal">
     <h3 id="qtEditTitle">견적서 발행</h3>
@@ -1861,7 +1884,8 @@
     <input type="text" id="docTitle" placeholder="제목" autocomplete="off">
     <input type="text" id="docNo" placeholder="문서번호 (예: JW-06-013, 선택)" autocomplete="off">
     <span class="fld-label">카테고리</span>
-    <select id="docCat"><option value="01">01 법인 (관리부·관리자만 열람)</option><option value="02">02 인사노무</option><option value="03">03 안전보건</option><option value="05">05 규정</option><option value="06">06 양식</option><option value="99">미분류</option></select>
+    <!-- 1층 12분류(문서번호체계 개편안 2026-09-04 §2) — option 값은 DOC_CATS 키와 동일(uismoke 대조) -->
+    <select id="docCat"><option value="01">01 법인·등기 (관리부·관리자만 열람)</option><option value="02">02 인사·노무</option><option value="03">03 안전보건</option><option value="04">04 인허가</option><option value="05">05 규정</option><option value="06">06 양식</option><option value="07">07 매뉴얼·가이드</option><option value="08">08 영업·입찰</option><option value="09">09 계약·공사</option><option value="10">10 재무·세무</option><option value="11">11 연구·인증</option><option value="12">12 홍보·소개</option><option value="99">99 미분류</option></select>
     <input type="text" id="docVer" placeholder="버전 (예: v1, 선택)" autocomplete="off">
     <span class="fld-label">개정일 (선택)</span>
     <input type="date" id="docRevised">
@@ -1872,6 +1896,10 @@
     <select id="docScope"><option value="">분류 기본값 따름 (권한관리 › 문서함 설정)</option><option value="all">전원</option><option value="mgmt">관리부+관리자</option><option value="admin">관리자만</option><option value="ids">직원 지정 (+관리자)</option></select>
     <div id="docScopeMembers" style="display:none;max-height:180px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:6px 8px;margin:4px 0 8px;"></div>
     <div class="scope-hint" id="docScopeHint">기본은 비공개 — 분류 기본값을 열거나 문서별로 지정할 때만 직원에게 보입니다.</div>
+    <!-- 첨부(v315) — 실파일은 서버 gw_files(docatt:<id>:<n>), 목록은 문서 files 메타. 신규 문서는 저장 후(id 확정) [수정]에서 첨부 -->
+    <span class="fld-label">첨부 파일 (pdf·docx·xlsx·pptx·hwp·hwpx·jpg·png, 파일당 4.3MB)</span>
+    <div id="docAttList" style="border:1px solid var(--line);border-radius:8px;padding:6px 8px;margin:0 0 6px;font-size:13px;"></div>
+    <div style="margin:0 0 10px;"><button type="button" class="mini-btn" id="docAttPickBtn" style="margin:0;">📎 파일 첨부</button> <span id="docAttMsg" style="font-size:12px;color:var(--sub);"></span></div>
     <button class="primary" id="docSave">저장</button>
     <button class="danger" id="docDelete">삭제</button>
     <button class="secondary" id="docCancel">취소</button>
@@ -3168,9 +3196,21 @@
     if (g === 1) return s + 'PM 전결 — 승인 시 종결 · 월간 총정리로 대표 확인</div>';
     return "";
   }
+  function apprMd(iso){ var t = Date.parse(iso || ""); if (isNaN(t)) return ""; var d = new Date(t); return (d.getMonth() + 1) + "/" + d.getDate(); }
+  // 직접 기안의 참조 문서 줄(v315) — 카드·내 상신 공용. 문서함 등재 카드는 전용 힌트가 따로 있어 제외.
+  // 사규 문서의 '등재'(문서함 게이트)와 사규 '결재'(이 기안)는 별개 행위 — 힌트 1줄로 구분
+  function apprRefDocHtml(it){
+    if (!it || it.kind === "문서함 등재" || String(it.ref || "").indexOf("doc:") !== 0) return "";
+    var rdoc = (typeof findDoc === "function") ? findDoc(String(it.ref).slice(4)) : null;
+    var s = '<div style="margin-top:5px;font-size:12px;color:var(--sub);">📎 참조 문서: ';
+    if (rdoc) s += '<b>' + esc(rdoc.title || "(제목없음)") + '</b>' + (rdoc.no ? ' · ' + esc(rdoc.no) : '') + ((rdoc.files && rdoc.files.length) ? ' · 첨부 ' + rdoc.files.length : '');
+    else s += '<span style="color:var(--amber);">문서함에서 찾을 수 없음(열람 범위 밖이거나 삭제)</span>';
+    return s + ' — 문서함 <b>등재</b>와는 별개의 결재 기록입니다</div>';
+  }
   // 내 상신 상태 문구(명세 단계 표) — 색은 원 status 기준 그대로
   function apprStageText(it){
     var g = apprGradeOf(it), st = (it && it.status) || "대기", q = (it && it.to) || "pm";
+    if (st === "승인" && it && it.self_decided) return "전결 종결 · " + apprMd(it.decided_at) + " · 월간 총정리 포함";   // v315 직접 기안 전결(기안=결재)
     if (st === "대기" || st === "보류"){
       var pre = st === "보류" ? "보류 · " : "";
       if (g === 2) return pre + (q === "boss" ? "PM 승인 완료 · 대표 대기" : "PM 대기 (1/2)");
@@ -3206,7 +3246,9 @@
     if (bd && bd.classList.contains("show")) return;
     gwCall("gw-data", { action: "approvals_list" }).then(function(res){
       if (res.status === 200 && res.body && Array.isArray(res.body.items)){
-        apprItems = res.body.items; apprBase = res.body.base || 0; apprBossPresent = (res.body.boss_present !== false); apprPmPresent = (res.body.pm_present !== false); apprEverLoaded = true; apprLoadFailed = false; apprBadgeRender();
+        apprItems = res.body.items; apprBase = res.body.base || 0; apprBossPresent = (res.body.boss_present !== false); apprPmPresent = (res.body.pm_present !== false); apprEverLoaded = true; apprLoadFailed = false;
+        if (res.body.grades && typeof res.body.grades === "object") apprGradesLive = res.body.grades;   // 기안 화면 등급 미리보기용 스냅샷(v315)
+        apprBadgeRender();
         if (apprAutoOpen){
           apprAutoOpen = false;   // 부팅 1회만 — 이후 폴에선 조용히
           if (apprWaitItems().length || apprHoldItems().length) apprOpen();
@@ -3245,9 +3287,12 @@
        + (it.status === "보류" ? ' · <b style="color:var(--amber);">보류 중' + (it.reason ? " — " + esc(it.reason) : "") + '</b>' : '')
        + '</div>';
     h += apprStageLine(it);   // 등급별 단계 줄(② "PM 승인 → 대표 (2/2)" 등 — 시안 문구)
+    h += apprRefDocHtml(it);  // 직접 기안의 참조 문서(v315) — 문서함 등재 카드는 아래 전용 힌트
     // 원 지시가 삭제된 고아 상신 힌트(지시-결재 양방향 동기화는 2차 TODO — 판단은 사람이)
-    if (it.kind === "지시" && it.ref && typeof tasks !== "undefined" && Array.isArray(tasks) && tasks.length
-        && !tasks.some(function(t){ return t && t.id === it.ref; }))
+    // ref가 지시 id 형식('task:<id>' 또는 genId("t") 꼴 't…')일 때만 — 참조 문서(doc:)·기타 ref를 지시로 오판해 고아 경고를 띄우지 않게(low8)
+    var taskRef = (it.kind === "지시" && it.ref) ? (String(it.ref).indexOf("task:") === 0 ? String(it.ref).slice(5) : (/^t[0-9a-z]{6,}$/i.test(String(it.ref)) ? String(it.ref) : "")) : "";
+    if (taskRef && typeof tasks !== "undefined" && Array.isArray(tasks) && tasks.length
+        && !tasks.some(function(t){ return t && t.id === taskRef; }))
       h += '<div style="margin-top:6px;font-size:12px;color:var(--amber);">⚠ 원 지시를 찾을 수 없습니다(삭제됐을 수 있음)</div>';
     // 문서함 등재 카드(v314): 문서의 현재 상태 힌트 — 관리자가 문서를 직접 수정해 이미 등재됐으면 이 카드는 기록용(승인·반려 모두 문서 무변경)
     if (it.kind === "문서함 등재" && String(it.ref || "").indexOf("doc:") === 0 && typeof documents !== "undefined" && Array.isArray(documents) && documents.length){
@@ -3405,6 +3450,126 @@
   document.getElementById("apprHoldBtn").addEventListener("click", function(){ apprDecide("보류"); });
   document.getElementById("apprSkipBtn").addEventListener("click", function(){ if (apprBusy) return; apprNext(); });   // 비행 중 건너뛰기 = 이중 전진
 
+  // ---- 직접 기안(v315, PM 9/4 "사규·가족친화 결재는 어딨노?"): 등급표 종류를 한 화면에서 기안 ----
+  // 종류 = 등급표 kind 중 전용 경로가 있는 4종 제외(APPR_DRAFT_EXCLUDE — 서버 APPR_SELF_DECIDE_EXCLUDE와 동일 목록, uismoke 대조).
+  // 기안자=비대표 관리자(PM) && ①이면 [전결 종결]=서버 self_decide(생성+승인 한 쓰기·큐에 안 뜸·푸시 없음) + [상신만] 보조.
+  // 직원·②·③은 [상신](기존 라우팅: ① PM 큐·② PM 1단계·③ 대표 큐 — 상신 대기열 경유). 등급은 표시용 스냅샷(apprGradesLive) — 진짜 등급은 서버가 스탬프.
+  var APPR_DRAFT_EXCLUDE = ["지시","운반일지","문서함 등재","휴가","전결총정리"];   // 지시는 지시 탭 전용(담당 완료→승인, ref=지시 id) — 기안 화면 대상 아님(low8)
+  var apprGradesLive = null;   // approvals_list 응답의 등급표(관리자·직원 공통)
+  var apprDraftBusy = false, apprDraftCid = "";
+  function apprDraftGrade(kind){ var g = apprGradesLive ? apprGradesLive[kind] : APPR_GRADE_DEFAULTS_APP[kind]; return (g === 1 || g === 2 || g === 3) ? g : 0; }
+  var APPR_GRADE_DEFAULTS_APP = { "운반일지":3, "지입료":3, "사직·휴직":2, "지시":1, "사규":1, "매뉴얼":1, "가족친화":1, "휴가":1, "계약 단계":1, "청구 검수":1, "문서함 등재":1, "견적":1, "인허가 등재":1, "조기퇴근":1 };   // 서버 표를 못 받았을 때의 표시 폴백(§2 확정표) — 서버가 최종
+  function apprDraftIsPm(){ return isAdmin() && !!(curMemberObj && !isBossMember(curMemberObj)); }
+  function apprDraftKinds(){
+    var ks = APPR_GRADE_ORDER.slice();
+    if (apprGradesLive) for (var k in apprGradesLive){ if (Object.prototype.hasOwnProperty.call(apprGradesLive, k) && ks.indexOf(k) < 0) ks.push(k); }
+    return ks.filter(function(k){ return APPR_DRAFT_EXCLUDE.indexOf(k) < 0; });
+  }
+  function apprDraftRouteText(kind){
+    var g = apprDraftGrade(kind), pm = apprDraftIsPm();
+    if (g === 1) return pm ? "① PM 전결 — 기안=결재(전결 종결), 월 총정리로 대표 확인" : "① PM 전결 — PM 승인 시 종결, 월 총정리로 대표 확인";
+    if (g === 2) return pm ? "② 담당→PM→대표 — PM 본인 기안은 PM 단계 자동통과, 대표 결재" : "② 담당→PM→대표";
+    if (g === 3) return "③ 대표 전결 — PM은 알림함 확인만";
+    return "등급 미정(현행) — 관리자 전원 결재함";
+  }
+  function apprDraftRender(){
+    var kind = document.getElementById("apprDraftKind").value;
+    var g = apprDraftGrade(kind), pm = apprDraftIsPm();
+    var self = pm && g === 1;
+    document.getElementById("apprDraftRoute").textContent = apprDraftRouteText(kind);
+    var ok = document.getElementById("apprDraftOkBtn"), sub = document.getElementById("apprDraftSubmitBtn");
+    ok.textContent = self ? "전결 종결" : "상신";
+    sub.style.display = self ? "block" : "none";
+    var hint = document.getElementById("apprDraftHint");
+    var refSel = document.getElementById("apprDraftRef");
+    if (refSel.value){
+      hint.style.display = "block";
+      hint.textContent = "참조 문서는 카드에 제목으로 표시됩니다. 문서함 '등재'(문서함 게이트)와 이 결재는 별개 행위입니다.";
+    } else hint.style.display = "none";
+  }
+  function apprDraftFillRef(){
+    var sel = document.getElementById("apprDraftRef");
+    var list = (typeof documents !== "undefined" && Array.isArray(documents)) ? documents.filter(function(d){ return d && d.del !== 1; }) : [];
+    list.sort(function(a, b){ var ka = docCatOf(a) + (a.title || ""), kb = docCatOf(b) + (b.title || ""); return ka < kb ? -1 : (ka > kb ? 1 : 0); });
+    var h = '<option value="">없음</option>';
+    list.forEach(function(d){
+      h += '<option value="' + esc(d.id) + '">[' + esc(DOC_CATS[docCatOf(d)] || "미분류") + '] ' + esc(d.title || "(제목없음)") + (d.no ? ' · ' + esc(d.no) : '') + ((d.files && d.files.length) ? ' 📎' + d.files.length : '') + '</option>';
+    });
+    sel.innerHTML = h;
+  }
+  function apprDraftOpen(){
+    if (!curMember() || (curMemberObj && isBossMember(curMemberObj))) return;
+    var sel = document.getElementById("apprDraftKind");
+    sel.innerHTML = apprDraftKinds().map(function(k){ return '<option value="' + esc(k) + '">' + (APPR_KIND_EMOJI[k] || "📄") + ' ' + esc(k) + '</option>'; }).join("");
+    if (sel.options.length && !sel.value) sel.selectedIndex = 0;
+    document.getElementById("apprDraftTitle").value = "";
+    document.getElementById("apprDraftBody").value = "";
+    document.getElementById("apprDraftBodyN").textContent = "0/500";
+    apprDraftFillRef();
+    document.getElementById("apprDraftErr").classList.remove("show");
+    apprDraftCid = "";   // 새 기안 = 새 멱등키(재시도는 같은 cid)
+    apprDraftRender();
+    document.getElementById("apprDraftBackdrop").classList.add("show");
+    // 등급표를 아직 못 받았으면(직원 첫 화면 등) 1회 조회 — 표시용. 실패해도 폴백 표로 그린다
+    if (!apprGradesLive){
+      gwCall("gw-data", { action: "approvals_list" }).then(function(res){
+        if (res.status === 200 && res.body && res.body.grades && typeof res.body.grades === "object"){ apprGradesLive = res.body.grades; apprDraftRender(); }
+      }).catch(function(){});
+    }
+  }
+  function apprDraftClose(){ document.getElementById("apprDraftBackdrop").classList.remove("show"); }
+  function apprDraftErr(msg){ var el = document.getElementById("apprDraftErr"); el.textContent = msg; el.classList.add("show"); }
+  // selfDecide=true → 서버 self_decide 직접 호출(즉시 결과·cid 멱등 재시도) / false → 상신 대기열(오프라인 영속·직렬)
+  function apprDraftSubmit(selfDecide){
+    if (apprDraftBusy) return;
+    var kind = document.getElementById("apprDraftKind").value;
+    var title = document.getElementById("apprDraftTitle").value.trim();
+    var body = document.getElementById("apprDraftBody").value.trim().slice(0, 500);
+    var refId = document.getElementById("apprDraftRef").value;
+    if (!kind || APPR_DRAFT_EXCLUDE.indexOf(kind) >= 0){ apprDraftErr("종류를 선택해주세요."); return; }
+    if (!title){ apprDraftErr("제목은 필수입니다."); document.getElementById("apprDraftTitle").focus(); return; }
+    if (selfDecide && !(apprDraftIsPm() && apprDraftGrade(kind) === 1)){ apprDraftErr("전결 종결은 PM의 ① 종류만 가능합니다 — [상신만]으로 올려주세요."); apprDraftRender(); return; }
+    var ref = refId ? "doc:" + refId : "";
+    var meId = myId();
+    if (!selfDecide){
+      apprPendingCreates.push({ cid: "c" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8), mid: meId, kind: kind, title: title, body: body, ref: ref });
+      apprSavePending(); apprFlushCreates();
+      apprDraftClose();
+      apprToastShow("상신 — " + kind + " · " + title.slice(0, 20));
+      myApprFetchedAt = 0; myApprEnsure();   // 직원 홈 '내 상신' 즉시 재조회
+      return;
+    }
+    if (!apprDraftCid) apprDraftCid = "c" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    apprDraftBusy = true;
+    var okBtn = document.getElementById("apprDraftOkBtn"); okBtn.disabled = true;
+    gwCall("gw-data", { action: "approval_create", kind: kind, title: title, body: body, ref: ref, cid: apprDraftCid, self_decide: true }).then(function(res){
+      apprDraftBusy = false; okBtn.disabled = false;
+      if (res.status === 200){
+        apprDraftClose();
+        apprToastShow((res.body && res.body.decided === "승인") ? ("전결 종결 — " + kind + " · " + title.slice(0, 20)) : ("상신됨 — " + title.slice(0, 20)));
+        apprRefresh();   // 관리자 '내 상신'·뱃지 재동기(전결 건은 status 승인이라 뱃지엔 안 잡힌다)
+        if (currentTab === "dash") renderDashboard();
+        return;
+      }
+      var code = (res.body && res.body.error_code) || res.status;
+      if (res.status === 400 && String(code).indexOf("SELF_DECIDE") === 0){
+        // 서버가 전결을 거부(등급표가 그 사이 바뀜·대표 계정 등) — [상신만]으로 되돌린다(자동 상신은 안 한다: 사람이 경로를 보고 결정)
+        apprDraftErr("전결 종결 불가(" + code + ") — 등급이 ①이 아니거나 PM 계정이 아닙니다. [상신만]으로 올려주세요.");
+        apprGradesLive = null; apprDraftRender();
+        return;
+      }
+      if (res.status === 401 || res.status === 403 || res.status >= 500) apprDraftErr("서버 오류(" + code + ") — 잠시 후 [전결 종결]을 다시 눌러주세요(같은 건으로 재시도됩니다).");
+      else apprDraftErr("기안 실패(" + code + ")");
+    }).catch(function(){ apprDraftBusy = false; okBtn.disabled = false; apprDraftErr("네트워크 오류 — 연결 후 [전결 종결]을 다시 눌러주세요(같은 건으로 재시도됩니다)."); });
+  }
+  document.getElementById("apprDraftBtn").addEventListener("click", apprDraftOpen);
+  document.getElementById("apprDraftCancel").addEventListener("click", apprDraftClose);
+  document.getElementById("apprDraftKind").addEventListener("change", apprDraftRender);
+  document.getElementById("apprDraftRef").addEventListener("change", apprDraftRender);
+  document.getElementById("apprDraftBody").addEventListener("input", function(){ document.getElementById("apprDraftBodyN").textContent = this.value.length + "/500"; });
+  document.getElementById("apprDraftOkBtn").addEventListener("click", function(){ apprDraftSubmit(apprDraftIsPm() && apprDraftGrade(document.getElementById("apprDraftKind").value) === 1); });
+  document.getElementById("apprDraftSubmitBtn").addEventListener("click", function(){ apprDraftSubmit(false); });
+
   // ---- 내 상신 목록(결재 2차): 상신자가 자기 건의 결과(대기/승인/반려/보류·사유)를 보는 곳 — 홈 섹션으로만 노출 ----
   // 대표 홈(renderBossHome)은 제외(대표는 결재자). 관리자=apprItems에서 내 것 필터(추가 fetch 없음),
   // 비관리자=approvals_list 직접 호출(서버가 본인분만 반환) 60초 캐시.
@@ -3429,6 +3594,7 @@
       myApprInflight = false; myApprFetchedAt = Date.now();
       if (res.status === 200 && res.body && Array.isArray(res.body.items)){
         myApprItems = res.body.items;
+        if (res.body.grades && typeof res.body.grades === "object") apprGradesLive = res.body.grades;   // 직원 기안 화면 등급 미리보기용(v315)
         if (currentTab === "dash") renderDashboard();
       }
     }).catch(function(){ myApprInflight = false; if (curMember() && curMember().id === reqMid) myApprFetchedAt = Date.now(); });
@@ -3454,6 +3620,7 @@
           + ' · <b style="color:' + col + ';">' + esc(apprStageText(it)) + '</b>'   // 단계 문구(결재 3차 — "PM 승인 완료 · 대표 대기" 등)
           + (it.created ? ' · ' + esc(apprDaysAgo(it.created)) : '') + '</div>'
         + (st === "반려" && it.reason ? '<div class="task-detail" style="color:#c0392b;">사유: ' + esc(it.reason) + '</div>' : '')
+        + apprRefDocHtml(it)
         + '</div></div>';
     }).join("");
     return '<div class="dash-sec"><h2>🧾 내 상신 <span class="cnt">' + list.length + '</span></h2><div class="card">' + rows + '</div></div>';
@@ -5138,6 +5305,108 @@
   document.getElementById("docBackdrop").addEventListener("click", function(e){ if (e.target === this) closeDocModal(); });
   document.getElementById("docSearch").addEventListener("input", function(){ docSearchTerm = this.value.toLowerCase().trim(); renderDocuments(); });
   document.getElementById("docScope").addEventListener("change", docScopeModeChanged);
+  // ---- 문서함 첨부(v315, PM 9/4 "실물 없는 포인터 목록"): 실파일은 서버 gw_files(docatt:<id>:<n>) — 문서 files 메타는 서버가 첨부 액션으로만 바꾼다(save 재구성 고정) ----
+  // 올리기=관리자 또는 등재 본인(대기 문서도) / 열기=서버 doc_att_get(열람 판정 docVisible=공개범위 하드차단과 같은 축) / 삭제=관리자. 신규 문서는 저장 후(id 확정) [수정]에서 첨부
+  var DOC_ATT_EXT = ["pdf","docx","xlsx","pptx","hwp","hwpx","jpg","jpeg","png"];   // 서버 DOC_ATT_EXT와 동일해야 한다(uismoke 대조)
+  var DOC_ATT_MAX = Math.floor(4.3 * 1024 * 1024);   // 4.3MB — base64+JSON 오버헤드가 Netlify 6MiB 본문 한도를 넘지 않게(리뷰 low)   // 원본 4.5MB(base64 6MB = 서버 DOC_ATT_MAX — Netlify 동기 함수 본문 한도 안쪽, med3). 계약 첨부 ATT_MAX(6MB)와 별개
+  // 확장자 → mime 고정표(high1) — 서버 DOC_ATT_MIME과 같은 표. 열 때 서버 응답 type은 무시하고 이 표만 쓴다(위장 mime이 앱 오리진 Blob URL로 실행되지 않게)
+  var DOC_ATT_MIME = { pdf:"application/pdf", docx:"application/vnd.openxmlformats-officedocument.wordprocessingml.document", xlsx:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    pptx:"application/vnd.openxmlformats-officedocument.presentationml.presentation", hwp:"application/x-hwp", hwpx:"application/hwp+zip", jpg:"image/jpeg", jpeg:"image/jpeg", png:"image/png" };
+  var DOC_ATT_INLINE = { pdf:1, jpg:1, jpeg:1, png:1 };   // 브라우저 뷰어로 새 창에 여는 형식 — 나머지는 다운로드
+  var docAttBusy = false;
+  function docAttKb(n){ n = Number(n) || 0; return n >= 1048576 ? (Math.round(n / 104857.6) / 10) + "MB" : Math.max(1, Math.round(n / 1024)) + "KB"; }
+  function docAttExtOf(name){ var m = String(name || "").toLowerCase().match(/\.([a-z0-9]+)$/); return m ? m[1] : ""; }
+  function docAttCanPut(d){ return !!(d && canDo("doc") && (isAdmin() || (d.by && d.by.id === myId()))); }
+  function docAttRenderModal(){
+    var host = document.getElementById("docAttList"), btn = document.getElementById("docAttPickBtn"), msg = document.getElementById("docAttMsg");
+    if (!host || !btn || !msg) return;
+    var d = editingDocId ? findDoc(editingDocId) : null;
+    if (!d){ host.innerHTML = '<div class="empty-line" style="padding:4px 0;">저장 후 [수정]에서 첨부할 수 있습니다(문서 id 확정 뒤).</div>'; btn.style.display = "none"; msg.textContent = ""; return; }
+    var files = Array.isArray(d.files) ? d.files : [];
+    host.innerHTML = files.length ? files.map(function(f){
+      return '<div style="display:flex;align-items:center;gap:6px;padding:3px 0;"><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">📎 ' + esc(f.name || "") + ' <span style="color:var(--sub);font-size:11.5px;">(' + docAttKb(f.size) + ')</span></span>'
+        + '<button type="button" class="mini-btn" style="margin:0;font-size:11.5px;padding:2px 8px;" data-doc-att-open="' + esc(d.id) + '|' + Number(f.n) + '">열기</button>'
+        + (isAdmin() ? '<button type="button" class="mini-btn" style="margin:0;font-size:11.5px;padding:2px 8px;" data-doc-att-del="' + esc(d.id) + '|' + Number(f.n) + '">삭제</button>' : '') + '</div>';
+    }).join("") : '<div class="empty-line" style="padding:4px 0;">첨부 없음</div>';
+    var can = docAttCanPut(d);
+    btn.style.display = can ? "" : "none";
+    msg.textContent = can ? "" : "첨부는 관리자 또는 등재한 본인만";
+    Array.prototype.forEach.call(host.querySelectorAll("[data-doc-att-open]"), function(el){ el.addEventListener("click", function(){ var p = el.getAttribute("data-doc-att-open").split("|"); docAttOpen(p[0], Number(p[1])); }); });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-doc-att-del]"), function(el){ el.addEventListener("click", function(){ var p = el.getAttribute("data-doc-att-del").split("|"); docAttDel(p[0], Number(p[1])); }); });
+  }
+  function docAttPick(){
+    var d = editingDocId ? findDoc(editingDocId) : null;
+    if (!d || !docAttCanPut(d) || docAttBusy) return;
+    var inp = document.createElement("input"); inp.type = "file"; inp.multiple = true;
+    inp.accept = DOC_ATT_EXT.map(function(e){ return "." + e; }).join(",");
+    inp.addEventListener("change", function(){ if (inp.files && inp.files.length) docAttUpload(d.id, Array.prototype.slice.call(inp.files)); });
+    inp.click();
+  }
+  // 직렬 업로드(파일마다 doc_att_put 1회) — 응답의 files 메타로 로컬 문서를 갱신(서버가 원천). 형식·크기는 클라에서 먼저 거르고 서버가 다시 검사
+  function docAttUpload(docId, files){
+    var msg = document.getElementById("docAttMsg");
+    var q = files.slice();
+    docAttBusy = true;
+    function done(){ docAttBusy = false; if (msg) msg.textContent = ""; docAttRenderModal(); renderDocuments(); }
+    function next(){
+      var f = q.shift();
+      if (!f){ done(); return; }
+      if (DOC_ATT_EXT.indexOf(docAttExtOf(f.name)) < 0){ alert('"' + f.name + '"는 허용되지 않는 형식입니다(pdf·docx·xlsx·pptx·hwp·hwpx·jpg·png).'); next(); return; }
+      if (f.size > DOC_ATT_MAX){ alert('"' + f.name + '"는 4.5MB를 넘어 첨부할 수 없습니다(서버 전송 한도).'); next(); return; }   // 선택 즉시(읽기 전) 거름
+      if (msg) msg.textContent = "올리는 중… " + f.name;
+      var r = new FileReader();
+      r.onload = function(){
+        gwCall("gw-data", { action: "doc_att_put", id: docId, name: f.name, mime: f.type || "", data: String(r.result).split(",")[1] || "" }).then(function(res){
+          if (res.status === 200 && res.body && Array.isArray(res.body.files)){
+            var d = findDoc(docId); if (d){ d.files = res.body.files; d.updated_ts = Date.now(); d.updated = todayStr(); }
+            if (res.body.updated_at) _colBase["documents"] = res.body.updated_at;   // 서버가 문서 블롭을 바꿨다 — 다음 저장의 낙관락 base 갱신(불필요한 409 방지)
+            apprToastShow("첨부됨 — " + f.name);
+          } else alert('"' + f.name + '" 첨부 실패 (' + ((res.body && res.body.error_code) || res.status) + ')');
+          next();
+        }).catch(function(){ alert('"' + f.name + '" 첨부 실패(네트워크)'); next(); });
+      };
+      r.onerror = function(){ alert('"' + f.name + '" 읽기 실패'); next(); };
+      r.readAsDataURL(f);
+    }
+    next();
+  }
+  // 열기: base64 → Blob URL. pdf·이미지는 새 창(브라우저 뷰어), hwp·docx 등은 다운로드 링크(브라우저가 못 여는 형식)
+  function docAttOpen(docId, n){
+    var d = findDoc(docId);
+    var meta = d ? (d.files || []).filter(function(f){ return f && Number(f.n) === n; })[0] : null;
+    apprToastShow("여는 중… " + ((meta && meta.name) || ""));
+    gwCall("gw-data", { action: "doc_att_get", id: docId, n: n }).then(function(res){
+      if (res.status !== 200 || !res.body || !res.body.data){ alert("파일을 열 수 없습니다 (" + ((res.body && res.body.error_code) || res.status) + ")"); return; }
+      var name = (meta && meta.name) || res.body.name || "file";
+      var ext = docAttExtOf(name);
+      // 응답 type은 쓰지 않는다(high1) — 확장자 고정표 밖이면 octet-stream 다운로드(새 창 실행 없음)
+      var mime = Object.prototype.hasOwnProperty.call(DOC_ATT_MIME, ext) ? DOC_ATT_MIME[ext] : "application/octet-stream";
+      var bin = atob(res.body.data), len = bin.length, u8 = new Uint8Array(len);
+      for (var i = 0; i < len; i++) u8[i] = bin.charCodeAt(i);
+      var url = URL.createObjectURL(new Blob([u8], { type: mime }));
+      var a = document.createElement("a");
+      a.href = url; a.target = "_blank"; a.rel = "noopener";
+      if (!Object.prototype.hasOwnProperty.call(DOC_ATT_INLINE, ext)) a.download = name;   // 브라우저 뷰어 형식(pdf·이미지) 외에는 파일로 저장
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(function(){ URL.revokeObjectURL(url); }, 60000);
+    }).catch(function(){ alert("파일을 열 수 없습니다(네트워크)"); });
+  }
+  function docAttDel(docId, n){
+    if (!isAdmin() || docAttBusy) return;
+    var d = findDoc(docId);
+    var meta = d ? (d.files || []).filter(function(f){ return f && Number(f.n) === n; })[0] : null;
+    if (!confirm("첨부를 삭제할까요?\n" + ((meta && meta.name) || ""))) return;   // confirm은 텍스트 — HTML 이스케이프 금지
+    docAttBusy = true;
+    gwCall("gw-data", { action: "doc_att_del", id: docId, n: n }).then(function(res){
+      docAttBusy = false;
+      if (res.status !== 200){ alert("첨부 삭제 실패 (" + ((res.body && res.body.error_code) || res.status) + ")"); return; }
+      if (d){ if (res.body && Array.isArray(res.body.files) && res.body.files.length) d.files = res.body.files; else delete d.files; d.updated_ts = Date.now(); d.updated = todayStr(); }
+      if (res.body && res.body.updated_at) _colBase["documents"] = res.body.updated_at;
+      docAttRenderModal(); renderDocuments();
+      apprToastShow("첨부 삭제됨");
+    }).catch(function(){ docAttBusy = false; alert("첨부 삭제 실패(네트워크)"); });
+  }
+  document.getElementById("docAttPickBtn").addEventListener("click", docAttPick);
   document.getElementById("cliAddBtn").addEventListener("click", function(){ openCliModal(null); });
   document.getElementById("cliSave").addEventListener("click", saveCliModal);
   document.getElementById("cliDelete").addEventListener("click", deleteCliFromModal);
@@ -5937,19 +6206,28 @@
     }).catch(function(){ docSaveRetried = false; });
   }
   // ---- 문서함 서랍형(PM 선택 2026-09-02) — 분류 5종 서랍 + 미분류. 인허가는 여기 안 끼움(원장=인허가 탭) ----
-  var DOC_CATS = { "01":"01 법인", "02":"02 인사노무", "03":"03 안전보건", "05":"05 규정", "06":"06 양식", "99":"미분류" };
+  // 1층 12분류(문서번호체계 개편안 2026-09-04 §2) + 99 미분류(앱 전용). 키·라벨은 서버 DOC_CAT_SET·DOC_CAT_LABEL과 동일(uismoke 대조). 순회 순서는 DOC_CAT_ORDER
+  var DOC_CATS = { "01":"01 법인·등기", "02":"02 인사·노무", "03":"03 안전보건", "04":"04 인허가", "05":"05 규정", "06":"06 양식", "07":"07 매뉴얼·가이드", "08":"08 영업·입찰", "09":"09 계약·공사", "10":"10 재무·세무", "11":"11 연구·인증", "12":"12 홍보·소개", "99":"99 미분류" };
+  var DOC_CAT_ORDER = ["01","02","03","04","05","06","07","08","09","10","11","12","99"];
   var docOpenCats = {};   // 서랍 펼침 상태(세션 내) — 검색 중엔 결과 있는 서랍이 자동으로 열린다
   // 분류 파생: cat 필드 우선, 없으면 JW 번호 → 구 분류 텍스트(양식만 확실) → 미분류. 서버 docCatOf와 같은 규칙이어야 한다
   function docCatOf(d){
     if (!d) return "99";
-    if (d.cat && DOC_CATS[d.cat]) return d.cat;
+    if (d.cat && Object.prototype.hasOwnProperty.call(DOC_CATS, String(d.cat))) return String(d.cat);
     var s = String(d.no||"") + " " + String(d.title||"");
-    var m = s.match(/JW-?0([12356])/i);
-    if (m) return "0" + m[1];
+    var m = s.match(/JW-?(0[1-9]|1[0-2])(?!\d)/i);   // 두 자리 그대로(하위번호 JW-03-016-01도 앞 두 자리) — 서버와 동일 정규식(uismoke 대조)
+    if (m) return m[1];
     var c = String(d.category||"");
     if (/법인/.test(c)) return "01";
     if (/인사|노무/.test(c)) return "02";
     if (/안전|보건/.test(c)) return "03";
+    if (/인허가/.test(c)) return "04";
+    if (/매뉴얼|가이드/.test(c)) return "07";
+    if (/입찰|영업/.test(c)) return "08";
+    if (/계약|공사/.test(c)) return "09";
+    if (/재무|세무/.test(c)) return "10";
+    if (/인증|연구/.test(c)) return "11";
+    if (/홍보|소개/.test(c)) return "12";
     if (/규정|지침/.test(c)) return "05";
     if (/양식|서식/.test(c)) return "06";
     return "99";
@@ -5958,7 +6236,7 @@
   // scope: 'all'(전원) | 'mgmt'(관리부+관리자) | 'admin'(관리자만) | {ids:[회원id]}(지정 직원+관리자). 미지정=분류 기본값(초기 전부 '관리자만' — 권한관리 › 문서함 설정).
   // status: '등재'(구건·status 없음 포함) | '대기'(직원 등재 → PM 승인 대기) | '반려'. 판정·표기 규칙은 서버 docStatusOf/docScopeText와 동일. 열람 차단은 서버(get 필터)가 한다 — 여기는 표시
   var DOC_SCOPE_TXT = { all: "전원", mgmt: "관리부+관리자", admin: "관리자만" };
-  var DOC_SCOPE_CATS = ["02","03","05","06","99"];   // 01 법인은 하드차단(관리부+관리자) — 설정 대상 아님
+  var DOC_SCOPE_CATS = ["02","03","04","05","06","07","08","09","10","11","12","99"];   // 01 법인은 하드차단(관리부+관리자) — 설정 대상 아님. 서버 DOC_SCOPE_CATS와 동일(uismoke 대조)
   function docStatusOf(d){ return (d && (d.status === "대기" || d.status === "반려")) ? d.status : "등재"; }
   function docScopeNorm(s){
     if (typeof s === "string") return DOC_SCOPE_TXT[s] ? s : null;
@@ -5990,11 +6268,18 @@
     else if (st === "반려") meta.push('<span class="dday red" title="' + esc(d.reject_reason || "") + '">반려' + (d.reject_reason ? " — " + esc(String(d.reject_reason).slice(0, 40)) : "") + '</span>');
     meta.push('<span class="own-badge" title="공개범위 — 문서 지정값이 없으면 분류 기본값(권한관리 › 문서함 설정)">공개 ' + esc(docScopeLabel(d)) + '</span>');
     if (d.by && d.by.name && (isAdmin() || st !== "등재")) meta.push('<span>등재 ' + esc(dispNameById(d.by.id) || d.by.name) + '</span>');
+    var files = Array.isArray(d.files) ? d.files : [];
+    if (files.length) meta.push('<span class="own-badge" title="첨부 파일 — 아래 [열기]">📎 ' + files.length + '</span>');
     var canEdit = admin && (docCatOf(d) !== "01" || isAdmin());   // 01 법인 편집은 관리자만(서버도 강제)
     var canResubmit = admin && st === "반려" && !isAdmin() && !!(d.by && d.by.id === myId());   // 반려 건 재상신은 등재한 본인(서버가 by 대조). 관리자는 수정=즉시 등재
+    // 첨부 목록(v315): 파일마다 [열기] — 서버 doc_att_get(열람 판정=docVisible)로 받아 새 창/다운로드
+    var fileRows = files.map(function(f){
+      return '<div style="font-size:12.5px;color:var(--sub);margin-top:2px;">📎 ' + esc(f.name || "") + ' <span style="font-size:11.5px;">(' + docAttKb(f.size) + ')</span> '
+        + '<button class="mini-btn" style="font-size:11.5px;padding:2px 8px;margin-left:4px;" data-doc-att-open="' + esc(d.id) + '|' + Number(f.n) + '">열기</button></div>';
+    }).join("");
     return '<div class="item"><div class="item-body"><div class="item-title">' + titleHtml + '</div>' +
       (meta.length ? '<div class="item-meta">' + meta.join('') + '</div>' : '') +
-      (d.note ? '<div class="task-detail">' + esc(d.note) + '</div>' : '') +
+      (d.note ? '<div class="task-detail">' + esc(d.note) + '</div>' : '') + fileRows +
       '</div>' + ((canEdit || canResubmit) ? '<div class="task-ctrl">' + (canEdit ? '<button class="mini-btn" data-doc-edit="' + d.id + '">수정</button>' : '') +
         (canResubmit ? '<button class="mini-btn" data-doc-resubmit="' + d.id + '" title="다시 PM 승인을 요청합니다(수정은 [수정]에서)">재상신</button>' : '') + '</div>' : '') + '</div>';
   }
@@ -6023,10 +6308,10 @@
     var searching = !!docSearchTerm;
     var h = "";
     // 순회는 리터럴 배열로 — Object.keys는 "99"(정수형 키)를 선두로 올려 미분류가 맨 위에 왔다(리뷰 지적)
-    ["01","02","03","05","06","99"].forEach(function(cat){
+    DOC_CAT_ORDER.forEach(function(cat){
       var rows = list.filter(function(d){ return docCatOf(d) === cat; });
       // 빈 서랍 처리: 미분류는 있을 때만, 01 법인은 서버가 걸러 0건인 사람에겐 서랍 자체를 안 보여줌(존재 노출 방지)
-      if (!rows.length && (cat === "99" || cat === "01")) return;
+      if (!rows.length && (cat === "99" || cat === "01" || !isAdmin())) return;   // 직원에겐 빈 서랍(비공개 분류)을 아예 안 그림 — 12분류 확장 후 빈 서랍 10개 노이즈 방지
       rows.sort(function(a,b){ var at=(a.title||""), bt=(b.title||""); return at<bt?-1:(at>bt?1:0); });
       var open = searching ? rows.length > 0 : !!docOpenCats[cat];
       h += '<div class="doc-acc"><div class="doc-acc-hd" data-doc-acc="' + cat + '"><span>' + (open ? "▾" : "▸") + ' ' + DOC_CATS[cat]
@@ -6050,6 +6335,9 @@
     });
     Array.prototype.forEach.call(host.querySelectorAll("[data-doc-resubmit]"), function(el){
       el.addEventListener("click", function(e){ e.stopPropagation(); docResubmit(el.getAttribute("data-doc-resubmit")); });
+    });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-doc-att-open]"), function(el){
+      el.addEventListener("click", function(e){ e.stopPropagation(); var p = el.getAttribute("data-doc-att-open").split("|"); docAttOpen(p[0], Number(p[1])); });
     });
   }
   // 직원 지정 체크박스 — 지시 모듈 scopeCheckboxesHtml의 "개별 직원" 상자와 같은 결(data-mid → getCheckedMembers). 부서·직급 토큰은 문서 scope 규격(ids만)에 없어 제외
@@ -6091,6 +6379,7 @@
     if (hint) hint.textContent = isAdmin()
       ? "기본은 비공개 — 분류 기본값(권한관리 › 문서함 설정)을 열거나 여기서 문서별로 지정할 때만 직원에게 보입니다. 관리자는 항상 열람."
       : (lock ? "분류·문서번호·공개범위는 PM만 변경합니다(내용만 수정 가능)." : "기본은 비공개(관리자만). 등록한 문서는 PM 승인 후 등재되며, 공개범위는 승인 시 함께 검토됩니다.");
+    docAttRenderModal();   // 첨부 영역(v315) — 기존 문서만(신규는 저장 후 id 확정), 올리기=관리자·등재 본인, 삭제=관리자
     document.getElementById("docDelete").style.display = d ? "block" : "none";
     document.getElementById("docBackdrop").classList.add("show");
   }
@@ -6102,11 +6391,11 @@
     var newCat = document.getElementById("docCat").value;
     // 검증은 전부 push 전에 — 차단 후 return하면 빈 스텁이 배열에 남아 유령 문서로 영속된다(리뷰 지적)
     if (newCat === "01" && !isAdmin()){ alert("01 법인 분류는 관리자만 지정할 수 있습니다(서버에서도 차단됩니다)."); return; }
-    var scopeMode = document.getElementById("docScope").value, scopeIds = [];
-    if (!lock && scopeMode === "ids"){ scopeIds = getCheckedMembers("docScopeMembers"); if (!scopeIds.length){ alert("직원 지정 공개는 최소 1명을 체크해주세요."); return; } }
     var d = editingDocId ? findDoc(editingDocId) : null;
     var today = todayStr(), isNew = !d, me = curMember();
-    var lock = !isNew && !isAdmin();   // 비관리자 기존 문서: 분류·문서번호·공개범위는 서버 원본 고정 — 클라도 손대지 않는다(잠긴 셀렉트 값 그대로)
+    var lock = !isNew && !isAdmin();   // 비관리자 기존 문서: 분류·문서번호·공개범위는 서버 원본 고정 — 클라도 손대지 않는다(잠긴 셀렉트 값 그대로). 검증(아래 ids)보다 앞에 둔다(v315 — 호이스팅으로 undefined였던 순서 정리)
+    var scopeMode = document.getElementById("docScope").value, scopeIds = [];
+    if (!lock && scopeMode === "ids"){ scopeIds = getCheckedMembers("docScopeMembers"); if (!scopeIds.length){ alert("직원 지정 공개는 최소 1명을 체크해주세요."); return; } }
     if (!d){ d = {id: genId("doc"), created: today}; documents.push(d); }
     d.title = title;
     if (!lock){
@@ -16365,6 +16654,9 @@
     var m = curMember();
     btn.textContent = m ? (m.name + (m.rank ? " " + m.rank : "")) : "로그인";
     btn.classList.toggle("empty", !m);
+    // [기안](v315): 로그인한 관리자·직원 모두 — 대표 계정만 숨김(대표는 기안 대상이 아니라 결재자)
+    var db = document.getElementById("apprDraftBtn");
+    if (db) db.style.display = (m && !isBossMember(m)) ? "flex" : "none";
   }
 
   function openChangePin(nudge){

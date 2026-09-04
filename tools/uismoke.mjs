@@ -158,5 +158,58 @@ try {
     '서버만: ' + onlyS.join(',') + ' / 앱만: ' + onlyA.join(','));
 } catch (e) { console.log('  (결재 등급표 대조 생략 — 파싱 실패)'); }
 
+// 10) v315 동률 검사 — ① 전결 종결 제외 목록(앱 APPR_DRAFT_EXCLUDE ↔ 서버 APPR_SELF_DECIDE_EXCLUDE: 한쪽만 바뀌면 화면이 허용한 종류를 서버가 400으로 튕기거나 반대)
+//    ② 문서함 첨부 확장자(앱 DOC_ATT_EXT ↔ 서버 DOC_ATT_EXT: 파일 선택창이 허용한 형식을 서버가 거부하는 사고)
+//    ③ 기안 화면 폴백 등급표(APPR_GRADE_DEFAULTS_APP) = 서버 기본표(값까지 — 표를 못 받았을 때 화면이 다른 경로를 말하지 않게)
+try {
+  const setOf = (seg, re) => new Set([...String(seg || '').matchAll(re)].map((m) => m[1]));
+  const eq = (a, b) => a.size > 0 && a.size === b.size && [...a].every((x) => b.has(x));
+  const appEx = setOf((html.match(/var APPR_DRAFT_EXCLUDE = \[([^\]]+)\]/) || ['', ''])[1], /"([^"]+)"/g);
+  const svrEx = setOf((gwd.match(/const APPR_SELF_DECIDE_EXCLUDE = \{([^}]+)\}/) || ['', ''])[1], /'([^']+)'\s*:/g);
+  T('전결 종결 제외 종류 앱↔서버 일치(' + svrEx.size + '종)', eq(appEx, svrEx), '앱: ' + [...appEx].join(',') + ' / 서버: ' + [...svrEx].join(','));
+  const appExt = setOf((html.match(/var DOC_ATT_EXT = \[([^\]]+)\]/) || ['', ''])[1], /"([^"]+)"/g);
+  const svrExt = setOf((gwd.match(/const DOC_ATT_EXT = \{([^}]+)\}/) || ['', ''])[1], /(\w+)\s*:/g);
+  T('문서함 첨부 확장자 앱↔서버 일치(' + svrExt.size + '종)', eq(appExt, svrExt), '앱: ' + [...appExt].join(',') + ' / 서버: ' + [...svrExt].join(','));
+  const tbl = (seg) => { const o = {}; [...String(seg || '').matchAll(/["']([^"']+)["']\s*:\s*(\d)/g)].forEach((m) => { o[m[1]] = Number(m[2]); }); return o; };
+  const appTbl = tbl((html.match(/var APPR_GRADE_DEFAULTS_APP = \{([^}]+)\}/) || ['', ''])[1]);
+  const svrTbl = tbl((gwd.match(/const APPR_GRADE_DEFAULTS = \{([\s\S]*?)\};/) || ['', ''])[1]);
+  const ka = Object.keys(appTbl), ks = Object.keys(svrTbl);
+  T('기안 화면 폴백 등급표 = 서버 기본표(값 포함)', ks.length > 0 && ka.length === ks.length && ks.every((k) => appTbl[k] === svrTbl[k]),
+    '차이: ' + ks.filter((k) => appTbl[k] !== svrTbl[k]).concat(ka.filter((k) => !(k in svrTbl))).join(','));
+} catch (e) { console.log('  (v315 동률 검사 생략 — 파싱 실패)'); }
+
+// 11) 문서함 1층 12분류(개편안 2026-09-04 §5) + 첨부 mime 고정표 동률 — 한쪽만 확장하면 새 분류가 서버에서 99로 강등되거나 화면에 서랍이 없다.
+//    ① 분류 키: 앱 DOC_CATS = 앱 DOC_CAT_ORDER = #docCat option = 서버 DOC_CAT_SET = 서버 DOC_CAT_LABEL(라벨 텍스트까지)
+//    ② 설정 대상 분류: 앱 DOC_SCOPE_CATS = 서버 DOC_SCOPE_CATS = 분류 키 − 01
+//    ③ docCatOf JW 번호 정규식 앱↔서버 동률  ④ mime 고정표 키 = 확장자 화이트리스트(앱·서버 각각) + 앱 DOC_ATT_MIME = 서버 DOC_ATT_MIME(값까지)
+try {
+  // 키 순서는 소스 등장 순서로 비교(Object.keys는 "10"·"99" 같은 정수형 키를 앞으로 올린다 — 순서 검증이 목적이라 matchAll로 뽑는다)
+  const kv = (seg, re) => { const o = { keys: [], val: {} }; [...String(seg || '').matchAll(re)].forEach((m) => { o.keys.push(m[1]); o.val[m[1]] = m[2]; }); return o; };
+  const same = (a, b) => a.length > 0 && a.length === b.length && a.every((x, i) => x === b[i]);
+  const appCats = kv((html.match(/var DOC_CATS = \{([^}]+)\}/) || ['', ''])[1], /"(\d{2})"\s*:\s*"([^"]+)"/g);
+  const appOrder = [...((html.match(/var DOC_CAT_ORDER = \[([^\]]+)\]/) || ['', ''])[1]).matchAll(/"(\d{2})"/g)].map((m) => m[1]);
+  const selSeg = (html.match(/<select id="docCat">([\s\S]*?)<\/select>/) || ['', ''])[1];
+  const selVals = [...selSeg.matchAll(/value="(\d{2})"/g)].map((m) => m[1]);
+  const svrSet = kv((gwd.match(/const DOC_CAT_SET = \{([^}]+)\}/) || ['', ''])[1], /'(\d{2})'\s*:\s*(\d)/g).keys;
+  const svrLabel = kv((gwd.match(/const DOC_CAT_LABEL = \{([^}]+)\}/) || ['', ''])[1], /'(\d{2})'\s*:\s*'([^']+)'/g);
+  const appKeys = appCats.keys;
+  T('문서함 분류 키 앱 DOC_CATS = DOC_CAT_ORDER = #docCat = 서버 DOC_CAT_SET (' + appKeys.length + '종)', same(appKeys, appOrder) && same(appKeys, selVals) && same(appKeys, svrSet),
+    'DOC_CATS ' + appKeys.join(',') + ' / ORDER ' + appOrder.join(',') + ' / select ' + selVals.join(',') + ' / 서버 ' + svrSet.join(','));
+  T('문서함 분류 라벨 앱↔서버 일치', same(appKeys, svrLabel.keys) && appKeys.every((k) => appCats.val[k] === svrLabel.val[k]),
+    '차이: ' + appKeys.filter((k) => appCats.val[k] !== svrLabel.val[k]).map((k) => k + ' 앱=' + appCats.val[k] + ' 서버=' + svrLabel.val[k]).join(' / '));
+  const appScope = [...((html.match(/var DOC_SCOPE_CATS = \[([^\]]+)\]/) || ['', ''])[1]).matchAll(/"(\d{2})"/g)].map((m) => m[1]);
+  const svrScope = [...((gwd.match(/const DOC_SCOPE_CATS = \[([^\]]+)\]/) || ['', ''])[1]).matchAll(/'(\d{2})'/g)].map((m) => m[1]);
+  T('문서함 설정 대상 분류 앱↔서버 일치 = 분류 키 − 01', same(appScope, svrScope) && same(appScope, appKeys.filter((k) => k !== '01')), '앱 ' + appScope.join(',') + ' / 서버 ' + svrScope.join(','));
+  const reApp = (html.match(/s\.match\((\/JW.*?\/i)\);/) || ['', ''])[1], reSvr = (gwd.match(/s\.match\((\/JW.*?\/i)\);/) || ['', ''])[1];
+  T('docCatOf JW 번호 정규식 앱↔서버 동률', !!reApp && reApp === reSvr, '앱 ' + reApp + ' / 서버 ' + reSvr);
+  const appMime = kv((html.match(/var DOC_ATT_MIME = \{([\s\S]*?)\};/) || ['', ''])[1], /(\w+)\s*:\s*"([^"]+)"/g);
+  const svrMime = kv((gwd.match(/const DOC_ATT_MIME = \{([\s\S]*?)\};/) || ['', ''])[1], /(\w+)\s*:\s*'([^']+)'/g);
+  const appExtL = [...((html.match(/var DOC_ATT_EXT = \[([^\]]+)\]/) || ['', ''])[1]).matchAll(/"([^"]+)"/g)].map((m) => m[1]).sort();
+  const svrExtL = [...((gwd.match(/const DOC_ATT_EXT = \{([^}]+)\}/) || ['', ''])[1]).matchAll(/(\w+)\s*:/g)].map((m) => m[1]).sort();
+  const mk = appMime.keys.slice().sort(), sk = svrMime.keys.slice().sort();
+  T('첨부 mime 고정표 키 = 확장자 화이트리스트(앱·서버) + 값 앱↔서버 일치', same(mk, appExtL) && same(sk, svrExtL) && same(mk, sk) && mk.every((k) => appMime.val[k] === svrMime.val[k]),
+    '앱 mime ' + mk.join(',') + ' / 서버 mime ' + sk.join(',') + ' / 값 차이 ' + mk.filter((k) => appMime.val[k] !== svrMime.val[k]).join(','));
+} catch (e) { console.log('  (12분류·mime 동률 검사 생략 — 파싱 실패: ' + e.message + ')'); }
+
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

@@ -87,19 +87,29 @@ async function verSnapshot(col, prevDoc, byName, dailyOnly, force) {
   } catch (e) {}
 }
 
-// 문서함 분류 파생 — cat 필드 우선, 없으면 JW 번호·구 분류 텍스트에서 유도. 클라 docCatOf와 같은 규칙 유지 필수
-const DOC_CAT_SET = { '01': 1, '02': 1, '03': 1, '05': 1, '06': 1, '99': 1 };
+// 객체를 화이트리스트로 쓸 때의 프로토타입 키('constructor' 등) 우회 차단 — 문서함 분류·확장자·공개범위 표 공용(적대 검증 low5)
+function hasOwn(o, k) { return Object.prototype.hasOwnProperty.call(o, k); }
+// 문서함 분류 파생 — cat 필드 우선, 없으면 JW 번호·구 분류 텍스트에서 유도. 클라 docCatOf와 같은 규칙 유지 필수(uismoke가 정규식 동률 대조)
+// 1층 12분류(문서번호체계 개편안 2026-09-04 §2): 01 법인·등기 / 02 인사·노무 / 03 안전보건 / 04 인허가 / 05 규정 / 06 양식 / 07 매뉴얼·가이드 / 08 영업·입찰 / 09 계약·공사 / 10 재무·세무 / 11 연구·인증 / 12 홍보·소개 (+99 미분류=앱 전용)
+const DOC_CAT_SET = { '01': 1, '02': 1, '03': 1, '04': 1, '05': 1, '06': 1, '07': 1, '08': 1, '09': 1, '10': 1, '11': 1, '12': 1, '99': 1 };
 function docCatOf(it) {
   if (!it) return '99';
   // cat은 화이트리스트만 신뢰 — 무효값을 그대로 분류로 삼으면 01 보호를 폴스루로 빠져나간다(클라와 동일 규칙)
-  if (it.cat && DOC_CAT_SET[String(it.cat)]) return String(it.cat);
+  if (it.cat && hasOwn(DOC_CAT_SET, String(it.cat))) return String(it.cat);
   const s = String(it.no || '') + ' ' + String(it.title || '');
-  const m = s.match(/JW-?0([12356])/i);
-  if (m) return '0' + m[1];
+  const m = s.match(/JW-?(0[1-9]|1[0-2])(?!\d)/i);   // 두 자리 그대로(하위번호 JW-03-016-01도 앞 두 자리)
+  if (m) return m[1];
   const c = String(it.category || '');
   if (/법인/.test(c)) return '01';
   if (/인사|노무/.test(c)) return '02';
   if (/안전|보건/.test(c)) return '03';
+  if (/인허가/.test(c)) return '04';
+  if (/매뉴얼|가이드/.test(c)) return '07';
+  if (/입찰|영업/.test(c)) return '08';
+  if (/계약|공사/.test(c)) return '09';
+  if (/재무|세무/.test(c)) return '10';
+  if (/인증|연구/.test(c)) return '11';
+  if (/홍보|소개/.test(c)) return '12';
   if (/규정|지침/.test(c)) return '05';
   if (/양식|서식/.test(c)) return '06';
   return '99';
@@ -113,9 +123,9 @@ function docCanSee01(m) { return !!(m && (m.admin || String(m.dept || '') === '�
 // 등재 결재(register_gate): 'staff'(기본 — 비관리자 등재는 status '대기' + 결재함 '문서함 등재' 카드 자동 상신, 승인 시 '등재') | 'none'(즉시 등재).
 // 관리자 등재는 항상 즉시 '등재'(등급표 ① PM 전결 — PM·관리자가 올리면 그 자체가 결재). status 없는 구건(18건)은 '등재'로 취급.
 const DOC_SETTINGS_KEY = 'settings:documents';
-const DOC_SCOPE_CATS = ['02', '03', '05', '06', '99'];   // 01 법인은 설정 불가(하드차단)
+const DOC_SCOPE_CATS = ['02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12', '99'];   // 01 법인은 설정 불가(하드차단). 12분류 확장(v315) — 신설 분류도 기본 비공개
 const DOC_SCOPE_VALS = { all: 1, mgmt: 1, admin: 1 };
-const DOC_SETTINGS_DEFAULTS = { scope_default: { '02': 'admin', '03': 'admin', '05': 'admin', '06': 'admin', '99': 'admin' }, register_gate: 'staff' };
+const DOC_SETTINGS_DEFAULTS = { scope_default: DOC_SCOPE_CATS.reduce(function (o, cat) { o[cat] = 'admin'; return o; }, {}), register_gate: 'staff' };
 // 읽기 실패는 기본표(전부 관리자만) 폴백 = 가장 닫힌 쪽(fail-closed). 등급표(apprGrades)와 같은 병합 규칙 — 저장본이 기본표 위에 얹힌다
 async function docSettings(st) {
   const out = { scope_default: Object.assign({}, DOC_SETTINGS_DEFAULTS.scope_default), register_gate: DOC_SETTINGS_DEFAULTS.register_gate, updated_at: 0, updated_by: '', read_failed: false };
@@ -123,7 +133,7 @@ async function docSettings(st) {
     const r = await blobGet(st, DOC_SETTINGS_KEY);
     if (r.ok && r.data) {
       const sd = r.data.scope_default;
-      if (sd && typeof sd === 'object') DOC_SCOPE_CATS.forEach(function (cat) { if (DOC_SCOPE_VALS[sd[cat]]) out.scope_default[cat] = sd[cat]; });
+      if (sd && typeof sd === 'object') DOC_SCOPE_CATS.forEach(function (cat) { if (typeof sd[cat] === 'string' && hasOwn(DOC_SCOPE_VALS, sd[cat])) out.scope_default[cat] = sd[cat]; });
       if (r.data.register_gate === 'none' || r.data.register_gate === 'staff') out.register_gate = r.data.register_gate;
       out.updated_at = r.data.updated_at || 0; out.updated_by = r.data.updated_by || '';
     } else if (!r.ok && r.code !== 'NOT_FOUND') out.read_failed = true;
@@ -132,7 +142,7 @@ async function docSettings(st) {
 }
 // scope 정규화 — 화이트리스트 밖 값은 버린다(무효값이 "미지정=분류 기본"으로 떨어지게). ids는 문자열만·중복 제거·상한 50
 function docScopeNorm(s) {
-  if (typeof s === 'string') return DOC_SCOPE_VALS[s] ? s : null;
+  if (typeof s === 'string') return hasOwn(DOC_SCOPE_VALS, s) ? s : null;
   if (s && typeof s === 'object' && Array.isArray(s.ids)) {
     const seen = {}, ids = [];
     s.ids.forEach(function (x) { if (typeof x === 'string' && x && !seen[x] && ids.length < 50) { seen[x] = 1; ids.push(x); } });
@@ -157,7 +167,7 @@ function docScopeOf(it, settings) {
   if (own) return own;
   const cat = docCatOf(it);
   if (cat === '01') return 'mgmt';
-  return (settings && settings.scope_default && DOC_SCOPE_VALS[settings.scope_default[cat]]) ? settings.scope_default[cat] : 'admin';
+  return (settings && settings.scope_default && typeof settings.scope_default[cat] === 'string' && hasOwn(DOC_SCOPE_VALS, settings.scope_default[cat])) ? settings.scope_default[cat] : 'admin';
 }
 // 열람 판정(서버 하드차단 — get 필터·save 재구성 공용). 관리자 무제한. '대기'·'반려'는 등재한 본인만.
 // 등재한 본인(by.id)은 자기 문서를 항상 본다 — 자기가 올린 문서가 승인 뒤 사라지는 혼란 방지(정보 유출 없음: 본인이 쓴 내용)
@@ -170,7 +180,7 @@ function docVisible(m, it, settings) {
   if (mine) return true;
   return docScopeMatch(docScopeOf(it, settings), m);
 }
-const DOC_CAT_LABEL = { '01': '01 법인', '02': '02 인사노무', '03': '03 안전보건', '05': '05 규정', '06': '06 양식', '99': '미분류' };
+const DOC_CAT_LABEL = { '01': '01 법인·등기', '02': '02 인사·노무', '03': '03 안전보건', '04': '04 인허가', '05': '05 규정', '06': '06 양식', '07': '07 매뉴얼·가이드', '08': '08 영업·입찰', '09': '09 계약·공사', '10': '10 재무·세무', '11': '11 연구·인증', '12': '12 홍보·소개', '99': '99 미분류' };   // 개편안 §2 명칭 — 앱 DOC_CATS와 동일(uismoke 대조)
 const DOC_SCOPE_LABEL = { all: '전원', mgmt: '관리부+관리자', admin: '관리자만' };
 function docScopeText(it, settings) {
   const own = docScopeNorm(it && it.scope);
@@ -182,6 +192,12 @@ function docScopeText(it, settings) {
 function docRegBody(it, settings) {
   return [it.no ? '문서번호 ' + it.no : '', '분류 ' + (DOC_CAT_LABEL[docCatOf(it)] || '미분류'), '공개범위 ' + docScopeText(it, settings),
     it.url ? '링크 ' + it.url : '', it.note ? '메모 ' + it.note : ''].filter(Boolean).join(' · ').slice(0, 500);
+}
+// 첨부 메타(v315) — files:[{n,name,size,mime,ts,by}]는 doc_att_put/doc_att_del(·doc_bulk_put)로만 바뀐다. save 재구성은 서버 원본을 이월(관리자·비관리자 공통 —
+// 비관리자의 위조·삭제 차단 + 낡은 사본 저장이 첨부 목록을 지우는 사고 차단). 바이트는 gw_files 'docatt:<docId>:<n>'
+function docFilesFix(s, o) {
+  if (o && Array.isArray(o.files) && o.files.length) s.files = o.files; else delete s.files;
+  if (o && Number(o.att_seq) > 0) s.att_seq = Number(o.att_seq); else delete s.att_seq;   // 첨부 번호 카운터도 서버 원본(low4·low7 — 클라 사본이 카운터를 되돌려 번호 재사용을 만들지 않게)
 }
 // 결재 결과 → 문서 상태 반영(승인='등재'·반려='반려'). approval_decide 훅과 approvals_list 폴(재시도)이 같은 함수를 탄다 — 멱등:
 //  ① 카드 cid가 문서의 현재 등재 cid와 같을 때만(재상신된 문서에 구 카드가 손대지 않게) ② 문서가 '대기'일 때만(이미 관리자가 직접 등재한 건은 그대로).
@@ -328,6 +344,9 @@ async function handleSave(event, d, R) {
   //  ③신규 문서는 서버가 등재자(by) 스탬프 + 게이트(register_gate): 'staff'=대기(아래 결재함 자동 상신) / 'none'=즉시 등재
   let docPending = [], docSet = null, docDropped = [];
   if (col === 'documents') {
+    // 직전 문서를 못 읽으면 이월 판단(비관리자=못 보는 문서 / 관리자·비관리자 공통=첨부 메타 files) 자체가 불가 — fail-open이면 저장 한 번에 숨은 문서·첨부 목록이 통째로 증발
+    // (licenses duties와 같은 원칙). 관리자도 예외 없음(적대 검증 med2: 관리자 저장이 files 전량 삭제·스냅샷 없이 덮던 경로)
+    if (prevReadFailed) return jr(500, { status: 'ERROR', error_code: 'PREV_READ_FAILED', request_id: R });
     if (Array.isArray(doc.items)) doc.items = doc.items.filter(function (x) { return x && typeof x === 'object'; });
     if (c.member.admin) {
       const oldDocBy = {}; oldItems.forEach(function (o) { if (o && o.id) oldDocBy[o.id] = o; });
@@ -337,11 +356,10 @@ async function handleSave(event, d, R) {
         const sc = docScopeNorm(s.scope); if (sc) s.scope = sc; else delete s.scope;
         if (!(s.id && oldDocBy[s.id]) && s.status !== '등재') { s.status = '등재'; s.registered_by = { id: c.member.id, name: c.member.name }; s.registered_at = nowIso; delete s.reject_reason; }
         if (!(s.id && oldDocBy[s.id]) && !s.by) s.by = { id: c.member.id, name: c.member.name };
+        docFilesFix(s, s.id ? oldDocBy[s.id] : null);   // 첨부 메타(v315)는 첨부 액션으로만 — 관리자 저장도 서버 원본 이월(낡은 사본이 첨부 목록을 지우지 않게)
         return s;
       });
     } else {
-      // 직전 문서를 못 읽으면 "못 보는 문서 이월" 판단 자체가 불가 — fail-open이면 비관리자 저장 한 번에 숨은 문서가 전부 증발(licenses duties와 같은 원칙)
-      if (prevReadFailed) return jr(500, { status: 'ERROR', error_code: 'PREV_READ_FAILED', request_id: R });
       docSet = await docSettings(store(DATA));
       const oldDocBy = {}; oldItems.forEach(function (o) { if (o && o.id) oldDocBy[o.id] = o; });
       const keep = [], keepIds = {};
@@ -361,10 +379,12 @@ async function handleSave(event, d, R) {
           const resubmit = docStatusOf(o) === '반려' && !!(o.by && o.by.id === me.id) && Number(x.reg_n) === (Number(o.reg_n) || 1) + 1;
           ['status', 'by', 'registered_by', 'registered_at', 'reject_reason', 'rejected_at', 'reg_n'].forEach(function (k) { if (o[k] != null) s[k] = o[k]; else delete s[k]; });
           if (resubmit) { s.status = '대기'; s.reg_n = (Number(o.reg_n) || 1) + 1; delete s.reject_reason; delete s.rejected_at; }
+          docFilesFix(s, o);   // 첨부 메타 원본 고정(v315) — 비관리자가 files를 위조·삭제해 보내도 첨부 액션(doc_att_put/del)으로만 바뀐다
         } else {
           if (docCatOf(x) === '01') { docDropped.push(x); return; }   // 신규 01 법인은 관리자만(2026-09-02 규칙) — 폐기 + 감사로그 '제거'
           const sc = docScopeNorm(s.scope); if (sc) s.scope = sc; else delete s.scope;
           s.by = me; delete s.registered_by; delete s.registered_at; delete s.reject_reason; delete s.rejected_at; delete s.reg_n;
+          docFilesFix(s, null);   // 신규 문서는 첨부 0으로 시작(id 확정 뒤 doc_att_put)
           if (docSet.register_gate === 'none') { s.status = '등재'; s.registered_by = me; s.registered_at = nowIso; }
           else s.status = '대기';
         }
@@ -1195,7 +1215,7 @@ async function handleDocSettingsSet(event, d, R) {
   if (d.cat !== undefined) {
     const cat = String(d.cat || ''), scope = String(d.scope || '');
     if (DOC_SCOPE_CATS.indexOf(cat) < 0) return jr(400, { status: 'REJECTED', error_code: 'BAD_CAT', request_id: R });   // 01 법인 포함 — 하드차단이라 설정 대상 아님
-    if (!DOC_SCOPE_VALS[scope]) return jr(400, { status: 'REJECTED', error_code: 'BAD_SCOPE', request_id: R });
+    if (!hasOwn(DOC_SCOPE_VALS, scope)) return jr(400, { status: 'REJECTED', error_code: 'BAD_SCOPE', request_id: R });
     evText = '기본 공개범위 ' + cat + ' ' + cur.scope_default[cat] + '→' + scope;
     cur.scope_default[cat] = scope;
   } else if (d.register_gate !== undefined) {
@@ -1242,7 +1262,10 @@ async function handleApprovalsList(event, d, R) {
   // pm_present — 비대표 관리자 존재 여부(결재 3차: ①·② 1단계는 비대표 관리자 전용인데, 없으면 대표에게 연다 — 서버 PM_ONLY 게이트와 같은 축)
   const bossN = c.member.admin ? (await push.bossIds()).length : 0;
   const pmN = c.member.admin ? (await push.pmIds()).length : 0;
-  return jr(200, { status: 'OK', items: items, base: docFresh.updated_at || 0, boss_present: bossN > 0, pm_present: pmN > 0, request_id: R });
+  // grades — 현재 등급표 스냅샷(v315 기안 화면의 등급·흐름 미리보기용). 정책표라 비관리자에게도 내려간다(appr_grades_get은 관리 화면 전용 admin 게이트 유지).
+  // 기안 시 진짜 등급은 서버 apprCreateItem이 다시 표를 읽어 스탬프한다 — 이 값은 표시용
+  const grades = await apprGrades(store(DATA));
+  return jr(200, { status: 'OK', items: items, base: docFresh.updated_at || 0, boss_present: bossN > 0, pm_present: pmN > 0, grades: grades, request_id: R });
 }
 // '대기' 문서 ↔ 카드 반대 방향 재시도(med2): 문서 블롭 1회 읽기, 현재 cid(docreg-<id>[-n])의 카드가 어떤 상태로도 없을 때만 생성(결정된 카드가 있으면 정방향 반영 몫).
 // 기안자=문서 등재자(by) 명의 — 상신 규칙(등급 스냅샷·푸시)은 apprCreateItem 그대로. 삭제(del:1) 문서는 제외. 반환=생성 건수
@@ -1262,6 +1285,9 @@ async function docRegisterReconcileCreate(st, apItems) {
   }
   return made;
 }
+// 전결 종결이 불가한 종류(v315) — 각각 전용 경로가 있다: 운반일지(③·올바로 자동 기안), 문서함 등재(문서함 게이트 훅 — 문서 '등재'와 사규 '결재'는 별개 행위),
+// 휴가(휴가 모듈 승인·총정리 읽기 합산), 전결총정리(크론). 기안 화면(index APPR_DRAFT_EXCLUDE)과 같은 목록이어야 한다(uismoke 대조).
+const APPR_SELF_DECIDE_EXCLUDE = { '지시': 1, '운반일지': 1, '문서함 등재': 1, '휴가': 1, '전결총정리': 1 };   // 지시는 지시 탭 전용(담당 완료→승인 흐름·ref=지시 id) — 기안 화면·전결 대상 아님(low8)
 async function handleApprovalCreate(event, d, R) {
   const c = await currentMember(event);
   if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
@@ -1270,11 +1296,20 @@ async function handleApprovalCreate(event, d, R) {
   if (!title) return jr(400, { status: 'REJECTED', error_code: 'NO_TITLE', request_id: R });
   const kind0 = String(d.kind || '일반').slice(0, 20);
   if (kind0 === '전결총정리') return jr(400, { status: 'REJECTED', error_code: 'SYSTEM_KIND', request_id: R });   // 크론 전용 kind — 사용자 기안 불가(§3.3)
-  const r = await apprCreateItem(store(DATA), c.member, { kind: kind0, title: title, body: d.body, ref: d.ref, cid: d.cid, boss_up: !!d.boss_up });
-  if (!r.ok) return jr(500, { status: 'ERROR', error_code: r.code, request_id: R });
+  // 전결 종결(v315, PM 9/4 "사규·가족친화 결재는 어딨노"): 기안자가 비대표 관리자(PM)이고 ① 등급이면 기안=결재 —
+  // 카드 생성과 '승인' 기록을 한 번의 쓰기로(create+decide 두 번 왕복 금지, 결재 큐에 잠깐이라도 뜨지 않게).
+  // 거부는 전부 400(클라가 [상신]으로 되돌리게): 비관리자·대표(대표는 기안 대상 아님) / ②·③·미정 등급 / 전용 경로가 있는 종류
+  const selfDecide = !!d.self_decide;
+  if (selfDecide) {
+    if (!c.member.admin || push.isBoss(c.member)) return jr(400, { status: 'REJECTED', error_code: 'SELF_DECIDE_PM_ONLY', request_id: R });
+    if (APPR_SELF_DECIDE_EXCLUDE[kind0]) return jr(400, { status: 'REJECTED', error_code: 'SELF_DECIDE_KIND', request_id: R });
+  }
+  const r = await apprCreateItem(store(DATA), c.member, { kind: kind0, title: title, body: d.body, ref: d.ref, cid: d.cid, boss_up: !!d.boss_up, self_decide: selfDecide });
+  if (!r.ok) return jr(r.http === 400 ? 400 : 500, { status: r.http === 400 ? 'REJECTED' : 'ERROR', error_code: r.code, request_id: R });
   const out = { status: 'OK', id: r.id, request_id: R };
   if (r.dedup) out.dedup = true;
   if (r.updated) out.updated = true;
+  if (r.self_decided) out.decided = '승인';   // 전결 종결(또는 그 재시도의 cid 멱등 흡수) — 클라가 "전결 종결"로 표시
   return jr(200, out);
 }
 // 상신 본체 — 사용자 기안(handleApprovalCreate)과 서버 내부 훅(문서함 등재 자동 상신, v314)이 같은 규칙을 탄다:
@@ -1290,7 +1325,7 @@ async function apprCreateItem(st, member, o) {
   const cid = String(o.cid || '').slice(0, 48);
   if (cid) {
     const dup = doc.items.find(function (x) { return x && x.cid === cid; });
-    if (dup) return { ok: true, id: dup.id, dedup: true };
+    if (dup) return { ok: true, id: dup.id, dedup: true, self_decided: dup.self_decided === true };
   }
   // 운반일지(ref ab:날짜)는 자동 기안(워커)과 수동 상신이 같은 날짜에 겹친다 — 열린(대기·보류) 동일 ref는
   // 새 카드를 만들지 않고 기존 카드를 정정본으로 갱신한다(아래 fresh 단계). 조용한 흡수는 자동 기안(자동수집분만)의
@@ -1301,13 +1336,28 @@ async function apprCreateItem(st, member, o) {
     if (refIn.indexOf('ab:') !== 0) return null;
     return items.find(function (x) { return x && x.ref === refIn && (x.status === '대기' || x.status === '보류'); }) || null;
   }
+  // 등급 스탬프(결재 3차 §4.3) — to·grade는 서버가 종류로 정한다(클라 값 불신). 기안 시점 스냅샷이라 이후 표 변경에 영향 없음.
+  // 스냅샷 쓰기보다 앞에서 읽는다 — 전결 종결(v315)의 등급 거부가 복구 링에 빈 스냅샷을 남기지 않게
+  const grades = await apprGrades(st);
+  let grade = grades[kind0];
+  if (grade !== 1 && grade !== 2 && grade !== 3) grade = 0;   // 0·미등재 = 등급 미정(현행)
+  let escalated = false;
+  if (grade === 1 && o.boss_up) { grade = 2; escalated = true; }   // "대표 상신" 토글 = ① 건별 ② 격상(§1)
+  // 전결 종결(v315): ① 등급 + 비대표 관리자 기안일 때만(격상 ②·③·미정은 거부 — 클라는 [상신]으로 되돌린다). 호출자(handleApprovalCreate)도 같은 검사를 하지만
+  // 본체가 최후 방어선(서버 내부 훅이 실수로 self_decide를 넘겨도 열리지 않게)
+  const selfDecide = !!o.self_decide;
+  if (selfDecide) {
+    if (!(member.admin && !push.isBoss(member))) return { ok: false, code: 'SELF_DECIDE_PM_ONLY', http: 400 };
+    if (grade !== 1) return { ok: false, code: 'SELF_DECIDE_GRADE1_ONLY', http: 400 };
+    if (refIn.indexOf('ab:') === 0) return { ok: false, code: 'SELF_DECIDE_KIND', http: 400 };   // 운반일지 ref는 정정 흡수 경로(dupOpenRef) — 전결과 섞이지 않게
+  }
   await verSnapshot('approvals', doc, member.name, false);   // 쓰기 전 시점 보존(복구 링 — 다른 컬렉션과 동일)
   // 레이스 창 축소: verSnapshot 왕복 사이 착지한 동시 결재/상신을 덮지 않게 쓰기 직전 신선본에 얹는다(3차=항목별 키 분리)
   const rd2 = await approvalsDoc(st);
   const fresh = rd2.ok ? rd2.doc : doc;
   if (cid) {
     const dup2 = fresh.items.find(function (x) { return x && x.cid === cid; });
-    if (dup2) return { ok: true, id: dup2.id, dedup: true };
+    if (dup2) return { ok: true, id: dup2.id, dedup: true, self_decided: dup2.self_decided === true };
   }
   const dr2 = dupOpenRef(fresh.items);
   if (dr2) {
@@ -1341,12 +1391,6 @@ async function apprCreateItem(st, member, o) {
     } catch (e) {}
     return { ok: true, id: dr2.id, updated: true };
   }
-  // 등급 스탬프(결재 3차 §4.3) — to·grade는 서버가 종류로 정한다(클라 값 불신). 기안 시점 스냅샷이라 이후 표 변경에 영향 없음.
-  const grades = await apprGrades(st);
-  let grade = grades[kind0];
-  if (grade !== 1 && grade !== 2 && grade !== 3) grade = 0;   // 0·미등재 = 등급 미정(현행)
-  let escalated = false;
-  if (grade === 1 && o.boss_up) { grade = 2; escalated = true; }   // "대표 상신" 토글 = ① 건별 ② 격상(§1)
   const item = { id: 'ap' + crypto.randomBytes(6).toString('hex'), cid: cid || undefined, kind: kind0, to: (kind0 === '운반일지' ? 'boss' : undefined),
     title: title, body: String(o.body || '').slice(0, 500), ref: refIn,
     by: { id: member.id, name: member.name }, created: new Date().toISOString(), status: '대기' };
@@ -1359,6 +1403,16 @@ async function apprCreateItem(st, member, o) {
     if (grade === 2 && member.admin && !push.isBoss(member)) {
       item.chain.push({ by: { id: member.id, name: member.name }, decision: '자동통과', at: item.created });
       item.to = 'boss';
+    }
+    // 전결 종결(v315): 생성과 동시에 '승인' — decide와 같은 최종 필드(status·decided_*·chain)를 한 쓰기로 박는다.
+    // to는 'pm'(① 큐 표기) 그대로 두되 status가 '승인'이라 어느 큐·뱃지에도 잡히지 않는다. 총정리 크론은 grade1+승인+decided_at(전월)로 집계 → 자동 포함
+    if (selfDecide) {
+      item.status = '승인';
+      item.decided_by = { id: member.id, name: member.name };
+      item.decided_at = item.created;
+      item.reason = '';
+      item.self_decided = true;   // 카드·내 상신 "전결 종결 · M/D" 표기용(감사로그와 별도)
+      item.chain.push({ by: { id: member.id, name: member.name }, decision: '전결', at: item.created });
     }
   }
   fresh.items.push(item);
@@ -1374,6 +1428,11 @@ async function apprCreateItem(st, member, o) {
       await blobSet(st, colKey('approvals'), chk.data);
     }
   } catch (e) {}
+  // 전결 종결은 감사로그 '전결' 1건(상신+결재를 한 행위로 기록) · 푸시 없음(본인 결재 — 결재 요청도 결과 통지도 받을 사람이 없다)
+  if (selfDecide) {
+    try { await appendAudit({ ts: Date.now(), by: member.name, bid: member.id, col: 'approvals', ev: [{ op: '전결', id: item.id, t: (item.kind + ' · ' + title).slice(0, 80) }] }); } catch (e) {}
+    return { ok: true, id: item.id, self_decided: true };
+  }
   try { await appendAudit({ ts: Date.now(), by: member.name, bid: member.id, col: 'approvals', ev: [{ op: '상신', id: item.id, t: (item.kind + ' · ' + title).slice(0, 80) }] }); } catch (e) {}
   // 결재 요청 웹푸시 — 기안자 본인만 제외(push_send __admins__ 관례와 동일). 발송 실패가 상신을 막지 않는다.
   // 수신자(결재 3차 §4.3): 대표 큐(③·자동통과 ②·구건 운반일지)=대표(없으면 관리자 폴백) / ①·② 1단계=비대표 관리자(없으면 관리자 폴백) / 구건=관리자 전원(현행).
@@ -1601,6 +1660,8 @@ async function handleAttParse(event, d, R) {
   if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
   if (permOf(c.member, 'contracts') !== 'do') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_WRITE', request_id: R });
   const id = String(d.id || '');
+  // att_ 프리픽스 강제(att_get/att_del과 동일) — 없으면 같은 스토어의 docatt:(문서함 첨부)·tpl:/proof: 키를 계약 권한으로 판독·parse: 캐시 생성할 수 있다(적대 검증 low6)
+  if (id.indexOf('att_') !== 0) return jr(400, { status: 'REJECTED', error_code: 'BAD_ID', request_id: R });
   const r = await blobGet(store(FILES), id);
   if (!r.ok || !r.data) return jr(404, { status: 'REJECTED', error_code: 'NOT_FOUND', request_id: R });
   let parsed = null;
@@ -1846,6 +1907,245 @@ async function handleAttDel(event, d, R) {
   return jr(200, { status: 'OK', request_id: R });
 }
 
+// ---- 문서함 파일 첨부(v315, PM 9/4 "실물 없는 포인터 목록") — 계약 첨부 저장소(gw_files) 재사용 ----
+// 바이트는 gw_files 'docatt:<docId>:<n>'(문서당 여러 파일, n은 문서 안에서 단조 증가), 메타는 문서 항목 files:[{n,name,size,mime,ts,by}].
+// 권한: 올리기=관리자 또는 등재 본인(doc 수행 — '대기' 문서에도 본인은 첨부 가능) / 열기=docVisible 통과자(공개범위 하드차단과 같은 축, 관리자 무제한) / 삭제=관리자.
+// save 재구성은 files를 서버 원본으로 고정(docFilesFix) — 첨부 메타는 여기 액션으로만 바뀐다.
+const DOC_ATT_EXT = { pdf: 1, docx: 1, xlsx: 1, pptx: 1, hwp: 1, hwpx: 1, jpg: 1, jpeg: 1, png: 1 };   // 확장자 화이트리스트 — 앱 DOC_ATT_EXT와 동일해야 한다(uismoke 대조)
+// 확장자 → mime 고정표(적대 검증 high1): 클라가 보낸 mime은 저장·반환 어디에도 쓰지 않는다 — text/html 등으로 위장한 첨부가 앱 오리진 Blob URL로 실행되는 저장형 XSS 차단.
+// 키 집합은 DOC_ATT_EXT와 같아야 한다(uismoke 대조). 앱 DOC_ATT_MIME도 같은 표(응답 type은 무시하고 확장자로만 연다)
+const DOC_ATT_MIME = { pdf: 'application/pdf', docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', hwp: 'application/x-hwp', hwpx: 'application/hwp+zip', jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png' };
+const DOC_ATT_MAX = 6 * 1024 * 1024;            // 문서 첨부 base64 상한 6MB(원본 ≈4.5MB — Netlify 동기 함수 본문 한도 ~6MB, 적대 검증 med3). 계약 첨부 ATT_MAX(8MB)는 별개·불변
+const DOC_ATT_PER_DOC = 20;                     // 문서당 첨부 상한(무한 누적 방지)
+const DOC_BULK_MAX_ITEMS = 100;                 // 일괄 등재 요청당 항목 상한
+const DOC_BULK_MAX_TOTAL = Math.floor(5.5 * 1024 * 1024);   // 일괄 등재 요청당 첨부 base64 합계 상한 5.5MB(JSON 오버헤드 포함 본문 6MB 안쪽)
+function docAttKey(docId, n) { return 'docatt:' + docId + ':' + n; }
+function docAttExt(name) { const m = String(name || '').toLowerCase().match(/\.([a-z0-9]+)$/); return m ? m[1] : ''; }
+function docAttExtOk(ext) { return !!ext && hasOwn(DOC_ATT_EXT, ext); }
+function docAttMime(name) { const e = docAttExt(name); return hasOwn(DOC_ATT_MIME, e) ? DOC_ATT_MIME[e] : 'application/octet-stream'; }
+// 매직바이트 최소 검증(high1) — 확장자만 믿지 않는다: pdf %PDF / png 89 50 4E 47 0D 0A 1A 0A / jpg FF D8 FF / zip 계열(docx·xlsx·pptx·hwpx) PK 03 04|05 06|07 08 / hwp OLE D0 CF 11 E0 또는 3.x 텍스트 머리 "HWP Document File"
+function docAttMagicOk(ext, b64) {
+  let head;
+  try { head = Buffer.from(String(b64 || '').slice(0, 32), 'base64'); } catch (e) { return false; }
+  if (!head || head.length < 4) return false;
+  const h = function (i) { return head[i]; };
+  if (ext === 'pdf') return head.toString('latin1').indexOf('%PDF') >= 0;   // 앞 24바이트 안 어디든 — BOM·공백 접두 PDF 허용(리뷰 low)
+  if (ext === 'png') return h(0) === 0x89 && h(1) === 0x50 && h(2) === 0x4E && h(3) === 0x47 && head.length >= 8 && h(4) === 0x0D && h(5) === 0x0A && h(6) === 0x1A && h(7) === 0x0A;
+  if (ext === 'jpg' || ext === 'jpeg') return h(0) === 0xFF && h(1) === 0xD8 && h(2) === 0xFF;
+  if (ext === 'docx' || ext === 'xlsx' || ext === 'pptx' || ext === 'hwpx') return h(0) === 0x50 && h(1) === 0x4B && ((h(2) === 0x03 && h(3) === 0x04) || (h(2) === 0x05 && h(3) === 0x06) || (h(2) === 0x07 && h(3) === 0x08));
+  if (ext === 'hwp') return (h(0) === 0xD0 && h(1) === 0xCF && h(2) === 0x11 && h(3) === 0xE0) || head.slice(0, 17).toString('latin1') === 'HWP Document File';
+  return false;
+}
+// 첨부 번호 = 문서의 att_seq 카운터(단조 증가·삭제 후 재사용 없음, low4·low7). 카운터 없는 구건은 기존 files 최대 n에서 이어간다
+function docAttNextN(it) {
+  let n = Number(it && it.att_seq) || 0;
+  ((it && it.files) || []).forEach(function (f) { if (f && Number(f.n) > n) n = Number(f.n); });
+  return n + 1;
+}
+function b64Bytes(b64) { const L = b64.length; return Math.floor(L * 3 / 4) - (L && b64.charAt(L - 1) === '=' ? (L > 1 && b64.charAt(L - 2) === '=' ? 2 : 1) : 0); }   // base64 → 원 바이트 수(디코드 없이)
+function docAttCanPut(m, it) { return !!(m && it && (m.admin || (it.by && it.by.id === m.id && permOf(m, 'documents') === 'do'))); }
+// 문서 블롭 읽기 + 항목 찾기(삭제 문서 제외). 반환 {ok, doc, it} / {ok:false, http, code}
+async function docAttLoad(st, docId) {
+  if (!docId) return { ok: false, http: 400, code: 'BAD_ID' };
+  const r = await blobGet(st, colKey('documents'));
+  if (!r.ok) return { ok: false, http: 500, code: r.code };
+  const doc = (r.data && Array.isArray(r.data.items)) ? r.data : null;
+  const it = doc ? doc.items.find(function (x) { return x && x.id === docId; }) : null;
+  if (!it || it.del === 1) return { ok: false, http: 404, code: 'NO_DOC' };
+  return { ok: true, doc: doc, it: it };
+}
+// 첨부 메타 변경 쓰기 — 사람 저장과 같은 시점 보존 + 쓰기 후 1회 자가복구(동시 문서 저장이 files 변경을 덮었으면 재적용 — save는 원본 files를 이월하므로 창은 좁다)
+// seq = 이번 쓰기의 att_seq(첨부 추가 시 새 n, 삭제 시 원값 유지 — 카운터는 절대 줄지 않는다).
+// 쓰기 후 재확인(low7): 동시 doc_att_put이 같은 n으로 착지했으면(신선본의 n 항목이 내 것이 아님) 되돌리지 않고 conflict로 알린다 —
+// 블롭 키가 같아 바이트도 뒤에 쓴 쪽이 이겼을 수 있어, 조용한 재적용은 남의 파일에 내 이름표를 붙이는 셈. 호출자는 409(클라 재시도=새 n)
+async function docAttWrite(st, doc, it, filesNew, seq, by, mineN) {
+  const prevDoc = JSON.parse(JSON.stringify(doc));
+  if (filesNew.length) it.files = filesNew; else delete it.files;
+  it.att_seq = Math.max(Number(it.att_seq) || 0, Number(seq) || 0);
+  it.updated_ts = Date.now(); it.updated = verDay(it.updated_ts);
+  doc.updated_by = by.id; doc.updated_at = Date.now();
+  await verSnapshot('documents', prevDoc, by.name + '(첨부)', false);
+  const w = await blobSet(st, colKey('documents'), doc);
+  if (!w.ok) return { ok: false, code: w.code };
+  try {
+    const chk = await blobGet(st, colKey('documents'));
+    if (chk.ok && chk.data && Array.isArray(chk.data.items)) {
+      const cur = chk.data.items.find(function (x) { return x && x.id === it.id; });
+      if (cur && mineN) {
+        const mine = (it.files || []).find(function (f) { return f && Number(f.n) === mineN; });
+        const theirs = (cur.files || []).find(function (f) { return f && Number(f.n) === mineN; });
+        if (mine && theirs && (theirs.ts !== mine.ts || !theirs.by || theirs.by.id !== mine.by.id)) return { ok: false, code: 'ATT_CONFLICT', http: 409 };
+      }
+      if (cur && (JSON.stringify(cur.files || []) !== JSON.stringify(it.files || []) || (Number(cur.att_seq) || 0) < it.att_seq)) {
+        if (it.files) cur.files = it.files; else delete cur.files;
+        cur.att_seq = Math.max(Number(cur.att_seq) || 0, it.att_seq);
+        cur.updated_ts = it.updated_ts; cur.updated = it.updated;
+        chk.data.updated_by = by.id; chk.data.updated_at = Date.now();
+        await blobSet(st, colKey('documents'), chk.data);
+        return { ok: true, updated_at: chk.data.updated_at };
+      }
+      if (chk.data.updated_at) return { ok: true, updated_at: chk.data.updated_at };
+    }
+  } catch (e) {}
+  return { ok: true, updated_at: doc.updated_at };
+}
+async function handleDocAttPut(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (!(await deviceApproved(event, c.member))) return jr(403, { status: 'FORBIDDEN', error_code: 'DEVICE_NOT_APPROVED', request_id: R });
+  if (permOf(c.member, 'documents') !== 'do') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_WRITE', request_id: R });
+  const docId = String(d.id || '').slice(0, 40);
+  const name = String(d.name || '').trim().slice(0, 120);
+  const b64 = String(d.data || '');
+  if (!docId || !name || !b64) return jr(400, { status: 'REJECTED', error_code: 'INVALID_FILE', request_id: R });
+  const ext = docAttExt(name);
+  if (!docAttExtOk(ext)) return jr(400, { status: 'REJECTED', error_code: 'BAD_EXT', request_id: R });
+  if (b64.length > DOC_ATT_MAX) return jr(413, { status: 'REJECTED', error_code: 'FILE_TOO_LARGE', request_id: R });
+  if (!docAttMagicOk(ext, b64)) return jr(400, { status: 'REJECTED', error_code: 'BAD_MAGIC', request_id: R });   // 확장자와 내용 불일치(위장 파일)
+  const st = store(DATA);
+  const ld = await docAttLoad(st, docId);
+  if (!ld.ok) return jr(ld.http, { status: ld.http === 500 ? 'ERROR' : 'REJECTED', error_code: ld.code, request_id: R });
+  if (!docAttCanPut(c.member, ld.it)) return jr(403, { status: 'FORBIDDEN', error_code: 'NOT_OWNER', request_id: R });
+  if ((ld.it.files || []).length >= DOC_ATT_PER_DOC) return jr(400, { status: 'REJECTED', error_code: 'TOO_MANY_FILES', request_id: R });
+  const n = docAttNextN(ld.it);
+  const mime = DOC_ATT_MIME[ext];   // 클라 mime 폐기 — 확장자 고정표만(high1)
+  const now = Date.now();
+  const fw = await blobSet(store(FILES), docAttKey(docId, n), { name: name, type: mime, kind: 'doc', doc: docId, n: n, data: b64, by: c.member.name, ts: now });
+  if (!fw.ok) return jr(500, { status: 'ERROR', error_code: fw.code, request_id: R });
+  const files = (ld.it.files || []).slice();
+  files.push({ n: n, name: name, size: b64Bytes(b64), mime: mime, ts: now, by: { id: c.member.id, name: c.member.name } });
+  const w = await docAttWrite(st, ld.doc, ld.it, files, n, c.member, n);
+  if (!w.ok) {
+    if (w.http === 409) return jr(409, { status: 'CONFLICT', error_code: 'ATT_CONFLICT', request_id: R });   // 동시 첨부가 같은 번호를 잡음 — 클라 재시도(새 n). 바이트·메타는 이긴 쪽 것
+    await blobDelete(store(FILES), docAttKey(docId, n)); return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
+  }
+  try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'documents', ev: [{ op: '첨부', id: docId, t: (name + ' · ' + String(ld.it.title || '')).slice(0, 80) }] }); } catch (e) {}
+  return jr(200, { status: 'OK', id: docId, n: n, files: files, updated_at: w.updated_at, request_id: R });
+}
+async function handleDocAttGet(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (!(await deviceApproved(event, c.member))) return jr(403, { status: 'FORBIDDEN', error_code: 'DEVICE_NOT_APPROVED', request_id: R });
+  if (permOf(c.member, 'documents') === 'hide') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_ACCESS', request_id: R });
+  const docId = String(d.id || '').slice(0, 40), n = Number(d.n);
+  if (!docId || !(n >= 1)) return jr(400, { status: 'REJECTED', error_code: 'BAD_ID', request_id: R });
+  const st = store(DATA);
+  const ld = await docAttLoad(st, docId);
+  if (!ld.ok) return jr(ld.http, { status: ld.http === 500 ? 'ERROR' : 'REJECTED', error_code: ld.code, request_id: R });
+  // 열람 판정 = get 필터와 같은 docVisible(공개범위·01 하드차단·대기/반려는 본인만). 못 보는 문서는 존재 자체를 안 알린다(404 NO_DOC — 관리자 무제한)
+  if (!c.member.admin) { const ds = await docSettings(st); if (!docVisible(c.member, ld.it, ds)) return jr(404, { status: 'REJECTED', error_code: 'NO_DOC', request_id: R }); }
+  const meta = (ld.it.files || []).find(function (f) { return f && Number(f.n) === n; });
+  if (!meta) return jr(404, { status: 'REJECTED', error_code: 'NO_FILE', request_id: R });
+  const r = await blobGet(store(FILES), docAttKey(docId, n));
+  if (!r.ok || !r.data) return jr(404, { status: 'REJECTED', error_code: 'NO_FILE', request_id: R });
+  // type은 저장값이 아니라 확장자 고정표(high1) — 저장 시점에 위장값이 들어갔더라도 응답은 표의 값만
+  return jr(200, { status: 'OK', name: r.data.name, type: docAttMime(r.data.name || meta.name), data: r.data.data, request_id: R });
+}
+async function handleDocAttDel(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (!c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
+  const docId = String(d.id || '').slice(0, 40), n = Number(d.n);
+  if (!docId || !(n >= 1)) return jr(400, { status: 'REJECTED', error_code: 'BAD_ID', request_id: R });
+  const st = store(DATA);
+  const ld = await docAttLoad(st, docId);
+  if (!ld.ok) return jr(ld.http, { status: ld.http === 500 ? 'ERROR' : 'REJECTED', error_code: ld.code, request_id: R });
+  const meta = (ld.it.files || []).find(function (f) { return f && Number(f.n) === n; });
+  if (!meta) return jr(404, { status: 'REJECTED', error_code: 'NO_FILE', request_id: R });
+  const files = (ld.it.files || []).filter(function (f) { return !(f && Number(f.n) === n); });
+  const w = await docAttWrite(st, ld.doc, ld.it, files, Number(ld.it.att_seq) || 0, c.member, 0);   // 메타 제거가 먼저 — 바이트 삭제 실패 시에도 목록에서 사라져 열기 404(고아 블롭은 무해). att_seq는 유지(번호 재사용 없음)
+  if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
+  await blobDelete(store(FILES), docAttKey(docId, n));
+  try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'documents', ev: [{ op: '첨부삭제', id: docId, t: (String(meta.name || '') + ' · ' + String(ld.it.title || '')).slice(0, 80) }] }); } catch (e) {}
+  return jr(200, { status: 'OK', id: docId, files: files, updated_at: w.updated_at, request_id: R });
+}
+// 일괄 등재(관리자 전용, 스크립트용 — 정본 61건+증빙): items:[{title,cat,no,version,revised,scope?,url?,note?,files:[{name,mime,data(base64)}]}]
+// 항목당 첨부 1~3 · 요청당 첨부 합계 6MB · 항목 100 · cid 멱등(같은 cid 재요청=첫 결과 그대로, 'docbulk:<cid>' 블롭).
+// 전량 검증 뒤에만 쓴다(하나라도 틀리면 전체 거부 — 반쯤 등재된 상태를 만들지 않는다). 관리자 등재=전결 즉시 '등재', scope 미지정=분류 기본(비공개).
+async function handleDocBulkPut(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (!c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
+  const cid = String(d.cid || '').trim().slice(0, 48);
+  if (!cid || !/^[A-Za-z0-9_.-]+$/.test(cid)) return jr(400, { status: 'REJECTED', error_code: 'NO_CID', request_id: R });
+  const st = store(DATA);
+  const prev = await blobGet(st, 'docbulk:' + cid);
+  if (prev.ok && prev.data && Array.isArray(prev.data.items)) return jr(200, { status: 'OK', dedup: true, count: prev.data.count, items: prev.data.items, updated_at: prev.data.updated_at, request_id: R });
+  const items = Array.isArray(d.items) ? d.items : [];
+  if (!items.length) return jr(400, { status: 'REJECTED', error_code: 'NO_ITEMS', request_id: R });
+  if (items.length > DOC_BULK_MAX_ITEMS) return jr(400, { status: 'REJECTED', error_code: 'TOO_MANY_ITEMS', request_id: R });
+  let total = 0;
+  const norm = [];
+  for (let i = 0; i < items.length; i++) {
+    const x = (items[i] && typeof items[i] === 'object') ? items[i] : {};
+    const title = String(x.title || '').trim().slice(0, 120);
+    if (!title) return jr(400, { status: 'REJECTED', error_code: 'NO_TITLE', index: i, request_id: R });
+    const cat = hasOwn(DOC_CAT_SET, String(x.cat || '')) ? String(x.cat) : '99';   // 12분류 화이트리스트(프로토타입 키 차단) — 밖이면 99로 강등
+    const files = Array.isArray(x.files) ? x.files : [];
+    if (files.length < 1 || files.length > 3) return jr(400, { status: 'REJECTED', error_code: 'BAD_FILE_COUNT', index: i, request_id: R });
+    const fl = [];
+    for (let j = 0; j < files.length; j++) {
+      const f = (files[j] && typeof files[j] === 'object') ? files[j] : {};
+      const name = String(f.name || '').trim().slice(0, 120), b64 = String(f.data || '');
+      if (!name || !b64) return jr(400, { status: 'REJECTED', error_code: 'INVALID_FILE', index: i, file: j, request_id: R });
+      const ext = docAttExt(name);
+      if (!docAttExtOk(ext)) return jr(400, { status: 'REJECTED', error_code: 'BAD_EXT', index: i, file: j, request_id: R });
+      if (b64.length > DOC_ATT_MAX) return jr(413, { status: 'REJECTED', error_code: 'FILE_TOO_LARGE', index: i, file: j, request_id: R });
+      if (!docAttMagicOk(ext, b64)) return jr(400, { status: 'REJECTED', error_code: 'BAD_MAGIC', index: i, file: j, request_id: R });
+      total += b64.length;
+      if (total > DOC_BULK_MAX_TOTAL) return jr(413, { status: 'REJECTED', error_code: 'BULK_TOO_LARGE', index: i, request_id: R });
+      fl.push({ name: name, mime: DOC_ATT_MIME[ext], data: b64 });   // mime은 확장자 고정표(클라 값 폐기)
+    }
+    norm.push({ title: title, cat: cat, no: String(x.no || '').trim().slice(0, 40), version: String(x.version || '').trim().slice(0, 40),
+      revised: /^\d{4}-\d{2}-\d{2}$/.test(String(x.revised || '')) ? String(x.revised) : '', url: String(x.url || '').trim().slice(0, 500),
+      note: String(x.note || '').trim().slice(0, 500), scope: docScopeNorm(x.scope), files: fl });
+  }
+  const r = await blobGet(st, colKey('documents'));
+  if (!r.ok) return jr(500, { status: 'ERROR', error_code: r.code, request_id: R });
+  const doc = (r.data && Array.isArray(r.data.items)) ? r.data : { schema: 1, items: [] };
+  const prevDoc = JSON.parse(JSON.stringify(doc));
+  const nowMs = Date.now(), nowIso = new Date(nowMs).toISOString(), day = verDay(nowMs), me = { id: c.member.id, name: c.member.name };
+  const made = [], added = [], written = [];
+  async function cleanup() { for (const k of written) { try { await blobDelete(store(FILES), k); } catch (e) {} } }
+  for (const x of norm) {
+    const id = 'doc' + nowMs.toString(36) + crypto.randomBytes(3).toString('hex');
+    const metas = [];
+    for (let j = 0; j < x.files.length; j++) {
+      const f = x.files[j], n = j + 1;
+      const fw = await blobSet(store(FILES), docAttKey(id, n), { name: f.name, type: f.mime, kind: 'doc', doc: id, n: n, data: f.data, by: me.name, ts: nowMs });
+      if (!fw.ok) { await cleanup(); return jr(500, { status: 'ERROR', error_code: fw.code, request_id: R }); }
+      written.push(docAttKey(id, n));
+      metas.push({ n: n, name: f.name, size: b64Bytes(f.data), mime: f.mime, ts: nowMs, by: me });
+    }
+    const it = { id: id, title: x.title, cat: x.cat, created: day, updated: day, updated_ts: nowMs, status: '등재', by: me, registered_by: me, registered_at: nowIso, bulk_cid: cid, files: metas, att_seq: metas.length };
+    if (x.no) it.no = x.no; if (x.version) it.version = x.version; if (x.revised) it.revised = x.revised; if (x.url) it.url = x.url; if (x.note) it.note = x.note;
+    if (x.scope) it.scope = x.scope;
+    doc.items.push(it); added.push(it); made.push({ id: id, title: x.title, files: metas.length });
+  }
+  await verSnapshot('documents', prevDoc, me.name + '(일괄 등재)', false);
+  doc.updated_by = me.id; doc.updated_at = Date.now();
+  const w = await blobSet(st, colKey('documents'), doc);
+  if (!w.ok) { await cleanup(); return jr(500, { status: 'ERROR', error_code: w.code, request_id: R }); }
+  // 무조건 덮어쓰기 저장소 — 동시 저장에 밀린 항목은 1회 자가복구
+  try {
+    const chk = await blobGet(st, colKey('documents'));
+    if (chk.ok && chk.data && Array.isArray(chk.data.items)) {
+      const have = {}; chk.data.items.forEach(function (x) { if (x && x.id) have[x.id] = 1; });
+      const miss = added.filter(function (x) { return !have[x.id]; });
+      if (miss.length) { miss.forEach(function (x) { chk.data.items.push(x); }); chk.data.updated_by = me.id; chk.data.updated_at = Date.now(); await blobSet(st, colKey('documents'), chk.data); doc.updated_at = chk.data.updated_at; }
+    }
+  } catch (e) {}
+  const result = { count: made.length, items: made, updated_at: doc.updated_at, cid: cid, ts: Date.now() };
+  try { await blobSet(st, 'docbulk:' + cid, result); } catch (e) {}   // 멱등 표식 실패는 등재를 되돌리지 않는다(재요청 시 중복 가능 — 스크립트가 응답 유실 시 목록으로 확인)
+  try {
+    const ev = made.slice(0, 30).map(function (m) { return { op: '일괄등재', id: m.id, t: (m.title + ' · 첨부 ' + m.files).slice(0, 80) }; });
+    if (made.length > 30) ev.push({ op: '생략', id: '', t: '이후 ' + (made.length - 30) + '건 생략(상한)' });
+    await appendAudit({ ts: Date.now(), by: me.name, bid: me.id, col: 'documents', ev: ev });
+  } catch (e) {}
+  return jr(200, { status: 'OK', count: made.length, items: made, updated_at: doc.updated_at, request_id: R });
+}
+
 // 감사 로그 조회(관리자 전용). month='YYYY-MM' 미지정 시 이번 달.
 async function handleAudit(event, d, R) {
   const c = await currentMember(event);
@@ -1974,6 +2274,10 @@ async function handler(event) {
     if (d && d.action === 'appr_grades_set') return await handleApprGradesSet(event, d, R);
     if (d && d.action === 'doc_settings_get') return await handleDocSettingsGet(event, d, R);
     if (d && d.action === 'doc_settings_set') return await handleDocSettingsSet(event, d, R);
+    if (d && d.action === 'doc_att_put') return await handleDocAttPut(event, d, R);
+    if (d && d.action === 'doc_att_get') return await handleDocAttGet(event, d, R);
+    if (d && d.action === 'doc_att_del') return await handleDocAttDel(event, d, R);
+    if (d && d.action === 'doc_bulk_put') return await handleDocBulkPut(event, d, R);
     return jr(400, { status: 'REJECTED', error_code: 'UNKNOWN_ACTION', request_id: R });
   } catch (e) {
     // 서버 예외도 오류 로그에 축적(클라 err_log와 같은 저장소) — 기록 실패는 무시
