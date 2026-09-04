@@ -357,6 +357,8 @@ async function handleSave(event, d, R) {
       doc.items = doc.items.map(function (x) {
         const s = Object.assign({}, x);
         const sc = docScopeNorm(s.scope); if (sc) s.scope = sc; else delete s.scope;
+        const o01 = s.id ? oldDocBy[s.id] : null;   // 01 법인 문서는 대분류를 벗어나게 저장하지 않는다(리뷰 확정: 구 2자리 cat 구건을 관리자가 열어 저장하면 99로 덮여 하드차단이 풀렸다)
+        if (o01 && docMajorOf(o01) === '01' && docMajorOf(s) !== '01') s.cat = o01.cat;
         if (!(s.id && oldDocBy[s.id]) && s.status !== '등재') { s.status = '등재'; s.registered_by = { id: c.member.id, name: c.member.name }; s.registered_at = nowIso; delete s.reject_reason; }
         if (!(s.id && oldDocBy[s.id]) && !s.by) s.by = { id: c.member.id, name: c.member.name };
         docFilesFix(s, s.id ? oldDocBy[s.id] : null);   // 첨부 메타(v315)는 첨부 액션으로만 — 관리자 저장도 서버 원본 이월(낡은 사본이 첨부 목록을 지우지 않게)
@@ -1947,7 +1949,7 @@ function docAttNextN(it) {
   return n + 1;
 }
 function b64Bytes(b64) { const L = b64.length; return Math.floor(L * 3 / 4) - (L && b64.charAt(L - 1) === '=' ? (L > 1 && b64.charAt(L - 2) === '=' ? 2 : 1) : 0); }   // base64 → 원 바이트 수(디코드 없이)
-function docAttCanPut(m, it) { return !!(m && it && (m.admin || (it.by && it.by.id === m.id && permOf(m, 'documents') === 'do'))); }
+function docAttCanPut(m, it) { if (!m || !it) return false; if (docMajorOf(it) === '01' && !m.admin) return false; return !!(m.admin || (it.by && it.by.id === m.id && permOf(m, 'documents') === 'do')); }   // 01 법인 문서 첨부는 관리자만(v317 — 하드차단을 첨부 경로에도)
 // 문서 블롭 읽기 + 항목 찾기(삭제 문서 제외). 반환 {ok, doc, it} / {ok:false, http, code}
 async function docAttLoad(st, docId) {
   if (!docId) return { ok: false, http: 400, code: 'BAD_ID' };

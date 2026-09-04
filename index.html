@@ -6305,7 +6305,6 @@
     var addBtn = document.getElementById("docAddBtn"); if (addBtn) addBtn.style.display = admin ? "block" : "none";
     var list = documents.filter(function(d){
       if (!d || d.del === 1) return false;
-      if (!isAdmin() && docMajorOf(d) === "99") return false;   // 99 미분류는 관리자만(설계 v2 — 번호 파생 실패 임시 서랍). 직원 화면엔 건수에서도 뺀다(구 cat 01 구건은 대분류 01로 남는다)
       if (!docSearchTerm) return true;
       // 분류 라벨(대분류명·중분류명)도 검색 대상 — 신규 문서는 category 텍스트가 없어 분류명 검색에서 빠졌다(리뷰 지적). 대분류명("안전보건")만 쳐도 걸리게(설계 v2 §6 #19)
       return ((d.title||"") + " " + (d.no||"") + " " + (d.category||"") + " " + (DOC_CATS[docCatOf(d)]||"") + " " + (DOC_MAJOR[docMajorOf(d)]||"")).toLowerCase().indexOf(docSearchTerm) >= 0;
@@ -6413,7 +6412,10 @@
     document.getElementById("docModalTitle").textContent = d ? "문서 수정" : "문서 추가";
     document.getElementById("docTitle").value = d ? (d.title||"") : "";
     document.getElementById("docNo").value = d ? (d.no||"") : "";
-    docCatSelectSet(d ? docCatOf(d) : "99");   // 신규 기본 99 — 사용자가 대분류·중분류를 고른다(설계 v2 §6 #8). 구 2자리 cat 구건은 번호 파생값(없으면 99)
+    // 신규 기본 99. 구 2자리 cat 구건(cat "01" + 구형식 번호)은 번호 파생이 99여도 대분류를 살려 연다 — 그대로 저장하면 01 하드차단이 풀렸다(리뷰 확정)
+    var c0 = d ? docCatOf(d) : "99";
+    if (d && c0 === "99" && docMajorOf(d) !== "99") c0 = docMajorOf(d) + "-";   // "01-" → 대분류 01·중분류 공란(저장 시 중분류 선택 강제)
+    docCatSelectSet(c0);
     document.getElementById("docVer").value = d ? (d.version||"") : "";
     document.getElementById("docRevised").value = (d && isDate(d.revised)) ? d.revised : "";
     document.getElementById("docUrl").value = d ? (d.url||"") : "";
@@ -6449,6 +6451,7 @@
     if (!newCat){ alert("중분류(문서 성격)를 선택해주세요 — 대분류만으로는 등재할 수 없습니다."); return; }
     if (newCat.slice(0, 2) === "01" && !isAdmin()){ alert("01 법인 분류는 관리자만 지정할 수 있습니다(서버에서도 차단됩니다)."); return; }
     if (newCat === "99" && !isAdmin()){ alert("99 미분류는 관리자만 지정할 수 있습니다 — 대분류(업무 영역)와 중분류(문서 성격)를 골라주세요."); return; }
+    if (d && docMajorOf(d) === "01" && newCat.slice(0, 2) !== "01"){ alert("01 법인 문서는 다른 분류로 옮길 수 없습니다 — 01의 중분류를 골라주세요."); return; }   // 하드차단 유지(리뷰 확정)
     var scopeMode = document.getElementById("docScope").value, scopeIds = [];
     if (!lock && scopeMode === "ids"){ scopeIds = getCheckedMembers("docScopeMembers"); if (!scopeIds.length){ alert("직원 지정 공개는 최소 1명을 체크해주세요."); return; } }
     if (!d){ d = {id: genId("doc"), created: today}; documents.push(d); }
