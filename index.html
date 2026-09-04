@@ -1314,6 +1314,9 @@
     <!-- 결재 등급표(결재 3차, 명세 §2) — 업무 종류 × 등급 칩. 변경은 새 상신부터(진행 중 건은 기안 시점 스냅샷), 감사로그 기록 -->
     <div class="dash-sec" style="margin:16px 0 8px;"><h2>결재 등급표</h2></div>
     <div class="card" id="apprGradeCard"><div class="loading">불러오는 중…</div></div>
+    <!-- 문서함 설정(v314) — 분류별 기본 공개범위(초기 전부 비공개=관리자만 — 공개할 분류만 열기) + 등재 결재 게이트. 관리자 전용·감사로그·낙관락(등급표와 같은 결) -->
+    <div class="dash-sec" style="margin:16px 0 8px;"><h2>문서함 설정</h2></div>
+    <div class="card" id="docSettingsCard"><div class="loading">불러오는 중…</div></div>
   </section>
 
   <!-- 가족친화인증 실적 (인사 하위 · 관리자 전용) — 혁신⑧ 확정사양(2026-08-19): 관리자 대장 4종 기록 + 분기 리포트. 연차 소진율은 휴가 데이터 자동 집계 -->
@@ -1864,6 +1867,11 @@
     <input type="date" id="docRevised">
     <input type="text" id="docUrl" placeholder="링크 URL (구글드라이브 등)" autocomplete="off">
     <input type="text" id="docNote" placeholder="메모 (선택)" autocomplete="off">
+    <!-- 공개범위(v314) — 미지정=분류 기본값(권한관리 › 문서함 설정, 초기 전부 관리자만). 서버가 get 필터로 하드차단 -->
+    <span class="fld-label">공개범위</span>
+    <select id="docScope"><option value="">분류 기본값 따름 (권한관리 › 문서함 설정)</option><option value="all">전원</option><option value="mgmt">관리부+관리자</option><option value="admin">관리자만</option><option value="ids">직원 지정 (+관리자)</option></select>
+    <div id="docScopeMembers" style="display:none;max-height:180px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:6px 8px;margin:4px 0 8px;"></div>
+    <div class="scope-hint" id="docScopeHint">기본은 비공개 — 분류 기본값을 열거나 문서별로 지정할 때만 직원에게 보입니다.</div>
     <button class="primary" id="docSave">저장</button>
     <button class="danger" id="docDelete">삭제</button>
     <button class="secondary" id="docCancel">취소</button>
@@ -2706,7 +2714,8 @@
       if (res.status === 409) return _ghResp(409, {});   // 동시 저장 충돌 — 각 컬렉션의 기존 409 재조회·병합·재시도 경로로
       if (res.status !== 200) return _ghResp(res.status, {});   // 저장 실패를 성공으로 위조하면 pending이 풀려 편집이 유실된다
       _colBase[col] = (res.body && res.body.updated_at) || Date.now();
-      return _ghResp(200, { content: { sha: "gw" } });
+      // register_warn(문서함 v314): 저장은 됐는데 등재 결재 카드 자동 상신이 실패한 건수 — saveDocuments가 직원에게 알린다(관리자 결재함 폴이 자동 복구)
+      return _ghResp(200, { content: { sha: "gw" }, register_warn: (res.body && res.body.register_warn) || 0 });
     });
   };
 
@@ -3240,6 +3249,13 @@
     if (it.kind === "지시" && it.ref && typeof tasks !== "undefined" && Array.isArray(tasks) && tasks.length
         && !tasks.some(function(t){ return t && t.id === it.ref; }))
       h += '<div style="margin-top:6px;font-size:12px;color:var(--amber);">⚠ 원 지시를 찾을 수 없습니다(삭제됐을 수 있음)</div>';
+    // 문서함 등재 카드(v314): 문서의 현재 상태 힌트 — 관리자가 문서를 직접 수정해 이미 등재됐으면 이 카드는 기록용(승인·반려 모두 문서 무변경)
+    if (it.kind === "문서함 등재" && String(it.ref || "").indexOf("doc:") === 0 && typeof documents !== "undefined" && Array.isArray(documents) && documents.length){
+      var rdoc = findDoc(String(it.ref).slice(4));
+      if (!rdoc || rdoc.del === 1) h += '<div style="margin-top:6px;font-size:12px;color:var(--amber);">⚠ 문서함에서 해당 문서를 찾을 수 없습니다(삭제됐을 수 있음)</div>';
+      else if (docStatusOf(rdoc) !== "대기") h += '<div style="margin-top:6px;font-size:12px;color:var(--sub);">문서 현재 상태: ' + esc(docStatusOf(rdoc)) + (docStatusOf(rdoc) === "등재" ? " — 이미 등재된 문서(관리자 직접 등재), 이 카드는 기록용" : "") + '</div>';
+      else h += '<div style="margin-top:6px;font-size:12px;color:var(--sub);">승인 → 문서함에 등재 · 반려 → 올린 직원에게 사유 통지(재상신 가능)</div>';
+    }
     document.getElementById("apprCard").innerHTML = h;
     // 버튼 분기(명세 §8): ② 1단계=[승인→대표로/반려](보류 없음) · 전결총정리=[확인]만 · 운반일지=[확인(결재)] 라벨 · 그 외 현행
     var g = apprGradeOf(it), q = it.to || "pm";
@@ -3340,6 +3356,7 @@
       if (res.body && res.body.to) it.to = res.body.to;
       it.status = (res.body && res.body.decided) || decision;
       if (reason) it.reason = reason;
+      if (it.kind === "문서함 등재" && (it.status === "승인" || it.status === "반려")) loadDocuments();   // 서버 훅이 문서 상태(등재/반려)를 바꿨다(v314) — 문서함 배지 동기
       if (decision === "승인" || decision === "확인") apprDoneN.ok++; else if (decision === "반려") apprDoneN.no++; else apprDoneN.hold++;
       apprNext();
     }).catch(function(){ apprBusy = false; if (g === apprGen) alert("네트워크 오류 — 다시 시도해주세요."); });
@@ -5120,6 +5137,7 @@
   document.getElementById("docCancel").addEventListener("click", closeDocModal);
   document.getElementById("docBackdrop").addEventListener("click", function(e){ if (e.target === this) closeDocModal(); });
   document.getElementById("docSearch").addEventListener("input", function(){ docSearchTerm = this.value.toLowerCase().trim(); renderDocuments(); });
+  document.getElementById("docScope").addEventListener("change", docScopeModeChanged);
   document.getElementById("cliAddBtn").addEventListener("click", function(){ openCliModal(null); });
   document.getElementById("cliSave").addEventListener("click", saveCliModal);
   document.getElementById("cliDelete").addEventListener("click", deleteCliFromModal);
@@ -5858,6 +5876,15 @@
   var docSearchTerm = "";
   var editingDocId = null;
   function findDoc(id){ for (var i=0;i<documents.length;i++){ if (documents[i].id === id) return documents[i]; } return null; }
+  // 문서함 설정(v314 — 분류별 기본 공개범위·등재 결재 게이트)은 관리자만 조회 가능(서버 ADMIN_ONLY). 행 배지 "분류 기본(…)"·권한관리 설정 카드용
+  var docSettingsTbl = null, docSettingsBase = 0;
+  function loadDocSettings(cb){
+    if (!isAdmin()){ docSettingsTbl = null; if (cb) cb(); return; }
+    gwCall("gw-data", { action: "doc_settings_get" }).then(function(res){
+      if (res.status === 200 && res.body && res.body.settings){ docSettingsTbl = res.body.settings; docSettingsBase = res.body.updated_at || 0; }
+      if (cb) cb();
+    }).catch(function(){ if (cb) cb(); });
+  }
   function loadDocuments(){
     var token = getToken(); if (!token) return;
     fetch(DOC_API, {headers: ghHeaders()}).then(function(resp){
@@ -5865,7 +5892,26 @@
       if (!resp.ok) throw new Error("HTTP " + resp.status);
       return resp.json().then(function(json){ docSha = json.sha; var p = JSON.parse(b64DecodeUnicode(json.content)); documents = (p && p.items) || []; renderDocuments(); });
     }).catch(function(){ renderDocuments(); });
+    if (isAdmin() && !docSettingsTbl) loadDocSettings(renderDocuments);
   }
+  // 409 충돌 병합(v314): id 기준, 더 최근 수정(updated_ts ms, 없으면 updated 일자)이 이기고 del은 mergeDel(인허가 mergeLic와 같은 규칙).
+  // 서버가 결재 경로(등재 승인·반려)로 문서 블롭을 스스로 바꾸게 되면서 낡은 사본 저장이 409로 서는 일이 생겼다 — 종전엔 조용히 유실
+  function mergeDocs(local, remote){
+    var byId = {};
+    (local || []).forEach(function(l){ if (l && l.id) byId[l.id] = l; });
+    (remote || []).forEach(function(x){
+      if (!x || !x.id) return;
+      var cur = byId[x.id];
+      if (!cur){ byId[x.id] = x; return; }
+      var w = mTime(x) > mTime(cur) ? x : cur;
+      var m = Object.assign({}, (w === x ? cur : x), w);
+      if (cur.del === 1 || x.del === 1) m.del = mergeDel(cur, x);
+      byId[x.id] = m;
+    });
+    var out = []; Object.keys(byId).forEach(function(id){ out.push(byId[id]); });
+    return out;
+  }
+  var docSaveRetried = false;
   function saveDocuments(){
     var token = getToken(); if (!token) return;
     var body = JSON.stringify({schema: 1, items: documents});
@@ -5873,8 +5919,22 @@
     if (docSha) payload.sha = docSha;
     fetch(DOC_API, {method: "PUT", headers: Object.assign({"Content-Type":"application/json"}, ghHeaders()), body: JSON.stringify(payload)}).then(function(resp){
       if (resp.status === 401) return;
-      return resp.json().then(function(json){ docSha = json.content && json.content.sha; });
-    }).catch(function(){});
+      if ((resp.status === 409 || resp.status === 422) && !docSaveRetried){
+        docSaveRetried = true;   // 재조회·병합 후 1회 재시도(무한 루프 방지)
+        return fetch(DOC_API, {headers: ghHeaders()}).then(function(r2){ return r2.status === 404 ? null : r2.json(); }).then(function(json){
+          if (json){ var p = {}; try{ p = JSON.parse(b64DecodeUnicode(json.content)) || {}; }catch(e){} documents = mergeDocs(documents, p.items || []); }
+          renderDocuments(); return saveDocuments();
+        });
+      }
+      docSaveRetried = false;
+      if (!resp.ok) throw new Error("HTTP " + resp.status);
+      // 저장 직후 재조회 — 서버 스탬프(등재자 by·게이트 상태 대기/등재·비관리자 재구성분)를 화면에 반영. 응답엔 updated_at만 온다
+      return resp.json().then(function(json){
+        docSha = json.content && json.content.sha;
+        if (json.register_warn) alert("등재 요청이 아직 결재함에 못 갔습니다 — 자동 재시도됩니다(관리자가 결재함을 열면 카드가 만들어집니다).");
+        loadDocuments();
+      });
+    }).catch(function(){ docSaveRetried = false; });
   }
   // ---- 문서함 서랍형(PM 선택 2026-09-02) — 분류 5종 서랍 + 미분류. 인허가는 여기 안 끼움(원장=인허가 탭) ----
   var DOC_CATS = { "01":"01 법인", "02":"02 인사노무", "03":"03 안전보건", "05":"05 규정", "06":"06 양식", "99":"미분류" };
@@ -5894,6 +5954,29 @@
     if (/양식|서식/.test(c)) return "06";
     return "99";
   }
+  // ---- 공개범위·등재 상태(v314, PM 9/4 "등재결재랑 공개범위 만들어라 내가 선택하게" + "비공개로 다 올리라고") ----
+  // scope: 'all'(전원) | 'mgmt'(관리부+관리자) | 'admin'(관리자만) | {ids:[회원id]}(지정 직원+관리자). 미지정=분류 기본값(초기 전부 '관리자만' — 권한관리 › 문서함 설정).
+  // status: '등재'(구건·status 없음 포함) | '대기'(직원 등재 → PM 승인 대기) | '반려'. 판정·표기 규칙은 서버 docStatusOf/docScopeText와 동일. 열람 차단은 서버(get 필터)가 한다 — 여기는 표시
+  var DOC_SCOPE_TXT = { all: "전원", mgmt: "관리부+관리자", admin: "관리자만" };
+  var DOC_SCOPE_CATS = ["02","03","05","06","99"];   // 01 법인은 하드차단(관리부+관리자) — 설정 대상 아님
+  function docStatusOf(d){ return (d && (d.status === "대기" || d.status === "반려")) ? d.status : "등재"; }
+  function docScopeNorm(s){
+    if (typeof s === "string") return DOC_SCOPE_TXT[s] ? s : null;
+    if (s && typeof s === "object" && Array.isArray(s.ids)) return { ids: s.ids.filter(function(x){ return typeof x === "string" && !!x; }) };
+    return null;
+  }
+  function docScopeLabel(d){
+    var sc = docScopeNorm(d.scope);
+    if (sc && typeof sc === "object"){
+      var names = sc.ids.map(function(id){ return dispNameById(id) || "?"; });
+      return "지정 " + (names.length > 3 ? names.slice(0, 3).join("·") + " 외 " + (names.length - 3) : names.join("·"));
+    }
+    if (sc) return DOC_SCOPE_TXT[sc];
+    var cat = docCatOf(d);
+    if (cat === "01") return "분류 기본(관리부+관리자)";
+    var def = (docSettingsTbl && docSettingsTbl.scope_default && DOC_SCOPE_TXT[docSettingsTbl.scope_default[cat]]) ? docSettingsTbl.scope_default[cat] : "";
+    return "분류 기본" + (def ? "(" + DOC_SCOPE_TXT[def] + ")" : "");
+  }
   function docRowHtml(d, admin){
     var t = esc(d.title || "(제목없음)");
     var titleHtml = d.url ? '<a href="' + esc(d.url) + '" target="_blank" rel="noopener" class="doc-link">' + t + ' ↗</a>' : t;
@@ -5902,50 +5985,28 @@
     if (d.version) meta.push('<span>' + esc(d.version) + '</span>');
     if (d.revised) meta.push('<span>' + esc(d.revised) + '</span>');
     if (d.category) meta.push('<span class="own-badge self">' + esc(d.category) + '</span>');
+    var st = docStatusOf(d);
+    if (st === "대기") meta.push('<span class="dday amber" title="PM 승인 후 등재됩니다(결재함 · 문서함 등재)">등재 대기</span>');
+    else if (st === "반려") meta.push('<span class="dday red" title="' + esc(d.reject_reason || "") + '">반려' + (d.reject_reason ? " — " + esc(String(d.reject_reason).slice(0, 40)) : "") + '</span>');
+    meta.push('<span class="own-badge" title="공개범위 — 문서 지정값이 없으면 분류 기본값(권한관리 › 문서함 설정)">공개 ' + esc(docScopeLabel(d)) + '</span>');
+    if (d.by && d.by.name && (isAdmin() || st !== "등재")) meta.push('<span>등재 ' + esc(dispNameById(d.by.id) || d.by.name) + '</span>');
     var canEdit = admin && (docCatOf(d) !== "01" || isAdmin());   // 01 법인 편집은 관리자만(서버도 강제)
+    var canResubmit = admin && st === "반려" && !isAdmin() && !!(d.by && d.by.id === myId());   // 반려 건 재상신은 등재한 본인(서버가 by 대조). 관리자는 수정=즉시 등재
     return '<div class="item"><div class="item-body"><div class="item-title">' + titleHtml + '</div>' +
       (meta.length ? '<div class="item-meta">' + meta.join('') + '</div>' : '') +
       (d.note ? '<div class="task-detail">' + esc(d.note) + '</div>' : '') +
-      '</div>' + (canEdit ? '<div class="task-ctrl"><button class="mini-btn" data-doc-edit="' + d.id + '">수정</button>' +
-        '<button class="mini-btn" data-doc-appr="' + d.id + '" title="이 문서를 결재함에 올립니다(종류별 등급표대로 PM 전결·결재라인·대표 전결)">결재 상신</button></div>' : '') + '</div>';
+      '</div>' + ((canEdit || canResubmit) ? '<div class="task-ctrl">' + (canEdit ? '<button class="mini-btn" data-doc-edit="' + d.id + '">수정</button>' : '') +
+        (canResubmit ? '<button class="mini-btn" data-doc-resubmit="' + d.id + '" title="다시 PM 승인을 요청합니다(수정은 [수정]에서)">재상신</button>' : '') + '</div>' : '') + '</div>';
   }
-  // 문서 결재 상신(결재 3차 §8 잔여, 9/4) — 문서함 항목을 종류(사규·매뉴얼·가족친화·문서함 등재)로 결재함에 올린다.
-  // 9/1부터 밀린 규정(안)·매뉴얼·가족친화 안건이 전부 문서함에 있는데 지시 종류로밖에 못 올리던 구멍. 종류→등급은 서버 등급표.
-  var DOC_APPR_KINDS = ["사규", "매뉴얼", "가족친화", "문서함 등재"];
-  function docApprDefaultKind(d){
-    var c = docCatOf(d), t = String(d.title || "");
-    if (/가족친화/.test(t)) return 3;
-    if (c === "05") return 1;            // 규정
-    if (c === "03") return 2;            // 안전 — 매뉴얼·절차서
-    if (c === "02" && /세칙|규칙|규정/.test(t)) return 1;
-    return 4;
-  }
-  var docApprBusy = false;
-  function docApprSubmit(id){
-    if (docApprBusy) return;
-    var d = findDoc(id); if (!d) return;
-    var def = docApprDefaultKind(d);
-    var ans = prompt("결재 종류 번호 — 1 사규 / 2 매뉴얼 / 3 가족친화 / 4 문서함 등재\n(" + String(d.title || "") + ")", String(def));   // prompt는 텍스트 — HTML 이스케이프 금지(&amp; 노출)
-    if (ans === null) return;
-    var k = parseInt(String(ans).trim(), 10);
-    if (!(k >= 1 && k <= 4)){ alert("1~4 번호로 골라주세요."); return; }
-    var kind = DOC_APPR_KINDS[k - 1];
-    var ref = "doc:" + d.id, meId = myId();
-    if (apprPendingCreates.some(function(p){ return p && p.mid === meId && p.ref === ref; })){ alert("이 문서 상신이 이미 전송 대기 중입니다."); return; }
-    var body = [d.no ? "문서번호 " + d.no : "", d.version ? "버전 " + d.version : "", d.category ? "분류 " + d.category : "", d.note ? "메모 " + d.note : ""].filter(Boolean).join(" · ").slice(0, 480);
-    docApprBusy = true;
-    gwCall("gw-data", { action: "approvals_list" }).then(function(res){
-      docApprBusy = false;
-      var dupSt = "";
-      if (res.status === 200 && res.body && Array.isArray(res.body.items))
-        res.body.items.forEach(function(x){ if (x && x.ref === ref && (x.status === "대기" || x.status === "보류" || x.status === "승인")) dupSt = x.status; });
-      if (dupSt && !confirm("이 문서는 이미 상신돼 있습니다(" + dupSt + "). 다시 올릴까요?")) return;
-      apprPendingCreates.push({ cid: "c" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8), mid: meId,
-        kind: kind, title: String(d.title || "(제목없음)").slice(0, 120), body: body, ref: ref });
-      apprSavePending();
-      apprFlushCreates();
-      apprToastShow("결재 상신(" + kind + ") — " + String(d.title || "").slice(0, 30));
-    }).catch(function(){ docApprBusy = false; alert("네트워크 오류 — 잠시 후 다시 시도해주세요."); });
+  // 반려 건 재상신 — 본인 문서를 '대기'로 되돌리고 reg_n을 올린다(서버가 새 cid 'docreg-<id>-<n>'로 결재함 카드를 자동 상신). 서버는 본인(by) 반려 건만 허용
+  function docResubmit(id){
+    if (!canDo("doc")) return;
+    var d = findDoc(id); if (!d || docStatusOf(d) !== "반려") return;
+    if (!confirm("이 문서를 다시 PM 승인 요청할까요?\n" + String(d.title || ""))) return;   // confirm은 텍스트 — HTML 이스케이프 금지
+    d.status = "대기"; d.reg_n = (Number(d.reg_n) || 1) + 1; delete d.reject_reason; delete d.rejected_at;
+    d.updated = todayStr(); d.updated_ts = Date.now();
+    renderDocuments(); saveDocuments();
+    apprToastShow("재상신 — PM 승인 후 등재됩니다");
   }
   function renderDocuments(){
     var host = document.getElementById("docList"); if (!host) return;
@@ -5987,9 +6048,21 @@
     Array.prototype.forEach.call(host.querySelectorAll("[data-doc-edit]"), function(el){
       el.addEventListener("click", function(e){ e.stopPropagation(); openDocModal(el.getAttribute("data-doc-edit")); });
     });
-    Array.prototype.forEach.call(host.querySelectorAll("[data-doc-appr]"), function(el){
-      el.addEventListener("click", function(e){ e.stopPropagation(); docApprSubmit(el.getAttribute("data-doc-appr")); });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-doc-resubmit]"), function(el){
+      el.addEventListener("click", function(e){ e.stopPropagation(); docResubmit(el.getAttribute("data-doc-resubmit")); });
     });
+  }
+  // 직원 지정 체크박스 — 지시 모듈 scopeCheckboxesHtml의 "개별 직원" 상자와 같은 결(data-mid → getCheckedMembers). 부서·직급 토큰은 문서 scope 규격(ids만)에 없어 제외
+  function docScopeMembersHtml(selIds){
+    var ms = liveMembers().filter(function(m){ return !m.admin; });   // 관리자는 항상 열람 — 체크 대상은 직원만
+    if (!ms.length) return '<div class="mrole2" style="padding:4px;">회원이 없습니다.</div>';
+    return '<div class="scope-hint">체크한 직원(+관리자)만 열람</div>' + ms.map(function(m){
+      return '<label class="mcheck"><input type="checkbox" data-mid="' + esc(m.id) + '"' + (selIds.indexOf(m.id) >= 0 ? " checked" : "") + '> ' + esc(isBossMember(m) ? "대표님" : m.name) + (m.role ? ' <span class="mrole2">' + esc(m.role) + '</span>' : '') + '</label>';
+    }).join("");
+  }
+  function docScopeModeChanged(){
+    var v = document.getElementById("docScope").value;
+    document.getElementById("docScopeMembers").style.display = (v === "ids") ? "block" : "none";
   }
   function openDocModal(id){
     if (!canDo("doc")) return;
@@ -6004,6 +6077,20 @@
     document.getElementById("docRevised").value = (d && isDate(d.revised)) ? d.revised : "";
     document.getElementById("docUrl").value = d ? (d.url||"") : "";
     document.getElementById("docNote").value = d ? (d.note||"") : "";
+    var sc = d ? docScopeNorm(d.scope) : null;
+    document.getElementById("docScope").value = !sc ? "" : (typeof sc === "object" ? "ids" : sc);
+    document.getElementById("docScopeMembers").innerHTML = docScopeMembersHtml(sc && typeof sc === "object" ? sc.ids : []);
+    docScopeModeChanged();
+    // 비관리자의 기존 문서 수정은 내용만 — 분류·공개범위·문서번호는 PM만 변경(서버가 원본 고정, 적대 검증 med1). 신규 등록 때는 골라서 올리고 PM이 카드에서 검토
+    var lock = !!d && !isAdmin();
+    document.getElementById("docCat").disabled = lock;
+    document.getElementById("docNo").disabled = lock;
+    document.getElementById("docScope").disabled = lock;
+    Array.prototype.forEach.call(document.getElementById("docScopeMembers").querySelectorAll("input"), function(cb){ cb.disabled = lock; });
+    var hint = document.getElementById("docScopeHint");
+    if (hint) hint.textContent = isAdmin()
+      ? "기본은 비공개 — 분류 기본값(권한관리 › 문서함 설정)을 열거나 여기서 문서별로 지정할 때만 직원에게 보입니다. 관리자는 항상 열람."
+      : (lock ? "분류·문서번호·공개범위는 PM만 변경합니다(내용만 수정 가능)." : "기본은 비공개(관리자만). 등록한 문서는 PM 승인 후 등재되며, 공개범위는 승인 시 함께 검토됩니다.");
     document.getElementById("docDelete").style.display = d ? "block" : "none";
     document.getElementById("docBackdrop").classList.add("show");
   }
@@ -6015,24 +6102,37 @@
     var newCat = document.getElementById("docCat").value;
     // 검증은 전부 push 전에 — 차단 후 return하면 빈 스텁이 배열에 남아 유령 문서로 영속된다(리뷰 지적)
     if (newCat === "01" && !isAdmin()){ alert("01 법인 분류는 관리자만 지정할 수 있습니다(서버에서도 차단됩니다)."); return; }
+    var scopeMode = document.getElementById("docScope").value, scopeIds = [];
+    if (!lock && scopeMode === "ids"){ scopeIds = getCheckedMembers("docScopeMembers"); if (!scopeIds.length){ alert("직원 지정 공개는 최소 1명을 체크해주세요."); return; } }
     var d = editingDocId ? findDoc(editingDocId) : null;
-    var today = todayStr();
+    var today = todayStr(), isNew = !d, me = curMember();
+    var lock = !isNew && !isAdmin();   // 비관리자 기존 문서: 분류·문서번호·공개범위는 서버 원본 고정 — 클라도 손대지 않는다(잠긴 셀렉트 값 그대로)
     if (!d){ d = {id: genId("doc"), created: today}; documents.push(d); }
     d.title = title;
-    d.no = document.getElementById("docNo").value.trim();
-    d.cat = newCat;   // 분류 5종+미분류. 구 category 텍스트는 표시용으로만 남긴다
+    if (!lock){
+      d.no = document.getElementById("docNo").value.trim();
+      d.cat = newCat;   // 분류 5종+미분류. 구 category 텍스트는 표시용으로만 남긴다
+    }
     d.version = document.getElementById("docVer").value.trim();
     d.revised = document.getElementById("docRevised").value || "";
     var url = document.getElementById("docUrl").value.trim();
     if (url && !/^https?:\/\//i.test(url)) url = "https://" + url;
     d.url = url;
     d.note = document.getElementById("docNote").value.trim();
-    d.updated = today;
+    if (!lock){ if (scopeMode === "ids") d.scope = { ids: scopeIds }; else if (scopeMode) d.scope = scopeMode; else delete d.scope; }   // 미지정=분류 기본값 따름
+    // 등재 상태(v314): 관리자 추가·수정 = 그 자체가 결재(① PM 전결) → 즉시 '등재'(반려·대기 건도 관리자가 손대면 등재 — 남은 결재 카드는 기록용).
+    // 비관리자 신규는 status를 안 붙인다 — 서버가 게이트대로(대기/즉시 등재) 스탬프하고 저장 직후 재조회로 화면에 반영. 기존 건은 서버가 원본 고정
+    if (isAdmin()){
+      if (isNew || docStatusOf(d) !== "등재"){ d.status = "등재"; d.registered_by = { id: me.id, name: me.name }; d.registered_at = new Date().toISOString(); delete d.reject_reason; delete d.rejected_at; }
+      if (!d.by) d.by = { id: me.id, name: me.name };
+    } else if (isNew && me) d.by = { id: me.id, name: me.name };
+    d.updated = today; d.updated_ts = Date.now();
     closeDocModal(); renderDocuments(); saveDocuments();
+    if (!isAdmin() && isNew) apprToastShow("등록됨 — PM 승인 후 등재됩니다(설정에 따라 즉시 등재)");
   }
   function deleteDocFromModal(){
     if (!canDo("doc") || !editingDocId) return;
-    var d = findDoc(editingDocId); if (d){ d.del = 1; d.updated = todayStr(); }
+    var d = findDoc(editingDocId); if (d){ d.del = 1; d.updated = todayStr(); d.updated_ts = Date.now(); }   // updated_ts 스탬프 — 409 병합(ms 우선)에서 서버 결재 훅 갱신본이 삭제를 되살리지 않게(적대 검증 low5)
     closeDocModal(); renderDocuments(); saveDocuments();
   }
 
@@ -16643,6 +16743,74 @@
       });
     });
     renderApprGrades();   // 결재 등급표(결재 3차) — 권한관리 화면 하단
+    renderDocSettings();   // 문서함 설정(v314) — 등급표 아래
+  }
+  // ---- 문서함 설정(v314) — 분류별 기본 공개범위 칩 + 등재 결재 게이트. 등급표 카드와 같은 결(칩·낙관락 base·토스트·감사로그). 관리자만(서버도 강제) ----
+  var DOC_GATE_TXT = { staff: "직원 등재 시 PM 승인", none: "결재 없이 즉시 등재" };
+  var docSettingSaving = false;
+  function docSetChipCss(on, val){
+    var base = 'border:1px solid var(--line);border-radius:7px;padding:3px 9px;font-size:11.5px;cursor:pointer;white-space:nowrap;background:transparent;color:var(--sub);';
+    if (!on) return base;
+    if (val === "all" || val === "none") return base + 'background:#EAF3FA;color:#2b6c95;font-weight:700;border-color:#8fb8d4;';
+    if (val === "mgmt") return base + 'background:#FAF0E4;color:#a8651f;font-weight:700;border-color:#d4b48f;';
+    return base + 'background:#EEF1EF;color:#3d4a44;font-weight:700;';
+  }
+  function renderDocSettings(){
+    var host = document.getElementById("docSettingsCard"); if (!host) return;
+    gwCall("gw-data", { action: "doc_settings_get" }).then(function(res){
+      if (res.status !== 200 || !res.body || !res.body.settings){
+        host.innerHTML = '<div class="empty-line">문서함 설정을 불러오지 못했습니다 — 새로고침 후 다시 시도해주세요.</div>'; return;
+      }
+      docSettingsTbl = res.body.settings; docSettingsBase = res.body.updated_at || 0;   // 낙관락 토큰 — 동시 변경 유실 방지
+      var sd = docSettingsTbl.scope_default || {};
+      var rowCss = 'display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:7px 2px;border-bottom:1px solid var(--line);';
+      var rows = '<div style="' + rowCss + '"><span style="min-width:118px;font-size:13px;font-weight:600;">🔒 01 법인</span><span style="font-size:11.5px;color:var(--sub);">관리부+관리자 고정(서버 하드차단 — 설정 불가)</span></div>';
+      rows += DOC_SCOPE_CATS.map(function(cat){
+        var cur = DOC_SCOPE_TXT[sd[cat]] ? sd[cat] : "admin";
+        var chips = ["admin","mgmt","all"].map(function(v){
+          return '<button type="button" style="' + docSetChipCss(cur === v, v) + '" data-ds-scope="' + cat + ':' + v + '">' + DOC_SCOPE_TXT[v] + '</button>';
+        }).join(" ");
+        return '<div style="' + rowCss + '"><span style="min-width:118px;font-size:13px;font-weight:600;">📁 ' + esc(DOC_CATS[cat]) + '</span><span style="display:inline-flex;gap:4px;flex-wrap:wrap;">' + chips + '</span></div>';
+      }).join("");
+      var g = docSettingsTbl.register_gate === "none" ? "none" : "staff";
+      rows += '<div style="' + rowCss + 'padding-top:9px;"><span style="min-width:118px;font-size:13px;font-weight:600;">🗂 등재 결재</span><span style="display:inline-flex;gap:4px;flex-wrap:wrap;">'
+        + ["staff","none"].map(function(v){ return '<button type="button" style="' + docSetChipCss(g === v, v) + '" data-ds-gate="' + v + '">' + DOC_GATE_TXT[v] + '</button>'; }).join(" ")
+        + '</span><span style="flex:1 1 100%;font-size:11.5px;color:var(--sub);padding-left:2px;">관리자(PM)가 올리면 그 자체가 결재(즉시 등재). 직원이 올리면 '
+        + (g === "staff" ? "'등재 대기' → 결재함 [문서함 등재] 카드 승인 후 등재(등급표 ①)" : "결재 없이 즉시 등재") + '</span></div>';
+      host.innerHTML = rows
+        + '<div class="empty-line" style="margin-top:6px;"><b>기본은 비공개</b>(관리자만) — 공개할 분류만 열어주세요. 문서별 공개범위(수정 모달)가 있으면 그 값이 우선 · 변경은 감사로그에 기록'
+        + '<br>전원=모든 직원 · 관리부+관리자=01 법인과 같은 축 · 관리자만=PM·대표만 · 등재 대기·반려 문서는 관리자와 올린 본인만 봅니다</div>';
+      Array.prototype.forEach.call(host.querySelectorAll("[data-ds-scope]"), function(btn){
+        btn.addEventListener("click", function(){
+          var p = btn.getAttribute("data-ds-scope").split(":");
+          docSettingSet({ cat: p[0], scope: p[1] }, DOC_CATS[p[0]] + " 기본 공개범위 → " + DOC_SCOPE_TXT[p[1]]);
+        });
+      });
+      Array.prototype.forEach.call(host.querySelectorAll("[data-ds-gate]"), function(btn){
+        btn.addEventListener("click", function(){ var v = btn.getAttribute("data-ds-gate"); docSettingSet({ register_gate: v }, "등재 결재 → " + DOC_GATE_TXT[v]); });
+      });
+    }).catch(function(){ host.innerHTML = '<div class="empty-line">문서함 설정을 불러오지 못했습니다(네트워크).</div>'; });
+  }
+  function docSettingSet(chg, label){
+    if (docSettingSaving) return;   // 연타 방지 — 직렬 저장
+    if (docSettingsTbl){
+      if (chg.cat !== undefined && (docSettingsTbl.scope_default || {})[chg.cat] === chg.scope) return;
+      if (chg.register_gate !== undefined && docSettingsTbl.register_gate === chg.register_gate) return;
+    }
+    docSettingSaving = true;
+    gwCall("gw-data", Object.assign({ action: "doc_settings_set", base: docSettingsBase }, chg)).then(function(res){
+      docSettingSaving = false;
+      if (res.status === 409){
+        apprToastShow("다른 관리자가 방금 문서함 설정을 변경했습니다 — 최신 설정을 다시 불러왔습니다");
+        renderDocSettings();   // 재조회로 base 갱신 — 사람이 최신 설정을 보고 다시 결정
+        return;
+      }
+      if (res.status !== 200){ alert("문서함 설정 저장 실패 (" + ((res.body && res.body.error_code) || res.status) + ")"); return; }
+      if (res.body && res.body.settings) docSettingsTbl = res.body.settings;
+      if (res.body && res.body.updated_at != null) docSettingsBase = res.body.updated_at;
+      apprToastShow("문서함 설정 — " + label);
+      renderDocSettings(); renderDocuments();   // 문서함 행 배지 "분류 기본(…)" 동기
+    }).catch(function(){ docSettingSaving = false; alert("문서함 설정 저장 실패(네트워크) — 다시 시도해주세요."); });
   }
   // ---- 결재 등급표(결재 3차, 명세 §2) — 종류 × 등급 칩(시안 표 ②). PM=admin만 변경(서버도 강제), 변경 감사로그. ----
   // 순서·표기는 §2 확정표. 키 문자열은 서버 APPR_GRADE_DEFAULTS와 동일해야 한다(uismoke가 대조).

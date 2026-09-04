@@ -106,6 +106,136 @@ function docCatOf(it) {
 }
 function docCanSee01(m) { return !!(m && (m.admin || String(m.dept || '') === '관리부')); }
 
+// ---- 문서함 공개범위·등재 결재(v314, PM 지시 9/4 "문서함 일단 다 올리고 등재결재랑 공개범위 만들어라 내가 선택하게" + "비공개로 다 올리라고") ----
+// 공개범위(scope): 문서 항목 scope = 'all'(전원) | 'mgmt'(관리부+관리자 — docCanSee01과 같은 축) | 'admin'(관리자만) | {ids:[회원id…]}(지정 직원+관리자).
+// 미지정 문서는 분류 기본값(settings:documents.scope_default) — 초기값은 전 분류 'admin'(전부 비공개, PM 9/4 추가 지시).
+// 공개는 PM이 설정 화면에서 분류별로 열거나 문서별 scope를 줄 때만. 01 법인은 하드차단(관리부+관리자) 유지·설정 대상 아님.
+// 등재 결재(register_gate): 'staff'(기본 — 비관리자 등재는 status '대기' + 결재함 '문서함 등재' 카드 자동 상신, 승인 시 '등재') | 'none'(즉시 등재).
+// 관리자 등재는 항상 즉시 '등재'(등급표 ① PM 전결 — PM·관리자가 올리면 그 자체가 결재). status 없는 구건(18건)은 '등재'로 취급.
+const DOC_SETTINGS_KEY = 'settings:documents';
+const DOC_SCOPE_CATS = ['02', '03', '05', '06', '99'];   // 01 법인은 설정 불가(하드차단)
+const DOC_SCOPE_VALS = { all: 1, mgmt: 1, admin: 1 };
+const DOC_SETTINGS_DEFAULTS = { scope_default: { '02': 'admin', '03': 'admin', '05': 'admin', '06': 'admin', '99': 'admin' }, register_gate: 'staff' };
+// 읽기 실패는 기본표(전부 관리자만) 폴백 = 가장 닫힌 쪽(fail-closed). 등급표(apprGrades)와 같은 병합 규칙 — 저장본이 기본표 위에 얹힌다
+async function docSettings(st) {
+  const out = { scope_default: Object.assign({}, DOC_SETTINGS_DEFAULTS.scope_default), register_gate: DOC_SETTINGS_DEFAULTS.register_gate, updated_at: 0, updated_by: '', read_failed: false };
+  try {
+    const r = await blobGet(st, DOC_SETTINGS_KEY);
+    if (r.ok && r.data) {
+      const sd = r.data.scope_default;
+      if (sd && typeof sd === 'object') DOC_SCOPE_CATS.forEach(function (cat) { if (DOC_SCOPE_VALS[sd[cat]]) out.scope_default[cat] = sd[cat]; });
+      if (r.data.register_gate === 'none' || r.data.register_gate === 'staff') out.register_gate = r.data.register_gate;
+      out.updated_at = r.data.updated_at || 0; out.updated_by = r.data.updated_by || '';
+    } else if (!r.ok && r.code !== 'NOT_FOUND') out.read_failed = true;
+  } catch (e) { out.read_failed = true; }
+  return out;
+}
+// scope 정규화 — 화이트리스트 밖 값은 버린다(무효값이 "미지정=분류 기본"으로 떨어지게). ids는 문자열만·중복 제거·상한 50
+function docScopeNorm(s) {
+  if (typeof s === 'string') return DOC_SCOPE_VALS[s] ? s : null;
+  if (s && typeof s === 'object' && Array.isArray(s.ids)) {
+    const seen = {}, ids = [];
+    s.ids.forEach(function (x) { if (typeof x === 'string' && x && !seen[x] && ids.length < 50) { seen[x] = 1; ids.push(x); } });
+    return { ids: ids };
+  }
+  return null;
+}
+function docStatusOf(it) { return (it && (it.status === '대기' || it.status === '반려')) ? it.status : '등재'; }
+// 재상신 멱등키 — 첫 상신 'docreg-<id>', 반려 후 재상신은 reg_n을 올려 'docreg-<id>-<n>'(닫힌 구 카드의 cid 멱등에 걸리지 않게)
+function docRegCid(it) { const n = Number(it && it.reg_n) || 1; return 'docreg-' + it.id + (n > 1 ? '-' + n : ''); }
+function docScopeMatch(sc, m) {
+  if (!m) return false;
+  if (m.admin) return true;
+  if (sc === 'all') return true;
+  if (sc === 'mgmt') return docCanSee01(m);
+  if (sc && typeof sc === 'object' && Array.isArray(sc.ids)) return sc.ids.indexOf(m.id) >= 0;
+  return false;   // 'admin'·미지정
+}
+// 유효 공개범위: 문서 scope > 분류 기본값. 01은 기본 'mgmt'(하드차단과 동일 축 — 문서 scope로 더 좁힐 수는 있어도 넓힐 수는 없다)
+function docScopeOf(it, settings) {
+  const own = docScopeNorm(it && it.scope);
+  if (own) return own;
+  const cat = docCatOf(it);
+  if (cat === '01') return 'mgmt';
+  return (settings && settings.scope_default && DOC_SCOPE_VALS[settings.scope_default[cat]]) ? settings.scope_default[cat] : 'admin';
+}
+// 열람 판정(서버 하드차단 — get 필터·save 재구성 공용). 관리자 무제한. '대기'·'반려'는 등재한 본인만.
+// 등재한 본인(by.id)은 자기 문서를 항상 본다 — 자기가 올린 문서가 승인 뒤 사라지는 혼란 방지(정보 유출 없음: 본인이 쓴 내용)
+function docVisible(m, it, settings) {
+  if (!it || !m) return false;
+  if (m.admin) return true;
+  if (docCatOf(it) === '01' && !docCanSee01(m)) return false;   // 01 하드차단이 본인 예외보다 앞 — 관리자가 직원 문서를 01로 옮기면 그 직원도 못 본다(적대 검증 low6)
+  const mine = !!(it.by && it.by.id === m.id);
+  if (docStatusOf(it) !== '등재') return mine;
+  if (mine) return true;
+  return docScopeMatch(docScopeOf(it, settings), m);
+}
+const DOC_CAT_LABEL = { '01': '01 법인', '02': '02 인사노무', '03': '03 안전보건', '05': '05 규정', '06': '06 양식', '99': '미분류' };
+const DOC_SCOPE_LABEL = { all: '전원', mgmt: '관리부+관리자', admin: '관리자만' };
+function docScopeText(it, settings) {
+  const own = docScopeNorm(it && it.scope);
+  if (own && typeof own === 'object') return '지정 ' + own.ids.length + '명';
+  if (own) return DOC_SCOPE_LABEL[own];
+  return '분류 기본(' + (DOC_SCOPE_LABEL[docScopeOf(it, settings)] || '관리자만') + ')';
+}
+// 결재 카드 본문 — PM이 카드만 보고 판단할 수 있게 번호·분류·공개범위·링크·메모
+function docRegBody(it, settings) {
+  return [it.no ? '문서번호 ' + it.no : '', '분류 ' + (DOC_CAT_LABEL[docCatOf(it)] || '미분류'), '공개범위 ' + docScopeText(it, settings),
+    it.url ? '링크 ' + it.url : '', it.note ? '메모 ' + it.note : ''].filter(Boolean).join(' · ').slice(0, 500);
+}
+// 결재 결과 → 문서 상태 반영(승인='등재'·반려='반려'). approval_decide 훅과 approvals_list 폴(재시도)이 같은 함수를 탄다 — 멱등:
+//  ① 카드 cid가 문서의 현재 등재 cid와 같을 때만(재상신된 문서에 구 카드가 손대지 않게) ② 문서가 '대기'일 때만(이미 관리자가 직접 등재한 건은 그대로).
+// 문서 블롭은 여기서만 결재 경로로 바뀐다 — 순서는 결재 상태 저장이 먼저, 이 반영은 그 뒤(실패해도 결재 결과는 확정, 다음 폴에서 재시도).
+async function docRegisterApply(st, aps, by) {
+  const targets = (aps || []).filter(function (a) { return a && a.kind === '문서함 등재' && (a.status === '승인' || a.status === '반려') && String(a.ref || '').indexOf('doc:') === 0 && a.cid; });
+  if (!targets.length) return { ok: true, applied: 0 };
+  const r = await blobGet(st, colKey('documents'));
+  if (!r.ok) return { ok: false, code: r.code };
+  const doc = (r.data && Array.isArray(r.data.items)) ? r.data : null;
+  if (!doc) return { ok: true, applied: 0, skipped: 'no-doc' };
+  const prevDoc = JSON.parse(JSON.stringify(doc));   // 스냅샷은 변형 전 상태여야 한다(아래에서 it을 제자리 수정)
+  const changed = [];
+  targets.forEach(function (a) {
+    const id = String(a.ref).slice(4);
+    const it = doc.items.find(function (x) { return x && x.id === id; });
+    if (!it || docRegCid(it) !== a.cid || docStatusOf(it) !== '대기') return;
+    const nowIso = new Date().toISOString();
+    if (a.status === '승인') {
+      it.status = '등재'; it.registered_by = a.decided_by || { id: by.id, name: by.name }; it.registered_at = a.decided_at || nowIso; delete it.reject_reason; delete it.rejected_at;   // 재상신 승인 시 반려 잔존 정리
+    } else {
+      it.status = '반려'; it.reject_reason = String(a.reason || '').slice(0, 300); it.rejected_at = a.decided_at || nowIso;
+    }
+    it.updated_ts = Date.now(); it.updated = verDay(it.updated_ts);
+    changed.push({ id: id, status: it.status, title: String(it.title || '').slice(0, 40) });
+  });
+  if (!changed.length) return { ok: true, applied: 0 };
+  await verSnapshot('documents', prevDoc, by.name + '(결재 반영)', false);   // 사람 저장과 같은 시점 보존(변형 전 문서)
+  doc.updated_by = by.id; doc.updated_at = Date.now();
+  const w = await blobSet(st, colKey('documents'), doc);
+  if (!w.ok) return { ok: false, code: w.code };
+  // 동시 저장(관리자 문서 편집)의 덮어쓰기가 이 전환을 되돌릴 수 있다 — 재확인 후 1회 재적용(approvals 자가복구와 같은 패턴).
+  // 재적용은 문서가 여전히 '대기'(같은 cid)일 때만 — 그 사이 관리자가 직접 등재한 문서를 뒤늦은 반려가 '반려'로 뒤집지 않게(적대 검증 low7)
+  try {
+    const chk = await blobGet(st, colKey('documents'));
+    if (chk.ok && chk.data && Array.isArray(chk.data.items)) {
+      let drift = false;
+      changed.forEach(function (ch) {
+        const cur = chk.data.items.find(function (x) { return x && x.id === ch.id; });
+        const src = doc.items.find(function (x) { return x && x.id === ch.id; });
+        if (cur && src && cur.status !== ch.status && docStatusOf(cur) === '대기' && docRegCid(cur) === docRegCid(src)) {
+          cur.status = src.status; cur.registered_by = src.registered_by; cur.registered_at = src.registered_at;
+          if (src.reject_reason != null) cur.reject_reason = src.reject_reason; else delete cur.reject_reason;
+          if (src.rejected_at != null) cur.rejected_at = src.rejected_at; else delete cur.rejected_at;
+          cur.updated_ts = src.updated_ts; cur.updated = src.updated; drift = true;
+        }
+      });
+      if (drift) { chk.data.updated_by = by.id; chk.data.updated_at = Date.now(); await blobSet(st, colKey('documents'), chk.data); }
+    }
+  } catch (e) {}
+  try { await appendAudit({ ts: Date.now(), by: by.name, bid: by.id, col: 'documents', ev: changed.map(function (ch) { return { op: ch.status === '등재' ? '등재' : '등재반려', id: ch.id, t: ch.title }; }) }); } catch (e) {}
+  return { ok: true, applied: changed.length };
+}
+
 async function handleGet(event, d, R) {
   const c = await currentMember(event);
   if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
@@ -132,9 +262,11 @@ async function handleGet(event, d, R) {
       const s = Object.assign({}, v); delete s.acq_price; delete s.nodoc_amt; return s;
     }) });
   }
-  // 문서함 01 법인 분류는 관리부·관리자만 열람(서랍형 개편 2026-09-02) — 서버 하드 차단
-  if (col === 'documents' && !docCanSee01(c.member) && Array.isArray(doc.items)) {
-    doc = Object.assign({}, doc, { items: doc.items.filter(function (it) { return docCatOf(it) !== '01'; }) });
+  // 문서함(v314): 비관리자는 (문서 scope 또는 분류 기본값)에 맞고 '등재'된 문서만 — 01 법인 하드차단(2026-09-02)·'대기'·'반려'(등재 본인만)까지
+  // docVisible 한 규칙으로 서버 하드 차단. del:1 항목도 규칙만 맞으면 그대로 내려간다(소프트 삭제·복구는 클라 몫 — 임시 숨김 hidden_tmp 건 포함)
+  if (col === 'documents' && !c.member.admin && Array.isArray(doc.items)) {
+    const ds = await docSettings(store(DATA));
+    doc = Object.assign({}, doc, { items: doc.items.filter(function (it) { return docVisible(c.member, it, ds); }) });
   }
   return jr(200, { status: 'OK', collection: col, doc, can_write: p === 'do', request_id: R });
 }
@@ -188,13 +320,60 @@ async function handleSave(event, d, R) {
     const prevDuties = (prevDoc && Array.isArray(prevDoc.duties)) ? prevDoc.duties : [];
     if (!c.member.admin || !Array.isArray(doc.duties) || (doc.duties.length === 0 && prevDuties.length > 0)) doc.duties = prevDuties;
   }
-  // 문서함: 01 법인 항목은 관리자만 편집 — 비관리자 저장은 서버가 01을 원본으로 재구성.
-  // 판정은 "서버 기준 01이었던 id" 기준(cat만 바꿔 다른 분류로 위장해 내보내는 탈취·중복 id 차단 — 리뷰 high)
-  // + 현재 01 주장 항목도 제거. 열람 필터로 01이 빠진 사본의 저장이 01을 지우는 사고도 이 재구성이 막는다
-  if (col === 'documents' && !c.member.admin && Array.isArray(doc.items)) {
-    const keep01 = oldItems.filter(function (o) { return docCatOf(o) === '01'; });
-    const ids01 = {}; keep01.forEach(function (o) { if (o && o.id) ids01[o.id] = 1; });
-    doc.items = doc.items.filter(function (x) { return x && !ids01[x.id] && docCatOf(x) !== '01'; }).concat(keep01);
+  // 문서함(v314 공개범위·등재 결재):
+  //  관리자 = 무제한. scope는 정규화만, 신규 항목은 status 없으면 즉시 '등재'(PM 전결 — 관리자가 올리면 그 자체가 결재).
+  //  비관리자 = 서버 재구성. ①못 보는 문서(docVisible 거짓 — 분류 기본값·scope 밖·타인의 대기/반려)와 01 법인은 서버 원본 유지
+  //    (판정은 "서버 기준 id" — 못 보는 문서를 지우거나 cat·scope를 바꿔 내보내는 탈취·열람 필터로 빠진 사본의 저장이 남의 문서를 지우는 사고 차단)
+  //  ②기존 문서의 status·by·등재 기록은 서버 원본 고정(status를 '등재'로 올리는 시도 원복) — 단 본인 반려 건의 재상신(반려→대기·reg_n+1)만 허용
+  //  ③신규 문서는 서버가 등재자(by) 스탬프 + 게이트(register_gate): 'staff'=대기(아래 결재함 자동 상신) / 'none'=즉시 등재
+  let docPending = [], docSet = null, docDropped = [];
+  if (col === 'documents') {
+    if (Array.isArray(doc.items)) doc.items = doc.items.filter(function (x) { return x && typeof x === 'object'; });
+    if (c.member.admin) {
+      const oldDocBy = {}; oldItems.forEach(function (o) { if (o && o.id) oldDocBy[o.id] = o; });
+      const nowIso = new Date().toISOString();
+      doc.items = doc.items.map(function (x) {
+        const s = Object.assign({}, x);
+        const sc = docScopeNorm(s.scope); if (sc) s.scope = sc; else delete s.scope;
+        if (!(s.id && oldDocBy[s.id]) && s.status !== '등재') { s.status = '등재'; s.registered_by = { id: c.member.id, name: c.member.name }; s.registered_at = nowIso; delete s.reject_reason; }
+        if (!(s.id && oldDocBy[s.id]) && !s.by) s.by = { id: c.member.id, name: c.member.name };
+        return s;
+      });
+    } else {
+      // 직전 문서를 못 읽으면 "못 보는 문서 이월" 판단 자체가 불가 — fail-open이면 비관리자 저장 한 번에 숨은 문서가 전부 증발(licenses duties와 같은 원칙)
+      if (prevReadFailed) return jr(500, { status: 'ERROR', error_code: 'PREV_READ_FAILED', request_id: R });
+      docSet = await docSettings(store(DATA));
+      const oldDocBy = {}; oldItems.forEach(function (o) { if (o && o.id) oldDocBy[o.id] = o; });
+      const keep = [], keepIds = {};
+      oldItems.forEach(function (o) { if (o && (docCatOf(o) === '01' || !docVisible(c.member, o, docSet))) { keep.push(o); if (o.id) keepIds[o.id] = 1; } });
+      const nowIso = new Date().toISOString(), me = { id: c.member.id, name: c.member.name };
+      const out = [], seenOut = {};
+      doc.items.forEach(function (x) {
+        if (x.id && (keepIds[x.id] || seenOut[x.id])) return;   // 서버 원본 유지 / 같은 id 중복 전송은 첫 건만
+        const o = x.id ? oldDocBy[x.id] : null;
+        const s = Object.assign({}, x);
+        if (o) {
+          // 기존 문서(보이는 것): 내용 편집만 허용. 분류·공개범위·문서번호·구 분류 텍스트는 서버 원본 고정 — 관리부원이 mgmt→all·ids 확장·05→02 갈아타기로
+          // 무결재 노출을 만들거나(적대 검증 med1), cat '01'로 보내 소실시키는(med3) 경로를 닫는다. cat은 원본 파생값을 명시 고정(no·title 편집으로 분류가 흔들리지 않게)
+          s.cat = docCatOf(o);
+          ['no', 'category', 'scope'].forEach(function (k) { if (o[k] != null) s[k] = o[k]; else delete s[k]; });
+          // 상태·등재자·등재 기록도 원본 고정 — 재상신은 "본인 반려 건 + 클라가 reg_n을 정확히 +1로 보냄"만 명시 신호로 인정(low4: 낡은 '대기' 사본 편집이 재상신으로 오판되지 않게)
+          const resubmit = docStatusOf(o) === '반려' && !!(o.by && o.by.id === me.id) && Number(x.reg_n) === (Number(o.reg_n) || 1) + 1;
+          ['status', 'by', 'registered_by', 'registered_at', 'reject_reason', 'rejected_at', 'reg_n'].forEach(function (k) { if (o[k] != null) s[k] = o[k]; else delete s[k]; });
+          if (resubmit) { s.status = '대기'; s.reg_n = (Number(o.reg_n) || 1) + 1; delete s.reject_reason; delete s.rejected_at; }
+        } else {
+          if (docCatOf(x) === '01') { docDropped.push(x); return; }   // 신규 01 법인은 관리자만(2026-09-02 규칙) — 폐기 + 감사로그 '제거'
+          const sc = docScopeNorm(s.scope); if (sc) s.scope = sc; else delete s.scope;
+          s.by = me; delete s.registered_by; delete s.registered_at; delete s.reject_reason; delete s.rejected_at; delete s.reg_n;
+          if (docSet.register_gate === 'none') { s.status = '등재'; s.registered_by = me; s.registered_at = nowIso; }
+          else s.status = '대기';
+        }
+        if (s.status === '대기') docPending.push(s);
+        if (s.id) seenOut[s.id] = 1;
+        out.push(s);
+      });
+      doc.items = out.concat(keep);
+    }
   }
   // 기성 돈 상태 3종(입금 paid·검수 reviewed·발행 invoice)은 관리자 전용 — 비관리자 저장은 서버가 기존값 강제 복원.
   // 분장 근거(용어집 v1): 공무는 청구 등록·수정까지, 상태 전환은 관리부. 화면 숨김은 안내일 뿐, 여기가 하드 차단(콘솔 우회 무력화)
@@ -239,7 +418,31 @@ async function handleSave(event, d, R) {
     }
     if (ev.length) await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: col, ev: ev });
   } catch (e) {}
-  return jr(200, { status: 'OK', updated_at: doc.updated_at, request_id: R });
+  // 문서함 등재 결재 훅(v314): 비관리자의 '대기' 문서마다 결재함에 '문서함 등재' 카드를 서버가 대신 기안(by=등재한 직원, ref 'doc:'+id, cid 멱등).
+  // 문서 저장이 먼저(사용자 본선), 상신은 그 뒤 — 상신 실패는 감사로그로 남기고 이 직원의 다음 문서 저장 때 같은 cid로 다시 시도(멱등이라 중복 0).
+  // 재상신(reg_n) 건도 같은 경로. 정정 상신(dupOpenRef)은 'ab:' 전용이라 doc: 중복은 cid 멱등에만 의존한다.
+  let regWarn = 0;
+  if (col === 'documents' && !c.member.admin && docDropped.length) {
+    try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'documents', ev: docDropped.map(function (x) { return { op: '제거', id: String(x.id || '-'), t: '01 법인 신규는 관리자만 · ' + String(x.title || '').slice(0, 40) }; }) }); } catch (e) {}
+  }
+  if (col === 'documents' && !c.member.admin && docPending.length) {
+    try {
+      const st = store(DATA);
+      const ar = await approvalsDoc(st);
+      const have = {};
+      if (ar.ok) ar.doc.items.forEach(function (a) { if (a && a.cid) have[a.cid] = 1; });
+      for (const p of docPending) {
+        if (!p.id) continue;
+        const cid = docRegCid(p);
+        if (have[cid]) continue;
+        const cr = await apprCreateItem(st, c.member, { kind: '문서함 등재', title: String(p.title || '(제목없음)').slice(0, 120), body: docRegBody(p, docSet), ref: 'doc:' + p.id, cid: cid });
+        if (!cr.ok) { regWarn++; try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'documents', ev: [{ op: '등재상신실패', id: p.id, t: String(cr.code || '') + ' · ' + String(p.title || '').slice(0, 40) }] }); } catch (e) {} }
+      }
+    } catch (e) { regWarn++; }
+  }
+  const okOut = { status: 'OK', updated_at: doc.updated_at, request_id: R };
+  if (regWarn) okOut.register_warn = regWarn;
+  return jr(200, okOut);
 }
 
 // ---- 일감 수집 공통 ----
@@ -969,6 +1172,44 @@ async function handleApprGradesSet(event, d, R) {
   try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'approvals', ev: [{ op: '등급변경', id: kind, t: kind + ' ' + before + '→' + grade + (grade === 0 ? '(현행)' : '') }] }); } catch (e) {}
   return jr(200, { status: 'OK', grades: Object.assign({}, APPR_GRADE_DEFAULTS, stored), updated_at: doc.updated_at, request_id: R });
 }
+// ---- 문서함 설정(v314): 분류별 기본 공개범위 + 등재 결재 게이트. 관리자 전용·감사로그·낙관락(등급표 패턴) ----
+async function handleDocSettingsGet(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (!c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
+  const s = await docSettings(store(DATA));
+  return jr(200, { status: 'OK', settings: { scope_default: s.scope_default, register_gate: s.register_gate }, defaults: DOC_SETTINGS_DEFAULTS, updated_at: s.updated_at, updated_by: s.updated_by, request_id: R });
+}
+async function handleDocSettingsSet(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (!c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });   // PM=admin만 변경
+  const st = store(DATA);
+  const cur = await docSettings(st);
+  // 읽기 실패 위에 쓰면 저장돼 있던 다른 분류의 설정이 기본표로 되돌아간다 — 거부
+  if (cur.read_failed) return jr(500, { status: 'ERROR', error_code: 'SETTINGS_READ_FAILED', request_id: R });
+  // 낙관락 — 두 관리자 동시 변경의 lost-update 방지(등급표 GRADES_STALE와 동일). base 미전송(구클라)은 last-write
+  if (d.base !== undefined && Number(d.base) !== Number(cur.updated_at))
+    return jr(409, { status: 'CONFLICT', error_code: 'DOC_SETTINGS_STALE', request_id: R });
+  let evText = '';
+  if (d.cat !== undefined) {
+    const cat = String(d.cat || ''), scope = String(d.scope || '');
+    if (DOC_SCOPE_CATS.indexOf(cat) < 0) return jr(400, { status: 'REJECTED', error_code: 'BAD_CAT', request_id: R });   // 01 법인 포함 — 하드차단이라 설정 대상 아님
+    if (!DOC_SCOPE_VALS[scope]) return jr(400, { status: 'REJECTED', error_code: 'BAD_SCOPE', request_id: R });
+    evText = '기본 공개범위 ' + cat + ' ' + cur.scope_default[cat] + '→' + scope;
+    cur.scope_default[cat] = scope;
+  } else if (d.register_gate !== undefined) {
+    const g = String(d.register_gate || '');
+    if (g !== 'staff' && g !== 'none') return jr(400, { status: 'REJECTED', error_code: 'BAD_GATE', request_id: R });
+    evText = '등재 결재 ' + cur.register_gate + '→' + g;
+    cur.register_gate = g;
+  } else return jr(400, { status: 'REJECTED', error_code: 'NO_CHANGE', request_id: R });
+  const docS = { schema: 1, scope_default: cur.scope_default, register_gate: cur.register_gate, updated_by: c.member.id, updated_at: Date.now() };
+  const w = await blobSet(st, DOC_SETTINGS_KEY, docS);
+  if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
+  try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'documents', ev: [{ op: '문서함설정', id: '-', t: evText }] }); } catch (e) {}
+  return jr(200, { status: 'OK', settings: { scope_default: docS.scope_default, register_gate: docS.register_gate }, updated_at: docS.updated_at, request_id: R });
+}
 async function approvalsDoc(st) {
   const r = await blobGet(st, colKey('approvals'));
   // 읽기 실패를 빈 문서로 위조하면 다음 쓰기가 대장 전체를 1건짜리로 덮는다(클라 shim과 같은 원칙) — 실패는 실패로 반환
@@ -982,13 +1223,44 @@ async function handleApprovalsList(event, d, R) {
   const rd = await approvalsDoc(store(DATA));
   if (!rd.ok) return jr(500, { status: 'ERROR', error_code: rd.code, request_id: R });
   const doc = rd.doc;
-  const items = c.member.admin ? doc.items : doc.items.filter(function (it) { return it && it.by && it.by.id === c.member.id; });
+  // 문서함 등재 재시도(v314): decide 시점에 문서 반영이 실패한 건을 관리자 폴이 멱등으로 주워 담는다 — 최근 7일 결정분만 후보(문서 블롭 1회 읽기),
+  // 이미 반영된 건은 docRegisterApply가 '대기' 아님·cid 불일치로 건너뛴다. 실패는 조용히(다음 폴).
+  let docFresh = doc;
+  if (c.member.admin) {
+    try {
+      const since = Date.now() - 7 * 86400000;
+      const cands = doc.items.filter(function (a) { return a && a.kind === '문서함 등재' && (a.status === '승인' || a.status === '반려') && a.cid && String(a.ref || '').indexOf('doc:') === 0 && (Date.parse(a.decided_at || '') || 0) >= since; });
+      if (cands.length) await docRegisterApply(store(DATA), cands, c.member);
+      // 반대 방향(적대 검증 med2): '대기' 문서인데 현재 cid의 카드가 없으면(저장 시 자동 상신 실패 고착) 관리자 폴이 등재자 명의로 대신 기안 — cid 멱등
+      const made = await docRegisterReconcileCreate(store(DATA), doc.items);
+      if (made) { const rd3 = await approvalsDoc(store(DATA)); if (rd3.ok) docFresh = rd3.doc; }   // 방금 만든 카드가 이 응답에 바로 실리게
+    } catch (e) {}
+  }
+  const items = c.member.admin ? docFresh.items : doc.items.filter(function (it) { return it && it.by && it.by.id === c.member.id; });
   // base = 낙관락 토큰. decide가 이 값을 들고 와야 하며 불일치면 409 APPR_STALE(관리자 2인 동시 결재 유실 방지)
   // boss_present — 대표 계정 존재 여부(클라 apprCanDecide 폴백용: 대표가 없으면 관리자 전원이 대표 전용 건을 결재). 관리자에게만 계산(회원 블롭 스캔)
   // pm_present — 비대표 관리자 존재 여부(결재 3차: ①·② 1단계는 비대표 관리자 전용인데, 없으면 대표에게 연다 — 서버 PM_ONLY 게이트와 같은 축)
   const bossN = c.member.admin ? (await push.bossIds()).length : 0;
   const pmN = c.member.admin ? (await push.pmIds()).length : 0;
-  return jr(200, { status: 'OK', items: items, base: doc.updated_at || 0, boss_present: bossN > 0, pm_present: pmN > 0, request_id: R });
+  return jr(200, { status: 'OK', items: items, base: docFresh.updated_at || 0, boss_present: bossN > 0, pm_present: pmN > 0, request_id: R });
+}
+// '대기' 문서 ↔ 카드 반대 방향 재시도(med2): 문서 블롭 1회 읽기, 현재 cid(docreg-<id>[-n])의 카드가 어떤 상태로도 없을 때만 생성(결정된 카드가 있으면 정방향 반영 몫).
+// 기안자=문서 등재자(by) 명의 — 상신 규칙(등급 스냅샷·푸시)은 apprCreateItem 그대로. 삭제(del:1) 문서는 제외. 반환=생성 건수
+async function docRegisterReconcileCreate(st, apItems) {
+  const r = await blobGet(st, colKey('documents'));
+  if (!r.ok || !r.data || !Array.isArray(r.data.items)) return 0;
+  const pend = r.data.items.filter(function (it) { return it && it.id && it.del !== 1 && docStatusOf(it) === '대기' && it.by && it.by.id; });
+  if (!pend.length) return 0;
+  const have = {}; (apItems || []).forEach(function (a) { if (a && a.cid) have[a.cid] = 1; });
+  const todo = pend.filter(function (it) { return !have[docRegCid(it)]; });
+  if (!todo.length) return 0;
+  const ds = await docSettings(st);
+  let made = 0;
+  for (const p of todo) {
+    const cr = await apprCreateItem(st, { id: p.by.id, name: p.by.name || '' }, { kind: '문서함 등재', title: String(p.title || '(제목없음)').slice(0, 120), body: docRegBody(p, ds), ref: 'doc:' + p.id, cid: docRegCid(p) });
+    if (cr.ok && !cr.dedup) { made++; try { await appendAudit({ ts: Date.now(), by: '서버', bid: '__system__', col: 'documents', ev: [{ op: '등재상신복구', id: p.id, t: String(p.title || '').slice(0, 40) + ' (관리자 결재함 조회 시 대신 기안)' }] }); } catch (e) {} }
+  }
+  return made;
 }
 async function handleApprovalCreate(event, d, R) {
   const c = await currentMember(event);
@@ -998,43 +1270,55 @@ async function handleApprovalCreate(event, d, R) {
   if (!title) return jr(400, { status: 'REJECTED', error_code: 'NO_TITLE', request_id: R });
   const kind0 = String(d.kind || '일반').slice(0, 20);
   if (kind0 === '전결총정리') return jr(400, { status: 'REJECTED', error_code: 'SYSTEM_KIND', request_id: R });   // 크론 전용 kind — 사용자 기안 불가(§3.3)
-  const st = store(DATA);
+  const r = await apprCreateItem(store(DATA), c.member, { kind: kind0, title: title, body: d.body, ref: d.ref, cid: d.cid, boss_up: !!d.boss_up });
+  if (!r.ok) return jr(500, { status: 'ERROR', error_code: r.code, request_id: R });
+  const out = { status: 'OK', id: r.id, request_id: R };
+  if (r.dedup) out.dedup = true;
+  if (r.updated) out.updated = true;
+  return jr(200, out);
+}
+// 상신 본체 — 사용자 기안(handleApprovalCreate)과 서버 내부 훅(문서함 등재 자동 상신, v314)이 같은 규칙을 탄다:
+// cid 멱등·dupOpenRef(ab: 정정)·등급 스냅샷·자가복구·감사로그·푸시 라우팅. 두 벌로 갈라지면 등급표·통지가 한쪽만 바뀌는 사고가 난다.
+// 입력 검증(title 비어있음·시스템 kind)은 호출자 몫. member = 기안자(훅에서는 등재한 직원). 반환 {ok,id,dedup|updated} / {ok:false,code}
+async function apprCreateItem(st, member, o) {
+  const title = String(o.title || '').trim().slice(0, 120);
+  const kind0 = String(o.kind || '일반').slice(0, 20);
   const rd = await approvalsDoc(st);
-  if (!rd.ok) return jr(500, { status: 'ERROR', error_code: rd.code, request_id: R });
+  if (!rd.ok) return { ok: false, code: rd.code };
   const doc = rd.doc;
   // 멱등키(cid): 클라 재시도(응답 유실)로 같은 상신이 2건 생기는 것을 서버에서 흡수
-  const cid = String(d.cid || '').slice(0, 48);
+  const cid = String(o.cid || '').slice(0, 48);
   if (cid) {
     const dup = doc.items.find(function (x) { return x && x.cid === cid; });
-    if (dup) return jr(200, { status: 'OK', id: dup.id, dedup: true, request_id: R });
+    if (dup) return { ok: true, id: dup.id, dedup: true };
   }
   // 운반일지(ref ab:날짜)는 자동 기안(워커)과 수동 상신이 같은 날짜에 겹친다 — 열린(대기·보류) 동일 ref는
   // 새 카드를 만들지 않고 기존 카드를 정정본으로 갱신한다(아래 fresh 단계). 조용한 흡수는 자동 기안(자동수집분만)의
   // body를 수기 포함본으로 고칠 통로를 없앤다(리뷰 med). 승인·반려 종결 건은 통과 → 재상신 경로 보존.
   // 비관리자는 목록에서 타인·시스템 상신을 못 보므로 클라 중복 검사만으론 못 막는다 — 여기가 최후 방어선
-  const refIn = String(d.ref || '').slice(0, 60);
+  const refIn = String(o.ref || '').slice(0, 60);
   function dupOpenRef(items) {
     if (refIn.indexOf('ab:') !== 0) return null;
     return items.find(function (x) { return x && x.ref === refIn && (x.status === '대기' || x.status === '보류'); }) || null;
   }
-  await verSnapshot('approvals', doc, c.member.name, false);   // 쓰기 전 시점 보존(복구 링 — 다른 컬렉션과 동일)
+  await verSnapshot('approvals', doc, member.name, false);   // 쓰기 전 시점 보존(복구 링 — 다른 컬렉션과 동일)
   // 레이스 창 축소: verSnapshot 왕복 사이 착지한 동시 결재/상신을 덮지 않게 쓰기 직전 신선본에 얹는다(3차=항목별 키 분리)
   const rd2 = await approvalsDoc(st);
   const fresh = rd2.ok ? rd2.doc : doc;
   if (cid) {
     const dup2 = fresh.items.find(function (x) { return x && x.cid === cid; });
-    if (dup2) return jr(200, { status: 'OK', id: dup2.id, dedup: true, request_id: R });
+    if (dup2) return { ok: true, id: dup2.id, dedup: true };
   }
   const dr2 = dupOpenRef(fresh.items);
   if (dr2) {
     dr2.title = title;
-    dr2.body = String(d.body || '').slice(0, 500);
-    dr2.by = { id: c.member.id, name: c.member.name };   // 정정자가 새 기안자 — 결재 결과 통지·'내 상신'도 이 사람 기준
+    dr2.body = String(o.body || '').slice(0, 500);
+    dr2.by = { id: member.id, name: member.name };   // 정정자가 새 기안자 — 결재 결과 통지·'내 상신'도 이 사람 기준
     if (apprBossOnly(dr2) && dr2.to == null) dr2.to = 'boss';   // 구건 승격 — 판정 규칙이 나중에 to 필드만 보게 바뀌어도 열리지 않게
     dr2.updated = new Date().toISOString();
-    fresh.updated_by = c.member.id; fresh.updated_at = Date.now();
+    fresh.updated_by = member.id; fresh.updated_at = Date.now();
     const uw = await blobSet(st, colKey('approvals'), fresh);
-    if (!uw.ok) return jr(500, { status: 'ERROR', error_code: uw.code, request_id: R });
+    if (!uw.ok) return { ok: false, code: uw.code };
     // 동시 create·decide의 본선쓰기가 이 정정(내용)을 되돌릴 수 있다 — 재확인 후 1회 재적용(자가복구, 리뷰 low).
     // 그 사이 결정이 붙었으면(대기·보류 아님) 재적용하지 않는다 — 결재된 카드의 근거를 사후 변조하지 않게
     try {
@@ -1043,65 +1327,65 @@ async function handleApprovalCreate(event, d, R) {
         const cur2 = chk2.data.items.find(function (x) { return x && x.id === dr2.id; });
         if (cur2 && cur2.updated !== dr2.updated && (cur2.status === '대기' || cur2.status === '보류')) {
           cur2.title = dr2.title; cur2.body = dr2.body; cur2.by = dr2.by; cur2.updated = dr2.updated; if (dr2.to) cur2.to = dr2.to;
-          chk2.data.updated_by = c.member.id; chk2.data.updated_at = Date.now();
+          chk2.data.updated_by = member.id; chk2.data.updated_at = Date.now();
           await blobSet(st, colKey('approvals'), chk2.data);
         }
       }
     } catch (e) {}
-    try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'approvals', ev: [{ op: '상신정정', id: dr2.id, t: (dr2.kind + ' · ' + title).slice(0, 80) }] }); } catch (e) {}
+    try { await appendAudit({ ts: Date.now(), by: member.name, bid: member.id, col: 'approvals', ev: [{ op: '상신정정', id: dr2.id, t: (dr2.kind + ' · ' + title).slice(0, 80) }] }); } catch (e) {}
     try {
       // 대표 전용 건은 대표에게만(없으면 관리자 폴백). sendTo는 수신자가 없어도 알림함 이력을 남긴다(관리자 확인용)
-      const uids = (apprBossOnly(dr2) ? await push.bossOrAdminIds() : await push.adminIds()).filter(function (id) { return id !== c.member.id; });
-      await push.sendTo(uids, { title: '결재 요청(정정): ' + title.slice(0, 40), body: '[' + dr2.kind + '] 정정 ' + c.member.name, url: './', tag: 'appr-' + dr2.id },
+      const uids = (apprBossOnly(dr2) ? await push.bossOrAdminIds() : await push.adminIds()).filter(function (id) { return id !== member.id; });
+      await push.sendTo(uids, { title: '결재 요청(정정): ' + title.slice(0, 40), body: '[' + dr2.kind + '] 정정 ' + member.name, url: './', tag: 'appr-' + dr2.id },
         dr2.kind === '운반일지' ? null : { primaryOnly: true });
     } catch (e) {}
-    return jr(200, { status: 'OK', id: dr2.id, updated: true, request_id: R });
+    return { ok: true, id: dr2.id, updated: true };
   }
   // 등급 스탬프(결재 3차 §4.3) — to·grade는 서버가 종류로 정한다(클라 값 불신). 기안 시점 스냅샷이라 이후 표 변경에 영향 없음.
   const grades = await apprGrades(st);
   let grade = grades[kind0];
   if (grade !== 1 && grade !== 2 && grade !== 3) grade = 0;   // 0·미등재 = 등급 미정(현행)
   let escalated = false;
-  if (grade === 1 && d.boss_up) { grade = 2; escalated = true; }   // "대표 상신" 토글 = ① 건별 ② 격상(§1)
+  if (grade === 1 && o.boss_up) { grade = 2; escalated = true; }   // "대표 상신" 토글 = ① 건별 ② 격상(§1)
   const item = { id: 'ap' + crypto.randomBytes(6).toString('hex'), cid: cid || undefined, kind: kind0, to: (kind0 === '운반일지' ? 'boss' : undefined),
-    title: title, body: String(d.body || '').slice(0, 500), ref: String(d.ref || '').slice(0, 60),
-    by: { id: c.member.id, name: c.member.name }, created: new Date().toISOString(), status: '대기' };
+    title: title, body: String(o.body || '').slice(0, 500), ref: refIn,
+    by: { id: member.id, name: member.name }, created: new Date().toISOString(), status: '대기' };
   if (grade) {
     item.grade = grade;
     item.to = (grade === 3) ? 'boss' : 'pm';   // ①·② 1단계는 PM 큐, ③은 즉시 대표 큐(v308 운반일지 하드코딩의 일반화)
     item.chain = [];
     if (escalated) item.escalated = true;
     // PM(비대표 관리자) 자기 기안 ②는 PM 단계 자동통과(§1·§4.3) — 자기 결재 단계를 없애고 chain에 명시(감사 논란 방지, §11)
-    if (grade === 2 && c.member.admin && !push.isBoss(c.member)) {
-      item.chain.push({ by: { id: c.member.id, name: c.member.name }, decision: '자동통과', at: item.created });
+    if (grade === 2 && member.admin && !push.isBoss(member)) {
+      item.chain.push({ by: { id: member.id, name: member.name }, decision: '자동통과', at: item.created });
       item.to = 'boss';
     }
   }
   fresh.items.push(item);
-  fresh.updated_by = c.member.id; fresh.updated_at = Date.now();
+  fresh.updated_by = member.id; fresh.updated_at = Date.now();
   const w = await blobSet(st, colKey('approvals'), fresh);
-  if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
+  if (!w.ok) return { ok: false, code: w.code };
   // 저장소가 조건부 쓰기를 지원하지 않아(무조건 덮어쓰기) 동시 쓰기에 내 항목이 밀릴 수 있다 — 재확인 후 1회 자가복구
   try {
     const chk = await blobGet(st, colKey('approvals'));
     if (chk.ok && chk.data && Array.isArray(chk.data.items) && !chk.data.items.some(function (x) { return x && x.id === item.id; })) {
       chk.data.items.push(item);
-      chk.data.updated_by = c.member.id; chk.data.updated_at = Date.now();
+      chk.data.updated_by = member.id; chk.data.updated_at = Date.now();
       await blobSet(st, colKey('approvals'), chk.data);
     }
   } catch (e) {}
-  try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'approvals', ev: [{ op: '상신', id: item.id, t: (item.kind + ' · ' + title).slice(0, 80) }] }); } catch (e) {}
+  try { await appendAudit({ ts: Date.now(), by: member.name, bid: member.id, col: 'approvals', ev: [{ op: '상신', id: item.id, t: (item.kind + ' · ' + title).slice(0, 80) }] }); } catch (e) {}
   // 결재 요청 웹푸시 — 기안자 본인만 제외(push_send __admins__ 관례와 동일). 발송 실패가 상신을 막지 않는다.
   // 수신자(결재 3차 §4.3): 대표 큐(③·자동통과 ②·구건 운반일지)=대표(없으면 관리자 폴백) / ①·② 1단계=비대표 관리자(없으면 관리자 폴백) / 구건=관리자 전원(현행).
   // 운반일지만 전 기기(배치도 결정 ① 명시 예외 — 오피스PC 팝업+폰 병행), 그 외 종류는 우선기기 1발(결정 ③).
   // ③건의 PM 몫은 별도 발송 없음 — 대표행 발송이 push:log(알림함)에 남고 관리자는 알림함 전체를 보므로 그 줄이 "확인" 줄이 된다(v308 방식).
   try {
     const ids = (apprBossOnly(item) ? await push.bossOrAdminIds()
-      : (item.grade ? await push.pmOrAdminIds() : await push.adminIds())).filter(function (id) { return id !== c.member.id; });
-    await push.sendTo(ids, { title: '결재 요청: ' + title.slice(0, 40), body: '[' + item.kind + '] 기안 ' + c.member.name, url: './', tag: 'appr-' + item.id },
+      : (item.grade ? await push.pmOrAdminIds() : await push.adminIds())).filter(function (id) { return id !== member.id; });
+    await push.sendTo(ids, { title: '결재 요청: ' + title.slice(0, 40), body: '[' + item.kind + '] 기안 ' + member.name, url: './', tag: 'appr-' + item.id },
       item.kind === '운반일지' ? null : { primaryOnly: true });
   } catch (e) {}
-  return jr(200, { status: 'OK', id: item.id, request_id: R });
+  return { ok: true, id: item.id };
 }
 async function handleApprovalDecide(event, d, R) {
   const c = await currentMember(event);
@@ -1185,6 +1469,13 @@ async function handleApprovalDecide(event, d, R) {
     }
   } catch (e) {}
   try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'approvals', ev: [{ op: '결재', id: it.id, t: ((isPmStep ? '승인→대표' : (decision === '확인' ? '열람 확인' : decision)) + (reason ? ' — ' + reason.slice(0, 40) : '') + ' · ' + String(it.title || '').slice(0, 40)) }] }); } catch (e) {}
+  // 문서함 등재 훅(v314): 최종 승인='등재'·반려='반려'를 문서 블롭에 반영. 결재 상태(위 쓰기)가 먼저 확정된 뒤라 여기 실패는 결재를 되돌리지 않는다 —
+  // 감사로그 '등재반영실패'만 남기고 다음 결재함 조회(approvals_list 폴)에서 같은 함수가 멱등으로 재시도한다. ② 1단계 전환·보류는 문서 무변경.
+  let docReg = null;
+  if (it.kind === '문서함 등재' && !isPmStep && (it.status === '승인' || it.status === '반려')) {
+    try { docReg = await docRegisterApply(st, [it], c.member); } catch (e) { docReg = { ok: false, code: 'EXC' }; }
+    if (!docReg.ok) { try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'documents', ev: [{ op: '등재반영실패', id: String(it.ref || '').slice(4), t: String(docReg.code || '') + ' · ' + String(it.title || '').slice(0, 40) + ' (다음 결재함 조회에서 재시도)' }] }); } catch (e) {} }
+  }
   // 통지 라우팅(결재 3차 §4.2):
   //  ② 1단계 승인 → 대표 우선기기 1발(결재 요청) + 기안자는 알림함 줄만(푸시 없음 — 담당이 할 일이 없다)
   //  전결총정리 [확인] → 푸시 없음(§5 — 기안자가 시스템)
@@ -1681,6 +1972,8 @@ async function handler(event) {
     if (d && d.action === 'approval_decide') return await handleApprovalDecide(event, d, R);
     if (d && d.action === 'appr_grades_get') return await handleApprGradesGet(event, d, R);
     if (d && d.action === 'appr_grades_set') return await handleApprGradesSet(event, d, R);
+    if (d && d.action === 'doc_settings_get') return await handleDocSettingsGet(event, d, R);
+    if (d && d.action === 'doc_settings_set') return await handleDocSettingsSet(event, d, R);
     return jr(400, { status: 'REJECTED', error_code: 'UNKNOWN_ACTION', request_id: R });
   } catch (e) {
     // 서버 예외도 오류 로그에 축적(클라 err_log와 같은 저장소) — 기록 실패는 무시

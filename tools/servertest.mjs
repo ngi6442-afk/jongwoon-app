@@ -330,5 +330,217 @@ r = await call({ action: 'approval_decide', id: 'summary-2026-08', decision: '�
   T('총정리 대표 [확인] → status 승인 · chain decision 확인', r.code === 200 && it.status === '승인' && it.chain.length === 1 && it.chain[0].decision === '확인');
 }
 
+// 19 문서함 공개범위·등재 결재(v314): 설정 게이트·기본값(전부 비공개) / get 필터(scope·mgmt·01·타인 대기) / save 재구성(탈취 차단·상태 원복·hidden_tmp 보존)
+//    / 직원 등재→대기+카드 자동 상신(멱등 cid) / 승인→등재·반려→반려 / 재상신 cid / 폴 재시도·구 카드 무시 / gate none / 관리자 즉시 등재 / 설정 낙관락
+const DOCW = { id: 'udocw', name: '문서직원', admin: false, perms: { doc: 'do' } };
+const DOCW2 = { id: 'udocw2', name: '직원2', admin: false, perms: { doc: 'do' } };
+const MGMT = { id: 'umgmt', name: '관리부원', admin: false, dept: '관리부', perms: { doc: 'view' } };
+mem.gw_users['member:udocw'] = DOCW; mem.gw_users['member:udocw2'] = DOCW2; mem.gw_users['member:umgmt'] = MGMT;
+const tokD = issueSession(DOCW).token, tokD2 = issueSession(DOCW2).token, tokM = issueSession(MGMT).token;
+mem.gw_data['col:approvals'] = { schema: 1, items: [], updated_at: 0 };
+delete mem.gw_data['settings:documents'];
+mem.gw_data['col:documents'] = { schema: 1, items: [
+  { id: 'd1', title: '취업규칙', cat: '02' },
+  { id: 'd2', title: '안전보건 수칙', cat: '03', scope: 'all' },
+  { id: 'd3', title: '규정 지정공개', cat: '05', scope: { ids: ['udocw'] } },
+  { id: 'd4', title: '양식 관리부', cat: '06', scope: 'mgmt' },
+  { id: 'd5', title: '법인 등기', cat: '01' },
+  { id: 'd6', title: '임시 숨김', cat: '06', del: 1, hidden_tmp: 1 },
+  { id: 'd7', title: '타인 대기', cat: '06', status: '대기', by: { id: 'udocw2', name: '직원2' }, scope: 'all' },
+], updated_at: 9000 };
+const docIds = (res) => ((res.body.doc && res.body.doc.items) || []).map((x) => x.id).sort().join(',');
+const docItem = (id) => (mem.gw_data['col:documents'].items || []).find((x) => x && x.id === id);
+const docAppr = (id) => mem.gw_data['col:approvals'].items.filter((x) => x && x.kind === '문서함 등재' && x.ref === 'doc:' + id);
+r = await call({ action: 'doc_settings_get' }, tokD, 'dev1');
+T('문서함 설정 조회 비관리자 → 403', r.code === 403);
+r = await call({ action: 'doc_settings_get' }, tokA);
+T('문서함 설정 기본값: 전 분류 관리자만(전부 비공개) · 등재 결재 staff', r.code === 200 && ['02', '03', '05', '06', '99'].every((c) => r.body.settings.scope_default[c] === 'admin') && r.body.settings.register_gate === 'staff', JSON.stringify(r.body.settings));
+r = await call({ action: 'get', collection: 'documents' }, tokD, 'dev1');
+T('get 필터(직원): 전원 공개·본인 지정만 — 분류 기본(관리자만)·mgmt·01·타인 대기·숨김 구건 제거', r.code === 200 && docIds(r) === 'd2,d3', docIds(r));
+r = await call({ action: 'get', collection: 'documents' }, tokM, 'dev1');
+T('get 필터(관리부): 전원·mgmt·01 — 지정(타인)·분류 기본은 제외', r.code === 200 && docIds(r) === 'd2,d4,d5', docIds(r));
+r = await call({ action: 'get', collection: 'documents' }, tokA);
+T('get(관리자): 무제한 7건', r.code === 200 && docIds(r) === 'd1,d2,d3,d4,d5,d6,d7', docIds(r));
+r = await call({ action: 'doc_settings_set', cat: '01', scope: 'all' }, tokA);
+T('설정: 01 법인 → 400 BAD_CAT(하드차단 유지)', r.code === 400 && r.body.error_code === 'BAD_CAT');
+r = await call({ action: 'doc_settings_set', cat: '02', scope: 'everyone' }, tokA);
+T('설정: 무효 scope → 400 BAD_SCOPE', r.code === 400 && r.body.error_code === 'BAD_SCOPE');
+r = await call({ action: 'doc_settings_set', register_gate: 'boss' }, tokA);
+T('설정: 무효 gate → 400 BAD_GATE', r.code === 400 && r.body.error_code === 'BAD_GATE');
+r = await call({ action: 'doc_settings_set', cat: '02', scope: 'all' }, tokD, 'dev1');
+T('설정 변경 비관리자 → 403', r.code === 403);
+r = await call({ action: 'doc_settings_set', cat: '02', scope: 'all', base: 0 }, tokA);
+const dsAt = r.body.updated_at;
+T('설정: 02 → 전원 (base 0) → 200 + 감사로그 문서함설정', r.code === 200 && r.body.settings.scope_default['02'] === 'all' && dsAt > 0 && auditMock.logs.some((l) => l.col === 'documents' && l.ev[0].op === '문서함설정'), r.code + '/' + r.body.error_code);
+r = await call({ action: 'doc_settings_set', cat: '03', scope: 'mgmt', base: 1 }, tokA);
+T('설정 낙관락: 낡은 base → 409 DOC_SETTINGS_STALE', r.code === 409 && r.body.error_code === 'DOC_SETTINGS_STALE');
+r = await call({ action: 'doc_settings_set', cat: '03', scope: 'mgmt', base: dsAt }, tokA);
+T('설정 낙관락: 최신 base → 200', r.code === 200 && r.body.settings.scope_default['03'] === 'mgmt' && r.body.settings.scope_default['02'] === 'all');
+r = await call({ action: 'get', collection: 'documents' }, tokD, 'dev1');
+T('분류 기본값 변경 즉시 반영: 02 전원 → 직원이 d1 열람', r.code === 200 && docIds(r) === 'd1,d2,d3', docIds(r));
+r = await call({ action: 'get', collection: 'documents' }, tokM, 'dev1');
+T('03 관리부+관리자 → 관리부원 d2 유지(문서 scope all 우선) + d1', r.code === 200 && docIds(r) === 'd1,d2,d4,d5', docIds(r));
+// save 재구성(탈취 차단): 못 보는 문서(d4 scope 확장·d5 01 위장·d6 삭제·d7 타인 대기 격상) 전부 서버 원본 유지, 신규는 등재자 스탬프+'대기'(status '등재' 위조 원복)
+r = await call({ action: 'save', collection: 'documents', doc: { schema: 1, items: [
+  { id: 'd1', title: '취업규칙', cat: '02', scope: 'admin' },
+  { id: 'd2', title: '안전보건 수칙', cat: '03', scope: 'all' },
+  { id: 'd3', title: '규정 지정공개', cat: '05', scope: { ids: ['udocw', 'udocw', 7] } },
+  { id: 'd4', title: '양식 관리부', cat: '06', scope: 'all' },
+  { id: 'd5', title: '법인 등기 위장', cat: '06' },
+  { id: 'd7', title: '타인 대기', cat: '06', status: '등재', by: { id: 'udocw', name: '문서직원' }, scope: 'all' },
+  { id: 'dn1', title: '신규 직원문서', cat: '06', status: '등재', by: { id: 'uadmin', name: '관리자' }, registered_by: { id: 'uadmin' }, scope: 'nope' },
+] } }, tokD, 'dev1');
+{
+  const d4 = docItem('d4'), d5 = docItem('d5'), d6 = docItem('d6'), d7 = docItem('d7'), dn1 = docItem('dn1'), d1 = docItem('d1'), d3 = docItem('d3');
+  T('재구성: 못 보는 문서 scope 확장 시도(d4 mgmt→all) 원본 유지', r.code === 200 && d4 && d4.scope === 'mgmt', JSON.stringify(d4));
+  T('재구성: 01 법인(d5) cat 위장 → 원본 유지', d5 && d5.cat === '01' && d5.title === '법인 등기');
+  T('재구성: 숨김 구건(d6 del:1 hidden_tmp:1) 소프트 삭제 그대로 보존(영구 삭제 아님)', d6 && d6.del === 1 && d6.hidden_tmp === 1, JSON.stringify(d6));
+  T('재구성: 타인 대기 문서(d7) 등재 격상·등재자 바꿔치기 원복', d7 && d7.status === '대기' && d7.by.id === 'udocw2', JSON.stringify(d7));
+  T('재구성: 신규 문서 status 등재 위조 → 대기 + 등재자=저장자 스탬프 + 무효 scope 제거', dn1 && dn1.status === '대기' && dn1.by.id === 'udocw' && !dn1.registered_by && dn1.scope === undefined, JSON.stringify(dn1));
+  T('재구성: 보이는 기존 문서의 scope 변경(d1 admin·d3 ids 확장)도 원본 고정(med1 — 내용 편집만)', d1 && d1.scope === undefined && d3 && d3.scope.ids.length === 1 && d3.scope.ids[0] === 'udocw', JSON.stringify([d1 && d1.scope, d3 && d3.scope]));
+  const ap = docAppr('dn1');
+  T('직원 등재 → 결재함 문서함 등재 카드 자동 상신(by=직원·cid docreg-dn1·① to pm·본문 공개범위)', ap.length === 1 && ap[0].by.id === 'udocw' && ap[0].cid === 'docreg-dn1' && ap[0].grade === 1 && ap[0].to === 'pm' && ap[0].status === '대기' && ap[0].body.indexOf('공개범위') >= 0, JSON.stringify(ap).slice(0, 200));
+  T('상신 푸시: 결재 요청(PM 큐)', pushMock.calls.length && pushMock.calls[pushMock.calls.length - 1].title.indexOf('결재 요청: 신규 직원문서') === 0, JSON.stringify(pushMock.calls[pushMock.calls.length - 1]));
+}
+// 멱등: 같은 사본 재저장(응답 유실 재시도 흉내 + status 위조) → 카드 1건 유지·상태 대기 유지
+r = await call({ action: 'save', collection: 'documents', doc: { schema: 1, items: mem.gw_data['col:documents'].items.filter((x) => ['d1', 'd2', 'd3', 'dn1'].indexOf(x.id) >= 0).map((x) => Object.assign({}, x, { status: '등재' })) } }, tokD, 'dev1');
+T('멱등: 재저장에도 카드 1건·본인 대기 문서 등재 위조 원복', r.code === 200 && docAppr('dn1').length === 1 && docItem('dn1').status === '대기', docAppr('dn1').length + '/' + docItem('dn1').status);
+r = await call({ action: 'get', collection: 'documents' }, tokD2, 'dev1');
+T('대기 문서는 타인에게 비노출(직원2 → dn1 없음, 본인 d7만)', r.code === 200 && docIds(r) === 'd1,d2,d7', docIds(r));
+r = await call({ action: 'get', collection: 'documents' }, tokD, 'dev1');
+T('대기 문서는 등재 본인에게 노출(문서직원 → dn1)', r.code === 200 && docIds(r) === 'd1,d2,d3,dn1', docIds(r));
+// 승인 → 등재(등재자 기록·감사로그), 반려 → 반려(사유)
+let dnAp = docAppr('dn1')[0];
+r = await call({ action: 'approval_decide', id: dnAp.id, decision: '승인' }, tokA);
+{
+  const dn1 = docItem('dn1');
+  T('승인 → 문서 등재(registered_by=결재자·감사로그 등재)', r.code === 200 && dn1.status === '등재' && dn1.registered_by.id === 'uadmin' && !!dn1.registered_at && auditMock.logs.some((l) => l.col === 'documents' && l.ev[0].op === '등재' && l.ev[0].id === 'dn1'), JSON.stringify(dn1));
+}
+r = await call({ action: 'get', collection: 'documents' }, tokD2, 'dev1');
+T('등재 후에도 분류 기본(06 관리자만) → 직원2 비노출', r.code === 200 && docIds(r).indexOf('dn1') < 0, docIds(r));
+r = await call({ action: 'save', collection: 'documents', doc: { schema: 1, items: mem.gw_data['col:documents'].items.filter((x) => ['d1', 'd2', 'd3', 'dn1'].indexOf(x.id) >= 0).concat([{ id: 'dn2', title: '반려될 문서', cat: '05' }]) } }, tokD, 'dev1');
+dnAp = docAppr('dn2')[0];
+T('두 번째 등재 → 카드 상신', r.code === 200 && dnAp && dnAp.cid === 'docreg-dn2' && docItem('dn2').status === '대기');
+r = await call({ action: 'approval_decide', id: dnAp.id, decision: '반려', reason: '보완 필요' }, tokA);
+{
+  const dn2 = docItem('dn2');
+  T('반려 → 문서 반려 + 사유 + 감사로그 등재반려', r.code === 200 && dn2.status === '반려' && dn2.reject_reason === '보완 필요' && auditMock.logs.some((l) => l.col === 'documents' && l.ev[0].op === '등재반려'), JSON.stringify(dn2));
+}
+// 재상신: 본인 반려 건 반려→대기·reg_n 2 → 새 cid 카드. 타인(직원2)은 못 보는 문서라 손댈 수 없음
+r = await call({ action: 'save', collection: 'documents', doc: { schema: 1, items: mem.gw_data['col:documents'].items.filter((x) => ['d1', 'd2', 'd7'].indexOf(x.id) >= 0).concat([Object.assign({}, docItem('dn2'), { status: '대기', reg_n: 2 })]) } }, tokD2, 'dev1');
+T('타인의 반려 문서 재상신 시도 → 서버 원본 유지(반려)', r.code === 200 && docItem('dn2').status === '반려' && docAppr('dn2').length === 1);
+r = await call({ action: 'save', collection: 'documents', doc: { schema: 1, items: mem.gw_data['col:documents'].items.filter((x) => ['d1', 'd2', 'd3', 'dn1'].indexOf(x.id) >= 0).concat([Object.assign({}, docItem('dn2'), { status: '대기', reg_n: 2, title: '보완한 문서' })]) } }, tokD, 'dev1');
+{
+  const dn2 = docItem('dn2'), aps = docAppr('dn2');
+  T('본인 재상신 → 대기·reg_n 2·사유 제거 + 새 cid(docreg-dn2-2) 카드', r.code === 200 && dn2.status === '대기' && dn2.reg_n === 2 && !dn2.reject_reason && aps.length === 2 && aps.some((a) => a.cid === 'docreg-dn2-2' && a.status === '대기'), JSON.stringify(aps.map((a) => a.cid + ':' + a.status)));
+}
+r = await call({ action: 'approval_decide', id: docAppr('dn2').find((a) => a.cid === 'docreg-dn2-2').id, decision: '승인' }, tokA);
+T('재상신 카드 승인 → 등재', r.code === 200 && docItem('dn2').status === '등재');
+// 폴 재시도: decide 시점 문서 반영 실패를 흉내(카드만 승인 상태) → 관리자 approvals_list가 멱등 반영. 구 카드(cid 불일치)는 무시
+r = await call({ action: 'save', collection: 'documents', doc: { schema: 1, items: mem.gw_data['col:documents'].items.filter((x) => ['d1', 'd2', 'd3', 'dn1', 'dn2'].indexOf(x.id) >= 0).concat([{ id: 'dn3', title: '폴 재시도 문서', cat: '06' }]) } }, tokD, 'dev1');
+{
+  const ap3 = docAppr('dn3')[0];
+  ap3.status = '승인'; ap3.decided_by = { id: 'uadmin', name: '관리자' }; ap3.decided_at = new Date().toISOString();   // 결재는 확정됐는데 문서 반영이 빠진 상태
+  mem.gw_data['col:approvals'].items.push({ id: 'apstale', kind: '문서함 등재', ref: 'doc:dn3', cid: 'docreg-dn3-9', status: '반려', reason: '구 카드', decided_by: { id: 'uadmin', name: '관리자' }, decided_at: new Date().toISOString(), by: { id: 'udocw', name: '문서직원' } });
+  r = await call({ action: 'approvals_list' }, tokD, 'dev1');
+  T('비관리자 폴은 문서 반영 안 함(dn3 대기 유지)', r.code === 200 && docItem('dn3').status === '대기');
+  r = await call({ action: 'approvals_list' }, tokA);
+  T('관리자 폴 → 미반영 승인 건 재시도 반영(dn3 등재), cid 불일치 구 카드(반려)는 무시', r.code === 200 && docItem('dn3').status === '등재', JSON.stringify(docItem('dn3')));
+}
+// gate none: 직원 등재 즉시 등재·카드 없음
+r = await call({ action: 'doc_settings_get' }, tokA);
+r = await call({ action: 'doc_settings_set', register_gate: 'none', base: r.body.updated_at }, tokA);
+T('설정: 등재 결재 none', r.code === 200 && r.body.settings.register_gate === 'none');
+r = await call({ action: 'save', collection: 'documents', doc: { schema: 1, items: mem.gw_data['col:documents'].items.filter((x) => ['d1', 'd2', 'd3', 'dn1', 'dn2', 'dn3'].indexOf(x.id) >= 0).concat([{ id: 'dn4', title: '즉시 등재 문서', cat: '06' }]) } }, tokD, 'dev1');
+{
+  const dn4 = docItem('dn4');
+  T('gate none: 직원 등재 → 즉시 등재(registered_by=본인)·카드 없음', r.code === 200 && dn4.status === '등재' && dn4.registered_by.id === 'udocw' && docAppr('dn4').length === 0, JSON.stringify(dn4));
+}
+r = await call({ action: 'doc_settings_get' }, tokA);
+r = await call({ action: 'doc_settings_set', register_gate: 'staff', base: r.body.updated_at }, tokA);
+// 관리자: 신규는 status 없어도 즉시 등재(PM 전결), scope 정규화, 기존 문서 상태는 클라 값 그대로(무제한)
+r = await call({ action: 'save', collection: 'documents', doc: { schema: 1, items: mem.gw_data['col:documents'].items.concat([{ id: 'dn5', title: '관리자 문서', cat: '02', scope: { ids: [1, 'udocw2', 'udocw2'] } }]) } }, tokA);
+{
+  const dn5 = docItem('dn5');
+  T('관리자 신규 → 즉시 등재(registered_by 관리자)·scope ids 정규화·카드 없음', r.code === 200 && dn5.status === '등재' && dn5.registered_by.id === 'uadmin' && dn5.scope.ids.length === 1 && dn5.scope.ids[0] === 'udocw2' && docAppr('dn5').length === 0, JSON.stringify(dn5));
+}
+r = await call({ action: 'get', collection: 'documents' }, tokD2, 'dev1');
+T('지정 직원 공개(dn5 ids udocw2) → 직원2 열람, 문서직원은 제외', r.code === 200 && docIds(r).indexOf('dn5') >= 0 && ((await call({ action: 'get', collection: 'documents' }, tokD, 'dev1')).body.doc.items || []).every((x) => x.id !== 'dn5'), docIds(r));
+
+// 20 문서함 적대 검증 7건 재현(9/4): med1 비관리자 기존 문서 scope·cat 고정 / med2 상신 실패 고착 → 관리자 폴 반대 방향 복구 / med3 01 위장 소실 방지
+//    / low4 재상신은 reg_n+1 명시 신호만 / low6 01 이동 문서 본인 비노출 / low7 대기 아닌 문서에 뒤늦은 반려 무시·승인 시 반려 잔존 정리
+const MGMT2 = { id: 'umgmt2', name: '관리부수행', admin: false, dept: '관리부', perms: { doc: 'do' } };
+mem.gw_users['member:umgmt2'] = MGMT2;
+const tokM2 = issueSession(MGMT2).token;
+const docVisibleTo = async (tok) => ((await call({ action: 'get', collection: 'documents' }, tok, 'dev1')).body.doc.items || []);
+// med1: 관리부원(doc 수행)이 보이는 문서 d4(mgmt)를 all로, cat 06→02, no 변경, d2 scope를 ids로 축소·확장 시도 → 전부 원본 유지, 내용(title)만 반영
+mem.gw_data['col:documents'].items.push({ id: 'd8', title: 'JW-06-001 양식(cat 없음)', no: 'JW-06-001', scope: 'all' });
+r = await call({ action: 'save', collection: 'documents', doc: { schema: 1, items: (await docVisibleTo(tokM2)).map((x) => {
+  if (x.id === 'd4') return Object.assign({}, x, { scope: 'all', cat: '02', no: 'JW-02-999', title: '양식 관리부(내용 수정)' });
+  if (x.id === 'd2') return Object.assign({}, x, { scope: { ids: ['udocw2', 'umgmt2'] } });
+  return x;
+}) } }, tokM2, 'dev1');
+{
+  const d4 = docItem('d4'), d2 = docItem('d2');
+  T('med1: 관리부원 scope mgmt→all·cat 06→02·no 변경 전송 → 서버 원본 유지(scope mgmt·cat 06·no 없음), 제목 수정만 반영', r.code === 200 && d4 && d4.scope === 'mgmt' && d4.cat === '06' && d4.no === undefined && d4.title === '양식 관리부(내용 수정)', JSON.stringify(d4));
+  T('med1: 보이는 문서 scope all→ids 변경 전송 → 원본(all) 유지', d2 && d2.scope === 'all', JSON.stringify(d2 && d2.scope));
+}
+r = await docVisibleTo(tokW);
+T('med1: 무결재 노출 없음 — 일반 직원에게 d4 여전히 비노출', r.every((x) => x.id !== 'd4'), r.map((x) => x.id).join(','));
+// med3: 보이는 문서를 cat '01'로 보내거나(기존) 신규를 01로 올리면 → 기존은 원본 유지(소실 0), 신규는 폐기+감사로그 '제거'. cat 없는 구건 d8은 no를 JW-01로 바꿔도 06 명시 고정
+r = await call({ action: 'save', collection: 'documents', doc: { schema: 1, items: (await docVisibleTo(tokD)).map((x) => {
+  if (x.id === 'd2') return Object.assign({}, x, { cat: '01' });
+  if (x.id === 'd8') return Object.assign({}, x, { no: 'JW-01-001', title: 'JW-01-001 법인으로 위장' });
+  return x;
+}).concat([{ id: 'dz01', title: '신규 01 위장', cat: '01' }]) } }, tokD, 'dev1');
+{
+  const d2 = docItem('d2'), d8 = docItem('d8');
+  T('med3: 기존 문서 cat 01 전송 → 원본(03) 유지·소실 0', r.code === 200 && d2 && d2.cat === '03' && d2.title === '안전보건 수칙', JSON.stringify(d2));
+  T('med3: cat 없는 구건 no를 JW-01로 바꿔도 분류 06 명시 고정·no 원본', d8 && d8.cat === '06' && d8.no === 'JW-06-001', JSON.stringify(d8));
+  T('med3: 신규 01 위장 → 폐기 + 감사로그 제거', !docItem('dz01') && auditMock.logs.some((l) => l.col === 'documents' && l.ev.some((e) => e.op === '제거' && e.id === 'dz01')));
+  T('med3: 전체 건수 보존(d1~d8·dn1~dn5 = 13건)', mem.gw_data['col:documents'].items.length === 13, String(mem.gw_data['col:documents'].items.length));
+}
+// low4: 반려 건을 '대기' 사본(reg_n 없음)으로 편집 전송 → 반려·사유 유지·카드 없음 / reg_n+1 전송 → 재상신
+r = await call({ action: 'save', collection: 'documents', doc: { schema: 1, items: (await docVisibleTo(tokD)).concat([{ id: 'dn6', title: '반려 후 편집 문서', cat: '05' }]) } }, tokD, 'dev1');
+r = await call({ action: 'approval_decide', id: docAppr('dn6')[0].id, decision: '반려', reason: '표지 누락' }, tokA);
+T('low4 준비: dn6 반려', r.code === 200 && docItem('dn6').status === '반려');
+r = await call({ action: 'save', collection: 'documents', doc: { schema: 1, items: (await docVisibleTo(tokD)).map((x) => x.id === 'dn6' ? Object.assign({}, x, { status: '대기', title: '반려 전 사본으로 편집' }) : x) } }, tokD, 'dev1');
+{
+  const dn6 = docItem('dn6');
+  T('low4: 낡은 대기 사본 편집 전송(reg_n 없음) → 반려·사유 유지·카드 추가 없음, 제목 편집만 반영', r.code === 200 && dn6.status === '반려' && dn6.reject_reason === '표지 누락' && docAppr('dn6').length === 1 && dn6.title === '반려 전 사본으로 편집', JSON.stringify(dn6));
+}
+r = await call({ action: 'save', collection: 'documents', doc: { schema: 1, items: (await docVisibleTo(tokD)).map((x) => x.id === 'dn6' ? Object.assign({}, x, { status: '대기', reg_n: 5 }) : x) } }, tokD, 'dev1');
+T('low4: reg_n을 +1이 아닌 값(5)으로 전송 → 재상신 아님(반려 유지)', r.code === 200 && docItem('dn6').status === '반려' && docAppr('dn6').length === 1);
+r = await call({ action: 'save', collection: 'documents', doc: { schema: 1, items: (await docVisibleTo(tokD)).map((x) => x.id === 'dn6' ? Object.assign({}, x, { status: '대기', reg_n: 2 }) : x) } }, tokD, 'dev1');
+T('low4: reg_n 정확히 +1 전송 → 재상신(대기·reg_n 2·새 카드)', r.code === 200 && docItem('dn6').status === '대기' && docItem('dn6').reg_n === 2 && docAppr('dn6').some((a) => a.cid === 'docreg-dn6-2'));
+r = await call({ action: 'approval_decide', id: docAppr('dn6').find((a) => a.cid === 'docreg-dn6-2').id, decision: '승인' }, tokA);
+{
+  const dn6 = docItem('dn6');
+  T('low7(정리): 재상신 승인 → 등재 + reject_reason·rejected_at 잔존 없음', r.code === 200 && dn6.status === '등재' && dn6.reject_reason === undefined && dn6.rejected_at === undefined, JSON.stringify(dn6));
+}
+// med2: 상신 실패 고착(approvals 블롭 읽기 실패 흉내) → 문서 대기·카드 0·register_warn → 관리자 approvals_list가 반대 방향 복구(카드 1·기안자=직원)
+{
+  const savedAppr = mem.gw_data['col:approvals'];
+  delete mem.gw_data['col:approvals'];
+  r = await call({ action: 'save', collection: 'documents', doc: { schema: 1, items: (await docVisibleTo(tokD)).concat([{ id: 'dn7', title: '상신 실패 문서', cat: '06' }]) } }, tokD, 'dev1');
+  mem.gw_data['col:approvals'] = savedAppr;
+  T('med2: 상신 실패 → 저장은 성공(대기)·register_warn 1·카드 0·감사로그 등재상신실패', r.code === 200 && r.body.register_warn === 1 && docItem('dn7').status === '대기' && docAppr('dn7').length === 0 && auditMock.logs.some((l) => l.ev.some((e) => e.op === '등재상신실패' && e.id === 'dn7')), JSON.stringify(r.body));
+  r = await call({ action: 'approvals_list' }, tokD2, 'dev1');
+  T('med2: 비관리자 폴은 복구 안 함(카드 0 유지)', r.code === 200 && docAppr('dn7').length === 0);
+  r = await call({ action: 'approvals_list' }, tokA);
+  const ap7 = docAppr('dn7');
+  T('med2: 관리자 폴 → 카드 생성(cid docreg-dn7·기안자=등재 직원·① PM 큐) + 응답에 즉시 포함 + 감사로그 등재상신복구', r.code === 200 && ap7.length === 1 && ap7[0].cid === 'docreg-dn7' && ap7[0].by.id === 'udocw' && ap7[0].to === 'pm' && r.body.items.some((x) => x.id === ap7[0].id) && auditMock.logs.some((l) => l.ev.some((e) => e.op === '등재상신복구' && e.id === 'dn7')), JSON.stringify(ap7).slice(0, 200));
+  r = await call({ action: 'approvals_list' }, tokA);
+  T('med2: 재폴 멱등(카드 1건 유지)', r.code === 200 && docAppr('dn7').length === 1);
+}
+// low6: 관리자가 직원 문서(dn1 by udocw, 등재)를 01로 옮김 → 그 직원 get에서 미노출
+r = await call({ action: 'save', collection: 'documents', doc: { schema: 1, items: mem.gw_data['col:documents'].items.map((x) => x.id === 'dn1' ? Object.assign({}, x, { cat: '01' }) : x) } }, tokA);
+r = await docVisibleTo(tokD);
+T('low6: 01로 옮긴 본인 문서 → 등재자에게도 비노출(01 하드차단이 본인 예외보다 앞)', r.every((x) => x.id !== 'dn1') && docItem('dn1').cat === '01', r.map((x) => x.id).join(','));
+// low7: 대기 아닌 문서(dn3 등재)에 현재 cid와 같은 뒤늦은 반려 카드 → 폴에서 무시(등재 유지)
+mem.gw_data['col:approvals'].items.push({ id: 'aplate', kind: '문서함 등재', ref: 'doc:dn3', cid: 'docreg-dn3', status: '반려', reason: '늦은 반려', decided_by: { id: 'uadmin', name: '관리자' }, decided_at: new Date().toISOString(), by: { id: 'udocw', name: '문서직원' } });
+r = await call({ action: 'approvals_list' }, tokA);
+T('low7: 이미 등재된 문서에 같은 cid의 뒤늦은 반려 → 무시(등재 유지·사유 없음)', r.code === 200 && docItem('dn3').status === '등재' && docItem('dn3').reject_reason === undefined, JSON.stringify(docItem('dn3')));
+
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');
 process.exit(fail ? 1 : 0);
