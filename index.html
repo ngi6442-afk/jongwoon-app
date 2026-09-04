@@ -305,6 +305,9 @@
   .doc-acc-hd .n{color:var(--sub);font-weight:400;font-size:12px}
   .doc-acc-bd{padding:2px 10px 8px}
   .doc-lock{font-size:11px;color:#c07f27;background:#faf3e6;border-radius:8px;padding:1px 8px;font-weight:400}
+  .doc-acc-sub{margin:6px 0;border-radius:10px}   /* 2층 서랍(v317): 대분류 안의 중분류 */
+  .doc-acc-sub>.doc-acc-hd{font-size:13px;padding:8px 12px;background:#fff;font-weight:600}
+  .doc-acc-sub>.doc-acc-hd:hover{background:#f6f8f5}
   /* 잠금 중엔 뒤 DOM 자체를 없앤다 — 덮개만으론 Ctrl+P 인쇄·전체선택 복사로 읽혔다(리뷰 지적).
      서류출력 print 규칙(#docPrintOverlay만 남김)도 잠금 중엔 통째로 무효가 되도록 body를 죽인다 */
   body.jw-locked > *:not(#lockBackdrop):not(#lockSetBackdrop){display:none !important;}
@@ -1882,10 +1885,10 @@
   <div class="modal">
     <h3 id="docModalTitle">문서 추가</h3>
     <input type="text" id="docTitle" placeholder="제목" autocomplete="off">
-    <input type="text" id="docNo" placeholder="문서번호 (예: JW-06-013, 선택)" autocomplete="off">
+    <input type="text" id="docNo" placeholder="문서번호 (예: JW-05-01-001-01, 선택)" autocomplete="off">
     <span class="fld-label">카테고리</span>
-    <!-- 1층 12분류(문서번호체계 개편안 2026-09-04 §2) — option 값은 DOC_CATS 키와 동일(uismoke 대조) -->
-    <select id="docCat"><option value="01">01 법인·등기 (관리부·관리자만 열람)</option><option value="02">02 인사·노무</option><option value="03">03 안전보건</option><option value="04">04 인허가</option><option value="05">05 규정</option><option value="06">06 양식</option><option value="07">07 매뉴얼·가이드</option><option value="08">08 영업·입찰</option><option value="09">09 계약·공사</option><option value="10">10 재무·세무</option><option value="11">11 연구·인증</option><option value="12">12 홍보·소개</option><option value="99">99 미분류</option></select>
+    <!-- 2층 분류(문서체계 설계안 v2 2026-09-04 §2·§6 #17, v317): 대분류(업무 영역) → 중분류(문서 성격). option은 docCatSelectsInit()가 DOC_MAJOR·DOC_MINOR로 생성(uismoke: id·생성 함수 존재 검사). 저장 cat = "AA-BB", 99 미분류는 대분류에만(중분류 비활성) -->
+    <div style="display:flex;gap:6px;"><select id="docCatMajor" style="flex:1 1 55%;"></select><select id="docCatMinor" style="flex:1 1 45%;"></select></div>
     <input type="text" id="docVer" placeholder="버전 (예: v1, 선택)" autocomplete="off">
     <span class="fld-label">개정일 (선택)</span>
     <input type="date" id="docRevised">
@@ -2503,64 +2506,64 @@
   // 불시 확인 시 '연구원 겸직'으로 읽혀 인정취소 사유가 된다 — 앱 부서를 신고 내용에 맞춰 둔다.
   var DEPT_LIST = ["관리부","운영부","준설팀","폐기물팀","기술개발부"];
 
-  // ---- 체크리스트 정의 (JW-05-011) ----
+  // ---- 체크리스트 정의 (JW-02-04-001 주기별 업무 체크리스트 — 구 JW-05-011. form 번호는 문서체계 v2 §5.1 대조표, v317) ----
   var GROUPS = [
     {
       type: "weekly", title: "매주 (월요일)",
       items: [
-        {id:"w1", title:"일일점검표 지난주 작성분 수거, 이상(유) 항목 조치 확인", who:"나경일→관리자", form:"JW-06-013", approve:false}
+        {id:"w1", title:"일일점검표 지난주 작성분 수거, 이상(유) 항목 조치 확인", who:"나경일→관리자", form:"JW-05-01-001-01", approve:false}
       ]
     },
     {
       type: "monthly", title: "월간",
       items: [
-        {id:"m1", title:"월별 안전교육 실시 · 교육일지 작성", who:"김정아·나경일", form:"JW-06-015", approve:true},
+        {id:"m1", title:"월별 안전교육 실시 · 교육일지 작성", who:"김정아·나경일", form:"JW-06-01-002-01", approve:true},
         {id:"m2", title:"임금 지급 · 임금대장 · 4대보험 처리 확인", who:"관리자", form:"임금대장", approve:false},
-        {id:"m3", title:"사고 · 민원 접수분 처리 상태 리뷰", who:"관리자", form:"JW-06-006", approve:false},
+        {id:"m3", title:"사고 · 민원 접수분 처리 상태 리뷰", who:"관리자", form:"JW-06-01-005-01", approve:false},
         {id:"m4", title:"위하고 매출목록(.xlsx) 내려받아 기성 미수 업로드", who:"관리자", form:"기성 탭", approve:false}
       ]
     },
     {
       type: "quarterly", title: "분기",
       items: [
-        {id:"q1", title:"정기 안전보건교육 (관리부 3h, 운송·현장 6h)", who:"김정아", form:"JW-03-008·06-015", approve:true},
-        {id:"q2", title:"차량 정기검사 도래분 확인 · 예약", who:"관리자", form:"JW-05-005", approve:false},
+        {id:"q1", title:"정기 안전보건교육 (관리부 3h, 운송·현장 6h)", who:"김정아", form:"JW-06-05-001·06-01-002-01", approve:true},
+        {id:"q2", title:"차량 정기검사 도래분 확인 · 예약", who:"관리자", form:"JW-05-01-001", approve:false},
         {id:"q3", title:"백업 복원 리허설 — 스냅샷 1건 복원해 데이터 확인 (RUNBOOK.md 절차)", who:"관리자", form:"RUNBOOK", approve:false}
       ]
     },
     {
       type: "half", title: "반기 (6월·12월 일괄 가능)",
       items: [
-        {id:"h1", title:"종사자 의견 청취 회의 (중처법 4조7호)", who:"관리자 주관", form:"JW-06-016", approve:true},
-        {id:"h2", title:"위험성평가 절차 · 기록 점검 (4조3호)", who:"김정아", form:"JW-03-007·06-014", approve:true},
+        {id:"h1", title:"종사자 의견 청취 회의 (중처법 4조7호)", who:"관리자 주관", form:"JW-06-01-004-02", approve:true},
+        {id:"h2", title:"위험성평가 절차 · 기록 점검 (4조3호)", who:"김정아", form:"JW-06-01-004·06-01-004-01", approve:true},
         {id:"h3", title:"안전보건 담당자 업무수행 평가 (4조5호)", who:"대표", form:"평가 기록", approve:true},
-        {id:"h4", title:"비상대응 · 보고 절차 점검 (4조8호)", who:"관리자", form:"JW-05-006", approve:false},
-        {id:"h5", title:"협력업체 안전 점검 (4조9호)", who:"관리자", form:"JW-06-009", approve:true},
-        {id:"h6", title:"밀폐공간 비상 구조훈련 (6개월 주기)", who:"나경일", form:"JW-06-015 특별교육", approve:true}
+        {id:"h4", title:"비상대응 · 보고 절차 점검 (4조8호)", who:"관리자", form:"JW-06-01-005", approve:false},
+        {id:"h5", title:"협력업체 안전 점검 (4조9호)", who:"관리자", form:"JW-04-01-001-01", approve:true},
+        {id:"h6", title:"밀폐공간 비상 구조훈련 (6개월 주기)", who:"나경일", form:"JW-06-01-002-01 특별교육", approve:true}
       ]
     },
     {
       type: "yearly", title: "연간",
       items: [
-        {id:"y1", title:"위험성평가 정기평가, 4개 부서 (상반기)", who:"김정아+부서별", form:"JW-06-014", approve:true},
-        {id:"y2", title:"경영방침 · 추진목표 점검 · 갱신 (1월)", who:"대표+관리자", form:"JW-03-002", approve:true},
-        {id:"y3", title:"안전보건 예산 편성, 1인당 2만원 이상 (1월)", who:"대표", form:"JW-03-007 예산표", approve:true},
-        {id:"y4", title:"차년도 안전보건교육계획 수립 (12월)", who:"김정아", form:"JW-03-008", approve:true},
+        {id:"y1", title:"위험성평가 정기평가, 4개 부서 (상반기)", who:"김정아+부서별", form:"JW-06-01-004-01", approve:true},
+        {id:"y2", title:"경영방침 · 추진목표 점검 · 갱신 (1월)", who:"대표+관리자", form:"JW-06-01-001", approve:true},
+        {id:"y3", title:"안전보건 예산 편성, 1인당 2만원 이상 (1월)", who:"대표", form:"JW-06-01-004-03 예산표", approve:true},
+        {id:"y4", title:"차년도 안전보건교육계획 수립 (12월)", who:"김정아", form:"JW-06-05-001", approve:true},
         {id:"y5", title:"건강진단(비사무직 연 1회) · 특수건진 대상 확인", who:"관리자", form:"검진 결과", approve:false},
         {id:"y6", title:"관리감독자 교육 연 16시간", who:"나경일·김혁", form:"수료증", approve:false},
-        {id:"y7", title:"인허가 만료 · 보수교육 전수 점검 (1월)", who:"관리자", form:"JW-04-001", approve:false},
-        {id:"y8", title:"차량 보험 갱신 · 검사 전수 확인 (갱신월)", who:"관리자", form:"JW-05-005", approve:false},
-        {id:"y9", title:"규정 · 문서대장 정비 검토 (12월)", who:"관리자", form:"JW-05-001", approve:false},
-        {id:"y10", title:"최저임금 인상 · 근로계약 반영 (1월)", who:"관리자+노무사", form:"JW-02-002", approve:false}
+        {id:"y7", title:"인허가 만료 · 보수교육 전수 점검 (1월)", who:"관리자", form:"JW-08-04-001", approve:false},
+        {id:"y8", title:"차량 보험 갱신 · 검사 전수 확인 (갱신월)", who:"관리자", form:"JW-05-01-001", approve:false},
+        {id:"y9", title:"규정 · 문서대장 정비 검토 (12월)", who:"관리자", form:"JW-02-01-001", approve:false},
+        {id:"y10", title:"최저임금 인상 · 근로계약 반영 (1월)", who:"관리자+노무사", form:"JW-07-03-001-01", approve:false}
       ]
     }
   ];
 
   var TYPE_LABEL = {weekly:"주간", monthly:"월간", quarterly:"분기", half:"반기", yearly:"연간"};
   var SUDSI = [
-    {id:"su1", title:"사고 발생 → 수시 위험성평가 + 사고 보고 (JW-05-006)"},
-    {id:"su2", title:"신규 입사 → JW-06-011로 일괄 처리"},
-    {id:"su3", title:"밀폐공간 · 석면 투입 전 → JW-06-012 · 특별교육"}
+    {id:"su1", title:"사고 발생 → 수시 위험성평가 + 사고 보고 (JW-06-01-005)"},
+    {id:"su2", title:"신규 입사 → JW-07-03-003로 일괄 처리"},
+    {id:"su3", title:"밀폐공간 · 석면 투입 전 → JW-06-01-003-01 · 특별교육"}
   ];
 
   // ---- 상태 ----
@@ -6205,38 +6208,41 @@
       });
     }).catch(function(){ docSaveRetried = false; });
   }
-  // ---- 문서함 서랍형(PM 선택 2026-09-02) — 분류 5종 서랍 + 미분류. 인허가는 여기 안 끼움(원장=인허가 탭) ----
-  // 1층 12분류(문서번호체계 개편안 2026-09-04 §2) + 99 미분류(앱 전용). 키·라벨은 서버 DOC_CAT_SET·DOC_CAT_LABEL과 동일(uismoke 대조). 순회 순서는 DOC_CAT_ORDER
-  var DOC_CATS = { "01":"01 법인·등기", "02":"02 인사·노무", "03":"03 안전보건", "04":"04 인허가", "05":"05 규정", "06":"06 양식", "07":"07 매뉴얼·가이드", "08":"08 영업·입찰", "09":"09 계약·공사", "10":"10 재무·세무", "11":"11 연구·인증", "12":"12 홍보·소개", "99":"99 미분류" };
-  var DOC_CAT_ORDER = ["01","02","03","04","05","06","07","08","09","10","11","12","99"];
-  var docOpenCats = {};   // 서랍 펼침 상태(세션 내) — 검색 중엔 결과 있는 서랍이 자동으로 열린다
-  // 분류 파생: cat 필드 우선, 없으면 JW 번호 → 구 분류 텍스트(양식만 확실) → 미분류. 서버 docCatOf와 같은 규칙이어야 한다
+  // ---- 문서함 2층 분류(문서체계 설계안 v2 2026-09-04 §2·§6, v317) — 1층 대분류 = 업무 영역 12 + 99 미분류(앱 전용), 2층 중분류 = 문서 성격 6(전 대분류 공통). 인허가는 여기 안 끼움(원장=인허가 탭) ----
+  // 라벨·키는 서버 DOC_MAJOR_LABEL·DOC_MINOR_LABEL과 동일(uismoke 대조). 순회 순서는 리터럴 배열(Object.keys는 "10"·"99" 같은 정수형 키를 앞으로 올린다)
+  var DOC_MAJOR = { "01":"01 법인·등기", "02":"02 경영·총무", "03":"03 영업·홍보", "04":"04 계약·공사", "05":"05 차량·장비", "06":"06 안전보건", "07":"07 인사·노무", "08":"08 인허가", "09":"09 인증·경영시스템", "10":"10 재무·세무", "11":"11 정보·시스템", "12":"12 기타", "99":"99 미분류" };
+  var DOC_MAJOR_ORDER = ["01","02","03","04","05","06","07","08","09","10","11","12","99"];
+  var DOC_MINOR = { "01":"01 규정·기준", "02":"02 매뉴얼·가이드", "03":"03 양식·서식", "04":"04 관리표·대장", "05":"05 계획·조직", "06":"06 자료" };
+  var DOC_MINOR_ORDER = ["01","02","03","04","05","06"];
+  // DOC_CATS = 대분류×중분류 72키("AA-BB" → "AA-BB 대분류명 · 중분류명") + "99". DOC_CAT_ORDER = 대분류 순 × 중분류 순 + 99(73) — 서버 DOC_CAT_SET·DOC_CAT_LABEL과 같은 생성 규칙
+  var DOC_CATS = {}, DOC_CAT_ORDER = [];
+  DOC_MAJOR_ORDER.forEach(function(maj){
+    if (maj === "99"){ DOC_CATS["99"] = DOC_MAJOR["99"]; DOC_CAT_ORDER.push("99"); return; }
+    DOC_MINOR_ORDER.forEach(function(min){ var k = maj + "-" + min; DOC_CATS[k] = k + " " + DOC_MAJOR[maj].slice(3) + " · " + DOC_MINOR[min].slice(3); DOC_CAT_ORDER.push(k); });
+  });
+  var docOpenCats = {};   // 서랍 펼침 상태(세션 내) — 키 "AA"(대분류)·"AA-BB"(중분류). 검색 중엔 결과 있는 서랍이 두 층 자동으로 열린다
+  // 분류 파생: cat 필드("AA-BB"·"99" 화이트리스트)가 우선. 없거나 구 2자리('03' 등)면 문서번호 JW-AA-BB-NNN[-SS|-YYYY]의 앞 두 마디에서 파생.
+  // 구형식 JW-05-001·번호 없음·구 분류 텍스트는 전부 99(오배정 대신 미분류 — 텍스트 폴백 삭제, 마이그레이션 §6.4 전까지 임시). 서버 docCatOf와 같은 규칙이어야 한다(uismoke가 정규식 동률 대조)
   function docCatOf(d){
     if (!d) return "99";
     if (d.cat && Object.prototype.hasOwnProperty.call(DOC_CATS, String(d.cat))) return String(d.cat);
     var s = String(d.no||"") + " " + String(d.title||"");
-    var m = s.match(/JW-?(0[1-9]|1[0-2])(?!\d)/i);   // 두 자리 그대로(하위번호 JW-03-016-01도 앞 두 자리) — 서버와 동일 정규식(uismoke 대조)
-    if (m) return m[1];
-    var c = String(d.category||"");
-    if (/법인/.test(c)) return "01";
-    if (/인사|노무/.test(c)) return "02";
-    if (/안전|보건/.test(c)) return "03";
-    if (/인허가/.test(c)) return "04";
-    if (/매뉴얼|가이드/.test(c)) return "07";
-    if (/입찰|영업/.test(c)) return "08";
-    if (/계약|공사/.test(c)) return "09";
-    if (/재무|세무/.test(c)) return "10";
-    if (/인증|연구/.test(c)) return "11";
-    if (/홍보|소개/.test(c)) return "12";
-    if (/규정|지침/.test(c)) return "05";
-    if (/양식|서식/.test(c)) return "06";
+    var m = s.match(/JW-?(\d{2})-(\d{2})-\d{3}/i);   // 4층 번호의 앞 두 마디(별지 -SS·연도판 -YYYY도 앞 두 마디) — 서버와 동일 정규식(uismoke 대조)
+    if (m && Object.prototype.hasOwnProperty.call(DOC_CATS, m[1] + "-" + m[2])) return m[1] + "-" + m[2];
     return "99";
+  }
+  // 대분류 2자리 — 01 법인 하드차단 판정·공개범위 설정 조회 공용(설정 키 = 대분류, 설계 v2 §6 #4·#5).
+  // 구 2자리 cat '01'은 번호 파생이 실패해도 01로 본다(마이그레이션 전 법인 문서가 99로 풀려 문서 scope로 노출되지 않게 — 서버 docMajorOf 동일)
+  function docMajorOf(d){
+    var c = docCatOf(d);
+    if (c !== "99") return c.slice(0, 2);
+    return (d && String(d.cat) === "01") ? "01" : "99";
   }
   // ---- 공개범위·등재 상태(v314, PM 9/4 "등재결재랑 공개범위 만들어라 내가 선택하게" + "비공개로 다 올리라고") ----
   // scope: 'all'(전원) | 'mgmt'(관리부+관리자) | 'admin'(관리자만) | {ids:[회원id]}(지정 직원+관리자). 미지정=분류 기본값(초기 전부 '관리자만' — 권한관리 › 문서함 설정).
   // status: '등재'(구건·status 없음 포함) | '대기'(직원 등재 → PM 승인 대기) | '반려'. 판정·표기 규칙은 서버 docStatusOf/docScopeText와 동일. 열람 차단은 서버(get 필터)가 한다 — 여기는 표시
   var DOC_SCOPE_TXT = { all: "전원", mgmt: "관리부+관리자", admin: "관리자만" };
-  var DOC_SCOPE_CATS = ["02","03","04","05","06","07","08","09","10","11","12","99"];   // 01 법인은 하드차단(관리부+관리자) — 설정 대상 아님. 서버 DOC_SCOPE_CATS와 동일(uismoke 대조)
+  var DOC_SCOPE_CATS = ["02","03","04","05","06","07","08","09","10","11","12","99"];   // 설정 키 = 대분류 2자리(v317 — 중분류 단위 설정 없음). 01 법인은 하드차단(관리부+관리자) — 설정 대상 아님. 서버 DOC_SCOPE_CATS와 동일(uismoke 대조)
   function docStatusOf(d){ return (d && (d.status === "대기" || d.status === "반려")) ? d.status : "등재"; }
   function docScopeNorm(s){
     if (typeof s === "string") return DOC_SCOPE_TXT[s] ? s : null;
@@ -6250,9 +6256,9 @@
       return "지정 " + (names.length > 3 ? names.slice(0, 3).join("·") + " 외 " + (names.length - 3) : names.join("·"));
     }
     if (sc) return DOC_SCOPE_TXT[sc];
-    var cat = docCatOf(d);
-    if (cat === "01") return "분류 기본(관리부+관리자)";
-    var def = (docSettingsTbl && docSettingsTbl.scope_default && DOC_SCOPE_TXT[docSettingsTbl.scope_default[cat]]) ? docSettingsTbl.scope_default[cat] : "";
+    var maj = docMajorOf(d);   // 설정 키는 대분류 2자리(v317)
+    if (maj === "01") return "분류 기본(관리부+관리자)";
+    var def = (docSettingsTbl && docSettingsTbl.scope_default && DOC_SCOPE_TXT[docSettingsTbl.scope_default[maj]]) ? docSettingsTbl.scope_default[maj] : "";
     return "분류 기본" + (def ? "(" + DOC_SCOPE_TXT[def] + ")" : "");
   }
   function docRowHtml(d, admin){
@@ -6270,7 +6276,7 @@
     if (d.by && d.by.name && (isAdmin() || st !== "등재")) meta.push('<span>등재 ' + esc(dispNameById(d.by.id) || d.by.name) + '</span>');
     var files = Array.isArray(d.files) ? d.files : [];
     if (files.length) meta.push('<span class="own-badge" title="첨부 파일 — 아래 [열기]">📎 ' + files.length + '</span>');
-    var canEdit = admin && (docCatOf(d) !== "01" || isAdmin());   // 01 법인 편집은 관리자만(서버도 강제)
+    var canEdit = admin && (docMajorOf(d) !== "01" || isAdmin());   // 01 법인 편집은 관리자만(서버도 강제) — 대분류 판정(v317)
     var canResubmit = admin && st === "반려" && !isAdmin() && !!(d.by && d.by.id === myId());   // 반려 건 재상신은 등재한 본인(서버가 by 대조). 관리자는 수정=즉시 등재
     // 첨부 목록(v315): 파일마다 [열기] — 서버 doc_att_get(열람 판정=docVisible)로 받아 새 창/다운로드
     var fileRows = files.map(function(f){
@@ -6299,26 +6305,44 @@
     var addBtn = document.getElementById("docAddBtn"); if (addBtn) addBtn.style.display = admin ? "block" : "none";
     var list = documents.filter(function(d){
       if (!d || d.del === 1) return false;
+      if (!isAdmin() && docMajorOf(d) === "99") return false;   // 99 미분류는 관리자만(설계 v2 — 번호 파생 실패 임시 서랍). 직원 화면엔 건수에서도 뺀다(구 cat 01 구건은 대분류 01로 남는다)
       if (!docSearchTerm) return true;
-      // 신설 cat 라벨도 검색 대상 — 신규 문서는 category 텍스트가 없어 분류명 검색에서 빠졌다(리뷰 지적)
-      return ((d.title||"") + " " + (d.no||"") + " " + (d.category||"") + " " + (DOC_CATS[docCatOf(d)]||"")).toLowerCase().indexOf(docSearchTerm) >= 0;
+      // 분류 라벨(대분류명·중분류명)도 검색 대상 — 신규 문서는 category 텍스트가 없어 분류명 검색에서 빠졌다(리뷰 지적). 대분류명("안전보건")만 쳐도 걸리게(설계 v2 §6 #19)
+      return ((d.title||"") + " " + (d.no||"") + " " + (d.category||"") + " " + (DOC_CATS[docCatOf(d)]||"") + " " + (DOC_MAJOR[docMajorOf(d)]||"")).toLowerCase().indexOf(docSearchTerm) >= 0;
     });
     var head = document.getElementById("docHead"); if (head) head.textContent = list.length ? (list.length + "건") : "";
     if (!list.length){ host.innerHTML = '<div class="empty-line">' + (docSearchTerm ? "검색 결과가 없습니다." : "등록된 문서가 없습니다.") + '</div>'; return; }
     var searching = !!docSearchTerm;
     var h = "";
-    // 순회는 리터럴 배열로 — Object.keys는 "99"(정수형 키)를 선두로 올려 미분류가 맨 위에 왔다(리뷰 지적)
-    DOC_CAT_ORDER.forEach(function(cat){
-      var rows = list.filter(function(d){ return docCatOf(d) === cat; });
-      // 빈 서랍 처리: 미분류는 있을 때만, 01 법인은 서버가 걸러 0건인 사람에겐 서랍 자체를 안 보여줌(존재 노출 방지)
-      if (!rows.length && (cat === "99" || cat === "01" || !isAdmin())) return;   // 직원에겐 빈 서랍(비공개 분류)을 아예 안 그림 — 12분류 확장 후 빈 서랍 10개 노이즈 방지
-      rows.sort(function(a,b){ var an=(a.no||"~"), bn=(b.no||"~"); if (an!==bn) return an<bn?-1:1; var at=(a.title||""), bt=(b.title||""); return at<bt?-1:(at>bt?1:0); });   // 문서번호순(번호 없는 것은 뒤), 같은 번호는 제목순
-      var open = searching ? rows.length > 0 : !!docOpenCats[cat];
-      h += '<div class="doc-acc"><div class="doc-acc-hd" data-doc-acc="' + cat + '"><span>' + (open ? "▾" : "▸") + ' ' + DOC_CATS[cat]
-         + (cat === "01" ? ' <span class="doc-lock">🔒 관리부</span>' : '') + '</span><span class="n">' + rows.length + '건</span></div>';
+    var byNo = function(a,b){ var an=(a.no||"~"), bn=(b.no||"~"); if (an!==bn) return an<bn?-1:1; var at=(a.title||""), bt=(b.title||""); return at<bt?-1:(at>bt?1:0); };   // 문서번호 문자열순(v316 — 4층 번호는 문자열 정렬이 계층 순서와 같다 §3.1, 번호 없는 것은 뒤), 같은 번호는 제목순
+    var rowsHtml = function(rows){ rows.sort(byNo); return rows.map(function(d){ return docRowHtml(d, admin); }).join(""); };
+    // 2층 서랍(설계 v2 §6 #18): 바깥 대분류(합계 건수, 01 🔒) → 안쪽 중분류(건수) → 행. 순회는 리터럴 배열로 — Object.keys는 "99"(정수형 키)를 선두로 올려 미분류가 맨 위에 왔다(리뷰 지적)
+    DOC_MAJOR_ORDER.forEach(function(maj){
+      var majRows = list.filter(function(d){ return docMajorOf(d) === maj; });
+      // 빈 서랍 처리: 미분류·01 법인은 있을 때만(01은 서버가 걸러 0건인 사람에겐 서랍 자체를 안 보여줌 — 존재 노출 방지), 그 밖의 빈 대분류는 관리자에게만 0건 표시(직원에겐 비공개 분류 노이즈)
+      if (!majRows.length && (maj === "99" || maj === "01" || !isAdmin())) return;
+      var open = searching ? majRows.length > 0 : !!docOpenCats[maj];
+      h += '<div class="doc-acc"><div class="doc-acc-hd" data-doc-acc="' + maj + '"><span>' + (open ? "▾" : "▸") + ' ' + DOC_MAJOR[maj]
+         + (maj === "01" ? ' <span class="doc-lock">🔒 관리부</span>' : '') + '</span><span class="n">' + majRows.length + '건</span></div>';
       if (open){
         h += '<div class="doc-acc-bd">';
-        h += rows.map(function(d){ return docRowHtml(d, admin); }).join("") || '<div class="empty-line">비어 있음</div>';
+        if (maj === "99"){ h += rowsHtml(majRows); }
+        else {
+          var inner = "";
+          DOC_MINOR_ORDER.forEach(function(min){
+            var cat = maj + "-" + min;
+            var rows = majRows.filter(function(d){ return docCatOf(d) === cat; });
+            if (!rows.length) return;   // 빈 중분류는 누구에게도 안 그림(설계 v2 #18)
+            var open2 = searching ? true : !!docOpenCats[cat];
+            inner += '<div class="doc-acc doc-acc-sub"><div class="doc-acc-hd" data-doc-acc="' + cat + '"><span>' + (open2 ? "▾" : "▸") + ' ' + DOC_MINOR[min] + '</span><span class="n">' + rows.length + '건</span></div>';
+            if (open2) inner += '<div class="doc-acc-bd">' + rowsHtml(rows) + '</div>';
+            inner += '</div>';
+          });
+          // 구 2자리 cat '01' + 구형식 번호(파생 실패): 대분류 01(하드차단)엔 속하지만 중분류가 없다 — 마이그레이션 전 임시 묶음(번호 정정 안내)
+          var rest = majRows.filter(function(d){ return docCatOf(d) === "99"; });
+          if (rest.length) inner += '<div class="doc-acc doc-acc-sub"><div class="doc-acc-hd"><span>중분류 없음 (문서번호 JW-AA-BB-NNN 정정 필요)</span><span class="n">' + rest.length + '건</span></div><div class="doc-acc-bd">' + rowsHtml(rest) + '</div></div>';
+          h += inner || '<div class="empty-line">비어 있음</div>';
+        }
         h += '</div>';
       }
       h += '</div>';
@@ -6352,15 +6376,44 @@
     var v = document.getElementById("docScope").value;
     document.getElementById("docScopeMembers").style.display = (v === "ids") ? "block" : "none";
   }
+  // ---- 문서 모달 2단 분류 select(설계 v2 §6 #17, v317): 대분류 → 중분류. 99 미분류는 대분류에만 있고 중분류 비활성. docCatSelectGet() = "AA-BB" | "99" | ""(중분류 미선택) ----
+  function docCatSelectsInit(){
+    var maj = document.getElementById("docCatMajor"), min = document.getElementById("docCatMinor");
+    if (!maj || !min || maj.options.length) return;
+    maj.innerHTML = DOC_MAJOR_ORDER.map(function(k){ return '<option value="' + k + '">' + esc(DOC_MAJOR[k]) + (k === "01" ? " (관리부·관리자만 열람)" : (k === "99" ? " (관리자만 지정)" : "")) + '</option>'; }).join("");
+    min.innerHTML = '<option value="">중분류(문서 성격) 선택</option>' + DOC_MINOR_ORDER.map(function(k){ return '<option value="' + k + '">' + esc(DOC_MINOR[k]) + '</option>'; }).join("");
+    maj.addEventListener("change", docCatMajorChanged);
+  }
+  function docCatMajorChanged(){
+    var maj = document.getElementById("docCatMajor"), min = document.getElementById("docCatMinor");
+    if (maj.value === "99"){ min.value = ""; min.disabled = true; } else min.disabled = !!maj.disabled;
+  }
+  function docCatSelectSet(cat){
+    docCatSelectsInit();
+    var maj = document.getElementById("docCatMajor"), min = document.getElementById("docCatMinor");
+    cat = String(cat || "99");
+    maj.value = cat === "99" ? "99" : cat.slice(0, 2);
+    min.value = cat === "99" ? "" : cat.slice(3);
+    docCatMajorChanged();
+  }
+  function docCatSelectLock(lock){
+    var maj = document.getElementById("docCatMajor"), min = document.getElementById("docCatMinor");
+    maj.disabled = !!lock; min.disabled = !!lock || maj.value === "99";
+  }
+  function docCatSelectGet(){
+    var maj = document.getElementById("docCatMajor").value, min = document.getElementById("docCatMinor").value;
+    if (maj === "99") return "99";
+    return min ? (maj + "-" + min) : "";
+  }
   function openDocModal(id){
     if (!canDo("doc")) return;
     var d = id ? findDoc(id) : null;
-    if (d && docCatOf(d) === "01" && !isAdmin()){ alert("01 법인 문서는 관리자만 수정할 수 있습니다."); return; }
+    if (d && docMajorOf(d) === "01" && !isAdmin()){ alert("01 법인 문서는 관리자만 수정할 수 있습니다."); return; }
     editingDocId = id || null;
     document.getElementById("docModalTitle").textContent = d ? "문서 수정" : "문서 추가";
     document.getElementById("docTitle").value = d ? (d.title||"") : "";
     document.getElementById("docNo").value = d ? (d.no||"") : "";
-    document.getElementById("docCat").value = d ? docCatOf(d) : "06";
+    docCatSelectSet(d ? docCatOf(d) : "99");   // 신규 기본 99 — 사용자가 대분류·중분류를 고른다(설계 v2 §6 #8). 구 2자리 cat 구건은 번호 파생값(없으면 99)
     document.getElementById("docVer").value = d ? (d.version||"") : "";
     document.getElementById("docRevised").value = (d && isDate(d.revised)) ? d.revised : "";
     document.getElementById("docUrl").value = d ? (d.url||"") : "";
@@ -6371,7 +6424,7 @@
     docScopeModeChanged();
     // 비관리자의 기존 문서 수정은 내용만 — 분류·공개범위·문서번호는 PM만 변경(서버가 원본 고정, 적대 검증 med1). 신규 등록 때는 골라서 올리고 PM이 카드에서 검토
     var lock = !!d && !isAdmin();
-    document.getElementById("docCat").disabled = lock;
+    docCatSelectLock(lock);
     document.getElementById("docNo").disabled = lock;
     document.getElementById("docScope").disabled = lock;
     Array.prototype.forEach.call(document.getElementById("docScopeMembers").querySelectorAll("input"), function(cb){ cb.disabled = lock; });
@@ -6388,19 +6441,21 @@
     if (!canDo("doc")) return;
     var title = document.getElementById("docTitle").value.trim();
     if (!title){ document.getElementById("docTitle").focus(); return; }
-    var newCat = document.getElementById("docCat").value;
-    // 검증은 전부 push 전에 — 차단 후 return하면 빈 스텁이 배열에 남아 유령 문서로 영속된다(리뷰 지적)
-    if (newCat === "01" && !isAdmin()){ alert("01 법인 분류는 관리자만 지정할 수 있습니다(서버에서도 차단됩니다)."); return; }
     var d = editingDocId ? findDoc(editingDocId) : null;
     var today = todayStr(), isNew = !d, me = curMember();
     var lock = !isNew && !isAdmin();   // 비관리자 기존 문서: 분류·문서번호·공개범위는 서버 원본 고정 — 클라도 손대지 않는다(잠긴 셀렉트 값 그대로). 검증(아래 ids)보다 앞에 둔다(v315 — 호이스팅으로 undefined였던 순서 정리)
+    var newCat = lock ? docCatOf(d) : docCatSelectGet();   // 2층 분류 "AA-BB" | "99" | ""(중분류 미선택). 잠긴 모달은 원본 파생값(서버가 원본 고정)
+    // 검증은 전부 push 전에 — 차단 후 return하면 빈 스텁이 배열에 남아 유령 문서로 영속된다(리뷰 지적)
+    if (!newCat){ alert("중분류(문서 성격)를 선택해주세요 — 대분류만으로는 등재할 수 없습니다."); return; }
+    if (newCat.slice(0, 2) === "01" && !isAdmin()){ alert("01 법인 분류는 관리자만 지정할 수 있습니다(서버에서도 차단됩니다)."); return; }
+    if (newCat === "99" && !isAdmin()){ alert("99 미분류는 관리자만 지정할 수 있습니다 — 대분류(업무 영역)와 중분류(문서 성격)를 골라주세요."); return; }
     var scopeMode = document.getElementById("docScope").value, scopeIds = [];
     if (!lock && scopeMode === "ids"){ scopeIds = getCheckedMembers("docScopeMembers"); if (!scopeIds.length){ alert("직원 지정 공개는 최소 1명을 체크해주세요."); return; } }
     if (!d){ d = {id: genId("doc"), created: today}; documents.push(d); }
     d.title = title;
     if (!lock){
       d.no = document.getElementById("docNo").value.trim();
-      d.cat = newCat;   // 분류 5종+미분류. 구 category 텍스트는 표시용으로만 남긴다
+      d.cat = newCat;   // 2층 분류 "AA-BB"(대분류-중분류) 또는 "99"(v317). 구 category 텍스트는 표시용으로만 남긴다
     }
     d.version = document.getElementById("docVer").value.trim();
     d.revised = document.getElementById("docRevised").value || "";
@@ -8257,7 +8312,7 @@
           .finally(function(){ $("xgGo").textContent="생성·다운로드"; $("xgGo").disabled=false; });
         return;
       }
-      if(kind==="quote_docs"){   // 견적서: 회사별 hwpx 양식(JW-06-001 환경 / JW-06-002 건설)
+      if(kind==="quote_docs"){   // 견적서: 회사별 hwpx 양식(JW-03-03-001-01 환경 / JW-03-03-001-02 건설 — 구 JW-06-001/002)
         var qtQty=parseFloat(($("xqtQty").value||"").replace(/[^0-9.]/g,""))||0;
         var qtPrice=parseInt(($("xqtPrice").value||"").replace(/[^0-9]/g,""),10)||0;
         var qtAmt=Math.round(qtQty*qtPrice);
@@ -8844,7 +8899,7 @@
       '<div class="doc-sign"><div>배출자 : '+dgFill(d.name)+' &nbsp; (인)</div><div>확인 : '+esc(JW_CO.name)+' &nbsp; (인)</div></div>'+
       '</div>';
   }
-  // 견적서(JW-06-001 종운환경 / JW-06-002 종운건설) 실물 반영
+  // 견적서(JW-03-03-001-01 종운환경 / JW-03-03-001-02 종운건설 — 구 JW-06-001/002) 실물 반영
   var QUOTE_CO = {
     env: { name:"(유)종운환경", biz:"506-81-48535", ceo:"나 종 운", addr:"포항시 남구 서원재로 1(호동)", biztype:"서비스,운수,제조", item:"종합재활용 폐기물수집·운반", tel:"054)291-1204", fax:"054)291-1214",
       notes:["처리비 및 운반비 포함 톤당 단가입니다.","1대당 팔레트로 적재하기로 함.","폐기물종합재활용업.","지정폐기물수집운반업.","사업장폐기물수집운반업(액상, 고상).","건설폐기물수집운반업.","상·하수도준설공사업, CCTV촬영, 수밀시험.","건설기계대여업.","화물자동차운송업.","사업장생활계수집운반업.","유해화학물질운송업.","담당자 : 나종운 대표 010-2584-0956"] },
@@ -17057,12 +17112,12 @@
       var sd = docSettingsTbl.scope_default || {};
       var rowCss = 'display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:7px 2px;border-bottom:1px solid var(--line);';
       var rows = '<div style="' + rowCss + '"><span style="min-width:118px;font-size:13px;font-weight:600;">🔒 01 법인</span><span style="font-size:11.5px;color:var(--sub);">관리부+관리자 고정(서버 하드차단 — 설정 불가)</span></div>';
-      rows += DOC_SCOPE_CATS.map(function(cat){
+      rows += DOC_SCOPE_CATS.map(function(cat){   // 행 = 대분류 12(02~12·99) — 공개범위 기본값은 대분류 단위(설계 v2 §6 #5, 중분류 60행 불채택)
         var cur = DOC_SCOPE_TXT[sd[cat]] ? sd[cat] : "admin";
         var chips = ["admin","mgmt","all"].map(function(v){
           return '<button type="button" style="' + docSetChipCss(cur === v, v) + '" data-ds-scope="' + cat + ':' + v + '">' + DOC_SCOPE_TXT[v] + '</button>';
         }).join(" ");
-        return '<div style="' + rowCss + '"><span style="min-width:118px;font-size:13px;font-weight:600;">📁 ' + esc(DOC_CATS[cat]) + '</span><span style="display:inline-flex;gap:4px;flex-wrap:wrap;">' + chips + '</span></div>';
+        return '<div style="' + rowCss + '"><span style="min-width:118px;font-size:13px;font-weight:600;">📁 ' + esc(DOC_MAJOR[cat]) + '</span><span style="display:inline-flex;gap:4px;flex-wrap:wrap;">' + chips + '</span></div>';
       }).join("");
       var g = docSettingsTbl.register_gate === "none" ? "none" : "staff";
       rows += '<div style="' + rowCss + 'padding-top:9px;"><span style="min-width:118px;font-size:13px;font-weight:600;">🗂 등재 결재</span><span style="display:inline-flex;gap:4px;flex-wrap:wrap;">'
@@ -17075,7 +17130,7 @@
       Array.prototype.forEach.call(host.querySelectorAll("[data-ds-scope]"), function(btn){
         btn.addEventListener("click", function(){
           var p = btn.getAttribute("data-ds-scope").split(":");
-          docSettingSet({ cat: p[0], scope: p[1] }, DOC_CATS[p[0]] + " 기본 공개범위 → " + DOC_SCOPE_TXT[p[1]]);
+          docSettingSet({ cat: p[0], scope: p[1] }, DOC_MAJOR[p[0]] + " 기본 공개범위 → " + DOC_SCOPE_TXT[p[1]]);   // 설정 단위 = 대분류(v317)
         });
       });
       Array.prototype.forEach.call(host.querySelectorAll("[data-ds-gate]"), function(btn){

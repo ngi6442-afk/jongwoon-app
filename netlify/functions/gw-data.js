@@ -89,30 +89,33 @@ async function verSnapshot(col, prevDoc, byName, dailyOnly, force) {
 
 // 객체를 화이트리스트로 쓸 때의 프로토타입 키('constructor' 등) 우회 차단 — 문서함 분류·확장자·공개범위 표 공용(적대 검증 low5)
 function hasOwn(o, k) { return Object.prototype.hasOwnProperty.call(o, k); }
-// 문서함 분류 파생 — cat 필드 우선, 없으면 JW 번호·구 분류 텍스트에서 유도. 클라 docCatOf와 같은 규칙 유지 필수(uismoke가 정규식 동률 대조)
-// 1층 12분류(문서번호체계 개편안 2026-09-04 §2): 01 법인·등기 / 02 인사·노무 / 03 안전보건 / 04 인허가 / 05 규정 / 06 양식 / 07 매뉴얼·가이드 / 08 영업·입찰 / 09 계약·공사 / 10 재무·세무 / 11 연구·인증 / 12 홍보·소개 (+99 미분류=앱 전용)
-const DOC_CAT_SET = { '01': 1, '02': 1, '03': 1, '04': 1, '05': 1, '06': 1, '07': 1, '08': 1, '09': 1, '10': 1, '11': 1, '12': 1, '99': 1 };
+// 문서함 2층 분류(문서체계 설계안 v2 2026-09-04 §2·§6, v317) — 1층 대분류 = 업무 영역 12 + 99 미분류(앱 전용), 2층 중분류 = 문서 성격 6(전 대분류 공통).
+// 라벨은 앱 DOC_MAJOR·DOC_MINOR와 동일(uismoke 대조). cat = 'AA-BB'(72) + '99' = 73키 화이트리스트. 구 2자리 cat('03' 등)은 키가 아니라 번호 파생으로 넘어간다(마이그레이션 §6.4 전 구건)
+const DOC_MAJOR_LABEL = { '01': '01 법인·등기', '02': '02 경영·총무', '03': '03 영업·홍보', '04': '04 계약·공사', '05': '05 차량·장비', '06': '06 안전보건', '07': '07 인사·노무', '08': '08 인허가', '09': '09 인증·경영시스템', '10': '10 재무·세무', '11': '11 정보·시스템', '12': '12 기타', '99': '99 미분류' };
+const DOC_MINOR_LABEL = { '01': '01 규정·기준', '02': '02 매뉴얼·가이드', '03': '03 양식·서식', '04': '04 관리표·대장', '05': '05 계획·조직', '06': '06 자료' };
+const DOC_MAJOR_SET = Object.keys(DOC_MAJOR_LABEL).reduce(function (o, k) { o[k] = 1; return o; }, {});
+const DOC_MINOR_SET = Object.keys(DOC_MINOR_LABEL).reduce(function (o, k) { o[k] = 1; return o; }, {});
+// DOC_CAT_SET(73키)·DOC_CAT_LABEL(결재 카드 문구 '06-01 안전보건 · 규정·기준') — 앱 DOC_CATS와 같은 생성 규칙
+const DOC_CAT_SET = {}, DOC_CAT_LABEL = {};
+Object.keys(DOC_MAJOR_LABEL).forEach(function (maj) {
+  if (maj === '99') { DOC_CAT_SET['99'] = 1; DOC_CAT_LABEL['99'] = DOC_MAJOR_LABEL['99']; return; }
+  Object.keys(DOC_MINOR_LABEL).forEach(function (min) { const k = maj + '-' + min; DOC_CAT_SET[k] = 1; DOC_CAT_LABEL[k] = k + ' ' + DOC_MAJOR_LABEL[maj].slice(3) + ' · ' + DOC_MINOR_LABEL[min].slice(3); });
+});
+// 분류 파생 — cat 화이트리스트 우선, 아니면 문서번호 JW-AA-BB-NNN[-SS|-YYYY]의 앞 두 마디. 구형식 JW-05-001·번호 없음·구 분류 텍스트 → 99(텍스트 폴백 삭제 — 오배정 대신 미분류). 클라 docCatOf와 같은 규칙 유지 필수(uismoke가 정규식 동률 대조)
 function docCatOf(it) {
   if (!it) return '99';
   // cat은 화이트리스트만 신뢰 — 무효값을 그대로 분류로 삼으면 01 보호를 폴스루로 빠져나간다(클라와 동일 규칙)
   if (it.cat && hasOwn(DOC_CAT_SET, String(it.cat))) return String(it.cat);
   const s = String(it.no || '') + ' ' + String(it.title || '');
-  const m = s.match(/JW-?(0[1-9]|1[0-2])(?!\d)/i);   // 두 자리 그대로(하위번호 JW-03-016-01도 앞 두 자리)
-  if (m) return m[1];
-  const c = String(it.category || '');
-  if (/법인/.test(c)) return '01';
-  if (/인사|노무/.test(c)) return '02';
-  if (/안전|보건/.test(c)) return '03';
-  if (/인허가/.test(c)) return '04';
-  if (/매뉴얼|가이드/.test(c)) return '07';
-  if (/입찰|영업/.test(c)) return '08';
-  if (/계약|공사/.test(c)) return '09';
-  if (/재무|세무/.test(c)) return '10';
-  if (/인증|연구/.test(c)) return '11';
-  if (/홍보|소개/.test(c)) return '12';
-  if (/규정|지침/.test(c)) return '05';
-  if (/양식|서식/.test(c)) return '06';
+  const m = s.match(/JW-?(\d{2})-(\d{2})-\d{3}/i);   // 4층 번호의 앞 두 마디(별지 -SS·연도판 -YYYY도 앞 두 마디) — 앱과 동일 정규식
+  if (m && hasOwn(DOC_CAT_SET, m[1] + '-' + m[2])) return m[1] + '-' + m[2];
   return '99';
+}
+// 대분류 2자리 — 01 하드차단 판정·공개범위 설정 조회 공용(설정 키 = 대분류). 구 2자리 cat '01'은 번호 파생이 실패해도 01(마이그레이션 전 법인 문서가 99로 풀려 문서 scope로 노출되지 않게 — 클라 동일)
+function docMajorOf(it) {
+  const c = docCatOf(it);
+  if (c !== '99') return c.slice(0, 2);
+  return (it && String(it.cat) === '01') ? '01' : '99';
 }
 function docCanSee01(m) { return !!(m && (m.admin || String(m.dept || '') === '관리부')); }
 
@@ -123,7 +126,7 @@ function docCanSee01(m) { return !!(m && (m.admin || String(m.dept || '') === '�
 // 등재 결재(register_gate): 'staff'(기본 — 비관리자 등재는 status '대기' + 결재함 '문서함 등재' 카드 자동 상신, 승인 시 '등재') | 'none'(즉시 등재).
 // 관리자 등재는 항상 즉시 '등재'(등급표 ① PM 전결 — PM·관리자가 올리면 그 자체가 결재). status 없는 구건(18건)은 '등재'로 취급.
 const DOC_SETTINGS_KEY = 'settings:documents';
-const DOC_SCOPE_CATS = ['02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12', '99'];   // 01 법인은 설정 불가(하드차단). 12분류 확장(v315) — 신설 분류도 기본 비공개
+const DOC_SCOPE_CATS = ['02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12', '99'];   // 설정 키 = 대분류 2자리(v317 2층 분류 — 중분류 단위 설정 없음, 'AA-BB' 키는 BAD_CAT). 01 법인은 설정 불가(하드차단). 미저장 대분류는 기본 비공개
 const DOC_SCOPE_VALS = { all: 1, mgmt: 1, admin: 1 };
 const DOC_SETTINGS_DEFAULTS = { scope_default: DOC_SCOPE_CATS.reduce(function (o, cat) { o[cat] = 'admin'; return o; }, {}), register_gate: 'staff' };
 // 읽기 실패는 기본표(전부 관리자만) 폴백 = 가장 닫힌 쪽(fail-closed). 등급표(apprGrades)와 같은 병합 규칙 — 저장본이 기본표 위에 얹힌다
@@ -165,22 +168,22 @@ function docScopeMatch(sc, m) {
 function docScopeOf(it, settings) {
   const own = docScopeNorm(it && it.scope);
   if (own) return own;
-  const cat = docCatOf(it);
-  if (cat === '01') return 'mgmt';
-  return (settings && settings.scope_default && typeof settings.scope_default[cat] === 'string' && hasOwn(DOC_SCOPE_VALS, settings.scope_default[cat])) ? settings.scope_default[cat] : 'admin';
+  const maj = docMajorOf(it);   // 분류 기본값은 대분류 단위(v317)
+  if (maj === '01') return 'mgmt';
+  return (settings && settings.scope_default && typeof settings.scope_default[maj] === 'string' && hasOwn(DOC_SCOPE_VALS, settings.scope_default[maj])) ? settings.scope_default[maj] : 'admin';
 }
 // 열람 판정(서버 하드차단 — get 필터·save 재구성 공용). 관리자 무제한. '대기'·'반려'는 등재한 본인만.
 // 등재한 본인(by.id)은 자기 문서를 항상 본다 — 자기가 올린 문서가 승인 뒤 사라지는 혼란 방지(정보 유출 없음: 본인이 쓴 내용)
 function docVisible(m, it, settings) {
   if (!it || !m) return false;
   if (m.admin) return true;
-  if (docCatOf(it) === '01' && !docCanSee01(m)) return false;   // 01 하드차단이 본인 예외보다 앞 — 관리자가 직원 문서를 01로 옮기면 그 직원도 못 본다(적대 검증 low6)
+  if (docMajorOf(it) === '01' && !docCanSee01(m)) return false;   // 01 하드차단(대분류 판정, v317)이 본인 예외보다 앞 — 관리자가 직원 문서를 01로 옮기면 그 직원도 못 본다(적대 검증 low6)
   const mine = !!(it.by && it.by.id === m.id);
   if (docStatusOf(it) !== '등재') return mine;
   if (mine) return true;
   return docScopeMatch(docScopeOf(it, settings), m);
 }
-const DOC_CAT_LABEL = { '01': '01 법인·등기', '02': '02 인사·노무', '03': '03 안전보건', '04': '04 인허가', '05': '05 규정', '06': '06 양식', '07': '07 매뉴얼·가이드', '08': '08 영업·입찰', '09': '09 계약·공사', '10': '10 재무·세무', '11': '11 연구·인증', '12': '12 홍보·소개', '99': '99 미분류' };   // 개편안 §2 명칭 — 앱 DOC_CATS와 동일(uismoke 대조)
+// DOC_CAT_LABEL은 위 2층 분류 표에서 생성(v317)
 const DOC_SCOPE_LABEL = { all: '전원', mgmt: '관리부+관리자', admin: '관리자만' };
 function docScopeText(it, settings) {
   const own = docScopeNorm(it && it.scope);
@@ -363,7 +366,7 @@ async function handleSave(event, d, R) {
       docSet = await docSettings(store(DATA));
       const oldDocBy = {}; oldItems.forEach(function (o) { if (o && o.id) oldDocBy[o.id] = o; });
       const keep = [], keepIds = {};
-      oldItems.forEach(function (o) { if (o && (docCatOf(o) === '01' || !docVisible(c.member, o, docSet))) { keep.push(o); if (o.id) keepIds[o.id] = 1; } });
+      oldItems.forEach(function (o) { if (o && (docMajorOf(o) === '01' || !docVisible(c.member, o, docSet))) { keep.push(o); if (o.id) keepIds[o.id] = 1; } });
       const nowIso = new Date().toISOString(), me = { id: c.member.id, name: c.member.name };
       const out = [], seenOut = {};
       doc.items.forEach(function (x) {
@@ -381,7 +384,7 @@ async function handleSave(event, d, R) {
           if (resubmit) { s.status = '대기'; s.reg_n = (Number(o.reg_n) || 1) + 1; delete s.reject_reason; delete s.rejected_at; }
           docFilesFix(s, o);   // 첨부 메타 원본 고정(v315) — 비관리자가 files를 위조·삭제해 보내도 첨부 액션(doc_att_put/del)으로만 바뀐다
         } else {
-          if (docCatOf(x) === '01') { docDropped.push(x); return; }   // 신규 01 법인은 관리자만(2026-09-02 규칙) — 폐기 + 감사로그 '제거'
+          if (docMajorOf(x) === '01') { docDropped.push(x); return; }   // 신규 01 법인(대분류 판정)은 관리자만(2026-09-02 규칙) — 폐기 + 감사로그 '제거'
           const sc = docScopeNorm(s.scope); if (sc) s.scope = sc; else delete s.scope;
           s.by = me; delete s.registered_by; delete s.registered_at; delete s.reject_reason; delete s.rejected_at; delete s.reg_n;
           docFilesFix(s, null);   // 신규 문서는 첨부 0으로 시작(id 확정 뒤 doc_att_put)
@@ -1214,7 +1217,7 @@ async function handleDocSettingsSet(event, d, R) {
   let evText = '';
   if (d.cat !== undefined) {
     const cat = String(d.cat || ''), scope = String(d.scope || '');
-    if (DOC_SCOPE_CATS.indexOf(cat) < 0) return jr(400, { status: 'REJECTED', error_code: 'BAD_CAT', request_id: R });   // 01 법인 포함 — 하드차단이라 설정 대상 아님
+    if (DOC_SCOPE_CATS.indexOf(cat) < 0) return jr(400, { status: 'REJECTED', error_code: 'BAD_CAT', request_id: R });   // 설정 키는 대분류 2자리만('AA-BB' 중분류 키·표 밖·01 법인 전부 BAD_CAT — 01은 하드차단이라 설정 대상 아님)
     if (!hasOwn(DOC_SCOPE_VALS, scope)) return jr(400, { status: 'REJECTED', error_code: 'BAD_SCOPE', request_id: R });
     evText = '기본 공개범위 ' + cat + ' ' + cur.scope_default[cat] + '→' + scope;
     cur.scope_default[cat] = scope;
@@ -2081,7 +2084,7 @@ async function handleDocBulkPut(event, d, R) {
     const x = (items[i] && typeof items[i] === 'object') ? items[i] : {};
     const title = String(x.title || '').trim().slice(0, 120);
     if (!title) return jr(400, { status: 'REJECTED', error_code: 'NO_TITLE', index: i, request_id: R });
-    const cat = hasOwn(DOC_CAT_SET, String(x.cat || '')) ? String(x.cat) : '99';   // 12분류 화이트리스트(프로토타입 키 차단) — 밖이면 99로 강등
+    const cat = hasOwn(DOC_CAT_SET, String(x.cat || '')) ? String(x.cat) : '99';   // 2층 분류 화이트리스트 73키('AA-BB'·'99', 프로토타입 키 차단) — 구 2자리·표 밖이면 99로 강등
     const files = Array.isArray(x.files) ? x.files : [];
     if (files.length < 1 || files.length > 3) return jr(400, { status: 'REJECTED', error_code: 'BAD_FILE_COUNT', index: i, request_id: R });
     const fl = [];

@@ -340,13 +340,13 @@ const tokD = issueSession(DOCW).token, tokD2 = issueSession(DOCW2).token, tokM =
 mem.gw_data['col:approvals'] = { schema: 1, items: [], updated_at: 0 };
 delete mem.gw_data['settings:documents'];
 mem.gw_data['col:documents'] = { schema: 1, items: [
-  { id: 'd1', title: '취업규칙', cat: '02' },
-  { id: 'd2', title: '안전보건 수칙', cat: '03', scope: 'all' },
-  { id: 'd3', title: '규정 지정공개', cat: '05', scope: { ids: ['udocw'] } },
-  { id: 'd4', title: '양식 관리부', cat: '06', scope: 'mgmt' },
-  { id: 'd5', title: '법인 등기', cat: '01' },
-  { id: 'd6', title: '임시 숨김', cat: '06', del: 1, hidden_tmp: 1 },
-  { id: 'd7', title: '타인 대기', cat: '06', status: '대기', by: { id: 'udocw2', name: '직원2' }, scope: 'all' },
+  { id: 'd1', title: '취업규칙', cat: '02-01' },   // v317 2층 cat 'AA-BB' — 공개범위 설정 키는 대분류 AA
+  { id: 'd2', title: '안전보건 수칙', cat: '03-01', scope: 'all' },
+  { id: 'd3', title: '규정 지정공개', cat: '05-01', scope: { ids: ['udocw'] } },
+  { id: 'd4', title: '양식 관리부', cat: '06-03', scope: 'mgmt' },
+  { id: 'd5', title: '법인 등기', cat: '01-03' },
+  { id: 'd6', title: '임시 숨김', cat: '06-03', del: 1, hidden_tmp: 1 },
+  { id: 'd7', title: '타인 대기', cat: '06-03', status: '대기', by: { id: 'udocw2', name: '직원2' }, scope: 'all' },
 ], updated_at: 9000 };
 const docIds = (res) => ((res.body.doc && res.body.doc.items) || []).map((x) => x.id).sort().join(',');
 const docItem = (id) => (mem.gw_data['col:documents'].items || []).find((x) => x && x.id === id);
@@ -382,18 +382,18 @@ r = await call({ action: 'get', collection: 'documents' }, tokM, 'dev1');
 T('03 관리부+관리자 → 관리부원 d2 유지(문서 scope all 우선) + d1', r.code === 200 && docIds(r) === 'd1,d2,d4,d5', docIds(r));
 // save 재구성(탈취 차단): 못 보는 문서(d4 scope 확장·d5 01 위장·d6 삭제·d7 타인 대기 격상) 전부 서버 원본 유지, 신규는 등재자 스탬프+'대기'(status '등재' 위조 원복)
 r = await call({ action: 'save', collection: 'documents', doc: { schema: 1, items: [
-  { id: 'd1', title: '취업규칙', cat: '02', scope: 'admin' },
-  { id: 'd2', title: '안전보건 수칙', cat: '03', scope: 'all' },
-  { id: 'd3', title: '규정 지정공개', cat: '05', scope: { ids: ['udocw', 'udocw', 7] } },
-  { id: 'd4', title: '양식 관리부', cat: '06', scope: 'all' },
-  { id: 'd5', title: '법인 등기 위장', cat: '06' },
-  { id: 'd7', title: '타인 대기', cat: '06', status: '등재', by: { id: 'udocw', name: '문서직원' }, scope: 'all' },
-  { id: 'dn1', title: '신규 직원문서', cat: '06', status: '등재', by: { id: 'uadmin', name: '관리자' }, registered_by: { id: 'uadmin' }, scope: 'nope' },
+  { id: 'd1', title: '취업규칙', cat: '02-01', scope: 'admin' },
+  { id: 'd2', title: '안전보건 수칙', cat: '03-01', scope: 'all' },
+  { id: 'd3', title: '규정 지정공개', cat: '05-01', scope: { ids: ['udocw', 'udocw', 7] } },
+  { id: 'd4', title: '양식 관리부', cat: '06-03', scope: 'all' },
+  { id: 'd5', title: '법인 등기 위장', cat: '06-03' },
+  { id: 'd7', title: '타인 대기', cat: '06-03', status: '등재', by: { id: 'udocw', name: '문서직원' }, scope: 'all' },
+  { id: 'dn1', title: '신규 직원문서', cat: '06-03', status: '등재', by: { id: 'uadmin', name: '관리자' }, registered_by: { id: 'uadmin' }, scope: 'nope' },
 ] } }, tokD, 'dev1');
 {
   const d4 = docItem('d4'), d5 = docItem('d5'), d6 = docItem('d6'), d7 = docItem('d7'), dn1 = docItem('dn1'), d1 = docItem('d1'), d3 = docItem('d3');
   T('재구성: 못 보는 문서 scope 확장 시도(d4 mgmt→all) 원본 유지', r.code === 200 && d4 && d4.scope === 'mgmt', JSON.stringify(d4));
-  T('재구성: 01 법인(d5) cat 위장 → 원본 유지', d5 && d5.cat === '01' && d5.title === '법인 등기');
+  T('재구성: 01 법인(d5) cat 위장 → 원본 유지', d5 && d5.cat === '01-03' && d5.title === '법인 등기');
   T('재구성: 숨김 구건(d6 del:1 hidden_tmp:1) 소프트 삭제 그대로 보존(영구 삭제 아님)', d6 && d6.del === 1 && d6.hidden_tmp === 1, JSON.stringify(d6));
   T('재구성: 타인 대기 문서(d7) 등재 격상·등재자 바꿔치기 원복', d7 && d7.status === '대기' && d7.by.id === 'udocw2', JSON.stringify(d7));
   T('재구성: 신규 문서 status 등재 위조 → 대기 + 등재자=저장자 스탬프 + 무효 scope 제거', dn1 && dn1.status === '대기' && dn1.by.id === 'udocw' && !dn1.registered_by && dn1.scope === undefined, JSON.stringify(dn1));
@@ -418,7 +418,7 @@ r = await call({ action: 'approval_decide', id: dnAp.id, decision: '승인' }, t
 }
 r = await call({ action: 'get', collection: 'documents' }, tokD2, 'dev1');
 T('등재 후에도 분류 기본(06 관리자만) → 직원2 비노출', r.code === 200 && docIds(r).indexOf('dn1') < 0, docIds(r));
-r = await call({ action: 'save', collection: 'documents', doc: { schema: 1, items: mem.gw_data['col:documents'].items.filter((x) => ['d1', 'd2', 'd3', 'dn1'].indexOf(x.id) >= 0).concat([{ id: 'dn2', title: '반려될 문서', cat: '05' }]) } }, tokD, 'dev1');
+r = await call({ action: 'save', collection: 'documents', doc: { schema: 1, items: mem.gw_data['col:documents'].items.filter((x) => ['d1', 'd2', 'd3', 'dn1'].indexOf(x.id) >= 0).concat([{ id: 'dn2', title: '반려될 문서', cat: '05-01' }]) } }, tokD, 'dev1');
 dnAp = docAppr('dn2')[0];
 T('두 번째 등재 → 카드 상신', r.code === 200 && dnAp && dnAp.cid === 'docreg-dn2' && docItem('dn2').status === '대기');
 r = await call({ action: 'approval_decide', id: dnAp.id, decision: '반려', reason: '보완 필요' }, tokA);
@@ -437,7 +437,7 @@ r = await call({ action: 'save', collection: 'documents', doc: { schema: 1, item
 r = await call({ action: 'approval_decide', id: docAppr('dn2').find((a) => a.cid === 'docreg-dn2-2').id, decision: '승인' }, tokA);
 T('재상신 카드 승인 → 등재', r.code === 200 && docItem('dn2').status === '등재');
 // 폴 재시도: decide 시점 문서 반영 실패를 흉내(카드만 승인 상태) → 관리자 approvals_list가 멱등 반영. 구 카드(cid 불일치)는 무시
-r = await call({ action: 'save', collection: 'documents', doc: { schema: 1, items: mem.gw_data['col:documents'].items.filter((x) => ['d1', 'd2', 'd3', 'dn1', 'dn2'].indexOf(x.id) >= 0).concat([{ id: 'dn3', title: '폴 재시도 문서', cat: '06' }]) } }, tokD, 'dev1');
+r = await call({ action: 'save', collection: 'documents', doc: { schema: 1, items: mem.gw_data['col:documents'].items.filter((x) => ['d1', 'd2', 'd3', 'dn1', 'dn2'].indexOf(x.id) >= 0).concat([{ id: 'dn3', title: '폴 재시도 문서', cat: '06-03' }]) } }, tokD, 'dev1');
 {
   const ap3 = docAppr('dn3')[0];
   ap3.status = '승인'; ap3.decided_by = { id: 'uadmin', name: '관리자' }; ap3.decided_at = new Date().toISOString();   // 결재는 확정됐는데 문서 반영이 빠진 상태
@@ -451,7 +451,7 @@ r = await call({ action: 'save', collection: 'documents', doc: { schema: 1, item
 r = await call({ action: 'doc_settings_get' }, tokA);
 r = await call({ action: 'doc_settings_set', register_gate: 'none', base: r.body.updated_at }, tokA);
 T('설정: 등재 결재 none', r.code === 200 && r.body.settings.register_gate === 'none');
-r = await call({ action: 'save', collection: 'documents', doc: { schema: 1, items: mem.gw_data['col:documents'].items.filter((x) => ['d1', 'd2', 'd3', 'dn1', 'dn2', 'dn3'].indexOf(x.id) >= 0).concat([{ id: 'dn4', title: '즉시 등재 문서', cat: '06' }]) } }, tokD, 'dev1');
+r = await call({ action: 'save', collection: 'documents', doc: { schema: 1, items: mem.gw_data['col:documents'].items.filter((x) => ['d1', 'd2', 'd3', 'dn1', 'dn2', 'dn3'].indexOf(x.id) >= 0).concat([{ id: 'dn4', title: '즉시 등재 문서', cat: '06-03' }]) } }, tokD, 'dev1');
 {
   const dn4 = docItem('dn4');
   T('gate none: 직원 등재 → 즉시 등재(registered_by=본인)·카드 없음', r.code === 200 && dn4.status === '등재' && dn4.registered_by.id === 'udocw' && docAppr('dn4').length === 0, JSON.stringify(dn4));
@@ -459,7 +459,7 @@ r = await call({ action: 'save', collection: 'documents', doc: { schema: 1, item
 r = await call({ action: 'doc_settings_get' }, tokA);
 r = await call({ action: 'doc_settings_set', register_gate: 'staff', base: r.body.updated_at }, tokA);
 // 관리자: 신규는 status 없어도 즉시 등재(PM 전결), scope 정규화, 기존 문서 상태는 클라 값 그대로(무제한)
-r = await call({ action: 'save', collection: 'documents', doc: { schema: 1, items: mem.gw_data['col:documents'].items.concat([{ id: 'dn5', title: '관리자 문서', cat: '02', scope: { ids: [1, 'udocw2', 'udocw2'] } }]) } }, tokA);
+r = await call({ action: 'save', collection: 'documents', doc: { schema: 1, items: mem.gw_data['col:documents'].items.concat([{ id: 'dn5', title: '관리자 문서', cat: '02-01', scope: { ids: [1, 'udocw2', 'udocw2'] } }]) } }, tokA);
 {
   const dn5 = docItem('dn5');
   T('관리자 신규 → 즉시 등재(registered_by 관리자)·scope ids 정규화·카드 없음', r.code === 200 && dn5.status === '등재' && dn5.registered_by.id === 'uadmin' && dn5.scope.ids.length === 1 && dn5.scope.ids[0] === 'udocw2' && docAppr('dn5').length === 0, JSON.stringify(dn5));
@@ -474,34 +474,35 @@ mem.gw_users['member:umgmt2'] = MGMT2;
 const tokM2 = issueSession(MGMT2).token;
 const docVisibleTo = async (tok) => ((await call({ action: 'get', collection: 'documents' }, tok, 'dev1')).body.doc.items || []);
 // med1: 관리부원(doc 수행)이 보이는 문서 d4(mgmt)를 all로, cat 06→02, no 변경, d2 scope를 ids로 축소·확장 시도 → 전부 원본 유지, 내용(title)만 반영
-mem.gw_data['col:documents'].items.push({ id: 'd8', title: 'JW-06-001 양식(cat 없음)', no: 'JW-06-001', scope: 'all' });
+mem.gw_data['col:documents'].items.push({ id: 'd8', title: 'JW-06-03-001 양식(cat 없음)', no: 'JW-06-03-001', scope: 'all' });
 r = await call({ action: 'save', collection: 'documents', doc: { schema: 1, items: (await docVisibleTo(tokM2)).map((x) => {
-  if (x.id === 'd4') return Object.assign({}, x, { scope: 'all', cat: '02', no: 'JW-02-999', title: '양식 관리부(내용 수정)' });
+  if (x.id === 'd4') return Object.assign({}, x, { scope: 'all', cat: '02-01', no: 'JW-02-01-999', title: '양식 관리부(내용 수정)' });
   if (x.id === 'd2') return Object.assign({}, x, { scope: { ids: ['udocw2', 'umgmt2'] } });
   return x;
 }) } }, tokM2, 'dev1');
 {
   const d4 = docItem('d4'), d2 = docItem('d2');
-  T('med1: 관리부원 scope mgmt→all·cat 06→02·no 변경 전송 → 서버 원본 유지(scope mgmt·cat 06·no 없음), 제목 수정만 반영', r.code === 200 && d4 && d4.scope === 'mgmt' && d4.cat === '06' && d4.no === undefined && d4.title === '양식 관리부(내용 수정)', JSON.stringify(d4));
+  T('med1: 관리부원 scope mgmt→all·cat 06-03→02-01·no 변경 전송 → 서버 원본 유지(scope mgmt·cat 06-03·no 없음), 제목 수정만 반영', r.code === 200 && d4 && d4.scope === 'mgmt' && d4.cat === '06-03' && d4.no === undefined && d4.title === '양식 관리부(내용 수정)', JSON.stringify(d4));
   T('med1: 보이는 문서 scope all→ids 변경 전송 → 원본(all) 유지', d2 && d2.scope === 'all', JSON.stringify(d2 && d2.scope));
 }
 r = await docVisibleTo(tokW);
 T('med1: 무결재 노출 없음 — 일반 직원에게 d4 여전히 비노출', r.every((x) => x.id !== 'd4'), r.map((x) => x.id).join(','));
-// med3: 보이는 문서를 cat '01'로 보내거나(기존) 신규를 01로 올리면 → 기존은 원본 유지(소실 0), 신규는 폐기+감사로그 '제거'. cat 없는 구건 d8은 no를 JW-01로 바꿔도 06 명시 고정
+// med3: 보이는 문서를 cat '01-03'로 보내거나(기존) 신규를 01로 올리면 → 기존은 원본 유지(소실 0), 신규는 폐기+감사로그 '제거'. cat 없는 구건 d8은 no를 JW-01-03으로 바꿔도 06-03 명시 고정
 r = await call({ action: 'save', collection: 'documents', doc: { schema: 1, items: (await docVisibleTo(tokD)).map((x) => {
-  if (x.id === 'd2') return Object.assign({}, x, { cat: '01' });
-  if (x.id === 'd8') return Object.assign({}, x, { no: 'JW-01-001', title: 'JW-01-001 법인으로 위장' });
+  if (x.id === 'd2') return Object.assign({}, x, { cat: '01-03' });
+  if (x.id === 'd8') return Object.assign({}, x, { no: 'JW-01-03-001', title: 'JW-01-03-001 법인으로 위장' });
   return x;
-}).concat([{ id: 'dz01', title: '신규 01 위장', cat: '01' }]) } }, tokD, 'dev1');
+}).concat([{ id: 'dz01', title: '신규 01 위장', cat: '01-03' }, { id: 'dz02', title: '신규 01 위장(번호 파생)', no: 'JW-01-01-002' }, { id: 'dz03', title: '신규 구 cat 01 위장', cat: '01', no: 'JW-01-002' }]) } }, tokD, 'dev1');
 {
   const d2 = docItem('d2'), d8 = docItem('d8');
-  T('med3: 기존 문서 cat 01 전송 → 원본(03) 유지·소실 0', r.code === 200 && d2 && d2.cat === '03' && d2.title === '안전보건 수칙', JSON.stringify(d2));
-  T('med3: cat 없는 구건 no를 JW-01로 바꿔도 분류 06 명시 고정·no 원본', d8 && d8.cat === '06' && d8.no === 'JW-06-001', JSON.stringify(d8));
-  T('med3: 신규 01 위장 → 폐기 + 감사로그 제거', !docItem('dz01') && auditMock.logs.some((l) => l.col === 'documents' && l.ev.some((e) => e.op === '제거' && e.id === 'dz01')));
+  T('med3: 기존 문서 cat 01-03 전송 → 원본(03-01) 유지·소실 0', r.code === 200 && d2 && d2.cat === '03-01' && d2.title === '안전보건 수칙', JSON.stringify(d2));
+  T('med3: cat 없는 구건 no를 JW-01-03으로 바꿔도 분류 06-03 명시 고정·no 원본', d8 && d8.cat === '06-03' && d8.no === 'JW-06-03-001', JSON.stringify(d8));
+  T('med3: 신규 01 위장(cat 01-03 / no JW-01-01-002 파생 / 구 cat 01+구형식 번호) 3건 전부 폐기 + 감사로그 제거', !docItem('dz01') && !docItem('dz02') && !docItem('dz03') && ['dz01', 'dz02', 'dz03'].every((id) => auditMock.logs.some((l) => l.col === 'documents' && l.ev.some((e) => e.op === '제거' && e.id === id))));
   T('med3: 전체 건수 보존(d1~d8·dn1~dn5 = 13건)', mem.gw_data['col:documents'].items.length === 13, String(mem.gw_data['col:documents'].items.length));
 }
 // low4: 반려 건을 '대기' 사본(reg_n 없음)으로 편집 전송 → 반려·사유 유지·카드 없음 / reg_n+1 전송 → 재상신
-r = await call({ action: 'save', collection: 'documents', doc: { schema: 1, items: (await docVisibleTo(tokD)).concat([{ id: 'dn6', title: '반려 후 편집 문서', cat: '05' }]) } }, tokD, 'dev1');
+r = await call({ action: 'save', collection: 'documents', doc: { schema: 1, items: (await docVisibleTo(tokD)).concat([{ id: 'dn6', title: '반려 후 편집 문서', cat: '05-01' }]) } }, tokD, 'dev1');
+T('결재 카드(문서함 등재) 본문: 2층 분류 라벨 "분류 05-01 차량·장비 · 규정·기준"(v317)', docAppr('dn6').length === 1 && String(docAppr('dn6')[0].body || '').indexOf('분류 05-01 차량·장비 · 규정·기준') >= 0, String(docAppr('dn6')[0] && docAppr('dn6')[0].body));
 r = await call({ action: 'approval_decide', id: docAppr('dn6')[0].id, decision: '반려', reason: '표지 누락' }, tokA);
 T('low4 준비: dn6 반려', r.code === 200 && docItem('dn6').status === '반려');
 r = await call({ action: 'save', collection: 'documents', doc: { schema: 1, items: (await docVisibleTo(tokD)).map((x) => x.id === 'dn6' ? Object.assign({}, x, { status: '대기', title: '반려 전 사본으로 편집' }) : x) } }, tokD, 'dev1');
@@ -522,7 +523,7 @@ r = await call({ action: 'approval_decide', id: docAppr('dn6').find((a) => a.cid
 {
   const savedAppr = mem.gw_data['col:approvals'];
   delete mem.gw_data['col:approvals'];
-  r = await call({ action: 'save', collection: 'documents', doc: { schema: 1, items: (await docVisibleTo(tokD)).concat([{ id: 'dn7', title: '상신 실패 문서', cat: '06' }]) } }, tokD, 'dev1');
+  r = await call({ action: 'save', collection: 'documents', doc: { schema: 1, items: (await docVisibleTo(tokD)).concat([{ id: 'dn7', title: '상신 실패 문서', cat: '06-03' }]) } }, tokD, 'dev1');
   mem.gw_data['col:approvals'] = savedAppr;
   T('med2: 상신 실패 → 저장은 성공(대기)·register_warn 1·카드 0·감사로그 등재상신실패', r.code === 200 && r.body.register_warn === 1 && docItem('dn7').status === '대기' && docAppr('dn7').length === 0 && auditMock.logs.some((l) => l.ev.some((e) => e.op === '등재상신실패' && e.id === 'dn7')), JSON.stringify(r.body));
   r = await call({ action: 'approvals_list' }, tokD2, 'dev1');
@@ -534,9 +535,9 @@ r = await call({ action: 'approval_decide', id: docAppr('dn6').find((a) => a.cid
   T('med2: 재폴 멱등(카드 1건 유지)', r.code === 200 && docAppr('dn7').length === 1);
 }
 // low6: 관리자가 직원 문서(dn1 by udocw, 등재)를 01로 옮김 → 그 직원 get에서 미노출
-r = await call({ action: 'save', collection: 'documents', doc: { schema: 1, items: mem.gw_data['col:documents'].items.map((x) => x.id === 'dn1' ? Object.assign({}, x, { cat: '01' }) : x) } }, tokA);
+r = await call({ action: 'save', collection: 'documents', doc: { schema: 1, items: mem.gw_data['col:documents'].items.map((x) => x.id === 'dn1' ? Object.assign({}, x, { cat: '01-03' }) : x) } }, tokA);
 r = await docVisibleTo(tokD);
-T('low6: 01로 옮긴 본인 문서 → 등재자에게도 비노출(01 하드차단이 본인 예외보다 앞)', r.every((x) => x.id !== 'dn1') && docItem('dn1').cat === '01', r.map((x) => x.id).join(','));
+T('low6: 01-03으로 옮긴 본인 문서 → 등재자에게도 비노출(01 하드차단이 본인 예외보다 앞)', r.every((x) => x.id !== 'dn1') && docItem('dn1').cat === '01-03', r.map((x) => x.id).join(','));
 // low7: 대기 아닌 문서(dn3 등재)에 현재 cid와 같은 뒤늦은 반려 카드 → 폴에서 무시(등재 유지)
 mem.gw_data['col:approvals'].items.push({ id: 'aplate', kind: '문서함 등재', ref: 'doc:dn3', cid: 'docreg-dn3', status: '반려', reason: '늦은 반려', decided_by: { id: 'uadmin', name: '관리자' }, decided_at: new Date().toISOString(), by: { id: 'udocw', name: '문서직원' } });
 r = await call({ action: 'approvals_list' }, tokA);
@@ -545,7 +546,7 @@ T('low7: 이미 등재된 문서에 같은 cid의 뒤늦은 반려 → 무시(�
 // 21 직접 기안·전결 종결(v315): 비대표 관리자 ① self_decide = 생성+승인 한 쓰기(승인·decided_by 본인·chain 전결·감사로그 전결·푸시 0·큐 미노출)
 //    / 직원·대표·②·③·격상·미정·제외 종류 → 400(카드 미생성) / cid 멱등 / approvals_list grades 동봉 / 상신만은 기존 라우팅 / 총정리 집계 포함
 mem.gw_data['col:approvals'] = { schema: 1, items: [], updated_at: 0 };
-mem.gw_data['col:documents'] = { schema: 1, items: [{ id: 'd1', title: '취업규칙', cat: '02', status: '등재' }], updated_at: 100 };   // 대기 문서 0 — 관리자 폴의 등재상신복구(med2)가 이 절의 카드 수를 흔들지 않게
+mem.gw_data['col:documents'] = { schema: 1, items: [{ id: 'd1', title: '취업규칙', cat: '02-01', status: '등재' }], updated_at: 100 };   // 대기 문서 0 — 관리자 폴의 등재상신복구(med2)가 이 절의 카드 수를 흔들지 않게
 const apprN = () => mem.gw_data['col:approvals'].items.length;
 let pushN0 = pushMock.calls.length;
 r = await call({ action: 'approval_create', kind: '사규', title: '취업규칙 개정 결재', body: '본문', ref: 'doc:d1', cid: 'sd-1', self_decide: true }, tokA);
@@ -601,14 +602,14 @@ T('직원 기안 ①: PM 큐 대기(전결 아님)', r.code === 200 && mem.gw_da
 
 // 22 문서함 파일 첨부(v315): 올리기 권한(관리자·등재 본인·doc 수행) / 확장자·매직바이트·크기 한도 / mime 고정표(high1) / 열기=docVisible(공개범위·타인 대기 404)
 //    / save 재구성 files 원본 고정(위조·삭제 무시)·관리자 직전 읽기 실패 500(med2) / 삭제 관리자 전용(메타·바이트 제거)·att_seq 단조 증가(low4·low7) / att_parse 프리픽스(low6)
-//    / 일괄 등재(관리자·cid 멱등·항목당 1~3·합계 5.5MB·확장자·매직·제목·항목 상한·12분류 cat)
+//    / 일괄 등재(관리자·cid 멱등·항목당 1~3·합계 5.5MB·확장자·매직·제목·항목 상한·2층 분류 cat 73키)
 mem.gw_data['col:documents'] = { schema: 1, items: [
-  { id: 'f1', title: '관리자 문서', cat: '02', scope: 'all', status: '등재' },
-  { id: 'f2', title: '직원 대기 문서', cat: '06', status: '대기', by: { id: 'udocw', name: '문서직원' } },
-  { id: 'f3', title: '비공개 문서', cat: '05', status: '등재' },
-  { id: 'f4', title: '삭제 문서', cat: '06', del: 1 },
-  { id: 'f5', title: '구건(카운터 없음·n 2 잔존)', cat: '06', scope: 'all', status: '등재', files: [{ n: 2, name: '구.pdf', size: 1, mime: 'application/pdf', ts: 1, by: { id: 'uadmin', name: '관리자' } }] },
-  { id: 'f6', title: '카운터만 남은 문서', cat: '06', scope: 'all', status: '등재', att_seq: 5 },
+  { id: 'f1', title: '관리자 문서', cat: '02-01', scope: 'all', status: '등재' },
+  { id: 'f2', title: '직원 대기 문서', cat: '06-03', status: '대기', by: { id: 'udocw', name: '문서직원' } },
+  { id: 'f3', title: '비공개 문서', cat: '05-01', status: '등재' },
+  { id: 'f4', title: '삭제 문서', cat: '06-03', del: 1 },
+  { id: 'f5', title: '구건(카운터 없음·n 2 잔존)', cat: '06-03', scope: 'all', status: '등재', files: [{ n: 2, name: '구.pdf', size: 1, mime: 'application/pdf', ts: 1, by: { id: 'uadmin', name: '관리자' } }] },
+  { id: 'f6', title: '카운터만 남은 문서', cat: '06-03', scope: 'all', status: '등재', att_seq: 5 },
 ], updated_at: 100 };
 mem.gw_files = { 'docatt:f5:2': { name: '구.pdf', type: 'application/pdf', data: 'JVBERi0=' } };
 // 매직바이트가 맞는 최소 페이로드 — 서버가 확장자와 내용을 대조한다(high1)
@@ -679,9 +680,9 @@ r = await call({ action: 'att_parse', id: 'docatt:f1:1' }, tokA);
 T('low6: att_parse에 docatt: 키 → 400 BAD_ID(계약 권한으로 문서함 첨부 판독 차단)', r.code === 400 && r.body.error_code === 'BAD_ID', r.code + '/' + r.body.error_code);
 // save 재구성: 비관리자가 files 위조(f1)·삭제(f2 files 제거) 전송 → 서버 원본 고정. 관리자 낡은 사본(files 없음) 저장에도 이월
 r = await call({ action: 'save', collection: 'documents', doc: { schema: 1, items: [
-  { id: 'f1', title: '관리자 문서', cat: '02', scope: 'all', status: '등재', files: [{ n: 9, name: '위조.pdf', size: 1 }] },
-  { id: 'f2', title: '직원 대기 문서(편집)', cat: '06', status: '대기', by: { id: 'udocw', name: '문서직원' } },
-  { id: 'fn1', title: '신규 with files', cat: '06', files: [{ n: 1, name: '위조.pdf' }] },
+  { id: 'f1', title: '관리자 문서', cat: '02-01', scope: 'all', status: '등재', files: [{ n: 9, name: '위조.pdf', size: 1 }] },
+  { id: 'f2', title: '직원 대기 문서(편집)', cat: '06-03', status: '대기', by: { id: 'udocw', name: '문서직원' } },
+  { id: 'fn1', title: '신규 with files', cat: '06-03', files: [{ n: 1, name: '위조.pdf' }] },
 ] } }, tokD, 'dev1');
 T('save 재구성(직원): 첨부 메타 위조(f1)·삭제(f2) 무시 — 서버 원본 고정(att_seq 포함), 신규 문서 files·att_seq 제거, 제목 편집만 반영', r.code === 200 && fdoc('f1').files.length === 3 && fdoc('f1').files[0].name === '취업규칙.pdf' && fdoc('f2').files.length === 1 && fdoc('f2').title === '직원 대기 문서(편집)' && fdoc('fn1') && fdoc('fn1').files === undefined && fdoc('f1').att_seq === 3 && fdoc('fn1').att_seq === undefined, JSON.stringify([fdoc('f1').files, fdoc('f1').att_seq, fdoc('f2').files, fdoc('fn1')]).slice(0, 200));
 r = await call({ action: 'save', collection: 'documents', doc: { schema: 1, items: mem.gw_data['col:documents'].items.map((x) => { const s = Object.assign({}, x); delete s.files; return s; }) } }, tokA);
@@ -708,11 +709,11 @@ r = await call({ action: 'doc_att_put', id: 'f1', name: '네번째.png', data: P
 T('삭제 후 재첨부 번호는 단조 증가(n=4 — 번호 재사용 없음)', r.code === 200 && r.body.n === 4 && fdoc('f1').att_seq === 4);
 // 일괄 등재(doc_bulk_put)
 const bulkItems = [
-  { title: '정본 A 규정', cat: '05', no: 'JW-05-001', version: 'v1', revised: '2026-09-01', note: '정본', files: [{ name: 'a.hwpx', mime: 'text/html', data: ZIP }] },
-  { title: '증빙 B', cat: '02', scope: 'mgmt', files: [{ name: 'b.pdf', data: PDF }, { name: 'b2.png', data: PNG }] },
+  { title: '정본 A 규정', cat: '02-01', no: 'JW-02-01-001', version: 'v1', revised: '2026-09-01', note: '정본', files: [{ name: 'a.hwpx', mime: 'text/html', data: ZIP }] },
+  { title: '증빙 B(구 2자리 cat → 99)', cat: '02', scope: 'mgmt', files: [{ name: 'b.pdf', data: PDF }, { name: 'b2.png', data: PNG }] },
   { title: '분류 없음 → 미분류', files: [{ name: 'c.xlsx', data: ZIP }] },
-  { title: '신설 분류 10', cat: '10', files: [{ name: 'd.pdf', data: PDF }] },
-  { title: '표 밖 분류 13 → 99', cat: '13', files: [{ name: 'e.pdf', data: PDF }] },
+  { title: '빈 대분류 10 재무·세무', cat: '10-01', files: [{ name: 'd.pdf', data: PDF }] },
+  { title: '표 밖 분류 13-01 → 99', cat: '13-01', files: [{ name: 'e.pdf', data: PDF }] },
   { title: '프로토타입 키 → 99', cat: 'constructor', files: [{ name: 'f.pdf', data: PDF }] },
 ];
 const docN0 = mem.gw_data['col:documents'].items.length;
@@ -724,9 +725,9 @@ r = await call({ action: 'doc_bulk_put', cid: 'bulk-1', items: bulkItems }, tokA
 const bulkIds = (r.body.items || []).map((x) => x.id);
 {
   const a = fdoc(bulkIds[0]), b = fdoc(bulkIds[1]), c = fdoc(bulkIds[2]), d10 = fdoc(bulkIds[3]), d13 = fdoc(bulkIds[4]), dpk = fdoc(bulkIds[5]);
-  T('bulk: 관리자 6건 → 200 count 6 · 전부 즉시 등재(registered_by 관리자·by 관리자) · 메타 이월(no·version·revised·note) · att_seq=첨부 수', r.code === 200 && r.body.count === 6 && bulkIds.length === 6 && a && a.status === '등재' && a.registered_by.id === 'uadmin' && a.by.id === 'uadmin' && a.no === 'JW-05-001' && a.version === 'v1' && a.revised === '2026-09-01' && a.note === '정본' && a.cat === '05' && a.att_seq === 1 && b.att_seq === 2, JSON.stringify(a).slice(0, 240));
-  T('bulk: 첨부 메타 n 1..k + gw_files 바이트 + mime 고정표(클라 text/html 폐기) + scope 정규화(mgmt) + 미지정 분류=99·scope 없음(비공개)', b && b.files.length === 2 && b.files[1].n === 2 && b.files[1].mime === 'image/png' && a.files[0].mime === 'application/hwp+zip' && mem.gw_files['docatt:' + a.id + ':1'].type === 'application/hwp+zip' && mem.gw_files['docatt:' + b.id + ':2'] && mem.gw_files['docatt:' + b.id + ':2'].data === PNG && b.scope === 'mgmt' && c && c.cat === '99' && c.scope === undefined && c.files.length === 1, JSON.stringify([a && a.files, b && b.files, c && c.cat, c && c.scope]).slice(0, 240));
-  T('12분류: bulk cat 10 → 10 그대로 / 13 → 99 강등 / constructor → 99', d10 && d10.cat === '10' && d13 && d13.cat === '99' && dpk && dpk.cat === '99', JSON.stringify([d10 && d10.cat, d13 && d13.cat, dpk && dpk.cat]));
+  T('bulk: 관리자 6건 → 200 count 6 · 전부 즉시 등재(registered_by 관리자·by 관리자) · 메타 이월(no·version·revised·note) · att_seq=첨부 수', r.code === 200 && r.body.count === 6 && bulkIds.length === 6 && a && a.status === '등재' && a.registered_by.id === 'uadmin' && a.by.id === 'uadmin' && a.no === 'JW-02-01-001' && a.version === 'v1' && a.revised === '2026-09-01' && a.note === '정본' && a.cat === '02-01' && a.att_seq === 1 && b.att_seq === 2, JSON.stringify(a).slice(0, 240));
+  T('bulk: 첨부 메타 n 1..k + gw_files 바이트 + mime 고정표(클라 text/html 폐기) + scope 정규화(mgmt) + 구 2자리 cat 02 → 99 강등 + 미지정 분류=99·scope 없음(비공개)', b && b.cat === '99' && b.files.length === 2 && b.files[1].n === 2 && b.files[1].mime === 'image/png' && a.files[0].mime === 'application/hwp+zip' && mem.gw_files['docatt:' + a.id + ':1'].type === 'application/hwp+zip' && mem.gw_files['docatt:' + b.id + ':2'] && mem.gw_files['docatt:' + b.id + ':2'].data === PNG && b.scope === 'mgmt' && c && c.cat === '99' && c.scope === undefined && c.files.length === 1, JSON.stringify([a && a.files, b && b.files, c && c.cat, c && c.scope]).slice(0, 240));
+  T('2층 분류: bulk cat 10-01 → 그대로 / 13-01(표 밖) → 99 강등 / constructor → 99', d10 && d10.cat === '10-01' && d13 && d13.cat === '99' && dpk && dpk.cat === '99', JSON.stringify([d10 && d10.cat, d13 && d13.cat, dpk && dpk.cat]));
   T('bulk: 감사로그 일괄등재 6건 · 문서 수 +6 · bulk_cid 스탬프', auditMock.logs.some((l) => l.col === 'documents' && l.ev.length === 6 && l.ev.every((e) => e.op === '일괄등재')) && mem.gw_data['col:documents'].items.length === docN0 + 6 && a.bulk_cid === 'bulk-1');
 }
 r = await call({ action: 'doc_bulk_put', cid: 'bulk-1', items: bulkItems }, tokA);
@@ -753,35 +754,49 @@ T('bulk: cid 형식 위반 → 400 NO_CID', r.code === 400 && r.body.error_code 
 r = await call({ action: 'get', collection: 'documents' }, tokM, 'dev1');
 T('bulk 등재 문서 열람: scope mgmt 건은 관리부원에게 보이고 미분류(분류 기본 관리자만)는 비노출', r.code === 200 && (r.body.doc.items || []).some((x) => x.id === bulkIds[1]) && !(r.body.doc.items || []).some((x) => x.id === bulkIds[2]));
 
-// 23 문서함 1층 12분류(개편안 2026-09-04 §5): 설정 기본값(신설 분류 전부 admin=비공개) / BAD_CAT 경계 / docCatOf JW 번호·구 분류 텍스트 파생 → get 필터
+// 23 문서함 2층 분류(문서체계 설계안 v2 2026-09-04 §6 #26, v317): 설정 기본값(대분류 12키 전부 admin=비공개) / BAD_CAT 경계(표 밖 13·중분류 키 06-01) / docCatOf 4층 번호 파생 → get 필터
+//    구형식 JW-05-001·구 텍스트 category·구 2자리 cat → 99(폴백 삭제) / cat 위조 'constructor' → no 파생 / 구 cat '01'+구형식 번호 → 대분류 01 하드차단 유지(docMajorOf)
 r = await call({ action: 'doc_settings_get' }, tokA);
 {
   const sd = r.body.settings.scope_default, keys = Object.keys(sd).sort();
-  T('12분류: 설정 기본값 키 02~12·99(12개) · 신설 분류(04·07~12) 전부 관리자만 · 기존 저장값(02 all·03 mgmt) 유지', r.code === 200 && keys.join() === ['02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12', '99'].join() && ['04', '07', '08', '09', '10', '11', '12'].every((c) => sd[c] === 'admin') && sd['02'] === 'all' && sd['03'] === 'mgmt', JSON.stringify(sd));
+  T('2층: 설정 기본값 키 = 대분류 02~12·99(12개) · 미저장 대분류 전부 관리자만 · 기존 저장값(02 all·03 mgmt) 유지', r.code === 200 && keys.join() === ['02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12', '99'].join() && ['04', '05', '06', '08', '09', '10', '11', '12', '99'].every((c) => sd[c] === 'admin') && sd['02'] === 'all' && sd['03'] === 'mgmt', JSON.stringify(sd));
 }
 r = await call({ action: 'doc_settings_set', cat: '13', scope: 'all' }, tokA);
-T('12분류: 표 밖 분류(13) 설정 → 400 BAD_CAT', r.code === 400 && r.body.error_code === 'BAD_CAT');
+T('2층: 표 밖 대분류(13) 설정 → 400 BAD_CAT', r.code === 400 && r.body.error_code === 'BAD_CAT');
+r = await call({ action: 'doc_settings_set', cat: '06-01', scope: 'all' }, tokA);
+T('2층: 중분류 키(06-01) 설정 → 400 BAD_CAT(공개범위 기본값은 대분류 단위)', r.code === 400 && r.body.error_code === 'BAD_CAT');
 r = await call({ action: 'doc_settings_set', cat: '07', scope: 'constructor' }, tokA);
 T('low5: scope 프로토타입 키(constructor) → 400 BAD_SCOPE', r.code === 400 && r.body.error_code === 'BAD_SCOPE');
 r = await call({ action: 'doc_settings_get' }, tokA);
 r = await call({ action: 'doc_settings_set', cat: '07', scope: 'all', base: r.body.updated_at }, tokA);
-T('12분류: 07 매뉴얼·가이드 → 전원 설정 200', r.code === 200 && r.body.settings.scope_default['07'] === 'all' && r.body.settings.scope_default['11'] === 'admin');
+T('2층: 07 인사·노무 → 전원 설정 200', r.code === 200 && r.body.settings.scope_default['07'] === 'all' && r.body.settings.scope_default['11'] === 'admin');
+r = await call({ action: 'doc_settings_get' }, tokA);
+r = await call({ action: 'doc_settings_set', cat: '06', scope: 'mgmt', base: r.body.updated_at }, tokA);
+T('2층: 06 안전보건 → 관리부+관리자 설정 200', r.code === 200 && r.body.settings.scope_default['06'] === 'mgmt' && r.body.settings.scope_default['07'] === 'all');
 mem.gw_data['col:documents'].items.push(
-  { id: 'g1', title: '기성청구 매뉴얼', no: 'JW-07-001', status: '등재' },
-  { id: 'g2', title: 'JW-11-002 KOITA 인정서', status: '등재' },
-  { id: 'g3', title: '회사소개서', category: '홍보물', status: '등재' },
-  { id: 'g4', title: '하위번호 문서', no: 'JW-03-016-01', status: '등재' },
-  { id: 'g5', title: 'JW-2026 사업계획', status: '등재' },
-  { id: 'g6', title: '인허가 관리표', category: '인허가', status: '등재', scope: 'all' },
-  { id: 'g7', title: 'cat 위조', cat: 'constructor', no: 'JW-12-001', status: '등재' },
+  { id: 'g1', title: '취업규칙', no: 'JW-07-01-001', status: '등재' },                                   // 07-01 → 대분류 07 전원 → 직원 열람
+  { id: 'g2', title: '연도판', no: 'JW-07-05-001-2026', status: '등재' },                                // 4층 연도판도 앞 두 마디 → 07-05 → 열람
+  { id: 'g3', title: '별지', no: 'JW-06-01-004-01', status: '등재' },                                    // 06-01 → 06 mgmt → 관리부만
+  { id: 'g4', title: 'JW-11-002 구형식 번호(제목)', status: '등재' },                                   // 구형식 → 99 → 비노출
+  { id: 'g5', title: '인허가 관리표', category: '인허가', status: '등재' },                              // 구 텍스트 폴백 삭제 → 99 → 비노출
+  { id: 'g6', title: '구형식 번호+scope all', no: 'JW-05-001', scope: 'all', status: '등재' },          // 99여도 문서 scope all은 열람
+  { id: 'g7', title: 'cat 위조', cat: 'constructor', no: 'JW-12-01-001', status: '등재' },               // no 파생 12-01 → 12 admin → 비노출
+  { id: 'g8', title: '구 2자리 cat', cat: '07', no: 'JW-05-001', status: '등재' },                      // 구 cat '07'은 키 아님 → 99 → 07 전원이어도 비노출
+  { id: 'g9', title: '구 cat 01+구형식', cat: '01', no: 'JW-01-002', scope: 'all', status: '등재' },    // 번호 파생 실패해도 대분류 01 → 하드차단(scope all 무시) → 직원 비노출·관리부 열람
+  { id: 'g10', title: 'JW-2026 사업계획', status: '등재' },                                             // 99
+  { id: 'g11', title: '표 밖 중분류', no: 'JW-06-07-001', scope: 'all', status: '등재' },               // 06-07은 키 아님 → 99, scope all → 열람
 );
 r = await call({ action: 'get', collection: 'documents' }, tokD, 'dev1');
 {
   const ids = (r.body.doc.items || []).map((x) => x.id);
-  T('12분류 파생: JW-07 번호(07 전원) 직원 열람 / JW-11·홍보물(12)·JW-2026(99)·하위번호 03(mgmt) 비노출 / 구 분류 텍스트 인허가(04)+scope all 열람 / cat 위조는 no에서 12 파생 → 비노출', r.code === 200 && ids.indexOf('g1') >= 0 && ids.indexOf('g6') >= 0 && ['g2', 'g3', 'g4', 'g5', 'g7'].every((id) => ids.indexOf(id) < 0), ids.join(','));
+  T('2층 파생(직원): g1 07-01·g2 연도판 07-05 열람 / g6·g11 99+scope all 열람 / g3 06-01(mgmt)·g4 구형식·g5 구 텍스트·g7 cat 위조→12·g8 구 2자리 cat·g9 구 cat 01·g10 비노출',
+    r.code === 200 && ['g1', 'g2', 'g6', 'g11'].every((id) => ids.indexOf(id) >= 0) && ['g3', 'g4', 'g5', 'g7', 'g8', 'g9', 'g10'].every((id) => ids.indexOf(id) < 0), ids.join(','));
 }
 r = await call({ action: 'get', collection: 'documents' }, tokM, 'dev1');
-T('12분류 파생: 하위번호 JW-03-016-01 → 03(관리부+관리자) 관리부원 열람', r.code === 200 && (r.body.doc.items || []).some((x) => x.id === 'g4'));
+{
+  const ids = (r.body.doc.items || []).map((x) => x.id);
+  T('2층 파생(관리부): 별지 JW-06-01-004-01 → 06 mgmt 열람 + 구 cat 01(g9) 하드차단 축(관리부+관리자) 열람 / g7(12 admin) 비노출', r.code === 200 && ids.indexOf('g3') >= 0 && ids.indexOf('g9') >= 0 && ids.indexOf('g7') < 0, ids.join(','));
+}
 
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');
 process.exit(fail ? 1 : 0);
