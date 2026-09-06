@@ -267,35 +267,38 @@ function shotInfo(shotAt) {
 // slot = 지역명 자리(앞/중/뒤/자유). needs = 이 원형이 성립하는 입력 조건.
 // ex(예시)는 시스템 프롬프트가 아니라 user 메시지의 [이번 글의 제목 원형] 블록에만 실린다.
 // 예시·규칙 문장에 네 자리 이상 숫자를 쓰지 않는다(계약금액 차단 scrubPayload와 충돌 — 2026-08-14 실사고).
+// 예시는 촬영일 없는 기록에도 실리므로 계절·시기어(겨울·낙엽·n월…)를 쓰지 않는다(S만 needs shot_at로 막힌다). 구두점은 쉼표·대시 합쳐 하나까지(제목 규칙과 동일).
+// 실제 기관명으로 읽힐 문구(포항 초등학교 등)도 쓰지 않는다 — 계약 금지 문자열(발주처명)과 겹치면 g1 검사에서 생성이 막힌다.
+// 소요 시간(하루에·반나절)은 현장 사실(A)이라 예시·규칙에 두지 않는다 — 담당자 수치·메모에 있을 때만(9/6 검증 반영 ④·⑦·⑧·⑨).
 var TITLE_TYPES = [
   { code: 'Q', name: '질문형', slot: '뒤',
-    rule: '독자가 검색창에 칠 질문 한 문장으로 끝냅니다(…일까요 / …할까요). 본문 소제목의 질문과 같은 말이면 안 됩니다.',
-    ex: ['오수관이 겨울에 더 자주 막히는 이유가 뭘까요, 포항 장량동 현장의 답',
-         '우수받이는 언제 비워야 할까요, 낙엽 그친 뒤 포항 용흥동에서 본 기준'] },
+    rule: '독자가 검색창에 칠 질문 한 문장(…일까요 / …할까요)을 앞세우고, 지역명은 그 뒤에 쉼표로 붙입니다. 본문 소제목의 질문과 같은 말이면 안 됩니다.',
+    ex: ['오수관이 한 자리에서만 자주 막히는 이유가 뭘까요, 포항 장량동 현장의 답',
+         '우수받이는 언제 비워야 할까요, 포항 용흥동 도로변에서 본 기준'] },
   { code: 'N', name: '수치·기록형', slot: '뒤', needs: 'metric|photos',
-    rule: '담당자가 적은 수치, 개소 수, 사진 장수, 걸린 시간 같은 실측 숫자를 앞세웁니다. 숫자는 세 자리까지, 금액은 쓰지 않습니다.',
-    ex: ['우수받이 열두 개소를 하루에 비운 기록, 포항 용흥동 산 아래 도로',
-         '사진 열여덟 장으로 남긴 12월 준설 — 포항 용흥동 우수받이 침전물'] },
+    rule: '담당자가 적은 수치, 개소 수, 사진 장수 같은 실측 숫자를 앞세웁니다. 걸린 시간은 담당자 수치나 현장 메모에 있을 때만 씁니다. 숫자는 세 자리까지, 금액은 쓰지 않습니다.',
+    ex: ['우수받이 열두 개소를 비운 기록, 포항 용흥동 산 아래 도로',
+         '사진 열여덟 장으로 남긴 준설 기록 — 포항 용흥동 우수받이 침전물'] },
   { code: 'C', name: '비교·대비형', slot: '중',
     rule: '작업 전과 후, 예상과 실제, 두 원인 중 어느 쪽인가처럼 둘을 맞세웁니다. "…인 줄 알았는데 …였습니다" 꼴이 대표입니다.',
     ex: ['정화조 문제인 줄 알았는데 오수관이었습니다 — 포항 제내리 역류 현장',
-         '그레이팅 위는 멀쩡한데 아래는 낙엽 반 통, 포항 용흥동 우수받이 전후'] },
+         '그레이팅 위는 멀쩡한데 아래는 흙 반 통, 포항 용흥동 우수받이 전후'] },
   { code: 'P', name: '과정·순서형', slot: '뒤',
     rule: '첫 공정부터 마지막 확인까지 순서를 제목에 담습니다. "…부터 …까지" 또는 "…순서" 꼴입니다.',
     ex: ['그레이팅 들어내기부터 관 입구 확인까지 — 포항 용흥동 우수받이 준설 순서',
-         '막힌 자리 찾기, 고압세척, 흡입 — 상가 하수구를 뚫는 순서, 포항 용덕리'] },
+         '막힌 자리 찾기부터 고압세척과 흡입까지 상가 하수구를 뚫는 순서, 포항 용덕리'] },
   { code: 'O', name: '현장 관찰형', slot: '자유',
     rule: '뚜껑을 열었을 때, 관을 비췄을 때 실제로 보인 것을 제목으로 씁니다. 사진에서 확인된 사실만 씁니다.',
-    ex: ['뚜껑을 열자 낙엽과 흙이 통 절반 — 포항 용흥동 우수받이가 막힌 이유',
+    ex: ['뚜껑을 열자 흙과 모래가 통 절반 — 포항 용흥동 우수받이가 막힌 이유',
          '맨홀 안에 물이 서 있었습니다, 포항 두호동 상가 하수구 침전물 현장'] },
   { code: 'T', name: '기간·주기형', slot: '뒤',
-    rule: '한 번 처리하면 얼마나 가는지, 작업에 얼마나 걸리는지, 몇 년마다 하는지 같은 기간·주기를 앞세웁니다. 금액은 쓰지 않습니다.',
-    ex: ['한 번 비우면 얼마나 갈까 — 우수받이 준설 주기, 포항 용흥동 도로변 기준',
-         '반나절이면 끝나는 상가 하수구 준설, 포항 용덕리에서 걸린 시간'] },
+    rule: '한 번 처리하면 얼마나 가는지, 몇 년마다 하는지 같은 주기를 앞세웁니다. 이번 작업에 걸린 시간은 담당자 수치나 현장 메모에 있을 때만 씁니다. 금액은 쓰지 않습니다.',
+    ex: ['한 번 비우면 얼마나 갈까 — 포항 용흥동 도로변 우수받이 준설 주기',
+         '상가 하수구 준설은 몇 년마다 하면 될까, 포항 용덕리 골목 기준'] },
   { code: 'M', name: '실수·오해 예방형', slot: '중',
     rule: '독자가 흔히 하는 오해나 직접 하다 그르치는 실수를 짚고, 그 이유를 예고합니다.',
     ex: ['물만 빼면 된다는 오해 — 포항 두호동 상가 하수구가 다시 막히는 이유',
-         '뚜껑만 열어 낙엽을 걷어내면 안 되는 이유, 포항 용흥동 우수받이의 경우'] },
+         '뚜껑만 열어 쓰레기를 걷어내면 안 되는 이유, 포항 용흥동 우수받이의 경우'] },
   { code: 'S', name: '계절·시기형', slot: '중', needs: 'shot_at',
     rule: '촬영일의 달·계절을 기준으로 지금 해야 하는 이유를 앞세웁니다. 촬영일이 없으면 이 원형을 쓰지 않습니다.',
     ex: ['낙엽 그친 12월이 우수받이를 비울 때인 이유 — 포항 용흥동 산 아래 도로',
@@ -311,7 +314,7 @@ var TITLE_TYPES = [
   { code: 'R', name: '관리 주체·절차형', slot: '중',
     rule: '이 시설은 누가 관리하는지(지자체·건물주·소유자)와 정해진 절차를 제목에서 예고합니다. 석면·철거처럼 법정 절차가 있는 공종에 잘 맞습니다.',
     ex: ['상가 하수구는 누가 뚫어야 할까 — 포항 용덕리 건물 배관과 공공 관로의 경계',
-         '학교 석면 해체는 신고부터 시작됩니다, 포항 초등학교 교사동 절차 기록'] }
+         '학교 석면 해체는 신고부터 시작됩니다, 교사동 텍스 철거 전 절차 기록'] }
 ];
 var TITLE_CODES = TITLE_TYPES.map(function (t) { return t.code; });
 function titleTypeByCode(code) {
@@ -365,21 +368,44 @@ function hash32(s) {
   return h >>> 0;
 }
 
+// 지역 문자열의 어절·동읍면리 토큰 — {토큰:1}. 면·리 접미 어절이 지역명인지 판정하는 근거(titleLeadsWithRegion·titleWords).
+function regionTokens(region) {
+  var r = String(region || '').trim();
+  var out = {};
+  if (!r) return out;
+  r.split(/\s+/).forEach(function (w) { var b = w.replace(/[,]$/, ''); if (b) out[b] = 1; });
+  var re = /([가-힣]{2,6})(읍|면|동|리)(?![가-힣])/g, m;
+  while ((m = re.exec(r)) !== null) out[m[1] + m[2]] = 1;
+  return out;
+}
+// 어절이 지역명인가 — 시·군·읍·동 접미(앞 2~6자)는 보통 어절과 거의 안 겹치므로 접미만으로 본다.
+// 면·리 접미는 보통 어절(반나절이면·놔두면·막히면·방치하면·마무리)과 겹쳐, region 토큰과 일치할 때만 지역명으로 본다(9/6 검증 반영 ③).
+// josa=true면 뒤에 붙은 조사(에서·의·은·는·이·가)를 떼고 본다(titleWords용).
+function isRegionWord(w, region, josa) {
+  var b = String(w || '').replace(/[,]$/, '');
+  if (!b) return false;
+  if (/^(포항|포항시|경주|경주시|영덕|안동|울진|경산|대구|울산)$/.test(b)) return true;
+  var m = josa ? /^([가-힣]{2,6}(?:시|군|읍|면|동|리))(?:에서|의|은|는|이|가)?$/.exec(b) : /^([가-힣]{2,6}(?:시|군|읍|면|동|리))$/.exec(b);
+  if (!m) return false;
+  if (/(시|군|읍|동)$/.test(m[1])) return true;
+  return !!regionTokens(region)[m[1]];
+}
 // 제목 첫 어절이 지역명인가 — "포항 ○○동 …"(22/22 실측)처럼 시 단위 또는 동·리 단위로 시작하면 참.
+// region은 그 제목이 속한 기록의 지역(최근 제목이면 그 기록의 region, 없으면 현재 기록의 region).
 function titleLeadsWithRegion(title, region) {
   var t = String(title || '').trim();
   var first = t.split(/\s+/)[0] || '';
   if (!first) return false;
-  if (/^[가-힣]{2,6}(시|군)$/.test(first)) return true;
-  if (/^[가-힣]{2,6}(읍|면|동|리)[,]?$/.test(first)) return true;
-  var r = String(region || '').trim().split(/\s+/);
-  for (var i = 0; i < r.length; i++) if (r[i] && first.replace(/[,]$/, '') === r[i]) return true;
+  if (isRegionWord(first, region, false)) return true;
   return /^(포항|경주|영덕|안동|울진|경산|대구|울산)/.test(first);
 }
-// 종결 부류 — q 질문 / s 서술(…다, …요) / n 명사·기타
+// 종결 부류 — q 질문 / s 서술(…다, …요) / n 명사·기타.
+// "…일까요, 포항 ○○동 …"처럼 질문 문장 뒤에 지역명을 쉼표로 붙인 Q 골격도 질문 종결로 본다(9/6 검증 반영 ⑧ — Q 규칙·예시와 정합).
 function titleEnding(title) {
   var t = String(title || '').trim();
-  return /[?？]\s*$|까요\s*$|까\s*$/.test(t) ? 'q' : (/(다|요)\s*[.]?\s*$/.test(t) ? 's' : 'n');
+  if (/[?？]\s*$|까요\s*$|까\s*$/.test(t)) return 'q';
+  if (/까요(?=[\s,，—–])/.test(t)) return 'q';
+  return /(다|요)\s*[.]?\s*$/.test(t) ? 's' : 'n';
 }
 // 구두점 서명 — 쉼표·대시·가운뎃점·콜론의 순서(대시 종류는 하나로 봄). 물음표는 종결 부류가 담는다.
 function punctSig(title) {
@@ -391,39 +417,41 @@ function titleShape(title, region) {
   return (titleLeadsWithRegion(t, region) ? 'R' : '_') + '|' + punctSig(t) + '|' + titleEnding(t);
 }
 // 어절 집합 — 지역명(시·군·읍·면·동·리)은 같은 동네 현장이면 늘 겹치므로 겹침 계산에서 뺀다.
-function titleWords(title) {
+// 면·리 접미 어절은 region 토큰과 일치할 때만 지역명으로 뺀다(isRegionWord) — '반나절이면·놔두면·마무리'가 겹침 계산·leadTwo에서 사라지던 결함 수리.
+function titleWords(title, region) {
   return String(title || '').replace(/[,—–\-·:?？.!]/g, ' ').split(/\s+/)
-    .filter(function (w) { return w && !/^(포항|포항시|경주|경주시|영덕|안동|울진|경산|대구|울산)$/.test(w) && !/^[가-힣]{2,6}(시|군|읍|면|동|리)(에서|의|은|는|이|가)?$/.test(w); });
+    .filter(function (w) { return w && !isRegionWord(w, region, true); });
 }
-function overlapCount(a, b) {
-  var wa = titleWords(a), wb = titleWords(b), n = 0, seen = {};
+// 겹치는 어절 수 — ra·rb는 각 제목이 속한 기록의 지역(없으면 빈 값: 면·리 어절도 보통 어절로 센다). rb 생략 시 ra.
+function overlapCount(a, b, ra, rb) {
+  var wa = titleWords(a, ra), wb = titleWords(b, rb === undefined ? ra : rb), n = 0, seen = {};
   for (var i = 0; i < wa.length; i++) {
     if (seen[wa[i]]) continue;
     if (wb.indexOf(wa[i]) >= 0) { n++; seen[wa[i]] = 1; }
   }
   return n;
 }
-function leadTwo(title) { return titleWords(title).slice(0, 2).join(' '); }
+function leadTwo(title, region) { return titleWords(title, region).slice(0, 2).join(' '); }
 
 // 같은 제목인가 — 이력 blob의 제목과 기록의 현재 제목을 맞출 때 쓴다(recentTitleInfo).
 // 1) 공백·끝 구두점만 다른 것은 같은 제목. 2) 사람이 한두 어절 고친 것도 같은 제목으로 본다:
 //    지역명 뺀 어절이 4개 이상 겹치고 짧은 쪽 어절의 70% 이상이면. (다른 원형으로 다시 쓴 제목은 어절이 이만큼 겹치지 않는다.)
 function normTitle(t) { return String(t || '').replace(/\s+/g, ' ').replace(/[\s.?？!,—–\-·:]+$/, '').trim(); }
-function titleMatch(a, b) {
+function titleMatch(a, b, region) {
   var na = normTitle(a), nb = normTitle(b);
   if (!na || !nb) return false;
   if (na === nb) return true;
-  var wa = titleWords(na), wb = titleWords(nb);
+  var wa = titleWords(na, region), wb = titleWords(nb, region);
   var m = Math.min(wa.length, wb.length);
   if (m < 4) return false;
-  var n = overlapCount(na, nb);
+  var n = overlapCount(na, nb, region);
   return n >= 4 && n / m >= 0.7;
 }
 
 // 골격(접두·지역명 위치·종결·구두점) — 원형을 알 수 없는 제목은 이 넷으로 '닮음'을 잰다.
 function titleSkeleton(title, region) {
   var t = String(title || '').trim();
-  return { title: t, prefix: leadTwo(t), lead: titleLeadsWithRegion(t, region), end: titleEnding(t), punct: punctSig(t) };
+  return { title: t, prefix: leadTwo(t, region), lead: titleLeadsWithRegion(t, region), end: titleEnding(t), punct: punctSig(t) };
 }
 // 두 골격이 겹치는 요소 이름 목록(접두는 둘 다 비어 있지 않을 때만).
 function skeletonOverlap(a, b) {
@@ -449,24 +477,29 @@ function shapeWords(title, region) {
 }
 
 // ---- 최근 제목·라벨 읽기(워커·회귀 시험 공용 순수 함수) ----
-// 최근 제목 후보 — col:promo items에서 게시(posted) 우선 → 게시일 내림차순 → 생성 ts 내림차순. 자기 기록 제외, 상위 n건.
-// 반환 [{id, title, ai_tt}] — ai_tt는 p.ai.tt(2단계 index.html 저장분, 없으면 '').
+// 최근 제목 후보 — col:promo items에서 '유효 시각' 내림차순. 유효 시각 = max(게시일 posted_at, AI 생성 시각 p.ai.ts). 동률은 ts.
+// (게시일은 날짜 단위라 같은 날 생성 시각으로 순서를 보정한다.) 상태 순위(게시 우선)를 두지 않는다 — 게시 5건이 쌓인 뒤 미게시 초안(review·approved)끼리
+// 서로를 못 보고 같은 제외 집합으로 연속 반복하던 결함(9/6 반박 검증 ①: 일괄 초안 3·5·30건에서 6·11·17/30 반복) 수리.
+// 게시도 AI 초안도 없는 기록(예비 생성기 제목 그대로인 갓 등록 기록·손으로만 쓴 미게시 제목)은 유효 시각이 없어 후보에서 뺀다 — ts로 넣으면 일괄 등록 뒤 첫 생성에서
+// 예비 제목이 실제 게시·초안 제목을 밀어낸다(servertest 실측). 게시되면 posted_at로 들어온다. posted인데 posted_at이 없는 구 기록만 ts로 본다.
+// 삭제(del)·반려(rejected)만 제외, 자기 기록 제외, 상위 n건.
+// 반환 [{id, title, ai_tt, region}] — ai_tt는 p.ai.tt(2단계 index.html 저장분, 없으면 ''), region은 그 기록의 지역(지역명 선두·어절 판정용).
 function recentTitleCandidates(list, selfId, n) {
-  var rank = function (it) { return it.status === 'posted' ? 2 : (it.status === 'review' ? 1 : 0); };
+  var eff = function (it) {
+    var t = 0, a = 0;
+    if (it.status === 'posted') t = (it.posted_at ? Date.parse(String(it.posted_at)) : 0) || Number(it.ts) || 0;
+    if (it.ai && it.ai.ts) a = Number(it.ai.ts) || 0;
+    return a > t ? a : t;   // 0 = 게시도 AI 초안도 없음 → 후보 밖
+  };
   return (Array.isArray(list) ? list : [])
-    .filter(function (it) { return it && it.del !== 1 && it.id !== selfId && it.title; })
-    .sort(function (a, b) {
-      var d = rank(b) - rank(a); if (d) return d;
-      var pa = String(a.posted_at || ''), pb = String(b.posted_at || '');
-      if (pa !== pb) return pa < pb ? 1 : -1;
-      return (b.ts || 0) - (a.ts || 0);
-    })
+    .filter(function (it) { return it && it.del !== 1 && it.status !== 'rejected' && it.id !== selfId && it.title && eff(it) > 0; })
+    .sort(function (a, b) { var d = eff(b) - eff(a); if (d) return d; return (Number(b.ts) || 0) - (Number(a.ts) || 0); })
     .slice(0, n)
-    .map(function (it) { return { id: String(it.id || ''), title: safeText(it.title, 60), ai_tt: safeText(it.ai && it.ai.tt, 2) }; })
+    .map(function (it) { return { id: String(it.id || ''), title: safeText(it.title, 60), ai_tt: safeText(it.ai && it.ai.tt, 2), region: safeText(it.region, 40) }; })
     .filter(function (x) { return x.title; });
 }
 // 이력 blob 항목([{title, tt, ts, job}])에서 '현재 제목과 같은 항목'의 tt — 최신 항목부터, 정확 일치 → 느슨 일치(titleMatch).
-function histLabel(histItems, title) {
+function histLabel(histItems, title, region) {
   var hi = Array.isArray(histItems) ? histItems : [];
   var cur = safeText(title, 60);
   if (!cur) return '';
@@ -479,19 +512,19 @@ function histLabel(histItems, title) {
   for (k = hi.length - 1; k >= 0; k--) {
     if (!hi[k] || !hi[k].title) continue;
     tt = safeText(hi[k].tt, 2);
-    if (tt && TITLE_CODES.indexOf(tt) >= 0 && titleMatch(hi[k].title, cur)) return tt;
+    if (tt && TITLE_CODES.indexOf(tt) >= 0 && titleMatch(hi[k].title, cur, region)) return tt;
   }
   return '';
 }
 // 후보에 라벨을 붙인다 — (a) histMap[id](이력 blob 문서 {items:[…]} 또는 배열) → (b) ai_tt → (c) ''(pickTitleType이 추정).
-// 반환 [{title, tt, src}] — src는 'hist' | 'ai' | 'guess'(로그·측정용, 프롬프트에는 안 실린다).
+// 반환 [{title, tt, src, region}] — src는 'hist' | 'ai' | 'guess'(로그·측정용, 프롬프트에는 안 실린다). region은 후보 기록의 지역.
 function recentTitleInfo(cands, histMap) {
   return (Array.isArray(cands) ? cands : []).map(function (c) {
     var hi = histMap && c.id ? histMap[c.id] : null;
     var items = (hi && Array.isArray(hi.items)) ? hi.items : (Array.isArray(hi) ? hi : []);
-    var tt = histLabel(items, c.title), src = tt ? 'hist' : '';
+    var tt = histLabel(items, c.title, c.region), src = tt ? 'hist' : '';
     if (!tt && c.ai_tt && TITLE_CODES.indexOf(c.ai_tt) >= 0) { tt = c.ai_tt; src = 'ai'; }
-    return { title: c.title, tt: tt, src: src || 'guess' };
+    return { title: c.title, tt: tt, src: src || 'guess', region: c.region || '' };
   });
 }
 // 자기 기록의 이전 제목들 — 현재 제목(라벨: 이력 → p.ai.tt) · 예비 생성기 제목 · 이력 blob 전부(최근 max건). 재생성 반복 방지 재료.
@@ -518,15 +551,16 @@ function ownTitleInfo(cur, histItems, max) {
 }
 
 // ---- 원형 선택(순수 함수) ----
-// opt = { recent:[{title,tt}] 최신순(게시 우선) 최대 5 / own:[{title,tt}] 이 기록의 이전 제목들 /
-//         region, metric, shot_at, photoCount, seed(기록 id), attempt(재생성 회차) }
-// 반환 { primary, backup, exclude:[codes], lead_ok, pool:[codes], relaxed, avoid:[골격], labels:{label,high,low,none}, region }
+// opt = { recent:[{title,tt,region?}] 최신순(유효 시각) 최대 5 / own:[{title,tt}] 이 기록의 이전 제목들 /
+//         region, metric, shot_at, photoCount, seed(기록 id), attempt(재생성 회차 = 성공 회차 + 실패 회차), ex_skip?:['R1',…](계약 금지 문자열과 겹쳐 뺀 예시) }
+// 반환 { primary, backup, exclude:[codes], lead_ok, pool:[codes], relaxed, avoid:[골격], labels:{label,high,low,none}, region, ex_skip, last_own }
 //
 // 제외 규칙(최근 3건 + 자기 기록 이전 제목):
 //   guessTrusted(label/high) → 그 원형 제외.
 //   그 밖(low/none/old) → 원형은 제외하지 않는다. 최근 3건이면 골격을 avoid에 넣고(프롬프트 지시·경고),
 //   종결이 질문이면 Q, 서술이면 C를 제외한다(그 종결을 만드는 원형 — 골격 제외의 일부). 지역명 선두는 leadN에 든다(L 제외·프롬프트 지시).
-// 후보 < 2면 단계 완화: ① 자기 기록 제외 해제 → ② 직전 1건만 제외 → ③ 전체(완화 여부 relaxed로 기록·경고).
+// 후보 < 2면 단계 완화: ① 자기 기록 제외 해제(직전 회차 원형 1건은 유지) → ② 직전 1건(최근 글·직전 회차)만 제외 → ③ 전체.
+//   완화 여부는 relaxed로 기록하고 titleWarnings가 '제목 원형 후보가 모자라…' 경고를 낸다(9/6 검증 반영 ⑤·⑥).
 // 선택 = FNV-1a(seed + ':' + attempt) mod 후보 수 → 주 원형, 보조 = 해시 상위 비트로 고른 다른 후보.
 function pickTitleType(opt) {
   var o = opt || {};
@@ -538,12 +572,13 @@ function pickTitleType(opt) {
   var avoid = [];
   var labels = { label: 0, high: 0, low: 0, none: 0 };
   function excludeBy(x, why, isRecent) {
-    var g = labelOf(x, region);
+    var xr = (x && x.region) || region;   // 최근 제목은 그 기록의 지역으로 판정한다(면·리 어절·지역명 선두)
+    var g = labelOf(x, xr);
     if (guessTrusted(g)) ex[g.code] = ex[g.code] || why;
     if (isRecent) {
       labels[g.conf === 'label' ? 'label' : (g.conf === 'high' ? 'high' : (g.conf === 'low' ? 'low' : 'none'))]++;
       if (!guessTrusted(g)) {
-        var sk = titleSkeleton(x && x.title, region);
+        var sk = titleSkeleton(x && x.title, xr);
         sk.conf = g.conf;
         avoid.push(sk);
         if (sk.end === 'q') ex.Q = ex.Q || why;
@@ -557,7 +592,7 @@ function pickTitleType(opt) {
   own.forEach(function (x) { excludeBy(x, 'own', false); });
 
   var leadN = 0;
-  last3.forEach(function (x) { if (titleLeadsWithRegion(x && x.title, region)) leadN++; });
+  last3.forEach(function (x) { if (titleLeadsWithRegion(x && x.title, (x && x.region) || region)) leadN++; });
   var lead_ok = leadN < 2;
 
   var hasMetric = !!String(o.metric || '').trim();
@@ -573,13 +608,21 @@ function pickTitleType(opt) {
     return true;
   }
   var lastCode = (recentInfo.length && guessTrusted(recentInfo[0])) ? recentInfo[0].code : '';
+  // 직전 회차 원형 — 자기 기록 이전 제목 중 마지막(이력 blob 마지막 항목)의 믿을 만한 라벨. 완화 1·2단계에서도 계속 제외한다
+  // (9/6 검증 반영 ⑤: 완화 1단계가 own 제외를 통째로 풀어 6회차부터 직전 회차 원형이 되풀이되던 결함 — 용흥동 16회 재생성 구간).
+  var lastOwnCode = '';
+  for (var oi = own.length - 1; oi >= 0; oi--) { var og = labelOf(own[oi], region); if (guessTrusted(og)) { lastOwnCode = og.code; break; } }
+  // 계약 금지 문자열과 겹쳐 뺀 예시(ex_skip: 'R1' 꼴 = 코드 + 예시 번호). 예시가 전부 빠진 원형은 후보에서 뺀다(9/6 검증 반영 ④).
+  var exSkip = {};
+  (Array.isArray(o.ex_skip) ? o.ex_skip : []).forEach(function (k) { if (k) exSkip[String(k)] = 1; });
+  function exOk(t) { for (var k = 0; k < t.ex.length; k++) if (!exSkip[t.code + k]) return true; return false; }
   function elig(level) {
     return TITLE_TYPES.filter(function (t) {
-      if (!needsOk(t)) return false;
+      if (!needsOk(t) || !exOk(t)) return false;
       if (!lead_ok && t.slot === '앞') return false;
       if (level === 0 && ex[t.code]) return false;
-      if (level === 1 && ex[t.code] === 'recent') return false;   // own 제외 해제
-      if (level === 2 && lastCode === t.code) return false;       // 직전 1건만 제외
+      if (level === 1 && (ex[t.code] === 'recent' || t.code === lastOwnCode)) return false;   // own 제외 해제 — 직전 회차 1건은 유지
+      if (level === 2 && (t.code === lastCode || t.code === lastOwnCode)) return false;       // 직전 1건(최근 글·직전 회차)만 제외
       return true;
     });
   }
@@ -596,7 +639,7 @@ function pickTitleType(opt) {
     primary: primary, backup: backup,
     exclude: Object.keys(ex), lead_ok: lead_ok, region: region,
     pool: pool.map(function (t) { return t.code; }), relaxed: relaxed,
-    avoid: avoid, labels: labels
+    avoid: avoid, labels: labels, ex_skip: Object.keys(exSkip), last_own: lastOwnCode
   };
 }
 
@@ -618,7 +661,7 @@ function titlePlanLines(plan, recent, safe, own) {
   var rec = (Array.isArray(recent) ? recent : []).slice(0, 5);
   if (rec.length) {
     lines.push('[최근에 올린 글 제목]  (첫 두 어절이 같거나 어절이 세 개 이상 겹치는 제목을 만들지 마십시오.)');
-    rec.forEach(function (x) { lines.push('- ' + labelTag(labelOf(x, region)) + ' ' + S(x && x.title, 60)); });
+    rec.forEach(function (x) { lines.push('- ' + labelTag(labelOf(x, (x && x.region) || region)) + ' ' + S(x && x.title, 60)); });
     lines.push('');
   }
   var ow = (Array.isArray(own) ? own : []).filter(function (x) { return x && x.title; }).slice(-5);
@@ -628,15 +671,21 @@ function titlePlanLines(plan, recent, safe, own) {
     lines.push('');
   }
   if (plan && plan.primary) {
+    // 계약 금지 문자열과 겹친 예시(plan.ex_skip)는 싣지 않는다 — 이력 제목과 같은 규칙(9/6 검증 반영 ④)
+    var skip = Array.isArray(plan.ex_skip) ? plan.ex_skip : [];
+    var exOf = function (t) { return t.ex.filter(function (e, k) { return skip.indexOf(t.code + k) < 0; }); };
     lines.push('[이번 글의 제목 원형]');
     lines.push('- 주 원형: ' + plan.primary.code + ' ' + plan.primary.name + ' — ' + plan.primary.rule);
-    plan.primary.ex.forEach(function (e) { lines.push('  예: ' + e); });
+    exOf(plan.primary).forEach(function (e) { lines.push('  예: ' + e); });
     if (plan.backup) {
       lines.push('- 보조 원형(주 원형의 재료가 이 현장에 없을 때만): ' + plan.backup.code + ' ' + plan.backup.name + ' — ' + plan.backup.rule);
-      lines.push('  예: ' + plan.backup.ex[0]);
+      var bex = exOf(plan.backup);
+      if (bex.length) lines.push('  예: ' + bex[0]);
     }
+    // (A)/(B) 분리 — 소요 시간은 현장 사실이라 담당자 재료가 있을 때만(9/6 검증 반영 ⑨)
+    lines.push('- 작업에 걸린 시간·기간은 담당자가 적은 수치나 현장 메모에 있을 때만 제목에 씁니다. 없으면 주기·상태 기준으로만 씁니다.');
     if (plan.exclude.length) lines.push('- 쓰지 않는 원형: ' + plan.exclude.join(', ') + ' (최근 글이나 이 기록의 이전 제목에서 썼습니다)');
-    if (rec.length && rec[0] && rec[0].title) lines.push('- 직전 글의 골격: ' + shapeWords(rec[0].title, region) + ' — 이번 제목은 이 골격(구두점 개수·지역명 자리·종결)을 그대로 되풀이하지 마십시오.');
+    if (rec.length && rec[0] && rec[0].title) lines.push('- 직전 글의 골격: ' + shapeWords(rec[0].title, rec[0].region || region) + ' — 이번 제목은 이 골격(구두점 개수·지역명 자리·종결)을 그대로 되풀이하지 마십시오.');
     (plan.avoid || []).forEach(function (sk) {
       if (rec[0] && sk.title === String(rec[0].title || '').trim()) return;   // 직전 글은 위 줄이 이미 다뤘다
       lines.push('- 피할 골격(원형을 알 수 없는 최근 제목): ' + (sk.prefix ? '접두 "' + sk.prefix + '" · ' : '') + shapeWords(sk.title, region) + ' — 접두·지역명 자리·종결·구두점 중 셋 이상 겹치는 제목을 만들지 마십시오.');
@@ -647,7 +696,8 @@ function titlePlanLines(plan, recent, safe, own) {
   return lines;
 }
 
-// 제목 경고 — draftWarnings에 합류(50자·상호 검사 포함). ctx = {recent, own, region, plan, title_type}
+// 제목 경고 — draftWarnings에 합류(50자·상호 검사 포함). ctx = {recent, own, region, plan, title_type, shot_at}
+// 경고 문구는 '제목'으로 시작한다(index.html paTitleWarnOnly가 접두로 제목 경고를 가려 "제목 칸만 고치면 됩니다" 안내를 낸다).
 function titleWarnings(title, ctx) {
   var w = [];
   var t = String(title || '');
@@ -660,20 +710,26 @@ function titleWarnings(title, ctx) {
   if (/\[|\]|[#*]/.test(t)) w.push('제목에 대괄호·마크다운 기호가 있습니다');
   if (/\d{4,}/.test(t.replace(/[,\s]/g, ''))) w.push('제목에 네 자리 이상 숫자가 있습니다(금액·연도로 오인)');
   if (/작업\s*사례|전문업체/.test(t)) w.push('제목에 구 템플릿 상투구(작업 사례·전문업체)가 있습니다');
+  // 구두점 상한(제목 규칙 '쉼표 하나 또는 대시 하나까지')·계절어(촬영일 없음)·완화 발생 — 검출 층이 없던 결함(9/6 검증 반영 ⑥·⑦·⑧)
+  var pc = (t.match(/[,，]/g) || []).length + (t.match(/[—–\-]/g) || []).length;
+  if (pc > 1) w.push('제목 구두점이 ' + pc + '개입니다 — 쉼표 하나 또는 대시 하나까지만');
+  if (!String(c.shot_at || '').trim() && /봄|여름|가을|겨울|장마|한파|폭염|낙엽|해빙|[0-9]{1,2}월/.test(t)) w.push('제목에 계절·시기 표현이 있습니다(촬영일 없음)');
+  if (c.plan && c.plan.relaxed) w.push('제목 원형 후보가 모자라 제외를 완화했습니다(단계 ' + c.plan.relaxed + ') — 최근 글·이전 제목과 같은 원형일 수 있습니다');
   var recent = Array.isArray(c.recent) ? c.recent : [];
-  var lead = leadTwo(t);
+  var rr = function (x) { return (x && x.region) || c.region; };   // 최근 제목은 그 기록의 지역으로 어절·선두를 판정
+  var lead = leadTwo(t, c.region);
   for (var i = 0; i < recent.length; i++) {
     var rt = recent[i] && recent[i].title;
     if (!rt) continue;
-    if (lead && leadTwo(rt) === lead) { w.push('제목 첫 두 어절이 최근 글과 같습니다(' + lead + ')'); break; }
+    if (lead && leadTwo(rt, rr(recent[i])) === lead) { w.push('제목 첫 두 어절이 최근 글과 같습니다(' + lead + ')'); break; }
   }
   for (var j = 0; j < recent.length; j++) {
     var rt2 = recent[j] && recent[j].title;
     if (!rt2) continue;
-    var n = overlapCount(t, rt2);
+    var n = overlapCount(t, rt2, c.region, rr(recent[j]));
     if (n >= 3) { w.push('제목 어절이 최근 글과 ' + n + '개 겹칩니다: ' + String(rt2).slice(0, 30)); break; }
   }
-  if (recent.length && recent[0].title && titleShape(t, c.region) === titleShape(recent[0].title, c.region)) {
+  if (recent.length && recent[0].title && titleShape(t, c.region) === titleShape(recent[0].title, rr(recent[0]))) {
     w.push('제목 골격(구두점·지역명 위치·종결)이 직전 글과 같습니다');
   }
   // 원형을 알 수 없던 최근 제목과의 골격 겹침(접두·지역명 위치·종결·구두점 중 셋 이상) — 직전 글은 위 경고가 담당
@@ -896,7 +952,7 @@ const SYSTEM_PROMPT = [
 ].join('\n');
 
 // input = {region, facility, problem, metric, note?, shot_at, contract, photoCount,
-//          recent_titles?:[{title,tt}|string], own_titles?:[{title,tt}], seed?, attempt?}   (제목 원형 재료 — v320)
+//          recent_titles?:[{title,tt,region?}|string], own_titles?:[{title,tt}], seed?, attempt?, ex_skip?:['R1',…]}   (제목 원형 재료 — v320)
 // 반환 {system, user, title_plan, title_ctx}. user는 사진 블록 뒤에 붙일 지시 텍스트다(사진 블록 조립은 buildRequest 담당).
 // title_plan·title_ctx는 순수 객체로만 흐른다(워커 guard가 보는 system/user 문자열에는 안 들어간다).
 function buildPrompt(input) {
@@ -934,8 +990,8 @@ function buildPrompt(input) {
   // 문자열만 넘어오던 구 recent_titles도 받는다(라벨 없음 → 추정).
   function titleInfoList(src, max) {
     return (Array.isArray(src) ? src : []).slice(0, max).map(function (t) {
-      if (t && typeof t === 'object') return { title: safeText(t.title, 60), tt: safeText(t.tt, 2) };
-      return { title: safeText(t, 60), tt: '' };
+      if (t && typeof t === 'object') return { title: safeText(t.title, 60), tt: safeText(t.tt, 2), region: safeText(t.region, 40) };
+      return { title: safeText(t, 60), tt: '', region: '' };
     }).filter(function (x) { return x.title; });
   }
   const recentInfo = titleInfoList(inp.recent_titles, 5);
@@ -945,6 +1001,7 @@ function buildPrompt(input) {
     shot_at: safeText(inp.shot_at, 40), photoCount: n,
     seed: safeText(inp.seed, 60) || (safeText(inp.region, 40) + '|' + safeText(inp.facility, 40)),
     attempt: parseInt(inp.attempt, 10) || 0,
+    ex_skip: Array.isArray(inp.ex_skip) ? inp.ex_skip.slice(0, 22).map(function (k) { return safeText(k, 3); }) : [],   // 워커가 계약 금지 문자열로 걸러 넘긴 예시 라벨
   });
   const tl = titlePlanLines(plan, recentInfo, safeText, ownInfo);
   if (tl.length) { lines.push(''); tl.forEach(function (l) { lines.push(l); }); }
@@ -971,7 +1028,7 @@ function buildPrompt(input) {
     lines.push('셋. 위 둘을 지키면 본문은 자연히 공백 포함 ' + koNum(bb.min) + ' 자에서 ' + koNum(bb.max) + ' 자 사이가 됩니다(마커 줄 제외). 이보다 짧으면 지식 덩어리가 모자란 것이니 더 넣으십시오.');
   }
 
-  return { system: SYSTEM_PROMPT, user: lines.join('\n'), title_plan: plan, title_ctx: { recent: recentInfo, own: ownInfo, region: safeText(inp.region, 40) } };
+  return { system: SYSTEM_PROMPT, user: lines.join('\n'), title_plan: plan, title_ctx: { recent: recentInfo, own: ownInfo, region: safeText(inp.region, 40), shot_at: safeText(inp.shot_at, 40) } };
 }
 
 // ---------- 5) 사진 정규화 ----------
@@ -1176,8 +1233,7 @@ function draftWarnings(draft, photoCount, tctx) {
   const bb = bodyBounds(photoCount);
   if (len < bb.min) w.push('본문 ' + len + '자 — 목표 ' + bb.min + '자 미만(사진 ' + (photoCount || 0) + '장 기준)');
   if (len > bb.max + 300) w.push('본문 ' + len + '자 — 목표 ' + bb.max + '자 초과(사진 ' + (photoCount || 0) + '장 기준)');
-  // 제목 경고 15종(50자·상호 포함) — titleWarnings(v320)
-  titleWarnings(draft.title, Object.assign({}, tctx || {}, { title_type: draft.title_type })).forEach(function (x) { w.push(x); });
+  // 제목 경고는 마커·장면 검사 뒤(return 직전)에 합류한다 — 워커 상한 안에서 사진 연동 경고가 제목 경고에 밀려 잘리지 않게(9/6 검증 반영 ②).
 
   const used = {};
   let maxNo = 0;
@@ -1224,6 +1280,8 @@ function draftWarnings(draft, photoCount, tctx) {
     if (isWork && !isPrep) { workSeen = true; return; }
     if (isPrep && !isWork && workSeen) w.push('안전조치·준비 사진(' + mk.nums.join(',') + ')이 본작업 사진 뒤에 있습니다 — 작업 순서 역행');
   });
+  // 제목 경고(50자·상호 포함, titleWarnings v320) — 마커·장면 경고 뒤에 둔다(워커가 갈래별 상한을 따로 둔다).
+  titleWarnings(draft.title, Object.assign({}, tctx || {}, { title_type: draft.title_type })).forEach(function (x) { w.push(x); });
   return w;
 }
 
@@ -1381,7 +1439,7 @@ module.exports = {
   parseDraft, responseText, draftWarnings, markerNums,
   // 제목 원형(v320, 순수 함수 — 테스트 대상)
   TITLE_TYPES, TITLE_CODES, titleTypeByCode, guessTitleType, guessTitleTypeInfo, labelOf, labelTag, guessTrusted,
-  hash32, titleLeadsWithRegion, titleEnding, punctSig, titleShape, shapeWords, titleWords, overlapCount, leadTwo,
+  hash32, regionTokens, isRegionWord, titleLeadsWithRegion, titleEnding, punctSig, titleShape, shapeWords, titleWords, overlapCount, leadTwo,
   normTitle, titleMatch, titleSkeleton, skeletonOverlap,
   recentTitleCandidates, histLabel, recentTitleInfo, ownTitleInfo,
   pickTitleType, titlePlanLines, titleWarnings,

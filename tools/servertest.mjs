@@ -829,14 +829,18 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   const worker = require(join(FN, 'gw-promo-ai-run-background.js'));
   const realGen = lib.generateDraft;
   const captured = [];
+  let mockWarn = null;   // null이면 실제 draftWarnings(제목 경고 포함)를 돌린다(9/6 ②·⑥ 검증용)
   lib.generateDraft = async function (key, photos, input) {   // 워커 loadLib은 같은 exports 객체를 본다 — 네트워크 없이 계획만 돌린다
     const pr = lib.buildPrompt(Object.assign({}, input, { photoCount: photos.length }));
     const plan = pr.title_plan;
     captured.push({ input: input, plan: plan, user: pr.user });
     const code = plan.primary.code;
-    return { ok: true, title: plan.primary.ex[captured.length % 2], body: '[사진 1 : 시험]\n본문.', tags: ['시험'], title_type: code,
+    const exs = plan.primary.ex.filter((e, k) => (plan.ex_skip || []).indexOf(code + k) < 0);   // 계약 금지 문자열과 겹쳐 뺀 예시는 제목으로도 안 쓴다
+    const draft = { title: exs[captured.length % exs.length], body: '[사진 1 : 시험]\n본문.', tags: ['시험'], title_type: code };
+    return Object.assign({ ok: true }, draft, {
       title_plan: { primary: code, backup: plan.backup && plan.backup.code, exclude: plan.exclude, lead_ok: plan.lead_ok, relaxed: plan.relaxed, labels: plan.labels },
-      used_tokens: { input: 1, output: 1, total: 2 }, model: 'mock', warn: [] };
+      used_tokens: { input: 1, output: 1, total: 2 }, model: 'mock',
+      warn: mockWarn ? mockWarn.slice() : lib.draftWarnings(draft, photos.length, Object.assign({}, pr.title_ctx, { plan: plan })) });
   };
   process.env.GW_ANTHROPIC_KEY = 'dummy-offline-test-key-not-real';
   const tokSys = issueSession({ id: '__promoai__', role: 'system' }).token;
@@ -848,7 +852,7 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
     { id: 'pl2', title: '포항 용덕리 상가 하수구 막힘, 겨울철에 더 심해지는 이유', status: 'posted', posted_at: '2026-08-25', ts: 1787620259234, region: '포항 용덕리', facility: '상가 하수구', problem: '막힘', shot_at: '2026-01-08', photos: [{ id: ATT }] },
     { id: 'pl3', title: '포항 용흥동 우수받이 준설, 그레이팅 막힘 신호 네 가지', status: 'posted', posted_at: '2026-08-20', ts: 1786060893317, region: '포항 용흥동', facility: '우수받이', problem: '침전물', shot_at: '', photos: [{ id: ATT }] },
     { id: 'pl4', title: '포항 장량동 오수관 막힘, 준설로 뚫을 수 있을까요?', status: 'posted', posted_at: '2026-08-19', ts: 1787035355729, region: '포항 장량동', facility: '오수관', problem: '막힘', shot_at: '2025-12-30', photos: [{ id: ATT }] },
-    { id: 'pl5', title: '포항 두호동 상가 하수구, 침전물과 악취는 왜 반복될까요', status: 'review', posted_at: '', ts: 1788311647545, region: '포항 두호동', facility: '상가 하수구', problem: '악취', shot_at: '2026-01-13', photos: [{ id: ATT }] },
+    { id: 'pl5', title: '포항 두호동 상가 하수구, 침전물과 악취는 왜 반복될까요', status: 'review', posted_at: '', ts: 1788311647545, ai: { model: 'mock', tokens: 1, ts: 1788311647545 }, region: '포항 두호동', facility: '상가 하수구', problem: '악취', shot_at: '2026-01-13', photos: [{ id: ATT }] },
   ];
   const fresh = (id, region) => ({ id: id, title: '예비 제목 ' + id, status: 'review', posted_at: '', ts: 1790000000000, region: region, facility: '우수받이', problem: '막힘', shot_at: '2026-02-03', photos: [{ id: ATT }], pre_ai: { title: '예비 제목 ' + id } });
   mem.gw_data['col:promo'] = { schema: 1, items: legacy.concat([fresh('pn1', '포항 죽도동'), fresh('pn2', '경주 황성동'), fresh('pn3', '포항 오천읍'), fresh('pn4', '포항 흥해읍')]), updated_at: 1 };
@@ -864,7 +868,7 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   T('v320 워커: 잡 blob에 title_type·title_plan(primary/backup/exclude/lead_ok/relaxed/labels) 기록 + done', j1 && j1.status === 'done' && /^[A-Z]$/.test(j1.title_type) && j1.title_plan && j1.title_plan.primary === j1.title_type && Array.isArray(j1.title_plan.exclude) && j1.title_plan.labels && typeof j1.title_plan.lead_ok === 'boolean', JSON.stringify(j1).slice(0, 300));
   const h1 = mem.gw_data['promoai:hist:pn1'];
   T('v320 워커: 이력 blob promoai:hist:pn1 = {items:[{title,tt,ts,job}], n:1}', h1 && Array.isArray(h1.items) && h1.items.length === 1 && h1.items[0].title === j1.title && h1.items[0].tt === j1.title_type && h1.items[0].job === 'pa_t1' && h1.n === 1, JSON.stringify(h1));
-  T('v320 첫 생성: 최근 5건 전부 라벨 없음(과거 게시분 → 추정 경로 (c)), 제외 집합에 추정 Q·S·K 포함, 지역명 선두 금지', captured[0].input.recent_titles.length === 5 && captured[0].input.recent_titles.every((x) => x.tt === '') && ['Q', 'S', 'K'].every((c) => j1.title_plan.exclude.indexOf(c) >= 0) && j1.title_plan.lead_ok === false && j1.title_plan.labels.label === 0, JSON.stringify(captured[0].input.recent_titles) + ' ' + JSON.stringify(j1.title_plan));
+  T('v320 첫 생성: 최근 5건 = 검수 초안(ai.ts) 1 + 게시 4, 유효 시각순(두호동 초안 → 제내리 → …), 전부 라벨 없음(추정 경로 (c)), 최근 3건 추정 Q·Q·S 제외, 지역명 선두 금지', captured[0].input.recent_titles.length === 5 && captured[0].input.recent_titles[0].title === legacy[4].title && captured[0].input.recent_titles.every((x) => x.tt === '') && ['Q', 'S'].every((c) => j1.title_plan.exclude.indexOf(c) >= 0) && j1.title_plan.lead_ok === false && j1.title_plan.labels.label === 0, JSON.stringify(captured[0].input.recent_titles) + ' ' + JSON.stringify(j1.title_plan));
   T('v320 워커 로그에 [제목] 라벨 출처·회차 줄', j1.log.some((l) => /\[제목\] 최근 5건\(라벨 이력 0·기록 0·추정 5\).*회차 0/.test(l)) && j1.log.some((l) => /\[제목\] 원형 [A-Z] \(지정/.test(l)), j1.log.join(' | '));
 
   applyNoTT('pn1', j1, '2026-10-01');
@@ -899,6 +903,67 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   const j6 = await runJob('pa_t6', 'pn4', 'c1');
   const rt6 = captured[5] && captured[5].input.recent_titles;
   T('v320 계약 참조 시 발주처명이 든 이력 제목은 제외되고 생성 정상(LEAK_BLOCKED 아님)', j6.status === 'done' && rt6 && !rt6.some((x) => /포항시청/.test(x.title)) && j6.log.some((l) => /계약 금지 문자열과 겹쳐 제외/.test(l)), JSON.stringify([j6.status, j6.code, j6.log]).slice(0, 300));
+
+  // ---- 9/6 2차 검증 반영(반박 검증 확정 결함) ----
+  // 시각은 실제 흐름대로: 초안 도착 시 p.ai.ts(생성 시각) 저장, 게시는 그 뒤. 앞 단계 pn1~pn3 게시일 2026-10-01~03보다 뒤로 둔다.
+  const applyDraft = (id, jb, aiTs) => { const p = promo(id); p.title = jb.title; p.ai = { model: 'mock', tokens: 2, ts: aiTs }; };
+  const T10 = Date.parse('2026-10-10');
+  // ① 일괄 초안(게시 없이 연속 생성): 2번째 초안의 recent_titles[0]이 1번째 초안 제목(이력 라벨 (a))이고 그 원형이 제외된다
+  mem.gw_data['col:promo'].items.push(fresh('pb1', '포항 양덕동'), fresh('pb2', '포항 대잠동'), fresh('pb3', '경주 안강읍'));
+  const jb1 = await runJob('pa_b1', 'pb1');
+  const rtb1 = captured[captured.length - 1].input.recent_titles;
+  T('9/6 ① 갓 등록 기록(게시·AI 초안 없음, 예비 제목 그대로 pb2·pb3)은 후보 밖 — 실제 게시·초안 5건만', jb1.status === 'done' && rtb1.length === 5 && !rtb1.some((x) => /^예비 제목/.test(x.title)), JSON.stringify(rtb1.map((x) => x.title)).slice(0, 240));
+  applyDraft('pb1', jb1, T10);
+  const jb2 = await runJob('pa_b2', 'pb2');
+  const rtb2 = captured[captured.length - 1].input.recent_titles;
+  T('9/6 ① 일괄 초안: 미게시 1번째 초안이 2번째의 recent_titles[0](이력 라벨·region 동반)으로 잡히고 그 원형이 제외됨', jb2.status === 'done' && rtb2[0].title === jb1.title && rtb2[0].tt === jb1.title_type && rtb2[0].region === '포항 양덕동' && jb2.title_plan.exclude.indexOf(jb1.title_type) >= 0 && jb2.title_type !== jb1.title_type, JSON.stringify(rtb2).slice(0, 240));
+  applyDraft('pb2', jb2, T10 + 1000);
+  const jb3 = await runJob('pa_b3', 'pb3');
+  const rtb3 = captured[captured.length - 1].input.recent_titles;
+  T('9/6 ① 일괄 초안 3번째: 최근 2건 = 앞선 미게시 초안 2건(최신순), 둘 다 제외되고 다른 원형', rtb3[0].title === jb2.title && rtb3[1].title === jb1.title && jb3.title_plan.exclude.indexOf(jb1.title_type) >= 0 && jb3.title_plan.exclude.indexOf(jb2.title_type) >= 0 && jb3.title_type !== jb1.title_type && jb3.title_type !== jb2.title_type, JSON.stringify(rtb3).slice(0, 240) + ' ' + [jb1.title_type, jb2.title_type, jb3.title_type].join(''));
+  applyDraft('pb3', jb3, T10 + 2000);
+
+  // ④ 원형 예시 문구가 계약 금지 문자열(발주처명)과 겹치는 경우: 그 예시만 빼고 생성 진행(LEAK_BLOCKED 아님)
+  mem.gw_data['col:contracts'].items.push({ id: 'c2', title: '우수받이 준설', site: '포항 죽도동', type: '준설', label: '준설', client: '용흥동 산 아래', contract_info: { amount: 0, client: '용흥동 산 아래' } });
+  mem.gw_data['col:promo'].items.push(fresh('pb4', '포항 상도동'));
+  const jb4 = await runJob('pa_b4', 'pb4', 'c2');
+  const cb4 = captured[captured.length - 1];
+  T('9/6 ④ 예시 문구가 발주처명과 겹치면 그 예시(N0·S0)만 제외하고 생성 정상(LEAK_BLOCKED 아님) — 로그·input.ex_skip·user 블록에 해당 문구 없음', jb4.status === 'done' && cb4.input.ex_skip.indexOf('N0') >= 0 && cb4.input.ex_skip.indexOf('S0') >= 0 && jb4.log.some((l) => /원형 예시 \d+건이 계약 금지 문자열과 겹쳐 제외/.test(l)) && cb4.user.indexOf('용흥동 산 아래') < 0 && cb4.plan.ex_skip.indexOf('N0') >= 0, JSON.stringify([jb4.status, jb4.code, cb4.input.ex_skip, jb4.log]).slice(0, 300));
+
+  // ④ 실패 회차 씨앗: 입력 자체가 금지 문자열과 겹쳐 LEAK_BLOCKED가 나면 이력 blob fail_n이 오르고 다음 회차 계획이 바뀐다
+  mem.gw_data['col:contracts'].items.push({ id: 'c3', title: '우수받이 준설', site: '포항 죽도동', type: '준설', label: '준설', client: '우수받이', contract_info: { amount: 0, client: '우수받이' } });
+  mem.gw_data['col:promo'].items.push(fresh('pb5', '포항 이동'));
+  const jf1 = await runJob('pa_f1', 'pb5', 'c3');
+  const hf1 = JSON.parse(JSON.stringify(mem.gw_data['promoai:hist:pb5'] || null));
+  const jf2 = await runJob('pa_f2', 'pb5', 'c3');
+  const hf2 = JSON.parse(JSON.stringify(mem.gw_data['promoai:hist:pb5'] || null));
+  T('9/6 ④ LEAK_BLOCKED 2회: 이력 blob fail_n 1→2(items 0·n 0 유지), 2회차 로그 "회차 1(실패 1 포함)", 회차별 계획(주 원형)이 다름', jf1.status === 'fail' && jf1.code === 'LEAK_BLOCKED' && hf1 && hf1.fail_n === 1 && hf1.items.length === 0 && hf1.n === 0 && jf2.code === 'LEAK_BLOCKED' && hf2.fail_n === 2 && jf2.log.some((l) => /회차 1\(실패 1 포함\)/.test(l)) && captured[captured.length - 1].plan.primary.code !== captured[captured.length - 2].plan.primary.code, JSON.stringify([jf1.code, hf1, jf2.code, hf2, jf2.log]).slice(0, 300));
+  const jf3 = await runJob('pa_f3', 'pb5');
+  const hf3 = mem.gw_data['promoai:hist:pb5'];
+  T('9/6 ④ 실패 뒤 성공: 이력 blob items 1·n 1·fail_n 2 유지, 로그 "회차 2(실패 2 포함)"', jf3.status === 'done' && hf3.items.length === 1 && hf3.n === 1 && hf3.fail_n === 2 && jf3.log.some((l) => /회차 2\(실패 2 포함\)/.test(l)), JSON.stringify([jf3.status, jf3.code, hf3, jf3.log]).slice(0, 300));
+  applyDraft('pb5', jf3, T10 + 3000);
+
+  // ② 검수 경고 상한 갈래별: 제목 경고가 많아도 사진·본문 경고는 잡 blob에 전부 남는다
+  mockWarn = ['본문 100자 — 목표 2000자 미만(사진 1장 기준)', '마커에 빠진 사진: 2,3', '중복 사용된 사진 번호: 1', '마커 한 개에 사진 3장(4,5,6) — 한두 장씩 나눠야 합니다', '안전조치·준비 사진(7)이 본작업 사진 뒤에 있습니다 — 작업 순서 역행'].concat(Array.from({ length: 15 }, (_, k) => '제목 경고 ' + (k + 1)));
+  mem.gw_data['col:promo'].items.push(fresh('pb6', '포항 송라면'));
+  const jw = await runJob('pa_w1', 'pb6');
+  T('9/6 ② 경고 상한 갈래별: 사진·본문 경고 5건 전부 앞에 보존 + 제목 경고는 8건까지(총 13)', jw.status === 'done' && jw.warn.length === 13 && jw.warn.slice(0, 5).join('|') === mockWarn.slice(0, 5).join('|') && jw.warn.filter((w) => /^제목/.test(w)).length === 8, JSON.stringify(jw.warn));
+  mockWarn = null;
+
+  // ⑤·⑥ 같은 기록 재생성 16회: 완화 구간에서도 직전 회차와 같은 원형이 없고, 완화 발생 회차는 잡 warn에 '제목 원형 후보가 모자라…' 경고
+  mem.gw_data['col:promo'].items.push(fresh('pb7', '포항 죽도동'));
+  let prevCode = '', sameN = 0, relaxN = 0, relaxWarnMiss = 0;
+  const regenSeq = [];
+  for (let k = 0; k < 16; k++) {
+    const jr = await runJob('pa_g' + k, 'pb7');
+    if (jr.status !== 'done') { relaxWarnMiss += 100; break; }
+    regenSeq.push(jr.title_type);
+    if (jr.title_type === prevCode) sameN++;
+    if (jr.title_plan.relaxed) { relaxN++; if (!(jr.warn || []).some((w) => /^제목 원형 후보가 모자라/.test(w))) relaxWarnMiss++; }
+    prevCode = jr.title_type;
+    applyDraft('pb7', jr, T10 + 10000 + k);
+  }
+  T('9/6 ⑤·⑥ 재생성 16회(실코드 워커): 직전 회차와 같은 원형 0, 완화 회차마다 잡 warn에 완화 경고', sameN === 0 && relaxN > 0 && relaxWarnMiss === 0, regenSeq.join(' ') + ' / 동일 ' + sameN + ' / 완화 ' + relaxN + ' / 경고 누락 ' + relaxWarnMiss);
 
   lib.generateDraft = realGen;
   delete process.env.GW_ANTHROPIC_KEY;
