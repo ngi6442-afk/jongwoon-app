@@ -358,7 +358,7 @@ async function handleSave(event, d, R) {
         const s = Object.assign({}, x);
         const sc = docScopeNorm(s.scope); if (sc) s.scope = sc; else delete s.scope;
         const o01 = s.id ? oldDocBy[s.id] : null;   // 01 법인 문서는 대분류를 벗어나게 저장하지 않는다(리뷰 확정: 구 2자리 cat 구건을 관리자가 열어 저장하면 99로 덮여 하드차단이 풀렸다)
-        if (o01 && docMajorOf(o01) === '01' && docMajorOf(s) !== '01') s.cat = o01.cat;
+        if (o01 && docMajorOf(o01) === '01' && docMajorOf(s) !== '01') { s.cat = o01.cat; s.no = o01.no; }   // cat·no를 함께 바꿔 보내는 조작도 원본으로(9/6 재검증)
         if (!(s.id && oldDocBy[s.id]) && s.status !== '등재') { s.status = '등재'; s.registered_by = { id: c.member.id, name: c.member.name }; s.registered_at = nowIso; delete s.reject_reason; }
         if (!(s.id && oldDocBy[s.id]) && !s.by) s.by = { id: c.member.id, name: c.member.name };
         docFilesFix(s, s.id ? oldDocBy[s.id] : null);   // 첨부 메타(v315)는 첨부 액션으로만 — 관리자 저장도 서버 원본 이월(낡은 사본이 첨부 목록을 지우지 않게)
@@ -1949,7 +1949,7 @@ function docAttNextN(it) {
   return n + 1;
 }
 function b64Bytes(b64) { const L = b64.length; return Math.floor(L * 3 / 4) - (L && b64.charAt(L - 1) === '=' ? (L > 1 && b64.charAt(L - 2) === '=' ? 2 : 1) : 0); }   // base64 → 원 바이트 수(디코드 없이)
-function docAttCanPut(m, it) { if (!m || !it) return false; if (docMajorOf(it) === '01' && !m.admin) return false; return !!(m.admin || (it.by && it.by.id === m.id && permOf(m, 'documents') === 'do')); }   // 01 법인 문서 첨부는 관리자만(v317 — 하드차단을 첨부 경로에도)
+function docAttCanPut(m, it) { if (!m || !it) return false; if (docMajorOf(it) === '01' && !m.admin) return false; return !!(m.admin || (it.by && it.by.id === m.id && permOf(m, 'documents') === 'do')); }   // 01 법인 문서 첨부는 관리자만(v318 — 하드차단을 첨부 경로에도)
 // 문서 블롭 읽기 + 항목 찾기(삭제 문서 제외). 반환 {ok, doc, it} / {ok:false, http, code}
 async function docAttLoad(st, docId) {
   if (!docId) return { ok: false, http: 400, code: 'BAD_ID' };
@@ -2011,7 +2011,7 @@ async function handleDocAttPut(event, d, R) {
   const st = store(DATA);
   const ld = await docAttLoad(st, docId);
   if (!ld.ok) return jr(ld.http, { status: ld.http === 500 ? 'ERROR' : 'REJECTED', error_code: ld.code, request_id: R });
-  if (!docAttCanPut(c.member, ld.it)) return jr(403, { status: 'FORBIDDEN', error_code: 'NOT_OWNER', request_id: R });
+  if (!docAttCanPut(c.member, ld.it)) return jr(403, { status: 'FORBIDDEN', error_code: (docMajorOf(ld.it) === '01' && !c.member.admin) ? 'BLOCKED_01' : 'NOT_OWNER', request_id: R });
   if ((ld.it.files || []).length >= DOC_ATT_PER_DOC) return jr(400, { status: 'REJECTED', error_code: 'TOO_MANY_FILES', request_id: R });
   const n = docAttNextN(ld.it);
   const mime = DOC_ATT_MIME[ext];   // 클라 mime 폐기 — 확장자 고정표만(high1)

@@ -798,5 +798,26 @@ r = await call({ action: 'get', collection: 'documents' }, tokM, 'dev1');
   T('2층 파생(관리부): 별지 JW-06-01-004-01 → 06 mgmt 열람 + 구 cat 01(g9) 하드차단 축(관리부+관리자) 열람 / g7(12 admin) 비노출', r.code === 200 && ids.indexOf('g3') >= 0 && ids.indexOf('g9') >= 0 && ids.indexOf('g7') < 0, ids.join(','));
 }
 
+// 24 v318·v319 회귀(9/6 재검증): 관리자 save의 01 대분류 이월(cat·no 동시 조작 포함) / 01 문서 첨부 하드차단(등재 본인도 403 BLOCKED_01)
+mem.gw_data['col:documents'] = { schema: 1, items: [
+  { id: 'h1', title: '구 법인(구 cat 01·구형식 번호)', cat: '01', no: 'JW-01-002', status: '등재' },
+  { id: 'h2', title: '01 직원 등재', cat: '01-03', no: 'JW-01-03-009', status: '등재', by: { id: 'udocw', name: '문서직원' } },
+  { id: 'h3', title: '06 직원 등재', cat: '06-03', no: 'JW-06-03-009', status: '등재', by: { id: 'udocw', name: '문서직원' } },
+], updated_at: 100 };
+r = await call({ action: 'save', collection: 'documents', doc: { schema: 1, items: [
+  { id: 'h1', title: '구 법인(제목만 수정)', cat: '99', no: 'JW-01-002', status: '등재' },
+  { id: 'h2', title: '01 직원 등재', cat: '05-01', no: 'JW-05-01-001', status: '등재', by: { id: 'udocw', name: '문서직원' } },
+  { id: 'h3', title: '06 직원 등재(이동)', cat: '05-01', no: 'JW-05-01-002', status: '등재', by: { id: 'udocw', name: '문서직원' } },
+] } }, tokA);
+T('v318·v319: 관리자 save — 구 cat 01 문서에 cat 99 → 원본 01 유지 / 01-03 문서에 cat·no 동시 변경 → 둘 다 원본 / 비01 문서 이동은 그대로',
+  r.code === 200 && docItem('h1').cat === '01' && docItem('h1').no === 'JW-01-002' && docItem('h1').title === '구 법인(제목만 수정)' && docItem('h2').cat === '01-03' && docItem('h2').no === 'JW-01-03-009' && docItem('h3').cat === '05-01' && docItem('h3').no === 'JW-05-01-002',
+  JSON.stringify([r.code, docItem('h1'), docItem('h2'), docItem('h3')]).slice(0, 300));
+r = await call({ action: 'doc_att_put', id: 'h2', name: '법인.pdf', data: PDF }, tokD, 'dev1');
+T('v318·v319: 등재 본인(doc 수행)이 01 문서에 첨부 → 403 BLOCKED_01', r.code === 403 && r.body.error_code === 'BLOCKED_01', JSON.stringify(r.body).slice(0, 120));
+r = await call({ action: 'doc_att_put', id: 'h3', name: '현장.pdf', data: PDF }, tokD, 'dev1');
+T('v318·v319: 같은 사람이 06 문서에 첨부 → 200', r.code === 200 && r.body.n === 1, JSON.stringify(r.body).slice(0, 120));
+r = await call({ action: 'doc_att_put', id: 'h2', name: '법인.pdf', data: PDF }, tokA);
+T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stringify(r.body).slice(0, 120));
+
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');
 process.exit(fail ? 1 : 0);

@@ -6449,9 +6449,10 @@
     var newCat = lock ? docCatOf(d) : docCatSelectGet();   // 2층 분류 "AA-BB" | "99" | ""(중분류 미선택). 잠긴 모달은 원본 파생값(서버가 원본 고정)
     // 검증은 전부 push 전에 — 차단 후 return하면 빈 스텁이 배열에 남아 유령 문서로 영속된다(리뷰 지적)
     if (!newCat){ alert("중분류(문서 성격)를 선택해주세요 — 대분류만으로는 등재할 수 없습니다."); return; }
-    if (newCat.slice(0, 2) === "01" && !isAdmin()){ alert("01 법인 분류는 관리자만 지정할 수 있습니다(서버에서도 차단됩니다)."); return; }
-    if (newCat === "99" && !isAdmin()){ alert("99 미분류는 관리자만 지정할 수 있습니다 — 대분류(업무 영역)와 중분류(문서 성격)를 골라주세요."); return; }
-    if (d && docMajorOf(d) === "01" && newCat.slice(0, 2) !== "01"){ alert("01 법인 문서는 다른 분류로 옮길 수 없습니다 — 01의 중분류를 골라주세요."); return; }   // 하드차단 유지(리뷰 확정)
+    // 아래 세 검증은 사용자가 분류를 "고른" 경우(!lock)에만 — 잠긴 모달(비관리자 기존 문서)은 newCat이 원본 파생값이라 99 구건의 내용 수정이 영구 차단됐다(9/6 재검증 회귀)
+    if (!lock && newCat.slice(0, 2) === "01" && !isAdmin()){ alert("01 법인 분류는 관리자만 지정할 수 있습니다(서버에서도 차단됩니다)."); return; }
+    if (!lock && newCat === "99" && !isAdmin()){ alert("99 미분류는 관리자만 지정할 수 있습니다 — 대분류(업무 영역)와 중분류(문서 성격)를 골라주세요."); return; }
+    if (!lock && d && docMajorOf(d) === "01" && newCat.slice(0, 2) !== "01"){ alert("01 법인 문서는 다른 분류로 옮길 수 없습니다 — 01의 중분류를 골라주세요."); return; }   // 하드차단 유지(리뷰 확정)
     var scopeMode = document.getElementById("docScope").value, scopeIds = [];
     if (!lock && scopeMode === "ids"){ scopeIds = getCheckedMembers("docScopeMembers"); if (!scopeIds.length){ alert("직원 지정 공개는 최소 1명을 체크해주세요."); return; } }
     if (!d){ d = {id: genId("doc"), created: today}; documents.push(d); }
