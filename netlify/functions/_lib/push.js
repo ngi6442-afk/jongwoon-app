@@ -4,7 +4,7 @@
 // 구독은 push:subs 에 회원 id별로 저장. 만료(404/410) 구독은 발송 시 자동 제거.
 const webpush = require('web-push');
 const { store, blobGet, blobSet, blobList } = require('./blobs');
-const tier = require('./tier');   // 관리자 등급(v321) — isBoss·pmIds·bossIds 판정의 단일 원천
+const tier = require('./tier');   // 관리자 등급(v321) — tierCtx(bossIds·pmIds·adminIds·요청자 등급) 판정의 단일 원천
 
 const DATA = 'gw_data';
 const USERS = 'gw_users';
@@ -25,19 +25,24 @@ async function getSubs() {
 }
 async function saveSubs(doc) { return blobSet(store(DATA), 'push:subs', doc); }
 
-// 관리자 회원 id 목록(개찰결과 등 전사 알림 대상)
-async function adminIds() {
+// 회원 전수 로드(원본 레코드 — 재직·삭제 여부는 tier.ctxOf가 거른다). 스캔 1회로 등급 컨텍스트를 만드는 재료
+async function loadMembers() {
   const st = store(USERS);
-  const l = await blobList(st);
+  const l = await blobList(st, 'member:');
   if (!l.ok) return [];
   const out = [];
   for (const k of l.keys) {
     if (k.indexOf('member:') !== 0) continue;
     const r = await blobGet(st, k);
-    if (r.ok && r.data && r.data.admin && r.data.del !== 1) out.push(r.data.id);
+    if (r.ok && r.data && r.data.id) out.push(r.data);
   }
   return out;
 }
+// 관리자 등급 컨텍스트(v321·9/6 검증 반영) — {members, bootstrap, tierOf(m), isBoss(m), isPm(m), bossIds, pmIds, adminIds}. _lib/tier.js ctxOf:
+// 명시 tier만 신뢰, 재직 관리자 전원이 미지정일 때만 파생(부트스트랩), 퇴사(leave_date 경과)·삭제 회원 제외. 게이트(gw-data)는 이 컨텍스트 하나로 요청자 등급·수신자 목록을 함께 판정한다(스캔 1회)
+async function tierCtx() { return tier.ctxOf(await loadMembers()); }
+// 관리자 회원 id 목록(개찰결과 등 전사 알림 대상) — 재직 관리자만
+async function adminIds() { return (await tierCtx()).adminIds; }
 
 // payload: {title, body, url, tag} / opts: {primaryOnly, logOnly}
 // primaryOnly=true(결재 2차, 배치도 결정 ③ "알림=우선기기 1발"): 회원별로 primary 구독이 있으면
@@ -91,38 +96,14 @@ async function sendTo(memberIds, payload, opts) {
   return { sent, removed };
 }
 
-// 대표 회원 id — 관리자 등급(v321, _lib/tier.js) tier boss. 명시 tier가 없으면 종전 규칙(role '대표' 또는 이름 나종운, admin 한정)으로 파생되므로 호환.
-// 클라 isBossMember와 같은 축. 운반일지 결재 라우팅·BOSS_ONLY 게이트 전용(9/3 PM 결정).
-function isBoss(m) { return tier.isBoss(m); }
-async function bossIds() {
-  const st = store(USERS);
-  const l = await blobList(st);
-  if (!l.ok) return [];
-  const out = [];
-  for (const k of l.keys) {
-    if (k.indexOf('member:') !== 0) continue;
-    const r = await blobGet(st, k);
-    if (r.ok && r.data && isBoss(r.data)) out.push(r.data.id);
-  }
-  return out;
-}
-// 대표 전용 건의 결재 요청 수신자 — 대표가 없으면(계정 role 불일치 등) 관리자 전원으로 폴백해 결재가 끊기지 않게 한다
+// 대표 회원 id — 관리자 등급(v321, _lib/tier.js) tier boss(명시 tier·부트스트랩 규칙은 tierCtx). 클라 isBossMember와 같은 축. 운반일지 결재 라우팅·BOSS_ONLY 게이트 전용(9/3 PM 결정).
+// 종전 동기 isBoss(m)·isPm(m)·tierOf(m)는 제거 — 회원 한 명만 보고는 부트스트랩 여부를 알 수 없어 게이트가 파생값을 믿게 된다(9/6 검증 S1). 게이트는 tierCtx().tierOf(m)로
+async function bossIds() { return (await tierCtx()).bossIds; }
+// 대표 전용 건의 결재 **요청 알림** 수신자 — 대표가 0명이면 관리자 전원에게 알려 대표 부재를 드러낸다(알림 전용 — 결재 게이트 BOSS_ONLY는 폴백 없이 대표만, S2).
 async function bossOrAdminIds() { const b = await bossIds(); return b.length ? b : await adminIds(); }
-// PM id 목록 — 관리자 등급(v321) tier pm만(종전 '비대표 관리자 전원'에서 좁힘: 관리자 등급 admin은 ① 전결·PM 큐 결재 권한이 없다).
-// 결재 3차 ①·② 1단계 라우팅·PM_ONLY 게이트·pm_present 전용. bossIds와 같은 축(스캔 1회).
-async function pmIds() {
-  const st = store(USERS);
-  const l = await blobList(st);
-  if (!l.ok) return [];
-  const out = [];
-  for (const k of l.keys) {
-    if (k.indexOf('member:') !== 0) continue;
-    const r = await blobGet(st, k);
-    if (r.ok && r.data && tier.isPm(r.data)) out.push(r.data.id);
-  }
-  return out;
-}
-// ①·② 1단계 결재 요청 수신자 — tier pm이 없으면(1인 관리자=대표뿐 등) 관리자 전원 폴백(교착 방지, bossOrAdminIds와 대칭)
+// PM id 목록 — 관리자 등급(v321) tier pm만(관리자 등급 admin은 ① 전결·PM 큐 결재 권한이 없다). 결재 3차 ①·② 1단계 라우팅·PM_ONLY 게이트·pm_present 전용.
+async function pmIds() { return (await tierCtx()).pmIds; }
+// ①·② 1단계 결재 요청 수신자 — tier pm이 없으면(1인 관리자=대표뿐 등) 관리자 전원 폴백(교착 방지 — PM 큐 게이트도 pm 0명이면 관리자 전원에게 열린다, 종전 유지)
 async function pmOrAdminIds() { const p = await pmIds(); return p.length ? p : await adminIds(); }
 
-module.exports = { getKeys, getSubs, saveSubs, sendTo, adminIds, bossIds, bossOrAdminIds, isBoss, isPm: tier.isPm, tierOf: tier.tierOf, pmIds, pmOrAdminIds };
+module.exports = { getKeys, getSubs, saveSubs, sendTo, loadMembers, tierCtx, adminIds, bossIds, bossOrAdminIds, pmIds, pmOrAdminIds };

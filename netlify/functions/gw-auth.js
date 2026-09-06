@@ -1,7 +1,8 @@
 'use strict';
 
 // 그룹웨어 인증 + 회원관리 (서버측). Netlify Blobs 'gw_users' 저장.
-// 회원: member:<id> = {id,name,role,rank,dept,admin,tier,perms,pin_salt,pin_hash,created,updated,del} — role=직책(권한), rank=직급, dept=부서, tier=관리자 등급(boss|pm|admin, v321 — 없으면 _lib/tier.js 파생)
+// 회원: member:<id> = {id,name,role,rank,dept,admin,tier,perms,pin_salt,pin_hash,created,updated,del} — role=직책(권한), rank=직급, dept=부서, tier=관리자 등급(boss|pm|admin, v321 — 게이트는 명시 tier만, 재직 관리자 전원 미지정일 때만 _lib/tier.js 파생)
+// 회원 저장 게이트(9/6 검증 S1): 자기 계정의 name·role·admin·dev·tier 변경 금지(SELF_CHANGE_FORBIDDEN, 개발자 예외 없음) / 이름·직책 변경은 개발자만(DEV_ONLY) / role '대표'·예약 이름(나종운·나경일)은 tier boss 또는 개발자만(ROLE_BOSS_ONLY·NAME_RESERVED) / 기존 회원과 같은 이름 거부(NAME_TAKEN) / 모든 저장은 결과 재직 pm 0명이면 거부(LAST_PM)
 //       name:<lower> = id  (이름 인덱스)
 // PIN은 scrypt 해시로만 저장(평문 저장 안 함). 세션은 HMAC 토큰.
 const crypto = require('crypto');
@@ -67,10 +68,11 @@ async function devAllowed(st, member) {
   const all = await listMembers(st);
   return !all.some(isDev);
 }
-// 마지막 PM 보호(v321) — 대상(selfId)을 뺀 재직 회원 중 tier pm이 있는지. 강등(LAST_PM)·삭제 공용. ① 전결·PM 큐 결재 주체가 0명이 되는 상태 방지
-async function otherPmExists(st, selfId) {
-  const all = await listMembers(st);
-  return all.some(function (x) { return x && x.id !== selfId && !retired(x) && tier.tierOf(x) === 'pm'; });
+// 마지막 PM 보호(v321·9/6 검증 S3) — 저장·삭제 결과로 재직 유효 pm이 0명이 되는 변화를 막는다(① 전결·PM 큐 결재 주체 소멸 방지).
+// 변경 전 컨텍스트(tcBefore — m 수정 전에 만든 것)와 변경 후 목록으로 등급 컨텍스트(tier.ctxOf — 명시 tier·부트스트랩·퇴사 제외)를 비교해 "있다가 없어짐"만 409.
+// 이미 0명이면(부트스트랩 미완·등급 지정 전) 저장을 막지 않는다 — 막으면 pm을 지정하는 저장 자체가 불가능한 교착
+function pmLost(tcBefore, allAfter) {
+  return tcBefore.pmIds.length > 0 && tier.ctxOf(allAfter).pmIds.length === 0;
 }
 // ── 계정 분리 이사 스위치 ───────────────────────────────────────────────
 // true  = 아이디·이름 둘 다로 로그인(이사 기간). 아이디 미발급자도 못 잠긴다.
@@ -107,11 +109,7 @@ async function listMembers(st) {
 
 // 퇴사자 차단(S2-A) — 퇴사일(leave_date)이 지난 계정은 로그인·기존 세션 모두 거부. 퇴사일 당일까지는 허용.
 // del=1(삭제)과 별개: 인사 기록(연차·근속)은 남기고 접근만 끊는다.
-function retired(m) {
-  const ld = m && m.leave_date;
-  if (!ld) return false;
-  return String(ld) < new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);   // KST 일자 비교
-}
+function retired(m) { return tier.retired(m); }   // 판정식은 _lib/tier.js 한 곳(KST 일자 비교) — 등급·pmIds·bossIds·gw-data도 같은 식
 
 // 세션 → 현재 회원(최신 perms 포함). { ok, member } 또는 { ok:false }
 async function currentMember(st, event) {
@@ -222,12 +220,14 @@ async function handleMemberList(st, event, R) {
 async function handleMemberUpsert(st, event, d, R) {
   const c = await currentMember(st, event);
   if (!c.ok || !c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
-  // 시스템 영역(계정 생성·관리자 지정·개발자 지정·권한 편집)은 개발자만.
-  // 인사 정보(연차·입사일 등) 수정은 종전대로 관리자도 가능 — 경리·인사 업무가 막히지 않게.
-  const canDev = await devAllowed(st, c.member);
-  const touchesSystem = (!d.id) || d.admin !== undefined || d.dev !== undefined || d.perms !== undefined || d.uid !== undefined;
-  if (touchesSystem && !canDev) return jr(403, { status: 'FORBIDDEN', error_code: 'DEV_ONLY', request_id: R });
+  // 회원 전수 1회 로드(변경 전 스냅샷 — 아래 m 수정보다 앞) — 개발자 부트스트랩·요청자 등급·이름 중복·LAST_PM 판정 공용
+  const allBefore = await listMembers(st);
+  const canDev = isDev(c.member) || !allBefore.some(isDev);
+  const tcBefore = tier.ctxOf(allBefore);
+  const reqTier = tcBefore.tierOf(c.member);
+  const bossOrDev = reqTier === 'boss' || isDev(c.member);   // role '대표' 지정·예약 이름(나종운·나경일) 사용 권한(S1) — 부트스트랩 파생의 근거를 아무 관리자나(개발자 부트스트랩 통과 상태 포함) 못 만들게. 실제 dev 플래그만 인정
   const name = cleanText(d.name);   // 저장 시점에 NFC 통일 — 타이핑 로그인이 깨지지 않게
+  const roleIn = (d.role !== undefined) ? (typeof d.role === 'string' ? cleanText(d.role).slice(0, 40) : '') : undefined;   // R7 — role은 문자열만(객체·배열은 빈 값 → 기존값 유지)
   let m;
   let before = null;   // 감사 로그용 변경 전 스냅샷
   if (d.id) {
@@ -236,35 +236,62 @@ async function handleMemberUpsert(st, event, d, R) {
     if (!r.ok || !r.data) return jr(404, { status: 'REJECTED', error_code: 'NOT_FOUND', request_id: R });
     m = r.data;
     before = JSON.parse(JSON.stringify(m));
-    if (name && m.name !== name) { await blobSet(st, nameKey(m.name), null); m.name = name; }
-    if (d.role !== undefined) m.role = d.role || m.role || '직원';
+  } else {
+    // 신규 회원: 이름 필수, role/admin 기본값
+    if (!name) return jr(400, { status: 'REJECTED', error_code: 'INVALID_INPUT', request_id: R });
+    m = { id: genId(), name: '', created: Date.now() };
+  }
+  const isNew = !before;
+  const self = !isNew && m.id === c.member.id;
+  const nameChange = !!(name && name !== String(m.name || ''));
+  const roleNew = (roleIn !== undefined) ? (roleIn || m.role || '직원') : undefined;
+  const roleChange = roleNew !== undefined && roleNew !== String(m.role || '직원');
+  // 시스템 영역(계정 생성·관리자 지정·개발자 지정·권한 편집·아이디·**이름·직책 변경**)은 개발자만(S1(c) — 이름·직책은 등급 파생·이름 로그인 색인의 근거).
+  // 인사 정보(연차·입사일 등) 수정은 종전대로 관리자도 가능 — 경리·인사 업무가 막히지 않게(인사 카드가 동봉하는 같은 값의 name·role은 변경이 아니다).
+  const touchesSystem = isNew || d.admin !== undefined || d.dev !== undefined || d.perms !== undefined || d.uid !== undefined || nameChange || roleChange;
+  if (touchesSystem && !canDev) return jr(403, { status: 'FORBIDDEN', error_code: 'DEV_ONLY', request_id: R });
+  // 자기 계정의 role·name·dev·admin·tier 변경 금지(S1(b) — 개발자 예외 없음: 다른 개발자·대표가 바꾼다). 자기 등급 상승·이름 색인 탈취의 뿌리를 닫는다
+  if (self) {
+    const selfChange = nameChange || roleChange
+      || (d.admin !== undefined && !!d.admin !== !!m.admin) || (d.dev !== undefined && !!d.dev !== !!m.dev)
+      || (d.tier !== undefined && String(d.tier || '') !== String(m.tier || ''));
+    if (selfChange) return jr(403, { status: 'FORBIDDEN', error_code: 'SELF_CHANGE_FORBIDDEN', request_id: R });
+  }
+  // role '대표' 지정·예약 이름 사용은 tier boss 또는 개발자만(변경될 때만 — 대표 카드의 인사 정보 수정처럼 같은 값이 오는 저장은 통과)
+  if (roleChange && roleNew === '대표' && !bossOrDev) return jr(403, { status: 'FORBIDDEN', error_code: 'ROLE_BOSS_ONLY', request_id: R });
+  if (nameChange && Object.prototype.hasOwnProperty.call(tier.RESERVED_NAMES, name) && !bossOrDev) return jr(403, { status: 'FORBIDDEN', error_code: 'NAME_RESERVED', request_id: R });
+  // 기존 회원과 같은 이름 거부(409 NAME_TAKEN) — 이름 색인(name:<lower>)을 덮어 남의 이름 로그인을 가로채는 경로 차단. 목록(NFC 정리·소문자 비교)과 색인을 둘 다 본다
+  if (nameChange) {
+    const lower = name.toLowerCase();
+    if (allBefore.some(function (x) { return x && x.id !== m.id && cleanText(x.name).toLowerCase() === lower; })) return jr(409, { status: 'REJECTED', error_code: 'NAME_TAKEN', request_id: R });
+    const ix = await blobGet(st, nameKey(name));
+    if (ix.ok && ix.data && ix.data !== m.id) return jr(409, { status: 'REJECTED', error_code: 'NAME_TAKEN', request_id: R });
+  }
+  if (!isNew) {
+    if (nameChange) { await blobSet(st, nameKey(m.name), null); m.name = name; }
+    if (roleNew !== undefined) m.role = roleNew;
     if (d.admin !== undefined) m.admin = !!d.admin;
     if (d.dev !== undefined) {
       // 마지막 개발자는 스스로 강등할 수 없다 — 시스템을 아무도 못 만지는 상태 방지
       if (!d.dev && isDev(m)) {
-        const devs = (await listMembers(st)).filter(isDev);
+        const devs = allBefore.filter(isDev);
         if (devs.length <= 1) return jr(409, { status: 'REJECTED', error_code: 'LAST_DEV', request_id: R });
       }
       m.dev = !!d.dev;
       if (m.dev) m.admin = true;   // 개발자는 관리자 권한을 포함한다
     }
   } else {
-    // 신규 회원: 이름 필수, role/admin 기본값
-    if (!name) return jr(400, { status: 'REJECTED', error_code: 'INVALID_INPUT', request_id: R });
-    m = { id: genId(), name, created: Date.now() };
-    m.role = (d.role || '직원');
+    m.name = name;
+    m.role = roleNew || '직원';
     m.admin = !!d.admin;
   }
-  // 관리자 등급(v321, PM 9/6 ㄱ): tier 'boss'|'pm'|'admin'. 변경은 요청자 tier boss·pm만(개발자 게이트와 별개 축), 대상은 관리자만, 마지막 pm 강등 불가(LAST_PM).
-  // 미지정 회원은 _lib/tier.js 파생(role 대표·나종운→boss / dev·나경일→pm / 그 외→admin)이라 마이그레이션 없이 동작. 관리자 해제 시 등급 제거(관리자 아닌 회원은 등급 없음)
-  const tierBefore = before ? tier.tierOf(before) : '';
+  // 관리자 등급(v321, PM 9/6 ㄱ): tier 'boss'|'pm'|'admin'. 변경은 요청자 tier boss·pm만(개발자 게이트와 별개 축), 대상은 관리자만. 마지막 pm 보호는 아래 LAST_PM(모든 저장 공통).
+  // 명시 tier만 게이트에 쓰인다(_lib/tier.js — 재직 관리자 전원 미지정일 때만 파생). 관리자 해제 시 등급 제거(관리자 아닌 회원은 등급 없음)
   if (d.tier !== undefined) {
-    const reqT = tier.tierOf(c.member);
-    if (reqT !== 'boss' && reqT !== 'pm') return jr(403, { status: 'FORBIDDEN', error_code: 'TIER_PM_OR_BOSS_ONLY', request_id: R });
+    if (reqTier !== 'boss' && reqTier !== 'pm') return jr(403, { status: 'FORBIDDEN', error_code: 'TIER_PM_OR_BOSS_ONLY', request_id: R });
     const nt = String(d.tier || '');
     if (!tier.validTier(nt)) return jr(400, { status: 'REJECTED', error_code: 'BAD_TIER', request_id: R });
     if (!m.admin) return jr(400, { status: 'REJECTED', error_code: 'TIER_NOT_ADMIN', request_id: R });
-    if (tierBefore === 'pm' && nt !== 'pm' && !(await otherPmExists(st, m.id))) return jr(409, { status: 'REJECTED', error_code: 'LAST_PM', request_id: R });
     m.tier = nt;
   }
   if (!m.admin && m.tier) delete m.tier;
@@ -310,6 +337,9 @@ async function handleMemberUpsert(st, event, d, R) {
     if (!validSecret(pinStr, m.admin)) return jr(400, { status: 'REJECTED', error_code: 'WEAK_SECRET', request_id: R });
     const h = hashSecret(pinStr); m.pin_salt = h.salt; m.pin_hash = h.hash;
   }
+  // 마지막 PM 보호(LAST_PM, S3) — 관리자 해제·leave_date·role/name/dev/tier 변경 등 **모든 저장**의 결과로 재직 유효 pm이 0명이 되면 거부
+  const allAfter = allBefore.filter(function (x) { return x && x.id !== m.id; }).concat([m]);
+  if (pmLost(tcBefore, allAfter)) return jr(409, { status: 'REJECTED', error_code: 'LAST_PM', request_id: R });
   const w1 = await blobSet(st, memberKey(m.id), m);
   const w2 = await blobSet(st, nameKey(m.name), m.id);
   if (m.uid) await blobSet(st, uidKey(m.uid), m.id);   // 아이디 색인 유지
@@ -329,9 +359,11 @@ async function handleMemberUpsert(st, event, d, R) {
       await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'member',
         ev: [{ op: (before ? '수정' : '추가'), id: m.id, t: m.name, f: (Object.keys(f).length ? f : undefined) }] });
     }
-    // 등급 변경은 별도 행(v321) — 파생값(미지정)에서 명시로 바뀐 경우도 남긴다(f.tier는 저장 필드 기준이라 '파생 admin→pm'을 못 보여준다)
-    if (d.tier !== undefined && (tierBefore || '') !== (m.tier || ''))
-      await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'member', ev: [{ op: '등급변경', id: m.id, t: m.name + ' ' + (tierBefore || '미지정') + '→' + m.tier + ((before && !before.tier) ? ' (종전 파생값)' : '') }] });
+    // 등급 변경은 별도 행(v321·S6) — **유효 등급**(명시·부트스트랩 파생·퇴사 반영)이 바뀐 모든 저장에 전·후를 남긴다(tier 필드만 본 f.tier는 '관리자 해제→등급 없음'·'퇴사→없음'·파생 전환을 못 보여준다)
+    const tierBefore = before ? tcBefore.tierOf(before) : '';
+    const tierAfter = tier.ctxOf(allAfter).tierOf(m);
+    if (tierBefore !== tierAfter)
+      await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'member', ev: [{ op: '등급변경', id: m.id, t: m.name + ' ' + (tierBefore || '없음') + '→' + (tierAfter || '없음') + (tier.validTier(m.tier) ? '' : ' (파생값)') }] });
   } catch (e) {}
   return jr(200, { status: 'OK', member: safeMember(m), request_id: R });
 }
@@ -342,13 +374,14 @@ async function handleMemberDelete(st, event, d, R) {
   if (!(await devAllowed(st, c.member))) return jr(403, { status: 'FORBIDDEN', error_code: 'DEV_ONLY', request_id: R });
   if (!d.id || d.id === c.member.id) return jr(400, { status: 'REJECTED', error_code: 'INVALID_INPUT', request_id: R });
   const r = await blobGet(st, memberKey(d.id));
+  const all = await listMembers(st);
   // 마지막 개발자 계정은 삭제 불가 — 시스템 관리 주체가 사라지는 것 방지
   if (r.ok && r.data && isDev(r.data)) {
-    const devs = (await listMembers(st)).filter(isDev);
+    const devs = all.filter(isDev);
     if (devs.length <= 1) return jr(409, { status: 'REJECTED', error_code: 'LAST_DEV', request_id: R });
   }
-  // 마지막 PM 삭제 불가(v321) — ① 전결·PM 큐 결재 주체가 사라지는 것 방지(강등 LAST_PM과 같은 축)
-  if (r.ok && r.data && tier.tierOf(r.data) === 'pm' && !(await otherPmExists(st, r.data.id))) return jr(409, { status: 'REJECTED', error_code: 'LAST_PM', request_id: R });
+  // 마지막 PM 삭제 불가(v321·S3) — 삭제 결과 재직 유효 pm 0명이면 거부(회원 저장 LAST_PM과 같은 판정)
+  if (r.ok && r.data && pmLost(tier.ctxOf(all), all.filter(function (x) { return x && x.id !== d.id; }))) return jr(409, { status: 'REJECTED', error_code: 'LAST_PM', request_id: R });
   if (r.ok && r.data) {
     r.data.del = 1; r.data.updated = Date.now();
     await blobSet(st, memberKey(d.id), r.data); await blobSet(st, nameKey(r.data.name), null);
@@ -357,7 +390,6 @@ async function handleMemberDelete(st, event, d, R) {
   }
   return jr(200, { status: 'OK', request_id: R });
 }
-
 // 아이디 설정 — 본인(현재 PIN 확인) 또는 관리자(타인 지정).
 // 계정 분리 이사에서 직원이 스스로 아이디를 정하는 경로.
 async function handleSetUid(st, event, d, R) {

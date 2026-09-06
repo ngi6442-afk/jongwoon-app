@@ -1,5 +1,5 @@
 // gw-data 액션 단위 서버 테스트(P3) — Blobs·push·audit를 인메모리 mock으로 갈아끼우고 handler를 직접 호출.
-// 커버: 인증 게이트 / 프로토타입 키 우회 / 관리자 전용 / 낙관적 락 409 / leaves 비관리자 재구성 / 홍보AI 워커 제목 원형 라벨 영속(25, v320) / 관리자 등급 게이트·tier 변경(26, v321) / 문서함 휴지통(27, v321) / 기안 참조 ref 형식(28, v321) /
+// 커버: 인증 게이트 / 프로토타입 키 우회 / 관리자 전용 / 낙관적 락 409 / leaves 비관리자 재구성 / 홍보AI 워커 제목 원형 라벨 영속(25, v320) / 관리자 등급 게이트·tier 변경(26, v321) / 문서함 휴지통(27, v321) / 기안 참조 ref 형식(28, v321) / 9/6 검증 반영 — 명시 등급 게이트·자기 변경 금지·LAST_PM 전면·스탬프 강제·부활 차단·누락 보존(29) /
 //       차량 관리자 필드 복원 / tpl·proof 입력 검증 / backup_put confirm 게이트 / bot_notify 키 검증
 // 실행: node tools/servertest.mjs
 import { createRequire } from 'module';
@@ -19,19 +19,21 @@ const mem = {};   // mem[store][key] = data
 const blobsMock = {
   setupBlobContext() {},
   store(n) { mem[n] = mem[n] || {}; return { name: n, toString() { return n; }, async list(o) { const pre = (o && o.prefix) || ''; return { blobs: Object.keys(mem[n] || {}).filter((k) => k.indexOf(pre) === 0).map((k) => ({ key: k })) }; } }; },
-  async blobGet(st, k) { const s = mem[st] || {}; return (k in s) ? { ok: true, data: s[k] } : { ok: false, code: 'NOT_FOUND' }; },
+  async blobGet(st, k) { const s = mem[st] || {}; return (k in s) ? { ok: true, data: JSON.parse(JSON.stringify(s[k])) } : { ok: false, code: 'NOT_FOUND' }; },   // 실 Blobs처럼 get마다 새 객체(JSON 파싱) — 핸들러가 저장 전 객체를 손대도 mem에 반영되지 않는다(9/6: 거부 응답 뒤 "저장 없음" 검증의 전제)
   async blobSet(st, k, v) { mem[st] = mem[st] || {}; if (v === null) delete mem[st][k]; else mem[st][k] = JSON.parse(JSON.stringify(v)); return { ok: true }; },
   async blobDelete(st, k) { if (mem[st]) delete mem[st][k]; return { ok: true }; },
   async blobList(st) { return { ok: true, keys: Object.keys(mem[st] || {}) }; },
 };
 const tierLib = require(join(FN, '_lib/tier.js'));   // 관리자 등급(v321) — 실 판정 모듈(의존성 없음). push mock의 isBoss·pmIds·bossIds가 실 push.js와 같은 축을 타게
 const membersOf = () => Object.keys(mem.gw_users || {}).filter((k) => k.indexOf('member:') === 0).map((k) => mem.gw_users[k]);
-const pushMock = { calls: [], bossList: [],   // bossList는 결재 등급 테스트(17)에서 채운다 — 그 전 테스트(bot_notify sent=1)는 uadmin 1명 유지
-  async adminIds() { return ['uadmin'].concat(pushMock.bossList); },
-  isBoss: tierLib.isBoss, isPm: tierLib.isPm, tierOf: tierLib.tierOf,
-  async bossIds() { return membersOf().filter(tierLib.isBoss).map((m) => m.id); },
+// push mock — 등급 판정은 실 tier.ctxOf(명시 tier·부트스트랩·퇴사 제외)를 회원 블롭 스캔 위에 얹는다(실 push.tierCtx와 같은 축). adminIds도 ctx(재직 관리자만 — bot_notify sent=1은 uadmin 1명)
+const pushMock = { calls: [],
+  async loadMembers() { return membersOf(); },
+  async tierCtx() { return tierLib.ctxOf(membersOf()); },
+  async adminIds() { return (await pushMock.tierCtx()).adminIds; },
+  async bossIds() { return (await pushMock.tierCtx()).bossIds; },
   async bossOrAdminIds() { const b = await pushMock.bossIds(); return b.length ? b : pushMock.adminIds(); },
-  async pmIds() { return membersOf().filter(tierLib.isPm).map((m) => m.id); },
+  async pmIds() { return (await pushMock.tierCtx()).pmIds; },
   async pmOrAdminIds() { const p = await pushMock.pmIds(); return p.length ? p : pushMock.adminIds(); },
   async getSubs() { return { members: { uadmin: [{ sub: {} }] } }; }, async saveSubs() {}, async sendTo(ids, p) { pushMock.calls.push(p); return { sent: ids.length, removed: 0 }; } };
 const auditMock = { logs: [], async appendAudit(e) { auditMock.logs.push(e); }, auditKey: () => 'audit', diffItems: () => [], short: (s) => String(s).slice(0, 20), DATA: 'gw_data' };
@@ -199,9 +201,8 @@ r = await call({ action: 'bids_ingest', key: 'test-ingest-key', items: [{ id: 'b
 }
 
 // 17 결재 3차 — 업무별 등급: 게이트 매트릭스(명세 §4.1) + 생성 스탬프 + ② 단계 전환
-const BOSS = { id: 'uboss', name: '나종운', admin: true, role: '대표', perms: {} };
+const BOSS = { id: 'uboss', name: '나종운', admin: true, role: '대표', perms: {}, tier: 'boss' };   // 9/6 검증 S1: 게이트는 명시 tier만(uadmin이 명시 pm이라 부트스트랩이 아니다 — role·이름 파생 없음) → 대표도 명시
 mem.gw_users['member:uboss'] = BOSS;
-pushMock.bossList = ['uboss'];
 const tokB = issueSession(BOSS).token;
 mem.gw_data['col:approvals'] = { schema: 1, items: [], updated_at: 0 };
 // 등급표 조회·변경 게이트
@@ -972,29 +973,36 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   delete process.env.GW_ANTHROPIC_KEY;
 }
 
-// 26 관리자 등급(v321, PM 9/6 ㄱ): _lib/tier.js 파생 규칙 / 실 push.js bossIds·pmIds tier 기준 / 서버 게이트(① 전결·PM 큐=pm만 → 관리자 등급 admin 403 PM_ONLY, ③·총정리=boss만)
+// 26 관리자 등급(v321, PM 9/6 ㄱ · 9/6 검증 S1 반영): _lib/tier.js 명시 우선·부트스트랩 파생·ctxOf / 실 push.js tierCtx·bossIds·pmIds tier 기준 / 서버 게이트(① 전결·PM 큐=pm만 → 관리자 등급 admin 403 PM_ONLY, ③·총정리=boss만)
 //    / 관리자 등급의 ② 기안은 자동통과 없음 / pm 0명 폴백 / gw-auth member_upsert tier(변경 권한 boss·pm, 관리자만, BAD_TIER, LAST_PM 강등·삭제, 감사로그 등급변경, 관리자 해제 시 제거, member_list 동봉)
 {
-  T('tier 파생: role 대표→boss / 이름 나종운→boss(dev여도) / dev→pm / 이름 나경일→pm / 그 외 관리자→admin / 비관리자·삭제→\'\' / 명시 tier 우선 / 무효 tier(constructor)는 파생',
-    tierLib.tierOf({ admin: true, role: '대표', name: 'x' }) === 'boss' && tierLib.tierOf({ admin: true, name: '나종운' }) === 'boss' && tierLib.tierOf({ admin: true, name: '나종운', dev: true }) === 'boss'
-    && tierLib.tierOf({ admin: true, dev: true, name: 'y' }) === 'pm' && tierLib.tierOf({ admin: true, name: '나경일' }) === 'pm' && tierLib.tierOf({ admin: true, role: '관리자', name: '나수진' }) === 'admin'
-    && tierLib.tierOf({ admin: false, role: '대표', name: '나종운' }) === '' && tierLib.tierOf({ admin: true, name: '나종운', del: 1 }) === '' && tierLib.tierOf(null) === ''
-    && tierLib.tierOf({ admin: true, name: '나종운', tier: 'admin' }) === 'admin' && tierLib.tierOf({ admin: true, name: '나수진', tier: 'pm' }) === 'pm' && tierLib.tierOf({ admin: true, name: '나수진', tier: 'constructor' }) === 'admin'
-    && tierLib.validTier('boss') && !tierLib.validTier('constructor') && !tierLib.validTier(''));
-  const TADM = { id: 'utadm', name: '나수진', admin: true, role: '관리자', dept: '관리부', perms: {} };   // 관리자 등급 admin(파생) — 예: 관리부
+  T('tier(명시 우선·strict 기본, 9/6 S1): 명시 boss·pm·admin 그대로 / 명시 없음 → admin(role 대표·이름 나종운·dev·나경일도 파생 없음) / 비관리자·삭제·퇴사 → \'\' / 무효 tier(constructor)는 admin',
+    tierLib.tierOf({ admin: true, name: '나종운', tier: 'admin' }) === 'admin' && tierLib.tierOf({ admin: true, name: '나수진', tier: 'pm' }) === 'pm' && tierLib.tierOf({ admin: true, tier: 'boss', name: 'x' }, false) === 'boss'
+    && tierLib.tierOf({ admin: true, role: '대표', name: 'x' }) === 'admin' && tierLib.tierOf({ admin: true, name: '나종운' }, false) === 'admin' && tierLib.tierOf({ admin: true, dev: true, name: 'y' }) === 'admin' && tierLib.tierOf({ admin: true, name: '나경일' }, false) === 'admin'
+    && tierLib.tierOf({ admin: false, role: '대표', name: '나종운' }, true) === '' && tierLib.tierOf({ admin: true, name: '나종운', del: 1 }, true) === '' && tierLib.tierOf({ admin: true, tier: 'pm', leave_date: '2020-01-01' }) === '' && tierLib.tierOf(null) === ''
+    && tierLib.tierOf({ admin: true, name: '나수진', tier: 'constructor' }, true) === 'admin' && tierLib.validTier('boss') && !tierLib.validTier('constructor') && !tierLib.validTier(''));
+  T('tier(부트스트랩 — 재직 관리자 전원 미지정일 때만): role 대표→boss / 이름 나종운→boss(dev여도) / dev→pm / 이름 나경일→pm / 그 외 관리자→admin · isBootstrap은 명시 tier 하나에 종료(퇴사·삭제·비관리자의 명시 tier는 무시) · retired KST',
+    tierLib.tierOf({ admin: true, role: '대표', name: 'x' }, true) === 'boss' && tierLib.tierOf({ admin: true, name: '나종운', dev: true }, true) === 'boss' && tierLib.tierOf({ admin: true, dev: true, name: 'y' }, true) === 'pm' && tierLib.tierOf({ admin: true, name: '나경일' }, true) === 'pm' && tierLib.tierOf({ admin: true, role: '관리자', name: '나수진' }, true) === 'admin'
+    && tierLib.isBootstrap([{ admin: true, name: '나종운' }, { admin: false, tier: 'pm' }]) === true && tierLib.isBootstrap([{ admin: true, name: '나종운' }, { admin: true, tier: 'pm', name: 'x' }]) === false
+    && tierLib.isBootstrap([{ admin: true, tier: 'pm', leave_date: '2020-01-01' }, { admin: true, tier: 'boss', del: 1 }, { admin: true, name: '나경일' }]) === true && tierLib.isBootstrap([]) === true && tierLib.retired({ leave_date: '2020-01-01' }) && !tierLib.retired({ leave_date: '2999-12-31' }) && !tierLib.retired({}));
+  {
+    const cx = tierLib.ctxOf([{ id: 'a', admin: true, role: '대표' }, { id: 'b', admin: true, name: '나경일' }, { id: 'c', admin: true, name: '나수진' }, { id: 'd', admin: false }, { id: 'e', admin: true, tier: 'pm', leave_date: '2020-01-01' }]);
+    const cy = tierLib.ctxOf([{ id: 'a', admin: true, role: '대표' }, { id: 'b', admin: true, name: '나경일' }, { id: 'c', admin: true, name: '나수진', tier: 'admin' }]);
+    T('ctxOf: 부트스트랩(전원 미지정·퇴사자 명시 무시) → boss a·pm b·admin 3(퇴사 e 제외) / 명시 하나 생기면 파생 중단 → boss 0·pm 0·admin 3 · isBoss/isPm/tierOf 노출',
+      cx.bootstrap === true && cx.bossIds.join() === 'a' && cx.pmIds.join() === 'b' && cx.adminIds.join() === 'a,b,c' && cx.isBoss(cx.members[0]) && cx.isPm(cx.members[1]) && cy.bootstrap === false && cy.bossIds.length === 0 && cy.pmIds.length === 0 && cy.adminIds.join() === 'a,b,c' && cy.tierOf(cy.members[0]) === 'admin', JSON.stringify([cx.bossIds, cx.pmIds, cx.adminIds, cy.bossIds, cy.pmIds]));
+  }  const TADM = { id: 'utadm', name: '나수진', admin: true, role: '관리자', dept: '관리부', perms: {} };   // 관리자 등급 admin(파생) — 예: 관리부
   mem.gw_users['member:utadm'] = TADM;
   const tokT = issueSession(TADM).token;
   mem.gw_data['col:approvals'] = { schema: 1, items: [], updated_at: 0 };
   mem.gw_data['col:documents'] = { schema: 1, items: [{ id: 'd1', title: '취업규칙', cat: '02-01', status: '등재' }], updated_at: 100 };
-  {   // 실 push.js를 한 번 로드(mock 대신) — bossIds·pmIds가 tier 기준인지. 로드 후 캐시는 mock으로 원복
+  {   // 실 push.js를 한 번 로드(mock 대신) — tierCtx·bossIds·pmIds·adminIds가 tier.ctxOf(명시 tier·퇴사 제외) 기준인지. 로드 후 캐시는 mock으로 원복
     const pp = require.resolve(join(FN, '_lib/push.js'));
     const saved = require.cache[pp]; delete require.cache[pp];
     const realPush = require(pp);
     require.cache[pp] = saved;
-    const b = await realPush.bossIds(), p = await realPush.pmIds(), a = await realPush.adminIds();
-    T('push.js(실물): bossIds=tier boss(uboss) · pmIds=tier pm(uadmin만 — 관리자 등급 utadm 제외) · adminIds=관리자 전원(3) · isPm/tierOf/isBoss 노출', b.join() === 'uboss' && p.join() === 'uadmin' && a.slice().sort().join() === 'uadmin,uboss,utadm' && realPush.isPm(ADMIN) && !realPush.isPm(TADM) && realPush.tierOf(TADM) === 'admin' && realPush.isBoss(BOSS) && !realPush.isBoss(TADM), JSON.stringify([b, p, a]));
-  }
-  const n0 = mem.gw_data['col:approvals'].items.length;
+    const tc = await realPush.tierCtx(), b = await realPush.bossIds(), p = await realPush.pmIds(), a = await realPush.adminIds();
+    T('push.js(실물): tierCtx bootstrap false(명시 tier 존재) · bossIds=uboss(명시) · pmIds=uadmin(명시 pm만 — 미지정 utadm은 admin) · adminIds=재직 관리자 3 · loadMembers 노출 · 동기 isBoss/isPm/tierOf 제거', tc.bootstrap === false && b.join() === 'uboss' && p.join() === 'uadmin' && a.slice().sort().join() === 'uadmin,uboss,utadm' && tc.tierOf(TADM) === 'admin' && tc.isPm(ADMIN) && tc.isBoss(BOSS) && typeof realPush.loadMembers === 'function' && realPush.isBoss === undefined && realPush.tierOf === undefined, JSON.stringify([tc.bootstrap, b, p, a]));
+  }  const n0 = mem.gw_data['col:approvals'].items.length;
   r = await call({ action: 'approval_create', kind: '사규', title: '관리자 등급 전결 시도', ref: 'doc:d1', self_decide: true }, tokT);
   T('등급: 관리자 등급(admin) 전결 종결 → 403 PM_ONLY · 카드 미생성', r.code === 403 && r.body.error_code === 'PM_ONLY' && r.body.status === 'FORBIDDEN' && mem.gw_data['col:approvals'].items.length === n0, r.code + '/' + r.body.error_code);
   r = await call({ action: 'approval_create', kind: '사규', title: 'PM 전결', ref: 'doc:d1', self_decide: true }, tokA);
@@ -1060,7 +1068,9 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   const gwa = require(join(FN, 'gw-auth.js'));
   const callA = async (body, tok) => { const x = await gwa.handler({ httpMethod: 'POST', headers: { authorization: tok ? 'Bearer ' + tok : '' }, body: JSON.stringify(body) }); return { code: x.statusCode, body: JSON.parse(x.body || '{}') }; };
   r = await callA({ action: 'member_upsert', id: 'utadm', tier: 'pm' }, tokT);
-  T('등급 변경: 관리자 등급(admin) 요청자 → 403 TIER_PM_OR_BOSS_ONLY', r.code === 403 && r.body.error_code === 'TIER_PM_OR_BOSS_ONLY', r.code + '/' + r.body.error_code);
+  T('등급 변경: 자기 등급 → 403 SELF_CHANGE_FORBIDDEN(9/6 S1 — 자기 변경 금지가 등급 권한보다 앞)', r.code === 403 && r.body.error_code === 'SELF_CHANGE_FORBIDDEN', r.code + '/' + r.body.error_code);
+  r = await callA({ action: 'member_upsert', id: 'uboss', tier: 'pm' }, tokT);
+  T('등급 변경: 관리자 등급(admin) 요청자가 남의 등급 → 403 TIER_PM_OR_BOSS_ONLY', r.code === 403 && r.body.error_code === 'TIER_PM_OR_BOSS_ONLY' && mem.gw_users['member:uboss'].tier === 'boss', r.code + '/' + r.body.error_code);
   r = await callA({ action: 'member_upsert', id: 'uwork', tier: 'pm' }, tokA);
   T('등급 변경: 비관리자 대상 → 400 TIER_NOT_ADMIN', r.code === 400 && r.body.error_code === 'TIER_NOT_ADMIN', r.code + '/' + r.body.error_code);
   r = await callA({ action: 'member_upsert', id: 'utadm', tier: 'super' }, tokA);
@@ -1068,7 +1078,9 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   r = await callA({ action: 'member_upsert', id: 'utadm', tier: 'constructor' }, tokA);
   T('등급 변경: 프로토타입 키 등급 → 400 BAD_TIER', r.code === 400 && r.body.error_code === 'BAD_TIER');
   r = await callA({ action: 'member_upsert', id: 'uadmin', tier: 'admin' }, tokA);
-  T('등급 변경: 마지막 pm(uadmin) 강등 → 409 LAST_PM', r.code === 409 && r.body.error_code === 'LAST_PM', r.code + '/' + r.body.error_code);
+  T('등급 변경: 자기 등급 변경 → 403 SELF_CHANGE_FORBIDDEN(9/6 S1)', r.code === 403 && r.body.error_code === 'SELF_CHANGE_FORBIDDEN', r.code + '/' + r.body.error_code);
+  r = await callA({ action: 'member_upsert', id: 'uadmin', tier: 'admin' }, tokB);
+  T('등급 변경: 마지막 pm(uadmin) 강등(대표 요청) → 409 LAST_PM', r.code === 409 && r.body.error_code === 'LAST_PM', r.code + '/' + r.body.error_code);
   const audN = auditMock.logs.length;
   r = await callA({ action: 'member_upsert', id: 'utadm', tier: 'pm' }, tokA);
   T('등급 변경: pm이 관리자 등급을 pm으로 → 200 · tier 저장 · 응답 member.tier · 감사로그 등급변경(admin→pm)', r.code === 200 && r.body.member.tier === 'pm' && mem.gw_users['member:utadm'].tier === 'pm' && auditMock.logs.slice(audN).some((l) => l.col === 'member' && l.ev.some((e) => e.op === '등급변경' && e.id === 'utadm' && /admin→pm/.test(e.t))), JSON.stringify(auditMock.logs.slice(audN)).slice(0, 240));
@@ -1084,7 +1096,7 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   T('관리자 해제 → tier 제거(관리자 아닌 회원은 등급 없음)', r.code === 200 && mem.gw_users['member:utadm'].tier === undefined && mem.gw_users['member:utadm'].admin === false, JSON.stringify(mem.gw_users['member:utadm']).slice(0, 160));
   r = await callA({ action: 'member_delete', id: 'uadmin' }, tokB);
   T('마지막 pm(uadmin) 삭제 → 409 LAST_PM', r.code === 409 && r.body.error_code === 'LAST_PM' && mem.gw_users['member:uadmin'].del !== 1, r.code + '/' + r.body.error_code);
-  // 원복 — blobGet은 저장 객체를 그대로 돌려주므로 upsert가 TADM/ADMIN 원본 객체를 손댔다. 새 객체로 다시 심는다(관리자 등급 admin / pm)
+  // 원복 — 절 26의 upsert가 바꾼 등급·관리자 여부를 되돌린다(관리자 등급 admin / pm). 절 29가 이 상태(개발자 0명·uadmin 명시 pm·uboss 명시 boss·utadm 미지정)를 전제한다
   mem.gw_users['member:utadm'] = { id: 'utadm', name: '나수진', admin: true, role: '관리자', dept: '관리부', perms: {} };
   mem.gw_users['member:uadmin'] = { id: 'uadmin', name: '관리자', admin: true, perms: {}, tier: 'pm' };
 }
@@ -1187,5 +1199,179 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   T('ref: 전결 종결 건에도 ref 보존 · 직원 approvals_list 본인 건에 ref 노출', a5 && a5.ref === 'doc:d1' && a5.status === '승인' && a5.self_decided === true && r.code === 200 && (r.body.items || []).some((x) => x.id === a1.id && x.ref === 'doc:d1'), JSON.stringify(a5).slice(0, 160));
 }
 
-console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');
-process.exit(fail ? 1 : 0);
+// 29 9/6 검증 반영(보안·권한 / 회귀·정확성): S1 명시 등급 게이트(부트스트랩 예외)·자기 name/role/admin/dev/tier 변경 금지·예약 이름·NAME_TAKEN·이름/직책 변경 DEV_ONLY / S2 BOSS_ONLY 폴백 제거·총정리 크론 스킵+감시 /
+//    S3 LAST_PM 전면(admin:false·leave_date)·퇴사 pm 제외 / S4 삭제 스탬프 서버 강제(관리자 위조 무시) / S5 직원 누락 저장 원본 유지·타인 문서 del 무시 / R1 부활 차단(관리자·직원) / R3 hidden_tmp purge / R6 docop 정리 / R7 role 코어션 / member_list 민감 필드 부재
+{
+  const gwa = require(join(FN, 'gw-auth.js'));
+  const callA = async (body, tok) => { const x = await gwa.handler({ httpMethod: 'POST', headers: { authorization: tok ? 'Bearer ' + tok : '' }, body: JSON.stringify(body) }); return { code: x.statusCode, body: JSON.parse(x.body || '{}') }; };
+  const U = (id) => mem.gw_users['member:' + id];
+  const tokT = issueSession(U('utadm')).token;
+  // ---- S1(b)(c) 회원 저장 게이트 ----
+  r = await callA({ action: 'member_upsert', id: 'utadm', name: '나수진', role: '대표' }, tokT);
+  T('S1: 관리자가 자기 role을 대표로 위조 → 403 SELF_CHANGE_FORBIDDEN · 저장 없음', r.code === 403 && r.body.error_code === 'SELF_CHANGE_FORBIDDEN' && U('utadm').role === '관리자', r.code + '/' + r.body.error_code);
+  r = await callA({ action: 'member_upsert', id: 'utadm', name: '나경일' }, tokT);
+  T('S1: 자기 이름을 나경일로 위조 → 403 SELF_CHANGE_FORBIDDEN', r.code === 403 && r.body.error_code === 'SELF_CHANGE_FORBIDDEN' && U('utadm').name === '나수진');
+  r = await callA({ action: 'member_upsert', id: 'uadmin', tier: 'boss' }, tokA);
+  T('S1: pm이 자기 tier를 boss로 → 403 SELF_CHANGE_FORBIDDEN(개발자 예외 없음 — 개발자 부트스트랩 통과 상태)', r.code === 403 && r.body.error_code === 'SELF_CHANGE_FORBIDDEN' && U('uadmin').tier === 'pm');
+  r = await callA({ action: 'member_upsert', id: 'uadmin', dev: true }, tokA);
+  T('S1: 자기 dev 지정 → 403 SELF_CHANGE_FORBIDDEN', r.code === 403 && r.body.error_code === 'SELF_CHANGE_FORBIDDEN' && !U('uadmin').dev);
+  r = await callA({ action: 'member_upsert', id: 'uadmin', name: '관리자', role: '', annual_days: 15 }, tokA);
+  T('S1: 자기 인사 정보(연차)만 수정 — 같은 name·빈 role 동봉 → 200(변경 아님)', r.code === 200 && U('uadmin').annual_days === 15 && U('uadmin').tier === 'pm', r.code + '/' + r.body.error_code);
+  // 예약 이름·role 대표: 개발자가 없어 개발자 게이트는 통과하는 상태에서 pm(비대표)이 시도
+  r = await callA({ action: 'member_upsert', id: 'utadm', name: '나경일' }, tokA);
+  T('S1: pm이 남의 이름을 나경일(예약)로 → 403 NAME_RESERVED', r.code === 403 && r.body.error_code === 'NAME_RESERVED' && U('utadm').name === '나수진', r.code + '/' + r.body.error_code);
+  r = await callA({ action: 'member_upsert', id: 'utadm', role: '대표' }, tokA);
+  T('S1: pm이 남의 role을 대표로 → 403 ROLE_BOSS_ONLY', r.code === 403 && r.body.error_code === 'ROLE_BOSS_ONLY' && U('utadm').role === '관리자');
+  r = await callA({ action: 'member_upsert', id: 'utadm', name: '나종운' }, tokB);
+  T('S1: 대표가 남의 이름을 나종운(기존 회원과 동일)으로 → 409 NAME_TAKEN(이름 색인 탈취 차단 — 목록 비교, 색인 없어도)', r.code === 409 && r.body.error_code === 'NAME_TAKEN' && U('utadm').name === '나수진' && U('uboss').name === '나종운' && !mem.gw_users['name:나종운'], r.code + '/' + r.body.error_code);
+  mem.gw_users['name:직원2x'] = 'udocw2';   // 색인만 있고 목록엔 다른 이름인 경우(구 색인 잔재) — 색인 쪽으로도 잡히는지
+  r = await callA({ action: 'member_upsert', id: 'utadm', name: '직원2x' }, tokB);
+  T('S1: 이름 색인(name:<lower>)이 남을 가리키면 → 409 NAME_TAKEN(색인 비교)', r.code === 409 && r.body.error_code === 'NAME_TAKEN' && U('utadm').name === '나수진');
+  delete mem.gw_users['name:직원2x'];
+  r = await callA({ action: 'member_upsert', id: 'utadm', name: '직원' }, tokB);
+  T('S1: 기존 회원(uwork)과 같은 이름 → 409 NAME_TAKEN', r.code === 409 && r.body.error_code === 'NAME_TAKEN');
+  r = await callA({ action: 'member_upsert', name: '직원', role: '직원', pin: '1234' }, tokB);
+  T('S1: 신규 회원을 기존 이름으로 → 409 NAME_TAKEN', r.code === 409 && r.body.error_code === 'NAME_TAKEN');
+  r = await callA({ action: 'member_upsert', id: 'utadm', role: '대표' }, tokB);
+  T('S1: 대표가 남의 role을 대표로 → 200 — 그러나 명시 tier 없으면 게이트는 admin(파생 없음)', r.code === 200 && U('utadm').role === '대표' && (await pushMock.tierCtx()).tierOf(U('utadm')) === 'admin', r.code + '/' + r.body.error_code);
+  r = await call({ action: 'approval_create', kind: '지입료', title: '③ 위조 대표 검사' }, tokW, 'dev1');
+  const q3f = r.body.id;
+  r = await call({ action: 'approval_decide', id: q3f, decision: '승인' }, tokT);
+  T('S1: role 대표(명시 tier 없음)로 ③ 승인 시도 → 403 BOSS_ONLY', r.code === 403 && r.body.error_code === 'BOSS_ONLY', r.code + '/' + r.body.error_code);
+  r = await call({ action: 'approval_create', kind: '사규', title: 'role 대표 전결 시도', self_decide: true }, tokT);
+  T('S1: role 대표(명시 없음)의 전결 시도 → 403 PM_ONLY(등급 admin)', r.code === 403 && r.body.error_code === 'PM_ONLY');
+  r = await callA({ action: 'member_upsert', id: 'utadm', role: '관리자' }, tokB);
+  T('S1: role 원복(대표→관리자, 대표 요청) → 200 · 감사로그 등급변경 없음(유효 등급 admin 그대로)', r.code === 200 && U('utadm').role === '관리자' && !auditMock.logs.some((l) => l.col === 'member' && l.ev.some((e) => e.op === '등급변경' && e.id === 'utadm' && /admin→admin/.test(e.t))));
+  r = await callA({ action: 'member_upsert', id: 'utadm', role: { a: 1 } }, tokB);
+  T('R7: role에 객체 전송 → 문자열 코어션(빈 값=변경 없음) 200 · role 유지', r.code === 200 && U('utadm').role === '관리자', JSON.stringify(U('utadm').role));
+  // ---- S3 LAST_PM 전면 ----
+  r = await callA({ action: 'member_upsert', id: 'uadmin', admin: false }, tokB);
+  T('S3: admin:false로 마지막 pm 해제 → 409 LAST_PM · 저장 없음', r.code === 409 && r.body.error_code === 'LAST_PM' && U('uadmin').admin === true && U('uadmin').tier === 'pm', r.code + '/' + r.body.error_code);
+  r = await callA({ action: 'member_upsert', id: 'uadmin', leave_date: '2020-01-01' }, tokB);
+  T('S3: 마지막 pm에 지난 퇴사일 → 409 LAST_PM(퇴사=유효 pm 아님)', r.code === 409 && r.body.error_code === 'LAST_PM' && !U('uadmin').leave_date, r.code + '/' + r.body.error_code);
+  r = await callA({ action: 'member_upsert', id: 'uadmin', leave_date: '2999-12-31' }, tokB);
+  T('S3: 미래 퇴사일은 통과(아직 재직) → 200', r.code === 200 && U('uadmin').leave_date === '2999-12-31');
+  r = await callA({ action: 'member_upsert', id: 'utadm', tier: 'pm' }, tokA);
+  T('S3 준비: utadm을 pm으로(다른 pm 생김) → 200', r.code === 200 && U('utadm').tier === 'pm');
+  const audL = auditMock.logs.length;
+  r = await callA({ action: 'member_upsert', id: 'uadmin', leave_date: '2020-01-01' }, tokB);
+  T('S3: 다른 pm이 있으면 퇴사일 저장 200 · 감사로그 등급변경 pm→없음(퇴사)', r.code === 200 && U('uadmin').leave_date === '2020-01-01' && auditMock.logs.slice(audL).some((l) => l.col === 'member' && l.ev.some((e) => e.op === '등급변경' && e.id === 'uadmin' && /pm→없음/.test(e.t))), JSON.stringify(auditMock.logs.slice(audL)).slice(0, 200));
+  {
+    const tc = await pushMock.tierCtx();
+    T('S3: 퇴사한 pm은 pmIds·adminIds에서 제외(utadm만 pm) · tierOf \'\'', tc.pmIds.join() === 'utadm' && tc.adminIds.indexOf('uadmin') < 0 && tc.tierOf(U('uadmin')) === '', JSON.stringify([tc.pmIds, tc.adminIds]));
+  }
+  r = await call({ action: 'approvals_list' }, tokT);
+  T('S3: 퇴사 pm 제외 후에도 pm_present true(utadm)', r.code === 200 && r.body.pm_present === true);
+  r = await call({ action: 'get', collection: 'tasks' }, tokA);
+  T('S3: 퇴사한 pm의 세션 → 401 NO_MEMBER', r.code === 401 && r.body.error_code === 'NO_MEMBER');
+  mem.gw_users['member:uadmin'] = { id: 'uadmin', name: '관리자', admin: true, perms: {}, tier: 'pm' };   // 원복(블롭 직접 — 퇴사 세션으로는 못 되돌린다)
+  r = await callA({ action: 'member_upsert', id: 'utadm', tier: 'admin' }, tokA);
+  T('S3 정리: utadm을 admin으로(uadmin pm 복귀) → 200', r.code === 200 && U('utadm').tier === 'admin');
+  r = await callA({ action: 'member_delete', id: 'uadmin' }, tokB);
+  T('S3: 마지막 pm 삭제 → 409 LAST_PM(삭제도 같은 판정)', r.code === 409 && r.body.error_code === 'LAST_PM' && U('uadmin').del !== 1);
+  // ---- 이름·직책 변경은 개발자만(S1(c)) — 개발자 생성 후 비개발자 pm 시도 ----
+  mem.gw_users['member:udev'] = { id: 'udev', name: '개발자', admin: true, dev: true, perms: {} };
+  const tokDev = issueSession(U('udev')).token;
+  r = await callA({ action: 'member_upsert', id: 'utadm', role: '직원' }, tokA);
+  T('S1(c): 개발자가 있으면 pm의 남의 role 변경 → 403 DEV_ONLY', r.code === 403 && r.body.error_code === 'DEV_ONLY' && U('utadm').role === '관리자', r.code + '/' + r.body.error_code);
+  r = await callA({ action: 'member_upsert', id: 'utadm', name: '나수진2' }, tokA);
+  T('S1(c): pm의 남의 name 변경 → 403 DEV_ONLY', r.code === 403 && r.body.error_code === 'DEV_ONLY');
+  r = await callA({ action: 'member_upsert', id: 'utadm', name: '나수진', role: '관리자', annual_days: 12 }, tokA);
+  T('S1(c): 같은 name·role 동봉한 인사 수정은 200(변경 아님)', r.code === 200 && U('utadm').annual_days === 12);
+  r = await callA({ action: 'member_upsert', id: 'utadm', name: '나수진2' }, tokDev);
+  T('S1(c): 개발자의 name 변경 → 200 · 이름 색인 이동', r.code === 200 && U('utadm').name === '나수진2' && mem.gw_users['name:나수진2'] === 'utadm' && !mem.gw_users['name:나수진']);
+  r = await callA({ action: 'member_upsert', id: 'utadm', name: '나수진' }, tokDev);
+  r = await callA({ action: 'member_upsert', id: 'udev', tier: 'boss' }, tokDev);
+  T('S1: 개발자(명시 tier 없음=admin)의 자기 tier 변경 → 403 SELF_CHANGE_FORBIDDEN', r.code === 403 && r.body.error_code === 'SELF_CHANGE_FORBIDDEN' && !U('udev').tier && U('utadm').name === '나수진');
+  {
+    const tc = await pushMock.tierCtx();
+    T('S1: dev 플래그도 명시 tier 없으면 admin(부트스트랩 아님) — pmIds에 udev 없음', tc.tierOf(U('udev')) === 'admin' && tc.pmIds.indexOf('udev') < 0 && tc.bootstrap === false);
+  }
+  delete mem.gw_users['member:udev'];
+  // ---- S2 BOSS_ONLY 폴백 제거 · 총정리 크론 스킵 ----
+  r = await callA({ action: 'member_upsert', id: 'uboss', tier: 'admin' }, tokA);
+  T('S2 준비: pm이 대표를 admin 등급으로(대표 0명) → 200 · 감사로그 등급변경 boss→admin', r.code === 200 && U('uboss').tier === 'admin' && auditMock.logs.some((l) => l.col === 'member' && l.ev.some((e) => e.op === '등급변경' && e.id === 'uboss' && /boss→admin/.test(e.t))), r.code + '/' + r.body.error_code);
+  r = await call({ action: 'approvals_list' }, tokA);
+  T('S2: boss_present false', r.code === 200 && r.body.boss_present === false);
+  r = await call({ action: 'approval_decide', id: q3f, decision: '승인' }, tokT);
+  T('S2: 대표 0명 — 관리자 등급의 ③ 승인 → 403 BOSS_ONLY(폴백 없음)', r.code === 403 && r.body.error_code === 'BOSS_ONLY', r.code + '/' + r.body.error_code);
+  r = await call({ action: 'approval_decide', id: q3f, decision: '승인' }, tokA);
+  T('S2: 대표 0명 — pm의 ③ 승인 → 403 BOSS_ONLY', r.code === 403 && r.body.error_code === 'BOSS_ONLY');
+  r = await call({ action: 'approval_decide', id: q3f, decision: '승인' }, tokB, 'dev1');
+  T('S2: 강등된 대표(role 대표·이름 나종운·tier admin)의 ③ 승인 → 403 BOSS_ONLY(파생 없음)', r.code === 403 && r.body.error_code === 'BOSS_ONLY');
+  r = await call({ action: 'approval_decide', id: q3f, decision: '보류' }, tokT);
+  T('S2: 대표 0명이어도 보류는 가능(대기 유지 통로)', r.code === 200 && r.body.decided === '보류');
+  mem.gw_data['col:approvals'].items.push({ id: 'summary-2026-06', kind: '전결총정리', grade: 3, to: 'boss', status: '대기', title: '6월 전결 총정리 — 1건', by: { id: '__system__', name: '자동' }, created: '2026-07-01T00:00:00.000Z', summary: { ids: [], counts: {} } });
+  r = await call({ action: 'approval_decide', id: 'summary-2026-06', decision: '확인' }, tokA);
+  T('S2: 대표 0명 — 총정리 [확인]을 pm이 → 403 BOSS_ONLY(폴백 없음)', r.code === 403 && r.body.error_code === 'BOSS_ONLY');
+  {
+    const apprCron2 = require(join(FN, 'gw-appr-cron.js'));
+    const saved = mem.gw_data['col:approvals'];
+    mem.gw_data['col:approvals'] = { schema: 1, items: [{ id: 'p9', kind: '지시', title: '8월 전결 건', grade: 1, to: 'pm', status: '승인', by: { id: 'uwork', name: '직원' }, created: '2026-08-19T01:00:00.000Z', decided_at: '2026-08-20T05:00:00.000Z', chain: [] }], updated_at: 100 };
+    mem.gw_data['col:leaves'] = { schema: 1, items: [], updated_at: 100 };
+    const audC = auditMock.logs.length, pushC = pushMock.calls.length;
+    const cr2 = await apprCron2.runSummary('gw_data', Date.UTC(2026, 7, 31, 23, 0));
+    T('S2: 총정리 크론 — 대표 0명이면 스킵(no-boss) · 카드 미생성 · 감사로그 감시 · 푸시 0', cr2.ok && cr2.skipped === 'no-boss' && !mem.gw_data['col:approvals'].items.some((x) => x.id === 'summary-2026-08') && auditMock.logs.slice(audC).some((l) => l.col === 'approvals' && l.ev.some((e) => e.op === '감시' && e.id === 'summary-2026-08')) && pushMock.calls.length === pushC, JSON.stringify(cr2));
+    mem.gw_users['member:uboss'].tier = 'boss';
+    const cr3 = await apprCron2.runSummary('gw_data', Date.UTC(2026, 7, 31, 23, 0));
+    T('S2: 등급 지정 후 재기동 → 카드 생성 · 대표에게만 푸시', cr3.ok && cr3.id === 'summary-2026-08' && pushMock.calls.length === pushC + 1, JSON.stringify(cr3));
+    mem.gw_data['col:approvals'] = saved;
+  }
+  r = await call({ action: 'approval_decide', id: q3f, decision: '승인' }, tokB, 'dev1');
+  T('S2: 대표 등급 복귀(tier boss) → ③ 승인 200', r.code === 200 && r.body.decided === '승인', r.code + '/' + r.body.error_code);
+  // ---- member_list 비관리자 민감 필드 ----
+  r = await callA({ action: 'member_list' }, tokW);
+  {
+    const bad = ['pin_hash', 'pin_salt', 'uid', 'perms', 'hire_date', 'annual_days', 'birth', 'leave_date', 'annual_base', 'loa_days', 'emp_type'];
+    const leak = r.body.members.filter((m) => m.id !== 'uwork').flatMap((m) => bad.filter((k) => k in m));
+    T('S7: member_list(비관리자) — 타인 레코드에 민감 필드(pin·uid·perms·인사정보) 없음 · tier·dev·admin은 동봉', r.code === 200 && leak.length === 0 && r.body.members.some((m) => m.id === 'uboss' && m.tier === 'boss' && m.admin === true), leak.join(','));
+  }
+  // ---- 문서함: S4 스탬프 강제 / S5 누락 보존·타인 del 무시 / R1 부활 차단 / R3 hidden_tmp / R6 docop 정리 ----
+  const OLD40 = new Date(Date.now() - 40 * 86400000).toISOString();
+  mem.gw_data['col:documents'] = { schema: 1, items: [
+    { id: 'w1', title: '관리자가 지울 문서', cat: '02-01', status: '등재' },
+    { id: 'w2', title: '전원 공개(타인 등재)', cat: '02-01', scope: 'all', status: '등재', by: { id: 'udocw2', name: '직원2' } },
+    { id: 'w3', title: '문서직원 본인 문서', cat: '02-01', scope: 'all', status: '등재', by: { id: 'udocw', name: '문서직원' } },
+    { id: 'w4', title: '40일 전 삭제(영구 삭제 대상)', cat: '02-01', del: 1, deleted_at: OLD40, deleted_by: { id: 'uadmin', name: '관리자' } },
+    { id: 'w5', title: 'v314 임시 숨김', cat: '02-01', del: 1, hidden_tmp: 1, deleted_at: OLD40 },
+    { id: 'w6', title: '관리자만(직원 비가시)', cat: '06-03', status: '등재' },
+  ], updated_at: 700 };
+  const wdoc = (id) => mem.gw_data['col:documents'].items.find((x) => x && x.id === id);
+  const wAll = () => mem.gw_data['col:documents'].items;
+  r = await call({ action: 'save', collection: 'documents', doc: { schema: 1, items: wAll().map((x) => x.id === 'w1' ? Object.assign({}, x, { del: 1, deleted_at: '2020-01-01T00:00:00.000Z', deleted_by: { id: 'uwork', name: '직원' } }) : x) } }, tokA);
+  T('S4: 관리자가 deleted_at(2020)·deleted_by(직원) 위조해 삭제 → 서버 시각·서버 by(uadmin) 강제', r.code === 200 && wdoc('w1').del === 1 && wdoc('w1').deleted_by.id === 'uadmin' && (Date.now() - Date.parse(wdoc('w1').deleted_at)) < 60000, JSON.stringify(wdoc('w1')).slice(0, 200));
+  r = await call({ action: 'doc_purge', id: 'w1', confirm: true }, tokA);
+  T('S4: 위조 삭제일이 폐기됐으므로 즉시 영구 삭제 불가 → 400 PURGE_TOO_EARLY', r.code === 400 && r.body.error_code === 'PURGE_TOO_EARLY');
+  const w1At = wdoc('w1').deleted_at;
+  r = await call({ action: 'save', collection: 'documents', doc: { schema: 1, items: wAll().map((x) => x.id === 'w1' ? Object.assign({}, x, { deleted_at: '2020-01-01T00:00:00.000Z' }) : x) } }, tokA);
+  T('S4: 이미 삭제된 문서의 deleted_at 위조 재저장 → 서버 원본 이월', r.code === 200 && wdoc('w1').deleted_at === w1At);
+  // S5 직원 누락 저장: 보이는 문서 중 w3만 보냄 → 나머지 유지
+  r = await call({ action: 'save', collection: 'documents', doc: { schema: 1, items: [Object.assign({}, wdoc('w3'), { title: '본인 문서(수정)' })] } }, tokD, 'dev1');
+  T('S5: 직원이 보이는 문서(w2 등)를 페이로드에서 빼고 저장 → 원본 유지 · w3 편집 반영 · 전체 건수 6 유지', r.code === 200 && wdoc('w2') && wdoc('w2').title === '전원 공개(타인 등재)' && wdoc('w3').title === '본인 문서(수정)' && wAll().length === 6, wAll().map((x) => x.id).join(','));
+  r = await call({ action: 'save', collection: 'documents', doc: { schema: 1, items: (await docVisibleTo(tokD)).map((x) => x.id === 'w2' ? Object.assign({}, x, { del: 1, title: '타인 문서 제목 편집' }) : x) } }, tokD, 'dev1');
+  T('S5: 타인 등재 문서(w2)에 del:1 전송 → del 무시(원본 유지) · 제목 편집만 반영', r.code === 200 && wdoc('w2').del === undefined && !wdoc('w2').deleted_at && wdoc('w2').title === '타인 문서 제목 편집', JSON.stringify(wdoc('w2')).slice(0, 200));
+  r = await call({ action: 'save', collection: 'documents', doc: { schema: 1, items: (await docVisibleTo(tokD)).map((x) => x.id === 'w3' ? Object.assign({}, x, { del: 1 }) : x) } }, tokD, 'dev1');
+  T('S5: 본인 등재 문서(w3) del:1 → 삭제 + 서버 스탬프(udocw)', r.code === 200 && wdoc('w3').del === 1 && wdoc('w3').deleted_by.id === 'udocw');
+  // R3 hidden_tmp
+  r = await call({ action: 'doc_purge', id: 'w5', confirm: true }, tokA);
+  T('R3: hidden_tmp(v314 임시 숨김) 영구 삭제 → 400 HIDDEN_TMP · 항목 유지', r.code === 400 && r.body.error_code === 'HIDDEN_TMP' && !!wdoc('w5'), r.code + '/' + r.body.error_code);
+  // R6 docop 정리
+  mem.gw_data['docop:old-1'] = { ts: Date.now() - 8 * 86400000, body: { status: 'OK' } };
+  mem.gw_data['docop:new-1'] = { ts: Date.now() - 86400000, body: { status: 'OK' } };
+  r = await call({ action: 'doc_restore', id: 'w5', cid: 'rs-w5' }, tokA);
+  T('R3: hidden_tmp는 복구 가능 → 200 · hidden_tmp 제거', r.code === 200 && wdoc('w5').del === undefined && wdoc('w5').hidden_tmp === undefined);
+  T('R6: 휴지통 작업 시 7일 지난 docop 블롭 정리(old 삭제·new 유지·방금 것 유지)', !mem.gw_data['docop:old-1'] && !!mem.gw_data['docop:new-1'] && !!mem.gw_data['docop:rs-w5'], Object.keys(mem.gw_data).filter((k) => k.indexOf('docop:') === 0).join(','));
+  // R1 부활 차단: w4 영구 삭제 → 낡은 사본(관리자·직원) 저장 → 부활 0
+  const staleW4 = JSON.parse(JSON.stringify(wdoc('w4')));
+  r = await call({ action: 'doc_purge', id: 'w4', confirm: true, cid: 'pg-w4' }, tokA);
+  T('R1 준비: w4 영구 삭제 → 200', r.code === 200 && !wdoc('w4'));
+  const nAppr = mem.gw_data['col:approvals'].items.length;
+  r = await call({ action: 'save', collection: 'documents', doc: { schema: 1, items: wAll().concat([staleW4]) } }, tokA);
+  T('R1: 관리자의 낡은 사본(del:1 w4) 저장 → 부활 0 · 감사로그 제거(부활 차단)', r.code === 200 && !wdoc('w4') && auditMock.logs.some((l) => l.col === 'documents' && l.ev.some((e) => e.op === '제거' && e.id === 'w4' && /부활/.test(e.t))), wAll().map((x) => x.id).join(','));
+  r = await call({ action: 'save', collection: 'documents', doc: { schema: 1, items: (await docVisibleTo(tokD)).concat([Object.assign({}, staleW4, { by: { id: 'udocw', name: '문서직원' } })]) } }, tokD, 'dev1');
+  T('R1: 직원의 낡은 사본(del:1 w4) 저장 → 부활 0 · \'대기\' 없음 · 등재 카드 없음', r.code === 200 && !wdoc('w4') && mem.gw_data['col:approvals'].items.length === nAppr && !mem.gw_data['col:approvals'].items.some((a) => a.ref === 'doc:w4'), wAll().map((x) => x.id).join(','));
+  r = await call({ action: 'get', collection: 'documents' }, tokD, 'dev1');
+  T('R1·S5 후 직원 get: w2(전원) 보이고 w6(관리자만)·w4(영구 삭제) 없음', r.code === 200 && docIds(r).indexOf('w2') >= 0 && docIds(r).indexOf('w6') < 0 && docIds(r).indexOf('w4') < 0, docIds(r));
+}
+
+console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

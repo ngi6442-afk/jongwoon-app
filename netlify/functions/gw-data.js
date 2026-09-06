@@ -8,7 +8,7 @@ const { setupBlobContext, store, blobGet, blobSet, blobDelete, blobList } = requ
 const { verifyToken, bearer } = require('./_lib/session');
 const { appendAudit, auditKey, diffItems } = require('./_lib/audit');
 const push = require('./_lib/push');
-const tier = require('./_lib/tier');   // 관리자 등급(v321) — 전결·PM 큐 게이트
+const tier = require('./_lib/tier');   // 관리자 등급(v321) — retired 판정식 공용. 게이트는 push.tierCtx()(명시 tier·부트스트랩·퇴사 제외, 9/6 검증 S1)
 
 const DATA = 'gw_data';
 const USERS = 'gw_users';
@@ -23,11 +23,7 @@ function jr(statusCode, body) { return { statusCode, headers: Object.assign({ 'C
 function colKey(c) { return `col:${c}`; }
 
 // 퇴사자 차단(S2-A) — gw-auth와 동일 규칙: 퇴사일(leave_date)이 지나면 기존 세션도 데이터 접근 불가
-function retired(m) {
-  const ld = m && m.leave_date;
-  if (!ld) return false;
-  return String(ld) < new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);   // KST 일자 비교
-}
+function retired(m) { return tier.retired(m); }   // 판정식은 _lib/tier.js 한 곳(KST 일자 비교) — 등급·pmIds·bossIds도 같은 식으로 재직자만
 async function currentMember(event) {
   const v = verifyToken(bearer(event));
   if (!v.ok) return { ok: false, reason: v.reason };
@@ -203,16 +199,16 @@ function docFilesFix(s, o) {
   if (o && Array.isArray(o.files) && o.files.length) s.files = o.files; else delete s.files;
   if (o && Number(o.att_seq) > 0) s.att_seq = Number(o.att_seq); else delete s.att_seq;   // 첨부 번호 카운터도 서버 원본(low4·low7 — 클라 사본이 카운터를 되돌려 번호 재사용을 만들지 않게)
 }
-// 삭제 스탬프(v321 휴지통) — del:1로 전환되는 저장에 deleted_at·deleted_by를 서버가 찍는다. trustClient(관리자)면 클라 값을 두고 없을 때만 채움, 비관리자는 서버 스탬프로 덮음(위조 폐기).
-// 이미 삭제된 원본은 스탬프를 이월(낡은 사본 저장이 삭제일을 지우지 않게 — 30일 계산의 근거), 삭제가 풀린 항목은 스탬프 제거. 스탬프 없는 구건은 docDeletedTs가 updated_ts를 삭제일로 간주
-function docDelStamp(s, o, member, nowIso, trustClient) {
+// 삭제 스탬프(v321 휴지통·9/6 검증 S4) — del:1로 **새로 전환**되는 저장은 관리자·비관리자 모두 서버 시각·서버 by를 강제(클라 deleted_at/deleted_by 폐기 — 삭제일 위조로 30일 시계를 당기거나 삭제자를 바꿔치지 못하게).
+// 이미 삭제된 원본은 서버 원본의 스탬프만 이월(낡은 사본 저장이 삭제일을 지우지 않게 — 30일 계산의 근거. 원본에 없으면 클라 값도 버린다 → docDeletedTs가 updated_ts를 삭제일로 간주), 삭제가 풀린 항목은 스탬프 제거
+function docDelStamp(s, o, member, nowIso) {
   if (s.del === 1) {
     if (o && o.del === 1) {
-      if (o.deleted_at) s.deleted_at = o.deleted_at; else if (!trustClient) delete s.deleted_at;
-      if (o.deleted_by) s.deleted_by = o.deleted_by; else if (!trustClient) delete s.deleted_by;
+      if (o.deleted_at) s.deleted_at = o.deleted_at; else delete s.deleted_at;
+      if (o.deleted_by) s.deleted_by = o.deleted_by; else delete s.deleted_by;
     } else {
-      if (!trustClient || !s.deleted_at) s.deleted_at = nowIso;
-      if (!trustClient || !s.deleted_by) s.deleted_by = { id: member.id, name: member.name };
+      s.deleted_at = nowIso;
+      s.deleted_by = { id: member.id, name: member.name };
     }
   } else { delete s.deleted_at; delete s.deleted_by; }
 }
@@ -378,15 +374,17 @@ async function handleSave(event, d, R) {
       const nowIso = new Date().toISOString();
       doc.items = doc.items.map(function (x) {
         const s = Object.assign({}, x);
+        // 부활 차단(9/6 검증 R1): 서버 원본에 없는 id가 del:1로 오면 영구 삭제된 문서의 낡은 사본(휴지통 항목 캐시) — 폐기(감사로그 '제거'). 관리자도 예외 없음
+        if (s.id && !oldDocBy[s.id] && s.del === 1) { docDropped.push({ x: x, why: '영구 삭제된 문서의 낡은 사본(부활 차단)' }); return null; }
         const sc = docScopeNorm(s.scope); if (sc) s.scope = sc; else delete s.scope;
         const o01 = s.id ? oldDocBy[s.id] : null;   // 01 법인 문서는 대분류를 벗어나게 저장하지 않는다(리뷰 확정: 구 2자리 cat 구건을 관리자가 열어 저장하면 99로 덮여 하드차단이 풀렸다)
         if (o01 && docMajorOf(o01) === '01' && docMajorOf(s) !== '01') { s.cat = o01.cat; s.no = o01.no; }   // cat·no를 함께 바꿔 보내는 조작도 원본으로(9/6 재검증)
         if (!(s.id && oldDocBy[s.id]) && s.status !== '등재') { s.status = '등재'; s.registered_by = { id: c.member.id, name: c.member.name }; s.registered_at = nowIso; delete s.reject_reason; }
         if (!(s.id && oldDocBy[s.id]) && !s.by) s.by = { id: c.member.id, name: c.member.name };
-        docDelStamp(s, s.id ? oldDocBy[s.id] : null, c.member, nowIso, true);   // 삭제 스탬프(v321 휴지통) — 관리자 값은 신뢰, 없으면 서버가 찍고 구 스탬프는 이월
+        docDelStamp(s, s.id ? oldDocBy[s.id] : null, c.member, nowIso);   // 삭제 스탬프(v321 휴지통·S4) — 신규 del 전환은 서버 시각·서버 by 강제(관리자 값도 폐기), 구 스탬프는 서버 원본만 이월
         docFilesFix(s, s.id ? oldDocBy[s.id] : null);   // 첨부 메타(v315)는 첨부 액션으로만 — 관리자 저장도 서버 원본 이월(낡은 사본이 첨부 목록을 지우지 않게)
         return s;
-      });
+      }).filter(Boolean);
     } else {
       docSet = await docSettings(store(DATA));
       const oldDocBy = {}; oldItems.forEach(function (o) { if (o && o.id) oldDocBy[o.id] = o; });
@@ -408,13 +406,15 @@ async function handleSave(event, d, R) {
           ['status', 'by', 'registered_by', 'registered_at', 'reject_reason', 'rejected_at', 'reg_n'].forEach(function (k) { if (o[k] != null) s[k] = o[k]; else delete s[k]; });
           if (resubmit) { s.status = '대기'; s.reg_n = (Number(o.reg_n) || 1) + 1; delete s.reject_reason; delete s.rejected_at; }
           if (o.del === 1) s.del = 1;   // 비관리자는 복구 불가(v321 — 복구는 관리자 휴지통 doc_restore). 낡은 사본 저장이 삭제를 되살리지 않게
-          docDelStamp(s, o, c.member, nowIso, false);   // 삭제 스탬프는 서버가(비관리자 값 폐기 — 삭제자 위조·삭제일 조작으로 30일 시계를 당기지 못하게)
+          else if (s.del === 1 && !(o.by && o.by.id === me.id)) delete s.del;   // 삭제(del:1) 전송은 본인 등재 문서만(9/6 검증 S5) — 타인 문서의 del은 무시(내용 편집만 반영, 원본 유지)
+          docDelStamp(s, o, c.member, nowIso);   // 삭제 스탬프는 서버가(클라 값 폐기 — 삭제자 위조·삭제일 조작으로 30일 시계를 당기지 못하게)
           docFilesFix(s, o);   // 첨부 메타 원본 고정(v315) — 비관리자가 files를 위조·삭제해 보내도 첨부 액션(doc_att_put/del)으로만 바뀐다
         } else {
-          if (docMajorOf(x) === '01') { docDropped.push(x); return; }   // 신규 01 법인(대분류 판정)은 관리자만(2026-09-02 규칙) — 폐기 + 감사로그 '제거'
+          if (s.del === 1) { docDropped.push({ x: x, why: '영구 삭제된 문서의 낡은 사본(부활 차단)' }); return; }   // R1: 서버 원본에 없는 id의 del:1 = 지워진 문서의 사본 — '대기'·등재 카드로 부활시키지 않는다
+          if (docMajorOf(x) === '01') { docDropped.push({ x: x, why: '01 법인 신규는 관리자만' }); return; }   // 신규 01 법인(대분류 판정)은 관리자만(2026-09-02 규칙) — 폐기 + 감사로그 '제거'
           const sc = docScopeNorm(s.scope); if (sc) s.scope = sc; else delete s.scope;
           s.by = me; delete s.registered_by; delete s.registered_at; delete s.reject_reason; delete s.rejected_at; delete s.reg_n;
-          docDelStamp(s, null, c.member, nowIso, false);   // 신규가 del:1로 오면 서버 스탬프(그 외엔 삭제 필드 제거)
+          docDelStamp(s, null, c.member, nowIso);   // 신규는 del 없이 온다(위에서 걸렀다) — 삭제 필드 제거
           docFilesFix(s, null);   // 신규 문서는 첨부 0으로 시작(id 확정 뒤 doc_att_put)
           if (docSet.register_gate === 'none') { s.status = '등재'; s.registered_by = me; s.registered_at = nowIso; }
           else s.status = '대기';
@@ -423,6 +423,8 @@ async function handleSave(event, d, R) {
         if (s.id) seenOut[s.id] = 1;
         out.push(s);
       });
+      // 누락 보존(9/6 검증 S5): 보이는 기존 문서가 페이로드에 없으면 서버 원본 유지 — 낡은 목록(열람 필터·검색 결과·부분 로드)으로 저장해도 남의 문서가 즉시 소실되지 않는다. 삭제는 del:1 명시 전송(본인 문서)으로만
+      oldItems.forEach(function (o) { if (o && o.id && !keepIds[o.id] && !seenOut[o.id]) { out.push(o); seenOut[o.id] = 1; } });
       doc.items = out.concat(keep);
     }
   }
@@ -473,8 +475,8 @@ async function handleSave(event, d, R) {
   // 문서 저장이 먼저(사용자 본선), 상신은 그 뒤 — 상신 실패는 감사로그로 남기고 이 직원의 다음 문서 저장 때 같은 cid로 다시 시도(멱등이라 중복 0).
   // 재상신(reg_n) 건도 같은 경로. 정정 상신(dupOpenRef)은 'ab:' 전용이라 doc: 중복은 cid 멱등에만 의존한다.
   let regWarn = 0;
-  if (col === 'documents' && !c.member.admin && docDropped.length) {
-    try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'documents', ev: docDropped.map(function (x) { return { op: '제거', id: String(x.id || '-'), t: '01 법인 신규는 관리자만 · ' + String(x.title || '').slice(0, 40) }; }) }); } catch (e) {}
+  if (col === 'documents' && docDropped.length) {   // 폐기 감사로그 '제거' — 비관리자 01 신규 / 관리자·비관리자 공통 부활 차단(R1)
+    try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'documents', ev: docDropped.slice(0, 30).map(function (e) { return { op: '제거', id: String(e.x.id || '-'), t: e.why + ' · ' + String(e.x.title || '').slice(0, 40) }; }) }); } catch (e) {}
   }
   if (col === 'documents' && !c.member.admin && docPending.length) {
     try {
@@ -1289,10 +1291,11 @@ async function handleApprovalsList(event, d, R) {
   }
   const items = c.member.admin ? docFresh.items : doc.items.filter(function (it) { return it && it.by && it.by.id === c.member.id; });
   // base = 낙관락 토큰. decide가 이 값을 들고 와야 하며 불일치면 409 APPR_STALE(관리자 2인 동시 결재 유실 방지)
-  // boss_present — 대표 계정 존재 여부(클라 apprCanDecide 폴백용: 대표가 없으면 관리자 전원이 대표 전용 건을 결재). 관리자에게만 계산(회원 블롭 스캔)
-  // pm_present — 비대표 관리자 존재 여부(결재 3차: ①·② 1단계는 비대표 관리자 전용인데, 없으면 대표에게 연다 — 서버 PM_ONLY 게이트와 같은 축)
-  const bossN = c.member.admin ? (await push.bossIds()).length : 0;
-  const pmN = c.member.admin ? (await push.pmIds()).length : 0;
+  // boss_present — 대표(tier boss) 존재 여부(표시용 — 9/6 검증 S2로 결재 폴백은 없다: 대표 0명이면 ③·총정리는 잠기고 클라도 버튼을 열지 않는다). 관리자에게만 계산(회원 블롭 스캔 1회)
+  // pm_present — tier pm 존재 여부(①·② 1단계는 pm 전용인데, 0명이면 관리자 전원에게 연다 — 서버 PM_ONLY 게이트와 같은 축)
+  const tcL = c.member.admin ? await push.tierCtx() : null;
+  const bossN = tcL ? tcL.bossIds.length : 0;
+  const pmN = tcL ? tcL.pmIds.length : 0;
   // grades — 현재 등급표 스냅샷(v315 기안 화면의 등급·흐름 미리보기용). 정책표라 비관리자에게도 내려간다(appr_grades_get은 관리 화면 전용 admin 게이트 유지).
   // 기안 시 진짜 등급은 서버 apprCreateItem이 다시 표를 읽어 스탬프한다 — 이 값은 표시용
   const grades = await apprGrades(store(DATA));
@@ -1320,10 +1323,13 @@ async function docRegisterReconcileCreate(st, apItems) {
 // 휴가(휴가 모듈 승인·총정리 읽기 합산), 전결총정리(크론). 기안 화면(index APPR_DRAFT_EXCLUDE)과 같은 목록이어야 한다(uismoke 대조).
 const APPR_SELF_DECIDE_EXCLUDE = { '지시': 1, '운반일지': 1, '문서함 등재': 1, '휴가': 1, '전결총정리': 1 };   // 지시는 지시 탭 전용(담당 완료→승인 흐름·ref=지시 id) — 기안 화면·전결 대상 아님(low8)
 // 전결 거부 응답(v321 관리자 등급) — 관리자 등급(admin, 예: 관리부)은 403 PM_ONLY(권한 없음·클라는 [전결 종결] 버튼 자체를 숨긴다), 직원·대표는 종전 400 SELF_DECIDE_PM_ONLY(전결 대상 아님)
-function apprSelfDecideDeny(member, R) {
-  if (tier.tierOf(member) === 'admin') return jr(403, { status: 'FORBIDDEN', error_code: 'PM_ONLY', request_id: R });
+function apprSelfDecideDeny(myTier, R) {   // myTier = push.tierCtx().tierOf(요청자) — 명시 tier 기준(9/6 검증 S1)
+  if (myTier === 'admin') return jr(403, { status: 'FORBIDDEN', error_code: 'PM_ONLY', request_id: R });
   return jr(400, { status: 'REJECTED', error_code: 'SELF_DECIDE_PM_ONLY', request_id: R });
 }
+// 등급 컨텍스트 기반 **알림** 수신자: 대표 큐=대표(0명이면 관리자 전원에게 알려 부재를 드러냄 — 결재 게이트는 폴백 없음) / PM 큐=pm(0명이면 관리자 전원 — 게이트 폴백과 같은 축)
+function tcBossOrAdmin(tc) { return tc.bossIds.length ? tc.bossIds : tc.adminIds; }
+function tcPmOrAdmin(tc) { return tc.pmIds.length ? tc.pmIds : tc.adminIds; }
 async function handleApprovalCreate(event, d, R) {
   const c = await currentMember(event);
   if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
@@ -1336,11 +1342,13 @@ async function handleApprovalCreate(event, d, R) {
   // 카드 생성과 '승인' 기록을 한 번의 쓰기로(create+decide 두 번 왕복 금지, 결재 큐에 잠깐이라도 뜨지 않게).
   // 거부는 전부 400(클라가 [상신]으로 되돌리게): 비관리자·대표(대표는 기안 대상 아님) / ②·③·미정 등급 / 전용 경로가 있는 종류
   const selfDecide = !!d.self_decide;
+  const tc = await push.tierCtx();   // 관리자 등급 컨텍스트(명시 tier·부트스트랩·퇴사 제외) — 전결 게이트·apprCreateItem 자동통과·수신자 판정에 같은 스캔을 쓴다
+  const myT = tc.tierOf(c.member);
   if (selfDecide) {
-    if (!tier.isPm(c.member)) return apprSelfDecideDeny(c.member, R);   // 전결 = tier pm만(v321)
+    if (myT !== 'pm') return apprSelfDecideDeny(myT, R);   // 전결 = tier pm만(v321, 명시 등급 기준)
     if (APPR_SELF_DECIDE_EXCLUDE[kind0]) return jr(400, { status: 'REJECTED', error_code: 'SELF_DECIDE_KIND', request_id: R });
   }
-  const r = await apprCreateItem(store(DATA), c.member, { kind: kind0, title: title, body: d.body, ref: d.ref, cid: d.cid, boss_up: !!d.boss_up, self_decide: selfDecide });
+  const r = await apprCreateItem(store(DATA), c.member, { kind: kind0, title: title, body: d.body, ref: d.ref, cid: d.cid, boss_up: !!d.boss_up, self_decide: selfDecide, tc: tc });
   if (!r.ok) return jr((r.http === 400 || r.http === 403) ? r.http : 500, { status: r.http === 400 ? 'REJECTED' : (r.http === 403 ? 'FORBIDDEN' : 'ERROR'), error_code: r.code, request_id: R });
   const out = { status: 'OK', id: r.id, request_id: R };
   if (r.dedup) out.dedup = true;
@@ -1382,8 +1390,10 @@ async function apprCreateItem(st, member, o) {
   // 전결 종결(v315): ① 등급 + 비대표 관리자 기안일 때만(격상 ②·③·미정은 거부 — 클라는 [상신]으로 되돌린다). 호출자(handleApprovalCreate)도 같은 검사를 하지만
   // 본체가 최후 방어선(서버 내부 훅이 실수로 self_decide를 넘겨도 열리지 않게)
   const selfDecide = !!o.self_decide;
+  const tc = o.tc || await push.tierCtx();   // 호출자가 넘긴 등급 컨텍스트(handleApprovalCreate) 또는 여기서 1회 스캔(서버 내부 훅) — 명시 tier 기준(9/6 검증 S1)
+  const memberT = tc.tierOf(member);
   if (selfDecide) {
-    if (!tier.isPm(member)) return (tier.tierOf(member) === 'admin') ? { ok: false, code: 'PM_ONLY', http: 403 } : { ok: false, code: 'SELF_DECIDE_PM_ONLY', http: 400 };   // 전결 = tier pm만(v321)
+    if (memberT !== 'pm') return (memberT === 'admin') ? { ok: false, code: 'PM_ONLY', http: 403 } : { ok: false, code: 'SELF_DECIDE_PM_ONLY', http: 400 };   // 전결 = tier pm만(v321)
     if (grade !== 1) return { ok: false, code: 'SELF_DECIDE_GRADE1_ONLY', http: 400 };
     if (refIn.indexOf('ab:') === 0) return { ok: false, code: 'SELF_DECIDE_KIND', http: 400 };   // 운반일지 ref는 정정 흡수 경로(dupOpenRef) — 전결과 섞이지 않게
   }
@@ -1421,7 +1431,7 @@ async function apprCreateItem(st, member, o) {
     try { await appendAudit({ ts: Date.now(), by: member.name, bid: member.id, col: 'approvals', ev: [{ op: '상신정정', id: dr2.id, t: (dr2.kind + ' · ' + title).slice(0, 80) }] }); } catch (e) {}
     try {
       // 대표 전용 건은 대표에게만(없으면 관리자 폴백). sendTo는 수신자가 없어도 알림함 이력을 남긴다(관리자 확인용)
-      const uids = (apprBossOnly(dr2) ? await push.bossOrAdminIds() : await push.adminIds()).filter(function (id) { return id !== member.id; });
+      const uids = (apprBossOnly(dr2) ? tcBossOrAdmin(tc) : tc.adminIds).filter(function (id) { return id !== member.id; });
       await push.sendTo(uids, { title: '결재 요청(정정): ' + title.slice(0, 40), body: '[' + dr2.kind + '] 정정 ' + member.name, url: './', tag: 'appr-' + dr2.id },
         dr2.kind === '운반일지' ? null : { primaryOnly: true });
     } catch (e) {}
@@ -1437,7 +1447,7 @@ async function apprCreateItem(st, member, o) {
     if (escalated) item.escalated = true;
     // PM(tier pm) 자기 기안 ②는 PM 단계 자동통과(§1·§4.3) — 자기 결재 단계를 없애고 chain에 명시(감사 논란 방지, §11).
     // 관리자 등급(admin)의 ② 기안은 자동통과 없이 PM 큐로(v321 — PM 단계 결재 권한이 없으므로 건너뛸 자기 단계가 없다)
-    if (grade === 2 && tier.isPm(member)) {
+    if (grade === 2 && memberT === 'pm') {
       item.chain.push({ by: { id: member.id, name: member.name }, decision: '자동통과', at: item.created });
       item.to = 'boss';
     }
@@ -1476,8 +1486,8 @@ async function apprCreateItem(st, member, o) {
   // 운반일지만 전 기기(배치도 결정 ① 명시 예외 — 오피스PC 팝업+폰 병행), 그 외 종류는 우선기기 1발(결정 ③).
   // ③건의 PM 몫은 별도 발송 없음 — 대표행 발송이 push:log(알림함)에 남고 관리자는 알림함 전체를 보므로 그 줄이 "확인" 줄이 된다(v308 방식).
   try {
-    const ids = (apprBossOnly(item) ? await push.bossOrAdminIds()
-      : (item.grade ? await push.pmOrAdminIds() : await push.adminIds())).filter(function (id) { return id !== member.id; });
+    const ids = (apprBossOnly(item) ? tcBossOrAdmin(tc)
+      : (item.grade ? tcPmOrAdmin(tc) : tc.adminIds)).filter(function (id) { return id !== member.id; });
     await push.sendTo(ids, { title: '결재 요청: ' + title.slice(0, 40), body: '[' + item.kind + '] 기안 ' + member.name, url: './', tag: 'appr-' + item.id },
       item.kind === '운반일지' ? null : { primaryOnly: true });
   } catch (e) {}
@@ -1502,8 +1512,10 @@ async function handleApprovalDecide(event, d, R) {
   // 승인·반려는 종결(재결정 불가). '보류'만 대기 성격을 유지해 재결정 가능 — 이 검사가 BOSS_ONLY보다 앞이어야 구 캐시 클라가 409(건너뜀)를 받는다
   if (pre.status === '승인' || pre.status === '반려') return jr(409, { status: 'CONFLICT', error_code: 'ALREADY_DECIDED', base: rd.doc.updated_at || 0, request_id: R });
   // 대표 전용 건의 승인·반려는 대표만(서버 하드 게이트 — 클라 숨김은 UI일 뿐). 보류는 관리자 누구나(대표 부재 시 대기 유지 통로).
-  // 대표 계정이 하나도 없으면(role 불일치 등) 관리자 전원에게 연다 — 푸시 폴백(bossOrAdminIds)·클라 boss_present와 같은 축(교착 방지, v310)
-  if (apprBossOnly(pre) && decision !== '보류' && !push.isBoss(c.member) && (await push.bossIds()).length) return jr(403, { status: 'FORBIDDEN', error_code: 'BOSS_ONLY', request_id: R });
+  // 대표(tier boss) 0명이어도 폴백 없음(9/6 검증 S2 — 종전 v310 폴백은 boss가 비는 순간 관리자 전원에게 ③·총정리를 열었다). 대표가 비면 ③은 보류만 가능하고 회원 등급 지정(tier boss)으로 푼다
+  const tc = await push.tierCtx();   // 명시 tier·부트스트랩·퇴사 제외 — 요청자 등급·pm 수·통지 수신자를 한 스캔으로
+  const myT = tc.tierOf(c.member);
+  if (apprBossOnly(pre) && decision !== '보류' && myT !== 'boss') return jr(403, { status: 'FORBIDDEN', error_code: 'BOSS_ONLY', request_id: R });
   // ---- 결재 3차 등급 게이트(명세 §4.1) — 위 BOSS_ONLY(대표 큐)와 함께 게이트 표를 이룬다. 구건(grade 없음)은 여기 전부 통과(현행 admin) ----
   const preGrade = (pre.grade === 1 || pre.grade === 2 || pre.grade === 3) ? pre.grade : ((pre.to === 'boss' && pre.kind === '운반일지') ? 3 : 0);   // v308 구건 운반일지=③ 간주(§6)
   const preQ = pre.to || 'pm';
@@ -1511,7 +1523,7 @@ async function handleApprovalDecide(event, d, R) {
   if (decision === '확인' && pre.kind !== '전결총정리') return jr(400, { status: 'REJECTED', error_code: 'CONFIRM_ONLY_SUMMARY', request_id: R });
   if (pre.kind === '전결총정리' && decision !== '확인') return jr(400, { status: 'REJECTED', error_code: 'SUMMARY_CONFIRM_ONLY', request_id: R });
   // ①·② 1단계(PM 큐)=tier pm만(v321 — 대표는 건별 관여 없음(① 정의), 관리자 등급 admin은 결재 전결 권한 없음). tier pm이 0명이면 관리자 전원에게 연다(교착 방지, BOSS_ONLY 폴백과 대칭)
-  if (preGrade && preQ === 'pm' && !tier.isPm(c.member) && (await push.pmIds()).length) return jr(403, { status: 'FORBIDDEN', error_code: 'PM_ONLY', request_id: R });
+  if (preGrade && preQ === 'pm' && myT !== 'pm' && tc.pmIds.length) return jr(403, { status: 'FORBIDDEN', error_code: 'PM_ONLY', request_id: R });
   // ②라인 PM 단계는 보류 없음(§12-6 PM 동의) — 미룰 이유가 있으면 반려로 되돌리는 게 빠르다는 판단
   if (preGrade === 2 && preQ === 'pm' && decision === '보류') return jr(400, { status: 'REJECTED', error_code: 'HOLD_NOT_ALLOWED', request_id: R });
   await verSnapshot('approvals', rd.doc, c.member.name, false);   // 변형 전 시점 보존(복구 링)
@@ -1578,7 +1590,7 @@ async function handleApprovalDecide(event, d, R) {
   //  그 외 최종 결과 → 기안자 1발(현행). 자동 기안(__system__)은 구독이 없어 관리자 전원 라우팅(리뷰 med).
   try {
     if (isPmStep) {
-      const bIds = (await push.bossOrAdminIds()).filter(function (id) { return id !== c.member.id; });
+      const bIds = tcBossOrAdmin(tc).filter(function (id) { return id !== c.member.id; });
       await push.sendTo(bIds, { title: '결재 요청: ' + String(it.title || '').slice(0, 40),
         body: '[' + it.kind + '] PM 승인 완료 → 대표 (2/2)', url: './', tag: 'appr-' + it.id }, { primaryOnly: true });
       if (it.by && it.by.id && it.by.id !== c.member.id && it.by.id !== '__system__')
@@ -1587,7 +1599,7 @@ async function handleApprovalDecide(event, d, R) {
     } else if (it.kind !== '전결총정리') {
       const isSys = !!(it.by && it.by.id === '__system__');
       const toIds = isSys
-        ? (await push.adminIds()).filter(function (id) { return id !== c.member.id; })
+        ? tc.adminIds.filter(function (id) { return id !== c.member.id; })
         : ((it.by && it.by.id && it.by.id !== c.member.id) ? [it.by.id] : []);
       if (toIds.length || isSys)   // 자동상신은 대상이 없어도(1인 관리자) 호출 — sendTo가 알림함 이력(push:log)은 남긴다
         await push.sendTo(toIds, { title: '결재 ' + decision + ': ' + String(it.title || '').slice(0, 40) + (isSys ? ' (자동상신)' : ''),
@@ -2188,7 +2200,25 @@ async function handleDocBulkPut(event, d, R) {
 // 첨부 블롭(docatt:<id>:files n + 1..att_seq — 삭제 실패로 남은 고아 포함)까지 제거. 문서 항목은 영구 삭제 직전 버전 링에 남지만 첨부 바이트는 복구 불가.
 const DOC_PURGE_DAYS = 30;
 async function docOpDedup(st, cid) { if (!cid) return null; const p = await blobGet(st, 'docop:' + cid); return (p.ok && p.data && p.data.body) ? p.data.body : null; }
-async function docOpMark(st, cid, body) { if (!cid) return; try { await blobSet(st, 'docop:' + cid, { ts: Date.now(), body: body }); } catch (e) {} }
+const DOC_OP_TTL_MS = 7 * 86400000;   // 멱등 블롭 보존 기간(9/6 검증 R6) — 재시도 창은 초 단위라 7일이면 충분, 그 뒤엔 정리
+async function docOpMark(st, cid, body) {
+  if (!cid) return;
+  try { await blobSet(st, 'docop:' + cid, { ts: Date.now(), body: body }); } catch (e) {}
+  try { await docOpSweep(st); } catch (e) {}
+}
+// 7일 지난 docop:<cid> 정리(R6 — 종전엔 휴지통 작업마다 1키씩 영구 누적) — list 후 ts 확인·삭제, 실패는 무시(본 작업을 막지 않는다), 회당 100키 상한
+async function docOpSweep(st) {
+  const l = await blobList(st, 'docop:');
+  if (!l.ok) return;
+  const cut = Date.now() - DOC_OP_TTL_MS;
+  let n = 0;
+  for (const k of l.keys) {
+    if (k.indexOf('docop:') !== 0) continue;
+    if (++n > 100) break;
+    const r = await blobGet(st, k);
+    if (r.ok && r.data && Number(r.data.ts) > 0 && Number(r.data.ts) < cut) await blobDelete(st, k);
+  }
+}
 // 공통 앞단: 관리자·id·cid 형식·멱등·문서 읽기·항목 존재·낙관락. 반환 {res}(즉시 응답) 또는 {st,doc,it,id,cid,member}
 async function docTrashPre(event, d, R) {
   const c = await currentMember(event);
@@ -2243,6 +2273,7 @@ async function handleDocPurge(event, d, R) {
   const st = p.st, doc = p.doc, it = p.it, me = { id: p.member.id, name: p.member.name };
   if (d.confirm !== true) return jr(400, { status: 'REJECTED', error_code: 'NEED_CONFIRM', request_id: R });   // backup_put과 같은 명시 확인 게이트
   if (it.del !== 1) return jr(400, { status: 'REJECTED', error_code: 'NOT_DELETED', request_id: R });   // 살아 있는 문서는 영구 삭제 불가 — 먼저 삭제(휴지통)로
+  if (it.hidden_tmp) return jr(400, { status: 'REJECTED', error_code: 'HIDDEN_TMP', request_id: R });   // v314 임시 숨김(마이그레이션 전 보류 18건)은 복구만(9/6 검증 R3) — 삭제 의사가 없던 항목을 영구 삭제로 잃지 않게. 클라도 버튼 비활성
   const delTs = docDeletedTs(it);
   if (!delTs) return jr(400, { status: 'REJECTED', error_code: 'PURGE_DATE_UNKNOWN', request_id: R });   // 삭제일을 알 수 없으면 fail-closed
   const ageDays = (Date.now() - delTs) / 86400000;

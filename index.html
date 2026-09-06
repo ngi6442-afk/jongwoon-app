@@ -2854,12 +2854,20 @@
   function memberIdByName(nm){ nm=(nm||"").trim(); if(!nm||nm==="전사") return nm==="전사"?"__all__":""; var ms=(typeof liveMembers==="function"?liveMembers():[]); for(var i=0;i<ms.length;i++){ if(ms[i].name===nm) return ms[i].id; } return ""; }
   function myId(){ if(curMemberObj && curMemberObj.id) return curMemberObj.id; var m=(typeof curMember==="function")?curMember():null; return (m&&m.id)||""; }
   // 표시용 존칭: 대표(나종운)는 지시·담당·공개범위 등 화면 표기에서 '대표님'으로. 데이터에는 원래 이름 유지.
-  // 관리자 등급(v321): tier 'boss'(대표)|'pm'|'admin'. 명시 tier 없으면 파생 — role 대표·이름 나종운→boss / dev·이름 나경일→pm / 그 외 관리자→admin / 관리자 아니면 "".
-  // 서버 _lib/tier.js와 같은 규칙(uismoke가 등급 키·파생 이름 대조) — 바꾸면 동시에. isBossMember(대표 판정)는 종전 규칙을 파생값으로 포함하므로 표시("대표님")·결재 큐 판정 호환
+  // 관리자 등급(v321): tier 'boss'(대표)|'pm'|'admin'. 관리자 아니면 "". 서버 _lib/tier.js tierOf(m, bootstrap)와 같은 규칙(uismoke가 등급 키·파생 이름·부트스트랩 게이트 대조) — 바꾸면 동시에.
+  // 9/6 검증 S1: 게이트·표시는 **명시 tier만** — 명시 없는 관리자는 "admin"(최하 등급). 재직 관리자 전원이 미지정일 때만(부트스트랩 — 배포 직후·등급 지정 전) 종전 파생(role 대표·나종운→boss / dev·나경일→pm).
+  // 부트스트랩 여부는 회원 목록(member_list — 비관리자에게도 tier 동봉)에서 판정. 퇴사(leave_date 경과)·삭제 회원은 등급 없음·부트스트랩 판정에서도 제외(서버 tier.retired와 같은 식 — 비관리자 목록엔 leave_date가 없어 재직으로 본다)
   var TIER_TXT = { boss:"대표", pm:"PM", admin:"관리자" };
+  function memberRetired(m){ return !!(m && m.leave_date && String(m.leave_date) < todayStr()); }
+  function tierBootstrap(){
+    var ms = (typeof liveMembers === "function") ? liveMembers() : [];
+    for (var i = 0; i < ms.length; i++){ var x = ms[i]; if (x && x.admin && x.del !== 1 && !memberRetired(x) && x.tier && Object.prototype.hasOwnProperty.call(TIER_TXT, String(x.tier))) return false; }
+    return true;
+  }
   function tierOfMember(m){
-    if (!m || !m.admin || m.del === 1) return "";
+    if (!m || !m.admin || m.del === 1 || memberRetired(m)) return "";
     if (m.tier && Object.prototype.hasOwnProperty.call(TIER_TXT, String(m.tier))) return String(m.tier);
+    if (!tierBootstrap()) return "admin";
     if (m.role === "대표" || m.name === "나종운") return "boss";
     if (m.dev || m.name === "나경일") return "pm";
     return "admin";
@@ -3176,7 +3184,7 @@
   // 2차(2026-09-02) 구현: 내 상신 목록(홈 섹션) · 우선기기 1발 라우팅 · 운반일지 자동 기안(워커) · PC 팝업 예외(운반일지=전 기기).
   var apprItems = [];                      // approvals_list 결과(관리자=전체)
   var apprBase = 0;                        // 목록의 낙관락 토큰 — decide에 동봉(관리자 2인 동시 결재 유실 방지)
-  var apprBossPresent = true;              // 서버 approvals_list의 boss_present — 대표 계정이 없으면 관리자 전원이 대표 전용 건을 결재(교착 방지, v310)
+  var apprBossPresent = true;              // 서버 approvals_list의 boss_present — 표시용(대표 tier 0명 안내). 결재 폴백은 없다(9/6 검증 S2 — 종전 v310 폴백 제거: 대표 큐는 tier boss만, 부재 시 보류만)
   var apprQueue = [], apprIdx = 0;         // 오버레이 진행용(대기 먼저, 보류는 뒤)
   var apprDoneN = { ok:0, no:0, hold:0 };
   var apprPollTimer = null, apprBusy = false;
@@ -3200,8 +3208,8 @@
     var isB = !!(curMemberObj && isBossMember(curMemberObj));
     var isP = !!(curMemberObj && isPmMember(curMemberObj));
     var g = apprGradeOf(it);
-    if (!g) return !apprBossOnly(it) || !apprBossPresent || isB;   // 구건: 현행(관리자 전원, 대표 전용 건은 대표 — v310 폴백 유지)
-    if ((it.to || "pm") === "boss") return isB || !apprBossPresent;
+    if (!g) return !apprBossOnly(it) || isB;   // 구건: 현행(관리자 전원, 대표 전용 건은 대표만 — 대표 0명 폴백 제거, 서버 BOSS_ONLY와 같은 축 9/6 검증 S2)
+    if ((it.to || "pm") === "boss") return isB;   // 대표 큐 = tier boss만(대표 부재 시 보류만 — 서버가 403으로 막는 버튼을 열지 않는다)
     return isP || !apprPmPresent;   // ①·② 1단계 = tier pm만(v321 — 대표·관리자 등급은 건별 관여 없음, 서버 PM_ONLY와 같은 축. pm이 0명이면 관리자 전원 폴백)
   }
   // 등급 뱃지·단계 줄(시안 문구) — 카드·대표 홈·내 상신 공용
@@ -6285,7 +6293,9 @@
       if (cur.del === 1 || x.del === 1) m.del = mergeDel(cur, x);
       byId[x.id] = m;
     });
-    var out = []; Object.keys(byId).forEach(function(id){ out.push(byId[id]); });
+    // 부활 차단(9/6 검증 R1): remote에 없는데 del:1인 local-only 항목 = 영구 삭제된 문서의 사본 — 병합 결과에서 제거(서버 save도 같은 규칙으로 폐기한다)
+    var remoteIds = {}; (remote || []).forEach(function(x){ if (x && x.id) remoteIds[x.id] = 1; });
+    var out = []; Object.keys(byId).forEach(function(id){ var it = byId[id]; if (it && it.del === 1 && !remoteIds[id]) return; out.push(it); });
     return out;
   }
   var docSaveRetried = false;
@@ -6495,7 +6505,7 @@
         if (d.files && d.files.length) meta.push('<span class="own-badge">📎 ' + d.files.length + '</span>');
         h += '<div class="item doc-trash-row"><div class="item-body"><div class="item-title">' + (d.no ? "<b>" + esc(d.no) + "</b> " : "") + esc(d.title || "(제목없음)") + '</div><div class="item-meta">' + meta.join("") + '</div></div>'
           + '<div class="task-ctrl"><button class="mini-btn" data-doc-restore="' + esc(d.id) + '">복구</button>'
-          + '<button class="mini-btn" data-doc-purge="' + esc(d.id) + '"' + (canPurge ? ' style="color:#B0332A;"' : ' disabled style="opacity:.45;" title="삭제 후 ' + DOC_PURGE_DAYS + '일이 지나야 영구 삭제할 수 있습니다"') + '>영구 삭제</button></div></div>';
+          + '<button class="mini-btn" data-doc-purge="' + esc(d.id) + '"' + (d.hidden_tmp ? ' disabled style="opacity:.45;" title="임시 숨김(v314) 문서는 복구만 할 수 있습니다"' : (canPurge ? ' style="color:#B0332A;"' : ' disabled style="opacity:.45;" title="삭제 후 ' + DOC_PURGE_DAYS + '일이 지나야 영구 삭제할 수 있습니다"')) + '>영구 삭제</button></div></div>';   // hidden_tmp는 복구만(서버 HIDDEN_TMP, 9/6 검증 R3)
       });
       h += '</div>';
     }
@@ -6511,6 +6521,7 @@
     var code = (res && res.body && res.body.error_code) || (res && res.status) || "?";
     if (res && res.status === 409){ alert(what + " 실패 — 그 사이 문서함이 바뀌었습니다. 목록을 다시 불러옵니다."); loadDocuments(); return; }
     if (code === "PURGE_TOO_EARLY") alert("아직 영구 삭제할 수 없습니다 — " + ((res.body && res.body.days_left) || "?") + "일 더 지나야 합니다.");
+    else if (code === "HIDDEN_TMP") alert("임시 숨김(v314) 문서는 영구 삭제할 수 없습니다 — [복구]만 가능합니다.");
     else alert(what + " 실패 (" + code + ")");
   }
   function docRestore(id){
@@ -6530,6 +6541,7 @@
   function docPurge(id){
     if (!isAdmin() || docTrashBusy) return;
     var d = findDoc(id); if (!d || d.del !== 1) return;
+    if (d.hidden_tmp){ alert("임시 숨김(v314) 문서는 영구 삭제할 수 없습니다 — [복구]만 가능합니다."); return; }   // 서버 HIDDEN_TMP와 같은 축(9/6 검증 R3)
     var ts = docDeletedTs(d), days = ts ? Math.floor((Date.now() - ts) / 86400000) : -1;
     if (!(ts > 0 && days >= DOC_PURGE_DAYS)){ alert("삭제 후 " + DOC_PURGE_DAYS + "일이 지나야 영구 삭제할 수 있습니다" + (days >= 0 ? " (현재 " + days + "일)" : "") + "."); return; }
     var nf = (d.files && d.files.length) || 0;
@@ -6668,7 +6680,7 @@
       + "\n\n삭제한 문서는 관리자 문서함의 휴지통에서 복구할 수 있고, 30일이 지나면 영구 삭제할 수 있습니다.")) return;
     var me = curMember();
     d.del = 1; d.updated = todayStr(); d.updated_ts = Date.now();   // updated_ts 스탬프 — 409 병합(ms 우선)에서 서버 결재 훅 갱신본이 삭제를 되살리지 않게(적대 검증 low5)
-    d.deleted_at = new Date().toISOString(); if (me) d.deleted_by = { id: me.id, name: me.name };   // 삭제일·삭제자(v321) — 서버 save도 같은 스탬프를 찍는다(비관리자는 서버값 우선)
+    d.deleted_at = new Date().toISOString(); if (me) d.deleted_by = { id: me.id, name: me.name };   // 삭제일·삭제자(v321) — 화면 즉시 표시용. 서버 save가 자기 시각·자기 by로 덮는다(관리자 포함, 9/6 검증 S4 — 재조회 시 서버값)
     closeDocModal(); renderDocuments(); saveDocuments();
     apprToastShow("휴지통으로 이동 — " + (d.title || "").slice(0, 20));
   }
@@ -17486,7 +17498,7 @@
     tierSel.disabled = !canChangeTier();
     tierSel.style.opacity = tierSel.disabled ? "0.6" : "";
     var tierHint = document.getElementById("meTierHint");
-    if (tierHint) tierHint.textContent = canChangeTier() ? "변경은 대표·PM만 · 마지막 PM은 강등 불가 · 등급을 정하지 않은 관리자는 직책(대표)·개발자·이름으로 자동 판정" : "등급 변경은 대표·PM만 할 수 있습니다(현재 계정은 조회만)";
+    if (tierHint) tierHint.textContent = canChangeTier() ? "변경은 대표·PM만(본인 등급은 불가) · 마지막 PM은 강등 불가 · 등급 미지정 관리자는 '관리자'(관리자 전원이 미지정일 때만 직책·이름으로 임시 판정)" : "등급 변경은 대표·PM만 할 수 있습니다(현재 계정은 조회만)";
     // 아이디·PIN 재설정은 개발자 영역 — 관리자에겐 읽기 전용으로 잠근다.
     var meUidEl = document.getElementById("meUid");
     var mePinEl = document.getElementById("mePin");
@@ -17556,7 +17568,7 @@
     var p = ROLE_PRESET[document.getElementById("meRole").value];
     if (p) Array.prototype.forEach.call(document.querySelectorAll("#mePerms [data-perm]"), function(sel){ sel.value = p.perms[sel.getAttribute("data-perm")] || "view"; });
     var tSel0 = document.getElementById("meTier");   // 직책을 바꾸면 등급 기본값도 따라간다(명시 등급이 있으면 유지 — v321)
-    if (tSel0 && !tSel0.disabled){ var em0 = editingMemberId ? findMember(editingMemberId) : null; tSel0.value = (em0 && em0.tier && TIER_TXT[em0.tier]) ? em0.tier : tierDefaultForRole(document.getElementById("meRole").value); }
+    if (tSel0 && !tSel0.disabled){ var em0 = editingMemberId ? findMember(editingMemberId) : null; var t0 = em0 ? tierOfMember(em0) : ""; tSel0.value = t0 || tierDefaultForRole(document.getElementById("meRole").value); }   // 유효 등급(명시·부트스트랩 파생) 유지 — 종전엔 명시 tier만 봐서 파생 pm이 admin으로 되돌아갔다(9/6 검증 R8)
     updatePermLock();
   }
   function saveMemberEdit(){
@@ -17620,7 +17632,11 @@
         else if (ec === "UID_TAKEN") e2.textContent = "이미 사용 중인 아이디입니다.";
         else if (ec === "INVALID_UID") e2.textContent = "아이디는 영문소문자·숫자·. _ - 로 4~20자입니다.";
         else if (ec === "TIER_PM_OR_BOSS_ONLY") e2.textContent = "관리자 등급 변경은 대표·PM만 할 수 있습니다.";
-        else if (ec === "LAST_PM") e2.textContent = "마지막 PM은 강등할 수 없습니다 — 다른 관리자를 먼저 PM으로 지정하세요.";
+        else if (ec === "SELF_CHANGE_FORBIDDEN") e2.textContent = "본인 계정의 이름·직책·관리자·개발자·등급은 다른 개발자·대표가 바꿉니다(인사 정보는 저장 가능).";
+        else if (ec === "NAME_TAKEN") e2.textContent = "같은 이름의 회원이 이미 있습니다 — 이름을 구분해 주세요.";
+        else if (ec === "NAME_RESERVED") e2.textContent = "이 이름은 대표·개발자만 지정할 수 있습니다.";
+        else if (ec === "ROLE_BOSS_ONLY") e2.textContent = "직책 '대표' 지정은 대표·개발자만 할 수 있습니다.";
+        else if (ec === "LAST_PM") e2.textContent = "마지막 PM은 강등·관리자 해제·퇴사 처리할 수 없습니다 — 다른 관리자를 먼저 PM으로 지정하세요.";
         else if (ec === "TIER_NOT_ADMIN" || ec === "BAD_TIER") e2.textContent = "관리자 등급은 관리자 직책에만 지정할 수 있습니다.";
         else e2.textContent = "저장 실패 (" + (ec || res.status) + ")";
         e2.classList.add("show"); return;

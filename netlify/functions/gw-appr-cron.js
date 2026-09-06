@@ -72,6 +72,12 @@ async function runSummary(st, nowMs) {
 
   const total = apr.length + lvN;
   if (!total) return { ok: true, skipped: 'empty' };                                // 0건이면 카드 안 만듦(§5)
+  // 대표(tier boss) 0명이면 스킵 + 감시 로그(9/6 검증 S2 — 종전엔 관리자 전원 폴백으로 총정리 [확인]이 열렸다). 등급 지정 뒤 1~5일 창 안에 재기동하면 생성된다(멱등)
+  const bossIds = await push.bossIds();
+  if (!bossIds.length) {
+    try { await appendAudit({ ts: Date.now(), by: '자동', bid: '__system__', col: 'approvals', ev: [{ op: '감시', id: sumId, t: '전결총정리 스킵 — 대표(tier boss) 0명 · ' + period + ' ' + total + '건 대기(회원 등급 지정 후 재기동)' }] }); } catch (e) {}
+    return { ok: true, skipped: 'no-boss', n: total };
+  }
 
   const mLabel = Number(period.slice(5, 7)) + '월';
   const parts = Object.keys(counts).map(function (k) { return k + ' ' + counts[k]; });
@@ -114,10 +120,9 @@ async function runSummary(st, nowMs) {
     }
   } catch (e) {}
   try { await appendAudit({ ts: Date.now(), by: '자동', bid: '__system__', col: 'approvals', ev: [{ op: '상신', id: item.id, t: ('전결총정리 · ' + item.title).slice(0, 80) }] }); } catch (e) {}
-  // 대표 우선기기 1발(§5 — 오피스PC 팝업 병행 없음: 운반일지 예외가 아니다). 대표 부재 시 관리자 폴백.
+  // 대표 우선기기 1발(§5 — 오피스PC 팝업 병행 없음: 운반일지 예외가 아니다). 대표(tier boss)에게만 — 위에서 0명이면 카드 자체를 만들지 않았다(S2)
   try {
-    const ids = await push.bossOrAdminIds();
-    await push.sendTo(ids, { title: '결재 요청: ' + item.title, body: parts.join(' · ').slice(0, 200), url: './', tag: 'appr-' + item.id }, { primaryOnly: true });
+    await push.sendTo(bossIds, { title: '결재 요청: ' + item.title, body: parts.join(' · ').slice(0, 200), url: './', tag: 'appr-' + item.id }, { primaryOnly: true });
   } catch (e) {}
   return { ok: true, id: item.id, n: total };
 }
