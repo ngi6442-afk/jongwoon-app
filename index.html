@@ -87,7 +87,8 @@
   .brand{display:flex;align-items:center;gap:8px;min-width:0;}
   .layout{position:relative;}
   .brand-logo{width:31px;height:31px;display:block;flex-shrink:0;}
-  .brand h1{font-size:17px;font-weight:800;color:var(--brand-dark);letter-spacing:-0.01em;line-height:1.1;}
+  .brand h1{font-size:17px;font-weight:800;color:var(--brand-dark);letter-spacing:-0.01em;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}
+  @media (max-width:639px){ .brand h1{display:none;} }   /* v322: 좁은 화면(폰·좁은 창)은 사명 숨기고 로고만 — 7~8줄 세로 줄바꿈 방지(PM 9/7) */
   .nav-group{display:none;}
   .nav-divider{flex:0 0 1px;align-self:stretch;background:var(--line);margin:2px 4px;border-radius:1px;}
   .perm-divider{height:1px;background:var(--line);margin:9px 2px;}
@@ -1019,6 +1020,14 @@
       /* 카드 안쪽 여백을 직접 잡는다 — .item 목록과 자유 텍스트가 한 카드에 섞여
          `.card:not(:has(> .item))` 자동 패딩이 목록 유무에 따라 오락가락하는 것을 막는다 */
       #abSheetCard, #abManualCard, #abFootCard{padding:0;}
+      .ab-sheet{display:grid;grid-template-columns:1fr 1fr;gap:0;border-top:1px solid var(--line);}
+      @media (max-width:639px){ .ab-sheet{grid-template-columns:1fr;} }
+      .ab-sheet table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:12px;line-height:1.25;}
+      .ab-sheet th,.ab-sheet td{border:1px solid var(--line);padding:4px 5px;text-align:center;word-break:keep-all;overflow-wrap:anywhere;vertical-align:middle;}
+      .ab-sheet th{background:#EFF5F2;font-weight:700;font-size:12px;}
+      .ab-sheet td.n{font-weight:800;font-variant-numeric:tabular-nums;}
+      .ab-sheet td.n .sub{display:block;font-size:10.5px;font-weight:500;color:var(--sub);}
+      .ab-sheet col.c-loc{width:29%;} .ab-sheet col.c-item{width:27%;} .ab-sheet col.c-n{width:15%;}
       .ab-pad{padding:12px 14px;}
       .ab-pad > :first-child{margin-top:0;}
       .ab-head{padding:12px 14px;border-bottom:1px solid var(--line);}
@@ -16274,6 +16283,37 @@
       apprToastShow("대표 결재로 상신 — 운반일지 " + day);
     }).catch(function(){ abApprBusy = false; alert("네트워크 오류 — 잠시 후 다시 시도해주세요."); });
   }
+  // v322: 운반일지 엑셀 양식(운반내역 L·R 두 표: 행선지(상차지·하차지)·품목·회수). 회수 0은 빈칸, 잠정·품목확인은 작은 글씨로. 노선표에 없는 배정 줄은 그 열 끝에 덧붙인다.
+  function abSheetTableHtml(rl, rows){
+    var byKey = {}, extra = { L: [], R: [] }, i, c, k;
+    for (i = 0; i < rows.length; i++){ c = rows[i]; if (!c || !c.route) continue; k = String(c.route.side || "") + "|" + c.route.row; byKey[k] = c; }
+    var seen = {};
+    function cellN(c){
+      if (!c) return '<td class="n"></td>';
+      var n = abInt(c.n), sub = "";
+      if (abInt(c.n_pending)) sub += "잠정 " + abInt(c.n_pending);
+      if (c.weak) sub += (sub ? " · " : "") + "품목확인";
+      if (abInt(c.qty_unknown)) sub += (sub ? " · " : "") + "단위미상";
+      return '<td class="n">' + (n ? n : "") + (sub ? '<span class="sub">' + esc(sub) + '</span>' : "") + '</td>';
+    }
+    function table(side){
+      var t = '<table><colgroup><col class="c-loc"><col class="c-loc"><col class="c-item"><col class="c-n"></colgroup>' +
+        '<thead><tr><th colspan="4">운반내역</th></tr><tr><th colspan="2">행선지</th><th rowspan="2">품 목</th><th rowspan="2">회수</th></tr><tr><th>상차지</th><th>하차지</th></tr></thead><tbody>';
+      var list = rl.filter(function(r){ return r.s === side; }).sort(function(a, b){ return a.r - b.r; });
+      for (var j = 0; j < list.length; j++){
+        var r = list[j], key = r.s + "|" + r.r, cc = byKey[key]; seen[key] = 1;
+        t += "<tr><td>" + esc(r.f) + "</td><td>" + esc(r.t) + "</td><td>" + esc(r.i) + "</td>" + cellN(cc) + "</tr>";
+      }
+      for (var e = 0; e < extra[side].length; e++){
+        var x = extra[side][e];
+        t += '<tr><td>' + esc(x.from || "?") + "</td><td>" + esc(x.to || "?") + "</td><td>" + esc(x.item || "-") + ' <span class="ab-rowno">' + esc(String(x.route.side || "") + x.route.row) + "</span></td>" + cellN(x) + "</tr>";
+      }
+      return t + "</tbody></table>";
+    }
+    for (i = 0; i < rows.length; i++){ c = rows[i]; if (!c || !c.route) continue; k = String(c.route.side || "") + "|" + c.route.row;
+      if (!rl.some(function(r){ return r.s + "|" + r.r === k; })){ var sd = (c.route.side === "R") ? "R" : "L"; extra[sd].push(c); } }
+    return '<div class="ab-sheet">' + table("L") + table("R") + "</div>";
+  }
   function renderAbSheet(){
     var host = document.getElementById("abSheetCard");
     if (!host) return;
@@ -16295,9 +16335,11 @@
     if (abDay.error){
       h += '<div class="ab-pad" style="padding-top:0;"><div class="ab-warn">' + esc(abDay.error) + '</div></div>';
     } else {
-      var rows = abAutoRows();
-      if (!rows.length){
+      var rows = abAutoRows(), rl = abRouteList();
+      if (!rows.length && !rl.length){
         h += '<div class="empty-line">이 날짜에 올바로로 들어온 인계서가 없습니다.</div>';
+      } else if (rl.length){
+        h += abSheetTableHtml(rl, rows);   // v322: 엑셀 운반내역 양식(L·R 두 열 표) — PM 9/7
       } else {
         rows.forEach(function(c){
           var rt = c.route || {};
