@@ -74,6 +74,7 @@ exports.handler = async function (event, context) {
       const nSkip = rec.results.reduce(function (a, dd) { return a + ((dd && Array.isArray(dd.skipped)) ? dd.skipped.length : 0); }, 0);
       await blobSet(st, 'hwakwan:lastrun', {
         ts: Date.now(), job: job, ok: !!r.ok, submitted: nSub, skipped: nSkip,
+        error: r.ok ? '' : failSummary(rec.log),   // 실패 요약(v321) — 상태 카드가 원인 근처 로그 3줄을 보여준다(자격증명 값은 icis.js가 로그에 안 남긴다)
         days: rec.results.map(function (dd) {
           return { day: dd && dd.day, base: dd && dd.base,
             submitted: ((dd && dd.submitted) || []).map(function (s) { return { sn: s && s.sn, label: s && s.label }; }),
@@ -85,7 +86,8 @@ exports.handler = async function (event, context) {
         const ids = await push.adminIds();
         if (ids.length) {
           if (r.ok) await push.sendTo(ids, { title: '화관법 자동 접수', body: nSub + '건 접수' + (nSkip ? ' · ' + nSkip + '건 건너뜀' : ''), url: './', tag: 'hwakwan' });
-          else await push.sendTo(ids, { title: '화관법 자동제출 실패', body: failSummary(rec.log), url: './', tag: 'hwakwan' });
+          // 실패 안내(v321): 로컬 폴백(김과장 PC 재시도)은 9/6 폐지 — 남은 복구 경로는 그룹웨어 자동 복구 발사층(08:20)과 관리자 확인뿐. 재제출을 부추기지 않는다
+          else await push.sendTo(ids, { title: '화관법 자동제출 실패', body: (failSummary(rec.log).slice(0, 200) + ' · 그룹웨어 자동 복구(08:20) 또는 관리자 확인'), url: './', tag: 'hwakwan' });
         }
       } catch (e) {}
       return;

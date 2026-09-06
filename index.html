@@ -308,6 +308,13 @@
   .doc-acc-sub{margin:6px 0;border-radius:10px}   /* 2층 서랍(v317): 대분류 안의 중분류 */
   .doc-acc-sub>.doc-acc-hd{font-size:13px;padding:8px 12px;background:#fff;font-weight:600}
   .doc-acc-sub>.doc-acc-hd:hover{background:#f6f8f5}
+  .adr-hd{display:flex;justify-content:space-between;align-items:center;padding:8px 10px;font-size:13px;font-weight:700;background:#fafbf9;border-bottom:1px solid var(--line);cursor:pointer}   /* 기안 참조 문서 선택(v321) — 문서함 서랍의 축소판(폰 화면: 행 높이 36px+) */
+  .adr-hd.sub{font-weight:600;background:#fff;padding-left:22px}
+  .adr-hd .n{color:var(--sub);font-weight:400;font-size:11.5px}
+  .adr-row{padding:9px 10px 9px 34px;border-bottom:1px solid var(--line);font-size:13px;cursor:pointer;line-height:1.4;word-break:break-all}
+  .adr-row.sel{background:#EAF3FA;font-weight:700}
+  .adr-row:active,.adr-row:hover{background:#f0f4ef}
+  .doc-trash-row{opacity:.88}
   /* 잠금 중엔 뒤 DOM 자체를 없앤다 — 덮개만으론 Ctrl+P 인쇄·전체선택 복사로 읽혔다(리뷰 지적).
      서류출력 print 규칙(#docPrintOverlay만 남김)도 잠금 중엔 통째로 무효가 되도록 body를 죽인다 */
   body.jw-locked > *:not(#lockBackdrop):not(#lockSetBackdrop){display:none !important;}
@@ -1791,7 +1798,11 @@
     <textarea id="apprDraftBody" rows="4" maxlength="500" placeholder="내용(선택, 500자)" style="width:100%;padding:12px;border-radius:10px;border:1px solid var(--line);font-size:14px;font-family:inherit;resize:vertical;margin-bottom:2px;box-sizing:border-box;"></textarea>
     <div id="apprDraftBodyN" style="text-align:right;font-size:11.5px;color:var(--sub);margin:0 2px 8px;">0/500</div>
     <span class="fld-label">참조 문서(선택 — 문서함 항목)</span>
-    <select id="apprDraftRef"></select>
+    <!-- v321: 드롭다운 대신 검색 + 접힘 목록(대분류 › 중분류 › 문서, 문서함 서랍과 같은 순서). 선택값은 숨은 입력 #apprDraftRef(문서 id) — 저장 형식은 종전과 동일(ref doc:<id>) -->
+    <input type="hidden" id="apprDraftRef" value="">
+    <input type="search" id="apprDraftRefSearch" placeholder="문서 검색 — 번호·제목·분류명 (비우면 전체 목록)" autocomplete="off" style="width:100%;padding:9px 12px;margin-bottom:6px;border:1px solid var(--line);border-radius:8px;font-size:14px;box-sizing:border-box;">
+    <div id="apprDraftRefSel" style="font-size:12.5px;margin:0 2px 6px;line-height:1.6;"></div>
+    <div id="apprDraftRefList" style="max-height:220px;overflow:auto;border:1px solid var(--line);border-radius:8px;margin:0 0 8px;background:#fff;"></div>
     <div id="apprDraftHint" style="display:none;margin:-4px 0 10px 2px;font-size:12px;color:var(--sub);line-height:1.45;"></div>
     <div class="err" id="apprDraftErr"></div>
     <button class="primary" id="apprDraftOkBtn">상신</button>
@@ -2399,6 +2410,12 @@
     <input type="number" id="meSeq" min="1" step="1" placeholder="예: 1" autocomplete="off">
     <span class="fld-label">직책 (권한)</span>
     <select id="meRole"><option value="개발자">개발자 (시스템)</option><option value="대표">대표</option><option value="관리자">관리자</option><option value="팀장">팀장</option><option value="직원">직원</option><option value="현장직">현장직</option></select>
+    <!-- 관리자 등급(v321) — 관리자 직책일 때만 표시(updatePermLock). 변경은 대표·PM만(서버 TIER_PM_OR_BOSS_ONLY), 마지막 PM 강등 불가(LAST_PM). 미지정 회원은 직책·이름으로 파생(tierOfMember = 서버 _lib/tier.js) -->
+    <div id="meTierWrap" style="display:none;">
+      <span class="fld-label">관리자 등급 (결재 권한)</span>
+      <select id="meTier"><option value="boss">대표 — ③ 대표 전결·전결 총정리 확인</option><option value="pm">PM — ① 전결 종결·PM 큐 결재·② 1단계</option><option value="admin">관리자 — 모듈·문서함·회원 관리 (결재 전결 없음)</option></select>
+      <div class="scope-hint" id="meTierHint">변경은 대표·PM만 · 마지막 PM은 강등 불가 · 등급을 정하지 않은 관리자는 직책(대표)·개발자·이름으로 자동 판정</div>
+    </div>
     <span class="fld-label">직급</span>
     <select id="meRank"><option value="">- 선택 -</option><option value="대표">대표</option><option value="이사">이사</option><option value="부장">부장</option><option value="차장">차장</option><option value="과장">과장</option><option value="대리">대리</option><option value="주임">주임</option><option value="사원">사원</option></select>
     <span class="fld-label">부서</span>
@@ -2837,7 +2854,25 @@
   function memberIdByName(nm){ nm=(nm||"").trim(); if(!nm||nm==="전사") return nm==="전사"?"__all__":""; var ms=(typeof liveMembers==="function"?liveMembers():[]); for(var i=0;i<ms.length;i++){ if(ms[i].name===nm) return ms[i].id; } return ""; }
   function myId(){ if(curMemberObj && curMemberObj.id) return curMemberObj.id; var m=(typeof curMember==="function")?curMember():null; return (m&&m.id)||""; }
   // 표시용 존칭: 대표(나종운)는 지시·담당·공개범위 등 화면 표기에서 '대표님'으로. 데이터에는 원래 이름 유지.
-  function isBossMember(m){ return !!(m && (m.role === "대표" || m.name === "나종운")); }
+  // 관리자 등급(v321): tier 'boss'(대표)|'pm'|'admin'. 명시 tier 없으면 파생 — role 대표·이름 나종운→boss / dev·이름 나경일→pm / 그 외 관리자→admin / 관리자 아니면 "".
+  // 서버 _lib/tier.js와 같은 규칙(uismoke가 등급 키·파생 이름 대조) — 바꾸면 동시에. isBossMember(대표 판정)는 종전 규칙을 파생값으로 포함하므로 표시("대표님")·결재 큐 판정 호환
+  var TIER_TXT = { boss:"대표", pm:"PM", admin:"관리자" };
+  function tierOfMember(m){
+    if (!m || !m.admin || m.del === 1) return "";
+    if (m.tier && Object.prototype.hasOwnProperty.call(TIER_TXT, String(m.tier))) return String(m.tier);
+    if (m.role === "대표" || m.name === "나종운") return "boss";
+    if (m.dev || m.name === "나경일") return "pm";
+    return "admin";
+  }
+  function isBossMember(m){ return tierOfMember(m) === "boss"; }
+  function isPmMember(m){ return tierOfMember(m) === "pm"; }
+  function tierDefaultForRole(role){ return role === "대표" ? "boss" : (role === "개발자" ? "pm" : "admin"); }   // 인사 카드 등급 기본값(직책 프리셋) — 서버 파생과 같은 방향
+  function tierBadgeHtml(m){
+    var t = tierOfMember(m); if (!t) return "";
+    var css = t === "boss" ? "background:#FAF0E4;color:#a8651f;" : (t === "pm" ? "background:#EAF3FA;color:#2b6c95;" : "background:#EEF1EF;color:#3d4a44;");
+    return ' <span class="own-badge" style="' + css + '" title="관리자 등급(결재 권한) — 인사 카드에서 변경">' + TIER_TXT[t] + '</span>';
+  }
+  function canChangeTier(){ var t = tierOfMember(curMemberObj); return t === "boss" || t === "pm"; }
   function dispName(name){
     if(!name) return "";
     if(name === "전사") return name;
@@ -3163,10 +3198,11 @@
   function apprCanDecide(it){
     if (!isAdmin() || !it) return false;
     var isB = !!(curMemberObj && isBossMember(curMemberObj));
+    var isP = !!(curMemberObj && isPmMember(curMemberObj));
     var g = apprGradeOf(it);
     if (!g) return !apprBossOnly(it) || !apprBossPresent || isB;   // 구건: 현행(관리자 전원, 대표 전용 건은 대표 — v310 폴백 유지)
     if ((it.to || "pm") === "boss") return isB || !apprBossPresent;
-    return !isB || !apprPmPresent;   // ①·② 1단계 = 비대표 관리자만(대표는 건별 관여 없음 — ① 정의)
+    return isP || !apprPmPresent;   // ①·② 1단계 = tier pm만(v321 — 대표·관리자 등급은 건별 관여 없음, 서버 PM_ONLY와 같은 축. pm이 0명이면 관리자 전원 폴백)
   }
   // 등급 뱃지·단계 줄(시안 문구) — 카드·대표 홈·내 상신 공용
   function apprGradeBadge(it){
@@ -3462,7 +3498,7 @@
   var apprDraftBusy = false, apprDraftCid = "";
   function apprDraftGrade(kind){ var g = apprGradesLive ? apprGradesLive[kind] : APPR_GRADE_DEFAULTS_APP[kind]; return (g === 1 || g === 2 || g === 3) ? g : 0; }
   var APPR_GRADE_DEFAULTS_APP = { "운반일지":3, "지입료":3, "사직·휴직":2, "지시":1, "사규":1, "매뉴얼":1, "가족친화":1, "휴가":1, "계약 단계":1, "청구 검수":1, "문서함 등재":1, "견적":1, "인허가 등재":1, "조기퇴근":1 };   // 서버 표를 못 받았을 때의 표시 폴백(§2 확정표) — 서버가 최종
-  function apprDraftIsPm(){ return isAdmin() && !!(curMemberObj && !isBossMember(curMemberObj)); }
+  function apprDraftIsPm(){ return !!(curMemberObj && isPmMember(curMemberObj)); }   // 전결 종결 = tier pm만(v321 — 관리자 등급 admin은 [상신]만, 서버도 403 PM_ONLY)
   function apprDraftKinds(){
     var ks = APPR_GRADE_ORDER.slice();
     if (apprGradesLive) for (var k in apprGradesLive){ if (Object.prototype.hasOwnProperty.call(apprGradesLive, k) && ks.indexOf(k) < 0) ks.push(k); }
@@ -3490,15 +3526,77 @@
       hint.textContent = "참조 문서는 카드에 제목으로 표시됩니다. 문서함 '등재'(문서함 게이트)와 이 결재는 별개 행위입니다.";
     } else hint.style.display = "none";
   }
-  function apprDraftFillRef(){
-    var sel = document.getElementById("apprDraftRef");
-    var list = (typeof documents !== "undefined" && Array.isArray(documents)) ? documents.filter(function(d){ return d && d.del !== 1; }) : [];
-    list.sort(function(a, b){ var ka = docCatOf(a) + (a.title || ""), kb = docCatOf(b) + (b.title || ""); return ka < kb ? -1 : (ka > kb ? 1 : 0); });
-    var h = '<option value="">없음</option>';
-    list.forEach(function(d){
-      h += '<option value="' + esc(d.id) + '">[' + esc(DOC_CATS[docCatOf(d)] || "미분류") + '] ' + esc(d.title || "(제목없음)") + (d.no ? ' · ' + esc(d.no) : '') + ((d.files && d.files.length) ? ' 📎' + d.files.length : '') + '</option>';
+  // ---- 참조 문서 선택(v321): 검색 입력 + 접힘 목록(대분류 › 중분류 › 문서 — 문서함 서랍과 같은 순서·정렬). 검색어가 없으면 목록 그대로(서랍은 탭으로 펼침),
+  // 타이핑하면 번호·제목·분류명(구 category 텍스트 포함)으로 즉시 걸러지고 일치 항목이 있는 서랍은 자동 펼침. 항목 탭=선택(칩 표시·✕ 해제, 같은 항목 다시 탭=해제).
+  // 선택값은 숨은 #apprDraftRef(문서 id) — 저장 형식 ref 'doc:<id>'는 종전과 동일. "없음"이 기본. 폰 화면 우선(행 높이·스크롤 상자 220px)
+  var apprDraftRefTerm = "", apprDraftRefOpen = {};
+  function apprDraftRefDocs(){ return (typeof documents !== "undefined" && Array.isArray(documents)) ? documents.filter(function(d){ return d && d.del !== 1; }) : []; }
+  function apprDraftRefMatch(d, term){
+    return ((d.title||"") + " " + (d.no||"") + " " + (d.category||"") + " " + (DOC_CATS[docCatOf(d)]||"") + " " + (DOC_MAJOR[docMajorOf(d)]||"")).toLowerCase().indexOf(term) >= 0;
+  }
+  function apprDraftRefRowHtml(d, selId){
+    return '<div class="adr-row' + (d.id === selId ? " sel" : "") + '" data-adr-pick="' + esc(d.id) + '">' + (d.no ? '<b>' + esc(d.no) + '</b> ' : '') + esc(d.title || "(제목없음)")
+      + ((d.files && d.files.length) ? ' <span class="mrole2">📎' + d.files.length + '</span>' : '') + '</div>';
+  }
+  function apprDraftRefRender(){
+    var host = document.getElementById("apprDraftRefList"), selHost = document.getElementById("apprDraftRefSel"), hid = document.getElementById("apprDraftRef");
+    if (!host || !selHost || !hid) return;
+    var all = apprDraftRefDocs();
+    var selId = hid.value, selDoc = null;
+    for (var i = 0; i < all.length; i++){ if (all[i].id === selId){ selDoc = all[i]; break; } }
+    if (selDoc){
+      selHost.innerHTML = '<span class="own-badge" style="background:#EAF3FA;color:#2b6c95;font-size:12px;padding:3px 9px;">📎 ' + (selDoc.no ? esc(selDoc.no) + ' ' : '') + esc(selDoc.title || "(제목없음)") + '</span> '
+        + '<button type="button" class="mini-btn" style="margin:0 0 0 4px;font-size:11.5px;padding:2px 8px;" data-adr-clear="1" title="선택 해제">✕ 해제</button>';
+    } else {
+      if (selId) hid.value = "";   // 삭제됐거나 열람 범위 밖으로 빠진 문서가 남아 있으면 해제
+      selHost.innerHTML = '<span class="mrole2">없음 — 아래 목록에서 문서를 누르면 참조로 붙습니다</span>';
+    }
+    var term = apprDraftRefTerm, searching = !!term;
+    var docs = all.filter(function(d){ return !searching || apprDraftRefMatch(d, term); });
+    var byNo = function(a,b){ var an=(a.no||"~"), bn=(b.no||"~"); if (an!==bn) return an<bn?-1:1; var at=(a.title||""), bt=(b.title||""); return at<bt?-1:(at>bt?1:0); };   // 문서함 서랍과 같은 정렬(번호순·번호 없음은 뒤)
+    var rows = function(list){ list.sort(byNo); return list.map(function(d){ return apprDraftRefRowHtml(d, hid.value); }).join(""); };
+    var h = "";
+    if (!docs.length) h = '<div class="empty-line">' + (searching ? "검색 결과가 없습니다." : "문서함에 문서가 없습니다.") + '</div>';
+    DOC_MAJOR_ORDER.forEach(function(maj){
+      var majRows = docs.filter(function(d){ return docMajorOf(d) === maj; });
+      if (!majRows.length) return;
+      var open = searching ? true : !!apprDraftRefOpen[maj];
+      h += '<div class="adr-hd" data-adr-acc="' + maj + '"><span>' + (open ? "▾" : "▸") + ' ' + esc(DOC_MAJOR[maj]) + '</span><span class="n">' + majRows.length + '건</span></div>';
+      if (!open) return;
+      if (maj === "99"){ h += rows(majRows); return; }
+      DOC_MINOR_ORDER.forEach(function(min){
+        var cat = maj + "-" + min;
+        var list = majRows.filter(function(d){ return docCatOf(d) === cat; });
+        if (!list.length) return;
+        var open2 = searching ? true : !!apprDraftRefOpen[cat];
+        h += '<div class="adr-hd sub" data-adr-acc="' + cat + '"><span>' + (open2 ? "▾" : "▸") + ' ' + esc(DOC_MINOR[min]) + '</span><span class="n">' + list.length + '건</span></div>';
+        if (open2) h += rows(list);
+      });
+      var rest = majRows.filter(function(d){ return docCatOf(d) === "99"; });   // 구 cat 01+구형식 번호(중분류 없음) — 문서함 서랍과 같은 임시 묶음
+      if (rest.length) h += '<div class="adr-hd sub"><span>중분류 없음</span><span class="n">' + rest.length + '건</span></div>' + rows(rest);
     });
-    sel.innerHTML = h;
+    host.innerHTML = h;
+    Array.prototype.forEach.call(host.querySelectorAll("[data-adr-acc]"), function(el){
+      el.addEventListener("click", function(){ if (apprDraftRefTerm) return; var c = el.getAttribute("data-adr-acc"); apprDraftRefOpen[c] = !apprDraftRefOpen[c]; apprDraftRefRender(); });   // 검색 중엔 자동 펼침이 우선(문서함 서랍과 동일)
+    });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-adr-pick]"), function(el){
+      el.addEventListener("click", function(){ apprDraftRefPick(el.getAttribute("data-adr-pick")); });
+    });
+    Array.prototype.forEach.call(selHost.querySelectorAll("[data-adr-clear]"), function(el){
+      el.addEventListener("click", function(){ apprDraftRefPick(""); });
+    });
+  }
+  function apprDraftRefPick(id){
+    var hid = document.getElementById("apprDraftRef");
+    hid.value = (id && hid.value === id) ? "" : (id || "");
+    apprDraftRefRender(); apprDraftRender();
+  }
+  // 모달 열 때 초기화 — 검색어·선택·펼침 전부 비움("없음" 기본)
+  function apprDraftFillRef(){
+    apprDraftRefTerm = ""; apprDraftRefOpen = {};
+    var s = document.getElementById("apprDraftRefSearch"); if (s) s.value = "";
+    var hid = document.getElementById("apprDraftRef"); if (hid) hid.value = "";
+    apprDraftRefRender();
   }
   function apprDraftOpen(){
     if (!curMember() || (curMemberObj && isBossMember(curMemberObj))) return;
@@ -3555,6 +3653,13 @@
         return;
       }
       var code = (res.body && res.body.error_code) || res.status;
+      if (res.status === 403 && code === "PM_ONLY"){
+        // 관리자 등급(admin)은 전결 권한이 없다(v321) — 버튼은 숨겨지지만 낡은 화면·등급 변경 직후엔 여기로 온다. 서버 판정을 화면에 반영해 [상신]으로 되돌린다
+        if (curMemberObj && !curMemberObj.tier) curMemberObj.tier = "admin";
+        apprDraftErr("전결 종결 불가 — 전결은 PM 등급만 가능합니다. [상신]으로 올려주세요(PM 큐).");
+        apprDraftRender();
+        return;
+      }
       if (res.status === 400 && String(code).indexOf("SELF_DECIDE") === 0){
         // 서버가 전결을 거부(등급표가 그 사이 바뀜·대표 계정 등) — [상신만]으로 되돌린다(자동 상신은 안 한다: 사람이 경로를 보고 결정)
         apprDraftErr("전결 종결 불가(" + code + ") — 등급이 ①이 아니거나 PM 계정이 아닙니다. [상신만]으로 올려주세요.");
@@ -3568,7 +3673,7 @@
   document.getElementById("apprDraftBtn").addEventListener("click", apprDraftOpen);
   document.getElementById("apprDraftCancel").addEventListener("click", apprDraftClose);
   document.getElementById("apprDraftKind").addEventListener("change", apprDraftRender);
-  document.getElementById("apprDraftRef").addEventListener("change", apprDraftRender);
+  document.getElementById("apprDraftRefSearch").addEventListener("input", function(){ apprDraftRefTerm = this.value.toLowerCase().trim(); apprDraftRefRender(); });   // 참조 문서 검색(v321) — 즉시 필터
   document.getElementById("apprDraftBody").addEventListener("input", function(){ document.getElementById("apprDraftBodyN").textContent = this.value.length + "/500"; });
   document.getElementById("apprDraftOkBtn").addEventListener("click", function(){ apprDraftSubmit(apprDraftIsPm() && apprDraftGrade(document.getElementById("apprDraftKind").value) === 1); });
   document.getElementById("apprDraftSubmitBtn").addEventListener("click", function(){ apprDraftSubmit(false); });
@@ -6310,7 +6415,8 @@
       return ((d.title||"") + " " + (d.no||"") + " " + (d.category||"") + " " + (DOC_CATS[docCatOf(d)]||"") + " " + (DOC_MAJOR[docMajorOf(d)]||"")).toLowerCase().indexOf(docSearchTerm) >= 0;
     });
     var head = document.getElementById("docHead"); if (head) head.textContent = list.length ? (list.length + "건") : "";
-    if (!list.length){ host.innerHTML = '<div class="empty-line">' + (docSearchTerm ? "검색 결과가 없습니다." : "등록된 문서가 없습니다.") + '</div>'; return; }
+    var trashHtml = (isAdmin() && !docSearchTerm) ? docTrashHtml() : "";   // 휴지통 서랍(v321) — 관리자만·검색 중엔 숨김(삭제 문서는 검색 대상 아님)
+    if (!list.length){ host.innerHTML = '<div class="empty-line">' + (docSearchTerm ? "검색 결과가 없습니다." : "등록된 문서가 없습니다.") + '</div>' + trashHtml; docTrashBind(host, true); return; }
     var searching = !!docSearchTerm;
     var h = "";
     var byNo = function(a,b){ var an=(a.no||"~"), bn=(b.no||"~"); if (an!==bn) return an<bn?-1:1; var at=(a.title||""), bt=(b.title||""); return at<bt?-1:(at>bt?1:0); };   // 문서번호 문자열순(v316 — 4층 번호는 문자열 정렬이 계층 순서와 같다 §3.1, 번호 없는 것은 뒤), 같은 번호는 제목순
@@ -6346,7 +6452,8 @@
       }
       h += '</div>';
     });
-    host.innerHTML = h;
+    host.innerHTML = h + trashHtml;
+    docTrashBind(host, false);   // 휴지통 서랍 헤더 토글은 아래 공용 [data-doc-acc] 리스너가 맡는다(키 "__trash__")
     Array.prototype.forEach.call(host.querySelectorAll("[data-doc-acc]"), function(el){
       el.addEventListener("click", function(){
         if (docSearchTerm) return;   // 검색 중엔 자동 펼침이 우선 — 토글하면 보이지 않는 상태만 뒤집혀 검색 해제 후 오염(리뷰 지적)
@@ -6362,6 +6469,81 @@
     Array.prototype.forEach.call(host.querySelectorAll("[data-doc-att-open]"), function(el){
       el.addEventListener("click", function(e){ e.stopPropagation(); var p = el.getAttribute("data-doc-att-open").split("|"); docAttOpen(p[0], Number(p[1])); });
     });
+  }
+  // ---- 문서함 휴지통(v321, PM 9/6 ㄱ): del:1 항목을 관리자에게 서랍으로 — 삭제일·삭제자·경과일, [복구](doc_restore)·[영구 삭제](30일 경과 건만 활성, 2단 확인, doc_purge — 첨부 블롭까지 서버가 제거).
+  // 자동 영구 삭제 없음. 삭제일 = deleted_at(v321) → 없으면 updated_ts(구건, 서버 docDeletedTs와 같은 규칙) → updated 일자. 낙관락 base(_colBase.documents)·cid 멱등은 서버 패턴 그대로
+  var DOC_PURGE_DAYS = 30;
+  var docTrashBusy = false;
+  function docDeletedTs(d){ var t = Date.parse((d && d.deleted_at) || ""); if (!isNaN(t)) return t; if (d && Number(d.updated_ts) > 0) return Number(d.updated_ts); var t2 = Date.parse((d && d.updated) || ""); return isNaN(t2) ? 0 : t2; }
+  function docTrashItems(){ return documents.filter(function(d){ return d && d.del === 1; }).sort(function(a, b){ return docDeletedTs(b) - docDeletedTs(a); }); }
+  function docTrashHtml(){
+    var items = docTrashItems();
+    if (!items.length) return "";
+    var open = !!docOpenCats["__trash__"];
+    var h = '<div class="doc-acc" style="border-style:dashed;"><div class="doc-acc-hd" data-doc-acc="__trash__"><span>' + (open ? "▾" : "▸") + ' 🗑 휴지통</span><span class="n">' + items.length + '건</span></div>';
+    if (open){
+      h += '<div class="doc-acc-bd"><div class="empty-line" style="padding:6px 0 2px;">삭제된 문서는 [복구]로 되살릴 수 있고, 삭제 후 ' + DOC_PURGE_DAYS + '일이 지나면 [영구 삭제](첨부 파일까지 제거 · 되돌릴 수 없음)가 열립니다. 자동으로 지워지지 않습니다.</div>';
+      var now = Date.now();
+      items.forEach(function(d){
+        var ts = docDeletedTs(d), days = ts ? Math.floor((now - ts) / 86400000) : -1;
+        var canPurge = ts > 0 && days >= DOC_PURGE_DAYS;
+        var meta = [];
+        var who = (d.deleted_by && d.deleted_by.name) ? (dispNameById(d.deleted_by.id) || d.deleted_by.name) : "";
+        meta.push('<span>삭제 ' + (ts ? esc(fmtDate(new Date(ts))) : "일자 미상") + (who ? ' · ' + esc(who) : (d.deleted_at ? '' : ' · 삭제자 기록 없음(구건)')) + '</span>');
+        if (days >= 0) meta.push('<span class="dday ' + (canPurge ? "red" : "grey") + '">' + days + '일 경과' + (canPurge ? ' · ' + DOC_PURGE_DAYS + '일 지남' : '') + '</span>');
+        if (d.hidden_tmp) meta.push('<span class="own-badge" style="background:#FCEFDD;color:var(--amber);">임시 숨김(v314)</span>');
+        if (d.files && d.files.length) meta.push('<span class="own-badge">📎 ' + d.files.length + '</span>');
+        h += '<div class="item doc-trash-row"><div class="item-body"><div class="item-title">' + (d.no ? "<b>" + esc(d.no) + "</b> " : "") + esc(d.title || "(제목없음)") + '</div><div class="item-meta">' + meta.join("") + '</div></div>'
+          + '<div class="task-ctrl"><button class="mini-btn" data-doc-restore="' + esc(d.id) + '">복구</button>'
+          + '<button class="mini-btn" data-doc-purge="' + esc(d.id) + '"' + (canPurge ? ' style="color:#B0332A;"' : ' disabled style="opacity:.45;" title="삭제 후 ' + DOC_PURGE_DAYS + '일이 지나야 영구 삭제할 수 있습니다"') + '>영구 삭제</button></div></div>';
+      });
+      h += '</div>';
+    }
+    return h + '</div>';
+  }
+  // 버튼 배선(재렌더마다). bindAcc=true면 빈 목록 경로(공용 [data-doc-acc] 리스너가 안 붙는 경로)에서 휴지통 헤더 토글도 여기서 붙인다
+  function docTrashBind(host, bindAcc){
+    Array.prototype.forEach.call(host.querySelectorAll("[data-doc-restore]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); docRestore(el.getAttribute("data-doc-restore")); }); });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-doc-purge]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); docPurge(el.getAttribute("data-doc-purge")); }); });
+    if (bindAcc) Array.prototype.forEach.call(host.querySelectorAll('[data-doc-acc="__trash__"]'), function(el){ el.addEventListener("click", function(){ docOpenCats["__trash__"] = !docOpenCats["__trash__"]; renderDocuments(); }); });
+  }
+  function docTrashFail(res, what){
+    var code = (res && res.body && res.body.error_code) || (res && res.status) || "?";
+    if (res && res.status === 409){ alert(what + " 실패 — 그 사이 문서함이 바뀌었습니다. 목록을 다시 불러옵니다."); loadDocuments(); return; }
+    if (code === "PURGE_TOO_EARLY") alert("아직 영구 삭제할 수 없습니다 — " + ((res.body && res.body.days_left) || "?") + "일 더 지나야 합니다.");
+    else alert(what + " 실패 (" + code + ")");
+  }
+  function docRestore(id){
+    if (!isAdmin() || docTrashBusy) return;
+    var d = findDoc(id); if (!d || d.del !== 1) return;
+    if (!confirm("이 문서를 복구할까요?\n" + (d.no ? d.no + "  " : "") + (d.title || "(제목없음)"))) return;   // confirm은 텍스트 — HTML 이스케이프 금지
+    docTrashBusy = true;
+    gwCall("gw-data", { action: "doc_restore", id: id, base: _colBase["documents"], cid: "dr" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8) }).then(function(res){
+      docTrashBusy = false;
+      if (res.status !== 200){ docTrashFail(res, "복구"); return; }
+      delete d.del; delete d.hidden_tmp; delete d.deleted_at; delete d.deleted_by; d.updated_ts = Date.now(); d.updated = todayStr();
+      if (res.body && res.body.updated_at) _colBase["documents"] = res.body.updated_at;
+      renderDocuments(); apprToastShow("복구됨 — " + (d.title || "").slice(0, 20));
+      loadDocuments();   // 서버 스탬프(restored_by 등) 반영
+    }).catch(function(){ docTrashBusy = false; alert("복구 실패(네트워크)"); });
+  }
+  function docPurge(id){
+    if (!isAdmin() || docTrashBusy) return;
+    var d = findDoc(id); if (!d || d.del !== 1) return;
+    var ts = docDeletedTs(d), days = ts ? Math.floor((Date.now() - ts) / 86400000) : -1;
+    if (!(ts > 0 && days >= DOC_PURGE_DAYS)){ alert("삭제 후 " + DOC_PURGE_DAYS + "일이 지나야 영구 삭제할 수 있습니다" + (days >= 0 ? " (현재 " + days + "일)" : "") + "."); return; }
+    var nf = (d.files && d.files.length) || 0;
+    // 2단 확인: ① 내용 확인 ② '영구삭제' 입력 — 되돌릴 수 없는 작업(첨부 바이트는 복구 링에도 없다). confirm·prompt는 텍스트 — HTML 이스케이프 금지
+    if (!confirm("영구 삭제 — 되돌릴 수 없습니다.\n\n" + (d.no ? d.no + "  " : "") + (d.title || "(제목없음)") + "\n삭제 " + fmtDate(new Date(ts)) + " (" + days + "일 경과)" + (nf ? "\n첨부 파일 " + nf + "개도 함께 삭제됩니다." : "") + "\n\n계속할까요?")) return;
+    if (prompt("정말 영구 삭제하려면 아래에 '영구삭제'라고 입력하세요.", "") !== "영구삭제"){ apprToastShow("영구 삭제 취소"); return; }
+    docTrashBusy = true;
+    gwCall("gw-data", { action: "doc_purge", id: id, confirm: true, base: _colBase["documents"], cid: "dp" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8) }).then(function(res){
+      docTrashBusy = false;
+      if (res.status !== 200){ docTrashFail(res, "영구 삭제"); return; }
+      documents = documents.filter(function(x){ return !(x && x.id === id); });
+      if (res.body && res.body.updated_at) _colBase["documents"] = res.body.updated_at;
+      renderDocuments(); apprToastShow("영구 삭제됨" + (res.body && res.body.purged_files ? " · 첨부 " + res.body.purged_files + "개 제거" : ""));
+    }).catch(function(){ docTrashBusy = false; alert("영구 삭제 실패(네트워크)"); });
   }
   // 직원 지정 체크박스 — 지시 모듈 scopeCheckboxesHtml의 "개별 직원" 상자와 같은 결(data-mid → getCheckedMembers). 부서·직급 토큰은 문서 scope 규격(ids만)에 없어 제외
   function docScopeMembersHtml(selIds){
@@ -6480,8 +6662,15 @@
   }
   function deleteDocFromModal(){
     if (!canDo("doc") || !editingDocId) return;
-    var d = findDoc(editingDocId); if (d){ d.del = 1; d.updated = todayStr(); d.updated_ts = Date.now(); }   // updated_ts 스탬프 — 409 병합(ms 우선)에서 서버 결재 훅 갱신본이 삭제를 되살리지 않게(적대 검증 low5)
+    var d = findDoc(editingDocId); if (!d) return;
+    // 삭제 확인(v321 휴지통) — 제목·번호를 보여주고 되돌리는 길(관리자 휴지통 [복구])을 함께 안내. confirm은 텍스트 — HTML 이스케이프 금지
+    if (!confirm("이 문서를 삭제할까요?\n\n" + (d.no ? d.no + "  " : "") + (d.title || "(제목없음)") + ((d.files && d.files.length) ? "\n첨부 " + d.files.length + "개 포함" : "")
+      + "\n\n삭제한 문서는 관리자 문서함의 휴지통에서 복구할 수 있고, 30일이 지나면 영구 삭제할 수 있습니다.")) return;
+    var me = curMember();
+    d.del = 1; d.updated = todayStr(); d.updated_ts = Date.now();   // updated_ts 스탬프 — 409 병합(ms 우선)에서 서버 결재 훅 갱신본이 삭제를 되살리지 않게(적대 검증 low5)
+    d.deleted_at = new Date().toISOString(); if (me) d.deleted_by = { id: me.id, name: me.name };   // 삭제일·삭제자(v321) — 서버 save도 같은 스탬프를 찍는다(비관리자는 서버값 우선)
     closeDocModal(); renderDocuments(); saveDocuments();
+    apprToastShow("휴지통으로 이동 — " + (d.title || "").slice(0, 20));
   }
 
   // ---- 계약·프로세스 파이프라인 엔진(contracts.json) ----
@@ -15263,6 +15452,8 @@
       var when = lr.ts ? hwFmtTs(lr.ts) : "";
       var okTxt = (lr.ok === false) ? '<span style="color:#B0332A;font-weight:700;">실패</span>' : '<span style="color:var(--brand-dark);font-weight:700;">정상</span>';
       h += '<div style="font-size:13px;margin:2px 0 6px;">마지막 자동 실행 ' + (when ? "<b>" + esc(when) + "</b> · " : "") + okTxt + '</div>';
+      // 실패 안내(v321): 로컬 폴백(김과장 PC 재시도)은 9/6 폐지 — 남은 복구 경로는 그룹웨어 자동 복구 발사층(08:20)과 관리자 확인뿐. 이 화면에서 재제출을 부추기지 않는다
+      if (lr.ok === false) h += '<div class="hw-warn">자동 제출 실패 — 그룹웨어 자동 복구(08:20)가 다시 시도합니다. 그래도 실패로 남으면 관리자 확인이 필요합니다.' + (lr.error ? '<br><span style="font-size:12px;">' + esc(String(lr.error).slice(0, 200)) + '</span>' : '') + '</div>';
       var days = Array.isArray(lr.days) ? lr.days : (lr.result && Array.isArray(lr.result.days) ? lr.result.days : []);
       if (days.length){
         days.forEach(function(d){
@@ -15276,7 +15467,7 @@
           }
           h += '</div>';
         });
-      } else if (lr.error){
+      } else if (lr.error && lr.ok !== false){
         h += '<div class="hw-err">' + esc(String(lr.error).slice(0, 200)) + '</div>';
       }
     }
@@ -16878,7 +17069,7 @@
     var host = document.getElementById("usersList");
     host.innerHTML = liveMembers().map(function(m){
       var sub = [m.role||"", m.rank||"", m.dept||""].filter(Boolean).join(" · ");
-      return '<div class="member-row"><div class="minfo"><div class="mname">' + esc(m.name) + (m.admin ? ' 👑' : '') + '</div><div class="mrole">' + esc(sub) + '</div></div>' +
+      return '<div class="member-row"><div class="minfo"><div class="mname">' + esc(m.name) + (m.admin ? ' 👑' + tierBadgeHtml(m) : '') + '</div><div class="mrole">' + esc(sub) + '</div></div>' +
         '<button class="mini-btn" data-user-edit="' + m.id + '">수정</button></div>';
     }).join("") || '<div class="empty-line">회원이 없습니다.</div>';
     Array.prototype.forEach.call(host.querySelectorAll("[data-user-edit]"), function(el){
@@ -16929,7 +17120,7 @@
         var hrLine = '<div class="mrole" style="margin-top:1px;opacity:.9;">' + esc(hr.join(" · ")) + '</div>';
         html += '<div class="hr-item">' +
           '<div class="hr-head' + (hrOpenId === m.id ? ' open' : '') + '" data-hr-toggle="' + m.id + '">' +
-            '<div class="minfo"><div class="mname">' + esc(nm) + (m.admin ? ' 👑' : '') + '</div><div class="mrole">' + esc(meta) + '</div>' + hrLine + '</div>' +
+            '<div class="minfo"><div class="mname">' + esc(nm) + (m.admin ? ' 👑' + tierBadgeHtml(m) : '') + '</div><div class="mrole">' + esc(meta) + '</div>' + hrLine + '</div>' +
             '<span class="hr-caret">▾</span>' +
           '</div>' +
           '<div class="hr-panel" id="hrpanel-' + m.id + '" style="display:none;"></div>' +
@@ -17017,7 +17208,7 @@
   var MOD_LABEL = {tasks:"지시", veh:"차량", rec:"기성·수금", lic:"인허가", check:"주기 체크", con:"계약", cli:"거래처", doc:"문서함", bid:"입찰", wk:"일용직", quote:"견적서", promo:"홍보"};   // check 권한은 주기 체크리스트 영역만 제어(내게 온 지시·내 할 일은 전원) — 탭 이름(내 업무)과 구분
   // ---- 감사 로그 뷰어(관리자 전용, 서버 기록 열람) ----
   var AUDIT_COL_LABEL = {tasks:"지시", vehicles:"차량", receivables:"기성", licenses:"인허가", checklist:"업무", documents:"문서함", clients:"거래처", contracts:"계약", leaves:"휴가", family:"가족친화", member:"회원", login:"로그인", progress:"진척도"};
-  var AUDIT_FIELD_LABEL = {status:"상태", title:"제목", who:"담당", who_id:"담당", due:"기한", amount:"금액", paid:"입금", del:"삭제", scope:"공개범위", stage:"단계", cancel_req:"취소요청", name:"이름", role:"직책", rank:"직급", dept:"부서", admin:"관리자", perms:"권한", hire_date:"입사일", leave_date:"퇴사일", seq:"연번", annual_base:"잔여연차기준", annual_base_date:"기준일", annual_days:"연차수동", loa_days:"휴직누적", on_loa:"휴직중", loa_start:"휴직시작", loa_end:"휴직종료", annual_paid:"연차수당포함", emp_type:"고용형태", birth:"생년월일", annual_basis:"연차기준", reason:"사유", approver:"승인자", done_by:"완료자", detail:"상세", recur:"반복", hl:"하이라이트", mismatch:"불일치", PIN:"PIN"};
+  var AUDIT_FIELD_LABEL = {status:"상태", title:"제목", who:"담당", who_id:"담당", due:"기한", amount:"금액", paid:"입금", del:"삭제", scope:"공개범위", stage:"단계", cancel_req:"취소요청", name:"이름", role:"직책", rank:"직급", dept:"부서", admin:"관리자", perms:"권한", hire_date:"입사일", leave_date:"퇴사일", seq:"연번", annual_base:"잔여연차기준", annual_base_date:"기준일", annual_days:"연차수동", loa_days:"휴직누적", on_loa:"휴직중", loa_start:"휴직시작", loa_end:"휴직종료", annual_paid:"연차수당포함", emp_type:"고용형태", birth:"생년월일", annual_basis:"연차기준", reason:"사유", approver:"승인자", done_by:"완료자", detail:"상세", recur:"반복", hl:"하이라이트", mismatch:"불일치", PIN:"PIN", tier:"관리자등급", deleted_at:"삭제일", deleted_by:"삭제자", restored_at:"복구일", restored_by:"복구자"};
   var auditMonthCur = "";
   function auditMonthShift(delta){
     var p = auditMonthCur.split("-"), y = +p[0], mo = +p[1] + delta;
@@ -17089,11 +17280,11 @@
       var div = "";
       if (ret && !retDivDone){ retDivDone = true; div = '<tr><td colspan="' + (mods.length + 1) + '" style="color:var(--sub);font-size:12px;padding:8px 6px 4px;border-top:2px solid rgba(128,148,138,.35);">퇴사자 — 서버가 로그인·데이터 접근을 차단 중(설정 불필요, 이력 보존용)</td></tr>'; }
       var nm = isBossMember(m) ? (m.name + " (대표님)") : m.name;
-      var info = '<td class="pm-nm"' + (ret ? ' style="opacity:.55;"' : '') + '>' + esc(nm) + (m.admin ? ' 👑' : '') +
+      var info = '<td class="pm-nm"' + (ret ? ' style="opacity:.55;"' : '') + '>' + esc(nm) + (m.admin ? ' 👑' + tierBadgeHtml(m) : '') +
         '<div class="pm-sub">' + esc((m.role||"") + (m.dept ? " · " + m.dept : "") + (ret ? " · 퇴사 " + m.leave_date : "")) + '</div>' +
         (m.admin || ret ? '' : '<div class="pm-stat" id="pmstat-' + m.id + '"></div>') + '</td>';
       if (ret) return div + '<tr>' + info + '<td colspan="' + mods.length + '" class="pm-admin" style="opacity:.55;">퇴사 — 접근 차단됨</td></tr>';
-      if (m.admin) return '<tr>' + info + '<td colspan="' + mods.length + '" class="pm-admin">관리자 — 모든 권한 고정</td></tr>';
+      if (m.admin) return '<tr>' + info + '<td colspan="' + mods.length + '" class="pm-admin">관리자(' + (TIER_TXT[tierOfMember(m)] || "등급 미정") + ') — 모든 권한 고정 · 결재 권한은 등급으로(인사 카드에서 변경)</td></tr>';
       return '<tr>' + info + mods.map(function(mod){
         var v = pmVal(m, mod);
         return '<td><button type="button" class="pm-cell pm-' + v + '" data-pm-cyc="' + m.id + ':' + mod + '">' + PM_TXT[v] + '</button></td>';
@@ -17289,6 +17480,13 @@
     var devOpt = document.querySelector('#meRole option[value="개발자"]');
     if (devOpt) devOpt.hidden = !(isDev() || (m && m.dev));
     document.getElementById("meRole").value = m ? (m.role||"직원") : "직원";
+    // 관리자 등급(v321): 현재 파생값(명시 tier 우선)을 보여주고, 변경은 대표·PM만(서버 TIER_PM_OR_BOSS_ONLY와 같은 축). 행 표시는 updatePermLock이 직책(관리자 프리셋)에 따라 켠다
+    var tierSel = document.getElementById("meTier");
+    tierSel.value = m ? (tierOfMember(m) || tierDefaultForRole(m.role)) : tierDefaultForRole("직원");
+    tierSel.disabled = !canChangeTier();
+    tierSel.style.opacity = tierSel.disabled ? "0.6" : "";
+    var tierHint = document.getElementById("meTierHint");
+    if (tierHint) tierHint.textContent = canChangeTier() ? "변경은 대표·PM만 · 마지막 PM은 강등 불가 · 등급을 정하지 않은 관리자는 직책(대표)·개발자·이름으로 자동 판정" : "등급 변경은 대표·PM만 할 수 있습니다(현재 계정은 조회만)";
     // 아이디·PIN 재설정은 개발자 영역 — 관리자에겐 읽기 전용으로 잠근다.
     var meUidEl = document.getElementById("meUid");
     var mePinEl = document.getElementById("mePin");
@@ -17346,6 +17544,7 @@
     var adminRole = !!(ROLE_PRESET[role] && ROLE_PRESET[role].admin);
     var note = document.getElementById("mePermNote");
     if (note) note.style.display = adminRole ? "block" : "none";
+    var tw = document.getElementById("meTierWrap"); if (tw) tw.style.display = adminRole ? "block" : "none";   // 관리자 등급 행(v321)은 관리자 직책일 때만
     Array.prototype.forEach.call(document.querySelectorAll("#mePerms [data-perm]"), function(sel){
       sel.disabled = adminRole;
       sel.style.opacity = adminRole ? "0.45" : "";
@@ -17356,6 +17555,8 @@
   function applyRolePreset(){
     var p = ROLE_PRESET[document.getElementById("meRole").value];
     if (p) Array.prototype.forEach.call(document.querySelectorAll("#mePerms [data-perm]"), function(sel){ sel.value = p.perms[sel.getAttribute("data-perm")] || "view"; });
+    var tSel0 = document.getElementById("meTier");   // 직책을 바꾸면 등급 기본값도 따라간다(명시 등급이 있으면 유지 — v321)
+    if (tSel0 && !tSel0.disabled){ var em0 = editingMemberId ? findMember(editingMemberId) : null; tSel0.value = (em0 && em0.tier && TIER_TXT[em0.tier]) ? em0.tier : tierDefaultForRole(document.getElementById("meRole").value); }
     updatePermLock();
   }
   function saveMemberEdit(){
@@ -17401,6 +17602,12 @@
     // 잔여값 입력 + 기준일 없음 + 이미 인사업무 시작됨 → 기준일=오늘 자동 스탬프
     var existM = editingMemberId ? findMember(editingMemberId) : null;
     if (payload.annual_base !== null && (!existM || !existM.annual_base_date) && hrStarted()) payload.annual_base_date = todayStr();
+    // 관리자 등급(v321): 관리자 직책 + 변경 권한(대표·PM)일 때만, 값이 현재 파생값과 다를 때만 전송(같으면 명시 저장도 안 해 파생 규칙 그대로)
+    var tSel = document.getElementById("meTier");
+    if (admin && tSel && !tSel.disabled){
+      var curT = existM ? tierOfMember(existM) : "";
+      if (!existM || tSel.value !== curT) payload.tier = tSel.value;
+    }
     if (editingMemberId) payload.id = editingMemberId;
     else if (ROLE_PRESET[role]) payload.perms = ROLE_PRESET[role].perms;   // 신규만 프리셋 권한
     if (pin && pinOk) payload.pin = pin;
@@ -17412,6 +17619,10 @@
         else if (ec === "LAST_DEV") e2.textContent = "마지막 개발자는 강등·삭제할 수 없습니다.";
         else if (ec === "UID_TAKEN") e2.textContent = "이미 사용 중인 아이디입니다.";
         else if (ec === "INVALID_UID") e2.textContent = "아이디는 영문소문자·숫자·. _ - 로 4~20자입니다.";
+        else if (ec === "TIER_PM_OR_BOSS_ONLY") e2.textContent = "관리자 등급 변경은 대표·PM만 할 수 있습니다.";
+        else if (ec === "LAST_PM") e2.textContent = "마지막 PM은 강등할 수 없습니다 — 다른 관리자를 먼저 PM으로 지정하세요.";
+        else if (ec === "TIER_NOT_ADMIN" || ec === "BAD_TIER") e2.textContent = "관리자 등급은 관리자 직책에만 지정할 수 있습니다.";
+        else e2.textContent = "저장 실패 (" + (ec || res.status) + ")";
         e2.classList.add("show"); return;
       }
       // 서버 응답으로 로컬 members 즉시 갱신(재조회 지연/캐시로 저장이 안 된 것처럼 보이던 문제 해결)
@@ -17451,7 +17662,8 @@
     if (!editingMemberId) return;
     if (curMember() && editingMemberId === curMember().id) return;  // 본인 삭제 금지
     var delId = editingMemberId;
-    gwCall("gw-auth", { action: "member_delete", id: delId }).then(function(){
+    gwCall("gw-auth", { action: "member_delete", id: delId }).then(function(res){
+      if (res.status !== 200){ var ec = res.body && res.body.error_code; alert(ec === "LAST_PM" ? "마지막 PM은 삭제할 수 없습니다 — 다른 관리자를 먼저 PM으로 지정하세요." : (ec === "LAST_DEV" ? "마지막 개발자는 삭제할 수 없습니다." : "삭제 실패 (" + (ec || res.status) + ")")); return; }
       members = members.filter(function(m){ return m.id !== delId; });
       try{ saveUsersCache(); }catch(e){}
       closeMemberEdit();

@@ -4,6 +4,7 @@
 // 구독은 push:subs 에 회원 id별로 저장. 만료(404/410) 구독은 발송 시 자동 제거.
 const webpush = require('web-push');
 const { store, blobGet, blobSet, blobList } = require('./blobs');
+const tier = require('./tier');   // 관리자 등급(v321) — isBoss·pmIds·bossIds 판정의 단일 원천
 
 const DATA = 'gw_data';
 const USERS = 'gw_users';
@@ -90,8 +91,9 @@ async function sendTo(memberIds, payload, opts) {
   return { sent, removed };
 }
 
-// 대표 회원 id — 클라 isBossMember와 같은 축(role '대표' 또는 이름 나종운, admin 한정). 운반일지 결재 라우팅 전용(9/3 PM 결정).
-function isBoss(m) { return !!(m && m.admin && m.del !== 1 && (String(m.role || '') === '대표' || String(m.name || '') === '나종운')); }
+// 대표 회원 id — 관리자 등급(v321, _lib/tier.js) tier boss. 명시 tier가 없으면 종전 규칙(role '대표' 또는 이름 나종운, admin 한정)으로 파생되므로 호환.
+// 클라 isBossMember와 같은 축. 운반일지 결재 라우팅·BOSS_ONLY 게이트 전용(9/3 PM 결정).
+function isBoss(m) { return tier.isBoss(m); }
 async function bossIds() {
   const st = store(USERS);
   const l = await blobList(st);
@@ -106,7 +108,8 @@ async function bossIds() {
 }
 // 대표 전용 건의 결재 요청 수신자 — 대표가 없으면(계정 role 불일치 등) 관리자 전원으로 폴백해 결재가 끊기지 않게 한다
 async function bossOrAdminIds() { const b = await bossIds(); return b.length ? b : await adminIds(); }
-// PM·관리자(비대표 관리자) id 목록 — 결재 3차(등급) ①·② 1단계 라우팅 전용. bossIds와 같은 축(스캔 1회).
+// PM id 목록 — 관리자 등급(v321) tier pm만(종전 '비대표 관리자 전원'에서 좁힘: 관리자 등급 admin은 ① 전결·PM 큐 결재 권한이 없다).
+// 결재 3차 ①·② 1단계 라우팅·PM_ONLY 게이트·pm_present 전용. bossIds와 같은 축(스캔 1회).
 async function pmIds() {
   const st = store(USERS);
   const l = await blobList(st);
@@ -115,11 +118,11 @@ async function pmIds() {
   for (const k of l.keys) {
     if (k.indexOf('member:') !== 0) continue;
     const r = await blobGet(st, k);
-    if (r.ok && r.data && r.data.admin && r.data.del !== 1 && !isBoss(r.data)) out.push(r.data.id);
+    if (r.ok && r.data && tier.isPm(r.data)) out.push(r.data.id);
   }
   return out;
 }
-// ①·② 1단계 결재 요청 수신자 — 비대표 관리자가 없으면(1인 관리자=대표뿐 등) 관리자 전원 폴백(교착 방지, bossOrAdminIds와 대칭)
+// ①·② 1단계 결재 요청 수신자 — tier pm이 없으면(1인 관리자=대표뿐 등) 관리자 전원 폴백(교착 방지, bossOrAdminIds와 대칭)
 async function pmOrAdminIds() { const p = await pmIds(); return p.length ? p : await adminIds(); }
 
-module.exports = { getKeys, getSubs, saveSubs, sendTo, adminIds, bossIds, bossOrAdminIds, isBoss, pmIds, pmOrAdminIds };
+module.exports = { getKeys, getSubs, saveSubs, sendTo, adminIds, bossIds, bossOrAdminIds, isBoss, isPm: tier.isPm, tierOf: tier.tierOf, pmIds, pmOrAdminIds };

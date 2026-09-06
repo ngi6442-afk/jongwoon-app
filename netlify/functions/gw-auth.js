@@ -1,7 +1,7 @@
 'use strict';
 
 // 그룹웨어 인증 + 회원관리 (서버측). Netlify Blobs 'gw_users' 저장.
-// 회원: member:<id> = {id,name,role,rank,dept,admin,perms,pin_salt,pin_hash,created,updated,del} — role=직책(권한), rank=직급, dept=부서
+// 회원: member:<id> = {id,name,role,rank,dept,admin,tier,perms,pin_salt,pin_hash,created,updated,del} — role=직책(권한), rank=직급, dept=부서, tier=관리자 등급(boss|pm|admin, v321 — 없으면 _lib/tier.js 파생)
 //       name:<lower> = id  (이름 인덱스)
 // PIN은 scrypt 해시로만 저장(평문 저장 안 함). 세션은 HMAC 토큰.
 const crypto = require('crypto');
@@ -9,6 +9,7 @@ const { setupBlobContext, store, blobGet, blobSet } = require('./_lib/blobs');
 const { hashSecret, verifySecret } = require('./_lib/password');
 const { issueSession, verifyToken, bearer } = require('./_lib/session');
 const { appendAudit, short } = require('./_lib/audit');
+const tier = require('./_lib/tier');   // 관리자 등급(v321)
 
 const USERS = 'gw_users';
 const MODULES = ['tasks', 'veh', 'rec', 'lic', 'check', 'con', 'cli', 'doc', 'wk', 'quote', 'promo'];   // wk(일용직) 누락으로 cleanPerms가 매 저장마다 버려 숨김·수행 설정이 불가능했음(프런트 레지스트리와 일치 필수). quote=견적서·promo=홍보(둘 다 기본 숨김 — 명시 부여만)
@@ -65,6 +66,11 @@ async function devAllowed(st, member) {
   if (!member || !member.admin) return false;
   const all = await listMembers(st);
   return !all.some(isDev);
+}
+// 마지막 PM 보호(v321) — 대상(selfId)을 뺀 재직 회원 중 tier pm이 있는지. 강등(LAST_PM)·삭제 공용. ① 전결·PM 큐 결재 주체가 0명이 되는 상태 방지
+async function otherPmExists(st, selfId) {
+  const all = await listMembers(st);
+  return all.some(function (x) { return x && x.id !== selfId && !retired(x) && tier.tierOf(x) === 'pm'; });
 }
 // ── 계정 분리 이사 스위치 ───────────────────────────────────────────────
 // true  = 아이디·이름 둘 다로 로그인(이사 기간). 아이디 미발급자도 못 잠긴다.
@@ -208,7 +214,7 @@ async function handleMemberList(st, event, R) {
   // 종전엔 safeMember 전체가 나가 현장직 계정으로 전사 입사일·연차 조회가 가능했다)
   const members = (await listMembers(st)).map(function (m) {
     if (c.member.admin || m.id === c.member.id) return safeMember(m);
-    return { id: m.id, name: m.name, role: m.role, rank: m.rank, dept: m.dept, seq: m.seq, admin: m.admin, on_loa: m.on_loa, del: m.del };
+    return { id: m.id, name: m.name, role: m.role, rank: m.rank, dept: m.dept, seq: m.seq, admin: m.admin, dev: m.dev, tier: m.tier, on_loa: m.on_loa, del: m.del };   // tier·dev(v321)는 클라 tierOfMember 파생·표시용(인사정보 아님)
   });
   return jr(200, { status: 'OK', members, request_id: R });
 }
@@ -249,6 +255,19 @@ async function handleMemberUpsert(st, event, d, R) {
     m.role = (d.role || '직원');
     m.admin = !!d.admin;
   }
+  // 관리자 등급(v321, PM 9/6 ㄱ): tier 'boss'|'pm'|'admin'. 변경은 요청자 tier boss·pm만(개발자 게이트와 별개 축), 대상은 관리자만, 마지막 pm 강등 불가(LAST_PM).
+  // 미지정 회원은 _lib/tier.js 파생(role 대표·나종운→boss / dev·나경일→pm / 그 외→admin)이라 마이그레이션 없이 동작. 관리자 해제 시 등급 제거(관리자 아닌 회원은 등급 없음)
+  const tierBefore = before ? tier.tierOf(before) : '';
+  if (d.tier !== undefined) {
+    const reqT = tier.tierOf(c.member);
+    if (reqT !== 'boss' && reqT !== 'pm') return jr(403, { status: 'FORBIDDEN', error_code: 'TIER_PM_OR_BOSS_ONLY', request_id: R });
+    const nt = String(d.tier || '');
+    if (!tier.validTier(nt)) return jr(400, { status: 'REJECTED', error_code: 'BAD_TIER', request_id: R });
+    if (!m.admin) return jr(400, { status: 'REJECTED', error_code: 'TIER_NOT_ADMIN', request_id: R });
+    if (tierBefore === 'pm' && nt !== 'pm' && !(await otherPmExists(st, m.id))) return jr(409, { status: 'REJECTED', error_code: 'LAST_PM', request_id: R });
+    m.tier = nt;
+  }
+  if (!m.admin && m.tier) delete m.tier;
   // 아이디(계정 분리) — 관리자가 인사 카드에서 발급/변경. 중복·이름충돌은 거부.
   // **빈 문자열은 '변경 없음'으로 본다.** 종전엔 '지워라'로 해석해서, 화면이 낡은 목록으로
   // 아이디 칸을 비운 채 저장하면 로그인 아이디가 통째로 날아갔다(2026-08-11 PM 실제 사고).
@@ -298,7 +317,7 @@ async function handleMemberUpsert(st, event, d, R) {
   // 감사 로그: 회원 필드 변경(이전값→새값). PIN은 값 미기록('변경'만), 해시·비밀값 제외.
   try {
     const f = {};
-    const AUD_FIELDS = ['name','uid','role','admin','dev','rank','dept','annual_days','birth','hire_date','emp_type','annual_basis','loa_days','leave_date','annual_paid','annual_base','annual_base_date','seq','on_loa','loa_start','loa_end'];
+    const AUD_FIELDS = ['name','uid','role','admin','dev','tier','rank','dept','annual_days','birth','hire_date','emp_type','annual_basis','loa_days','leave_date','annual_paid','annual_base','annual_base_date','seq','on_loa','loa_start','loa_end'];
     const b = before || {};
     for (const k of AUD_FIELDS) {
       const a = b[k], v = m[k];
@@ -310,6 +329,9 @@ async function handleMemberUpsert(st, event, d, R) {
       await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'member',
         ev: [{ op: (before ? '수정' : '추가'), id: m.id, t: m.name, f: (Object.keys(f).length ? f : undefined) }] });
     }
+    // 등급 변경은 별도 행(v321) — 파생값(미지정)에서 명시로 바뀐 경우도 남긴다(f.tier는 저장 필드 기준이라 '파생 admin→pm'을 못 보여준다)
+    if (d.tier !== undefined && (tierBefore || '') !== (m.tier || ''))
+      await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'member', ev: [{ op: '등급변경', id: m.id, t: m.name + ' ' + (tierBefore || '미지정') + '→' + m.tier + ((before && !before.tier) ? ' (종전 파생값)' : '') }] });
   } catch (e) {}
   return jr(200, { status: 'OK', member: safeMember(m), request_id: R });
 }
@@ -325,6 +347,8 @@ async function handleMemberDelete(st, event, d, R) {
     const devs = (await listMembers(st)).filter(isDev);
     if (devs.length <= 1) return jr(409, { status: 'REJECTED', error_code: 'LAST_DEV', request_id: R });
   }
+  // 마지막 PM 삭제 불가(v321) — ① 전결·PM 큐 결재 주체가 사라지는 것 방지(강등 LAST_PM과 같은 축)
+  if (r.ok && r.data && tier.tierOf(r.data) === 'pm' && !(await otherPmExists(st, r.data.id))) return jr(409, { status: 'REJECTED', error_code: 'LAST_PM', request_id: R });
   if (r.ok && r.data) {
     r.data.del = 1; r.data.updated = Date.now();
     await blobSet(st, memberKey(d.id), r.data); await blobSet(st, nameKey(r.data.name), null);
