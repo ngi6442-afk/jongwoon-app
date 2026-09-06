@@ -1,5 +1,5 @@
 // gw-data 액션 단위 서버 테스트(P3) — Blobs·push·audit를 인메모리 mock으로 갈아끼우고 handler를 직접 호출.
-// 커버: 인증 게이트 / 프로토타입 키 우회 / 관리자 전용 / 낙관적 락 409 / leaves 비관리자 재구성 /
+// 커버: 인증 게이트 / 프로토타입 키 우회 / 관리자 전용 / 낙관적 락 409 / leaves 비관리자 재구성 / 홍보AI 워커 제목 원형 라벨 영속(25, v320) /
 //       차량 관리자 필드 복원 / tpl·proof 입력 검증 / backup_put confirm 게이트 / bot_notify 키 검증
 // 실행: node tools/servertest.mjs
 import { createRequire } from 'module';
@@ -818,6 +818,91 @@ r = await call({ action: 'doc_att_put', id: 'h3', name: '현장.pdf', data: PDF 
 T('v318·v319: 같은 사람이 06 문서에 첨부 → 200', r.code === 200 && r.body.n === 1, JSON.stringify(r.body).slice(0, 120));
 r = await call({ action: 'doc_att_put', id: 'h2', name: '법인.pdf', data: PDF }, tokA);
 T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stringify(r.body).slice(0, 120));
+
+
+// 25 블로그 제목 원형(v320) — 워커(gw-promo-ai-run-background)를 인메모리 blob으로 돌려 라벨 영속 경로를 실측.
+//    모델 호출은 없다: promoai.generateDraft만 가짜(실제 buildPrompt·pickTitleType은 그대로 돌린다). 키 값은 더미 문자열(실키 아님).
+//    검증: 잡 blob title_type·title_plan / 이력 blob promoai:hist:<id> / 다음 생성의 recent_titles 라벨 출처 (a) 이력 → (b) p.ai.tt → (c) 추정 /
+//          재생성 회차 own 제외 / 계약 금지 문자열과 겹치는 이력 제목 제외(LEAK_BLOCKED 유발 방지)
+{
+  const lib = require(join(FN, '_lib/promoai.js'));
+  const worker = require(join(FN, 'gw-promo-ai-run-background.js'));
+  const realGen = lib.generateDraft;
+  const captured = [];
+  lib.generateDraft = async function (key, photos, input) {   // 워커 loadLib은 같은 exports 객체를 본다 — 네트워크 없이 계획만 돌린다
+    const pr = lib.buildPrompt(Object.assign({}, input, { photoCount: photos.length }));
+    const plan = pr.title_plan;
+    captured.push({ input: input, plan: plan, user: pr.user });
+    const code = plan.primary.code;
+    return { ok: true, title: plan.primary.ex[captured.length % 2], body: '[사진 1 : 시험]\n본문.', tags: ['시험'], title_type: code,
+      title_plan: { primary: code, backup: plan.backup && plan.backup.code, exclude: plan.exclude, lead_ok: plan.lead_ok, relaxed: plan.relaxed, labels: plan.labels },
+      used_tokens: { input: 1, output: 1, total: 2 }, model: 'mock', warn: [] };
+  };
+  process.env.GW_ANTHROPIC_KEY = 'dummy-offline-test-key-not-real';
+  const tokSys = issueSession({ id: '__promoai__', role: 'system' }).token;
+  const ATT = 'att_0123456789abcdef';
+  mem.gw_files = mem.gw_files || {};
+  mem.gw_files[ATT] ={ kind: 'promo', type: 'image/jpeg', name: 'a.jpg', data: 'A'.repeat(200) };
+  const legacy = [
+    { id: 'pl1', title: '포항 제내리 오수관 역류, 막힘의 원인은 어디에 있을까요?', status: 'posted', posted_at: '2026-09-02', ts: 1788309688273, region: '포항 제내리', facility: '오수관', problem: '역류', shot_at: '2026-01-10', photos: [{ id: ATT }] },
+    { id: 'pl2', title: '포항 용덕리 상가 하수구 막힘, 겨울철에 더 심해지는 이유', status: 'posted', posted_at: '2026-08-25', ts: 1787620259234, region: '포항 용덕리', facility: '상가 하수구', problem: '막힘', shot_at: '2026-01-08', photos: [{ id: ATT }] },
+    { id: 'pl3', title: '포항 용흥동 우수받이 준설, 그레이팅 막힘 신호 네 가지', status: 'posted', posted_at: '2026-08-20', ts: 1786060893317, region: '포항 용흥동', facility: '우수받이', problem: '침전물', shot_at: '', photos: [{ id: ATT }] },
+    { id: 'pl4', title: '포항 장량동 오수관 막힘, 준설로 뚫을 수 있을까요?', status: 'posted', posted_at: '2026-08-19', ts: 1787035355729, region: '포항 장량동', facility: '오수관', problem: '막힘', shot_at: '2025-12-30', photos: [{ id: ATT }] },
+    { id: 'pl5', title: '포항 두호동 상가 하수구, 침전물과 악취는 왜 반복될까요', status: 'review', posted_at: '', ts: 1788311647545, region: '포항 두호동', facility: '상가 하수구', problem: '악취', shot_at: '2026-01-13', photos: [{ id: ATT }] },
+  ];
+  const fresh = (id, region) => ({ id: id, title: '예비 제목 ' + id, status: 'review', posted_at: '', ts: 1790000000000, region: region, facility: '우수받이', problem: '막힘', shot_at: '2026-02-03', photos: [{ id: ATT }], pre_ai: { title: '예비 제목 ' + id } });
+  mem.gw_data['col:promo'] = { schema: 1, items: legacy.concat([fresh('pn1', '포항 죽도동'), fresh('pn2', '경주 황성동'), fresh('pn3', '포항 오천읍'), fresh('pn4', '포항 흥해읍')]), updated_at: 1 };
+  const promo = (id) => mem.gw_data['col:promo'].items.filter((x) => x.id === id)[0];
+  const runJob = async (job, promoId, contractId) => {
+    await worker.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + tokSys }, body: JSON.stringify({ job: job, promo_id: promoId, contract_id: contractId || '', mode: 'draft', max_photos: 30 }) }, {});
+    return mem.gw_data['promoai:job:' + job];
+  };
+  // 클라이언트 흉내(1단계 = index.html 무편집: p.ai에 tt 없음) — 결과 적용 + 게시
+  const applyNoTT = (id, jb, posted) => { const p = promo(id); p.title = jb.title; p.ai = { model: 'mock', tokens: 2, ts: 1 }; if (posted) { p.status = 'posted'; p.posted_at = posted; } };
+
+  const j1 = await runJob('pa_t1', 'pn1');
+  T('v320 워커: 잡 blob에 title_type·title_plan(primary/backup/exclude/lead_ok/relaxed/labels) 기록 + done', j1 && j1.status === 'done' && /^[A-Z]$/.test(j1.title_type) && j1.title_plan && j1.title_plan.primary === j1.title_type && Array.isArray(j1.title_plan.exclude) && j1.title_plan.labels && typeof j1.title_plan.lead_ok === 'boolean', JSON.stringify(j1).slice(0, 300));
+  const h1 = mem.gw_data['promoai:hist:pn1'];
+  T('v320 워커: 이력 blob promoai:hist:pn1 = {items:[{title,tt,ts,job}], n:1}', h1 && Array.isArray(h1.items) && h1.items.length === 1 && h1.items[0].title === j1.title && h1.items[0].tt === j1.title_type && h1.items[0].job === 'pa_t1' && h1.n === 1, JSON.stringify(h1));
+  T('v320 첫 생성: 최근 5건 전부 라벨 없음(과거 게시분 → 추정 경로 (c)), 제외 집합에 추정 Q·S·K 포함, 지역명 선두 금지', captured[0].input.recent_titles.length === 5 && captured[0].input.recent_titles.every((x) => x.tt === '') && ['Q', 'S', 'K'].every((c) => j1.title_plan.exclude.indexOf(c) >= 0) && j1.title_plan.lead_ok === false && j1.title_plan.labels.label === 0, JSON.stringify(captured[0].input.recent_titles) + ' ' + JSON.stringify(j1.title_plan));
+  T('v320 워커 로그에 [제목] 라벨 출처·회차 줄', j1.log.some((l) => /\[제목\] 최근 5건\(라벨 이력 0·기록 0·추정 5\).*회차 0/.test(l)) && j1.log.some((l) => /\[제목\] 원형 [A-Z] \(지정/.test(l)), j1.log.join(' | '));
+
+  applyNoTT('pn1', j1, '2026-10-01');
+  const j2 = await runJob('pa_t2', 'pn2');
+  const rt2 = captured[1].input.recent_titles;
+  T('v320 (a) 이력 blob 경로: index.html 무편집(p.ai.tt 없음)인데도 다음 생성의 recent_titles[0]에 pn1 라벨이 실리고 그 원형이 제외됨', rt2[0].title === j1.title && rt2[0].tt === j1.title_type && j2.title_plan.exclude.indexOf(j1.title_type) >= 0 && j2.title_type !== j1.title_type && j2.title_plan.labels.label === 1, JSON.stringify(rt2) + ' ' + JSON.stringify(j2.title_plan));
+
+  // (b) p.ai.tt 경로 — 이력 blob이 사라진 상황(백업 복원 등) + 2단계 index.html이 tt를 저장한 경우
+  applyNoTT('pn2', j2, '2026-10-02');
+  promo('pn2').ai.tt = j2.title_type;
+  delete mem.gw_data['promoai:hist:pn2'];
+  const j3 = await runJob('pa_t3', 'pn3');
+  const rt3 = captured[2].input.recent_titles;
+  T('v320 (b) p.ai.tt 경로: 이력 blob 없어도 기록 라벨로 제외', rt3[0].title === j2.title && rt3[0].tt === j2.title_type && j3.title_plan.exclude.indexOf(j2.title_type) >= 0 && j3.title_type !== j2.title_type, JSON.stringify(rt3) + ' ' + JSON.stringify(j3.title_plan));
+
+  // (c) 사람이 제목을 통째로 새로 쓴 기록 — 이력 불일치·p.ai.tt 없음 → 라벨 '' (추정 경로) — 생성은 정상
+  applyNoTT('pn3', j3, '2026-10-03');
+  promo('pn3').title = '현장 정리 가, 포항 오천읍 작업 내용';
+  const j4 = await runJob('pa_t4', 'pn4');
+  const rt4 = captured[3].input.recent_titles;
+  T('v320 (c) 재작성 제목: 이력·기록 라벨 없음 → tt "" (추정), 생성 정상·완화 0', j4.status === 'done' && rt4[0].title === '현장 정리 가, 포항 오천읍 작업 내용' && rt4[0].tt === '' && rt4[1].tt === j2.title_type && j4.title_plan.relaxed === 0, JSON.stringify(rt4));
+
+  // 재생성 회차 — 같은 기록 두 번째: own_titles에 이전 AI 제목(라벨)이 실리고 attempt 1, 이전 원형 제외
+  const j5 = await runJob('pa_t5', 'pn1');
+  const in5 = captured[4].input;
+  const h5 = mem.gw_data['promoai:hist:pn1'];
+  T('v320 재생성: own_titles에 이전 AI 제목+라벨, attempt 1, 이전 원형 제외·다른 원형 선택, 이력 blob 2건·n=2', in5.attempt === 1 && in5.own_titles.some((x) => x.title === j1.title && x.tt === j1.title_type) && j5.title_type !== j1.title_type && j5.title_plan.exclude.indexOf(j1.title_type) >= 0 && h5.items.length === 2 && h5.n === 2, JSON.stringify(in5.own_titles) + ' ' + j5.title_type + ' ' + JSON.stringify(h5));
+
+  // 계약 금지 문자열과 겹치는 이력 제목 — 그 제목만 빼고 생성은 진행(LEAK_BLOCKED 아님)
+  mem.gw_data['col:contracts'] = { schema: 1, items: [{ id: 'c1', title: '우수받이 준설', site: '포항 죽도동', type: '준설', label: '준설', client: '포항시청', contract_info: { amount: 20000000, client: '포항시청' } }], updated_at: 1 };
+  promo('pl1').title = '포항시청 앞 오수관 역류, 막힘의 원인은 어디에 있을까요?';
+  const j6 = await runJob('pa_t6', 'pn4', 'c1');
+  const rt6 = captured[5] && captured[5].input.recent_titles;
+  T('v320 계약 참조 시 발주처명이 든 이력 제목은 제외되고 생성 정상(LEAK_BLOCKED 아님)', j6.status === 'done' && rt6 && !rt6.some((x) => /포항시청/.test(x.title)) && j6.log.some((l) => /계약 금지 문자열과 겹쳐 제외/.test(l)), JSON.stringify([j6.status, j6.code, j6.log]).slice(0, 300));
+
+  lib.generateDraft = realGen;
+  delete process.env.GW_ANTHROPIC_KEY;
+}
 
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');
 process.exit(fail ? 1 : 0);
