@@ -117,6 +117,18 @@ function canEdit(member) { return !!(member && member.id); }
 // 노선 지정 권한(v323, PM 9/7 #13) — 관리자 또는 부서가 '운영부'(공무)인 회원. 앱 abCanLearn과 같은 조건(uismoke 대조).
 const LEARN_DEPT = '운영부';
 function canLearn(member) { return !!(member && member.id && (member.admin || String(member.dept || '') === LEARN_DEPT)); }
+// 봇 공유 시크릿 검증(v323 후속, PM 9/7 ㄱ "앱에서 숨긴 노선은 엑셀에서도 빠져야 한다") — appdata logsheet 워크플로가 세션 없이 부른다.
+// 키 = BIDS_INGEST_KEY(gw-data ingest·gw-cron-kick·gw-lawwatch와 같은 시크릿). 헤더 x-ingest-key 또는 body.key(gw-lawwatch와 같은 두 통로).
+// 비교 = 길이 확인 + crypto.timingSafeEqual(gw-gallery-feed keyOk와 같은 상수 시간 방식). env 미설정이면 닫힘(기본 개방 금지).
+function ingestKeyOk(event, d) {
+  const want = (process.env.BIDS_INGEST_KEY || '').trim();
+  if (!want) return false;
+  const h = (event && event.headers) || {};
+  const got = String(h['x-ingest-key'] || h['X-Ingest-Key'] || (d && d.key) || '').trim();
+  const a = Buffer.from(got), b = Buffer.from(want);
+  if (a.length !== b.length) return false;
+  try { return crypto.timingSafeEqual(a, b); } catch (e) { return false; }
+}
 
 // 미매칭 '건수' 합. aggregate의 unmatched=[{from,to,item,n}] — n이 비면 1건으로 센다(과소집계 방지).
 function unmatchedCount(list) {
@@ -462,6 +474,22 @@ async function handleRouteHide(st, c, d, R) {
   return jr(200, { ok: true, side: side, row: row, hidden: !!d.hide, changed: true, hidden_n: items.length, hidden_list: hiddenBrief(items), request_id: R });
 }
 
+// 숨긴 노선 내보내기(봇 전용, v323 후속 — PM 9/7 ㄱ 숨김→엑셀 동기화). appdata logsheet_daily.py가 매일 08:25 엑셀 생성 전에
+// 1회 호출해 숨긴 (side,row)를 양식에서 빈 줄로 남긴다. 세션·기기승인 대신 ingestKeyOk — 불일치·누락은 401.
+// 응답은 좌표만 — by·bid·ts(회원 정보)는 싣지 않는다(키 누출이 회원 정보 유출로 번지지 않게). 노선표에 없는 잔재는 hiddenMap이 버린다.
+// 블롭 읽기 실패는 500 — 봇이 '숨김 없음'으로 오해하지 않고 전체 양식으로 생성한다(빠뜨리는 쪽이 아니라 다 보이는 쪽으로 실패).
+async function handleHiddenExport(event, d, R) {
+  if (!ingestKeyOk(event, d)) return jr(401, { ok: false, code: 'BAD_INGEST_KEY', request_id: R });
+  const st = store(DATA);
+  const r = await blobGet(st, HIDDEN_KEY);
+  if (!r.ok) return jr(500, { ok: false, code: r.code, request_id: R });
+  const m = hiddenMap(r.data);
+  const items = Object.keys(m).map(function (k) { const p = k.split(':'); return { side: p[0], row: Number(p[1]) }; })
+    .sort(function (a, b) { return a.side === b.side ? a.row - b.row : (a.side < b.side ? -1 : 1); });
+  const updated = r.data ? Number(r.data.updated_at) : 0;
+  return jr(200, { ok: true, items: items, n: items.length, updated_at: (updated > 0) ? updated : null, request_id: R });
+}
+
 // 수동 수집 — 관리자 또는 개발자만. 날짜는 정규식+달력 왕복 검증, 오늘−60일~오늘, 최대 14개.
 async function handleRunNow(st, c, d, R) {
   if (!(c.member.admin || c.member.dev)) return jr(403, { ok: false, code: 'ADMIN_ONLY', request_id: R });
@@ -556,6 +584,10 @@ async function handler(event) {
   setupBlobContext(event);
   let d;
   try { d = JSON.parse(event.body || '{}'); } catch { return jr(400, { ok: false, code: 'INVALID_JSON', request_id: R }); }
+  // 봇 전용 읽기(세션 대신 공유 시크릿, v323 후속) — 회원 게이트 앞에서 갈라진다. 그 외 액션은 종전대로 세션·기기승인 필수.
+  if (d && d.action === 'ab_hidden_export') {
+    try { return await handleHiddenExport(event, d, R); } catch (e) { return jr(500, { ok: false, code: 'HANDLER_FAILED', request_id: R }); }
+  }
   const c = await currentMember(event);
   if (!c.ok) return jr(401, { ok: false, code: c.reason || 'NO_SESSION', request_id: R });
   if (!(await deviceApproved(event, c.member))) return jr(403, { ok: false, code: 'DEVICE_NOT_APPROVED', request_id: R });

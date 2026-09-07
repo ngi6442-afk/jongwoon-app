@@ -1,5 +1,5 @@
 // gw-data 액션 단위 서버 테스트(P3) — Blobs·push·audit를 인메모리 mock으로 갈아끼우고 handler를 직접 호출.
-// 커버: 인증 게이트 / 프로토타입 키 우회 / 관리자 전용 / 낙관적 락 409 / leaves 비관리자 재구성 / 홍보AI 워커 제목 원형 라벨 영속(25, v320) / 관리자 등급 게이트·tier 변경(26, v321) / 문서함 휴지통(27, v321) / 기안 참조 ref 형식(28, v321) / 9/6 검증 반영 — 명시 등급 게이트·자기 변경 금지·LAST_PM 전면·스탬프 강제·부활 차단·누락 보존(29) / gw-allbaro 노선 지정 400자·운영부·노선 숨김(30, v323) /
+// 커버: 인증 게이트 / 프로토타입 키 우회 / 관리자 전용 / 낙관적 락 409 / leaves 비관리자 재구성 / 홍보AI 워커 제목 원형 라벨 영속(25, v320) / 관리자 등급 게이트·tier 변경(26, v321) / 문서함 휴지통(27, v321) / 기안 참조 ref 형식(28, v321) / 9/6 검증 반영 — 명시 등급 게이트·자기 변경 금지·LAST_PM 전면·스탬프 강제·부활 차단·누락 보존(29) / gw-allbaro 노선 지정 400자·운영부·노선 숨김(30, v323) / ab_hidden_export 봇 키 내보내기(31, v323 후속) /
 //       차량 관리자 필드 복원 / tpl·proof 입력 검증 / backup_put confirm 게이트 / bot_notify 키 검증
 // 실행: node tools/servertest.mjs
 import { createRequire } from 'module';
@@ -1447,6 +1447,40 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   delete mem.gw_data['allbaro:routes_hidden'];
   r = await ab({ action: 'ab_status' }, tokA);
   T('ab_status: 숨김 blob 읽기 실패(mock NOT_FOUND) → 200 유지 · hidden 없음 · hidden_error true(없음과 구분)', r.code === 200 && !(r.body.routes || []).some((x) => x.hidden) && r.body.hidden_error === true, JSON.stringify(r.body).slice(0, 120));
+}
+
+// 31 ab_hidden_export(v323 후속, PM 9/7 ㄱ 숨김→엑셀 동기화) — appdata logsheet 봇이 세션 없이 BIDS_INGEST_KEY로 숨긴 좌표만 읽는다.
+//    키 일치 200(body.key·헤더 x-ingest-key) / 불일치·누락 401 / 세션 있어도 키 없으면 401 / env 키 비면 닫힘 / 응답에 by·bid·ts 없음 / 잔재 무시 / 블롭 읽기 실패 500.
+{
+  const gwab = require(join(FN, 'gw-allbaro.js'));
+  const ab = async (body, headers) => { const rr = await gwab.handler({ httpMethod: 'POST', headers: Object.assign({}, headers || {}), body: JSON.stringify(body) }); return { code: rr.statusCode, body: JSON.parse(rr.body || '{}') }; };
+  mem.gw_data['allbaro:routes_hidden'] = { schema: 1, updated_at: 1757200000000, items: [{ side: 'R', row: 6, by: '관리자', bid: 'uadmin', ts: 2 }, { side: 'L', row: 5, by: '관리자', bid: 'uadmin', ts: 1 }, { side: 'R', row: 999, by: '옛줄', ts: 1 }] };
+  r = await ab({ action: 'ab_hidden_export', key: 'test-ingest-key' });
+  T('ab_hidden_export body.key 일치·세션 없음 → 200 · items 좌표만(L5·R6 정렬) · 잔재 R999 제외 · updated_at', r.code === 200 && r.body.ok === true && r.body.n === 2 && JSON.stringify(r.body.items) === JSON.stringify([{ side: 'L', row: 5 }, { side: 'R', row: 6 }]) && r.body.updated_at === 1757200000000, JSON.stringify(r.body).slice(0, 200));
+  T('응답에 회원 정보 없음(by·bid·ts 키·이름·id 없음)', r.code === 200 && !/"(by|bid|ts)"/.test(JSON.stringify(r.body)) && !/관리자|uadmin|옛줄/.test(JSON.stringify(r.body)), JSON.stringify(r.body).slice(0, 200));
+  r = await ab({ action: 'ab_hidden_export' }, { 'x-ingest-key': 'test-ingest-key' });
+  T('헤더 x-ingest-key 일치 → 200', r.code === 200 && r.body.n === 2, r.code + '/' + r.body.code);
+  r = await ab({ action: 'ab_hidden_export', key: 'wrong-key' });
+  T('키 불일치 → 401 BAD_INGEST_KEY · items 없음', r.code === 401 && r.body.code === 'BAD_INGEST_KEY' && !('items' in r.body), r.code + '/' + r.body.code);
+  r = await ab({ action: 'ab_hidden_export', key: 'test-ingest-ke' });
+  T('길이 다른 키(접두 일치) → 401', r.code === 401 && r.body.code === 'BAD_INGEST_KEY', r.code + '/' + r.body.code);
+  r = await ab({ action: 'ab_hidden_export' });
+  T('키 누락·세션 없음 → 401 BAD_INGEST_KEY(NO_SESSION 아님 — 세션 게이트 앞에서 갈라짐)', r.code === 401 && r.body.code === 'BAD_INGEST_KEY', r.code + '/' + r.body.code);
+  r = await ab({ action: 'ab_hidden_export' }, { authorization: 'Bearer ' + tokA, 'x-device-id': 'dev1' });
+  T('관리자 세션·승인 기기만 있고 키 없음 → 401(세션은 대체 인증 아님)', r.code === 401 && r.body.code === 'BAD_INGEST_KEY', r.code + '/' + r.body.code);
+  r = await ab({ action: 'ab_status', key: 'test-ingest-key' });
+  T('다른 액션(ab_status)은 키로 못 연다 → 401(세션 게이트 그대로)', r.code === 401 && r.body.code !== 'BAD_INGEST_KEY', r.code + '/' + r.body.code);
+  { const saved = process.env.BIDS_INGEST_KEY; process.env.BIDS_INGEST_KEY = '';
+    r = await ab({ action: 'ab_hidden_export', key: '' });
+    T('env BIDS_INGEST_KEY 비어 있으면 빈 키도 401(기본 개방 금지)', r.code === 401 && r.body.code === 'BAD_INGEST_KEY', r.code + '/' + r.body.code);
+    process.env.BIDS_INGEST_KEY = saved; }
+  mem.gw_data['allbaro:routes_hidden'] = { schema: 1, items: [] };
+  r = await ab({ action: 'ab_hidden_export', key: 'test-ingest-key' });
+  T('숨긴 줄 없음 → 200 items [] · updated_at null', r.code === 200 && r.body.n === 0 && Array.isArray(r.body.items) && r.body.items.length === 0 && r.body.updated_at === null, JSON.stringify(r.body).slice(0, 120));
+  delete mem.gw_data['allbaro:routes_hidden'];
+  r = await ab({ action: 'ab_hidden_export', key: 'test-ingest-key' });
+  T('숨김 blob 읽기 실패(mock NOT_FOUND) → 500(봇은 전체 양식으로 폴백 — 빈 목록으로 오해 금지)', r.code === 500 && r.body.ok === false && !('items' in r.body), r.code + '/' + r.body.code);
+  mem.gw_data['allbaro:routes_hidden'] = { schema: 1, items: [] };
 }
 
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);
