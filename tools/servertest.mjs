@@ -1,5 +1,5 @@
 // gw-data 액션 단위 서버 테스트(P3) — Blobs·push·audit를 인메모리 mock으로 갈아끼우고 handler를 직접 호출.
-// 커버: 인증 게이트 / 프로토타입 키 우회 / 관리자 전용 / 낙관적 락 409 / leaves 비관리자 재구성 / 홍보AI 워커 제목 원형 라벨 영속(25, v320) / 관리자 등급 게이트·tier 변경(26, v321) / 문서함 휴지통(27, v321) / 기안 참조 ref 형식(28, v321) / 9/6 검증 반영 — 명시 등급 게이트·자기 변경 금지·LAST_PM 전면·스탬프 강제·부활 차단·누락 보존(29) /
+// 커버: 인증 게이트 / 프로토타입 키 우회 / 관리자 전용 / 낙관적 락 409 / leaves 비관리자 재구성 / 홍보AI 워커 제목 원형 라벨 영속(25, v320) / 관리자 등급 게이트·tier 변경(26, v321) / 문서함 휴지통(27, v321) / 기안 참조 ref 형식(28, v321) / 9/6 검증 반영 — 명시 등급 게이트·자기 변경 금지·LAST_PM 전면·스탬프 강제·부활 차단·누락 보존(29) / gw-allbaro 노선 지정 400자·운영부·노선 숨김(30, v323) /
 //       차량 관리자 필드 복원 / tpl·proof 입력 검증 / backup_put confirm 게이트 / bot_notify 키 검증
 // 실행: node tools/servertest.mjs
 import { createRequire } from 'module';
@@ -1372,6 +1372,81 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   T('R1: 직원의 낡은 사본(del:1 w4) 저장 → 부활 0 · \'대기\' 없음 · 등재 카드 없음', r.code === 200 && !wdoc('w4') && mem.gw_data['col:approvals'].items.length === nAppr && !mem.gw_data['col:approvals'].items.some((a) => a.ref === 'doc:w4'), wAll().map((x) => x.id).join(','));
   r = await call({ action: 'get', collection: 'documents' }, tokD, 'dev1');
   T('R1·S5 후 직원 get: w2(전원) 보이고 w6(관리자만)·w4(영구 삭제) 없음', r.code === 200 && docIds(r).indexOf('w2') >= 0 && docIds(r).indexOf('w6') < 0 && docIds(r).indexOf('w4') < 0, docIds(r));
+}
+
+// 30 gw-allbaro(v323, PM 9/7) — 노선 지정 품목 400자·상차지/하차지 120자(#10) · 노선 지정 운영부 허용(#13) · 노선 숨김 ab_route_hide(#9)
+//    같은 mock(blobs·audit) 위에서 gw-allbaro handler를 직접 호출. mock blobGet은 없는 키를 NOT_FOUND(ok:false)로 주므로(실 Blobs는 ok:true·data:null) 학습·숨김 blob을 빈 문서로 선시드.
+{
+  const gwab = require(join(FN, 'gw-allbaro.js'));
+  const OPS = { id: 'uops', name: '운영부원', admin: false, dept: '운영부', perms: {} };
+  const OTHER = { id: 'uoth', name: '타부서원', admin: false, dept: '관리부', perms: {} };
+  mem.gw_users['member:uops'] = OPS; mem.gw_users['member:uoth'] = OTHER;
+  mem.gw_users['member:uadmin'] = { id: 'uadmin', name: '관리자', admin: true, perms: {}, tier: 'pm' };
+  mem.gw_users['member:uwork'] = WORKER;
+  const tokO = issueSession(OPS).token, tokX = issueSession(OTHER).token;
+  mem.gw_data['allbaro:learned'] = { schema: 1, items: [] };
+  mem.gw_data['allbaro:routes_hidden'] = { schema: 1, items: [] };
+  const ab = async (body, tok, dev) => { const rr = await gwab.handler({ httpMethod: 'POST', headers: Object.assign({ authorization: tok ? 'Bearer ' + tok : '' }, dev ? { 'x-device-id': dev } : {}), body: JSON.stringify(body) }); return { code: rr.statusCode, body: JSON.parse(rr.body || '{}') }; };
+  const learned = () => mem.gw_data['allbaro:learned'].items;
+  const hidden = () => mem.gw_data['allbaro:routes_hidden'].items;
+  const LONG_ITEM = ('그 밖의 폐광물유[아스팔트유·그리스(grease)·방청유 및 ' + '기타폐광물유'.repeat(60)).slice(0, 200);
+  // #10 길이 상한
+  r = await ab({ action: 'ab_learn', from: '에코프로 씨엔지', to: '네이처(경주)', item: LONG_ITEM, side: 'L', row: 35 }, tokA);
+  T('ab_learn 품목 200자(관리자) → 200 · 저장 원문 그대로(200자) · route L35', LONG_ITEM.length === 200 && r.code === 200 && r.body.ok === true && r.body.route.side === 'L' && r.body.route.row === 35 && learned().length === 1 && learned()[0].item === LONG_ITEM && learned()[0].item.length === 200, r.code + '/' + r.body.code);
+  r = await ab({ action: 'ab_learn', from: '에코프로 씨엔지', to: '네이처(경주)', item: LONG_ITEM + ' ', side: 'L', row: 35 }, tokA);
+  T('같은 조합(공백 차이) 재지정 → 200 · 덮어씀(learned 1건 유지 — learnKey는 normItem 정규화)', r.code === 200 && learned().length === 1, r.code + '/' + learned().length);
+  r = await ab({ action: 'ab_learn', from: 'A', to: 'B', item: 'x'.repeat(401), side: 'L', row: 35 }, tokA);
+  T('ab_learn 품목 401자 → 400 STR_TOO_LONG', r.code === 400 && r.body.code === 'STR_TOO_LONG', r.code + '/' + r.body.code);
+  r = await ab({ action: 'ab_learn', from: 'x'.repeat(121), to: 'B', item: '', side: 'L', row: 35 }, tokA);
+  T('ab_learn 상차지 121자 → 400 STR_TOO_LONG', r.code === 400 && r.body.code === 'STR_TOO_LONG', r.code + '/' + r.body.code);
+  r = await ab({ action: 'ab_learn', from: 'x'.repeat(120), to: 'y'.repeat(120), item: 'z'.repeat(400), side: 'R', row: 8 }, tokA);
+  T('ab_learn 상·하차지 120자·품목 400자(상한 그대로) → 200', r.code === 200 && learned().length === 2, r.code + '/' + r.body.code);
+  // #13 운영부 허용
+  let audL = auditMock.logs.length;
+  r = await ab({ action: 'ab_learn', from: '운영부테스트', to: '네이처', item: '폐합성수지', side: 'L', row: 5 }, tokO, 'dev1');
+  T('ab_learn 운영부 직원 → 200 · 감사로그 노선지정 by 운영부원', r.code === 200 && learned().some((x) => x.from === '운영부테스트' && x.by === '운영부원') && auditMock.logs.slice(audL).some((l) => l.col === 'allbaro' && l.by === '운영부원' && l.ev[0].op === '노선지정'), r.code + '/' + r.body.code);
+  audL = auditMock.logs.length;
+  r = await ab({ action: 'ab_learn', from: '타부서테스트', to: '네이처', item: '폐합성수지', side: 'L', row: 5 }, tokX, 'dev1');
+  T('ab_learn 타 부서(관리부) 직원 → 403 FORBIDDEN · 저장 없음 · 감사로그 노선지정거부 by 타부서원', r.code === 403 && r.body.code === 'FORBIDDEN' && !learned().some((x) => x.from === '타부서테스트') && auditMock.logs.slice(audL).some((l) => l.col === 'allbaro' && l.by === '타부서원' && l.ev[0].op === '노선지정거부' && /관리부/.test(l.ev[0].t)), r.code + '/' + r.body.code);
+  r = await ab({ action: 'ab_learn', from: '무부서테스트', to: '네이처', item: '', side: 'L', row: 5 }, tokW, 'dev1');
+  T('ab_learn 부서 없는 직원 → 403 FORBIDDEN', r.code === 403 && r.body.code === 'FORBIDDEN', r.code + '/' + r.body.code);
+  r = await ab({ action: 'ab_learn', from: '미승인기기', to: '네이처', item: '', side: 'L', row: 5 }, tokO, 'devX');
+  T('ab_learn 운영부라도 미승인 기기 → 403 DEVICE_NOT_APPROVED', r.code === 403 && r.body.code === 'DEVICE_NOT_APPROVED', r.code + '/' + r.body.code);
+  // #9 노선 숨김
+  r = await ab({ action: 'ab_route_hide', side: 'L', row: 5, hide: true }, tokW, 'dev1');
+  T('ab_route_hide 직원 → 403 ADMIN_ONLY', r.code === 403 && r.body.code === 'ADMIN_ONLY', r.code + '/' + r.body.code);
+  r = await ab({ action: 'ab_route_hide', side: 'L', row: 5, hide: true }, tokO, 'dev1');
+  T('ab_route_hide 운영부 직원도 403 ADMIN_ONLY(숨김은 관리자 전용)', r.code === 403 && r.body.code === 'ADMIN_ONLY' && hidden().length === 0, r.code + '/' + r.body.code);
+  r = await ab({ action: 'ab_route_hide', side: 'L', row: 999, hide: true }, tokA);
+  T('ab_route_hide 없는 줄(L999) → 400 BAD_ROUTE', r.code === 400 && r.body.code === 'BAD_ROUTE', r.code + '/' + r.body.code);
+  r = await ab({ action: 'ab_route_hide', side: 'X', row: 5, hide: true }, tokA);
+  T('ab_route_hide 잘못된 side → 400 BAD_ROUTE', r.code === 400 && r.body.code === 'BAD_ROUTE', r.code + '/' + r.body.code);
+  r = await ab({ action: 'ab_route_hide', side: 'L', row: 5, hide: 'yes' }, tokA);
+  T('ab_route_hide hide가 불리언 아님 → 400 BAD_INPUT', r.code === 400 && r.body.code === 'BAD_INPUT', r.code + '/' + r.body.code);
+  audL = auditMock.logs.length;
+  r = await ab({ action: 'ab_route_hide', side: 'L', row: 5, hide: true }, tokA);
+  T('ab_route_hide 관리자 hide → 200 changed · 블롭 routes_hidden items [{side,row,by,ts}] · 감사로그 노선숨김 L5', r.code === 200 && r.body.hidden === true && r.body.changed === true && r.body.hidden_n === 1 && hidden().length === 1 && hidden()[0].side === 'L' && hidden()[0].row === 5 && hidden()[0].by === '관리자' && hidden()[0].ts > 0 && mem.gw_data['allbaro:routes_hidden'].schema === 1 && auditMock.logs.slice(audL).some((l) => l.col === 'allbaro' && l.by === '관리자' && l.ev[0].op === '노선숨김' && l.ev[0].id === 'L5'), JSON.stringify(r.body).slice(0, 160));
+  audL = auditMock.logs.length;
+  r = await ab({ action: 'ab_route_hide', side: 'L', row: 5, hide: true }, tokA);
+  T('같은 줄 다시 hide → 200 changed:false · 중복 없음 · 감사로그 추가 없음', r.code === 200 && r.body.changed === false && hidden().length === 1 && auditMock.logs.length === audL, JSON.stringify(r.body).slice(0, 120));
+  r = await ab({ action: 'ab_status' }, tokA);
+  { const rt = (r.body.routes || []).find((x) => x.side === 'L' && x.row === 5);
+    T('ab_status routes: L5 hidden:true·hidden_by 관리자 · 다른 줄 hidden 없음 · hidden_error false · 노선 수 그대로', r.code === 200 && rt && rt.hidden === true && rt.hidden_by === '관리자' && rt.hidden_ts > 0 && r.body.routes.filter((x) => x.hidden).length === 1 && r.body.hidden_error === false && r.body.routes.length === require(join(FN, '_lib/allbaro.js')).ROUTES.length, JSON.stringify(rt)); }
+  r = await ab({ action: 'ab_learn', from: '숨긴줄배정', to: '네이처', item: '폐합성수지', side: 'L', row: 5 }, tokA);
+  T('숨긴 줄에도 노선 지정 가능(배정은 소프트 숨김과 무관) → 200', r.code === 200 && learned().some((x) => x.from === '숨긴줄배정' && x.row === 5), r.code + '/' + r.body.code);
+  audL = auditMock.logs.length;
+  r = await ab({ action: 'ab_route_hide', side: 'L', row: 5, hide: false }, tokA);
+  T('unhide → 200 changed · 블롭 비움 · 감사로그 노선숨김해제', r.code === 200 && r.body.hidden === false && r.body.changed === true && hidden().length === 0 && auditMock.logs.slice(audL).some((l) => l.col === 'allbaro' && l.ev[0].op === '노선숨김해제' && l.ev[0].id === 'L5'), JSON.stringify(r.body).slice(0, 120));
+  r = await ab({ action: 'ab_status' }, tokA);
+  T('unhide 후 ab_status routes에 hidden 없음', r.code === 200 && !(r.body.routes || []).some((x) => x.hidden), '');
+  r = await ab({ action: 'ab_route_hide', side: 'L', row: 5, hide: false }, tokA);
+  T('이미 안 숨긴 줄 unhide → 200 changed:false', r.code === 200 && r.body.changed === false, JSON.stringify(r.body).slice(0, 120));
+  mem.gw_data['allbaro:routes_hidden'] = { schema: 1, items: [{ side: 'L', row: 5, by: '관리자', ts: 1 }, { side: 'R', row: 999, by: '옛줄', ts: 1 }] };
+  r = await ab({ action: 'ab_status' }, tokA);
+  T('ab_status: 노선표에 없는 숨김 잔재(R999)는 무시 · L5만 hidden', r.code === 200 && r.body.routes.filter((x) => x.hidden).length === 1 && r.body.routes.find((x) => x.hidden).row === 5, '');
+  delete mem.gw_data['allbaro:routes_hidden'];
+  r = await ab({ action: 'ab_status' }, tokA);
+  T('ab_status: 숨김 blob 읽기 실패(mock NOT_FOUND) → 200 유지 · hidden 없음 · hidden_error true(없음과 구분)', r.code === 200 && !(r.body.routes || []).some((x) => x.hidden) && r.body.hidden_error === true, JSON.stringify(r.body).slice(0, 120));
 }
 
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

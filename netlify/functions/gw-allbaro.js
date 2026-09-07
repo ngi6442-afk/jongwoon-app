@@ -25,6 +25,7 @@ function manualKey(day) { return `allbaro:manual:${day}`; }   // 담당자 수�
 const LEARNED_KEY = 'allbaro:learned';   // 사람이 지정한 (조합 → 양식 줄) 대응
 const PRESETS_KEY = 'allbaro:presets';   // 단골 노선 카드(회사 공용)
 const PRESETS_PREV_KEY = 'allbaro:presets:prev';   // 직전 단골 노선 1벌 — 통째 교체 실수 복구 근거(계약 B-major2)
+const HIDDEN_KEY = 'allbaro:routes_hidden';   // 관리자가 운반내역 표에서 숨긴 양식 줄(v323, PM 9/7 #9) — 소프트: 노선표 상수·집계·배정은 그대로
 const RE_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const RE_JOB = /^ab_[a-z0-9_-]{1,60}$/i;
 const RE_PRESET_ID = /^[A-Za-z0-9_-]{1,40}$/;
@@ -36,7 +37,9 @@ const DEFAULT_RUN_DAYS = 7; // 기본 수집 창(오늘 포함 최근 7일) — 
 const MAX_LEARNED = 500;        // 학습 지정 총 개수
 const MAX_MANUAL_ITEMS = 100;   // 하루 수동 입력 줄 수
 const MAX_PRESETS = 60;         // 단골 노선 카드 수
-const MAX_STR = 80;             // 상차지·하차지·품목 등 이름 길이
+const MAX_STR = 120;            // 상차지·하차지 등 이름 길이(v323: 80→120)
+const MAX_ITEM = 400;           // 품목 길이(v323, PM 9/7 #10) — 올바로 법정 품목명(예: '그 밖의 폐광물유[아스팔트유·그리스(grease)·방청유 및 …]')은 80자를 넘는다.
+                                // 저장은 원문 그대로 두고 비교(learnKey)는 normItem 정규화라 길이와 무관.
 const MAX_UNIT = 10;            // 단위 표기 길이
 const MAX_MEMO = 200;           // 비고 길이
 const MAX_N = 999;              // 하루 한 줄 회수 상한
@@ -75,8 +78,28 @@ ROUTE_LIST.forEach(function (r) {
 });
 function findRoute(side, row) { return ROUTE_INDEX[side + ':' + row] || null; }
 // UI [노선 지정] 목록용 — 양식 좌표(side,row)와 표시용 텍스트만. count_col 등 내부 열 정보는 내보내지 않는다.
-function routeList() {
-  return ROUTE_LIST.map(function (r) { return { side: r.side, row: r.row, from: r.from, to: r.to, item: r.item }; });
+// hidden = {'L:5': {by,ts}} — 숨긴 줄은 hidden:true(+hidden_by·hidden_ts)로 표기해 UI가 표에서 빼고 '숨긴 노선' 목록으로 보여준다(v323).
+function routeList(hidden) {
+  return ROUTE_LIST.map(function (r) {
+    const o = { side: r.side, row: r.row, from: r.from, to: r.to, item: r.item };
+    const h = hidden && hidden[r.side + ':' + r.row];
+    if (h) { o.hidden = true; o.hidden_by = String(h.by || ''); o.hidden_ts = Number(h.ts) || 0; }
+    return o;
+  });
+}
+// 숨김 blob → 사전(프로토타입 없음). 노선표에 없는 줄(과거 재정렬 잔재)은 버린다.
+function hiddenMap(doc) {
+  const m = Object.create(null);
+  const items = (doc && Array.isArray(doc.items)) ? doc.items : [];
+  items.forEach(function (h) {
+    if (!h) return;
+    const side = String(h.side || '').toUpperCase(), row = Number(h.row);
+    if (findRoute(side, row)) m[side + ':' + row] = { by: h.by, ts: h.ts };
+  });
+  return m;
+}
+function hiddenBrief(items) {
+  return items.map(function (h) { return { side: h.side, row: h.row, by: String(h.by || ''), ts: Number(h.ts) || 0 }; });
 }
 // 학습 지정 중복 판정 키 — 같은 (상차지,하차지,품목)이면 덮어쓴다.
 // 라이브러리 매칭(normName/normItem)과 '똑같은' 기준으로 비교한다(계약 B-crit). 공백만 지우면
@@ -91,6 +114,9 @@ function learnKey(from, to, item) {
 // 핸들러 진입 전에 세션·퇴사·기기승인을 이미 통과한 회원만 여기 온다. 운반일지 탭은 전 직원 공개이고
 // 별도 perms 키가 없으므로 게이트는 여기 한 곳뿐이다 — 누가 무엇을 바꿨는지는 appendAudit가 남긴다.
 function canEdit(member) { return !!(member && member.id); }
+// 노선 지정 권한(v323, PM 9/7 #13) — 관리자 또는 부서가 '운영부'(공무)인 회원. 앱 abCanLearn과 같은 조건(uismoke 대조).
+const LEARN_DEPT = '운영부';
+function canLearn(member) { return !!(member && member.id && (member.admin || String(member.dept || '') === LEARN_DEPT)); }
 
 // 미매칭 '건수' 합. aggregate의 unmatched=[{from,to,item,n}] — n이 비면 1건으로 센다(과소집계 방지).
 function unmatchedCount(list) {
@@ -159,12 +185,12 @@ async function handleStatus(st, R) {
   const wanted = [];
   for (let i = 0; i < STATUS_DAYS; i++) wanted.push(kstDate(-i));   // 오늘 → 13일 전
   const reads = await Promise.all(
-    [blobGet(st, 'allbaro:lastrun')].concat(wanted.map(function (day) { return blobGet(st, dayKey(day)); }))
+    [blobGet(st, 'allbaro:lastrun'), blobGet(st, HIDDEN_KEY)].concat(wanted.map(function (day) { return blobGet(st, dayKey(day)); }))
   );
-  const lr = reads[0];
+  const lr = reads[0], hr = reads[1];   // hr = 숨긴 노선(v323)
   const days = [];
   for (let i = 0; i < wanted.length; i++) {
-    const r = reads[i + 1];
+    const r = reads[i + 2];
     if (!r || !r.ok || !r.data) continue;   // 아직 수집 안 된 날은 목록에서 뺀다(0건과 구분되게)
     days.push({
       day: wanted[i],
@@ -177,7 +203,8 @@ async function handleStatus(st, R) {
     env_ready: envReady(),   // ID·PW 둘 다 있어야 수집 가능(값은 노출하지 않는다)
     lastrun: (lr && lr.ok && lr.data) ? lr.data : null,
     days: days,              // 최신 날짜부터
-    routes: routeList(),     // 미매칭 [노선 지정] 목록용 — UI가 노선표를 따로 들고 있으면 반드시 어긋난다
+    routes: routeList(hiddenMap(hr.ok ? hr.data : null)),   // 미매칭 [노선 지정] 목록용 — UI가 노선표를 따로 들고 있으면 반드시 어긋난다. 숨긴 줄은 hidden:true(v323)
+    hidden_error: !hr.ok,    // 숨김 blob 읽기 실패는 '숨긴 줄 없음'과 다르다 — UI가 표시(숨긴 줄이 잠시 다 보이는 쪽으로 실패)
     request_id: R,
   });
 }
@@ -218,14 +245,22 @@ async function handleDay(st, d, R) {
 }
 
 // 노선 지정(학습) — 미매칭 조합을 사람이 양식의 어느 줄인지 찍어준다. 다음 수집부터 그 줄로 간다.
-// 관리자·개발자가 아니어도 되지만(계약 B-2) 로그인·기기승인은 필수이고, 감사 로그에 남는다.
+// v323(PM 9/7 #13): 관리자 또는 운영부(공무) 회원만 — 그 외는 403 FORBIDDEN(거부도 감사 로그에 by 기록). 로그인·기기승인은 필수.
 async function handleLearn(st, c, d, R) {
   if (!canEdit(c.member)) return jr(403, { ok: false, code: 'NO_PERMISSION', request_id: R });
   const from = cleanStr(d.from), to = cleanStr(d.to), item = cleanStr(d.item);
   const side = cleanStr(d.side).toUpperCase();
   const row = Number(d.row);
+  if (!canLearn(c.member)) {
+    // 거부도 남긴다 — 누가 어느 조합을 지정하려 했는지. 기록 실패해도 응답은 403 그대로.
+    try {
+      await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'allbaro',
+        ev: [{ op: '노선지정거부', id: side + (Number.isInteger(row) ? row : ''), t: from + ' → ' + to + (item ? ' · ' + item : '') + ' · 부서 ' + String(c.member.dept || '(없음)') }] });
+    } catch (e) {}
+    return jr(403, { ok: false, code: 'FORBIDDEN', request_id: R });
+  }
   if (!from || !to) return jr(400, { ok: false, code: 'BAD_INPUT', request_id: R });
-  if (from.length > MAX_STR || to.length > MAX_STR || item.length > MAX_STR) return jr(400, { ok: false, code: 'STR_TOO_LONG', request_id: R });
+  if (from.length > MAX_STR || to.length > MAX_STR || item.length > MAX_ITEM) return jr(400, { ok: false, code: 'STR_TOO_LONG', request_id: R });
   // 노선표에 실재하는 줄만 — 없는 (side,row)를 학습시키면 그 조합이 영영 어디에도 안 실린다
   if ((side !== 'L' && side !== 'R') || !Number.isInteger(row)) return jr(400, { ok: false, code: 'BAD_ROUTE', request_id: R });
   const rt = findRoute(side, row);
@@ -280,7 +315,7 @@ function parseManualItems(raw) {
     if (pid && !RE_PRESET_ID.test(pid)) return { ok: false, code: 'BAD_ROUTE_ID' };
     const from = cleanStr(x.from), to = cleanStr(x.to), item = cleanStr(x.item), memo = cleanStr(x.memo);
     if (!from || !to) return { ok: false, code: 'BAD_ITEM' };
-    if (from.length > MAX_STR || to.length > MAX_STR || item.length > MAX_STR || memo.length > MAX_MEMO) return { ok: false, code: 'STR_TOO_LONG' };
+    if (from.length > MAX_STR || to.length > MAX_STR || item.length > MAX_ITEM || memo.length > MAX_MEMO) return { ok: false, code: 'STR_TOO_LONG' };
     const n = num0(x.n);
     // 회수는 정수만 — 2.5회 같은 값을 반올림해 저장하면 사람이 넣은 값과 일지가 달라진다(거부해 드러낸다)
     if (n === null || !Number.isInteger(n) || n > MAX_N) return { ok: false, code: 'BAD_N' };
@@ -349,7 +384,7 @@ function parsePresetItems(raw) {
     seen[id] = 1;
     const from = cleanStr(x.from), to = cleanStr(x.to), item = cleanStr(x.item), unit = cleanStr(x.unit);
     if (!from || !to) return { ok: false, code: 'BAD_ITEM' };
-    if (from.length > MAX_STR || to.length > MAX_STR || item.length > MAX_STR || unit.length > MAX_UNIT) return { ok: false, code: 'STR_TOO_LONG' };
+    if (from.length > MAX_STR || to.length > MAX_STR || item.length > MAX_ITEM || unit.length > MAX_UNIT) return { ok: false, code: 'STR_TOO_LONG' };
     out.push({ id: id, from: from, to: to, item: item, unit: unit });
   }
   return { ok: true, items: out };
@@ -394,6 +429,37 @@ async function handlePresetsPut(st, c, d, R) {
       ev: [{ op: '단골노선', id: 'presets', t: p.items.length + '개 저장' + rmNote }] });
   } catch (e) {}
   return jr(200, { ok: true, n: p.items.length, items: p.items, ts: doc.ts, request_id: R });
+}
+
+// 노선 숨김(v323, PM 9/7 #9) — 관리자가 운반내역 표에서 쓰지 않는 양식 줄을 뺀다. 소프트 숨김:
+// 노선표 상수·집계·학습 배정은 그대로이고 UI 표시만 빠진다. 숨긴 줄에 인계서가 배정되면 UI가 '숨김 해제 필요' 배지로 다시 드러낸다(데이터 손실 방지).
+// {side, row, hide:true|false}. 같은 상태 반복은 저장·감사 없이 200(changed:false) — 이중 탭·재시도 안전.
+async function handleRouteHide(st, c, d, R) {
+  if (!c.member.admin) return jr(403, { ok: false, code: 'ADMIN_ONLY', request_id: R });
+  if (typeof d.hide !== 'boolean') return jr(400, { ok: false, code: 'BAD_INPUT', request_id: R });
+  const side = cleanStr(d.side).toUpperCase();
+  const row = Number(d.row);
+  if ((side !== 'L' && side !== 'R') || !Number.isInteger(row)) return jr(400, { ok: false, code: 'BAD_ROUTE', request_id: R });
+  const rt = findRoute(side, row);
+  if (!rt) return jr(400, { ok: false, code: 'BAD_ROUTE', request_id: R });
+  const r = await blobGet(st, HIDDEN_KEY);
+  if (!r.ok) return jr(500, { ok: false, code: r.code, request_id: R });
+  const cur = (r.data && Array.isArray(r.data.items)) ? r.data.items.filter(Boolean) : [];
+  const same = function (h) { return String(h.side || '').toUpperCase() === side && Number(h.row) === row; };
+  const wasHidden = cur.some(same);
+  if (d.hide === wasHidden) {
+    return jr(200, { ok: true, side: side, row: row, hidden: wasHidden, changed: false, hidden_n: cur.length, hidden_list: hiddenBrief(cur), request_id: R });
+  }
+  const items = d.hide
+    ? cur.concat([{ side: side, row: row, by: c.member.name, bid: c.member.id, ts: Date.now() }])
+    : cur.filter(function (h) { return !same(h); });
+  const w = await blobSet(st, HIDDEN_KEY, { schema: 1, items: items, updated_at: Date.now() });
+  if (!w.ok) return jr(500, { ok: false, code: w.code, request_id: R });
+  try {
+    await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'allbaro',
+      ev: [{ op: d.hide ? '노선숨김' : '노선숨김해제', id: side + row, t: side + row + ' ' + rt.from + ' → ' + rt.to + ' · ' + rt.item }] });
+  } catch (e) {}
+  return jr(200, { ok: true, side: side, row: row, hidden: !!d.hide, changed: true, hidden_n: items.length, hidden_list: hiddenBrief(items), request_id: R });
 }
 
 // 수동 수집 — 관리자 또는 개발자만. 날짜는 정규식+달력 왕복 검증, 오늘−60일~오늘, 최대 14개.
@@ -503,6 +569,7 @@ async function handler(event) {
       case 'ab_run_now': return await handleRunNow(st, c, d, R);
       case 'ab_job': return await handleJob(st, d, R);
       case 'ab_learn': return await handleLearn(st, c, d, R);
+      case 'ab_route_hide': return await handleRouteHide(st, c, d, R);
       case 'ab_manual_get': return await handleManualGet(st, d, R);
       case 'ab_manual_put': return await handleManualPut(st, c, d, R);
       case 'ab_presets_get': return await handlePresetsGet(st, R);

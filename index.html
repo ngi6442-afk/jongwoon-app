@@ -1061,6 +1061,16 @@
       input.ab-qty{width:100%;margin-top:2px;}
       input.ab-bad{border-color:#B0332A;background:#FBE7E3;}
       select.ab-rsel{width:100%;margin-bottom:6px;}
+      /* v323: 빈 줄 토글·노선 숨김 */
+      .ab-secline .ab-toggle{float:right;font-size:12px;font-weight:500;color:var(--sub);display:inline-flex;align-items:center;gap:4px;cursor:pointer;margin-top:-1px;}
+      .ab-secline .ab-toggle input{margin:0;}
+      .ab-sheet .ab-hide-btn{font-size:10px;padding:1px 5px;border:1px solid var(--line);border-radius:6px;background:transparent;color:var(--sub);cursor:pointer;line-height:1.3;font-weight:500;vertical-align:middle;}
+      .ab-sheet .ab-hide-btn:hover{color:var(--text);border-color:var(--text);}
+      .ab-sheet tr.ab-row-hidden td{background:#FFF6DE;}
+      .ab-sheet .ab-need-unhide{display:block;font-size:10.5px;font-weight:700;color:#B0332A;margin-top:2px;}
+      .ab-hidden-line{font-size:12px;color:var(--sub);padding:8px 14px 0;}
+      .ab-hidden-list{font-size:12px;padding:4px 14px 0;}
+      .ab-hidden-list div{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:4px 0;border-bottom:1px dashed var(--line);}
     </style>
     <div class="dash-sec" style="margin-bottom:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
       <h2 style="margin:0;flex:1;min-width:120px;">운반일지 <span class="cnt" id="abHead"></span></h2>
@@ -2329,6 +2339,7 @@
     <button class="secondary" id="pushTestBtn" style="display:none;">📨 알림 테스트 보내기</button>
     <a href="./MANUAL.html" target="_blank" rel="noopener" style="display:block;text-align:center;font-size:13px;margin-top:6px;">📖 사용 안내</a>
     <button class="secondary" id="helpBtn">도움말</button>
+    <button class="secondary" id="memberLogoutBtn" style="display:none;">로그아웃</button>
   </div>
 </div>
 
@@ -2744,6 +2755,32 @@
       location.reload(); return;
     }
     if (typeof showMemberLogin === "function") showMemberLogin();
+  }
+  // ---- 로그아웃(v323, PM 9/7 #12) ----
+  // 토큰·회원·오프라인 부팅용 회원 캐시 제거 + 메모리 컬렉션 전부 비움(9/6 보안 리뷰: 로그아웃 뒤 이전 관리자의 배열이 남아 다음 로그인 화면에 비쳤다).
+  // 화면잠금 PIN(jw_lock_pin_<회원id>, 기기 해시)은 그대로 둔다 — 같은 사람이 다시 로그인하면 재세팅 없이 쓴다(lockLogout과 다른 점).
+  function clearSessionData(){
+    tasks = []; vehicles = []; receivables = []; licenses = []; duties = []; documents = []; contracts = []; leaves = [];
+    bids = []; onbids = []; quotes = []; promoItems = []; clients = []; myTodos = []; members = []; apprItems = []; myApprItems = []; fam = []; edu = [];
+    records = {};
+    abStatus = null; abDay = { day: "", data: null, loading: false, error: "" }; abPresets = { items: null, loading: false, saving: false, error: "" };
+    abManual = { day: "", items: [], loaded: false, timer: null, saving: false, dirty: false, savedTs: 0, bad: 0, err: "", errBad: false, pendingRender: false };
+    abLearnDone = {}; abLearnOpen = "";
+  }
+  function gwLogoutCore(){
+    try{ if (typeof abFlushManualSave === "function") abFlushManualSave(); }catch(e){}   // 밀린 운반일지 직접 추가 저장부터(요청은 이 시점 토큰으로 나간다)
+    setGwToken(null); curMemberObj = null;
+    try{ localStorage.removeItem("jw_member_cache"); }catch(e){}   // 오프라인 콜드스타트가 이전 회원으로 부팅하지 않게
+    clearSessionData();
+  }
+  function gwLogout(){
+    var m = curMember(); if (!m) return;
+    if (!confirm(m.name + "님, 로그아웃할까요?\n(이 기기의 화면잠금 PIN은 유지됩니다)")) return;
+    var pending = !!(abManual.dirty || abManual.timer || abManual.saving);   // 저장 요청이 나가는 중이면 리로드를 잠깐 미룬다
+    gwLogoutCore();
+    hideMemberLogin();
+    // 뒤에 그려진 지시·미수금이 반투명 로그인 모달에 비치지 않게 리로드 — 토큰이 없어 빈 화면 위 로그인만 뜬다(lockLogout과 같은 처리)
+    setTimeout(function(){ location.reload(); }, pending ? 1500 : 0);
   }
   // 기존 모듈의 GitHub Contents API 호출을 gw-data로 라우팅(모듈 코드 그대로 재사용)
   window.fetch = function(url, opts){
@@ -5074,7 +5111,8 @@
   });
   document.getElementById("memberPin").addEventListener("keydown", function(e){ if (e.key === "Enter") doMemberLogin(); });
   document.getElementById("devicesClose").addEventListener("click", function(){ document.getElementById("devicesBackdrop").classList.remove("show"); });
-  document.getElementById("devPendLogout").addEventListener("click", function(){ setGwToken(null); curMemberObj = null; document.getElementById("devicePendingBackdrop").classList.remove("show"); showMemberLogin(); });
+  document.getElementById("devPendLogout").addEventListener("click", function(){ gwLogoutCore(); document.getElementById("devicePendingBackdrop").classList.remove("show"); showMemberLogin(); });   // v323: 토큰·회원 제거 + 메모리 배열 비움(gwLogoutCore 공용)
+  document.getElementById("memberLogoutBtn").addEventListener("click", gwLogout);   // v323 로그아웃(PM 9/7 #12)
   document.getElementById("usersClose").addEventListener("click", function(){ document.getElementById("usersBackdrop").classList.remove("show"); });
   document.getElementById("userAddBtn").addEventListener("click", function(){ openMemberEdit(null); });
   document.getElementById("hrAddBtn").addEventListener("click", function(){ if (hrNewOpen){ hrCloseNew(); } else hrOpenNew(); });
@@ -15605,6 +15643,12 @@
   var abPresetEdit = false;     // 단골 노선 삭제 버튼 노출 토글
   var abPresetFormOpen = false;
   var abCardEls = {};           // route_id -> {card, n, q} — 카드 부분 갱신용(전체 재렌더는 입력 포커스를 깬다)
+  // v323(PM 9/7 #9): 운반내역 표의 빈 줄 처리 — ① 보는 사람 토글(그날 화면만, 이 기기 localStorage 기억) ② 관리자 노선 숨김(서버 allbaro:routes_hidden, 소프트)
+  var AB_HIDE_EMPTY_KEY = "jw_ab_hide_empty";
+  var abHideEmpty = false;
+  try{ abHideEmpty = localStorage.getItem(AB_HIDE_EMPTY_KEY) === "1"; }catch(e){}
+  var abHiddenOpen = false;     // '숨긴 노선 n개 · [보기]' 목록 펼침
+  var abHideBusy = false;
 
   // 양식 노선표(노선사전.json 69줄 임베드, 2026-08-24 배출자 가나다순 재정렬) — [노선 지정] 목록용.
   // 서버가 (side,row) 실재를 다시 검증하므로(BAD_ROUTE) 표가 어긋나면 조용히 통과하지 않고 오류로 드러난다.
@@ -15689,7 +15733,8 @@
         var r = src[i]; if (!r) continue;
         var side = String(r.side || r.s || ""), row = Number(r.row != null ? r.row : r.r);
         if ((side !== "L" && side !== "R") || !isFinite(row)) continue;
-        out.push({ s: side, r: row, f: String(r.from || r.f || ""), t: String(r.to || r.t || ""), i: String(r.item || r.i || "") });
+        out.push({ s: side, r: row, f: String(r.from || r.f || ""), t: String(r.to || r.t || ""), i: String(r.item || r.i || ""),
+          h: !!r.hidden, hb: String(r.hidden_by || ""), ht: Number(r.hidden_ts) || 0 });   // h=관리자가 표에서 숨긴 줄(v323, ab_status가 병합해 준다)
       }
       if (out.length) return out;
     }
@@ -15700,6 +15745,11 @@
     for (var i = 0; i < rs.length; i++){ if (rs[i].s === side && rs[i].r === row) return rs[i]; }
     return null;
   }
+  // 노선 지정 권한(v323 #13) — 관리자 또는 부서 '운영부'(공무). 서버 canLearn과 같은 조건(uismoke 대조). 그 외는 미매칭 목록만 보고 버튼 없음.
+  var AB_LEARN_DEPT = "운영부";
+  function abCanLearn(){ var m = curMember(); return !!(m && (m.admin || String(m.dept || "") === AB_LEARN_DEPT)); }
+  function abRowEmpty(c){ return !c || (abInt(c.n) === 0 && abInt(c.n_pending) === 0); }   // 회수가 빈 줄(잠정도 없음) — 토글·숨김의 '빈 줄' 기준
+  function abHiddenRoutes(){ return abRouteList().filter(function(r){ return r.h; }); }
 
   // 서버(blob 키·ab_status)가 KST 기준이라 클라이언트도 KST로 맞춘다.
   // 기기 시간대가 KST가 아니면 최신 행 날짜가 로컬 '오늘'보다 미래가 되어 조회가 막혔다.
@@ -15761,7 +15811,8 @@
     BAD_ITEM: "입력한 항목 형식이 올바르지 않습니다.",
     BAD_N: "회수는 0~999 정수만 입력할 수 있습니다.",
     BAD_QTY: "수량(톤)이 허용 범위를 벗어났습니다.",
-    STR_TOO_LONG: "상차지·하차지·품목은 각 80자, 비고는 200자까지 입력할 수 있습니다.",
+    STR_TOO_LONG: "상차지·하차지는 각 120자, 품목은 400자, 비고는 200자까지 입력할 수 있습니다.",
+    FORBIDDEN: "노선 지정은 관리자와 운영부(공무)만 할 수 있습니다.",
     TOO_MANY_ITEMS: "저장 한도를 넘었습니다 — 직접 추가는 하루 100건, 단골 노선은 60개까지입니다.",
     LEARN_FULL: "노선 지정이 한도(500건)에 도달했습니다 — 관리자에게 정리를 요청하세요.",
     CONFLICT: "다른 곳에서 먼저 저장돼 내용이 바뀌었습니다 — 새로고침해 최신 내용을 확인한 뒤 다시 저장하세요.",
@@ -15795,6 +15846,7 @@
       else if (res.status === 404) abStatus = { error: "백엔드 함수(gw-allbaro)가 아직 배포되지 않았습니다." };
       else abStatus = { error: abCodeText(res.body && res.body.code, (res.body && res.body.error) || ("HTTP " + res.status)) };
       renderAbHead(); renderAbFoot();
+      renderAbSheet();   // 노선표·숨김 표기(v323)는 status에서 오므로 표도 다시 그린다
     }).catch(function(){
       abStatusLoading = false;
       abStatus = { error: "네트워크 오류 — 연결 상태를 확인하세요." };
@@ -16145,19 +16197,22 @@
 
   // ---- 노선 지정(학습) ----
   function abRouteOptsHtml(){
-    var rs = abRouteList(), L = "", R = "", i, r, lab, o;
+    var rs = abRouteList(), L = "", R = "", H = "", i, r, lab, o;
     for (i = 0; i < rs.length; i++){
       r = rs[i];
       lab = r.s + r.r + " · " + r.f + " → " + r.t + " · " + r.i;
+      if (r.h){ H += '<option value="' + esc(r.s + "|" + r.r) + '">' + esc(lab) + ' (숨김)</option>'; continue; }   // 숨긴 줄은 맨 아래 — 배정은 가능(v323)
       o = '<option value="' + esc(r.s + "|" + r.r) + '">' + esc(lab) + '</option>';
       if (r.s === "L") L += o; else R += o;
     }
     return '<option value="">— 양식 줄 선택 —</option>' +
       (L ? '<optgroup label="왼쪽(L열)">' + L + '</optgroup>' : '') +
-      (R ? '<optgroup label="오른쪽(R열)">' + R + '</optgroup>' : '');
+      (R ? '<optgroup label="오른쪽(R열)">' + R + '</optgroup>' : '') +
+      (H ? '<optgroup label="숨긴 줄(표에서 뺌 — 배정은 가능)">' + H + '</optgroup>' : '');
   }
   function abLearnGo(key, val){
     if (abLearnBusy) return;
+    if (!abCanLearn()){ alert(AB_CODE_TEXT.FORBIDDEN); return; }   // v323 #13 — 서버도 같은 조건으로 403
     var list = abUnmatchedList(), u = null, i;
     for (i = 0; i < list.length; i++){ if (list[i].key === key) u = list[i]; }
     if (!u) return;
@@ -16185,6 +16240,65 @@
     }).catch(function(){
       abLearnBusy = false; renderAbSheet();
       alert("노선 지정을 저장하지 못했습니다(네트워크).");
+    });
+  }
+
+  // ---- 노선 숨김/복구(v323 #9, 관리자) — 서버 ab_route_hide. 소프트 숨김: 노선표·집계·배정은 그대로, 표에서만 뺀다 ----
+  function abRouteHide(side, row, hide){
+    if (abHideBusy) return;
+    if (!isAdmin()){ alert("노선 숨김은 관리자만 할 수 있습니다."); return; }
+    var rt = abRouteFind(side, row);
+    var lab = side + row + (rt ? " · " + rt.f + " → " + rt.t + " · " + rt.i : "");
+    if (hide && !confirm("이 줄을 운반내역 표에서 숨길까요?\n\n" + lab + "\n\n노선표·집계·배정은 그대로이고 표에서만 빠집니다. 인계서가 이 줄에 배정되면 '숨김 해제 필요'로 다시 나타납니다.\n표 아래 '숨긴 노선'에서 언제든 복구할 수 있습니다.")) return;
+    abHideBusy = true;
+    gwCall("gw-allbaro", { action: "ab_route_hide", side: side, row: row, hide: !!hide }).then(function(res){
+      abHideBusy = false;
+      if (res.status === 401){ onSessionInvalid(); return; }
+      if (res.status === 200 && res.body && res.body.ok !== false){
+        abApplyHidden(res.body.hidden_list);
+        renderAbSheet();
+        return;
+      }
+      alert(abErrText(res, hide ? "노선 숨김 실패" : "노선 복구 실패"));
+    }).catch(function(){ abHideBusy = false; alert("노선 숨김을 저장하지 못했습니다(네트워크)."); });
+  }
+  // 서버 응답의 숨김 목록을 abStatus.routes에 반영(status 재조회 없이 즉시 일치). routes가 없으면(구 서버·오류 상태) 재조회로 맞춘다.
+  function abApplyHidden(list){
+    if (!abStatus || !Array.isArray(abStatus.routes)){ abStatus = null; loadAbStatus(); return; }
+    var map = {}, i, h;
+    if (Array.isArray(list)) for (i = 0; i < list.length; i++){ h = list[i]; if (h) map[String(h.side || "").toUpperCase() + "|" + Number(h.row)] = h; }
+    for (i = 0; i < abStatus.routes.length; i++){
+      var r = abStatus.routes[i]; if (!r) continue;
+      h = map[String(r.side || "").toUpperCase() + "|" + Number(r.row)];
+      if (h){ r.hidden = true; r.hidden_by = String(h.by || ""); r.hidden_ts = Number(h.ts) || 0; }
+      else { delete r.hidden; delete r.hidden_by; delete r.hidden_ts; }
+    }
+    abStatus.hidden_error = false;
+  }
+  // 표 아래 '숨긴 노선 n개 · [보기]' — 누가·언제 + 관리자 [복구]. 숨김 blob을 못 읽었으면 그 사실을, 숨긴 줄이 없으면 빈 문자열.
+  function abHiddenListHtml(){
+    if (abStatus && abStatus.hidden_error) return '<div class="ab-hidden-line">숨긴 노선 목록을 읽지 못해 모든 줄을 표시합니다 — 새로고침 후에도 계속되면 관리자에게 알려주세요.</div>';
+    var hs = abHiddenRoutes(); if (!hs.length) return "";
+    var h = '<div class="ab-hidden-line">숨긴 노선 ' + hs.length + '개 · <button type="button" class="mini-btn" data-ab-hidden-toggle="1">' + (abHiddenOpen ? "닫기" : "보기") + '</button></div>';
+    if (abHiddenOpen){
+      h += '<div class="ab-hidden-list">';
+      hs.forEach(function(r){
+        h += '<div><b>' + esc(r.s + r.r) + '</b> ' + esc(r.f) + " → " + esc(r.t) + " · " + esc(r.i) +
+          '<span style="color:var(--sub);">' + esc((r.hb ? r.hb + " · " : "") + (r.ht ? abFmtTs(r.ht) : "")) + '</span>' +
+          (isAdmin() ? ' <button type="button" class="mini-btn" data-ab-unhide="' + esc(r.s + "|" + r.r) + '">복구</button>' : "") + '</div>';
+      });
+      h += '</div>';
+    }
+    return h;
+  }
+  // [빈 줄 숨기기] 체크박스 배선 — renderAbSheet의 로딩·본문 두 경로에서 같이 쓴다
+  function abBindHideToggle(host){
+    var chk = host ? host.querySelector("#abHideEmptyChk") : null;
+    if (!chk) return;
+    chk.addEventListener("change", function(){
+      abHideEmpty = !!chk.checked;
+      try{ localStorage.setItem(AB_HIDE_EMPTY_KEY, abHideEmpty ? "1" : "0"); }catch(e){}
+      renderAbSheet();
     });
   }
 
@@ -16284,35 +16398,45 @@
     }).catch(function(){ abApprBusy = false; alert("네트워크 오류 — 잠시 후 다시 시도해주세요."); });
   }
   // v322: 운반일지 엑셀 양식(운반내역 L·R 두 표: 행선지(상차지·하차지)·품목·회수). 회수 0은 빈칸, 잠정·품목확인은 작은 글씨로. 노선표에 없는 배정 줄은 그 열 끝에 덧붙인다.
+  // v323(PM 9/7 #9) 빈 줄 처리: ① abHideEmpty(보는 사람 토글)면 회수가 빈 줄을 그날 화면에서만 뺀다 ② 관리자가 숨긴 줄(r.h)은 빼되, 인계서가 배정돼 있으면
+  //   '숨김 해제 필요' 배지로 다시 드러낸다(데이터 손실 방지) ③ 관리자에겐 빈 줄마다 작은 [숨김] 버튼. 반환 {html, hiddenN(숨긴 줄 중 실제로 뺀 수), emptyN(토글로 뺀 수)}.
   function abSheetTableHtml(rl, rows){
-    var byKey = {}, extra = { L: [], R: [] }, i, c, k;
+    var byKey = {}, extra = { L: [], R: [] }, i, c, k, admin = isAdmin(), emptyN = 0, hiddenN = 0;
     for (i = 0; i < rows.length; i++){ c = rows[i]; if (!c || !c.route) continue; k = String(c.route.side || "") + "|" + c.route.row; byKey[k] = c; }
-    var seen = {};
-    function cellN(c){
-      if (!c) return '<td class="n"></td>';
+    function hideBtn(key){ return (admin && key) ? ' <button type="button" class="ab-hide-btn" data-ab-hide="' + esc(key) + '" title="이 줄을 운반내역 표에서 숨김(관리자) — 노선표·집계는 그대로">숨김</button>' : ""; }
+    function cellN(c, hideKey){
+      if (!c) return '<td class="n">' + hideBtn(hideKey) + '</td>';
       var n = abInt(c.n), sub = "";
       if (abInt(c.n_pending)) sub += "잠정 " + abInt(c.n_pending);
       if (c.weak) sub += (sub ? " · " : "") + "품목확인";
       if (abInt(c.qty_unknown)) sub += (sub ? " · " : "") + "단위미상";
-      return '<td class="n">' + (n ? n : "") + (sub ? '<span class="sub">' + esc(sub) + '</span>' : "") + '</td>';
+      return '<td class="n">' + (n ? n : "") + (sub ? '<span class="sub">' + esc(sub) + '</span>' : "") + ((!n && !sub) ? hideBtn(hideKey) : "") + '</td>';
     }
     function table(side){
       var t = '<table><colgroup><col class="c-loc"><col class="c-loc"><col class="c-item"><col class="c-n"></colgroup>' +
         '<thead><tr><th colspan="4">운반내역</th></tr><tr><th colspan="2">행선지</th><th rowspan="2">품 목</th><th rowspan="2">회수</th></tr><tr><th>상차지</th><th>하차지</th></tr></thead><tbody>';
       var list = rl.filter(function(r){ return r.s === side; }).sort(function(a, b){ return a.r - b.r; });
       for (var j = 0; j < list.length; j++){
-        var r = list[j], key = r.s + "|" + r.r, cc = byKey[key]; seen[key] = 1;
-        t += "<tr><td>" + esc(r.f) + "</td><td>" + esc(r.t) + "</td><td>" + esc(r.i) + "</td>" + cellN(cc) + "</tr>";
+        var r = list[j], key = r.s + "|" + r.r, cc = byKey[key], empty = abRowEmpty(cc);
+        if (r.h){
+          if (empty){ hiddenN++; continue; }   // 관리자가 숨긴 줄 — 인계서가 없으면 표에서 뺀다
+          // 숨긴 줄에 인계서가 배정됨 — 숨긴 채 두면 회수가 안 보이므로 드러내고 해제를 권한다
+          t += '<tr class="ab-row-hidden"><td>' + esc(r.f) + "</td><td>" + esc(r.t) + "</td><td>" + esc(r.i) +
+            '<span class="ab-need-unhide">숨김 해제 필요' + (admin ? ' <button type="button" class="ab-hide-btn" data-ab-unhide="' + esc(key) + '">해제</button>' : "") + '</span></td>' + cellN(cc, "") + "</tr>";
+          continue;
+        }
+        if (empty && abHideEmpty){ emptyN++; continue; }   // 보는 사람 토글 — 그날 화면에서만 뺀다(서버·집계 무관)
+        t += "<tr><td>" + esc(r.f) + "</td><td>" + esc(r.t) + "</td><td>" + esc(r.i) + "</td>" + cellN(cc, empty ? key : "") + "</tr>";
       }
       for (var e = 0; e < extra[side].length; e++){
         var x = extra[side][e];
-        t += '<tr><td>' + esc(x.from || "?") + "</td><td>" + esc(x.to || "?") + "</td><td>" + esc(x.item || "-") + ' <span class="ab-rowno">' + esc(String(x.route.side || "") + x.route.row) + "</span></td>" + cellN(x) + "</tr>";
+        t += '<tr><td>' + esc(x.from || "?") + "</td><td>" + esc(x.to || "?") + "</td><td>" + esc(x.item || "-") + ' <span class="ab-rowno">' + esc(String(x.route.side || "") + x.route.row) + "</span></td>" + cellN(x, "") + "</tr>";
       }
       return t + "</tbody></table>";
     }
     for (i = 0; i < rows.length; i++){ c = rows[i]; if (!c || !c.route) continue; k = String(c.route.side || "") + "|" + c.route.row;
       if (!rl.some(function(r){ return r.s + "|" + r.r === k; })){ var sd = (c.route.side === "R") ? "R" : "L"; extra[sd].push(c); } }
-    return '<div class="ab-sheet">' + table("L") + table("R") + "</div>";
+    return { html: '<div class="ab-sheet">' + table("L") + table("R") + "</div>", hiddenN: hiddenN, emptyN: emptyN };
   }
   function renderAbSheet(){
     var host = document.getElementById("abSheetCard");
@@ -16326,10 +16450,12 @@
       '<div class="ab-box"><div class="k">올바로 자동</div><div class="v" id="abSumAuto">' + t.autoN + '회</div></div>' +
       '<div class="ab-box"><div class="k">직접 추가</div><div class="v" id="abSumMan">' + t.manN + '회</div></div>' +
       '</div>';
-    h += '<div class="ab-secline">올바로 자동 · 조회 전용</div>';
+    h += '<div class="ab-secline">올바로 자동 · 조회 전용' +
+      '<label class="ab-toggle" title="회수가 빈 줄을 이 화면에서만 뺍니다(이 기기 기억)"><input type="checkbox" id="abHideEmptyChk"' + (abHideEmpty ? " checked" : "") + '> 빈 줄 숨기기</label></div>';   // v323 #9
     if (abDay.loading){
       h += '<div class="loading">불러오는 중…</div>';
       host.innerHTML = h;
+      abBindHideToggle(host);
       return;
     }
     if (abDay.error){
@@ -16339,7 +16465,10 @@
       if (!rows.length && !rl.length){
         h += '<div class="empty-line">이 날짜에 올바로로 들어온 인계서가 없습니다.</div>';
       } else if (rl.length){
-        h += abSheetTableHtml(rl, rows);   // v322: 엑셀 운반내역 양식(L·R 두 열 표) — PM 9/7
+        var sh = abSheetTableHtml(rl, rows);   // v322: 엑셀 운반내역 양식(L·R 두 열 표) — PM 9/7
+        h += sh.html;
+        if (sh.emptyN) h += '<div class="ab-hidden-line">빈 줄 ' + sh.emptyN + '개 생략(빈 줄 숨기기 켜짐)</div>';
+        h += abHiddenListHtml();   // 숨긴 노선 n개 · [보기]/[복구](v323)
       } else {
         rows.forEach(function(c){
           var rt = c.route || {};
@@ -16368,7 +16497,8 @@
         var unmN = 0;
         unm.forEach(function(u){ unmN += u.n; });
         h += '<div class="ab-pad" style="padding-top:8px;"><div class="ab-warn">' +
-          '<div class="ab-unm-head">⚠ 어느 줄에 넣을지 정해지지 않은 인계서 ' + unm.length + '종 · ' + unmN + '회</div>';
+          '<div class="ab-unm-head">⚠ 어느 줄에 넣을지 정해지지 않은 인계서 ' + unm.length + '종 · ' + unmN + '회' +
+          (abCanLearn() ? "" : ' <span style="font-weight:500;">· 노선 지정은 관리자·운영부(공무)가 합니다</span>') + '</div>';
         unm.forEach(function(u){
           var done = abLearnDone[u.key];
           h += '<div class="ab-unm-row">' + esc(u.from || "?") + " → " + esc(u.to || "?") +
@@ -16382,8 +16512,8 @@
               '<button class="mini-btn" data-ab-learn-ok="' + esc(u.key) + '"' + (abLearnBusy ? " disabled" : "") + '>' + (abLearnBusy ? "저장 중…" : "지정") + '</button> ' +
               '<button class="mini-btn" data-ab-learn-cancel="1">취소</button>' +
               '</div>';
-          } else {
-            h += '<div class="ab-unm-act"><button class="mini-btn" data-ab-learn="' + esc(u.key) + '">노선 지정</button></div>';
+          } else if (abCanLearn()){
+            h += '<div class="ab-unm-act"><button class="mini-btn" data-ab-learn="' + esc(u.key) + '">노선 지정</button></div>';   // v323 #13: 관리자·운영부만
           }
           h += '</div>';   // .ab-unm-row 닫기 — 안 닫으면 다음 줄이 앞줄 안으로 말려 들어간다
         });
@@ -16395,6 +16525,17 @@
     host.innerHTML = h;
     var apb = document.getElementById("abApprBtn");
     if (apb) apb.addEventListener("click", abApprSubmit);
+    // v323: 빈 줄 토글·노선 숨김/복구·숨긴 목록 펼침
+    abBindHideToggle(host);
+    Array.prototype.forEach.call(host.querySelectorAll("[data-ab-hide]"), function(b){
+      b.addEventListener("click", function(){ var p = b.getAttribute("data-ab-hide").split("|"); abRouteHide(p[0], Number(p[1]), true); });
+    });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-ab-unhide]"), function(b){
+      b.addEventListener("click", function(){ var p = b.getAttribute("data-ab-unhide").split("|"); abRouteHide(p[0], Number(p[1]), false); });
+    });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-ab-hidden-toggle]"), function(b){
+      b.addEventListener("click", function(){ abHiddenOpen = !abHiddenOpen; renderAbSheet(); });
+    });
     // 미매칭 버튼 배선
     Array.prototype.forEach.call(host.querySelectorAll("[data-ab-learn]"), function(b){
       b.addEventListener("click", function(){ abLearnOpen = b.getAttribute("data-ab-learn"); renderAbSheet(); });
@@ -16901,6 +17042,7 @@
     document.getElementById("memberPin").value = "";
     document.getElementById("memberUidBtn").style.display = cm ? "block" : "none";
     document.getElementById("memberPinBtn").style.display = cm ? "block" : "none";
+    document.getElementById("memberLogoutBtn").style.display = cm ? "block" : "none";   // v323: 로그인 상태에서만
     try{ document.getElementById("memberKeep").checked = !!localStorage.getItem(GW_TOKEN_KEY); }catch(e){}
     // 마지막 로그인 아이디 자동 채움 — 개인 기기 자동로그인의 출발점(대표 기기 자동실행 전제)
     try{ document.getElementById("memberUid").value = localStorage.getItem("jw_last_uid") || ""; }catch(e){}
