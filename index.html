@@ -2439,7 +2439,7 @@
     <span class="fld-label">직급</span>
     <select id="meRank"><option value="">- 선택 -</option><option value="대표">대표</option><option value="이사">이사</option><option value="부장">부장</option><option value="차장">차장</option><option value="과장">과장</option><option value="대리">대리</option><option value="주임">주임</option><option value="사원">사원</option></select>
     <span class="fld-label">부서</span>
-    <select id="meDept"><option value="">- 선택 -</option><option value="관리부">관리부</option><option value="운영부">운영부</option><option value="준설팀">준설팀</option><option value="폐기물팀">폐기물팀</option><option value="기술개발부">기술개발부</option></select>
+    <select id="meDept"><option value="">- 선택 -</option><option value="관리부">관리부</option><option value="기술개발부">기술개발부</option><option value="운영부">운영부</option><option value="준설팀">준설팀</option><option value="폐기물팀">폐기물팀</option></select>
     <span class="fld-label">생년월일</span>
     <input type="date" id="meBirth">
     <div style="font-size:12px;color:var(--sub);margin:-2px 2px 8px;">법정 주기 의무 중 나이로 갈리는 것 계산용 — 운수종사자 자격유지검사(65세↑ 3년·70세↑ 1년), 건설기계 조종사 정기적성검사(65세↑ 5년)</div>
@@ -2541,7 +2541,7 @@
   var ROLE_ORDER = ["개발자","대표","관리자","팀장","직원","현장직"];
   // 기술개발부 = 연구개발전담부서(KOITA 설립신고 2026-08-21). 신고서상 소속과 앱 소속이 다르면
   // 불시 확인 시 '연구원 겸직'으로 읽혀 인정취소 사유가 된다 — 앱 부서를 신고 내용에 맞춰 둔다.
-  var DEPT_LIST = ["관리부","운영부","준설팀","폐기물팀","기술개발부"];
+  var DEPT_LIST = ["관리부","기술개발부","운영부","준설팀","폐기물팀"];   // v325: 기술개발부를 관리부·운영부 사이로(PM 9/7)
 
   // ---- 체크리스트 정의 (JW-02-04-001 주기별 업무 체크리스트 — 구 JW-05-011. form 번호는 문서체계 v2 §5.1 대조표, v317) ----
   var GROUPS = [

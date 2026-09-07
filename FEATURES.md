@@ -1,6 +1,6 @@
 # 종운 그룹웨어 — 기능 대장 (사용자 매뉴얼 원천)
 
-> 살아있는 문서. 기능 추가·변경 시 이 파일을 함께 갱신한다. 기준: v324 (2026-09-07).
+> 살아있는 문서. 기능 추가·변경 시 이 파일을 함께 갱신한다. 기준: v325 (2026-09-07).
 > 세부 변경 이력은 git 커밋 메시지(한글) 참조.
 
 ## 1. 전체 구조
@@ -241,3 +241,6 @@ PM 지시 "문서함 일단 다 올리고 등재결재랑 공개범위 만들어
 ### v324 (9/7) — 숨긴 노선 → 운반일지 엑셀 동기화(PM 9/7 ㄱ)
 - **숨긴 노선 → 엑셀 동기화(PM 9/7 ㄱ, 후속)**: `ab_hidden_export {key}`(봇 전용 — 세션·기기승인 대신 `BIDS_INGEST_KEY`, body.key 또는 헤더 x-ingest-key, 길이 확인+timingSafeEqual, 불일치·누락 401 `BAD_INGEST_KEY`, env 미설정이면 닫힘) → `{ok, items:[{side,row}], n, updated_at}` 좌표만(by·bid·ts 없음, 노선표에 없는 잔재 제외, 블롭 읽기 실패 500). appdata `collectors/logsheet_daily.py`가 08:25 엑셀 생성 전 1회 호출(15초, 실패·형식 오류 시 경고+숨김 없이 전체 양식)해 숨긴 줄의 상·하차지·품목·회수 칸을 비워 **빈 줄로 남긴다**(양식 행 고정·40행 SUM·43행 광재 — 행 삭제 없음; 회수가 붙은 숨긴 줄은 그대로 = 앱 '숨김 해제 필요'와 같은 원칙). 새 secret 없음. servertest 절 31 (11건).
 - 검증: servertest 절 31 (11건, 387 통과)·uismoke 전 항목. appdata `hidden-sync` → main 병합(logsheet_daily.py fetch_hidden·parse_hidden, generate.py 빈 줄 처리, selftest 3건). sw v324.
+
+### v325 (9/7) — 부서 순서
+- 인사·직원 탭·부서 선택의 부서 순서를 관리부 → **기술개발부** → 운영부 → 준설팀 → 폐기물팀으로(PM 9/7 "기술개발부는 관리부와 운영부 사이에"). `DEPT_LIST`와 `#meDept` 옵션 순서 동일. 데이터 무변경. sw v325.
