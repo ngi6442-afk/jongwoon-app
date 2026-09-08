@@ -15722,7 +15722,8 @@
     {s:"R",r:35,f:"㈜SMC",t:"렘코㈜ 재활용1공장",i:"분진"},
     {s:"R",r:36,f:"TCC스틸",t:"성진kp",i:"폐수오니"},
     {s:"R",r:37,f:"TCC스틸",t:"포항그린",i:"폐수오니"},
-    {s:"R",r:38,f:"YK스틸",t:"스틸싸이클㈜",i:"EAFD"}
+    {s:"R",r:38,f:"YK스틸",t:"스틸싸이클㈜",i:"EAFD"},
+    {s:"R",r:39,f:"(주)포스코퓨처엠",t:"대화산업",i:"폐석회"}
   ];
   function abRouteList(){
     var d = abDay.data || {}, s = abStatus || {};
@@ -16150,7 +16151,7 @@
     return s;
   }
   function abUnmKey(u){ return String((u && u.from) || "") + "|" + String((u && u.to) || "") + "|" + String((u && u.item) || ""); }
-  var AB_REASON_TEXT = { NO_ROUTE: "노선표에 없음", AMBIGUOUS: "어느 줄인지 모호" };
+  var AB_REASON_TEXT = { NO_ROUTE: "노선표에 없음", AMBIGUOUS: "어느 줄인지 모호", ITEM_MISMATCH: "품목이 다름 — 같은 상·하차지 줄은 있음(노선 지정 또는 줄 추가)" };   // v326
   function abReasonText(r){
     var s = String(r || "");
     return AB_REASON_TEXT[s] || (s || "사유 미상");

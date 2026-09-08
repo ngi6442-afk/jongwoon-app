@@ -1483,4 +1483,28 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   mem.gw_data['allbaro:routes_hidden'] = { schema: 1, items: [] };
 }
 
+
+// ===== 32. 노선 매칭 규칙 v326(PM 9/8) — 품목 불일치는 후보 1개여도 미매칭(ITEM_MISMATCH), R39 폐석회 줄 =====
+{
+  const abLib = require(join(FN, '_lib/allbaro.js'));
+  const mx = (row) => abLib.matchRouteEx(row, {});
+  let d = mx({ from: '(주)포스코퓨처엠', to: '대화산업(주)', item: '폐석회(고상)' });
+  T('포스코퓨처엠→대화산업 폐석회 → R39(새 줄) 배정 · weak false', !!d.route && d.route.side === 'R' && d.route.row === 39 && d.weak === false && d.reason === null, JSON.stringify(d.route) + '/' + d.reason);
+  d = mx({ from: '(주)포스코퓨처엠', to: '대화산업(주)', item: '분진(고상)' });
+  T('같은 상·하차지 분진 → R14 그대로', !!d.route && d.route.row === 14 && d.reason === null, JSON.stringify(d.route));
+  d = mx({ from: '(주)티씨씨스틸', to: '(주)성진케이피인터내셔널(종합재활용업)', item: '폐석회(고상)' });
+  T('후보 1개(R36 폐수오니)인데 품목 다름 → 배정 없음 · ITEM_MISMATCH · 후보 동봉', d.route === null && d.reason === 'ITEM_MISMATCH' && d.weak === false && Array.isArray(d.candidates) && d.candidates.length === 1 && d.candidates[0].row === 36, JSON.stringify(d));
+  d = mx({ from: '(주)티씨씨스틸', to: '(주)성진케이피인터내셔널(종합재활용업)', item: '폐수처리오니(고상)' });
+  T('후보 1개 품목 일치 → R36 배정', !!d.route && d.route.row === 36 && d.reason === null && d.weak === false, JSON.stringify(d.route));
+  d = mx({ from: '주식회사포스코', to: '(주)피엔알', item: '전혀 다른 품목명' });
+  T('구내운송(품목칸=도착처, viaItem) 줄은 품목이 달라도 종전대로 배정 · weak false', !!d.route && d.route.side === 'R' && d.route.row === 9 && d.weak === false, JSON.stringify(d));
+  d = mx({ from: '없는배출자', to: '없는처리자', item: '분진' });
+  T('상·하차지 없음 → NO_ROUTE 그대로', d.route === null && d.reason === 'NO_ROUTE', d.reason);
+  const rs = abLib.ROUTES || [];
+  const keys = rs.map((r) => r.side + r.row);
+  T('ROUTES: R39 존재 · (side,row) 중복 없음 · R39 count_col 11', keys.includes('R39') && new Set(keys).size === keys.length && rs.find((r) => r.side === 'R' && r.row === 39).count_col === 11, keys.length + '/' + new Set(keys).size);
+  const src = fs.readFileSync(join(ROOT, 'index.html'), 'utf8');
+  T('앱 AB_ROUTES에 R39 폐석회 · 사유 문구 ITEM_MISMATCH 있음', /\{s:"R",r:39,f:"\(주\)포스코퓨처엠",t:"대화산업",i:"폐석회"\}/.test(src) && /ITEM_MISMATCH:\s*"품목이 다름/.test(src));
+}
+
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

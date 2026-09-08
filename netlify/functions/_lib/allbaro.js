@@ -103,6 +103,7 @@ const ROUTES = [
   { side: "R", row: 36, from: "TCC스틸", to: "성진kp", item: "폐수오니", count_col: 11 },
   { side: "R", row: 37, from: "TCC스틸", to: "포항그린", item: "폐수오니", count_col: 11 },
   { side: "R", row: 38, from: "YK스틸", to: "스틸싸이클㈜", item: "EAFD", count_col: 11 },
+  { side: "R", row: 39, from: "(주)포스코퓨처엠", to: "대화산업", item: "폐석회", count_col: 11 },   // v326(PM 9/8): 9/7 폐석회 별도 줄 — 양식 R39 빈 줄(SUM K5:K39 범위 안), 가나다 재정렬 없이 말미 추가
 ];
 
 // ---------- 별칭사전(별칭사전.json 11개 임베드, _설명 키 제외) ----------
@@ -396,7 +397,7 @@ function candBrief(list) {
 // 매칭 결과 상세. row는 {from,to,item} 또는 파싱된 인계서 행({emis,trtm,wasteName}).
 // opts = { vehicleType:'덤프'|'트랙터'…, vehicle:'차량번호', vehicles:[{no,type}], learned:[{from,to,item,side,row}] }
 // 반환 { route, weak, learned, reason, needVehicle, candidates }
-//   reason: null(배정됨) | 'NO_ROUTE'(상차지·하차지가 노선표에 없음) | 'AMBIGUOUS'(후보 여럿, 못 좁힘)
+//   reason: null(배정됨) | 'NO_ROUTE'(상차지·하차지가 노선표에 없음) | 'AMBIGUOUS'(후보 여럿, 못 좁힘) | 'ITEM_MISMATCH'(상·하차지 줄은 있으나 품목이 다름 — v326)
 //   weak  : 후보가 1개뿐이라 품목이 달라도 배정한 경우(사람이 눈으로 확인하라는 표시)
 function matchRouteEx(row, opts) {
   const src = row || {};
@@ -444,14 +445,16 @@ function matchRouteEx(row, opts) {
   });
 
   if (!cands.length) return miss('NO_ROUTE', false);
-  // 후보가 1개뿐이면 품목이 달라도 배정한다(안전) — 대신 weak로 표시한다.
-  if (cands.length === 1) return take(cands[0]);
+  // v326(PM 9/8 "별도 품목인데 왜 안 물어보고 배정했나"): 후보가 1개뿐이어도 품목이 다르면 배정하지 않는다 —
+  //   미매칭 'ITEM_MISMATCH'(후보 줄 동봉)로 드러내 [노선 지정]이나 줄 추가를 받는다. 종전 "후보 1개면 품목 달라도 배정+weak 표시"는
+  //   9/7 포스코퓨처엠→대화산업 폐석회가 분진 줄(R14)에 붙는 오배정을 낳았다. 구내운송(viaItem) 줄은 품목 비교가 성립하지 않으므로 종전대로 배정.
+  if (cands.length === 1) return (cands[0].viaItem || itemHit(rawItem, cands[0].nr.route.item)) ? take(cands[0]) : miss('ITEM_MISMATCH', false);
 
   // 후보 2개 이상 — 여기서부터는 '먼저 나온 줄'을 고르지 않는다.
   const itemPool = cands.filter((c) => c.viaItem || itemHit(rawItem, c.nr.route.item));
   if (itemPool.length === 1) return take(itemPool[0]);
   // 품목이 어느 후보와도 안 맞으면(itemPool 비었으면) 차량으로도 배정하지 않는다(A-minor1).
-  // 품목 불일치 허용은 후보 1개일 때만(위 cands.length===1 경로). 여기선 미매칭으로 드러낸다.
+  // 품목 불일치는 후보 수와 무관하게 미매칭(v326 — 후보 1개도 ITEM_MISMATCH).
   if (itemPool.length === 0) return miss('AMBIGUOUS', false);
   const pool = itemPool;
 
