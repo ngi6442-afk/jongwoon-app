@@ -11,7 +11,7 @@ const crypto = require('crypto');
 const { setupBlobContext, store, blobGet, blobSet } = require('./_lib/blobs');
 const { issueSession, verifyToken, bearer } = require('./_lib/session');
 const { appendAudit } = require('./_lib/audit');
-const { ROUTES, normName, normItem, mergeMonthCounts } = require('./_lib/allbaro');   // 노선표(양식 줄) + 이름·품목 정규화(learnKey를 라이브러리 매칭과 같은 기준으로) + 월 합산(혁신②)
+const { ROUTES, ROUTES_VER, normName, normItem, mergeMonthCounts, rematchDoc, dayMinus } = require('./_lib/allbaro');   // 노선표(양식 줄)·노선표 해시(v327) + 이름·품목 정규화(learnKey를 라이브러리 매칭과 같은 기준으로) + 월 합산(혁신②) + 일자 문서 재판정(v327)
 
 const DATA = 'gw_data';
 const USERS = 'gw_users';
@@ -33,6 +33,11 @@ const STATUS_DAYS = 14;   // 상태 카드에 보여줄 최근 일수
 const MAX_RUN_DAYS = 14;  // 한 번에 수집 요청 가능한 최대 날짜 수
 const RUN_BACK_DAYS = 60; // 소급 허용 한도(오늘−60일)
 const DEFAULT_RUN_DAYS = 7; // 기본 수집 창(오늘 포함 최근 7일) — 크론과 동일
+// 자동 재정렬(v327, PM 9/8) — 학습 저장 직후·노선표가 바뀐 뒤 읽는 자리에서 일자 문서를 다시 판정한다. 일반 함수 10초 한도 안에서 끝내야 하므로
+// 시간 가드를 두고, 넘치면 남은 날짜를 응답(left·stale_days)으로 드러낸다(조용히 반쯤만 하고 끝났다고 말하지 않는다).
+const REMATCH_BUDGET_MS = 6000;         // ab_learn 훅 — 요청 하나에서 재정렬에 쓰는 총 시간
+const STATUS_REMATCH_MAX = 7;           // ab_status 한 번에 재정렬하는 stale 날짜 상한(최근 14일을 병렬로 읽은 뒤 최신순) — 나머지는 stale_days
+const STATUS_REMATCH_BUDGET_MS = 4000;  // ab_status는 읽기 16건을 먼저 쓰므로 더 짧게
 // 2단계 상한(계약 B-2). 실사용 규모(노선 64줄·차량 수십 대)의 몇 배로 잡되, 무한 증식은 막는다.
 const MAX_LEARNED = 500;        // 학습 지정 총 개수
 const MAX_MANUAL_ITEMS = 100;   // 하루 수동 입력 줄 수
@@ -192,38 +197,116 @@ function defaultDays() {
   return out;
 }
 
+// 학습 훅 재정렬 창(v327) — 지정한 날짜부터 오늘까지(오름차순, 소급 한도 안). 날짜가 없거나 미래면 기본 수집 창(오늘 포함 최근 7일).
+function rematchWindow(day) {
+  const hi = kstDate(0), lo = kstDate(-RUN_BACK_DAYS);
+  if (!day || day > hi) return defaultDays();
+  const out = [];
+  for (let cur = (day < lo ? lo : day); cur <= hi && out.length <= RUN_BACK_DAYS; cur = dayMinus(cur, -1)) out.push(cur);
+  return out;
+}
+// 학습 사전 → 라이브러리용 목록. 읽기 실패는 null — 학습 없이 재정렬하면 사람이 찍어둔 배정이 풀리므로 호출부가 재정렬을 건너뛴다.
+function learnedItems(data) { return (data && Array.isArray(data.items)) ? data.items.filter(Boolean) : []; }
+async function readLearnedList(st) {
+  const r = await blobGet(st, LEARNED_KEY);
+  return r.ok ? learnedItems(r.data) : null;
+}
+
+// 재정렬 실행기(v327) — 날짜 블롭을 차례로 읽어 rematchDoc을 적용하고, 판정이 바뀌었거나 routes_ver가 다르면 저장한다.
+// learned = 학습 목록(호출부가 읽어 넘긴다). o = { docs:{day:doc}(이미 읽은 문서 — 재읽기 생략), budgetMs, why:'학습'|'노선표', by, bid }
+// 반환 { days:[처리한 날짜(집계가 있는 날만)], changed:판정이 바뀐 묶음 합, left:[시간 가드로 못 한 날짜], failed:[{day,code}], docs:{day:재정렬된 문서} }
+// 감사로그: 변경이 있었던 날짜만 '재정렬 <day> 변경 n건 (사유: 학습|노선표)' — 한 실행에 한 항목(ev 여러 줄).
+async function rematchDays(st, days, learned, o) {
+  const opt = o || {};
+  const budget = Number(opt.budgetMs) > 0 ? Number(opt.budgetMs) : REMATCH_BUDGET_MS;
+  const t0 = Date.now();
+  const out = { days: [], changed: 0, left: [], failed: [], docs: Object.create(null) };
+  const list = Array.isArray(days) ? days.slice() : [];
+  const ev = [];
+  for (let i = 0; i < list.length; i++) {
+    const day = list[i];
+    if (Date.now() - t0 > budget) { out.left = list.slice(i); break; }
+    let doc = opt.docs ? opt.docs[day] : undefined;
+    if (doc === undefined) {
+      const r = await blobGet(st, dayKey(day));
+      if (!r.ok) { out.failed.push({ day: day, code: r.code || 'READ_FAILED' }); continue; }
+      doc = r.data;
+    }
+    if (!doc) continue;   // 아직 수집 안 된 날
+    const res = rematchDoc(doc, { learned: learned });
+    if (!res.ok) { out.failed.push({ day: day, code: 'BAD_DOC' }); continue; }
+    if (res.changed > 0 || doc.routes_ver !== ROUTES_VER) {
+      const w = await blobSet(st, dayKey(day), res.doc);
+      if (!w.ok) { out.failed.push({ day: day, code: w.code || 'WRITE_FAILED' }); continue; }
+    }
+    out.days.push(day);
+    out.changed += res.changed;
+    out.docs[day] = res.doc;
+    if (res.changed > 0) ev.push({ op: '재정렬', id: day, t: '재정렬 ' + day + ' 변경 ' + res.changed + '건 (사유: ' + (opt.why || '노선표') + ')' });
+  }
+  if (ev.length) {
+    try { await appendAudit({ ts: Date.now(), by: opt.by || '자동재정렬', bid: opt.bid || '__system__', col: 'allbaro', ev: ev }); } catch (e) {}
+  }
+  return out;
+}
+
 // 현황 — UI 상태 카드용. 최근 14일 요약은 각 날짜 blob에서 병렬로 읽는다(10초 한도 안).
-async function handleStatus(st, R) {
+// v327: 읽은 문서의 routes_ver가 현재 노선표와 다르면(없으면) 그 자리에서 재정렬해 저장하고 재정렬된 값으로 답한다 — 최신순 최대 7일·시간 가드 안.
+// 못 한 날짜는 stale_days로 드러내 앱이 "열면 자동 정리"를 안내한다(ab_day가 처리). 학습 사전을 못 읽으면 재정렬하지 않는다(학습 배정이 풀리는 쪽으로 실패 금지).
+async function handleStatus(st, c, R) {
   const wanted = [];
   for (let i = 0; i < STATUS_DAYS; i++) wanted.push(kstDate(-i));   // 오늘 → 13일 전
   const reads = await Promise.all(
     [blobGet(st, 'allbaro:lastrun'), blobGet(st, HIDDEN_KEY)].concat(wanted.map(function (day) { return blobGet(st, dayKey(day)); }))
   );
   const lr = reads[0], hr = reads[1];   // hr = 숨긴 노선(v323)
-  const days = [];
+  const docs = Object.create(null);
+  const stale = [];
   for (let i = 0; i < wanted.length; i++) {
     const r = reads[i + 2];
     if (!r || !r.ok || !r.data) continue;   // 아직 수집 안 된 날은 목록에서 뺀다(0건과 구분되게)
+    docs[wanted[i]] = r.data;
+    if (r.data.routes_ver !== ROUTES_VER) stale.push(wanted[i]);
+  }
+  let staleDays = stale;
+  let rematched = null;
+  if (stale.length) {
+    const learned = await readLearnedList(st);
+    if (learned !== null) {
+      const rd = await rematchDays(st, stale.slice(0, STATUS_REMATCH_MAX), learned,
+        { docs: docs, budgetMs: STATUS_REMATCH_BUDGET_MS, why: '노선표', by: c.member.name, bid: c.member.id });
+      rd.days.forEach(function (day) { docs[day] = rd.docs[day]; });
+      rematched = { days: rd.days, changed: rd.changed, left: rd.left };
+      staleDays = stale.filter(function (day) { return rd.days.indexOf(day) < 0; });
+    }
+  }
+  const days = [];
+  for (let i = 0; i < wanted.length; i++) {
+    const doc = docs[wanted[i]];
+    if (!doc) continue;
     days.push({
       day: wanted[i],
-      total: Number(r.data.total) || 0,
-      unmatched_n: unmatchedCount(r.data.unmatched),
+      total: Number(doc.total) || 0,
+      unmatched_n: unmatchedCount(doc.unmatched),
     });
   }
-  return jr(200, {
+  const body = {
     ok: true,
     env_ready: envReady(),   // ID·PW 둘 다 있어야 수집 가능(값은 노출하지 않는다)
     lastrun: (lr && lr.ok && lr.data) ? lr.data : null,
     days: days,              // 최신 날짜부터
     routes: routeList(hiddenMap(hr.ok ? hr.data : null)),   // 미매칭 [노선 지정] 목록용 — UI가 노선표를 따로 들고 있으면 반드시 어긋난다. 숨긴 줄은 hidden:true(v323)
     hidden_error: !hr.ok,    // 숨김 blob 읽기 실패는 '숨긴 줄 없음'과 다르다 — UI가 표시(숨긴 줄이 잠시 다 보이는 쪽으로 실패)
+    stale_days: staleDays,   // v327: 노선표 변경 뒤 아직 재정렬 못 한 날짜(최신순) — 앱이 안내, 열면 ab_day가 정리
     request_id: R,
-  });
+  };
+  if (rematched) body.rematched = rematched;
+  return jr(200, body);
 }
 
 // 날짜 상세 — blob allbaro:day:<YYYY-MM-DD> 그대로 + 그날 수동분 + 학습 건수(계약 B-2).
 // 조회 전용이라 권한 게이트 없음(전 직원). UI가 일지 한 장을 한 번의 왕복으로 그리게 한다.
-async function handleDay(st, d, R) {
+async function handleDay(st, c, d, R) {
   const day = cleanStr(d.day);
   if (!RE_DATE.test(day) || !validDay(day)) return jr(400, { ok: false, code: 'BAD_DAY', request_id: R });
   const reads = await Promise.all([blobGet(st, dayKey(day)), blobGet(st, manualKey(day)), blobGet(st, LEARNED_KEY)]);
@@ -253,7 +336,18 @@ async function handleDay(st, d, R) {
     // 수동분을 못 읽었으면 '아무것도 없다'고 단정할 수 없다 → 404 대신 읽기 실패를 드러낸다.
     return jr(500, { ok: false, code: mr.code, request_id: R });
   }
-  return jr(200, Object.assign({ ok: true, request_id: R }, r.data, { collected: true }, extra));
+  // v327: 노선표가 바뀐 뒤 집계된 문서(routes_ver 불일치·없음)는 여기서 재정렬해 저장하고 재정렬된 문서로 답한다(단일 날짜라 항상 처리).
+  // 학습 사전을 못 읽었으면(lr.ok false) 재정렬하지 않고 stale:true로 드러낸다 — 학습 배정이 풀린 문서를 저장하는 쪽으로 실패하지 않는다.
+  let doc = r.data;
+  if (doc.routes_ver !== ROUTES_VER) {
+    if (lr.ok) {
+      const docs = Object.create(null); docs[day] = doc;
+      const rd = await rematchDays(st, [day], learnedItems(lr.data), { docs: docs, why: '노선표', by: c.member.name, bid: c.member.id });
+      if (rd.docs[day]) { doc = rd.docs[day]; extra.rematched = { changed: rd.changed }; }
+      else extra.stale = true;
+    } else extra.stale = true;
+  }
+  return jr(200, Object.assign({ ok: true, request_id: R }, doc, { collected: true }, extra));
 }
 
 // 노선 지정(학습) — 미매칭 조합을 사람이 양식의 어느 줄인지 찍어준다. 다음 수집부터 그 줄로 간다.
@@ -277,6 +371,9 @@ async function handleLearn(st, c, d, R) {
   if ((side !== 'L' && side !== 'R') || !Number.isInteger(row)) return jr(400, { ok: false, code: 'BAD_ROUTE', request_id: R });
   const rt = findRoute(side, row);
   if (!rt) return jr(400, { ok: false, code: 'BAD_ROUTE', request_id: R });
+  // v327: 재정렬 시작 날짜(선택) — 앱이 보고 있던 날짜. 형식이 틀리면 학습을 저장하기 전에 거부한다(반쯤 적용 금지).
+  const day = cleanStr(d.day);
+  if (day && (!RE_DATE.test(day) || !validDay(day))) return jr(400, { ok: false, code: 'BAD_DAY', request_id: R });
 
   const r = await blobGet(st, LEARNED_KEY);
   if (!r.ok) return jr(500, { ok: false, code: r.code, request_id: R });
@@ -310,8 +407,13 @@ async function handleLearn(st, c, d, R) {
     await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'allbaro',
       ev: [{ op: '노선지정', id: side + row, t: from + ' → ' + to + (item ? ' · ' + item : '') + ' ⇒ ' + side + row + ' ' + rt.item + prevNote }] });
   } catch (e) {}
+  // v327(PM 9/8): 학습 저장 직후 같은 요청 안에서 기록을 재정렬 — 사람이 [수동 수집]을 다시 누르지 않아도 그날 화면이 바로 바뀐다.
+  // 지정한 날짜부터 오늘까지(없으면 최근 7일). 시간 가드에 걸려 남은 날짜는 left로 돌려주고, 그 날짜는 현황(ab_status)·열 때(ab_day)에서 마저 정리된다.
+  const rd = await rematchDays(st, rematchWindow(day), items, { why: '학습', by: c.member.name, bid: c.member.id });
   const out = { ok: true, learned_n: items.length, route: { side: rt.side, row: rt.row, from: rt.from, to: rt.to, item: rt.item }, request_id: R };
   if (previous) out.previous = previous;   // UI가 '다른 줄을 덮었다'를 사람에게 확인시키게
+  out.rematched = { days: rd.days, changed: rd.changed, left: rd.left };
+  if (rd.failed.length) out.rematched.failed = rd.failed;   // 읽기·쓰기 실패 날짜 — 조용히 빼지 않는다
   return jr(200, out);
 }
 
@@ -594,8 +696,8 @@ async function handler(event) {
   const st = store(DATA);
   try {
     switch (d && d.action) {
-      case 'ab_status': return await handleStatus(st, R);
-      case 'ab_day': return await handleDay(st, d, R);
+      case 'ab_status': return await handleStatus(st, c, R);
+      case 'ab_day': return await handleDay(st, c, d, R);
       case 'ab_xlsx': return await handleXlsx(st, d, R);
       case 'ab_month': return await handleMonth(st, d, R);
       case 'ab_run_now': return await handleRunNow(st, c, d, R);
@@ -615,3 +717,4 @@ async function handler(event) {
 }
 
 exports.handler = handler;
+exports.rematchDays = rematchDays;   // 테스트용(servertest 절 33 시간 가드) — Netlify는 handler만 본다

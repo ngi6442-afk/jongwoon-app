@@ -1,5 +1,5 @@
 // gw-data 액션 단위 서버 테스트(P3) — Blobs·push·audit를 인메모리 mock으로 갈아끼우고 handler를 직접 호출.
-// 커버: 인증 게이트 / 프로토타입 키 우회 / 관리자 전용 / 낙관적 락 409 / leaves 비관리자 재구성 / 홍보AI 워커 제목 원형 라벨 영속(25, v320) / 관리자 등급 게이트·tier 변경(26, v321) / 문서함 휴지통(27, v321) / 기안 참조 ref 형식(28, v321) / 9/6 검증 반영 — 명시 등급 게이트·자기 변경 금지·LAST_PM 전면·스탬프 강제·부활 차단·누락 보존(29) / gw-allbaro 노선 지정 400자·운영부·노선 숨김(30, v323) / ab_hidden_export 봇 키 내보내기(31, v323 후속) /
+// 커버: 인증 게이트 / 프로토타입 키 우회 / 관리자 전용 / 낙관적 락 409 / leaves 비관리자 재구성 / 홍보AI 워커 제목 원형 라벨 영속(25, v320) / 관리자 등급 게이트·tier 변경(26, v321) / 문서함 휴지통(27, v321) / 기안 참조 ref 형식(28, v321) / 9/6 검증 반영 — 명시 등급 게이트·자기 변경 금지·LAST_PM 전면·스탬프 강제·부활 차단·누락 보존(29) / gw-allbaro 노선 지정 400자·운영부·노선 숨김(30, v323) / ab_hidden_export 봇 키 내보내기(31, v323 후속) / 운반일지 자동 재정렬 rematch(33, v327) /
 //       차량 관리자 필드 복원 / tpl·proof 입력 검증 / backup_put confirm 게이트 / bot_notify 키 검증
 // 실행: node tools/servertest.mjs
 import { createRequire } from 'module';
@@ -17,10 +17,11 @@ process.env.URL = 'https://test.local';
 const mem = {};   // mem[store][key] = data
 // store()는 이름으로 좌표되는 객체(toString=이름) — gw-auth listMembers가 st.list({prefix})를 직접 부르므로(v321 등급 테스트) list도 흉내낸다. mem[st]는 toString으로 좌표된다
 const blobsMock = {
+  hooks: { beforeGet: null, beforeSet: null },   // 절 33(v327) — 느린 읽기(시간 가드)·저장 횟수 검증용 훅. 없으면 무동작
   setupBlobContext() {},
   store(n) { mem[n] = mem[n] || {}; return { name: n, toString() { return n; }, async list(o) { const pre = (o && o.prefix) || ''; return { blobs: Object.keys(mem[n] || {}).filter((k) => k.indexOf(pre) === 0).map((k) => ({ key: k })) }; } }; },
-  async blobGet(st, k) { const s = mem[st] || {}; return (k in s) ? { ok: true, data: JSON.parse(JSON.stringify(s[k])) } : { ok: false, code: 'NOT_FOUND' }; },   // 실 Blobs처럼 get마다 새 객체(JSON 파싱) — 핸들러가 저장 전 객체를 손대도 mem에 반영되지 않는다(9/6: 거부 응답 뒤 "저장 없음" 검증의 전제)
-  async blobSet(st, k, v) { mem[st] = mem[st] || {}; if (v === null) delete mem[st][k]; else mem[st][k] = JSON.parse(JSON.stringify(v)); return { ok: true }; },
+  async blobGet(st, k) { if (blobsMock.hooks.beforeGet) await blobsMock.hooks.beforeGet(k); const s = mem[st] || {}; return (k in s) ? { ok: true, data: JSON.parse(JSON.stringify(s[k])) } : { ok: false, code: 'NOT_FOUND' }; },   // 실 Blobs처럼 get마다 새 객체(JSON 파싱) — 핸들러가 저장 전 객체를 손대도 mem에 반영되지 않는다(9/6: 거부 응답 뒤 "저장 없음" 검증의 전제)
+  async blobSet(st, k, v) { if (blobsMock.hooks.beforeSet) await blobsMock.hooks.beforeSet(k); mem[st] = mem[st] || {}; if (v === null) delete mem[st][k]; else mem[st][k] = JSON.parse(JSON.stringify(v)); return { ok: true }; },
   async blobDelete(st, k) { if (mem[st]) delete mem[st][k]; return { ok: true }; },
   async blobList(st) { return { ok: true, keys: Object.keys(mem[st] || {}) }; },
 };
@@ -1505,6 +1506,123 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   T('ROUTES: R39 존재 · (side,row) 중복 없음 · R39 count_col 11', keys.includes('R39') && new Set(keys).size === keys.length && rs.find((r) => r.side === 'R' && r.row === 39).count_col === 11, keys.length + '/' + new Set(keys).size);
   const src = require('fs').readFileSync(join(ROOT, 'index.html'), 'utf8');
   T('앱 AB_ROUTES에 R39 폐석회 · 사유 문구 ITEM_MISMATCH 있음', /\{s:"R",r:39,f:"\(주\)포스코퓨처엠",t:"대화산업",i:"폐석회"\}/.test(src) && /ITEM_MISMATCH:\s*"품목이 다름/.test(src));
+}
+
+// ===== 33. 운반일지 자동 재정렬 v327(PM 9/8 "학습시키거나 노선표가 바뀌면 사람이 수동 수집을 안 눌러도 기록이 스스로 재정렬") =====
+//    (a) 옛 규칙 day 블롭 → ab_day가 그 자리에서 재정렬(R14 분진→R39·routes_ver·n/qty/total 불변·감사) (b) ab_learn(day) → 그날 묶음이 학습 줄로·rematched.changed≥1
+//    (c) 학습 없는 다른 묶음 불변 (d) 차량 분리 묶음(vehicle_type)은 같은 줄·차량 미상은 종전 줄 유지 없이 미매칭 (e) 숨긴 노선·직접 추가 블롭 무변경
+//    (f) 시간 가드(느린 blobGet) left 반환 (g) routes_ver 같으면 저장 0 · 학습 못 읽으면 stale·저장 0 · ab_status 7일 상한·stale_days · BAD_DAY · 순수 함수
+{
+  const gwab = require(join(FN, 'gw-allbaro.js'));
+  const abLib = require(join(FN, '_lib/allbaro.js'));
+  const ab = async (body, tok, dev) => { const rr = await gwab.handler({ httpMethod: 'POST', headers: Object.assign({ authorization: tok ? 'Bearer ' + tok : '' }, dev ? { 'x-device-id': dev } : {}), body: JSON.stringify(body) }); return { code: rr.statusCode, body: JSON.parse(rr.body || '{}') }; };
+  const VER = abLib.ROUTES_VER;
+  const kst = (n) => new Date(Date.now() + 9 * 3600000 + n * 86400000).toISOString().slice(0, 10);
+  const D = kst(-1);   // 어제(학습 대상 날짜)
+  const dk = (day) => 'allbaro:day:' + day;
+  const expectVer = require('crypto').createHash('sha1').update(abLib.ROUTES.map((r) => [r.side, r.row, r.from, r.to, r.item].join('\u0001')).join('\n'), 'utf8').digest('hex').slice(0, 12);
+  T('ROUTES_VER = side/row/from/to/item 이어붙인 sha1 앞 12자(노선표 바뀌면 값이 바뀐다)', typeof VER === 'string' && /^[0-9a-f]{12}$/.test(VER) && VER === expectVer, VER + '/' + expectVer);
+  mem.gw_data['allbaro:learned'] = { schema: 1, items: [] };
+  mem.gw_data['allbaro:routes_hidden'] = { schema: 1, items: [{ side: 'L', row: 5, by: '관리자', bid: 'uadmin', ts: 1 }] };
+  mem.gw_data['allbaro:manual:' + D] = { schema: 1, day: D, items: [{ route_id: '', from: '수동상차', to: '수동하차', item: '', n: 1, qty_ton: 0, memo: '' }], by: '관리자', bid: 'uadmin', ts: 5 };
+  const hiddenBefore = JSON.stringify(mem.gw_data['allbaro:routes_hidden']), manualBefore = JSON.stringify(mem.gw_data['allbaro:manual:' + D]);
+  const B = (from, to, item, n, qty, route, extra) => Object.assign({ from: from, to: to, item: item, n: n, manf_nums: Array.from({ length: n }, (_, i) => 'M' + i), qty_ton: qty, qty_unknown: 0, qty_src: 'tran', n_pending: 0, route: route, weak: false }, extra || {});
+  const TCC = ['(주)티씨씨스틸', '(주)성진케이피인터내셔널(종합재활용업)', '폐석회(고상)'];
+  const oldDoc = (day) => ({ schema: 2, day: day || D, total: 7, total_qty_ton: 61.5, qty_unknown: 0,
+    counts: [
+      B('(주)포스코퓨처엠', '대화산업(주)', '폐석회(고상)', 2, 20.5, { side: 'R', row: 14, count_col: 11, item: '분진' }, { weak: true }),   // v325 이전 규칙 — 후보 1개라 분진 줄에 배정+weak(9/7 실사고)
+      B('(주)포스코퓨처엠', '대화산업(주)', '분진(고상)', 1, 10, { side: 'R', row: 14, count_col: 11, item: '분진' }),
+      B(TCC[0], TCC[1], TCC[2], 1, 5, null, { reason: 'ITEM_MISMATCH', candidates: [{ side: 'R', row: 36, item: '폐수오니' }] }),
+      B('(주)태웅제강', '(주)스틸싸이클', '분진(고상)', 2, 16, { side: 'R', row: 7, count_col: 11, item: 'EAFD(덤프)' }, { vehicle_type: '덤프' }),
+      B('(주)태웅제강', '(주)스틸싸이클', '분진(고상)', 1, 10, { side: 'R', row: 6, count_col: 11, item: 'EAFD (BCT차량)' }, { vehicle_type: '트랙터' }),
+    ],
+    unmatched: [{ from: TCC[0], to: TCC[1], item: TCC[2], n: 1, reason: 'ITEM_MISMATCH', candidates: [{ side: 'R', row: 36, item: '폐수오니' }] }],
+    excluded: [{ manf: 'X1', from: 'a', to: 'b', item: 'c', why: '타사 운반(x)', state: '운반중' }],
+    pending: [{ manf: 'P1', from: 'a', to: 'b', item: 'c', state: '운반중' }],
+    veh_totals: [{ no: '82수1234', n: 7, ton: 61.5, ton_unknown: 0 }], ts: 1, job: 'ab_run_old' });
+  const curDoc = (day) => ({ schema: 2, day: day, total: 0, total_qty_ton: 0, qty_unknown: 0, counts: [], unmatched: [], excluded: [], pending: [], veh_totals: [], routes_ver: VER, ts: 1, job: 'ab_run_cur' });
+  const find = (doc, from, item, vt) => (doc.counts || []).find((c) => c.from === from && c.item === item && (vt === undefined || c.vehicle_type === vt));
+  const keep = (doc) => JSON.stringify([doc.total, doc.total_qty_ton, doc.qty_unknown, doc.excluded, doc.pending, doc.veh_totals, (doc.counts || []).map((c) => JSON.stringify([c.from, c.to, c.item, c.n, c.qty_ton, c.qty_unknown, c.qty_src, c.n_pending, c.manf_nums, c.vehicle_type || null])).sort()]);
+  const keepBefore = keep(oldDoc());
+  let sets = 0;
+  blobsMock.hooks.beforeSet = (k) => { if (String(k).indexOf('allbaro:day:') === 0) sets++; };
+  // (a) 옛 규칙 블롭(routes_ver 없음) → ab_day가 그 자리에서 재정렬
+  mem.gw_data[dk(D)] = oldDoc();
+  mem.gw_data[dk(kst(0))] = curDoc(kst(0));   // 오늘은 이미 현재 노선표로 집계된 빈 문서(mock은 없는 키를 NOT_FOUND로 주므로 심어 둔다)
+  let audL = auditMock.logs.length; sets = 0;
+  r = await ab({ action: 'ab_day', day: D }, tokA);
+  { const b = r.body, lime = find(b, '(주)포스코퓨처엠', '폐석회(고상)'), dust = find(b, '(주)포스코퓨처엠', '분진(고상)'), tcc = find(b, TCC[0], TCC[2]);
+    T('(a) ab_day: 옛 규칙(R14 분진·weak) 폐석회 묶음 → R39 폐석회 · weak false · reason/candidates 없음', r.code === 200 && lime && lime.route && lime.route.side === 'R' && lime.route.row === 39 && lime.route.count_col === 11 && lime.route.item === '폐석회' && lime.weak === false && !('reason' in lime) && !('candidates' in lime), JSON.stringify(lime));
+    T('(a) 응답·블롭 routes_ver=ROUTES_VER · rematched_at>0 · rematched.changed 1 · 저장 1회', b.routes_ver === VER && b.rematched_at > 0 && b.rematched && b.rematched.changed === 1 && mem.gw_data[dk(D)].routes_ver === VER && mem.gw_data[dk(D)].rematched_at > 0 && sets === 1, JSON.stringify([b.routes_ver, b.rematched, sets]));
+    T('(a) n·qty·qty_src·n_pending·manf_nums·total·excluded·pending·veh_totals 불변(응답·블롭)', keep(b) === keepBefore && keep(mem.gw_data[dk(D)]) === keepBefore, '');
+    T('(a) 분진 묶음 R14 그대로 · 티씨씨 폐석회는 여전히 미매칭 ITEM_MISMATCH(후보 R36) · unmatched 1건 재생성', dust && dust.route && dust.route.row === 14 && dust.weak === false && tcc && tcc.route === null && tcc.reason === 'ITEM_MISMATCH' && b.unmatched.length === 1 && b.unmatched[0].from === TCC[0] && b.unmatched[0].n === 1 && b.unmatched[0].candidates[0].row === 36, JSON.stringify(b.unmatched));
+    T('(a) 감사로그 "재정렬 ' + D + ' 변경 1건 (사유: 노선표)" by 관리자', auditMock.logs.slice(audL).some((l) => l.col === 'allbaro' && l.by === '관리자' && l.ev.some((e) => e.op === '재정렬' && e.id === D && e.t === '재정렬 ' + D + ' 변경 1건 (사유: 노선표)')), JSON.stringify(auditMock.logs.slice(audL).map((l) => l.ev))); }
+  // (b) ab_learn(day 지정) → 같은 요청 안에서 그날부터 오늘까지 재정렬
+  audL = auditMock.logs.length; sets = 0;
+  r = await ab({ action: 'ab_learn', from: TCC[0], to: TCC[1], item: TCC[2], side: 'R', row: 36, day: D }, tokA);
+  { const saved = mem.gw_data[dk(D)], tcc = find(saved, TCC[0], TCC[2]);
+    T('(b) ab_learn day=' + D + ' → 200 · rematched {days:[D,오늘], changed 1, left []} · 학습 1건', r.code === 200 && r.body.rematched && JSON.stringify(r.body.rematched.days) === JSON.stringify([D, kst(0)]) && r.body.rematched.changed === 1 && Array.isArray(r.body.rematched.left) && r.body.rematched.left.length === 0 && !('failed' in r.body.rematched) && mem.gw_data['allbaro:learned'].items.length === 1, JSON.stringify(r.body.rematched));
+    T('(b) 그날 티씨씨 묶음 route R36 · learned true · reason 없음 · unmatched [] · 저장 1회(오늘 문서는 변경 0·routes_ver 같음 → 저장 없음)', tcc && tcc.route && tcc.route.row === 36 && tcc.learned === true && !('reason' in tcc) && saved.unmatched.length === 0 && sets === 1, JSON.stringify(tcc) + '/' + sets);
+    T('(b) 감사로그 재정렬 (사유: 학습)', auditMock.logs.slice(audL).some((l) => l.col === 'allbaro' && l.by === '관리자' && l.ev.some((e) => e.op === '재정렬' && e.id === D && e.t === '재정렬 ' + D + ' 변경 1건 (사유: 학습)')), '');
+    // (c) 학습과 무관한 묶음 불변
+    const lime2 = find(saved, '(주)포스코퓨처엠', '폐석회(고상)'), dust2 = find(saved, '(주)포스코퓨처엠', '분진(고상)');
+    T('(c) 학습과 무관한 묶음(폐석회 R39·분진 R14) 불변 · 회수·수량·합계 불변', lime2.route.row === 39 && !lime2.learned && dust2.route.row === 14 && !dust2.learned && keep(saved) === keepBefore, '');
+    // (d) 차량 분리 묶음
+    T('(d) 차량 분리 묶음(vehicle_type 덤프→R7 · 트랙터→R6) 재정렬 2회 뒤에도 같은 줄', find(saved, '(주)태웅제강', '분진(고상)', '덤프').route.row === 7 && find(saved, '(주)태웅제강', '분진(고상)', '트랙터').route.row === 6, ''); }
+  // (d) 차량 종류 미상 서브묶음(vehicle_type 없음)이 옛 저장에서 R7에 붙어 있어도 종전 줄을 붙들지 않는다 + 순수 함수(입력 불변)
+  { const input = { counts: [B('(주)태웅제강', '(주)스틸싸이클', '분진(고상)', 1, 8, { side: 'R', row: 7, count_col: 11, item: 'EAFD(덤프)' })], total: 1 };
+    const snap = JSON.stringify(input);
+    const res = abLib.rematchDoc(input, { learned: [] });
+    T('(d) 차량 미상 묶음 → 미매칭 AMBIGUOUS(종전 R7 유지 안 함) · changed 1 · unmatched 1 · 입력 문서 불변(순수 함수) · counts 없는 문서는 ok:false', res.ok && res.changed === 1 && res.doc.counts[0].route === null && res.doc.counts[0].reason === 'AMBIGUOUS' && res.doc.unmatched.length === 1 && res.doc.routes_ver === VER && JSON.stringify(input) === snap && abLib.rematchDoc({ total: 1 }, {}).ok === false, JSON.stringify(res.doc.counts[0])); }
+  // (e) 숨긴 노선·직접 추가 블롭 무변경
+  T('(e) 숨긴 노선·직접 추가 블롭 무변경(재정렬 2회 뒤) · 학습 블롭은 handleLearn 기존 로직 그대로 1건', JSON.stringify(mem.gw_data['allbaro:routes_hidden']) === hiddenBefore && JSON.stringify(mem.gw_data['allbaro:manual:' + D]) === manualBefore && mem.gw_data['allbaro:learned'].items[0].row === 36, '');
+  // (g) routes_ver 같으면 저장 0
+  sets = 0;
+  r = await ab({ action: 'ab_day', day: D }, tokA);
+  T('(g) routes_ver 같은 문서 ab_day → 저장 0 · rematched/stale 없음 · R36 유지', r.code === 200 && sets === 0 && !('rematched' in r.body) && !('stale' in r.body) && find(r.body, TCC[0], TCC[2]).route.row === 36, sets + '/' + JSON.stringify(r.body.rematched));
+  r = await ab({ action: 'ab_status' }, tokA);
+  T('(g) ab_status(전부 최신) → 저장 0 · stale_days [] · rematched 없음 · days에 D 미배정 0', r.code === 200 && sets === 0 && Array.isArray(r.body.stale_days) && r.body.stale_days.length === 0 && !('rematched' in r.body) && r.body.days.find((x) => x.day === D).unmatched_n === 0, JSON.stringify(r.body.stale_days));
+  // 학습 사전을 못 읽으면 재정렬하지 않는다(stale:true·저장 0) — 학습 배정이 풀린 문서 저장 금지
+  { const stale = oldDoc(); stale.routes_ver = 'old000000000'; mem.gw_data[dk(D)] = stale; delete mem.gw_data['allbaro:learned']; sets = 0;
+    r = await ab({ action: 'ab_day', day: D }, tokA);
+    T('학습 블롭 읽기 실패 + stale 문서 → 재정렬 안 함 · stale:true · 저장 0 · 옛 배정 그대로 응답(routes_ver old)', r.code === 200 && r.body.stale === true && !('rematched' in r.body) && sets === 0 && r.body.routes_ver === 'old000000000' && find(r.body, '(주)포스코퓨처엠', '폐석회(고상)').route.row === 14, JSON.stringify([r.body.stale, sets, r.body.routes_ver]));
+    r = await ab({ action: 'ab_status' }, tokA);
+    T('학습 블롭 읽기 실패 + ab_status → 재정렬 안 함 · stale_days [D] · 저장 0 · days D 미배정 1(옛 값)', r.code === 200 && sets === 0 && JSON.stringify(r.body.stale_days) === JSON.stringify([D]) && !('rematched' in r.body) && r.body.days.find((x) => x.day === D).unmatched_n === 1, JSON.stringify(r.body.stale_days));
+    mem.gw_data['allbaro:learned'] = { schema: 1, items: [{ from: TCC[0], to: TCC[1], item: TCC[2], side: 'R', row: 36, by: '관리자', ts: 1 }] };
+    r = await ab({ action: 'ab_status' }, tokA);
+    T('학습 복구 후 ab_status → stale 1일 재정렬(저장 1·changed 2: 폐석회 R39+티씨씨 R36) · rematched.days [D] · days D 미배정 0(재정렬된 값으로 응답) · stale_days []', r.code === 200 && sets === 1 && r.body.rematched && JSON.stringify(r.body.rematched.days) === JSON.stringify([D]) && r.body.rematched.changed === 2 && r.body.days.find((x) => x.day === D).unmatched_n === 0 && r.body.stale_days.length === 0 && mem.gw_data[dk(D)].routes_ver === VER, JSON.stringify(r.body.rematched) + '/' + sets); }
+  // ab_status 상한 7일·stale_days: 오늘~-8 아홉 날을 옛 버전으로 심는다
+  { const nine = []; for (let i = 0; i <= 8; i++) nine.push(kst(-i));
+    nine.forEach((day) => { const x = oldDoc(day); x.routes_ver = 'old000000000'; mem.gw_data[dk(day)] = x; });
+    sets = 0;
+    r = await ab({ action: 'ab_status' }, tokA);
+    const rm = r.body.rematched || {};
+    T('ab_status: stale 9일 → 최신순 7일만 재정렬(저장 7) · stale_days [-7,-8] · 재정렬된 7일은 미배정 0 · 나머지 2일은 옛 값(미배정 1·routes_ver old)', r.code === 200 && sets === 7 && rm.days && rm.days.length === 7 && rm.days[0] === kst(0) && rm.days[6] === kst(-6) && rm.changed === 14 && JSON.stringify(r.body.stale_days) === JSON.stringify([kst(-7), kst(-8)]) && r.body.days.find((x) => x.day === kst(-6)).unmatched_n === 0 && r.body.days.find((x) => x.day === kst(-7)).unmatched_n === 1 && mem.gw_data[dk(kst(-7))].routes_ver === 'old000000000', JSON.stringify([sets, rm.days, rm.changed, r.body.stale_days]));
+    sets = 0;
+    r = await ab({ action: 'ab_day', day: kst(-8) }, tokA);
+    T('ab_day(-8): stale 단일 날짜는 항상 처리 → 저장 1 · routes_ver 갱신 · rematched.changed 2', r.code === 200 && sets === 1 && r.body.routes_ver === VER && r.body.rematched && r.body.rematched.changed === 2 && mem.gw_data[dk(kst(-8))].routes_ver === VER, JSON.stringify([sets, r.body.rematched]));
+    sets = 0;
+    r = await ab({ action: 'ab_status' }, tokA);
+    T('ab_status 재호출: 남은 stale 1일(-7)만 재정렬(저장 1) · stale_days []', r.code === 200 && sets === 1 && JSON.stringify(r.body.rematched.days) === JSON.stringify([kst(-7)]) && JSON.stringify(r.body.stale_days) === '[]', JSON.stringify([sets, r.body.stale_days])); }
+  // (f) 시간 가드 — 느린 blobGet(60ms)·예산 200ms로 20일 요청 → 처리한 날짜 + left = 20, left는 요청 순서의 꼬리
+  { const twenty = []; for (let i = 19; i >= 0; i--) twenty.push(kst(-i));
+    twenty.forEach((day) => { if (!mem.gw_data[dk(day)]) { const x = oldDoc(day); x.routes_ver = 'old000000000'; mem.gw_data[dk(day)] = x; } });
+    blobsMock.hooks.beforeGet = (k) => (String(k).indexOf('allbaro:day:') === 0 ? new Promise((res) => setTimeout(res, 60)) : null);
+    const t0 = Date.now();
+    const rd = await gwab.rematchDays(blobsMock.store('gw_data'), twenty, mem.gw_data['allbaro:learned'].items, { budgetMs: 200, why: '학습', by: '관리자', bid: 'uadmin' });
+    const took = Date.now() - t0;
+    blobsMock.hooks.beforeGet = null;
+    T('(f) 시간 가드: 20일·예산 200ms·읽기 60ms → left ' + rd.left.length + '일 반환 · 처리 ' + rd.days.length + '+left=20 · left는 요청 순서의 꼬리 · failed 0 · ' + took + 'ms', rd.left.length > 0 && rd.days.length > 0 && rd.days.length + rd.left.length === 20 && JSON.stringify(rd.left) === JSON.stringify(twenty.slice(20 - rd.left.length)) && rd.failed.length === 0 && took < 1500, JSON.stringify([rd.days.length, rd.left.length, took]));
+    // 같은 20일을 정상 속도로 ab_learn(day=-19) → 창(-19…오늘) 전부 처리(left [])
+    sets = 0;
+    r = await ab({ action: 'ab_learn', from: TCC[0], to: TCC[1], item: TCC[2], side: 'R', row: 36, day: kst(-19) }, tokA);
+    T('(f) ab_learn day=-19 → 20일 창(-19…오늘, 오름차순) 전부 처리 · left [] · 남은 stale 전부 저장(routes_ver 갱신)', r.code === 200 && JSON.stringify(r.body.rematched.days) === JSON.stringify(twenty) && r.body.rematched.left.length === 0 && twenty.every((day) => mem.gw_data[dk(day)].routes_ver === VER), JSON.stringify(r.body.rematched).slice(0, 200)); }
+  // day 없음 → 최근 7일 창(오름차순) / day 형식 오류 → 400 BAD_DAY(학습 저장 전 거부)
+  r = await ab({ action: 'ab_learn', from: '(주)포스코퓨처엠', to: '대화산업(주)', item: '폐석회(고상)', side: 'R', row: 39, day: '' }, tokA);
+  T('ab_learn day 없음 → 최근 7일 창(-6…오늘) · left []', r.code === 200 && r.body.rematched.days.length === 7 && r.body.rematched.days[0] === kst(-6) && r.body.rematched.days[6] === kst(0) && r.body.rematched.left.length === 0, JSON.stringify(r.body.rematched));
+  r = await ab({ action: 'ab_learn', from: 'A', to: 'B', item: '', side: 'L', row: 5, day: '2026-13-01' }, tokA);
+  T('ab_learn day 형식 오류 → 400 BAD_DAY · 학습 저장 없음(2건 유지)', r.code === 400 && r.body.code === 'BAD_DAY' && mem.gw_data['allbaro:learned'].items.length === 2, r.code + '/' + r.body.code);
+  blobsMock.hooks.beforeSet = null;
 }
 
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

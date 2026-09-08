@@ -16,6 +16,8 @@
 // 아이디·비밀번호는 로그·반환값·예외 메시지 어디에도 넣지 않는다 — 요청 본문을 통째로 찍는 로그 금지.
 // 조회 전용이다. 올바로에 쓰기(등록·수정·삭제) 요청을 보내는 함수는 이 파일에 없다.
 
+const crypto = require('crypto');   // ROUTES_VER(노선표 해시, v327)
+
 const BASE = 'https://www.allbaro.or.kr';
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)';
 const LOGIN_PATH = '/main.login.do';
@@ -607,6 +609,13 @@ function opDayFromTrtm(t) {
   return '' + dt.getUTCFullYear() + p(dt.getUTCMonth() + 1) + p(dt.getUTCDate());
 }
 
+// counts 정렬 — 파이썬 sorted(dict.items()) 재현 + 차량으로 쪼갠 줄은 노선 순서로 안정화(미매칭은 뒤). aggregate·rematchDoc 공용(v327).
+function countRowKey(c) { return c.route ? c.route.side + String(c.route.row).padStart(3, '0') : '~'; }
+function cmpCounts(a, b) {
+  return cmpStr(a.from, b.from) || cmpStr(a.to, b.to) || cmpStr(a.item, b.item)
+    || cmpStr(countRowKey(a), countRowKey(b)) || cmpStr(a.vehicle_type || '', b.vehicle_type || '');
+}
+
 function aggregate(rows, day, opts) {
   // 형식이 틀린 기준일을 조용히 0건으로 넘기면 그날 일지가 통째로 비어 버린다 — 시끄럽게 중단한다.
   if (day != null && day !== '' && !validDay(day)) throw new Error('집계 기준일 형식 오류: ' + String(day));
@@ -760,10 +769,7 @@ function aggregate(rows, day, opts) {
     }
   }
 
-  // 파이썬 sorted(dict.items()) 재현 + 차량으로 쪼갠 줄은 노선 순서로 안정화(미매칭은 뒤).
-  const rowKey = (c) => (c.route ? c.route.side + String(c.route.row).padStart(3, '0') : '~');
-  counts.sort((a, b) => cmpStr(a.from, b.from) || cmpStr(a.to, b.to) || cmpStr(a.item, b.item)
-    || cmpStr(rowKey(a), rowKey(b)) || cmpStr(a.vehicle_type || '', b.vehicle_type || ''));
+  counts.sort(cmpCounts);
 
   const unmatched = [];
   for (const c of counts) {
@@ -1105,11 +1111,79 @@ function mergeMonthCounts(dayDocs) {
   return { rows: rows, veh_rows: vehRows, total_n: totalN, total_ton: Math.round(totalTon * 1000) / 1000, unmatched_n: unmatchedN, excluded_n: excludedN, pending_n: pendingN, days_n: daysN };
 }
 
+// ---------- v327. 저장된 일자 집계 재판정(자동 재정렬, PM 2026-09-08) ----------
+// "[노선 지정]으로 학습시키거나 노선표가 바뀌면 사람이 수동 수집을 누르지 않아도 기록이 스스로 재정렬돼야 한다."
+// 9/8 실사고: 수동 수집이 배포 8분 전에 돌아 옛 규칙(R14 분진)으로 집계된 9/7 기록이 다음 크론까지 그대로 남았다.
+
+// 노선표 내용 해시 — side/row/from/to/item을 이어붙인 문자열의 sha1 앞 12자. 일자 문서(allbaro:day:*)에 routes_ver로 찍어 두고,
+// 읽을 때 현재 값과 다르면(노선표가 바뀐 뒤 집계된 옛 기록) 그 자리에서 재정렬한다. 워커도 저장 시 같은 값을 찍는다.
+const ROUTES_VER = crypto.createHash('sha1')
+  .update(ROUTES.map((r) => [r.side, r.row, r.from, r.to, r.item].join('\u0001')).join('\n'), 'utf8')
+  .digest('hex').slice(0, 12);
+
+// 판정 결과 서명 — 배정 줄·weak·학습 표시·미매칭 사유·후보. 이 값이 달라진 묶음만 '변경'으로 센다(회수·수량은 판정이 아니다).
+function decSig(c) {
+  return JSON.stringify([
+    c.route ? [c.route.side, c.route.row, c.route.count_col, c.route.item] : null,
+    !!c.weak, !!c.learned, c.reason || null, c.candidates || null,
+  ]);
+}
+
+// 저장된 묶음 하나를 aggregate와 같은 규칙으로 다시 판정한다. 차량으로 갈리는 묶음(vehicle_type 있음)은 종전 차량 종류로
+// 먼저 좁히고(차량이 학습을 이긴다), 못 좁히면 학습 순 — 그래도 안 되면 종전 route를 붙들지 않고 미매칭으로 드러낸다.
+function judgeBundle(c, learnedIndex, notes) {
+  const row = { from: c.from, to: c.to, item: c.item };
+  const mopts = { learnedIndex: learnedIndex, notes: notes };
+  const cands = routeCandidates(normName(c.from), normName(c.to));
+  const vehTagged = cands.filter((x) => x.nr.veh).length;
+  const k = cleanText(c.vehicle_type);
+  if (vehTagged < 2 || !k) return matchRouteEx(row, mopts);
+  let d = matchRouteEx(row, { vehicleType: k });
+  if (!d.route) d = matchRouteEx(row, { learnedIndex: learnedIndex, notes: notes, vehicleType: k });
+  return d;
+}
+
+// 일자 문서(allbaro:day:*) 재판정 — 순수 함수(입력 문서는 손대지 않고 새 문서를 돌려준다).
+// counts 각 묶음의 route/weak/reason/candidates/learned만 현재 ROUTES·학습 사전으로 갱신하고, unmatched[]를 counts의
+// route:null 묶음으로 다시 만든다(aggregate와 같은 규칙). n·qty·n_pending·excluded·pending·veh_totals·total은 건드리지 않는다.
+// opts = { learned:[{from,to,item,side,row}] | learnedIndex, now }
+// 반환 { ok, changed(판정이 바뀐 묶음 수), doc(routes_ver·rematched_at 기록), notes }. counts 배열이 없는 문서는 ok:false·원본 그대로.
+function rematchDoc(doc, opts) {
+  const o = opts || {};
+  if (!doc || typeof doc !== 'object' || !Array.isArray(doc.counts)) return { ok: false, changed: 0, doc: doc, notes: [] };
+  const notes = [];
+  const learnedIndex = o.learnedIndex || prepLearned(o.learned, notes);
+  let changed = 0;
+  const counts = doc.counts.filter((c) => c && typeof c === 'object').map((c0) => {
+    const c = Object.assign({}, c0);
+    const dec = judgeBundle(c, learnedIndex, notes);
+    c.route = dec.route
+      ? { side: dec.route.side, row: dec.route.row, count_col: dec.route.count_col, item: dec.route.item }
+      : null;
+    c.weak = !!dec.weak;
+    if (dec.learned) c.learned = true; else delete c.learned;
+    if (dec.route) { delete c.reason; delete c.candidates; }
+    else { c.reason = dec.reason; c.candidates = dec.candidates; }
+    if (decSig(c) !== decSig(c0)) changed += 1;
+    return c;
+  });
+  counts.sort(cmpCounts);
+  const unmatched = [];
+  for (const c of counts) {
+    if (c.route) continue;
+    const u = { from: c.from, to: c.to, item: c.item, n: c.n, reason: c.reason, candidates: c.candidates };
+    if (c.vehicle_type) u.vehicle_type = c.vehicle_type;
+    unmatched.push(u);
+  }
+  const out = Object.assign({}, doc, { counts: counts, unmatched: unmatched, routes_ver: ROUTES_VER, rematched_at: Number(o.now) || Date.now() });
+  return { ok: true, changed: changed, doc: out, notes: notes };
+}
+
 module.exports = {
   // 상수
-  ROUTES, ALIAS, ITEM_ALIAS, VEHICLE_TAGS, UNIT_FACTOR, BASE, ENTN, ENTN_NAME, TD,
+  ROUTES, ROUTES_VER, ALIAS, ITEM_ALIAS, VEHICLE_TAGS, UNIT_FACTOR, BASE, ENTN, ENTN_NAME, TD,
   // 순수 함수(픽스처 테스트 대상)
-  normName, normItem, itemHit, matchRoute, matchRouteEx,
+  normName, normItem, itemHit, matchRoute, matchRouteEx, rematchDoc,
   vehicleTagOf, vehicleTagOk, normVehNo, buildVehicleIndex, vehicleTypeOf,
   parseSheetXml, sheetTotal, aggregate, validDay, toSlash, kstTodayISO,
   isPosco, opDayFromTrtm, dayMinus, mergeMonthCounts,
