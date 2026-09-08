@@ -1685,4 +1685,81 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   mem.gw_users = savedUsers;
 }
 
+
+// ===== 35. 퇴사직원 분류 v329(PM 9/8) — member_list 퇴사 파생 불리언 / push.sendTo 수신자 활성 필터 / gw-todo-cron 퇴사자 스킵 =====
+{
+  const gwa35 = require(join(FN, 'gw-auth.js'));
+  const callA35 = async (body, tok) => { const x = await gwa35.handler({ httpMethod: 'POST', headers: { authorization: tok ? 'Bearer ' + tok : '' }, body: JSON.stringify(body) }); return { code: x.statusCode, body: JSON.parse(x.body || '{}') }; };
+  const kst35 = (d) => new Date(Date.now() + 9 * 3600000 + d * 86400000).toISOString().slice(0, 10);
+  const savedUsers35 = JSON.parse(JSON.stringify(mem.gw_users));
+  const savedLog35 = mem.gw_data['push:log'], savedSubs35 = mem.gw_data['push:subs'];
+  mem.gw_users = {
+    'member:uliv': { id: 'uliv', name: '재직', role: '직원', admin: false, perms: {}, hire_date: '2024-01-01', seq: 1 },
+    'member:uret': { id: 'uret', name: '퇴사자', role: '직원', admin: false, perms: {}, leave_date: kst35(-1), seq: 2 },   // 어제 퇴사 = 퇴사
+    'member:usoon': { id: 'usoon', name: '퇴사예정', role: '직원', admin: false, perms: {}, leave_date: kst35(1), seq: 3 },   // 내일 퇴사 = 아직 재직
+    'member:udel35': { id: 'udel35', name: '삭제회원', role: '직원', admin: false, perms: {}, del: 1, seq: 4 },
+    'member:uadm35': { id: 'uadm35', name: '관리자35', role: '관리자', admin: true, perms: {}, tier: 'pm', seq: 5 },
+    'device:dev1': { status: 'approved' },
+  };
+  const tokLiv = issueSession(mem.gw_users['member:uliv']).token;
+  const tokAdm35 = issueSession(mem.gw_users['member:uadm35']).token;
+  const tokRet = issueSession(mem.gw_users['member:uret']).token;
+  // ---- member_list: 퇴사자는 계속 내려주되(인사 화면이 그린다) 비관리자에겐 날짜 대신 파생 불리언만 ----
+  let r35 = await callA35({ action: 'member_list' }, tokLiv);
+  const byId35 = {}; (r35.body.members || []).forEach((m) => { byId35[m.id] = m; });
+  T('member_list(비관리자): 퇴사자 포함(목록에서 빼지 않는다) · retired 파생 true · leave_date는 여전히 없음(S7 개인정보 차단 유지)',
+    r35.code === 200 && !!byId35.uret && byId35.uret.retired === true && !('leave_date' in byId35.uret) && !('hire_date' in byId35.uret), JSON.stringify(byId35.uret));
+  T('member_list(비관리자): 퇴사예정(미래 leave_date)은 retired false — 아직 재직이므로 담당 배정·공개범위에서 걸러지지 않는다', !!byId35.usoon && byId35.usoon.retired === false && !('leave_date' in byId35.usoon), JSON.stringify(byId35.usoon));
+  T('member_list: 삭제(del=1) 회원은 종전대로 목록에 없음 · 관리자·본인 레코드는 종전대로 safeMember 전체(leave_date 포함)', !byId35.udel35 && byId35.uliv && byId35.uliv.hire_date === '2024-01-01',
+    JSON.stringify(Object.keys(byId35)));
+  r35 = await callA35({ action: 'member_list' }, tokAdm35);
+  {
+    const a35 = (r35.body.members || []).find((m) => m.id === 'uret');
+    T('member_list(관리자): 퇴사자 leave_date 종전대로 내려감(인사 탭이 퇴사일·정산을 그린다)', r35.code === 200 && !!a35 && a35.leave_date === kst35(-1), JSON.stringify(a35));
+  }
+  T('퇴사자 세션은 종전대로 차단(S2-A 무손상) — member_list도 401', (await callA35({ action: 'member_list' }, tokRet)).code === 401, '');
+  // ---- 실 push.js sendTo: 수신자 활성 필터(퇴사·삭제·미존재) ----
+  {
+    const pp = require.resolve(join(FN, '_lib/push.js'));
+    const savedPush35 = require.cache[pp]; delete require.cache[pp];
+    const realPush35 = require(pp);
+    require.cache[pp] = savedPush35;   // 이후 절은 다시 mock
+    delete mem.gw_data['push:log'];
+    const res35 = await realPush35.sendTo(['uliv', 'uret', 'udel35', 'unknown35', 'usoon'], { title: 't', body: 'b', url: './', tag: 'g' });
+    const log35 = (mem.gw_data['push:log'] && mem.gw_data['push:log'].items) || [];
+    const last35 = log35[log35.length - 1] || {};
+    T('push.sendTo: 퇴사·삭제·미존재 수신자는 발송에서도 알림함(push:log) to에서도 제외 · 재직·퇴사예정은 유지 · skipped 3',
+      res35.skipped === 3 && (last35.to || []).join() === 'uliv,usoon' && last35.skipped === 3, JSON.stringify([res35, last35.to, last35.skipped]));
+    const res35b = await realPush35.sendTo(['uret'], { title: 'x', body: '', url: './', tag: 'g' }, { logOnly: true });
+    const log35b = mem.gw_data['push:log'].items;
+    T('push.sendTo(logOnly): 퇴사자만 지정 → 이력 to 빈 목록 · skipped 1 · 발송 0(알림함만 남기는 결재 통지 경로도 같은 필터)',
+      res35b.sent === 0 && res35b.skipped === 1 && (log35b[log35b.length - 1].to || []).length === 0 && log35b[log35b.length - 1].skipped === 1, JSON.stringify(res35b));
+    const ctx35 = await realPush35.tierCtx();
+    const res35c = await realPush35.sendTo(['uret', 'uliv'], { title: 'y', body: '', url: './', tag: 'g' }, { ctx: ctx35 });
+    T('push.sendTo(opts.ctx): 호출자가 만든 tierCtx를 재사용해도 같은 필터 결과(회원 재스캔 없음) · skipped 1', res35c.skipped === 1 && (mem.gw_data['push:log'].items.slice(-1)[0].to || []).join() === 'uliv', JSON.stringify(res35c));
+    const res35d = await realPush35.sendTo([], { title: 'z', body: '', url: './', tag: 'g' });
+    T('push.sendTo([]): 자동상신처럼 대상이 없어도 알림함 이력은 종전대로 남는다(skipped 0)', res35d.skipped === 0 && mem.gw_data['push:log'].items.slice(-1)[0].title === 'z' && mem.gw_data['push:log'].items.slice(-1)[0].skipped === undefined, JSON.stringify(res35d));
+    T('activeIdSet: 재직·퇴사예정만 활성 — 퇴사·삭제 제외', (await realPush35.activeIdSet()).uliv === 1 && (await realPush35.activeIdSet()).usoon === 1 && (await realPush35.activeIdSet()).uret === undefined && (await realPush35.activeIdSet()).udel35 === undefined, '');
+  }
+  // ---- gw-todo-cron: 회원 레코드를 안 읽던 무인 크론에 활성 게이트 ----
+  {
+    Object.keys(mem.gw_data).forEach((k) => { if (/^priv:[^:]+:mytasks$/.test(k) || /^todo:sent:/.test(k)) delete mem.gw_data[k]; });
+    const today35 = kst35(0);
+    mem.gw_data['priv:uliv:mytasks'] = { schema: 1, items: [{ id: 'a1', due: today35, text: '재직자 할 일' }] };
+    mem.gw_data['priv:uret:mytasks'] = { schema: 1, items: [{ id: 'b1', due: today35, text: '퇴사자가 남긴 할 일' }] };
+    mem.gw_data['priv:usoon:mytasks'] = { schema: 1, items: [{ id: 'c1', due: today35, text: '퇴사예정 할 일' }] };
+    const cron35 = require(join(FN, 'gw-todo-cron.js'));
+    const pc35 = pushMock.calls.length;
+    const out35 = JSON.parse((await cron35.handler({})).body || '{}');
+    T('gw-todo-cron: 퇴사자는 루프에서 건너뛴다(skipped 1) — 종전엔 priv 블롭 키만 훑어 접근이 막힌 퇴사자 폰이 매일 08시에 울렸다',
+      out35.ok === true && out35.skipped === 1 && out35.members === 2 && pushMock.calls.length === pc35 + 2, JSON.stringify(out35));
+    T('gw-todo-cron: 퇴사자에겐 todo:sent 기록조차 남기지 않는다(쓰기 절약) · 재직·퇴사예정은 종전대로 발송·기록',
+      !mem.gw_data['todo:sent:uret'] && !!mem.gw_data['todo:sent:uliv'] && !!mem.gw_data['todo:sent:usoon'], JSON.stringify(Object.keys(mem.gw_data).filter((k) => k.indexOf('todo:sent:') === 0)));
+    Object.keys(mem.gw_data).forEach((k) => { if (/^priv:[^:]+:mytasks$/.test(k) || /^todo:sent:/.test(k)) delete mem.gw_data[k]; });
+  }
+  mem.gw_users = savedUsers35;
+  if (savedLog35 === undefined) delete mem.gw_data['push:log']; else mem.gw_data['push:log'] = savedLog35;
+  if (savedSubs35 === undefined) delete mem.gw_data['push:subs']; else mem.gw_data['push:subs'] = savedSubs35;
+}
+
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

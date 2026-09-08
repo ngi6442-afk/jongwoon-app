@@ -16,11 +16,19 @@ exports.handler = async function (event) {
   try { setupBlobContext(event); st = store(DATA); } catch (e) { return { statusCode: 500, body: JSON.stringify({ ok: false, code: 'NO_BLOB_CONTEXT' }) }; }
   const l = await blobList(st, 'priv:');
   if (!l.ok) return { statusCode: 500, body: JSON.stringify({ ok: false, code: l.code || 'LIST_FAILED' }) };
-  let members = 0, items = 0, fails = 0;
+  // 퇴사·삭제 회원은 건너뛴다(v329) — priv 블롭 키만 훑던 종전엔 회원 레코드를 한 번도 읽지 않아,
+  // 퇴사자가 남겨둔 미래 기한 할 일이 있으면 접근이 막힌 그 사람 폰이 매일 08시에 울렸다(구독은 회수되지 않는다).
+  // 최종 관문은 push.sendTo의 활성 필터지만, 여기서 먼저 끊어 todo:sent 쓰기와 루프를 아낀다. ctx를 못 만들면 걸러내지 않고 진행(sendTo가 막는다).
+  let ctx = null;
+  try { ctx = await push.tierCtx(); } catch (e) { ctx = null; }
+  const activeSet = Object.create(null);
+  if (ctx) (ctx.members || []).forEach(function (m) { if (m && m.id) activeSet[m.id] = 1; });
+  let members = 0, items = 0, fails = 0, skipped = 0;
   for (const k of (l.keys || [])) {
     const m = /^priv:([^:]+):mytasks$/.exec(String(k));
     if (!m) continue;
     const mid = m[1];
+    if (ctx && !activeSet[mid]) { skipped++; continue; }   // 퇴사·삭제 회원
     const r = await blobGet(st, k);
     const list = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data.items : [];
     if (!list.length) continue;
@@ -31,7 +39,7 @@ exports.handler = async function (event) {
     try {
       // 본문에 제목을 싣지 않는다 — sendTo가 알림함(push:log)에 남기고 그 이력은 관리자 전원이 보므로 '나만 보기' 할 일이 새어 나간다(v310)
       const body = '내 업무 탭 > 내가 할 일에서 확인하세요.';
-      await push.sendTo([mid], { title: '오늘 기한 할 일 ' + dueNow.length + '건', body: body, url: './', tag: 'todo-due-' + today });
+      await push.sendTo([mid], { title: '오늘 기한 할 일 ' + dueNow.length + '건', body: body, url: './', tag: 'todo-due-' + today }, ctx ? { ctx: ctx } : null);
       dueNow.forEach(function (t) { sentDoc.ids[t.id] = today; });
       // 링 정리 — 오래된 발송 기록은 90일 지나면 버린다(문서가 무한히 자라지 않게)
       const cutoff = new Date(Date.now() + 9 * 3600000 - 90 * 86400000).toISOString().slice(0, 10);
@@ -40,5 +48,5 @@ exports.handler = async function (event) {
       members++; items += dueNow.length;
     } catch (e) { fails++; }
   }
-  return { statusCode: 200, body: JSON.stringify({ ok: true, today: today, members: members, items: items, fails: fails }) };
+  return { statusCode: 200, body: JSON.stringify({ ok: true, today: today, members: members, items: items, fails: fails, skipped: skipped }) };
 };

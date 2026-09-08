@@ -222,7 +222,7 @@ async function handleMemberList(st, event, R) {
   // 종전엔 safeMember 전체가 나가 현장직 계정으로 전사 입사일·연차 조회가 가능했다)
   const members = (await listMembers(st)).map(function (m) {
     if (c.member.admin || m.id === c.member.id) return safeMember(m);
-    return { id: m.id, name: m.name, role: m.role, rank: m.rank, dept: m.dept, seq: m.seq, admin: m.admin, dev: m.dev, tier: m.tier, on_loa: m.on_loa, del: m.del };   // tier·dev(v321)는 클라 tierOfMember 파생·표시용(인사정보 아님)
+    return { id: m.id, name: m.name, role: m.role, rank: m.rank, dept: m.dept, seq: m.seq, admin: m.admin, dev: m.dev, tier: m.tier, on_loa: m.on_loa, del: m.del, retired: retired(m) };   // tier·dev(v321)는 클라 tierOfMember 파생·표시용(인사정보 아님). retired(v329)는 퇴사 여부 파생 불리언 — 날짜(leave_date)는 여전히 숨기고, 비관리자 화면도 담당·공개범위에서 퇴사자를 걸러낼 수 있게 한다
   });
   return jr(200, { status: 'OK', members, request_id: R });
 }

@@ -1133,12 +1133,13 @@ async function handlePushSend(event, d, R) {
     url: './', tag: String(d.tag || '').slice(0, 40) || undefined };
   try {
     let ids;
+    const tc = await push.tierCtx();   // 회원 스캔 1회 — __admins__ 목록과 수신자 활성 필터(push.sendTo opts.ctx)에 함께 쓴다(v329)
     if (d.self === true) ids = [c.member.id];
-    else if (to === '__admins__') ids = (await push.adminIds()).filter(function (id) { return id !== c.member.id; });   // 본인 행동 알림은 본인 제외
+    else if (to === '__admins__') ids = tc.adminIds.filter(function (id) { return id !== c.member.id; });   // 본인 행동 알림은 본인 제외
     else ids = [to];
     if (!ids.length) return jr(200, { status: 'OK', sent: 0, request_id: R });
-    const rres = await push.sendTo(ids, payload);
-    return jr(200, { status: 'OK', sent: rres.sent, request_id: R });
+    const rres = await push.sendTo(ids, payload, { ctx: tc });   // 퇴사·삭제 회원 id로는 발사되지 않는다(v329)
+    return jr(200, { status: 'OK', sent: rres.sent, skipped: rres.skipped || 0, request_id: R });
   } catch (e) { return jr(500, { status: 'ERROR', error_code: 'PUSH_SEND_FAILED', request_id: R }); }
 }
 

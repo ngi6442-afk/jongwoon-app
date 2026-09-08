@@ -698,6 +698,12 @@
   .hr-dept{margin-bottom:14px;}
   .hr-dept-h{font-size:13px;font-weight:800;color:var(--brand);padding:2px 2px 6px;border-bottom:1px solid var(--line);margin-bottom:4px;}
   .hr-dept-h .cnt{color:var(--sub);font-weight:600;}
+  /* v329 퇴사자 그룹(인사 탭 맨 아래 접이식) — 권한관리 구분선·흐림과 같은 언어 */
+  .hr-ret-h{display:flex;align-items:center;gap:8px;width:100%;background:transparent;border:none;border-top:2px solid rgba(128,148,138,.35);padding:10px 2px 8px;cursor:pointer;text-align:left;font-family:inherit;}
+  .hr-ret-h .hr-ret-t{flex:1;min-width:0;}
+  .hr-ret-h.open .hr-caret{transform:rotate(180deg);}
+  .hr-ret .hr-item>.hr-head{opacity:.6;}   /* 흐림은 요약줄만 — 펼친 인사 카드(폼)는 또렷하게(퇴사일 정정·연차 정산용) */
+  .hr-ret-note{font-size:12px;color:var(--sub);padding:6px 2px 2px;}
   /* 서류 출력 */
   .dg-check{display:flex;align-items:center;gap:8px;font-size:14px;padding:6px 2px;}
   .dg-check input[type=checkbox]{width:18px;height:18px;flex:none;padding:0;margin:0;}
@@ -2902,9 +2908,11 @@
   // 표시용 존칭: 대표(나종운)는 지시·담당·공개범위 등 화면 표기에서 '대표님'으로. 데이터에는 원래 이름 유지.
   // 관리자 등급(v321): tier 'boss'(대표)|'pm'|'admin'. 관리자 아니면 "". 서버 _lib/tier.js tierOf(m, bootstrap)와 같은 규칙(uismoke가 등급 키·파생 이름·부트스트랩 게이트 대조) — 바꾸면 동시에.
   // 9/6 검증 S1: 게이트·표시는 **명시 tier만** — 명시 없는 관리자는 "admin"(최하 등급). 재직 관리자 전원이 미지정일 때만(부트스트랩 — 배포 직후·등급 지정 전) 종전 파생(role 대표·나종운→boss / dev·나경일→pm).
-  // 부트스트랩 여부는 회원 목록(member_list — 비관리자에게도 tier 동봉)에서 판정. 퇴사(leave_date 경과)·삭제 회원은 등급 없음·부트스트랩 판정에서도 제외(서버 tier.retired와 같은 식 — 비관리자 목록엔 leave_date가 없어 재직으로 본다)
+  // 부트스트랩 여부는 회원 목록(member_list — 비관리자에게도 tier 동봉)에서 판정. 퇴사(leave_date 경과)·삭제 회원은 등급 없음·부트스트랩 판정에서도 제외(서버 tier.retired와 같은 식)
   var TIER_TXT = { boss:"대표", pm:"PM", admin:"관리자" };
-  function memberRetired(m){ return !!(m && m.leave_date && String(m.leave_date) < todayStr()); }
+  // 퇴사 판정(v329) — 관리자·본인 레코드는 leave_date로, 비관리자 목록은 서버가 함께 내리는 파생 불리언 retired로(개인정보라 날짜는 계속 숨긴다).
+  // 종전엔 비관리자 화면이 퇴사자를 재직으로 봐서 담당 드롭다운·공개범위에 퇴사자가 그대로 떴다(gw-auth member_list 투영에 retired 추가).
+  function memberRetired(m){ if(!m) return false; if(m.retired === true) return true; return !!(m.leave_date && String(m.leave_date) < todayStr()); }
   function tierBootstrap(){
     var ms = (typeof liveMembers === "function") ? liveMembers() : [];
     for (var i = 0; i < ms.length; i++){ var x = ms[i]; if (x && x.admin && x.del !== 1 && !memberRetired(x) && x.tier && Object.prototype.hasOwnProperty.call(TIER_TXT, String(x.tier))) return false; }
@@ -2936,12 +2944,24 @@
     return name;
   }
   function dispNameById(id){ if(!id) return ""; if(id==="__all__") return "전사"; var m=findMember(id); return m ? (isBossMember(m) ? "대표님" : m.name) : ""; }
+  // 담당·대상 셀렉트 회원 목록(v329) — 재직자만 새로 고를 수 있다. 단 **이미 지정된 퇴사자**는 옵션으로 남긴다:
+  // 옵션을 지우면 sel.value가 ""로 떨어져, 퇴사자 담당 구건을 열었다 저장하는 것만으로 담당이 소리 없이 지워진다.
+  function assignableMembers(selId){
+    var out = activeMembers();
+    if (selId){
+      for (var i=0;i<out.length;i++){ if (out[i].id === selId) return out; }
+      var m = findMember(selId); if (m && m.del !== 1) out = out.concat([m]);
+    }
+    return out;
+  }
+  function memberOptLabel(m){ return (isBossMember(m) ? "대표님" : m.name) + (memberRetired(m) ? " (퇴사)" : ""); }
   function fillMemberSelect(sel, selId){
     if(!sel) return;
+    var cur = selId || "";
     var html = '<option value="">담당 선택…</option><option value="__all__">전사 (전 직원)</option>';
-    html += (typeof liveMembers==="function"?liveMembers():[]).map(function(m){ return '<option value="'+m.id+'">'+esc(isBossMember(m)?"대표님":m.name)+'</option>'; }).join("");
+    html += assignableMembers(cur).map(function(m){ return '<option value="'+m.id+'">'+esc(memberOptLabel(m))+'</option>'; }).join("");
     sel.innerHTML = html;
-    sel.value = selId || "";
+    sel.value = cur;
   }
   // 공개범위(공지) 체크박스 드롭다운 — 비면 전체공개. 관리자·각 직원을 체크로 지정.
   function renderTaskScopePanel(){
@@ -4301,8 +4321,9 @@
     editingCheckItem = id;
     document.getElementById("csTitle").textContent = title || "";
     var sel = document.getElementById("csAssignee");
-    sel.innerHTML = '<option value="">(담당 없음)</option>' + liveMembers().map(function(m){ return '<option value="' + m.id + '">' + esc(isBossMember(m)?"대표님":m.name) + '</option>'; }).join("");
-    sel.value = checkAssignee[id] || "";
+    var csCur = checkAssignee[id] || "";   // v329: 재직자만 + 이미 지정된 퇴사자는 유지(옵션이 사라지면 저장 시 담당이 지워진다)
+    sel.innerHTML = '<option value="">(담당 없음)</option>' + assignableMembers(csCur).map(function(m){ return '<option value="' + m.id + '">' + esc(memberOptLabel(m)) + '</option>'; }).join("");
+    sel.value = csCur;
     renderMemberChecks("csScope", checkScopes[id] || []);
     document.getElementById("checkScopeBackdrop").classList.add("show");
   }
@@ -6606,10 +6627,12 @@
   }
   // 직원 지정 체크박스 — 지시 모듈 scopeCheckboxesHtml의 "개별 직원" 상자와 같은 결(data-mid → getCheckedMembers). 부서·직급 토큰은 문서 scope 규격(ids만)에 없어 제외
   function docScopeMembersHtml(selIds){
-    var ms = liveMembers().filter(function(m){ return !m.admin; });   // 관리자는 항상 열람 — 체크 대상은 직원만
+    selIds = selIds || [];
+    // 관리자는 항상 열람 — 체크 대상은 직원만. 퇴사자는 새 지정 대상에서 빼되 이미 체크된 사람은 남긴다(v329 — 숨기면 저장 시 공개범위에서 조용히 탈락)
+    var ms = liveMembers().filter(function(m){ return !m.admin && (!memberRetired(m) || selIds.indexOf(m.id) >= 0); });
     if (!ms.length) return '<div class="mrole2" style="padding:4px;">회원이 없습니다.</div>';
     return '<div class="scope-hint">체크한 직원(+관리자)만 열람</div>' + ms.map(function(m){
-      return '<label class="mcheck"><input type="checkbox" data-mid="' + esc(m.id) + '"' + (selIds.indexOf(m.id) >= 0 ? " checked" : "") + '> ' + esc(isBossMember(m) ? "대표님" : m.name) + (m.role ? ' <span class="mrole2">' + esc(m.role) + '</span>' : '') + '</label>';
+      return '<label class="mcheck"><input type="checkbox" data-mid="' + esc(m.id) + '"' + (selIds.indexOf(m.id) >= 0 ? " checked" : "") + '> ' + esc(memberOptLabel(m)) + (m.role ? ' <span class="mrole2">' + esc(m.role) + '</span>' : '') + '</label>';
     }).join("");
   }
   function docScopeModeChanged(){
@@ -9889,8 +9912,9 @@
         opts+='<option value="worker:'+esc(w.id)+'"'+((sel==="worker:"+w.id)?" selected":"")+'>'+esc(w.name||"")+' (일용직)</option>';
       });
     } else {
-      liveMembers().forEach(function(m){
-        opts+='<option value="member:'+esc(m.id)+'"'+((sel==="member:"+m.id)?" selected":"")+'>'+esc(dispName(m.name)||m.name||"")+'</option>';
+      // 퇴사자에게 새 교육·특수건진 이력을 만들지 않는다(v329) — 이미 선택된 대상은 남긴다(기존 이력 편집 시 대상 유실 방지)
+      liveMembers().filter(function(m){ return !memberRetired(m) || sel==="member:"+m.id; }).forEach(function(m){
+        opts+='<option value="member:'+esc(m.id)+'"'+((sel==="member:"+m.id)?" selected":"")+'>'+esc((dispName(m.name)||m.name||"")+(memberRetired(m)?" (퇴사)":""))+'</option>';
       });
     }
     s.innerHTML = opts || '<option value="">(대상 없음)</option>';
@@ -16822,6 +16846,9 @@
 
   // ---- 회원·권한(users.json) ----
   function liveMembers(){ return members.filter(function(m){ return m && m.del !== 1; }); }
+  // 재직자만(v329) — 담당 배정·알림·공개범위·교육 대상처럼 "앞으로 일이 생기는" 목록 전용.
+  // liveMembers()는 그대로 둔다: 인사·권한관리 화면이 퇴사자를 그려야 하고, 과거 지시·기성·계약의 담당자 이름 해석(findMember)이 여기 걸려 있다.
+  function activeMembers(){ return liveMembers().filter(function(m){ return !memberRetired(m); }); }
   function findMember(id){ for (var i=0;i<members.length;i++){ if (members[i].id === id) return members[i]; } return null; }
   // 자동로그인 기본 OFF: 세션 저장이 기본, "로그인 유지" 체크 시에만 localStorage 영구 저장.
   function getMemberId(){
@@ -16878,8 +16905,9 @@
     var html = '<div class="scope-hint">비우면 전체공개 · 체크한 대상만 공개</div>';
     html += '<div class="scope-hint">부서</div>' + DEPT_LIST.map(function(d){ return box("dept:"+d, d+" 전체"); }).join("");
     html += '<div class="scope-hint">직급 이상</div>' + RANK_LIST.map(function(r){ return box("rank:"+r, r+" 이상"); }).join("");
-    var ms = liveMembers();
-    html += '<div class="scope-hint">개별 직원</div>' + (ms.length ? ms.map(function(m){ return box(m.id, isBossMember(m)?"대표님":m.name, m.role||""); }).join("") : '<div class="mrole2" style="padding:4px;">회원이 없습니다.</div>');
+    // 퇴사자는 새 지정 대상에서 제외(v329) — 단 이미 체크된 퇴사자는 남긴다(숨기면 저장 시 scope에서 조용히 탈락). 이 한 곳이 지시·수정·정기업무·석면·기성·인허가 6개 패널을 함께 고친다
+    var ms = liveMembers().filter(function(m){ return !memberRetired(m) || sel.indexOf(m.id) >= 0; });
+    html += '<div class="scope-hint">개별 직원</div>' + (ms.length ? ms.map(function(m){ return box(m.id, memberOptLabel(m), m.role||""); }).join("") : '<div class="mrole2" style="padding:4px;">회원이 없습니다.</div>');
     return html;
   }
   function renderMemberChecks(hostId, selectedIds){
@@ -17294,11 +17322,56 @@
       drawHrRoster();
     });
   }
+  // 퇴사자 그룹 펼침은 기기별로 기억(운반일지 빈 줄 토글 AB_HIDE_EMPTY_KEY와 같은 방식). 기본 접힘.
+  var HR_RET_OPEN_KEY = "jw_hr_ret_open";
+  var hrRetOpen = false;
+  try{ hrRetOpen = localStorage.getItem(HR_RET_OPEN_KEY) === "1"; }catch(e){}
+  function hrRetToggle(){
+    // 퇴사자 카드를 연 채로 그룹을 접으면 #memberEditForm(앱 전체에 1개)이 display:none 안에 갇혀 다른 화면의 인사 카드까지 죽는다 → 먼저 홀더로 복귀
+    if (hrOpenId && memberRetired(findMember(hrOpenId))) hrCollapse();
+    hrRetOpen = !hrRetOpen;
+    try{ localStorage.setItem(HR_RET_OPEN_KEY, hrRetOpen ? "1" : "0"); }catch(e){}
+    drawHrRoster();
+  }
+  // 인사 명부 한 줄. isRet=퇴사자 — 근속은 퇴사일에 정지(serviceInfo asOf)하고, 연차 잔여(오늘 기준으로 계속 굴러감)는 빼고 퇴직 연차수당만 남긴다.
+  function hrRowHtml(m, isRet){
+    var nm = (typeof m.seq==="number" ? m.seq + ". " : "") + (isBossMember(m) ? (m.name + " (대표님)") : m.name);
+    var meta = [(isRet && m.dept) ? m.dept : "", m.role || "", m.rank || ""].filter(Boolean).join(" · ");   // 퇴사자는 부서 그룹을 벗어나므로 부서를 메타 앞머리에
+    var hr = [];
+    if(m.hire_date){ var si=serviceInfo(m, isRet ? m.leave_date : null); hr.push("입사 " + m.hire_date); if(si) hr.push("근속 " + (Math.floor(si.years*10)/10) + "년"); }
+    if(!isRet){
+      if(m.annual_paid){
+        hr.push("연차 " + computeAnnual(m) + "일(수당포함·사용불가)" + (typeof m.annual_days==="number" ? "(수동)" : ""));
+      } else {
+        var lr=leaveRemaining(m.id);
+        var gl=(lr.mode==="base")?"기준값":"부여";
+        hr.push("연차 잔여 " + lr.left + " (" + gl + " " + lr.grant + " · 사용 " + lr.used + (lr.scheduled?" · 예정 "+lr.scheduled:"") + (lr.mode!=="base"&&lr.expired?" · 소멸 "+lr.expired:"") + ")");
+      }
+    }
+    if(m.leave_date) hr.push("퇴사 " + m.leave_date);
+    var sev = severanceAnnual(m);
+    if(sev) hr.push("퇴직 연차수당 " + sev.days + "일(" + (sev.under1 ? "1년미만" : "1년이상") + ")");
+    var chips = "";
+    if(!isRet && m.leave_date) chips += ' <span class="review-chip">퇴사예정 ' + esc(m.leave_date) + '</span>';   // 미래 퇴사일 = 아직 재직 → 부서 그룹에 두고 칩으로만 구분
+    if(m.on_loa) chips += ' <span class="scope-chip">휴직중' + esc((m.loa_start?" "+m.loa_start:"") + (m.loa_end?"~"+m.loa_end:"")) + '</span>';
+    var hrLine = '<div class="mrole" style="margin-top:1px;opacity:.9;">' + esc(hr.join(" · ")) + '</div>';
+    return '<div class="hr-item">' +
+      '<div class="hr-head' + (hrOpenId === m.id ? ' open' : '') + '" data-hr-toggle="' + m.id + '">' +
+        '<div class="minfo"><div class="mname">' + esc(nm) + (m.admin ? ' 👑' + tierBadgeHtml(m) : '') + chips + '</div><div class="mrole">' + esc(meta) + '</div>' + hrLine + '</div>' +
+        '<span class="hr-caret">▾</span>' +
+      '</div>' +
+      '<div class="hr-panel" id="hrpanel-' + m.id + '" style="display:none;"></div>' +
+      '</div>';
+  }
   function drawHrRoster(){
     var host = document.getElementById("hrRoster"); if (!host) return;
     var mem = liveMembers();
+    // v329 퇴사직원 분류(PM 9/8): 재직(퇴사예정·휴직 포함)은 종전대로 부서 그룹, 퇴사자는 맨 아래 접이식 '퇴사자' 그룹으로 분리.
+    // 판정은 memberRetired(m) 하나만 쓴다(서버 _lib/tier.js retired와 같은 식) — 인사 탭에 새 판정식을 만들지 않는다.
+    var act = [], ret = [];
+    mem.forEach(function(m){ if (memberRetired(m)) ret.push(m); else act.push(m); });
     var groups = {}; DEPT_LIST.forEach(function(d){ groups[d] = []; }); groups["미지정"] = [];
-    mem.forEach(function(m){ var d = (m.dept && DEPT_LIST.indexOf(m.dept) >= 0) ? m.dept : "미지정"; groups[d].push(m); });
+    act.forEach(function(m){ var d = (m.dept && DEPT_LIST.indexOf(m.dept) >= 0) ? m.dept : "미지정"; groups[d].push(m); });
     var html = "";
     DEPT_LIST.concat(["미지정"]).forEach(function(d){
       var list = groups[d]; if (!list.length) return;
@@ -17307,42 +17380,36 @@
         if (sa !== sb) return sa - sb;
         return ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role);
       });
-      html += '<div class="hr-dept"><div class="hr-dept-h">' + esc(d) + ' <span class="cnt">' + list.length + '</span></div>';
-      list.forEach(function(m){
-        var nm = (typeof m.seq==="number" ? m.seq + ". " : "") + (isBossMember(m) ? (m.name + " (대표님)") : m.name);
-        var meta = [m.role || "", m.rank || ""].filter(Boolean).join(" · ");
-        var hr = [];
-        if(m.hire_date){ var si=serviceInfo(m); hr.push("입사 " + m.hire_date); if(si) hr.push("근속 " + (Math.floor(si.years*10)/10) + "년"); }
-        if(m.annual_paid){
-          hr.push("연차 " + computeAnnual(m) + "일(수당포함·사용불가)" + (typeof m.annual_days==="number" ? "(수동)" : ""));
-        } else {
-          var lr=leaveRemaining(m.id);
-          var gl=(lr.mode==="base")?"기준값":"부여";
-          hr.push("연차 잔여 " + lr.left + " (" + gl + " " + lr.grant + " · 사용 " + lr.used + (lr.scheduled?" · 예정 "+lr.scheduled:"") + (lr.mode!=="base"&&lr.expired?" · 소멸 "+lr.expired:"") + ")");
-        }
-        if(m.on_loa) hr.push("휴직중" + (m.loa_start?" "+m.loa_start:"") + (m.loa_end?"~"+m.loa_end:""));
-        if(m.leave_date) hr.push("퇴사 " + m.leave_date);
-        var sev = severanceAnnual(m);
-        if(sev) hr.push("퇴직 연차수당 " + sev.days + "일(" + (sev.under1 ? "1년미만" : "1년이상") + ")");
-        var hrLine = '<div class="mrole" style="margin-top:1px;opacity:.9;">' + esc(hr.join(" · ")) + '</div>';
-        html += '<div class="hr-item">' +
-          '<div class="hr-head' + (hrOpenId === m.id ? ' open' : '') + '" data-hr-toggle="' + m.id + '">' +
-            '<div class="minfo"><div class="mname">' + esc(nm) + (m.admin ? ' 👑' + tierBadgeHtml(m) : '') + '</div><div class="mrole">' + esc(meta) + '</div>' + hrLine + '</div>' +
-            '<span class="hr-caret">▾</span>' +
-          '</div>' +
-          '<div class="hr-panel" id="hrpanel-' + m.id + '" style="display:none;"></div>' +
-          '</div>';
-      });
+      html += '<div class="hr-dept"><div class="hr-dept-h">' + esc(d) + ' <span class="cnt">' + list.length + '</span></div>';   // 부서 카운트는 재직자만
+      list.forEach(function(m){ html += hrRowHtml(m, false); });
       html += '</div>';
     });
     var reopen = hrOpenId;
+    // 저장 후 재오픈 대상이 퇴사자면 그 화면에서만 강제로 펼친다(기억값은 건드리지 않는다 — 접힌 그룹 안에서 폼이 안 보이는 사고 방지)
+    var openRet = hrRetOpen || !!(reopen && memberRetired(findMember(reopen)));
+    if (ret.length){
+      ret.sort(function(a, b){
+        var la = String(a.leave_date || ""), lb = String(b.leave_date || "");
+        if (la !== lb) return la < lb ? 1 : -1;   // 최근 퇴사가 위
+        var sa = (typeof a.seq==="number") ? a.seq : 1e9, sb = (typeof b.seq==="number") ? b.seq : 1e9;
+        return sa - sb;
+      });
+      html += '<div class="hr-dept hr-ret">' +
+        '<button type="button" class="hr-dept-h hr-ret-h' + (openRet ? ' open' : '') + '" id="hrRetToggle" aria-expanded="' + (openRet ? "true" : "false") + '" aria-controls="hrRetBody" aria-label="퇴사자 ' + ret.length + '명 목록 ' + (openRet ? "접기" : "펼치기") + '">' +
+          '<span class="hr-ret-t">퇴사자 <span class="cnt">' + ret.length + '</span></span><span class="hr-caret">▾</span></button>' +
+        '<div id="hrRetBody"' + (openRet ? '' : ' style="display:none;"') + '>' +
+        '<div class="hr-ret-note">로그인·데이터 접근은 서버가 차단 중입니다 — 인사 기록 보존용(퇴사일 정정·연차 정산은 카드를 열어 수정).</div>';
+      ret.forEach(function(m){ html += hrRowHtml(m, true); });
+      html += '</div></div>';
+    }
     hrOpenId = null;  // DOM 재생성으로 이전 패널 무효화 → 상태 초기화 후 재오픈
     host.innerHTML = html || '<div class="empty-line">직원이 없습니다.</div>';
-    var total = document.getElementById("hrTotal"); if (total) total.textContent = "총 " + mem.length + "명";
+    var total = document.getElementById("hrTotal"); if (total) total.textContent = ret.length ? ("재직 " + act.length + "명 · 퇴사 " + ret.length + "명") : ("총 " + act.length + "명");
     var banner = document.getElementById("hrStartBanner"); if (banner) banner.style.display = (isAdmin() && !hrStarted()) ? "" : "none";
     Array.prototype.forEach.call(host.querySelectorAll("[data-hr-toggle]"), function(el){
       el.addEventListener("click", function(){ hrToggle(el.getAttribute("data-hr-toggle")); });
     });
+    var retBtn = document.getElementById("hrRetToggle"); if (retBtn) retBtn.addEventListener("click", hrRetToggle);
     if (reopen && findMember(reopen)) hrToggle(reopen);
   }
   function hrStarted(){ return liveMembers().some(function(m){ return !!m.annual_base_date; }); }
@@ -17473,9 +17540,9 @@
     if (!isAdmin()){ switchTab("dash"); return; }
     var host = document.getElementById("permRoster"); if (!host) return;
     // 퇴사자는 맨 아래 구분선 밑으로(서버가 접근을 이미 차단하므로 설정 대상이 아님 — 이력 보존용 표시만, PM 지시 2026-08-05)
-    var pmRetired = function(m){ return !!(m.leave_date && String(m.leave_date) <= todayStr()); };
+    // 판정식은 memberRetired 하나로(v329) — 종전 지역 pmRetired는 <=라 퇴사일 당일에 화면은 "접근 차단됨", 서버(_lib/tier.js <)는 정상 허용이라 하루 어긋났다
     var mem = liveMembers().slice().sort(function(a,b){
-      var ra = pmRetired(a) ? 1 : 0, rb = pmRetired(b) ? 1 : 0;
+      var ra = memberRetired(a) ? 1 : 0, rb = memberRetired(b) ? 1 : 0;
       if (ra !== rb) return ra - rb;
       return ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role);
     });
@@ -17483,7 +17550,7 @@
     var head = '<tr><th class="pm-nm">이름</th>' + mods.map(function(x){ return '<th>' + MOD_LABEL[x] + '</th>'; }).join("") + '</tr>';
     var retDivDone = false;
     var rows = mem.map(function(m){
-      var ret = pmRetired(m);
+      var ret = memberRetired(m);
       var div = "";
       if (ret && !retDivDone){ retDivDone = true; div = '<tr><td colspan="' + (mods.length + 1) + '" style="color:var(--sub);font-size:12px;padding:8px 6px 4px;border-top:2px solid rgba(128,148,138,.35);">퇴사자 — 서버가 로그인·데이터 접근을 차단 중(설정 불필요, 이력 보존용)</td></tr>'; }
       var nm = isBossMember(m) ? (m.name + " (대표님)") : m.name;

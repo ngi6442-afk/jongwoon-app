@@ -43,6 +43,13 @@ async function loadMembers() {
 async function tierCtx() { return tier.ctxOf(await loadMembers()); }
 // 관리자 회원 id 목록(개찰결과 등 전사 알림 대상) — 재직 관리자만
 async function adminIds() { return (await tierCtx()).adminIds; }
+// 활성(재직·미삭제) 회원 id 집합 — 수신자 필터용. opts.ctx로 이미 만든 tierCtx를 넘기면 회원 재스캔을 하지 않는다.
+async function activeIdSet(ctx) {
+  const c = ctx || await tierCtx();
+  const s = Object.create(null);
+  (c.members || []).forEach(function (m) { if (m && m.id) s[m.id] = 1; });
+  return s;
+}
 
 // payload: {title, body, url, tag} / opts: {primaryOnly, logOnly}
 // primaryOnly=true(결재 2차, 배치도 결정 ③ "알림=우선기기 1발"): 회원별로 primary 구독이 있으면
@@ -50,24 +57,37 @@ async function adminIds() { return (await tierCtx()).adminIds; }
 // 알림을 아예 못 받는 사고 방지. 만료(404/410) 제거는 현행 유지.
 // logOnly=true(결재 3차, 명세 §4.2 "알림함만"): push:log 이력만 남기고 웹푸시는 발사하지 않는다 —
 // ②라인 중간 단계(PM 승인 완료)처럼 담당이 할 일이 없는 통지는 기기를 깨우지 않는다는 결정.
+// 수신자 활성 필터(v329) — 회원 레코드가 없거나 삭제(del)·퇴사(leave_date 경과)한 id는 발송에서도 알림함(push:log)에서도 뺀다.
+// push:subs는 퇴사해도 회수되지 않으므로(구독은 그 사람 폰에 살아 있다) id가 수신자 목록에 들기만 하면 알림이 그대로 닿았다.
+// gw-todo-cron(무인 08시)·gw-data handlePushSend(담당 지정)·결재 결과 통지가 전부 이 함수를 지나므로 여기 한 곳이 공통 관문이다.
 async function sendTo(memberIds, payload, opts) {
+  const asked = Array.isArray(memberIds) ? memberIds : [];
+  let ids = asked, skipped = 0;
+  if (asked.length) {
+    const act = await activeIdSet(opts && opts.ctx);
+    ids = asked.filter(function (id) { return !!act[id]; });
+    skipped = asked.length - ids.length;
+  }
   // 알림함(push:log) — 폰 팝업이 지나가면 다시 볼 곳이 없다는 PM 지적(2026-08-20).
   // 발송 전에 남기고(구독이 없어도 이력은 남게), 이력 실패가 발송을 막지 않는다. 최근 100건 링.
   try {
     const lr = await blobGet(store(DATA), 'push:log');
     const ldoc = (lr.ok && lr.data && Array.isArray(lr.data.items)) ? lr.data : { schema: 1, items: [] };
-    ldoc.items.push({ ts: Date.now(), title: String(payload.title || ''), body: String(payload.body || ''),
-      url: String(payload.url || ''), tag: String(payload.tag || ''), to: memberIds.slice(0, 30) });
+    const ent = { ts: Date.now(), title: String(payload.title || ''), body: String(payload.body || ''),
+      url: String(payload.url || ''), tag: String(payload.tag || ''), to: ids.slice(0, 30) };
+    if (skipped) ent.skipped = skipped;   // 가시화 — 퇴사자로 흘러가던 알림이 몇 건 끊겼는지 이력에 남는다
+    ldoc.items.push(ent);
     if (ldoc.items.length > 100) ldoc.items = ldoc.items.slice(-100);
     await blobSet(store(DATA), 'push:log', ldoc);
   } catch (e) {}
-  if (opts && opts.logOnly === true) return { sent: 0, removed: 0 };
+  if (opts && opts.logOnly === true) return { sent: 0, removed: 0, skipped: skipped };
+  if (!ids.length) return { sent: 0, removed: 0, skipped: skipped };
   const keys = await getKeys();
   webpush.setVapidDetails('mailto:ngi6442@gmail.com', keys.publicKey, keys.privateKey);
   const doc = await getSubs();
   const body = JSON.stringify(payload);
   let sent = 0, removed = 0;
-  for (const mid of memberIds) {
+  for (const mid of ids) {
     const subs = doc.members[mid] || [];
     const wantPrimary = !!(opts && opts.primaryOnly === true) && subs.some(function (x) { return x && x.primary; });
     // pass 0 = primary 기기만. 한 발도 못 나가면(만료 제거 등) pass 1에서 나머지 구독 폴백 —
@@ -93,7 +113,7 @@ async function sendTo(memberIds, payload, opts) {
     if (subs.length) doc.members[mid] = subs; else delete doc.members[mid];
   }
   if (removed) { try { await saveSubs(doc); } catch (e) {} }
-  return { sent, removed };
+  return { sent, removed, skipped };
 }
 
 // 대표 회원 id — 관리자 등급(v321, _lib/tier.js) tier boss(명시 tier·부트스트랩 규칙은 tierCtx). 클라 isBossMember와 같은 축. 운반일지 결재 라우팅·BOSS_ONLY 게이트 전용(9/3 PM 결정).
@@ -106,4 +126,4 @@ async function pmIds() { return (await tierCtx()).pmIds; }
 // ①·② 1단계 결재 요청 수신자 — tier pm이 없으면(1인 관리자=대표뿐 등) 관리자 전원 폴백(교착 방지 — PM 큐 게이트도 pm 0명이면 관리자 전원에게 열린다, 종전 유지)
 async function pmOrAdminIds() { const p = await pmIds(); return p.length ? p : await adminIds(); }
 
-module.exports = { getKeys, getSubs, saveSubs, sendTo, loadMembers, tierCtx, adminIds, bossIds, bossOrAdminIds, pmIds, pmOrAdminIds };
+module.exports = { getKeys, getSubs, saveSubs, sendTo, loadMembers, tierCtx, activeIdSet, adminIds, bossIds, bossOrAdminIds, pmIds, pmOrAdminIds };
