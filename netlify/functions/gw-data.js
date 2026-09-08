@@ -954,9 +954,10 @@ async function handleBidsResults(event, d, R) {
     // 낙찰/유찰 확정 → 관리자 웹푸시(실패해도 수신 처리는 성공으로)
     if (ev.length) {
       try {
-        const ids = await push.adminIds();
+        const tcB = await push.tierCtx();   // 스캔 1회 — 수신자 목록과 sendTo 활성 필터에 같은 컨텍스트를 쓴다
+        const ids = tcB.adminIds;
         if (ids.length) await push.sendTo(ids, { title: '개찰결과 ' + ev.length + '건',
-          body: ev.map(function (x) { return x.t; }).join('\n').slice(0, 300), url: './', tag: 'bids-result' });
+          body: ev.map(function (x) { return x.t; }).join('\n').slice(0, 300), url: './', tag: 'bids-result' }, { ctx: tcB });
       } catch (e) {}
     }
   }
@@ -972,12 +973,13 @@ async function handleBotNotify(event, d, R) {
   const tag = String(d.tag || 'bot-notify').slice(0, 30);
   // 반환값은 실제 발송 결과(sent=성공한 기기 수). 관리자 수와 혼동하면 안 된다(과거 오보 원인).
   try {
-    const ids = await push.adminIds();
+    const tcN = await push.tierCtx();   // 스캔 1회 — adminIds와 sendTo 활성 필터 공용
+    const ids = tcN.adminIds;
     const subs = await push.getSubs();
     const devices = ids.reduce(function (n, id) { return n + ((subs.members[id] || []).length); }, 0);
     if (!ids.length) return jr(200, { status: 'OK', sent: 0, admins: 0, devices: 0, note: '관리자 없음', request_id: R });
     if (!devices) return jr(200, { status: 'OK', sent: 0, admins: ids.length, devices: 0, note: '구독 기기 없음 — 각 기기에서 [알림 켜기] 필요', request_id: R });
-    const r = await push.sendTo(ids, { title: title, body: body, url: './', tag: tag });
+    const r = await push.sendTo(ids, { title: title, body: body, url: './', tag: tag }, { ctx: tcN });
     return jr(200, { status: 'OK', sent: r.sent, removed: r.removed, admins: ids.length, devices: devices, request_id: R });
   } catch (e) {
     return jr(200, { status: 'OK', sent: 0, note: 'push 예외: ' + String(e && e.message || e).slice(0, 80), request_id: R });
@@ -1138,7 +1140,7 @@ async function handlePushSend(event, d, R) {
     else if (to === '__admins__') ids = tc.adminIds.filter(function (id) { return id !== c.member.id; });   // 본인 행동 알림은 본인 제외
     else ids = [to];
     if (!ids.length) return jr(200, { status: 'OK', sent: 0, request_id: R });
-    const rres = await push.sendTo(ids, payload, { ctx: tc });   // 퇴사·삭제 회원 id로는 발사되지 않는다(v329)
+    const rres = await push.sendTo(ids, payload, { ctx: tc, by: c.member.id });   // 퇴사·삭제 회원 id로는 발사되지 않는다(v329) · 발신자는 알림함 이력에 남긴다
     return jr(200, { status: 'OK', sent: rres.sent, skipped: rres.skipped || 0, request_id: R });
   } catch (e) { return jr(500, { status: 'ERROR', error_code: 'PUSH_SEND_FAILED', request_id: R }); }
 }
@@ -1434,7 +1436,7 @@ async function apprCreateItem(st, member, o) {
       // 대표 전용 건은 대표에게만(없으면 관리자 폴백). sendTo는 수신자가 없어도 알림함 이력을 남긴다(관리자 확인용)
       const uids = (apprBossOnly(dr2) ? tcBossOrAdmin(tc) : tc.adminIds).filter(function (id) { return id !== member.id; });
       await push.sendTo(uids, { title: '결재 요청(정정): ' + title.slice(0, 40), body: '[' + dr2.kind + '] 정정 ' + member.name, url: './', tag: 'appr-' + dr2.id },
-        dr2.kind === '운반일지' ? null : { primaryOnly: true });
+        dr2.kind === '운반일지' ? { ctx: tc } : { ctx: tc, primaryOnly: true });
     } catch (e) {}
     return { ok: true, id: dr2.id, updated: true };
   }
@@ -1490,7 +1492,7 @@ async function apprCreateItem(st, member, o) {
     const ids = (apprBossOnly(item) ? tcBossOrAdmin(tc)
       : (item.grade ? tcPmOrAdmin(tc) : tc.adminIds)).filter(function (id) { return id !== member.id; });
     await push.sendTo(ids, { title: '결재 요청: ' + title.slice(0, 40), body: '[' + item.kind + '] 기안 ' + member.name, url: './', tag: 'appr-' + item.id },
-      item.kind === '운반일지' ? null : { primaryOnly: true });
+      item.kind === '운반일지' ? { ctx: tc } : { ctx: tc, primaryOnly: true });
   } catch (e) {}
   return { ok: true, id: item.id };
 }
@@ -1593,10 +1595,10 @@ async function handleApprovalDecide(event, d, R) {
     if (isPmStep) {
       const bIds = tcBossOrAdmin(tc).filter(function (id) { return id !== c.member.id; });
       await push.sendTo(bIds, { title: '결재 요청: ' + String(it.title || '').slice(0, 40),
-        body: '[' + it.kind + '] PM 승인 완료 → 대표 (2/2)', url: './', tag: 'appr-' + it.id }, { primaryOnly: true });
+        body: '[' + it.kind + '] PM 승인 완료 → 대표 (2/2)', url: './', tag: 'appr-' + it.id }, { ctx: tc, primaryOnly: true });
       if (it.by && it.by.id && it.by.id !== c.member.id && it.by.id !== '__system__')
         await push.sendTo([it.by.id], { title: '결재 진행: ' + String(it.title || '').slice(0, 40),
-          body: 'PM 승인 완료 · 대표 대기', url: './', tag: 'appr-' + it.id }, { logOnly: true });
+          body: 'PM 승인 완료 · 대표 대기', url: './', tag: 'appr-' + it.id }, { ctx: tc, logOnly: true });
     } else if (it.kind !== '전결총정리') {
       const isSys = !!(it.by && it.by.id === '__system__');
       const toIds = isSys
@@ -1605,7 +1607,7 @@ async function handleApprovalDecide(event, d, R) {
       if (toIds.length || isSys)   // 자동상신은 대상이 없어도(1인 관리자) 호출 — sendTo가 알림함 이력(push:log)은 남긴다
         await push.sendTo(toIds, { title: '결재 ' + decision + ': ' + String(it.title || '').slice(0, 40) + (isSys ? ' (자동상신)' : ''),
           body: reason ? '사유: ' + reason.slice(0, 150) : (decision === '승인' ? '승인되었습니다' : ''), url: './', tag: 'appr-' + it.id },
-          (isSys || itGrade) ? { primaryOnly: true } : null);   // 등급 건·자동상신 결과는 우선기기 1발(결정 ③), 구건은 현행(전 기기)
+          (isSys || itGrade) ? { ctx: tc, primaryOnly: true } : { ctx: tc });   // 등급 건·자동상신 결과는 우선기기 1발(결정 ③), 구건은 현행(전 기기). ctx 재사용 — 결재 1건에 회원 전수 재스캔이 2~3회 붙던 것 제거
     }
   } catch (e) {}
   return jr(200, { status: 'OK', id: it.id, decided: it.status, to: it.to, base: newBase, request_id: R });

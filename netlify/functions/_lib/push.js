@@ -25,27 +25,35 @@ async function getSubs() {
 }
 async function saveSubs(doc) { return blobSet(store(DATA), 'push:subs', doc); }
 
-// 회원 전수 로드(원본 레코드 — 재직·삭제 여부는 tier.ctxOf가 거른다). 스캔 1회로 등급 컨텍스트를 만드는 재료
+// 회원 전수 로드(원본 레코드 — 재직·삭제 여부는 tier.ctxOf가 거른다). 스캔 1회로 등급 컨텍스트를 만드는 재료.
+// **못 읽은 것과 없는 것은 다르다**: gw_users list가 한 번 튀면 종전엔 빈 명부를 돌려줘 sendTo의 활성 필터가
+// 수신자를 전원 '퇴사'로 판정하고 그 시간대 알림(결재·운반일지·화관법·개찰·할 일 크론)이 통째로 무음 차단됐다(200 OK / sent:0).
+// 그래서 실패를 out.unavailable로 표시해 위층(activeIdSet)이 필터를 아예 걸지 않도록(fail-open) 한다 —
+// 로그인·세션·데이터 차단은 gw-auth/gw-data의 retired 게이트가 이미 하므로 이 필터는 2차 방어다.
 async function loadMembers() {
   const st = store(USERS);
   const l = await blobList(st, 'member:');
-  if (!l.ok) return [];
+  if (!l.ok) { const bad = []; bad.unavailable = true; return bad; }
   const out = [];
+  let miss = 0;
   for (const k of l.keys) {
     if (k.indexOf('member:') !== 0) continue;
     const r = await blobGet(st, k);
-    if (r.ok && r.data && r.data.id) out.push(r.data);
+    if (r.ok && r.data && r.data.id) out.push(r.data); else miss++;   // 개별 읽기 실패도 '없는 사람'으로 굳히지 않는다
   }
+  if (miss) out.unavailable = true;
   return out;
 }
 // 관리자 등급 컨텍스트(v321·9/6 검증 반영) — {members, bootstrap, tierOf(m), isBoss(m), isPm(m), bossIds, pmIds, adminIds}. _lib/tier.js ctxOf:
 // 명시 tier만 신뢰, 재직 관리자 전원이 미지정일 때만 파생(부트스트랩), 퇴사(leave_date 경과)·삭제 회원 제외. 게이트(gw-data)는 이 컨텍스트 하나로 요청자 등급·수신자 목록을 함께 판정한다(스캔 1회)
-async function tierCtx() { return tier.ctxOf(await loadMembers()); }
+async function tierCtx() { const ms = await loadMembers(); const c = tier.ctxOf(ms); if (ms.unavailable) c.unavailable = true; return c; }   // 미가용 표시는 ctxOf가 거르므로 여기서 다시 얹는다
 // 관리자 회원 id 목록(개찰결과 등 전사 알림 대상) — 재직 관리자만
 async function adminIds() { return (await tierCtx()).adminIds; }
 // 활성(재직·미삭제) 회원 id 집합 — 수신자 필터용. opts.ctx로 이미 만든 tierCtx를 넘기면 회원 재스캔을 하지 않는다.
+// 명부를 못 읽었으면 **null**(= 판정 불가)을 돌려준다. 호출자는 null이면 거르지 않는다 — 빈 집합과 구분되어야 무음 전멸이 안 난다.
 async function activeIdSet(ctx) {
   const c = ctx || await tierCtx();
+  if (c && c.unavailable) return null;
   const s = Object.create(null);
   (c.members || []).forEach(function (m) { if (m && m.id) s[m.id] = 1; });
   return s;
@@ -62,11 +70,13 @@ async function activeIdSet(ctx) {
 // gw-todo-cron(무인 08시)·gw-data handlePushSend(담당 지정)·결재 결과 통지가 전부 이 함수를 지나므로 여기 한 곳이 공통 관문이다.
 async function sendTo(memberIds, payload, opts) {
   const asked = Array.isArray(memberIds) ? memberIds : [];
-  let ids = asked, skipped = 0;
+  let ids = asked, skipped = 0, filterOff = false;
   if (asked.length) {
     const act = await activeIdSet(opts && opts.ctx);
-    ids = asked.filter(function (id) { return !!act[id]; });
-    skipped = asked.length - ids.length;
+    if (act) {
+      ids = asked.filter(function (id) { return !!act[id]; });
+      skipped = asked.length - ids.length;
+    } else filterOff = true;   // 명부 미가용 — 거르지 않고 보낸다(퇴사자 1건이 새는 것보다 회사 전체가 무음이 되는 쪽이 나쁘다)
   }
   // 알림함(push:log) — 폰 팝업이 지나가면 다시 볼 곳이 없다는 PM 지적(2026-08-20).
   // 발송 전에 남기고(구독이 없어도 이력은 남게), 이력 실패가 발송을 막지 않는다. 최근 100건 링.
@@ -76,6 +86,8 @@ async function sendTo(memberIds, payload, opts) {
     const ent = { ts: Date.now(), title: String(payload.title || ''), body: String(payload.body || ''),
       url: String(payload.url || ''), tag: String(payload.tag || ''), to: ids.slice(0, 30) };
     if (skipped) ent.skipped = skipped;   // 가시화 — 퇴사자로 흘러가던 알림이 몇 건 끊겼는지 이력에 남는다
+    if (filterOff) ent.filter_unavailable = true;   // 회원 명부를 못 읽어 필터를 건너뛴 발송(감지 — 조용히 지나가지 않게)
+    if (opts && opts.by) ent.by = String(opts.by).slice(0, 40);   // 발신자(push_send는 임의 제목·본문을 실을 수 있다 — 최소한 누가 쐈는지는 남는다)
     ldoc.items.push(ent);
     if (ldoc.items.length > 100) ldoc.items = ldoc.items.slice(-100);
     await blobSet(store(DATA), 'push:log', ldoc);

@@ -201,8 +201,9 @@ async function autoDraftApproval(st) {
   // 대표 전용 푸시(9/3) — 전 기기 유지(배치도 결정 ① 예외: 오피스PC 팝업+폰 병행, primaryOnly 미적용). 대표 계정이 없으면 관리자 전원 폴백.
   // sendTo는 수신자가 없어도 알림함(push:log)에 남기므로 관리자 알림함이 '확인용' 이력이 된다.
   try {
-    const ids = await push.bossOrAdminIds();
-    await push.sendTo(ids, { title: '결재 요청: 운반일지 ' + day, body: body.slice(0, 200), url: './', tag: 'appr-' + item.id });
+    const tcA = await push.tierCtx();   // 스캔 1회 — 수신자 목록과 sendTo 활성 필터 공용
+    const ids = tcA.bossIds.length ? tcA.bossIds : tcA.adminIds;   // push.bossOrAdminIds와 같은 규칙(대표 0명이면 관리자 폴백 — 알림 전용)
+    await push.sendTo(ids, { title: '결재 요청: 운반일지 ' + day, body: body.slice(0, 200), url: './', tag: 'appr-' + item.id }, { ctx: tcA });
   } catch (e) {}
 }
 
@@ -382,10 +383,11 @@ exports.handler = async function (event, context) {
         if (prev.ok && prev.data && prev.data.sig === sig) needUnmatched = false;
       }
       if (needFail || needUnmatched) {
-        const ids = await push.adminIds();
+        const tcF = await push.tierCtx();   // 스캔 1회 — adminIds와 sendTo 활성 필터 공용
+        const ids = tcF.adminIds;
         if (ids.length) {
-          if (needFail) await push.sendTo(ids, { title: '올바로 수집 실패', body: failSummary(rec.log), url: './', tag: 'allbaro' });
-          if (needUnmatched) await push.sendTo(ids, { title: '운반일지 미매칭', body: (unmatchedDays.join(' · ') + ' — 노선표 확인 필요').slice(0, 280), url: './', tag: 'allbaro-unmatched' });
+          if (needFail) await push.sendTo(ids, { title: '올바로 수집 실패', body: failSummary(rec.log), url: './', tag: 'allbaro' }, { ctx: tcF });
+          if (needUnmatched) await push.sendTo(ids, { title: '운반일지 미매칭', body: (unmatchedDays.join(' · ') + ' — 노선표 확인 필요').slice(0, 280), url: './', tag: 'allbaro-unmatched' }, { ctx: tcF });
         }
       }
       if (unmatchedTotal > 0) { if (needUnmatched) await blobSet(st, 'allbaro:lastnotify', { sig: sig, ts: Date.now() }); }

@@ -1740,6 +1740,26 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
     const res35d = await realPush35.sendTo([], { title: 'z', body: '', url: './', tag: 'g' });
     T('push.sendTo([]): 자동상신처럼 대상이 없어도 알림함 이력은 종전대로 남는다(skipped 0)', res35d.skipped === 0 && mem.gw_data['push:log'].items.slice(-1)[0].title === 'z' && mem.gw_data['push:log'].items.slice(-1)[0].skipped === undefined, JSON.stringify(res35d));
     T('activeIdSet: 재직·퇴사예정만 활성 — 퇴사·삭제 제외', (await realPush35.activeIdSet()).uliv === 1 && (await realPush35.activeIdSet()).usoon === 1 && (await realPush35.activeIdSet()).uret === undefined && (await realPush35.activeIdSet()).udel35 === undefined, '');
+    // ---- v330: 명부 미가용(gw_users list 실패)은 "전원 퇴사"가 아니다 — 필터를 건너뛴다(fail-open) ----
+    // 종전(v329)엔 blobList 한 번이 튀면 members:[] → activeIdSet 빈 집합 → 수신자 전원 탈락 → 결재·운반일지·화관법·개찰·할 일 알림이
+    // 그 시간대에 통째로 무음 차단(200 OK / sent:0)됐다. push.js가 blobs를 로드시 구조분해하므로 실패 주입 뒤 모듈을 다시 읽는다.
+    {
+      const savedList35 = blobsMock.blobList;
+      blobsMock.blobList = async (st) => (String(st) === 'gw_users' ? { ok: false, code: 'LIST_FAILED' } : savedList35(st));
+      delete require.cache[pp];
+      const pushFail35 = require(pp);
+      require.cache[pp] = savedPush35;
+      T('activeIdSet: 회원 명부를 못 읽으면 null(판정 불가) — 빈 집합과 구분된다', (await pushFail35.activeIdSet()) === null, '');
+      delete mem.gw_data['push:log'];
+      const res35f = await pushFail35.sendTo(['uliv', 'uret'], { title: 'fo', body: '', url: './', tag: 'g' });
+      const last35f = (mem.gw_data['push:log'].items || []).slice(-1)[0] || {};
+      T('push.sendTo(명부 미가용): 수신자를 거르지 않고 보낸다(skipped 0 · to 원본 유지) · push:log에 filter_unavailable로 가시화 — 퇴사자 1건이 새는 것보다 회사 전체가 무음이 되는 쪽이 나쁘다',
+        res35f.skipped === 0 && (last35f.to || []).join() === 'uliv,uret' && last35f.filter_unavailable === true && last35f.skipped === undefined, JSON.stringify([res35f, last35f.to, last35f.filter_unavailable]));
+      const res35g = await pushFail35.sendTo(['uliv'], { title: 'by', body: '', url: './', tag: 'g' }, { by: 'uadm35' });
+      T('push.sendTo(opts.by): 발신자 id가 알림함 이력에 남는다(push_send는 임의 제목·본문을 실을 수 있다 — 최소한 누가 쐈는지)',
+        res35g.sent === 0 && mem.gw_data['push:log'].items.slice(-1)[0].by === 'uadm35', JSON.stringify(mem.gw_data['push:log'].items.slice(-1)[0]));
+      blobsMock.blobList = savedList35;
+    }
   }
   // ---- gw-todo-cron: 회원 레코드를 안 읽던 무인 크론에 활성 게이트 ----
   {
@@ -1755,6 +1775,16 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
       out35.ok === true && out35.skipped === 1 && out35.members === 2 && pushMock.calls.length === pc35 + 2, JSON.stringify(out35));
     T('gw-todo-cron: 퇴사자에겐 todo:sent 기록조차 남기지 않는다(쓰기 절약) · 재직·퇴사예정은 종전대로 발송·기록',
       !mem.gw_data['todo:sent:uret'] && !!mem.gw_data['todo:sent:uliv'] && !!mem.gw_data['todo:sent:usoon'], JSON.stringify(Object.keys(mem.gw_data).filter((k) => k.indexOf('todo:sent:') === 0)));
+    {   // v330: 명부 미가용(ctx.unavailable)이면 게이트를 걸지 않는다 — 종전 주석("ctx를 못 만들면 진행")은 tierCtx가 throw하지 않는 이 경로에서 죽은 코드였다
+      Object.keys(mem.gw_data).forEach((k) => { if (/^todo:sent:/.test(k)) delete mem.gw_data[k]; });
+      const savedTC35 = pushMock.tierCtx;
+      pushMock.tierCtx = async () => { const c = tierLib.ctxOf(membersOf()); c.unavailable = true; return c; };
+      const pc35b = pushMock.calls.length;
+      const out35b = JSON.parse((await cron35.handler({})).body || '{}');
+      pushMock.tierCtx = savedTC35;
+      T('gw-todo-cron(명부 미가용): 아무도 건너뛰지 않는다(skipped 0 · members 3) — 회원 스토어가 한 번 튀었다고 전원이 스킵되면 그날 아침 알림이 통째로 사라진다',
+        out35b.ok === true && out35b.skipped === 0 && out35b.members === 3 && pushMock.calls.length === pc35b + 3, JSON.stringify(out35b));
+    }
     Object.keys(mem.gw_data).forEach((k) => { if (/^priv:[^:]+:mytasks$/.test(k) || /^todo:sent:/.test(k)) delete mem.gw_data[k]; });
   }
   mem.gw_users = savedUsers35;

@@ -18,9 +18,12 @@ exports.handler = async function (event) {
   if (!l.ok) return { statusCode: 500, body: JSON.stringify({ ok: false, code: l.code || 'LIST_FAILED' }) };
   // 퇴사·삭제 회원은 건너뛴다(v329) — priv 블롭 키만 훑던 종전엔 회원 레코드를 한 번도 읽지 않아,
   // 퇴사자가 남겨둔 미래 기한 할 일이 있으면 접근이 막힌 그 사람 폰이 매일 08시에 울렸다(구독은 회수되지 않는다).
-  // 최종 관문은 push.sendTo의 활성 필터지만, 여기서 먼저 끊어 todo:sent 쓰기와 루프를 아낀다. ctx를 못 만들면 걸러내지 않고 진행(sendTo가 막는다).
+  // 최종 관문은 push.sendTo의 활성 필터지만, 여기서 먼저 끊어 todo:sent 쓰기와 루프를 아낀다. 명부를 못 읽으면 걸러내지 않고 진행한다(sendTo도 같은 규칙).
   let ctx = null;
   try { ctx = await push.tierCtx(); } catch (e) { ctx = null; }
+  // 게이트는 명부를 **실제로 읽었을 때만** 건다 — ctx.unavailable(스토어 list/get 실패)이나 0명이면 거르지 않는다.
+  // 종전 주석("ctx를 못 만들면 sendTo가 막는다")은 tierCtx가 throw하지 않는 이 실패 모드에서 성립하지 않았다(빈 명부 = 전원 스킵).
+  const gateOn = !!(ctx && !ctx.unavailable && (ctx.members || []).length);
   const activeSet = Object.create(null);
   if (ctx) (ctx.members || []).forEach(function (m) { if (m && m.id) activeSet[m.id] = 1; });
   let members = 0, items = 0, fails = 0, skipped = 0;
@@ -28,7 +31,7 @@ exports.handler = async function (event) {
     const m = /^priv:([^:]+):mytasks$/.exec(String(k));
     if (!m) continue;
     const mid = m[1];
-    if (ctx && !activeSet[mid]) { skipped++; continue; }   // 퇴사·삭제 회원
+    if (gateOn && !activeSet[mid]) { skipped++; continue; }   // 퇴사·삭제 회원
     const r = await blobGet(st, k);
     const list = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data.items : [];
     if (!list.length) continue;

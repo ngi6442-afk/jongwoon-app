@@ -36,8 +36,9 @@ exports.handler = async (event) => {
   const title = d.title ? String(d.title).slice(0, 60) : autoTitle; // 수집기 공용화(adwatch 등)
   const body = alerts.slice(0, 3).join('\n').slice(0, 280) + (alerts.length > 3 ? ' 외 ' + (alerts.length - 3) + '건' : '');
 
-  const ids = await push.adminIds();
+  const tcL2 = await push.tierCtx();   // 스캔 1회 — adminIds와 sendTo 활성 필터 공용
+  const ids = tcL2.adminIds;
   if (!ids.length) return jr(200, { status: 'OK', sent: 0, note: 'NO_ADMIN_SUBS' });
-  const r = await push.sendTo(ids, { title, body, url: './', tag: 'lawwatch' });
+  const r = await push.sendTo(ids, { title, body, url: './', tag: 'lawwatch' }, { ctx: tcL2 });
   return jr(200, { status: 'OK', sent: r.sent });
 };
