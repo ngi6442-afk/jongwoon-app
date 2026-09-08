@@ -1792,4 +1792,75 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   if (savedSubs35 === undefined) delete mem.gw_data['push:subs']; else mem.gw_data['push:subs'] = savedSubs35;
 }
 
+// ---- 36 주기업무 공개범위 롤백(v331, 2026-09-08 PM 실사고 재현) ----
+// 실사고: 관리자가 공개범위 6건을 "전체공개"로 비운 직후, 그날 오전부터 켜둔 직원 탭이 체크박스를 하나 누른 것만으로
+//         6건이 전부 부활했다(ver:checklist 17:27~17:34 실측 — 라이브가 8/11 상태로 회귀). 저장이 문서 통째 PUT이라
+//         직원 payload에 그 탭의 낡은 scopes 지도가 통째로 실려 나간 것. 서버는 그것을 아무 저항 없이 받아썼다.
+{
+  const admScopes = { m1: ['uwork'], q1: ['uadmin'] };
+  const admAsg = { m1: 'uwork' };
+  // 주기업무 저장 권한(check='do')을 가진 **비관리자** — 실사고의 그 계정 형태(관리자가 아니지만 체크는 누른다)
+  const WORKC = { id: 'uchk', name: '주기직원', admin: false, perms: { check: 'do' } };
+  mem.gw_users['member:uchk'] = WORKC;
+  const tokC = issueSession(WORKC).token;
+  const seed = () => { mem.gw_data['col:checklist'] = { records: { m: { '2026-09': { m1: '2026-09-08' } } }, custom: {}, scopes: JSON.parse(JSON.stringify(admScopes)), assignee: JSON.parse(JSON.stringify(admAsg)), scope_ts: { m1: 500 }, updated_at: 7100 }; };
+  seed();
+  auditMock.logs.length = 0;
+  // 직원(비관리자)이 체크 하나를 누르며 그 탭의 낡은 지도를 함께 올린다 — 관리자가 지운 q2를 되살리고 m1을 옛 값으로 되돌리려 한다
+  r = await call({ action: 'save', collection: 'checklist', base: 7100, doc: {
+    records: { m: { '2026-09': { m1: '2026-09-08', m2: '2026-09-08' } } }, custom: {},
+    scopes: { m1: ['uOLD'], q1: ['uadmin'], q2: ['uOLD'] }, assignee: { m1: 'uOLD' }, scope_ts: {},
+  } }, tokC, 'dev1');
+  {
+    const saved = mem.gw_data['col:checklist'];
+    T('checklist: 비관리자 저장이 공개범위를 되돌리지 못한다 — 서버 원본 이월(지운 q2 부활 없음 · m1 옛 값 복귀 없음)',
+      r.code === 200 && !saved.scopes.q2 && JSON.stringify(saved.scopes.m1) === JSON.stringify(['uwork']) && Object.keys(saved.scopes).length === 2, JSON.stringify(saved.scopes));
+    T('checklist: 비관리자 저장이 담당(assignee)도 되돌리지 못한다', saved.assignee.m1 === 'uwork', JSON.stringify(saved.assignee));
+    T('checklist: 편집시각 사이드카(scope_ts)도 함께 이월 — 지도만 지키면 다음 병합이 다시 어긋난다', saved.scope_ts && saved.scope_ts.m1 === 500, JSON.stringify(saved.scope_ts));
+    T('checklist: 그래도 그 직원의 체크 자체는 정상 저장된다(거부가 아니라 재구성인 이유)',
+      !!(saved.records && saved.records.m && saved.records.m['2026-09'] && saved.records.m['2026-09'].m2), JSON.stringify(saved.records));
+    const ev = (auditMock.logs.filter((l) => l.col === 'checklist').pop() || {}).ev || [];
+    T('checklist: 되돌리려던 시도가 감사로그에 남는다(공개범위 보호) — 낡은 사본을 쓰는 사람을 찾아낼 수 있게',
+      ev.some((e) => e.op === '공개범위 보호'), JSON.stringify(ev));
+  }
+  // 관리자는 종전대로 공개범위를 바꿀 수 있고, 그 변경이 감사로그에 남는다(종전엔 한 줄도 안 남았다)
+  seed();
+  auditMock.logs.length = 0;
+  r = await call({ action: 'save', collection: 'checklist', base: 7100, doc: {
+    records: {}, custom: {}, scopes: { q1: ['uadmin'] }, assignee: {}, scope_ts: { m1: 9000 },
+  } }, tokA);
+  {
+    const saved = mem.gw_data['col:checklist'];
+    const ev = (auditMock.logs.filter((l) => l.col === 'checklist').pop() || {}).ev || [];
+    T('checklist: 관리자의 공개범위 삭제는 그대로 반영된다(전체공개 전환 — 이게 9/8에 매번 되돌아가던 편집)',
+      r.code === 200 && !saved.scopes.m1 && Object.keys(saved.scopes).length === 1, JSON.stringify(saved.scopes));
+    T('checklist: 관리자 삭제 스탬프(툼스톤 scope_ts)가 서버에 보존돼 다른 기기로 삭제가 전파된다', saved.scope_ts && saved.scope_ts.m1 === 9000, JSON.stringify(saved.scope_ts));
+    T('checklist: 공개범위·담당 변경이 감사로그에 남는다',
+      ev.some((e) => e.op === '공개범위') && ev.some((e) => e.op === '담당') && !ev.some((e) => e.op === '공개범위 보호'), JSON.stringify(ev));
+  }
+  // 직전 문서를 못 읽으면 이월 판단 자체가 불가 → 저장 거부(fail-open이면 원 결함이 그대로 재발)
+  seed();
+  {
+    // blobGet은 gw-data.js가 모듈 로드 시 구조분해로 묶어 두므로 mock 함수를 갈아끼워도 안 먹는다 — 이 mock이 그래서 hooks.beforeGet을 둔다
+    blobsMock.hooks.beforeGet = (k) => { if (k === 'col:checklist') throw new Error('READ_FAILED'); };
+    r = await call({ action: 'save', collection: 'checklist', doc: { records: {}, custom: {}, scopes: {} } }, tokC, 'dev1');
+    blobsMock.hooks.beforeGet = null;
+    T('checklist: 비관리자 저장 중 직전 문서 읽기 실패 → 500 PREV_READ_FAILED(이월 불가 시 fail-closed · licenses·documents와 같은 원칙)',
+      r.code === 500 && r.body.error_code === 'PREV_READ_FAILED', r.code + '/' + r.body.error_code);
+    T('checklist: 그 거부로 서버 문서가 손상되지 않았다(공개범위 원본 유지)',
+      JSON.stringify(mem.gw_data['col:checklist'].scopes) === JSON.stringify(admScopes), JSON.stringify(mem.gw_data['col:checklist'].scopes));
+  }
+  // 구버전 앱(v330 이하)의 관리자 저장 — 사이드카를 아예 모른다. 그 저장이 툼스톤을 지우면 낡은 사본이 다시 키를 되살린다(= 재발).
+  seed();
+  r = await call({ action: 'save', collection: 'checklist', base: 7100, doc: { records: {}, custom: {}, scopes: { m1: ['uwork'], q1: ['uadmin'] }, assignee: {} } }, tokA);
+  T('checklist: 사이드카를 모르는 구버전 앱의 저장도 툼스톤(scope_ts)을 지우지 못한다 — 서버가 원본을 이월',
+    r.code === 200 && mem.gw_data['col:checklist'].scope_ts && mem.gw_data['col:checklist'].scope_ts.m1 === 500, JSON.stringify(mem.gw_data['col:checklist'].scope_ts));
+  // 오프라인 캐시로 부팅해 빈 사이드카를 올리는 사본도 마찬가지
+  r = await call({ action: 'save', collection: 'checklist', base: mem.gw_data['col:checklist'].updated_at, doc: { records: {}, custom: {}, scopes: { q1: ['uadmin'] }, assignee: {}, scope_ts: {} } }, tokA);
+  T('checklist: 빈 사이드카를 올리는 사본도 툼스톤을 지우지 못한다(서버에서 줄지 않음)',
+    r.code === 200 && mem.gw_data['col:checklist'].scope_ts.m1 === 500, JSON.stringify(mem.gw_data['col:checklist'].scope_ts));
+  delete mem.gw_data['col:checklist'];
+  delete mem.gw_users['member:uchk'];
+}
+
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

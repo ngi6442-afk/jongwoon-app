@@ -501,5 +501,108 @@ try {
     && /const rres = await push\.sendTo\(ids, payload, \{ ctx: tc, by: c\.member\.id \}\);/.test(gwd), '');
 } catch (e) { console.log('  (v329 검사 생략 — ' + e.message + ')'); fails++; }
 
+// 34) v331 — 주기업무 공개범위 저장 롤백 수리(2026-09-08 PM 실사고 "공개범위를 고치면 다시 롤백된다").
+//     ① 병합기 mergeStamped를 index.html 실제 소스로 뽑아 실행: 키 삭제 전파(툼스톤) · 최신 편집 승 · 동률이면 원격 승
+//     ② scopeCheckboxesHtml ↔ getCheckedMembers 짝: 화면에 상자가 안 그려지는 기존 지정(삭제회원·구 부서/직급·명부 미로딩)이 저장 시 탈락하지 않는가
+//     ③ 저장·캐시 본문에 편집시각 사이드카가 함께 실리는가 + 구 Object.assign 병합이 남아 있지 않은가 ④ 서버 비관리자 재구성 가드 존재
+try {
+  // index.html에서 함수 하나를 이름으로 잘라낸다(중괄호 짝맞춤) — 실제로 배포되는 소스를 그대로 돌리기 위해
+  const fnSrc = (name) => {
+    const i = html.indexOf('function ' + name + '(');
+    if (i < 0) throw new Error('함수 없음: ' + name);
+    let d = 0, started = false;
+    for (let j = i; j < html.length; j++) {
+      const ch = html[j];
+      if (ch === '{') { d++; started = true; }
+      else if (ch === '}') { d--; if (started && d === 0) return html.slice(i, j + 1); }
+    }
+    throw new Error('중괄호 짝 안 맞음: ' + name);
+  };
+
+  // ---- ① 병합기 ----
+  const mergeCtx = new Function([
+    fnSrc('hasOwnKey'), fnSrc('mergeStamped'), 'return mergeStamped;',
+  ].join('\n'))();
+  {
+    // 관리자가 q2를 지우고(툼스톤 ts=200) 저장한 서버 vs 그 키를 아직 들고 있는 낡은 탭(ts 없음)
+    const r1 = mergeCtx({ q2: ['uA'], m1: ['uOLD'] }, {}, { m1: ['uNEW'] }, { q2: 200, m1: 200 });
+    T('v331 병합: 관리자가 지운 공개범위 키가 낡은 사본에서 부활하지 않는다(툼스톤 전파)', !('q2' in r1.map) && r1.ts.q2 === 200, JSON.stringify(r1.map));
+    T('v331 병합: 낡은 사본의 값이 서버 최신값을 덮지 않는다(원격 승) + 밀린 키를 세어 화면에 알린다',
+      JSON.stringify(r1.map.m1) === JSON.stringify(['uNEW']) && r1.overridden.indexOf('m1') >= 0, JSON.stringify([r1.map, r1.overridden]));
+    // 반대 방향 — 내가 방금 만든 편집(ts 큰 쪽)은 낡은 서버값에 밀리지 않는다
+    const r2 = mergeCtx({ m1: ['uMINE'] }, { m1: 900 }, { m1: ['uOLD'] }, { m1: 100 });
+    T('v331 병합: 내 최신 편집(ts 큰 쪽)이 이긴다', JSON.stringify(r2.map.m1) === JSON.stringify(['uMINE']) && r2.overridden.length === 0, JSON.stringify(r2.map));
+    // 아직 서버에 못 올린 로컬 전용 키는 동률(둘 다 ts 없음)이어도 지켜야 한다 — 원격 우선 규칙의 예외
+    const r3 = mergeCtx({ solo: ['uA'] }, {}, {}, {});
+    T('v331 병합: 원격에 없는 로컬 전용 키는 동률이어도 유실되지 않는다', JSON.stringify(r3.map.solo) === JSON.stringify(['uA']), JSON.stringify(r3.map));
+    // 내가 지웠는데(ts 큼) 서버엔 아직 있는 경우 → 삭제가 이긴다
+    const r4 = mergeCtx({}, { m1: 900 }, { m1: ['uOLD'] }, { m1: 100 });
+    T('v331 병합: 내 삭제(ts 큰 쪽)가 서버의 옛 값을 이긴다', !('m1' in r4.map) && r4.ts.m1 === 900, JSON.stringify(r4.map));
+  }
+
+  // ---- ② 렌더 ↔ 수거 짝 ----
+  {
+    const scopeHtml = new Function('__members', [
+      'var DEPT_LIST = ["관리부","공무부"], RANK_LIST = ["부장","사원"];',
+      'var members = __members;',
+      'function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\"/g,"&quot;").replace(/\x27/g,"&#39;"); }',
+      'function liveMembers(){ return members.filter(function(m){ return m && m.del !== 1; }); }',
+      'function memberRetired(m){ return !!(m && m.retired); }',
+      'function isBossMember(){ return false; }',
+      'function findMember(id){ for (var i=0;i<members.length;i++){ if (members[i].id === id) return members[i]; } return null; }',
+      'function memberOptLabel(m){ return m.name + (memberRetired(m) ? " (퇴사)" : ""); }',
+      fnSrc('hasOwnKey'), fnSrc('scopeCheckboxesHtml'), 'return scopeCheckboxesHtml;',
+    ].join('\n'))([
+      { id: 'uA', name: '재직자A' }, { id: 'uR', name: '퇴사자R', retired: true }, { id: 'uD', name: '삭제회원D', del: 1 },
+    ]);
+    // getCheckedMembers가 실제로 쓰는 셀렉터([data-scope],[data-mid])와 같은 축으로 수거
+    const collect = (h) => [...h.matchAll(/data-(?:scope|mid)="([^"]*)"([^>]*)>/g)].filter((m) => / checked/.test(m[2]))
+      .map((m) => m[1].replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&'));
+    const sel = ['uA', 'uR', 'uD', 'dept:없는부서', 'rank:없는직급', 'uGHOST'];
+    const got = collect(scopeHtml(sel));
+    T('v331 공개범위: 화면에 상자가 없는 기존 지정(삭제회원·구 부서/직급·명부에 없는 id)도 저장 시 전부 왕복 — 종전엔 조용히 탈락해 공개범위가 저절로 넓어졌다',
+      got.length === sel.length && sel.every((t) => got.includes(t)), '수거: ' + got.join(',') + ' / 탈락: ' + sel.filter((t) => !got.includes(t)).join(','));
+    // 명부 로딩 전 다이얼로그를 열어 저장 — 개별 직원이 통째로 탈락하던 경로
+    const scopeHtml0 = new Function('__members', [
+      'var DEPT_LIST = ["관리부"], RANK_LIST = ["사원"];', 'var members = __members;',
+      'function esc(s){ return String(s==null?"":s); }',
+      'function liveMembers(){ return members.filter(function(m){ return m && m.del !== 1; }); }',
+      'function memberRetired(m){ return !!(m && m.retired); }', 'function isBossMember(){ return false; }',
+      'function findMember(id){ for (var i=0;i<members.length;i++){ if (members[i].id === id) return members[i]; } return null; }',
+      'function memberOptLabel(m){ return m.name; }',
+      fnSrc('hasOwnKey'), fnSrc('scopeCheckboxesHtml'), 'return scopeCheckboxesHtml;',
+    ].join('\n'))([]);
+    const sel0 = ['uA', 'uB', 'dept:관리부'];
+    const got0 = collect(scopeHtml0(sel0));
+    T('v331 공개범위: 회원 명부가 아직 로드되기 전에 저장해도 개별 직원 지정이 살아남는다',
+      got0.length === sel0.length && sel0.every((t) => got0.includes(t)), '수거: ' + got0.join(','));
+  }
+
+  // ---- ③ 저장·캐시 본문 + 구 병합 잔재 ----
+  T('v331 저장 본문에 편집시각 사이드카(scope_ts·assignee_ts) 동봉 — 없으면 삭제가 다른 기기로 전파되지 않는다',
+    /scopes: checkScopes, assignee: checkAssignee, review: checkReview, scope_ts: checkScopeTs, assignee_ts: checkAssigneeTs/.test(html), '');
+  T('v331 로컬 캐시도 사이드카 동반 저장(오프라인 부팅 뒤 첫 저장이 삭제를 되돌리지 않게)',
+    /CACHE_KEY, JSON\.stringify\(\{sha: currentSha[^)]*scope_ts: checkScopeTs, assignee_ts: checkAssigneeTs\}\)/.test(html), '');
+  T('v331 구 병합(Object.assign로 scopes·assignee 로컬 무조건 승)이 남아 있지 않다 — 3곳 전부 applyScopeMerge',
+    !/Object\.assign\(\{\}, *(?:remoteParsed|parsed|cache)\.(?:scopes|assignee)/.test(html)
+    && (html.match(/applyScopeMerge\(/g) || []).length >= 3, '');
+  T('v331 공개범위·담당 편집에 시각 스탬프(삭제 포함) — 스탬프가 없으면 낡은 사본이 지운 키를 반드시 되살린다',
+    /checkScopeTs\[editingCheckItem\] = nowTs;/.test(html) && /checkAssigneeTs\[editingCheckItem\] = nowTs;/.test(html), '');
+  T('v331 가시화: 저장 실패·권한 거부·남에게 밀림을 화면 토스트로 알린다(#gwToast) — 조용한 롤백 금지(9/3 PM 원칙)',
+    /id="gwToast"/.test(html) && /function gwToast\(/.test(html)
+    && /gwToast\("주기업무 저장에 실패했습니다/.test(html) && /json\.write_denied/.test(html)
+    && /write_denied: 1/.test(html) && /if \(lost\) gwToast\(/.test(html), '');
+  T('v331 디바운스 유실 차단: pagehide에서 밀린 주기업무 저장을 즉시 발사',
+    /addEventListener\("pagehide"[\s\S]{0,240}?if \(pendingSave\)\{[\s\S]{0,120}?doSave\(\);/.test(html), '');
+
+  // ---- ④ 서버 가드 ----
+  T('v331 서버: 비관리자 checklist 저장은 scopes·assignee(+사이드카)를 서버 원본으로 이월 — 직원의 낡은 사본이 관리자 편집을 되돌리지 못한다',
+    /if \(col === 'checklist' && !c\.member\.admin\)/.test(gwd)
+    && /\['scopes', 'assignee', 'scope_ts', 'assignee_ts'\]\.forEach/.test(gwd)
+    && /col === 'checklist'[\s\S]{0,400}?prevReadFailed\) return jr\(500/.test(gwd), '');
+  T('v331 서버: 공개범위·담당 변경과 이월 차단이 감사로그에 남는다(종전엔 한 줄도 없어 버전 링을 뒤져야 규명됐다)',
+    /op: '공개범위'/.test(gwd) && /op: '담당'/.test(gwd) && /op: '공개범위 보호'/.test(gwd) && /function scopeMapSame\(/.test(gwd), '');
+} catch (e) { console.log('  (v331 검사 생략 — ' + e.message + ')'); fails++; }
+
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

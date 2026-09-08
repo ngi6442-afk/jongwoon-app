@@ -86,6 +86,24 @@ async function verSnapshot(col, prevDoc, byName, dailyOnly, force) {
 
 // 객체를 화이트리스트로 쓸 때의 프로토타입 키('constructor' 등) 우회 차단 — 문서함 분류·확장자·공개범위 표 공용(적대 검증 low5)
 function hasOwn(o, k) { return Object.prototype.hasOwnProperty.call(o, k); }
+// 주기업무 공개범위·담당 지도({항목id: [대상토큰...]} / {항목id: 회원id}) 동일성 비교(v331) —
+// 키 순서·배열 순서에 흔들리지 않게. 비관리자 재구성 판정과 감사로그가 함께 쓴다.
+function scopeMapSame(a, b) {
+  a = (a && typeof a === 'object') ? a : {};
+  b = (b && typeof b === 'object') ? b : {};
+  const ka = Object.keys(a).sort(), kb = Object.keys(b).sort();
+  if (ka.length !== kb.length) return false;
+  for (let i = 0; i < ka.length; i++) if (ka[i] !== kb[i]) return false;
+  for (const k of ka) {
+    const va = a[k], vb = b[k];
+    if (Array.isArray(va) || Array.isArray(vb)) {
+      if (!Array.isArray(va) || !Array.isArray(vb) || va.length !== vb.length) return false;
+      const sa = va.map(String).sort(), sb = vb.map(String).sort();
+      for (let i = 0; i < sa.length; i++) if (sa[i] !== sb[i]) return false;
+    } else if (String(va) !== String(vb)) return false;
+  }
+  return true;
+}
 // 문서함 2층 분류(문서체계 설계안 v2 2026-09-04 §2·§6, v317) — 1층 대분류 = 업무 영역 12 + 99 미분류(앱 전용), 2층 중분류 = 문서 성격 6(전 대분류 공통).
 // 라벨은 앱 DOC_MAJOR·DOC_MINOR와 동일(uismoke 대조). cat = 'AA-BB'(72) + '99' = 73키 화이트리스트. 구 2자리 cat('03' 등)은 키가 아니라 번호 파생으로 넘어간다(마이그레이션 §6.4 전 구건)
 const DOC_MAJOR_LABEL = { '01': '01 법인·등기', '02': '02 경영·총무', '03': '03 영업·홍보', '04': '04 계약·공사', '05': '05 차량·장비', '06': '06 안전보건', '07': '07 인사·노무', '08': '08 인허가', '09': '09 인증·경영시스템', '10': '10 재무·세무', '11': '11 정보·시스템', '12': '12 기타', '99': '99 미분류' };
@@ -357,6 +375,36 @@ async function handleSave(event, d, R) {
     const prevDuties = (prevDoc && Array.isArray(prevDoc.duties)) ? prevDoc.duties : [];
     if (!c.member.admin || !Array.isArray(doc.duties) || (doc.duties.length === 0 && prevDuties.length > 0)) doc.duties = prevDuties;
   }
+  // 주기업무 공개범위·담당 보호(v331 — 2026-09-08 PM 실사고 '공개범위를 고치면 다시 롤백된다'):
+  //  scopes·assignee는 앱에서 관리자만 편집한다(openCheckScope의 isAdmin 게이트 — 비관리자에겐 편집 UI 자체가 없다).
+  //  그런데 checklist 저장은 문서 통째 PUT이라, 직원이 체크박스 하나만 눌러도 그 브라우저가 로드했던 낡은 scopes/assignee 지도가 함께 올라온다.
+  //  실측(ver:checklist 09-08 17:27~17:34, 20회 저장): 비관리자 저장 2건이 관리자의 공개범위 삭제 6건을 전부 되살려 라이브가 8/11 상태로 회귀했다.
+  //  → leaves·licenses·documents와 같은 '서버 재구성' 원칙. 거부(403)가 아니라 이월인 이유: 낡은 사본으로 체크를 눌러도 체크 자체는 저장돼야 한다.
+  //  review(완료 요청)는 직원이 정상적으로 쓰는 필드라 제외. records·custom도 종전대로 — 항목 단위 병합기가 프런트에 있다.
+  let chkGuard = 0;
+  if (col === 'checklist' && !c.member.admin) {
+    // 직전 문서를 못 읽으면 이월 판단 자체가 불가 — fail-open이면 원 결함(롤백)이 그대로 재발하므로 저장을 거부한다(licenses·documents와 같은 원칙).
+    if (prevReadFailed) return jr(500, { status: 'ERROR', error_code: 'PREV_READ_FAILED', request_id: R });
+    const pv = prevDoc || {};
+    if (!scopeMapSame(doc.scopes, pv.scopes)) chkGuard++;
+    if (!scopeMapSame(doc.assignee, pv.assignee)) chkGuard++;
+    ['scopes', 'assignee', 'scope_ts', 'assignee_ts'].forEach(function (f) {   // 편집시각 사이드카(v331 툼스톤)도 함께 이월 — 지도만 되돌리면 다음 병합이 다시 어긋난다
+      if (pv[f] !== undefined) doc[f] = pv[f]; else delete doc[f];
+    });
+  }
+  // 편집시각 사이드카(툼스톤)는 서버에서 절대 줄이지 않는다(v331): 구버전 앱(v330 이하)은 이 맵의 존재를 모르고,
+  // v331이어도 오프라인 캐시로 부팅한 사본은 빈 맵을 올린다. 그때 서버가 그대로 받아쓰면 '지웠음' 기록이 통째로 사라져
+  // 다음 저장에서 낡은 사본이 다시 키를 되살린다(= 이번 사고의 재발). 값은 더 최신 스탬프만 갱신. 항목 수만큼만 자라므로 누적 부담이 없다.
+  if (col === 'checklist' && prevDoc) {
+    ['scope_ts', 'assignee_ts'].forEach(function (f) {
+      const pv = (prevDoc[f] && typeof prevDoc[f] === 'object') ? prevDoc[f] : null;
+      if (!pv) return;
+      const inc = (doc[f] && typeof doc[f] === 'object') ? doc[f] : {};
+      const out = Object.assign({}, pv);
+      Object.keys(inc).forEach(function (k) { if (!(Number(out[k]) > Number(inc[k]))) out[k] = inc[k]; });
+      doc[f] = out;
+    });
+  }
   // 문서함(v314 공개범위·등재 결재):
   //  관리자 = 무제한. scope는 정규화만, 신규 항목은 status 없으면 즉시 '등재'(PM 전결 — 관리자가 올리면 그 자체가 결재).
   //  비관리자 = 서버 재구성. ①못 보는 문서(docVisible 거짓 — 분류 기본값·scope 밖·타인의 대기/반려)와 01 법인은 서버 원본 유지
@@ -466,6 +514,11 @@ async function handleSave(event, d, R) {
       const cnt = function (dc) { let n = 0; const rec = (dc && dc.records) || {}; Object.keys(rec).forEach(function (t) { const ks = rec[t] || {}; Object.keys(ks).forEach(function (k) { n += Object.keys(ks[k] || {}).length; }); }); return n; };
       const c0 = cnt(prevDoc), c1 = cnt(doc);
       ev = (c0 === c1) ? [] : [{ op: '체크저장', id: '-', t: '체크 ' + c0 + '→' + c1 }];
+      // v331: 공개범위·담당 변경은 종전에 감사로그에 한 줄도 남지 않아, 9/8 롤백을 버전 링(ver:checklist)을 뒤져서야 규명할 수 있었다.
+      const nk = function (o) { return Object.keys((o && typeof o === 'object') ? o : {}).length; };
+      if (!scopeMapSame(prevDoc && prevDoc.scopes, doc.scopes)) ev.push({ op: '공개범위', id: '-', t: '주기업무 공개범위 ' + nk(prevDoc && prevDoc.scopes) + '→' + nk(doc.scopes) + '건' });
+      if (!scopeMapSame(prevDoc && prevDoc.assignee, doc.assignee)) ev.push({ op: '담당', id: '-', t: '주기업무 담당 ' + nk(prevDoc && prevDoc.assignee) + '→' + nk(doc.assignee) + '건' });
+      if (chkGuard) ev.push({ op: '공개범위 보호', id: '-', t: '비관리자 저장이 공개범위·담당(' + chkGuard + '종)을 되돌리려 해 서버가 원본을 이월했습니다 — 그 사람의 앱 화면이 낡은 사본입니다' });
     } else {
       ev = diffItems(oldItems, Array.isArray(doc.items) ? doc.items : []);
     }

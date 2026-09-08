@@ -189,6 +189,11 @@
     display:none;
   }
   .offline-banner.show{display:block;}
+  /* 저장 실패·병합 결과 알림(v331) — 주기업무 공개범위가 남의 저장에 되돌려졌던 9/8 실사고: 조용히 일어나면 사람이 못 잡는다 */
+  .gw-toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);max-width:92vw;background:#2B2B2B;color:#fff;
+    border-radius:10px;padding:11px 15px;font-size:13px;line-height:1.5;box-shadow:0 6px 20px rgba(0,0,0,0.25);z-index:9999;display:none;white-space:pre-line;}
+  .gw-toast.show{display:block;}
+  .gw-toast.warn{background:#8A3B00;}
   section.group{
     margin-bottom:20px;
   }
@@ -874,6 +879,7 @@
   </header>
 
   <div class="offline-banner" id="offlineBanner">오프라인 — 연결되면 자동 저장</div>
+  <div class="gw-toast" id="gwToast" role="status" aria-live="polite"></div>
 
   <div class="layout">
   <nav class="tabbar" id="tabbar">
@@ -2614,6 +2620,10 @@
   var customItems = {};  // {type: {itemId: {t,who,del,created,updated}}}
   var checkScopes = {};  // {itemId: [memberId...]} 비면 전체 공개(관리자만 편집)
   var checkAssignee = {};  // {itemId: memberId} 주기업무 담당(관리자만 편집)
+  // 공개범위·담당의 항목별 마지막 편집 시각(ms). **삭제도 스탬프를 남긴다** — 병합에서 "지웠음"을 표현하는 유일한 수단(v331).
+  // 없으면 0으로 읽혀 동률 → 원격(서버 진실) 우선. 구 데이터·구버전 클라이언트와 그대로 섞인다.
+  var checkScopeTs = {};
+  var checkAssigneeTs = {};
   var checkReview = {};    // {type: {periodKey: {itemId: {by,date}}}} 승인 대기(하드코딩 항목)
   var currentSha = null;
   var saveTimer = null;
@@ -2810,7 +2820,9 @@
     var doc = {}; try{ doc = JSON.parse(b64DecodeUnicode(body.content)); }catch(e){}
     return gwCall("gw-data", { action: "save", collection: col, doc: doc, base: _colBase[col] }).then(function(res){
       if (res.status === 401){ onSessionInvalid(); return _ghResp(401, {}); }
-      if (res.status === 403) return _ghResp(200, { content: { sha: "gw" } });   // 쓰기권한 없음은 조용히: 서버가 이미 막음
+      // 쓰기권한 없음: 서버가 이미 막았고 재시도해도 결과가 같아 200으로 흘린다(무한 재시도 방지). 단 v331부터 조용히 넘기지 않고 표시한다 —
+      // 종전에는 화면상 저장된 것처럼 보여, 권한 없는 사람이 만진 값이 사라진 것을 아무도 몰랐다.
+      if (res.status === 403) return _ghResp(200, { content: { sha: "gw" }, write_denied: 1 });
       if (res.status === 409) return _ghResp(409, {});   // 동시 저장 충돌 — 각 컬렉션의 기존 409 재조회·병합·재시도 경로로
       if (res.status !== 200) return _ghResp(res.status, {});   // 저장 실패를 성공으로 위조하면 pending이 풀려 편집이 유실된다
       _colBase[col] = (res.body && res.body.updated_at) || Date.now();
@@ -2851,7 +2863,7 @@
 
   function saveCache(){
     try{
-      localStorage.setItem(CACHE_KEY, JSON.stringify({sha: currentSha, records: records, custom: customItems, scopes: checkScopes, assignee: checkAssignee, review: checkReview}));
+      localStorage.setItem(CACHE_KEY, JSON.stringify({sha: currentSha, records: records, custom: customItems, scopes: checkScopes, assignee: checkAssignee, review: checkReview, scope_ts: checkScopeTs, assignee_ts: checkAssigneeTs}));
     }catch(e){}
   }
 
@@ -2899,6 +2911,16 @@
     isOffline = state;
     var b = document.getElementById("offlineBanner");
     if (state) b.classList.add("show"); else b.classList.remove("show");
+  }
+  // 화면 알림(v331) — alert처럼 흐름을 막지 않되 저장 실패·되돌림은 반드시 눈에 띄게. 같은 문구가 연속으로 쌓이지 않게 타이머 하나만 쓴다.
+  var gwToastTimer = null;
+  function gwToast(msg, warn, ms){
+    var el = document.getElementById("gwToast");
+    if (!el || !msg) return;
+    el.textContent = msg;
+    el.className = "gw-toast show" + (warn ? " warn" : "");
+    if (gwToastTimer) clearTimeout(gwToastTimer);
+    gwToastTimer = setTimeout(function(){ el.className = "gw-toast"; gwToastTimer = null; }, ms || (warn ? 9000 : 4000));
   }
 
   // 지시 담당 입력칸 자동완성: 회원명 목록 채우기(오타로 인박스 매칭 실패 방지)
@@ -4341,9 +4363,12 @@
   function saveCheckScope(){
     if (!editingCheckItem) return closeCheckScope();
     var ids = getCheckedMembers("csScope");
+    var nowTs = Date.now();   // 삭제(전체공개 전환)에도 스탬프를 남긴다 — 스탬프가 없으면 남의 낡은 사본이 이 키를 반드시 되살린다(9/8 실사고)
     if (ids.length) checkScopes[editingCheckItem] = ids; else delete checkScopes[editingCheckItem];
+    checkScopeTs[editingCheckItem] = nowTs;
     var asg = document.getElementById("csAssignee").value;
     if (asg) checkAssignee[editingCheckItem] = asg; else delete checkAssignee[editingCheckItem];
+    checkAssigneeTs[editingCheckItem] = nowTs;
     closeCheckScope();
     saveCache(); renderList(); renderSummary(); renderDashboard(); scheduleSave();
   }
@@ -4624,6 +4649,41 @@
     return merged;
   }
 
+  // 공개범위·담당 병합(v331) — 항목 키 단위 "최신 편집 승".
+  // 종전 Object.assign({}, 원격, 로컬)은 두 가지가 동시에 틀렸다:
+  //  (1) 로컬 무조건 승 → 몇 시간 켜둔 탭이 체크 하나만 눌러도, 그 탭이 로드했던 낡은 지도가 남의 최신 편집을 통째로 덮었다.
+  //  (2) Object.assign은 키 삭제를 표현하지 못함 → 관리자가 "공개범위를 비워 전체공개"로 바꾸면 낡은 사본이 그 키를 반드시 부활시켰다.
+  // (2026-09-08 17:27~17:34 실측: 비관리자 저장 2건이 관리자 삭제 6건을 전부 되돌려 라이브가 8/11 상태로 회귀)
+  // 규칙: ts 큰 쪽 승 / 동률이면 원격 우선(서버 진실), 단 원격에 키가 없으면 로컬 값을 지킨다(아직 못 올린 편집 유실 방지).
+  // 승자에 키가 없으면 = 승자가 지운 것 -> 결과에서도 없앤다(툼스톤). ts는 삭제된 키도 남겨 다음 병합까지 삭제를 전파한다.
+  function hasOwnKey(o, k){ return Object.prototype.hasOwnProperty.call(o, k); }
+  function mergeStamped(lo, loTs, re, reTs){
+    lo = lo || {}; loTs = loTs || {}; re = re || {}; reTs = reTs || {};
+    var seen = {}, keys = [], out = {}, ts = {}, over = [];
+    [lo, loTs, re, reTs].forEach(function(o){
+      Object.keys(o).forEach(function(k){ if (!hasOwnKey(seen, k)){ seen[k] = 1; keys.push(k); } });
+    });
+    keys.forEach(function(k){
+      var lt = Number(loTs[k]) || 0, rt = Number(reTs[k]) || 0;
+      var useLocal = (lt !== rt) ? (lt > rt) : !hasOwnKey(re, k);
+      var src = useLocal ? lo : re, t = useLocal ? lt : rt;
+      if (hasOwnKey(src, k)) out[k] = src[k];
+      if (t) ts[k] = t;
+      // 내 값이 남의 최신 저장에 밀린 키 — 조용히 넘기지 않고 세어서 화면에 알린다
+      if (!useLocal && hasOwnKey(lo, k) && JSON.stringify(lo[k]) !== JSON.stringify(hasOwnKey(re, k) ? re[k] : null)) over.push(k);
+    });
+    return { map: out, ts: ts, overridden: over };
+  }
+  // 병합 결과를 전역에 적용 + 남에게 밀린 항목이 있으면 화면에 알린다(조용한 롤백 금지 — 9/3 PM 원칙: 감지·복구·가시화)
+  function applyScopeMerge(remoteParsed){
+    var a = mergeStamped(checkScopes, checkScopeTs, remoteParsed.scopes || {}, remoteParsed.scope_ts || {});
+    var b = mergeStamped(checkAssignee, checkAssigneeTs, remoteParsed.assignee || {}, remoteParsed.assignee_ts || {});
+    checkScopes = a.map; checkScopeTs = a.ts;
+    checkAssignee = b.map; checkAssigneeTs = b.ts;
+    var lost = a.overridden.length + b.overridden.length;
+    if (lost) gwToast("다른 사람이 먼저 저장해 주기업무 공개범위·담당 " + lost + "건이 서버 값으로 갱신되었습니다.\n방금 하신 변경이 맞는지 확인해주세요.", true);
+    return lost;
+  }
   function fetchRemote(){
     return fetch(CHECK_API, {headers: ghHeaders()});
   }
@@ -4651,14 +4711,15 @@
           // 미저장 편집(오프라인 체크 등) 보존 — 통째 교체하면 online 복귀 재로드가 체크를 덮어 증발시켰다(충돌 병합과 동일 규칙)
           records = mergeRecords(records, parsed.records || {});
           customItems = mergeCustom(customItems, parsed.custom || {});
-          checkScopes = Object.assign({}, parsed.scopes || {}, checkScopes);
-          checkAssignee = Object.assign({}, parsed.assignee || {}, checkAssignee);
+          applyScopeMerge(parsed);   // v331: 키 삭제를 표현하는 스탬프 병합(구 Object.assign은 로컬 무조건 승 + 삭제 전파 불가)
           checkReview = Object.assign({}, parsed.review || {}, checkReview);
         } else {
           records = parsed.records || {};
           customItems = parsed.custom || {};
           checkScopes = parsed.scopes || {};
+          checkScopeTs = parsed.scope_ts || {};
           checkAssignee = parsed.assignee || {};
+          checkAssigneeTs = parsed.assignee_ts || {};
           checkReview = parsed.review || {};
         }
         setOffline(false);
@@ -4673,7 +4734,9 @@
         records = cache.records || {};
         customItems = cache.custom || {};
         checkScopes = cache.scopes || {};
+        checkScopeTs = cache.scope_ts || {};
         checkAssignee = cache.assignee || {};
+        checkAssigneeTs = cache.assignee_ts || {};
         checkReview = cache.review || {};
         setOffline(true);
         renderList();
@@ -4689,7 +4752,7 @@
   function doSave(){
     var token = getToken();
     if (!token) return;
-    var body = JSON.stringify({records: records, custom: customItems, scopes: checkScopes, assignee: checkAssignee, review: checkReview});
+    var body = JSON.stringify({records: records, custom: customItems, scopes: checkScopes, assignee: checkAssignee, review: checkReview, scope_ts: checkScopeTs, assignee_ts: checkAssigneeTs});
     var payload = {
       message: "check: 업데이트",
       content: b64EncodeUnicode(body),
@@ -4718,9 +4781,12 @@
         setOffline(false);
         saveCache();
         pendingSave = false;
+        // v331: 종전엔 403(쓰기권한 없음)이 200으로 위조돼 저장된 것처럼 보였다 — 이제 표시한다
+        if (json.write_denied) gwToast("주기업무 저장 권한이 없어 서버가 이 변경을 받지 않았습니다.\n화면 값은 새로고침하면 서버 값으로 돌아갑니다.", true);
       });
     }).catch(function(){
       setOffline(true);
+      gwToast("주기업무 저장에 실패했습니다 — 편집은 남아 있고 연결되면 다시 저장합니다.", true);
     });
   }
 
@@ -4734,8 +4800,7 @@
       }catch(e){}
       records = mergeRecords(records, remoteParsed.records || {});
       customItems = mergeCustom(customItems, remoteParsed.custom || {});
-      checkScopes = Object.assign({}, remoteParsed.scopes || {}, checkScopes);
-      checkAssignee = Object.assign({}, remoteParsed.assignee || {}, checkAssignee);
+      applyScopeMerge(remoteParsed);   // v331: 여기가 9/8 롤백의 발화점이었다 — 낡은 로컬 지도가 서버 최신값을 덮고 그대로 재저장됐다
       checkReview = Object.assign({}, remoteParsed.review || {}, checkReview);
       currentSha = json.sha;
       saveCache();
@@ -4891,6 +4956,11 @@
     });
   }
 
+  // 탭을 닫거나 뒤로 갈 때 밀린 주기업무 저장을 즉시 발사(v331) — scheduleSave 디바운스 1500ms 안에 나가면 PUT이 아예 안 나가
+  // 로컬 캐시에만 남고, 다음 부팅 doLoad가 서버 옛값으로 화면·캐시를 덮어 "편집이 되돌아간 것"처럼 보였다.
+  window.addEventListener("pagehide", function(){
+    try{ if (pendingSave){ if (saveTimer){ clearTimeout(saveTimer); saveTimer = null; } doSave(); } }catch(e){}
+  });
   window.addEventListener("online", function(){
     try{ apprFlushCreates(); }catch(e){}   // 밀린 대표 상신 재시도(큐는 localStorage에 살아 있다)
     if (isOffline || pendingSave || tasksPending || recPending || licPending || vehPending){
@@ -6640,10 +6710,20 @@
     selIds = selIds || [];
     // 관리자는 항상 열람 — 체크 대상은 직원만. 퇴사자는 새 지정 대상에서 빼되 이미 체크된 사람은 남긴다(v329 — 숨기면 저장 시 공개범위에서 조용히 탈락)
     var ms = liveMembers().filter(function(m){ return !m.admin && (!memberRetired(m) || selIds.indexOf(m.id) >= 0); });
-    if (!ms.length) return '<div class="mrole2" style="padding:4px;">회원이 없습니다.</div>';
+    // 기존 지정 중 상자로 못 그리는 id(명부에서 삭제된 회원·관리자로 승격된 사람)도 체크된 상자로 남긴다(v331 — 주기업무 공개범위와 같은 결함).
+    var docShown = {}; ms.forEach(function(m){ docShown[m.id] = 1; });
+    var docSeen = {}, docLeft = [];
+    selIds.forEach(function(id){
+      if (typeof id !== "string" || !id) return;
+      if (hasOwnKey(docShown, id) || hasOwnKey(docSeen, id)) return;
+      docSeen[id] = 1; docLeft.push(id);
+    });
+    var boxOf = function(id, label){ return '<label class="mcheck"><input type="checkbox" data-mid="' + esc(id) + '" checked> ' + esc(label) + '</label>'; };
+    var tail = docLeft.length ? ('<div class="scope-hint">기존 지정 — 목록에 없는 대상</div>' + docLeft.map(function(id){ var mm = findMember(id); return boxOf(id, mm ? (memberOptLabel(mm) + (mm.admin ? " (관리자)" : " (명부에서 삭제됨)")) : ("알 수 없는 대상 " + id)); }).join("")) : "";
+    if (!ms.length) return tail || '<div class="mrole2" style="padding:4px;">회원이 없습니다.</div>';
     return '<div class="scope-hint">체크한 직원(+관리자)만 열람</div>' + ms.map(function(m){
       return '<label class="mcheck"><input type="checkbox" data-mid="' + esc(m.id) + '"' + (selIds.indexOf(m.id) >= 0 ? " checked" : "") + '> ' + esc(memberOptLabel(m)) + (m.role ? ' <span class="mrole2">' + esc(m.role) + '</span>' : '') + '</label>';
-    }).join("");
+    }).join("") + tail;
   }
   function docScopeModeChanged(){
     var v = document.getElementById("docScope").value;
@@ -16918,6 +16998,27 @@
     // 퇴사자는 새 지정 대상에서 제외(v329) — 단 이미 체크된 퇴사자는 남긴다(숨기면 저장 시 scope에서 조용히 탈락). 이 한 곳이 지시·수정·정기업무·석면·기성·인허가 6개 패널을 함께 고친다
     var ms = liveMembers().filter(function(m){ return !memberRetired(m) || sel.indexOf(m.id) >= 0; });
     html += '<div class="scope-hint">개별 직원</div>' + (ms.length ? ms.map(function(m){ return box(m.id, memberOptLabel(m), m.role||""); }).join("") : '<div class="mrole2" style="padding:4px;">회원이 없습니다.</div>');
+    // 기존 지정 중 위 상자로 그려지지 않은 토큰을 마지막 묶음으로 되살린다(v331) — 상자가 없으면 getCheckedMembers가 수거하지 못해
+    // 저장하는 순간 공개범위에서 조용히 탈락한다(= 공개범위가 저절로 넓어진다). 해당 예: 삭제된 회원 id, 명부 로딩 전 다이얼로그, 개편 전 부서·직급명.
+    var shown = {};
+    DEPT_LIST.forEach(function(d){ shown["dept:" + d] = 1; });
+    RANK_LIST.forEach(function(r){ shown["rank:" + r] = 1; });
+    ms.forEach(function(m){ shown[m.id] = 1; });
+    var leftSeen = {}, left = [];
+    sel.forEach(function(tk){
+      if (typeof tk !== "string" || !tk) return;
+      if (hasOwnKey(shown, tk) || hasOwnKey(leftSeen, tk)) return;
+      leftSeen[tk] = 1; left.push(tk);
+    });
+    if (left.length){
+      html += '<div class="scope-hint">기존 지정 — 목록에 없는 대상(체크를 풀면 공개범위에서 빠집니다)</div>' + left.map(function(tk){
+        var lb;
+        if (tk.indexOf("dept:") === 0) lb = tk.slice(5) + " 전체 (현재 없는 부서)";
+        else if (tk.indexOf("rank:") === 0) lb = tk.slice(5) + " 이상 (현재 없는 직급)";
+        else { var mm = findMember(tk); lb = mm ? (memberOptLabel(mm) + " (명부에서 삭제됨)") : ("알 수 없는 대상 " + tk); }
+        return box(tk, lb);
+      }).join("");
+    }
     return html;
   }
   function renderMemberChecks(hostId, selectedIds){
