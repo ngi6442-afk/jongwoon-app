@@ -1503,7 +1503,7 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   const rs = abLib.ROUTES || [];
   const keys = rs.map((r) => r.side + r.row);
   T('ROUTES: R39 존재 · (side,row) 중복 없음 · R39 count_col 11', keys.includes('R39') && new Set(keys).size === keys.length && rs.find((r) => r.side === 'R' && r.row === 39).count_col === 11, keys.length + '/' + new Set(keys).size);
-  const src = fs.readFileSync(join(ROOT, 'index.html'), 'utf8');
+  const src = require('fs').readFileSync(join(ROOT, 'index.html'), 'utf8');
   T('앱 AB_ROUTES에 R39 폐석회 · 사유 문구 ITEM_MISMATCH 있음', /\{s:"R",r:39,f:"\(주\)포스코퓨처엠",t:"대화산업",i:"폐석회"\}/.test(src) && /ITEM_MISMATCH:\s*"품목이 다름/.test(src));
 }
 
