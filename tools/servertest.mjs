@@ -1625,4 +1625,64 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   blobsMock.hooks.beforeSet = null;
 }
 
+
+// ===== 34. 직원 등록 권한 v328(PM 9/8 "대표/관리자/개발자 제외한 다른 직책은 관리자도 등록") =====
+{
+  const gwa34 = require(join(FN, 'gw-auth.js'));
+  const callA34 = async (body, tok) => { const x = await gwa34.handler({ httpMethod: 'POST', headers: { authorization: tok ? 'Bearer ' + tok : '' }, body: JSON.stringify(body) }); return { code: x.statusCode, body: JSON.parse(x.body || '{}') }; };
+  const savedUsers = JSON.parse(JSON.stringify(mem.gw_users));
+  // 개발자가 있는 상태여야 canDev 부트스트랩(개발자 0명이면 아무 관리자나 개발자 취급)이 꺼진다
+  mem.gw_users = {
+    'member:udev': { id: 'udev', name: '개발자', role: '개발자', admin: true, dev: true, perms: {}, tier: 'pm' },
+    'member:usoo': { id: 'usoo', name: '경리', role: '관리자', admin: true, perms: {}, tier: 'admin' },
+    'member:uw1': { id: 'uw1', name: '직원1', role: '직원', admin: false, perms: { tasks: 'do' } },
+    'member:ua2': { id: 'ua2', name: '관리자2', role: '관리자', admin: true, perms: {}, tier: 'admin' },
+    'device:dev1': { status: 'approved' },
+  };
+  const tokSoo = issueSession(mem.gw_users['member:usoo']).token;   // 관리자(비개발자) = 나수진 자리
+  const tokDev = issueSession(mem.gw_users['member:udev']).token;
+  const PRESET_WORKER = { tasks: 'do', veh: 'view', rec: 'view', lic: 'view', check: 'do', con: 'view', cli: 'view', doc: 'view', wk: 'view', quote: 'hide', promo: 'hide' };
+  let r34 = await callA34({ action: 'member_upsert', name: '새직원', role: '직원', rank: '사원', dept: '폐기물팀', pin: '1234', hire_date: '2026-09-08', emp_type: '계약직' }, tokSoo);
+  const made = Object.values(mem.gw_users).find((x) => x && x.name === '새직원');
+  T('관리자(비개발자)가 직원 등록 → 200 · admin false · dev 없음 · 계약직 저장', r34.code === 200 && !!made && made.admin === false && made.dev === undefined && made.role === '직원' && made.emp_type === '계약직', r34.code + '/' + r34.body.error_code);
+  T('등록분 perms = 서버 프리셋(클라 값 아님)', !!made && JSON.stringify(made.perms) === JSON.stringify(PRESET_WORKER), made && JSON.stringify(made.perms));
+  r34 = await callA34({ action: 'member_upsert', name: '권한도둑', role: '직원', pin: '1234', perms: { tasks: 'do', veh: 'do', rec: 'do', lic: 'do', check: 'do', con: 'do', cli: 'do', doc: 'do', wk: 'do', quote: 'do', promo: 'do' } }, tokSoo);
+  const thief = Object.values(mem.gw_users).find((x) => x && x.name === '권한도둑');
+  T('관리자가 perms를 직접 실어 보내도(구버전 앱) → 200이되 서버 프리셋으로 덮어씀(권한 도배 차단)', r34.code === 200 && !!thief && JSON.stringify(thief.perms) === JSON.stringify(PRESET_WORKER), r34.code + '/' + (thief && JSON.stringify(thief.perms)));
+  r34 = await callA34({ action: 'member_upsert', id: 'uw1', perms: { tasks: 'do', veh: 'do', rec: 'do', lic: 'do', check: 'do', con: 'do', cli: 'do', doc: 'do', wk: 'do', quote: 'do', promo: 'do' } }, tokSoo);
+  T('관리자가 기존 회원 perms 편집 → 403 DEV_ONLY(권한관리는 개발자만)', r34.code === 403 && r34.body.error_code === 'DEV_ONLY', r34.code + '/' + r34.body.error_code);
+  r34 = await callA34({ action: 'member_upsert', name: '새관리자', role: '관리자', pin: 'password12' }, tokSoo);
+  T('관리자가 관리자 직책 등록 → 403 DEV_ONLY', r34.code === 403 && r34.body.error_code === 'DEV_ONLY', r34.code + '/' + r34.body.error_code);
+  r34 = await callA34({ action: 'member_upsert', name: '새대표', role: '대표', pin: 'password12' }, tokSoo);
+  T('관리자가 대표 직책 등록 → 403', r34.code === 403, r34.code + '/' + r34.body.error_code);
+  r34 = await callA34({ action: 'member_upsert', name: '몰래관리자', role: '직원', pin: '1234', admin: true }, tokSoo);
+  T('관리자가 admin:true로 등록 → 403 DEV_ONLY', r34.code === 403 && r34.body.error_code === 'DEV_ONLY', r34.code + '/' + r34.body.error_code);
+  r34 = await callA34({ action: 'member_upsert', name: '몰래개발자', role: '직원', pin: '1234', dev: true }, tokSoo);
+  T('관리자가 dev:true로 등록 → 403', r34.code === 403 && r34.body.error_code === 'DEV_ONLY', r34.code + '/' + r34.body.error_code);
+  r34 = await callA34({ action: 'member_upsert', name: '아이디직원', role: '직원', pin: '1234', uid: 'newbie1' }, tokSoo);
+  T('관리자가 아이디까지 발급하려 하면 → 403(아이디는 개발자만)', r34.code === 403 && r34.body.error_code === 'DEV_ONLY', r34.code + '/' + r34.body.error_code);
+  r34 = await callA34({ action: 'member_upsert', name: '나종운', role: '직원', pin: '1234' }, tokSoo);
+  T('관리자가 예약 이름(나종운)으로 등록 → 403 NAME_RESERVED', r34.code === 403 && r34.body.error_code === 'NAME_RESERVED', r34.code + '/' + r34.body.error_code);
+  r34 = await callA34({ action: 'member_upsert', name: '직원1', role: '직원', pin: '1234' }, tokSoo);
+  T('관리자가 기존과 같은 이름으로 등록 → 409 NAME_TAKEN', r34.code === 409 && r34.body.error_code === 'NAME_TAKEN', r34.code + '/' + r34.body.error_code);
+  r34 = await callA34({ action: 'member_upsert', id: 'uw1', role: '팀장' }, tokSoo);
+  T('관리자가 직원→팀장 직책 변경 → 200 · perms 보존(권한관리에서만 편집)', r34.code === 200 && mem.gw_users['member:uw1'].role === '팀장' && mem.gw_users['member:uw1'].admin === false, r34.code + '/' + r34.body.error_code);
+  r34 = await callA34({ action: 'member_upsert', id: 'uw1', role: '관리자' }, tokSoo);
+  T('관리자가 직원→관리자 직책 변경 → 403 DEV_ONLY', r34.code === 403 && r34.body.error_code === 'DEV_ONLY' && mem.gw_users['member:uw1'].role === '팀장', r34.code + '/' + r34.body.error_code);
+  r34 = await callA34({ action: 'member_upsert', id: 'ua2', role: '직원' }, tokSoo);
+  T('관리자가 다른 관리자의 직책을 일반 직책으로 내리기 → 403(대상이 관리자면 개발자만)', r34.code === 403 && r34.body.error_code === 'DEV_ONLY' && mem.gw_users['member:ua2'].role === '관리자', r34.code + '/' + r34.body.error_code);
+  r34 = await callA34({ action: 'member_upsert', id: 'uw1', name: '직원1개명' }, tokSoo);
+  T('관리자가 기존 회원 이름 변경 → 403(종전대로 개발자만)', r34.code === 403 && r34.body.error_code === 'DEV_ONLY', r34.code + '/' + r34.body.error_code);
+  r34 = await callA34({ action: 'member_upsert', id: 'uw1', rank: '주임', annual_days: 15, emp_type: '계약직' }, tokSoo);
+  T('관리자의 인사 정보 수정(직급·연차·고용형태)은 종전대로 200', r34.code === 200 && mem.gw_users['member:uw1'].rank === '주임' && mem.gw_users['member:uw1'].emp_type === '계약직', r34.code + '/' + r34.body.error_code);
+  r34 = await callA34({ action: 'member_upsert', name: '개발자등록분', role: '관리자', pin: 'password12', admin: true }, tokDev);
+  T('개발자는 종전대로 관리자 등록 가능 → 200', r34.code === 200, r34.code + '/' + r34.body.error_code);
+  const src34 = require('fs').readFileSync(join(ROOT, 'index.html'), 'utf8');
+  const mPre = src34.match(/"직원":\s*\{admin:false, perms:\{([^}]*)\}/);
+  const appPerm = mPre ? mPre[1].replace(/\s|"/g, '') : '';
+  const srvPerm = Object.keys(PRESET_WORKER).map((k) => k + ':' + PRESET_WORKER[k]).join(',');
+  T('앱 ROLE_PRESET(직원) = 서버 ROLE_OPEN_PERMS(직원) — 두 표가 어긋나면 등록분 권한이 화면과 달라진다', appPerm === srvPerm, appPerm + ' vs ' + srvPerm);
+  mem.gw_users = savedUsers;
+}
+
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

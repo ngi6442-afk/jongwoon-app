@@ -2446,7 +2446,7 @@
     <span class="fld-label">입사일</span>
     <input type="date" id="meHire">
     <span class="fld-label">고용형태</span>
-    <select id="meEmp"><option value="정규직">정규직</option><option value="일용직">일용직</option><option value="아르바이트">아르바이트</option><option value="기타">기타</option></select>
+    <select id="meEmp"><option value="정규직">정규직</option><option value="계약직">계약직</option><option value="일용직">일용직</option><option value="아르바이트">아르바이트</option><option value="기타">기타</option></select>
     <span class="fld-label">연차 부여 기준</span>
     <select id="meBasis"><option value="hire">입사일 기준</option><option value="fiscal">회계연도(1/1) 기준</option></select>
     <span class="fld-label">휴직 누적일수 (근속에서 제외)</span>
@@ -17686,6 +17686,12 @@
     // 단 이미 개발자인 사람을 열어볼 땐 표시해야 값이 안 뭉개진다.
     var devOpt = document.querySelector('#meRole option[value="개발자"]');
     if (devOpt) devOpt.hidden = !(isDev() || (m && m.dev));
+    // v328(PM 9/8): 관리자(비개발자)는 일반 직책(팀장·직원·현장직)만 고를 수 있다 — 대표·관리자 지정은 개발자만(서버도 DEV_ONLY).
+    //   이미 그 직책인 회원을 열어볼 땐 값이 뭉개지지 않게 표시한다.
+    ['대표', '관리자'].forEach(function (rv){
+      var op = document.querySelector('#meRole option[value="' + rv + '"]');
+      if (op) op.hidden = !(isDev() || (m && String(m.role || '') === rv));
+    });
     document.getElementById("meRole").value = m ? (m.role||"직원") : "직원";
     // 관리자 등급(v321): 현재 파생값(명시 tier 우선)을 보여주고, 변경은 대표·PM만(서버 TIER_PM_OR_BOSS_ONLY와 같은 축). 행 표시는 updatePermLock이 직책(관리자 프리셋)에 따라 켠다
     var tierSel = document.getElementById("meTier");
@@ -17803,7 +17809,9 @@
       loa_days: loaRaw === "" ? 0 : Number(loaRaw),
       leave_date: document.getElementById("meLeave").value || "",
       annual_paid: document.getElementById("mePaidAnnual").checked };
-    if (isDev() || !editingMemberId){          // 신규 생성은 어차피 개발자만 가능(서버가 막음)
+    // 관리자·개발자 지정과 아이디는 개발자만 보낸다(서버 DEV_ONLY). v328: 관리자가 만든 일반 직책 회원은
+    // 이 필드들을 아예 싣지 않아 통과하고, 권한은 서버 프리셋이 붙는다.
+    if (isDev()){
       payload.admin = admin; payload.dev = devRole; payload.uid = uidRaw;
     }
     // 잔여값 입력 + 기준일 없음 + 이미 인사업무 시작됨 → 기준일=오늘 자동 스탬프
@@ -17816,7 +17824,7 @@
       if (!existM || tSel.value !== curT) payload.tier = tSel.value;
     }
     if (editingMemberId) payload.id = editingMemberId;
-    else if (ROLE_PRESET[role]) payload.perms = ROLE_PRESET[role].perms;   // 신규만 프리셋 권한
+    else if (isDev() && ROLE_PRESET[role]) payload.perms = ROLE_PRESET[role].perms;   // 신규만 프리셋 권한(관리자 등록분은 서버가 붙인다 — v328)
     if (pin && pinOk) payload.pin = pin;
     gwCall("gw-auth", payload).then(function(res){
       if (res.status !== 200){

@@ -88,6 +88,16 @@ function normUid(uid) { return cleanText(uid).toLowerCase(); }
 function validUid(uid) { return /^[a-z0-9._-]{4,20}$/.test(normUid(uid)); }
 function genId() { return 'u' + crypto.randomBytes(5).toString('hex'); }
 function safeMember(m) { if (!m) return null; const { pin_salt, pin_hash, ...s } = m; return s; }
+// 일반 직책(v328, PM 9/8 "대표/관리자/개발자 제외한 다른 직책 등록 가능하게") — 권한 상승이 없는 직책만.
+// 이 직책의 회원 등록·직책 변경은 관리자(비개발자)도 할 수 있다. 관리자·대표·개발자 지정은 종전대로 개발자만.
+const ROLE_OPEN = { '팀장': 1, '직원': 1, '현장직': 1 };
+function roleOpen(r) { return Object.prototype.hasOwnProperty.call(ROLE_OPEN, String(r || '')); }
+// 일반 직책 기본 권한 — 앱 ROLE_PRESET과 같은 값(uismoke가 대조). 관리자가 만든 회원의 perms는 클라 값이 아니라 이 표에서 온다(권한 상승 차단).
+const ROLE_OPEN_PERMS = {
+  '팀장':   { tasks: 'do', veh: 'do', rec: 'do', lic: 'do', check: 'do', con: 'view', cli: 'view', doc: 'view', wk: 'do', quote: 'hide', promo: 'hide' },
+  '직원':   { tasks: 'do', veh: 'view', rec: 'view', lic: 'view', check: 'do', con: 'view', cli: 'view', doc: 'view', wk: 'view', quote: 'hide', promo: 'hide' },
+  '현장직': { tasks: 'do', veh: 'view', rec: 'hide', lic: 'hide', check: 'do', con: 'hide', cli: 'hide', doc: 'view', wk: 'hide', quote: 'hide', promo: 'hide' }
+};
 function cleanPerms(p) { const out = {}; MODULES.forEach(function (k) { out[k] = (p && (p[k] === 'do' || p[k] === 'view' || p[k] === 'hide')) ? p[k] : 'view'; }); return out; }
 
 async function listMembers(st) {
@@ -246,9 +256,21 @@ async function handleMemberUpsert(st, event, d, R) {
   const nameChange = !!(name && name !== String(m.name || ''));
   const roleNew = (roleIn !== undefined) ? (roleIn || m.role || '직원') : undefined;
   const roleChange = roleNew !== undefined && roleNew !== String(m.role || '직원');
+  // v328 — 관리자(비개발자)에게 열린 두 가지: ①일반 직책 회원 신규 등록 ②일반 직책 사이의 직책 변경(대상이 관리자·개발자가 아닐 때).
+  // 등록 시 perms는 클라가 보낸 값을 쓰지 않고 서버 표(ROLE_OPEN_PERMS)에서 붙인다 — 'do' 도배로 권한을 올리는 경로 차단.
+  const roleEff = isNew ? (roleNew || '직원') : roleNew;
+  const wantsPriv = (d.admin !== undefined && !!d.admin) || (d.dev !== undefined && !!d.dev);
+  const openCreate = isNew && roleOpen(roleEff) && !wantsPriv;
+  const openRole = !isNew && roleChange && roleOpen(roleEff) && roleOpen(m.role || '직원') && !m.admin && !m.dev;
+  const forcedPerms = (!canDev && openCreate) ? ROLE_OPEN_PERMS[roleEff] : null;
   // 시스템 영역(계정 생성·관리자 지정·개발자 지정·권한 편집·아이디·**이름·직책 변경**)은 개발자만(S1(c) — 이름·직책은 등급 파생·이름 로그인 색인의 근거).
   // 인사 정보(연차·입사일 등) 수정은 종전대로 관리자도 가능 — 경리·인사 업무가 막히지 않게(인사 카드가 동봉하는 같은 값의 name·role은 변경이 아니다).
-  const touchesSystem = isNew || d.admin !== undefined || d.dev !== undefined || d.perms !== undefined || d.uid !== undefined || nameChange || roleChange;
+  // 시스템 판정(v328): 신규 등록·직책 변경은 '일반 직책'이면 관리자도 가능. 관리자·개발자 지정, 권한 직접 편집, 아이디, 기존 회원 이름 변경은 종전대로 개발자만.
+  //   admin·dev는 '값이 현재와 다를 때만' 시스템 변경으로 본다(앱이 관리자 아님을 뜻하는 false를 같이 보내도 막히지 않게).
+  const adminSys = (d.admin !== undefined && !!d.admin !== !!m.admin) || (d.dev !== undefined && !!d.dev !== !!m.dev);
+  const permsSys = d.perms !== undefined && !forcedPerms;
+  const uidSys = d.uid_clear === true || (d.uid !== undefined && normUid(d.uid) !== '');
+  const touchesSystem = (isNew && !openCreate) || adminSys || permsSys || uidSys || (nameChange && !isNew) || (roleChange && !openRole);
   if (touchesSystem && !canDev) return jr(403, { status: 'FORBIDDEN', error_code: 'DEV_ONLY', request_id: R });
   // 자기 계정의 role·name·dev·admin·tier 변경 금지(S1(b) — 개발자 예외 없음: 다른 개발자·대표가 바꾼다). 자기 등급 상승·이름 색인 탈취의 뿌리를 닫는다
   if (self) {
@@ -282,8 +304,9 @@ async function handleMemberUpsert(st, event, d, R) {
     }
   } else {
     m.name = name;
-    m.role = roleNew || '직원';
+    m.role = roleEff;
     m.admin = !!d.admin;
+    if (!canDev) { m.admin = false; delete m.dev; }   // v328 관리자 등록분은 항상 일반 회원(개발자만 관리자·개발자를 만든다)
   }
   // 관리자 등급(v321, PM 9/6 ㄱ): tier 'boss'|'pm'|'admin'. 변경은 요청자 tier boss·pm만(개발자 게이트와 별개 축), 대상은 관리자만. 마지막 pm 보호는 아래 LAST_PM(모든 저장 공통).
   // 명시 tier만 게이트에 쓰인다(_lib/tier.js — 재직 관리자 전원 미지정일 때만 파생). 관리자 해제 시 등급 제거(관리자 아닌 회원은 등급 없음)
@@ -330,7 +353,7 @@ async function handleMemberUpsert(st, event, d, R) {
   if (d.on_loa !== undefined) m.on_loa = !!d.on_loa;
   if (d.loa_start !== undefined) m.loa_start = String(d.loa_start || '');
   if (d.loa_end !== undefined) m.loa_end = String(d.loa_end || '');
-  m.perms = cleanPerms(d.perms || m.perms);
+  m.perms = cleanPerms(forcedPerms || d.perms || m.perms);   // v328: 관리자 등록분은 서버 표 프리셋(클라 값 무시)
   m.updated = Date.now();
   if (d.pin) {
     const pinStr = String(d.pin).trim();
