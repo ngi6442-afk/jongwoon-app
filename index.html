@@ -9810,6 +9810,21 @@
     }).catch(function(){});
   }
   function scheduleAsbSave(){ asbPending=true; if(asbSaveTimer) clearTimeout(asbSaveTimer); asbSaveTimer=setTimeout(doSaveAsb,1200); }
+  // v335 (PM 2026-09-09 실사고: "저장을 눌러도 창이 안 닫히고 목록에도 안 뜬다" — 서버에는 같은 기록이 17건 쌓여 있었다)
+  //   원인 구조: 저장(배열 push + 예약 저장)은 끝났는데 그 뒤 renderAsb()/renderCalendar()에서 예외가 나면
+  //   같은 문장에 이어 붙은 closeAsb()가 실행되지 않는다 → 사람은 "저장이 안 됐다"고 보고 다시 누른다 → 기록이 계속 쌓인다.
+  //   그래서 (1) 화면 갱신은 각각 감싸 실패해도 넘어가고 (2) 닫기는 finally로 보장하고 (3) 실패는 조용히 넘기지 않고 토스트로 알린다.
+  function safeRender(list, whereLabel){
+    var bad = [];
+    for (var i = 0; i < list.length; i++){
+      try { list[i].fn(); } catch (e) { bad.push(list[i].name + ": " + ((e && e.message) || e)); }
+    }
+    if (bad.length){
+      try { if (typeof console !== "undefined" && console.error) console.error("[" + whereLabel + "] 화면 갱신 실패", bad); } catch (e2) {}
+      try { gwToast("저장은 됐지만 화면 갱신에 실패했습니다 — 새로고침하면 보입니다.\n(" + whereLabel + " / " + bad.join(" · ") + ")"); } catch (e3) {}
+    }
+    return bad.length === 0;
+  }
   function doSaveAsb(){
     return gwCall("gw-data",{action:"save",collection:"asbestos",doc:{schema:1,items:asb},base:asbBase}).then(function(res){
       if(res.status===409){
@@ -9908,9 +9923,13 @@
     document.getElementById("asbBackdrop").classList.add("show");
   }
   function closeAsb(){ document.getElementById("asbBackdrop").classList.remove("show"); asbEditId=null; }
+  var asbSaveBusy = false;   // v335: 같은 클릭이 두 번 처리돼 기록이 겹쳐 쌓이는 것 차단
   function saveAsb(){
+    if (asbSaveBusy) return;
     var title=document.getElementById("asbTitle").value.trim();
     if(!title){ alert("공사명을 입력하세요."); return; }
+    asbSaveBusy = true;
+    setTimeout(function(){ asbSaveBusy = false; }, 800);
     var r=asbEditId?findAsb(asbEditId):null, isNew=!r;
     if(isNew){ r={ id:genId("asb"), created:todayStr() }; asb.push(r); }
     r.title=title;
@@ -9927,13 +9946,18 @@
     r.member_ids=getCheckedMembers("asbMembers");
     r.worker_ids=asbGetCheckedWorkers();
     r.updated=todayStr();
-    scheduleAsbSave(); renderAsb(); renderCalendar(); closeAsb();
+    scheduleAsbSave();
+    safeRender([{ name: "석면 목록", fn: renderAsb }, { name: "캘린더", fn: renderCalendar }], "석면 작업");
+    closeAsb();
+    try { gwToast(isNew ? "석면 작업을 저장했습니다 — 목록 맨 위에서 확인하세요." : "석면 작업을 수정했습니다."); } catch (e) {}
   }
   function deleteAsb(){
     var r=asbEditId?findAsb(asbEditId):null; if(!r) return;
     if(!confirm("이 석면 작업 기록을 삭제할까요?\n(기록은 30년 보존 대상입니다 — 잘못 만든 것만 지우세요)")) return;
     r.del=1; r.updated=todayStr();
-    scheduleAsbSave(); renderAsb(); renderCalendar(); closeAsb();
+    scheduleAsbSave();
+    safeRender([{ name: "석면 목록", fn: renderAsb }, { name: "캘린더", fn: renderCalendar }], "석면 작업");
+    closeAsb();
   }
 
   // ═══ 교육·건강진단 이력 ════════════════════════════════════════════════
@@ -10095,13 +10119,17 @@
     r.next=document.getElementById("eduNext").value||"";
     r.note=document.getElementById("eduNote").value.trim();
     r.updated=todayStr();
-    scheduleEduSave(); renderEdu(); renderCalendar(); renderAsb(); closeEdu();
+    scheduleEduSave();
+    safeRender([{ name: "교육 목록", fn: renderEdu }, { name: "캘린더", fn: renderCalendar }, { name: "석면 목록", fn: renderAsb }], "교육 이력");
+    closeEdu();
   }
   function deleteEdu(){
     var r=eduEditId?findEdu(eduEditId):null; if(!r) return;
     if(!confirm("이 이력을 삭제할까요?")) return;
     r.del=1; r.updated=todayStr();
-    scheduleEduSave(); renderEdu(); renderCalendar(); renderAsb(); closeEdu();
+    scheduleEduSave();
+    safeRender([{ name: "교육 목록", fn: renderEdu }, { name: "캘린더", fn: renderCalendar }, { name: "석면 목록", fn: renderAsb }], "교육 이력");
+    closeEdu();
   }
 
   function famQRange(){
