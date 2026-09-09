@@ -711,5 +711,97 @@ try {
     && /renderMemberChecks\("licScope"/.test(html) && /renderMemberChecks\("reScope"/.test(html), '');
 } catch (e) { console.log('  (v332 검사 생략 — ' + e.message + ')'); fails++; }
 
+// 36) v333 — 미판독 건 화면 표시(PM 2026-09-09 ㄱ · 입찰에이전트 진화설계 v2.1 확인1 안 ㄴ).
+//     사고 형태: 하한율을 공고문에서 읽지 못한 건에 "공사/용역·금액구간" 최빈값을 값 칸에 써 넣어
+//     화면에 숫자가 떴다. 실측 2026-09-09 원장 2,292건 = 820건이 그렇게 떴고, 그중 적격심사제 261건에
+//     들어간 값은 소액수의견적이 만든 88%였다(설계 §2-3: 적격심사제 실제값은 85.495~87.745로 갈린다).
+//     그대로 투찰하면 하한 미달(무효)이거나 적격 탈락이다. 그래서 통계 대입 경로를 전부 끊고
+//     값 칸은 그 공고문에서 읽은 값으로만 채우며, 통계는 "참고(산정 미사용)" 줄로만 남긴다.
+try {
+  const fnSrc = (name) => {
+    const i = html.indexOf('function ' + name + '(');
+    if (i < 0) throw new Error('함수 없음: ' + name);
+    let d = 0, started = false;
+    for (let j = i; j < html.length; j++) {
+      const ch = html[j];
+      if (ch === '{') { d++; started = true; }
+      else if (ch === '}') { d--; if (started && d === 0) return html.slice(i, j + 1); }
+    }
+    throw new Error('중괄호 짝 안 맞음: ' + name);
+  };
+
+  // ---- ① 값 경로에 통계가 다시 들어오지 못하게(이름·대입문 감시) ----
+  T('v333 통계 최빈값 함수는 참고 전용 이름(lwltRefMode)만 남는다 — 구 이름 lwltMode가 되살아나면 값 경로 재유입 신호',
+    !/\blwltMode\s*\(/.test(html) && /function lwltRefMode\(/.test(html), '');
+  {
+    const openSrc = fnSrc('openBidCalc');
+    T('v333 계산기 값 칸은 그 공고의 판독값(ext.lwlt·ext.rng)으로만 채운다 — openBidCalc가 통계(bidsAwards.lwlt·bcModeRng)를 아예 읽지 않는다',
+      !/bidsAwards/.test(openSrc) && !/bcModeRng/.test(openSrc)
+      && (openSrc.match(/getElementById\("bcLwlt"\)\.value\s*=/g) || []).length === 1
+      && /if\(pre\.lwlt\) document\.getElementById\("bcLwlt"\)\.value=parseFloat\(pre\.lwlt\)\|\|"";/.test(openSrc),
+      openSrc.slice(0, 200));
+  }
+  T('v333 남은 자동 채움은 같은 공고의 추정가격→기초금액 하나뿐(다른 공고를 모은 값이 아니다)',
+    /bcAutoSrc\.push\("기초금액=이 공고 추정가격"\)/.test(html)
+    && (html.match(/bcAutoSrc\.push\(/g) || []).length === 1, '');
+
+  // ---- ② bidFloorRange: 판독값이 있을 때만 숫자를 낸다(실제 배포 소스를 그대로 실행) ----
+  {
+    const bidFloorRange = new Function([fnSrc('bidFloorRange'), 'return bidFloorRange;'].join('\n'))();
+    const rng = '-2% ~ +2%';
+    const read = bidFloorRange({ kind: '용역', title: '폐기물 처리', ext: { bss: 100000000, rng: rng, lwlt: 87.745 } });
+    T('v333 투찰범위: 그 공고문에서 읽은 하한율이 있으면 종전대로 계산한다',
+      !!read && read.lwlt === 87.745 && read.lo === Math.round(98000000 * 0.87745), JSON.stringify(read));
+    const unread = bidFloorRange({ kind: '용역', title: '폐기물 처리', ext: { bss: 100000000, rng: rng } });
+    T('v333 투찰범위: 하한율 미판독이면 null — 유사공고 최빈값을 끌어와 "≈"로 띄우지 않는다(P5)',
+      unread === null, JSON.stringify(unread));
+    T('v333 투찰범위 반환에 est(추정) 플래그가 없다 — 화면 3곳(카드·상세·파이프라인)이 이 플래그로 "≈"를 찍었다',
+      !!read && !('est' in read) && !/fr\.est/.test(html), Object.keys(read || {}).join(','));
+  }
+
+  // ---- ③ 미판독을 상태로 드러낸다(숨기지 않는다) ----
+  {
+    const bidLwltState = new Function([fnSrc('methodKindOf'), fnSrc('bidLwltState'), 'return bidLwltState;'].join('\n'))();
+    const cases = [
+      ['적격심사제', { lwlt: 87.745 }, 'read', '판독값이 있으면 read'],
+      ['적격심사제', {}, 'unread', '적격심사제인데 못 읽었으면 unread(사람이 공고문을 열어야 한다)'],
+      ['소액수의견적', {}, 'unread', '소액수의견적도 하한율이 있으므로 unread'],
+      ['협상에의한계약', {}, 'none', '협상은 하한율 개념이 없어 미판독이라 부르지 않는다'],
+      ['매각 (최고가)', {}, 'none', '매각은 최고가 — 하한 개념이 반대'],
+      ['종합심사낙찰제', {}, 'none', '종합심사는 별도 산식'],
+      ['제한경쟁·B5202602263', {}, 'method_unknown', '참가자격+공고번호 문자열은 낙찰방법이 아니다(수자원 형태)'],
+      ['전자입찰·E26S077000', {}, 'method_unknown', '입찰방식+공고번호도 낙찰방법이 아니다(한수원 형태)'],
+      ['공개구매·6663047', {}, 'method_unknown', '포스코는 구매유형만 있고 낙찰방법이 없다'],
+      ['공고게시', {}, 'method_unknown', '철도공단은 처리상태가 들어와 있었다'],
+      ['최저 낙찰·신규공고', {}, 'unread', '공동주택 "최저 낙찰"은 진짜 낙찰방법 — 상태가 붙어 있어도 하한율 대상'],
+      ['최저 낙찰·재공고', {}, 'unread', '꼬리 "재공고"가 낙찰방법 판정을 이기면 안 된다(2026-09-09 원장 2건이 그렇게 미상으로 떨어졌다)'],
+      ['적격심사 낙찰제(구매,용역)', {}, 'unread', '한수원 실제 낙찰방법 — 수집기 수리 후 들어오는 값'],
+      ['55-1. 폐기물처리용역 (2억미만)', {}, 'unread', '철도공단 상세의 낙찰자 선정방법(하한율 대상)'],
+      ['43-1. 100억이상(종합심사낙찰제)', {}, 'none', '철도공단 종합심사 — 하한율 개념 없음'],
+      ['제한경쟁 시설·2026-10655', {}, 'method_unknown', '국방 형태(계약방법+업무구분+공고번호)'],
+      ['', {}, 'method_unknown', '빈 낙찰방법'],
+    ];
+    let bad = [];
+    cases.forEach((c) => { const got = bidLwltState({ method: c[0], ext: c[1] }); if (got !== c[2]) bad.push(c[0] + '→' + got + '(기대 ' + c[2] + ')'); });
+    T('v333 하한율 판독 상태 4종(read/unread/none/method_unknown)이 낙찰방법별로 갈린다 — ' + cases.length + '케이스', !bad.length, bad.join(' · '));
+  }
+  T('v333 카드에 "하한율 미판독"·"낙찰방법 미상" 칩이 뜬다 — 미판독을 숨기면 사람이 몇 건인지 셀 수 없다',
+    /하한율 미판독</.test(html) && /낙찰방법 미상</.test(html) && /bidLwltState\(b\)==="unread"/.test(html), '');
+  T('v333 상세표 낙찰하한율·투찰범위 칸이 미판독을 말한다(빈칸으로 숨기지 않는다)',
+    /미판독 — 공고문 확인/.test(html) && /산정 안 함 — /.test(html), '');
+  T('v333 하한율은 읽었는데 기초금액·예가범위가 없어 못 내는 경우를 "미판독"이라 부르지 않는다 — 철도공단 상세는 하한율만 주고 사정률 범위를 안 준다',
+    /if\(s==="read"\)\{/.test(html) && /miss\.push\("기초금액"\)/.test(html) && /miss\.push\("예가범위"\)/.test(html)
+    && /는 판독됨 — 계산기에서 기초금액·예가범위를 넣으면 나옵니다/.test(html), '');
+
+  // ---- ④ 통계는 "참고(산정 미사용)" 줄로만 ----
+  T('v333 계산기 참고선에 "참고(산정 미사용)" 배너와 미판독 경고가 붙는다(PM 확인1 안 ㄴ)',
+    /참고\(산정 미사용\)<\/b> — 아래는 <b>다른 공고들을 모은 통계<\/b>/.test(html)
+    && /낙찰하한율 미판독<\/b> — 이 공고문에서 하한율을 읽지 못했습니다/.test(html), '');
+  T('v333 하한율·사정률 참고 줄은 "값 칸에 넣지 않았습니다"를 명시한다 — 참고를 값으로 오독하지 않게',
+    (html.match(/값 칸에 넣지 않았습니다/g) || []).length >= 2, '');
+  T('v333 기관 칩·상세 기관 행이 "참고(산정 미사용)"로 재라벨된다 — 종전 "📊 기관실측 88.5%"는 이 공고 하한율처럼 읽혔다',
+    /참고 기관개찰 /.test(html) && !/📊 기관실측 /.test(html) && /\["참고·기관개찰"/.test(html), '');
+} catch (e) { console.log('  (v333 검사 생략 — ' + e.message + ')'); fails++; }
+
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

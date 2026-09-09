@@ -6308,7 +6308,7 @@
         });
         liveBids().filter(function(b){ return bidSt(b)==="응찰"; }).slice(0,4).forEach(function(b){
           var fr=bidFloorRange(b);
-          cols[0].cards.push('<div class="pipe-card" data-inbox-go="bid"><b>'+esc((b.title||"").slice(0,34))+'</b><div class="s">투찰'+(b.due?' · 마감 '+esc(b.due):'')+(fr?' · 투찰≥'+(fr.est?'≈':'')+fmtAmount(fr.lo):'')+'</div></div>');
+          cols[0].cards.push('<div class="pipe-card" data-inbox-go="bid"><b>'+esc((b.title||"").slice(0,34))+'</b><div class="s">투찰'+(b.due?' · 마감 '+esc(b.due):'')+(fr?' · 투찰≥'+fmtAmount(fr.lo):'')+'</div></div>');
         });
         cols[0].sub=(awarded.length?("낙찰 "+awarded.length+" · "):"")+"투찰 "+liveBids().filter(function(b){return bidSt(b)==="응찰";}).length;
       } else { cols[0].sub="관리자 전용"; }
@@ -13276,8 +13276,9 @@
   // 산식은 적격심사 모달과 동일: 필요 입찰가격 평점 = 95 − 수행능력 소계 − 안전성, r = 피벗 − (배점−필요)/2000
   // 낙찰방법별 산식 분기 — 적격심사가 아닌 건(수의시담·협상·제한경쟁 최저가 등)에 적격 산식을 들이대면 안 된다.
   // 판정 불가면 숫자를 내지 않고 경고만 낸다(추정으로 통과선을 보여주는 게 가장 위험).
-  function bcMethodKind(){
-    var m=String(bcQualMethod||"");
+  // 낙찰방법 분류 — 계산기·카드·상세가 같은 규칙을 쓰도록 순수 함수로 분리(v333).
+  function methodKindOf(mth){
+    var m=String(mth||"");
     if(!m) return "unknown";
     if(/시담|지명|수의/.test(m)) return "negotiate";
     if(/협상/.test(m)) return "proposal";
@@ -13286,7 +13287,25 @@
     if(/매각|최고가/.test(m)) return "sale";          // 공매·자산처분 — 최고가 낙찰(하한 개념 반대)
     if(/제한경쟁|일반경쟁/.test(m)) return "compet";   // 참가자격 제한 표기일 뿐 낙찰방법이 아님
     if(/최저\s*가?\s*낙찰|최저가/.test(m)) return "lowest";
+    // 입찰 진행방식·공고상태 문자열이 낙찰방법 자리에 들어온 소스(한수원 전자입찰·포스코 공개구매·철도공단 공고게시).
+    // compet과 같은 U군이지만 사유가 달라 문구를 나눈다 — 수집기가 낙찰방법을 아예 안 받아온 경우다.
+    // ⚠ 진짜 낙찰방법 판정을 전부 지난 뒤에 본다 — 앞에 두면 '최저 낙찰·재공고'(공동주택 구데이터)의
+    //   꼬리 '재공고'에 걸려 멀쩡한 낙찰방법이 미상으로 떨어진다(2026-09-09 원장 2건 실측).
+    if(/전자입찰|수작업입찰|현장입찰|공개구매|공고게시|변경공고|재공고/.test(m)) return "notmethod";
     return "other";
+  }
+  function bcMethodKind(){ return methodKindOf(bcQualMethod); }
+  // 하한율 판독 상태(v333, PM 2026-09-09 ㄱ) — 통계로 채우지 않고 상태를 그대로 화면에 낸다.
+  //   read = 그 공고문에서 읽은 값이 있다 / none = 하한율 개념이 없는 낙찰방법(협상·종합심사·매각)
+  //   method_unknown = 낙찰방법 자리에 참가자격·입찰방식 문자열만 있다(진화설계 v2.1 §3-1 U군)
+  //   unread = 하한율이 있어야 할 건인데 못 읽었다 → 사람이 공고문을 열어야 한다(P3·P5)
+  function bidLwltState(b){
+    var e=(b&&b.ext)||{};
+    if(parseFloat(e.lwlt)) return "read";
+    var k=methodKindOf(b&&b.method);
+    if(k==="compet"||k==="notmethod"||k==="unknown") return "method_unknown";
+    if(k==="proposal"||k==="comprehensive"||k==="sale") return "none";
+    return "unread";
   }
   function bcQualFloor(){
     // 모달 DOM을 읽지 않는다 — 모달을 연 적 없으면 빈 값이라 "미제출 등급·실적 0"으로 오계산됐던 결함(v204)의 수정.
@@ -13338,6 +13357,7 @@
         lowest:["최저가","적격심사 없이 최저가로 결정됩니다. 하한가 이상 최저 투찰이 관건입니다."],
         sale:["매각·공매(최고가)","자산 처분 건이라 <b>최고가 낙찰</b>입니다. 낙찰하한가 계산 자체가 방향이 반대이니 이 화면을 쓰지 마세요."],
         compet:["제한경쟁·일반경쟁","이건 참가자격 표기이지 낙찰자 결정방법이 아닙니다. 공고문에서 적격심사인지 최저가인지 확인해야 합니다."],
+        notmethod:["낙찰방법 미수집","수집된 값이 입찰 진행방식·공고상태 문자열입니다(전자입찰·공개구매·공고게시 등). 낙찰자 결정방법은 공고문에서 확인해야 합니다."],
         other:["기타 낙찰방법","적격심사 산식 대상인지 공고문에서 확인하세요."],
         unknown:["낙찰방법 미확인","수집 데이터에 낙찰방법이 없습니다 — 공고문에서 확인 후 판단하세요."] };
       var mi=MK[mk]||MK.unknown;
@@ -13397,24 +13417,29 @@
     mo.textContent=msg;
   }
   function bcBand(v){ v=parseFloat(v)||0; if(v<2e8) return "2억미만"; if(v<1e9) return "2~10억"; if(v<5e9) return "10~50억"; return "50억이상"; }
-  // 하한율 최빈값(유형·금액구간별, 공고문 명기값들의 최빈치 — 표본 3건 이상만)
-  function lwltMode(kindTxt, bss){
+  // 하한율 최빈값(유형·금액구간별, 공고문 명기값들의 최빈치 — 표본 3건 이상만).
+  // ⚠ 참고 표시 전용 — 값 칸·투찰범위·하한가 계산 어디에도 넣지 않는다(진화설계 v2.1 §1-1 '대입 금지').
+  //   v333 이전에는 bidFloorRange·openBidCalc가 이 값을 주입해 미판독 공고에 숫자를 띄웠다
+  //   (실측 2026-09-09 원장 2,292건 = 820건. 그중 적격심사제 261건에 들어가던 값은 소액수의견적이 만든 88%였다).
+  //   이름에 Ref를 박아 둔 것은 값 경로에서 다시 불리면 grep으로 잡히게 하려는 것이다(uismoke 36 검사).
+  function lwltRefMode(kindTxt, bss){
     if(!bidsAwards||!bidsAwards.lwlt) return null;
     var k=(/공사/.test(kindTxt||"")?"공사":"용역")+"·"+bcBand(bss);
     var o=bidsAwards.lwlt[k];
     return (o&&o.n>=3&&parseFloat(o.mode))?{v:parseFloat(o.mode),n:o.n,key:k}:null;
   }
-  // 투찰 범위(낙찰하한가 최소~최대) — 하한율 명기 판독 실패 건은 최빈값으로 추정 표시(est)
+  // 투찰 범위(낙찰하한가 최소~최대) — **그 공고에서 판독한 하한율(ext.lwlt)이 있을 때만** 계산한다.
+  // v333(PM 2026-09-09 ㄱ): 미판독 건에 유사공고 최빈값을 주입해 "≈"로 띄우던 est 경로를 삭제.
+  //   진화설계 v2.1 P5 — 낙찰방법·산정방식이 미판독인 건에는 어떤 하한가·투찰범위도 계산하지 않는다.
   function bidFloorRange(b){
     var e=b.ext||{};
-    var bss=parseFloat(e.bss)||0, lwlt=parseFloat(e.lwlt)||0, est=false;
+    var bss=parseFloat(e.bss)||0, lwlt=parseFloat(e.lwlt)||0;
     var m=String(e.rng||"").match(/(-?[\d.]+)\s*%\s*~\s*\+?(-?[\d.]+)\s*%/);
-    if(!lwlt){ var lm=lwltMode((b.kind||"")+(b.title||""), bss); if(lm){ lwlt=lm.v; est=true; } }
     if(!bss||!lwlt||!m) return null;
     var low=parseFloat(m[1]), high=parseFloat(m[2]);
     var a=parseFloat(e.aamt)||0;   // 공개값 합산이 있으면 항상 반영(v209 정책과 동일)
     var f=function(p){ return a ? (p-a)*lwlt/100+a : p*lwlt/100; };
-    return { lo: Math.round(f(bss*(1+low/100))), hi: Math.round(f(bss*(1+high/100))), a: a, est: est, lwlt: lwlt };
+    return { lo: Math.round(f(bss*(1+low/100))), hi: Math.round(f(bss*(1+high/100))), a: a, lwlt: lwlt };
   }
   // 발주처 실측 칩(S3) — 이 기관의 최근 낙찰 투찰률 분포. 경북 상세(gb_orgs, 사분위 포함) 우선, 없으면 전국(orgs) 중앙값.
   // 표본 3건 미만은 비표시(lwlt 최빈값과 동일 정책). 매칭은 계산기 참고선(bcRefLines)과 같은 양방향 부분일치.
@@ -13444,19 +13469,28 @@
       var BC_CATL={asb:"석면", dredge:"준설", demo:"철거·해체"};
       if(bcCat && a.cats[bcCat]) parts.push("동일 공종("+BC_CATL[bcCat]+") 실측: 중앙값 "+a.cats[bcCat].med+"% · 상하위 "+a.cats[bcCat].q1+"~"+a.cats[bcCat].q3+"% (n="+a.cats[bcCat].n+")");
     }
-    // 명기 하한율 참고 — 같은 유형·금액구간 공고들의 공고문 명기값 최빈치
+    // 명기 하한율 참고 — 같은 유형·금액구간 공고들의 공고문 명기값 최빈치.
+    // v333: 값 칸에 넣지 않고 참고 줄로만 남긴다(PM 2026-09-09 확인1 안 ㄴ).
     if(a.lwlt && !document.getElementById("bcLwlt").value){
       var key=lbl+"·"+bcBand(document.getElementById("bcBss").value);
       var lo=a.lwlt[key];
-      if(lo && lo.n>=3) parts.push("유사 조건("+key+") 공고 명기 하한율 최빈값 "+lo.mode+"% (n="+lo.n+") — 참고용, 이 공고문 확인 필수");
+      if(lo && lo.n>=3) parts.push("유사 조건("+key+") 공고 명기 하한율 최빈 "+lo.mode+"% (n="+lo.n+") — <b>이 공고 값이 아니라 값 칸에 넣지 않았습니다.</b> 공고문에서 확인해 직접 입력하세요");
     }
-    var html = parts.length ? "📊 "+parts.join("<br>📊 ") : "";
+    // 사정률(예가범위)도 같은 이유로 참고 줄로만 — 종전엔 이력 최빈값을 값 칸에 써 넣었다.
+    if(!document.getElementById("bcLow").value && !document.getElementById("bcHigh").value){
+      var rr=bcModeRng(lbl);
+      if(rr) parts.push("사정률 범위 최빈 "+rr.low+"~+"+rr.high+"% (우리 수집 이력 "+rr.n+"건) — <b>이 공고 예가범위가 아니라 값 칸에 넣지 않았습니다.</b> 공고문에서 확인해 직접 입력하세요");
+    }
+    var html = parts.length ? '<div style="color:#8A6D3B;margin-bottom:2px;"><b>참고(산정 미사용)</b> — 아래는 <b>다른 공고들을 모은 통계</b>입니다. 값 칸에 자동으로 넣지 않습니다(진화설계 v2.1 §1-1).</div>📊 '+parts.join("<br>📊 ") : "";
     if(aFlag==="auto") html += (html?"<br>":"")+'<span style="color:#2E7D32;">✓ 공고문에 A값 감액 방식 명기 — 금액 자동 입력됨(공고문 명기값 우선, 없으면 공식 공개항목 합산).</span>';
     else if(aFlag==="open") html += (html?"<br>":"")+'<span style="color:#2E7D32;">✓ A값 자동 입력 — 조달청 기초금액 공개값 합산(연금·건보·요양·퇴직공제·산안비 등). 산출방식은 공고문 확인.</span>';
     else if(aFlag) html += (html?"<br>":"")+'<span style="color:#B7791F;">⚠ 공고문에 A값 감액 방식이 명기됐는데 금액을 찾지 못했습니다 — 공고문 산출내역의 A값을 입력하세요.</span>';
     if(arguments[3]) html += (html?"<br>":"")+'<span style="color:#5A6472;">산출방식: '+arguments[3]+' 위임(공고문 명기) — 하한율은 해당 기준 원문 확인.</span>';
     if(bcAutoSrc && bcAutoSrc.length)
-      html += (html?"<br>":"")+'<span style="color:#B7791F;">✎ <b>자동 채움(추정)</b>: '+esc(bcAutoSrc.join(" · "))+' — 공고문 값이 확인되면 덮어쓰세요.</span>';
+      html += (html?"<br>":"")+'<span style="color:#B7791F;">✎ <b>자동 채움(이 공고 값)</b>: '+esc(bcAutoSrc.join(" · "))+' — 공고문 값이 확인되면 덮어쓰세요.</span>';
+    // 미판독을 숨기지 않는다 — 값 칸이 비어 있는 이유를 화면에서 말한다.
+    if(!document.getElementById("bcLwlt").value)
+      html = '<div style="color:#B7791F;margin-bottom:2px;">⚠ <b>낙찰하한율 미판독</b> — 이 공고문에서 하한율을 읽지 못했습니다. 유사공고 통계로 채우지 않으니(진화설계 v2.1 P3·P5) 공고문·첨부에서 확인해 위 칸에 직접 입력하세요.</div>' + html;
     el.innerHTML = html;
   }
   function openBidCalc(pre){
@@ -13473,27 +13507,16 @@
     bcQualKind=pre.kind||"";
     bcQualMethod=pre.method||"";
     bcQualBudget=pre.budget||0;
-    // 공고문 판독이 못 뽑은 값은 실측 통계로 자동 채운다(빈칸으로 두면 계산 자체가 안 됨 — 실측 63%가 빈칸이었음).
-    // 채운 값은 추정치이므로 출처를 표시하고, 공고문 확인 후 덮어쓰도록 안내한다.
+    // 자동 채움 — v333(PM 2026-09-09 ㄱ)에서 **통계 대입 2경로를 삭제**했다.
+    //   ① 하한율 = 유사공고(공사/용역·금액구간) 최빈값  ② 사정률 = 우리 수집 이력 최빈값
+    //   둘 다 '다른 공고들을 모아 만든 값'이라 진화설계 v2.1 §1-1의 대입 금지 대상이다.
+    //   실측 2026-09-09 원장 2,292건에서 ①로 숫자가 뜨던 건 820(적격심사제 261건에 소액수의견적의 88%가 들어감).
+    //   지금은 참고 줄(bcRefLines)로만 보이고, 값 칸은 사람이 공고문을 보고 직접 넣는다.
+    //   남은 자동 채움은 '같은 공고의 추정가격을 기초금액 칸에'뿐 — 다른 공고를 모은 값이 아니다.
     bcAutoSrc = [];
-    var _kindTxt = (pre.kind||"");   // 발주처명 섞으면 "○○공사"(기관)가 공사 공고로 오분류 — 카드 칩(lwltMode)과 동일 기준 유지
-    var _isCn = /공사/.test(_kindTxt) ? "공사" : "용역";
     if(!document.getElementById("bcBss").value && pre.budget) {
-      document.getElementById("bcBss").value = pre.budget;   // 기초금액 없으면 추정가격으로
-      bcAutoSrc.push("기초금액=추정가격");
-    }
-    if(!document.getElementById("bcLwlt").value && bidsAwards && bidsAwards.lwlt){
-      var _k = _isCn+"·"+bcBand(document.getElementById("bcBss").value);
-      var _lo = bidsAwards.lwlt[_k];
-      if(_lo && _lo.n>=3 && parseFloat(_lo.mode)){
-        document.getElementById("bcLwlt").value = parseFloat(_lo.mode);
-        bcAutoSrc.push("하한율="+_lo.mode+"%(유사공고 "+_lo.n+"건 최빈)");
-      }
-    }
-    if(!document.getElementById("bcLow").value && !document.getElementById("bcHigh").value){
-      var _r = bcModeRng(_isCn);   // 우리 공고 이력에서 사정률 범위 최빈값
-      if(_r){ document.getElementById("bcLow").value=_r.low; document.getElementById("bcHigh").value=_r.high;
-        bcAutoSrc.push("사정률="+_r.low+"~+"+_r.high+"%(이력 "+_r.n+"건 최빈)"); }
+      document.getElementById("bcBss").value = pre.budget;   // 기초금액 없으면 같은 공고의 추정가격으로
+      bcAutoSrc.push("기초금액=이 공고 추정가격");
     }
     bcRefLines(pre.org||"", pre.kind||"", (pre.a ? (pre.aamt?"auto":true) : (pre.aamt?"open":false)), pre.src?esc(pre.src):"");
     bcCalc();
@@ -13718,12 +13741,16 @@
       if(b.region) meta.push('<span class="scope-chip">지역 '+esc(b.region)+'</span>');
       if(b.method) meta.push('<span class="hold-chip">'+esc(b.method)+'</span>');
       var osc=orgStatChip(b.org);
-      if(osc) meta.push('<span class="from-chip" title="이 발주처 최근 낙찰 투찰률(예정가 대비) 실측 — '+esc(osc.name)+' 표본 '+osc.n+'건'+(osc.q1?' · Q1~Q3 '+osc.q1+'~'+osc.q3+'%':'')+(osc.low?' · 88%대 저가 경쟁 발주처, 공고문 하한율 필수 확인':'')+'">📊 기관실측 '+osc.med+'%'+(osc.low?' ⚠':'')+' <span style="opacity:.7;">n='+osc.n+'</span></span>');
+      // 기관 칩은 '참고(산정 미사용)' — 지난 개찰 결과이지 이 공고의 하한율이 아니다(PM 2026-09-09 "값처럼 읽히면 정리").
+      if(osc) meta.push('<span class="from-chip" title="참고(산정 미사용) — 이 발주처의 지난 개찰 결과 투찰률(예정가 대비) 실측입니다. 이 공고의 낙찰하한율이 아니고 계산에도 쓰지 않습니다. '+esc(osc.name)+' 표본 '+osc.n+'건'+(osc.q1?' · Q1~Q3 '+osc.q1+'~'+osc.q3+'%':'')+(osc.low?' · 88%대 저가 경쟁 발주처, 공고문 하한율 필수 확인':'')+'">참고 기관개찰 '+osc.med+'%'+(osc.low?' ⚠':'')+' <span style="opacity:.7;">n='+osc.n+'</span></span>');
       if(b.auto_pass) meta.push('<span class="hold-chip">자동패스(학습)</span>');
       if(b.matched&&b.matched.length) meta.push('<span class="from-chip">'+esc(b.matched.join(","))+'</span>');
       if(b.budget) meta.push('<span class="rec-amt">'+fmtAmount(b.budget)+'원</span>');
       var fr=bidFloorRange(b);
-      if(fr) meta.push('<span class="rec-amt" title="낙찰하한가 범위(예가 추첨에 따라) — 이 위에서 투찰'+(fr.a?' · A값 반영':'')+(fr.est?' · 하한율 '+fr.lwlt+'%는 유사공고 최빈값(공고문 확인)':'')+'">투찰≥'+(fr.est?'≈':'')+' '+fmtAmount(fr.lo)+'~'+fmtAmount(fr.hi)+'원</span>');
+      if(fr) meta.push('<span class="rec-amt" title="낙찰하한가 범위(예가 추첨에 따라) — 이 위에서 투찰'+(fr.a?' · A값 반영':'')+' · 하한율 '+fr.lwlt+'%는 이 공고문에서 읽은 값">투찰≥ '+fmtAmount(fr.lo)+'~'+fmtAmount(fr.hi)+'원</span>');
+      // 미판독을 숨기지 않는다 — 사람이 "오늘 몇 건이 확인 안 됐나"를 셀 수 있어야 한다(진화설계 v2.1 §4-2 6번).
+      else if(bidLwltState(b)==="unread") meta.push('<span class="hold-chip" title="이 공고의 낙찰하한율을 공고문에서 읽지 못했습니다. 유사공고 통계로 채우지 않습니다(진화설계 v2.1 P3·P5) — 공고문에서 확인해 계산기에 직접 넣으십시오.">하한율 미판독</span>');
+      else if(bidLwltState(b)==="method_unknown") meta.push('<span class="hold-chip" title="낙찰방법 자리에 참가자격·입찰방식 문자열만 있습니다(수자원·국방·포스코 등). 낙찰자 결정방법을 공고문에서 확인해야 합니다.">낙찰방법 미상</span>');
       var ctrl='';
       if(canDo("bid")){
         (BID_NEXT[st]||[]).forEach(function(s){ ctrl+='<button class="mini-btn'+((s[0]==="응찰"||s[0]==="낙찰")?' appr-btn':'')+'" data-bid-st="'+s[0]+'" data-bid-id="'+b.id+'">'+s[1]+'</button>'; });
@@ -13771,15 +13798,35 @@
         var t2 = tbl([
           ["기초금액", (ext.bss?fmtAmount(ext.bss)+"원":"")], ["추정가격", (b.budget?fmtAmount(b.budget)+"원":"")],
           ["예가범위", (esc(ext.rng||"")+(ext.prc_m?" ("+esc(ext.prc_m)+")":""))],
-          ["낙찰하한율", (ext.lwlt?esc(ext.lwlt)+"%":(function(){ var lm=lwltMode((b.kind||"")+(b.title||""), ext.bss||b.budget); return lm?("≈"+lm.v+"% <span style='color:#888;'>(유사공고 "+lm.n+"건 최빈값 — 공고문 확인)</span>"):""; })())],
+          // 값 칸은 판독값으로만 채우고, 통계는 '참고(산정 미사용)' 줄로만 남긴다(PM 2026-09-09 확인1 안 ㄴ).
+          ["낙찰하한율", (function(){
+            var s=bidLwltState(b);
+            if(s==="read") return esc(ext.lwlt)+"% <span style='color:#888;'>(이 공고문 판독값)</span>";
+            if(s==="none") return "<span style='color:#888;'>해당 없음 — 이 낙찰방법은 낙찰하한율 개념이 없습니다</span>";
+            var lab=(s==="method_unknown")?"낙찰방법 미상 — 공고문 확인":"미판독 — 공고문 확인";
+            var lm=lwltRefMode((b.kind||"")+(b.title||""), ext.bss||b.budget);
+            return "<span style='color:#B7791F;'>⚠ "+lab+"</span>"+(lm?("<br><span style='color:#888;'>참고(산정 미사용): 유사 조건("+esc(lm.key)+") 공고 명기 하한율 최빈 "+lm.v+"% · n="+lm.n+" — 이 공고 값이 아니라 넣지 않았습니다</span>"):"");
+          })()],
           ["A값(합산)", (ext.aamt?fmtAmount(ext.aamt)+"원"+(ext.a?"":" <span style='color:#888;'>(기초금액 공개값)</span>"):"")],
-          ["투찰범위(하한)", (function(){ var fr=bidFloorRange(b); return fr ? ((fr.est?"≈":"")+fmtAmount(fr.lo)+" ~ "+fmtAmount(fr.hi)+"원 <span style='color:#888;'>(예가 추첨 범위"+(fr.a?" · A값 반영":"")+(fr.est?" · 하한율 추정":"")+" — 최대값 이상이면 항상 통과)</span>") : ""; })()]
+          ["투찰범위(하한)", (function(){
+            var fr=bidFloorRange(b);
+            if(fr) return fmtAmount(fr.lo)+" ~ "+fmtAmount(fr.hi)+"원 <span style='color:#888;'>(예가 추첨 범위"+(fr.a?" · A값 반영":"")+" · 하한율 "+fr.lwlt+"% 판독값 — 최대값 이상이면 항상 통과)</span>";
+            var s=bidLwltState(b);
+            if(s==="none") return "";
+            // 하한율은 읽었는데 범위가 안 나오는 경우가 있다 — 기초금액·예가범위가 없을 때(철도공단 상세는 하한율은 주지만 사정률 범위를 안 준다).
+            // 그때 "하한율 미판독"이라고 하면 거짓말이 되므로 빠진 것이 무엇인지 그대로 말한다.
+            if(s==="read"){
+              var miss=[]; if(!parseFloat(ext.bss)) miss.push("기초금액"); if(!/%\s*~/.test(String(ext.rng||""))) miss.push("예가범위");
+              return "<span style='color:#B7791F;'>산정 안 함 — "+(miss.length?miss.join("·")+" 미확보":"입력값 부족")+"</span> <span style='color:#888;'>(하한율 "+esc(ext.lwlt)+"%는 판독됨 — 계산기에서 기초금액·예가범위를 넣으면 나옵니다)</span>";
+            }
+            return "<span style='color:#B7791F;'>산정 안 함 — "+(s==="method_unknown"?"낙찰방법 미상":"낙찰하한율 미판독")+"</span> <span style='color:#888;'>(추정값으로 채우지 않습니다)</span>";
+          })()]
         ]);
         if(t2 && (ext.bss||b.budget)) t2 += '<button class="mini-btn" data-bid-calc="'+b.id+'" style="margin-top:4px;">🧮 이 공고로 계산</button>';
         var t3 = tbl([
           ["공고기관", esc(b.org||"")], ["수요기관", esc(ext.dmin||"")],
           ["담당자", esc(ext.ofcl||"")], ["전화번호", esc(ext.tel||"")],
-          ["최근 낙찰투찰률", (function(){ var o=orgStatChip(b.org); return o ? (o.med+"% 중앙값"+(o.q1?" · Q1~Q3 "+o.q1+"~"+o.q3+"%":"")+" · n="+o.n+" <span style='color:#888;'>(예정가 대비 실측"+(o.low?" · 88%대 저가 경쟁 — 하한율 확인":"")+")</span>") : ""; })()]
+          ["참고·기관개찰", (function(){ var o=orgStatChip(b.org); return o ? (o.med+"% 중앙값"+(o.q1?" · Q1~Q3 "+o.q1+"~"+o.q3+"%":"")+" · n="+o.n+" <span style='color:#888;'>(참고(산정 미사용) — 지난 개찰 결과 예정가 대비 실측이지 이 공고 하한율이 아닙니다"+(o.low?" · 88%대 저가 경쟁 — 하한율 확인":"")+")</span>") : ""; })()]
         ]);
         var rs = b.result || null;
         var t4 = rs ? tbl([
