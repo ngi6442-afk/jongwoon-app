@@ -13451,6 +13451,8 @@
     if(!hit||!(hit.n>=3)||!hit.med) return null;
     return { med:hit.med, q1:hit.q1||0, q3:hit.q3||0, n:hit.n, name:nm, low:hit.med<89.5 };
   }
+  // 최근 참고줄 인자 — 사람이 하한율·사정률을 직접 넣으면 "미판독" 경고가 남아 있으면 거짓이 된다.
+  var bcRefArgs=null;
   function bcRefLines(org, kind, aFlag){
     // 실측 참고선 — 최근 개찰 데이터(예정가 대비 낙찰 투찰률). 예규 하한율은 공고문 확인 사항.
     var el=document.getElementById("bcRef"); if(!el) return;
@@ -13518,11 +13520,15 @@
       document.getElementById("bcBss").value = pre.budget;   // 기초금액 없으면 같은 공고의 추정가격으로
       bcAutoSrc.push("기초금액=이 공고 추정가격");
     }
-    bcRefLines(pre.org||"", pre.kind||"", (pre.a ? (pre.aamt?"auto":true) : (pre.aamt?"open":false)), pre.src?esc(pre.src):"");
+    // 값 칸을 사람이 채우면 참고줄도 다시 그려야 한다 — 그래서 인자를 보관한다(v334).
+    bcRefArgs=[pre.org||"", pre.kind||"", (pre.a ? (pre.aamt?"auto":true) : (pre.aamt?"open":false)), pre.src?esc(pre.src):""];
+    bcRefLines.apply(null, bcRefArgs);
     bcCalc();
     document.getElementById("bidCalcBackdrop").classList.add("show");
   }
   ["bcBss","bcLow","bcHigh","bcLwlt","bcA","bcMy"].forEach(function(id){ document.getElementById(id).addEventListener("input", bcCalc); });
+  // 미판독 경고·참고줄은 값 칸 상태를 보고 갈리므로, 사람이 채우면 다시 그린다(v334).
+  ["bcLwlt","bcLow","bcHigh"].forEach(function(id){ document.getElementById(id).addEventListener("input", function(){ if(bcRefArgs) bcRefLines.apply(null, bcRefArgs); }); });
   document.getElementById("bcClose").addEventListener("click", function(){ document.getElementById("bidCalcBackdrop").classList.remove("show"); });
   document.getElementById("bidCalcBtn").addEventListener("click", function(){ openBidCalc({}); });
   // ---- 낙찰 통계(R2): 수집봇 실측 분포 — 공종(전국/경북)·슬레이트·경북 발주처 ----

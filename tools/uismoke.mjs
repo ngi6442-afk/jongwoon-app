@@ -801,6 +801,13 @@ try {
     (html.match(/값 칸에 넣지 않았습니다/g) || []).length >= 2, '');
   T('v333 기관 칩·상세 기관 행이 "참고(산정 미사용)"로 재라벨된다 — 종전 "📊 기관실측 88.5%"는 이 공고 하한율처럼 읽혔다',
     /참고 기관개찰 /.test(html) && !/📊 기관실측 /.test(html) && /\["참고·기관개찰"/.test(html), '');
+
+  // ---- ⑤ v334 — 사람이 값을 넣으면 경고가 걷히도록 ----
+  //     v333의 미판독 경고·참고줄은 openBidCalc에서 1회만 그려졌다. 그래서 "위 칸에 직접 입력하세요"대로
+  //     사람이 하한율을 넣어도 "⚠ 낙찰하한율 미판독"이 그대로 남아 거짓이 된다(적대검증 2026-09-09).
+  T('v334 사람이 하한율·사정률을 직접 넣으면 미판독 경고·참고줄이 다시 그려진다',
+    /var bcRefArgs=null;/.test(html) && /bcRefArgs=\[pre\.org\|\|""/.test(html)
+    && /\["bcLwlt","bcLow","bcHigh"\]\.forEach\(function\(id\)\{ document\.getElementById\(id\)\.addEventListener\("input", function\(\)\{ if\(bcRefArgs\) bcRefLines\.apply\(null, bcRefArgs\); \}\); \}\);/.test(html), '');
 } catch (e) { console.log('  (v333 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
