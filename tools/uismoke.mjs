@@ -957,5 +957,104 @@ try {
   }
 } catch (e) { console.log('  (v336 검사 생략 — ' + e.message + ')'); fails++; }
 
+// 38) v337 — v336 적대검증(9/10)에서 나온 반례. asList는 member_ids만 못 박았고 **정렬 비교자**는
+//     start·next가 문자열이라고 그대로 믿고 있었다. 9/2 일괄 입력분이 배열 자리에 문자열을 넣었듯
+//     같은 경로가 날짜 자리에 숫자(20260901)를 넣으면 (b.start||"").localeCompare 가 없어 렌더가 통째로 죽는다.
+//     → 사고 재발 조건이 그대로 남아 있었다는 뜻이다. String()으로 못 박고 여기서 회귀를 잡는다.
+try {
+  const fnSrc = (name) => {
+    const i = html.indexOf('function ' + name + '(');
+    if (i < 0) throw new Error('함수 없음: ' + name);
+    let d = 0, started = false;
+    for (let j = i; j < html.length; j++) {
+      const ch = html[j];
+      if (ch === '{') { d++; started = true; }
+      else if (ch === '}') { d--; if (started && d === 0) return html.slice(i, j + 1); }
+    }
+    throw new Error('중괄호 짝 안 맞음: ' + name);
+  };
+  const ASB_STATUS_SRC = 'var ASB_STATUS = ' + (html.match(/var ASB_STATUS = (\{[^}]*\});/) || [])[1] + ';';
+  const mkEl = (id) => ({ id, innerHTML: '', textContent: '', querySelectorAll: () => [] });
+  const COMMON = [
+    fnSrc('pad'), fnSrc('fmtDate'), fnSrc('todayStr'), fnSrc('esc'), fnSrc('addDays'), fnSrc('isDate'), fnSrc('asList'),
+    'function findMember(id){ for(var i=0;i<members.length;i++){ if(members[i].id===id) return members[i]; } return null; }',
+    'function memberName(id){ if(!id) return ""; var m=findMember(id); return m?m.name:""; }',
+    'function dispName(n){ return n||""; }',
+    'function liveMembers(){ return members.filter(function(m){ return m && m.del!==1; }); }',
+    'function memberRetired(m){ return false; }',
+  ];
+
+  // ---- ① 석면: start가 문자열이 아니어도 목록이 그려진다 ----
+  {
+    const DOM = { asbList: mkEl('asbList'), asbHead: mkEl('asbHead') };
+    const api = new Function('__items', '__DOM', [
+      'var document = { getElementById: function(id){ return __DOM[id] || null; } };',
+      'var asb = __items; var workers = []; var members = []; var edu = [];',
+      ...COMMON,
+      'function liveEdu(){ return edu.filter(function(r){ return r && r.del!==1; }); }',
+      fnSrc('eduLatest'), fnSrc('eduHasValidSpecial'), ASB_STATUS_SRC,
+      fnSrc('liveAsb'), fnSrc('normAsbRow'), fnSrc('asbNotifyDue'), fnSrc('asbKeepUntil'),
+      fnSrc('asbWorkerNames'), fnSrc('asbNoSpecial'), fnSrc('renderAsb'),
+      'return { renderAsb: renderAsb };',
+    ].join('\n'))([
+      { id: 's1', title: '정상 문자열', start: '2026-05-01', end: '2026-05-10', member_ids: [], worker_ids: [] },
+      { id: 's2', title: '숫자 날짜', start: 20260101, end: 20260115, member_ids: '[]', worker_ids: '[]' },
+      { id: 's3', title: '객체 날짜', start: {}, end: [], member_ids: [], worker_ids: [] },
+      { id: 's4', title: 'null 날짜', start: null, end: null, member_ids: [], worker_ids: [] },
+      { id: 's5', title: '뒤쪽 정상', start: '2026-03-01', end: '2026-03-05', member_ids: [], worker_ids: [] },
+    ], DOM);
+    let err = null;
+    try { api.renderAsb(); } catch (e) { err = e; }
+    T('v337 반례: start가 숫자·객체·null이어도 renderAsb가 던지지 않는다(정렬 비교자 String 고정)',
+      !err, err && (err.constructor.name + ': ' + err.message));
+    T('v337 반례: 그 상태에서도 5건이 실제로 그려진다(빈 목록으로 죽지 않는다)',
+      DOM.asbHead.textContent === '총 5건' && DOM.asbList.innerHTML.indexOf('숫자 날짜') >= 0 && DOM.asbList.innerHTML.indexOf('뒤쪽 정상') >= 0,
+      'head=' + DOM.asbHead.textContent + ' len=' + DOM.asbList.innerHTML.length);
+  }
+
+  // ---- ② 교육 이력: next가 문자열이 아니어도 목록이 그려진다(같은 부류 — 저장 경로가 v336에서 함께 바뀐 자리) ----
+  {
+    const DOM = { L: mkEl('L'), H: mkEl('H') };
+    const kIdx = html.indexOf('var EDU_KINDS');
+    const EDU_KINDS_SRC = html.slice(kIdx, html.indexOf('];', kIdx) + 2);
+    const api = new Function('__items', '__DOM', [
+      'var document = { getElementById: function(id){ return __DOM[id] || null; } };',
+      'var edu = __items; var workers = []; var members = [];',
+      ...COMMON, EDU_KINDS_SRC,
+      fnSrc('eduKindDef'), fnSrc('eduKindLabel'), fnSrc('eduPersonName'), fnSrc('liveEdu'), fnSrc('renderEduInto'),
+      'return { renderEduInto: renderEduInto };',
+    ].join('\n'))([
+      { id: 'n0', ptype: 'member', pid: 'u1', kind: 'special', date: '2026-05-01', next: '2026-05-01' },
+      { id: 'n1', ptype: 'member', pid: 'u1', kind: 'regular', date: '2026-01-01', next: 20260101 },
+      { id: 'n2', ptype: 'member', pid: 'u1', kind: 'regular', date: '2026-03-01', next: '2026-03-01' },
+      { id: 'n3', ptype: 'member', pid: 'u1', kind: 'regular', date: '2026-01-15', next: '2026-01-15' },
+      { id: 'n4', ptype: 'member', pid: 'u1', kind: 'regular', date: '2026-02-02', next: '2026-02-02' },
+    ], DOM);
+    let err = null;
+    try { api.renderEduInto('L', 'H', 'member'); } catch (e) { err = e; }
+    T('v337 반례: next가 문자열이 아니어도 renderEduInto가 던지지 않는다', !err, err && (err.constructor.name + ': ' + err.message));
+    T('v337 반례: 교육 이력 5건이 실제로 그려진다', DOM.H.textContent.indexOf('총 5건') === 0, 'head=' + DOM.H.textContent);
+  }
+
+  // ---- ③ 정적: 레코드 필드에 거는 localeCompare는 전부 String()으로 감싼다 ----
+  {
+    const bare = [];
+    const re = /\(\s*[ab]\.\w+\s*\|\|\s*"[^"]*"\s*\)\.localeCompare/g;
+    let m; while ((m = re.exec(html))) bare.push(html.slice(Math.max(0, m.index - 60), m.index + m[0].length).replace(/\s+/g, ' '));
+    T('v337: 석면·교육 렌더 정렬이 String()으로 못 박혀 있다',
+      /String\(b\.start\|\|""\)\.localeCompare\(String\(a\.start\|\|""\)\)/.test(html.replace(/\s+/g, ''))
+      && /String\(a\.next\|\|"9999"\)\.localeCompare\(String\(b\.next\|\|"9999"\)\)/.test(html.replace(/\s+/g, '')), '');
+    // 남은 맨 localeCompare는 리포트만 한다(석면·교육 밖 — 이번 갈래가 아니다)
+    if (bare.length) console.log('  (참고: String() 없이 필드에 거는 localeCompare ' + bare.length + '곳 남음 — 휴가·기성 등 다른 갈래)');
+  }
+
+  // ---- ④ 409 병합도 입구다: 재저장 경로가 normAsbRow를 다시 건다 ----
+  {
+    const src = fnSrc('doSaveAsb').replace(/\s+/g, ' ');
+    T('v337: 409 충돌 병합 뒤에도 normAsbRow를 다시 걸어 문자열 "[]"가 서버로 되돌아가지 않는다',
+      /mergeAsb\(asb,\s*Array\.isArray\(doc\.items\)\s*\?\s*doc\.items\s*:\s*\[\]\s*\);\s*asb\.forEach\(normAsbRow\);/.test(src), src.slice(0, 200));
+  }
+} catch (e) { console.log('  (v337 검사 생략 — ' + e.message + ')'); fails++; }
+
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

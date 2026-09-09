@@ -9856,7 +9856,7 @@
     return gwCall("gw-data",{action:"save",collection:"asbestos",doc:{schema:1,items:asb},base:asbBase}).then(function(res){
       if(res.status===409){
         return gwCall("gw-data",{action:"get",collection:"asbestos"}).then(function(r2){
-          if(r2.status===200){ var doc=(r2.body&&r2.body.doc)||{}; asb=mergeAsb(asb,Array.isArray(doc.items)?doc.items:[]); asbBase=doc.updated_at||0; }
+          if(r2.status===200){ var doc=(r2.body&&r2.body.doc)||{}; asb=mergeAsb(asb,Array.isArray(doc.items)?doc.items:[]); asb.forEach(normAsbRow); asbBase=doc.updated_at||0; }   // v336 적대검증: 409 병합도 입구다 — 여기서 안 고치면 문자열 "[]"가 서버로 되돌아간다
           return doSaveAsb();
         });
       }
@@ -9881,7 +9881,10 @@
   }
   function renderAsb(){
     var host=document.getElementById("asbList"); if(!host) return;
-    var list=liveAsb().slice().sort(function(a,b){ return (b.start||"").localeCompare(a.start||""); });
+    // v336 적대검증(9/10): asList는 member_ids만 못 박았고 정렬은 여전히 start가 문자열이라고 믿고 있었다.
+    // start가 숫자(20260901)나 객체면 (b.start||"").localeCompare 가 없어 renderAsb가 통째로 죽는다 —
+    // 9/2 일괄 입력분과 같은 부류의 사고다(출처 미확인 경로가 넣은 모양). String()으로 못 박는다(L13102와 같은 식).
+    var list=liveAsb().slice().sort(function(a,b){ return String(b.start||"").localeCompare(String(a.start||"")); });
     var head=document.getElementById("asbHead");
     if(head) head.textContent = list.length ? ("총 "+list.length+"건") : "";
     if(!list.length){ host.innerHTML='<div class="empty-line">등록된 석면 작업이 없습니다. 아래 [+ 석면 작업 추가]로 시작하세요.</div>'; return; }
@@ -10056,7 +10059,7 @@
   function renderEduInto(hostId, headId, scope){
     var host=document.getElementById(hostId); if(!host) return;
     var list=liveEdu().filter(function(r){ return r.ptype===scope; });
-    list.sort(function(a,b){ return (a.next||"9999").localeCompare(b.next||"9999"); });
+    list.sort(function(a,b){ return String(a.next||"9999").localeCompare(String(b.next||"9999")); });   // v336 적대검증: next가 문자열이 아니면 localeCompare가 없어 renderEdu가 통째로 죽는다
     var head=document.getElementById(headId);
     var today=todayStr(), soon=addDays(today,30);
     var over=list.filter(function(r){ return isDate(r.next) && r.next<today; }).length;
