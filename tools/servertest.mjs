@@ -1863,4 +1863,87 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   delete mem.gw_users['member:uchk'];
 }
 
+// ---- 37 주기업무 완료요청 툼스톤(v332) ----
+// v331은 review를 {type:{periodKey:{itemId}}} 3층이라는 이유로 평면 스탬프 병합에서 제외했다. 그 사이 프런트는 Object.assign으로
+// '타입' 한 층만 얕게 합쳤고, 그래서 ①관리자가 승인·반려로 지운 요청이 낡은 탭에서 부활하고 ②남이 방금 올린 요청이 내 저장에 증발했다.
+// 프런트는 3층 mergeReview로 고쳤고, 서버 몫은 하나다: review_ts(툼스톤)를 절대 줄이지 않기. 줄면 다음 병합에서 부활이 다시 시작된다.
+// review 본체는 종전대로 이월하지 않는다 — 완료요청은 직원이 정상적으로 쓰는 필드다.
+{
+  const WORKR = { id: 'urev', name: '완료요청직원', admin: false, perms: { check: 'do' } };
+  mem.gw_users['member:urev'] = WORKR;
+  const tokR = issueSession(WORKR).token;
+  const seedR = () => {
+    mem.gw_data['col:checklist'] = {
+      records: {}, custom: {}, scopes: {}, assignee: {},
+      review: { monthly: { '2026-09': { m2: { by: '직원', date: '2026-09-09' } } } },
+      review_ts: { monthly: { '2026-09': { m1: 500, m2: 400 } } },   // m1 = 관리자가 반려해 지운 자리(툼스톤만 남음)
+      updated_at: 7200,
+    };
+  };
+
+  // 낡은 탭(사이드카를 안 올림)이 지워진 m1을 되살려 저장 — 서버는 툼스톤을 지키고, 그 직원의 새 요청 m3는 정상 저장한다
+  seedR();
+  r = await call({ action: 'save', collection: 'checklist', base: 7200, doc: {
+    records: {}, custom: {}, scopes: {}, assignee: {},
+    review: { monthly: { '2026-09': { m1: { by: '낡은탭', date: '2026-09-01' }, m3: { by: '직원', date: '2026-09-09' } } } },
+  } }, tokR, 'dev1');
+  {
+    const saved = mem.gw_data['col:checklist'];
+    T('checklist: 완료요청 툼스톤(review_ts)이 사이드카를 모르는 저장에도 줄지 않는다 — 줄면 다음 병합에서 지운 요청이 다시 부활한다',
+      r.code === 200 && saved.review_ts.monthly['2026-09'].m1 === 500 && saved.review_ts.monthly['2026-09'].m2 === 400,
+      JSON.stringify(saved.review_ts));
+    T('checklist: 그래도 직원의 완료요청 자체는 정상 저장된다(review 본체는 이월 대상이 아니다 — 직원이 쓰는 필드)',
+      !!(saved.review && saved.review.monthly['2026-09'].m3), JSON.stringify(saved.review));
+  }
+
+  // 관리자가 반려(m2 삭제)하며 더 최신 스탬프를 올린다 — 서버는 최댓값만 갱신하고 옛 스탬프는 유지
+  seedR();
+  r = await call({ action: 'save', collection: 'checklist', base: 7200, doc: {
+    records: {}, custom: {}, scopes: {}, assignee: {},
+    review: { monthly: { '2026-09': {} } },
+    review_ts: { monthly: { '2026-09': { m2: 9000 } } },
+  } }, tokA);
+  {
+    const saved = mem.gw_data['col:checklist'];
+    T('checklist: 관리자의 완료요청 반려·승인 스탬프는 더 최신일 때만 갱신된다(3층 재귀 최댓값)',
+      r.code === 200 && saved.review_ts.monthly['2026-09'].m2 === 9000 && saved.review_ts.monthly['2026-09'].m1 === 500,
+      JSON.stringify(saved.review_ts));
+    T('checklist: 관리자의 반려는 그대로 반영된다(요청 삭제)',
+      !saved.review.monthly['2026-09'].m2, JSON.stringify(saved.review));
+  }
+
+  // 더 옛 스탬프를 올리는 낡은 사본은 툼스톤을 뒤로 되돌리지 못한다
+  seedR();
+  r = await call({ action: 'save', collection: 'checklist', base: 7200, doc: {
+    records: {}, custom: {}, scopes: {}, assignee: {},
+    review: { monthly: { '2026-09': { m1: { by: '낡은탭', date: '2026-09-01' } } } },
+    review_ts: { monthly: { '2026-09': { m1: 100 } } },
+  } }, tokR, 'dev1');
+  T('checklist: 더 옛 스탬프(낡은 사본)는 툼스톤을 뒤로 되돌리지 못한다',
+    r.code === 200 && mem.gw_data['col:checklist'].review_ts.monthly['2026-09'].m1 === 500,
+    JSON.stringify(mem.gw_data['col:checklist'].review_ts));
+
+  // 층이 어긋난(구조 파손·조작) 사이드카는 서버 원본을 유지한다 — 툼스톤이 스칼라로 덮여 통째 증발하는 경로 차단
+  seedR();
+  r = await call({ action: 'save', collection: 'checklist', base: 7200, doc: {
+    records: {}, custom: {}, scopes: {}, assignee: {}, review: {}, review_ts: { monthly: 1 },
+  } }, tokR, 'dev1');
+  T('checklist: 층이 어긋난 사이드카(monthly=스칼라)로는 툼스톤을 덮을 수 없다',
+    r.code === 200 && mem.gw_data['col:checklist'].review_ts.monthly['2026-09'].m1 === 500,
+    JSON.stringify(mem.gw_data['col:checklist'].review_ts));
+
+  // 공개범위 사이드카(평면 지도)는 재귀 병합으로 바꾼 뒤에도 종전과 같이 동작해야 한다(회귀)
+  seedR();
+  mem.gw_data['col:checklist'].scope_ts = { m1: 500 };
+  r = await call({ action: 'save', collection: 'checklist', base: 7200, doc: {
+    records: {}, custom: {}, scopes: {}, assignee: {}, review: {}, scope_ts: { m1: 100, q1: 800 },
+  } }, tokA);
+  T('checklist: 평면 사이드카(scope_ts)의 최댓값 규칙은 재귀 병합으로 바꾼 뒤에도 그대로다(회귀)',
+    r.code === 200 && mem.gw_data['col:checklist'].scope_ts.m1 === 500 && mem.gw_data['col:checklist'].scope_ts.q1 === 800,
+    JSON.stringify(mem.gw_data['col:checklist'].scope_ts));
+
+  delete mem.gw_data['col:checklist'];
+  delete mem.gw_users['member:urev'];
+}
+
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

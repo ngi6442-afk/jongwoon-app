@@ -579,10 +579,10 @@ try {
   }
 
   // ---- ③ 저장·캐시 본문 + 구 병합 잔재 ----
-  T('v331 저장 본문에 편집시각 사이드카(scope_ts·assignee_ts) 동봉 — 없으면 삭제가 다른 기기로 전파되지 않는다',
-    /scopes: checkScopes, assignee: checkAssignee, review: checkReview, scope_ts: checkScopeTs, assignee_ts: checkAssigneeTs/.test(html), '');
+  T('v331·v332 저장 본문에 편집시각 사이드카(scope_ts·assignee_ts·review_ts) 동봉 — 없으면 삭제가 다른 기기로 전파되지 않는다',
+    /scopes: checkScopes, assignee: checkAssignee, review: checkReview, scope_ts: checkScopeTs, assignee_ts: checkAssigneeTs, review_ts: checkReviewTs\}\);/.test(html), '');
   T('v331 로컬 캐시도 사이드카 동반 저장(오프라인 부팅 뒤 첫 저장이 삭제를 되돌리지 않게)',
-    /CACHE_KEY, JSON\.stringify\(\{sha: currentSha[^)]*scope_ts: checkScopeTs, assignee_ts: checkAssigneeTs\}\)/.test(html), '');
+    /CACHE_KEY, JSON\.stringify\(\{sha: currentSha[^)]*scope_ts: checkScopeTs, assignee_ts: checkAssigneeTs, review_ts: checkReviewTs\}\)/.test(html), '');
   T('v331 구 병합(Object.assign로 scopes·assignee 로컬 무조건 승)이 남아 있지 않다 — 3곳 전부 applyScopeMerge',
     !/Object\.assign\(\{\}, *(?:remoteParsed|parsed|cache)\.(?:scopes|assignee)/.test(html)
     && (html.match(/applyScopeMerge\(/g) || []).length >= 3, '');
@@ -603,6 +603,113 @@ try {
   T('v331 서버: 공개범위·담당 변경과 이월 차단이 감사로그에 남는다(종전엔 한 줄도 없어 버전 링을 뒤져야 규명됐다)',
     /op: '공개범위'/.test(gwd) && /op: '담당'/.test(gwd) && /op: '공개범위 보호'/.test(gwd) && /function scopeMapSame\(/.test(gwd), '');
 } catch (e) { console.log('  (v331 검사 생략 — ' + e.message + ')'); fails++; }
+
+// 35) v332 — v331이 "미확정"으로 남긴 2건을 판정해 고친 자리.
+//     ① 주기업무 완료요청(review) 병합: 종전 Object.assign({}, 원격.review, 로컬.review)은 '타입' 한 층만 얕게 합쳐 두 방향 모두 데이터를 잃었다.
+//        부활 = 관리자가 승인·반려로 지운 요청이 낡은 탭의 다음 저장에 되살아난다 / 증발 = 같은 타입에서 남이 방금 올린 요청이 내 저장 한 번에 사라진다.
+//        3층 mergeReview를 index.html 실제 소스에서 뽑아 실행해 두 방향을 모두 재현한다.
+//     ② 석면 투입 근로자 명단(asbMembers): 공개범위 상자(dept:·rank:)를 그리면 member_ids에 사람 아닌 토큰이 저장되는데
+//        소비자(asbWorkerNames·asbNoSpecial → memberName=findMember)가 못 풀어 명단과 배치 전 특별교육 점검에서 조용히 빠진다.
+try {
+  const fnSrc = (name) => {
+    const i = html.indexOf('function ' + name + '(');
+    if (i < 0) throw new Error('함수 없음: ' + name);
+    let d = 0, started = false;
+    for (let j = i; j < html.length; j++) {
+      const ch = html[j];
+      if (ch === '{') { d++; started = true; }
+      else if (ch === '}') { d--; if (started && d === 0) return html.slice(i, j + 1); }
+    }
+    throw new Error('중괄호 짝 안 맞음: ' + name);
+  };
+
+  // ---- ① 완료요청 3층 병합(실제 배포 소스를 그대로 실행) ----
+  {
+    const mergeReview = new Function([
+      fnSrc('hasOwnKey'), fnSrc('mergeStamped'), fnSrc('unionKeys'), fnSrc('mergeReview'), 'return mergeReview;',
+    ].join('\n'))();
+    const REQ = { by: '직원', date: '2026-09-09' };
+    // 관리자가 m1을 반려(review에서 삭제, 툼스톤 ts=200)한 서버 vs 그 요청을 아직 들고 있는 낡은 탭(스탬프 없음)
+    const r1 = mergeReview(
+      { monthly: { '2026-09': { m1: REQ } } }, {},
+      { monthly: { '2026-09': {} } }, { monthly: { '2026-09': { m1: 200 } } });
+    T('v332 완료요청: 관리자가 승인·반려로 지운 요청이 낡은 사본에서 부활하지 않는다(3층 툼스톤 전파) — 종전 Object.assign은 타입 덩어리째 되살렸다',
+      !(r1.map.monthly && r1.map.monthly['2026-09'] && ('m1' in r1.map.monthly['2026-09']))
+      && r1.ts.monthly['2026-09'].m1 === 200 && r1.overridden.length === 1, JSON.stringify([r1.map, r1.overridden]));
+    // 같은 타입·같은 기간에 남이 방금 올린 요청(x9) — 내 낡은 덩어리엔 없다
+    const r2 = mergeReview(
+      { monthly: { '2026-09': { m1: REQ } } }, { monthly: { '2026-09': { m1: 100 } } },
+      { monthly: { '2026-09': { m1: REQ, x9: REQ } } }, { monthly: { '2026-09': { m1: 100, x9: 300 } } });
+    T('v332 완료요청: 같은 타입에서 남이 방금 올린 요청이 내 저장에 증발하지 않는다 — 종전엔 로컬 타입 덩어리가 통째로 이겨 사라졌다',
+      !!(r2.map.monthly['2026-09'].x9 && r2.map.monthly['2026-09'].m1), JSON.stringify(r2.map));
+    // 내가 방금 만든 요청(ts 큼)은 서버 옛 상태에 밀리지 않는다 + 다른 타입·기간은 서로 건드리지 않는다
+    const r3 = mergeReview(
+      { monthly: { '2026-09': { m1: REQ } }, weekly: { '2026-09-07': { w1: REQ } } }, { monthly: { '2026-09': { m1: 900 } } },
+      { monthly: { '2026-09': {} }, quarterly: { '2026-Q3': { q1: REQ } } }, { monthly: { '2026-09': { m1: 100 } } });
+    T('v332 완료요청: 내 최신 요청(ts 큰 쪽)이 이기고, 다른 타입·기간의 요청은 그대로 살아남는다',
+      !!r3.map.monthly['2026-09'].m1 && !!r3.map.weekly['2026-09-07'].w1 && !!r3.map.quarterly['2026-Q3'].q1
+      && r3.overridden.length === 0, JSON.stringify(r3.map));
+    // 내가 지운 것(승인·반려, ts 큼)은 서버의 옛 요청을 이긴다 — 빈 층은 결과에서 아예 사라진다
+    const r4 = mergeReview(
+      { monthly: { '2026-09': {} } }, { monthly: { '2026-09': { m1: 900 } } },
+      { monthly: { '2026-09': { m1: REQ } } }, { monthly: { '2026-09': { m1: 100 } } });
+    T('v332 완료요청: 내 승인·반려(ts 큰 쪽)가 서버의 옛 요청을 이긴다',
+      !r4.map.monthly && r4.ts.monthly['2026-09'].m1 === 900, JSON.stringify([r4.map, r4.ts]));
+  }
+  T('v332 완료요청: 구 얕은 병합(Object.assign로 review 타입 한 층만)이 사라지고 applyScopeMerge 안 mergeReview로 대체',
+    !/Object\.assign\(\{\}, *(?:remoteParsed|parsed|cache)\.review/.test(html)
+    && /var c = mergeReview\(checkReview, checkReviewTs, remoteParsed\.review \|\| \{\}, remoteParsed\.review_ts \|\| \{\}\);/.test(html), '');
+  T('v332 완료요청: 요청·승인·반려·요청취소 모두 시각 스탬프(삭제 포함) + 로드·오프라인 부팅에서 사이드카를 받는다',
+    /function reviewStamp\(type, key, id\)\{/.test(html)
+    && /todayStr\(\) \}; reviewStamp\(type, key, id\); \}/.test(html)
+    && /if \(had\) reviewStamp\(type, key, id\);/.test(html)
+    && /checkReviewTs = parsed\.review_ts \|\| \{\};/.test(html)
+    && /checkReviewTs = cache\.review_ts \|\| \{\};/.test(html), '');
+  T('v332 서버: review_ts(완료요청 툼스톤)도 사이드카 보존 대상 — 3층이라 재귀 최댓값 병합(tsMax)',
+    /\['scope_ts', 'assignee_ts', 'review_ts'\]\.forEach/.test(gwd) && /const tsMax = function \(pv, inc\)/.test(gwd), '');
+  T('v332 서버: review 본체는 비관리자 이월 대상이 아니다 — 완료요청은 직원이 정상적으로 쓰는 필드(툼스톤만 보호)',
+    /\['scopes', 'assignee', 'scope_ts', 'assignee_ts'\]\.forEach/.test(gwd)
+    && !/\['scopes', 'assignee', 'review'/.test(gwd), '');
+
+  // ---- ② 석면 투입 근로자 명단은 '사람'만 ----
+  {
+    const pick = new Function('__members', [
+      'var members = __members;',
+      'function esc(s){ return String(s==null?"":s); }',
+      'function liveMembers(){ return members.filter(function(m){ return m && m.del !== 1; }); }',
+      'function memberRetired(m){ return !!(m && m.retired); }',
+      'function isBossMember(){ return false; }',
+      'function findMember(id){ for (var i=0;i<members.length;i++){ if (members[i].id === id) return members[i]; } return null; }',
+      'function memberOptLabel(m){ return m.name + (memberRetired(m) ? " (퇴사)" : ""); }',
+      fnSrc('hasOwnKey'), fnSrc('memberPickHtml'), 'return memberPickHtml;',
+    ].join('\n'))([
+      { id: 'uA', name: '재직자A' }, { id: 'uAdm', name: '관리자M', admin: true },
+      { id: 'uR', name: '퇴사자R', retired: true }, { id: 'uD', name: '삭제회원D', del: 1 },
+    ]);
+    // getCheckedMembers가 실제로 쓰는 축([data-scope],[data-mid])과 같게 수거
+    const collect = (h) => [...h.matchAll(/data-(?:scope|mid)="([^"]*)"([^>]*)>/g)].filter((m) => / checked/.test(m[2])).map((m) => m[1]);
+    const boxes = (h) => [...h.matchAll(/data-(?:scope|mid)="([^"]*)"/g)].map((m) => m[1]);
+    const h0 = pick([]);
+    T('v332 석면 명단: 부서·직급 토큰 상자를 아예 그리지 않는다 — 체크하면 member_ids에 사람 아닌 값이 저장돼 투입 근로자 명단·특별교육 점검에서 조용히 빠졌다',
+      !/data-scope=/.test(h0) && !boxes(h0).some((t) => /^(dept|rank):/.test(t)), boxes(h0).join(','));
+    T('v332 석면 명단: 관리자도 투입 대상으로 고를 수 있다(공개범위 상자와 다른 점 — 명단은 사람 단위)',
+      boxes(h0).indexOf('uAdm') >= 0, boxes(h0).join(','));
+    T('v332 석면 명단: 퇴사자·삭제회원은 새 지정 목록에 뜨지 않는다',
+      boxes(h0).indexOf('uR') < 0 && boxes(h0).indexOf('uD') < 0, boxes(h0).join(','));
+    // 이미 저장된 값은 자동으로 지우지 않는다 — 상자가 없으면 저장 시 조용히 탈락한다(공개범위 v331과 같은 이유)
+    const sel = ['uA', 'uR', 'dept:관리부', 'rank:과장', 'uGHOST'];
+    const got = collect(pick(sel));
+    T('v332 석면 명단: 기존 지정(구 부서·직급 토큰·퇴사자·명부에 없는 id)은 저장 시 전부 왕복 — 자동 삭제 금지, 사람이 판단',
+      got.length === sel.length && sel.every((t) => got.includes(t)), '수거: ' + got.join(',') + ' / 탈락: ' + sel.filter((t) => !got.includes(t)).join(','));
+    T('v332 석면 명단: 남아 있는 토큰은 "명단에 반영되지 않습니다" 경고와 함께 뜬다(조용한 무시 금지)',
+      /부서 지정은 명단에 반영되지 않습니다/.test(pick(sel)) && /직급 지정은 명단에 반영되지 않습니다/.test(pick(sel)), '');
+  }
+  T('v332 석면 작업 모달만 사람 전용 렌더러를 쓴다(asbMembers=renderMemberPicks) · 공개범위 4패널은 종전대로 부서·직급 상자',
+    /renderMemberPicks\("asbMembers"/.test(html) && !/renderMemberChecks\("asbMembers"/.test(html)
+    && (html.match(/renderMemberPicks\("/g) || []).length === 1
+    && /renderMemberChecks\("teScope"/.test(html) && /renderMemberChecks\("csScope"/.test(html)
+    && /renderMemberChecks\("licScope"/.test(html) && /renderMemberChecks\("reScope"/.test(html), '');
+} catch (e) { console.log('  (v332 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

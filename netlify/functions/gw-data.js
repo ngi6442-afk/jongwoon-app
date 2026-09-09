@@ -395,14 +395,22 @@ async function handleSave(event, d, R) {
   // 편집시각 사이드카(툼스톤)는 서버에서 절대 줄이지 않는다(v331): 구버전 앱(v330 이하)은 이 맵의 존재를 모르고,
   // v331이어도 오프라인 캐시로 부팅한 사본은 빈 맵을 올린다. 그때 서버가 그대로 받아쓰면 '지웠음' 기록이 통째로 사라져
   // 다음 저장에서 낡은 사본이 다시 키를 되살린다(= 이번 사고의 재발). 값은 더 최신 스탬프만 갱신. 항목 수만큼만 자라므로 누적 부담이 없다.
+  // v332: review_ts(완료요청 툼스톤)도 같은 보호. scope_ts·assignee_ts는 평면{키:ms}, review_ts는 review와 같은 3층{타입:{기간키:{항목:ms}}}이라 재귀로 최댓값 병합.
   if (col === 'checklist' && prevDoc) {
-    ['scope_ts', 'assignee_ts'].forEach(function (f) {
+    const tsMax = function (pv, inc) {
+      const out = Object.assign({}, pv);
+      Object.keys(inc || {}).forEach(function (k) {
+        const a = out[k], b = inc[k];
+        if (b && typeof b === 'object') out[k] = tsMax((a && typeof a === 'object') ? a : {}, b);
+        else if (a && typeof a === 'object') { /* 층이 어긋난 입력(구조 파손·조작)은 서버 원본을 유지 */ }
+        else if (!(Number(a) > Number(b))) out[k] = b;
+      });
+      return out;
+    };
+    ['scope_ts', 'assignee_ts', 'review_ts'].forEach(function (f) {
       const pv = (prevDoc[f] && typeof prevDoc[f] === 'object') ? prevDoc[f] : null;
       if (!pv) return;
-      const inc = (doc[f] && typeof doc[f] === 'object') ? doc[f] : {};
-      const out = Object.assign({}, pv);
-      Object.keys(inc).forEach(function (k) { if (!(Number(out[k]) > Number(inc[k]))) out[k] = inc[k]; });
-      doc[f] = out;
+      doc[f] = tsMax(pv, (doc[f] && typeof doc[f] === 'object') ? doc[f] : {});
     });
   }
   // 문서함(v314 공개범위·등재 결재):
