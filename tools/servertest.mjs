@@ -1946,4 +1946,56 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   delete mem.gw_users['member:urev'];
 }
 
+// ---- 38 석면 대장 저장 왕복(v336, 2026-09-09 PM 실사고 "저장을 눌러도 창이 안 닫히고 목록에 안 뜬다" 재현·차단) ----
+// 사고의 씨앗은 9/2 일괄 입력분 130건이 member_ids·worker_ids를 배열이 아니라 문자열 "[]"로 들고 있었던 것이다.
+// 서버는 문서를 있는 그대로 보관하므로(정규화를 하지 않는다) 그 모양이 매 로드마다 프런트로 흘러갔고,
+// renderAsb의 (r.member_ids||[]).forEach가 TypeError를 던져 목록도 안 그려지고 닫기까지 못 갔다.
+// 서버 몫은 두 가지다: ① 앱이 교정해 올린 배열 모양을 변질 없이 보관할 것 ② 저장 충돌(409) 뒤 재저장이 정상 성립할 것.
+// (렌더가 던지지 않는지 자체는 uismoke 37에서 실제 소스를 뽑아 실행해 검증한다.)
+{
+  const seedAsb = (items, at) => { mem.gw_data['col:asbestos'] = { schema: 1, items, updated_at: at }; };
+
+  // ① 사고 당시 모양 그대로 저장 → 서버는 손대지 않고 그대로 돌려준다(= 프런트가 반드시 교정해야 하는 이유)
+  seedAsb([], 100);
+  r = await call({ action: 'save', collection: 'asbestos', base: 100, doc: { schema: 1, items: [
+    { id: 'a1', title: '일괄입력분', start: '2014-03-24', end: '2014-04-10', status: 'done', member_ids: '[]', worker_ids: '[]' },
+  ] } }, tokA);
+  r = await call({ action: 'get', collection: 'asbestos' }, tokA);
+  T('석면: 서버는 문서를 정규화하지 않는다 — 문자열 "[]"가 그대로 되돌아온다(모양 교정은 앱 입구의 몫)',
+    r.code === 200 && r.body.doc.items[0].member_ids === '[]', JSON.stringify(r.body.doc.items[0].member_ids));
+
+  // ② 앱이 asList로 교정해 올린 배열 모양은 변질 없이 보관된다 → 다음 로드부터 지뢰가 사라진다
+  const base2 = mem.gw_data['col:asbestos'].updated_at;
+  r = await call({ action: 'save', collection: 'asbestos', base: base2, doc: { schema: 1, items: [
+    { id: 'a1', title: '일괄입력분', start: '2014-03-24', end: '2014-04-10', status: 'done', member_ids: [], worker_ids: ['w1'] },
+  ] } }, tokA);
+  r = await call({ action: 'get', collection: 'asbestos' }, tokA);
+  T('석면: 교정본(배열)이 저장되면 배열 그대로 보관된다 — 한 번 저장하면 그 기록은 다시 지뢰가 되지 않는다',
+    r.code === 200 && Array.isArray(r.body.doc.items[0].member_ids) && Array.isArray(r.body.doc.items[0].worker_ids)
+    && r.body.doc.items[0].worker_ids[0] === 'w1', JSON.stringify(r.body.doc.items[0]));
+
+  // ③ 낡은 base로 저장하면 409 — 프런트 doSaveAsb는 이걸 받아 재조회·mergeAsb 후 다시 저장한다.
+  //    사고 당시 저장은 매번 이 경로로 성공했다(그래서 서버에 17건이 쌓였다). 실패한 것은 저장이 아니라 화면이었다.
+  r = await call({ action: 'save', collection: 'asbestos', base: 1, doc: { schema: 1, items: [] } }, tokA);
+  T('석면: 낡은 base 저장 → 409(프런트가 재조회·병합 후 재저장하는 정상 경로)', r.code === 409, String(r.code));
+  const base3 = mem.gw_data['col:asbestos'].updated_at;
+  r = await call({ action: 'save', collection: 'asbestos', base: base3, doc: { schema: 1, items: [
+    { id: 'a1', title: '일괄입력분', member_ids: [], worker_ids: ['w1'] },
+    { id: 'a2', title: '남성초', start: '2026-09-09', status: 'plan', member_ids: ['u1'], worker_ids: [] },
+  ] } }, tokA);
+  T('석면: 재조회한 base로 재저장하면 200 — 새 기록이 1건만 늘어난다(중복은 화면 오해에서 생겼지 저장에서 생기지 않았다)',
+    r.code === 200 && mem.gw_data['col:asbestos'].items.length === 2, String(r.code) + '/' + mem.gw_data['col:asbestos'].items.length);
+
+  // ④ 석면 대장은 인허가(lic) 권한을 공유한다. 서버 기본값은 view이므로 미지정 직원도 읽을 수 있고(현행 설계),
+  //    숨김으로 명시한 직원만 차단된다. 이 대장에는 근로자 인적사항이 들어가므로 기본값이 맞는지는 PM 판단 사항으로 남긴다.
+  r = await call({ action: 'get', collection: 'asbestos' }, tokW, 'dev1');
+  T('석면: lic 미지정 직원은 현행 기본값(view)대로 읽힌다 — 기본 숨김이 아니라는 사실을 고정', r.code === 200, String(r.code));
+  mem.gw_users['member:uwork'].perms.lic = 'hide';
+  r = await call({ action: 'get', collection: 'asbestos' }, tokW, 'dev1');
+  T('석면: lic=숨김으로 지정한 직원은 차단된다(대장은 lic 권한을 공유)', r.code === 403, String(r.code) + '/' + r.body.error_code);
+  delete mem.gw_users['member:uwork'].perms.lic;
+
+  delete mem.gw_data['col:asbestos'];
+}
+
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

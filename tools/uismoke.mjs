@@ -810,5 +810,152 @@ try {
     && /\["bcLwlt","bcLow","bcHigh"\]\.forEach\(function\(id\)\{ document\.getElementById\(id\)\.addEventListener\("input", function\(\)\{ if\(bcRefArgs\) bcRefLines\.apply\(null, bcRefArgs\); \}\); \}\);/.test(html), '');
 } catch (e) { console.log('  (v333 검사 생략 — ' + e.message + ')'); fails++; }
 
+// 37) v336 — 석면 저장 사고의 진짜 원인과 재설계(PM 2026-09-10 "저장됐으면 저장됐다고만 나오게, 갱신은 실패할 수 없게").
+//     원인: 9/2 일괄 입력분 130건이 member_ids·worker_ids를 배열이 아니라 문자열 "[]"로 들고 있었다.
+//     "[]"는 truthy라 (r.member_ids || []) 가 걸러주지 못하고 .forEach에서 TypeError → renderAsb가 통째로 죽는다.
+//     목록이 안 그려지고, 같은 문장에 이어 붙은 closeAsb()까지 못 가 창이 안 닫혔다 → 사람이 17번 다시 눌렀다.
+//     v335는 try/catch로 덮었을 뿐이므로, v336은 ①모양(asList) ②순서(닫기·토스트 먼저) ③시점(다음 프레임)으로 다시 짰다.
+//     아래는 index.html 실제 소스에서 렌더 함수를 뽑아 실행하는 재현 테스트다 — 회귀하면 여기서 잡힌다.
+try {
+  const fnSrc = (name) => {
+    const i = html.indexOf('function ' + name + '(');
+    if (i < 0) throw new Error('함수 없음: ' + name);
+    let d = 0, started = false;
+    for (let j = i; j < html.length; j++) {
+      const ch = html[j];
+      if (ch === '{') { d++; started = true; }
+      else if (ch === '}') { d--; if (started && d === 0) return html.slice(i, j + 1); }
+    }
+    throw new Error('중괄호 짝 안 맞음: ' + name);
+  };
+  const ASB_STATUS_SRC = 'var ASB_STATUS = ' + (html.match(/var ASB_STATUS = (\{[^}]*\});/) || [])[1] + ';';
+  const mkEl = (id) => ({ id, innerHTML: '', textContent: '', querySelectorAll: () => [] });
+  const build = (items) => {
+    const DOM = { asbList: mkEl('asbList'), asbHead: mkEl('asbHead') };
+    const api = new Function('__items', '__DOM', [
+      'var document = { getElementById: function(id){ return __DOM[id] || null; } };',
+      'var asb = __items; var workers = []; var members = []; var edu = [];',
+      fnSrc('pad'), fnSrc('fmtDate'), fnSrc('todayStr'), fnSrc('esc'), fnSrc('addDays'), fnSrc('isDate'), fnSrc('asList'),
+      'function findMember(id){ for(var i=0;i<members.length;i++){ if(members[i].id===id) return members[i]; } return null; }',
+      'function memberName(id){ if(!id) return ""; var m=findMember(id); return m?m.name:""; }',
+      'function dispName(n){ return n||""; }',
+      'function liveEdu(){ return edu.filter(function(r){ return r && r.del!==1; }); }',
+      fnSrc('eduLatest'), fnSrc('eduHasValidSpecial'), ASB_STATUS_SRC,
+      fnSrc('liveAsb'), fnSrc('normAsbRow'), fnSrc('asbNotifyDue'), fnSrc('asbKeepUntil'),
+      fnSrc('asbWorkerNames'), fnSrc('asbNoSpecial'), fnSrc('renderAsb'),
+      'return { renderAsb: renderAsb, normAsbRow: normAsbRow, asList: asList };',
+    ].join('\n'))(items, DOM);
+    return { api, DOM };
+  };
+
+  // ---- ① 사고 당시 모양(문자열 "[]")을 그대로 넣고 렌더 — 종전엔 여기서 TypeError가 났다 ----
+  {
+    const accident = [
+      { id: 'a1', title: '임고면 축사 철거', client: '개인', site: '임고면', start: '2013-10-07', end: '2013-10-15',
+        material: '슬레이트', area: '370', status: 'done', conc: '', waste_no: '', note: '', member_ids: '[]', worker_ids: '[]' },
+      { id: 'a2', title: '남성초', client: '포항교육지원청', site: '', start: '2026-09-09', end: '2026-09-20',
+        material: '', area: '', status: 'plan', conc: '', waste_no: '', note: '', member_ids: ['u1'], worker_ids: [] },
+    ];
+    const { api, DOM } = build(accident);
+    let err = null;
+    try { api.renderAsb(); } catch (e) { err = e; }
+    T('v336 재현: member_ids가 문자열 "[]"인 기록이 섞여도 renderAsb가 던지지 않는다(9/9 사고 지점)',
+      !err, err && (err.constructor.name + ': ' + err.message));
+    T('v336 재현: 그 상태에서도 목록이 실제로 그려진다(종전엔 innerHTML이 비어 "목록에 안 뜬다"였다)',
+      DOM.asbList.innerHTML.indexOf('남성초') >= 0 && DOM.asbList.innerHTML.indexOf('임고면 축사 철거') >= 0,
+      'len=' + DOM.asbList.innerHTML.length);
+    T('v336 재현: 총 건수 머리글도 정상', DOM.asbHead.textContent === '총 2건', DOM.asbHead.textContent);
+  }
+
+  // ---- ② 적대 데이터: 배열 자리에 들어올 수 있는 모든 모양 + 레코드 자체가 이상한 경우 ----
+  {
+    const hostile = [
+      { id: 'h1', title: 'JSON 문자열', member_ids: '["u1","u2"]', worker_ids: '["w1"]', start: '2026-01-02', end: '2026-01-03', status: 'run' },
+      { id: 'h2', title: '쉼표 문자열', member_ids: 'u1, u2', worker_ids: 'w1', status: 'done' },
+      { id: 'h3', title: '숫자·불리언', member_ids: 7, worker_ids: true, start: '2026-02-30', end: '9999-99-99' },
+      { id: 'h4', title: '객체', member_ids: { a: 1 }, worker_ids: { b: 2 } },
+      { id: 'h5', title: 'null', start: null, end: undefined, status: null, area: null, conc: null, member_ids: null, worker_ids: undefined },
+      { id: 'h6' },
+      { id: 'h7', title: '깨진 JSON', member_ids: '[u1,', worker_ids: '[' },
+      { id: 'h8', title: '<script>alert(1)</script>', site: '"><img src=x>', member_ids: [], worker_ids: [] },
+      'not-an-object', null,
+    ];
+    const { api, DOM } = build(hostile);
+    let err = null;
+    try { api.renderAsb(); } catch (e) { err = e; }
+    T('v336 적대 데이터 10종(문자열·숫자·객체·null·깨진 JSON·비객체 레코드)에도 renderAsb가 던지지 않는다',
+      !err, err && (err.constructor.name + ': ' + err.message));
+    T('v336 적대 데이터에서도 목록이 그려지고 스크립트는 이스케이프된다',
+      DOM.asbList.innerHTML.length > 0 && DOM.asbList.innerHTML.indexOf('<script>') < 0, 'len=' + DOM.asbList.innerHTML.length);
+  }
+
+  // ---- ③ asList·normAsbRow 단위 ----
+  {
+    const { api } = build([]);
+    const eq = (x, y) => JSON.stringify(x) === JSON.stringify(y);
+    T('v336 asList: "[]"→[] / JSON 문자열→배열 / 쉼표 문자열→배열 / 배열→원본',
+      eq(api.asList('[]'), []) && eq(api.asList('["u1","u2"]'), ['u1', 'u2'])
+      && eq(api.asList('u1, u2'), ['u1', 'u2']) && eq(api.asList(['x']), ['x']), '');
+    T('v336 asList: null·undefined·숫자·객체·깨진 JSON 어떤 것도 던지지 않고 배열을 돌려준다',
+      eq(api.asList(null), []) && eq(api.asList(undefined), []) && eq(api.asList(7), [])
+      && eq(api.asList({}), []) && Array.isArray(api.asList('[u1,')), '');
+    const row = { id: 'x', member_ids: '[]', worker_ids: '["w1"]' };
+    api.normAsbRow(row);
+    T('v336 normAsbRow: 입구에서 모양을 교정한다(다음 저장 때 서버 기록도 배열로 정리된다)',
+      Array.isArray(row.member_ids) && row.member_ids.length === 0 && row.worker_ids[0] === 'w1', JSON.stringify(row));
+    T('v336 loadAsb가 로드 직후 normAsbRow를 돌린다(교정을 화면이 아니라 입구에서 한다)',
+      /asb\.forEach\(normAsbRow\)/.test(fnSrc('loadAsb')), '');
+  }
+
+  // ---- ④ 저장 뒤 닫힘 보장: 닫기·토스트가 렌더보다 먼저, 렌더는 다음 프레임 ----
+  {
+    [['saveAsb', 'closeAsb'], ['deleteAsb', 'closeAsb'], ['saveEdu', 'closeEdu'], ['deleteEdu', 'closeEdu']].forEach(([fn, closer]) => {
+      const b = fnSrc(fn);
+      const ci = b.lastIndexOf(closer + '()'), ri = b.indexOf('afterSave(');
+      T('v336 ' + fn + ': ' + closer + '()가 화면 갱신(afterSave)보다 먼저 — 렌더가 죽어도 창은 닫힌다', ci > 0 && ri > 0 && ci < ri, 'close@' + ci + ' render@' + ri);
+    });
+    T('v336 afterSave는 렌더를 다음 프레임으로 미룬다(rAF, 없으면 setTimeout)',
+      /requestAnimationFrame\(run\); else setTimeout\(run, 0\)/.test(fnSrc('afterSave')), '');
+    T('v336 afterSave의 실패는 콘솔·err_log 텔레메트리로만 남는다 — 사용자에게 오류 문구를 던지지 않는다',
+      /reportErr\(/.test(fnSrc('afterSave')) && !/gwToast/.test(fnSrc('afterSave')), '');
+    T('v336 성공 토스트는 "저장했습니다" 한 줄뿐 — v335의 실패 문구·부가 안내는 제거됐다',
+      /gwToast\("저장했습니다"\)/.test(html) && html.indexOf('저장은 됐지만 화면 갱신에 실패했습니다') < 0
+      && html.indexOf('목록 맨 위에서 확인하세요') < 0, '');
+    T('v336 v335 safeRender는 정의·호출 모두 남아 있지 않다(덮는 층을 걷어낸 자리)',
+      html.indexOf('function safeRender') < 0 && html.indexOf('safeRender([') < 0, '');
+  }
+
+  // ---- ⑤ 전수: 모달을 닫는 저장 경로는 전부 "닫기 먼저" 여야 한다 ----
+  //      한 곳이라도 렌더가 닫기보다 앞서면 같은 사고(창이 안 닫혀 사람이 다시 누름 → 중복 저장)가 재현된다.
+  {
+    const fnBlocks = [];
+    const re = /function\s+([A-Za-z_$][\w$]*)\s*\(/g;
+    let m;
+    while ((m = re.exec(html))) {
+      let d = 0, started = false, end = -1;
+      for (let j = m.index; j < html.length; j++) {
+        const ch = html[j];
+        if (ch === '{') { d++; started = true; }
+        else if (ch === '}') { d--; if (started && d === 0) { end = j + 1; break; } }
+      }
+      if (end > 0) fnBlocks.push({ name: m[1], body: html.slice(m.index, end) });
+    }
+    const bad = [];
+    fnBlocks.forEach((f) => {
+      if (f.body.length > 14000) return;
+      if (!/\b(schedule\w*Save|save\w*Cache|doSave\w*|saveDocuments|saveClients)\s*\(/.test(f.body)) return;   // 저장하는 함수만
+      const closeRe = /\b(close[A-Z]\w*\s*\(\s*\)|classList\.remove\(\s*"show"\s*\))/g;
+      const renderRe = /\brender[A-Z]\w*\s*\(/g;
+      let lastClose = -1, lastRender = -1, x;
+      while ((x = closeRe.exec(f.body))) lastClose = x.index;
+      while ((x = renderRe.exec(f.body))) lastRender = x.index;
+      if (lastClose < 0 || lastRender < 0) return;
+      if (lastRender < lastClose) bad.push(f.name);
+    });
+    T('v336 전수: 저장하며 모달을 닫는 경로 어디에도 "렌더 뒤에 닫기"가 남아 있지 않다(' + fnBlocks.length + '개 함수 대조)',
+      bad.length === 0, '렌더가 닫기를 막을 수 있는 함수: ' + bad.join(', '));
+  }
+} catch (e) { console.log('  (v336 검사 생략 — ' + e.message + ')'); fails++; }
+
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

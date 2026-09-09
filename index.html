@@ -2924,6 +2924,41 @@
     gwToastTimer = setTimeout(function(){ el.className = "gw-toast"; gwToastTimer = null; }, ms || (warn ? 9000 : 4000));
   }
 
+  // ── 저장 ↔ 화면 갱신 분리 (v336 — PM 2026-09-10 "저장됐으면 저장됐다고만 나오게, 갱신은 실패할 수 없게")
+  // 9/9 석면 사고의 진짜 원인은 렌더 코드가 아니라 데이터 모양이었다. 9/2 일괄 입력분 130건이
+  // member_ids·worker_ids를 배열이 아니라 문자열 "[]"로 들고 있었고, "[]"는 truthy라
+  // (r.member_ids || []) 가 걸러주지 못해 .forEach에서 TypeError가 났다(실데이터로 재현 완료).
+  // renderAsb가 통째로 죽어 목록이 안 그려졌고, 같은 문장에 이어 붙은 closeAsb()까지 못 가 창이 안 닫혔다.
+  // v335는 이걸 try/catch로 덮었지만 원인은 그대로였다. 그래서 세 층으로 나눈다.
+  //   ① 모양 — asList()로 무엇이 들어와도 배열로 떨어뜨린다. 렌더가 던질 이유 자체를 없앤다.
+  //   ② 순서 — 닫기·토스트가 렌더보다 먼저. 저장은 이미 끝난 일이라 화면 갱신에 매달리지 않는다.
+  //   ③ 시점 — 렌더는 다음 프레임에서. 클릭 응답(닫기)이 렌더 시간에 묶이지 않는다.
+  // 그래도 렌더가 실패하면 사람에게 묻지 않는다(PM 지시) — 콘솔 + err_log 텔레메트리에만 남긴다.
+  function asList(v){
+    if (Array.isArray(v)) return v;
+    if (typeof v === "string"){
+      var s = v.trim();
+      if (!s || s === "[]") return [];
+      if (s.charAt(0) === "["){ try { var p = JSON.parse(s); if (Array.isArray(p)) return p; } catch (e) {} }
+      return s.split(",").map(function(x){ return x.trim(); }).filter(Boolean);
+    }
+    return [];
+  }
+  function afterSave(){
+    var fns = Array.prototype.slice.call(arguments);
+    var run = function(){
+      for (var i = 0; i < fns.length; i++){
+        if (typeof fns[i] !== "function") continue;
+        try { fns[i](); }
+        catch (e){
+          try { if (typeof console !== "undefined" && console.error) console.error("[afterSave] 화면 갱신 실패", e); } catch (e2) {}
+          try { reportErr("afterSave render: " + ((e && e.message) || e), "afterSave", (e && e.stack) || ""); } catch (e3) {}
+        }
+      }
+    };
+    if (typeof requestAnimationFrame === "function") requestAnimationFrame(run); else setTimeout(run, 0);
+  }
+
   // 지시 담당 입력칸 자동완성: 회원명 목록 채우기(오타로 인박스 매칭 실패 방지)
   function memberName(id){ if(!id) return ""; if(id==="__all__") return "전사"; var m=findMember(id); return m?m.name:""; }
   function memberIdByName(nm){ nm=(nm||"").trim(); if(!nm||nm==="전사") return nm==="전사"?"__all__":""; var ms=(typeof liveMembers==="function"?liveMembers():[]); for(var i=0;i<ms.length;i++){ if(ms[i].name===nm) return ms[i].id; } return ""; }
@@ -9359,7 +9394,7 @@
         if(!cc.title&&dd.work) cc.title=dd.work;
         if(!cc.client&&dd.owner) cc.client=dd.owner;
         if(!cc.site&&dd.site) cc.site=dd.site;
-        scheduleContractSave(); renderContracts();
+        scheduleContractSave(); afterSave(renderContracts);   // v336: 계약 목록 갱신이 실패해도 서류 미리보기·모달 닫기까지는 반드시 간다
         if(cc.elems&&(cc.elems.asb||cc.elems.demo||cc.elems.permit)&&dd.site&&!cc.bldg_info) conBldgLookup(cc.id, dd.site, true);   // 대장 자동
         setTimeout(function(){
           var pk=conPacketKinds(cc);
@@ -9784,6 +9819,10 @@
   var ASB_STATUS = { plan:"예정", run:"작업중", done:"종결" };
   function liveAsb(){ return asb.filter(function(r){ return r && r.del !== 1; }); }
   function findAsb(id){ for (var i=0;i<asb.length;i++){ if (asb[i].id===id) return asb[i]; } return null; }
+  // v336: 배열이어야 하는 필드를 들어오는 순간 배열로 못 박는다.
+  //   9/2 일괄 입력분 130건(유효 131건 중)이 member_ids·worker_ids를 문자열 "[]"로 들고 있었고
+  //   그대로 렌더까지 흘러가 TypeError를 냈다. 모양 교정은 화면이 아니라 입구에서 한다.
+  function normAsbRow(r){ if(!r || typeof r !== "object") return r; r.member_ids = asList(r.member_ids); r.worker_ids = asList(r.worker_ids); return r; }
   function asbNotifyDue(r){ return isDate(r.start) ? addDays(r.start, -7) : ""; }      // 작업신고: 착수 7일 전(법 제122조③)
   function asbKeepUntil(r){ if(!isDate(r.end)) return ""; var d=new Date(r.end+"T00:00:00"); d.setFullYear(d.getFullYear()+30); return fmtDate(d); }
   function mergeAsb(local, remote){
@@ -9805,26 +9844,14 @@
       var doc=(res.body&&res.body.doc)||{};
       var ri=Array.isArray(doc.items)?doc.items:[];
       asb = asbPending ? mergeAsb(asb, ri) : ri;   // 저장 대기 중이면 로컬 우선(로드 덮어쓰기 금지)
+      asb.forEach(normAsbRow);                     // v336: 모양 교정은 입구에서 1회 — 다음 저장 때 서버 기록도 배열로 정리된다
       asbBase = doc.updated_at||0;
       renderAsb(); renderCalendar();
     }).catch(function(){});
   }
   function scheduleAsbSave(){ asbPending=true; if(asbSaveTimer) clearTimeout(asbSaveTimer); asbSaveTimer=setTimeout(doSaveAsb,1200); }
-  // v335 (PM 2026-09-09 실사고: "저장을 눌러도 창이 안 닫히고 목록에도 안 뜬다" — 서버에는 같은 기록이 17건 쌓여 있었다)
-  //   원인 구조: 저장(배열 push + 예약 저장)은 끝났는데 그 뒤 renderAsb()/renderCalendar()에서 예외가 나면
-  //   같은 문장에 이어 붙은 closeAsb()가 실행되지 않는다 → 사람은 "저장이 안 됐다"고 보고 다시 누른다 → 기록이 계속 쌓인다.
-  //   그래서 (1) 화면 갱신은 각각 감싸 실패해도 넘어가고 (2) 닫기는 finally로 보장하고 (3) 실패는 조용히 넘기지 않고 토스트로 알린다.
-  function safeRender(list, whereLabel){
-    var bad = [];
-    for (var i = 0; i < list.length; i++){
-      try { list[i].fn(); } catch (e) { bad.push(list[i].name + ": " + ((e && e.message) || e)); }
-    }
-    if (bad.length){
-      try { if (typeof console !== "undefined" && console.error) console.error("[" + whereLabel + "] 화면 갱신 실패", bad); } catch (e2) {}
-      try { gwToast("저장은 됐지만 화면 갱신에 실패했습니다 — 새로고침하면 보입니다.\n(" + whereLabel + " / " + bad.join(" · ") + ")"); } catch (e3) {}
-    }
-    return bad.length === 0;
-  }
+  // v335의 safeRender(개별 try/catch + 닫기 보장 + 실패 토스트)는 v336에서 걷어냈다 —
+  // 덮는 층이 아니라 던지는 원인(asList)과 순서(afterSave)를 고쳤기 때문. 위 gwToast 아래 주석 참조.
   function doSaveAsb(){
     return gwCall("gw-data",{action:"save",collection:"asbestos",doc:{schema:1,items:asb},base:asbBase}).then(function(res){
       if(res.status===409){
@@ -9838,15 +9865,15 @@
   }
   function asbWorkerNames(r){
     var out=[];
-    (r.member_ids||[]).forEach(function(id){ var n=dispName(memberName(id)); if(n) out.push(n); });
-    (r.worker_ids||[]).forEach(function(id){ for(var i=0;i<workers.length;i++){ if(workers[i].id===id && workers[i].del!==1){ out.push(workers[i].name||""); break; } } });
+    asList(r.member_ids).forEach(function(id){ var n=dispName(memberName(id)); if(n) out.push(n); });   // v336: ||[] 는 문자열 "[]"를 못 거른다 — asList로 모양을 못 박는다
+    asList(r.worker_ids).forEach(function(id){ for(var i=0;i<workers.length;i++){ if(workers[i].id===id && workers[i].del!==1){ out.push(workers[i].name||""); break; } } });
     return out.filter(Boolean);
   }
   // 배치 전 특별교육 미이수자 — 안전성평가 항목1(작업기준 준수)에서 바로 깎이는 지점이라 목록에 띄운다
   function asbNoSpecial(r){
     var out=[];
-    (r.member_ids||[]).forEach(function(id){ if(!eduHasValidSpecial("member",id)){ var n=dispName(memberName(id)); if(n) out.push(n); } });
-    (r.worker_ids||[]).forEach(function(id){
+    asList(r.member_ids).forEach(function(id){ if(!eduHasValidSpecial("member",id)){ var n=dispName(memberName(id)); if(n) out.push(n); } });
+    asList(r.worker_ids).forEach(function(id){
       if(eduHasValidSpecial("worker",id)) return;
       for(var i=0;i<workers.length;i++){ if(workers[i].id===id && workers[i].del!==1){ out.push(workers[i].name||""); break; } }
     });
@@ -9916,8 +9943,8 @@
     document.getElementById("asbConc").value = r ? (r.conc||"") : "";
     document.getElementById("asbWaste").value = r ? (r.waste_no||"") : "";
     document.getElementById("asbNote").value = r ? (r.note||"") : "";
-    renderMemberPicks("asbMembers", r ? (r.member_ids||[]) : []);   // v332: 공개범위용 상자(dept:·rank:)를 쓰면 명단에 사람이 빠진다
-    asbRenderWorkerChecks(r ? (r.worker_ids||[]) : []);
+    renderMemberPicks("asbMembers", r ? asList(r.member_ids) : []);   // v332: 공개범위용 상자(dept:·rank:)를 쓰면 명단에 사람이 빠진다 / v336: asList
+    asbRenderWorkerChecks(r ? asList(r.worker_ids) : []);
     asbUpdateDerived();
     document.getElementById("asbDelete").style.display = r ? "" : "none";
     document.getElementById("asbBackdrop").classList.add("show");
@@ -9947,17 +9974,17 @@
     r.worker_ids=asbGetCheckedWorkers();
     r.updated=todayStr();
     scheduleAsbSave();
-    safeRender([{ name: "석면 목록", fn: renderAsb }, { name: "캘린더", fn: renderCalendar }], "석면 작업");
-    closeAsb();
-    try { gwToast(isNew ? "석면 작업을 저장했습니다 — 목록 맨 위에서 확인하세요." : "석면 작업을 수정했습니다."); } catch (e) {}
+    closeAsb();                       // v336: 닫기·토스트가 렌더보다 먼저 — 저장은 이미 끝난 일이다
+    gwToast("저장했습니다");           // 성공 문구는 이 한 줄뿐. 실패 문구는 화면에 띄우지 않는다(PM 9/10)
+    afterSave(renderAsb, renderCalendar);
   }
   function deleteAsb(){
     var r=asbEditId?findAsb(asbEditId):null; if(!r) return;
     if(!confirm("이 석면 작업 기록을 삭제할까요?\n(기록은 30년 보존 대상입니다 — 잘못 만든 것만 지우세요)")) return;
     r.del=1; r.updated=todayStr();
     scheduleAsbSave();
-    safeRender([{ name: "석면 목록", fn: renderAsb }, { name: "캘린더", fn: renderCalendar }], "석면 작업");
     closeAsb();
+    afterSave(renderAsb, renderCalendar);
   }
 
   // ═══ 교육·건강진단 이력 ════════════════════════════════════════════════
@@ -10120,16 +10147,17 @@
     r.note=document.getElementById("eduNote").value.trim();
     r.updated=todayStr();
     scheduleEduSave();
-    safeRender([{ name: "교육 목록", fn: renderEdu }, { name: "캘린더", fn: renderCalendar }, { name: "석면 목록", fn: renderAsb }], "교육 이력");
-    closeEdu();
+    closeEdu();                       // v336: 석면과 같은 순서 — 닫기·토스트 먼저, 렌더는 다음 프레임
+    gwToast("저장했습니다");
+    afterSave(renderEdu, renderCalendar, renderAsb);
   }
   function deleteEdu(){
     var r=eduEditId?findEdu(eduEditId):null; if(!r) return;
     if(!confirm("이 이력을 삭제할까요?")) return;
     r.del=1; r.updated=todayStr();
     scheduleEduSave();
-    safeRender([{ name: "교육 목록", fn: renderEdu }, { name: "캘린더", fn: renderCalendar }, { name: "석면 목록", fn: renderAsb }], "교육 이력");
     closeEdu();
+    afterSave(renderEdu, renderCalendar, renderAsb);
   }
 
   function famQRange(){
