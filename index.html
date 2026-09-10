@@ -723,6 +723,21 @@
   .todo-due-in{font-size:12px;padding:3px 6px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);max-width:132px;}
   #myTodoDue{flex:0 0 auto;width:138px;min-width:0;}
   .hr-dept{margin-bottom:14px;}
+  /* 석면 대장 접기(v342, PM 2026-09-10) — 한 줄은 연번·공사명·완료일만. 나머지는 펴서 본다.
+     목록이 131건이고 투입 근로자가 최대 22명이라 한 줄에 펴 놓으면 이름이 잘렸다. */
+  .asb-hd{display:flex;align-items:center;gap:8px;width:100%;background:transparent;border:none;
+    padding:11px 4px;cursor:pointer;text-align:left;font-size:14px;color:var(--text);
+    border-bottom:1px solid var(--line);}
+  .asb-hd:active{background:#f0f4ef;}
+  .asb-hd .asb-seq{flex:0 0 auto;min-width:34px;font-size:12px;font-weight:700;color:var(--sub);
+    font-variant-numeric:tabular-nums;}
+  .asb-hd .asb-t{flex:1;min-width:0;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .asb-hd .asb-end{flex:0 0 auto;font-size:12px;color:var(--sub);font-variant-numeric:tabular-nums;}
+  .asb-hd.open{border-bottom-color:transparent;}
+  .asb-hd.open .sec-caret{transform:rotate(180deg);}
+  .asb-bd{padding:2px 4px 12px 42px;border-bottom:1px solid var(--line);}
+  .asb-bd .item-sub{margin:3px 0;}
+  .asb-bd .asb-names{word-break:keep-all;line-height:1.6;}   /* 전원 보여준다 — 자르지 않는다 */
   .hr-dept-h{font-size:13px;font-weight:800;color:var(--brand);padding:2px 2px 6px;border-bottom:1px solid var(--line);margin-bottom:4px;}
   .hr-dept-h .cnt{color:var(--sub);font-weight:600;}
   /* v329 퇴사자 그룹(인사 탭 맨 아래 접이식) — 권한관리 구분선·흐림과 같은 언어 */
@@ -9943,20 +9958,40 @@
       var chip='<span class="scope-chip">'+esc(ASB_STATUS[r.status]||"예정")+'</span>';
       if(hot) chip='<span class="from-chip">신고 D-'+Math.max(0,Math.round((new Date(due+"T00:00:00")-new Date(today+"T00:00:00"))/86400000))+'</span>';
       var names=asbWorkerNames(r);
-      html+='<div class="item"><div class="item-body">'
-        + '<div class="item-title">'+esc(r.title||"(공사명 없음)")+' '+chip+'</div>'
+      // 접힌 줄에는 연번·공사명·완료일만. 상태 칩은 넣지 않되 신고 마감이 임박한 건(D-n)만은 접혀 있어도 보여야 한다.
+      html+='<div class="item asb-item" style="display:block;padding:0;">'
+        + '<button type="button" class="asb-hd" data-asb-fold="'+esc(r.id)+'" aria-expanded="false">'
+        +   '<span class="asb-seq">'+(r.seq?("#"+r.seq):"–")+'</span>'
+        +   '<span class="asb-t">'+esc(r.title||"(공사명 없음)")+(hot?" "+chip:"")+'</span>'
+        +   '<span class="asb-end">'+esc(r.end||"기간 미상")+'</span>'
+        +   '<span class="sec-caret">▾</span>'
+        + '</button>'
+        + '<div class="asb-bd" id="asbBd-'+esc(r.id)+'" style="display:none;">'
+        + (hot?"":'<div class="item-sub">'+chip+'</div>')
         + '<div class="item-sub">'+esc(r.client||"")+(r.site?" · "+esc(r.site):"")+'</div>'
         + '<div class="item-sub">'+esc(r.start||"?")+" ~ "+esc(r.end||"?")+(r.material?" · "+esc(r.material):"")+(r.area?" · "+esc(r.area)+"㎡":"")+'</div>'
         + (isDate(due)&&r.status!=="done" ? '<div class="item-sub">작업신고 마감 '+esc(due)+' (착수 7일 전)</div>' : "")
-        + (names.length ? '<div class="item-sub">투입 '+names.length+'명 · '+esc(names.slice(0,6).join(", "))+(names.length>6?" 외":"")+'</div>' : '<div class="item-sub">투입 근로자 미지정</div>')
+        + (names.length ? '<div class="item-sub asb-names">투입 '+names.length+'명 · '+esc(names.join(", "))+'</div>' : '<div class="item-sub">투입 근로자 미지정</div>')
         + (function(){ var m=(r.status==="done") ? [] : asbNoSpecial(r); return m.length ? '<div class="item-sub" style="color:#B3261E;">특별교육 미이수 '+m.length+'명 — '+esc(m.slice(0,4).join(", "))+(m.length>4?" 외":"")+' (배치 전 이수 필요)</div>' : ""; })()
         + (r.conc ? '<div class="item-sub">농도 '+esc(r.conc)+' 개/㎤</div>' : "")
         + (asbKeepUntil(r) ? '<div class="item-sub">기록 보존 만료 '+esc(asbKeepUntil(r))+'</div>' : "")
-        + '</div><div class="item-actions"><button class="link-btn" data-asb-edit="'+esc(r.id)+'">수정</button></div></div>';
+        + '<button class="link-btn" data-asb-edit="'+esc(r.id)+'" style="text-align:left;width:auto;padding:6px 0 0;">수정</button>'
+        + '</div></div>';
     });
     host.innerHTML=html;
     host.querySelectorAll("[data-asb-edit]").forEach(function(b){
       b.addEventListener("click", function(){ openAsb(b.getAttribute("data-asb-edit")); });
+    });
+    // 펼침은 화면 안에서만 산다(저장하지 않는다) — 목록을 다시 그리면 도로 접힌다.
+    host.querySelectorAll("[data-asb-fold]").forEach(function(b){
+      b.addEventListener("click", function(){
+        var bd=document.getElementById("asbBd-"+b.getAttribute("data-asb-fold"));
+        if(!bd) return;
+        var open = b.getAttribute("aria-expanded")!=="true";
+        bd.style.display = open ? "" : "none";
+        b.className = open ? "asb-hd open" : "asb-hd";
+        b.setAttribute("aria-expanded", open?"true":"false");
+      });
     });
   }
   function asbRenderWorkerChecks(sel){
