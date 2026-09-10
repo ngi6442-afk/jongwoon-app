@@ -9915,7 +9915,10 @@
     asList(r.worker_ids).forEach(function(id){ for(var i=0;i<workers.length;i++){ if(workers[i].id===id && workers[i].del!==1){ out.push(workers[i].name||""); break; } } });
     return out.filter(Boolean);
   }
-  // 배치 전 특별교육 미이수자 — 안전성평가 항목1(작업기준 준수)에서 바로 깎이는 지점이라 목록에 띄운다
+  // 배치 전 특별교육 미이수자 — 안전성평가 항목1(작업기준 준수)에서 바로 깎이는 지점이라 목록에 띄운다.
+  // v340(9/10): 부르는 쪽에서 status==="done"이면 건너뛴다. 과거 131건에 투입 근로자를 소급 채우면서
+  //   교육 기록이 없는 옛 인부 122명이 들어왔는데, 이미 끝난 공사에 "배치 전 이수 필요"는 거짓 경보이고
+  //   앞으로 배치될 현장의 진짜 경고를 묻어버린다. 예정·진행 건에서는 종전대로 뜬다.
   function asbNoSpecial(r){
     var out=[];
     asList(r.member_ids).forEach(function(id){ if(!eduHasValidSpecial("member",id)){ var n=dispName(memberName(id)); if(n) out.push(n); } });
@@ -9946,7 +9949,7 @@
         + '<div class="item-sub">'+esc(r.start||"?")+" ~ "+esc(r.end||"?")+(r.material?" · "+esc(r.material):"")+(r.area?" · "+esc(r.area)+"㎡":"")+'</div>'
         + (isDate(due)&&r.status!=="done" ? '<div class="item-sub">작업신고 마감 '+esc(due)+' (착수 7일 전)</div>' : "")
         + (names.length ? '<div class="item-sub">투입 '+names.length+'명 · '+esc(names.slice(0,6).join(", "))+(names.length>6?" 외":"")+'</div>' : '<div class="item-sub">투입 근로자 미지정</div>')
-        + (function(){ var m=asbNoSpecial(r); return m.length ? '<div class="item-sub" style="color:#B3261E;">특별교육 미이수 '+m.length+'명 — '+esc(m.slice(0,4).join(", "))+(m.length>4?" 외":"")+' (배치 전 이수 필요)</div>' : ""; })()
+        + (function(){ var m=(r.status==="done") ? [] : asbNoSpecial(r); return m.length ? '<div class="item-sub" style="color:#B3261E;">특별교육 미이수 '+m.length+'명 — '+esc(m.slice(0,4).join(", "))+(m.length>4?" 외":"")+' (배치 전 이수 필요)</div>' : ""; })()
         + (r.conc ? '<div class="item-sub">농도 '+esc(r.conc)+' 개/㎤</div>' : "")
         + (asbKeepUntil(r) ? '<div class="item-sub">기록 보존 만료 '+esc(asbKeepUntil(r))+'</div>' : "")
         + '</div><div class="item-actions"><button class="link-btn" data-asb-edit="'+esc(r.id)+'">수정</button></div></div>';
