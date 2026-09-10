@@ -332,6 +332,16 @@
     width:100%;
     max-width:400px;
   }
+  /* v338 (PM 2026-09-10): 폰에서 입력 창이 화면보다 길면 위아래가 잘린 채 손이 닿지 않았다.
+     배경(.modal-backdrop)은 fixed라 스크롤이 안 되고 세로 가운데 정렬이라 넘친 쪽이 양끝에서 동시에 잘린다.
+     모달 자신을 화면 높이에 가두고 안쪽에서 굴린다. 100dvh는 주소창이 접힐 때의 실제 높이 — 지원 브라우저만 덮어쓴다. */
+  .modal-backdrop > .modal{
+    max-height:calc(100vh - 40px);
+    overflow-y:auto;
+    -webkit-overflow-scrolling:touch;
+    overscroll-behavior:contain;   /* 모달 끝까지 굴려도 뒤 화면이 따라 움직이지 않게 */
+  }
+  @supports (max-height:100dvh){ .modal-backdrop > .modal{ max-height:calc(100dvh - 40px); } }
   .modal h3{margin:0 0 8px;font-size:16px;}
   .modal p{margin:0 0 16px;font-size:13px;color:var(--sub);line-height:1.5;}
   .modal input{
@@ -576,6 +586,18 @@
 
   /* 대시보드 */
   .dash-sec{margin-bottom:18px;}
+  /* v338: 목록이 긴 탭(인허가·석면)에서 접기 + [추가]를 제목 줄로 — 폰에서 추가하려고 끝까지 끌어내리지 않게 */
+  .sec-hd{display:flex;align-items:center;gap:8px;margin:0 0 8px 2px;}
+  .sec-hd-t{flex:1;min-width:0;display:flex;align-items:center;gap:6px;background:transparent;border:none;
+    padding:4px 2px;text-align:left;font-size:14px;font-weight:700;color:var(--brand-dark);cursor:pointer;}
+  .sec-hd-t .cnt{font-size:12px;font-weight:700;color:var(--sub);}
+  .sec-caret{display:inline-block;font-size:10px;color:var(--sub);transition:transform .15s;}
+  .sec-hd-t.closed .sec-caret{transform:rotate(-90deg);}
+  .sec-hd-add{background:transparent;border:1px solid var(--line);border-radius:8px;color:var(--sub);
+    font-size:12.5px;padding:6px 10px;cursor:pointer;white-space:nowrap;}
+  .sec-hd-add:active{background:#f0f4ef;}
+  /* 읽기전용(보기 권한) 화면에서 추가 버튼을 감추는 규칙은 .link-btn과 동일하게 유지한다 */
+  .view.readonly .sec-hd-add{display:none !important;}
   .dash-sec h2{
     font-size:14px;font-weight:700;color:var(--brand-dark);
     margin:0 0 8px 4px;display:flex;justify-content:space-between;align-items:baseline;
@@ -1186,22 +1208,26 @@
     </div>
 
     <div id="licLayerCert">
-    <div class="dash-sec" style="margin-bottom:8px;">
-      <h2>인허가 <span class="cnt" id="licHead"></span></h2>
+    <div class="sec-hd">
+      <button type="button" class="sec-hd-t" id="licFold" aria-expanded="true" aria-controls="licFoldBody"><span class="sec-caret">▾</span>인허가 <span class="cnt" id="licHead"></span></button>
+      <button type="button" class="sec-hd-add" id="licAddBtn">+ 인허가 추가</button>
     </div>
-    <div class="card" id="licList">
-      <div class="loading">불러오는 중…</div>
+    <div id="licFoldBody">
+      <div class="card" id="licList">
+        <div class="loading">불러오는 중…</div>
+      </div>
+      <button class="link-btn" id="licGradeBtn" title="신용평가확인서·안전성평가 통보서(pdf/이미지)를 판독해 등급·만료일을 인허가에 자동 반영">🧠 등급확인서 판독</button>
     </div>
-    <button class="link-btn" id="licAddBtn">+ 인허가 추가</button>
-    <button class="link-btn" id="licGradeBtn" title="신용평가확인서·안전성평가 통보서(pdf/이미지)를 판독해 등급·만료일을 인허가에 자동 반영">🧠 등급확인서 판독</button>
 
     <!-- 석면 작업 이력 대장 — 산안법 제164조⑥ 30년 보존 + 안전성평가 항목3(전산화 정도).
          인허가 탭 안에 두어 lic 권한을 공유한다(PM 결정 2026-08-26). -->
-    <div class="dash-sec" style="margin:22px 0 8px;">
-      <h2>석면 작업 이력 <span class="cnt" id="asbHead"></span></h2>
+    <div class="sec-hd" style="margin-top:22px;">
+      <button type="button" class="sec-hd-t" id="asbFold" aria-expanded="true" aria-controls="asbFoldBody"><span class="sec-caret">▾</span>석면 작업 이력 <span class="cnt" id="asbHead"></span></button>
+      <button type="button" class="sec-hd-add" id="asbAddBtn">+ 석면 작업 추가</button>
     </div>
-    <div class="card" id="asbList"><div class="loading">불러오는 중…</div></div>
-    <button class="link-btn" id="asbAddBtn">+ 석면 작업 추가</button>
+    <div id="asbFoldBody">
+      <div class="card" id="asbList"><div class="loading">불러오는 중…</div></div>
+    </div>
     <input type="file" id="licGradeFile" accept=".pdf,.jpg,.jpeg,.png,.webp" style="display:none;">
     </div>
 
@@ -5545,6 +5571,26 @@
   })();
 
   document.getElementById("licAddBtn").addEventListener("click", function(){ openLicModal(null); });
+  // v338: 섹션 접기. 목록이 길어 폰에서 아래 섹션까지 손이 안 닿던 것 — 접힌 상태는 이 기기에만 남는다.
+  function bindSecFold(btnId, bodyId, key){
+    var b = document.getElementById(btnId), bd = document.getElementById(bodyId);
+    if (!b || !bd) return;
+    function apply(open){
+      bd.style.display = open ? "" : "none";
+      b.className = open ? "sec-hd-t" : "sec-hd-t closed";
+      b.setAttribute("aria-expanded", open ? "true" : "false");
+    }
+    var saved = null;
+    try { saved = localStorage.getItem(key); } catch (e) {}
+    apply(saved !== "0");
+    b.addEventListener("click", function(){
+      var open = b.getAttribute("aria-expanded") !== "true";
+      apply(open);
+      try { localStorage.setItem(key, open ? "1" : "0"); } catch (e2) {}
+    });
+  }
+  bindSecFold("licFold", "licFoldBody", "jw-fold-lic");
+  bindSecFold("asbFold", "asbFoldBody", "jw-fold-asb");
   // 인허가 3층 서브탭·의무 대장 배선
   Array.prototype.forEach.call(document.querySelectorAll("#licSubBar .lsub-btn"), function(b){
     b.addEventListener("click", function(){ setLicLayer(b.getAttribute("data-lsub")); });
