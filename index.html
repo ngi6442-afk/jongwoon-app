@@ -1353,6 +1353,11 @@
   <section class="view" id="view-progress">
     <div class="dash-sec" style="margin-bottom:8px;display:flex;align-items:baseline;gap:10px;"><h2 style="flex:1;">진척도 <span class="cnt" id="progHead"></span></h2><button class="mini-btn" id="progReloadBtn" type="button">↻ 새로고침</button></div>
     <div id="progHost"><div class="loading">불러오는 중…</div></div>
+    <!-- 비용 실측(임시, 2026-09-10) — 질문창 1단계 착수 전 0번. 측정이 끝나면 이 블록과 gw-ask-meter.js를 함께 지운다. -->
+    <div class="dash-sec" style="margin:26px 0 6px;"><h2>질문창 비용 실측 <span class="cnt">임시</span></h2></div>
+    <div style="font-size:13px;color:var(--sub);margin-bottom:6px;">실제 업무 질문 30개를 진짜 원장에 물려 돌리고 토큰을 잽니다. 읽기만 하며 아무것도 바꾸지 않습니다. 3~5분 걸립니다.</div>
+    <button class="link-btn" id="meterRunBtn">▶ 30문항 실측 시작</button>
+    <div class="card" id="meterOut" style="display:none;"></div>
   </section>
 
   <!-- 견적서 (문서번호 관리·발행 이력) -->
@@ -5154,6 +5159,76 @@
   // ---- 진척도(관리자 전용, 2026-09-03) ----
   // 서버 gw-progress가 세션+관리자를 검증한 뒤 진척도 HTML을 JSON으로 준다(정적 /w/ 무인증 벽지와 별개 경로).
   // iframe은 sandbox(allow-scripts·allow-popups·allow-popups-to-escape-sandbox, same-origin 없음)라 앱 origin의 토큰·저장소에 닿지 못한다. 📄 문서 링크(rel=noopener)는 새 창.
+  // ── 질문창 비용 실측(임시, 2026-09-10) ────────────────────────────────
+  // 질문 30개는 실제 업무에서 뽑았다 — 공무(배차·만기)·경리(마감)·홍보(인허가·석면)·PM(입찰).
+  // 한 번에 한 문항씩 서버를 부른다(함수 시간 제한을 피하려고 브라우저가 돌린다).
+  var METER_Q = [
+    "84수6457 검사 언제까지야",
+    "검사만기 30일 안 남은 차 몇 대야",
+    "보험 만기 지난 차 있어?",
+    "지입차 몇 대야",
+    "환경 허가 차량하고 건설 허가 차량 각각 몇 대야",
+    "암롤차 기사 누구야",
+    "휴차 중인 차 알려줘",
+    "지금 진행 중인 계약 뭐 있어",
+    "포항시 발주 계약 있어?",
+    "계약금액 제일 큰 건 뭐야",
+    "준설 계약 몇 건이야",
+    "인허가 만기 60일 안 남은 거 알려줘",
+    "폐기물 수집운반업 허가 만기 언제야",
+    "우리 면허 몇 개야",
+    "작년에 석면 현장 몇 건 했어",
+    "석면 800제곱미터 넘는 현장 알려줘",
+    "남성초 석면 공사 언제 했어",
+    "슬레이트 철거 현장 최근 것 5개",
+    "2024년 석면 현장 다 알려줘",
+    "석면 현장 중에 포항 아닌 데 있어?",
+    "포스코 거래처 연락처 알려줘",
+    "거래처 몇 곳이야",
+    "그린바이로 담당자 누구야",
+    "오늘 마감 안 지난 입찰 몇 건이야",
+    "적격심사 입찰 중에 하한율 못 읽은 거 몇 건이야",
+    "경북 지역 입찰 알려줘",
+    "기초금액 5억 넘는 공고 있어?",
+    "문서함에서 취업규칙 찾아줘",
+    "안전보건 관련 문서 뭐 있어",
+    "내게 온 지시 뭐 있어"
+  ];
+  function meterRun(){
+    var btn=document.getElementById("meterRunBtn"), out=document.getElementById("meterOut");
+    if(!btn||!out) return;
+    btn.disabled=true; out.style.display="";
+    var rows=[], i=0, tIn=0, tOut=0, t0=Date.now();
+    function draw(done){
+      var h='<div style="padding:10px 12px;font-size:13px;">'
+        + (done?'<b>실측 끝</b> — ':'<b>도는 중</b> ')+(i)+' / '+METER_Q.length+'문항'
+        + ' · 입력 '+tIn.toLocaleString()+' 토큰 · 출력 '+tOut.toLocaleString()+' 토큰'
+        + (i?(' · 1문항 평균 입력 '+Math.round(tIn/i).toLocaleString()+' · 출력 '+Math.round(tOut/i).toLocaleString()):'')
+        + ' · '+Math.round((Date.now()-t0)/1000)+'초</div>'
+        + '<div class="jw-sheet-wrap"><table class="jw-sheet"><tr><th style="width:auto;">질문</th><th style="width:52px;">왕복</th><th style="width:64px;">입력</th><th style="width:58px;">출력</th><th style="width:52px;">초</th><th style="width:auto;">쓴 도구</th></tr>';
+      rows.forEach(function(r){
+        h+='<tr><td>'+esc(r.q)+(r.err?'<br><span style="color:#B0332A;">'+esc(r.err)+'</span>':'')+'</td>'
+          +'<td class="num">'+(r.turns||0)+'</td><td class="num">'+(r.in||0).toLocaleString()+'</td>'
+          +'<td class="num">'+(r.out||0).toLocaleString()+'</td><td class="num">'+Math.round((r.ms||0)/100)/10+'</td>'
+          +'<td>'+esc(r.tools||"")+'</td></tr>';
+      });
+      out.innerHTML=h+'</table></div>';
+    }
+    function step(){
+      if(i>=METER_Q.length){ btn.disabled=false; btn.textContent="▶ 다시 실측"; draw(true); return; }
+      var q=METER_Q[i];
+      gwCall("gw-ask-meter",{action:"ask",q:q}).then(function(res){
+        var b=res.body||{};
+        rows.push({ q:q, turns:b.turns, in:b.in, out:b.out, ms:b.ms,
+                    tools:(b.tools||[]).map(function(t){ return t.name+"("+t.rows+")"; }).join(" "),
+                    err: b.error||(res.status!==200?("HTTP "+res.status):"") });
+        tIn+=(b.in||0); tOut+=(b.out||0); i++; draw(false); step();
+      }).catch(function(e){
+        rows.push({ q:q, err:String(e&&e.message||e) }); i++; draw(false); step();
+      });
+    }
+    draw(false); step();
+  }
   function renderProgress(){
     if (!isAdmin()){ switchTab("dash"); return; }
     var host = document.getElementById("progHost"); if (!host) return;
@@ -5596,6 +5671,7 @@
     if(bd) bd.addEventListener("click", function(e){ if(e.target===this){ vehInsPending=null; bd.classList.remove("show"); } });
   })();
 
+  (function(){ var mb=document.getElementById("meterRunBtn"); if(mb) mb.addEventListener("click", meterRun); })();
   document.getElementById("licAddBtn").addEventListener("click", function(){ openLicModal(null); });
   // v338: 섹션 접기. 목록이 길어 폰에서 아래 섹션까지 손이 안 닿던 것 — 접힌 상태는 이 기기에만 남는다.
   function bindSecFold(btnId, bodyId, key){
