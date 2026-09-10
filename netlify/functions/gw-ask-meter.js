@@ -14,7 +14,7 @@
 //     (미수 제외 = PM 2026-09-10 "미수는 빼도 될 듯 — 자동으로 띄우는 형태가 아니기 때문")
 
 const crypto = require('crypto');
-const { setupBlobContext, store, blobGet } = require('./_lib/blobs');
+const { setupBlobContext, store, blobGet, blobSet } = require('./_lib/blobs');
 const { verifyToken, bearer } = require('./_lib/session');
 const tier = require('./_lib/tier');
 
@@ -235,5 +235,18 @@ exports.handler = async function (event) {
   if (!q) return jr(400, { ok: false, code: 'NO_QUESTION', request_id: R });
   const t0 = Date.now();
   const r = await ask(q, member);
-  return jr(200, Object.assign({ ok: !r.error, q, who: member.name, ms: Date.now() - t0, request_id: R }, r));
+  const row = Object.assign({ ok: !r.error, q, who: member.name, ms: Date.now() - t0, ts: Date.now() }, r);
+  // 측정값을 서버에 남긴다 — 종전엔 브라우저 화면에만 있어서 창을 닫으면 사라졌다(2026-09-10 실사고).
+  // 결과를 사람이 옮겨 적지 않아도 되게 원장 옆에 쌓아 둔다(측정이 끝나면 계측기와 함께 지운다).
+  try {
+    const prev = await blobGet(store(DATA), 'meter:cost');
+    const doc = (prev.ok && prev.data && Array.isArray(prev.data.rows)) ? prev.data : { schema: 1, rows: [] };
+    doc.rows.push({ ts: row.ts, who: row.who, q: row.q, turns: r.turns || 0, in: r.in || 0, out: r.out || 0,
+                    ms: row.ms, tools: (r.tools || []).map((t) => t.name + '(' + t.rows + ')').join(' '),
+                    err: r.error || '', answer: String(r.answer || '').slice(0, 400) });
+    doc.rows = doc.rows.slice(-300);
+    doc.updated_at = Date.now();
+    await blobSet(store(DATA), 'meter:cost', doc);
+  } catch (e) { /* 측정 기록 실패가 측정 자체를 막지는 않는다 */ }
+  return jr(200, row);
 };
