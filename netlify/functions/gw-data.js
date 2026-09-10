@@ -31,11 +31,17 @@ async function currentMember(event) {
   if (!r.ok || !r.data || r.data.del === 1 || retired(r.data)) return { ok: false, reason: 'NO_MEMBER' };
   return { ok: true, member: r.data };
 }
+// 기본 숨김 모듈(닫고 시작 — 명시 부여만). 앱 index.html의 PERM_CLOSED와 같은 집합이어야 하고 uismoke가 대조한다.
+//   quote 견적서 = 영업 직렬에게만
+//   promo  홍보  = 홍보 담당에게만
+//   hr     교육·건강진단 대장 = 인사 탭이 관리자 전용인데 서버가 view로 열려 있던 구멍(9/4 uismoke 실사고 조사)
+//   lic    인허가·석면 작업 이력 대장 = PM 2026-09-10 "인허가 석면은 운영 및 관리부만".
+//          기본이 view라 명시적으로 닫지 않은 현장 직원 4명에게 근로자 인적사항(30년 보존 대장)이 열려 있었다.
+const PERM_CLOSED = { quote: 1, promo: 1, hr: 1, lic: 1 };
 function permOf(member, col) {
   if (member.admin) return 'do';
   const key = COL[col];
-  // 견적서·홍보는 기본 숨김(닫고 시작 — 명시 부여만). 다른 모듈 기본은 보기
-  return (member.perms && member.perms[key]) || ((key === 'quote' || key === 'promo' || key === 'hr') ? 'hide' : 'view');   // hr(교육·건강진단 대장)은 인사 탭이 관리자 전용인데 서버가 view로 열려 있던 구멍(9/4 uismoke 실사고 조사) — 닫고 시작
+  return (member.perms && member.perms[key]) || (PERM_CLOSED[key] ? 'hide' : 'view');
 }
 // 인가된 기기만 데이터 접근. 관리자는 항상 허용.
 async function deviceApproved(event, member) {

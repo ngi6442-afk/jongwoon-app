@@ -1986,10 +1986,13 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   T('석면: 재조회한 base로 재저장하면 200 — 새 기록이 1건만 늘어난다(중복은 화면 오해에서 생겼지 저장에서 생기지 않았다)',
     r.code === 200 && mem.gw_data['col:asbestos'].items.length === 2, String(r.code) + '/' + mem.gw_data['col:asbestos'].items.length);
 
-  // ④ 석면 대장은 인허가(lic) 권한을 공유한다. 서버 기본값은 view이므로 미지정 직원도 읽을 수 있고(현행 설계),
-  //    숨김으로 명시한 직원만 차단된다. 이 대장에는 근로자 인적사항이 들어가므로 기본값이 맞는지는 PM 판단 사항으로 남긴다.
+  // ④ 석면 대장은 인허가(lic) 권한을 공유한다. 이 대장에는 근로자 인적사항(30년 보존)이 들어간다.
+  //    v339(PM 2026-09-10 "인허가 석면은 운영 및 관리부만"): 기본값을 view → hide로 뒤집었다.
+  //    권한을 명시로 받은 사람만 열린다. 아래 두 검사가 그 사실을 고정한다(전에는 반대 사실을 고정하고 있었다).
   r = await call({ action: 'get', collection: 'asbestos' }, tokW, 'dev1');
-  T('석면: lic 미지정 직원은 현행 기본값(view)대로 읽힌다 — 기본 숨김이 아니라는 사실을 고정', r.code === 200, String(r.code));
+  T('석면: lic 미지정 직원은 차단된다(v339 기본 숨김 — 관리부·운영부만 명시 부여)', r.code === 403, String(r.code));
+  r = await call({ action: 'get', collection: 'licenses' }, tokW, 'dev1');
+  T('인허가: lic 미지정 직원도 같은 규칙으로 차단(석면과 같은 권한을 공유하므로 한쪽만 열리면 안 된다)', r.code === 403, String(r.code));
   mem.gw_users['member:uwork'].perms.lic = 'hide';
   r = await call({ action: 'get', collection: 'asbestos' }, tokW, 'dev1');
   T('석면: lic=숨김으로 지정한 직원은 차단된다(대장은 lic 권한을 공유)', r.code === 403, String(r.code) + '/' + r.body.error_code);

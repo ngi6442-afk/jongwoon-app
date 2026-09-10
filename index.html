@@ -17151,12 +17151,15 @@
   }
   function curMember(){ return curMemberObj; }
 
+  // 기본 숨김 모듈 — 서버 gw-data.js의 PERM_CLOSED와 **같은 집합**이어야 한다(uismoke가 두 곳을 대조).
+  // v339(9/10): lic 추가 — PM "인허가 석면은 운영 및 관리부만". 아울러 이 함수는 promo가, 아래 pmVal은 hr가
+  // 빠져 있어 서버와 집합이 서로 달랐다(홍보 탭이 열린 것처럼 보이는데 서버가 막는 식). 한 곳으로 모은다.
+  var PERM_CLOSED = { quote: 1, promo: 1, hr: 1, lic: 1 };
   function permOf(mod){
     var m = curMember();
     if (!m) return "hide";
     if (m.admin) return "do";
-    // 견적서는 기본 숨김(닫고 시작 — 영업 직렬에게만 명시 부여, 서버 permOf와 동일 규칙)
-    return (m.perms && m.perms[mod]) || ((mod === "quote" || mod === "hr") ? "hide" : "view");   // hr=교육·건강진단 대장: 서버와 동일하게 닫고 시작(9/4)
+    return (m.perms && m.perms[mod]) || (PERM_CLOSED[mod] ? "hide" : "view");
   }
   function canDo(mod){ return permOf(mod) === "do"; }
   function canSee(mod){ return permOf(mod) !== "hide"; }
@@ -17879,7 +17882,7 @@
   // 권한관리(별도 화면) — 매트릭스 표(S2-C, PM 지시): 셀 클릭마다 수행→보기→숨김 순환, 사람 단위 디바운스 자동 저장.
   // 구 아코디언(사람 펼침 → 드롭다운 → 저장 버튼)은 클릭 수가 많아 폐기 — 시안 표와 형태 일치.
   var PERM_ORDER = ["tasks","rec","cli","con","quote","promo","veh","lic","doc","check","wk"];   // MODULES와 반드시 일치(uismoke가 검사) — wk·promo 누락 사고 2회
-  function pmVal(m, mod){ return (m.perms && m.perms[mod]) || ((mod === "quote" || mod === "promo") ? "hide" : "view"); }   // 표시·순환 기본값 = permOf와 동일 규칙
+  function pmVal(m, mod){ return (m.perms && m.perms[mod]) || (PERM_CLOSED[mod] ? "hide" : "view"); }   // 표시·순환 기본값 = permOf와 동일 집합(PERM_CLOSED 한 곳)
   var PM_TXT = { do: "수행", view: "보기", hide: "숨김" };
   var PM_NEXT = { do: "view", view: "hide", hide: "do" };
   var pmSaveTimers = {};
