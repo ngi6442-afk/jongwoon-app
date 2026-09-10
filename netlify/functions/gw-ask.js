@@ -79,6 +79,14 @@ exports.handler = async function (event) {
   const mine = u.day[day + '|' + member.id] || 0;
   const monthTok = u.month[mon] || 0;
 
+  // 백그라운드 결과 조회 — 화면이 1.5초마다 부른다. 남의 작업은 키에 회원 id가 박혀 있어 못 본다.
+  if (d.action === 'poll') {
+    const id = String(d.job || '');
+    if (!/^[a-z0-9]{6,32}$/.test(id)) return jr(400, { ok: false, code: 'BAD_JOB', request_id: R });
+    const j = await blobGet(store(DATA), 'ask:job:' + member.id + ':' + id);
+    if (!j.ok || !j.data) return jr(200, { ok: true, state: 'pending', request_id: R });
+    return jr(200, Object.assign({ request_id: R }, j.data));
+  }
   if (d.action === 'status') {
     return jr(200, {
       ok: true, who: member.name, tools: A.toolDefs(member).map(function (t) { return t.name; }),

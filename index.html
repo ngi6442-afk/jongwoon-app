@@ -10267,22 +10267,33 @@
     if(inp){ inp.value = ""; inp.style.height = "auto"; }
     askAdd("ask-q", q);
     var wait = askAdd("ask-a", "찾는 중…");
-    gwCall("gw-ask", { q: q }).then(function(res){
-      var b = res.body || {};
+    // v349: 서버가 끝까지 돌리고(백그라운드) 화면은 결과를 가져온다. 동기 호출은 긴 질문에서 504가 났다(9/11 실사용).
+    var job = Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+    var t0 = Date.now();
+    function finish(b){
       if(wait && wait.parentNode) wait.parentNode.removeChild(wait);
-      if(res.status !== 200){ askAdd("ask-a err", "지금은 답할 수 없습니다 (" + res.status + ")"); return; }
-      if(!b.ok){ askAdd("ask-a err", b.answer || "답할 수 없습니다"); return; }
-      var src = (b.tools||[]).map(function(t){ return esc(t.name) + "(" + esc(String(t.rows)) + ")"; }).join(" · ");
-      askAdd("ask-a", b.answer || "(빈 답)", src ? ("본 자료: " + src + " · " + Math.round((b.ms||0)/100)/10 + "초") : "");
-      var head = document.getElementById("askHead");
-      if(head && b.day_max) head.textContent = "오늘 " + b.day_used + "/" + b.day_max;
-    }).catch(function(){
-      if(wait && wait.parentNode) wait.parentNode.removeChild(wait);
-      askAdd("ask-a err", "연결이 안 됩니다. 잠시 뒤 다시 물어보세요.");
-    }).then(function(){
+      if(!b || !b.ok){ askAdd("ask-a err", (b && b.answer) || "답할 수 없습니다"); }
+      else {
+        var src = (b.tools||[]).map(function(t){ return esc(t.name) + "(" + esc(String(t.rows)) + ")"; }).join(" · ");
+        askAdd("ask-a", b.answer || "(빈 답)", src ? ("본 자료: " + src + " · " + Math.round((b.ms||0)/100)/10 + "초") : "");
+        var head = document.getElementById("askHead");
+        if(head && b.day_max) head.textContent = "오늘 " + b.day_used + "/" + b.day_max;
+      }
       askBusy = false; if(btn){ btn.disabled = false; btn.textContent = "묻기"; }
       if(inp) inp.focus();
-    });
+    }
+    function poll(){
+      if(Date.now() - t0 > 90000){ finish({ ok:false, answer:"시간이 너무 걸립니다. 질문을 짧게 바꿔 다시 물어보세요." }); return; }
+      gwCall("gw-ask", { action:"poll", job: job }).then(function(res){
+        var b = res.body || {};
+        if(b.state === "done") finish(b);
+        else { if(wait) wait.textContent = "찾는 중… " + Math.round((Date.now()-t0)/1000) + "초"; setTimeout(poll, 1500); }
+      }).catch(function(){ setTimeout(poll, 2500); });
+    }
+    gwCall("gw-ask-background", { q: q, job: job }).then(function(res){
+      if(res.status === 401){ finish({ ok:false, answer:"로그인이 풀렸습니다. 다시 로그인해 주세요." }); return; }
+      setTimeout(poll, 1500);
+    }).catch(function(){ setTimeout(poll, 2000); });
   }
   function renderAskTab(){
     var ex = document.getElementById("askEx");
@@ -14334,7 +14345,12 @@
       // 마감 지난 미판단 건은 '지남' 칩에서만 — 다른 모든 화면에서 숨김(2026-08-12 PM 지적)
       if(bidStatusFilter==="expired"){ if(!bidExpired(b)) return false; }
       else if(bidExpired(b)) return false;
-      else if(bidStatusFilter==="all"){ if(bidSt(b)==="패스") return false; }   // 전체 보기에서 패스는 숨김(패스 칩에서만)
+      else if(bidStatusFilter==="all"){
+        if(bidSt(b)==="패스") return false;   // 전체 보기에서 패스는 숨김(패스 칩에서만)
+        // v349: 마감이 지난 낙찰·유찰 건도 전체에서는 뺀다 — 마감 임박순 정렬이라 7월 개찰 결과가 맨 위에 눌러앉았다(PM 9/11).
+        //   낙찰·유찰 칩에서는 그대로 보인다.
+        if(b.due && b.due<todayStr() && (bidSt(b)==="낙찰"||bidSt(b)==="유찰")) return false;
+      }
       else if(bidSt(b)!==bidStatusFilter) return false;
       if(!bidSearchTerm) return true;
       return ((b.title||"")+" "+(b.org||"")).toLowerCase().indexOf(bidSearchTerm)>=0;
