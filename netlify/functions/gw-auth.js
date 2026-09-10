@@ -13,7 +13,7 @@ const { appendAudit, short } = require('./_lib/audit');
 const tier = require('./_lib/tier');   // 관리자 등급(v321)
 
 const USERS = 'gw_users';
-const MODULES = ['tasks', 'veh', 'rec', 'lic', 'check', 'con', 'cli', 'doc', 'wk', 'quote', 'promo'];   // wk(일용직) 누락으로 cleanPerms가 매 저장마다 버려 숨김·수행 설정이 불가능했음(프런트 레지스트리와 일치 필수). quote=견적서·promo=홍보(둘 다 기본 숨김 — 명시 부여만)
+const MODULES = ['tasks', 'veh', 'rec', 'lic', 'site', 'check', 'con', 'cli', 'doc', 'wk', 'quote', 'promo'];   // wk(일용직) 누락으로 cleanPerms가 매 저장마다 버려 숨김·수행 설정이 불가능했음(프런트 레지스트리와 일치 필수). quote=견적서·promo=홍보(둘 다 기본 숨김 — 명시 부여만)
 const LOCK_THRESHOLD = 5;                 // 연속 실패 허용 횟수
 const LOCK_MS = 15 * 60 * 1000;           // 잠금 시간(15분)
 function lockKey(name) { return `lock:${String(name).trim().toLowerCase()}`; }
@@ -94,11 +94,14 @@ const ROLE_OPEN = { '팀장': 1, '직원': 1, '현장직': 1 };
 function roleOpen(r) { return Object.prototype.hasOwnProperty.call(ROLE_OPEN, String(r || '')); }
 // 일반 직책 기본 권한 — 앱 ROLE_PRESET과 같은 값(uismoke가 대조). 관리자가 만든 회원의 perms는 클라 값이 아니라 이 표에서 온다(권한 상승 차단).
 const ROLE_OPEN_PERMS = {
-  '팀장':   { tasks: 'do', veh: 'do', rec: 'do', lic: 'do', check: 'do', con: 'view', cli: 'view', doc: 'view', wk: 'do', quote: 'hide', promo: 'hide' },
-  '직원':   { tasks: 'do', veh: 'view', rec: 'view', lic: 'view', check: 'do', con: 'view', cli: 'view', doc: 'view', wk: 'view', quote: 'hide', promo: 'hide' },
-  '현장직': { tasks: 'do', veh: 'view', rec: 'hide', lic: 'hide', check: 'do', con: 'hide', cli: 'hide', doc: 'view', wk: 'hide', quote: 'hide', promo: 'hide' }
+  '팀장':   { tasks: 'do', veh: 'do', rec: 'do', lic: 'do', site: 'do', check: 'do', con: 'view', cli: 'view', doc: 'view', wk: 'do', quote: 'hide', promo: 'hide' },
+  '직원':   { tasks: 'do', veh: 'view', rec: 'view', lic: 'view', site: 'hide', check: 'do', con: 'view', cli: 'view', doc: 'view', wk: 'view', quote: 'hide', promo: 'hide' },
+  '현장직': { tasks: 'do', veh: 'view', rec: 'hide', lic: 'hide', site: 'hide', check: 'do', con: 'hide', cli: 'hide', doc: 'view', wk: 'hide', quote: 'hide', promo: 'hide' }
 };
-function cleanPerms(p) { const out = {}; MODULES.forEach(function (k) { out[k] = (p && (p[k] === 'do' || p[k] === 'view' || p[k] === 'hide')) ? p[k] : 'view'; }); return out; }
+// 값이 없는 모듈의 기본값 — 닫고 시작하는 모듈(gw-data PERM_CLOSED와 같은 집합)은 'hide'다.
+// 종전엔 무조건 'view'라, 새 모듈을 MODULES에 넣는 순간 전 직원에게 열렸다(2026-09-10 site 추가 때 잡힘).
+const CLOSED_DEFAULT = { quote: 1, promo: 1, hr: 1, lic: 1, site: 1 };
+function cleanPerms(p) { const out = {}; MODULES.forEach(function (k) { out[k] = (p && (p[k] === 'do' || p[k] === 'view' || p[k] === 'hide')) ? p[k] : (CLOSED_DEFAULT[k] ? 'hide' : 'view'); }); return out; }
 
 async function listMembers(st) {
   const { blobs } = await st.list({ prefix: 'member:' });

@@ -955,6 +955,7 @@
     <button class="tab-btn" data-tab="veh" id="tabVehBtn">차량</button>
     <button class="tab-btn" data-tab="hwakwan" id="tabHwakwanBtn">화관법</button>
     <button class="tab-btn" data-tab="allbaro" id="tabAllbaroBtn">운반일지</button>
+    <button class="tab-btn perm-hidden" data-tab="site" id="tabSiteBtn">현장</button>
     <button class="tab-btn" data-tab="lic" id="tabLicBtn">인허가</button>
     <button class="tab-btn" data-tab="doc" id="tabDocBtn">문서함</button>
     <div class="nav-divider"></div>
@@ -1248,14 +1249,18 @@
       <button class="link-btn" id="licGradeBtn" title="신용평가확인서·안전성평가 통보서(pdf/이미지)를 판독해 등급·만료일을 인허가에 자동 반영">🧠 등급확인서 판독</button>
     </div>
 
-    <!-- 석면 작업 이력 대장 — 산안법 제164조⑥ 30년 보존 + 안전성평가 항목3(전산화 정도).
-         인허가 탭 안에 두어 lic 권한을 공유한다(PM 결정 2026-08-26). -->
-    <div class="sec-hd" style="margin-top:22px;">
+    <!-- 석면 작업 이력은 2026-09-10에 [현장] 탭으로 옮겼다(석면·철거·준설을 한 대장에서 본다).
+         데이터는 제자리(col:asbestos)에 두고 권한키만 lic → site로 나눴다. 여기엔 길만 남긴다. -->
+    <div class="hw-note" style="margin-top:22px;">석면 작업 이력은 <b>[현장]</b> 탭으로 옮겼습니다 — 철거·준설과 한 대장에서 봅니다.
+      <button class="mini-btn" id="asbMovedBtn" style="margin-left:6px;">현장 탭 열기</button></div>
+    <!-- 아래 블록은 숨겨 둔 채 남긴다 — renderAsb가 아직 이 자리를 그린다.
+         현장 탭 전환이 확인되면 이 블록과 renderAsb를 함께 지운다. -->
+    <div class="sec-hd" style="display:none;">
       <button type="button" class="sec-hd-t" id="asbFold" aria-expanded="true" aria-controls="asbFoldBody"><span class="sec-caret">▾</span>석면 작업 이력 <span class="cnt" id="asbHead"></span></button>
       <button type="button" class="sec-hd-add" id="asbAddBtn">+ 석면 작업 추가</button>
     </div>
-    <div id="asbFoldBody">
-      <div class="card" id="asbList"><div class="loading">불러오는 중…</div></div>
+    <div id="asbFoldBody" style="display:none;">
+      <div class="card" id="asbList"></div>
     </div>
     <input type="file" id="licGradeFile" accept=".pdf,.jpg,.jpeg,.png,.webp" style="display:none;">
     </div>
@@ -1361,6 +1366,18 @@
     <div style="font-size:13px;color:var(--sub);margin-bottom:6px;">실제 업무 질문 30개를 진짜 원장에 물려 돌리고 토큰을 잽니다. 읽기만 하며 아무것도 바꾸지 않습니다. 3~5분 걸립니다.</div>
     <button class="link-btn" id="meterRunBtn">▶ 30문항 실측 시작</button>
     <div class="card" id="meterOut" style="display:none;"></div>
+  </section>
+
+  <!-- 현장(석면·철거·준설) — 2026-09-10 인허가 탭에서 분리. 한 대장을 종류로 갈라 본다.
+       석면은 산안법 제164조⑥ 30년 보존이라 데이터는 옮기지 않고 종류 칸만 더했다. -->
+  <section class="view" id="view-site">
+    <div class="sec-hd">
+      <button type="button" class="sec-hd-t" style="cursor:default;"><span>현장</span> <span class="cnt" id="siteHead"></span></button>
+      <button type="button" class="sec-hd-add" id="siteAddBtn">+ 현장 추가</button>
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;" id="siteFilterBar"></div>
+    <input type="search" id="siteSearch" placeholder="공사명·발주처·소재지 검색" autocomplete="off" style="width:100%;padding:9px 12px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;font-size:14px;box-sizing:border-box;">
+    <div class="card" id="siteList"><div class="loading">불러오는 중…</div></div>
   </section>
 
   <!-- 견적서 (문서번호 관리·발행 이력) -->
@@ -1557,6 +1574,23 @@
     <input type="text" id="baUrl" placeholder="원문 링크 (선택)" autocomplete="off">
     <button class="primary" id="baSave">등록</button>
     <button class="secondary" id="baCancel">취소</button>
+  </div>
+</div>
+
+<!-- 현장 참여 근로자 추가(v347) — 명부에 없으면 여기서 바로 등록한다(인사 탭까지 갔다 오지 않게) -->
+<div class="modal-backdrop" id="swBackdrop">
+  <div class="modal">
+    <h3 id="swTitle">참여 근로자 추가</h3>
+    <p id="swSub" style="margin:0 0 10px;"></p>
+    <input type="search" id="swSearch" placeholder="이름 검색" autocomplete="off">
+    <div class="mchecks" id="swList" style="max-height:220px;"></div>
+    <div class="hw-note" style="margin-bottom:10px;">명부에 없는 사람은 아래에 이름만 넣고 [+ 새 일용직]을 누르면 바로 등재됩니다. 생년월일·연락처는 나중에 인사·일용직 탭에서 채우면 됩니다.</div>
+    <div style="display:flex;gap:8px;">
+      <input type="text" id="swNewName" placeholder="새 일용직 이름" autocomplete="off" style="flex:1;margin-bottom:10px;">
+      <button class="mini-btn" id="swNewBtn" style="height:42px;white-space:nowrap;">+ 새 일용직</button>
+    </div>
+    <button class="primary" id="swSave">이 현장에 넣기</button>
+    <button class="secondary" id="swCancel">취소</button>
   </div>
 </div>
 
@@ -2597,17 +2631,17 @@
   var MEMBER_KEY = "jw_app_member";
 
   // 모듈 레지스트리 — 신규 탭 추가 시 여기 5곳(MODULES/MODULE_TAB/MODULE_VIEW/MOD_LABEL/ROLE_PRESET)에 등록하면 권한관리 UI·게이팅에 자동 반영. 모듈 id = 백엔드 gw-data COL 권한키와 일치시킬 것.
-  var MODULES = ["tasks", "veh", "rec", "lic", "check", "con", "cli", "doc", "wk", "quote", "promo"];  // 일감(bid)은 관리자 전용 고정이라 권한 목록에서 제외. quote=견적서·promo=홍보(둘 다 기본 숨김)
-  var MODULE_TAB = {tasks:"tabTasksBtn", veh:"tabVehBtn", rec:"tabRecBtn", lic:"tabLicBtn", check:"tabCheckBtn", con:"tabConBtn", cli:"tabCliBtn", doc:"tabDocBtn", wk:"tabWkBtn", quote:"tabQuoteBtn", promo:"tabPromoBtn"};  // bid는 계약 탭 내 섹션(자체 탭 없음)
-  var MODULE_VIEW = {tasks:"view-tasks", veh:"view-veh", rec:"view-rec", lic:"view-lic", check:"view-check", con:"view-con", cli:"view-cli", doc:"view-doc", wk:"view-workers", quote:"view-quote", promo:"view-promo"};  // bid 섹션은 applyPerms에서 canSee로 표시
+  var MODULES = ["tasks", "veh", "rec", "lic", "site", "check", "con", "cli", "doc", "wk", "quote", "promo"];  // 일감(bid)은 관리자 전용 고정이라 권한 목록에서 제외. quote=견적서·promo=홍보(둘 다 기본 숨김)
+  var MODULE_TAB = {tasks:"tabTasksBtn", veh:"tabVehBtn", rec:"tabRecBtn", lic:"tabLicBtn", site:"tabSiteBtn", check:"tabCheckBtn", con:"tabConBtn", cli:"tabCliBtn", doc:"tabDocBtn", wk:"tabWkBtn", quote:"tabQuoteBtn", promo:"tabPromoBtn"};  // bid는 계약 탭 내 섹션(자체 탭 없음)
+  var MODULE_VIEW = {tasks:"view-tasks", veh:"view-veh", rec:"view-rec", lic:"view-lic", site:"view-site", check:"view-check", con:"view-con", cli:"view-cli", doc:"view-doc", wk:"view-workers", quote:"view-quote", promo:"view-promo"};  // bid 섹션은 applyPerms에서 canSee로 표시
   var ROLE_PRESET = {
     // 개발자 = 시스템 영역(계정·기기·권한·복원) 담당. 업무 서열과 별개 축이라 대표를 대체하지 않는다.
-    "개발자": {admin:true,  dev:true, perms:{tasks:"do", veh:"do", rec:"do", lic:"do", check:"do", con:"do", cli:"do", doc:"do", wk:"do", quote:"do", promo:"do"}},
-    "대표":   {admin:true,  perms:{tasks:"do", veh:"do", rec:"do", lic:"do", check:"do", con:"do", cli:"do", doc:"do", wk:"do", quote:"do", promo:"do"}},
-    "관리자": {admin:true,  perms:{tasks:"do", veh:"do", rec:"do", lic:"do", check:"do", con:"do", cli:"do", doc:"do", wk:"do", quote:"do", promo:"do"}},
-    "팀장":   {admin:false, perms:{tasks:"do", veh:"do", rec:"do", lic:"do", check:"do", con:"view", cli:"view", doc:"view", wk:"do", quote:"hide", promo:"hide"}},
-    "직원":   {admin:false, perms:{tasks:"do", veh:"view", rec:"view", lic:"view", check:"do", con:"view", cli:"view", doc:"view", wk:"view", quote:"hide", promo:"hide"}},
-    "현장직": {admin:false, perms:{tasks:"do", veh:"view", rec:"hide", lic:"hide", check:"do", con:"hide", cli:"hide", doc:"view", wk:"hide", quote:"hide", promo:"hide"}}
+    "개발자": {admin:true,  dev:true, perms:{tasks:"do", veh:"do", rec:"do", lic:"do", site:"do", check:"do", con:"do", cli:"do", doc:"do", wk:"do", quote:"do", promo:"do"}},
+    "대표":   {admin:true,  perms:{tasks:"do", veh:"do", rec:"do", lic:"do", site:"do", check:"do", con:"do", cli:"do", doc:"do", wk:"do", quote:"do", promo:"do"}},
+    "관리자": {admin:true,  perms:{tasks:"do", veh:"do", rec:"do", lic:"do", site:"do", check:"do", con:"do", cli:"do", doc:"do", wk:"do", quote:"do", promo:"do"}},
+    "팀장":   {admin:false, perms:{tasks:"do", veh:"do", rec:"do", lic:"do", site:"do", check:"do", con:"view", cli:"view", doc:"view", wk:"do", quote:"hide", promo:"hide"}},
+    "직원":   {admin:false, perms:{tasks:"do", veh:"view", rec:"view", lic:"view", site:"hide", check:"do", con:"view", cli:"view", doc:"view", wk:"view", quote:"hide", promo:"hide"}},
+    "현장직": {admin:false, perms:{tasks:"do", veh:"view", rec:"hide", lic:"hide", site:"hide", check:"do", con:"hide", cli:"hide", doc:"view", wk:"hide", quote:"hide", promo:"hide"}}
   };
   // 직급(정보용)·부서 목록 — 서열 순서(공개범위·결재라인에서 사용)
   var RANK_LIST = ["대표","이사","부장","차장","과장","대리","주임","사원"];
@@ -5123,6 +5157,7 @@
     document.getElementById("view-tasks").classList.toggle("active", name === "tasks");
     document.getElementById("view-veh").classList.toggle("active", name === "veh");
     document.getElementById("view-rec").classList.toggle("active", name === "rec");
+    document.getElementById("view-site").classList.toggle("active", name === "site");
     document.getElementById("view-lic").classList.toggle("active", name === "lic");
     document.getElementById("view-check").classList.toggle("active", name === "check");
     document.getElementById("view-doc").classList.toggle("active", name === "doc");
@@ -5150,6 +5185,7 @@
     if (name === "cal") renderCalendar();
     if (name === "dash" && prevTab !== "dash") renderDashboard();   // 탭 "복귀" 시만 재렌더(타 탭 체류 중 폴 갱신 반영) — 재클릭은 종전대로 no-op(직원 홈 입력 중 유실 방지)
     // 석면 대장은 인허가 탭 안에 있고, 투입 근로자 이름을 일용직 명부에서 끌어오므로 둘을 같이 읽는다
+    if (name === "site"){ renderSites(); loadAsb(); loadEdu(); if(canSee("wk")) loadWorkers(); }
     if (name === "lic"){ setLicLayer("cert"); renderAsb(); loadAsb(); loadEdu(); if(canSee("wk")) loadWorkers(); }   // 전역검색·캘린더 점프가 의무/이번달 층 위에 내려앉지 않게 ①층 복귀
     if (name === "hr"){ renderHrRoster(); renderEdu(); loadEdu(); if(canSee("wk")) loadWorkers(); }
     if (name === "workers"){ renderWorkers(); loadWorkers(); renderEdu(); loadEdu(); }
@@ -5713,6 +5749,40 @@
   })();
 
   (function(){ var mb=document.getElementById("meterRunBtn"); if(mb){ mb.addEventListener("click", meterRun); meterPoll(); } })();
+  // 현장 탭 배선(v347)
+  (function(){
+    var q=document.getElementById("siteSearch");
+    if(q) q.addEventListener("input", function(){ siteQ=this.value; renderSites(); });
+    var add=document.getElementById("siteAddBtn");
+    if(add) add.addEventListener("click", function(){ openAsb(null); });
+    var sc=document.getElementById("swSearch");
+    if(sc) sc.addEventListener("input", function(){ swQ=this.value; renderSwList(); });
+    var cancel=document.getElementById("swCancel");
+    if(cancel) cancel.addEventListener("click", function(){ document.getElementById("swBackdrop").classList.remove("show"); swSiteId=null; });
+    var nb=document.getElementById("swNewBtn");
+    if(nb) nb.addEventListener("click", function(){
+      var nm=document.getElementById("swNewName").value.trim();
+      if(!nm){ document.getElementById("swNewName").focus(); return; }
+      var w={ id:genId("w"), created:todayStr(), name:nm, birth:"", role:"인부", phone:"", exam:"",
+              note:"현장에서 바로 등재(2026-09-10 이후) — 생년월일·연락처 확인 요망", updated:todayStr() };
+      workers.push(w); scheduleWorkersSave(); renderWorkers();
+      document.getElementById("swNewName").value=""; swQ=""; document.getElementById("swSearch").value="";
+      renderSwList();
+      // 새로 만든 사람은 바로 체크해 둔다 — 넣으려고 만든 것이다
+      var el=document.querySelector('#swList [data-sw="'+w.id+'"]'); if(el) el.checked=true;
+      try{ gwToast("명부에 등재했습니다 — 생년월일·연락처는 나중에"); }catch(e){}
+    });
+    var sv=document.getElementById("swSave");
+    if(sv) sv.addEventListener("click", function(){
+      var r=swSiteId?findAsb(swSiteId):null;
+      if(!r){ document.getElementById("swBackdrop").classList.remove("show"); return; }
+      r.worker_ids=swChecked(); r.member_ids=asList(r.member_ids); r.updated=todayStr();
+      scheduleAsbSave();
+      document.getElementById("swBackdrop").classList.remove("show"); swSiteId=null;
+      gwToast("저장했습니다");
+      afterSave(renderSites, renderAsb, renderCalendar);
+    });
+  })();
   document.getElementById("licAddBtn").addEventListener("click", function(){ openLicModal(null); });
   // v338: 섹션 접기. 목록이 길어 폰에서 아래 섹션까지 손이 안 닿던 것 — 접힌 상태는 이 기기에만 남는다.
   function bindSecFold(btnId, bodyId, key){
@@ -5733,7 +5803,7 @@
     });
   }
   bindSecFold("licFold", "licFoldBody", "jw-fold-lic");
-  bindSecFold("asbFold", "asbFoldBody", "jw-fold-asb");
+  (function(){ var mv=document.getElementById("asbMovedBtn"); if(mv) mv.addEventListener("click", function(){ switchTab("site"); }); })();
   // 인허가 3층 서브탭·의무 대장 배선
   Array.prototype.forEach.call(document.querySelectorAll("#licSubBar .lsub-btn"), function(b){
     b.addEventListener("click", function(){ setLicLayer(b.getAttribute("data-lsub")); });
@@ -10127,6 +10197,119 @@
   // 엑셀형 표 한 줄(항목/내용). 세 목록(석면·일용직·거래처)이 같이 쓴다 — 값은 부르는 쪽에서 esc한다.
   function sheetRow(label, valHtml, cls){
     return '<tr><th>'+esc(label)+'</th><td'+(cls?' class="'+cls+'"':'')+'>'+(valHtml||"—")+'</td></tr>';
+  }
+  // ═══ 현장(석면·철거·준설) ═══════════════════════════════════════════
+  // 한 대장(col:asbestos)을 kind로 갈라 본다. 석면은 산안법 30년 보존 대장이라 옮기지 않고 칸만 더했다(2026-09-10).
+  var SITE_KIND = { asbestos:"석면", demolition:"철거", dredge:"준설" };
+  var SITE_ORDER = ["asbestos","demolition","dredge"];
+  var siteFilter = "", siteQ = "";
+  function siteKind(r){ return (r && SITE_KIND[r.kind]) ? r.kind : "asbestos"; }   // 옛 기록은 kind가 없다 = 석면
+  function liveSites(){ return asb.filter(function(r){ return r && r.del!==1; }); }
+  function siteLabel(r){ return SITE_KIND[siteKind(r)] + (r.seq ? " #"+r.seq : ""); }
+  function renderSiteFilter(){
+    var host=document.getElementById("siteFilterBar"); if(!host) return;
+    var all=liveSites(), n={};
+    all.forEach(function(r){ var k=siteKind(r); n[k]=(n[k]||0)+1; });
+    var h='<button class="mini-btn'+(siteFilter?"":" on")+'" data-sf="">전체 '+all.length+'</button>';
+    SITE_ORDER.forEach(function(k){
+      if(!n[k]) return;
+      h+='<button class="mini-btn'+(siteFilter===k?" on":"")+'" data-sf="'+k+'">'+SITE_KIND[k]+' '+n[k]+'</button>';
+    });
+    host.innerHTML=h;
+    Array.prototype.forEach.call(host.querySelectorAll("[data-sf]"), function(b){
+      b.addEventListener("click", function(){ siteFilter=b.getAttribute("data-sf"); renderSites(); });
+    });
+  }
+  function renderSites(){
+    var host=document.getElementById("siteList"); if(!host) return;
+    renderSiteFilter();
+    var q=siteQ.trim().toLowerCase().replace(/\s+/g,"");
+    var list=liveSites().filter(function(r){
+      if(siteFilter && siteKind(r)!==siteFilter) return false;
+      if(!q) return true;
+      return ((r.title||"")+(r.client||"")+(r.site||"")).toLowerCase().replace(/\s+/g,"").indexOf(q)>=0;
+    }).sort(function(a,b){ return String(b.start||b.end||"").localeCompare(String(a.start||a.end||"")); });
+    var head=document.getElementById("siteHead");
+    if(head) head.textContent = list.length ? ("총 "+list.length+"건") : "";
+    if(!list.length){ host.innerHTML='<div class="empty-line">해당하는 현장이 없습니다.</div>'; return; }
+    var today=todayStr(), can=canDo("site"), html="";
+    list.forEach(function(r){
+      var k=siteKind(r), names=asbWorkerNames(r), ks=r.ks||{};
+      var due=asbNotifyDue(r), hot=(k==="asbestos" && r.status!=="done" && isDate(due) && due>=today && due<=addDays(today,7));
+      var chip = hot ? '<span class="from-chip">신고 D-'+Math.max(0,Math.round((new Date(due+"T00:00:00")-new Date(today+"T00:00:00"))/86400000))+'</span>' : "";
+      html+='<div class="item asb-item" style="display:block;padding:0;">'
+        + '<button type="button" class="asb-hd" data-site-fold="'+esc(r.id)+'" aria-expanded="false">'
+        +   '<span class="asb-seq">'+esc(siteLabel(r))+'</span>'
+        +   '<span class="asb-t">'+esc(r.title||"(공사명 없음)")+(hot?" "+chip:"")+'</span>'
+        +   '<span class="asb-end">'+esc(r.end||"기간 미상")+'</span>'
+        +   '<span class="sec-caret">▾</span>'
+        + '</button>'
+        + '<div class="asb-bd" id="siteBd-'+esc(r.id)+'" style="display:none;">'
+        + '<div class="jw-sheet-wrap"><table class="jw-sheet">'
+        + sheetRow("종류·상태", esc(SITE_KIND[k])+" · "+esc(ASB_STATUS[r.status]||"예정"))
+        + sheetRow("발주처", esc(r.client||"—"))
+        + sheetRow("소재지", r.site?esc(r.site):"<b>미입력</b>", r.site?"":"warn")
+        + sheetRow("기간", '<span class="num">'+esc(r.start||"?")+" ~ "+esc(r.end||"?")+'</span>')
+        + (k==="asbestos" ? sheetRow("자재·면적", esc(r.material||"—")+(r.area?' · <span class="num">'+esc(r.area)+'㎡</span>':"")) : "")
+        + (k==="asbestos" && isDate(due) && r.status!=="done" ? sheetRow("작업신고 마감", '<span class="num">'+esc(due)+'</span> (착수 7일 전)', "warn") : "")
+        + sheetRow("참여 근로자",
+            (names.length ? '<b class="num">'+names.length+'명</b> · '+esc(names.join(", ")) : "<b>미지정</b>")
+            + (can ? ' <button class="mini-btn" data-site-wk="'+esc(r.id)+'" style="margin-left:6px;">근로자 추가</button>' : ""),
+            names.length?"":"warn")
+        + (function(){ var m=(r.status==="done")?[]:asbNoSpecial(r);
+             return m.length ? sheetRow("특별교육", '<b>미이수 '+m.length+'명</b> — '+esc(m.join(", "))+' (배치 전 이수 필요)', "warn") : ""; })()
+        + (k==="asbestos" && r.conc ? sheetRow("공기 중 농도", '<span class="num">'+esc(r.conc)+'</span> 개/㎤') : "")
+        + (k==="asbestos" && r.waste_no ? sheetRow("폐기물 인계번호", esc(r.waste_no)) : "")
+        + (ks.no ? sheetRow("키스콘 신고", '<span class="num">'+esc(ks.no)+'</span> · '+esc(ks.year)+'년 · '+esc(ks.biz)) : "")
+        + (ks.amount ? sheetRow("계약액", '<span class="num">'+fmtAmount(ks.amount)+'원</span>'+(ks.done_amount?' · 기성 <span class="num">'+fmtAmount(ks.done_amount)+'원</span>':"")) : "")
+        + (ks.approve ? sheetRow("발주자 승인", esc(ks.approve), (String(ks.approve).indexOf("취소")>=0?"warn":"")) : "")
+        + (asbKeepUntil(r) ? sheetRow("기록 보존 만료", '<span class="num">'+esc(asbKeepUntil(r))+'</span>') : "")
+        + (r.note ? sheetRow("메모", esc(r.note).replace(/\n/g,"<br>")) : "")
+        + '</table></div>'
+        + (can ? '<button class="link-btn" data-asb-edit="'+esc(r.id)+'" style="text-align:left;width:auto;padding:2px 0 0;">수정</button>' : "")
+        + '</div></div>';
+    });
+    host.innerHTML=html;
+    Array.prototype.forEach.call(host.querySelectorAll("[data-asb-edit]"), function(b){
+      b.addEventListener("click", function(){ openAsb(b.getAttribute("data-asb-edit")); });
+    });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-site-wk]"), function(b){
+      b.addEventListener("click", function(e){ e.stopPropagation(); openSiteWorkers(b.getAttribute("data-site-wk")); });
+    });
+    bindFold(host, "data-site-fold", "siteBd-");
+  }
+  // 참여 근로자 추가 — 명부에서 고르고, 없으면 그 자리에서 등재한다(인사 탭까지 갔다 오지 않게).
+  var swSiteId=null, swQ="";
+  function openSiteWorkers(id){
+    swSiteId=id; swQ="";
+    var r=findAsb(id); if(!r) return;
+    document.getElementById("swSub").textContent = siteLabel(r)+" · "+(r.title||"");
+    document.getElementById("swSearch").value="";
+    document.getElementById("swNewName").value="";
+    renderSwList();
+    document.getElementById("swBackdrop").classList.add("show");
+  }
+  function renderSwList(){
+    var host=document.getElementById("swList"); if(!host) return;
+    var r=swSiteId?findAsb(swSiteId):null, sel=asList(r&&r.worker_ids);
+    var q=swQ.trim().toLowerCase();
+    var list=sortedWorkers().filter(function(w){ return !q || (w.name||"").toLowerCase().indexOf(q)>=0; });
+    if(!list.length){ host.innerHTML='<div class="empty-line">명부에 사람이 없습니다 — 아래에서 바로 등재하세요.</div>'; return; }
+    host.innerHTML=list.map(function(w){
+      var on=sel.indexOf(w.id)>=0, miss=wkMissing(w);
+      return '<label class="chk"><input type="checkbox" data-sw="'+esc(w.id)+'"'+(on?" checked":"")+'> '
+        + esc(w.name||"")+' <span class="'+(w.role==="반장"?"from-chip":"scope-chip")+'">'+esc(w.role||"인부")+'</span>'
+        + (w.birth?' <span class="num" style="color:var(--sub);font-size:12px;">'+esc(w.birth)+'</span>':'')
+        + (miss.length?' <span class="need-chip">'+esc(miss.join("·"))+' 필요</span>':'')
+        + '</label>';
+    }).join("");
+  }
+  function swChecked(){
+    var out=[];
+    Array.prototype.forEach.call(document.querySelectorAll("#swList [data-sw]"), function(el){
+      if(el.checked) out.push(el.getAttribute("data-sw"));
+    });
+    return out;
   }
   function renderAsb(){
     var host=document.getElementById("asbList"); if(!host) return;
@@ -17399,7 +17582,7 @@
   // 기본 숨김 모듈 — 서버 gw-data.js의 PERM_CLOSED와 **같은 집합**이어야 한다(uismoke가 두 곳을 대조).
   // v339(9/10): lic 추가 — PM "인허가 석면은 운영 및 관리부만". 아울러 이 함수는 promo가, 아래 pmVal은 hr가
   // 빠져 있어 서버와 집합이 서로 달랐다(홍보 탭이 열린 것처럼 보이는데 서버가 막는 식). 한 곳으로 모은다.
-  var PERM_CLOSED = { quote: 1, promo: 1, hr: 1, lic: 1 };
+  var PERM_CLOSED = { quote: 1, promo: 1, hr: 1, lic: 1, site: 1 };
   function permOf(mod){
     var m = curMember();
     if (!m) return "hide";
@@ -18075,7 +18258,7 @@
     hrOpenId = null;
   }
 
-  var MOD_LABEL = {tasks:"지시", veh:"차량", rec:"기성·수금", lic:"인허가", check:"주기 체크", con:"계약", cli:"거래처", doc:"문서함", bid:"입찰", wk:"일용직", quote:"견적서", promo:"홍보"};   // check 권한은 주기 체크리스트 영역만 제어(내게 온 지시·내 할 일은 전원) — 탭 이름(내 업무)과 구분
+  var MOD_LABEL = {tasks:"지시", veh:"차량", rec:"기성·수금", lic:"인허가", site:"현장", check:"주기 체크", con:"계약", cli:"거래처", doc:"문서함", bid:"입찰", wk:"일용직", quote:"견적서", promo:"홍보"};   // check 권한은 주기 체크리스트 영역만 제어(내게 온 지시·내 할 일은 전원) — 탭 이름(내 업무)과 구분
   // ---- 감사 로그 뷰어(관리자 전용, 서버 기록 열람) ----
   var AUDIT_COL_LABEL = {tasks:"지시", vehicles:"차량", receivables:"기성", licenses:"인허가", checklist:"업무", documents:"문서함", clients:"거래처", contracts:"계약", leaves:"휴가", family:"가족친화", member:"회원", login:"로그인", progress:"진척도"};
   var AUDIT_FIELD_LABEL = {status:"상태", title:"제목", who:"담당", who_id:"담당", due:"기한", amount:"금액", paid:"입금", del:"삭제", scope:"공개범위", stage:"단계", cancel_req:"취소요청", name:"이름", role:"직책", rank:"직급", dept:"부서", admin:"관리자", perms:"권한", hire_date:"입사일", leave_date:"퇴사일", seq:"연번", annual_base:"잔여연차기준", annual_base_date:"기준일", annual_days:"연차수동", loa_days:"휴직누적", on_loa:"휴직중", loa_start:"휴직시작", loa_end:"휴직종료", annual_paid:"연차수당포함", emp_type:"고용형태", birth:"생년월일", annual_basis:"연차기준", reason:"사유", approver:"승인자", done_by:"완료자", detail:"상세", recur:"반복", hl:"하이라이트", mismatch:"불일치", PIN:"PIN", tier:"관리자등급", deleted_at:"삭제일", deleted_by:"삭제자", restored_at:"복구일", restored_by:"복구자"};
@@ -18126,7 +18309,7 @@
   }
   // 권한관리(별도 화면) — 매트릭스 표(S2-C, PM 지시): 셀 클릭마다 수행→보기→숨김 순환, 사람 단위 디바운스 자동 저장.
   // 구 아코디언(사람 펼침 → 드롭다운 → 저장 버튼)은 클릭 수가 많아 폐기 — 시안 표와 형태 일치.
-  var PERM_ORDER = ["tasks","rec","cli","con","quote","promo","veh","lic","doc","check","wk"];   // MODULES와 반드시 일치(uismoke가 검사) — wk·promo 누락 사고 2회
+  var PERM_ORDER = ["tasks","rec","cli","con","quote","promo","veh","lic","site","doc","check","wk"];   // MODULES와 반드시 일치(uismoke가 검사) — wk·promo 누락 사고 2회
   function pmVal(m, mod){ return (m.perms && m.perms[mod]) || (PERM_CLOSED[mod] ? "hide" : "view"); }   // 표시·순환 기본값 = permOf와 동일 집합(PERM_CLOSED 한 곳)
   var PM_TXT = { do: "수행", view: "보기", hide: "숨김" };
   var PM_NEXT = { do: "view", view: "hide", hide: "do" };

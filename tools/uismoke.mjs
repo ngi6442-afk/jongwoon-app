@@ -1067,8 +1067,8 @@ try {
   const keys = (src, re) => [...((src.match(re) || ['', ''])[1]).matchAll(/(\w+)\s*:/g)].map((m) => m[1]).sort();
   const appC = keys(html, /var PERM_CLOSED = \{([^}]+)\}/);
   const svrC = keys(gwd, /const PERM_CLOSED = \{([^}]+)\}/);
-  T('기본 숨김 집합(PERM_CLOSED) 앱↔서버 일치 + lic 포함(인허가·석면=관리부·운영부만)',
-    appC.length === 4 && same(appC, svrC) && appC.indexOf('lic') >= 0,
+  T('기본 숨김 집합(PERM_CLOSED) 앱↔서버 일치 + lic·site 포함(인허가=면허 · site=현장 대장, 둘 다 관리부·운영부만)',
+    appC.length === 5 && same(appC, svrC) && appC.indexOf('lic') >= 0 && appC.indexOf('site') >= 0,
     '앱 [' + appC.join(',') + '] / 서버 [' + svrC.join(',') + ']');
   T('앱 permOf·pmVal 둘 다 PERM_CLOSED를 쓴다(집합이 함수마다 따로 놀지 않게)',
     /return \(m\.perms && m\.perms\[mod\]\) \|\| \(PERM_CLOSED\[mod\] \? "hide" : "view"\);/.test(html)

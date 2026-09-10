@@ -1641,7 +1641,7 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   };
   const tokSoo = issueSession(mem.gw_users['member:usoo']).token;   // 관리자(비개발자) = 나수진 자리
   const tokDev = issueSession(mem.gw_users['member:udev']).token;
-  const PRESET_WORKER = { tasks: 'do', veh: 'view', rec: 'view', lic: 'view', check: 'do', con: 'view', cli: 'view', doc: 'view', wk: 'view', quote: 'hide', promo: 'hide' };
+  const PRESET_WORKER = { tasks: 'do', veh: 'view', rec: 'view', lic: 'view', site: 'hide', check: 'do', con: 'view', cli: 'view', doc: 'view', wk: 'view', quote: 'hide', promo: 'hide' };
   let r34 = await callA34({ action: 'member_upsert', name: '새직원', role: '직원', rank: '사원', dept: '폐기물팀', pin: '1234', hire_date: '2026-09-08', emp_type: '계약직' }, tokSoo);
   const made = Object.values(mem.gw_users).find((x) => x && x.name === '새직원');
   T('관리자(비개발자)가 직원 등록 → 200 · admin false · dev 없음 · 계약직 저장', r34.code === 200 && !!made && made.admin === false && made.dev === undefined && made.role === '직원' && made.emp_type === '계약직', r34.code + '/' + r34.body.error_code);
