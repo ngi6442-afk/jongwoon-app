@@ -735,6 +735,9 @@
   .jw-sheet td.num{font-variant-numeric:tabular-nums;}
   .jw-sheet tr.wide th{width:auto;}
   .jw-sheet td.warn{background:#FBF3DF;color:#7a5b12;}
+  /* 미입력 표시(v345) — 저장은 막지 않고 빠진 것만 눈에 보이게 한다(PM 2026-09-10) */
+  .need-chip{display:inline-block;background:#FBF3DF;border:1px solid #E5D3A4;color:#7a5b12;
+    border-radius:6px;padding:0 6px;font-size:11px;font-weight:700;white-space:nowrap;}
   .jw-sheet-wrap{overflow-x:auto;margin:2px 0 8px;}   /* 넘치면 표만 굴러간다 — 본문은 가로로 안 밀린다 */
   .asb-hd{display:flex;align-items:center;gap:8px;width:100%;background:transparent;border:none;
     padding:11px 4px;cursor:pointer;text-align:left;font-size:14px;color:var(--text);
@@ -1562,9 +1565,10 @@
     <h3 id="wkModalTitle">일용직 추가</h3>
     <input type="text" id="wkName" placeholder="이름" autocomplete="off">
     <input type="text" id="wkBirth" placeholder="생년월일 (예: 81.08.17)" autocomplete="off">
+    <div class="hw-note" id="wkNeedNote" style="display:none;"></div>
     <span class="fld-label">직책</span>
     <select id="wkRole"><option value="반장">반장</option><option value="인부" selected>인부</option></select>
-    <input type="text" id="wkPhone" placeholder="연락처 (선택)" autocomplete="off">
+    <input type="text" id="wkPhone" placeholder="연락처" autocomplete="off">
     <span class="fld-label">건강진단일 (선택)</span>
     <input type="date" id="wkExam">
     <input type="text" id="wkNote" placeholder="비고 (선택 — 교육이수 등)" autocomplete="off">
@@ -7845,11 +7849,21 @@
     },1200);
   }
   function wkLabel(w){ return (w.name||"")+(w.birth?"("+w.birth+")":""); }
+  // v345: 일용직에서 아직 안 채워진 항목. 저장을 막지는 않고 표시만 한다.
+  //   석면 대장이 산안법 30년 보존이라 근로자 인적사항이 결국 필요하다 — 빠진 것이 보여야 채워진다.
+  function wkMissing(w){
+    var m=[];
+    if(!(w&&String(w.birth||"").trim())) m.push("생년월일");
+    if(!(w&&String(w.phone||"").trim())) m.push("연락처");
+    return m;
+  }
   function findWk(id){ for(var i=0;i<workers.length;i++){ if(workers[i].id===id) return workers[i]; } return null; }
   function renderWorkers(){
     var host=document.getElementById("wkList"); if(!host) return;
     var list=sortedWorkers();
-    var head=document.getElementById("wkHead"); if(head) head.textContent=list.length?(list.length+"명"):"";
+    var need=0; list.forEach(function(w){ if(wkMissing(w).length) need++; });
+    var head=document.getElementById("wkHead");
+    if(head) head.textContent=list.length?(list.length+"명"+(need?" · 인적사항 미입력 "+need+"명":"")):"";
     var can=canDo("wk");
     var addBtn=document.getElementById("wkAddBtn"); if(addBtn) addBtn.style.display=can?"block":"none";
     // v343: 석면 대장과 같은 모양 — 한 줄은 이름·역할·생년월일, 내용은 펴서 표로(PM 2026-09-10).
@@ -7859,14 +7873,14 @@
         +'<button type="button" class="asb-hd" data-wk-fold="'+esc(w.id)+'" aria-expanded="false">'
         +  '<span class="asb-seq">'+(w.role==="반장"?'<span class="from-chip">반장</span>':'인부')+'</span>'
         +  '<span class="asb-t">'+esc(w.name||"(이름 없음)")+'</span>'
-        +  '<span class="asb-end num">'+esc(w.birth||"")+'</span>'
+        +  '<span class="asb-end num">'+(w.birth?esc(w.birth):'<span class="need-chip">인적사항 필요</span>')+'</span>'
         +  '<span class="sec-caret">▾</span>'
         +'</button>'
         +'<div class="asb-bd" id="wkBd-'+esc(w.id)+'" style="display:none;">'
         +  '<div class="jw-sheet-wrap"><table class="jw-sheet">'
-        +  sheetRow("생년월일", w.birth?'<span class="num">'+esc(w.birth)+'</span>':"—")
+        +  sheetRow("생년월일", w.birth?'<span class="num">'+esc(w.birth)+'</span>':"<b>미입력</b> — 석면 대장(30년 보존)에 들어가는 항목입니다", w.birth?"":"warn")
         +  sheetRow("역할", esc(w.role||"인부"))
-        +  sheetRow("연락처", w.phone?'<span class="num">'+esc(w.phone)+'</span>':"—")
+        +  sheetRow("연락처", w.phone?'<span class="num">'+esc(w.phone)+'</span>':"<b>미입력</b>", w.phone?"":"warn")
         +  sheetRow("검진", w.exam?'<span class="num">'+esc(w.exam)+'</span>':"—")
         +  sheetRow("메모", w.note?esc(w.note):"—")
         +  '</table></div>'
@@ -7889,6 +7903,14 @@
     document.getElementById("wkExam").value=(w&&isDate(w.exam))?w.exam:"";
     document.getElementById("wkNote").value=w?(w.note||""):"";
     document.getElementById("wkDelete").style.display=w?"block":"none";
+    // v345: 빠진 항목을 열 때 미리 알린다. 저장은 그래도 된다 — 막지 않는다.
+    var note=document.getElementById("wkNeedNote"), miss=w?wkMissing(w):["생년월일","연락처"];
+    if(note){
+      note.style.display = miss.length ? "" : "none";
+      note.innerHTML = miss.length
+        ? ("아직 안 넣은 항목: <b>"+miss.join(" · ")+"</b>. 지금 비워 둬도 저장은 됩니다 — 석면 대장(산안법 30년 보존)에 들어가는 항목이라 나중에 채워 주세요.")
+        : "";
+    }
     document.getElementById("wkBackdrop").classList.add("show");
   }
   (function(){
@@ -7905,6 +7927,9 @@
       w.updated=todayStr();
       $("wkBackdrop").classList.remove("show"); wkEditId=null;
       scheduleWorkersSave(); renderWorkers(); renderXgWorkers();
+      // 저장은 됐다. 빠진 것이 있으면 그 사실만 한 줄로 알린다(실패가 아니다 — 성공 문구 원칙 v337과 같은 결).
+      var miss=wkMissing(w);
+      try{ gwToast(miss.length ? ("저장했습니다 — "+miss.join("·")+" 미입력") : "저장했습니다"); }catch(e){}
     });
     $("wkDelete").addEventListener("click",function(){
       var w=wkEditId?findWk(wkEditId):null; if(!w) return;
