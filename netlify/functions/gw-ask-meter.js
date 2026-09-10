@@ -145,6 +145,42 @@ const TOOLS = [
       .map((t) => ({ 제목: t.title, 기한: t.due, 상태: t.status })) },
 ];
 
+// 실측 질문 30개 — 실제 업무에서 뽑았다(공무 배차·만기 7 · 계약 4 · 인허가 3 · 석면 6 · 거래처 3 · 입찰 4 · 문서함 2 · 내 지시 1).
+// 종전엔 브라우저가 들고 한 문항씩 돌렸는데, 폰 화면이 꺼지면 브라우저가 멈춰 4문항에서 끊겼다(2026-09-10 실측).
+// 그래서 목록을 서버로 옮기고 백그라운드 함수가 끝까지 돈다.
+const METER_Q = [
+  '84수6457 검사 언제까지야',
+  '검사만기 30일 안 남은 차 몇 대야',
+  '보험 만기 지난 차 있어?',
+  '지입차 몇 대야',
+  '환경 허가 차량하고 건설 허가 차량 각각 몇 대야',
+  '암롤차 기사 누구야',
+  '휴차 중인 차 알려줘',
+  '지금 진행 중인 계약 뭐 있어',
+  '포항시 발주 계약 있어?',
+  '계약금액 제일 큰 건 뭐야',
+  '준설 계약 몇 건이야',
+  '인허가 만기 60일 안 남은 거 알려줘',
+  '폐기물 수집운반업 허가 만기 언제야',
+  '우리 면허 몇 개야',
+  '작년에 석면 현장 몇 건 했어',
+  '석면 800제곱미터 넘는 현장 알려줘',
+  '남성초 석면 공사 언제 했어',
+  '슬레이트 철거 현장 최근 것 5개',
+  '2024년 석면 현장 다 알려줘',
+  '석면 현장 중에 포항 아닌 데 있어?',
+  '포스코 거래처 연락처 알려줘',
+  '거래처 몇 곳이야',
+  '그린바이로 담당자 누구야',
+  '오늘 마감 안 지난 입찰 몇 건이야',
+  '적격심사 입찰 중에 하한율 못 읽은 거 몇 건이야',
+  '경북 지역 입찰 알려줘',
+  '기초금액 5억 넘는 공고 있어?',
+  '문서함에서 취업규칙 찾아줘',
+  '안전보건 관련 문서 뭐 있어',
+  '내게 온 지시 뭐 있어',
+];
+
 const SYSTEM = [
   '너는 종운환경(폐기물·준설)·종운건설(철거·석면)의 사내 그룹웨어 안에서 직원 질문에 답한다.',
   '규칙:',
@@ -212,6 +248,25 @@ async function ask(question, member) {
   return { answer, turns, in: inTok, out: outTok, tools: used, tool_count: tools.length };
 }
 
+// 측정값을 서버에 남긴다 — 종전엔 브라우저 화면에만 있어 창을 닫으면 사라졌다(2026-09-10 실사고).
+async function saveRow(row, r) {
+  try {
+    const prev = await blobGet(store(DATA), 'meter:cost');
+    const doc = (prev.ok && prev.data && Array.isArray(prev.data.rows)) ? prev.data : { schema: 1, rows: [] };
+    doc.rows.push({ ts: row.ts, who: row.who, q: row.q, turns: r.turns || 0, in: r.in || 0, out: r.out || 0,
+                    ms: row.ms, tools: (r.tools || []).map((t) => t.name + '(' + t.rows + ')').join(' '),
+                    err: r.error || '', answer: String(r.answer || '').slice(0, 400) });
+    doc.rows = doc.rows.slice(-300);
+    doc.updated_at = Date.now();
+    await blobSet(store(DATA), 'meter:cost', doc);
+  } catch (e) { /* 기록 실패가 측정 자체를 막지는 않는다 */ }
+}
+
+module.exports.METER_Q = METER_Q;
+module.exports.ask = ask;
+module.exports.saveRow = saveRow;
+module.exports.currentMember = currentMember;
+
 exports.handler = async function (event) {
   const R = rid();
   if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: CORS, body: '' };
@@ -236,17 +291,6 @@ exports.handler = async function (event) {
   const t0 = Date.now();
   const r = await ask(q, member);
   const row = Object.assign({ ok: !r.error, q, who: member.name, ms: Date.now() - t0, ts: Date.now() }, r);
-  // 측정값을 서버에 남긴다 — 종전엔 브라우저 화면에만 있어서 창을 닫으면 사라졌다(2026-09-10 실사고).
-  // 결과를 사람이 옮겨 적지 않아도 되게 원장 옆에 쌓아 둔다(측정이 끝나면 계측기와 함께 지운다).
-  try {
-    const prev = await blobGet(store(DATA), 'meter:cost');
-    const doc = (prev.ok && prev.data && Array.isArray(prev.data.rows)) ? prev.data : { schema: 1, rows: [] };
-    doc.rows.push({ ts: row.ts, who: row.who, q: row.q, turns: r.turns || 0, in: r.in || 0, out: r.out || 0,
-                    ms: row.ms, tools: (r.tools || []).map((t) => t.name + '(' + t.rows + ')').join(' '),
-                    err: r.error || '', answer: String(r.answer || '').slice(0, 400) });
-    doc.rows = doc.rows.slice(-300);
-    doc.updated_at = Date.now();
-    await blobSet(store(DATA), 'meter:cost', doc);
-  } catch (e) { /* 측정 기록 실패가 측정 자체를 막지는 않는다 */ }
+  await saveRow(row, r);
   return jr(200, row);
 };

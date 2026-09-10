@@ -5198,7 +5198,44 @@
     "안전보건 관련 문서 뭐 있어",
     "내게 온 지시 뭐 있어"
   ];
+  // v346: 서버가 끝까지 돌린다. 종전엔 브라우저가 한 문항씩 돌려서 폰 화면이 꺼지면 4문항에서 멈췄다.
   function meterRun(){
+    var btn=document.getElementById("meterRunBtn"), out=document.getElementById("meterOut");
+    if(!btn||!out) return;
+    btn.disabled=true; btn.textContent="⏳ 서버에서 도는 중 — 화면 꺼도 됩니다"; out.style.display="";
+    gwCall("gw-ask-meter-background",{}).then(function(){ meterPoll(); }).catch(function(){ meterPoll(); });
+  }
+  function meterFmt(d){
+    var rows=(d&&d.rows)||[], run=(d&&d.run)||{};
+    var ok=rows.filter(function(r){ return !r.err; });
+    var tIn=0,tOut=0,tMs=0,tT=0;
+    ok.forEach(function(r){ tIn+=r["in"]||0; tOut+=r.out||0; tMs+=r.ms||0; tT+=r.turns||0; });
+    var n=ok.length||1;
+    var h='<div style="padding:10px 12px;font-size:13px;">'
+      + '<b>'+(run.state==="done"?"실측 끝":(run.state==="no_api_key"?"API 키 없음":"도는 중"))+'</b> — '
+      + (run.done||rows.length)+' / '+(run.total||30)+'문항'
+      + ' · 입력 '+tIn.toLocaleString()+' · 출력 '+tOut.toLocaleString()+' 토큰'
+      + '<br>1문항 평균 — 입력 <b>'+Math.round(tIn/n).toLocaleString()+'</b> · 출력 <b>'+Math.round(tOut/n).toLocaleString()+'</b> 토큰 · 왕복 '+(Math.round(tT/n*10)/10)+' · '+(Math.round(tMs/n/100)/10)+'초</div>'
+      + '<div class="jw-sheet-wrap"><table class="jw-sheet"><tr><th style="width:auto;">질문</th><th style="width:52px;">왕복</th><th style="width:64px;">입력</th><th style="width:58px;">출력</th><th style="width:52px;">초</th><th style="width:auto;">쓴 도구</th></tr>';
+    rows.forEach(function(r){
+      h+='<tr><td>'+esc(r.q)+(r.err?'<br><span style="color:#B0332A;">'+esc(r.err)+'</span>':'')+'</td>'
+        +'<td class="num">'+(r.turns||0)+'</td><td class="num">'+((r["in"]||0)).toLocaleString()+'</td>'
+        +'<td class="num">'+((r.out||0)).toLocaleString()+'</td><td class="num">'+(Math.round((r.ms||0)/100)/10)+'</td>'
+        +'<td>'+esc(r.tools||"")+'</td></tr>';
+    });
+    return h+'</table></div>';
+  }
+  function meterPoll(){
+    var btn=document.getElementById("meterRunBtn"), out=document.getElementById("meterOut");
+    gwCall("gw-data",{action:"meter"}).then(function(res){
+      var d=(res.body&&res.body.doc)||null;
+      if(out&&d) out.innerHTML=meterFmt(d);
+      var run=(d&&d.run)||{};
+      if(run.state==="done"||run.state==="no_api_key"){ if(btn){ btn.disabled=false; btn.textContent="▶ 다시 실측"; } return; }
+      setTimeout(meterPoll, 6000);
+    }).catch(function(){ setTimeout(meterPoll, 8000); });
+  }
+  function meterRunOld(){
     var btn=document.getElementById("meterRunBtn"), out=document.getElementById("meterOut");
     if(!btn||!out) return;
     btn.disabled=true; out.style.display="";
@@ -5675,7 +5712,7 @@
     if(bd) bd.addEventListener("click", function(e){ if(e.target===this){ vehInsPending=null; bd.classList.remove("show"); } });
   })();
 
-  (function(){ var mb=document.getElementById("meterRunBtn"); if(mb) mb.addEventListener("click", meterRun); })();
+  (function(){ var mb=document.getElementById("meterRunBtn"); if(mb){ mb.addEventListener("click", meterRun); meterPoll(); } })();
   document.getElementById("licAddBtn").addEventListener("click", function(){ openLicModal(null); });
   // v338: 섹션 접기. 목록이 길어 폰에서 아래 섹션까지 손이 안 닿던 것 — 접힌 상태는 이 기기에만 남는다.
   function bindSecFold(btnId, bodyId, key){

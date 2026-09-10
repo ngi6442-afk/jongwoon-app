@@ -2454,6 +2454,14 @@ async function handler(event) {
   let d;
   try { d = JSON.parse(event.body || '{}'); } catch { return jr(400, { status: 'REJECTED', error_code: 'INVALID_JSON', request_id: R }); }
   try {
+    // 비용 실측 결과 조회(임시, 2026-09-10) — 관리자 전용. 계측기를 지울 때 이 분기도 함께 지운다.
+    if (d && d.action === 'meter') {
+      const cm = await currentMember(event);
+      if (!cm.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: cm.reason, request_id: R });
+      if (!cm.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
+      const mr = await blobGet(store(DATA), 'meter:cost');
+      return jr(200, { status: 'OK', doc: (mr.ok && mr.data) ? mr.data : { schema: 1, rows: [] }, request_id: R });
+    }
     if (d && d.action === 'get') return await handleGet(event, d, R);
     if (d && d.action === 'save') return await handleSave(event, d, R);
     if (d && d.action === 'audit') return await handleAudit(event, d, R);
