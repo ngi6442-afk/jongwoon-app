@@ -847,7 +847,7 @@ try {
       'function liveEdu(){ return edu.filter(function(r){ return r && r.del!==1; }); }',
       fnSrc('eduLatest'), fnSrc('eduHasValidSpecial'), ASB_STATUS_SRC,
       fnSrc('liveAsb'), fnSrc('normAsbRow'), fnSrc('asbNotifyDue'), fnSrc('asbKeepUntil'),
-      fnSrc('asbWorkerNames'), fnSrc('asbNoSpecial'), fnSrc('renderAsb'),
+      fnSrc('asbWorkerNames'), fnSrc('asbNoSpecial'), fnSrc('sheetRow'), fnSrc('bindFold'), fnSrc('renderAsb'),
       'return { renderAsb: renderAsb, normAsbRow: normAsbRow, asList: asList };',
     ].join('\n'))(items, DOM);
     return { api, DOM };
@@ -999,7 +999,7 @@ try {
       'function liveEdu(){ return edu.filter(function(r){ return r && r.del!==1; }); }',
       fnSrc('eduLatest'), fnSrc('eduHasValidSpecial'), ASB_STATUS_SRC,
       fnSrc('liveAsb'), fnSrc('normAsbRow'), fnSrc('asbNotifyDue'), fnSrc('asbKeepUntil'),
-      fnSrc('asbWorkerNames'), fnSrc('asbNoSpecial'), fnSrc('renderAsb'),
+      fnSrc('asbWorkerNames'), fnSrc('asbNoSpecial'), fnSrc('sheetRow'), fnSrc('bindFold'), fnSrc('renderAsb'),
       'return { renderAsb: renderAsb };',
     ].join('\n'))([
       { id: 's1', title: '정상 문자열', start: '2026-05-01', end: '2026-05-10', member_ids: [], worker_ids: [] },

@@ -723,8 +723,19 @@
   .todo-due-in{font-size:12px;padding:3px 6px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);max-width:132px;}
   #myTodoDue{flex:0 0 auto;width:138px;min-width:0;}
   .hr-dept{margin-bottom:14px;}
-  /* 석면 대장 접기(v342, PM 2026-09-10) — 한 줄은 연번·공사명·완료일만. 나머지는 펴서 본다.
-     목록이 131건이고 투입 근로자가 최대 22명이라 한 줄에 펴 놓으면 이름이 잘렸다. */
+  /* 접기 줄 + 엑셀형 표(v342·v343, PM 2026-09-10) — 석면·일용직·거래처가 같이 쓴다.
+     한 줄에는 식별에 필요한 것만 두고, 내용은 펴서 운반일지와 같은 격자 표로 본다.
+     ".asb-*"는 석면이 먼저 쓰던 이름이고 v343에서 세 목록 공용이 됐다(이름은 그대로 둔다 — 쓰는 곳이 많다). */
+  /* 엑셀형 표 — 운반일지(.ab-sheet)와 같은 격자·같은 머리색. 항목/내용 2열이 기본이고 전폭 행도 쓴다. */
+  .jw-sheet{width:100%;border-collapse:collapse;table-layout:fixed;font-size:12.5px;line-height:1.45;}
+  .jw-sheet th,.jw-sheet td{border:1px solid var(--line);padding:5px 7px;vertical-align:top;
+    word-break:keep-all;overflow-wrap:anywhere;}
+  .jw-sheet th{background:#EFF5F2;font-weight:700;color:var(--sub);text-align:left;width:86px;white-space:nowrap;}
+  .jw-sheet td{background:var(--surface,#fff);}
+  .jw-sheet td.num{font-variant-numeric:tabular-nums;}
+  .jw-sheet tr.wide th{width:auto;}
+  .jw-sheet td.warn{background:#FBF3DF;color:#7a5b12;}
+  .jw-sheet-wrap{overflow-x:auto;margin:2px 0 8px;}   /* 넘치면 표만 굴러간다 — 본문은 가로로 안 밀린다 */
   .asb-hd{display:flex;align-items:center;gap:8px;width:100%;background:transparent;border:none;
     padding:11px 4px;cursor:pointer;text-align:left;font-size:14px;color:var(--text);
     border-bottom:1px solid var(--line);}
@@ -7765,14 +7776,31 @@
     var head=document.getElementById("wkHead"); if(head) head.textContent=list.length?(list.length+"명"):"";
     var can=canDo("wk");
     var addBtn=document.getElementById("wkAddBtn"); if(addBtn) addBtn.style.display=can?"block":"none";
+    // v343: 석면 대장과 같은 모양 — 한 줄은 이름·역할·생년월일, 내용은 펴서 표로(PM 2026-09-10).
+    //   123명이라 한 줄에 펴 놓으면 메모가 잘린다(석면에서 이름이 잘린 것과 같은 문제).
     host.innerHTML=list.length?list.map(function(w){
-      return '<div class="item"><div class="item-body"><div class="item-title">'+esc(w.name||"")+' <span class="'+(w.role==="반장"?"from-chip":"scope-chip")+'">'+esc(w.role||"인부")+'</span></div>'
-        +'<div class="item-meta">'+(w.birth?'<span>'+esc(w.birth)+'</span>':'')+(w.phone?'<span>'+esc(w.phone)+'</span>':'')+(w.exam?'<span>검진 '+esc(w.exam)+'</span>':'')+(w.note?'<span>'+esc(w.note)+'</span>':'')+'</div></div>'
-        +(can?'<div class="task-ctrl"><button class="mini-btn" data-wk-edit="'+w.id+'">수정</button></div>':'')+'</div>';
+      return '<div class="item asb-item" style="display:block;padding:0;">'
+        +'<button type="button" class="asb-hd" data-wk-fold="'+esc(w.id)+'" aria-expanded="false">'
+        +  '<span class="asb-seq">'+(w.role==="반장"?'<span class="from-chip">반장</span>':'인부')+'</span>'
+        +  '<span class="asb-t">'+esc(w.name||"(이름 없음)")+'</span>'
+        +  '<span class="asb-end num">'+esc(w.birth||"")+'</span>'
+        +  '<span class="sec-caret">▾</span>'
+        +'</button>'
+        +'<div class="asb-bd" id="wkBd-'+esc(w.id)+'" style="display:none;">'
+        +  '<div class="jw-sheet-wrap"><table class="jw-sheet">'
+        +  sheetRow("생년월일", w.birth?'<span class="num">'+esc(w.birth)+'</span>':"—")
+        +  sheetRow("역할", esc(w.role||"인부"))
+        +  sheetRow("연락처", w.phone?'<span class="num">'+esc(w.phone)+'</span>':"—")
+        +  sheetRow("검진", w.exam?'<span class="num">'+esc(w.exam)+'</span>':"—")
+        +  sheetRow("메모", w.note?esc(w.note):"—")
+        +  '</table></div>'
+        +  (can?'<button class="link-btn" data-wk-edit="'+esc(w.id)+'" style="text-align:left;width:auto;padding:2px 0 0;">수정</button>':'')
+        +'</div></div>';
     }).join(""):'<div class="empty-line">등록된 일용직이 없습니다.</div>';
     Array.prototype.forEach.call(host.querySelectorAll("[data-wk-edit]"),function(el){
       el.addEventListener("click",function(){ openWkModal(el.getAttribute("data-wk-edit")); });
     });
+    bindFold(host, "data-wk-fold", "wkBd-");
   }
   function openWkModal(id){
     wkEditId=id||null;
@@ -9943,6 +9971,25 @@
     });
     return out.filter(Boolean);
   }
+  // 접기 줄 배선(v343 공용) — 펼침은 화면 안에서만 산다(저장하지 않는다). 목록을 다시 그리면 도로 접힌다.
+  // querySelectorAll의 forEach는 구형 브라우저에 없어 Array.prototype.forEach.call로 돈다(앱 전역 규칙).
+  function bindFold(host, attr, idPrefix){
+    if(!host) return;
+    Array.prototype.forEach.call(host.querySelectorAll("["+attr+"]"), function(b){
+      b.addEventListener("click", function(){
+        var bd = document.getElementById(idPrefix + b.getAttribute(attr));
+        if(!bd) return;
+        var open = b.getAttribute("aria-expanded") !== "true";
+        bd.style.display = open ? "" : "none";
+        b.className = open ? "asb-hd open" : "asb-hd";
+        b.setAttribute("aria-expanded", open ? "true" : "false");
+      });
+    });
+  }
+  // 엑셀형 표 한 줄(항목/내용). 세 목록(석면·일용직·거래처)이 같이 쓴다 — 값은 부르는 쪽에서 esc한다.
+  function sheetRow(label, valHtml, cls){
+    return '<tr><th>'+esc(label)+'</th><td'+(cls?' class="'+cls+'"':'')+'>'+(valHtml||"—")+'</td></tr>';
+  }
   function renderAsb(){
     var host=document.getElementById("asbList"); if(!host) return;
     // v336 적대검증(9/10): asList는 member_ids만 못 박았고 정렬은 여전히 start가 문자열이라고 믿고 있었다.
@@ -9967,32 +10014,29 @@
         +   '<span class="sec-caret">▾</span>'
         + '</button>'
         + '<div class="asb-bd" id="asbBd-'+esc(r.id)+'" style="display:none;">'
-        + (hot?"":'<div class="item-sub">'+chip+'</div>')
-        + '<div class="item-sub">'+esc(r.client||"")+(r.site?" · "+esc(r.site):"")+'</div>'
-        + '<div class="item-sub">'+esc(r.start||"?")+" ~ "+esc(r.end||"?")+(r.material?" · "+esc(r.material):"")+(r.area?" · "+esc(r.area)+"㎡":"")+'</div>'
-        + (isDate(due)&&r.status!=="done" ? '<div class="item-sub">작업신고 마감 '+esc(due)+' (착수 7일 전)</div>' : "")
-        + (names.length ? '<div class="item-sub asb-names">투입 '+names.length+'명 · '+esc(names.join(", "))+'</div>' : '<div class="item-sub">투입 근로자 미지정</div>')
-        + (function(){ var m=(r.status==="done") ? [] : asbNoSpecial(r); return m.length ? '<div class="item-sub" style="color:#B3261E;">특별교육 미이수 '+m.length+'명 — '+esc(m.slice(0,4).join(", "))+(m.length>4?" 외":"")+' (배치 전 이수 필요)</div>' : ""; })()
-        + (r.conc ? '<div class="item-sub">농도 '+esc(r.conc)+' 개/㎤</div>' : "")
-        + (asbKeepUntil(r) ? '<div class="item-sub">기록 보존 만료 '+esc(asbKeepUntil(r))+'</div>' : "")
-        + '<button class="link-btn" data-asb-edit="'+esc(r.id)+'" style="text-align:left;width:auto;padding:6px 0 0;">수정</button>'
+        + '<div class="jw-sheet-wrap"><table class="jw-sheet">'
+        + sheetRow("상태", (hot?chip:"")+esc(ASB_STATUS[r.status]||"예정"))
+        + sheetRow("발주처", esc(r.client||"—"))
+        + sheetRow("소재지", esc(r.site||"—"))
+        + sheetRow("작업기간", '<span class="num">'+esc(r.start||"?")+" ~ "+esc(r.end||"?")+'</span>')
+        + sheetRow("자재·면적", esc(r.material||"—")+(r.area?' · <span class="num">'+esc(r.area)+'㎡</span>':""))
+        + (isDate(due)&&r.status!=="done" ? sheetRow("작업신고 마감", '<span class="num">'+esc(due)+'</span> (착수 7일 전)', "warn") : "")
+        + sheetRow("투입 근로자", names.length ? ('<b class="num">'+names.length+'명</b> · '+esc(names.join(", "))) : "미지정")
+        + (function(){ var m=(r.status==="done") ? [] : asbNoSpecial(r);
+             return m.length ? sheetRow("특별교육", '<b>미이수 '+m.length+'명</b> — '+esc(m.join(", "))+' (배치 전 이수 필요)', "warn") : ""; })()
+        + (r.conc ? sheetRow("공기 중 농도", '<span class="num">'+esc(r.conc)+'</span> 개/㎤') : "")
+        + (r.waste_no ? sheetRow("폐기물 인계번호", esc(r.waste_no)) : "")
+        + (asbKeepUntil(r) ? sheetRow("기록 보존 만료", '<span class="num">'+esc(asbKeepUntil(r))+'</span>') : "")
+        + (r.note ? sheetRow("메모", esc(r.note).replace(/\n/g, "<br>")) : "")
+        + '</table></div>'
+        + '<button class="link-btn" data-asb-edit="'+esc(r.id)+'" style="text-align:left;width:auto;padding:2px 0 0;">수정</button>'
         + '</div></div>';
     });
     host.innerHTML=html;
     host.querySelectorAll("[data-asb-edit]").forEach(function(b){
       b.addEventListener("click", function(){ openAsb(b.getAttribute("data-asb-edit")); });
     });
-    // 펼침은 화면 안에서만 산다(저장하지 않는다) — 목록을 다시 그리면 도로 접힌다.
-    host.querySelectorAll("[data-asb-fold]").forEach(function(b){
-      b.addEventListener("click", function(){
-        var bd=document.getElementById("asbBd-"+b.getAttribute("data-asb-fold"));
-        if(!bd) return;
-        var open = b.getAttribute("aria-expanded")!=="true";
-        bd.style.display = open ? "" : "none";
-        b.className = open ? "asb-hd open" : "asb-hd";
-        b.setAttribute("aria-expanded", open?"true":"false");
-      });
-    });
+    bindFold(host, "data-asb-fold", "asbBd-");
   }
   function asbRenderWorkerChecks(sel){
     var host=document.getElementById("asbWorkers"); if(!host) return;
@@ -14319,12 +14363,29 @@
         var un = cliUnpaid(c);
         if (un.length){ var sum = 0; un.forEach(function(r){ sum += (r.amount||0); }); due = '<span class="rec-amt2" style="font-size:14px;">미수 ' + fmtAmount(sum) + '원 · ' + un.length + '건</span>'; }
       }
-      return '<div class="item" data-cli-detail="' + c.id + '" style="cursor:pointer;"><div class="item-body"><div class="item-title">' + esc(c.name || "(상호없음)") + ' <span class="cli-more">상세 ›</span></div>' +
-        (meta.length ? '<div class="item-meta">' + meta.join('') + '</div>' : '') +
-        (due ? '<div class="item-meta" style="margin-top:4px;">' + due + '</div>' : '') +
-        (c.note ? '<div class="task-detail">' + esc(c.note) + '</div>' : '') +
-        '</div>' + (admin ? '<div class="task-ctrl"><button class="mini-btn" data-cli-edit="' + c.id + '">수정</button></div>' : '') + '</div>';
+      // v343: 석면 대장과 같은 모양 — 한 줄은 상호·미수, 내용은 펴서 표로(PM 2026-09-10).
+      //   [상세 ›]는 그대로 둔다 — 미수 낱건·거래 이력은 펼침 표에 담기에 너무 커서 모달이 맞다.
+      var unSum = "";
+      if (seeRec){ var u2 = cliUnpaid(c); if (u2.length){ var s2 = 0; u2.forEach(function(r){ s2 += (r.amount||0); }); unSum = fmtAmount(s2) + '원 · ' + u2.length + '건'; } }
+      return '<div class="item asb-item" style="display:block;padding:0;">'
+        + '<button type="button" class="asb-hd" data-cli-fold="' + esc(c.id) + '" aria-expanded="false">'
+        +   '<span class="asb-t">' + esc(c.name || "(상호없음)") + '</span>'
+        +   (unSum ? '<span class="asb-end num" style="color:#B0332A;">미수 ' + esc(unSum) + '</span>' : '')
+        +   '<span class="sec-caret">▾</span>'
+        + '</button>'
+        + '<div class="asb-bd" id="cliBd-' + esc(c.id) + '" style="display:none;">'
+        +   '<div class="jw-sheet-wrap"><table class="jw-sheet">'
+        +   sheetRow("사업자번호", c.biz_no ? '<span class="num">' + esc(c.biz_no) + '</span>' : "—")
+        +   sheetRow("담당자", esc(c.contact || "—"))
+        +   sheetRow("연락처", c.phone ? '<span class="num">' + esc(c.phone) + '</span>' : "—")
+        +   (seeRec ? sheetRow("미수", unSum ? '<b class="num">' + esc(unSum) + '</b>' : "없음", unSum ? "warn" : "") : "")
+        +   sheetRow("메모", c.note ? esc(c.note) : "—")
+        +   '</table></div>'
+        +   '<button class="link-btn" data-cli-detail="' + esc(c.id) + '" style="text-align:left;width:auto;padding:2px 12px 0 0;">상세 ›</button>'
+        +   (admin ? '<button class="link-btn" data-cli-edit="' + esc(c.id) + '" style="text-align:left;width:auto;padding:2px 0 0;">수정</button>' : '')
+        + '</div></div>';
     }).join("") : '<div class="empty-line">등록된 거래처가 없습니다.</div>';
+    bindFold(host, "data-cli-fold", "cliBd-");
     Array.prototype.forEach.call(host.querySelectorAll("[data-cli-detail]"), function(el){
       el.addEventListener("click", function(){ openCliDetail(el.getAttribute("data-cli-detail")); });
     });
