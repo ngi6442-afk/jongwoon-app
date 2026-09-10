@@ -45,28 +45,28 @@ h2{font-size:13px;margin-bottom:8px}
 
 <div class="view on" id="v-home">
   <h1>진척도</h1><span class="date">2026-09-10 · 클릭=상세</span>
-  <div class="hero">83%<small>큰틀 4개 평균</small></div>
-  <div class="row" onclick="go('v1')"><b>1&nbsp; 업무플랫폼 &nbsp;◀ 배포 주간</b><div class="track"><div class="fillb t" style="width:89%"></div><span>89</span></div></div>
+  <div class="hero">84%<small>큰틀 4개 평균</small></div>
+  <div class="row" onclick="go('v1')"><b>1&nbsp; 업무플랫폼 &nbsp;◀ 배포 주간</b><div class="track"><div class="fillb t" style="width:92%"></div><span>92</span></div></div>
   <div class="row" onclick="go('v2')"><b>2&nbsp; 인증·자격 &nbsp;◀ ★인정 취득</b><div class="track"><div class="fillb" style="width:68%"></div><span>68</span></div></div>
   <div class="row" onclick="go('v3')"><b>3&nbsp; 홍보·검색노출</b><div class="track"><div class="fillb t" style="width:97%"></div><span>97</span></div></div>
   <div class="row" onclick="go('v4')"><b>4&nbsp; 경영 기반 &nbsp;◀ 상장 트랙 가동</b><div class="track"><div class="fillb" style="width:77%"></div><span>77</span></div></div>
-  <div class="lane">★9/9~10 입찰 판독 실원장 반영 완료(백필 3회 — bids 2,318건 중 하한율 1,201건, 미판독 추정값 820→0) · 백필 평일 22:40 정기화 · 앱 v326~v339 7판(석면 저장 사고 원인 규명·폰 모달 42개·인허가/석면 권한 봉쇄) · 키스콘 신고실적 26건 통합. 이번 주 축: ①조기퇴근 9월 공문(지정일 셋째 금요일, 대상=관리부·운영부) ②석면 방문평가 D-11 창고 실사·검교정 ③KOSHA 서명·편철→포털 신청 ④키스콘 발주자 승인 재요청 13건</div>
+  <div class="lane">★9/10 밤 — 앱 8판(v340~v347). 석면 대장에 투입 근로자 소급 등재(127건·연인원 633명)·낙찰방법 오분류 65건 수리·펼침을 엑셀 표로·**(건설)현장 탭 신설**(석면 131+준설 19+철거 7=157건을 한 대장에서). 질문창 1단계 **비용 실측 완료**(34문항, 1문항 4,930/521토큰·약 30원 — 입력 77%가 고정비라 캐싱으로 10원 아래). 이번 주 축: ①조기퇴근 9월 공문(9/12 기안) ②석면 방문평가 D-11 창고 실사 ③KOSHA 서명·편철→포털 신청 ④노무사 창구 확보(안건 14건 — 당직근무 3건 신규)</div>
   <hr>
   <h2>지금 중요한 순서 — 전체 (상위 8)</h2>
-  <div class="item done" style="margin-top:10px"><span class="m">☑</span>★석면 저장 사고 원인 규명·재설계 종결(v335~v337, 9/9~10) — PM &quot;저장이 안 된다&quot;의 진짜 원인은 저장이 아니라 데이터 모양이었다: 9/2 일괄 입력 130건이 member_ids·worker_ids를 문자열 &quot;[]&quot;로 들고 있어 renderAsb가 던지고, 같은 문장에 이어 붙은 닫기가 실행되지 않았다. asList() 입구 교정·닫기와 토스트 우선·정렬 비교자 String 고정. 성공 문구는 &quot;저장했습니다&quot; 한 줄뿐(PM 9/10). 중복 17건 del 처리</div>
+  <div class="item done" style="margin-top:10px"><span class="m">☑</span>★(건설)현장 탭 신설(v347, 9/10) — 석면 131·준설 19·철거 7 = **157건을 한 대장에서 종류로 갈라** 본다. 데이터는 제자리(col:asbestos)에 두고 kind 칸만 더했다(산안법 30년 보존 대장을 옮기는 위험을 피한다). 연번은 종류별(석면 #1~131은 노동부 신고 대장 순번 그대로). 권한 site 신설(기본 숨김·관리부·운영부). [근로자 추가]는 명부에 없으면 그 자리에서 등재한다. 곁가지로 gw-auth cleanPerms가 새 모듈을 전 직원에게 열던 잠재 결함을 막았다</div>
+  <div class="item done"><span class="m">☑</span>★질문창 1단계 비용 실측 완료(9/10) — 실제 업무 질문 34문항 전부 성공. 1문항 평균 입력 4,930·출력 521 토큰·왕복 2.1·8.4초(약 30원). **입력의 77%가 고정비**(도구 설명서 8개가 왕복마다 재전송)라 프롬프트 캐싱으로 크게 준다. 계측기는 관리자 전용·읽기 전용이고 측정이 끝나면 지운다. PM GO 대기</div>
+  <div class="item done"><span class="m">☑</span>★석면 대장 투입 근로자 소급 등재(v340, 9/10) — 노동부 신고 LIST sheet1 131행과 앱 131건이 완전한 1:1(짝 못 지은 행 0). 127건·연인원 633명, 일용직 122명 신규. 적대 검증이 5건을 뒤집었다(Sheet2 전용 9명 보류·오타 2건 통합·남성초 완료보고서 재판독으로 9명→19명 정정). 남은 판단 8건은 확인목록으로</div>
+  <div class="item done"><span class="m">☑</span>★석면 저장 사고 원인 규명·재설계 종결(v335~v337, 9/9~10) — PM &quot;저장이 안 된다&quot;의 진짜 원인은 저장이 아니라 데이터 모양이었다: 9/2 일괄 입력 130건이 member_ids·worker_ids를 문자열 &quot;[]&quot;로 들고 있어 renderAsb가 던지고, 같은 문장에 이어 붙은 닫기가 실행되지 않았다. asList() 입구 교정·닫기와 토스트 우선·정렬 비교자 String 고정. 성공 문구는 &quot;저장했습니다&quot; 한 줄뿐(PM 9/10). 중복 17건 del 처리</div>
   <div class="item done"><span class="m">☑</span>★인허가·석면 대장 권한 봉쇄(v339, 9/10 PM &quot;운영 및 관리부만&quot;) — 서버 기본값이 view라 명시적으로 닫지 않은 현장 4명(김호태·김영미·김영진·김형태)에게 근로자 인적사항 30년 보존 대장이 열려 있었다. 4명 hide + 기본 숨김 집합을 서버·앱 PERM_CLOSED 한 곳으로 통일해 신규 직원은 닫힌 채 시작. 곁가지로 홍보 탭 누수도 해소, uismoke 대조 검사 2건 추가</div>
   <div class="item done"><span class="m">☑</span>★키스콘 신고실적 통합(9/10) — 26건 386,266천원(건설 7건 84,806·환경 19건 301,460, 전부 2023~2025). 사내 실적DB와 겹치는 건 0건이라 사실상 최초 실적 원장. ★환경 13건 263,786천원이 발주자 승인 &quot;요청취소&quot;(2025 금액의 87.5%) → 재요청 전에는 실적증명 사용 불가. 미수령 = 2021·2022</div>
   <div class="item done"><span class="m">☑</span>★보증연계투자 리스크 11건(상 3·중 6·하 2, 9/4) — ★업력 요건이 경로를 막을 수 있음(기보 설립 5년 원칙·예외 R&amp;D기업 / 신보 17년 이내 — 종운환경 23년): 전화 첫 질문=전담부서 보유가 &quot;R&amp;D기업&quot; 예외에 드는지, 불인정 시 혁신성장유형으로. 유한회사는 CB·RCPS 불가(주식회사 전환 선행 가능성), 3년 재확인 시 투자 잔존 필요. 사내 선결 3건: 등기부 자본금(≤4.5억)·기보/신보 보증 이용 여부·사원 구성</div>
   <div class="item"><span class="m">☐</span>★v321 배포(9/6 밤) — 관리자 등급 3단(대표/PM/관리자, 명시 등급만 결재 게이트·3인 지정 완료)·문서함 휴지통(삭제 확인·30일 복구·영구삭제)·기안 참조 검색+분류 서랍·화관법 실패 안내 문구. 리뷰 2갈래 결함 15건 수정, servertest 353. PM 확인(9/7 아침): 1·2·4·5 OK, 3(본인 등급 배지)은 재로그인 후 재확인 →  나수진 계정 [전결 종결] 미노출 / 휴지통 복구 1건(v314 임시 숨김 18건 포함) / 기안 참조 검색(폰). 다음 = v322(선행확인 재설계·사직휴직 결재함 연동) 브리핑 · ★v322-a 배포(9/7): 헤더 사명 640px 미만 로고만(폰 세로 줄바꿈 해소)·운반일지 카드 엑셀 운반내역 표(L·R) · ★v323(9/7): 노선 지정 품목 400자(9/4 실패 해소)·권한 관리자+운영부(김정아·김혁·권민지)·운반일지 빈 줄 숨기기/노선 숨김(복구 가능)·로그아웃 버튼(로그인 모달 하단). · ★9/8~10 v324~v339 14판: 숨긴 노선 엑셀 동기화·부서 순서·품목 불일치 미매칭(v326)·운반일지 자동 재정렬·관리자 직원 등록·퇴사자 분류(v329/v330)·공개범위 롤백 수리(v331/v332 툼스톤)·미판독 표시(v333/v334)·석면 저장 사고 재설계(v335~v337 asList)·폰 모달 42개 높이(v338)·인허가/석면 권한 봉쇄(v339) · PM</div>
-  <div class="item done"><span class="m">☑</span>★인증 혜택 중복 배제 조사(9/7, 공식 원문) — §7 중소기업 특별감면 + §10 연구인력개발비 + §29의8 통합고용 동시 적용 가능(§127④ 공제군에 §10·§29의8 없음). 최저한세 7%: §7·§29의8 걸림, §10(중소)은 제외. 산재보험료 인하는 위험성평가 인정 20%·사업주교육 10% 중 큰 것 하나, 종운환경만 해당(종운건설 건설업은 제외). 석면 등급·가족친화는 법정 가점 없음(조달 신인도 상한). ★9/7 PM 확정 2: 종운환경 중기업(§7 15%)·종운건설 소기업(30%) / 나경일 비임원·비주주 → §10 인건비 제외 없음(전담요원 인건비 산입 가능). 조사 문서·전담부서 지원제도 조사에 반영 · PM</div>
-  <div class="item"><span class="m">☐</span>★노무사 경유 서류철 완성(9/4, 19_노무사경유) — PM: 노무사 미팅 일정 잡기(취업규칙 신고 이력·개정 범위·근로계약서 v3가 1순위) · PM</div>
-  <div class="item"><span class="m">☐</span>★입찰 1차 hind 가동 대기 — 첫 정규 크론 월 9/7 12:00 KST(결과: 원장 신규·예가 조회 err/abort·cron_ts). 앞당기려면 GitHub → jongwoon-appdata → Actions → results → Run workflow(limit 5) · ★9/9 판독 커버리지: 병목은 정규식이 아니라 도달(회차 25건 캡·기판독 미스킵)이었고, 8/25 수집창 확대 뒤 판독률이 0%로 무너진 채 3주 방치됐다(가시화 부재). 판독 패스·A값 상한 방어·백필 워크플로 신설. ★실원장 백필 3회 실행 완료(9/9 17:01~17:28) — 하한율 판독 328→1,201건(2,318건 중), 미판독 추정값 노출 820→0(v333). 백필은 평일 KST 22:40 자동으로 전환(수동 실행 불요). 남은 것 = 예규 위임형 379건 사람 등재 여부(PM) · PM</div>
   <div class="foot">갱신: "진척도 갱신해"(모바일 D → 이 벽지 자동 생성) · 이 판 생성 기준: 2026-09-10</div>
 </div>
 
 <div class="view" id="v1">
   <span class="back" onclick="go('v-home')">← 큰틀로</span>
-  <h1>1 업무플랫폼 — 89% · 배포 주간</h1>
+  <h1>1 업무플랫폼 — 92% · 배포 주간</h1>
   <div class="rowc" onclick="go('v1-1')" style="margin-top:10px"><b>데이터·보안</b><div class="track2"><div class="fillb t" style="width:98%"></div></div><span class="pv">98</span></div>
   <div class="rowc" onclick="go('v1-2')"><b>돈 (기성·미수)</b><div class="track2"><div class="fillb t" style="width:92%"></div></div><span class="pv">92</span></div>
   <div class="rowc" onclick="go('v1-3')"><b>운영 모듈</b><div class="track2"><div class="fillb t" style="width:92%"></div></div><span class="pv">92</span></div>
@@ -81,14 +81,14 @@ h2{font-size:13px;margin-bottom:8px}
   <div class="rowc focus" onclick="go('v1-lawwatch')"><b>법령 워치 (신규 자동화) ◀ 가동</b><div class="track2"><div class="fillb t" style="width:95%"></div></div><span class="pv">95</span></div>
   <div class="rowc focus" onclick="go('v1-12')"><b>대표 업무유연성 · 기기 배치도 ◀ 결재 3차+기안 화면 배포</b><div class="track2"><div class="fillb t" style="width:96%"></div></div><span class="pv">96</span></div>
   <div class="rowc focus" onclick="go('v1-13')"><b>관리자 기기 보안 ◀ 9/3 정적 노출 차단·진척도 탭</b><div class="track2"><div class="fillb" style="width:68%"></div></div><span class="pv">68</span></div>
-  <div class="lane">결재 3차 등급 체계까지 배포 완료(9/3, v311) · 9/8~10 실사고 3건 규명·수리(공개범위 롤백 v331 · 석면 저장 v336/v337 · 인허가 권한 v339). 남은 축 = 업무 데이터 입력(계약 종결 0·미수 0·응찰 0)과 인허가 2차 착수 결정</div>
+  <div class="lane">결재 3차 등급 체계까지 배포 완료(9/3) · 9/8~10 실사고 3건 규명·수리(공개범위 롤백·석면 저장·인허가 권한) · 9/10 밤 v340~v347 8판(석면 소급 등재·낙찰방법 65건·엑셀 표·현장 탭 신설·질문창 계측). 남은 축 = 업무 데이터 입력(계약 종결 0·미수 0·응찰 0)과 질문창 1단계 GO</div>
   <hr>
   <h2>지금 중요한 순서 — 업무플랫폼</h2>
   <div class="item done" style="margin-top:10px"><span class="m">☑</span>★9/8 공개범위 롤백 실사고 규명·수리(v331·v332) — 문서 통째 PUT + Object.assign이 &quot;키 삭제&quot;를 표현하지 못해 PM이 지운 6건이 다른 계정의 8/11 사본으로 되살아났다. 툼스톤(scope_ts·assignee_ts)과 키 단위 최신 승 병합으로 봉합, 서버가 비관리자 저장 시 공개범위를 서버 원본으로 이월</div>
   <div class="item done"><span class="m">☑</span>★9/9~10 v333~v339 — 미판독 추정값 표시(v333/v334)·석면 저장 사고 재설계(v335~v337)·폰 입력 창 높이 42개 일괄(v338)·인허가/석면 권한 봉쇄(v339). 폰에서 인허가·석면 접기와 [+추가] 제목 줄 이동 포함</div>
   <div class="item now"><span class="m">▶</span>결재함·문서함 실사용 안착 — 첫 상신 가동·미분류 재지정·?appr=auto 확인</div>
   <div class="item done"><span class="m">☑</span>★대표 홈=결재함 배포(9/2) — 대기 카드+결재 시작+조망 타일 4</div>
-  <div class="item now"><span class="m">▶</span>★인허가 3층 1차 배포(9/2) — 98행 시드·선행확인 관문. &quot;PM 등재 1회&quot;는 9/2 서버 시드로 해소(9/6 정정). 남은 사람 몫 = 조건부 31행 선행확인 답 0/31 · 2차(회차 인스턴스 자동생성) 착수 여부 PM 결정 · v322 시안 승인/보류 확정</div>
+  <div class="item now"><span class="m">▶</span>★인허가 3층 1차 배포(9/2) — 98행 시드·선행확인 관문. 9/10 석면 이력이 **[현장] 탭으로 분리**돼 인허가는 면허·만기만 남았다(권한도 lic/site로 나눔). 남은 사람 몫 = 조건부 31행 선행확인 답 0/31 · 2차 착수 여부 · v322 시안 승인/보류 확정</div>
   <div class="item done"><span class="m">☑</span>★결재함 2차 배포(9/2 밤) — 내 상신·우선기기 1발·운반일지 자동 기안·정정 상신</div>
   <div class="item"><span class="m">☐</span>업무 데이터 미입력이 진짜 병목 — 완주계약·미수·응찰표시 공란</div>
   <div class="item done"><span class="m">☑</span>★화관법 로컬 폴백 스케줄러 삭제 완료(9/6 밤) — 실측 Disabled 확인 후 작업 XML 백업·등록 삭제. 김과장 실패 문구 회수는 v321 동승</div>
@@ -316,7 +316,7 @@ h2{font-size:13px;margin-bottom:8px}
   <h2>지금 중요한 순서 — 인증·자격</h2>
   <div class="item done" style="margin-top:10px"><span class="m">☑</span>★KOITA 인정(9/2, 제2026155881호) — 41일 완주. 사후관리 3종 상시+연구노트 자동화 가동</div>
   <div class="item done"><span class="m">☑</span>★세무사 통보 완료(9/7 PM: §10 25%+§7 환경 15%·건설 30%+§29의8 동시) · 월 20만 비과세 즉시+구분경리+인건비 산입 판정 확정(9/7 PM: 나경일 지분 0·임원 등기 없음 → 산입 가능, 조특칙 §7③ 제외 아님)</div>
-  <div class="item now"><span class="m">▶</span>★석면 9/21 방문평가(D-11) — 과거현장 131건 전수 기입 완료(9/2)·자체 매뉴얼 정본화 완료(9/8, 4.3 20점 관문 해소). 남은 실행 2 = 창고 실사(F09 장비이력카드 5종·유효풍량 실측)·검교정 회신</div>
+  <div class="item now"><span class="m">▶</span>★석면 9/21 방문평가(D-11) — 과거현장 131건 전수·자체 매뉴얼 정본화 완료. ★9/10 투입 근로자 소급 등재로 3.7(대장 전산화) 근거가 채워졌다. **다만 3.5 분모가 9명→19명으로 정정**돼 만점 조건이 이수자 3명→6명이 됐다(남성초 완료보고서 2p 재판독). 남은 실행 2 = 창고 실사(F09 장비이력카드 5종·유효풍량)·검교정 회신</div>
   <div class="item now"><span class="m">▶</span>★KOSHA 수료증 2장 확보(9/3) — 실행 4건 → 포털 신청</div>
   <div class="item now"><span class="m">▶</span>★가족친화 5종 PM 전결 승인 완료(9/6 20:27, 결재함 ap813bd02f2b10) — 실적 기산 9/6~12/31. 결정 15항 전량 확정(9/10 ⑧ 대상 = 관리부·운영부). 남은 것 = 9월분 시행 공문·노무사 7건 회신. ★진짜 위험은 만족도 20점 — 설문이 총원 50%(8명) 미달이면 0점이라 현장 5명 이상 참여가 강제된다</div>
 </div>
