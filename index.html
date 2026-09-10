@@ -736,6 +736,22 @@
   .jw-sheet tr.wide th{width:auto;}
   .jw-sheet td.warn{background:#FBF3DF;color:#7a5b12;}
   /* 미입력 표시(v345) — 저장은 막지 않고 빠진 것만 눈에 보이게 한다(PM 2026-09-10) */
+  /* 물어보기(v348) */
+  .ask-wrap{display:flex;flex-direction:column;gap:10px;}
+  .ask-log{display:flex;flex-direction:column;gap:10px;min-height:120px;}
+  .ask-q{align-self:flex-end;max-width:88%;background:var(--brand-dark);color:#fff;border-radius:14px 14px 4px 14px;padding:9px 13px;font-size:14px;line-height:1.55;white-space:pre-wrap;word-break:break-word;}
+  .ask-a{align-self:flex-start;max-width:94%;background:var(--surface,#fff);border:1px solid var(--line);border-radius:14px 14px 14px 4px;padding:11px 14px;font-size:14px;line-height:1.65;white-space:pre-wrap;word-break:break-word;}
+  .ask-a .src{display:block;margin-top:7px;padding-top:6px;border-top:1px solid var(--line);font-size:11.5px;color:var(--sub);white-space:normal;}
+  .ask-a.err{border-color:#E4B7B4;background:#FBE7E3;color:#B0332A;}
+  .ask-bar{display:flex;gap:8px;align-items:flex-end;}
+  .ask-bar textarea{flex:1;min-height:44px;max-height:120px;padding:11px 12px;border:1px solid var(--line);border-radius:10px;
+    font-family:inherit;font-size:14px;line-height:1.5;box-sizing:border-box;resize:none;background:var(--surface,#fff);color:var(--text);}
+  .ask-bar button{flex:0 0 auto;height:44px;padding:0 16px;border:none;border-radius:10px;background:var(--brand-dark);color:#fff;font-size:14px;font-weight:700;cursor:pointer;}
+  .ask-bar button:disabled{opacity:.45;cursor:default;}
+  .ask-tip{font-size:12px;color:var(--sub);line-height:1.6;}
+  .ask-tip b{color:var(--text);}
+  .ask-ex{display:flex;gap:6px;flex-wrap:wrap;}
+  .ask-ex button{background:transparent;border:1px solid var(--line);border-radius:16px;padding:5px 11px;font-size:12.5px;color:var(--sub);cursor:pointer;}
   .need-chip{display:inline-block;background:#FBF3DF;border:1px solid #E5D3A4;color:#7a5b12;
     border-radius:6px;padding:0 6px;font-size:11px;font-weight:700;white-space:nowrap;}
   .jw-sheet-wrap{overflow-x:auto;margin:2px 0 8px;}   /* 넘치면 표만 굴러간다 — 본문은 가로로 안 밀린다 */
@@ -960,6 +976,7 @@
     <button class="tab-btn" data-tab="doc" id="tabDocBtn">문서함</button>
     <div class="nav-divider"></div>
     <div class="nav-group">개인</div>
+    <button class="tab-btn" data-tab="ask" id="tabAskBtn">물어보기</button>
     <button class="tab-btn" data-tab="check" id="tabCheckBtn">내 업무</button>
     <button class="tab-btn" data-tab="leave" id="tabLeaveBtn">휴가 <span class="tab-badge hide" id="leaveTabBadge">0</span></button>
   </nav>
@@ -1366,6 +1383,21 @@
     <div style="font-size:13px;color:var(--sub);margin-bottom:6px;">실제 업무 질문 30개를 진짜 원장에 물려 돌리고 토큰을 잽니다. 읽기만 하며 아무것도 바꾸지 않습니다. 3~5분 걸립니다.</div>
     <button class="link-btn" id="meterRunBtn">▶ 30문항 실측 시작</button>
     <div class="card" id="meterOut" style="display:none;"></div>
+  </section>
+
+  <!-- 물어보기(v348) — 회사 원장을 근거로 답한다. 읽기 전용이고, 볼 수 있는 자료는 그 사람 권한 그대로다. -->
+  <section class="view" id="view-ask">
+    <div class="dash-sec" style="margin-bottom:6px;"><h2>물어보기 <span class="cnt" id="askHead"></span></h2></div>
+    <div class="ask-wrap">
+      <div class="ask-tip" id="askTip">회사 자료를 근거로 답합니다. <b>물어보기만 되고 아무것도 바뀌지 않습니다.</b>
+        볼 수 있는 자료는 지금 내 권한 그대로입니다 — 권한 없는 자료는 "못 본다"고 답합니다.</div>
+      <div class="ask-ex" id="askEx"></div>
+      <div class="ask-log" id="askLog"></div>
+      <div class="ask-bar">
+        <textarea id="askInput" rows="1" placeholder="예: 84수6457 검사 언제까지야" autocomplete="off"></textarea>
+        <button id="askSend">묻기</button>
+      </div>
+    </div>
   </section>
 
   <!-- 현장(석면·철거·준설) — 2026-09-10 인허가 탭에서 분리. 한 대장을 종류로 갈라 본다.
@@ -5157,6 +5189,7 @@
     document.getElementById("view-tasks").classList.toggle("active", name === "tasks");
     document.getElementById("view-veh").classList.toggle("active", name === "veh");
     document.getElementById("view-rec").classList.toggle("active", name === "rec");
+    document.getElementById("view-ask").classList.toggle("active", name === "ask");
     document.getElementById("view-site").classList.toggle("active", name === "site");
     document.getElementById("view-lic").classList.toggle("active", name === "lic");
     document.getElementById("view-check").classList.toggle("active", name === "check");
@@ -5185,6 +5218,7 @@
     if (name === "cal") renderCalendar();
     if (name === "dash" && prevTab !== "dash") renderDashboard();   // 탭 "복귀" 시만 재렌더(타 탭 체류 중 폴 갱신 반영) — 재클릭은 종전대로 no-op(직원 홈 입력 중 유실 방지)
     // 석면 대장은 인허가 탭 안에 있고, 투입 근로자 이름을 일용직 명부에서 끌어오므로 둘을 같이 읽는다
+    if (name === "ask") renderAskTab();
     if (name === "site"){ renderSites(); loadAsb(); loadEdu(); if(canSee("wk")) loadWorkers(); }
     if (name === "lic"){ setLicLayer("cert"); renderAsb(); loadAsb(); loadEdu(); if(canSee("wk")) loadWorkers(); }   // 전역검색·캘린더 점프가 의무/이번달 층 위에 내려앉지 않게 ①층 복귀
     if (name === "hr"){ renderHrRoster(); renderEdu(); loadEdu(); if(canSee("wk")) loadWorkers(); }
@@ -5749,6 +5783,18 @@
   })();
 
   (function(){ var mb=document.getElementById("meterRunBtn"); if(mb){ mb.addEventListener("click", meterRun); meterPoll(); } })();
+  // 물어보기 배선(v348)
+  (function(){
+    var b=document.getElementById("askSend"); if(b) b.addEventListener("click", function(){ askSend(); });
+    var t=document.getElementById("askInput");
+    if(t){
+      t.addEventListener("input", function(){ this.style.height="auto"; this.style.height=Math.min(120,this.scrollHeight)+"px"; });
+      t.addEventListener("keydown", function(e){
+        // 엔터로 보낸다(줄바꿈은 Shift+Enter). 폰에서는 보내기 버튼을 쓴다.
+        if(e.key==="Enter" && !e.shiftKey && !e.isComposing){ e.preventDefault(); askSend(); }
+      });
+    }
+  })();
   // 현장 탭 배선(v347)
   (function(){
     var q=document.getElementById("siteSearch");
@@ -10197,6 +10243,61 @@
   // 엑셀형 표 한 줄(항목/내용). 세 목록(석면·일용직·거래처)이 같이 쓴다 — 값은 부르는 쪽에서 esc한다.
   function sheetRow(label, valHtml, cls){
     return '<tr><th>'+esc(label)+'</th><td'+(cls?' class="'+cls+'"':'')+'>'+(valHtml||"—")+'</td></tr>';
+  }
+  // ═══ 물어보기(v348) ═══════════════════════════════════════════════════
+  // 서버(gw-ask)가 도구를 실행하고 권한을 판정한다. 화면은 주고받기만 한다.
+  var ASK_EX = ["검사만기 30일 안 남은 차", "지금 진행 중인 계약", "작년 석면 현장 몇 건", "내게 온 지시"];
+  var askBusy = false;
+  function askAdd(cls, text, srcHtml){
+    var log = document.getElementById("askLog"); if(!log) return null;
+    var d = document.createElement("div");
+    d.className = cls;
+    d.textContent = text;
+    if(srcHtml){ var s2=document.createElement("span"); s2.className="src"; s2.innerHTML=srcHtml; d.appendChild(s2); }
+    log.appendChild(d);
+    d.scrollIntoView({block:"nearest"});
+    return d;
+  }
+  function askSend(q){
+    if(askBusy) return;
+    var inp = document.getElementById("askInput"), btn = document.getElementById("askSend");
+    q = (q || (inp ? inp.value : "")).trim();
+    if(!q) return;
+    askBusy = true; if(btn){ btn.disabled = true; btn.textContent = "…"; }
+    if(inp){ inp.value = ""; inp.style.height = "auto"; }
+    askAdd("ask-q", q);
+    var wait = askAdd("ask-a", "찾는 중…");
+    gwCall("gw-ask", { q: q }).then(function(res){
+      var b = res.body || {};
+      if(wait && wait.parentNode) wait.parentNode.removeChild(wait);
+      if(res.status !== 200){ askAdd("ask-a err", "지금은 답할 수 없습니다 (" + res.status + ")"); return; }
+      if(!b.ok){ askAdd("ask-a err", b.answer || "답할 수 없습니다"); return; }
+      var src = (b.tools||[]).map(function(t){ return esc(t.name) + "(" + esc(String(t.rows)) + ")"; }).join(" · ");
+      askAdd("ask-a", b.answer || "(빈 답)", src ? ("본 자료: " + src + " · " + Math.round((b.ms||0)/100)/10 + "초") : "");
+      var head = document.getElementById("askHead");
+      if(head && b.day_max) head.textContent = "오늘 " + b.day_used + "/" + b.day_max;
+    }).catch(function(){
+      if(wait && wait.parentNode) wait.parentNode.removeChild(wait);
+      askAdd("ask-a err", "연결이 안 됩니다. 잠시 뒤 다시 물어보세요.");
+    }).then(function(){
+      askBusy = false; if(btn){ btn.disabled = false; btn.textContent = "묻기"; }
+      if(inp) inp.focus();
+    });
+  }
+  function renderAskTab(){
+    var ex = document.getElementById("askEx");
+    if(ex && !ex.childNodes.length){
+      ex.innerHTML = ASK_EX.map(function(q){ return '<button data-askex="'+esc(q)+'">'+esc(q)+'</button>'; }).join("");
+      Array.prototype.forEach.call(ex.querySelectorAll("[data-askex]"), function(b){
+        b.addEventListener("click", function(){ askSend(b.getAttribute("data-askex")); });
+      });
+    }
+    gwCall("gw-ask", { action: "status" }).then(function(res){
+      var b = res.body || {}, head = document.getElementById("askHead");
+      if(head && b.day_max) head.textContent = "오늘 " + (b.day_used||0) + "/" + b.day_max;
+      var tip = document.getElementById("askTip");
+      if(tip && b.tools && !b.tools.length) tip.innerHTML = "조회할 수 있는 자료가 없습니다 — 권한을 받은 뒤에 물어보세요.";
+    }).catch(function(){});
   }
   // ═══ 현장(석면·철거·준설) ═══════════════════════════════════════════
   // 한 대장(col:asbestos)을 kind로 갈라 본다. 석면은 산안법 30년 보존 대장이라 옮기지 않고 칸만 더했다(2026-09-10).
