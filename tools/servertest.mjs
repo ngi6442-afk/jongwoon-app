@@ -2062,4 +2062,65 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   mem.gw_data['allbaro:learned'] = { schema: 1, items: [] };
 }
 
+// ===== 40. 엑셀 재생성 요청 v352(PM 9/11 #33) — 숨김/노선 변경 → GitHub workflow_dispatch(가짜 fetch) · 디바운스 · 토큰 없음 · 내려받기 stale/covered
+{
+  const gwab = require(join(FN, 'gw-allbaro.js'));
+  const ab = async (body, tok, dev) => { const rr = await gwab.handler({ httpMethod: 'POST', headers: Object.assign({ authorization: tok ? 'Bearer ' + tok : '' }, dev ? { 'x-device-id': dev } : {}), body: JSON.stringify(body) }); return { code: rr.statusCode, body: JSON.parse(rr.body) }; };
+  mem.gw_data['allbaro:learned'] = { schema: 1, items: [] };
+  mem.gw_data['allbaro:routes_hidden'] = { schema: 1, items: [] };
+  delete mem.gw_data['allbaro:xlsx_regen'];
+  const realFetch = global.fetch; const calls = []; let ghStatus = 204;
+  global.fetch = async (url, opt) => { if (/api\.github\.com/.test(String(url))) { calls.push({ url: String(url), body: JSON.parse(opt.body), auth: opt.headers.Authorization }); return { status: ghStatus }; } return realFetch(url, opt); };
+  const savedTok = process.env.GW_APPDATA_GITHUB_TOKEN; process.env.GW_APPDATA_GITHUB_TOKEN = 'test-appdata-token';
+  const regen = () => mem.gw_data['allbaro:xlsx_regen'] || {};
+  r = await ab({ action: 'ab_route_hide', side: 'L', row: 6, hide: true }, tokA);
+  T('숨김 → 200 · dispatch 1회(logsheet.yml, ref main, days_back 7, Bearer 토큰) · blob xlsx_regen{requested_at,dispatched_at,dispatch_code 204,reason hide} · 응답 regen.code 204',
+    r.code === 200 && r.body.changed === true && calls.length === 1 && /jongwoon-appdata\/actions\/workflows\/logsheet\.yml\/dispatches$/.test(calls[0].url) && calls[0].body.ref === 'main' && calls[0].body.inputs.days_back === '7'
+    && calls[0].auth === 'Bearer test-appdata-token' && regen().dispatch_code === 204 && regen().dispatched_at > 0 && regen().reason === 'hide' && r.body.regen && r.body.regen.code === 204, JSON.stringify(r.body.regen));
+  T('응답 regen에 회원 정보 없음(by 없음)', !('by' in (r.body.regen || {})), '');
+  r = await ab({ action: 'ab_route_hide', side: 'L', row: 6, hide: false }, tokA);
+  T('2분 안 해제 → dispatch 안 함(디바운스) · requested_at 갱신 · skipped · 응답 regen.skipped', r.code === 200 && calls.length === 1 && regen().skipped === true && regen().reason === 'unhide' && r.body.regen.skipped === true, JSON.stringify(r.body.regen));
+  r = await ab({ action: 'ab_route_hide', side: 'L', row: 6, hide: false }, tokA);
+  T('변경 없음(changed:false)이면 재생성 요청도 없음', r.code === 200 && r.body.changed === false && !r.body.regen && calls.length === 1, '');
+  mem.gw_data['allbaro:xlsx_regen'] = { schema: 1, requested_at: 1, dispatched_at: 1, dispatch_code: 204 };
+  r = await ab({ action: 'ab_learn', from: '재생성테스트', to: '네이처', item: '', side: 'L', row: 5 }, tokA);
+  T('노선 지정 → dispatch(디바운스 지남) · reason learn · 응답 regen 동봉', r.code === 200 && calls.length === 2 && regen().reason === 'learn' && r.body.regen && r.body.regen.code === 204, JSON.stringify(r.body.regen));
+  mem.gw_data['allbaro:xlsx_regen'] = { schema: 1, requested_at: 1, dispatched_at: 1, dispatch_code: 204 };
+  delete mem.gw_data['allbaro:routes_extra'];
+  r = await ab({ action: 'ab_route_add', from: '재생성상차', to: '재생성하차', item: '', side: 'L' }, tokA);
+  T('노선 추가(새 줄) → dispatch · reason route_add', r.code === 200 && r.body.existed === false && calls.length === 3 && regen().reason === 'route_add', '');
+  r = await ab({ action: 'ab_route_add', from: '재생성상차', to: '재생성하차', item: '', side: 'L' }, tokA);
+  T('이미 있는 노선(existed) → 재생성 요청 없음', r.code === 200 && r.body.existed === true && calls.length === 3, '');
+  // 토큰 권한 없음(403) / 토큰 없음
+  mem.gw_data['allbaro:xlsx_regen'] = { schema: 1, requested_at: 1, dispatched_at: 1, dispatch_code: 204 };
+  ghStatus = 403;
+  r = await ab({ action: 'ab_route_hide', side: 'L', row: 7, hide: true }, tokA);
+  T('GitHub 403 → 숨김은 200 그대로 · dispatch_code 403 · dispatch_err HTTP_403 · dispatched_at 갱신 안 됨', r.code === 200 && r.body.hidden === true && regen().dispatch_code === 403 && regen().dispatch_err === 'HTTP_403' && regen().dispatched_at === 1 && r.body.regen.err === 'HTTP_403', JSON.stringify(regen()));
+  ghStatus = 204;
+  process.env.GW_APPDATA_GITHUB_TOKEN = ''; const g1 = process.env.GW_GALLERY_GITHUB_TOKEN, g2 = process.env.MEMBER_RELAY_GITHUB_TOKEN; process.env.GW_GALLERY_GITHUB_TOKEN = ''; process.env.MEMBER_RELAY_GITHUB_TOKEN = '';
+  mem.gw_data['allbaro:xlsx_regen'] = { schema: 1, requested_at: 1, dispatched_at: 1, dispatch_code: 204 };
+  r = await ab({ action: 'ab_route_hide', side: 'L', row: 7, hide: false }, tokA);
+  T('토큰 없음 → 숨김 해제는 200 · dispatch 호출 없음 · dispatch_err NO_TOKEN', r.code === 200 && calls.length === 4 && regen().dispatch_err === 'NO_TOKEN' && regen().dispatch_code === 0, JSON.stringify(regen()));
+  process.env.GW_APPDATA_GITHUB_TOKEN = 'test-appdata-token'; process.env.GW_GALLERY_GITHUB_TOKEN = g1 || ''; process.env.MEMBER_RELAY_GITHUB_TOKEN = g2 || '';
+  // 내려받기 stale
+  const today = new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);
+  const old = new Date(Date.now() + 9 * 3600000 - 20 * 86400000).toISOString().slice(0, 10);
+  mem.gw_data['allbaro:xlsx:' + today] = { name: 'x.xlsx', b64: 'UEs=', ts: 1000, total: 1 };
+  mem.gw_data['allbaro:xlsx:' + old] = { name: 'y.xlsx', b64: 'UEs=', ts: 1000, total: 1 };
+  mem.gw_data['allbaro:xlsx_regen'] = { schema: 1, requested_at: 5000, dispatched_at: 5000, dispatch_code: 204, by: '관리자' };
+  r = await ab({ action: 'ab_xlsx', day: today }, tokA);
+  T('ab_xlsx: 파일 ts(1000) < 변경(5000) → stale:true · covered:true(7일 안) · regen{requested_at,dispatched_at,code} · by 없음', r.code === 200 && r.body.stale === true && r.body.covered === true && r.body.regen && r.body.regen.requested_at === 5000 && r.body.regen.code === 204 && !('by' in r.body.regen), JSON.stringify(r.body.regen));
+  r = await ab({ action: 'ab_xlsx', day: old }, tokA);
+  T('ab_xlsx: 20일 전 날짜 → stale:true·covered:false(재생성 범위 밖)', r.code === 200 && r.body.stale === true && r.body.covered === false, JSON.stringify([r.body.stale, r.body.covered]));
+  mem.gw_data['allbaro:xlsx:' + today].ts = 9000;
+  r = await ab({ action: 'ab_xlsx', day: today }, tokA);
+  T('ab_xlsx: 재생성 뒤(ts 9000 > 5000) → stale:false · regen null', r.code === 200 && r.body.stale === false && r.body.regen === null, '');
+  delete mem.gw_data['allbaro:xlsx_regen'];
+  r = await ab({ action: 'ab_xlsx', day: today }, tokA);
+  T('ab_xlsx: 재생성 blob 없음(mock NOT_FOUND) → stale:false(경고 없이 종전과 같음)', r.code === 200 && r.body.stale === false, '');
+  global.fetch = realFetch; process.env.GW_APPDATA_GITHUB_TOKEN = savedTok || '';
+  delete mem.gw_data['allbaro:xlsx:' + today]; delete mem.gw_data['allbaro:xlsx:' + old]; delete mem.gw_data['allbaro:routes_extra'];
+  mem.gw_data['allbaro:routes_hidden'] = { schema: 1, items: [] }; mem.gw_data['allbaro:learned'] = { schema: 1, items: [] };
+}
+
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

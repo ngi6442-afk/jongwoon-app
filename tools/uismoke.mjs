@@ -137,7 +137,28 @@ try {
   const uiCodes = [...((idx.match(/var PA_TITLE_TYPE_NAMES=\{([^}]+)\}/) || ['', ''])[1]).matchAll(/([A-Z]):"/g)].map((m) => m[1]);
   T('제목 원형 코드 11종 라이브러리 = 화면 이름표(' + libCodes.join('') + ')', libCodes.length === 11 && libCodes.join('') === uiCodes.join(''), '라이브러리 ' + libCodes.join('') + ' / 화면 ' + uiCodes.join(''));
   T('출력 스키마 title_type enum·required + 제목 규칙 절 4자리 숫자 없음', /title_type: \{ type: 'string', enum: TITLE_CODES/.test(lib) && /required: \['title', 'body', 'tags', 'title_type'\]/.test(lib) && !/\d{4,}/.test(((lib.match(/var TITLE_TYPES = \[([\s\S]*?)\n\];/) || ['', ''])[1]).replace(/[,\s]/g, '')), '');
-} catch (e) { console.log('  (사진 상한 대조 생략 — 파일 읽기 실패)'); }
+  // v352(PM 9/11 #31ⓒ "태그 생성이 빠졌다"): 실사고는 태그 코드 상실이 아니라 자동 생성 누락(다른 기록 생성 중 등록 → 버려짐)이었다.
+  //   그래도 태그 사슬 8고리(v267 신설·v271 parseDraft 증발 수리 — 두 번 깨진 사슬)는 검사가 없었다 — 어느 고리가 빠져도 push 전에 잡는다.
+  T('태그 사슬(v267·v271): 프롬프트 절·스키마 tags·parseDraft 통과·generateDraft 반환·워커 rec.tags·화면 paFinish/paApply 2곳/태그 상자',
+    /## 해시태그 \(tags 값\)/.test(lib) && /tags: \{ type: 'array'/.test(lib) && /tags: tags, title_type: tt/.test(lib) && /tags: draft\.tags \|\| \[\]/.test(lib)
+    && /rec\.tags = r\.tags\.slice\(0, 25\)/.test(wk) && /tags:\(Array\.isArray\(blob\.tags\)\?blob\.tags:\(r\.tags\|\|\[\]\)\)/.test(idx)
+    && (idx.match(/p\.tags=r\.tags\.slice\(0,25\)/g) || []).length === 2 && /id="tags" readonly/.test(idx),
+    '어느 고리가 빠졌는지 promoai.js 해시태그 절·schema·parseDraft·generateDraft / 워커 rec.tags / index.html paFinish·paApply·태그 상자 대조');
+  T('v352 자동 생성 대기열: paAutoQueue·paDrainAuto · paKick 생성 중이면 auto는 줄 세움 · 배수 5곳(실패·네트워크·초과·완료 + 정의) · 카드 "사진AI 미생성 — 태그 없음"/"태그 n개" · 검수 문구 태그 수',
+    /var paAutoQueue=\[\];/.test(idx) && /function paDrainAuto\(\)\{ if\(paJob\.polling\) return; var next=paAutoQueue\.shift\(\); if\(next\) paKick\(next, true\); \}/.test(idx)
+    && /if\(auto\)\{ if\(paAutoQueue\.indexOf\(promoId\)<0\) paAutoQueue\.push\(promoId\); \}/.test(idx) && (idx.match(/paDrainAuto\(\);/g) || []).length === 4
+    && /사진AI 미생성 — 태그 없음/.test(idx) && /' · 태그 '\+\(\(p\.tags\|\|\[\]\)\.length\)\+'개'/.test(idx) && /" · 태그 "\+\(\(r\.tags&&r\.tags\.length\)\|\|0\)\+"개"/.test(idx), '');
+  // v352(PM 9/11 #31ⓑ — 직원 수정본 5편 실측): 담당자 포장 = 가운데 정렬·20자 개행·소제목 굵게+구분선·물음표·정화조/저수조 삭제
+  const bp = (idx.match(/function promoBuildPostHtml\(title, body, imgs\)\{([\s\S]*?)\n  \}/) || ['', ''])[1];
+  T('v352 복사 HTML 서식: promoWrap20(22자 어절 개행 <br>)·promoIsSubhead(물음표 한 줄 ≤45자)·소제목 <hr>+굵게+가운데·본문/캡션/사진/제목/꼬리 text-align:center',
+    /function promoWrap20\(t\)/.test(bp) && /\(cur\+" "\+w\)\.length>22/.test(bp) && /function promoIsSubhead\(t\)\{ return t\.length<=45 && \/\[\?？\]\$\/\.test\(t\)/.test(bp)
+    && /<hr style="border:0;border-top:1px solid #ddd;margin:22px 0 14px;"><p style="margin:12px 0;line-height:1\.8;text-align:center;font-weight:700;">/.test(bp)
+    && /text-align:center;">'\+promoWrap20\(t\)\+'<\/p>/.test(bp) && /color:#777;font-size:13px;text-align:center;/.test(bp) && /<h2 style="font-size:20px;margin:0 0 16px;text-align:center;">/.test(bp)
+    && (idx.match(/function promoTailHtml\(\)\{([\s\S]*?)\n  \}/) || ['', ''])[1].split('text-align:center').length === 6, '');
+  T('v352 프롬프트: 소제목 물음표 강제 · 정화조/저수조 업무 제외(회사 절·FACILITY_WORDS·예시 제목에서 제거)',
+    /질문형이므로 반드시 물음표\(\?\)로 끝냅니다/.test(lib) && /정화조·저수조는 종운환경의 업무가 아닙니다/.test(lib)
+    && !/\(우수받이·빗물받이·맨홀·관로·집수정·정화조/.test(lib) && !/'정화조', '오수관로'/.test(lib) && !/'저수조', '물탱크'/.test(lib) && !/ex: \['정화조 문제인 줄/.test(lib), '');
+} catch (e) { console.log('  (사진 상한 대조 생략 — 파일 읽기 실패: ' + e.message + ')'); fails++; }
 
 // 8) 크론 등록 ↔ 함수 파일 대조 — 감시 설계 1단계(2026-08-19). netlify.toml의 schedule 선언과
 //    실제 *-cron.js 파일이 어긋나면(파일 개명·블록 삭제·오타) 크론이 소리 없이 사라진다.
@@ -1082,6 +1103,17 @@ try {
     && /abLearnGo\(key, sd \+ "\|" \+ rw, true\);/.test(html) && /function abLearnGo\(key, val, noConfirm\)/.test(html) && /if \(!noConfirm && !confirm\("이 조합을 아래 줄로 지정할까요\?/.test(html)
     && (html.match(/abLearnNew = "";/g) || []).length >= 4 && /ROWS_FULL: "양식 예비 줄\(40~49행\)이 다 찼습니다/.test(html) && /if \(abLearnNew === key\) abRouteAddGo\(key, host\);/.test(html), '');
 } catch (e) { console.log('  (v351 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ---- v352(PM 9/11 #33): 숨김·노선 변경 뒤 엑셀 재생성 요청(dispatch) + 내려받기 stale 경고 ----
+try {
+  const ab = readFileSync(join(ROOT, 'netlify/functions/gw-allbaro.js'), 'utf8');
+  T('서버: requestXlsxRegen(디바운스 2분·토큰 3후보·6초 타임아웃·204 접수) — 숨김/해제·노선 추가·노선 지정 3곳에서 부름 · handleXlsx가 stale/covered/regen 동봉',
+    /const REGEN_KEY = 'allbaro:xlsx_regen';/.test(ab) && /const REGEN_DEBOUNCE_MS = 120000;/.test(ab) && /process\.env\.GW_APPDATA_GITHUB_TOKEN \|\| process\.env\.GW_GALLERY_GITHUB_TOKEN \|\| process\.env\.MEMBER_RELAY_GITHUB_TOKEN/.test(ab)
+    && /\/actions\/workflows\/' \+ REGEN_WORKFLOW \+ '\/dispatches'/.test(ab) && (ab.match(/await requestXlsxRegen\(st, /g) || []).length === 3
+    && /const stale = !!\(regen && regen\.requested_at && ts && regen\.requested_at > ts\);/.test(ab) && /stale: stale, covered: covered, regen: stale \? regen : null/.test(ab), '');
+  T('앱: 내려받기 전 stale이면 abXlsxStaleOk 확인창(생성 시각·변경 시각·재생성 상태·7일 밖·토큰 실패 안내)',
+    /if\(res\.body\.stale && !abXlsxStaleOk\(res\.body\)\) return;/.test(html) && /function abXlsxStaleOk\(b\)\{/.test(html) && /GW_APPDATA_GITHUB_TOKEN/.test(html) && /자동 재생성 범위\(최근 7일\) 밖/.test(html), '');
+} catch (e) { console.log('  (v352 엑셀 재생성 검사 생략 — ' + e.message + ')'); fails++; }
 
 // ---- v339: 기본 숨김 모듈 집합이 앱·서버에서 갈라지면 권한 구멍이 된다(9/4 hr·9/10 lic 실사고) ----
 try {

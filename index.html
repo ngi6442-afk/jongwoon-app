@@ -11101,6 +11101,10 @@
   var paResults={};    // promo_id → 도착한 결과 {title,body,used_tokens,model,applied} — 사람이 저장하기 전까지 보관
   var paUndo=null;     // {promo,title,body} — AI 초안 적용 직전의 화면 내용(예비 생성기 초안) 복구용
   var paAutoWait="";   // 기록 저장 완료를 기다렸다가 자동 생성할 promo id (PM 확정 8/14: 사진 올리면 버튼 없이 자동)
+  // v352: 자동 생성 대기열 — 다른 기록이 생성 중일 때 등록된 기록을 버리지 않는다(9/7 prmtqxcgekmj5z1 실사고: 권민지가 두 기록을
+  //   1분 간격으로 등록 → 둘째 자동 생성이 소리 없이 버려져 예비 초안(태그 없음·키워드 나열 제목) 그대로 승인까지 감. PM "태그 생성이 빠졌다")
+  var paAutoQueue=[];
+  function paDrainAuto(){ if(paJob.polling) return; var next=paAutoQueue.shift(); if(next) paKick(next, true); }
   var galWait="";      // 혁신⑥ — 게시 완료 저장이 서버에 실린 뒤 홈페이지 갤러리로 보낼 promo id (서버가 저장된 기록으로 검증하므로 저장이 먼저다)
   var mapWait=false;   // 혁신⑦ — 게시 완료(posted) 저장이 서버에 실린 뒤 시공 지도 데이터를 재빌드할지 (id 불필요 — 서버가 전량 재빌드)
   function livePromo(){ return promoItems.filter(function(p){ return p && p.del!==1; }); }
@@ -13174,7 +13178,7 @@
         + (shown.length? shown.map(function(p){
             return '<div class="pipe-card" data-pr="'+esc(p.id)+'"><b>'+esc(p.title||"(제목 없음)")+'</b>'
               +'<div class="s">'+esc(p.region||"지역 미정")+' · '+esc(p.facility||"")+' · 사진 '+((p.photos||[]).length)+'장</div>'
-              +'<div class="s">'+esc(promoGenLabel(p))+' · '+esc(p.by||"")+' '+esc((p.updated||""))+(p.note?' · 반려: '+esc(p.note):'')
+              +'<div class="s">'+esc(promoGenLabel(p))+(p.ai? ' · 태그 '+((p.tags||[]).length)+'개' : ((p.photos||[]).length? ' · <span style="color:#a5382c;">사진AI 미생성 — 태그 없음</span>' : ''))+' · '+esc(p.by||"")+' '+esc((p.updated||""))+(p.note?' · 반려: '+esc(p.note):'')
               +(paResults[p.id]?' · <b>AI 초안 도착</b>':'')+'</div></div>';
           }).join("") : '<div class="s" style="color:var(--sub);padding:4px;">없음</div>')
         + '</div>';
@@ -13345,11 +13349,11 @@
     var b=(document.getElementById("promoDetBody")||{}).value||"";
     var o=/석면|철거|해체/.test(b) ? PROMO_ORG.con : PROMO_ORG.env;
     var L=[];
-    L.push('<p style="margin:26px 0 6px;font-weight:700;">'+promoEscHtml(o.name)+'</p>');
-    L.push('<p style="margin:2px 0;">'+promoEscHtml(o.biz)+'</p>');
-    L.push('<p style="margin:2px 0;">'+promoEscHtml(o.addr)+'</p>');
-    if(PROMO_TEL) L.push('<p style="margin:2px 0;">문의 '+promoEscHtml(PROMO_TEL)+'</p>');
-    L.push('<p style="margin:2px 0;"><a href="https://'+PROMO_SITE+'">'+PROMO_SITE+'</a></p>');
+    L.push('<p style="margin:26px 0 6px;font-weight:700;text-align:center;">'+promoEscHtml(o.name)+'</p>');
+    L.push('<p style="margin:2px 0;text-align:center;">'+promoEscHtml(o.biz)+'</p>');
+    L.push('<p style="margin:2px 0;text-align:center;">'+promoEscHtml(o.addr)+'</p>');
+    if(PROMO_TEL) L.push('<p style="margin:2px 0;text-align:center;">문의 '+promoEscHtml(PROMO_TEL)+'</p>');
+    L.push('<p style="margin:2px 0;text-align:center;"><a href="https://'+PROMO_SITE+'">'+PROMO_SITE+'</a></p>');
     return L.join("");
   }
   function promoBuildPostHtml(title, body, imgs){
@@ -13362,9 +13366,22 @@
     function imgTag(i){
       var im=imgs[i]; if(!im) return "";
       used[i]=1;
-      return '<p style="margin:14px 0;"><img src="'+im.url+'" alt="'+promoEscHtml(im.name||("사진 "+(i+1)))+'" style="max-width:100%;height:auto;display:block;"></p>';
+      return '<p style="margin:14px 0;text-align:center;"><img src="'+im.url+'" alt="'+promoEscHtml(im.name||("사진 "+(i+1)))+'" style="max-width:100%;height:auto;display:inline-block;"></p>';
     }
-    function pushText(t){ t=String(t||"").trim(); if(t) out.push('<p style="margin:12px 0;line-height:1.8;">'+promoEscHtml(t)+'</p>'); }
+    // v352(PM 9/11 #31ⓑ — 직원 수정본 5편 실측): 담당자가 매번 손으로 하던 포장 — 전 문단 가운데 정렬, 한 줄 20자 안팎 어절 개행(모바일 폭),
+    //   질문형 소제목 굵게 + 앞에 구분선. 문장은 손대지 않는다(5편 모두 문장 수정 0건). 20자 개행을 손으로 하다 '욕실'→'실' 같은 글자 소실이 있었다.
+    function promoWrap20(t){
+      var out=[], cur="";
+      String(t).split(" ").forEach(function(w){ if(!w) return; if(cur && (cur+" "+w).length>22){ out.push(cur); cur=w; } else cur=cur? cur+" "+w : w; });
+      if(cur) out.push(cur);
+      return out.map(promoEscHtml).join("<br>");
+    }
+    function promoIsSubhead(t){ return t.length<=45 && /[?？]$/.test(t) && t.indexOf(". ")<0; }   // 프롬프트 규칙: 질문형 소제목은 기호 없는 한 줄
+    function pushText(t){
+      t=String(t||"").trim(); if(!t) return;
+      if(promoIsSubhead(t)){ out.push('<hr style="border:0;border-top:1px solid #ddd;margin:22px 0 14px;"><p style="margin:12px 0;line-height:1.8;text-align:center;font-weight:700;">'+promoEscHtml(t)+'</p>'); return; }
+      out.push('<p style="margin:12px 0;line-height:1.8;text-align:center;">'+promoWrap20(t)+'</p>');
+    }
     function pushNums(nums, cap){
       var seen={}, any=false;
       for(var k=0;k<nums.length;k++){
@@ -13377,7 +13394,7 @@
       // 마커 설명은 버리지 않고 사진 밑 캡션으로 싣는다 — 네이버 공식 가이드(이미지 아래 부연 설명이
       // 일반적)와 상위 노출 글 실측(서술형 캡션)에 맞춘 것(2026-08-16 외부조사).
       cap=String(cap||"").trim();
-      if(any && cap) out.push('<p style="margin:-8px 0 14px;color:#777;font-size:13px;">'+promoEscHtml(cap)+'</p>');
+      if(any && cap) out.push('<p style="margin:-8px 0 14px;color:#777;font-size:13px;text-align:center;">'+promoEscHtml(cap)+'</p>');
     }
     function handleLine(ln){
       // 대괄호 마커 — 줄 안 어디에 있어도, 몇 개가 있어도 그 자리마다 사진을 끼우고 앞뒤 글은 살린다
@@ -13418,7 +13435,7 @@
       if(orphanAt>=0) out.splice(orphanAt, 0, note, rest.join(""));
       else out.push(note, rest.join(""));
     }
-    return '<h2 style="font-size:20px;margin:0 0 16px;">'+promoEscHtml(title)+'</h2>'+out.join("")+promoTailHtml();
+    return '<h2 style="font-size:20px;margin:0 0 16px;text-align:center;">'+promoEscHtml(title)+'</h2>'+out.join("")+promoTailHtml();
   }
   function promoOpenPost(){
     var p=promoDetId? promoFind(promoDetId) : null; if(!p) return;
@@ -13758,7 +13775,11 @@
   function paKick(promoId, auto){
     var p=promoFind(promoId);
     if(!p || !canDo("promo")) return;
-    if(paJob.polling){ if(!auto) paStat("이미 생성 중입니다. 끝난 뒤 다시 시도하세요.", true); return; }
+    if(paJob.polling){
+      if(auto){ if(paAutoQueue.indexOf(promoId)<0) paAutoQueue.push(promoId); }   // v352: 버리지 않고 줄 세운다 — 앞 생성이 끝나면 이어서
+      else paStat("이미 생성 중입니다. 끝난 뒤 다시 시도하세요.", true);
+      return;
+    }
     if(!(p.photos||[]).length){ if(!auto) paStat("이 기록에 사진이 없습니다.", true); return; }
     paJob={ polling:true, id:"", promo:p.id, tries:0 };   // 요청 중에도 버튼 잠금
     if(promoDetId===p.id) paStat("사진으로 다시 쓰는 중… 사진이 많으면 5~10분 걸립니다. 화면을 닫아도 계속됩니다.");
@@ -13766,12 +13787,12 @@
     gwCall("gw-promo-ai", paBody(p.id, p.contract_id)).then(function(res){
       if(res.status===401){ paJob.polling=false; paRenderBtns(); onSessionInvalid(); return; }
       if(res.status===200 && res.body && res.body.ok && res.body.job){ paStartPoll(res.body.job, p.id); return; }
-      paJob.polling=false; paRenderBtns();
+      paJob.polling=false; paRenderBtns(); paDrainAuto();
       if(auto){ renderPromo(); return; }
       if(res.status===404){ paStat("백엔드 함수(gw-promo-ai)가 아직 배포되지 않았습니다. 지금 초안(변형 생성기)을 그대로 쓰세요.", true); return; }
       paStat(paFailText((res.body&&res.body.code)||"", (res.body&&res.body.error)||("HTTP "+res.status)), true);
     }).catch(function(){
-      paJob.polling=false; paRenderBtns();
+      paJob.polling=false; paRenderBtns(); paDrainAuto();
       if(!auto) paStat("요청을 보내지 못했습니다(네트워크). 연결을 확인하고 다시 시도하세요.", true);
     });
   }
@@ -13792,7 +13813,7 @@
       if(!paJob.polling || paJob.id!==jobId) return;   // 새 작업이 시작되면 이전 폴링은 조용히 종료
       paJob.tries++;
       if(paJob.tries>360){   // 2초 × 360회 = 12분 (서버 생성 타임아웃 10분 + 여유)
-        paJob.polling=false; paRenderBtns();
+        paJob.polling=false; paRenderBtns(); paDrainAuto();
         if(promoDetId===promoId) paStat("12분 안에 끝나지 않았습니다. 잠시 뒤 다시 시도하거나, 지금 초안을 그대로 쓰세요.", true);
         return;
       }
@@ -13801,7 +13822,7 @@
         if(res.status===401){ paJob.polling=false; paRenderBtns(); onSessionInvalid(); return; }
         var blob=(res.status===200)? paJobBlob(res.body) : null;
         if(blob && (blob.status==="done" || blob.status==="fail")){
-          paJob.polling=false; paFinish(blob, promoId); return;
+          paJob.polling=false; paFinish(blob, promoId); paDrainAuto(); return;
         }
         if(promoDetId===promoId){
           var sec=paJob.tries*2;
@@ -13852,6 +13873,7 @@
     promoStamp(p); schedulePromoSave();
     paRenderBtns(); renderPromo();
     paStat("사진 기반 초안으로 바꿔 저장했습니다"+(r.used_tokens? " (토큰 "+r.used_tokens+")":"")
+      +" · 태그 "+((r.tags&&r.tags.length)||0)+"개"
       +(r.tt? " · 제목 원형 "+paTitleTypeLabel(r.tt) : "")
       +((r.warn&&r.warn.length)? " · 점검: "+r.warn.join(" / ") : "")
       +(paTitleWarnOnly(r.warn)? " · 제목 경고만이면 재생성 대신 제목 칸만 고쳐 저장하면 됩니다(첫 두 어절 바꾸기 / 겹친 낱말 하나 바꾸기 / 쉼표·대시 자리 바꾸기)" : "")
@@ -14294,6 +14316,18 @@
     });
   });
   document.getElementById("ntfClose").addEventListener("click", function(){ document.getElementById("ntfBackdrop").classList.remove("show"); });
+  // v352: 엑셀은 액션즈가 만들어 올린 파일이라 숨김·노선 변경이 즉시 반영되지 않는다. 서버가 변경 뒤 재생성을 요청하므로(약 2~3분)
+  //   "변경 전 파일"을 받으려는 사람에게 사정을 말하고 고르게 한다. 재생성 요청이 실패(토큰 권한 없음 등)하면 그 사실도 숨기지 않는다.
+  function abXlsxStaleOk(b){
+    var g=b.regen||{}, made=b.ts? new Date(b.ts) : null, chg=g.requested_at? new Date(g.requested_at) : null;
+    function hm(d){ return d? (("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2)) : "?"; }
+    var msg="이 파일은 "+hm(made)+" 생성본입니다. 그 뒤 "+hm(chg)+"에 숨김·노선 변경이 있어 아직 반영되지 않았습니다.\n\n";
+    if(!b.covered) msg+="이 날짜는 자동 재생성 범위(최근 7일) 밖이라 이 파일은 다시 만들어지지 않습니다.";
+    else if(g.dispatched_at && g.code===204) msg+="재생성이 요청되어 있습니다(약 2~3분). 잠시 뒤 다시 받으면 반영본이 옵니다.";
+    else if(g.skipped) msg+="직전 재생성이 진행 중이라 뒤이어 한 번 더 만들어집니다(약 2~5분).";
+    else msg+="자동 재생성 요청이 실패했습니다("+(g.err||"원인 미상")+") — 관리자: Netlify 환경변수 GW_APPDATA_GITHUB_TOKEN(appdata 저장소 actions 쓰기)을 확인하세요. 그 전까지는 다음 날 08:25 생성본에 반영됩니다.";
+    return confirm(msg+"\n\n그래도 지금 이 파일을 받을까요?");
+  }
   document.getElementById("abXlsxBtn").addEventListener("click", function(){
     var day=(document.getElementById("abDate")||{}).value||"";
     if(!day){ alert("날짜를 먼저 선택하세요."); return; }
@@ -14302,6 +14336,7 @@
       b.disabled=false;
       if(res.status===404){ alert("이 날짜의 일지 파일이 아직 없습니다. 매일 아침 08:25에 최근 7일치가 생성됩니다."); return; }
       if(res.status!==200||!res.body||!res.body.b64){ alert("내려받기 실패 — 잠시 후 다시 시도하세요."); return; }
+      if(res.body.stale && !abXlsxStaleOk(res.body)) return;   // v352(PM 9/11 #33): 숨김·노선 변경이 아직 반영되지 않은 파일이면 먼저 알린다
       try{
         var bin=atob(res.body.b64), arr=new Uint8Array(bin.length);
         for(var i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i);
