@@ -2112,6 +2112,13 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   T('ab_xlsx: 파일 ts(1000) < 변경(5000) → stale:true · covered:true(7일 안) · regen{requested_at,dispatched_at,code} · by 없음', r.code === 200 && r.body.stale === true && r.body.covered === true && r.body.regen && r.body.regen.requested_at === 5000 && r.body.regen.code === 204 && !('by' in r.body.regen), JSON.stringify(r.body.regen));
   r = await ab({ action: 'ab_xlsx', day: old }, tokA);
   T('ab_xlsx: 20일 전 날짜 → stale:true·covered:false(재생성 범위 밖)', r.code === 200 && r.body.stale === true && r.body.covered === false, JSON.stringify([r.body.stale, r.body.covered]));
+  // 9/11 실측: 변경 때 dispatch 404(토큰 없음) → 토큰 넣고 배포해도 재시도가 없어 확인창이 옛 404를 계속 보여줌 → 내려받기 때 재시도
+  mem.gw_data['allbaro:xlsx_regen'] = { schema: 1, requested_at: 5000, dispatch_code: 404, dispatch_err: 'HTTP_404', reason: 'unhide' };
+  const before = calls.length;
+  r = await ab({ action: 'ab_xlsx', day: today }, tokA);
+  T('ab_xlsx: stale + 직전 dispatch 404 → 내려받기 때 다시 보냄 · 응답 regen.code 204 · requested_at은 변경 시각(5000) 유지 · blob reason retry', r.code === 200 && calls.length === before + 1 && r.body.regen && r.body.regen.code === 204 && r.body.regen.requested_at === 5000 && regen().dispatch_code === 204 && regen().reason === 'retry' && regen().requested_at === 5000, JSON.stringify(r.body.regen));
+  r = await ab({ action: 'ab_xlsx', day: today }, tokA);
+  T('바로 또 내려받기 → 접수됐으므로 재시도 없음(dispatch 1회 그대로)', r.code === 200 && calls.length === before + 1 && r.body.regen.code === 204, '');
   mem.gw_data['allbaro:xlsx:' + today].ts = 9000;
   r = await ab({ action: 'ab_xlsx', day: today }, tokA);
   T('ab_xlsx: 재생성 뒤(ts 9000 > 5000) → stale:false · regen null', r.code === 200 && r.body.stale === false && r.body.regen === null, '');

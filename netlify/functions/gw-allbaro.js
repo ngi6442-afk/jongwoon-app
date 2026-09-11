@@ -767,10 +767,15 @@ async function handleXlsx(st, d, R) {
   if (!r.data || !r.data.b64) return jr(404, { ok: false, code: 'NO_XLSX', request_id: R });
   // v352: 파일 생성(ts) 뒤에 숨김·노선 변경(requested_at)이 있었으면 stale — 앱이 내려받기 전에 알린다.
   //   재생성은 최근 REGEN_DAYS_BACK일만 다시 만드므로 그보다 오래된 날짜는 covered:false(그 파일은 바뀌지 않는다).
-  let regen = null;
-  try { const g = await blobGet(st, REGEN_KEY); if (g.ok && g.data) regen = regenBrief(g.data); } catch (e) {}
+  let regen = null, gdoc = null;
+  try { const g = await blobGet(st, REGEN_KEY); if (g.ok && g.data) { gdoc = g.data; regen = regenBrief(g.data); } } catch (e) {}
   const ts = Number(r.data.ts) || 0;
   const stale = !!(regen && regen.requested_at && ts && regen.requested_at > ts);
+  // v352 후속(9/11 실측): 변경 시점의 dispatch가 실패(토큰 없음·404)했다가 토큰이 뒤늦게 들어오면, 변경을 한 번 더 하기 전엔 재시도가 없어
+  //   내려받기 확인창이 계속 옛 실패를 보여줬다. 내려받기 시점에 '반영 전 + 직전 요청 실패'면 여기서 다시 한 번 보낸다(같은 디바운스·회원 정보 무관).
+  if (stale && gdoc && gdoc.dispatch_code !== 204 && !gdoc.skipped) {
+    try { const again = await requestXlsxRegen(st, 'retry', ''); if (again) { again.requested_at = gdoc.requested_at; regen = regenBrief(again); await blobSet(st, REGEN_KEY, again); } } catch (e) {}
+  }
   const covered = (function () { const t = Date.parse(day + 'T00:00:00+09:00'); return isFinite(t) && (Date.now() - t) < (REGEN_DAYS_BACK + 1) * 86400000; })();
   return jr(200, { ok: true, name: String(r.data.name || ('운반일지_' + day + '.xlsx')),
     b64: String(r.data.b64), ts: r.data.ts || null, total: r.data.total, stale: stale, covered: covered, regen: stale ? regen : null, request_id: R });
