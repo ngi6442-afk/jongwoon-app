@@ -50,17 +50,17 @@ h2{font-size:13px;margin-bottom:8px}
   <div class="row" onclick="go('v2')"><b>2&nbsp; 인증·자격 &nbsp;◀ ★인정 취득</b><div class="track"><div class="fillb" style="width:68%"></div><span>68</span></div></div>
   <div class="row" onclick="go('v3')"><b>3&nbsp; 홍보·검색노출</b><div class="track"><div class="fillb t" style="width:97%"></div><span>97</span></div></div>
   <div class="row" onclick="go('v4')"><b>4&nbsp; 경영 기반 &nbsp;◀ 상장 트랙 가동</b><div class="track"><div class="fillb" style="width:78%"></div><span>78</span></div></div>
-  <div class="lane">★9/11 — 물어보기 1단계 배포(v348)→첫날 504·대화 잔존 두 실사고를 v349·v350으로 수리·이름 로그인 종료·일용직 참여 배지·회사소개서 v3·나라장터 매뉴얼 폐기·파일철 라벨 v2(사진 실측 7행형 2폭)·docs 원격 동기. 결정방식(decide) 오라벨 표본 실측 진행 중. 이번 주 축: ①조기퇴근 9월 공문(9/12 기안) ②석면 방문평가 D-10 창고 실사 ③KOSHA 서명·편철→포털 신청 ④노무사 창구 확보(안건 14건) ⑤블로그 첫 편 오늘</div>
+  <div class="lane">★9/11 — 운반일지 새 노선 추가(v351)·엑셀 자동 재생성(v352)·사진AI 대기열·블로그 서식 포장·인허가 2차 브리핑 / 물어보기 1단계 배포(v348)→첫날 504·대화 잔존 두 실사고를 v349·v350으로 수리·이름 로그인 종료·일용직 참여 배지·회사소개서 v3·나라장터 매뉴얼 폐기·파일철 라벨 v2(사진 실측 7행형 2폭)·docs 원격 동기. 결정방식(decide) 오라벨 표본 실측 진행 중. 이번 주 축: ①조기퇴근 9월 공문(9/12 기안) ②석면 방문평가 D-10 창고 실사 ③KOSHA 서명·편철→포털 신청 ④노무사 창구 확보(안건 14건) ⑤블로그 첫 편 오늘</div>
   <hr>
   <h2>지금 중요한 순서 — 전체 (상위 8)</h2>
-  <div class="item done" style="margin-top:10px"><span class="m">☑</span>★v350(9/11) — 실사고: PM이 로그아웃 뒤 새로고침 없이 김호태로 들어가니 **PM의 물어보기 대화가 남아 있었다**(대화는 서버에 없고 화면에만) → 로그아웃·로그인 양쪽에서 비움. 일용직 이름 옆 참여 종류 배지(석면/준설/철거 N회, [근로자 추가] 목록에도). 인허가 탭 옛 석면 블록 제거. 나라장터 실적증명서 매뉴얼(JW-03-02-001) 폐기(PM &quot;구 나라장터 내용&quot;)·회사소개서 v43→v3·이름 로그인 종료</div>
+  <div class="item done" style="margin-top:10px"><span class="m">☑</span>★v352(9/11) — PM &quot;숨김 눌러도 엑셀에 반영 안 됨&quot;: 엑셀은 액션즈가 매일 08:25 만드는 파일이라 그 뒤 변경은 다음 날 반영되던 것 → 숨김·노선 지정·노선 추가·재정렬 뒤 서버가 워크플로를 바로 한 번 더 돌리고(2분 디바운스), 내려받기 때 &quot;HH:MM 생성본 — 변경 미반영&quot; 확인창. **토큰 권한(GW_APPDATA_GITHUB_TOKEN) 첫 실측 필요**. 같은 배포에 사진AI 자동 생성 대기열(태그 없던 글은 태그 코드 상실이 아니라 두 기록 연달아 등록 → 둘째 생성이 소리 없이 버려진 실사고)·블로그 서식 포장(직원 수정본 5편 실측: 가운데 정렬·20자 개행·소제목 굵게+구분선·정화조 삭제·물음표) 반영. servertest 511·uismoke 통과</div>
+  <div class="item done"><span class="m">☑</span>★v351(9/11) — PM &quot;R40 추가 및 드롭다운 맨 위에 새 노선 추가 버튼&quot;: 9/10 한라티씨→거성산업 분진 미매칭. 노선 하나 더하려면 코드 4곳 배포가 필요했고 양식은 39행 다음이 바로 합계라 줄이 없었다 → 양식 원본 **예비 행 40~49 삽입**(합계 50행·광재 51~54), 기본표 R40, 앱 [노선 지정] 맨 위 &quot;＋ 새 노선으로 추가…&quot;(폼 프리필 → 서버 ab_route_add → 바로 지정). 서버·워커·엑셀 봇이 같은 추가분(blob routes_extra)을 본다. 액션즈 push 트리거로 아카이브 즉시 재생성 실측(11:11 — R40 줄·예비 행 숨김·합계 50행 확인)</div>
+  <div class="item done"><span class="m">☑</span>★v350(9/11) — 실사고: PM이 로그아웃 뒤 새로고침 없이 김호태로 들어가니 **PM의 물어보기 대화가 남아 있었다**(대화는 서버에 없고 화면에만) → 로그아웃·로그인 양쪽에서 비움. 일용직 이름 옆 참여 종류 배지(석면/준설/철거 N회, [근로자 추가] 목록에도). 인허가 탭 옛 석면 블록 제거. 나라장터 실적증명서 매뉴얼(JW-03-02-001) 폐기(PM &quot;구 나라장터 내용&quot;)·회사소개서 v43→v3·이름 로그인 종료</div>
   <div class="item done"><span class="m">☑</span>★물어보기(질문창 1단계) 배포·수리(v348~v349, 9/10~11) — 실측 34문항 뒤 PM GO. 도구 8개 읽기 전용·권한은 서버 permOf 그대로·프롬프트 캐싱·서버 상한(하루 40회·월 1,200만 토큰)·감사로그. 첫날 김호태 계정에서 504(함수 시간 초과) 실사고 → 백그라운드+폴링으로 수리. 권한 밖 자료를 &quot;원장에 없다&quot;고 하던 문구도 정정. 이름 로그인 종료(GW_ALLOW_NAME_LOGIN=off, 재직 14명 전원 아이디)</div>
   <div class="item done"><span class="m">☑</span>★파일철 라벨 v2(9/11) — PM이 보낸 22_파일철 사진 7장 실측: 사무실에 이미 7행 기록물철형(관리번호·생산년도·보존기간·분류번호·제목·기관명)이 붙어 있고 바인더가 3cm·5cm 두 종류. 같은 형식으로 45mm·28mm 두 폭, 보존기간은 규정 제13조①에서. 42종 18쪽. 회사소개서 판번호 v43→v3 정정(문서대장·README·문서함 첨부명)</div>
   <div class="item done"><span class="m">☑</span>★(건설)현장 탭 신설(v347, 9/10) — 석면 131·준설 19·철거 7 = **157건을 한 대장에서 종류로 갈라** 본다. 데이터는 제자리(col:asbestos)에 두고 kind 칸만 더했다(산안법 30년 보존 대장을 옮기는 위험을 피한다). 연번은 종류별(석면 #1~131은 노동부 신고 대장 순번 그대로). 권한 site 신설(기본 숨김·관리부·운영부). [근로자 추가]는 명부에 없으면 그 자리에서 등재한다. 곁가지로 gw-auth cleanPerms가 새 모듈을 전 직원에게 열던 잠재 결함을 막았다</div>
   <div class="item done"><span class="m">☑</span>★질문창 1단계 비용 실측 완료(9/10) — 실제 업무 질문 34문항 전부 성공. 1문항 평균 입력 4,930·출력 521 토큰·왕복 2.1·8.4초(약 30원). **입력의 77%가 고정비**(도구 설명서 8개가 왕복마다 재전송)라 프롬프트 캐싱으로 크게 준다. 계측기는 관리자 전용·읽기 전용이고 측정이 끝나면 지운다. PM GO 대기</div>
   <div class="item done"><span class="m">☑</span>★석면 대장 투입 근로자 소급 등재(v340, 9/10) — 노동부 신고 LIST sheet1 131행과 앱 131건이 완전한 1:1(짝 못 지은 행 0). 127건·연인원 633명, 일용직 122명 신규. 적대 검증이 5건을 뒤집었다(Sheet2 전용 9명 보류·오타 2건 통합·남성초 완료보고서 재판독으로 9명→19명 정정). 남은 판단 8건은 확인목록으로</div>
-  <div class="item done"><span class="m">☑</span>★석면 저장 사고 원인 규명·재설계 종결(v335~v337, 9/9~10) — PM &quot;저장이 안 된다&quot;의 진짜 원인은 저장이 아니라 데이터 모양이었다: 9/2 일괄 입력 130건이 member_ids·worker_ids를 문자열 &quot;[]&quot;로 들고 있어 renderAsb가 던지고, 같은 문장에 이어 붙은 닫기가 실행되지 않았다. asList() 입구 교정·닫기와 토스트 우선·정렬 비교자 String 고정. 성공 문구는 &quot;저장했습니다&quot; 한 줄뿐(PM 9/10). 중복 17건 del 처리</div>
-  <div class="item done"><span class="m">☑</span>★인허가·석면 대장 권한 봉쇄(v339, 9/10 PM &quot;운영 및 관리부만&quot;) — 서버 기본값이 view라 명시적으로 닫지 않은 현장 4명(김호태·김영미·김영진·김형태)에게 근로자 인적사항 30년 보존 대장이 열려 있었다. 4명 hide + 기본 숨김 집합을 서버·앱 PERM_CLOSED 한 곳으로 통일해 신규 직원은 닫힌 채 시작. 곁가지로 홍보 탭 누수도 해소, uismoke 대조 검사 2건 추가</div>
   <div class="foot">갱신: "진척도 갱신해"(모바일 D → 이 벽지 자동 생성) · 이 판 생성 기준: 2026-09-11</div>
 </div>
 
@@ -77,7 +77,7 @@ h2{font-size:13px;margin-bottom:8px}
   <div class="rowc" onclick="go('v1-8')"><b>실적·자격 DB (기능)</b><div class="track2"><div class="fillb" style="width:50%"></div></div><span class="pv">50</span></div>
   <div class="rowc" onclick="go('v1-9')"><b>실사용 (사무실 완료·현장 보류)</b><div class="track2"><div class="fillb" style="width:70%"></div></div><span class="pv">70</span></div>
   <div class="rowc focus" onclick="go('v1-10')"><b>외부신고 자동화 (화관법) ◀ 무인 가동</b><div class="track2"><div class="fillb t" style="width:99%"></div></div><span class="pv">99</span></div>
-  <div class="rowc focus" onclick="go('v1-11')"><b>운반일지·배차 자동화 ◀ 무인 가동</b><div class="track2"><div class="fillb t" style="width:92%"></div></div><span class="pv">92</span></div>
+  <div class="rowc focus" onclick="go('v1-11')"><b>운반일지·배차 자동화 ◀ 무인 가동</b><div class="track2"><div class="fillb t" style="width:94%"></div></div><span class="pv">94</span></div>
   <div class="rowc focus" onclick="go('v1-lawwatch')"><b>법령 워치 (신규 자동화) ◀ 가동</b><div class="track2"><div class="fillb t" style="width:95%"></div></div><span class="pv">95</span></div>
   <div class="rowc focus" onclick="go('v1-12')"><b>대표 업무유연성 · 기기 배치도 ◀ 결재 3차+기안 화면 배포</b><div class="track2"><div class="fillb t" style="width:96%"></div></div><span class="pv">96</span></div>
   <div class="rowc focus" onclick="go('v1-13')"><b>관리자 기기 보안 ◀ 9/3 정적 노출 차단·진척도 탭</b><div class="track2"><div class="fillb" style="width:68%"></div></div><span class="pv">68</span></div>
@@ -105,6 +105,7 @@ h2{font-size:13px;margin-bottom:8px}
   <div class="item done"><span class="m">☑</span>자동화 감시 1단계 가동(8/19) — 매일 09/16시 앱 밖에서 화관법·올바로·입찰 무음 감지, 웹푸시 유효 24h</div>
   <div class="item done"><span class="m">☑</span>★수용 위험 3건 — 재검토 종결(9/1 PM ㅇㅋ): 셋 다 수용 유지(사후적발 체제). 연 1회 재검토로 주기화(다음 2027-08, 감사로그 표본 점검과 세트)</div>
   <div class="item"><span class="m">☐</span>기기게이트 마감</div>
+  <div class="item now"><span class="m">▶</span>★인허가 2차 착수 브리핑(9/11, PM ㄱ) — v322 선행확인 시안 폐기·D-30 자동 지시 우선. 98행 주기가 자유 문장(40여 꼴)이라 ⓐ주기 정규화 표(검수판) → ⓑ다음 기한 계산·완료 처리 → ⓒ이번 달 탭 → ⓓ08:00 크론이 D-30 회차를 담당자 내 할 일에 1회 등재+푸시. 결정 4건(담당자·증빙·알림 시점·조건부 31행은 기준일만 입력) 답 대기. 개인 14행은 persons 명부 뒤(2차-b)</div>
   <div class="note">주의: member-relay(홈페이지 CMS)·AI_BUILD_GITHUB_TOKEN은 사용 중 — 지우면 안 됨</div>
 </div>
 
@@ -229,7 +230,7 @@ h2{font-size:13px;margin-bottom:8px}
 </div>
 
 <div class="view" id="v1-11"><span class="back" onclick="go('v1')">← 업무플랫폼</span>
-  <h1>운반일지·배차 자동화 — 92 · 무인 가동</h1>
+  <h1>운반일지·배차 자동화 — 94 · 무인 가동</h1>
   <div class="item done" style="margin-top:10px"><span class="m">☑</span>클라우드 수집 v256(8/12) — 올바로 운반인계서를 매일 자동 수집, PC 꺼져도 돌아감</div>
   <div class="item done"><span class="m">☑</span>2단계 v258(8/12) — 매칭 정밀화(학습사전 오배정·충돌 차단)·수량 집계·수동추가</div>
   <div class="item done"><span class="m">☑</span>EP더스트 조업일(처리인수 06시~익일 06시) 재배치 + 올바로 시각 필드 4종 추출·inspect 모드 — 8/13 실측</div>
@@ -253,6 +254,7 @@ h2{font-size:13px;margin-bottom:8px}
   <div class="item done"><span class="m">☑</span>운반일지 대표 결재 — 상신 버튼 배포(9/2, 완성시점 규칙: 오늘-2일 무경고·최신은 잠정 확인). 자동 기안은 결재 2차</div>
   <div class="item"><span class="m">☐</span>미래 피벗: 기사 앱 운행 시작/종료 버튼 → 즉시 일지(GPS 연계)</div>
   <div class="item done"><span class="m">☑</span>★BCT/덤프 질문 종결(9/1) — 기준=차량번호(1743·5749=BCT, PM 확정). 8월 전수 검증 3중 일치(8/20 톤수 정확 일치·덤프일엔 두 차량 부재·매일 런은 한국특강 노선). ★이미 자동 가동 중이었음(차량탭 트랙터 등록+차량분리 매처) — 코드 추가 불요. 8/12부터 열려 있던 마지막 질문 소멸</div>
+  <div class="item done"><span class="m">☑</span>★v351·v352(9/11) — 새 노선을 앱에서 추가(양식 예비 행 40~49, 기본표 R40 한라티씨→거성산업 분진) · 숨김/노선 변경 뒤 엑셀 자동 재생성(액션즈 dispatch, 2분 디바운스) + 내려받기 &quot;변경 미반영&quot; 확인창. 남은 실측 = 토큰 권한(403이면 GW_APPDATA_GITHUB_TOKEN)</div>
   <div class="note">미확정 노선은 조용히 배정하지 않고 미매칭으로 띄운다(오배정 차단). 확인 문서: 07_운반일지_자동화\확인대기_PM.md</div>
 </div>
 
@@ -447,6 +449,8 @@ h2{font-size:13px;margin-bottom:8px}
   <div class="item done"><span class="m">☑</span>GW_GALLERY_GITHUB_TOKEN 등록 완료(8/25 13:00) — ⑥갤러리·⑦지도 릴레이가 실제로 PR을 내보내는 상태가 됨</div>
   <div class="item"><span class="m">☐</span>(킵) 사진대지 hwpx · ★PROMO_TEL 전화번호 확정만 PM 결정 1건</div>
   <div class="item done"><span class="m">☑</span>★정착 완료 선언(8/31) — 기록→초안 생성→검수→복붙 게시→홈페이지 갤러리·지도 자동 반영까지 전 구간 운영 상태. 권민지 단독 사이클 이관 완료. 남은 것은 개선 킵뿐</div>
+  <div class="item done"><span class="m">☑</span>★v352(9/11) — &quot;태그 생성이 빠졌다&quot; 조사: 태그 코드는 v320 전후 어디서도 안 지워짐, 태그 없던 글은 사진AI가 돌지 않은 기록(두 건 연달아 등록 → 둘째 자동 생성 버려짐) → 자동 생성 대기열·카드에 &quot;사진AI 미생성/태그 n개&quot;·태그 사슬 회귀검사. 직원 수정본 5편 실측(문장 수정 0, 포장만) → 복사 HTML 가운데 정렬·20자 개행·소제목 굵게+구분선, 프롬프트 물음표·정화조/저수조 제외. 네이버 붙여넣기 생존 실측 1회 남음</div>
+  <div class="item"><span class="m">☐</span>사진 모자이크(PM 9/11 ⓐ) — 실측: 사진은 1600px JPEG로 gw_files에 저장, 공유 URL은 서버가 그대로 흘림. 경로 3개 중 추천 = Claude 비전 좌표(장당 9~24원) + jimp 픽셀화(0.75초) + 사람 확인 격자 → 원본 보존 mask:&lt;id&gt;. 방식 브리핑 → PM ㄱ 후 착수</div>
   <div class="note">계약 차단 규칙: 프롬프트로 말리지 않고 애초에 안 보낸다 — CONTRACT_사진AI.md</div>
 </div>
 
