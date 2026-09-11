@@ -1,0 +1,1675 @@
+{
+ "schema": 1,
+ "version": "2026-09-11a",
+ "note": "의무 대장 98행 주기 정규화(v353). 원천 = 등재표 cycle·basis 문장(새 법령 조사 없음). 7묶음 병렬 정규화 → 묶음마다 문장 충실성·계산 시뮬레이션 2렌즈 반박 → 완전성 비평 → 반박 반영 19행. 검수판에서 PM이 행별 확인.",
+ "items": [
+  {
+   "no": 1,
+   "sched": {
+    "type": "interval",
+    "every_n": 5,
+    "every_unit": "year",
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "issued",
+    "lic_id": "lseed07",
+    "grace_days": 90,
+    "auto": true,
+    "needs_manual_date": false,
+    "note": "허가받은 날부터 5년마다(lseed07 허가일 2015-03-24 기준 → 2020·2025·2030…), 주기 경과일부터 3개월 이내 제출=유예 90일. 개인화물 운송사업자 제외라 '일반화물' 전제(precheck). 허가증 '확인요'라 허가일 재확인 필요",
+    "confidence": "mid"
+   }
+  },
+  {
+   "no": 2,
+   "sched": {
+    "type": "fixed",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": 3,
+    "fixed_day": 0,
+    "base": "none",
+    "lic_id": "lseed07",
+    "grace_days": null,
+    "auto": true,
+    "needs_manual_date": false,
+    "note": "전년도 실적을 다음연도 3월 말일까지 입력 → 매년 3월 말일 고정. 개인 운송사업자 제외(일반화물 전제), 협회 등 대행 위임 가능",
+    "confidence": "high"
+   }
+  },
+  {
+   "no": 3,
+   "sched": {
+    "type": "fixed",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": 12,
+    "fixed_day": 0,
+    "base": "none",
+    "lic_id": "lseed07",
+    "grace_days": null,
+    "auto": true,
+    "needs_manual_date": false,
+    "note": "제출기한이 아닌 연간 실적 판정이라 산정구간 종료일(그 해 12월 31일)을 매년 회차일로 잡음(가정 1개). 사업기간 1년 미만이면 허가일~12/31 구간. '허가 후 6개월 실적 5% 미달' 처분 사유는 1회성이라 별도. 개인화물이면 비대상",
+    "confidence": "mid"
+   }
+  },
+  {
+   "no": 4,
+   "sched": {
+    "type": "fixed",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": 12,
+    "fixed_day": 0,
+    "base": "none",
+    "lic_id": "lseed07",
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": false,
+    "note": "'매년 1회 이상'을 달력연도 단위(매년 12/31까지)로 읽음 — 대상 판정이 '전년도 10/31 기준', 면제가 '해당 연도 이수'라 연도 단위(문장 충실성·계산 두 렌즈 일치). 개인 단위(지입차주 포함)라 회차 미생성 — persons 명부 뒤",
+    "confidence": "mid"
+   }
+  },
+  {
+   "no": 5,
+   "sched": {
+    "type": "interval",
+    "every_n": 1,
+    "every_unit": "year",
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "last_done",
+    "lic_id": "lseed07",
+    "grace_days": 90,
+    "auto": false,
+    "needs_manual_date": true,
+    "note": "갈래(65~70세 3년 / 70세↑ 1년)가 개인 생년월일로 갈려 회사 단위 선택 불가 → 최단 1년 기재. 기준일=직전 자격유지검사 적합판정일, 대상이 된 날부터 3개월 이내 수검=유예 90일. 65세·70세 도달일이 트리거, 갈음 요건 있음",
+    "confidence": "low"
+   }
+  },
+  {
+   "no": 6,
+   "sched": {
+    "type": "always",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "none",
+    "lic_id": "lseed07",
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": false,
+    "note": "상시 유지(보험 갱신마다 공백 없이). 차량별 가입이라 만기는 차량 대장에서 관리, 5년 주기신고(1번) 첨부 증빙과 연동",
+    "confidence": "high"
+   }
+  },
+  {
+   "no": 7,
+   "sched": {
+    "type": "interval",
+    "every_n": 6,
+    "every_unit": "month",
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "manual",
+    "lic_id": "lseed07",
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": true,
+    "note": "차종·규모·차령별 6개월~2년 갈래가 차량마다 달라 선택 불가 → 최단 6개월 기재. 주기는 최초등록일 기준 차령으로 산출(base manual=차량대장 최초등록일·직전 검사만료). 회차는 차량 대장 검사 만기 알림으로 대체",
+    "confidence": "low"
+   }
+  },
+  {
+   "no": 8,
+   "sched": {
+    "type": "interval",
+    "every_n": 6,
+    "every_unit": "month",
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "last_done",
+    "lic_id": "lseed09",
+    "grace_days": 31,
+    "auto": false,
+    "needs_manual_date": true,
+    "note": "기종·연식별 6개월/1년/2년/3년 갈래가 기계마다 달라 선택 불가 → 최단 6개월 기재. 다음 만기 기산=기간 내 신청 시 종전 만료일 다음 날, 그 외 검사일 다음 날(신규등록은 등록일) → base last_done. 만료일 전후 각 31일 신청창=유예 31일",
+    "confidence": "low"
+   }
+  },
+  {
+   "no": 9,
+   "sched": {
+    "type": "event",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "none",
+    "lic_id": "lseed09",
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": false,
+    "note": "수시 — 상호·대표자·사무실·주기장·보유대수 변경 시 사유 발생일부터 30일 이내(grace 30=사유일 기준 기한). 타 시·도 이전은 변경신고 아닌 폐지+신규 신고",
+    "confidence": "high"
+   }
+  },
+  {
+   "no": 10,
+   "sched": {
+    "type": "event",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "none",
+    "lic_id": "lseed09",
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": false,
+    "note": "수시 — 휴·폐업은 사유 발생 시(기한 일수 미명시), 재개는 예정일 5일 전까지(사전 기한이라 grace 미기재)",
+    "confidence": "high"
+   }
+  },
+  {
+   "no": 11,
+   "sched": {
+    "type": "event",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "none",
+    "lic_id": "lseed09",
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": false,
+    "note": "수시 — 승계 사유 발생일부터 30일 이내(grace 30=사유일 기준 기한)",
+    "confidence": "high"
+   }
+  },
+  {
+   "no": 12,
+   "sched": {
+    "type": "always",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "none",
+    "lic_id": "lseed09",
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": false,
+    "note": "'상시(대여 건별)' 2갈래 중 상시로 읽음 — 계약서 작성·보관은 대여 계약 건별 이벤트 성격이나 문장이 상시로 시작",
+    "confidence": "mid"
+   }
+  },
+  {
+   "no": 13,
+   "sched": {
+    "type": "always",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "none",
+    "lic_id": "lseed09",
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": false,
+    "note": "상시 유지 — 등록기준 4항목 계속 충족 + 표지 2종 설치. 조건부는 충족 여부 판정용(등록 구분·대수 환산·주기장 면적), 주기 자체는 명확",
+    "confidence": "high"
+   }
+  },
+  {
+   "no": 14,
+   "sched": {
+    "type": "interval",
+    "every_n": 3,
+    "every_unit": "year",
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "last_done",
+    "lic_id": "lseed09",
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": true,
+    "note": "면허 최초 취득일 또는 마지막 교육일부터 3년이 되는 날이 속한 해의 12/31까지 이수 → 3년 interval, 기준일은 마지막 교육일(미이수자는 면허 최초 취득일, 면허 2개↑면 최근 면허 취득일). 조종사면허 미보유(도로교통법 면허로 덤프·믹서 조종) 기사는 비대상",
+    "confidence": "mid"
+   }
+  },
+  {
+   "no": 15,
+   "sched": {
+    "type": "interval",
+    "every_n": 5,
+    "every_unit": "year",
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "manual",
+    "lic_id": "lseed09",
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": true,
+    "note": "면허 취득일 다음날 기산, 기간 도래 해의 1/1~12/31 수검(base=최종 면허 취득일 수동). 갈래 10년/65세 이상 5년은 조종사별 연령 미상이라 규칙대로 최단 5년 기입 — 표준은 10년이므로 사람 판정 필요. 안전교육(14번)과 기산점 다름. 단위 개인이라 auto 제외.",
+    "confidence": "low"
+   }
+  },
+  {
+   "no": 16,
+   "sched": {
+    "type": "interval",
+    "every_n": 1,
+    "every_unit": "year",
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "last_done",
+    "lic_id": "lseed13",
+    "grace_days": null,
+    "auto": true,
+    "needs_manual_date": true,
+    "note": "등급별 갈래(S3·A~C2·D1년) 중 허가증 메모 '현 D=1년' 근거로 1년 선택, 등급 변동 시 재설정. 공단 공고·통지 기반(주기 도래 자동 실시 아님)이라 자동 회차는 예정 알림용, 기준일=직전 평가일 수동 입력.",
+    "confidence": "mid"
+   }
+  },
+  {
+   "no": 17,
+   "sched": {
+    "type": "always",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "none",
+    "lic_id": "lseed13",
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": false,
+    "note": "신규 1회 18시간·보수교육 없음이라 반복 주기 없음 → 이수 상태 유지(always)로 읽음. 실제 행동 트리거는 전담인력 교체 시 후임자 이수(event 성격), 결원=등록취소 사유.",
+    "confidence": "mid"
+   }
+  },
+  {
+   "no": 18,
+   "sched": {
+    "type": "event",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "none",
+    "lic_id": "lseed13",
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": false,
+    "note": "전담인력 교체·사무소 이전 등 변경 발생 시 신청(event). 문장에 기한 일수 없음.",
+    "confidence": "high"
+   }
+  },
+  {
+   "no": 19,
+   "sched": {
+    "type": "event",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "none",
+    "lic_id": "lseed13",
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": false,
+    "note": "건별 event — 작업 시작 7일 전 신고, 내용 변경 시 지체 없이. 신고처=작업 장소 관할 관서.",
+    "confidence": "high"
+   }
+  },
+  {
+   "no": 20,
+   "sched": {
+    "type": "event",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "none",
+    "lic_id": "lseed13",
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": false,
+    "note": "건별 event — 작업 완료 후 지체 없이 농도측정·결과보고서 제출. 자체 측정 불가, 건별 측정기관 계약.",
+    "confidence": "high"
+   }
+  },
+  {
+   "no": 21,
+   "sched": {
+    "type": "interval",
+    "every_n": 6,
+    "every_unit": "month",
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "last_done",
+    "lic_id": "lseed13",
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": true,
+    "note": "3트랙 혼재 — 특별교육=배치 전 16h(event), 근로자 정기=매반기 12h, 관리감독자 정기=연 16h. 구조는 근로자 정기 반기(6개월, 직전 교육일 기준)로 두었으나 행 분리 권장, 사람 확인. 단위 개인이라 auto 제외.",
+    "confidence": "low"
+   }
+  },
+  {
+   "no": 22,
+   "sched": {
+    "type": "interval",
+    "every_n": 6,
+    "every_unit": "month",
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "last_done",
+    "lic_id": "lseed13",
+    "grace_days": null,
+    "auto": true,
+    "needs_manual_date": true,
+    "note": "반기 1회(전회 측정 완료일 기준, 3개월 이상 간격) 선택, 완화 연 1회 갈래는 요건 충족 미확인이라 미적용. 최초 측정=대상 작업장이 된 날부터 30일 이내(event), 결과보고서=시료채취 종료일부터 30일 이내 제출(주기 유예 아님이라 grace 미기입).",
+    "confidence": "mid"
+   }
+  },
+  {
+   "no": 23,
+   "sched": {
+    "type": "interval",
+    "every_n": 12,
+    "every_unit": "month",
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "manual",
+    "lic_id": "lseed13",
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": true,
+    "note": "첫 회=배치일부터 12개월 이내(base=배치일 수동), 이후 직전 진단일 기준 12개월. 3사유 해당 시 다음 회만 6개월 단축(예외, 미반영). 배치전건강진단 선행. 단위 개인이라 auto 제외.",
+    "confidence": "mid"
+   }
+  },
+  {
+   "no": 24,
+   "sched": {
+    "type": "always",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "none",
+    "lic_id": "lseed13",
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": false,
+    "note": "건별 서류 30년 보존 — 상시 always. 전산입력 대체 가능.",
+    "confidence": "high"
+   }
+  },
+  {
+   "no": 25,
+   "sched": {
+    "type": "interval",
+    "every_n": 4,
+    "every_unit": "year",
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "last_done",
+    "lic_id": "lseed11",
+    "grace_days": null,
+    "auto": true,
+    "needs_manual_date": true,
+    "note": "4년 이내마다(상한), A5년·D3년 갈래는 발전사업용 비적용이라 4년 확정. 최초 기산점 원문 명문 없음 → 직전 검사일(검사확인증·안전공사 통지) 기준 last_done, 조기검사 시 그 검사일로 재기산. 검사 7일 전 신청.",
+    "confidence": "mid"
+   }
+  },
+  {
+   "no": 26,
+   "sched": {
+    "type": "event",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "none",
+    "lic_id": "lseed11",
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": false,
+    "note": "1회성 event — 최초 전력거래일부터 30일 이내(허가 2024-07-26, 기이행 여부 확인). 산지 중간복구명령 있으면 완료증명 동봉, 준비기간 도과 시 필요적 취소.",
+    "confidence": "high"
+   }
+  },
+  {
+   "no": 27,
+   "sched": {
+    "type": "always",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "none",
+    "lic_id": "lseed11",
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": false,
+    "note": "상시 선임 유지 always. 해임 시 30일 이내 후임 선임·선임/해임 30일 이내 신고는 event 트리거. 20kW 이하면 선임 면제(na)라 설비용량 확인 전제.",
+    "confidence": "mid"
+   }
+  },
+  {
+   "no": 28,
+   "sched": {
+    "type": "interval",
+    "every_n": 3,
+    "every_unit": "year",
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "last_done",
+    "lic_id": "lseed11",
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": true,
+    "note": "기술교육 3년마다(기산점 문장 미명시 → 직전 교육일 last_done 가정), 최초 선임자 특별교육=선임일부터 6개월 이내 별도 1회. 안전공사·대행사업자 위탁이면 회사 의무 없음(na), 개인대행자면 대행자 본인 — 선임 방식 미확인이라 사람 판정. 단위 개인이라 auto 제외.",
+    "confidence": "low"
+   }
+  },
+  {
+   "no": 29,
+   "sched": {
+    "type": "interval",
+    "every_n": 1,
+    "every_unit": "month",
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "last_done",
+    "lic_id": "lseed11",
+    "grace_days": null,
+    "auto": true,
+    "needs_manual_date": true,
+    "note": "'매월 N회'를 interval 1개월로 옮김. 월내 횟수(1~6회)는 설비용량 구간별 갈래인데 용량이 문장·허가증에 없어 못 고름 → 월 단위만 표현, 횟수는 구조 미표현. 대행 계약 여부도 미확정(자체 선임이면 이 행 비적용, 안전관리규정 점검으로 대체). 이행 주체는 대행자이고 회사 측 관리 포인트는 점검확인서 수령이라 기준일=직전 점검확인서 일자(last_done).",
+    "confidence": "low"
+   }
+  },
+  {
+   "no": 30,
+   "sched": {
+    "type": "always",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "none",
+    "lic_id": "lseed11",
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": false,
+    "note": "'기록 4년간 보존'을 상시 유지로 읽음. 제출은 별도 회차가 아니라 25번 정기검사 회차에 붙는 부속 의무이고, 전기안전종합정보시스템 매월 입력 시 제출 면제(대안)라 월 회차 생성 안 함. 보존 기산점(최종 기재일 등)은 문장에 없음.",
+    "confidence": "mid"
+   }
+  },
+  {
+   "no": 31,
+   "sched": {
+    "type": "event",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "none",
+    "lic_id": "lseed11",
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": false,
+    "note": "'수시 — 중요 사항 변경 시마다' → event. 트리거=설비용량 허가용량 10% 초과 변경·설치장소·사업구역·공급전압 변경(10% 이하 불요).",
+    "confidence": "high"
+   }
+  },
+  {
+   "no": 32,
+   "sched": {
+    "type": "event",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "none",
+    "lic_id": "lseed11",
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": false,
+    "note": "사고 발생 트리거 event. 발생 후 24시간 속보·15일 상보 두 기한은 이벤트 후 마감이라 주기 필드 없음. 20kW 이상이면 1시간 이상 발전중단만으로 대상, 위탁해도 통보 주체는 사업자.",
+    "confidence": "high"
+   }
+  },
+  {
+   "no": 33,
+   "sched": {
+    "type": "na",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "none",
+    "lic_id": "lseed11",
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": false,
+    "note": "'해당 없음 — 3,000kW 이하 발전사업자 제외'를 na로 옮김. 단 허가증 설비용량이 3,000kW 이하임을 확인해야 확정(precheck), 초과면 이 행 재검토.",
+    "confidence": "mid"
+   }
+  },
+  {
+   "no": 34,
+   "sched": {
+    "type": "interval",
+    "every_n": 5,
+    "every_unit": "year",
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "manual",
+    "lic_id": "lseed01",
+    "grace_days": null,
+    "auto": true,
+    "needs_manual_date": true,
+    "note": "5년마다 interval. 무위반 시 2년 연장(실질 7년) 갈래는 처분 이력에 달려 못 고름 → 짧은 5년. 기준일은 허가일이 아니라 영 별표5의3 경과규정(가목~사목)으로 산출되는 최초 기산일인데 2024.1.1. 이전 허가분 규정 내용이 문장에 없음(4건 모두 2024 이전) → base manual. 신청 마감은 만료 3개월 전(선행)이라 grace_days 양수 정의와 방향이 반대 → null, D-90 알림 별도 필요. lic_id 단일값 한계 — lseed01 대표, 실제 lseed01·02·04·05 4건 각각 회차 필요(lseed03 건폐법 비대상).",
+    "confidence": "low"
+   }
+  },
+  {
+   "no": 35,
+   "sched": {
+    "type": "interval",
+    "every_n": 3,
+    "every_unit": "year",
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "last_done",
+    "lic_id": "lseed02",
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": true,
+    "note": "'이후 3년마다 재교육' → interval 3년, 기준일=직전 이수일(last_done). 최초 회차는 허가일부터 1년 이내(3건 모두 허가일+1년 경과라 사실상 재교육 트랙). unit 개인이라 auto false, 담당자별 최종 이수일은 명부에서. 허가 건별(lseed02·04·05) 담당자 1인씩 — lseed02 대표. 행정처분 시 1년 내 추가교육은 event 성격.",
+    "confidence": "mid"
+   }
+  },
+  {
+   "no": 36,
+   "sched": {
+    "type": "interval",
+    "every_n": 1,
+    "every_unit": "year",
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "last_done",
+    "lic_id": "lseed01",
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": true,
+    "note": "①유자격 기술요원 3년마다 / ②소규모 특례 임명자 1년마다 두 갈래. 판정 기준(허가증 영업대상에 지정·의료폐기물 포함 여부, 1일 재활용용량)이 licenses 파일에 없어 못 고름 → 가장 짧은 1년 대입, 사람 판정 필요(잘못 잡으면 3배 오차). 최초 회차(①1년/②6개월 이내)와 행정처분 시 1년 내 추가교육은 별도. unit 개인 → auto false.",
+    "confidence": "low"
+   }
+  },
+  {
+   "no": 37,
+   "sched": {
+    "type": "fixed",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": 2,
+    "fixed_day": 0,
+    "base": "none",
+    "lic_id": "lseed01",
+    "grace_days": null,
+    "auto": true,
+    "needs_manual_date": false,
+    "note": "'다음 연도 2월 말일까지' → fixed 2월 말일(fixed_day 0). 허가 건별 제출(lseed01·02·04·05 4건, 수집·운반 별지50호/재활용 별지52호)인데 lic_id 단일값이라 lseed01 대표 — 4행 분리 필요. lseed03 건폐법 건은 76번으로 별도.",
+    "confidence": "mid"
+   }
+  },
+  {
+   "no": 38,
+   "sched": {
+    "type": "interval",
+    "every_n": 1,
+    "every_unit": "year",
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "manual",
+    "lic_id": "lseed01",
+    "grace_days": -30,
+    "auto": true,
+    "needs_manual_date": true,
+    "note": "보증보험(1년 단위 갱신)/공제조합 분담금(상시) 두 갈래 중 회차가 생기는 보증보험으로 등재. 기준일 = 현 보험 시작일(직전 갱신일) → 갱신 마감 = 시작일+1년−30일(종료일 30일 전). 최초 가입기간이 1년이 아니면(다음 해 12/31까지) 첫 회차는 완료 처리 후 직전 갱신일 기준으로 맞춘다. 공제조합 방식이면 검수판에서 자동 회차 끄기",
+    "confidence": "low"
+   }
+  },
+  {
+   "no": 39,
+   "sched": {
+    "type": "interval",
+    "every_n": 1,
+    "every_unit": "year",
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "last_done",
+    "lic_id": "lseed01",
+    "grace_days": 30,
+    "auto": true,
+    "needs_manual_date": true,
+    "note": "검사대상 7개 시설 보유 여부가 미확정(조건부)이고 갈래(음식물류 1년/소각 3년·TMS 연결 시 최초 5년)도 시설 유형에 달림 → 가장 짧은 1년, 기준일=최종 정기검사일(last_done, 최초 회차는 사용개시일). '기준일 전후 각 30일 이내 수검' → grace 30. 일반 재활용시설만 보유면 na로 정정, 수집·운반업 4건은 비적용.",
+    "confidence": "low"
+   }
+  },
+  {
+   "no": 40,
+   "sched": {
+    "type": "always",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "none",
+    "lic_id": "lseed12",
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": false,
+    "note": "'상시(항시 충족)' → always. 기술인 사망·실종·퇴직 결원은 50일 내 보완 시 일시적 미달 구제 — 이벤트성 대응, 회차 없음.",
+    "confidence": "high"
+   }
+  },
+  {
+   "no": 41,
+   "sched": {
+    "type": "event",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "none",
+    "lic_id": "lseed12",
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": false,
+    "note": "'연 1회 이상'은 국토부·지자체가 실시하는 빈도이고 회사 의무는 사전 통보 수신 시 수검·자료 제출 — 46번과 같은 이유로 통보 트리거(event), 자동 회차 없음",
+    "confidence": "mid"
+   }
+  },
+  {
+   "no": 42,
+   "sched": {
+    "type": "event",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "none",
+    "lic_id": "lseed12",
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": false,
+    "note": "'수시 — 변경일부터 30일 이내' → event. 사무실 기준 미달 시 2차 변경신청 30일(가목 변경신청일 기산)은 별개 시계.",
+    "confidence": "high"
+   }
+  },
+  {
+   "no": 43,
+   "sched": {
+    "type": "event",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "none",
+    "lic_id": "lseed12",
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": false,
+    "note": "1회성(신규 등록일부터 6개월 이내, 보수교육 없음)이라 event. lseed12 등록일 2013-08-22 기준 기한(2014-02-22)은 이미 경과 — 최초 건설업 등록이면 임원 1명 이수 이력만 확인, 추가 등록이면 비대상(최초/추가 여부는 문장·허가증만으로 판정 불가, precheck)",
+    "confidence": "mid"
+   }
+  },
+  {
+   "no": 44,
+   "sched": {
+    "type": "fixed",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": 2,
+    "fixed_day": 15,
+    "base": "none",
+    "lic_id": "lseed12",
+    "grace_days": null,
+    "auto": true,
+    "needs_manual_date": false,
+    "note": "기성실적 제출 '매년 2월 15일까지'를 회차로 채택. 재무서류(법인 4/15·개인 5/31·성실신고확인대상 6/30)와 공시 7/31은 별도 기한이라 미반영 — 사업자 구분 확인 후 필요 시 4/15 알림 추가. '평가를 받으려는 자' 신청 의무라 관급 입찰 계획 없으면 생략 가능(조건부)",
+    "confidence": "mid"
+   }
+  },
+  {
+   "no": 45,
+   "sched": {
+    "type": "always",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "none",
+    "lic_id": "lseed06",
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": false,
+    "note": "'상시(항시 충족)' 그대로 always. 보증가능금액확인서 약관상 갱신 주기는 문장에 없음(precheck 항목)",
+    "confidence": "high"
+   }
+  },
+  {
+   "no": 46,
+   "sched": {
+    "type": "event",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "none",
+    "lic_id": "lseed06",
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": false,
+    "note": "'연 1회 이상'은 국토부장관·위임 시도지사의 실시 빈도. 회사 의무는 '기간·내용·사유 사전 통보' 수신 시 수검 — 통보 트리거(event). 자동 회차를 만들면 정부가 조사하지 않은 해에도 허위 미이행이 쌓인다(두 렌즈 일치)",
+    "confidence": "mid"
+   }
+  },
+  {
+   "no": 47,
+   "sched": {
+    "type": "fixed",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": 2,
+    "fixed_day": 15,
+    "base": "none",
+    "lic_id": "lseed06",
+    "grace_days": null,
+    "auto": true,
+    "needs_manual_date": false,
+    "note": "기성실적 신고 '매년 2월 15일까지'를 회차로 채택. 재무제표류(법인 4/15·개인 5/31·성실신고확인대상 6/30)·공시 7/31은 별도 기한이라 미반영. 관급 수주 계획 없으면 생략 가능(조건부), 접수는 전문건설협회 경유",
+    "confidence": "mid"
+   }
+  },
+  {
+   "no": 48,
+   "sched": {
+    "type": "event",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "none",
+    "lic_id": "lseed06",
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": false,
+    "note": "1회성(등록일부터 6개월 이내, 반복 없음)이라 event. lseed06 등록일 2024-08-22 기준 기한 2025-02-22 경과. 허가증 13건 중 종운환경의 건설산업기본법 등록은 이 건뿐이라 최초 등록(대상)으로 보이나 추가 업종이면 면제 — 당시 등기임원 이수 여부는 사내 기록 확인",
+    "confidence": "mid"
+   }
+  },
+  {
+   "no": 49,
+   "sched": {
+    "type": "event",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "none",
+    "lic_id": "lseed06",
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": false,
+    "note": "수시 4갈래(기재사항 변경 30일 이내·상속 개시일부터 60일 이내·양도합병 기한 규정 없음·폐업 사유 발생 시) 모두 사유 발생형이라 event, 사유별 기한은 문장 참조",
+    "confidence": "high"
+   }
+  },
+  {
+   "no": 50,
+   "sched": {
+    "type": "event",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "none",
+    "lic_id": "lseed08",
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": false,
+    "note": "건별(1회 운반량 인체등유해성물질 5,000kg/사고대비물질 3,000kg 초과 시 운반 전 제출) event. 8/17 이후 무인 봇 가동 중인 운반계획서 의무와 동일 항목",
+    "confidence": "high"
+   }
+  },
+  {
+   "no": 51,
+   "sched": {
+    "type": "interval",
+    "every_n": 2,
+    "every_unit": "year",
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "last_done",
+    "lic_id": "lseed08",
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": true,
+    "note": "'매 2년마다 16시간' → interval 2년. 최초 회차만 선임일부터 2년 이내(자격 취득 2년 경과 후 선임 시 1년 이내)이고 이후는 직전 이수일 기준이라 base last_done 선택(첫 회차는 선임일이 기준). 개인 단위라 auto false, 관리자·기술인력별 선임일·최종 이수일은 명부에서",
+    "confidence": "mid"
+   }
+  },
+  {
+   "no": 52,
+   "sched": {
+    "type": "interval",
+    "every_n": 2,
+    "every_unit": "year",
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "last_done",
+    "lic_id": "lseed08",
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": true,
+    "note": "운반자 8시간/그 외 직접 취급자 16시간 두 갈래 모두 '매 2년마다'라 every_n 2 확정, 운반업이라 운전기사(8시간, 인터넷 불가) 갈래가 주. 최초는 업무 수행 전 선이수, 이후 직전 이수일 기준. 사고 유발 운반자 사고일부터 1년 내 8시간 추가는 event 갈래(미반영). 개인 단위라 auto false",
+    "confidence": "high"
+   }
+  },
+  {
+   "no": 53,
+   "sched": {
+    "type": "interval",
+    "every_n": 1,
+    "every_unit": "year",
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "last_done",
+    "lic_id": "lseed08",
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": true,
+    "note": "'매년 1회 2시간'을 직전 교육일 기준 1년 interval로 읽음(연도 단위 12/31 fixed 해석도 가능 — 문장에 기준 명시 없음). 대상=관리자·기술인력·운전기사 제외 전 종사자(신규 입사자 포함), 개인 단위라 auto false",
+    "confidence": "mid"
+   }
+  },
+  {
+   "no": 54,
+   "sched": {
+    "type": "fixed",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": 8,
+    "fixed_day": 31,
+    "base": "none",
+    "lic_id": "lseed08",
+    "grace_days": null,
+    "auto": true,
+    "needs_manual_date": false,
+    "note": "'연 1회 — 매년 8월 31일까지' 그대로 fixed 8/31. 전년도 운반 실적을 한국환경공단 제출(별지 68·74호)",
+    "confidence": "high"
+   }
+  },
+  {
+   "no": 55,
+   "sched": {
+    "type": "interval",
+    "every_n": 1,
+    "every_unit": "year",
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "manual",
+    "lic_id": "lseed08",
+    "grace_days": 30,
+    "auto": false,
+    "needs_manual_date": true,
+    "note": "물질별 3갈래(①염화수소·황산·브롬화수소·플루오르화수소 운송시설 1년 ②그 밖의 금속부식성 2년 ③그 외 3년) 중 운송 물질이 문장·허가증에 없어 최단 1년 임시. 기준일 = 검사기준일(최초 검사결과서 검사일, 안전진단 시 안전진단일 — 고정 앵커, 직전 검사일 아님)이라 manual. 신청 창 = 도래일 전후 30일. 차량 단위라 회차 미생성 — 차량 대장 검사 만기로",
+    "confidence": "low"
+   }
+  },
+  {
+   "no": 56,
+   "sched": {
+    "type": "event",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "none",
+    "lic_id": "lseed08",
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": false,
+    "note": "지방환경관서 통지 수신일 D+7 트리거 event(사고일 아님, 2025.8.7 개정). 7일은 유예가 아니라 기한이라 grace null, 공문 수신 창구 지정이 관리 포인트",
+    "confidence": "high"
+   }
+  },
+  {
+   "no": 57,
+   "sched": {
+    "type": "always",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "none",
+    "lic_id": "lseed08",
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": false,
+    "note": "주 1회 이상 자체점검 + 점검대장(별지 42호) 5년 보존 — 주 단위 회차는 이 대장에서 만들지 않는다(결정: 주간 점검은 현장 점검표로, 여기는 상시 의무로 등재)",
+    "confidence": "mid"
+   }
+  },
+  {
+   "no": 58,
+   "sched": {
+    "type": "event",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "none",
+    "lic_id": "lseed08",
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": false,
+    "note": "변경 사유 발생 시 트리거 — 변경신고 변경일+30일(대표자·기술인력 등 일부 60일), 운반시설 용량 누적 50% 이상은 사전 변경허가; grace_days는 30일 갈래 기입, 60일·사전 갈래는 사유별 판정",
+    "confidence": "high"
+   }
+  },
+  {
+   "no": 59,
+   "sched": {
+    "type": "event",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "none",
+    "lic_id": "lseed08",
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": false,
+    "note": "최초 선임은 사업개시 전 완료 전제(허가 2023-06-28), 이후 해임·퇴직 결원 시 30일 이내 재선임(승인 시 30일 범위 연장) — 결원 트리거 event로 등재",
+    "confidence": "high"
+   }
+  },
+  {
+   "no": 60,
+   "sched": {
+    "type": "event",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "none",
+    "lic_id": "lseed08",
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": false,
+    "note": "'2년마다'는 정부 통계조사 주기이고 basis가 '통보 받으면 응하는 의무'로 명시 → 41·46과 같은 통보 트리거(event). 직전 조사연도가 문장에 없어 예정 알림용 회차도 만들지 않는다(공문 수신 시 기한 엄수)",
+    "confidence": "mid"
+   }
+  },
+  {
+   "no": 61,
+   "sched": {
+    "type": "always",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "none",
+    "lic_id": "lseed08",
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": false,
+    "note": "취급 관련 서류(별지 77호 운반 관리대장) 5년 기록·보존 상시 의무",
+    "confidence": "high"
+   }
+  },
+  {
+   "no": 62,
+   "sched": {
+    "type": "na",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "none",
+    "lic_id": "lseed08",
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": false,
+    "note": "basis가 '차량만 보유한 운반업은 비대상 확정' 명시 → na; 보관·저장시설 또는 상·하차 설비 보유 시 5년 interval(주요취급시설)로 재판정 필요",
+    "confidence": "mid"
+   }
+  },
+  {
+   "no": 63,
+   "sched": {
+    "type": "event",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "none",
+    "lic_id": "lseed10",
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": false,
+    "note": "1회성 사전 신고 — 설치 완료 후 가동 전에 내는 별개 절차. 이후 20% 이상 증설(누계) 또는 변경허가 변경 완료 시 가동 전 재트리거(event). 최초 이행 여부는 문장에 없음(사람 확인)",
+    "confidence": "high"
+   }
+  },
+  {
+   "no": 64,
+   "sched": {
+    "type": "event",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "none",
+    "lic_id": "lseed10",
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": false,
+    "note": "사유별 기한 4갈래(시설·방지시설·원료 등 변경 전 / 명칭·대표자 2개월 / 신규물질·임대 30일 / 종별변경 통보일+7일) — 단일 grace_days로 못 담아 null, 종별 변경은 통보 수령 시 D+7 조건부 트리거",
+    "confidence": "high"
+   }
+  },
+  {
+   "no": 65,
+   "sched": {
+    "type": "interval",
+    "every_n": 6,
+    "every_unit": "month",
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "last_done",
+    "lic_id": "lseed10",
+    "grace_days": null,
+    "auto": true,
+    "needs_manual_date": true,
+    "note": "종별 4갈래 중 허가증 note '자가측정 반기 1회'로 4·5종 갈래 선택(6개월 interval, 직전 측정일 기준) — 종별은 규칙 42조 산식(24h×365일)으로 실측 확인 필요, 완화 시 연 1회·특정대기유해물질 배출 시 월 2회 갈래 있음",
+    "confidence": "mid"
+   }
+  },
+  {
+   "no": 66,
+   "sched": {
+    "type": "fixed",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": 7,
+    "fixed_day": 31,
+    "fixed2_month": 1,
+    "fixed2_day": 31,
+    "base": "none",
+    "lic_id": "lseed10",
+    "grace_days": null,
+    "auto": true,
+    "needs_manual_date": false,
+    "note": "반기 1회 고정 2날짜 — 상반기분 7/31, 하반기분 다음 해 1/31(둘째 고정일 fixed2). 전산 기록(환경부 고시 방식)이면 제출 면제 — 면제 중이면 검수판에서 자동 회차 끄기",
+    "confidence": "high"
+   }
+  },
+  {
+   "no": 67,
+   "sched": {
+    "type": "always",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "none",
+    "lic_id": "lseed10",
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": false,
+    "note": "기록 상시 보존, 여과지·시료채취기록지는 측정일부터 6개월 보존 — always",
+    "confidence": "high"
+   }
+  },
+  {
+   "no": 68,
+   "sched": {
+    "type": "always",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "none",
+    "lic_id": "lseed10",
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": false,
+    "note": "매일 기록·최종 기재일부터 1년 보존 — 일 단위는 회차 대상 아님, 상시 의무로 등재",
+    "confidence": "high"
+   }
+  },
+  {
+   "no": 69,
+   "sched": {
+    "type": "event",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "none",
+    "lic_id": "lseed10",
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": false,
+    "note": "최초 임명은 가동개시 신고 시 1회성, 이후 교체 사유 발생일부터 5일 이내(30일 잠정 임명 단서는 4·5종 비적용) — event, grace 5일",
+    "confidence": "high"
+   }
+  },
+  {
+   "no": 70,
+   "sched": {
+    "type": "interval",
+    "every_n": 3,
+    "every_unit": "year",
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "last_done",
+    "lic_id": "lseed10",
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": true,
+    "note": "보수교육 3년마다(신규교육일 기준)를 구조화, 신규교육(임명일부터 1년 이내 1회)은 별도 1회성 갈래; unit 개인이라 auto false, 임명일·최종 교육일은 persons 명부에서",
+    "confidence": "mid"
+   }
+  },
+  {
+   "no": 71,
+   "sched": {
+    "type": "interval",
+    "every_n": 6,
+    "every_unit": "month",
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "manual",
+    "lic_id": "lseed10",
+    "grace_days": 30,
+    "auto": true,
+    "needs_manual_date": true,
+    "note": "'매 반기별 부과'를 6개월 interval로 읽음. 부과기준일·부과기간(영 별표6)이 문장에 없어 기준일 = 직전 부과기간 완료일을 사람이 입력(base manual), 유예 30일 = '확정배출량 자료 요구 시 부과기간 완료일부터 30일 이내'. 실제 납부는 고지서 기준이라 예정 알림용 — 계산 렌즈가 기준일 정의 모호 지적(검수 필요)",
+    "confidence": "low"
+   }
+  },
+  {
+   "no": 72,
+   "sched": {
+    "type": "always",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "none",
+    "lic_id": "lseed10",
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": false,
+    "note": "'해당 시 상시'를 always로 읽음. 적산전력계(종별 무관)·TMS(1~3종)·IoT(4·5종) 3갈래 모두 상시 유지 의무라 갈래 선택 불요, 어느 기기가 해당하는지는 precheck(방지시설 목록·종별)로 판정.",
+    "confidence": "high"
+   }
+  },
+  {
+   "no": 73,
+   "sched": {
+    "type": "event",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "none",
+    "lic_id": "lseed10",
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": false,
+    "note": "'해당 시 1회 — 배출량 기준 초과 시'를 event(기준 초과 사유 발생 시 1회 허가)로 읽음. basis상 4·5종 소규모 사업장은 허가 대상 아님이라 종별 확인 결과 4·5종이면 na로 바꿔야 함.",
+    "confidence": "mid"
+   }
+  },
+  {
+   "no": 74,
+   "sched": {
+    "type": "na",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "none",
+    "lic_id": "lseed03",
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": false,
+    "note": "'만기 없음·갱신 일정 등재 불요'를 na(일정 대상 아님)로 읽음. 존속형 허가 확인 행이라 회차 생성 없음, 존속 자체 감시는 78번(허가기준 상시 유지)이 담당.",
+    "confidence": "high"
+   }
+  },
+  {
+   "no": 75,
+   "sched": {
+    "type": "na",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "none",
+    "lic_id": "lseed03",
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": false,
+    "note": "'비적용 확인(주기 없음)' 판정 행 → na. 폐기물관리법 기반 34·35·37·38·39 주기는 건폐법 수집·운반업 허가(lseed03)에 붙이지 않음.",
+    "confidence": "high"
+   }
+  },
+  {
+   "no": 76,
+   "sched": {
+    "type": "fixed",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": 2,
+    "fixed_day": 0,
+    "base": "none",
+    "lic_id": "lseed03",
+    "grace_days": null,
+    "auto": true,
+    "needs_manual_date": false,
+    "note": "'매년 익년 2월말'(달력 고정) → fixed 2월 말일, 전년도 실적을 다음 해 2월 말일까지. 폐기물관리법 실적보고(37번)와 별개 서식(별지 29호, 시·도지사).",
+    "confidence": "high"
+   }
+  },
+  {
+   "no": 77,
+   "sched": {
+    "type": "na",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "none",
+    "lic_id": "lseed03",
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": false,
+    "note": "'없음(중간처리업만 3년)' → na. 수집·운반업은 기술인력 교육 주기 없음, 35번 담당자 교육 범위에서도 제외됨.",
+    "confidence": "high"
+   }
+  },
+  {
+   "no": 78,
+   "sched": {
+    "type": "always",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "none",
+    "lic_id": "lseed03",
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": false,
+    "note": "'상시' → always. 차량 3대↑·자본금 2천만↑·사무실 허가기준 계속 충족.",
+    "confidence": "high"
+   }
+  },
+  {
+   "no": 79,
+   "sched": {
+    "type": "event",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "none",
+    "lic_id": "lseed03",
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": false,
+    "note": "'사전(적합통보 후 6월 내)'·basis '이벤트' → event(변경 전 사전 변경허가). '적합통보 후 6월 내'는 이벤트 착수 후 기한이지 주기 유예가 아니라 grace_days 비움.",
+    "confidence": "high"
+   }
+  },
+  {
+   "no": 80,
+   "sched": {
+    "type": "event",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "none",
+    "lic_id": "lseed03",
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": false,
+    "note": "'이원화' 두 갈래(감차·교체·사무실 이전=변경 전 / 상호·대표자=30일 내) 모두 사유 발생형이라 event 하나로 둠. 갈래별 기한은 사유 종류로 판정.",
+    "confidence": "high"
+   }
+  },
+  {
+   "no": 81,
+   "sched": {
+    "type": "always",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "none",
+    "lic_id": "lseed03",
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": false,
+    "note": "cycle '최종기록 후 2년 보존'·basis '상시' → always(장부 상시 기록·보존). 2년은 보존기간이지 회차 주기 아님. 올바로 입력 시 장부 면제.",
+    "confidence": "high"
+   }
+  },
+  {
+   "no": 82,
+   "sched": {
+    "type": "event",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "none",
+    "lic_id": "lseed03",
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": false,
+    "note": "'인수 후 2일 내'·basis '건별' → event(인수 건마다 2일 내 올바로 입력).",
+    "confidence": "high"
+   }
+  },
+  {
+   "no": 83,
+   "sched": {
+    "type": "event",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "none",
+    "lic_id": "lseed03",
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": false,
+    "note": "'사전'·basis '이벤트' → event(휴업·폐업·재개업 전 신고 + 방치폐기물 선처리).",
+    "confidence": "high"
+   }
+  },
+  {
+   "no": 84,
+   "sched": {
+    "type": "event",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "none",
+    "lic_id": "lseed03",
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": false,
+    "note": "'승계 후 30일'·basis '이벤트' → event(승계 사유 발생일부터 30일 내 신고).",
+    "confidence": "high"
+   }
+  },
+  {
+   "no": 85,
+   "sched": {
+    "type": "interval",
+    "every_n": 1,
+    "every_unit": "year",
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "manual",
+    "lic_id": "lseed03",
+    "grace_days": null,
+    "auto": true,
+    "needs_manual_date": true,
+    "note": "cycle '임시보관장소 승인 시에만(보험이면 연 단위)' — 승인 없으면 대상 아님(검수판에서 자동 회차 끄기), 승인+보증보험이면 연 단위 갱신(기준일 = 보험 시작일, manual). 공제조합이면 상시. 두 렌즈 일치로 interval 1년 등재",
+    "confidence": "low"
+   }
+  },
+  {
+   "no": 86,
+   "sched": {
+    "type": "na",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "none",
+    "lic_id": "lseed03",
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": false,
+    "note": "문장 '해당 없음 확인'(수집·운반업 비대상) → na. 중간처리업 진출 시에만 fixed 2/15(재무제표 4/15)로 전환.",
+    "confidence": "high"
+   }
+  },
+  {
+   "no": 87,
+   "sched": {
+    "type": "always",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "none",
+    "lic_id": "lseed03",
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": false,
+    "note": "'상시' 준수사항(전용차량 운반·명의대여 금지·운반증 반납) → always.",
+    "confidence": "high"
+   }
+  },
+  {
+   "no": 88,
+   "sched": {
+    "type": "event",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "none",
+    "lic_id": null,
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": false,
+    "note": "'착공 전, 현장별 1회' → event(현장 착공 트리거). 현장별 신고라 13건 허가증에 미부착(lic_id null). 규모 기준(연면적 1,000㎡↑·해체는 별표13 라목1) 3,000㎡↑)은 대상 판정용.",
+    "confidence": "high"
+   }
+  },
+  {
+   "no": 89,
+   "sched": {
+    "type": "event",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "none",
+    "lic_id": null,
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": false,
+    "note": "'변경 전' → event. 공사기간 연장은 종료일 도과 전 필수 — 92번 종료신고 부존재라 공기 연장 역산 알림은 이 행에서 관리.",
+    "confidence": "high"
+   }
+  },
+  {
+   "no": 90,
+   "sched": {
+    "type": "always",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "none",
+    "lic_id": null,
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": false,
+    "note": "'공사기간 상시' → always(현장 존속 중 유지). 별표14 기준(방진벽 1.8m·주거 50m 내 3m)은 판정용.",
+    "confidence": "high"
+   }
+  },
+  {
+   "no": 91,
+   "sched": {
+    "type": "always",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "none",
+    "lic_id": null,
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": false,
+    "note": "cycle이 주기가 아니라 운행 건별 준수 조건(덮개·5cm 수평적재·세륜) → always로 읽음(건별 event로도 볼 수 있음). 신고 불요(운송업 신고 제외), confirm 조건부.",
+    "confidence": "mid"
+   }
+  },
+  {
+   "no": 92,
+   "sched": {
+    "type": "na",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "none",
+    "lic_id": null,
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": false,
+    "note": "'없음(조문 부존재 확정)' → na. 공기 연장 역산 알림은 89번 변경신고에서 처리.",
+    "confidence": "high"
+   }
+  },
+  {
+   "no": 93,
+   "sched": {
+    "type": "event",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "none",
+    "lic_id": null,
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": false,
+    "note": "★미확인 항목 — cycle '—', 주기 아님. 포항시 조례 확인 후 해당되면 88번과 같은 현장별 착공 전 신고(학교 50m 이내 소규모 + 분할발주 합산)가 되므로 event로 두었으나 조례 선행 확인 전에는 의무 존재 자체가 미정.",
+    "confidence": "low"
+   }
+  },
+  {
+   "no": 94,
+   "sched": {
+    "type": "event",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "none",
+    "lic_id": null,
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": false,
+    "note": "'착공 전' → event(현장 착공 트리거, 처리 4일이라 4일 전 접수). 대상 판정(별표9 장비 5일↑·연면적 3,000㎡↑ 해체·학교 50m 내 규모 무관)은 precheck. 현장별이라 lic_id null.",
+    "confidence": "high"
+   }
+  },
+  {
+   "no": 95,
+   "sched": {
+    "type": "event",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "none",
+    "lic_id": null,
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": false,
+    "note": "변경 사유(장비 30%↑ 증가·기간 연장은 종료 전·방음시설 명세 변경) 발생 시 → event.",
+    "confidence": "high"
+   }
+  },
+  {
+   "no": 96,
+   "sched": {
+    "type": "event",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "none",
+    "lic_id": null,
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": false,
+    "note": "basis '이벤트' — 현장별 착공 전 방음시설 설치 → event. 해체공사는 곤란사유 인정 시 97번 저감대책으로 대체 가능.",
+    "confidence": "high"
+   }
+  },
+  {
+   "no": 97,
+   "sched": {
+    "type": "always",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "none",
+    "lic_id": null,
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": false,
+    "note": "'착공 전 수립·기간 중 상시', basis '상시' → always로 읽음(수립은 94번 사전신고 첨부로 건별 처리, 시행이 상시). 방음벽 곤란 시에도 필수.",
+    "confidence": "mid"
+   }
+  },
+  {
+   "no": 98,
+   "sched": {
+    "type": "na",
+    "every_n": null,
+    "every_unit": null,
+    "fixed_month": null,
+    "fixed_day": null,
+    "base": "none",
+    "lic_id": null,
+    "grace_days": null,
+    "auto": false,
+    "needs_manual_date": false,
+    "note": "'적용 제외'(산업단지 내 공사) → na. 포항국가산단(포스코 현장)은 특정공사 비대상, 산단 외 현장은 94~97 적용.",
+    "confidence": "high"
+   }
+  }
+ ]
+}
