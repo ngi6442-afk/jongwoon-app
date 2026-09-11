@@ -321,6 +321,7 @@ async function handleStatus(st, c, R) {
       rd.days.forEach(function (day) { docs[day] = rd.docs[day]; });
       rematched = { days: rd.days, changed: rd.changed, left: rd.left };
       staleDays = stale.filter(function (day) { return rd.days.indexOf(day) < 0; });
+      if (rd.changed > 0) { try { await requestXlsxRegen(st, 'rematch', c.member.name); } catch (e) {} }   // v352: 노선표 바뀌어 재정렬된 날의 엑셀도 다시
     }
   }
   const days = [];
@@ -386,7 +387,7 @@ async function handleDay(st, c, d, R) {
     if (lr.ok) {
       const docs = Object.create(null); docs[day] = doc;
       const rd = await rematchDays(st, [day], learnedItems(lr.data), { docs: docs, why: '노선표', by: c.member.name, bid: c.member.id });
-      if (rd.docs[day]) { doc = rd.docs[day]; extra.rematched = { changed: rd.changed }; }
+      if (rd.docs[day]) { doc = rd.docs[day]; extra.rematched = { changed: rd.changed }; if (rd.changed > 0) { try { await requestXlsxRegen(st, 'rematch', c.member.name); } catch (e) {} } }   // v352
       else extra.stale = true;
     } else extra.stale = true;
   }

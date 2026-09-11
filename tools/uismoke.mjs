@@ -1107,9 +1107,9 @@ try {
 // ---- v352(PM 9/11 #33): 숨김·노선 변경 뒤 엑셀 재생성 요청(dispatch) + 내려받기 stale 경고 ----
 try {
   const ab = readFileSync(join(ROOT, 'netlify/functions/gw-allbaro.js'), 'utf8');
-  T('서버: requestXlsxRegen(디바운스 2분·토큰 3후보·6초 타임아웃·204 접수) — 숨김/해제·노선 추가·노선 지정 3곳에서 부름 · handleXlsx가 stale/covered/regen 동봉',
+  T('서버: requestXlsxRegen(디바운스 2분·토큰 3후보·6초 타임아웃·204 접수) — 숨김/해제·노선 추가·노선 지정·재정렬(ab_status·ab_day) 5곳에서 부름 · handleXlsx가 stale/covered/regen 동봉',
     /const REGEN_KEY = 'allbaro:xlsx_regen';/.test(ab) && /const REGEN_DEBOUNCE_MS = 120000;/.test(ab) && /process\.env\.GW_APPDATA_GITHUB_TOKEN \|\| process\.env\.GW_GALLERY_GITHUB_TOKEN \|\| process\.env\.MEMBER_RELAY_GITHUB_TOKEN/.test(ab)
-    && /\/actions\/workflows\/' \+ REGEN_WORKFLOW \+ '\/dispatches'/.test(ab) && (ab.match(/await requestXlsxRegen\(st, /g) || []).length === 3
+    && /\/actions\/workflows\/' \+ REGEN_WORKFLOW \+ '\/dispatches'/.test(ab) && (ab.match(/await requestXlsxRegen\(st, /g) || []).length === 5
     && /const stale = !!\(regen && regen\.requested_at && ts && regen\.requested_at > ts\);/.test(ab) && /stale: stale, covered: covered, regen: stale \? regen : null/.test(ab), '');
   T('앱: 내려받기 전 stale이면 abXlsxStaleOk 확인창(생성 시각·변경 시각·재생성 상태·7일 밖·토큰 실패 안내)',
     /if\(res\.body\.stale && !abXlsxStaleOk\(res\.body\)\) return;/.test(html) && /function abXlsxStaleOk\(b\)\{/.test(html) && /GW_APPDATA_GITHUB_TOKEN/.test(html) && /자동 재생성 범위\(최근 7일\) 밖/.test(html), '');
