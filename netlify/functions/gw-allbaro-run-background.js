@@ -12,7 +12,8 @@ const { setupBlobContext, store, blobGet, blobSet } = require('./_lib/blobs');
 const { verifyToken, bearer } = require('./_lib/session');
 const { appendAudit } = require('./_lib/audit');
 const push = require('./_lib/push');
-const { collectDays, ROUTES_VER } = require('./_lib/allbaro');   // ROUTES_VER(v327): 저장하는 일자 문서에 노선표 해시를 찍는다 — 읽기 경로가 옛 규칙 기록을 가려내는 기준
+const AB = require('./_lib/allbaro');   // v351: routes_ver는 접근자로(추가 노선 반영)
+const { collectDays } = AB;   // ROUTES_VER(v327): 저장하는 일자 문서에 노선표 해시를 찍는다 — 읽기 경로가 옛 규칙 기록을 가려내는 기준
 
 const DATA = 'gw_data';
 function jobKey(id) { return `allbaro:job:${id}`; }
@@ -221,6 +222,11 @@ exports.handler = async function (event, context) {
     const mode = String(d.mode || '').trim();
     if (!RE_JOB.test(job)) return;
     if (mode !== 'collect' && mode !== 'inspect') return;
+    // v351: 추가 노선을 합친 뒤 매칭한다 — 앱에서 더한 노선이 다음 수집부터 바로 배정된다
+    try {
+      const ex = await blobGet(store(DATA), 'allbaro:routes_extra');
+      AB.setExtraRoutes((ex.ok && ex.data && Array.isArray(ex.data.items)) ? ex.data.items : []);
+    } catch (e) { AB.setExtraRoutes([]); }
 
     // ---- inspect: 하루치 원시 행(시각 포함)을 그대로 반환 — EP더스트 조업일 규칙 실측용.
     // 조회 전용·내부 토큰 전용. 집계·저장(allbaro:day)은 건드리지 않는다.
@@ -344,7 +350,7 @@ exports.handler = async function (event, context) {
       // 차량번호별 합계(2026-08-24) — 주는돈(지입차 지급) 마감 정산 참고. 일지에는 안 싣는다.
       const vehTotals = Array.isArray(dd.veh_totals) ? dd.veh_totals : [];
       // schema 2 = 수량 필드 추가(1단계 문서와 구분). 소비자는 필드별로 방어적으로 읽는다.
-      const w = await blobSet(st, dayKey(day), { schema: 2, day: day, total: total, total_qty_ton: qty, qty_unknown: qtyUnknown, counts: counts, unmatched: unmatched, excluded: excluded, pending: pendingRows, veh_totals: vehTotals, routes_ver: ROUTES_VER, ts: Date.now(), job: job });
+      const w = await blobSet(st, dayKey(day), { schema: 2, day: day, total: total, total_qty_ton: qty, qty_unknown: qtyUnknown, counts: counts, unmatched: unmatched, excluded: excluded, pending: pendingRows, veh_totals: vehTotals, routes_ver: AB.routesVer(), ts: Date.now(), job: job });
       if (!w.ok) { writeFail++; log.push('[저장실패] ' + day + ' ' + (w.code || '')); continue; }
       saved.push({ day: day, total: total, qty_ton: qty, unmatched_n: un });
       unmatchedTotal += un;

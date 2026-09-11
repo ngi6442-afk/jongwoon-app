@@ -355,10 +355,10 @@ try {
   const wk = readFileSync(join(ROOT, 'netlify/functions/gw-allbaro-run-background.js'), 'utf8');
   const libExports = lib.slice(lib.indexOf('module.exports'));
   T('서버 재정렬 배선: lib ROUTES_VER(sha1 12자)·rematchDoc export · gw-allbaro rematchDays·ab_learn rematched{days,changed,left}·ab_status stale_days·ab_day rematched/stale·시간 가드 상수(6초·7일·4초) · 워커 저장에 routes_ver 스탬프',
-    /const ROUTES_VER = crypto\.createHash\('sha1'\)/.test(lib) && /\.digest\('hex'\)\.slice\(0, 12\);/.test(lib) && /function rematchDoc\(doc, opts\)/.test(lib) && /ROUTES_VER,/.test(libExports) && /rematchDoc,/.test(libExports)
+    /function routesVerOf\(list\) \{\s*return crypto\.createHash\('sha1'\)/.test(lib) && /\.digest\('hex'\)\.slice\(0, 12\);/.test(lib) && /function rematchDoc\(doc, opts\)/.test(lib) && /get ROUTES_VER\(\) \{ return ROUTES_VER; \}/.test(libExports) && /rematchDoc,/.test(libExports)
     && /async function rematchDays\(st, days, learned, o\)/.test(ab) && /out\.rematched = \{ days: rd\.days, changed: rd\.changed, left: rd\.left \};/.test(ab) && /stale_days: staleDays/.test(ab) && /extra\.rematched = \{ changed: rd\.changed \}/.test(ab) && /extra\.stale = true/.test(ab)
-    && /const REMATCH_BUDGET_MS = 6000;/.test(ab) && /const STATUS_REMATCH_MAX = 7;/.test(ab) && /const STATUS_REMATCH_BUDGET_MS = 4000;/.test(ab) && /routes_ver: ROUTES_VER, ts: Date\.now\(\), job: job/.test(wk), '');
-  const learnSeg = (html.match(/function abLearnGo\(key, val\)\{([\s\S]*?)\n  \}/) || ['', ''])[1];
+    && /const REMATCH_BUDGET_MS = 6000;/.test(ab) && /const STATUS_REMATCH_MAX = 7;/.test(ab) && /const STATUS_REMATCH_BUDGET_MS = 4000;/.test(ab) && /routes_ver: AB\.routesVer\(\), ts: Date\.now\(\), job: job/.test(wk), '');
+  const learnSeg = (html.match(/function abLearnGo\(key, val(?:, noConfirm)?\)\{([\s\S]*?)\n  \}/) || ['', ''])[1];   // v351: noConfirm 인자 추가
   T('앱 [노선 지정]: ab_learn에 day 동봉 · 토스트 "재정렬 n건" · 응답 후 그날 재조회(abOpenDay) · "다음 수집부터" 문구 없음 · 표 위 "노선표 변경 뒤 재정렬 대기 n일(열면 자동 정리)" · 열면 stale_days에서 제거 · 새 버튼 없음',
     /action: "ab_learn", from: u\.from, to: u\.to, item: u\.item, side: side, row: row, day: learnDay/.test(learnSeg) && /var learnDay = abDay\.day \|\| "";/.test(learnSeg)
     && /apprToastShow\("노선 지정 " \+ side \+ row \+ \(rm \? " · 재정렬 " \+ abInt\(rm\.changed\) \+ "건"/.test(learnSeg) && /if \(learnDay && abDay\.day === learnDay\) abOpenDay\(learnDay\);/.test(learnSeg)
@@ -1060,6 +1060,28 @@ try {
       /mergeAsb\(asb,\s*Array\.isArray\(doc\.items\)\s*\?\s*doc\.items\s*:\s*\[\]\s*\);\s*asb\.forEach\(normAsbRow\);/.test(src), src.slice(0, 200));
   }
 } catch (e) { console.log('  (v337 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ---- v351(PM 9/11): 노선표 기본표 앱↔서버 일치(R40 포함) · [노선 지정] 드롭다운 맨 위 "＋ 새 노선으로 추가…" · 인라인 폼 → ab_route_add → 바로 지정 · 서버·워커·엑셀 봇이 같은 추가분(routes_extra)을 본다 ----
+try {
+  const lib = readFileSync(join(ROOT, 'netlify/functions/_lib/allbaro.js'), 'utf8');
+  const ab = readFileSync(join(ROOT, 'netlify/functions/gw-allbaro.js'), 'utf8');
+  const wk = readFileSync(join(ROOT, 'netlify/functions/gw-allbaro-run-background.js'), 'utf8');
+  const appR = [...html.matchAll(/\{s:"([LR])",r:(\d+),f:"([^"]*)",t:"([^"]*)",i:"([^"]*)"\}/g)].map((m) => m.slice(1).join('|'));
+  const svrR = [...lib.slice(lib.indexOf('const BASE_ROUTES'), lib.indexOf('const EXTRA_ROW_MIN')).matchAll(/\{ side: "([LR])", row: (\d+), from: "([^"]*)", to: "([^"]*)", item: "([^"]*)"/g)].map((m) => m.slice(1).join('|'));
+  T('노선표 기본표 앱 AB_ROUTES ↔ 서버 BASE_ROUTES 71줄 완전 일치 · R40 한라티씨→거성산업 분진 · 예비 행 40~49',
+    appR.length === 71 && appR.length === svrR.length && appR.every((x, i) => x === svrR[i]) && appR.indexOf('R|40|한라티씨|거성산업|분진') >= 0 && /const EXTRA_ROW_MIN = 40, EXTRA_ROW_MAX = 49;/.test(lib),
+    '앱 ' + appR.length + ' / 서버 ' + svrR.length + (appR.length === svrR.length ? ' 첫 불일치 ' + (appR.findIndex((x, i) => x !== svrR[i])) : ''));
+  T('서버: 요청 시작에 추가분 합침(loadExtraRoutes) · ab_route_add 분기 · findRoute가 현재 표를 본다 · ROUTE_LIST/ROUTE_INDEX 스냅샷 없음 · hidden export에 routes_extra · 워커도 합친 뒤 매칭',
+    /await loadExtraRoutes\(store\(DATA\)\);/.test(ab) && /case 'ab_route_add': return await handleRouteAdd\(st, c, d, R\);/.test(ab) && /function findRoute\(side, row\) \{\s*const list = AB\.routes\(\);/.test(ab)
+    && !/ROUTE_LIST|ROUTE_INDEX/.test(ab) && /routes_extra: extra, request_id: R/.test(ab) && /AB\.setExtraRoutes\(\(ex\.ok && ex\.data && Array\.isArray\(ex\.data\.items\)\) \? ex\.data\.items : \[\]\);/.test(wk), '');
+  const i0 = html.indexOf('function abRouteOptsHtml(');
+  const opts = html.slice(i0, html.indexOf('\n  }', i0));
+  T('앱 드롭다운: 첫 항목 "— 양식 줄 선택 —" 바로 다음(맨 위)에 "＋ 새 노선으로 추가…"(value __new__)', /— 양식 줄 선택 —<\/option>' \+\s*'<option value="__new__">＋ 새 노선으로 추가…<\/option>'/.test(opts), opts.slice(0, 200));
+  T('앱 새 노선 폼·저장: abNewRouteFormHtml(상차지·하차지·품목 프리필, L/R 기본 = 먼저 비는 열) · abRouteAddGo → ab_route_add → 성공 시 abLearnGo(noConfirm) 바로 지정 · 취소·날짜 이동·로그아웃에 abLearnNew 초기화 · ROWS_FULL 문구',
+    ['abFreeReserve', 'abNewRouteFormHtml', 'abRouteAddGo'].every((f) => new RegExp('function ' + f + '\\(').test(html)) && /action: "ab_route_add", from: from, to: to, item: item, side: side/.test(html)
+    && /abLearnGo\(key, sd \+ "\|" \+ rw, true\);/.test(html) && /function abLearnGo\(key, val, noConfirm\)/.test(html) && /if \(!noConfirm && !confirm\("이 조합을 아래 줄로 지정할까요\?/.test(html)
+    && (html.match(/abLearnNew = "";/g) || []).length >= 4 && /ROWS_FULL: "양식 예비 줄\(40~49행\)이 다 찼습니다/.test(html) && /if \(abLearnNew === key\) abRouteAddGo\(key, host\);/.test(html), '');
+} catch (e) { console.log('  (v351 검사 생략 — ' + e.message + ')'); fails++; }
 
 // ---- v339: 기본 숨김 모듈 집합이 앱·서버에서 갈라지면 권한 구멍이 된다(9/4 hr·9/10 lic 실사고) ----
 try {

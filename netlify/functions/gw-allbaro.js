@@ -11,7 +11,8 @@ const crypto = require('crypto');
 const { setupBlobContext, store, blobGet, blobSet } = require('./_lib/blobs');
 const { issueSession, verifyToken, bearer } = require('./_lib/session');
 const { appendAudit } = require('./_lib/audit');
-const { ROUTES, ROUTES_VER, normName, normItem, mergeMonthCounts, rematchDoc, dayMinus } = require('./_lib/allbaro');   // 노선표(양식 줄)·노선표 해시(v327) + 이름·품목 정규화(learnKey를 라이브러리 매칭과 같은 기준으로) + 월 합산(혁신②) + 일자 문서 재판정(v327)
+const AB = require('./_lib/allbaro');   // v351: 노선표는 접근자로(AB.routes()·AB.routesVer()) — 추가 노선이 합쳐지면 값이 바뀐다
+const { normName, normItem, mergeMonthCounts, rematchDoc, dayMinus } = AB;   // 노선표(양식 줄)·노선표 해시(v327) + 이름·품목 정규화(learnKey를 라이브러리 매칭과 같은 기준으로) + 월 합산(혁신②) + 일자 문서 재판정(v327)
 
 const DATA = 'gw_data';
 const USERS = 'gw_users';
@@ -76,17 +77,22 @@ function round3(n) { return Math.round(n * 1000) / 1000; }
 
 // 노선표 인덱스 — 학습 지정이 실재하는 줄을 가리키는지 검증한다(계약 B-2 BAD_ROUTE).
 // 프로토타입 오염 없는 사전(Object.create(null))으로 'constructor' 같은 키 우회를 원천 차단.
-const ROUTE_LIST = Array.isArray(ROUTES) ? ROUTES : [];
-const ROUTE_INDEX = Object.create(null);
-ROUTE_LIST.forEach(function (r) {
-  if (r && (r.side === 'L' || r.side === 'R') && Number.isInteger(r.row)) ROUTE_INDEX[r.side + ':' + r.row] = r;
-});
-function findRoute(side, row) { return ROUTE_INDEX[side + ':' + row] || null; }
+const EXTRA_KEY = 'allbaro:routes_extra';   // v351: 사람이 앱에서 더한 노선(양식 예비 행 40~49)
+// v351: 추가 노선까지 보이도록 매번 현재 표에서 찾는다(인덱스 스냅샷이면 새 줄을 BAD_ROUTE로 거절한다).
+function findRoute(side, row) {
+  const list = AB.routes();
+  for (let i = 0; i < list.length; i++) {
+    const r = list[i];
+    if (r && r.side === side && Number(r.row) === Number(row)) return r;
+  }
+  return null;
+}
 // UI [노선 지정] 목록용 — 양식 좌표(side,row)와 표시용 텍스트만. count_col 등 내부 열 정보는 내보내지 않는다.
 // hidden = {'L:5': {by,ts}} — 숨긴 줄은 hidden:true(+hidden_by·hidden_ts)로 표기해 UI가 표에서 빼고 '숨긴 노선' 목록으로 보여준다(v323).
 function routeList(hidden) {
-  return ROUTE_LIST.map(function (r) {
+  return AB.routes().map(function (r) {
     const o = { side: r.side, row: r.row, from: r.from, to: r.to, item: r.item };
+    if (r.extra) o.extra = true;
     const h = hidden && hidden[r.side + ':' + r.row];
     if (h) { o.hidden = true; o.hidden_by = String(h.by || ''); o.hidden_ts = Number(h.ts) || 0; }
     return o;
@@ -235,7 +241,7 @@ async function rematchDays(st, days, learned, o) {
     if (!doc) continue;   // 아직 수집 안 된 날
     const res = rematchDoc(doc, { learned: learned });
     if (!res.ok) { out.failed.push({ day: day, code: 'BAD_DOC' }); continue; }
-    if (res.changed > 0 || doc.routes_ver !== ROUTES_VER) {
+    if (res.changed > 0 || doc.routes_ver !== AB.routesVer()) {
       const w = await blobSet(st, dayKey(day), res.doc);
       if (!w.ok) { out.failed.push({ day: day, code: w.code || 'WRITE_FAILED' }); continue; }
     }
@@ -266,7 +272,7 @@ async function handleStatus(st, c, R) {
     const r = reads[i + 2];
     if (!r || !r.ok || !r.data) continue;   // 아직 수집 안 된 날은 목록에서 뺀다(0건과 구분되게)
     docs[wanted[i]] = r.data;
-    if (r.data.routes_ver !== ROUTES_VER) stale.push(wanted[i]);
+    if (r.data.routes_ver !== AB.routesVer()) stale.push(wanted[i]);
   }
   let staleDays = stale;
   let rematched = null;
@@ -339,7 +345,7 @@ async function handleDay(st, c, d, R) {
   // v327: 노선표가 바뀐 뒤 집계된 문서(routes_ver 불일치·없음)는 여기서 재정렬해 저장하고 재정렬된 문서로 답한다(단일 날짜라 항상 처리).
   // 학습 사전을 못 읽었으면(lr.ok false) 재정렬하지 않고 stale:true로 드러낸다 — 학습 배정이 풀린 문서를 저장하는 쪽으로 실패하지 않는다.
   let doc = r.data;
-  if (doc.routes_ver !== ROUTES_VER) {
+  if (doc.routes_ver !== AB.routesVer()) {
     if (lr.ok) {
       const docs = Object.create(null); docs[day] = doc;
       const rd = await rematchDays(st, [day], learnedItems(lr.data), { docs: docs, why: '노선표', by: c.member.name, bid: c.member.id });
@@ -589,7 +595,44 @@ async function handleHiddenExport(event, d, R) {
   const items = Object.keys(m).map(function (k) { const p = k.split(':'); return { side: p[0], row: Number(p[1]) }; })
     .sort(function (a, b) { return a.side === b.side ? a.row - b.row : (a.side < b.side ? -1 : 1); });
   const updated = r.data ? Number(r.data.updated_at) : 0;
-  return jr(200, { ok: true, items: items, n: items.length, updated_at: (updated > 0) ? updated : null, request_id: R });
+  const extra = AB.routes().filter(function (x) { return x.extra; }).map(function (x) { return { side: x.side, row: x.row, from: x.from, to: x.to, item: x.item, count_col: x.count_col }; });
+  return jr(200, { ok: true, items: items, n: items.length, updated_at: (updated > 0) ? updated : null, routes_extra: extra, request_id: R });
+}
+
+// v351: 추가 노선 blob → 기본표에 합침. 실패해도 기본표로 간다(빈 표가 아니라).
+async function loadExtraRoutes(st) {
+  try {
+    const r = await blobGet(st, EXTRA_KEY);
+    const items = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data.items : [];
+    AB.setExtraRoutes(items);
+    return items;
+  } catch (e) { AB.setExtraRoutes([]); return []; }
+}
+// 새 노선 추가 — 관리자·운영부(canLearn과 같은 문). 예비 행(40~49)에서 다음 빈 줄을 잡는다.
+//   같은 상·하차지·품목이 이미 있으면 그 줄을 돌려주고 새로 만들지 않는다.
+async function handleRouteAdd(st, c, d, R) {
+  if (!canLearn(c.member)) return jr(403, { ok: false, code: 'FORBIDDEN', request_id: R });
+  const from = cleanStr(d.from), to = cleanStr(d.to), item = cleanStr(d.item);
+  const side = cleanStr(d.side).toUpperCase();
+  if (!from || !to || (side !== 'L' && side !== 'R')) return jr(400, { ok: false, code: 'BAD_INPUT', request_id: R });
+  // 길이 상한은 lib cleanExtraRoute와 같다(상·하차지 60·품목 40 — 양식 칸 폭). 학습(ab_learn)의 120·400과 다르다: 여기 값은 엑셀 칸에 그대로 찍힌다.
+  if (!AB.cleanExtraRoute({ side: side, row: AB.EXTRA_ROW_MIN, from: from, to: to, item: item })) return jr(400, { ok: false, code: 'STR_TOO_LONG', request_id: R });
+  const dup = AB.routes().find(function (x) { return normName(x.from) === normName(from) && normName(x.to) === normName(to) && normItem(x.item) === normItem(item); });
+  if (dup) return jr(200, { ok: true, side: dup.side, row: dup.row, existed: true, request_id: R });
+  const r = await blobGet(st, EXTRA_KEY);
+  const items = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data.items : [];
+  const row = AB.nextExtraRow(side, items);
+  if (!row) return jr(409, { ok: false, code: 'ROWS_FULL', side: side, request_id: R });   // 예비 행 소진 — 양식 원본을 늘려야 한다
+  const entry = { side: side, row: row, from: from, to: to, item: item, count_col: side === 'L' ? 5 : 11, by: c.member.name, bid: c.member.id, ts: Date.now() };
+  items.push(entry);
+  const w = await blobSet(st, EXTRA_KEY, { schema: 1, items: items, updated_at: Date.now() });
+  if (!w.ok) return jr(500, { ok: false, code: w.code, request_id: R });
+  AB.setExtraRoutes(items);
+  try {
+    await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'allbaro',
+      ev: [{ op: '노선추가', id: side + row, t: from + ' → ' + to + (item ? ' · ' + item : '') }] });
+  } catch (e) {}
+  return jr(200, { ok: true, side: side, row: row, existed: false, routes_ver: AB.routesVer(), request_id: R });
 }
 
 // 수동 수집 — 관리자 또는 개발자만. 날짜는 정규식+달력 왕복 검증, 오늘−60일~오늘, 최대 14개.
@@ -687,6 +730,8 @@ async function handler(event) {
   let d;
   try { d = JSON.parse(event.body || '{}'); } catch { return jr(400, { ok: false, code: 'INVALID_JSON', request_id: R }); }
   // 봇 전용 읽기(세션 대신 공유 시크릿, v323 후속) — 회원 게이트 앞에서 갈라진다. 그 외 액션은 종전대로 세션·기기승인 필수.
+  // v351: 추가 노선을 기본표에 합친다 — 매칭·재정렬·노선 목록·엑셀 내보내기가 전부 같은 표를 본다.
+  await loadExtraRoutes(store(DATA));
   if (d && d.action === 'ab_hidden_export') {
     try { return await handleHiddenExport(event, d, R); } catch (e) { return jr(500, { ok: false, code: 'HANDLER_FAILED', request_id: R }); }
   }
@@ -704,6 +749,7 @@ async function handler(event) {
       case 'ab_job': return await handleJob(st, d, R);
       case 'ab_learn': return await handleLearn(st, c, d, R);
       case 'ab_route_hide': return await handleRouteHide(st, c, d, R);
+      case 'ab_route_add': return await handleRouteAdd(st, c, d, R);
       case 'ab_manual_get': return await handleManualGet(st, d, R);
       case 'ab_manual_put': return await handleManualPut(st, c, d, R);
       case 'ab_presets_get': return await handlePresetsGet(st, R);

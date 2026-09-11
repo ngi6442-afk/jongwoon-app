@@ -33,7 +33,9 @@ const ONE_PAGE_ROWS = '500';
 
 // ---------- 노선사전(노선사전.json routes 66개 임베드) ----------
 // 회수 기입: L측=E열(count_col 5), R측=K열(count_col 11).
-const ROUTES = [
+// v351(2026-09-11): 기본표(BASE_ROUTES)와 사람이 앱에서 더한 추가분(blob allbaro:routes_extra)을 합쳐 ROUTES가 된다.
+//   추가분은 양식 원본의 예비 행(L40~L49·R40~R49, 2026-09-11 삽입)에 들어간다. 요청마다 setExtraRoutes()로 합친다.
+const BASE_ROUTES = [
   // 2026-08-24 배출자 가나다순 전면 재정렬(PM 지시) + 신설 3행 — 양식 원본도 같은 날 재배열.
   // 영문 배출자(SMC·TCC·YK)는 한글 뒤 알파벳순. 이전 행번호·이력 주석은 git 이력 참조.
   { side: "L", row: 5, from: "거성산업", to: "네이처", item: "폐합성수지", count_col: 5 },
@@ -106,7 +108,11 @@ const ROUTES = [
   { side: "R", row: 37, from: "TCC스틸", to: "포항그린", item: "폐수오니", count_col: 11 },
   { side: "R", row: 38, from: "YK스틸", to: "스틸싸이클㈜", item: "EAFD", count_col: 11 },
   { side: "R", row: 39, from: "(주)포스코퓨처엠", to: "대화산업", item: "폐석회", count_col: 11 },   // v326(PM 9/8): 9/7 폐석회 별도 줄 — 양식 R39 빈 줄(SUM K5:K39 범위 안), 가나다 재정렬 없이 말미 추가
+  { side: "R", row: 40, from: "한라티씨", to: "거성산업", item: "분진", count_col: 11 },   // v351(PM 9/11): 9/10 미매칭 실측 — 양식 예비 행 R40(2026-09-11 삽입)
 ];
+// 추가 노선이 들어갈 수 있는 행 — 양식 원본 예비 행. 넘치면 원본을 다시 늘려야 한다(generate.py 주석 참조).
+const EXTRA_ROW_MIN = 40, EXTRA_ROW_MAX = 49;
+let ROUTES = BASE_ROUTES.slice();
 
 // ---------- 별칭사전(별칭사전.json 11개 임베드, _설명 키 제외) ----------
 // 키=올바로 표기 일부, 값=회사 양식 표기.
@@ -366,11 +372,14 @@ function prepLearned(list, notes) {
 
 // ---------- A-3. 노선 매칭(조용한 오배정 차단) ----------
 
-// 노선사전을 미리 정규화해 둔다(ALIAS·ROUTES가 상수라 결과는 항상 동일 — 의미 변화 없음).
-const NORM_ROUTES = ROUTES.map((r) => ({
-  route: r, f: normName(r.from), t: normName(r.to), i: normName(r.item),
-  ni: normItem(r.item), veh: vehicleTagOf(r.item),
-}));
+// 노선사전을 미리 정규화해 둔다. v351: 추가분이 합쳐지면 다시 센다(setExtraRoutes).
+function normRoutes(list) {
+  return list.map((r) => ({
+    route: r, f: normName(r.from), t: normName(r.to), i: normName(r.item),
+    ni: normItem(r.item), veh: vehicleTagOf(r.item),
+  }));
+}
+let NORM_ROUTES = normRoutes(ROUTES);
 
 // (상차지,하차지)로 후보 줄을 모은다. viaItem = 하차지를 양식 품목칸에서 찾은 경우(포스코 구내운송).
 function routeCandidates(f, t) {
@@ -1117,9 +1126,49 @@ function mergeMonthCounts(dayDocs) {
 
 // 노선표 내용 해시 — side/row/from/to/item을 이어붙인 문자열의 sha1 앞 12자. 일자 문서(allbaro:day:*)에 routes_ver로 찍어 두고,
 // 읽을 때 현재 값과 다르면(노선표가 바뀐 뒤 집계된 옛 기록) 그 자리에서 재정렬한다. 워커도 저장 시 같은 값을 찍는다.
-const ROUTES_VER = crypto.createHash('sha1')
-  .update(ROUTES.map((r) => [r.side, r.row, r.from, r.to, r.item].join('\u0001')).join('\n'), 'utf8')
-  .digest('hex').slice(0, 12);
+function routesVerOf(list) {
+  return crypto.createHash('sha1')
+    .update(list.map((r) => [r.side, r.row, r.from, r.to, r.item].join('\u0001')).join('\n'), 'utf8')
+    .digest('hex').slice(0, 12);
+}
+let ROUTES_VER = routesVerOf(ROUTES);
+
+// v351: 추가 노선(blob)을 기본표에 합친다. 요청·워커 시작 때 한 번 부른다. 같은 좌표가 기본표에 있으면 기본표가 이긴다.
+//   실행 컨테이너가 재사용되므로 매번 기본표에서 다시 만든다(누적 금지).
+function cleanExtraRoute(x) {
+  if (!x || typeof x !== 'object') return null;
+  const side = String(x.side || '').toUpperCase();
+  const row = Number(x.row);
+  const from = String(x.from || '').trim(), to = String(x.to || '').trim(), item = String(x.item || '').trim();
+  if ((side !== 'L' && side !== 'R') || !Number.isInteger(row) || row < EXTRA_ROW_MIN || row > EXTRA_ROW_MAX) return null;
+  if (!from || !to || from.length > 60 || to.length > 60 || item.length > 40) return null;
+  return { side, row, from, to, item, count_col: side === 'L' ? 5 : 11, extra: true };
+}
+function setExtraRoutes(list) {
+  const seen = Object.create(null);
+  BASE_ROUTES.forEach((r) => { seen[r.side + ':' + r.row] = true; });
+  const extra = [];
+  (Array.isArray(list) ? list : []).forEach((x) => {
+    const r = cleanExtraRoute(x);
+    if (!r || seen[r.side + ':' + r.row]) return;
+    seen[r.side + ':' + r.row] = true;
+    extra.push(r);
+  });
+  ROUTES = BASE_ROUTES.concat(extra);
+  NORM_ROUTES = normRoutes(ROUTES);
+  ROUTES_VER = routesVerOf(ROUTES);
+  return extra.length;
+}
+// 추가 노선이 들어갈 다음 빈 행(예비 행 안에서). 없으면 0.
+function nextExtraRow(side, extraList) {
+  const used = Object.create(null);
+  BASE_ROUTES.forEach((r) => { if (r.side === side) used[r.row] = true; });
+  (extraList || []).forEach((x) => { const r = cleanExtraRoute(x); if (r && r.side === side) used[r.row] = true; });
+  for (let row = EXTRA_ROW_MIN; row <= EXTRA_ROW_MAX; row++) if (!used[row]) return row;
+  return 0;
+}
+function routes() { return ROUTES; }
+function routesVer() { return ROUTES_VER; }
 
 // 판정 결과 서명 — 배정 줄·weak·학습 표시·미매칭 사유·후보. 이 값이 달라진 묶음만 '변경'으로 센다(회수·수량은 판정이 아니다).
 function decSig(c) {
@@ -1180,8 +1229,11 @@ function rematchDoc(doc, opts) {
 }
 
 module.exports = {
-  // 상수
-  ROUTES, ROUTES_VER, ALIAS, ITEM_ALIAS, VEHICLE_TAGS, UNIT_FACTOR, BASE, ENTN, ENTN_NAME, TD,
+  // 상수 — ROUTES·ROUTES_VER는 v351부터 접근자 routes()·routesVer()로 읽는다(추가 노선이 합쳐지면 값이 바뀐다).
+  //   아래 두 이름은 require 시점 스냅샷이라 기본표만 본다 — 테스트·픽스처 전용. 실서비스 코드는 접근자를 쓴다.
+  BASE_ROUTES, EXTRA_ROW_MIN, EXTRA_ROW_MAX, routes, routesVer, setExtraRoutes, cleanExtraRoute, nextExtraRow,
+  get ROUTES() { return ROUTES; }, get ROUTES_VER() { return ROUTES_VER; },
+  ALIAS, ITEM_ALIAS, VEHICLE_TAGS, UNIT_FACTOR, BASE, ENTN, ENTN_NAME, TD,
   // 순수 함수(픽스처 테스트 대상)
   normName, normItem, itemHit, matchRoute, matchRouteEx, rematchDoc,
   vehicleTagOf, vehicleTagOk, normVehNo, buildVehicleIndex, vehicleTypeOf,

@@ -1142,6 +1142,9 @@
       input.ab-qty{width:100%;margin-top:2px;}
       input.ab-bad{border-color:#B0332A;background:#FBE7E3;}
       select.ab-rsel{width:100%;margin-bottom:6px;}
+      .ab-nr{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px;padding:8px;border:1px dashed var(--line);border-radius:8px;}   /* v351 새 노선 폼 */
+      .ab-nr .ab-nr-hd{flex:1 1 100%;font-size:12px;color:var(--muted);}
+      .ab-nr .ab-in{flex:1 1 140px;min-width:0;margin:0;}
       /* v323: 빈 줄 토글·노선 숨김 */
       .ab-secline .ab-toggle{float:right;font-size:12px;font-weight:500;color:var(--sub);display:inline-flex;align-items:center;gap:4px;cursor:pointer;margin-top:-1px;}
       .ab-secline .ab-toggle input{margin:0;}
@@ -2904,7 +2907,7 @@
     records = {};
     abStatus = null; abDay = { day: "", data: null, loading: false, error: "" }; abPresets = { items: null, loading: false, saving: false, error: "" };
     abManual = { day: "", items: [], loaded: false, timer: null, saving: false, dirty: false, savedTs: 0, bad: 0, err: "", errBad: false, pendingRender: false };
-    abLearnDone = {}; abLearnOpen = "";
+    abLearnDone = {}; abLearnOpen = ""; abLearnNew = "";
   }
   function gwLogoutCore(){
     try{ if (typeof abFlushManualSave === "function") abFlushManualSave(); }catch(e){}   // 밀린 운반일지 직접 추가 저장부터(요청은 이 시점 토큰으로 나간다)
@@ -16518,6 +16521,7 @@
   var abManual = { day: "", items: [], loaded: false, timer: null, saving: false, dirty: false, savedTs: 0, bad: 0, err: "", errBad: false, pendingRender: false };
   var abLearnOpen = "";         // [노선 지정] UI가 열린 미매칭 조합 키
   var abLearnBusy = false;
+  var abLearnNew = "";          // v351: [노선 지정] 드롭다운에서 "＋ 새 노선으로 추가"를 고른 미매칭 조합 키 — 인라인 폼이 열린다
   var abLearnDone = {};         // 이번 화면에서 지정한 조합 key -> 'R27' (v327: 저장 즉시 서버가 그날부터 재정렬 → 그날 재조회)
   var abPresetEdit = false;     // 단골 노선 삭제 버튼 노출 토글
   var abPresetFormOpen = false;
@@ -16602,7 +16606,8 @@
     {s:"R",r:36,f:"TCC스틸",t:"성진kp",i:"폐수오니"},
     {s:"R",r:37,f:"TCC스틸",t:"포항그린",i:"폐수오니"},
     {s:"R",r:38,f:"YK스틸",t:"스틸싸이클㈜",i:"EAFD"},
-    {s:"R",r:39,f:"(주)포스코퓨처엠",t:"대화산업",i:"폐석회"}
+    {s:"R",r:39,f:"(주)포스코퓨처엠",t:"대화산업",i:"폐석회"},
+    {s:"R",r:40,f:"한라티씨",t:"거성산업",i:"분진"}   // v351(PM 9/11): 양식 예비 행 R40. 이후 새 노선은 앱 [＋ 새 노선으로 추가]가 예비 행(40~49)에 넣는다 — 코드 수정 없음
   ];
   function abRouteList(){
     var d = abDay.data || {}, s = abStatus || {};
@@ -16685,6 +16690,8 @@
     WORKER_THREW: "수집 작업이 비정상 종료됐습니다.",
     BAD_ROUTE: "양식 노선표에 없는 줄입니다 — 앱을 새로고침해 최신 노선표로 다시 지정하세요(계속 나오면 관리자에게 알려주세요).",
     BAD_ROUTE_ID: "노선 식별자가 올바르지 않습니다 — 앱을 새로고침한 뒤 다시 시도하세요.",
+    ROWS_FULL: "양식 예비 줄(40~49행)이 다 찼습니다 — 양식 원본에 줄을 늘려야 합니다. 관리자에게 알려주세요.",
+    BAD_INPUT: "상차지·하차지와 왼쪽/오른쪽 열을 모두 입력하세요.",
     BAD_PRESET_ID: "단골 노선 식별자가 올바르지 않습니다 — 앱을 새로고침한 뒤 다시 시도하세요.",
     DUP_PRESET_ID: "단골 노선 식별자가 중복됩니다 — 앱을 새로고침한 뒤 다시 시도하세요.",
     BAD_ITEMS: "입력값이 올바르지 않아 저장하지 못했습니다.",
@@ -16744,7 +16751,7 @@
     }
     if (abManual.day && abManual.day !== day) abFlushManualSave();   // 날짜를 옮기기 전에 밀린 저장부터 끝낸다
     abDay = { day: day, data: null, loading: true, error: "" };
-    abLearnOpen = "";
+    abLearnOpen = ""; abLearnNew = "";
     if (abManual.day !== day){
       abManual = { day: day, items: [], loaded: false, timer: null, saving: false, dirty: false, savedTs: 0, bad: 0, err: "", errBad: false, pendingRender: false };
     }
@@ -17089,11 +17096,70 @@
       if (r.s === "L") L += o; else R += o;
     }
     return '<option value="">— 양식 줄 선택 —</option>' +
+      '<option value="__new__">＋ 새 노선으로 추가…</option>' +   // v351(PM 9/11): 맨 위 — 양식 예비 행(40~49)에 새 줄을 만들고 바로 지정
       (L ? '<optgroup label="왼쪽(L열)">' + L + '</optgroup>' : '') +
       (R ? '<optgroup label="오른쪽(R열)">' + R + '</optgroup>' : '') +
       (H ? '<optgroup label="숨긴 줄(표에서 뺌 — 배정은 가능)">' + H + '</optgroup>' : '');
   }
-  function abLearnGo(key, val){
+  // v351: 새 노선 폼 — 어느 열(L/R)이 먼저 비는지(예비 행 40~49 중 가장 낮은 빈 줄)로 기본 열을 고른다. 둘 다 찼으면 "".
+  function abFreeReserve(){
+    var rs = abRouteList(), used = { L: {}, R: {} }, i, side, row, out = { L: 0, R: 0 };
+    for (i = 0; i < rs.length; i++){ if (rs[i].r >= 40 && rs[i].r <= 49) used[rs[i].s][rs[i].r] = true; }
+    for (side in out){ for (row = 40; row <= 49; row++){ if (!used[side][row]){ out[side] = row; break; } } }
+    return out;
+  }
+  function abNewRouteFormHtml(u){
+    var free = abFreeReserve(), def = (!free.L || (free.R && free.R < free.L)) ? "R" : "L";
+    return '<div class="ab-nr" data-ab-nr="' + esc(u.key) + '">' +
+      '<div class="ab-nr-hd">새 노선 — 양식 예비 줄(40~49행)에 추가하고 이 조합을 바로 지정합니다</div>' +
+      '<input class="ab-in" data-ab-nr-from="1" maxlength="60" placeholder="상차지" value="' + esc(u.from || "") + '">' +
+      '<input class="ab-in" data-ab-nr-to="1" maxlength="60" placeholder="하차지" value="' + esc(u.to || "") + '">' +
+      '<input class="ab-in" data-ab-nr-item="1" maxlength="40" placeholder="품목" value="' + esc(u.item || "") + '">' +
+      '<select class="ab-in" data-ab-nr-side="1">' +
+        '<option value="L"' + (def === "L" ? " selected" : "") + '>왼쪽(L열)' + (free.L ? " — L" + free.L : " — 빈 줄 없음") + '</option>' +
+        '<option value="R"' + (def === "R" ? " selected" : "") + '>오른쪽(R열)' + (free.R ? " — R" + free.R : " — 빈 줄 없음") + '</option>' +
+      '</select>' +
+      '</div>';
+  }
+  function abRouteAddGo(key, host){
+    if (abLearnBusy) return;
+    if (!abCanLearn()){ alert(AB_CODE_TEXT.FORBIDDEN); return; }
+    var box = null;
+    Array.prototype.forEach.call(host.querySelectorAll("[data-ab-nr]"), function(b){ if (b.getAttribute("data-ab-nr") === key) box = b; });
+    if (!box) return;
+    function v(sel){ var el = box.querySelector(sel); return el ? String(el.value || "").trim() : ""; }
+    var from = v("[data-ab-nr-from]"), to = v("[data-ab-nr-to]"), item = v("[data-ab-nr-item]"), side = v("[data-ab-nr-side]");
+    if (!from || !to){ alert("상차지와 하차지를 입력하세요."); return; }
+    if (side !== "L" && side !== "R"){ alert("왼쪽/오른쪽 열을 고르세요."); return; }
+    var free = abFreeReserve();
+    if (!free[side]){ alert(AB_CODE_TEXT.ROWS_FULL); return; }
+    if (!confirm("새 노선을 추가하고 이 조합을 그 줄로 지정할까요?\n\n" + from + " → " + to + (item ? " · " + item : "") +
+        "\n→ " + side + free[side] + " (양식 예비 줄)\n\n같은 상·하차지·품목이 이미 있으면 새로 만들지 않고 그 줄로 지정합니다.")) return;
+    abLearnBusy = true;
+    renderAbSheet();
+    gwCall("gw-allbaro", { action: "ab_route_add", from: from, to: to, item: item, side: side }).then(function(res){
+      abLearnBusy = false;
+      if (res.status === 401){ renderAbSheet(); onSessionInvalid(); return; }
+      if (res.status === 200 && res.body && res.body.ok !== false && res.body.side && res.body.row){
+        var sd = res.body.side, rw = Number(res.body.row), nr = { side: sd, row: rw, from: from, to: to, item: item, extra: true };
+        // 화면 노선표에 바로 얹는다(ab_status 재조회 전에도 abRouteFind가 찾도록) — 서버 표에는 이미 들어갔다
+        if (!abRouteFind(sd, rw)){
+          if (abStatus && Array.isArray(abStatus.routes)) abStatus.routes.push(nr);
+          if (abDay.data && Array.isArray(abDay.data.routes)) abDay.data.routes.push(nr);
+        }
+        apprToastShow(res.body.existed ? ("이미 있는 노선 → " + sd + rw + "로 지정") : ("새 노선 " + sd + rw + " 추가"));
+        abLearnNew = "";
+        abLearnGo(key, sd + "|" + rw, true);   // 확인창은 위에서 한 번 — 바로 지정·재정렬
+        return;
+      }
+      renderAbSheet();
+      alert(abErrText(res, "새 노선 추가 실패"));
+    }).catch(function(){
+      abLearnBusy = false; renderAbSheet();
+      alert("새 노선을 저장하지 못했습니다(네트워크).");
+    });
+  }
+  function abLearnGo(key, val, noConfirm){
     if (abLearnBusy) return;
     if (!abCanLearn()){ alert(AB_CODE_TEXT.FORBIDDEN); return; }   // v323 #13 — 서버도 같은 조건으로 403
     var list = abUnmatchedList(), u = null, i;
@@ -17102,8 +17168,9 @@
     if (!val){ alert("배정할 양식 줄을 고르세요."); return; }
     var p = String(val).split("|"), side = p[0], row = Number(p[1]);
     if ((side !== "L" && side !== "R") || !isFinite(row)){ alert("양식 줄 선택이 올바르지 않습니다."); return; }
+    if (val === "__new__"){ abLearnNew = key; renderAbSheet(); return; }   // v351: 드롭다운에서 새 노선을 고른 채 [지정] — 폼을 연다
     var rt = abRouteFind(side, row);
-    if (!confirm("이 조합을 아래 줄로 지정할까요?\n\n" + (u.from || "?") + " → " + (u.to || "?") + (u.item ? " · " + u.item : "") +
+    if (!noConfirm && !confirm("이 조합을 아래 줄로 지정할까요?\n\n" + (u.from || "?") + " → " + (u.to || "?") + (u.item ? " · " + u.item : "") +
         "\n→ " + side + row + (rt ? " · " + rt.f + " → " + rt.t + " · " + rt.i : "") +
         "\n\n같은 조합은 앞으로 이 줄에 들어갑니다.\n저장 즉시 이 날짜부터의 기록이 자동으로 재정렬됩니다(다시 수집할 필요 없음).")) return;
     abLearnBusy = true;
@@ -17397,9 +17464,11 @@
           if (done){
             h += '<div class="ab-unm-act">지정됨 → <b>' + esc(done) + '</b> · 재정렬되면 이 줄로 들어갑니다.</div>';
           } else if (abLearnOpen === u.key){
+            var isNew = (abLearnNew === u.key);   // v351: "＋ 새 노선으로 추가"를 고른 상태 — 인라인 폼 + [추가하고 지정]
             h += '<div class="ab-unm-act">' +
-              '<select class="ab-in ab-rsel" data-ab-rsel="' + esc(u.key) + '">' + abRouteOptsHtml() + '</select>' +
-              '<button class="mini-btn" data-ab-learn-ok="' + esc(u.key) + '"' + (abLearnBusy ? " disabled" : "") + '>' + (abLearnBusy ? "저장 중…" : "지정") + '</button> ' +
+              '<select class="ab-in ab-rsel" data-ab-rsel="' + esc(u.key) + '">' + (isNew ? abRouteOptsHtml().replace('value="__new__"', 'value="__new__" selected') : abRouteOptsHtml()) + '</select>' +
+              (isNew ? abNewRouteFormHtml(u) : '') +
+              '<button class="mini-btn" data-ab-learn-ok="' + esc(u.key) + '"' + (abLearnBusy ? " disabled" : "") + '>' + (abLearnBusy ? "저장 중…" : (isNew ? "추가하고 지정" : "지정")) + '</button> ' +
               '<button class="mini-btn" data-ab-learn-cancel="1">취소</button>' +
               '</div>';
           } else if (abCanLearn()){
@@ -17431,7 +17500,14 @@
       b.addEventListener("click", function(){ abLearnOpen = b.getAttribute("data-ab-learn"); renderAbSheet(); });
     });
     Array.prototype.forEach.call(host.querySelectorAll("[data-ab-learn-cancel]"), function(b){
-      b.addEventListener("click", function(){ abLearnOpen = ""; renderAbSheet(); });
+      b.addEventListener("click", function(){ abLearnOpen = ""; abLearnNew = ""; renderAbSheet(); });
+    });
+    // v351: 드롭다운에서 "＋ 새 노선으로 추가…"를 고르면 폼을 펴고, 다른 줄로 바꾸면 접는다
+    Array.prototype.forEach.call(host.querySelectorAll("[data-ab-rsel]"), function(sl){
+      sl.addEventListener("change", function(){
+        var key = sl.getAttribute("data-ab-rsel"), want = (sl.value === "__new__") ? key : "";
+        if (want !== (abLearnNew === key ? key : "")){ abLearnNew = want; renderAbSheet(); }
+      });
     });
     Array.prototype.forEach.call(host.querySelectorAll("[data-ab-learn-ok]"), function(b){
       b.addEventListener("click", function(){
@@ -17439,7 +17515,8 @@
         Array.prototype.forEach.call(host.querySelectorAll("[data-ab-rsel]"), function(s){
           if (s.getAttribute("data-ab-rsel") === key) sel = s;
         });
-        abLearnGo(key, sel ? sel.value : "");
+        if (abLearnNew === key) abRouteAddGo(key, host);
+        else abLearnGo(key, sel ? sel.value : "");
       });
     });
   }

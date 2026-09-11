@@ -2001,4 +2001,65 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   delete mem.gw_data['col:asbestos'];
 }
 
+// ===== 39. 새 노선 추가 v351(PM 9/11 "R40 추가 및 드롭다운 가장 상단에 새 노선으로 추가 버튼") — 기본표 R40 · blob allbaro:routes_extra → 예비 행 40~49 ·
+//   ab_route_add(운영부·관리자, 중복이면 기존 줄, 길이 60·60·40, 예비 행 소진 409) · 추가된 줄은 ab_status routes·findRoute(ab_learn)·매칭·ab_hidden_export routes_extra에 바로 보인다.
+{
+  const gwab = require(join(FN, 'gw-allbaro.js'));
+  const abLib = require(join(FN, '_lib/allbaro.js'));
+  const OPS = { id: 'uops', name: '운영부원', admin: false, dept: '운영부', perms: {} };
+  mem.gw_users['member:uops'] = OPS; mem.gw_users['member:uwork'] = WORKER;
+  const tokO = issueSession(OPS).token;
+  mem.gw_data['allbaro:learned'] = { schema: 1, items: [] };
+  mem.gw_data['allbaro:routes_hidden'] = { schema: 1, items: [] };
+  delete mem.gw_data['allbaro:routes_extra'];
+  const ab = async (body, tok, dev, headers) => { const rr = await gwab.handler({ httpMethod: 'POST', headers: Object.assign({ authorization: tok ? 'Bearer ' + tok : '' }, dev ? { 'x-device-id': dev } : {}, headers || {}), body: JSON.stringify(body) }); return { code: rr.statusCode, body: JSON.parse(rr.body) }; };
+  const extra = () => ((mem.gw_data['allbaro:routes_extra'] || {}).items || []);
+  T('기본표 R40 한라티씨→거성산업 분진(9/10 미매칭 실측) · 기본표 71줄 · 예비 행 40~49', abLib.BASE_ROUTES.length === 71 && abLib.BASE_ROUTES.some((x) => x.side === 'R' && x.row === 40 && x.from === '한라티씨' && x.to === '거성산업' && x.item === '분진') && abLib.EXTRA_ROW_MIN === 40 && abLib.EXTRA_ROW_MAX === 49, String(abLib.BASE_ROUTES.length));
+  let d = abLib.matchRouteEx({ from: '한라티씨(주)', to: '거성산업(주)', item: '분진(고상)' }, {});
+  T('매칭: 한라티씨→거성산업 분진 → R40', !!d.route && d.route.side === 'R' && d.route.row === 40, JSON.stringify(d).slice(0, 120));
+  const verBase = abLib.routesVer();
+  r = await ab({ action: 'ab_route_add', from: '새상차지', to: '새하차지', item: '새품목', side: 'L' }, tokW, 'dev1');
+  T('ab_route_add 부서 없는 직원 → 403 FORBIDDEN · blob 없음', r.code === 403 && r.body.code === 'FORBIDDEN' && !mem.gw_data['allbaro:routes_extra'], r.code + '/' + r.body.code);
+  r = await ab({ action: 'ab_route_add', from: '', to: '새하차지', item: '', side: 'L' }, tokO, 'dev1');
+  T('ab_route_add 상차지 없음 → 400 BAD_INPUT', r.code === 400 && r.body.code === 'BAD_INPUT', r.code + '/' + r.body.code);
+  r = await ab({ action: 'ab_route_add', from: '새상차지', to: '새하차지', item: '', side: 'X' }, tokO, 'dev1');
+  T('ab_route_add side X → 400 BAD_INPUT', r.code === 400 && r.body.code === 'BAD_INPUT', r.code + '/' + r.body.code);
+  r = await ab({ action: 'ab_route_add', from: 'x'.repeat(61), to: '새하차지', item: '', side: 'L' }, tokO, 'dev1');
+  T('ab_route_add 상차지 61자 → 400 STR_TOO_LONG(양식 칸 폭 60·품목 40)', r.code === 400 && r.body.code === 'STR_TOO_LONG', r.code + '/' + r.body.code);
+  r = await ab({ action: 'ab_route_add', from: '새상차지', to: '새하차지', item: 'z'.repeat(41), side: 'L' }, tokO, 'dev1');
+  T('ab_route_add 품목 41자 → 400 STR_TOO_LONG', r.code === 400 && r.body.code === 'STR_TOO_LONG', r.code + '/' + r.body.code);
+  let audL = auditMock.logs.length;
+  r = await ab({ action: 'ab_route_add', from: '새상차지', to: '새하차지', item: '새품목', side: 'L' }, tokO, 'dev1');
+  T('ab_route_add 운영부 → 200 L40(예비 첫 줄) existed:false · blob routes_extra 1건{side,row,from,to,item,count_col 5,by,bid,ts} · routes_ver 바뀜 · 감사로그 노선추가 L40',
+    r.code === 200 && r.body.ok === true && r.body.side === 'L' && r.body.row === 40 && r.body.existed === false && r.body.routes_ver !== verBase
+    && extra().length === 1 && extra()[0].row === 40 && extra()[0].count_col === 5 && extra()[0].by === '운영부원' && extra()[0].bid === 'uops' && extra()[0].ts > 0
+    && auditMock.logs.slice(audL).some((l) => l.col === 'allbaro' && l.ev && l.ev[0].op === '노선추가' && l.ev[0].id === 'L40'), JSON.stringify(r.body).slice(0, 160));
+  r = await ab({ action: 'ab_route_add', from: '새상차지', to: '새하차지', item: '새품목', side: 'R' }, tokO, 'dev1');
+  T('같은 상·하차지·품목 다시(열이 달라도) → 200 existed:true L40 · blob 그대로 1건', r.code === 200 && r.body.existed === true && r.body.side === 'L' && r.body.row === 40 && extra().length === 1, JSON.stringify(r.body).slice(0, 120));
+  r = await ab({ action: 'ab_route_add', from: '한라티씨', to: '거성산업', item: '분진', side: 'L' }, tokO, 'dev1');
+  T('기본표에 있는 조합 → 200 existed:true R40 · 새 줄 없음', r.code === 200 && r.body.existed === true && r.body.side === 'R' && r.body.row === 40 && extra().length === 1, JSON.stringify(r.body).slice(0, 120));
+  r = await ab({ action: 'ab_route_add', from: '둘째상차', to: '둘째하차', item: '분진', side: 'R' }, tokA);
+  T('R열 추가 → R41(R40은 기본표가 차지)', r.code === 200 && r.body.side === 'R' && r.body.row === 41 && extra().length === 2, JSON.stringify(r.body).slice(0, 120));
+  r = await ab({ action: 'ab_status' }, tokA);
+  { const l40 = (r.body.routes || []).find((x) => x.side === 'L' && x.row === 40), r41 = (r.body.routes || []).find((x) => x.side === 'R' && x.row === 41);
+    T('ab_status routes: L40·R41 extra:true 포함(앱 드롭다운·표에 바로 보인다) · 노선 수 73', r.code === 200 && l40 && l40.extra === true && l40.from === '새상차지' && r41 && r41.extra === true && r.body.routes.length === 73, String((r.body.routes || []).length)); }
+  r = await ab({ action: 'ab_learn', from: '새상차지(주)', to: '새하차지', item: '새품목', side: 'L', row: 40 }, tokO, 'dev1');
+  T('추가한 줄 L40에 ab_learn 배정 → 200(findRoute가 추가 노선을 본다 — BAD_ROUTE 아님)', r.code === 200 && r.body.ok === true, r.code + '/' + r.body.code);
+  d = abLib.matchRouteEx({ from: '둘째상차(주)', to: '둘째하차', item: '분진(고상)' }, {});
+  T('매칭: 추가 노선 둘째상차→둘째하차 분진 → R41 · 품목 다르면 v326대로 ITEM_MISMATCH(자동 배정 없음)', !!d.route && d.route.side === 'R' && d.route.row === 41 && abLib.matchRouteEx({ from: '둘째상차', to: '둘째하차', item: '전혀다른품목' }, {}).reason === 'ITEM_MISMATCH', JSON.stringify(d).slice(0, 120));
+  r = await ab({ action: 'ab_hidden_export', key: 'test-ingest-key' });
+  T('ab_hidden_export routes_extra 동봉(엑셀 봇이 예비 행에 쓴다) · L40·R41 · by/bid/ts 없음', r.code === 200 && Array.isArray(r.body.routes_extra) && r.body.routes_extra.length === 2 && r.body.routes_extra[0].row === 40 && r.body.routes_extra[1].row === 41 && !/"(by|bid|ts)"/.test(JSON.stringify(r.body.routes_extra)), JSON.stringify(r.body.routes_extra).slice(0, 160));
+  // 예비 행 소진 — L40~49 가득 채운 blob
+  mem.gw_data['allbaro:routes_extra'] = { schema: 1, items: Array.from({ length: 10 }, (_, i) => ({ side: 'L', row: 40 + i, from: '가득' + i, to: '가득', item: '', count_col: 5 })) };
+  r = await ab({ action: 'ab_route_add', from: '열한번째', to: '가득', item: '', side: 'L' }, tokA);
+  T('L열 예비 행 10줄 소진 → 409 ROWS_FULL · blob 그대로 10건', r.code === 409 && r.body.code === 'ROWS_FULL' && extra().length === 10, r.code + '/' + r.body.code);
+  mem.gw_data['allbaro:routes_extra'] = { schema: 1, items: [{ side: 'L', row: 5, from: '기본표좌표', to: 'x', item: '' }, { side: 'R', row: 99, from: '범위밖', to: 'x', item: '' }, { side: 'L', row: 42, from: '', to: '이름없음', item: '' }, { side: 'L', row: 43, from: '정상', to: '정상', item: '' }] };
+  r = await ab({ action: 'ab_status' }, tokA);
+  T('불량 추가분(기본표 좌표 L5·범위 밖 R99·이름 없음)은 버리고 정상 L43만 합친다 · 기본표 L5는 원래 이름', r.code === 200 && r.body.routes.length === 72 && r.body.routes.some((x) => x.side === 'L' && x.row === 43 && x.extra) && r.body.routes.find((x) => x.side === 'L' && x.row === 5).from !== '기본표좌표', String(r.body.routes.length));
+  delete mem.gw_data['allbaro:routes_extra'];
+  r = await ab({ action: 'ab_status' }, tokA);
+  T('추가분 blob 없음(mock NOT_FOUND) → 기본표 71줄 그대로(빈 표로 떨어지지 않는다) · routes_ver 원복', r.code === 200 && r.body.routes.length === 71 && abLib.routesVer() === verBase, String(r.body.routes.length));
+  mem.gw_data['allbaro:learned'] = { schema: 1, items: [] };
+}
+
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);
