@@ -1,6 +1,6 @@
 # 종운 그룹웨어 — 기능 대장 (사용자 매뉴얼 원천)
 
-> 살아있는 문서. 기능 추가·변경 시 이 파일을 함께 갱신한다. 기준: v354 (2026-09-13).
+> 살아있는 문서. 기능 추가·변경 시 이 파일을 함께 갱신한다. 기준: v355 (2026-09-14).
 > 세부 변경 이력은 git 커밋 메시지(한글) 참조.
 
 ## 1. 전체 구조
@@ -483,6 +483,9 @@ PM 지시 "문서함 일단 다 올리고 등재결재랑 공개범위 만들어
 - **소비처 4곳이 가린 판을 먼저 본다**: 공개 서빙(`gw-promo-img` — 이미 발급된 공유 링크에도 소급), 검수 격자·완성본 창(`att_get`, 원본은 `raw:true`+홍보 do 권한에만), 홈페이지 갤러리 릴레이, 사진AI 초안 워커. 첨부 삭제 시 mask 동반 삭제. 상자 0개로 확인된 사진은 "가릴 것 없음"으로 기록돼 원본이 나간다.
 - 서버: `_lib/promomask.js`(detectBoxes·applyBoxes·cleanBoxes) · `gw-promo-mask.js`(mask_start/job/state/get/apply/clear, 홍보 'do', 잠금 10분) · `gw-promo-mask-background.js`(내부 토큰 `__promomask__`, 사진당 감지→픽셀화, 사용량 `promomask:usage`). API 키는 워커만 env에서 읽어 인자로 흘린다. 비용 장당 약 10원(감지 1회).
 - 검사: servertest 41절(권한·기동·워커 인메모리(가짜 비전)·상태·apply/clear·att_get 기본=가린 판/raw=원본·공개 서빙·재실행 kept:human/auto·force·att_del 동반 삭제·감사로그) · uismoke v353(표 규칙·서버 배선·소비처 4곳·앱 배선). **실사진 정확도(작은 얼굴·헬멧·측면)는 미검증 — 첫 게시에서 편집 창으로 확인**(TESTLIST).
+
+### v355 (9/14) — 옛 석면 렌더러 정리(체크리스트 21)
+- 인허가 탭의 옛 석면 블록은 v350에서 지웠지만 `renderAsb`와 숨은 `asbHead/asbList` 요소가 uismoke v336·v337 회귀검사(9/9 저장 사고 재현) 때문에 남아 있었다. 두 하네스를 **현장 탭 `renderSites`**(같은 대장 `col:asbestos`를 그린다)로 옮기고 `renderAsb`·잔여 요소·`afterSave(renderAsb)` 호출을 제거. 사고 재현 검사(문자열 "[]"·적대 데이터 10종·숫자 날짜 정렬)는 renderSites에서 그대로 통과.
 
 ### v354 (9/13 밤) — 모자이크 적대 검증 반영(보안·정확성·회귀 3렌즈 + 발견마다 2인 반박 → 확정 29건 / 기각 5건)
 - **실패를 '없음'으로 저장하던 결함(high)**: 비전 응답의 거부(stop_reason refusal)·잘림(max_tokens, 1024에 단체 사진이 잘림)·파싱 불가를 '가릴 것 없음'으로 확정 저장했다 → 이제 예외(REFUSAL/TRUNCATED/PARSE)로 기록만 남기고 mask를 쓰지 않는다(배지 '미확인' 유지 → 게시 전 경고). MAX_TOKENS 4096·effort low.

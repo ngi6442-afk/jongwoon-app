@@ -836,9 +836,9 @@ try {
     && /\["bcLwlt","bcLow","bcHigh"\]\.forEach\(function\(id\)\{ document\.getElementById\(id\)\.addEventListener\("input", function\(\)\{ if\(bcRefArgs\) bcRefLines\.apply\(null, bcRefArgs\); \}\); \}\);/.test(html), '');
 } catch (e) { console.log('  (v333 검사 생략 — ' + e.message + ')'); fails++; }
 
-// 37) v336 — 석면 저장 사고의 진짜 원인과 재설계(PM 2026-09-10 "저장됐으면 저장됐다고만 나오게, 갱신은 실패할 수 없게").
+// 37) v336 — 석면 저장 사고의 진짜 원인과 재설계(v355: 검사 대상을 renderAsb → renderSites로 이관 — 옛 석면 블록은 v350에서 제거, 현장 탭이 같은 대장을 그린다)(PM 2026-09-10 "저장됐으면 저장됐다고만 나오게, 갱신은 실패할 수 없게").
 //     원인: 9/2 일괄 입력분 130건이 member_ids·worker_ids를 배열이 아니라 문자열 "[]"로 들고 있었다.
-//     "[]"는 truthy라 (r.member_ids || []) 가 걸러주지 못하고 .forEach에서 TypeError → renderAsb가 통째로 죽는다.
+//     "[]"는 truthy라 (r.member_ids || []) 가 걸러주지 못하고 .forEach에서 TypeError → renderSites(당시 renderAsb)가 통째로 죽는다.
 //     목록이 안 그려지고, 같은 문장에 이어 붙은 closeAsb()까지 못 가 창이 안 닫혔다 → 사람이 17번 다시 눌렀다.
 //     v335는 try/catch로 덮었을 뿐이므로, v336은 ①모양(asList) ②순서(닫기·토스트 먼저) ③시점(다음 프레임)으로 다시 짰다.
 //     아래는 index.html 실제 소스에서 렌더 함수를 뽑아 실행하는 재현 테스트다 — 회귀하면 여기서 잡힌다.
@@ -857,7 +857,7 @@ try {
   const ASB_STATUS_SRC = 'var ASB_STATUS = ' + (html.match(/var ASB_STATUS = (\{[^}]*\});/) || [])[1] + ';';
   const mkEl = (id) => ({ id, innerHTML: '', textContent: '', querySelectorAll: () => [] });
   const build = (items) => {
-    const DOM = { asbList: mkEl('asbList'), asbHead: mkEl('asbHead') };
+    const DOM = { siteList: mkEl('siteList'), siteHead: mkEl('siteHead') };
     const api = new Function('__items', '__DOM', [
       'var document = { getElementById: function(id){ return __DOM[id] || null; } };',
       'var asb = __items; var workers = []; var members = []; var edu = [];',
@@ -868,8 +868,11 @@ try {
       'function liveEdu(){ return edu.filter(function(r){ return r && r.del!==1; }); }',
       fnSrc('eduLatest'), fnSrc('eduHasValidSpecial'), ASB_STATUS_SRC,
       fnSrc('liveAsb'), fnSrc('normAsbRow'), fnSrc('asbNotifyDue'), fnSrc('asbKeepUntil'),
-      fnSrc('asbWorkerNames'), fnSrc('asbNoSpecial'), fnSrc('sheetRow'), fnSrc('bindFold'), fnSrc('renderAsb'),
-      'return { renderAsb: renderAsb, normAsbRow: normAsbRow, asList: asList };',
+      'var SITE_KIND = { asbestos:"석면", demolition:"철거", dredge:"준설" }; var siteFilter = "", siteQ = "";',
+      'function renderSiteFilter(){} function canDo(){ return false; } function fmtAmount(v){ return String(v); } function openAsb(){} function openSiteWorkers(){}',
+      fnSrc('siteKind'), fnSrc('liveSites'), fnSrc('siteLabel'),
+      fnSrc('asbWorkerNames'), fnSrc('asbNoSpecial'), fnSrc('sheetRow'), fnSrc('bindFold'), fnSrc('renderSites'),
+      'return { renderSites: renderSites, normAsbRow: normAsbRow, asList: asList };',
     ].join('\n'))(items, DOM);
     return { api, DOM };
   };
@@ -884,13 +887,13 @@ try {
     ];
     const { api, DOM } = build(accident);
     let err = null;
-    try { api.renderAsb(); } catch (e) { err = e; }
-    T('v336 재현: member_ids가 문자열 "[]"인 기록이 섞여도 renderAsb가 던지지 않는다(9/9 사고 지점)',
+    try { api.renderSites(); } catch (e) { err = e; }
+    T('v336 재현: member_ids가 문자열 "[]"인 기록이 섞여도 renderSites가 던지지 않는다(9/9 사고 지점)',
       !err, err && (err.constructor.name + ': ' + err.message));
     T('v336 재현: 그 상태에서도 목록이 실제로 그려진다(종전엔 innerHTML이 비어 "목록에 안 뜬다"였다)',
-      DOM.asbList.innerHTML.indexOf('남성초') >= 0 && DOM.asbList.innerHTML.indexOf('임고면 축사 철거') >= 0,
-      'len=' + DOM.asbList.innerHTML.length);
-    T('v336 재현: 총 건수 머리글도 정상', DOM.asbHead.textContent === '총 2건', DOM.asbHead.textContent);
+      DOM.siteList.innerHTML.indexOf('남성초') >= 0 && DOM.siteList.innerHTML.indexOf('임고면 축사 철거') >= 0,
+      'len=' + DOM.siteList.innerHTML.length);
+    T('v336 재현: 총 건수 머리글도 정상', DOM.siteHead.textContent === '총 2건', DOM.siteHead.textContent);
   }
 
   // ---- ② 적대 데이터: 배열 자리에 들어올 수 있는 모든 모양 + 레코드 자체가 이상한 경우 ----
@@ -908,11 +911,11 @@ try {
     ];
     const { api, DOM } = build(hostile);
     let err = null;
-    try { api.renderAsb(); } catch (e) { err = e; }
-    T('v336 적대 데이터 10종(문자열·숫자·객체·null·깨진 JSON·비객체 레코드)에도 renderAsb가 던지지 않는다',
+    try { api.renderSites(); } catch (e) { err = e; }
+    T('v336 적대 데이터 10종(문자열·숫자·객체·null·깨진 JSON·비객체 레코드)에도 renderSites가 던지지 않는다',
       !err, err && (err.constructor.name + ': ' + err.message));
     T('v336 적대 데이터에서도 목록이 그려지고 스크립트는 이스케이프된다',
-      DOM.asbList.innerHTML.length > 0 && DOM.asbList.innerHTML.indexOf('<script>') < 0, 'len=' + DOM.asbList.innerHTML.length);
+      DOM.siteList.innerHTML.length > 0 && DOM.siteList.innerHTML.indexOf('<script>') < 0, 'len=' + DOM.siteList.innerHTML.length);
   }
 
   // ---- ③ asList·normAsbRow 단위 ----
@@ -1012,7 +1015,7 @@ try {
 
   // ---- ① 석면: start가 문자열이 아니어도 목록이 그려진다 ----
   {
-    const DOM = { asbList: mkEl('asbList'), asbHead: mkEl('asbHead') };
+    const DOM = { siteList: mkEl('siteList'), siteHead: mkEl('siteHead') };
     const api = new Function('__items', '__DOM', [
       'var document = { getElementById: function(id){ return __DOM[id] || null; } };',
       'var asb = __items; var workers = []; var members = []; var edu = [];',
@@ -1020,8 +1023,11 @@ try {
       'function liveEdu(){ return edu.filter(function(r){ return r && r.del!==1; }); }',
       fnSrc('eduLatest'), fnSrc('eduHasValidSpecial'), ASB_STATUS_SRC,
       fnSrc('liveAsb'), fnSrc('normAsbRow'), fnSrc('asbNotifyDue'), fnSrc('asbKeepUntil'),
-      fnSrc('asbWorkerNames'), fnSrc('asbNoSpecial'), fnSrc('sheetRow'), fnSrc('bindFold'), fnSrc('renderAsb'),
-      'return { renderAsb: renderAsb };',
+      'var SITE_KIND = { asbestos:"석면", demolition:"철거", dredge:"준설" }; var siteFilter = "", siteQ = "";',
+      'function renderSiteFilter(){} function canDo(){ return false; } function fmtAmount(v){ return String(v); } function openAsb(){} function openSiteWorkers(){}',
+      fnSrc('siteKind'), fnSrc('liveSites'), fnSrc('siteLabel'),
+      fnSrc('asbWorkerNames'), fnSrc('asbNoSpecial'), fnSrc('sheetRow'), fnSrc('bindFold'), fnSrc('renderSites'),
+      'return { renderSites: renderSites };',
     ].join('\n'))([
       { id: 's1', title: '정상 문자열', start: '2026-05-01', end: '2026-05-10', member_ids: [], worker_ids: [] },
       { id: 's2', title: '숫자 날짜', start: 20260101, end: 20260115, member_ids: '[]', worker_ids: '[]' },
@@ -1030,12 +1036,12 @@ try {
       { id: 's5', title: '뒤쪽 정상', start: '2026-03-01', end: '2026-03-05', member_ids: [], worker_ids: [] },
     ], DOM);
     let err = null;
-    try { api.renderAsb(); } catch (e) { err = e; }
-    T('v337 반례: start가 숫자·객체·null이어도 renderAsb가 던지지 않는다(정렬 비교자 String 고정)',
+    try { api.renderSites(); } catch (e) { err = e; }
+    T('v337 반례: start가 숫자·객체·null이어도 renderSites가 던지지 않는다(정렬 비교자 String 고정)',
       !err, err && (err.constructor.name + ': ' + err.message));
     T('v337 반례: 그 상태에서도 5건이 실제로 그려진다(빈 목록으로 죽지 않는다)',
-      DOM.asbHead.textContent === '총 5건' && DOM.asbList.innerHTML.indexOf('숫자 날짜') >= 0 && DOM.asbList.innerHTML.indexOf('뒤쪽 정상') >= 0,
-      'head=' + DOM.asbHead.textContent + ' len=' + DOM.asbList.innerHTML.length);
+      DOM.siteHead.textContent === '총 5건' && DOM.siteList.innerHTML.indexOf('숫자 날짜') >= 0 && DOM.siteList.innerHTML.indexOf('뒤쪽 정상') >= 0,
+      'head=' + DOM.siteHead.textContent + ' len=' + DOM.siteList.innerHTML.length);
   }
 
   // ---- ② 교육 이력: next가 문자열이 아니어도 목록이 그려진다(같은 부류 — 저장 경로가 v336에서 함께 바뀐 자리) ----

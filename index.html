@@ -1277,9 +1277,8 @@
     <div class="hw-note" style="margin-top:22px;">석면 작업 이력은 <b>[현장]</b> 탭으로 옮겼습니다 — 철거·준설과 한 대장에서 봅니다.
       <button class="mini-btn" id="asbMovedBtn" style="margin-left:6px;">현장 탭 열기</button></div>
     <!-- 옛 석면 블록은 v350에서 제거(현장 탭 PM 확인 2026-09-11). 화면은 현장 탭(renderSites)이 그린다.
-         아래 두 빈 요소는 renderAsb가 참조하는 자리만 남긴 것 — renderAsb는 9/9 저장 사고 회귀검사(uismoke v336·v337)가 붙잡고 있어
+         (v355: renderAsb·빈 요소 제거 — 9/9 저장 사고 회귀검사는 현장 탭 renderSites에 붙였다)
          그 검사를 renderSites로 옮길 때 함께 지운다. 화면에는 아무것도 안 보인다. -->
-    <span id="asbHead" hidden></span><div id="asbList" hidden></div>
     <input type="file" id="licGradeFile" accept=".pdf,.jpg,.jpeg,.png,.webp" style="display:none;">
     </div>
 
@@ -5848,7 +5847,7 @@
       scheduleAsbSave();
       document.getElementById("swBackdrop").classList.remove("show"); swSiteId=null;
       gwToast("저장했습니다");
-      afterSave(renderSites, renderAsb, renderCalendar);
+      afterSave(renderSites, renderCalendar);
     });
   })();
   document.getElementById("licAddBtn").addEventListener("click", function(){ openLicModal(null); });
@@ -10232,7 +10231,7 @@
       asb = asbPending ? mergeAsb(asb, ri) : ri;   // 저장 대기 중이면 로컬 우선(로드 덮어쓰기 금지)
       asb.forEach(normAsbRow);                     // v336: 모양 교정은 입구에서 1회 — 다음 저장 때 서버 기록도 배열로 정리된다
       asbBase = doc.updated_at||0;
-      renderAsb(); renderCalendar();
+      renderSites(); renderCalendar();
     }).catch(function(){});
   }
   function scheduleAsbSave(){ asbPending=true; if(asbSaveTimer) clearTimeout(asbSaveTimer); asbSaveTimer=setTimeout(doSaveAsb,1200); }
@@ -10472,54 +10471,6 @@
     });
     return out;
   }
-  function renderAsb(){
-    var host=document.getElementById("asbList"); if(!host) return;
-    // v336 적대검증(9/10): asList는 member_ids만 못 박았고 정렬은 여전히 start가 문자열이라고 믿고 있었다.
-    // start가 숫자(20260901)나 객체면 (b.start||"").localeCompare 가 없어 renderAsb가 통째로 죽는다 —
-    // 9/2 일괄 입력분과 같은 부류의 사고다(출처 미확인 경로가 넣은 모양). String()으로 못 박는다(L13102와 같은 식).
-    var list=liveAsb().slice().sort(function(a,b){ return String(b.start||"").localeCompare(String(a.start||"")); });
-    var head=document.getElementById("asbHead");
-    if(head) head.textContent = list.length ? ("총 "+list.length+"건") : "";
-    if(!list.length){ host.innerHTML='<div class="empty-line">등록된 석면 작업이 없습니다. 아래 [+ 석면 작업 추가]로 시작하세요.</div>'; return; }
-    var today=todayStr(), html="";
-    list.forEach(function(r){
-      var due=asbNotifyDue(r), hot=(r.status!=="done" && isDate(due) && due>=today && due<=addDays(today,7));
-      var chip='<span class="scope-chip">'+esc(ASB_STATUS[r.status]||"예정")+'</span>';
-      if(hot) chip='<span class="from-chip">신고 D-'+Math.max(0,Math.round((new Date(due+"T00:00:00")-new Date(today+"T00:00:00"))/86400000))+'</span>';
-      var names=asbWorkerNames(r);
-      // 접힌 줄에는 연번·공사명·완료일만. 상태 칩은 넣지 않되 신고 마감이 임박한 건(D-n)만은 접혀 있어도 보여야 한다.
-      html+='<div class="item asb-item" style="display:block;padding:0;">'
-        + '<button type="button" class="asb-hd" data-asb-fold="'+esc(r.id)+'" aria-expanded="false">'
-        +   '<span class="asb-seq">'+(r.seq?("#"+r.seq):"–")+'</span>'
-        +   '<span class="asb-t">'+esc(r.title||"(공사명 없음)")+(hot?" "+chip:"")+'</span>'
-        +   '<span class="asb-end">'+esc(r.end||"기간 미상")+'</span>'
-        +   '<span class="sec-caret">▾</span>'
-        + '</button>'
-        + '<div class="asb-bd" id="asbBd-'+esc(r.id)+'" style="display:none;">'
-        + '<div class="jw-sheet-wrap"><table class="jw-sheet">'
-        + sheetRow("상태", (hot?chip:"")+esc(ASB_STATUS[r.status]||"예정"))
-        + sheetRow("발주처", esc(r.client||"—"))
-        + sheetRow("소재지", esc(r.site||"—"))
-        + sheetRow("작업기간", '<span class="num">'+esc(r.start||"?")+" ~ "+esc(r.end||"?")+'</span>')
-        + sheetRow("자재·면적", esc(r.material||"—")+(r.area?' · <span class="num">'+esc(r.area)+'㎡</span>':""))
-        + (isDate(due)&&r.status!=="done" ? sheetRow("작업신고 마감", '<span class="num">'+esc(due)+'</span> (착수 7일 전)', "warn") : "")
-        + sheetRow("투입 근로자", names.length ? ('<b class="num">'+names.length+'명</b> · '+esc(names.join(", "))) : "미지정")
-        + (function(){ var m=(r.status==="done") ? [] : asbNoSpecial(r);
-             return m.length ? sheetRow("특별교육", '<b>미이수 '+m.length+'명</b> — '+esc(m.join(", "))+' (배치 전 이수 필요)', "warn") : ""; })()
-        + (r.conc ? sheetRow("공기 중 농도", '<span class="num">'+esc(r.conc)+'</span> 개/㎤') : "")
-        + (r.waste_no ? sheetRow("폐기물 인계번호", esc(r.waste_no)) : "")
-        + (asbKeepUntil(r) ? sheetRow("기록 보존 만료", '<span class="num">'+esc(asbKeepUntil(r))+'</span>') : "")
-        + (r.note ? sheetRow("메모", esc(r.note).replace(/\n/g, "<br>")) : "")
-        + '</table></div>'
-        + '<button class="link-btn" data-asb-edit="'+esc(r.id)+'" style="text-align:left;width:auto;padding:2px 0 0;">수정</button>'
-        + '</div></div>';
-    });
-    host.innerHTML=html;
-    host.querySelectorAll("[data-asb-edit]").forEach(function(b){
-      b.addEventListener("click", function(){ openAsb(b.getAttribute("data-asb-edit")); });
-    });
-    bindFold(host, "data-asb-fold", "asbBd-");
-  }
   function asbRenderWorkerChecks(sel){
     var host=document.getElementById("asbWorkers"); if(!host) return;
     var live=workers.filter(function(w){ return w && w.del!==1; });
@@ -10589,7 +10540,7 @@
     scheduleAsbSave();
     closeAsb();                       // v336: 닫기·토스트가 렌더보다 먼저 — 저장은 이미 끝난 일이다
     gwToast("저장했습니다");           // 성공 문구는 이 한 줄뿐. 실패 문구는 화면에 띄우지 않는다(PM 9/10)
-    afterSave(renderSites, renderAsb, renderCalendar);
+    afterSave(renderSites, renderCalendar);
   }
   function deleteAsb(){
     var r=asbEditId?findAsb(asbEditId):null; if(!r) return;
@@ -10597,7 +10548,7 @@
     r.del=1; r.updated=todayStr();
     scheduleAsbSave();
     closeAsb();
-    afterSave(renderSites, renderAsb, renderCalendar);
+    afterSave(renderSites, renderCalendar);
   }
 
   // ═══ 교육·건강진단 이력 ════════════════════════════════════════════════
@@ -10637,7 +10588,7 @@
       var ri=Array.isArray(doc.items)?doc.items:[];
       edu = eduPending ? mergeEdu(edu, ri) : ri;
       eduBase = doc.updated_at||0;
-      renderEdu(); renderCalendar(); renderAsb();
+      renderEdu(); renderCalendar(); renderSites();
     }).catch(function(){});
   }
   function scheduleEduSave(){ eduPending=true; if(eduSaveTimer) clearTimeout(eduSaveTimer); eduSaveTimer=setTimeout(doSaveEdu,1200); }
@@ -10762,7 +10713,7 @@
     scheduleEduSave();
     closeEdu();                       // v336: 석면과 같은 순서 — 닫기·토스트 먼저, 렌더는 다음 프레임
     gwToast("저장했습니다");
-    afterSave(renderEdu, renderCalendar, renderAsb);
+    afterSave(renderEdu, renderCalendar, renderSites);
   }
   function deleteEdu(){
     var r=eduEditId?findEdu(eduEditId):null; if(!r) return;
@@ -10770,7 +10721,7 @@
     r.del=1; r.updated=todayStr();
     scheduleEduSave();
     closeEdu();
-    afterSave(renderEdu, renderCalendar, renderAsb);
+    afterSave(renderEdu, renderCalendar, renderSites);
   }
 
   function famQRange(){
