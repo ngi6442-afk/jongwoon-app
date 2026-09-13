@@ -81,7 +81,10 @@ async function handleImg(qs, R) {
   const ids = r.data.ids || [];
   if (!(i >= 0 && i < ids.length)) return jr(404, { status: 'REJECTED', error_code: 'BAD_INDEX', request_id: R });
 
-  const fr = await blobGet(store(FILES), ids[i]);
+  // v354 모자이크: 가린 판(mask:<id>, 얼굴·번호판 픽셀화)이 있으면 그것을 내보낸다 — 이미 발급된 공유 링크에도 소급 적용(원본 파손 없음).
+  //   상자 0개로 확인된 mask(data 빈 값)는 '가릴 것 없음'이므로 원본을 낸다.
+  let fr = await blobGet(store(FILES), 'mask:' + ids[i]);
+  if (!(fr.ok && fr.data && String(fr.data.data || ''))) fr = await blobGet(store(FILES), ids[i]);
   if (!fr.ok || !fr.data) return jr(404, { status: 'REJECTED', error_code: 'NO_FILE', request_id: R });
   // 홍보 사진만 — 다른 종류 첨부(계약·석면 등)는 이 통로로 절대 나가지 않는다
   if (String(fr.data.kind || '') !== 'promo') return jr(403, { status: 'FORBIDDEN', error_code: 'NOT_PROMO', request_id: R });

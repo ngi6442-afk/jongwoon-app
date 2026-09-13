@@ -119,7 +119,9 @@ async function pickImages(rec, pid) {
     if (out.length >= MAX_PHOTOS) break;
     const id = String((ph && ph.id) || '');
     if (!RE_ATT.test(id)) continue;
-    const fr = await blobGet(store(FILES), id);
+    // v354 모자이크: 홈페이지로 나가는 사진은 가린 판이 있으면 그것(원본은 앱 밖으로 안 나간다)
+    let fr = await blobGet(store(FILES), 'mask:' + id);
+    if (!(fr.ok && fr.data && String(fr.data.data || ''))) fr = await blobGet(store(FILES), id);
     if (!fr.ok || !fr.data || String(fr.data.kind || '') !== 'promo') continue;
     const b64 = String(fr.data.data || '');
     if (!b64) continue;

@@ -1142,6 +1142,9 @@
       input.ab-qty{width:100%;margin-top:2px;}
       input.ab-bad{border-color:#B0332A;background:#FBE7E3;}
       select.ab-rsel{width:100%;margin-bottom:6px;}
+      .mask-badge{position:absolute;right:3px;bottom:3px;z-index:2;font-size:10.5px;font-weight:700;border-radius:4px;padding:1px 5px;background:rgba(0,0,0,.62);color:#fff;cursor:pointer;}   /* v354 가리기 상태 */
+      .mask-badge.amber{background:#B8860B;} .mask-badge.on{background:#A5382C;} .mask-badge.ok{background:#1F6B4A;} .mask-badge.run{background:#555;}
+      .mask-badge:empty{display:none;}
       .ab-nr{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px;padding:8px;border:1px dashed var(--line);border-radius:8px;}   /* v351 새 노선 폼 */
       .ab-nr .ab-nr-hd{flex:1 1 100%;font-size:12px;color:var(--muted);}
       .ab-nr .ab-in{flex:1 1 140px;min-width:0;margin:0;}
@@ -1681,6 +1684,7 @@
     <textarea id="promoDetBody" rows="12" style="width:100%;font-size:13px;"></textarea>
     <span class="fld-label">사진 — 본문의 [사진 N] 번호와 같은 순서입니다. 눌러서 저장한 뒤 그 자리에 넣으세요.</span>
     <div id="promoDetPhotos" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:6px;margin-bottom:8px;"></div>
+    <div id="promoMaskLine" style="font-size:12px;color:var(--sub);margin:-2px 0 8px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;"></div>
     <div id="promoAiNote" style="display:none;font-size:12px;color:var(--sub);margin-bottom:6px;"></div>
     <div id="promoDetStat" style="font-size:12px;color:#1A9A6B;min-height:14px;"></div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;">
@@ -2109,6 +2113,25 @@
     <label class="chk"><input type="checkbox" id="dutyConfirmChk"> 확정도를 '확정'으로 전환 (답·기준일 필수)</label>
     <button class="primary" id="dutyPreSave">저장</button>
     <button class="secondary" id="dutyPreCancel">취소</button>
+  </div>
+</div>
+
+<!-- 홍보 사진 가리기 편집(v354 모자이크) — 원본 위에 자동 감지 상자를 보여주고, 사람이 끌어서 더하거나 눌러서 지운 뒤 [적용]하면 서버가 원본에서 다시 픽셀화한다.
+     원본은 이 창에서만 잠깐 보인다(att_get raw:true — 홍보 do 권한). 저장은 가린 판(mask:<id>)에만. -->
+<div class="modal-backdrop" id="maskBackdrop">
+  <div class="modal" style="max-width:720px;">
+    <h3 id="maskTitle">사진 가리기</h3>
+    <div style="font-size:12.5px;color:var(--sub);margin-bottom:6px;">얼굴·번호판 위에 상자를 <b>끌어서</b> 더하고, 상자를 <b>누르면</b> 지웁니다. [적용]하면 그 자리가 픽셀화됩니다(원본은 그대로 보관).</div>
+    <div id="maskWrap" style="position:relative;width:100%;background:#111;border-radius:8px;overflow:hidden;touch-action:none;">
+      <canvas id="maskCanvas" style="display:block;width:100%;height:auto;"></canvas>
+    </div>
+    <div id="maskStat" style="font-size:12px;color:var(--sub);min-height:16px;margin:6px 0;"></div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;">
+      <button class="primary" id="maskApplyBtn" style="width:auto;padding:8px 14px;">적용</button>
+      <button class="mini-btn" id="maskAutoBtn">자동 감지 다시</button>
+      <button class="mini-btn" id="maskNoneBtn">가릴 것 없음</button>
+      <button class="secondary" id="maskCloseBtn" style="width:auto;padding:8px 14px;">닫기</button>
+    </div>
   </div>
 </div>
 
@@ -13156,6 +13179,7 @@
       if(resp.status===409||resp.status===422){ return fetch(PROMO_API,{headers:ghHeaders()}).then(function(r){ return r.status===404?null:r.json(); }).then(function(j){ if(j){ var up={}; try{ up=JSON.parse(b64DecodeUnicode(j.content))||{}; }catch(e){} promoItems=mergePromo(promoItems,up.items||[]); promoSha=j.sha; } return doSavePromo(); }); }
       return resp.json().then(function(json){ promoSha=json.content&&json.content.sha; promoPending=false; renderPromo();
         if(paAutoWait){ var w=paAutoWait; paAutoWait=""; paKick(w, true); }   // 새 기록이 서버에 실린 뒤에만 자동 생성
+        if(maskAutoWait){ var mw=maskAutoWait; maskAutoWait=""; maskKick(mw, false); }   // v354: 사진 가리기 자동 감지도 저장 뒤에
         if(galWait){ var g=galWait; galWait=""; galleryRelaySend(g); }        // 혁신⑥ — posted 저장이 서버에 실린 뒤에만 갤러리 전송
         if(mapWait){ mapWait=false; mapRelaySend(); }                         // 혁신⑦ — posted 저장이 서버에 실린 뒤 시공 지도 재빌드(무음)
       });
@@ -13231,13 +13255,14 @@
     list.forEach(function(ph,i){
       var d=document.createElement("div");
       d.style.cssText="position:relative;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:var(--bg2);aspect-ratio:1;";
-      d.innerHTML='<div style="position:absolute;left:3px;top:3px;z-index:2;background:rgba(0,0,0,.62);color:#fff;font-size:11px;font-weight:700;border-radius:4px;padding:1px 5px;">'+(i+1)+'</div>';
+      d.innerHTML='<div style="position:absolute;left:3px;top:3px;z-index:2;background:rgba(0,0,0,.62);color:#fff;font-size:11px;font-weight:700;border-radius:4px;padding:1px 5px;">'+(i+1)+'</div>'
+        +'<div class="mask-badge" data-mask-badge="'+esc(ph.id)+'" title="가리기 상태 — 눌러서 편집"></div>';
       boxes.push(d);
     });
     host.innerHTML="";
     boxes.forEach(function(d){ host.appendChild(d); });
     list.forEach(function(ph,i){
-      gwCall("gw-data",{action:"att_get",id:ph.id}).then(function(res){
+      gwCall("gw-data",{action:"att_get",id:ph.id}).then(function(res){   // v354: 가린 판이 있으면 서버가 그것을 준다(masked:true)
         if(res.status!==200||!res.body||!res.body.data) return;
         var url="data:"+(res.body.type||"image/jpeg")+";base64,"+res.body.data;
         var a=document.createElement("a");
@@ -13248,6 +13273,144 @@
         boxes[i].appendChild(a);
       }).catch(function(){});
     });
+    maskRefreshState(p.id);
+  }
+  // ---- v354 모자이크: 가림 상태·자동 감지·편집 창 ----
+  var maskState={};        // promo id -> {items:[{id,has,boxes,human,auto}], running, job}
+  var maskPoll=null;
+  var maskAutoWait="";     // 새 기록 저장 완료 뒤 자동 감지할 promo id(paAutoWait와 같은 방식)
+  function maskBadgeText(it){
+    if(!it) return ["", ""];
+    if(!it.has) return ["미확인", "amber"];
+    if(it.boxes) return ["가림 "+it.boxes+(it.human?" ✓":""), "on"];
+    return [it.human? "없음 ✓" : "없음", "ok"];
+  }
+  function maskPaintBadges(promoId){
+    var st=maskState[promoId]; if(!st) return;
+    var by={}; (st.items||[]).forEach(function(it){ by[it.id]=it; });
+    Array.prototype.forEach.call(document.querySelectorAll("[data-mask-badge]"), function(el){
+      var it=by[el.getAttribute("data-mask-badge")], t=maskBadgeText(it);
+      el.textContent = st.running && (!it||!it.has) ? "감지 중…" : t[0];
+      el.className="mask-badge"+(t[1]? " "+t[1] : "")+(st.running && (!it||!it.has) ? " run" : "");
+      el.onclick=function(e){ e.preventDefault(); e.stopPropagation(); if(canDo("promo")) maskOpenEditor(el.getAttribute("data-mask-badge")); };
+    });
+    var line=document.getElementById("promoMaskLine"); if(!line || promoDetId!==promoId) return;
+    var n=(st.items||[]).length, has=(st.items||[]).filter(function(x){return x.has;}).length, masked=(st.items||[]).filter(function(x){return x.boxes;}).length;
+    var h='<span>가리기: '+(st.running? '감지 중… ' : '')+'확인 '+has+'/'+n+'장 · 가린 사진 '+masked+'장</span>';
+    if(canDo("promo")) h+='<button class="mini-btn" id="maskRunBtn"'+(st.running?" disabled":"")+'>'+(has<n? "자동 감지 실행" : "자동 감지 다시")+'</button>';
+    if(has<n && !st.running) h+='<span style="color:#a5382c;">미확인 사진은 원본 그대로 게시됩니다 — 자동 감지를 실행하세요</span>';
+    line.innerHTML=h;
+    var rb=document.getElementById("maskRunBtn"); if(rb) rb.addEventListener("click", function(){ maskKick(promoId, has>=n); });
+  }
+  function maskRefreshState(promoId){
+    gwCall("gw-promo-mask",{action:"mask_state",promo_id:promoId}).then(function(res){
+      if(res.status!==200||!res.body||!res.body.ok) return;
+      maskState[promoId]={items:res.body.items||[], running:!!res.body.running, job:res.body.job||""};
+      maskPaintBadges(promoId);
+      if(res.body.running) maskWatch(promoId);
+    }).catch(function(){});
+  }
+  function maskWatch(promoId){
+    if(maskPoll) clearTimeout(maskPoll);
+    maskPoll=setTimeout(function(){ if(promoDetId===promoId) maskRefreshState(promoId); }, 4000);
+  }
+  // 자동 감지 기동 — 사진 있는 기록이 저장된 직후(자동), 또는 상세 화면 버튼(force=다시)
+  function maskKick(promoId, force){
+    if(!canDo("promo")) return;
+    gwCall("gw-promo-mask",{action:"mask_start",promo_id:promoId,force:!!force}).then(function(res){
+      if(res.status===202||(res.status===409&&res.body&&res.body.code==="ALREADY_RUNNING")){
+        maskState[promoId]=maskState[promoId]||{items:[]}; maskState[promoId].running=true; maskPaintBadges(promoId); maskWatch(promoId); return;
+      }
+      if(res.status===400&&res.body&&res.body.code==="ENV_MISSING"){ if(promoDetId===promoId) document.getElementById("promoDetStat").textContent="가리기 자동 감지는 AI 키가 있어야 합니다(관리자 설정)."; return; }
+      if(promoDetId===promoId && res.status!==401) document.getElementById("promoDetStat").textContent="가리기 감지를 시작하지 못했습니다("+((res.body&&res.body.code)||("HTTP "+res.status))+").";
+    }).catch(function(){});
+  }
+  // ---- 편집 창: 원본(raw) 위에 상자 그리기 ----
+  var maskEd={ id:"", img:null, w:0, h:0, boxes:[], drag:null, busy:false };
+  function maskOpenEditor(attId){
+    maskEd={ id:attId, img:null, w:0, h:0, boxes:[], drag:null, busy:false };
+    document.getElementById("maskTitle").textContent="사진 가리기 — 불러오는 중…";
+    document.getElementById("maskStat").textContent="";
+    document.getElementById("maskBackdrop").classList.add("show");
+    Promise.all([
+      gwCall("gw-data",{action:"att_get",id:attId,raw:true}),
+      gwCall("gw-promo-mask",{action:"mask_get",att_id:attId})
+    ]).then(function(rs){
+      var a=rs[0], m=rs[1];
+      if(a.status!==200||!a.body||!a.body.data){ document.getElementById("maskStat").textContent="원본을 불러오지 못했습니다("+(a.status===403? "권한 없음" : "HTTP "+a.status)+")."; return; }
+      if(m.status===200&&m.body&&m.body.ok) maskEd.boxes=(m.body.boxes||[]).map(function(b){ return {kind:b.kind||"other",x:b.x,y:b.y,w:b.w,h:b.h,by:b.by||"auto"}; });
+      var img=new Image();
+      img.onload=function(){ maskEd.img=img; maskEd.w=img.naturalWidth; maskEd.h=img.naturalHeight; maskDraw(); document.getElementById("maskTitle").textContent="사진 가리기 — 상자 "+maskEd.boxes.length+"개"; };
+      img.src="data:"+(a.body.type||"image/jpeg")+";base64,"+a.body.data;
+    }).catch(function(){ document.getElementById("maskStat").textContent="불러오기 실패(네트워크)."; });
+  }
+  function maskCloseEditor(){ document.getElementById("maskBackdrop").classList.remove("show"); maskEd.img=null; }
+  function maskDraw(){
+    var cv=document.getElementById("maskCanvas"), img=maskEd.img; if(!img) return;
+    var maxW=Math.min(680, (document.getElementById("maskWrap").clientWidth||680)), sc=Math.min(1, maxW/img.naturalWidth);
+    cv.width=Math.round(img.naturalWidth*sc); cv.height=Math.round(img.naturalHeight*sc);
+    var ctx=cv.getContext("2d");
+    ctx.drawImage(img,0,0,cv.width,cv.height);
+    maskEd.boxes.forEach(function(b,i){
+      var x=b.x*cv.width, y=b.y*cv.height, w=b.w*cv.width, h=b.h*cv.height;
+      ctx.fillStyle="rgba(255,60,60,.28)"; ctx.fillRect(x,y,w,h);
+      ctx.lineWidth=2; ctx.strokeStyle=(b.by==="human")? "#ffd400" : "#ff3c3c"; ctx.strokeRect(x,y,w,h);
+      ctx.fillStyle="#fff"; ctx.font="bold 12px sans-serif"; ctx.fillText((b.kind==="plate"? "번호판" : b.kind==="face"? "얼굴" : "가림")+" "+(i+1), x+4, y+14);
+    });
+    if(maskEd.drag){ var d=maskEd.drag; ctx.setLineDash([5,4]); ctx.strokeStyle="#ffd400"; ctx.strokeRect(Math.min(d.x0,d.x1),Math.min(d.y0,d.y1),Math.abs(d.x1-d.x0),Math.abs(d.y1-d.y0)); ctx.setLineDash([]); }
+    document.getElementById("maskTitle").textContent="사진 가리기 — 상자 "+maskEd.boxes.length+"개";
+  }
+  function maskPt(e){
+    var cv=document.getElementById("maskCanvas"), r=cv.getBoundingClientRect();
+    var p=(e.touches&&e.touches[0])||(e.changedTouches&&e.changedTouches[0])||e;
+    return { x:(p.clientX-r.left)*(cv.width/r.width), y:(p.clientY-r.top)*(cv.height/r.height) };
+  }
+  function maskHit(pt){
+    var cv=document.getElementById("maskCanvas");
+    for(var i=maskEd.boxes.length-1;i>=0;i--){ var b=maskEd.boxes[i]; if(pt.x>=b.x*cv.width && pt.x<=(b.x+b.w)*cv.width && pt.y>=b.y*cv.height && pt.y<=(b.y+b.h)*cv.height) return i; }
+    return -1;
+  }
+  (function(){
+    var cv=document.getElementById("maskCanvas");
+    function down(e){ if(!maskEd.img) return; e.preventDefault(); var p=maskPt(e); maskEd.drag={x0:p.x,y0:p.y,x1:p.x,y1:p.y}; }
+    function move(e){ if(!maskEd.drag) return; e.preventDefault(); var p=maskPt(e); maskEd.drag.x1=p.x; maskEd.drag.y1=p.y; maskDraw(); }
+    function up(e){
+      if(!maskEd.drag) return; e.preventDefault();
+      var d=maskEd.drag; maskEd.drag=null;
+      var w=Math.abs(d.x1-d.x0), h=Math.abs(d.y1-d.y0);
+      if(w<8 && h<8){   // 탭 = 상자 삭제
+        var i=maskHit({x:d.x0,y:d.y0});
+        if(i>=0){ maskEd.boxes.splice(i,1); }
+      } else {
+        maskEd.boxes.push({ kind:"other", x:Math.min(d.x0,d.x1)/cv.width, y:Math.min(d.y0,d.y1)/cv.height, w:w/cv.width, h:h/cv.height, by:"human" });
+      }
+      maskDraw();
+    }
+    cv.addEventListener("mousedown",down); cv.addEventListener("mousemove",move); window.addEventListener("mouseup",function(e){ if(maskEd.drag) up(e); });
+    cv.addEventListener("touchstart",down,{passive:false}); cv.addEventListener("touchmove",move,{passive:false}); cv.addEventListener("touchend",up,{passive:false});
+    document.getElementById("maskCloseBtn").addEventListener("click", maskCloseEditor);
+    document.getElementById("maskNoneBtn").addEventListener("click", function(){ maskEd.boxes=[]; maskDraw(); maskApply(); });
+    document.getElementById("maskApplyBtn").addEventListener("click", maskApply);
+    document.getElementById("maskAutoBtn").addEventListener("click", function(){
+      if(!promoDetId) return;
+      if(!confirm("이 기록의 사진 전부를 자동 감지로 다시 가릴까요? 사람이 손본 상자는 유지됩니다.")) return;
+      maskCloseEditor(); maskKick(promoDetId, true);
+    });
+  })();
+  function maskApply(){
+    if(!maskEd.id || maskEd.busy) return;
+    maskEd.busy=true; document.getElementById("maskStat").textContent="적용 중…";
+    var boxes=maskEd.boxes.map(function(b){ return {kind:b.kind,x:b.x,y:b.y,w:b.w,h:b.h,by:"human"}; });   // 사람이 확인한 결과는 전부 human — 자동이 다시 덮지 않는다
+    gwCall("gw-promo-mask",{action:"mask_apply",att_id:maskEd.id,boxes:boxes}).then(function(res){
+      maskEd.busy=false;
+      if(res.status===200&&res.body&&res.body.ok){
+        document.getElementById("maskStat").textContent="적용됨 — 상자 "+res.body.boxes+"개"+(res.body.masked? "" : " (가릴 것 없음으로 기록)");
+        maskCloseEditor();
+        if(promoDetId){ var p=promoFind(promoDetId); if(p) promoRenderDetPhotos(p); }
+        return;
+      }
+      document.getElementById("maskStat").textContent="적용 실패("+((res.body&&res.body.code)||("HTTP "+res.status))+").";
+    }).catch(function(){ maskEd.busy=false; document.getElementById("maskStat").textContent="적용 실패(네트워크)."; });
   }
   function promoDetApplyEdits(p){
     var nt=document.getElementById("promoDetBlogTitle").value.trim()||p.title;
@@ -13297,6 +13460,7 @@
     promoItems.push(item);
     // 사진이 있으면 저장 완료 직후 사진AI 자동 실행 — 서버가 기록의 사진을 읽어야 하므로 저장이 먼저다(doSavePromo 성공 시 발화).
     paAutoWait=item.id;
+    maskAutoWait=item.id;   // v354 모자이크 — 사진AI와 같이 자동 감지
     schedulePromoSave(); renderPromo();
     document.getElementById("promoAddBackdrop").classList.remove("show");
   });
@@ -13439,6 +13603,13 @@
   }
   function promoOpenPost(){
     var p=promoDetId? promoFind(promoDetId) : null; if(!p) return;
+    // v354 모자이크: 가리기 확인이 안 끝난 사진이 있으면 먼저 알린다(원본 얼굴·번호판이 그대로 나갈 수 있다)
+    var ms=maskState[p.id];
+    if(ms && (ms.items||[]).length){
+      var un=(ms.items||[]).filter(function(x){ return !x.has; }).length;
+      if(ms.running){ if(!confirm("사진 가리기 자동 감지가 아직 진행 중입니다. 지금 열면 일부 사진은 원본 그대로입니다.\n\n그래도 열까요?")) return; }
+      else if(un){ if(!confirm("가리기 확인이 안 된 사진 "+un+"장이 있습니다(얼굴·번호판이 그대로 나갈 수 있음). 위 [자동 감지 실행]을 먼저 누르는 것을 권합니다.\n\n그래도 열까요?")) return; }
+    }
     var title=document.getElementById("promoDetBlogTitle").value||p.title||"";
     var body=document.getElementById("promoDetBody").value||p.body||"";
     var list=(p.photos||[]);
@@ -17402,14 +17573,28 @@
       if (abInt(c.qty_unknown)) sub += (sub ? " · " : "") + "단위미상";
       return '<td class="n">' + (n ? n : "") + (sub ? '<span class="sub">' + esc(sub) + '</span>' : "") + ((!n && !sub) ? hideBtn(hideKey) : "") + '</td>';
     }
-    function table(side){
+    // v353(PM 9/13 "가나다 순"): 엑셀(generate.py)과 같은 규칙 — 노선 좌표(L5·R40)는 식별자일 뿐, 표의 좌우는 보이는 노선을
+    //   배출자 가나다(한글 먼저·영문 뒤, 같은 배출자끼리는 8/24 확정 순서 유지)로 세워 앞 절반 왼쪽·뒤 절반 오른쪽에 채운다.
+    //   숨긴 줄은 표에서 빠지고(인계서가 붙은 숨긴 줄은 '숨김 해제 필요'로 드러냄), 빈 줄 숨기기 토글은 그다음에 건다.
+    var vis = [], fixedOrder = rl.filter(function(r){ return r.s === "L"; }).concat(rl.filter(function(r){ return r.s === "R"; }));
+    for (i = 0; i < fixedOrder.length; i++){
+      var fr = fixedOrder[i], fk = fr.s + "|" + fr.r, fcc = byKey[fk], fempty = abRowEmpty(fcc);
+      if (fr.h && fempty){ hiddenN++; continue; }   // 관리자가 숨긴 줄 — 인계서가 없으면 표에서 뺀다
+      vis.push({ r: fr, key: fk, cc: fcc, empty: fempty, idx: i });
+    }
+    vis.sort(function(a, b){
+      var ka = abSortKey(a.r.f), kb = abSortKey(b.r.f);
+      if (ka[0] !== kb[0]) return ka[0] - kb[0];
+      if (ka[1] !== kb[1]) return ka[1] < kb[1] ? -1 : 1;
+      return a.idx - b.idx;
+    });
+    var half = Math.ceil(vis.length / 2), halves = [vis.slice(0, half), vis.slice(half)];
+    function table(list, side){
       var t = '<table><colgroup><col class="c-loc"><col class="c-loc"><col class="c-item"><col class="c-n"></colgroup>' +
         '<thead><tr><th colspan="4">운반내역</th></tr><tr><th colspan="2">행선지</th><th rowspan="2">품 목</th><th rowspan="2">회수</th></tr><tr><th>상차지</th><th>하차지</th></tr></thead><tbody>';
-      var list = rl.filter(function(r){ return r.s === side; }).sort(function(a, b){ return a.r - b.r; });
       for (var j = 0; j < list.length; j++){
-        var r = list[j], key = r.s + "|" + r.r, cc = byKey[key], empty = abRowEmpty(cc);
+        var r = list[j].r, key = list[j].key, cc = list[j].cc, empty = list[j].empty;
         if (r.h){
-          if (empty){ hiddenN++; continue; }   // 관리자가 숨긴 줄 — 인계서가 없으면 표에서 뺀다
           // 숨긴 줄에 인계서가 배정됨 — 숨긴 채 두면 회수가 안 보이므로 드러내고 해제를 권한다
           t += '<tr class="ab-row-hidden"><td>' + esc(r.f) + "</td><td>" + esc(r.t) + "</td><td>" + esc(r.i) +
             '<span class="ab-need-unhide">숨김 해제 필요' + (admin ? ' <button type="button" class="ab-hide-btn" data-ab-unhide="' + esc(key) + '">해제</button>' : "") + '</span></td>' + cellN(cc, "") + "</tr>";
@@ -17426,7 +17611,14 @@
     }
     for (i = 0; i < rows.length; i++){ c = rows[i]; if (!c || !c.route) continue; k = String(c.route.side || "") + "|" + c.route.row;
       if (!rl.some(function(r){ return r.s + "|" + r.r === k; })){ var sd = (c.route.side === "R") ? "R" : "L"; extra[sd].push(c); } }
-    return { html: '<div class="ab-sheet">' + table("L") + table("R") + "</div>", hiddenN: hiddenN, emptyN: emptyN };
+    return { html: '<div class="ab-sheet">' + table(halves[0], "L") + table(halves[1], "R") + "</div>", hiddenN: hiddenN, emptyN: emptyN };
+  }
+  // 배출자 정렬 키(엑셀 generate.py _sort_key와 같은 규칙): 공백·법인격 표기 제거 → [한글 0/그 외 1, 문자열]
+  function abSortKey(name){
+    var t = String(name || "").replace(/\s+/g, "");
+    ["㈜", "(주)", "주식회사", "(유)", "유한회사", "(合)"].forEach(function(x){ t = t.split(x).join(""); });
+    var c = t.charAt(0);
+    return [(c >= "가" && c <= "힣") ? 0 : 1, t];
   }
   function renderAbSheet(){
     var host = document.getElementById("abSheetCard");

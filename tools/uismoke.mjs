@@ -1115,6 +1115,34 @@ try {
     /if\(res\.body\.stale && !abXlsxStaleOk\(res\.body\)\) return;/.test(html) && /function abXlsxStaleOk\(b\)\{/.test(html) && /GW_APPDATA_GITHUB_TOKEN/.test(html) && /자동 재생성 범위\(최근 7일\) 밖/.test(html), '');
 } catch (e) { console.log('  (v352 엑셀 재생성 검사 생략 — ' + e.message + ')'); fails++; }
 
+// ---- v353(PM 9/13): ① 운반내역 표 가나다 반반(엑셀 generate.py와 같은 규칙) ② 홍보 사진 모자이크(가리기) 배선·소비처 4곳 mask 우선 ----
+try {
+  const seg = (html.match(/function abSheetTableHtml\(rl, rows\)\{([\s\S]*?)\n  function abSortKey/) || ['', ''])[1];
+  T('운반내역 표: 보이는 노선을 abSortKey(한글 먼저·법인격 제거)로 정렬해 앞 절반 왼쪽·뒤 절반 오른쪽 · 숨김은 표에서 뺌 · side 필터 렌더 없음',
+    /var half = Math\.ceil\(vis\.length \/ 2\), halves = \[vis\.slice\(0, half\), vis\.slice\(half\)\];/.test(seg) && /table\(halves\[0\], "L"\) \+ table\(halves\[1\], "R"\)/.test(seg)
+    && /if \(fr\.h && fempty\)\{ hiddenN\+\+; continue; \}/.test(seg) && !/rl\.filter\(function\(r\)\{ return r\.s === side; \}\)/.test(seg)
+    && /function abSortKey\(name\)\{/.test(html) && /\["㈜", "\(주\)", "주식회사", "\(유\)", "유한회사", "\(合\)"\]/.test(html), '');
+  const img = readFileSync(join(ROOT, 'netlify/functions/gw-promo-img.js'), 'utf8');
+  const gal = readFileSync(join(ROOT, 'netlify/functions/gw-gallery-relay.js'), 'utf8');
+  const pw = readFileSync(join(ROOT, 'netlify/functions/gw-promo-ai-run-background.js'), 'utf8');
+  const mk = readFileSync(join(ROOT, 'netlify/functions/gw-promo-mask.js'), 'utf8');
+  const mw = readFileSync(join(ROOT, 'netlify/functions/gw-promo-mask-background.js'), 'utf8');
+  const ml = readFileSync(join(ROOT, 'netlify/functions/_lib/promomask.js'), 'utf8');
+  const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
+  T('모자이크 서버: jimp 의존성 · _lib/promomask(detectBoxes·applyBoxes·cleanBoxes·PAD 0.2) · 워커 내부 토큰 __promomask__ · 디스패처 6액션 · API 키는 env에서만',
+    !!(pkg.dependencies && pkg.dependencies.jimp) && /async function detectBoxes\(apiKey, mediaType, b64\)/.test(ml) && /async function applyBoxes\(buf, boxes\)/.test(ml) && /const PAD = 0\.20;/.test(ml)
+    && /v\.payload\.mid !== '__promomask__'/.test(mw) && ['mask_start', 'mask_job', 'mask_state', 'mask_get', 'mask_apply', 'mask_clear'].every((a) => new RegExp("case '" + a + "'").test(mk))
+    && !/process\.env\.GW_ANTHROPIC_KEY/.test(ml) && /process\.env\.GW_ANTHROPIC_KEY/.test(mw), '');
+  T('소비처 4곳 mask 우선: 공개 서빙·검수 격자 att_get(raw:true는 홍보 do)·갤러리 릴레이·사진AI 워커 · att_del이 mask 동반 삭제',
+    /blobGet\(store\(FILES\), 'mask:' \+ ids\[i\]\)/.test(img) && /blobGet\(store\(FILES\), 'mask:' \+ String\(d\.id \|\| ''\)\)/.test(gwd) && /if \(d\.raw !== true\) \{/.test(gwd) && /else if \(permOf\(c\.member, 'promo'\) !== 'do'\) return jr\(403/.test(gwd)
+    && /blobGet\(store\(FILES\), 'mask:' \+ id\)/.test(gal) && /blobGet\(fst, 'mask:' \+ id\)/.test(pw) && /blobDelete\(store\(FILES\), 'mask:' \+ String\(d\.id \|\| ''\)\)/.test(gwd), '');
+  T('앱: 격자 배지(data-mask-badge)·상태줄·maskKick(새 기록 저장 뒤 자동)·편집 창(maskCanvas·끌어서 추가·탭 삭제·적용 human)·완성본 열기 전 미확인 경고',
+    /data-mask-badge=/.test(html) && /id="promoMaskLine"/.test(html) && /if\(maskAutoWait\)\{ var mw=maskAutoWait; maskAutoWait=""; maskKick\(mw, false\); \}/.test(html) && /maskAutoWait=item\.id;/.test(html)
+    && ['maskRefreshState', 'maskKick', 'maskOpenEditor', 'maskDraw', 'maskApply', 'maskPaintBadges'].every((f) => new RegExp('function ' + f + '\\(').test(html))
+    && /action:"mask_apply",att_id:maskEd\.id,boxes:boxes/.test(html) && /by:"human"/.test(html) && /action:"att_get",id:attId,raw:true/.test(html)
+    && /가리기 확인이 안 된 사진 "\+un\+"장이 있습니다/.test(html) && /id="maskCanvas"/.test(html), '');
+} catch (e) { console.log('  (v353 검사 생략 — ' + e.message + ')'); fails++; }
+
 // ---- v339: 기본 숨김 모듈 집합이 앱·서버에서 갈라지면 권한 구멍이 된다(9/4 hr·9/10 lic 실사고) ----
 try {
   const same = (a, b) => a.length > 0 && a.length === b.length && a.every((x, i) => x === b[i]);
