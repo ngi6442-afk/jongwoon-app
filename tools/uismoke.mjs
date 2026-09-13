@@ -337,7 +337,7 @@ try {
   T('운반일지 빈 줄 숨기기 토글: #abHideEmptyChk 렌더 + change 배선(abBindHideToggle) + localStorage jw_ab_hide_empty 기억(읽기·쓰기 try/catch) + abRowEmpty + abSheetTableHtml 반환 {html,hiddenN,emptyN}',
     /id="abHideEmptyChk"/.test(html) && /var AB_HIDE_EMPTY_KEY = "jw_ab_hide_empty";/.test(html) && /try\{ abHideEmpty = localStorage\.getItem\(AB_HIDE_EMPTY_KEY\) === "1"; \}catch\(e\)\{\}/.test(html)
     && /try\{ localStorage\.setItem\(AB_HIDE_EMPTY_KEY, abHideEmpty \? "1" : "0"\); \}catch\(e\)\{\}/.test(html) && /function abRowEmpty\(c\)/.test(html) && /return \{ html: '<div class="ab-sheet">'/.test(html)
-    && /function abBindHideToggle\(host\)/.test(html) && (html.match(/abBindHideToggle\(host\);/g) || []).length === 2 && /if \(empty && abHideEmpty\)\{ emptyN\+\+; continue; \}/.test(html), '');
+    && /function abBindHideToggle\(host\)/.test(html) && (html.match(/abBindHideToggle\(host\);/g) || []).length === 2 && /if \(!fr\.h && fempty && abHideEmpty\)\{ emptyN\+\+; continue; \}/.test(html), '');   // v353 후속: 반반 나누기 전에 거른다
   const coreSeg = (html.match(/function gwLogoutCore\(\)\{([\s\S]*?)\n  \}/) || ['', ''])[1];
   const clearSeg = (html.match(/function clearSessionData\(\)\{([\s\S]*?)\n  \}/) || ['', ''])[1];
   const logoutSeg = (html.match(/function gwLogout\(\)\{([\s\S]*?)\n  \}/) || ['', ''])[1];
@@ -1120,10 +1120,11 @@ try {
   const seg = (html.match(/function abSheetTableHtml\(rl, rows\)\{([\s\S]*?)\n  function abSortKey/) || ['', ''])[1];
   T('운반내역 표: 보이는 노선을 abSortKey(한글 먼저·법인격 제거)로 정렬해 앞 절반 왼쪽·뒤 절반 오른쪽 · 숨김은 표에서 뺌 · side 필터 렌더 없음',
     /var half = Math\.ceil\(vis\.length \/ 2\), halves = \[vis\.slice\(0, half\), vis\.slice\(half\)\];/.test(seg) && /table\(halves\[0\], "L"\) \+ table\(halves\[1\], "R"\)/.test(seg)
-    && /if \(fr\.h && fempty\)\{ hiddenN\+\+; continue; \}/.test(seg) && !/rl\.filter\(function\(r\)\{ return r\.s === side; \}\)/.test(seg)
+    && /if \(fr\.h && fempty\)\{ hiddenN\+\+; continue; \}/.test(seg) && /if \(!fr\.h && fempty && abHideEmpty\)\{ emptyN\+\+; continue; \}/.test(seg) && !/if \(empty && abHideEmpty\)\{ emptyN\+\+; continue; \}/.test(seg) && !/rl\.filter\(function\(r\)\{ return r\.s === side; \}\)/.test(seg)
     && /function abSortKey\(name\)\{/.test(html) && /\["㈜", "\(주\)", "주식회사", "\(유\)", "유한회사", "\(合\)"\]/.test(html), '');
   const img = readFileSync(join(ROOT, 'netlify/functions/gw-promo-img.js'), 'utf8');
   const gal = readFileSync(join(ROOT, 'netlify/functions/gw-gallery-relay.js'), 'utf8');
+  const feed = readFileSync(join(ROOT, 'netlify/functions/gw-gallery-feed.js'), 'utf8');
   const pw = readFileSync(join(ROOT, 'netlify/functions/gw-promo-ai-run-background.js'), 'utf8');
   const mk = readFileSync(join(ROOT, 'netlify/functions/gw-promo-mask.js'), 'utf8');
   const mw = readFileSync(join(ROOT, 'netlify/functions/gw-promo-mask-background.js'), 'utf8');
@@ -1133,9 +1134,15 @@ try {
     !!(pkg.dependencies && pkg.dependencies.jimp) && /async function detectBoxes\(apiKey, mediaType, b64\)/.test(ml) && /async function applyBoxes\(buf, boxes\)/.test(ml) && /const PAD = 0\.20;/.test(ml)
     && /v\.payload\.mid !== '__promomask__'/.test(mw) && ['mask_start', 'mask_job', 'mask_state', 'mask_get', 'mask_apply', 'mask_clear'].every((a) => new RegExp("case '" + a + "'").test(mk))
     && !/process\.env\.GW_ANTHROPIC_KEY/.test(ml) && /process\.env\.GW_ANTHROPIC_KEY/.test(mw), '');
-  T('소비처 4곳 mask 우선: 공개 서빙·검수 격자 att_get(raw:true는 홍보 do)·갤러리 릴레이·사진AI 워커 · att_del이 mask 동반 삭제',
-    /blobGet\(store\(FILES\), 'mask:' \+ ids\[i\]\)/.test(img) && /blobGet\(store\(FILES\), 'mask:' \+ String\(d\.id \|\| ''\)\)/.test(gwd) && /if \(d\.raw !== true\) \{/.test(gwd) && /else if \(permOf\(c\.member, 'promo'\) !== 'do'\) return jr\(403/.test(gwd)
-    && /blobGet\(store\(FILES\), 'mask:' \+ id\)/.test(gal) && /blobGet\(fst, 'mask:' \+ id\)/.test(pw) && /blobDelete\(store\(FILES\), 'mask:' \+ String\(d\.id \|\| ''\)\)/.test(gwd), '');
+  T('소비처 5곳 mask 우선: 공개 서빙·검수 격자 att_get(raw:true는 홍보 do+승인 기기+감사)·갤러리 릴레이·갤러리 실경로(feed index/img)·사진AI 워커 · att_del이 mask·maskmeta 동반 삭제 · 캐시 5분',
+    /blobGet\(store\(FILES\), 'mask:' \+ ids\[i\]\)/.test(img) && /max-age=300/.test(img) && /blobGet\(store\(FILES\), 'mask:' \+ String\(d\.id \|\| ''\)\)/.test(gwd) && /if \(d\.raw !== true\) \{/.test(gwd) && /if \(permOf\(c\.member, 'promo'\) !== 'do'\) return jr\(403/.test(gwd) && /op: '원본열람'/.test(gwd)
+    && /blobGet\(store\(FILES\), 'mask:' \+ id\)/.test(gal) && (feed.match(/blobGet\(store\(FILES\), 'mask:' \+ (id|att)\)/g) || []).length === 2 && /max-age=300/.test(feed) && /blobGet\(fst, 'mask:' \+ id\)/.test(pw)
+    && /\['mask:' \+ String\(d\.id \|\| ''\), 'maskmeta:' \+ String\(d\.id \|\| ''\)\]/.test(gwd), '');
+  T('적대 검증 반영: 비전 stop_reason 검사(REFUSAL·TRUNCATED)·parseBoxes null·MAX_TOKENS 4096·effort low·cleanBoxes 클램프·PAD_MIN · 워커 force=자동 판만(human 보호)·저장 직전 재확인·12분 예산·maskmeta · 디스패처 월 상한·잠금 재확인·apply 검사 · 앱 좌표 클램프·다시 확인창',
+    /stop === 'refusal'/.test(ml) && /stop === 'max_tokens'/.test(ml) && /if \(boxes === null\) throw new Error\('PARSE'\)/.test(ml) && /const MAX_TOKENS = 4096;/.test(ml) && /effort: 'low'/.test(ml) && /const x0 = Math\.max\(0, x\), y0 = Math\.max\(0, y\), x1 = Math\.min\(1, x \+ w\), y1 = Math\.min\(1, y \+ h\);/.test(ml) && /const PAD_MIN = 0\.01;/.test(ml)
+    && /if \(prev && isHuman\(prev\)\)/.test(mw) && /const again = await blobGet\(fst, M\.maskKey\(id\)\);/.test(mw) && /const BUDGET_MS = 12 \* 60 \* 1000;/.test(mw) && /M\.metaKey\(id\), M\.metaOf\(rec\)/.test(mw)
+    && /const MONTH_CALL_CAP = 1000;/.test(mk) && /const lk2 = await blobGet\(st, lockKey\(promoId\)\);/.test(mk) && /const chk = M\.checkImageRec\(r\.data\);/.test(mk) && /human: true, boxes: boxes/.test(mk)
+    && /return \{ x:Math\.max\(0,Math\.min\(cv\.width,x\)\), y:Math\.max\(0,Math\.min\(cv\.height,y\)\) \};/.test(html) && /if\(again && !confirm\("자동 판을 다시 감지합니다/.test(html), '');
   T('앱: 격자 배지(data-mask-badge)·상태줄·maskKick(새 기록 저장 뒤 자동)·편집 창(maskCanvas·끌어서 추가·탭 삭제·적용 human)·완성본 열기 전 미확인 경고',
     /data-mask-badge=/.test(html) && /id="promoMaskLine"/.test(html) && /if\(maskAutoWait\)\{ var mw=maskAutoWait; maskAutoWait=""; maskKick\(mw, false\); \}/.test(html) && /maskAutoWait=item\.id;/.test(html)
     && ['maskRefreshState', 'maskKick', 'maskOpenEditor', 'maskDraw', 'maskApply', 'maskPaintBadges'].every((f) => new RegExp('function ' + f + '\\(').test(html))

@@ -13300,7 +13300,11 @@
     if(canDo("promo")) h+='<button class="mini-btn" id="maskRunBtn"'+(st.running?" disabled":"")+'>'+(has<n? "자동 감지 실행" : "자동 감지 다시")+'</button>';
     if(has<n && !st.running) h+='<span style="color:#a5382c;">미확인 사진은 원본 그대로 게시됩니다 — 자동 감지를 실행하세요</span>';
     line.innerHTML=h;
-    var rb=document.getElementById("maskRunBtn"); if(rb) rb.addEventListener("click", function(){ maskKick(promoId, has>=n); });
+    var rb=document.getElementById("maskRunBtn"); if(rb) rb.addEventListener("click", function(){
+      var again = has>=n;
+      if(again && !confirm("자동 판을 다시 감지합니다(비용 사진당 약 10원). 사람이 손본 사진은 그대로 둡니다.\n\n진행할까요?")) return;
+      maskKick(promoId, again);
+    });
   }
   function maskRefreshState(promoId){
     gwCall("gw-promo-mask",{action:"mask_state",promo_id:promoId}).then(function(res){
@@ -13312,7 +13316,7 @@
   }
   function maskWatch(promoId){
     if(maskPoll) clearTimeout(maskPoll);
-    maskPoll=setTimeout(function(){ if(promoDetId===promoId) maskRefreshState(promoId); }, 4000);
+    maskPoll=setTimeout(function(){ if(promoDetId===promoId) maskRefreshState(promoId); }, 8000);   // 8초 — mask_state는 상태 문서만 읽지만 40장이면 40회 blob 읽기
   }
   // 자동 감지 기동 — 사진 있는 기록이 저장된 직후(자동), 또는 상세 화면 버튼(force=다시)
   function maskKick(promoId, force){
@@ -13339,6 +13343,8 @@
       var a=rs[0], m=rs[1];
       if(a.status!==200||!a.body||!a.body.data){ document.getElementById("maskStat").textContent="원본을 불러오지 못했습니다("+(a.status===403? "권한 없음" : "HTTP "+a.status)+")."; return; }
       if(m.status===200&&m.body&&m.body.ok) maskEd.boxes=(m.body.boxes||[]).map(function(b){ return {kind:b.kind||"other",x:b.x,y:b.y,w:b.w,h:b.h,by:b.by||"auto"}; });
+      else { document.getElementById("maskStat").textContent="기존 상자를 불러오지 못했습니다 — 적용하면 지금 화면의 상자로만 저장됩니다."; maskEd.stale=true; }
+      var stRun=maskState[promoDetId]; if(stRun&&stRun.running) document.getElementById("maskStat").textContent="자동 감지가 진행 중입니다 — 지금 적용하면 사람 판단이 우선됩니다(자동이 덮지 않음).";
       var img=new Image();
       img.onload=function(){ maskEd.img=img; maskEd.w=img.naturalWidth; maskEd.h=img.naturalHeight; maskDraw(); document.getElementById("maskTitle").textContent="사진 가리기 — 상자 "+maskEd.boxes.length+"개"; };
       img.src="data:"+(a.body.type||"image/jpeg")+";base64,"+a.body.data;
@@ -13363,7 +13369,9 @@
   function maskPt(e){
     var cv=document.getElementById("maskCanvas"), r=cv.getBoundingClientRect();
     var p=(e.touches&&e.touches[0])||(e.changedTouches&&e.changedTouches[0])||e;
-    return { x:(p.clientX-r.left)*(cv.width/r.width), y:(p.clientY-r.top)*(cv.height/r.height) };
+    // 캔버스 밖으로 나간 손가락도 가장자리로 붙인다 — 밖으로 끌면 상자가 조용히 사라지던 것(적대 검증)
+    var x=(p.clientX-r.left)*(cv.width/r.width), y=(p.clientY-r.top)*(cv.height/r.height);
+    return { x:Math.max(0,Math.min(cv.width,x)), y:Math.max(0,Math.min(cv.height,y)) };
   }
   function maskHit(pt){
     var cv=document.getElementById("maskCanvas");
@@ -13393,7 +13401,7 @@
     document.getElementById("maskApplyBtn").addEventListener("click", maskApply);
     document.getElementById("maskAutoBtn").addEventListener("click", function(){
       if(!promoDetId) return;
-      if(!confirm("이 기록의 사진 전부를 자동 감지로 다시 가릴까요? 사람이 손본 상자는 유지됩니다.")) return;
+      if(!confirm("이 기록의 자동 판을 다시 감지합니다(사진당 약 10원). 사람이 손본 사진('✓')은 그대로 둡니다.\n\n진행할까요?")) return;
       maskCloseEditor(); maskKick(promoDetId, true);
     });
   })();
@@ -17580,6 +17588,7 @@
     for (i = 0; i < fixedOrder.length; i++){
       var fr = fixedOrder[i], fk = fr.s + "|" + fr.r, fcc = byKey[fk], fempty = abRowEmpty(fcc);
       if (fr.h && fempty){ hiddenN++; continue; }   // 관리자가 숨긴 줄 — 인계서가 없으면 표에서 뺀다
+      if (!fr.h && fempty && abHideEmpty){ emptyN++; continue; }   // 보는 사람 토글 — 반반 나누기 전에 빼야 좌우가 맞는다(적대 검증)
       vis.push({ r: fr, key: fk, cc: fcc, empty: fempty, idx: i });
     }
     vis.sort(function(a, b){
@@ -17600,7 +17609,6 @@
             '<span class="ab-need-unhide">숨김 해제 필요' + (admin ? ' <button type="button" class="ab-hide-btn" data-ab-unhide="' + esc(key) + '">해제</button>' : "") + '</span></td>' + cellN(cc, "") + "</tr>";
           continue;
         }
-        if (empty && abHideEmpty){ emptyN++; continue; }   // 보는 사람 토글 — 그날 화면에서만 뺀다(서버·집계 무관)
         t += "<tr><td>" + esc(r.f) + "</td><td>" + esc(r.t) + "</td><td>" + esc(r.i) + "</td>" + cellN(cc, empty ? key : "") + "</tr>";
       }
       for (var e = 0; e < extra[side].length; e++){

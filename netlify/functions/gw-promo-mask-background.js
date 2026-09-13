@@ -1,11 +1,16 @@
 'use strict';
-// 홍보 사진 가리기 워커 — Netlify Background Function(15분 한도). v354(PM 2026-09-13 "모자이크 착수").
+// 홍보 사진 가리기 워커 — Netlify Background Function(15분 한도). v353(PM 2026-09-13 "모자이크 착수") · 적대 검증 반영(9/13 밤).
 // gw-promo-mask(사용자 API)가 내부 토큰(mid='__promomask__')으로만 기동한다. 호출 즉시 202, 진행·결과는 blob 'promomask:job:<id>' → 앱이 mask_job으로 폴링.
-// 사진마다: 원본(att_<id>, gw_files) 읽기 → Claude 비전 좌표 → jimp 픽셀화 → gw_files 'mask:<att_id>' 저장(원본 보존).
-//   이미 사람이 손본 가림(by:'human' 상자가 있는 mask)은 자동으로 덮지 않는다(force가 아니면 건너뜀).
+// 사진마다: 원본(att_<id>, gw_files) 읽기 → Claude 비전 좌표 → jimp 픽셀화 → gw_files 'mask:<att_id>'(이미지) + 'maskmeta:<att_id>'(상태) 저장(원본 보존).
+// 규칙(적대 검증 반영):
+//   · 사람이 손본 판(human 상자가 있거나 human:true — '가릴 것 없음'도 포함)은 force여도 덮지 않는다. force는 '자동 판만 다시'다.
+//   · 비전 거부·잘림·파싱 실패는 mask를 쓰지 않고 'fail:'로 남긴다(배지 '미확인' 유지 → 게시 전 경고).
+//   · 저장 직전에 mask를 다시 읽어, 감지 중 사람이 먼저 적용했으면(human 또는 더 새 ts) 덮지 않는다.
+//   · 12분 예산 — 넘으면 남은 사진은 skip:time, status 'partial'. 사진마다 잠금 ts를 갱신한다.
 // API 키는 GW_ANTHROPIC_KEY 를 여기서만 읽어 detectBoxes 인자로만 흘린다 — 로그·blob·응답에 남기지 않는다(scrub 마지막 방어선).
 const { setupBlobContext, store, blobGet, blobSet } = require('./_lib/blobs');
 const { verifyToken, bearer } = require('./_lib/session');
+const { appendAudit } = require('./_lib/audit');
 const M = require('./_lib/promomask');
 
 const DATA = 'gw_data';
@@ -16,10 +21,8 @@ const USAGE_KEY = 'promomask:usage';
 const RE_JOB = /^pm_[a-z0-9_-]{1,60}$/i;
 const RE_REC_ID = /^[A-Za-z0-9_-]{2,48}$/;
 const RE_ATT = /^att_[a-f0-9]{16}$/i;
-const RE_B64 = /^[A-Za-z0-9+/=\r\n]+$/;
 const MAX_PHOTOS = 40;
-const MAX_PHOTO_B64 = 1600000;
-const IMG_MIME = { 'image/jpeg': 1, 'image/png': 1, 'image/webp': 1 };
+const BUDGET_MS = 12 * 60 * 1000;      // 15분 한도 안에서 마감(비전 최대 40초 × 사진 수가 넘칠 수 있다)
 const MAX_LOG_CHARS = 300;
 
 function makeScrub() {
@@ -29,15 +32,6 @@ function makeScrub() {
     for (const sec of secrets) { if (out.indexOf(sec) >= 0) out = out.split(sec).join('***'); }
     return out.length > MAX_LOG_CHARS ? out.slice(0, MAX_LOG_CHARS) + '…' : out;
   };
-}
-function mimeOf(rec) {
-  const t = String((rec && rec.type) || '').trim().toLowerCase();
-  if (IMG_MIME[t]) return t;
-  const n = String((rec && rec.name) || '').toLowerCase();
-  if (/\.jpe?g$/.test(n)) return 'image/jpeg';
-  if (/\.png$/.test(n)) return 'image/png';
-  if (/\.webp$/.test(n)) return 'image/webp';
-  return '';
 }
 function kstMonth() { return new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 7); }
 async function bumpUsage(st, calls, usage) {
@@ -50,6 +44,16 @@ async function bumpUsage(st, calls, usage) {
     doc.months[m] = cur;
     await blobSet(st, USAGE_KEY, doc);
   } catch (e) { /* 사용량 집계 실패는 본 작업을 바꾸지 않는다 */ }
+}
+function isHuman(rec) {
+  if (!rec) return false;
+  if (rec.human === true) return true;
+  return Array.isArray(rec.boxes) && rec.boxes.some(function (b) { return b && b.by === 'human'; });
+}
+async function saveMask(fst, id, rec) {
+  const w = await blobSet(fst, M.maskKey(id), rec);
+  if (!w.ok) throw new Error('WRITE_' + (w.code || 'FAILED'));
+  await blobSet(fst, M.metaKey(id), M.metaOf(rec));
 }
 
 exports.handler = async function (event, context) {
@@ -76,36 +80,37 @@ exports.handler = async function (event, context) {
     const ids = (Array.isArray(d.ids) ? d.ids : []).map(function (x) { return String(x || '').trim(); }).filter(function (x) { return RE_ATT.test(x); }).slice(0, MAX_PHOTOS);
 
     st = store(DATA); fst = store(FILES);
-    rec = { ts: Date.now(), status: 'running', promo_id: promoId, n: ids.length, done: 0, photos: [] };
+    const started = Date.now();
+    rec = { ts: started, status: 'running', promo_id: promoId, n: ids.length, done: 0, photos: [] };
     await blobSet(st, jobKey(job), rec);
     if (!process.env.GW_ANTHROPIC_KEY) { await finish('fail', 'ENV_MISSING'); return; }
     const apiKey = process.env.GW_ANTHROPIC_KEY;   // detectBoxes 인자로만 흐른다
     if (!ids.length) { await finish('done', 'NO_PHOTOS'); return; }
 
-    let calls = 0; const usage = { input: 0, output: 0 };
+    let calls = 0, timedOut = false; const usage = { input: 0, output: 0 };
     for (const id of ids) {
       const item = { id: id, boxes: 0, st: '' };
+      if (Date.now() - started > BUDGET_MS) { item.st = 'skip:time'; timedOut = true; rec.photos.push(item); continue; }
       try {
         const r = await blobGet(fst, id);
-        if (!r.ok || !r.data || r.data.kind !== 'promo') { item.st = 'skip:not_promo'; rec.photos.push(item); continue; }
-        const mt = mimeOf(r.data), data = String(r.data.data || '');
-        if (!mt || !data || !RE_B64.test(data) || data.length > MAX_PHOTO_B64) { item.st = 'skip:bad_image'; rec.photos.push(item); continue; }
-        // 사람이 손본 가림은 자동으로 덮지 않는다
+        const chk = M.checkImageRec(r.ok ? r.data : null);
+        if (chk.err) { item.st = 'skip:' + chk.err; rec.photos.push(item); continue; }
         const mr = await blobGet(fst, M.maskKey(id));
         const prev = (mr.ok && mr.data) ? mr.data : null;
-        if (prev && !force && Array.isArray(prev.boxes) && prev.boxes.some(function (b) { return b && b.by === 'human'; })) {
-          item.st = 'kept:human'; item.boxes = prev.boxes.length; rec.photos.push(item); continue;
-        }
-        if (prev && !force && prev.auto === true) { item.st = 'kept:auto'; item.boxes = prev.boxes.length; rec.photos.push(item); continue; }
-        const det = await M.detectBoxes(apiKey, mt, data);
+        // 사람이 손본 판은 force여도 덮지 않는다('가릴 것 없음'으로 확인한 것도 사람 판단이다)
+        if (prev && isHuman(prev)) { item.st = 'kept:human'; item.boxes = (prev.boxes || []).length; rec.photos.push(item); continue; }
+        if (prev && !force && prev.auto === true) { item.st = 'kept:auto'; item.boxes = (prev.boxes || []).length; rec.photos.push(item); continue; }
+        const det = await M.detectBoxes(apiKey, chk.mt, chk.data);
         calls += 1; if (det.usage) { usage.input += det.usage.input; usage.output += det.usage.output; }
         const boxes = det.boxes.map(function (b) { b.by = 'auto'; return b; });
         item.boxes = boxes.length;
-        const buf = Buffer.from(data, 'base64');
-        const out = boxes.length ? await M.applyBoxes(buf, boxes) : null;
-        const size = await M.imageSize(buf);
-        await blobSet(fst, M.maskKey(id), { schema: 1, src: id, name: r.data.name, type: 'image/jpeg', kind: 'promo', auto: true, boxes: boxes,
-          w: size.w, h: size.h, data: out ? out.toString('base64') : '', model: det.model, by: '__promomask__', ts: Date.now() });
+        const out = await M.applyBoxes(Buffer.from(chk.data, 'base64'), boxes);
+        // 저장 직전 재확인 — 감지하는 사이 사람이 먼저 적용했으면 그쪽이 이긴다(적대 검증 #17)
+        const again = await blobGet(fst, M.maskKey(id));
+        const cur = (again.ok && again.data) ? again.data : null;
+        if (cur && (isHuman(cur) || (Number(cur.ts) || 0) > started)) { item.st = 'kept:human'; item.boxes = (cur.boxes || []).length; rec.photos.push(item); continue; }
+        await saveMask(fst, id, { schema: 1, src: id, name: r.data.name, type: 'image/jpeg', kind: 'promo', auto: true, human: false, boxes: boxes,
+          w: out.w, h: out.h, data: out.buf ? out.buf.toString('base64') : '', model: det.model, by: '__promomask__', ts: Date.now() });
         item.st = boxes.length ? 'masked' : 'clear';
       } catch (e) {
         item.st = 'fail:' + scrub((e && e.message) || 'ERR');
@@ -113,10 +118,13 @@ exports.handler = async function (event, context) {
       rec.photos.push(item);
       rec.done = rec.photos.length;
       try { await blobSet(st, jobKey(job), rec); } catch (e2) {}
+      try { await blobSet(st, lockKey(promoId), { ts: Date.now(), job: job }); } catch (e3) {}   // 잠금 ts 갱신(긴 작업이 TTL을 넘지 않게)
     }
     await bumpUsage(st, calls, usage);
     rec.calls = calls;
-    await finish('done', '');
+    const masked = rec.photos.filter(function (p) { return p.st === 'masked'; }).length, failed = rec.photos.filter(function (p) { return /^fail:/.test(p.st); }).length;
+    try { await appendAudit({ ts: Date.now(), by: '__promomask__', bid: '__promomask__', col: 'promo', ev: [{ op: '자동가리기', id: job, t: promoId + ' · 가림 ' + masked + '장 / 실패 ' + failed + '장 / 호출 ' + calls + (timedOut ? ' · 시간 초과' : '') }] }); } catch (e) {}
+    await finish(timedOut ? 'partial' : 'done', timedOut ? 'TIME_BUDGET' : '');
   } catch (e) {
     await finish('fail', 'WORKER_THREW', (e && e.message) || '');
   } finally {

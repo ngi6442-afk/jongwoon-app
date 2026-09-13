@@ -2008,15 +2008,20 @@ async function handleTplList(event, d, R) {
 async function handleAttGet(event, d, R) {
   const c = await currentMember(event);
   if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
-  if (permOf(c.member, 'contracts') === 'hide') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_ACCESS', request_id: R });
+  // 입장: 계약 첨부 열람권 또는 홍보 열람권(v353 후속 — 홍보만 있는 회원도 검수 격자 사진을 봐야 한다)
+  if (permOf(c.member, 'contracts') === 'hide' && permOf(c.member, 'promo') === 'hide') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_ACCESS', request_id: R });
   // att_ 프리픽스 강제 — 없으면 같은 스토어의 tpl:/proof: 키를 이 완화된 가드로 읽어 관리자 전용(proof_get/tpl_put) 우회가 된다
-  if (String(d.id || '').indexOf('att_') !== 0) return jr(400, { status: 'REJECTED', error_code: 'BAD_ID', request_id: R });
-  // v354 모자이크: 홍보 사진에 가린 판(mask:<id>)이 있으면 기본으로 그것을 준다(검수 격자·완성본 창이 가린 사진을 본다).
-  //   raw:true 는 가리기 편집 화면이 원본 위에 상자를 그릴 때만 — 홍보 'do' 권한 또는 관리자에게만 허용.
+  if (!/^att_[a-f0-9]{16}$/i.test(String(d.id || ''))) return jr(400, { status: 'REJECTED', error_code: 'BAD_ID', request_id: R });
+  // v353 모자이크: 홍보 사진에 가린 판(mask:<id>)이 있으면 기본으로 그것을 준다(검수 격자·완성본 창이 가린 사진을 본다).
+  //   raw:true 는 가리기 편집 화면이 원본 위에 상자를 그릴 때만 — 홍보 'do' + 승인 기기, 감사로그(원본열람).
   if (d.raw !== true) {
     const mr = await blobGet(store(FILES), 'mask:' + String(d.id || ''));
     if (mr.ok && mr.data && String(mr.data.data || '')) return jr(200, { status: 'OK', name: mr.data.name, type: mr.data.type || 'image/jpeg', data: mr.data.data, masked: true, request_id: R });
-  } else if (permOf(c.member, 'promo') !== 'do') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_WRITE', request_id: R });
+  } else {
+    if (permOf(c.member, 'promo') !== 'do') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_WRITE', request_id: R });
+    if (!(await deviceApproved(event, c.member))) return jr(403, { status: 'FORBIDDEN', error_code: 'DEVICE_NOT_APPROVED', request_id: R });
+    try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'promo', ev: [{ op: '원본열람', id: String(d.id || '').slice(0, 30), t: '가리기 편집' }] }); } catch (e) {}
+  }
   const r = await blobGet(store(FILES), String(d.id || ''));
   if (!r.ok || !r.data) return jr(404, { status: 'REJECTED', error_code: 'NOT_FOUND', request_id: R });
   return jr(200, { status: 'OK', name: r.data.name, type: r.data.type, data: r.data.data, request_id: R });
@@ -2030,7 +2035,11 @@ async function handleAttDel(event, d, R) {
   if (String(d.id || '').indexOf('att_') !== 0) return jr(400, { status: 'REJECTED', error_code: 'BAD_ID', request_id: R });
   await blobDelete(store(FILES), String(d.id || ''));
   await blobDelete(store(FILES), 'parse:' + String(d.id || ''));
-  try { await blobDelete(store(FILES), 'mask:' + String(d.id || '')); } catch (e) {}   // v354: 가린 판 동반 삭제
+  // v353: 가린 판·상태 동반 삭제 — 실패를 삼키지 않는다(고아 mask가 att_get으로 되살아나지 않게 감사에 남긴다)
+  for (const k of ['mask:' + String(d.id || ''), 'maskmeta:' + String(d.id || '')]) {
+    try { const dr = await blobDelete(store(FILES), k); if (dr && dr.ok === false) throw new Error(dr.code || 'DELETE_FAILED'); }
+    catch (e) { try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'files', ev: [{ op: '가림삭제실패', id: k.slice(0, 40), t: String((e && e.message) || '').slice(0, 60) }] }); } catch (e2) {} }
+  }
   try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'files', ev: [{ op: '첨부삭제', id: String(d.id || '').slice(0, 30), t: '' }] }); } catch (e) {}
   return jr(200, { status: 'OK', request_id: R });
 }

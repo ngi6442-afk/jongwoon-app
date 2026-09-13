@@ -2149,13 +2149,14 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   mem.gw_files[A3] = { name: 'c.pdf', type: 'application/pdf', kind: 'contract', data: b64, by: 'x', ts: 1 };
   mem.gw_data['col:promo'] = { schema: 1, items: [{ id: 'prtest01', title: 't', body: 'b', status: 'review', photos: [{ id: A1, name: 'p1.jpg' }, { id: A2, name: 'p2.jpg' }, { id: 'docatt:1', name: 'c.pdf' }] }] };
   const savedKey = process.env.GW_ANTHROPIC_KEY, savedUrl = process.env.URL; process.env.GW_ANTHROPIC_KEY = 'test-anthropic-key-0000'; process.env.URL = 'https://x.test';
-  const realFetch = global.fetch; const kicks = []; let visionBoxes = [{ kind: 'face', x: 200 / 600, y: 100 / 400, w: 100 / 600, h: 100 / 400 }];
+  const realFetch = global.fetch; const kicks = []; let visionBoxes = [{ kind: 'face', x: 200 / 600, y: 100 / 400, w: 100 / 600, h: 100 / 400 }]; let visionStop = 'end_turn'; let visionText = null;
   global.fetch = async (url, opt) => {
     const u = String(url);
     if (/gw-promo-mask-background/.test(u)) { kicks.push(JSON.parse(opt.body)); return { ok: true, status: 202 }; }
-    if (/api\.anthropic\.com/.test(u)) { return { status: 200, text: async () => JSON.stringify({ model: 'claude-sonnet-5', usage: { input_tokens: 1000, output_tokens: 50 }, content: [{ type: 'text', text: JSON.stringify({ boxes: visionBoxes }) }] }) }; }
+    if (/api\.anthropic\.com/.test(u)) { const b = JSON.parse(opt.body); T2 = b; return { status: 200, text: async () => JSON.stringify({ model: 'claude-sonnet-5', stop_reason: visionStop, usage: { input_tokens: 1000, output_tokens: 50 }, content: [{ type: 'text', text: visionText !== null ? visionText : JSON.stringify({ boxes: visionBoxes }) }] }) }; }
     return realFetch(url, opt);
   };
+  let T2 = null;
   r = await call({ action: 'mask_state', promo_id: 'prtest01' }, tokN, 'dev1');
   T('mask_state 홍보 권한 없음 → 403 NO_ACCESS', r.code === 403 && r.body.code === 'NO_ACCESS', r.code + '/' + r.body.code);
   r = await call({ action: 'mask_start', promo_id: 'prtest01' }, tokN, 'dev1');
@@ -2171,31 +2172,44 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   const itok = issueSession({ id: '__promomask__', role: 'system' }).token;
   await wk.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + itok }, body: JSON.stringify({ job: job1, promo_id: 'prtest01', ids: [A1, A2], force: false }) }, {});
   const j1 = mem.gw_data['promomask:job:' + job1];
-  T('워커: done · 사진 2장 masked(상자 1) · 호출 2 · 잠금 해제 · gw_files mask:<id> 2건(원본 보존·auto:true·w/h·jpeg)', j1.status === 'done' && j1.photos.length === 2 && j1.photos.every((p) => p.st === 'masked' && p.boxes === 1) && j1.calls === 2 && mem.gw_data['promomask:lock:prtest01'].job === '' && mem.gw_files['mask:' + A1] && mem.gw_files['mask:' + A1].auto === true && mem.gw_files['mask:' + A1].w === 600 && mem.gw_files['mask:' + A1].h === 400 && Buffer.from(mem.gw_files['mask:' + A1].data, 'base64').slice(0, 3).toString('hex') === 'ffd8ff' && mem.gw_files[A1].data === b64, JSON.stringify(j1).slice(0, 200));
+  T('워커: done · 사진 2장 masked(상자 1) · 호출 2 · 잠금 해제 · gw_files mask:<id> 2건(원본 보존·auto:true·w/h·jpeg) + maskmeta 2건', j1.status === 'done' && j1.photos.length === 2 && j1.photos.every((p) => p.st === 'masked' && p.boxes === 1) && j1.calls === 2 && mem.gw_data['promomask:lock:prtest01'].job === '' && mem.gw_files['mask:' + A1] && mem.gw_files['mask:' + A1].auto === true && mem.gw_files['mask:' + A1].w === 600 && mem.gw_files['mask:' + A1].h === 400 && Buffer.from(mem.gw_files['mask:' + A1].data, 'base64').slice(0, 3).toString('hex') === 'ffd8ff' && mem.gw_files[A1].data === b64 && mem.gw_files['maskmeta:' + A1] && mem.gw_files['maskmeta:' + A1].n === 1 && mem.gw_files['maskmeta:' + A1].human === false, JSON.stringify(j1).slice(0, 200));
+  T('비전 요청: max_tokens 4096 · effort low · json_schema boxes', T2 && T2.max_tokens === 4096 && T2.output_config && T2.output_config.effort === 'low' && T2.output_config.format && T2.output_config.format.type === 'json_schema', JSON.stringify(T2 && T2.output_config).slice(0, 120));
+  // 픽셀화 실효 — 가린 판의 상자 안은 원본과 다르고, 밖은 같다(적대 검증 #26)
+  { const { Jimp: J2 } = require('jimp'); const o = await J2.read(Buffer.from(b64, 'base64')); const m = await J2.read(Buffer.from(mem.gw_files['mask:' + A1].data, 'base64'));
+    const dist = (a, b) => { const r = (a >>> 24) - (b >>> 24), g = ((a >>> 16) & 255) - ((b >>> 16) & 255), bb = ((a >>> 8) & 255) - ((b >>> 8) & 255); return Math.sqrt(r * r + g * g + bb * bb); };
+    let inside = 0, outside = 0; for (let k = 0; k < 20; k++) { inside += dist(o.getPixelColor(205 + k * 4, 105 + k * 4), m.getPixelColor(205 + k * 4, 105 + k * 4)); outside += dist(o.getPixelColor(20 + k * 5, 20 + k * 5), m.getPixelColor(20 + k * 5, 20 + k * 5)); }
+    T('픽셀화 실효: 상자 안 색차 큼 · 밖은 거의 같음', inside / 20 > 20 && outside / 20 < 12, 'in ' + (inside / 20).toFixed(1) + ' out ' + (outside / 20).toFixed(1)); }
   T('워커: 사용자 토큰으로는 안 돈다', (await (async () => { const before = JSON.stringify(mem.gw_data['promomask:job:' + job1]); await wk.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + tokP }, body: JSON.stringify({ job: 'pm_x', promo_id: 'prtest01', ids: [A1] }) }, {}); return !mem.gw_data['promomask:job:pm_x'] && JSON.stringify(mem.gw_data['promomask:job:' + job1]) === before; })()), '');
   T('워커 응답·job에 API 키 없음', !JSON.stringify(j1).includes('test-anthropic-key'), '');
   r = await call({ action: 'mask_job', job: job1 }, tokP, 'dev1');
   T('mask_job → 200 done', r.code === 200 && r.body.status === 'done' && r.body.n === 2, '');
   r = await call({ action: 'mask_state', promo_id: 'prtest01' }, tokP, 'dev1');
-  T('mask_state: 2장 has:true·boxes 1·auto·human false', r.code === 200 && r.body.items.every((x) => x.has && x.boxes === 1 && x.auto && !x.human) && r.body.running === false, JSON.stringify(r.body.items));
+  T('mask_state: 2장 has:true·boxes 1·auto·human false · used 2/cap 1000(maskmeta만 읽음)', r.code === 200 && r.body.items.every((x) => x.has && x.boxes === 1 && x.auto && !x.human) && r.body.running === false && r.body.used === 2 && r.body.cap === 1000, JSON.stringify(r.body).slice(0, 200));
   // 소비처: att_get 기본은 가린 판(masked:true), raw:true는 원본(홍보 do만)
   const gwd = require(join(FN, 'gw-data.js'));
   const dcall = async (body, tok, dev) => { const rr = await gwd.handler({ httpMethod: 'POST', headers: Object.assign({ authorization: tok ? 'Bearer ' + tok : '' }, dev ? { 'x-device-id': dev } : {}), body: JSON.stringify(body) }); return { code: rr.statusCode, body: JSON.parse(rr.body) }; };
   r = await dcall({ action: 'att_get', id: A1 }, tokP, 'dev1');
   T('att_get 기본 → 가린 판(masked:true, 원본과 다름)', r.code === 200 && r.body.masked === true && r.body.data !== b64 && r.body.data === mem.gw_files['mask:' + A1].data, r.code + '/' + JSON.stringify(r.body).slice(0, 80));
   r = await dcall({ action: 'att_get', id: A1, raw: true }, tokP, 'dev1');
-  T('att_get raw:true(홍보 do) → 원본', r.code === 200 && !r.body.masked && r.body.data === b64, r.code);
+  T('att_get raw:true(홍보 do·승인 기기) → 원본 · 감사로그 원본열람', r.code === 200 && !r.body.masked && r.body.data === b64 && auditMock.logs.some((l) => l.col === 'promo' && l.ev && l.ev[0].op === '원본열람'), r.code);
+  r = await dcall({ action: 'att_get', id: A1, raw: true }, tokP, 'devX');
+  T('att_get raw:true 미승인 기기 → 403 DEVICE_NOT_APPROVED', r.code === 403 && r.body.error_code === 'DEVICE_NOT_APPROVED', r.code + '/' + r.body.error_code);
   mem.gw_users['member:uview'] = { id: 'uview', name: '열람자', admin: false, perms: { contracts: 'view', promo: 'view' } };
   r = await dcall({ action: 'att_get', id: A1, raw: true }, issueSession(mem.gw_users['member:uview']).token, 'dev1');
   T('att_get raw:true 홍보 view → 403(원본은 편집 권한에만)', r.code === 403, r.code);
+  mem.gw_users['member:uponly'] = { id: 'uponly', name: '홍보만', admin: false, perms: { contracts: 'hide', promo: 'do' } };
+  r = await dcall({ action: 'att_get', id: A1 }, issueSession(mem.gw_users['member:uponly']).token, 'dev1');
+  T('att_get: 계약 hide·홍보 do 회원도 홍보 사진(가린 판)을 본다', r.code === 200 && r.body.masked === true, r.code);
+  r = await dcall({ action: 'att_get', id: 'att_zz' }, tokP, 'dev1');
+  T('att_get: att_ 16hex 형식 아니면 400', r.code === 400, r.code);
   // 공개 서빙(gw-promo-img) — 공유 토큰 경로도 가린 판
   const gwi = require(join(FN, 'gw-promo-img.js'));
   mem.gw_data['promo:share:' + 'f'.repeat(64)] = { ids: [A1, A2], promo_id: 'prtest01', exp: Date.now() + 100000, by: 'x', ts: 1 };
   { const rr = await gwi.handler({ httpMethod: 'GET', queryStringParameters: { s: 'f'.repeat(64), i: '0' }, headers: {} });
     T('gw-promo-img 공개 서빙 → 가린 판 바이트(원본 아님)', rr.statusCode === 200 && rr.isBase64Encoded && rr.body === mem.gw_files['mask:' + A1].data && rr.body !== b64, String(rr.statusCode)); }
   // 편집 적용 — 사람이 상자 2개 지정(human) → auto가 다시 덮지 않음
-  r = await call({ action: 'mask_apply', att_id: A1, boxes: [{ kind: 'plate', x: 0.1, y: 0.1, w: 0.2, h: 0.1 }, { kind: 'face', x: 0.5, y: 0.5, w: 0.1, h: 0.1 }, { x: 5, y: 5, w: 1, h: 1 }] }, tokP, 'dev1');
-  T('mask_apply 상자 3개(불량 1 제외) → 200 boxes 2 masked · mask human·auto false', r.code === 200 && r.body.boxes === 2 && r.body.masked === true && mem.gw_files['mask:' + A1].auto === false && mem.gw_files['mask:' + A1].boxes.every((b) => b.by === 'human'), JSON.stringify(r.body));
+  r = await call({ action: 'mask_apply', att_id: A1, boxes: [{ kind: 'plate', x: 0.1, y: 0.1, w: 0.2, h: 0.1 }, { kind: 'face', x: -0.05, y: 0.5, w: 0.2, h: 0.1 }, { x: 5, y: 5, w: 1, h: 1 }] }, tokP, 'dev1');
+  T('mask_apply 상자 3개(범위 밖 1 제외, 가장자리 걸친 것은 잘라 수용) → 200 boxes 2 masked · human:true · 걸친 상자 x 0·w 0.15', r.code === 200 && r.body.boxes === 2 && r.body.masked === true && mem.gw_files['mask:' + A1].human === true && mem.gw_files['mask:' + A1].boxes.every((b) => b.by === 'human') && Math.abs(mem.gw_files['mask:' + A1].boxes[1].x) < 1e-9 && Math.abs(mem.gw_files['mask:' + A1].boxes[1].w - 0.15) < 1e-9 && mem.gw_files['maskmeta:' + A1].human === true, JSON.stringify(r.body) + JSON.stringify(mem.gw_files['mask:' + A1].boxes));
   kicks.length = 0;
   r = await call({ action: 'mask_start', promo_id: 'prtest01' }, tokP, 'dev1');
   await wk.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + itok }, body: JSON.stringify({ job: r.body.job, promo_id: 'prtest01', ids: [A1, A2], force: false }) }, {});
@@ -2204,20 +2218,60 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   r = await call({ action: 'mask_start', promo_id: 'prtest01', force: true }, tokP, 'dev1');
   await wk.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + itok }, body: JSON.stringify({ job: r.body.job, promo_id: 'prtest01', ids: [A1, A2], force: true }) }, {});
   { const j3 = mem.gw_data['promomask:job:' + r.body.job];
-    T('force: 두 장 다 다시 감지(masked·호출 2) — 사람 상자도 덮인다(사용자가 확인창에서 동의)', j3.status === 'done' && j3.photos.every((p) => p.st === 'masked') && j3.calls === 2, JSON.stringify(j3.photos)); }
+    T('force = 자동 판만 다시: 사람이 손본 A1은 kept:human 유지 · 자동 A2만 masked · 호출 1', j3.status === 'done' && j3.photos[0].st === 'kept:human' && j3.photos[1].st === 'masked' && j3.calls === 1 && mem.gw_files['mask:' + A1].human === true, JSON.stringify(j3.photos)); }
   visionBoxes = [];
   r = await call({ action: 'mask_apply', att_id: A2, boxes: [] }, tokP, 'dev1');
-  T('mask_apply 상자 0 → "가릴 것 없음" 기록(masked false·data 빈 값) → att_get은 원본', r.code === 200 && r.body.masked === false && mem.gw_files['mask:' + A2].data === '' && (await dcall({ action: 'att_get', id: A2 }, tokP, 'dev1')).body.masked !== true, JSON.stringify(r.body));
+  T('mask_apply 상자 0 → "가릴 것 없음"(human:true·masked false·data 빈 값) → att_get은 원본', r.code === 200 && r.body.masked === false && mem.gw_files['mask:' + A2].data === '' && mem.gw_files['mask:' + A2].human === true && (await dcall({ action: 'att_get', id: A2 }, tokP, 'dev1')).body.masked !== true, JSON.stringify(r.body));
+  r = await call({ action: 'mask_start', promo_id: 'prtest01', force: true }, tokP, 'dev1');
+  await wk.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + itok }, body: JSON.stringify({ job: r.body.job, promo_id: 'prtest01', ids: [A1, A2], force: true }) }, {});
+  T('사람이 정한 "가릴 것 없음"도 force 재감지에 안 덮인다(kept:human 2장·호출 0)', mem.gw_data['promomask:job:' + r.body.job].photos.every((p) => p.st === 'kept:human') && mem.gw_data['promomask:job:' + r.body.job].calls === 0, JSON.stringify(mem.gw_data['promomask:job:' + r.body.job].photos));
+  // 비전 잘림·거부·파싱 실패 → mask 안 씀(has:false 유지) — 적대 검증 #1/#10/#23
+  const A4 = 'att_' + 'd'.repeat(16); mem.gw_files[A4] = { name: 'p4.jpg', type: 'image/jpeg', kind: 'promo', data: b64, by: 'x', ts: 1 };
+  mem.gw_data['col:promo'].items[0].photos.push({ id: A4, name: 'p4.jpg' });
+  visionStop = 'max_tokens'; visionText = '{"boxes":[{"kind":"fa';
+  r = await call({ action: 'mask_start', promo_id: 'prtest01' }, tokP, 'dev1');
+  await wk.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + itok }, body: JSON.stringify({ job: r.body.job, promo_id: 'prtest01', ids: [A4], force: false }) }, {});
+  T('비전 max_tokens 잘림 → fail:TRUNCATED · mask 미저장 · 상태 has:false', mem.gw_data['promomask:job:' + r.body.job].photos[0].st === 'fail:TRUNCATED' && !mem.gw_files['mask:' + A4] && (await call({ action: 'mask_state', promo_id: 'prtest01' }, tokP, 'dev1')).body.items.find((x) => x.id === A4).has === false, JSON.stringify(mem.gw_data['promomask:job:' + r.body.job].photos));
+  visionStop = 'refusal'; visionText = '';
+  r = await call({ action: 'mask_start', promo_id: 'prtest01' }, tokP, 'dev1');
+  await wk.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + itok }, body: JSON.stringify({ job: r.body.job, promo_id: 'prtest01', ids: [A4], force: false }) }, {});
+  T('비전 refusal → fail:REFUSAL · mask 미저장', mem.gw_data['promomask:job:' + r.body.job].photos[0].st === 'fail:REFUSAL' && !mem.gw_files['mask:' + A4], '');
+  visionStop = 'end_turn'; visionText = 'not json at all';
+  r = await call({ action: 'mask_start', promo_id: 'prtest01' }, tokP, 'dev1');
+  await wk.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + itok }, body: JSON.stringify({ job: r.body.job, promo_id: 'prtest01', ids: [A4], force: false }) }, {});
+  T('비전 응답 파싱 불가 → fail:PARSE · mask 미저장', mem.gw_data['promomask:job:' + r.body.job].photos[0].st === 'fail:PARSE' && !mem.gw_files['mask:' + A4], '');
+  visionText = null;
+  // 월 상한
+  mem.gw_data['promomask:usage'] = { schema: 1, months: {} }; mem.gw_data['promomask:usage'].months[new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 7)] = { calls: 999, input: 0, output: 0 };
+  r = await call({ action: 'mask_start', promo_id: 'prtest01' }, tokP, 'dev1');
+  T('월 호출 상한(999+3 > 1000) → 429 BUDGET_CAP · 워커 미기동', r.code === 429 && r.body.code === 'BUDGET_CAP', r.code + '/' + r.body.code);
+  delete mem.gw_data['promomask:usage'];
+  // 홈페이지 갤러리 실경로(gw-gallery-feed)도 가린 판
+  const gwf = require(join(FN, 'gw-gallery-feed.js'));
+  mem.gw_data['col:promo'].items[0].status = 'posted'; mem.gw_data['col:promo'].items[0].blog_url = 'https://blog.naver.com/x/1'; const savedFk = process.env.GW_GALLERY_FEED_KEY; process.env.GW_GALLERY_FEED_KEY = 'feed-test-key';
+  { const rr = await gwf.handler({ httpMethod: 'GET', queryStringParameters: { img: A2, key: 'feed-test-key' }, headers: {} });
+    const body2 = rr.isBase64Encoded ? rr.body : ''; const expectRaw = mem.gw_files['mask:' + A2].data === '';   // A2는 '가릴 것 없음' → 원본
+    T('gw-gallery-feed img: mask 우선(가릴 것 없음이면 원본) · 캐시 5분', rr.statusCode === 200 && (expectRaw ? body2 === b64 : body2 === mem.gw_files['mask:' + A2].data) && /max-age=300/.test(rr.headers['Cache-Control']), String(rr.statusCode) + ' ' + (rr.headers || {})['Cache-Control']); }
+  mem.gw_data['col:promo'].items[0].status = 'review'; process.env.GW_GALLERY_FEED_KEY = savedFk || '';
+  // mask_apply 입력 검사(형식·용량)
+  const A5 = 'att_' + 'e'.repeat(16); mem.gw_files[A5] = { name: 'x.webp', type: 'image/webp', kind: 'promo', data: b64, by: 'x', ts: 1 };
+  r = await call({ action: 'mask_apply', att_id: A5, boxes: [] }, tokP, 'dev1');
+  T('mask_apply webp(디코더 없음) → 400 UNSUPPORTED_FORMAT', r.code === 400 && r.body.code === 'UNSUPPORTED_FORMAT', r.code + '/' + r.body.code);
+  r = await call({ action: 'mask_apply', att_id: A3, boxes: [] }, tokP, 'dev1');
+  T('mask_apply 홍보 아닌 첨부(contract) → 403 NOT_PROMO', r.code === 403 && r.body.code === 'NOT_PROMO', r.code + '/' + r.body.code);
+  delete mem.gw_files[A5]; delete mem.gw_files[A4];
   r = await call({ action: 'mask_get', att_id: A1 }, tokP, 'dev1');
   T('mask_get → has·boxes(정규화)·w/h', r.code === 200 && r.body.has === true && r.body.w === 600 && r.body.h === 400 && Array.isArray(r.body.boxes), JSON.stringify(r.body).slice(0, 120));
   r = await call({ action: 'mask_get', att_id: 'mask:' + A1 }, tokP, 'dev1');
   T('mask_get att_ 형식 아님 → 400 BAD_ID', r.code === 400 && r.body.code === 'BAD_ID', r.code);
   r = await call({ action: 'mask_clear', att_id: A1 }, tokP, 'dev1');
-  T('mask_clear → 가린 판 삭제 · att_get 원본', r.code === 200 && !mem.gw_files['mask:' + A1] && (await dcall({ action: 'att_get', id: A1 }, tokP, 'dev1')).body.data === b64, r.code);
+  T('mask_clear → 가린 판·상태 삭제(existed true) · att_get 원본', r.code === 200 && r.body.existed === true && !mem.gw_files['mask:' + A1] && !mem.gw_files['maskmeta:' + A1] && (await dcall({ action: 'att_get', id: A1 }, tokP, 'dev1')).body.data === b64, r.code);
+  { const aud = auditMock.logs.length; r = await call({ action: 'mask_clear', att_id: A1 }, tokP, 'dev1');
+    T('mask_clear 없는 판 → existed false · 감사로그 없음', r.code === 200 && r.body.existed === false && auditMock.logs.length === aud, ''); }
   mem.gw_users['member:uadmin'] = { id: 'uadmin', name: '관리자', admin: true, perms: {}, tier: 'pm' };
   r = await dcall({ action: 'att_del', id: A2 }, tokA);
-  T('att_del → mask:<id>도 함께 삭제', r.code === 200 && !mem.gw_files[A2] && !mem.gw_files['mask:' + A2], r.code);
-  T('감사로그: 사진가리기·가리기수정·가리기해제 op 존재', ['사진가리기', '가리기수정', '가리기해제'].every((op) => auditMock.logs.some((l) => l.col === 'promo' && l.ev && l.ev[0].op === op)), '');
+  T('att_del → mask:<id>·maskmeta도 함께 삭제', r.code === 200 && !mem.gw_files[A2] && !mem.gw_files['mask:' + A2] && !mem.gw_files['maskmeta:' + A2], r.code);
+  T('감사로그: 사진가리기·가리기수정·가리기해제·자동가리기(워커 요약)·원본열람 op 존재', ['사진가리기', '가리기수정', '가리기해제', '자동가리기', '원본열람'].every((op) => auditMock.logs.some((l) => l.col === 'promo' && l.ev && l.ev[0].op === op)), '');
   global.fetch = realFetch; process.env.GW_ANTHROPIC_KEY = savedKey || ''; process.env.URL = savedUrl || '';
   delete mem.gw_data['col:promo']; delete mem.gw_files[A1]; delete mem.gw_files[A3]; delete mem.gw_data['promo:share:' + 'f'.repeat(64)];
 }

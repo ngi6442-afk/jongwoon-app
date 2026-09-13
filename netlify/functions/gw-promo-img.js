@@ -81,7 +81,7 @@ async function handleImg(qs, R) {
   const ids = r.data.ids || [];
   if (!(i >= 0 && i < ids.length)) return jr(404, { status: 'REJECTED', error_code: 'BAD_INDEX', request_id: R });
 
-  // v354 모자이크: 가린 판(mask:<id>, 얼굴·번호판 픽셀화)이 있으면 그것을 내보낸다 — 이미 발급된 공유 링크에도 소급 적용(원본 파손 없음).
+  // v353 모자이크: 가린 판(mask:<id>, 얼굴·번호판 픽셀화)이 있으면 그것을 내보낸다 — 이미 발급된 공유 링크도 새로 열리는 요청부터 가린 판(캐시 5분).
   //   상자 0개로 확인된 mask(data 빈 값)는 '가릴 것 없음'이므로 원본을 낸다.
   let fr = await blobGet(store(FILES), 'mask:' + ids[i]);
   if (!(fr.ok && fr.data && String(fr.data.data || ''))) fr = await blobGet(store(FILES), ids[i]);
@@ -93,7 +93,7 @@ async function handleImg(qs, R) {
     statusCode: 200,
     headers: Object.assign({
       'Content-Type': String(fr.data.type || 'image/jpeg'),
-      'Cache-Control': 'public, max-age=86400',
+      'Cache-Control': 'public, max-age=300',   // v353 후속: 가리기 수정이 5분 안에 반영되게(24시간이면 원본이 하루 남는다)
       'X-Robots-Tag': 'noindex'
     }, CORS),
     body: String(fr.data.data || ''),

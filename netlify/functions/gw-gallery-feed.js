@@ -102,7 +102,9 @@ async function handleIndex(R) {
       if (imgs.length >= MAX_PHOTOS) break;
       const id = String((ph && ph.id) || '');
       if (!RE_ATT.test(id)) continue;
-      const fr = await blobGet(store(FILES), id);
+      // v353 모자이크: 홈페이지로 나가는 사진은 가린 판(mask:<id>) 우선 — 원본은 앱 밖으로 안 나간다
+      let fr = await blobGet(store(FILES), 'mask:' + id);
+      if (!(fr.ok && fr.data && String(fr.data.data || ''))) fr = await blobGet(store(FILES), id);
       if (!fr.ok || !fr.data || String(fr.data.kind || '') !== 'promo') continue;
       let buf; try { buf = Buffer.from(String(fr.data.data || ''), 'base64'); } catch { continue; }
       const ext = detectImageExt(buf);
@@ -140,7 +142,8 @@ async function handleImg(qs, R) {
   });
   if (!allowed) return jr(404, { ok: false, code: 'NOT_IN_FEED', request_id: R });
 
-  const fr = await blobGet(store(FILES), att);
+  let fr = await blobGet(store(FILES), 'mask:' + att);   // v353 모자이크: 가린 판 우선
+  if (!(fr.ok && fr.data && String(fr.data.data || ''))) fr = await blobGet(store(FILES), att);
   if (!fr.ok || !fr.data) return jr(404, { ok: false, code: 'NO_FILE', request_id: R });
   if (String(fr.data.kind || '') !== 'promo') return jr(403, { ok: false, code: 'NOT_PROMO', request_id: R });
 
@@ -148,7 +151,7 @@ async function handleImg(qs, R) {
     statusCode: 200,
     headers: Object.assign({
       'Content-Type': String(fr.data.type || 'image/jpeg'),
-      'Cache-Control': 'public, max-age=86400',
+      'Cache-Control': 'public, max-age=300',   // v353 후속: 가리기 수정 5분 반영
     }, CORS),
     body: String(fr.data.data || ''),
     isBase64Encoded: true,
