@@ -1508,6 +1508,17 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   T('앱 AB_ROUTES에 R39 폐석회 · 사유 문구 ITEM_MISMATCH 있음', /\{s:"R",r:39,f:"\(주\)포스코퓨처엠",t:"대화산업",i:"폐석회"\}/.test(src) && /ITEM_MISMATCH:\s*"품목이 다름/.test(src));
 }
 
+// ===== 32b. v357 잠정 행에 인계일자(date) 동봉 — 앱이 경과일을 세어 '3일+ 미확정'을 드러낸다(PM 9/14 "9/11 동일→스틸 1대인데 2대"). 계수는 그대로 =====
+{
+  const abLib = require(join(FN, '_lib/allbaro.js'));
+  const base = { emis: '동일산업(주)', trtm: '(주)스틸싸이클', wasteName: '분진(고상)', date: '20260911', state: '운반중', tranFirm: '종운환경(주)', tranVehicle: '경북80사1234' };
+  const rows = [Object.assign({}, base, { manf: '2609524417', confirmedAt: '' }), Object.assign({}, base, { manf: '2609599999', confirmedAt: '20260911 16:39' })];
+  const agg = abLib.aggregate(rows, '2026-09-11', {});
+  const nSum = (agg.counts || []).reduce((s, c) => s + (Number(c.n) || 0), 0);
+  T('aggregate: 확정 없는 행만 pending · date=인계일자 8자리 · manf 동봉 · 계수 n 합계 2(잠정 포함 규칙 불변)',
+    Array.isArray(agg.pending) && agg.pending.length === 1 && agg.pending[0].date === '20260911' && agg.pending[0].manf === '2609524417' && nSum === 2, JSON.stringify(agg.pending) + ' n=' + nSum);
+}
+
 // ===== 33. 운반일지 자동 재정렬 v327(PM 9/8 "학습시키거나 노선표가 바뀌면 사람이 수동 수집을 안 눌러도 기록이 스스로 재정렬") =====
 //    (a) 옛 규칙 day 블롭 → ab_day가 그 자리에서 재정렬(R14 분진→R39·routes_ver·n/qty/total 불변·감사) (b) ab_learn(day) → 그날 묶음이 학습 줄로·rematched.changed≥1
 //    (c) 학습 없는 다른 묶음 불변 (d) 차량 분리 묶음(vehicle_type)은 같은 줄·차량 미상은 종전 줄 유지 없이 미매칭 (e) 숨긴 노선·직접 추가 블롭 무변경

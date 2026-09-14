@@ -1170,5 +1170,33 @@ try {
     && (html.match(/PERM_CLOSED\[mod\] \? "hide" : "view"/g) || []).length === 2, '');
 } catch (e) { console.log('  (PERM_CLOSED 대조 생략 — ' + e.message + ')'); fails++; }
 
+// ---- v357: 잠정 건 가시화(인계번호·경과일·3일+ 미확정) — PM 9/14 "9/11 동일→스틸 1대인데 앱 2대". 계수 규칙은 그대로(n_pending 포함) ----
+try {
+  const ab = readFileSync(join(ROOT, 'netlify/functions/_lib/allbaro.js'), 'utf8');
+  T('서버: pending 행에 date(인계일자) 동봉 · 앱: abPendList/Age/Info/Badge · 3일+ 미확정 붉은 배지 · 표 셀·합계줄 표시 · 계수 규칙(pendN 포함) 불변',
+    /pending\.push\(\{ manf: [^}]*state: state, date: d \}\)/.test(ab)
+    && ['abPendList', 'abPendAge', 'abPendInfo', 'abPendBadge'].every((f) => new RegExp('function ' + f + '\\(').test(html))
+    && /var AB_PEND_STALE_DAYS = 3;/.test(html) && /class="dday red" title="' \+ esc\(AB_PEND_STALE_DAYS \+ "일이 지나도록/.test(html)
+    && /abInt\(c\.n_pending\) \? abPendBadge\(c\) : ''/.test(html) && /sub \+= "잠정 " \+ abInt\(c\.n_pending\) \+ \(pi\.stale/.test(html)
+    && /var ps = abPendInfo\(null\)\.stale;/.test(html) && /pendN \+= abInt\(c\.n_pending\);/.test(html), '');
+  // 경과일 계산·배지 분기 실행(순수 함수만 떼어 실행)
+  const fn = (name) => { const i = html.indexOf('function ' + name + '('); let d = 0, st = false; for (let j = i; j < html.length; j++) { const ch = html[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return html.slice(i, j + 1); } } throw new Error(name); };
+  const api = new Function('__pend', '__today', [
+    'var abDay = { data: { pending: __pend } }; function todayStr(){ return __today; } function abInt(v){ return Number(v) || 0; }',
+    'function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;"); }',
+    'var AB_PEND_STALE_DAYS = 3;', fn('abPendList'), fn('abPendAge'), fn('abPendInfo'), fn('abPendBadge'),
+    'return { info: abPendInfo, badge: abPendBadge };'].join('\n'));
+  const P = [{ manf: '2609524417', from: '동일산업(주)', to: '(주)스틸싸이클', item: '분진(고상)', state: '운반중', date: '20260911' },
+             { manf: '2609564886', from: '동일산업(주)', to: '(주)스틸싸이클', item: '분진(고상)', state: '운반중', date: '20260911' },
+             { manf: '2609500001', from: '(주)스틸싸이클', to: '씨엔텍', item: '분진(고상)', state: '운반중', date: '20260914' }];
+  const a = api(P, '2026-09-15');
+  const c1 = { from: '동일산업(주)', to: '(주)스틸싸이클', item: '분진(고상)', n_pending: 2 };
+  const c2 = { from: '(주)스틸싸이클', to: '씨엔텍', item: '분진(고상)', n_pending: 1 };
+  const i1 = a.info(c1), b1 = a.badge(c1), b2 = a.badge(c2), i0 = a.info(null);
+  T('실행: 4일 경과 2건 → stale 2·붉은 배지 "잠정 2 · 3일+ 미확정 2"·인계번호 둘 다 title에 · 1일 경과 건은 노란 "잠정 1" · 전체 stale 2',
+    i1.n === 2 && i1.stale === 2 && /dday red/.test(b1) && /잠정 2 · 3일\+ 미확정 2/.test(b1) && /2609524417/.test(b1) && /2609564886/.test(b1) && /4일 경과/.test(b1)
+    && /dday amber/.test(b2) && /잠정 1</.test(b2) && !/미확정/.test(b2) && i0.stale === 2 && i0.n === 3, b1 + ' / ' + b2);
+} catch (e) { console.log('  (v357 검사 생략 — ' + e.message + ')'); fails++; }
+
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

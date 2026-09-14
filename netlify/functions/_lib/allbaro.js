@@ -680,7 +680,8 @@ function aggregate(rows, day, opts) {
     // 있다(실행된 건은 당일 확정이 찍힌다 — 8/24 실측: 실행 757733=당일 16:39 확정, 유령 2건=공란).
     // 운반자 작업일시는 판정에 쓰지 않는다 — 사후 일괄 등록이라(8/24 14시대에 수십 건) 실측 무의미.
     const pend = !isP && !/^\d{8}/.test(String(r.confirmedAt == null ? '' : r.confirmedAt).trim());
-    if (pend) pending.push({ manf: String(r.manf == null ? '' : r.manf), from: from, to: to, item: item, state: state });
+    // v357(PM 9/14 9/11 동일→스틸 '1대인데 2대'): 인계일자(date)를 같이 실어 앱이 경과일을 세고 3일이 지나도록 확정이 없는 건을 붉게 드러낸다.
+    if (pend) pending.push({ manf: String(r.manf == null ? '' : r.manf), from: from, to: to, item: item, state: state, date: d });
     const key = JSON.stringify([from, to, item]);   // 충돌 없는 합성 키
     let v = map.get(key);
     if (!v) { v = { from: from, to: to, item: item, rows: [] }; map.set(key, v); }
