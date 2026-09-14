@@ -5243,7 +5243,7 @@
     if (name === "site"){ renderSites(); loadAsb(); loadEdu(); if(canSee("wk")) loadWorkers(); }
     if (name === "lic"){ setLicLayer("cert"); loadEdu(); }   // 전역검색·캘린더 점프가 의무/이번달 층 위에 내려앉지 않게 ①층 복귀
     if (name === "hr"){ renderHrRoster(); renderEdu(); loadEdu(); if(canSee("wk")) loadWorkers(); }
-    if (name === "workers"){ renderWorkers(); loadWorkers(); renderEdu(); loadEdu(); }
+    if (name === "workers"){ renderWorkers(); loadWorkers(); renderEdu(); loadEdu(); loadAsb(); }   // v356: 참여 칩은 현장 대장(asb)이 있어야 붙는다
     if (name === "perm") renderPermMgmt();
     if (name === "fam"){ renderFam(); loadFam(); }
     if (name === "leave") renderLeaves();
@@ -8028,20 +8028,30 @@
   // v350: 이 사람이 어느 종류 현장에 몇 번 들어갔나 — 현장 대장(asb, kind)에서 센다. 인사·일용직 목록과 [근로자 추가] 목록에 배지로.
   var WK_KIND_LABEL = { asbestos:"석면", demolition:"철거", dredge:"준설" };
   var WK_KIND_ORDER = ["asbestos","demolition","dredge"];
+  // v356(PM 9/14): 종류별 횟수 대신 **가장 최근 참여 작업**을 "(석면) 17일 전"으로. 근로자별로 현장 대장에서 가장 늦은 날짜(종료일, 없으면 시작일)를 고른다.
   function wkKindCounts(){
     var m = {};
     (asb || []).forEach(function(r){
       if(!r || r.del===1) return;
       var k = (r.kind && WK_KIND_LABEL[r.kind]) ? r.kind : "asbestos";
-      asList(r.worker_ids).forEach(function(id){ if(!m[id]) m[id] = {}; m[id][k] = (m[id][k]||0) + 1; });
+      var d = String(r.end || r.start || "");
+      asList(r.worker_ids).forEach(function(id){
+        var cur = m[id];
+        if(!cur || d > cur.date) m[id] = { kind: k, date: d, title: r.title || "" };
+      });
     });
     return m;
   }
-  function wkKindChips(counts, id){
-    var c = counts[id]; if(!c) return "";
-    return WK_KIND_ORDER.filter(function(k){ return c[k]; }).map(function(k){
-      return '<span class="scope-chip" style="margin-left:4px;">'+WK_KIND_LABEL[k]+' '+c[k]+'</span>';
-    }).join("");
+  function wkAgoText(dateStr){
+    if(!isDate(dateStr)) return "날짜 미상";
+    var diff = Math.round((new Date(todayStr()+"T00:00:00") - new Date(dateStr+"T00:00:00")) / 86400000);
+    if(diff === 0) return "오늘";
+    if(diff > 0) return diff + "일 전";
+    return (-diff) + "일 후";
+  }
+  function wkKindChips(latest, id){
+    var c = latest[id]; if(!c) return "";
+    return '<span class="scope-chip" style="margin-left:4px;" title="'+esc(c.title)+(isDate(c.date)?' · '+esc(c.date):'')+'">('+WK_KIND_LABEL[c.kind]+') '+wkAgoText(c.date)+'</span>';
   }
   function wkMissing(w){
     var m=[];
@@ -10231,7 +10241,7 @@
       asb = asbPending ? mergeAsb(asb, ri) : ri;   // 저장 대기 중이면 로컬 우선(로드 덮어쓰기 금지)
       asb.forEach(normAsbRow);                     // v336: 모양 교정은 입구에서 1회 — 다음 저장 때 서버 기록도 배열로 정리된다
       asbBase = doc.updated_at||0;
-      renderSites(); renderCalendar();
+      renderSites(); renderCalendar(); renderWorkers();   // v356: 일용직 목록의 참여 칩 갱신
     }).catch(function(){});
   }
   function scheduleAsbSave(){ asbPending=true; if(asbSaveTimer) clearTimeout(asbSaveTimer); asbSaveTimer=setTimeout(doSaveAsb,1200); }
