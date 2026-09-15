@@ -782,7 +782,8 @@ try {
 
   // ---- ③ 미판독을 상태로 드러낸다(숨기지 않는다) ----
   {
-    const bidLwltState = new Function([fnSrc('methodKindOf'), fnSrc('bidLwltState'), 'return bidLwltState;'].join('\n'))();
+    const DTM = (html.match(/var DECIDE_TO_METHOD=\{[^}]*\};/) || [''])[0];
+    const bidLwltState = new Function([DTM, fnSrc('methodKindOf'), fnSrc('bidMethodEff'), fnSrc('bidLwltState'), 'return bidLwltState;'].join('\n'))();
     const cases = [
       ['적격심사제', { lwlt: 87.745 }, 'read', '판독값이 있으면 read'],
       ['적격심사제', {}, 'unread', '적격심사제인데 못 읽었으면 unread(사람이 공고문을 열어야 한다)'],
@@ -1197,6 +1198,27 @@ try {
     i1.n === 2 && i1.stale === 2 && /dday red/.test(b1) && /잠정 2 · 미확정 · 3일\+ 2</.test(b1) && /2609524417/.test(b1) && /2609564886/.test(b1) && /4일 경과/.test(b1)
     && /dday red/.test(b2) && /잠정 1 · 미확정</.test(b2) && !/3일\+/.test(b2) && !/dday amber/.test(b2) && i0.stale === 2 && i0.n === 3, b1 + ' / ' + b2);
 } catch (e) { console.log('  (v357 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ---- v359: 입찰 2-E — 불일치는 공고문 기준(PM 9/16) · 낙찰방법 판독 3상태 노출 ----
+try {
+  const fn = (name) => { const i = html.indexOf('function ' + name + '('); if (i < 0) throw new Error('함수 없음: ' + name); let d = 0, st = false; for (let j = i; j < html.length; j++) { const ch = html[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return html.slice(i, j + 1); } } throw new Error(name); };
+  const DTM = (html.match(/var DECIDE_TO_METHOD=\{[^}]*\};/) || [''])[0];
+  const api = new Function([DTM, fn('methodKindOf'), fn('bidMethodEff'), fn('bidLwltState'), fn('bidDecideState'), 'return { eff: bidMethodEff, st: bidLwltState, ds: bidDecideState, kind: methodKindOf };'].join('\n'))();
+  const mm = { method: '소액수의견적', docs: [{ n: '공고문.hwpx' }], ext: { mmis: 1, decide: '적격심사', dsrc: 'doc', dctx: 'STRONG:적격심사를실시합니다' } };
+  const neg = { method: '적격심사제', docs: [{ n: '공고문.pdf' }], ext: { mmis: 1, dneg: 1 } };
+  const ok = { method: '소액수의견적', docs: [{ n: '공고문.hwpx' }], ext: { mmis: 0, decide: '소액수의(견적)', lwlt: '88' } };
+  const un = { method: '적격심사제', docs: [{ n: '공고문.hwpx' }], ext: { mmis: 0 } };
+  const nd = { method: '적격심사제', docs: [{ n: '내역서.xlsx' }], ext: {} };
+  T('v359 bidMethodEff: 불일치+공고문 적격심사 → 적격심사제(doc) · 부정 명시 → 미상(neg) · 일치 → API 그대로',
+    api.eff(mm).m === '적격심사제' && api.eff(mm).src === 'doc' && api.kind(api.eff(mm).m) === 'qual' && api.eff(neg).m === '' && api.eff(neg).src === 'neg' && api.eff(ok).m === '소액수의견적' && api.eff(ok).src === 'api', JSON.stringify([api.eff(mm), api.eff(neg)]));
+  T('v359 bidLwltState는 실효 낙찰방법으로 판정: 불일치 적격(하한율 없음) → unread · 부정 명시 → method_unknown · 일치 소액수의 88 → read',
+    api.st(mm) === 'unread' && api.st(neg) === 'method_unknown' && api.st(ok) === 'read', [api.st(mm), api.st(neg), api.st(ok)].join('/'));
+  T('v359 bidDecideState 4상태: mismatch / read / unread / nodoc', api.ds(mm) === 'mismatch' && api.ds(ok) === 'read' && api.ds(un) === 'unread' && api.ds(nd) === 'nodoc', [api.ds(mm), api.ds(ok), api.ds(un), api.ds(nd)].join('/'));
+  T('v359 화면: 카드 불일치 칩(공고문 기준 · API)·미판독 칩 · 상세 "낙찰방법 판독"·"산정 출처" 행 · 계산기 pre.method가 실효값 · 석면 통과선에 적용 세부기준 라벨 · 결정방식 행 제거',
+    /\(공고문 기준 · API '\+esc\(me\.api\)\+'\)/.test(html) && />낙찰방법 미판독</.test(html) && /\["낙찰방법 판독", \(function\(\)/.test(html) && /\["산정 출처", \(function\(\)/.test(html)
+    && /method: bidMethodEff\(b\)\.m\|\|"", budget: b\.budg/.test(html) && /적용 세부기준: 경북교육청 석면해체 2023 등록 기준/.test(html) && !/\["결정방식", /.test(html)
+    && /var k=methodKindOf\(bidMethodEff\(b\)\.m\);/.test(html), '');
+} catch (e) { console.log('  (v359 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

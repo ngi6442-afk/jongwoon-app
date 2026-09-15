@@ -14107,13 +14107,34 @@
     return "other";
   }
   function bcMethodKind(){ return methodKindOf(bcQualMethod); }
+  // v359(PM 9/16 "불일치 시 공고문으로"): 낙찰방법의 실효값. 수집기(appdata g2b.annotate)가 API 라벨과 공고문 판독을 대조해 ext.mmis=1을 찍은 건은
+  //   공고문 판독(ext.decide)을 낙찰방법으로 쓴다 — 카드·상세·하한율 상태·계산기 판정 전부. 공고문이 '적격심사 아님'만 명시(dneg)한 건은 낙찰방법 미상(값 없이).
+  //   원장 item.method(API 원문)는 바꾸지 않는다(수집기·개찰 대조가 원문에 기댄다). 어느 쪽도 자동으로 원장에 굳히지 않는다(설계 X8) — 화면 판정만 공고문 기준.
+  var DECIDE_TO_METHOD={"적격심사":"적격심사제","소액수의(견적)":"소액수의견적","최저가(하한율)":"제한적최저가(낙찰하한율)","최저가":"최저가낙찰제"};
+  function bidMethodEff(b){
+    var e=(b&&b.ext)||{}; var api=String((b&&b.method)||"");
+    if(String(e.mmis)==="1"){
+      if(e.decide&&DECIDE_TO_METHOD[e.decide]) return {m:DECIDE_TO_METHOD[e.decide], src:"doc", api:api, doc:String(e.decide)};
+      if(e.dneg) return {m:"", src:"neg", api:api, doc:"적격심사 아님(명시)"};
+    }
+    return {m:api, src:"api", api:api, doc:String(e.decide||"")};
+  }
+  // 낙찰방법 판독 3상태(진화설계 v2.1 R8 — 4-2 ⑥ 미판독을 숨기지 않는다): mismatch(API와 어긋남, 공고문 기준) / read(공고문에서 읽음) / unread(읽을 첨부는 있는데 못 읽음) / nodoc(읽을 첨부 없음)
+  function bidDecideState(b){
+    var e=(b&&b.ext)||{};
+    if(String(e.mmis)==="1") return "mismatch";
+    if(e.decide) return "read";
+    var docs=(b&&b.docs)||[], has=false, i;
+    for(i=0;i<docs.length;i++){ if(/\.(hwpx|pdf|hwp)$/i.test(String((docs[i]&&docs[i].n)||""))){ has=true; break; } }
+    return has?"unread":"nodoc";
+  }
   // 하한율 판독 상태(v333, PM 2026-09-09 ㄱ) — 통계로 채우지 않고 상태를 그대로 화면에 낸다.
   //   read = 그 공고문에서 읽은 값이 있다 / none = 하한율 개념이 없는 낙찰방법(협상·종합심사·매각)
   //   method_unknown = 낙찰방법 자리에 참가자격·입찰방식 문자열만 있다(진화설계 v2.1 §3-1 U군)
   //   unread = 하한율이 있어야 할 건인데 못 읽었다 → 사람이 공고문을 열어야 한다(P3·P5)
   function bidLwltState(b){
     var e=(b&&b.ext)||{};
-    var k=methodKindOf(b&&b.method);
+    var k=methodKindOf(bidMethodEff(b).m);   // v359: 불일치 건은 공고문 판독 기준(PM 9/16)
     // v341(9/10): 하한율 개념이 없는 낙찰방법을 판독값보다 먼저 본다. 종전엔 read가 맨 앞이라
     //   협상에의한계약 7건에 "이 공고문 판독값 80~87.995%"가 찍혔다(원장 실측, 7건 모두 제목에 협상 명시).
     //   협상은 기술·가격 배점이라 낙찰하한율이라는 개념 자체가 없다 — 그 숫자는 가격평가 산식의 다른 백분율을
@@ -14185,7 +14206,7 @@
     if(isAsb){
       // 경북교육청 2023 기준(88 피벗)·현 등급(B° 4.5+안전성 D −4)·확약 +0.5, 실적 4.0 가정 → 소계 9.0 → 필요 평점 90 = 만점 → 88.00% 저격
       return '<div style="margin-top:6px;padding-top:6px;border-top:1px dashed var(--line);color:#B03A2E;font-size:13px;">'
-        +'⚠ <b>적격 통과선(석면·교육청 2023 기준·현 등급)</b>: 투찰비율(A값 반영) <b>약 88.00%</b> 부근만 통과 — '
+        +'⚠ <b>적격 통과선(석면 · 적용 세부기준: 경북교육청 석면해체 2023 등록 기준 · 현 등급)</b>: 투찰비율(A값 반영) <b>약 88.00%</b> 부근만 통과 — '
         +'안전성 D(−4) 영향으로 하한율'+(lwlt?'('+lwlt+'%)':'')+' 투찰 시 <b>적격심사 탈락</b>. 정확 값은 적격심사 모달 [점수 미리보기]로.</div>';
     }
     return '<div style="margin-top:6px;padding-top:6px;border-top:1px dashed var(--line);color:#555;font-size:13px;">'
@@ -14579,7 +14600,11 @@
       meta.push('<span class="own-badge '+(b.source==="수동"?"lease":"self")+'">'+esc(b.source||"-")+'</span>');
       if(b.org) meta.push('<span>'+esc(b.org)+'</span>');
       if(b.region) meta.push('<span class="scope-chip">지역 '+esc(b.region)+'</span>');
-      if(b.method) meta.push('<span class="hold-chip">'+esc(b.method)+'</span>');
+      var me=bidMethodEff(b);   // v359: 불일치면 공고문 기준으로 표시(PM 9/16)
+      if(me.src==="doc") meta.push('<span class="hold-chip" style="background:#FDE8E8;color:#9B2C2C;" title="API 낙찰방법('+esc(me.api)+')과 공고문 판독('+esc(me.doc)+')이 어긋납니다 — 공고문 기준으로 표시·계산합니다(PM 9/16). 근거: '+esc((b.ext&&b.ext.dctx)||"")+'">⚠ '+esc(me.m)+' <small>(공고문 기준 · API '+esc(me.api)+')</small></span>');
+      else if(me.src==="neg") meta.push('<span class="hold-chip" style="background:#FDE8E8;color:#9B2C2C;" title="API는 '+esc(me.api)+'인데 공고문에 적격심사 아님이 명시돼 있습니다 — 낙찰방법 미상으로 둡니다(공고문 확인)">⚠ 낙찰방법 미상 <small>(공고문: 적격심사 아님 · API '+esc(me.api)+')</small></span>');
+      else if(b.method) meta.push('<span class="hold-chip">'+esc(b.method)+'</span>');
+      if(bidDecideState(b)==="unread"&&b.source==="나라장터") meta.push('<span class="hold-chip" title="공고문에서 낙찰방법을 아직 못 읽었습니다(수집기 문형 미매치). API 라벨로 표시 중 — 공고문에서 확인해 주세요">낙찰방법 미판독</span>');
       var osc=orgStatChip(b.org);
       // 기관 칩은 '참고(산정 미사용)' — 지난 개찰 결과이지 이 공고의 하한율이 아니다(PM 2026-09-09 "값처럼 읽히면 정리").
       if(osc) meta.push('<span class="from-chip" title="참고(산정 미사용) — 이 발주처의 지난 개찰 결과 투찰률(예정가 대비) 실측입니다. 이 공고의 낙찰하한율이 아니고 계산에도 쓰지 않습니다. '+esc(osc.name)+' 표본 '+osc.n+'건'+(osc.q1?' · Q1~Q3 '+osc.q1+'~'+osc.q3+'%':'')+(osc.low?' · 88%대 저가 경쟁 발주처, 공고문 하한율 필수 확인':'')+'">참고 기관개찰 '+osc.med+'%'+(osc.low?' ⚠':'')+' <span style="opacity:.7;">n='+osc.n+'</span></span>');
@@ -14626,10 +14651,19 @@
         var t1 = tbl([
           ["공고번호", esc(b.no||"")], ["발주처공고", esc(ext.ref||"")],
           ["공고종류", esc(ext.kind_n||"")], ["계약방법", esc(ext.cntrct||"")],
-          ["낙찰방법", esc(b.method||"")], ["공고일", esc(b.posted||"")],
+          ["낙찰방법", (function(){ var me=bidMethodEff(b);   // v359: 불일치면 공고문 기준
+            if(me.src==="doc") return '<span style="color:#9B2C2C;">'+esc(me.m)+' (공고문 기준)</span> <span style="color:#888;">API: '+esc(me.api)+'</span>';
+            if(me.src==="neg") return '<span style="color:#9B2C2C;">낙찰방법 미상 — 공고문에 적격심사 아님 명시</span> <span style="color:#888;">API: '+esc(me.api)+'</span>';
+            return esc(me.api); })()], ["공고일", esc(b.posted||"")],
           ["지역제한", (esc(ext.rgns||b.region||"")+(b.rgn_ref?' <span style="color:#B7791F;">(공고서 확인 필요)</span>':''))], ["업종제한", esc(ext.lics||"")],
-          ["결정방식", (esc(ext.decide||"")+(ext.a?" · A값 감액 방식":""))],
+          // v359: 낙찰방법 판독 3상태(진화설계 R8) — 판독/미판독/첨부 없음/불일치를 그대로 보인다. 결정방식 행을 이 행으로 대체.
+          ["낙찰방법 판독", (function(){ var st=bidDecideState(b), aN=(ext.a?" · A값 감액 방식":""), srcTxt=(ext.dsrc==="fb")?" (하한율에서 추정)":(ext.dsrc==="doc"?" (공고문 문장)":"");
+            if(st==="mismatch") return '<span style="color:#9B2C2C;">⚠ 불일치 — 공고문 '+esc(ext.decide||"적격심사 아님")+srcTxt+' · API '+esc(b.method||"")+' → 공고문 기준</span>'+(ext.dctx?'<br><span style="color:#888;">근거: '+esc(ext.dctx)+'</span>':'')+aN;
+            if(st==="read") return esc(ext.decide)+srcTxt+' <span style="color:#888;">(API와 일치)</span>'+aN;
+            if(st==="unread") return '<span style="color:#B7791F;">⚠ 미판독 — 공고문 확인</span>'+aN;
+            return '<span style="color:#888;">읽을 첨부 없음</span>'+aN; })()],
           ["산출근거", (ext.src?esc(ext.src)+" 위임(공고문 명기)":"")],
+          ["산정 출처", (function(){ var c=String(ext.calc||""); if(!c) return ""; if(c==="exp") return "공고문 하한율 명기"; if(c==="api") return "API 하한율(공고문 미확인)"; if(c.indexOf("del:")===0) return esc(c.slice(4))+" 위임"; if(c==="none") return "하한율 개념 없음"; return "미판독"; })()],
           ["입찰서접수", ((ext.begin?esc(ext.begin)+" ~ ":"")+esc(ext.close||b.due||""))],
           ["개찰일시", (esc(ext.openg||"")+(ext.openg_p?" · "+esc(ext.openg_p):""))],
           ["참가등록마감", esc(ext.reg_due||"")], ["현장(소재지)", esc(ext.site||"")],
@@ -14712,7 +14746,7 @@
       el.addEventListener("click",function(){
         var b=findBid(el.getAttribute("data-bid-calc")); if(!b) return;
         var ext=b.ext||{};
-        openBidCalc({bss: ext.bss||b.budget||"", rng: ext.rng||"", lwlt: ext.lwlt||"", org: b.org||"", kind: (b.kind||"")+(b.title||""), a: ext.a, aamt: ext.aamt||0, src: ext.src||"", method: b.method||"", budget: b.budget||0});
+        openBidCalc({bss: ext.bss||b.budget||"", rng: ext.rng||"", lwlt: ext.lwlt||"", org: b.org||"", kind: (b.kind||"")+(b.title||""), a: ext.a, aamt: ext.aamt||0, src: ext.src||"", method: bidMethodEff(b).m||"", budget: b.budget||0});
       });
     });
     Array.prototype.forEach.call(host.querySelectorAll("[data-bid-con]"),function(el){
@@ -14874,7 +14908,11 @@
       if(b.org) meta.push('<span>'+esc(b.org)+'</span>');
       if(b.appr) meta.push('<span>감정 '+fmtAmount(b.appr)+'원</span>');
       if(b.budget) meta.push('<span class="rec-amt">최저 '+fmtAmount(b.budget)+'원</span>');
-      if(b.method) meta.push('<span class="hold-chip">'+esc(b.method)+'</span>');
+      var me=bidMethodEff(b);   // v359: 불일치면 공고문 기준으로 표시(PM 9/16)
+      if(me.src==="doc") meta.push('<span class="hold-chip" style="background:#FDE8E8;color:#9B2C2C;" title="API 낙찰방법('+esc(me.api)+')과 공고문 판독('+esc(me.doc)+')이 어긋납니다 — 공고문 기준으로 표시·계산합니다(PM 9/16). 근거: '+esc((b.ext&&b.ext.dctx)||"")+'">⚠ '+esc(me.m)+' <small>(공고문 기준 · API '+esc(me.api)+')</small></span>');
+      else if(me.src==="neg") meta.push('<span class="hold-chip" style="background:#FDE8E8;color:#9B2C2C;" title="API는 '+esc(me.api)+'인데 공고문에 적격심사 아님이 명시돼 있습니다 — 낙찰방법 미상으로 둡니다(공고문 확인)">⚠ 낙찰방법 미상 <small>(공고문: 적격심사 아님 · API '+esc(me.api)+')</small></span>');
+      else if(b.method) meta.push('<span class="hold-chip">'+esc(b.method)+'</span>');
+      if(bidDecideState(b)==="unread"&&b.source==="나라장터") meta.push('<span class="hold-chip" title="공고문에서 낙찰방법을 아직 못 읽었습니다(수집기 문형 미매치). API 라벨로 표시 중 — 공고문에서 확인해 주세요">낙찰방법 미판독</span>');
       var ctrl='';
       ["검토","참여","패스"].forEach(function(st){ if(st!==b.status) ctrl+='<button class="mini-btn'+(st==="참여"?' appr-btn':'')+'" data-ob-st="'+st+'" data-ob-id="'+b.id+'">'+st+'</button>'; });
       if(b.url) ctrl+='<a class="mini-btn" href="'+esc(b.url)+'" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center;">원문↗</a>';
