@@ -17203,11 +17203,11 @@
     }
     return { n: L.length, stale: stale, title: lines.join("\n") };
   }
+  // v358(PM 9/15 "자동 제외하면 안 됨. 확정 안 됐다면 붉게"): 배출자 확정이 없는 잠정 건은 첫날부터 붉게. 3일+는 덧붙여 센다. 계수(회수 포함)는 그대로.
   function abPendBadge(c){
     var pi = abPendInfo(c), n = abInt(c.n_pending);
-    var base = "배출자 확정등록 전입니다 — 예약이 밀린 건이면 확정 후 자동으로 해당 날짜로 정리됩니다.";
-    if (pi.stale) return '<span class="dday red" title="' + esc(AB_PEND_STALE_DAYS + "일이 지나도록 배출자 확정이 없습니다 — 예약이 밀렸는데 취소되지 않은 유령 건일 수 있습니다. 올바로에서 인계번호를 확인하세요.\n" + pi.title) + '">잠정 ' + n + ' · ' + AB_PEND_STALE_DAYS + '일+ 미확정 ' + pi.stale + '</span>';
-    return '<span class="dday amber" title="' + esc(base + (pi.title ? "\n" + pi.title : "")) + '">잠정 ' + n + '</span>';
+    var base = "배출자 확정등록이 아직 없는 인계서입니다(미확정). 이 날 회수에는 세어져 있습니다 — 예약이 밀린 건이면 실행 뒤 재수집에서 그 날짜로 자동 정리되고, 아니면 올바로에서 인계번호를 확인하세요.";
+    return '<span class="dday red" title="' + esc(base + (pi.title ? "\n" + pi.title : "")) + '">잠정 ' + n + ' · 미확정' + (pi.stale ? ' · ' + AB_PEND_STALE_DAYS + '일+ ' + pi.stale : '') + '</span>';
   }
   // ---- 집계·미매칭 ----
   function abTotals(){
@@ -17242,7 +17242,7 @@
     else s += " · 톤 미집계";
     if (t.unmN > 0) s += " · 미배정 " + t.unmN + "회";
     if (t.unk > 0) s += " · 단위미상 " + t.unk + "건";
-    if (t.pendN > 0){ var ps = abPendInfo(null).stale; s += " · 잠정 " + t.pendN + "회" + (ps ? "(" + AB_PEND_STALE_DAYS + "일+ 미확정 " + ps + ")" : ""); }   // v357
+    if (t.pendN > 0){ var ps = abPendInfo(null).stale; s += " · 잠정 " + t.pendN + "회(미확정" + (ps ? " · " + AB_PEND_STALE_DAYS + "일+ " + ps : "") + ")"; }   // v357·v358
     return s;
   }
   function abUnmKey(u){ return String((u && u.from) || "") + "|" + String((u && u.to) || "") + "|" + String((u && u.item) || ""); }
@@ -17568,7 +17568,7 @@
     function cellN(c, hideKey){
       if (!c) return '<td class="n">' + hideBtn(hideKey) + '</td>';
       var n = abInt(c.n), sub = "";
-      if (abInt(c.n_pending)){ var pi = abPendInfo(c); sub += "잠정 " + abInt(c.n_pending) + (pi.stale ? "(" + AB_PEND_STALE_DAYS + "일+ 미확정 " + pi.stale + ")" : ""); }   // v357
+      if (abInt(c.n_pending)){ var pi = abPendInfo(c); sub += "잠정 " + abInt(c.n_pending) + "(미확정" + (pi.stale ? " · " + AB_PEND_STALE_DAYS + "일+ " + pi.stale : "") + ")"; }   // v357·v358
       if (c.weak) sub += (sub ? " · " : "") + "품목확인";
       if (abInt(c.qty_unknown)) sub += (sub ? " · " : "") + "단위미상";
       return '<td class="n">' + (n ? n : "") + (sub ? '<span class="sub">' + esc(sub) + '</span>' : "") + ((!n && !sub) ? hideBtn(hideKey) : "") + '</td>';
