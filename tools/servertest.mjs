@@ -2304,7 +2304,7 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
     mk('c_never'),                                                         // 상태 없음 → 대상
     mk('c_ai', { ai: { ts: 1 } }),                                         // 이미 있음 → 제외
     mk('c_nophoto', { photos: [] }),                                       // 사진 없음 → 제외
-    mk('c_posted', { status: 'posted' }),                                  // 게시 완료 → 제외
+    mk('c_posted', { status: 'posted', tags: ['x'] }),                     // 게시 완료(태그 있음) → 제외(v361: 태그 없으면 태그만 생성 대상)
     mk('c_running', { ai_st: { st: 'running', ts: NOW - 60000, tries: 1 } }),           // 진행 중(1분) → 제외
     mk('c_stale', { ai_st: { st: 'running', ts: NOW - 20 * 60000, tries: 1 } }),         // 20분 running → 죽은 것 → 대상
     mk('c_fail1_soon', { ai_st: { st: 'fail', ts: NOW - 60000, tries: 1 } }),            // 1회 실패 1분 전 → 10분 간격 → 제외
@@ -2317,6 +2317,13 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   const got = PJ.pickCandidates(items, NOW, { c_locked: { ts: NOW - 1000, job: 'j' } }).map((c) => c.rec.id + ':' + c.why);
   T('pickCandidates 규칙: never·stale_running·retry_1(11분)·done_not_applied만 · ai/사진 없음/posted/진행 중/간격 전/4회/잠금 제외',
     got.length === 4 && got.indexOf('c_never:never') >= 0 && got.indexOf('c_stale:stale_running') >= 0 && got.indexOf('c_fail1_due:retry_1') >= 0 && got.indexOf('c_done_noapply:done_not_applied') >= 0, got.join(','));
+  // v361: 게시 완료 글은 태그만
+  let docP = { schema: 1, items: [{ id: 'prm_p', status: 'posted', title: '게시된 제목', body: '게시된 본문', photos: ph, tags: [] }] };
+  let ap = PJ.applyResult(docP, 'prm_p', { title: 'AI 제목', body: 'AI 본문', tags: ['포항', '학교', '준설'], model: 'm', tokens: 3, job: 'j' }, NOW);
+  T('v361 applyResult(posted): 제목·본문 그대로 · 태그만 채움 · ai.tags_only · ai_st done', ap.changed && ap.tags_only && docP.items[0].title === '게시된 제목' && docP.items[0].body === '게시된 본문' && docP.items[0].tags.length === 3 && docP.items[0].ai.tags_only === 1 && docP.items[0].ai_st.st === 'done' && !docP.items[0].pre_ai, JSON.stringify(docP.items[0]));
+  T('v361 applyResult(posted): 태그가 없는 결과는 적용 안 함', !PJ.applyResult({ items: [{ id: 'q', status: 'posted', photos: ph }] }, 'q', { title: 'a', body: 'b', tags: [] }).changed);
+  const gotP = PJ.pickCandidates([mk('p_notag', { status: 'posted', tags: [] }), mk('p_tag', { status: 'posted', tags: ['x'] }), mk('p_ai', { status: 'posted', ai: {} })], NOW, {}).map((c) => c.rec.id);
+  T('v361 pickCandidates: 게시 완료는 태그 없을 때만 대상', gotP.length === 1 && gotP[0] === 'p_notag', gotP.join(','));
   T('setAiState: running마다 tries +1 · fail은 code·job 보존', (() => { const r = {}; PJ.setAiState(r, 'running', { job: 'j1' }, NOW); PJ.setAiState(r, 'fail', { code: 'NETWORK', job: 'j1' }, NOW + 1); PJ.setAiState(r, 'running', { job: 'j2' }, NOW + 2); return r.ai_st.tries === 2 && r.ai_st.st === 'running' && r.ai_st.job === 'j2'; })());
   // 크론 통합 — 인메모리 blob + fetch mock(워커 기동 202)
   const cron = require(join(FN, 'gw-promo-ai-cron.js'));
@@ -2326,7 +2333,7 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
     mem.gw_data['col:promo'] = { schema: 1, items: [
       mk('p_old_done', { title: '예비', body: '예비' }),                          // 옛 워커 완료작이 job blob에만 있음 → 적용
       mk('p_new', { title: '예비2', body: '예비2' }),                            // 시작 대상
-      mk('p_posted', { status: 'posted' }),
+      mk('p_posted', { status: 'posted', tags: ['x'] }),
     ] };
     mem.gw_data['promoai:job:pa_gen_aaa_11111111'] = { status: 'done', promo_id: 'p_old_done', title: '완료 제목', body: '완료 본문', tags: ['t1'], model: 'm', used_tokens: { total: 5 }, title_type: 'q' };
     mem.gw_data['promoai:usage'] = { schema: 1, months: {} };

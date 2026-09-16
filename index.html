@@ -12970,8 +12970,9 @@
   //   브라우저가 닫혀도 서버(gw-promo-ai-cron, 10분)가 끝까지 책임지고, 실패는 이유·횟수와 함께 보인다.
   function paFailShort(code){ var m={NETWORK:"네트워크 끊김",TIMEOUT:"시간 초과",BUDGET_CAP:"월 상한 도달",NO_PHOTOS:"사진 없음",REFUSAL:"모델 거부",KICKOFF_FAILED:"기동 실패",ENV_MISSING:"설정 누락",WORKER_THREW:"서버 오류",GENERATE_THREW:"생성 오류"}; return m[code]||(code||"원인 미상"); }
   function promoAiLine(p){
-    if(p.ai) return ' · 태그 '+((p.tags||[]).length)+'개';
+    if(p.ai) return ' · 태그 '+((p.tags||[]).length)+'개'+(p.ai.tags_only?' <span style="color:#888;">(게시 뒤 태그만 생성 — 네이버 글 편집으로 추가)</span>':'');
     if(!(p.photos||[]).length) return '';
+    if(p.status==="posted"){ var ps=p.ai_st||{}; return ' · <span style="color:#a5382c;">태그 없이 게시됨 — 서버가 태그만 생성 중'+(ps.st==="fail"?'(실패 '+(ps.tries||1)+'회 '+esc(paFailShort(ps.code))+')':'')+'</span>'; }
     var s=p.ai_st||{};
     var hm=function(ts){ var d=ts?new Date(ts):null; return (d&&!isNaN(d))?(pad(d.getHours())+':'+pad(d.getMinutes())):''; };
     if(s.st==="running") return ' · <span style="color:#1B4F8A;">블로그 초안·태그 자동 생성 중('+hm(s.ts)+'~, 5~10분)</span>';
@@ -14035,6 +14036,11 @@
   function paApplyToRecord(promoId){
     var p=promoFind(promoId), r=paResults[promoId];
     if(!p || !r || r.applied) return;
+    // v361: 게시 완료 글은 네이버에 이미 올라간 글 — 제목·본문은 안 바꾸고 태그만 채운다(서버 applyResult와 같은 규칙)
+    if(p.status==="posted"){
+      if(r.tags&&r.tags.length){ p.tags=r.tags.slice(0,25); p.ai={ model:r.model||"", tokens:r.used_tokens||0, ts:Date.now(), tt:String(r.tt||""), tags_only:1 }; }
+      r.applied=true; promoStamp(p); schedulePromoSave(); renderPromo(); return;
+    }
     if(!p.pre_ai) p.pre_ai={ title:String(p.title||""), body:String(p.body||"") };
     p.title=r.title; p.body=r.body;
     p.ai={ model:r.model||"", tokens:r.used_tokens||0, ts:Date.now(), tt:String(r.tt||"") };

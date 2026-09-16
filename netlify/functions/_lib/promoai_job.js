@@ -66,14 +66,27 @@ function applyResult(doc, promoId, res, now) {
   if (!rec) return { changed: false, why: 'NOT_FOUND' };
   if (rec.ai) return { changed: false, why: 'ALREADY', rec: rec };
   const title = String((res && res.title) || ''), body = String((res && res.body) || '');
-  if (!title || !body) return { changed: false, why: 'EMPTY', rec: rec };
+  const tags = (Array.isArray(res && res.tags) ? res.tags : []).slice(0, 25).map(function (t) { return String(t).slice(0, 30); }).filter(Boolean);
   now = now || Date.now();
+  const tk = res.tokens;
+  const aiRec = { model: String((res && res.model) || ''), tokens: (tk && typeof tk === 'object') ? (Number(tk.total) || 0) : (Number(tk) || 0), ts: now, tt: String((res && res.tt) || ''), by: 'server' };
+  // 게시 완료 기록은 글을 바꾸지 않는다 — 네이버에 이미 올라간 글이다. 태그만 채운다(PM 9/16: 9/7 용흥동 글이 태그 없이 게시됨 — 태그는 게시글 편집으로 넣을 수 있다).
+  if (String(rec.status || '') === 'posted') {
+    if (!tags.length) return { changed: false, why: 'EMPTY', rec: rec };
+    rec.tags = tags;
+    aiRec.tags_only = 1;
+    rec.ai = aiRec;
+    rec.updated = kstDate(now);
+    rec.updated_ts = now;
+    setAiState(rec, 'done', { job: res.job }, now);
+    return { changed: true, rec: rec, tags_only: true };
+  }
+  if (!title || !body) return { changed: false, why: 'EMPTY', rec: rec };
   if (!rec.pre_ai) rec.pre_ai = { title: String(rec.title || ''), body: String(rec.body || '') };
   rec.title = title;
   rec.body = body;
-  const tk = res.tokens;
-  rec.ai = { model: String(res.model || ''), tokens: (tk && typeof tk === 'object') ? (Number(tk.total) || 0) : (Number(tk) || 0), ts: now, tt: String(res.tt || ''), by: 'server' };
-  if (Array.isArray(res.tags) && res.tags.length) rec.tags = res.tags.slice(0, 25).map(function (t) { return String(t).slice(0, 30); }).filter(Boolean);
+  rec.ai = aiRec;
+  if (tags.length) rec.tags = tags;
   rec.updated = kstDate(now);
   rec.updated_ts = now;   // 앱 mergePromo는 updated_ts가 큰 쪽을 이긴다 — 브라우저의 낡은 사본이 이 적용을 덮지 못하게
   setAiState(rec, 'done', { job: res.job }, now);
@@ -87,7 +100,10 @@ function pickCandidates(items, now, locks) {
   const out = [];
   for (const rec of (items || [])) {
     if (!rec || rec.del === 1 || rec.ai) continue;
-    if (!AUTO_STATUSES[String(rec.status || 'review')]) continue;
+    const posted = String(rec.status || '') === 'posted';
+    // 게시 완료라도 태그가 비어 있으면 대상(태그만 생성·적용 — applyResult가 글은 안 바꾼다). 태그가 있으면 손대지 않는다.
+    if (posted) { if (Array.isArray(rec.tags) && rec.tags.length) continue; }
+    else if (!AUTO_STATUSES[String(rec.status || 'review')]) continue;
     if (!pickPhotoIds(rec).total) continue;
     const lk = locks[rec.id];
     if (lk && lk.ts && (now - lk.ts) < LOCK_TTL_MS) continue;          // 지금 돌고 있음

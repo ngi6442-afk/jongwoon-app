@@ -132,17 +132,17 @@ try {
   T('제목 원형 사슬: 라이브러리 exports ↔ 워커 필수 목록(' + chain.join('·') + ')', chain.every((f) => new RegExp('\\b' + f + '\\b').test(expSeg) && needSeg.indexOf("'" + f + "'") >= 0),
     'exports 누락: ' + chain.filter((f) => !new RegExp('\\b' + f + '\\b').test(expSeg)).join(',') + ' / need 누락: ' + chain.filter((f) => needSeg.indexOf("'" + f + "'") < 0).join(','));
   T('워커가 이력 blob(promoai:hist:<기록id>)과 잡 blob title_type을 기록하고 input에 own_titles·seed·attempt를 배선', /promoai:hist:\$\{promoId\}/.test(wk) && /rec\.title_type = cleanStr\(r\.title_type/.test(wk) && /blobSet\(st, histKey\(promoId\)/.test(wk) && /own_titles: own/.test(wk) && /seed: promoId/.test(wk) && /attempt: attempt/.test(wk), '');
-  T('화면이 결과 tt를 저장(paResults.tt + p.ai.tt 2곳)하고 사람이 제목을 바꾸면 라벨을 지움', /tt:String\(blob\.title_type\|\|r\.title_type\|\|""\)/.test(idx) && (idx.match(/ts:Date\.now\(\), tt:String\(r\.tt\|\|""\)/g) || []).length === 2 && /p\.ai\.tt=""/.test(idx), '');
+  T('화면이 결과 tt를 저장(paResults.tt + p.ai.tt 3곳(v361 posted 갈래 포함))하고 사람이 제목을 바꾸면 라벨을 지움', /tt:String\(blob\.title_type\|\|r\.title_type\|\|""\)/.test(idx) && (idx.match(/ts:Date\.now\(\), tt:String\(r\.tt\|\|""\)/g) || []).length === 3 && /p\.ai\.tt=""/.test(idx), '');
   const libCodes = [...((lib.match(/var TITLE_TYPES = \[([\s\S]*?)\n\];/) || ['', ''])[1]).matchAll(/\{ code: '([A-Z])'/g)].map((m) => m[1]);
   const uiCodes = [...((idx.match(/var PA_TITLE_TYPE_NAMES=\{([^}]+)\}/) || ['', ''])[1]).matchAll(/([A-Z]):"/g)].map((m) => m[1]);
   T('제목 원형 코드 11종 라이브러리 = 화면 이름표(' + libCodes.join('') + ')', libCodes.length === 11 && libCodes.join('') === uiCodes.join(''), '라이브러리 ' + libCodes.join('') + ' / 화면 ' + uiCodes.join(''));
   T('출력 스키마 title_type enum·required + 제목 규칙 절 4자리 숫자 없음', /title_type: \{ type: 'string', enum: TITLE_CODES/.test(lib) && /required: \['title', 'body', 'tags', 'title_type'\]/.test(lib) && !/\d{4,}/.test(((lib.match(/var TITLE_TYPES = \[([\s\S]*?)\n\];/) || ['', ''])[1]).replace(/[,\s]/g, '')), '');
   // v352(PM 9/11 #31ⓒ "태그 생성이 빠졌다"): 실사고는 태그 코드 상실이 아니라 자동 생성 누락(다른 기록 생성 중 등록 → 버려짐)이었다.
   //   그래도 태그 사슬 8고리(v267 신설·v271 parseDraft 증발 수리 — 두 번 깨진 사슬)는 검사가 없었다 — 어느 고리가 빠져도 push 전에 잡는다.
-  T('태그 사슬(v267·v271): 프롬프트 절·스키마 tags·parseDraft 통과·generateDraft 반환·워커 rec.tags·화면 paFinish/paApply 2곳/태그 상자',
+  T('태그 사슬(v267·v271): 프롬프트 절·스키마 tags·parseDraft 통과·generateDraft 반환·워커 rec.tags·화면 paFinish/paApply 3곳(v361 posted 갈래 포함)/태그 상자',
     /## 해시태그 \(tags 값\)/.test(lib) && /tags: \{ type: 'array'/.test(lib) && /tags: tags, title_type: tt/.test(lib) && /tags: draft\.tags \|\| \[\]/.test(lib)
     && /rec\.tags = r\.tags\.slice\(0, 25\)/.test(wk) && /tags:\(Array\.isArray\(blob\.tags\)\?blob\.tags:\(r\.tags\|\|\[\]\)\)/.test(idx)
-    && (idx.match(/p\.tags=r\.tags\.slice\(0,25\)/g) || []).length === 2 && /id="tags" readonly/.test(idx),
+    && (idx.match(/p\.tags=r\.tags\.slice\(0,25\)/g) || []).length === 3 && /id="tags" readonly/.test(idx),
     '어느 고리가 빠졌는지 promoai.js 해시태그 절·schema·parseDraft·generateDraft / 워커 rec.tags / index.html paFinish·paApply·태그 상자 대조');
   T('v352 자동 생성 대기열: paAutoQueue·paDrainAuto · paKick 생성 중이면 auto는 줄 세움 · 배수 5곳(실패·네트워크·초과·완료 + 정의) · 카드 문구는 promoAiLine(v360 — 서버 상태 ai_st 기반)/"태그 n개" · 검수 문구 태그 수',
     /var paAutoQueue=\[\];/.test(idx) && /function paDrainAuto\(\)\{ if\(paJob\.polling\) return; var next=paAutoQueue\.shift\(\); if\(next\) paKick\(next, true\); \}/.test(idx)
@@ -1229,6 +1229,9 @@ try {
     /태그 3개/.test(api({ ai: {}, tags: [1, 2, 3], photos: ph })) && api({ photos: [] }) === '' && /자동 생성 대기\(서버가 10분 안에 시작\)/.test(api({ photos: ph }))
     && /자동 생성 중\(/.test(api({ photos: ph, ai_st: { st: 'running', ts: Date.now() } })) && /자동 생성 실패 1회\(네트워크 끊김/.test(api({ photos: ph, ai_st: { st: 'fail', tries: 1, code: 'NETWORK', ts: Date.now() } })) && /서버가 잠시 뒤 다시 시도/.test(api({ photos: ph, ai_st: { st: 'fail', tries: 1, code: 'NETWORK', ts: Date.now() } }))
     && /자동 재시도 끝/.test(api({ photos: ph, ai_st: { st: 'fail', tries: 4, code: 'TIMEOUT', ts: Date.now() } })), '');
+  T('v361 게시 완료 카드: 태그 없으면 "태그 없이 게시됨 — 서버가 태그만 생성 중" · 태그만 채워지면 "(게시 뒤 태그만 생성…)" · paApplyToRecord는 posted면 제목·본문 안 바꿈',
+    /태그 없이 게시됨/.test(api({ photos: ph, status: 'posted' })) && /게시 뒤 태그만 생성/.test(api({ photos: ph, status: 'posted', ai: { tags_only: 1 }, tags: ['a'] }))
+    && /if\(p\.status==="posted"\)\{\s*if\(r\.tags&&r\.tags\.length\)\{ p\.tags=r\.tags\.slice\(0,25\); p\.ai=\{[^}]*tags_only:1 \}; \}/.test(html), '');
   T('v360 "사진AI 미생성" 문구가 앱에 없다 · 크론 등록(netlify.toml gw-promo-ai-cron */10) · 공용 층 존재',
     !/사진AI 미생성/.test(html) && /\[functions\."gw-promo-ai-cron"\]\s*\r?\n\s*schedule = "\*\/10 \* \* \* \*"/.test(readFileSync(join(ROOT, 'netlify.toml'), 'utf8'))
     && /PJ\.applyResult\(doc, promoId/.test(readFileSync(join(ROOT, 'netlify/functions/gw-promo-ai-run-background.js'), 'utf8')) && /PJ\.startJob\(st, \{ promoId/.test(readFileSync(join(ROOT, 'netlify/functions/gw-promo-ai.js'), 'utf8')), '');
