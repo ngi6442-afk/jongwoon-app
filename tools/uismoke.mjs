@@ -150,10 +150,12 @@ try {
     && /promoAiLine\(p\)/.test(idx) && /' · 태그 '\+\(\(p\.tags\|\|\[\]\)\.length\)\+'개'/.test(idx) && /" · 태그 "\+\(\(r\.tags&&r\.tags\.length\)\|\|0\)\+"개"/.test(idx), '');
   // v352(PM 9/11 #31ⓑ — 직원 수정본 5편 실측): 담당자 포장 = 가운데 정렬·20자 개행·소제목 굵게+구분선·물음표·정화조/저수조 삭제
   const bp = (idx.match(/function promoBuildPostHtml\(title, body, imgs\)\{([\s\S]*?)\n  \}/) || ['', ''])[1];
-  T('v352 복사 HTML 서식: promoWrap20(22자 어절 개행 <br>)·promoIsSubhead(물음표 한 줄 ≤45자)·소제목 <hr>+굵게+가운데·본문/캡션/사진/제목/꼬리 text-align:center',
-    /function promoWrap20\(t\)/.test(bp) && /\(cur\+" "\+w\)\.length>22/.test(bp) && /function promoIsSubhead\(t\)\{ return t\.length<=45 && \/\[\?？\]\$\/\.test\(t\)/.test(bp)
-    && /<hr style="border:0;border-top:1px solid #ddd;margin:22px 0 14px;"><p style="margin:12px 0;line-height:1\.8;text-align:center;font-weight:700;">/.test(bp)
-    && /text-align:center;">'\+promoWrap20\(t\)\+'<\/p>/.test(bp) && /color:#777;font-size:13px;text-align:center;/.test(bp) && /<h2 style="font-size:20px;margin:0 0 16px;text-align:center;">/.test(bp)
+  const wrapSrc = (idx.match(/\/\/ @promo-wrap-start([\s\S]*?)\/\/ @promo-wrap-end/) || ['', ''])[1];
+  T('v363 복사 HTML 서식: 줄나눔 함수 구간(@promo-wrap) 12~26자·promoLinesOf·뒤보기 정규식 없음 · pushText=한 줄=한 <p>(margin:0) · promoWrap20/<hr>/굵게/12px 여백 없음 · 사진·캡션 여백 0 · 제목 h2 가운데 · 꼬리 5곳 가운데',
+    /var PROMO_WRAP_LO=12, PROMO_WRAP_HI=26;/.test(wrapSrc) && /function promoWrapSense\(t, lo, hi, commaFirst\)/.test(wrapSrc) && /function promoLinesOf\(t\)/.test(wrapSrc) && !/\(\?<[=!]/.test(wrapSrc)
+    && /function promoIsSubhead\(t\)\{ return t\.length<=45 && \/\[\?？\]\$\/\.test\(t\)/.test(bp) && /function pushLine\(l\)\{ out\.push\('<p style="margin:0;line-height:1\.8;text-align:center;">'\+promoEscHtml\(l\)\+'<\/p>'\); \}/.test(bp)
+    && /promoLinesOf\(t\)\.forEach\(pushLine\);/.test(bp) && !/promoWrap20/.test(idx) && !/<hr /.test(bp) && !/font-weight:700/.test(bp) && !/margin:12px 0/.test(bp) && !/margin:14px 0;text-align:center;"><img/.test(bp)
+    && /<p style="margin:0;color:#777;font-size:13px;text-align:center;">/.test(bp) && /<h2 style="font-size:20px;margin:0 0 16px;text-align:center;">/.test(bp)
     && (idx.match(/function promoTailHtml\(\)\{([\s\S]*?)\n  \}/) || ['', ''])[1].split('text-align:center').length === 6, '');
   T('v352 프롬프트: 소제목 물음표 강제 · 정화조/저수조 업무 제외(회사 절·FACILITY_WORDS·예시 제목에서 제거)',
     /질문형이므로 반드시 물음표\(\?\)로 끝냅니다/.test(lib) && /정화조·저수조는 종운환경의 업무가 아닙니다/.test(lib)

@@ -13502,6 +13502,52 @@
     L.push('<p style="margin:2px 0;text-align:center;"><a href="https://'+PROMO_SITE+'">'+PROMO_SITE+'</a></p>');
     return L.join("");
   }
+  // @promo-wrap-start
+  // v363(PM 9/16 "줄간·문장간격 다 일치하지 않음" → 브리핑 §3 ② ㄱ): 직원이 줄을 끊는 규칙(9/11 수정본 2편 실측 — 글자 수가 아니라 의미 단위).
+  //   문장 끝은 항상 개행. 문장 안에서는 12~26자 창에서 조사·연결어미·쉼표로 끝나는 어절 뒤에서 끊는다(쉼표 우선). 후보가 없으면 26자 직전 어절에서 강제.
+  //   회귀: tools/promo_wrap_check.mjs — 직원 줄과 일치 44%·39%(v352 22자 기계 개행은 14~31%). 문장은 손대지 않는다(낱말 보존 검사).
+  var PROMO_WRAP_LO=12, PROMO_WRAP_HI=26;
+  var PROMO_CUT_RE=/(는|은|이|가|을|를|에|에서|로|으로|도|까지|부터|와|과|의|면|지만|는데|고|며|서|아서|어서|해서|해|어|아|자|니|처럼|보다|만|께|한테|뿐|이라|라서|라면|다면|든지|거나|던)$/;
+  function promoIsCut(w){ return PROMO_CUT_RE.test(w) || /,$/.test(w); }
+  function promoSplitSentences(t){
+    // 마침표·물음표·느낌표 뒤 공백에서 문장을 나눈다(뒤보기 정규식 없이 — 옛 사파리 호환)
+    var out=[], cur="", str=String(t||"").trim();
+    for(var i=0;i<str.length;i++){
+      var ch=str.charAt(i); cur+=ch;
+      if((ch==="."||ch==="?"||ch==="!"||ch==="？"||ch==="！") && i+1<str.length && /\s/.test(str.charAt(i+1))){ out.push(cur.trim()); cur=""; }
+    }
+    if(cur.trim()) out.push(cur.trim());
+    return out;
+  }
+  function promoWrapSense(t, lo, hi, commaFirst){
+    var words=String(t||"").split(" ").filter(function(w){ return !!w; });
+    var out=[], cur=[], lastCut=-1;
+    function joined(a){ return a.join(" "); }
+    function recalc(){ lastCut=-1; for(var i=0;i<cur.length;i++){ if(promoIsCut(cur[i]) && joined(cur.slice(0,i+1)).length>=lo) lastCut=i; } }
+    function flush(upto){ out.push(joined(cur.slice(0,upto+1))); cur=cur.slice(upto+1); recalc(); }
+    for(var k=0;k<words.length;k++){
+      var w=words[k]; cur.push(w);
+      var L=joined(cur).length, i=cur.length-1;
+      var cut=promoIsCut(w) && L>=lo;
+      if(cut && commaFirst && /,$/.test(w)){ flush(i); continue; }
+      if(cut) lastCut=i;
+      if(L>hi){
+        if(lastCut>=0 && lastCut<i){
+          flush(lastCut);
+          if(cur.length && promoIsCut(cur[cur.length-1]) && joined(cur).length>=lo) lastCut=cur.length-1;
+        } else flush(i>0? i-1 : i);
+      } else if(cut && L>=(lo+hi)/2){ flush(i); }
+    }
+    if(cur.length) out.push(joined(cur));
+    return out;
+  }
+  // 문단 텍스트 → 게시 줄 목록(문장 나누기 → 의미 단위 줄나눔)
+  function promoLinesOf(t){
+    var out=[];
+    promoSplitSentences(t).forEach(function(u){ out=out.concat(promoWrapSense(u, PROMO_WRAP_LO, PROMO_WRAP_HI, true)); });
+    return out;
+  }
+  // @promo-wrap-end
   function promoBuildPostHtml(title, body, imgs){
     // imgs[i] = {url,name} (i는 0-based, 마커 번호는 1-based)
     var used={}, out=[], lines=String(body||"").split(/\r?\n/);
@@ -13512,21 +13558,17 @@
     function imgTag(i){
       var im=imgs[i]; if(!im) return "";
       used[i]=1;
-      return '<p style="margin:14px 0;text-align:center;"><img src="'+im.url+'" alt="'+promoEscHtml(im.name||("사진 "+(i+1)))+'" style="max-width:100%;height:auto;display:inline-block;"></p>';
+      return '<p style="margin:0;text-align:center;"><img src="'+im.url+'" alt="'+promoEscHtml(im.name||("사진 "+(i+1)))+'" style="max-width:100%;height:auto;display:inline-block;"></p>';   // v363: 여백 0(직원 실측 빈 줄 0)
     }
-    // v352(PM 9/11 #31ⓑ — 직원 수정본 5편 실측): 담당자가 매번 손으로 하던 포장 — 전 문단 가운데 정렬, 한 줄 20자 안팎 어절 개행(모바일 폭),
-    //   질문형 소제목 굵게 + 앞에 구분선. 문장은 손대지 않는다(5편 모두 문장 수정 0건). 20자 개행을 손으로 하다 '욕실'→'실' 같은 글자 소실이 있었다.
-    function promoWrap20(t){
-      var out=[], cur="";
-      String(t).split(" ").forEach(function(w){ if(!w) return; if(cur && (cur+" "+w).length>22){ out.push(cur); cur=w; } else cur=cur? cur+" "+w : w; });
-      if(cur) out.push(cur);
-      return out.map(promoEscHtml).join("<br>");
-    }
+    // v352(PM 9/11 #31ⓑ — 직원 수정본 5편 실측): 전 문단 가운데 정렬, 문장은 손대지 않는다(5편 모두 문장 수정 0건).
+    // v363(PM 9/16 "줄간·문장간격 다 일치하지 않음"): 22자 기계 개행(<br>)·문단 여백 12px·소제목 구분선/굵게를 버리고, 직원 실측대로
+    //   의미 단위 줄나눔(promoLinesOf) + 한 줄=한 문단(여백 0, 빈 줄 0, 구분선 0). 네이버 편집기에 붙이면 줄마다 한 문단이 된다.
     function promoIsSubhead(t){ return t.length<=45 && /[?？]$/.test(t) && t.indexOf(". ")<0; }   // 프롬프트 규칙: 질문형 소제목은 기호 없는 한 줄
+    function pushLine(l){ out.push('<p style="margin:0;line-height:1.8;text-align:center;">'+promoEscHtml(l)+'</p>'); }
     function pushText(t){
       t=String(t||"").trim(); if(!t) return;
-      if(promoIsSubhead(t)){ out.push('<hr style="border:0;border-top:1px solid #ddd;margin:22px 0 14px;"><p style="margin:12px 0;line-height:1.8;text-align:center;font-weight:700;">'+promoEscHtml(t)+'</p>'); return; }
-      out.push('<p style="margin:12px 0;line-height:1.8;text-align:center;">'+promoWrap20(t)+'</p>');
+      if(promoIsSubhead(t)){ pushLine(t); return; }   // 소제목은 한 줄 그대로(끊지 않음)
+      promoLinesOf(t).forEach(pushLine);
     }
     function pushNums(nums, cap){
       var seen={}, any=false;
@@ -13540,7 +13582,7 @@
       // 마커 설명은 버리지 않고 사진 밑 캡션으로 싣는다 — 네이버 공식 가이드(이미지 아래 부연 설명이
       // 일반적)와 상위 노출 글 실측(서술형 캡션)에 맞춘 것(2026-08-16 외부조사).
       cap=String(cap||"").trim();
-      if(any && cap) out.push('<p style="margin:-8px 0 14px;color:#777;font-size:13px;text-align:center;">'+promoEscHtml(cap)+'</p>');
+      if(any && cap) out.push('<p style="margin:0;color:#777;font-size:13px;text-align:center;">'+promoEscHtml(cap)+'</p>');   // v363 여백 0
     }
     function handleLine(ln){
       // 대괄호 마커 — 줄 안 어디에 있어도, 몇 개가 있어도 그 자리마다 사진을 끼우고 앞뒤 글은 살린다
