@@ -2287,4 +2287,69 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   delete mem.gw_data['col:promo']; delete mem.gw_files[A1]; delete mem.gw_files[A3]; delete mem.gw_data['promo:share:' + 'f'.repeat(64)];
 }
 
+// ===== 43. v360 사진AI 자동 생성 — 서버 책임(PM 9/16 "틀어막지 말고 근본적으로"): 결과 직접 적용·상태 기록·크론 재시작·옛 작업 적용 =====
+{
+  const PJ = require(join(FN, '_lib/promoai_job.js'));
+  const NOW = 1789520000000;
+  const ph = [{ id: 'att_00000000000000aa' }, { id: 'att_00000000000000bb' }];
+  // applyResult(순수)
+  let doc = { schema: 1, items: [{ id: 'prm_a', status: 'review', title: '예비 제목', body: '예비 본문', photos: ph, ts: NOW - 5000 }] };
+  let a = PJ.applyResult(doc, 'prm_a', { title: 'AI 제목', body: 'AI 본문', tags: ['포항', '준설', '하수구'], model: 'm', tokens: { input: 1, output: 2, total: 3 }, tt: 'q', job: 'pa_gen_x_1' }, NOW);
+  const r0 = doc.items[0];
+  T('applyResult: 제목·본문·태그·ai·pre_ai·updated_ts·ai_st done — 앱 paApplyToRecord와 같은 필드', a.changed && r0.title === 'AI 제목' && r0.body === 'AI 본문' && r0.tags.length === 3 && r0.ai && r0.ai.tokens === 3 && r0.ai.by === 'server' && r0.pre_ai.title === '예비 제목' && r0.updated_ts === NOW && r0.ai_st.st === 'done' && r0.ai_st.job === 'pa_gen_x_1', JSON.stringify(r0));
+  T('applyResult: 이미 ai가 있으면 멱등(안 바꿈) · 빈 결과는 적용 안 함 · 없는 기록 NOT_FOUND', !PJ.applyResult(doc, 'prm_a', { title: 'x', body: 'y' }, NOW).changed && PJ.applyResult({ items: [{ id: 'z', photos: ph }] }, 'z', { title: '', body: 'y' }).why === 'EMPTY' && PJ.applyResult(doc, 'nope', {}).why === 'NOT_FOUND');
+  // pickCandidates(순수) — 규칙표
+  const mk = (id, extra) => Object.assign({ id: id, status: 'review', photos: ph, ts: NOW - 60000 }, extra || {});
+  const items = [
+    mk('c_never'),                                                         // 상태 없음 → 대상
+    mk('c_ai', { ai: { ts: 1 } }),                                         // 이미 있음 → 제외
+    mk('c_nophoto', { photos: [] }),                                       // 사진 없음 → 제외
+    mk('c_posted', { status: 'posted' }),                                  // 게시 완료 → 제외
+    mk('c_running', { ai_st: { st: 'running', ts: NOW - 60000, tries: 1 } }),           // 진행 중(1분) → 제외
+    mk('c_stale', { ai_st: { st: 'running', ts: NOW - 20 * 60000, tries: 1 } }),         // 20분 running → 죽은 것 → 대상
+    mk('c_fail1_soon', { ai_st: { st: 'fail', ts: NOW - 60000, tries: 1 } }),            // 1회 실패 1분 전 → 10분 간격 → 제외
+    mk('c_fail1_due', { ai_st: { st: 'fail', ts: NOW - 11 * 60000, tries: 1 } }),        // 1회 실패 11분 전 → 대상
+    mk('c_fail2_soon', { ai_st: { st: 'fail', ts: NOW - 20 * 60000, tries: 2 } }),       // 2회 실패 20분 전 → 30분 간격 → 제외
+    mk('c_fail4', { ai_st: { st: 'fail', ts: NOW - 999 * 60000, tries: 4 } }),           // 4회 → 끝 → 제외
+    mk('c_locked'),                                                        // 잠금 있음 → 제외
+    mk('c_done_noapply', { ai_st: { st: 'done', ts: NOW - 60000, tries: 1 } }),          // 끝났는데 ai 없음 → 대상(크론이 job에서 적용 시도)
+  ];
+  const got = PJ.pickCandidates(items, NOW, { c_locked: { ts: NOW - 1000, job: 'j' } }).map((c) => c.rec.id + ':' + c.why);
+  T('pickCandidates 규칙: never·stale_running·retry_1(11분)·done_not_applied만 · ai/사진 없음/posted/진행 중/간격 전/4회/잠금 제외',
+    got.length === 4 && got.indexOf('c_never:never') >= 0 && got.indexOf('c_stale:stale_running') >= 0 && got.indexOf('c_fail1_due:retry_1') >= 0 && got.indexOf('c_done_noapply:done_not_applied') >= 0, got.join(','));
+  T('setAiState: running마다 tries +1 · fail은 code·job 보존', (() => { const r = {}; PJ.setAiState(r, 'running', { job: 'j1' }, NOW); PJ.setAiState(r, 'fail', { code: 'NETWORK', job: 'j1' }, NOW + 1); PJ.setAiState(r, 'running', { job: 'j2' }, NOW + 2); return r.ai_st.tries === 2 && r.ai_st.st === 'running' && r.ai_st.job === 'j2'; })());
+  // 크론 통합 — 인메모리 blob + fetch mock(워커 기동 202)
+  const cron = require(join(FN, 'gw-promo-ai-cron.js'));
+  const realFetch = global.fetch; const kicks = [];
+  global.fetch = async (url, o) => { kicks.push(JSON.parse(o.body)); return { ok: true, status: 202 }; };
+  try {
+    mem.gw_data['col:promo'] = { schema: 1, items: [
+      mk('p_old_done', { title: '예비', body: '예비' }),                          // 옛 워커 완료작이 job blob에만 있음 → 적용
+      mk('p_new', { title: '예비2', body: '예비2' }),                            // 시작 대상
+      mk('p_posted', { status: 'posted' }),
+    ] };
+    mem.gw_data['promoai:job:pa_gen_aaa_11111111'] = { status: 'done', promo_id: 'p_old_done', title: '완료 제목', body: '완료 본문', tags: ['t1'], model: 'm', used_tokens: { total: 5 }, title_type: 'q' };
+    mem.gw_data['promoai:usage'] = { schema: 1, months: {} };
+    const r = await cron.handler({});
+    const out = JSON.parse(r.body);
+    const pd = mem.gw_data['col:promo'].items;
+    const oldDone = pd.filter((x) => x.id === 'p_old_done')[0], pNew = pd.filter((x) => x.id === 'p_new')[0], pPosted = pd.filter((x) => x.id === 'p_posted')[0];
+    T('크론 ①: 끝났는데 안 실린 옛 작업을 job blob에서 기록에 적용(제목·태그·ai·ai_st done)', r.statusCode === 200 && out.applied === 1 && oldDone.title === '완료 제목' && oldDone.tags[0] === 't1' && oldDone.ai && oldDone.ai_st.st === 'done', JSON.stringify(out));
+    T('크론 ②: 초안 없는 기록은 서버가 시작(잠금·job queued·워커 기동 1회) · 게시 완료는 손대지 않음', out.started.length === 1 && out.started[0].id === 'p_new' && kicks.length === 1 && kicks[0].promo_id === 'p_new' && mem.gw_data['promoai:lock:p_new'].job === kicks[0].job && mem.gw_data['promoai:job:' + kicks[0].job].status === 'queued' && !pPosted.ai && !pPosted.ai_st, JSON.stringify(out));
+    const r2 = await cron.handler({}); const out2 = JSON.parse(r2.body);
+    T('크론 멱등: 바로 다시 돌면 잠금 때문에 시작 0·적용 0', out2.started.length === 0 && out2.applied === 0, JSON.stringify(out2));
+    // 워커 실패 → ai_st fail → 간격 뒤 크론 재시작 (워커는 절 25 하네스처럼 직접 호출하지 않고 updatePromo 경로만 실측)
+    await PJ.updatePromo(mem.gw_data ? { name: 'gw_data', toString() { return 'gw_data'; } } : null, 'p_new', (rec) => { PJ.setAiState(rec, 'fail', { code: 'NETWORK', job: kicks[0].job }, Date.now() - 11 * 60000); rec.ai_st.tries = 1; return {}; });
+    mem.gw_data['promoai:lock:p_new'] = { ts: 0, job: '' };
+    const r3 = await cron.handler({}); const out3 = JSON.parse(r3.body);
+    T('크론 재시도: 실패 11분 뒤 다시 시작(why retry_1) · 기동 실패면 ai_st fail에 이유', out3.started.length === 1 && out3.started[0].why === 'retry_1' && kicks.length === 2, JSON.stringify(out3));
+    global.fetch = async () => { throw new Error('down'); };
+    mem.gw_data['promoai:lock:p_new'] = { ts: 0, job: '' };
+    await PJ.updatePromo({ name: 'gw_data', toString() { return 'gw_data'; } }, 'p_new', (rec) => { PJ.setAiState(rec, 'fail', { code: 'NETWORK' }, Date.now() - 40 * 60000); rec.ai_st.tries = 2; return {}; });
+    const r4 = await cron.handler({}); const out4 = JSON.parse(r4.body);
+    const pn4 = mem.gw_data['col:promo'].items.filter((x) => x.id === 'p_new')[0];
+    T('크론 기동 실패(KICKOFF_FAILED): 잠금 해제·job fail·기록 ai_st fail 코드', out4.failed.length === 1 && out4.failed[0].code === 'KICKOFF_FAILED' && pn4.ai_st.st === 'fail' && pn4.ai_st.code === 'KICKOFF_FAILED' && mem.gw_data['promoai:lock:p_new'].ts === 0, JSON.stringify(out4) + ' ' + JSON.stringify(pn4.ai_st));
+  } finally { global.fetch = realFetch; }
+}
+
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

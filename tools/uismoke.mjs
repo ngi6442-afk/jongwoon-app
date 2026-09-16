@@ -144,10 +144,10 @@ try {
     && /rec\.tags = r\.tags\.slice\(0, 25\)/.test(wk) && /tags:\(Array\.isArray\(blob\.tags\)\?blob\.tags:\(r\.tags\|\|\[\]\)\)/.test(idx)
     && (idx.match(/p\.tags=r\.tags\.slice\(0,25\)/g) || []).length === 2 && /id="tags" readonly/.test(idx),
     '어느 고리가 빠졌는지 promoai.js 해시태그 절·schema·parseDraft·generateDraft / 워커 rec.tags / index.html paFinish·paApply·태그 상자 대조');
-  T('v352 자동 생성 대기열: paAutoQueue·paDrainAuto · paKick 생성 중이면 auto는 줄 세움 · 배수 5곳(실패·네트워크·초과·완료 + 정의) · 카드 "사진AI 미생성 — 태그 없음"/"태그 n개" · 검수 문구 태그 수',
+  T('v352 자동 생성 대기열: paAutoQueue·paDrainAuto · paKick 생성 중이면 auto는 줄 세움 · 배수 5곳(실패·네트워크·초과·완료 + 정의) · 카드 문구는 promoAiLine(v360 — 서버 상태 ai_st 기반)/"태그 n개" · 검수 문구 태그 수',
     /var paAutoQueue=\[\];/.test(idx) && /function paDrainAuto\(\)\{ if\(paJob\.polling\) return; var next=paAutoQueue\.shift\(\); if\(next\) paKick\(next, true\); \}/.test(idx)
     && /if\(auto\)\{ if\(paAutoQueue\.indexOf\(promoId\)<0\) paAutoQueue\.push\(promoId\); \}/.test(idx) && (idx.match(/paDrainAuto\(\);/g) || []).length === 4
-    && /사진AI 미생성 — 태그 없음/.test(idx) && /' · 태그 '\+\(\(p\.tags\|\|\[\]\)\.length\)\+'개'/.test(idx) && /" · 태그 "\+\(\(r\.tags&&r\.tags\.length\)\|\|0\)\+"개"/.test(idx), '');
+    && /promoAiLine\(p\)/.test(idx) && /' · 태그 '\+\(\(p\.tags\|\|\[\]\)\.length\)\+'개'/.test(idx) && /" · 태그 "\+\(\(r\.tags&&r\.tags\.length\)\|\|0\)\+"개"/.test(idx), '');
   // v352(PM 9/11 #31ⓑ — 직원 수정본 5편 실측): 담당자 포장 = 가운데 정렬·20자 개행·소제목 굵게+구분선·물음표·정화조/저수조 삭제
   const bp = (idx.match(/function promoBuildPostHtml\(title, body, imgs\)\{([\s\S]*?)\n  \}/) || ['', ''])[1];
   T('v352 복사 HTML 서식: promoWrap20(22자 어절 개행 <br>)·promoIsSubhead(물음표 한 줄 ≤45자)·소제목 <hr>+굵게+가운데·본문/캡션/사진/제목/꼬리 text-align:center',
@@ -1219,6 +1219,20 @@ try {
     && /method: bidMethodEff\(b\)\.m\|\|"", budget: b\.budg/.test(html) && /적용 세부기준: 경북교육청 석면해체 2023 등록 기준/.test(html) && !/\["결정방식", /.test(html)
     && /var k=methodKindOf\(bidMethodEff\(b\)\.m\);/.test(html), '');
 } catch (e) { console.log('  (v359 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ---- v360: 사진AI 자동 생성 상태 문구(서버 ai_st) — "사진AI 미생성" 문구 제거 ----
+try {
+  const fn = (name) => { const i = html.indexOf('function ' + name + '('); if (i < 0) throw new Error('함수 없음: ' + name); let d = 0, st = false; for (let j = i; j < html.length; j++) { const ch = html[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return html.slice(i, j + 1); } } throw new Error(name); };
+  const api = new Function([fn('pad'), fn('esc'), fn('paFailShort'), fn('promoAiLine'), 'return promoAiLine;'].join('\n'))();
+  const ph = [{ id: 'att_0000000000000001' }];
+  T('v360 카드 문구: ai 있음 → 태그 N개 · 사진 없음 → 빈 문자열 · 상태 없음 → 대기(서버 10분) · running → 생성 중 · fail 1회 → 이유+재시도 · fail 4회 → 재시도 끝',
+    /태그 3개/.test(api({ ai: {}, tags: [1, 2, 3], photos: ph })) && api({ photos: [] }) === '' && /자동 생성 대기\(서버가 10분 안에 시작\)/.test(api({ photos: ph }))
+    && /자동 생성 중\(/.test(api({ photos: ph, ai_st: { st: 'running', ts: Date.now() } })) && /자동 생성 실패 1회\(네트워크 끊김/.test(api({ photos: ph, ai_st: { st: 'fail', tries: 1, code: 'NETWORK', ts: Date.now() } })) && /서버가 잠시 뒤 다시 시도/.test(api({ photos: ph, ai_st: { st: 'fail', tries: 1, code: 'NETWORK', ts: Date.now() } }))
+    && /자동 재시도 끝/.test(api({ photos: ph, ai_st: { st: 'fail', tries: 4, code: 'TIMEOUT', ts: Date.now() } })), '');
+  T('v360 "사진AI 미생성" 문구가 앱에 없다 · 크론 등록(netlify.toml gw-promo-ai-cron */10) · 공용 층 존재',
+    !/사진AI 미생성/.test(html) && /\[functions\."gw-promo-ai-cron"\]\s*\r?\n\s*schedule = "\*\/10 \* \* \* \*"/.test(readFileSync(join(ROOT, 'netlify.toml'), 'utf8'))
+    && /PJ\.applyResult\(doc, promoId/.test(readFileSync(join(ROOT, 'netlify/functions/gw-promo-ai-run-background.js'), 'utf8')) && /PJ\.startJob\(st, \{ promoId/.test(readFileSync(join(ROOT, 'netlify/functions/gw-promo-ai.js'), 'utf8')), '');
+} catch (e) { console.log('  (v360 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

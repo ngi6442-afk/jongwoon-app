@@ -12966,6 +12966,18 @@
     return null;
   }
   // 카드에 표시할 생성 조합 라벨 — 신규(gen)·구버전(fi/bi) 겸용
+  // v360(PM 9/16 "미생성은 또 뭔말인데"): 카드에 자동 생성 상태를 말로. 상태(ai_st)는 서버 워커·크론이 기록에 쓴다 —
+  //   브라우저가 닫혀도 서버(gw-promo-ai-cron, 10분)가 끝까지 책임지고, 실패는 이유·횟수와 함께 보인다.
+  function paFailShort(code){ var m={NETWORK:"네트워크 끊김",TIMEOUT:"시간 초과",BUDGET_CAP:"월 상한 도달",NO_PHOTOS:"사진 없음",REFUSAL:"모델 거부",KICKOFF_FAILED:"기동 실패",ENV_MISSING:"설정 누락",WORKER_THREW:"서버 오류",GENERATE_THREW:"생성 오류"}; return m[code]||(code||"원인 미상"); }
+  function promoAiLine(p){
+    if(p.ai) return ' · 태그 '+((p.tags||[]).length)+'개';
+    if(!(p.photos||[]).length) return '';
+    var s=p.ai_st||{};
+    var hm=function(ts){ var d=ts?new Date(ts):null; return (d&&!isNaN(d))?(pad(d.getHours())+':'+pad(d.getMinutes())):''; };
+    if(s.st==="running") return ' · <span style="color:#1B4F8A;">블로그 초안·태그 자동 생성 중('+hm(s.ts)+'~, 5~10분)</span>';
+    if(s.st==="fail"){ var n=s.tries||1; return ' · <span style="color:#a5382c;">자동 생성 실패 '+n+'회('+esc(paFailShort(s.code))+' '+hm(s.ts)+')'+(n>=4?' — 자동 재시도 끝, 카드 열어 [사진으로 다시 쓰기]':' — 서버가 잠시 뒤 다시 시도')+'</span>'; }
+    return ' · <span style="color:#B7791F;">블로그 초안·태그 자동 생성 대기(서버가 10분 안에 시작)</span>';
+  }
   function promoGenLabel(p){
     if(p.gen){
       var T=FACIL_TYPES[p.gen.ty];
@@ -13163,7 +13175,7 @@
         + (shown.length? shown.map(function(p){
             return '<div class="pipe-card" data-pr="'+esc(p.id)+'"><b>'+esc(p.title||"(제목 없음)")+'</b>'
               +'<div class="s">'+esc(p.region||"지역 미정")+' · '+esc(p.facility||"")+' · 사진 '+((p.photos||[]).length)+'장</div>'
-              +'<div class="s">'+esc(promoGenLabel(p))+(p.ai? ' · 태그 '+((p.tags||[]).length)+'개' : ((p.photos||[]).length? ' · <span style="color:#a5382c;">사진AI 미생성 — 태그 없음</span>' : ''))+' · '+esc(p.by||"")+' '+esc((p.updated||""))+(p.note?' · 반려: '+esc(p.note):'')
+              +'<div class="s">'+esc(promoGenLabel(p))+promoAiLine(p)+' · '+esc(p.by||"")+' '+esc((p.updated||""))+(p.note?' · 반려: '+esc(p.note):'')
               +(paResults[p.id]?' · <b>AI 초안 도착</b>':'')+'</div></div>';
           }).join("") : '<div class="s" style="color:var(--sub);padding:4px;">없음</div>')
         + '</div>';
