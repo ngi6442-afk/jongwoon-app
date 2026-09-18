@@ -467,7 +467,21 @@ function matchRouteEx(row, opts) {
   // 품목이 어느 후보와도 안 맞으면(itemPool 비었으면) 차량으로도 배정하지 않는다(A-minor1).
   // 품목 불일치는 후보 수와 무관하게 미매칭(v326 — 후보 1개도 ITEM_MISMATCH).
   if (itemPool.length === 0) return miss('AMBIGUOUS', false);
-  const pool = itemPool;
+  let pool = itemPool;
+  // v365(PM 9/18 "에코프로비엠과 에코프로비엠(CAM)은 한 차에 실어 무게만 나눠 올라갔다 — 두 개로 나눠달라, 앞으로도"):
+  //   같은 상·하차지·품목에 '본체' 줄과 더 구체적인 줄(예: L34 '에코프로비엠' / L43 '에코프로비엠(CAM4)')이 같이 있으면
+  //   올바로 상차지 이름이 줄 이름을 '품는' 후보 중 가장 긴 줄 이름을 고른다 — '에코프로비엠(CAM4)'는 CAM4 줄, '(주)에코프로비엠'은 본체 줄.
+  //   (hit()은 양방향 포함이라 종전엔 둘 다 후보가 돼 AMBIGUOUS로 미매칭이 되거나, 줄이 하나뿐이면 본체 줄에 합쳐져 회수가 2로 찍혔다.)
+  //   줄 이름 길이가 같은 후보들(차량으로 갈리는 줄)은 종전 흐름(차량 판정)으로 간다.
+  if (pool.length >= 2) {
+    const specific = pool.filter((c) => f.indexOf(c.nr.f) >= 0);
+    if (specific.length) {
+      const maxLen = Math.max.apply(null, specific.map((c) => c.nr.f.length));
+      const best = specific.filter((c) => c.nr.f.length === maxLen);
+      if (best.length === 1 && pool.length > 1 && best.length < pool.length) return take(best[0]);
+      if (best.length < pool.length) pool = best;
+    }
+  }
 
   // 차량 표기로 갈리는 후보(R5 BCT차량 / R6 덤프 같은 줄)라면 차량 종류로 좁힌다.
   const needVehicle = pool.some((c) => c.nr.veh);

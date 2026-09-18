@@ -19458,6 +19458,25 @@
     document.getElementById("lockSetPin2").addEventListener("keydown", function(e){ if (e.key === "Enter") saveLockSetup(); });
   })();
 
+  // v365(PM 9/18 "일용직 권한을 수행으로 바꿨는데 보기만 된다"): 권한(perms)은 로그인·부팅 때만 서버에서 읽혔다 —
+  //   관리자가 바꾼 권한이 그 직원의 열린 앱에는 안 실려 [+ 일용직 추가]가 계속 숨어 있었다(정재욱 9/17 실측: 서버 wk=do, 앱은 옛 권한).
+  //   화면이 다시 보일 때(탭 복귀·앱 재진입) 5분에 한 번 세션을 재확인해 perms·admin·dev·tier가 바뀌었으면 알리고 새로 고친다
+  //   (모든 게이트를 한 번에 다시 적용하는 가장 안전한 길 — 바뀐 경우에만 새로고침하므로 평소 입력은 건드리지 않는다).
+  var permRefreshAt = 0;
+  function refreshMemberPerms(){
+    if (!gwToken() || !curMember()) return;
+    var now = Date.now(); if (now - permRefreshAt < 5 * 60 * 1000) return; permRefreshAt = now;
+    gwCall("gw-auth", { action: "verify" }).then(function(res){
+      if (!(res.status === 200 && res.body && res.body.valid && res.body.member)) return;
+      var cur = curMember(), nm = res.body.member;
+      var changed = JSON.stringify(cur.perms || {}) !== JSON.stringify(nm.perms || {}) || !!cur.admin !== !!nm.admin || !!cur.dev !== !!nm.dev || String(cur.tier || "") !== String(nm.tier || "");
+      if (!changed) return;
+      curMemberObj = nm; try{ localStorage.setItem("jw_member_cache", JSON.stringify(nm)); }catch(e){}
+      gwToast("권한이 바뀌었습니다 — 화면을 새로 고칩니다", false, 1500);
+      setTimeout(function(){ location.reload(); }, 1600);
+    }).catch(function(){});
+  }
+  document.addEventListener("visibilitychange", function(){ if (!document.hidden) refreshMemberPerms(); });
   // 시작: 세션 검증 → 유효하면 데이터 로드, 아니면 로그인
   (function boot(){
     if (!gwToken()){ showMemberLogin(); return; }

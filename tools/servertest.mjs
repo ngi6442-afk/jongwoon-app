@@ -2060,6 +2060,18 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   T('추가한 줄 L40에 ab_learn 배정 → 200(findRoute가 추가 노선을 본다 — BAD_ROUTE 아님)', r.code === 200 && r.body.ok === true, r.code + '/' + r.body.code);
   d = abLib.matchRouteEx({ from: '둘째상차(주)', to: '둘째하차', item: '분진(고상)' }, {});
   T('매칭: 추가 노선 둘째상차→둘째하차 분진 → R41 · 품목 다르면 v326대로 ITEM_MISMATCH(자동 배정 없음)', !!d.route && d.route.side === 'R' && d.route.row === 41 && abLib.matchRouteEx({ from: '둘째상차', to: '둘째하차', item: '전혀다른품목' }, {}).reason === 'ITEM_MISMATCH', JSON.stringify(d).slice(0, 120));
+  // v365(PM 9/18): 본체 줄 + 구체 줄이 같이 있으면 올바로 이름이 품는 가장 긴 줄 — CAM4는 CAM4 줄, 본체는 본체 줄. 차량 갈림 줄(같은 이름)은 종전 흐름.
+  { const prevExtra = (mem.gw_data['allbaro:routes_extra'] || {}).items || [];
+    abLib.setExtraRoutes(prevExtra.concat([{ side: 'L', row: 43, from: '에코프로비엠(CAM4)', to: '주식회사 에코프로씨엔지', item: '폐양극활물질', count_col: 5 }]));
+    const cam = abLib.matchRouteEx({ from: '에코프로비엠(CAM4)', to: '주식회사 에코프로씨엔지', item: '폐양극활물질(양극재 또는 전구체 제조공정에서 발생하는 것을 포함한다)(고상)' }, {});
+    const base = abLib.matchRouteEx({ from: '(주)에코프로비엠', to: '주식회사 에코프로씨엔지', item: '폐양극활물질(양극재 또는 전구체 제조공정에서 발생하는 것을 포함한다)(고상)' }, {});
+    T('v365 구체 줄 우선: 에코프로비엠(CAM4) → L43(구체 줄) · (주)에코프로비엠 → L34(본체 줄) · 둘 다 AMBIGUOUS 아님', !!cam.route && cam.route.side === 'L' && cam.route.row === 43 && !!base.route && base.route.side === 'L' && base.route.row === 34, JSON.stringify([cam.route && cam.route.row, cam.reason, base.route && base.route.row, base.reason]));
+    abLib.setExtraRoutes(prevExtra);
+    const cam2 = abLib.matchRouteEx({ from: '에코프로비엠(CAM4)', to: '주식회사 에코프로씨엔지', item: '폐양극활물질' }, {});
+    T('v365 구체 줄이 없으면 종전대로 본체 줄 L34(줄 추가 전 동작 유지)', !!cam2.route && cam2.route.row === 34, JSON.stringify(cam2.route && cam2.route.row));
+    const bct = abLib.matchRouteEx({ from: '태웅제강(주)', to: '스틸싸이클 주식회사', item: 'EAFD' }, {});
+    T('v365 차량 갈림 줄(태웅제강→스틸싸이클 EAFD, R6 BCT/R7 덤프 같은 이름)은 종전 흐름 유지(차량 없으면 AMBIGUOUS·needVehicle)', !bct.route && bct.reason === 'AMBIGUOUS' && bct.needVehicle === true, JSON.stringify([bct.reason, bct.needVehicle, bct.candidates]));
+  }
   r = await ab({ action: 'ab_hidden_export', key: 'test-ingest-key' });
   T('ab_hidden_export routes_extra 동봉(엑셀 봇이 예비 행에 쓴다) · L40·R41 · by/bid/ts 없음', r.code === 200 && Array.isArray(r.body.routes_extra) && r.body.routes_extra.length === 2 && r.body.routes_extra[0].row === 40 && r.body.routes_extra[1].row === 41 && !/"(by|bid|ts)"/.test(JSON.stringify(r.body.routes_extra)), JSON.stringify(r.body.routes_extra).slice(0, 160));
   // 예비 행 소진 — L40~49 가득 채운 blob
