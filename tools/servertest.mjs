@@ -38,7 +38,9 @@ const pushMock = { calls: [],
   async pmOrAdminIds() { const p = await pushMock.pmIds(); return p.length ? p : pushMock.adminIds(); },
   async getSubs() { return { members: { uadmin: [{ sub: {} }] } }; }, async saveSubs() {}, async sendTo(ids, p) { pushMock.calls.push(p); return { sent: ids.length, removed: 0 }; } };
 const auditMock = { logs: [], async appendAudit(e) { auditMock.logs.push(e); }, auditKey: () => 'audit', diffItems: () => [], short: (s) => String(s).slice(0, 20), DATA: 'gw_data' };
-for (const [p, m] of [['_lib/blobs.js', blobsMock], ['_lib/push.js', pushMock], ['_lib/audit.js', auditMock]]) {
+// v364 얼굴 검출기 mock — 기본은 '못 실림'(throw) → 워커가 종전(Claude 전부)으로 내려가므로 절 41은 그대로. 절 44에서 켜서 검출기 경로·폴백을 검사한다. 실제 모델 정확도는 tools/facedet_check.mjs(실사진 게이트).
+const faceMock = { fail: true, boxes: [], calls: 0, async detectFaces() { faceMock.calls++; if (faceMock.fail) throw (faceMock.fail instanceof Error ? faceMock.fail : new Error('MODELS_MISSING')); return { boxes: faceMock.boxes.map((b) => Object.assign({}, b)), w: 600, h: 400, ms: 1, diag: { passes: 12, raw: faceMock.boxes.length, clusters: faceMock.boxes.length, dropped: 0, big: 0, pose: true } }; } };
+for (const [p, m] of [['_lib/blobs.js', blobsMock], ['_lib/push.js', pushMock], ['_lib/audit.js', auditMock], ['_lib/facedet.js', faceMock]]) {
   const rp = require.resolve(join(FN, p));
   require.cache[rp] = { id: rp, filename: rp, loaded: true, exports: m };
 }
@@ -2357,6 +2359,214 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
     const pn4 = mem.gw_data['col:promo'].items.filter((x) => x.id === 'p_new')[0];
     T('크론 기동 실패(KICKOFF_FAILED): 잠금 해제·job fail·기록 ai_st fail 코드', out4.failed.length === 1 && out4.failed[0].code === 'KICKOFF_FAILED' && pn4.ai_st.st === 'fail' && pn4.ai_st.code === 'KICKOFF_FAILED' && mem.gw_data['promoai:lock:p_new'].ts === 0, JSON.stringify(out4) + ' ' + JSON.stringify(pn4.ai_st));
   } finally { global.fetch = realFetch; }
+}
+
+// ===== 44. 사진 가리기 얼굴·머리 검출기 v364(PM 9/16 "얼굴 못 가리네 … 근본적으로" → "중국계 불허") — 순수 함수(머리 상자·후보·군집·투표) · 워커(검출기 얼굴 + Claude 번호판 / 못 실리면 종전) · 크론 옛 판 재감지 · 동봉 파일(MoveNet만)
+{
+  const fp = require.resolve(join(FN, '_lib/facedet.js'));
+  const savedFace = require.cache[fp]; delete require.cache[fp];
+  const FD = require(fp);                       // 실 모듈(순수 함수만 — 모델은 지연 적재라 안 실린다)
+  require.cache[fp] = savedFace;
+  const A = { x: 0.10, y: 0.10, w: 0.05, h: 0.05 };
+  T('iou: 같은 상자 1 · 떨어진 상자 0 · 반 겹침 1/3', Math.abs(FD.iou(A, A) - 1) < 1e-9 && FD.iou(A, { x: 0.5, y: 0.5, w: 0.1, h: 0.1 }) === 0 && Math.abs(FD.iou(A, { x: 0.125, y: 0.10, w: 0.05, h: 0.05 }) - 1 / 3) < 1e-9, String(FD.iou(A, A)));
+  T('centerIn: 중심이 안이면 참, 밖이면 거짓', FD.centerIn({ x: 0.11, y: 0.11, w: 0.02, h: 0.02 }, A) && !FD.centerIn({ x: 0.2, y: 0.2, w: 0.02, h: 0.02 }, A), '');
+  const kps = [{ name: 'nose', x: 100, y: 100, score: 0.9 }, { name: 'left_eye', x: 95, y: 95, score: 0.8 }, { name: 'right_eye', x: 105, y: 95, score: 0.8 }, { name: 'left_ear', x: 90, y: 98, score: 0.3 }, { name: 'right_ear', x: 110, y: 98, score: 0.1 }, { name: 'left_shoulder', x: 70, y: 140, score: 0.7 }, { name: 'right_shoulder', x: 130, y: 140, score: 0.7 }];
+  const hb = FD.headBoxFromKeypoints(kps, 600, 400);
+  T('headBoxFromKeypoints(픽셀): 코·눈·귀(0.25 이상)로 머리 상자 — 코(100,100)를 품고 크기=max(외접 20·5, 어깨 60×0.55=33, 짧은 변 3%=12)=33 → w 42.9·h 49.5, 중심 (97.5,97.5: 왼귀 90~오른눈 105, 0.1짜리 오른귀 제외)', hb && Math.abs(hb.size - 33) < 1e-9 && Math.abs(hb.w - 33 * 1.3) < 1e-9 && Math.abs(hb.h - 33 * 1.5) < 1e-9 && hb.cx === 97.5 && hb.cy === 97.5 && 100 > hb.x && 100 < hb.x + hb.w && 100 > hb.y && 100 < hb.y + hb.h, JSON.stringify(hb));
+  T('headBoxFromKeypoints: 머리 관절점이 전부 약하면 null · headScore = {best 최고, n 보이는 개수(0.25↑)}', FD.headBoxFromKeypoints([{ name: 'nose', x: 1, y: 1, score: 0.1 }], 600, 400) === null && FD.headScore(kps).best === 0.9 && FD.headScore(kps).n === 4 && FD.headScore([]).best === 0, JSON.stringify(FD.headScore(kps)));
+  const pose = { score: 0.35, keypoints: kps };
+  const c1 = FD.candidateOf(pose, 600, 400, false, 'w256'), c2 = FD.candidateOf(pose, 600, 400, true, 'f256');
+  T('candidateOf: 후보 ok(자세 0.35≥0.10·머리 0.9≥0.40·머리점 4≥2) · 반전판은 x를 되돌린다(600-97.5=502.5)', c1.ok && c1.pass === 'w256' && c1.box.cx === 97.5 && c2.ok && c2.box.cx === 502.5 && c2.box.cy === 97.5, JSON.stringify([c1.box.cx, c2.box.cx]));
+  T('candidateOf: 자세 0.05 → 탈락 · 머리 최고 0.3 → 탈락 · 머리점 1개 → 탈락', !FD.candidateOf({ score: 0.05, keypoints: kps }, 600, 400, false, 'w').ok && !FD.candidateOf({ score: 0.5, keypoints: kps.map((k) => Object.assign({}, k, { score: Math.min(k.score, 0.3) })) }, 600, 400, false, 'w').ok && !FD.candidateOf({ score: 0.5, keypoints: [{ name: 'nose', x: 1, y: 1, score: 0.9 }] }, 600, 400, false, 'w').ok, '');
+  // 군집·투표: 같은 자리 4판(w192·w256·f256·w320) + 다른 자리 2판(w384·f384) + 같은 판 중복(w256 두 번 = 1표)
+  const mk44 = (pass, cx, cy, s) => FD.candidateOf({ score: s, keypoints: kps.map((k) => Object.assign({}, k, { x: k.x + (cx - 100), y: k.y + (cy - 100) })) }, 600, 400, false, pass);
+  const cands = [mk44('w192', 100, 100, 0.3), mk44('w256', 102, 99, 0.4), mk44('w256', 101, 101, 0.2), mk44('f256', 98, 102, 0.35), mk44('w320', 100, 103, 0.25), mk44('w384', 400, 300, 0.5), mk44('f384', 402, 301, 0.45), Object.assign(mk44('w448', 300, 200, 0.5), { ok: false })];
+  const cls = FD.clusterCandidates(cands);
+  const cl4 = cls.filter((c) => c.passes.length === 4)[0], cl2 = cls.filter((c) => c.passes.length === 2)[0];
+  T('clusterCandidates: 군집 2(같은 자리 5후보=4판, 다른 자리 2판) · ok 아닌 후보 제외 · 같은 판 중복은 1표 · 점수 높은 군집이 앞', cls.length === 2 && cl4 && cl4.members.length === 5 && cl4.maxS === 0.4 && cl2 && cl2.members.length === 2 && cls[0] === cl2, JSON.stringify(cls.map((c) => [c.passes, c.members.length])));
+  const fin = FD.finalsOf(cls, 600, 400);
+  T('finalsOf: 3표 이상만 최종(1개) · 상자는 구성원 중앙값×1.3 비율 좌표 · src movenet-vote4 · 중심 (100,~100)이 상자 안', fin.length === 1 && fin[0].src === 'movenet-vote4' && fin[0].votes === 4 && fin[0].kind === 'face' && Math.abs(fin[0].w * 600 - 33 * 1.3 * 1.3) < 1e-6 && (100 / 600) > fin[0].x && (100 / 600) < fin[0].x + fin[0].w && (100 / 400) > fin[0].y && (100 / 400) < fin[0].y + fin[0].h, JSON.stringify(fin));
+  T('finalsOf: votesMin 2로 낮추면 2개 · median 홀짝', FD.finalsOf(cls, 600, 400, { votesMin: 2 }).length === 2 && FD.median([3, 1, 2]) === 2 && FD.median([4, 1, 3, 2]) === 2.5, '');
+  T('facedet 적재: WASM 백엔드 확인(실패면 WASM_BACKEND_FAILED로 던져 폴백) · 판마다 엔진 스코프', /if \(!okBackend \|\| tf\.getBackend\(\) !== 'wasm'\) throw new Error\('WASM_BACKEND_FAILED'\)/.test(require('fs').readFileSync(fp, 'utf8')) && /eng\.startScope\(\);/.test(require('fs').readFileSync(fp, 'utf8')) && /eng\.endScope\(\);/.test(require('fs').readFileSync(fp, 'utf8')), '');
+  T('상수: SIZES 192~512 6단 · POSE 0.10 · HEAD 0.40 · KP 0.25 · NHEAD 2 · VOTES 3 · EXPAND 1.3 · modelRoot 첫 후보 __dirname/_models', JSON.stringify(FD.SIZES) === '[192,256,320,384,448,512]' && FD.POSE_MIN === 0.1 && FD.HEAD_MIN === 0.4 && FD.KP_MIN === 0.25 && FD.NHEAD_MIN === 2 && FD.VOTES_MIN === 3 && FD.EXPAND === 1.3 && /const cands = \[path\.join\(__dirname, '_models'\)\]/.test(require('fs').readFileSync(fp, 'utf8')), '');
+  // 동봉 파일·배선
+  const fs44 = require('fs');
+  const MD = join(FN, '_models');
+  const need = ['wasm/tfjs-backend-wasm.wasm', 'wasm/tfjs-backend-wasm-simd.wasm', 'wasm/tfjs-backend-wasm-threaded-simd.wasm', 'movenet/model.json', 'movenet/group1-shard1of3.bin', 'movenet/group1-shard2of3.bin', 'movenet/group1-shard3of3.bin'];
+  const missing = need.filter((p) => { try { return fs44.statSync(join(MD, p)).size < 1000; } catch (e) { return true; } });
+  T('모델 동봉 7파일(wasm 3·movenet 4) 전부 있음(1KB 이상) · face-api 폴더 없음(SSD·Tiny 가중치 불허) · modelRoot가 찾는다', missing.length === 0 && !fs44.existsSync(join(MD, 'face-api')) && !!FD.modelRoot(), missing.join(','));
+  const toml = fs44.readFileSync(join(ROOT, 'netlify.toml'), 'utf8'), pkg = JSON.parse(fs44.readFileSync(join(ROOT, 'package.json'), 'utf8'));
+  T('netlify.toml: gw-promo-mask-background included_files=_models/** · package.json deps tfjs·wasm·pose-detection·@mediapipe/pose, face-api 없음 · facedet.js는 얼굴 모델을 싣지 않는다', /\[functions\."gw-promo-mask-background"\]\s*\n\s*included_files = \["netlify\/functions\/_models\/\*\*"\]/.test(toml) && ['@tensorflow/tfjs', '@tensorflow/tfjs-backend-wasm', '@tensorflow-models/pose-detection', '@mediapipe/pose'].every((d) => pkg.dependencies[d]) && !pkg.dependencies['@vladmandic/face-api'] && !/face-api\/dist|ssdMobilenetv1|tinyFaceDetector|face-detection'\)/.test(require('fs').readFileSync(fp, 'utf8')), '');
+  const wsrc = fs44.readFileSync(join(FN, 'gw-promo-mask-background.js'), 'utf8'), csrc = fs44.readFileSync(join(FN, 'gw-promo-ai-cron.js'), 'utf8'), msrc = fs44.readFileSync(join(FN, 'gw-promo-mask.js'), 'utf8');
+  T('배선: 워커 F.detectFaces·faces===null 폴백·model facedet+ · 크론 remaskOld·startForCron(force) · mask exports.startForCron', /F\.detectFaces\(raw\)/.test(wsrc) && /faces === null \? true : b\.kind !== 'face'/.test(wsrc) && /'facedet\+' \+ det\.model/.test(wsrc) && /async function remaskOld/.test(csrc) && /startForCron\(st, \{ promoId: r\.id, ids: old, force: true/.test(csrc) && /exports\.startForCron = startForCron/.test(msrc) && /only_old: !!onlyOld/.test(msrc) && /"@mediapipe\/pose"/.test(JSON.stringify(pkg.dependencies)), '');
+  // 워커 통합 — 검출기 켬: 검출기 얼굴 + Claude 번호판, Claude 얼굴은 버림
+  const gwm = require(join(FN, 'gw-promo-mask.js'));
+  const wk = require(join(FN, 'gw-promo-mask-background.js'));
+  const cron44 = require(join(FN, 'gw-promo-ai-cron.js'));
+  const { Jimp } = require('jimp');
+  const img44 = new Jimp({ width: 600, height: 400, color: 0x2266aaff }); for (let y = 100; y < 200; y++) for (let x = 200; x < 300; x++) img44.setPixelColor((((x * 5) % 256 << 24) | ((y * 7) % 256 << 16) | (50 << 8) | 255) >>> 0, x, y);
+  const b64 = (await img44.getBuffer('image/jpeg', { quality: 90 })).toString('base64');
+  const A9 = 'att_' + 'e'.repeat(16), A10 = 'att_' + 'f'.repeat(16), A11 = 'att_' + '1'.repeat(16);
+  mem.gw_files[A9] = { name: 'p9.jpg', type: 'image/jpeg', kind: 'promo', data: b64, by: 'x', ts: 1 };
+  mem.gw_files[A10] = { name: 'p10.jpg', type: 'image/jpeg', kind: 'promo', data: b64, by: 'x', ts: 1 };
+  mem.gw_files[A11] = { name: 'p11.jpg', type: 'image/jpeg', kind: 'promo', data: b64, by: 'x', ts: 1 };
+  mem.gw_files['maskmeta:' + A10] = { schema: 1, has: true, n: 1, human: false, auto: true, w: 600, h: 400, ts: 5, model: 'facedet+claude-sonnet-5' };   // 이미 새 판
+  mem.gw_files['maskmeta:' + A11] = { schema: 1, has: true, n: 2, human: true, auto: false, w: 600, h: 400, ts: 5, model: 'human' };                    // 사람 판
+  mem.gw_data['col:promo'] = { schema: 1, items: [
+    { id: 'prv364', title: 't', body: 'b', status: 'review', photos: [{ id: A9, name: 'p9.jpg' }, { id: A10, name: 'p10.jpg' }, { id: A11, name: 'p11.jpg' }], ai: { ts: 1 }, tags: ['x'] },
+    { id: 'prv364p', title: 't', body: 'b', status: 'posted', photos: [{ id: A9, name: 'p9.jpg' }], ai: { ts: 1 }, tags: ['x'] },
+    { id: 'bad:id/x', title: 't', body: 'b', status: 'review', photos: [{ id: A9, name: 'p9.jpg' }], ai: { ts: 1 }, tags: ['x'] },
+  ] };
+  mem.gw_data['promomask:usage'] = { schema: 1, months: {} };
+  const savedKey = process.env.GW_ANTHROPIC_KEY, savedUrl = process.env.URL; process.env.GW_ANTHROPIC_KEY = 'test-anthropic-key-0000'; process.env.URL = 'https://x.test';
+  const realFetch = global.fetch; const kicks = [];
+  const visionBoxes = [{ kind: 'face', x: 0.5, y: 0.5, w: 0.1, h: 0.1 }, { kind: 'plate', x: 0.7, y: 0.7, w: 0.1, h: 0.05 }];
+  global.fetch = async (url, opt) => {
+    const u = String(url);
+    if (/gw-promo-mask-background/.test(u)) { kicks.push(JSON.parse(opt.body)); return { ok: true, status: 202 }; }
+    if (/api\.anthropic\.com/.test(u)) return { status: 200, text: async () => JSON.stringify({ model: 'claude-sonnet-5', stop_reason: 'end_turn', usage: { input_tokens: 1000, output_tokens: 50 }, content: [{ type: 'text', text: JSON.stringify({ boxes: visionBoxes }) }] }) };
+    return { ok: true, status: 202 };
+  };
+  try {
+    const itok = issueSession({ id: '__promomask__', role: 'system' }).token;
+    faceMock.fail = false; faceMock.boxes = [{ kind: 'face', x: 200 / 600, y: 100 / 400, w: 100 / 600, h: 100 / 400, score: 0.9, src: 'movenet-vote12', votes: 12 }]; faceMock.calls = 0;
+    await wk.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + itok }, body: JSON.stringify({ job: 'pm_v364a', promo_id: 'prv364', ids: [A9], force: true }) }, {});
+    const mm = mem.gw_files['maskmeta:' + A9], mk9 = mem.gw_files['mask:' + A9], j9 = mem.gw_data['promomask:job:pm_v364a'];
+    T('워커(검출기 켬): 상자 2 = 검출기 얼굴(200,100) + Claude 번호판 · Claude 얼굴(0.5,0.5)은 버림 · model facedet+claude-sonnet-5(mask·maskmeta 둘 다) · maskmeta n 2 · 사진 항목 det "faces 1"',
+      faceMock.calls === 1 && mk9 && mk9.boxes.length === 2 && mk9.boxes.some((b) => b.kind === 'face' && Math.abs(b.x - 200 / 600) < 1e-6) && mk9.boxes.some((b) => b.kind === 'plate') && !mk9.boxes.some((b) => b.kind === 'face' && Math.abs(b.x - 0.5) < 1e-6) && mk9.model === 'facedet+claude-sonnet-5' && mm && mm.model === 'facedet+claude-sonnet-5' && mm.n === 2 && mk9.data && j9 && j9.photos[0].st === 'masked' && /^faces 1 \(/.test(j9.photos[0].det || ''), JSON.stringify(mk9 && mk9.boxes) + ' ' + (mm && mm.model) + ' ' + JSON.stringify(j9 && j9.photos[0]));
+    T('워커 결과 상자는 by:auto · 픽셀화 실효(검출기 상자 안 색차 큼)', mk9.boxes.every((b) => b.by === 'auto') && (await (async () => { const o = await Jimp.read(Buffer.from(b64, 'base64')); const m = await Jimp.read(Buffer.from(mk9.data, 'base64')); let d = 0; for (let k = 0; k < 20; k++) { const a = o.getPixelColor(205 + k * 4, 105 + k * 4), b = m.getPixelColor(205 + k * 4, 105 + k * 4); d += Math.abs((a >>> 24) - (b >>> 24)) + Math.abs(((a >>> 16) & 255) - ((b >>> 16) & 255)); } return d / 20 > 20; })()), '');
+    // 검출기 못 실림 → 종전(Claude 전부)
+    faceMock.fail = true; faceMock.calls = 0;
+    await wk.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + itok }, body: JSON.stringify({ job: 'pm_v364b', promo_id: 'prv364', ids: [A9], force: true }) }, {});
+    const mm2 = mem.gw_files['maskmeta:' + A9], mk9b = mem.gw_files['mask:' + A9], j9b = mem.gw_data['promomask:job:pm_v364b'];
+    T('워커(검출기 못 실림): Claude 얼굴+번호판 2상자 그대로 · model claude-sonnet-5(facedet 없음) · det "facedet fail: MODELS_MISSING"',
+      mk9b.boxes.length === 2 && mk9b.boxes.some((b) => b.kind === 'face' && Math.abs(b.x - 0.5) < 1e-6) && mk9b.model === 'claude-sonnet-5' && mm2.model === 'claude-sonnet-5' && /^facedet fail: MODELS_MISSING/.test(j9b.photos[0].det || ''), JSON.stringify(mk9b.boxes) + ' ' + mm2.model + ' ' + (j9b.photos[0].det || ''));
+    // 재감지(only_old): 검출기 살아 있음 → 얼굴은 검출기, 번호판은 옛 판(Claude) 재사용 → Claude 호출 0
+    faceMock.fail = false; faceMock.calls = 0;
+    await wk.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + itok }, body: JSON.stringify({ job: 'pm_v364c', promo_id: 'prv364', ids: [A9], force: true, only_old: true }) }, {});
+    { const mkc = mem.gw_files['mask:' + A9], jc = mem.gw_data['promomask:job:pm_v364c'];
+      T('워커 재감지(only_old, 검출기 켬): 상자 2 = 검출기 얼굴 + 옛 판 번호판 재사용 · Claude 얼굴(0.5) 제거 · 호출 0 · model facedet+claude-sonnet-5 · det "번호판 재사용"',
+        jc.status === 'done' && jc.calls === 0 && jc.det_fail === 0 && jc.photos[0].st === 'masked' && /번호판 재사용/.test(jc.photos[0].det || '') && mkc.boxes.length === 2 && mkc.boxes.some((b) => b.kind === 'plate' && Math.abs(b.x - 0.7) < 1e-6) && mkc.boxes.some((b) => b.kind === 'face' && Math.abs(b.x - 200 / 600) < 1e-6) && !mkc.boxes.some((b) => b.kind === 'face' && Math.abs(b.x - 0.5) < 1e-6) && mkc.model === 'facedet+claude-sonnet-5' && mkc.boxes.every((b) => b.by === 'auto'), JSON.stringify(jc.photos[0]) + ' ' + JSON.stringify(mkc.boxes));
+      // 새 판이면 only_old는 건너뛴다(kept:auto)
+      await wk.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + itok }, body: JSON.stringify({ job: 'pm_v364d', promo_id: 'prv364', ids: [A9], force: true, only_old: true }) }, {});
+      T('워커 재감지: 이미 새 판(facedet+)이면 kept:auto · 호출 0', mem.gw_data['promomask:job:pm_v364d'].photos[0].st === 'kept:auto' && mem.gw_data['promomask:job:pm_v364d'].calls === 0, JSON.stringify(mem.gw_data['promomask:job:pm_v364d'].photos[0]));
+      // 검출기 못 실림 + only_old → skip:detector(Claude 호출 없음·판 그대로·det_fail 1)
+      mem.gw_files['mask:' + A9].model = 'claude-sonnet-5'; mem.gw_files['maskmeta:' + A9].model = 'claude-sonnet-5';
+      faceMock.fail = true; faceMock.calls = 0;
+      await wk.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + itok }, body: JSON.stringify({ job: 'pm_v364e', promo_id: 'prv364', ids: [A9], force: true, only_old: true }) }, {});
+      const je = mem.gw_data['promomask:job:pm_v364e'];
+      T('워커 재감지(검출기 못 실림): skip:detector · Claude 호출 0 · 판 그대로(model claude) · det_fail 1 · 감사에 "검출기 실패 1장"', je.status === 'done' && je.calls === 0 && je.det_fail === 1 && je.photos[0].st === 'skip:detector' && mem.gw_files['mask:' + A9].model === 'claude-sonnet-5' && auditMock.logs.some((l) => l.ev && l.ev[0].op === '자동가리기' && /검출기 실패 1장/.test(l.ev[0].t)), JSON.stringify(je.photos[0]));
+    }
+    // 검증 #8: 검출기가 한 장도 못 돈 재감지 회차는 시도로 안 센다(tries 되돌림) + det_down 표식
+    mem.gw_data['promomask:remask:prv364'] = { tries: 1, ts: 1 };
+    await wk.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + itok }, body: JSON.stringify({ job: 'pm_v364f', promo_id: 'prv364', ids: [A9], force: true, only_old: true }) }, {});
+    T('워커 재감지(검출기 못 실림): 표식 tries 1→0 · det_down 기록', mem.gw_data['promomask:remask:prv364'].tries === 0 && mem.gw_data['promomask:remask:prv364'].det_down > 0, JSON.stringify(mem.gw_data['promomask:remask:prv364']));
+    delete mem.gw_data['promomask:remask:prv364'];
+    // 검증 #9: 검출기 오류 문구는 코드만(경로 없음) · scrub이 경로를 지운다
+    faceMock.fail = new Error("ENOENT: no such file or directory, open 'C:\\var\\task\\netlify\\functions\\_models\\movenet\\model.json'");
+    await wk.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + itok }, body: JSON.stringify({ job: 'pm_v364g', promo_id: 'prv364', ids: [A9], force: true, only_old: true }) }, {});
+    T('검출기 오류 문구: "facedet fail: ENOENT"(경로·상세 없음)', mem.gw_data['promomask:job:pm_v364g'].photos[0].det === 'facedet fail: ENOENT', mem.gw_data['promomask:job:pm_v364g'].photos[0].det);
+    delete mem.gw_data['promomask:remask:prv364'];
+    faceMock.fail = true;
+    // 검증 #5: 검출기 켬 + 얼굴 0 → Claude 얼굴은 버리고 번호판만 · 클램프(가장자리 음수 상자)
+    faceMock.fail = false; faceMock.boxes = []; faceMock.calls = 0;
+    await wk.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + itok }, body: JSON.stringify({ job: 'pm_v364h', promo_id: 'prv364', ids: [A9], force: true }) }, {});
+    { const mh = mem.gw_files['mask:' + A9];
+      T('워커(검출기 켬·얼굴 0): Claude 얼굴 버림 → 번호판 1상자만 · model facedet+ · st masked', mh.boxes.length === 1 && mh.boxes[0].kind === 'plate' && mh.model === 'facedet+claude-sonnet-5' && mem.gw_data['promomask:job:pm_v364h'].photos[0].st === 'masked', JSON.stringify(mh.boxes)); }
+    faceMock.boxes = [{ kind: 'face', x: -0.02, y: 0.95, w: 0.10, h: 0.10, score: 0.5, src: 'movenet-vote3', votes: 3 }];
+    await wk.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + itok }, body: JSON.stringify({ job: 'pm_v364i', promo_id: 'prv364', ids: [A9], force: true }) }, {});
+    { const fb = mem.gw_files['mask:' + A9].boxes.filter((b) => b.kind === 'face')[0];
+      T('워커: 가장자리 상자는 클램프(x 0·y+h ≤ 1)', fb && fb.x === 0 && fb.y + fb.h <= 1 + 1e-9 && fb.w > 0, JSON.stringify(fb)); }
+    // 검증 #7: 재감지에서 검출기가 머리 0인데 옛 판에 얼굴 상자가 있으면 옛 판 유지(skip:noface) · no_face 1 · 감사 문구
+    mem.gw_files['mask:' + A9].model = 'claude-sonnet-5'; mem.gw_files['maskmeta:' + A9].model = 'claude-sonnet-5';
+    mem.gw_files['mask:' + A9].boxes = [{ kind: 'face', x: 0.5, y: 0.5, w: 0.1, h: 0.1, by: 'auto' }, { kind: 'plate', x: 0.7, y: 0.7, w: 0.1, h: 0.05, by: 'auto' }];
+    faceMock.boxes = []; faceMock.calls = 0;
+    await wk.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + itok }, body: JSON.stringify({ job: 'pm_v364j', promo_id: 'prv364', ids: [A9], force: true, only_old: true }) }, {});
+    { const jj = mem.gw_data['promomask:job:pm_v364j'];
+      T('워커 재감지(머리 0·옛 판에 얼굴 있음): skip:noface · 옛 판 그대로(model claude) · no_face 1 · Claude 호출 0 · 감사 "얼굴 미검출"', jj.photos[0].st === 'skip:noface' && jj.no_face === 1 && jj.calls === 0 && mem.gw_files['mask:' + A9].model === 'claude-sonnet-5' && mem.gw_files['mask:' + A9].boxes.length === 2 && auditMock.logs.some((l) => l.ev && l.ev[0].op === '자동가리기' && /얼굴 미검출\(옛 판 유지\) 1장/.test(l.ev[0].t)), JSON.stringify(jj.photos[0])); }
+    // 검증 #10: 고아 maskmeta(mask 판 없음) → skip:nomask(Claude 호출 0)
+    { const savedMask = mem.gw_files['mask:' + A9]; delete mem.gw_files['mask:' + A9];
+      faceMock.boxes = [{ kind: 'face', x: 0.3, y: 0.3, w: 0.1, h: 0.1, score: 0.9, src: 'movenet-vote12', votes: 12 }]; faceMock.calls = 0;
+      await wk.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + itok }, body: JSON.stringify({ job: 'pm_v364k', promo_id: 'prv364', ids: [A9], force: true, only_old: true }) }, {});
+      T('워커 재감지(고아 메타): skip:nomask · 검출기·Claude 호출 0 · 판 생성 없음', mem.gw_data['promomask:job:pm_v364k'].photos[0].st === 'skip:nomask' && faceMock.calls === 0 && mem.gw_data['promomask:job:pm_v364k'].calls === 0 && !mem.gw_files['mask:' + A9], JSON.stringify(mem.gw_data['promomask:job:pm_v364k'].photos[0]));
+      mem.gw_files['mask:' + A9] = savedMask; }
+    faceMock.fail = true; faceMock.boxes = [];
+    // 크론 재감지: 옛 판(model에 facedet 없음)이 있는 게시 전 기록 → mask_start(force) 1건 · 게시 완료 기록은 안 봄
+    kicks.length = 0;
+    mem.gw_data['promomask:lock:prv364'] = { ts: 0, job: '' };
+    let rc = await cron44.handler({}); let oc = JSON.parse(rc.body);
+    T('크론 ③ 재감지: 옛 판 1장(새 판 A10·사람 판 A11 제외) → prv364 mask_start(force true, ids=[A9]만) 1회 · 잠금·job queued(n 1) · 게시 완료 prv364p·형식 밖 id는 대상 아님', rc.statusCode === 200 && oc.remask && oc.remask.promo === 'prv364' && oc.remask.old === 1 && oc.remask.seen === 3 && oc.remask.ok === true && kicks.length === 1 && kicks[0].promo_id === 'prv364' && kicks[0].force === true && kicks[0].ids.length === 1 && kicks[0].ids[0] === A9 && kicks[0].only_old === true && auditMock.logs.some((l) => l.ev && l.ev[0].op === '가리기재감지') && mem.gw_data['promomask:lock:prv364'].job === kicks[0].job && mem.gw_data['promomask:job:' + kicks[0].job].status === 'queued' && mem.gw_data['promomask:job:' + kicks[0].job].n === 1 && !mem.gw_data['promomask:remask:bad:id/x'], JSON.stringify(oc.remask) + ' kicks ' + JSON.stringify(kicks));
+    rc = await cron44.handler({}); oc = JSON.parse(rc.body);
+    T('크론 ③ 멱등: 잠금 살아 있으면 그 기록은 읽지도 않는다(scanned 0·기동 0·시도 수 그대로 1)', oc.remask && oc.remask.scanned === 0 && !oc.remask.promo && kicks.length === 1 && mem.gw_data['promomask:remask:prv364'].tries === 1, JSON.stringify(oc.remask));
+    mem.gw_data['promomask:lock:prv364'] = { ts: 0, job: '' };
+    rc = await cron44.handler({}); oc = JSON.parse(rc.body);
+    T('크론 ③ 2회차: 옛 판이 그대로면 한 번 더(시도 2)', oc.remask && oc.remask.promo === 'prv364' && oc.remask.ok === true && kicks.length === 2 && mem.gw_data['promomask:remask:prv364'].tries === 2, JSON.stringify(oc.remask));
+    mem.gw_data['promomask:lock:prv364'] = { ts: 0, job: '' };
+    rc = await cron44.handler({}); oc = JSON.parse(rc.body);
+    T('크론 ③ 상한: 2회 뒤에도 옛 판이면 더 안 돈다(capped 1·기동 없음·done 표식) — 검출기 못 실리는 배포에서 무한 반복 방지', oc.remask && !oc.remask.promo && oc.remask.capped === 1 && kicks.length === 2 && mem.gw_data['promomask:remask:prv364'].done > 0, JSON.stringify(oc.remask));
+    rc = await cron44.handler({}); oc = JSON.parse(rc.body);
+    T('크론 ③ done 표식: 기록이 안 바뀌면 maskmeta를 다시 안 읽는다(scanned 0)', oc.remask && oc.remask.scanned === 0 && kicks.length === 2, JSON.stringify(oc.remask));
+    mem.gw_files['maskmeta:' + A9].model = 'facedet+claude-sonnet-5';
+    mem.gw_data['col:promo'].items[0].updated_ts = Date.now() + 5;   // 기록이 바뀌면 다시 본다
+    mem.gw_data['promomask:lock:prv364'] = { ts: 0, job: '' };
+    rc = await cron44.handler({}); oc = JSON.parse(rc.body);
+    T('크론 ③: 기록이 바뀌어 다시 보니 새 판만 → 대상 0 · done 갱신', oc.remask && oc.remask.old === 0 && !oc.remask.promo && oc.remask.capped === 0 && oc.remask.scanned === 1 && kicks.length === 2, JSON.stringify(oc.remask));
+    // 크론 예산 70%: 사용량이 상한 70%를 넘으면 BUDGET_CAP(시도 수 안 셈) — 사람 mask_start 몫 보호
+    delete mem.gw_data['promomask:remask:prv364'];
+    mem.gw_files['maskmeta:' + A9].model = 'claude-sonnet-5';
+    mem.gw_data['col:promo'].items[0].updated_ts = Date.now() + 9;
+    mem.gw_data['promomask:lock:prv364'] = { ts: 0, job: '' };
+    { const mk = require(join(FN, 'gw-promo-mask.js'));
+      const d0 = new Date(Date.now() + 9 * 3600000); const mkey = d0.getUTCFullYear() + '-' + String(d0.getUTCMonth() + 1).padStart(2, '0');
+      mem.gw_data['promomask:usage'] = { schema: 1, months: {} }; mem.gw_data['promomask:usage'].months[mkey] = { calls: 700, input: 0, output: 0 };
+      rc = await cron44.handler({}); oc = JSON.parse(rc.body);
+      T('크론 ③ 예산: 월 700(=1000×70%) 사용이면 BUDGET_CAP · 기동 0 · 시도 수 없음', oc.remask && oc.remask.promo === 'prv364' && oc.remask.ok === false && oc.remask.code === 'BUDGET_CAP' && kicks.length === 2 && !(mem.gw_data['promomask:remask:prv364'] && mem.gw_data['promomask:remask:prv364'].tries), JSON.stringify(oc.remask) + ' ' + JSON.stringify(mem.gw_data['promomask:remask:prv364']));
+      mem.gw_data['promomask:usage'] = { schema: 1, months: {} };
+      delete mem.gw_data['promomask:remask'];   // 예산 검사(BUDGET_CAP=전역 원인)가 남긴 전역 중단 표식 제거
+      // 검증 #1: done 표식은 사진마다 판이 다 있을 때만 — 판 없는 새 기록은 표식 없이 다음 회차
+      mem.gw_files['maskmeta:' + A9].model = 'facedet+claude-sonnet-5';
+      mem.gw_data['col:promo'].items.push({ id: 'prv364n', title: 't', body: 'b', status: 'review', photos: [{ id: 'att_' + '2'.repeat(16), name: 'p.jpg' }], ai: { ts: 1 }, tags: ['x'], updated_ts: Date.now() + 20 });
+      mem.gw_data['col:promo'].items[0].updated_ts = Date.now() + 20;
+      mem.gw_data['promomask:lock:prv364'] = { ts: 0, job: '' };
+      rc = await cron44.handler({}); oc = JSON.parse(rc.body);
+      T('크론 ③ done 조건: 판이 다 있는 prv364는 done · 판 없는 prv364n은 표식 없음(scanned 2)', oc.remask && oc.remask.scanned === 2 && mem.gw_data['promomask:remask:prv364'].done > 0 && !(mem.gw_data['promomask:remask:prv364n'] && mem.gw_data['promomask:remask:prv364n'].done), JSON.stringify(oc.remask) + ' ' + JSON.stringify(mem.gw_data['promomask:remask:prv364n']));
+      mem.gw_data['col:promo'].items = mem.gw_data['col:promo'].items.filter((x) => x.id !== 'prv364n');
+      mem.gw_files['maskmeta:' + A9].model = 'claude-sonnet-5'; delete mem.gw_data['promomask:remask:prv364'];
+      mem.gw_data['col:promo'].items[0].updated_ts = Date.now() + 30;
+      // 검증 #1: 가리기 작업이 도는 중(잠금 살아 있음)이면 그 기록은 건너뛴다(scanned 0)
+      mem.gw_data['promomask:lock:prv364'] = { ts: Date.now(), job: 'pm_running' };
+      rc = await cron44.handler({}); oc = JSON.parse(rc.body);
+      T('크론 ③ 잠금 중 기록은 읽지 않는다(scanned 0·기동 없음)', oc.remask && oc.remask.scanned === 0 && !oc.remask.promo && kicks.length === 2, JSON.stringify(oc.remask));
+      mem.gw_data['promomask:lock:prv364'] = { ts: 0, job: '' };
+      // 검증 #8: det_down 표식이 6시간 안이면 건너뛴다
+      mem.gw_data['promomask:remask:prv364'] = { tries: 0, det_down: Date.now() - 60000 };
+      rc = await cron44.handler({}); oc = JSON.parse(rc.body);
+      T('크론 ③ 검출기 장애 표식(1분 전) → 건너뜀', oc.remask && oc.remask.scanned === 0 && !oc.remask.promo, JSON.stringify(oc.remask));
+      mem.gw_data['promomask:remask:prv364'] = { tries: 0, det_down: Date.now() - 7 * 3600000 };
+      rc = await cron44.handler({}); oc = JSON.parse(rc.body);
+      T('크론 ③ 검출기 장애 표식(7시간 전) → 다시 감지(기동 1)', oc.remask && oc.remask.promo === 'prv364' && oc.remask.ok === true && kicks.length === 3, JSON.stringify(oc.remask));
+      mem.gw_data['promomask:lock:prv364'] = { ts: 0, job: '' }; delete mem.gw_data['promomask:remask:prv364'];
+      // 검증 #6·#12: 전역 원인(사이트 URL 없음)으로 기동 실패 → 전역 중단 표식(6시간) · 다음 회차 ③ 전체 skipped:global · 고아 job 없음
+      { const savedUrl2 = process.env.URL; process.env.URL = '';
+        rc = await cron44.handler({}); oc = JSON.parse(rc.body);
+        const jobsBefore = Object.keys(mem.gw_data).filter((k) => k.indexOf('promomask:job:') === 0).length;   // 첫 회차(실패 job 1개 생김) 뒤 기준
+        const gm = mem.gw_data['promomask:remask'];
+        T('크론 ③ 전역 기동 실패(NO_SITE_URL) → promomask:remask {until +6h, code} · 기록 시도 수 없음', oc.remask && oc.remask.ok === false && oc.remask.code === 'NO_SITE_URL' && gm && gm.code === 'NO_SITE_URL' && gm.until > Date.now() + 5 * 3600000 && !(mem.gw_data['promomask:remask:prv364'] && mem.gw_data['promomask:remask:prv364'].tries), JSON.stringify(oc.remask) + ' ' + JSON.stringify(gm));
+        rc = await cron44.handler({}); oc = JSON.parse(rc.body);
+        T('크론 ③ 전역 중단 중: skipped global · maskmeta 안 읽음 · 새 job 없음', oc.remask && oc.remask.skipped === 'global' && Object.keys(mem.gw_data).filter((k) => k.indexOf('promomask:job:') === 0).length === jobsBefore, JSON.stringify(oc.remask));
+        process.env.URL = savedUrl2; delete mem.gw_data['promomask:remask']; mem.gw_data['promomask:lock:prv364'] = { ts: 0, job: '' }; }
+      // startForCron 잠금 재확인: 쓰고 나서 남의 job이 보이면 ALREADY_RUNNING(기동 없음)
+      const realGet = blobsMock.hooks.beforeGet; let stolen = false;
+      blobsMock.hooks.beforeGet = async (k) => { if (!stolen && k === 'promomask:lock:prv364' && mem.gw_data[k] && /^pm_/.test(String(mem.gw_data[k].job || ''))) { stolen = true; mem.gw_data[k] = { ts: Date.now(), job: 'pm_human' }; } };   // 우리가 쓴 직후의 재확인 읽기에서 남이 잡은 것으로
+      const kb = kicks.length;
+      const s2 = await mk.startForCron({ name: 'gw_data', toString() { return 'gw_data'; } }, { promoId: 'prv364', ids: [A9], force: true, capRatio: 0.7 });
+      blobsMock.hooks.beforeGet = realGet;
+      T('startForCron 잠금 재확인: 쓴 직후 남(pm_human)이 잡았으면 ALREADY_RUNNING · 기동 없음', s2.ok === false && s2.code === 'ALREADY_RUNNING' && kicks.length === kb, JSON.stringify(s2));
+      mem.gw_data['promomask:lock:prv364'] = { ts: 0, job: '' };
+      T('mask_apply(사람 판)는 model human으로 저장돼 재감지 대상이 아니다 · netlify.toml 크론 schedule 등록', /model: 'human'/.test(msrc) && /\[functions\."gw-promo-ai-cron"\]\s*\n\s*schedule = "\*\/10 \* \* \* \*"/.test(toml), '');
+    }
+    // 사람이 만진 판(human)은 재감지 대상에서 제외돼야 하나? — 아니다: force는 '자동 판만 다시'라 워커가 human을 지킨다(절 41). 여기서는 model만 본다.
+  } finally { global.fetch = realFetch; process.env.GW_ANTHROPIC_KEY = savedKey; process.env.URL = savedUrl; faceMock.fail = true; faceMock.boxes = []; }
 }
 
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

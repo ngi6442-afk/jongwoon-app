@@ -155,7 +155,8 @@ async function applyBoxes(buf, boxes) {
 function metaOf(rec) {
   const boxes = (rec && Array.isArray(rec.boxes)) ? rec.boxes : [];
   return { schema: 1, has: true, n: boxes.length, human: !!(rec && (rec.human === true || boxes.some(function (b) { return b && b.by === 'human'; }))),
-    auto: !!(rec && rec.auto === true), w: Number(rec && rec.w) || 0, h: Number(rec && rec.h) || 0, ts: Number(rec && rec.ts) || 0 };
+    auto: !!(rec && rec.auto === true), w: Number(rec && rec.w) || 0, h: Number(rec && rec.h) || 0, ts: Number(rec && rec.ts) || 0,
+    model: String((rec && rec.model) || '') };   // v364: 어느 검출기 판인지(facedet+… / claude-…) — 크론 재감지 판정용
 }
 
 module.exports = { maskKey, metaKey, mimeOf, checkImageRec, cleanBoxes, parseBoxes, detectBoxes, applyBoxes, metaOf, MODEL, PAD, PAD_MIN, MAX_BOXES, MAX_PHOTO_B64, IMG_MIME };

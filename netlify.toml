@@ -5,6 +5,10 @@
 [functions]
   node_bundler = "esbuild"
 
+# v364 사진 가리기 얼굴·머리 검출기 — 모델(Google MoveNet 9.7MB)·wasm(0.4MB×3)을 함수에 동봉(외부 호출 없음, 얼굴 모델 없음). 경로는 _lib/facedet.js modelRoot()가 찾는다.
+[functions."gw-promo-mask-background"]
+  included_files = ["netlify/functions/_models/**"]
+
 # 화관법 제품 노선 자동 제출 — UTC 22:30 = KST 익일 07:30, UTC 일~목 = KST 월~금.
 # 요일 규칙(월~목 D+3, 금 D+3~5, 주말 스킵 — PM 8/11 정정)은 함수 내부에서 KST로 재계산(이중 방어).
 [functions."gw-hwakwan-cron"]

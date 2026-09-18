@@ -53,7 +53,7 @@ function newJobId() { return 'pm_' + Date.now().toString(36) + '_' + crypto.rand
 function envReady() { return !!process.env.GW_ANTHROPIC_KEY; }
 function monthCalls(doc) { const m = (doc && doc.months && doc.months[kstMonth()]) || null; const n = Number(m && m.calls); return (Number.isFinite(n) && n > 0) ? Math.floor(n) : 0; }
 
-async function kickBackground(job, promoId, ids, force) {
+async function kickBackground(job, promoId, ids, force, onlyOld) {
   const s = issueSession({ id: '__promomask__', role: 'system' });
   if (!s.ok) return { ok: false, code: s.code || 'SERVER_CONFIG_MISSING' };
   const base = String(process.env.URL || '').replace(/\/$/, '');
@@ -61,7 +61,7 @@ async function kickBackground(job, promoId, ids, force) {
   try {
     const resp = await fetch(base + '/.netlify/functions/gw-promo-mask-background', {
       method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + s.token },
-      body: JSON.stringify({ job: job, promo_id: promoId, ids: ids, force: !!force }),
+      body: JSON.stringify({ job: job, promo_id: promoId, ids: ids, force: !!force, only_old: !!onlyOld }),
     });
     if (!resp.ok && resp.status !== 202) return { ok: false, code: 'KICKOFF_HTTP_' + resp.status };
     return { ok: true };
@@ -84,6 +84,43 @@ async function promoPhotoIds(st, promoId) {
 async function lockAlive(st, promoId) {
   const lk = await blobGet(st, lockKey(promoId));
   return (lk.ok && lk.data && lk.data.ts && (Date.now() - lk.data.ts) < LOCK_TTL_MS) ? lk.data : null;
+}
+
+// v364: 크론(검출기 교체 재감지)용 — 회원 권한 검사 없이 잠금·상한·기동만. handleStart와 같은 규칙(잠금 재확인 포함).
+//   o.ids: 이 사진들만(기록의 사진 중 부분집합 — 옛 판만 다시 감지, 새 판·사람 판은 안 건드림) · o.capRatio: 월 상한의 몇 %까지만 크론이 쓰나(사람 몫 보호)
+async function startForCron(st, o) {
+  const promoId = String((o && o.promoId) || '').trim();
+  if (!RE_REC_ID.test(promoId)) return { ok: false, code: 'BAD_PROMO_ID' };
+  if (!envReady()) return { ok: false, code: 'ENV_MISSING' };
+  const ph = await promoPhotoIds(st, promoId);
+  if (ph.err) return { ok: false, code: ph.err };
+  let ids = ph.ids;
+  if (o && Array.isArray(o.ids) && o.ids.length) { const want = Object.create(null); o.ids.forEach(function (i) { want[String(i)] = 1; }); ids = ph.ids.filter(function (i) { return want[i] === 1; }); }
+  if (!ids.length) return { ok: false, code: 'NO_PHOTOS' };
+  const ur = await blobGet(st, USAGE_KEY);
+  const used = ur.ok ? monthCalls(ur.data) : 0;
+  const cap = Math.floor(MONTH_CALL_CAP * ((o && o.capRatio > 0 && o.capRatio <= 1) ? o.capRatio : 1));
+  if (used + ids.length > cap) return { ok: false, code: 'BUDGET_CAP', used: used, cap: cap };
+  const alive = await lockAlive(st, promoId);
+  if (alive) return { ok: false, code: 'ALREADY_RUNNING', job: String(alive.job || '') };
+  const job = newJobId();
+  await blobSet(st, lockKey(promoId), { ts: Date.now(), job: job });
+  const lk2 = await blobGet(st, lockKey(promoId));   // 사람 클릭과 동시 방어(handleStart와 동일)
+  if (!(lk2.ok && lk2.data && lk2.data.job === job)) return { ok: false, code: 'ALREADY_RUNNING', job: String((lk2.data && lk2.data.job) || '') };
+  await new Promise(function (res) { setTimeout(res, 150 + Math.floor(Math.random() * 250)); });   // 검증 #11: 쓰기-재읽기가 원자적이지 않아 짧은 무작위 지연 뒤 한 번 더(동시 클릭 창을 닫는다)
+  const lk3 = await blobGet(st, lockKey(promoId));
+  if (!(lk3.ok && lk3.data && lk3.data.job === job)) return { ok: false, code: 'ALREADY_RUNNING', job: String((lk3.data && lk3.data.job) || '') };
+  const base = { ts: Date.now(), by: String((o && o.by) || '자동'), promo_id: promoId, n: ids.length, done: 0, photos: [] };
+  await blobSet(st, jobKey(job), Object.assign({ status: 'queued' }, base));
+  const onlyOld = !!(o && Array.isArray(o.ids) && o.ids.length);
+  const k = await kickBackground(job, promoId, ids, !!(o && o.force), onlyOld);
+  if (!k.ok) {
+    await blobSet(st, jobKey(job), Object.assign({ status: 'fail', code: k.code }, base));
+    try { await blobSet(st, lockKey(promoId), { ts: 0, job: '' }); } catch (e) {}
+    return { ok: false, code: k.code };
+  }
+  try { await appendAudit({ ts: Date.now(), by: base.by, bid: '__cron__', col: 'promo', ev: [{ op: '가리기재감지', id: promoId.slice(0, 30), t: (onlyOld ? '옛 판 ' : '') + ids.length + '장 · ' + job }] }); } catch (e) {}
+  return { ok: true, job: job, n: ids.length };
 }
 
 async function handleStart(st, c, d, R) {
@@ -169,7 +206,7 @@ async function handleApply(st, c, d, R) {
   let out = null;
   try { out = await M.applyBoxes(Buffer.from(chk.data, 'base64'), boxes); } catch (e) { return jr(500, { ok: false, code: 'PIXELATE_FAILED', request_id: R }); }
   const rec = { schema: 1, src: id, name: r.data.name, type: 'image/jpeg', kind: 'promo', auto: false, human: true, boxes: boxes,
-    w: out.w, h: out.h, data: out.buf ? out.buf.toString('base64') : '', by: c.member.name, ts: Date.now() };
+    w: out.w, h: out.h, data: out.buf ? out.buf.toString('base64') : '', model: 'human', by: c.member.name, ts: Date.now() };   // v364: model 'human' — 크론 재감지가 옛 판으로 오인하지 않게
   const w = await blobSet(fst, M.maskKey(id), rec);
   if (!w.ok) return jr(500, { ok: false, code: w.code, request_id: R });
   await blobSet(fst, M.metaKey(id), M.metaOf(rec));
@@ -217,3 +254,4 @@ async function handler(event) {
 }
 
 exports.handler = handler;
+exports.startForCron = startForCron;   // v364: gw-promo-ai-cron 재감지용

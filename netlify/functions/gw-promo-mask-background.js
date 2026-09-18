@@ -10,6 +10,7 @@
 // API 키는 GW_ANTHROPIC_KEY 를 여기서만 읽어 detectBoxes 인자로만 흘린다 — 로그·blob·응답에 남기지 않는다(scrub 마지막 방어선).
 const { setupBlobContext, store, blobGet, blobSet } = require('./_lib/blobs');
 const { verifyToken, bearer } = require('./_lib/session');
+const F = require('./_lib/facedet');   // v364: 얼굴 전용 검출기(공개 모델, 외부 호출 없음)
 const { appendAudit } = require('./_lib/audit');
 const M = require('./_lib/promomask');
 
@@ -30,6 +31,7 @@ function makeScrub() {
   return function scrub(v) {
     let out = (v === null || v === undefined) ? '' : String(v);
     for (const sec of secrets) { if (out.indexOf(sec) >= 0) out = out.split(sec).join('***'); }
+    out = out.replace(/(?:[A-Za-z]:)?[\\/](?:[^\s'"\\/]+[\\/])+[^\s'"\\/]*/g, '<path>');   // 서버 파일 경로 제거(검증 #9 — 검출기·fs 오류 문구가 job에 실린다)
     return out.length > MAX_LOG_CHARS ? out.slice(0, MAX_LOG_CHARS) + '…' : out;
   };
 }
@@ -76,6 +78,7 @@ exports.handler = async function (event, context) {
     job = String(d.job || '').trim();
     promoId = String(d.promo_id || '').trim();
     const force = d.force === true;
+    const onlyOld = d.only_old === true;   // v364 크론 재감지: 옛 판만(새 판 건너뜀·검출기 없으면 Claude 호출 없이 skip·번호판은 옛 판 재사용)
     if (!RE_JOB.test(job) || !RE_REC_ID.test(promoId)) return;
     const ids = (Array.isArray(d.ids) ? d.ids : []).map(function (x) { return String(x || '').trim(); }).filter(function (x) { return RE_ATT.test(x); }).slice(0, MAX_PHOTOS);
 
@@ -87,7 +90,7 @@ exports.handler = async function (event, context) {
     const apiKey = process.env.GW_ANTHROPIC_KEY;   // detectBoxes 인자로만 흐른다
     if (!ids.length) { await finish('done', 'NO_PHOTOS'); return; }
 
-    let calls = 0, timedOut = false; const usage = { input: 0, output: 0 };
+    let calls = 0, timedOut = false, detFail = 0, noFace = 0; const usage = { input: 0, output: 0 };
     for (const id of ids) {
       const item = { id: id, boxes: 0, st: '' };
       if (Date.now() - started > BUDGET_MS) { item.st = 'skip:time'; timedOut = true; rec.photos.push(item); continue; }
@@ -100,17 +103,35 @@ exports.handler = async function (event, context) {
         // 사람이 손본 판은 force여도 덮지 않는다('가릴 것 없음'으로 확인한 것도 사람 판단이다)
         if (prev && isHuman(prev)) { item.st = 'kept:human'; item.boxes = (prev.boxes || []).length; rec.photos.push(item); continue; }
         if (prev && !force && prev.auto === true) { item.st = 'kept:auto'; item.boxes = (prev.boxes || []).length; rec.photos.push(item); continue; }
-        const det = await M.detectBoxes(apiKey, chk.mt, chk.data);
-        calls += 1; if (det.usage) { usage.input += det.usage.input; usage.output += det.usage.output; }
-        const boxes = det.boxes.map(function (b) { b.by = 'auto'; return b; });
-        item.boxes = boxes.length;
-        const out = await M.applyBoxes(Buffer.from(chk.data, 'base64'), boxes);
+        if (prev && onlyOld && /^facedet/.test(String(prev.model || ''))) { item.st = 'kept:auto'; item.boxes = (prev.boxes || []).length; rec.photos.push(item); continue; }   // 이미 새 판
+        if (onlyOld && !prev) { item.st = 'skip:nomask'; rec.photos.push(item); continue; }   // 검증 #10: maskmeta만 남은 고아(사람이 지운 판) — 재감지가 다시 가리지 않는다
+        // v364(PM 9/16 "얼굴 못 가리네 … 근본적으로"): 얼굴·머리는 전용 검출기(_lib/facedet — Google MoveNet 다중 배율 투표, 얼굴 모델 없음·중국계 없음), 번호판만 Claude 비전.
+        //   9/16 실측: Claude 비전 얼굴 상자는 자리가 틀려(픽셀화가 가슴·벽에 찍힘) 얼굴 상자로는 쓰지 않는다. 검출기가 못 실리면 종전(Claude 전부)으로 내려간다.
+        const raw = Buffer.from(chk.data, 'base64');
+        let faces = null, fdiag = '';
+        try { const fr = await F.detectFaces(raw); faces = fr.boxes.map(function (b) { return { kind: 'face', x: b.x, y: b.y, w: b.w, h: b.h }; }); fdiag = 'faces ' + faces.length + ' (' + fr.ms + 'ms, raw ' + fr.diag.raw + ', pose ' + (fr.diag.pose ? 'on' : 'off') + ')'; }
+        catch (e) { faces = null; fdiag = 'facedet fail: ' + ((e && (e.code || String(e.message || 'ERR').split(/[:'\\/]/)[0])) || 'ERR'); }   // 코드만(경로·상세 제외, 검증 #9)
+        if (faces === null) detFail++;
+        if (faces === null && onlyOld) { item.st = 'skip:detector'; item.det = scrub(fdiag); rec.photos.push(item); continue; }   // 검출기 없이 재감지하면 옛 판을 같은 판으로 덮을 뿐 — Claude 호출 안 함
+        // 검증 #7: 재감지에서 검출기가 머리를 하나도 못 찾았는데 옛 판에 얼굴 상자가 있으면 옛 판을 지우지 않는다(사람 확인 없이 가림을 줄이지 않는다) — 카드에 "얼굴 미검출"로 보인다
+        if (onlyOld && faces && !faces.length && prev && (prev.boxes || []).some(function (b) { return b && b.kind === 'face'; })) { item.st = 'skip:noface'; item.boxes = (prev.boxes || []).length; item.det = scrub(fdiag); noFace++; rec.photos.push(item); continue; }
+        let det;
+        if (onlyOld && prev && Array.isArray(prev.boxes)) {   // 재감지: 번호판은 옛 판의 Claude 결과 재사용(호출 0)
+          det = { boxes: prev.boxes.filter(function (b) { return b && b.kind === 'plate'; }).map(function (b) { return { kind: 'plate', x: b.x, y: b.y, w: b.w, h: b.h }; }), model: String(prev.model || M.MODEL || 'claude'), usage: null, reused: true };
+        } else {
+          det = await M.detectBoxes(apiKey, chk.mt, chk.data);
+          calls += 1; if (det.usage) { usage.input += det.usage.input; usage.output += det.usage.output; }
+        }
+        const claude = det.boxes.filter(function (b) { return faces === null ? true : b.kind !== 'face'; });   // 검출기가 살아 있으면 Claude는 번호판만
+        const boxes = M.cleanBoxes((faces || []).concat(claude)).map(function (b) { b.by = 'auto'; return b; });   // 클램프(머리 상자는 가장자리에서 음수가 될 수 있다)
+        item.boxes = boxes.length; item.det = scrub(fdiag + (det.reused ? ' · 번호판 재사용' : ''));   // 검출기 오류 문구에 서버 경로가 실릴 수 있어 스크럽(길이 상한 포함)
+        const out = await M.applyBoxes(raw, boxes);
         // 저장 직전 재확인 — 감지하는 사이 사람이 먼저 적용했으면 그쪽이 이긴다(적대 검증 #17)
         const again = await blobGet(fst, M.maskKey(id));
         const cur = (again.ok && again.data) ? again.data : null;
         if (cur && (isHuman(cur) || (Number(cur.ts) || 0) > started)) { item.st = 'kept:human'; item.boxes = (cur.boxes || []).length; rec.photos.push(item); continue; }
         await saveMask(fst, id, { schema: 1, src: id, name: r.data.name, type: 'image/jpeg', kind: 'promo', auto: true, human: false, boxes: boxes,
-          w: out.w, h: out.h, data: out.buf ? out.buf.toString('base64') : '', model: det.model, by: '__promomask__', ts: Date.now() });
+          w: out.w, h: out.h, data: out.buf ? out.buf.toString('base64') : '', model: (faces === null ? det.model : 'facedet+' + det.model), by: '__promomask__', ts: Date.now() });
         item.st = boxes.length ? 'masked' : 'clear';
       } catch (e) {
         item.st = 'fail:' + scrub((e && e.message) || 'ERR');
@@ -120,10 +141,18 @@ exports.handler = async function (event, context) {
       try { await blobSet(st, jobKey(job), rec); } catch (e2) {}
       try { await blobSet(st, lockKey(promoId), { ts: Date.now(), job: job }); } catch (e3) {}   // 잠금 ts 갱신(긴 작업이 TTL을 넘지 않게)
     }
+    // 검증 #8: 재감지(only_old)에서 검출기가 한 장도 못 돌았으면 이 회차는 시도로 안 센다(표식 tries 되돌림) + det_down 표식(크론이 6시간 쉼) — 장애가 걷히면 다시 감지된다
+    if (onlyOld && detFail > 0 && !rec.photos.some(function (p) { return p.st === 'masked' || p.st === 'clear'; })) {
+      try {
+        const rk = 'promomask:remask:' + promoId; const cur = await blobGet(st, rk);
+        const td = (cur.ok && cur.data && typeof cur.data === 'object') ? cur.data : {};
+        await blobSet(st, rk, Object.assign({}, td, { tries: Math.max(0, (Number(td.tries) || 0) - 1), det_down: Date.now(), job: job }));
+      } catch (e) {}
+    }
     await bumpUsage(st, calls, usage);
-    rec.calls = calls;
+    rec.calls = calls; rec.det_fail = detFail; rec.no_face = noFace;   // 검출기 실패 장수(0이 정상 — 모델 누락·번들 경로 문제를 크게 보이게) · 얼굴 미검출(옛 판 유지) 장수
     const masked = rec.photos.filter(function (p) { return p.st === 'masked'; }).length, failed = rec.photos.filter(function (p) { return /^fail:/.test(p.st); }).length;
-    try { await appendAudit({ ts: Date.now(), by: '__promomask__', bid: '__promomask__', col: 'promo', ev: [{ op: '자동가리기', id: job, t: promoId + ' · 가림 ' + masked + '장 / 실패 ' + failed + '장 / 호출 ' + calls + (timedOut ? ' · 시간 초과' : '') }] }); } catch (e) {}
+    try { await appendAudit({ ts: Date.now(), by: '__promomask__', bid: '__promomask__', col: 'promo', ev: [{ op: '자동가리기', id: job, t: promoId + ' · 가림 ' + masked + '장 / 실패 ' + failed + '장 / 호출 ' + calls + (detFail ? ' / 검출기 실패 ' + detFail + '장' : '') + (noFace ? ' / 얼굴 미검출(옛 판 유지) ' + noFace + '장' : '') + (timedOut ? ' · 시간 초과' : '') }] }); } catch (e) {}
     await finish(timedOut ? 'partial' : 'done', timedOut ? 'TIME_BUDGET' : '');
   } catch (e) {
     await finish('fail', 'WORKER_THREW', (e && e.message) || '');
