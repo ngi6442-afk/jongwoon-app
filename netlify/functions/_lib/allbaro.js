@@ -410,6 +410,8 @@ function candBrief(list) {
 // 반환 { route, weak, learned, reason, needVehicle, candidates }
 //   reason: null(배정됨) | 'NO_ROUTE'(상차지·하차지가 노선표에 없음) | 'AMBIGUOUS'(후보 여럿, 못 좁힘) | 'ITEM_MISMATCH'(상·하차지 줄은 있으나 품목이 다름 — v326)
 //   weak  : 후보가 1개뿐이라 품목이 달라도 배정한 경우(사람이 눈으로 확인하라는 표시)
+//   variant: v366 — 배정된 줄 이름과 올바로 상차지가 (정규화 뒤) 다르고 올바로 이름이 줄 이름을 품는 경우('에코프로비엠(CAM4)' vs 줄 '에코프로비엠').
+//            같은 곳의 다른 표기일 수도, 다른 현장(호기·사업장)일 수도 있어 사람이 [별도 줄로 나누기]로 정한다 — 집계가 counts[].variants에 남긴다.
 function matchRouteEx(row, opts) {
   const src = row || {};
   const o = opts || {};
@@ -432,14 +434,14 @@ function matchRouteEx(row, opts) {
         if (!distinct.some((r) => r.side === h.route.side && Number(r.row) === Number(h.route.row))) distinct.push(h.route);
       }
       if (distinct.length === 1) {
-        return { route: hits[0].route, weak: false, learned: true, reason: null, needVehicle: false, candidates: [] };
+        return { route: hits[0].route, weak: false, learned: true, reason: null, needVehicle: false, candidates: [], variant: false };
       }
       // 충돌 — 사람이 다시 정하도록 미매칭으로 남긴다.
       if (o.notes) {
         o.notes.push('[학습] 충돌: ' + cleanText(rawFrom) + ' → ' + cleanText(rawTo) + ' · ' + cleanText(rawItem)
           + ' → ' + distinct.map((r) => r.side + r.row).join(',') + ' (여러 줄 지정, 배정 보류)');
       }
-      return { route: null, weak: false, learned: false, reason: 'AMBIGUOUS', needVehicle: false, candidates: candBrief(routeCandidates(f, t)) };
+      return { route: null, weak: false, learned: false, reason: 'AMBIGUOUS', needVehicle: false, candidates: candBrief(routeCandidates(f, t)), variant: false };
     }
   }
 
@@ -447,12 +449,14 @@ function matchRouteEx(row, opts) {
   const brief = candBrief(cands);
   const miss = (reason, needVehicle) => ({
     route: null, weak: false, learned: false, reason: reason,
-    needVehicle: !!needVehicle, candidates: brief,
+    needVehicle: !!needVehicle, candidates: brief, variant: false,
   });
   const take = (c) => ({
     route: c.nr.route, learned: false, reason: null, needVehicle: false, candidates: brief,
     // 구내운송처럼 품목칸이 도착처인 줄은 품목 비교 자체가 성립하지 않으므로 weak를 달지 않는다.
     weak: !c.viaItem && !itemHit(rawItem, c.nr.route.item),
+    // v366: 표기 변형 — 올바로 이름이 줄 이름을 품되 같지 않다(정규화 뒤). 반대 방향(줄 이름이 더 김)은 변형이 아니다.
+    variant: f !== c.nr.f && f.indexOf(c.nr.f) >= 0,
   });
 
   if (!cands.length) return miss('NO_ROUTE', false);
@@ -747,6 +751,7 @@ function aggregate(rows, day, opts) {
     };
     if (vtype) c.vehicle_type = vtype;
     if (dec.learned) c.learned = true;
+    if (dec.variant) c.variants = [g.from];   // v366: 올바로 원문 이름(앱 칩·[별도 줄로 나누기]·푸시가 그대로 쓴다)
     if (!dec.route) { c.reason = dec.reason; c.candidates = dec.candidates; }
     counts.push(c);
   };
@@ -1208,7 +1213,7 @@ function judgeBundle(c, learnedIndex, notes) {
 }
 
 // 일자 문서(allbaro:day:*) 재판정 — 순수 함수(입력 문서는 손대지 않고 새 문서를 돌려준다).
-// counts 각 묶음의 route/weak/reason/candidates/learned만 현재 ROUTES·학습 사전으로 갱신하고, unmatched[]를 counts의
+// counts 각 묶음의 route/weak/reason/candidates/learned·variants(v366)만 현재 ROUTES·학습 사전으로 갱신하고, unmatched[]를 counts의
 // route:null 묶음으로 다시 만든다(aggregate와 같은 규칙). n·qty·n_pending·excluded·pending·veh_totals·total은 건드리지 않는다.
 // opts = { learned:[{from,to,item,side,row}] | learnedIndex, now }
 // 반환 { ok, changed(판정이 바뀐 묶음 수), doc(routes_ver·rematched_at 기록), notes }. counts 배열이 없는 문서는 ok:false·원본 그대로.
@@ -1226,6 +1231,7 @@ function rematchDoc(doc, opts) {
       : null;
     c.weak = !!dec.weak;
     if (dec.learned) c.learned = true; else delete c.learned;
+    if (dec.variant) c.variants = [c.from]; else delete c.variants;   // v366: 줄이 생겨 제 줄로 가면 변형 표시도 사라진다
     if (dec.route) { delete c.reason; delete c.candidates; }
     else { c.reason = dec.reason; c.candidates = dec.candidates; }
     if (decSig(c) !== decSig(c0)) changed += 1;

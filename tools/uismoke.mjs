@@ -150,6 +150,13 @@ try {
     && /promoAiLine\(p\)/.test(idx) && /' · 태그 '\+\(\(p\.tags\|\|\[\]\)\.length\)\+'개'/.test(idx) && /" · 태그 "\+\(\(r\.tags&&r\.tags\.length\)\|\|0\)\+"개"/.test(idx), '');
   // v352(PM 9/11 #31ⓑ — 직원 수정본 5편 실측): 담당자 포장 = 가운데 정렬·20자 개행·소제목 굵게+구분선·물음표·정화조/저수조 삭제
   const bp = (idx.match(/function promoBuildPostHtml\(title, body, imgs\)\{([\s\S]*?)\n  \}/) || ['', ''])[1];
+  const abl366 = readFileSync(join(ROOT, 'netlify/functions/_lib/allbaro.js'), 'utf8'), abw366 = readFileSync(join(ROOT, 'netlify/functions/gw-allbaro-run-background.js'), 'utf8');
+  T('v366 운반일지 재발방지: AB_PEND_HINT·전부 잠정 칸 붉은 숫자(ab-n-pend, "?")·문구 "예약 미실행 가능" 3곳 · abVariantHtml 칩(표기 변형)+[별도 줄로 나누기](abCanLearn) · abVariantSplit=ab_route_add(from=원문, to·item=줄 값)→loadAbStatus+abOpenDay · data-ab-split 배선 · 서버 matchRouteEx variant·aggregate variants·rematch 갱신 · 워커 notifyPendingAndVariants(운영부+PM, (day,manf)/(이름) 1회)',
+    /var AB_PEND_HINT = "/.test(idx) && /class="ab-n-pend" title="' \+ esc\(AB_PEND_HINT/.test(idx) && /n \+ '\?<\/span>'/.test(idx) && (idx.match(/예약 미실행 가능/g) || []).length >= 3
+    && /function abVariantHtml\(c, r\)/.test(idx) && /표기 변형 ' \+ esc\(names\.join/.test(idx) && /if \(abCanLearn\(\)\) h \+= '<button type="button" class="ab-hide-btn" data-ab-split=/.test(idx)
+    && /function abVariantSplit\(side, row, name\)/.test(idx) && /action: "ab_route_add", from: name, to: rt\.t, item: rt\.i, side: sd/.test(idx) && /loadAbStatus\(\); if \(abDay\.day\) abOpenDay\(abDay\.day\);\s*\}\)\.catch/.test(idx) && /querySelectorAll\("\[data-ab-split\]"\)/.test(idx)
+    && /variant: f !== c\.nr\.f && f\.indexOf\(c\.nr\.f\) >= 0/.test(abl366) && /if \(dec\.variant\) c\.variants = \[g\.from\];/.test(abl366) && /if \(dec\.variant\) c\.variants = \[c\.from\]; else delete c\.variants;/.test(abl366)
+    && /async function notifyPendingAndVariants\(st, dayDocs, tcIn\)/.test(abw366) && /String\(m\.dept \|\| ''\) === '운영부'/.test(abw366) && /dd\.day >= today\) continue;/.test(abw366) && /tag: 'allbaro-pend-' \+ day/.test(abw366), '');
   T('v365 권한 재확인: refreshMemberPerms(5분 간격·verify·perms/admin/dev/tier 비교·바뀌면 토스트+새로고침) · visibilitychange 배선', /function refreshMemberPerms\(\)/.test(idx) && /permRefreshAt < 5 \* 60 \* 1000/.test(idx) && /JSON\.stringify\(cur\.perms \|\| \{\}\) !== JSON\.stringify\(nm\.perms \|\| \{\}\)/.test(idx) && /gwToast\("권한이 바뀌었습니다 — 화면을 새로 고칩니다"/.test(idx) && /if \(!document\.hidden\) refreshMemberPerms\(\);/.test(idx), '');
   const wrapSrc = (idx.match(/\/\/ @promo-wrap-start([\s\S]*?)\/\/ @promo-wrap-end/) || ['', ''])[1];
   T('v363 복사 HTML 서식: 줄나눔 함수 구간(@promo-wrap) 12~26자·promoLinesOf·뒤보기 정규식 없음 · pushText=한 줄=한 <p>(margin:0) · promoWrap20/<hr>/굵게/12px 여백 없음 · 사진·캡션 여백 0 · 제목 h2 가운데 · 꼬리 5곳 가운데',
@@ -1181,7 +1188,7 @@ try {
     /pending\.push\(\{ manf: [^}]*state: state, date: d \}\)/.test(ab)
     && ['abPendList', 'abPendAge', 'abPendInfo', 'abPendBadge'].every((f) => new RegExp('function ' + f + '\\(').test(html))
     && /var AB_PEND_STALE_DAYS = 3;/.test(html) && /class="dday red" title="' \+ esc\(base \+ \(pi\.title/.test(html) && !/dday amber" title="' \+ esc\(base/.test(html)
-    && /abInt\(c\.n_pending\) \? abPendBadge\(c\) : ''/.test(html) && /sub \+= "잠정 " \+ abInt\(c\.n_pending\) \+ "\(미확정"/.test(html)
+    && /abInt\(c\.n_pending\) \? abPendBadge\(c\) : ''/.test(html) && /sub \+= "잠정 " \+ np \+ "\(예약 미실행 가능 · 미확정"/.test(html)
     && /var ps = abPendInfo\(null\)\.stale;/.test(html) && /pendN \+= abInt\(c\.n_pending\);/.test(html), '');
   // 경과일 계산·배지 분기 실행(순수 함수만 떼어 실행)
   const fn = (name) => { const i = html.indexOf('function ' + name + '('); let d = 0, st = false; for (let j = i; j < html.length; j++) { const ch = html[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return html.slice(i, j + 1); } } throw new Error(name); };
@@ -1197,9 +1204,9 @@ try {
   const c1 = { from: '동일산업(주)', to: '(주)스틸싸이클', item: '분진(고상)', n_pending: 2 };
   const c2 = { from: '(주)스틸싸이클', to: '씨엔텍', item: '분진(고상)', n_pending: 1 };
   const i1 = a.info(c1), b1 = a.badge(c1), b2 = a.badge(c2), i0 = a.info(null);
-  T('실행(v358): 4일 경과 2건 → 붉은 "잠정 2 · 미확정 · 3일+ 2"·인계번호 둘 다 title에 · 1일 경과 건도 붉은 "잠정 1 · 미확정"(3일+ 없음) · 전체 stale 2',
-    i1.n === 2 && i1.stale === 2 && /dday red/.test(b1) && /잠정 2 · 미확정 · 3일\+ 2</.test(b1) && /2609524417/.test(b1) && /2609564886/.test(b1) && /4일 경과/.test(b1)
-    && /dday red/.test(b2) && /잠정 1 · 미확정</.test(b2) && !/3일\+/.test(b2) && !/dday amber/.test(b2) && i0.stale === 2 && i0.n === 3, b1 + ' / ' + b2);
+  T('실행(v358): 4일 경과 2건 → 붉은 "잠정 2 · 예약 미실행 가능 · 3일+ 2"·인계번호 둘 다 title에 · 1일 경과 건도 붉은 "잠정 1 · 예약 미실행 가능"(3일+ 없음) (v366 문구) · 전체 stale 2',
+    i1.n === 2 && i1.stale === 2 && /dday red/.test(b1) && /잠정 2 · 예약 미실행 가능 · 3일\+ 2</.test(b1) && /2609524417/.test(b1) && /2609564886/.test(b1) && /4일 경과/.test(b1)
+    && /dday red/.test(b2) && /잠정 1 · 예약 미실행 가능</.test(b2) && !/3일\+/.test(b2) && !/dday amber/.test(b2) && i0.stale === 2 && i0.n === 3, b1 + ' / ' + b2);
 } catch (e) { console.log('  (v357 검사 생략 — ' + e.message + ')'); fails++; }
 
 // ---- v359: 입찰 2-E — 불일치는 공고문 기준(PM 9/16) · 낙찰방법 판독 3상태 노출 ----

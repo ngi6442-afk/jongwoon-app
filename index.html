@@ -1108,6 +1108,7 @@
       .ab-sheet th{background:#EFF5F2;font-weight:700;font-size:12px;}
       .ab-sheet td.n{font-weight:800;font-variant-numeric:tabular-nums;}
       .ab-sheet td.n .sub{display:block;font-size:10.5px;font-weight:500;color:var(--sub);}
+      .ab-sheet td.n .ab-n-pend{color:#B0332A;} .ab-sheet td.n .sub.pend{color:#B0332A;font-weight:700;}   /* v366: 전부 잠정인 칸은 숫자도 붉게 */
       .ab-sheet col.c-loc{width:29%;} .ab-sheet col.c-item{width:27%;} .ab-sheet col.c-n{width:15%;}
       .ab-pad{padding:12px 14px;}
       .ab-pad > :first-child{margin-top:0;}
@@ -17280,6 +17281,8 @@
   //   원장 실측(9/14): 그 2건 모두 '운반중·확정 없음'인 채 3일이 지나도 그대로 = 예약이 밀렸는데 취소되지 않은 유령 1건. 계수 규칙은 안 바꾼다
   //   (늦은 확정도 실측됨 — 스틸→씨엔텍 5건 · 8/20 사고 재현 위험). 대신 3일이 지나도록 확정이 없으면 '3일+ 미확정'으로 붉게 드러내 사람이 올바로에서 확인한다.
   var AB_PEND_STALE_DAYS = 3;
+  // v366(PM 9/18 재발방지): 잠정 = 배출자 확정등록이 없는 인계서 — 예약만 있고 실행 전(예약 밀림)일 수 있다. 검은 숫자가 실행 운행으로 읽히던 것(9/11·9/17)을 막는다.
+  var AB_PEND_HINT = "배출자 확정등록이 아직 없는 인계서 — 예약만 있고 실행 전(예약 밀림)일 수 있습니다. 올바로 실적에 없으면 예약이 밀린 것이고, 실행되면 재수집에서 그 날짜로 자동 이동합니다. 이 날 회수에는 세어져 있습니다. 인계번호로 올바로에서 확인:";
   function abPendList(c){
     var d = abDay.data || {}, L = Array.isArray(d.pending) ? d.pending : [], out = [], i, p;
     for (i = 0; i < L.length; i++){ p = L[i]; if (!p) continue;
@@ -17305,7 +17308,7 @@
   function abPendBadge(c){
     var pi = abPendInfo(c), n = abInt(c.n_pending);
     var base = "배출자 확정등록이 아직 없는 인계서입니다(미확정). 이 날 회수에는 세어져 있습니다 — 예약이 밀린 건이면 실행 뒤 재수집에서 그 날짜로 자동 정리되고, 아니면 올바로에서 인계번호를 확인하세요.";
-    return '<span class="dday red" title="' + esc(base + (pi.title ? "\n" + pi.title : "")) + '">잠정 ' + n + ' · 미확정' + (pi.stale ? ' · ' + AB_PEND_STALE_DAYS + '일+ ' + pi.stale : '') + '</span>';
+    return '<span class="dday red" title="' + esc(base + (pi.title ? "\n" + pi.title : "")) + '">잠정 ' + n + ' · 예약 미실행 가능' + (pi.stale ? ' · ' + AB_PEND_STALE_DAYS + '일+ ' + pi.stale : '') + '</span>';
   }
   // ---- 집계·미매칭 ----
   function abTotals(){
@@ -17340,7 +17343,7 @@
     else s += " · 톤 미집계";
     if (t.unmN > 0) s += " · 미배정 " + t.unmN + "회";
     if (t.unk > 0) s += " · 단위미상 " + t.unk + "건";
-    if (t.pendN > 0){ var ps = abPendInfo(null).stale; s += " · 잠정 " + t.pendN + "회(미확정" + (ps ? " · " + AB_PEND_STALE_DAYS + "일+ " + ps : "") + ")"; }   // v357·v358
+    if (t.pendN > 0){ var ps = abPendInfo(null).stale; s += " · 잠정 " + t.pendN + "회(예약 미실행 가능 · 미확정" + (ps ? " · " + AB_PEND_STALE_DAYS + "일+ " + ps : "") + ")"; }   // v357·v358·v366
     return s;
   }
   function abUnmKey(u){ return String((u && u.from) || "") + "|" + String((u && u.to) || "") + "|" + String((u && u.item) || ""); }
@@ -17406,6 +17409,31 @@
       (H ? '<optgroup label="숨긴 줄(표에서 뺌 — 배정은 가능)">' + H + '</optgroup>' : '');
   }
   // v351: 새 노선 폼 — 어느 열(L/R)이 먼저 비는지(예비 행 40~49 중 가장 낮은 빈 줄)로 기본 열을 고른다. 둘 다 찼으면 "".
+  // v366(PM 9/18 "에코프로비엠과 (CAM)은 두 개로 나눠달라, 앞으로도" 재발방지): 서버가 counts[].variants에 올바로 원문 이름을 남기면
+  //   줄에 '표기 변형' 칩을 달고, 운영부·관리자는 [별도 줄로 나누기]로 그 이름의 줄을 예비 행에 바로 만든다(ab_route_add) → 이 날 일지는 다시 열 때 재판정(v327).
+  function abVariantHtml(c, r){
+    if (!c || !Array.isArray(c.variants) || !c.variants.length) return "";
+    var names = c.variants.map(function(v){ return String((v && v.name) || v || ""); }).filter(Boolean);
+    if (!names.length) return "";
+    var h = '<span class="dday amber" title="' + esc("올바로 상차지 표기가 이 줄 이름과 다릅니다: " + names.join(", ") + "\n같은 곳의 다른 표기면 그대로 두고, 다른 현장(호기·사업장)이면 [별도 줄로 나누기] — 회수가 두 줄로 갈립니다") + '">표기 변형 ' + esc(names.join(", ")) + '</span>';
+    if (abCanLearn()) h += '<button type="button" class="ab-hide-btn" data-ab-split="' + esc(r.s + "|" + r.r + "|" + names[0]) + '">별도 줄로 나누기</button>';
+    return h;
+  }
+  function abVariantSplit(side, row, name){
+    if (abLearnBusy || !abCanLearn() || !name) return;
+    var rt = null, rs = abRouteList(); for (var i = 0; i < rs.length; i++){ if (rs[i].s === side && rs[i].r === row){ rt = rs[i]; break; } }
+    if (!rt) return;
+    if (!confirm("'" + name + "'을(를) 줄 " + side + row + " '" + rt.f + "'에서 떼어 예비 행에 별도 줄로 만듭니다.\n하차지 '" + rt.t + "' · 품목 '" + rt.i + "' 그대로. 만든 뒤 이 날 일지는 다시 열 때 재판정되고 엑셀은 다음 재생성에 반영됩니다.\n\n진행할까요?")) return;
+    var fr = abFreeReserve(), sd = fr[side] ? side : (fr.L ? "L" : (fr.R ? "R" : ""));
+    if (!sd){ gwToast("예비 행(40~49)이 다 찼습니다 — 양식 원본을 늘려야 합니다", true, 2500); return; }
+    abLearnBusy = true;
+    gwCall("gw-allbaro", { action: "ab_route_add", from: name, to: rt.t, item: rt.i, side: sd }).then(function(res){
+      abLearnBusy = false;
+      if (!(res.status === 200 && res.body && res.body.side && res.body.row)){ gwToast("줄 추가 실패: " + ((res.body && res.body.code) || res.status), true, 2500); return; }
+      gwToast(res.body.existed ? ("이미 있는 줄 → " + res.body.side + res.body.row) : ("새 줄 " + res.body.side + res.body.row + " '" + name + "' 추가 — 이 날 일지를 다시 판정합니다"), false, 2400);
+      loadAbStatus(); if (abDay.day) abOpenDay(abDay.day);
+    }).catch(function(){ abLearnBusy = false; gwToast("줄 추가 실패(네트워크)", true, 2500); });
+  }
   function abFreeReserve(){
     var rs = abRouteList(), used = { L: {}, R: {} }, i, side, row, out = { L: 0, R: 0 };
     for (i = 0; i < rs.length; i++){ if (rs[i].r >= 40 && rs[i].r <= 49) used[rs[i].s][rs[i].r] = true; }
@@ -17665,11 +17693,13 @@
     function hideBtn(key){ return (admin && key) ? ' <button type="button" class="ab-hide-btn" data-ab-hide="' + esc(key) + '" title="이 줄을 운반내역 표에서 숨김(관리자) — 노선표·집계는 그대로">숨김</button>' : ""; }
     function cellN(c, hideKey){
       if (!c) return '<td class="n">' + hideBtn(hideKey) + '</td>';
-      var n = abInt(c.n), sub = "";
-      if (abInt(c.n_pending)){ var pi = abPendInfo(c); sub += "잠정 " + abInt(c.n_pending) + "(미확정" + (pi.stale ? " · " + AB_PEND_STALE_DAYS + "일+ " + pi.stale : "") + ")"; }   // v357·v358
+      var n = abInt(c.n), np = abInt(c.n_pending), sub = "", pi = null, allPend = n > 0 && np >= n;
+      if (np){ pi = abPendInfo(c); sub += "잠정 " + np + "(예약 미실행 가능 · 미확정" + (pi.stale ? " · " + AB_PEND_STALE_DAYS + "일+ " + pi.stale : "") + ")"; }   // v357·v358·v366
       if (c.weak) sub += (sub ? " · " : "") + "품목확인";
       if (abInt(c.qty_unknown)) sub += (sub ? " · " : "") + "단위미상";
-      return '<td class="n">' + (n ? n : "") + (sub ? '<span class="sub">' + esc(sub) + '</span>' : "") + ((!n && !sub) ? hideBtn(hideKey) : "") + '</td>';
+      // v366(PM 9/18 재발방지): 전부 잠정이면 숫자 자체를 붉게 + '?' + 안내 툴팁 — 검은 "1"이 실행된 운행으로 읽히던 것(9/11·9/17)
+      var nh = n ? (allPend ? '<span class="ab-n-pend" title="' + esc(AB_PEND_HINT + (pi && pi.title ? "\n" + pi.title : "")) + '">' + n + '?</span>' : String(n)) : "";
+      return '<td class="n">' + nh + (sub ? '<span class="sub' + (allPend ? ' pend' : '') + '">' + esc(sub) + '</span>' : "") + ((!n && !sub) ? hideBtn(hideKey) : "") + '</td>';
     }
     // v353(PM 9/13 "가나다 순"): 엑셀(generate.py)과 같은 규칙 — 노선 좌표(L5·R40)는 식별자일 뿐, 표의 좌우는 보이는 노선을
     //   배출자 가나다(한글 먼저·영문 뒤, 같은 배출자끼리는 8/24 확정 순서 유지)로 세워 앞 절반 왼쪽·뒤 절반 오른쪽에 채운다.
@@ -17699,7 +17729,7 @@
             '<span class="ab-need-unhide">숨김 해제 필요' + (admin ? ' <button type="button" class="ab-hide-btn" data-ab-unhide="' + esc(key) + '">해제</button>' : "") + '</span></td>' + cellN(cc, "") + "</tr>";
           continue;
         }
-        t += "<tr><td>" + esc(r.f) + "</td><td>" + esc(r.t) + "</td><td>" + esc(r.i) + "</td>" + cellN(cc, empty ? key : "") + "</tr>";
+        t += "<tr><td>" + esc(r.f) + "</td><td>" + esc(r.t) + "</td><td>" + esc(r.i) + abVariantHtml(cc, r) + "</td>" + cellN(cc, empty ? key : "") + "</tr>";
       }
       for (var e = 0; e < extra[side].length; e++){
         var x = extra[side][e];
@@ -17813,6 +17843,9 @@
     abBindHideToggle(host);
     Array.prototype.forEach.call(host.querySelectorAll("[data-ab-hide]"), function(b){
       b.addEventListener("click", function(){ var p = b.getAttribute("data-ab-hide").split("|"); abRouteHide(p[0], Number(p[1]), true); });
+    });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-ab-split]"), function(b){   // v366
+      b.addEventListener("click", function(){ var p = b.getAttribute("data-ab-split").split("|"); abVariantSplit(p[0], Number(p[1]), p.slice(2).join("|")); });
     });
     Array.prototype.forEach.call(host.querySelectorAll("[data-ab-unhide]"), function(b){
       b.addEventListener("click", function(){ var p = b.getAttribute("data-ab-unhide").split("|"); abRouteHide(p[0], Number(p[1]), false); });

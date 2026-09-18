@@ -139,6 +139,75 @@ function failSummary(log) {
   return (lines.slice(-3).join(' / ') || '원인 미상 — 작업 로그 확인').slice(0, 280);
 }
 
+// ---- v366 잠정(예약 밀림 유령)·상차지 표기 변형 알림(PM 9/18 재발방지) — 수집 뒤, (day,인계번호)·(이름)당 1회 ----
+//   9/11·9/17: 예약이 밀려 인계일자만 남은 인계서가 붉은 '잠정'으로 일지에 남는데 담당자가 실행된 운행으로 읽고 PM에게 물었다.
+//   → 수집 다음 아침 운영부(공무)+PM에게 "예약 밀림일 수 있음"을 먼저 알려 올바로에서 확인하게 한다. 오늘 날짜는 확정 전이 정상이라 뺀다(어제 이전만).
+//   표기 변형(v366 aggregate counts[].variants): 새 이름이 처음 나타난 날 한 번 알려 [별도 줄로 나누기]를 받는다.
+const PEND_KEY = 'allbaro:pend_notified';      // {schema:1, keys:{'<day>|<manf>': 'YYYY-MM-DD'}}
+const VAR_KEY = 'allbaro:variant_notified';    // {schema:1, keys:{'<normName(올바로 상차지)>': 'YYYY-MM-DD'}}
+const NOTIFY_KEEP_DAYS = 90;
+// 수신자 = 운영부(gw-allbaro canLearn과 같은 부서 기준) + PM(tier pm). 둘 다 0명이면 관리자 전원(push.pmOrAdminIds와 같은 폴백).
+function opsPmIds(tc) {
+  const set = Object.create(null);
+  ((tc && tc.members) || []).forEach(function (m) { if (m && m.id && String(m.dept || '') === '운영부') set[m.id] = 1; });
+  ((tc && tc.pmIds) || []).forEach(function (id) { set[id] = 1; });
+  const out = Object.keys(set);
+  return out.length ? out : ((tc && tc.adminIds) || []);
+}
+function mmdd(day) { return Number(String(day).slice(5, 7)) + '/' + Number(String(day).slice(8, 10)); }
+function routeName(route) {
+  if (!route) return '';
+  const r = AB.routes().find(function (x) { return x.side === route.side && Number(x.row) === Number(route.row); });
+  return r ? (r.side + r.row + " '" + r.from + "'") : (String(route.side || '') + String(route.row || ''));
+}
+// dayDocs = [{day, counts, pending}] (저장에 성공한 날만). 표식 blob을 못 읽으면(없음 제외) 보내지 않는다(fail-closed — 매일 다시 쏘는 쪽이 더 나쁘다).
+// 발송 뒤에만 표식을 쓴다(todo-cron 방식 — 발송 예외는 다음 수집 때 재시도). 반환 { pend_days, pend_n, var_n }.
+async function notifyPendingAndVariants(st, dayDocs, tcIn) {
+  const today = kstDate(0);
+  const pr = await blobGet(st, PEND_KEY), vr = await blobGet(st, VAR_KEY);
+  if ((!pr.ok && pr.code !== 'NOT_FOUND') || (!vr.ok && vr.code !== 'NOT_FOUND')) return { pend_days: 0, pend_n: 0, var_n: 0, skipped: 'READ_FAIL' };
+  const pend = (pr.ok && pr.data && pr.data.keys && typeof pr.data.keys === 'object') ? pr.data : { schema: 1, keys: {} };
+  const vars = (vr.ok && vr.data && vr.data.keys && typeof vr.data.keys === 'object') ? vr.data : { schema: 1, keys: {} };
+  const byDay = Object.create(null), varMsgs = [];
+  for (const dd of (Array.isArray(dayDocs) ? dayDocs : [])) {
+    if (!dd || !dd.day || dd.day >= today) continue;
+    for (const p of (Array.isArray(dd.pending) ? dd.pending : [])) {
+      const k = dd.day + '|' + String((p && p.manf) || '?');
+      if (pend.keys[k]) continue;
+      pend.keys[k] = today;
+      (byDay[dd.day] = byDay[dd.day] || []).push(String(p.from || '') + '→' + String(p.to || '') + (p.item ? ' ' + String(p.item).slice(0, 12) : '') + (p.manf ? ' #' + p.manf : ''));
+    }
+    for (const c of (Array.isArray(dd.counts) ? dd.counts : [])) {
+      for (const v of (Array.isArray(c.variants) ? c.variants : [])) {
+        const name = String((v && v.name) || v || '').trim(); if (!name) continue;
+        const nk = AB.normName(name);
+        if (!nk || vars.keys[nk]) continue;
+        vars.keys[nk] = today;
+        varMsgs.push("'" + name + "' → 줄 " + routeName(c.route));
+      }
+    }
+  }
+  const days = Object.keys(byDay).sort();
+  if (!days.length && !varMsgs.length) return { pend_days: 0, pend_n: 0, var_n: 0 };
+  const tc = tcIn || await push.tierCtx();
+  const ids = opsPmIds(tc);
+  let pendN = 0;
+  for (const day of days) {   // 날짜별 1발 — tag에 날짜를 넣어 여러 날짜 알림이 서로 덮어쓰지 않게
+    const list = byDay[day]; pendN += list.length;
+    await push.sendTo(ids, { title: '운반일지 ' + mmdd(day) + ' 잠정 ' + list.length + '건 — 예약 밀림일 수 있음',
+      body: (list.slice(0, 3).join(' · ') + (list.length > 3 ? ' 외 ' + (list.length - 3) + '건' : '') + ' — 배출자 확정 전(올바로 실적에 없으면 예약이 밀린 것). 실행되면 자동 이동. 운반일지 탭 붉은 잠정 칸').slice(0, 280),
+      url: './', tag: 'allbaro-pend-' + day }, { ctx: tc });
+  }
+  if (varMsgs.length) await push.sendTo(ids, { title: '운반일지 상차지 표기 변형 ' + varMsgs.length + '건',
+    body: (varMsgs.slice(0, 3).join(' · ') + (varMsgs.length > 3 ? ' 외 ' + (varMsgs.length - 3) + '건' : '') + ' — 다른 현장이면 운반일지 탭 [별도 줄로 나누기], 같은 곳이면 그대로').slice(0, 280),
+    url: './', tag: 'allbaro-variant-' + today }, { ctx: tc });
+  const cutoff = kstDate(-NOTIFY_KEEP_DAYS);
+  [pend, vars].forEach(function (doc) { Object.keys(doc.keys).forEach(function (k) { if (String(doc.keys[k]) < cutoff) delete doc.keys[k]; }); });
+  await blobSet(st, PEND_KEY, pend);
+  await blobSet(st, VAR_KEY, vars);
+  return { pend_days: days.length, pend_n: pendN, var_n: varMsgs.length };
+}
+
 // ---- 운반일지 자동 기안(결재 2차, 2026-09-02) — 공무의 매일 수동 상신을 대체 ----
 const APPR_KEY = 'col:approvals';   // gw-data colKey('approvals')와 동일 키(전용 액션 밖의 유일한 쓰기 지점)
 
@@ -208,6 +277,7 @@ async function autoDraftApproval(st) {
   } catch (e) {}
 }
 
+exports.opsPmIds = opsPmIds; exports.notifyPendingAndVariants = notifyPendingAndVariants; exports.PEND_KEY = PEND_KEY; exports.VAR_KEY = VAR_KEY;   // v366 검사용
 exports.handler = async function (event, context) {
   let st = null, job = '', rec = null;
   const scrub = makeScrub();
@@ -316,6 +386,7 @@ exports.handler = async function (event, context) {
     // 날짜별 저장 — 덮어쓰기(늦게 올라온 인계서가 반영되도록).
     // 요청한 날짜 집합에 있는 값만 키로 쓴다(라이브러리가 이상한 day를 돌려줘도 키 오염 없음).
     const saved = [];
+    const dayDocs = [];   // v366: 저장 성공한 날의 counts·pending — 수집 뒤 잠정·표기 변형 알림용
     let unmatchedTotal = 0;
     let writeFail = 0;   // blob 쓰기 실패가 수집 성공에 묻히면 그날 집계가 조용히 빈다 — 따로 센다
     const unmatchedDays = [];
@@ -353,6 +424,7 @@ exports.handler = async function (event, context) {
       const w = await blobSet(st, dayKey(day), { schema: 2, day: day, total: total, total_qty_ton: qty, qty_unknown: qtyUnknown, counts: counts, unmatched: unmatched, excluded: excluded, pending: pendingRows, veh_totals: vehTotals, routes_ver: AB.routesVer(), ts: Date.now(), job: job });
       if (!w.ok) { writeFail++; log.push('[저장실패] ' + day + ' ' + (w.code || '')); continue; }
       saved.push({ day: day, total: total, qty_ton: qty, unmatched_n: un });
+      dayDocs.push({ day: day, counts: counts, pending: pendingRows });
       unmatchedTotal += un;
       if (un > 0) unmatchedDays.push(day + ' ' + un + '건');
     }
@@ -374,6 +446,8 @@ exports.handler = async function (event, context) {
 
     // 운반일지 자동 기안 — 수집이 성공(done)한 실행만. 기안 실패가 수집 결과를 바꾸면 안 되므로 전부 삼킨다.
     try { if (rec.status === 'done') await autoDraftApproval(st); } catch (e) {}
+    // v366: 잠정(예약 밀림)·표기 변형 알림 — 수집 성공한 실행만, 운영부+PM, (day,인계번호)/(이름)당 1회. 실패는 삼킨다.
+    try { if (rec.status === 'done' && dayDocs.length) { const nt = await notifyPendingAndVariants(st, dayDocs); if (nt && (nt.pend_n || nt.var_n)) log.push('[알림] 잠정 ' + nt.pend_n + '건(' + nt.pend_days + '일) · 표기 변형 ' + nt.var_n + '건'); } } catch (e) {}
 
     // 관리자 웹푸시 — 실패는 반드시, 미매칭이 있으면 알림(노선표 손질이 필요하다는 신호).
     // 성공 + 미매칭 0이면 푸시하지 않는다(매일 오는 알림은 소음이다).

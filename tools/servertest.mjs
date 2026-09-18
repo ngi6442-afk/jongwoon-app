@@ -1521,6 +1521,49 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
     Array.isArray(agg.pending) && agg.pending.length === 1 && agg.pending[0].date === '20260911' && agg.pending[0].manf === '2609524417' && nSum === 2, JSON.stringify(agg.pending) + ' n=' + nSum);
 }
 
+// ===== 32c. v366 재발방지 — 표기 변형(variant) 판정·집계·재판정 + 워커 잠정/변형 알림(운영부+PM, 1회) =====
+{
+  const abLib = require(join(FN, '_lib/allbaro.js'));
+  const ITEM = '폐양극활물질(양극재 또는 전구체 제조공정에서 발생하는 것을 포함한다)(고상)';
+  const prevExtra = ((mem.gw_data['allbaro:routes_extra'] || {}).items) || [];
+  abLib.setExtraRoutes(prevExtra);
+  const cam = abLib.matchRouteEx({ from: '에코프로비엠(CAM4)', to: '주식회사 에코프로씨엔지', item: ITEM }, {});
+  const base = abLib.matchRouteEx({ from: '(주)에코프로비엠', to: '주식회사 에코프로씨엔지', item: ITEM }, {});
+  T('variant: 구체 줄이 없을 때 CAM4 → L34 배정 + variant:true · 본체 이름은 variant:false · 미매칭/학습 반환에도 variant 필드', !!cam.route && cam.route.row === 34 && cam.variant === true && !!base.route && base.variant === false && abLib.matchRouteEx({ from: '없는곳', to: '없는곳', item: 'x' }, {}).variant === false, JSON.stringify([cam.variant, base.variant]));
+  const rowBase = { trtm: '주식회사 에코프로씨엔지', wasteName: ITEM, date: '20260917', state: '운반중', tranFirm: '종운환경(주)', tranVehicle: '92모4921', confirmedAt: '20260917 15:00' };
+  const rows = [Object.assign({}, rowBase, { emis: '(주)에코프로비엠', manf: '2609510222', tranQty: '0.41' }), Object.assign({}, rowBase, { emis: '에코프로비엠(CAM4)', manf: '2609510246', tranQty: '5.37' })];
+  const agg = abLib.aggregate(rows, '2026-09-17', {});
+  const cB = (agg.counts || []).find((c) => c.from === '(주)에코프로비엠'), cC = (agg.counts || []).find((c) => c.from === '에코프로비엠(CAM4)');
+  T('aggregate: 두 묶음 모두 L34 · CAM4 묶음에만 variants ["에코프로비엠(CAM4)"] · 본체 묶음엔 variants 없음', cB && cC && cB.route && cB.route.row === 34 && cC.route && cC.route.row === 34 && !cB.variants && Array.isArray(cC.variants) && cC.variants[0] === '에코프로비엠(CAM4)', JSON.stringify([cB && cB.variants, cC && cC.variants]));
+  abLib.setExtraRoutes(prevExtra.concat([{ side: 'L', row: 43, from: '에코프로비엠(CAM4)', to: '주식회사 에코프로씨엔지', item: '폐양극활물질', count_col: 5 }]));
+  const rm = abLib.rematchDoc(agg, { learned: [] });
+  const rC = (rm.doc.counts || []).find((c) => c.from === '에코프로비엠(CAM4)'), rB = (rm.doc.counts || []).find((c) => c.from === '(주)에코프로비엠');
+  T('rematchDoc: CAM4 줄이 생기면 CAM4 묶음 → L43·variants 삭제(changed 1) · 본체 묶음 L34 그대로', rm.ok && rm.changed === 1 && rC && rC.route.row === 43 && !rC.variants && rB && rB.route.row === 34 && !rB.variants, JSON.stringify([rm.changed, rC && rC.route, rC && rC.variants]));
+  abLib.setExtraRoutes(prevExtra);
+  // 워커 알림 — 순수 함수 + 인메모리 blob/push mock
+  const wk = require(join(FN, 'gw-allbaro-run-background.js'));
+  T('opsPmIds: 운영부 + pm 합집합(중복 제거) · 둘 다 없으면 관리자', wk.opsPmIds({ members: [{ id: 'o1', dept: '운영부' }, { id: 'o2', dept: '관리부' }, { id: 'p1', dept: '운영부' }], pmIds: ['p1', 'p2'], adminIds: ['a1'] }).sort().join() === 'o1,p1,p2' && wk.opsPmIds({ members: [], pmIds: [], adminIds: ['a1'] }).join() === 'a1', '');
+  const kst = (o) => new Date(Date.now() + 9 * 3600000 + (o || 0) * 86400000).toISOString().slice(0, 10);
+  const stD = { name: 'gw_data', toString() { return 'gw_data'; } };
+  delete mem.gw_data[wk.PEND_KEY]; delete mem.gw_data[wk.VAR_KEY];
+  const docs = [
+    { day: kst(-1), counts: [{ from: '에코프로비엠(CAM4)', to: 'x', item: 'y', route: { side: 'L', row: 34 }, variants: ['에코프로비엠(CAM4)'] }], pending: [{ manf: '2609747334', from: '동일산업(주)', to: '스틸싸이클 주식회사', item: '분진(고상)', state: '운반중', date: '20260917' }] },
+    { day: kst(0), counts: [], pending: [{ manf: '999', from: '오늘', to: '오늘', item: 'z' }] },
+  ];
+  const tcT = { members: [{ id: 'o1', dept: '운영부' }], pmIds: ['p1'], adminIds: ['a1'] };
+  const before = pushMock.calls.length;
+  const n1 = await wk.notifyPendingAndVariants(stD, docs, tcT);
+  const sent = pushMock.calls.slice(before);
+  T('알림 1회차: 어제 잠정 1건 → 푸시 1(tag allbaro-pend-<day>, 제목에 "예약 밀림") · 오늘 날짜 잠정은 제외 · 표기 변형 1 → 푸시 1 · 표식 2개 저장', n1.pend_days === 1 && n1.pend_n === 1 && n1.var_n === 1 && sent.length === 2 && sent[0].tag === 'allbaro-pend-' + kst(-1) && /예약 밀림/.test(sent[0].title) && /2609747334/.test(sent[0].body) && /표기 변형/.test(sent[1].title) && /L34/.test(sent[1].body) && mem.gw_data[wk.PEND_KEY].keys[kst(-1) + '|2609747334'] === kst(0) && Object.keys(mem.gw_data[wk.VAR_KEY].keys).length === 1, JSON.stringify([n1, sent.map((p) => p.title)]));
+  const n2 = await wk.notifyPendingAndVariants(stD, docs, tcT);
+  T('알림 2회차(같은 날 재수집·08:20 백업 기동): 표식으로 중복 발송 0', n2.pend_n === 0 && n2.var_n === 0 && pushMock.calls.length === before + 2, JSON.stringify(n2));
+  blobsMock.hooks.beforeGet = async (k) => { if (k === wk.PEND_KEY) throw new Error('down'); };
+  let n3 = null; try { n3 = await wk.notifyPendingAndVariants(stD, [{ day: kst(-2), counts: [], pending: [{ manf: '777', from: 'a', to: 'b' }] }], tcT); } catch (e) { n3 = { threw: true }; }
+  blobsMock.hooks.beforeGet = null;
+  T('표식 blob 읽기 예외는 위로 던져 워커가 삼킨다(발송 없음) — 매일 다시 쏘는 쪽이 더 나쁨', n3 && n3.threw === true && pushMock.calls.length === before + 2, JSON.stringify(n3));
+  delete mem.gw_data[wk.PEND_KEY]; delete mem.gw_data[wk.VAR_KEY];
+}
+
 // ===== 33. 운반일지 자동 재정렬 v327(PM 9/8 "학습시키거나 노선표가 바뀌면 사람이 수동 수집을 안 눌러도 기록이 스스로 재정렬") =====
 //    (a) 옛 규칙 day 블롭 → ab_day가 그 자리에서 재정렬(R14 분진→R39·routes_ver·n/qty/total 불변·감사) (b) ab_learn(day) → 그날 묶음이 학습 줄로·rematched.changed≥1
 //    (c) 학습 없는 다른 묶음 불변 (d) 차량 분리 묶음(vehicle_type)은 같은 줄·차량 미상은 종전 줄 유지 없이 미매칭 (e) 숨긴 노선·직접 추가 블롭 무변경
