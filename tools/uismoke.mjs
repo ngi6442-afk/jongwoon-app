@@ -149,7 +149,7 @@ try {
     && /if\(auto\)\{ if\(paAutoQueue\.indexOf\(promoId\)<0\) paAutoQueue\.push\(promoId\); \}/.test(idx) && (idx.match(/paDrainAuto\(\);/g) || []).length === 4
     && /promoAiLine\(p\)/.test(idx) && /' · 태그 '\+\(\(p\.tags\|\|\[\]\)\.length\)\+'개'/.test(idx) && /" · 태그 "\+\(\(r\.tags&&r\.tags\.length\)\|\|0\)\+"개"/.test(idx), '');
   // v352(PM 9/11 #31ⓑ — 직원 수정본 5편 실측): 담당자 포장 = 가운데 정렬·20자 개행·소제목 굵게+구분선·물음표·정화조/저수조 삭제
-  const bp = (idx.match(/function promoBuildPostHtml\(title, body, imgs\)\{([\s\S]*?)\n  \}/) || ['', ''])[1];
+  const bp = (idx.match(/function promoBuildPostHtml\(title, body, imgs, tags\)\{([\s\S]*?)\n  \}/) || ['', ''])[1];
   const abl366 = readFileSync(join(ROOT, 'netlify/functions/_lib/allbaro.js'), 'utf8'), abw366 = readFileSync(join(ROOT, 'netlify/functions/gw-allbaro-run-background.js'), 'utf8');
   T('v366 운반일지 재발방지: AB_PEND_HINT·전부 잠정 칸 붉은 숫자(ab-n-pend, "?")·문구 "예약 미실행 가능" 3곳 · abVariantHtml 칩(표기 변형)+[별도 줄로 나누기](abCanLearn) · abVariantSplit=ab_route_add(from=원문, to·item=줄 값)→loadAbStatus+abOpenDay · data-ab-split 배선 · 서버 matchRouteEx variant·aggregate variants·rematch 갱신 · 워커 notifyPendingAndVariants(운영부+PM, (day,manf)/(이름) 1회)',
     /var AB_PEND_HINT = "/.test(idx) && /class="ab-n-pend" title="' \+ esc\(AB_PEND_HINT/.test(idx) && /n \+ '\?<\/span>'/.test(idx) && (idx.match(/예약 미실행 가능/g) || []).length >= 3
@@ -159,12 +159,16 @@ try {
     && /async function notifyPendingAndVariants\(st, dayDocs, tcIn\)/.test(abw366) && /String\(m\.dept \|\| ''\) === '운영부'/.test(abw366) && /dd\.day >= today\) continue;/.test(abw366) && /tag: 'allbaro-pend-' \+ day/.test(abw366), '');
   T('v365 권한 재확인: refreshMemberPerms(5분 간격·verify·perms/admin/dev/tier 비교·바뀌면 토스트+새로고침) · visibilitychange 배선', /function refreshMemberPerms\(\)/.test(idx) && /permRefreshAt < 5 \* 60 \* 1000/.test(idx) && /JSON\.stringify\(cur\.perms \|\| \{\}\) !== JSON\.stringify\(nm\.perms \|\| \{\}\)/.test(idx) && /gwToast\("권한이 바뀌었습니다 — 화면을 새로 고칩니다"/.test(idx) && /if \(!document\.hidden\) refreshMemberPerms\(\);/.test(idx), '');
   const wrapSrc = (idx.match(/\/\/ @promo-wrap-start([\s\S]*?)\/\/ @promo-wrap-end/) || ['', ''])[1];
-  T('v363 복사 HTML 서식: 줄나눔 함수 구간(@promo-wrap) 12~26자·promoLinesOf·뒤보기 정규식 없음 · pushText=한 줄=한 <p>(margin:0) · promoWrap20/<hr>/굵게/12px 여백 없음 · 사진·캡션 여백 0 · 제목 h2 가운데 · 꼬리 5곳 가운데',
+  T('v363·v367 복사 HTML 서식(직원판): 줄나눔 구간(@promo-wrap) 12~26자·promoLinesOf·뒤보기 없음 · pushText=한 줄=한 <p>(margin:0) · 소제목 앞 pushBlank · 사진 묶음 위아래 pushBlank·캡션 없음 · 고정 머리(PROMO_HEAD_SIG 3줄+PROMO_GREET env/con)+빈 줄 · 꼬리 promoTailHtml(org)+promoTagsHtml(5개씩) · 호출부 p.tags · 제목 h2 가운데 · 꼬리 5곳 가운데',
     /var PROMO_WRAP_LO=12, PROMO_WRAP_HI=26;/.test(wrapSrc) && /function promoWrapSense\(t, lo, hi, commaFirst\)/.test(wrapSrc) && /function promoLinesOf\(t\)/.test(wrapSrc) && !/\(\?<[=!]/.test(wrapSrc)
     && /function promoIsSubhead\(t\)\{ return t\.length<=45 && \/\[\?？\]\$\/\.test\(t\)/.test(bp) && /function pushLine\(l\)\{ out\.push\('<p style="margin:0;line-height:1\.8;text-align:center;">'\+promoEscHtml\(l\)\+'<\/p>'\); \}/.test(bp)
-    && /promoLinesOf\(t\)\.forEach\(pushLine\);/.test(bp) && !/promoWrap20/.test(idx) && !/<hr /.test(bp) && !/font-weight:700/.test(bp) && !/margin:12px 0/.test(bp) && !/margin:14px 0;text-align:center;"><img/.test(bp)
-    && /<p style="margin:0;color:#777;font-size:13px;text-align:center;">/.test(bp) && /<h2 style="font-size:20px;margin:0 0 16px;text-align:center;">/.test(bp)
-    && (idx.match(/function promoTailHtml\(\)\{([\s\S]*?)\n  \}/) || ['', ''])[1].split('text-align:center').length === 6, '');
+    && /function pushBlank\(\)\{ if\(out\.length && out\[out\.length-1\]!==PROMO_BLANK\) out\.push\(PROMO_BLANK\); \}/.test(bp) && /if\(promoIsSubhead\(t\)\)\{ pushBlank\(\); pushLine\(t\); return; \}/.test(bp) && /promoLinesOf\(t\)\.forEach\(pushLine\);/.test(bp)
+    && /if\(tags\.length\)\{ pushBlank\(\); tags\.forEach\(function\(t\)\{ out\.push\(t\); \}\); pushBlank\(\); \}/.test(bp) && !/color:#777;font-size:13px/.test(bp) && /promoHeadLines\(org\)\.forEach\(pushLine\); pushBlank\(\);/.test(bp)
+    && /promoTailHtml\(org\)\+promoTagsHtml\(tags\)/.test(bp) && !/promoWrap20/.test(idx) && !/<hr /.test(bp) && !/font-weight:700/.test(bp) && !/margin:12px 0/.test(bp)
+    && /var PROMO_HEAD_SIG = \["종운환경·종운건설 \| 포항 준설·폐기물·철거·석면"/.test(idx) && /var PROMO_GREET = \{/.test(idx) && /"\(유\)종운환경 입니다\."\]/.test(idx) && /"\(주\)종운건설 입니다\."\]/.test(idx)
+    && /function promoTagsHtml\(tags\)/.test(idx) && /t\.slice\(i,i\+5\)/.test(idx) && /function promoTailHtml\(orgIn\)/.test(idx) && /promoBuildPostHtml\(title, body, webImgs, p\.tags\)/.test(idx) && /promoBuildPostHtml\(title, body, got, p\.tags\)/.test(idx)
+    && /<h2 style="font-size:20px;margin:0 0 16px;text-align:center;">/.test(bp)
+    && (idx.match(/function promoTailHtml\(orgIn\)\{([\s\S]*?)\n  \}/) || ['', ''])[1].split('text-align:center').length === 6, '');
   T('v352 프롬프트: 소제목 물음표 강제 · 정화조/저수조 업무 제외(회사 절·FACILITY_WORDS·예시 제목에서 제거)',
     /질문형이므로 반드시 물음표\(\?\)로 끝냅니다/.test(lib) && /정화조·저수조는 종운환경의 업무가 아닙니다/.test(lib)
     && !/\(우수받이·빗물받이·맨홀·관로·집수정·정화조/.test(lib) && !/'정화조', '오수관로'/.test(lib) && !/'저수조', '물탱크'/.test(lib) && !/ex: \['정화조 문제인 줄/.test(lib), '');

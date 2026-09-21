@@ -13487,14 +13487,30 @@
   // ※ 전화번호는 값을 확인한 뒤 PROMO_TEL에 넣는다. 비어 있으면 그 줄만 빠진다(빈칸·가짜번호 금지).
   var PROMO_TEL = "";
   var PROMO_SITE = "jongwoon.co.kr";
+  // v367(PM 9/21 "직원판에 맞춰라" — 9/21 브리핑 ①②③): 직원 수정본(9/11)과 같은 고정 머리·빈 줄·꼬리 해시태그. 서명 3줄·환경 인사말은 직원판 원문 그대로,
+  //   건설 인사말은 환경 문안에서 업무만 바꾼 것(직원판에 건설 글이 없어 실측 불가 — 첫 건설 글에서 확인). 캡션은 담당자가 매번 지워서 뺐다(8/16 외부조사 근거는 FEATURES v276에 남김).
+  var PROMO_HEAD_SIG = ["종운환경·종운건설 | 포항 준설·폐기물·철거·석면", "포항·경북 하수관로 준설·CCTV 관로조사, 폐기물 수집운반, 철거·석면해체 전문. 공공기관 실적 다수. 대표전화 054-291-1202.", "www.jongwoon.co.kr"];
+  var PROMO_GREET = {
+    env: ["안녕하세요.", "포항 및 대구·경북 지역에서", "하수관로 준설, 맨홀 준설, 집수정 준설,", "하수관로 조사 및 고압세척을", "전문으로 수행하고 있는", "(유)종운환경 입니다."],
+    con: ["안녕하세요.", "포항 및 대구·경북 지역에서", "건축물 철거, 석면 해체·제거를", "전문으로 수행하고 있는", "(주)종운건설 입니다."]
+  };
+  var PROMO_BLANK = '<p style="margin:0;line-height:1.8;">&nbsp;</p>';   // 네이버 편집기가 빈 줄로 받는 빈 문단(직원판: 소제목 앞·사진 위아래·머리/꼬리 경계)
+  function promoOrgOf(body){ return /석면|철거|해체/.test(String(body||"")) ? "con" : "env"; }   // 어느 회사 글인지는 본문이 정한다(계약서 규칙과 동일)
+  function promoHeadLines(org){ return PROMO_HEAD_SIG.concat(PROMO_GREET[org==="con"?"con":"env"]); }
+  function promoTagsHtml(tags){
+    var t=(Array.isArray(tags)?tags:[]).map(function(x){ return String(x||"").replace(/^#+/,"").replace(/\s+/g,""); }).filter(Boolean);
+    if(!t.length) return "";
+    var L=[]; for(var i=0;i<t.length;i+=5){ L.push('<p style="margin:0;line-height:1.8;text-align:center;">'+promoEscHtml(t.slice(i,i+5).map(function(x){ return "#"+x; }).join(" "))+'</p>'); }
+    return PROMO_BLANK+L.join("");
+  }
   var PROMO_ORG = {
     env:  { name:"(유)종운환경", addr:"경북 포항시 남구 서원재로 1", biz:"우수받이·맨홀·관로·집수정 준설, 폐기물 수집운반" },
     con:  { name:"(주)종운건설", addr:"경북 포항시 남구 정몽주로 823-10", biz:"석면 해체·제거, 건축물 철거" }
   };
-  function promoTailHtml(){
-    // 어느 회사 글인지는 본문이 정한다 — 석면·철거면 건설, 그 외는 환경(계약서 규칙과 동일)
+  function promoTailHtml(orgIn){
+    // 어느 회사 글인지는 본문이 정한다 — 석면·철거면 건설, 그 외는 환경(계약서 규칙과 동일). v367: 머리와 같은 판정(orgIn)을 받는다
     var b=(document.getElementById("promoDetBody")||{}).value||"";
-    var o=/석면|철거|해체/.test(b) ? PROMO_ORG.con : PROMO_ORG.env;
+    var o=(orgIn && PROMO_ORG[orgIn]) ? PROMO_ORG[orgIn] : (/석면|철거|해체/.test(b) ? PROMO_ORG.con : PROMO_ORG.env);
     var L=[];
     L.push('<p style="margin:26px 0 6px;font-weight:700;text-align:center;">'+promoEscHtml(o.name)+'</p>');
     L.push('<p style="margin:2px 0;text-align:center;">'+promoEscHtml(o.biz)+'</p>');
@@ -13549,9 +13565,9 @@
     return out;
   }
   // @promo-wrap-end
-  function promoBuildPostHtml(title, body, imgs){
-    // imgs[i] = {url,name} (i는 0-based, 마커 번호는 1-based)
-    var used={}, out=[], lines=String(body||"").split(/\r?\n/);
+  function promoBuildPostHtml(title, body, imgs, tags){
+    // imgs[i] = {url,name} (i는 0-based, 마커 번호는 1-based). tags = 기록 태그(v367 꼬리 해시태그)
+    var used={}, out=[], lines=String(body||"").split(/\r?\n/), org=promoOrgOf(body);
     var imgCount=0;     // 들어간 사진 수 — 줄 단위로 늘었는지 보고 고아 삽입점을 정한다
     var orphanAt=-1;    // 남은 사진을 끼울 위치 — 마지막 사진이 든 "줄의 처리가 끝난 지점".
                         // 사진 바로 뒤(lastImgAt+1)에 끼우면 마커와 같은 줄에 이어진 설명 문장이
@@ -13566,24 +13582,23 @@
     //   의미 단위 줄나눔(promoLinesOf) + 한 줄=한 문단(여백 0, 빈 줄 0, 구분선 0). 네이버 편집기에 붙이면 줄마다 한 문단이 된다.
     function promoIsSubhead(t){ return t.length<=45 && /[?？]$/.test(t) && t.indexOf(". ")<0; }   // 프롬프트 규칙: 질문형 소제목은 기호 없는 한 줄
     function pushLine(l){ out.push('<p style="margin:0;line-height:1.8;text-align:center;">'+promoEscHtml(l)+'</p>'); }
+    function pushBlank(){ if(out.length && out[out.length-1]!==PROMO_BLANK) out.push(PROMO_BLANK); }   // v367: 빈 줄은 연달아 두 개 안 만든다
     function pushText(t){
       t=String(t||"").trim(); if(!t) return;
-      if(promoIsSubhead(t)){ pushLine(t); return; }   // 소제목은 한 줄 그대로(끊지 않음)
+      if(promoIsSubhead(t)){ pushBlank(); pushLine(t); return; }   // 소제목은 한 줄 그대로(끊지 않음) + 앞에 빈 줄(v367 직원판)
       promoLinesOf(t).forEach(pushLine);
     }
     function pushNums(nums, cap){
-      var seen={}, any=false;
+      // v367(PM 9/21 "직원판에 맞춰라"): 사진 묶음 위·아래에 빈 줄, 캡션은 싣지 않는다(직원은 사진 설명 칸을 전부 비운다 — 9/21 실측 0/11). cap은 받아 두기만(마커 설명은 본문에서 이미 뺐다).
+      var seen={}, tags=[];
       for(var k=0;k<nums.length;k++){
         var n=nums[k];
         if(seen[n]) continue;               // 같은 마커 안 중복 번호는 한 번만
         seen[n]=1;
         var tag=imgTag(n-1);
-        if(tag){ out.push(tag); imgCount++; any=true; }
+        if(tag){ tags.push(tag); imgCount++; }
       }
-      // 마커 설명은 버리지 않고 사진 밑 캡션으로 싣는다 — 네이버 공식 가이드(이미지 아래 부연 설명이
-      // 일반적)와 상위 노출 글 실측(서술형 캡션)에 맞춘 것(2026-08-16 외부조사).
-      cap=String(cap||"").trim();
-      if(any && cap) out.push('<p style="margin:0;color:#777;font-size:13px;text-align:center;">'+promoEscHtml(cap)+'</p>');   // v363 여백 0
+      if(tags.length){ pushBlank(); tags.forEach(function(t){ out.push(t); }); pushBlank(); }
     }
     function handleLine(ln){
       // 대괄호 마커 — 줄 안 어디에 있어도, 몇 개가 있어도 그 자리마다 사진을 끼우고 앞뒤 글은 살린다
@@ -13608,6 +13623,7 @@
       }
       pushText(ln);
     }
+    promoHeadLines(org).forEach(pushLine); pushBlank();   // v367: 고정 머리(서명 3줄 + 인사말) + 빈 줄
     lines.forEach(function(ln){
       var before=imgCount;
       handleLine(ln);
@@ -13624,7 +13640,7 @@
       if(orphanAt>=0) out.splice(orphanAt, 0, note, rest.join(""));
       else out.push(note, rest.join(""));
     }
-    return '<h2 style="font-size:20px;margin:0 0 16px;text-align:center;">'+promoEscHtml(title)+'</h2>'+out.join("")+promoTailHtml();
+    return '<h2 style="font-size:20px;margin:0 0 16px;text-align:center;">'+promoEscHtml(title)+'</h2>'+out.join("")+promoTailHtml(org)+promoTagsHtml(tags);   // v367: 꼬리 뒤 해시태그(직원판)
   }
   function promoOpenPost(){
     var p=promoDetId? promoFind(promoDetId) : null; if(!p) return;
@@ -13665,8 +13681,8 @@
     seq.then(function(){
       var base=(location.origin+location.pathname).replace(/\/[^\/]*$/,"")+"/.netlify/functions/gw-promo-img";
       var webImgs=share? got.map(function(g,i){ return g? { url:base+"?s="+share+"&i="+i, name:g.name } : null; }) : null;
-      var innerWeb = webImgs? promoBuildPostHtml(title, body, webImgs) : "";
-      var innerData = promoBuildPostHtml(title, body, got);
+      var innerWeb = webImgs? promoBuildPostHtml(title, body, webImgs, p.tags) : "";
+      var innerData = promoBuildPostHtml(title, body, got, p.tags);
       var inner = innerWeb || innerData;
       var miss=0; got.forEach(function(g){ if(!g) miss++; });
       // 태그 — 모델이 낸 tags(기록에 저장됨). 본문과 따로 두고 태그칸에 따로 붙여넣는다.
