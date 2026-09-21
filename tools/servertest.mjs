@@ -1564,6 +1564,44 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   delete mem.gw_data[wk.PEND_KEY]; delete mem.gw_data[wk.VAR_KEY];
 }
 
+// ===== 32d. v368 무기계약직 레이더 — contractPlan 순수 함수(기간제법 4조: 2년 시계·55세 예외·단계 멱등) =====
+{
+  const dc = require(join(FN, 'gw-duty-cron.js'));
+  const M = [
+    { id: 'c_exempt', name: '박국진', emp_type: '계약직', hire_date: '2025-09-01', birth: '1964-08-07' },     // 입사 시 61세 → 예외
+    { id: 'c_due', name: '정수현', emp_type: '계약직', hire_date: '2025-12-29', birth: '1978-01-09' },        // 전환일 2027-12-29
+    { id: 'c_unknown', name: '정재욱', emp_type: '계약직', hire_date: '2026-09-17' },                        // 생년월일 없음
+    { id: 'c_reg', name: '정규', emp_type: '정규직', hire_date: '2020-01-01', birth: '1990-01-01' },
+    { id: 'c_ret', name: '퇴사', emp_type: '계약직', hire_date: '2025-01-01', birth: '1990-01-01', leave_date: '2026-01-31' },
+    { id: 'c_leap', name: '윤년', emp_type: '계약직', hire_date: '2024-02-29', birth: '1990-01-01' },         // 전환일 2026-02-28
+  ];
+  const sentD = { schema: 1, keys: {} };
+  let it = dc.contractPlan(M, sentD, '2027-11-01');
+  T('contractPlan 2027-11-01: 정수현 D-58 → d90 · 예외(61세)·정규직·퇴사자·윤년(이미 초과 → over) 처리', it.length === 2 && it[0].id === 'c_leap' && it[0].stage === 'over' && it[1].id === 'c_due' && it[1].stage === 'd90' && it[1].days === 58 && it[1].conv === '2027-12-29', JSON.stringify(it));
+  it.forEach((x) => { sentD.keys[x.key] = '2027-11-01'; });
+  it = dc.contractPlan(M, sentD, '2027-11-02');
+  T('다음 날: d90은 회차 1회라 다시 안 뜨고 over는 매일(윤년 건만)', it.length === 1 && it[0].id === 'c_leap' && it[0].stage === 'over', JSON.stringify(it));
+  it = dc.contractPlan(M, sentD, '2027-12-10');
+  T('2027-12-10: 정수현 D-19 → d30(새 단계라 다시 알림)', it.some((x) => x.id === 'c_due' && x.stage === 'd30' && x.days === 19), JSON.stringify(it));
+  it = dc.contractPlan(M, sentD, '2028-01-05');
+  T('2028-01-05: 정수현 2년 초과 7일 → over', it.some((x) => x.id === 'c_due' && x.stage === 'over' && x.days === -7), JSON.stringify(it));
+  it = dc.contractPlan(M, { keys: {} }, '2028-07-01');
+  T('생년월일 없는 계약직은 90일 이내에 unknown 1회(정재욱 D-78)', it.some((x) => x.id === 'c_unknown' && x.stage === 'unknown' && x.days === 78), JSON.stringify(it));
+  const cb = dc.contractBody([{ name: '정수현', conv: '2027-12-29', days: 19, stage: 'd30' }, { name: '윤년', conv: '2026-02-28', days: -600, stage: 'over' }]);
+  T('contractBody: 제목 "무기계약 전환 시계 — 2명" · 본문 D-19·2년 초과 600일·노무사 확인', /2명/.test(cb.title) && /정수현 D-19\(2027-12-29\)/.test(cb.body) && /윤년 2년 초과 600일/.test(cb.body) && /노무사/.test(cb.body), cb.body);
+  // 크론 통합: 인허가 0건 + 계약직 알림 1건 → PM에게 1발(tag ct-<today>) · duty:sent에 ct 키 기록
+  {
+    mem.gw_data['col:licenses'] = { schema: 1, duties: [], items: [] }; delete mem.gw_data['duty:sent'];
+    mem.gw_users['member:c_due2'] = { id: 'c_due2', name: '정수현', role: '직원', emp_type: '계약직', hire_date: '2025-12-29', birth: '1978-01-09', perms: {} };
+    const before = pushMock.calls.length;
+    const realNow = Date.now; Date.now = () => new Date('2027-12-10T00:00:00Z').getTime() + 3600000;   // KST 2027-12-10 10:00
+    let r0 = null; try { r0 = await dc.handler({}); } finally { Date.now = realNow; }
+    const b0 = JSON.parse(r0.body); const sentAfter = pushMock.calls.slice(before);
+    T('duty 크론 통합: 인허가 0·계약직 1 → ct 1·발송 1(tag ct-2027-12-10, 제목 "무기계약 전환 시계") · duty:sent에 ct: 키', b0.ct === 1 && sentAfter.length === 1 && sentAfter[0].tag === 'ct-2027-12-10' && /무기계약 전환 시계/.test(sentAfter[0].title) && Object.keys((mem.gw_data['duty:sent'] || { keys: {} }).keys).some((k) => k.indexOf('ct:c_due2:2027-12-29:d30') === 0), JSON.stringify(b0) + ' ' + JSON.stringify(sentAfter.map((p) => p.title)));
+    delete mem.gw_users['member:c_due2']; delete mem.gw_data['duty:sent'];
+  }
+}
+
 // ===== 33. 운반일지 자동 재정렬 v327(PM 9/8 "학습시키거나 노선표가 바뀌면 사람이 수동 수집을 안 눌러도 기록이 스스로 재정렬") =====
 //    (a) 옛 규칙 day 블롭 → ab_day가 그 자리에서 재정렬(R14 분진→R39·routes_ver·n/qty/total 불변·감사) (b) ab_learn(day) → 그날 묶음이 학습 줄로·rematched.changed≥1
 //    (c) 학습 없는 다른 묶음 불변 (d) 차량 분리 묶음(vehicle_type)은 같은 줄·차량 미상은 종전 줄 유지 없이 미매칭 (e) 숨긴 노선·직접 추가 블롭 무변경

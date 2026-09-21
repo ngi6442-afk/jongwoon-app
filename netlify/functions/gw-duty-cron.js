@@ -49,6 +49,38 @@ function bodyOf(items) {
   return { title: '인허가 기한 — ' + head, body: (top + (items.length > 3 ? ' 외 ' + (items.length - 3) + '건' : '') + ' · 인허가 > 이번 달').slice(0, 200) };
 }
 
+// ---- v368 무기계약직 레이더(PM 9/21) — 계약직 2년 시계(기간제법 4조). 앱 ctRadar와 같은 규칙. 단계: d90(1회)·d30(1회)·over(매일 1회)·unknown(생년월일 없음, 90일 이내 1회).
+//   55세 이상(계약 체결 시)은 제4조①5호 예외라 알리지 않는다. 수신자 = PM(tier pm), 없으면 관리자. 멱등 키 'ct:<id>:<전환일>:<단계>'는 duty:sent에 같이 둔다.
+function ctAddYears(d, y) { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(d || '')); if (!m) return ''; const yy = Number(m[1]) + y; let dd = m[3]; if (m[2] === '02' && dd === '29') { const leap = (yy % 4 === 0 && yy % 100 !== 0) || yy % 400 === 0; if (!leap) dd = '28'; } return yy + '-' + m[2] + '-' + dd; }
+function ctAgeAt(birth, at) { const b = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(birth || '')), a = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(at || '')); if (!b || !a) return null; let age = Number(a[1]) - Number(b[1]); if (Number(a[2]) < Number(b[2]) || (Number(a[2]) === Number(b[2]) && Number(a[3]) < Number(b[3]))) age--; return age; }
+function ctDays(from, to) { const f = Date.UTC(+from.slice(0, 4), +from.slice(5, 7) - 1, +from.slice(8, 10)), t = Date.UTC(+to.slice(0, 4), +to.slice(5, 7) - 1, +to.slice(8, 10)); return Math.round((t - f) / 86400000); }
+function contractPlan(members, sentDoc, today) {
+  const sent = (sentDoc && sentDoc.keys && typeof sentDoc.keys === 'object') ? sentDoc.keys : {};
+  const items = [];
+  (members || []).forEach(function (m) {
+    if (!m || m.emp_type !== '계약직' || m.del === 1) return;
+    if (m.leave_date && String(m.leave_date) < today) return;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(m.hire_date || ''))) return;
+    const conv = ctAddYears(m.hire_date, 2), days = ctDays(today, conv), age = ctAgeAt(m.birth, m.hire_date);
+    if (age !== null && age >= 55) return;   // 예외
+    let stage = null;
+    if (age === null) { if (days <= 90) stage = 'unknown'; }
+    else if (days < 0) stage = 'over';
+    else if (days <= 30) stage = 'd30';
+    else if (days <= 90) stage = 'd90';
+    if (!stage) return;
+    const key = 'ct:' + m.id + ':' + conv + ':' + stage;
+    if (stage === 'over' ? sent[key] === today : !!sent[key]) return;
+    items.push({ id: m.id, name: String(m.name || ''), conv: conv, days: days, stage: stage, key: key });
+  });
+  items.sort(function (a, b) { return a.days - b.days; });
+  return items;
+}
+function contractBody(items) {
+  const line = function (x) { return x.stage === 'over' ? (x.name + ' 2년 초과 ' + (-x.days) + '일(' + x.conv + ')') : x.stage === 'unknown' ? (x.name + ' 생년월일 없음 — 판정 불가') : (x.name + ' D-' + x.days + '(' + x.conv + ')'); };
+  return { title: '무기계약 전환 시계 — ' + items.length + '명', body: (items.slice(0, 3).map(line).join(' / ') + (items.length > 3 ? ' 외 ' + (items.length - 3) + '명' : '') + ' · 인사·직원 탭 칩 · 기간제법 4조 — 노무사 확인').slice(0, 200) };
+}
+
 exports.handler = async function (event) {
   const today = kstToday();
   let st;
@@ -60,24 +92,36 @@ exports.handler = async function (event) {
   const sr = await blobGet(st, SENT_KEY);
   const sentDoc = (sr.ok && sr.data && sr.data.keys && typeof sr.data.keys === 'object') ? sr.data : { schema: 1, keys: {} };
   const items = plan(duties, licenses, sentDoc, today);
-  if (!items.length) return { statusCode: 200, body: JSON.stringify({ ok: true, today: today, items: 0 }) };
   let ctx = null;
   try { ctx = await push.tierCtx(); } catch (e) { ctx = null; }
+  const ctItems = contractPlan(ctx ? ctx.members : [], sentDoc, today);   // v368
+  if (!items.length && !ctItems.length) return { statusCode: 200, body: JSON.stringify({ ok: true, today: today, items: 0, ct: 0 }) };
   const ids = (ctx && Array.isArray(ctx.adminIds)) ? ctx.adminIds : [];
   let sent = 0, fails = 0;
-  if (ids.length) {
+  if (items.length && ids.length) {
     try {
       const msg = bodyOf(items);
       await push.sendTo(ids, { title: msg.title, body: msg.body, url: './', tag: 'duty-' + today }, ctx ? { ctx: ctx } : null);
       sent = ids.length;
     } catch (e) { fails++; }
   }
+  // v368 무기계약직 레이더 — PM(없으면 관리자)에게 1발
+  let ctSent = 0;
+  if (ctItems.length) {
+    const pmIds = (ctx && Array.isArray(ctx.pmIds) && ctx.pmIds.length) ? ctx.pmIds : ids;
+    if (pmIds.length) {
+      try { const cm = contractBody(ctItems); await push.sendTo(pmIds, { title: cm.title, body: cm.body, url: './', tag: 'ct-' + today }, ctx ? { ctx: ctx } : null); ctSent = pmIds.length; } catch (e) { fails++; }
+    }
+  }
   // 발송 기록(관리자가 없어도 기록은 남긴다 — 다음 날 중복 판정용) + 오래된 키 정리
   items.forEach(function (x) { sentDoc.keys[x.key] = today; });
+  ctItems.forEach(function (x) { sentDoc.keys[x.key] = today; });
   const cutoff = new Date(Date.now() + 9 * 3600000 - KEEP_DAYS * 86400000).toISOString().slice(0, 10);
   Object.keys(sentDoc.keys).forEach(function (k) { if (String(sentDoc.keys[k]) < cutoff) delete sentDoc.keys[k]; });
   await blobSet(st, SENT_KEY, sentDoc);
-  return { statusCode: 200, body: JSON.stringify({ ok: true, today: today, items: items.length, admins: ids.length, sent: sent, fails: fails }) };
+  return { statusCode: 200, body: JSON.stringify({ ok: true, today: today, items: items.length, admins: ids.length, sent: sent, ct: ctItems.length, ct_sent: ctSent, fails: fails }) };
 };
 exports.plan = plan;
 exports.bodyOf = bodyOf;
+exports.contractPlan = contractPlan;   // v368
+exports.contractBody = contractBody;

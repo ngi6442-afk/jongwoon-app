@@ -151,6 +151,18 @@ try {
   // v352(PM 9/11 #31ⓑ — 직원 수정본 5편 실측): 담당자 포장 = 가운데 정렬·20자 개행·소제목 굵게+구분선·물음표·정화조/저수조 삭제
   const bp = (idx.match(/function promoBuildPostHtml\(title, body, imgs, tags\)\{([\s\S]*?)\n  \}/) || ['', ''])[1];
   const abl366 = readFileSync(join(ROOT, 'netlify/functions/_lib/allbaro.js'), 'utf8'), abw366 = readFileSync(join(ROOT, 'netlify/functions/gw-allbaro-run-background.js'), 'utf8');
+  {
+    const ct = (idx.match(/\/\/ @ct-radar-start([\s\S]*?)\/\/ @ct-radar-end/) || ['', ''])[1];
+    const api = new Function('todayStr', 'esc', ct + '\nreturn { ctRadar: ctRadar, ctChipHtml: ctChipHtml, ctAddYears: ctAddYears, ctAgeAt: ctAgeAt };')(() => '2026-09-21', (x) => String(x));
+    const r1 = api.ctRadar({ emp_type: '계약직', hire_date: '2025-09-01', birth: '1964-08-07' }, '2026-09-21');
+    const r2 = api.ctRadar({ emp_type: '계약직', hire_date: '2025-12-29', birth: '1978-01-09' }, '2026-09-21');
+    const r3 = api.ctRadar({ emp_type: '계약직', hire_date: '2026-09-17' }, '2026-09-21');
+    const r4 = api.ctRadar({ emp_type: '계약직', hire_date: '2024-02-29', birth: '1990-01-01' }, '2026-09-21');
+    T('v368 무기계약직 레이더(ctRadar 실행): 박국진(입사 시 61세) exempt · 정수현 due D-464(2027-12-29) · 정재욱 생년월일 없음 unknown · 윤년 입사 2024-02-29 → 2026-02-28 over 205일 · 정규직 null · 칩 문구',
+      r1 && r1.state === 'exempt' && r1.age === 61 && r2 && r2.state === 'due' && r2.days === 464 && r2.conv === '2027-12-29' && r3 && r3.state === 'unknown' && r4 && r4.state === 'over' && r4.days === -205 && api.ctRadar({ emp_type: '정규직', hire_date: '2020-01-01' }, '2026-09-21') === null
+      && /55세 이상 예외/.test(api.ctChipHtml({ emp_type: '계약직', hire_date: '2025-09-01', birth: '1964-08-07' }, '2026-09-21')) && /무기계약 전환 D-464 \(2027-12-29\)/.test(api.ctChipHtml({ emp_type: '계약직', hire_date: '2025-12-29', birth: '1978-01-09' }, '2026-09-21')) && /무기계약 간주 — 2년 초과 205일/.test(api.ctChipHtml({ emp_type: '계약직', hire_date: '2024-02-29', birth: '1990-01-01' }, '2026-09-21'))
+      && /chips \+= ctChipHtml\(m, todayStr\(\)\);/.test(idx) && /function contractPlan\(members, sentDoc, today\)/.test(readFileSync(join(ROOT, 'netlify/functions/gw-duty-cron.js'), 'utf8')), JSON.stringify([r1, r2, r3, r4]));
+  }
   T('v366 운반일지 재발방지: AB_PEND_HINT·전부 잠정 칸 붉은 숫자(ab-n-pend, "?")·문구 "예약 미실행 가능" 3곳 · abVariantHtml 칩(표기 변형)+[별도 줄로 나누기](abCanLearn) · abVariantSplit=ab_route_add(from=원문, to·item=줄 값)→loadAbStatus+abOpenDay · data-ab-split 배선 · 서버 matchRouteEx variant·aggregate variants·rematch 갱신 · 워커 notifyPendingAndVariants(운영부+PM, (day,manf)/(이름) 1회)',
     /var AB_PEND_HINT = "/.test(idx) && /class="ab-n-pend" title="' \+ esc\(AB_PEND_HINT/.test(idx) && /n \+ '\?<\/span>'/.test(idx) && (idx.match(/예약 미실행 가능/g) || []).length >= 3
     && /function abVariantHtml\(c, r\)/.test(idx) && /표기 변형 ' \+ esc\(names\.join/.test(idx) && /if \(abCanLearn\(\)\) h \+= '<button type="button" class="ab-hide-btn" data-ab-split=/.test(idx)
