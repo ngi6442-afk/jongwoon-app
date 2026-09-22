@@ -717,6 +717,7 @@
   .view.readonly .del-x,
   .view.readonly .mini-btn,
   .view.readonly .link-btn{display:none !important;}
+  .view.readonly .mini-btn[data-doc-att-open]{display:inline-block !important;}   /* v369: 문서함 첨부 [열기]는 열람(보기) 권한의 통로 — 서버 doc_att_get이 docVisible로 판정하므로 화면에서 지우지 않는다(PM 9/22 "직원들이 뽑을 수가 없다") */
   .tab-btn.perm-hidden{display:none !important;}
   .nav-group.perm-hidden{display:none !important;}
   .prog-frame{display:block;width:100%;height:calc(100vh - 170px);height:calc(100dvh - 170px);min-height:480px;border:1px solid var(--line);border-radius:12px;background:var(--card);}
