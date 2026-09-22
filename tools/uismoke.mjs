@@ -169,6 +169,44 @@ try {
     && /function abVariantSplit\(side, row, name\)/.test(idx) && /action: "ab_route_add", from: name, to: rt\.t, item: rt\.i, side: sd/.test(idx) && /loadAbStatus\(\); if \(abDay\.day\) abOpenDay\(abDay\.day\);\s*\}\)\.catch/.test(idx) && /querySelectorAll\("\[data-ab-split\]"\)/.test(idx)
     && /variant: f !== c\.nr\.f && f\.indexOf\(c\.nr\.f\) >= 0/.test(abl366) && /if \(dec\.variant\) c\.variants = \[g\.from\];/.test(abl366) && /if \(dec\.variant\) c\.variants = \[c\.from\]; else delete c\.variants;/.test(abl366)
     && /async function notifyPendingAndVariants\(st, dayDocs, tcIn\)/.test(abw366) && /String\(m\.dept \|\| ''\) === '운영부'/.test(abw366) && /dd\.day >= today\) continue;/.test(abw366) && /tag: 'allbaro-pend-' \+ day/.test(abw366), '');
+  // ---- v370: 차량 시트형(A안) + 폰 2단(C안) — 순수 함수 실행(PM 9/22 "25. ㄱ") ----
+  try {
+    const fn370 = (name) => { const i = idx.indexOf('function ' + name + '('); if (i < 0) throw new Error('함수 없음: ' + name); let d = 0, st = false; for (let j = i; j < idx.length; j++) { const ch = idx[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return idx.slice(i, j + 1); } } throw new Error(name); };
+    const cols370 = (idx.match(/var VEH_COLS = \[[\s\S]*?\n  \];/) || [''])[0];
+    if (!cols370) throw new Error('VEH_COLS 없음');
+    const api = new Function([
+      'var todayStr = function(){ return "2026-09-22"; }; var esc = function(s){ return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); };',
+      cols370, fn370('isGreyState'), fn370('vehDday'), fn370('vehNearest'), fn370('vehDueCell'), fn370('vehNearInfo'), fn370('vehSortVal'), fn370('vehSheetSortRows'), fn370('vehSheetPass'), fn370('vehEnumValues'), fn370('vehColCls'),
+      'return { VEH_COLS: VEH_COLS, vehDueCell: vehDueCell, vehNearInfo: vehNearInfo, vehSheetSortRows: vehSheetSortRows, vehSheetPass: vehSheetPass, vehEnumValues: vehEnumValues, vehColCls: vehColCls };'].join('\n'))();
+    const V = [
+      { id: 'a', no: '82수1111', type: '준설차', own: '직영', state: '운행', insp_due: '2026-09-10', ins_due: '2027-03-01', driver: '김호태', insurer: 'DB' },          // 검사 경과 12일
+      { id: 'b', no: '12가2222', type: '암롤', own: '지입', state: '운행', insp_due: '2026-10-10', ins_due: '2026-09-30', driver: '', insurer: 'KB' },                 // 보험 D-8(가까움)
+      { id: 'c', no: '33나3333', type: '준설차', own: '직영', state: '매각', insp_due: '2026-09-01', ins_due: null, driver: '박국진', insurer: 'DB' },                   // 회색(매각) — 경과지만 뒤로
+      { id: 'd', no: '44다4444', type: '카고', own: '직영', state: '정비', insp_due: '2027-01-15', ins_due: '2027-02-01', driver: '이홍식', insurer: '' },              // 멀다
+      { id: 'e', no: '55라5555', type: '암롤', own: '지입', state: '운행', insp_due: null, ins_due: null, driver: '허성관', insurer: 'KB' }                               // 만기 없음
+    ];
+    const c1 = api.vehDueCell('2026-09-10', false), c2 = api.vehDueCell('2026-09-30', false), c3 = api.vehDueCell('2027-01-15', false), c4 = api.vehDueCell('2026-09-01', true), c5 = api.vehDueCell('', false);
+    const n1 = api.vehNearInfo(V[1]), n2 = api.vehNearInfo(V[4]);
+    const sDue = api.vehSheetSortRows(V, 'due', 1).map(x => x.id).join(''), sDueDesc = api.vehSheetSortRows(V, 'due', -1).map(x => x.id).join(''), sNo = api.vehSheetSortRows(V, 'no', 1).map(x => x.id).join(''), sInsp = api.vehSheetSortRows(V, 'insp_due', 1).map(x => x.id).join('');
+    const pOver = V.filter(v => api.vehSheetPass(v, {}, 'over')).map(x => x.id).join(''), p30 = V.filter(v => api.vehSheetPass(v, {}, 'due30')).map(x => x.id).join(''), pJi = V.filter(v => api.vehSheetPass(v, {}, 'jiip')).map(x => x.id).join(''), pStop = V.filter(v => api.vehSheetPass(v, {}, 'stop')).map(x => x.id).join('');
+    const pEnum = V.filter(v => api.vehSheetPass(v, { type: '준설차' }, '')).map(x => x.id).join(''), pText = V.filter(v => api.vehSheetPass(v, { no: '가22' }, '')).map(x => x.id).join(''), pBoth = V.filter(v => api.vehSheetPass(v, { insurer: 'KB' }, 'jiip')).map(x => x.id).join('');
+    const en = api.vehEnumValues(V, 'insurer').join(',');
+    const colsOk = api.VEH_COLS.length === 12 && api.VEH_COLS[0].k === 'no' && api.VEH_COLS.filter(c => c.ph).length === 1 && api.VEH_COLS.filter(c => c.hs).length === 9 && api.vehColCls(api.VEH_COLS[2]) === ' vs-ph' && api.vehColCls(api.VEH_COLS[3]) === 'vs-hs' && api.vehColCls(api.VEH_COLS[1]) === '';
+    T('v370 차량 시트형(실행): 만기 칸 3단계(경과 12일=vs-dan·D-8=vs-warn·먼 것 색 없음·회색 상태 색 없음·빈 값 "-") · 폰 만기=가까운 것(보험 D-8) · 정렬 due(경과 먼저·회색 뒤: a b d e c)/역순(e d b a c)/차번호/검사만기 · 칩 over·due30·jiip·stop · 필터 enum·text·enum+칩 · enum 값 정렬 · 열 정의(12열·폰 1·PC 전용 9)',
+      c1.cls === 'vs-dan' && c1.level === 2 && /경과 12일/.test(c1.html) && c2.cls === 'vs-warn' && c2.level === 1 && /D-8/.test(c2.html) && c3.cls === '' && c3.level === 0 && c4.cls === '' && /D\+21/.test(c4.html) && c5.level === 0 && /-<\/span>/.test(c5.html)
+      && n1 && n1.t === '보험' && n1.diff === 8 && n2 === null
+      && sDue === 'abdec' && sDueDesc === 'edbac' && sNo === 'bcdea' && sInsp === 'cabde'
+      && pOver === 'ac' && p30 === 'abc' && pJi === 'be' && pStop === 'cd'
+      && pEnum === 'ac' && pText === 'b' && pBoth === 'be' && en === 'DB,KB' && colsOk,
+      JSON.stringify({ c1, c2, n1, sDue, sDueDesc, sNo, sInsp, pOver, p30, pJi, pStop, pEnum, pText, pBoth, en, colsOk }));
+    T('v370 구조: @veh-sheet 구간 · #vehDetailCard · 옛 카드형(vehRowHtml·vehDdayLine) 제거 · 표 고정 규칙(머리 sticky top·첫 열 sticky left·합계 sticky bottom) · 폰 859px 규칙(vs-hs 숨김·상세 카드 표시·표 안 펼침 숨김) · PC 860px(vs-ph 숨김) · 열 폭·정렬 저장 키 · 대시보드 .veh-item 유지 · 재그리기 포커스 복원',
+      /\/\/ @veh-sheet-start/.test(idx) && /\/\/ @veh-sheet-end/.test(idx) && /id="vehDetailCard"/.test(idx) && !/vehRowHtml\(/.test(idx) && !/vehDdayLine\(/.test(idx)
+      && /\.vs thead th\{position:sticky;top:0;z-index:3;/.test(idx) && /\.vs th:first-child,\.vs td:first-child\{position:sticky;left:0;z-index:2;\}/.test(idx) && /\.vs tfoot td\{position:sticky;bottom:0;z-index:4;/.test(idx)
+      && /@media \(max-width:859px\)\{\s*\.vs\{min-width:0;width:100%;table-layout:auto;\}/.test(idx) && /\.vs th\.vs-hs,\.vs td\.vs-hs\{display:none;\}/.test(idx) && /#vehDetailCard\{display:block;margin-top:8px;\}/.test(idx) && /\.vs tr\.vs-det\{display:none;\}/.test(idx)
+      && /@media \(min-width:860px\)\{\s*\.vs th\.vs-ph,\.vs td\.vs-ph\{display:none;\}/.test(idx)
+      && /var VEH_SHEET_KEY = "jw_veh_sheet", VEH_COLW_KEY = "jw_veh_colw";/.test(idx) && /class="item veh-item"/.test(idx) && /\.veh-item\{display:flex;/.test(idx)
+      && /var act = document\.activeElement, focusKey = /.test(idx) && /fe\.setSelectionRange\(caret, caret\)/.test(idx) && /renderDeletedList\("veh", "vehDeletedToggle", "vehDeletedList", showDeletedVeh, "차량", delLabel\)/.test(idx), '');
+  } catch (e) { console.log('  (v370 검사 생략 — ' + e.message + ')'); fails++; }
   T('v369 문서함 [열기] 직원 표시: .view.readonly .mini-btn 숨김의 예외로 [data-doc-att-open] 버튼은 남는다(보기 권한 열람 통로) · 행 렌더의 열기 버튼이 그 속성을 갖는다',
     /\.view\.readonly \.mini-btn\[data-doc-att-open\]\{display:inline-block !important;\}/.test(idx) && /class="mini-btn" style="[^"]*" data-doc-att-open="' \+ esc\(d\.id\) \+ '\|' \+ Number\(f\.n\) \+ '">열기<\/button>/.test(idx)
     && idx.indexOf('.view.readonly .mini-btn[data-doc-att-open]') > idx.indexOf('.view.readonly .link-btn{display:none !important;}'), '');

@@ -637,6 +637,70 @@
   .veh-due{font-size:12px;color:var(--sub);font-weight:700;white-space:nowrap;}
   .veh-due .dday{font-size:13px;padding:1px 8px;margin-left:3px;}
   .veh-grid .mini-btn{font-size:12px;padding:5px 10px;border-radius:8px;white-space:nowrap;}
+  /* v370 차량 시트형(A안) + 폰 2단(C안) — 새 클래스(.vs-*)만 쓴다. .veh-item/.item은 대시보드 만기 목록이 재사용하므로 손대지 않는다 */
+  .vs-tools{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:0 0 8px;}
+  .vs-chip{font-size:12px;padding:4px 10px;border-radius:999px;border:1px solid var(--line);background:var(--surface,#fff);color:var(--text,#222);cursor:pointer;white-space:nowrap;line-height:1.3;}
+  .vs-chip.on{background:var(--brand);color:#fff;border-color:var(--brand);}
+  .vs-chip.warn.on{background:#B0332A;border-color:#B0332A;}
+  .vs-count{margin-left:auto;font-size:12px;color:var(--sub);white-space:nowrap;}
+  .vs-wrap{overflow:auto;max-height:calc(100vh - 230px);border:1px solid var(--line);border-radius:8px;background:var(--surface,#fff);}
+  .vs{border-collapse:separate;border-spacing:0;table-layout:fixed;min-width:1160px;font-size:12.5px;line-height:1.35;}
+  .vs th,.vs td{border-bottom:1px solid var(--line);border-right:1px solid #EDF0EE;padding:0 8px;height:32px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left;vertical-align:middle;background:var(--surface,#fff);font-variant-numeric:tabular-nums;box-sizing:border-box;}
+  .vs thead th{position:sticky;top:0;z-index:3;background:#EFF5F2;font-weight:700;color:var(--sub);cursor:pointer;user-select:none;-webkit-user-select:none;}
+  .vs thead th.sorted{color:var(--brand-dark,#1F5A3C);}
+  .vs thead tr.vs-filt th{top:32px;cursor:default;padding:0 4px;background:#F6F9F7;}
+  .vs thead tr.vs-filt th input,.vs thead tr.vs-filt th select{width:100%;box-sizing:border-box;font-size:12px;padding:3px 4px;border:1px solid var(--line);border-radius:5px;background:#fff;color:inherit;}
+  .vs th:first-child,.vs td:first-child{position:sticky;left:0;z-index:2;}
+  .vs thead th:first-child{z-index:6;}
+  .vs tfoot td{position:sticky;bottom:0;z-index:4;background:#EFF5F2;font-weight:700;color:var(--sub);}
+  .vs tfoot td:first-child{z-index:7;}
+  .vs-wrap.scrolled th:first-child,.vs-wrap.scrolled td:first-child{box-shadow:4px 0 6px -4px rgba(0,0,0,.18);}
+  .vs tbody tr.vs-r{cursor:pointer;}
+  .vs tbody tr.vs-r:hover td{background:#F7FAF8;}
+  .vs tbody tr.vs-r.open td{background:#EAF4EE;}
+  .vs tbody tr.vs-r.grey td{color:#8A8F8C;}
+  .vs td.vs-b{font-weight:800;font-size:13px;}
+  .vs td.vs-dan{background:#FBEAE8;color:#B0332A;font-weight:700;}
+  .vs td.vs-warn{background:#FFF6E0;color:#8A5A00;font-weight:700;}
+  .vs tbody tr.vs-r.open td.vs-dan,.vs tbody tr.vs-r:hover td.vs-dan{background:#F6DCD9;}
+  .vs tbody tr.vs-r.open td.vs-warn,.vs tbody tr.vs-r:hover td.vs-warn{background:#F7E9C4;}
+  .vs .vs-ar{font-size:10px;margin-left:3px;opacity:.7;}
+  .vs .vs-rs{position:absolute;right:0;top:0;width:7px;height:100%;cursor:col-resize;}
+  .vs tr.vs-det>td{position:static;white-space:normal;height:auto;padding:0;background:#FAFCFB;border-right:0;}
+  .vs-det-in{position:sticky;left:0;width:var(--vs-panew,100%);box-sizing:border-box;padding:10px 12px;}
+  .vs-dh{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;}
+  .vs-dh b{font-size:15px;}
+  .vs-stabs{display:flex;gap:4px;margin:6px 0 8px;}
+  .vs-stab{font-size:12px;padding:4px 10px;border-radius:6px;border:1px solid var(--line);background:#fff;color:inherit;cursor:pointer;}
+  .vs-stab.on{background:var(--brand);color:#fff;border-color:var(--brand);}
+  .vs-kv{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px 14px;font-size:12.5px;margin-top:6px;}
+  .vs-kv .k{color:var(--sub);font-size:11.5px;}
+  .vs-kv .v{font-weight:600;word-break:keep-all;overflow-wrap:anywhere;}
+  .vs-due{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:8px;border:1px solid var(--line);background:#fff;margin:2px 8px 4px 0;font-size:12.5px;}
+  .vs-due.red{border-color:#E7B4AF;background:#FBEAE8;color:#B0332A;}
+  .vs-due.orange{border-color:#F0D48A;background:#FFF6E0;color:#8A5A00;}
+  .vs-act{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;}
+  .vs-hist{width:100%;border-collapse:collapse;font-size:12.5px;}
+  .vs-hist th,.vs-hist td{border-bottom:1px solid var(--line);padding:4px 6px;text-align:left;vertical-align:top;}
+  .vs-hist th{color:var(--sub);font-weight:600;font-size:12px;white-space:nowrap;}
+  .vs-hist td.num,.vs-hist th.num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;}
+  .vs-empty{padding:10px 4px;color:var(--sub);font-size:13px;}
+  #vehDetailCard{display:none;}
+  @media (max-width:859px){
+    .vs{min-width:0;width:100%;table-layout:auto;}
+    .vs col{width:auto !important;}
+    .vs th.vs-hs,.vs td.vs-hs{display:none;}
+    .vs td:first-child,.vs th:first-child{width:40%;}
+    .vs th,.vs td{height:34px;}
+    .vs .vs-rs{display:none;}
+    .vs-wrap{max-height:46vh;}
+    .vs tr.vs-det{display:none;}
+    #vehDetailCard{display:block;margin-top:8px;}
+    .vs-kv{grid-template-columns:repeat(2,minmax(0,1fr));}
+  }
+  @media (min-width:860px){
+    .vs th.vs-ph,.vs td.vs-ph{display:none;}
+  }
 
   /* 수금 */
   .rec-item{align-items:flex-start;cursor:default;}
@@ -1037,6 +1101,7 @@
     <div class="card" id="vehList">
       <div class="loading">불러오는 중…</div>
     </div>
+    <div class="card" id="vehDetailCard"></div>   <!-- v370 폰(859px 이하) 상세 카드 — PC에서는 표 안에 펼침 -->
     <button class="link-btn" id="vehAddBtn">+ 차량 추가</button>
     <button class="link-btn" id="vehDeletedToggle" style="display:none;color:#B0332A;"></button>
     <div class="card" id="vehDeletedList" style="display:none;margin-top:6px;"></div>
@@ -6208,70 +6273,262 @@
       '<span class="dday' + (cls ? ' ' + cls : '') + '" title="' + esc(dateStr) + '">' + dd.text + '</span>';
   }
 
-  function vehRowHtml(v, sel){
-    var grey = isGreyState(v);
-    var ownCls = v.own === "지입" ? "lease" : "self";
-    var subParts = [];
-    if (v.type || v.kind) subParts.push(esc(v.type || v.kind));
-    if (v.insurer) subParts.push(esc(v.insurer));
-    if (v.driver) subParts.push(esc(v.driver));
-    if (v.state && v.state !== "운행") subParts.push(esc(v.state));
-    if (v.history && v.history.length) subParts.push('이력 ' + v.history.length);
-    var subText = subParts.join(' · ');
-    var memo = (v.note && v.note.trim() && v.note.trim() !== (v.insurer || "").trim()) ? v.note.trim() : "";
-    return '<div class="item veh-item ' + ownCls + '" data-veh-row="' + v.id + '">' +
-        (sel ? selBoxHtml("veh", v.id, false) : '') +
-        '<div class="veh-left">' +
-          '<div class="veh-no"><span class="own-badge ' + ownCls + '">' + esc(v.own) + '</span> ' + esc(v.no) + '</div>' +
-          (subText ? '<div class="veh-sub">' + subText + '</div>' : '') +
-        '</div>' +
-        '<div class="veh-note" title="' + esc(memo) + '">' + esc(memo) + '</div>' +
-        '<div class="veh-grid">' +
-          vehDdayLine("검사", v.insp_due, grey) +
-          '<button class="mini-btn" data-veh-hist="' + v.id + '">이력</button>' +
-          vehDdayLine("보험", v.ins_due, grey) +
-          '<button class="mini-btn" data-veh-edit="' + v.id + '">수정</button>' +
-        '</div>' +
-      '</div>';
-  }
-  function vehDdayLine(label, dateStr, grey){
-    if (!dateStr) return '<span class="veh-due">' + label + ' <span class="dday grey">-</span></span>';
+  // ---- v370 차량 시트형(A안 뼈대) + 폰 2단(C안) — PM 9/21 "추천 ㄱ"·9/22 "ㄱ". 화면 층만 교체: 데이터 모델(col:vehicles)·저장·권한·서류출력·vehicleTypeOf(no·type) 무변경 ----
+  // @veh-sheet-start
+  // 열 정의: hs=PC 전용(폰에서 숨김), ph=폰 전용(검사·보험 중 가까운 만기 하나). f=필터 종류(text 부분일치 / enum 정확일치 / none)
+  var VEH_SHEET_KEY = "jw_veh_sheet", VEH_COLW_KEY = "jw_veh_colw";
+  var VEH_COLS = [
+    { k:"no",       h:"차번호",   w:112, f:"text", b:1 },
+    { k:"type",     h:"차종",     w:80,  f:"enum" },
+    { k:"due",      h:"만기",     w:110, f:"none", ph:1 },
+    { k:"kind",     h:"상세",     w:200, f:"text", hs:1 },
+    { k:"own",      h:"소유",     w:66,  f:"enum", hs:1 },
+    { k:"permit",   h:"허가",     w:74,  f:"enum", hs:1 },
+    { k:"driver",   h:"기사",     w:84,  f:"enum", hs:1 },
+    { k:"state",    h:"상태",     w:72,  f:"enum", hs:1 },
+    { k:"insp_due", h:"검사만기", w:128, f:"none", hs:1 },
+    { k:"ins_due",  h:"보험만기", w:128, f:"none", hs:1 },
+    { k:"insurer",  h:"보험사",   w:106, f:"enum", hs:1 },
+    { k:"note",     h:"비고",     w:220, f:"text", hs:1 }
+  ];
+  var VEH_CHIPS = [["", "전체"], ["due30", "만기 30일 내"], ["over", "만기 경과"], ["jiip", "지입"], ["stop", "운행 외"]];
+  var vehSheet = { k: "due", d: 1, f: {}, chip: "" };   // 정렬 키·방향, 필터 행 값, 칩 — 기기별(localStorage), 서버 무관
+  var vehColw = {};                                      // 열 폭(px) — 기기별
+  try { var _vs0 = JSON.parse(localStorage.getItem(VEH_SHEET_KEY) || "null"); if (_vs0 && typeof _vs0 === "object"){ vehSheet.k = _vs0.k || "due"; vehSheet.d = _vs0.d === -1 ? -1 : 1; vehSheet.f = (_vs0.f && typeof _vs0.f === "object") ? _vs0.f : {}; vehSheet.chip = _vs0.chip || ""; } } catch(e){}
+  try { var _vc0 = JSON.parse(localStorage.getItem(VEH_COLW_KEY) || "null"); if (_vc0 && typeof _vc0 === "object") vehColw = _vc0; } catch(e){}
+  function vehSheetSave(){ try { localStorage.setItem(VEH_SHEET_KEY, JSON.stringify(vehSheet)); } catch(e){} }
+  function vehColwSave(){ try { localStorage.setItem(VEH_COLW_KEY, JSON.stringify(vehColw)); } catch(e){} }
+  var vehOpenId = null, vehDetTab = "ov";
+  function vehColW(c){ var w = Number(vehColw[c.k]); return (w >= 40 && w <= 600) ? w : c.w; }
+  // 만기 칸: 지난 것 붉게("경과 n일"), 30일 이내 노랑(D-n), 그 밖 D-n. 회색 상태(말소예정·매각·검사보류)는 색 없이
+  function vehDueCell(dateStr, grey){
+    if (!dateStr) return { html: '<span style="color:#9AA09C;">-</span>', cls: "", level: 0, sortv: 99999 };
     var dd = vehDday(dateStr);
-    var cls = grey ? "grey" : (dd.cls || "");
-    return '<span class="veh-due">' + label + ' <span class="dday ' + cls + '" title="' + esc(dateStr) + '">' + dd.text + '</span></span>';
+    if (grey) return { html: esc(dateStr) + ' <span style="color:#9AA09C;">' + dd.text + '</span>', cls: "", level: 0, sortv: dd.diff };
+    if (dd.diff < 0) return { html: esc(dateStr) + ' 경과 ' + (-dd.diff) + '일', cls: "vs-dan", level: 2, sortv: dd.diff };
+    if (dd.diff <= 30) return { html: esc(dateStr) + ' ' + dd.text, cls: "vs-warn", level: 1, sortv: dd.diff };
+    return { html: esc(dateStr) + ' <span style="color:var(--sub);">' + dd.text + '</span>', cls: "", level: 0, sortv: dd.diff };
   }
-
+  // 폰 '만기' 열: 검사·보험 중 가까운 것 하나
+  function vehNearInfo(v){
+    var a = v.insp_due ? vehDday(v.insp_due).diff : null, b = v.ins_due ? vehDday(v.ins_due).diff : null;
+    if (a === null && b === null) return null;
+    if (b === null || (a !== null && a <= b)) return { t: "검사", diff: a, date: v.insp_due };
+    return { t: "보험", diff: b, date: v.ins_due };
+  }
+  function vehSortVal(v, k){
+    if (k === "due") return vehNearest(v);
+    if (k === "insp_due" || k === "ins_due") return v[k] ? vehDday(v[k]).diff : 99999;
+    if (k === "driver") return v.driver || "힣힣";   // 미배정은 뒤로
+    return String(v[k] == null ? "" : v[k]);
+  }
+  function vehSheetSortRows(rows, k, d){
+    var out = rows.slice();
+    out.sort(function(a, b){
+      var ag = isGreyState(a) ? 1 : 0, bg = isGreyState(b) ? 1 : 0;
+      if (k === "due" && ag !== bg) return ag - bg;   // 만기순(기본)에서만 회색 상태를 뒤로 — 종전 카드형과 같은 순서
+      var va = vehSortVal(a, k), vb = vehSortVal(b, k), r;
+      if (typeof va === "number" && typeof vb === "number") r = va - vb;
+      else r = String(va).localeCompare(String(vb), "ko");
+      if (r === 0) r = String(a.no || "").localeCompare(String(b.no || ""), "ko");
+      return r * d;
+    });
+    return out;
+  }
+  // 필터 행 + 칩 판정 — text=부분 일치(대소문자 무시), enum=정확히 같음. 칩: due30(가까운 만기 30일 이내·경과 포함)/over(경과)/jiip(지입)/stop(운행 외 상태)
+  function vehSheetPass(v, f, chip){
+    var i, c, q, val;
+    for (i = 0; i < VEH_COLS.length; i++){
+      c = VEH_COLS[i]; q = f ? f[c.k] : ""; if (!q) continue;
+      val = String(v[c.k] == null ? "" : v[c.k]);
+      if (c.f === "enum"){ if (val !== q) return false; }
+      else if (c.f === "text"){ if (val.toLowerCase().indexOf(String(q).toLowerCase()) < 0) return false; }
+    }
+    if (chip === "due30"){ if (vehNearest(v) > 30) return false; }
+    else if (chip === "over"){ if (vehNearest(v) >= 0) return false; }
+    else if (chip === "jiip"){ if (v.own !== "지입") return false; }
+    else if (chip === "stop"){ if (!v.state || v.state === "운행") return false; }
+    return true;
+  }
+  function vehEnumValues(rows, k){
+    var seen = {}, out = [];
+    rows.forEach(function(v){ var t = String(v[k] == null ? "" : v[k]).trim(); if (t && !seen[t]){ seen[t] = 1; out.push(t); } });
+    out.sort(function(a, b){ return a.localeCompare(b, "ko"); });
+    return out;
+  }
+  function vehColCls(c){ return (c.hs ? "vs-hs" : "") + (c.ph ? " vs-ph" : ""); }
+  function vehSheetRowHtml(v, sel, open){
+    var grey = isGreyState(v), cells = "", i, c, cls, val, dc, near;
+    for (i = 0; i < VEH_COLS.length; i++){
+      c = VEH_COLS[i]; cls = vehColCls(c);
+      if (c.k === "no") cells += '<td class="vs-b" title="' + esc(v.no || "") + '">' + (sel ? selBoxHtml("veh", v.id, false) + ' ' : '') + esc(v.no || "") + '</td>';
+      else if (c.k === "due"){
+        near = vehNearInfo(v);
+        if (!near) cells += '<td class="' + cls + '"><span style="color:#9AA09C;">-</span></td>';
+        else { dc = vehDueCell(near.date, grey); cells += '<td class="' + cls + (dc.cls ? ' ' + dc.cls : '') + '" title="' + esc(near.date) + '">' + near.t + ' ' + (dc.level === 2 ? '경과 ' + (-near.diff) + '일' : (near.diff < 0 ? 'D+' + (-near.diff) : 'D-' + near.diff)) + '</td>'; }
+      }
+      else if (c.k === "insp_due" || c.k === "ins_due"){ dc = vehDueCell(v[c.k], grey); cells += '<td class="' + cls + (dc.cls ? ' ' + dc.cls : '') + '">' + dc.html + '</td>'; }
+      else if (c.k === "own"){ val = v.own || ""; cells += '<td class="' + cls + '">' + (val === "지입" ? '<span class="own-badge lease">지입</span>' : (val ? '<span class="own-badge self">' + esc(val) + '</span>' : '')) + '</td>'; }
+      else if (c.k === "driver"){ val = v.driver || ""; cells += '<td class="' + cls + '">' + (val ? esc(val) : '<span style="color:#9AA09C;">미배정</span>') + '</td>'; }
+      else if (c.k === "state"){ val = v.state || ""; cells += '<td class="' + cls + '">' + (val === "운행" ? '<span style="color:var(--brand);font-weight:700;">운행</span>' : esc(val)) + '</td>'; }
+      else { val = v[c.k]; cells += '<td class="' + cls + '" title="' + esc(val || "") + '">' + esc(val || "") + '</td>'; }
+    }
+    return '<tr class="vs-r' + (grey ? ' grey' : '') + (open ? ' open' : '') + '" data-vs-row="' + esc(v.id) + '">' + cells + '</tr>';
+  }
+  // 상세 — PC는 행 아래 펼침, 폰은 표 아래 카드(#vehDetailCard). 하위 탭 개요/정비 이력. 편집은 기존 모달(수정·정비 이력) 그대로
+  function vehDetailHtml(v){
+    if (!v) return '<div class="vs-empty">목록에서 차량을 누르면 상세가 여기에 펼쳐집니다.</div>';
+    var grey = isGreyState(v), cost = 0, hist = (v.history || []).slice(), h, di, ds, kv;
+    hist.forEach(function(x){ cost += Number(x.cost) || 0; });
+    hist.sort(function(a, b){ return String(b.date || "").localeCompare(String(a.date || "")); });
+    h = '<div class="vs-dh"><b>' + esc(v.no || "") + '</b>' +
+      (v.own ? '<span class="own-badge ' + (v.own === "지입" ? 'lease' : 'self') + '">' + esc(v.own) + '</span>' : '') +
+      (v.state ? '<span class="own-badge" style="background:#EEF0EF;color:#444;">' + esc(v.state) + '</span>' : '') +
+      '<span style="color:var(--sub);font-size:12.5px;">' + esc(v.type || "") + (v.kind ? ' · ' + esc(v.kind) : '') + '</span>' +
+      '<button type="button" class="vs-chip" data-vs-close="1" style="margin-left:auto;">닫기 ▲</button></div>';
+    h += '<div class="vs-stabs"><button type="button" class="vs-stab' + (vehDetTab === "ov" ? ' on' : '') + '" data-vs-tab="ov">개요</button>' +
+      '<button type="button" class="vs-stab' + (vehDetTab === "hist" ? ' on' : '') + '" data-vs-tab="hist">정비 이력 (' + hist.length + ')</button></div>';
+    if (vehDetTab === "hist"){
+      h += hist.length ? '<table class="vs-hist"><thead><tr><th>일자</th><th>구분</th><th>내용</th><th class="num">비용</th><th>업체</th></tr></thead><tbody>' +
+        hist.map(function(x){ return '<tr><td>' + esc(x.date || "") + '</td><td>' + esc(x.kind || "") + '</td><td>' + esc(x.content || "") + '</td><td class="num">' + (x.cost ? Number(x.cost).toLocaleString() : "") + '</td><td>' + esc(x.vendor || "") + '</td></tr>'; }).join("") +
+        '</tbody><tfoot><tr><td colspan="3"><b>누적 수리비</b></td><td class="num"><b>' + cost.toLocaleString() + '</b></td><td></td></tr></tfoot></table>'
+        : '<div class="vs-empty">정비 이력이 없습니다.</div>';
+    } else {
+      di = vehDueCell(v.insp_due, grey); ds = vehDueCell(v.ins_due, grey);
+      h += '<div><span class="vs-due' + (di.level === 2 ? ' red' : (di.level === 1 ? ' orange' : '')) + '">검사 만기 <b>' + (v.insp_due ? esc(v.insp_due) : '-') + '</b>' +
+        (v.insp_due ? ' ' + vehDday(v.insp_due).text + ' <button type="button" class="vs-chip" data-cal-veh-insp="' + esc(v.id) + '" title="캘린더에 넣기">📅</button>' : '') + '</span>' +
+        '<span class="vs-due' + (ds.level === 2 ? ' red' : (ds.level === 1 ? ' orange' : '')) + '">보험 만기 <b>' + (v.ins_due ? esc(v.ins_due) : '-') + '</b>' +
+        (v.ins_due ? ' ' + vehDday(v.ins_due).text + ' <button type="button" class="vs-chip" data-cal-veh-ins="' + esc(v.id) + '" title="캘린더에 넣기">📅</button>' : '') + '</span></div>';
+      kv = [["차종", v.type], ["상세", v.kind], ["소유", v.own], ["허가", v.permit], ["기사", v.driver], ["보험사", v.insurer], ["상태", v.state], ["누적 수리비", cost ? cost.toLocaleString() + "원" : ""], ["비고", v.note]];
+      if (isAdmin()){ kv.push(["취득가액", (v.acq_price != null && v.acq_price !== "") ? Number(v.acq_price).toLocaleString() + "원" : ""]); kv.push(["무자료금액", (v.nodoc_amt != null && v.nodoc_amt !== "") ? Number(v.nodoc_amt).toLocaleString() + "원" : ""]); }
+      h += '<div class="vs-kv">' + kv.map(function(p){ return '<div><div class="k">' + p[0] + '</div><div class="v">' + (p[1] ? esc(String(p[1])) : '<span style="color:#9AA09C;">-</span>') + '</div></div>'; }).join("") + '</div>';
+    }
+    h += '<div class="vs-act"><button class="mini-btn" data-veh-edit="' + esc(v.id) + '">수정</button><button class="mini-btn" data-veh-hist="' + esc(v.id) + '">정비 이력 추가</button></div>';
+    return h;
+  }
+  function vehSetPaneW(wrap){ try { wrap.style.setProperty("--vs-panew", wrap.clientWidth + "px"); } catch(e){} }
   var vehSearchTerm = "";
   function vehMatchesSearch(v){
     if (!vehSearchTerm) return true;
-    return ((v.no||"") + " " + (v.type||"") + " " + (v.kind||"") + " " + (v.driver||"") + " " + (v.own||"")).toLowerCase().indexOf(vehSearchTerm) >= 0;
+    return ((v.no||"") + " " + (v.type||"") + " " + (v.kind||"") + " " + (v.driver||"") + " " + (v.own||"") + " " + (v.insurer||"") + " " + (v.permit||"") + " " + (v.note||"")).toLowerCase().indexOf(vehSearchTerm) >= 0;
   }
   function renderVehicles(){
     var host = document.getElementById("vehList");
     if (!host) return;
-    var list = liveVehicles().filter(vehMatchesSearch);
-    list.sort(function(a, b){
-      var ag = isGreyState(a) ? 1 : 0, bg = isGreyState(b) ? 1 : 0;
-      if (ag !== bg) return ag - bg;
-      return vehNearest(a) - vehNearest(b);
-    });
+    var all = liveVehicles();
+    var searched = all.filter(vehMatchesSearch);
+    var rows = vehSheetSortRows(searched.filter(function(v){ return vehSheetPass(v, vehSheet.f, vehSheet.chip); }), vehSheet.k, vehSheet.d);
     var head = document.getElementById("vehHead");
-    if (head) head.textContent = list.length ? ("총 " + list.length + "대 · 만기 임박순") : "";
+    if (head) head.textContent = all.length ? ("총 " + all.length + "대" + (rows.length !== all.length ? " · 표시 " + rows.length + "대" : "")) : "";
     var xb = document.getElementById("vehXlsxBtn"); if (xb) xb.style.display = isAdmin() ? "block" : "none";
     var selV = canDo("veh");
-    host.innerHTML = list.length ? list.map(function(v){ return vehRowHtml(v, selV); }).join("") : '<div class="empty-line">차량 데이터가 없습니다.</div>';
-    bindCalHandlers(host);
-    bindSelBoxes(host);
-    Array.prototype.forEach.call(host.querySelectorAll("[data-veh-edit]"), function(el){
-      el.addEventListener("click", function(e){ e.stopPropagation(); openVehModal(el.getAttribute("data-veh-edit")); });
+    var openV = vehOpenId ? findVeh(vehOpenId) : null;
+    if (!openV || openV.del === 1){ openV = null; vehOpenId = null; }
+    var dcard = document.getElementById("vehDetailCard");
+    var delLabel = function(v){ return (v.no || "번호없음") + (v.kind || v.type ? " · " + (v.kind || v.type) : "") + (v.state ? " · " + v.state : ""); };
+    if (!all.length){
+      host.innerHTML = '<div class="empty-line">차량 데이터가 없습니다.</div>';
+      if (dcard) dcard.innerHTML = "";
+      renderSelBar("veh");
+      renderDeletedList("veh", "vehDeletedToggle", "vehDeletedList", showDeletedVeh, "차량", delLabel);
+      return;
+    }
+    // 재그리기 전 스크롤·필터 입력 포커스 보존(글자마다 다시 그리므로)
+    var wrap0 = host.querySelector(".vs-wrap"), sl = wrap0 ? wrap0.scrollLeft : 0, st = wrap0 ? wrap0.scrollTop : 0;
+    var act = document.activeElement, focusKey = (act && act.getAttribute && host.contains(act)) ? act.getAttribute("data-vf") : null;
+    var caret = (focusKey && act.selectionStart != null) ? act.selectionStart : null;
+    var h = '<div class="vs-tools">' + VEH_CHIPS.map(function(ch){ return '<button type="button" class="vs-chip' + (ch[0] === "over" ? ' warn' : '') + (vehSheet.chip === ch[0] ? ' on' : '') + '" data-vs-chip="' + ch[0] + '">' + ch[1] + '</button>'; }).join("") +
+      '<button type="button" class="vs-chip" data-vs-reset="1" title="필터 행·칩 지우기">필터 초기화</button><span class="vs-count">' + rows.length + '대 / 전체 ' + all.length + '대</span></div>';
+    h += '<div class="vs-wrap"><table class="vs"><colgroup>' + VEH_COLS.map(function(c){ return '<col style="width:' + vehColW(c) + 'px">'; }).join("") + '</colgroup><thead><tr>';
+    VEH_COLS.forEach(function(c){
+      var sorted = vehSheet.k === c.k;
+      h += '<th class="' + vehColCls(c) + (sorted ? ' sorted' : '') + '" data-vs-sort="' + c.k + '" title="누르면 정렬">' + c.h + (sorted ? '<span class="vs-ar">' + (vehSheet.d === 1 ? '▲' : '▼') + '</span>' : '') + '<span class="vs-rs" data-vs-rs="' + c.k + '" title="끌어서 폭 조절"></span></th>';
     });
-    Array.prototype.forEach.call(host.querySelectorAll("[data-veh-hist]"), function(el){
-      el.addEventListener("click", function(e){ e.stopPropagation(); openVehHistory(el.getAttribute("data-veh-hist")); });
+    h += '</tr><tr class="vs-filt">';
+    VEH_COLS.forEach(function(c){
+      var q = vehSheet.f[c.k] || "";
+      if (c.f === "enum") h += '<th class="' + vehColCls(c) + '"><select data-vf="' + c.k + '"><option value="">전체</option>' + vehEnumValues(searched, c.k).map(function(t){ return '<option value="' + esc(t) + '"' + (t === q ? ' selected' : '') + '>' + esc(t) + '</option>'; }).join("") + '</select></th>';
+      else if (c.f === "text") h += '<th class="' + vehColCls(c) + '"><input type="text" data-vf="' + c.k + '" value="' + esc(q) + '" placeholder="검색" autocomplete="off"></th>';
+      else h += '<th class="' + vehColCls(c) + '"></th>';
     });
+    h += '</tr></thead><tbody>';
+    if (!rows.length) h += '<tr><td colspan="' + VEH_COLS.length + '" style="text-align:center;color:var(--sub);position:static;">조건에 맞는 차량이 없습니다.</td></tr>';
+    rows.forEach(function(v){
+      var open = !!(openV && openV.id === v.id);
+      h += vehSheetRowHtml(v, selV, open);
+      if (open) h += '<tr class="vs-det"><td colspan="' + VEH_COLS.length + '"><div class="vs-det-in">' + vehDetailHtml(v) + '</div></td></tr>';
+    });
+    var nRun = 0, nJi = 0, nSoon = 0, nOver = 0;
+    rows.forEach(function(v){ if (v.state === "운행") nRun++; if (v.own === "지입") nJi++; var n = vehNearest(v); if (n < 0) nOver++; else if (n <= 30) nSoon++; });
+    h += '</tbody><tfoot><tr>';
+    VEH_COLS.forEach(function(c){
+      var t = "";
+      if (c.k === "no") t = '합계 ' + rows.length + '대'; else if (c.k === "state") t = '운행 ' + nRun; else if (c.k === "own") t = '지입 ' + nJi;
+      else if (c.k === "insp_due") t = '임박 ' + nSoon; else if (c.k === "ins_due") t = '경과 ' + nOver; else if (c.k === "due") t = '임박 ' + nSoon + ' · 경과 ' + nOver;
+      h += '<td class="' + vehColCls(c) + '">' + t + '</td>';
+    });
+    h += '</tr></tfoot></table></div>';
+    host.innerHTML = h;
+    if (dcard) dcard.innerHTML = vehDetailHtml(openV);
+    var wrap = host.querySelector(".vs-wrap");
+    if (wrap){
+      wrap.scrollLeft = sl; wrap.scrollTop = st;
+      wrap.addEventListener("scroll", function(){ wrap.classList.toggle("scrolled", wrap.scrollLeft > 0); });
+      wrap.classList.toggle("scrolled", sl > 0);
+      vehSetPaneW(wrap);
+    }
+    bindVehSheet(host, dcard);
+    if (focusKey){ var fe = host.querySelector('[data-vf="' + focusKey + '"]'); if (fe){ fe.focus(); if (caret != null && fe.setSelectionRange){ try { fe.setSelectionRange(caret, caret); } catch(e){} } } }
     renderSelBar("veh");
-    renderDeletedList("veh", "vehDeletedToggle", "vehDeletedList", showDeletedVeh, "차량",
-      function(v){ return (v.no || "번호없음") + (v.kind || v.type ? " · " + (v.kind || v.type) : "") + (v.state ? " · " + v.state : ""); });
+    renderDeletedList("veh", "vehDeletedToggle", "vehDeletedList", showDeletedVeh, "차량", delLabel);
   }
+  function bindVehSheet(host, dcard){
+    [host, dcard].forEach(function(root){
+      if (!root) return;
+      bindCalHandlers(root);
+      bindSelBoxes(root);
+      Array.prototype.forEach.call(root.querySelectorAll("[data-veh-edit]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); openVehModal(el.getAttribute("data-veh-edit")); }); });
+      Array.prototype.forEach.call(root.querySelectorAll("[data-veh-hist]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); openVehHistory(el.getAttribute("data-veh-hist")); }); });
+      Array.prototype.forEach.call(root.querySelectorAll("[data-vs-tab]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); vehDetTab = el.getAttribute("data-vs-tab") === "hist" ? "hist" : "ov"; renderVehicles(); }); });
+      Array.prototype.forEach.call(root.querySelectorAll("[data-vs-close]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); vehOpenId = null; renderVehicles(); }); });
+    });
+    Array.prototype.forEach.call(host.querySelectorAll("tr.vs-r"), function(tr){
+      tr.addEventListener("click", function(){
+        var id = tr.getAttribute("data-vs-row");
+        vehOpenId = (vehOpenId === id) ? null : id;
+        renderVehicles();
+        if (vehOpenId && window.innerWidth < 860){ var d = document.getElementById("vehDetailCard"); if (d && d.scrollIntoView){ try { d.scrollIntoView({ block: "start", behavior: "smooth" }); } catch(e){ d.scrollIntoView(); } } }
+      });
+    });
+    Array.prototype.forEach.call(host.querySelectorAll("th[data-vs-sort]"), function(th){
+      th.addEventListener("click", function(e){
+        if (e.target && e.target.getAttribute && e.target.getAttribute("data-vs-rs")) return;
+        var k = th.getAttribute("data-vs-sort");
+        if (vehSheet.k === k) vehSheet.d = -vehSheet.d; else { vehSheet.k = k; vehSheet.d = 1; }
+        vehSheetSave(); renderVehicles();
+      });
+    });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-vf]"), function(el){
+      var ev = el.tagName === "SELECT" ? "change" : "input";
+      el.addEventListener("click", function(e){ e.stopPropagation(); });
+      el.addEventListener(ev, function(){ var k = el.getAttribute("data-vf"); if (el.value) vehSheet.f[k] = el.value; else delete vehSheet.f[k]; vehSheetSave(); renderVehicles(); });
+    });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-vs-chip]"), function(el){ el.addEventListener("click", function(){ vehSheet.chip = el.getAttribute("data-vs-chip") || ""; vehSheetSave(); renderVehicles(); }); });
+    var rs = host.querySelector("[data-vs-reset]"); if (rs) rs.addEventListener("click", function(){ vehSheet.f = {}; vehSheet.chip = ""; vehSheetSave(); renderVehicles(); });
+    // 열 폭 끌기(PC·마우스) — 기기별 저장, 서버 무관
+    Array.prototype.forEach.call(host.querySelectorAll("[data-vs-rs]"), function(hd){
+      hd.addEventListener("mousedown", function(e){
+        e.preventDefault(); e.stopPropagation();
+        var k = hd.getAttribute("data-vs-rs"), th = hd.parentNode, x0 = e.clientX, w0 = th.offsetWidth, cols = host.querySelectorAll("col"), idx = -1, i, col = null;
+        for (i = 0; i < VEH_COLS.length; i++){ if (VEH_COLS[i].k === k) idx = i; }
+        if (idx >= 0) col = cols[idx];
+        var mv = function(ev){ var w = Math.max(40, Math.min(600, w0 + (ev.clientX - x0))); if (col) col.style.width = w + "px"; vehColw[k] = w; };
+        var up = function(){ document.removeEventListener("mousemove", mv); document.removeEventListener("mouseup", up); vehColwSave(); };
+        document.addEventListener("mousemove", mv); document.addEventListener("mouseup", up);
+      });
+    });
+  }
+  // @veh-sheet-end
 
   // 차량 리스트 엑셀 다운로드 — 관리자 전용(취득가액·무자료금액 포함)
   function vehExportXlsx(){
