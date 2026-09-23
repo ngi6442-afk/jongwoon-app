@@ -37,7 +37,7 @@ async function applyDoneJobs(st, doc, now) {
   return { applied: applied, scanned: scanned };
 }
 
-// 옛 판 재감지(v364): 게시 전 기록의 사진 중 maskmeta.model이 'facedet'로 시작하지 않는(=Claude 단독·v364 이전) 자동 판만 골라 그 사진들만 mask_start(force). 회차당 1건.
+// 옛 판 재감지(v364 → v371): 게시 전 기록의 사진 중 maskmeta.model에 'platedet'가 없는(=번호판 전용 경로 이전) 자동 판만 골라 그 사진들만 mask_start(force). 회차당 1건.
 //   적대 검증(9/16) 반영: 사람 판(human)은 제외 · 옛 판 사진 id만 워커에(새 판·시간 초과 꼬리 재감지 낭비 없음) · 시도 수는 실제 기동 때만(REMASK_MAX회, 잠금·예산·기동 실패는 안 셈)
 //   · 크론은 월 상한의 70%까지만(사람 몫 보호) · 옛 판이 없거나 상한에 닿은 기록은 promomask:remask:<id>.done 표식 → 기록이 바뀌기 전엔 maskmeta를 다시 안 읽는다(10분마다 전수 읽기 방지, 30초 제한)
 const REMASK_MAX = 2, REMASK_CAP_RATIO = 0.7, REMASK_PHOTOS = 40;
@@ -74,7 +74,7 @@ async function remaskOld(st, doc, now) {
       if (!m.ok || !m.data) continue;   // 판이 아직 없음 — 저장 뒤 자동 감지가 만든다
       seen++;
       if (m.data.human === true) continue;   // 사람 판은 그대로
-      if (!/^facedet/.test(String(m.data.model || ''))) old.push(id);
+      if (!/platedet/.test(String(m.data.model || ''))) old.push(id);   // v371: 번호판 전용 경로(platedet)를 거치지 않은 판은 전부 옛 판(v364 facedet+claude 판 포함)
     }
     const tries = Number(td.tries) || 0;
     const want = r.photos.slice(0, REMASK_PHOTOS).filter(function (p) { return p && p.id; }).length;

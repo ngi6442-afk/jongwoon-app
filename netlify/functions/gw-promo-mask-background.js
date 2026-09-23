@@ -11,6 +11,7 @@
 const { setupBlobContext, store, blobGet, blobSet } = require('./_lib/blobs');
 const { verifyToken, bearer } = require('./_lib/session');
 const F = require('./_lib/facedet');   // v364: 얼굴 전용 검출기(공개 모델, 외부 호출 없음)
+const P = require('./_lib/platedet');  // v371: 번호판 — 차량 검출기(Google COCO-SSD) → 조각 확대 → Claude 좌표 → 자기검증
 const { appendAudit } = require('./_lib/audit');
 const M = require('./_lib/promomask');
 
@@ -103,7 +104,7 @@ exports.handler = async function (event, context) {
         // 사람이 손본 판은 force여도 덮지 않는다('가릴 것 없음'으로 확인한 것도 사람 판단이다)
         if (prev && isHuman(prev)) { item.st = 'kept:human'; item.boxes = (prev.boxes || []).length; rec.photos.push(item); continue; }
         if (prev && !force && prev.auto === true) { item.st = 'kept:auto'; item.boxes = (prev.boxes || []).length; rec.photos.push(item); continue; }
-        if (prev && onlyOld && /^facedet/.test(String(prev.model || ''))) { item.st = 'kept:auto'; item.boxes = (prev.boxes || []).length; rec.photos.push(item); continue; }   // 이미 새 판
+        if (prev && onlyOld && /platedet/.test(String(prev.model || ''))) { item.st = 'kept:auto'; item.boxes = (prev.boxes || []).length; rec.photos.push(item); continue; }   // 이미 새 판(v371: 번호판 전용 경로까지 거친 판)
         if (onlyOld && !prev) { item.st = 'skip:nomask'; rec.photos.push(item); continue; }   // 검증 #10: maskmeta만 남은 고아(사람이 지운 판) — 재감지가 다시 가리지 않는다
         // v364(PM 9/16 "얼굴 못 가리네 … 근본적으로"): 얼굴·머리는 전용 검출기(_lib/facedet — Google MoveNet 다중 배율 투표, 얼굴 모델 없음·중국계 없음), 번호판만 Claude 비전.
         //   9/16 실측: Claude 비전 얼굴 상자는 자리가 틀려(픽셀화가 가슴·벽에 찍힘) 얼굴 상자로는 쓰지 않는다. 검출기가 못 실리면 종전(Claude 전부)으로 내려간다.
@@ -115,16 +116,35 @@ exports.handler = async function (event, context) {
         if (faces === null && onlyOld) { item.st = 'skip:detector'; item.det = scrub(fdiag); rec.photos.push(item); continue; }   // 검출기 없이 재감지하면 옛 판을 같은 판으로 덮을 뿐 — Claude 호출 안 함
         // 검증 #7: 재감지에서 검출기가 머리를 하나도 못 찾았는데 옛 판에 얼굴 상자가 있으면 옛 판을 지우지 않는다(사람 확인 없이 가림을 줄이지 않는다) — 카드에 "얼굴 미검출"로 보인다
         if (onlyOld && faces && !faces.length && prev && (prev.boxes || []).some(function (b) { return b && b.kind === 'face'; })) { item.st = 'skip:noface'; item.boxes = (prev.boxes || []).length; item.det = scrub(fdiag); noFace++; rec.photos.push(item); continue; }
-        let det;
-        if (onlyOld && prev && Array.isArray(prev.boxes)) {   // 재감지: 번호판은 옛 판의 Claude 결과 재사용(호출 0)
-          det = { boxes: prev.boxes.filter(function (b) { return b && b.kind === 'plate'; }).map(function (b) { return { kind: 'plate', x: b.x, y: b.y, w: b.w, h: b.h }; }), model: String(prev.model || M.MODEL || 'claude'), usage: null, reused: true };
-        } else {
-          det = await M.detectBoxes(apiKey, chk.mt, chk.data);
+        // v371(PM 9/23 "차번호 덜/안 가려짐" → "ㄱ"): 번호판도 전용 경로 — 차량 검출기(_lib/platedet, Google COCO-SSD 6판 투표) → 차량 조각 확대 → Claude 좌표 → 자기검증(full/partial/none) →
+        //   실패면 차량 하단 띠. 전체 사진 1회(종전 detectBoxes)는 폴백(whole)으로만 쓰고 그 상자도 검증한다. 9/23 실측: 종전 방식은 번호판 상자 7개 전부 엉뚱한 자리(세로로 밀림).
+        //   재감지(only_old)도 번호판을 새로 감지한다(옛 판 재사용 없음 — 그 판이 틀린 것이 재감지 이유). 차량 검출기가 못 실리면(MODELS_MISSING·WASM) 종전(전체 사진 1회)으로 내려가고 model에 platedet가 안 붙어 크론이 다시 잡는다.
+        let det, pdiag = '';
+        if (faces === null) {
+          det = await M.detectBoxes(apiKey, chk.mt, chk.data);   // 얼굴 검출기 못 실림 → 종전(Claude 전부)
           calls += 1; if (det.usage) { usage.input += det.usage.input; usage.output += det.usage.output; }
+        } else {
+          try {
+            const pr = await P.detectPlates(raw, {
+              plates: function (b64) { return M.detectPlatesInCrop(apiKey, 'image/jpeg', b64); },
+              verify: function (b64) { return M.verifyPlate(apiKey, 'image/jpeg', b64); },
+              whole: function () { return M.detectBoxes(apiKey, chk.mt, chk.data); },
+            });
+            calls += pr.calls; usage.input += (pr.usage && pr.usage.input) || 0; usage.output += (pr.usage && pr.usage.output) || 0;
+            det = { boxes: pr.boxes.map(function (b) { return { kind: 'plate', x: b.x, y: b.y, w: b.w, h: b.h }; }), model: 'platedet+' + M.MODEL, usage: null };
+            pdiag = ' · plates ' + det.boxes.length + ' (veh ' + pr.diag.veh + ', crops ' + pr.diag.crops + ', verified ' + pr.diag.verified + ', band ' + pr.diag.band + ', ' + pr.ms + 'ms, calls ' + pr.calls + ')';
+          } catch (e) {
+            const code = (e && (e.code || String(e.message || 'ERR').split(/[:'\\/]/)[0])) || 'ERR';
+            if (code !== 'MODELS_MISSING' && code !== 'WASM_BACKEND_FAILED') throw e;   // 비전 오류(REFUSAL·TRUNCATED·PARSE·AUTH·TIMEOUT…)는 종전처럼 fail:로 — mask 저장 안 함
+            det = await M.detectBoxes(apiKey, chk.mt, chk.data);   // 차량 검출기 못 실림 → 종전 번호판 경로(platedet 표식 없음 → 크론이 다시 잡는다)
+            calls += 1; if (det.usage) { usage.input += det.usage.input; usage.output += det.usage.output; }
+            det = { boxes: det.boxes, model: det.model, usage: null };
+            pdiag = ' · platedet fail: ' + code;
+          }
         }
         const claude = det.boxes.filter(function (b) { return faces === null ? true : b.kind !== 'face'; });   // 검출기가 살아 있으면 Claude는 번호판만
         const boxes = M.cleanBoxes((faces || []).concat(claude)).map(function (b) { b.by = 'auto'; return b; });   // 클램프(머리 상자는 가장자리에서 음수가 될 수 있다)
-        item.boxes = boxes.length; item.det = scrub(fdiag + (det.reused ? ' · 번호판 재사용' : ''));   // 검출기 오류 문구에 서버 경로가 실릴 수 있어 스크럽(길이 상한 포함)
+        item.boxes = boxes.length; item.det = scrub(fdiag + pdiag);   // 검출기 오류 문구에 서버 경로가 실릴 수 있어 스크럽(길이 상한 포함)
         const out = await M.applyBoxes(raw, boxes);
         // 저장 직전 재확인 — 감지하는 사이 사람이 먼저 적용했으면 그쪽이 이긴다(적대 검증 #17)
         const again = await blobGet(fst, M.maskKey(id));

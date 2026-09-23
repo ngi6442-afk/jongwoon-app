@@ -40,7 +40,9 @@ const pushMock = { calls: [],
 const auditMock = { logs: [], async appendAudit(e) { auditMock.logs.push(e); }, auditKey: () => 'audit', diffItems: () => [], short: (s) => String(s).slice(0, 20), DATA: 'gw_data' };
 // v364 얼굴 검출기 mock — 기본은 '못 실림'(throw) → 워커가 종전(Claude 전부)으로 내려가므로 절 41은 그대로. 절 44에서 켜서 검출기 경로·폴백을 검사한다. 실제 모델 정확도는 tools/facedet_check.mjs(실사진 게이트).
 const faceMock = { fail: true, boxes: [], calls: 0, async detectFaces() { faceMock.calls++; if (faceMock.fail) throw (faceMock.fail instanceof Error ? faceMock.fail : new Error('MODELS_MISSING')); return { boxes: faceMock.boxes.map((b) => Object.assign({}, b)), w: 600, h: 400, ms: 1, diag: { passes: 12, raw: faceMock.boxes.length, clusters: faceMock.boxes.length, dropped: 0, big: 0, pose: true } }; } };
-for (const [p, m] of [['_lib/blobs.js', blobsMock], ['_lib/push.js', pushMock], ['_lib/audit.js', auditMock], ['_lib/facedet.js', faceMock]]) {
+// v371 번호판 검출기 mock — 기본은 '못 실림'(MODELS_MISSING) → 워커가 종전 번호판 경로(전체 사진 1회)로 내려가므로 절 41·44는 그 기준. 절 45에서 켜서 platedet 경로·폴백·재감지를 검사한다. 실사진 정확도는 tools/platedet_check.mjs.
+const plateMock = { fail: true, boxes: [], calls: 3, count: 0, async detectPlates() { plateMock.count++; if (plateMock.fail) throw (plateMock.fail instanceof Error ? plateMock.fail : new Error('MODELS_MISSING')); return { boxes: plateMock.boxes.map((b) => Object.assign({}, b)), vehicles: [{ cls: 'car', score: 0.9, x: 0.6, y: 0.6, w: 0.3, h: 0.3, votes: 4 }], calls: plateMock.calls, usage: { input: 300, output: 30 }, ms: 5, diag: { veh: 1, crops: 1, verified: plateMock.boxes.length, band: 0, fallback: 1, grown: 0, small: 0 } }; } };
+for (const [p, m] of [['_lib/blobs.js', blobsMock], ['_lib/push.js', pushMock], ['_lib/audit.js', auditMock], ['_lib/facedet.js', faceMock], ['_lib/platedet.js', plateMock]]) {
   const rp = require.resolve(join(FN, p));
   require.cache[rp] = { id: rp, filename: rp, loaded: true, exports: m };
 }
@@ -2503,7 +2505,7 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   mem.gw_files[A9] = { name: 'p9.jpg', type: 'image/jpeg', kind: 'promo', data: b64, by: 'x', ts: 1 };
   mem.gw_files[A10] = { name: 'p10.jpg', type: 'image/jpeg', kind: 'promo', data: b64, by: 'x', ts: 1 };
   mem.gw_files[A11] = { name: 'p11.jpg', type: 'image/jpeg', kind: 'promo', data: b64, by: 'x', ts: 1 };
-  mem.gw_files['maskmeta:' + A10] = { schema: 1, has: true, n: 1, human: false, auto: true, w: 600, h: 400, ts: 5, model: 'facedet+claude-sonnet-5' };   // 이미 새 판
+  mem.gw_files['maskmeta:' + A10] = { schema: 1, has: true, n: 1, human: false, auto: true, w: 600, h: 400, ts: 5, model: 'facedet+platedet+claude-sonnet-5' };   // 이미 새 판(v371 = platedet 포함)
   mem.gw_files['maskmeta:' + A11] = { schema: 1, has: true, n: 2, human: true, auto: false, w: 600, h: 400, ts: 5, model: 'human' };                    // 사람 판
   mem.gw_data['col:promo'] = { schema: 1, items: [
     { id: 'prv364', title: 't', body: 'b', status: 'review', photos: [{ id: A9, name: 'p9.jpg' }, { id: A10, name: 'p10.jpg' }, { id: A11, name: 'p11.jpg' }], ai: { ts: 1 }, tags: ['x'] },
@@ -2538,11 +2540,12 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
     faceMock.fail = false; faceMock.calls = 0;
     await wk.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + itok }, body: JSON.stringify({ job: 'pm_v364c', promo_id: 'prv364', ids: [A9], force: true, only_old: true }) }, {});
     { const mkc = mem.gw_files['mask:' + A9], jc = mem.gw_data['promomask:job:pm_v364c'];
-      T('워커 재감지(only_old, 검출기 켬): 상자 2 = 검출기 얼굴 + 옛 판 번호판 재사용 · Claude 얼굴(0.5) 제거 · 호출 0 · model facedet+claude-sonnet-5 · det "번호판 재사용"',
-        jc.status === 'done' && jc.calls === 0 && jc.det_fail === 0 && jc.photos[0].st === 'masked' && /번호판 재사용/.test(jc.photos[0].det || '') && mkc.boxes.length === 2 && mkc.boxes.some((b) => b.kind === 'plate' && Math.abs(b.x - 0.7) < 1e-6) && mkc.boxes.some((b) => b.kind === 'face' && Math.abs(b.x - 200 / 600) < 1e-6) && !mkc.boxes.some((b) => b.kind === 'face' && Math.abs(b.x - 0.5) < 1e-6) && mkc.model === 'facedet+claude-sonnet-5' && mkc.boxes.every((b) => b.by === 'auto'), JSON.stringify(jc.photos[0]) + ' ' + JSON.stringify(mkc.boxes));
-      // 새 판이면 only_old는 건너뛴다(kept:auto)
+      T('워커 재감지(only_old, 얼굴 검출기 켬·차량 검출기 못 실림): 상자 2 = 검출기 얼굴 + 번호판(종전 전체 사진 1회로 새로 감지 — v371: 옛 판 재사용 없음) · Claude 얼굴(0.5) 제거 · 호출 1 · model facedet+claude-sonnet-5 · det "platedet fail: MODELS_MISSING"',
+        jc.status === 'done' && jc.calls === 1 && jc.det_fail === 0 && jc.photos[0].st === 'masked' && /platedet fail: MODELS_MISSING/.test(jc.photos[0].det || '') && mkc.boxes.length === 2 && mkc.boxes.some((b) => b.kind === 'plate' && Math.abs(b.x - 0.7) < 1e-6) && mkc.boxes.some((b) => b.kind === 'face' && Math.abs(b.x - 200 / 600) < 1e-6) && !mkc.boxes.some((b) => b.kind === 'face' && Math.abs(b.x - 0.5) < 1e-6) && mkc.model === 'facedet+claude-sonnet-5' && mkc.boxes.every((b) => b.by === 'auto'), JSON.stringify(jc.photos[0]) + ' ' + JSON.stringify(mkc.boxes));
+      // 새 판이면 only_old는 건너뛴다(kept:auto) — v371: 새 판 = model에 platedet가 있는 판
+      mem.gw_files['mask:' + A9].model = 'facedet+platedet+claude-sonnet-5'; mem.gw_files['maskmeta:' + A9].model = 'facedet+platedet+claude-sonnet-5';
       await wk.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + itok }, body: JSON.stringify({ job: 'pm_v364d', promo_id: 'prv364', ids: [A9], force: true, only_old: true }) }, {});
-      T('워커 재감지: 이미 새 판(facedet+)이면 kept:auto · 호출 0', mem.gw_data['promomask:job:pm_v364d'].photos[0].st === 'kept:auto' && mem.gw_data['promomask:job:pm_v364d'].calls === 0, JSON.stringify(mem.gw_data['promomask:job:pm_v364d'].photos[0]));
+      T('워커 재감지: 이미 새 판(facedet+platedet+)이면 kept:auto · 호출 0', mem.gw_data['promomask:job:pm_v364d'].photos[0].st === 'kept:auto' && mem.gw_data['promomask:job:pm_v364d'].calls === 0, JSON.stringify(mem.gw_data['promomask:job:pm_v364d'].photos[0]));
       // 검출기 못 실림 + only_old → skip:detector(Claude 호출 없음·판 그대로·det_fail 1)
       mem.gw_files['mask:' + A9].model = 'claude-sonnet-5'; mem.gw_files['maskmeta:' + A9].model = 'claude-sonnet-5';
       faceMock.fail = true; faceMock.calls = 0;
@@ -2599,7 +2602,7 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
     T('크론 ③ 상한: 2회 뒤에도 옛 판이면 더 안 돈다(capped 1·기동 없음·done 표식) — 검출기 못 실리는 배포에서 무한 반복 방지', oc.remask && !oc.remask.promo && oc.remask.capped === 1 && kicks.length === 2 && mem.gw_data['promomask:remask:prv364'].done > 0, JSON.stringify(oc.remask));
     rc = await cron44.handler({}); oc = JSON.parse(rc.body);
     T('크론 ③ done 표식: 기록이 안 바뀌면 maskmeta를 다시 안 읽는다(scanned 0)', oc.remask && oc.remask.scanned === 0 && kicks.length === 2, JSON.stringify(oc.remask));
-    mem.gw_files['maskmeta:' + A9].model = 'facedet+claude-sonnet-5';
+    mem.gw_files['maskmeta:' + A9].model = 'facedet+platedet+claude-sonnet-5';
     mem.gw_data['col:promo'].items[0].updated_ts = Date.now() + 5;   // 기록이 바뀌면 다시 본다
     mem.gw_data['promomask:lock:prv364'] = { ts: 0, job: '' };
     rc = await cron44.handler({}); oc = JSON.parse(rc.body);
@@ -2617,7 +2620,7 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
       mem.gw_data['promomask:usage'] = { schema: 1, months: {} };
       delete mem.gw_data['promomask:remask'];   // 예산 검사(BUDGET_CAP=전역 원인)가 남긴 전역 중단 표식 제거
       // 검증 #1: done 표식은 사진마다 판이 다 있을 때만 — 판 없는 새 기록은 표식 없이 다음 회차
-      mem.gw_files['maskmeta:' + A9].model = 'facedet+claude-sonnet-5';
+      mem.gw_files['maskmeta:' + A9].model = 'facedet+platedet+claude-sonnet-5';
       mem.gw_data['col:promo'].items.push({ id: 'prv364n', title: 't', body: 'b', status: 'review', photos: [{ id: 'att_' + '2'.repeat(16), name: 'p.jpg' }], ai: { ts: 1 }, tags: ['x'], updated_ts: Date.now() + 20 });
       mem.gw_data['col:promo'].items[0].updated_ts = Date.now() + 20;
       mem.gw_data['promomask:lock:prv364'] = { ts: 0, job: '' };
@@ -2660,6 +2663,107 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
     }
     // 사람이 만진 판(human)은 재감지 대상에서 제외돼야 하나? — 아니다: force는 '자동 판만 다시'라 워커가 human을 지킨다(절 41). 여기서는 model만 본다.
   } finally { global.fetch = realFetch; process.env.GW_ANTHROPIC_KEY = savedKey; process.env.URL = savedUrl; faceMock.fail = true; faceMock.boxes = []; }
+}
+
+// ===== 45. 번호판 전용 경로 v371(PM 9/23 "차번호 덜/안 가려짐" → "ㄱ") — 순수 함수 · detectPlates 흐름(주입 차량·가짜 비전) · 워커 platedet 경로/폴백/비전 오류/재감지 · 크론 옛 판 판정
+{
+  const pp = require.resolve(join(FN, '_lib/platedet.js'));
+  const savedPlate = require.cache[pp]; delete require.cache[pp];
+  const PD = require(pp);                       // 실 모듈(순수 함수·흐름 — 모델은 지연 적재라 안 실린다; detectPlates는 vehiclesOf 주입)
+  require.cache[pp] = savedPlate;
+  const raw45 = [
+    { cls: 'car', score: 0.3, x: 0.1, y: 0.1, w: 0.2, h: 0.2, pass: 'w512' }, { cls: 'car', score: 0.35, x: 0.11, y: 0.1, w: 0.2, h: 0.2, pass: 'f512' },
+    { cls: 'truck', score: 0.7, x: 0.5, y: 0.5, w: 0.3, h: 0.3, pass: 'w800' },
+    { cls: 'car', score: 0.3, x: 0.8, y: 0.1, w: 0.1, h: 0.1, pass: 'w512' },
+    { cls: 'person', score: 0.9, x: 0.3, y: 0.3, w: 0.1, h: 0.3, pass: 'w512' },
+    { cls: 'car', score: 0.1, x: 0.1, y: 0.1, w: 0.2, h: 0.2, pass: 'w1024' },
+  ];
+  const mv = PD.mergeVehicles(raw45);
+  T('mergeVehicles: 같은 자리 2판(0.3·0.35)=채택(votes 2·중앙값 x 0.105) · 0.7 1판=채택 · 0.3 1판=탈락 · person 제외 · 0.1(하한 미만) 제외 · 점수순', mv.length === 2 && mv[0].cls === 'truck' && mv[0].votes === 1 && mv[1].votes === 2 && Math.abs(mv[1].x - 0.105) < 1e-9 && Math.abs(mv[1].w - 0.2) < 1e-9, JSON.stringify(mv));
+  const pr45 = PD.padRect({ x: 0.5, y: 0.5, w: 0.2, h: 0.2 }, 1000, 1000, 0.15, 0.6), pr45b = PD.padRect({ x: 0.95, y: 0.95, w: 0.1, h: 0.1 }, 1000, 1000, 0.15);
+  T('padRect: 좌우·위 15% · 아래 60%(번호판 자리) → (470,470,260,350) · 가장자리 클램프 → (935,935,65,65)', pr45.x === 470 && pr45.y === 470 && pr45.w === 260 && pr45.h === 350 && pr45b.x === 935 && pr45b.w === 65 && pr45b.h === 65, JSON.stringify([pr45, pr45b]));
+  const mf = PD.mapFromCrop({ x: 0.5, y: 0.5, w: 0.1, h: 0.1 }, { x: 100, y: 200, w: 400, h: 200 }, 1000, 1000), gr = PD.grow({ x: 0.4, y: 0.4, w: 0.2, h: 0.1 }, 0.5), bd = PD.bandOf({ x: 0.2, y: 0.2, w: 0.4, h: 0.4 });
+  T('mapFromCrop 조각→원본(0.3,0.3,0.04,0.02) · grow 중심 고정 50%(0.35,0.375,0.3,0.15) · bandOf 차량 하단 띠(0.232,0.42,0.336,0.18, fallback) · overlaps IoU 0.47 참/떨어지면 거짓',
+    Math.abs(mf.x - 0.3) < 1e-9 && Math.abs(mf.y - 0.3) < 1e-9 && Math.abs(mf.w - 0.04) < 1e-9 && Math.abs(mf.h - 0.02) < 1e-9 && Math.abs(gr.x - 0.35) < 1e-9 && Math.abs(gr.y - 0.375) < 1e-9 && Math.abs(gr.w - 0.3) < 1e-9 && Math.abs(gr.h - 0.15) < 1e-9
+    && Math.abs(bd.x - 0.232) < 1e-9 && Math.abs(bd.y - 0.42) < 1e-9 && Math.abs(bd.w - 0.336) < 1e-9 && Math.abs(bd.h - 0.18) < 1e-9 && bd.fallback === true
+    && PD.overlaps({ x: 0.1, y: 0.1, w: 0.1, h: 0.1 }, [{ x: 0.12, y: 0.12, w: 0.1, h: 0.1 }]) && !PD.overlaps({ x: 0.1, y: 0.1, w: 0.1, h: 0.1 }, [{ x: 0.5, y: 0.5, w: 0.1, h: 0.1 }]), JSON.stringify([mf, gr, bd]));
+  T('상수: SIZES 512·800·1024 · 타일 3×3(45%) · 차량 클래스 4 · 채택 0.45↑ 또는 2판 · 아래 여백 60% · 검증 여백 60% · 재시도 40% · 띠 55%~', JSON.stringify(PD.SIZES) === '[512,800,1024]' && PD.TILES === 3 && PD.TILE_FRAC === 0.45 && Object.keys(PD.VEH).length === 4 && PD.SCORE_SURE === 0.45 && PD.VOTES_MIN === 2 && PD.CROP_PAD_BOTTOM === 0.6 && PD.VERIFY_PAD === 0.6 && PD.GROW === 0.4 && PD.BAND.top === 0.55, '');
+  // detectPlates 흐름 — 600×400 그림, 차량 주입 1대(0.1,0.1,0.4,0.4). 조각 = padRect(…,0.15,0.6) = (24,16,312,280). 조각 번호판 (0.5,0.8,0.2,0.1) → 원본 (0.3,0.6,0.104,0.07). 검증 partial→grow 40%→full. 폴백 상자는 none → 버림.
+  const { Jimp: J45 } = require('jimp');
+  const img45 = new J45({ width: 600, height: 400, color: 0x336699ff });
+  const buf45 = await img45.getBuffer('image/jpeg', { quality: 90 });
+  const vlog = [];
+  const mkVision = (verifyStates, plateBoxes, wholeBoxes) => { let vi = 0; return {
+    plates: async (b64) => { vlog.push('plates:' + (b64.length > 100)); return { boxes: plateBoxes.map((b) => Object.assign({}, b)), usage: { input: 10, output: 1 } }; },
+    verify: async (b64) => { const s = verifyStates[Math.min(vi, verifyStates.length - 1)]; vi++; vlog.push('verify:' + s); return { state: s, usage: { input: 5, output: 1 } }; },
+    whole: async () => { vlog.push('whole'); return { boxes: wholeBoxes.map((b) => Object.assign({}, b)), usage: { input: 20, output: 2 } }; },
+  }; };
+  const vehOf = async () => ({ boxes: [{ cls: 'car', score: 0.9, x: 0.1, y: 0.1, w: 0.4, h: 0.4, votes: 3 }], w: 600, h: 400, ms: 1, diag: { passes: 15, raw: 3 } });
+  const r45a = await PD.detectPlates(buf45, mkVision(['partial', 'full', 'none'], [{ kind: 'plate', x: 0.5, y: 0.8, w: 0.2, h: 0.1 }], [{ kind: 'plate', x: 0.8, y: 0.8, w: 0.1, h: 0.05 }, { kind: 'face', x: 0.1, y: 0.1, w: 0.1, h: 0.1 }]), { vehiclesOf: vehOf });
+  T('detectPlates 흐름: 차량 1 → 조각 번호판 1 → 검증 partial→40% 키움→full(verified) · 폴백 whole 상자는 none → 버림(얼굴은 애초 제외) · 호출 5(plates1+verify2+whole1+verify1) · 상자 (0.2792,0.586,0.1456,0.098) src vehicle-crop · diag grown 1·verified 1·fallback 1',
+    r45a.boxes.length === 1 && r45a.boxes[0].src === 'vehicle-crop' && r45a.boxes[0].verified === true && Math.abs(r45a.boxes[0].x - 0.2792) < 1e-6 && Math.abs(r45a.boxes[0].y - 0.586) < 1e-6 && Math.abs(r45a.boxes[0].w - 0.1456) < 1e-6 && Math.abs(r45a.boxes[0].h - 0.098) < 1e-6
+    && r45a.calls === 5 && r45a.usage.input === 10 + 5 + 5 + 20 + 5 && r45a.diag.grown === 1 && r45a.diag.verified === 1 && r45a.diag.fallback === 1 && r45a.vehicles.length === 1 && vlog.join(',') === 'plates:true,verify:partial,verify:full,whole,verify:none', JSON.stringify(r45a.boxes) + ' ' + vlog.join(','));
+  vlog.length = 0;
+  const r45b = await PD.detectPlates(buf45, mkVision(['none', 'none'], [{ kind: 'plate', x: 0.5, y: 0.8, w: 0.2, h: 0.1 }], []), { vehiclesOf: vehOf });
+  T('detectPlates: 좌표는 나왔는데 검증 none → 차량 하단 띠(fallback true, src vehicle-band, y=0.1+0.4×0.55=0.32) · 폴백 0상자 · 호출 3', r45b.boxes.length === 1 && r45b.boxes[0].src === 'vehicle-band' && r45b.boxes[0].fallback === true && Math.abs(r45b.boxes[0].y - 0.32) < 1e-9 && r45b.diag.band === 1 && r45b.calls === 3, JSON.stringify(r45b.boxes));
+  const r45c = await PD.detectPlates(buf45, mkVision(['partial', 'partial'], [{ kind: 'plate', x: 0.5, y: 0.8, w: 0.2, h: 0.1 }], []), { vehiclesOf: vehOf });
+  T('detectPlates: 두 번 다 partial → 키운 상자로 가림(verified false) · 호출 4', r45c.boxes.length === 1 && r45c.boxes[0].verified === false && r45c.boxes[0].src === 'vehicle-crop' && r45c.calls === 4 && r45c.diag.grown === 2, JSON.stringify(r45c.boxes));
+  const r45d = await PD.detectPlates(buf45, mkVision(['full'], [], [{ kind: 'plate', x: 0.8, y: 0.8, w: 0.1, h: 0.05 }]), { vehiclesOf: async () => ({ boxes: [], w: 600, h: 400, ms: 1, diag: { passes: 15, raw: 0 } }) });
+  T('detectPlates: 차량 0 → 조각 없음 · 폴백 whole 상자 full → 채택(src whole) · 호출 2', r45d.boxes.length === 1 && r45d.boxes[0].src === 'whole' && r45d.boxes[0].verified === true && r45d.calls === 2 && r45d.diag.crops === 0, JSON.stringify(r45d.boxes));
+  const r45e = await PD.detectPlates(buf45, mkVision(['full'], [{ kind: 'plate', x: 0.5, y: 0.8, w: 0.2, h: 0.1 }], []), { vehiclesOf: async () => ({ boxes: [{ cls: 'car', score: 0.9, x: 0.1, y: 0.1, w: 0.02, h: 0.02, votes: 3 }], w: 600, h: 400, ms: 1, diag: { passes: 15, raw: 1 } }) });
+  T('detectPlates: 48px 미만 작은 차량은 건너뜀(small 1·호출 0, 폴백만 1)', r45e.diag.small === 1 && r45e.diag.crops === 0 && r45e.calls === 1 && r45e.boxes.length === 0, JSON.stringify(r45e.diag));
+  // 워커 통합 — plateMock 켬
+  const wk = require(join(FN, 'gw-promo-mask-background.js'));
+  const cron45 = require(join(FN, 'gw-promo-ai-cron.js'));
+  const A12 = 'att_' + '3'.repeat(16);
+  mem.gw_files[A12] = { name: 'p12.jpg', type: 'image/jpeg', kind: 'promo', data: buf45.toString('base64'), by: 'x', ts: 1 };
+  mem.gw_data['col:promo'] = { schema: 1, items: [{ id: 'prv371', title: 't', body: 'b', status: 'review', photos: [{ id: A12, name: 'p12.jpg' }], ai: { ts: 1 }, tags: ['x'] }] };
+  mem.gw_data['promomask:usage'] = { schema: 1, months: {} };
+  const savedKey = process.env.GW_ANTHROPIC_KEY, savedUrl = process.env.URL; process.env.GW_ANTHROPIC_KEY = 'test-anthropic-key-0000'; process.env.URL = 'https://x.test';
+  const realFetch = global.fetch; const kicks = []; let fetchCalls = 0;
+  global.fetch = async (url, opt) => {
+    const u = String(url);
+    if (/gw-promo-mask-background/.test(u)) { kicks.push(JSON.parse(opt.body)); return { ok: true, status: 202 }; }
+    if (/api\.anthropic\.com/.test(u)) { fetchCalls++; return { status: 200, text: async () => JSON.stringify({ model: 'claude-sonnet-5', stop_reason: 'end_turn', usage: { input_tokens: 100, output_tokens: 5 }, content: [{ type: 'text', text: JSON.stringify({ boxes: [{ kind: 'plate', x: 0.7, y: 0.7, w: 0.1, h: 0.05 }] }) }] }) }; }
+    return { ok: true, status: 202 };
+  };
+  try {
+    const itok = issueSession({ id: '__promomask__', role: 'system' }).token;
+    faceMock.fail = false; faceMock.boxes = [{ kind: 'face', x: 0.2, y: 0.2, w: 0.1, h: 0.1, score: 0.9, src: 'movenet-vote12', votes: 12 }]; faceMock.calls = 0;
+    plateMock.fail = false; plateMock.boxes = [{ kind: 'plate', x: 0.6, y: 0.8, w: 0.1, h: 0.04, src: 'vehicle-crop', verified: true }]; plateMock.calls = 3; plateMock.count = 0; fetchCalls = 0;
+    await wk.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + itok }, body: JSON.stringify({ job: 'pm_v371a', promo_id: 'prv371', ids: [A12], force: true }) }, {});
+    const ja = mem.gw_data['promomask:job:pm_v371a'], ma = mem.gw_files['mask:' + A12], mma = mem.gw_files['maskmeta:' + A12];
+    T('워커(얼굴·차량 검출기 켬): 상자 2 = 검출기 얼굴 + platedet 번호판(0.6,0.8) · 전체 사진 Claude 직접 호출 0(fetch 0 — 폴백은 platedet 안에서만) · calls 3(platedet 집계) · model facedet+platedet+claude-sonnet-5(mask·maskmeta) · det "plates 1 (veh 1, crops 1, verified 1"',
+      ja && ja.status === 'done' && ja.calls === 3 && fetchCalls === 0 && plateMock.count === 1 && ma && ma.boxes.length === 2 && ma.boxes.some((b) => b.kind === 'plate' && Math.abs(b.x - 0.6) < 1e-9 && b.by === 'auto') && ma.model === 'facedet+platedet+claude-sonnet-5' && mma.model === 'facedet+platedet+claude-sonnet-5' && /plates 1 \(veh 1, crops 1, verified 1/.test(ja.photos[0].det || ''), JSON.stringify(ja) + ' ' + JSON.stringify(ma && ma.boxes));
+    T('워커: 사용량 집계에 platedet usage 반영(input 300)', mem.gw_data['promomask:usage'].months[Object.keys(mem.gw_data['promomask:usage'].months)[0]].input === 300, JSON.stringify(mem.gw_data['promomask:usage']));
+    // 차량 검출기 못 실림(MODELS_MISSING) → 종전 번호판 경로(전체 사진 1회) · model에 platedet 없음
+    plateMock.fail = true; plateMock.count = 0; fetchCalls = 0;
+    await wk.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + itok }, body: JSON.stringify({ job: 'pm_v371b', promo_id: 'prv371', ids: [A12], force: true }) }, {});
+    const jb = mem.gw_data['promomask:job:pm_v371b'], mb = mem.gw_files['mask:' + A12];
+    T('워커(차량 검출기 못 실림): 종전 번호판 경로 1회(fetch 1·calls 1) · 상자 2(얼굴 + Claude 번호판 0.7) · model facedet+claude-sonnet-5(platedet 없음 → 크론 재감지 대상) · det "platedet fail: MODELS_MISSING"',
+      jb.status === 'done' && jb.calls === 1 && fetchCalls === 1 && mb.boxes.length === 2 && mb.boxes.some((b) => b.kind === 'plate' && Math.abs(b.x - 0.7) < 1e-9) && mb.model === 'facedet+claude-sonnet-5' && /platedet fail: MODELS_MISSING/.test(jb.photos[0].det || ''), JSON.stringify(jb.photos[0]));
+    // 비전 오류는 platedet 안에서 나도 fail: — mask 저장 안 함(판 그대로)
+    plateMock.fail = new Error('TRUNCATED'); const tsBefore = mem.gw_files['mask:' + A12].ts;
+    await wk.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + itok }, body: JSON.stringify({ job: 'pm_v371c', promo_id: 'prv371', ids: [A12], force: true }) }, {});
+    T('워커(platedet 안 비전 잘림): fail:TRUNCATED · 판 그대로(ts 불변)', mem.gw_data['promomask:job:pm_v371c'].photos[0].st === 'fail:TRUNCATED' && mem.gw_files['mask:' + A12].ts === tsBefore, JSON.stringify(mem.gw_data['promomask:job:pm_v371c'].photos[0]));
+    // 재감지(only_old): 옛 판(facedet+claude) → platedet로 새로 감지(호출 3) → 새 판 → 다시 돌리면 kept:auto
+    plateMock.fail = false; plateMock.count = 0;
+    await wk.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + itok }, body: JSON.stringify({ job: 'pm_v371d', promo_id: 'prv371', ids: [A12], force: true, only_old: true }) }, {});
+    const jd = mem.gw_data['promomask:job:pm_v371d'];
+    await wk.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + itok }, body: JSON.stringify({ job: 'pm_v371e', promo_id: 'prv371', ids: [A12], force: true, only_old: true }) }, {});
+    T('워커 재감지(only_old): v364 판(facedet+claude)은 옛 판 → platedet로 새로 감지(masked·calls 3·model …platedet…) → 다음 재감지는 kept:auto(호출 0)',
+      jd.photos[0].st === 'masked' && jd.calls === 3 && /platedet/.test(mem.gw_files['maskmeta:' + A12].model) && mem.gw_data['promomask:job:pm_v371e'].photos[0].st === 'kept:auto' && mem.gw_data['promomask:job:pm_v371e'].calls === 0, JSON.stringify(jd.photos[0]) + ' ' + JSON.stringify(mem.gw_data['promomask:job:pm_v371e'].photos[0]));
+    // 크론 옛 판 판정: platedet 없는 자동 판만 대상
+    mem.gw_files['maskmeta:' + A12].model = 'facedet+claude-sonnet-5'; mem.gw_data['col:promo'].items[0].updated_ts = Date.now() + 3; mem.gw_data['promomask:lock:prv371'] = { ts: 0, job: '' }; kicks.length = 0; delete mem.gw_data['promomask:remask:prv371']; delete mem.gw_data['promomask:remask'];
+    let rc = await cron45.handler({}); let oc = JSON.parse(rc.body);
+    T('크론 ③(v371): v364 판(facedet+claude)은 옛 판 → 재감지 기동 1(ids [A12])', oc.remask && oc.remask.promo === 'prv371' && kicks.length === 1 && kicks[0].ids.length === 1 && kicks[0].ids[0] === A12 && kicks[0].only_old === true, JSON.stringify(oc.remask));
+    mem.gw_files['maskmeta:' + A12].model = 'facedet+platedet+claude-sonnet-5'; mem.gw_data['col:promo'].items[0].updated_ts = Date.now() + 6; mem.gw_data['promomask:lock:prv371'] = { ts: 0, job: '' }; kicks.length = 0; delete mem.gw_data['promomask:remask:prv371'];
+    rc = await cron45.handler({}); oc = JSON.parse(rc.body);
+    T('크론 ③(v371): platedet 판은 새 판 → 대상 0·기동 없음', oc.remask && oc.remask.old === 0 && !oc.remask.promo && kicks.length === 0, JSON.stringify(oc.remask));
+  } finally {
+    global.fetch = realFetch; process.env.GW_ANTHROPIC_KEY = savedKey || ''; process.env.URL = savedUrl || '';
+    faceMock.fail = true; faceMock.boxes = []; plateMock.fail = true; plateMock.boxes = [];
+  }
 }
 
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

@@ -129,6 +129,57 @@ async function detectBoxes(apiKey, mediaType, b64) {
   return { boxes: boxes, usage: usage, model: (j && j.model) || MODEL };
 }
 
+// ①-b 비전 공용 호출(v371) — detectBoxes와 같은 오류 규약(TIMEOUT/NETWORK/AUTH/RATE_LIMIT/HTTP_/BAD_JSON/REFUSAL/TRUNCATED). 본문 text와 usage를 돌려준다.
+async function askVision(apiKey, mediaType, b64, system, question, schema, maxTokens) {
+  const body = {
+    model: MODEL, max_tokens: maxTokens || 1024, system: system,
+    output_config: { effort: 'low', format: { type: 'json_schema', schema: schema } },
+    messages: [{ role: 'user', content: [{ type: 'image', source: { type: 'base64', media_type: mediaType, data: b64 } }, { type: 'text', text: question }] }],
+  };
+  const ctl = new AbortController();
+  const timer = setTimeout(function () { ctl.abort(); }, TIMEOUT_MS);
+  let res, text;
+  try {
+    res = await fetch(API_URL, { method: 'POST', headers: { 'content-type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': API_VERSION }, body: JSON.stringify(body), signal: ctl.signal });
+    text = await res.text();
+  } catch (e) {
+    throw new Error((e && e.name === 'AbortError') ? 'TIMEOUT' : 'NETWORK');
+  } finally { clearTimeout(timer); }
+  if (res.status === 401 || res.status === 403) throw new Error('AUTH');
+  if (res.status === 429) throw new Error('RATE_LIMIT');
+  if (res.status >= 400) throw new Error('HTTP_' + res.status);
+  let j = null;
+  try { j = JSON.parse(text); } catch (e) { throw new Error('BAD_JSON'); }
+  const stop = String((j && j.stop_reason) || '');
+  if (stop === 'refusal') throw new Error('REFUSAL');
+  if (stop === 'max_tokens') throw new Error('TRUNCATED');
+  const parts = (j && Array.isArray(j.content)) ? j.content : [];
+  const out = parts.filter(function (p) { return p && p.type === 'text'; }).map(function (p) { return p.text; }).join('\n');
+  const usage = (j && j.usage) ? { input: Number(j.usage.input_tokens) || 0, output: Number(j.usage.output_tokens) || 0 } : null;
+  return { text: out, usage: usage, model: (j && j.model) || MODEL };
+}
+const BOX_SCHEMA = { type: 'object', properties: { boxes: { type: 'array', items: { type: 'object', properties: { kind: { type: 'string', enum: ['plate'] }, x: { type: 'number' }, y: { type: 'number' }, w: { type: 'number' }, h: { type: 'number' } }, required: ['kind', 'x', 'y', 'w', 'h'], additionalProperties: false } } }, required: ['boxes'], additionalProperties: false };
+const VERIFY_SCHEMA = { type: 'object', properties: { state: { type: 'string', enum: ['full', 'partial', 'none'] } }, required: ['state'], additionalProperties: false };
+// ①-c 차량 조각 안의 번호판 좌표(v371, platedet ②) — 좌표는 조각 기준 비율. 상자 0개 = 이 차량에 보이는 번호판 없음. 번호 문자열은 받지도 저장하지도 않는다.
+async function detectPlatesInCrop(apiKey, mediaType, b64) {
+  const r = await askVision(apiKey, mediaType, b64,
+    '당신은 자동차 사진에서 번호판 위치를 찾는 검출기입니다. 이 이미지는 차량 한 대 주변을 잘라낸 조각입니다. 앞·뒤 번호판(기울어진 것, 일부 가려진 것 포함)의 위치를 전부 찾으세요. 좌표는 이 조각의 왼쪽 위 (0,0)·오른쪽 아래 (1,1) 비율값이고 x,y는 상자 왼쪽 위, w,h는 너비·높이입니다. 번호판 테두리를 정확히 감싸되 놓치는 것보다 조금 넓게 잡으세요. 번호판이 없으면 빈 배열. 번호 문자열은 적지 마세요.',
+    '이 차량 조각에서 번호판 위치를 boxes로 주세요.', BOX_SCHEMA, 1024);
+  const boxes = parseBoxes(r.text);
+  if (boxes === null) throw new Error('PARSE');
+  return { boxes: boxes.map(function (b) { return { kind: 'plate', x: b.x, y: b.y, w: b.w, h: b.h }; }), usage: r.usage, model: r.model };
+}
+// ①-d 자기검증(v371, platedet ③) — 번호판 상자를 여백 두고 잘라낸 조각: 'full'(번호판 네 변이 조각 안에·글자가 보임) / 'partial'(잘려 일부만) / 'none'(번호판 아님)
+async function verifyPlate(apiKey, mediaType, b64) {
+  const r = await askVision(apiKey, mediaType, b64,
+    '당신은 사진 조각을 검사합니다. 이 조각은 자동차 번호판이 있다고 추정한 자리를 여백을 두고 잘라낸 것입니다. 판정: 번호판 전체(네 변)가 조각 안에 들어 있고 글자가 보이면 full, 번호판이 잘려 일부만 보이면 partial, 번호판이 아예 없으면 none. 번호 문자열은 적지 마세요.',
+    '이 조각의 상태를 state로 주세요.', VERIFY_SCHEMA, 256);
+  let state = '';
+  try { const j = JSON.parse(String(r.text || '').trim()); state = String((j && j.state) || ''); } catch (e) { const m = /"state"\s*:\s*"(full|partial|none)"/.exec(String(r.text || '')); state = m ? m[1] : ''; }
+  if (state !== 'full' && state !== 'partial' && state !== 'none') throw new Error('PARSE');
+  return { state: state, usage: r.usage, model: r.model };
+}
+
 // ② 픽셀화 — 원본 buf(JPEG/PNG)를 한 번만 디코드해 {buf(JPEG q82 또는 null), w, h}를 돌려준다. 상자가 없으면 buf null(가릴 것 없음).
 async function applyBoxes(buf, boxes) {
   const list = cleanBoxes(boxes);
@@ -159,4 +210,4 @@ function metaOf(rec) {
     model: String((rec && rec.model) || '') };   // v364: 어느 검출기 판인지(facedet+… / claude-…) — 크론 재감지 판정용
 }
 
-module.exports = { maskKey, metaKey, mimeOf, checkImageRec, cleanBoxes, parseBoxes, detectBoxes, applyBoxes, metaOf, MODEL, PAD, PAD_MIN, MAX_BOXES, MAX_PHOTO_B64, IMG_MIME };
+module.exports = { maskKey, metaKey, mimeOf, checkImageRec, cleanBoxes, parseBoxes, detectBoxes, askVision, detectPlatesInCrop, verifyPlate, applyBoxes, metaOf, MODEL, PAD, PAD_MIN, MAX_BOXES, MAX_PHOTO_B64, IMG_MIME };

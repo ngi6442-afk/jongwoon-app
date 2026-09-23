@@ -207,6 +207,20 @@ try {
       && /var VEH_SHEET_KEY = "jw_veh_sheet", VEH_COLW_KEY = "jw_veh_colw";/.test(idx) && /class="item veh-item"/.test(idx) && /\.veh-item\{display:flex;/.test(idx)
       && /var act = document\.activeElement, focusKey = /.test(idx) && /fe\.setSelectionRange\(caret, caret\)/.test(idx) && /renderDeletedList\("veh", "vehDeletedToggle", "vehDeletedList", showDeletedVeh, "차량", delLabel\)/.test(idx), '');
   } catch (e) { console.log('  (v370 검사 생략 — ' + e.message + ')'); fails++; }
+  // ---- v371: 번호판 전용 경로(차량 검출기 COCO-SSD → 조각 확대 → Claude 좌표 → 자기검증) — 동봉·배선·출처 규칙(PM 9/23 "차번호 덜/안 가려짐" → "ㄱ") ----
+  try {
+    const fs371 = readFileSync;
+    const MD = join(ROOT, 'netlify/functions/_models');
+    const need = ['cocossd/model.json', 'cocossd/group1-shard1of5', 'cocossd/group1-shard2of5', 'cocossd/group1-shard3of5', 'cocossd/group1-shard4of5', 'cocossd/group1-shard5of5'];
+    const missing = need.filter((p) => { try { return fs371(join(MD, p)).length < 1000; } catch (e) { return true; } });
+    const pd = fs371(join(ROOT, 'netlify/functions/_lib/platedet.js'), 'utf8'), pm = fs371(join(ROOT, 'netlify/functions/_lib/promomask.js'), 'utf8'), wk = fs371(join(ROOT, 'netlify/functions/gw-promo-mask-background.js'), 'utf8'), cr = fs371(join(ROOT, 'netlify/functions/gw-promo-ai-cron.js'), 'utf8');
+    const pkg = JSON.parse(fs371(join(ROOT, 'package.json'), 'utf8')), toml = fs371(join(ROOT, 'netlify.toml'), 'utf8');
+    T('v371 동봉·의존: cocossd 6파일(1KB 이상) · package.json @tensorflow-models/coco-ssd · netlify.toml included_files _models/**(cocossd 포함) · platedet.js는 OCR·번호판 전용 모델을 싣지 않고 번호 문자열을 저장하지 않는다(프롬프트 "번호 문자열은 적지 마세요" 2곳)',
+      missing.length === 0 && !!pkg.dependencies['@tensorflow-models/coco-ssd'] && /included_files = \["netlify\/functions\/_models\/\*\*"\]/.test(toml) && /lite_mobilenet_v2/.test(pd) && !/ocr|OCR|easyocr|paddle|hyperlpr|yolo/i.test(pd) && (pm.match(/번호 문자열은 적지 마세요/g) || []).length === 2, missing.join(','));
+    T('v371 배선: 워커 P.detectPlates(plates·verify·whole 주입)·model platedet+·차량 검출기 못 실리면 종전 번호판 경로(MODELS_MISSING·WASM만)·비전 오류는 fail: · 재감지 새 판 판정 /platedet/ · 크론 옛 판 = platedet 없음 · promomask askVision·detectPlatesInCrop·verifyPlate(full/partial/none) 내보냄',
+      /P\.detectPlates\(raw, \{/.test(wk) && /model: 'platedet\+' \+ M\.MODEL/.test(wk) && /code !== 'MODELS_MISSING' && code !== 'WASM_BACKEND_FAILED'\) throw e;/.test(wk) && /prev && onlyOld && \/platedet\/\.test\(String\(prev\.model \|\| ''\)\)/.test(wk) && /if \(!\/platedet\/\.test\(String\(m\.data\.model \|\| ''\)\)\) old\.push\(id\);/.test(cr)
+      && /async function askVision\(apiKey, mediaType, b64, system, question, schema, maxTokens\)/.test(pm) && /async function detectPlatesInCrop\(apiKey, mediaType, b64\)/.test(pm) && /async function verifyPlate\(apiKey, mediaType, b64\)/.test(pm) && /enum: \['full', 'partial', 'none'\]/.test(pm) && /detectBoxes, askVision, detectPlatesInCrop, verifyPlate, applyBoxes/.test(pm), '');
+  } catch (e) { console.log('  (v371 검사 생략 — ' + e.message + ')'); fails++; }
   T('v369 문서함 [열기] 직원 표시: .view.readonly .mini-btn 숨김의 예외로 [data-doc-att-open] 버튼은 남는다(보기 권한 열람 통로) · 행 렌더의 열기 버튼이 그 속성을 갖는다',
     /\.view\.readonly \.mini-btn\[data-doc-att-open\]\{display:inline-block !important;\}/.test(idx) && /class="mini-btn" style="[^"]*" data-doc-att-open="' \+ esc\(d\.id\) \+ '\|' \+ Number\(f\.n\) \+ '">열기<\/button>/.test(idx)
     && idx.indexOf('.view.readonly .mini-btn[data-doc-att-open]') > idx.indexOf('.view.readonly .link-btn{display:none !important;}'), '');

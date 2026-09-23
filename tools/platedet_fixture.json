@@ -1,0 +1,31 @@
+{
+  "note": "v371 번호판 검출 게이트 표본 — 2026-09-23 두 게시글 26장(장량동 상가 8·용흥동 학교 18). plates = 사람이 확인한 번호판 상자(비율 x,y,w,h), 사진은 git 밖(PLATEDET_PHOTOS). vehicles = 사람이 센 번호판 보이는 차량 수(단계 ① 회수 확인용). plates_hard = 아주 작아 못 잡아도 실패 아님.",
+  "photos": [
+    { "id": "att_a95631980f9f3593", "vehicles": 1, "plates": [[0.800, 0.390, 0.060, 0.045]], "plates_hard": [] },
+    { "id": "att_88ed8e48efd74691", "vehicles": 0, "plates": [] },
+    { "id": "att_d0e979ef41cd532a", "vehicles": 0, "plates": [] },
+    { "id": "att_132af8aed94e9b60", "vehicles": 0, "plates": [] },
+    { "id": "att_5fda951e44f97a1b", "vehicles": 0, "plates": [] },
+    { "id": "att_6574f9981564ef74", "vehicles": 0, "plates": [] },
+    { "id": "att_4efa34d21d729af7", "vehicles": 0, "plates": [] },
+    { "id": "att_1c97def2600adba8", "vehicles": 2, "plates": [[0.830, 0.130, 0.040, 0.025], [0.925, 0.135, 0.060, 0.030]] },
+    { "id": "att_01553c65ca1d62ca", "vehicles": 0, "plates": [] },
+    { "id": "att_3a44849ec350f6fa", "vehicles": 0, "plates": [] },
+    { "id": "att_a8899c8009e5aa38", "vehicles": 0, "plates": [] },
+    { "id": "att_5ebc47ab55c0a23d", "vehicles": 0, "plates": [] },
+    { "id": "att_13223a55027bfc50", "vehicles": 0, "plates": [] },
+    { "id": "att_6d78e0bc6782c0e5", "vehicles": 3, "plates": [[0.335, 0.530, 0.060, 0.040], [0.600, 0.690, 0.055, 0.035], [0.700, 0.795, 0.065, 0.040]] },
+    { "id": "att_b28f1a4c73aa7509", "vehicles": 0, "plates": [] },
+    { "id": "att_1acf65ed7d17300e", "vehicles": 0, "plates": [] },
+    { "id": "att_0106f8f29b28a848", "vehicles": 0, "plates": [] },
+    { "id": "att_7b24e0e5ba6840a2", "vehicles": 0, "plates": [] },
+    { "id": "att_10ebc5ebf54d27dc", "vehicles": 0, "plates": [] },
+    { "id": "att_b9b8e50f35ce9a65", "vehicles": 0, "plates": [] },
+    { "id": "att_1f85f29046ee8b63", "vehicles": 0, "plates": [] },
+    { "id": "att_bc856e506b5a60c2", "vehicles": 0, "plates": [] },
+    { "id": "att_8c51e6c614ece3dd", "vehicles": 5, "plates": [[0.280, 0.330, 0.070, 0.040], [0.840, 0.000, 0.085, 0.040]], "plates_hard": [[0.575, 0.260, 0.055, 0.035], [0.625, 0.240, 0.070, 0.040], [0.725, 0.230, 0.075, 0.040]] },
+    { "id": "att_484aa8b01bd7b8ad", "vehicles": 0, "plates": [] },
+    { "id": "att_15371e0129433533", "vehicles": 0, "plates": [] },
+    { "id": "att_a791ee111dd7f772", "vehicles": 2, "plates": [[0.505, 0.620, 0.060, 0.040], [0.320, 0.610, 0.050, 0.030]] }
+  ]
+}
