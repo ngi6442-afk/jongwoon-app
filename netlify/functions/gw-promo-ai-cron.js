@@ -74,7 +74,7 @@ async function remaskOld(st, doc, now) {
       if (!m.ok || !m.data) continue;   // 판이 아직 없음 — 저장 뒤 자동 감지가 만든다
       seen++;
       if (m.data.human === true) continue;   // 사람 판은 그대로
-      if (!/platedet/.test(String(m.data.model || ''))) old.push(id);   // v371: 번호판 전용 경로(platedet)를 거치지 않은 판은 전부 옛 판(v364 facedet+claude 판 포함)
+      if (!/platedet2/.test(String(m.data.model || ''))) old.push(id);   // v372: 번호판 전용 경로 2판(platedet2)을 거치지 않은 판은 전부 옛 판(v364 facedet+claude 판·v371 platedet 1판 포함)
     }
     const tries = Number(td.tries) || 0;
     const want = r.photos.slice(0, REMASK_PHOTOS).filter(function (p) { return p && p.id; }).length;

@@ -2505,7 +2505,7 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   mem.gw_files[A9] = { name: 'p9.jpg', type: 'image/jpeg', kind: 'promo', data: b64, by: 'x', ts: 1 };
   mem.gw_files[A10] = { name: 'p10.jpg', type: 'image/jpeg', kind: 'promo', data: b64, by: 'x', ts: 1 };
   mem.gw_files[A11] = { name: 'p11.jpg', type: 'image/jpeg', kind: 'promo', data: b64, by: 'x', ts: 1 };
-  mem.gw_files['maskmeta:' + A10] = { schema: 1, has: true, n: 1, human: false, auto: true, w: 600, h: 400, ts: 5, model: 'facedet+platedet+claude-sonnet-5' };   // 이미 새 판(v371 = platedet 포함)
+  mem.gw_files['maskmeta:' + A10] = { schema: 1, has: true, n: 1, human: false, auto: true, w: 600, h: 400, ts: 5, model: 'facedet+platedet2+claude-sonnet-5' };   // 이미 새 판(v371 = platedet 포함)
   mem.gw_files['maskmeta:' + A11] = { schema: 1, has: true, n: 2, human: true, auto: false, w: 600, h: 400, ts: 5, model: 'human' };                    // 사람 판
   mem.gw_data['col:promo'] = { schema: 1, items: [
     { id: 'prv364', title: 't', body: 'b', status: 'review', photos: [{ id: A9, name: 'p9.jpg' }, { id: A10, name: 'p10.jpg' }, { id: A11, name: 'p11.jpg' }], ai: { ts: 1 }, tags: ['x'] },
@@ -2543,7 +2543,7 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
       T('워커 재감지(only_old, 얼굴 검출기 켬·차량 검출기 못 실림): 상자 2 = 검출기 얼굴 + 번호판(종전 전체 사진 1회로 새로 감지 — v371: 옛 판 재사용 없음) · Claude 얼굴(0.5) 제거 · 호출 1 · model facedet+claude-sonnet-5 · det "platedet fail: MODELS_MISSING"',
         jc.status === 'done' && jc.calls === 1 && jc.det_fail === 0 && jc.photos[0].st === 'masked' && /platedet fail: MODELS_MISSING/.test(jc.photos[0].det || '') && mkc.boxes.length === 2 && mkc.boxes.some((b) => b.kind === 'plate' && Math.abs(b.x - 0.7) < 1e-6) && mkc.boxes.some((b) => b.kind === 'face' && Math.abs(b.x - 200 / 600) < 1e-6) && !mkc.boxes.some((b) => b.kind === 'face' && Math.abs(b.x - 0.5) < 1e-6) && mkc.model === 'facedet+claude-sonnet-5' && mkc.boxes.every((b) => b.by === 'auto'), JSON.stringify(jc.photos[0]) + ' ' + JSON.stringify(mkc.boxes));
       // 새 판이면 only_old는 건너뛴다(kept:auto) — v371: 새 판 = model에 platedet가 있는 판
-      mem.gw_files['mask:' + A9].model = 'facedet+platedet+claude-sonnet-5'; mem.gw_files['maskmeta:' + A9].model = 'facedet+platedet+claude-sonnet-5';
+      mem.gw_files['mask:' + A9].model = 'facedet+platedet2+claude-sonnet-5'; mem.gw_files['maskmeta:' + A9].model = 'facedet+platedet2+claude-sonnet-5';
       await wk.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + itok }, body: JSON.stringify({ job: 'pm_v364d', promo_id: 'prv364', ids: [A9], force: true, only_old: true }) }, {});
       T('워커 재감지: 이미 새 판(facedet+platedet+)이면 kept:auto · 호출 0', mem.gw_data['promomask:job:pm_v364d'].photos[0].st === 'kept:auto' && mem.gw_data['promomask:job:pm_v364d'].calls === 0, JSON.stringify(mem.gw_data['promomask:job:pm_v364d'].photos[0]));
       // 검출기 못 실림 + only_old → skip:detector(Claude 호출 없음·판 그대로·det_fail 1)
@@ -2602,7 +2602,7 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
     T('크론 ③ 상한: 2회 뒤에도 옛 판이면 더 안 돈다(capped 1·기동 없음·done 표식) — 검출기 못 실리는 배포에서 무한 반복 방지', oc.remask && !oc.remask.promo && oc.remask.capped === 1 && kicks.length === 2 && mem.gw_data['promomask:remask:prv364'].done > 0, JSON.stringify(oc.remask));
     rc = await cron44.handler({}); oc = JSON.parse(rc.body);
     T('크론 ③ done 표식: 기록이 안 바뀌면 maskmeta를 다시 안 읽는다(scanned 0)', oc.remask && oc.remask.scanned === 0 && kicks.length === 2, JSON.stringify(oc.remask));
-    mem.gw_files['maskmeta:' + A9].model = 'facedet+platedet+claude-sonnet-5';
+    mem.gw_files['maskmeta:' + A9].model = 'facedet+platedet2+claude-sonnet-5';
     mem.gw_data['col:promo'].items[0].updated_ts = Date.now() + 5;   // 기록이 바뀌면 다시 본다
     mem.gw_data['promomask:lock:prv364'] = { ts: 0, job: '' };
     rc = await cron44.handler({}); oc = JSON.parse(rc.body);
@@ -2620,7 +2620,7 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
       mem.gw_data['promomask:usage'] = { schema: 1, months: {} };
       delete mem.gw_data['promomask:remask'];   // 예산 검사(BUDGET_CAP=전역 원인)가 남긴 전역 중단 표식 제거
       // 검증 #1: done 표식은 사진마다 판이 다 있을 때만 — 판 없는 새 기록은 표식 없이 다음 회차
-      mem.gw_files['maskmeta:' + A9].model = 'facedet+platedet+claude-sonnet-5';
+      mem.gw_files['maskmeta:' + A9].model = 'facedet+platedet2+claude-sonnet-5';
       mem.gw_data['col:promo'].items.push({ id: 'prv364n', title: 't', body: 'b', status: 'review', photos: [{ id: 'att_' + '2'.repeat(16), name: 'p.jpg' }], ai: { ts: 1 }, tags: ['x'], updated_ts: Date.now() + 20 });
       mem.gw_data['col:promo'].items[0].updated_ts = Date.now() + 20;
       mem.gw_data['promomask:lock:prv364'] = { ts: 0, job: '' };
@@ -2682,12 +2682,14 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   T('mergeVehicles: 같은 자리 2판(0.3·0.35)=채택(votes 2·중앙값 x 0.105) · 0.7 1판=채택 · 0.3 1판=탈락 · person 제외 · 0.1(하한 미만) 제외 · 점수순', mv.length === 2 && mv[0].cls === 'truck' && mv[0].votes === 1 && mv[1].votes === 2 && Math.abs(mv[1].x - 0.105) < 1e-9 && Math.abs(mv[1].w - 0.2) < 1e-9, JSON.stringify(mv));
   const pr45 = PD.padRect({ x: 0.5, y: 0.5, w: 0.2, h: 0.2 }, 1000, 1000, 0.15, 0.6), pr45b = PD.padRect({ x: 0.95, y: 0.95, w: 0.1, h: 0.1 }, 1000, 1000, 0.15);
   T('padRect: 좌우·위 15% · 아래 60%(번호판 자리) → (470,470,260,350) · 가장자리 클램프 → (935,935,65,65)', pr45.x === 470 && pr45.y === 470 && pr45.w === 260 && pr45.h === 350 && pr45b.x === 935 && pr45b.w === 65 && pr45b.h === 65, JSON.stringify([pr45, pr45b]));
-  const mf = PD.mapFromCrop({ x: 0.5, y: 0.5, w: 0.1, h: 0.1 }, { x: 100, y: 200, w: 400, h: 200 }, 1000, 1000), gr = PD.grow({ x: 0.4, y: 0.4, w: 0.2, h: 0.1 }, 0.5), bd = PD.bandOf({ x: 0.2, y: 0.2, w: 0.4, h: 0.4 });
-  T('mapFromCrop 조각→원본(0.3,0.3,0.04,0.02) · grow 중심 고정 50%(0.35,0.375,0.3,0.15) · bandOf 차량 하단 띠(0.232,0.42,0.336,0.18, fallback) · overlaps IoU 0.47 참/떨어지면 거짓',
+  const mf = PD.mapFromCrop({ x: 0.5, y: 0.5, w: 0.1, h: 0.1 }, { x: 100, y: 200, w: 400, h: 200 }, 1000, 1000), gr = PD.grow({ x: 0.4, y: 0.4, w: 0.2, h: 0.1 }, 0.5), bd = PD.bandOf({ x: 0.2, y: 0.2, w: 0.4, h: 0.4 }), bs = PD.bandOf({ x: 0.1, y: 0.1, w: 0.2, h: 0.2 });
+  T('mapFromCrop 조각→원본(0.3,0.3,0.04,0.02) · grow 중심 고정 50%(0.35,0.375,0.3,0.15) · bandOf 큰 차(면적 0.16>0.15) 좁은 띠(0.3,0.48,0.2,0.12) · 보통 차 띠(0.13,0.21,0.14,0.09) · verifyPad 작은 번호판(40×25px)은 최소 200px 조각이 되게 3.5 · overlaps IoU 0.47 참/떨어지면 거짓',
     Math.abs(mf.x - 0.3) < 1e-9 && Math.abs(mf.y - 0.3) < 1e-9 && Math.abs(mf.w - 0.04) < 1e-9 && Math.abs(mf.h - 0.02) < 1e-9 && Math.abs(gr.x - 0.35) < 1e-9 && Math.abs(gr.y - 0.375) < 1e-9 && Math.abs(gr.w - 0.3) < 1e-9 && Math.abs(gr.h - 0.15) < 1e-9
-    && Math.abs(bd.x - 0.232) < 1e-9 && Math.abs(bd.y - 0.42) < 1e-9 && Math.abs(bd.w - 0.336) < 1e-9 && Math.abs(bd.h - 0.18) < 1e-9 && bd.fallback === true
+    && Math.abs(bd.x - 0.3) < 1e-9 && Math.abs(bd.y - 0.48) < 1e-9 && Math.abs(bd.w - 0.2) < 1e-9 && Math.abs(bd.h - 0.12) < 1e-9 && bd.fallback === true
+    && Math.abs(bs.x - 0.13) < 1e-9 && Math.abs(bs.y - 0.21) < 1e-9 && Math.abs(bs.w - 0.14) < 1e-9 && Math.abs(bs.h - 0.09) < 1e-9
+    && Math.abs(PD.verifyPad({ x: 0, y: 0, w: 0.04, h: 0.025 }, 1000, 1000) - 3.5) < 1e-9 && PD.verifyPad({ x: 0, y: 0, w: 0.5, h: 0.5 }, 1000, 1000) === 0.6
     && PD.overlaps({ x: 0.1, y: 0.1, w: 0.1, h: 0.1 }, [{ x: 0.12, y: 0.12, w: 0.1, h: 0.1 }]) && !PD.overlaps({ x: 0.1, y: 0.1, w: 0.1, h: 0.1 }, [{ x: 0.5, y: 0.5, w: 0.1, h: 0.1 }]), JSON.stringify([mf, gr, bd]));
-  T('상수: SIZES 512·800·1024 · 타일 3×3(45%) · 차량 클래스 4 · 채택 0.45↑ 또는 2판 · 아래 여백 60% · 검증 여백 60% · 재시도 40% · 띠 55%~', JSON.stringify(PD.SIZES) === '[512,800,1024]' && PD.TILES === 3 && PD.TILE_FRAC === 0.45 && Object.keys(PD.VEH).length === 4 && PD.SCORE_SURE === 0.45 && PD.VOTES_MIN === 2 && PD.CROP_PAD_BOTTOM === 0.6 && PD.VERIFY_PAD === 0.6 && PD.GROW === 0.4 && PD.BAND.top === 0.55, '');
+  T('상수: SIZES 512·800·1024 · 타일 3×3(45%) · 차량 클래스 4 · 채택 0.45↑ 또는 2판 · 아래 여백 60% · 검증 여백 60% · 재시도 40% · 띠 55%~', JSON.stringify(PD.SIZES) === '[512,800,1024]' && PD.TILES === 3 && PD.TILE_FRAC === 0.45 && Object.keys(PD.VEH).length === 4 && PD.SCORE_SURE === 0.45 && PD.VOTES_MIN === 2 && PD.CROP_PAD_BOTTOM === 0.6 && PD.VERIFY_PAD === 0.6 && PD.VERIFY_MIN_PX === 200 && PD.GROW === 0.4 && PD.BAND.top === 0.55 && PD.BAND.bigTop === 0.7 && PD.BAND.bigArea === 0.15, '');
   // detectPlates 흐름 — 600×400 그림, 차량 주입 1대(0.1,0.1,0.4,0.4). 조각 = padRect(…,0.15,0.6) = (24,16,312,280). 조각 번호판 (0.5,0.8,0.2,0.1) → 원본 (0.3,0.6,0.104,0.07). 검증 partial→grow 40%→full. 폴백 상자는 none → 버림.
   const { Jimp: J45 } = require('jimp');
   const img45 = new J45({ width: 600, height: 400, color: 0x336699ff });
@@ -2705,7 +2707,7 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
     && r45a.calls === 5 && r45a.usage.input === 10 + 5 + 5 + 20 + 5 && r45a.diag.grown === 1 && r45a.diag.verified === 1 && r45a.diag.fallback === 1 && r45a.vehicles.length === 1 && vlog.join(',') === 'plates:true,verify:partial,verify:full,whole,verify:none', JSON.stringify(r45a.boxes) + ' ' + vlog.join(','));
   vlog.length = 0;
   const r45b = await PD.detectPlates(buf45, mkVision(['none', 'none'], [{ kind: 'plate', x: 0.5, y: 0.8, w: 0.2, h: 0.1 }], []), { vehiclesOf: vehOf });
-  T('detectPlates: 좌표는 나왔는데 검증 none → 차량 하단 띠(fallback true, src vehicle-band, y=0.1+0.4×0.55=0.32) · 폴백 0상자 · 호출 3', r45b.boxes.length === 1 && r45b.boxes[0].src === 'vehicle-band' && r45b.boxes[0].fallback === true && Math.abs(r45b.boxes[0].y - 0.32) < 1e-9 && r45b.diag.band === 1 && r45b.calls === 3, JSON.stringify(r45b.boxes));
+  T('detectPlates: 좌표는 나왔는데 검증 none → 차량 하단 띠(fallback true, src vehicle-band, 큰 차(0.16)라 y=0.1+0.4×0.70=0.38) · 폴백 0상자 · 호출 3', r45b.boxes.length === 1 && r45b.boxes[0].src === 'vehicle-band' && r45b.boxes[0].fallback === true && Math.abs(r45b.boxes[0].y - 0.38) < 1e-9 && r45b.diag.band === 1 && r45b.calls === 3, JSON.stringify(r45b.boxes));
   const r45c = await PD.detectPlates(buf45, mkVision(['partial', 'partial'], [{ kind: 'plate', x: 0.5, y: 0.8, w: 0.2, h: 0.1 }], []), { vehiclesOf: vehOf });
   T('detectPlates: 두 번 다 partial → 키운 상자로 가림(verified false) · 호출 4', r45c.boxes.length === 1 && r45c.boxes[0].verified === false && r45c.boxes[0].src === 'vehicle-crop' && r45c.calls === 4 && r45c.diag.grown === 2, JSON.stringify(r45c.boxes));
   const r45d = await PD.detectPlates(buf45, mkVision(['full'], [], [{ kind: 'plate', x: 0.8, y: 0.8, w: 0.1, h: 0.05 }]), { vehiclesOf: async () => ({ boxes: [], w: 600, h: 400, ms: 1, diag: { passes: 15, raw: 0 } }) });
@@ -2733,8 +2735,8 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
     plateMock.fail = false; plateMock.boxes = [{ kind: 'plate', x: 0.6, y: 0.8, w: 0.1, h: 0.04, src: 'vehicle-crop', verified: true }]; plateMock.calls = 3; plateMock.count = 0; fetchCalls = 0;
     await wk.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + itok }, body: JSON.stringify({ job: 'pm_v371a', promo_id: 'prv371', ids: [A12], force: true }) }, {});
     const ja = mem.gw_data['promomask:job:pm_v371a'], ma = mem.gw_files['mask:' + A12], mma = mem.gw_files['maskmeta:' + A12];
-    T('워커(얼굴·차량 검출기 켬): 상자 2 = 검출기 얼굴 + platedet 번호판(0.6,0.8) · 전체 사진 Claude 직접 호출 0(fetch 0 — 폴백은 platedet 안에서만) · calls 3(platedet 집계) · model facedet+platedet+claude-sonnet-5(mask·maskmeta) · det "plates 1 (veh 1, crops 1, verified 1"',
-      ja && ja.status === 'done' && ja.calls === 3 && fetchCalls === 0 && plateMock.count === 1 && ma && ma.boxes.length === 2 && ma.boxes.some((b) => b.kind === 'plate' && Math.abs(b.x - 0.6) < 1e-9 && b.by === 'auto') && ma.model === 'facedet+platedet+claude-sonnet-5' && mma.model === 'facedet+platedet+claude-sonnet-5' && /plates 1 \(veh 1, crops 1, verified 1/.test(ja.photos[0].det || ''), JSON.stringify(ja) + ' ' + JSON.stringify(ma && ma.boxes));
+    T('워커(얼굴·차량 검출기 켬): 상자 2 = 검출기 얼굴 + platedet 번호판(0.6,0.8) · 전체 사진 Claude 직접 호출 0(fetch 0 — 폴백은 platedet 안에서만) · calls 3(platedet 집계) · model facedet+platedet2+claude-sonnet-5(mask·maskmeta) · det "plates 1 (veh 1, crops 1, verified 1"',
+      ja && ja.status === 'done' && ja.calls === 3 && fetchCalls === 0 && plateMock.count === 1 && ma && ma.boxes.length === 2 && ma.boxes.some((b) => b.kind === 'plate' && Math.abs(b.x - 0.6) < 1e-9 && b.by === 'auto') && ma.model === 'facedet+platedet2+claude-sonnet-5' && mma.model === 'facedet+platedet2+claude-sonnet-5' && /plates 1 \(veh 1, crops 1, verified 1/.test(ja.photos[0].det || ''), JSON.stringify(ja) + ' ' + JSON.stringify(ma && ma.boxes));
     T('워커: 사용량 집계에 platedet usage 반영(input 300)', mem.gw_data['promomask:usage'].months[Object.keys(mem.gw_data['promomask:usage'].months)[0]].input === 300, JSON.stringify(mem.gw_data['promomask:usage']));
     // 차량 검출기 못 실림(MODELS_MISSING) → 종전 번호판 경로(전체 사진 1회) · model에 platedet 없음
     plateMock.fail = true; plateMock.count = 0; fetchCalls = 0;
@@ -2757,7 +2759,7 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
     mem.gw_files['maskmeta:' + A12].model = 'facedet+claude-sonnet-5'; mem.gw_data['col:promo'].items[0].updated_ts = Date.now() + 3; mem.gw_data['promomask:lock:prv371'] = { ts: 0, job: '' }; kicks.length = 0; delete mem.gw_data['promomask:remask:prv371']; delete mem.gw_data['promomask:remask'];
     let rc = await cron45.handler({}); let oc = JSON.parse(rc.body);
     T('크론 ③(v371): v364 판(facedet+claude)은 옛 판 → 재감지 기동 1(ids [A12])', oc.remask && oc.remask.promo === 'prv371' && kicks.length === 1 && kicks[0].ids.length === 1 && kicks[0].ids[0] === A12 && kicks[0].only_old === true, JSON.stringify(oc.remask));
-    mem.gw_files['maskmeta:' + A12].model = 'facedet+platedet+claude-sonnet-5'; mem.gw_data['col:promo'].items[0].updated_ts = Date.now() + 6; mem.gw_data['promomask:lock:prv371'] = { ts: 0, job: '' }; kicks.length = 0; delete mem.gw_data['promomask:remask:prv371'];
+    mem.gw_files['maskmeta:' + A12].model = 'facedet+platedet2+claude-sonnet-5'; mem.gw_data['col:promo'].items[0].updated_ts = Date.now() + 6; mem.gw_data['promomask:lock:prv371'] = { ts: 0, job: '' }; kicks.length = 0; delete mem.gw_data['promomask:remask:prv371'];
     rc = await cron45.handler({}); oc = JSON.parse(rc.body);
     T('크론 ③(v371): platedet 판은 새 판 → 대상 0·기동 없음', oc.remask && oc.remask.old === 0 && !oc.remask.promo && kicks.length === 0, JSON.stringify(oc.remask));
   } finally {

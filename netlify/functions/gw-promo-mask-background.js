@@ -104,7 +104,7 @@ exports.handler = async function (event, context) {
         // 사람이 손본 판은 force여도 덮지 않는다('가릴 것 없음'으로 확인한 것도 사람 판단이다)
         if (prev && isHuman(prev)) { item.st = 'kept:human'; item.boxes = (prev.boxes || []).length; rec.photos.push(item); continue; }
         if (prev && !force && prev.auto === true) { item.st = 'kept:auto'; item.boxes = (prev.boxes || []).length; rec.photos.push(item); continue; }
-        if (prev && onlyOld && /platedet/.test(String(prev.model || ''))) { item.st = 'kept:auto'; item.boxes = (prev.boxes || []).length; rec.photos.push(item); continue; }   // 이미 새 판(v371: 번호판 전용 경로까지 거친 판)
+        if (prev && onlyOld && /platedet2/.test(String(prev.model || ''))) { item.st = 'kept:auto'; item.boxes = (prev.boxes || []).length; rec.photos.push(item); continue; }   // 이미 새 판(v372: 번호판 전용 경로 2판 — 띠 축소·검증 조각 최소 크기 — 를 거친 판)
         if (onlyOld && !prev) { item.st = 'skip:nomask'; rec.photos.push(item); continue; }   // 검증 #10: maskmeta만 남은 고아(사람이 지운 판) — 재감지가 다시 가리지 않는다
         // v364(PM 9/16 "얼굴 못 가리네 … 근본적으로"): 얼굴·머리는 전용 검출기(_lib/facedet — Google MoveNet 다중 배율 투표, 얼굴 모델 없음·중국계 없음), 번호판만 Claude 비전.
         //   9/16 실측: Claude 비전 얼굴 상자는 자리가 틀려(픽셀화가 가슴·벽에 찍힘) 얼굴 상자로는 쓰지 않는다. 검출기가 못 실리면 종전(Claude 전부)으로 내려간다.
@@ -131,7 +131,7 @@ exports.handler = async function (event, context) {
               whole: function () { return M.detectBoxes(apiKey, chk.mt, chk.data); },
             });
             calls += pr.calls; usage.input += (pr.usage && pr.usage.input) || 0; usage.output += (pr.usage && pr.usage.output) || 0;
-            det = { boxes: pr.boxes.map(function (b) { return { kind: 'plate', x: b.x, y: b.y, w: b.w, h: b.h }; }), model: 'platedet+' + M.MODEL, usage: null };
+            det = { boxes: pr.boxes.map(function (b) { return { kind: 'plate', x: b.x, y: b.y, w: b.w, h: b.h }; }), model: 'platedet2+' + M.MODEL, usage: null };   // platedet2 = v372 규칙 판(크론 옛 판 판정 기준)
             pdiag = ' · plates ' + det.boxes.length + ' (veh ' + pr.diag.veh + ', crops ' + pr.diag.crops + ', verified ' + pr.diag.verified + ', band ' + pr.diag.band + ', ' + pr.ms + 'ms, calls ' + pr.calls + ')';
           } catch (e) {
             const code = (e && (e.code || String(e.message || 'ERR').split(/[:'\\/]/)[0])) || 'ERR';

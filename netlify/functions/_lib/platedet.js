@@ -27,8 +27,11 @@ const TILE_FRAC = 0.45;
 const CROP_MIN_PX = 48;                    // 이보다 작은 차량은 번호판이 읽힐 크기가 아니다 — 하단 띠 폴백 없이 건너뜀(오검출 방지)
 const CROP_MAX_SIDE = 1200;                // 조각 긴 변 상한(비전 입력)
 const VERIFY_PAD = 0.60;                   // 검증 조각 여백(번호판 상자 대비)
+const VERIFY_MIN_PX = 200;                 // 검증 조각 최소 변(px) — 번호판 30px짜리를 여백 60%로만 자르면 80px 조각이라 비전이 못 읽고 none을 낸다(9/23 라이브 1차: verified 0·band 다수). 여백을 키워 맥락을 준다
 const GROW = 0.40;                         // 재시도 때 상자 키우는 비율
-const BAND = { top: 0.55, left: 0.08, right: 0.92 };   // 폴백: 차량 하단 띠(상자 세로 55%부터 끝까지, 좌우 8% 안쪽)
+// 폴백: 차량 하단 띠. 보통 차 = 세로 55%부터 끝까지·좌우 15% 안쪽. 화면의 15%를 넘는 큰 차(버스·근접 트럭)는 번호판이 상대적으로 작으니 띠도 좁게(세로 70%~·가운데 50%) —
+//   9/23 라이브 1차에서 버스 하단 절반이 통째로 가려져 앞의 작업자까지 뭉개졌다.
+const BAND = { top: 0.55, left: 0.15, right: 0.85, bigArea: 0.15, bigTop: 0.70, bigLeft: 0.25, bigRight: 0.75 };
 
 // ── 순수 함수(검사 대상) ──
 function iou(a, b) {
@@ -73,8 +76,17 @@ function mapFromCrop(b, rect, W, H) {
 }
 // 상자를 비율 g만큼 키운다(중심 고정, 0~1 클램프는 cleanBoxes가)
 function grow(b, g) { return { kind: b.kind || 'plate', x: b.x - b.w * g / 2, y: b.y - b.h * g / 2, w: b.w * (1 + g), h: b.h * (1 + g) }; }
-// 폴백: 차량 하단 띠
-function bandOf(v) { return { kind: 'plate', x: v.x + v.w * BAND.left, y: v.y + v.h * BAND.top, w: v.w * (BAND.right - BAND.left), h: v.h * (1 - BAND.top), fallback: true }; }
+// 폴백: 차량 하단 띠(큰 차는 좁게)
+function bandOf(v) {
+  const big = v.w * v.h > BAND.bigArea;
+  const top = big ? BAND.bigTop : BAND.top, left = big ? BAND.bigLeft : BAND.left, right = big ? BAND.bigRight : BAND.right;
+  return { kind: 'plate', x: v.x + v.w * left, y: v.y + v.h * top, w: v.w * (right - left), h: v.h * (1 - top), fallback: true };
+}
+// 검증 조각 여백 — 번호판이 작을수록 크게(조각 변이 VERIFY_MIN_PX 이상이 되게)
+function verifyPad(b, W, H) {
+  const pw = Math.max(1, b.w * W), ph = Math.max(1, b.h * H);
+  return Math.max(VERIFY_PAD, (VERIFY_MIN_PX / pw - 1) / 2, (VERIFY_MIN_PX / ph - 1) / 2);
+}
 // 이미 있는 상자와 겹치는가(IoU 또는 중심 포함)
 function overlaps(b, list, thr) {
   return (list || []).some(function (o) { return iou(b, o) >= (thr == null ? 0.3 : thr) || centerIn(b, o) || centerIn(o, b); });
@@ -167,7 +179,7 @@ async function detectPlates(buf, vision, opts) {
   const verify = async function (b) {
     let cur = b;
     for (let i = 0; i < 2; i++) {
-      const rect = padRect(cur, W, H, VERIFY_PAD);
+      const rect = padRect(cur, W, H, verifyPad(cur, W, H));
       if (rect.w < 8 || rect.h < 8) return null;
       const r = await vision.verify(await cropB64(img, rect)); acc(r);
       if (r.state === 'full') { diag.verified++; return { box: cur, verified: true }; }
@@ -204,4 +216,4 @@ async function detectPlates(buf, vision, opts) {
   return { boxes: out, vehicles: vr.boxes, calls: calls, usage: usage, ms: Date.now() - t0, diag: diag };
 }
 
-module.exports = { detectPlates, detectVehicles, mergeVehicles, padRect, mapFromCrop, grow, bandOf, overlaps, loadModel, SIZES, SCORE_MIN, SCORE_SURE, VOTES_MIN, JOIN_IOU, MAX_VEH, CROP_PAD, CROP_PAD_BOTTOM, TILES, TILE_FRAC, CROP_MIN_PX, VERIFY_PAD, GROW, BAND, VEH };
+module.exports = { detectPlates, detectVehicles, mergeVehicles, padRect, mapFromCrop, grow, bandOf, verifyPad, overlaps, loadModel, VERIFY_MIN_PX, SIZES, SCORE_MIN, SCORE_SURE, VOTES_MIN, JOIN_IOU, MAX_VEH, CROP_PAD, CROP_PAD_BOTTOM, TILES, TILE_FRAC, CROP_MIN_PX, VERIFY_PAD, GROW, BAND, VEH };
