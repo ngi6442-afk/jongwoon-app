@@ -213,6 +213,12 @@ try {
     && !/\.vs td:first-child,\.vs th:first-child\{width:40%;\}/.test(idx) && /'<col class="vs-c-' \+ c\.k \+ '" style="width:' \+ vehColW\(c\) \+ 'px">'/.test(idx)
     && /near\.t \+ ' ' \+ \(near\.diff < 0 \? 'D\+' \+ \(-near\.diff\) : 'D-' \+ near\.diff\) \+ '<\/td>'/.test(idx) && !/'경과 ' \+ \(-near\.diff\) \+ '일'/.test(idx)
     && /t = '임박 ' \+ nSoon \+ '·경과 ' \+ nOver;/.test(idx), '');
+  // ---- v374: PC 열 폭 끌기 수리(PM 10/1 "열간격 조정 안 됨") ----
+  T('v374 차량 표 고정 배치: .vs width:1px(표 폭=열 폭 합) · 보이는 열만 colgroup(vehPhoneMode·visCols) · colspan=nVis 2곳 · 끌기 col은 열 키 · 경계 넘으면 다시 그리기 · 기본 열 폭 차번호 180·검사/보험만기 150 · matchMedia change',
+    /\.vs\{border-collapse:separate;border-spacing:0;table-layout:fixed;width:1px;min-width:1160px;/.test(idx) && /function vehPhoneMode\(\)\{ try \{ return window\.matchMedia\("\(max-width:859px\)"\)\.matches; \}/.test(idx)
+    && /visCols = VEH_COLS\.filter\(function\(c\)\{ return phoneMode \? !c\.hs : !c\.ph; \}\), nVis = visCols\.length;/.test(idx) && (idx.match(/colspan="' \+ nVis \+ '"/g) || []).length === 2 && !/colspan="' \+ VEH_COLS\.length \+ '"/.test(idx)
+    && /col = host\.querySelector\("col\.vs-c-" \+ k\)/.test(idx) && !/cols = host\.querySelectorAll\("col"\)/.test(idx) && /window\.addEventListener\("resize", vehOnBreak\);/.test(idx) && /function vehOnBreak\(\)\{ var p = vehPhoneMode\(\); if \(vehLastPhone !== null && p !== vehLastPhone\)/.test(idx)
+    && /h:"차번호",   w:180,/.test(idx) && /vehMql\.addEventListener\("change", vehOnBreak\)/.test(idx) && /h:"검사만기", w:150,/.test(idx) && /h:"보험만기", w:150,/.test(idx), '');
   // ---- v371: 번호판 전용 경로(차량 검출기 COCO-SSD → 조각 확대 → Claude 좌표 → 자기검증) — 동봉·배선·출처 규칙(PM 9/23 "차번호 덜/안 가려짐" → "ㄱ") ----
   try {
     const fs371 = readFileSync;

@@ -644,7 +644,7 @@
   .vs-chip.warn.on{background:#B0332A;border-color:#B0332A;}
   .vs-count{margin-left:auto;font-size:12px;color:var(--sub);white-space:nowrap;}
   .vs-wrap{overflow:auto;max-height:calc(100vh - 230px);border:1px solid var(--line);border-radius:8px;background:var(--surface,#fff);}
-  .vs{border-collapse:separate;border-spacing:0;table-layout:fixed;min-width:1160px;font-size:12.5px;line-height:1.35;}
+  .vs{border-collapse:separate;border-spacing:0;table-layout:fixed;width:1px;min-width:1160px;font-size:12.5px;line-height:1.35;}   /* v374: width:1px — 고정 배치는 width가 auto면 무효(끌기·col 폭 무시). 폭 1px+min-width로 표 폭 = max(1160, 열 폭 합) */
   .vs th,.vs td{border-bottom:1px solid var(--line);border-right:1px solid #EDF0EE;padding:0 8px;height:32px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left;vertical-align:middle;background:var(--surface,#fff);font-variant-numeric:tabular-nums;box-sizing:border-box;}
   .vs thead th{position:sticky;top:0;z-index:3;background:#EFF5F2;font-weight:700;color:var(--sub);cursor:pointer;user-select:none;-webkit-user-select:none;}
   .vs thead th.sorted{color:var(--brand-dark,#1F5A3C);}
@@ -6281,16 +6281,16 @@
   // 열 정의: hs=PC 전용(폰에서 숨김), ph=폰 전용(검사·보험 중 가까운 만기 하나). f=필터 종류(text 부분일치 / enum 정확일치 / none)
   var VEH_SHEET_KEY = "jw_veh_sheet", VEH_COLW_KEY = "jw_veh_colw";
   var VEH_COLS = [
-    { k:"no",       h:"차번호",   w:112, f:"text", b:1 },
-    { k:"type",     h:"차종",     w:80,  f:"enum" },
+    { k:"no",       h:"차번호",   w:180, f:"text", b:1 },
+    { k:"type",     h:"차종",     w:96,  f:"enum" },
     { k:"due",      h:"만기",     w:110, f:"none", ph:1 },
     { k:"kind",     h:"상세",     w:200, f:"text", hs:1 },
     { k:"own",      h:"소유",     w:66,  f:"enum", hs:1 },
-    { k:"permit",   h:"허가",     w:74,  f:"enum", hs:1 },
+    { k:"permit",   h:"허가",     w:100, f:"enum", hs:1 },
     { k:"driver",   h:"기사",     w:84,  f:"enum", hs:1 },
     { k:"state",    h:"상태",     w:72,  f:"enum", hs:1 },
-    { k:"insp_due", h:"검사만기", w:128, f:"none", hs:1 },
-    { k:"ins_due",  h:"보험만기", w:128, f:"none", hs:1 },
+    { k:"insp_due", h:"검사만기", w:150, f:"none", hs:1 },
+    { k:"ins_due",  h:"보험만기", w:150, f:"none", hs:1 },
     { k:"insurer",  h:"보험사",   w:106, f:"enum", hs:1 },
     { k:"note",     h:"비고",     w:220, f:"text", hs:1 }
   ];
@@ -6303,6 +6303,12 @@
   function vehColwSave(){ try { localStorage.setItem(VEH_COLW_KEY, JSON.stringify(vehColw)); } catch(e){} }
   var vehOpenId = null, vehDetTab = "ov";
   function vehColW(c){ var w = Number(vehColw[c.k]); return (w >= 40 && w <= 600) ? w : c.w; }
+  // v374: 폰/PC 판정은 CSS와 같은 경계(859px). 숨긴 열은 <col>도 빼야 고정 배치에서 열이 한 칸씩 밀리지 않는다 — 경계를 넘으면 colgroup이 달라지므로 다시 그린다
+  function vehPhoneMode(){ try { return window.matchMedia("(max-width:859px)").matches; } catch(e){ return window.innerWidth < 860; } }
+  var vehLastPhone = null;
+  function vehOnBreak(){ var p = vehPhoneMode(); if (vehLastPhone !== null && p !== vehLastPhone){ var hostEl = document.getElementById("vehList"); if (hostEl && hostEl.querySelector(".vs")) renderVehicles(); } }
+  window.addEventListener("resize", vehOnBreak);
+  try { var vehMql = window.matchMedia("(max-width:859px)"); if (vehMql.addEventListener) vehMql.addEventListener("change", vehOnBreak); else if (vehMql.addListener) vehMql.addListener(vehOnBreak); } catch(e){}   // 경계 변경은 matchMedia change가 resize보다 확실(에뮬레이터·회전)
   // 만기 칸: 지난 것 붉게("경과 n일"), 30일 이내 노랑(D-n), 그 밖 D-n. 회색 상태(말소예정·매각·검사보류)는 색 없이
   function vehDueCell(dateStr, grey){
     if (!dateStr) return { html: '<span style="color:#9AA09C;">-</span>', cls: "", level: 0, sortv: 99999 };
@@ -6442,7 +6448,8 @@
     var caret = (focusKey && act.selectionStart != null) ? act.selectionStart : null;
     var h = '<div class="vs-tools">' + VEH_CHIPS.map(function(ch){ return '<button type="button" class="vs-chip' + (ch[0] === "over" ? ' warn' : '') + (vehSheet.chip === ch[0] ? ' on' : '') + '" data-vs-chip="' + ch[0] + '">' + ch[1] + '</button>'; }).join("") +
       '<button type="button" class="vs-chip" data-vs-reset="1" title="필터 행·칩 지우기">필터 초기화</button><span class="vs-count">' + rows.length + '대 / 전체 ' + all.length + '대</span></div>';
-    h += '<div class="vs-wrap"><table class="vs"><colgroup>' + VEH_COLS.map(function(c){ return '<col class="vs-c-' + c.k + '" style="width:' + vehColW(c) + 'px">'; }).join("") + '</colgroup><thead><tr>';
+    var phoneMode = vehPhoneMode(), visCols = VEH_COLS.filter(function(c){ return phoneMode ? !c.hs : !c.ph; }), nVis = visCols.length; vehLastPhone = phoneMode;
+    h += '<div class="vs-wrap"><table class="vs"><colgroup>' + visCols.map(function(c){ return '<col class="vs-c-' + c.k + '" style="width:' + vehColW(c) + 'px">'; }).join("") + '</colgroup><thead><tr>';
     VEH_COLS.forEach(function(c){
       var sorted = vehSheet.k === c.k;
       h += '<th class="' + vehColCls(c) + (sorted ? ' sorted' : '') + '" data-vs-sort="' + c.k + '" title="누르면 정렬">' + c.h + (sorted ? '<span class="vs-ar">' + (vehSheet.d === 1 ? '▲' : '▼') + '</span>' : '') + '<span class="vs-rs" data-vs-rs="' + c.k + '" title="끌어서 폭 조절"></span></th>';
@@ -6455,11 +6462,11 @@
       else h += '<th class="' + vehColCls(c) + '"></th>';
     });
     h += '</tr></thead><tbody>';
-    if (!rows.length) h += '<tr><td colspan="' + VEH_COLS.length + '" style="text-align:center;color:var(--sub);position:static;">조건에 맞는 차량이 없습니다.</td></tr>';
+    if (!rows.length) h += '<tr><td colspan="' + nVis + '" style="text-align:center;color:var(--sub);position:static;">조건에 맞는 차량이 없습니다.</td></tr>';
     rows.forEach(function(v){
       var open = !!(openV && openV.id === v.id);
       h += vehSheetRowHtml(v, selV, open);
-      if (open) h += '<tr class="vs-det"><td colspan="' + VEH_COLS.length + '"><div class="vs-det-in">' + vehDetailHtml(v) + '</div></td></tr>';
+      if (open) h += '<tr class="vs-det"><td colspan="' + nVis + '"><div class="vs-det-in">' + vehDetailHtml(v) + '</div></td></tr>';
     });
     var nRun = 0, nJi = 0, nSoon = 0, nOver = 0;
     rows.forEach(function(v){ if (v.state === "운행") nRun++; if (v.own === "지입") nJi++; var n = vehNearest(v); if (n < 0) nOver++; else if (n <= 30) nSoon++; });
@@ -6522,9 +6529,7 @@
     Array.prototype.forEach.call(host.querySelectorAll("[data-vs-rs]"), function(hd){
       hd.addEventListener("mousedown", function(e){
         e.preventDefault(); e.stopPropagation();
-        var k = hd.getAttribute("data-vs-rs"), th = hd.parentNode, x0 = e.clientX, w0 = th.offsetWidth, cols = host.querySelectorAll("col"), idx = -1, i, col = null;
-        for (i = 0; i < VEH_COLS.length; i++){ if (VEH_COLS[i].k === k) idx = i; }
-        if (idx >= 0) col = cols[idx];
+        var k = hd.getAttribute("data-vs-rs"), th = hd.parentNode, x0 = e.clientX, w0 = th.offsetWidth, col = host.querySelector("col.vs-c-" + k);   // v374: col은 열 키로 찾는다(숨긴 열은 colgroup에 없어 순번이 어긋남)
         var mv = function(ev){ var w = Math.max(40, Math.min(600, w0 + (ev.clientX - x0))); if (col) col.style.width = w + "px"; vehColw[k] = w; };
         var up = function(){ document.removeEventListener("mousemove", mv); document.removeEventListener("mouseup", up); vehColwSave(); };
         document.addEventListener("mousemove", mv); document.addEventListener("mouseup", up);
