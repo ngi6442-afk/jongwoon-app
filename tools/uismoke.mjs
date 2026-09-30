@@ -202,11 +202,17 @@ try {
     T('v370 구조: @veh-sheet 구간 · #vehDetailCard · 옛 카드형(vehRowHtml·vehDdayLine) 제거 · 표 고정 규칙(머리 sticky top·첫 열 sticky left·합계 sticky bottom) · 폰 859px 규칙(vs-hs 숨김·상세 카드 표시·표 안 펼침 숨김) · PC 860px(vs-ph 숨김) · 열 폭·정렬 저장 키 · 대시보드 .veh-item 유지 · 재그리기 포커스 복원',
       /\/\/ @veh-sheet-start/.test(idx) && /\/\/ @veh-sheet-end/.test(idx) && /id="vehDetailCard"/.test(idx) && !/vehRowHtml\(/.test(idx) && !/vehDdayLine\(/.test(idx)
       && /\.vs thead th\{position:sticky;top:0;z-index:3;/.test(idx) && /\.vs th:first-child,\.vs td:first-child\{position:sticky;left:0;z-index:2;\}/.test(idx) && /\.vs tfoot td\{position:sticky;bottom:0;z-index:4;/.test(idx)
-      && /@media \(max-width:859px\)\{\s*\.vs\{min-width:0;width:100%;table-layout:auto;\}/.test(idx) && /\.vs th\.vs-hs,\.vs td\.vs-hs\{display:none;\}/.test(idx) && /#vehDetailCard\{display:block;margin-top:8px;\}/.test(idx) && /\.vs tr\.vs-det\{display:none;\}/.test(idx)
+      && /@media \(max-width:859px\)\{[\s\S]{0,240}?\.vs\{min-width:0;width:100%;table-layout:fixed;\}/.test(idx) && /\.vs th\.vs-hs,\.vs td\.vs-hs\{display:none;\}/.test(idx) && /#vehDetailCard\{display:block;margin-top:8px;\}/.test(idx) && /\.vs tr\.vs-det\{display:none;\}/.test(idx)
       && /@media \(min-width:860px\)\{\s*\.vs th\.vs-ph,\.vs td\.vs-ph\{display:none;\}/.test(idx)
       && /var VEH_SHEET_KEY = "jw_veh_sheet", VEH_COLW_KEY = "jw_veh_colw";/.test(idx) && /class="item veh-item"/.test(idx) && /\.veh-item\{display:flex;/.test(idx)
       && /var act = document\.activeElement, focusKey = /.test(idx) && /fe\.setSelectionRange\(caret, caret\)/.test(idx) && /renderDeletedList\("veh", "vehDeletedToggle", "vehDeletedList", showDeletedVeh, "차량", delLabel\)/.test(idx), '');
   } catch (e) { console.log('  (v370 검사 생략 — ' + e.message + ')'); fails++; }
+  // ---- v373: 차량 탭 폰 3열 넘침 수리(PM 10/1 폰 스샷 — 만기 열 잘림) ----
+  T('v373 폰 차량 표: 고정 배치 + 열 클래스 폭(차번호 46%·차종 22%·만기 32%, 숨긴 열 0) · colgroup 열 클래스 · 폰 만기 칸 D 표기("경과 n일" 없음) · 합계줄 축약',
+    /\.vs col\{width:0 !important;\}\s*\.vs col\.vs-c-no\{width:46% !important;\}\s*\.vs col\.vs-c-type\{width:22% !important;\}\s*\.vs col\.vs-c-due\{width:32% !important;\}/.test(idx)
+    && !/\.vs td:first-child,\.vs th:first-child\{width:40%;\}/.test(idx) && /'<col class="vs-c-' \+ c\.k \+ '" style="width:' \+ vehColW\(c\) \+ 'px">'/.test(idx)
+    && /near\.t \+ ' ' \+ \(near\.diff < 0 \? 'D\+' \+ \(-near\.diff\) : 'D-' \+ near\.diff\) \+ '<\/td>'/.test(idx) && !/'경과 ' \+ \(-near\.diff\) \+ '일'/.test(idx)
+    && /t = '임박 ' \+ nSoon \+ '·경과 ' \+ nOver;/.test(idx), '');
   // ---- v371: 번호판 전용 경로(차량 검출기 COCO-SSD → 조각 확대 → Claude 좌표 → 자기검증) — 동봉·배선·출처 규칙(PM 9/23 "차번호 덜/안 가려짐" → "ㄱ") ----
   try {
     const fs371 = readFileSync;

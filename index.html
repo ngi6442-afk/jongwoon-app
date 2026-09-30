@@ -687,11 +687,14 @@
   .vs-empty{padding:10px 4px;color:var(--sub);font-size:13px;}
   #vehDetailCard{display:none;}
   @media (max-width:859px){
-    .vs{min-width:0;width:100%;table-layout:auto;}
-    .vs col{width:auto !important;}
+    /* v373: auto 배치는 nowrap 내용 때문에 표가 100%를 넘어 만기 열이 잘렸다(PM 10/1 폰 스샷) → 고정 배치 + 보이는 3열만 비율 폭, 숨긴 열은 0 */
+    .vs{min-width:0;width:100%;table-layout:fixed;}
+    .vs col{width:0 !important;}
+    .vs col.vs-c-no{width:46% !important;}
+    .vs col.vs-c-type{width:22% !important;}
+    .vs col.vs-c-due{width:32% !important;}
     .vs th.vs-hs,.vs td.vs-hs{display:none;}
-    .vs td:first-child,.vs th:first-child{width:40%;}
-    .vs th,.vs td{height:34px;}
+    .vs th,.vs td{height:34px;padding:0 6px;}
     .vs .vs-rs{display:none;}
     .vs-wrap{max-height:46vh;}
     .vs tr.vs-det{display:none;}
@@ -6365,7 +6368,7 @@
       else if (c.k === "due"){
         near = vehNearInfo(v);
         if (!near) cells += '<td class="' + cls + '"><span style="color:#9AA09C;">-</span></td>';
-        else { dc = vehDueCell(near.date, grey); cells += '<td class="' + cls + (dc.cls ? ' ' + dc.cls : '') + '" title="' + esc(near.date) + '">' + near.t + ' ' + (dc.level === 2 ? '경과 ' + (-near.diff) + '일' : (near.diff < 0 ? 'D+' + (-near.diff) : 'D-' + near.diff)) + '</td>'; }
+        else { dc = vehDueCell(near.date, grey); cells += '<td class="' + cls + (dc.cls ? ' ' + dc.cls : '') + '" title="' + esc(near.date) + '">' + near.t + ' ' + (near.diff < 0 ? 'D+' + (-near.diff) : 'D-' + near.diff) + '</td>'; }   // v373: 폰 만기 칸은 D 표기(상세 카드 칩과 동일) — "경과 n일"은 PC 검사만기·보험만기 열에만
       }
       else if (c.k === "insp_due" || c.k === "ins_due"){ dc = vehDueCell(v[c.k], grey); cells += '<td class="' + cls + (dc.cls ? ' ' + dc.cls : '') + '">' + dc.html + '</td>'; }
       else if (c.k === "own"){ val = v.own || ""; cells += '<td class="' + cls + '">' + (val === "지입" ? '<span class="own-badge lease">지입</span>' : (val ? '<span class="own-badge self">' + esc(val) + '</span>' : '')) + '</td>'; }
@@ -6439,7 +6442,7 @@
     var caret = (focusKey && act.selectionStart != null) ? act.selectionStart : null;
     var h = '<div class="vs-tools">' + VEH_CHIPS.map(function(ch){ return '<button type="button" class="vs-chip' + (ch[0] === "over" ? ' warn' : '') + (vehSheet.chip === ch[0] ? ' on' : '') + '" data-vs-chip="' + ch[0] + '">' + ch[1] + '</button>'; }).join("") +
       '<button type="button" class="vs-chip" data-vs-reset="1" title="필터 행·칩 지우기">필터 초기화</button><span class="vs-count">' + rows.length + '대 / 전체 ' + all.length + '대</span></div>';
-    h += '<div class="vs-wrap"><table class="vs"><colgroup>' + VEH_COLS.map(function(c){ return '<col style="width:' + vehColW(c) + 'px">'; }).join("") + '</colgroup><thead><tr>';
+    h += '<div class="vs-wrap"><table class="vs"><colgroup>' + VEH_COLS.map(function(c){ return '<col class="vs-c-' + c.k + '" style="width:' + vehColW(c) + 'px">'; }).join("") + '</colgroup><thead><tr>';
     VEH_COLS.forEach(function(c){
       var sorted = vehSheet.k === c.k;
       h += '<th class="' + vehColCls(c) + (sorted ? ' sorted' : '') + '" data-vs-sort="' + c.k + '" title="누르면 정렬">' + c.h + (sorted ? '<span class="vs-ar">' + (vehSheet.d === 1 ? '▲' : '▼') + '</span>' : '') + '<span class="vs-rs" data-vs-rs="' + c.k + '" title="끌어서 폭 조절"></span></th>';
@@ -6464,7 +6467,7 @@
     VEH_COLS.forEach(function(c){
       var t = "";
       if (c.k === "no") t = '합계 ' + rows.length + '대'; else if (c.k === "state") t = '운행 ' + nRun; else if (c.k === "own") t = '지입 ' + nJi;
-      else if (c.k === "insp_due") t = '임박 ' + nSoon; else if (c.k === "ins_due") t = '경과 ' + nOver; else if (c.k === "due") t = '임박 ' + nSoon + ' · 경과 ' + nOver;
+      else if (c.k === "insp_due") t = '임박 ' + nSoon; else if (c.k === "ins_due") t = '경과 ' + nOver; else if (c.k === "due") t = '임박 ' + nSoon + '·경과 ' + nOver;
       h += '<td class="' + vehColCls(c) + '">' + t + '</td>';
     });
     h += '</tr></tfoot></table></div>';
