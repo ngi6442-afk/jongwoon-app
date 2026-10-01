@@ -204,7 +204,7 @@ try {
       && /\.vs thead th\{position:sticky;top:0;z-index:3;/.test(idx) && /\.vs th:first-child,\.vs td:first-child\{position:sticky;left:0;z-index:2;\}/.test(idx) && /\.vs tfoot td\{position:sticky;bottom:0;z-index:4;/.test(idx)
       && /@media \(max-width:859px\)\{[\s\S]{0,240}?\.vs\{min-width:0;width:100%;table-layout:fixed;\}/.test(idx) && /\.vs th\.vs-hs,\.vs td\.vs-hs\{display:none;\}/.test(idx) && /#vehDetailCard\{display:block;margin-top:8px;\}/.test(idx) && /\.vs tr\.vs-det\{display:none;\}/.test(idx)
       && /@media \(min-width:860px\)\{\s*\.vs th\.vs-ph,\.vs td\.vs-ph\{display:none;\}/.test(idx)
-      && /var VEH_SHEET_KEY = "jw_veh_sheet", VEH_COLW_KEY = "jw_veh_colw";/.test(idx) && /class="item veh-item"/.test(idx) && /\.veh-item\{display:flex;/.test(idx)
+      && /var VEH_SHEET_KEY = "jw_veh_sheet", VEH_COLW_KEY = "jw_veh_colw2";/.test(idx) && /class="item veh-item"/.test(idx) && /\.veh-item\{display:flex;/.test(idx)
       && /var act = document\.activeElement, focusKey = /.test(idx) && /fe\.setSelectionRange\(caret, caret\)/.test(idx) && /renderDeletedList\("veh", "vehDeletedToggle", "vehDeletedList", showDeletedVeh, "차량", delLabel\)/.test(idx), '');
   } catch (e) { console.log('  (v370 검사 생략 — ' + e.message + ')'); fails++; }
   // ---- v373: 차량 탭 폰 3열 넘침 수리(PM 10/1 폰 스샷 — 만기 열 잘림) ----
@@ -214,11 +214,15 @@ try {
     && /near\.t \+ ' ' \+ \(near\.diff < 0 \? 'D\+' \+ \(-near\.diff\) : 'D-' \+ near\.diff\) \+ '<\/td>'/.test(idx) && !/'경과 ' \+ \(-near\.diff\) \+ '일'/.test(idx)
     && /t = '임박 ' \+ nSoon \+ '·경과 ' \+ nOver;/.test(idx), '');
   // ---- v374: PC 열 폭 끌기 수리(PM 10/1 "열간격 조정 안 됨") ----
-  T('v374 차량 표 고정 배치: .vs width:1px(표 폭=열 폭 합) · 보이는 열만 colgroup(vehPhoneMode·visCols) · colspan=nVis 2곳 · 끌기 col은 열 키 · 경계 넘으면 다시 그리기 · 기본 열 폭 차번호 180·검사/보험만기 150 · matchMedia change',
+  T('v374 차량 표 고정 배치: .vs width:1px(표 폭=열 폭 합) · 보이는 열만 colgroup(vehPhoneMode·visCols) · colspan=nVis 2곳 · 끌기 col은 열 키 · 경계 넘으면 다시 그리기 · 기본 열 폭(v375: 수리 전 실측 185/146/138) · matchMedia change',
     /\.vs\{border-collapse:separate;border-spacing:0;table-layout:fixed;width:1px;min-width:1160px;/.test(idx) && /function vehPhoneMode\(\)\{ try \{ return window\.matchMedia\("\(max-width:859px\)"\)\.matches; \}/.test(idx)
     && /visCols = VEH_COLS\.filter\(function\(c\)\{ return phoneMode \? !c\.hs : !c\.ph; \}\), nVis = visCols\.length;/.test(idx) && (idx.match(/colspan="' \+ nVis \+ '"/g) || []).length === 2 && !/colspan="' \+ VEH_COLS\.length \+ '"/.test(idx)
     && /col = host\.querySelector\("col\.vs-c-" \+ k\)/.test(idx) && !/cols = host\.querySelectorAll\("col"\)/.test(idx) && /window\.addEventListener\("resize", vehOnBreak\);/.test(idx) && /function vehOnBreak\(\)\{ var p = vehPhoneMode\(\); if \(vehLastPhone !== null && p !== vehLastPhone\)/.test(idx)
-    && /h:"차번호",   w:180,/.test(idx) && /vehMql\.addEventListener\("change", vehOnBreak\)/.test(idx) && /h:"검사만기", w:150,/.test(idx) && /h:"보험만기", w:150,/.test(idx), '');
+    && /h:"차번호",   w:185,/.test(idx) && /vehMql\.addEventListener\("change", vehOnBreak\)/.test(idx) && /h:"검사만기", w:146,/.test(idx) && /h:"보험만기", w:138,/.test(idx), '');
+  // ---- v375: 기본 열 폭 = 수리 전 간격 · 저장 키 교체 · [열 폭 초기화](PM 10/1 "기본 줄간격은 있어야지") ----
+  T('v375 열 폭 기본값: 11열 w = 185/130/230/60/100/55/67/146/138/80/153 · 옛 키 jw_veh_colw 삭제 · [열 폭 초기화] 칩(vs-pc, 폰 숨김)·바인딩',
+    /w:185, f:"text", b:1/.test(idx) && /h:"차종",     w:130,/.test(idx) && /h:"상세",     w:230,/.test(idx) && /h:"소유",     w:60,/.test(idx) && /h:"기사",     w:55,/.test(idx) && /h:"상태",     w:67,/.test(idx) && /h:"보험사",   w:80,/.test(idx) && /h:"비고",     w:153,/.test(idx)
+    && /localStorage\.removeItem\("jw_veh_colw"\)/.test(idx) && /data-vs-colreset="1"[^>]*>열 폭 초기화<\/button>/.test(idx) && /host\.querySelector\("\[data-vs-colreset\]"\)/.test(idx) && /vehColw = \{\}; vehColwSave\(\); renderVehicles\(\);/.test(idx) && /\.vs-chip\.vs-pc\{display:none;\}/.test(idx), '');
   // ---- v371: 번호판 전용 경로(차량 검출기 COCO-SSD → 조각 확대 → Claude 좌표 → 자기검증) — 동봉·배선·출처 규칙(PM 9/23 "차번호 덜/안 가려짐" → "ㄱ") ----
   try {
     const fs371 = readFileSync;

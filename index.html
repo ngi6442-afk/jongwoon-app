@@ -696,6 +696,7 @@
     .vs th.vs-hs,.vs td.vs-hs{display:none;}
     .vs th,.vs td{height:34px;padding:0 6px;}
     .vs .vs-rs{display:none;}
+    .vs-chip.vs-pc{display:none;}
     .vs-wrap{max-height:46vh;}
     .vs tr.vs-det{display:none;}
     #vehDetailCard{display:block;margin-top:8px;}
@@ -6279,25 +6280,27 @@
   // ---- v370 차량 시트형(A안 뼈대) + 폰 2단(C안) — PM 9/21 "추천 ㄱ"·9/22 "ㄱ". 화면 층만 교체: 데이터 모델(col:vehicles)·저장·권한·서류출력·vehicleTypeOf(no·type) 무변경 ----
   // @veh-sheet-start
   // 열 정의: hs=PC 전용(폰에서 숨김), ph=폰 전용(검사·보험 중 가까운 만기 하나). f=필터 종류(text 부분일치 / enum 정확일치 / none)
-  var VEH_SHEET_KEY = "jw_veh_sheet", VEH_COLW_KEY = "jw_veh_colw";
+  var VEH_SHEET_KEY = "jw_veh_sheet", VEH_COLW_KEY = "jw_veh_colw2";   // v375: 키 교체 — v374 전에 저장만 되고 안 먹던 끌기 값(jw_veh_colw)은 버린다
+  // 기본 열 폭(w)은 v374 전 자동 배치의 실측 폭(PM 10/1 "적용 전 간격으로") — 끌어서 바꾼 값은 jw_veh_colw2에 기기별 저장, [열 폭 초기화]로 복귀
   var VEH_COLS = [
-    { k:"no",       h:"차번호",   w:180, f:"text", b:1 },
-    { k:"type",     h:"차종",     w:96,  f:"enum" },
+    { k:"no",       h:"차번호",   w:185, f:"text", b:1 },
+    { k:"type",     h:"차종",     w:130, f:"enum" },
     { k:"due",      h:"만기",     w:110, f:"none", ph:1 },
-    { k:"kind",     h:"상세",     w:200, f:"text", hs:1 },
-    { k:"own",      h:"소유",     w:66,  f:"enum", hs:1 },
+    { k:"kind",     h:"상세",     w:230, f:"text", hs:1 },
+    { k:"own",      h:"소유",     w:60,  f:"enum", hs:1 },
     { k:"permit",   h:"허가",     w:100, f:"enum", hs:1 },
-    { k:"driver",   h:"기사",     w:84,  f:"enum", hs:1 },
-    { k:"state",    h:"상태",     w:72,  f:"enum", hs:1 },
-    { k:"insp_due", h:"검사만기", w:150, f:"none", hs:1 },
-    { k:"ins_due",  h:"보험만기", w:150, f:"none", hs:1 },
-    { k:"insurer",  h:"보험사",   w:106, f:"enum", hs:1 },
-    { k:"note",     h:"비고",     w:220, f:"text", hs:1 }
+    { k:"driver",   h:"기사",     w:55,  f:"enum", hs:1 },
+    { k:"state",    h:"상태",     w:67,  f:"enum", hs:1 },
+    { k:"insp_due", h:"검사만기", w:146, f:"none", hs:1 },
+    { k:"ins_due",  h:"보험만기", w:138, f:"none", hs:1 },
+    { k:"insurer",  h:"보험사",   w:80,  f:"enum", hs:1 },
+    { k:"note",     h:"비고",     w:153, f:"text", hs:1 }
   ];
   var VEH_CHIPS = [["", "전체"], ["due30", "만기 30일 내"], ["over", "만기 경과"], ["jiip", "지입"], ["stop", "운행 외"]];
   var vehSheet = { k: "due", d: 1, f: {}, chip: "" };   // 정렬 키·방향, 필터 행 값, 칩 — 기기별(localStorage), 서버 무관
   var vehColw = {};                                      // 열 폭(px) — 기기별
   try { var _vs0 = JSON.parse(localStorage.getItem(VEH_SHEET_KEY) || "null"); if (_vs0 && typeof _vs0 === "object"){ vehSheet.k = _vs0.k || "due"; vehSheet.d = _vs0.d === -1 ? -1 : 1; vehSheet.f = (_vs0.f && typeof _vs0.f === "object") ? _vs0.f : {}; vehSheet.chip = _vs0.chip || ""; } } catch(e){}
+  try { localStorage.removeItem("jw_veh_colw"); } catch(e){}
   try { var _vc0 = JSON.parse(localStorage.getItem(VEH_COLW_KEY) || "null"); if (_vc0 && typeof _vc0 === "object") vehColw = _vc0; } catch(e){}
   function vehSheetSave(){ try { localStorage.setItem(VEH_SHEET_KEY, JSON.stringify(vehSheet)); } catch(e){} }
   function vehColwSave(){ try { localStorage.setItem(VEH_COLW_KEY, JSON.stringify(vehColw)); } catch(e){} }
@@ -6447,7 +6450,7 @@
     var act = document.activeElement, focusKey = (act && act.getAttribute && host.contains(act)) ? act.getAttribute("data-vf") : null;
     var caret = (focusKey && act.selectionStart != null) ? act.selectionStart : null;
     var h = '<div class="vs-tools">' + VEH_CHIPS.map(function(ch){ return '<button type="button" class="vs-chip' + (ch[0] === "over" ? ' warn' : '') + (vehSheet.chip === ch[0] ? ' on' : '') + '" data-vs-chip="' + ch[0] + '">' + ch[1] + '</button>'; }).join("") +
-      '<button type="button" class="vs-chip" data-vs-reset="1" title="필터 행·칩 지우기">필터 초기화</button><span class="vs-count">' + rows.length + '대 / 전체 ' + all.length + '대</span></div>';
+      '<button type="button" class="vs-chip" data-vs-reset="1" title="필터 행·칩 지우기">필터 초기화</button><button type="button" class="vs-chip vs-pc" data-vs-colreset="1" title="끌어서 바꾼 열 폭을 기본값으로">열 폭 초기화</button><span class="vs-count">' + rows.length + '대 / 전체 ' + all.length + '대</span></div>';
     var phoneMode = vehPhoneMode(), visCols = VEH_COLS.filter(function(c){ return phoneMode ? !c.hs : !c.ph; }), nVis = visCols.length; vehLastPhone = phoneMode;
     h += '<div class="vs-wrap"><table class="vs"><colgroup>' + visCols.map(function(c){ return '<col class="vs-c-' + c.k + '" style="width:' + vehColW(c) + 'px">'; }).join("") + '</colgroup><thead><tr>';
     VEH_COLS.forEach(function(c){
@@ -6524,6 +6527,7 @@
       el.addEventListener(ev, function(){ var k = el.getAttribute("data-vf"); if (el.value) vehSheet.f[k] = el.value; else delete vehSheet.f[k]; vehSheetSave(); renderVehicles(); });
     });
     Array.prototype.forEach.call(host.querySelectorAll("[data-vs-chip]"), function(el){ el.addEventListener("click", function(){ vehSheet.chip = el.getAttribute("data-vs-chip") || ""; vehSheetSave(); renderVehicles(); }); });
+    var cr = host.querySelector("[data-vs-colreset]"); if (cr) cr.addEventListener("click", function(){ vehColw = {}; vehColwSave(); renderVehicles(); });
     var rs = host.querySelector("[data-vs-reset]"); if (rs) rs.addEventListener("click", function(){ vehSheet.f = {}; vehSheet.chip = ""; vehSheetSave(); renderVehicles(); });
     // 열 폭 끌기(PC·마우스) — 기기별 저장, 서버 무관
     Array.prototype.forEach.call(host.querySelectorAll("[data-vs-rs]"), function(hd){
