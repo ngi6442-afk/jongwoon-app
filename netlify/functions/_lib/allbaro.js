@@ -26,7 +26,7 @@ const SEARCH_XML = '/man/man100.XML.searchManfProcessByEntn.do?exec';   // 실�
 
 // 사업장 기본값 — 로그인 후 조회 화면의 hidden 값으로 덮어쓴다(사업장이 바뀌어도 따라간다).
 const ENTN = '200520958';
-const ENTN_NAME = '(유)종운환경';
+const ENTN_NAME = '(주)종운환경';   // 2026-10 조직변경(구 (유)종운환경) — 로그인 뒤 화면 hidden 값으로 덮어쓰므로 기본값일 뿐
 
 // 한 번에 받아올 행 수(브라우저 실측값 그대로). TOTAL과 파싱 행 수가 다르면 searchManifests가 중단한다.
 const ONE_PAGE_ROWS = '500';
@@ -60,7 +60,7 @@ const BASE_ROUTES = [
   { side: "L", row: 24, from: "베페사(포항)", to: "베페사", item: "폐수오니", count_col: 5 },
   { side: "L", row: 25, from: "스틸싸이클㈜", to: "포항그린", item: "광재", count_col: 5 },
   { side: "L", row: 26, from: "스틸싸이클㈜", to: "씨엔텍경주", item: "광재", count_col: 5 },
-  { side: "L", row: 27, from: "스틸싸이클㈜", to: "(유)종운환경", item: "광재", count_col: 5 },
+  { side: "L", row: 27, from: "스틸싸이클㈜", to: "(주)종운환경", item: "광재", count_col: 5 },
   { side: "L", row: 28, from: "스틸싸이클㈜", to: "영내작업", item: "영내작업", count_col: 5 },
   { side: "L", row: 29, from: "스틸싸이클㈜", to: "네이처이앤티㈜", item: "폐유성페인트", count_col: 5 },
   { side: "L", row: 30, from: "심팩", to: "베페사", item: "지정분진", count_col: 5 },

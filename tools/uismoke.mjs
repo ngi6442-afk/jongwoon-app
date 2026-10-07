@@ -219,6 +219,11 @@ try {
     && /visCols = VEH_COLS\.filter\(function\(c\)\{ return phoneMode \? !c\.hs : !c\.ph; \}\), nVis = visCols\.length;/.test(idx) && (idx.match(/colspan="' \+ nVis \+ '"/g) || []).length === 2 && !/colspan="' \+ VEH_COLS\.length \+ '"/.test(idx)
     && /col = host\.querySelector\("col\.vs-c-" \+ k\)/.test(idx) && !/cols = host\.querySelectorAll\("col"\)/.test(idx) && /window\.addEventListener\("resize", vehOnBreak\);/.test(idx) && /function vehOnBreak\(\)\{ var p = vehPhoneMode\(\); if \(vehLastPhone !== null && p !== vehLastPhone\)/.test(idx)
     && /h:"차번호",   w:185,/.test(idx) && /vehMql\.addEventListener\("change", vehOnBreak\)/.test(idx) && /h:"검사만기", w:146,/.test(idx) && /h:"보험만기", w:138,/.test(idx), '');
+  // ---- v377: 종운환경 유한회사→주식회사 조직변경(PM 10/8) — 표시 문자열에 옛 법인격 잔존 금지, 매칭 정규화 목록은 유지 ----
+  T('v377 상호 변경: index.html에 "(유)종운환경"·"유한회사 종운환경"·띄어쓰기 변형 0곳 · XG_CO/CD_CO/AD_CO/JW_CO/env 표시 = 주식회사 · CORP 정규화 목록에 (유)·유한회사 유지(옛 자료 매칭)',
+    !/\(유\)종운환경|유한회사 종운환경|유 한 회 사 종 운 환 경/.test(idx) && /no:"\(주\)종운환경", a2:"주 식 회 사 종 운 환 경"/.test(idx) && /var CD_CO=\{ env:\{name:"주식회사 종운환경"/.test(idx) && /var JW_CO = \{ name:"\(주\)종운환경"/.test(idx)
+    && /\["㈜", "\(주\)", "주식회사", "\(유\)", "유한회사", "\(合\)"\]/.test(idx), '');
+
   // ---- v375: 기본 열 폭 = 수리 전 간격 · 저장 키 교체 · [열 폭 초기화](PM 10/1 "기본 줄간격은 있어야지") ----
   T('v375 열 폭 기본값: 11열 w = 185/130/230/60/100/55/67/146/138/80/153 · 옛 키 jw_veh_colw 삭제 · [열 폭 초기화] 칩(vs-pc, 폰 숨김)·바인딩',
     /w:185, f:"text", b:1/.test(idx) && /h:"차종",     w:130,/.test(idx) && /h:"상세",     w:230,/.test(idx) && /h:"소유",     w:60,/.test(idx) && /h:"기사",     w:55,/.test(idx) && /h:"상태",     w:67,/.test(idx) && /h:"보험사",   w:80,/.test(idx) && /h:"비고",     w:153,/.test(idx)

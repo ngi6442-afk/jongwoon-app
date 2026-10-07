@@ -1810,7 +1810,7 @@
     </select>
     <span class="fld-label">시행 회사</span>
     <select id="xgCo">
-      <option value="env">(유)종운환경</option>
+      <option value="env">(주)종운환경</option>
       <option value="con">㈜종운건설</option>
     </select>
     <input type="text" id="xgTitle" placeholder="공사명" autocomplete="off">
@@ -2048,7 +2048,7 @@
     <div style="display:flex;gap:8px;">
       <input type="text" id="qtNo" placeholder="견적번호(자동)" style="flex:1" autocomplete="off">
       <input type="date" id="qtDate" style="flex:1">
-      <select id="qtCo" style="flex:1"><option value="env">(유)종운환경</option><option value="con">㈜종운건설</option></select>
+      <select id="qtCo" style="flex:1"><option value="env">(주)종운환경</option><option value="con">㈜종운건설</option></select>
     </div>
     <input type="text" id="qtRecv" placeholder="수신처 (예: 포항시 맑은물사업본부)" autocomplete="off">
     <input type="text" id="qtTitle" placeholder="용역명 / 공사명" autocomplete="off">
@@ -2280,7 +2280,7 @@
 <div class="modal-backdrop" id="recEditBackdrop">
   <div class="modal">
     <h3>기성 수정</h3>
-    <select id="reCo"><option value="">회사 미지정</option><option value="env">(유)종운환경</option><option value="con">㈜종운건설</option></select>
+    <select id="reCo"><option value="">회사 미지정</option><option value="env">(주)종운환경</option><option value="con">㈜종운건설</option></select>
     <input type="text" id="reClient" placeholder="거래처" autocomplete="off">
     <input type="text" id="reDesc" placeholder="내역 (예: 6월 기성)" autocomplete="off">
     <input type="text" id="reAmount" placeholder="금액 (선택)" inputmode="numeric" autocomplete="off">
@@ -7926,8 +7926,8 @@
   // 회사 실측 등급(증빙 하드리딩 — 만료 지나면 자동 폴백. 갱신 시 여기와 인허가 탭 함께 갱신)
   // ㈜종운건설 안전성평가: 2025년 평가 D등급, 유효 2026-01-01~2026-12-31(공단 통보서 2026.1.2) → 만료 후 무등급(등록 2년↑)
   // ㈜종운건설 신용평가: B°(NICE D&B 확인서, 평가 2026-05-11, 유효 ~2027-05-10) = B+~B− 군 → 만료 후 미제출(최저)
-  // ※ (유)종운환경 BB°(~2027-06-29)는 별도 명의 — 석면(건설) 적격심사에 사용 금지
-  // (유)종운환경 신용평가: BB°(NICE D&B 확인서, 유효 ~2027-06-29) = BBB−~BB− 군. 안전성평가는 석면해체업 대상이라 환경은 무등급(0점 취급)
+  // ※ (주)종운환경(구 유한회사) BB°(~2027-06-29)는 별도 명의 — 석면(건설) 적격심사에 사용 금지
+  // (주)종운환경(구 유한회사) 신용평가: BB°(NICE D&B 확인서, 유효 ~2027-06-29) = BBB−~BB− 군. 안전성평가는 석면해체업 대상이라 환경은 무등급(0점 취급)
   var QUAL_DEF={ con:{ safety:{v:"D", until:"2026-12-31", fallback:"none_old"}, credit:{v:"t3", until:"2027-05-10", fallback:""} },
                  env:{ safety:{v:"none_new", until:"9999-12-31", fallback:"none_new"}, credit:{v:"t2", until:"2027-06-29", fallback:""} } };
   function qualApplyDefaults(){
@@ -8439,7 +8439,7 @@
       var ci=c.contract_info||{};
       var el=c.elems||{}; var elTxt=CON_ELEMS.filter(function(e){return el[e[0]];}).map(function(e){return e[1];}).join("·");
       var rr=c.rec_id?findRec(c.rec_id):null;
-      var co=(c.type==="asbestos"||c.type==="demolition")?"㈜종운건설":"(유)종운환경";
+      var co=(c.type==="asbestos"||c.type==="demolition")?"㈜종운건설":"(주)종운환경";
       rows.push([c.title||c.label||"", c.client||"", c.label||"", elTxt, c.site||"",
         (conAmt(c)||""), (ci.d2||c.start||""), (ci.d3||""), (rr&&rr.paid)||"", co,
         (c.bldg_info&&c.bldg_info.total_floor)||""]);
@@ -9074,9 +9074,9 @@
     }
     // 착공계/준공계 — '기본정보 입력' + 수식 미연결 하드코딩 셀(공문·제출일·직접시공계획서·청구서·회사) 재작성
     var amt=Number($("xgAmount").replace(/[^0-9]/g,""))||0;
-    // 시행 회사(석면·철거=㈜종운건설 / 폐기물·준설=(유)종운환경) — 주소·우편은 실물 서류값
-    var XG_CO={ env:{no:"(유)종운환경", a2:"유 한 회 사 종 운 환 경", a4:"우 37859   경상북도 포항시 남구 서원재로 1(호동)   ☎ (054)291-1204",
-                     sign:"유 한 회 사 종 운 환 경   대 표 이 사  나 종 운", addr:"경북 포항시 남구 서원재로 1(호동)", tel:"054-291-1204"},
+    // 시행 회사(석면·철거=㈜종운건설 / 폐기물·준설=(주)종운환경 — 2026-10 유한회사→주식회사 조직변경) — 주소·우편은 실물 서류값
+    var XG_CO={ env:{no:"(주)종운환경", a2:"주 식 회 사 종 운 환 경", a4:"우 37859   경상북도 포항시 남구 서원재로 1(호동)   ☎ (054)291-1204",
+                     sign:"주 식 회 사 종 운 환 경   대 표 이 사  나 종 운", addr:"경북 포항시 남구 서원재로 1(호동)", tel:"054-291-1204"},
                 con:{no:"㈜종운건설", a2:"주 식 회 사  종 운 건 설", a4:"우 37899   경상북도 포항시 남구 정몽주로 823-10(청림동)   ☎ (054)291-1202",
                      sign:"주 식 회 사  종 운 건 설   대 표 이 사  나 종 운", addr:"경상북도 포항시 남구 정몽주로 823-10(청림동)", tel:"054-291-1202"} };
     var coKey=document.getElementById("xgCo").value||"env", co=XG_CO[coKey];
@@ -9282,7 +9282,7 @@
         return;
       }
       if(kind==="con_docs"){   // 계약서류: 서약서+사용인감계 hwpx 2종 (포항시 양식)
-        var CD_CO={ env:{name:"유한회사 종운환경", tel:"054-291-1204", addr:"경북 포항시 남구 서원재로 1(호동)", biz:"506-81-48535"},
+        var CD_CO={ env:{name:"주식회사 종운환경", tel:"054-291-1204", addr:"경북 포항시 남구 서원재로 1(호동)", biz:"506-81-48535"},
                     con:{name:"주식회사 종운건설", tel:"054-291-1202", addr:"포항시 남구 정몽주로 823-10", biz:"506-81-84827"} };
         var cdCo=CD_CO[$("xgCo").value]||CD_CO.env;
         var cdAmt=parseInt(($("xgAmount").value||"").replace(/[^0-9]/g,""),10)||0;
@@ -9367,7 +9367,7 @@
         return;
       }
       if(kind==="adv_pay"){   // 선금지급신청 세트: 공문+별첨2~5+지급조건 (김천서부초 실물 역산 템플릿)
-        var AD_CO={ env:{name:"유한회사 종운환경", addr:"경북 포항시 남구 서원재로 1(호동)"},
+        var AD_CO={ env:{name:"주식회사 종운환경", addr:"경북 포항시 남구 서원재로 1(호동)"},
                     con:{name:"주식회사 종운건설", addr:"경북 포항시 남구 정몽주로 823-10"} };
         var adCo=AD_CO[$("xgCo").value]||AD_CO.con;
         var adA=xadNum("xgAmount"), adB=xadNum("xadLabor"), adE=xadNum("xadReq");
@@ -9833,7 +9833,7 @@
   }
 
   // ---- 서류 출력(입력 폼 → 템플릿 자동생성 → 인쇄/PDF) · 실제 양식 확정 시 아래 템플릿만 교체 ----
-  var JW_CO = { name:"(유)종운환경", ceo:"나종운", addr:"포항시 남구 서원재로 1", tel:"054-291-1202" };
+  var JW_CO = { name:"(주)종운환경", ceo:"나종운", addr:"포항시 남구 서원재로 1", tel:"054-291-1202" };
   function dgFill(v){ return v ? esc(v) : '<span class="doc-fill">(________)</span>'; }
   function dgDateKo(s){ if(!isDate(s)) return '&nbsp;&nbsp;&nbsp;년&nbsp;&nbsp;&nbsp;월&nbsp;&nbsp;&nbsp;일'; var p=s.split('-'); return p[0]+'년 '+(+p[1])+'월 '+(+p[2])+'일'; }
   var dgConId=null;   // 서류출력이 어느 계약에서 열렸는지 — 계약서 작성 시 입력값을 계약에 저장
@@ -9975,7 +9975,7 @@
   function docContract(d){
     var co = '업체명 : '+esc(JW_CO.name)+'<br>주&nbsp;&nbsp;소 : '+esc(JW_CO.addr)+'<br>대표자 : '+esc(JW_CO.ceo)+' &nbsp;(인)<br>연락처 : '+esc(JW_CO.tel);
     return '<div class="doc-page"><h1 style="letter-spacing:3px;font-size:20px;">폐기물 수집·운반 및 처리 계약서</h1>'+
-      '<p>본 계약을 함에 있어 편의상 배출자인 <b>'+dgFill(d.name)+'</b> 을(를) "갑", 운반 및 처리자인 (유)종운환경 을(를) "을"이라 하며 상호 신의에 입각하여 다음과 같이 계약을 체결한다.</p>'+
+      '<p>본 계약을 함에 있어 편의상 배출자인 <b>'+dgFill(d.name)+'</b> 을(를) "갑", 운반 및 처리자인 (주)종운환경 을(를) "을"이라 하며 상호 신의에 입각하여 다음과 같이 계약을 체결한다.</p>'+
       '<p class="doc-clause"><b>제1조(계약목적)</b> 본 계약은 "갑"이 배출하는 폐기물을 "을"이 수집·운반하여 "을"의 처리장까지 운반하는 것을 목적으로 한다.</p>'+
       '<p class="doc-clause"><b>제2조(위탁업체)</b> "을"은 "갑"의 사업장에서 배출된 폐기물을 위 계약목적에 따라 적법하게 운송하여야 한다.</p>'+
       '<p class="doc-clause"><b>제3조(폐기물의 종류 및 처리단가)</b></p>'+
@@ -10007,7 +10007,7 @@
   }
   // 견적서(JW-03-03-001-01 종운환경 / JW-03-03-001-02 종운건설 — 구 JW-06-001/002) 실물 반영
   var QUOTE_CO = {
-    env: { name:"(유)종운환경", biz:"506-81-48535", ceo:"나 종 운", addr:"포항시 남구 서원재로 1(호동)", biztype:"서비스,운수,제조", item:"종합재활용 폐기물수집·운반", tel:"054)291-1204", fax:"054)291-1214",
+    env: { name:"(주)종운환경", biz:"506-81-48535", ceo:"나 종 운", addr:"포항시 남구 서원재로 1(호동)", biztype:"서비스,운수,제조", item:"종합재활용 폐기물수집·운반", tel:"054)291-1204", fax:"054)291-1214",
       notes:["처리비 및 운반비 포함 톤당 단가입니다.","1대당 팔레트로 적재하기로 함.","폐기물종합재활용업.","지정폐기물수집운반업.","사업장폐기물수집운반업(액상, 고상).","건설폐기물수집운반업.","상·하수도준설공사업, CCTV촬영, 수밀시험.","건설기계대여업.","화물자동차운송업.","사업장생활계수집운반업.","유해화학물질운송업.","담당자 : 나종운 대표 010-2584-0956"] },
     con: { name:"(주)종운건설", biz:"506-81-84827", ceo:"나 종 운", addr:"포항시 남구 정몽주로823-10", biztype:"건설업", item:"해체공사업, 석면해체·제거업", tel:"054)291-1202", fax:"054)291-1214",
       notes:["처리비 및 운반비 포함 톤당 단가입니다.","1대당 팔레트로 적재하기로 함.","구조물해체공사업.","석면해체·제거업 등록.","전문면허 경북포항 2013-6-4.","노동부 제3339호.","담당자 : 나종운 대표 010-2584-0956"] }
@@ -11239,7 +11239,7 @@
       var amt=qtAmt(q);
       return '<div class="item-row"><div class="item-main"><div class="item-title">'+esc(q.no||"(번호없음)")+' · '+esc(q.title||"(용역명 없음)")+'</div>'
         +'<div class="item-meta"><span>'+esc(q.date||"")+'</span><span>'+esc(q.recv||"")+'</span>'
-        +'<span>'+(q.co==="con"?"㈜종운건설":"(유)종운환경")+'</span>'
+        +'<span>'+(q.co==="con"?"㈜종운건설":"(주)종운환경")+'</span>'
         +(amt?'<span>'+((parseFloat(q.qty)&&parseInt(q.price,10))?esc(q.qty)+esc(q.unit||"")+' × '+fmtAmount(parseInt(q.price,10))+'원 = ':'')+fmtAmount(amt)+'원 '+esc(q.vat||"")+'</span>':'')
         +(q.con_id?'<span class="review-chip">계약 연결</span>':'')
         +(q.note?'<span>'+esc(q.note)+'</span>':'')+'</div></div>'
@@ -13762,7 +13762,7 @@
   //   건설 인사말은 환경 문안에서 업무만 바꾼 것(직원판에 건설 글이 없어 실측 불가 — 첫 건설 글에서 확인). 캡션은 담당자가 매번 지워서 뺐다(8/16 외부조사 근거는 FEATURES v276에 남김).
   var PROMO_HEAD_SIG = ["종운환경·종운건설 | 포항 준설·폐기물·철거·석면", "포항·경북 하수관로 준설·CCTV 관로조사, 폐기물 수집운반, 철거·석면해체 전문. 공공기관 실적 다수. 대표전화 054-291-1202.", "www.jongwoon.co.kr"];
   var PROMO_GREET = {
-    env: ["안녕하세요.", "포항 및 대구·경북 지역에서", "하수관로 준설, 맨홀 준설, 집수정 준설,", "하수관로 조사 및 고압세척을", "전문으로 수행하고 있는", "(유)종운환경 입니다."],
+    env: ["안녕하세요.", "포항 및 대구·경북 지역에서", "하수관로 준설, 맨홀 준설, 집수정 준설,", "하수관로 조사 및 고압세척을", "전문으로 수행하고 있는", "(주)종운환경 입니다."],
     con: ["안녕하세요.", "포항 및 대구·경북 지역에서", "건축물 철거, 석면 해체·제거를", "전문으로 수행하고 있는", "(주)종운건설 입니다."]
   };
   var PROMO_BLANK = '<p style="margin:0;line-height:1.8;">&nbsp;</p>';   // 네이버 편집기가 빈 줄로 받는 빈 문단(직원판: 소제목 앞·사진 위아래·머리/꼬리 경계)
@@ -13775,7 +13775,7 @@
     return PROMO_BLANK+L.join("");
   }
   var PROMO_ORG = {
-    env:  { name:"(유)종운환경", addr:"경북 포항시 남구 서원재로 1", biz:"우수받이·맨홀·관로·집수정 준설, 폐기물 수집운반" },
+    env:  { name:"(주)종운환경", addr:"경북 포항시 남구 서원재로 1", biz:"우수받이·맨홀·관로·집수정 준설, 폐기물 수집운반" },
     con:  { name:"(주)종운건설", addr:"경북 포항시 남구 정몽주로 823-10", biz:"석면 해체·제거, 건축물 철거" }
   };
   function promoTailHtml(orgIn){
@@ -15934,7 +15934,7 @@
     if (!/^\d{4}-\d{2}$/.test(ym)){ alert("형식: YYYY-MM (예: "+def+")"); return; }
     var rows = liveRec().filter(function(r){ return (r.billed||"").indexOf(ym)===0; });
     if (!rows.length){ alert(ym+" 청구(작성)일 기준 건이 없습니다."); return; }
-    var coName = { env:"(유)종운환경", con:"㈜종운건설", "":"미지정" };
+    var coName = { env:"(주)종운환경", con:"㈜종운건설", "":"미지정" };
     var order = { env:0, con:1, "":2 };
     rows.sort(function(a,b){
       var ca=order[a.co||""], cb=order[b.co||""];
@@ -17120,7 +17120,7 @@
     {s:"L",r:24,f:"베페사(포항)",t:"베페사",i:"폐수오니"},
     {s:"L",r:25,f:"스틸싸이클㈜",t:"포항그린",i:"광재"},
     {s:"L",r:26,f:"스틸싸이클㈜",t:"씨엔텍경주",i:"광재"},
-    {s:"L",r:27,f:"스틸싸이클㈜",t:"(유)종운환경",i:"광재"},
+    {s:"L",r:27,f:"스틸싸이클㈜",t:"(주)종운환경",i:"광재"},
     {s:"L",r:28,f:"스틸싸이클㈜",t:"영내작업",i:"영내작업"},
     {s:"L",r:29,f:"스틸싸이클㈜",t:"네이처이앤티㈜",i:"폐유성페인트"},
     {s:"L",r:30,f:"심팩",t:"베페사",i:"지정분진"},
