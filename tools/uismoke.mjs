@@ -253,7 +253,7 @@ try {
     && /function pushBlank\(\)\{ if\(out\.length && out\[out\.length-1\]!==PROMO_BLANK\) out\.push\(PROMO_BLANK\); \}/.test(bp) && /if\(promoIsSubhead\(t\)\)\{ pushBlank\(\); pushLine\(t\); return; \}/.test(bp) && /promoLinesOf\(t\)\.forEach\(pushLine\);/.test(bp)
     && /if\(tags\.length\)\{ pushBlank\(\); tags\.forEach\(function\(t\)\{ out\.push\(t\); \}\); pushBlank\(\); \}/.test(bp) && !/color:#777;font-size:13px/.test(bp) && /promoHeadLines\(org\)\.forEach\(pushLine\); pushBlank\(\);/.test(bp)
     && /promoTailHtml\(org\)\+promoTagsHtml\(tags\)/.test(bp) && !/promoWrap20/.test(idx) && !/<hr /.test(bp) && !/font-weight:700/.test(bp) && !/margin:12px 0/.test(bp)
-    && /var PROMO_HEAD_SIG = \["종운환경·종운건설 \| 포항 준설·폐기물·철거·석면"/.test(idx) && /var PROMO_GREET = \{/.test(idx) && /"\(유\)종운환경 입니다\."\]/.test(idx) && /"\(주\)종운건설 입니다\."\]/.test(idx)
+    && /var PROMO_HEAD_SIG = \["종운환경·종운건설 \| 포항 준설·폐기물·철거·석면"/.test(idx) && /var PROMO_GREET = \{/.test(idx) && /"\(주\)종운환경 입니다\."\]/.test(idx) && /"\(주\)종운건설 입니다\."\]/.test(idx)
     && /function promoTagsHtml\(tags\)/.test(idx) && /t\.slice\(i,i\+5\)/.test(idx) && /function promoTailHtml\(orgIn\)/.test(idx) && /promoBuildPostHtml\(title, body, webImgs, p\.tags\)/.test(idx) && /promoBuildPostHtml\(title, body, got, p\.tags\)/.test(idx)
     && /<h2 style="font-size:20px;margin:0 0 16px;text-align:center;">/.test(bp)
     && (idx.match(/function promoTailHtml\(orgIn\)\{([\s\S]*?)\n  \}/) || ['', ''])[1].split('text-align:center').length === 6, '');
