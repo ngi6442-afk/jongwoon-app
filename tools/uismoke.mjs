@@ -222,7 +222,7 @@ try {
   // ---- v375: 기본 열 폭 = 수리 전 간격 · 저장 키 교체 · [열 폭 초기화](PM 10/1 "기본 줄간격은 있어야지") ----
   T('v375 열 폭 기본값: 11열 w = 185/130/230/60/100/55/67/146/138/80/153 · 옛 키 jw_veh_colw 삭제 · [열 폭 초기화] 칩(vs-pc, 폰 숨김)·바인딩',
     /w:185, f:"text", b:1/.test(idx) && /h:"차종",     w:130,/.test(idx) && /h:"상세",     w:230,/.test(idx) && /h:"소유",     w:60,/.test(idx) && /h:"기사",     w:55,/.test(idx) && /h:"상태",     w:67,/.test(idx) && /h:"보험사",   w:80,/.test(idx) && /h:"비고",     w:153,/.test(idx)
-    && /localStorage\.removeItem\("jw_veh_colw"\)/.test(idx) && /data-vs-colreset="1"[^>]*>열 폭 초기화<\/button>/.test(idx) && /host\.querySelector\("\[data-vs-colreset\]"\)/.test(idx) && /vehColw = \{\}; vehColwSave\(\); renderVehicles\(\);/.test(idx) && /\.vs-chip\.vs-pc\{display:none;\}/.test(idx), '');
+    && /localStorage\.removeItem\("jw_veh_colw"\)/.test(idx) && /data-vs-colreset="1"[^>]*>열 폭 초기화<\/button>/.test(idx) && /host\.querySelector\("\[data-vs-colreset\]"\)/.test(idx) && /vehColw = \{\}; try \{ localStorage\.removeItem\(VEH_COLW_KEY\); localStorage\.removeItem\(\"jw_veh_colw\"\); \} catch\(err\)\{\} renderVehicles\(\); gwToast\(\"열 폭을 기본값으로 되돌렸습니다\"/.test(idx) && /setTimeout\(function\(\)\{ try \{ location\.reload\(\); \} catch\(err\)\{\} \}, 900\);/.test(idx) && /\.vs-chip\.vs-pc\{display:none;\}/.test(idx), '');
   // ---- v371: 번호판 전용 경로(차량 검출기 COCO-SSD → 조각 확대 → Claude 좌표 → 자기검증) — 동봉·배선·출처 규칙(PM 9/23 "차번호 덜/안 가려짐" → "ㄱ") ----
   try {
     const fs371 = readFileSync;

@@ -6527,7 +6527,8 @@
       el.addEventListener(ev, function(){ var k = el.getAttribute("data-vf"); if (el.value) vehSheet.f[k] = el.value; else delete vehSheet.f[k]; vehSheetSave(); renderVehicles(); });
     });
     Array.prototype.forEach.call(host.querySelectorAll("[data-vs-chip]"), function(el){ el.addEventListener("click", function(){ vehSheet.chip = el.getAttribute("data-vs-chip") || ""; vehSheetSave(); renderVehicles(); }); });
-    var cr = host.querySelector("[data-vs-colreset]"); if (cr) cr.addEventListener("click", function(){ vehColw = {}; vehColwSave(); renderVehicles(); });
+    // v376: 초기화는 저장값(현행·구 키) 전부 삭제 → 다시 그리기 → 토스트 → 새로고침(캐시·DOM 잔재까지 비움). PM 10/8 "열 폭 초기화 안됨"
+    var cr = host.querySelector("[data-vs-colreset]"); if (cr) cr.addEventListener("click", function(e){ e.stopPropagation(); var n = Object.keys(vehColw || {}).length; vehColw = {}; try { localStorage.removeItem(VEH_COLW_KEY); localStorage.removeItem("jw_veh_colw"); } catch(err){} renderVehicles(); gwToast("열 폭을 기본값으로 되돌렸습니다" + (n ? " (저장값 " + n + "열 삭제)" : "") + " — 화면을 새로 불러옵니다"); setTimeout(function(){ try { location.reload(); } catch(err){} }, 900); });
     var rs = host.querySelector("[data-vs-reset]"); if (rs) rs.addEventListener("click", function(){ vehSheet.f = {}; vehSheet.chip = ""; vehSheetSave(); renderVehicles(); });
     // 열 폭 끌기(PC·마우스) — 기기별 저장, 서버 무관
     Array.prototype.forEach.call(host.querySelectorAll("[data-vs-rs]"), function(hd){
