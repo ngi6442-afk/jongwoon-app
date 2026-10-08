@@ -2472,16 +2472,23 @@ async function handleVerRestore(event, d, R) {
 //   ② 요청: 앱 gwCall이 1MB 넘는 본문을 CompressionStream으로 gzip해 application/octet-stream + X-GW-Enc: gzip 으로 보낸다(base64·binary 모두 수용)
 // 무손실·모든 액션 공통. 자라는 데이터의 근본 상한(보관 기간)은 PM 결정으로 남긴다(FEATURES v378).
 const GZ_MIN = 1024 * 1024;
+const GZ_MAX_B64 = 6000000;   // Lambda가 거부하는 응답 상한(6,291,556B) 아래 — 압축해도 넘으면 502 대신 명시적 오류
+// v379(10/8 15:57 실사고): v378은 accept-encoding에 gzip이 있을 때만 압축했는데, 브라우저 요청에서 함수가 받은 헤더에는 gzip이 없었다
+// (curl 탐침에는 보였음) → 평문 6.78MB → LAMBDA_RUNTIME 413 "Exceeded maximum allowed payload size" → 앱에 502. 모든 브라우저·node fetch가
+// gzip을 푸므로 헤더를 보지 않고 1MB 초과면 무조건 압축한다. 로그 한 줄로 크기·시간·헤더값을 남긴다(가시화).
 function gzipOut(event, res) {
   try {
     if (!res || typeof res.body !== 'string' || res.body.length < GZ_MIN || res.isBase64Encoded) return res;
     const h = (event && event.headers) || {};
     const ae = String(h['accept-encoding'] || h['Accept-Encoding'] || '');
-    if (ae.indexOf('gzip') < 0) return res;
+    const t0 = Date.now();
     const raw = Buffer.from(res.body, 'utf8');
     const gz = zlib.gzipSync(raw, { level: 6 });
-    return { statusCode: res.statusCode, headers: Object.assign({}, res.headers, { 'Content-Encoding': 'gzip', 'Vary': 'Accept-Encoding', 'X-GW-Raw-Bytes': String(raw.length) }), body: gz.toString('base64'), isBase64Encoded: true };
-  } catch (e) { return res; }
+    const b64 = gz.toString('base64');
+    console.log('[gzipOut] raw ' + raw.length + 'B → gz ' + gz.length + 'B (b64 ' + b64.length + 'B) ' + (Date.now() - t0) + 'ms · accept-encoding="' + ae.slice(0, 60) + '"');
+    if (b64.length > GZ_MAX_B64) return jr(500, { status: 'ERROR', error_code: 'PAYLOAD_TOO_LARGE', raw_bytes: raw.length, gz_bytes: gz.length, request_id: rid() });
+    return { statusCode: res.statusCode, headers: Object.assign({}, res.headers, { 'Content-Encoding': 'gzip', 'Vary': 'Accept-Encoding', 'X-GW-Raw-Bytes': String(raw.length) }), body: b64, isBase64Encoded: true };
+  } catch (e) { console.log('[gzipOut] 실패 ' + String(e && e.message)); return res; }
 }
 function parseBody(event) {
   const h = (event && event.headers) || {};

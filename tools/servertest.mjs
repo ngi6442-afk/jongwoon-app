@@ -2782,7 +2782,7 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   const dec46 = JSON.parse(zlib46.gunzipSync(Buffer.from(r46.body, 'base64')).toString('utf8'));
   T('응답 gzip: 풀면 원문 그대로(9000건) · X-GW-Raw-Bytes = 원문 바이트', dec46.status === 'OK' && dec46.doc.items.length === 9000 && Math.abs(Number(r46.headers['X-GW-Raw-Bytes']) - Buffer.byteLength(JSON.stringify(dec46), 'utf8')) <= 0, String(r46.headers['X-GW-Raw-Bytes']));
   r46 = await gwd.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + tokA }, body: JSON.stringify({ action: 'get', collection: 'bids' }) });
-  T('응답: accept-encoding 없으면 평문 그대로', r46.statusCode === 200 && !r46.isBase64Encoded && !r46.headers['Content-Encoding'] && JSON.parse(r46.body).doc.items.length === 9000, '');
+  T('응답: accept-encoding 없어도 1MB 초과면 gzip(v379 — 브라우저 요청에서 헤더가 안 보여 평문 6.78MB → 413 실사고)', r46.statusCode === 200 && r46.isBase64Encoded === true && r46.headers['Content-Encoding'] === 'gzip' && JSON.parse(zlib46.gunzipSync(Buffer.from(r46.body, 'base64')).toString('utf8')).doc.items.length === 9000, r46.statusCode + ' ' + String(r46.headers['Content-Encoding']));
   const small46 = await gwd.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + tokA, 'accept-encoding': 'gzip' }, body: JSON.stringify({ action: 'get', collection: 'tasks' }) });
   T('응답: 1MB 미만은 gzip 안 함', small46.statusCode === 200 && !small46.isBase64Encoded && !small46.headers['Content-Encoding'], '');
   // 요청 gzip — 앱 gwCall이 보내는 꼴(octet-stream + X-GW-Enc: gzip). Netlify는 이진 본문을 base64(isBase64Encoded)로 넘기지만 평문 binary도 받는다
