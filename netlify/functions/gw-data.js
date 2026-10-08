@@ -4,6 +4,7 @@
 // 'gw_data' 저장: col:tasks / col:vehicles / col:receivables / col:licenses / col:checklist
 // 권한은 'gw_users'의 회원 레코드(perms)에서 확인. 관리자는 전부 허용.
 const crypto = require('crypto');
+const zlib = require('zlib');   // v378 큰 본문 gzip(응답·요청) — 10/8 실사고(col:bids 6.69MB > 동기 함수 한도 6MB)
 const { setupBlobContext, store, blobGet, blobSet, blobDelete, blobList } = require('./_lib/blobs');
 const { verifyToken, bearer } = require('./_lib/session');
 const { appendAudit, auditKey, diffItems } = require('./_lib/audit');
@@ -17,7 +18,7 @@ const COL = { tasks: 'tasks', vehicles: 'veh', receivables: 'rec', licenses: 'li
 // 사용자별 비공개 컬렉션(본인만 접근, 회원 id로 분리 저장)
 const PRIVATE_COL = { mytasks: true };
 
-const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, content-type, x-device-id, x-device-label', 'Access-Control-Allow-Methods': 'POST, OPTIONS' };
+const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, content-type, x-device-id, x-device-label, x-gw-enc', 'Access-Control-Allow-Methods': 'POST, OPTIONS' };
 function rid() { return crypto.randomBytes(8).toString('hex'); }
 function jr(statusCode, body) { return { statusCode, headers: Object.assign({ 'Content-Type': 'application/json' }, CORS), body: JSON.stringify(body) }; }
 function colKey(c) { return `col:${c}`; }
@@ -2464,13 +2465,43 @@ async function handleVerRestore(event, d, R) {
   return jr(200, { status: 'OK', updated_at: doc.updated_at, request_id: R });
 }
 
+// v378 큰 본문 양방향 gzip(2026-10-08 실사고): col:bids가 9/11 3.94MB(2,462건)에서 10/8 07:52 분할 전송 수신 뒤 6.69MB(3,953건)로 자라
+// Netlify 동기 함수 응답 한도 6MB(6,291,456B)를 넘자 get이 실패했고, 앱은 그 실패를 삼켜 "수집된 공고가 없습니다"로 보였다(PM "기존거 다 날라갔나").
+// 저장(save) 본문도 같은 6MB 요청 한도라 상태 변경이 조용히 유실될 자리였다.
+//   ① 응답: 본문이 GZ_MIN을 넘고 클라가 gzip을 받으면 gzip+base64(isBase64Encoded) — 한도는 함수가 돌려주는 바이트로 센다(6.69MB → 약 1.2MB)
+//   ② 요청: 앱 gwCall이 1MB 넘는 본문을 CompressionStream으로 gzip해 application/octet-stream + X-GW-Enc: gzip 으로 보낸다(base64·binary 모두 수용)
+// 무손실·모든 액션 공통. 자라는 데이터의 근본 상한(보관 기간)은 PM 결정으로 남긴다(FEATURES v378).
+const GZ_MIN = 1024 * 1024;
+function gzipOut(event, res) {
+  try {
+    if (!res || typeof res.body !== 'string' || res.body.length < GZ_MIN || res.isBase64Encoded) return res;
+    const h = (event && event.headers) || {};
+    const ae = String(h['accept-encoding'] || h['Accept-Encoding'] || '');
+    if (ae.indexOf('gzip') < 0) return res;
+    const raw = Buffer.from(res.body, 'utf8');
+    const gz = zlib.gzipSync(raw, { level: 6 });
+    return { statusCode: res.statusCode, headers: Object.assign({}, res.headers, { 'Content-Encoding': 'gzip', 'Vary': 'Accept-Encoding', 'X-GW-Raw-Bytes': String(raw.length) }), body: gz.toString('base64'), isBase64Encoded: true };
+  } catch (e) { return res; }
+}
+function parseBody(event) {
+  const h = (event && event.headers) || {};
+  const enc = String(h['x-gw-enc'] || h['X-GW-Enc'] || '').toLowerCase();
+  let txt = event.body || '';
+  if (enc === 'gzip') txt = zlib.gunzipSync(Buffer.from(txt, event.isBase64Encoded ? 'base64' : 'binary')).toString('utf8');
+  else if (event.isBase64Encoded) txt = Buffer.from(txt, 'base64').toString('utf8');
+  return JSON.parse(txt || '{}');
+}
 async function handler(event) {
+  const res = await handlerInner(event);
+  return gzipOut(event, res);
+}
+async function handlerInner(event) {
   const R = rid();
   if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: CORS, body: '' };
   if (event.httpMethod !== 'POST') return jr(405, { status: 'REJECTED', error_code: 'METHOD_NOT_ALLOWED', request_id: R });
   setupBlobContext(event);
   let d;
-  try { d = JSON.parse(event.body || '{}'); } catch { return jr(400, { status: 'REJECTED', error_code: 'INVALID_JSON', request_id: R }); }
+  try { d = parseBody(event); } catch { return jr(400, { status: 'REJECTED', error_code: 'INVALID_JSON', request_id: R }); }
   try {
     // 비용 실측 결과 조회(임시, 2026-09-10) — 관리자 전용. 계측기를 지울 때 이 분기도 함께 지운다.
     if (d && d.action === 'meter') {

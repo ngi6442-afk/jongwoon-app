@@ -2956,12 +2956,29 @@
     }catch(e){}
   }
   var _rawFetch = window.fetch.bind(window);
+  // v378: 1MB 넘는 본문(일감 저장 6.7MB 등)은 브라우저 CompressionStream으로 gzip해 보낸다 — Netlify 동기 함수 요청 한도 6MB(10/8 실사고).
+  //   미지원 브라우저·압축 실패는 종전대로 평문. 서버(gw-data parseBody)가 X-GW-Enc: gzip + octet-stream 본문을 풀어 읽는다. 응답 gzip은 브라우저가 알아서 푼다.
+  var GW_GZ_MIN = 1024 * 1024;
+  function gwHeaders(ct){ return { "Content-Type": ct, "Authorization": "Bearer " + (gwToken() || ""), "X-Device-Id": deviceId(), "X-Device-Label": encodeURIComponent(deviceLabel()) }; }
+  function gwSend(fn, payload, headers){
+    return _rawFetch(FN_BASE + "/" + fn, { method: "POST", headers: headers, body: payload })
+      .then(function(r){ return r.json().then(function(j){ return { status: r.status, body: j }; }).catch(function(){ return { status: r.status, body: {} }; }); });
+  }
+  function gwGzip(txt){
+    try {
+      if (typeof CompressionStream !== "function" || typeof Blob !== "function" || !Blob.prototype.stream || typeof Response !== "function") return Promise.resolve(null);
+      var cs = new Blob([txt]).stream().pipeThrough(new CompressionStream("gzip"));
+      return new Response(cs).arrayBuffer().then(function(buf){ return (buf && buf.byteLength) ? buf : null; }).catch(function(){ return null; });
+    } catch(e){ return Promise.resolve(null); }
+  }
   function gwCall(fn, body){
-    return _rawFetch(FN_BASE + "/" + fn, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + (gwToken() || ""), "X-Device-Id": deviceId(), "X-Device-Label": encodeURIComponent(deviceLabel()) },
-      body: JSON.stringify(body || {})
-    }).then(function(r){ return r.json().then(function(j){ return { status: r.status, body: j }; }).catch(function(){ return { status: r.status, body: {} }; }); });
+    var txt = JSON.stringify(body || {});
+    if (txt.length < GW_GZ_MIN) return gwSend(fn, txt, gwHeaders("application/json"));
+    return gwGzip(txt).then(function(buf){
+      if (!buf) return gwSend(fn, txt, gwHeaders("application/json"));
+      var h = gwHeaders("application/octet-stream"); h["X-GW-Enc"] = "gzip";
+      return gwSend(fn, buf, h);
+    });
   }
   function _ghResp(status, obj){ return Promise.resolve({ status: status, ok: status >= 200 && status < 300, json: function(){ return Promise.resolve(obj); } }); }
   function emptyDoc(col){ return col === "checklist" ? { records: {}, custom: {} } : { schema: 1, items: [] }; }
@@ -6280,8 +6297,8 @@
   // ---- v370 차량 시트형(A안 뼈대) + 폰 2단(C안) — PM 9/21 "추천 ㄱ"·9/22 "ㄱ". 화면 층만 교체: 데이터 모델(col:vehicles)·저장·권한·서류출력·vehicleTypeOf(no·type) 무변경 ----
   // @veh-sheet-start
   // 열 정의: hs=PC 전용(폰에서 숨김), ph=폰 전용(검사·보험 중 가까운 만기 하나). f=필터 종류(text 부분일치 / enum 정확일치 / none)
-  var VEH_SHEET_KEY = "jw_veh_sheet", VEH_COLW_KEY = "jw_veh_colw2";   // v375: 키 교체 — v374 전에 저장만 되고 안 먹던 끌기 값(jw_veh_colw)은 버린다
-  // 기본 열 폭(w)은 v374 전 자동 배치의 실측 폭(PM 10/1 "적용 전 간격으로") — 끌어서 바꾼 값은 jw_veh_colw2에 기기별 저장, [열 폭 초기화]로 복귀
+  var VEH_SHEET_KEY = "jw_veh_sheet";   // v378: 열 폭은 저장하지 않는다(PM 10/8 "그냥 새로고침하면 돼야지") — 끌기는 이 화면에서만, 새로고침이면 기본 폭. 옛 저장 키 2종은 지운다
+  // 기본 열 폭(w)은 v374 전 자동 배치의 실측 폭(PM 10/1 "적용 전 간격으로")
   var VEH_COLS = [
     { k:"no",       h:"차번호",   w:185, f:"text", b:1 },
     { k:"type",     h:"차종",     w:130, f:"enum" },
@@ -6298,12 +6315,10 @@
   ];
   var VEH_CHIPS = [["", "전체"], ["due30", "만기 30일 내"], ["over", "만기 경과"], ["jiip", "지입"], ["stop", "운행 외"]];
   var vehSheet = { k: "due", d: 1, f: {}, chip: "" };   // 정렬 키·방향, 필터 행 값, 칩 — 기기별(localStorage), 서버 무관
-  var vehColw = {};                                      // 열 폭(px) — 기기별
+  var vehColw = {};                                      // 열 폭(px) — 이 화면에서 끈 값만(새로고침이면 비움, v378)
   try { var _vs0 = JSON.parse(localStorage.getItem(VEH_SHEET_KEY) || "null"); if (_vs0 && typeof _vs0 === "object"){ vehSheet.k = _vs0.k || "due"; vehSheet.d = _vs0.d === -1 ? -1 : 1; vehSheet.f = (_vs0.f && typeof _vs0.f === "object") ? _vs0.f : {}; vehSheet.chip = _vs0.chip || ""; } } catch(e){}
-  try { localStorage.removeItem("jw_veh_colw"); } catch(e){}
-  try { var _vc0 = JSON.parse(localStorage.getItem(VEH_COLW_KEY) || "null"); if (_vc0 && typeof _vc0 === "object") vehColw = _vc0; } catch(e){}
+  try { localStorage.removeItem("jw_veh_colw"); localStorage.removeItem("jw_veh_colw2"); } catch(e){}   // v375까지 저장하던 열 폭 — v378부터 저장 안 함
   function vehSheetSave(){ try { localStorage.setItem(VEH_SHEET_KEY, JSON.stringify(vehSheet)); } catch(e){} }
-  function vehColwSave(){ try { localStorage.setItem(VEH_COLW_KEY, JSON.stringify(vehColw)); } catch(e){} }
   var vehOpenId = null, vehDetTab = "ov";
   function vehColW(c){ var w = Number(vehColw[c.k]); return (w >= 40 && w <= 600) ? w : c.w; }
   // v374: 폰/PC 판정은 CSS와 같은 경계(859px). 숨긴 열은 <col>도 빼야 고정 배치에서 열이 한 칸씩 밀리지 않는다 — 경계를 넘으면 colgroup이 달라지므로 다시 그린다
@@ -6450,7 +6465,7 @@
     var act = document.activeElement, focusKey = (act && act.getAttribute && host.contains(act)) ? act.getAttribute("data-vf") : null;
     var caret = (focusKey && act.selectionStart != null) ? act.selectionStart : null;
     var h = '<div class="vs-tools">' + VEH_CHIPS.map(function(ch){ return '<button type="button" class="vs-chip' + (ch[0] === "over" ? ' warn' : '') + (vehSheet.chip === ch[0] ? ' on' : '') + '" data-vs-chip="' + ch[0] + '">' + ch[1] + '</button>'; }).join("") +
-      '<button type="button" class="vs-chip" data-vs-reset="1" title="필터 행·칩 지우기">필터 초기화</button><button type="button" class="vs-chip vs-pc" data-vs-colreset="1" title="끌어서 바꾼 열 폭을 기본값으로">열 폭 초기화</button><span class="vs-count">' + rows.length + '대 / 전체 ' + all.length + '대</span></div>';
+      '<button type="button" class="vs-chip" data-vs-reset="1" title="필터 행·칩 지우기">필터 초기화</button><span class="vs-count">' + rows.length + '대 / 전체 ' + all.length + '대</span></div>';
     var phoneMode = vehPhoneMode(), visCols = VEH_COLS.filter(function(c){ return phoneMode ? !c.hs : !c.ph; }), nVis = visCols.length; vehLastPhone = phoneMode;
     h += '<div class="vs-wrap"><table class="vs"><colgroup>' + visCols.map(function(c){ return '<col class="vs-c-' + c.k + '" style="width:' + vehColW(c) + 'px">'; }).join("") + '</colgroup><thead><tr>';
     VEH_COLS.forEach(function(c){
@@ -6527,8 +6542,6 @@
       el.addEventListener(ev, function(){ var k = el.getAttribute("data-vf"); if (el.value) vehSheet.f[k] = el.value; else delete vehSheet.f[k]; vehSheetSave(); renderVehicles(); });
     });
     Array.prototype.forEach.call(host.querySelectorAll("[data-vs-chip]"), function(el){ el.addEventListener("click", function(){ vehSheet.chip = el.getAttribute("data-vs-chip") || ""; vehSheetSave(); renderVehicles(); }); });
-    // v376: 초기화는 저장값(현행·구 키) 전부 삭제 → 다시 그리기 → 토스트 → 새로고침(캐시·DOM 잔재까지 비움). PM 10/8 "열 폭 초기화 안됨"
-    var cr = host.querySelector("[data-vs-colreset]"); if (cr) cr.addEventListener("click", function(e){ e.stopPropagation(); var n = Object.keys(vehColw || {}).length; vehColw = {}; try { localStorage.removeItem(VEH_COLW_KEY); localStorage.removeItem("jw_veh_colw"); } catch(err){} renderVehicles(); gwToast("열 폭을 기본값으로 되돌렸습니다" + (n ? " (저장값 " + n + "열 삭제)" : "") + " — 화면을 새로 불러옵니다"); setTimeout(function(){ try { location.reload(); } catch(err){} }, 900); });
     var rs = host.querySelector("[data-vs-reset]"); if (rs) rs.addEventListener("click", function(){ vehSheet.f = {}; vehSheet.chip = ""; vehSheetSave(); renderVehicles(); });
     // 열 폭 끌기(PC·마우스) — 기기별 저장, 서버 무관
     Array.prototype.forEach.call(host.querySelectorAll("[data-vs-rs]"), function(hd){
@@ -6536,7 +6549,7 @@
         e.preventDefault(); e.stopPropagation();
         var k = hd.getAttribute("data-vs-rs"), th = hd.parentNode, x0 = e.clientX, w0 = th.offsetWidth, col = host.querySelector("col.vs-c-" + k);   // v374: col은 열 키로 찾는다(숨긴 열은 colgroup에 없어 순번이 어긋남)
         var mv = function(ev){ var w = Math.max(40, Math.min(600, w0 + (ev.clientX - x0))); if (col) col.style.width = w + "px"; vehColw[k] = w; };
-        var up = function(){ document.removeEventListener("mousemove", mv); document.removeEventListener("mouseup", up); vehColwSave(); };
+        var up = function(){ document.removeEventListener("mousemove", mv); document.removeEventListener("mouseup", up); };
         document.addEventListener("mousemove", mv); document.addEventListener("mouseup", up);
       });
     });
@@ -11158,13 +11171,14 @@
   // 마감이 지났는데 아직 판단 전(신규·검토)인 공고 = 죽은 건. 기본 화면에서 숨기고 '지남' 칩에 몬다.
   // 투찰(응찰)한 건은 개찰결과(낙찰/유찰) 대기라 마감이 지나도 남긴다. 삭제는 안 한다(사람 확인 원칙).
   function bidExpired(b){ var st=bidSt(b); return !!(b.due && b.due<todayStr() && (st==="new"||st==="검토")); }
+  var bidsLoadErr = null;   // v378: 불러오기 실패를 '공고 없음'과 구분해 보여 준다(10/8 실사고 — 6MB 한도로 실패했는데 화면은 "수집된 공고가 없습니다")
   function loadBids(){
     var token=getToken(); if(!token) return;
     fetch(BIDS_API, {headers:ghHeaders()}).then(function(resp){
-      if(resp.status===404){ bidsSha=null; bids=[]; renderBids(); return; }
+      if(resp.status===404){ bidsSha=null; bids=[]; bidsLoadErr=null; renderBids(); return; }
       if(!resp.ok) throw new Error("HTTP "+resp.status);
-      return resp.json().then(function(json){ bidsSha=json.sha; var p=JSON.parse(b64DecodeUnicode(json.content)); var ri=(p&&p.items)||[]; bidsHealth=(p&&p.health)||null; bidsAwards=(p&&p.awards)||null; bids = bidsPending ? mergeBidsLocal(bids, ri) : ri; renderBids(); renderDashboard(); runBidQualGen(); autoGenReady.bids=true; runAwardAutoCon(); });
-    }).catch(function(){});
+      return resp.json().then(function(json){ bidsSha=json.sha; var p=JSON.parse(b64DecodeUnicode(json.content)); var ri=(p&&p.items)||[]; bidsHealth=(p&&p.health)||null; bidsAwards=(p&&p.awards)||null; bids = bidsPending ? mergeBidsLocal(bids, ri) : ri; bidsLoadErr=null; renderBids(); renderDashboard(); runBidQualGen(); autoGenReady.bids=true; runAwardAutoCon(); });
+    }).catch(function(e){ bidsLoadErr={ msg:String((e&&e.message)||e||"오류"), ts:Date.now() }; renderBids(); });
   }
   function scheduleBidsSave(){ bidsPending=true; if(bidsSaveTimer) clearTimeout(bidsSaveTimer); bidsSaveTimer=setTimeout(doSaveBids,1200); }
   function mergeBidsLocal(local,remote){ var byId={}; (local||[]).forEach(function(b){if(b&&b.id)byId[b.id]=b;}); (remote||[]).forEach(function(x){if(!x||!x.id)return;var c=byId[x.id];if(!c){byId[x.id]=x;}else{var w=(x.updated||"")>(c.updated||"")?x:c;var m=Object.assign({},(w===x?c:x),w);if(c.del===1||x.del===1)m.del=mergeDel(c,x);byId[x.id]=m;}}); return Object.keys(byId).map(function(k){return byId[k];}); }
@@ -14929,7 +14943,8 @@
     list.sort(function(a,b){ return (a.due||"9999-99-99") < (b.due||"9999-99-99") ? -1 : 1; });
     var head=document.getElementById("bidHead");
     if(head){ var nExp=all.filter(bidExpired).length;
-      head.textContent = all.length ? ("총 "+all.length+" · 신규 "+bidNewCount()+(nExp?" · 지남 "+nExp:"")) : ""; }
+      var hts=(bidsHealth&&bidsHealth.ts)?("자동 수집 "+new Date(bidsHealth.ts).toLocaleString("ko-KR",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"})+" · "):"";   // v378: 현재 상태 한 줄(PM 10/8 "상태 파악도 안 됨")
+      head.textContent = all.length ? (hts+"총 "+all.length+" · 신규 "+bidNewCount()+(nExp?" · 지남 "+nExp:"")) : (bidsLoadErr?"불러오기 실패":""); }
     // 수집 헬스 배너 — 어댑터 실패(API·사이트 변경 의심) 또는 자동수집 장기 미실행 경고
     var banner="";
     if(bidsHealth){
@@ -14938,6 +14953,8 @@
       if(ageDays>3.5) banner+='<div style="background:#FDECEA;border:1px solid #F5C6CB;color:#842029;border-radius:8px;padding:8px 12px;margin-bottom:8px;font-size:13px;">⚠️ 자동 수집이 '+Math.floor(ageDays)+'일째 실행되지 않았습니다. 수집 시스템 점검이 필요합니다.</div>';
       if(hFails.length) banner+='<div style="background:#FFF8E1;border:1px solid #F0E3B2;color:#7A5E00;border-radius:8px;padding:8px 12px;margin-bottom:8px;font-size:13px;">⚠️ 수집 실패: <b>'+hFails.map(function(a){ return esc(a.name); }).join(", ")+'</b> — API 기준이나 사이트 구조가 바뀌었을 수 있습니다.<br><span style="font-size:12px;">'+hFails.map(function(a){ return esc(a.name)+": "+esc((a.error||"").slice(0,80)); }).join(" · ")+' (마지막 시도 '+new Date(bidsHealth.ts).toLocaleString("ko-KR")+')</span></div>';
     }
+    // v378: 불러오기 실패는 '공고 없음'이 아니다 — 원인·시각·하지 말 것·되살리기 단추(10/8 실사고: 6MB 한도 실패를 빈 화면으로 보여 PM이 데이터 유실로 읽음)
+    if(bidsLoadErr) banner='<div style="background:#FDECEA;border:1px solid #F5C6CB;color:#842029;border-radius:8px;padding:8px 12px;margin-bottom:8px;font-size:13px;">⚠️ 서버에서 공고를 불러오지 못했습니다 ('+esc(bidsLoadErr.msg)+', '+new Date(bidsLoadErr.ts).toLocaleTimeString("ko-KR")+'). 공고는 서버에 그대로 있고 이 화면만 비어 있습니다 — 수집·재수집을 누르지 마십시오. <button type="button" class="mini-btn" id="bidReloadBtn">다시 불러오기</button></div>'+banner;
     var today=todayStr();
     host.innerHTML = banner + (list.length ? list.map(function(b){
       var st=bidSt(b);
@@ -15072,7 +15089,8 @@
         '<div class="item-title" style="'+(isNew?'font-weight:800;':'')+'">'+(exp?'▾ ':'▸ ')+esc(b.title||"-")+' '+stChip+'</div>'+
         '<div class="item-meta">'+meta.join("")+(b.due?'<span>마감 '+esc(b.due)+'</span>':'')+'</div>'+detail+'</div>'+
         '<div class="task-ctrl">'+(dd?'<span class="dday '+(dd.cls||"")+'">'+dd.text+'</span>':'')+ctrl+'</div></div>';
-    }).join("") : '<div class="empty-line">'+(all.length?'조건에 맞는 공고가 없습니다.':'수집된 공고가 없습니다. (평일 아침 자동 수집)')+'</div>');
+    }).join("") : '<div class="empty-line">'+(all.length?'조건에 맞는 공고가 없습니다.':(bidsLoadErr?'불러오기 실패 — 위 안내의 [다시 불러오기]':'수집된 공고가 없습니다. (평일 아침 자동 수집)'))+'</div>');
+    var rb=document.getElementById("bidReloadBtn"); if(rb) rb.addEventListener("click", function(){ rb.disabled=true; rb.textContent="불러오는 중…"; loadBids(); });
     Array.prototype.forEach.call(host.querySelectorAll("[data-bid-st]"),function(el){
       el.addEventListener("click",function(){ setBidStatus(el.getAttribute("data-bid-id"), el.getAttribute("data-bid-st")); });
     });

@@ -204,7 +204,7 @@ try {
       && /\.vs thead th\{position:sticky;top:0;z-index:3;/.test(idx) && /\.vs th:first-child,\.vs td:first-child\{position:sticky;left:0;z-index:2;\}/.test(idx) && /\.vs tfoot td\{position:sticky;bottom:0;z-index:4;/.test(idx)
       && /@media \(max-width:859px\)\{[\s\S]{0,240}?\.vs\{min-width:0;width:100%;table-layout:fixed;\}/.test(idx) && /\.vs th\.vs-hs,\.vs td\.vs-hs\{display:none;\}/.test(idx) && /#vehDetailCard\{display:block;margin-top:8px;\}/.test(idx) && /\.vs tr\.vs-det\{display:none;\}/.test(idx)
       && /@media \(min-width:860px\)\{\s*\.vs th\.vs-ph,\.vs td\.vs-ph\{display:none;\}/.test(idx)
-      && /var VEH_SHEET_KEY = "jw_veh_sheet", VEH_COLW_KEY = "jw_veh_colw2";/.test(idx) && /class="item veh-item"/.test(idx) && /\.veh-item\{display:flex;/.test(idx)
+      && /var VEH_SHEET_KEY = "jw_veh_sheet";/.test(idx) && /class="item veh-item"/.test(idx) && /\.veh-item\{display:flex;/.test(idx)
       && /var act = document\.activeElement, focusKey = /.test(idx) && /fe\.setSelectionRange\(caret, caret\)/.test(idx) && /renderDeletedList\("veh", "vehDeletedToggle", "vehDeletedList", showDeletedVeh, "차량", delLabel\)/.test(idx), '');
   } catch (e) { console.log('  (v370 검사 생략 — ' + e.message + ')'); fails++; }
   // ---- v373: 차량 탭 폰 3열 넘침 수리(PM 10/1 폰 스샷 — 만기 열 잘림) ----
@@ -224,10 +224,15 @@ try {
     !/\(유\)종운환경|유한회사 종운환경|유 한 회 사 종 운 환 경/.test(idx) && /no:"\(주\)종운환경", a2:"주 식 회 사 종 운 환 경"/.test(idx) && /var CD_CO=\{ env:\{name:"주식회사 종운환경"/.test(idx) && /var JW_CO = \{ name:"\(주\)종운환경"/.test(idx)
     && /\["㈜", "\(주\)", "주식회사", "\(유\)", "유한회사", "\(合\)"\]/.test(idx), '');
 
-  // ---- v375: 기본 열 폭 = 수리 전 간격 · 저장 키 교체 · [열 폭 초기화](PM 10/1 "기본 줄간격은 있어야지") ----
-  T('v375 열 폭 기본값: 11열 w = 185/130/230/60/100/55/67/146/138/80/153 · 옛 키 jw_veh_colw 삭제 · [열 폭 초기화] 칩(vs-pc, 폰 숨김)·바인딩',
+  // ---- v378: 열 폭 저장 폐지(PM 10/8 "열폭초기화 기능 왜 만든거? 그냥 새로고침하면 돼야지") — 끌기는 이 화면에서만, 새로고침=기본 폭(v375 실측값 유지), 저장 키 2종 삭제, [열 폭 초기화] 칩·바인딩 제거 ----
+  T('v378 열 폭: 기본값 11열 185/130/230/60/100/55/67/146/138/80/153 유지 · VEH_COLW_KEY·vehColwSave·data-vs-colreset 없음 · 옛 키 jw_veh_colw·jw_veh_colw2 삭제',
     /w:185, f:"text", b:1/.test(idx) && /h:"차종",     w:130,/.test(idx) && /h:"상세",     w:230,/.test(idx) && /h:"소유",     w:60,/.test(idx) && /h:"기사",     w:55,/.test(idx) && /h:"상태",     w:67,/.test(idx) && /h:"보험사",   w:80,/.test(idx) && /h:"비고",     w:153,/.test(idx)
-    && /localStorage\.removeItem\("jw_veh_colw"\)/.test(idx) && /data-vs-colreset="1"[^>]*>열 폭 초기화<\/button>/.test(idx) && /host\.querySelector\("\[data-vs-colreset\]"\)/.test(idx) && /vehColw = \{\}; try \{ localStorage\.removeItem\(VEH_COLW_KEY\); localStorage\.removeItem\(\"jw_veh_colw\"\); \} catch\(err\)\{\} renderVehicles\(\); gwToast\(\"열 폭을 기본값으로 되돌렸습니다\"/.test(idx) && /setTimeout\(function\(\)\{ try \{ location\.reload\(\); \} catch\(err\)\{\} \}, 900\);/.test(idx) && /\.vs-chip\.vs-pc\{display:none;\}/.test(idx), '');
+    && !/VEH_COLW_KEY/.test(idx) && !/vehColwSave/.test(idx) && !/data-vs-colreset/.test(idx) && !/열 폭 초기화/.test(idx) && /localStorage\.removeItem\("jw_veh_colw"\); localStorage\.removeItem\("jw_veh_colw2"\);/.test(idx) && /var up = function\(\)\{ document\.removeEventListener\("mousemove", mv\); document\.removeEventListener\("mouseup", up\); \};/.test(idx), '');
+  // ---- v378: 큰 본문 양방향 gzip + 입찰 불러오기 실패 가시화(10/8 실사고: col:bids 6.69MB > 함수 응답 한도 6MB → "수집된 공고가 없습니다") ----
+  T('v378 gwCall gzip: GW_GZ_MIN 1MB · CompressionStream("gzip") · octet-stream+X-GW-Enc · 미지원·실패 시 평문 폴백',
+    /var GW_GZ_MIN = 1024 \* 1024;/.test(idx) && /new CompressionStream\("gzip"\)/.test(idx) && /h\["X-GW-Enc"\] = "gzip";/.test(idx) && /if \(!buf\) return gwSend\(fn, txt, gwHeaders\("application\/json"\)\);/.test(idx) && /typeof CompressionStream !== "function"/.test(idx), '');
+  T('v378 입찰 불러오기 실패 가시화: loadBids catch→bidsLoadErr+renderBids · 붉은 배너(수집·재수집 누르지 마십시오)+[다시 불러오기] · 빈 상태 문구 분리 · 머리줄에 자동 수집 시각',
+    /var bidsLoadErr = null;/.test(idx) && /catch\(function\(e\)\{ bidsLoadErr=\{ msg:String\(\(e&&e\.message\)\|\|e\|\|"오류"\), ts:Date\.now\(\) \}; renderBids\(\); \}\);/.test(idx) && /id="bidReloadBtn"/.test(idx) && /수집·재수집을 누르지 마십시오/.test(idx) && /bidsLoadErr\?'불러오기 실패 — 위 안내의 \[다시 불러오기\]'/.test(idx) && /var hts=\(bidsHealth&&bidsHealth\.ts\)/.test(idx) && /bidsLoadErr=null; renderBids\(\); renderDashboard\(\);/.test(idx), '');
   // ---- v371: 번호판 전용 경로(차량 검출기 COCO-SSD → 조각 확대 → Claude 좌표 → 자기검증) — 동봉·배선·출처 규칙(PM 9/23 "차번호 덜/안 가려짐" → "ㄱ") ----
   try {
     const fs371 = readFileSync;

@@ -1,6 +1,6 @@
 # 종운 그룹웨어 — 기능 대장 (사용자 매뉴얼 원천)
 
-> 살아있는 문서. 기능 추가·변경 시 이 파일을 함께 갱신한다. 기준: v377 (2026-10-08).
+> 살아있는 문서. 기능 추가·변경 시 이 파일을 함께 갱신한다. 기준: v378 (2026-10-08).
 > 세부 변경 이력은 git 커밋 메시지(한글) 참조.
 
 ## 1. 전체 구조
@@ -483,6 +483,14 @@ PM 지시 "문서함 일단 다 올리고 등재결재랑 공개범위 만들어
 - **소비처 4곳이 가린 판을 먼저 본다**: 공개 서빙(`gw-promo-img` — 이미 발급된 공유 링크에도 소급), 검수 격자·완성본 창(`att_get`, 원본은 `raw:true`+홍보 do 권한에만), 홈페이지 갤러리 릴레이, 사진AI 초안 워커. 첨부 삭제 시 mask 동반 삭제. 상자 0개로 확인된 사진은 "가릴 것 없음"으로 기록돼 원본이 나간다.
 - 서버: `_lib/promomask.js`(detectBoxes·applyBoxes·cleanBoxes) · `gw-promo-mask.js`(mask_start/job/state/get/apply/clear, 홍보 'do', 잠금 10분) · `gw-promo-mask-background.js`(내부 토큰 `__promomask__`, 사진당 감지→픽셀화, 사용량 `promomask:usage`). API 키는 워커만 env에서 읽어 인자로 흘린다. 비용 장당 약 10원(감지 1회).
 - 검사: servertest 41절(권한·기동·워커 인메모리(가짜 비전)·상태·apply/clear·att_get 기본=가린 판/raw=원본·공개 서빙·재실행 kept:human/auto·force·att_del 동반 삭제·감사로그) · uismoke v353(표 규칙·서버 배선·소비처 4곳·앱 배선). ~~실사진 정확도 미검증~~ → **v364: 얼굴 좌표는 전용 검출기(Claude 비전은 번호판만)**, 표본 13장 게이트.
+
+### v378 (10/8) — 입찰 탭 빈 화면(6MB 한도) 수리 · 큰 본문 양방향 gzip · 차량 열 폭 저장 폐지
+- **실사고**: 10/8 07:52 분할 전송(appdata 279639c) 수신으로 col:bids가 2,462건 3.94MB(9/11 상태) → 3,953건 6.69MB(6,685,582B)가 되자 Netlify 동기 함수 응답 한도 6MB(6,291,456B)를 넘어 `get`이 실패, 앱은 `.catch(){}`로 삼키고 "수집된 공고가 없습니다"를 보였다(PM "기존거 다 날라간 건지… 현재 상태 파악도 안 됨"). 데이터는 그대로(PM 상태 패스 342·검토 10·유찰 2·낙찰 1 보존). 7월 메모(VER_SKIP) 그대로 bids는 스냅샷 제외라 10/7 백업(appdata a149cb8)으로 전후를 쟀다.
+- **서버(gw-data)**: `handler` → `handlerInner` + `gzipOut`: 응답 본문이 1MB(GZ_MIN)를 넘고 클라가 gzip을 받으면 gzip+base64(`isBase64Encoded`, `Content-Encoding: gzip`, `Vary`, `X-GW-Raw-Bytes`) — 한도는 함수가 돌려주는 바이트로 센다(6.69MB → 약 1.2MB). `parseBody`: `X-GW-Enc: gzip`(octet-stream, base64·binary 모두)을 풀어 읽고, 깨지면 400 INVALID_JSON. 모든 액션 공통·무손실. CORS 허용 헤더에 x-gw-enc.
+- **앱**: `gwCall`이 1MB 넘는 본문을 `CompressionStream("gzip")`으로 압축해 octet-stream + `X-GW-Enc: gzip`으로 보낸다(미지원 브라우저·실패는 평문) — 일감 저장(6.7MB)도 같은 6MB 요청 한도에 걸려 상태 변경이 조용히 유실될 자리였다. `loadBids` 실패를 `bidsLoadErr`로 받아 붉은 배너(원인·시각·"수집·재수집을 누르지 마십시오"·[다시 불러오기])와 빈 상태 문구("불러오기 실패")를 "공고 없음"과 분리. 머리줄(bidHead)에 "자동 수집 M/D HH:MM" 상시 표시.
+- **차량 열 폭(PM 10/8 "열폭초기화 기능 왜 만든거? 그냥 새로고침하면 돼야지")**: 끌기 값을 저장하지 않는다 — 이 화면에서만 유효, 새로고침이면 v375 기본 폭. 저장 키(jw_veh_colw·jw_veh_colw2)는 로드 때 삭제, [열 폭 초기화] 칩·바인딩·VEH_COLW_KEY·vehColwSave 제거.
+- **남은 결정(PM)**: 자라는 일감 데이터의 보관 기간. 10/8 기준 마감 30일+ 지난 신규·패스 1,424건 2.27MB, 60일+ 402건 0.62MB(마감 없음 262건 별도). 월 약 1,500건(+2.5MB)씩 늘어 gzip으로도 반년 뒤엔 다시 커진다 — 보관함 분리(예: 마감 60일 지난 신규·패스는 `col:bids_arch`로) 또는 삭제는 PM 결정 뒤.
+- 검사: servertest 46절 10항(응답 gzip·평문·1MB 미만·요청 gzip base64/binary·save 반영·깨진 gzip 400) · uismoke v378 3항. 플랫폼 실측: 초안 배포 탐침(gw-gztest, 미커밋)으로 Content-Encoding 통과·octet-stream 본문 base64 수신 확인.
 
 ### v377 (10/8) — 종운환경 법인격 표기 유한회사 → 주식회사 (PM 10/8 "주식회사 전환 완료, 명기변경 전수 프로토콜 실행")
 - 표시 문자열 전부 교체: 회사 선택지 3곳·현장 대장 시행사·착공계 레터헤드(XG_CO 띄어쓰기 포함)·계약서 CD_CO/AD_CO·위수탁계약 본문·폐기물신고 env 블록·견적 coName·블로그 인사말·노선사전 표기 · allbaro 기본 사업장명·노선 · 사진AI 프롬프트 · 양식 라벨(gw-data TPL_KEYS) · MANUAL.html · regress_fill 기대값.

@@ -2768,4 +2768,37 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   }
 }
 
+// 46 v378 큰 본문 양방향 gzip(10/8 실사고: col:bids 6.69MB > 동기 함수 응답 한도 6MB → get 실패 → 입찰 탭 "수집된 공고가 없습니다")
+{
+  console.log('\n[46] v378 큰 본문 gzip');
+  const zlib46 = require('zlib');
+  const big = { schema: 1, items: [], updated_at: 1000 };
+  for (let i = 0; i < 9000; i++) big.items.push({ id: 'b' + i, title: '포항시 남구 우수받이 준설 ' + i, org: '포항시청', due: '2026-10-20', status: 'new', ext: { dctx: '낙찰자 결정방법 적격심사 '.repeat(4) + i }, docs: [{ n: '공고문' + i + '.pdf', u: 'https://www.g2b.go.kr/doc/' + i }] });
+  mem.gw_data['col:bids'] = big;
+  const rawLen = Buffer.byteLength(JSON.stringify({ status: 'OK', collection: 'bids', doc: big, can_write: true, request_id: '0123456789abcdef' }), 'utf8');
+  T('준비: 큰 문서 응답 본문 > 1MB', rawLen > 1024 * 1024, String(rawLen));
+  let r46 = await gwd.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + tokA, 'accept-encoding': 'gzip, deflate, br' }, body: JSON.stringify({ action: 'get', collection: 'bids' }) });
+  T('응답 gzip: 200 · Content-Encoding gzip · isBase64Encoded · 본문(base64)이 원문 1/4 이하', r46.statusCode === 200 && r46.headers['Content-Encoding'] === 'gzip' && r46.isBase64Encoded === true && r46.body.length < rawLen / 4, r46.statusCode + ' ' + String(r46.headers['Content-Encoding']) + ' ' + r46.body.length + '/' + rawLen);
+  const dec46 = JSON.parse(zlib46.gunzipSync(Buffer.from(r46.body, 'base64')).toString('utf8'));
+  T('응답 gzip: 풀면 원문 그대로(9000건) · X-GW-Raw-Bytes = 원문 바이트', dec46.status === 'OK' && dec46.doc.items.length === 9000 && Math.abs(Number(r46.headers['X-GW-Raw-Bytes']) - Buffer.byteLength(JSON.stringify(dec46), 'utf8')) <= 0, String(r46.headers['X-GW-Raw-Bytes']));
+  r46 = await gwd.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + tokA }, body: JSON.stringify({ action: 'get', collection: 'bids' }) });
+  T('응답: accept-encoding 없으면 평문 그대로', r46.statusCode === 200 && !r46.isBase64Encoded && !r46.headers['Content-Encoding'] && JSON.parse(r46.body).doc.items.length === 9000, '');
+  const small46 = await gwd.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + tokA, 'accept-encoding': 'gzip' }, body: JSON.stringify({ action: 'get', collection: 'tasks' }) });
+  T('응답: 1MB 미만은 gzip 안 함', small46.statusCode === 200 && !small46.isBase64Encoded && !small46.headers['Content-Encoding'], '');
+  // 요청 gzip — 앱 gwCall이 보내는 꼴(octet-stream + X-GW-Enc: gzip). Netlify는 이진 본문을 base64(isBase64Encoded)로 넘기지만 평문 binary도 받는다
+  const gzGet = zlib46.gzipSync(Buffer.from(JSON.stringify({ action: 'get', collection: 'tasks' }), 'utf8'));
+  r46 = await gwd.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + tokA, 'content-type': 'application/octet-stream', 'x-gw-enc': 'gzip' }, body: gzGet.toString('base64'), isBase64Encoded: true });
+  T('요청 gzip(base64 본문): 풀어서 읽음 → get tasks 200', r46.statusCode === 200 && JSON.parse(r46.body).status === 'OK', r46.statusCode + ' ' + (r46.body || '').slice(0, 80));
+  r46 = await gwd.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + tokA, 'content-type': 'application/octet-stream', 'x-gw-enc': 'gzip' }, body: gzGet.toString('binary'), isBase64Encoded: false });
+  T('요청 gzip(binary 문자열 본문): 풀어서 읽음 → 200', r46.statusCode === 200 && JSON.parse(r46.body).status === 'OK', r46.statusCode + ' ' + (r46.body || '').slice(0, 80));
+  const saveDoc46 = { schema: 1, items: big.items.map((it) => (it.id === 'b7' ? Object.assign({}, it, { status: '검토', updated: '2026-10-08' }) : it)) };
+  const gzSave = zlib46.gzipSync(Buffer.from(JSON.stringify({ action: 'save', collection: 'bids', doc: saveDoc46, base: 1000 }), 'utf8'));
+  T('준비: 저장 본문(평문) > 1MB · gzip은 1/4 이하', Buffer.byteLength(JSON.stringify(saveDoc46), 'utf8') > 1024 * 1024 && gzSave.length < Buffer.byteLength(JSON.stringify(saveDoc46), 'utf8') / 4, String(gzSave.length));
+  r46 = await gwd.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + tokA, 'content-type': 'application/octet-stream', 'x-gw-enc': 'gzip' }, body: gzSave.toString('base64'), isBase64Encoded: true });
+  T('요청 gzip: 일감 save 200 · 상태 변경(b7 검토) 저장됨', r46.statusCode === 200 && (mem.gw_data['col:bids'].items.find((x) => x.id === 'b7') || {}).status === '검토', r46.statusCode + ' ' + (r46.body || '').slice(0, 120));
+  r46 = await gwd.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + tokA, 'content-type': 'application/octet-stream', 'x-gw-enc': 'gzip' }, body: Buffer.from('not-gzip-at-all').toString('base64'), isBase64Encoded: true });
+  T('요청: 깨진 gzip → 400 INVALID_JSON(500 아님)', r46.statusCode === 400 && JSON.parse(r46.body).error_code === 'INVALID_JSON', String(r46.statusCode));
+  delete mem.gw_data['col:bids'];
+}
+
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);
