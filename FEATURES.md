@@ -1,6 +1,6 @@
 # 종운 그룹웨어 — 기능 대장 (사용자 매뉴얼 원천)
 
-> 살아있는 문서. 기능 추가·변경 시 이 파일을 함께 갱신한다. 기준: v379 (2026-10-08).
+> 살아있는 문서. 기능 추가·변경 시 이 파일을 함께 갱신한다. 기준: v380 (2026-10-11).
 > 세부 변경 이력은 git 커밋 메시지(한글) 참조.
 
 ## 1. 전체 구조
@@ -483,6 +483,11 @@ PM 지시 "문서함 일단 다 올리고 등재결재랑 공개범위 만들어
 - **소비처 4곳이 가린 판을 먼저 본다**: 공개 서빙(`gw-promo-img` — 이미 발급된 공유 링크에도 소급), 검수 격자·완성본 창(`att_get`, 원본은 `raw:true`+홍보 do 권한에만), 홈페이지 갤러리 릴레이, 사진AI 초안 워커. 첨부 삭제 시 mask 동반 삭제. 상자 0개로 확인된 사진은 "가릴 것 없음"으로 기록돼 원본이 나간다.
 - 서버: `_lib/promomask.js`(detectBoxes·applyBoxes·cleanBoxes) · `gw-promo-mask.js`(mask_start/job/state/get/apply/clear, 홍보 'do', 잠금 10분) · `gw-promo-mask-background.js`(내부 토큰 `__promomask__`, 사진당 감지→픽셀화, 사용량 `promomask:usage`). API 키는 워커만 env에서 읽어 인자로 흘린다. 비용 장당 약 10원(감지 1회).
 - 검사: servertest 41절(권한·기동·워커 인메모리(가짜 비전)·상태·apply/clear·att_get 기본=가린 판/raw=원본·공개 서빙·재실행 kept:human/auto·force·att_del 동반 삭제·감사로그) · uismoke v353(표 규칙·서버 배선·소비처 4곳·앱 배선). ~~실사진 정확도 미검증~~ → **v364: 얼굴 좌표는 전용 검출기(Claude 비전은 번호판만)**, 표본 13장 게이트.
+
+### v380 (10/11) — 공고 보관 기간 14일 · 홈페이지 문의 → 앱 푸시
+- **공고 보관(PM 10/11 "마감 14일 보관")**: 수집봇 ingest가 병합 뒤 마감이 14일 넘게 지난 `new`·`패스` 공고를 정리하고(`purged`), 앱에 없는 만료 공고는 들어오는 쪽에서 거른다(`skipped` — 수집봇은 원장 전건을 매일 보내므로 안 거르면 되살아난다). 검토·응찰·참여·낙찰·유찰은 이력이라 보존. due가 YYYY-MM-DD가 아니면 만료로 보지 않는다. `bids_purge mode:'expired'`(관리자 세션 또는 수집봇 키) + `dry:true`(세기만, 스냅샷·저장 없음). 감사 로그 "정리 N건(마감 14일 경과)". 입찰 탭 안내 한 줄 추가. 정리가 있는 날의 ingest는 VER_SKIP(bids)을 넘어 **강제 스냅샷 1벌**을 남기고(검토 발견 — 이 경로엔 스냅샷이 없었다), 관리자 `save`(bids)도 같은 규칙으로 다시 걸러 정리 전에 열려 있던 탭이 저장해도 되살아나지 않는다. dry는 true·'true'·1 관용. 문의 키 비교는 timingSafeEqual.
+- **홈페이지 문의 알림(PM 10/10 "앱 푸시로 연결")**: `inquiry_notify` — jongwoon-website `netlify/functions/inquiry.js`가 접수 저장 직후 공유 비밀키 `INQUIRY_PUSH_KEY`(앱·홈페이지 양쪽 env)로 호출 → PM 등급(없으면 관리자)에게 웹 푸시(제목 "홈페이지 문의 접수 · 서비스", 본문 이름(연락처)·지역·내용 120자, 태그 `inquiry:<id>`, url = 홈페이지 회원 관리자 페이지). 키 미설정이면 403. 알림함(push:log)에 `by: 홈페이지 문의`로 남는다. **속도 제한**(검토 발견): 앱 쪽 10분 6건(블롭 `inquiry:rl`, 초과는 발송 없이 `note: rate-limited`) + 홈페이지 쪽 IP당 10분 5건(초과는 저장·알림 없이 OK 흉내) — 봇이 PM 폰과 push:log 100건 링을 밀어내지 못하게.
+- 검사: servertest 47(inquiry_notify 키·수신·본문)·48(보관 기간: dry·ingest 정리/건너뜀/보존·실행).
 
 ### v379 (10/8) — 응답 gzip을 헤더와 무관하게(1MB 초과면 무조건) · 로그 · 압축 뒤에도 6MB 초과면 명시적 오류
 - **실사고(v378 배포 뒤에도 입찰 탭 502)**: 함수 로그 `LAMBDA_RUNTIME Failed to post handler success response. Http response code: 413. Exceeded maximum allowed payload size (6291556 bytes)` — 브라우저 요청에서 함수가 받은 `accept-encoding`에 gzip이 없어 v378 gzipOut이 평문 6.78MB를 돌려줬다(curl 탐침은 Netlify가 `accept-encoding: gzip`을 넣어 줘 압축됐음). 초안 배포 탐침(gw-bidstest, 미커밋)으로 실제 col:bids(4,002건 6.78MB)가 읽기 0.4~0.9초·gzip 0.65MB임은 확인돼 있었고, 남은 차이가 이 헤더였다.

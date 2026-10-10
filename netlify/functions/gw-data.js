@@ -362,6 +362,8 @@ async function handleSave(event, d, R) {
   const doc = Object.assign({}, d.doc, { updated_by: c.member.id, updated_at: Date.now() });
   // items형 컬렉션 정규화 — items가 배열이 아니면(콘솔 우회 등) 아래 재구성 가드들이 통째로 건너뛰어진다(리뷰 지적)
   if (col !== 'checklist' && !Array.isArray(doc.items)) doc.items = [];
+  // v380(검토 발견): 정리 전에 열려 있던 관리자 탭이 상태 하나만 바꿔 저장해도(409 병합 = 로컬 우선 합집합) 정리된 공고가 되살아나지 않게 서버가 다시 거른다
+  if (col === 'bids' && Array.isArray(doc.items)) purgeExpiredBids(doc, bidsCutDate());
   // 휴가: 신청 저장은 전 직원 필요하지만, 비관리자 저장은 서버가 재구성 — 타인 항목은 서버 원본 유지(클라이언트 사본으로 못 덮음),
   // 본인 항목만 반영, 승인 상태는 스스로 못 올림. (종전엔 전면 면제라 임의 직원이 전사 휴가 문서를 통째로 조작할 수 있었다.
   // 거부(403) 방식이 아니라 재구성인 이유: 낡은 사본으로 저장해도 타인 신청이 유실되지 않게)
@@ -570,6 +572,24 @@ async function handleSave(event, d, R) {
 
 // ---- 일감 수집 공통 ----
 // 병합 원칙: 새 id만 추가(status=new). 기존 항목은 원천 메타만 갱신, 앱이 관리하는 status는 절대 보존. 삭제 없음.
+// v380(10/11, PM "마감 14일 보관"): 마감이 14일 넘게 지난 공고 가운데 사람이 손대지 않은 것(new·패스)만 정리한다.
+// 검토·응찰·참여·낙찰·유찰은 이력이라 남긴다. 수집봇은 원장 전건을 매일 보내므로 들어오는 쪽도 같은 규칙으로 걸러 되살아나지 않게 한다.
+// due가 YYYY-MM-DD가 아니면(빈 값·다른 표기) 만료로 보지 않는다 — 모르면 지우지 않는다.
+const BIDS_KEEP_DAYS = 14;
+const BIDS_PURGEABLE = { 'new': 1, '패스': 1 };
+function bidsCutDate(keepDays) {
+  return new Date(Date.now() + 9 * 3600000 - (keepDays || BIDS_KEEP_DAYS) * 86400000).toISOString().slice(0, 10);
+}
+function bidExpired(it, cut) {
+  const due = String((it && it.due) || '').slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(due) && due < cut;
+}
+function bidPurgeable(it, cut) { return !!(it && bidExpired(it, cut) && BIDS_PURGEABLE[it.status || 'new']); }
+function purgeExpiredBids(doc, cut) {
+  const before = doc.items.length;
+  doc.items = doc.items.filter(function (it) { return !bidPurgeable(it, cut); });
+  return before - doc.items.length;
+}
 function mergeBidItems(doc, items) {
   const byId = {};
   doc.items.forEach(function (it) { if (it && it.id) byId[it.id] = it; });
@@ -617,8 +637,17 @@ async function handleBidsIngest(event, d, R) {
   const st = store(DATA);
   const r = await blobGet(st, colKey(target));
   const doc = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data : { schema: 1, items: [] };
-  await verSnapshot(target, doc, '수집봇', true);   // 병합이 doc를 제자리 변형하므로 반드시 병합 전에(봇은 일 1개)
+  const cut = bidsCutDate();
+  // v380(검토 발견): 정리가 있는 날은 VER_SKIP(bids)을 넘어 강제 보존 — 매일 정리는 재수집으로 못 되돌리는 삭제라 하루 1벌은 남긴다
+  const willPurge = target === 'bids' && doc.items.some(function (it) { return bidPurgeable(it, cut); });
+  await verSnapshot(target, doc, '수집봇', true, willPurge);   // 병합이 doc를 제자리 변형하므로 반드시 병합 전에(봇은 일 1개)
+  let skipped = 0;
+  if (target === 'bids') {   // v380 되살림 방지 — 원장이 더 오래 들고 있는 만료 공고(new·패스)는 앱에 없으면 받지 않는다
+    const have = {}; doc.items.forEach(function (it) { if (it && it.id) have[it.id] = 1; });
+    d.items = d.items.filter(function (n) { const drop = n && n.id && !have[n.id] && bidPurgeable(n, cut); if (drop) skipped++; return !drop; });
+  }
   const m = mergeBidItems(doc, d.items);
+  const purged = (target === 'bids') ? purgeExpiredBids(doc, cut) : 0;   // v380 기존 만료 new·패스 정리(사람이 정한 상태는 보존)
   // 수집 헬스(실패 어댑터·마지막 실행시각) — 변경 없어도 항상 갱신해 앱 배너가 최신을 보게
   let hasHealth = false;
   if (target === 'bids' && d.health && typeof d.health === 'object' && Array.isArray(d.health.adapters)) {
@@ -681,13 +710,13 @@ async function handleBidsIngest(event, d, R) {
     }
     doc.awards = aw; hasAwards = true;
   }
-  if (m.added || m.updated || hasHealth || hasAwards) {
+  if (m.added || m.updated || hasHealth || hasAwards || purged) {
     doc.updated_by = '수집봇'; doc.updated_at = Date.now();
     const w = await blobSet(st, colKey(target), doc);
     if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
-    if (m.added || m.updated) { try { await appendAudit({ ts: Date.now(), by: '수집봇', bid: 'bot', col: target, ev: [{ op: '수집', id: '', t: '신규 ' + m.added + ' · 갱신 ' + m.updated }] }); } catch (e) {} }
+    if (m.added || m.updated || purged) { try { await appendAudit({ ts: Date.now(), by: '수집봇', bid: 'bot', col: target, ev: [{ op: '수집', id: '', t: '신규 ' + m.added + ' · 갱신 ' + m.updated + (purged ? ' · 정리 ' + purged + '건(마감 ' + BIDS_KEEP_DAYS + '일 경과)' : '') }] }); } catch (e) {} }
   }
-  return jr(200, { status: 'OK', added: m.added, updated: m.updated, total: doc.items.length, request_id: R });
+  return jr(200, { status: 'OK', added: m.added, updated: m.updated, purged: purged, skipped: skipped, total: doc.items.length, request_id: R });
 }
 
 // 정기업무 봇 ingest(autotask 크론 전용) — S1 단일 원천 이후 리포 tasks.json이 스테일 미러가 되어
@@ -963,16 +992,23 @@ async function handleBidsPurge(event, d, R) {
   const st = store(DATA);
   const r = await blobGet(st, colKey('bids'));
   const doc = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data : { schema: 1, items: [] };
+  const cutP = bidsCutDate();
+  const dryRun = d.dry === true || d.dry === 'true' || d.dry === 1;   // 관용(검토 발견: 문자열 'true'로 실제 정리가 돌지 않게)
+  if (d.mode === 'expired' && dryRun) {   // v380 — 세기만(스냅샷·저장 없음): 정리 전 PM 보고용
+    const would = doc.items.filter(function (it) { return bidPurgeable(it, cutP); }).length;
+    return jr(200, { status: 'OK', dry: true, would_remove: would, total: doc.items.length, cut: cutP, keep_days: BIDS_KEEP_DAYS, request_id: R });
+  }
   await verSnapshot('bids', doc, c.member.name, false, true);   // 비우기는 파괴적 — 제외 대상이어도 강제 보존
   const before = doc.items.length;
-  doc.items = (d.mode === 'all') ? [] : doc.items.filter(function (it) { return it && it.status && it.status !== 'new'; });
+  if (d.mode === 'expired') purgeExpiredBids(doc, cutP);   // v380 마감 14일 경과 new·패스만
+  else doc.items = (d.mode === 'all') ? [] : doc.items.filter(function (it) { return it && it.status && it.status !== 'new'; });
   const removed = before - doc.items.length;
   doc.updated_by = c.member.id; doc.updated_at = Date.now();
   const w = await blobSet(st, colKey('bids'), doc);
   if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
   // 쿨다운도 해제해 바로 재수집 가능하게
   try { await blobSet(st, 'bids:lastfetch', { ts: 0 }); } catch (e) {}
-  try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'bids', ev: [{ op: '비우기', id: '', t: (d.mode === 'all' ? '전체' : '미검토') + ' ' + removed + '건 제거' }] }); } catch (e) {}
+  try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'bids', ev: [{ op: '비우기', id: '', t: (d.mode === 'all' ? '전체' : d.mode === 'expired' ? '마감 ' + BIDS_KEEP_DAYS + '일 경과' : '미검토') + ' ' + removed + '건 제거' }] }); } catch (e) {}
   return jr(200, { status: 'OK', removed: removed, total: doc.items.length, request_id: R });
 }
 
@@ -1051,6 +1087,41 @@ async function handleBotNotify(event, d, R) {
     if (!devices) return jr(200, { status: 'OK', sent: 0, admins: ids.length, devices: 0, note: '구독 기기 없음 — 각 기기에서 [알림 켜기] 필요', request_id: R });
     const r = await push.sendTo(ids, { title: title, body: body, url: './', tag: tag }, { ctx: tcN });
     return jr(200, { status: 'OK', sent: r.sent, removed: r.removed, admins: ids.length, devices: devices, request_id: R });
+  } catch (e) {
+    return jr(200, { status: 'OK', sent: 0, note: 'push 예외: ' + String(e && e.message || e).slice(0, 80), request_id: R });
+  }
+}
+
+// 홈페이지 문의 알림(v380, PM 10/10 "앱 푸시로 연결") — jongwoon-website의 inquiry 함수가 저장 직후 공유 비밀키(INQUIRY_PUSH_KEY)로 부른다.
+// 받는 사람 = PM 등급(없으면 관리자). 문의 내용은 외부 입력이라 길이·제어문자만 정리해 본문에 싣고 제목에는 섞지 않는다.
+// 키가 설정돼 있지 않으면 전부 403 — 열린 문을 두지 않는다.
+const INQUIRY_ADMIN_URL = 'https://www.jongwoon.co.kr/member-admin.html';
+const INQUIRY_RL_WINDOW = 10 * 60 * 1000, INQUIRY_RL_MAX = 6;
+function keyMatch(given, secret) {   // 상수시간 비교(검토 발견 low) — 길이가 다르면 바로 false, 같으면 timingSafeEqual
+  const a = Buffer.from(String(given || '').trim(), 'utf8'), b = Buffer.from(String(secret || ''), 'utf8');
+  return b.length > 0 && a.length === b.length && crypto.timingSafeEqual(a, b);
+}   // 10분 6건 — 홈페이지 쪽 IP 제한(5건/10분)을 뚫어도 PM 폰·알림함(push:log 100건 링)을 밀어내지 못하게
+async function handleInquiryNotify(event, d, R) {
+  const secret = (process.env.INQUIRY_PUSH_KEY || '').trim();
+  if (!secret || !keyMatch(d.key, secret)) return jr(403, { status: 'FORBIDDEN', error_code: 'BAD_INQUIRY_KEY', request_id: R });
+  try {   // 속도 제한(검토 발견 10/11): 창 안 건수가 상한이면 발송 없이 OK — 접수 자체는 홈페이지에 이미 저장돼 있다
+    const now = Date.now();
+    const rl = await blobGet(store(DATA), 'inquiry:rl');
+    const ts = ((rl.ok && rl.data && Array.isArray(rl.data.ts)) ? rl.data.ts : []).filter(function (t) { return now - t < INQUIRY_RL_WINDOW; });
+    if (ts.length >= INQUIRY_RL_MAX) return jr(200, { status: 'OK', sent: 0, note: 'rate-limited', window_count: ts.length, request_id: R });
+    ts.push(now);
+    await blobSet(store(DATA), 'inquiry:rl', { ts: ts.slice(-50) });
+  } catch (e) {}
+  const clean = function (v, n) { return String(v || '').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, n); };
+  const name = clean(d.name, 40), contact = clean(d.contact, 60), service = clean(d.service, 30), region = clean(d.region, 40), msg = clean(d.message, 120), id = clean(d.id, 40);
+  const title = '홈페이지 문의 접수' + (service ? ' · ' + service : '');
+  const body = [name + (contact ? ' (' + contact + ')' : ''), region, msg].filter(Boolean).join('\n').slice(0, 300);
+  try {
+    const tc = await push.tierCtx();
+    const ids = (tc.pmIds && tc.pmIds.length) ? tc.pmIds : tc.adminIds;
+    if (!ids.length) return jr(200, { status: 'OK', sent: 0, note: '수신자 없음', request_id: R });
+    const r = await push.sendTo(ids, { title: title, body: body, url: INQUIRY_ADMIN_URL, tag: 'inquiry' + (id ? ':' + id : '') }, { ctx: tc, by: '홈페이지 문의' });
+    return jr(200, { status: 'OK', sent: r.sent, removed: r.removed, to: ids.length, request_id: R });
   } catch (e) {
     return jr(200, { status: 'OK', sent: 0, note: 'push 예외: ' + String(e && e.message || e).slice(0, 80), request_id: R });
   }
@@ -2528,6 +2599,7 @@ async function handlerInner(event) {
     if (d && d.action === 'bids_ingest') return await handleBidsIngest(event, d, R);
     if (d && d.action === 'autotask_ingest') return await handleAutotaskIngest(event, d, R);
     if (d && d.action === 'bot_notify') return await handleBotNotify(event, d, R);
+    if (d && d.action === 'inquiry_notify') return await handleInquiryNotify(event, d, R);
     if (d && d.action === 'bids_refresh') return await handleBidsRefresh(event, d, R);
     if (d && d.action === 'bids_purge') return await handleBidsPurge(event, d, R);
     if (d && d.action === 'bids_export') return await handleBidsExport(event, d, R);

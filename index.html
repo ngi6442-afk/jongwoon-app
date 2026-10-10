@@ -1372,7 +1372,7 @@
     <div id="bidSection">
       <div class="dash-sec" style="margin-bottom:8px;display:flex;align-items:baseline;gap:10px;"><h2 style="flex:1;">입찰 <span class="cnt" id="bidHead"></span></h2><button class="mini-btn" id="bidRefreshBtn">↻ 지금 수집</button><button class="mini-btn" id="bidPurgeBtn" title="미검토 항목을 비우고 새 필터로 다시 수집">🧹 재수집</button><button class="mini-btn" id="bidCalcBtn" title="기초금액·예가범위·낙찰하한율로 투찰 범위 계산">🧮 계산기</button><button class="mini-btn" id="bidStatsBtn" title="낙찰 투찰률 실측 분포 — 공종·경북·발주처·슬레이트">📊 통계</button></div>
       <div class="card" id="bidStatsWrap" style="display:none;padding:12px;font-size:13px;"></div>
-      <div style="font-size:12px;color:var(--sub);margin:-4px 0 8px;">입찰 공고는 지역·업종(보유면허)·낙찰방법 자격 필터를 통과한 <b>참가 가능</b> 건입니다. 칩의 <b>지역</b>=실제 참가제한 내용. <span style="background:#FFF3CD;border-radius:4px;padding:0 5px;">노란 카드</span>=지역이 '공고서 참조'인데 자동 판독으로 확인 못 한 건 — 원문에서 직접 확인.</div>
+      <div style="font-size:12px;color:var(--sub);margin:-4px 0 8px;">입찰 공고는 지역·업종(보유면허)·낙찰방법 자격 필터를 통과한 참가 가능 건입니다. 마감이 14일 넘게 지난 신규·패스 공고는 매일 자동 정리됩니다(검토·응찰·낙찰·유찰은 보존). 칩의 <b>지역</b>=실제 참가제한 내용. <span style="background:#FFF3CD;border-radius:4px;padding:0 5px;">노란 카드</span>=지역이 '공고서 참조'인데 자동 판독으로 확인 못 한 건 — 원문에서 직접 확인.</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;" id="bidFilterBar"></div>
       <input type="search" id="bidSearch" placeholder="공고 검색(공고명·기관)" autocomplete="off" style="width:100%;padding:9px 12px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;font-size:14px;box-sizing:border-box;">
       <div class="card" id="bidList"><div class="loading">불러오는 중…</div></div>

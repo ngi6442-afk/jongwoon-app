@@ -2801,4 +2801,62 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   delete mem.gw_data['col:bids'];
 }
 
+// 47 v380 홈페이지 문의 알림(inquiry_notify) — 공유 키 검증 · PM 등급(없으면 관리자) 수신 · 본문 정제 · 키 미설정이면 닫힘
+{
+  process.env.INQUIRY_PUSH_KEY = 'test-inquiry-key';
+  const n0 = pushMock.calls.length;
+  let r47 = await call({ action: 'inquiry_notify', key: 'wrong', name: 'x' });
+  T('inquiry_notify 잘못된 키 → 403 BAD_INQUIRY_KEY', r47.code === 403 && r47.body.error_code === 'BAD_INQUIRY_KEY', r47.code + '/' + r47.body.error_code);
+  r47 = await call({ action: 'inquiry_notify', key: 'test-inquiry-key', id: 'inq_1', name: '홍길동', contact: '010-1234-5678', service: '석면 해체', region: '포항 남구', message: '견적\u0007 문의\n드립니다' });
+  const p47 = pushMock.calls[pushMock.calls.length - 1] || {};
+  T('inquiry_notify → 200 · 발송 1(PM 없으면 관리자 폴백)', r47.code === 200 && r47.body.sent === 1 && pushMock.calls.length === n0 + 1, JSON.stringify(r47.body));
+  T('제목에 서비스, 본문에 이름(연락처)·지역·내용(제어문자 제거) · 태그 inquiry:id · 관리자 페이지 url', p47.title === '홈페이지 문의 접수 · 석면 해체' && p47.body.indexOf('홍길동 (010-1234-5678)') === 0 && p47.body.indexOf('\u0007') < 0 && p47.body.indexOf('견적 문의 드립니다') > 0 && p47.tag === 'inquiry:inq_1' && /member-admin/.test(p47.url), JSON.stringify(p47));
+  // 속도 제한: 10분 6건 — 위 1건 포함 6건째까지 발송, 7건째는 note=rate-limited·발송 없음
+  const n1 = pushMock.calls.length;
+  for (let k = 0; k < 5; k++) r47 = await call({ action: 'inquiry_notify', key: 'test-inquiry-key', id: 'inq_rl' + k, name: '반복' });
+  T('6건째까지 발송(창 안 상한)', r47.body.sent === 1 && pushMock.calls.length === n1 + 5, JSON.stringify(r47.body));
+  r47 = await call({ action: 'inquiry_notify', key: 'test-inquiry-key', id: 'inq_rl9', name: '반복' });
+  T('7건째 → 200 note=rate-limited · 발송 없음', r47.code === 200 && r47.body.note === 'rate-limited' && r47.body.sent === 0 && pushMock.calls.length === n1 + 5, JSON.stringify(r47.body));
+  delete mem.gw_data['inquiry:rl'];
+  delete process.env.INQUIRY_PUSH_KEY;
+  r47 = await call({ action: 'inquiry_notify', key: 'test-inquiry-key', name: 'x' });
+  T('INQUIRY_PUSH_KEY 미설정 → 403(열린 문 없음)', r47.code === 403);
+}
+
+// 48 v380 공고 보관 기간(PM 10/11 "마감 14일 보관") — ingest가 마감 14일 경과 new·패스를 정리하고 되살리지 않는다 · 사람이 정한 상태는 보존 · bids_purge mode:expired(dry)
+{
+  const day = (n) => new Date(Date.now() + 9 * 3600000 - n * 86400000).toISOString().slice(0, 10);
+  mem.gw_data['col:bids'] = { schema: 1, items: [
+    { id: 'e1', title: '만료 신규', due: day(20), status: 'new' },
+    { id: 'e2', title: '만료 패스', due: day(15), status: '패스' },
+    { id: 'e3', title: '만료 응찰', due: day(40), status: '응찰' },
+    { id: 'e4', title: '만료 검토', due: day(30), status: '검토' },
+    { id: 'k1', title: '유효 신규', due: day(13), status: 'new' },
+    { id: 'k2', title: '마감 없음', due: '', status: 'new' },
+    { id: 'k3', title: '경계(14일째)', due: day(14), status: 'new' },
+  ] };
+  Object.keys(mem.gw_data).forEach((k) => { if (k === 'veridx:bids' || k.indexOf('ver:bids:') === 0) delete mem.gw_data[k]; });
+  let r48 = await call({ action: 'bids_purge', key: 'test-ingest-key', mode: 'expired', dry: true });
+  T('bids_purge expired dry → 세기만(2건)·저장 안 함', r48.code === 200 && r48.body.dry === true && r48.body.would_remove === 2 && mem.gw_data['col:bids'].items.length === 7, JSON.stringify(r48.body));
+  r48 = await call({ action: 'bids_purge', key: 'test-ingest-key', mode: 'expired', dry: 'true' });
+  T("dry:'true'(문자열)도 세기만 — 실제 정리 안 돎", r48.body.dry === true && mem.gw_data['col:bids'].items.length === 7 && !mem.gw_data['veridx:bids'], JSON.stringify(r48.body));
+  r48 = await call({ action: 'bids_ingest', key: 'test-ingest-key', items: [
+    { id: 'e1', title: '만료 신규', due: day(20) },
+    { id: 'n1', title: '새 만료', due: day(16) },
+    { id: 'n2', title: '새 유효', due: day(2) },
+    { id: 'e3', title: '만료 응찰', due: day(40) },
+  ] });
+  const ids48 = mem.gw_data['col:bids'].items.map((x) => x.id).sort().join(',');
+  T('ingest: 만료 new·패스 정리 2 · 새로 들어온 만료 1 건너뜀 · 유효 추가 1', r48.code === 200 && r48.body.purged === 2 && r48.body.skipped === 1 && r48.body.added === 1, JSON.stringify(r48.body));
+  T('남은 것 = 응찰·검토·유효·마감없음·경계·새 유효(상태 보존)', ids48 === 'e3,e4,k1,k2,k3,n2' && mem.gw_data['col:bids'].items.find((x) => x.id === 'e3').status === '응찰', ids48);
+  const vi48 = mem.gw_data['veridx:bids'];
+  T('정리가 있던 ingest는 VER_SKIP을 넘어 스냅샷 1벌(정리 전 7건)을 남긴다', vi48 && vi48.items.length === 1 && vi48.items[0].tot === 7 && vi48.items[0].by === '수집봇', JSON.stringify(vi48));
+  r48 = await call({ action: 'save', collection: 'bids', doc: { schema: 1, items: [{ id: 'z1', title: '되살림 시도(만료 new)', due: day(30), status: 'new' }, { id: 'z2', title: '유효', due: day(1), status: 'new' }, { id: 'z3', title: '만료 응찰', due: day(30), status: '응찰' }] } }, tokA);
+  const ids48b = (mem.gw_data['col:bids'].items || []).map((x) => x.id).sort().join(',');
+  T('관리자 save(bids): 만료 new 되살림을 서버가 거른다 · 응찰은 통과', r48.code === 200 && ids48b === 'z2,z3', r48.code + ' ' + ids48b);
+  r48 = await call({ action: 'bids_purge', key: 'test-ingest-key', mode: 'expired' });
+  T('bids_purge expired(실행) → 더 지울 것 없음 0(앞선 save 뒤 2건 그대로)', r48.code === 200 && r48.body.removed === 0 && mem.gw_data['col:bids'].items.length === 2, JSON.stringify(r48.body));
+  delete mem.gw_data['col:bids'];
+}
+
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);
