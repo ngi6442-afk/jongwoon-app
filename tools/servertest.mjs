@@ -916,7 +916,7 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   // ---- 9/6 2차 검증 반영(반박 검증 확정 결함) ----
   // 시각은 실제 흐름대로: 초안 도착 시 p.ai.ts(생성 시각) 저장, 게시는 그 뒤. 앞 단계 pn1~pn3 게시일 2026-10-01~03보다 뒤로 둔다.
   const applyDraft = (id, jb, aiTs) => { const p = promo(id); p.title = jb.title; p.ai = { model: 'mock', tokens: 2, ts: aiTs }; };
-  const T10 = Date.parse('2026-10-10');
+  const T10 = Date.now() + 60000;   // 10/11 수리: 고정 날짜('2026-10-10')는 실제 시각이 지나자 pn4(ai.ts=Date.now())보다 과거가 돼 10/10부터 2건이 깨졌다(검토 확정) — 항상 '지금보다 뒤'로
   // ① 일괄 초안(게시 없이 연속 생성): 2번째 초안의 recent_titles[0]이 1번째 초안 제목(이력 라벨 (a))이고 그 원형이 제외된다
   mem.gw_data['col:promo'].items.push(fresh('pb1', '포항 양덕동'), fresh('pb2', '포항 대잠동'), fresh('pb3', '경주 안강읍'));
   const jb1 = await runJob('pa_b1', 'pb1');
