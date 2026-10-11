@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>브리핑 음성 샘플</title>
+<style>
+  :root { --bg:#0f1a14; --card:#15241c; --line:#24392e; --text:#e8f0ea; --muted:#9fb3a7; --accent:#2fbf7f; --warn:#f2c14e; }
+  body { margin:0; background:var(--bg); color:var(--text); font-family:"Malgun Gothic","Noto Sans KR",sans-serif; }
+  .wrap { max-width:680px; margin:0 auto; padding:24px 16px; }
+  h1 { font-size:18px; margin:0 0 6px; }
+  .sub { color:var(--muted); font-size:13px; margin-bottom:16px; line-height:1.6; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px; margin-bottom:12px; }
+  .row { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .btn { font-size:14px; padding:10px 14px; border-radius:10px; border:1px solid var(--line); background:#0f1d16; color:var(--text); cursor:pointer; }
+  .btn.p { background:var(--accent); color:#06130c; border-color:transparent; font-weight:700; }
+  .btn:disabled { opacity:.45; cursor:default; }
+  .st { font-size:12px; color:var(--muted); min-width:220px; }
+  .st b { color:var(--accent); }
+  .st .no { color:var(--warn); }
+  textarea { width:100%; box-sizing:border-box; min-height:120px; background:#0f1d16; color:var(--text); border:1px solid var(--line); border-radius:10px; padding:10px; font-size:14px; line-height:1.6; font-family:inherit; }
+  .voices { font-size:12px; color:var(--muted); line-height:1.7; }
+  .stop { margin-top:10px; font-size:13px; }
+  .stop b { color:var(--warn); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>브리핑 음성 샘플 — 선히 · 인준(Edge 온라인) · 헤아미(Windows 내장)</h1>
+  <div class="sub">Microsoft Edge로 여시고 버튼을 누르시면 같은 대본을 세 목소리로 들을 수 있습니다. 선히·인준은 Edge가 온라인으로 가져오는 음성이라 인터넷이 필요하고, 헤아미는 PC 안에 있는 음성입니다. 크롬에서는 헤아미만(또는 구글 한국어) 나옵니다. 스피커나 이어폰이 연결돼 있어야 소리가 납니다.</div>
+  <div class="card">
+    <textarea id="txt">안녕하세요, 10월 12일 월요일 브리핑입니다. 결재함에 대기 2건, 운반일지 10월 2주차 대표 상신과 조기퇴근 공문 전결입니다. 입찰은 마감 3일 안 공고 4건, 그중 영덕군 하수관로 준설 용역, 추정가격 1억 2천만 원이 적격심사입니다. 운반일지는 오늘 배차 12줄, 잠정 1건. 차량 만기 30일 안 2대, 81다 3011 검사, 82사 4420 보험. 오늘 일정은 14시 동일산업 미팅 하나입니다. 브리핑 끝, 화면에 카드로 남겼습니다.</textarea>
+  </div>
+  <div class="card">
+    <div class="row"><button class="btn p" data-v="SunHi">▶ 선히(여성, 온라인)</button><button class="btn p" data-v="InJoon">▶ 인준(남성, 온라인)</button><button class="btn" data-v="Heami">▶ 헤아미(내장)</button><button class="btn" id="stop">■ 정지</button></div>
+    <div class="st" id="st" style="margin-top:10px">음성 목록을 읽는 중…</div>
+    <div class="stop">정지 명령 시연: 마이크가 있으면 <b>[정지 명령 듣기]</b>를 켜고 재생 중에 "<b>브리핑 그만</b>"이라고 말씀해 보시면 됩니다(Edge·크롬, 음성 인식은 온라인). <button class="btn" id="mic">정지 명령 듣기</button> <span id="heard" class="st"></span></div>
+  </div>
+  <div class="card voices" id="voices"></div>
+</div>
+<script>
+(function () {
+  var synth = window.speechSynthesis, voices = [], st = document.getElementById('st'), vbox = document.getElementById('voices');
+  function load() {
+    voices = synth ? synth.getVoices() : [];
+    var ko = voices.filter(function (v) { return /^ko/i.test(v.lang); });
+    var has = function (n) { return ko.some(function (v) { return v.name.indexOf(n) >= 0; }); };
+    st.innerHTML = '한국어 음성 ' + ko.length + '개 — 선히 ' + (has('SunHi') ? '<b>있음</b>' : '<span class="no">없음</span>') + ' · 인준 ' + (has('InJoon') ? '<b>있음</b>' : '<span class="no">없음</span>') + ' · 헤아미 ' + (has('Heami') ? '<b>있음</b>' : '<span class="no">없음</span>');
+    vbox.textContent = ko.length ? ('이 PC·브라우저의 한국어 음성: ' + ko.map(function (v) { return v.name; }).join(' · ')) : '한국어 음성이 아직 안 잡혔습니다. 잠시 뒤 다시 눌러 주시면 됩니다(Edge는 1~2초 뒤 온라인 음성이 올라옵니다).';
+    vbox.innerHTML += '<br>전체 음성 ' + voices.length + '개: ' + voices.map(function (v) { return v.name + ' [' + v.lang + ']'; }).join(' · ');
+  }
+  if (synth) { load(); synth.onvoiceschanged = load; [1000, 2500, 5000, 10000].forEach(function (ms) { setTimeout(load, ms); }); }
+  else st.textContent = '이 브라우저는 음성 합성을 지원하지 않습니다.';
+  function speak(name) {
+    if (!synth) return;
+    synth.cancel();
+    var ko = voices.filter(function (x) { return /^ko/i.test(x.lang); });
+    var v = ko.filter(function (x) { return x.name.indexOf(name) >= 0; })[0]
+      || (name !== 'Heami' ? ko.filter(function (x) { return /online|natural/i.test(x.name); })[0] : null)
+      || ko[0];
+    if (!v) { st.innerHTML = '<span class="no">한국어 음성이 하나도 없습니다</span> — 전체 목록을 아래에서 확인해 주시면 됩니다'; return; }
+    if (v.name.indexOf(name) < 0) st.innerHTML = '<span class="no">' + name + ' 음성이 목록에 없어</span> 대신 ' + v.name + '로 재생합니다';
+    // 온라인 음성은 긴 문장을 한 번에 넘기면 중간에 끊기는 일이 있어 문장 단위로 나눠 재생
+    var parts = document.getElementById('txt').value.split(/(?<=[.!?。])\s+/).filter(Boolean);
+    var done = 0, started = false;
+    parts.forEach(function (p, i) { var u = new SpeechSynthesisUtterance(p); u.voice = v; u.lang = 'ko-KR'; u.rate = 1.0;
+      u.onstart = function () { if (!started) { started = true; st.innerHTML = '재생 시작: <b>' + v.name + '</b> (' + parts.length + '문장) — 소리가 안 들리면 출력 장치·볼륨 확인'; } };
+      u.onend = function () { done++; if (done === parts.length) st.innerHTML = '재생 끝: <b>' + v.name + '</b>'; };
+      u.onerror = function (e) { st.innerHTML = '<span class="no">오류: ' + e.error + '</span> — 이 문구를 그대로 알려주시면 됩니다(' + v.name + ')'; };
+      synth.speak(u); });
+    st.innerHTML = '요청함: <b>' + v.name + '</b> — 3초 안에 "재생 시작"으로 안 바뀌면 Edge가 온라인 음성을 못 받은 것(인터넷·Edge 업데이트 확인)';
+    setTimeout(function () { if (!started && !/오류/.test(st.textContent)) st.innerHTML = '<span class="no">3초 동안 재생이 시작되지 않음</span> — ' + v.name + ' (온라인 음성이면 인터넷·Edge 업데이트, 또는 Ctrl+Shift+U 소리 내어 읽기로 음성 확인)'; }, 3000);
+  }
+  document.querySelectorAll('[data-v]').forEach(function (b) { b.addEventListener('click', function () { speak(b.getAttribute('data-v')); }); });
+  document.getElementById('stop').addEventListener('click', function () { if (synth) synth.cancel(); st.textContent = '정지'; });
+  // 정지 명령 시연 — Web Speech 인식(온라인). "브리핑 그만"이 들리면 재생을 끊는다.
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition, rec = null, heard = document.getElementById('heard');
+  document.getElementById('mic').addEventListener('click', function () {
+    if (!SR) { heard.textContent = '이 브라우저는 음성 인식을 지원하지 않습니다.'; return; }
+    if (rec) { rec.stop(); rec = null; heard.textContent = '듣기 끔'; return; }
+    rec = new SR(); rec.lang = 'ko-KR'; rec.continuous = true; rec.interimResults = true;
+    rec.onresult = function (e) {
+      var t = ''; for (var i = e.resultIndex; i < e.results.length; i++) t += e.results[i][0].transcript;
+      heard.textContent = '들림: ' + t.slice(-40);
+      if (/브리핑\s*그만|그만\s*해|스톱/.test(t.replace(/\s/g, ''))) { if (synth) synth.cancel(); st.innerHTML = '<b>정지 명령 인식 → 브리핑 정지</b>'; }
+    };
+    rec.onerror = function (e) { heard.textContent = '인식 오류: ' + e.error; };
+    rec.onend = function () { if (rec) { try { rec.start(); } catch (e) {} } };
+    rec.start(); heard.textContent = '듣는 중…';
+  });
+})();
+</script>
+</body>
+</html>
