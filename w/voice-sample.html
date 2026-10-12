@@ -26,13 +26,13 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>브리핑 음성 샘플 — 선히 · 인준(Edge 온라인) · 헤아미(Windows 내장)</h1>
+  <h1>브리핑 음성 샘플 — 선히 · 인준 · 현수(Edge 온라인) · 헤아미(Windows 내장)</h1>
   <div class="sub">Microsoft Edge로 여시고 버튼을 누르시면 같은 대본을 세 목소리로 들을 수 있습니다. 선히·인준은 Edge가 온라인으로 가져오는 음성이라 인터넷이 필요하고, 헤아미는 PC 안에 있는 음성입니다. 크롬에서는 헤아미만(또는 구글 한국어) 나옵니다. 스피커나 이어폰이 연결돼 있어야 소리가 납니다.</div>
   <div class="card">
     <textarea id="txt">안녕하세요, 10월 12일 월요일 브리핑입니다. 결재함에 대기 2건, 운반일지 10월 2주차 대표 상신과 조기퇴근 공문 전결입니다. 입찰은 마감 3일 안 공고 4건, 그중 영덕군 하수관로 준설 용역, 추정가격 1억 2천만 원이 적격심사입니다. 운반일지는 오늘 배차 12줄, 잠정 1건. 차량 만기 30일 안 2대, 81다 3011 검사, 82사 4420 보험. 오늘 일정은 14시 동일산업 미팅 하나입니다. 브리핑 끝, 화면에 카드로 남겼습니다.</textarea>
   </div>
   <div class="card">
-    <div class="row"><button class="btn p" data-v="SunHi">▶ 선히(여성, 온라인)</button><button class="btn p" data-v="InJoon">▶ 인준(남성, 온라인)</button><button class="btn" data-v="Heami">▶ 헤아미(내장)</button><button class="btn" id="stop">■ 정지</button></div>
+    <div class="row"><button class="btn p" data-v="SunHi">▶ 선히(여성, 온라인)</button><button class="btn p" data-v="InJoon">▶ 인준(남성, 온라인)</button><button class="btn" data-v="Hyunsu">▶ 현수(다국어, 온라인)</button><button class="btn" data-v="Heami">▶ 헤아미(내장)</button><button class="btn" id="stop">■ 정지</button></div>
     <div class="st" id="st" style="margin-top:10px">음성 목록을 읽는 중…</div>
     <div class="stop">정지 명령 시연: 마이크가 있으면 <b>[정지 명령 듣기]</b>를 켜고 재생 중에 "<b>브리핑 그만</b>"이라고 말씀해 보시면 됩니다(Edge·크롬, 음성 인식은 온라인). <button class="btn" id="mic">정지 명령 듣기</button> <span id="heard" class="st"></span></div>
   </div>
@@ -44,8 +44,10 @@
   function load() {
     voices = synth ? synth.getVoices() : [];
     var ko = voices.filter(function (v) { return /^ko/i.test(v.lang); });
-    var has = function (n) { return ko.some(function (v) { return v.name.indexOf(n) >= 0; }); };
-    st.innerHTML = '한국어 음성 ' + ko.length + '개 — 선히 ' + (has('SunHi') ? '<b>있음</b>' : '<span class="no">없음</span>') + ' · 인준 ' + (has('InJoon') ? '<b>있음</b>' : '<span class="no">없음</span>') + ' · 헤아미 ' + (has('Heami') ? '<b>있음</b>' : '<span class="no">없음</span>');
+    var ALIAS = { SunHi: ['선히', 'SunHi'], InJoon: ['인준', 'InJoon'], Hyunsu: ['Hyunsu', '현수'], Heami: ['Heami', '헤아미'] };
+    var nameHit = function (v, n) { return (ALIAS[n] || [n]).some(function (a) { return v.name.indexOf(a) >= 0; }); };
+    var has = function (n) { return ko.some(function (v) { return nameHit(v, n); }); };
+    st.innerHTML = '한국어 음성 ' + ko.length + '개 — 선히 ' + (has('SunHi') ? '<b>있음</b>' : '<span class="no">없음</span>') + ' · 인준 ' + (has('InJoon') ? '<b>있음</b>' : '<span class="no">없음</span>') + ' · 현수 ' + (has('Hyunsu') ? '<b>있음</b>' : '<span class="no">없음</span>') + ' · 헤아미 ' + (has('Heami') ? '<b>있음</b>' : '<span class="no">없음</span>') + (ko.some(function (v) { return /Google/.test(v.name); }) ? ' · Google 한국어 <b>있음</b>(크롬)' : '');
     vbox.textContent = ko.length ? ('이 PC·브라우저의 한국어 음성: ' + ko.map(function (v) { return v.name; }).join(' · ')) : '한국어 음성이 아직 안 잡혔습니다. 잠시 뒤 다시 눌러 주시면 됩니다(Edge는 1~2초 뒤 온라인 음성이 올라옵니다).';
     vbox.innerHTML += '<br>전체 음성 ' + voices.length + '개: ' + voices.map(function (v) { return v.name + ' [' + v.lang + ']'; }).join(' · ');
   }
@@ -55,11 +57,12 @@
     if (!synth) return;
     synth.cancel();
     var ko = voices.filter(function (x) { return /^ko/i.test(x.lang); });
-    var v = ko.filter(function (x) { return x.name.indexOf(name) >= 0; })[0]
+    var ALIAS2 = { SunHi: ['선히', 'SunHi'], InJoon: ['인준', 'InJoon'], Hyunsu: ['Hyunsu', '현수'], Heami: ['Heami', '헤아미'] };
+    var v = ko.filter(function (x) { return (ALIAS2[name] || [name]).some(function (a) { return x.name.indexOf(a) >= 0; }); })[0]
       || (name !== 'Heami' ? ko.filter(function (x) { return /online|natural/i.test(x.name); })[0] : null)
       || ko[0];
     if (!v) { st.innerHTML = '<span class="no">한국어 음성이 하나도 없습니다</span> — 전체 목록을 아래에서 확인해 주시면 됩니다'; return; }
-    if (v.name.indexOf(name) < 0) st.innerHTML = '<span class="no">' + name + ' 음성이 목록에 없어</span> 대신 ' + v.name + '로 재생합니다';
+    if (!(ALIAS2[name] || [name]).some(function (a) { return v.name.indexOf(a) >= 0; })) st.innerHTML = '<span class="no">' + name + ' 음성이 목록에 없어</span> 대신 ' + v.name + '로 재생합니다';
     // 온라인 음성은 긴 문장을 한 번에 넘기면 중간에 끊기는 일이 있어 문장 단위로 나눠 재생
     var parts = document.getElementById('txt').value.split(/(?<=[.!?。])\s+/).filter(Boolean);
     var done = 0, started = false;
