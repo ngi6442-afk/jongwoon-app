@@ -706,6 +706,32 @@
     .vs th.vs-ph,.vs td.vs-ph{display:none;}
   }
 
+  /* v381 계약 시트형 — .vs-* 공용(표·칩·펼침), 계약 전용은 .cs-* 만 추가 */
+  .cs-num{text-align:right;}
+  .cs-bar{display:inline-block;width:46px;height:6px;border-radius:3px;background:#E6EBE8;vertical-align:middle;margin-right:6px;overflow:hidden;}
+  .cs-bar i{display:block;height:100%;background:var(--brand);}
+  .cs-pipe-h{font-size:12px;color:var(--sub);font-weight:700;margin:6px 0 4px;}
+  .cs-stages{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;margin-bottom:6px;}
+  .cs-stg{border:1px solid var(--line);border-radius:8px;padding:6px 8px;font-size:12px;background:#fff;display:flex;flex-direction:column;gap:2px;min-height:58px;}
+  .cs-stg .n{font-weight:700;color:var(--text,#222);}
+  .cs-stg .m{color:var(--sub);}
+  .cs-stg.done{border-color:var(--brand);background:#EAF4EE;}
+  .cs-stg.cur{border-color:#F0D48A;background:#FFF6E0;}
+  .cs-stg .k{margin-top:auto;}
+  .cs-links{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:6px;}
+  .cs-lk{border:1px solid var(--line);border-radius:8px;padding:6px 8px;font-size:12.5px;background:#fff;}
+  .cs-lk .k{color:var(--sub);font-size:11.5px;}
+  .cs-lk .v{font-weight:600;word-break:keep-all;overflow-wrap:anywhere;}
+  #conDetailCard{display:none;}
+  @media (max-width:859px){
+    .vs col.cs-c-client{width:30% !important;}
+    .vs col.cs-c-site{width:36% !important;}
+    .vs col.cs-c-stage{width:20% !important;}
+    .vs col.cs-c-end{width:14% !important;}
+    #conDetailCard{display:block;margin-top:8px;}
+    .cs-stages{grid-template-columns:repeat(2,minmax(0,1fr));}
+  }
+
   /* 수금 */
   .rec-item{align-items:flex-start;cursor:default;}
   .rec-amt{font-weight:700;color:var(--text);}
@@ -1388,6 +1414,7 @@
     <button class="link-btn" id="tplManageBtn" style="display:none;">+ 양식 등록</button>
     <button class="link-btn" id="conPerfBtn" style="display:none;">실적 다운로드</button>
     <div class="card" id="conList"><div class="loading">불러오는 중…</div></div>
+    <div class="card" id="conDetailCard"></div>   <!-- v381 폰(859px 이하) 상세 카드 — PC에서는 표 안에 펼침 -->
   </section>
 
   <!-- 부동산(온비드 공매) — 관리자 전용 -->
@@ -9723,7 +9750,298 @@
     return chip;
   }
   function pipeLabel(k){ return k==="waste" ? "폐기물" : "본"; }
+  // @con-sheet-start — v381 계약 시트형(A안, 9/21 결정) + 펼침 4탭(개요/단계/서류/연결). 설계 브리핑 10/12 PM ㄱ.
+  // 표·칩·펼침 CSS는 차량 시트(.vs-*)를 그대로 쓰고, 상태(정렬·필터·칩)는 기기별 localStorage. 데이터 모델·저장·권한은 손대지 않는다(새 키 없음).
+  // 종전 카드형 renderContractsCards는 v382에서 제거 예정(롤백 대비 1판 보존).
+  var CON_SHEET_KEY = "jw_con_sheet";
+  var CON_COLS = [
+    { k:"client", h:"발주처",        w:170, f:"text" },
+    { k:"site",   h:"현장 · 공사명", w:250, f:"text" },
+    { k:"kind",   h:"종류",          w:96,  f:"enum", hs:1 },
+    { k:"pub",    h:"사급/관급",     w:76,  f:"enum", hs:1 },
+    { k:"amount", h:"계약액",        w:110, f:"none", hs:1 },
+    { k:"stage",  h:"단계",          w:190, f:"none" },
+    { k:"end",    h:"준공 · 만기",   w:120, f:"none" },
+    { k:"who",    h:"담당",          w:72,  f:"enum", hs:1 }
+  ];
+  var CON_CHIPS = [["", "전체"], ["active", "진행 중"], ["done", "완료"], ["pub", "관급"], ["pri", "사급"], ["unpaid", "미수"]];
+  var CON_KIND_LABEL = { asbestos:"석면", demolition:"철거", waste:"운반", dredge:"준설", lic_change:"인허가" };
+  var conSheet = { k:"stage", d:1, f:{}, chip:"" };
+  var conColw = {};   // 열 폭은 이 화면에서 끈 값만(새로고침이면 기본, 차량 v378과 같음)
+  try { var _cs0 = JSON.parse(localStorage.getItem(CON_SHEET_KEY) || "null"); if (_cs0 && typeof _cs0 === "object"){ conSheet.k = _cs0.k || "stage"; conSheet.d = _cs0.d === -1 ? -1 : 1; conSheet.f = (_cs0.f && typeof _cs0.f === "object") ? _cs0.f : {}; conSheet.chip = _cs0.chip || ""; } } catch(e){}
+  function conSheetSave(){ try { localStorage.setItem(CON_SHEET_KEY, JSON.stringify(conSheet)); } catch(e){} }
+  var conOpenId = null, conDetTab = "ov";
+  function conColW(c){ var w = Number(conColw[c.k]); return (w >= 40 && w <= 600) ? w : c.w; }
+  function conColCls(c){ return (c.hs ? "vs-hs" : "") + (c.ph ? " vs-ph" : ""); }
+  function conPhoneMode(){ try { return window.matchMedia("(max-width:859px)").matches; } catch(e){ return window.innerWidth < 860; } }
+  var conLastPhone = null;
+  function conOnBreak(){ var p = conPhoneMode(); if (conLastPhone !== null && p !== conLastPhone){ var hostEl = document.getElementById("conList"); if (hostEl && hostEl.querySelector(".vs")) renderContracts(); } }
+  window.addEventListener("resize", conOnBreak);
+  try { var conMql = window.matchMedia("(max-width:859px)"); if (conMql.addEventListener) conMql.addEventListener("change", conOnBreak); else if (conMql.addListener) conMql.addListener(conOnBreak); } catch(e){}
+  function csKind(c){ var e = c.elems || {}; if (e.asb && (e.demo || e.permit)) return "석면+철거"; return CON_KIND_LABEL[c.type] || (c.label || ""); }
+  function csPub(c){ return c.docType === "public" ? "관급" : "사급"; }
+  function csTitle(c){ return c.title || ((c.contract_info || {}).title) || ""; }
+  function csSiteText(c){ var t = csTitle(c); return (c.site || "") + ((t && t !== c.site) ? ((c.site ? " · " : "") + t) : ""); }
+  function csEnd(c){ return ((c.contract_info || {}).d3) || ""; }
+  function csMain(c){ var ps = c.pipes || [], i; for (i = 0; i < ps.length; i++){ if (ps[i].key === "main") return ps[i]; } return ps[0] || null; }
+  function csStageInfo(c){
+    var p = csMain(c);
+    if (!p || !p.stages || !p.stages.length) return { pos:"", name:"", frac:(c.status === "done" ? 1 : 0), due:"", total:0, cur:0, atEnd:true, hasTask:false };
+    var atEnd = p.cur >= p.stages.length, s = atEnd ? null : p.stages[p.cur];
+    var due = (s && s.task_id) ? ((findTask(s.task_id) || {}).due || "") : "";
+    return { pos: Math.min(p.cur + (atEnd ? 0 : 1), p.stages.length) + "/" + p.stages.length, name: s ? s.name : "완료", frac: atEnd ? 1 : (p.cur / p.stages.length), due: due, total: p.stages.length, cur: p.cur, atEnd: atEnd, hasTask: !!(s && s.task_id) };
+  }
+  function csRec(c){ if (!c.rec_id) return null; var r = findRec(c.rec_id); return (r && r.del !== 1) ? r : null; }
+  // 준공·만기 칸: 준공 예정일(계약서 판독 d3) 기준 — 지난 것 붉게, 30일 이내 노랑. 완료 건은 회색 "완료"
+  function csEndCell(c){
+    var d = csEnd(c), dd;
+    if (c.status === "done") return { html: (d ? esc(d) + ' ' : '') + '<span style="color:#9AA09C;">완료</span>', cls:"", sortv: d ? vehDday(d).diff : 99999 };
+    if (!d) return { html: '<span style="color:#9AA09C;">-</span>', cls:"", sortv: 99999 };
+    dd = vehDday(d);
+    if (dd.diff < 0) return { html: esc(d) + ' 경과 ' + (-dd.diff) + '일', cls:"vs-dan", sortv: dd.diff };
+    if (dd.diff <= 30) return { html: esc(d) + ' ' + dd.text, cls:"vs-warn", sortv: dd.diff };
+    return { html: esc(d) + ' <span style="color:var(--sub);">' + dd.text + '</span>', cls:"", sortv: dd.diff };
+  }
+  function csVal(c, k){
+    if (k === "client") return c.client || "";
+    if (k === "site") return csSiteText(c);
+    if (k === "kind") return csKind(c);
+    if (k === "pub") return csPub(c);
+    if (k === "amount") return conAmt(c) || 0;
+    if (k === "stage") return csStageInfo(c).frac;
+    if (k === "end") return csEndCell(c).sortv;
+    if (k === "who") return c.who || "";
+    return "";
+  }
+  function csSortRows(rows, k, d){
+    var out = rows.slice();
+    out.sort(function(a, b){
+      var ad = a.status === "done" ? 1 : 0, bd = b.status === "done" ? 1 : 0, va, vb, r;
+      if (k === "stage" && ad !== bd) return ad - bd;   // 기본(단계순)에서는 완료 건을 뒤로 — 종전 카드형과 같은 순서
+      va = csVal(a, k); vb = csVal(b, k);
+      if (k === "who"){ va = va || "힣힣"; vb = vb || "힣힣"; }   // 담당 없음은 뒤로
+      if (typeof va === "number" && typeof vb === "number") r = va - vb; else r = String(va).localeCompare(String(vb), "ko");
+      if (r === 0) r = String(b.start || "").localeCompare(String(a.start || ""));   // 같으면 최근 시작 먼저
+      return r * d;
+    });
+    return out;
+  }
+  // 필터 행 + 칩 — text=부분 일치, enum=정확히 같음. 칩: active/done/pub(관급)/pri(사급)/unpaid(기성 미수)
+  function csPass(c, f, chip){
+    var i, col, q, val, r;
+    for (i = 0; i < CON_COLS.length; i++){
+      col = CON_COLS[i]; q = f ? f[col.k] : ""; if (!q) continue;
+      val = String(csVal(c, col.k) == null ? "" : csVal(c, col.k));
+      if (col.f === "enum"){ if (val !== q) return false; }
+      else if (col.f === "text"){ if (val.toLowerCase().indexOf(String(q).toLowerCase()) < 0) return false; }
+    }
+    if (chip === "active") return c.status !== "done";
+    if (chip === "done") return c.status === "done";
+    if (chip === "pub") return c.docType === "public";
+    if (chip === "pri") return c.docType !== "public";
+    if (chip === "unpaid"){ r = csRec(c); return !!(r && !r.paid); }
+    return true;
+  }
+  function csEnumValues(rows, k){
+    var seen = {}, out = [];
+    rows.forEach(function(c){ var t = String(csVal(c, k) || "").trim(); if (t && !seen[t]){ seen[t] = 1; out.push(t); } });
+    out.sort(function(a, b){ return a.localeCompare(b, "ko"); });
+    return out;
+  }
+  function csRowHtml(c, open){
+    var cells = "", i, col, cls, st, ec, amt;
+    for (i = 0; i < CON_COLS.length; i++){
+      col = CON_COLS[i]; cls = conColCls(col);
+      if (col.k === "client") cells += '<td class="vs-b" title="' + esc(c.client || "") + '">' + esc(c.client || "") + '</td>';
+      else if (col.k === "site") cells += '<td class="' + cls + '" title="' + esc(csSiteText(c)) + '">' + esc(csSiteText(c)) + '</td>';
+      else if (col.k === "kind") cells += '<td class="' + cls + '" title="' + esc(c.label || "") + '">' + esc(csKind(c)) + '</td>';
+      else if (col.k === "pub") cells += '<td class="' + cls + '">' + (c.docType === "public" ? '<span class="from-chip" title="공문서">관급</span>' : '<span class="scope-chip" title="사문서">사급</span>') + '</td>';
+      else if (col.k === "amount"){ amt = conAmt(c); cells += '<td class="' + cls + ' cs-num">' + (amt ? esc(fmtAmount(amt)) : '') + '</td>'; }
+      else if (col.k === "stage"){ st = csStageInfo(c); cells += '<td class="' + cls + '" title="' + esc(st.name) + (st.due ? ' · 기한 ' + esc(st.due) : '') + '"><span class="cs-bar"><i style="width:' + Math.round(st.frac * 100) + '%"></i></span>' + esc(st.pos) + (st.name ? ' · ' + esc(st.name) : '') + '</td>'; }
+      else if (col.k === "end"){ ec = csEndCell(c); cells += '<td class="' + cls + (ec.cls ? ' ' + ec.cls : '') + '">' + ec.html + '</td>'; }
+      else if (col.k === "who") cells += '<td class="' + cls + '">' + (c.who ? esc(dispName(c.who)) : '<span style="color:#9AA09C;">-</span>') + '</td>';
+    }
+    return '<tr class="vs-r' + (c.status === "done" ? ' grey' : '') + (open ? ' open' : '') + '" data-cs-row="' + esc(c.id) + '">' + cells + '</tr>';
+  }
+  function csStagesHtml(c){
+    var ps = c.pipes || [];
+    if (!ps.length) return '<div class="vs-empty">단계가 없습니다.</div>';
+    return ps.map(function(p){
+      var h = ps.length > 1 ? '<div class="cs-pipe-h">' + esc(pipeLabel(p.key)) + ' 파이프 ' + Math.min(p.cur, p.stages.length) + '/' + p.stages.length + '</div>' : '';
+      h += '<div class="cs-stages">' + p.stages.map(function(s, i){
+        var isCur = i === p.cur, isDone = i < p.cur || s.status === "done", t = s.task_id ? findTask(s.task_id) : null, due = (t && t.due) ? t.due : "";
+        var cls = isDone ? ' done' : (isCur ? ' cur' : '');
+        var meta = isDone ? ('완료' + (s.done_at ? ' ' + esc(s.done_at) : '')) : (isCur ? (due ? '기한 ' + esc(due) : '<span class="need-due">기한 입력</span>') : '대기');
+        var act = (isCur && canDo("con") && c.status !== "done") ? '<button type="button" class="vs-chip" data-cs-sdoc="' + esc(c.id) + '|' + esc(s.name) + '">📄 서류</button>' : '';
+        return '<div class="cs-stg' + cls + '"><span class="n">' + (i + 1) + ' ' + esc(s.name) + '</span><span class="m">' + meta + '</span>' + (act ? '<span class="k">' + act + '</span>' : '') + '</div>';
+      }).join("") + '</div>';
+      return h;
+    }).join("");
+  }
+  function csOverviewHtml(c){
+    var ci = c.contract_info || {}, bi = c.bldg_info, amt = conAmt(c), kv;
+    kv = [["종류", csKind(c) + ((c.label && c.label !== csKind(c)) ? ' (' + c.label + ')' : '')], ["사급/관급", csPub(c) + (c.docType === "public" ? " · 공문서" : " · 사문서")],
+      ["발주처", c.client], ["현장", c.site], ["공사명", csTitle(c)], ["시작", c.start], ["계약일", ci.d1], ["착공", ci.d2], ["준공 예정", ci.d3],
+      ["계약액", amt ? fmtAmount(amt) + "원" : ""], ["계약보증", ci.guarantee ? fmtAmount(ci.guarantee) + "원" : ""], ["담당", c.who ? dispName(c.who) : ""],
+      ["입찰", c.bid_id ? (ci.from || c.bid_id) : ""],
+      ["건축물대장", bi ? ((bi.site || "") + " · " + (bi.total_floor || 0) + "㎡ · " + (bi.dongs || 0) + "동" + (bi.auto ? " (자동)" : "")) : (conNeedsBldg(c) ? "필요 — [대장]으로 조회" : "")],
+      ["등록", c.created], ["상태", c.status === "done" ? "완료" : "진행 중"]];
+    return '<div class="vs-kv">' + kv.map(function(p){ return '<div><div class="k">' + p[0] + '</div><div class="v">' + (p[1] ? esc(String(p[1])) : '<span style="color:#9AA09C;">-</span>') + '</div></div>'; }).join("") + '</div>';
+  }
+  function csLinksHtml(c){
+    var r = csRec(c), ci = c.contract_info || {}, bi = c.bldg_info, items = [];
+    items.push(["기성·수금", r ? ((r.amount ? fmtAmount(r.amount) + "원" : "") + (r.paid ? " · 입금 " + r.paid : " · 미수") + (r.billed ? " · 청구 " + r.billed : "")) : "없음(청구 단계 완료 때 생성)"]);
+    items.push(["입찰", c.bid_id ? (ci.from || c.bid_id) : "없음"]);
+    items.push(["건축물대장", bi ? ((bi.site || "") + " · " + (bi.total_floor || 0) + "㎡") : "없음"]);
+    items.push(["현장 대장", "연결 없음(v384 예정)"]);
+    items.push(["결재", "연결 없음(v384 예정 — 계약 단계·청구 검수)"]);
+    return '<div class="cs-links">' + items.map(function(p){ return '<div class="cs-lk"><div class="k">' + p[0] + '</div><div class="v">' + esc(p[1]) + '</div></div>'; }).join("") + '</div>';
+  }
+  // 상세 — PC는 행 아래 펼침, 폰은 표 아래 카드(#conDetailCard). 하위 탭 개요/단계/서류/연결. 편집·생성은 기존 모달·툴 그대로
+  function csDetailHtml(c){
+    if (!c) return '<div class="vs-empty">목록에서 계약을 누르면 상세가 여기에 펼쳐집니다.</div>';
+    var h = '<div class="vs-dh"><b>' + esc(c.label || csKind(c)) + '</b>' + (c.client ? '<span style="color:var(--sub);">' + esc(c.client) + '</span>' : '') +
+      (c.docType === "public" ? '<span class="from-chip">공문서</span>' : '<span class="scope-chip">사문서</span>') + (c.status === "done" ? '<span class="done-by">✓ 완료</span>' : '') +
+      '<button type="button" class="vs-chip" data-cs-close="1" style="margin-left:auto;">닫기 ▲</button></div>';
+    h += '<div class="vs-stabs">' + [["ov", "개요"], ["st", "단계"], ["doc", "서류"], ["lk", "연결"]].map(function(t){ return '<button type="button" class="vs-stab' + (conDetTab === t[0] ? ' on' : '') + '" data-cs-tab="' + t[0] + '">' + t[1] + '</button>'; }).join("") + '</div>';
+    if (conDetTab === "st") h += csStagesHtml(c);
+    else if (conDetTab === "doc") h += (conAttBoxHtml(c) || '<div class="vs-empty">첨부가 없습니다.</div>');
+    else if (conDetTab === "lk") h += csLinksHtml(c);
+    else h += csOverviewHtml(c);
+    if (canDo("con")) h += '<div class="vs-act">' + (conHasBldg(c) ? '<button class="mini-btn" data-con-bldg="' + esc(c.id) + '">대장</button>' : '') + '<button class="mini-btn" data-con-xlsx="' + esc(c.id) + '">생성</button><button class="mini-btn" data-con-doc="' + esc(c.id) + '">서류</button><button class="mini-btn danger" data-con-del="' + esc(c.id) + '">삭제</button></div>';
+    return h;
+  }
+  function conSetPaneW(wrap){ try { wrap.style.setProperty("--vs-panew", wrap.clientWidth + "px"); } catch(e){} }
   function renderContracts(){
+    var host=document.getElementById("conList"); if(!host) return;
+    var startBtn=document.getElementById("conStartBtn"); if(startBtn) startBtn.style.display = canDo("con") ? "block" : "none";
+    var dgBtn=document.getElementById("docGenBtn"); if(dgBtn) dgBtn.style.display = canDo("con") ? "block" : "none";
+    var tmBtn=document.getElementById("tplManageBtn"); if(tmBtn) tmBtn.style.display = isAdmin() ? "block" : "none";
+    var pfBtn=document.getElementById("conPerfBtn"); if(pfBtn) pfBtn.style.display = canDo("con") ? "block" : "none";
+    var all = liveContracts(), nAct = 0;
+    all.forEach(function(c){ if (c.status !== "done") nAct++; });
+    var head=document.getElementById("conHead"); if(head) head.textContent = nAct ? (nAct+" 진행중") : "";
+    var dcard = document.getElementById("conDetailCard");
+    if(!all.length){ host.innerHTML='<div class="empty-line">진행 중인 계약이 없습니다.</div>'; if (dcard) dcard.innerHTML = ""; return; }
+    var rows = csSortRows(all.filter(function(c){ return csPass(c, conSheet.f, conSheet.chip); }), conSheet.k, conSheet.d);
+    var openC = conOpenId ? findProc(conOpenId) : null;
+    if (!openC || openC.del === 1){ openC = null; conOpenId = null; }
+    // 재그리기 전 스크롤·필터 입력 포커스 보존(글자마다 다시 그리므로)
+    var wrap0 = host.querySelector(".vs-wrap"), sl = wrap0 ? wrap0.scrollLeft : 0, st0 = wrap0 ? wrap0.scrollTop : 0;
+    var act = document.activeElement, focusKey = (act && act.getAttribute && host.contains(act)) ? act.getAttribute("data-cf") : null;
+    var caret = (focusKey && act.selectionStart != null) ? act.selectionStart : null;
+    var h = '<div class="vs-tools">' + CON_CHIPS.map(function(ch){ return '<button type="button" class="vs-chip' + (conSheet.chip === ch[0] ? ' on' : '') + '" data-cs-chip="' + ch[0] + '">' + ch[1] + '</button>'; }).join("") +
+      '<button type="button" class="vs-chip" data-cs-reset="1" title="필터 행·칩 지우기">필터 초기화</button><span class="vs-count">' + rows.length + '건 / 전체 ' + all.length + '건</span></div>';
+    var phoneMode = conPhoneMode(), visCols = CON_COLS.filter(function(c){ return phoneMode ? !c.hs : !c.ph; }), csN = visCols.length; conLastPhone = phoneMode;
+    h += '<div class="vs-wrap"><table class="vs cs"><colgroup>' + visCols.map(function(c){ return '<col class="cs-c-' + c.k + '" style="width:' + conColW(c) + 'px">'; }).join("") + '</colgroup><thead><tr>';
+    CON_COLS.forEach(function(c){
+      var sorted = conSheet.k === c.k;
+      h += '<th class="' + conColCls(c) + (sorted ? ' sorted' : '') + '" data-cs-sort="' + c.k + '" title="누르면 정렬">' + c.h + (sorted ? '<span class="vs-ar">' + (conSheet.d === 1 ? '▲' : '▼') + '</span>' : '') + '<span class="vs-rs" data-cs-rs="' + c.k + '" title="끌어서 폭 조절"></span></th>';
+    });
+    h += '</tr><tr class="vs-filt">';
+    CON_COLS.forEach(function(c){
+      var q = conSheet.f[c.k] || "";
+      if (c.f === "enum") h += '<th class="' + conColCls(c) + '"><select data-cf="' + c.k + '"><option value="">전체</option>' + csEnumValues(all, c.k).map(function(t){ return '<option value="' + esc(t) + '"' + (t === q ? ' selected' : '') + '>' + esc(t) + '</option>'; }).join("") + '</select></th>';
+      else if (c.f === "text") h += '<th class="' + conColCls(c) + '"><input type="text" data-cf="' + c.k + '" value="' + esc(q) + '" placeholder="검색" autocomplete="off"></th>';
+      else h += '<th class="' + conColCls(c) + '"></th>';
+    });
+    h += '</tr></thead><tbody>';
+    if (!rows.length) h += '<tr><td colspan="' + csN + '" style="text-align:center;color:var(--sub);position:static;">조건에 맞는 계약이 없습니다.</td></tr>';
+    rows.forEach(function(c){
+      var open = !!(openC && openC.id === c.id);
+      h += csRowHtml(c, open);
+      if (open) h += '<tr class="vs-det"><td colspan="' + csN + '"><div class="vs-det-in">' + csDetailHtml(c) + '</div></td></tr>';
+    });
+    var sumAmt = 0, nA = 0, nD = 0, nSoon = 0, nOver = 0;
+    rows.forEach(function(c){ sumAmt += conAmt(c) || 0; if (c.status === "done") nD++; else { nA++; var ec = csEndCell(c); if (ec.cls === "vs-dan") nOver++; else if (ec.cls === "vs-warn") nSoon++; } });
+    h += '</tbody><tfoot><tr>';
+    CON_COLS.forEach(function(c){
+      var t = "";
+      if (c.k === "client") t = '합계 ' + rows.length + '건'; else if (c.k === "amount") t = sumAmt ? fmtAmount(sumAmt) : ''; else if (c.k === "stage") t = '진행 ' + nA + ' · 완료 ' + nD; else if (c.k === "end") t = '임박 ' + nSoon + ' · 경과 ' + nOver;
+      h += '<td class="' + conColCls(c) + (c.k === "amount" ? ' cs-num' : '') + '">' + t + '</td>';
+    });
+    h += '</tr></tfoot></table></div>';
+    host.innerHTML = h;
+    if (dcard) dcard.innerHTML = csDetailHtml(openC);
+    var wrap = host.querySelector(".vs-wrap");
+    if (wrap){
+      wrap.scrollLeft = sl; wrap.scrollTop = st0;
+      wrap.addEventListener("scroll", function(){ wrap.classList.toggle("scrolled", wrap.scrollLeft > 0); });
+      wrap.classList.toggle("scrolled", sl > 0);
+      conSetPaneW(wrap);
+    }
+    bindConSheet(host, dcard);
+    if (focusKey){ var fe = host.querySelector('[data-cf="' + focusKey + '"]'); if (fe){ fe.focus(); if (caret != null && fe.setSelectionRange){ try { fe.setSelectionRange(caret, caret); } catch(e){} } } }
+  }
+  // 종전 카드형의 행 버튼·첨부 배선(data-con-* / data-catt-*)을 펼침 안에서 그대로 쓴다
+  function bindConActions(root){
+    Array.prototype.forEach.call(root.querySelectorAll("[data-con-del]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); delContract(el.getAttribute("data-con-del")); }); });
+    Array.prototype.forEach.call(root.querySelectorAll("[data-con-doc]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); openDocFromContract(el.getAttribute("data-con-doc")); }); });
+    Array.prototype.forEach.call(root.querySelectorAll("[data-con-xlsx]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); openXlsxGen(el.getAttribute("data-con-xlsx")); }); });
+    Array.prototype.forEach.call(root.querySelectorAll("[data-con-bldg]"), function(el){
+      el.addEventListener("click", function(e){
+        e.stopPropagation();
+        var c=findProc(el.getAttribute("data-con-bldg")); if(!c) return;
+        // 낙찰 연동 건은 c.site=공고명(주소 아님) — 판독된 주소값만 기본값으로, 없으면 빈칸
+        var def=c.bid_id ? (((c.contract_info||{}).site)||((c.asb_survey||{}).site)||"")
+          : (c.site||((c.contract_info||{}).site)||((c.asb_survey||{}).site)||"");
+        var addr=prompt("건축물대장 조회 — 지번 주소를 입력하세요\n(예: 경북 안동시 풍산읍 하리리 247 / 번지 없이 리·동까지만 넣으면 전체 목록)", def);
+        if(addr) conBldgLookup(c.id, addr, false);
+      });
+    });
+    Array.prototype.forEach.call(root.querySelectorAll("[data-catt-add]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); conPickAttach(el.getAttribute("data-catt-add")); }); });
+    Array.prototype.forEach.call(root.querySelectorAll("[data-catt-del]"), function(el){ el.addEventListener("click", function(e){ e.preventDefault(); e.stopPropagation(); var p=el.getAttribute("data-catt-del").split("|"); conDelAttach(p[0], p[1], +p[2]); }); });
+    Array.prototype.forEach.call(root.querySelectorAll("[data-catt-rev]"), function(el){ el.addEventListener("click", function(e){ e.preventDefault(); e.stopPropagation(); var p=el.getAttribute("data-catt-rev").split("|"); openAsbReview(p[0], p[1], +p[2]); }); });
+    Array.prototype.forEach.call(root.querySelectorAll("[data-catt-drop]"), function(el){
+      el.addEventListener("dragover", function(e){ e.preventDefault(); el.style.background="#EEF5FF"; });
+      el.addEventListener("dragleave", function(){ el.style.background=""; });
+      el.addEventListener("drop", function(e){ e.preventDefault(); el.style.background=""; var f=e.dataTransfer && e.dataTransfer.files; if(f&&f.length) conAddAttach(el.getAttribute("data-catt-drop"), f); });
+    });
+  }
+  function bindConSheet(host, dcard){
+    [host, dcard].forEach(function(root){
+      if (!root) return;
+      bindConActions(root);
+      Array.prototype.forEach.call(root.querySelectorAll("[data-cs-tab]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); conDetTab = el.getAttribute("data-cs-tab") || "ov"; renderContracts(); }); });
+      Array.prototype.forEach.call(root.querySelectorAll("[data-cs-close]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); conOpenId = null; renderContracts(); }); });
+      Array.prototype.forEach.call(root.querySelectorAll("[data-cs-sdoc]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); var p = el.getAttribute("data-cs-sdoc").split("|"); openStageDoc(p[0], p[1]); }); });
+      Array.prototype.forEach.call(root.querySelectorAll(".vs-det-in, #conDetailCard"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); }); });   // 펼침 안 클릭이 행 토글로 번지지 않게
+    });
+    Array.prototype.forEach.call(host.querySelectorAll("tr.vs-r"), function(tr){
+      tr.addEventListener("click", function(){
+        var id = tr.getAttribute("data-cs-row");
+        conOpenId = (conOpenId === id) ? null : id;
+        renderContracts();
+        if (conOpenId && window.innerWidth < 860){ var d = document.getElementById("conDetailCard"); if (d && d.scrollIntoView){ try { d.scrollIntoView({ block: "start", behavior: "smooth" }); } catch(e){ d.scrollIntoView(); } } }
+      });
+    });
+    Array.prototype.forEach.call(host.querySelectorAll("th[data-cs-sort]"), function(th){
+      th.addEventListener("click", function(e){
+        if (e.target && e.target.getAttribute && e.target.getAttribute("data-cs-rs")) return;
+        var k = th.getAttribute("data-cs-sort");
+        if (conSheet.k === k) conSheet.d = -conSheet.d; else { conSheet.k = k; conSheet.d = 1; }
+        conSheetSave(); renderContracts();
+      });
+    });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-cf]"), function(el){
+      var ev = el.tagName === "SELECT" ? "change" : "input";
+      el.addEventListener("click", function(e){ e.stopPropagation(); });
+      el.addEventListener(ev, function(){ var k = el.getAttribute("data-cf"); if (el.value) conSheet.f[k] = el.value; else delete conSheet.f[k]; conSheetSave(); renderContracts(); });
+    });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-cs-chip]"), function(el){ el.addEventListener("click", function(){ conSheet.chip = el.getAttribute("data-cs-chip") || ""; conSheetSave(); renderContracts(); }); });
+    var rs = host.querySelector("[data-cs-reset]"); if (rs) rs.addEventListener("click", function(){ conSheet.f = {}; conSheet.chip = ""; conSheetSave(); renderContracts(); });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-cs-rs]"), function(hd){
+      hd.addEventListener("mousedown", function(e){
+        e.preventDefault(); e.stopPropagation();
+        var k = hd.getAttribute("data-cs-rs"), th = hd.parentNode, x0 = e.clientX, w0 = th.offsetWidth, col = host.querySelector("col.cs-c-" + k);
+        var mv = function(ev){ var w = Math.max(40, Math.min(600, w0 + (ev.clientX - x0))); if (col) col.style.width = w + "px"; conColw[k] = w; };
+        var up = function(){ document.removeEventListener("mousemove", mv); document.removeEventListener("mouseup", up); };
+        document.addEventListener("mousemove", mv); document.addEventListener("mouseup", up);
+      });
+    });
+  }
+  // @con-sheet-end
+  function renderContractsCards(){   // v380까지의 카드형 — v381 시트형(renderContracts)으로 교체, 롤백 대비 1판 보존 뒤 v382에서 제거
     var host=document.getElementById("conList"); if(!host) return;
     var startBtn=document.getElementById("conStartBtn"); if(startBtn) startBtn.style.display = canDo("con") ? "block" : "none";
     var dgBtn=document.getElementById("docGenBtn"); if(dgBtn) dgBtn.style.display = canDo("con") ? "block" : "none";

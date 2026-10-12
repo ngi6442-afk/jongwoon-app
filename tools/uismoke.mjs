@@ -1344,5 +1344,22 @@ try {
     && /PJ\.applyResult\(doc, promoId/.test(readFileSync(join(ROOT, 'netlify/functions/gw-promo-ai-run-background.js'), 'utf8')) && /PJ\.startJob\(st, \{ promoId/.test(readFileSync(join(ROOT, 'netlify/functions/gw-promo-ai.js'), 'utf8')), '');
 } catch (e) { console.log('  (v360 검사 생략 — ' + e.message + ')'); fails++; }
 
+// ---- v381: 계약 시트형(A안) + 펼침 4탭 — 설계 브리핑 10/12 ㄱ ----
+try {
+  const seg = html.slice(html.indexOf('// @con-sheet-start'), html.indexOf('// @con-sheet-end'));
+  const cols = [...seg.matchAll(/\{ k:"(\w+)",\s+h:"/g)].map((m) => m[1]);
+  T('v381 시트 블록: CON_COLS 8열(발주처·현장·종류·사급/관급·계약액·단계·준공·담당) · 폰 숨김 4열(kind/pub/amount/who) · 칩 6 · 상태 키 jw_con_sheet',
+    cols.join(',') === 'client,site,kind,pub,amount,stage,end,who' && (seg.match(/hs:1/g) || []).length === 4 && /CON_CHIPS = \[\["", "전체"\], \["active"/.test(seg) && /CON_SHEET_KEY = "jw_con_sheet"/.test(seg), cols.join(','));
+  T('v381 배선: renderContracts가 시트 블록 안 · 종전 카드형은 renderContractsCards로 보존 · 펼침 4탭(ov/st/doc/lk) · 행/정렬/필터/칩/초기화/폭끌기/탭/닫기/단계서류 핸들러 · colspan=csN 2곳 · 폰 상세 카드 id',
+    /function renderContracts\(\)\{/.test(seg) && /function renderContractsCards\(\)\{/.test(html) && /\[\["ov", "개요"\], \["st", "단계"\], \["doc", "서류"\], \["lk", "연결"\]\]/.test(seg)
+    && seg.indexOf('querySelectorAll("tr.vs-r")') >= 0 && seg.indexOf('th[data-cs-sort]') >= 0 && seg.indexOf('querySelector("[data-cs-reset]")') >= 0
+    && ['data-cf', 'data-cs-chip', 'data-cs-rs', 'data-cs-tab', 'data-cs-close', 'data-cs-sdoc'].every((a) => seg.indexOf('querySelectorAll("[' + a + ']")') >= 0)
+    && (seg.match(/colspan="' \+ csN \+ '"/g) || []).length === 2 && ids.has('conDetailCard') && /#conDetailCard\{display:none;\}/.test(html) && /#conDetailCard\{display:block;margin-top:8px;\}/.test(html), '');
+  T('v381 종전 행 버튼·첨부 배선(data-con-del/doc/xlsx/bldg · data-catt-add/del/rev/drop)이 펼침 안에서 그대로 묶인다',
+    ['data-con-del', 'data-con-doc', 'data-con-xlsx', 'data-con-bldg', 'data-catt-add', 'data-catt-del', 'data-catt-rev', 'data-catt-drop'].every((a) => seg.indexOf('querySelectorAll("[' + a + ']")') >= 0), '');
+  T('v381 CSS: .cs-stg 단계 카드(done/cur) · .cs-bar 진행 막대 · 폰 열 폭 4(cs-c-client/site/stage/end) · 데이터 모델 새 키 없음(scheduleContractSave 호출 없음)',
+    /\.cs-stg\.done\{/.test(html) && /\.cs-stg\.cur\{/.test(html) && /\.cs-bar i\{/.test(html) && ['client', 'site', 'stage', 'end'].every((k) => new RegExp('\\.vs col\\.cs-c-' + k + '\\{width:\\d+% !important;\\}').test(html)) && !/scheduleContractSave/.test(seg), '');
+} catch (e) { console.log('  (v381 검사 생략 — ' + e.message + ')'); fails++; }
+
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
