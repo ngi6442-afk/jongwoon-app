@@ -722,6 +722,23 @@
   .cs-lk{border:1px solid var(--line);border-radius:8px;padding:6px 8px;font-size:12.5px;background:#fff;}
   .cs-lk .k{color:var(--sub);font-size:11.5px;}
   .cs-lk .v{font-weight:600;word-break:keep-all;overflow-wrap:anywhere;}
+  .cs-prev{font-size:12px;color:var(--sub);margin:0 0 8px;line-height:1.55;border:1px solid var(--line);border-radius:8px;padding:6px 10px;}
+  .cs-prev b{color:var(--text,#222);}
+  .cs-stg{cursor:pointer;}
+  .cs-stg.opt{border-style:dashed;}
+  .cs-stg.skip{opacity:.55;border-style:dashed;}
+  .cs-stg.open{grid-column:1 / -1;cursor:default;}
+  .cs-stg small{color:var(--sub);font-weight:400;}
+  .cs-fld{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:6px 10px;margin:6px 0;}
+  .cs-fld label{display:flex;flex-direction:column;gap:2px;font-size:11.5px;color:var(--sub);}
+  .cs-fld input{font-size:12.5px;padding:4px 6px;border:1px solid var(--line);border-radius:5px;}
+  .cs-wl{width:100%;border-collapse:collapse;font-size:12px;margin-top:6px;}
+  .cs-wl th,.cs-wl td{border-bottom:1px solid var(--line);padding:3px 5px;text-align:left;white-space:nowrap;}
+  .cs-wl th{color:var(--sub);font-weight:600;}
+  .cs-wl td.num,.cs-wl th.num{text-align:right;font-variant-numeric:tabular-nums;}
+  .cs-wl input{width:100%;box-sizing:border-box;font-size:12px;padding:3px 4px;border:1px solid var(--line);border-radius:4px;}
+  .cs-wl-wrap{overflow-x:auto;}
+  .cs-act{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;}
   #conDetailCard{display:none;}
   @media (max-width:859px){
     .vs col.cs-c-client{width:30% !important;}
@@ -2401,14 +2418,14 @@
       <option value="waste">폐기물 수집·운반</option>
       <option value="dredge">준설·시설공사</option>
     </select>
-    <span class="fld-label">계약서 성격</span>
+    <span class="fld-label">사급 / 관급</span>
     <select id="conDoc">
-      <option value="public">공문서 (관공서·공기업) — 착공·준공 포함</option>
-      <option value="private">사문서 (일반)</option>
+      <option value="public">관급 (공문서 — 관공서·공기업)</option>
+      <option value="private">사급 (사문서 — 일반)</option>
     </select>
-    <span class="fld-label">시나리오 구성 — 해당 요소 체크 (조합대로 단계가 만들어짐)</span>
-    <div id="conElems" style="display:grid;grid-template-columns:1fr 1fr;gap:2px 8px;font-size:13px;border:1px solid #E4E7EA;border-radius:8px;padding:8px 10px;margin-bottom:4px;"></div>
-    <div id="conStagePreview" style="font-size:12px;color:#5A6472;margin-bottom:8px;"></div>
+    <label id="conComboWrap" style="display:none;font-size:13px;align-items:center;gap:6px;margin:2px 0 6px;"><input type="checkbox" id="conCombo"> 석면 + 철거를 한 건으로 (석면이 있는 철거)</label>
+    <span class="fld-label">단계 — 종류와 사급/관급으로 정해집니다 (PM 원문, 괄호 = 선택 단계)</span>
+    <div id="conScenPreview" class="cs-prev"></div>
     <input type="text" id="conClient" placeholder="거래처/발주처" autocomplete="off">
     <input type="text" id="conSite" placeholder="현장 (선택)" autocomplete="off">
     <span class="fld-label">시작일</span>
@@ -6051,7 +6068,9 @@
   });
   document.getElementById("conStartBtn").addEventListener("click", openConStart);
   document.getElementById("conStartSave").addEventListener("click", saveConStart);
-  document.getElementById("conType").addEventListener("change", function(){ renderConElems(CON_TYPE_ELEMS[this.value]||{}); });
+  document.getElementById("conType").addEventListener("change", renderConScen);   // v382: 종류·사급/관급·혼합 체크 → 단계 목록 미리보기
+  document.getElementById("conDoc").addEventListener("change", renderConScen);
+  document.getElementById("conCombo").addEventListener("change", renderConScen);
   document.getElementById("conStartCancel").addEventListener("click", function(){ document.getElementById("conStartBackdrop").classList.remove("show"); });
   document.getElementById("docGenBtn").addEventListener("click", openDocGen);
   document.getElementById("dgParty").addEventListener("change", dgToggleParty);
@@ -7651,9 +7670,10 @@
     });
   }
   // 현재 단계(이름 패턴 일치)를 완료 처리 — 승인권 있으면 완료+다음 단계 생성, 없으면 완료요청까지
-  function completeStageNow(c, pat){
+  function completeStageNow(c, pat, pipeKey){   // v382 검토 7: pipeKey를 주면 그 파이프만(옛 2파이프 계약의 같은 이름 단계 혼동 방지)
     for(var i=0;i<(c.pipes||[]).length;i++){
       var p=c.pipes[i];
+      if(pipeKey && p.key!==pipeKey) continue;
       if(p.cur>=p.stages.length) continue;
       var s=p.stages[p.cur];
       if(!pat.test(s.name||"")) continue;
@@ -7665,6 +7685,7 @@
         saveTasksCache(); scheduleTasksSave(); renderTasks(); renderSummary(); renderContracts();
         return "done";
       }
+      if(t.status==="review") return "review";   // v382 검토 14: 승인 대기 중 재요청은 푸시를 다시 보내지 않는다
       t.status="review"; t.done_at=todayStr(); t.done_by=myName()||""; t.updated=todayStr();
       pushNotify((t.from_id && t.from_id!==myId())?t.from_id:"__admins__", "승인요청: "+(t.title||"").slice(0,40), (t.done_by||"")+" 단계 완료 요청", "task-rv-"+t.id);
       saveTasksCache(); scheduleTasksSave(); renderTasks(); renderSummary();
@@ -8477,7 +8498,7 @@
     done.sort(function(a,b){ return (a.updated||"").localeCompare(b.updated||""); });
     done.forEach(function(c){
       var ci=c.contract_info||{};
-      var el=c.elems||{}; var elTxt=CON_ELEMS.filter(function(e){return el[e[0]];}).map(function(e){return e[1];}).join("·");
+      var el=c.elems||{}; var elTxt=Object.keys(CON_ELEM_LABEL).filter(function(k){return el[k];}).map(function(k){return CON_ELEM_LABEL[k];}).join("·");
       var rr=c.rec_id?findRec(c.rec_id):null;
       var co=(c.type==="asbestos"||c.type==="demolition")?"㈜종운건설":"(주)종운환경";
       rows.push([c.title||c.label||"", c.client||"", c.label||"", elTxt, c.site||"",
@@ -8614,8 +8635,8 @@
     if(/계약서류|계약체결/.test(s)) return "con_docs";
     if(/착공|착수/.test(s)) return "work_start";
     if(/준공/.test(s)) return "work_complete";
-    if(/노동부신고/.test(s) && !/완료/.test(s)) return "asb_plan";
-    if(/철거신고|해체허가|해체신고/.test(s)) return "demo_report";
+    if(/노동부\s*신고/.test(s) && !/완료/.test(s)) return "asb_plan";   // v382: PM 원문 "노동부 신고 서류 작성"
+    if(/철거\s*신고|해체\s*허가|해체\s*신고|해체\s*완료\s*신고/.test(s)) return "demo_report";
     if(/폐기물|배출|신고접수/.test(s)) return "waste_report";
     return null;
   }
@@ -9585,34 +9606,73 @@
   // 공문서(관공서·공기업) 계약만 착공/착수·준공/용역완료 마일스톤 추가(본 파이프라인 한정)
   var PROC_MILESTONE = { waste:{start:"착수",end:"용역완료"}, asbestos:{start:"착공",end:"준공"}, demolition:{start:"착공",end:"준공"} };
 
-  // ---- 시나리오 조립(원드라이브 실서류 기반, 2026-07-23) ----
-  // 스테이지는 시나리오 요소 조합이 결정 — 발주처(공/사문서)와 무관하게 동일.
-  var CON_ELEMS = [
-    ["asb","석면철거"], ["labor","노동부신고 대상"],
-    ["demo","일반(건축물)철거"], ["permit","대형철거(허가건)"],
-    ["wst","폐기물 운반·처리"], ["dredge","준설·시설공사"],
-    ["qual","적격심사(공공 낙찰건)"], ["est","수의계약(견적 제출)"]
-  ];
-  var CON_TYPE_ELEMS = {   // 유형 선택 시 기본 체크
-    asbestos:{asb:1,labor:1,wst:1}, demolition:{demo:1,wst:1},
-    waste:{wst:1}, dredge:{dredge:1}
+  // @con-scen-start — v382 시나리오 조립: 종류 × 사급/관급 → 단계 목록(PM 원문 9/23 석면·철거·운반, 10/12 준설 초안). 설계 브리핑 10/12 PM ㄱ ②.
+  // 사람이 고르는 것은 둘(종류, 사급/관급)뿐. 요소(asb·demo·wst·dredge)는 종류에서 파생돼 서류 라우팅·첨부 판독·건축물대장에 그대로 쓰인다.
+  // 괄호로 감싼 단계 = 선택(해당 시) — [건너뜀] 가능. 긴급 건은 [이 단계부터]로 순서를 뒤집을 수 있다.
+  var CON_TYPE_ELEMS = { asbestos:{asb:1,labor:1,wst:1}, demolition:{demo:1,wst:1}, waste:{wst:1}, dredge:{dredge:1} };
+  var CON_ELEM_LABEL = { asb:"석면철거", labor:"노동부신고 대상", demo:"일반(건축물)철거", permit:"대형철거(허가건)", wst:"폐기물 운반·처리", dredge:"준설·시설공사", qual:"적격심사(공공 낙찰건)", est:"수의계약(견적 제출)" };   // 실적 다운로드 요소 라벨(옛 요소 라벨 배열 대체, v382 검토 15)
+  var CON_SCEN = {
+    "asbestos:pri": ["석면 조사","해체 면적 기입","계약서 작성","배출신고 서류 작성","노동부 신고 서류 작성","필증 수령. 공사 수행. 공기질 농도 측정","청구 및 입금확인","완료보고 및 실적보고"],
+    "asbestos:pub": ["석면조사","계약서류 작성","착공 서류 작성","해체 면적 기입","(배출신고 서류 작성)","노동부 신고 서류 작성","필증 수령. 공사 수행. 공기질 농도측정","준공서류 작성","청구 및 입금확인","완료보고 및 실적보고"],
+    "demolition:pri": ["석면조사","계약서 작성","배출신고 서류 작성","해체 신고 서류 작성","필증 수령. 공사수행","해체완료신고서류 작성","청구 및 입금확인","실적보고"],
+    "demolition:pub": ["석면조사","계약서류","착공서류","(배출신고)","(해체신고)","(필증수령) 공사수행","(해체완료신고)","준공서류 작성","청구 및 입금확인","완료보고 및 실적보고"],
+    "combo:pri": ["석면조사","계약서 작성","배출신고 서류 작성","노동부 신고 서류 작성","해체 신고 서류 작성","필증 수령. 공사수행. 공기질 농도 측정","해체완료신고서류 작성","청구 및 입금확인","완료보고 및 실적보고"],
+    "combo:pub": ["석면조사","계약서류","착공서류","(배출신고)","노동부 신고 서류 작성","(해체신고)","(필증수령) 공사수행. 공기질 농도측정","(해체완료신고)","준공서류 작성","청구 및 입금확인","완료보고 및 실적보고"],
+    "waste:pri": ["(폐기물 성분분석)","계약서 작성","배출신고서류 작성","필증수령, 용역 수행","청구 및 입금확인","처리확인서 발부 및 실적보고"],
+    "waste:pub": ["계약서류 작성","착수서류 작성","배출신고 서류 작성","필증 수령. 용역수행","준공서류 작성(처리확인서 포함)","청구 및 입금확인"],
+    "dredge:pub": ["견적·수의계약","계약서류 작성","착공서류 작성","작업 수행","준설토 계량·반입","준공서류 작성","청구 및 입금확인","실적신고·대장 종결"],
+    "dredge:pri": ["요청·견적","(계약서·발주서)","작업 수행","(폐기물 처리)","청구 및 입금확인"]
   };
-  function conBuildStages(el){
-    var st=[];
-    if(el.qual) st.push("적격심사");
-    if(el.est) st.push("견적");   // 수의계약: 견적 제출 → 계약
-    st.push("계약","착공");
-    if(el.asb) st.push("석면조사");
-    if(el.asb&&el.labor) st.push("노동부신고","필증인수");
-    if(el.permit) st.push("해체허가");
-    else if(el.demo) st.push("철거신고");
-    st.push("작업");
-    if(el.wst) st.push("폐기물 처리");
-    if(el.permit) st.push("감리");
-    st.push("준공");
-    if(el.asb&&el.labor) st.push("완료신고");
-    st.push("청구","수금확인");
-    return st;
+  function conScenKey(type, pub, combo){ return ((combo && (type==="asbestos"||type==="demolition")) ? "combo" : type) + ":" + (pub ? "pub" : "pri"); }
+  function conIsOptName(n){ return /^\(.+\)$/.test(String(n||"")); }
+  // 단계 목록 → [{name, opt}] · extra.qual(적격심사 낙찰건)은 맨 앞에 "적격심사"
+  function conScenStages(type, pub, combo, extra){
+    var names = CON_SCEN[conScenKey(type, pub, combo)] || CON_SCEN[type + ":pub"] || [];
+    var out = names.map(function(n){ return { name:n, opt: conIsOptName(n) ? 1 : 0 }; });
+    if (extra && extra.qual) out.unshift({ name:"적격심사", opt:0 });
+    return out;
+  }
+  function conModalElems(type, combo){
+    var src = CON_TYPE_ELEMS[type] || {}, el = {}, k;
+    for (k in src) el[k] = src[k];
+    if (combo && (type==="asbestos"||type==="demolition")){ el.asb = 1; el.labor = 1; el.demo = 1; el.wst = 1; }
+    return el;
+  }
+  // 단계 이름(PM 원문) → 지시 상세(STAGE_DOCS 키). 순서가 중요: 해체완료·완료보고는 해체신고보다 먼저
+  var STAGE_DOC_MAP = [[/적격/,"적격심사"],[/견적/,"견적"],[/노동부/,"노동부신고"],[/면적/,"석면조사"],[/해체\s*허가/,"해체허가"],[/해체\s*완료|완료\s*신고|완료보고/,"완료신고"],[/준공|계량|반입/,"준공"],[/해체|철거\s*신고/,"철거신고"],[/배출|성분분석|폐기물|처리확인서/,"폐기물 처리"],[/석면\s*조사/,"석면조사"],[/착공|착수/,"착공"],[/공사\s*수행|작업|용역/,"작업"],[/필증/,"필증인수"],[/청구|입금/,"청구"],[/계약/,"계약"]];   // v382 검토 13: 면적·준공이 해체·배출보다 먼저
+  function stageDocsFor(name){
+    if (STAGE_DOCS[name]) return STAGE_DOCS[name];
+    for (var i = 0; i < STAGE_DOC_MAP.length; i++){ if (STAGE_DOC_MAP[i][0].test(name||"")) return STAGE_DOCS[STAGE_DOC_MAP[i][1]] || ""; }
+    return "";
+  }
+  // 단계 입력 칸(시나리오 표 "계약 탭이 해야 할 것" 열) — 값은 stage.vals에, 정산액은 contract.settle_amount에도
+  var CON_STAGE_FIELDS = [
+    [/견적/, [["q_no","견적 번호","text"],["q_date","제출일","date"],["q_ok","수의계약 통보일","date"]]],
+    [/석면\s*조사/, [["survey_org","조사기관","text"],["survey_date","결과서 수령일","date"]]],
+    [/면적/, [["area","해체 면적(㎡)","num"]]],
+    [/해체\s*완료|완료\s*신고|완료보고/, [["fin_base","기산일(반출 완료·감리보고서 수령)","date"],["fin_date","신고일","date"]]],
+    [/노동부/, [["mol_in","접수일","date"],["mol_no","필증 번호","text"]]],
+    [/배출|성분분석/, [["rep_in","접수일","date"],["rep_ok","수리 통지일","date"],["rep_no","신고 필증 번호","text"]]],
+    [/해체|철거\s*신고/, [["dem_kind","신고/허가","text"],["dem_in","접수일","date"],["dem_no","필증·허가 번호","text"]]],
+    [/공사\s*수행|필증/, [["cert_date","필증 수령일","date"],["work_from","착수일","date"],["work_to","완료일","date"],["air","농도 측정 결과","text"]]],
+    [/착공|착수/, [["st_date","착공(착수)일","date"],["rep_person","현장대리인","text"]]],
+    [/계량|반입/, [["weigh_kg","계량증명서 합계(kg)","num"],["dump","반입처","text"]]],
+    [/준공/, [["fin","준공일","date"],["settle_amount","정산액(원)","num"]]],
+    [/청구|입금/, [["bill_date","청구일","date"],["tax_no","세금계산서 번호","text"],["paid","입금일","date"]]],
+    [/실적/, [["ks_no","실적 신고번호","text"],["ks_date","신고일","date"]]],
+    [/처리확인서/, [["conf_date","처리확인서 발부일","date"]]],
+    [/계약/, [["bond_no","계약보증증권 번호","text"],["bond_amt","보증금액(원)","num"]]]
+  ];
+  function csStageFields(name){ for (var i = 0; i < CON_STAGE_FIELDS.length; i++){ if (CON_STAGE_FIELDS[i][0].test(name||"")) return CON_STAGE_FIELDS[i][1]; } return []; }
+  function conModalCombo(){ var cb = document.getElementById("conCombo"); return !!(cb && cb.checked); }
+  // 계약 시작 모달 — 단계 목록 미리보기(종류·사급/관급·혼합 체크가 바뀔 때마다)
+  function renderConScen(){
+    var p = document.getElementById("conScenPreview"); if (!p) return;
+    var type = (document.getElementById("conType")||{}).value || "asbestos", pub = ((document.getElementById("conDoc")||{}).value || "public") === "public";
+    var wrap = document.getElementById("conComboWrap"); if (wrap) wrap.style.display = (type==="asbestos"||type==="demolition") ? "flex" : "none";
+    var combo = conModalCombo() && (type==="asbestos"||type==="demolition");
+    var st = conScenStages(type, pub, combo, { qual: !!(lastBidForCon && /적격/.test(String(((lastBidForCon.ext||{}).decide)||""))) });
+    p.innerHTML = '<b>' + st.length + '단계</b> · ' + st.map(function(s, i){ return (i + 1) + '. ' + esc(s.name); }).join(' → ');
   }
   // 단계별 서류 체크리스트 — [작성]=우리가 생성, [수정]=받아서 금액 등 수정, [수령]=받아서 확인·보관
   var STAGE_DOCS = {
@@ -9633,24 +9693,7 @@
     "청구":"[작성] 공문·대금청구서(계좌 기재)·임금지불확인서·전자세금계산서 / [수령] 국세·지방세·4대보험 완납증명·하도급지킴이",
     "수금확인":"입금 확인(계좌·금액 대조) — 완료 시 계약 종결. 미입금 지속 시 기성·미수 관리 대상"
   };
-  function conElemChecked(){
-    var el={};
-    CON_ELEMS.forEach(function(e){ var c=document.getElementById("ce_"+e[0]); if(c&&c.checked) el[e[0]]=1; });
-    return el;
-  }
-  function conStagePreview(){
-    var p=document.getElementById("conStagePreview");
-    if(p) p.textContent="단계: "+conBuildStages(conElemChecked()).join(" → ");
-  }
-  function renderConElems(preset){
-    preset=preset||{};
-    var host=document.getElementById("conElems"); if(!host) return;
-    host.innerHTML=CON_ELEMS.map(function(e){
-      return '<label style="display:flex;gap:6px;align-items:center;"><input type="checkbox" id="ce_'+e[0]+'"'+(preset[e[0]]?' checked':'')+'> '+e[1]+'</label>';
-    }).join("");
-    CON_ELEMS.forEach(function(e){ document.getElementById("ce_"+e[0]).addEventListener("change", conStagePreview); });
-    conStagePreview();
-  }
+  // @con-scen-end
   // 제목 키워드로 요소 제안(낙찰→계약 유입 시) — 학습 전 초기 제안
   function suggestConElems(text, decide){
     var t=(text||"").replace(/\s+/g,"");
@@ -9673,11 +9716,13 @@
   }
   function procStageTitle(c, sname){ var who=(c.client||c.site||"").trim(); return "[" + c.label + "] " + (who?who+" · ":"") + sname; }
   function materializeStage(c, pipe, baseDate){
+    while(pipe.cur < pipe.stages.length && pipe.stages[pipe.cur].status==="skipped") pipe.cur++;   // v382: 건너뛴 선택 단계는 지시 없이 지나간다
     if(pipe.cur >= pipe.stages.length) return;
     var s = pipe.stages[pipe.cur];
+    if(s.status==="open" && s.task_id && findTask(s.task_id)) return;   // v382 검토 1: 이미 열린 단계에 지시를 또 만들지 않는다
     var due = "";
     if(s.due==="auto" && s.days){ due = addDays(baseDate||todayStr(), s.days); }
-    var t = { id:genId("t"), title:procStageTitle(c, s.name), detail:(STAGE_DOCS[s.name]||""), who_id:c.who_id||"", who:memberName(c.who_id||""), from:myName()||"", from_id:myId(), by:myName()||"",
+    var t = { id:genId("t"), title:procStageTitle(c, s.name), detail:(stageDocsFor(s.name)||""), who_id:c.who_id||"", who:memberName(c.who_id||""), from:myName()||"", from_id:myId(), by:myName()||"",
       due:due, status:"open", done_at:null, done_by:null, created:todayStr(), updated:todayStr(),
       proc_id:c.id, proc_label:c.label, pipe:pipe.key, stage_i:pipe.cur, stage_name:s.name, stage_total:pipe.stages.length, stage_auto:(s.due==="auto") };
     tasks.push(t);
@@ -9692,7 +9737,8 @@
     var pipes;
     if(opts.stages && opts.stages.length){
       // 시나리오 조립 방식 — 요소 조합이 결정한 단계 그대로(발주처 무관 동일)
-      pipes=[{key:"main", cur:0, stages:opts.stages.map(function(n){ return {name:n,due:"manual",days:null,status:"pending",task_id:null,done_at:null}; })}];
+      pipes=[{key:"main", cur:0, stages:opts.stages.map(function(n){ var o=(typeof n==="string")?{name:n}:n; return {name:o.name,due:"manual",days:null,status:"pending",task_id:null,done_at:null,opt:(o.opt?1:0)}; })}];
+      if(opts.doneFirst && pipes[0].stages.length>1){ pipes[0].stages[0].status="done"; pipes[0].stages[0].done_at=today; pipes[0].cur=1; }   // v382 견적 승격: 견적 단계는 완료로
     } else {
       pipes=tpl.pipes.map(function(p){
         var st = p.stages;
@@ -9703,7 +9749,7 @@
     var c = { id:genId("c"), type:type, label:tpl.label, docType:docType, client:opts.client||"", site:opts.site||"", start:opts.start||today,
       title:opts.title||"", contract_info:opts.cinfo||null,
       lic_id:opts.lic_id||null, info:{}, review:{missing:[],suspect:[],ok:false}, docs:[],
-      elems:opts.elems||null, bid_id:opts.bid_id||"",
+      elems:opts.elems||null, bid_id:opts.bid_id||"", scen:opts.scen||null,
       pipes:pipes,
       status:"active", who_id:opts.who||"", who:memberName(opts.who||""), created:today, updated:today };
     contracts.push(c);
@@ -9717,7 +9763,7 @@
     var c = findProc(t.proc_id); if(!c) return;
     var pipe=null; for(var i=0;i<c.pipes.length;i++){ if(c.pipes[i].key===t.pipe){ pipe=c.pipes[i]; break; } }
     if(!pipe) return;
-    var s = pipe.stages[t.stage_i]; if(!s || s.status==="done") return;
+    var s = pipe.stages[t.stage_i]; if(!s || s.status==="done" || s.status==="skipped" || t.stage_i < pipe.cur) return;   // v382 검토 1: 건너뛴·지난 단계 지시를 되돌려 재승인해도 파이프를 되감지 않는다
     s.status="done"; s.done_at=todayStr();
     pipe.cur = t.stage_i + 1;
     if(pipe.cur < pipe.stages.length){ materializeStage(c, pipe, todayStr()); }
@@ -9731,7 +9777,7 @@
     if(!canDo("rec")) return;   // 기성 권한 없으면 담당자가 기성 탭에서 등록
     if(c.rec_id && receivables.some(function(r){ return r.id===c.rec_id && r.del!==1; })) return;
     var ci=c.contract_info||{};
-    var amt=conAmt(c);
+    var amt=conAmtEff(c);   // v382 정산액(준공 단계 입력)이 있으면 정산액
     if(!confirm("청구 단계 완료 — 기성(미수)에 청구 건을 등록할까요?\n"+(c.client||"발주처?")+" · "+(c.title||c.label)+(amt?" · "+fmtAmount(amt)+"원":" · 금액 미확인(기성에서 입력)"))) return;
     var today=todayStr();
     var r={ id:genId("r"), client:c.client||"", site:c.site||"", desc:(c.title||c.label||""),
@@ -9741,7 +9787,7 @@
     receivables.push(r);
     c.rec_id=r.id; scheduleContractSave();
     saveRecCache(); renderReceivables(); renderDashboard(); scheduleRecSave();
-    alert("기성(미수)에 등록되었습니다 — 입금되면 기성에서 입금 처리하세요(수금확인 단계가 자동 제안됩니다).");
+    alert("기성(미수)에 등록되었습니다 — 입금되면 기성에서 입금 처리하세요(수금확인 단계가 따로 열려 있는 계약은 자동 제안됩니다).");
   }
   function procChipHtml(t){
     if(!t.proc_id) return "";
@@ -9752,7 +9798,7 @@
   function pipeLabel(k){ return k==="waste" ? "폐기물" : "본"; }
   // @con-sheet-start — v381 계약 시트형(A안, 9/21 결정) + 펼침 4탭(개요/단계/서류/연결). 설계 브리핑 10/12 PM ㄱ.
   // 표·칩·펼침 CSS는 차량 시트(.vs-*)를 그대로 쓰고, 상태(정렬·필터·칩)는 기기별 localStorage. 데이터 모델·저장·권한은 손대지 않는다(새 키 없음).
-  // 종전 카드형 renderContractsCards는 v382에서 제거 예정(롤백 대비 1판 보존).
+  // 종전 카드형은 v382에서 제거(v381 한 판 보존 뒤).
   var CON_SHEET_KEY = "jw_con_sheet";
   var CON_COLS = [
     { k:"client", h:"발주처",        w:170, f:"text" },
@@ -9807,7 +9853,7 @@
     if (k === "site") return csSiteText(c);
     if (k === "kind") return csKind(c);
     if (k === "pub") return csPub(c);
-    if (k === "amount") return conAmt(c) || 0;
+    if (k === "amount") return conAmtEff(c) || 0;
     if (k === "stage") return csStageInfo(c).frac;
     if (k === "end") return csEndCell(c).sortv;
     if (k === "who") return c.who || "";
@@ -9856,33 +9902,123 @@
       else if (col.k === "site") cells += '<td class="' + cls + '" title="' + esc(csSiteText(c)) + '">' + esc(csSiteText(c)) + '</td>';
       else if (col.k === "kind") cells += '<td class="' + cls + '" title="' + esc(c.label || "") + '">' + esc(csKind(c)) + '</td>';
       else if (col.k === "pub") cells += '<td class="' + cls + '">' + (c.docType === "public" ? '<span class="from-chip" title="공문서">관급</span>' : '<span class="scope-chip" title="사문서">사급</span>') + '</td>';
-      else if (col.k === "amount"){ amt = conAmt(c); cells += '<td class="' + cls + ' cs-num">' + (amt ? esc(fmtAmount(amt)) : '') + '</td>'; }
+      else if (col.k === "amount"){ amt = conAmtEff(c); cells += '<td class="' + cls + ' cs-num">' + (amt ? esc(fmtAmount(amt)) : '') + '</td>'; }
       else if (col.k === "stage"){ st = csStageInfo(c); cells += '<td class="' + cls + '" title="' + esc(st.name) + (st.due ? ' · 기한 ' + esc(st.due) : '') + '"><span class="cs-bar"><i style="width:' + Math.round(st.frac * 100) + '%"></i></span>' + esc(st.pos) + (st.name ? ' · ' + esc(st.name) : '') + '</td>'; }
       else if (col.k === "end"){ ec = csEndCell(c); cells += '<td class="' + cls + (ec.cls ? ' ' + ec.cls : '') + '">' + ec.html + '</td>'; }
       else if (col.k === "who") cells += '<td class="' + cls + '">' + (c.who ? esc(dispName(c.who)) : '<span style="color:#9AA09C;">-</span>') + '</td>';
     }
     return '<tr class="vs-r' + (c.status === "done" ? ' grey' : '') + (open ? ' open' : '') + '" data-cs-row="' + esc(c.id) + '">' + cells + '</tr>';
   }
+  // 단계 탭(v382) — 파이프별 단계 카드. 카드 클릭 → 입력 칸(stage.vals)·작업현황(준설)·버튼(📄 서류 / 완료 / 건너뜀 / 이 단계부터)
+  var csStageOpen = "";   // "pipeKey|i"
+  function csIsOpt(s){ return !!(s && (s.opt || conIsOptName(s.name))); }
+  function csExactRe(name){ return new RegExp("^" + String(name||"").replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "$"); }
+  function csPipeOf(c, key){ var ps = c.pipes || [], i; for (i = 0; i < ps.length; i++) if (ps[i].key === key) return ps[i]; return null; }
+  function csStageCard(c, p, i, open){
+    var s = p.stages[i], isCur = i === p.cur, isSkip = s.status === "skipped", isDone = !isSkip && (s.status === "done" || i < p.cur);
+    var t = s.task_id ? findTask(s.task_id) : null, due = (t && t.due) ? t.due : "", opt = csIsOpt(s), key = p.key + "|" + i, can = canDo("con") && c.status !== "done";
+    var review = !!(t && t.status === "review" && !canApproveTask(t));
+    var ct = (p.cur < p.stages.length && p.stages[p.cur].task_id) ? findTask(p.stages[p.cur].task_id) : null, canCloseCur = !ct || ct.status === "done" || canApproveTask(ct);   // 현재 지시를 닫을 수 있는 사람(승인권)만 건너뜀·순서 변경(v382 검토 4)
+    var cls = isSkip ? ' skip' : (isDone ? ' done' : (isCur ? ' cur' : '')) + (opt ? ' opt' : '') + (open ? ' open' : '');
+    var meta = isSkip ? '건너뜀' : (isDone ? ('완료' + (s.done_at ? ' ' + esc(s.done_at) : '')) : (isCur ? ((t && t.status === "review") ? '승인 대기' + (due ? ' · 기한 ' + esc(due) : '') : (due ? '기한 ' + esc(due) : '<span class="need-due">기한 입력</span>')) : '대기'));
+    var h = '<div class="cs-stg' + cls + '" data-cs-stg="' + esc(key) + '"><span class="n">' + (i + 1) + ' ' + esc(s.name) + (opt ? ' <small>선택</small>' : '') + '</span><span class="m">' + meta + '</span>';
+    if (!open) return h + '</div>';
+    var flds = csStageFields(s.name), vals = s.vals || {};
+    if (flds.length){
+      h += '<div class="cs-fld" data-cs-fpanel="' + esc(key) + '">' + flds.map(function(f){
+        var v = (f[0] === "settle_amount" && c.settle_amount) ? c.settle_amount : (vals[f[0]] == null ? "" : vals[f[0]]);
+        return '<label>' + esc(f[1]) + '<input type="' + (f[2] === "date" ? "date" : (f[2] === "num" ? "number" : "text")) + '" data-cs-fld="' + esc(f[0]) + '" value="' + esc(String(v)) + '"' + (can ? '' : ' disabled') + '></label>';
+      }).join("") + '</div>';
+    }
+    if (c.type === "dredge" && /작업|공사\s*수행/.test(s.name)) h += csWorkLogHtml(c, can);
+    var act = '';
+    if (can){
+      if (isCur && t && t.status !== "done"){
+        act += '<button type="button" class="vs-chip" data-cs-sdoc="' + esc(c.id) + '|' + esc(s.name) + '">📄 서류</button>';
+        if (!review) act += '<button type="button" class="vs-chip" data-cs-done="' + esc(c.id) + '|' + esc(key) + '">' + (canApproveTask(t) ? '완료' : '완료 요청') + '</button>';
+        else act += '<span class="vs-chip" style="cursor:default;opacity:.7;">승인 대기 중</span>';
+      }
+      if (flds.length) act += '<button type="button" class="vs-chip" data-cs-fsave="' + esc(c.id) + '|' + esc(key) + '">입력 저장</button>';
+      if (opt && !isDone && !isSkip && (!isCur || canCloseCur)) act += '<button type="button" class="vs-chip" data-cs-skip="' + esc(c.id) + '|' + esc(key) + '">건너뜀</button>';
+      if (!isDone && !isSkip && !isCur && i > p.cur && canCloseCur) act += '<button type="button" class="vs-chip" data-cs-jump="' + esc(c.id) + '|' + esc(key) + '" title="앞 단계를 건너뛰고 이 단계부터(긴급 건) — 되돌릴 수 없음">이 단계부터</button>';
+      if (isSkip && i > p.cur) act += '<button type="button" class="vs-chip" data-cs-unskip="' + esc(c.id) + '|' + esc(key) + '">선택 복구</button>';
+    }
+    act += '<button type="button" class="vs-chip" data-cs-stg="' + esc(key) + '">접기 ▲</button>';
+    return h + '<div class="cs-act">' + act + '</div></div>';
+  }
   function csStagesHtml(c){
     var ps = c.pipes || [];
     if (!ps.length) return '<div class="vs-empty">단계가 없습니다.</div>';
     return ps.map(function(p){
       var h = ps.length > 1 ? '<div class="cs-pipe-h">' + esc(pipeLabel(p.key)) + ' 파이프 ' + Math.min(p.cur, p.stages.length) + '/' + p.stages.length + '</div>' : '';
-      h += '<div class="cs-stages">' + p.stages.map(function(s, i){
-        var isCur = i === p.cur, isDone = i < p.cur || s.status === "done", t = s.task_id ? findTask(s.task_id) : null, due = (t && t.due) ? t.due : "";
-        var cls = isDone ? ' done' : (isCur ? ' cur' : '');
-        var meta = isDone ? ('완료' + (s.done_at ? ' ' + esc(s.done_at) : '')) : (isCur ? (due ? '기한 ' + esc(due) : '<span class="need-due">기한 입력</span>') : '대기');
-        var act = (isCur && canDo("con") && c.status !== "done") ? '<button type="button" class="vs-chip" data-cs-sdoc="' + esc(c.id) + '|' + esc(s.name) + '">📄 서류</button>' : '';
-        return '<div class="cs-stg' + cls + '"><span class="n">' + (i + 1) + ' ' + esc(s.name) + '</span><span class="m">' + meta + '</span>' + (act ? '<span class="k">' + act + '</span>' : '') + '</div>';
-      }).join("") + '</div>';
+      h += '<div class="cs-stages">' + p.stages.map(function(s, i){ return csStageCard(c, p, i, csStageOpen === p.key + "|" + i); }).join("") + '</div>';
       return h;
-    }).join("");
+    }).join("") + (c.scen ? '' : '<div class="vs-empty" style="font-size:12px;">이 계약은 v382 이전 단계 목록입니다(종류·사급/관급 시나리오 아님).</div>');
   }
+  // 작업현황(준설 작업 단계) — 날짜·구간·실중량 kg·실수량 ㎥·시간·차량·근로자·사진. 준공 수량·사진대지·실적의 원천(시나리오 J2)
+  var CS_WL_COLS = [["date","날짜","date"],["section","구간","text"],["kg","실중량 kg","num"],["m3","실수량 ㎥","num"],["hrs","시간","num"],["veh","차량","text"],["workers","근로자","num"],["photos","사진","num"]];
+  function csWorkLogHtml(c, can){
+    var rows = (c.work_log || []).slice().sort(function(a, b){ return String(a.date||"").localeCompare(String(b.date||"")); }), sum = { kg:0, m3:0, hrs:0, workers:0, photos:0 };
+    rows.forEach(function(r){ ["kg","m3","hrs","workers","photos"].forEach(function(k){ sum[k] += Number(r[k]) || 0; }); });
+    var h = '<div class="cs-pipe-h">작업현황 ' + rows.length + '일</div><div class="cs-wl-wrap"><table class="cs-wl"><thead><tr>' + CS_WL_COLS.map(function(k){ return '<th' + (k[2] === "num" ? ' class="num"' : '') + '>' + k[1] + '</th>'; }).join("") + (can ? '<th></th>' : '') + '</tr></thead><tbody>';
+    h += rows.map(function(r){ return '<tr>' + CS_WL_COLS.map(function(k){ var v = r[k[0]]; return '<td' + (k[2] === "num" ? ' class="num"' : '') + '>' + (v == null || v === "" ? '' : esc(k[2] === "num" ? Number(v).toLocaleString() : String(v))) + '</td>'; }).join("") + (can ? '<td><button type="button" class="vs-chip" data-cs-wldel="' + esc(c.id) + '|' + esc(r.id) + '">✕</button></td>' : '') + '</tr>'; }).join("");
+    if (can) h += '<tr data-cs-wlform="' + esc(c.id) + '">' + CS_WL_COLS.map(function(k){ return '<td><input type="' + (k[2] === "date" ? "date" : (k[2] === "num" ? "number" : "text")) + '" data-cs-wl="' + k[0] + '" placeholder="' + esc(k[1]) + '"></td>'; }).join("") + '<td><button type="button" class="vs-chip" data-cs-wladd="' + esc(c.id) + '">추가</button></td></tr>';
+    h += '</tbody><tfoot><tr><td>합계</td><td>' + rows.length + '일</td><td class="num">' + sum.kg.toLocaleString() + '</td><td class="num">' + sum.m3.toLocaleString() + '</td><td class="num">' + sum.hrs.toLocaleString() + '</td><td></td><td class="num">' + sum.workers.toLocaleString() + '</td><td class="num">' + sum.photos.toLocaleString() + '</td>' + (can ? '<td></td>' : '') + '</tr></tfoot></table></div>';
+    return h;
+  }
+  function csCloseTask(t, how){ if (!t || t.status === "done") return; t.status = "done"; t.done_at = todayStr(); t.done_by = myName() || "자동"; t.approved_by = myName() || ""; t.approved_at = todayStr(); t.updated = todayStr(); if (how) t.detail = (t.detail ? t.detail + "\n" : "") + how; }
+  function csRecalc(c){ c.status = (c.pipes||[]).every(function(p){ return p.cur >= p.stages.length; }) ? "done" : "active"; c.updated = todayStr(); }
+  // 현재 단계의 열린 지시를 닫아도 되는 사람인지(승인권) — 아니면 [완료 요청]과 같은 길로(v382 검토 4·8·17)
+  function csCanCloseCur(c, p){ var s = p.stages[p.cur]; var t = (s && s.task_id) ? findTask(s.task_id) : null; if (t && t.status !== "done" && !canApproveTask(t)){ alert("현재 단계 지시는 승인권자(관리자·지시자)만 닫을 수 있습니다 — [완료 요청]을 올리거나 승인권자에게 맡기세요."); return false; } return true; }
+  function csSkipStage(c, p, i){
+    if (!canDo("con")) return;
+    var s = p.stages[i]; if (!s || s.status === "done" || s.status === "skipped") return;
+    var cur = i === p.cur;
+    if (cur && !csCanCloseCur(c, p)) return;
+    if (!confirm('"' + s.name + '" 단계를 건너뜁니다(해당 없음).' + (cur ? ' 현재 단계라 되돌릴 수 없습니다(필요하면 지시 탭에서 처리).' : ' 되돌리려면 [선택 복구].'))) return;
+    s.status = "skipped"; s.done_at = todayStr();
+    if (cur){ csCloseTask(s.task_id ? findTask(s.task_id) : null, "단계 건너뜀(해당 없음)"); p.cur = i + 1; materializeStage(c, p, todayStr()); }
+    csRecalc(c); scheduleContractSave(); saveTasksCache(); scheduleTasksSave(); renderTasks(); renderSummary(); renderContracts();
+  }
+  function csUnskipStage(c, p, i){ if (!canDo("con")) return; var s = p.stages[i]; if (!s || s.status !== "skipped" || i <= p.cur) return; s.status = "pending"; s.done_at = null; c.updated = todayStr(); scheduleContractSave(); renderContracts(); }
+  function csJumpStage(c, p, i){
+    if (!canDo("con")) return;
+    if (i <= p.cur || i >= p.stages.length) return;
+    if (!csCanCloseCur(c, p)) return;
+    var n = 0, j, bill = false; for (j = p.cur; j < i; j++) if (p.stages[j].status !== "done"){ n++; if (/청구|입금/.test(p.stages[j].name||"")) bill = true; }
+    if (!confirm('앞 단계 ' + n + '개를 건너뛰고 "' + p.stages[i].name + '"부터 진행합니다(긴급 건). 건너뛴 단계는 되돌릴 수 없고 지시 탭에만 기록이 남습니다.' + (bill ? '\n※ 청구 단계를 건너뛰면 기성(미수) 등록이 생기지 않습니다 — 기성 탭에서 직접 등록해야 합니다.' : ''))) return;
+    for (j = p.cur; j < i; j++){ var s = p.stages[j]; if (s.status === "done") continue; csCloseTask(s.task_id ? findTask(s.task_id) : null, "순서 변경으로 건너뜀"); s.status = "skipped"; s.done_at = todayStr(); }
+    if (p.stages[i].status === "skipped"){ p.stages[i].status = "pending"; p.stages[i].done_at = null; }   // v382 검토 3: 미리 건너뛴 단계부터 시작하면 그 단계를 되살린다
+    p.cur = i; materializeStage(c, p, todayStr());
+    csRecalc(c); scheduleContractSave(); saveTasksCache(); scheduleTasksSave(); renderTasks(); renderSummary(); renderContracts();
+  }
+  function csDoneStage(c, p, i){
+    var s = p.stages[i]; if (!s || i !== p.cur) return;
+    var r = completeStageNow(c, csExactRe(s.name), p.key);   // v382 검토 7: 이 파이프만
+    if (r === "review") alert("완료 요청으로 올렸습니다 — 승인권자가 승인하면 다음 단계가 생성됩니다.");
+    else if (r === "none") alert("이 단계의 지시를 찾지 못했습니다 — 지시 탭에서 확인하세요.");
+    renderContracts();
+  }
+  function csSaveFields(c, p, i, panel){
+    var s = p.stages[i]; if (!s || !panel) return;
+    s.vals = s.vals || {};
+    Array.prototype.forEach.call(panel.querySelectorAll("[data-cs-fld]"), function(el){ var k = el.getAttribute("data-cs-fld"), v = el.value; if (v === "") delete s.vals[k]; else s.vals[k] = (el.type === "number") ? Number(v) : v; if (k === "settle_amount"){ if (v === "") delete c.settle_amount; else c.settle_amount = Number(v); } });
+    c.updated = todayStr(); scheduleContractSave(); renderContracts();
+  }
+  function csWlAdd(c, row){
+    var r = { id: genId("w") }, any = false;
+    Array.prototype.forEach.call(row.querySelectorAll("[data-cs-wl]"), function(el){ var k = el.getAttribute("data-cs-wl"), v = el.value; if (v === "") return; any = true; r[k] = (el.type === "number") ? Number(v) : v; });
+    if (!any) return;
+    if (!r.date) r.date = todayStr();
+    Array.prototype.forEach.call(row.querySelectorAll("[data-cs-wl]"), function(el){ el.value = ""; });
+    c.work_log = c.work_log || []; c.work_log.push(r); c.updated = todayStr(); scheduleContractSave(); renderContracts();
+  }
+  function csWlDel(c, id){ if (!c.work_log) return; if (!confirm("이 작업현황 줄을 지울까요?")) return; c.work_log = c.work_log.filter(function(r){ return r.id !== id; }); c.updated = todayStr(); scheduleContractSave(); renderContracts(); }
   function csOverviewHtml(c){
     var ci = c.contract_info || {}, bi = c.bldg_info, amt = conAmt(c), kv;
     kv = [["종류", csKind(c) + ((c.label && c.label !== csKind(c)) ? ' (' + c.label + ')' : '')], ["사급/관급", csPub(c) + (c.docType === "public" ? " · 공문서" : " · 사문서")],
       ["발주처", c.client], ["현장", c.site], ["공사명", csTitle(c)], ["시작", c.start], ["계약일", ci.d1], ["착공", ci.d2], ["준공 예정", ci.d3],
-      ["계약액", amt ? fmtAmount(amt) + "원" : ""], ["계약보증", ci.guarantee ? fmtAmount(ci.guarantee) + "원" : ""], ["담당", c.who ? dispName(c.who) : ""],
+      ["계약액", amt ? fmtAmount(amt) + "원" : ""], ["정산액", c.settle_amount ? fmtAmount(c.settle_amount) + "원" : ""], ["계약보증", ci.guarantee ? fmtAmount(ci.guarantee) + "원" : ""], ["담당", c.who ? dispName(c.who) : ""],
       ["입찰", c.bid_id ? (ci.from || c.bid_id) : ""],
       ["건축물대장", bi ? ((bi.site || "") + " · " + (bi.total_floor || 0) + "㎡ · " + (bi.dongs || 0) + "동" + (bi.auto ? " (자동)" : "")) : (conNeedsBldg(c) ? "필요 — [대장]으로 조회" : "")],
       ["등록", c.created], ["상태", c.status === "done" ? "완료" : "진행 중"]];
@@ -9910,6 +10046,16 @@
     else h += csOverviewHtml(c);
     if (canDo("con")) h += '<div class="vs-act">' + (conHasBldg(c) ? '<button class="mini-btn" data-con-bldg="' + esc(c.id) + '">대장</button>' : '') + '<button class="mini-btn" data-con-xlsx="' + esc(c.id) + '">생성</button><button class="mini-btn" data-con-doc="' + esc(c.id) + '">서류</button><button class="mini-btn danger" data-con-del="' + esc(c.id) + '">삭제</button></div>';
     return h;
+  }
+  function csPanelOf(el){ var e = el; while (e && e.getAttribute && !(e.getAttribute("data-cs-fpanel") || e.getAttribute("data-cs-wlform"))) e = e.parentNode; return (e && e.getAttribute) ? e : null; }
+  function csSnapInputs(root){
+    var out = []; if (!root) return out;
+    Array.prototype.forEach.call(root.querySelectorAll("[data-cs-fld], [data-cs-wl]"), function(el){ if (el.value === "") return; var pan = csPanelOf(el); if (!pan) return; out.push({ p: pan.getAttribute("data-cs-fpanel") || ("wl:" + pan.getAttribute("data-cs-wlform")), k: el.getAttribute("data-cs-fld") || el.getAttribute("data-cs-wl"), v: el.value }); });
+    return out;
+  }
+  function csRestoreInputs(root, snap){
+    if (!root || !snap.length) return;
+    snap.forEach(function(x){ var pan = x.p.indexOf("wl:") === 0 ? root.querySelector('[data-cs-wlform="' + x.p.slice(3) + '"]') : root.querySelector('[data-cs-fpanel="' + x.p + '"]'); if (!pan) return; var el = pan.querySelector('[data-cs-fld="' + x.k + '"], [data-cs-wl="' + x.k + '"]'); if (el && el.value !== x.v) el.value = x.v; });
   }
   function conSetPaneW(wrap){ try { wrap.style.setProperty("--vs-panew", wrap.clientWidth + "px"); } catch(e){} }
   function renderContracts(){
@@ -9953,7 +10099,7 @@
       if (open) h += '<tr class="vs-det"><td colspan="' + csN + '"><div class="vs-det-in">' + csDetailHtml(c) + '</div></td></tr>';
     });
     var sumAmt = 0, nA = 0, nD = 0, nSoon = 0, nOver = 0;
-    rows.forEach(function(c){ sumAmt += conAmt(c) || 0; if (c.status === "done") nD++; else { nA++; var ec = csEndCell(c); if (ec.cls === "vs-dan") nOver++; else if (ec.cls === "vs-warn") nSoon++; } });
+    rows.forEach(function(c){ sumAmt += conAmtEff(c) || 0; if (c.status === "done") nD++; else { nA++; var ec = csEndCell(c); if (ec.cls === "vs-dan") nOver++; else if (ec.cls === "vs-warn") nSoon++; } });
     h += '</tbody><tfoot><tr>';
     CON_COLS.forEach(function(c){
       var t = "";
@@ -9961,8 +10107,10 @@
       h += '<td class="' + conColCls(c) + (c.k === "amount" ? ' cs-num' : '') + '">' + t + '</td>';
     });
     h += '</tr></tfoot></table></div>';
+    var snap = csSnapInputs(host).concat(csSnapInputs(dcard));   // v382 검토 10: 백그라운드 재그리기(판독 폴링·승인·폭 변경)에도 입력 중인 값 유지
     host.innerHTML = h;
     if (dcard) dcard.innerHTML = csDetailHtml(openC);
+    csRestoreInputs(host, snap); csRestoreInputs(dcard, snap);
     var wrap = host.querySelector(".vs-wrap");
     if (wrap){
       wrap.scrollLeft = sl; wrap.scrollTop = st0;
@@ -10005,6 +10153,24 @@
       Array.prototype.forEach.call(root.querySelectorAll("[data-cs-tab]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); conDetTab = el.getAttribute("data-cs-tab") || "ov"; renderContracts(); }); });
       Array.prototype.forEach.call(root.querySelectorAll("[data-cs-close]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); conOpenId = null; renderContracts(); }); });
       Array.prototype.forEach.call(root.querySelectorAll("[data-cs-sdoc]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); var p = el.getAttribute("data-cs-sdoc").split("|"); openStageDoc(p[0], p[1]); }); });
+      // v382 단계 카드: 펼침·완료·건너뜀·이 단계부터·입력 저장·작업현황
+      Array.prototype.forEach.call(root.querySelectorAll("[data-cs-stg]"), function(el){ el.addEventListener("click", function(e){
+        var tg = e.target;
+        if (el.tagName !== "BUTTON"){   // 카드 본체: 입력·버튼 클릭은 무시, 펼친 카드는 [접기] 버튼으로만 닫는다(v382 검토 9 — 입력 중 값 보호)
+          if (tg && tg.tagName && /^(INPUT|BUTTON|SELECT|LABEL|TEXTAREA)$/.test(tg.tagName)) return;
+          if (el.classList.contains("open")) return;
+        }
+        e.stopPropagation(); var k = el.getAttribute("data-cs-stg"); csStageOpen = (csStageOpen === k) ? "" : k; renderContracts();
+      }); });
+      var csAct = function(attr, fn){ Array.prototype.forEach.call(root.querySelectorAll("[" + attr + "]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); var p = el.getAttribute(attr).split("|"), c = findProc(p[0]); if (!c) return; var pipe = csPipeOf(c, p[1]), i = Number(p[2]); if (!pipe || isNaN(i)) return; fn(c, pipe, i, el); }); }); };
+      csAct("data-cs-done", function(c, p, i){ csDoneStage(c, p, i); });
+      csAct("data-cs-skip", function(c, p, i){ csSkipStage(c, p, i); });
+      csAct("data-cs-unskip", function(c, p, i){ csUnskipStage(c, p, i); });
+      csAct("data-cs-jump", function(c, p, i){ csJumpStage(c, p, i); });
+      csAct("data-cs-fsave", function(c, p, i, el){ var panel = root.querySelector('[data-cs-fpanel="' + p.key + '|' + i + '"]'); csSaveFields(c, p, i, panel); });
+      Array.prototype.forEach.call(root.querySelectorAll("[data-cs-wladd]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); var c = findProc(el.getAttribute("data-cs-wladd")); var row = root.querySelector('[data-cs-wlform="' + (c ? c.id : "") + '"]'); if (c && row) csWlAdd(c, row); }); });
+      Array.prototype.forEach.call(root.querySelectorAll("[data-cs-wldel]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); var p = el.getAttribute("data-cs-wldel").split("|"), c = findProc(p[0]); if (c) csWlDel(c, p[1]); }); });
+      Array.prototype.forEach.call(root.querySelectorAll("[data-cs-fld], [data-cs-wl]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); }); });
       Array.prototype.forEach.call(root.querySelectorAll(".vs-det-in, #conDetailCard"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); }); });   // 펼침 안 클릭이 행 토글로 번지지 않게
     });
     Array.prototype.forEach.call(host.querySelectorAll("tr.vs-r"), function(tr){
@@ -10041,73 +10207,6 @@
     });
   }
   // @con-sheet-end
-  function renderContractsCards(){   // v380까지의 카드형 — v381 시트형(renderContracts)으로 교체, 롤백 대비 1판 보존 뒤 v382에서 제거
-    var host=document.getElementById("conList"); if(!host) return;
-    var startBtn=document.getElementById("conStartBtn"); if(startBtn) startBtn.style.display = canDo("con") ? "block" : "none";
-    var dgBtn=document.getElementById("docGenBtn"); if(dgBtn) dgBtn.style.display = canDo("con") ? "block" : "none";
-    var tmBtn=document.getElementById("tplManageBtn"); if(tmBtn) tmBtn.style.display = isAdmin() ? "block" : "none";
-    var pfBtn=document.getElementById("conPerfBtn"); if(pfBtn) pfBtn.style.display = canDo("con") ? "block" : "none";
-    var active=liveContracts().filter(function(c){return c.status!=="done";});
-    var done=liveContracts().filter(function(c){return c.status==="done";});
-    var head=document.getElementById("conHead"); if(head) head.textContent = active.length ? (active.length+" 진행중") : "";
-    var list=active.concat(done);
-    if(!list.length){ host.innerHTML='<div class="empty-line">진행 중인 계약이 없습니다.</div>'; return; }
-    host.innerHTML=list.map(function(c){
-      var pipes=c.pipes.map(function(p){
-        var atEnd=p.cur>=p.stages.length;
-        var s=atEnd?null:p.stages[p.cur];
-        var pos=Math.min(p.cur+(atEnd?0:1), p.stages.length)+"/"+p.stages.length;
-        var taskDue = (s && s.task_id) ? ((findTask(s.task_id)||{}).due||"") : "";
-        var dueBit = s ? (taskDue?' · '+esc(taskDue):' · <span class="need-due">기한 입력</span>') : '';
-        return '<div class="con-pipe">'+(c.pipes.length>1?'<b>'+pipeLabel(p.key)+'</b> ':'')+pos+' · '+esc(s?s.name:"완료")+dueBit+'</div>';
-      }).join("");
-      return '<div class="item con-item'+(c.status==="done"?' checked':'')+'">'+
-        '<div class="item-body">'+
-          '<div class="item-title">'+esc(c.label)+(c.client?' · '+esc(c.client):'')+'</div>'+
-          '<div class="item-meta">'+(c.docType==="public"?'<span class="from-chip">공문서</span>':'<span class="scope-chip">사문서</span>')+(c.site?'<span>'+esc(c.site)+'</span>':'')+'<span>시작 '+esc(c.start||"")+'</span>'+(c.who?'<span class="author-chip">'+esc(c.who)+'</span>':'')+(c.bldg_info?'<span class="scope-chip" title="'+esc((c.bldg_info.site||"")+(c.bldg_info.auto?' — 자동조회('+(c.bldg_info.q||"")+') · 다른 건물이면 [대장]으로 재조회':''))+'">🏢 대장'+(c.bldg_info.auto?'(자동)':'')+' '+c.bldg_info.total_floor+'㎡·'+c.bldg_info.dongs+'동</span>':(conNeedsBldg(c)?'<span class="hold-chip" title="자동 조회로 지번을 찾지 못했습니다 — [대장]에 지번 주소를 입력하거나, 서류함에 건축물대장 파일을 첨부하면 자동 판독됩니다">🏢 대장 필요</span>':''))+(c.rec_id?(function(){ var rr=findRec(c.rec_id); return rr&&rr.del!==1?(rr.paid?'<span class="from-chip">💰 수금완료 '+esc(rr.paid)+'</span>':'<span class="hold-chip">미수'+(rr.amount?' '+fmtAmount(rr.amount)+'원':'')+'</span>'):''; })():'')+(c.status==="done"?'<span class="done-by">✓ 완료</span>':'')+'</div>'+
-          pipes+
-          conAttBoxHtml(c)+
-        '</div>'+
-        (canDo("con")?'<div class="task-ctrl">'+(conHasBldg(c)?'<button class="mini-btn" data-con-bldg="'+c.id+'">대장</button>':'')+'<button class="mini-btn" data-con-xlsx="'+c.id+'">생성</button><button class="mini-btn" data-con-doc="'+c.id+'">서류</button><button class="mini-btn danger" data-con-del="'+c.id+'">삭제</button></div>':'')+
-      '</div>';
-    }).join("");
-    Array.prototype.forEach.call(host.querySelectorAll("[data-con-del]"), function(el){
-      el.addEventListener("click", function(){ delContract(el.getAttribute("data-con-del")); });
-    });
-    Array.prototype.forEach.call(host.querySelectorAll("[data-con-doc]"), function(el){
-      el.addEventListener("click", function(){ openDocFromContract(el.getAttribute("data-con-doc")); });
-    });
-    Array.prototype.forEach.call(host.querySelectorAll("[data-con-xlsx]"), function(el){
-      el.addEventListener("click", function(){ openXlsxGen(el.getAttribute("data-con-xlsx")); });
-    });
-    Array.prototype.forEach.call(host.querySelectorAll("[data-con-bldg]"), function(el){
-      el.addEventListener("click", function(){
-        var c=findProc(el.getAttribute("data-con-bldg")); if(!c) return;
-        // 낙찰 연동 건은 c.site=공고명(주소 아님) — 판독된 주소값만 기본값으로, 없으면 빈칸
-        var def=c.bid_id ? (((c.contract_info||{}).site)||((c.asb_survey||{}).site)||"")
-          : (c.site||((c.contract_info||{}).site)||((c.asb_survey||{}).site)||"");
-        var addr=prompt("건축물대장 조회 — 지번 주소를 입력하세요\n(예: 경북 안동시 풍산읍 하리리 247 / 번지 없이 리·동까지만 넣으면 전체 목록)", def);
-        if(addr) conBldgLookup(c.id, addr, false);
-      });
-    });
-    Array.prototype.forEach.call(host.querySelectorAll("[data-catt-add]"), function(el){
-      el.addEventListener("click", function(e){ e.stopPropagation(); conPickAttach(el.getAttribute("data-catt-add")); });
-    });
-    Array.prototype.forEach.call(host.querySelectorAll("[data-catt-del]"), function(el){
-      el.addEventListener("click", function(e){ e.preventDefault(); e.stopPropagation();
-        var p=el.getAttribute("data-catt-del").split("|"); conDelAttach(p[0], p[1], +p[2]); });
-    });
-    Array.prototype.forEach.call(host.querySelectorAll("[data-catt-rev]"), function(el){
-      el.addEventListener("click", function(e){ e.preventDefault(); e.stopPropagation();
-        var p=el.getAttribute("data-catt-rev").split("|"); openAsbReview(p[0], p[1], +p[2]); });
-    });
-    Array.prototype.forEach.call(host.querySelectorAll("[data-catt-drop]"), function(el){
-      el.addEventListener("dragover", function(e){ e.preventDefault(); el.style.background="#EEF5FF"; });
-      el.addEventListener("dragleave", function(){ el.style.background=""; });
-      el.addEventListener("drop", function(e){ e.preventDefault(); el.style.background="";
-        var f=e.dataTransfer && e.dataTransfer.files; if(f&&f.length) conAddAttach(el.getAttribute("data-catt-drop"), f); });
-    });
-  }
   function delContract(id){
     if(!canDo("con")) return;
     var c=findProc(id); if(!c) return;
@@ -10124,7 +10223,8 @@
     document.getElementById("conSite").value="";
     document.getElementById("conStart").value=todayStr();
     fillMemberSelect(document.getElementById("conWho"), "");
-    renderConElems(CON_TYPE_ELEMS.asbestos);
+    var cb0=document.getElementById("conCombo"); if(cb0) cb0.checked=false;
+    renderConScen();
     document.getElementById("conStartBackdrop").classList.add("show");
   }
   function saveConStart(){
@@ -10136,7 +10236,9 @@
     var who=document.getElementById("conWho").value.trim();
     var docType=document.getElementById("conDoc").value;
     if(!client && !site){ alert("거래처 또는 현장을 입력하세요."); return; }
-    var elems=conElemChecked();
+    var combo=conModalCombo() && (type==="asbestos"||type==="demolition"), pub=(docType==="public");
+    var elems=conModalElems(type, combo);
+    var stages=conScenStages(type, pub, combo, { qual: !!(lastBidForCon && /적격/.test(String(((lastBidForCon.ext||{}).decide)||""))) });
     // 중복 가드: 같은 낙찰 공고에 이미 계약이 연결돼 있으면 생성 차단(관리자 2명 동시 접속 시 자동오픈 중복 방지)
     if(lastBidForCon && liveContracts().some(function(c){ return c.bid_id===lastBidForCon.id; })){
       alert("이 낙찰 공고("+(lastBidForCon.title||"").slice(0,30)+")는 이미 계약이 연결되어 있습니다.\n계약 탭에서 기존 계약을 확인하세요.");
@@ -10155,7 +10257,7 @@
     }
     var nc=startProcess(type, {client:client, site:site, start:start, who:who, docType:docType,
       title:btitle, cinfo:bcinfo,
-      stages:conBuildStages(elems), elems:elems, bid_id:(lastBidForCon?lastBidForCon.id:"")});
+      stages:stages, elems:elems, scen:{type:type, pub:pub, combo:combo, ver:1}, bid_id:(lastBidForCon?lastBidForCon.id:"")});
     if(!nc){ alert("계약 생성 실패 — 유형 템플릿(" + type + ") 누락. 관리자에게 문의."); return; }
     document.getElementById("conStartBackdrop").classList.remove("show");
     renderContracts();
@@ -11485,6 +11587,7 @@
   // 연동 공고의 낙찰금액 — 계약 생성 시점에 개찰결과가 아직 없어 contract_info.amount=0으로 굳는 케이스의 폴백
   function conBidAmt(c){ if(!c||!c.bid_id) return 0; var b=findBid(c.bid_id); return (b&&b.result&&b.result.amt)||0; }
   function conAmt(c){ return ((c&&c.contract_info&&c.contract_info.amount)||0) || conBidAmt(c); }
+  function conAmtEff(c){ return (c && Number(c.settle_amount)) || conAmt(c); }   // v382 정산액 우선(시트 금액·기성)
   function liveBids(){ return bids.filter(function(b){ return b && b.del!==1; }); }
   // 마감이 지났는데 아직 판단 전(신규·검토)인 공고 = 죽은 건. 기본 화면에서 숨기고 '지남' 칩에 몬다.
   // 투찰(응찰)한 건은 개찰결과(낙찰/유찰) 대기라 마감이 지나도 남긴다. 삭제는 안 한다(사람 확인 원칙).
@@ -11650,14 +11753,15 @@
   }
   function quoteToContract(id){
     var q=liveQuotes().filter(function(x){return x.id===id;})[0]; if(!q) return;
-    if(!confirm("["+(q.no||"")+"] 견적서를 계약으로 승격할까요?\n견적 단계는 완료 처리하고 계약 단계부터 시작합니다.")) return;
     var type=(q.co==="con")?"asbestos":"dredge";
+    var qst=conScenStages(type, true, false, {}), qdf=/견적/.test((qst[0]||{}).name||"");   // v382 검토 6: 견적 단계가 있는 시나리오(준설)만 완료 처리
+    if(!confirm("["+(q.no||"")+"] 견적서를 계약으로 승격할까요?\n"+(qdf?("견적 단계는 완료 처리하고 \""+((qst[1]||{}).name||"")+"\"부터 시작합니다."):("\""+((qst[0]||{}).name||"")+"\" 단계부터 시작합니다(이 시나리오엔 견적 단계가 없습니다).")))) return;
     var elems=(q.co==="con")?{asb:1,labor:1,wst:1}:{dredge:1};
     var amt=qtAmt(q);
     var nc=startProcess(type, {client:q.recv||"", site:"", start:q.date||todayStr(), who:"", docType:"public",
       title:q.title||"", cinfo:{ title:q.title||"", amount:amt, d1:"", d2:"", d3:"", client:q.recv||"", site:"",
         guarantee:0, from:"견적서("+(q.no||"")+")", checked:todayStr() },
-      stages:conBuildStages(elems), elems:elems, bid_id:""});
+      stages:qst, scen:{type:type, pub:true, combo:false, ver:1}, doneFirst:qdf, elems:elems, bid_id:""});
     if(!nc){ alert("계약 생성 실패 — 유형 템플릿 누락. 관리자에게 문의."); return; }
     q.con_id=nc.id; q.updated=todayStr(); renderQuotes(); scheduleQuoteSave();
     renderContracts(); switchTab("tasks");
@@ -15224,7 +15328,7 @@
       else if(sug.demo) document.getElementById("conType").value="demolition";
       else if(sug.dredge) document.getElementById("conType").value="dredge";
       else document.getElementById("conType").value="waste";
-      renderConElems(sug);
+      var cbs=document.getElementById("conCombo"); if(cbs) cbs.checked=!!(sug.asb&&sug.demo); renderConScen();
     }
   }
   function renderBids(){
@@ -15459,7 +15563,7 @@
     else if(sug.demo) document.getElementById("conType").value="demolition";
     else if(sug.dredge) document.getElementById("conType").value="dredge";
     else document.getElementById("conType").value="waste";
-    renderConElems(sug);
+    var cbs=document.getElementById("conCombo"); if(cbs) cbs.checked=!!(sug.asb&&sug.demo); renderConScen();
   }
   // 낙찰 감지 → 적격심사 서류 제출 지시 자동 생성(세부기준 제5조: 통보 후 7일 이내 — 놓치면 낙찰자 결정 제외)
   function addDaysStr(iso, n){ var d=new Date(iso+"T00:00:00"); d.setDate(d.getDate()+n); return fmtDate(d); }
@@ -16333,11 +16437,12 @@
       // 검수 게이트(간이): 발행 전 청구가 검수 없이 입금 처리되면 경고 — 차단은 안 함(간이 단계)
       if (!r.invoice && !r.reviewed && !confirm("이 청구는 관리부 검수 전입니다. 검수 없이 입금 처리할까요?")) return;
       r.paid = todayStr(); r.mismatch = false; completeRecTask(r);  // 입금완료 → 연동 업무 완료
-      if (r.con_id){                                            // 계약 연동 건 → 수금확인 단계 완료 제안
+      if (r.con_id){                                            // 계약 연동 건 → 수금(입금)확인 단계 완료 제안 — 그 단계가 지금 열려 있을 때만(v382 검토 5: 새 시나리오는 "청구 및 입금확인" 한 단계라 청구 때 닫힘)
         var cc = findProc(r.con_id);
-        if (cc && cc.status !== "done") setTimeout(function(){
-          if (confirm("입금 처리 완료 — 연동된 계약 [" + (cc.title||cc.label) + "]의 수금확인 단계를 완료할까요?")){
-            var res = completeStageNow(cc, /수금확인/);
+        var ccOpen = !!(cc && cc.status !== "done" && (cc.pipes||[]).some(function(p){ var s=p.stages[p.cur]; return s && /수금확인|입금확인/.test(s.name||"") && s.status!=="done" && s.status!=="skipped"; }));
+        if (ccOpen) setTimeout(function(){
+          if (confirm("입금 처리 완료 — 연동된 계약 [" + (cc.title||cc.label) + "]의 수금(입금)확인 단계를 완료할까요?")){
+            var res = completeStageNow(cc, /수금확인|입금확인/);
             if (res === "none") alert("현재 단계가 수금확인이 아니라 자동 완료하지 않았습니다. 지시 탭에서 진행하세요.");
             else if (res === "review") alert("완료 요청으로 올렸습니다 — 승인권자 승인 후 종결됩니다.");
           }

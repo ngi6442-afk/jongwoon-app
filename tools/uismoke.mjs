@@ -1351,15 +1351,48 @@ try {
   T('v381 시트 블록: CON_COLS 8열(발주처·현장·종류·사급/관급·계약액·단계·준공·담당) · 폰 숨김 4열(kind/pub/amount/who) · 칩 6 · 상태 키 jw_con_sheet',
     cols.join(',') === 'client,site,kind,pub,amount,stage,end,who' && (seg.match(/hs:1/g) || []).length === 4 && /CON_CHIPS = \[\["", "전체"\], \["active"/.test(seg) && /CON_SHEET_KEY = "jw_con_sheet"/.test(seg), cols.join(','));
   T('v381 배선: renderContracts가 시트 블록 안 · 종전 카드형은 renderContractsCards로 보존 · 펼침 4탭(ov/st/doc/lk) · 행/정렬/필터/칩/초기화/폭끌기/탭/닫기/단계서류 핸들러 · colspan=csN 2곳 · 폰 상세 카드 id',
-    /function renderContracts\(\)\{/.test(seg) && /function renderContractsCards\(\)\{/.test(html) && /\[\["ov", "개요"\], \["st", "단계"\], \["doc", "서류"\], \["lk", "연결"\]\]/.test(seg)
+    /function renderContracts\(\)\{/.test(seg) && !/function renderContractsCards\(\)\{/.test(html) && /\[\["ov", "개요"\], \["st", "단계"\], \["doc", "서류"\], \["lk", "연결"\]\]/.test(seg)
     && seg.indexOf('querySelectorAll("tr.vs-r")') >= 0 && seg.indexOf('th[data-cs-sort]') >= 0 && seg.indexOf('querySelector("[data-cs-reset]")') >= 0
     && ['data-cf', 'data-cs-chip', 'data-cs-rs', 'data-cs-tab', 'data-cs-close', 'data-cs-sdoc'].every((a) => seg.indexOf('querySelectorAll("[' + a + ']")') >= 0)
     && (seg.match(/colspan="' \+ csN \+ '"/g) || []).length === 2 && ids.has('conDetailCard') && /#conDetailCard\{display:none;\}/.test(html) && /#conDetailCard\{display:block;margin-top:8px;\}/.test(html), '');
   T('v381 종전 행 버튼·첨부 배선(data-con-del/doc/xlsx/bldg · data-catt-add/del/rev/drop)이 펼침 안에서 그대로 묶인다',
     ['data-con-del', 'data-con-doc', 'data-con-xlsx', 'data-con-bldg', 'data-catt-add', 'data-catt-del', 'data-catt-rev', 'data-catt-drop'].every((a) => seg.indexOf('querySelectorAll("[' + a + ']")') >= 0), '');
-  T('v381 CSS: .cs-stg 단계 카드(done/cur) · .cs-bar 진행 막대 · 폰 열 폭 4(cs-c-client/site/stage/end) · 데이터 모델 새 키 없음(scheduleContractSave 호출 없음)',
-    /\.cs-stg\.done\{/.test(html) && /\.cs-stg\.cur\{/.test(html) && /\.cs-bar i\{/.test(html) && ['client', 'site', 'stage', 'end'].every((k) => new RegExp('\\.vs col\\.cs-c-' + k + '\\{width:\\d+% !important;\\}').test(html)) && !/scheduleContractSave/.test(seg), '');
+  T('v381 CSS: .cs-stg 단계 카드(done/cur) · .cs-bar 진행 막대 · 폰 열 폭 4(cs-c-client/site/stage/end) · 시트 블록의 저장 호출은 v382 단계 입력·작업현황(새 키 vals/work_log/settle_amount) 6함수뿐',
+    /\.cs-stg\.done\{/.test(html) && /\.cs-stg\.cur\{/.test(html) && /\.cs-bar i\{/.test(html) && ['client', 'site', 'stage', 'end'].every((k) => new RegExp('\\.vs col\\.cs-c-' + k + '\\{width:\\d+% !important;\\}').test(html))
+    && (seg.match(/scheduleContractSave\(\)/g) || []).length === (seg.match(/function (csSkipStage|csUnskipStage|csJumpStage|csSaveFields|csWlAdd|csWlDel)\(/g) || []).length, '');
 } catch (e) { console.log('  (v381 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ---- v382: 시나리오 조립(종류 × 사급/관급 → 단계 목록, PM 원문) · 선택 단계 · 작업현황 · 정산액 · 카드형 제거 ----
+try {
+  const sc = html.slice(html.indexOf('// @con-scen-start'), html.indexOf('// @con-scen-end'));
+  const lists = {}; for (const m of sc.matchAll(/"(\w+:(?:pub|pri))": \[([^\]]*)\]/g)) lists[m[1]] = (m[2].match(/"/g) || []).length / 2;
+  const want = { 'asbestos:pri': 8, 'asbestos:pub': 10, 'demolition:pri': 8, 'demolition:pub': 10, 'combo:pri': 9, 'combo:pub': 11, 'waste:pri': 6, 'waste:pub': 6, 'dredge:pub': 8, 'dredge:pri': 5 };
+  T('v382 CON_SCEN 10목록(석면 8/10 · 철거 8/10 · 혼합 9/11 · 운반 6/6 · 준설 8/5) · 괄호 = 선택 단계 판정 · 적격심사 낙찰건은 맨 앞',
+    Object.keys(want).every((k) => lists[k] === want[k]) && /function conIsOptName\(n\)\{ return \/\^\\\(\.\+\\\)\$\//.test(sc) && /if \(extra && extra\.qual\) out\.unshift\(\{ name:"적격심사"/.test(sc), JSON.stringify(lists));
+  T('v382 옛 요소 체크 UI 제거(conElems·renderConElems·conElemChecked·conBuildStages 0) · 모달 conCombo/conScenPreview · 종류·사급/관급·혼합 change → renderConScen · 카드형 renderContractsCards 제거',
+    !/conElems\b/.test(html) && !/renderConElems|conElemChecked|conBuildStages/.test(html) && ids.has('conCombo') && ids.has('conScenPreview') && ids.has('conComboWrap')
+    && /getElementById\("conDoc"\)\.addEventListener\("change", renderConScen\)/.test(html) && /getElementById\("conCombo"\)\.addEventListener\("change", renderConScen\)/.test(html) && !/function renderContractsCards/.test(html) && !/CON_ELEMS\b/.test(html) && /var CON_ELEM_LABEL = \{/.test(html), '');
+  T('v382 엔진: materializeStage가 skipped 단계를 지나감 · 지시 상세 stageDocsFor · startProcess가 {name,opt}·scen·doneFirst 수용 · 견적 승격은 견적 단계 완료 · 낙찰 유입 2곳이 renderConScen',
+    /while\(pipe\.cur < pipe\.stages\.length && pipe\.stages\[pipe\.cur\]\.status==="skipped"\) pipe\.cur\+\+;/.test(html) && /detail:\(stageDocsFor\(s\.name\)\|\|""\)/.test(html)
+    && /opt:\(o\.opt\?1:0\)/.test(html) && /scen:opts\.scen\|\|null,/.test(html) && /if\(opts\.doneFirst && pipes\[0\]\.stages\.length>1\)/.test(html) && /doneFirst:qdf/.test(html)
+    && (html.match(/cbs\.checked=!!\(sug\.asb&&sug\.demo\); renderConScen\(\);/g) || []).length === 2, '');
+  T('v382 서류 라우팅이 PM 원문을 받는다: 노동부\\s*신고 · 해체\\s*완료\\s*신고 → demo_report · 정산액 conAmtEff(시트 금액 3곳·기성 1곳) · 단계 카드 버튼 6종 · 작업현황 표(CS_WL_COLS 8열) · 단계 입력 칸 15묶음',
+    /if\(\/노동부\\s\*신고\/\.test\(s\) && !\/완료\/\.test\(s\)\) return "asb_plan";/.test(html) && /해체\\s\*완료\\s\*신고\/\.test\(s\)\) return "demo_report"/.test(html)
+    && /function conAmtEff\(c\)/.test(html) && (html.match(/conAmtEff\(c\)/g) || []).length >= 4
+    && ['data-cs-done', 'data-cs-skip', 'data-cs-unskip', 'data-cs-jump', 'data-cs-fsave'].every((a) => html.indexOf('csAct("' + a + '"') >= 0) && ['data-cs-wladd', 'data-cs-wldel', 'data-cs-stg'].every((a) => html.indexOf('querySelectorAll("[' + a + ']")') >= 0)
+    && (html.match(/\["(\w+)","[^"]+","(?:date|text|num)"\]/g) || []).length >= 8 && (sc.match(/\[\/[^\]]+\/, \[\[/g) || []).length === 15, '');
+} catch (e) { console.log('  (v382 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ---- v382 적대 검토 반영(확정 21 = 12묶음) ----
+try {
+  T('v382 검토: advanceProc 가드(skipped·되감기) · materializeStage 중복 지시 금지 · completeStageNow pipeKey+review 재요청 금지 · 입금→수금확인 제안은 열린 단계일 때만 · 견적 승격 안내 분기 · 접기 버튼으로만 · 입력값 보존(csSnapInputs/csRestoreInputs) · 승인 게이트(csCanCloseCur) · 청구 건너뜀 경고',
+    /if\(!s \|\| s\.status==="done" \|\| s\.status==="skipped" \|\| t\.stage_i < pipe\.cur\) return;/.test(html) && /if\(s\.status==="open" && s\.task_id && findTask\(s\.task_id\)\) return;/.test(html)
+    && /function completeStageNow\(c, pat, pipeKey\)\{/.test(html) && /if\(pipeKey && p\.key!==pipeKey\) continue;/.test(html) && /if\(t\.status==="review"\) return "review";/.test(html)
+    && /var ccOpen = !!\(cc && cc\.status !== "done"/.test(html) && /completeStageNow\(cc, \/수금확인\|입금확인\/\)/.test(html) && /qdf=\/견적\/\.test/.test(html)
+    && /if \(el\.classList\.contains\("open"\)\) return;/.test(html) && /function csSnapInputs\(root\)/.test(html) && /csRestoreInputs\(host, snap\); csRestoreInputs\(dcard, snap\);/.test(html)
+    && /function csCanCloseCur\(c, p\)/.test(html) && /청구 단계를 건너뛰면 기성\(미수\) 등록이 생기지 않습니다/.test(html) && /if \(p\.stages\[i\]\.status === "skipped"\)\{ p\.stages\[i\]\.status = "pending";/.test(html)
+    && /completeStageNow\(c, csExactRe\(s\.name\), p\.key\)/.test(html) && /\[\/면적\/,"석면조사"\]/.test(html), '');
+} catch (e) { console.log('  (v382 검토 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
