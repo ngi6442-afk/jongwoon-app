@@ -739,6 +739,16 @@
   .cs-wl input{width:100%;box-sizing:border-box;font-size:12px;padding:3px 4px;border:1px solid var(--line);border-radius:4px;}
   .cs-wl-wrap{overflow-x:auto;}
   .cs-act{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;}
+  .cs-pks{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:8px;margin-bottom:10px;}
+  .cs-pk{border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:#fff;font-size:12.5px;}
+  .cs-pk .h{font-weight:700;margin-bottom:4px;display:flex;gap:6px;align-items:baseline;}
+  .cs-pk .h small{color:var(--sub);font-weight:400;margin-left:auto;}
+  .cs-pk .it{display:flex;gap:6px;align-items:center;padding:2px 0;border-top:1px dashed #EEF0EE;}
+  .cs-pk .it:first-of-type{border-top:0;}
+  .cs-pk .st{width:16px;text-align:center;font-weight:700;}
+  .cs-pk .st.ok{color:var(--brand);} .cs-pk .st.att{color:#2a5fa8;} .cs-pk .st.gap{color:#B0332A;} .cs-pk .st.wait{color:#9AA09C;}
+  .cs-pk .nm{flex:1;min-width:0;}
+  .cs-pk .sub{color:var(--sub);font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   #conDetailCard{display:none;}
   @media (max-width:859px){
     .vs col.cs-c-client{width:30% !important;}
@@ -8546,6 +8556,7 @@
     document.getElementById("tplBackdrop").classList.add("show");
     gwCall("gw-data",{action:"tpl_list"}).then(function(res){
       var t=(res.body&&res.body.templates)||{};
+      if(res.status===200&&res.body&&res.body.templates&&typeof csTplSet==="function") csTplSet(t);   // v383 검토: 패킷 캐시도 같은 응답으로 갱신
       host.innerHTML=Object.keys(TPL_LABELS).map(function(k){
         var cur=t[k];
         return '<div style="display:flex;align-items:center;gap:8px;margin:6px 0;">'
@@ -8563,7 +8574,7 @@
             r.onload=function(){
               el.textContent="올리는 중…";
               gwCall("gw-data",{action:"tpl_put", key:key, name:f.name, data:String(r.result).split(",")[1]||""})
-                .then(function(res){ if(res.status===200){ openTplManage(); } else { alert("등록 실패: "+((res.body&&res.body.error_code)||res.status)); el.textContent="등록"; } })
+                .then(function(res){ if(res.status===200){ if(typeof csTplInvalidate==="function") csTplInvalidate(); openTplManage(); if(typeof renderContracts==="function") renderContracts(); } else { alert("등록 실패: "+((res.body&&res.body.error_code)||res.status)); el.textContent="등록"; } })
                 .catch(function(){ alert("등록 실패(네트워크)"); el.textContent="등록"; });
             };
             r.readAsDataURL(f);
@@ -9231,7 +9242,7 @@
     var $=function(id){return document.getElementById(id);};
     if($("tplManageBtn")) $("tplManageBtn").addEventListener("click", openTplManage);
     if($("conPerfBtn")) $("conPerfBtn").addEventListener("click", conExportPerf);
-    if($("tplClose")) $("tplClose").addEventListener("click", function(){ $("tplBackdrop").classList.remove("show"); });
+    if($("tplClose")) $("tplClose").addEventListener("click", function(){ $("tplBackdrop").classList.remove("show"); if(typeof renderContracts==="function") renderContracts(); });   // v383 검토: 패킷 ✓/✗ 갱신
     if($("xgKind")) $("xgKind").addEventListener("change", xgToggle);
     if($("xgLandBtn")) $("xgLandBtn").addEventListener("click", function(){
       var num=function(id){ return parseInt(($(id).value||"").replace(/[^0-9]/g,""),10)||0; };
@@ -9693,6 +9704,105 @@
     "청구":"[작성] 공문·대금청구서(계좌 기재)·임금지불확인서·전자세금계산서 / [수령] 국세·지방세·4대보험 완납증명·하도급지킴이",
     "수금확인":"입금 확인(계좌·금액 대조) — 완료 시 계약 종결. 미입금 지속 시 기성·미수 관리 대상"
   };
+  // ---- v383 서류 4종 패킷(설계 §4) — gen: 등록 양식으로 생성 / att: 첨부 파일명으로 확인(re 포함·ex 제외, 한 파일은 앞 항목 하나만 차지) / gap: 양식 없음(실물 등록 예정). when: pub·pri·quote·demo·asb·dredge·waste·dredge-pri
+  var CON_PACKETS = [
+    { k:"con", h:"계약 패킷", items:[
+      { t:"gen", k:"con_docs", h:"계약서류(서약서·인감계·채권포기각서·노무비제외)", when:"pub" },
+      { t:"gen", k:"quote", h:"견적서", when:"quote" },
+      { t:"gen", k:"html_contract", h:"계약서(작성 툴)", when:"pri" },
+      { t:"att", k:"contract", h:"계약서(발주처 서식·날인본)", re:/계약서|도급계약/ },
+      { t:"att", k:"bond", h:"계약보증증권", re:/계약(이행)?보증|이행보증/, when:"pub" },
+      { t:"att", k:"biz", h:"사업자등록증", re:/사업자/ },
+      { t:"att", k:"reg", h:"건설업·폐기물 등록증", re:/(건설업|해체|폐기물|수집운반|운반업)[^.]*(등록증|허가증|등록수첩)|등록수첩/ },
+      { t:"att", k:"pledge", h:"계약이행통합서약서", re:/서약/, when:"pub" },
+      { t:"gap", h:"안전보건관리계획서 양식", when:"pub" },
+      { t:"gap", h:"준설 약식 계약서(사급)", when:"dredge-pri" }
+    ]},
+    { k:"start", h:"착공 패킷", when:"pub", items:[
+      { t:"gen", k:"work_start", h:"착공계(12시트)" },
+      { t:"gen", k:"adv_pay", h:"선금지급신청 세트" },
+      { t:"gen", k:"demo_report", h:"해체신고서·위임장·해체계획서", when:"demo" },
+      { t:"att", k:"cert", h:"현장대리인 자격증·재직증명", re:/자격|기능사|기사|재직/ },
+      { t:"gap", h:"안전 패킷(위험성평가·작업 안전수칙·비상대응·보호구 대장)" },
+      { t:"gap", h:"착수계(운반·용역)", when:"waste" }
+    ]},
+    { k:"complete", h:"준공 패킷", when:"pub", items:[
+      { t:"gen", k:"work_complete", h:"준공계(8시트)" },
+      { t:"gen", k:"settle_doc", h:"준공 정산합의서" },
+      { t:"gen", k:"asb_plan", h:"석면해체계획서(완료신고 근거)", when:"asb" },
+      { t:"att", k:"photos", h:"사진대지", re:/사진/, ex:/보호구|안전/ },
+      { t:"att", k:"weigh", h:"계량증명서(준설토)", re:/계량/, when:"dredge" },
+      { t:"att", k:"super", h:"감리완료보고서(수령)", re:/감리/, when:"demo" },
+      { t:"gap", h:"산업안전보건관리비 사용내역서" },
+      { t:"gap", h:"용역완료계·처리확인서", when:"waste" },
+      { t:"gap", h:"석면 완료보고서(별지 77호)", when:"asb" }
+    ]},
+    { k:"bill", h:"청구 패킷", items:[
+      { t:"gen", k:"work_complete", h:"청구서·청구 공문(준공계 안)", when:"pub" },
+      { t:"att", k:"tax", h:"국세·지방세 납세증명", re:/납세|국세|지방세/, when:"pub" },
+      { t:"att", k:"ins", h:"4대보험 완납증명", re:/4대보험|사대보험|사회보험|건강보험|국민연금|고용보험|산재보험|보험료/, when:"pub" },
+      { t:"att", k:"bank", h:"통장사본", re:/통장/ },
+      { t:"att", k:"invoice", h:"세금계산서", re:/세금계산서/ },
+      { t:"gap", h:"노무비 구분관리 패킷", when:"pub" }
+    ]}
+  ];
+  function csPkWhen(c, when){
+    if (!when) return true;
+    var el = c.elems || {}, pub = c.docType === "public";
+    if (when === "pub") return pub;
+    if (when === "pri") return !pub;
+    if (when === "quote") return (c.pipes || []).some(function(p){ return (p.stages || []).some(function(s){ return /견적/.test(s.name || ""); }); });
+    if (when === "demo") return !!(el.demo || el.permit);
+    if (when === "asb") return !!el.asb;
+    if (when === "dredge") return c.type === "dredge";
+    if (when === "waste") return c.type === "waste";
+    if (when === "dredge-pri") return c.type === "dredge" && !pub;
+    return true;
+  }
+  // 등록 양식 목록(tpl_list) — 처음 서류 탭을 열 때 한 번 받아 둔다. 받기 전엔 "확인 중"
+  var csTplKeys = null, csTplLoading = false, csTplErr = 0;   // csTplErr = 마지막 실패 시각(ms) — 실패는 '미등록'이 아니다. 30초 뒤 다음 렌더에서 재시도
+  function csLoadTpl(){
+    if (csTplKeys || csTplLoading || typeof gwCall !== "function") return;
+    if (csTplErr && Date.now() - csTplErr < 30000) return;
+    csTplLoading = true;
+    gwCall("gw-data", { action:"tpl_list" }).then(function(res){
+      csTplLoading = false;
+      if (!(res && res.status === 200 && res.body && res.body.templates)){ csTplErr = Date.now(); if (res && res.status === 401 && typeof onSessionInvalid === "function") onSessionInvalid(); else renderContracts(); return; }
+      csTplSet(res.body.templates); renderContracts();
+    }, function(){ csTplLoading = false; csTplErr = Date.now(); renderContracts(); });
+  }
+  function csTplSet(t){ var m = {}; Object.keys(t || {}).forEach(function(k){ if (t[k]) m[k] = 1; }); csTplKeys = m; csTplErr = 0; }
+  function csTplInvalidate(){ csTplKeys = null; csTplErr = 0; }
+  // gen 항목의 실제 양식 키 — con_docs는 서약서+인감계가 핵심, quote는 회사별
+  function csGenKeys(c, k){
+    if (k === "con_docs") return ["contract_pledge", "seal_reg"];
+    if (k === "quote") return [(c.type === "asbestos" || c.type === "demolition") ? "quote_con" : "quote_env"];
+    if (k === "html_contract") return [];
+    return [k];
+  }
+  function csGenKind(c, k){ return k === "quote" ? "quote_docs" : k; }
+  function csPacketsHtml(c){
+    var atts = conAttList(c).map(function(x){ return x.a && x.a.name ? x.a.name : ""; }), can = canDo("con") && c.status !== "done", admin = isAdmin(), claimed = {};   // claimed: 파일 번호 → 이미 어느 항목이 차지함(v383 검토: 사업자등록증 1장이 등록증까지 채우던 오탐)
+    if (csTplKeys === null) csLoadTpl();
+    return '<div class="cs-pks">' + CON_PACKETS.filter(function(pk){ return csPkWhen(c, pk.when); }).map(function(pk){
+      var items = pk.items.filter(function(it){ return csPkWhen(c, it.when); }), nOk = 0, nAtt = 0, nGap = 0;
+      var rows = items.map(function(it){
+        var st, sub = "", act = "";
+        if (it.t === "gen"){
+          var keys = csGenKeys(c, it.k), reg = csTplKeys === null ? null : keys.every(function(x){ return !!csTplKeys[x]; });
+          if (reg === null){ st = '<span class="st wait">…</span>'; sub = csTplErr ? "양식 목록 확인 실패 — 잠시 뒤 다시 시도합니다(등록 여부 아님)" : "양식 확인 중"; }
+          else if (reg){ st = '<span class="st ok">✓</span>'; sub = "생성 가능"; nOk++; if (can) act = '<button type="button" class="vs-chip" data-cs-gen="' + esc(c.id) + '|' + esc(it.k) + '">생성</button>'; }
+          else { st = '<span class="st gap">✗</span>'; sub = "양식 미등록(" + keys.map(function(x){ return TPL_LABELS[x] || x; }).join("·") + ")" + (admin ? " — [+ 양식 등록]" : ""); nGap++; }
+        } else if (it.t === "att"){
+          var hit = []; atts.forEach(function(n, ai){ if (!claimed[ai] && it.re.test(n) && !(it.ex && it.ex.test(n))){ claimed[ai] = 1; hit.push(n); } });
+          if (hit.length){ st = '<span class="st att">◻</span>'; sub = "첨부됨 · " + hit[0] + (hit.length > 1 ? " 외 " + (hit.length - 1) : ""); nAtt++; }
+          else { st = '<span class="st wait">◻</span>'; sub = "첨부 필요"; if (can) act = '<button type="button" class="vs-chip" data-catt-add="' + esc(c.id) + '">📎</button>'; }
+        } else { st = '<span class="st gap">✗</span>'; sub = "양식 없음 — 실물 등록 예정"; nGap++; }
+        return '<div class="it">' + st + '<span class="nm">' + esc(it.h) + '<div class="sub">' + esc(sub) + '</div></span>' + act + '</div>';
+      }).join("");
+      return '<div class="cs-pk"><div class="h">' + esc(pk.h) + '<small>생성 ' + nOk + ' · 첨부 ' + nAtt + ' · 빈칸 ' + nGap + '</small></div>' + rows + '</div>';
+    }).join("") + '</div>';
+  }
   // @con-scen-end
   // 제목 키워드로 요소 제안(낙찰→계약 유입 시) — 학습 전 초기 제안
   function suggestConElems(text, decide){
@@ -10041,7 +10151,7 @@
       '<button type="button" class="vs-chip" data-cs-close="1" style="margin-left:auto;">닫기 ▲</button></div>';
     h += '<div class="vs-stabs">' + [["ov", "개요"], ["st", "단계"], ["doc", "서류"], ["lk", "연결"]].map(function(t){ return '<button type="button" class="vs-stab' + (conDetTab === t[0] ? ' on' : '') + '" data-cs-tab="' + t[0] + '">' + t[1] + '</button>'; }).join("") + '</div>';
     if (conDetTab === "st") h += csStagesHtml(c);
-    else if (conDetTab === "doc") h += (conAttBoxHtml(c) || '<div class="vs-empty">첨부가 없습니다.</div>');
+    else if (conDetTab === "doc") h += csPacketsHtml(c) + (conAttBoxHtml(c) || '<div class="vs-empty">첨부가 없습니다.</div>');   // v383 서류 4종 패킷 + 첨부함
     else if (conDetTab === "lk") h += csLinksHtml(c);
     else h += csOverviewHtml(c);
     if (canDo("con")) h += '<div class="vs-act">' + (conHasBldg(c) ? '<button class="mini-btn" data-con-bldg="' + esc(c.id) + '">대장</button>' : '') + '<button class="mini-btn" data-con-xlsx="' + esc(c.id) + '">생성</button><button class="mini-btn" data-con-doc="' + esc(c.id) + '">서류</button><button class="mini-btn danger" data-con-del="' + esc(c.id) + '">삭제</button></div>';
@@ -10163,6 +10273,7 @@
         e.stopPropagation(); var k = el.getAttribute("data-cs-stg"); csStageOpen = (csStageOpen === k) ? "" : k; renderContracts();
       }); });
       var csAct = function(attr, fn){ Array.prototype.forEach.call(root.querySelectorAll("[" + attr + "]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); var p = el.getAttribute(attr).split("|"), c = findProc(p[0]); if (!c) return; var pipe = csPipeOf(c, p[1]), i = Number(p[2]); if (!pipe || isNaN(i)) return; fn(c, pipe, i, el); }); }); };
+      Array.prototype.forEach.call(root.querySelectorAll("[data-cs-gen]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); var p = el.getAttribute("data-cs-gen").split("|"); if (p[1] === "html_contract") openDocFromContract(p[0]); else openXlsxGen(p[0], csGenKind(findProc(p[0]) || {}, p[1])); }); });   // v383 패킷 [생성]
       csAct("data-cs-done", function(c, p, i){ csDoneStage(c, p, i); });
       csAct("data-cs-skip", function(c, p, i){ csSkipStage(c, p, i); });
       csAct("data-cs-unskip", function(c, p, i){ csUnskipStage(c, p, i); });

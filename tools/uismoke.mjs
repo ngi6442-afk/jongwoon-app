@@ -1394,5 +1394,20 @@ try {
     && /completeStageNow\(c, csExactRe\(s\.name\), p\.key\)/.test(html) && /\[\/면적\/,"석면조사"\]/.test(html), '');
 } catch (e) { console.log('  (v382 검토 검사 생략 — ' + e.message + ')'); fails++; }
 
+// ---- v383: 서류 4종 패킷(생성 ✓ · 첨부 ◻ · 빈칸 ✗) ----
+try {
+  const sc = html.slice(html.indexOf('// @con-scen-start'), html.indexOf('// @con-scen-end'));
+  const pks = [...sc.matchAll(/\{ k:"(con|start|complete|bill)", h:"[^"]+ 패킷"/g)].map((m) => m[1]);
+  T('v383 CON_PACKETS 4(계약·착공·준공·청구) · gen 키는 TPL_LABELS 또는 가상 키(con_docs·quote·html_contract) · tpl_list 캐시(csLoadTpl) · 서류 탭에 csPacketsHtml + 첨부함 · [생성] 배선(html_contract → 계약서 툴, 그 외 openXlsxGen)',
+    pks.join(',') === 'con,start,complete,bill'
+    && [...sc.matchAll(/t:"gen", k:"(\w+)"/g)].map((m) => m[1]).every((k) => ['con_docs', 'quote', 'html_contract'].includes(k) || new RegExp('\\b' + k + ':"').test(html.slice(html.indexOf('var TPL_LABELS='), html.indexOf('var TPL_LABELS=') + 900)))
+    && /gwCall\("gw-data", \{ action:"tpl_list" \}\)/.test(sc) && /h \+= csPacketsHtml\(c\) \+ \(conAttBoxHtml\(c\)/.test(html) && /querySelectorAll\("\[data-cs-gen\]"\)/.test(html) && /openDocFromContract\(p\[0\]\); else openXlsxGen\(p\[0\], csGenKind/.test(html)
+    && /\.cs-pk \.st\.gap\{/.test(html), pks.join(','));
+  T('v383 검토 반영: tpl_list 실패는 캐시 null 유지 + csTplErr 쿨다운(30초) · 비200 불신 · then 2인자 · tpl_put 성공·관리 목록 수신 → csTplInvalidate/csTplSet · 모달 닫기 재그리기 · 첨부 claim 1회 + ex 제외 · 정규식 좁힘(사업자 제외 등록증·세금계산서·4대보험)',
+    /if \(csTplErr && Date\.now\(\) - csTplErr < 30000\) return;/.test(sc) && /if \(!\(res && res\.status === 200 && res\.body && res\.body\.templates\)\)\{ csTplErr = Date\.now\(\);/.test(sc) && /\}, function\(\)\{ csTplLoading = false; csTplErr = Date\.now\(\); renderContracts\(\); \}\);/.test(sc)
+    && /if\(res\.status===200\)\{ if\(typeof csTplInvalidate==="function"\) csTplInvalidate\(\); openTplManage\(\);/.test(html) && /typeof csTplSet==="function"\) csTplSet\(t\);/.test(html) && /\$\("tplBackdrop"\)\.classList\.remove\("show"\); if\(typeof renderContracts==="function"\) renderContracts\(\); \}\);/.test(html)
+    && /if \(!claimed\[ai\] && it\.re\.test\(n\) && !\(it\.ex && it\.ex\.test\(n\)\)\)\{ claimed\[ai\] = 1; hit\.push\(n\); \}/.test(sc) && /k:"reg", h:"건설업·폐기물 등록증", re:\/\(건설업\|해체\|폐기물\|수집운반\|운반업\)/.test(sc) && /k:"invoice", h:"세금계산서", re:\/세금계산서\//.test(sc) && /k:"ins", h:"4대보험 완납증명", re:\/4대보험/.test(sc) && !/re:\/보험\|완납\//.test(sc), '');
+} catch (e) { console.log('  (v383 검사 생략 — ' + e.message + ')'); fails++; }
+
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
