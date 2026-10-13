@@ -3671,6 +3671,11 @@
   // 직접 기안의 참조 문서 줄(v315) — 카드·내 상신 공용. 문서함 등재 카드는 전용 힌트가 따로 있어 제외.
   // 사규 문서의 '등재'(문서함 게이트)와 사규 '결재'(이 기안)는 별개 행위 — 힌트 1줄로 구분
   function apprRefDocHtml(it){
+    if (it && String(it.ref || "").indexOf("con:") === 0){   // v384 계약 단계·청구 검수 상신 — 계약·단계 표시
+      var cp = String(it.ref).slice(4).split("|"), cc = (typeof findProc === "function") ? findProc(cp[0]) : null, sn = "";
+      if (cc){ var pp = (cc.pipes || []).filter(function(p){ return p.key === cp[1]; })[0]; var ss = pp && pp.stages[Number(cp[2])]; sn = ss ? ss.name : ""; }
+      return '<div style="margin-top:5px;font-size:12px;color:var(--sub);">📎 계약: ' + (cc ? '<b>' + esc(cc.label || "") + '</b>' + (cc.client ? ' · ' + esc(cc.client) : '') + (csTitle(cc) ? ' · ' + esc(csTitle(cc)) : '') + (sn ? ' · 단계 <b>' + esc(sn) + '</b>' : '') : '<span style="color:var(--amber);">계약을 찾을 수 없음</span>') + ' — 승인하면 계약 탭에서 그 단계가 자동으로 넘어갑니다</div>';
+    }
     if (!it || it.kind === "문서함 등재" || String(it.ref || "").indexOf("doc:") !== 0) return "";
     var rdoc = (typeof findDoc === "function") ? findDoc(String(it.ref).slice(4)) : null;
     var s = '<div style="margin-top:5px;font-size:12px;color:var(--sub);">📎 참조 문서: ';
@@ -3873,6 +3878,7 @@
       it.status = (res.body && res.body.decided) || decision;
       if (reason) it.reason = reason;
       if (it.kind === "문서함 등재" && (it.status === "승인" || it.status === "반려")) loadDocuments();   // 서버 훅이 문서 상태(등재/반려)를 바꿨다(v314) — 문서함 배지 동기
+      if (String(it.ref || "").indexOf("con:") === 0 && typeof csApprOnDecided === "function"){ try { csApprOnDecided(it); } catch(e){} }   // v384 계약 단계·청구 검수 → 단계 진행
       if (decision === "승인" || decision === "확인") apprDoneN.ok++; else if (decision === "반려") apprDoneN.no++; else apprDoneN.hold++;
       apprNext();
     }).catch(function(){ apprBusy = false; if (g === apprGen) alert("네트워크 오류 — 다시 시도해주세요."); });
@@ -3906,6 +3912,7 @@
       } else {
         // 400대 형식 오류만 재시도 무의미 — 버리고 알린다
         apprPendingCreates.splice(idx, 1); apprSavePending();
+        if (String(p.ref || "").indexOf("con:") === 0 && typeof csApprDropped === "function"){ try { csApprDropped(p.ref, p.cid); } catch(e){} }   // v384: 계약 단계 상신이면 카드에 [상신] 다시
         alert("대표 상신 실패: " + String(p.title || "").slice(0, 30) + " (" + ((res.body && res.body.error_code) || res.status) + ")");
         apprFlushCreates();
       }
@@ -4524,8 +4531,8 @@
     var t = findTask(id);
     if (!t || t.status !== "review" || !canApproveTask(t)) return;
     t.status = "done"; t.approved_by = myName() || "관리자"; t.approved_at = todayStr(); t.updated = todayStr();
-    if (t.who_id && t.who_id !== myId()) pushNotify(t.who_id, "승인됨: "+(t.title||"").slice(0,40), "승인자 "+(t.approved_by||""), "task-ok-"+t.id);
-    advanceProc(t);
+    var adv = advanceProc(t);   // v384 2차 F5: 결재 대상 단계면 되돌려지므로(false) "승인됨" 푸시를 보내지 않는다
+    if (adv !== false && t.who_id && t.who_id !== myId()) pushNotify(t.who_id, "승인됨: "+(t.title||"").slice(0,40), "승인자 "+(t.approved_by||""), "task-ok-"+t.id);
     if (t.recur) spawnNextRecur(t);   // 반복 지시: 완료 승인 시 다음 회차 생성
     saveTasksCache(); renderTasks(); renderSummary(); scheduleTasksSave();
   }
@@ -5239,6 +5246,7 @@
         var remoteItems = (parsed && parsed.items) || [];
         // 저장 대기 중이면 로컬 낙관적 변경을 보존하기 위해 머지(통째 덮어쓰기 금지)
         tasks = (tasksPending || pendingSave) ? mergeTasks(tasks, remoteItems) : remoteItems;
+        if (typeof csAlignTasksAll === "function"){ try { csAlignTasksAll(); } catch(e){} }   // v384 2차 F7·F11: 단계가 끝난 지시는 닫는다(동률 병합으로 review로 남거나 도착 전 진행된 고아)
         setOffline(false);
         markLoadedForAutoGen("tasks");
         saveTasksCache();
@@ -7691,9 +7699,9 @@
       if(!t || t.status==="done") return "none";
       if(canApproveTask(t)){
         t.status="done"; t.done_at=todayStr(); t.done_by=myName()||"자동"; t.approved_by=myName()||""; t.approved_at=todayStr(); t.updated=todayStr();
-        advanceProc(t);
+        var adv=advanceProc(t);
         saveTasksCache(); scheduleTasksSave(); renderTasks(); renderSummary(); renderContracts();
-        return "done";
+        return adv===false ? "locked" : "done";   // v384 2차 F5: 결재 대상 단계는 진행되지 않았음을 호출처에 알린다(안내는 advanceProc가 띄움)
       }
       if(t.status==="review") return "review";   // v382 검토 14: 승인 대기 중 재요청은 푸시를 다시 보내지 않는다
       t.status="review"; t.done_at=todayStr(); t.done_by=myName()||""; t.updated=todayStr();
@@ -9569,7 +9577,7 @@
     fetch(CONTRACT_API, {headers: ghHeaders()}).then(function(resp){
       if(resp.status===404){ contractSha=null; contracts=[]; autoGenReady.con=true; runAwardAutoCon(); return; }
       if(!resp.ok) throw new Error("HTTP "+resp.status);
-      return resp.json().then(function(json){ contractSha=json.sha; var p=JSON.parse(b64DecodeUnicode(json.content)); var cr=(p&&p.items)||[]; contracts = contractsPending ? mergeContracts(contracts, cr) : cr; renderContracts(); renderTasks(); autoGenReady.con=true; runAwardAutoCon(); liveContracts().forEach(conBldgAutoTry); });
+      return resp.json().then(function(json){ contractSha=json.sha; var p=JSON.parse(b64DecodeUnicode(json.content)); var cr=(p&&p.items)||[]; contracts = contractsPending ? mergeContracts(contracts, cr) : cr; renderContracts(); renderTasks(); autoGenReady.con=true; runAwardAutoCon(); liveContracts().forEach(conBldgAutoTry); if (typeof asbLoaded !== "undefined" && asbLoaded && typeof csSiteHooksRetry === "function"){ try { csSiteHooksRetry(); } catch(e){} } });   // v384: 대장이 먼저 로드된 순서도 보류 훅 처리
     }).catch(function(){});
   }
   var contractsPending=false;   // 저장 디바운스(1.4s) 사이 재로드가 편집을 덮지 않게 — bids/quotes와 동일 패턴
@@ -9803,6 +9811,229 @@
       return '<div class="cs-pk"><div class="h">' + esc(pk.h) + '<small>생성 ' + nOk + ' · 첨부 ' + nAtt + ' · 빈칸 ' + nGap + '</small></div>' + rows + '</div>';
     }).join("") + '</div>';
   }
+  // ---- v384 결재 2종(설계 §5) — 계약 단계·청구 검수. 상신(approval_create, ref "con:<id>|<pipe>|<i>") → 결재함 승인 → 단계 자동 진행. 서버 변경 없음
+  // 검토(10/13) 반영: 재상신은 cid로만 매칭 · 적용 전 서버 계약본을 읽어 다른 기기가 이미 진행했으면 그 결과를 받아들인다(지시 2개·기성 2건 방지) · 상신한 단계의 지시는 완료 요청으로 잠근다(advanceProc 잠금과 한 쌍)
+  var CON_APPR_KINDS = [[/청구|입금/, "청구 검수"], [/계약서/, "계약 단계"]];   // "견적·수의계약"은 견적 단계 — 결재 없음
+  function csApprKind(name){ for (var i = 0; i < CON_APPR_KINDS.length; i++){ if (CON_APPR_KINDS[i][0].test(name||"")) return CON_APPR_KINDS[i][1]; } return ""; }
+  function csApprRef(c, p, i){ return "con:" + c.id + "|" + p.key + "|" + i; }
+  function csApprSubmit(c, p, i){
+    var s = p.stages[i], kind = csApprKind(s.name); if (!kind) return false;
+    var cid = "c" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8), amt = conAmtEff(c);
+    apprPendingCreates.push({ cid: cid, mid: myId(), kind: kind, title: ("[계약] " + (c.client || c.label || "") + " · " + s.name).slice(0, 120),
+      body: (csTitle(c) ? "공사명 " + csTitle(c) + " · " : "") + (amt ? "금액 " + fmtAmount(amt) + "원 · " : "") + (c.who ? "담당 " + dispName(c.who) + " · " : "") + csPub(c) + " " + csKind(c), ref: csApprRef(c, p, i) });
+    apprSavePending(); apprFlushCreates();
+    s.appr = { cid: cid, kind: kind, at: new Date().toISOString(), by: myName() || "", by_id: myId(), status: "대기" };
+    var t = s.task_id ? findTask(s.task_id) : null;
+    if (t && t.status !== "done"){ t.status = "review"; t.done_at = todayStr(); t.done_by = "결재함 상신(" + kind + ")"; t.updated = todayStr(); saveTasksCache(); scheduleTasksSave(); renderTasks(); }
+    c.updated = todayStr(); scheduleContractSave();
+    return true;
+  }
+  // 서버 계약 저장소(깃허브 contents)의 이 계약 현재본 — contractSha는 건드리지 않는다(저장 때 409→병합 경로가 다른 계약의 변경을 지킨다)
+  function csFetchServerContract(id){
+    if (typeof CONTRACT_API === "undefined" || typeof getToken !== "function" || !getToken() || typeof fetch !== "function") return Promise.resolve(null);
+    return fetch(CONTRACT_API, { headers: ghHeaders() }).then(function(resp){
+      if (!resp || !resp.ok) return null;
+      return resp.json().then(function(json){ var p = JSON.parse(b64DecodeUnicode(json.content)), items = (p && p.items) || []; for (var k = 0; k < items.length; k++){ if (items[k] && items[k].id === id) return items[k]; } return null; });
+    }).catch(function(){ return null; });
+  }
+  // 서버 계약본을 로컬에 접목(2차 검토 F1) — '앞섬' 판정을 하지 않는다. 진행(pipes)은 cur가 앞선 쪽(동률이면 서버), 단계 입력값(vals)은 비어 있지 않은 쪽, 상신(appr)은 더 최근·결정이 난 쪽,
+  // 최상위 키는 서버에 값이 있으면 서버(work_log·settle_amount·attachments는 서버가 비었으면 로컬 유지). 바뀐 게 있으면 true + loadTasks(다른 기기가 만든 지시)
+  function csEmpty(v){ return v === undefined || v === null || v === "" || (Array.isArray(v) && !v.length) || (typeof v === "object" && !Array.isArray(v) && !Object.keys(v).length); }
+  function csApprRank(st){ return (st === "승인" || st === "반려") ? 2 : (st === "보류" ? 1 : 0); }
+  function csSyncFromServer(c, sc){
+    if (!c || !sc || sc.id !== c.id) return false;
+    var changed = false;
+    Object.keys(sc).forEach(function(k){
+      if (k === "pipes" || k === "status") return;
+      if (sc[k] === undefined || sc[k] === null || sc[k] === "") return;
+      if ((k === "work_log" || k === "attachments" || k === "settle_amount") && csEmpty(sc[k]) && !csEmpty(c[k])) return;
+      if (JSON.stringify(sc[k]) !== JSON.stringify(c[k])){ c[k] = sc[k]; changed = true; }
+    });
+    var lp = c.pipes || [];
+    (sc.pipes || []).forEach(function(q){
+      var lq = lp.filter(function(x){ return x && x.key === q.key; })[0];
+      if (!lq){ lp.push(q); changed = true; return; }
+      var localAhead = (lq.cur || 0) > (q.cur || 0), base = localAhead ? lq : q, other = localAhead ? q : lq;
+      var stages = (base.stages || []).map(function(s, i){
+        var o = (other.stages || [])[i] || {}, m = Object.assign({}, s);
+        if (csEmpty(m.vals) && !csEmpty(o.vals)) m.vals = o.vals;
+        if (!m.appr && o.appr) m.appr = o.appr;
+        else if (m.appr && o.appr && (String(o.appr.at || "") > String(m.appr.at || "") || (o.appr.at === m.appr.at && csApprRank(o.appr.status) > csApprRank(m.appr.status)))) m.appr = o.appr;
+        return m;
+      });
+      if ((base.cur || 0) !== (lq.cur || 0) || JSON.stringify(stages) !== JSON.stringify(lq.stages)){ lq.cur = base.cur || 0; lq.stages = stages; changed = true; }
+    });
+    c.pipes = lp;
+    if (c.status === "done" || c.status === "active"){ var st = lp.length && lp.every(function(p){ return p.cur >= p.stages.length; }) ? "done" : "active"; if (st !== c.status){ c.status = st; changed = true; } }
+    if (changed && typeof loadTasks === "function") loadTasks();
+    return changed;
+  }
+  // 결정 기기는 디바운스 없이 바로 저장 — 상신 기기의 폴이 서버본에서 진행을 먼저 보게(두 기기 중복 진행 창 축소, F18)
+  function csSaveNow(){ scheduleContractSave(); if (typeof contractSaveTimer !== "undefined" && contractSaveTimer){ clearTimeout(contractSaveTimer); contractSaveTimer = null; } if (typeof doSaveContracts === "function") doSaveContracts(); }
+  // 상신 큐가 4xx로 폐기됐을 때(apprFlushCreates) — 그 단계의 appr를 미전송으로 되돌려 [상신]을 다시 열어 준다(F4)
+  function csApprDropped(ref, cid){
+    var cp = String(ref || "").slice(4).split("|"), c = findProc(cp[0]); if (!c) return;
+    var p = (c.pipes || []).filter(function(q){ return q.key === cp[1]; })[0], s = p && p.stages[Number(cp[2])];
+    if (s && s.appr && (!cid || s.appr.cid === cid) && s.appr.status !== "승인" && s.appr.status !== "반려"){ s.appr.status = "미전송"; c.updated = todayStr(); scheduleContractSave(); renderContracts(); }
+  }
+  // 단계가 끝났는데 그 지시가 열려 있으면 닫는다(다른 기기가 승인한 지시가 동률 병합으로 review로 남는 것 F7 · 지시 도착 전 단계 진행의 고아 F11) — 단계 상태가 진실. loadTasks 성공 뒤 호출
+  function csAlignTasksAll(){
+    var n = 0;
+    (typeof contracts !== "undefined" ? contracts : []).forEach(function(c){
+      if (!c || c.del === 1 || !c.scen) return;
+      (c.pipes || []).forEach(function(p){ (p.stages || []).forEach(function(s){
+        if (s.status !== "done" || !s.task_id) return;
+        var t = findTask(s.task_id); if (!t || t.status === "done") return;
+        t.status = "done"; t.done_at = t.done_at || s.done_at || todayStr(); t.done_by = t.done_by || "단계 완료"; t.approved_by = t.approved_by || ((s.appr && s.appr.decided_by) || "결재함"); t.approved_at = t.approved_at || s.done_at || todayStr(); t.updated = todayStr(); n++;
+      }); });
+    });
+    if (n){ saveTasksCache(); scheduleTasksSave(); renderTasks(); renderSummary(); }
+    return n;
+  }
+  var csApprSyncAt = {};
+  function csApprPending(c){ return (c.pipes || []).some(function(p){ return (p.stages || []).some(function(s){ return s.appr && s.appr.status !== "승인" && s.appr.status !== "반려"; }); }); }
+  // 결재함 항목 찾기 — cid가 있으면 cid만(재상신 뒤 옛 반려 카드를 다시 집지 않게), 없으면 같은 ref 중 상신 시각 이후 가장 최근(created)
+  function csApprFind(items, c, p, i, s){
+    var ref = csApprRef(c, p, i), it = null;
+    items.forEach(function(x){
+      if (!x) return;
+      if (s.appr.cid){ if (x.cid === s.appr.cid) it = x; return; }
+      if (x.ref === ref && String(x.created || "") >= String(s.appr.at || "") && (!it || String(x.created || "") > String(it.created || ""))) it = x;
+    });
+    return it;
+  }
+  // 결재 결과 동기화 — 단계 탭을 볼 때 계약당 60초 1회(force면 즉시): ① 서버 계약본 접목 ② approvals_list → 상신 건 상태를 stage.appr로 → 승인이고 아직 현재 단계면 진행
+  // 카드가 없고 큐에도 없이 2분이 지났으면 "미전송"(F4). 결정 뒤 20초 안에는 결정 기기의 저장이 먼저 — 다음 폴에서(F18)
+  function csApprSync(c, force){
+    if (!c || !c.scen || typeof gwCall !== "function" || !csApprPending(c)) return;
+    var now = Date.now(); if (!force && csApprSyncAt[c.id] && now - csApprSyncAt[c.id] < 60000) return; csApprSyncAt[c.id] = now;
+    var id = c.id;
+    csFetchServerContract(id).then(function(sc){
+      c = findProc(id) || c;   // 응답 대기 중 409 병합이 객체를 바꿨을 수 있다(F6)
+      if (sc && csSyncFromServer(c, sc)) renderContracts();
+      if (!csApprPending(c)) return null;
+      return gwCall("gw-data", { action: "approvals_list" });
+    }).then(function(res){
+      if (!(res && res.status === 200 && res.body && Array.isArray(res.body.items))) return;
+      c = findProc(id) || c;
+      var changed = false;
+      (c.pipes || []).forEach(function(p){ (p.stages || []).forEach(function(s, i){
+        if (!s.appr || s.appr.status === "승인" || s.appr.status === "반려") return;
+        var it = csApprFind(res.body.items, c, p, i, s);
+        if (!it){
+          if (s.appr.status !== "미전송" && !apprPendingCreates.some(function(q){ return q && q.cid === s.appr.cid; }) && Date.now() - (Date.parse(s.appr.at || "") || 0) > 120000){ s.appr.status = "미전송"; changed = true; }
+          return;
+        }
+        if (it.status === "승인" && it.decided_at && Date.now() - (Date.parse(it.decided_at) || 0) < 20000) return;
+        if (csApprTake(c, p, i, it)) changed = true;
+      }); });
+      if (changed){ c.updated = todayStr(); scheduleContractSave(); renderContracts(); }
+    }).catch(function(){});
+  }
+  // 결재함 항목 1건을 단계에 옮긴다 — 상태가 바뀌면 true. 승인이고 현재 단계면 진행(csApprApply)
+  function csApprTake(c, p, i, it){
+    var s = p.stages[i], st = it.status || "대기", changed = false;
+    if (st !== s.appr.status || (it.id && !s.appr.id)){ s.appr.status = st; s.appr.id = it.id || s.appr.id; s.appr.reason = it.reason || ""; s.appr.decided_by = (it.decided_by && it.decided_by.name) || ""; s.appr.decided_at = (it.decided_at || "").slice(0, 10); changed = true; }
+    if (st === "승인" && s.status !== "done" && s.status !== "skipped" && i === p.cur) csApprApply(c, p, i);
+    return changed;
+  }
+  // 결재함에서 이 기기로 결정한 직후(60초 폴을 기다리지 않게) — 서버본을 접목한 뒤 적용(상신 기기의 폴과 같은 길), 저장은 즉시. 반영 못 하면 토스트(F3)
+  function csApprOnDecided(it){
+    var cp = String(it && it.ref || "").slice(4).split("|"), id = cp[0], c0 = findProc(id);
+    if (!c0){ if (typeof apprToastShow === "function") apprToastShow("계약을 이 기기에서 찾지 못했습니다 — 계약 탭에서 동기화됩니다"); return; }
+    csFetchServerContract(id).then(function(sc){
+      var c = findProc(id) || c0;
+      if (sc) csSyncFromServer(c, sc);
+      var p = (c.pipes || []).filter(function(q){ return q.key === cp[1]; })[0], i = Number(cp[2]);
+      if (!p || !p.stages[i] || !p.stages[i].appr){ if (typeof apprToastShow === "function") apprToastShow("계약 단계에 상신 기록이 없습니다 — 계약 탭 단계 탭에서 동기화됩니다"); return; }
+      if (csApprTake(c, p, i, { id: it.id, status: it.status, reason: it.reason, decided_by: it.decided_by || { name: myName() }, decided_at: it.decided_at || todayStr() })){ c.updated = todayStr(); csSaveNow(); renderContracts(); }
+    }).catch(function(){});
+  }
+  // 승인된 단계를 진행 — 지시를 승인 완료로 닫고 advanceProc(다음 단계 생성·청구면 기성 등록). 지시가 없으면 단계만 진행(청구면 기성 연동은 같게)
+  function csApprApply(c, p, i){
+    var s = p.stages[i], t = s.task_id ? findTask(s.task_id) : null;
+    if (t && t.status !== "done"){ t.status = "done"; t.done_at = todayStr(); t.done_by = t.done_by || (s.appr.by || "결재"); t.approved_by = s.appr.decided_by || "결재함"; t.approved_at = s.appr.decided_at || todayStr(); t.updated = todayStr(); saveTasksCache(); scheduleTasksSave(); advanceProc(t); renderTasks(); renderSummary(); }
+    else { s.status = "done"; s.done_at = todayStr(); if (i === p.cur){ p.cur = i + 1; materializeStage(c, p, todayStr()); } c.status = (c.pipes||[]).every(function(q){ return q.cur >= q.stages.length; }) ? "done" : "active"; c.updated = todayStr(); if (c.status === "done") csOnDone(c); scheduleContractSave(); renderContracts(); if (/청구/.test(s.name || "") && typeof conBillToRec === "function") setTimeout(function(){ conBillToRec(c); }, 150); }
+  }
+  // ---- v384 현장 대장 연결(설계 §6) — 계약 시작 때 같은 종류·공사명(또는 발주처+현장/시작일)의 대장을 찾아 연결, 없으면 새 대장(운반은 대장 없음). 종결 때 대장 done·ks 초안·2/15 실적신고 할 일
+  // 검토(10/13) 반영: 대장을 못 받은 기기는 받은 뒤 처리(loadAsb → csSiteHooksRetry) · 종결된 옛 대장에는 붙이지 않음 · 부분 포함 매칭 제거 · 삭제된 대장은 다시 연결
+  var CON_SITE_BIZ = { asbestos:"비계ㆍ구조물해체공사업", demolition:"비계ㆍ구조물해체공사업", dredge:"상ㆍ하수도설비공사업" };
+  var CON_SITE_CORP = { asbestos:"주식회사 종운건설", demolition:"주식회사 종운건설", dredge:"종운환경 주식회사" };
+  function csSiteKindOf(c){ if (!c) return ""; if (SITE_KIND[c.type]) return c.type; if (c.elems && c.elems.asb) return "asbestos"; if (c.elems && (c.elems.demo || c.elems.permit)) return "demolition"; return ""; }
+  function csNorm(s){ return String(s || "").toLowerCase().replace(/[\s()\-·,.㈜]/g, "").replace(/주식회사|유한회사/g, ""); }
+  var csSiteLinkQueue = {};
+  // 계약 시작·[대장 연결] 공통 입구 — 대장을 아직 못 받았으면 받아서(열람 권한 lic) 연결 큐에, 받았으면 바로. 반환: 대장 행 | "wait" | "noperm" | "skip" | "none"
+  function csLinkSiteLater(c){
+    if (!c || !csSiteKindOf(c) || !canDo("site")) return "skip";
+    var loaded = (typeof asbLoaded === "undefined" || asbLoaded);
+    if (!loaded || (c.site_id && !findAsb(c.site_id))){   // 못 받았거나, 가리키는 대장이 로컬에 없다(다른 기기 생성·갱신 전) → 다시 받아 보고 결정(F8)
+      if (typeof canSee === "function" && !canSee("lic")) return "noperm";
+      csSiteLinkQueue[c.id] = 1; if (typeof loadAsb === "function") loadAsb(); return "wait";
+    }
+    return csLinkSite(c, true) || "none";
+  }
+  function csLinkSite(c, auto){
+    if (!c || typeof asb === "undefined" || !Array.isArray(asb) || !canDo("site")) return null;
+    if (typeof asbLoaded !== "undefined" && !asbLoaded) return null;   // 대장을 아직 못 받았으면 보류 — 있는 대장을 두고 새 대장을 만들지 않는다
+    if (c.site_id){ var cur = findAsb(c.site_id); if (cur && cur.del !== 1) return null; }   // 삭제된 대장을 가리키면 다시 연결 허용
+    var kind = csSiteKindOf(c); if (!kind) return null;
+    var cl = csNorm(c.client), st = csNorm(c.site), ti = csNorm(csTitle(c));
+    var hit = liveSites().filter(function(r){ return r.con_id === c.id; })[0] || null;   // 이미 이 계약을 가리키는 대장이 있으면 그 행(중복 생성 차단, F10)
+    if (!hit) liveSites().forEach(function(r){
+      if (hit || siteKind(r) !== kind || r.con_id || r.status === "done") return;   // 종결된 옛 대장(작년 반복 공사)에는 붙이지 않는다
+      var rc = csNorm(r.client), rt = csNorm(r.title), rs = csNorm(r.site), sameClient = !!(cl && rc && rc === cl);
+      if ((ti && rt === ti) || (sameClient && st && (rs === st || rt === st))) hit = r;   // 공사명 일치, 또는 발주처+현장 일치(시작일 단독 일치는 기본값 '오늘'과 겹쳐 제외, F16)
+    });
+    if (!hit){
+      if (auto === "find") return null;
+      hit = { id: genId("asb"), created: todayStr(), kind: kind, title: csTitle(c) || c.site || c.label || "", client: c.client || "", site: c.site || "", start: c.start || "", end: ((c.contract_info||{}).d3) || "",
+        material: "", area: "", status: "plan", conc: "", waste_no: "", note: "계약 탭에서 자동 생성(" + todayStr() + ")", member_ids: [], worker_ids: [], updated: todayStr() };
+      asb.push(hit);
+    }
+    hit.con_id = c.id; hit.updated = todayStr(); c.site_id = hit.id; c.updated = todayStr();
+    if (c.site_hook === "none") delete c.site_hook;   // '대장 없음' 표식은 재연결로 무효(F9)
+    scheduleAsbSave(); scheduleContractSave();
+    if (c.scen && c.status === "done") csSiteDone(c);   // 옛 계약(scen 없음)은 연결만(F12)
+    if (typeof renderSites === "function") renderSites();
+    return hit;
+  }
+  function csNextFeb15(){ var td = todayStr(), y = Number(td.slice(0, 4)); return (td >= y + "-02-15" ? (y + 1) : y) + "-02-15"; }   // 문자열 비교 — 시간대 무관(2/15 당일이면 내년)
+  // 종결 훅 — advanceProc·csRecalc·csApprApply에서 계약이 done이 될 때. 새 시나리오 계약만(옛 계약은 종전 그대로). 대장은 받은 상태에서만 처리하고 그때 site_hook, 2/15 지시는 task_hook — 각각 1회
+  function csOnDone(c){
+    if (!c || !c.scen || c.status !== "done") return;
+    csSiteDone(c);
+    if (!c.task_hook && csSiteKindOf(c)){   // 매년 2/15 실적신고 할 일(건설업 등록 — 통합실적관리시스템) — 같은 제목이 열려 있으면 안 만든다
+      var title = "실적신고(2/15) — " + (csTitle(c) || c.site || c.label || "");
+      if (!tasks.some(function(t){ return t && t.del !== 1 && t.title === title && t.status !== "done"; })){
+        tasks.push({ id: genId("t"), title: title, detail: "통합실적관리시스템(icms.or.kr) 연도별 신고 — 현장 탭 대장(계약액 행)과 계약 탭 연결 탭의 실적 초안(업종·금액·계약일)을 확인하고 신고. 신고번호 입력 칸은 후속(현재는 메모로)", who_id: c.who_id || "", who: memberName(c.who_id || ""), from: myName() || "", from_id: myId(), by: myName() || "",
+          due: csNextFeb15(), status: "open", done_at: null, done_by: null, created: todayStr(), updated: todayStr(), con_ref: c.id });
+        saveTasksCache(); scheduleTasksSave();
+      }
+      c.task_hook = todayStr(); c.updated = todayStr(); scheduleContractSave();
+    }
+  }
+  // 대장 종결 — 대장을 받은 상태에서 행을 찾았을 때만 site_hook. 못 받았으면 받아 오게 하고 보류(loadAsb 완료 → csSiteHooksRetry)
+  function csSiteDone(c){
+    if (!c || !c.scen || (c.site_hook && c.site_hook !== "none") || !c.site_id || c.status !== "done" || typeof findAsb !== "function") return false;
+    if (typeof asbLoaded !== "undefined" && !asbLoaded){ if (typeof canSee === "function" && canSee("lic") && typeof loadAsb === "function") loadAsb(); return false; }
+    var r = findAsb(c.site_id), amt = conAmtEff(c);
+    if (!r) return false;   // 로컬에 없음(다른 기기 생성·갱신 전) — 표식 없이 보류, 다음 loadAsb 때 재시도(F8: 없음 ≠ 삭제)
+    if (r.del === 1){ if (c.site_hook !== "none"){ c.site_hook = "none"; c.updated = todayStr(); scheduleContractSave(); } return false; }   // 대장이 삭제됨 — 할 일 없음(재연결하면 해제)
+    r.status = "done"; if (!r.end) r.end = todayStr();
+    var kd = { no: "", year: todayStr().slice(0, 4), biz: CON_SITE_BIZ[csSiteKindOf(c)] || "", amount: amt || 0, done_amount: amt || 0, contract_date: ((c.contract_info||{}).d1) || c.start || "", approve: "-", corp: CON_SITE_CORP[csSiteKindOf(c)] || "" };
+    r.ks = (r.ks && typeof r.ks === "object") ? r.ks : {};
+    Object.keys(kd).forEach(function(k){ if (r.ks[k] === undefined || r.ks[k] === null || r.ks[k] === "") r.ks[k] = kd[k]; });   // 초안은 빈 칸만 채운다 — 사람이 넣은 값은 지우지 않는다
+    if (!r.ks.no) r.ks.draft = 1;
+    r.updated = todayStr(); scheduleAsbSave();
+    c.site_hook = todayStr(); c.updated = todayStr(); scheduleContractSave();
+    return true;
+  }
+  // 대장을 받은 직후(loadAsb 성공) — 보류된 연결·종결을 처리한다
+  function csSiteHooksRetry(){
+    if (typeof contracts === "undefined") return;
+    Object.keys(csSiteLinkQueue).forEach(function(id){ var c = findProc(id); delete csSiteLinkQueue[id]; if (c) csLinkSite(c, true); });
+    (contracts || []).forEach(function(c){ if (c && c.del !== 1 && c.scen && c.status === "done" && c.site_id && !c.site_hook) csSiteDone(c); });
+  }
   // @con-scen-end
   // 제목 키워드로 요소 제안(낙찰→계약 유입 시) — 학습 전 초기 제안
   function suggestConElems(text, decide){
@@ -9864,6 +10095,7 @@
       status:"active", who_id:opts.who||"", who:memberName(opts.who||""), created:today, updated:today };
     contracts.push(c);
     c.pipes.forEach(function(p){ materializeStage(c, p, c.start); });
+    if(opts.scen){ try { csLinkSiteLater(c); } catch(e){} }   // v384 현장 대장 자동 연결(새 시나리오 계약만, 현장 권한) — 대장을 못 받았으면 받은 뒤
     scheduleContractSave();
     renderTasks(); renderSummary(); renderDashboard(); renderContracts();
     return c;
@@ -9874,11 +10106,17 @@
     var pipe=null; for(var i=0;i<c.pipes.length;i++){ if(c.pipes[i].key===t.pipe){ pipe=c.pipes[i]; break; } }
     if(!pipe) return;
     var s = pipe.stages[t.stage_i]; if(!s || s.status==="done" || s.status==="skipped" || t.stage_i < pipe.cur) return;   // v382 검토 1: 건너뛴·지난 단계 지시를 되돌려 재승인해도 파이프를 되감지 않는다
+    if(c.scen && csApprKind(s.name) && !(s.appr && s.appr.status==="승인")){   // v384 검토 J·2차 F2: 결재 대상 단계(계약서·청구)는 상신 전후 모두 지시 탭으로 넘어가지 않는다 — 지시는 완료 요청으로
+      t.status="review"; t.done_at=t.done_at||todayStr(); t.approved_by=null; t.approved_at=null; t.updated=todayStr();
+      alert(s.appr ? ("이 단계는 결재함에 상신돼 있습니다(" + s.appr.kind + " " + s.appr.status + ") — 결재함에서 승인되면 단계가 넘어갑니다. 지시는 완료 요청 상태로 둡니다.") : ("이 단계(" + csApprKind(s.name) + ")는 결재함 상신이 필요합니다 — 계약 탭 단계 카드의 [상신]을 눌러 주세요. 지시는 완료 요청 상태로 둡니다."));
+      return false;
+    }
     s.status="done"; s.done_at=todayStr();
     pipe.cur = t.stage_i + 1;
     if(pipe.cur < pipe.stages.length){ materializeStage(c, pipe, todayStr()); }
     c.status = c.pipes.every(function(p){ return p.cur >= p.stages.length; }) ? "done" : "active";
     c.updated=todayStr();
+    if(c.status==="done") csOnDone(c);   // v384 종결: 대장 done·ks 초안·2/15 실적신고 할 일
     scheduleContractSave(); renderContracts();
     if(/청구/.test(t.stage_name||"")) setTimeout(function(){ conBillToRec(c); }, 150);   // 청구 완료 → 기성(미수) 연동
   }
@@ -10031,6 +10269,7 @@
     var ct = (p.cur < p.stages.length && p.stages[p.cur].task_id) ? findTask(p.stages[p.cur].task_id) : null, canCloseCur = !ct || ct.status === "done" || canApproveTask(ct);   // 현재 지시를 닫을 수 있는 사람(승인권)만 건너뜀·순서 변경(v382 검토 4)
     var cls = isSkip ? ' skip' : (isDone ? ' done' : (isCur ? ' cur' : '')) + (opt ? ' opt' : '') + (open ? ' open' : '');
     var meta = isSkip ? '건너뜀' : (isDone ? ('완료' + (s.done_at ? ' ' + esc(s.done_at) : '')) : (isCur ? ((t && t.status === "review") ? '승인 대기' + (due ? ' · 기한 ' + esc(due) : '') : (due ? '기한 ' + esc(due) : '<span class="need-due">기한 입력</span>')) : '대기'));
+    if (s.appr && !isSkip) meta += ' · 결재 ' + esc(s.appr.status || "대기") + (s.appr.decided_at ? ' ' + esc(s.appr.decided_at) : '') + (s.appr.reason ? '(' + esc(s.appr.reason) + ')' : '');   // v384
     var h = '<div class="cs-stg' + cls + '" data-cs-stg="' + esc(key) + '"><span class="n">' + (i + 1) + ' ' + esc(s.name) + (opt ? ' <small>선택</small>' : '') + '</span><span class="m">' + meta + '</span>';
     if (!open) return h + '</div>';
     var flds = csStageFields(s.name), vals = s.vals || {};
@@ -10045,7 +10284,12 @@
     if (can){
       if (isCur && t && t.status !== "done"){
         act += '<button type="button" class="vs-chip" data-cs-sdoc="' + esc(c.id) + '|' + esc(s.name) + '">📄 서류</button>';
-        if (!review) act += '<button type="button" class="vs-chip" data-cs-done="' + esc(c.id) + '|' + esc(key) + '">' + (canApproveTask(t) ? '완료' : '완료 요청') + '</button>';
+        var ak = c.scen ? csApprKind(s.name) : "";   // v384 결재 2종: 계약·청구 단계는 [완료] 대신 결재함 상신 → 승인되면 자동 진행
+        if (ak && s.appr && s.appr.status === "대기") act += '<span class="vs-chip" style="cursor:default;opacity:.7;">결재 대기 중(' + esc(ak) + ')</span>';
+        else if (ak && s.appr && s.appr.status === "보류") act += '<span class="vs-chip" style="cursor:default;opacity:.7;">결재 보류(' + esc(ak) + ')</span>';
+        else if (ak && s.appr && s.appr.status === "반려") act += '<button type="button" class="vs-chip" data-cs-done="' + esc(c.id) + '|' + esc(key) + '">다시 상신(' + esc(ak) + ')</button>';
+        else if (ak && !(s.appr && s.appr.status === "승인")) act += '<button type="button" class="vs-chip" data-cs-done="' + esc(c.id) + '|' + esc(key) + '">' + esc(ak) + ' 상신</button>';
+        else if (!review) act += '<button type="button" class="vs-chip" data-cs-done="' + esc(c.id) + '|' + esc(key) + '">' + (canApproveTask(t) ? '완료' : '완료 요청') + '</button>';
         else act += '<span class="vs-chip" style="cursor:default;opacity:.7;">승인 대기 중</span>';
       }
       if (flds.length) act += '<button type="button" class="vs-chip" data-cs-fsave="' + esc(c.id) + '|' + esc(key) + '">입력 저장</button>';
@@ -10077,7 +10321,7 @@
     return h;
   }
   function csCloseTask(t, how){ if (!t || t.status === "done") return; t.status = "done"; t.done_at = todayStr(); t.done_by = myName() || "자동"; t.approved_by = myName() || ""; t.approved_at = todayStr(); t.updated = todayStr(); if (how) t.detail = (t.detail ? t.detail + "\n" : "") + how; }
-  function csRecalc(c){ c.status = (c.pipes||[]).every(function(p){ return p.cur >= p.stages.length; }) ? "done" : "active"; c.updated = todayStr(); }
+  function csRecalc(c){ c.status = (c.pipes||[]).every(function(p){ return p.cur >= p.stages.length; }) ? "done" : "active"; c.updated = todayStr(); if (c.status === "done") csOnDone(c); }
   // 현재 단계의 열린 지시를 닫아도 되는 사람인지(승인권) — 아니면 [완료 요청]과 같은 길로(v382 검토 4·8·17)
   function csCanCloseCur(c, p){ var s = p.stages[p.cur]; var t = (s && s.task_id) ? findTask(s.task_id) : null; if (t && t.status !== "done" && !canApproveTask(t)){ alert("현재 단계 지시는 승인권자(관리자·지시자)만 닫을 수 있습니다 — [완료 요청]을 올리거나 승인권자에게 맡기세요."); return false; } return true; }
   function csSkipStage(c, p, i){
@@ -10104,6 +10348,14 @@
   }
   function csDoneStage(c, p, i){
     var s = p.stages[i]; if (!s || i !== p.cur) return;
+    var ak = c.scen ? csApprKind(s.name) : "";
+    if (ak && !(s.appr && s.appr.status === "승인")){   // v384: 계약 단계·청구 검수는 결재함으로
+      if (s.appr && (s.appr.status === "대기" || s.appr.status === "보류")){ alert("이미 상신돼 있습니다(" + s.appr.status + ") — 결재함에서 승인되면 자동으로 넘어갑니다."); csApprSync(c, true); return; }
+      if (s.appr && s.appr.status === "반려" && !confirm('반려된 상신입니다(' + (s.appr.reason || "사유 없음") + '). 다시 상신할까요?')) return;
+      if (!confirm('"' + s.name + '" 단계를 결재함에 상신합니다(' + ak + '). 승인되면 다음 단계가 자동으로 생성됩니다.')) return;
+      if (csApprSubmit(c, p, i)){ alert("상신했습니다 — 결재함(" + ak + ")에서 승인되면 단계가 넘어갑니다."); renderContracts(); }
+      return;
+    }
     var r = completeStageNow(c, csExactRe(s.name), p.key);   // v382 검토 7: 이 파이프만
     if (r === "review") alert("완료 요청으로 올렸습니다 — 승인권자가 승인하면 다음 단계가 생성됩니다.");
     else if (r === "none") alert("이 단계의 지시를 찾지 못했습니다 — 지시 탭에서 확인하세요.");
@@ -10139,9 +10391,13 @@
     items.push(["기성·수금", r ? ((r.amount ? fmtAmount(r.amount) + "원" : "") + (r.paid ? " · 입금 " + r.paid : " · 미수") + (r.billed ? " · 청구 " + r.billed : "")) : "없음(청구 단계 완료 때 생성)"]);
     items.push(["입찰", c.bid_id ? (ci.from || c.bid_id) : "없음"]);
     items.push(["건축물대장", bi ? ((bi.site || "") + " · " + (bi.total_floor || 0) + "㎡") : "없음"]);
-    items.push(["현장 대장", "연결 없음(v384 예정)"]);
-    items.push(["결재", "연결 없음(v384 예정 — 계약 단계·청구 검수)"]);
-    return '<div class="cs-links">' + items.map(function(p){ return '<div class="cs-lk"><div class="k">' + p[0] + '</div><div class="v">' + esc(p[1]) + '</div></div>'; }).join("") + '</div>';
+    var sr = (c.site_id && typeof findAsb === "function") ? findAsb(c.site_id) : null, sk = csSiteKindOf(c), asbOk = (typeof asbLoaded === "undefined" || asbLoaded); if (sr && sr.del === 1) sr = null;
+    items.push(["현장 대장", sr ? ((sr.title || "") + " · " + (sr.status === "done" ? "종결" : (sr.status === "run" ? "진행" : "예정")) + (sr.ks ? " · 실적 " + (sr.ks.no ? sr.ks.no : "초안") + (sr.ks.amount ? " " + fmtAmount(sr.ks.amount) + "원" : "") : "")) : (sk ? (!canDo("site") ? "연결 없음(현장 권한 필요)" : (!asbOk ? (canSee("lic") ? "대장을 아직 불러오지 않음 — [대장 연결]을 누르면 받아서 연결합니다" : "연결 없음(현장 대장 열람 권한 필요)") : (c.site_id ? "연결했던 대장이 삭제됨 — [대장 연결]로 다시 연결" : "연결 없음 — [대장 연결]로 찾거나 새로 만듭니다"))) : "해당 없음(운반)")]);
+    var ap = []; (c.pipes || []).forEach(function(p){ (p.stages || []).forEach(function(s){ if (s.appr) ap.push(s.name + ": " + s.appr.kind + " " + (s.appr.status || "대기") + (s.appr.decided_at ? " " + s.appr.decided_at : "") + (s.appr.decided_by ? " · " + s.appr.decided_by : "")); }); });
+    items.push(["결재", ap.length ? ap.join(" / ") : (c.scen ? "상신 없음 — 계약·청구 단계의 [상신]으로 올립니다" : "옛 계약(결재 배선 없음)")]);
+    var h = '<div class="cs-links">' + items.map(function(p){ return '<div class="cs-lk"><div class="k">' + p[0] + '</div><div class="v">' + esc(p[1]) + '</div></div>'; }).join("") + '</div>';
+    if (!sr && sk && canDo("site") && (asbOk || canSee("lic"))) h += '<div class="cs-act"><button type="button" class="vs-chip" data-cs-site="' + esc(c.id) + '">대장 연결</button></div>';
+    return h;
   }
   // 상세 — PC는 행 아래 펼침, 폰은 표 아래 카드(#conDetailCard). 하위 탭 개요/단계/서류/연결. 편집·생성은 기존 모달·툴 그대로
   function csDetailHtml(c){
@@ -10150,7 +10406,7 @@
       (c.docType === "public" ? '<span class="from-chip">공문서</span>' : '<span class="scope-chip">사문서</span>') + (c.status === "done" ? '<span class="done-by">✓ 완료</span>' : '') +
       '<button type="button" class="vs-chip" data-cs-close="1" style="margin-left:auto;">닫기 ▲</button></div>';
     h += '<div class="vs-stabs">' + [["ov", "개요"], ["st", "단계"], ["doc", "서류"], ["lk", "연결"]].map(function(t){ return '<button type="button" class="vs-stab' + (conDetTab === t[0] ? ' on' : '') + '" data-cs-tab="' + t[0] + '">' + t[1] + '</button>'; }).join("") + '</div>';
-    if (conDetTab === "st") h += csStagesHtml(c);
+    if (conDetTab === "st"){ csApprSync(c); h += csStagesHtml(c); }   // v384: 결재 결과 동기화(60초 1회)
     else if (conDetTab === "doc") h += csPacketsHtml(c) + (conAttBoxHtml(c) || '<div class="vs-empty">첨부가 없습니다.</div>');   // v383 서류 4종 패킷 + 첨부함
     else if (conDetTab === "lk") h += csLinksHtml(c);
     else h += csOverviewHtml(c);
@@ -10274,6 +10530,7 @@
       }); });
       var csAct = function(attr, fn){ Array.prototype.forEach.call(root.querySelectorAll("[" + attr + "]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); var p = el.getAttribute(attr).split("|"), c = findProc(p[0]); if (!c) return; var pipe = csPipeOf(c, p[1]), i = Number(p[2]); if (!pipe || isNaN(i)) return; fn(c, pipe, i, el); }); }); };
       Array.prototype.forEach.call(root.querySelectorAll("[data-cs-gen]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); var p = el.getAttribute("data-cs-gen").split("|"); if (p[1] === "html_contract") openDocFromContract(p[0]); else openXlsxGen(p[0], csGenKind(findProc(p[0]) || {}, p[1])); }); });   // v383 패킷 [생성]
+      Array.prototype.forEach.call(root.querySelectorAll("[data-cs-site]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); var c = findProc(el.getAttribute("data-cs-site")); if (!c) return; var r = csLinkSiteLater(c); alert(typeof r === "object" ? ("현장 대장에 연결했습니다: " + (r.title || "")) : (r === "wait" ? "현장 대장을 불러오는 중입니다 — 받는 대로 연결합니다(잠시 뒤 연결 탭 확인)." : (r === "noperm" ? "현장 대장 열람 권한(인허가)이 없어 연결할 수 없습니다." : "연결할 수 없습니다(현장 권한 또는 종류)."))); renderContracts(); }); });   // v384
       csAct("data-cs-done", function(c, p, i){ csDoneStage(c, p, i); });
       csAct("data-cs-skip", function(c, p, i){ csSkipStage(c, p, i); });
       csAct("data-cs-unskip", function(c, p, i){ csUnskipStage(c, p, i); });
@@ -11026,7 +11283,7 @@
   // 그래야 이 화면 자체가 보존 의무의 이행이자 안전성평가 항목3(전산화 정도)의 증빙이 된다.
   // 날짜는 하나만 받는다 — 신고 마감(착수 7일 전)·보존 만료(종료 +30년)는 파생값이라
   // 사람이 넣으면 서로 어긋난다.
-  var asb = [], asbBase = 0, asbPending = false, asbSaveTimer = null, asbEditId = null;
+  var asb = [], asbBase = 0, asbPending = false, asbSaveTimer = null, asbEditId = null, asbLoaded = false;   // asbLoaded: 서버 대장을 한 번이라도 받았는가(v384 계약 연결은 받기 전엔 새 대장을 만들지 않는다)
   var ASB_STATUS = { plan:"예정", run:"작업중", done:"종결" };
   function liveAsb(){ return asb.filter(function(r){ return r && r.del !== 1; }); }
   function findAsb(id){ for (var i=0;i<asb.length;i++){ if (asb[i].id===id) return asb[i]; } return null; }
@@ -11056,7 +11313,8 @@
       var ri=Array.isArray(doc.items)?doc.items:[];
       asb = asbPending ? mergeAsb(asb, ri) : ri;   // 저장 대기 중이면 로컬 우선(로드 덮어쓰기 금지)
       asb.forEach(normAsbRow);                     // v336: 모양 교정은 입구에서 1회 — 다음 저장 때 서버 기록도 배열로 정리된다
-      asbBase = doc.updated_at||0;
+      asbBase = doc.updated_at||0; asbLoaded = true;
+      if (typeof csSiteHooksRetry === "function"){ try { csSiteHooksRetry(); } catch(e){} }   // v384: 보류된 계약 연결·종결
       renderSites(); renderCalendar(); renderWorkers();   // v356: 일용직 목록의 참여 칩 갱신
     }).catch(function(){});
   }

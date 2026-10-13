@@ -1409,5 +1409,28 @@ try {
     && /if \(!claimed\[ai\] && it\.re\.test\(n\) && !\(it\.ex && it\.ex\.test\(n\)\)\)\{ claimed\[ai\] = 1; hit\.push\(n\); \}/.test(sc) && /k:"reg", h:"건설업·폐기물 등록증", re:\/\(건설업\|해체\|폐기물\|수집운반\|운반업\)/.test(sc) && /k:"invoice", h:"세금계산서", re:\/세금계산서\//.test(sc) && /k:"ins", h:"4대보험 완납증명", re:\/4대보험/.test(sc) && !/re:\/보험\|완납\//.test(sc), '');
 } catch (e) { console.log('  (v383 검사 생략 — ' + e.message + ')'); fails++; }
 
+// ---- v384: 결재 2종 배선 + 현장 대장 연결 (10/13 적대 검토 1·2차 반영) ----
+try {
+  const sc = html.slice(html.indexOf('// @con-scen-start'), html.indexOf('// @con-scen-end'));
+  const gradeKeys = (gwd.match(/const APPR_GRADE_DEFAULTS = \{([\s\S]*?)\};/) || ['', ''])[1];
+  T('v384 결재: CON_APPR_KINDS 2종 = 서버 등급표 키(계약 단계=/계약서/·청구 검수) · 상신 큐(ref con:) + 지시 review 잠금 · 적용 전 서버 계약본(csFetchServerContract, sha 불변) → csSyncFromServer 접목(앞섬 판정 없음) · cid 전용 매칭 · 60초 폴(미전송 2분·결정 20초 유예) · 결정 훅(토스트·즉시 저장 csSaveNow) · 4xx 폐기 → csApprDropped · loadTasks → csAlignTasksAll · advanceProc 잠금(미상신 포함, false) · completeStageNow locked · approveTask 푸시는 진행 뒤',
+    /\[\/청구\|입금\/, "청구 검수"\], \[\/계약서\/, "계약 단계"\]/.test(sc) && /'계약 단계'/.test(gradeKeys) && /'청구 검수'/.test(gradeKeys)
+    && /apprPendingCreates\.push\(\{ cid: cid, mid: myId\(\), kind: kind, title: \("\[계약\] "/.test(sc) && /t\.status = "review"; t\.done_at = todayStr\(\); t\.done_by = "결재함 상신\("/.test(sc)
+    && /function csFetchServerContract\(id\)/.test(sc) && !/contractSha = json\.sha/.test(sc) && /function csSyncFromServer\(c, sc\)/.test(sc) && !/csAdoptIfAhead/.test(html) && /var localAhead = \(lq\.cur \|\| 0\) > \(q\.cur \|\| 0\), base = localAhead \? lq : q/.test(sc) && /if \(csEmpty\(m\.vals\) && !csEmpty\(o\.vals\)\) m\.vals = o\.vals;/.test(sc)
+    && /if \(s\.appr\.cid\)\{ if \(x\.cid === s\.appr\.cid\) it = x; return; \}/.test(sc) && /c = findProc\(id\) \|\| c;   \/\/ 응답 대기 중/.test(sc) && /s\.appr\.status = "미전송"; changed = true;/.test(sc) && /Date\.now\(\) - \(Date\.parse\(it\.decided_at\) \|\| 0\) < 20000\) return;/.test(sc)
+    && /function csSaveNow\(\)/.test(sc) && /c\.updated = todayStr\(\); csSaveNow\(\); renderContracts\(\);/.test(sc) && /apprToastShow\("계약을 이 기기에서 찾지 못했습니다/.test(sc) && /function csApprDropped\(ref, cid\)/.test(sc) && /typeof csApprDropped === "function"\)\{ try \{ csApprDropped\(p\.ref, p\.cid\); \}/.test(html)
+    && /function csAlignTasksAll\(\)/.test(sc) && /if \(typeof csAlignTasksAll === "function"\)\{ try \{ csAlignTasksAll\(\); \}/.test(html)
+    && /if\(c\.scen && csApprKind\(s\.name\) && !\(s\.appr && s\.appr\.status==="승인"\)\)\{/.test(html) && /return adv===false \? "locked" : "done";/.test(html) && /var adv = advanceProc\(t\);   \/\/ v384 2차 F5/.test(html)
+    && /indexOf\("con:"\) === 0\)\{   \/\/ v384/.test(html) && /indexOf\("con:"\) === 0 && typeof csApprOnDecided === "function"\)\{ try \{ csApprOnDecided\(it\); \}/.test(html) && /csApprSync\(c\); h \+= csStagesHtml\(c\);/.test(html) && /csApprSync\(c, true\); return; \}/.test(html) && /data-cs-done="' \+ esc\(c\.id\) \+ '\|' \+ esc\(key\) \+ '">' \+ esc\(ak\) \+ ' 상신</.test(html), '');
+  T('v384 대장: csLinkSiteLater(미로드·로컬에 없는 대장 → lic 있으면 loadAsb+큐) · csLinkSite(asbLoaded 가드·자기 con_id 행 재연결·삭제 대장 재연결·종결 대장 제외·공사명 또는 발주처+현장·none 해제·옛 계약은 연결만) · startProcess → csLinkSiteLater · csOnDone(scen, task_hook) · csSiteDone(scen, site_hook, 없음≠삭제) · loadAsb/loadContracts → csSiteHooksRetry · 연결 탭 안내 + [대장 연결] · 서버 변경 없음',
+    /function csLinkSiteLater\(c\)/.test(sc) && /if \(!loaded \|\| \(c\.site_id && !findAsb\(c\.site_id\)\)\)\{/.test(sc) && /csSiteLinkQueue\[c\.id\] = 1; if \(typeof loadAsb === "function"\) loadAsb\(\); return "wait";/.test(sc)
+    && /if \(typeof asbLoaded !== "undefined" && !asbLoaded\) return null;/.test(sc) && /var hit = liveSites\(\)\.filter\(function\(r\)\{ return r\.con_id === c\.id; \}\)\[0\] \|\| null;/.test(sc) && /\|\| r\.con_id \|\| r\.status === "done"\) return;/.test(sc) && /\(sameClient && st && \(rs === st \|\| rt === st\)\)\) hit = r;/.test(sc) && !/r\.start === c\.start/.test(sc)
+    && /if \(c\.site_hook === "none"\) delete c\.site_hook;/.test(sc) && /if \(c\.scen && c\.status === "done"\) csSiteDone\(c\);/.test(sc)
+    && /if\(opts\.scen\)\{ try \{ csLinkSiteLater\(c\); \} catch\(e\)\{\} \}/.test(html) && /if\(c\.status==="done"\) csOnDone\(c\);/.test(html) && /if \(c\.status === "done"\) csOnDone\(c\); \}/.test(html)
+    && /function csOnDone\(c\)\{\s+if \(!c \|\| !c\.scen \|\| c\.status !== "done"\) return;/.test(sc) && /c\.task_hook = todayStr\(\);/.test(sc) && /if \(!c \|\| !c\.scen \|\| \(c\.site_hook && c\.site_hook !== "none"\) \|\| !c\.site_id/.test(sc) && /if \(!r\) return false;   \/\/ 로컬에 없음/.test(sc) && /c\.site_hook = todayStr\(\);/.test(sc) && !/done_hook/.test(html)
+    && /asbBase = doc\.updated_at\|\|0; asbLoaded = true;\s+if \(typeof csSiteHooksRetry === "function"\)/.test(html) && /asbLoaded && typeof csSiteHooksRetry === "function"\)\{ try \{ csSiteHooksRetry\(\); \}/.test(html) && /title = "실적신고\(2\/15\) — "/.test(sc)
+    && /querySelectorAll\("\[data-cs-site\]"\)/.test(html) && /var r = csLinkSiteLater\(c\); alert\(typeof r === "object"/.test(html) && /현장 대장 열람 권한 필요/.test(html) && !/approval_apply|task_done_by_approval/.test(gwd), '');
+} catch (e) { console.log('  (v384 검사 생략 — ' + e.message + ')'); fails++; }
+
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
