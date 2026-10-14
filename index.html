@@ -18009,6 +18009,7 @@
   // 노선 지정 권한(v323 #13) — 관리자 또는 부서 '운영부'(공무). 서버 canLearn과 같은 조건(uismoke 대조). 그 외는 미매칭 목록만 보고 버튼 없음.
   var AB_LEARN_DEPT = "운영부";
   function abCanLearn(){ var m = curMember(); return !!(m && (m.admin || String(m.dept || "") === AB_LEARN_DEPT)); }
+  var AB_HIDE_FORBIDDEN = "노선 숨김·해제는 관리자와 운영부(공무)만 할 수 있습니다.";   // v386
   function abRowEmpty(c){ return !c || (abInt(c.n) === 0 && abInt(c.n_pending) === 0); }   // 회수가 빈 줄(잠정도 없음) — 토글·숨김의 '빈 줄' 기준
   function abHiddenRoutes(){ return abRouteList().filter(function(r){ return r.h; }); }
 
@@ -18632,10 +18633,10 @@
     });
   }
 
-  // ---- 노선 숨김/복구(v323 #9, 관리자) — 서버 ab_route_hide. 소프트 숨김: 노선표·집계·배정은 그대로, 표에서만 뺀다 ----
+  // ---- 노선 숨김/복구(v323 #9) — 서버 ab_route_hide. v386(PM 10/14): 관리자 + 운영부(abCanLearn, 노선 지정과 같은 조건). 소프트 숨김: 노선표·집계·배정은 그대로, 표에서만 뺀다 ----
   function abRouteHide(side, row, hide){
     if (abHideBusy) return;
-    if (!isAdmin()){ alert("노선 숨김은 관리자만 할 수 있습니다."); return; }
+    if (!abCanLearn()){ alert(AB_HIDE_FORBIDDEN); return; }
     var rt = abRouteFind(side, row);
     var lab = side + row + (rt ? " · " + rt.f + " → " + rt.t + " · " + rt.i : "");
     if (hide && !confirm("이 줄을 운반내역 표에서 숨길까요?\n\n" + lab + "\n\n노선표·집계·배정은 그대로이고 표에서만 빠집니다. 인계서가 이 줄에 배정되면 '숨김 해제 필요'로 다시 나타납니다.\n표 아래 '숨긴 노선'에서 언제든 복구할 수 있습니다.")) return;
@@ -18648,6 +18649,7 @@
         renderAbSheet();
         return;
       }
+      if (res.status === 403 && res.body && res.body.code === "FORBIDDEN"){ alert(AB_HIDE_FORBIDDEN); return; }   // 노선 지정 문구(AB_CODE_TEXT.FORBIDDEN)와 구분
       alert(abErrText(res, hide ? "노선 숨김 실패" : "노선 복구 실패"));
     }).catch(function(){ abHideBusy = false; alert("노선 숨김을 저장하지 못했습니다(네트워크)."); });
   }
@@ -18674,7 +18676,7 @@
       hs.forEach(function(r){
         h += '<div><b>' + esc(r.s + r.r) + '</b> ' + esc(r.f) + " → " + esc(r.t) + " · " + esc(r.i) +
           '<span style="color:var(--sub);">' + esc((r.hb ? r.hb + " · " : "") + (r.ht ? abFmtTs(r.ht) : "")) + '</span>' +
-          (isAdmin() ? ' <button type="button" class="mini-btn" data-ab-unhide="' + esc(r.s + "|" + r.r) + '">복구</button>' : "") + '</div>';
+          (abCanLearn() ? ' <button type="button" class="mini-btn" data-ab-unhide="' + esc(r.s + "|" + r.r) + '">복구</button>' : "") + '</div>';
       });
       h += '</div>';
     }
@@ -18790,9 +18792,9 @@
   // v323(PM 9/7 #9) 빈 줄 처리: ① abHideEmpty(보는 사람 토글)면 회수가 빈 줄을 그날 화면에서만 뺀다 ② 관리자가 숨긴 줄(r.h)은 빼되, 인계서가 배정돼 있으면
   //   '숨김 해제 필요' 배지로 다시 드러낸다(데이터 손실 방지) ③ 관리자에겐 빈 줄마다 작은 [숨김] 버튼. 반환 {html, hiddenN(숨긴 줄 중 실제로 뺀 수), emptyN(토글로 뺀 수)}.
   function abSheetTableHtml(rl, rows){
-    var byKey = {}, extra = { L: [], R: [] }, i, c, k, admin = isAdmin(), emptyN = 0, hiddenN = 0;
+    var byKey = {}, extra = { L: [], R: [] }, i, c, k, admin = abCanLearn(), emptyN = 0, hiddenN = 0;   // v386: 숨김·해제 = 관리자 + 운영부
     for (i = 0; i < rows.length; i++){ c = rows[i]; if (!c || !c.route) continue; k = String(c.route.side || "") + "|" + c.route.row; byKey[k] = c; }
-    function hideBtn(key){ return (admin && key) ? ' <button type="button" class="ab-hide-btn" data-ab-hide="' + esc(key) + '" title="이 줄을 운반내역 표에서 숨김(관리자) — 노선표·집계는 그대로">숨김</button>' : ""; }
+    function hideBtn(key){ return (admin && key) ? ' <button type="button" class="ab-hide-btn" data-ab-hide="' + esc(key) + '" title="이 줄을 운반내역 표에서 숨김(관리자·운영부) — 노선표·집계는 그대로">숨김</button>' : ""; }
     function cellN(c, hideKey){
       if (!c) return '<td class="n">' + hideBtn(hideKey) + '</td>';
       var n = abInt(c.n), np = abInt(c.n_pending), sub = "", pi = null, allPend = n > 0 && np >= n;
@@ -18828,7 +18830,7 @@
         if (r.h){
           // 숨긴 줄에 인계서가 배정됨 — 숨긴 채 두면 회수가 안 보이므로 드러내고 해제를 권한다
           t += '<tr class="ab-row-hidden"><td>' + esc(r.f) + "</td><td>" + esc(r.t) + "</td><td>" + esc(r.i) +
-            '<span class="ab-need-unhide">숨김 해제 필요' + (admin ? ' <button type="button" class="ab-hide-btn" data-ab-unhide="' + esc(key) + '">해제</button>' : "") + '</span></td>' + cellN(cc, "") + "</tr>";
+            '<span class="ab-need-unhide">숨김 해제 필요' + (admin ? ' <button type="button" class="ab-hide-btn" data-ab-unhide="' + esc(key) + '">해제</button>' : ' <span style="font-weight:500;">(관리자·운영부가 해제)</span>') + '</span></td>' + cellN(cc, "") + "</tr>";
           continue;
         }
         t += "<tr><td>" + esc(r.f) + "</td><td>" + esc(r.t) + "</td><td>" + esc(r.i) + abVariantHtml(cc, r) + "</td>" + cellN(cc, empty ? key : "") + "</tr>";

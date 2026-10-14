@@ -1418,10 +1418,18 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   r = await ab({ action: 'ab_learn', from: '미승인기기', to: '네이처', item: '', side: 'L', row: 5 }, tokO, 'devX');
   T('ab_learn 운영부라도 미승인 기기 → 403 DEVICE_NOT_APPROVED', r.code === 403 && r.body.code === 'DEVICE_NOT_APPROVED', r.code + '/' + r.body.code);
   // #9 노선 숨김
+  audL = auditMock.logs.length;
   r = await ab({ action: 'ab_route_hide', side: 'L', row: 5, hide: true }, tokW, 'dev1');
-  T('ab_route_hide 직원 → 403 ADMIN_ONLY', r.code === 403 && r.body.code === 'ADMIN_ONLY', r.code + '/' + r.body.code);
+  T('ab_route_hide 부서 없는 직원 → 403 FORBIDDEN · 저장 없음 · 감사로그 노선숨김거부(v386)', r.code === 403 && r.body.code === 'FORBIDDEN' && hidden().length === 0 && auditMock.logs.slice(audL).some((l) => l.ev[0].op === '노선숨김거부'), r.code + '/' + r.body.code);
+  r = await ab({ action: 'ab_route_hide', side: 'L', row: 5, hide: true }, tokX, 'dev1');
+  T('ab_route_hide 타 부서(관리부) 직원 → 403 FORBIDDEN', r.code === 403 && r.body.code === 'FORBIDDEN' && hidden().length === 0, r.code + '/' + r.body.code);
+  audL = auditMock.logs.length;
   r = await ab({ action: 'ab_route_hide', side: 'L', row: 5, hide: true }, tokO, 'dev1');
-  T('ab_route_hide 운영부 직원도 403 ADMIN_ONLY(숨김은 관리자 전용)', r.code === 403 && r.body.code === 'ADMIN_ONLY' && hidden().length === 0, r.code + '/' + r.body.code);
+  T('ab_route_hide 운영부 직원 숨김 → 200 changed · 숨긴 사람 운영부원 · 감사로그 노선숨김(v386 PM 10/14 "운영부까지 숨김·해제")', r.code === 200 && r.body.changed === true && hidden().length === 1 && hidden()[0].by === '운영부원' && auditMock.logs.slice(audL).some((l) => l.by === '운영부원' && l.ev[0].op === '노선숨김'), r.code + '/' + r.body.code);
+  r = await ab({ action: 'ab_route_hide', side: 'L', row: 5, hide: false }, tokO, 'dev1');
+  T('ab_route_hide 운영부 직원 해제 → 200 changed · 블롭 비움', r.code === 200 && r.body.changed === true && hidden().length === 0, r.code + '/' + r.body.code);
+  r = await ab({ action: 'ab_route_hide', side: 'L', row: 5, hide: false }, tokO, 'devX');
+  T('ab_route_hide 운영부라도 미승인 기기 → 403 DEVICE_NOT_APPROVED', r.code === 403 && r.body.code === 'DEVICE_NOT_APPROVED', r.code + '/' + r.body.code);
   r = await ab({ action: 'ab_route_hide', side: 'L', row: 999, hide: true }, tokA);
   T('ab_route_hide 없는 줄(L999) → 400 BAD_ROUTE', r.code === 400 && r.body.code === 'BAD_ROUTE', r.code + '/' + r.body.code);
   r = await ab({ action: 'ab_route_hide', side: 'X', row: 5, hide: true }, tokA);

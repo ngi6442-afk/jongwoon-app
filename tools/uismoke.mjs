@@ -467,7 +467,7 @@ try {
     && /function abCanLearn\(\)\{ var m = curMember\(\); return !!\(m && \(m\.admin \|\| String\(m\.dept \|\| ""\) === AB_LEARN_DEPT\)\); \}/.test(html) && /\} else if \(abCanLearn\(\)\)\{/.test(html) && /if \(!abCanLearn\(\)\)\{ alert\(AB_CODE_TEXT\.FORBIDDEN\); return; \}/.test(html) && /FORBIDDEN: "/.test(html), '서버 ' + svrDept + ' / 앱 ' + appDept);
   const hideFn = (ab.match(/async function handleRouteHide\([\s\S]*?\n\}/) || [''])[0];
   T('노선 숨김(PM 9/7 #9): 서버 ab_route_hide(관리자 ADMIN_ONLY·BAD_INPUT 불리언·BAD_ROUTE 실재 줄·blob allbaro:routes_hidden·감사 노선숨김/해제·changed:false 멱등) + ab_status routes hidden 병합·hidden_error + 앱 abRouteHide/abApplyHidden/abHiddenListHtml/abHiddenRoutes + 숨김·해제·목록 버튼 배선 + 셀렉트 "(숨김)" 그룹 + "숨김 해제 필요" 배지',
-    /case 'ab_route_hide': return await handleRouteHide\(st, c, d, R\);/.test(ab) && /const HIDDEN_KEY = 'allbaro:routes_hidden';/.test(ab) && /if \(!c\.member\.admin\) return jr\(403, \{ ok: false, code: 'ADMIN_ONLY'/.test(hideFn)
+    /case 'ab_route_hide': return await handleRouteHide\(st, c, d, R\);/.test(ab) && /const HIDDEN_KEY = 'allbaro:routes_hidden';/.test(ab) && /if \(!canLearn\(c\.member\)\) \{[\s\S]{0,400}op: '노선숨김거부'[\s\S]{0,300}return jr\(403, \{ ok: false, code: 'FORBIDDEN'/.test(hideFn) && !/c\.member\.admin\) return jr\(403, \{ ok: false, code: 'ADMIN_ONLY'/.test(hideFn)
     && /typeof d\.hide !== 'boolean'/.test(hideFn) && /code: 'BAD_ROUTE'/.test(hideFn) && /changed: false/.test(hideFn) && /op: d\.hide \? '노선숨김' : '노선숨김해제'/.test(hideFn)
     && /routes: routeList\(hiddenMap\(hr\.ok \? hr\.data : null\)\)/.test(ab) && /hidden_error: !hr\.ok/.test(ab)
     && ['abRouteHide', 'abApplyHidden', 'abHiddenListHtml', 'abHiddenRoutes'].every((f) => new RegExp('function ' + f + '\\(').test(html)) && /action: "ab_route_hide"/.test(html)
@@ -1438,6 +1438,15 @@ try {
     /var AB_XLSX_WHY = \{ collect: "올바로 수집분 갱신", manual: "직접 추가 변경", route: "숨김·노선 변경" \};/.test(html) && /chg=b\.changed_at\? new Date\(b\.changed_at\)/.test(html) && /자동 재생성 범위\(최근 59일\)/.test(html) && /else if\(stt==="skipped"\)[\s\S]{0,200}else if\(stt==="requested"\|\|stt==="in_flight"\)[\s\S]{0,200}else if\(stt==="gave_up"\)/.test(html) && /made=\(b\.src_at\|\|b\.ts\)/.test(html) && !/다음 날 08:25 생성본에 반영됩니다/.test(html)
     && /stale: stale, why: why, changed_at: changedAt \|\| null, covered: covered/.test(readFileSync(join(ROOT, 'netlify', 'functions', 'gw-allbaro.js'), 'utf8')), '');
 } catch (e) { console.log('  (v385 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ---- v386(PM 10/14 "운영부까지 숨김·해제 다 열어"): 노선 숨김·해제·복구 = 관리자 + 운영부(abCanLearn) ----
+try {
+  const seg = (html.match(/function abSheetTableHtml\(rl, rows\)\{([\s\S]*?)\n  function abSortKey/) || ['', ''])[1];
+  T('v386 숨김 권한: abRouteHide 가드 abCanLearn · 숨긴 노선 [복구] abCanLearn · 표의 [숨김]/[해제] admin = abCanLearn() · 비대상은 "(관리자·운영부가 해제)" · 403 FORBIDDEN은 숨김 전용 문구 · isAdmin 잔존 없음',
+    /function abRouteHide\(side, row, hide\)\{[\s\S]{0,120}if \(!abCanLearn\(\)\)\{ alert\(AB_HIDE_FORBIDDEN\); return; \}/.test(html) && /\(abCanLearn\(\) \? ' <button type="button" class="mini-btn" data-ab-unhide=/.test(html)
+    && /admin = abCanLearn\(\), emptyN = 0/.test(seg) && /\(관리자·운영부가 해제\)/.test(seg) && !/isAdmin\(\)/.test(seg) && /var AB_HIDE_FORBIDDEN = "노선 숨김·해제는 관리자와 운영부\(공무\)만 할 수 있습니다\.";/.test(html)
+    && /res\.body\.code === "FORBIDDEN"\)\{ alert\(AB_HIDE_FORBIDDEN\); return; \}/.test(html) && !/노선 숨김은 관리자만 할 수 있습니다/.test(html), '');
+} catch (e) { console.log('  (v386 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

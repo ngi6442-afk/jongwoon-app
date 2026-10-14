@@ -558,11 +558,18 @@ async function handlePresetsPut(st, c, d, R) {
   return jr(200, { ok: true, n: p.items.length, items: p.items, ts: doc.ts, request_id: R });
 }
 
-// 노선 숨김(v323, PM 9/7 #9) — 관리자가 운반내역 표에서 쓰지 않는 양식 줄을 뺀다. 소프트 숨김:
+// 노선 숨김(v323, PM 9/7 #9) — 쓰지 않는 양식 줄을 운반내역 표에서 뺀다. v386(PM 10/14 "운영부까지 숨김·해제 다 열어"): 관리자 + 운영부(노선 지정과 같은 canLearn). 소프트 숨김:
 // 노선표 상수·집계·학습 배정은 그대로이고 UI 표시만 빠진다. 숨긴 줄에 인계서가 배정되면 UI가 '숨김 해제 필요' 배지로 다시 드러낸다(데이터 손실 방지).
 // {side, row, hide:true|false}. 같은 상태 반복은 저장·감사 없이 200(changed:false) — 이중 탭·재시도 안전.
 async function handleRouteHide(st, c, d, R) {
-  if (!c.member.admin) return jr(403, { ok: false, code: 'ADMIN_ONLY', request_id: R });
+  if (!canLearn(c.member)) {
+    // 거부도 남긴다(노선 지정 거부와 같은 방식) — 기록 실패해도 응답은 403 그대로
+    try {
+      await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'allbaro',
+        ev: [{ op: '노선숨김거부', id: cleanStr(d.side).toUpperCase() + (Number.isInteger(Number(d.row)) ? Number(d.row) : ''), t: (d.hide ? '숨김' : '해제') + ' · 부서 ' + String(c.member.dept || '(없음)') }] });
+    } catch (e) {}
+    return jr(403, { ok: false, code: 'FORBIDDEN', request_id: R });
+  }
   if (typeof d.hide !== 'boolean') return jr(400, { ok: false, code: 'BAD_INPUT', request_id: R });
   const side = cleanStr(d.side).toUpperCase();
   const row = Number(d.row);
