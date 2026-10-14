@@ -15632,14 +15632,19 @@
   document.getElementById("ntfClose").addEventListener("click", function(){ document.getElementById("ntfBackdrop").classList.remove("show"); });
   // v352: 엑셀은 액션즈가 만들어 올린 파일이라 숨김·노선 변경이 즉시 반영되지 않는다. 서버가 변경 뒤 재생성을 요청하므로(약 2~3분)
   //   "변경 전 파일"을 받으려는 사람에게 사정을 말하고 고르게 한다. 재생성 요청이 실패(토큰 권한 없음 등)하면 그 사실도 숨기지 않는다.
+  // v385(10/14 권민지 12·13일 "엑셀 수량이 화면과 다름"): 파일이 놓친 변경 = 올바로 수집분 갱신·직접 추가·숨김/노선 변경(서버 why). 서버가 재생성을 이미 요청해 둔다.
+  var AB_XLSX_WHY = { collect: "올바로 수집분 갱신", manual: "직접 추가 변경", route: "숨김·노선 변경" };
   function abXlsxStaleOk(b){
-    var g=b.regen||{}, made=b.ts? new Date(b.ts) : null, chg=g.requested_at? new Date(g.requested_at) : null;
-    function hm(d){ return d? (("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2)) : "?"; }
-    var msg="이 파일은 "+hm(made)+" 생성본입니다. 그 뒤 "+hm(chg)+"에 숨김·노선 변경이 있어 아직 반영되지 않았습니다.\n\n";
-    if(!b.covered) msg+="이 날짜는 자동 재생성 범위(최근 7일) 밖이라 이 파일은 다시 만들어지지 않습니다.";
-    else if(g.dispatched_at && g.code===204) msg+="재생성이 요청되어 있습니다(약 2~3분). 잠시 뒤 다시 받으면 반영본이 옵니다.";
-    else if(g.skipped) msg+="직전 재생성이 진행 중이라 뒤이어 한 번 더 만들어집니다(약 2~5분).";
-    else msg+="자동 재생성 요청이 실패했습니다("+(g.err||"원인 미상")+") — 관리자: Netlify 환경변수 GW_APPDATA_GITHUB_TOKEN(appdata 저장소 actions 쓰기)을 확인하세요. 그 전까지는 다음 날 08:25 생성본에 반영됩니다.";
+    var g=b.regen||{}, made=(b.src_at||b.ts)? new Date(b.src_at||b.ts) : null, chg=b.changed_at? new Date(b.changed_at) : (g.requested_at? new Date(g.requested_at) : null);
+    function hm(d){ return d? (((d.getMonth()+1)+"/"+d.getDate())+" "+("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2)) : "?"; }
+    var whyTxt=(b.why&&b.why.length)? b.why.map(function(w){ return AB_XLSX_WHY[w]||w; }).join("·") : "숨김·노선 변경";
+    var msg="이 파일은 "+hm(made)+" 기준 기록으로 만든 것입니다. 그 뒤 "+hm(chg)+"에 "+whyTxt+"이 있어 화면과 숫자가 다를 수 있습니다.\n\n";
+    var stt=g.state||((g.skipped)?"skipped":((g.code===204&&g.dispatched_at)?"in_flight":"failed"));   // state 없는 옛 응답 대비
+    if(!b.covered) msg+="이 날짜는 자동 재생성 범위(최근 59일) 밖이라 이 파일은 다시 만들어지지 않습니다.";
+    else if(stt==="skipped") msg+="방금 다른 재생성이 시작돼 이번 변경이 빠졌을 수 있습니다. 2~3분 뒤 다시 받으면 자동으로 한 번 더 요청합니다.";
+    else if(stt==="requested"||stt==="in_flight") msg+="반영본을 다시 만들고 있습니다(보통 1~2분). 잠시 뒤 다시 받으면 화면과 같은 숫자로 옵니다.";
+    else if(stt==="gave_up") msg+="자동 재생성이 이 날짜 파일을 아직 만들지 못했습니다. 1시간 뒤 다시 받으면 한 번 더 요청합니다. 계속되면 관리자에게 알려 주세요.";
+    else msg+="자동 재생성 요청이 실패했습니다("+(g.err||"원인 미상")+") — 관리자: Netlify 환경변수 GW_APPDATA_GITHUB_TOKEN(appdata 저장소 actions 쓰기)을 확인하세요.";
     return confirm(msg+"\n\n그래도 지금 이 파일을 받을까요?");
   }
   document.getElementById("abXlsxBtn").addEventListener("click", function(){
@@ -15650,7 +15655,7 @@
       b.disabled=false;
       if(res.status===404){ alert("이 날짜의 일지 파일이 아직 없습니다. 매일 아침 08:25에 최근 7일치가 생성됩니다."); return; }
       if(res.status!==200||!res.body||!res.body.b64){ alert("내려받기 실패 — 잠시 후 다시 시도하세요."); return; }
-      if(res.body.stale && !abXlsxStaleOk(res.body)) return;   // v352(PM 9/11 #33): 숨김·노선 변경이 아직 반영되지 않은 파일이면 먼저 알린다
+      if(res.body.stale && !abXlsxStaleOk(res.body)) return;   // v352·v385: 파일이 놓친 변경(수집·직접 추가·숨김/노선)이 있으면 먼저 알린다
       try{
         var bin=atob(res.body.b64), arr=new Uint8Array(bin.length);
         for(var i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i);

@@ -2182,8 +2182,8 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   const savedTok = process.env.GW_APPDATA_GITHUB_TOKEN; process.env.GW_APPDATA_GITHUB_TOKEN = 'test-appdata-token';
   const regen = () => mem.gw_data['allbaro:xlsx_regen'] || {};
   r = await ab({ action: 'ab_route_hide', side: 'L', row: 6, hide: true }, tokA);
-  T('숨김 → 200 · dispatch 1회(logsheet.yml, ref main, days_back 7, Bearer 토큰) · blob xlsx_regen{requested_at,dispatched_at,dispatch_code 204,reason hide} · 응답 regen.code 204',
-    r.code === 200 && r.body.changed === true && calls.length === 1 && /jongwoon-appdata\/actions\/workflows\/logsheet\.yml\/dispatches$/.test(calls[0].url) && calls[0].body.ref === 'main' && calls[0].body.inputs.days_back === '7'
+  T('숨김 → 200 · dispatch 1회(logsheet.yml, ref main, days_back 10 — v385 수집 창 9 + 자정 여유 1, Bearer 토큰) · blob xlsx_regen{requested_at,dispatched_at,dispatch_code 204,reason hide} · 응답 regen.code 204',
+    r.code === 200 && r.body.changed === true && calls.length === 1 && /jongwoon-appdata\/actions\/workflows\/logsheet\.yml\/dispatches$/.test(calls[0].url) && calls[0].body.ref === 'main' && calls[0].body.inputs.days_back === '10'
     && calls[0].auth === 'Bearer test-appdata-token' && regen().dispatch_code === 204 && regen().dispatched_at > 0 && regen().reason === 'hide' && r.body.regen && r.body.regen.code === 204, JSON.stringify(r.body.regen));
   T('응답 regen에 회원 정보 없음(by 없음)', !('by' in (r.body.regen || {})), '');
   r = await ab({ action: 'ab_route_hide', side: 'L', row: 6, hide: false }, tokA);
@@ -2218,8 +2218,10 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   mem.gw_data['allbaro:xlsx_regen'] = { schema: 1, requested_at: 5000, dispatched_at: 5000, dispatch_code: 204, by: '관리자' };
   r = await ab({ action: 'ab_xlsx', day: today }, tokA);
   T('ab_xlsx: 파일 ts(1000) < 변경(5000) → stale:true · covered:true(7일 안) · regen{requested_at,dispatched_at,code} · by 없음', r.code === 200 && r.body.stale === true && r.body.covered === true && r.body.regen && r.body.regen.requested_at === 5000 && r.body.regen.code === 204 && !('by' in r.body.regen), JSON.stringify(r.body.regen));
+  mem.gw_data['allbaro:xlsx_regen'] = { schema: 1, requested_at: 5000, dispatched_at: 5000, dispatch_code: 204 };   // 오늘 날짜 재요청(디바운스) 영향 제거
+  const c20 = calls.length;
   r = await ab({ action: 'ab_xlsx', day: old }, tokA);
-  T('ab_xlsx: 20일 전 날짜 → stale:true·covered:false(재생성 범위 밖)', r.code === 200 && r.body.stale === true && r.body.covered === false, JSON.stringify([r.body.stale, r.body.covered]));
+  T('ab_xlsx: 20일 전 날짜 → stale:true·covered:true(v385 범위 59일) · 그 날짜를 덮는 접수가 없으니(cover_from 없음) 재요청 1회 days_back 22(20+1+여유1) · state requested', r.code === 200 && r.body.stale === true && r.body.covered === true && calls.length === c20 + 1 && calls[calls.length - 1].body.inputs.days_back === '22' && r.body.regen.state === 'requested', JSON.stringify([r.body.stale, r.body.covered, calls.length - c20, r.body.regen]));
   // 9/11 실측: 변경 때 dispatch 404(토큰 없음) → 토큰 넣고 배포해도 재시도가 없어 확인창이 옛 404를 계속 보여줌 → 내려받기 때 재시도
   mem.gw_data['allbaro:xlsx_regen'] = { schema: 1, requested_at: 5000, dispatch_code: 404, dispatch_err: 'HTTP_404', reason: 'unhide' };
   const before = calls.length;
@@ -2857,6 +2859,110 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   r48 = await call({ action: 'bids_purge', key: 'test-ingest-key', mode: 'expired' });
   T('bids_purge expired(실행) → 더 지울 것 없음 0(앞선 save 뒤 2건 그대로)', r48.code === 200 && r48.body.removed === 0 && mem.gw_data['col:bids'].items.length === 2, JSON.stringify(r48.body));
   delete mem.gw_data['col:bids'];
+}
+
+// ===== 46. 운반일지 엑셀 놓친 변경 v385(10/14 권민지 12·13일 "엑셀 수량이 화면과 다름" — 예약 08:25가 매일 2.5~4시간 늦음) — 수집·직접 추가·노선 판정 · 재요청 · 직접 추가 저장 요청 · 워커 배선
+{
+  const gwab = require(join(FN, 'gw-allbaro.js'));
+  const lib = require(join(FN, '_lib', 'xlsx_regen.js'));
+  const ab = async (body, tok, dev) => { const rr = await gwab.handler({ httpMethod: 'POST', headers: Object.assign({ authorization: tok ? 'Bearer ' + tok : '' }, dev ? { 'x-device-id': dev } : {}), body: JSON.stringify(body) }); return { code: rr.statusCode, body: JSON.parse(rr.body) }; };
+  mem.gw_data['allbaro:learned'] = { schema: 1, items: [] }; mem.gw_data['allbaro:routes_hidden'] = { schema: 1, items: [] };
+  const realFetch = global.fetch; const calls = [];
+  global.fetch = async (url, opt) => { if (/api\.github\.com/.test(String(url))) { calls.push({ url: String(url), body: JSON.parse(opt.body) }); return { status: 204 }; } return realFetch(url, opt); };
+  const savedTok = process.env.GW_APPDATA_GITHUB_TOKEN; process.env.GW_APPDATA_GITHUB_TOKEN = 'test-appdata-token';
+  const kd = (o) => new Date(Date.now() + 9 * 3600000 + (o || 0) * 86400000).toISOString().slice(0, 10);
+  const d1 = kd(-1), d30 = kd(-30);
+  T('lib daysAgoKst: 오늘 0 · 어제 1 · 30일 전 30 · 형식 오류 0', lib.daysAgoKst(kd(0)) === 0 && lib.daysAgoKst(d1) === 1 && lib.daysAgoKst(d30) === 30 && lib.daysAgoKst('x') === 0, '');
+  T('lib routeAtOf: route_at 우선 · 없으면 노선류/이유 없음의 requested_at · collect·manual·retry는 0', lib.routeAtOf({ route_at: 7, requested_at: 9, reason: 'collect' }) === 7 && lib.routeAtOf({ requested_at: 9, reason: 'hide' }) === 9 && lib.routeAtOf({ requested_at: 9 }) === 9 && lib.routeAtOf({ requested_at: 9, reason: 'collect' }) === 0 && lib.routeAtOf({ requested_at: 9, reason: 'manual' }) === 0 && lib.routeAtOf(null) === 0, '');
+  // ① 12일 재현: 파일은 전날 아침(1000), 수집본은 다음 날 아침(5000) — 노선 변경 없음
+  delete mem.gw_data['allbaro:xlsx_regen'];
+  mem.gw_data['allbaro:xlsx:' + d1] = { name: 'x.xlsx', b64: 'UEs=', ts: 1000, total: 5 };
+  mem.gw_data['allbaro:day:' + d1] = { schema: 2, day: d1, total: 33, counts: [], ts: 5000 };
+  mem.gw_data['allbaro:manual:' + d1] = { schema: 1, day: d1, items: [], ts: 500 };
+  let n0 = calls.length;
+  r = await ab({ action: 'ab_xlsx', day: d1 }, tokW, 'dev1');
+  T('① 12일 재현: 수집본(5000) > 파일(1000) → stale·why [collect]·changed_at 5000·src_at 1000 · 접수된 실행 없음 → 재요청 1회(days_back 10) · state requested', r.code === 200 && r.body.stale === true && JSON.stringify(r.body.why) === '["collect"]' && r.body.changed_at === 5000 && r.body.src_at === 1000 && calls.length === n0 + 1 && calls[calls.length - 1].body.inputs.days_back === '10' && r.body.regen && r.body.regen.code === 204 && r.body.regen.state === 'requested', JSON.stringify([r.body.why, r.body.changed_at, calls.length - n0]));
+  r = await ab({ action: 'ab_xlsx', day: d1 }, tokW, 'dev1');
+  T('바로 또 받기 → 변경 뒤 접수된 실행이 이 날짜를 덮음(cover_from) → 재요청 없음 · state in_flight', r.body.stale === true && calls.length === n0 + 1 && r.body.regen.state === 'in_flight', JSON.stringify(r.body.regen));
+  // 기한: 접수 20분 지났는데 반영본 없음 → gave_up(재요청 없음) · 70분 지나면 다시 요청
+  const rg0 = mem.gw_data['allbaro:xlsx_regen']; const disp0 = rg0.dispatched_at;
+  rg0.dispatched_at = Date.now() - 20 * 60000; mem.gw_data['allbaro:day:' + d1].ts = rg0.dispatched_at - 1000;
+  r = await ab({ action: 'ab_xlsx', day: d1 }, tokW, 'dev1');
+  T('접수 20분 뒤에도 반영본 없음 → state gave_up · 재요청 없음(내려받기마다 dispatch 반복 방지)', r.body.stale === true && r.body.regen.state === 'gave_up' && calls.length === n0 + 1, JSON.stringify(r.body.regen));
+  rg0.dispatched_at = Date.now() - 70 * 60000; mem.gw_data['allbaro:day:' + d1].ts = rg0.dispatched_at - 1000;
+  r = await ab({ action: 'ab_xlsx', day: d1 }, tokW, 'dev1');
+  T('접수 70분 뒤에도 반영본 없음 → 다시 요청(1시간에 한 번) · state requested', r.body.regen.state === 'requested' && calls.length === n0 + 2, JSON.stringify(r.body.regen));
+  mem.gw_data['allbaro:day:' + d1].ts = 5000; void disp0;
+  mem.gw_data['allbaro:xlsx:' + d1] = { name: 'x.xlsx', b64: 'UEs=', ts: 9000, src_at: 6000, total: 33 };
+  r = await ab({ action: 'ab_xlsx', day: d1 }, tokW, 'dev1');
+  T('재생성본(src_at 6000 > 5000) → stale:false · why [] · regen null', r.body.stale === false && r.body.why.length === 0 && r.body.regen === null, JSON.stringify(r.body.why));
+  // ② src_at이 기준: 생성기가 읽기 시작한 뒤(6000) 저장된 직접 추가(7000)는 파일 ts(9000)보다 앞이어도 놓친 변경
+  mem.gw_data['allbaro:manual:' + d1].ts = Date.now() + 5000;   // 방금 보낸 실행(①)보다 뒤의 직접 추가
+  r = await ab({ action: 'ab_xlsx', day: d1 }, tokW, 'dev1');
+  T('② 직접 추가(①의 실행보다 뒤) > src_at(6000) → stale·why [manual] (파일 ts 9000과 무관하게 src_at 기준) · 놓친 변경 뒤 접수 없음 → 재요청하나 디바운스 안이라 state skipped(직전 204를 물려받아도 접수로 읽지 않음)', r.body.stale === true && JSON.stringify(r.body.why) === '["manual"]' && r.body.regen && r.body.regen.skipped === true && r.body.regen.state === 'skipped' && r.body.regen.code === 204, JSON.stringify([r.body.why, r.body.regen]));
+  // ③ 노선 변경 route_at은 다른 요청(collect)이 덮어도 유지
+  mem.gw_data['allbaro:xlsx_regen'] = { schema: 1, requested_at: 1, dispatched_at: 1, dispatch_code: 204 };
+  r = await ab({ action: 'ab_route_hide', side: 'L', row: 8, hide: true }, tokA);
+  const ra = (mem.gw_data['allbaro:xlsx_regen'] || {}).route_at;
+  await lib.requestXlsxRegen({ name: 'gw_data', toString() { return 'gw_data'; } }, 'collect', '', 9);
+  T('③ 숨김 → route_at 기록 · 이어서 collect 요청이 와도 route_at 그대로 · reason collect', r.code === 200 && ra > 0 && mem.gw_data['allbaro:xlsx_regen'].route_at === ra && mem.gw_data['allbaro:xlsx_regen'].reason === 'collect', JSON.stringify(mem.gw_data['allbaro:xlsx_regen']));
+  mem.gw_data['allbaro:xlsx:' + d1] = { name: 'x.xlsx', b64: 'UEs=', ts: ra - 10, src_at: ra - 20, total: 33 };
+  mem.gw_data['allbaro:manual:' + d1].ts = 1; mem.gw_data['allbaro:day:' + d1].ts = 1; mem.gw_data['allbaro:manual:' + d30] = { schema: 1, day: d30, items: [], ts: 0 };
+  r = await ab({ action: 'ab_xlsx', day: d1 }, tokW, 'dev1');
+  T('숨김 뒤 파일 → why [route]', r.body.stale === true && JSON.stringify(r.body.why) === '["route"]', JSON.stringify(r.body.why));
+  r = await ab({ action: 'ab_route_hide', side: 'L', row: 8, hide: false }, tokA);
+  // ④ 직접 추가 저장 → 재생성 요청(그날까지 소급 — 30일 전이면 31)
+  mem.gw_data['allbaro:xlsx_regen'] = { schema: 1, requested_at: 1, dispatched_at: 1, dispatch_code: 204 };
+  n0 = calls.length;
+  r = await ab({ action: 'ab_manual_put', day: d30, items: [{ from: '주식회사포스코', to: 'CIP', item: 'CIP', n: 3, qty_ton: 0 }] }, tokW, 'dev1');
+  T('④ 직접 추가 저장(30일 전) → 200 · dispatch 1회 days_back 32(31+여유) · reason manual · 응답 regen state requested · cover_from = 30일 전', r.code === 200 && calls.length === n0 + 1 && calls[calls.length - 1].body.inputs.days_back === '32' && mem.gw_data['allbaro:xlsx_regen'].reason === 'manual' && mem.gw_data['allbaro:xlsx_regen'].cover_from === d30 && r.body.regen && r.body.regen.state === 'requested', JSON.stringify([r.code, r.body.code, calls.length - n0]));
+  // ⑤ 30일 전 파일이 놓친 직접 추가 → 재요청도 그날까지 소급, covered true · 61일 전은 covered false
+  mem.gw_data['allbaro:xlsx_regen'] = { schema: 1, requested_at: 1, dispatched_at: 1, dispatch_code: 204 };
+  mem.gw_data['allbaro:xlsx:' + d30] = { name: 'z.xlsx', b64: 'UEs=', ts: 1000, total: 3 };
+  n0 = calls.length;
+  r = await ab({ action: 'ab_xlsx', day: d30 }, tokW, 'dev1');
+  T('⑤ 30일 전 파일 + 그 뒤 직접 추가 → stale·why [manual]·covered · 재요청 days_back 32', r.body.stale === true && r.body.covered === true && calls.length === n0 + 1 && calls[calls.length - 1].body.inputs.days_back === '32', JSON.stringify([r.body.why, calls.length - n0]));
+  const g99 = await lib.requestXlsxRegen({ name: 'gw_data', toString() { return 'gw_data'; } }, 'manual', '', 99); const g3 = await lib.requestXlsxRegen({ name: 'gw_data', toString() { return 'gw_data'; } }, 'manual', '', 3);
+  T('lib 소급: 99 → 상한 59(+여유 1 = 생성기 상한 60) · 3 → 하한 9(수집 창) · backFor([30일 전, 어제]) 31', g99.days_back === 59 && g3.days_back === 9 && lib.backFor([d30, d1]) === 31 && lib.backFor([]) === 9, JSON.stringify([g99.days_back, g3.days_back]));
+  // ⑦ 노선 변경(9일 범위) 뒤 20일 전 파일 → 그 실행은 이 날짜를 안 덮으므로 그날까지 소급해 재요청(F1·F7 — '만들고 있습니다'로 굳지 않음)
+  const d20 = kd(-20);
+  mem.gw_data['allbaro:xlsx_regen'] = { schema: 1, requested_at: 1, dispatched_at: 1, dispatch_code: 204 };
+  mem.gw_data['allbaro:xlsx:' + d20] = { name: 'w.xlsx', b64: 'UEs=', ts: 1000, src_at: 900, total: 2 };
+  r = await ab({ action: 'ab_route_hide', side: 'L', row: 9, hide: true }, tokA);
+  n0 = calls.length;
+  mem.gw_data['allbaro:xlsx_regen'].dispatched_at = Date.now() - 3 * 60000;   // 디바운스 밖으로(숨김 접수는 3분 전, 9일 범위)
+  mem.gw_data['allbaro:xlsx_regen'].route_at = Date.now() - 3 * 60000;
+  r = await ab({ action: 'ab_xlsx', day: d20 }, tokW, 'dev1');
+  T('⑦ 숨김(9일 범위 접수) 뒤 20일 전 파일 → why [route] · cover_from이 그 날짜보다 뒤 → 재요청 days_back 22 · state requested', r.body.stale === true && JSON.stringify(r.body.why) === '["route"]' && calls.length === n0 + 1 && calls[calls.length - 1].body.inputs.days_back === '22' && r.body.regen.state === 'requested', JSON.stringify([r.body.why, r.body.regen, calls.length - n0]));
+  r = await ab({ action: 'ab_route_hide', side: 'L', row: 9, hide: false }, tokA);
+  // ⑧ 노선 지정(15일 전 날짜를 보며) → 재정렬한 가장 오래된 날까지 소급(F2)
+  const d15 = kd(-15);
+  mem.gw_data['allbaro:day:' + d15] = { schema: 2, day: d15, total: 1, counts: [{ from: '소급테스트상차', to: '네이처', item: '', n: 1, route: null }], unmatched: [], ts: 1 };
+  mem.gw_data['allbaro:xlsx_regen'] = { schema: 1, requested_at: 1, dispatched_at: 1, dispatch_code: 204 };
+  n0 = calls.length;
+  r = await ab({ action: 'ab_learn', from: '소급테스트상차', to: '네이처', item: '', side: 'L', row: 5, day: d15 }, tokA);
+  T('⑧ 노선 지정(15일 전부터 재정렬) → dispatch days_back 17(15+1+여유) · 응답 regen.state requested', r.code === 200 && calls.length === n0 + 1 && calls[calls.length - 1].body.inputs.days_back === '17' && r.body.regen && r.body.regen.state === 'requested', JSON.stringify([r.code, r.body.code, r.body.rematched, calls.length - n0, calls.length > n0 ? calls[calls.length - 1].body.inputs : null]));
+  delete mem.gw_data['allbaro:day:' + d15]; delete mem.gw_data['allbaro:xlsx:' + d20];
+  mem.gw_data['allbaro:learned'] = { schema: 1, items: [] };
+  // ⑥ 워커: regenAfterCollect를 실제로 실행(수집기 전체는 돌리지 않는다) + 호출 위치 소스 대조
+  const wk = require(join(FN, 'gw-allbaro-run-background.js'));
+  const stW = { name: 'gw_data', toString() { return 'gw_data'; } };
+  mem.gw_data['allbaro:xlsx_regen'] = { schema: 1, requested_at: 1, dispatched_at: 1, dispatch_code: 204 };
+  n0 = calls.length;
+  const recA = { status: 'done' }, logA = [];
+  await wk.regenAfterCollect(stW, recA, 'collect', [{ day: kd(0) }, { day: kd(-8) }], logA);
+  const recB = { status: 'done' }, logB = [];
+  await wk.regenAfterCollect(stW, recB, 'collect', [{ day: kd(0) }], logB);
+  const recC = { status: 'fail' }, recD = { status: 'done' };
+  await wk.regenAfterCollect(stW, recC, 'collect', [{ day: kd(0) }], []); await wk.regenAfterCollect(stW, recD, 'inspect', [{ day: kd(0) }], []); await wk.regenAfterCollect(stW, { status: 'done' }, 'collect', [], []);
+  T('⑥ 워커 regenAfterCollect: 성공·저장 9일 → dispatch 1회 days_back 10 · rec.regen.state requested · 로그 "[엑셀] 재생성 요청 접수" / 2분 안 두 번째 → 보류(state skipped, 로그 "보류") / 실패·inspect·저장 0건 → 요청 없음',
+    calls.length === n0 + 1 && calls[calls.length - 1].body.inputs.days_back === '10' && recA.regen.state === 'requested' && /\[엑셀\] 재생성 요청 접수 · 소급 9일/.test(logA.join()) && recB.regen.state === 'skipped' && /보류/.test(logB.join()) && !recC.regen && !recD.regen, JSON.stringify([calls.length - n0, recA.regen, recB.regen, logA, logB]));
+  const wsrc = require('fs').readFileSync(join(FN, 'gw-allbaro-run-background.js'), 'utf8');
+  T('⑥ 워커 호출 위치: rec.status 판정 직후 · 잡 블롭 저장 전 await regenAfterCollect(st, rec, mode, saved, log)', /rec\.status = \(r && r\.ok && !writeFail\) \? 'done' : 'fail';[\s\S]{0,300}await regenAfterCollect\(st, rec, mode, saved, log\);[\s\S]{0,800}await blobSet\(st, jobKey\(job\), rec\);/.test(wsrc), '');
+  const asrc = require('fs').readFileSync(join(FN, 'gw-allbaro.js'), 'utf8');
+  T('⑥ gw-allbaro: 재생성 함수는 lib 하나(로컬 정의 없음) · 기본 소급 9 = 수집 창 WINDOW_DAYS', !/async function requestXlsxRegen/.test(asrc) && lib.REGEN_DAYS_BACK === Number((require('fs').readFileSync(join(FN, 'gw-allbaro-cron.js'), 'utf8').match(/const WINDOW_DAYS = (\d+);/) || [])[1]), '');
+  global.fetch = realFetch; process.env.GW_APPDATA_GITHUB_TOKEN = savedTok || '';
+  ['allbaro:xlsx:' + d1, 'allbaro:day:' + d1, 'allbaro:manual:' + d1, 'allbaro:xlsx:' + d30, 'allbaro:manual:' + d30, 'allbaro:xlsx_regen'].forEach((k) => { delete mem.gw_data[k]; });
 }
 
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

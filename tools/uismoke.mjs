@@ -1220,13 +1220,13 @@ try {
 
 // ---- v352(PM 9/11 #33): 숨김·노선 변경 뒤 엑셀 재생성 요청(dispatch) + 내려받기 stale 경고 ----
 try {
-  const ab = readFileSync(join(ROOT, 'netlify/functions/gw-allbaro.js'), 'utf8');
-  T('서버: requestXlsxRegen(디바운스 2분·토큰 3후보·6초 타임아웃·204 접수) — 숨김/해제·노선 추가·노선 지정·재정렬(ab_status·ab_day)·내려받기 재시도 6곳에서 부름 · handleXlsx가 stale/covered/regen 동봉',
-    /const REGEN_KEY = 'allbaro:xlsx_regen';/.test(ab) && /const REGEN_DEBOUNCE_MS = 120000;/.test(ab) && /process\.env\.GW_APPDATA_GITHUB_TOKEN \|\| process\.env\.GW_GALLERY_GITHUB_TOKEN \|\| process\.env\.MEMBER_RELAY_GITHUB_TOKEN/.test(ab)
-    && /\/actions\/workflows\/' \+ REGEN_WORKFLOW \+ '\/dispatches'/.test(ab) && (ab.match(/await requestXlsxRegen\(st, /g) || []).length === 6
-    && /const stale = !!\(regen && regen\.requested_at && ts && regen\.requested_at > ts\);/.test(ab) && /stale: stale, covered: covered, regen: stale \? regen : null/.test(ab), '');
-  T('앱: 내려받기 전 stale이면 abXlsxStaleOk 확인창(생성 시각·변경 시각·재생성 상태·7일 밖·토큰 실패 안내)',
-    /if\(res\.body\.stale && !abXlsxStaleOk\(res\.body\)\) return;/.test(html) && /function abXlsxStaleOk\(b\)\{/.test(html) && /GW_APPDATA_GITHUB_TOKEN/.test(html) && /자동 재생성 범위\(최근 7일\) 밖/.test(html), '');
+  const ab = readFileSync(join(ROOT, 'netlify/functions/gw-allbaro.js'), 'utf8'), rg = readFileSync(join(ROOT, 'netlify/functions/_lib/xlsx_regen.js'), 'utf8');
+  T('서버(v385 _lib/xlsx_regen): requestXlsxRegen(디바운스 2분·토큰 3후보·6초 타임아웃·204 접수·소급 9~60) — gw-allbaro 7곳(숨김/해제·노선 추가·노선 지정·재정렬 2·직접 추가·내려받기 재시도) · handleXlsx가 stale/why/changed_at/covered/regen 동봉',
+    /const REGEN_KEY = 'allbaro:xlsx_regen';/.test(rg) && /const REGEN_DEBOUNCE_MS = 120000;/.test(rg) && /process\.env\.GW_APPDATA_GITHUB_TOKEN \|\| process\.env\.GW_GALLERY_GITHUB_TOKEN \|\| process\.env\.MEMBER_RELAY_GITHUB_TOKEN/.test(rg)
+    && /\/actions\/workflows\/' \+ REGEN_WORKFLOW \+ '\/dispatches'/.test(rg) && /require\('\.\/_lib\/xlsx_regen'\)/.test(ab) && !/async function requestXlsxRegen/.test(ab) && (ab.match(/await requestXlsxRegen\(st, /g) || []).length === 7
+    && /const stale = why\.length > 0;/.test(ab) && /src_at: base \|\| null, total: r\.data\.total, stale: stale, why: why, changed_at: changedAt \|\| null, covered: covered, regen: stale \? regen : null/.test(ab) && /if \(covers && now - disp < REGEN_STALE_MS\) state = 'in_flight';/.test(ab) && /cover_from = kstDayMinus\(db - 1\)/.test(rg) && /days_back: String\(db \+ 1\)/.test(rg), '');
+  T('앱: 내려받기 전 stale이면 abXlsxStaleOk 확인창(생성 시각·놓친 변경·재생성 상태·60일 밖·토큰 실패 안내)',
+    /if\(res\.body\.stale && !abXlsxStaleOk\(res\.body\)\) return;/.test(html) && /function abXlsxStaleOk\(b\)\{/.test(html) && /GW_APPDATA_GITHUB_TOKEN/.test(html) && /자동 재생성 범위\(최근 59일\) 밖/.test(html), '');
 } catch (e) { console.log('  (v352 엑셀 재생성 검사 생략 — ' + e.message + ')'); fails++; }
 
 // ---- v353(PM 9/13): ① 운반내역 표 가나다 반반(엑셀 generate.py와 같은 규칙) ② 홍보 사진 모자이크(가리기) 배선·소비처 4곳 mask 우선 ----
@@ -1431,6 +1431,13 @@ try {
     && /asbBase = doc\.updated_at\|\|0; asbLoaded = true;\s+if \(typeof csSiteHooksRetry === "function"\)/.test(html) && /asbLoaded && typeof csSiteHooksRetry === "function"\)\{ try \{ csSiteHooksRetry\(\); \}/.test(html) && /title = "실적신고\(2\/15\) — "/.test(sc)
     && /querySelectorAll\("\[data-cs-site\]"\)/.test(html) && /var r = csLinkSiteLater\(c\); alert\(typeof r === "object"/.test(html) && /현장 대장 열람 권한 필요/.test(html) && !/approval_apply|task_done_by_approval/.test(gwd), '');
 } catch (e) { console.log('  (v384 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ---- v385: 운반일지 엑셀 놓친 변경 안내(서버 why·changed_at) ----
+try {
+  T('v385 엑셀 안내: AB_XLSX_WHY 3종(collect·manual·route) · 확인창은 b.why·b.changed_at · 범위 60일 · 옛 "08:25 생성본에 반영" 문구 제거',
+    /var AB_XLSX_WHY = \{ collect: "올바로 수집분 갱신", manual: "직접 추가 변경", route: "숨김·노선 변경" \};/.test(html) && /chg=b\.changed_at\? new Date\(b\.changed_at\)/.test(html) && /자동 재생성 범위\(최근 59일\)/.test(html) && /else if\(stt==="skipped"\)[\s\S]{0,200}else if\(stt==="requested"\|\|stt==="in_flight"\)[\s\S]{0,200}else if\(stt==="gave_up"\)/.test(html) && /made=\(b\.src_at\|\|b\.ts\)/.test(html) && !/다음 날 08:25 생성본에 반영됩니다/.test(html)
+    && /stale: stale, why: why, changed_at: changedAt \|\| null, covered: covered/.test(readFileSync(join(ROOT, 'netlify', 'functions', 'gw-allbaro.js'), 'utf8')), '');
+} catch (e) { console.log('  (v385 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

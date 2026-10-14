@@ -13,6 +13,7 @@ const { verifyToken, bearer } = require('./_lib/session');
 const { appendAudit } = require('./_lib/audit');
 const push = require('./_lib/push');
 const AB = require('./_lib/allbaro');   // v351: routes_ver는 접근자로(추가 노선 반영)
+const { requestXlsxRegen, requestState, backFor } = require('./_lib/xlsx_regen');   // v385: 수집이 끝나면 엑셀을 바로 다시 만든다(예약 08:25가 매일 2.5~4시간 늦음)
 const { collectDays } = AB;   // ROUTES_VER(v327): 저장하는 일자 문서에 노선표 해시를 찍는다 — 읽기 경로가 옛 규칙 기록을 가려내는 기준
 
 const DATA = 'gw_data';
@@ -277,6 +278,19 @@ async function autoDraftApproval(st) {
   } catch (e) {}
 }
 
+// v385: 수집 성공·저장 날짜 있음 → 엑셀 재생성 요청(rec.regen·로그 [엑셀]). 예외는 삼킨다(수집 결과를 바꾸지 않는다). 검사에서 직접 부른다.
+async function regenAfterCollect(st, rec, mode, saved, log) {
+  if (!(rec && rec.status === 'done' && mode === 'collect' && saved && saved.length)) return null;
+  try {
+    const g = await requestXlsxRegen(st, 'collect', '', backFor(saved.map(function (s) { return s.day; })));
+    const state = requestState(g);
+    rec.regen = { state: state, code: (g && g.dispatch_code !== undefined) ? g.dispatch_code : null, err: (g && g.dispatch_err) || null, days_back: g && g.days_back };
+    log.push('[엑셀] 재생성 요청 ' + (state === 'requested' ? '접수' : (state === 'skipped' ? '보류(직전 요청 2분 안 — 내려받기 때 다시)' : '실패 ' + ((g && g.dispatch_err) || ''))) + ' · 소급 ' + (g && g.days_back) + '일');
+    rec.log = log.slice(-MAX_LOG_LINES);
+    return g;
+  } catch (e) { return null; }
+}
+exports.regenAfterCollect = regenAfterCollect;
 exports.opsPmIds = opsPmIds; exports.notifyPendingAndVariants = notifyPendingAndVariants; exports.PEND_KEY = PEND_KEY; exports.VAR_KEY = VAR_KEY;   // v366 검사용
 exports.handler = async function (event, context) {
   let st = null, job = '', rec = null;
@@ -434,6 +448,8 @@ exports.handler = async function (event, context) {
     rec.results = saved;
     rec.unmatched_total = unmatchedTotal;
     rec.status = (r && r.ok && !writeFail) ? 'done' : 'fail';
+    // v385(10/14 권민지 "엑셀 수량이 화면과 다름"): 저장한 날짜가 있으면 엑셀 재생성 요청 — 가장 오래된 저장 날짜까지 소급. 실패는 기록만(수집 결과는 그대로)
+    await regenAfterCollect(st, rec, mode, saved, log);
     if (!(r && r.ok)) { rec.code = (r && r.code) ? scrub(String(r.code)).slice(0, 60) : 'COLLECT_FAILED'; if (r && r.detail) rec.detail = scrub(r.detail); }
     else if (writeFail) { rec.code = 'DAY_WRITE_FAILED'; rec.detail = writeFail + '개 날짜 저장 실패'; }
     rec.ts = Date.now();

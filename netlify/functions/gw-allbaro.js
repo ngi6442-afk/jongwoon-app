@@ -78,43 +78,8 @@ function round3(n) { return Math.round(n * 1000) / 1000; }
 // 노선표 인덱스 — 학습 지정이 실재하는 줄을 가리키는지 검증한다(계약 B-2 BAD_ROUTE).
 // 프로토타입 오염 없는 사전(Object.create(null))으로 'constructor' 같은 키 우회를 원천 차단.
 const EXTRA_KEY = 'allbaro:routes_extra';   // v351: 사람이 앱에서 더한 노선(양식 예비 행 40~49)
-// v352(PM 9/11 #33 "숨김 버튼 눌러도 엑셀 내려받기하면 반영 안 됨"): 엑셀은 appdata 액션즈가 매일 08:25 최근 7일치를 만들어 올린다.
-//   숨김·노선 지정·노선 추가가 일어나면 여기서 그 워크플로(logsheet.yml)를 바로 한 번 더 돌린다(workflow_dispatch, 2분 디바운스).
-//   요청 시각은 allbaro:xlsx_regen에 남겨 내려받기 때 "변경이 아직 반영되지 않은 파일"을 알린다. 토큰 없음·권한 없음이면 코드만 남긴다(주 동작은 막지 않는다).
-const REGEN_KEY = 'allbaro:xlsx_regen';
-const REGEN_DEBOUNCE_MS = 120000;
-const REGEN_REPO = 'ngi6442-afk/jongwoon-appdata';
-const REGEN_WORKFLOW = 'logsheet.yml';
-const REGEN_DAYS_BACK = 7;
-async function requestXlsxRegen(st, reason, who) {
-  let cur = {};
-  try { const r = await blobGet(st, REGEN_KEY); if (r.ok && r.data && typeof r.data === 'object') cur = r.data; } catch (e) {}
-  const now = Date.now();
-  const doc = Object.assign({ schema: 1 }, cur, { requested_at: now, reason: reason, by: who || '' });
-  if (Number(cur.dispatched_at) && now - Number(cur.dispatched_at) < REGEN_DEBOUNCE_MS) {
-    doc.skipped = true;   // 방금 돌린 워크플로가 이 변경도 읽는다(같은 concurrency group — 뒤이어 한 번 더 돈다)
-    try { await blobSet(st, REGEN_KEY, doc); } catch (e) {}
-    return doc;
-  }
-  delete doc.skipped;
-  const token = process.env.GW_APPDATA_GITHUB_TOKEN || process.env.GW_GALLERY_GITHUB_TOKEN || process.env.MEMBER_RELAY_GITHUB_TOKEN || '';
-  if (!token) { doc.dispatch_code = 0; doc.dispatch_err = 'NO_TOKEN'; }
-  else {
-    const ac = new AbortController(); const tm = setTimeout(function () { ac.abort(); }, 6000);
-    try {
-      const res = await fetch('https://api.github.com/repos/' + REGEN_REPO + '/actions/workflows/' + REGEN_WORKFLOW + '/dispatches', {
-        method: 'POST', signal: ac.signal,
-        headers: { Authorization: 'Bearer ' + token, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28', 'User-Agent': 'gw-allbaro', 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ref: 'main', inputs: { days_back: String(REGEN_DAYS_BACK) } }),
-      });
-      doc.dispatch_code = res.status;   // 204 = 접수
-      if (res.status === 204) { doc.dispatched_at = now; delete doc.dispatch_err; } else doc.dispatch_err = 'HTTP_' + res.status;
-    } catch (e) { doc.dispatch_code = -1; doc.dispatch_err = (e && e.name === 'AbortError') ? 'TIMEOUT' : 'NETWORK'; }
-    clearTimeout(tm);
-  }
-  try { await blobSet(st, REGEN_KEY, doc); } catch (e) {}
-  return doc;
-}
+// v352(PM 9/11 #33) 엑셀 재생성 요청 → v385에서 _lib/xlsx_regen.js로 옮김(수집 워커도 같이 부른다). 기본 소급 9일(수집 창과 같음).
+const { requestXlsxRegen, requestState, routeAtOf, daysAgoKst, backFor, REGEN_KEY, REGEN_MAX_DAYS, REGEN_STALE_MS, REGEN_GIVEUP_RETRY_MS } = require('./_lib/xlsx_regen');
 // v351: 추가 노선까지 보이도록 매번 현재 표에서 찾는다(인덱스 스냅샷이면 새 줄을 BAD_ROUTE로 거절한다).
 function findRoute(side, row) {
   const list = AB.routes();
@@ -321,7 +286,7 @@ async function handleStatus(st, c, R) {
       rd.days.forEach(function (day) { docs[day] = rd.docs[day]; });
       rematched = { days: rd.days, changed: rd.changed, left: rd.left };
       staleDays = stale.filter(function (day) { return rd.days.indexOf(day) < 0; });
-      if (rd.changed > 0) { try { await requestXlsxRegen(st, 'rematch', c.member.name); } catch (e) {} }   // v352: 노선표 바뀌어 재정렬된 날의 엑셀도 다시
+      if (rd.changed > 0) { try { await requestXlsxRegen(st, 'rematch', c.member.name, backFor(rd.days)); } catch (e) {} }   // v352: 노선표 바뀌어 재정렬된 날의 엑셀도 다시(v385: 그 가장 오래된 날까지)
     }
   }
   const days = [];
@@ -387,7 +352,7 @@ async function handleDay(st, c, d, R) {
     if (lr.ok) {
       const docs = Object.create(null); docs[day] = doc;
       const rd = await rematchDays(st, [day], learnedItems(lr.data), { docs: docs, why: '노선표', by: c.member.name, bid: c.member.id });
-      if (rd.docs[day]) { doc = rd.docs[day]; extra.rematched = { changed: rd.changed }; if (rd.changed > 0) { try { await requestXlsxRegen(st, 'rematch', c.member.name); } catch (e) {} } }   // v352
+      if (rd.docs[day]) { doc = rd.docs[day]; extra.rematched = { changed: rd.changed }; if (rd.changed > 0) { try { await requestXlsxRegen(st, 'rematch', c.member.name, daysAgoKst(day) + 1); } catch (e) {} } }   // v352(v385: 그날까지 소급)
       else extra.stale = true;
     } else extra.stale = true;
   }
@@ -458,7 +423,7 @@ async function handleLearn(st, c, d, R) {
   if (previous) out.previous = previous;   // UI가 '다른 줄을 덮었다'를 사람에게 확인시키게
   out.rematched = { days: rd.days, changed: rd.changed, left: rd.left };
   if (rd.failed.length) out.rematched.failed = rd.failed;   // 읽기·쓰기 실패 날짜 — 조용히 빼지 않는다
-  try { out.regen = regenBrief(await requestXlsxRegen(st, 'learn', c.member.name)); } catch (e) {}   // v352: 재정렬된 날의 엑셀도 다시 만든다
+  try { const g = await requestXlsxRegen(st, 'learn', c.member.name, backFor(rd.days.concat(rd.left))); out.regen = regenBrief(g, requestState(g)); } catch (e) {}   // v352: 재정렬된 날의 엑셀도 다시 만든다(v385: 재정렬한 가장 오래된 날까지)
   return jr(200, out);
 }
 
@@ -525,7 +490,10 @@ async function handleManualPut(st, c, d, R) {
     await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'allbaro',
       ev: [{ op: '수동입력', id: day, t: day + ' · ' + p.items.length + '줄 · ' + n + '회' + shrink }] });
   } catch (e) {}
-  return jr(200, { ok: true, day: day, n: p.items.length, ts: doc.ts, request_id: R });
+  // v385: 직접 추가분도 엑셀에 들어간다 — 저장하면 그날까지 소급해 재생성 요청(디바운스·실패는 내려받기 때 다시)
+  let regen = null;
+  try { const g = await requestXlsxRegen(st, 'manual', c.member.name, daysAgoKst(day) + 1); regen = regenBrief(g, requestState(g)); } catch (e) {}
+  return jr(200, { ok: true, day: day, n: p.items.length, ts: doc.ts, regen: regen, request_id: R });
 }
 
 // 단골 노선 카드 검증 — id는 UI가 준 값을 쓰되 형식을 강제하고, 없으면 서버가 만든다.
@@ -620,12 +588,14 @@ async function handleRouteHide(st, c, d, R) {
   } catch (e) {}
   let regen = null;
   try { regen = await requestXlsxRegen(st, d.hide ? 'hide' : 'unhide', c.member.name); } catch (e) {}   // v352: 엑셀 재생성 요청
-  return jr(200, { ok: true, side: side, row: row, hidden: !!d.hide, changed: true, hidden_n: items.length, hidden_list: hiddenBrief(items), regen: regenBrief(regen), request_id: R });
+  return jr(200, { ok: true, side: side, row: row, hidden: !!d.hide, changed: true, hidden_n: items.length, hidden_list: hiddenBrief(items), regen: regenBrief(regen, regen ? requestState(regen) : null), request_id: R });
 }
 // 앱에 주는 재생성 상태 요약(회원 정보 없이)
-function regenBrief(doc) {
+function regenBrief(doc, state) {
   if (!doc) return null;
-  return { requested_at: Number(doc.requested_at) || 0, dispatched_at: Number(doc.dispatched_at) || 0, code: (doc.dispatch_code === undefined) ? null : doc.dispatch_code, err: doc.dispatch_err || null, skipped: !!doc.skipped };
+  const o = { requested_at: Number(doc.requested_at) || 0, dispatched_at: Number(doc.dispatched_at) || 0, code: (doc.dispatch_code === undefined) ? null : doc.dispatch_code, err: doc.dispatch_err || null, skipped: !!doc.skipped };
+  if (state) o.state = state;   // v385: requested·in_flight·skipped·gave_up·failed — 앱은 이것으로 문구를 고른다(직전 204를 물려받은 보류를 '접수'로 읽지 않게)
+  return o;
 }
 
 // 숨긴 노선 내보내기(봇 전용, v323 후속 — PM 9/7 ㄱ 숨김→엑셀 동기화). appdata logsheet_daily.py가 매일 08:25 엑셀 생성 전에
@@ -758,27 +728,59 @@ async function handleMonth(st, d, R) {
   return jr(200, Object.assign({ ok: true, request_id: R }, merged));
 }
 
-// 일일운반일지 엑셀 내려받기 — 매일 08:25 액션즈가 회사 양식으로 생성해 올린 파일(allbaro:xlsx:날짜).
+// 일일운반일지 엑셀 내려받기 — appdata 액션즈가 회사 양식으로 생성해 올린 파일(allbaro:xlsx:날짜). v385부터 수집 직후 생성(예약 08:25는 예비).
+// stale = 이 파일이 놓친 변경이 있다: 그날 수집본(day.ts)·직접 추가(manual.ts)·숨김/노선 변경(route_at)이 파일의 기준 시각(src_at = 생성기가
+//   읽기 시작한 시각, 옛 파일은 ts)보다 뒤. 놓친 변경 뒤로 접수된 실행이 없으면 여기서 다시 요청한다(디바운스 안이면 다음 내려받기 때).
 async function handleXlsx(st, d, R) {
   const day = cleanStr(d.day);
   if (!RE_DATE.test(day) || !validDay(day)) return jr(400, { ok: false, code: 'BAD_DAY', request_id: R });
-  const r = await blobGet(st, 'allbaro:xlsx:' + day);
+  const reads = await Promise.all([blobGet(st, 'allbaro:xlsx:' + day), blobGet(st, REGEN_KEY), blobGet(st, dayKey(day)), blobGet(st, manualKey(day))]);
+  const r = reads[0];
   if (!r.ok) return jr(500, { ok: false, code: r.code, request_id: R });
   if (!r.data || !r.data.b64) return jr(404, { ok: false, code: 'NO_XLSX', request_id: R });
-  // v352: 파일 생성(ts) 뒤에 숨김·노선 변경(requested_at)이 있었으면 stale — 앱이 내려받기 전에 알린다.
-  //   재생성은 최근 REGEN_DAYS_BACK일만 다시 만드므로 그보다 오래된 날짜는 covered:false(그 파일은 바뀌지 않는다).
-  let regen = null, gdoc = null;
-  try { const g = await blobGet(st, REGEN_KEY); if (g.ok && g.data) { gdoc = g.data; regen = regenBrief(g.data); } } catch (e) {}
+  const gdoc = (reads[1].ok && reads[1].data && typeof reads[1].data === 'object') ? reads[1].data : null;
+  let regen = gdoc ? regenBrief(gdoc) : null;
   const ts = Number(r.data.ts) || 0;
-  const stale = !!(regen && regen.requested_at && ts && regen.requested_at > ts);
-  // v352 후속(9/11 실측): 변경 시점의 dispatch가 실패(토큰 없음·404)했다가 토큰이 뒤늦게 들어오면, 변경을 한 번 더 하기 전엔 재시도가 없어
-  //   내려받기 확인창이 계속 옛 실패를 보여줬다. 내려받기 시점에 '반영 전 + 직전 요청 실패'면 여기서 다시 한 번 보낸다(같은 디바운스·회원 정보 무관).
-  if (stale && gdoc && gdoc.dispatch_code !== 204 && !gdoc.skipped) {
-    try { const again = await requestXlsxRegen(st, 'retry', ''); if (again) { again.requested_at = gdoc.requested_at; regen = regenBrief(again); await blobSet(st, REGEN_KEY, again); } } catch (e) {}
+  const base = Number(r.data.src_at) || ts;
+  const dayTs = (reads[2].ok && reads[2].data) ? (Number(reads[2].data.ts) || 0) : 0;
+  const manTs = (reads[3].ok && reads[3].data) ? (Number(reads[3].data.ts) || 0) : 0;
+  const routeAt = routeAtOf(gdoc);
+  const why = [];
+  let changedAt = 0;
+  if (base) {
+    if (dayTs > base) { why.push('collect'); changedAt = Math.max(changedAt, dayTs); }
+    if (manTs > base) { why.push('manual'); changedAt = Math.max(changedAt, manTs); }
+    if (routeAt > base) { why.push('route'); changedAt = Math.max(changedAt, routeAt); }
   }
-  const covered = (function () { const t = Date.parse(day + 'T00:00:00+09:00'); return isFinite(t) && (Date.now() - t) < (REGEN_DAYS_BACK + 1) * 86400000; })();
+  const stale = why.length > 0;
+  // 상태 판정(v385 검토 F1·F7·F9): '놓친 변경 뒤에 접수된 실행'이 이 날짜를 덮고(cover_from) 15분 안이면 진행 중.
+  //   덮었는데 15분이 지나도 반영본이 없으면 그 실행이 이 날짜를 못 만든 것(gave_up) — 1시간에 한 번만 다시 요청(내려받기마다 반복 dispatch 방지).
+  //   덮지 않았거나(9일 실행 + 20일 전 파일) 접수가 없으면 그 날짜까지 소급해 지금 요청.
+  let state = null;
+  if (stale) {
+    const now = Date.now();
+    const disp = gdoc ? (Number(gdoc.dispatched_at) || 0) : 0;
+    const cover = gdoc ? String(gdoc.cover_from || '') : '';
+    const covers = !!(cover && day >= cover && disp >= changedAt);
+    if (covers && now - disp < REGEN_STALE_MS) state = 'in_flight';
+    else if (covers && now - disp < REGEN_GIVEUP_RETRY_MS) state = 'gave_up';
+    else {
+      try {
+        const again = await requestXlsxRegen(st, 'retry', '', daysAgoKst(day) + 1);
+        state = requestState(again);
+        if (again) {
+          if (gdoc && Number(gdoc.requested_at)) again.requested_at = Number(gdoc.requested_at);   // '언제 바뀌었나'는 원래 요청 시각 그대로
+          if (routeAt) again.route_at = routeAt;
+          regen = regenBrief(again);
+          await blobSet(st, REGEN_KEY, again);
+        }
+      } catch (e) { state = 'failed'; }
+    }
+    if (regen) regen.state = state;
+  }
+  const covered = daysAgoKst(day) + 1 <= REGEN_MAX_DAYS;
   return jr(200, { ok: true, name: String(r.data.name || ('운반일지_' + day + '.xlsx')),
-    b64: String(r.data.b64), ts: r.data.ts || null, total: r.data.total, stale: stale, covered: covered, regen: stale ? regen : null, request_id: R });
+    b64: String(r.data.b64), ts: r.data.ts || null, src_at: base || null, total: r.data.total, stale: stale, why: why, changed_at: changedAt || null, covered: covered, regen: stale ? regen : null, request_id: R });
 }
 
 async function handler(event) {
