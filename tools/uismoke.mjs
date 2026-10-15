@@ -1448,5 +1448,18 @@ try {
     && /res\.body\.code === "FORBIDDEN"\)\{ alert\(AB_HIDE_FORBIDDEN\); return; \}/.test(html) && !/노선 숨김은 관리자만 할 수 있습니다/.test(html), '');
 } catch (e) { console.log('  (v386 검사 생략 — ' + e.message + ')'); fails++; }
 
+// ---- v387(PM 10/15): 주기별 업무 체크리스트 = 정본 JW-02-04-001 v3 (KOITA·위험성평가 인정·v2 미반영분) ----
+try {
+  const seg = html.slice(html.indexOf('var GROUPS = ['), html.indexOf('var TYPE_LABEL'));
+  const sud = html.slice(html.indexOf('var SUDSI = ['), html.indexOf('// ---- 상태 ----'));
+  const ids = [...seg.matchAll(/\{id:"([a-z0-9]+)"/g)].map((m) => m[1]);
+  const need = ['w1', 'm1', 'm2', 'm3', 'm4', 'q1', 'q2', 'q3', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'h7', 'y1', 'y2', 'y3', 'y4', 'y5', 'y6', 'y7', 'y8', 'y9', 'y10', 'y11', 'y12', 'y13', 'y14', 'y15', 'y16', 'y17', 'y18'];
+  T('v387 체크리스트 정의: 항목 33개 id 순서 그대로(기존 id 보존 + h7·y11~y18) · 중복 없음 · 수시 su1~su6 · 퇴사자(김혁) 담당 없음 · KOITA 조사표 4월 30일·위험성평가 인정 사후점검·재인정 3개월 문구 · 정본 v3 주석',
+    JSON.stringify(ids) === JSON.stringify(need) && new Set(ids).size === ids.length
+    && ['su1', 'su2', 'su3', 'su4', 'su5', 'su6'].every((k) => sud.includes('{id:"' + k + '"')) && !/김혁/.test(seg)
+    && /KOITA 연구개발활동조사표 제출 — 전년도분, 4월 30일까지/.test(seg) && /위험성평가 인정 사후점검 수검/.test(seg) && /재인정 신청 \(만료 3개월 전부터\)/.test(seg) && /30일 이내 KOITA 변경신고/.test(sud)
+    && /JW-02-04-001 주기별 업무 체크리스트 v3/.test(html), JSON.stringify(ids));
+} catch (e) { console.log('  (v387 검사 생략 — ' + e.message + ')'); fails++; }
+
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
