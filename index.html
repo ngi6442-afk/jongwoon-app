@@ -14307,7 +14307,7 @@
   }
   // ---- v389 자동 학습 카드(관리자) — 서버 pl_get/pl_set. 규칙은 모델이 쓴 것(사람이 쓰지 않는다), 카드는 보고·끄기·삭제·짝 지정만 ----
   var PL_SCOPE_TXT = { style:"문체", format:"포장", structure:"구성", content:"내용" };
-  var PL_STATUS_TXT = { pending:"대기", running:"학습 중", done:"완료", fail:"실패", unmatched:"짝 없음" };
+  var PL_STATUS_TXT = { pending:"대기", running:"학습 중", done:"완료", fail:"실패", unmatched:"짝 없음", superseded:"게시글로 대체" };
   var promoLearnBusy = false;
   function plFmtTs(ts){ var t = new Date(Number(ts)||0); return isNaN(t.getTime())||!ts ? "" : (String(t.getMonth()+1).padStart(2,"0")+"/"+String(t.getDate()).padStart(2,"0")+" "+String(t.getHours()).padStart(2,"0")+":"+String(t.getMinutes()).padStart(2,"0")); }
   function plPct(x){ return (x===null||x===undefined||isNaN(Number(x))) ? "—" : (Math.round(Number(x)*1000)/10)+"%"; }
