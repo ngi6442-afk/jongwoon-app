@@ -444,6 +444,7 @@ async function handleSave(event, d, R) {
         // 부활 차단(9/6 검증 R1): 서버 원본에 없는 id가 del:1로 오면 영구 삭제된 문서의 낡은 사본(휴지통 항목 캐시) — 폐기(감사로그 '제거'). 관리자도 예외 없음
         if (s.id && !oldDocBy[s.id] && s.del === 1) { docDropped.push({ x: x, why: '영구 삭제된 문서의 낡은 사본(부활 차단)' }); return null; }
         const sc = docScopeNorm(s.scope); if (sc) s.scope = sc; else delete s.scope;
+        if (s.orig_dl !== 'all') delete s.orig_dl;   // v388 원본 다운로드 예외는 'all'만(관리자 저장) — 그 밖 값은 기본(관리부·관리자·양식)
         const o01 = s.id ? oldDocBy[s.id] : null;   // 01 법인 문서는 대분류를 벗어나게 저장하지 않는다(리뷰 확정: 구 2자리 cat 구건을 관리자가 열어 저장하면 99로 덮여 하드차단이 풀렸다)
         if (o01 && docMajorOf(o01) === '01' && docMajorOf(s) !== '01') { s.cat = o01.cat; s.no = o01.no; }   // cat·no를 함께 바꿔 보내는 조작도 원본으로(9/6 재검증)
         if (!(s.id && oldDocBy[s.id]) && s.status !== '등재') { s.status = '등재'; s.registered_by = { id: c.member.id, name: c.member.name }; s.registered_at = nowIso; delete s.reject_reason; }
@@ -467,7 +468,7 @@ async function handleSave(event, d, R) {
           // 기존 문서(보이는 것): 내용 편집만 허용. 분류·공개범위·문서번호·구 분류 텍스트는 서버 원본 고정 — 관리부원이 mgmt→all·ids 확장·05→02 갈아타기로
           // 무결재 노출을 만들거나(적대 검증 med1), cat '01'로 보내 소실시키는(med3) 경로를 닫는다. cat은 원본 파생값을 명시 고정(no·title 편집으로 분류가 흔들리지 않게)
           s.cat = docCatOf(o);
-          ['no', 'category', 'scope'].forEach(function (k) { if (o[k] != null) s[k] = o[k]; else delete s[k]; });
+          ['no', 'category', 'scope', 'orig_dl'].forEach(function (k) { if (o[k] != null) s[k] = o[k]; else delete s[k]; });   // orig_dl(v388 원본 범위)도 서버 원본 고정
           // 상태·등재자·등재 기록도 원본 고정 — 재상신은 "본인 반려 건 + 클라가 reg_n을 정확히 +1로 보냄"만 명시 신호로 인정(low4: 낡은 '대기' 사본 편집이 재상신으로 오판되지 않게)
           const resubmit = docStatusOf(o) === '반려' && !!(o.by && o.by.id === me.id) && Number(x.reg_n) === (Number(o.reg_n) || 1) + 1;
           ['status', 'by', 'registered_by', 'registered_at', 'reject_reason', 'rejected_at', 'reg_n'].forEach(function (k) { if (o[k] != null) s[k] = o[k]; else delete s[k]; });
@@ -480,6 +481,7 @@ async function handleSave(event, d, R) {
           if (s.del === 1) { docDropped.push({ x: x, why: '영구 삭제된 문서의 낡은 사본(부활 차단)' }); return; }   // R1: 서버 원본에 없는 id의 del:1 = 지워진 문서의 사본 — '대기'·등재 카드로 부활시키지 않는다
           if (docMajorOf(x) === '01') { docDropped.push({ x: x, why: '01 법인 신규는 관리자만' }); return; }   // 신규 01 법인(대분류 판정)은 관리자만(2026-09-02 규칙) — 폐기 + 감사로그 '제거'
           const sc = docScopeNorm(s.scope); if (sc) s.scope = sc; else delete s.scope;
+          delete s.orig_dl;   // v388 원본 다운로드 예외는 관리자만 지정
           s.by = me; delete s.registered_by; delete s.registered_at; delete s.reject_reason; delete s.rejected_at; delete s.reg_n;
           docDelStamp(s, null, c.member, nowIso);   // 신규는 del 없이 온다(위에서 걸렀다) — 삭제 필드 제거
           docFilesFix(s, null);   // 신규 문서는 첨부 0으로 시작(id 확정 뒤 doc_att_put)
@@ -2154,6 +2156,46 @@ function docAttNextN(it) {
 }
 function b64Bytes(b64) { const L = b64.length; return Math.floor(L * 3 / 4) - (L && b64.charAt(L - 1) === '=' ? (L > 1 && b64.charAt(L - 2) === '=' ? 2 : 1) : 0); }   // base64 → 원 바이트 수(디코드 없이)
 function docAttCanPut(m, it) { if (!m || !it) return false; if (docMajorOf(it) === '01' && !m.admin) return false; return !!(m.admin || (it.by && it.by.id === m.id && permOf(m, 'documents') === 'do')); }   // 01 법인 문서 첨부는 관리자만(v318 — 하드차단을 첨부 경로에도)
+// ---- v388 직원 출력(PM 10/19 ㄱ): 열람·인쇄(PDF·이미지)와 편집 원본(docx·xlsx·pptx·hwp·hwpx) 분리 + 열람 기록 ----
+// 원본 내려받기 = 관리자 · 관리부 · 중분류 03 양식·서식(직원이 채워 써야 함) · 문서별 orig_dl:'all'. 열람·인쇄는 종전 공개범위(docVisible) 그대로.
+// 서버가 판정한다(화면 숨김만이 아님) — 직원이 주소를 알아도 원본은 못 받는다. 첨부 메타 view:1 = 열람용 PDF(로컬 변환 도구가 붙임).
+const DOC_ORIG_EXT = { docx: 1, xlsx: 1, pptx: 1, hwp: 1, hwpx: 1 };
+function docMinorOf(it) { const c = docCatOf(it); return (c && c.length === 5) ? c.slice(3, 5) : ''; }
+function docOrigAllowed(m, it) {
+  if (!m || !it) return false;
+  if (m.admin) return true;
+  if (docCanSee01(m)) return true;   // 관리부(01 하드차단과 같은 축)
+  if (docMinorOf(it) === '03') return true;
+  return it.orig_dl === 'all';
+}
+// 열람 기록 — 월 블롭 doclog:YYYY-MM(KST), 감사로그와 같은 방식(실패는 삼킴 — 기록이 열람을 막지 않는다). 상한 5,000건/월
+const DOCLOG_MAX = 5000;
+function docLogKey(month) {
+  if (month && /^\d{4}-\d{2}$/.test(month)) return 'doclog:' + month;
+  const d = new Date(Date.now() + 9 * 3600 * 1000);
+  return 'doclog:' + d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0');
+}
+async function appendDocLog(st, entry) {
+  try {
+    const key = docLogKey();
+    const r = await blobGet(st, key);
+    const doc = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data : { schema: 1, items: [] };
+    doc.items.push(entry);
+    if (doc.items.length > DOCLOG_MAX) doc.items = doc.items.slice(-DOCLOG_MAX);
+    await blobSet(st, key, doc);
+  } catch (e) { /* no-op */ }
+}
+async function handleDocLogGet(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (!c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
+  const month = (typeof d.month === 'string' && /^\d{4}-\d{2}$/.test(d.month)) ? d.month : '';
+  const key = docLogKey(month);
+  const r = await blobGet(store(DATA), key);
+  const items = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data.items : [];
+  const limit = Math.min(500, Math.max(1, parseInt(d.limit, 10) || 200));
+  return jr(200, { status: 'OK', month: key.slice(7), total: items.length, items: items.slice(-limit).reverse(), request_id: R });
+}
 // 문서 블롭 읽기 + 항목 찾기(삭제 문서 제외). 반환 {ok, doc, it} / {ok:false, http, code}
 async function docAttLoad(st, docId) {
   if (!docId) return { ok: false, http: 400, code: 'BAD_ID' };
@@ -2223,7 +2265,14 @@ async function handleDocAttPut(event, d, R) {
   const fw = await blobSet(store(FILES), docAttKey(docId, n), { name: name, type: mime, kind: 'doc', doc: docId, n: n, data: b64, by: c.member.name, ts: now });
   if (!fw.ok) return jr(500, { status: 'ERROR', error_code: fw.code, request_id: R });
   const files = (ld.it.files || []).slice();
-  files.push({ n: n, name: name, size: b64Bytes(b64), mime: mime, ts: now, by: { id: c.member.id, name: c.member.name } });
+  const fm = { n: n, name: name, size: b64Bytes(b64), mime: mime, ts: now, by: { id: c.member.id, name: c.member.name } };
+  // v388 열람용 표식 — 관리자가 pdf를 view:1로 올리면 [보기·인쇄]가 그 파일을 연다(src_n·src_hash는 변환 도구의 재변환 판정용)
+  if ((d.view === 1 || d.view === '1') && c.member.admin && ext === 'pdf') {
+    fm.view = 1;
+    if (Number(d.src_n) >= 1) fm.src_n = Number(d.src_n);
+    if (typeof d.src_hash === 'string' && /^[0-9a-f]{8,40}$/.test(d.src_hash)) fm.src_hash = d.src_hash;
+  }
+  files.push(fm);
   const w = await docAttWrite(st, ld.doc, ld.it, files, n, c.member, n);
   if (!w.ok) {
     if (w.http === 409) return jr(409, { status: 'CONFLICT', error_code: 'ATT_CONFLICT', request_id: R });   // 동시 첨부가 같은 번호를 잡음 — 클라 재시도(새 n). 바이트·메타는 이긴 쪽 것
@@ -2246,8 +2295,14 @@ async function handleDocAttGet(event, d, R) {
   if (!c.member.admin) { const ds = await docSettings(st); if (!docVisible(c.member, ld.it, ds)) return jr(404, { status: 'REJECTED', error_code: 'NO_DOC', request_id: R }); }
   const meta = (ld.it.files || []).find(function (f) { return f && Number(f.n) === n; });
   if (!meta) return jr(404, { status: 'REJECTED', error_code: 'NO_FILE', request_id: R });
+  // v388: 편집 원본(docx·xlsx·pptx·hwp·hwpx)은 docOrigAllowed만 — 열람용 PDF·이미지는 종전대로 docVisible이면 됨
+  const ext = docAttExt(meta.name || '');
+  const isOrig = !!DOC_ORIG_EXT[ext];
+  if (isOrig && !docOrigAllowed(c.member, ld.it)) return jr(403, { status: 'FORBIDDEN', error_code: 'ORIG_FORBIDDEN', request_id: R });
   const r = await blobGet(store(FILES), docAttKey(docId, n));
   if (!r.ok || !r.data) return jr(404, { status: 'REJECTED', error_code: 'NO_FILE', request_id: R });
+  // 열람 기록(v388) — 누가·언제·어느 문서·어느 파일·원본/열람용. 관리자 열람도 남긴다(유출 추적은 전원)
+  await appendDocLog(st, { ts: Date.now(), bid: c.member.id, by: String(c.member.name || ''), dept: String(c.member.dept || ''), doc: docId, no: String(ld.it.no || ''), title: String(ld.it.title || '').slice(0, 60), n: n, name: String(meta.name || '').slice(0, 80), kind: meta.view === 1 ? 'view' : (isOrig ? 'orig' : 'file') });
   // type은 저장값이 아니라 확장자 고정표(high1) — 저장 시점에 위장값이 들어갔더라도 응답은 표의 값만
   return jr(200, { status: 'OK', name: r.data.name, type: docAttMime(r.data.name || meta.name), data: r.data.data, request_id: R });
 }
@@ -2641,6 +2696,7 @@ async function handlerInner(event) {
     if (d && d.action === 'doc_att_put') return await handleDocAttPut(event, d, R);
     if (d && d.action === 'doc_att_get') return await handleDocAttGet(event, d, R);
     if (d && d.action === 'doc_att_del') return await handleDocAttDel(event, d, R);
+    if (d && d.action === 'doc_log_get') return await handleDocLogGet(event, d, R);   // v388 열람 이력(관리자)
     if (d && d.action === 'doc_bulk_put') return await handleDocBulkPut(event, d, R);
     if (d && d.action === 'doc_restore') return await handleDocRestore(event, d, R);
     if (d && d.action === 'doc_purge') return await handleDocPurge(event, d, R);

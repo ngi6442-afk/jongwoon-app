@@ -2973,4 +2973,65 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   ['allbaro:xlsx:' + d1, 'allbaro:day:' + d1, 'allbaro:manual:' + d1, 'allbaro:xlsx:' + d30, 'allbaro:manual:' + d30, 'allbaro:xlsx_regen'].forEach((k) => { delete mem.gw_data[k]; });
 }
 
+// 47 v388 문서함 직원 출력·권한(PM 10/19 "33. ㄱ지금"): 편집 원본 403 ORIG_FORBIDDEN(직원) / 열람용 PDF·이미지 200 / 관리부·양식 03·orig_dl all·관리자 허용
+//    / 열람 기록 doclog(월 KST·kind view/orig/file·403은 미기록) / doc_log_get 관리자만·최신순·limit·월 / save 정규화(관리자 all만·비관리자 원본 고정·신규 제거) / doc_att_put view:1(관리자·pdf만)
+{
+  mem.gw_data['col:documents'] = { schema: 1, items: [
+    { id: 'v1', title: '안전 매뉴얼', cat: '06-02', scope: 'all', status: '등재', files: [{ n: 1, name: '매뉴얼.docx', size: 10, mime: 'x', ts: 1, by: { id: 'uadmin' } }, { n: 2, name: '열람용_매뉴얼.pdf', size: 10, mime: 'application/pdf', ts: 2, by: { id: 'uadmin' }, view: 1 }], att_seq: 2 },
+    { id: 'v2', title: '휴가 신청서', cat: '07-03', scope: 'all', status: '등재', files: [{ n: 1, name: '양식.hwp', size: 10, mime: 'x', ts: 1, by: { id: 'uadmin' } }], att_seq: 1 },
+    { id: 'v3', title: '단가표', cat: '05-04', scope: 'all', status: '등재', orig_dl: 'all', files: [{ n: 1, name: '표.xlsx', size: 10, mime: 'x', ts: 1, by: { id: 'uadmin' } }], att_seq: 1 },
+    { id: 'v4', title: '사진 자료', cat: '06-06', scope: 'all', status: '등재', files: [{ n: 1, name: '현장.png', size: 10, mime: 'image/png', ts: 1, by: { id: 'uadmin' } }], att_seq: 1 },
+  ], updated_at: 200 };
+  mem.gw_files['docatt:v1:1'] = { name: '매뉴얼.docx', type: 'x', data: ZIP }; mem.gw_files['docatt:v1:2'] = { name: '열람용_매뉴얼.pdf', type: 'application/pdf', data: PDF };
+  mem.gw_files['docatt:v2:1'] = { name: '양식.hwp', type: 'x', data: HWP }; mem.gw_files['docatt:v3:1'] = { name: '표.xlsx', type: 'x', data: ZIP }; mem.gw_files['docatt:v4:1'] = { name: '현장.png', type: 'image/png', data: PNG };
+  Object.keys(mem.gw_data).filter((k) => k.indexOf('doclog:') === 0).forEach((k) => { delete mem.gw_data[k]; });
+  r = await call({ action: 'doc_att_get', id: 'v1', n: 1 }, tokD, 'dev1');
+  T('47 직원 원본(docx) → 403 ORIG_FORBIDDEN', r.code === 403 && r.body.error_code === 'ORIG_FORBIDDEN', JSON.stringify(r.body).slice(0, 100));
+  r = await call({ action: 'doc_att_get', id: 'v1', n: 2 }, tokD, 'dev1');
+  T('47 직원 열람용 PDF → 200', r.code === 200 && r.body.data === PDF);
+  r = await call({ action: 'doc_att_get', id: 'v4', n: 1 }, tokD, 'dev1');
+  T('47 직원 이미지 첨부 → 200(원본 규칙은 편집 형식만)', r.code === 200);
+  r = await call({ action: 'doc_att_get', id: 'v2', n: 1 }, tokD, 'dev1');
+  T('47 양식·서식(중분류 03) hwp → 직원 200', r.code === 200 && r.body.data === HWP);
+  r = await call({ action: 'doc_att_get', id: 'v3', n: 1 }, tokD, 'dev1');
+  T('47 orig_dl all 문서 xlsx → 직원 200', r.code === 200);
+  r = await call({ action: 'doc_att_get', id: 'v1', n: 1 }, tokM, 'dev1');
+  T('47 관리부 원본 docx → 200', r.code === 200 && r.body.data === ZIP);
+  r = await call({ action: 'doc_att_get', id: 'v1', n: 1 }, tokA);
+  T('47 관리자 원본 → 200', r.code === 200);
+  const logKeys = Object.keys(mem.gw_data).filter((k) => k.indexOf('doclog:') === 0);
+  const logs = logKeys.length ? mem.gw_data[logKeys[0]].items : [];
+  T('47 열람 기록: 성공 6건만 월 블롭 1개(KST YYYY-MM)·kind view/file/orig·부서·403은 미기록', logKeys.length === 1 && /^doclog:\d{4}-\d{2}$/.test(logKeys[0]) && logs.length === 6 && logs[0].kind === 'view' && logs[0].bid === 'udocw' && logs[1].kind === 'file' && logs[2].kind === 'orig' && logs[4].dept === '관리부' && logs[5].bid === 'uadmin', JSON.stringify(logs.map((x) => x.kind)));
+  r = await call({ action: 'doc_log_get' }, tokD, 'dev1');
+  T('47 doc_log_get 비관리자 → 403', r.code === 403);
+  r = await call({ action: 'doc_log_get', limit: 3 }, tokA);
+  T('47 doc_log_get 관리자: 최신순·limit·total·month', r.code === 200 && r.body.total === 6 && r.body.items.length === 3 && r.body.items[0].bid === 'uadmin' && r.body.month === logKeys[0].slice(7), JSON.stringify(r.body).slice(0, 120));
+  r = await call({ action: 'doc_log_get', month: '2001-01' }, tokA);
+  T('47 doc_log_get 빈 달 → 0건', r.code === 200 && r.body.total === 0 && r.body.month === '2001-01');
+  r = await call({ action: 'save', collection: 'documents', doc: { schema: 1, items: [
+    { id: 'v1', title: '안전 매뉴얼', cat: '06-02', scope: 'all', status: '등재', orig_dl: 'all' },
+    { id: 'v2', title: '휴가 신청서', cat: '07-03', scope: 'all', status: '등재', orig_dl: 'nope' },
+    { id: 'v3', title: '단가표', cat: '05-04', scope: 'all', status: '등재' },
+    { id: 'v4', title: '사진 자료', cat: '06-06', scope: 'all', status: '등재' },
+  ], updated_at: 200 }, base: 200 }, tokA);
+  const vd = (id) => mem.gw_data['col:documents'].items.find((x) => x && x.id === id);
+  T('47 관리자 save: orig_dl all 유지·무효값 제거·비움=제거 · files 원본 이월', r.code === 200 && vd('v1').orig_dl === 'all' && vd('v2').orig_dl === undefined && vd('v3').orig_dl === undefined && vd('v1').files.length === 2, JSON.stringify(r.body).slice(0, 120));
+  const at2 = mem.gw_data['col:documents'].updated_at;
+  r = await call({ action: 'save', collection: 'documents', doc: { schema: 1, items: [
+    { id: 'v1', title: '안전 매뉴얼(직원 편집)', cat: '06-02', scope: 'all', status: '등재' },
+    { id: 'v2', title: '휴가 신청서', cat: '07-03', scope: 'all', status: '등재', orig_dl: 'all' },
+    { id: 'v3', title: '단가표', cat: '05-04', scope: 'all', status: '등재' },
+    { id: 'v4', title: '사진 자료', cat: '06-06', scope: 'all', status: '등재' },
+    { id: 'vn', title: '직원 신규', cat: '06-06', orig_dl: 'all' },
+  ], updated_at: at2 }, base: at2 }, tokD, 'dev1');
+  T('47 직원 save: orig_dl은 서버 원본 고정(v1 all 유지·v2 추가 무시)·신규는 제거', r.code === 200 && vd('v1').orig_dl === 'all' && vd('v2').orig_dl === undefined && !!vd('vn') && vd('vn').orig_dl === undefined, JSON.stringify(r.body).slice(0, 120));
+  r = await call({ action: 'doc_att_put', id: 'v4', name: '열람용_사진.pdf', data: PDF, view: 1, src_n: 1, src_hash: 'abcdef1234' }, tokA);
+  T('47 관리자 pdf view:1 업로드 → 메타 view·src_n·src_hash', r.code === 200 && r.body.files.some((f) => f.view === 1 && f.src_n === 1 && f.src_hash === 'abcdef1234'), JSON.stringify(r.body).slice(0, 160));
+  r = await call({ action: 'doc_att_put', id: 'v4', name: '첨부.docx', data: ZIP, view: 1 }, tokA);
+  T('47 docx에 view:1 → 무시', r.code === 200 && !r.body.files.some((f) => f.name === '첨부.docx' && f.view === 1));
+  r = await call({ action: 'doc_att_put', id: 'vn', name: '열람용.pdf', data: PDF, view: 1 }, tokD, 'dev1');
+  T('47 직원(본인 문서) pdf view:1 → 무시(관리자만)', r.code === 200 && !r.body.files.some((f) => f.view === 1), JSON.stringify(r.body).slice(0, 120));
+  const gsrc = require('fs').readFileSync(join(FN, 'gw-data.js'), 'utf8');
+  T('47 서버 DOC_ORIG_EXT = docx·xlsx·pptx·hwp·hwpx · docOrigAllowed 4축(admin·관리부·03·orig_dl)', /const DOC_ORIG_EXT = \{ docx: 1, xlsx: 1, pptx: 1, hwp: 1, hwpx: 1 \}/.test(gsrc) && /docMinorOf\(it\) === '03'/.test(gsrc) && /it\.orig_dl === 'all'/.test(gsrc));
+}
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

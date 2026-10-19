@@ -1461,5 +1461,18 @@ try {
     && /JW-02-04-001 주기별 업무 체크리스트 v3/.test(html), JSON.stringify(ids));
 } catch (e) { console.log('  (v387 검사 생략 — ' + e.message + ')'); fails++; }
 
+// ---- v388(PM 10/19 "33. ㄱ지금"): 문서함 직원 출력·권한 — 열람용 PDF·[보기·인쇄]·원본 권한(클라=서버 규칙)·열람 이력 ----
+try {
+  const cli = html.slice(html.indexOf('var DOC_ORIG_EXT ='), html.indexOf('var docAttBusy = false;'));
+  const swv = readFileSync(join(ROOT, 'sw.js'), 'utf8');
+  T('v388 문서함 출력: 클라 DOC_ORIG_EXT 5형식 = 서버 · docOrigAllowed 4축(admin·관리부·03·orig_dl) · docViewFile · [보기·인쇄]/[원본]/"원본은 관리부·관리자"/"열람용 PDF 준비 중" · 모달 docOrigDl(관리자만) · 설정 열람 이력(doc_log_get) · 서버 ORIG_FORBIDDEN·doclog·doc_log_get · sw v388',
+    /var DOC_ORIG_EXT = \{ docx:1, xlsx:1, pptx:1, hwp:1, hwpx:1 \}/.test(cli) && /const DOC_ORIG_EXT = \{ docx: 1, xlsx: 1, pptx: 1, hwp: 1, hwpx: 1 \}/.test(gwd)
+    && /if \(m\.admin\) return true; if \(String\(m\.dept \|\| ""\) === "관리부"\) return true; if \(docMinorOf\(d\) === "03"\) return true; return d\.orig_dl === "all";/.test(cli)
+    && /function docViewFile\(d\)/.test(html) && html.indexOf('>보기·인쇄</button>') > 0 && html.indexOf('"원본" : "열기"') > 0 && html.indexOf('원본은 관리부·관리자') > 0 && html.indexOf('열람용 PDF 준비 중') > 0
+    && html.indexOf('id="docOrigDl"') > 0 && /odw\.style\.display = isAdmin\(\) \? "block" : "none"/.test(html) && /action: "doc_log_get"/.test(html) && html.indexOf('id="docLogCard"') > 0 && /function docLogRender\(month\)/.test(html)
+    && /error_code: 'ORIG_FORBIDDEN'/.test(gwd) && /'doclog:' \+ month/.test(gwd) && /d\.action === 'doc_log_get'/.test(gwd) && /if \(s\.orig_dl !== 'all'\) delete s\.orig_dl;/.test(gwd) && /'scope', 'orig_dl'\]/.test(gwd)
+    && /jw-shell-v388/.test(swv));
+} catch (e) { console.log('  (v388 검사 생략 — ' + e.message + ')'); fails++; }
+
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

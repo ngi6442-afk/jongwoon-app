@@ -2194,6 +2194,10 @@
     <select id="docScope"><option value="">분류 기본값 따름 (권한관리 › 문서함 설정)</option><option value="all">전원</option><option value="mgmt">관리부+관리자</option><option value="admin">관리자만</option><option value="ids">직원 지정 (+관리자)</option></select>
     <div id="docScopeMembers" style="display:none;max-height:180px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:6px 8px;margin:4px 0 8px;"></div>
     <div class="scope-hint" id="docScopeHint">기본은 비공개 — 분류 기본값을 열거나 문서별로 지정할 때만 직원에게 보입니다.</div>
+    <!-- 원본 다운로드 범위(v388) — 열람·인쇄는 공개범위대로, 편집 원본(docx·hwp 등)은 기본 관리부·관리자 + 양식·서식 중분류 전원. 관리자만 문서별 예외. 서버가 판정 -->
+    <div id="docOrigDlWrap" style="display:none;"><span class="fld-label">원본 파일 내려받기</span>
+    <select id="docOrigDl"><option value="">기본 — 관리부·관리자 (양식·서식 중분류는 전원)</option><option value="all">전원 (이 문서만 예외)</option></select>
+    <div class="scope-hint">직원은 [보기·인쇄]로 열람용 PDF만 봅니다. 원본(docx·xlsx·pptx·hwp)은 위 범위에서만 내려받습니다.</div></div>
     <!-- 첨부(v315) — 실파일은 서버 gw_files(docatt:<id>:<n>), 목록은 문서 files 메타. 신규 문서는 저장 후(id 확정) [수정]에서 첨부 -->
     <span class="fld-label">첨부 파일 (pdf·docx·xlsx·pptx·hwp·hwpx·jpg·png, 파일당 4.3MB)</span>
     <div id="docAttList" style="border:1px solid var(--line);border-radius:8px;padding:6px 8px;margin:0 0 6px;font-size:13px;"></div>
@@ -6142,6 +6146,11 @@
   var DOC_ATT_MIME = { pdf:"application/pdf", docx:"application/vnd.openxmlformats-officedocument.wordprocessingml.document", xlsx:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     pptx:"application/vnd.openxmlformats-officedocument.presentationml.presentation", hwp:"application/x-hwp", hwpx:"application/hwp+zip", jpg:"image/jpeg", jpeg:"image/jpeg", png:"image/png" };
   var DOC_ATT_INLINE = { pdf:1, jpg:1, jpeg:1, png:1 };   // 브라우저 뷰어로 새 창에 여는 형식 — 나머지는 다운로드
+  // v388 직원 출력(PM 10/19 ㄱ): 편집 원본(docx·xlsx·pptx·hwp·hwpx)과 열람용(PDF view:1) 분리. 원본 내려받기 = 관리자·관리부·중분류 03 양식·서식·문서별 orig_dl 'all' — 서버 docOrigAllowed와 같은 규칙(화면은 안내, 판정은 서버)
+  var DOC_ORIG_EXT = { docx:1, xlsx:1, pptx:1, hwp:1, hwpx:1 };
+  function docMinorOf(d){ var c = docCatOf(d); return (c && c.length === 5) ? c.slice(3, 5) : ""; }
+  function docOrigAllowed(d){ var m = curMember(); if (!m || !d) return false; if (m.admin) return true; if (String(m.dept || "") === "관리부") return true; if (docMinorOf(d) === "03") return true; return d.orig_dl === "all"; }
+  function docViewFile(d){ var fs = (d && Array.isArray(d.files)) ? d.files : []; for (var i = fs.length - 1; i >= 0; i--){ if (fs[i] && Number(fs[i].view) === 1) return fs[i]; } return null; }   // 열람용 PDF(가장 새 것)
   var docAttBusy = false;
   function docAttKb(n){ n = Number(n) || 0; return n >= 1048576 ? (Math.round(n / 104857.6) / 10) + "MB" : Math.max(1, Math.round(n / 1024)) + "KB"; }
   function docAttExtOf(name){ var m = String(name || "").toLowerCase().match(/\.([a-z0-9]+)$/); return m ? m[1] : ""; }
@@ -6153,7 +6162,7 @@
     if (!d){ host.innerHTML = '<div class="empty-line" style="padding:4px 0;">저장 후 [수정]에서 첨부할 수 있습니다(문서 id 확정 뒤).</div>'; btn.style.display = "none"; msg.textContent = ""; return; }
     var files = Array.isArray(d.files) ? d.files : [];
     host.innerHTML = files.length ? files.map(function(f){
-      return '<div style="display:flex;align-items:center;gap:6px;padding:3px 0;"><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">📎 ' + esc(f.name || "") + ' <span style="color:var(--sub);font-size:11.5px;">(' + docAttKb(f.size) + ')</span></span>'
+      return '<div style="display:flex;align-items:center;gap:6px;padding:3px 0;"><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + (Number(f.view) === 1 ? '🖨 ' : '📎 ') + esc(f.name || "") + ' <span style="color:var(--sub);font-size:11.5px;">(' + docAttKb(f.size) + (Number(f.view) === 1 ? ' · 열람용' : '') + ')</span></span>'
         + '<button type="button" class="mini-btn" style="margin:0;font-size:11.5px;padding:2px 8px;" data-doc-att-open="' + esc(d.id) + '|' + Number(f.n) + '">열기</button>'
         + (isAdmin() ? '<button type="button" class="mini-btn" style="margin:0;font-size:11.5px;padding:2px 8px;" data-doc-att-del="' + esc(d.id) + '|' + Number(f.n) + '">삭제</button>' : '') + '</div>';
     }).join("") : '<div class="empty-line" style="padding:4px 0;">첨부 없음</div>';
@@ -7300,14 +7309,22 @@
     meta.push('<span class="own-badge" title="공개범위 — 문서 지정값이 없으면 분류 기본값(권한관리 › 문서함 설정)">공개 ' + esc(docScopeLabel(d)) + '</span>');
     if (d.by && d.by.name && (isAdmin() || st !== "등재")) meta.push('<span>등재 ' + esc(dispNameById(d.by.id) || d.by.name) + '</span>');
     var files = Array.isArray(d.files) ? d.files : [];
-    if (files.length) meta.push('<span class="own-badge" title="첨부 파일 — 아래 [열기]">📎 ' + files.length + '</span>');
+    if (files.length) meta.push('<span class="own-badge" title="첨부 파일 — 아래 [보기·인쇄]·[원본]">📎 ' + files.length + '</span>');
+    if (isAdmin() && d.orig_dl === "all") meta.push('<span class="own-badge" title="원본 파일 내려받기 — 이 문서만 전원(수정 모달)">원본 전원</span>');
     var canEdit = admin && (docMajorOf(d) !== "01" || isAdmin());   // 01 법인 편집은 관리자만(서버도 강제) — 대분류 판정(v317)
     var canResubmit = admin && st === "반려" && !isAdmin() && !!(d.by && d.by.id === myId());   // 반려 건 재상신은 등재한 본인(서버가 by 대조). 관리자는 수정=즉시 등재
-    // 첨부 목록(v315): 파일마다 [열기] — 서버 doc_att_get(열람 판정=docVisible)로 받아 새 창/다운로드
+    // 첨부 목록(v388): 열람용 PDF(view:1) = [보기·인쇄](새 창 뷰어 → PC Ctrl+P·폰 공유→인쇄), 편집 원본 = [원본](docOrigAllowed만 — 서버가 403으로 재판정), 그 밖(pdf·이미지) = [열기]
+    var vf = docViewFile(d), origOk = docOrigAllowed(d), hasOrig = false;
     var fileRows = files.map(function(f){
+      var isView = Number(f.view) === 1, ext = docAttExtOf(f.name), isOrig = !isView && !!DOC_ORIG_EXT[ext];
+      if (isOrig) hasOrig = true;
+      if (isView) return '<div style="font-size:12.5px;color:var(--sub);margin-top:2px;">🖨 ' + esc(f.name || "") + ' <span style="font-size:11.5px;">(' + docAttKb(f.size) + ' · 열람용)</span> '
+        + '<button class="mini-btn" style="font-size:11.5px;padding:2px 8px;margin-left:4px;" data-doc-att-open="' + esc(d.id) + '|' + Number(f.n) + '" title="브라우저 뷰어로 열어 인쇄(PC: Ctrl+P · 폰: 공유 → 인쇄)">보기·인쇄</button></div>';
+      if (isOrig && !origOk) return '<div style="font-size:12.5px;color:var(--sub);margin-top:2px;">📎 ' + esc(f.name || "") + ' <span style="font-size:11.5px;">(' + docAttKb(f.size) + ' · 원본은 관리부·관리자)</span></div>';
       return '<div style="font-size:12.5px;color:var(--sub);margin-top:2px;">📎 ' + esc(f.name || "") + ' <span style="font-size:11.5px;">(' + docAttKb(f.size) + ')</span> '
-        + '<button class="mini-btn" style="font-size:11.5px;padding:2px 8px;margin-left:4px;" data-doc-att-open="' + esc(d.id) + '|' + Number(f.n) + '">열기</button></div>';
+        + '<button class="mini-btn" style="font-size:11.5px;padding:2px 8px;margin-left:4px;" data-doc-att-open="' + esc(d.id) + '|' + Number(f.n) + '">' + (isOrig ? "원본" : "열기") + '</button></div>';
     }).join("");
+    if (files.length && !vf && hasOrig) fileRows += '<div style="font-size:12px;color:var(--sub);margin-top:2px;">🖨 열람용 PDF 준비 중 — 관리자가 변환 도구를 돌리면 [보기·인쇄]가 생깁니다</div>';
     return '<div class="item"><div class="item-body"><div class="item-title">' + titleHtml + '</div>' +
       (meta.length ? '<div class="item-meta">' + meta.join('') + '</div>' : '') +
       (d.note ? '<div class="task-detail">' + esc(d.note) + '</div>' : '') + fileRows +
@@ -7540,6 +7557,9 @@
     document.getElementById("docScope").value = !sc ? "" : (typeof sc === "object" ? "ids" : sc);
     document.getElementById("docScopeMembers").innerHTML = docScopeMembersHtml(sc && typeof sc === "object" ? sc.ids : []);
     docScopeModeChanged();
+    // 원본 다운로드 범위(v388) — 관리자만 보이고 저장(서버도 관리자 저장만 orig_dl 인정)
+    var odw = document.getElementById("docOrigDlWrap"), ods = document.getElementById("docOrigDl");
+    if (odw && ods){ odw.style.display = isAdmin() ? "block" : "none"; ods.value = (d && d.orig_dl === "all") ? "all" : ""; }
     // 비관리자의 기존 문서 수정은 내용만 — 분류·공개범위·문서번호는 PM만 변경(서버가 원본 고정, 적대 검증 med1). 신규 등록 때는 골라서 올리고 PM이 카드에서 검토
     var lock = !!d && !isAdmin();
     docCatSelectLock(lock);
@@ -7584,6 +7604,7 @@
     d.url = url;
     d.note = document.getElementById("docNote").value.trim();
     if (!lock){ if (scopeMode === "ids") d.scope = { ids: scopeIds }; else if (scopeMode) d.scope = scopeMode; else delete d.scope; }   // 미지정=분류 기본값 따름
+    if (isAdmin()){ var odsEl = document.getElementById("docOrigDl"); if (odsEl && odsEl.value === "all") d.orig_dl = "all"; else delete d.orig_dl; }   // v388 원본 내려받기 예외(관리자만, 서버 동일)
     // 등재 상태(v314): 관리자 추가·수정 = 그 자체가 결재(① PM 전결) → 즉시 '등재'(반려·대기 건도 관리자가 손대면 등재 — 남은 결재 카드는 기록용).
     // 비관리자 신규는 status를 안 붙인다 — 서버가 게이트대로(대기/즉시 등재) 스탬프하고 저장 직후 재조회로 화면에 반영. 기존 건은 서버가 원본 고정
     if (isAdmin()){
@@ -20112,7 +20133,10 @@
         + (g === "staff" ? "'등재 대기' → 결재함 [문서함 등재] 카드 승인 후 등재(등급표 ①)" : "결재 없이 즉시 등재") + '</span></div>';
       host.innerHTML = rows
         + '<div class="empty-line" style="margin-top:6px;"><b>기본은 비공개</b>(관리자만) — 공개할 분류만 열어주세요. 문서별 공개범위(수정 모달)가 있으면 그 값이 우선 · 변경은 감사로그에 기록'
-        + '<br>전원=모든 직원 · 관리부+관리자=01 법인과 같은 축 · 관리자만=PM·대표만 · 등재 대기·반려 문서는 관리자와 올린 본인만 봅니다</div>';
+        + '<br>전원=모든 직원 · 관리부+관리자=01 법인과 같은 축 · 관리자만=PM·대표만 · 등재 대기·반려 문서는 관리자와 올린 본인만 봅니다</div>'
+        + '<div class="empty-line" style="margin-top:6px;"><b>원본 파일 내려받기</b>(v388) — 열람·인쇄는 위 공개범위대로 열람용 PDF를 보고, 편집 원본(docx·xlsx·pptx·hwp)은 <b>관리부·관리자 + 양식·서식 중분류(전원)</b>만. 문서별 예외는 수정 모달 "원본 파일 내려받기 = 전원"</div>'
+        + '<div id="docLogCard" style="margin-top:10px;"><div style="font-weight:600;font-size:13px;margin-bottom:4px;">👁 열람 이력 <span style="font-weight:400;color:var(--sub);font-size:12px;">누가·언제·어느 파일을 열었는지(원본/열람용) — 이번 달, 최근 200건</span></div><div id="docLogBody" class="empty-line">불러오는 중…</div></div>';
+      docLogRender();
       Array.prototype.forEach.call(host.querySelectorAll("[data-ds-scope]"), function(btn){
         btn.addEventListener("click", function(){
           var p = btn.getAttribute("data-ds-scope").split(":");
@@ -20123,6 +20147,23 @@
         btn.addEventListener("click", function(){ var v = btn.getAttribute("data-ds-gate"); docSettingSet({ register_gate: v }, "등재 결재 → " + DOC_GATE_TXT[v]); });
       });
     }).catch(function(){ host.innerHTML = '<div class="empty-line">문서함 설정을 불러오지 못했습니다(네트워크).</div>'; });
+  }
+  // 열람 이력(v388) — 서버 doclog:YYYY-MM(관리자만). 월 선택: 이번 달 + 이전 2개월
+  function docLogRender(month){
+    var body = document.getElementById("docLogBody"); if (!body) return;
+    gwCall("gw-data", Object.assign({ action: "doc_log_get", limit: 200 }, month ? { month: month } : {})).then(function(res){
+      if (res.status !== 200 || !res.body){ body.innerHTML = '<div class="empty-line">열람 이력을 불러오지 못했습니다 (' + ((res.body && res.body.error_code) || res.status) + ')</div>'; return; }
+      var cur = res.body.month || "", items = res.body.items || [];
+      var months = [], d0 = new Date(); for (var k = 0; k < 3; k++){ var dd = new Date(d0.getFullYear(), d0.getMonth() - k, 1); months.push(dd.getFullYear() + "-" + String(dd.getMonth() + 1).padStart(2, "0")); }
+      var sel = '<select id="docLogMonth" style="font-size:12px;margin:0 0 6px;">' + months.map(function(m){ return '<option value="' + m + '"' + (m === cur ? ' selected' : '') + '>' + m + '</option>'; }).join("") + '</select> <span style="font-size:12px;color:var(--sub);">' + res.body.total + '건</span>';
+      var KIND = { view: "열람용", orig: "원본", file: "파일" };
+      var rows = items.length ? '<div style="overflow:auto;"><table style="font-size:12px;border-collapse:collapse;width:100%;"><tr><th style="text-align:left;padding:2px 6px;">시각</th><th style="text-align:left;padding:2px 6px;">이름</th><th style="text-align:left;padding:2px 6px;">문서</th><th style="text-align:left;padding:2px 6px;">파일</th><th style="text-align:left;padding:2px 6px;">구분</th></tr>'
+        + items.map(function(x){ var t = new Date(Number(x.ts) || 0); var ts = isNaN(t.getTime()) ? "" : (String(t.getMonth() + 1).padStart(2, "0") + "/" + String(t.getDate()).padStart(2, "0") + " " + String(t.getHours()).padStart(2, "0") + ":" + String(t.getMinutes()).padStart(2, "0"));
+            return '<tr><td style="padding:2px 6px;white-space:nowrap;">' + esc(ts) + '</td><td style="padding:2px 6px;white-space:nowrap;">' + esc(dispName(x.by || "")) + (x.dept ? ' <span style="color:var(--sub);">' + esc(x.dept) + '</span>' : '') + '</td><td style="padding:2px 6px;">' + esc((x.no ? x.no + " " : "") + (x.title || "")) + '</td><td style="padding:2px 6px;">' + esc(x.name || "") + '</td><td style="padding:2px 6px;white-space:nowrap;">' + (x.kind === "orig" ? '<span class="dday amber">원본</span>' : esc(KIND[x.kind] || x.kind || "")) + '</td></tr>'; }).join("") + '</table></div>'
+        : '<div class="empty-line">이 달 열람 기록이 없습니다.</div>';
+      body.innerHTML = sel + rows;
+      var ms = document.getElementById("docLogMonth"); if (ms) ms.addEventListener("change", function(){ docLogRender(ms.value); });
+    }).catch(function(){ body.innerHTML = '<div class="empty-line">열람 이력을 불러오지 못했습니다(네트워크).</div>'; });
   }
   function docSettingSet(chg, label){
     if (docSettingSaving) return;   // 연타 방지 — 직렬 저장
