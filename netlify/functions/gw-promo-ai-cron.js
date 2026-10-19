@@ -32,7 +32,7 @@ async function applyDoneJobs(st, doc, now) {
     if (j.status !== 'done' || !j.title || !j.body) continue;
     seen[pid] = 1;
     const a = PJ.applyResult(doc, pid, { title: j.title, body: j.body, tags: j.tags, model: j.model, tokens: j.used_tokens, tt: j.title_type, job: k.slice('promoai:job:'.length) }, now);
-    if (a.changed) applied++;
+    if (a.changed) { applied++; try { await PJ.saveDraft(st, pid, k.slice('promoai:job:'.length), j.title, j.body, now); } catch (e) {} }   // v389 초안 보존(옛 워커 결과도)
   }
   return { applied: applied, scanned: scanned };
 }
@@ -135,7 +135,32 @@ exports.handler = async function (event) {
   // ③ v364: 사진 가리기 재감지 — 옛 검출기(Claude 비전 단독) 판이 남은 게시 전 기록을 회차당 1건씩 다시 감지(force=자동 판만, 사람 판 유지). 완료·표시는 maskmeta model에 남는다.
   let remask = null;
   try { remask = await remaskOld(st, doc, now); } catch (e) { remask = { error: (e && e.message) || 'ERR' }; }
-  const out = { ok: true, at: new Date(now).toISOString(), applied: ap.applied, scanned: ap.scanned, candidates: cand0.length, started: started, failed: failed, remask: remask };
+  // ④ v389 자동 학습 — 로컬 수집기·카드가 올린 짝(직원 최종본)을 1건씩 학습 워커에 넘긴다(전역 잠금 5분, 실패 10분 뒤 재시도 3회). 모자이크(③)·생성(②)과 독립.
+  let learn = null;
+  try { learn = await kickLearn(st, now); } catch (e) { learn = { error: (e && e.message) || 'ERR' }; }
+  const out = { ok: true, at: new Date(now).toISOString(), applied: ap.applied, scanned: ap.scanned, candidates: cand0.length, started: started, failed: failed, remask: remask, learn: learn };
   console.log('[사진AI 크론] ' + JSON.stringify(out));
   return { statusCode: 200, body: JSON.stringify(out) };
 };
+
+const LEARN_SCAN = 40;
+async function kickLearn(st, now) {
+  const { blobSet } = require('./_lib/blobs');
+  const PL = require('./_lib/promolearn');
+  const lk = await blobGet(st, PL.LOCK_KEY);
+  if (lk.ok && lk.data && Number(lk.data.ts) && now - Number(lk.data.ts) < PL.LOCK_TTL_MS) return { skipped: 'running', pair: String(lk.data.pair || '') };
+  const l = await blobList(st, PL.PAIR_PREFIX);
+  if (!l.ok) return { error: l.code || 'LIST_FAILED' };
+  const keys = (l.keys || []).filter(function (k) { return k.indexOf(PL.PAIR_PREFIX) === 0; }).sort().slice(-LEARN_SCAN);
+  const pairs = [];
+  for (const k of keys) { const r = await blobGet(st, k); if (r.ok && r.data && typeof r.data === 'object') pairs.push(r.data); }
+  const cand = PL.pickPending(pairs, now);
+  if (!cand.length) return { pending: 0, scanned: pairs.length };
+  const p = cand[0];
+  p.status = 'running'; p.tries = (Number(p.tries) || 0) + 1; p.ts = now;
+  await blobSet(st, PL.pairKey(p.id), p);
+  const k = await PL.kickLearnWorker(p.id);
+  if (!k.ok) { p.status = 'fail'; p.code = String(k.code || 'KICKOFF_FAILED'); await blobSet(st, PL.pairKey(p.id), p); }
+  return { pending: cand.length, scanned: pairs.length, started: k.ok ? p.id : '', code: k.ok ? '' : String(k.code || '') };
+}
+exports.kickLearn = kickLearn;

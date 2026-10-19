@@ -3034,4 +3034,125 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   const gsrc = require('fs').readFileSync(join(FN, 'gw-data.js'), 'utf8');
   T('47 서버 DOC_ORIG_EXT = docx·xlsx·pptx·hwp·hwpx · docOrigAllowed 4축(admin·관리부·03·orig_dl)', /const DOC_ORIG_EXT = \{ docx: 1, xlsx: 1, pptx: 1, hwp: 1, hwpx: 1 \}/.test(gsrc) && /docMinorOf\(it\) === '03'/.test(gsrc) && /it\.orig_dl === 'all'/.test(gsrc));
 }
+// 48 v389 블로그 자동 학습(PM 10/19 "니가 아니라 모델이 학습"): 순수 함수(간극·병합·주입·짝 선별) / 초안 보존 saveDraft / 학습 워커(가짜 모델 응답 → 규칙 창고·짝 done·rec.learn / 금지 문자열 차단 / 초안 없음)
+//    / 크론 ④ 기동(전역 잠금·pending 1건·fetch 호출) / pl_get·pl_set(관리자만·끄기·규칙 삭제·짝 지정·재시도) / 생성 프롬프트 주입(buildPrompt lessons·exemplar, off면 없음)
+{
+  const PL = require(join(FN, '_lib/promolearn.js'));
+  const PJ48 = require(join(FN, '_lib/promoai_job.js'));
+  const lib48 = require(join(FN, '_lib/promoai.js'));
+  const draft = '포항 장량동 상가 하수구 준설\n\n[사진 1 : 입구]\n왜 막히나요?\n상가 하수구는 기름과 음식물이 굳어 막힙니다. 저희 종운환경이 준설했습니다.\n[사진 2 : 작업]\n고압세척으로 뚫었습니다.';
+  const fin = '포항 장량동 상가 하수구 준설\n\n왜 막히나요?\n상가 하수구는 기름과 음식물이 굳어서 막힙니다.\n(주)종운환경이 준설했습니다.\n고압 세척으로 뚫었습니다.\n문의는 전화로 주시면 됩니다.';
+  const g = PL.gapScore(draft, fin);
+  T('48 gapScore: 정규화 편집거리 0<ratio<1 · 사진 마커 제외(photos_d -2) · 같은 글은 0', g.ratio > 0.05 && g.ratio < 0.5 && g.photos_d === -2 && PL.gapScore(fin, fin).ratio === 0, JSON.stringify(g));
+  const out1 = { summary: '저희→회사명', changes: [{ kind: 'style', what: '저희를 회사명으로' }], rules: [{ text: '자기 지칭은 저희가 아니라 회사명으로 쓴다', scope: 'style', n: 1, keep_id: '' }, { text: '글 끝에 문의 연락처 한 줄을 덧붙인다', scope: 'content', n: 1, keep_id: '' }, { text: '', scope: 'style', n: 1, keep_id: '' }] };
+  const L1 = PL.mergeLessons(null, out1, { promo_id: 'p1', pair_id: 'pl_0123456789ab', final_title: 't1', final_body: fin, facility: '상가하수구', now: 1000, tokens: 50, gap: g, summary: out1.summary });
+  const out2 = { summary: '', changes: [], rules: [{ text: '자기 지칭은 저희가 아니라 회사명으로 쓴다', scope: 'style', n: 2, keep_id: L1.rules[0].id }, { text: '사진 아래 첫 문장은 사진 묘사가 아니다', scope: 'bogus', n: 1, keep_id: 'nope' }] };
+  const L2 = PL.mergeLessons(L1, out2, { promo_id: 'p2', pair_id: 'pl_0123456789ac', final_title: 't2', final_body: fin, facility: '우수받이', now: 2000, tokens: 10, gap: g, summary: '' });
+  T('48 mergeLessons: 빈 규칙 제외 · keep_id로 id 유지·n 누적·first 보존 · scope 밖은 style · 예시 시설별 · gaps·stats 누적', L1.rules.length === 2 && L2.rules.length === 2 && L2.rules[0].id === L1.rules[0].id && L2.rules[0].n === 2 && L2.rules[0].first === 1000 && L2.rules[1].scope === 'style' && Object.keys(L2.exemplars).length === 2 && L2.gaps.length === 2 && L2.stats.pairs === 2 && L2.stats.tokens === 60, JSON.stringify(L2.rules));
+  const ll = PL.lessonLines(L2);
+  T('48 lessonLines: 근거 많은 순 · "(근거 n건)" · off면 빈 배열', ll.length === 2 && /회사명으로 쓴다 \(근거 2건\)$/.test(ll[0]) && PL.lessonLines(Object.assign({}, L2, { off: true })).length === 0, JSON.stringify(ll));
+  const ex = PL.exemplarFor(L2, '상가 하수구');
+  T('48 exemplarFor: 시설 키 정규화(공백 제거) 일치 → 없으면 최신 · off면 null · 마커 제거 발췌', ex && ex.facility_key === '상가하수구' && PL.exemplarFor(L2, '학교').facility_key === '우수받이' && PL.exemplarFor(Object.assign({}, L2, { off: true }), '학교') === null && ex.excerpt.indexOf('[사진') < 0, JSON.stringify(ex).slice(0, 120));
+  const NOW48 = 10000000;
+  const picked = PL.pickPending([{ id: 'pl_0123456789ab', promo_id: 'p1', status: 'pending', ts: 5 }, { id: 'pl_0123456789ac', promo_id: 'p1', status: 'running', ts: NOW48 - 1000 }, { id: 'pl_0123456789ad', promo_id: '', status: 'unmatched' }, { id: 'pl_0123456789ae', promo_id: 'p1', status: 'fail', tries: 1, ts: NOW48 - 20 * 60000 }, { id: 'pl_0123456789af', promo_id: 'p1', status: 'fail', tries: 3, ts: 1 }, { id: 'bad', promo_id: 'p1' }, { id: 'pl_0123456789a0', promo_id: 'p1', status: 'running', ts: NOW48 - 20 * 60000, tries: 1 }], NOW48).map((p) => p.id);
+  T('48 pickPending: pending·죽은 running(15분)·fail 10분 뒤(3회 미만)만 · unmatched·진행 중·상한·id 불량 제외 · ts 오름차순', JSON.stringify(picked) === JSON.stringify(['pl_0123456789ab', 'pl_0123456789ae', 'pl_0123456789a0']), JSON.stringify(picked));
+  // 생성 프롬프트 주입
+  const pr1 = lib48.buildPrompt({ region: '포항', facility: '상가 하수구', problem: '막힘', photoCount: 3, lessons: ll, exemplar: { title: ex.title, excerpt: ex.excerpt } });
+  const pr0 = lib48.buildPrompt({ region: '포항', facility: '상가 하수구', problem: '막힘', photoCount: 3 });
+  T('48 buildPrompt: 규칙 블록 "[직원이 고치는 패턴 — 자동 학습 … 건]" + 참고 완성본 블록이 user에 들어가고 system은 그대로 · 자료 없으면 종전과 같음', pr1.user.indexOf('[직원이 고치는 패턴 — 자동 학습') > 0 && pr1.user.indexOf(ll[0]) > 0 && pr1.user.indexOf('[참고 완성본') > 0 && pr1.user.indexOf('옮겨 쓰지 않습니다') > 0 && pr1.system === pr0.system && pr0.user.indexOf('자동 학습') < 0 && pr1.user.indexOf('자동 학습') < pr1.user.indexOf('이번 글의 필수 조건'), pr1.user.slice(pr1.user.indexOf('[직원이'), pr1.user.indexOf('[직원이') + 80));
+  // 초안 보존
+  mem.gw_data['promoai:draft:pl1'] = { schema: 1, items: [{ job: 'pa_old', title: 'o', body: 'o', ts: 1 }] };
+  await PJ48.saveDraft('gw_data', 'pl1', 'pa_j1', '제목1', draft, 5000);
+  await PJ48.saveDraft('gw_data', 'pl1', 'pa_j1', '제목1', draft, 5001);
+  await PJ48.saveDraft('gw_data', 'pl1', 'pa_j2', '제목2', draft + '2', 5002);
+  await PJ48.saveDraft('gw_data', 'pl1', 'pa_j3', '제목3', draft + '3', 5003);
+  {
+    const dd = mem.gw_data['promoai:draft:pl1'];
+    T('48 saveDraft: job 멱등 · 최근 3건만 보존 · 최신이 마지막', dd.items.length === 3 && dd.items.map((x) => x.job).join(',') === 'pa_j1,pa_j2,pa_j3' && dd.items[2].title === '제목3', JSON.stringify(dd.items.map((x) => x.job)));
+  }
+  // 학습 워커 — 가짜 모델 응답(global.fetch) · 내부 토큰
+  const worker48 = require(join(FN, 'gw-promo-learn-background.js'));
+  const savedKey48 = process.env.GW_ANTHROPIC_KEY, savedUrl48 = process.env.URL, realFetch48 = global.fetch;
+  process.env.GW_ANTHROPIC_KEY = 'test-anthropic-key-0000'; process.env.URL = 'https://test.local';
+  mem.gw_data['col:promo'] = { schema: 1, items: [
+    { id: 'pl1', title: '포항 장량동 상가 하수구 준설', body: draft, facility: '상가 하수구', status: 'posted', ai: { ts: 1 }, photos: [{ id: 'att_0123456789abcdef' }] },
+    { id: 'pl2', title: '옛 기록', body: draft, facility: '우수받이', status: 'posted', ai: { ts: 1 }, contract_id: 'c48' },
+    { id: 'pl3', title: '초안 없음', body: '', facility: '학교', status: 'review' },
+  ], updated_at: 1 };
+  mem.gw_data['col:contracts'] = { schema: 1, items: [{ id: 'c48', title: '계약', contract_info: { amount: 77777777, client: '비밀발주처' } }], updated_at: 1 };
+  delete mem.gw_data['promoai:lessons']; delete mem.gw_data['promolearn:lock']; delete mem.gw_data['promoai:draft:pl1'];   // 보존 초안 없음 → 기록 본문(record) 경로부터
+  mem.gw_data['promolearn:in:pl_aaaaaaaaaaa1'] = { schema: 1, id: 'pl_aaaaaaaaaaa1', promo_id: 'pl1', status: 'running', tries: 1, ts: 1, final_title: '포항 장량동 상가 하수구 준설', final_body: '&#65279;' + fin, src_file: 'a.hwp' };
+  mem.gw_data['promolearn:in:pl_aaaaaaaaaaa2'] = { schema: 1, id: 'pl_aaaaaaaaaaa2', promo_id: 'pl2', status: 'running', tries: 1, ts: 1, final_title: '옛 기록', final_body: fin + '\n금액은 77777777원이었습니다', src_file: 'b.hwp' };
+  mem.gw_data['promolearn:in:pl_aaaaaaaaaaa3'] = { schema: 1, id: 'pl_aaaaaaaaaaa3', promo_id: 'pl3', status: 'running', tries: 1, ts: 1, final_title: '초안 없음', final_body: fin, src_file: 'c.hwp' };
+  const apiCalls48 = [];
+  global.fetch = async (url, opt) => {
+    apiCalls48.push({ url: String(url), auth: String((opt && opt.headers && (opt.headers['x-api-key'] || opt.headers.Authorization)) || '') });
+    const b = JSON.parse(opt.body || '{}');
+    const text = JSON.stringify({ summary: '저희를 회사명으로 바꿨고 연락처를 덧붙였다', changes: [{ kind: 'style', what: '저희→회사명' }], rules: [{ text: '자기 지칭은 저희가 아니라 회사명으로 쓴다', scope: 'style', n: 1, keep_id: '' }, { text: '글 끝에 문의 안내 한 줄을 덧붙인다', scope: 'content', n: 1, keep_id: '' }] });
+    return { ok: true, status: 200, text: async () => JSON.stringify({ model: b.model, stop_reason: 'end_turn', usage: { input_tokens: 900, output_tokens: 100 }, content: [{ type: 'text', text: text }] }) };
+  };
+  const tokIn = issueSession({ id: '__promoai__', role: 'system' }).token;
+  const ev48 = (body, tok) => ({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + tok }, body: JSON.stringify(body) });
+  await worker48.handler(ev48({ pair_id: 'pl_aaaaaaaaaaa1' }, tokA), {});
+  T('48 학습 워커: 사용자 토큰으로는 안 돈다(짝 그대로 running)', mem.gw_data['promolearn:in:pl_aaaaaaaaaaa1'].status === 'running' && apiCalls48.length === 0);
+  await worker48.handler(ev48({ pair_id: 'pl_aaaaaaaaaaa1' }, tokIn), {});
+  {
+    const p = mem.gw_data['promolearn:in:pl_aaaaaaaaaaa1'], L = mem.gw_data['promoai:lessons'], rec = mem.gw_data['col:promo'].items[0];
+    T('48 학습 워커: 모델 1회(키는 x-api-key 헤더로만) → 짝 done(gap·draft_src record·summary·changes) · 규칙 창고 2개 · 예시(상가하수구) · rec.learn · 잠금 해제', apiCalls48.length === 1 && apiCalls48[0].auth === 'test-anthropic-key-0000' && p.status === 'done' && p.gap && p.gap.ratio > 0 && p.draft_src === 'record' && p.rules_n === 2 && /회사명/.test(p.summary) && p.changes.length === 1
+      && L && L.rules.length === 2 && L.exemplars['상가하수구'] && L.exemplars['상가하수구'].promo_id === 'pl1' && L.gaps.length === 1 && L.stats.tokens === 1000 && rec.learn && rec.learn.pair === 'pl_aaaaaaaaaaa1' && rec.learn.src === 'record' && mem.gw_data['promolearn:lock'].pair === '', JSON.stringify(p).slice(0, 200));
+    T('48 학습 워커: 최종본 BOM 엔티티 제거(cleanFinal) → 예시 발췌에 &#65279; 없음', L.exemplars['상가하수구'].excerpt.indexOf('65279') < 0 && L.exemplars['상가하수구'].excerpt.indexOf('왜 막히나요') >= 0);
+  }
+  await worker48.handler(ev48({ pair_id: 'pl_aaaaaaaaaaa2' }, tokIn), {});
+  T('48 학습 워커: 계약 참조 기록 + 최종본에 계약 금액 → LEAK_BLOCKED(모델 호출 0 추가) · 규칙 창고 그대로', mem.gw_data['promolearn:in:pl_aaaaaaaaaaa2'].status === 'fail' && mem.gw_data['promolearn:in:pl_aaaaaaaaaaa2'].code === 'LEAK_BLOCKED' && apiCalls48.length === 1 && mem.gw_data['promoai:lessons'].rules.length === 2, JSON.stringify(mem.gw_data['promolearn:in:pl_aaaaaaaaaaa2']).slice(0, 160));
+  await worker48.handler(ev48({ pair_id: 'pl_aaaaaaaaaaa3' }, tokIn), {});
+  T('48 학습 워커: 초안도 AI 결과도 없는 기록 → NO_DRAFT', mem.gw_data['promolearn:in:pl_aaaaaaaaaaa3'].status === 'fail' && mem.gw_data['promolearn:in:pl_aaaaaaaaaaa3'].code === 'NO_DRAFT');
+  // 보존 초안이 있으면 그것을 쓴다(draft_src draft)
+  mem.gw_data['promoai:draft:pl1'] = { schema: 1, items: [{ job: 'pa_x', title: '초안 제목', body: draft + '\n보존본 문장', ts: 2 }] };
+  mem.gw_data['promolearn:in:pl_aaaaaaaaaaa4'] = { schema: 1, id: 'pl_aaaaaaaaaaa4', promo_id: 'pl1', status: 'running', tries: 1, ts: 1, final_title: 't', final_body: fin, src_file: 'd.hwp' };
+  await worker48.handler(ev48({ pair_id: 'pl_aaaaaaaaaaa4' }, tokIn), {});
+  T('48 학습 워커: 보존 초안 우선(draft_src draft·draft_job) · 규칙 n 누적(같은 문장 → 2)', mem.gw_data['promolearn:in:pl_aaaaaaaaaaa4'].draft_src === 'draft' && mem.gw_data['promolearn:in:pl_aaaaaaaaaaa4'].draft_job === 'pa_x' && mem.gw_data['promoai:lessons'].rules.some((r) => r.n === 2), JSON.stringify(mem.gw_data['promoai:lessons'].rules));
+  // 크론 ④ — pending 짝 1건 기동(fetch로 학습 워커 URL), 전역 잠금이면 건너뜀
+  const cron48 = require(join(FN, 'gw-promo-ai-cron.js'));
+  mem.gw_data['promolearn:in:pl_aaaaaaaaaaa5'] = { schema: 1, id: 'pl_aaaaaaaaaaa5', promo_id: 'pl1', status: 'pending', tries: 0, ts: 100, final_title: 't', final_body: fin };
+  mem.gw_data['promolearn:in:pl_aaaaaaaaaaa6'] = { schema: 1, id: 'pl_aaaaaaaaaaa6', promo_id: 'pl1', status: 'pending', tries: 0, ts: 200, final_title: 't', final_body: fin };
+  const kicks48 = [];
+  global.fetch = async (url, opt) => { kicks48.push({ url: String(url), body: JSON.parse(opt.body || '{}') }); return { ok: true, status: 202 }; };
+  let kl = await cron48.kickLearn('gw_data', Date.now());
+  T('48 크론 ④: pending 2 중 오래된 1건만 기동 → 학습 워커 URL·pair_id · 짝 running·tries 1', kl.started === 'pl_aaaaaaaaaaa5' && kl.pending === 2 && kicks48.length === 1 && /gw-promo-learn-background$/.test(kicks48[0].url) && kicks48[0].body.pair_id === 'pl_aaaaaaaaaaa5' && mem.gw_data['promolearn:in:pl_aaaaaaaaaaa5'].status === 'running' && mem.gw_data['promolearn:in:pl_aaaaaaaaaaa5'].tries === 1, JSON.stringify(kl));
+  mem.gw_data['promolearn:lock'] = { ts: Date.now(), pair: 'pl_aaaaaaaaaaa5' };
+  kl = await cron48.kickLearn('gw_data', Date.now());
+  T('48 크론 ④: 전역 잠금(5분) 중이면 건너뜀', kl.skipped === 'running' && kicks48.length === 1);
+  delete mem.gw_data['promolearn:lock'];
+  global.fetch = async () => { throw new Error('down'); };
+  kl = await cron48.kickLearn('gw_data', Date.now());
+  T('48 크론 ④: 기동 실패 → 짝 fail KICKOFF_FAILED(10분 뒤 재시도 대상)', kl.code === 'KICKOFF_FAILED' && mem.gw_data['promolearn:in:pl_aaaaaaaaaaa6'].status === 'fail' && mem.gw_data['promolearn:in:pl_aaaaaaaaaaa6'].code === 'KICKOFF_FAILED');
+  global.fetch = realFetch48;
+  // pl_get / pl_set
+  const pai48 = require(join(FN, 'gw-promo-ai.js'));
+  const callP = async (body, tok, dev) => { const r = await pai48.handler({ httpMethod: 'POST', headers: Object.assign({ authorization: tok ? 'Bearer ' + tok : '' }, dev ? { 'x-device-id': dev } : {}), body: JSON.stringify(body) }); return { code: r.statusCode, body: JSON.parse(r.body || '{}') }; };
+  let rp = await callP({ action: 'pl_get' }, tokW, 'dev1');
+  T('48 pl_get 비관리자 → 403', rp.code === 403);
+  rp = await callP({ action: 'pl_get' }, tokA);
+  T('48 pl_get 관리자: 규칙·예시·간극 요약·짝 목록(최신순)·상태', rp.code === 200 && rp.body.ok && rp.body.lessons.rules.length === 2 && rp.body.lessons.exemplars.length >= 1 && rp.body.lessons.summary.n >= 2 && rp.body.pairs.length >= 5 && rp.body.pairs[0].ts >= rp.body.pairs[1].ts, JSON.stringify(rp.body).slice(0, 200));
+  const rid48 = rp.body.lessons.rules[0].id;
+  rp = await callP({ action: 'pl_set', del_rule: rid48 }, tokA);
+  T('48 pl_set 규칙 삭제 → 창고 1개 · 감사로그 블로그학습', rp.code === 200 && rp.body.lessons.rules.length === 1 && !rp.body.lessons.rules.some((r) => r.id === rid48) && auditMock.logs.some((l) => l.col === 'promo' && l.ev[0].op === '블로그학습'));
+  rp = await callP({ action: 'pl_set', off: true }, tokA);
+  T('48 pl_set 끄기 → lessons.off true → lessonLines 빈 배열', rp.code === 200 && rp.body.lessons.off === true && PL.lessonLines(mem.gw_data['promoai:lessons']).length === 0);
+  rp = await callP({ action: 'pl_set', off: false }, tokA);
+  T('48 pl_set 켜기', rp.code === 200 && rp.body.lessons.off === false);
+  mem.gw_data['promolearn:in:pl_aaaaaaaaaaa7'] = { schema: 1, id: 'pl_aaaaaaaaaaa7', promo_id: '', status: 'unmatched', tries: 0, ts: 300, final_title: '짝 없음', final_body: fin };
+  rp = await callP({ action: 'pl_set', assign: { pair_id: 'pl_aaaaaaaaaaa7', promo_id: 'nope' } }, tokA);
+  T('48 pl_set 짝 지정: 없는 기록 → 404', rp.code === 404 && rp.body.code === 'PROMO_NOT_FOUND');
+  rp = await callP({ action: 'pl_set', assign: { pair_id: 'pl_aaaaaaaaaaa7', promo_id: 'pl1' } }, tokA);
+  T('48 pl_set 짝 지정 → pending·promo_id·match 관리자 지정', rp.code === 200 && mem.gw_data['promolearn:in:pl_aaaaaaaaaaa7'].status === 'pending' && mem.gw_data['promolearn:in:pl_aaaaaaaaaaa7'].promo_id === 'pl1' && mem.gw_data['promolearn:in:pl_aaaaaaaaaaa7'].match.title === '관리자 지정');
+  rp = await callP({ action: 'pl_set', retry: 'pl_aaaaaaaaaaa6' }, tokA);
+  T('48 pl_set 다시 → pending·tries 0', rp.code === 200 && mem.gw_data['promolearn:in:pl_aaaaaaaaaaa6'].status === 'pending' && mem.gw_data['promolearn:in:pl_aaaaaaaaaaa6'].tries === 0);
+  rp = await callP({ action: 'pl_set' }, tokA);
+  T('48 pl_set 변경 없음 → 400', rp.code === 400 && rp.body.code === 'NO_CHANGE');
+  const csrc48 = require('fs').readFileSync(join(FN, 'gw-promo-ai-cron.js'), 'utf8'), wsrc48 = require('fs').readFileSync(join(FN, 'gw-promo-ai-run-background.js'), 'utf8');
+  T('48 배선: 크론 ④ kickLearn 호출 · 워커 생성 성공 뒤 saveDraft · 생성 입력에 lessons/exemplar 주입 + 차단 시 자료만 빼고 재조립 · 모자이크(③ remaskOld) 그대로', /learn = await kickLearn\(st, doc, now\)|learn = await kickLearn\(st, now\)/.test(csrc48) && /remask = await remaskOld\(st, doc, now\)/.test(csrc48) && /PJ\.saveDraft\(st, promoId, job, title, body/.test(wsrc48) && /input\.lessons = ll/.test(wsrc48) && /delete input\.exemplar; delete input\.lessons;/.test(wsrc48));
+  process.env.GW_ANTHROPIC_KEY = savedKey48; process.env.URL = savedUrl48;
+  if (savedKey48 === undefined) delete process.env.GW_ANTHROPIC_KEY;
+}
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

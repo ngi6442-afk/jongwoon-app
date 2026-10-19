@@ -1,6 +1,6 @@
 # 종운 그룹웨어 — 기능 대장 (사용자 매뉴얼 원천)
 
-> 살아있는 문서. 기능 추가·변경 시 이 파일을 함께 갱신한다. 기준: v388 (2026-10-19).
+> 살아있는 문서. 기능 추가·변경 시 이 파일을 함께 갱신한다. 기준: v389 (2026-10-20).
 > 세부 변경 이력은 git 커밋 메시지(한글) 참조.
 
 ## 1. 전체 구조
@@ -690,3 +690,12 @@ PM 지시 "문서함 일단 다 올리고 등재결재랑 공개범위 만들어
 - 문서별 예외: 수정 모달 "원본 파일 내려받기 = 전원"(관리자만, 서버는 관리자 저장의 orig_dl:all만 인정·비관리자 저장은 원본 고정).
 - 열람 기록: doc_att_get 성공마다 doclog:YYYY-MM(KST, 월 5,000건) — 누가·언제·문서·파일·구분(view/orig/file). 권한관리 › 문서함 설정 "열람 이력"(doc_log_get, 관리자, 최근 200·월 선택 3개월).
 - 검사: servertest 절 47(원본 403·관리부·양식·orig_dl·열람 기록·설정 저장 정규화·view 업로드), uismoke v388(클라·서버 규칙 동일·문구).
+
+### v389 (10/20) — 블로그 자동 학습 루프 (PM 10/19 "니가 아니라 모델이 학습하도록", 10/20 "ㄱ. 모자이크 기능 빼지마라")
+- 학습의 뜻: Claude는 파인튜닝이 없으므로 "모델이 초안↔직원 최종본 차이를 읽어 규칙(≤25)과 시설별 완성본 예시를 스스로 쌓고, 다음 생성이 그것을 데이터로 읽는" 구조. 사람(개발자)은 규칙을 쓰지 않는다.
+- 초안 보존 promoai:draft:<기록id>(최근 3건, _lib/promoai_job.saveDraft — 워커 성공·크론 적용 때). 짝 블롭 promolearn:in:<pl_id> {promo_id, final_title, final_body, status pending|running|done|fail|unmatched, match, gap…} — 로컬 수집기(work\05_홍보_검색노출\_도구\promo_learn_ingest.py: 폴더 work\05_홍보_검색노출\직원수정본_20260911, hwp·hwpx 한컴 COM·docx·txt·html, 제목·본문 유사도로 짝, CLI 블롭 업로드)가 올린다.
+- 학습 워커 gw-promo-learn-background(내부 토큰): 초안(보존본 → 없으면 기록 본문 src record) ↔ 최종본 → 모델 1회(json_schema: summary·changes·rules keep_id) → _lib/promolearn.mergeLessons(규칙 id 유지·n 누적·scope 화이트리스트, 예시 시설별 1,500자, gaps ≤60, stats) → promoai:lessons. 간극 = 정규화 편집거리(마커 제외) + 줄·소제목·사진 수 차. 계약 참조 기록은 금지 문자열 검사(LEAK_BLOCKED·결과 항목 단위 제거). 전역 잠금 5분.
+- 크론 ④(gw-promo-ai-cron.kickLearn): pending 짝 1건씩 기동, 죽은 running 15분·실패 10분 뒤 재시도 3회. ①~③(적용·재시작·모자이크 재감지)은 그대로.
+- 생성 주입(_lib/promoai.buildPrompt): "[직원이 고치는 패턴 — 자동 학습 N건]" 규칙 줄 + "[참고 완성본]" 같은 시설 발췌(문체·포장만 참고, 내용 복사 금지). 워커는 lessons.off면 생략, 금지 문자열에 걸리면 자료만 빼고 재조립(종전 생성은 막지 않음). 잡 로그 "[학습] 규칙 N건 · 완성본 예시".
+- 관리자 카드(홍보 탭 promoLearnCard, pl_get/pl_set): 켜기/끄기·규칙 삭제·예시 비우기·짝 없음 → 기록 지정·실패 다시. 감사로그 "블로그학습".
+- 검사: servertest 절 48(순수 함수·saveDraft·워커 4경로·크론 ④ 3경로·pl_get/pl_set 9항·배선), uismoke v389(모자이크 워커 불변 포함).

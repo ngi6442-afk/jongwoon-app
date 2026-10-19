@@ -211,7 +211,22 @@ async function startJob(st, opts) {
   return { ok: true, job: job, photo_n: ph.use.length, photo_total: ph.total, photo_capped: ph.total > ph.use.length };
 }
 
+// v389 자동 학습 — 생성 성공 때 초안을 보존한다(applyResult가 기록 본문을 덮고 검수에서 고치면 초안이 사라지므로). 기록당 최근 DRAFT_KEEP건.
+const DRAFT_KEEP = 3;
+function draftKey(promoId) { return `promoai:draft:${promoId}`; }
+async function saveDraft(st, promoId, job, title, body, now) {
+  try {
+    if (!RE_REC_ID.test(String(promoId || '')) || !body) return { ok: false, code: 'BAD_INPUT' };
+    const r = await blobGet(st, draftKey(promoId));
+    const items = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data.items : [];
+    if (items.some(function (x) { return x && job && x.job === job; })) return { ok: true, dup: true };
+    items.push({ job: String(job || ''), title: String(title || '').slice(0, 200), body: String(body || '').slice(0, 12000), ts: now || Date.now() });
+    const w = await blobSet(st, draftKey(promoId), { schema: 1, items: items.slice(-DRAFT_KEEP), updated_at: now || Date.now() });
+    return { ok: !!w.ok, code: w.code };
+  } catch (e) { return { ok: false, code: 'DRAFT_THREW' }; }
+}
+
 module.exports = {
-  USAGE_KEY, MAX_PHOTOS, LOCK_TTL_MS, MONTH_CALL_CAP, RE_REC_ID, RE_ATT, RETRY_MIN, MAX_TRIES, RUNNING_STALE_MS,
-  jobKey, lockKey, kstDate, kstMonth, newJobId, monthUsage, pickPhotoIds, setAiState, applyResult, pickCandidates, updatePromo, kickBackground, startJob,
+  USAGE_KEY, MAX_PHOTOS, LOCK_TTL_MS, MONTH_CALL_CAP, RE_REC_ID, RE_ATT, RETRY_MIN, MAX_TRIES, RUNNING_STALE_MS, DRAFT_KEEP,
+  jobKey, lockKey, draftKey, kstDate, kstMonth, newJobId, monthUsage, pickPhotoIds, setAiState, applyResult, pickCandidates, updatePromo, kickBackground, startJob, saveDraft,
 };

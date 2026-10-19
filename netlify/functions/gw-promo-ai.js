@@ -93,6 +93,67 @@ function monthUsage(doc, month) {
 
 // 현황 — UI가 [사진으로 다시 쓰기] 버튼을 안내로 바꿀지 판단하는 근거.
 // env_ready=false면 앱은 기존 변형 생성기로 그대로 동작한다(계약서 C절 '예비로 유지').
+// ---- v389 자동 학습(PM 10/19) — 관리자 카드: 규칙 창고·예시·간극 추세·짝 목록 조회, 끄기/규칙 삭제/미매칭 짝 지정/재시도 ----
+const PL = require('./_lib/promolearn');
+const LEARN_LIST = 40;
+async function learnPairs(st) {
+  const { blobList } = require('./_lib/blobs');
+  const l = await blobList(st, PL.PAIR_PREFIX);
+  if (!l.ok) return { ok: false, code: l.code || 'LIST_FAILED', pairs: [] };
+  const keys = (l.keys || []).filter(function (k) { return k.indexOf(PL.PAIR_PREFIX) === 0; }).sort().slice(-LEARN_LIST);
+  const out = [];
+  for (const k of keys) {
+    const r = await blobGet(st, k);
+    if (!r.ok || !r.data) continue;
+    const p = r.data;
+    out.push({ id: String(p.id || k.slice(PL.PAIR_PREFIX.length)), status: String(p.status || 'pending'), promo_id: String(p.promo_id || ''), final_title: String(p.final_title || '').slice(0, 80), src_file: String(p.src_file || '').slice(0, 80),
+      ts: Number(p.ts) || 0, tries: Number(p.tries) || 0, code: String(p.code || ''), detail: String(p.detail || '').slice(0, 160), gap: (p.gap && typeof p.gap === 'object') ? p.gap : null, match: (p.match && typeof p.match === 'object') ? { score: Number(p.match.score) || 0, title: String(p.match.title || '').slice(0, 60) } : null, draft_src: String(p.draft_src || ''), summary: String(p.summary || '').slice(0, 200), rules_n: Number(p.rules_n) || 0 });
+  }
+  out.sort(function (a, b) { return b.ts - a.ts; });
+  return { ok: true, pairs: out };
+}
+async function handleLearnGet(st, c, d, R) {
+  if (!c.member.admin) return jr(403, { ok: false, code: 'ADMIN_ONLY', request_id: R });
+  const lr = await blobGet(st, PL.LESSONS_KEY);
+  const L = PL.normLessons(lr.ok ? lr.data : null);
+  const pairs = await learnPairs(st);
+  return jr(200, { ok: true, lessons: { off: L.off, rules: L.rules, exemplars: Object.keys(L.exemplars).map(function (k) { const e = L.exemplars[k]; return { key: k, promo_id: String(e.promo_id || ''), title: String(e.title || ''), ts: Number(e.ts) || 0, chars: String(e.excerpt || '').length }; }), gaps: L.gaps.slice(-20), stats: L.stats, updated_at: L.updated_at, summary: PL.gapSummary(L) },
+    pairs: pairs.pairs, pairs_error: pairs.ok ? '' : pairs.code, request_id: R });
+}
+async function handleLearnSet(st, c, d, R) {
+  if (!c.member.admin) return jr(403, { ok: false, code: 'ADMIN_ONLY', request_id: R });
+  let ev = '';
+  if (typeof d.off === 'boolean' || d.del_rule || d.clear_exemplar) {
+    const lr = await blobGet(st, PL.LESSONS_KEY);
+    if (!lr.ok && lr.code !== 'NOT_FOUND') return jr(500, { ok: false, code: lr.code || 'LESSONS_READ_FAILED', request_id: R });
+    const L = PL.normLessons(lr.ok ? lr.data : null);
+    if (typeof d.off === 'boolean') { L.off = d.off; ev = '자동 학습 ' + (d.off ? '끔' : '켬'); }
+    if (d.del_rule) { const id = String(d.del_rule).slice(0, 20); const before = L.rules.length; L.rules = L.rules.filter(function (r) { return r.id !== id; }); if (L.rules.length === before) return jr(404, { ok: false, code: 'RULE_NOT_FOUND', request_id: R }); ev = '규칙 삭제 ' + id; }
+    if (d.clear_exemplar) { const k = String(d.clear_exemplar).slice(0, 20); if (!L.exemplars[k]) return jr(404, { ok: false, code: 'EXEMPLAR_NOT_FOUND', request_id: R }); delete L.exemplars[k]; ev = '예시 비움 ' + k; }
+    L.updated_at = Date.now();
+    const w = await blobSet(st, PL.LESSONS_KEY, L);
+    if (!w.ok) return jr(500, { ok: false, code: w.code || 'LESSONS_WRITE_FAILED', request_id: R });
+  } else if (d.assign || d.retry) {
+    const pid = String((d.assign && d.assign.pair_id) || d.retry || '').trim();
+    if (!PL.RE_PAIR_ID.test(pid)) return jr(400, { ok: false, code: 'BAD_PAIR_ID', request_id: R });
+    const pr = await blobGet(st, PL.pairKey(pid));
+    if (!pr.ok || !pr.data) return jr(404, { ok: false, code: 'PAIR_NOT_FOUND', request_id: R });
+    const p = pr.data;
+    if (d.assign) {
+      const promoId = String(d.assign.promo_id || '').trim();
+      if (!RE_REC_ID.test(promoId)) return jr(400, { ok: false, code: 'BAD_PROMO_ID', request_id: R });
+      const pm = await blobGet(st, 'col:promo');
+      const items = (pm.ok && pm.data && Array.isArray(pm.data.items)) ? pm.data.items : [];
+      if (!items.some(function (it) { return it && it.id === promoId && it.del !== 1; })) return jr(404, { ok: false, code: 'PROMO_NOT_FOUND', request_id: R });
+      p.promo_id = promoId; p.match = { score: 1, title: '관리자 지정', by: c.member.name }; ev = '짝 지정 ' + pid + ' → ' + promoId;
+    } else ev = '다시 학습 ' + pid;
+    p.status = 'pending'; p.tries = 0; delete p.code; delete p.detail; p.ts = Date.now();
+    const w = await blobSet(st, PL.pairKey(pid), p);
+    if (!w.ok) return jr(500, { ok: false, code: w.code || 'PAIR_WRITE_FAILED', request_id: R });
+  } else return jr(400, { ok: false, code: 'NO_CHANGE', request_id: R });
+  try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'promo', ev: [{ op: '블로그학습', id: '-', t: ev.slice(0, 80) }] }); } catch (e) {}
+  return await handleLearnGet(st, c, d, R);
+}
 async function handleStatus(st, R) {
   const u = await blobGet(st, USAGE_KEY);
   return jr(200, {
@@ -171,6 +232,8 @@ async function handler(event) {
       case 'pa_status': return await handleStatus(st, R);
       case 'pa_generate': return await handleGenerate(st, c, d, R);
       case 'pa_job': return await handleJob(st, c, d, R);
+      case 'pl_get': return await handleLearnGet(st, c, d, R);     // v389 자동 학습 카드(관리자)
+      case 'pl_set': return await handleLearnSet(st, c, d, R);
       default: return jr(400, { ok: false, code: 'UNKNOWN_ACTION', request_id: R });
     }
   } catch (e) {

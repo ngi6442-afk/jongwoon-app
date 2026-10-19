@@ -1471,8 +1471,27 @@ try {
     && /function docViewFile\(d\)/.test(html) && html.indexOf('>보기·인쇄</button>') > 0 && html.indexOf('"원본" : "열기"') > 0 && html.indexOf('원본은 관리부·관리자') > 0 && html.indexOf('열람용 PDF 준비 중') > 0
     && html.indexOf('id="docOrigDl"') > 0 && /odw\.style\.display = isAdmin\(\) \? "block" : "none"/.test(html) && /action: "doc_log_get"/.test(html) && html.indexOf('id="docLogCard"') > 0 && /function docLogRender\(month\)/.test(html)
     && /error_code: 'ORIG_FORBIDDEN'/.test(gwd) && /'doclog:' \+ month/.test(gwd) && /d\.action === 'doc_log_get'/.test(gwd) && /if \(s\.orig_dl !== 'all'\) delete s\.orig_dl;/.test(gwd) && /'scope', 'orig_dl'\]/.test(gwd)
-    && /jw-shell-v388/.test(swv));
+    && /jw-shell-v3(8[89]|9\d)/.test(swv));   // v388 이후 판도 통과(sw 버전은 최신 블록이 정확히 본다)
 } catch (e) { console.log('  (v388 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ---- v389(PM 10/19 "니가 아니라 모델이 학습 — 초안↔직원 수정본 차이를 학습"): 블로그 자동 학습 루프 — 초안 보존·짝 블롭·학습 워커·규칙 창고 주입·관리자 카드. 모자이크 코드 불변 ----
+try {
+  const plsrc = readFileSync(join(ROOT, 'netlify', 'functions', '_lib', 'promolearn.js'), 'utf8');
+  const lw = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-promo-learn-background.js'), 'utf8');
+  const pai = readFileSync(join(ROOT, 'netlify', 'functions', '_lib', 'promoai.js'), 'utf8');
+  const papi = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-promo-ai.js'), 'utf8');
+  const swv = readFileSync(join(ROOT, 'sw.js'), 'utf8');
+  const mask = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-promo-mask-background.js'), 'utf8');
+  T('v389 자동 학습: 라이브러리(규칙 25·예시 1,500자·간극 편집거리·pickPending) · 워커(내부 토큰·LEAK_BLOCKED·NO_DRAFT·잠금 해제) · buildPrompt 주입 블록 2 · pl_get/pl_set(관리자) · 카드(promoLearnCard·renderPromoLearn·끄기·삭제·짝 지정·재시도) · switchTab promo 훅 · 모자이크 워커 facedet/platedet 호출 그대로 · sw v389',
+    /MAX_RULES = 25/.test(plsrc) && /EXEMPLAR_CHARS = 1500/.test(plsrc) && /function levenshtein/.test(plsrc) && /function pickPending/.test(plsrc) && /function kickLearnWorker/.test(plsrc)
+    && /v\.payload\.mid !== '__promoai__'/.test(lw) && /'LEAK_BLOCKED'/.test(lw) && /'NO_DRAFT'/.test(lw) && /PL\.LOCK_KEY, \{ ts: 0, pair: '' \}/.test(lw)
+    && /\[직원이 고치는 패턴 — 자동 학습 /.test(pai) && /\[참고 완성본 — 직원이 다듬어 실제 게시한 글의 앞부분\]/.test(pai) && /inp\.lessons/.test(pai) && /inp\.exemplar/.test(pai)
+    && /case 'pl_get'/.test(papi) && /case 'pl_set'/.test(papi) && /ADMIN_ONLY/.test(papi) && /op: '블로그학습'/.test(papi)
+    && html.indexOf('id="promoLearnCard"') > 0 && /function renderPromoLearn\(\)/.test(html) && /action: "pl_get"/.test(html) && /action: "pl_set"/.test(html) && /data-pl-off/.test(html) && /data-pl-del/.test(html) && /data-pl-assign/.test(html) && /data-pl-retry/.test(html)
+    && /if \(name === "promo"\)\{ renderPromo\(\); loadPromo\(\); renderPromoLearn\(\); \}/.test(html)
+    && /detectFaces|facedet/.test(mask) && /detectPlates|platedet/.test(mask)
+    && /jw-shell-v389/.test(swv));
+} catch (e) { console.log('  (v389 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

@@ -1552,6 +1552,8 @@
     <button class="link-btn" id="promoNewBtn">+ 현장 기록</button>
     <div class="pipe-board" id="promoBoard" style="grid-template-columns:repeat(4,1fr);"></div>
     <div class="card" style="font-size:12px;color:var(--sub);" id="promoVarState"></div>
+    <!-- v389 자동 학습 카드(관리자) — 직원 수정본에서 모델이 뽑은 규칙·완성본 예시·간극 추세·짝 목록. PM 10/19 "니가 아니라 모델이 학습" -->
+    <div class="card" id="promoLearnCard" style="display:none;font-size:12.5px;"></div>
   </section>
 
   <!-- 인사·일용직 (권한 설정 가능) -->
@@ -5395,7 +5397,7 @@
     document.getElementById("view-quote").classList.toggle("active", name === "quote");
     if (name === "quote"){ renderQuotes(); loadQuotes(); }
     document.getElementById("view-promo").classList.toggle("active", name === "promo");
-    if (name === "promo"){ renderPromo(); loadPromo(); }
+    if (name === "promo"){ renderPromo(); loadPromo(); renderPromoLearn(); }   // v389 학습 카드(관리자)
     document.getElementById("view-hwakwan").classList.toggle("active", name === "hwakwan");
     if (name === "hwakwan") renderHwakwan();
     document.getElementById("view-allbaro").classList.toggle("active", name === "allbaro");
@@ -14302,6 +14304,53 @@
       vs.innerHTML="회전 상태 — 직전: "+(lg? esc((PROMO_SCEN_NAMES[lg.sc]||"")+" · "+(PROMO_TITLE_NAMES[lg.ti]||"")) : "없음")
         +" / 다음 기록: <b>"+esc((PROMO_SCEN_NAMES[ng.sc]||"")+" · "+(PROMO_TITLE_NAMES[ng.ti]||""))+"</b> (시설유형은 입력에서 자동 판정 · 발행 시각 분산은 붙여넣는 사람이 지킬 것)";
     }
+  }
+  // ---- v389 자동 학습 카드(관리자) — 서버 pl_get/pl_set. 규칙은 모델이 쓴 것(사람이 쓰지 않는다), 카드는 보고·끄기·삭제·짝 지정만 ----
+  var PL_SCOPE_TXT = { style:"문체", format:"포장", structure:"구성", content:"내용" };
+  var PL_STATUS_TXT = { pending:"대기", running:"학습 중", done:"완료", fail:"실패", unmatched:"짝 없음" };
+  var promoLearnBusy = false;
+  function plFmtTs(ts){ var t = new Date(Number(ts)||0); return isNaN(t.getTime())||!ts ? "" : (String(t.getMonth()+1).padStart(2,"0")+"/"+String(t.getDate()).padStart(2,"0")+" "+String(t.getHours()).padStart(2,"0")+":"+String(t.getMinutes()).padStart(2,"0")); }
+  function plPct(x){ return (x===null||x===undefined||isNaN(Number(x))) ? "—" : (Math.round(Number(x)*1000)/10)+"%"; }
+  function renderPromoLearn(){
+    var host = document.getElementById("promoLearnCard"); if (!host) return;
+    if (!isAdmin()){ host.style.display = "none"; return; }
+    host.style.display = "block";
+    if (!host.innerHTML) host.innerHTML = '<div class="empty-line">자동 학습 현황 불러오는 중…</div>';
+    gwCall("gw-promo-ai", { action: "pl_get" }).then(function(res){ promoLearnDraw(host, res); }).catch(function(){ host.innerHTML = '<div class="empty-line">자동 학습 현황을 불러오지 못했습니다(네트워크).</div>'; });
+  }
+  function promoLearnDraw(host, res){
+    if (res.status !== 200 || !res.body || !res.body.ok){ host.innerHTML = '<div class="empty-line">자동 학습 현황을 불러오지 못했습니다 (' + ((res.body && res.body.code) || res.status) + ')</div>'; return; }
+    var L = res.body.lessons || {}, pairs = res.body.pairs || [], sm = L.summary || {};
+    var h = '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:6px;"><b style="font-size:13.5px;">🧠 자동 학습 — 직원 수정본에서 모델이 배운 것</b>'
+      + '<button type="button" class="mini-btn" data-pl-off="' + (L.off ? "0" : "1") + '" style="margin:0;' + (L.off ? 'background:#FAF0E4;color:#a8651f;' : '') + '">' + (L.off ? "꺼짐 — 켜기" : "켜짐 — 끄기") + '</button>'
+      + '<span style="color:var(--sub);">학습 ' + (L.stats && L.stats.pairs || 0) + '편 · 규칙 ' + (L.rules||[]).length + ' · 예시 ' + (L.exemplars||[]).length + ' · 마지막 ' + (plFmtTs(L.updated_at) || "없음") + '</span></div>';
+    h += '<div style="margin:2px 0 8px;">간극(초안→최종본이 바뀐 비율): 최근 5편 평균 <b>' + (sm.last5_avg===null||sm.last5_avg===undefined ? "—" : sm.last5_avg + "%") + '</b>'
+      + (sm.prev5_avg!==null&&sm.prev5_avg!==undefined ? ' · 그 전 5편 ' + sm.prev5_avg + '%' + (sm.trend==="down" ? ' <span class="dday" style="background:#e3f3ea;color:#1f6b45;">줄어듦</span>' : sm.trend==="up" ? ' <span class="dday amber">늘어남</span>' : '') : '') + ' · 총 ' + (sm.n||0) + '편</div>';
+    var rules = (L.rules||[]).slice().sort(function(a,b){ return (b.n||0)-(a.n||0); });
+    h += '<div style="font-weight:600;margin:4px 0;">규칙 창고 ' + rules.length + '개 <span style="font-weight:400;color:var(--sub);">(모델이 쓴 문장 그대로 — 다음 글 생성에 그대로 들어감 · 틀린 것은 [삭제])</span></div>';
+    h += rules.length ? rules.map(function(r){ return '<div style="display:flex;gap:6px;align-items:flex-start;padding:2px 0;border-bottom:1px solid var(--line);"><span class="scope-chip" style="flex:0 0 auto;">' + esc(PL_SCOPE_TXT[r.scope]||r.scope||"") + '</span><span style="flex:1;">' + esc(r.text||"") + ' <span style="color:var(--sub);">(근거 ' + (r.n||1) + '건)</span></span><button type="button" class="mini-btn" style="margin:0;font-size:11px;padding:1px 6px;" data-pl-del="' + esc(r.id) + '">삭제</button></div>'; }).join("") : '<div class="empty-line">아직 규칙이 없습니다 — 수정본 폴더에 파일이 들어오면 10분 안에 첫 학습이 돕니다.</div>';
+    h += '<div style="font-weight:600;margin:8px 0 4px;">완성본 예시 ' + (L.exemplars||[]).length + '개 <span style="font-weight:400;color:var(--sub);">(시설별 1편 — 같은 시설 글 생성 때 문체·포장 참고용)</span></div>';
+    h += (L.exemplars||[]).length ? (L.exemplars||[]).map(function(e){ return '<div style="padding:2px 0;">📄 <b>' + esc(e.key) + '</b> · ' + esc(e.title||"") + ' <span style="color:var(--sub);">(' + (e.chars||0) + '자 · ' + plFmtTs(e.ts) + ')</span> <button type="button" class="mini-btn" style="margin:0;font-size:11px;padding:1px 6px;" data-pl-clear="' + esc(e.key) + '">비우기</button></div>'; }).join("") : '<div class="empty-line">없음</div>';
+    h += '<div style="font-weight:600;margin:8px 0 4px;">수정본 짝 ' + pairs.length + '건 <span style="font-weight:400;color:var(--sub);">(폴더 → 수집기 → 여기. "짝 없음"은 아래에서 기록을 골라 지정)</span></div>';
+    var live = livePromo().slice().sort(function(a,b){ return (b.ts||0)-(a.ts||0); });
+    h += pairs.length ? '<div style="overflow:auto;"><table style="font-size:12px;border-collapse:collapse;width:100%;"><tr><th style="text-align:left;padding:2px 6px;">파일·제목</th><th style="text-align:left;padding:2px 6px;">짝 기록</th><th style="text-align:left;padding:2px 6px;">상태</th><th style="text-align:left;padding:2px 6px;">간극</th><th></th></tr>'
+      + pairs.map(function(p){
+          var rec = p.promo_id ? promoFind(p.promo_id) : null;
+          var stTxt = PL_STATUS_TXT[p.status] || p.status;
+          var stHtml = p.status === "done" ? '<span class="done-by">✓ ' + stTxt + '</span>' : p.status === "fail" ? '<span class="dday red" title="' + esc(p.detail||"") + '">' + stTxt + (p.code ? ' · ' + esc(p.code) : '') + '</span>' : p.status === "unmatched" ? '<span class="dday amber">' + stTxt + '</span>' : esc(stTxt);
+          var act = '';
+          if (p.status === "unmatched" || (p.status === "fail" && p.code === "NO_PROMO_ID")) act = '<select data-pl-assign="' + esc(p.id) + '" style="font-size:11.5px;max-width:200px;"><option value="">기록 선택…</option>' + live.map(function(r){ return '<option value="' + esc(r.id) + '">' + esc((r.title||"").slice(0,30)) + '</option>'; }).join("") + '</select>';
+          else if (p.status === "fail") act = '<button type="button" class="mini-btn" style="margin:0;font-size:11px;padding:1px 6px;" data-pl-retry="' + esc(p.id) + '">다시</button>';
+          return '<tr><td style="padding:2px 6px;">' + esc(p.final_title || p.src_file || p.id) + (p.src_file ? '<div style="color:var(--sub);font-size:11px;">' + esc(p.src_file) + ' · ' + plFmtTs(p.ts) + '</div>' : '') + '</td><td style="padding:2px 6px;">' + (rec ? esc((rec.title||"").slice(0,30)) + (p.match && p.match.score < 1 ? ' <span style="color:var(--sub);">(유사 ' + Math.round(p.match.score*100) + '%)</span>' : '') : '<span style="color:var(--sub);">—</span>') + '</td><td style="padding:2px 6px;white-space:nowrap;">' + stHtml + '</td><td style="padding:2px 6px;white-space:nowrap;">' + (p.gap ? plPct(p.gap.ratio) + (p.draft_src === "record" ? ' <span style="color:var(--sub);" title="생성 당시 초안이 없어 기록 본문과 비교">(기록)</span>' : '') : '—') + '</td><td style="padding:2px 6px;">' + act + '</td></tr>';
+        }).join("") + '</table></div>' : '<div class="empty-line">아직 올라온 수정본이 없습니다.</div>';
+    h += '<div class="empty-line" style="margin-top:6px;">수정본 폴더: work › 05_홍보_검색노출 › 직원수정본_20260911 (hwp·hwpx·docx·txt·html 아무거나) — 수집기가 09:05·16:05에 새 파일을 올리고, 서버가 10분 안에 학습합니다. 규칙은 사람이 쓰지 않습니다.</div>';
+    host.innerHTML = h;
+    var send = function(chg){ if (promoLearnBusy) return; promoLearnBusy = true; gwCall("gw-promo-ai", Object.assign({ action: "pl_set" }, chg)).then(function(res){ promoLearnBusy = false; if (res.status !== 200){ alert("자동 학습 설정 실패 (" + ((res.body && res.body.code) || res.status) + ")"); return; } promoLearnDraw(host, res); apprToastShow("자동 학습 설정 반영"); }).catch(function(){ promoLearnBusy = false; alert("자동 학습 설정 실패(네트워크)"); }); };
+    Array.prototype.forEach.call(host.querySelectorAll("[data-pl-off]"), function(b){ b.addEventListener("click", function(){ send({ off: b.getAttribute("data-pl-off") === "1" }); }); });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-pl-del]"), function(b){ b.addEventListener("click", function(){ if (!confirm("이 규칙을 지울까요? 다음 학습에서 같은 차이가 또 보이면 다시 생길 수 있습니다.")) return; send({ del_rule: b.getAttribute("data-pl-del") }); }); });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-pl-clear]"), function(b){ b.addEventListener("click", function(){ send({ clear_exemplar: b.getAttribute("data-pl-clear") }); }); });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-pl-retry]"), function(b){ b.addEventListener("click", function(){ send({ retry: b.getAttribute("data-pl-retry") }); }); });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-pl-assign]"), function(s){ s.addEventListener("change", function(){ if (!s.value) return; send({ assign: { pair_id: s.getAttribute("data-pl-assign"), promo_id: s.value } }); }); });
   }
   function promoFind(id){ return promoItems.filter(function(p){ return p&&p.id===id; })[0]||null; }
   function promoOpenDetail(id){

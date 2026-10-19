@@ -1007,6 +1007,22 @@ function buildPrompt(input) {
   const tl = titlePlanLines(plan, recentInfo, safeText, ownInfo);
   if (tl.length) { lines.push(''); tl.forEach(function (l) { lines.push(l); }); }
 
+  // 자동 학습(v389, PM 10/19 "모델이 직원 수정본에서 학습"): 규칙은 모델이 초안↔직원 최종본 차이에서 스스로 뽑아 둔 것(규칙 창고), 예시는 같은 시설의 직원 완성본 발췌.
+  // 둘 다 자료로 받는다 — system 규칙을 덮지 않고, 예시의 지역·수치·문장은 옮겨 쓰지 않는다. 금지 문자열 검사는 워커가 하고 걸리면 이 블록만 빼고 다시 조립한다.
+  const lessons = Array.isArray(inp.lessons) ? inp.lessons.slice(0, 25).map(function (x) { return safeText(x, 160); }).filter(Boolean) : [];
+  if (lessons.length) {
+    lines.push('');
+    lines.push('[직원이 고치는 패턴 — 자동 학습 ' + koCount(lessons.length) + ' 건]  (모델 초안을 직원이 게시 전에 고친 차이에서 뽑은 규칙입니다. 다음 글은 처음부터 이렇게 씁니다.)');
+    lessons.forEach(function (l) { lines.push('- ' + l); });
+  }
+  const ex = (inp.exemplar && typeof inp.exemplar === 'object') ? { title: safeText(inp.exemplar.title, 80), excerpt: String(inp.exemplar.excerpt || '').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '').slice(0, 1600) } : null;
+  if (ex && ex.excerpt) {
+    lines.push('');
+    lines.push('[참고 완성본 — 직원이 다듬어 실제 게시한 글의 앞부분]  (문체·줄 길이·소제목·사진 설명 방식만 참고합니다. 이 글의 지역·시설·수치·문장을 옮겨 쓰지 않습니다.)');
+    if (ex.title) lines.push('제목: ' + ex.title);
+    lines.push(ex.excerpt);
+  }
+
   lines.push('');
   // 이 세 줄은 사진 블록 뒤, 생성 직전에 마지막으로 읽힌다 — system 규칙을 덮어쓰지 않도록 같은 방향으로 맞춘다.
   // (구버전은 여기서 "사진이 글의 중심"이라고 못박아, system을 고쳐도 캡션 나열이 그대로 나왔다.)
