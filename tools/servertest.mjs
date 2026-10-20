@@ -3056,6 +3056,8 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   const NOW48 = 10000000;
   const picked = PL.pickPending([{ id: 'pl_0123456789ab', promo_id: 'p1', status: 'pending', ts: 5 }, { id: 'pl_0123456789ac', promo_id: 'p1', status: 'running', ts: NOW48 - 1000 }, { id: 'pl_0123456789ad', promo_id: '', status: 'unmatched' }, { id: 'pl_0123456789ae', promo_id: 'p1', status: 'fail', tries: 1, ts: NOW48 - 20 * 60000 }, { id: 'pl_0123456789af', promo_id: 'p1', status: 'fail', tries: 3, ts: 1 }, { id: 'bad', promo_id: 'p1' }, { id: 'pl_0123456789a0', promo_id: 'p1', status: 'running', ts: NOW48 - 20 * 60000, tries: 1 }], NOW48).map((p) => p.id);
   T('48 pickPending: pending·죽은 running(15분)·fail 10분 뒤(3회 미만)만 · unmatched·진행 중·상한·id 불량 제외 · ts 오름차순', JSON.stringify(picked) === JSON.stringify(['pl_0123456789ab', 'pl_0123456789ae', 'pl_0123456789a0']), JSON.stringify(picked));
+  const picked391 = PL.pickPending([{ id: 'pl_0123456789b1', promo_id: 'p1', status: 'superseded', ts: 1 }, { id: 'pl_0123456789b2', promo_id: 'p1', status: 'done', ts: 2 }, { id: 'pl_0123456789b3', promo_id: 'p1', status: 'hold', ts: 3 }, { id: 'pl_0123456789b4', promo_id: 'p1', status: 'pending', ts: 4 }], NOW48).map((p) => p.id);
+  T('48(v391) pickPending 화이트리스트: superseded(게시글로 대체)·done·모르는 상태는 집지 않고 pending만', JSON.stringify(picked391) === JSON.stringify(['pl_0123456789b4']), JSON.stringify(picked391));
   // 생성 프롬프트 주입
   const pr1 = lib48.buildPrompt({ region: '포항', facility: '상가 하수구', problem: '막힘', photoCount: 3, lessons: ll, exemplar: { title: ex.title, excerpt: ex.excerpt } });
   const pr0 = lib48.buildPrompt({ region: '포항', facility: '상가 하수구', problem: '막힘', photoCount: 3 });

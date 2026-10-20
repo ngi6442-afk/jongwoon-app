@@ -224,11 +224,11 @@ function pickPending(pairs, now) {
   (Array.isArray(pairs) ? pairs : []).forEach(function (p) {
     if (!p || !RE_PAIR_ID.test(String(p.id || '')) || !RE_REC_ID.test(String(p.promo_id || ''))) return;
     const st = String(p.status || 'pending'), ts = Number(p.ts) || 0, tries = Number(p.tries) || 0;
-    if (st === 'done' || st === 'unmatched') return;
-    if (st === 'running' && now - ts < RUNNING_STALE_MS) return;
-    if (st === 'fail' && (tries >= MAX_TRIES || now - ts < RETRY_WAIT_MS)) return;
-    if (st === 'running' && tries >= MAX_TRIES) return;
-    out.push(p);
+    // v391 화이트리스트 — 집는 상태는 pending · 죽은 running · 재시도 fail 셋만. done·unmatched·superseded(게시글로 대체)·모르는 상태는 손대지 않는다
+    // (10/20 실사고: 블랙리스트라 수집기가 'superseded'로 바꾼 폴더 짝 7건을 크론이 그대로 집어 학습 → 규칙 창고 오염 2차).
+    if (st === 'pending') { out.push(p); return; }
+    if (st === 'running') { if (now - ts >= RUNNING_STALE_MS && tries < MAX_TRIES) out.push(p); return; }
+    if (st === 'fail') { if (tries < MAX_TRIES && now - ts >= RETRY_WAIT_MS) out.push(p); return; }
   });
   out.sort(function (a, b) { return (Number(a.ts) || 0) - (Number(b.ts) || 0); });
   return out;
