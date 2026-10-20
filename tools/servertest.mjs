@@ -3136,6 +3136,11 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   T('48 pl_get 비관리자 → 403', rp.code === 403);
   rp = await callP({ action: 'pl_get' }, tokA);
   T('48 pl_get 관리자: 규칙·예시·간극 요약·짝 목록(최신순)·상태', rp.code === 200 && rp.body.ok && rp.body.lessons.rules.length === 2 && rp.body.lessons.exemplars.length >= 1 && rp.body.lessons.summary.n >= 2 && rp.body.pairs.length >= 5 && rp.body.pairs[0].ts >= rp.body.pairs[1].ts, JSON.stringify(rp.body).slice(0, 200));
+  T('48(v392) pl_get: 포장 프로필 블롭 없으면 layout null', rp.body.layout === null);
+  mem.gw_data['promoai:layout'] = { schema: 1, ts: 5, by: 't', profile: { n_posts: 9, ok: true, center_ratio: 1, bold_ratio: 0.19, len_med: 19, len_p90: 25, gap_default: 1, hr_per_post: 8, tags_med: 61 }, posts: Array.from({ length: 14 }, (_, i) => ({ date: '2026-10-' + (15 - i), paras: 200 + i })) };
+  const rpl = await callP({ action: 'pl_get' }, tokA);
+  T('48(v392) pl_get layout: profile 그대로 · posts 12편 상한 · ts', rpl.code === 200 && rpl.body.layout && rpl.body.layout.profile.len_med === 19 && rpl.body.layout.profile.center_ratio === 1 && rpl.body.layout.posts.length === 12 && rpl.body.layout.ts === 5, JSON.stringify(rpl.body.layout).slice(0, 160));
+  delete mem.gw_data['promoai:layout'];
   const rid48 = rp.body.lessons.rules[0].id;
   rp = await callP({ action: 'pl_set', del_rule: rid48 }, tokA);
   T('48 pl_set 규칙 삭제 → 창고 1개 · 감사로그 블로그학습', rp.code === 200 && rp.body.lessons.rules.length === 1 && !rp.body.lessons.rules.some((r) => r.id === rid48) && auditMock.logs.some((l) => l.col === 'promo' && l.ev[0].op === '블로그학습'));

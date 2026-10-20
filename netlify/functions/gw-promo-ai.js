@@ -117,8 +117,10 @@ async function handleLearnGet(st, c, d, R) {
   const lr = await blobGet(st, PL.LESSONS_KEY);
   const L = PL.normLessons(lr.ok ? lr.data : null);
   const pairs = await learnPairs(st);
+  const lay = await blobGet(st, PL.LAYOUT_KEY);   // v392 포장 측정 프로필(없으면 null — 수집기가 아직 안 올린 것)
+  const layout = (lay.ok && lay.data && typeof lay.data === 'object' && lay.data.profile) ? { ts: Number(lay.data.ts) || 0, profile: lay.data.profile, posts: (Array.isArray(lay.data.posts) ? lay.data.posts : []).slice(0, 12) } : null;
   return jr(200, { ok: true, lessons: { off: L.off, rules: L.rules, exemplars: Object.keys(L.exemplars).map(function (k) { const e = L.exemplars[k]; return { key: k, promo_id: String(e.promo_id || ''), title: String(e.title || ''), ts: Number(e.ts) || 0, chars: String(e.excerpt || '').length }; }), gaps: L.gaps.slice(-20), stats: L.stats, updated_at: L.updated_at, summary: PL.gapSummary(L) },
-    pairs: pairs.pairs, pairs_error: pairs.ok ? '' : pairs.code, request_id: R });
+    pairs: pairs.pairs, pairs_error: pairs.ok ? '' : pairs.code, layout: layout, request_id: R });
 }
 async function handleLearnSet(st, c, d, R) {
   if (!c.member.admin) return jr(403, { ok: false, code: 'ADMIN_ONLY', request_id: R });

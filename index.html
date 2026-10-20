@@ -14321,7 +14321,7 @@
   function promoLearnDraw(host, res){
     if (res.status !== 200 || !res.body || !res.body.ok){ host.innerHTML = '<div class="empty-line">자동 학습 현황을 불러오지 못했습니다 (' + ((res.body && res.body.code) || res.status) + ')</div>'; return; }
     var L = res.body.lessons || {}, pairs = res.body.pairs || [], sm = L.summary || {};
-    var h = '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:6px;"><b style="font-size:13.5px;">🧠 자동 학습 — 직원 수정본에서 모델이 배운 것</b>'
+    var h = '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:6px;"><b style="font-size:13.5px;">🧠 자동 학습 — 실제 게시글과 생성글의 차이에서 모델이 배운 것</b>'
       + '<button type="button" class="mini-btn" data-pl-off="' + (L.off ? "0" : "1") + '" style="margin:0;' + (L.off ? 'background:#FAF0E4;color:#a8651f;' : '') + '">' + (L.off ? "꺼짐 — 켜기" : "켜짐 — 끄기") + '</button>'
       + '<span style="color:var(--sub);">학습 ' + (L.stats && L.stats.pairs || 0) + '편 · 규칙 ' + (L.rules||[]).length + ' · 예시 ' + (L.exemplars||[]).length + ' · 마지막 ' + (plFmtTs(L.updated_at) || "없음") + '</span></div>';
     h += '<div style="margin:2px 0 8px;">간극(초안→최종본이 바뀐 비율): 최근 5편 평균 <b>' + (sm.last5_avg===null||sm.last5_avg===undefined ? "—" : sm.last5_avg + "%") + '</b>'
@@ -14331,7 +14331,23 @@
     h += rules.length ? rules.map(function(r){ return '<div style="display:flex;gap:6px;align-items:flex-start;padding:2px 0;border-bottom:1px solid var(--line);"><span class="scope-chip" style="flex:0 0 auto;">' + esc(PL_SCOPE_TXT[r.scope]||r.scope||"") + '</span><span style="flex:1;">' + esc(r.text||"") + ' <span style="color:var(--sub);">(근거 ' + (r.n||1) + '건)</span></span><button type="button" class="mini-btn" style="margin:0;font-size:11px;padding:1px 6px;" data-pl-del="' + esc(r.id) + '">삭제</button></div>'; }).join("") : '<div class="empty-line">아직 규칙이 없습니다 — 수정본 폴더에 파일이 들어오면 10분 안에 첫 학습이 돕니다.</div>';
     h += '<div style="font-weight:600;margin:8px 0 4px;">완성본 예시 ' + (L.exemplars||[]).length + '개 <span style="font-weight:400;color:var(--sub);">(시설별 1편 — 같은 시설 글 생성 때 문체·포장 참고용)</span></div>';
     h += (L.exemplars||[]).length ? (L.exemplars||[]).map(function(e){ return '<div style="padding:2px 0;">📄 <b>' + esc(e.key) + '</b> · ' + esc(e.title||"") + ' <span style="color:var(--sub);">(' + (e.chars||0) + '자 · ' + plFmtTs(e.ts) + ')</span> <button type="button" class="mini-btn" style="margin:0;font-size:11px;padding:1px 6px;" data-pl-clear="' + esc(e.key) + '">비우기</button></div>'; }).join("") : '<div class="empty-line">없음</div>';
-    h += '<div style="font-weight:600;margin:8px 0 4px;">수정본 짝 ' + pairs.length + '건 <span style="font-weight:400;color:var(--sub);">(폴더 → 수집기 → 여기. "짝 없음"은 아래에서 기록을 골라 지정)</span></div>';
+    // v392 D1 — 포장 측정(실제 게시글의 줄 길이·정렬·간격·구분선·굵게). 수집기가 재서 올리고(promoai:layout), 다음 단계(D3)에서 복사 출력에 그대로 반영된다. 사람 승인 없음.
+    var lay = res.body.layout || null, pf = lay && lay.profile;
+    h += '<div style="font-weight:600;margin:8px 0 4px;">포장 측정 — 실제 게시글 ' + (pf ? (pf.n_posts||0) : 0) + '편 <span style="font-weight:400;color:var(--sub);">(네이버 글의 줄 길이·정렬·간격·구분선·굵게를 수집기가 재서 자동 갱신 · 복사 출력에 반영)</span></div>';
+    if (pf){
+      h += '<div style="display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12.5px;">'
+        + '<span>가운데 정렬 <b>' + Math.round((pf.center_ratio||0)*100) + '%</b></span>'
+        + '<span>한 줄 <b>' + (pf.len_med||0) + '자</b> <span style="color:var(--sub);">(90%가 ' + (pf.len_p90||0) + '자 이하)</span></span>'
+        + '<span>문단 간격 빈 줄 <b>' + (pf.gap_default||1) + '칸</b></span>'
+        + '<span>구분선 편당 <b>' + (pf.hr_per_post||0) + '</b></span>'
+        + '<span>굵게 <b>' + Math.round((pf.bold_ratio||0)*100) + '%</b></span>'
+        + '<span>해시태그 <b>' + (pf.tags_med||0) + '개</b></span>'
+        + '<span style="color:var(--sub);">인사말 ' + Math.round((pf.greet_ratio||0)*100) + '% · 회사 소개 ' + Math.round((pf.org_ratio||0)*100) + '%</span>'
+        + (pf.ok ? '' : ' <span class="dday amber">3편 미만 — 참고만</span>') + '</div>';
+      if (lay.posts && lay.posts.length) h += '<div style="overflow:auto;margin-top:4px;"><table style="font-size:11.5px;border-collapse:collapse;"><tr><th style="text-align:left;padding:1px 6px;">게시</th><th style="padding:1px 6px;">문단</th><th style="padding:1px 6px;">가운데</th><th style="padding:1px 6px;">줄(중앙/90%)</th><th style="padding:1px 6px;">빈 줄</th><th style="padding:1px 6px;">구분선</th><th style="padding:1px 6px;">굵게</th></tr>'
+        + lay.posts.map(function(p){ return '<tr><td style="padding:1px 6px;">' + esc(p.date||"") + '</td><td style="text-align:right;padding:1px 6px;">' + (p.paras||0) + '</td><td style="text-align:right;padding:1px 6px;">' + Math.round((p.center||0)*100) + '%</td><td style="text-align:right;padding:1px 6px;">' + (p.len_med||0) + '/' + (p.len_p90||0) + '</td><td style="text-align:right;padding:1px 6px;">' + (p.blank||0) + '</td><td style="text-align:right;padding:1px 6px;">' + (p.hr||0) + '</td><td style="text-align:right;padding:1px 6px;">' + Math.round((p.bold||0)*100) + '%</td></tr>'; }).join("") + '</table></div>';
+    } else h += '<div class="empty-line">아직 측정된 게시글이 없습니다 (수집기 09:05·16:05).</div>';
+    h += '<div style="font-weight:600;margin:8px 0 4px;">비교 짝 ' + pairs.length + '건 <span style="font-weight:400;color:var(--sub);">(네이버 게시글 자동 + 폴더 수정본. "짝 없음"은 아래에서 기록을 골라 지정)</span></div>';
     var live = livePromo().slice().sort(function(a,b){ return (b.ts||0)-(a.ts||0); });
     h += pairs.length ? '<div style="overflow:auto;"><table style="font-size:12px;border-collapse:collapse;width:100%;"><tr><th style="text-align:left;padding:2px 6px;">파일·제목</th><th style="text-align:left;padding:2px 6px;">짝 기록</th><th style="text-align:left;padding:2px 6px;">상태</th><th style="text-align:left;padding:2px 6px;">간극</th><th></th></tr>'
       + pairs.map(function(p){

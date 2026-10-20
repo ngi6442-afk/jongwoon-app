@@ -14,6 +14,7 @@ const { issueSession } = require('./session');
 const LESSONS_KEY = 'promoai:lessons';
 const PAIR_PREFIX = 'promolearn:in:';
 const LOCK_KEY = 'promolearn:lock';
+const LAYOUT_KEY = 'promoai:layout';     // v392 포장 측정 프로필(수집기가 실제 게시글을 재서 올림 — 줄 길이·정렬·간격·구분선·굵게·회사 소개)
 const MAX_RULES = 25;
 const RULE_CHARS = 120;
 const EXEMPLAR_CHARS = 1500;
@@ -249,7 +250,7 @@ async function kickLearnWorker(pairId) {
 }
 
 module.exports = {
-  LESSONS_KEY, PAIR_PREFIX, LOCK_KEY, MAX_RULES, RULE_CHARS, EXEMPLAR_CHARS, MAX_GAPS, MAX_TRIES, LOCK_TTL_MS, RE_PAIR_ID, RE_REC_ID,
+  LESSONS_KEY, PAIR_PREFIX, LOCK_KEY, LAYOUT_KEY, MAX_RULES, RULE_CHARS, EXEMPLAR_CHARS, MAX_GAPS, MAX_TRIES, LOCK_TTL_MS, RE_PAIR_ID, RE_REC_ID,
   pairKey, draftKey, cleanFinal, stripMarkers, normForGap, levenshtein, gapScore, facilityKey, hash32,
   LEARN_SYSTEM, LEARN_SCHEMA, buildLearnPrompt, normRules, emptyLessons, normLessons, mergeLessons, lessonLines, exemplarFor, gapSummary, pickPending,
   kickLearnWorker,
