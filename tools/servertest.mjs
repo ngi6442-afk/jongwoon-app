@@ -3141,6 +3141,22 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   const rpl = await callP({ action: 'pl_get' }, tokA);
   T('48(v392) pl_get layout: profile 그대로 · posts 12편 상한 · ts', rpl.code === 200 && rpl.body.layout && rpl.body.layout.profile.len_med === 19 && rpl.body.layout.profile.center_ratio === 1 && rpl.body.layout.posts.length === 12 && rpl.body.layout.ts === 5, JSON.stringify(rpl.body.layout).slice(0, 160));
   delete mem.gw_data['promoai:layout'];
+  // v394 포장 간극·pl_layout·copy_save
+  const lg = PL.layoutGap([['안녕하세요.', 'c'], ['왜 막히나요?', 'c'], ['', ''], ['상가 하수구는 기름이 굳어 막힙니다.', 'c'], ['', 'i']], [['안녕하세요.', 'cb'], ['', 'h'], ['왜 막히나요?', 'cb'], ['', 'c'], ['', 'c'], ['상가 하수구는 기름이 굳어 막힙니다', 'c'], ['새로 넣은 줄', 'c'], ['', 'i'], ['', 'i']]);
+  T('48(v394) layoutGap: 줄 일치(문장부호·공백 무시) 3/4 · 굵게 차 + · 구분선 +1 · 사진 +1 · 빈 줄 차 +', lg.line_match === 0.75 && lg.bold_d > 0 && lg.hr_d === 1 && lg.img_d === 1 && lg.blank_d > 0 && lg.n_final === 4, JSON.stringify(lg));
+  let rl = await callP({ action: 'pl_layout' }, tokA);
+  T('48(v394) pl_layout: 블롭 없으면 profile null·200', rl.code === 200 && rl.body.ok && rl.body.profile === null, JSON.stringify(rl.body).slice(0, 120));
+  mem.gw_data['promoai:layout'] = { schema: 2, ts: 7, profile: { n_posts: 9, ok: true, sig_kept_ratio: 0, head_hr_ratio: 0.75 }, posts: [] };
+  rl = await callP({ action: 'pl_layout' }, tokA);
+  T('48(v394) pl_layout: 프로필 그대로(홍보 권한) · posts는 안 보냄', rl.code === 200 && rl.body.profile.head_hr_ratio === 0.75 && rl.body.ts === 7 && rl.body.posts === undefined, JSON.stringify(rl.body).slice(0, 160));
+  delete mem.gw_data['promoai:layout'];
+  let cs = await callP({ action: 'copy_save', promo_id: 'bad id', lines: [['a', 'c']] }, tokA);
+  T('48(v394) copy_save: 기록 id 불량 → 400', cs.code === 400 && cs.body.code === 'BAD_PROMO_ID');
+  cs = await callP({ action: 'copy_save', promo_id: 'pl1', lines: [] }, tokA);
+  T('48(v394) copy_save: 줄 없음 → 400', cs.code === 400 && cs.body.code === 'NO_LINES');
+  cs = await callP({ action: 'copy_save', promo_id: 'pl1', lines: [['안녕하세요.', 'c<x>b'], ['', 'h'], 'junk', ['x'.repeat(300), 'cb']] }, tokA);
+  const cpb = mem.gw_data['promoai:copy:pl1'];
+  T('48(v394) copy_save: 저장 · 표식은 c/b/i/h만 · 200자 절단 · 배열 아닌 줄은 빈 줄로 · by', cs.code === 200 && cs.body.n === 4 && cpb && cpb.lines[0][1] === 'cb' && cpb.lines[1][1] === 'h' && cpb.lines[2][0] === '' && cpb.lines[3][0].length === 200 && cpb.by, JSON.stringify(cpb).slice(0, 160));
   const rid48 = rp.body.lessons.rules[0].id;
   rp = await callP({ action: 'pl_set', del_rule: rid48 }, tokA);
   T('48 pl_set 규칙 삭제 → 창고 1개 · 감사로그 블로그학습', rp.code === 200 && rp.body.lessons.rules.length === 1 && !rp.body.lessons.rules.some((r) => r.id === rid48) && auditMock.logs.some((l) => l.col === 'promo' && l.ev[0].op === '블로그학습'));

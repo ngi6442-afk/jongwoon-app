@@ -5397,7 +5397,7 @@
     document.getElementById("view-quote").classList.toggle("active", name === "quote");
     if (name === "quote"){ renderQuotes(); loadQuotes(); }
     document.getElementById("view-promo").classList.toggle("active", name === "promo");
-    if (name === "promo"){ renderPromo(); loadPromo(); renderPromoLearn(); }   // v389 학습 카드(관리자)
+    if (name === "promo"){ renderPromo(); loadPromo(); renderPromoLearn(); promoLoadLayoutProf(); }   // v389 학습 카드(관리자) · v394 포장 프로필(복사 출력용)
     document.getElementById("view-hwakwan").classList.toggle("active", name === "hwakwan");
     if (name === "hwakwan") renderHwakwan();
     document.getElementById("view-allbaro").classList.toggle("active", name === "allbaro");
@@ -14368,7 +14368,7 @@
           var act = '';
           if (p.status === "unmatched" || (p.status === "fail" && p.code === "NO_PROMO_ID")) act = '<select data-pl-assign="' + esc(p.id) + '" style="font-size:11.5px;max-width:200px;"><option value="">기록 선택…</option>' + live.map(function(r){ return '<option value="' + esc(r.id) + '">' + esc((r.title||"").slice(0,30)) + '</option>'; }).join("") + '</select>';
           else if (p.status === "fail") act = '<button type="button" class="mini-btn" style="margin:0;font-size:11px;padding:1px 6px;" data-pl-retry="' + esc(p.id) + '">다시</button>';
-          return '<tr><td style="padding:2px 6px;">' + esc(p.final_title || p.src_file || p.id) + (p.src_file ? '<div style="color:var(--sub);font-size:11px;">' + esc(p.src_file) + ' · ' + plFmtTs(p.ts) + '</div>' : '') + '</td><td style="padding:2px 6px;">' + (rec ? esc((rec.title||"").slice(0,30)) + (p.match && p.match.score < 1 ? ' <span style="color:var(--sub);">(유사 ' + Math.round(p.match.score*100) + '%)</span>' : '') : '<span style="color:var(--sub);">—</span>') + '</td><td style="padding:2px 6px;white-space:nowrap;">' + stHtml + '</td><td style="padding:2px 6px;white-space:nowrap;">' + (p.gap ? plPct(p.gap.ratio) + (p.draft_src === "record" ? ' <span style="color:var(--sub);" title="생성 당시 초안이 없어 기록 본문과 비교">(기록)</span>' : '') : '—') + '</td><td style="padding:2px 6px;">' + act + '</td></tr>';
+          return '<tr><td style="padding:2px 6px;">' + esc(p.final_title || p.src_file || p.id) + (p.src_file ? '<div style="color:var(--sub);font-size:11px;">' + esc(p.src_file) + ' · ' + plFmtTs(p.ts) + '</div>' : '') + '</td><td style="padding:2px 6px;">' + (rec ? esc((rec.title||"").slice(0,30)) + (p.match && p.match.score < 1 ? ' <span style="color:var(--sub);">(유사 ' + Math.round(p.match.score*100) + '%)</span>' : '') : '<span style="color:var(--sub);">—</span>') + '</td><td style="padding:2px 6px;white-space:nowrap;">' + stHtml + '</td><td style="padding:2px 6px;white-space:nowrap;">' + (p.gap ? plPct(p.gap.ratio) + (p.draft_src === "record" ? ' <span style="color:var(--sub);" title="생성 당시 초안이 없어 기록 본문과 비교">(기록)</span>' : '') + (p.gap.layout && p.gap.layout.line_match !== null && p.gap.layout.line_match !== undefined ? '<div style="color:var(--sub);font-size:11px;" title="앱 복사본 줄 중 게시글에 그대로 남은 비율 · 구분선 차">포장 ' + Math.round(p.gap.layout.line_match*100) + '% · 구분선 ' + (p.gap.layout.hr_d>0?'+':'') + p.gap.layout.hr_d + '</div>' : '') : '—') + '</td><td style="padding:2px 6px;">' + act + '</td></tr>';
         }).join("") + '</table></div>' : '<div class="empty-line">아직 올라온 수정본이 없습니다.</div>';
     h += '<div class="empty-line" style="margin-top:6px;">수정본 폴더: work › 05_홍보_검색노출 › 직원수정본_20260911 (hwp·hwpx·docx·txt·html 아무거나) — 수집기가 09:05·16:05에 새 파일을 올리고, 서버가 10분 안에 학습합니다. 규칙은 사람이 쓰지 않습니다.</div>';
     host.innerHTML = h;
@@ -14645,6 +14645,10 @@
   // 정규식·번호 해석은 서버 promoai.js(RE_MARK_BR/RE_MARK_NB/pushSpec)와 자구까지 동일해야 한다(uismoke가 대조).
   // 콜론은 전각(：)도 받는다 — 같은 모델이 제목 구분자로 전각 콜론을 낸 전력이 parseDraft에 박제돼 있다.
   // 스펙은 숫자로 시작해야 마커다 — "사진 : 참고용" 같은 번호 없는 줄을 삼켜 조용히 지우는 사고 방지.
+  // v394 — 아래 @promo-post 구간은 tools/promo_post_check.mjs가 그대로 떼어 node에서 돌린다(복사 출력이 포장 프로필을 제대로 적용하는지 회귀 검사). 마커 줄에는 다른 글자를 두지 않는다.
+  // @promo-post-start
+  var promoLayoutProf=null;   // v394 포장 프로필(pl_layout) — 실제 게시글에서 수집기가 잰 값. ok일 때만 복사 출력에 적용. 사람 승인 없음.
+  var PROMO_HR='<hr>';        // 소제목 앞 구분선(직원 실측 75%) — 네이버 편집기가 구분선 모듈로 받는지 1회 실험(D3)
   var PROMO_MARK_RE=/\[\s*사진\s*([0-9][0-9,\s~\-–·과번]*?)\s*(?:[:：]([^\]]*))?\]/g;
   var PROMO_MARK_NB_RE=/^\s*[-*•]?\s*사진\s*([0-9][0-9,\s~\-–·과번]*?)\s*[:：](.*)$/;
   function promoMarkNums(spec){
@@ -14751,8 +14755,11 @@
     return out;
   }
   // @promo-wrap-end
-  function promoBuildPostHtml(title, body, imgs, tags){
+  function promoBuildPostHtml(title, body, imgs, tags, prof){
     // imgs[i] = {url,name} (i는 0-based, 마커 번호는 1-based). tags = 기록 태그(v367 꼬리 해시태그)
+    // v394 prof = 포장 프로필(없으면 전역 promoLayoutProf). ok일 때 직원이 손으로 하던 포장 5가지를 자동 적용:
+    //   ① 서명 3줄 삭제(sig_kept_ratio<0.3) ② 인사말 줄별 굵게(greet_bold≥0.5) ③ 소제목 굵게(head_bold_ratio≥0.5) ④ 소제목 앞 구분선(head_hr_ratio≥0.5) ⑤ 문단 경계 빈 줄(blank_per_para≥0.15)
+    var P=prof||promoLayoutProf, useP=!!(P&&P.ok);
     var used={}, out=[], lines=String(body||"").split(/\r?\n/), org=promoOrgOf(body);
     var imgCount=0;     // 들어간 사진 수 — 줄 단위로 늘었는지 보고 고아 삽입점을 정한다
     var orphanAt=-1;    // 남은 사진을 끼울 위치 — 마지막 사진이 든 "줄의 처리가 끝난 지점".
@@ -14767,12 +14774,18 @@
     // v363(PM 9/16 "줄간·문장간격 다 일치하지 않음"): 22자 기계 개행(<br>)·문단 여백 12px·소제목 구분선/굵게를 버리고, 직원 실측대로
     //   의미 단위 줄나눔(promoLinesOf) + 한 줄=한 문단(여백 0, 빈 줄 0, 구분선 0). 네이버 편집기에 붙이면 줄마다 한 문단이 된다.
     function promoIsSubhead(t){ return t.length<=45 && /[?？]$/.test(t) && t.indexOf(". ")<0; }   // 프롬프트 규칙: 질문형 소제목은 기호 없는 한 줄
-    function pushLine(l){ out.push('<p style="margin:0;line-height:1.8;text-align:center;">'+promoEscHtml(l)+'</p>'); }
+    function pushLine(l, bold){ out.push('<p style="margin:0;line-height:1.8;text-align:center;">'+(bold? '<b>'+promoEscHtml(l)+'</b>' : promoEscHtml(l))+'</p>'); }
     function pushBlank(){ if(out.length && out[out.length-1]!==PROMO_BLANK) out.push(PROMO_BLANK); }   // v367: 빈 줄은 연달아 두 개 안 만든다
+    function pushHr(){ if(out.length && out[out.length-1]!==PROMO_HR) out.push(PROMO_HR); }            // v394: 구분선도 연달아 두 개 안 만든다
     function pushText(t){
       t=String(t||"").trim(); if(!t) return;
-      if(promoIsSubhead(t)){ pushBlank(); pushLine(t); return; }   // 소제목은 한 줄 그대로(끊지 않음) + 앞에 빈 줄(v367 직원판)
-      promoLinesOf(t).forEach(pushLine);
+      if(promoIsSubhead(t)){   // 소제목은 한 줄 그대로(끊지 않음) + 앞에 빈 줄(v367 직원판) + v394 프로필대로 구분선·굵게
+        pushBlank();
+        if(useP && (P.head_hr_ratio||0)>=0.5) pushHr();
+        pushLine(t, useP && (P.head_bold_ratio||0)>=0.5);
+        return;
+      }
+      promoLinesOf(t).forEach(function(l){ pushLine(l,false); });
     }
     function pushNums(nums, cap){
       // v367(PM 9/21 "직원판에 맞춰라"): 사진 묶음 위·아래에 빈 줄, 캡션은 싣지 않는다(직원은 사진 설명 칸을 전부 비운다 — 9/21 실측 0/11). cap은 받아 두기만(마커 설명은 본문에서 이미 뺐다).
@@ -14809,8 +14822,12 @@
       }
       pushText(ln);
     }
-    promoHeadLines(org).forEach(pushLine); pushBlank();   // v367: 고정 머리(서명 3줄 + 인사말) + 빈 줄
+    // v367: 고정 머리(서명 3줄 + 인사말) + 빈 줄 → v394: 직원이 서명 3줄을 매번 지우면(유지율<30%) 인사말만, 인사말 줄은 실측 비율대로 굵게
+    var headLines = (useP && (P.sig_kept_ratio||0)<0.3) ? PROMO_GREET[org==="con"?"con":"env"] : promoHeadLines(org);
+    var gbold = (useP && P.greet_bold && typeof P.greet_bold==="object") ? P.greet_bold : {};
+    headLines.forEach(function(l){ pushLine(l, (gbold[l]||0)>=0.5); }); pushBlank();
     lines.forEach(function(ln){
+      if(!String(ln).trim()){ if(useP && (P.blank_per_para||0)>=0.15) pushBlank(); return; }   // v394: 문단 경계 빈 줄(직원 실측 문단당 0.26) — 프로필 없으면 예전처럼 버린다
       var before=imgCount;
       handleLine(ln);
       if(imgCount>before) orphanAt=out.length;   // 이 줄에서 사진이 들어갔다 — 줄 끝(설명 문장 포함) 뒤가 삽입점
@@ -14827,6 +14844,30 @@
       else out.push(note, rest.join(""));
     }
     return '<h2 style="font-size:20px;margin:0 0 16px;text-align:center;">'+promoEscHtml(title)+'</h2>'+out.join("")+promoTailHtml(org)+promoTagsHtml(tags);   // v367: 꼬리 뒤 해시태그(직원판)
+  }
+  // v394 — 복사 HTML → 줄 계획 [[텍스트, 표식]] (c 가운데·b 굵게, 빈 줄 ['',''], 사진 ['','i'], 구분선 ['','h']). 서버 copy_save → 학습 워커가 게시글 줄 배치와 비교(포장 간극)
+  function promoPlanOfHtml(html){
+    var plan=[];
+    try{
+      var doc=new DOMParser().parseFromString('<!doctype html><body>'+html+'</body>', 'text/html');
+      var kids=doc.body.children;
+      for(var i=0;i<kids.length && plan.length<600;i++){
+        var el=kids[i], tag=el.tagName;
+        if(el.className && String(el.className).indexOf("jw-nocopy")>=0) continue;
+        if(tag==="H2") continue;
+        if(tag==="HR"){ plan.push(["","h"]); continue; }
+        if(el.querySelector && el.querySelector("img")){ plan.push(["","i"]); continue; }
+        var t=String(el.textContent||"").replace(/ /g," ").replace(/\s+/g," ").trim();
+        var st=String(el.getAttribute("style")||"");
+        var f=(/text-align:\s*center/.test(st)?"c":"")+((el.querySelector && el.querySelector("b,strong")) || /font-weight:\s*(700|bold)/.test(st) ? "b":"");
+        plan.push([t.slice(0,200), t? f : ""]);
+      }
+    }catch(e){}
+    return plan;
+  }
+  // @promo-post-end
+  function promoLoadLayoutProf(){   // v394 홍보 탭에 들어올 때 1회 — 실패해도 복사는 예전 방식으로 그대로 된다
+    gwCall("gw-promo-ai",{action:"pl_layout"}).then(function(res){ if(res.status===200 && res.body && res.body.ok) promoLayoutProf = res.body.profile || null; }).catch(function(){});
   }
   function promoOpenPost(){
     var p=promoDetId? promoFind(promoDetId) : null; if(!p) return;
@@ -14870,6 +14911,7 @@
       var innerWeb = webImgs? promoBuildPostHtml(title, body, webImgs, p.tags) : "";
       var innerData = promoBuildPostHtml(title, body, got, p.tags);
       var inner = innerWeb || innerData;
+      try{ var plan=promoPlanOfHtml(innerData); if(plan.length) gwCall("gw-promo-ai",{action:"copy_save",promo_id:p.id,lines:plan}).catch(function(){}); }catch(e){}   // v394 포장 간극용 줄 계획(실패해도 복사 흐름 무관)
       var miss=0; got.forEach(function(g){ if(!g) miss++; });
       // 태그 — 모델이 낸 tags(기록에 저장됨). 본문과 따로 두고 태그칸에 따로 붙여넣는다.
       var tg=(p.tags&&p.tags.length)? p.tags : ((paResults[p.id]&&paResults[p.id].tags)||[]);

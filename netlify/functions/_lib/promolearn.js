@@ -15,6 +15,28 @@ const LESSONS_KEY = 'promoai:lessons';
 const PAIR_PREFIX = 'promolearn:in:';
 const LOCK_KEY = 'promolearn:lock';
 const LAYOUT_KEY = 'promoai:layout';     // v392 포장 측정 프로필(수집기가 실제 게시글을 재서 올림 — 줄 길이·정렬·간격·구분선·굵게·회사 소개)
+const COPY_PREFIX = 'promoai:copy:';     // v394 복사 때 앱이 내보낸 줄 계획([텍스트, 표식]) — 게시글 final_layout과 비교해 포장 간극을 잰다
+function copyKey(id) { return COPY_PREFIX + String(id || ''); }
+function normLine(t) { return String(t || '').replace(/\s+/g, '').replace(/[.,!?？！·…\-–—"'“”‘’()\[\]]/g, ''); }
+// 포장 간극 — 앱 복사본 줄 계획 ↔ 게시글 줄 배치. line_match = 게시글 글 줄 중 복사본에 같은 줄이 있는 비율(정규화), 나머지는 차이(게시글 − 복사본).
+function layoutGap(copyLines, finalLines) {
+  const C = Array.isArray(copyLines) ? copyLines : [], F = Array.isArray(finalLines) ? finalLines : [];
+  const txt = function (L) { return L.filter(function (x) { return x && x[0] && x[1] !== 'i' && x[1] !== 'h'; }); };
+  const cnt = function (L, f) { return L.filter(function (x) { return x && x[1] === f && !x[0]; }).length; };
+  const blanks = function (L) { return L.filter(function (x) { return x && !x[0] && x[1] !== 'i' && x[1] !== 'h'; }).length; };
+  const ct = txt(C), ft = txt(F);
+  const set = Object.create(null); ct.forEach(function (x) { set[normLine(x[0])] = 1; });
+  let hit = 0; ft.forEach(function (x) { if (set[normLine(x[0])]) hit++; });
+  const ratio = function (L, ch) { return L.length ? L.filter(function (x) { return String(x[1] || '').indexOf(ch) >= 0; }).length / L.length : 0; };
+  return {
+    line_match: ft.length ? Math.round(1000 * hit / ft.length) / 1000 : null,
+    bold_d: Math.round(100 * (ratio(ft, 'b') - ratio(ct, 'b'))) / 100,
+    center_d: Math.round(100 * (ratio(ft, 'c') - ratio(ct, 'c'))) / 100,
+    hr_d: cnt(F, 'h') - cnt(C, 'h'), img_d: cnt(F, 'i') - cnt(C, 'i'),
+    blank_d: Math.round(100 * ((ft.length ? blanks(F) / ft.length : 0) - (ct.length ? blanks(C) / ct.length : 0))) / 100,
+    n_copy: ct.length, n_final: ft.length,
+  };
+}
 const MAX_RULES = 25;
 const RULE_CHARS = 120;
 const EXEMPLAR_CHARS = 1500;
@@ -185,7 +207,8 @@ function mergeLessons(oldL, out, ctx) {
   L.rules = rules;
   const fk = String(ctx.facility || 'default');
   L.exemplars[fk] = { promo_id: String(ctx.promo_id || ''), title: String(ctx.final_title || '').slice(0, 80), excerpt: stripMarkers(ctx.final_body).slice(0, EXEMPLAR_CHARS), ts: now, gap: ctx.gap ? ctx.gap.ratio : null };
-  L.gaps.push({ promo_id: String(ctx.promo_id || ''), pair: String(ctx.pair_id || ''), ts: now, ratio: ctx.gap ? ctx.gap.ratio : null, lines_d: ctx.gap ? ctx.gap.lines_d : 0, heads_d: ctx.gap ? ctx.gap.heads_d : 0, photos_d: ctx.gap ? ctx.gap.photos_d : 0, summary: String(ctx.summary || '').slice(0, 200) });
+  L.gaps.push({ promo_id: String(ctx.promo_id || ''), pair: String(ctx.pair_id || ''), ts: now, ratio: ctx.gap ? ctx.gap.ratio : null, lines_d: ctx.gap ? ctx.gap.lines_d : 0, heads_d: ctx.gap ? ctx.gap.heads_d : 0, photos_d: ctx.gap ? ctx.gap.photos_d : 0, summary: String(ctx.summary || '').slice(0, 200),
+    layout: (ctx.gap && ctx.gap.layout) ? { line_match: ctx.gap.layout.line_match, hr_d: ctx.gap.layout.hr_d, bold_d: ctx.gap.layout.bold_d, blank_d: ctx.gap.layout.blank_d } : null });   // v394 포장 간극(복사본 줄 계획이 있을 때만)
   if (L.gaps.length > MAX_GAPS) L.gaps = L.gaps.slice(-MAX_GAPS);
   L.stats.pairs = (Number(L.stats.pairs) || 0) + 1;
   L.stats.calls = (Number(L.stats.calls) || 0) + 1;
@@ -250,7 +273,7 @@ async function kickLearnWorker(pairId) {
 }
 
 module.exports = {
-  LESSONS_KEY, PAIR_PREFIX, LOCK_KEY, LAYOUT_KEY, MAX_RULES, RULE_CHARS, EXEMPLAR_CHARS, MAX_GAPS, MAX_TRIES, LOCK_TTL_MS, RE_PAIR_ID, RE_REC_ID,
+  LESSONS_KEY, PAIR_PREFIX, LOCK_KEY, LAYOUT_KEY, COPY_PREFIX, copyKey, layoutGap, MAX_RULES, RULE_CHARS, EXEMPLAR_CHARS, MAX_GAPS, MAX_TRIES, LOCK_TTL_MS, RE_PAIR_ID, RE_REC_ID,
   pairKey, draftKey, cleanFinal, stripMarkers, normForGap, levenshtein, gapScore, facilityKey, hash32,
   LEARN_SYSTEM, LEARN_SCHEMA, buildLearnPrompt, normRules, emptyLessons, normLessons, mergeLessons, lessonLines, exemplarFor, gapSummary, pickPending,
   kickLearnWorker,

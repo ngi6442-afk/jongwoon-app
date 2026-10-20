@@ -122,6 +122,29 @@ async function handleLearnGet(st, c, d, R) {
   return jr(200, { ok: true, lessons: { off: L.off, rules: L.rules, exemplars: Object.keys(L.exemplars).map(function (k) { const e = L.exemplars[k]; return { key: k, promo_id: String(e.promo_id || ''), title: String(e.title || ''), ts: Number(e.ts) || 0, chars: String(e.excerpt || '').length }; }), gaps: L.gaps.slice(-20), stats: L.stats, updated_at: L.updated_at, summary: PL.gapSummary(L) },
     pairs: pairs.pairs, pairs_error: pairs.ok ? '' : pairs.code, layout: layout, request_id: R });
 }
+// v394 — 복사 출력이 읽는 포장 프로필(홍보 권한이면 누구나). 사람 승인 없음: 수집기가 올린 그대로.
+async function handleLayoutGet(st, c, d, R) {
+  if (promoPerm(c.member) === 'hide') return jr(403, { ok: false, code: 'NO_PERMISSION', request_id: R });
+  const lay = await blobGet(st, PL.LAYOUT_KEY);
+  if (!lay.ok && lay.code !== 'NOT_FOUND') return jr(500, { ok: false, code: lay.code || 'LAYOUT_READ_FAILED', request_id: R });
+  const ok = lay.ok && lay.data && typeof lay.data === 'object' && lay.data.profile && typeof lay.data.profile === 'object';
+  return jr(200, { ok: true, profile: ok ? lay.data.profile : null, ts: ok ? (Number(lay.data.ts) || 0) : 0, request_id: R });
+}
+// v394 — 복사 창이 연 순간의 줄 계획([텍스트, 표식]) 저장. 기록당 1건(최신), 600줄·200자 상한. 학습 워커가 게시글과 비교해 포장 간극을 잰다.
+const COPY_MAX_LINES = 600;
+async function handleCopySave(st, c, d, R) {
+  if (promoPerm(c.member) === 'hide') return jr(403, { ok: false, code: 'NO_PERMISSION', request_id: R });
+  const pid = String(d.promo_id || '').trim();
+  if (!PL.RE_REC_ID.test(pid)) return jr(400, { ok: false, code: 'BAD_PROMO_ID', request_id: R });
+  if (!Array.isArray(d.lines) || !d.lines.length) return jr(400, { ok: false, code: 'NO_LINES', request_id: R });
+  const lines = d.lines.slice(0, COPY_MAX_LINES).map(function (x) {
+    const t = Array.isArray(x) ? String(x[0] || '').slice(0, 200) : '', f = Array.isArray(x) ? String(x[1] || '').replace(/[^cbih]/g, '').slice(0, 3) : '';
+    return [t, f];
+  });
+  const w = await blobSet(st, PL.copyKey(pid), { schema: 1, ts: Date.now(), by: String((c.member && c.member.id) || ''), lines: lines });
+  if (!w.ok) return jr(500, { ok: false, code: w.code || 'COPY_WRITE_FAILED', request_id: R });
+  return jr(200, { ok: true, n: lines.length, request_id: R });
+}
 async function handleLearnSet(st, c, d, R) {
   if (!c.member.admin) return jr(403, { ok: false, code: 'ADMIN_ONLY', request_id: R });
   let ev = '';
@@ -236,6 +259,8 @@ async function handler(event) {
       case 'pa_job': return await handleJob(st, c, d, R);
       case 'pl_get': return await handleLearnGet(st, c, d, R);     // v389 자동 학습 카드(관리자)
       case 'pl_set': return await handleLearnSet(st, c, d, R);
+      case 'pl_layout': return await handleLayoutGet(st, c, d, R);   // v394 포장 프로필(홍보 권한 — 복사 출력이 읽는다)
+      case 'copy_save': return await handleCopySave(st, c, d, R);   // v394 복사 때 줄 계획 저장(포장 간극 측정용)
       default: return jr(400, { ok: false, code: 'UNKNOWN_ACTION', request_id: R });
     }
   } catch (e) {

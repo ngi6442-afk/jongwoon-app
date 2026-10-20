@@ -149,7 +149,7 @@ try {
     && /if\(auto\)\{ if\(paAutoQueue\.indexOf\(promoId\)<0\) paAutoQueue\.push\(promoId\); \}/.test(idx) && (idx.match(/paDrainAuto\(\);/g) || []).length === 4
     && /promoAiLine\(p\)/.test(idx) && /' · 태그 '\+\(\(p\.tags\|\|\[\]\)\.length\)\+'개'/.test(idx) && /" · 태그 "\+\(\(r\.tags&&r\.tags\.length\)\|\|0\)\+"개"/.test(idx), '');
   // v352(PM 9/11 #31ⓑ — 직원 수정본 5편 실측): 담당자 포장 = 가운데 정렬·20자 개행·소제목 굵게+구분선·물음표·정화조/저수조 삭제
-  const bp = (idx.match(/function promoBuildPostHtml\(title, body, imgs, tags\)\{([\s\S]*?)\n  \}/) || ['', ''])[1];
+  const bp = (idx.match(/function promoBuildPostHtml\(title, body, imgs, tags, prof\)\{([\s\S]*?)\n  \}/) || ['', ''])[1];   // v394: prof 인자
   const abl366 = readFileSync(join(ROOT, 'netlify/functions/_lib/allbaro.js'), 'utf8'), abw366 = readFileSync(join(ROOT, 'netlify/functions/gw-allbaro-run-background.js'), 'utf8');
   {
     const ct = (idx.match(/\/\/ @ct-radar-start([\s\S]*?)\/\/ @ct-radar-end/) || ['', ''])[1];
@@ -254,9 +254,9 @@ try {
   const wrapSrc = (idx.match(/\/\/ @promo-wrap-start([\s\S]*?)\/\/ @promo-wrap-end/) || ['', ''])[1];
   T('v363·v367 복사 HTML 서식(직원판): 줄나눔 구간(@promo-wrap) 12~26자·promoLinesOf·뒤보기 없음 · pushText=한 줄=한 <p>(margin:0) · 소제목 앞 pushBlank · 사진 묶음 위아래 pushBlank·캡션 없음 · 고정 머리(PROMO_HEAD_SIG 3줄+PROMO_GREET env/con)+빈 줄 · 꼬리 promoTailHtml(org)+promoTagsHtml(5개씩) · 호출부 p.tags · 제목 h2 가운데 · 꼬리 5곳 가운데',
     /var PROMO_WRAP_LO=12, PROMO_WRAP_HI=26;/.test(wrapSrc) && /function promoWrapSense\(t, lo, hi, commaFirst\)/.test(wrapSrc) && /function promoLinesOf\(t\)/.test(wrapSrc) && !/\(\?<[=!]/.test(wrapSrc)
-    && /function promoIsSubhead\(t\)\{ return t\.length<=45 && \/\[\?？\]\$\/\.test\(t\)/.test(bp) && /function pushLine\(l\)\{ out\.push\('<p style="margin:0;line-height:1\.8;text-align:center;">'\+promoEscHtml\(l\)\+'<\/p>'\); \}/.test(bp)
-    && /function pushBlank\(\)\{ if\(out\.length && out\[out\.length-1\]!==PROMO_BLANK\) out\.push\(PROMO_BLANK\); \}/.test(bp) && /if\(promoIsSubhead\(t\)\)\{ pushBlank\(\); pushLine\(t\); return; \}/.test(bp) && /promoLinesOf\(t\)\.forEach\(pushLine\);/.test(bp)
-    && /if\(tags\.length\)\{ pushBlank\(\); tags\.forEach\(function\(t\)\{ out\.push\(t\); \}\); pushBlank\(\); \}/.test(bp) && !/color:#777;font-size:13px/.test(bp) && /promoHeadLines\(org\)\.forEach\(pushLine\); pushBlank\(\);/.test(bp)
+    && /function promoIsSubhead\(t\)\{ return t\.length<=45 && \/\[\?？\]\$\/\.test\(t\)/.test(bp) && /function pushLine\(l, bold\)\{ out\.push\('<p style="margin:0;line-height:1\.8;text-align:center;">'\+\(bold\? '<b>'\+promoEscHtml\(l\)\+'<\/b>' : promoEscHtml\(l\)\)\+'<\/p>'\); \}/.test(bp)
+    && /function pushBlank\(\)\{ if\(out\.length && out\[out\.length-1\]!==PROMO_BLANK\) out\.push\(PROMO_BLANK\); \}/.test(bp) && /if\(promoIsSubhead\(t\)\)\{[\s\S]{0,300}?pushBlank\(\);[\s\S]{0,200}?pushLine\(t, useP && \(P\.head_bold_ratio\|\|0\)>=0\.5\);[\s\S]{0,40}?return;/.test(bp) && /promoLinesOf\(t\)\.forEach\(function\(l\)\{ pushLine\(l,false\); \}\);/.test(bp)
+    && /if\(tags\.length\)\{ pushBlank\(\); tags\.forEach\(function\(t\)\{ out\.push\(t\); \}\); pushBlank\(\); \}/.test(bp) && !/color:#777;font-size:13px/.test(bp) && /headLines\.forEach\(function\(l\)\{ pushLine\(l, \(gbold\[l\]\|\|0\)>=0\.5\); \}\); pushBlank\(\);/.test(bp) && /\(useP && \(P\.sig_kept_ratio\|\|0\)<0\.3\) \? PROMO_GREET\[org==="con"\?"con":"env"\] : promoHeadLines\(org\)/.test(bp)
     && /promoTailHtml\(org\)\+promoTagsHtml\(tags\)/.test(bp) && !/promoWrap20/.test(idx) && !/<hr /.test(bp) && !/font-weight:700/.test(bp) && !/margin:12px 0/.test(bp)
     && /var PROMO_HEAD_SIG = \["종운환경·종운건설 \| 포항 준설·폐기물·철거·석면"/.test(idx) && /var PROMO_GREET = \{/.test(idx) && /"\(주\)종운환경 입니다\."\]/.test(idx) && /"\(주\)종운건설 입니다\."\]/.test(idx)
     && /function promoTagsHtml\(tags\)/.test(idx) && /t\.slice\(i,i\+5\)/.test(idx) && /function promoTailHtml\(orgIn\)/.test(idx) && /promoBuildPostHtml\(title, body, webImgs, p\.tags\)/.test(idx) && /promoBuildPostHtml\(title, body, got, p\.tags\)/.test(idx)
@@ -1488,9 +1488,9 @@ try {
     && /\[직원이 고치는 패턴 — 자동 학습 /.test(pai) && /\[참고 완성본 — 직원이 다듬어 실제 게시한 글의 앞부분\]/.test(pai) && /inp\.lessons/.test(pai) && /inp\.exemplar/.test(pai)
     && /case 'pl_get'/.test(papi) && /case 'pl_set'/.test(papi) && /ADMIN_ONLY/.test(papi) && /op: '블로그학습'/.test(papi)
     && html.indexOf('id="promoLearnCard"') > 0 && /function renderPromoLearn\(\)/.test(html) && /action: "pl_get"/.test(html) && /action: "pl_set"/.test(html) && /data-pl-off/.test(html) && /data-pl-del/.test(html) && /data-pl-assign/.test(html) && /data-pl-retry/.test(html)
-    && /if \(name === "promo"\)\{ renderPromo\(\); loadPromo\(\); renderPromoLearn\(\); \}/.test(html)
+    && /if \(name === "promo"\)\{ renderPromo\(\); loadPromo\(\); renderPromoLearn\(\); promoLoadLayoutProf\(\); \}/.test(html)
     && /detectFaces|facedet/.test(mask) && /detectPlates|platedet/.test(mask)
-    && /jw-shell-v393/.test(swv));
+    && /jw-shell-v394/.test(swv));
 } catch (e) { console.log('  (v389 검사 생략 — ' + e.message + ')'); fails++; }
 
 // ---- v392(PM 10/20 "자동으로 학습해서 반영되게 · 줄간격·정렬도 포함"): D1 포장 측정 프로필 — 수집기 promoai:layout → pl_get layout → 카드 "포장 측정"(승인 버튼 없음) ----
@@ -1501,15 +1501,29 @@ try {
   T('v392 포장 측정 프로필: LAYOUT_KEY promoai:layout · pl_get layout(profile·posts 12, 없으면 null) · 카드 "포장 측정 — 실제 게시글" 가운데/한 줄/간격/구분선/굵게/해시태그 + 편별 표 · 승인 버튼 없음 · sw v392',
     /LAYOUT_KEY = 'promoai:layout'/.test(plsrc) && /LAYOUT_KEY,/.test(plsrc) && /blobGet\(st, PL\.LAYOUT_KEY\)/.test(papi) && /layout: layout, request_id: R/.test(papi) && /\.slice\(0, 12\)/.test(papi)
     && html.indexOf('포장 측정 — 실제 게시글') > 0 && /pf\.center_ratio/.test(html) && /pf\.len_med/.test(html) && /pf\.gap_default/.test(html) && /pf\.hr_per_post/.test(html) && /pf\.bold_ratio/.test(html) && /pf\.tags_med/.test(html) && /lay\.posts\.map/.test(html)
-    && html.indexOf('data-pl-approve') < 0 && /jw-shell-v393/.test(swv));
+    && html.indexOf('data-pl-approve') < 0 && /jw-shell-v394/.test(swv));
 } catch (e) { console.log('  (v392 검사 생략 — ' + e.message + ')'); fails++; }
 
 // ---- v393: 포장 프로필 2판 — 모듈 순서(사진 i·구분선 h)·서명 유지·인사말 줄별 굵게·소제목 굵게/앞 구분선/앞 빈 줄·자주 쓰는 해시태그 → 카드 표시 ----
 try {
   const swv = readFileSync(join(ROOT, 'sw.js'), 'utf8');
   T('v393 포장 프로필 2판 카드: 서명 유지·인사말 굵게·소제목 굵게/앞 구분선/앞 빈 줄·사진 뒤 구분선·자주 쓰는 해시태그 · sw v393',
-    /pf\.sig_kept_ratio/.test(html) && /pf\.greet_bold/.test(html) && /pf\.head_bold_ratio/.test(html) && /pf\.head_hr_ratio/.test(html) && /pf\.head_blank_ratio/.test(html) && /pf\.hr_after_img_ratio/.test(html) && /pf\.tags_top/.test(html) && /jw-shell-v393/.test(swv));
+    /pf\.sig_kept_ratio/.test(html) && /pf\.greet_bold/.test(html) && /pf\.head_bold_ratio/.test(html) && /pf\.head_hr_ratio/.test(html) && /pf\.head_blank_ratio/.test(html) && /pf\.hr_after_img_ratio/.test(html) && /pf\.tags_top/.test(html) && /jw-shell-v394/.test(swv));
 } catch (e) { console.log('  (v393 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ---- v394(D3): 복사 출력에 포장 프로필 자동 적용(서명 삭제·인사말/소제목 굵게·소제목 앞 구분선·문단 경계 빈 줄) · pl_layout(홍보 권한) · copy_save → 워커 포장 간극 → 카드 ----
+try {
+  const plsrc = readFileSync(join(ROOT, 'netlify', 'functions', '_lib', 'promolearn.js'), 'utf8');
+  const papi = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-promo-ai.js'), 'utf8');
+  const lw = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-promo-learn-background.js'), 'utf8');
+  const swv = readFileSync(join(ROOT, 'sw.js'), 'utf8');
+  T('v394 복사 출력 자동 포장: @promo-post 구간 · promoLayoutProf · promoBuildPostHtml(prof) 5가지(sig_kept·greet_bold·head_bold·head_hr·blank_per_para) · pushHr · promoPlanOfHtml · pl_layout/copy_save 호출 · 홍보 탭 훅 promoLoadLayoutProf · 서버 pl_layout(NO_PERMISSION)·copy_save(600줄·c/b/i/h) · 워커 layoutGap · 카드 포장 % · sw v394',
+    /\/\/ @promo-post-start/.test(html) && /\/\/ @promo-post-end/.test(html) && /var promoLayoutProf=null;/.test(html) && /function promoBuildPostHtml\(title, body, imgs, tags, prof\)/.test(html)
+    && /P\.sig_kept_ratio\|\|0\)<0\.3/.test(html) && /gbold\[l\]\|\|0\)>=0\.5/.test(html) && /P\.head_bold_ratio\|\|0\)>=0\.5/.test(html) && /P\.head_hr_ratio\|\|0\)>=0\.5/.test(html) && /P\.blank_per_para\|\|0\)>=0\.15/.test(html)
+    && /function pushHr\(\)/.test(html) && /function promoPlanOfHtml\(html\)/.test(html) && /action:"pl_layout"/.test(html) && /action:"copy_save"/.test(html) && /promoLoadLayoutProf\(\); \}/.test(html) && /p\.gap\.layout\.line_match/.test(html)
+    && /case 'pl_layout'/.test(papi) && /case 'copy_save'/.test(papi) && /COPY_MAX_LINES = 600/.test(papi) && /replace\(\/\[\^cbih\]\/g, ''\)/.test(papi) && /code: 'NO_PERMISSION'/.test(papi)
+    && /function layoutGap\(copyLines, finalLines\)/.test(plsrc) && /COPY_PREFIX = 'promoai:copy:'/.test(plsrc) && /PL\.layoutGap\(cp\.data\.lines, pair\.final_layout\)/.test(lw) && /jw-shell-v394/.test(swv));
+} catch (e) { console.log('  (v394 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

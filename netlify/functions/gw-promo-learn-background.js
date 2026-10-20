@@ -108,6 +108,13 @@ exports.handler = async function (event, context) {
       if (!lib.scrubPayload(String(out.summary || ''), forbidden).ok) out.summary = '';
     }
     const gap = PL.gapScore(draft.body, finalBody);
+    // v394 포장 간극 — 복사 때 앱이 저장한 줄 계획(promoai:copy:<기록>) ↔ 게시글 줄 배치(final_layout). 둘 중 하나가 없으면 재지 않는다.
+    try {
+      if (Array.isArray(pair.final_layout) && pair.final_layout.length) {
+        const cp = await blobGet(st, PL.copyKey(rec.id));
+        if (cp.ok && cp.data && Array.isArray(cp.data.lines) && cp.data.lines.length) gap.layout = PL.layoutGap(cp.data.lines, pair.final_layout);
+      }
+    } catch (e) {}
     const merged = PL.mergeLessons(lessons, out, { promo_id: rec.id, pair_id: pairId, final_title: finalTitle, final_body: finalBody, facility: facility, now: Date.now(), tokens: tokens, gap: gap, summary: out.summary });
     const w = await blobSet(st, PL.LESSONS_KEY, merged);
     if (!w.ok) { await finish('fail', w.code || 'LESSONS_WRITE_FAILED'); return; }
