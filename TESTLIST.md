@@ -739,3 +739,7 @@
 - [ ] 켬 → 차량 탭에서 정기검사 만기를 카드 기한보다 뒤로 바꾸면 10분 안에 그 자동 지시가 "승인 대기중 · 앱 기준"으로, 승인권자(나수진) 폰에 "승인 대기 n건(앱 기준)" 1발.
 - [ ] 지시함 자동 만기 구역 위 [오늘 승인 일괄 (n)] → 확인 → 전부 done. 반려하면 다시 올라오지 않음.
 - [ ] `node tools/servertest.mjs` 절 51 · `node tools/uismoke.mjs` v397 통과.
+
+## v398 — 크론 흔적 스탬프
+- [ ] 배포 10분 뒤 gw_data `it:cron:gw-doneif-cron:last`·`gw-promo-ai-cron` 스탬프 생김(내일 08:00 뒤 todo·appr). 감시 09:04 판에 "크론흔적 … 정상" 또는 경보.
+- [ ] `node tools/servertest.mjs` 절 52 · `node tools/uismoke.mjs` v398 · appdata `python collectors/watch.py --selftest` 통과.

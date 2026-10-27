@@ -1593,8 +1593,24 @@ try {
     && /\[functions\."gw-doneif-cron"\]\s*\r?\n\s*schedule = "\*\/10 \* \* \* \*"/.test(toml)
     && /action === 'doneif_get'/.test(gwd) && /action === 'doneif_set'/.test(gwd) && /o\.done_by === '앱 기준' && t\.status === 'open' && !t\.doneif_off/.test(gwd)
     && html.indexOf('id="taskBulkApprove"') > 0 && /t\.done_by === "앱 기준" && canApproveTask\(t\)/.test(html) && /if \(t\.done_by === "앱 기준"\) t\.doneif_off = 1;/.test(html) && /function renderDoneifRow\(\)/.test(html) && /action: "doneif_get"/.test(html) && /action: "doneif_set"/.test(html)
-    && /jw-shell-v397/.test(swv));
+    && /jw-shell-v39[7-9]/.test(swv));
 } catch (e) { console.log('  (v397 검사 생략 — ' + e.message + ')'); fails++; }
+
+
+// ---- v398(10/27 A7 1일차 · 공통 기반 14): 크론 흔적 스탬프 — 4 예약 함수 시작 스탬프 + todo/appr/doneif 끝 스탬프 · cron_map evidence stamp · sw ----
+try {
+  const fns = ['gw-todo-cron', 'gw-appr-cron', 'gw-doneif-cron', 'gw-promo-ai-cron'];
+  const srcs = {}; fns.forEach((f) => { srcs[f] = readFileSync(join(ROOT, 'netlify', 'functions', f + '.js'), 'utf8'); });
+  const lib = readFileSync(join(ROOT, 'netlify', 'functions', '_lib', 'cronstamp.js'), 'utf8');
+  const swv = readFileSync(join(ROOT, 'sw.js'), 'utf8');
+  const okStart = fns.every((f) => new RegExp("await stamp\\('" + f + "', \\{ state: 'start' \\}\\)").test(srcs[f]) && /require\('\.\/_lib\/cronstamp'\)/.test(srcs[f]));
+  const okEnd = ['gw-todo-cron', 'gw-appr-cron', 'gw-doneif-cron'].every((f) => new RegExp("await stamp\\('" + f + "', \\{ state: 'end'").test(srcs[f]));
+  let okMap = true;
+  const cmPath = join(ROOT, '..', 'jongwoon-appdata', 'data', 'cron_map.json');
+  if (existsSync(cmPath)) { const cm = JSON.parse(readFileSync(cmPath, 'utf8')); okMap = fns.every((f) => (cm.crons || []).some((c) => c.id === f && c.evidence && c.evidence.type === 'stamp' && c.evidence.key === 'it:cron:' + f + ':last' && c.watch === true)); }
+  T('v398 크론 흔적: cronstamp.js(it:cron:<fn>:last, 저장 실패 삼킴) · 4 함수 시작 스탬프 · 3 함수 끝 스탬프 · cron_map stamp 편입 · sw',
+    /it:cron:/.test(lib) && /catch \(e\) \{ \/\* no-op \*\/ \}/.test(lib) && okStart && okEnd && okMap && /jw-shell-v398/.test(swv), 'start ' + okStart + ' end ' + okEnd + ' map ' + okMap);
+} catch (e) { console.log('  (v398 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

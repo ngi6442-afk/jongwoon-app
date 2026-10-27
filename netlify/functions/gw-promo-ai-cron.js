@@ -5,6 +5,7 @@
 //   ② 사진은 있는데 초안이 없는 게시 전 기록을 골라 다시 시작(잠금·진행 중·재시도 간격 10/30/120분·상한 4회 준수, 회차당 최대 3건)
 // 상태는 기록의 ai_st(running/fail/done, tries, code)로 남겨 카드가 말로 보여준다. 게시 완료 기록은 손대지 않는다.
 const { setupBlobContext, store, blobGet, blobList } = require('./_lib/blobs');
+const { stamp } = require('./_lib/cronstamp');   // v398 실행 흔적 it:cron:<fn>:last(시작만 — 반환 경로가 많아 끝 스탬프는 생략)
 const PJ = require('./_lib/promoai_job');
 
 const DATA = 'gw_data';
@@ -99,6 +100,7 @@ exports.handler = async function (event) {
   const now = Date.now();
   let st;
   try { setupBlobContext(event); st = store(DATA); } catch (e) { return { statusCode: 500, body: JSON.stringify({ ok: false, code: 'NO_BLOB_CONTEXT' }) }; }
+  await stamp('gw-promo-ai-cron', { state: 'start' });
   const pr = await blobGet(st, 'col:promo');
   if (!pr.ok) return { statusCode: 500, body: JSON.stringify({ ok: false, code: pr.code || 'PROMO_READ_FAILED' }) };
   const doc = (pr.data && typeof pr.data === 'object') ? pr.data : { schema: 1, items: [] };

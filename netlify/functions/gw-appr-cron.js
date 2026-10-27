@@ -7,6 +7,7 @@
 //   멱등(id 'summary-YYYY-MM' + cid 'auto-sum-YYYY-MM') · approvals 읽기 실패 시 스킵(fail-closed) ·
 //   쓰기 직전 신선본 재검사 · 본선 쓰기 후 1회 자가복구 · 감사로그 · 0건이면 미생성 · 미확인 재푸시 없음(§12-7).
 const crypto = require('crypto');
+const { stamp } = require('./_lib/cronstamp');   // v398 실행 흔적 it:cron:<fn>:last
 const { setupBlobContext, store, blobGet, blobSet } = require('./_lib/blobs');
 const { appendAudit } = require('./_lib/audit');
 const push = require('./_lib/push');
@@ -133,6 +134,8 @@ exports.runSummary = runSummary;   // servertest에서 nowMs 주입 호출용
 exports.handler = async function (event) {
   let st;
   try { setupBlobContext(event); st = store(DATA); } catch (e) { return { statusCode: 500, body: JSON.stringify({ ok: false, code: 'NO_BLOB_CONTEXT' }) }; }
+  await stamp('gw-appr-cron', { state: 'start' });
   const r = await runSummary(st, Date.now());
+  await stamp('gw-appr-cron', { state: 'end', ok: !!r.ok, note: String(r.code || r.skipped || 'ok').slice(0, 40) });
   return { statusCode: r.ok ? 200 : 500, body: JSON.stringify(r) };
 };

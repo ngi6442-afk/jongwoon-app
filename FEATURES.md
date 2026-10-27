@@ -1,6 +1,6 @@
 # 종운 그룹웨어 — 기능 대장 (사용자 매뉴얼 원천)
 
-> 살아있는 문서. 기능 추가·변경 시 이 파일을 함께 갱신한다. 기준: v397 (2026-10-27).
+> 살아있는 문서. 기능 추가·변경 시 이 파일을 함께 갱신한다. 기준: v398 (2026-10-27).
 > 세부 변경 이력은 git 커밋 메시지(한글) 참조.
 
 ## 1. 전체 구조
@@ -759,3 +759,10 @@ PM 지시 "문서함 일단 다 올리고 등재결재랑 공개범위 만들어
 - 앱: 지시함 [오늘 승인 일괄 (n)] — 앱 기준 review 중 내가 승인권자인 것만 한 번에 approveTask(사람 완료 요청은 건별 그대로). 반려(rejectTask)는 앱 기준 건에 `doneif_off=1`(워커가 다시 올리지 않음). 권한관리 › 지시 알림 설정 카드에 "완료 신호 자동 전환" 켬/끔 + 마지막 점검(살핀·후보·전환·후보 3건 요약).
 - 게이트(착수 브리핑 §6 "표본 3건 캡처 없으면 review 전환 배포 보류") → 배포는 **dry-run(끔)** 으로만. 라이브 후보 3건을 레코드와 대조한 뒤 켠다(켜기=관리자 칩 1클릭, 되돌리기=끔).
 - 검사: servertest 절 51(16항), uismoke v397. sw v397.
+
+### v398 (10/27) — 크론 실행 흔적 스탬프 (공통 기반 14 · infra D0 · 착수 브리핑 A7 1일차)
+- 배경: 변경안 0·크론 지도(A4) — Netlify 예약 함수 중 todo·appr·promo-ai·doneif는 실행 흔적이 없어 감시 밖이었다(화관법·올바로는 작업 블롭이 흔적).
+- `_lib/cronstamp.js` stamp(fn, patch): `it:cron:<fn>:last` {fn, ts, day(KST), state start|end, ok, note, runs, start_ts}. 저장 실패는 삼킨다(본 작업 불변). 4 함수 시작 스탬프 + todo·appr·doneif 끝 스탬프(promo-ai는 반환 경로가 많아 시작만).
+- appdata: cron_map.json 4건 evidence stamp·watch true(alert_after_h todo·appr 26h, promo-ai·doneif 2h) · watch.py `judge_stamp`(흔적 없음=경보 / 기준 초과=경보 / 시작만 2h↑=안내 / 끝 실패=안내) 3c)에서 함수별 판정, selftest 7항.
+- 아직 아님: 경보 라벨(it:alerts — 확인/무시/승격 1클릭, 1주 warn 뒤 alert 승격)은 A7 2일차. 화관법·올바로는 종전 판정 유지.
+- 검사: servertest 절 52(2항), uismoke v398. sw v398(서버만 바뀌었지만 sw↔FEATURES 기준 일치 규칙).

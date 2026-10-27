@@ -3328,4 +3328,16 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   r51 = await call({ action: 'doneif_set', on: false, base: mem.gw_data['settings:doneif'].updated_at }, tokA); T('51 doneif_set 끔 · prev on true', r51.code === 200 && mem.gw_data['settings:doneif'].prev.on === true);
   ['settings:doneif', 'it:doneif:last', 'settings:assign', 'col:vehicles', 'col:licenses', 'col:receivables', 'clog:appr:' + c51.today.slice(0, 7), 'ver:tasks:appbase:' + c51.today].forEach((k) => { delete mem.gw_data[k]; }); pushMock.calls.length = 0;
 }
+{ // ---- 52(v398) 크론 흔적 스탬프 — todo·doneif·appr 핸들러 1회 실행 → it:cron:<fn>:last {state end, ok, runs, day} ----
+  ['it:cron:gw-todo-cron:last', 'it:cron:gw-doneif-cron:last', 'it:cron:gw-appr-cron:last'].forEach((k) => { delete mem.gw_data[k]; });
+  mem.gw_data['col:tasks'] = { schema: 1, items: [] };
+  const todo52 = require(join(FN, 'gw-todo-cron.js')); await todo52.handler({});
+  const doneif52 = require(join(FN, 'gw-doneif-cron.js')); await doneif52.handler({});
+  const appr52 = require(join(FN, 'gw-appr-cron.js')); await appr52.handler({});
+  const s1 = mem.gw_data['it:cron:gw-todo-cron:last'], s2 = mem.gw_data['it:cron:gw-doneif-cron:last'], s3 = mem.gw_data['it:cron:gw-appr-cron:last'];
+  T('52 스탬프: todo·doneif·appr 실행 뒤 it:cron:<fn>:last state end · ok true · runs 1 · day KST', !!s1 && s1.state === 'end' && s1.ok === true && s1.runs === 1 && /^\d{4}-\d{2}-\d{2}$/.test(s1.day) && !!s2 && s2.state === 'end' && s2.ok === true && /on false/.test(s2.note) && !!s3 && s3.state === 'end' && s3.runs === 1, JSON.stringify([s1, s2, s3]).slice(0, 300));
+  await todo52.handler({});
+  T('52 스탬프: 재실행 runs 2 · start_ts 갱신', mem.gw_data['it:cron:gw-todo-cron:last'].runs === 2 && mem.gw_data['it:cron:gw-todo-cron:last'].start_ts >= s1.start_ts);
+  ['it:cron:gw-todo-cron:last', 'it:cron:gw-doneif-cron:last', 'it:cron:gw-appr-cron:last', 'it:doneif:last'].forEach((k) => { delete mem.gw_data[k]; });
+}
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

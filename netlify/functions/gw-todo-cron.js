@@ -6,6 +6,7 @@
 // 완료·삭제된 항목은 대상에서 빠지므로 '완료 시 미발송'이 자연히 성립한다. 경과(D+n) 재알림은 없음(화면 빨강 배지로만).
 const { setupBlobContext, store, blobGet, blobSet, blobList } = require('./_lib/blobs');
 const push = require('./_lib/push');
+const { stamp } = require('./_lib/cronstamp');   // v398 실행 흔적 it:cron:<fn>:last
 
 const DATA = 'gw_data';
 function kstToday() { return new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10); }
@@ -14,6 +15,7 @@ exports.handler = async function (event) {
   const today = kstToday();
   let st;
   try { setupBlobContext(event); st = store(DATA); } catch (e) { return { statusCode: 500, body: JSON.stringify({ ok: false, code: 'NO_BLOB_CONTEXT' }) }; }
+  await stamp('gw-todo-cron', { state: 'start' });
   const l = await blobList(st, 'priv:');
   if (!l.ok) return { statusCode: 500, body: JSON.stringify({ ok: false, code: l.code || 'LIST_FAILED' }) };
   // 퇴사·삭제 회원은 건너뛴다(v329) — priv 블롭 키만 훑던 종전엔 회원 레코드를 한 번도 읽지 않아,
@@ -72,5 +74,6 @@ exports.handler = async function (event) {
       }
     }
   } catch (e) { digest = { error: String(e && e.message || e).slice(0, 80) }; }
+  await stamp('gw-todo-cron', { state: 'end', ok: fails === 0, note: 'members ' + members + ' · items ' + items + ' · fails ' + fails + (digest && digest.sent ? ' · digest' : '') });
   return { statusCode: 200, body: JSON.stringify({ ok: true, today: today, members: members, items: items, fails: fails, skipped: skipped, digest: digest }) };
 };

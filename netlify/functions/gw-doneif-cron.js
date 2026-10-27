@@ -6,6 +6,7 @@ const { setupBlobContext, store, blobGet, blobSet } = require('./_lib/blobs');
 const push = require('./_lib/push');
 const audit = require('./_lib/audit');
 const D = require('./_lib/doneif');
+const { stamp } = require('./_lib/cronstamp');   // v398 실행 흔적 it:cron:<fn>:last
 
 const DATA = 'gw_data';
 function kstToday(ms) { return new Date(ms + 9 * 3600000).toISOString().slice(0, 10); }
@@ -65,6 +66,8 @@ exports.run = run;
 exports.handler = async function (event) {
   let st;
   try { setupBlobContext(event); st = store(DATA); } catch (e) { return { statusCode: 500, body: JSON.stringify({ ok: false, code: 'NO_BLOB_CONTEXT' }) }; }
+  await stamp('gw-doneif-cron', { state: 'start' });
   const r = await run(st, Date.now());
+  await stamp('gw-doneif-cron', { state: 'end', ok: !!r.ok, note: 'on ' + !!r.on + ' · scanned ' + (r.scanned || 0) + ' · cand ' + ((r.candidates || []).length) + ' · moved ' + (r.moved || 0) });
   return { statusCode: r.ok ? 200 : 500, body: JSON.stringify(r) };
 };
