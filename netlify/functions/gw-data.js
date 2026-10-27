@@ -368,7 +368,11 @@ async function handleSave(event, d, R) {
   if (col === 'tasks' && Array.isArray(doc.items)) {
     const oldByA = {}; oldItems.forEach(function (o) { if (o && o.id) oldByA[o.id] = o; });
     doc.items.forEach(function (t) { if (!t || !t.auto_key || t.who_id) return; const o = oldByA[t.id]; if (o && o.who_id && o.who_by === 'assign') { t.who_id = o.who_id; t.who = o.who || ''; t.who_by = 'assign'; } });
+    const blankBeforeS = {}; doc.items.forEach(function (t) { if (t && t.auto_key && !t.who_id) blankBeforeS[t.id] = 1; });
     try { const at = await assignRead(store(DATA)); if (Object.keys(at.rules || {}).length) { const ms = await assignMembers(); if (ms) assignFill(doc.items, at.rules, assignNames(ms)); } } catch (e) {}
+    // v396 알림: 클라 생성기(runAutoTaskGen·recOverdueGen·runBidQualGen)가 만든 새 자동 지시 + 이번에 채워진 공란 → 담당자 본인 1발(설정 assignee일 때만)
+    const newAutoS = doc.items.filter(function (t) { return t && t.auto_key && t.who_id && (!oldByA[t.id] || blankBeforeS[t.id]); });
+    if (newAutoS.length) await notifyAutoCreated(store(DATA), newAutoS, c.member.name);
   }
   // 휴가: 신청 저장은 전 직원 필요하지만, 비관리자 저장은 서버가 재구성 — 타인 항목은 서버 원본 유지(클라이언트 사본으로 못 덮음),
   // 본인 항목만 반영, 승인 상태는 스스로 못 올림. (종전엔 전면 면제라 임의 직원이 전사 휴가 문서를 통째로 조작할 수 있었다.
@@ -740,8 +744,8 @@ async function handleAutotaskIngest(event, d, R) {
   const doc = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data : { schema: 1, items: [] };
   await verSnapshot('tasks', doc, '정기봇', true);
   const today = new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);
-  const have = {};
-  doc.items.forEach(function (t) { if (t && t.auto_key) have[t.auto_key] = t; });
+  const have = {}, have0 = {};
+  doc.items.forEach(function (t) { if (t && t.auto_key) { have[t.auto_key] = t; have0[t.auto_key] = 1; } });
   let made = 0, fixed = 0;
   for (const n of items.slice(0, 100)) {
     const k = String((n && n.auto_key) || '');
@@ -759,14 +763,19 @@ async function handleAutotaskIngest(event, d, R) {
   });
   // v395 배정표: 새 항목과 기존 공란 자동 지시에 담당 채움(사람 지정분 불변) — 매일 아침 ingest가 곧 일일 backfill
   let assigned = 0;
+  const blankBefore = {}; doc.items.forEach(function (t) { if (t && t.auto_key && !t.who_id) blankBefore[t.id] = 1; });
   try { const at = await assignRead(st); if (Object.keys(at.rules || {}).length) { const ms = await assignMembers(); if (ms) assigned = assignFill(doc.items, at.rules, assignNames(ms)); } } catch (e) {}
+  // v396 알림: 이번에 생긴 항목 + 이번에 담당이 채워진 항목 → 담당자 본인 1발(설정 assignee일 때만)
+  const notifyItems = doc.items.filter(function (t) { return t && t.auto_key && t.who_id && (t.created === today && !have0[t.auto_key] || blankBefore[t.id]); });
+  let notified = 0;
+  if (notifyItems.length) notified = await notifyAutoCreated(st, notifyItems, '정기봇');
   if (made || fixed || assigned) {
     doc.updated_by = '정기봇'; doc.updated_at = Date.now();
     const w = await blobSet(st, colKey('tasks'), doc);
     if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
     try { await appendAudit({ ts: Date.now(), by: '정기봇', bid: 'bot', col: 'tasks', ev: [{ op: '정기업무', id: '', t: '신규 ' + made + ' · 정정 ' + fixed + (assigned ? ' · 배정 ' + assigned : '') }] }); } catch (e) {}
   }
-  return jr(200, { status: 'OK', made: made, fixed: fixed, assigned: assigned, request_id: R });
+  return jr(200, { status: 'OK', made: made, fixed: fixed, assigned: assigned, notified: notified, request_id: R });
 }
 
 // 지금 수집(관리자 버튼) — 서버가 나라장터 API를 직접 조회해 병합. G2B_API_KEY(Netlify env) 필요. 10분 쿨다운.
@@ -1288,8 +1297,19 @@ async function handlePushSend(event, d, R) {
   try {
     let ids;
     const tc = await push.tierCtx();   // 회원 스캔 1회 — __admins__ 목록과 수신자 활성 필터(push.sendTo opts.ctx)에 함께 쓴다(v329)
+    // v396 알림 설정: ① 자동 지시 생성이 '담당자 본인'이면 클라의 관리자 전원 푸시(auto-due·rec-over·bid-qual)는 서버가 삼킨다(서버가 save 때 담당자에게 보냄)
+    //                 ② 완료 요청이 '지시자·승인권자'이면 __admins__ 대신 배정표 승인권자 1인에게만(승인권자 비면 종전대로)
+    const tagP = String(payload.tag || '');
+    const nfP = (to === '__admins__') ? await notifyRead(store(DATA)) : null;
+    if (nfP && nfP.events.task_auto_create === 'assignee' && /^(auto-due|rec-over|bid-qual)$/.test(tagP)) return jr(200, { status: 'OK', sent: 0, suppressed: 'task_auto_create', request_id: R });
     if (d.self === true) ids = [c.member.id];
-    else if (to === '__admins__') ids = tc.adminIds.filter(function (id) { return id !== c.member.id; });   // 본인 행동 알림은 본인 제외
+    else if (to === '__admins__') {
+      ids = tc.adminIds.filter(function (id) { return id !== c.member.id; });   // 본인 행동 알림은 본인 제외
+      if (nfP && nfP.events.task_review === 'issuer_approver' && /^task-rv-/.test(tagP)) {
+        const atP = await assignRead(store(DATA));
+        if (atP.approver_id && atP.approver_id !== c.member.id) ids = [atP.approver_id];
+      }
+    }
     else ids = [to];
     if (!ids.length) return jr(200, { status: 'OK', sent: 0, request_id: R });
     const rres = await push.sendTo(ids, payload, { ctx: tc, by: c.member.id });   // 퇴사·삭제 회원 id로는 발사되지 않는다(v329) · 발신자는 알림함 이력에 남긴다
@@ -1466,6 +1486,92 @@ async function handleAssignRevert(event, d, R) {
   if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
   try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'tasks', ev: [{ op: '배정되돌림', id: '', t: '배정표 직전 판으로' }] }); } catch (e) {}
   return jr(200, { status: 'OK', rules: doc.rules, approver_id: doc.approver_id, updated_at: doc.updated_at, request_id: R });
+}
+// ---- 알림 설정 settings:notify (v396 — 공통 기반 3 첫 시범. 착수 브리핑 A3 · 카드 1-4 R1) ----
+// 지시 이벤트 3종의 수신자·방식을 설정값으로. 기본값(블롭 없음) = 현행(관리자 전원·생성 때마다). R1: D-3 예고 뒤 추천값 적용, prev 1판·되돌리기 1클릭.
+//  task_auto_create: 자동 지시 생성 → admins(현행, 클라 push_send __admins__) | assignee(담당자 본인 1발·우선기기, 서버가 save·ingest 때 발송, 클라 관리자 푸시는 서버가 삼킴)
+//  task_review: 완료 요청 → admins(현행: 지시자 없으면 관리자 전원) | issuer_approver(지시자 · 자동 지시는 배정표 승인권자 1인)
+//  due_digest: 만기 임박 → each(현행: 생성 때마다 관리자 전원) | summary(아침 크론 요약 1줄 — 승인권자 1인, 없으면 관리자)
+const NOTIFY_KEY = 'settings:notify';
+const NOTIFY_EVENTS = {
+  task_auto_create: { label: '자동 지시 생성 알림', options: { admins: '관리자 전원(현행)', assignee: '담당자 본인 1발(우선기기)' }, def: 'admins', rec: 'assignee' },
+  task_review: { label: '완료 요청(승인 대기) 알림', options: { admins: '지시자, 없으면 관리자 전원(현행)', issuer_approver: '지시자 · 자동 지시는 배정 승인권자 1인' }, def: 'admins', rec: 'issuer_approver' },
+  due_digest: { label: '만기 임박 알림 방식', options: { each: '생성 때마다 관리자 전원(현행)', summary: '아침 요약 1줄(승인권자 1인, 없으면 관리자)' }, def: 'each', rec: 'summary' },
+};
+function notifyDefaults() { const o = {}; Object.keys(NOTIFY_EVENTS).forEach(function (k) { o[k] = NOTIFY_EVENTS[k].def; }); return o; }
+function notifyValid(k, v) { return Object.prototype.hasOwnProperty.call(NOTIFY_EVENTS, k) && Object.prototype.hasOwnProperty.call(NOTIFY_EVENTS[k].options, String(v)); }
+async function notifyRead(st) {
+  try {
+    const r = await blobGet(st, NOTIFY_KEY);
+    if (r.ok && r.data && r.data.events && typeof r.data.events === 'object') {
+      const ev = notifyDefaults();
+      Object.keys(r.data.events).forEach(function (k) { if (notifyValid(k, r.data.events[k])) ev[k] = r.data.events[k]; });
+      return { events: ev, prev: r.data.prev || null, updated_at: r.data.updated_at || 0, updated_by: r.data.updated_by || '' };
+    }
+  } catch (e) {}
+  return { events: notifyDefaults(), prev: null, updated_at: 0, updated_by: '' };
+}
+function notifyPublic(nf) {
+  const meta = {}; Object.keys(NOTIFY_EVENTS).forEach(function (k) { meta[k] = { label: NOTIFY_EVENTS[k].label, options: NOTIFY_EVENTS[k].options, def: NOTIFY_EVENTS[k].def, rec: NOTIFY_EVENTS[k].rec }; });
+  return { events: nf.events, meta: meta, prev: nf.prev ? { updated_at: nf.prev.updated_at || 0, updated_by: nf.prev.updated_by || '' } : null, updated_at: nf.updated_at || 0, updated_by: nf.updated_by || '' };
+}
+async function handleNotifyGet(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (!c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
+  const nf = await notifyRead(store(DATA));
+  return jr(200, Object.assign({ status: 'OK', request_id: R }, notifyPublic(nf)));
+}
+async function handleNotifySet(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (!c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
+  const k = String(d.event || ''), v = String(d.value || '');
+  if (!notifyValid(k, v)) return jr(400, { status: 'REJECTED', error_code: 'BAD_EVENT', request_id: R });
+  const st = store(DATA);
+  const nf = await notifyRead(st);
+  if (d.base !== undefined && Number(d.base) !== Number(nf.updated_at || 0)) return jr(409, { status: 'CONFLICT', error_code: 'NOTIFY_STALE', request_id: R });
+  if (nf.events[k] === v) return jr(400, { status: 'REJECTED', error_code: 'NO_CHANGE', request_id: R });
+  const next = Object.assign({}, nf.events); next[k] = v;
+  const doc = { schema: 1, events: next, prev: { events: nf.events, updated_at: nf.updated_at || 0, updated_by: nf.updated_by || '' }, updated_by: c.member.id, updated_at: Date.now() };
+  const w = await blobSet(st, NOTIFY_KEY, doc);
+  if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
+  try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'tasks', ev: [{ op: '알림변경', id: k, t: NOTIFY_EVENTS[k].label + ' ' + (NOTIFY_EVENTS[k].options[nf.events[k]] || nf.events[k]) + '→' + NOTIFY_EVENTS[k].options[v] }] }); } catch (e) {}
+  return jr(200, Object.assign({ status: 'OK', request_id: R }, notifyPublic({ events: next, prev: doc.prev, updated_at: doc.updated_at, updated_by: doc.updated_by })));
+}
+async function handleNotifyRevert(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (!c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
+  const st = store(DATA);
+  const nf = await notifyRead(st);
+  if (!nf.prev || !nf.prev.events) return jr(400, { status: 'REJECTED', error_code: 'NO_PREV', request_id: R });
+  if (d.base !== undefined && Number(d.base) !== Number(nf.updated_at || 0)) return jr(409, { status: 'CONFLICT', error_code: 'NOTIFY_STALE', request_id: R });
+  const ev = notifyDefaults(); Object.keys(nf.prev.events).forEach(function (k) { if (notifyValid(k, nf.prev.events[k])) ev[k] = nf.prev.events[k]; });
+  const doc = { schema: 1, events: ev, prev: { events: nf.events, updated_at: nf.updated_at || 0, updated_by: nf.updated_by || '' }, updated_by: c.member.id, updated_at: Date.now() };
+  const w = await blobSet(st, NOTIFY_KEY, doc);
+  if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
+  try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'tasks', ev: [{ op: '알림되돌림', id: '', t: '알림 설정 직전 판으로' }] }); } catch (e) {}
+  return jr(200, Object.assign({ status: 'OK', request_id: R }, notifyPublic({ events: ev, prev: doc.prev, updated_at: doc.updated_at, updated_by: doc.updated_by })));
+}
+// 자동 지시 생성·배정 → 담당자 본인 1발(우선기기). save·ingest 공용. 담당 없는 항목은 발송 없음(배지만). 같은 사람은 하루 한 묶음(tag로 치환).
+async function notifyAutoCreated(st, items, by) {
+  try {
+    const nf = await notifyRead(st); if (nf.events.task_auto_create !== 'assignee') return 0;
+    const byWho = {};
+    (items || []).forEach(function (t) { if (t && t.who_id && t.who_id !== '__all__' && t.del !== 1 && t.status !== 'done') (byWho[t.who_id] = byWho[t.who_id] || []).push(t); });
+    const whos = Object.keys(byWho); if (!whos.length) return 0;
+    const today = new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);
+    const tc = await push.tierCtx();
+    let n = 0;
+    for (const who of whos) {
+      const list = byWho[who];
+      const body = list.slice(0, 3).map(function (t) { return String(t.title || '').slice(0, 30) + (t.due ? ' ~' + t.due : ''); }).join(' · ') + (list.length > 3 ? ' 외 ' + (list.length - 3) + '건' : '');
+      await push.sendTo([who], { title: '자동 지시 ' + list.length + '건', body: body.slice(0, 200), url: './', tag: 'auto-new-' + who + '-' + today }, { ctx: tc, primaryOnly: true, by: by || '자동' });
+      n++;
+    }
+    return n;
+  } catch (e) { return 0; }
 }
 // ---- 문서함 설정(v314): 분류별 기본 공개범위 + 등재 결재 게이트. 관리자 전용·감사로그·낙관락(등급표 패턴) ----
 async function handleDocSettingsGet(event, d, R) {
@@ -2790,6 +2896,9 @@ async function handlerInner(event) {
     if (d && d.action === 'assign_get') return await handleAssignGet(event, d, R);
     if (d && d.action === 'assign_set') return await handleAssignSet(event, d, R);
     if (d && d.action === 'assign_revert') return await handleAssignRevert(event, d, R);
+    if (d && d.action === 'notify_get') return await handleNotifyGet(event, d, R);
+    if (d && d.action === 'notify_set') return await handleNotifySet(event, d, R);
+    if (d && d.action === 'notify_revert') return await handleNotifyRevert(event, d, R);
     if (d && d.action === 'doc_settings_get') return await handleDocSettingsGet(event, d, R);
     if (d && d.action === 'doc_settings_set') return await handleDocSettingsSet(event, d, R);
     if (d && d.action === 'doc_att_put') return await handleDocAttPut(event, d, R);

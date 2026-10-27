@@ -3219,4 +3219,64 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   T('49 assign_set 변경 없음 → 400 NO_CHANGE', r49.code === 400 && r49.body.error_code === 'NO_CHANGE');
   delete mem.gw_data['settings:assign'];
 }
+{ // ---- 50(v396) 지시 알림 설정 settings:notify — 기반 3 첫 시범(관리자 전용·검증·낙관락·push_send 정책·save/ingest 담당자 1발·크론 요약·되돌리기·감사) ----
+  mem.gw_users['member:uadm50'] = { id: 'uadm50', name: '관리자50', admin: true, perms: {}, tier: 'admin' };
+  const adminsN50 = (await pushMock.adminIds()).length;   // 앞 절들이 심어둔 재직 관리자 수(고정값 아님)
+  let r50 = await call({ action: 'notify_get' }, tokW, 'dev1');
+  T('50 notify_get 비관리자 → 403', r50.code === 403);
+  r50 = await call({ action: 'notify_get' }, tokA);
+  T('50 notify_get 관리자 → 기본값 3종(현행) · meta 라벨·추천 · prev null', r50.code === 200 && r50.body.events.task_auto_create === 'admins' && r50.body.events.task_review === 'admins' && r50.body.events.due_digest === 'each' && r50.body.meta.task_auto_create.rec === 'assignee' && r50.body.prev === null, JSON.stringify(r50.body).slice(0, 200));
+  r50 = await call({ action: 'notify_set', event: 'task_auto_create', value: 'nope' }, tokA);
+  T('50 notify_set 모르는 값 → 400 BAD_EVENT', r50.code === 400 && r50.body.error_code === 'BAD_EVENT');
+  r50 = await call({ action: 'notify_set', event: 'task_auto_create', value: 'admins' }, tokA);
+  T('50 notify_set 변경 없음 → 400 NO_CHANGE', r50.code === 400 && r50.body.error_code === 'NO_CHANGE');
+  // 현행 모드: 클라 관리자 전원 푸시 그대로(직원이 쏘면 관리자 2명)
+  pushMock.calls.length = 0;
+  r50 = await call({ action: 'push_send', to: '__admins__', title: '만기 임박 1건', body: 'x', tag: 'auto-due' }, tokW, 'dev1');
+  T('50 현행(admins): auto-due 관리자 전원 푸시 그대로(sent = 관리자 수)', r50.code === 200 && r50.body.sent === adminsN50 && pushMock.calls.length === 1, JSON.stringify(r50.body) + ' admins ' + adminsN50);
+  const auditN50 = auditMock.logs.length;
+  r50 = await call({ action: 'notify_set', event: 'task_auto_create', value: 'assignee', base: 0 }, tokA);
+  T('50 notify_set 생성→담당자 본인 · 감사 알림변경', r50.code === 200 && r50.body.events.task_auto_create === 'assignee' && auditMock.logs.length === auditN50 + 1 && auditMock.logs[auditN50].ev[0].op === '알림변경', JSON.stringify(r50.body).slice(0, 160));
+  let base50 = r50.body.updated_at;
+  pushMock.calls.length = 0;
+  r50 = await call({ action: 'push_send', to: '__admins__', title: '만기 임박 1건', body: 'x', tag: 'auto-due' }, tokW, 'dev1');
+  T('50 assignee 모드: 클라 auto-due 관리자 푸시는 서버가 삼킴(sent 0 suppressed) · 다른 태그는 그대로', r50.code === 200 && r50.body.sent === 0 && r50.body.suppressed === 'task_auto_create' && pushMock.calls.length === 0, JSON.stringify(r50.body));
+  r50 = await call({ action: 'push_send', to: '__admins__', title: '기타', body: 'x', tag: 'etc' }, tokW, 'dev1');
+  T('50 assignee 모드: 다른 태그 __admins__는 종전대로(sent = 관리자 수)', r50.code === 200 && r50.body.sent === adminsN50, JSON.stringify(r50.body));
+  // save: 새 자동 지시 → 배정표로 담당 채움 → 담당자 본인 1발(우선기기)
+  mem.gw_data['settings:assign'] = { schema: 1, rules: { 'veh:': { who_id: 'uwork' } }, approver_id: '', prev: null, updated_at: 5, updated_by: 'x' };
+  mem.gw_data['col:tasks'] = { schema: 1, items: [] };
+  pushMock.calls.length = 0;
+  r50 = await call({ action: 'save', collection: 'tasks', doc: { schema: 1, items: [
+    { id: 't_a50', title: '12가3456 정기검사 갱신', auto_key: 'veh:1:insp:2026-11-20', who_id: '', who: '', status: 'open', from: '자동', due: '2026-11-20' },
+    { id: 't_b50', title: '12가3456 보험 갱신', auto_key: 'veh:1:ins:2026-11-25', who_id: '', who: '', status: 'open', from: '자동', due: '2026-11-25' },
+    { id: 't_c50', title: '인허가 갱신(배정 없음)', auto_key: 'lic:1:exp:2026-12-01', who_id: '', who: '', status: 'open', from: '자동', due: '2026-12-01' }] } }, tokA);
+  const pc50 = pushMock.calls.filter((p) => /^auto-new-uwork-/.test(p.tag || ''));
+  T('50 save: veh 2건 담당 채움 → 담당자 1묶음 푸시("자동 지시 2건", 제목·기한) · 담당 없는 lic는 발송 없음', r50.code === 200 && pc50.length === 1 && /자동 지시 2건/.test(pc50[0].title) && /정기검사 갱신 ~2026-11-20/.test(pc50[0].body) && pushMock.calls.length === 1, JSON.stringify(pushMock.calls));
+  // ingest: 새 항목 + 공란 backfill → 담당자 1발 · notified 1
+  pushMock.calls.length = 0;
+  r50 = await call({ action: 'autotask_ingest', key: 'test-ingest-key', items: [{ auto_key: 'veh:2:insp:2026-11-28', title: '34나5678 정기검사 갱신', due: '2026-11-28' }] });
+  T('50 ingest: 새 veh 항목 → 담당 채움 + 담당자 1발 · notified 1', r50.code === 200 && r50.body.assigned === 1 && r50.body.notified === 1 && pushMock.calls.length === 1 && /자동 지시 1건/.test(pushMock.calls[0].title), JSON.stringify(r50.body) + JSON.stringify(pushMock.calls));
+  // 완료 요청 → 승인권자 1인
+  r50 = await call({ action: 'notify_set', event: 'task_review', value: 'issuer_approver', base: base50 }, tokA); base50 = r50.body.updated_at;
+  pushMock.calls.length = 0;
+  r50 = await call({ action: 'push_send', to: '__admins__', title: '승인요청: x', body: 'x', tag: 'task-rv-t1' }, tokW, 'dev1');
+  T('50 issuer_approver + 승인권자 미지정 → 종전대로 관리자 전원(sent = 관리자 수)', r50.code === 200 && r50.body.sent === adminsN50, JSON.stringify(r50.body));
+  mem.gw_data['settings:assign'].approver_id = 'uadmin';
+  r50 = await call({ action: 'push_send', to: '__admins__', title: '승인요청: x', body: 'x', tag: 'task-rv-t1' }, tokW, 'dev1');
+  T('50 issuer_approver + 승인권자 지정 → 승인권자 1인만(sent 1)', r50.code === 200 && r50.body.sent === 1, JSON.stringify(r50.body));
+  r50 = await call({ action: 'push_send', to: '__admins__', title: '승인요청: x', body: 'x', tag: 'task-rv-t2' }, tokA);
+  T('50 승인권자 본인이 완료 요청하면 자기 제외 → 다른 관리자(sent = 관리자 수 − 1)', r50.code === 200 && r50.body.sent === adminsN50 - 1, JSON.stringify(r50.body));
+  // 크론 요약
+  r50 = await call({ action: 'notify_set', event: 'due_digest', value: 'summary', base: base50 }, tokA); base50 = r50.body.updated_at;
+  const cron50 = require(join(FN, 'gw-todo-cron.js'));
+  const kst50 = new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);
+  mem.gw_data['col:tasks'].items.push({ id: 't_d50', title: '경과', auto_key: 'cert:c9', who_id: '', who: '', status: 'open', from: '자동', due: '2026-01-01' });
+  pushMock.calls.length = 0;
+  const cr50 = JSON.parse((await cron50.handler({})).body);
+  T('50 크론 요약: 자동 지시 열린 5·기한/경과 1·담당 없음 2 → 승인권자 1인 1발(tag task-digest-오늘)', cr50.ok && cr50.digest && cr50.digest.autos === 5 && cr50.digest.due === 1 && cr50.digest.no_who === 2 && cr50.digest.to === 1 && cr50.digest.sent === true && pushMock.calls.length === 1 && pushMock.calls[0].tag === 'task-digest-' + kst50, JSON.stringify(cr50) + JSON.stringify(pushMock.calls));
+  r50 = await call({ action: 'notify_revert', base: base50 }, tokA);
+  T('50 notify_revert → 직전 판(due_digest each · 나머지 유지) · 감사 알림되돌림', r50.code === 200 && r50.body.events.due_digest === 'each' && r50.body.events.task_review === 'issuer_approver' && auditMock.logs[auditMock.logs.length - 1].ev[0].op === '알림되돌림', JSON.stringify(r50.body).slice(0, 160));
+  delete mem.gw_data['settings:notify']; delete mem.gw_data['settings:assign']; delete mem.gw_users['member:uadm50']; pushMock.calls.length = 0;
+}
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

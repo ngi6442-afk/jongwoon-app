@@ -1,6 +1,6 @@
 # 종운 그룹웨어 — 기능 대장 (사용자 매뉴얼 원천)
 
-> 살아있는 문서. 기능 추가·변경 시 이 파일을 함께 갱신한다. 기준: v395 (2026-10-27).
+> 살아있는 문서. 기능 추가·변경 시 이 파일을 함께 갱신한다. 기준: v396 (2026-10-27).
 > 세부 변경 이력은 git 커밋 메시지(한글) 참조.
 
 ## 1. 전체 구조
@@ -743,3 +743,11 @@ PM 지시 "문서함 일단 다 올리고 등재결재랑 공개범위 만들어
 - 앱: 권한관리 › 등급표 아래 "자동 지시 배정표" 카드(접두어 5행 담당 select + 승인권자 1인 select + 되돌리기). 지시 카드: 자동 지시에 담당이 없으면 `담당 없음` 배지(종전 "미지정" 대신).
 - 아직 아님: 승인권자 라우팅(A5 done_if 때 연결) · [내 것 아님] · 인당 월 건수 열(§4-2는 배정표 R1 카드에 동봉) · 클라 생성기(runAutoTaskGen 등)는 그대로 who_id 공란으로 만들고 저장 때 서버가 채운다.
 - 검사: servertest 절 49(14항), uismoke v395(접두어 동률·배선·sw). sw v395.
+
+### v396 (10/27) — 지시 알림 설정 settings:notify (공통 기반 3 첫 시범 · 착수 브리핑 A3 · 카드 1-4 R1, PM 10/27 "계속 밀어")
+- 배경: 변경안 0 실측 — 푸시 수신 153명분 중 54%가 구독 없는 사람(대표·권민지·정재욱)에게 갔고, 자동 지시 생성·만기 임박은 관리자 전원 푸시였다. 수신자·방식을 설정값으로 빼고 기본값은 현행 그대로 둔다(R1: D-3 예고 뒤 추천값 적용).
+- 서버: `settings:notify` {events:{task_auto_create: admins|assignee, task_review: admins|issuer_approver, due_digest: each|summary}, prev, updated_at/by}. `NOTIFY_EVENTS`(라벨·선택지·기본값·추천값) — 앱 `NOTIFY_EVENT_ORDER`와 키 동률(uismoke). 액션 `notify_get`·`notify_set`(이벤트 1칸, 낙관락, 감사 "알림변경")·`notify_revert`. 관리자 전용.
+- 적용 지점 3: ① `push_send`: 생성 알림이 assignee면 클라의 관리자 전원 푸시(auto-due·rec-over·bid-qual)를 서버가 삼키고(sent 0 suppressed), 완료 요청(task-rv-*)이 issuer_approver면 __admins__ 대신 배정표 승인권자 1인(비면 종전대로) ② `save`(tasks)·`autotask_ingest`: 새 자동 지시와 이번에 담당이 채워진 항목을 사람별 1묶음으로 담당자 본인에게 우선기기 1발(`notifyAutoCreated`, tag auto-new-<id>-<날짜>) — 담당 없는 항목은 발송 없음 ③ `gw-todo-cron`(08:00): due_digest=summary면 "자동 지시 요약 n건 · 오늘 기한/경과 m · 담당 없음 k"를 승인권자 1인(없으면 관리자)에게 1발(tag task-digest-<날짜>).
+- 앱: 권한관리 › 배정표 아래 "지시 알림 설정" 카드(이벤트 3행 × 선택지 칩, ★=추천값, 되돌리기). 클라 push 호출은 손대지 않음(서버 정책).
+- 아직 아님: hr 수신자 설정값(D-H3, C3-1) · 07:30 요약 시각(크론 08:00 그대로 — netlify.toml은 A4 때) · 승인 라우팅(A5).
+- 검사: servertest 절 50(16항), uismoke v396(키 동률·배선·sw). sw v396.

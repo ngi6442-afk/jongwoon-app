@@ -1543,8 +1543,29 @@ try {
     && /action === 'assign_get'/.test(gwd) && /action === 'assign_set'/.test(gwd) && /action === 'assign_revert'/.test(gwd)
     && /function assignFill\(items, rules, names\)/.test(gwd) && (gwd.match(/assignFill\(doc\.items/g) || []).length === 2 && /who_by === 'assign'/.test(gwd)
     && /'MEMBERS_UNAVAILABLE'/.test(gwd) && /'BAD_PREFIX'/.test(gwd) && /'BAD_MEMBER'/.test(gwd) && /'ASSIGN_STALE'/.test(gwd) && /'NO_PREV'/.test(gwd)
-    && /jw-shell-v395/.test(swv));
+    && /jw-shell-v39[5-9]/.test(swv));
 } catch (e) { console.log('  (v395 검사 생략 — ' + e.message + ')'); fails++; }
+
+
+// ---- v396(10/27 착수 브리핑 A3 · 공통 기반 3 첫 시범): 지시 알림 설정 settings:notify — 이벤트 키 앱↔서버 동률 · 카드·호출·액션·push_send 정책·크론 요약 · sw ----
+try {
+  const svrSeg = (gwd.match(/const NOTIFY_EVENTS = \{([\s\S]*?)\n\};/) || ['', ''])[1];
+  const svrK = new Set([...svrSeg.matchAll(/^\s*([a-z_]+):\s*\{\s*label/gm)].map((m) => m[1]));
+  const appSeg = (html.match(/var NOTIFY_EVENT_ORDER = \[([^\]]+)\]/) || ['', ''])[1];
+  const appK = new Set([...appSeg.matchAll(/"([a-z_]+)"/g)].map((m) => m[1]));
+  const onlyS = [...svrK].filter((k) => !appK.has(k)), onlyA = [...appK].filter((k) => !svrK.has(k));
+  T('v396 알림 이벤트 키 앱↔서버 일치(' + svrK.size + '종)', svrK.size === 3 && !onlyS.length && !onlyA.length, '서버만: ' + onlyS.join(',') + ' / 앱만: ' + onlyA.join(','));
+  const todo = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-todo-cron.js'), 'utf8');
+  const swv = readFileSync(join(ROOT, 'sw.js'), 'utf8');
+  T('v396 배선: 카드 id·렌더·호출·notify_get/set/revert·서버 핸들러 3·push_send 정책(삼킴·승인권자)·save/ingest notifyAutoCreated·크론 요약·sw',
+    html.indexOf('id="notifyCard"') > 0 && /function renderNotifyCard\(\)/.test(html) && /renderAssignCard\(\);[^\n]*\n\s*renderNotifyCard\(\);/.test(html)
+    && /action: "notify_get"/.test(html) && /"notify_set"/.test(html) && /"notify_revert"/.test(html)
+    && /async function handleNotifyGet/.test(gwd) && /async function handleNotifySet/.test(gwd) && /async function handleNotifyRevert/.test(gwd)
+    && /action === 'notify_get'/.test(gwd) && /action === 'notify_set'/.test(gwd) && /action === 'notify_revert'/.test(gwd)
+    && /suppressed: 'task_auto_create'/.test(gwd) && /task_review === 'issuer_approver'/.test(gwd) && (gwd.match(/await notifyAutoCreated\(/g) || []).length === 2
+    && /due_digest === 'summary'/.test(todo) && /task-digest-/.test(todo)
+    && /jw-shell-v396/.test(swv));
+} catch (e) { console.log('  (v396 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

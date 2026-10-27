@@ -51,5 +51,26 @@ exports.handler = async function (event) {
       members++; items += dueNow.length;
     } catch (e) { fails++; }
   }
-  return { statusCode: 200, body: JSON.stringify({ ok: true, today: today, members: members, items: items, fails: fails, skipped: skipped }) };
+  // v396 알림 설정 due_digest=summary: 만기 임박 개별 푸시 대신 아침 요약 1줄 — 자동 지시 열린 n·오늘 기한/경과 m·담당 없음 k → 배정표 승인권자 1인(없으면 관리자 전원)
+  let digest = null;
+  try {
+    const nfr = await blobGet(st, 'settings:notify');
+    if (nfr.ok && nfr.data && nfr.data.events && nfr.data.events.due_digest === 'summary') {
+      const tr = await blobGet(st, 'col:tasks');
+      const tasks = (tr.ok && tr.data && Array.isArray(tr.data.items)) ? tr.data.items : [];
+      const autos = tasks.filter(function (x) { return x && x.auto_key && x.del !== 1 && x.status !== 'done'; });
+      const due = autos.filter(function (x) { return x.due && String(x.due) <= today; }).length;
+      const noWho = autos.filter(function (x) { return !x.who_id; }).length;
+      const ar = await blobGet(st, 'settings:assign');
+      const apv = (ar.ok && ar.data && ar.data.approver_id) ? String(ar.data.approver_id) : '';
+      let to = apv ? [apv] : ((ctx && ctx.adminIds) || []);
+      if (gateOn) to = to.filter(function (id) { return !!activeSet[id]; });
+      digest = { autos: autos.length, due: due, no_who: noWho, to: to.length };
+      if (autos.length && to.length) {
+        await push.sendTo(to, { title: '자동 지시 요약 ' + autos.length + '건', body: '오늘 기한·경과 ' + due + '건 · 담당 없음 ' + noWho + '건 — 지시함 자동 만기 구역에서 확인', url: './', tag: 'task-digest-' + today }, ctx ? { ctx: ctx, primaryOnly: true } : { primaryOnly: true });
+        digest.sent = true;
+      }
+    }
+  } catch (e) { digest = { error: String(e && e.message || e).slice(0, 80) }; }
+  return { statusCode: 200, body: JSON.stringify({ ok: true, today: today, members: members, items: items, fails: fails, skipped: skipped, digest: digest }) };
 };
