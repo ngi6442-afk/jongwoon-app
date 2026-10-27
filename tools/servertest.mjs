@@ -3340,4 +3340,18 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   T('52 스탬프: 재실행 runs 2 · start_ts 갱신', mem.gw_data['it:cron:gw-todo-cron:last'].runs === 2 && mem.gw_data['it:cron:gw-todo-cron:last'].start_ts >= s1.start_ts);
   ['it:cron:gw-todo-cron:last', 'it:cron:gw-doneif-cron:last', 'it:cron:gw-appr-cron:last', 'it:doneif:last'].forEach((k) => { delete mem.gw_data[k]; });
 }
+{ // ---- 53(v399) 감시 경보 라벨 it:alerts — 관리자 전용 · id/level 검증 · mute until 7일 · 감사 경보라벨 ----
+  delete mem.gw_data['it:alerts'];
+  let r53 = await call({ action: 'alerts_get' }, tokW, 'dev1'); T('53 alerts_get 비관리자 → 403', r53.code === 403);
+  r53 = await call({ action: 'alerts_get' }, tokA); T('53 alerts_get 관리자 → 빈 라벨', r53.code === 200 && Object.keys(r53.body.labels).length === 0);
+  r53 = await call({ action: 'alerts_set', id: 'bad id!', level: 'alert' }, tokA); T('53 alerts_set id 불량 → 400 BAD_ID', r53.code === 400 && r53.body.error_code === 'BAD_ID');
+  r53 = await call({ action: 'alerts_set', id: 'gw-doneif-cron', level: 'loud' }, tokA); T('53 alerts_set level 불량 → 400 BAD_LEVEL', r53.code === 400 && r53.body.error_code === 'BAD_LEVEL');
+  const auditN53 = auditMock.logs.length;
+  r53 = await call({ action: 'alerts_set', id: 'gw-doneif-cron', level: 'alert' }, tokA);
+  T('53 alerts_set 승격 · 감사 경보라벨 warn→alert', r53.code === 200 && r53.body.labels['gw-doneif-cron'].level === 'alert' && r53.body.labels['gw-doneif-cron'].until === '' && auditMock.logs[auditN53].ev[0].op === '경보라벨' && /warn→alert/.test(auditMock.logs[auditN53].ev[0].t), JSON.stringify(r53.body));
+  r53 = await call({ action: 'alerts_set', id: 'gw-hwakwan-cron', level: 'mute' }, tokA);
+  const kst53 = new Date(Date.now() + 9 * 3600000); const until53 = new Date(kst53.getTime() + 7 * 86400000).toISOString().slice(0, 10);
+  T('53 alerts_set 무음 → until = 오늘+7(KST) · 다른 라벨 보존', r53.code === 200 && r53.body.labels['gw-hwakwan-cron'].level === 'mute' && r53.body.labels['gw-hwakwan-cron'].until === until53 && r53.body.labels['gw-doneif-cron'].level === 'alert', JSON.stringify(r53.body));
+  delete mem.gw_data['it:alerts'];
+}
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

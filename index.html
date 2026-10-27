@@ -1599,6 +1599,9 @@
     <!-- 알림 설정(v396, 공통 기반 3 첫 시범) — 지시 이벤트 3종의 수신자·방식. 기본값 = 현행. 변경 전 판 보존 → [되돌리기]. 관리자만(서버 강제)·감사로그·낙관락 -->
     <div class="dash-sec" style="margin:16px 0 8px;"><h2>지시 알림 설정</h2></div>
     <div class="card" id="notifyCard"><div class="loading">불러오는 중…</div></div>
+    <!-- 감시 경보 라벨(v399, 공통 기반 14) — 감시 항목별 완충/승격/무음. IT 운영 책임자용. 라벨은 appdata watch.py가 09·16시 판정 때 읽는다 -->
+    <div class="dash-sec" style="margin:16px 0 8px;"><h2>감시 경보 라벨</h2></div>
+    <div class="card" id="alertsCard"><div class="loading">불러오는 중…</div></div>
     <!-- 문서함 설정(v314) — 분류별 기본 공개범위(초기 전부 비공개=관리자만 — 공개할 분류만 열기) + 등재 결재 게이트. 관리자 전용·감사로그·낙관락(등급표와 같은 결) -->
     <div class="dash-sec" style="margin:16px 0 8px;"><h2>문서함 설정</h2></div>
     <div class="card" id="docSettingsCard"><div class="loading">불러오는 중…</div></div>
@@ -20233,6 +20236,7 @@
     renderApprGrades();   // 결재 등급표(결재 3차) — 권한관리 화면 하단
     renderAssignCard();   // 자동 지시 배정표(v395) — 등급표 아래
     renderNotifyCard();   // 지시 알림 설정(v396) — 배정표 아래
+    renderAlertsCard();   // 감시 경보 라벨(v399) — 알림 설정 아래
     renderDocSettings();   // 문서함 설정(v314) — 등급표 아래
   }
   // ---- 문서함 설정(v314) — 분류별 기본 공개범위 칩 + 등재 결재 게이트. 등급표 카드와 같은 결(칩·낙관락 base·토스트·감사로그). 관리자만(서버도 강제) ----
@@ -20506,6 +20510,38 @@
       apprToastShow(p.revert ? "알림 설정을 직전 판으로 되돌렸습니다" : "알림 설정 변경 저장 — 다음 알림부터 적용됩니다");
       renderNotifyCard();
     }).catch(function(){ notifySaving = false; alert("알림 설정 저장 실패(네트워크) — 다시 시도해주세요."); });
+  }
+
+  // ---- 감시 경보 라벨(v399, 공통 기반 14 · 착수 브리핑 A7 2일차). 감시 항목(appdata cron_map watch=true id)별 완충(기본)/경보 승격/7일 무음.
+  //      새로 편입된 감시는 1주간 경보가 안내로 낮춰지고, 승격을 누르면 즉시 경보. 라벨은 appdata watch.py가 판정 때 it:alerts로 읽는다. 관리자 전용·감사로그 ----
+  var ALERT_WATCH_IDS = ["gw-hwakwan-cron","gw-allbaro-cron","gw-todo-cron","gw-appr-cron","gw-promo-ai-cron","gw-doneif-cron","bids.yml","bidsrefill.yml","autotask.yml","results.yml"];   // cron_map watch=true와 동일(uismoke 대조)
+  var ALERT_WATCH_TXT = { "gw-hwakwan-cron":"화관법 자동 제출(07:30)", "gw-allbaro-cron":"운반일지 수집(08:00)", "gw-todo-cron":"할 일 기한·지시 요약(08:00)", "gw-appr-cron":"전결 총정리(매월 1일)", "gw-promo-ai-cron":"사진AI 감독(10분)", "gw-doneif-cron":"완료 신호 워커(10분)", "bids.yml":"일감 수집(07:23)", "bidsrefill.yml":"공고문 판독(22:40)", "autotask.yml":"자동 지시 봇(08:10)", "results.yml":"개찰 대조(12·18시)" };
+  var ALERT_LEVEL_TXT = { warn:"완충(기본)", alert:"경보 승격", mute:"7일 무음" };
+  var alertsSaving = false;
+  function renderAlertsCard(){
+    var host = document.getElementById("alertsCard"); if (!host) return;
+    gwCall("gw-data", { action: "alerts_get" }).then(function(res){
+      if (res.status !== 200 || !res.body || !res.body.labels){ host.innerHTML = '<div class="empty-line">경보 라벨을 불러오지 못했습니다 — 새로고침 후 다시 시도해주세요.</div>'; return; }
+      var labels = res.body.labels;
+      var rows = ALERT_WATCH_IDS.map(function(id){
+        var L = labels[id] || {}; var cur = L.level || "warn";
+        var chips = ["warn","alert","mute"].map(function(v){ var on = (cur === v); return '<button type="button" style="' + apprGradeChipCss(v === "alert" ? 3 : (v === "mute" ? 2 : 1), on) + '" data-alert-set="' + esc(id) + ':' + v + '">' + ALERT_LEVEL_TXT[v] + (on && v === "mute" && L.until ? ' ~' + esc(L.until) : '') + '</button>'; }).join(" ");
+        return '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:7px 2px;border-bottom:1px solid var(--line);">'
+          + '<span style="min-width:200px;font-size:13px;font-weight:600;">' + esc(ALERT_WATCH_TXT[id] || id) + ' <span style="font-weight:400;color:var(--sub);font-size:11px;">' + esc(id) + '</span></span>'
+          + '<span style="display:inline-flex;gap:4px;flex-wrap:wrap;">' + chips + '</span></div>';
+      }).join("");
+      host.innerHTML = rows + '<div class="empty-line" style="margin-top:6px;">감시(appdata watch.py, 09·16시)가 이 라벨을 읽습니다. <b>완충</b>: 새로 편입된 감시는 1주간 경보 대신 안내로. <b>경보 승격</b>: 완충 없이 즉시 경보. <b>7일 무음</b>: 알고 있는 장애를 고치는 동안 푸시를 멈춤(7일 뒤 자동 해제). 변경은 감사로그에 남습니다.</div>';
+      Array.prototype.forEach.call(host.querySelectorAll("[data-alert-set]"), function(btn){ btn.addEventListener("click", function(){ var p = btn.getAttribute("data-alert-set").split(":"); alertsSet(p[0], p[1]); }); });
+    }).catch(function(){ host.innerHTML = '<div class="empty-line">경보 라벨을 불러오지 못했습니다(네트워크).</div>'; });
+  }
+  function alertsSet(id, level){
+    if (alertsSaving) return; alertsSaving = true;
+    gwCall("gw-data", { action: "alerts_set", id: id, level: level }).then(function(res){
+      alertsSaving = false;
+      if (res.status !== 200){ alert("경보 라벨 저장 실패 (" + ((res.body && res.body.error_code) || res.status) + ")"); return; }
+      apprToastShow("경보 라벨 — " + (ALERT_WATCH_TXT[id] || id) + " → " + ALERT_LEVEL_TXT[level] + " (다음 감시 판정부터)");
+      renderAlertsCard();
+    }).catch(function(){ alertsSaving = false; alert("경보 라벨 저장 실패(네트워크)"); });
   }
 
   function pmCycle(id, mod, btn){

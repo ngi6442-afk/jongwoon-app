@@ -1609,8 +1609,22 @@ try {
   const cmPath = join(ROOT, '..', 'jongwoon-appdata', 'data', 'cron_map.json');
   if (existsSync(cmPath)) { const cm = JSON.parse(readFileSync(cmPath, 'utf8')); okMap = fns.every((f) => (cm.crons || []).some((c) => c.id === f && c.evidence && c.evidence.type === 'stamp' && c.evidence.key === 'it:cron:' + f + ':last' && c.watch === true)); }
   T('v398 크론 흔적: cronstamp.js(it:cron:<fn>:last, 저장 실패 삼킴) · 4 함수 시작 스탬프 · 3 함수 끝 스탬프 · cron_map stamp 편입 · sw',
-    /it:cron:/.test(lib) && /catch \(e\) \{ \/\* no-op \*\/ \}/.test(lib) && okStart && okEnd && okMap && /jw-shell-v398/.test(swv), 'start ' + okStart + ' end ' + okEnd + ' map ' + okMap);
+    /it:cron:/.test(lib) && /catch \(e\) \{ \/\* no-op \*\/ \}/.test(lib) && okStart && okEnd && okMap && /jw-shell-v39[8-9]/.test(swv), 'start ' + okStart + ' end ' + okEnd + ' map ' + okMap);
 } catch (e) { console.log('  (v398 검사 생략 — ' + e.message + ')'); fails++; }
+
+
+// ---- v399(10/27 A7 2일차 · 공통 기반 14): 감시 경보 라벨 — 카드·액션·서버 핸들러·감시 id 목록 = cron_map watch=true · sw ----
+try {
+  const swv = readFileSync(join(ROOT, 'sw.js'), 'utf8');
+  const appIds = new Set([...((html.match(/var ALERT_WATCH_IDS = \[([^\]]+)\]/) || ['', ''])[1]).matchAll(/"([^"]+)"/g)].map((m) => m[1]));
+  let okMap = true, mapTxt = '';
+  const cmPath = join(ROOT, '..', 'jongwoon-appdata', 'data', 'cron_map.json');
+  if (existsSync(cmPath)) { const cm = JSON.parse(readFileSync(cmPath, 'utf8')); const w = (cm.crons || []).filter((c) => c.watch === true).map((c) => c.id); okMap = w.length === appIds.size && w.every((id) => appIds.has(id)); mapTxt = '지도 ' + w.join(',') + ' / 앱 ' + [...appIds].join(','); }
+  T('v399 경보 라벨: 카드 id·렌더·호출·alerts_get/set·서버 핸들러(level warn|alert|mute, mute until 7일, 감사 경보라벨)·감시 id 목록 = cron_map watch · sw',
+    html.indexOf('id="alertsCard"') > 0 && /function renderAlertsCard\(\)/.test(html) && /renderNotifyCard\(\);[^\n]*\n\s*renderAlertsCard\(\);/.test(html) && /action: "alerts_get"/.test(html) && /action: "alerts_set"/.test(html)
+    && /async function handleAlertsGet/.test(gwd) && /async function handleAlertsSet/.test(gwd) && /action === 'alerts_get'/.test(gwd) && /action === 'alerts_set'/.test(gwd) && /const ALERT_LEVELS = \{ warn: 1, alert: 1, mute: 1 \}/.test(gwd) && /op: '경보라벨'/.test(gwd)
+    && appIds.size >= 6 && okMap && /jw-shell-v399/.test(swv), mapTxt);
+} catch (e) { console.log('  (v399 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

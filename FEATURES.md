@@ -1,6 +1,6 @@
 # 종운 그룹웨어 — 기능 대장 (사용자 매뉴얼 원천)
 
-> 살아있는 문서. 기능 추가·변경 시 이 파일을 함께 갱신한다. 기준: v398 (2026-10-27).
+> 살아있는 문서. 기능 추가·변경 시 이 파일을 함께 갱신한다. 기준: v399 (2026-10-27).
 > 세부 변경 이력은 git 커밋 메시지(한글) 참조.
 
 ## 1. 전체 구조
@@ -766,3 +766,9 @@ PM 지시 "문서함 일단 다 올리고 등재결재랑 공개범위 만들어
 - appdata: cron_map.json 4건 evidence stamp·watch true(alert_after_h todo·appr 26h, promo-ai·doneif 2h) · watch.py `judge_stamp`(흔적 없음=경보 / 기준 초과=경보 / 시작만 2h↑=안내 / 끝 실패=안내) 3c)에서 함수별 판정, selftest 7항.
 - 아직 아님: 경보 라벨(it:alerts — 확인/무시/승격 1클릭, 1주 warn 뒤 alert 승격)은 A7 2일차. 화관법·올바로는 종전 판정 유지.
 - 검사: servertest 절 52(2항), uismoke v398. sw v398(서버만 바뀌었지만 sw↔FEATURES 기준 일치 규칙).
+
+### v399 (10/27) — 감시 경보 라벨 it:alerts (공통 기반 14 · 착수 브리핑 A7 2일차, PM "더 밀어")
+- 뜻: 감시(appdata watch.py 09·16시)가 새로 편입된 크론을 1주간은 경보 대신 안내로 낮추고(완충), IT 운영 책임자가 [경보 승격]을 누르면 즉시 경보, [7일 무음]은 고치는 동안 푸시를 멈춘다(until 뒤 자동 해제).
+- 서버: `it:alerts` {labels:{id:{level warn|alert|mute, until, by, ts}}}. 액션 `alerts_get`·`alerts_set`(관리자, id 영숫자·level 3종, 감사 "경보라벨"). 앱: 권한관리 › 알림 설정 아래 "감시 경보 라벨" 카드(감시 10건 = cron_map watch=true, uismoke 대조).
+- appdata: cron_map.json 감시 항목에 watch_since(편입일) · watch.py `apply_alert_label`(mute until→info / 편입 7일 안 alert→warn, 라벨 alert면 즉시) — 흔적 스탬프 판정 뒤 적용, selftest 7항. 화관법·올바로 판정은 종전 함수 그대로(라벨은 스탬프 항목에만, 확장은 A7 3일차).
+- 검사: servertest 절 53(6항), uismoke v399. sw v399.

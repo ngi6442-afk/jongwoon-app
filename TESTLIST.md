@@ -743,3 +743,8 @@
 ## v398 — 크론 흔적 스탬프
 - [ ] 배포 10분 뒤 gw_data `it:cron:gw-doneif-cron:last`·`gw-promo-ai-cron` 스탬프 생김(내일 08:00 뒤 todo·appr). 감시 09:04 판에 "크론흔적 … 정상" 또는 경보.
 - [ ] `node tools/servertest.mjs` 절 52 · `node tools/uismoke.mjs` v398 · appdata `python collectors/watch.py --selftest` 통과.
+
+## v399 — 감시 경보 라벨
+- [ ] 권한관리 맨 아래 "감시 경보 라벨" 카드 10행, 기본 완충. 승격/무음 클릭 → 토스트 + 감사로그 "경보라벨".
+- [ ] 무음 7일 뒤 자동 해제(until 날짜 표시).
+- [ ] `node tools/servertest.mjs` 절 53 · `node tools/uismoke.mjs` v399 · appdata selftest 통과.

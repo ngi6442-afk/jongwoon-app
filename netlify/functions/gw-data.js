@@ -1609,6 +1609,38 @@ async function handleDoneifSet(event, d, R) {
   try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'tasks', ev: [{ op: '앱기준설정', id: '', t: '완료 신호 자동 전환 ' + (cur.on ? '켬' : '끔') + '→' + (d.on ? '켬' : '끔') }] }); } catch (e) {}
   return jr(200, { status: 'OK', on: d.on, updated_at: doc.updated_at, request_id: R });
 }
+// ---- 감시 경보 라벨 it:alerts (v399 — 공통 기반 14 · 착수 브리핑 A7 2일차). 감시 항목(크론 지도 id)별 라벨 {level, until, by, ts}.
+// level: 'warn'(기본 — 편입 뒤 1주는 경보를 안내로 낮춤) · 'alert'(승격 1클릭 — 즉시 경보) · 'mute'(7일 무음, until). IT 운영 책임자(관리자) 전용·감사로그.
+const ALERTS_KEY = 'it:alerts';
+const ALERT_LEVELS = { warn: 1, alert: 1, mute: 1 };
+async function handleAlertsGet(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (!c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
+  let labels = {}, updated_at = 0;
+  try { const r = await blobGet(store(DATA), ALERTS_KEY); if (r.ok && r.data) { labels = (r.data.labels && typeof r.data.labels === 'object') ? r.data.labels : {}; updated_at = r.data.updated_at || 0; } } catch (e) {}
+  return jr(200, { status: 'OK', labels: labels, updated_at: updated_at, request_id: R });
+}
+async function handleAlertsSet(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (!c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
+  const id = String(d.id || '').trim().slice(0, 60), level = String(d.level || '');
+  if (!/^[A-Za-z0-9_.-]{2,60}$/.test(id)) return jr(400, { status: 'REJECTED', error_code: 'BAD_ID', request_id: R });
+  if (!Object.prototype.hasOwnProperty.call(ALERT_LEVELS, level)) return jr(400, { status: 'REJECTED', error_code: 'BAD_LEVEL', request_id: R });
+  const st = store(DATA);
+  let doc = { schema: 1, labels: {}, updated_at: 0 };
+  try { const r = await blobGet(st, ALERTS_KEY); if (r.ok && r.data && r.data.labels && typeof r.data.labels === 'object') doc = r.data; } catch (e) {}
+  const before = (doc.labels[id] || {}).level || 'warn';
+  const today = new Date(Date.now() + 9 * 3600000);
+  const until = level === 'mute' ? new Date(today.getTime() + 7 * 86400000).toISOString().slice(0, 10) : '';
+  doc.labels[id] = { level: level, until: until, by: c.member.id, ts: Date.now() };
+  doc.updated_at = Date.now(); doc.updated_by = c.member.id;
+  const w = await blobSet(st, ALERTS_KEY, doc);
+  if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
+  try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'tasks', ev: [{ op: '경보라벨', id: id, t: id + ' ' + before + '→' + level + (until ? '(~' + until + ')' : '') }] }); } catch (e) {}
+  return jr(200, { status: 'OK', labels: doc.labels, updated_at: doc.updated_at, request_id: R });
+}
 // ---- 문서함 설정(v314): 분류별 기본 공개범위 + 등재 결재 게이트. 관리자 전용·감사로그·낙관락(등급표 패턴) ----
 async function handleDocSettingsGet(event, d, R) {
   const c = await currentMember(event);
@@ -2937,6 +2969,8 @@ async function handlerInner(event) {
     if (d && d.action === 'notify_revert') return await handleNotifyRevert(event, d, R);
     if (d && d.action === 'doneif_get') return await handleDoneifGet(event, d, R);
     if (d && d.action === 'doneif_set') return await handleDoneifSet(event, d, R);
+    if (d && d.action === 'alerts_get') return await handleAlertsGet(event, d, R);
+    if (d && d.action === 'alerts_set') return await handleAlertsSet(event, d, R);
     if (d && d.action === 'doc_settings_get') return await handleDocSettingsGet(event, d, R);
     if (d && d.action === 'doc_settings_set') return await handleDocSettingsSet(event, d, R);
     if (d && d.action === 'doc_att_put') return await handleDocAttPut(event, d, R);
