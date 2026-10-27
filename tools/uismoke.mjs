@@ -2,7 +2,7 @@
 // (진짜 헤드리스 브라우저는 앱 저장소의 no-node_modules 원칙과 충돌 — 이 세션들에서 실제 결함을
 //  잡아온 검증들을 자동화한 것: ID 배선·탭 배선·앱/서버 레지스트리 일치·sw 버전업 누락)
 // 실행: node tools/uismoke.mjs
-import { readFileSync } from 'fs';
+import { readFileSync, existsSync } from 'fs';
 import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -1566,6 +1566,19 @@ try {
     && /due_digest === 'summary'/.test(todo) && /task-digest-/.test(todo)
     && /jw-shell-v396/.test(swv));
 } catch (e) { console.log('  (v396 검사 생략 — ' + e.message + ')'); fails++; }
+
+
+// ---- A4(10/27 착수 브리핑 · 공통 기반 14): 크론 지도 대조 — netlify.toml의 예약 함수가 전부 ../jongwoon-appdata/data/cron_map.json에 where=netlify·expr 동일로 등재. 지도 파일 없으면 생략 ----
+try {
+  const cmPath = join(ROOT, '..', 'jongwoon-appdata', 'data', 'cron_map.json');
+  if (existsSync(cmPath)) {
+    const cm = JSON.parse(readFileSync(cmPath, 'utf8')); const byId = {}; (cm.crons || []).forEach((c) => { byId[c.id] = c; });
+    const toml = readFileSync(join(ROOT, 'netlify.toml'), 'utf8');
+    const decl = [...toml.matchAll(/\[functions\."([^"]+)"\]\s*\r?\n\s*schedule\s*=\s*"([^"]+)"/g)].map((m) => ({ fn: m[1], cron: m[2] }));
+    const bad = decl.filter((d) => !byId[d.fn] || byId[d.fn].where !== 'netlify' || !byId[d.fn].schedule || byId[d.fn].schedule.expr !== d.cron);
+    T('A4 크론 지도: netlify 예약 함수 ' + decl.length + '개 전부 등재·표현식 일치', decl.length >= 5 && bad.length === 0, '불일치: ' + bad.map((d) => d.fn + '=' + d.cron).join(','));
+  } else console.log('  (A4 크론 지도 대조 생략 — appdata 클론 없음)');
+} catch (e) { console.log('  (A4 크론 지도 대조 생략 — ' + e.message + ')'); }
 
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
