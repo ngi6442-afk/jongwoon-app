@@ -364,6 +364,12 @@ async function handleSave(event, d, R) {
   if (col !== 'checklist' && !Array.isArray(doc.items)) doc.items = [];
   // v380(검토 발견): 정리 전에 열려 있던 관리자 탭이 상태 하나만 바꿔 저장해도(409 병합 = 로컬 우선 합집합) 정리된 공고가 되살아나지 않게 서버가 다시 거른다
   if (col === 'bids' && Array.isArray(doc.items)) purgeExpiredBids(doc, bidsCutDate());
+  // v395 배정표(기반 1·9): 자동 지시의 서버 배정 who_id(who_by 'assign')는 클라 사본이 공란으로 올려도 이월 + 남은 공란은 배정표로 채움
+  if (col === 'tasks' && Array.isArray(doc.items)) {
+    const oldByA = {}; oldItems.forEach(function (o) { if (o && o.id) oldByA[o.id] = o; });
+    doc.items.forEach(function (t) { if (!t || !t.auto_key || t.who_id) return; const o = oldByA[t.id]; if (o && o.who_id && o.who_by === 'assign') { t.who_id = o.who_id; t.who = o.who || ''; t.who_by = 'assign'; } });
+    try { const at = await assignRead(store(DATA)); if (Object.keys(at.rules || {}).length) { const ms = await assignMembers(); if (ms) assignFill(doc.items, at.rules, assignNames(ms)); } } catch (e) {}
+  }
   // 휴가: 신청 저장은 전 직원 필요하지만, 비관리자 저장은 서버가 재구성 — 타인 항목은 서버 원본 유지(클라이언트 사본으로 못 덮음),
   // 본인 항목만 반영, 승인 상태는 스스로 못 올림. (종전엔 전면 면제라 임의 직원이 전사 휴가 문서를 통째로 조작할 수 있었다.
   // 거부(403) 방식이 아니라 재구성인 이유: 낡은 사본으로 저장해도 타인 신청이 유실되지 않게)
@@ -751,13 +757,16 @@ async function handleAutotaskIngest(event, d, R) {
     const t = have[k];
     if (t && t.del !== 1) { t.del = 1; t.updated = today; fixed++; }
   });
-  if (made || fixed) {
+  // v395 배정표: 새 항목과 기존 공란 자동 지시에 담당 채움(사람 지정분 불변) — 매일 아침 ingest가 곧 일일 backfill
+  let assigned = 0;
+  try { const at = await assignRead(st); if (Object.keys(at.rules || {}).length) { const ms = await assignMembers(); if (ms) assigned = assignFill(doc.items, at.rules, assignNames(ms)); } } catch (e) {}
+  if (made || fixed || assigned) {
     doc.updated_by = '정기봇'; doc.updated_at = Date.now();
     const w = await blobSet(st, colKey('tasks'), doc);
     if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
-    try { await appendAudit({ ts: Date.now(), by: '정기봇', bid: 'bot', col: 'tasks', ev: [{ op: '정기업무', id: '', t: '신규 ' + made + ' · 정정 ' + fixed }] }); } catch (e) {}
+    try { await appendAudit({ ts: Date.now(), by: '정기봇', bid: 'bot', col: 'tasks', ev: [{ op: '정기업무', id: '', t: '신규 ' + made + ' · 정정 ' + fixed + (assigned ? ' · 배정 ' + assigned : '') }] }); } catch (e) {}
   }
-  return jr(200, { status: 'OK', made: made, fixed: fixed, request_id: R });
+  return jr(200, { status: 'OK', made: made, fixed: fixed, assigned: assigned, request_id: R });
 }
 
 // 지금 수집(관리자 버튼) — 서버가 나라장터 API를 직접 조회해 병합. G2B_API_KEY(Netlify env) 필요. 10분 쿨다운.
@@ -1370,6 +1379,93 @@ async function handleApprGradesSet(event, d, R) {
   // 변경 감사로그(명세 §2) — 진행 중 건은 스냅샷이라 영향 없음(항목 grade가 이미 박혀 있다)
   try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'approvals', ev: [{ op: '등급변경', id: kind, t: kind + ' ' + before + '→' + grade + (grade === 0 ? '(현행)' : '') }] }); } catch (e) {}
   return jr(200, { status: 'OK', grades: Object.assign({}, APPR_GRADE_DEFAULTS, stored), updated_at: doc.updated_at, request_id: R });
+}
+// ---- 배정표 settings:assign (v395 — 공통 기반 1 첫 시범. 업무별 최적화 설계 3-14 appr A1 · 착수 브리핑 A2) ----
+// 자동 지시(auto_key 접두어 veh:·lic:·cert:·rec:·bid:) → 담당 who_id. 기본표 = 빈 표: 배정 없는 접두어는 '담당 없음' 배지(관리자 폴백 금지).
+// 서버가 채운 담당은 who_by='assign' — 클라 사본이 공란으로 올려도 handleSave가 이월한다(기반 9). 사람이 지정한 who_id는 건드리지 않는다.
+// 변경 전 표는 prev에 1판 보존(R1 되돌리기 1클릭). 변경은 관리자만·감사로그·낙관락(등급표 패턴). 승인권자 1인(approver_id)은 저장만(승인 라우팅 연결은 A5 done_if 때).
+const ASSIGN_KEY = 'settings:assign';
+const ASSIGN_PREFIXES = { 'veh:': '차량 만기(정기검사·보험)', 'lic:': '인허가 만기·보수교육', 'cert:': '증명서 갱신(20일 주기)', 'rec:': '미수 장기화(45일)', 'bid:': '적격심사 검토' };
+function assignEmpty() { return { schema: 1, rules: {}, approver_id: '', prev: null, updated_at: 0, updated_by: '' }; }
+async function assignRead(st) {
+  try { const r = await blobGet(st, ASSIGN_KEY); if (r.ok && r.data && r.data.rules && typeof r.data.rules === 'object') return Object.assign(assignEmpty(), r.data); } catch (e) {}
+  return assignEmpty();
+}
+function assignFor(autoKey, rules) {   // 가장 긴 접두어 일치
+  const k = String(autoKey || ''); let best = null;
+  Object.keys(rules || {}).forEach(function (p) { if (k.indexOf(p) === 0 && (!best || p.length > best.length)) best = p; });
+  return best ? rules[best] : null;
+}
+function assignFill(items, rules, names) {   // 공란(who_id '')인 자동 지시만 채움. 바뀐 수 반환
+  let n = 0;
+  (items || []).forEach(function (t) {
+    if (!t || !t.auto_key || t.who_id || t.del === 1 || t.status === 'done') return;
+    const r = assignFor(t.auto_key, rules); if (!r || !r.who_id) return;
+    t.who_id = r.who_id; t.who = names[r.who_id] || t.who || ''; t.who_by = 'assign'; n++;
+  });
+  return n;
+}
+async function assignMembers() {   // 재직 회원 id → {name}. 명부를 못 읽으면 null(저장은 fail-closed, 채움은 건너뜀)
+  try { const tc = await push.tierCtx(); if (!tc || tc.unavailable) return null; const o = {}; (tc.members || []).forEach(function (m) { if (m && m.id) o[m.id] = { name: m.name || '' }; }); return o; } catch (e) { return null; }
+}
+function assignNames(members) { const o = {}; Object.keys(members || {}).forEach(function (id) { o[id] = members[id].name || ''; }); return o; }
+async function handleAssignGet(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (!c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
+  const a = await assignRead(store(DATA));
+  return jr(200, { status: 'OK', rules: a.rules, approver_id: a.approver_id || '', prefixes: ASSIGN_PREFIXES,
+    prev: a.prev ? { updated_at: a.prev.updated_at || 0, updated_by: a.prev.updated_by || '' } : null,
+    updated_at: a.updated_at || 0, updated_by: a.updated_by || '', request_id: R });
+}
+async function handleAssignSet(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (!c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
+  const hasPrefix = d.prefix !== undefined, hasApv = d.approver_id !== undefined;
+  if (!hasPrefix && !hasApv) return jr(400, { status: 'REJECTED', error_code: 'NO_CHANGE', request_id: R });
+  const st = store(DATA);
+  const a = await assignRead(st);
+  if (d.base !== undefined && Number(d.base) !== Number(a.updated_at || 0)) return jr(409, { status: 'CONFLICT', error_code: 'ASSIGN_STALE', request_id: R });
+  const members = await assignMembers();
+  if (!members) return jr(503, { status: 'ERROR', error_code: 'MEMBERS_UNAVAILABLE', request_id: R });   // 명부 없이 저장하면 퇴사자·오타 id가 배정될 수 있다 → 거부
+  const okId = function (id) { return id === '' || Object.prototype.hasOwnProperty.call(members, id); };
+  const nm = function (id) { return id ? ((members[id] || {}).name || id) : ''; };
+  const next = JSON.parse(JSON.stringify(a.rules || {})); let apv = a.approver_id || ''; const evs = [];
+  if (hasPrefix) {
+    const p = String(d.prefix || '');
+    if (!Object.prototype.hasOwnProperty.call(ASSIGN_PREFIXES, p)) return jr(400, { status: 'REJECTED', error_code: 'BAD_PREFIX', request_id: R });
+    const who = String(d.who_id || '').slice(0, 40);
+    if (!okId(who)) return jr(400, { status: 'REJECTED', error_code: 'BAD_MEMBER', request_id: R });
+    const before = (next[p] || {}).who_id || '';
+    if (who) next[p] = { who_id: who }; else delete next[p];
+    evs.push({ op: '배정변경', id: p, t: ASSIGN_PREFIXES[p] + ' ' + (nm(before) || '없음') + '→' + (nm(who) || '없음') });
+  }
+  if (hasApv) {
+    const w = String(d.approver_id || '').slice(0, 40);
+    if (!okId(w)) return jr(400, { status: 'REJECTED', error_code: 'BAD_MEMBER', request_id: R });
+    evs.push({ op: '배정변경', id: 'approver', t: '자동 지시 승인권자 ' + (nm(apv) || '관리자 전원') + '→' + (nm(w) || '관리자 전원') });
+    apv = w;
+  }
+  const doc = { schema: 1, rules: next, approver_id: apv, prev: { rules: a.rules || {}, approver_id: a.approver_id || '', updated_at: a.updated_at || 0, updated_by: a.updated_by || '' }, updated_by: c.member.id, updated_at: Date.now() };
+  const w = await blobSet(st, ASSIGN_KEY, doc);
+  if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
+  try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'tasks', ev: evs }); } catch (e) {}
+  return jr(200, { status: 'OK', rules: next, approver_id: apv, updated_at: doc.updated_at, request_id: R });
+}
+async function handleAssignRevert(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (!c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
+  const st = store(DATA);
+  const a = await assignRead(st);
+  if (!a.prev) return jr(400, { status: 'REJECTED', error_code: 'NO_PREV', request_id: R });
+  if (d.base !== undefined && Number(d.base) !== Number(a.updated_at || 0)) return jr(409, { status: 'CONFLICT', error_code: 'ASSIGN_STALE', request_id: R });
+  const doc = { schema: 1, rules: a.prev.rules || {}, approver_id: a.prev.approver_id || '', prev: { rules: a.rules || {}, approver_id: a.approver_id || '', updated_at: a.updated_at || 0, updated_by: a.updated_by || '' }, updated_by: c.member.id, updated_at: Date.now() };
+  const w = await blobSet(st, ASSIGN_KEY, doc);
+  if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
+  try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'tasks', ev: [{ op: '배정되돌림', id: '', t: '배정표 직전 판으로' }] }); } catch (e) {}
+  return jr(200, { status: 'OK', rules: doc.rules, approver_id: doc.approver_id, updated_at: doc.updated_at, request_id: R });
 }
 // ---- 문서함 설정(v314): 분류별 기본 공개범위 + 등재 결재 게이트. 관리자 전용·감사로그·낙관락(등급표 패턴) ----
 async function handleDocSettingsGet(event, d, R) {
@@ -2691,6 +2787,9 @@ async function handlerInner(event) {
     if (d && d.action === 'approval_decide') return await handleApprovalDecide(event, d, R);
     if (d && d.action === 'appr_grades_get') return await handleApprGradesGet(event, d, R);
     if (d && d.action === 'appr_grades_set') return await handleApprGradesSet(event, d, R);
+    if (d && d.action === 'assign_get') return await handleAssignGet(event, d, R);
+    if (d && d.action === 'assign_set') return await handleAssignSet(event, d, R);
+    if (d && d.action === 'assign_revert') return await handleAssignRevert(event, d, R);
     if (d && d.action === 'doc_settings_get') return await handleDocSettingsGet(event, d, R);
     if (d && d.action === 'doc_settings_set') return await handleDocSettingsSet(event, d, R);
     if (d && d.action === 'doc_att_put') return await handleDocAttPut(event, d, R);

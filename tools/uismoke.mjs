@@ -1490,7 +1490,7 @@ try {
     && html.indexOf('id="promoLearnCard"') > 0 && /function renderPromoLearn\(\)/.test(html) && /action: "pl_get"/.test(html) && /action: "pl_set"/.test(html) && /data-pl-off/.test(html) && /data-pl-del/.test(html) && /data-pl-assign/.test(html) && /data-pl-retry/.test(html)
     && /if \(name === "promo"\)\{ renderPromo\(\); loadPromo\(\); renderPromoLearn\(\); promoLoadLayoutProf\(\); \}/.test(html)
     && /detectFaces|facedet/.test(mask) && /detectPlates|platedet/.test(mask)
-    && /jw-shell-v394/.test(swv));
+    && /jw-shell-v39[4-9]/.test(swv));
 } catch (e) { console.log('  (v389 검사 생략 — ' + e.message + ')'); fails++; }
 
 // ---- v392(PM 10/20 "자동으로 학습해서 반영되게 · 줄간격·정렬도 포함"): D1 포장 측정 프로필 — 수집기 promoai:layout → pl_get layout → 카드 "포장 측정"(승인 버튼 없음) ----
@@ -1501,14 +1501,14 @@ try {
   T('v392 포장 측정 프로필: LAYOUT_KEY promoai:layout · pl_get layout(profile·posts 12, 없으면 null) · 카드 "포장 측정 — 실제 게시글" 가운데/한 줄/간격/구분선/굵게/해시태그 + 편별 표 · 승인 버튼 없음 · sw v392',
     /LAYOUT_KEY = 'promoai:layout'/.test(plsrc) && /LAYOUT_KEY,/.test(plsrc) && /blobGet\(st, PL\.LAYOUT_KEY\)/.test(papi) && /layout: layout, request_id: R/.test(papi) && /\.slice\(0, 12\)/.test(papi)
     && html.indexOf('포장 측정 — 실제 게시글') > 0 && /pf\.center_ratio/.test(html) && /pf\.len_med/.test(html) && /pf\.gap_default/.test(html) && /pf\.hr_per_post/.test(html) && /pf\.bold_ratio/.test(html) && /pf\.tags_med/.test(html) && /lay\.posts\.map/.test(html)
-    && html.indexOf('data-pl-approve') < 0 && /jw-shell-v394/.test(swv));
+    && html.indexOf('data-pl-approve') < 0 && /jw-shell-v39[4-9]/.test(swv));
 } catch (e) { console.log('  (v392 검사 생략 — ' + e.message + ')'); fails++; }
 
 // ---- v393: 포장 프로필 2판 — 모듈 순서(사진 i·구분선 h)·서명 유지·인사말 줄별 굵게·소제목 굵게/앞 구분선/앞 빈 줄·자주 쓰는 해시태그 → 카드 표시 ----
 try {
   const swv = readFileSync(join(ROOT, 'sw.js'), 'utf8');
   T('v393 포장 프로필 2판 카드: 서명 유지·인사말 굵게·소제목 굵게/앞 구분선/앞 빈 줄·사진 뒤 구분선·자주 쓰는 해시태그 · sw v393',
-    /pf\.sig_kept_ratio/.test(html) && /pf\.greet_bold/.test(html) && /pf\.head_bold_ratio/.test(html) && /pf\.head_hr_ratio/.test(html) && /pf\.head_blank_ratio/.test(html) && /pf\.hr_after_img_ratio/.test(html) && /pf\.tags_top/.test(html) && /jw-shell-v394/.test(swv));
+    /pf\.sig_kept_ratio/.test(html) && /pf\.greet_bold/.test(html) && /pf\.head_bold_ratio/.test(html) && /pf\.head_hr_ratio/.test(html) && /pf\.head_blank_ratio/.test(html) && /pf\.hr_after_img_ratio/.test(html) && /pf\.tags_top/.test(html) && /jw-shell-v39[4-9]/.test(swv));
 } catch (e) { console.log('  (v393 검사 생략 — ' + e.message + ')'); fails++; }
 
 // ---- v394(D3): 복사 출력에 포장 프로필 자동 적용(서명 삭제·인사말/소제목 굵게·소제목 앞 구분선·문단 경계 빈 줄) · pl_layout(홍보 권한) · copy_save → 워커 포장 간극 → 카드 ----
@@ -1522,8 +1522,29 @@ try {
     && /P\.sig_kept_ratio\|\|0\)<0\.3/.test(html) && /gbold\[l\]\|\|0\)>=0\.5/.test(html) && /P\.head_bold_ratio\|\|0\)>=0\.5/.test(html) && /P\.head_hr_ratio\|\|0\)>=0\.5/.test(html) && /P\.blank_per_para\|\|0\)>=0\.15/.test(html)
     && /function pushHr\(\)/.test(html) && /function promoPlanOfHtml\(html\)/.test(html) && /action:"pl_layout"/.test(html) && /action:"copy_save"/.test(html) && /promoLoadLayoutProf\(\); \}/.test(html) && /p\.gap\.layout\.line_match/.test(html)
     && /case 'pl_layout'/.test(papi) && /case 'copy_save'/.test(papi) && /COPY_MAX_LINES = 600/.test(papi) && /replace\(\/\[\^cbih\]\/g, ''\)/.test(papi) && /code: 'NO_PERMISSION'/.test(papi)
-    && /function layoutGap\(copyLines, finalLines\)/.test(plsrc) && /COPY_PREFIX = 'promoai:copy:'/.test(plsrc) && /PL\.layoutGap\(cp\.data\.lines, pair\.final_layout\)/.test(lw) && /jw-shell-v394/.test(swv));
+    && /function layoutGap\(copyLines, finalLines\)/.test(plsrc) && /COPY_PREFIX = 'promoai:copy:'/.test(plsrc) && /PL\.layoutGap\(cp\.data\.lines, pair\.final_layout\)/.test(lw) && /jw-shell-v39[4-9]/.test(swv));
 } catch (e) { console.log('  (v394 검사 생략 — ' + e.message + ')'); fails++; }
+
+
+// ---- v395(10/27 착수 브리핑 A2 · 공통 기반 1 첫 시범): 자동 지시 배정표 settings:assign — 접두어 앱↔서버 동률 · 카드·호출·배지·액션 배선 · sw ----
+try {
+  const svrSeg = (gwd.match(/const ASSIGN_PREFIXES = \{([\s\S]*?)\};/) || ['', ''])[1];
+  const svrP = new Set([...svrSeg.matchAll(/'([a-z]+:)'\s*:/g)].map((m) => m[1]));
+  const appSeg = (html.match(/var ASSIGN_PREFIX_ORDER = \[([^\]]+)\]/) || ['', ''])[1];
+  const appP = new Set([...appSeg.matchAll(/"([a-z]+:)"/g)].map((m) => m[1]));
+  const appTxt = (html.match(/var ASSIGN_PREFIX_TXT = \{([^}]+)\}/) || ['', ''])[1];
+  const onlyS = [...svrP].filter((k) => !appP.has(k)), onlyA = [...appP].filter((k) => !svrP.has(k));
+  T('v395 배정표 접두어 앱↔서버 일치(' + svrP.size + '종) · 라벨 표에도 전부', svrP.size === 5 && !onlyS.length && !onlyA.length && [...appP].every((k) => appTxt.indexOf('"' + k + '"') >= 0), '서버만: ' + onlyS.join(',') + ' / 앱만: ' + onlyA.join(','));
+  const swv = readFileSync(join(ROOT, 'sw.js'), 'utf8');
+  T('v395 배선: 카드 id·렌더·호출·assign_get/set/revert 액션·담당 없음 배지·서버 핸들러 3·ingest/save 채움·sw',
+    html.indexOf('id="assignCard"') > 0 && /function renderAssignCard\(\)/.test(html) && /renderApprGrades\(\);[^\n]*\n\s*renderAssignCard\(\);/.test(html)
+    && /action: "assign_get"/.test(html) && /"assign_set"/.test(html) && /"assign_revert"/.test(html) && /담당 없음<\/span>/.test(html) && /t\.auto_key && !t\.who_id && !t\.who/.test(html)
+    && /async function handleAssignGet/.test(gwd) && /async function handleAssignSet/.test(gwd) && /async function handleAssignRevert/.test(gwd)
+    && /action === 'assign_get'/.test(gwd) && /action === 'assign_set'/.test(gwd) && /action === 'assign_revert'/.test(gwd)
+    && /function assignFill\(items, rules, names\)/.test(gwd) && (gwd.match(/assignFill\(doc\.items/g) || []).length === 2 && /who_by === 'assign'/.test(gwd)
+    && /'MEMBERS_UNAVAILABLE'/.test(gwd) && /'BAD_PREFIX'/.test(gwd) && /'BAD_MEMBER'/.test(gwd) && /'ASSIGN_STALE'/.test(gwd) && /'NO_PREV'/.test(gwd)
+    && /jw-shell-v395/.test(swv));
+} catch (e) { console.log('  (v395 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

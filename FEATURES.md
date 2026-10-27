@@ -1,6 +1,6 @@
 # 종운 그룹웨어 — 기능 대장 (사용자 매뉴얼 원천)
 
-> 살아있는 문서. 기능 추가·변경 시 이 파일을 함께 갱신한다. 기준: v394 (2026-10-20).
+> 살아있는 문서. 기능 추가·변경 시 이 파일을 함께 갱신한다. 기준: v395 (2026-10-27).
 > 세부 변경 이력은 git 커밋 메시지(한글) 참조.
 
 ## 1. 전체 구조
@@ -735,3 +735,11 @@ PM 지시 "문서함 일단 다 올리고 등재결재랑 공개범위 만들어
 - 게이트 `tools/promo_post_check.mjs`(신설): index의 `// @promo-post-start ~ end`를 떼어 node에서 돌림 — 프로필 없음/ok/문턱 아래 3경로 + 낱말 보존. servertest 48(v394) 6항(layoutGap·pl_layout·copy_save).
 - 남은 실험 1: `<hr>`을 네이버 에디터가 붙여넣기에서 구분선 모듈로 받는지(권민지 임시저장 글 1회). 안 받으면 PROMO_HR를 빈 줄로 바꾼다.
 - sw v394.
+
+### v395 (10/27) — 자동 지시 배정표 settings:assign (공통 기반 1 첫 시범 · 착수 브리핑 A2, PM 10/27 "착수 ㄱ")
+- 배경: 변경안 0 실측(10/27) 자동 지시 61건 중 담당 공란 33건(54%). 공란의 뜻이 "관리자 전원"이던 것을 끊고(관리자 폴백 금지), 접두어별 담당을 설정값으로 둔다.
+- 서버: `settings:assign` {rules:{접두어:{who_id}}, approver_id, prev(직전 1판), updated_at/by}. 접두어 5종 `ASSIGN_PREFIXES`(veh:·lic:·cert:·rec:·bid:) — 앱 `ASSIGN_PREFIX_ORDER`와 동률(uismoke). 액션 `assign_get`·`assign_set`(접두어 1칸 또는 승인권자, 재직 회원만·명부 못 읽으면 503 거부·낙관락 base·감사 "배정변경")·`assign_revert`(prev로, 감사 "배정되돌림"). 전부 관리자 전용.
+- 채움 2곳: `autotask_ingest`(아침 봇) — 새 항목과 기존 공란 자동 지시에 `assignFill`(사람 지정분·done 불변, who_by=assign, 감사 "배정 n") = 일일 backfill / `save`(tasks) — 클라 사본이 서버 배정 who_id를 공란으로 올려도 이월(who_by assign) + 남은 공란 채움(기반 9 서버 우선).
+- 앱: 권한관리 › 등급표 아래 "자동 지시 배정표" 카드(접두어 5행 담당 select + 승인권자 1인 select + 되돌리기). 지시 카드: 자동 지시에 담당이 없으면 `담당 없음` 배지(종전 "미지정" 대신).
+- 아직 아님: 승인권자 라우팅(A5 done_if 때 연결) · [내 것 아님] · 인당 월 건수 열(§4-2는 배정표 R1 카드에 동봉) · 클라 생성기(runAutoTaskGen 등)는 그대로 who_id 공란으로 만들고 저장 때 서버가 채운다.
+- 검사: servertest 절 49(14항), uismoke v395(접두어 동률·배선·sw). sw v395.

@@ -1592,6 +1592,9 @@
     <!-- 결재 등급표(결재 3차, 명세 §2) — 업무 종류 × 등급 칩. 변경은 새 상신부터(진행 중 건은 기안 시점 스냅샷), 감사로그 기록 -->
     <div class="dash-sec" style="margin:16px 0 8px;"><h2>결재 등급표</h2></div>
     <div class="card" id="apprGradeCard"><div class="loading">불러오는 중…</div></div>
+    <!-- 자동 지시 배정표(v395, 공통 기반 1 첫 시범) — 접두어(차량·인허가·증명서·미수·적격) → 담당. 공란 = '담당 없음' 배지(관리자 폴백 금지). 변경 전 표 1판 보존 → [되돌리기]. 관리자만(서버 강제)·감사로그·낙관락 -->
+    <div class="dash-sec" style="margin:16px 0 8px;"><h2>자동 지시 배정표</h2></div>
+    <div class="card" id="assignCard"><div class="loading">불러오는 중…</div></div>
     <!-- 문서함 설정(v314) — 분류별 기본 공개범위(초기 전부 비공개=관리자만 — 공개할 분류만 열기) + 등재 결재 게이트. 관리자 전용·감사로그·낙관락(등급표와 같은 결) -->
     <div class="dash-sec" style="margin:16px 0 8px;"><h2>문서함 설정</h2></div>
     <div class="card" id="docSettingsCard"><div class="loading">불러오는 중…</div></div>
@@ -4196,7 +4199,8 @@
   var SHOW_TASK_ISSUER = false;
   function taskRowHtml(t, isDone, sel){
     var metaBits = [];
-    metaBits.push('<span class="author-chip">담당 ' + esc(t.who ? dispName(t.who) : "미지정") + '</span>');
+    if (t.auto_key && !t.who_id && !t.who) metaBits.push('<span class="hold-chip" title="배정표(권한관리)에 이 접두어의 담당이 없습니다 — 관리자에게 자동으로 가지 않습니다">담당 없음</span>');   // v395 배정표 공란 = 배지(관리자 폴백 금지)
+    else metaBits.push('<span class="author-chip">담당 ' + esc(t.who ? dispName(t.who) : "미지정") + '</span>');
     if (SHOW_TASK_ISSUER && t.from) metaBits.push('<span class="from-chip">지시 ' + esc(dispName(t.from)) + '</span>');
     if (t.due) metaBits.push('<span>' + esc(t.due) + '</span>');
     if (t.status === "hold") metaBits.push('<span class="hold-chip">보류</span>');
@@ -20215,6 +20219,7 @@
       });
     });
     renderApprGrades();   // 결재 등급표(결재 3차) — 권한관리 화면 하단
+    renderAssignCard();   // 자동 지시 배정표(v395) — 등급표 아래
     renderDocSettings();   // 문서함 설정(v314) — 등급표 아래
   }
   // ---- 문서함 설정(v314) — 분류별 기본 공개범위 칩 + 등재 결재 게이트. 등급표 카드와 같은 결(칩·낙관락 base·토스트·감사로그). 관리자만(서버도 강제) ----
@@ -20370,6 +20375,57 @@
       apprToastShow("결재 등급 변경 — " + kind + " → " + APPR_GRADE_TXT[g] + " (새 상신부터 적용)");
       renderApprGrades();
     }).catch(function(){ apprGradeSaving = false; alert("등급 저장 실패(네트워크) — 다시 시도해주세요."); });
+  }
+
+  // ---- 자동 지시 배정표(v395, 공통 기반 1 첫 시범 — 업무별 최적화 설계 3-14 A1 · 착수 브리핑 A2). 접두어 → 담당. 공란 = '담당 없음' 배지(관리자 폴백 금지).
+  //      변경 전 표 1판 보존 → [되돌리기] 1클릭(R1). 관리자만(서버 강제)·감사로그·낙관락 base·토스트 — 등급표 카드와 같은 결. 승인권자 1인은 저장만(라우팅 연결은 A5). ----
+  var ASSIGN_PREFIX_ORDER = ["veh:","lic:","cert:","rec:","bid:"];   // 서버 ASSIGN_PREFIXES 키와 동일(uismoke 대조)
+  var ASSIGN_PREFIX_TXT = { "veh:":"차량 만기(정기검사·보험)", "lic:":"인허가 만기·보수교육", "cert:":"증명서 갱신(20일 주기)", "rec:":"미수 장기화(45일)", "bid:":"적격심사 검토" };
+  var assignTbl = null, assignBase = 0, assignSaving = false;
+  function assignMemberOpts(cur){
+    var h = '<option value=""' + (cur ? '' : ' selected') + '>(없음 — 담당 없음 배지)</option>';
+    liveMembers().filter(function(m){ return !isBossMember(m); }).forEach(function(m){ h += '<option value="' + m.id + '"' + (m.id === cur ? ' selected' : '') + '>' + esc(m.name || "") + (m.dept ? ' · ' + esc(m.dept) : '') + '</option>'; });
+    if (cur && !liveMembers().some(function(m){ return m.id === cur; })) h += '<option value="' + esc(cur) + '" selected>(이전 담당)</option>';
+    return h;
+  }
+  function renderAssignCard(){
+    var host = document.getElementById("assignCard"); if (!host) return;
+    gwCall("gw-data", { action: "assign_get" }).then(function(res){
+      if (res.status !== 200 || !res.body || !res.body.rules){ host.innerHTML = '<div class="empty-line">배정표를 불러오지 못했습니다 — 새로고침 후 다시 시도해주세요.</div>'; return; }
+      assignTbl = res.body.rules; assignBase = res.body.updated_at || 0;
+      var rows = ASSIGN_PREFIX_ORDER.map(function(p){
+        var r = assignTbl[p] || {}; var cur = r.who_id || "";
+        return '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:7px 2px;border-bottom:1px solid var(--line);">'
+          + '<span style="min-width:190px;font-size:13px;font-weight:600;">' + esc(ASSIGN_PREFIX_TXT[p] || p) + ' <span style="font-weight:400;color:var(--sub);font-size:11px;">' + esc(p) + '</span></span>'
+          + '<select data-assign-who="' + esc(p) + '" style="font-size:12.5px;padding:3px 6px;">' + assignMemberOpts(cur) + '</select>'
+          + (cur ? '' : '<span class="hold-chip">담당 없음</span>')
+          + '</div>';
+      }).join("");
+      var apv = res.body.approver_id || "";
+      rows += '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:7px 2px;border-bottom:1px solid var(--line);">'
+        + '<span style="min-width:190px;font-size:13px;font-weight:600;">자동 지시 승인권자 1인</span>'
+        + '<select data-assign-apv="1" style="font-size:12.5px;padding:3px 6px;">' + assignMemberOpts(apv) + '</select>'
+        + '<span style="font-size:11.5px;color:var(--sub);">(비면 종전대로 관리자 전원 · 승인 흐름 연결은 다음 단계)</span></div>';
+      var prev = res.body.prev;
+      host.innerHTML = rows
+        + '<div class="empty-line" style="margin-top:6px;">자동 지시(차량·인허가·증명서·미수·적격)의 담당을 접두어로 정합니다. 공란이면 지시 카드에 <b>담당 없음</b> 배지가 붙고 관리자에게 자동으로 가지 않습니다. 변경은 새 지시와 공란 지시에 바로 적용되고(저장·아침 수집 때 서버가 채움), 사람이 직접 지정한 담당은 바꾸지 않습니다. 변경은 감사로그에 남습니다.'
+        + (prev ? ' · 직전 표 보존 <button type="button" class="link-btn" id="assignRevertBtn">되돌리기</button>' : '') + '</div>';
+      Array.prototype.forEach.call(host.querySelectorAll("[data-assign-who]"), function(sel){ sel.addEventListener("change", function(){ assignSet({ prefix: sel.getAttribute("data-assign-who"), who_id: sel.value }); }); });
+      var ap = host.querySelector("[data-assign-apv]"); if (ap) ap.addEventListener("change", function(){ assignSet({ approver_id: ap.value }); });
+      var rb = document.getElementById("assignRevertBtn"); if (rb) rb.addEventListener("click", function(){ if (!confirm("배정표를 직전 표로 되돌립니다. 계속할까요?")) return; assignSet({ revert: true }); });
+    }).catch(function(){ host.innerHTML = '<div class="empty-line">배정표를 불러오지 못했습니다(네트워크).</div>'; });
+  }
+  function assignSet(p){
+    if (assignSaving) return; assignSaving = true;
+    var body = { action: p.revert ? "assign_revert" : "assign_set", base: assignBase };
+    if (!p.revert){ if (p.prefix !== undefined){ body.prefix = p.prefix; body.who_id = p.who_id || ""; } if (p.approver_id !== undefined) body.approver_id = p.approver_id || ""; }
+    gwCall("gw-data", body).then(function(res){
+      assignSaving = false;
+      if (res.status === 409){ apprToastShow("다른 관리자가 방금 배정표를 변경했습니다 — 최신 표를 다시 불러왔습니다"); renderAssignCard(); return; }
+      if (res.status !== 200){ alert("배정표 저장 실패 (" + ((res.body && res.body.error_code) || res.status) + ")"); renderAssignCard(); return; }
+      apprToastShow(p.revert ? "배정표를 직전 표로 되돌렸습니다" : "배정표 변경 저장 — 공란 자동 지시에 바로 적용됩니다");
+      renderAssignCard();
+    }).catch(function(){ assignSaving = false; alert("배정표 저장 실패(네트워크) — 다시 시도해주세요."); });
   }
 
   function pmCycle(id, mod, btn){

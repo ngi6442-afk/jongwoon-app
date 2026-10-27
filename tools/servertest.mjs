@@ -3178,4 +3178,45 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   process.env.GW_ANTHROPIC_KEY = savedKey48; process.env.URL = savedUrl48;
   if (savedKey48 === undefined) delete process.env.GW_ANTHROPIC_KEY;
 }
+{ // ---- 49(v395) 자동 지시 배정표 settings:assign — 기반 1 첫 시범(관리자 전용·접두어·회원 검증·낙관락·ingest/save 채움·이월·되돌리기·감사) ----
+  let r49 = await call({ action: 'assign_get' }, tokW, 'dev1');
+  T('49 assign_get 비관리자 → 403', r49.code === 403);
+  r49 = await call({ action: 'assign_get' }, tokA);
+  T('49 assign_get 관리자 → 빈 표 · 접두어 5 · prev null', r49.code === 200 && Object.keys(r49.body.rules).length === 0 && Object.keys(r49.body.prefixes).length === 5 && r49.body.prev === null, JSON.stringify(r49.body).slice(0, 160));
+  r49 = await call({ action: 'assign_set', prefix: 'xx:', who_id: 'uwork' }, tokA);
+  T('49 assign_set 모르는 접두어 → 400 BAD_PREFIX', r49.code === 400 && r49.body.error_code === 'BAD_PREFIX', r49.code + '/' + r49.body.error_code);
+  r49 = await call({ action: 'assign_set', prefix: 'veh:', who_id: 'ughost' }, tokA);
+  T('49 assign_set 비회원 id → 400 BAD_MEMBER', r49.code === 400 && r49.body.error_code === 'BAD_MEMBER', r49.code + '/' + r49.body.error_code);
+  r49 = await call({ action: 'assign_set', prefix: 'veh:', who_id: 'uwork' }, tokW, 'dev1');
+  T('49 assign_set 비관리자 → 403', r49.code === 403);
+  const auditN49 = auditMock.logs.length;
+  r49 = await call({ action: 'assign_set', prefix: 'veh:', who_id: 'uwork', base: 0 }, tokA);
+  T('49 assign_set veh:→직원 · 감사 배정변경 1', r49.code === 200 && r49.body.rules['veh:'].who_id === 'uwork' && auditMock.logs.length === auditN49 + 1 && auditMock.logs[auditN49].ev[0].op === '배정변경', JSON.stringify(r49.body).slice(0, 160));
+  const base49 = r49.body.updated_at;
+  r49 = await call({ action: 'assign_set', prefix: 'lic:', who_id: 'uwork', base: 0 }, tokA);
+  T('49 assign_set 낡은 base → 409 ASSIGN_STALE', r49.code === 409 && r49.body.error_code === 'ASSIGN_STALE');
+  mem.gw_data['col:tasks'] = { schema: 1, items: [
+    { id: 't_old49', title: '옛 인허가', auto_key: 'lic:1:exp:2026-12-01', who_id: '', who: '', status: 'open', from: '자동' },
+    { id: 't_h49', title: '사람 지정', auto_key: 'veh:9:ins:2026-11-30', who_id: 'uadmin', who: '관리자', status: 'open', from: '자동' },
+    { id: 't_d49', title: '끝난 것', auto_key: 'veh:8:ins:2026-10-01', who_id: '', who: '', status: 'done', from: '자동' }] };
+  r49 = await call({ action: 'autotask_ingest', key: 'test-ingest-key', items: [{ auto_key: 'veh:2:insp:2026-11-20', title: '차량 정기검사', due: '2026-11-20' }] });
+  const tk49 = mem.gw_data['col:tasks'].items;
+  const nv49 = tk49.find((t) => t.auto_key === 'veh:2:insp:2026-11-20'), ol49 = tk49.find((t) => t.id === 't_old49'), hh49 = tk49.find((t) => t.id === 't_h49'), dd49 = tk49.find((t) => t.id === 't_d49');
+  T('49 ingest: 새 veh 담당=직원(who_by assign) · 규칙 없는 lic 공란 유지 · 사람 지정 불변 · done 불변 · assigned 1 · 감사 "배정 1"',
+    r49.code === 200 && r49.body.assigned === 1 && nv49 && nv49.who_id === 'uwork' && nv49.who === '직원' && nv49.who_by === 'assign' && ol49.who_id === '' && hh49.who_id === 'uadmin' && dd49.who_id === ''
+    && /배정 1/.test(auditMock.logs[auditMock.logs.length - 1].ev[0].t), JSON.stringify({ r: r49.body, nv: nv49 }).slice(0, 220));
+  const docS49 = JSON.parse(JSON.stringify(mem.gw_data['col:tasks']));
+  docS49.items.forEach((t) => { if (t.id === nv49.id) { t.who_id = ''; t.who = ''; } });
+  docS49.items.push({ id: 't_new49', title: '새 차량', auto_key: 'veh:3:insp:2026-12-05', who_id: '', who: '', status: 'open', from: '자동' });
+  r49 = await call({ action: 'save', collection: 'tasks', doc: docS49 }, tokA);
+  const tk49b = mem.gw_data['col:tasks'].items;
+  T('49 save: 클라가 비워 보낸 서버 배정 who_id 이월 · 새 공란 veh 채움', r49.code === 200 && tk49b.find((t) => t.id === nv49.id).who_id === 'uwork' && tk49b.find((t) => t.id === 't_new49').who_id === 'uwork' && tk49b.find((t) => t.id === 't_new49').who_by === 'assign', r49.code + ' ' + JSON.stringify(tk49b.map((t) => [t.id, t.who_id])));
+  r49 = await call({ action: 'assign_set', approver_id: 'uadmin', base: base49 }, tokA);
+  T('49 승인권자 저장', r49.code === 200 && r49.body.approver_id === 'uadmin');
+  r49 = await call({ action: 'assign_revert', base: r49.body.updated_at }, tokA);
+  T('49 assign_revert → 직전 표(승인권자 빔 · veh 유지) · 감사 배정되돌림', r49.code === 200 && r49.body.approver_id === '' && r49.body.rules['veh:'].who_id === 'uwork' && auditMock.logs[auditMock.logs.length - 1].ev[0].op === '배정되돌림', JSON.stringify(r49.body).slice(0, 160));
+  r49 = await call({ action: 'assign_set', base: r49.body.updated_at }, tokA);
+  T('49 assign_set 변경 없음 → 400 NO_CHANGE', r49.code === 400 && r49.body.error_code === 'NO_CHANGE');
+  delete mem.gw_data['settings:assign'];
+}
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);
