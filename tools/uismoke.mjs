@@ -1471,7 +1471,7 @@ try {
     && /function docViewFile\(d\)/.test(html) && html.indexOf('>보기·인쇄</button>') > 0 && html.indexOf('"원본" : "열기"') > 0 && html.indexOf('원본은 관리부·관리자') > 0 && html.indexOf('열람용 PDF 준비 중') > 0
     && html.indexOf('id="docOrigDl"') > 0 && /odw\.style\.display = isAdmin\(\) \? "block" : "none"/.test(html) && /action: "doc_log_get"/.test(html) && html.indexOf('id="docLogCard"') > 0 && /function docLogRender\(month\)/.test(html)
     && /error_code: 'ORIG_FORBIDDEN'/.test(gwd) && /'doclog:' \+ month/.test(gwd) && /d\.action === 'doc_log_get'/.test(gwd) && /if \(s\.orig_dl !== 'all'\) delete s\.orig_dl;/.test(gwd) && /'scope', 'orig_dl'\]/.test(gwd)
-    && /jw-shell-v3(8[89]|9\d)/.test(swv));   // v388 이후 판도 통과(sw 버전은 최신 블록이 정확히 본다)
+    && /jw-shell-v(3(8[89]|9\d)|4\d\d)/.test(swv));   // v388 이후 판도 통과(sw 버전은 최신 블록이 정확히 본다)
 } catch (e) { console.log('  (v388 검사 생략 — ' + e.message + ')'); fails++; }
 
 // ---- v389(PM 10/19 "니가 아니라 모델이 학습 — 초안↔직원 수정본 차이를 학습"): 블로그 자동 학습 루프 — 초안 보존·짝 블롭·학습 워커·규칙 창고 주입·관리자 카드. 모자이크 코드 불변 ----
@@ -1490,7 +1490,7 @@ try {
     && html.indexOf('id="promoLearnCard"') > 0 && /function renderPromoLearn\(\)/.test(html) && /action: "pl_get"/.test(html) && /action: "pl_set"/.test(html) && /data-pl-off/.test(html) && /data-pl-del/.test(html) && /data-pl-assign/.test(html) && /data-pl-retry/.test(html)
     && /if \(name === "promo"\)\{ renderPromo\(\); loadPromo\(\); renderPromoLearn\(\); promoLoadLayoutProf\(\); \}/.test(html)
     && /detectFaces|facedet/.test(mask) && /detectPlates|platedet/.test(mask)
-    && /jw-shell-v39[4-9]/.test(swv));
+    && /jw-shell-v(39[4-9]|4\d\d)/.test(swv));
 } catch (e) { console.log('  (v389 검사 생략 — ' + e.message + ')'); fails++; }
 
 // ---- v392(PM 10/20 "자동으로 학습해서 반영되게 · 줄간격·정렬도 포함"): D1 포장 측정 프로필 — 수집기 promoai:layout → pl_get layout → 카드 "포장 측정"(승인 버튼 없음) ----
@@ -1501,14 +1501,14 @@ try {
   T('v392 포장 측정 프로필: LAYOUT_KEY promoai:layout · pl_get layout(profile·posts 12, 없으면 null) · 카드 "포장 측정 — 실제 게시글" 가운데/한 줄/간격/구분선/굵게/해시태그 + 편별 표 · 승인 버튼 없음 · sw v392',
     /LAYOUT_KEY = 'promoai:layout'/.test(plsrc) && /LAYOUT_KEY,/.test(plsrc) && /blobGet\(st, PL\.LAYOUT_KEY\)/.test(papi) && /layout: layout, request_id: R/.test(papi) && /\.slice\(0, 12\)/.test(papi)
     && html.indexOf('포장 측정 — 실제 게시글') > 0 && /pf\.center_ratio/.test(html) && /pf\.len_med/.test(html) && /pf\.gap_default/.test(html) && /pf\.hr_per_post/.test(html) && /pf\.bold_ratio/.test(html) && /pf\.tags_med/.test(html) && /lay\.posts\.map/.test(html)
-    && html.indexOf('data-pl-approve') < 0 && /jw-shell-v39[4-9]/.test(swv));
+    && html.indexOf('data-pl-approve') < 0 && /jw-shell-v(39[4-9]|4\d\d)/.test(swv));
 } catch (e) { console.log('  (v392 검사 생략 — ' + e.message + ')'); fails++; }
 
 // ---- v393: 포장 프로필 2판 — 모듈 순서(사진 i·구분선 h)·서명 유지·인사말 줄별 굵게·소제목 굵게/앞 구분선/앞 빈 줄·자주 쓰는 해시태그 → 카드 표시 ----
 try {
   const swv = readFileSync(join(ROOT, 'sw.js'), 'utf8');
   T('v393 포장 프로필 2판 카드: 서명 유지·인사말 굵게·소제목 굵게/앞 구분선/앞 빈 줄·사진 뒤 구분선·자주 쓰는 해시태그 · sw v393',
-    /pf\.sig_kept_ratio/.test(html) && /pf\.greet_bold/.test(html) && /pf\.head_bold_ratio/.test(html) && /pf\.head_hr_ratio/.test(html) && /pf\.head_blank_ratio/.test(html) && /pf\.hr_after_img_ratio/.test(html) && /pf\.tags_top/.test(html) && /jw-shell-v39[4-9]/.test(swv));
+    /pf\.sig_kept_ratio/.test(html) && /pf\.greet_bold/.test(html) && /pf\.head_bold_ratio/.test(html) && /pf\.head_hr_ratio/.test(html) && /pf\.head_blank_ratio/.test(html) && /pf\.hr_after_img_ratio/.test(html) && /pf\.tags_top/.test(html) && /jw-shell-v(39[4-9]|4\d\d)/.test(swv));
 } catch (e) { console.log('  (v393 검사 생략 — ' + e.message + ')'); fails++; }
 
 // ---- v394(D3): 복사 출력에 포장 프로필 자동 적용(서명 삭제·인사말/소제목 굵게·소제목 앞 구분선·문단 경계 빈 줄) · pl_layout(홍보 권한) · copy_save → 워커 포장 간극 → 카드 ----
@@ -1522,7 +1522,7 @@ try {
     && /P\.sig_kept_ratio\|\|0\)<0\.3/.test(html) && /gbold\[l\]\|\|0\)>=0\.5/.test(html) && /P\.head_bold_ratio\|\|0\)>=0\.5/.test(html) && /P\.head_hr_ratio\|\|0\)>=0\.5/.test(html) && /P\.blank_per_para\|\|0\)>=0\.15/.test(html)
     && /function pushHr\(\)/.test(html) && /function promoPlanOfHtml\(html\)/.test(html) && /action:"pl_layout"/.test(html) && /action:"copy_save"/.test(html) && /promoLoadLayoutProf\(\); \}/.test(html) && /p\.gap\.layout\.line_match/.test(html)
     && /case 'pl_layout'/.test(papi) && /case 'copy_save'/.test(papi) && /COPY_MAX_LINES = 600/.test(papi) && /replace\(\/\[\^cbih\]\/g, ''\)/.test(papi) && /code: 'NO_PERMISSION'/.test(papi)
-    && /function layoutGap\(copyLines, finalLines\)/.test(plsrc) && /COPY_PREFIX = 'promoai:copy:'/.test(plsrc) && /PL\.layoutGap\(cp\.data\.lines, pair\.final_layout\)/.test(lw) && /jw-shell-v39[4-9]/.test(swv));
+    && /function layoutGap\(copyLines, finalLines\)/.test(plsrc) && /COPY_PREFIX = 'promoai:copy:'/.test(plsrc) && /PL\.layoutGap\(cp\.data\.lines, pair\.final_layout\)/.test(lw) && /jw-shell-v(39[4-9]|4\d\d)/.test(swv));
 } catch (e) { console.log('  (v394 검사 생략 — ' + e.message + ')'); fails++; }
 
 
@@ -1543,7 +1543,7 @@ try {
     && /action === 'assign_get'/.test(gwd) && /action === 'assign_set'/.test(gwd) && /action === 'assign_revert'/.test(gwd)
     && /function assignFill\(items, rules, names\)/.test(gwd) && (gwd.match(/assignFill\(doc\.items/g) || []).length === 2 && /who_by === 'assign'/.test(gwd)
     && /'MEMBERS_UNAVAILABLE'/.test(gwd) && /'BAD_PREFIX'/.test(gwd) && /'BAD_MEMBER'/.test(gwd) && /'ASSIGN_STALE'/.test(gwd) && /'NO_PREV'/.test(gwd)
-    && /jw-shell-v39[5-9]/.test(swv));
+    && /jw-shell-v(39[5-9]|4\d\d)/.test(swv));
 } catch (e) { console.log('  (v395 검사 생략 — ' + e.message + ')'); fails++; }
 
 
@@ -1564,7 +1564,7 @@ try {
     && /action === 'notify_get'/.test(gwd) && /action === 'notify_set'/.test(gwd) && /action === 'notify_revert'/.test(gwd)
     && /suppressed: 'task_auto_create'/.test(gwd) && /task_review === 'issuer_approver'/.test(gwd) && (gwd.match(/await notifyAutoCreated\(/g) || []).length === 2
     && /due_digest === 'summary'/.test(todo) && /task-digest-/.test(todo)
-    && /jw-shell-v39[6-9]/.test(swv));
+    && /jw-shell-v(39[6-9]|4\d\d)/.test(swv));
 } catch (e) { console.log('  (v396 검사 생략 — ' + e.message + ')'); fails++; }
 
 
@@ -1593,7 +1593,7 @@ try {
     && /\[functions\."gw-doneif-cron"\]\s*\r?\n\s*schedule = "\*\/10 \* \* \* \*"/.test(toml)
     && /action === 'doneif_get'/.test(gwd) && /action === 'doneif_set'/.test(gwd) && /o\.done_by === '앱 기준' && t\.status === 'open' && !t\.doneif_off/.test(gwd)
     && html.indexOf('id="taskBulkApprove"') > 0 && /t\.done_by === "앱 기준" && canApproveTask\(t\)/.test(html) && /if \(t\.done_by === "앱 기준"\) t\.doneif_off = 1;/.test(html) && /function renderDoneifRow\(\)/.test(html) && /action: "doneif_get"/.test(html) && /action: "doneif_set"/.test(html)
-    && /jw-shell-v39[7-9]/.test(swv));
+    && /jw-shell-v(39[7-9]|4\d\d)/.test(swv));
 } catch (e) { console.log('  (v397 검사 생략 — ' + e.message + ')'); fails++; }
 
 
@@ -1609,7 +1609,7 @@ try {
   const cmPath = join(ROOT, '..', 'jongwoon-appdata', 'data', 'cron_map.json');
   if (existsSync(cmPath)) { const cm = JSON.parse(readFileSync(cmPath, 'utf8')); okMap = fns.every((f) => (cm.crons || []).some((c) => c.id === f && c.evidence && c.evidence.type === 'stamp' && c.evidence.key === 'it:cron:' + f + ':last' && c.watch === true)); }
   T('v398 크론 흔적: cronstamp.js(it:cron:<fn>:last, 저장 실패 삼킴) · 4 함수 시작 스탬프 · 3 함수 끝 스탬프 · cron_map stamp 편입 · sw',
-    /it:cron:/.test(lib) && /catch \(e\) \{ \/\* no-op \*\/ \}/.test(lib) && okStart && okEnd && okMap && /jw-shell-v39[8-9]/.test(swv), 'start ' + okStart + ' end ' + okEnd + ' map ' + okMap);
+    /it:cron:/.test(lib) && /catch \(e\) \{ \/\* no-op \*\/ \}/.test(lib) && okStart && okEnd && okMap && /jw-shell-v(39[8-9]|4\d\d)/.test(swv), 'start ' + okStart + ' end ' + okEnd + ' map ' + okMap);
 } catch (e) { console.log('  (v398 검사 생략 — ' + e.message + ')'); fails++; }
 
 
@@ -1623,8 +1623,25 @@ try {
   T('v399 경보 라벨: 카드 id·렌더·호출·alerts_get/set·서버 핸들러(level warn|alert|mute, mute until 7일, 감사 경보라벨)·감시 id 목록 = cron_map watch · sw',
     html.indexOf('id="alertsCard"') > 0 && /function renderAlertsCard\(\)/.test(html) && /renderNotifyCard\(\);[^\n]*\n\s*renderAlertsCard\(\);/.test(html) && /action: "alerts_get"/.test(html) && /action: "alerts_set"/.test(html)
     && /async function handleAlertsGet/.test(gwd) && /async function handleAlertsSet/.test(gwd) && /action === 'alerts_get'/.test(gwd) && /action === 'alerts_set'/.test(gwd) && /const ALERT_LEVELS = \{ warn: 1, alert: 1, mute: 1 \}/.test(gwd) && /op: '경보라벨'/.test(gwd)
-    && appIds.size >= 6 && okMap && /jw-shell-v399/.test(swv), mapTxt);
+    && appIds.size >= 6 && okMap && /jw-shell-v(399|4\d\d)/.test(swv), mapTxt);
 } catch (e) { console.log('  (v399 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ---- v400(10/28 계약 D1 2일차): 계약 골조·목록 거울 — 로더(제자리 덮어쓰기·검증·폴백)·afterLogin 호출·관리자 카드·서버 액션 2종·dredge 접두형·appdata 거울 파일 2층·신설 제안 전부 비활성 · sw ----
+try {
+  const swv = readFileSync(join(ROOT, 'sw.js'), 'utf8');
+  const adir = join(ROOT, '..', 'jongwoon-appdata', 'data', 'contract');
+  let okAdd = false, okBlob = false, addTxt = '';
+  const addPath = join(adir, 'proc_added_v1.json');
+  if (existsSync(addPath)) { const ad = JSON.parse(readFileSync(addPath, 'utf8')); const all = [...(ad.stages || []), ...(ad.lists || [])]; okAdd = all.length >= 4 && all.every((s) => s.active === false && s.proposed === true) && ad.status === 'pending'; addTxt = 'added ' + all.length + '건 비활성 ' + okAdd; }
+  const bp = join(adir, 'blob_proc_contract_v1.json'), bl = join(adir, 'blob_list_contract.json');
+  if (existsSync(bp) && existsSync(bl)) { const p = JSON.parse(readFileSync(bp, 'utf8')), l = JSON.parse(readFileSync(bl, 'utf8')); okBlob = p.layer === 'proc' && l.layer === 'list' && p.proc_ver === 'v1' && l.proc_ver === 'v1' && Object.keys(p.consts).length === 4 && Object.keys(l.consts).length === 3 && p.consts.CON_SITE_CORP.dredge === '주식회사 종운환경' && Object.keys(p.consts.CON_SCEN).length === 10; addTxt += ' · 거울 2층 ' + okBlob; }
+  T('v400 계약 거울: 로더 4함수·afterLogin 호출·카드 id·렌더·액션 2종·서버 핸들러 2종(CON_PROC_KEYS·MIRROR_MISSING·CON_PROC_STALE·감사 계약골조)·dredge 접두형·옛 표기 0·appdata added 비활성·거울 파일 2층·sw',
+    /function conProcLoad\(\)/.test(html) && /function conProcApplyInPlace\(/.test(html) && /function conProcValid\(/.test(html) && /function conProcRevive\(/.test(html) && /loadMembers\(\);[^\n]*\n\s*conProcLoad\(\);/.test(html)
+    && html.indexOf('id="conProcCard"') > 0 && /function renderConProcCard\(\)/.test(html) && /renderAlertsCard\(\);[^\n]*\n\s*renderConProcCard\(\);/.test(html) && /action: "con_proc_get"/.test(html) && /action: "con_proc_flag_set"/.test(html)
+    && /dredge:"주식회사 종운환경"/.test(html) && html.indexOf('종운환경 주식회사') < 0 && /var elems=conModalElems\(type, false\);/.test(html) && html.indexOf('{asb:1,labor:1,wst:1}:{dredge:1}') < 0
+    && /async function handleConProcGet/.test(gwd) && /async function handleConProcFlagSet/.test(gwd) && /action === 'con_proc_get'/.test(gwd) && /action === 'con_proc_flag_set'/.test(gwd) && /const CON_PROC_KEYS = \{ proc: 'proc:contract:v1', list: 'list:contract', flag: 'settings:contract' \}/.test(gwd) && /MIRROR_MISSING/.test(gwd) && /CON_PROC_STALE/.test(gwd) && /op: '계약골조'/.test(gwd)
+    && okAdd && okBlob && /jw-shell-v400/.test(swv), addTxt);
+} catch (e) { console.log('  (v400 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

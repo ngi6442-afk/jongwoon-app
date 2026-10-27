@@ -1602,6 +1602,9 @@
     <!-- 감시 경보 라벨(v399, 공통 기반 14) — 감시 항목별 완충/승격/무음. IT 운영 책임자용. 라벨은 appdata watch.py가 09·16시 판정 때 읽는다 -->
     <div class="dash-sec" style="margin:16px 0 8px;"><h2>감시 경보 라벨</h2></div>
     <div class="card" id="alertsCard"><div class="loading">불러오는 중…</div></div>
+    <!-- 계약 골조·목록 거울(v400, 계약 D1 2일차) — 계약 상수 7종의 원천 스위치(코드 상수 ↔ Blobs 거울, 기본 상수). 거울은 appdata collectors/contract_mirror.py 가 쓴다 -->
+    <div class="dash-sec" style="margin:16px 0 8px;"><h2>계약 골조·목록 거울</h2></div>
+    <div class="card" id="conProcCard"><div class="loading">불러오는 중…</div></div>
     <!-- 문서함 설정(v314) — 분류별 기본 공개범위(초기 전부 비공개=관리자만 — 공개할 분류만 열기) + 등재 결재 게이트. 관리자 전용·감사로그·낙관락(등급표와 같은 결) -->
     <div class="dash-sec" style="margin:16px 0 8px;"><h2>문서함 설정</h2></div>
     <div class="card" id="docSettingsCard"><div class="loading">불러오는 중…</div></div>
@@ -10013,7 +10016,7 @@
   // ---- v384 현장 대장 연결(설계 §6) — 계약 시작 때 같은 종류·공사명(또는 발주처+현장/시작일)의 대장을 찾아 연결, 없으면 새 대장(운반은 대장 없음). 종결 때 대장 done·ks 초안·2/15 실적신고 할 일
   // 검토(10/13) 반영: 대장을 못 받은 기기는 받은 뒤 처리(loadAsb → csSiteHooksRetry) · 종결된 옛 대장에는 붙이지 않음 · 부분 포함 매칭 제거 · 삭제된 대장은 다시 연결
   var CON_SITE_BIZ = { asbestos:"비계ㆍ구조물해체공사업", demolition:"비계ㆍ구조물해체공사업", dredge:"상ㆍ하수도설비공사업" };
-  var CON_SITE_CORP = { asbestos:"주식회사 종운건설", demolition:"주식회사 종운건설", dredge:"종운환경 주식회사" };
+  var CON_SITE_CORP = { asbestos:"주식회사 종운건설", demolition:"주식회사 종운건설", dredge:"주식회사 종운환경" };
   function csSiteKindOf(c){ if (!c) return ""; if (SITE_KIND[c.type]) return c.type; if (c.elems && c.elems.asb) return "asbestos"; if (c.elems && (c.elems.demo || c.elems.permit)) return "demolition"; return ""; }
   function csNorm(s){ return String(s || "").toLowerCase().replace(/[\s()\-·,.㈜]/g, "").replace(/주식회사|유한회사/g, ""); }
   var csSiteLinkQueue = {};
@@ -10090,6 +10093,93 @@
     (contracts || []).forEach(function(c){ if (c && c.del !== 1 && c.scen && c.status === "done" && c.site_id && !c.site_hook) csSiteDone(c); });
   }
   // @con-scen-end
+  // ---- 계약 골조·목록 거울(v400, 계약 D1 2일차). 위 상수 7종(CON_TYPE_ELEMS·CON_SCEN·CON_STAGE_FIELDS·CON_SITE_CORP / STAGE_DOCS·STAGE_DOC_MAP·CON_PACKETS)은 그대로 두고,
+  //      settings:contract.use_blob 가 켜져 있으면 Blobs 거울(proc:contract:v1·list:contract)을 같은 자리에 "제자리 덮어쓰기"(배열 length=0 뒤 push, 객체 키 교체)한다 — 참조를 잡고 있는 함수도 같은 객체를 본다.
+  //      검증 실패·네트워크 실패·꺼짐 = 상수 그대로(폴백). added(신설 단계·목록 제안, 카드 9)는 엔진이 아직 읽지 않는다 — 여기서는 개수만 센다. 거울은 appdata collectors/contract_mirror.py 가 쓴다. ----
+  var CON_PROC_SRC = { mode:"const", reason:"", proc_sha:"", list_sha:"", built_at:"", flag:null, added_active:0, same:null };
+  function conProcRevive(v){
+    if (v && typeof v === "object"){
+      if (typeof v.$re === "string" && Object.keys(v).length <= 2){ try { return new RegExp(v.$re, v.$flags || ""); } catch(e){ return /$^/; } }
+      if (Object.prototype.toString.call(v) === "[object Array]") return v.map(conProcRevive);
+      var o = {}, k; for (k in v) if (Object.prototype.hasOwnProperty.call(v, k)) o[k] = conProcRevive(v[k]); return o;
+    }
+    return v;
+  }
+  function conProcSer(v){ return JSON.stringify(v, function(k, x){ return (x instanceof RegExp) ? { $re: x.source, $flags: (x.global ? "g" : "") + (x.ignoreCase ? "i" : "") + (x.multiline ? "m" : "") } : x; }); }
+  function conProcApplyInPlace(target, src){
+    var k, i;
+    if (Object.prototype.toString.call(target) === "[object Array]"){ target.length = 0; for (i = 0; i < src.length; i++) target.push(src[i]); return; }
+    for (k in target) if (Object.prototype.hasOwnProperty.call(target, k)) delete target[k];
+    for (k in src) if (Object.prototype.hasOwnProperty.call(src, k)) target[k] = src[k];
+  }
+  function conProcValid(proc, list){
+    try{
+      var pc = proc.consts, lc = list.consts, scen = pc.CON_SCEN, k, n = 0;
+      if (!scen || typeof scen !== "object") return "CON_SCEN 없음";
+      for (k in scen){ if (!Object.prototype.hasOwnProperty.call(scen, k)) continue; n++; if (Object.prototype.toString.call(scen[k]) !== "[object Array]" || !scen[k].length || !scen[k].every(function(s){ return typeof s === "string" && !!s.replace(/\s/g, ""); })) return "CON_SCEN " + k + " 단계 이름 불량"; }
+      if (n !== 10) return "CON_SCEN 키 " + n + "개(10 아님)";
+      if (!pc.CON_TYPE_ELEMS || typeof pc.CON_TYPE_ELEMS !== "object") return "CON_TYPE_ELEMS 없음";
+      if (Object.prototype.toString.call(pc.CON_STAGE_FIELDS) !== "[object Array]" || pc.CON_STAGE_FIELDS.length < 10) return "CON_STAGE_FIELDS 불량";
+      if (!pc.CON_SITE_CORP || typeof pc.CON_SITE_CORP !== "object") return "CON_SITE_CORP 없음";
+      if (!lc.STAGE_DOCS || typeof lc.STAGE_DOCS !== "object" || Object.keys(lc.STAGE_DOCS).length < 10) return "STAGE_DOCS 불량";
+      if (Object.prototype.toString.call(lc.STAGE_DOC_MAP) !== "[object Array]" || lc.STAGE_DOC_MAP.length < 10 || !lc.STAGE_DOC_MAP.every(function(p){ return !!(p && p.length === 2 && p[0] && typeof p[0].$re === "string" && typeof p[1] === "string"); })) return "STAGE_DOC_MAP 불량";
+      if (Object.prototype.toString.call(lc.CON_PACKETS) !== "[object Array]" || lc.CON_PACKETS.length !== 4) return "CON_PACKETS 불량";
+      return "";
+    }catch(e){ return "검증 예외"; }
+  }
+  function conProcLoad(){
+    if (!curMember()) return;
+    gwCall("gw-data", { action: "con_proc_get" }).then(function(res){
+      if (res.status !== 200 || !res.body){ CON_PROC_SRC.reason = "조회 실패"; return; }
+      var b = res.body, k; CON_PROC_SRC.flag = b.flag || null;
+      if (!b.proc || !b.list){ CON_PROC_SRC.mode = "const"; CON_PROC_SRC.reason = "거울 없음"; CON_PROC_SRC.same = null; return; }
+      CON_PROC_SRC.proc_sha = b.proc.sha || ""; CON_PROC_SRC.list_sha = b.list.sha || ""; CON_PROC_SRC.built_at = b.proc.built_at || "";
+      var inline = { CON_TYPE_ELEMS:CON_TYPE_ELEMS, CON_SCEN:CON_SCEN, CON_STAGE_FIELDS:CON_STAGE_FIELDS, CON_SITE_CORP:CON_SITE_CORP, STAGE_DOCS:STAGE_DOCS, STAGE_DOC_MAP:STAGE_DOC_MAP, CON_PACKETS:CON_PACKETS };
+      var mirror = {};
+      for (k in b.proc.consts) if (Object.prototype.hasOwnProperty.call(b.proc.consts, k)) mirror[k] = b.proc.consts[k];
+      for (k in b.list.consts) if (Object.prototype.hasOwnProperty.call(b.list.consts, k)) mirror[k] = b.list.consts[k];
+      try { CON_PROC_SRC.same = (CON_PROC_SRC.mode === "blob") ? CON_PROC_SRC.same : (conProcSer(inline) === JSON.stringify(mirror)); } catch(e){ CON_PROC_SRC.same = null; }
+      var ac = 0; try { ac = ((b.proc.added || {}).stages || []).filter(function(s){ return !!s.active; }).length + ((b.list.added || {}).lists || []).filter(function(s){ return !!s.active; }).length; } catch(e){}
+      CON_PROC_SRC.added_active = ac;
+      if (!(b.flag && b.flag.use_blob)){ CON_PROC_SRC.mode = "const"; CON_PROC_SRC.reason = "거울 꺼짐"; return; }
+      var bad = conProcValid(b.proc, b.list);
+      if (bad){ CON_PROC_SRC.mode = "const"; CON_PROC_SRC.reason = "거울 검증 실패: " + bad; return; }
+      var rv = conProcRevive(mirror);
+      conProcApplyInPlace(CON_TYPE_ELEMS, rv.CON_TYPE_ELEMS); conProcApplyInPlace(CON_SCEN, rv.CON_SCEN); conProcApplyInPlace(CON_STAGE_FIELDS, rv.CON_STAGE_FIELDS); conProcApplyInPlace(CON_SITE_CORP, rv.CON_SITE_CORP);
+      conProcApplyInPlace(STAGE_DOCS, rv.STAGE_DOCS); conProcApplyInPlace(STAGE_DOC_MAP, rv.STAGE_DOC_MAP); conProcApplyInPlace(CON_PACKETS, rv.CON_PACKETS);
+      CON_PROC_SRC.mode = "blob"; CON_PROC_SRC.reason = "";
+    }).catch(function(){ CON_PROC_SRC.reason = "네트워크"; });
+  }
+  var conProcSaving = false;
+  function renderConProcCard(){
+    var host = document.getElementById("conProcCard"); if (!host) return;
+    gwCall("gw-data", { action: "con_proc_get" }).then(function(res){
+      if (res.status !== 200 || !res.body){ host.innerHTML = '<div class="empty-line">거울 상태를 불러오지 못했습니다 — 새로고침 후 다시 시도해주세요.</div>'; return; }
+      var b = res.body, f = b.flag || {}, on = !!f.use_blob, has = !!(b.proc && b.list), same = CON_PROC_SRC.same;
+      var src = on ? (CON_PROC_SRC.mode === "blob" ? "거울(Blobs) — 이 화면에 적용 중" : "거울 켜짐 — 새로고침부터 적용" + (CON_PROC_SRC.reason ? " · " + esc(CON_PROC_SRC.reason) : "")) : "코드 상수(기본)";
+      var rows = [
+        ["현재 원천", src],
+        ["거울", has ? ("proc " + esc(String(b.proc.sha)) + " · list " + esc(String(b.list.sha)) + " · 생성 " + esc(String(b.proc.built_at || "").replace("T", " ").slice(0, 16))) : "없음 — appdata collectors/contract_mirror.py --push 로 만듭니다"],
+        ["거울 ↔ 상수", has ? (same === true ? "같음(diff 0)" : (same === false ? "다름 — 켜면 거울이 우선" : "비교 전")) : "—"],
+        ["신설 제안(카드 9)", has ? ((((b.proc.added || {}).stages || []).length) + "단계 · " + (((b.list.added || {}).lists || []).length) + "목록 · 활성 " + CON_PROC_SRC.added_active + "건 (엔진은 카드 9 회신 뒤 읽음)") : "—"],
+        ["마지막 변경", f.updated_at ? (esc(memberName(f.updated_by) || f.updated_by || "") + " · " + esc(new Date(f.updated_at + 9 * 3600000).toISOString().slice(0, 16).replace("T", " "))) : "없음"]
+      ].map(function(r){ return '<div style="display:flex;gap:8px;padding:5px 2px;border-bottom:1px solid var(--line);font-size:13px;"><span style="min-width:120px;color:var(--sub);">' + r[0] + '</span><span>' + r[1] + '</span></div>'; }).join("");
+      var btn = '<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">'
+        + '<button type="button" style="' + apprGradeChipCss(on ? 1 : 3, true) + '" data-conproc-set="' + (on ? "0" : "1") + '" data-base="' + (f.updated_at || 0) + '"' + ((!on && !has) ? ' disabled' : '') + '>' + (on ? "거울 끄기 — 코드 상수로 되돌리기" : "거울 켜기") + '</button>'
+        + (f.prev ? '<span class="empty-line">이전 값: ' + (f.prev.use_blob ? "켬" : "끔") + '</span>' : '') + '</div>';
+      host.innerHTML = rows + btn + '<div class="empty-line" style="margin-top:6px;">계약 단계 목록·서류 목록·입력 칸·패킷·시행 회사 상수 7종의 원천을 바꾸는 스위치입니다(계약 D1). 기본은 코드 상수. 켜면 다음 로그인·새로고침부터 거울을 읽고, 거울이 깨져 있으면 자동으로 상수로 돌아갑니다. 단계 이름은 어느 쪽이든 PM 원문 그대로입니다.</div>';
+      Array.prototype.forEach.call(host.querySelectorAll("[data-conproc-set]"), function(el){ el.addEventListener("click", function(){ conProcFlagSet(el.getAttribute("data-conproc-set") === "1", Number(el.getAttribute("data-base") || 0)); }); });
+    }).catch(function(){ host.innerHTML = '<div class="empty-line">거울 상태를 불러오지 못했습니다(네트워크).</div>'; });
+  }
+  function conProcFlagSet(on, base){
+    if (conProcSaving) return; conProcSaving = true;
+    gwCall("gw-data", { action: "con_proc_flag_set", use_blob: on, base: base }).then(function(res){
+      conProcSaving = false;
+      if (res.status !== 200){ alert("거울 스위치 저장 실패 (" + ((res.body && res.body.error_code) || res.status) + ")"); return; }
+      apprToastShow("계약 골조·목록 거울 " + (on ? "켬 — 새로고침하면 거울을 읽습니다" : "끔 — 새로고침하면 코드 상수로 돌아갑니다"));
+      renderConProcCard();
+    }).catch(function(){ conProcSaving = false; alert("거울 스위치 저장 실패(네트워크)"); });
+  }
   // 제목 키워드로 요소 제안(낙찰→계약 유입 시) — 학습 전 초기 제안
   function suggestConElems(text, decide){
     var t=(text||"").replace(/\s+/g,"");
@@ -12180,7 +12270,7 @@
     var type=(q.co==="con")?"asbestos":"dredge";
     var qst=conScenStages(type, true, false, {}), qdf=/견적/.test((qst[0]||{}).name||"");   // v382 검토 6: 견적 단계가 있는 시나리오(준설)만 완료 처리
     if(!confirm("["+(q.no||"")+"] 견적서를 계약으로 승격할까요?\n"+(qdf?("견적 단계는 완료 처리하고 \""+((qst[1]||{}).name||"")+"\"부터 시작합니다."):("\""+((qst[0]||{}).name||"")+"\" 단계부터 시작합니다(이 시나리오엔 견적 단계가 없습니다).")))) return;
-    var elems=(q.co==="con")?{asb:1,labor:1,wst:1}:{dredge:1};
+    var elems=conModalElems(type, false);   // v400: 요소는 CON_TYPE_ELEMS 한 곳(거울 적용 경로) — 종전 리터럴 {asb,labor,wst}/{dredge}와 같은 값
     var amt=qtAmt(q);
     var nc=startProcess(type, {client:q.recv||"", site:"", start:q.date||todayStr(), who:"", docType:"public",
       title:q.title||"", cinfo:{ title:q.title||"", amount:amt, d1:"", d2:"", d3:"", client:q.recv||"", site:"",
@@ -19760,6 +19850,7 @@
     applyPerms();
     doLoad(); loadTasks(); loadVehicles(); loadReceivables(); loadLicenses(); loadDocuments(); loadClients(); loadContracts(); loadMyTasks(); loadLeaves(); loadBids(); loadOnbid();
     loadMembers();   // 담당 배정 드롭다운용 — 관리자·직원 모두
+    conProcLoad();   // v400: 계약 골조·목록 거울 — settings:contract.use_blob 가 켜져 있을 때만 상수 7종을 제자리 덮어쓰기(검증 실패·네트워크 실패 = 상수 유지)
     apprInit();      // 결재함(C안): 뱃지 즉시 갱신 + 5분 주기 폴링(관리자만 실제 조회)
     if (currentTab === "progress") renderProgress();   // 진척도 탭에서 세션 만료→재로그인한 경우 화면 복구
     render();
@@ -20237,6 +20328,7 @@
     renderAssignCard();   // 자동 지시 배정표(v395) — 등급표 아래
     renderNotifyCard();   // 지시 알림 설정(v396) — 배정표 아래
     renderAlertsCard();   // 감시 경보 라벨(v399) — 알림 설정 아래
+    renderConProcCard();  // 계약 골조·목록 거울(v400) — 경보 라벨 아래
     renderDocSettings();   // 문서함 설정(v314) — 등급표 아래
   }
   // ---- 문서함 설정(v314) — 분류별 기본 공개범위 칩 + 등재 결재 게이트. 등급표 카드와 같은 결(칩·낙관락 base·토스트·감사로그). 관리자만(서버도 강제) ----

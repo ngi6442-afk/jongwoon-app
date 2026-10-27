@@ -3354,4 +3354,25 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   T('53 alerts_set 무음 → until = 오늘+7(KST) · 다른 라벨 보존', r53.code === 200 && r53.body.labels['gw-hwakwan-cron'].level === 'mute' && r53.body.labels['gw-hwakwan-cron'].until === until53 && r53.body.labels['gw-doneif-cron'].level === 'alert', JSON.stringify(r53.body));
   delete mem.gw_data['it:alerts'];
 }
+{ // ---- 54(v400) 계약 골조·목록 거울 settings:contract / proc:contract:v1 / list:contract — 조회(로그인 전원)·스위치(관리자·값·낙관락·거울 층 검증·prev 되돌리기·감사 계약골조) ----
+  delete mem.gw_data['settings:contract']; delete mem.gw_data['proc:contract:v1']; delete mem.gw_data['list:contract'];
+  let r54 = await call({ action: 'con_proc_get' }, tokW, 'dev1'); T('54 con_proc_get 직원 → 200 · 기본 꺼짐 · 거울 없음', r54.code === 200 && r54.body.flag.use_blob === false && r54.body.proc === null && r54.body.list === null);
+  r54 = await call({ action: 'con_proc_flag_set', use_blob: true }, tokW, 'dev1'); T('54 flag_set 비관리자 → 403', r54.code === 403);
+  r54 = await call({ action: 'con_proc_flag_set', use_blob: 'yes' }, tokA); T('54 flag_set 값 불량 → 400 BAD_VALUE', r54.code === 400 && r54.body.error_code === 'BAD_VALUE');
+  r54 = await call({ action: 'con_proc_flag_set', use_blob: true }, tokA); T('54 거울 없이 켜기 → 409 MIRROR_MISSING', r54.code === 409 && r54.body.error_code === 'MIRROR_MISSING');
+  const mk54 = (layer, names) => ({ schema: 1, layer, proc_ver: 'v1', built_at: '2026-10-28T09:00:00+09:00', consts: Object.fromEntries(names.map((n) => [n, {}])), added: layer === 'proc' ? { stages: [] } : { lists: [] }, sha: 'abcdef0123456789' });
+  mem.gw_data['proc:contract:v1'] = mk54('proc', ['CON_TYPE_ELEMS', 'CON_SCEN', 'CON_STAGE_FIELDS', 'CON_SITE_CORP']);
+  mem.gw_data['list:contract'] = { ...mk54('list', ['STAGE_DOCS', 'STAGE_DOC_MAP', 'CON_PACKETS']), proc_ver: 'v2' };
+  r54 = await call({ action: 'con_proc_flag_set', use_blob: true }, tokA); T('54 목록 층 proc_ver≠v1 → 409 MIRROR_MISSING(층 검증)', r54.code === 409 && r54.body.error_code === 'MIRROR_MISSING');
+  mem.gw_data['list:contract'] = mk54('list', ['STAGE_DOCS', 'STAGE_DOC_MAP', 'CON_PACKETS']);
+  const auditN54 = auditMock.logs.length;
+  r54 = await call({ action: 'con_proc_flag_set', use_blob: true }, tokA); T('54 켜기 → 200 · 감사 계약골조', r54.code === 200 && r54.body.use_blob === true && auditMock.logs.length === auditN54 + 1 && auditMock.logs[auditN54].ev[0].op === '계약골조');
+  const at54 = r54.body.updated_at;
+  r54 = await call({ action: 'con_proc_get' }, tokW, 'dev1'); T('54 켠 뒤 조회(직원) → 거울 2층 sha·flag·prev', r54.code === 200 && r54.body.flag.use_blob === true && r54.body.proc.sha === 'abcdef0123456789' && r54.body.list.layer === 'list' && r54.body.flag.prev.use_blob === false);
+  r54 = await call({ action: 'con_proc_flag_set', use_blob: true }, tokA); T('54 같은 값 → 400 NO_CHANGE', r54.code === 400 && r54.body.error_code === 'NO_CHANGE');
+  r54 = await call({ action: 'con_proc_flag_set', use_blob: false, base: 1 }, tokA); T('54 base 불일치 → 409 CON_PROC_STALE', r54.code === 409 && r54.body.error_code === 'CON_PROC_STALE');
+  r54 = await call({ action: 'con_proc_flag_set', use_blob: false, base: at54 }, tokA); T('54 끄기(되돌리기) → 200 · prev=켬', r54.code === 200 && r54.body.use_blob === false && mem.gw_data['settings:contract'].prev.use_blob === true);
+  delete mem.gw_data['settings:contract']; delete mem.gw_data['proc:contract:v1']; delete mem.gw_data['list:contract'];
+}
+
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

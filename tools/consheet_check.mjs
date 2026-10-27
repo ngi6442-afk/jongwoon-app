@@ -208,7 +208,7 @@ api.popContract();
 // 종결 훅
 c6.contract_info = { amount: 19525000, d1: '2026-05-08' }; c6.settle_amount = 19450000; c6.status = 'done'; const nT = api.tasks.length; api.csOnDone(c6);
 const t15 = api.tasks[api.tasks.length - 1];
-T('v384 csOnDone: 대장 done·end 채움·ks 초안(상ㆍ하수도설비공사업·정산액 19,450,000·계약일·corp 환경·draft) · 2/15 할 일 1건(다음 2월 15일) · 두 번 불러도 1회 · site_hook/task_hook', linked.status === 'done' && !!linked.end && linked.ks && linked.ks.biz === '상ㆍ하수도설비공사업' && linked.ks.amount === 19450000 && linked.ks.contract_date === '2026-05-08' && linked.ks.corp === '종운환경 주식회사' && linked.ks.draft === 1
+T('v384 csOnDone: 대장 done·end 채움·ks 초안(상ㆍ하수도설비공사업·정산액 19,450,000·계약일·corp 환경·draft) · 2/15 할 일 1건(다음 2월 15일) · 두 번 불러도 1회 · site_hook/task_hook', linked.status === 'done' && !!linked.end && linked.ks && linked.ks.biz === '상ㆍ하수도설비공사업' && linked.ks.amount === 19450000 && linked.ks.contract_date === '2026-05-08' && linked.ks.corp === '주식회사 종운환경' && linked.ks.draft === 1
   && api.tasks.length === nT + 1 && t15.title === '실적신고(2/15) — 하수도시설물 준설공사(3공구)' && t15.due === '2027-02-15' && (api.csOnDone(c6), api.tasks.length === nT + 1) && c6.site_hook === '2026-10-13' && c6.task_hook === '2026-10-13', JSON.stringify(linked.ks) + ' ' + (t15 && t15.due));
 T('v384 검토 I: 옛 계약(scen 없음)은 종결 훅 없음(2/15 지시 안 만듦)', (() => { const o = mk(); delete o.scen; o.status = 'done'; const n = api.tasks.length; api.csOnDone(o); return api.tasks.length === n && !o.task_hook; })(), '');
 // 검토 C — 대장을 못 받은 기기에서 종결: site_hook 안 찍고 보류 → 받은 뒤 재시도로 처리

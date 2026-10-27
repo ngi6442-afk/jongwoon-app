@@ -1,6 +1,6 @@
 # 종운 그룹웨어 — 기능 대장 (사용자 매뉴얼 원천)
 
-> 살아있는 문서. 기능 추가·변경 시 이 파일을 함께 갱신한다. 기준: v399 (2026-10-27).
+> 살아있는 문서. 기능 추가·변경 시 이 파일을 함께 갱신한다. 기준: v400 (2026-10-28).
 > 세부 변경 이력은 git 커밋 메시지(한글) 참조.
 
 ## 1. 전체 구조
@@ -772,3 +772,10 @@ PM 지시 "문서함 일단 다 올리고 등재결재랑 공개범위 만들어
 - 서버: `it:alerts` {labels:{id:{level warn|alert|mute, until, by, ts}}}. 액션 `alerts_get`·`alerts_set`(관리자, id 영숫자·level 3종, 감사 "경보라벨"). 앱: 권한관리 › 알림 설정 아래 "감시 경보 라벨" 카드(감시 10건 = cron_map watch=true, uismoke 대조).
 - appdata: cron_map.json 감시 항목에 watch_since(편입일) · watch.py `apply_alert_label`(mute until→info / 편입 7일 안 alert→warn, 라벨 alert면 즉시) — 흔적 스탬프 판정 뒤 적용, selftest 7항. 화관법·올바로 판정은 종전 함수 그대로(라벨은 스탬프 항목에만, 확장은 A7 3일차).
 - 검사: servertest 절 53(6항), uismoke v399. sw v399.
+
+### v400 (10/28) — 계약 골조·목록 거울 proc:contract:v1·list:contract (계약 D1 2일차, PM "계속 밀고")
+- 뜻: 계약 단계 목록·서류 목록·입력 칸·패킷·시행 회사 상수 7종(@con-scen)을 Blobs 거울로도 두고, 관리자 스위치(settings:contract.use_blob, 기본 끔)가 켜져 있을 때만 로그인 뒤 상수 자리에 제자리 덮어쓰기. 거울이 깨지면 상수로 폴백. 단계 이름 PM 원문 불변.
+- 거울 생성: appdata `collectors/contract_mirror.py`(proc_v1.json export + proc_added_v1.json 제안 → blob_proc_contract_v1.json·blob_list_contract.json 2층 → `--push` 로컬 CLI → `--verify` diff 0, selftest 13). 신설 단계 4(변경계약·사급 (착공)·(완료)·적격심사 수동)·목록 2(완료신고 석면/철거)는 카드 9 회신 전 전부 active:false(엔진 미반영, 개수만 카드에 표시).
+- 서버: `con_proc_get`(로그인 전원 — flag·proc·list, 층 검증 proc_ver v1·layer·sha) · `con_proc_flag_set`(관리자, BAD_VALUE·NO_CHANGE·CON_PROC_STALE 409·MIRROR_MISSING 409, prev 보존=되돌리기, 감사 "계약골조"). 앱: afterLogin→conProcLoad(conProcValid → conProcRevive {$re,$flags}→RegExp → conProcApplyInPlace) · 권한관리 › 경보 라벨 아래 "계약 골조·목록 거울" 카드(원천·sha·거울↔상수 diff·신설 제안 수·스위치).
+- 정정: CON_SITE_CORP.dredge "종운환경 주식회사"→"주식회사 종운환경"(접두형, 10/8 전환 잔재) → proc_v1.json 재export(diff 0).
+- 검사: servertest 절 54(10항), uismoke v400, `node tools/proctpl_check.mjs`(변환 diff 0 — 상수를 바꾸면 `--export` 뒤 appdata 커밋·`contract_mirror.py --push --verify`). sw v400.

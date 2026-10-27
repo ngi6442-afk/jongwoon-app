@@ -1641,6 +1641,46 @@ async function handleAlertsSet(event, d, R) {
   try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'tasks', ev: [{ op: '경보라벨', id: id, t: id + ' ' + before + '→' + level + (until ? '(~' + until + ')' : '') }] }); } catch (e) {}
   return jr(200, { status: 'OK', labels: doc.labels, updated_at: doc.updated_at, request_id: R });
 }
+// ---- 계약 골조·목록 거울 (v400 — 계약 D1 2일차). Blobs proc:contract:v1(골조 층: CON_TYPE_ELEMS·CON_SCEN·CON_STAGE_FIELDS·CON_SITE_CORP + added.stages)·list:contract(목록 층: STAGE_DOCS·STAGE_DOC_MAP·CON_PACKETS + added.lists)는
+//      appdata collectors/contract_mirror.py 가 쓴다(코드 상수 export + proc_added_v1 제안). 앱은 settings:contract.use_blob 가 true 일 때만 로그인 뒤 상수 자리에 거울을 덮어 쓴다(기본 false = 배포 무변화).
+//      켜기·끄기는 관리자 1클릭(prev 보존 = 되돌리기), 거울 두 층이 검증(proc_ver v1·layer·sha)을 못 넘으면 켤 수 없다(MIRROR_MISSING). 단계 이름은 어느 쪽이든 PM 원문 불변.
+const CON_PROC_KEYS = { proc: 'proc:contract:v1', list: 'list:contract', flag: 'settings:contract' };
+function conProcLayerOk(x, layer) { return !!(x && typeof x === 'object' && x.proc_ver === 'v1' && x.layer === layer && x.consts && typeof x.consts === 'object' && typeof x.sha === 'string' && x.sha.length >= 8); }
+async function conProcReadFlag(st) {
+  let flag = { use_blob: false, updated_at: 0, updated_by: '', prev: null };
+  try { const r = await blobGet(st, CON_PROC_KEYS.flag); if (r.ok && r.data) flag = { use_blob: r.data.use_blob === true, updated_at: r.data.updated_at || 0, updated_by: r.data.updated_by || '', prev: r.data.prev || null }; } catch (e) {}
+  return flag;
+}
+async function conProcReadLayers(st) {
+  let proc = null, list = null;
+  try { const p = await blobGet(st, CON_PROC_KEYS.proc); if (p.ok && conProcLayerOk(p.data, 'proc')) proc = p.data; } catch (e) {}
+  try { const l = await blobGet(st, CON_PROC_KEYS.list); if (l.ok && conProcLayerOk(l.data, 'list')) list = l.data; } catch (e) {}
+  return { proc: proc, list: list };
+}
+async function handleConProcGet(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  const st = store(DATA);
+  const flag = await conProcReadFlag(st);
+  const L = await conProcReadLayers(st);
+  return jr(200, { status: 'OK', flag: flag, proc: L.proc, list: L.list, request_id: R });
+}
+async function handleConProcFlagSet(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (!c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
+  if (typeof d.use_blob !== 'boolean') return jr(400, { status: 'REJECTED', error_code: 'BAD_VALUE', request_id: R });
+  const st = store(DATA);
+  const cur = await conProcReadFlag(st);
+  if (d.base !== undefined && Number(d.base) !== Number(cur.updated_at || 0)) return jr(409, { status: 'CONFLICT', error_code: 'CON_PROC_STALE', request_id: R });
+  if (cur.use_blob === d.use_blob) return jr(400, { status: 'REJECTED', error_code: 'NO_CHANGE', request_id: R });
+  if (d.use_blob) { const L = await conProcReadLayers(st); if (!L.proc || !L.list) return jr(409, { status: 'CONFLICT', error_code: 'MIRROR_MISSING', request_id: R }); }
+  const doc = { schema: 1, use_blob: d.use_blob, prev: { use_blob: cur.use_blob, updated_at: cur.updated_at, updated_by: cur.updated_by }, updated_by: c.member.id, updated_at: Date.now() };
+  const w = await blobSet(st, CON_PROC_KEYS.flag, doc);
+  if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
+  try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'contracts', ev: [{ op: '계약골조', id: '', t: '골조·목록 거울 ' + (cur.use_blob ? '켬' : '끔') + '→' + (d.use_blob ? '켬' : '끔') }] }); } catch (e) {}
+  return jr(200, { status: 'OK', use_blob: d.use_blob, updated_at: doc.updated_at, request_id: R });
+}
 // ---- 문서함 설정(v314): 분류별 기본 공개범위 + 등재 결재 게이트. 관리자 전용·감사로그·낙관락(등급표 패턴) ----
 async function handleDocSettingsGet(event, d, R) {
   const c = await currentMember(event);
@@ -2971,6 +3011,8 @@ async function handlerInner(event) {
     if (d && d.action === 'doneif_set') return await handleDoneifSet(event, d, R);
     if (d && d.action === 'alerts_get') return await handleAlertsGet(event, d, R);
     if (d && d.action === 'alerts_set') return await handleAlertsSet(event, d, R);
+    if (d && d.action === 'con_proc_get') return await handleConProcGet(event, d, R);
+    if (d && d.action === 'con_proc_flag_set') return await handleConProcFlagSet(event, d, R);
     if (d && d.action === 'doc_settings_get') return await handleDocSettingsGet(event, d, R);
     if (d && d.action === 'doc_settings_set') return await handleDocSettingsSet(event, d, R);
     if (d && d.action === 'doc_att_put') return await handleDocAttPut(event, d, R);
