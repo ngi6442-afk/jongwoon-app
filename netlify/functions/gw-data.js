@@ -368,6 +368,12 @@ async function handleSave(event, d, R) {
   if (col === 'tasks' && Array.isArray(doc.items)) {
     const oldByA = {}; oldItems.forEach(function (o) { if (o && o.id) oldByA[o.id] = o; });
     doc.items.forEach(function (t) { if (!t || !t.auto_key || t.who_id) return; const o = oldByA[t.id]; if (o && o.who_id && o.who_by === 'assign') { t.who_id = o.who_id; t.who = o.who || ''; t.who_by = 'assign'; } });
+    // v397 앱 기준 review 보호: 서버가 올린 review('앱 기준')를 클라 사본이 open으로 보내면 반려(doneif_off=1)가 아닌 한 서버 값을 이월(낡은 사본·로컬 우선 병합 방지). 승인(done)은 통과
+    doc.items.forEach(function (t) {
+      if (!t || !t.auto_key) return;
+      const o = oldByA[t.id];
+      if (o && o.status === 'review' && o.done_by === '앱 기준' && t.status === 'open' && !t.doneif_off) { t.status = 'review'; t.done_at = o.done_at; t.done_by = o.done_by; t.done_src = o.done_src; }
+    });
     const blankBeforeS = {}; doc.items.forEach(function (t) { if (t && t.auto_key && !t.who_id) blankBeforeS[t.id] = 1; });
     try { const at = await assignRead(store(DATA)); if (Object.keys(at.rules || {}).length) { const ms = await assignMembers(); if (ms) assignFill(doc.items, at.rules, assignNames(ms)); } } catch (e) {}
     // v396 알림: 클라 생성기(runAutoTaskGen·recOverdueGen·runBidQualGen)가 만든 새 자동 지시 + 이번에 채워진 공란 → 담당자 본인 1발(설정 assignee일 때만)
@@ -1572,6 +1578,36 @@ async function notifyAutoCreated(st, items, by) {
     }
     return n;
   } catch (e) { return 0; }
+}
+// ---- 완료 신호 자동 전환 settings:doneif (v397 — 공통 기반 2 첫 시범, 착수 브리핑 A5 · 카드 1-5 추천안 'review까지 자동') ----
+// 워커는 gw-doneif-cron(*/10)·라이브러리 _lib/doneif.js. 여기는 관리자 스위치(on/off, 기본 off=dry-run)와 마지막 점검 조회만.
+const DONEIF_KEY = 'settings:doneif';
+async function handleDoneifGet(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (!c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
+  const st = store(DATA);
+  let on = false, updated_at = 0, prev = null;
+  try { const r = await blobGet(st, DONEIF_KEY); if (r.ok && r.data) { on = r.data.on === true; updated_at = r.data.updated_at || 0; prev = r.data.prev || null; } } catch (e) {}
+  let last = null;
+  try { const l = await blobGet(st, 'it:doneif:last'); if (l.ok && l.data) last = { ts: l.data.ts || 0, today: l.data.today || '', on: !!l.data.on, scanned: l.data.scanned || 0, candidates: (l.data.candidates || []).slice(0, 20), moved: l.data.moved || 0, notified: l.data.notified || 0 }; } catch (e) {}
+  return jr(200, { status: 'OK', on: on, updated_at: updated_at, prev: prev, last: last, request_id: R });
+}
+async function handleDoneifSet(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (!c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
+  if (typeof d.on !== 'boolean') return jr(400, { status: 'REJECTED', error_code: 'BAD_VALUE', request_id: R });
+  const st = store(DATA);
+  let cur = { on: false, updated_at: 0, updated_by: '' };
+  try { const r = await blobGet(st, DONEIF_KEY); if (r.ok && r.data) cur = { on: r.data.on === true, updated_at: r.data.updated_at || 0, updated_by: r.data.updated_by || '' }; } catch (e) {}
+  if (d.base !== undefined && Number(d.base) !== Number(cur.updated_at || 0)) return jr(409, { status: 'CONFLICT', error_code: 'DONEIF_STALE', request_id: R });
+  if (cur.on === d.on) return jr(400, { status: 'REJECTED', error_code: 'NO_CHANGE', request_id: R });
+  const doc = { schema: 1, on: d.on, prev: { on: cur.on, updated_at: cur.updated_at, updated_by: cur.updated_by }, updated_by: c.member.id, updated_at: Date.now() };
+  const w = await blobSet(st, DONEIF_KEY, doc);
+  if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
+  try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'tasks', ev: [{ op: '앱기준설정', id: '', t: '완료 신호 자동 전환 ' + (cur.on ? '켬' : '끔') + '→' + (d.on ? '켬' : '끔') }] }); } catch (e) {}
+  return jr(200, { status: 'OK', on: d.on, updated_at: doc.updated_at, request_id: R });
 }
 // ---- 문서함 설정(v314): 분류별 기본 공개범위 + 등재 결재 게이트. 관리자 전용·감사로그·낙관락(등급표 패턴) ----
 async function handleDocSettingsGet(event, d, R) {
@@ -2899,6 +2935,8 @@ async function handlerInner(event) {
     if (d && d.action === 'notify_get') return await handleNotifyGet(event, d, R);
     if (d && d.action === 'notify_set') return await handleNotifySet(event, d, R);
     if (d && d.action === 'notify_revert') return await handleNotifyRevert(event, d, R);
+    if (d && d.action === 'doneif_get') return await handleDoneifGet(event, d, R);
+    if (d && d.action === 'doneif_set') return await handleDoneifSet(event, d, R);
     if (d && d.action === 'doc_settings_get') return await handleDocSettingsGet(event, d, R);
     if (d && d.action === 'doc_settings_set') return await handleDocSettingsSet(event, d, R);
     if (d && d.action === 'doc_att_put') return await handleDocAttPut(event, d, R);

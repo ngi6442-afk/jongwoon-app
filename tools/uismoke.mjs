@@ -1564,7 +1564,7 @@ try {
     && /action === 'notify_get'/.test(gwd) && /action === 'notify_set'/.test(gwd) && /action === 'notify_revert'/.test(gwd)
     && /suppressed: 'task_auto_create'/.test(gwd) && /task_review === 'issuer_approver'/.test(gwd) && (gwd.match(/await notifyAutoCreated\(/g) || []).length === 2
     && /due_digest === 'summary'/.test(todo) && /task-digest-/.test(todo)
-    && /jw-shell-v396/.test(swv));
+    && /jw-shell-v39[6-9]/.test(swv));
 } catch (e) { console.log('  (v396 검사 생략 — ' + e.message + ')'); fails++; }
 
 
@@ -1579,6 +1579,22 @@ try {
     T('A4 크론 지도: netlify 예약 함수 ' + decl.length + '개 전부 등재·표현식 일치', decl.length >= 5 && bad.length === 0, '불일치: ' + bad.map((d) => d.fn + '=' + d.cron).join(','));
   } else console.log('  (A4 크론 지도 대조 생략 — appdata 클론 없음)');
 } catch (e) { console.log('  (A4 크론 지도 대조 생략 — ' + e.message + ')'); }
+
+
+// ---- v397(10/27 착수 브리핑 A5 · 공통 기반 2 첫 시범): 공통 done_if 워커 — 라이브러리·크론·toml 등재·설정 액션·save 보호·일괄 승인·반려 신호 끔·카드 행·sw ----
+try {
+  const dl = readFileSync(join(ROOT, 'netlify', 'functions', '_lib', 'doneif.js'), 'utf8');
+  const dc = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-doneif-cron.js'), 'utf8');
+  const toml = readFileSync(join(ROOT, 'netlify.toml'), 'utf8');
+  const swv = readFileSync(join(ROOT, 'sw.js'), 'utf8');
+  T('v397 done_if 배선: 라이브러리(parseKey·signalFor 3신호·eligible·plan·apply·clogAppend 해시 체인) · 크론(dry-run on=false·스냅샷·clog·감사 앱기준전환·승인권자 1발) · toml */10 · doneif_get/set · save 보호 · [오늘 승인 일괄] · 반려 doneif_off · 카드 행 · sw',
+    /function parseKey/.test(dl) && /function signalFor/.test(dl) && /insp_due/.test(dl) && /expiry/.test(dl) && /rec\.paid/.test(dl) && /function eligible/.test(dl) && /doneif_off/.test(dl) && /function clogAppend/.test(dl) && /createHash\('sha256'\)/.test(dl)
+    && /D\.DONEIF_KEY/.test(dc) && /sr\.data\.on === true/.test(dc) && /ver:tasks:appbase:/.test(dc) && /clog:appr:/.test(dc) && /op: '앱기준전환'/.test(dc) && /task-appbase-/.test(dc) && /it:doneif:last|DONEIF_LAST/.test(dc)
+    && /\[functions\."gw-doneif-cron"\]\s*\r?\n\s*schedule = "\*\/10 \* \* \* \*"/.test(toml)
+    && /action === 'doneif_get'/.test(gwd) && /action === 'doneif_set'/.test(gwd) && /o\.done_by === '앱 기준' && t\.status === 'open' && !t\.doneif_off/.test(gwd)
+    && html.indexOf('id="taskBulkApprove"') > 0 && /t\.done_by === "앱 기준" && canApproveTask\(t\)/.test(html) && /if \(t\.done_by === "앱 기준"\) t\.doneif_off = 1;/.test(html) && /function renderDoneifRow\(\)/.test(html) && /action: "doneif_get"/.test(html) && /action: "doneif_set"/.test(html)
+    && /jw-shell-v397/.test(swv));
+} catch (e) { console.log('  (v397 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

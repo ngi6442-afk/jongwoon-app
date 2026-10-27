@@ -3279,4 +3279,53 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   T('50 notify_revert → 직전 판(due_digest each · 나머지 유지) · 감사 알림되돌림', r50.code === 200 && r50.body.events.due_digest === 'each' && r50.body.events.task_review === 'issuer_approver' && auditMock.logs[auditMock.logs.length - 1].ev[0].op === '알림되돌림', JSON.stringify(r50.body).slice(0, 160));
   delete mem.gw_data['settings:notify']; delete mem.gw_data['settings:assign']; delete mem.gw_users['member:uadm50']; pushMock.calls.length = 0;
 }
+{ // ---- 51(v397) 공통 done_if 워커 — 라이브러리 순수 함수 · 크론 dry-run/적용 · clog 해시 체인 · 감사 · 승인권자 1발 · doneif_off · save 보호 · doneif_get/set ----
+  const D51 = require(join(FN, '_lib/doneif.js'));
+  const recs51 = { vehicles: { v1: { id: 'v1', insp_due: '2026-12-20', ins_due: '2026-11-25' } }, licenses: { l1: { id: 'l1', expiry: '2026-12-01', edu_due: '2027-01-15' } }, receivables: { r1: { id: 'r1', paid: '2026-10-20' }, r2: { id: 'r2', paid: null } } };
+  const mk51 = (id, key, extra) => Object.assign({ id: id, title: id, auto_key: key, status: 'open', from: '자동', who_id: 'uwork' }, extra || {});
+  T('51 signalFor: 차량 정기검사 기한 11-20 → 레코드 12-20(갱신) = 신호', D51.signalFor(mk51('a', 'veh:v1:insp:2026-11-20'), recs51).ok === true);
+  T('51 signalFor: 차량 보험 기한 11-25 = 레코드 11-25(미갱신) = 신호 없음', D51.signalFor(mk51('b', 'veh:v1:ins:2026-11-25'), recs51).ok === false);
+  T('51 signalFor: 인허가 보수교육 12-01 → 레코드 2027-01-15 = 신호 · 미수 입금 = 신호 · 미입금 = 없음 · 레코드 없음 = 없음',
+    D51.signalFor(mk51('c', 'lic:l1:edu:2026-12-01'), recs51).ok === true && D51.signalFor(mk51('d', 'rec:r1:over45'), recs51).ok === true && D51.signalFor(mk51('e', 'rec:r2:over45'), recs51).ok === false && D51.signalFor(mk51('f', 'veh:v9:insp:2026-11-20'), recs51).why === 'no_record');
+  T('51 eligible: open/hold 자동 지시만 · done·삭제·doneif_off·사람 지시 제외', D51.eligible(mk51('g', 'veh:v1:insp:2026-11-20')) && D51.eligible(mk51('h', 'veh:v1:insp:2026-11-20', { status: 'hold' })) && !D51.eligible(mk51('i', 'veh:v1:insp:2026-11-20', { status: 'done' })) && !D51.eligible(mk51('j', 'veh:v1:insp:2026-11-20', { del: 1 })) && !D51.eligible(mk51('k', 'veh:v1:insp:2026-11-20', { doneif_off: 1 })) && !D51.eligible({ id: 'l', status: 'open' }));
+  const cl = D51.clogAppend(D51.clogAppend(null, { id: 'x', to: 'review' }), { id: 'y', to: 'review' });
+  T('51 clogAppend: 해시 체인(2번째 p = 1번째 h, head = 마지막 h)', cl.items.length === 2 && cl.items[1].p === cl.items[0].h && cl.head === cl.items[1].h && cl.items[0].h.length === 16);
+  // 크론: dry-run(기본) → 데이터 불변 · it:doneif:last 기록
+  const cron51 = require(join(FN, 'gw-doneif-cron.js'));
+  mem.gw_data['col:tasks'] = { schema: 1, items: [mk51('t_v', 'veh:v1:insp:2026-11-20'), mk51('t_i', 'veh:v1:ins:2026-11-25'), mk51('t_r', 'rec:r1:over45'), mk51('t_off', 'rec:r1:over45', { doneif_off: 1 }), mk51('t_h', 'veh:v1:insp:2026-11-20', { status: 'review', done_by: '직원' }), { id: 't_man', title: '사람 지시', status: 'open' }] };
+  mem.gw_data['col:vehicles'] = { items: [recs51.vehicles.v1] }; mem.gw_data['col:licenses'] = { items: [recs51.licenses.l1] }; mem.gw_data['col:receivables'] = { items: [recs51.receivables.r1, recs51.receivables.r2] };
+  delete mem.gw_data['settings:doneif']; delete mem.gw_data['it:doneif:last']; pushMock.calls.length = 0;
+  let c51 = JSON.parse((await cron51.handler({})).body);
+  T('51 크론 dry-run(설정 없음=끔): 후보 2(t_v·t_r) · 전환 0 · 데이터 불변 · it:doneif:last 기록 · 푸시 0', c51.ok && c51.on === false && c51.scanned === 3 && c51.candidates.length === 2 && c51.moved === 0 && mem.gw_data['col:tasks'].items.find((t) => t.id === 't_v').status === 'open' && mem.gw_data['it:doneif:last'].candidates.length === 2 && pushMock.calls.length === 0, JSON.stringify(c51));
+  // 설정 액션
+  let r51 = await call({ action: 'doneif_get' }, tokW, 'dev1'); T('51 doneif_get 비관리자 → 403', r51.code === 403);
+  r51 = await call({ action: 'doneif_get' }, tokA); T('51 doneif_get 관리자 → on false · last 후보 2', r51.code === 200 && r51.body.on === false && r51.body.last && r51.body.last.candidates.length === 2, JSON.stringify(r51.body).slice(0, 160));
+  r51 = await call({ action: 'doneif_set', on: 'yes' }, tokA); T('51 doneif_set 불리언 아님 → 400', r51.code === 400);
+  const auditN51 = auditMock.logs.length;
+  r51 = await call({ action: 'doneif_set', on: true, base: 0 }, tokA); T('51 doneif_set 켬 · 감사 앱기준설정', r51.code === 200 && r51.body.on === true && auditMock.logs[auditN51].ev[0].op === '앱기준설정');
+  mem.gw_data['settings:assign'] = { schema: 1, rules: {}, approver_id: 'uadmin', prev: null, updated_at: 1, updated_by: 'x' };
+  pushMock.calls.length = 0;
+  c51 = JSON.parse((await cron51.handler({})).body);
+  const tk51 = mem.gw_data['col:tasks'].items; const tv = tk51.find((t) => t.id === 't_v'), ti = tk51.find((t) => t.id === 't_i'), toff = tk51.find((t) => t.id === 't_off'), th = tk51.find((t) => t.id === 't_h');
+  const clog51 = mem.gw_data['clog:appr:' + c51.today.slice(0, 7)];
+  T('51 크론 켬: t_v·t_r → review·앱 기준·done_src · 미갱신 t_i open · doneif_off·사람 review 불변 · 스냅샷 키 · clog 2행 체인 · 감사 앱기준전환 · 승인권자 1발(task-appbase)',
+    c51.moved === 2 && tv.status === 'review' && tv.done_by === '앱 기준' && /^doneif:veh\.insp_due/.test(tv.done_src) && ti.status === 'open' && toff.status === 'open' && th.done_by === '직원'
+    && !!mem.gw_data['ver:tasks:appbase:' + c51.today] && clog51 && clog51.items.length === 2 && clog51.items[1].p === clog51.items[0].h
+    && auditMock.logs[auditMock.logs.length - 1].ev[0].op === '앱기준전환' && pushMock.calls.length === 1 && pushMock.calls[0].tag === 'task-appbase-' + c51.today && c51.notified === 1, JSON.stringify(c51) + JSON.stringify(pushMock.calls));
+  c51 = JSON.parse((await cron51.handler({})).body);
+  T('51 크론 재실행: 이미 review인 건은 후보 아님(후보 0·전환 0·스냅샷 그대로 1개)', c51.moved === 0 && c51.candidates.length === 0);
+  // save 보호: 낡은 사본이 t_v를 open으로 보내도 review 유지 · 반려(doneif_off=1)는 통과 · 승인(done)은 통과
+  const docS51 = JSON.parse(JSON.stringify(mem.gw_data['col:tasks']));
+  docS51.items.forEach((t) => { if (t.id === 't_v') { t.status = 'open'; t.done_at = null; t.done_by = null; } if (t.id === 't_r') { t.status = 'open'; t.done_at = null; t.done_by = null; t.doneif_off = 1; } });
+  r51 = await call({ action: 'save', collection: 'tasks', doc: docS51 }, tokA);
+  const tk51b = mem.gw_data['col:tasks'].items;
+  T('51 save 보호: 앱 기준 review를 open으로 보낸 t_v는 review 이월 · 반려(doneif_off) t_r은 open 통과', r51.code === 200 && tk51b.find((t) => t.id === 't_v').status === 'review' && tk51b.find((t) => t.id === 't_v').done_by === '앱 기준' && tk51b.find((t) => t.id === 't_r').status === 'open' && tk51b.find((t) => t.id === 't_r').doneif_off === 1, JSON.stringify(tk51b.map((t) => [t.id, t.status])));
+  const docS51b = JSON.parse(JSON.stringify(mem.gw_data['col:tasks'])); docS51b.items.forEach((t) => { if (t.id === 't_v') { t.status = 'done'; t.approved_by = '관리자'; t.approved_at = '2026-10-27'; } });
+  r51 = await call({ action: 'save', collection: 'tasks', doc: docS51b }, tokA);
+  T('51 save: 승인(done)은 통과', r51.code === 200 && mem.gw_data['col:tasks'].items.find((t) => t.id === 't_v').status === 'done');
+  c51 = JSON.parse((await cron51.handler({})).body);
+  T('51 크론: 반려로 신호 끈 t_r(입금 신호 있음)은 다시 올리지 않음', c51.candidates.length === 0 && mem.gw_data['col:tasks'].items.find((t) => t.id === 't_r').status === 'open');
+  r51 = await call({ action: 'doneif_set', on: false, base: mem.gw_data['settings:doneif'].updated_at }, tokA); T('51 doneif_set 끔 · prev on true', r51.code === 200 && mem.gw_data['settings:doneif'].prev.on === true);
+  ['settings:doneif', 'it:doneif:last', 'settings:assign', 'col:vehicles', 'col:licenses', 'col:receivables', 'clog:appr:' + c51.today.slice(0, 7), 'ver:tasks:appbase:' + c51.today].forEach((k) => { delete mem.gw_data[k]; }); pushMock.calls.length = 0;
+}
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

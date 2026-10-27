@@ -35,7 +35,12 @@
 [functions."gw-promo-ai-cron"]
   schedule = "*/10 * * * *"
 
-# 예정(등재만 — appdata data/cron_map.json, 공통 기반 14, 10/27 A4): gw-doneif-cron(*/10, 공통 done_if 워커 — A5 본체와 함께 등록) · gw-digest-0730(30 22 UTC = KST 07:30, 지시 요약 전용 — 지금은 gw-todo-cron 08:00에 통합 v396). 도메인별 10분 크론 신설 금지.
+# 공통 done_if 워커(공통 기반 2, v397) — 10분마다. 데이터 신호(차량·인허가 갱신, 미수 입금) → 자동 지시를 승인 대기(앱 기준)로. settings:doneif.on=false면 점검 기록만(dry-run).
+# 도메인별 10분 크론 신설 금지 — 신호 추가는 _lib/doneif.js signalFor에 1행.
+[functions."gw-doneif-cron"]
+  schedule = "*/10 * * * *"
+
+# 예정(등재만 — appdata data/cron_map.json): gw-digest-0730(30 22 UTC = KST 07:30, 지시 요약 전용 — 지금은 gw-todo-cron 08:00에 통합 v396).
 
 # 정적 파일은 그대로 서빙, /.netlify/functions/* 는 서버리스 함수로.
 

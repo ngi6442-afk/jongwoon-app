@@ -1139,6 +1139,7 @@
       <div class="loading">불러오는 중…</div>
     </div>
     <button class="link-btn" id="taskAutoToggle" style="display:none;"></button>
+    <button class="link-btn" id="taskBulkApprove" style="display:none;" title="앱 기준(데이터 신호)으로 승인 대기에 오른 자동 지시만 한 번에 승인 — 사람 완료 요청은 건별">오늘 승인 일괄</button>
     <div class="card" id="taskAutoList" style="display:none;margin-top:6px;"></div>
     <button class="link-btn" id="taskDoneToggle"></button>
     <div class="card" id="taskDoneList" style="display:none;margin-top:6px;"></div>
@@ -4288,6 +4289,13 @@
       ? active.map(function(t){ return taskRowHtml(t, false, selT); }).join("")
       : '<div class="loading" style="padding:18px 0;">등록된 지시가 없습니다.</div>';
 
+    var bulkBtn = document.getElementById("taskBulkApprove");   // v397 앱 기준 review 일괄 승인(승인권자만)
+    if (bulkBtn){
+      var bulk = autos.filter(function(t){ return t.status === "review" && t.done_by === "앱 기준" && canApproveTask(t); });
+      bulkBtn.style.display = bulk.length ? "inline-block" : "none";
+      bulkBtn.textContent = "오늘 승인 일괄 (" + bulk.length + ")";
+      bulkBtn.onclick = function(){ if (!confirm("앱 기준으로 승인 대기에 오른 자동 지시 " + bulk.length + "건을 한 번에 승인합니다. 계속할까요?")) return; bulk.forEach(function(t){ approveTask(t.id); }); apprToastShow("자동 지시 " + bulk.length + "건 승인(앱 기준)"); };
+    }
     var autoToggle = document.getElementById("taskAutoToggle");
     var autoHost = document.getElementById("taskAutoList");
     if (autoToggle){
@@ -4645,7 +4653,8 @@
   function rejectTask(id){
     var t = findTask(id);
     if (!t || t.status !== "review" || !canApproveTask(t)) return;
-    t.status = "open"; t.done_at = null; t.done_by = null; t.updated = todayStr();
+    if (t.done_by === "앱 기준") t.doneif_off = 1;   // v397 반려 = 완료 신호 끔(워커가 다시 올리지 않음, 서버 이월 보호도 해제)
+    t.status = "open"; t.done_at = null; t.done_by = null; t.done_src = null; t.updated = todayStr();
     if (t.who_id && t.who_id !== myId()) pushNotify(t.who_id, "반려: "+(t.title||"").slice(0,40), "다시 확인 후 진행해주세요", "task-rj-"+t.id);
     saveTasksCache(); renderTasks(); renderSummary(); scheduleTasksSave();
   }
@@ -20451,12 +20460,38 @@
           + '<span style="display:inline-flex;gap:4px;flex-wrap:wrap;">' + chips + '</span></div>';
       }).join("");
       var prev = res.body.prev;
+      rows += '<div id="doneifRow" style="display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:7px 2px;border-bottom:1px solid var(--line);"><span style="min-width:190px;font-size:13px;font-weight:600;">완료 신호 자동 전환(앱 기준)</span><span class="empty-line">불러오는 중…</span></div>';
       host.innerHTML = rows
         + '<div class="empty-line" style="margin-top:6px;">★ = 추천값(착수 브리핑 카드 1-4). 자동 지시 생성 알림을 "담당자 본인"으로 두면 관리자 전원에게 가던 만기·미수·적격 푸시가 멈추고, 담당자에게 우선기기 1발만 갑니다. 완료 요청을 "승인권자"로 두면 자동 지시의 승인 요청은 배정표 승인권자 1인에게만 갑니다. 변경은 감사로그에 남습니다.'
         + (prev ? ' · 직전 설정 보존 <button type="button" class="link-btn" id="notifyRevertBtn">되돌리기</button>' : '') + '</div>';
       Array.prototype.forEach.call(host.querySelectorAll("[data-nf-set]"), function(btn){ btn.addEventListener("click", function(){ var p = btn.getAttribute("data-nf-set").split(":"); notifySet({ event: p[0], value: p[1] }); }); });
       var rb = document.getElementById("notifyRevertBtn"); if (rb) rb.addEventListener("click", function(){ if (!confirm("알림 설정을 직전 판으로 되돌립니다. 계속할까요?")) return; notifySet({ revert: true }); });
+      renderDoneifRow();
     }).catch(function(){ host.innerHTML = '<div class="empty-line">알림 설정을 불러오지 못했습니다(네트워크).</div>'; });
+  }
+  // v397 완료 신호 자동 전환(기반 2) — 켜기/끄기 + 마지막 점검(10분 워커 dry-run 계획). 기본 꺼짐: 켜기 전엔 "후보 n건"만 보인다.
+  var doneifBase = 0, doneifSaving = false;
+  function renderDoneifRow(){
+    var row = document.getElementById("doneifRow"); if (!row) return;
+    gwCall("gw-data", { action: "doneif_get" }).then(function(res){
+      if (res.status !== 200 || !res.body){ row.innerHTML = '<span style="min-width:190px;font-size:13px;font-weight:600;">완료 신호 자동 전환(앱 기준)</span><span class="empty-line">불러오지 못함</span>'; return; }
+      doneifBase = res.body.updated_at || 0;
+      var on = !!res.body.on, L = res.body.last;
+      var chips = '<button type="button" style="' + apprGradeChipCss(on ? 1 : 0, on) + '" data-doneif-set="1">켬 — 신호 오면 승인 대기로</button> <button type="button" style="' + apprGradeChipCss(0, !on) + '" data-doneif-set="0">끔(점검만)</button>';
+      var lastTxt = L ? ('마지막 점검 ' + new Date(L.ts).toLocaleString("ko-KR", { hour12: false }).slice(0, 16) + ' · 살핀 ' + L.scanned + '건 · 후보 ' + (L.candidates || []).length + '건 · 전환 ' + L.moved + '건' + ((L.candidates || []).length ? ' — ' + L.candidates.slice(0, 3).map(function(c){ return c.title.slice(0, 18) + '(' + c.why.split(' ')[0] + ')'; }).join(', ') : '')) : '아직 점검 기록 없음(10분 안에 첫 점검)';
+      row.innerHTML = '<span style="min-width:190px;font-size:13px;font-weight:600;">완료 신호 자동 전환(앱 기준)</span><span style="display:inline-flex;gap:4px;flex-wrap:wrap;">' + chips + '</span><span style="flex:1 1 100%;font-size:11.5px;color:var(--sub);padding-left:2px;">' + esc(lastTxt) + ' · 신호: 차량 검사·보험 만기 갱신 / 인허가 만료·교육 갱신 / 미수 입금. 올라온 건은 지시함 [오늘 승인 일괄]</span>';
+      Array.prototype.forEach.call(row.querySelectorAll("[data-doneif-set]"), function(btn){ btn.addEventListener("click", function(){ doneifSet(btn.getAttribute("data-doneif-set") === "1"); }); });
+    }).catch(function(){});
+  }
+  function doneifSet(on){
+    if (doneifSaving) return; doneifSaving = true;
+    gwCall("gw-data", { action: "doneif_set", on: on, base: doneifBase }).then(function(res){
+      doneifSaving = false;
+      if (res.status === 409){ apprToastShow("다른 관리자가 방금 바꿨습니다 — 다시 불러왔습니다"); renderDoneifRow(); return; }
+      if (res.status !== 200){ if (!(res.body && res.body.error_code === "NO_CHANGE")) alert("저장 실패 (" + ((res.body && res.body.error_code) || res.status) + ")"); renderDoneifRow(); return; }
+      apprToastShow(on ? "완료 신호 자동 전환 켬 — 다음 10분 점검부터 승인 대기로 올립니다" : "완료 신호 자동 전환 끔 — 점검 기록만 남깁니다");
+      renderDoneifRow();
+    }).catch(function(){ doneifSaving = false; alert("저장 실패(네트워크)"); });
   }
   function notifySet(p){
     if (notifySaving) return;
