@@ -55,7 +55,7 @@ const stubs = `
 `;
 const tplLine = (html.match(/var TPL_LABELS=\{[^\r\n]*\};/) || [''])[0];
 const api = new Function('contracts', 'tasks', 'recs', stubs + tplLine + fnOf('conAttList') + scen + sheet + fnOf('stageXlsxKind') + fnOf('advanceProc') + fnOf('materializeStage') + fnOf('procStageTitle') + `
-  return { CON_COLS, CON_SCEN, CON_PACKETS, conScenStages, conModalElems, stageDocsFor, csStageFields, stageXlsxKind, csRowHtml, csDetailHtml, csStageInfo, csSortRows, csPass, csEnumValues, csEndCell, csKind, csSkipStage, csJumpStage, csUnskipStage, csPacketsHtml, csLoadTpl, csApprKind, csApprSubmit, csApprOnDecided, csApprFind, csSyncFromServer, csApprSync, csApprDropped, csAlignTasksAll, toasts: toasts, saveNow: function(){ return saveNowN; }, csLinkSite, csLinkSiteLater, csOnDone, csSiteDone, csSiteHooksRetry, csNextFeb15, advanceProc, materializeStage, asb: asb, tasks: tasks, appr: apprPendingCreates, alerts: alerts, bills: function(){ return billN; }, setServer: function(items){ serverItems = items; }, pushContract: function(c){ contracts.push(c); }, popContract: function(){ contracts.pop(); }, setAsbLoaded: function(v){ asbLoaded = v; }, setTab: function(t){ conDetTab = t; }, openStage: function(k){ csStageOpen = k; }, setTpl: function(o){ csTplKeys = o; csTplErr = 0; }, setTplErr: function(v){ csTplErr = v; }, tplState: function(){ return { keys: csTplKeys, err: csTplErr, loading: csTplLoading }; }, setGw: function(f){ gwCall = f; } };
+  return { CON_COLS, CON_SCEN, CON_PACKETS, STAGE_DOCS, conScenStages, conModalElems, stageDocsFor, csSplitTop, csParseStageDocs, csStageDocItems, csStageDocsHtml, csDocToggle, csDocNa, csDocAdd, csDocDel, csMergeDocs, csStageFields, stageXlsxKind, csRowHtml, csDetailHtml, csStageInfo, csSortRows, csPass, csEnumValues, csEndCell, csKind, csSkipStage, csJumpStage, csUnskipStage, csPacketsHtml, csLoadTpl, csApprKind, csApprSubmit, csApprOnDecided, csApprFind, csSyncFromServer, csApprSync, csApprDropped, csAlignTasksAll, toasts: toasts, saveNow: function(){ return saveNowN; }, csLinkSite, csLinkSiteLater, csOnDone, csSiteDone, csSiteHooksRetry, csNextFeb15, advanceProc, materializeStage, asb: asb, tasks: tasks, appr: apprPendingCreates, alerts: alerts, bills: function(){ return billN; }, setServer: function(items){ serverItems = items; }, pushContract: function(c){ contracts.push(c); }, popContract: function(){ contracts.pop(); }, setAsbLoaded: function(v){ asbLoaded = v; }, setTab: function(t){ conDetTab = t; }, openStage: function(k){ csStageOpen = k; }, setTpl: function(o){ csTplKeys = o; csTplErr = 0; }, setTplErr: function(v){ csTplErr = v; }, tplState: function(){ return { keys: csTplKeys, err: csTplErr, loading: csTplLoading }; }, setGw: function(f){ gwCall = f; } };
 `)(contracts, tasks, recs);
 let fails = 0; const T = (n, ok, note) => { console.log((ok ? '  ✓ ' : '  ✗ ') + n + (ok ? '' : ' — ' + note)); if (!ok) fails++; };
 // 시나리오 목록
@@ -221,4 +221,32 @@ api.popContract();
 T('v384 ks 초안은 빈 칸만: 사람이 넣은 ks.amount·no는 유지, no가 있으면 draft 없음', (() => { api.asb.push({ id: 'a_ks', kind: 'dredge', title: 'ks', status: 'run', ks: { no: '2026-001', amount: 123 } }); const x = mk(); x.id = 'c_ks'; x.site_id = 'a_ks'; x.status = 'done'; api.csSiteDone(x); const r = api.asb.find((q) => q.id === 'a_ks'); return r.status === 'done' && r.ks.no === '2026-001' && r.ks.amount === 123 && r.ks.biz === '상ㆍ하수도설비공사업' && !r.ks.draft; })(), '');
 T('v384 csNextFeb15: 2026-10-13 기준 → 2027-02-15', api.csNextFeb15() === '2027-02-15', api.csNextFeb15());
 T('준공·만기 칸: d3 없음 → "-" · 지난 날짜 → vs-dan · 완료 건 → 회색 완료', api.csEndCell({ status: 'active' }).html.indexOf('-') >= 0 && api.csEndCell({ status: 'active', contract_info: { d3: '2026-01-01' } }).cls === 'vs-dan' && /완료/.test(api.csEndCell({ status: 'done' }).html), '');
+// v401 건별 서류 체크리스트(stage.docs[]) — 항목화 파서(괄호 보존)·골조 목록 커버리지·체크/해당없음/추가/삭제·s.docs 굳기·html 배선
+{
+  const P = (k) => api.csParseStageDocs(api.STAGE_DOCS[k]).map((x) => (x.t ? '[' + x.t + ']' : '') + x.n);
+  T('v401 파서: 계약 8항(괄호 안 · 보존 "사용인감계(해당시 공동수급협정·수의계약확인서·안전보건확약서)") · 작업 3항(괄호 안 " — " 보존) · 견적 3항("[서류]" 괄호 안) · 수금확인 1항 태그 없음 · 완료신고 1항 · 청구 7항',
+    P('계약').length === 8 && P('계약')[3] === '[작성]사용인감계(해당시 공동수급협정·수의계약확인서·안전보건확약서)' && P('계약')[4] === '[수정]설계내역서→낙찰금액 반영'
+    && P('작업').length === 3 && P('작업')[2] === '[수령]농도/비산 측정결과보고서(석면 — 측정업체 발행)' && P('견적').length === 3 && P('견적')[0] === '[작성]견적서(회사별 양식 — [서류] 버튼으로 자동 생성)'
+    && P('수금확인').length === 1 && P('수금확인')[0] === '입금 확인(계좌·금액 대조)' && P('완료신고').length === 1 && P('청구').length === 7 && P('청구')[4] === '[수령]국세/지방세 납세증명', JSON.stringify([P('계약'), P('작업'), P('청구')]));
+  const names = [].concat(...Object.values(api.CON_SCEN)), withDocs = names.filter((n) => api.csStageDocItems({ name: n }).length > 0).length;
+  T('v401 커버리지: 단계 이름 ' + names.length + '개 중 서류 목록 있는 것 ' + withDocs + '(실적보고·실적신고 2개만 없음) · 16키 전부 1항 이상 · 항목 k 고유', names.length === 81 && withDocs === 79 && Object.keys(api.STAGE_DOCS).every((k) => api.csParseStageDocs(api.STAGE_DOCS[k]).length >= 1)
+    && (() => { const it = api.csStageDocItems({ name: '계약서류 작성' }); return new Set(it.map((d) => d.k)).size === it.length && it[0].k === '작성:0' && it[0].st === 'todo'; })(), '');
+  const c9 = { id: 'c_v401', pipes: [{ key: 'main', cur: 0, stages: [{ name: '계약서류 작성', status: 'open', task_id: null }] }], status: 'active', scen: { type: 'asbestos' }, docType: 'public' };
+  const p9 = c9.pipes[0], s9 = p9.stages[0];
+  const html0 = api.csStageDocsHtml(c9, p9, 0, 'main|0', true);
+  T('v401 html: 체크 8개 · 해당없음 버튼 8 · 추가 칸 1 · 골조 목록 표식 · 아직 s.docs 없음', (html0.match(/data-cs-dchk=/g) || []).length === 8 && (html0.match(/data-cs-dna=/g) || []).length === 8 && (html0.match(/data-cs-dnew=/g) || []).length === 1 && html0.indexOf('골조 목록') >= 0 && !Array.isArray(s9.docs), html0.slice(0, 200));
+  api.csDocToggle(c9, p9, 0, '작성:0');
+  T('v401 ☑ → s.docs 굳음(8항) · 작성:0 done · by/at', Array.isArray(s9.docs) && s9.docs.length === 8 && s9.docs[0].st === 'done' && s9.docs[0].by === 'm1' && s9.docs[0].at === '2026-10-13', JSON.stringify(s9.docs[0]));
+  api.csDocToggle(c9, p9, 0, '작성:0'); api.csDocNa(c9, p9, 0, '수령:5');
+  T('v401 다시 ☑ → todo · 해당없음 → na · na 항목 체크는 무시', s9.docs[0].st === 'todo' && s9.docs[5].st === 'na' && (api.csDocToggle(c9, p9, 0, '수령:5'), s9.docs[5].st === 'na'));
+  api.csDocAdd(c9, p9, 0, '  현장 사진 '); api.csDocAdd(c9, p9, 0, '   ');
+  T('v401 추가 → 9항(공백 이름 무시) · add:1 · k add: 접두 · 추가분 해당없음 무시', s9.docs.length === 9 && s9.docs[8].add === 1 && s9.docs[8].n === '현장 사진' && /^add:/.test(s9.docs[8].k) && (api.csDocNa(c9, p9, 0, s9.docs[8].k), s9.docs[8].st === 'todo'));
+  const k9 = s9.docs[8].k; api.csDocDel(c9, p9, 0, '작성:1'); api.csDocDel(c9, p9, 0, k9);
+  T('v401 삭제: 골조 항목은 안 지워짐 · 추가분만 제거 → 8항', s9.docs.length === 8 && s9.docs.some((d) => d.k === '작성:1'));
+  const html1 = api.csStageDocsHtml(c9, p9, 0, 'main|0', false);
+  T('v401 권한 없음 html: 버튼 0 · 체크 disabled 8 · 추가 칸 0 · 골조 표식 없음(굳은 뒤)', (html1.match(/data-cs-dna=/g) || []).length === 0 && (html1.match(/ disabled>/g) || []).length === 8 && (html1.match(/data-cs-dnew=/g) || []).length === 0 && html1.indexOf('골조 목록') < 0);
+  const mA = [{ k: 'a', st: 'done', at: '2026-10-29' }, { k: 'b', st: 'todo' }], mB = [{ k: 'a', st: 'todo', at: '2026-10-28' }, { k: 'add:1', st: 'todo', add: 1, at: '2026-10-29' }];
+  T('v401 검토 2 csMergeDocs: 같은 k 는 at 늦은 쪽 · 한쪽에만 있는 항목 보존 → 3항', (() => { const m = api.csMergeDocs(mA, mB); return m.length === 3 && m[0].st === 'done' && m[2].k === 'add:1'; })());
+  T('v401 옛 계약(v382 이전 이름) 단계: 항목 0 · 빈 안내 · 추가 칸은 있음', api.csStageDocItems({ name: '현장 답사' }).length === 0 && api.csStageDocsHtml({ id: 'c_old', pipes: [{ key: 'main', cur: 0, stages: [{ name: '현장 답사' }] }], status: 'active' }, { key: 'main', cur: 0, stages: [{ name: '현장 답사' }] }, 0, 'main|0', true).indexOf('등록된 서류 목록이 없습니다') >= 0);
+}
 console.log(fails ? '\n계약 시트 실행 검사 실패 ' + fails + '건' : '\n계약 시트 실행 검사 전 항목 통과'); process.exit(fails ? 1 : 0);

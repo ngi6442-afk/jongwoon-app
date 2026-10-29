@@ -748,3 +748,12 @@
 - [ ] 권한관리 맨 아래 "감시 경보 라벨" 카드 10행, 기본 완충. 승격/무음 클릭 → 토스트 + 감사로그 "경보라벨".
 - [ ] 무음 7일 뒤 자동 해제(until 날짜 표시).
 - [ ] `node tools/servertest.mjs` 절 53 · `node tools/uismoke.mjs` v399 · appdata selftest 통과.
+
+## v401 — 계약 골조·목록 편집(clog:contract) · 단계 서류 체크리스트
+- [ ] 권한관리 › 계약 골조·목록 거울 카드 아래 "편집(관리자)" 4절이 접혀 보임(폰 폭에서 잘림 없음). 서류 목록 한 키 [수정] → textarea → [저장] → 토스트 "… — 거울을 켜면 반영", 기록 절에 1건·[되돌리기].
+- [ ] 단계 목록에서 × → 확인 → 그 시나리오 칩이 줄 그어지고 [복구] 생김. 복구 → 원래대로. 거울이 켜진 상태면 새로고침 뒤 새 계약 모달 단계 미리보기에서 그 단계가 빠짐(진행 중 계약은 불변).
+- [ ] 다른 브라우저(관리자)에서 먼저 편집한 뒤 저장 → "다른 관리자가 먼저 바꿨습니다" 안내 뒤 카드 재로딩.
+- [ ] 계약 › 단계 탭 › 단계 카드 펼침 → "서류 n건" 체크리스트. ☑ → 줄 그어짐·날짜, [해당없음] → 흐려짐·[복구], 서류 추가 → "추가" 표식·✕. 새로고침 뒤 그대로(계약 저장).
+- [ ] 권한 없는 계정(계약 view)은 체크 비활성·버튼 없음. 옛 계약(v382 이전 이름) 단계는 "등록된 서류 목록이 없습니다"+추가 칸.
+- [ ] appdata `python collectors/contract_mirror.py --verify` diff 0(편집이 있어도) · netlify blobs:get gw_data clog:contract 에 items·head.
+- [ ] `node tools/servertest.mjs` 절 55 · `node tools/uismoke.mjs` v401 · `node tools/consheet_check.mjs` · `node tools/proctpl_check.mjs` 통과.

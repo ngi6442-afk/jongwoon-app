@@ -727,6 +727,15 @@
   .cs-stg{cursor:pointer;}
   .cs-stg.opt{border-style:dashed;}
   .cs-stg.skip{opacity:.55;border-style:dashed;}
+  .cs-docs{border-top:1px dashed var(--line);margin-top:4px;padding-top:4px;cursor:default;}
+  .cs-doc{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:2px 0;font-size:12px;}
+  .cs-doc small{color:var(--sub);font-size:11px;}
+  .cs-doc .nm{overflow-wrap:anywhere;}
+  .cs-doc.done .nm{text-decoration:line-through;color:var(--sub);}
+  .cs-doc.na .nm{text-decoration:line-through;opacity:.55;}
+  .cs-doc .vs-chip{margin-left:auto;padding:1px 6px;font-size:11px;}
+  .cs-doc-add{display:flex;gap:6px;margin-top:4px;}
+  .cs-doc-add input{flex:1;min-width:0;font-size:12px;}
   .cs-stg.open{grid-column:1 / -1;cursor:default;}
   .cs-stg small{color:var(--sub);font-weight:400;}
   .cs-fld{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:6px 10px;margin:6px 0;}
@@ -9722,6 +9731,29 @@
     for (var i = 0; i < STAGE_DOC_MAP.length; i++){ if (STAGE_DOC_MAP[i][0].test(name||"")) return STAGE_DOCS[STAGE_DOC_MAP[i][1]] || ""; }
     return "";
   }
+  // v401 단계 서류 항목화(계약 D1 3일차) — STAGE_DOCS 한 줄 "[작성] a·b(c·d) / [수령] e — 메모" → [{t:"작성",n:"a"},…]. 괄호 안의 '·'와 ' — '는 나누지 않는다. 건별 stage.docs[]의 원천(첫 조작 때 s.docs 로 굳고, 그 뒤 골조가 바뀌어도 그 계약은 그대로)
+  function csSplitTop(str, sep){
+    var out = [], buf = "", d = 0, i, ch;
+    for (i = 0; i < str.length; i++){
+      ch = str.charAt(i);
+      if (ch === "(" || ch === "[") d++; else if ((ch === ")" || ch === "]") && d > 0) d--;
+      if (d === 0 && str.substr(i, sep.length) === sep){ out.push(buf); buf = ""; i += sep.length - 1; continue; }
+      buf += ch;
+    }
+    out.push(buf); return out;
+  }
+  function csParseStageDocs(text){
+    var out = [];
+    csSplitTop(String(text || ""), " / ").forEach(function(part){
+      var m = part.match(/^\s*\[(작성|수령|수정)\]\s*([\s\S]*)$/), t = m ? m[1] : "", body = csSplitTop(m ? m[2] : part, " — ")[0];
+      csSplitTop(body, "·").forEach(function(n){ n = n.trim(); if (n) out.push({ t: t, n: n }); });
+    });
+    return out;
+  }
+  function csStageDocItems(s){
+    if (s && Object.prototype.toString.call(s.docs) === "[object Array]") return s.docs;
+    return csParseStageDocs(stageDocsFor((s && s.name) || "")).map(function(d, i){ return { k: (d.t || "기타") + ":" + i, t: d.t, n: d.n, st: "todo" }; });
+  }
   // 단계 입력 칸(시나리오 표 "계약 탭이 해야 할 것" 열) — 값은 stage.vals에, 정산액은 contract.settle_amount에도
   var CON_STAGE_FIELDS = [
     [/견적/, [["q_no","견적 번호","text"],["q_date","제출일","date"],["q_ok","수의계약 통보일","date"]]],
@@ -9766,8 +9798,8 @@
     "폐기물 처리":"[작성] 위수탁계약서(네이처이앤티 양식)·운반서류(군부대: 배출신고) / [수령] 올바로 인계서·외부 위수탁계약서",
     "감리":"[수령] 감리완료보고서",
     "준공":"[작성] 공문·준공검사원·준공계·사진대지갑지·준공사진첩 / [수정] 준공내역서→준공금액(물량증감) 반영",
-    "완료신고":"[작성] 석면해체·제거 완료신고(노동부)",
-    "청구":"[작성] 공문·대금청구서(계좌 기재)·임금지불확인서·전자세금계산서 / [수령] 국세·지방세·4대보험 완납증명·하도급지킴이",
+    "완료신고":"[작성] 석면해체/제거 완료신고(노동부)",
+    "청구":"[작성] 공문·대금청구서(계좌 기재)·임금지불확인서·전자세금계산서 / [수령] 국세/지방세 납세증명·4대보험 완납증명·하도급지킴이",
     "수금확인":"입금 확인(계좌·금액 대조) — 완료 시 계약 종결. 미입금 지속 시 기성·미수 관리 대상"
   };
   // ---- v383 서류 4종 패킷(설계 §4) — gen: 등록 양식으로 생성 / att: 첨부 파일명으로 확인(re 포함·ex 제외, 한 파일은 앞 항목 하나만 차지) / gap: 양식 없음(실물 등록 예정). when: pub·pri·quote·demo·asb·dredge·waste·dredge-pri
@@ -9898,6 +9930,7 @@
   // 최상위 키는 서버에 값이 있으면 서버(work_log·settle_amount·attachments는 서버가 비었으면 로컬 유지). 바뀐 게 있으면 true + loadTasks(다른 기기가 만든 지시)
   function csEmpty(v){ return v === undefined || v === null || v === "" || (Array.isArray(v) && !v.length) || (typeof v === "object" && !Array.isArray(v) && !Object.keys(v).length); }
   function csApprRank(st){ return (st === "승인" || st === "반려") ? 2 : (st === "보류" ? 1 : 0); }
+  function csMergeDocs(a, b){ var out = a.slice(), idx = {}, i, j; for (i = 0; i < out.length; i++) idx[out[i].k] = i; for (j = 0; j < b.length; j++){ var d = b[j]; if (!d || !d.k) continue; if (idx[d.k] === undefined){ idx[d.k] = out.length; out.push(d); } else if (String(d.at || "") > String(out[idx[d.k]].at || "")) out[idx[d.k]] = d; } return out; }
   function csSyncFromServer(c, sc){
     if (!c || !sc || sc.id !== c.id) return false;
     var changed = false;
@@ -9915,6 +9948,8 @@
       var stages = (base.stages || []).map(function(s, i){
         var o = (other.stages || [])[i] || {}, m = Object.assign({}, s);
         if (csEmpty(m.vals) && !csEmpty(o.vals)) m.vals = o.vals;
+        if (csEmpty(m.docs) && !csEmpty(o.docs)) m.docs = o.docs;   // v401 검토 2: 서류 체크리스트는 기기 간 합친다(없는 쪽이 지우지 않게)
+        else if (!csEmpty(m.docs) && !csEmpty(o.docs)) m.docs = csMergeDocs(m.docs, o.docs);
         if (!m.appr && o.appr) m.appr = o.appr;
         else if (m.appr && o.appr && (String(o.appr.at || "") > String(m.appr.at || "") || (o.appr.at === m.appr.at && csApprRank(o.appr.status) > csApprRank(m.appr.status)))) m.appr = o.appr;
         return m;
@@ -10096,7 +10131,7 @@
   // ---- 계약 골조·목록 거울(v400, 계약 D1 2일차). 위 상수 7종(CON_TYPE_ELEMS·CON_SCEN·CON_STAGE_FIELDS·CON_SITE_CORP / STAGE_DOCS·STAGE_DOC_MAP·CON_PACKETS)은 그대로 두고,
   //      settings:contract.use_blob 가 켜져 있으면 Blobs 거울(proc:contract:v1·list:contract)을 같은 자리에 "제자리 덮어쓰기"(배열 length=0 뒤 push, 객체 키 교체)한다 — 참조를 잡고 있는 함수도 같은 객체를 본다.
   //      검증 실패·네트워크 실패·꺼짐 = 상수 그대로(폴백). added(신설 단계·목록 제안, 카드 9)는 엔진이 아직 읽지 않는다 — 여기서는 개수만 센다. 거울은 appdata collectors/contract_mirror.py 가 쓴다. ----
-  var CON_PROC_SRC = { mode:"const", reason:"", proc_sha:"", list_sha:"", built_at:"", flag:null, added_active:0, same:null };
+  var CON_PROC_SRC = { mode:"const", reason:"", proc_sha:"", list_sha:"", built_at:"", flag:null, added_active:0, same:null, edits:0 };
   function conProcRevive(v){
     if (v && typeof v === "object"){
       if (typeof v.$re === "string" && Object.keys(v).length <= 2){ try { return new RegExp(v.$re, v.$flags || ""); } catch(e){ return /$^/; } }
@@ -10133,7 +10168,7 @@
       if (res.status !== 200 || !res.body){ CON_PROC_SRC.reason = "조회 실패"; return; }
       var b = res.body, k; CON_PROC_SRC.flag = b.flag || null;
       if (!b.proc || !b.list){ CON_PROC_SRC.mode = "const"; CON_PROC_SRC.reason = "거울 없음"; CON_PROC_SRC.same = null; return; }
-      CON_PROC_SRC.proc_sha = b.proc.sha || ""; CON_PROC_SRC.list_sha = b.list.sha || ""; CON_PROC_SRC.built_at = b.proc.built_at || "";
+      CON_PROC_SRC.proc_sha = b.proc.sha || ""; CON_PROC_SRC.list_sha = b.list.sha || ""; CON_PROC_SRC.built_at = b.proc.built_at || ""; CON_PROC_SRC.edits = Number(b.proc.edits || 0);   // v401: 서버가 clog:contract 재생분을 얹은 유효 층을 준다
       var inline = { CON_TYPE_ELEMS:CON_TYPE_ELEMS, CON_SCEN:CON_SCEN, CON_STAGE_FIELDS:CON_STAGE_FIELDS, CON_SITE_CORP:CON_SITE_CORP, STAGE_DOCS:STAGE_DOCS, STAGE_DOC_MAP:STAGE_DOC_MAP, CON_PACKETS:CON_PACKETS };
       var mirror = {};
       for (k in b.proc.consts) if (Object.prototype.hasOwnProperty.call(b.proc.consts, k)) mirror[k] = b.proc.consts[k];
@@ -10150,16 +10185,17 @@
       CON_PROC_SRC.mode = "blob"; CON_PROC_SRC.reason = "";
     }).catch(function(){ CON_PROC_SRC.reason = "네트워크"; });
   }
-  var conProcSaving = false;
+  var conProcSaving = false, conProcHead = "", conProcEditing = "", conProcEditOpen = {};
   function renderConProcCard(){
     var host = document.getElementById("conProcCard"); if (!host) return;
     gwCall("gw-data", { action: "con_proc_get" }).then(function(res){
       if (res.status !== 200 || !res.body){ host.innerHTML = '<div class="empty-line">거울 상태를 불러오지 못했습니다 — 새로고침 후 다시 시도해주세요.</div>'; return; }
-      var b = res.body, f = b.flag || {}, on = !!f.use_blob, has = !!(b.proc && b.list), same = CON_PROC_SRC.same;
+      var b = res.body, f = b.flag || {}, on = !!f.use_blob, has = !!(b.proc && b.list), same = CON_PROC_SRC.same, clog = b.clog || {};
+      conProcHead = clog.head || "";
       var src = on ? (CON_PROC_SRC.mode === "blob" ? "거울(Blobs) — 이 화면에 적용 중" : "거울 켜짐 — 새로고침부터 적용" + (CON_PROC_SRC.reason ? " · " + esc(CON_PROC_SRC.reason) : "")) : "코드 상수(기본)";
       var rows = [
         ["현재 원천", src],
-        ["거울", has ? ("proc " + esc(String(b.proc.sha)) + " · list " + esc(String(b.list.sha)) + " · 생성 " + esc(String(b.proc.built_at || "").replace("T", " ").slice(0, 16))) : "없음 — appdata collectors/contract_mirror.py --push 로 만듭니다"],
+        ["거울", has ? ("proc " + esc(String(b.proc.base_sha || b.proc.sha)) + " · list " + esc(String(b.list.base_sha || b.list.sha)) + " · 생성 " + esc(String(b.proc.built_at || "").replace("T", " ").slice(0, 16)) + (clog.applied ? ' · <b>편집 ' + clog.applied + '건</b> 재생' : ' · 편집 0')) : "없음 — appdata collectors/contract_mirror.py --push 로 만듭니다"],
         ["거울 ↔ 상수", has ? (same === true ? "같음(diff 0)" : (same === false ? "다름 — 켜면 거울이 우선" : "비교 전")) : "—"],
         ["신설 제안(카드 9)", has ? ((((b.proc.added || {}).stages || []).length) + "단계 · " + (((b.list.added || {}).lists || []).length) + "목록 · 활성 " + CON_PROC_SRC.added_active + "건 (엔진은 카드 9 회신 뒤 읽음)") : "—"],
         ["마지막 변경", f.updated_at ? (esc(memberName(f.updated_by) || f.updated_by || "") + " · " + esc(new Date(f.updated_at + 9 * 3600000).toISOString().slice(0, 16).replace("T", " "))) : "없음"]
@@ -10167,8 +10203,10 @@
       var btn = '<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">'
         + '<button type="button" style="' + apprGradeChipCss(on ? 1 : 3, true) + '" data-conproc-set="' + (on ? "0" : "1") + '" data-base="' + (f.updated_at || 0) + '"' + ((!on && !has) ? ' disabled' : '') + '>' + (on ? "거울 끄기 — 코드 상수로 되돌리기" : "거울 켜기") + '</button>'
         + (f.prev ? '<span class="empty-line">이전 값: ' + (f.prev.use_blob ? "켬" : "끔") + '</span>' : '') + '</div>';
-      host.innerHTML = rows + btn + '<div class="empty-line" style="margin-top:6px;">계약 단계 목록·서류 목록·입력 칸·패킷·시행 회사 상수 7종의 원천을 바꾸는 스위치입니다(계약 D1). 기본은 코드 상수. 켜면 다음 로그인·새로고침부터 거울을 읽고, 거울이 깨져 있으면 자동으로 상수로 돌아갑니다. 단계 이름은 어느 쪽이든 PM 원문 그대로입니다.</div>';
+      host.innerHTML = rows + btn + '<div class="empty-line" style="margin-top:6px;">계약 단계 목록·서류 목록·입력 칸·패킷·시행 회사 상수 7종의 원천을 바꾸는 스위치입니다(계약 D1). 기본은 코드 상수. 켜면 다음 로그인·새로고침부터 거울(편집 재생분 포함)을 읽고, 거울이 깨져 있으면 자동으로 상수로 돌아갑니다. 단계 이름은 어느 쪽이든 PM 원문 그대로입니다.</div>'
+        + (has ? conProcEditHtml(b) : '');
       Array.prototype.forEach.call(host.querySelectorAll("[data-conproc-set]"), function(el){ el.addEventListener("click", function(){ conProcFlagSet(el.getAttribute("data-conproc-set") === "1", Number(el.getAttribute("data-base") || 0)); }); });
+      if (has) conProcBindEdit(host, b);
     }).catch(function(){ host.innerHTML = '<div class="empty-line">거울 상태를 불러오지 못했습니다(네트워크).</div>'; });
   }
   function conProcFlagSet(on, base){
@@ -10179,6 +10217,88 @@
       apprToastShow("계약 골조·목록 거울 " + (on ? "켬 — 새로고침하면 거울을 읽습니다" : "끔 — 새로고침하면 코드 상수로 돌아갑니다"));
       renderConProcCard();
     }).catch(function(){ conProcSaving = false; alert("거울 스위치 저장 실패(네트워크)"); });
+  }
+  // ---- v401 계약 골조·목록 편집(관리자, 계약 D1 3일차) — 거울 base 위에 clog:contract 를 재생. 서류 목록(STAGE_DOCS) 수정·새 키·소프트 삭제 / 단계(CON_SCEN) 소프트 삭제(새 계약부터) / 매핑(STAGE_DOC_MAP) 추가·삭제 / 변경 기록 되돌리기.
+  //      단계 이름·순서는 바꾸지 않는다(PM 원문). 거울이 꺼져 있으면 편집은 쌓이기만 하고 엔진 반영은 스위치 켠 뒤(R1 10/31)부터.
+  function conProcOpText(it){
+    if (!it) return "";
+    if (it.op === "docs_set") return "서류 목록 " + it.key + " 수정/추가";
+    if (it.op === "docs_del") return "서류 목록 " + it.key + " 삭제";
+    if (it.op === "map_add") return "매핑 /" + it.re + "/ → " + it.key;
+    if (it.op === "map_del") return "매핑 /" + it.re + "/ 삭제";
+    if (it.op === "scen_del") return "단계 " + it.scen + " #" + (Number(it.i) + 1) + " " + it.name + " 삭제";
+    if (it.op === "revert") return "되돌리기 " + String(it.of || "").slice(0, 8);
+    return it.op;
+  }
+  function conProcEditHtml(b){
+    var L = b.list.consts, P = b.proc.consts, es = b.edit_state || { docs_set:{}, docs_del:{}, map_add:[], map_del:{}, scen_del:{} }, clog = b.clog || { items: [] }, on = !!(b.flag && b.flag.use_blob);
+    var det = function(id, title, body){ return '<details data-conproc-det="' + id + '"' + (conProcEditOpen[id] ? ' open' : '') + ' style="margin-top:6px;border-top:1px solid var(--line);padding-top:6px;"><summary style="cursor:pointer;font-weight:600;font-size:13px;">' + title + '</summary><div style="margin-top:6px;">' + body + '</div></details>'; };
+    var chip = function(attr, val, txt, danger){ return '<button type="button" class="vs-chip" style="padding:1px 7px;font-size:11.5px;' + (danger ? 'color:#B00020;' : '') + '" ' + attr + '="' + esc(val) + '">' + txt + '</button>'; };
+    var h = '<div style="margin-top:12px;font-size:13px;border-top:2px solid var(--line);padding-top:8px;"><b>편집(관리자)</b> — 유효 ' + (clog.applied || 0) + '건' + (clog.reverted ? ' · 되돌림 ' + clog.reverted : '') + ' · 기록 ' + (clog.n || 0) + '건' + (clog.head ? ' · ' + esc(String(clog.head).slice(0, 8)) : '') + (clog.chain_ok === false ? ' · <span style="color:#B00020;font-weight:700;">해시 체인 손상</span>' : '')
+      + '<div class="empty-line" style="margin-top:2px;">' + (on ? '거울 켜짐 — 편집은 다음 로그인·새로고침부터 엔진에 반영됩니다.' : '거울이 꺼져 있어 편집은 쌓이기만 합니다 — 스위치를 켜면 반영(기존 계약의 단계·서류 목록은 바뀌지 않고 새 계약부터).') + ' 단계 이름·순서는 PM 원문 그대로, 삭제는 전부 되돌릴 수 있습니다.</div></div>';
+    // 1 서류 목록 STAGE_DOCS
+    var keys = Object.keys(L.STAGE_DOCS), dels = Object.keys(es.docs_del || {});
+    var drows = keys.map(function(k){
+      var edited = !!(es.docs_set && es.docs_set[k]), v = L.STAGE_DOCS[k];
+      var body = (conProcEditing === "docs:" + k)
+        ? '<textarea data-conproc-dval="' + esc(k) + '" rows="3" style="width:100%;font-size:12px;box-sizing:border-box;">' + esc(v) + '</textarea><div style="display:flex;gap:6px;margin-top:4px;">' + chip('data-conproc-dsave', k, '저장') + chip('data-conproc-dcancel', k, '취소') + '</div>'
+        : '<span style="font-size:12px;color:var(--sub);overflow-wrap:anywhere;">' + esc(v) + '</span>';
+      return '<div style="padding:5px 0;border-bottom:1px solid var(--line);"><div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;"><b style="font-size:12.5px;">' + esc(k) + '</b>' + (edited ? '<small style="color:var(--brand);">편집됨</small>' : '') + '<span style="margin-left:auto;display:inline-flex;gap:4px;">' + (conProcEditing === "docs:" + k ? '' : chip('data-conproc-dedit', k, '수정') + chip('data-conproc-ddel', k, '삭제', true)) + '</span></div>' + body + '</div>';
+    }).concat(dels.map(function(k){ return '<div style="padding:5px 0;border-bottom:1px solid var(--line);display:flex;gap:6px;align-items:center;flex-wrap:wrap;"><b style="font-size:12.5px;text-decoration:line-through;opacity:.6;">' + esc(k) + '</b><small style="color:#B00020;">삭제됨</small><span style="margin-left:auto;">' + chip('data-conproc-revert', es.docs_del[k], '복구') + '</span></div>'; })).join("");
+    drows += '<div style="margin-top:8px;padding:6px;border:1px dashed var(--line);border-radius:8px;"><div style="font-size:12px;font-weight:600;margin-bottom:4px;">새 서류 키</div><div style="display:flex;gap:6px;flex-wrap:wrap;"><input type="text" data-conproc-nkey maxlength="40" placeholder="키(예: 완료신고_석면)" style="flex:1;min-width:140px;font-size:12px;"><input type="text" data-conproc-nre maxlength="120" placeholder="단계 이름 매칭 정규식(선택, 예: 노동부|석면)" style="flex:2;min-width:160px;font-size:12px;"></div><textarea data-conproc-nval rows="2" maxlength="2000" placeholder="[작성] a·b / [수령] c" style="width:100%;margin-top:4px;font-size:12px;box-sizing:border-box;"></textarea><div style="margin-top:4px;">' + chip('data-conproc-dadd', '1', '추가') + ' <small class="empty-line">키 이름이 단계 이름과 같으면 매핑 없이도 바로 쓰입니다. 정규식을 적으면 매핑 맨 앞에 끼워 넣습니다.</small></div></div>';
+    h += det("docs", "서류 목록 STAGE_DOCS · " + keys.length + "키" + (dels.length ? ' · 삭제 ' + dels.length : ''), drows);
+    // 2 단계 목록 CON_SCEN(base 순서 복원: 유효 목록 + 삭제 자리)
+    var srows = Object.keys(P.CON_SCEN).map(function(sk){
+      var eff = P.CON_SCEN[sk], delAt = {}, n = eff.length, i, k;
+      for (k in es.scen_del) if (Object.prototype.hasOwnProperty.call(es.scen_del, k) && k.split("|")[0] === sk){ delAt[Number(k.split("|")[1])] = es.scen_del[k]; n++; }
+      var chips = [], j = 0;
+      for (i = 0; i < n; i++){
+        if (delAt[i]) chips.push('<span class="vs-chip" style="cursor:default;text-decoration:line-through;opacity:.6;">' + (i + 1) + ' ' + esc(delAt[i].name) + '</span>' + chip('data-conproc-revert', delAt[i].h, '복구'));
+        else { chips.push('<span class="vs-chip" style="cursor:default;">' + (i + 1) + ' ' + esc(eff[j]) + (eff.length > 1 ? ' <b data-conproc-sdel="' + esc(sk + '|' + i + '|' + eff[j]) + '" title="이 시나리오에서 소프트 삭제(새 계약부터)" style="cursor:pointer;color:#B00020;margin-left:4px;">×</b>' : '') + '</span>'); j++; }
+      }
+      return '<div style="padding:5px 0;border-bottom:1px solid var(--line);"><div style="font-size:12.5px;font-weight:600;">' + esc(sk) + ' <small style="font-weight:400;color:var(--sub);">' + eff.length + '단계</small></div><div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:3px;">' + chips.join("") + '</div></div>';
+    }).join("");
+    h += det("scen", "단계 목록 CON_SCEN · 10시나리오" + (Object.keys(es.scen_del || {}).length ? ' · 삭제 ' + Object.keys(es.scen_del).length : ''), srows + '<div class="empty-line" style="margin-top:4px;">× = 소프트 삭제(새 계약의 단계 목록에서만 빠짐, 진행 중 계약 불변, [복구] 가능). 이름 수정·추가·순서 변경은 없습니다 — 신설 단계는 카드 9 뒤 added 로.</div>');
+    // 3 매핑 STAGE_DOC_MAP
+    var addedRe = {}; (es.map_add || []).forEach(function(m){ addedRe[m.re] = 1; });
+    var mrows = (L.STAGE_DOC_MAP || []).map(function(p, i){ return '<div style="display:flex;gap:6px;align-items:center;padding:3px 0;border-bottom:1px solid var(--line);font-size:12px;flex-wrap:wrap;"><span style="color:var(--sub);min-width:22px;">' + (i + 1) + '</span><code style="font-size:11.5px;">/' + esc(p[0].$re) + '/' + esc(p[0].$flags || '') + '</code><span>→ <b>' + esc(p[1]) + '</b></span>' + (addedRe[p[0].$re] ? '<small style="color:var(--brand);">추가됨</small>' : '') + '<span style="margin-left:auto;">' + chip('data-conproc-mdel', p[0].$re, '삭제', true) + '</span></div>'; }).join("");
+    mrows += Object.keys(es.map_del || {}).map(function(re){ return '<div style="display:flex;gap:6px;align-items:center;padding:3px 0;border-bottom:1px solid var(--line);font-size:12px;"><code style="font-size:11.5px;text-decoration:line-through;opacity:.6;">/' + esc(re) + '/</code><small style="color:#B00020;">삭제됨</small><span style="margin-left:auto;">' + chip('data-conproc-revert', es.map_del[re], '복구') + '</span></div>'; }).join("");
+    mrows += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;align-items:center;"><input type="text" data-conproc-mre maxlength="120" placeholder="정규식(예: 실적)" style="flex:1;min-width:120px;font-size:12px;"><select data-conproc-mkey style="font-size:12px;">' + keys.map(function(k){ return '<option value="' + esc(k) + '">' + esc(k) + '</option>'; }).join("") + '</select>' + chip('data-conproc-madd', '1', '맨 앞에 추가') + '</div><div class="empty-line" style="margin-top:4px;">단계 이름 → 서류 키. 위에서부터 먼저 맞는 것이 이깁니다(추가분은 맨 앞).</div>';
+    h += det("map", "이름 매핑 STAGE_DOC_MAP · " + (L.STAGE_DOC_MAP || []).length + "줄", mrows);
+    // 4 변경 기록
+    var items = (clog.items || []).slice().reverse(), revertedOf = {}; (clog.reverted_of || []).forEach(function(of){ revertedOf[of] = 1; });
+    var lrows = items.length ? items.map(function(it){ var rv = !!revertedOf[it.h]; return '<div style="display:flex;gap:6px;align-items:center;padding:3px 0;border-bottom:1px solid var(--line);font-size:12px;flex-wrap:wrap;"><span style="color:var(--sub);">' + esc(new Date((it.ts || 0) + 9 * 3600000).toISOString().slice(5, 16).replace("T", " ")) + '</span><span>' + esc(memberName(it.by) || it.by || "") + '</span><span style="' + (rv ? 'text-decoration:line-through;opacity:.6;' : '') + '">' + esc(conProcOpText(it)) + '</span>' + (rv ? '<small style="color:var(--sub);">되돌림</small>' : '') + '<span style="margin-left:auto;">' + ((it.op !== "revert" && !rv) ? chip('data-conproc-revert', it.h, '되돌리기') : '') + '</span></div>'; }).join("") : '<div class="empty-line">기록이 없습니다.</div>';
+    h += det("log", "변경 기록 clog:contract · " + (clog.n || 0) + "건(최근 30)", lrows);
+    return h;
+  }
+  function conProcBindEdit(host, b){
+    var q = function(sel){ return host.querySelector(sel); }, all = function(sel, fn){ Array.prototype.forEach.call(host.querySelectorAll(sel), fn); };
+    all("[data-conproc-det]", function(el){ el.addEventListener("toggle", function(){ conProcEditOpen[el.getAttribute("data-conproc-det")] = el.open; }); });
+    all("[data-conproc-dedit]", function(el){ el.addEventListener("click", function(){ conProcEditing = "docs:" + el.getAttribute("data-conproc-dedit"); conProcEditOpen.docs = true; renderConProcCard(); }); });
+    all("[data-conproc-dcancel]", function(el){ el.addEventListener("click", function(){ conProcEditing = ""; renderConProcCard(); }); });
+    all("[data-conproc-dsave]", function(el){ el.addEventListener("click", function(){ var k = el.getAttribute("data-conproc-dsave"), ta = q('[data-conproc-dval="' + k.replace(/"/g, '\\"') + '"]'); if (!ta) return; conProcEdit({ op: "docs_set", key: k, value: conProcOneLine(ta.value) }, "서류 목록 " + k + " 저장"); }); });
+    all("[data-conproc-ddel]", function(el){ el.addEventListener("click", function(){ var k = el.getAttribute("data-conproc-ddel"); if (!confirm('서류 목록 "' + k + '" 을 소프트 삭제합니다 — 이 키를 쓰는 단계의 서류 목록이 비게 됩니다(새 계약부터). [복구]로 되돌릴 수 있습니다.')) return; conProcEdit({ op: "docs_del", key: k }, "서류 목록 " + k + " 삭제"); }); });
+    all("[data-conproc-dadd]", function(el){ el.addEventListener("click", function(){
+      var k = (q("[data-conproc-nkey]") || {}).value || "", v = (q("[data-conproc-nval]") || {}).value || "", re = ((q("[data-conproc-nre]") || {}).value || "").trim();
+      if (!k.trim() || !v.trim()){ alert("키와 서류 목록 글을 적어 주세요."); return; }
+      conProcEdit({ op: "docs_set", key: k.trim(), value: conProcOneLine(v) }, "서류 목록 " + k.trim() + " 추가", re ? function(body){ conProcHead = body.head; conProcEdit({ op: "map_add", re: re, key: k.trim() }, "매핑 /" + re + "/ → " + k.trim() + " 추가"); } : null);
+    }); });
+    all("[data-conproc-sdel]", function(el){ el.addEventListener("click", function(){ var p = el.getAttribute("data-conproc-sdel").split("|"); if (!confirm('"' + p[2] + '" 단계를 ' + p[0] + ' 목록에서 소프트 삭제합니다 — 새 계약부터, 진행 중 계약은 그대로. [복구]로 되돌릴 수 있습니다.')) return; conProcEdit({ op: "scen_del", scen: p[0], i: Number(p[1]), name: p.slice(2).join("|") }, "단계 " + p[2] + " 삭제"); }); });
+    all("[data-conproc-mdel]", function(el){ el.addEventListener("click", function(){ var re = el.getAttribute("data-conproc-mdel"); if (!confirm('매핑 /' + re + '/ 를 소프트 삭제합니다. [복구]로 되돌릴 수 있습니다.')) return; conProcEdit({ op: "map_del", re: re }, "매핑 삭제"); }); });
+    all("[data-conproc-madd]", function(el){ el.addEventListener("click", function(){ var re = ((q("[data-conproc-mre]") || {}).value || "").trim(), key = (q("[data-conproc-mkey]") || {}).value || ""; if (!re || !key){ alert("정규식과 서류 키를 고르세요."); return; } conProcEdit({ op: "map_add", re: re, key: key }, "매핑 /" + re + "/ → " + key + " 추가"); }); });
+    all("[data-conproc-revert]", function(el){ el.addEventListener("click", function(){ conProcEdit({ op: "revert", of: el.getAttribute("data-conproc-revert") }, "되돌렸습니다"); }); });
+  }
+  function conProcOneLine(v){ return String(v || "").split(/\s*\n+\s*/).filter(function(x){ return x.trim(); }).join(" / "); }   // 줄바꿈 = 구분자 " / "(서버 BAD_VALUE 방지)
+  function conProcEdit(body, msg, then){
+    if (conProcSaving) return; conProcSaving = true;
+    body.action = "con_proc_edit"; body.head = conProcHead;
+    gwCall("gw-data", body).then(function(res){
+      conProcSaving = false;
+      if (res.status !== 200){ var ec = (res.body && res.body.error_code) || res.status; alert(ec === "CON_PROC_STALE" ? "다른 관리자가 먼저 바꿨습니다 — 화면을 다시 불러옵니다." : ("골조 편집 실패 (" + ec + (res.body && res.body.detail ? ": " + res.body.detail : "") + ")")); renderConProcCard(); return; }
+      conProcEditing = ""; conProcHead = res.body.head || conProcHead;
+      apprToastShow(msg + ((CON_PROC_SRC.flag && CON_PROC_SRC.flag.use_blob) ? " — 새로고침부터 반영" : " — 거울을 켜면 반영"));
+      if (then) then(res.body); else renderConProcCard();
+    }).catch(function(){ conProcSaving = false; alert("골조 편집 실패(네트워크)"); });
   }
   // 제목 키워드로 요소 제안(낙찰→계약 유입 시) — 학습 전 초기 제안
   function suggestConElems(text, decide){
@@ -10424,6 +10544,7 @@
         return '<label>' + esc(f[1]) + '<input type="' + (f[2] === "date" ? "date" : (f[2] === "num" ? "number" : "text")) + '" data-cs-fld="' + esc(f[0]) + '" value="' + esc(String(v)) + '"' + (can ? '' : ' disabled') + '></label>';
       }).join("") + '</div>';
     }
+    h += csStageDocsHtml(c, p, i, key, can);   // v401 건별 서류 체크리스트(stage.docs[])
     if (c.type === "dredge" && /작업|공사\s*수행/.test(s.name)) h += csWorkLogHtml(c, can);
     var act = '';
     if (can){
@@ -10445,6 +10566,33 @@
     act += '<button type="button" class="vs-chip" data-cs-stg="' + esc(key) + '">접기 ▲</button>';
     return h + '<div class="cs-act">' + act + '</div></div>';
   }
+  // v401 건별 서류 체크리스트(stage.docs[]) — ☑ 완료 · 해당없음(=목록에서 건너뜀) · 추가(담당자 몫) · 추가분 삭제. 변경은 계약 저장 + clog:contract:월 사건 1건(서류 이름 없이 종류·좌표만). 지표 ② 서류 목록 delta의 재료
+  function csStageDocsHtml(c, p, i, key, can){
+    var s = p.stages[i], items = csStageDocItems(s), nDone = 0, nNa = 0, nAdd = 0, fixed = Object.prototype.toString.call(s.docs) === "[object Array]";
+    items.forEach(function(d){ if (d.st === "done") nDone++; else if (d.st === "na") nNa++; if (d.add) nAdd++; });
+    var base = esc(c.id) + '|' + esc(p.key) + '|' + i + '|';
+    var h = '<div class="cs-docs" data-cs-dpanel="' + esc(key) + '"><div class="cs-pipe-h">서류 ' + items.length + '건 · 완료 ' + nDone + (nNa ? ' · 해당없음 ' + nNa : '') + (nAdd ? ' · 추가 ' + nAdd : '') + (fixed ? '' : ' <small style="font-weight:400;">(골조 목록 — 체크하면 이 계약의 목록으로 굳습니다)</small>') + '</div>';
+    if (!items.length) h += '<div class="vs-empty" style="font-size:12px;">이 단계에 등록된 서류 목록이 없습니다.</div>';
+    h += items.map(function(d){
+      var na = d.st === "na", done = d.st === "done";
+      return '<div class="cs-doc' + (na ? ' na' : (done ? ' done' : '')) + '"><input type="checkbox" data-cs-dchk="' + base + esc(d.k) + '"' + (done ? ' checked' : '') + ((can && !na) ? '' : ' disabled') + '>'
+        + (d.t ? '<small>[' + esc(d.t) + ']</small>' : '') + '<span class="nm">' + esc(d.n) + '</span>' + (d.add ? '<small>추가</small>' : '') + (d.at && d.st !== "todo" ? '<small>' + esc(d.at) + '</small>' : '')
+        + (can ? (d.add ? '<button type="button" class="vs-chip" data-cs-ddel="' + base + esc(d.k) + '" title="추가분 삭제">✕</button>' : '<button type="button" class="vs-chip" data-cs-dna="' + base + esc(d.k) + '">' + (na ? '복구' : '해당없음') + '</button>') : '') + '</div>';
+    }).join("");
+    if (can) h += '<div class="cs-doc-add"><input type="text" data-cs-dnew="' + esc(key) + '" maxlength="80" placeholder="서류 추가(이름)" autocomplete="off"><button type="button" class="vs-chip" data-cs-dadd="' + base + '-">추가</button></div>';
+    return h + '</div>';
+  }
+  function csDocsOf(s){ if (Object.prototype.toString.call(s.docs) !== "[object Array]") s.docs = csStageDocItems(s); return s.docs; }
+  function csDocFind(s, k){ var ds = csDocsOf(s), j; for (j = 0; j < ds.length; j++) if (ds[j].k === k) return ds[j]; return null; }
+  function csDocLog(c, p, i, k, act){
+    if (typeof gwCall !== "function") return;
+    try { gwCall("gw-data", { action: "con_clog_add", cid: c.id, pipe: p.key, i: i, k: k, act: act }).then(function(res){ if (res.status !== 200) apprToastShow("서류 변경 기록 실패(" + ((res.body && res.body.error_code) || res.status) + ") — 체크 자체는 계약에 저장됩니다"); }).catch(function(){ apprToastShow("서류 변경 기록 실패(네트워크) — 체크 자체는 계약에 저장됩니다"); }); } catch(e){}
+  }
+  function csDocAfter(c, p, i, k, act){ c.updated = todayStr(); scheduleContractSave(); renderContracts(); csDocLog(c, p, i, k, act); }
+  function csDocToggle(c, p, i, k){ if (!canDo("con")) return; var s = p.stages[i], d = s && csDocFind(s, k); if (!d || d.st === "na") return; d.st = (d.st === "done") ? "todo" : "done"; d.by = myId(); d.at = todayStr(); csDocAfter(c, p, i, k, d.st === "done" ? "done" : "undo"); }
+  function csDocNa(c, p, i, k){ if (!canDo("con")) return; var s = p.stages[i], d = s && csDocFind(s, k); if (!d || d.add) return; d.st = (d.st === "na") ? "todo" : "na"; d.by = myId(); d.at = todayStr(); csDocAfter(c, p, i, k, d.st === "na" ? "na" : "undo"); }
+  function csDocAdd(c, p, i, name){ if (!canDo("con")) return; name = String(name || "").trim().slice(0, 80); if (!name) return; var s = p.stages[i], ds = csDocsOf(s), d = { k: "add:" + genId(""), t: "", n: name, st: "todo", add: 1, by: myId(), at: todayStr() }; ds.push(d); csDocAfter(c, p, i, d.k, "add"); }
+  function csDocDel(c, p, i, k){ if (!canDo("con")) return; var s = p.stages[i], ds = s && csDocsOf(s), j; if (!ds) return; for (j = 0; j < ds.length; j++) if (ds[j].k === k && ds[j].add){ ds.splice(j, 1); csDocAfter(c, p, i, k, "del"); return; } }
   function csStagesHtml(c){
     var ps = c.pipes || [];
     if (!ps.length) return '<div class="vs-empty">단계가 없습니다.</div>';
@@ -10558,15 +10706,15 @@
     if (canDo("con")) h += '<div class="vs-act">' + (conHasBldg(c) ? '<button class="mini-btn" data-con-bldg="' + esc(c.id) + '">대장</button>' : '') + '<button class="mini-btn" data-con-xlsx="' + esc(c.id) + '">생성</button><button class="mini-btn" data-con-doc="' + esc(c.id) + '">서류</button><button class="mini-btn danger" data-con-del="' + esc(c.id) + '">삭제</button></div>';
     return h;
   }
-  function csPanelOf(el){ var e = el; while (e && e.getAttribute && !(e.getAttribute("data-cs-fpanel") || e.getAttribute("data-cs-wlform"))) e = e.parentNode; return (e && e.getAttribute) ? e : null; }
+  function csPanelOf(el){ var e = el; while (e && e.getAttribute && !(e.getAttribute("data-cs-fpanel") || e.getAttribute("data-cs-wlform") || e.getAttribute("data-cs-dpanel"))) e = e.parentNode; return (e && e.getAttribute) ? e : null; }
   function csSnapInputs(root){
     var out = []; if (!root) return out;
-    Array.prototype.forEach.call(root.querySelectorAll("[data-cs-fld], [data-cs-wl]"), function(el){ if (el.value === "") return; var pan = csPanelOf(el); if (!pan) return; out.push({ p: pan.getAttribute("data-cs-fpanel") || ("wl:" + pan.getAttribute("data-cs-wlform")), k: el.getAttribute("data-cs-fld") || el.getAttribute("data-cs-wl"), v: el.value }); });
+    Array.prototype.forEach.call(root.querySelectorAll("[data-cs-fld], [data-cs-wl], [data-cs-dnew]"), function(el){ if (el.value === "") return; var pan = csPanelOf(el); if (!pan) return; out.push({ p: pan.getAttribute("data-cs-fpanel") || (pan.getAttribute("data-cs-wlform") ? "wl:" + pan.getAttribute("data-cs-wlform") : "dp:" + pan.getAttribute("data-cs-dpanel")), k: el.getAttribute("data-cs-fld") || el.getAttribute("data-cs-wl") || "dnew", v: el.value }); });
     return out;
   }
   function csRestoreInputs(root, snap){
     if (!root || !snap.length) return;
-    snap.forEach(function(x){ var pan = x.p.indexOf("wl:") === 0 ? root.querySelector('[data-cs-wlform="' + x.p.slice(3) + '"]') : root.querySelector('[data-cs-fpanel="' + x.p + '"]'); if (!pan) return; var el = pan.querySelector('[data-cs-fld="' + x.k + '"], [data-cs-wl="' + x.k + '"]'); if (el && el.value !== x.v) el.value = x.v; });
+    snap.forEach(function(x){ var pan = x.p.indexOf("wl:") === 0 ? root.querySelector('[data-cs-wlform="' + x.p.slice(3) + '"]') : (x.p.indexOf("dp:") === 0 ? root.querySelector('[data-cs-dpanel="' + x.p.slice(3) + '"]') : root.querySelector('[data-cs-fpanel="' + x.p + '"]')); if (!pan) return; var el = x.k === "dnew" ? pan.querySelector('[data-cs-dnew]') : pan.querySelector('[data-cs-fld="' + x.k + '"], [data-cs-wl="' + x.k + '"]'); if (el && el.value !== x.v) el.value = x.v; });
   }
   function conSetPaneW(wrap){ try { wrap.style.setProperty("--vs-panew", wrap.clientWidth + "px"); } catch(e){} }
   function renderContracts(){
@@ -10681,9 +10829,13 @@
       csAct("data-cs-unskip", function(c, p, i){ csUnskipStage(c, p, i); });
       csAct("data-cs-jump", function(c, p, i){ csJumpStage(c, p, i); });
       csAct("data-cs-fsave", function(c, p, i, el){ var panel = root.querySelector('[data-cs-fpanel="' + p.key + '|' + i + '"]'); csSaveFields(c, p, i, panel); });
+      csAct("data-cs-dchk", function(c, p, i, el){ csDocToggle(c, p, i, el.getAttribute("data-cs-dchk").split("|")[3]); });   // v401 서류 체크리스트
+      csAct("data-cs-dna", function(c, p, i, el){ csDocNa(c, p, i, el.getAttribute("data-cs-dna").split("|")[3]); });
+      csAct("data-cs-ddel", function(c, p, i, el){ csDocDel(c, p, i, el.getAttribute("data-cs-ddel").split("|")[3]); });
+      csAct("data-cs-dadd", function(c, p, i){ var inp = root.querySelector('[data-cs-dpanel="' + p.key + '|' + i + '"] [data-cs-dnew]'); if (!inp) return; var nm = inp.value; inp.value = ""; csDocAdd(c, p, i, nm); });
       Array.prototype.forEach.call(root.querySelectorAll("[data-cs-wladd]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); var c = findProc(el.getAttribute("data-cs-wladd")); var row = root.querySelector('[data-cs-wlform="' + (c ? c.id : "") + '"]'); if (c && row) csWlAdd(c, row); }); });
       Array.prototype.forEach.call(root.querySelectorAll("[data-cs-wldel]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); var p = el.getAttribute("data-cs-wldel").split("|"), c = findProc(p[0]); if (c) csWlDel(c, p[1]); }); });
-      Array.prototype.forEach.call(root.querySelectorAll("[data-cs-fld], [data-cs-wl]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); }); });
+      Array.prototype.forEach.call(root.querySelectorAll("[data-cs-fld], [data-cs-wl], [data-cs-dnew]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); }); });
       Array.prototype.forEach.call(root.querySelectorAll(".vs-det-in, #conDetailCard"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); }); });   // 펼침 안 클릭이 행 토글로 번지지 않게
     });
     Array.prototype.forEach.call(host.querySelectorAll("tr.vs-r"), function(tr){

@@ -1357,9 +1357,9 @@ try {
     && (seg.match(/colspan="' \+ csN \+ '"/g) || []).length === 2 && ids.has('conDetailCard') && /#conDetailCard\{display:none;\}/.test(html) && /#conDetailCard\{display:block;margin-top:8px;\}/.test(html), '');
   T('v381 종전 행 버튼·첨부 배선(data-con-del/doc/xlsx/bldg · data-catt-add/del/rev/drop)이 펼침 안에서 그대로 묶인다',
     ['data-con-del', 'data-con-doc', 'data-con-xlsx', 'data-con-bldg', 'data-catt-add', 'data-catt-del', 'data-catt-rev', 'data-catt-drop'].every((a) => seg.indexOf('querySelectorAll("[' + a + ']")') >= 0), '');
-  T('v381 CSS: .cs-stg 단계 카드(done/cur) · .cs-bar 진행 막대 · 폰 열 폭 4(cs-c-client/site/stage/end) · 시트 블록의 저장 호출은 v382 단계 입력·작업현황(새 키 vals/work_log/settle_amount) 6함수뿐',
+  T('v381 CSS: .cs-stg 단계 카드(done/cur) · .cs-bar 진행 막대 · 폰 열 폭 4(cs-c-client/site/stage/end) · 시트 블록의 저장 호출은 v382 단계 입력·작업현황(새 키 vals/work_log/settle_amount) 7함수뿐(v401 csDocAfter 포함)',
     /\.cs-stg\.done\{/.test(html) && /\.cs-stg\.cur\{/.test(html) && /\.cs-bar i\{/.test(html) && ['client', 'site', 'stage', 'end'].every((k) => new RegExp('\\.vs col\\.cs-c-' + k + '\\{width:\\d+% !important;\\}').test(html))
-    && (seg.match(/scheduleContractSave\(\)/g) || []).length === (seg.match(/function (csSkipStage|csUnskipStage|csJumpStage|csSaveFields|csWlAdd|csWlDel)\(/g) || []).length, '');
+    && (seg.match(/scheduleContractSave\(\)/g) || []).length === (seg.match(/function (csSkipStage|csUnskipStage|csJumpStage|csSaveFields|csWlAdd|csWlDel|csDocAfter)\(/g) || []).length, '');   // v401 csDocAfter(서류 체크리스트) 추가
 } catch (e) { console.log('  (v381 검사 생략 — ' + e.message + ')'); fails++; }
 
 // ---- v382: 시나리오 조립(종류 × 사급/관급 → 단계 목록, PM 원문) · 선택 단계 · 작업현황 · 정산액 · 카드형 제거 ----
@@ -1640,8 +1640,31 @@ try {
     && html.indexOf('id="conProcCard"') > 0 && /function renderConProcCard\(\)/.test(html) && /renderAlertsCard\(\);[^\n]*\n\s*renderConProcCard\(\);/.test(html) && /action: "con_proc_get"/.test(html) && /action: "con_proc_flag_set"/.test(html)
     && /dredge:"주식회사 종운환경"/.test(html) && html.indexOf('종운환경 주식회사') < 0 && /var elems=conModalElems\(type, false\);/.test(html) && html.indexOf('{asb:1,labor:1,wst:1}:{dredge:1}') < 0
     && /async function handleConProcGet/.test(gwd) && /async function handleConProcFlagSet/.test(gwd) && /action === 'con_proc_get'/.test(gwd) && /action === 'con_proc_flag_set'/.test(gwd) && /const CON_PROC_KEYS = \{ proc: 'proc:contract:v1', list: 'list:contract', flag: 'settings:contract' \}/.test(gwd) && /MIRROR_MISSING/.test(gwd) && /CON_PROC_STALE/.test(gwd) && /op: '계약골조'/.test(gwd)
-    && okAdd && okBlob && /jw-shell-v400/.test(swv), addTxt);
+    && okAdd && okBlob && /jw-shell-v(400|4\d\d)/.test(swv), addTxt);
 } catch (e) { console.log('  (v400 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ---- v401(10/29 계약 D1 3일차): 골조·목록 편집 clog:contract(관리자 카드 편집 4절·서버 con_proc_edit op 6종·재생 유효 층) · 건별 서류 체크리스트 stage.docs[](☑·해당없음·추가, con_clog_add 월 키) · STAGE_DOCS 2줄 표기 정정(·→/) · sw ----
+try {
+  const swv = readFileSync(join(ROOT, 'sw.js'), 'utf8');
+  const seg401 = html.slice(html.indexOf('// @con-scen-start'), html.indexOf('// @con-scen-end'));
+  const sheet401 = html.slice(html.indexOf('// @con-sheet-start'), html.indexOf('  function renderContracts(){'));
+  T('v401 서류 항목화: csSplitTop·csParseStageDocs·csStageDocItems(@con-scen) · 단계 카드 csStageDocsHtml 호출 · 체크리스트 6함수 · 배선 4(dchk/dna/ddel/dadd) · 입력 보존(dpanel/dnew) · CSS .cs-docs/.cs-doc · con_clog_add 호출 · STAGE_DOCS 완료신고·청구 "/" 표기',
+    /function csSplitTop\(/.test(seg401) && /function csParseStageDocs\(/.test(seg401) && /function csStageDocItems\(/.test(seg401)
+    && /h \+= csStageDocsHtml\(c, p, i, key, can\);/.test(sheet401) && ['csStageDocsHtml', 'csDocsOf', 'csDocFind', 'csDocLog', 'csDocToggle', 'csDocNa', 'csDocAdd', 'csDocDel'].every((f) => sheet401.indexOf('function ' + f + '(') >= 0)
+    && ['data-cs-dchk', 'data-cs-dna', 'data-cs-ddel', 'data-cs-dadd'].every((a) => html.indexOf('csAct("' + a + '"') >= 0) && sheet401.indexOf('[data-cs-fld], [data-cs-wl], [data-cs-dnew]') >= 0 && sheet401.indexOf('e.getAttribute("data-cs-dpanel")') >= 0
+    && /\.cs-docs\{/.test(html) && /\.cs-doc\.na \.nm\{/.test(html) && /action: "con_clog_add"/.test(sheet401)
+    && seg401.indexOf('"완료신고":"[작성] 석면해체/제거 완료신고(노동부)"') >= 0 && seg401.indexOf('[수령] 국세/지방세 납세증명·4대보험 완납증명·하도급지킴이') >= 0 && html.indexOf('석면해체·제거 완료신고') < 0, '');
+  T('v401 관리자 편집 카드: conProcEditHtml 4절(docs/scen/map/log) · 배선 conProcBindEdit(dedit/dsave/ddel/dadd/sdel/mdel/madd/revert) · conProcEdit(head 낙관락·STALE 안내) · 거울 꺼짐 안내 · 로더 edits 표식',
+    /function conProcEditHtml\(b\)/.test(html) && ['docs', 'scen', 'map', 'log'].every((id) => html.indexOf('det("' + id + '"') >= 0) && /function conProcBindEdit\(host, b\)/.test(html)
+    && ['data-conproc-dedit', 'data-conproc-dsave', 'data-conproc-ddel', 'data-conproc-dadd', 'data-conproc-sdel', 'data-conproc-mdel', 'data-conproc-madd', 'data-conproc-revert'].every((a) => html.indexOf('all("[' + a + ']"') >= 0)
+    && /function conProcEdit\(body, msg, then\)/.test(html) && /body\.action = "con_proc_edit"; body\.head = conProcHead;/.test(html) && html.indexOf('ec === "CON_PROC_STALE"') >= 0 && html.indexOf('거울이 꺼져 있어 편집은 쌓이기만') >= 0 && /CON_PROC_SRC\.edits = Number\(b\.proc\.edits \|\| 0\)/.test(html), '');
+  T('v401 서버: CON_CLOG_KEY/OPS 6종/STAGE_ACTS 5종 · conClogHash·conClogChainOk·conProcReplay·conProcEffOk · handleConProcGet 유효 층+clog+edit_state · handleConProcEdit(BAD_OP·MIRROR_MISSING·CON_PROC_STALE·CLOG_FULL·WOULD_BREAK·BAD_RE·감사 계약골조편집) · handleConClogAdd(permOf contracts do·월 키) · 디스패치 2 · sw',
+    /const CON_CLOG_KEY = 'clog:contract';/.test(gwd) && /const CON_CLOG_OPS = \{ docs_set: 1, docs_del: 1, map_add: 1, map_del: 1, scen_del: 1, revert: 1 \}/.test(gwd) && /const CON_STAGE_ACTS = \{ done: 1, undo: 1, na: 1, add: 1, del: 1 \}/.test(gwd)
+    && ['conClogHash', 'conClogChainOk', 'conProcReplay', 'conProcEffOk', 'conClogMonthKey'].every((f) => gwd.indexOf('function ' + f + '(') >= 0) && /async function conClogRead\(st, key\)/.test(gwd)
+    && /async function handleConProcGet/.test(gwd) && /edit_state: state/.test(gwd) && /async function handleConProcEdit/.test(gwd) && ['BAD_OP', 'CLOG_FULL', 'WOULD_BREAK', 'BAD_RE'].every((c) => gwd.indexOf("'" + c + "'") >= 0) && /op: '계약골조편집'/.test(gwd)
+    && /async function handleConClogAdd/.test(gwd) && /permOf\(c\.member, 'contracts'\) !== 'do'\) return jr\(403, \{ status: 'FORBIDDEN', error_code: 'NO_WRITE', request_id: R \}\);\s*\n\s*const cid/.test(gwd)
+    && /action === 'con_proc_edit'/.test(gwd) && /action === 'con_clog_add'/.test(gwd) && (gwd.match(/async function handleConProcGet/g) || []).length === 1 && /jw-shell-v401/.test(swv), '');
+} catch (e) { console.log('  (v401 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

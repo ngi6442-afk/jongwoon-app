@@ -1657,14 +1657,6 @@ async function conProcReadLayers(st) {
   try { const l = await blobGet(st, CON_PROC_KEYS.list); if (l.ok && conProcLayerOk(l.data, 'list')) list = l.data; } catch (e) {}
   return { proc: proc, list: list };
 }
-async function handleConProcGet(event, d, R) {
-  const c = await currentMember(event);
-  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
-  const st = store(DATA);
-  const flag = await conProcReadFlag(st);
-  const L = await conProcReadLayers(st);
-  return jr(200, { status: 'OK', flag: flag, proc: L.proc, list: L.list, request_id: R });
-}
 async function handleConProcFlagSet(event, d, R) {
   const c = await currentMember(event);
   if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
@@ -1681,6 +1673,145 @@ async function handleConProcFlagSet(event, d, R) {
   try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'contracts', ev: [{ op: '계약골조', id: '', t: '골조·목록 거울 ' + (cur.use_blob ? '켬' : '끔') + '→' + (d.use_blob ? '켬' : '끔') }] }); } catch (e) {}
   return jr(200, { status: 'OK', use_blob: d.use_blob, updated_at: doc.updated_at, request_id: R });
 }
+// ---- 계약 골조·목록 편집 기록 clog:contract (v401 — 계약 D1 3일차). 거울 두 층(contract_mirror.py 출력)은 그대로 두고, 관리자 편집을 append-only 해시 체인 clog:contract 에 쌓아
+//      읽을 때마다 base 위에 재생(replay)한 "유효 층"을 돌려준다 — --push/--verify 는 base 만 보므로 편집이 지워지지도, 변환 diff 0 게이트가 깨지지도 않는다. 앱 로더(conProcLoad)는 유효 층을 받는다.
+//      op: docs_set(서류 목록 글 수정·새 키) · docs_del(소프트 삭제) · map_add(이름→서류 키 매핑, 맨 앞에 끼움) · map_del(소프트 삭제) · scen_del(시나리오에서 단계 소프트 삭제 — 새 계약부터, 기존 계약 불변) · revert(앞 항목 되돌리기).
+//      단계 이름 재작성·추가·순서 재배치는 없다(PM 원문 불변 · 신설은 카드 9 added, 4일차). 값은 골조 상수 글뿐(개인정보 없음). 건별 stage.docs[] 사건은 월 키 clog:contract:YYYY-MM(con_clog_add, 값 없이 종류만).
+const CON_CLOG_KEY = 'clog:contract';
+const CON_CLOG_MAX = 2000;
+const CON_CLOG_MONTH_MAX = 5000;
+const CON_CLOG_OPS = { docs_set: 1, docs_del: 1, map_add: 1, map_del: 1, scen_del: 1, revert: 1 };
+const CON_STAGE_ACTS = { done: 1, undo: 1, na: 1, add: 1, del: 1 };
+function conClogHash(prev, entry) { return crypto.createHash('sha256').update(prev + '|' + JSON.stringify(entry)).digest('hex').slice(0, 16); }
+function conClogChainOk(doc) { let prev = ''; for (const it of (doc.items || [])) { const e = Object.assign({}, it); delete e.h; delete e.p; if (it.p !== prev || conClogHash(prev, e) !== it.h) return false; prev = it.h; } return prev === (doc.head || ''); }
+async function conClogRead(st, key) {
+  let doc = { schema: 1, items: [], head: '' };
+  try { const r = await blobGet(st, key || CON_CLOG_KEY); if (r.ok && r.data && Array.isArray(r.data.items)) doc = { schema: 1, items: r.data.items, head: r.data.head || '' }; } catch (e) {}
+  return doc;
+}
+// 재생: base 두 층 + clog → 유효 두 층(깊은 복사) + 편집 상태(카드의 '편집됨'·'삭제됨' 표시와 [복구] 버튼의 h)
+function conProcReplay(proc, list, clog) {
+  const P = JSON.parse(JSON.stringify(proc)), L = JSON.parse(JSON.stringify(list));
+  const items = (clog && clog.items) || [];
+  const reverted = {}; items.forEach((it) => { if (it.op === 'revert' && it.of) reverted[it.of] = it.h; });
+  const state = { docs_set: {}, docs_del: {}, map_add: [], map_del: {}, scen_del: {}, applied: 0, reverted: Object.keys(reverted).length };
+  for (const it of items) {
+    if (it.op === 'revert' || reverted[it.h]) continue;
+    state.applied++;
+    if (it.op === 'docs_set') { L.consts.STAGE_DOCS[it.key] = it.value; state.docs_set[it.key] = it.h; delete state.docs_del[it.key]; }
+    else if (it.op === 'docs_del') { state.docs_del[it.key] = it.h; }
+    else if (it.op === 'map_add') { state.map_add.unshift({ re: it.re, flags: it.flags || '', key: it.key, h: it.h }); delete state.map_del[it.re]; }   // 검토 1: 삭제 뒤 같은 정규식 추가 = 되살림
+    else if (it.op === 'map_del') { state.map_del[it.re] = it.h; state.map_add = state.map_add.filter((m) => m.re !== it.re); }
+    else if (it.op === 'scen_del') { state.scen_del[it.scen + '|' + it.i] = { h: it.h, name: it.name }; }
+  }
+  Object.keys(state.docs_del).forEach((k) => { delete L.consts.STAGE_DOCS[k]; });
+  L.consts.STAGE_DOC_MAP = state.map_add.map((m) => [{ $re: m.re, $flags: m.flags }, m.key]).concat(L.consts.STAGE_DOC_MAP || []).filter((p) => !(p && p[0] && state.map_del[p[0].$re]));
+  Object.keys(P.consts.CON_SCEN || {}).forEach((sk) => { P.consts.CON_SCEN[sk] = (P.consts.CON_SCEN[sk] || []).filter((n, i) => !state.scen_del[sk + '|' + i]); });
+  const head = (clog && clog.head) || '';
+  P.base_sha = proc.sha; L.base_sha = list.sha; P.edits = state.applied; L.edits = state.applied; P.clog_head = head; L.clog_head = head;
+  return { proc: P, list: L, state: state };
+}
+// 유효 층 문턱 — 앱 conProcValid 가 폴백하는 조건과 같은 축(깨질 편집은 서버가 거부 = WOULD_BREAK)
+function conProcEffOk(P, L) {
+  const scen = (P.consts && P.consts.CON_SCEN) || {};
+  for (const k of Object.keys(scen)) if (!Array.isArray(scen[k]) || !scen[k].length) return 'CON_SCEN ' + k + ' 단계 0';
+  if (Object.keys((L.consts && L.consts.STAGE_DOCS) || {}).length < 10) return 'STAGE_DOCS 10 미만';
+  if (!Array.isArray(L.consts.STAGE_DOC_MAP) || L.consts.STAGE_DOC_MAP.length < 10) return 'STAGE_DOC_MAP 10 미만';
+  return '';
+}
+async function handleConProcGet(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  const st = store(DATA);
+  const flag = await conProcReadFlag(st);
+  const L = await conProcReadLayers(st);
+  const clog = await conClogRead(st);
+  let proc = L.proc, list = L.list, state = null;
+  if (proc && list) { const eff = conProcReplay(proc, list, clog); proc = eff.proc; list = eff.list; state = eff.state; }
+  const clogOut = { n: clog.items.length, head: clog.head || '', applied: state ? state.applied : 0, reverted: state ? state.reverted : 0, chain_ok: conClogChainOk(clog), items: clog.items.slice(-30), reverted_of: clog.items.filter((x) => x.op === 'revert' && x.of).map((x) => x.of) };
+  return jr(200, { status: 'OK', flag: flag, proc: proc, list: list, clog: clogOut, edit_state: state, request_id: R });
+}
+async function handleConProcEdit(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (!c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
+  const op = String(d.op || '');
+  if (!Object.prototype.hasOwnProperty.call(CON_CLOG_OPS, op)) return jr(400, { status: 'REJECTED', error_code: 'BAD_OP', request_id: R });
+  const st = store(DATA);
+  const L0 = await conProcReadLayers(st);
+  if (!L0.proc || !L0.list) return jr(409, { status: 'CONFLICT', error_code: 'MIRROR_MISSING', request_id: R });
+  const clog = await conClogRead(st);
+  if (d.head !== undefined && String(d.head) !== String(clog.head || '')) return jr(409, { status: 'CONFLICT', error_code: 'CON_PROC_STALE', request_id: R });
+  if (clog.items.length >= CON_CLOG_MAX) return jr(409, { status: 'CONFLICT', error_code: 'CLOG_FULL', request_id: R });
+  const cur = conProcReplay(L0.proc, L0.list, clog);
+  const SD = cur.list.consts.STAGE_DOCS, MAP = cur.list.consts.STAGE_DOC_MAP;
+  const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+  const str = (v, max) => { const s = String(v == null ? '' : v).replace(/\r\n?/g, '\n').trim(); return (s.length && s.length <= max && !/[\u0000-\u0008\u000b\u000c\u000e-\u001f\n]/.test(s)) ? s : null; };
+  const bad = (code, detail) => jr(400, Object.assign({ status: 'REJECTED', error_code: code, request_id: R }, detail ? { detail: detail } : {}));
+  const entry = { ts: Date.now(), by: c.member.id, op: op };
+  let t = '';
+  if (op === 'docs_set') {
+    const key = str(d.key, 40), value = str(d.value, 2000);
+    if (!key || !value || /[\[\]{}"\\|]/.test(key) || key === '__proto__') return bad('BAD_VALUE', '키 1~40자(괄호·따옴표 제외)·값 1~2000자 한 줄');
+    if (SD[key] === value) return bad('NO_CHANGE');
+    entry.key = key; entry.value = value; t = '서류 목록 ' + key + (has(SD, key) ? ' 수정' : ' 추가');
+  } else if (op === 'docs_del') {
+    const key = str(d.key, 40);
+    if (!key || !has(SD, key)) return bad('BAD_VALUE', '없는 서류 키');
+    entry.key = key; t = '서류 목록 ' + key + ' 삭제';
+  } else if (op === 'map_add') {
+    const re = str(d.re, 120), key = str(d.key, 40), flags = String(d.flags || '');
+    if (!re || !key || !/^i?$/.test(flags)) return bad('BAD_VALUE', '정규식 1~120자·키·flags(i만)');
+    try { new RegExp(re, flags); } catch (e) { return bad('BAD_RE', String(e.message || '').slice(0, 80)); }
+    if (!has(SD, key)) return bad('BAD_VALUE', '매핑 대상 서류 키가 없음: ' + key);
+    if (MAP.some((p) => p && p[0] && p[0].$re === re)) return bad('NO_CHANGE', '같은 정규식 매핑이 이미 있음');
+    entry.re = re; entry.flags = flags; entry.key = key; t = '매핑 /' + re + '/ → ' + key + ' 추가';
+  } else if (op === 'map_del') {
+    const re = str(d.re, 120);
+    if (!re || !MAP.some((p) => p && p[0] && p[0].$re === re)) return bad('BAD_VALUE', '없는 매핑');
+    entry.re = re; t = '매핑 /' + re + '/ 삭제';
+  } else if (op === 'scen_del') {
+    const scen = str(d.scen, 40), i = Number(d.i), name = str(d.name, 120);
+    const base = scen ? L0.proc.consts.CON_SCEN[scen] : null;
+    if (!scen || !Array.isArray(base) || !Number.isInteger(i) || i < 0 || i >= base.length || base[i] !== name) return bad('BAD_VALUE', '시나리오·번호·이름이 base 와 다름');
+    if (cur.state.scen_del[scen + '|' + i]) return bad('NO_CHANGE');
+    entry.scen = scen; entry.i = i; entry.name = name; t = '단계 ' + scen + ' #' + (i + 1) + ' ' + name + ' 삭제(새 계약부터)';
+  } else {   // revert
+    const of = str(d.of, 16); const target = of ? clog.items.find((x) => x.h === of) : null;
+    if (!of || !target || target.op === 'revert') return bad('BAD_VALUE', '되돌릴 항목이 없거나 되돌리기 항목');
+    if (clog.items.some((x) => x.op === 'revert' && x.of === of)) return bad('NO_CHANGE', '이미 되돌림');
+    entry.of = of; t = '되돌리기 ' + target.op + ' ' + (target.key || target.re || (target.scen ? target.scen + ' #' + (target.i + 1) : ''));
+  }
+  const trial = { items: clog.items.concat([Object.assign({ h: '-', p: clog.head || '' }, entry)]), head: '-' };
+  const eff = conProcReplay(L0.proc, L0.list, trial);
+  const brk = conProcEffOk(eff.proc, eff.list);
+  if (brk) return bad('WOULD_BREAK', brk);
+  const h = conClogHash(clog.head || '', entry);
+  clog.items.push(Object.assign({ h: h, p: clog.head || '' }, entry)); clog.head = h;
+  const w = await blobSet(st, CON_CLOG_KEY, { schema: 1, items: clog.items, head: h, updated_at: Date.now(), updated_by: c.member.id });
+  if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
+  try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'contracts', ev: [{ op: '계약골조편집', id: h, t: t }] }); } catch (e) {}
+  return jr(200, { status: 'OK', head: h, n: clog.items.length, edits: eff.state.applied, item: clog.items[clog.items.length - 1], request_id: R });
+}
+// 건별 단계 서류 사건(stage.docs[] ☑·해당없음·추가·삭제) — 계약 do 권한. 값(서류 이름)은 적지 않고 종류·좌표만(지표 ② 서류 목록 delta의 재료). 월 키, 해시 체인, 상한 5,000/월
+function conClogMonthKey(ts) { return 'clog:contract:' + new Date((ts || Date.now()) + 9 * 3600000).toISOString().slice(0, 7); }
+async function handleConClogAdd(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (permOf(c.member, 'contracts') !== 'do') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_WRITE', request_id: R });
+  const cid = String(d.cid || ''), pipe = String(d.pipe || ''), i = Number(d.i), k = String(d.k || ''), act = String(d.act || '');
+  if (!/^[A-Za-z0-9_-]{1,40}$/.test(cid) || !/^[A-Za-z0-9_-]{1,20}$/.test(pipe) || !Number.isInteger(i) || i < 0 || i > 99 || !/^[A-Za-z0-9가-힣_:.-]{1,60}$/.test(k) || !Object.prototype.hasOwnProperty.call(CON_STAGE_ACTS, act)) return jr(400, { status: 'REJECTED', error_code: 'BAD_VALUE', request_id: R });
+  const st = store(DATA), key = conClogMonthKey();
+  const doc = await conClogRead(st, key);
+  if (doc.items.length >= CON_CLOG_MONTH_MAX) return jr(409, { status: 'CONFLICT', error_code: 'CLOG_FULL', request_id: R });
+  const entry = { ts: Date.now(), by: c.member.id, op: 'stage_docs', cid: cid, pipe: pipe, i: i, k: k, act: act };
+  const h = conClogHash(doc.head || '', entry);
+  doc.items.push(Object.assign({ h: h, p: doc.head || '' }, entry)); doc.head = h;
+  const w = await blobSet(st, key, { schema: 1, items: doc.items, head: h, updated_at: Date.now() });
+  if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
+  return jr(200, { status: 'OK', key: key, n: doc.items.length, head: h, request_id: R });
+}
+
 // ---- 문서함 설정(v314): 분류별 기본 공개범위 + 등재 결재 게이트. 관리자 전용·감사로그·낙관락(등급표 패턴) ----
 async function handleDocSettingsGet(event, d, R) {
   const c = await currentMember(event);
@@ -3013,6 +3144,8 @@ async function handlerInner(event) {
     if (d && d.action === 'alerts_set') return await handleAlertsSet(event, d, R);
     if (d && d.action === 'con_proc_get') return await handleConProcGet(event, d, R);
     if (d && d.action === 'con_proc_flag_set') return await handleConProcFlagSet(event, d, R);
+    if (d && d.action === 'con_proc_edit') return await handleConProcEdit(event, d, R);
+    if (d && d.action === 'con_clog_add') return await handleConClogAdd(event, d, R);
     if (d && d.action === 'doc_settings_get') return await handleDocSettingsGet(event, d, R);
     if (d && d.action === 'doc_settings_set') return await handleDocSettingsSet(event, d, R);
     if (d && d.action === 'doc_att_put') return await handleDocAttPut(event, d, R);

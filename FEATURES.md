@@ -1,6 +1,6 @@
 # 종운 그룹웨어 — 기능 대장 (사용자 매뉴얼 원천)
 
-> 살아있는 문서. 기능 추가·변경 시 이 파일을 함께 갱신한다. 기준: v400 (2026-10-28).
+> 살아있는 문서. 기능 추가·변경 시 이 파일을 함께 갱신한다. 기준: v401 (2026-10-29).
 > 세부 변경 이력은 git 커밋 메시지(한글) 참조.
 
 ## 1. 전체 구조
@@ -779,3 +779,12 @@ PM 지시 "문서함 일단 다 올리고 등재결재랑 공개범위 만들어
 - 서버: `con_proc_get`(로그인 전원 — flag·proc·list, 층 검증 proc_ver v1·layer·sha) · `con_proc_flag_set`(관리자, BAD_VALUE·NO_CHANGE·CON_PROC_STALE 409·MIRROR_MISSING 409, prev 보존=되돌리기, 감사 "계약골조"). 앱: afterLogin→conProcLoad(conProcValid → conProcRevive {$re,$flags}→RegExp → conProcApplyInPlace) · 권한관리 › 경보 라벨 아래 "계약 골조·목록 거울" 카드(원천·sha·거울↔상수 diff·신설 제안 수·스위치).
 - 정정: CON_SITE_CORP.dredge "종운환경 주식회사"→"주식회사 종운환경"(접두형, 10/8 전환 잔재) → proc_v1.json 재export(diff 0).
 - 검사: servertest 절 54(10항), uismoke v400, `node tools/proctpl_check.mjs`(변환 diff 0 — 상수를 바꾸면 `--export` 뒤 appdata 커밋·`contract_mirror.py --push --verify`). sw v400.
+
+### v401 (10/29) — 계약 골조·목록 편집 clog:contract · 건별 서류 체크리스트 stage.docs[] (계약 D1 3일차, PM "다 되면 이거 빨리")
+- 뜻: 거울 두 층(proc:contract:v1·list:contract, contract_mirror.py 출력)은 그대로 두고, 관리자의 편집을 append-only 해시 체인 `clog:contract`에 쌓아 서버가 읽을 때마다 base 위에 재생(replay)한 "유효 층"을 돌려준다. 앱 로더(conProcLoad)는 유효 층을 받으므로 거울 스위치가 켜져 있으면 편집이 다음 로그인부터 엔진(단계 목록·서류 목록·매핑)에 반영되고, 꺼져 있으면 쌓이기만 한다. `--push/--verify`는 base만 보므로 편집이 지워지지도 변환 diff 0 게이트가 깨지지도 않는다. 단계 이름 재작성·추가·순서 재배치는 없다(PM 원문 불변 · 신설은 카드 9 added, 4일차).
+- 서버: `con_proc_edit`(관리자) op 6종 — docs_set(서류 목록 글 수정·새 키) · docs_del(소프트 삭제) · map_add(이름→서류 키 매핑, 맨 앞) · map_del(소프트 삭제) · scen_del(시나리오에서 단계 소프트 삭제, base 번호+이름 대조, 새 계약부터) · revert(앞 항목 되돌리기 — 삭제 복구도 이것). 거부: BAD_OP·BAD_VALUE(키 1~40자·값 1~2000자 한 줄)·BAD_RE·NO_CHANGE·MIRROR_MISSING 409·CON_PROC_STALE 409(head 낙관락)·CLOG_FULL 409(2,000건)·WOULD_BREAK(적용 뒤 유효 층이 앱 conProcValid 문턱을 못 넘으면 — 시나리오 단계 0·STAGE_DOCS/MAP 10 미만). 감사 "계약골조편집"(id=h). `con_proc_get`은 유효 층(+base_sha·edits·clog_head)과 clog 요약(n·head·applied·reverted·chain_ok·최근 30)·edit_state를 함께 준다. `con_clog_add`(계약 do 권한): 건별 단계 서류 사건을 월 키 `clog:contract:YYYY-MM`에 값 없이 종류·좌표만(cid·pipe·i·k·act done/undo/na/add/del, 5,000/월) — 지표 ② 서류 목록 delta의 재료.
+- 앱(관리자): 권한관리 › 계약 골조·목록 거울 카드 아래 "편집(관리자)" 4절(details) — 서류 목록 STAGE_DOCS(수정 textarea·삭제·복구·새 키+선택 정규식) / 단계 목록 CON_SCEN(× 소프트 삭제·복구, 1단계 남으면 × 없음) / 이름 매핑 STAGE_DOC_MAP(삭제·맨 앞 추가) / 변경 기록(최근 30, 되돌리기). 다른 관리자가 먼저 바꾸면 STALE 안내 뒤 다시 불러온다.
+- 앱(담당자): 계약 › 단계 탭 › 펼친 단계 카드에 "서류 n건" 체크리스트 — STAGE_DOCS 한 줄을 항목화(csParseStageDocs: " / "·"·"는 괄호 밖에서만, " — " 뒤 메모 제거)해 ☑ 완료 · [해당없음](=목록에서 건너뜀) · 서류 추가 · 추가분 ✕. 첫 조작 때 `stage.docs[]`로 굳어 그 뒤 골조가 바뀌어도 그 계약은 그대로(옛 계약 24건 호환 — 이름이 안 맞으면 항목 0·추가 칸만). 변경은 계약 저장 + con_clog_add 1건(실패는 토스트, 체크는 유지).
+- 정정: STAGE_DOCS "완료신고" 석면해체·제거→석면해체/제거, "청구" 국세·지방세→국세/지방세 납세증명(파서가 복합 서류 이름을 나누던 2곳) → proc_v1.json 재export·거울 2층 재빌드(list sha 7eeb1ce6c1d18b44)·push.
+- 배포 전 적대 검토 7건 → 6건 반영: map_del 뒤 같은 정규식 map_add 가 무시되던 재생 순서(map_add 가 map_del 을 되살림·map_del 이 앞선 map_add 를 지움) · 기기 간 동기화 머지(csSyncFromServer)가 stage.docs[] 를 떨어뜨리던 것 → csMergeDocs(k 별 at 늦은 쪽·한쪽만 있는 항목 보존) · 서류 추가 뒤 입력 칸 비움 · 편집 textarea 줄바꿈=" / " · 되돌림 판정은 전체 기록(reverted_of) · __proto__ 키 거부. 수용 1건: 월 사건 로그 clog:contract:YYYY-MM 은 읽고-쓰기 사이 잠금이 없어 같은 초에 두 사람이 누르면 1건이 빠질 수 있다(지표용 로그, 체인은 유지 — 4일차 집계에서 빠진 수를 세지 않도록 참고).
+- 검사: servertest 절 55(40항), uismoke v401(3항), consheet_check v401(10항 — 파서·커버리지 81단계 중 79·체크/해당없음/추가/삭제·머지·html·옛 계약), proctpl diff 0. sw v401.

@@ -3375,4 +3375,82 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   delete mem.gw_data['settings:contract']; delete mem.gw_data['proc:contract:v1']; delete mem.gw_data['list:contract'];
 }
 
+{ // ---- 55(v401) 계약 골조 편집 clog:contract — con_proc_edit(관리자·op 6종·검증·낙관락 head·WOULD_BREAK·해시 체인·재생 유효 층·감사 계약골조편집) · con_clog_add(계약 do·값 없이 종류만·월 키 체인) ----
+  const fs55 = require('fs'), dir55 = join(ROOT, '..', 'jongwoon-appdata', 'data', 'contract');
+  const bp55 = join(dir55, 'blob_proc_contract_v1.json'), bl55 = join(dir55, 'blob_list_contract.json');
+  if (!fs55.existsSync(bp55) || !fs55.existsSync(bl55)) { console.log('  (55 생략 — appdata 거울 파일 없음)'); fail++; }
+  else {
+    const P55 = JSON.parse(fs55.readFileSync(bp55, 'utf8')), L55 = JSON.parse(fs55.readFileSync(bl55, 'utf8'));
+    delete mem.gw_data['settings:contract']; delete mem.gw_data['proc:contract:v1']; delete mem.gw_data['list:contract']; delete mem.gw_data['clog:contract'];
+    let r55 = await call({ action: 'con_proc_edit', op: 'docs_set', key: '계약', value: 'X' }, tokW, 'dev1'); T('55 edit 비관리자 → 403', r55.code === 403);
+    r55 = await call({ action: 'con_proc_edit', op: 'docs_set', key: '계약', value: 'X' }, tokA); T('55 거울 없이 edit → 409 MIRROR_MISSING', r55.code === 409 && r55.body.error_code === 'MIRROR_MISSING');
+    mem.gw_data['proc:contract:v1'] = P55; mem.gw_data['list:contract'] = L55;
+    const nDocs = Object.keys(L55.consts.STAGE_DOCS).length, nMap = L55.consts.STAGE_DOC_MAP.length, nPub = P55.consts.CON_SCEN['asbestos:pub'].length;
+    r55 = await call({ action: 'con_proc_edit', op: 'nope' }, tokA); T('55 op 불량 → 400 BAD_OP', r55.code === 400 && r55.body.error_code === 'BAD_OP');
+    r55 = await call({ action: 'con_proc_edit', op: 'docs_set', key: '계약', value: 'X\nY' }, tokA); T('55 docs_set 줄바꿈 값 → 400 BAD_VALUE', r55.code === 400 && r55.body.error_code === 'BAD_VALUE');
+    r55 = await call({ action: 'con_proc_edit', op: 'docs_set', key: '계약', value: '[작성] X / [수령] Y', head: '' }, tokA);
+    T('55 docs_set 계약 → 200 · head 16hex · n 1', r55.code === 200 && /^[0-9a-f]{16}$/.test(r55.body.head) && r55.body.n === 1 && r55.body.edits === 1, JSON.stringify(r55.body).slice(0, 160));
+    let h1 = r55.body.head;
+    const auditN55 = auditMock.logs.filter((l) => l.ev[0].op === '계약골조편집').length;
+    T('55 감사 계약골조편집 1건(id=h)', auditN55 === 1 && auditMock.logs.some((l) => l.ev[0].op === '계약골조편집' && l.ev[0].id === h1 && /서류 목록 계약 수정/.test(l.ev[0].t)));
+    r55 = await call({ action: 'con_proc_get' }, tokW, 'dev1');
+    T('55 get(직원) → 유효 층: STAGE_DOCS.계약 바뀜 · edits 1 · base_sha=파일 sha · sha 유지 · clog n/head/chain_ok', r55.code === 200 && r55.body.list.consts.STAGE_DOCS['계약'] === '[작성] X / [수령] Y' && r55.body.list.edits === 1 && r55.body.list.base_sha === L55.sha && r55.body.list.sha === L55.sha && r55.body.clog.n === 1 && r55.body.clog.head === h1 && r55.body.clog.chain_ok === true && r55.body.edit_state.docs_set['계약'] === h1, JSON.stringify(r55.body.clog).slice(0, 200));
+    T('55 base 거울 블롭은 불변(편집은 clog에만)', mem.gw_data['list:contract'].consts.STAGE_DOCS['계약'] === L55.consts.STAGE_DOCS['계약'] && mem.gw_data['clog:contract'].items.length === 1);
+    r55 = await call({ action: 'con_proc_edit', op: 'docs_set', key: '계약', value: '[작성] X / [수령] Y' }, tokA); T('55 같은 값 → 400 NO_CHANGE', r55.code === 400 && r55.body.error_code === 'NO_CHANGE');
+    r55 = await call({ action: 'con_proc_edit', op: 'docs_del', key: '계약', head: 'stale' }, tokA); T('55 head 불일치 → 409 CON_PROC_STALE', r55.code === 409 && r55.body.error_code === 'CON_PROC_STALE');
+    r55 = await call({ action: 'con_proc_edit', op: 'docs_del', key: '없는키' }, tokA); T('55 docs_del 없는 키 → 400 BAD_VALUE', r55.code === 400 && r55.body.error_code === 'BAD_VALUE');
+    r55 = await call({ action: 'con_proc_edit', op: 'docs_del', key: '계약', head: h1 }, tokA); T('55 docs_del 계약 → 200 · p=h1 체인', r55.code === 200 && r55.body.item.p === h1 && r55.body.item.op === 'docs_del');
+    const hDel = r55.body.head;
+    r55 = await call({ action: 'con_proc_get' }, tokA);
+    T('55 get → STAGE_DOCS 계약 없음(소프트 삭제) · edit_state.docs_del.계약=h · 키 수 -1', r55.code === 200 && !('계약' in r55.body.list.consts.STAGE_DOCS) && r55.body.edit_state.docs_del['계약'] === hDel && Object.keys(r55.body.list.consts.STAGE_DOCS).length === nDocs - 1);
+    r55 = await call({ action: 'con_proc_edit', op: 'scen_del', scen: 'asbestos:pub', i: 2, name: '엉뚱' }, tokA); T('55 scen_del 이름 불일치 → 400', r55.code === 400 && r55.body.error_code === 'BAD_VALUE');
+    r55 = await call({ action: 'con_proc_edit', op: 'scen_del', scen: 'asbestos:pub', i: 2, name: P55.consts.CON_SCEN['asbestos:pub'][2] }, tokA); T('55 scen_del asbestos:pub #3 → 200', r55.code === 200);
+    const hScen = r55.body.head;
+    r55 = await call({ action: 'con_proc_get' }, tokA);
+    T('55 get → asbestos:pub 단계 -1 · 이름 빠짐 · 나머지 순서 그대로 · base 불변', r55.body.proc.consts.CON_SCEN['asbestos:pub'].length === nPub - 1 && r55.body.proc.consts.CON_SCEN['asbestos:pub'].indexOf(P55.consts.CON_SCEN['asbestos:pub'][2]) < 0 && r55.body.proc.consts.CON_SCEN['asbestos:pub'][2] === P55.consts.CON_SCEN['asbestos:pub'][3] && r55.body.edit_state.scen_del['asbestos:pub|2'].h === hScen && mem.gw_data['proc:contract:v1'].consts.CON_SCEN['asbestos:pub'].length === nPub);
+    r55 = await call({ action: 'con_proc_edit', op: 'scen_del', scen: 'asbestos:pub', i: 2, name: P55.consts.CON_SCEN['asbestos:pub'][2] }, tokA); T('55 같은 단계 다시 삭제 → 400 NO_CHANGE', r55.code === 400 && r55.body.error_code === 'NO_CHANGE');
+    // 마지막 단계까지 지우려 하면 WOULD_BREAK
+    const wp = P55.consts.CON_SCEN['waste:pri']; let okAll = true, last = null;
+    for (let i = 0; i < wp.length; i++) { last = await call({ action: 'con_proc_edit', op: 'scen_del', scen: 'waste:pri', i: i, name: wp[i] }, tokA); if (i < wp.length - 1 && last.code !== 200) okAll = false; }
+    T('55 waste:pri 단계 ' + (wp.length - 1) + '개 삭제 OK · 마지막 1개 → 400 WOULD_BREAK(CON_SCEN 단계 0)', okAll && last.code === 400 && last.body.error_code === 'WOULD_BREAK' && /waste:pri/.test(last.body.detail), JSON.stringify(last.body));
+    r55 = await call({ action: 'con_proc_edit', op: 'map_add', re: '(', key: '청구' }, tokA); T('55 map_add 정규식 불량 → 400 BAD_RE', r55.code === 400 && r55.body.error_code === 'BAD_RE');
+    r55 = await call({ action: 'con_proc_edit', op: 'map_add', re: '실적', key: '없는키' }, tokA); T('55 map_add 없는 키 → 400', r55.code === 400 && r55.body.error_code === 'BAD_VALUE');
+    r55 = await call({ action: 'con_proc_edit', op: 'map_add', re: '실적', key: '청구' }, tokA); T('55 map_add /실적/→청구 → 200', r55.code === 200);
+    r55 = await call({ action: 'con_proc_edit', op: 'map_add', re: '실적', key: '청구' }, tokA); T('55 같은 정규식 다시 → 400 NO_CHANGE', r55.code === 400 && r55.body.error_code === 'NO_CHANGE');
+    r55 = await call({ action: 'con_proc_get' }, tokA);
+    T('55 get → MAP 맨 앞 /실적/ · 길이 +1 · $re/$flags 모양', r55.body.list.consts.STAGE_DOC_MAP.length === nMap + 1 && r55.body.list.consts.STAGE_DOC_MAP[0][0].$re === '실적' && r55.body.list.consts.STAGE_DOC_MAP[0][0].$flags === '' && r55.body.list.consts.STAGE_DOC_MAP[0][1] === '청구');
+    r55 = await call({ action: 'con_proc_edit', op: 'map_del', re: '실적' }, tokA); T('55 map_del /실적/ → 200', r55.code === 200);
+    r55 = await call({ action: 'con_proc_edit', op: 'map_add', re: '실적', key: '청구' }, tokA); const hRe = r55.body.head;
+    let g55 = await call({ action: 'con_proc_get' }, tokA); T('55 검토 1: 삭제 뒤 같은 정규식 다시 추가 → 유효 MAP 에 /실적/ 있음 · map_del 표식 사라짐', r55.code === 200 && g55.body.list.consts.STAGE_DOC_MAP[0][0].$re === '실적' && !g55.body.edit_state.map_del['실적'] && g55.body.edit_state.map_add.length === 1);
+    r55 = await call({ action: 'con_proc_edit', op: 'revert', of: hRe }, tokA); g55 = await call({ action: 'con_proc_get' }, tokA); T('55 그 추가를 되돌리면 원래 map_del 이 다시 산다(MAP 원복) · reverted_of 포함', r55.code === 200 && g55.body.list.consts.STAGE_DOC_MAP.length === nMap && !!g55.body.edit_state.map_del['실적'] && g55.body.clog.reverted_of.indexOf(hRe) >= 0);
+    r55 = await call({ action: 'con_proc_edit', op: 'docs_set', key: '__proto__', value: 'x' }, tokA); T('55 검토 6: __proto__ 키 → 400', r55.code === 400);
+    r55 = await call({ action: 'con_proc_get' }, tokA); T('55 get → MAP 길이 원복 · edit_state.map_del', r55.body.list.consts.STAGE_DOC_MAP.length === nMap && !!r55.body.edit_state.map_del['실적']);
+    // 되돌리기
+    r55 = await call({ action: 'con_proc_edit', op: 'revert', of: hDel }, tokA); T('55 revert(docs_del) → 200', r55.code === 200);
+    const hRev = r55.body.head;
+    r55 = await call({ action: 'con_proc_get' }, tokA); T('55 get → 계약 키 복구(앞선 docs_set 값 유지) · reverted 2(매핑 되돌림 포함)', r55.body.list.consts.STAGE_DOCS['계약'] === '[작성] X / [수령] Y' && r55.body.clog.reverted === 2 && !r55.body.edit_state.docs_del['계약']);
+    r55 = await call({ action: 'con_proc_edit', op: 'revert', of: hDel }, tokA); T('55 같은 항목 다시 revert → 400 NO_CHANGE', r55.code === 400 && r55.body.error_code === 'NO_CHANGE');
+    r55 = await call({ action: 'con_proc_edit', op: 'revert', of: hRev }, tokA); T('55 revert 의 revert → 400 BAD_VALUE', r55.code === 400 && r55.body.error_code === 'BAD_VALUE');
+    r55 = await call({ action: 'con_proc_edit', op: 'revert', of: 'ffffffffffffffff' }, tokA); T('55 없는 h → 400', r55.code === 400);
+    // 체인 검증(실 해시 재계산) · 손상 감지
+    const crypto55 = require('crypto'), doc55 = mem.gw_data['clog:contract'];
+    let prev55 = '', chain = true; for (const it of doc55.items) { const e = Object.assign({}, it); delete e.h; delete e.p; const h = crypto55.createHash('sha256').update(prev55 + '|' + JSON.stringify(e)).digest('hex').slice(0, 16); if (it.p !== prev55 || it.h !== h) chain = false; prev55 = it.h; }
+    T('55 clog ' + doc55.items.length + '건 해시 체인 재계산 일치 · head 일치', chain && prev55 === doc55.head);
+    const saved55 = doc55.items[1].value; doc55.items[1].value = 'tamper';
+    r55 = await call({ action: 'con_proc_get' }, tokA); T('55 항목 변조 → get.clog.chain_ok false', r55.body.clog.chain_ok === false); doc55.items[1].value = saved55;
+    // 거울 켜기는 base 층만 보므로 편집이 있어도 켜진다
+    r55 = await call({ action: 'con_proc_flag_set', use_blob: true }, tokA); T('55 편집 있어도 flag_set 켜기 → 200', r55.code === 200);
+    // 건별 서류 사건 clog:contract:YYYY-MM
+    const mk55 = 'clog:contract:' + new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 7);
+    delete mem.gw_data[mk55];
+    r55 = await call({ action: 'con_clog_add', cid: 'c1', pipe: 'main', i: 0, k: '작성:0', act: 'done' }, tokW, 'dev1'); T('55 con_clog_add 계약 권한 없음 → 403 NO_WRITE', r55.code === 403 && r55.body.error_code === 'NO_WRITE');
+    r55 = await call({ action: 'con_clog_add', cid: 'c1', pipe: 'main', i: 0, k: '작성:0', act: 'zzz' }, tokA); T('55 act 불량 → 400', r55.code === 400);
+    r55 = await call({ action: 'con_clog_add', cid: 'c1', pipe: 'main', i: 0, k: '작성:0', act: 'done', n: '비밀 이름' }, tokA); T('55 con_clog_add 관리자 → 200 · 월 키 · n 1', r55.code === 200 && r55.body.key === mk55 && r55.body.n === 1);
+    r55 = await call({ action: 'con_clog_add', cid: 'c1', pipe: 'main', i: 0, k: 'add:x1', act: 'add' }, tokA);
+    const mdoc = mem.gw_data[mk55];
+    T('55 월 clog 2건 · 체인(p=앞 h) · 값 없음(종류·좌표만) · op stage_docs', mdoc.items.length === 2 && mdoc.items[1].p === mdoc.items[0].h && mdoc.head === mdoc.items[1].h && !('n' in mdoc.items[0]) && !('name' in mdoc.items[0]) && mdoc.items[0].op === 'stage_docs' && mdoc.items[0].act === 'done' && mdoc.items[1].act === 'add', JSON.stringify(mdoc.items[0]));
+    delete mem.gw_data['settings:contract']; delete mem.gw_data['proc:contract:v1']; delete mem.gw_data['list:contract']; delete mem.gw_data['clog:contract']; delete mem.gw_data[mk55];
+  }
+}
+
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);
