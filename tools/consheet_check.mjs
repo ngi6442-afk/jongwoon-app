@@ -1,5 +1,5 @@
 // 계약 시트·시나리오 순수 함수 실행 검사(v381~) — 브라우저 없이 백업 실데이터로 행·상세·정렬·필터·단계 목록·서류 라우팅을 실제로 돌려 본다.
-// 실행: node tools/consheet_check.mjs   (백업: ../jongwoon-appdata/data/backup/gw_backup.json)
+// 실행: node tools/consheet_check.mjs   (백업: ../jongwoon-appdata/data/backup/gw/ 조각 + manifest.json, 없으면 옛 gw_backup.json)
 import { readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -9,8 +9,16 @@ const cut = (a, b) => { const i = html.indexOf(a), j = html.indexOf(b); if (i < 
 const scen = cut('// @con-scen-start', '// @con-scen-end');
 const sheet = cut('// @con-sheet-start', '  function renderContracts(){');
 const fnOf = (name) => { const i = html.indexOf('  function ' + name + '('); if (i < 0) throw new Error('함수 없음: ' + name); let d = 0, st = false; for (let j = i; j < html.length; j++) { const ch = html[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return html.slice(i, j + 1); } } throw new Error(name); };
-const bkPath = [join(ROOT, '..', 'jongwoon-appdata', 'data', 'backup', 'gw_backup.json'), 'C:/Users/user/jongwoon/jongwoon-appdata/data/backup/gw_backup.json'].find((p) => existsSync(p));
-const bk = bkPath ? JSON.parse(readFileSync(bkPath, 'utf8')).stores.gw_data : null;
+// 10/29 appdata 백업이 조각 형식(data/backup/gw/gw_NN.json + manifest.json)으로 바뀜 — 조각의 gw_data를 합친다. 없으면 옛 한 파일.
+const bkBase = [join(ROOT, '..', 'jongwoon-appdata', 'data', 'backup'), 'C:/Users/user/jongwoon/jongwoon-appdata/data/backup'].find((p) => existsSync(join(p, 'gw', 'manifest.json')) || existsSync(join(p, 'gw_backup.json')));
+const loadGwData = (base) => {
+  const man = join(base, 'gw', 'manifest.json');
+  if (!existsSync(man)) return JSON.parse(readFileSync(join(base, 'gw_backup.json'), 'utf8')).stores.gw_data;
+  const out = {};
+  for (const f of JSON.parse(readFileSync(man, 'utf8')).files) Object.assign(out, (JSON.parse(readFileSync(join(base, 'gw', f.name), 'utf8')).stores || {}).gw_data || {});
+  return out;
+};
+const bk = bkBase ? loadGwData(bkBase) : null;
 const contracts = bk ? bk['col:contracts'].items.filter((c) => c && c.del !== 1) : [];
 const tasks = (bk && bk['col:tasks'] && bk['col:tasks'].items) || [];
 const recs = (bk && bk['col:receivables'] && bk['col:receivables'].items) || [];
