@@ -1359,7 +1359,7 @@ try {
     ['data-con-del', 'data-con-doc', 'data-con-xlsx', 'data-con-bldg', 'data-catt-add', 'data-catt-del', 'data-catt-rev', 'data-catt-drop'].every((a) => seg.indexOf('querySelectorAll("[' + a + ']")') >= 0), '');
   T('v381 CSS: .cs-stg 단계 카드(done/cur) · .cs-bar 진행 막대 · 폰 열 폭 4(cs-c-client/site/stage/end) · 시트 블록의 저장 호출은 v382 단계 입력·작업현황(새 키 vals/work_log/settle_amount) 7함수뿐(v401 csDocAfter 포함)',
     /\.cs-stg\.done\{/.test(html) && /\.cs-stg\.cur\{/.test(html) && /\.cs-bar i\{/.test(html) && ['client', 'site', 'stage', 'end'].every((k) => new RegExp('\\.vs col\\.cs-c-' + k + '\\{width:\\d+% !important;\\}').test(html))
-    && (seg.match(/scheduleContractSave\(\)/g) || []).length === (seg.match(/function (csSkipStage|csUnskipStage|csJumpStage|csSaveFields|csWlAdd|csWlDel|csDocAfter)\(/g) || []).length, '');   // v401 csDocAfter(서류 체크리스트) 추가
+    && (seg.match(/scheduleContractSave\(\)/g) || []).length === (seg.match(/function (csSkipStage|csUnskipStage|csJumpStage|csSaveFields|csWlAdd|csWlDel|csDocAfter|csChgAdd)\(/g) || []).length, '');   // v401 csDocAfter(서류 체크리스트) 추가
 } catch (e) { console.log('  (v381 검사 생략 — ' + e.message + ')'); fails++; }
 
 // ---- v382: 시나리오 조립(종류 × 사급/관급 → 단계 목록, PM 원문) · 선택 단계 · 작업현황 · 정산액 · 카드형 제거 ----
@@ -1373,7 +1373,7 @@ try {
     !/conElems\b/.test(html) && !/renderConElems|conElemChecked|conBuildStages/.test(html) && ids.has('conCombo') && ids.has('conScenPreview') && ids.has('conComboWrap')
     && /getElementById\("conDoc"\)\.addEventListener\("change", renderConScen\)/.test(html) && /getElementById\("conCombo"\)\.addEventListener\("change", renderConScen\)/.test(html) && !/function renderContractsCards/.test(html) && !/CON_ELEMS\b/.test(html) && /var CON_ELEM_LABEL = \{/.test(html), '');
   T('v382 엔진: materializeStage가 skipped 단계를 지나감 · 지시 상세 stageDocsFor · startProcess가 {name,opt}·scen·doneFirst 수용 · 견적 승격은 견적 단계 완료 · 낙찰 유입 2곳이 renderConScen',
-    /while\(pipe\.cur < pipe\.stages\.length && pipe\.stages\[pipe\.cur\]\.status==="skipped"\) pipe\.cur\+\+;/.test(html) && /detail:\(stageDocsFor\(s\.name\)\|\|""\)/.test(html)
+    /while\(pipe\.cur < pipe\.stages\.length && pipe\.stages\[pipe\.cur\]\.status==="skipped"\) pipe\.cur\+\+;/.test(html) && /detail:\(stageDocsOf\(s\)\|\|""\)/.test(html)
     && /opt:\(o\.opt\?1:0\)/.test(html) && /scen:opts\.scen\|\|null,/.test(html) && /if\(opts\.doneFirst && pipes\[0\]\.stages\.length>1\)/.test(html) && /doneFirst:qdf/.test(html)
     && (html.match(/cbs\.checked=!!\(sug\.asb&&sug\.demo\); renderConScen\(\);/g) || []).length === 2, '');
   T('v382 서류 라우팅이 PM 원문을 받는다: 노동부\\s*신고 · 해체\\s*완료\\s*신고 → demo_report · 정산액 conAmtEff(시트 금액 3곳·기성 1곳) · 단계 카드 버튼 6종 · 작업현황 표(CS_WL_COLS 8열) · 단계 입력 칸 15묶음',
@@ -1420,7 +1420,7 @@ try {
     && /if \(s\.appr\.cid\)\{ if \(x\.cid === s\.appr\.cid\) it = x; return; \}/.test(sc) && /c = findProc\(id\) \|\| c;   \/\/ 응답 대기 중/.test(sc) && /s\.appr\.status = "미전송"; changed = true;/.test(sc) && /Date\.now\(\) - \(Date\.parse\(it\.decided_at\) \|\| 0\) < 20000\) return;/.test(sc)
     && /function csSaveNow\(\)/.test(sc) && /c\.updated = todayStr\(\); csSaveNow\(\); renderContracts\(\);/.test(sc) && /apprToastShow\("계약을 이 기기에서 찾지 못했습니다/.test(sc) && /function csApprDropped\(ref, cid\)/.test(sc) && /typeof csApprDropped === "function"\)\{ try \{ csApprDropped\(p\.ref, p\.cid\); \}/.test(html)
     && /function csAlignTasksAll\(\)/.test(sc) && /if \(typeof csAlignTasksAll === "function"\)\{ try \{ csAlignTasksAll\(\); \}/.test(html)
-    && /if\(c\.scen && csApprKind\(s\.name\) && !\(s\.appr && s\.appr\.status==="승인"\)\)\{/.test(html) && /return adv===false \? "locked" : "done";/.test(html) && /var adv = advanceProc\(t\);   \/\/ v384 2차 F5/.test(html)
+    && /if\(c\.scen && csApprKindOf\(c, s\) && !\(s\.appr && s\.appr\.status==="승인"\)\)\{/.test(html) && /return adv===false \? "locked" : "done";/.test(html) && /var adv = advanceProc\(t\);   \/\/ v384 2차 F5/.test(html)
     && /indexOf\("con:"\) === 0\)\{   \/\/ v384/.test(html) && /indexOf\("con:"\) === 0 && typeof csApprOnDecided === "function"\)\{ try \{ csApprOnDecided\(it\); \}/.test(html) && /csApprSync\(c\); h \+= csStagesHtml\(c\);/.test(html) && /csApprSync\(c, true\); return; \}/.test(html) && /data-cs-done="' \+ esc\(c\.id\) \+ '\|' \+ esc\(key\) \+ '">' \+ esc\(ak\) \+ ' 상신</.test(html), '');
   T('v384 대장: csLinkSiteLater(미로드·로컬에 없는 대장 → lic 있으면 loadAsb+큐) · csLinkSite(asbLoaded 가드·자기 con_id 행 재연결·삭제 대장 재연결·종결 대장 제외·공사명 또는 발주처+현장·none 해제·옛 계약은 연결만) · startProcess → csLinkSiteLater · csOnDone(scen, task_hook) · csSiteDone(scen, site_hook, 없음≠삭제) · loadAsb/loadContracts → csSiteHooksRetry · 연결 탭 안내 + [대장 연결] · 서버 변경 없음',
     /function csLinkSiteLater\(c\)/.test(sc) && /if \(!loaded \|\| \(c\.site_id && !findAsb\(c\.site_id\)\)\)\{/.test(sc) && /csSiteLinkQueue\[c\.id\] = 1; if \(typeof loadAsb === "function"\) loadAsb\(\); return "wait";/.test(sc)
@@ -1632,7 +1632,7 @@ try {
   const adir = join(ROOT, '..', 'jongwoon-appdata', 'data', 'contract');
   let okAdd = false, okBlob = false, addTxt = '';
   const addPath = join(adir, 'proc_added_v1.json');
-  if (existsSync(addPath)) { const ad = JSON.parse(readFileSync(addPath, 'utf8')); const all = [...(ad.stages || []), ...(ad.lists || [])]; okAdd = all.length >= 4 && all.every((s) => s.active === false && s.proposed === true) && ad.status === 'pending'; addTxt = 'added ' + all.length + '건 비활성 ' + okAdd; }
+  if (existsSync(addPath)) { const ad = JSON.parse(readFileSync(addPath, 'utf8')); const all = [...(ad.stages || []), ...(ad.lists || [])]; okAdd = ad.schema === 2 && all.length >= 6 && (ad.status === 'pending' ? all.every((s) => s.active === false) : (ad.status === 'applied' && !!ad.applied && typeof ad.applied.at === 'string')); /* v402 완화: 11/4 데이터 전환(applied) 뒤에도 푸시가 막히지 않게 */ addTxt = 'added ' + all.length + '건 비활성 ' + okAdd; }
   const bp = join(adir, 'blob_proc_contract_v1.json'), bl = join(adir, 'blob_list_contract.json');
   if (existsSync(bp) && existsSync(bl)) { const p = JSON.parse(readFileSync(bp, 'utf8')), l = JSON.parse(readFileSync(bl, 'utf8')); okBlob = p.layer === 'proc' && l.layer === 'list' && p.proc_ver === 'v1' && l.proc_ver === 'v1' && Object.keys(p.consts).length === 4 && Object.keys(l.consts).length === 3 && p.consts.CON_SITE_CORP.dredge === '주식회사 종운환경' && Object.keys(p.consts.CON_SCEN).length === 10; addTxt += ' · 거울 2층 ' + okBlob; }
   T('v400 계약 거울: 로더 4함수·afterLogin 호출·카드 id·렌더·액션 2종·서버 핸들러 2종(CON_PROC_KEYS·MIRROR_MISSING·CON_PROC_STALE·감사 계약골조)·dredge 접두형·옛 표기 0·appdata added 비활성·거울 파일 2층·sw',
@@ -1663,8 +1663,45 @@ try {
     && ['conClogHash', 'conClogChainOk', 'conProcReplay', 'conProcEffOk', 'conClogMonthKey'].every((f) => gwd.indexOf('function ' + f + '(') >= 0) && /async function conClogRead\(st, key\)/.test(gwd)
     && /async function handleConProcGet/.test(gwd) && /edit_state: state/.test(gwd) && /async function handleConProcEdit/.test(gwd) && ['BAD_OP', 'CLOG_FULL', 'WOULD_BREAK', 'BAD_RE'].every((c) => gwd.indexOf("'" + c + "'") >= 0) && /op: '계약골조편집'/.test(gwd)
     && /async function handleConClogAdd/.test(gwd) && /permOf\(c\.member, 'contracts'\) !== 'do'\) return jr\(403, \{ status: 'FORBIDDEN', error_code: 'NO_WRITE', request_id: R \}\);\s*\n\s*const cid/.test(gwd)
-    && /action === 'con_proc_edit'/.test(gwd) && /action === 'con_clog_add'/.test(gwd) && (gwd.match(/async function handleConProcGet/g) || []).length === 1 && /jw-shell-v401/.test(swv), '');
+    && /action === 'con_proc_edit'/.test(gwd) && /action === 'con_clog_add'/.test(gwd) && (gwd.match(/async function handleConProcGet/g) || []).length === 1 && Number((swv.match(/jw-shell-v(\d+)/) || ['', '0'])[1]) >= 401, '');   // v402: sw 숫자 비교
 } catch (e) { console.log('  (v401 검사 생략 — ' + e.message + ')'); fails++; }
 
+
+// ---- v402(10/30 계약 D1 4일차): 카드 9 신설 엔진(added, 스위치 끈 채) — 엔진 함수·훅 · 호출처(지시 상세·결재 판정·계약 단계 main 고정·로더·태그) · 시트(chg 줄·버튼·[켜기]·서류 버튼 숨김) · 관리자 카드(미리보기 격리·카드 9 행·예시) · appdata 원천·거울 빌드 일치 · sw ----
+try {
+  const swv = readFileSync(join(ROOT, 'sw.js'), 'utf8');
+  const sc402 = html.slice(html.indexOf('// @con-scen-start'), html.indexOf('// @con-scen-end'));
+  const sh402 = html.slice(html.indexOf('// @con-sheet-start'), html.indexOf('  function renderContracts(){'));
+  const fns = ['conScenRk', 'conIsArr', 'conAddedRe', 'conRouteKey', 'conAddedAt', 'conChgWindow', 'conAddedPrep', 'conAddedApply', 'conAddedClear', 'conAddedUse', 'conAddedHasChg', 'conScenTag', 'conModalExtra', 'conAddedPreviewHtml', 'stageDocsOf', 'csStageFieldsOf', 'csStageLabel', 'csStageNew', 'csStageTag', 'csNum', 'csChgLastAmt', 'csChgAmtChanged', 'csApprKindOf', 'conChgItemOf', 'csChgCan', 'csChgOpenAt', 'csChgRank', 'csChgMerge', 'csChgBase', 'csTaskChg'];
+  const missFn = fns.filter((f) => sc402.indexOf('function ' + f + '(') < 0);
+  T('v402 엔진: CON_ADDED 기본 빈 값 리터럴 · 신설 함수 ' + fns.length + '종 @con-scen · conScenStages 훅(적격 unshift 유지) · csSyncFromServer chg 병합 분기 · R5 두 층 status',
+    /var CON_ADDED = \{ stages: \[\], lists: \[\], bad: \[\], src: "", keys: \[\] \};/.test(sc402) && missFn.length === 0 && /if \(extra && extra\.qual\) out\.unshift\(\{ name:"적격심사", opt:0 \}\);\r?\n    if \(CON_ADDED\.stages\.length \|\| CON_ADDED\.lists\.length\) out = conAddedApply\(out, conScenRk\(type, pub, combo\), type, combo, extra \|\| \{\}, CON_ADDED\);/.test(sc402)
+    && /if \(q\.key === "chg"\)\{ var mr = csChgMerge\(c, lq, q\); if \(mr\)\{ changed = true; if \(mr === 2\) chgPush = true; \} return; \}/.test(sc402) && /if \(chgPush\)\{ c\.updated = todayStr\(\); scheduleContractSave\(\); \}/.test(sc402) && /status: \(pa\.status === la\.status\) \? pa\.status : "mismatch"/.test(html) && /if \(raw\.status !== "applied"\)/.test(sc402), missFn.join(','));
+  const ci = html.indexOf('function conProcLoad()'), cThen = html.indexOf('.then(function(res){', ci);
+  T('v402 호출처: 지시 상세 stageDocsOf · csApprKind(s.name) 1회(csApprKindOf 안) · 계약 단계 완료 main 고정 2곳 · 로더 then 첫 문장 conAddedClear · conAddedUse 호출 1회(거울 적용 뒤) · 새 계약 2곳 conScenTag · 모달 적격 수동 체크·리스너·리셋',
+    /detail:\(stageDocsOf\(s\)\|\|""\)/.test(html) && (html.match(/csApprKind\(s\.name\)/g) || []).length === 1 && (html.match(/completeStageNow\(cc?, \/계약\/, "main"\)/g) || []).length === 2 && !/completeStageNow\(cc?, \/계약\/\)/.test(html)
+    && /^\s*conAddedClear\(\); CON_PROC_SRC\.added_applied = 0;/.test(html.slice(cThen + 20, cThen + 120)) && (html.match(/conAddedUse\(/g) || []).length - (html.match(/function conAddedUse\(/g) || []).length === 1 && html.indexOf('conAddedUse(ad, ') > html.indexOf('conProcApplyInPlace(CON_PACKETS')
+    && /scen:conScenTag\(\{type:type, pub:pub, combo:combo, ver:1\}, stages\)/.test(html) && /scen:conScenTag\(\{type:type, pub:true, combo:false, ver:1\}, qst\)/.test(html) && ids.has('conQualWrap') && ids.has('conQualMan') && /getElementById\("conQualMan"\)\.addEventListener\("change", renderConScen\)/.test(html) && /var qm0=document\.getElementById\("conQualMan"\); if\(qm0\) qm0\.checked=false;/.test(html), '');
+  T('v402 시트: csChgAdd(@con-sheet)·버튼 배선 data-cs-chgadd · pipeLabel chg · csUnskipStage delete s.off · [켜기] 라벨 · R1 csDocsLost(굳히지 않음) · R3 본 줄 잠금(advanceProc·csDoneStage) · R4 변경계약 서류 버튼 숨김(단계 카드·지시 탭) · R15 완료 전 입력 칸 저장',
+    sh402.indexOf('function csChgAdd(') >= 0 && html.indexOf('querySelectorAll("[data-cs-chgadd]")') >= 0 && /k==="chg" \? "변경계약" : "본"/.test(html) && /s\.status = "pending"; s\.done_at = null; delete s\.off;/.test(sh402) && sh402.indexOf("(s.off ? '켜기' : '선택 복구')") >= 0
+    && sh402.indexOf("var cls = (isSkip ? ' skip' : (isDone ? ' done' : (isCur ? ' cur' : ''))) + (opt ? ' opt' : '') + (open ? ' open' : '');") >= 0 && /function csDocsLost\(s\)/.test(sh402) && /if \(csDocsLost\(s\)\)\{ alert\(/.test(sh402) && /var chgN = c\.scen \? csChgOpenAt\(c, pipe, t\.stage_i\) : 0;/.test(html) && /var chgN = csChgOpenAt\(c, p, i\); if \(chgN\)\{ alert\(/.test(sh402)
+    && sh402.indexOf('if (s.aid !== "change_contract" && p.key !== "chg") act += \'<button type="button" class="vs-chip" data-cs-sdoc=') >= 0 && html.indexOf('var docBtn = (t.proc_id && canDo("con") && t.pipe !== "chg" && !csTaskChg(t)) ?') >= 0 && /fp = \(s0 && s0\.aw === "amt"\) \? root\.querySelector/.test(html)
+    && ['var chgA = csChgOpenAt(c, p, i); if (chgA)', 'if(s.aid==="change_contract" && pat.source==="계약") continue;', 'var chgJ = csChgOpenAt(c, p, i); if (chgJ)', 'if (s.aw === "amt" && (csNum((s.vals || {}).chg_amt) || s.appr))', 'hold = !!(cs && cs.appr && /대기|보류|승인/.test(cs.appr.status || "")', 'if (!tl || tl.status === "done"){ csApprApply(c, p, i);'].every((x) => html.indexOf(x) >= 0), '');   // v402 적대 검토 반영 리터럴
+  T('v402 관리자 카드: 미리보기 try/catch 격리(R6) · 카드 9 목록 읽기 전용 행·같은 키 docs_set 확인창(R11) · 편집 예시 해 없는 값(완료신고_석면·노동부|석면 예시 0)',
+    /var pv = ""; if \(has\)\{ try \{ pv = conAddedPreviewHtml\(b\); \} catch\(e\)\{/.test(html) && /\+ pv \+ \(has \? conProcEditHtml\(b\) : ''\);/.test(html) && html.indexOf('카드 9 · ') >= 0 && /은 카드 9 목록 키와 같은 이름입니다/.test(html)
+    && html.indexOf('placeholder="키(예: 실적보고_추가)"') >= 0 && html.indexOf('placeholder="키(예: 완료신고_석면)"') < 0 && html.indexOf('예: 노동부|석면)') < 0, '');
+  const adir = join(ROOT, '..', 'jongwoon-appdata', 'data', 'contract'), addPath = join(adir, 'proc_added_v1.json');
+  let okData = false, okBuilt = false, dTxt = 'appdata 없음';
+  if (existsSync(addPath)) {
+    const ad = JSON.parse(readFileSync(addPath, 'utf8')), all = [...(ad.stages || []), ...(ad.lists || [])], idset = all.map((x) => x.id).sort().join(',');
+    okData = ad.schema === 2 && ['pending', 'applied'].includes(ad.status) && all.every((x) => typeof x.active === 'boolean') && (ad.status === 'pending' ? all.every((x) => x.active === false) : !!(ad.applied && ad.applied.at)) && idset === 'change_contract,complete_asb,complete_demo,pri_complete,pri_start,qual_manual';
+    const p = JSON.parse(readFileSync(join(adir, 'blob_proc_contract_v1.json'), 'utf8')), l = JSON.parse(readFileSync(join(adir, 'blob_list_contract.json'), 'utf8'));
+    const norm = (xs) => JSON.stringify((xs || []).map((x) => Object.assign({}, x, { active: x.active === undefined ? false : x.active })));
+    okBuilt = norm(ad.stages) === JSON.stringify(p.added.stages) && norm(ad.lists) === JSON.stringify(l.added.lists) && p.added.status === ad.status && l.added.status === ad.status && p.added.schema === ad.schema && JSON.stringify(p.added.applied) === JSON.stringify(ad.applied);
+    dTxt = 'schema ' + ad.schema + ' · ' + ad.status + ' · ' + idset + ' · 데이터 ' + okData + ' · 거울 빌드 일치 ' + okBuilt;
+  }
+  const swN = Number((swv.match(/jw-shell-v(\d+)/) || ['', '0'])[1]);
+  T('v402 데이터·sw: proc_added_v1 스키마 2·status pending|applied·active는 bool·pending이면 전부 비활성·id 6개 고정 · R16 거울 파일 added = 원천(빌드 누락 없음) · sw ≥ 402(숫자 비교)', okData && okBuilt && swN >= 402, dTxt + ' · sw ' + swN);
+} catch (e) { console.log('  (v402 검사 생략 — ' + e.message + ')'); fails++; }
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

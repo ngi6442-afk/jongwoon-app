@@ -2462,6 +2462,7 @@
       <option value="private">사급 (사문서 — 일반)</option>
     </select>
     <label id="conComboWrap" style="display:none;font-size:13px;align-items:center;gap:6px;margin:2px 0 6px;"><input type="checkbox" id="conCombo"> 석면 + 철거를 한 건으로 (석면이 있는 철거)</label>
+    <label id="conQualWrap" style="display:none;font-size:13px;align-items:center;gap:6px;margin:2px 0 6px;"><input type="checkbox" id="conQualMan"> 적격심사 단계 넣기 (낙찰 연동이 아닌 관급 건)</label>
     <span class="fld-label">단계 — 종류와 사급/관급으로 정해집니다 (PM 원문, 괄호 = 선택 단계)</span>
     <div id="conScenPreview" class="cs-prev"></div>
     <input type="text" id="conClient" placeholder="거래처/발주처" autocomplete="off">
@@ -4257,7 +4258,7 @@
         : '<button class="mini-btn" data-task-hold="' + t.id + '">보류</button>');
       var doneBtn = canActTask(t) ? '<button class="mini-btn appr-btn" data-task-done="' + t.id + '">완료</button>' : '';
       var editBtn = canDo("tasks") ? '<button class="mini-btn" data-task-edit="' + t.id + '">수정</button>' : '';
-      var docBtn = (t.proc_id && canDo("con")) ? '<button class="mini-btn" data-task-doc="' + t.proc_id + '" data-task-doc-stage="' + esc(t.stage_name||"") + '">📄 서류</button>' : '';
+      var docBtn = (t.proc_id && canDo("con") && t.pipe !== "chg" && !csTaskChg(t)) ? '<button class="mini-btn" data-task-doc="' + t.proc_id + '" data-task-doc-stage="' + esc(t.stage_name||"") + '">📄 서류</button>' : '';
       ctrl = '<div class="task-ctrl">' + ddayBadge + doneBtn + docBtn + holdBtn + editBtn + '</div>';
     }
 
@@ -6139,6 +6140,7 @@
   document.getElementById("conType").addEventListener("change", renderConScen);   // v382: 종류·사급/관급·혼합 체크 → 단계 목록 미리보기
   document.getElementById("conDoc").addEventListener("change", renderConScen);
   document.getElementById("conCombo").addEventListener("change", renderConScen);
+  document.getElementById("conQualMan").addEventListener("change", renderConScen);   // v402 카드 9 적격심사 수동
   document.getElementById("conStartCancel").addEventListener("click", function(){ document.getElementById("conStartBackdrop").classList.remove("show"); });
   document.getElementById("docGenBtn").addEventListener("click", openDocGen);
   document.getElementById("dgParty").addEventListener("change", dgToggleParty);
@@ -7762,6 +7764,7 @@
       if(p.cur>=p.stages.length) continue;
       var s=p.stages[p.cur];
       if(!pat.test(s.name||"")) continue;
+      if(s.aid==="change_contract" && pat.source==="계약") continue;   // v402 검토 3: 계약서 판독·작성 툴은 변경계약 단계를 대신 완료하지 않음(7번 고정 대안 포함)
       var t=s.task_id?findTask(s.task_id):null;
       if(!t || t.status==="done") return "none";
       if(canApproveTask(t)){
@@ -7809,7 +7812,7 @@
       setTimeout(function(){
         var sum=(p.title||entry.name)+(p.amount?" · "+Number(p.amount).toLocaleString()+"원":"")+(p.date_contract?" · 계약일 "+p.date_contract:"");
         if(!confirm("계약서 판독 완료\n"+sum+"\n\n계약 단계를 완료하고 다음 단계로 진행할까요?")) return;
-        var r=completeStageNow(c, /계약/);
+        var r=completeStageNow(c, /계약/, "main");
         if(r==="done"){
           if(confirm("착공 단계로 넘어갔습니다. 착공계를 지금 작성할까요? (판독값 자동 입력)")) openXlsxGen(c.id, "work_start", "착공");
         } else if(r==="review"){ alert("완료 요청으로 올렸습니다 — 승인권자가 승인하면 다음 단계가 생성됩니다."); }
@@ -9709,6 +9712,7 @@
     "dredge:pub": ["견적·수의계약","계약서류 작성","착공서류 작성","작업 수행","준설토 계량·반입","준공서류 작성","청구 및 입금확인","실적신고·대장 종결"],
     "dredge:pri": ["요청·견적","(계약서·발주서)","작업 수행","(폐기물 처리)","청구 및 입금확인"]
   };
+  var CON_ADDED = { stages: [], lists: [], bad: [], src: "", keys: [] };   // v402 카드 9 신설 — conProcLoad가 거울 켜짐+active+두 층 status applied+검증 통과분만 채움(비면 v401과 바이트 동일)
   function conScenKey(type, pub, combo){ return ((combo && (type==="asbestos"||type==="demolition")) ? "combo" : type) + ":" + (pub ? "pub" : "pri"); }
   function conIsOptName(n){ return /^\(.+\)$/.test(String(n||"")); }
   // 단계 목록 → [{name, opt}] · extra.qual(적격심사 낙찰건)은 맨 앞에 "적격심사"
@@ -9716,6 +9720,7 @@
     var names = CON_SCEN[conScenKey(type, pub, combo)] || CON_SCEN[type + ":pub"] || [];
     var out = names.map(function(n){ return { name:n, opt: conIsOptName(n) ? 1 : 0 }; });
     if (extra && extra.qual) out.unshift({ name:"적격심사", opt:0 });
+    if (CON_ADDED.stages.length || CON_ADDED.lists.length) out = conAddedApply(out, conScenRk(type, pub, combo), type, combo, extra || {}, CON_ADDED);   // v402 카드 9 — 비면 종전 그대로
     return out;
   }
   function conModalElems(type, combo){
@@ -9724,12 +9729,133 @@
     if (combo && (type==="asbestos"||type==="demolition")){ el.asb = 1; el.labor = 1; el.demo = 1; el.wst = 1; }
     return el;
   }
+  // ---- v402 카드 9 신설 엔진(계약 D1 4일차) — 원천 = 거울 added(appdata proc_added_v1.json 스키마 2). 켜짐 = 거울 스위치 ∧ 항목 active ∧ 두 층 status applied ∧ 검증 통과. 새 계약 생성 때만 조립(기존 계약 소급 없음) ----
+  function conScenRk(type, pub, combo){ var k = conScenKey(type, pub, combo); return CON_SCEN[k] ? k : type + ":pub"; }   // conScenStages 폴백과 같은 키
+  function conIsArr(x){ return Object.prototype.toString.call(x) === "[object Array]"; }
+  function conAddedRe(src){ if (typeof src !== "string" || !src || src.length > 120) return null; try { return new RegExp(src); } catch(e){ return null; } }
+  function conRouteKey(name){ if (Object.prototype.hasOwnProperty.call(STAGE_DOCS, name) && STAGE_DOCS[name]) return name; for (var i = 0; i < STAGE_DOC_MAP.length; i++){ if (STAGE_DOC_MAP[i][0].test(name || "")) return STAGE_DOC_MAP[i][1]; } return ""; }   // stageDocsFor 순서와 같음
+  function conAddedAt(names, pos){   // base 기준 자리 — before_re 첫 일치 바로 앞, 없으면 (before 앞에서) after_re 마지막 일치 바로 뒤, 기준 없으면 -1
+    if (pos.type === "front") return 0;
+    var i, a = -1, b = names.length;
+    if (pos.bre){ b = -1; for (i = 0; i < names.length; i++){ if (pos.bre.test(names[i])){ b = i; break; } } if (b < 0) return -1; }
+    if (pos.are){ for (i = 0; i < b; i++){ if (pos.are.test(names[i])) a = i; } if (a < 0) return -1; }
+    return pos.bre ? b : a + 1;
+  }
+  function conChgWindow(names, pos){ var a = -1, b = -1, i; for (i = 0; i < names.length; i++){ if (pos.bre && pos.bre.test(names[i])){ b = i; break; } } if (b < 0) b = names.length; for (i = 0; i < b; i++){ if (pos.are && pos.are.test(names[i])) a = i; } return { a: a, b: b }; }
+  function conAddedPrep(raw){   // raw = {schema, status, stages, lists} — active:true 항목만 검증(파이썬 contract_mirror.validate_added와 같은 규칙). 구조 불량 = 제외(bad), 서류 키 없음·일부 시나리오 기준 없음 = 적용하되 표시(soft)
+    var out = { stages: [], lists: [], bad: [] }, seen = {}, ELEM = { asb:1, labor:1, demo:1, permit:1, wst:1, dredge:1 }, KIND = { "계약 단계":1, "청구 검수":1 };
+    var bad = function(id, why){ out.bad.push({ id: String(id || "?").slice(0, 40), why: why }); };
+    var ss = (raw && raw.stages) || [], ls = (raw && raw.lists) || [];
+    if (!conIsArr(ss)){ bad("*", "stages 형식 불량"); ss = []; }   // R6: 배열이 아니면 예외 대신 표시
+    if (!conIsArr(ls)){ bad("*", "lists 형식 불량"); ls = []; }
+    var all = ss.concat(ls), act = all.filter(function(x){ return x && x.active === true; });
+    if (!act.length) return out;
+    if (raw.schema !== 2){ act.forEach(function(x){ bad(x.id, "데이터 스키마 2 아님 — contract_mirror.py 재빌드"); }); return out; }
+    if (raw.status !== "applied"){ act.forEach(function(x){ bad(x.id, "status applied 아님(" + String(raw.status || "") + ") — 두 층이 applied로 같아야 켜짐"); }); return out; }   // R5 fail-closed
+    all.forEach(function(x){ var k = "#" + String((x && x.id) || ""); seen[k] = (seen[k] || 0) + 1; });   // 활성 여부와 무관하게 id 중복은 둘 다 무효
+    ss.forEach(function(s){
+      if (!s || s.active !== true) return;
+      if (!/^[a-z][a-z0-9_]{1,30}$/.test(String(s.id || "")) || seen["#" + s.id] > 1) return bad(s && s.id, "id 불량·중복");
+      if (s.kind !== "stage" || typeof s.name !== "string" || !s.name.trim() || s.name.length > 40) return bad(s.id, "이름 불량");
+      var sc = conIsArr(s.scen) ? s.scen.filter(function(k){ return Object.prototype.hasOwnProperty.call(CON_SCEN, k); }) : [];
+      if (!sc.length || sc.length !== s.scen.length) return bad(s.id, "시나리오 키 불량");
+      var p = s.pos || {}, pos = { type: p.type, are: p.after_re ? conAddedRe(p.after_re) : null, bre: p.before_re ? conAddedRe(p.before_re) : null, after_re: p.after_re || "", before_re: p.before_re || "" };
+      if (!/^(insert|front|chg_pipe)$/.test(String(p.type)) || (p.after_re && !pos.are) || (p.before_re && !pos.bre) || (p.type === "insert" && !pos.are && !pos.bre)) return bad(s.id, "위치 규칙 불량");
+      if (p.type === "insert"){ var miss = sc.filter(function(k){ return conAddedAt(CON_SCEN[k], pos) < 0; }); if (miss.length === sc.length) return bad(s.id, "기준 단계 없음(전 시나리오)"); if (miss.length) out.bad.push({ id: s.id, why: "기준 단계 없음(건너뜀): " + miss.join(","), soft: 1 }); }
+      if (s.appr_kind && !KIND[s.appr_kind]) return bad(s.id, "결재 종류 불량");
+      if (s.appr_when && s.appr_when !== "amt") return bad(s.id, "결재 조건 불량");
+      var docs = conIsArr(s.docs) ? s.docs.filter(function(k){ return typeof k === "string" && !!k; }) : [];
+      if (!docs.length || docs.length > 3 || docs.length !== s.docs.length) return bad(s.id, "서류 키 불량");
+      var fl = null;
+      if (s.flds != null){ if (!conIsArr(s.flds) || !s.flds.length || s.flds.length > 6 || !s.flds.every(function(f){ return conIsArr(f) && f.length === 3 && /^[a-z][a-z0-9_]{1,19}$/.test(String(f[0])) && typeof f[1] === "string" && /^(date|num|text)$/.test(String(f[2])); })) return bad(s.id, "입력 칸 불량"); fl = s.flds.map(function(f){ return [f[0], f[1], f[2]]; }); }
+      if (s.init != null && s.init !== "on" && s.init !== "off") return bad(s.id, "init 불량");
+      var miss2 = docs.filter(function(k){ return !(Object.prototype.hasOwnProperty.call(STAGE_DOCS, k) && STAGE_DOCS[k]) && !ls.some(function(l){ return l && l.active === true && l.key === k; }); });
+      if (miss2.length) out.bad.push({ id: s.id, why: "서류 키 없음(목록 빈 채로 적용): " + miss2.join(","), soft: 1 });
+      out.stages.push({ id: s.id, name: s.name.trim(), scen: sc, pos: pos, opt: s.opt ? 1 : 0, manual: !!s.manual, ak: s.appr_kind || "", aw: s.appr_when || "", docs: docs, flds: fl, init: s.init === "off" ? "off" : "on" });
+    });
+    ls.forEach(function(l){
+      if (!l || l.active !== true) return;
+      if (!/^[a-z][a-z0-9_]{1,30}$/.test(String(l.id || "")) || seen["#" + l.id] > 1) return bad(l && l.id, "id 불량·중복");
+      var re = conAddedRe(l.match_re);
+      if (l.kind !== "list" || typeof l.key !== "string" || !l.key || l.key.length > 40 || /[\[\]{}"\\|]/.test(l.key) || l.key === "__proto__") return bad(l.id, "키 불량");
+      if (!Object.prototype.hasOwnProperty.call(STAGE_DOCS, l.replaces) || !re || (l.elem && !ELEM[l.elem])) return bad(l.id, "대상·정규식·요소 불량");
+      if (typeof l.value !== "string" || !l.value.trim() || l.value.length > 2000 || /[\r\n]/.test(l.value)) return bad(l.id, "목록 글 불량");
+      out.lists.push({ id: l.id, key: l.key, replaces: l.replaces, re: re, elem: l.elem || "", value: l.value });
+      var hit = Object.keys(CON_SCEN).some(function(k){ var t0 = k.split(":")[0], el = conModalElems(t0 === "combo" ? "asbestos" : t0, t0 === "combo"); return (!l.elem || el[l.elem]) && CON_SCEN[k].some(function(n){ return conRouteKey(n) === l.replaces && re.test(n); }); });
+      if (!hit) out.bad.push({ id: l.id, why: "걸리는 단계 0(적용해도 효과 없음)", soft: 1 });   // v402 검토 4: 파이썬은 빌드 오류, 앱은 표시
+    });
+    return out;
+  }
+  function conAddedApply(out, rk, type, combo, extra, AD){   // out = base [{name,opt}](적격 자동분 포함). 위치는 끼우기 전 목록 기준, 뒤에서부터 끼움(같은 자리 = 파일 순서)
+    var el = conModalElems(type, combo), ins = [], names;
+    out.forEach(function(s){ var base = conRouteKey(s.name), j, l; for (j = 0; j < AD.lists.length; j++){ l = AD.lists[j]; if (base === l.replaces && l.re.test(s.name) && (!l.elem || el[l.elem])){ s.dk = [l.key]; s.lid = l.id; break; } } });
+    names = out.map(function(s){ return s.name; });
+    AD.stages.forEach(function(a, ord){
+      if (a.scen.indexOf(rk) < 0 || a.pos.type === "chg_pipe") return;   // 끼움형은 생성 때 넣지 않음(단계 탭 [+ 변경계약])
+      if (a.manual && !extra[a.id]) return;                              // 수동 = 모달 체크 때만
+      if (a.pos.type === "front" && names[0] === a.name) return;         // 적격 자동분과 중복 금지
+      var at = conAddedAt(names, a.pos); if (at < 0) return;
+      var st = { name: a.name, opt: a.opt, aid: a.id, dk: a.docs.slice() }; if (a.ak) st.ak = a.ak; if (a.aw) st.aw = a.aw; if (a.flds) st.flds = a.flds; if (a.init === "off") st.off = 1;
+      ins.push({ at: at, ord: ord, st: st });
+    });
+    ins.sort(function(x, y){ return (y.at - x.at) || (y.ord - x.ord); });
+    ins.forEach(function(x){ out.splice(x.at, 0, x.st); });
+    return out;
+  }
+  function conAddedClear(){ CON_ADDED.stages.length = 0; CON_ADDED.lists.length = 0; CON_ADDED.bad = []; CON_ADDED.src = ""; (CON_ADDED.keys || []).forEach(function(k){ delete STAGE_DOCS[k]; }); CON_ADDED.keys = []; }
+  function conAddedUse(ap, src){ conAddedClear(); (ap.stages || []).forEach(function(s){ CON_ADDED.stages.push(s); }); (ap.lists || []).forEach(function(l){ CON_ADDED.lists.push(l); if (!Object.prototype.hasOwnProperty.call(STAGE_DOCS, l.key)){ STAGE_DOCS[l.key] = l.value; CON_ADDED.keys.push(l.key); } }); CON_ADDED.bad = (ap.bad || []).slice(); CON_ADDED.src = String(src || "").slice(0, 16); }   // E9: 관리자 docs_set으로 같은 키가 이미 있으면 그 값이 이긴다
+  function conAddedHasChg(rk){ return CON_ADDED.stages.some(function(a){ return a.pos.type === "chg_pipe" && a.scen.indexOf(rk) >= 0; }); }
+  function conScenTag(sc, stages){   // 꺼짐 = 같은 객체 그대로(바이트 동일). 켬 = 쓴 신설 id + 변경계약 정의를 생성 시점에 고정(R1·소급 금지 — 정규식은 원문 문자열로, 객체는 JSON 저장 때 {}가 됨)
+    if (!(CON_ADDED.stages.length || CON_ADDED.lists.length)) return sc;
+    var ids = [], rk = conScenRk(sc.type, sc.pub, sc.combo);
+    (stages || []).forEach(function(s){ var id = s.aid || s.lid; if (id && ids.indexOf(id) < 0) ids.push(id); });
+    CON_ADDED.stages.forEach(function(a){
+      if (a.pos.type !== "chg_pipe" || a.scen.indexOf(rk) < 0 || sc.chg) return;
+      if (ids.indexOf(a.id) < 0) ids.push(a.id);
+      sc.chg = { id: a.id, name: a.name, opt: a.opt, docs: a.docs.slice(), ak: a.ak, aw: a.aw, flds: a.flds ? JSON.parse(JSON.stringify(a.flds)) : null, after_re: a.pos.after_re || "", before_re: a.pos.before_re || "" };
+    });
+    if (ids.length){ sc.added = ids; sc.src = CON_ADDED.src; }
+    return sc;
+  }
+  function conModalExtra(type, pub, combo){   // renderConScen·saveConStart 공용 — 적격 자동(낙찰 연동) + 카드 9 적격심사 수동 체크(관급 비연동 건)
+    var auto = !!(lastBidForCon && /적격/.test(String(((lastBidForCon.ext||{}).decide)||""))), ex = { qual: auto }, rk = conScenRk(type, pub, combo), qm = null;
+    CON_ADDED.stages.forEach(function(a){ if (a.id === "qual_manual" && a.scen.indexOf(rk) >= 0) qm = a; });
+    var wrap = document.getElementById("conQualWrap"), cb = document.getElementById("conQualMan"), show = !!(qm && !auto);
+    if (wrap) wrap.style.display = show ? "flex" : "none";
+    if (show && cb && cb.checked) ex.qual_manual = 1;
+    return ex;
+  }
+  function conAddedPreviewHtml(b){   // 관리자 카드 '카드 9 미리보기' — 거울 added를 깊은 복사·전부 켬(status applied)으로 검증·조립만 한다(CON_ADDED·STAGE_DOCS 불변, 읽기 전용)
+    var pa = (b && b.proc && b.proc.added) || {}, la = (b && b.list && b.list.added) || {};
+    var raw = JSON.parse(JSON.stringify({ schema: (pa.schema === 2 && la.schema === 2) ? 2 : 1, status: "applied", stages: pa.stages || [], lists: la.lists || [] }));
+    [].concat(conIsArr(raw.stages) ? raw.stages : [], conIsArr(raw.lists) ? raw.lists : []).forEach(function(x){ if (x && typeof x === "object") x.active = true; });
+    var ap = conAddedPrep(raw), AD = { stages: ap.stages, lists: ap.lists }, rows = [];
+    Object.keys(CON_SCEN).forEach(function(k){
+      var sp = k.split(":"), combo = sp[0] === "combo", type = combo ? "asbestos" : sp[0];
+      var base = CON_SCEN[k].map(function(n){ return { name: n, opt: conIsOptName(n) ? 1 : 0 }; }), out = conAddedApply(base.map(function(s){ return { name: s.name, opt: s.opt }; }), k, type, combo, { qual_manual: 1 }, AD), adds = [], lists = [], i;
+      for (i = 0; i < out.length; i++){ if (out[i].aid) adds.push("+" + (i + 1) + " " + esc(out[i].name) + (out[i].off ? "(기본 꺼짐)" : "") + (out[i].aid === "qual_manual" ? "(체크 때만)" : "")); else if (out[i].lid) lists.push("#" + (i + 1) + " " + esc(out[i].name) + " → " + esc(out[i].dk[0])); }
+      var chg = AD.stages.some(function(a){ return a.pos.type === "chg_pipe" && a.scen.indexOf(k) >= 0; });
+      if (adds.length || lists.length || chg) rows.push('<div style="padding:3px 0;border-bottom:1px solid var(--line);"><b>' + esc(k) + '</b> ' + base.length + '→' + (out.length - (out.some(function(s){ return s.aid === "qual_manual"; }) ? 1 : 0)) + '단계' + (adds.length ? ' · ' + adds.join(" · ") : '') + (lists.length ? ' · 목록 ' + lists.join(" · ") : '') + (chg ? ' · 변경계약: 본 단계 목록 아래 별도 줄 [+ 변경계약 n차]' : '') + '</div>');
+    });
+    var bads = ap.bad.map(function(x){ return esc(x.id) + ": " + esc(x.why) + (x.soft ? "(적용)" : "(제외)"); });
+    return '<details data-conproc-det="c9"' + ((typeof conProcEditOpen !== "undefined" && conProcEditOpen.c9) ? ' open' : '') + ' style="margin-top:6px;border-top:1px solid var(--line);padding-top:6px;"><summary style="cursor:pointer;font-weight:600;font-size:13px;">카드 9 미리보기 — 켜면 새 계약 단계(지금 상태와 무관한 시안, 읽기 전용)</summary><div style="margin-top:6px;font-size:12px;overflow-wrap:anywhere;">'
+      + (rows.length ? rows.join("") : '<div class="empty-line">신설 항목 없음</div>') + (bads.length ? '<div style="margin-top:4px;color:#B00020;">검증: ' + bads.join(" / ") + '</div>' : '')
+      + '<div class="empty-line" style="margin-top:4px;">진행 중 계약은 바뀌지 않습니다(새 계약부터). 켜는 조건 = 거울 켬 + 항목 active + 두 층 status applied.</div></div></details>';
+  }
   // 단계 이름(PM 원문) → 지시 상세(STAGE_DOCS 키). 순서가 중요: 해체완료·완료보고는 해체신고보다 먼저
   var STAGE_DOC_MAP = [[/적격/,"적격심사"],[/견적/,"견적"],[/노동부/,"노동부신고"],[/면적/,"석면조사"],[/해체\s*허가/,"해체허가"],[/해체\s*완료|완료\s*신고|완료보고/,"완료신고"],[/준공|계량|반입/,"준공"],[/해체|철거\s*신고/,"철거신고"],[/배출|성분분석|폐기물|처리확인서/,"폐기물 처리"],[/석면\s*조사/,"석면조사"],[/착공|착수/,"착공"],[/공사\s*수행|작업|용역/,"작업"],[/필증/,"필증인수"],[/청구|입금/,"청구"],[/계약/,"계약"]];   // v382 검토 13: 면적·준공이 해체·배출보다 먼저
   function stageDocsFor(name){
     if (STAGE_DOCS[name]) return STAGE_DOCS[name];
     for (var i = 0; i < STAGE_DOC_MAP.length; i++){ if (STAGE_DOC_MAP[i][0].test(name||"")) return STAGE_DOCS[STAGE_DOC_MAP[i][1]] || ""; }
     return "";
+  }
+  function stageDocsOf(s){   // v402 — 신설·목록 덮어쓰기 단계(dk)는 STAGE_DOCS[dk] → 생성 때 굳힌 글(dtx) → 이름 폴백 순(R1: 거울 끔·로드 실패 기기에서도 목록이 비지 않게)
+    if (s && conIsArr(s.dk) && s.dk.length){
+      var t = s.dk.map(function(k){ return (Object.prototype.hasOwnProperty.call(STAGE_DOCS, k) && STAGE_DOCS[k]) || ""; }).filter(function(x){ return !!x; }).join(" / ");
+      if (t) return t;
+      if (typeof s.dtx === "string" && s.dtx) return s.dtx;
+    }
+    return stageDocsFor((s && s.name) || "");
   }
   // v401 단계 서류 항목화(계약 D1 3일차) — STAGE_DOCS 한 줄 "[작성] a·b(c·d) / [수령] e — 메모" → [{t:"작성",n:"a"},…]. 괄호 안의 '·'와 ' — '는 나누지 않는다. 건별 stage.docs[]의 원천(첫 조작 때 s.docs 로 굳고, 그 뒤 골조가 바뀌어도 그 계약은 그대로)
   function csSplitTop(str, sep){
@@ -9752,7 +9878,7 @@
   }
   function csStageDocItems(s){
     if (s && Object.prototype.toString.call(s.docs) === "[object Array]") return s.docs;
-    return csParseStageDocs(stageDocsFor((s && s.name) || "")).map(function(d, i){ return { k: (d.t || "기타") + ":" + i, t: d.t, n: d.n, st: "todo" }; });
+    return csParseStageDocs(stageDocsOf(s || {})).map(function(d, i){ return { k: (d.t || "기타") + ":" + i, t: d.t, n: d.n, st: "todo" }; });
   }
   // 단계 입력 칸(시나리오 표 "계약 탭이 해야 할 것" 열) — 값은 stage.vals에, 정산액은 contract.settle_amount에도
   var CON_STAGE_FIELDS = [
@@ -9773,6 +9899,16 @@
     [/계약/, [["bond_no","계약보증증권 번호","text"],["bond_amt","보증금액(원)","num"]]]
   ];
   function csStageFields(name){ for (var i = 0; i < CON_STAGE_FIELDS.length; i++){ if (CON_STAGE_FIELDS[i][0].test(name||"")) return CON_STAGE_FIELDS[i][1]; } return []; }
+  function csStageFieldsOf(s){ return (s && conIsArr(s.flds) && s.flds.length) ? s.flds : csStageFields((s && s.name) || ""); }   // v402 신설 단계는 명시 칸
+  function csStageLabel(s){ return ((s && s.name) || "") + ((s && s.round) ? " " + s.round + "차" : ""); }
+  function csStageNew(o){ var st = {name:o.name,due:"manual",days:null,status:"pending",task_id:null,done_at:null,opt:(o.opt?1:0)}; if (o.aid || o.dk) csStageTag(st, o); return st; }   // v402 — 꺼짐(aid·dk 없음)이면 v401과 같은 키 7개
+  function csStageTag(st, o){
+    if (o.aid) st.aid = o.aid; if (o.lid) st.lid = o.lid;
+    if (o.dk){ st.dk = o.dk.slice(); var tx = st.dk.map(function(k){ return (Object.prototype.hasOwnProperty.call(STAGE_DOCS, k) && STAGE_DOCS[k]) || ""; }).filter(function(x){ return !!x; }).join(" / "); if (tx) st.dtx = tx; }   // R1 생성 시점 고정(목록 글)
+    if (o.ak) st.ak = o.ak; if (o.aw) st.aw = o.aw; if (o.flds) st.flds = JSON.parse(JSON.stringify(o.flds));
+    if (o.off){ st.off = 1; st.status = "skipped"; }   // R10 기본 꺼짐 = 건너뜀으로 생성, [켜기](선택 복구)로 살림
+    return st;
+  }
   function conModalCombo(){ var cb = document.getElementById("conCombo"); return !!(cb && cb.checked); }
   // 계약 시작 모달 — 단계 목록 미리보기(종류·사급/관급·혼합 체크가 바뀔 때마다)
   function renderConScen(){
@@ -9780,8 +9916,8 @@
     var type = (document.getElementById("conType")||{}).value || "asbestos", pub = ((document.getElementById("conDoc")||{}).value || "public") === "public";
     var wrap = document.getElementById("conComboWrap"); if (wrap) wrap.style.display = (type==="asbestos"||type==="demolition") ? "flex" : "none";
     var combo = conModalCombo() && (type==="asbestos"||type==="demolition");
-    var st = conScenStages(type, pub, combo, { qual: !!(lastBidForCon && /적격/.test(String(((lastBidForCon.ext||{}).decide)||""))) });
-    p.innerHTML = '<b>' + st.length + '단계</b> · ' + st.map(function(s, i){ return (i + 1) + '. ' + esc(s.name); }).join(' → ');
+    var st = conScenStages(type, pub, combo, conModalExtra(type, pub, combo));   // v402: 적격 자동 + 카드 9 수동 체크
+    p.innerHTML = '<b>' + st.length + '단계</b> · ' + st.map(function(s, i){ return (i + 1) + '. ' + esc(s.name) + (s.aid ? ' <small>신설' + (s.off ? '·기본 꺼짐' : '') + '</small>' : ''); }).join(' → ') + (conAddedHasChg(conScenRk(type, pub, combo)) ? ' · <small>변경계약은 필요할 때 단계 탭 [+ 변경계약](본 단계 아래 별도 줄)</small>' : '');
   }
   // 단계별 서류 체크리스트 — [작성]=우리가 생성, [수정]=받아서 금액 등 수정, [수령]=받아서 확인·보관
   var STAGE_DOCS = {
@@ -9905,12 +10041,38 @@
   // 검토(10/13) 반영: 재상신은 cid로만 매칭 · 적용 전 서버 계약본을 읽어 다른 기기가 이미 진행했으면 그 결과를 받아들인다(지시 2개·기성 2건 방지) · 상신한 단계의 지시는 완료 요청으로 잠근다(advanceProc 잠금과 한 쌍)
   var CON_APPR_KINDS = [[/청구|입금/, "청구 검수"], [/계약서/, "계약 단계"]];   // "견적·수의계약"은 견적 단계 — 결재 없음
   function csApprKind(name){ for (var i = 0; i < CON_APPR_KINDS.length; i++){ if (CON_APPR_KINDS[i][0].test(name||"")) return CON_APPR_KINDS[i][1]; } return ""; }
+  function csNum(x){ return Number(String(x == null ? "" : x).replace(/[^0-9]/g, "")) || 0; }
+  function csChgLastAmt(c){ var v = 0; (c.pipes || []).forEach(function(p){ (p.stages || []).forEach(function(x){ if (x.aw === "amt" && x.status === "done" && csNum((x.vals || {}).chg_amt)) v = csNum(x.vals.chg_amt); }); }); return v; }
+  function csChgBase(c){ return Number(((c && c.contract_info) || {}).amount) || 0; }   // v402 검토 2: 계약서 금액만(낙찰액 폴백·정산액 제외 — 기기마다 판정이 달라지지 않게)
+  function csChgAmtChanged(c, s){ var v = csNum((s.vals || {}).chg_amt); return (v > 0 && v !== csNum(s.amt0)) || (s.eff0 != null && csNum(csChgBase(c)) !== csNum(s.eff0)); }   // v402 R15: 두 번째 = 계약서 작성 툴 등이 계약액(contract_info.amount)을 먼저 바꾼 경우 — 정산액(settle_amount)은 제외
+  function csApprKindOf(c, s){ if (!s) return ""; if (!s.aid) return csApprKind(s.name); if (!s.ak) return ""; return (s.aw === "amt" && !csChgAmtChanged(c, s)) ? "" : s.ak; }   // 신설 단계는 명시값만
+  function conChgItemOf(c){   // v402 R1: 생성 때 c.scen.chg에 고정한 정의 우선(원문 정규식 → 다시 컴파일, 값이 있는데 안 되면 null=버튼 없음, 빈 값=조건 없음), 없을 때만 CON_ADDED(scen.added 기록 계약만 — 소급 없음)
+    var sc = c && c.scen, d, are, bre, i, a, ids;
+    if (!sc) return null;
+    if (sc.chg && typeof sc.chg === "object"){
+      d = sc.chg; are = d.after_re ? conAddedRe(d.after_re) : null; bre = d.before_re ? conAddedRe(d.before_re) : null;
+      if ((d.after_re && !are) || (d.before_re && !bre) || typeof d.name !== "string" || !d.name) return null;
+      return { id: String(d.id || "change_contract"), name: d.name, opt: d.opt ? 1 : 0, docs: conIsArr(d.docs) ? d.docs.slice() : [], ak: d.ak || "", aw: d.aw || "", flds: conIsArr(d.flds) ? d.flds : null, pos: { type: "chg_pipe", are: are, bre: bre } };
+    }
+    ids = conIsArr(sc.added) ? sc.added : [];
+    for (i = 0; i < CON_ADDED.stages.length; i++){ a = CON_ADDED.stages[i]; if (a.pos.type === "chg_pipe" && ids.indexOf(a.id) >= 0) return a; }
+    return null;
+  }
+  function csChgCan(c){ var a = conChgItemOf(c), m = a ? csMain(c) : null; if (!m) return null; var w = conChgWindow(m.stages.map(function(s){ return s.name; }), a.pos), cs = m.stages[m.cur], hold = !!(cs && cs.appr && /대기|보류|승인/.test(cs.appr.status || "") && cs.status !== "done"); return { a: a, w: w, hold: hold, ok: c.status !== "done" && m.cur > w.a && m.cur <= w.b && !hold }; }   // v402 검토 1: 본 줄 현재 단계가 상신 중·승인 대기면 창 닫힘
+  function csChgOpenAt(c, p, i){   // v402 R3: 본 줄 w.b(첫 준공|청구) 이후 단계는 변경계약 미완료 차수가 있으면 진행 금지 → 미완료 수(0 = 막지 않음)
+    if (!c || !c.scen || !p || p.key !== "main") return 0;
+    var q = csPipeOf(c, "chg"); if (!q) return 0;
+    var n = (q.stages || []).filter(function(s){ return s.status !== "done" && s.status !== "skipped"; }).length; if (!n) return 0;
+    var a = conChgItemOf(c), w = conChgWindow(p.stages.map(function(s){ return s.name; }), a ? a.pos : { are: null, bre: /준공|청구/ });   // v402 검토 14: 정의 복원 실패면 기본 창(첫 준공|청구) — 0번부터 전부 잠그지 않음
+    return i >= w.b ? n : 0;
+  }
+  function csTaskChg(t){ var c = (t && t.proc_id) ? findProc(t.proc_id) : null, p = c ? csPipeOf(c, t.pipe) : null, s = p ? p.stages[t.stage_i] : null; return !!(s && s.aid === "change_contract"); }   // v402 검토 3: 7번 고정 대안(main 줄 변경계약)도 지시 탭 서류 버튼 숨김
   function csApprRef(c, p, i){ return "con:" + c.id + "|" + p.key + "|" + i; }
   function csApprSubmit(c, p, i){
-    var s = p.stages[i], kind = csApprKind(s.name); if (!kind) return false;
+    var s = p.stages[i], kind = csApprKindOf(c, s); if (!kind) return false;
     var cid = "c" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8), amt = conAmtEff(c);
-    apprPendingCreates.push({ cid: cid, mid: myId(), kind: kind, title: ("[계약] " + (c.client || c.label || "") + " · " + s.name).slice(0, 120),
-      body: (csTitle(c) ? "공사명 " + csTitle(c) + " · " : "") + (amt ? "금액 " + fmtAmount(amt) + "원 · " : "") + (c.who ? "담당 " + dispName(c.who) + " · " : "") + csPub(c) + " " + csKind(c), ref: csApprRef(c, p, i) });
+    apprPendingCreates.push({ cid: cid, mid: myId(), kind: kind, title: ("[계약] " + (c.client || c.label || "") + " · " + csStageLabel(s)).slice(0, 120),
+      body: (s.aw === "amt" ? "변경 " + fmtAmount(csNum(s.amt0)) + "→" + fmtAmount(csNum((s.vals || {}).chg_amt) || csChgBase(c)) + "원 · " : "") + (csTitle(c) ? "공사명 " + csTitle(c) + " · " : "") + (amt ? "금액 " + fmtAmount(amt) + "원 · " : "") + (c.who ? "담당 " + dispName(c.who) + " · " : "") + csPub(c) + " " + csKind(c), ref: csApprRef(c, p, i) });
     apprSavePending(); apprFlushCreates();
     s.appr = { cid: cid, kind: kind, at: new Date().toISOString(), by: myName() || "", by_id: myId(), status: "대기" };
     var t = s.task_id ? findTask(s.task_id) : null;
@@ -9931,9 +10093,28 @@
   function csEmpty(v){ return v === undefined || v === null || v === "" || (Array.isArray(v) && !v.length) || (typeof v === "object" && !Array.isArray(v) && !Object.keys(v).length); }
   function csApprRank(st){ return (st === "승인" || st === "반려") ? 2 : (st === "보류" ? 1 : 0); }
   function csMergeDocs(a, b){ var out = a.slice(), idx = {}, i, j; for (i = 0; i < out.length; i++) idx[out[i].k] = i; for (j = 0; j < b.length; j++){ var d = b[j]; if (!d || !d.k) continue; if (idx[d.k] === undefined){ idx[d.k] = out.length; out.push(d); } else if (String(d.at || "") > String(out[idx[d.k]].at || "")) out[idx[d.k]] = d; } return out; }
+  function csChgRank(s){ return !s ? 0 : (s.status === "done" ? 3 : (s.status === "skipped" ? 2 : (s.status === "open" ? 1 : 0))); }   // v402 검토 12: 완료가 건너뜀을 이김(다른 기기 승인 차수 보존)
+  function csChgMerge(c, lq, q){   // v402 R2 변경계약 줄 = 덧붙이기 전용 → 인덱스별 합집합: 길이는 긴 쪽, 단계마다 더 진행된 쪽(done/skipped > open > pending), vals·docs·appr는 본 줄 규칙, cur = 첫 미완료. 새 꼬리 단계가 현재인데 지시가 없으면 만든다
+    var A = lq.stages || [], B = q.stages || [], n = Math.max(A.length, B.length), out = [], i, cur = -1;
+    for (i = 0; i < n; i++){
+      var a = A[i], b = B[i];
+      if (!a || !b){ out.push(Object.assign({}, a || b)); continue; }
+      var hi = csChgRank(b) > csChgRank(a) ? b : a, lo = hi === b ? a : b, m = Object.assign({}, hi);
+      if (csEmpty(m.vals) && !csEmpty(lo.vals)) m.vals = lo.vals;
+      if (csEmpty(m.docs) && !csEmpty(lo.docs)) m.docs = lo.docs; else if (!csEmpty(m.docs) && !csEmpty(lo.docs)) m.docs = csMergeDocs(m.docs, lo.docs);
+      if (!m.appr && lo.appr) m.appr = lo.appr; else if (m.appr && lo.appr && (String(lo.appr.at || "") > String(m.appr.at || "") || (lo.appr.at === m.appr.at && csApprRank(lo.appr.status) > csApprRank(m.appr.status)))) m.appr = lo.appr;
+      if (!m.task_id && lo.task_id) m.task_id = lo.task_id;
+      out.push(m);
+    }
+    for (i = 0; i < n; i++){ if (csChgRank(out[i]) < 2){ cur = i; break; } } if (cur < 0) cur = n;
+    if (cur === (lq.cur || 0) && JSON.stringify(out) === JSON.stringify(A)) return false;
+    lq.stages = out; lq.cur = cur;
+    if (cur < n && out[cur].status === "pending" && !out[cur].task_id && c && c.status !== "done") materializeStage(c, lq, todayStr());
+    return JSON.stringify(out) !== JSON.stringify(B) ? 2 : 1;   // 2 = 서버본과 다름 → 저장(v402 검토 5)
+  }
   function csSyncFromServer(c, sc){
     if (!c || !sc || sc.id !== c.id) return false;
-    var changed = false;
+    var changed = false, chgPush = false;
     Object.keys(sc).forEach(function(k){
       if (k === "pipes" || k === "status") return;
       if (sc[k] === undefined || sc[k] === null || sc[k] === "") return;
@@ -9944,6 +10125,7 @@
     (sc.pipes || []).forEach(function(q){
       var lq = lp.filter(function(x){ return x && x.key === q.key; })[0];
       if (!lq){ lp.push(q); changed = true; return; }
+      if (q.key === "chg"){ var mr = csChgMerge(c, lq, q); if (mr){ changed = true; if (mr === 2) chgPush = true; } return; }   // v402 R2·검토 5
       var localAhead = (lq.cur || 0) > (q.cur || 0), base = localAhead ? lq : q, other = localAhead ? q : lq;
       var stages = (base.stages || []).map(function(s, i){
         var o = (other.stages || [])[i] || {}, m = Object.assign({}, s);
@@ -9958,6 +10140,7 @@
     });
     c.pipes = lp;
     if (c.status === "done" || c.status === "active"){ var st = lp.length && lp.every(function(p){ return p.cur >= p.stages.length; }) ? "done" : "active"; if (st !== c.status){ c.status = st; changed = true; } }
+    if (chgPush){ c.updated = todayStr(); scheduleContractSave(); }   // v402 검토 5: 병합 결과(새 차수·지시)를 서버에 남김
     if (changed && typeof loadTasks === "function") loadTasks();
     return changed;
   }
@@ -10045,6 +10228,7 @@
   // 승인된 단계를 진행 — 지시를 승인 완료로 닫고 advanceProc(다음 단계 생성·청구면 기성 등록). 지시가 없으면 단계만 진행(청구면 기성 연동은 같게)
   function csApprApply(c, p, i){
     var s = p.stages[i], t = s.task_id ? findTask(s.task_id) : null;
+    var chgA = csChgOpenAt(c, p, i); if (chgA){ if (typeof apprToastShow === "function") apprToastShow("변경계약 " + chgA + "건이 처리 중이라 승인된 단계를 아직 넘기지 않았습니다 — 변경계약을 끝낸 뒤 단계 카드 [완료]"); return; }   // v402 검토 1: 지시 없음·닫힘 분기도 본 줄 잠금
     if (t && t.status !== "done"){ t.status = "done"; t.done_at = todayStr(); t.done_by = t.done_by || (s.appr.by || "결재"); t.approved_by = s.appr.decided_by || "결재함"; t.approved_at = s.appr.decided_at || todayStr(); t.updated = todayStr(); saveTasksCache(); scheduleTasksSave(); advanceProc(t); renderTasks(); renderSummary(); }
     else { s.status = "done"; s.done_at = todayStr(); if (i === p.cur){ p.cur = i + 1; materializeStage(c, p, todayStr()); } c.status = (c.pipes||[]).every(function(q){ return q.cur >= q.stages.length; }) ? "done" : "active"; c.updated = todayStr(); if (c.status === "done") csOnDone(c); scheduleContractSave(); renderContracts(); if (/청구/.test(s.name || "") && typeof conBillToRec === "function") setTimeout(function(){ conBillToRec(c); }, 150); }
   }
@@ -10130,8 +10314,8 @@
   // @con-scen-end
   // ---- 계약 골조·목록 거울(v400, 계약 D1 2일차). 위 상수 7종(CON_TYPE_ELEMS·CON_SCEN·CON_STAGE_FIELDS·CON_SITE_CORP / STAGE_DOCS·STAGE_DOC_MAP·CON_PACKETS)은 그대로 두고,
   //      settings:contract.use_blob 가 켜져 있으면 Blobs 거울(proc:contract:v1·list:contract)을 같은 자리에 "제자리 덮어쓰기"(배열 length=0 뒤 push, 객체 키 교체)한다 — 참조를 잡고 있는 함수도 같은 객체를 본다.
-  //      검증 실패·네트워크 실패·꺼짐 = 상수 그대로(폴백). added(신설 단계·목록 제안, 카드 9)는 엔진이 아직 읽지 않는다 — 여기서는 개수만 센다. 거울은 appdata collectors/contract_mirror.py 가 쓴다. ----
-  var CON_PROC_SRC = { mode:"const", reason:"", proc_sha:"", list_sha:"", built_at:"", flag:null, added_active:0, same:null, edits:0 };
+  //      검증 실패·네트워크 실패·꺼짐 = 상수 그대로(폴백). added(카드 9 신설)는 v402부터 거울 적용 뒤 conAddedPrep 검증 통과분만 CON_ADDED로(두 층 status applied·active만, 실패해도 거울은 그대로). 거울은 appdata collectors/contract_mirror.py 가 쓴다. ----
+  var CON_PROC_SRC = { mode:"const", reason:"", proc_sha:"", list_sha:"", built_at:"", flag:null, added_active:0, same:null, edits:0, added_applied:0, added_bad:[] };
   function conProcRevive(v){
     if (v && typeof v === "object"){
       if (typeof v.$re === "string" && Object.keys(v).length <= 2){ try { return new RegExp(v.$re, v.$flags || ""); } catch(e){ return /$^/; } }
@@ -10165,6 +10349,7 @@
   function conProcLoad(){
     if (!curMember()) return;
     gwCall("gw-data", { action: "con_proc_get" }).then(function(res){
+      conAddedClear(); CON_PROC_SRC.added_applied = 0; CON_PROC_SRC.added_bad = [];   // v402: 어느 분기든 신설은 빈 값에서 시작
       if (res.status !== 200 || !res.body){ CON_PROC_SRC.reason = "조회 실패"; return; }
       var b = res.body, k; CON_PROC_SRC.flag = b.flag || null;
       if (!b.proc || !b.list){ CON_PROC_SRC.mode = "const"; CON_PROC_SRC.reason = "거울 없음"; CON_PROC_SRC.same = null; return; }
@@ -10182,8 +10367,13 @@
       var rv = conProcRevive(mirror);
       conProcApplyInPlace(CON_TYPE_ELEMS, rv.CON_TYPE_ELEMS); conProcApplyInPlace(CON_SCEN, rv.CON_SCEN); conProcApplyInPlace(CON_STAGE_FIELDS, rv.CON_STAGE_FIELDS); conProcApplyInPlace(CON_SITE_CORP, rv.CON_SITE_CORP);
       conProcApplyInPlace(STAGE_DOCS, rv.STAGE_DOCS); conProcApplyInPlace(STAGE_DOC_MAP, rv.STAGE_DOC_MAP); conProcApplyInPlace(CON_PACKETS, rv.CON_PACKETS);
+      try {   // v402 카드 9 신설 — 거울 적용 뒤에만, 실패해도 거울은 그대로(신설만 0). 두 층 status가 둘 다 applied이고 같을 때만 켜짐(R5)
+        var pa = b.proc.added || {}, la = b.list.added || {};
+        var ad = conAddedPrep({ schema: (pa.schema === 2 && la.schema === 2) ? 2 : 1, status: (pa.status === la.status) ? pa.status : "mismatch", stages: pa.stages, lists: la.lists });
+        conAddedUse(ad, CON_PROC_SRC.proc_sha); CON_PROC_SRC.added_applied = CON_ADDED.stages.length + CON_ADDED.lists.length; CON_PROC_SRC.added_bad = ad.bad;
+      } catch(e){ conAddedClear(); CON_PROC_SRC.added_applied = 0; CON_PROC_SRC.added_bad = [{ id: "*", why: "검증 예외" }]; }
       CON_PROC_SRC.mode = "blob"; CON_PROC_SRC.reason = "";
-    }).catch(function(){ CON_PROC_SRC.reason = "네트워크"; });
+    }).catch(function(){ conAddedClear(); CON_PROC_SRC.reason = "네트워크"; });
   }
   var conProcSaving = false, conProcHead = "", conProcEditing = "", conProcEditOpen = {};
   function renderConProcCard(){
@@ -10197,14 +10387,15 @@
         ["현재 원천", src],
         ["거울", has ? ("proc " + esc(String(b.proc.base_sha || b.proc.sha)) + " · list " + esc(String(b.list.base_sha || b.list.sha)) + " · 생성 " + esc(String(b.proc.built_at || "").replace("T", " ").slice(0, 16)) + (clog.applied ? ' · <b>편집 ' + clog.applied + '건</b> 재생' : ' · 편집 0')) : "없음 — appdata collectors/contract_mirror.py --push 로 만듭니다"],
         ["거울 ↔ 상수", has ? (same === true ? "같음(diff 0)" : (same === false ? "다름 — 켜면 거울이 우선" : "비교 전")) : "—"],
-        ["신설 제안(카드 9)", has ? ((((b.proc.added || {}).stages || []).length) + "단계 · " + (((b.list.added || {}).lists || []).length) + "목록 · 활성 " + CON_PROC_SRC.added_active + "건 (엔진은 카드 9 회신 뒤 읽음)") : "—"],
+        ["신설 제안(카드 9)", has ? (esc(String(((b.proc.added || {}).stages || []).length)) + "단계 · " + esc(String(((b.list.added || {}).lists || []).length)) + "목록 · 활성 " + CON_PROC_SRC.added_active + "건 · 이 기기 적용 " + CON_PROC_SRC.added_applied + "건 · " + esc(String((b.proc.added || {}).status || "")) + (on ? "" : " — 거울 꺼짐: 적용 0(켜면 활성 항목만 새 계약부터)") + ((CON_PROC_SRC.added_bad || []).length ? ' · <span style="color:#B00020;">제외·표시 ' + CON_PROC_SRC.added_bad.map(function(x){ return esc(x.id) + " " + esc(x.why); }).join(" / ") + '</span>' : '')) : "—"],
         ["마지막 변경", f.updated_at ? (esc(memberName(f.updated_by) || f.updated_by || "") + " · " + esc(new Date(f.updated_at + 9 * 3600000).toISOString().slice(0, 16).replace("T", " "))) : "없음"]
-      ].map(function(r){ return '<div style="display:flex;gap:8px;padding:5px 2px;border-bottom:1px solid var(--line);font-size:13px;"><span style="min-width:120px;color:var(--sub);">' + r[0] + '</span><span>' + r[1] + '</span></div>'; }).join("");
+      ].map(function(r){ return '<div style="display:flex;gap:8px;padding:5px 2px;border-bottom:1px solid var(--line);font-size:13px;"><span style="min-width:120px;color:var(--sub);">' + r[0] + '</span><span style="overflow-wrap:anywhere;min-width:0;">' + r[1] + '</span></div>'; }).join("");
+      var pv = ""; if (has){ try { pv = conAddedPreviewHtml(b); } catch(e){ pv = '<div class="empty-line" style="margin-top:6px;">카드 9 미리보기 실패 — 데이터 형식을 확인해 주세요(거울 스위치는 그대로 쓸 수 있습니다).</div>'; } }   // v402 R6: 미리보기 예외가 스위치 버튼을 지우지 않게
       var btn = '<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">'
         + '<button type="button" style="' + apprGradeChipCss(on ? 1 : 3, true) + '" data-conproc-set="' + (on ? "0" : "1") + '" data-base="' + (f.updated_at || 0) + '"' + ((!on && !has) ? ' disabled' : '') + '>' + (on ? "거울 끄기 — 코드 상수로 되돌리기" : "거울 켜기") + '</button>'
         + (f.prev ? '<span class="empty-line">이전 값: ' + (f.prev.use_blob ? "켬" : "끔") + '</span>' : '') + '</div>';
       host.innerHTML = rows + btn + '<div class="empty-line" style="margin-top:6px;">계약 단계 목록·서류 목록·입력 칸·패킷·시행 회사 상수 7종의 원천을 바꾸는 스위치입니다(계약 D1). 기본은 코드 상수. 켜면 다음 로그인·새로고침부터 거울(편집 재생분 포함)을 읽고, 거울이 깨져 있으면 자동으로 상수로 돌아갑니다. 단계 이름은 어느 쪽이든 PM 원문 그대로입니다.</div>'
-        + (has ? conProcEditHtml(b) : '');
+        + pv + (has ? conProcEditHtml(b) : '');
       Array.prototype.forEach.call(host.querySelectorAll("[data-conproc-set]"), function(el){ el.addEventListener("click", function(){ conProcFlagSet(el.getAttribute("data-conproc-set") === "1", Number(el.getAttribute("data-base") || 0)); }); });
       if (has) conProcBindEdit(host, b);
     }).catch(function(){ host.innerHTML = '<div class="empty-line">거울 상태를 불러오지 못했습니다(네트워크).</div>'; });
@@ -10245,7 +10436,9 @@
         : '<span style="font-size:12px;color:var(--sub);overflow-wrap:anywhere;">' + esc(v) + '</span>';
       return '<div style="padding:5px 0;border-bottom:1px solid var(--line);"><div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;"><b style="font-size:12.5px;">' + esc(k) + '</b>' + (edited ? '<small style="color:var(--brand);">편집됨</small>' : '') + '<span style="margin-left:auto;display:inline-flex;gap:4px;">' + (conProcEditing === "docs:" + k ? '' : chip('data-conproc-dedit', k, '수정') + chip('data-conproc-ddel', k, '삭제', true)) + '</span></div>' + body + '</div>';
     }).concat(dels.map(function(k){ return '<div style="padding:5px 0;border-bottom:1px solid var(--line);display:flex;gap:6px;align-items:center;flex-wrap:wrap;"><b style="font-size:12.5px;text-decoration:line-through;opacity:.6;">' + esc(k) + '</b><small style="color:#B00020;">삭제됨</small><span style="margin-left:auto;">' + chip('data-conproc-revert', es.docs_del[k], '복구') + '</span></div>'; })).join("");
-    drows += '<div style="margin-top:8px;padding:6px;border:1px dashed var(--line);border-radius:8px;"><div style="font-size:12px;font-weight:600;margin-bottom:4px;">새 서류 키</div><div style="display:flex;gap:6px;flex-wrap:wrap;"><input type="text" data-conproc-nkey maxlength="40" placeholder="키(예: 완료신고_석면)" style="flex:1;min-width:140px;font-size:12px;"><input type="text" data-conproc-nre maxlength="120" placeholder="단계 이름 매칭 정규식(선택, 예: 노동부|석면)" style="flex:2;min-width:160px;font-size:12px;"></div><textarea data-conproc-nval rows="2" maxlength="2000" placeholder="[작성] a·b / [수령] c" style="width:100%;margin-top:4px;font-size:12px;box-sizing:border-box;"></textarea><div style="margin-top:4px;">' + chip('data-conproc-dadd', '1', '추가') + ' <small class="empty-line">키 이름이 단계 이름과 같으면 매핑 없이도 바로 쓰입니다. 정규식을 적으면 매핑 맨 앞에 끼워 넣습니다.</small></div></div>';
+    var c9 = (b.list.added || {}).lists;   // v402 R11: 카드 9 목록 키는 서버 STAGE_DOCS에 없어 편집기에 안 보이던 것 — 읽기 전용 행
+    if (conIsArr(c9)) drows += c9.map(function(l){ return '<div style="padding:5px 0;border-bottom:1px solid var(--line);"><div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;"><b style="font-size:12.5px;">' + esc(String((l && l.key) || "")) + '</b><small style="color:var(--brand);">카드 9 · ' + ((l && l.active === true) ? '활성' : '비활성') + ' · 읽기 전용(appdata 원천)</small></div><span style="font-size:12px;color:var(--sub);overflow-wrap:anywhere;">' + esc(String((l && l.value) || "")) + '</span></div>'; }).join("");
+    drows += '<div style="margin-top:8px;padding:6px;border:1px dashed var(--line);border-radius:8px;"><div style="font-size:12px;font-weight:600;margin-bottom:4px;">새 서류 키</div><div style="display:flex;gap:6px;flex-wrap:wrap;"><input type="text" data-conproc-nkey maxlength="40" placeholder="키(예: 실적보고_추가)" style="flex:1;min-width:140px;font-size:12px;"><input type="text" data-conproc-nre maxlength="120" placeholder="단계 이름 매칭 정규식(선택, 예: 실적)" style="flex:2;min-width:160px;font-size:12px;"></div><textarea data-conproc-nval rows="2" maxlength="2000" placeholder="[작성] a·b / [수령] c" style="width:100%;margin-top:4px;font-size:12px;box-sizing:border-box;"></textarea><div style="margin-top:4px;">' + chip('data-conproc-dadd', '1', '추가') + ' <small class="empty-line">키 이름이 단계 이름과 같으면 매핑 없이도 바로 쓰입니다. 정규식을 적으면 매핑 맨 앞에 끼워 넣습니다.</small></div></div>';
     h += det("docs", "서류 목록 STAGE_DOCS · " + keys.length + "키" + (dels.length ? ' · 삭제 ' + dels.length : ''), drows);
     // 2 단계 목록 CON_SCEN(base 순서 복원: 유효 목록 + 삭제 자리)
     var srows = Object.keys(P.CON_SCEN).map(function(sk){
@@ -10281,6 +10474,7 @@
     all("[data-conproc-dadd]", function(el){ el.addEventListener("click", function(){
       var k = (q("[data-conproc-nkey]") || {}).value || "", v = (q("[data-conproc-nval]") || {}).value || "", re = ((q("[data-conproc-nre]") || {}).value || "").trim();
       if (!k.trim() || !v.trim()){ alert("키와 서류 목록 글을 적어 주세요."); return; }
+      var c9k = (b.list.added || {}).lists; if (conIsArr(c9k) && c9k.some(function(l){ return l && l.key === k.trim(); }) && !confirm('"' + k.trim() + '"은 카드 9 목록 키와 같은 이름입니다 — 저장하면 관리자 값이 카드 9 값을 덮습니다(새 계약부터). 계속할까요?')) return;   // v402 R11
       conProcEdit({ op: "docs_set", key: k.trim(), value: conProcOneLine(v) }, "서류 목록 " + k.trim() + " 추가", re ? function(body){ conProcHead = body.head; conProcEdit({ op: "map_add", re: re, key: k.trim() }, "매핑 /" + re + "/ → " + k.trim() + " 추가"); } : null);
     }); });
     all("[data-conproc-sdel]", function(el){ el.addEventListener("click", function(){ var p = el.getAttribute("data-conproc-sdel").split("|"); if (!confirm('"' + p[2] + '" 단계를 ' + p[0] + ' 목록에서 소프트 삭제합니다 — 새 계약부터, 진행 중 계약은 그대로. [복구]로 되돌릴 수 있습니다.')) return; conProcEdit({ op: "scen_del", scen: p[0], i: Number(p[1]), name: p.slice(2).join("|") }, "단계 " + p[2] + " 삭제"); }); });
@@ -10328,7 +10522,8 @@
     if(s.status==="open" && s.task_id && findTask(s.task_id)) return;   // v382 검토 1: 이미 열린 단계에 지시를 또 만들지 않는다
     var due = "";
     if(s.due==="auto" && s.days){ due = addDays(baseDate||todayStr(), s.days); }
-    var t = { id:genId("t"), title:procStageTitle(c, s.name), detail:(stageDocsFor(s.name)||""), who_id:c.who_id||"", who:memberName(c.who_id||""), from:myName()||"", from_id:myId(), by:myName()||"",
+    if(s.aw==="amt" && s.amt0==null){ s.eff0 = csChgBase(c); s.amt0 = csChgLastAmt(c)||s.eff0; }   // v402 변경계약: 현재 단계가 될 때 금액 기준을 굳힘(R15 계약액 기준, 정산액 제외)
+    var t = { id:genId("t"), title:procStageTitle(c, csStageLabel(s)), detail:(stageDocsOf(s)||""), who_id:c.who_id||"", who:memberName(c.who_id||""), from:myName()||"", from_id:myId(), by:myName()||"",
       due:due, status:"open", done_at:null, done_by:null, created:todayStr(), updated:todayStr(),
       proc_id:c.id, proc_label:c.label, pipe:pipe.key, stage_i:pipe.cur, stage_name:s.name, stage_total:pipe.stages.length, stage_auto:(s.due==="auto") };
     tasks.push(t);
@@ -10343,7 +10538,7 @@
     var pipes;
     if(opts.stages && opts.stages.length){
       // 시나리오 조립 방식 — 요소 조합이 결정한 단계 그대로(발주처 무관 동일)
-      pipes=[{key:"main", cur:0, stages:opts.stages.map(function(n){ var o=(typeof n==="string")?{name:n}:n; return {name:o.name,due:"manual",days:null,status:"pending",task_id:null,done_at:null,opt:(o.opt?1:0)}; })}];
+      pipes=[{key:"main", cur:0, stages:opts.stages.map(function(n){ return csStageNew((typeof n==="string")?{name:n}:n); })}];   // v402 csStageNew(꺼짐이면 키 7개 그대로)
       if(opts.doneFirst && pipes[0].stages.length>1){ pipes[0].stages[0].status="done"; pipes[0].stages[0].done_at=today; pipes[0].cur=1; }   // v382 견적 승격: 견적 단계는 완료로
     } else {
       pipes=tpl.pipes.map(function(p){
@@ -10371,9 +10566,15 @@
     var pipe=null; for(var i=0;i<c.pipes.length;i++){ if(c.pipes[i].key===t.pipe){ pipe=c.pipes[i]; break; } }
     if(!pipe) return;
     var s = pipe.stages[t.stage_i]; if(!s || s.status==="done" || s.status==="skipped" || t.stage_i < pipe.cur) return;   // v382 검토 1: 건너뛴·지난 단계 지시를 되돌려 재승인해도 파이프를 되감지 않는다
-    if(c.scen && csApprKind(s.name) && !(s.appr && s.appr.status==="승인")){   // v384 검토 J·2차 F2: 결재 대상 단계(계약서·청구)는 상신 전후 모두 지시 탭으로 넘어가지 않는다 — 지시는 완료 요청으로
+    var chgN = c.scen ? csChgOpenAt(c, pipe, t.stage_i) : 0;
+    if(chgN){   // v402 R3: 변경계약 미완료 차수가 있으면 본 줄 준공·청구부터는 진행 금지 — 지시는 완료 요청으로(결재 잠금과 같은 모양)
       t.status="review"; t.done_at=t.done_at||todayStr(); t.approved_by=null; t.approved_at=null; t.updated=todayStr();
-      alert(s.appr ? ("이 단계는 결재함에 상신돼 있습니다(" + s.appr.kind + " " + s.appr.status + ") — 결재함에서 승인되면 단계가 넘어갑니다. 지시는 완료 요청 상태로 둡니다.") : ("이 단계(" + csApprKind(s.name) + ")는 결재함 상신이 필요합니다 — 계약 탭 단계 카드의 [상신]을 눌러 주세요. 지시는 완료 요청 상태로 둡니다."));
+      alert("변경계약 " + chgN + "건이 아직 처리 중입니다 — 변경계약을 끝낸 뒤 이 단계가 넘어갑니다. 지시는 완료 요청 상태로 둡니다.");
+      return false;
+    }
+    if(c.scen && csApprKindOf(c, s) && !(s.appr && s.appr.status==="승인")){   // v384 검토 J·2차 F2: 결재 대상 단계(계약서·청구)는 상신 전후 모두 지시 탭으로 넘어가지 않는다 — 지시는 완료 요청으로
+      t.status="review"; t.done_at=t.done_at||todayStr(); t.approved_by=null; t.approved_at=null; t.updated=todayStr();
+      alert(s.appr ? ("이 단계는 결재함에 상신돼 있습니다(" + s.appr.kind + " " + s.appr.status + ") — 결재함에서 승인되면 단계가 넘어갑니다. 지시는 완료 요청 상태로 둡니다.") : ("이 단계(" + csApprKindOf(c, s) + ")는 결재함 상신이 필요합니다 — 계약 탭 단계 카드의 [상신]을 눌러 주세요. 지시는 완료 요청 상태로 둡니다."));
       return false;
     }
     s.status="done"; s.done_at=todayStr();
@@ -10408,7 +10609,7 @@
     if(!t.due) chip += '<span class="need-due">기한 입력</span>';
     return chip;
   }
-  function pipeLabel(k){ return k==="waste" ? "폐기물" : "본"; }
+  function pipeLabel(k){ return k==="waste" ? "폐기물" : (k==="chg" ? "변경계약" : "본"); }
   // @con-sheet-start — v381 계약 시트형(A안, 9/21 결정) + 펼침 4탭(개요/단계/서류/연결). 설계 브리핑 10/12 PM ㄱ.
   // 표·칩·펼침 CSS는 차량 시트(.vs-*)를 그대로 쓰고, 상태(정렬·필터·칩)는 기기별 localStorage. 데이터 모델·저장·권한은 손대지 않는다(새 키 없음).
   // 종전 카드형은 v382에서 제거(v381 한 판 보존 뒤).
@@ -10532,12 +10733,12 @@
     var t = s.task_id ? findTask(s.task_id) : null, due = (t && t.due) ? t.due : "", opt = csIsOpt(s), key = p.key + "|" + i, can = canDo("con") && c.status !== "done";
     var review = !!(t && t.status === "review" && !canApproveTask(t));
     var ct = (p.cur < p.stages.length && p.stages[p.cur].task_id) ? findTask(p.stages[p.cur].task_id) : null, canCloseCur = !ct || ct.status === "done" || canApproveTask(ct);   // 현재 지시를 닫을 수 있는 사람(승인권)만 건너뜀·순서 변경(v382 검토 4)
-    var cls = isSkip ? ' skip' : (isDone ? ' done' : (isCur ? ' cur' : '')) + (opt ? ' opt' : '') + (open ? ' open' : '');
+    var cls = (isSkip ? ' skip' : (isDone ? ' done' : (isCur ? ' cur' : ''))) + (opt ? ' opt' : '') + (open ? ' open' : '');   // v402: 건너뜀 카드도 펼치면 한 줄 전체(종전엔 우선순위 탓에 open이 빠져 입력 칸이 넘침)
     var meta = isSkip ? '건너뜀' : (isDone ? ('완료' + (s.done_at ? ' ' + esc(s.done_at) : '')) : (isCur ? ((t && t.status === "review") ? '승인 대기' + (due ? ' · 기한 ' + esc(due) : '') : (due ? '기한 ' + esc(due) : '<span class="need-due">기한 입력</span>')) : '대기'));
     if (s.appr && !isSkip) meta += ' · 결재 ' + esc(s.appr.status || "대기") + (s.appr.decided_at ? ' ' + esc(s.appr.decided_at) : '') + (s.appr.reason ? '(' + esc(s.appr.reason) + ')' : '');   // v384
-    var h = '<div class="cs-stg' + cls + '" data-cs-stg="' + esc(key) + '"><span class="n">' + (i + 1) + ' ' + esc(s.name) + (opt ? ' <small>선택</small>' : '') + '</span><span class="m">' + meta + '</span>';
+    var h = '<div class="cs-stg' + cls + '" data-cs-stg="' + esc(key) + '"><span class="n">' + (i + 1) + ' ' + esc(csStageLabel(s)) + (s.aid ? ' <small>신설</small>' : '') + (opt ? ' <small>선택</small>' : '') + '</span><span class="m">' + meta + '</span>';
     if (!open) return h + '</div>';
-    var flds = csStageFields(s.name), vals = s.vals || {};
+    var flds = csStageFieldsOf(s), vals = s.vals || {};
     if (flds.length){
       h += '<div class="cs-fld" data-cs-fpanel="' + esc(key) + '">' + flds.map(function(f){
         var v = (f[0] === "settle_amount" && c.settle_amount) ? c.settle_amount : (vals[f[0]] == null ? "" : vals[f[0]]);
@@ -10549,8 +10750,9 @@
     var act = '';
     if (can){
       if (isCur && t && t.status !== "done"){
-        act += '<button type="button" class="vs-chip" data-cs-sdoc="' + esc(c.id) + '|' + esc(s.name) + '">📄 서류</button>';
-        var ak = c.scen ? csApprKind(s.name) : "";   // v384 결재 2종: 계약·청구 단계는 [완료] 대신 결재함 상신 → 승인되면 자동 진행
+        if (s.aid !== "change_contract" && p.key !== "chg") act += '<button type="button" class="vs-chip" data-cs-sdoc="' + esc(c.id) + '|' + esc(s.name) + '">📄 서류</button>';
+        else act += '<span class="vs-chip" style="cursor:default;opacity:.7;" title="변경계약서 양식 등록 전 — 계약 탭 서류함에 첨부">변경계약서: 서류함 첨부</span>';   // v402 R4: 계약서 작성 툴이 원계약 contract_info를 덮어쓰지 않게
+        var ak = c.scen ? csApprKindOf(c, s) : "";   // v384 결재 2종: 계약·청구 단계는 [완료] 대신 결재함 상신 → 승인되면 자동 진행
         if (ak && s.appr && s.appr.status === "대기") act += '<span class="vs-chip" style="cursor:default;opacity:.7;">결재 대기 중(' + esc(ak) + ')</span>';
         else if (ak && s.appr && s.appr.status === "보류") act += '<span class="vs-chip" style="cursor:default;opacity:.7;">결재 보류(' + esc(ak) + ')</span>';
         else if (ak && s.appr && s.appr.status === "반려") act += '<button type="button" class="vs-chip" data-cs-done="' + esc(c.id) + '|' + esc(key) + '">다시 상신(' + esc(ak) + ')</button>';
@@ -10561,7 +10763,7 @@
       if (flds.length) act += '<button type="button" class="vs-chip" data-cs-fsave="' + esc(c.id) + '|' + esc(key) + '">입력 저장</button>';
       if (opt && !isDone && !isSkip && (!isCur || canCloseCur)) act += '<button type="button" class="vs-chip" data-cs-skip="' + esc(c.id) + '|' + esc(key) + '">건너뜀</button>';
       if (!isDone && !isSkip && !isCur && i > p.cur && canCloseCur) act += '<button type="button" class="vs-chip" data-cs-jump="' + esc(c.id) + '|' + esc(key) + '" title="앞 단계를 건너뛰고 이 단계부터(긴급 건) — 되돌릴 수 없음">이 단계부터</button>';
-      if (isSkip && i > p.cur) act += '<button type="button" class="vs-chip" data-cs-unskip="' + esc(c.id) + '|' + esc(key) + '">선택 복구</button>';
+      if (isSkip && i > p.cur) act += '<button type="button" class="vs-chip" data-cs-unskip="' + esc(c.id) + '|' + esc(key) + '">' + (s.off ? '켜기' : '선택 복구') + '</button>';
     }
     act += '<button type="button" class="vs-chip" data-cs-stg="' + esc(key) + '">접기 ▲</button>';
     return h + '<div class="cs-act">' + act + '</div></div>';
@@ -10573,6 +10775,7 @@
     var base = esc(c.id) + '|' + esc(p.key) + '|' + i + '|';
     var h = '<div class="cs-docs" data-cs-dpanel="' + esc(key) + '"><div class="cs-pipe-h">서류 ' + items.length + '건 · 완료 ' + nDone + (nNa ? ' · 해당없음 ' + nNa : '') + (nAdd ? ' · 추가 ' + nAdd : '') + (fixed ? '' : ' <small style="font-weight:400;">(골조 목록 — 체크하면 이 계약의 목록으로 굳습니다)</small>') + '</div>';
     if (!items.length) h += '<div class="vs-empty" style="font-size:12px;">이 단계에 등록된 서류 목록이 없습니다.</div>';
+    if (csDocsLost(s)) h += '<div class="vs-empty" style="font-size:12px;color:#B00020;">서류 목록 원천을 불러오지 못했습니다 — 새로고침 뒤 체크해 주세요(지금 체크하면 표준 항목이 빠진 채 굳습니다).</div>';   // v402 R1
     h += items.map(function(d){
       var na = d.st === "na", done = d.st === "done";
       return '<div class="cs-doc' + (na ? ' na' : (done ? ' done' : '')) + '"><input type="checkbox" data-cs-dchk="' + base + esc(d.k) + '"' + (done ? ' checked' : '') + ((can && !na) ? '' : ' disabled') + '>'
@@ -10582,8 +10785,9 @@
     if (can) h += '<div class="cs-doc-add"><input type="text" data-cs-dnew="' + esc(key) + '" maxlength="80" placeholder="서류 추가(이름)" autocomplete="off"><button type="button" class="vs-chip" data-cs-dadd="' + base + '-">추가</button></div>';
     return h + '</div>';
   }
-  function csDocsOf(s){ if (Object.prototype.toString.call(s.docs) !== "[object Array]") s.docs = csStageDocItems(s); return s.docs; }
-  function csDocFind(s, k){ var ds = csDocsOf(s), j; for (j = 0; j < ds.length; j++) if (ds[j].k === k) return ds[j]; return null; }
+  function csDocsLost(s){ return !!(s && !conIsArr(s.docs) && conIsArr(s.dk) && s.dk.length && !s.dtx && !s.dk.some(function(k){ return Object.prototype.hasOwnProperty.call(STAGE_DOCS, k) && !!STAGE_DOCS[k]; })); }   // v402 R1: dk도 dtx도 안 풀림
+  function csDocsOf(s){ if (csDocsLost(s)){ alert("이 단계의 서류 목록을 불러오지 못했습니다 — 새로고침 뒤 다시 해 주세요(지금 체크하면 표준 항목이 빠진 채 굳습니다)."); return null; } if (Object.prototype.toString.call(s.docs) !== "[object Array]") s.docs = csStageDocItems(s); return s.docs; }
+  function csDocFind(s, k){ var ds = csDocsOf(s), j; if (!ds) return null; for (j = 0; j < ds.length; j++) if (ds[j].k === k) return ds[j]; return null; }
   function csDocLog(c, p, i, k, act){
     if (typeof gwCall !== "function") return;
     try { gwCall("gw-data", { action: "con_clog_add", cid: c.id, pipe: p.key, i: i, k: k, act: act }).then(function(res){ if (res.status !== 200) apprToastShow("서류 변경 기록 실패(" + ((res.body && res.body.error_code) || res.status) + ") — 체크 자체는 계약에 저장됩니다"); }).catch(function(){ apprToastShow("서류 변경 기록 실패(네트워크) — 체크 자체는 계약에 저장됩니다"); }); } catch(e){}
@@ -10591,17 +10795,18 @@
   function csDocAfter(c, p, i, k, act){ c.updated = todayStr(); scheduleContractSave(); renderContracts(); csDocLog(c, p, i, k, act); }
   function csDocToggle(c, p, i, k){ if (!canDo("con")) return; var s = p.stages[i], d = s && csDocFind(s, k); if (!d || d.st === "na") return; d.st = (d.st === "done") ? "todo" : "done"; d.by = myId(); d.at = todayStr(); csDocAfter(c, p, i, k, d.st === "done" ? "done" : "undo"); }
   function csDocNa(c, p, i, k){ if (!canDo("con")) return; var s = p.stages[i], d = s && csDocFind(s, k); if (!d || d.add) return; d.st = (d.st === "na") ? "todo" : "na"; d.by = myId(); d.at = todayStr(); csDocAfter(c, p, i, k, d.st === "na" ? "na" : "undo"); }
-  function csDocAdd(c, p, i, name){ if (!canDo("con")) return; name = String(name || "").trim().slice(0, 80); if (!name) return; var s = p.stages[i], ds = csDocsOf(s), d = { k: "add:" + genId(""), t: "", n: name, st: "todo", add: 1, by: myId(), at: todayStr() }; ds.push(d); csDocAfter(c, p, i, d.k, "add"); }
+  function csDocAdd(c, p, i, name){ if (!canDo("con")) return; name = String(name || "").trim().slice(0, 80); if (!name) return; var s = p.stages[i], ds = csDocsOf(s); if (!ds) return; var d = { k: "add:" + genId(""), t: "", n: name, st: "todo", add: 1, by: myId(), at: todayStr() }; ds.push(d); csDocAfter(c, p, i, d.k, "add"); }
   function csDocDel(c, p, i, k){ if (!canDo("con")) return; var s = p.stages[i], ds = s && csDocsOf(s), j; if (!ds) return; for (j = 0; j < ds.length; j++) if (ds[j].k === k && ds[j].add){ ds.splice(j, 1); csDocAfter(c, p, i, k, "del"); return; } }
   function csStagesHtml(c){
     var ps = c.pipes || [];
     if (!ps.length) return '<div class="vs-empty">단계가 없습니다.</div>';
     return ps.map(function(p){
-      var h = ps.length > 1 ? '<div class="cs-pipe-h">' + esc(pipeLabel(p.key)) + ' 파이프 ' + Math.min(p.cur, p.stages.length) + '/' + p.stages.length + '</div>' : '';
+      var h = ps.length > 1 ? '<div class="cs-pipe-h">' + (p.key === "chg" ? '변경계약 ' + p.stages.length + '건 · 완료 ' + Math.min(p.cur, p.stages.length) + ' <small style="font-weight:400;">(본 단계와 별도 줄 — 미완료 차수가 있으면 본 줄 준공·청구가 멈춥니다)</small>' : esc(pipeLabel(p.key)) + ' 파이프 ' + Math.min(p.cur, p.stages.length) + '/' + p.stages.length) + '</div>' : '';
       h += '<div class="cs-stages">' + p.stages.map(function(s, i){ return csStageCard(c, p, i, csStageOpen === p.key + "|" + i); }).join("") + '</div>';
       return h;
-    }).join("") + (c.scen ? '' : '<div class="vs-empty" style="font-size:12px;">이 계약은 v382 이전 단계 목록입니다(종류·사급/관급 시나리오 아님).</div>');
+    }).join("") + csChgBtnHtml(c) + (c.scen ? '' : '<div class="vs-empty" style="font-size:12px;">이 계약은 v382 이전 단계 목록입니다(종류·사급/관급 시나리오 아님).</div>');
   }
+  function csChgBtnHtml(c){ var ck = (c.scen && canDo("con")) ? csChgCan(c) : null; if (!ck || !ck.ok) return ""; var q = csPipeOf(c, "chg"), n = q ? q.stages.length + 1 : 1; if (n > 9) return ""; return '<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;"><button type="button" class="vs-chip" data-cs-chgadd="' + esc(c.id) + '">+ 변경계약 ' + n + '차</button><small class="empty-line" style="overflow-wrap:anywhere;">필요할 때만 · 본 단계 아래 별도 줄 · 금액이 바뀌면 결재(계약 단계)</small></div>'; }   // v402 카드 9
   // 작업현황(준설 작업 단계) — 날짜·구간·실중량 kg·실수량 ㎥·시간·차량·근로자·사진. 준공 수량·사진대지·실적의 원천(시나리오 J2)
   var CS_WL_COLS = [["date","날짜","date"],["section","구간","text"],["kg","실중량 kg","num"],["m3","실수량 ㎥","num"],["hrs","시간","num"],["veh","차량","text"],["workers","근로자","num"],["photos","사진","num"]];
   function csWorkLogHtml(c, can){
@@ -10620,6 +10825,7 @@
   function csSkipStage(c, p, i){
     if (!canDo("con")) return;
     var s = p.stages[i]; if (!s || s.status === "done" || s.status === "skipped") return;
+    if (s.aw === "amt" && (csNum((s.vals || {}).chg_amt) || s.appr)){ alert("금액을 입력했거나 상신한 변경계약은 건너뛸 수 없습니다 — 금액을 지우고 건너뛰거나 완료로 처리해 주세요."); return; }   // v402 검토 10
     var cur = i === p.cur;
     if (cur && !csCanCloseCur(c, p)) return;
     if (!confirm('"' + s.name + '" 단계를 건너뜁니다(해당 없음).' + (cur ? ' 현재 단계라 되돌릴 수 없습니다(필요하면 지시 탭에서 처리).' : ' 되돌리려면 [선택 복구].'))) return;
@@ -10627,11 +10833,12 @@
     if (cur){ csCloseTask(s.task_id ? findTask(s.task_id) : null, "단계 건너뜀(해당 없음)"); p.cur = i + 1; materializeStage(c, p, todayStr()); }
     csRecalc(c); scheduleContractSave(); saveTasksCache(); scheduleTasksSave(); renderTasks(); renderSummary(); renderContracts();
   }
-  function csUnskipStage(c, p, i){ if (!canDo("con")) return; var s = p.stages[i]; if (!s || s.status !== "skipped" || i <= p.cur) return; s.status = "pending"; s.done_at = null; c.updated = todayStr(); scheduleContractSave(); renderContracts(); }
+  function csUnskipStage(c, p, i){ if (!canDo("con")) return; var s = p.stages[i]; if (!s || s.status !== "skipped" || i <= p.cur) return; s.status = "pending"; s.done_at = null; delete s.off; c.updated = todayStr(); scheduleContractSave(); renderContracts(); }
   function csJumpStage(c, p, i){
     if (!canDo("con")) return;
     if (i <= p.cur || i >= p.stages.length) return;
     if (!csCanCloseCur(c, p)) return;
+    var chgJ = csChgOpenAt(c, p, i); if (chgJ){ alert("변경계약 " + chgJ + "건이 처리 중이라 준공·청구 이후로 건너뛸 수 없습니다."); return; }   // v402 검토 9
     var n = 0, j, bill = false; for (j = p.cur; j < i; j++) if (p.stages[j].status !== "done"){ n++; if (/청구|입금/.test(p.stages[j].name||"")) bill = true; }
     if (!confirm('앞 단계 ' + n + '개를 건너뛰고 "' + p.stages[i].name + '"부터 진행합니다(긴급 건). 건너뛴 단계는 되돌릴 수 없고 지시 탭에만 기록이 남습니다.' + (bill ? '\n※ 청구 단계를 건너뛰면 기성(미수) 등록이 생기지 않습니다 — 기성 탭에서 직접 등록해야 합니다.' : ''))) return;
     for (j = p.cur; j < i; j++){ var s = p.stages[j]; if (s.status === "done") continue; csCloseTask(s.task_id ? findTask(s.task_id) : null, "순서 변경으로 건너뜀"); s.status = "skipped"; s.done_at = todayStr(); }
@@ -10639,9 +10846,24 @@
     p.cur = i; materializeStage(c, p, todayStr());
     csRecalc(c); scheduleContractSave(); saveTasksCache(); scheduleTasksSave(); renderTasks(); renderSummary(); renderContracts();
   }
+  function csChgAdd(c){   // v402 카드 9 변경계약(끼움형) — 본 단계 목록은 그대로 두고 chg 줄에 n차를 덧붙인다(번호 기반 참조 불변)
+    if (!canDo("con") || !c) return;
+    var k = csChgCan(c);
+    if (!k || !k.ok){ alert((k && k.hold) ? "본 단계가 결재 중이라 지금은 변경계약을 추가할 수 없습니다 — 결재가 끝나거나 반려된 뒤 추가해 주세요." : "변경계약은 진행 중 계약에서 착공(계약) 단계 뒤부터 준공(청구) 단계까지 추가할 수 있습니다."); return; }
+    var p = csPipeOf(c, "chg"), n = p ? p.stages.length + 1 : 1;
+    if (n > 9){ alert("변경계약은 9차까지 추가할 수 있습니다."); return; }
+    if (!confirm("변경계약 " + n + "차를 추가합니다 — 본 단계 목록은 그대로이고 아래 '변경계약' 줄에 붙습니다. 이 차수를 끝내기 전에는 본 줄의 준공·청구가 넘어가지 않습니다. 금액이 바뀌면 결재(계약 단계)로 갑니다.")) return;
+    if (!p){ p = { key: "chg", cur: 0, stages: [] }; c.pipes.push(p); }
+    var st = csStageNew({ name: k.a.name, opt: k.a.opt, aid: k.a.id, dk: k.a.docs, ak: k.a.ak, aw: k.a.aw, flds: k.a.flds }); st.round = n;
+    p.stages.push(st);
+    if (p.cur === p.stages.length - 1) materializeStage(c, p, todayStr());   // 앞 차수가 끝났으면 바로 지시(금액 기준도 이때 굳음)
+    c.status = "active"; c.updated = todayStr(); scheduleContractSave(); renderTasks(); renderSummary(); renderContracts();
+  }
   function csDoneStage(c, p, i){
     var s = p.stages[i]; if (!s || i !== p.cur) return;
-    var ak = c.scen ? csApprKind(s.name) : "";
+    var chgN = csChgOpenAt(c, p, i); if (chgN){ alert("변경계약 " + chgN + "건이 아직 처리 중입니다 — 변경계약을 끝낸 뒤 이 단계를 진행해 주세요."); return; }   // v402 R3
+    if (c.scen && s.aw === "amt" && !csChgAmtChanged(c, s) && !csNum((s.vals || {}).chg_amt) && !confirm("변경 후 계약금액이 비어 있습니다.\n금액이 그대로인 변경(기간·물량 등)이면 [확인] — 결재 없이 완료합니다.\n금액이 바뀌었으면 [취소] → 금액 입력 → [입력 저장] → 계약 단계 상신.")) return;   // v402
+    var ak = c.scen ? csApprKindOf(c, s) : "";
     if (ak && !(s.appr && s.appr.status === "승인")){   // v384: 계약 단계·청구 검수는 결재함으로
       if (s.appr && (s.appr.status === "대기" || s.appr.status === "보류")){ alert("이미 상신돼 있습니다(" + s.appr.status + ") — 결재함에서 승인되면 자동으로 넘어갑니다."); csApprSync(c, true); return; }
       if (s.appr && s.appr.status === "반려" && !confirm('반려된 상신입니다(' + (s.appr.reason || "사유 없음") + '). 다시 상신할까요?')) return;
@@ -10649,6 +10871,7 @@
       if (csApprSubmit(c, p, i)){ alert("상신했습니다 — 결재함(" + ak + ")에서 승인되면 단계가 넘어갑니다."); renderContracts(); }
       return;
     }
+    if (ak && s.appr && s.appr.status === "승인"){ var tl = s.task_id ? findTask(s.task_id) : null; if (!tl || tl.status === "done"){ csApprApply(c, p, i); renderContracts(); return; } }   // v402 검토 1·11: 승인됐는데 지시가 없거나 닫힌 단계(변경계약 잠금 뒤 재개)
     var r = completeStageNow(c, csExactRe(s.name), p.key);   // v382 검토 7: 이 파이프만
     if (r === "review") alert("완료 요청으로 올렸습니다 — 승인권자가 승인하면 다음 단계가 생성됩니다.");
     else if (r === "none") alert("이 단계의 지시를 찾지 못했습니다 — 지시 탭에서 확인하세요.");
@@ -10824,10 +11047,11 @@
       var csAct = function(attr, fn){ Array.prototype.forEach.call(root.querySelectorAll("[" + attr + "]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); var p = el.getAttribute(attr).split("|"), c = findProc(p[0]); if (!c) return; var pipe = csPipeOf(c, p[1]), i = Number(p[2]); if (!pipe || isNaN(i)) return; fn(c, pipe, i, el); }); }); };
       Array.prototype.forEach.call(root.querySelectorAll("[data-cs-gen]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); var p = el.getAttribute("data-cs-gen").split("|"); if (p[1] === "html_contract") openDocFromContract(p[0]); else openXlsxGen(p[0], csGenKind(findProc(p[0]) || {}, p[1])); }); });   // v383 패킷 [생성]
       Array.prototype.forEach.call(root.querySelectorAll("[data-cs-site]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); var c = findProc(el.getAttribute("data-cs-site")); if (!c) return; var r = csLinkSiteLater(c); alert(typeof r === "object" ? ("현장 대장에 연결했습니다: " + (r.title || "")) : (r === "wait" ? "현장 대장을 불러오는 중입니다 — 받는 대로 연결합니다(잠시 뒤 연결 탭 확인)." : (r === "noperm" ? "현장 대장 열람 권한(인허가)이 없어 연결할 수 없습니다." : "연결할 수 없습니다(현장 권한 또는 종류)."))); renderContracts(); }); });   // v384
-      csAct("data-cs-done", function(c, p, i){ csDoneStage(c, p, i); });
+      csAct("data-cs-done", function(c, p, i){ var s0 = p.stages[i], fp = (s0 && s0.aw === "amt") ? root.querySelector('[data-cs-fpanel="' + p.key + '|' + i + '"]') : null; if (fp) csSaveFields(c, p, i, fp); csDoneStage(c, p, i); });   // v402 R15: 변경계약은 입력 칸 값을 먼저 저장한 뒤 판정
       csAct("data-cs-skip", function(c, p, i){ csSkipStage(c, p, i); });
       csAct("data-cs-unskip", function(c, p, i){ csUnskipStage(c, p, i); });
       csAct("data-cs-jump", function(c, p, i){ csJumpStage(c, p, i); });
+      Array.prototype.forEach.call(root.querySelectorAll("[data-cs-chgadd]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); var c = findProc(el.getAttribute("data-cs-chgadd")); if (c) csChgAdd(c); }); });   // v402 카드 9 변경계약
       csAct("data-cs-fsave", function(c, p, i, el){ var panel = root.querySelector('[data-cs-fpanel="' + p.key + '|' + i + '"]'); csSaveFields(c, p, i, panel); });
       csAct("data-cs-dchk", function(c, p, i, el){ csDocToggle(c, p, i, el.getAttribute("data-cs-dchk").split("|")[3]); });   // v401 서류 체크리스트
       csAct("data-cs-dna", function(c, p, i, el){ csDocNa(c, p, i, el.getAttribute("data-cs-dna").split("|")[3]); });
@@ -10889,6 +11113,7 @@
     document.getElementById("conStart").value=todayStr();
     fillMemberSelect(document.getElementById("conWho"), "");
     var cb0=document.getElementById("conCombo"); if(cb0) cb0.checked=false;
+    var qm0=document.getElementById("conQualMan"); if(qm0) qm0.checked=false;   // v402
     renderConScen();
     document.getElementById("conStartBackdrop").classList.add("show");
   }
@@ -10903,7 +11128,7 @@
     if(!client && !site){ alert("거래처 또는 현장을 입력하세요."); return; }
     var combo=conModalCombo() && (type==="asbestos"||type==="demolition"), pub=(docType==="public");
     var elems=conModalElems(type, combo);
-    var stages=conScenStages(type, pub, combo, { qual: !!(lastBidForCon && /적격/.test(String(((lastBidForCon.ext||{}).decide)||""))) });
+    var stages=conScenStages(type, pub, combo, conModalExtra(type, pub, combo));   // v402
     // 중복 가드: 같은 낙찰 공고에 이미 계약이 연결돼 있으면 생성 차단(관리자 2명 동시 접속 시 자동오픈 중복 방지)
     if(lastBidForCon && liveContracts().some(function(c){ return c.bid_id===lastBidForCon.id; })){
       alert("이 낙찰 공고("+(lastBidForCon.title||"").slice(0,30)+")는 이미 계약이 연결되어 있습니다.\n계약 탭에서 기존 계약을 확인하세요.");
@@ -10922,7 +11147,7 @@
     }
     var nc=startProcess(type, {client:client, site:site, start:start, who:who, docType:docType,
       title:btitle, cinfo:bcinfo,
-      stages:stages, elems:elems, scen:{type:type, pub:pub, combo:combo, ver:1}, bid_id:(lastBidForCon?lastBidForCon.id:"")});
+      stages:stages, elems:elems, scen:conScenTag({type:type, pub:pub, combo:combo, ver:1}, stages), bid_id:(lastBidForCon?lastBidForCon.id:"")});
     if(!nc){ alert("계약 생성 실패 — 유형 템플릿(" + type + ") 누락. 관리자에게 문의."); return; }
     document.getElementById("conStartBackdrop").classList.remove("show");
     renderContracts();
@@ -11166,7 +11391,7 @@
           var pkTxt=pk.map(function(k){return TPL_LABELS[k];}).join("·");
           if(confirm("계약서 내용을 계약에 저장했습니다.\n계약 단계를 완료"+(pkTxt?"하고 후속 서류("+pkTxt+")를 일괄 생성":"")+"할까요?"
             +(cc.docType!=="public"?"\n(개인·사문서 건 — 착공계·준공계는 작성하지 않습니다)":""))){
-            completeStageNow(cc, /계약/);
+            completeStageNow(cc, /계약/, "main");
             if(pk.length) conGenPacket(cc);
           }
         }, 400);
@@ -12427,7 +12652,7 @@
     var nc=startProcess(type, {client:q.recv||"", site:"", start:q.date||todayStr(), who:"", docType:"public",
       title:q.title||"", cinfo:{ title:q.title||"", amount:amt, d1:"", d2:"", d3:"", client:q.recv||"", site:"",
         guarantee:0, from:"견적서("+(q.no||"")+")", checked:todayStr() },
-      stages:qst, scen:{type:type, pub:true, combo:false, ver:1}, doneFirst:qdf, elems:elems, bid_id:""});
+      stages:qst, scen:conScenTag({type:type, pub:true, combo:false, ver:1}, qst), doneFirst:qdf, elems:elems, bid_id:""});
     if(!nc){ alert("계약 생성 실패 — 유형 템플릿 누락. 관리자에게 문의."); return; }
     q.con_id=nc.id; q.updated=todayStr(); renderQuotes(); scheduleQuoteSave();
     renderContracts(); switchTab("tasks");

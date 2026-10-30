@@ -24,7 +24,7 @@ const tasks = (bk && bk['col:tasks'] && bk['col:tasks'].items) || [];
 const recs = (bk && bk['col:receivables'] && bk['col:receivables'].items) || [];
 const stubs = `
   var window = { addEventListener: function(){}, matchMedia: function(){ return { matches: false, addEventListener: function(){} }; }, innerWidth: 1200 };
-  var document = { getElementById: function(){ return null; } };
+  var docEls = {}; var document = { getElementById: function(id){ return docEls[id] || null; } };
   var localStorage = { getItem: function(){ return null; }, setItem: function(){}, removeItem: function(){} };
   var lastBidForCon = null;
   function esc(s){ return String(s == null ? "" : s).replace(/[&<>"']/g, function(ch){ return { "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[ch]; }); }
@@ -43,11 +43,11 @@ const stubs = `
   function canApproveTask(){ return true; }
   function conHasBldg(c){ return !!(c && (c.type === "asbestos" || c.type === "demolition" || c.bldg_info)); }
   function conNeedsBldg(c){ return !!(c && !c.bldg_info && (c.type === "asbestos" || c.type === "demolition")); }
-  function pipeLabel(k){ return k === "waste" ? "폐기물" : "본"; }
+  function pipeLabel(k){ return k === "waste" ? "폐기물" : (k === "chg" ? "변경계약" : "본"); }
   function conAttBoxHtml(c){ return (c.attachments && c.attachments["서류함"] && c.attachments["서류함"].length) ? '<div data-catt-drop="' + c.id + '">att</div>' : ''; }
   var gidN = 0; function genId(p){ return p + "x" + (++gidN); }   // 고유해야 한다 — 같은 id면 findTask가 엉뚱한 지시를 집는다(검토 J 검사에서 실측)
   function myName(){ return "검사"; }
-  function scheduleContractSave(){} function saveTasksCache(){} function scheduleTasksSave(){} function renderTasks(){} function renderSummary(){} function renderContracts(){}
+  var schedN = 0; function scheduleContractSave(){ schedN++; } function saveTasksCache(){} function scheduleTasksSave(){} function renderTasks(){} function renderSummary(){} function renderContracts(){}
   function completeStageNow(){ return "done"; }
   var alerts = []; var CONTRACT_API = "contracts.json", serverItems = null, billN = 0;
   function getToken(){ return "t"; } function ghHeaders(){ return {}; } function addDays(d){ return d; } function loadTasks(){} function loadAsb(){} function conBillToRec(){ billN++; } function canSee(){ return true; } var contractSaveTimer = null, saveNowN = 0; function doSaveContracts(){ saveNowN++; } var toasts = []; function apprToastShow(m){ toasts.push(String(m)); }
@@ -60,10 +60,11 @@ const stubs = `
   function findAsb(id){ for (var i = 0; i < asb.length; i++) if (asb[i].id === id) return asb[i]; return null; }
   function scheduleAsbSave(){} function apprSavePending(){} function apprFlushCreates(){} function myId(){ return "m1"; } function memberName(){ return ""; } function fmtDate(d){ return d.toISOString().slice(0, 10); } 
   var gwCall = null; var Date = globalThis.Date;
+  function curMember(){ return { id: "m1" }; } function apprGradeChipCss(){ return ""; } function renderDashboard(){}   // v402 로더·카드·startProcess 실제 실행용
 `;
 const tplLine = (html.match(/var TPL_LABELS=\{[^\r\n]*\};/) || [''])[0];
-const api = new Function('contracts', 'tasks', 'recs', stubs + tplLine + fnOf('conAttList') + scen + sheet + fnOf('stageXlsxKind') + fnOf('advanceProc') + fnOf('materializeStage') + fnOf('procStageTitle') + `
-  return { CON_COLS, CON_SCEN, CON_PACKETS, STAGE_DOCS, conScenStages, conModalElems, stageDocsFor, csSplitTop, csParseStageDocs, csStageDocItems, csStageDocsHtml, csDocToggle, csDocNa, csDocAdd, csDocDel, csMergeDocs, csStageFields, stageXlsxKind, csRowHtml, csDetailHtml, csStageInfo, csSortRows, csPass, csEnumValues, csEndCell, csKind, csSkipStage, csJumpStage, csUnskipStage, csPacketsHtml, csLoadTpl, csApprKind, csApprSubmit, csApprOnDecided, csApprFind, csSyncFromServer, csApprSync, csApprDropped, csAlignTasksAll, toasts: toasts, saveNow: function(){ return saveNowN; }, csLinkSite, csLinkSiteLater, csOnDone, csSiteDone, csSiteHooksRetry, csNextFeb15, advanceProc, materializeStage, asb: asb, tasks: tasks, appr: apprPendingCreates, alerts: alerts, bills: function(){ return billN; }, setServer: function(items){ serverItems = items; }, pushContract: function(c){ contracts.push(c); }, popContract: function(){ contracts.pop(); }, setAsbLoaded: function(v){ asbLoaded = v; }, setTab: function(t){ conDetTab = t; }, openStage: function(k){ csStageOpen = k; }, setTpl: function(o){ csTplKeys = o; csTplErr = 0; }, setTplErr: function(v){ csTplErr = v; }, tplState: function(){ return { keys: csTplKeys, err: csTplErr, loading: csTplLoading }; }, setGw: function(f){ gwCall = f; } };
+const api = new Function('contracts', 'tasks', 'recs', stubs + tplLine + fnOf('conAttList') + scen + sheet + fnOf('stageXlsxKind') + fnOf('advanceProc') + fnOf('materializeStage') + fnOf('procStageTitle') + cut('  var CON_PROC_SRC', '  // 제목 키워드로 요소 제안') + cut('  var WASTE_BACKBONE = [', '  // @con-scen-start') + fnOf('applyPublicMilestones') + fnOf('startProcess') + `
+  return { CON_COLS, CON_SCEN, CON_PACKETS, STAGE_DOCS, conScenStages, conModalElems, stageDocsFor, csSplitTop, csParseStageDocs, csStageDocItems, csStageDocsHtml, csDocToggle, csDocNa, csDocAdd, csDocDel, csMergeDocs, csStageFields, stageXlsxKind, csRowHtml, csDetailHtml, csStageInfo, csSortRows, csPass, csEnumValues, csEndCell, csKind, csSkipStage, csJumpStage, csUnskipStage, csPacketsHtml, csLoadTpl, csApprKind, csApprSubmit, csApprOnDecided, csApprFind, csSyncFromServer, csApprSync, csApprDropped, csAlignTasksAll, toasts: toasts, saveNow: function(){ return saveNowN; }, csLinkSite, csLinkSiteLater, csOnDone, csSiteDone, csSiteHooksRetry, csNextFeb15, advanceProc, materializeStage, asb: asb, tasks: tasks, appr: apprPendingCreates, alerts: alerts, bills: function(){ return billN; }, setServer: function(items){ serverItems = items; }, pushContract: function(c){ contracts.push(c); }, popContract: function(){ contracts.pop(); }, setAsbLoaded: function(v){ asbLoaded = v; }, setTab: function(t){ conDetTab = t; }, openStage: function(k){ csStageOpen = k; }, setTpl: function(o){ csTplKeys = o; csTplErr = 0; }, setTplErr: function(v){ csTplErr = v; }, tplState: function(){ return { keys: csTplKeys, err: csTplErr, loading: csTplLoading }; }, setGw: function(f){ gwCall = f; }, conScenKey, CON_ADDED, conAddedPrep, conAddedApply, conAddedUse, conAddedClear, conScenTag, conChgWindow, conAddedPreviewHtml, conRouteKey, stageDocsOf, csStageFieldsOf, csStageNew, csApprKindOf, csChgAmtChanged, csChgCan, csChgAdd, csChgOpenAt, csStagesHtml, csDoneStage, conProcLoad, renderConProcCard, startProcess, procSrc: function(){ return CON_PROC_SRC; }, setDocEl: function(id, el){ docEls[id] = el; }, sched: function(){ return schedN; }, csApprApply, csTaskChg, csChgBase };
 `)(contracts, tasks, recs);
 let fails = 0; const T = (n, ok, note) => { console.log((ok ? '  ✓ ' : '  ✗ ') + n + (ok ? '' : ' — ' + note)); if (!ok) fails++; };
 // 시나리오 목록
@@ -256,5 +257,168 @@ T('준공·만기 칸: d3 없음 → "-" · 지난 날짜 → vs-dan · 완료 �
   const mA = [{ k: 'a', st: 'done', at: '2026-10-29' }, { k: 'b', st: 'todo' }], mB = [{ k: 'a', st: 'todo', at: '2026-10-28' }, { k: 'add:1', st: 'todo', add: 1, at: '2026-10-29' }];
   T('v401 검토 2 csMergeDocs: 같은 k 는 at 늦은 쪽 · 한쪽에만 있는 항목 보존 → 3항', (() => { const m = api.csMergeDocs(mA, mB); return m.length === 3 && m[0].st === 'done' && m[2].k === 'add:1'; })());
   T('v401 옛 계약(v382 이전 이름) 단계: 항목 0 · 빈 안내 · 추가 칸은 있음', api.csStageDocItems({ name: '현장 답사' }).length === 0 && api.csStageDocsHtml({ id: 'c_old', pipes: [{ key: 'main', cur: 0, stages: [{ name: '현장 답사' }] }], status: 'active' }, { key: 'main', cur: 0, stages: [{ name: '현장 답사' }] }, 0, 'main|0', true).indexOf('등록된 서류 목록이 없습니다') >= 0);
+}
+
+// ---- v402(10/30 계약 D1 4일차): 카드 9 신설 엔진(added) — 꺼짐 동일성 · 실데이터 켬 드라이런 · 사급/관급/목록 · 7번 고정 대안 · 결재 판정 · 변경계약 chg 줄 · 부록 R(생성 시점 고정·chg 병합·본 줄 잠금·서류 버튼·status·로더/startProcess 실제 실행·미리보기 격리) ----
+{
+  const ref = (t, p, c, ex) => { const names = api.CON_SCEN[api.conScenKey(t, p, c)] || api.CON_SCEN[t + ':pub'] || []; const o = names.map((n) => ({ name: n, opt: /^\(.+\)$/.test(n) ? 1 : 0 })); if (ex && ex.qual) o.unshift({ name: '적격심사', opt: 0 }); return o; };
+  const CASES = [['asbestos', false, false], ['asbestos', true, false], ['demolition', false, false], ['demolition', true, false], ['asbestos', false, true], ['asbestos', true, true], ['demolition', false, true], ['demolition', true, true], ['waste', false, false], ['waste', true, false], ['dredge', true, false], ['dredge', false, false], ['waste', true, true], ['dredge', true, true]];
+  const offOk = () => CASES.every(([t, p, c]) => [false, true].every((q) => JSON.stringify(api.conScenStages(t, p, c, { qual: q })) === JSON.stringify(ref(t, p, c, { qual: q }))));
+  const st7 = api.csStageNew({ name: 'x', opt: 1 });
+  T('v402 꺼짐 동일성: 14경우×적격 2 = v382 참조와 바이트 동일 · csStageNew 키 7개 · conScenTag 같은 객체·키 추가 없음 · CON_ADDED 빈 값',
+    offOk() && Object.keys(st7).join(',') === 'name,due,days,status,task_id,done_at,opt' && (() => { const sc = { type: 'asbestos', pub: false, combo: false, ver: 1 }; return api.conScenTag(sc, []) === sc && Object.keys(sc).length === 4; })() && api.CON_ADDED.stages.length === 0 && api.CON_ADDED.lists.length === 0, '');
+  const AP = JSON.parse(readFileSync(join(ROOT, '..', 'jongwoon-appdata', 'data', 'contract', 'proc_added_v1.json'), 'utf8'));
+  const on = JSON.parse(JSON.stringify(AP)); on.status = 'applied'; on.applied = { at: '2026-11-04', by: 'consheet', basis: 'dry-run' }; [...on.stages, ...on.lists].forEach((x) => { x.active = true; });
+  const pr = api.conAddedPrep({ schema: on.schema, status: on.status, stages: on.stages, lists: on.lists });
+  T('v402 실데이터 켬 드라이런(원천 proc_added_v1 스키마 ' + AP.schema + '·' + AP.status + '): conAddedPrep hard bad 0 · 단계 4 · 목록 2', AP.schema === 2 && pr.stages.length === 4 && pr.lists.length === 2 && pr.bad.filter((b) => !b.soft).length === 0, JSON.stringify(pr.bad));
+  api.conAddedUse(pr, 'testsrc');
+  const PRI = CASES.filter((x) => !x[1]), PUB = CASES.filter((x) => x[1]);
+  T('v402 사급 5종: (착공)이 /계약/ 단계 바로 뒤 · (완료)가 /청구/ 바로 앞 · 길이 +2 · 신설 빼면 base 순서 그대로 · 둘 다 기본 꺼짐(off, R10)',
+    PRI.every(([t, p, c]) => { const st = api.conScenStages(t, p, c, {}), base = ref(t, p, c, {}); const i1 = st.findIndex((s) => s.aid === 'pri_start'), i2 = st.findIndex((s) => s.aid === 'pri_complete'); return st.length === base.length + 2 && /계약/.test(st[i1 - 1].name) && /청구/.test(st[i2 + 1].name) && JSON.stringify(st.filter((s) => !s.aid).map((s) => s.name)) === JSON.stringify(base.map((s) => s.name)) && st[i1].off === 1 && st[i2].off === 1; }), '');
+  T('v402 관급 5종: 생성 때 길이 그대로(변경계약 없음) · qual_manual 체크 → 맨 앞 적격심사(aid) · 자동+수동 = 1개 · 준설 관급 첫 단계 /견적/(견적 승격 유지)',
+    PUB.every(([t, p, c]) => api.conScenStages(t, p, c, {}).length === ref(t, p, c, {}).length && !api.conScenStages(t, p, c, {}).some((s) => s.aid)) && api.conScenStages('asbestos', true, false, { qual_manual: 1 })[0].aid === 'qual_manual'
+    && api.conScenStages('asbestos', true, false, { qual: true, qual_manual: 1 }).filter((s) => s.name === '적격심사').length === 1 && /견적/.test(api.conScenStages('dredge', true, false, {})[0].name), '');
+  const dk = []; CASES.forEach(([t, p, c]) => api.conScenStages(t, p, c, {}).forEach((s, i) => { if (s.lid) dk.push(api.conScenKey(t, p, c) + '#' + (i + 1) + ' ' + s.dk[0]); }));
+  const u = [...new Set(dk)], asbDone = api.conScenStages('asbestos', true, false, {}).find((s) => s.name === '완료보고 및 실적보고'), demoPub = api.conScenStages('demolition', true, false, {}).find((s) => s.name === '완료보고 및 실적보고');
+  T('v402 목록: dk 8곳(석면 4·철거 4) · demolition:pub 완료보고는 dk 없음 · 석면 완료보고 2항 · (완료)는 준공 목록 · dk 없으면 stageDocsFor와 같음',
+    u.filter((x) => /완료신고_석면/.test(x)).length === 4 && u.filter((x) => /완료신고_철거/.test(x)).length === 4 && !demoPub.dk && api.csParseStageDocs(api.stageDocsOf(asbDone)).length === 2
+    && api.stageDocsOf(api.conScenStages('asbestos', false, false, {}).find((s) => s.aid === 'pri_complete')) === api.STAGE_DOCS['준공'] && api.stageDocsOf({ name: '착공서류' }) === api.stageDocsFor('착공서류'), u.join(' / '));
+  const alt = JSON.parse(JSON.stringify(on)); alt.stages.find((s) => s.id === 'change_contract').pos = { type: 'insert', after_re: '착공|착수|계약', before_re: '준공|청구' };
+  const pa7 = api.conAddedPrep({ schema: 2, status: 'applied', stages: alt.stages, lists: alt.lists }); api.conAddedUse(pa7, 'alt7');
+  const pub7 = api.conScenStages('asbestos', true, false, {}), pri7 = api.conScenStages('asbestos', false, false, {}), i7 = pri7.findIndex((s) => s.aid === 'change_contract');
+  const ok7 = pa7.bad.filter((b) => !b.soft).length === 0 && pub7[pub7.findIndex((s) => s.aid === 'change_contract') + 1].name === '준공서류 작성' && pri7[i7 + 1].aid === 'pri_complete' && /청구/.test(pri7[i7 + 2].name);
+  api.conAddedUse(pr, 'testsrc');
+  T('v402 7번 고정 대안(pos insert, 데이터만): bad 0 · 관급 준공서류 작성 바로 앞 · 사급 변경계약 → (완료) → 청구', ok7, JSON.stringify(pa7.bad));
+  const cA = { id: 'c_a', contract_info: { amount: 1000 }, pipes: [], status: 'active', scen: { type: 'asbestos' } };
+  const sChg = { name: '변경계약', aid: 'change_contract', ak: '계약 단계', aw: 'amt', amt0: 1000, eff0: 1000, vals: {} };
+  const k0 = api.csApprKindOf(cA, sChg); sChg.vals.chg_amt = 1200; const k1 = api.csApprKindOf(cA, sChg); sChg.vals.chg_amt = 1000; const k2 = api.csApprKindOf(cA, sChg); delete sChg.vals.chg_amt;
+  cA.contract_info.amount = 1500; const k3 = api.csApprKindOf(cA, sChg); cA.contract_info.amount = 1000; cA.settle_amount = 900; const k4 = api.csApprKindOf(cA, sChg); delete cA.settle_amount;
+  T('v402 csApprKindOf: aid 없는 4이름 = csApprKind · 변경계약 금액 빈칸 "" · 1200 → 계약 단계 · 1000 → "" · 계약액 바뀌면 계약 단계 · 정산액만 바뀌면 ""(R15②)',
+    ['계약서류 작성', '청구 및 입금확인', '(계약서·발주서)', '견적·수의계약'].every((n) => api.csApprKindOf(cA, { name: n }) === api.csApprKind(n)) && k0 === '' && k1 === '계약 단계' && k2 === '' && k3 === '계약 단계' && k4 === '', JSON.stringify([k0, k1, k2, k3, k4]));
+  const mkC = (id) => { const stg = api.conScenStages('asbestos', true, false, {}); const sc = api.conScenTag({ type: 'asbestos', pub: true, combo: false, ver: 1 }, stg); return { id, type: 'asbestos', label: '석면철거', docType: 'public', client: 'x', contract_info: { amount: 1000 }, scen: sc, status: 'active', pipes: [{ key: 'main', cur: 3, stages: stg.map((s) => api.csStageNew(s)) }] }; };
+  const c8 = mkC('c_v402a'); api.pushContract(c8);
+  const nT8 = api.tasks.length, mainJson = JSON.stringify(c8.pipes[0]);
+  api.csChgAdd(c8);
+  const q8 = c8.pipes.find((p) => p.key === 'chg'), t8 = api.tasks[api.tasks.length - 1];
+  const ok8a = !!q8 && q8.stages.length === 1 && q8.stages[0].round === 1 && q8.stages[0].amt0 === 1000 && q8.stages[0].eff0 === 1000 && api.tasks.length === nT8 + 1 && t8.pipe === 'chg' && t8.stage_i === 0 && /변경계약 1차/.test(t8.title) && JSON.stringify(c8.pipes[0]) === mainJson && !!c8.scen.chg && c8.scen.chg.after_re === '착공|착수|계약';
+  api.csChgAdd(c8);
+  const ok8b = q8.stages.length === 2 && q8.cur === 0 && api.tasks.length === nT8 + 1 && q8.stages[1].round === 2;
+  const nA = api.alerts.length, cOut = mkC('c_v402b'); cOut.pipes[0].cur = 8; api.csChgAdd(cOut); const cDone = mkC('c_v402c'); cDone.status = 'done'; api.csChgAdd(cDone); const cOld = mkC('c_v402d'); delete cOld.scen.added; delete cOld.scen.chg; api.csChgAdd(cOld);
+  const ok8c = ![cOut, cDone, cOld].some((x) => x.pipes.some((p) => p.key === 'chg')) && api.alerts.length === nA + 3;
+  T('v402 csChgAdd: 창 안 → chg 줄 1차(round·amt0·eff0) + 지시 1(pipe chg·stage_i 0) · 본 줄 그대로 · scen.chg 원문 고정 · 1차 열린 채 2차 → 2단계·cur 0·지시 추가 없음 · 창 밖/완료/기록 없는 계약 → 변화 없음·alert', ok8a && ok8b && ok8c, JSON.stringify({ ok8a, ok8b, ok8c }));
+  q8.stages[0].vals = { chg_amt: 1200 }; q8.stages[0].status = 'done'; q8.cur = 1; api.materializeStage(c8, q8, '2026-10-13');
+  q8.stages[1].vals = { chg_amt: 1200 }; const kk1 = api.csApprKindOf(c8, q8.stages[1]); q8.stages[1].vals.chg_amt = 1300; const kk2 = api.csApprKindOf(c8, q8.stages[1]);
+  T('v402 변경계약 2차 금액 기준 = 1차 승인 금액(현재 단계가 될 때 굳힘) — 1200→1200 결재 없음 · 1300 → 계약 단계', q8.stages[1].amt0 === 1200 && q8.stages[1].eff0 === 1000 && kk1 === '' && kk2 === '계약 단계', JSON.stringify([q8.stages[1].amt0, kk1, kk2]));
+  c8.pipes[0].cur = 7; const nA3 = api.alerts.length; api.csDoneStage(c8, c8.pipes[0], 7);
+  const tMain = { proc_id: c8.id, pipe: 'main', stage_i: 7, stage_name: '준공서류 작성', status: 'done' }, r3 = api.advanceProc(tMain);
+  T('v402 R3: 변경계약 미완료 차수가 있으면 본 줄 준공서류 작성부터 [완료]·지시 완료 모두 막힘(지시는 완료 요청) · 그 앞 단계는 안 막힘',
+    api.alerts.length === nA3 + 2 && r3 === false && tMain.status === 'review' && c8.pipes[0].cur === 7 && c8.pipes[0].stages[7].status !== 'done' && api.csChgOpenAt(c8, c8.pipes[0], 6) === 0 && api.csChgOpenAt(c8, c8.pipes[0], 7) === 1, JSON.stringify({ a: api.alerts.length - nA3, r3, st: tMain.status }));
+  const base9 = () => { const c = mkC('c_v402s'); const s1 = api.csStageNew({ name: '변경계약', aid: 'change_contract', dk: ['계약'], ak: '계약 단계', aw: 'amt' }); s1.round = 1; s1.status = 'open'; s1.task_id = 'tA'; c.pipes.push({ key: 'chg', cur: 0, stages: [s1] }); return c; };
+  const nx = (r) => { const s = api.csStageNew({ name: '변경계약', aid: 'change_contract', dk: ['계약'] }); s.round = r; return s; };
+  const lB = base9(); lB.pipes[1].stages[0].status = 'done'; lB.pipes[1].cur = 1; const sB = JSON.parse(JSON.stringify(base9())); sB.pipes[1].stages.push(nx(2)); api.csSyncFromServer(lB, sB);
+  const okB = lB.pipes[1].stages.length === 2 && lB.pipes[1].stages[0].status === 'done' && lB.pipes[1].cur === 1 && lB.pipes[1].stages[1].status === 'open' && !!lB.pipes[1].stages[1].task_id;
+  const lC = base9(); lC.pipes[1].stages.push(nx(2)); const sC = JSON.parse(JSON.stringify(base9())); sC.pipes[1].stages[0].status = 'done'; sC.pipes[1].cur = 1; api.csSyncFromServer(lC, sC);
+  const okC = lC.pipes[1].stages.length === 2 && lC.pipes[1].stages[0].status === 'done' && lC.pipes[1].cur === 1 && lC.pipes[1].stages[1].status === 'open' && !!lC.pipes[1].stages[1].task_id;
+  const lD = mkC('c_v402s'); api.csSyncFromServer(lD, JSON.parse(JSON.stringify(base9())));
+  const okD = lD.pipes.some((p) => p.key === 'chg' && p.stages.length === 1);
+  T('v402 R2 csSyncFromServer chg 병합(인덱스별 합집합): (B) 로컬 1차 완료 + 서버 2차 → 2단계·cur 1·2차 지시 생성 · (C) 로컬 2차 추가 + 서버 1차 승인 → 2차 보존 · 서버에만 chg → 받음', okB && okC && okD, JSON.stringify({ okB, okC, okD }));
+  const h9 = api.csStagesHtml(c8);
+  const stP = api.conScenStages('asbestos', false, false, {}), cP = { id: 'c_v402p', type: 'asbestos', docType: 'private', status: 'active', scen: api.conScenTag({ type: 'asbestos', pub: false, combo: false, ver: 1 }, stP), pipes: [{ key: 'main', cur: 0, stages: stP.map((s) => api.csStageNew(s)) }] };
+  const iPS = cP.pipes[0].stages.findIndex((s) => s.aid === 'pri_start'); api.openStage('main|' + iPS); const hP = api.csStagesHtml(cP); api.openStage('');
+  const fakeB = { proc: { added: { schema: 2, status: 'pending', stages: JSON.parse(JSON.stringify(AP.stages)) } }, list: { added: { schema: 2, status: 'pending', lists: JSON.parse(JSON.stringify(AP.lists)) } } };
+  const pvH = api.conAddedPreviewHtml(fakeB);
+  T('v402 단계 탭: "변경계약 2건" 머리 · [+ 변경계약 3차](창 안) · 사급 신설 배지·기본 꺼짐 단계 [켜기] · 미리보기에 (착공)·(완료)·완료신고_석면·변경계약 별도 줄',
+    /변경계약 2건/.test(h9) && /data-cs-chgadd="c_v402a">\+ 변경계약 3차/.test(h9) && /<small>신설<\/small>/.test(hP) && /data-cs-unskip="[^"]*">켜기</.test(hP) && /\(착공\)/.test(pvH) && /\(완료\)/.test(pvH) && /완료신고_석면/.test(pvH) && /별도 줄/.test(pvH), h9.slice(0, 160));
+  api.openStage('chg|1'); const h13 = api.csStagesHtml(c8); api.openStage('');
+  T('v402 R4: 변경계약 단계 카드에 📄 서류 버튼 없음(계약서 작성 툴이 원계약 contract_info를 덮지 않게) · 서류함 첨부 안내', !/data-cs-sdoc="c_v402a\|변경계약"/.test(h13) && /변경계약서: 서류함 첨부/.test(h13), '');
+  const allC = (bk['col:contracts'].items || []), pBefore = JSON.stringify(allC.map((x) => x.pipes)); let ex11 = 0;
+  for (const tab of ['ov', 'st', 'doc', 'lk']) { api.setTab(tab); allC.forEach((x) => { try { api.csDetailHtml(x); } catch (e) { ex11++; } }); }
+  T('v402 옛 계약 호환(켬 상태): 백업 ' + allC.length + '건(삭제 포함) 4탭 렌더 예외 0 · 렌더 전후 pipes 같음', ex11 === 0 && JSON.stringify(allC.map((x) => x.pipes)) === pBefore, String(ex11));
+  const S = (o) => Object.assign({ kind: 'stage', pos: { type: 'insert', before_re: '청구' }, docs: ['계약'], active: true }, o);
+  const badD = { schema: 2, status: 'applied', stages: [S({ id: 'x1', name: 'X', scen: ['nope:pub'] }), S({ id: 'x2', name: 'Y', scen: ['asbestos:pri'], pos: { type: 'insert', after_re: '(' } }), S({ id: 'x3', name: 'Z', scen: ['asbestos:pri'] }), S({ id: 'x3', name: 'Z2', scen: ['asbestos:pri'] }), S({ id: 'x4', name: 'W', scen: ['asbestos:pri'], docs: ['없는키'] }), S({ id: 'x5', name: 'V', scen: ['asbestos:pri', 'dredge:pri'], pos: { type: 'insert', before_re: '노동부' } }), S({ id: 'x6', name: 'U', scen: ['asbestos:pri'], active: false })],
+    lists: [{ id: 'l1', kind: 'list', key: 'K', replaces: '없음', match_re: 'a', value: 'v', active: true }] };
+  const pb = api.conAddedPrep(badD), s1 = api.conAddedPrep({ schema: 1, status: 'applied', stages: on.stages, lists: on.lists }), sP = api.conAddedPrep({ schema: 2, status: 'pending', stages: on.stages, lists: on.lists }), sM = api.conAddedPrep({ schema: 2, status: 'mismatch', stages: on.stages, lists: on.lists }), sStr = api.conAddedPrep({ schema: 2, status: 'applied', stages: 'oops', lists: on.lists });
+  T('v402 검증 실패: 시나리오 키·정규식 "("·id 중복(둘 다)·목록 대상 불량 → 그 항목만 제외+사유 · 서류 키 없음·일부 시나리오 기준 없음 → soft 적용 · 비활성 무시 · 스키마 1/pending/두 층 불일치 → 활성 전부 제외(R5) · stages 문자열 → 예외 없이 표시(R6)',
+    pb.stages.map((s) => s.id).join(',') === 'x4,x5' && pb.lists.length === 0 && ['x1', 'x2', 'l1'].every((id) => pb.bad.some((b) => b.id === id && !b.soft)) && pb.bad.filter((b) => b.id === 'x3').length === 2 && pb.bad.some((b) => b.id === 'x4' && b.soft) && pb.bad.some((b) => b.id === 'x5' && b.soft)
+    && [s1, sP, sM].every((x) => x.stages.length === 0 && x.lists.length === 0 && x.bad.length === 6) && sStr.lists.length === 2 && sStr.stages.length === 0 && sStr.bad.some((b) => b.id === '*'), JSON.stringify(pb.bad));
+  const stA = api.conScenStages('asbestos', true, false, {}), cAsb = { id: 'c_v402r', type: 'asbestos', docType: 'public', status: 'active', contract_info: { amount: 1000 }, scen: api.conScenTag({ type: 'asbestos', pub: true, combo: false, ver: 1 }, stA), pipes: [{ key: 'main', cur: 3, stages: stA.map((s) => api.csStageNew(s)) }] };
+  const cAsbR = JSON.parse(JSON.stringify(cAsb)), cR = JSON.parse(JSON.stringify(c8)), iDone = cAsbR.pipes[0].stages.findIndex((s) => s.lid === 'complete_asb');
+  const wBefore = JSON.stringify(api.csChgCan(c8).w), akBefore = api.csApprKindOf(c8, q8.stages[1]);
+  api.conAddedClear();
+  const keyGone = !('완료신고_석면' in api.STAGE_DOCS), items0 = api.csStageDocItems(cAsbR.pipes[0].stages[iDone]), canR = api.csChgCan(cR), akR = api.csApprKindOf(cR, cR.pipes.find((p) => p.key === 'chg').stages[1]);
+  api.csDocAdd(cAsbR, cAsbR.pipes[0], iDone, '추가 서류'); const fixed = cAsbR.pipes[0].stages[iDone].docs; let exR = 0; try { api.csStagesHtml(cR); api.csStagesHtml(cAsbR); } catch (e) { exR++; }
+  T('v402 R1 생성 시점 고정: JSON 왕복 + conAddedClear(목록 키 삭제) 뒤에도 석면 완료보고 2항(dtx) · [+ 변경계약] 창·결재 판정 같음(scen.chg 원문 정규식 재컴파일) · [추가] 뒤 표준 2항 + 추가 1 · 렌더 예외 0',
+    keyGone && items0.length === 2 && !!canR && JSON.stringify(canR.w) === wBefore && akR === akBefore && Array.isArray(fixed) && fixed.length === 3 && fixed.filter((d) => !d.add).length === 2 && exR === 0, JSON.stringify({ keyGone, n: items0.length, canR: !!canR, akR, akBefore, fixed: fixed && fixed.length }));
+  const sL = { name: '(완료)', aid: 'pri_complete', dk: ['없는키_x'], status: 'open' }, cL = { id: 'c_l', status: 'active', pipes: [{ key: 'main', cur: 0, stages: [sL] }] }, nAL = api.alerts.length;
+  api.csDocAdd(cL, cL.pipes[0], 0, 'x'); api.csDocToggle(cL, cL.pipes[0], 0, '기타:0');
+  T('v402 R1 dk도 dtx도 안 풀리는 단계: [추가]·체크가 s.docs를 굳히지 않음(alert) · 단계 카드에 원천 못 불러옴 경고', !Array.isArray(sL.docs) && api.alerts.length >= nAL + 1 && /원천을 불러오지 못했습니다/.test(api.csStageDocsHtml(cL, cL.pipes[0], 0, 'main|0', true)), String(api.alerts.length - nAL));
+  const PB = JSON.parse(readFileSync(join(ROOT, '..', 'jongwoon-appdata', 'data', 'contract', 'blob_proc_contract_v1.json'), 'utf8')), LB = JSON.parse(readFileSync(join(ROOT, '..', 'jongwoon-appdata', 'data', 'contract', 'blob_list_contract.json'), 'utf8'));
+  const mkRes = (flagOn, mut) => { const p = JSON.parse(JSON.stringify(PB)), l = JSON.parse(JSON.stringify(LB)); if (mut) mut(p, l); return { status: 200, body: { flag: { use_blob: flagOn }, proc: p, list: l } }; };
+  const activate = (p, l) => { p.added.status = 'applied'; l.added.status = 'applied'; p.added.applied = { at: '2026-11-04' }; l.added.applied = { at: '2026-11-04' }; p.added.stages.forEach((s) => { s.active = true; }); l.added.lists.forEach((x) => { x.active = true; }); };
+  const tick = () => new Promise((r) => setTimeout(r, 0));
+  const load = async (res) => { api.setGw(() => (res instanceof Error ? Promise.reject(res) : Promise.resolve(res))); api.conProcLoad(); await tick(); await tick(); return { n: api.CON_ADDED.stages.length + api.CON_ADDED.lists.length, key: '완료신고_석면' in api.STAGE_DOCS, bad: (api.procSrc().added_bad || []).length, mode: api.procSrc().mode }; };
+  const L1 = await load(mkRes(false, activate)), L2 = await load(mkRes(true, (p, l) => { activate(p, l); p.added.schema = 1; })), L3 = await load(mkRes(true, activate)), L4 = await load(new Error('net')), L5 = await load(mkRes(true, (p, l) => { activate(p, l); l.added.status = 'pending'; })), L6 = await load(mkRes(true));
+  T('v402 R7 conProcLoad 실제 실행: 꺼짐+active → 신설 0·목록 키 없음 · 켬+스키마1 → 0·bad · 켬+정상 → 6·목록 키 있음 · 네트워크 예외 → 비워짐 · 두 층 status 불일치 → 0(R5) · 켬+현행 파일(전부 비활성) → 0',
+    L1.n === 0 && !L1.key && L2.n === 0 && L2.bad > 0 && L3.n === 6 && L3.key && L3.mode === 'blob' && L4.n === 0 && !L4.key && L5.n === 0 && L5.bad > 0 && L6.n === 0 && !L6.key, JSON.stringify([L1, L2, L3, L4, L5, L6]));
+  await load(mkRes(true, activate));
+  const stSP = api.conScenStages('asbestos', false, false, {}), cSP = api.startProcess('asbestos', { client: 'sp', docType: 'private', stages: stSP, scen: api.conScenTag({ type: 'asbestos', pub: false, combo: false, ver: 1 }, stSP) });
+  const ps = cSP.pipes[0].stages, iS = ps.findIndex((s) => s.aid === 'pri_start'), iD = ps.findIndex((s) => s.lid === 'complete_asb');
+  T('v402 R7 startProcess 실제 실행: aid·off(skipped)·dk·dtx·flds가 pipes까지 남음 · scen.added·chg 기록 · 기본 꺼짐 단계는 지시 없이 지나감',
+    iS > 0 && ps[iS].status === 'skipped' && ps[iS].off === 1 && ps[iS].dk[0] === '착공' && !!ps[iS].dtx && iD > 0 && ps[iD].dk[0] === '완료신고_석면' && /석면농도측정/.test(ps[iD].dtx) && Array.isArray(ps.find((s) => s.aid === 'pri_complete').flds) && cSP.scen.added.indexOf('pri_start') >= 0 && !!cSP.scen.chg && cSP.scen.chg.before_re === '준공|청구' && !ps[iS].task_id, '');
+  api.popContract(); api.popContract();
+  const snapA = JSON.stringify([api.CON_ADDED.stages.map((s) => s.id), api.CON_ADDED.lists.map((l) => l.id), api.CON_ADDED.keys]), snapD = JSON.stringify(api.STAGE_DOCS);
+  api.conAddedPreviewHtml(fakeB);
+  T('v402 R7 미리보기는 읽기 전용(CON_ADDED·STAGE_DOCS 그대로)', JSON.stringify([api.CON_ADDED.stages.map((s) => s.id), api.CON_ADDED.lists.map((l) => l.id), api.CON_ADDED.keys]) === snapA && JSON.stringify(api.STAGE_DOCS) === snapD, '');
+  const host = { innerHTML: '', querySelectorAll: () => [], querySelector: () => null };
+  api.setDocEl('conProcCard', host); api.setGw(() => Promise.resolve(mkRes(false, (p) => { p.added.stages = [Object.defineProperty({}, 'id', { enumerable: true, get() { throw new Error('주입 예외'); } })]; })));   // 검토 6: 실제 예외 주입(문자열 stages는 예외를 안 던져 거짓 통과)
+  api.renderConProcCard(); await tick(); await tick(); api.setDocEl('conProcCard', null);
+  T('v402 R6·R11 관리자 카드: 미리보기가 예외를 던져도(검토 6 실제 주입) [거울 켜기](data-conproc-set)·편집 절이 남고 "미리보기 실패" 한 줄 · 카드 9 목록 읽기 전용 행 · 편집 예시가 해 없는 값', /data-conproc-set=/.test(host.innerHTML) && /카드 9 미리보기 실패/.test(host.innerHTML) && /카드 9 · 비활성 · 읽기 전용/.test(host.innerHTML) && /키\(예: 실적보고_추가\)/.test(host.innerHTML) && !/노동부\|석면\)/.test(host.innerHTML), host.innerHTML.slice(0, 160));
+  api.setGw(null); api.conAddedClear();
+  T('v402 정리(격리): conAddedClear 뒤 STAGE_DOCS에 카드 9 키 없음 · 꺼짐 동일성 다시 성립', !('완료신고_석면' in api.STAGE_DOCS) && !('완료신고_철거' in api.STAGE_DOCS) && offOk(), '');
+}
+
+// ---- v402 적대 검토 반영(10/30): 창 닫힘·승인 분기 잠금·재개 · 금액 기준 · 7번 대안 서류 버튼 · 이 단계부터·건너뜀 가드 · 병합 순위·저장 · 정의 깨짐 기본 창 · 목록 hits 0 ----
+{
+  const AP2 = JSON.parse(readFileSync(join(ROOT, '..', 'jongwoon-appdata', 'data', 'contract', 'proc_added_v1.json'), 'utf8'));
+  const on2 = JSON.parse(JSON.stringify(AP2)); [...on2.stages, ...on2.lists].forEach((x) => { x.active = true; });
+  api.conAddedUse(api.conAddedPrep({ schema: 2, status: 'applied', stages: on2.stages, lists: on2.lists }), 'rv');
+  const stR = api.conScenStages('asbestos', false, false, {}), iBill = stR.findIndex((s) => /청구/.test(s.name));
+  const mk = (id) => ({ id, type: 'asbestos', docType: 'private', status: 'active', contract_info: { amount: 1000 }, scen: api.conScenTag({ type: 'asbestos', pub: false, combo: false, ver: 1 }, stR), pipes: [{ key: 'main', cur: 0, stages: stR.map((s) => api.csStageNew(s)) }] });
+  const c1 = mk('c_rv1'); c1.pipes[0].cur = iBill; api.pushContract(c1);
+  const okOpen = api.csChgCan(c1).ok;
+  c1.pipes[0].stages[iBill].appr = { status: '대기', at: '2026-10-30' }; const hold = api.csChgCan(c1); delete c1.pipes[0].stages[iBill].appr;
+  api.csChgAdd(c1); const q1 = c1.pipes.find((p) => p.key === 'chg'), sB = c1.pipes[0].stages[iBill];
+  sB.appr = { status: '승인', at: '2026-10-30' }; sB.task_id = null;
+  const nT1 = api.toasts.length; api.csApprApply(c1, c1.pipes[0], iBill);
+  const blocked = sB.status !== 'done' && c1.pipes[0].cur === iBill && api.toasts.length === nT1 + 1;
+  q1.stages[0].status = 'done'; q1.cur = 1; api.csDoneStage(c1, c1.pipes[0], iBill);
+  const resumed = sB.status === 'done' && c1.pipes[0].cur === iBill + 1;
+  T('v402 검토 1·11: 본 줄 청구 상신 중이면 [+ 변경계약] 창 닫힘(hold) · 승인됐는데 지시 없는 분기(csApprApply)도 변경계약 열린 동안 진행 보류(토스트) · 변경계약 끝낸 뒤 [완료] → 승인 적용·진행', okOpen && hold.ok === false && hold.hold === true && !!q1 && blocked && resumed, JSON.stringify({ okOpen, hold: hold.ok, blocked, resumed }));
+  const c2 = mk('c_rv2'); c2.contract_info = { amount: 0 }; c2.settle_amount = 900; c2.pipes[0].cur = 4; api.csChgAdd(c2); const s2 = (c2.pipes.find((p) => p.key === 'chg') || { stages: [{}] }).stages[0];
+  T('v402 검토 2: 변경계약 금액 기준 = 계약서 금액(contract_info.amount)만 — 정산액·낙찰액 폴백 무시(eff0 0) · 정산액이 바뀌어도 판정 ""', s2.eff0 === 0 && (c2.settle_amount = 1200, api.csApprKindOf(c2, s2) === ''), JSON.stringify({ eff0: s2.eff0, amt0: s2.amt0 }));
+  const alt = JSON.parse(JSON.stringify(on2)); alt.stages.find((s) => s.id === 'change_contract').pos = { type: 'insert', after_re: '착공|착수|계약', before_re: '준공|청구' };
+  api.conAddedUse(api.conAddedPrep({ schema: 2, status: 'applied', stages: alt.stages, lists: alt.lists }), 'alt');
+  const stA = api.conScenStages('asbestos', true, false, {}), iC = stA.findIndex((s) => s.aid === 'change_contract');
+  const c3 = { id: 'c_rv3', type: 'asbestos', docType: 'public', status: 'active', contract_info: { amount: 1000 }, scen: { type: 'asbestos', pub: true }, pipes: [{ key: 'main', cur: iC, stages: stA.map((s) => api.csStageNew(s)) }] }; api.pushContract(c3);
+  const okT3 = iC > 0 && api.csTaskChg({ proc_id: 'c_rv3', pipe: 'main', stage_i: iC }) === true && api.csTaskChg({ proc_id: 'c_rv3', pipe: 'main', stage_i: 0 }) === false;
+  api.conAddedUse(api.conAddedPrep({ schema: 2, status: 'applied', stages: on2.stages, lists: on2.lists }), 'rv');
+  T('v402 검토 3: 7번 고정 대안(main 줄 변경계약) 지시도 서류 버튼 숨김 판정(csTaskChg)', okT3, String(iC));
+  const c9 = mk('c_rv9'); c9.pipes[0].cur = 4; api.pushContract(c9); api.csChgAdd(c9); const q9 = c9.pipes.find((p) => p.key === 'chg');
+  const nA9 = api.alerts.length; api.csJumpStage(c9, c9.pipes[0], iBill + 1); const okJ = c9.pipes[0].cur === 4 && api.alerts.length === nA9 + 1;
+  q9.stages[0].vals = { chg_amt: 1500 }; api.csSkipStage(c9, q9, 0); const okS = q9.stages[0].status !== 'skipped' && api.alerts.length === nA9 + 2;
+  T('v402 검토 9·10: 변경계약 열린 동안 [이 단계부터]로 준공·청구 뒤로 못 건너뜀 · 금액 넣은 변경계약은 [건너뜀] 금지', okJ && okS, JSON.stringify({ okJ, okS }));
+  const nx = (r, st) => { const x = api.csStageNew({ name: '변경계약', aid: 'change_contract', dk: ['계약'] }); x.round = r; x.status = st; return x; };
+  const lS = mk('c_rvs'); lS.pipes.push({ key: 'chg', cur: 1, stages: [nx(1, 'done')] });
+  const sS = JSON.parse(JSON.stringify(lS)); sS.pipes[1].stages[0].status = 'open'; sS.pipes[1].cur = 0; sS.pipes[1].stages.push(nx(2, 'pending'));
+  const nS = api.sched(); api.csSyncFromServer(lS, sS); const okSave = api.sched() === nS + 1 && lS.pipes[1].stages.length === 2 && lS.pipes[1].stages[1].status === 'open';
+  const lM = mk('c_rvm'); lM.pipes.push({ key: 'chg', cur: 1, stages: [nx(1, 'skipped')] });
+  const sM = JSON.parse(JSON.stringify(lM)); sM.pipes[1].stages[0].status = 'done'; sM.pipes[1].stages[0].vals = { chg_amt: 1200 };
+  const nM = api.sched(); api.csSyncFromServer(lM, sM); const okRank = lM.pipes[1].stages[0].status === 'done' && lM.pipes[1].stages[0].vals.chg_amt === 1200 && api.sched() === nM;
+  T('v402 검토 5·12: chg 병합 결과가 서버본과 다르면 저장 예약(새 차수·지시 유실 방지) · 같으면 저장 안 함 · 완료가 건너뜀을 이김(다른 기기 승인 차수 금액 보존)', okSave && okRank, JSON.stringify({ okSave, okRank }));
+  const c14 = mk('c_rv14'); c14.scen.chg.after_re = '('; c14.pipes.push({ key: 'chg', cur: 0, stages: [nx(1, 'open')] });
+  T('v402 검토 14: scen.chg 정규식이 깨져도 본 줄은 0번부터 잠기지 않고 기본 창(첫 준공|청구)부터만 잠김', api.csChgOpenAt(c14, c14.pipes[0], 0) === 0 && api.csChgOpenAt(c14, c14.pipes[0], iBill) === 1, '');
+  const pH = api.conAddedPrep({ schema: 2, status: 'applied', stages: [], lists: [{ id: 'lx', kind: 'list', key: 'K_x', replaces: '완료신고', match_re: '없는단계이름', value: 'v', active: true }] });
+  T('v402 검토 4: 목록이 걸리는 단계 0이면 표시(soft — 파이썬은 빌드 오류)', pH.lists.length === 1 && pH.bad.some((b) => b.id === 'lx' && b.soft && /걸리는 단계 0/.test(b.why)), JSON.stringify(pH.bad));
+  api.popContract(); api.popContract(); api.popContract(); api.conAddedClear();
 }
 console.log(fails ? '\n계약 시트 실행 검사 실패 ' + fails + '건' : '\n계약 시트 실행 검사 전 항목 통과'); process.exit(fails ? 1 : 0);

@@ -3453,4 +3453,32 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   }
 }
 
+{ // ---- 56(v402) 계약 카드 9 신설 — 서버는 고치지 않음: added를 스위치와 무관하게 그대로 내보내고(앱이 거름), 편집 재생·scen_del이 added를 건드리지 않으며, 불량 added가 거울 전체를 죽이지 않음 ----
+  const fs56 = require('fs'), dir56 = join(ROOT, '..', 'jongwoon-appdata', 'data', 'contract');
+  const bp56 = join(dir56, 'blob_proc_contract_v1.json'), bl56 = join(dir56, 'blob_list_contract.json');
+  if (!fs56.existsSync(bp56) || !fs56.existsSync(bl56)) { console.log('  (56 생략 — appdata 거울 파일 없음)'); fail++; }
+  else {
+    const P56 = JSON.parse(fs56.readFileSync(bp56, 'utf8')), L56 = JSON.parse(fs56.readFileSync(bl56, 'utf8'));
+    const on56 = (x, k) => { x.added.status = 'applied'; x.added.applied = { at: '2026-11-04', by: 'servertest', basis: '56' }; x.added[k].forEach((s) => { s.active = true; }); return x; };
+    const p56 = on56(JSON.parse(JSON.stringify(P56)), 'stages'), l56 = on56(JSON.parse(JSON.stringify(L56)), 'lists');
+    delete mem.gw_data['settings:contract']; delete mem.gw_data['clog:contract'];
+    mem.gw_data['proc:contract:v1'] = p56; mem.gw_data['list:contract'] = l56;
+    let r56 = await call({ action: 'con_proc_get' }, tokW, 'dev1');
+    T('56 get(직원) → added 그대로(active·schema·status·applied 보존) · flag.use_blob 꺼짐(서버는 스위치 무관 내보냄, 거름은 앱)', r56.code === 200 && JSON.stringify(r56.body.proc.added) === JSON.stringify(p56.added) && JSON.stringify(r56.body.list.added) === JSON.stringify(l56.added) && !(r56.body.flag && r56.body.flag.use_blob), JSON.stringify(r56.body.flag));
+    r56 = await call({ action: 'con_proc_edit', op: 'docs_set', key: '계약', value: '[작성] A / [수령] B', head: '' }, tokA);
+    const okSet56 = r56.code === 200; r56 = await call({ action: 'con_proc_get' }, tokA);
+    T('56 docs_set 뒤 get → added 바이트 그대로(재생이 안 건드림) · STAGE_DOCS에 카드 9 목록 키 없음(병합은 앱 몫)', okSet56 && r56.code === 200 && JSON.stringify(r56.body.list.added) === JSON.stringify(l56.added) && !('완료신고_석면' in r56.body.list.consts.STAGE_DOCS) && r56.body.list.consts.STAGE_DOCS['계약'] === '[작성] A / [수령] B', '');
+    const sc56 = P56.consts.CON_SCEN['asbestos:pri'], i56 = sc56.indexOf('청구 및 입금확인');
+    r56 = await call({ action: 'con_proc_edit', op: 'scen_del', scen: 'asbestos:pri', i: i56, name: sc56[i56] }, tokA);
+    const okDel56 = r56.code === 200; r56 = await call({ action: 'con_proc_get' }, tokA);
+    T('56 scen_del asbestos:pri 청구 → 유효 층 CON_SCEN에서 빠짐 · added 그대로((완료)는 앱이 그 시나리오에서 건너뜀 — consheet soft)', okDel56 && r56.body.proc.consts.CON_SCEN['asbestos:pri'].length === sc56.length - 1 && JSON.stringify(r56.body.proc.added) === JSON.stringify(p56.added), String(okDel56));
+    delete mem.gw_data['clog:contract'];
+    const p56s = JSON.parse(JSON.stringify(p56)); p56s.added.stages = 'oops'; mem.gw_data['proc:contract:v1'] = p56s;
+    r56 = await call({ action: 'con_proc_get' }, tokW, 'dev1');
+    T('56 proc.added.stages 문자열이어도 층 유효 → get 200(불량 added가 거울 전체를 죽이지 않음)', r56.code === 200 && !!r56.body.proc && r56.body.proc.added.stages === 'oops', String(r56.code));
+    delete mem.gw_data['settings:contract']; delete mem.gw_data['proc:contract:v1']; delete mem.gw_data['list:contract']; delete mem.gw_data['clog:contract'];
+    T('56 정리: 키 4개 지움', !mem.gw_data['proc:contract:v1'] && !mem.gw_data['list:contract'] && !mem.gw_data['clog:contract'] && !mem.gw_data['settings:contract']);
+  }
+}
+
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);
