@@ -3494,8 +3494,10 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
     mem.gw_data['map:contract:v1'] = JSON.parse(fs57.readFileSync(bm57, 'utf8'));
     mem.gw_data['bg:contract:law:v1'] = { schema: 1, ver: 'v1-test', rows: [{ id: 'law.osh.r181-1', law: '산업안전보건법 시행규칙', art: '제181조①', mst: 288431, eff: '2026-08-01', checked: '2026-10-31', grade: '실측', days: -7, base: '작업 시작일' }], sha: 'abcdef1234567890' };
     r57 = await call({ action: 'con_proc_get' }, tokW, 'dev1'); const light57 = r57.code === 200 && r57.body.map === null && r57.body.bg === null && !!r57.body.proc;   // S4: 직원+꺼짐 → 가벼운 응답
+    mem.gw_data['lawwatch:last'] = { schema: 1, date: '2026-11-03', alerts: ['[계약 배경 재확인] 개정 감지 1행'], bg_recheck: [{ id: 'law.osh.r181-1', law: '산업안전보건법 시행규칙', mst: 288431 }], ts: 1 };   // v405
     r57 = await call({ action: 'con_proc_get' }, tokA);
-    T('57 get: 관리자에겐 map(scen 10키·81단계·sha)·bg(ver·rows 1) 동봉 · 직원+꺼짐엔 null(S4) · 두 층 불변', light57 && r57.code === 200 && r57.body.map && Object.keys(r57.body.map.scen).length === 10 && Object.values(r57.body.map.scen).reduce((a, b) => a + b.length, 0) === 81 && typeof r57.body.map.sha === 'string' && r57.body.bg && r57.body.bg.ver === 'v1-test' && r57.body.bg.rows.length === 1 && !!r57.body.proc && !!r57.body.list);
+    const lw57 = r57.code === 200 && r57.body.lawwatch && r57.body.lawwatch.date === '2026-11-03' && r57.body.lawwatch.bg_recheck.length === 1 && r57.body.lawwatch.bg_recheck[0].id === 'law.osh.r181-1';
+    T('57 get: 관리자에겐 map(scen 10키·81단계·sha)·bg(ver·rows 1)·lawwatch(bg_recheck 1, v405) 동봉 · 직원+꺼짐엔 null(S4) · 두 층 불변', light57 && lw57 && r57.code === 200 && r57.body.map && Object.keys(r57.body.map.scen).length === 10 && Object.values(r57.body.map.scen).reduce((a, b) => a + b.length, 0) === 81 && typeof r57.body.map.sha === 'string' && r57.body.bg && r57.body.bg.ver === 'v1-test' && r57.body.bg.rows.length === 1 && !!r57.body.proc && !!r57.body.list);
     r57 = await call({ action: 'con_proc_bg_set', bg_ver: 'v1-test' }, tokW, 'dev1'); const f57a = r57.code === 403;
     r57 = await call({ action: 'con_proc_bg_set', bg_ver: 'v9-none' }, tokA); const f57b = r57.code === 409 && r57.body.error_code === 'BG_MISSING';
     r57 = await call({ action: 'con_proc_bg_set', bg_ver: 'bad ver!' }, tokA); const f57c = r57.code === 400;
@@ -3514,7 +3516,7 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
     r57 = await call({ action: 'con_proc_bg_set', annual_override: { 'law.cic.23-3': '' }, bg_ver: '' }, tokA);
     const off57 = r57.code === 200 && mem.gw_data['settings:contract'].bg_ver === '' && !mem.gw_data['settings:contract'].annual_override['law.cic.23-3'] && mem.gw_data['settings:contract'].prev.bg_ver === 'v1-test';
     T('57 스위치 토글이 bg_ver 보존(prev에도) · override 설정(날짜 형식 검사·같은 값 NO_CHANGE)·해제 · 승격 해제 prev.bg_ver 기록', keep57 && ov57 && bad57 && same57 && off57);
-    delete mem.gw_data['settings:contract']; delete mem.gw_data['proc:contract:v1']; delete mem.gw_data['list:contract']; delete mem.gw_data['map:contract:v1']; delete mem.gw_data['bg:contract:law:v1'];
+    delete mem.gw_data['settings:contract']; delete mem.gw_data['proc:contract:v1']; delete mem.gw_data['list:contract']; delete mem.gw_data['map:contract:v1']; delete mem.gw_data['bg:contract:law:v1']; delete mem.gw_data['lawwatch:last'];
   }
 }
 

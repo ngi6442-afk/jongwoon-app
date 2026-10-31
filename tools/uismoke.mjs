@@ -1720,5 +1720,15 @@ try {
     && Number((swv4.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 404);
 } catch (e) { console.log('  (v404 검사 생략 — ' + e.message + ')'); fails++; }
 
+// ---- v405(10/31 계약 D2 3일차): lawwatch ↔ bg 재확인 — gw-lawwatch bg_recheck 보관 · con_proc_get lawwatch 동봉 · 엔진 recheck 배지 · 카드 개정 감지 · appdata lawwatch ③ 블록 · sw ≥405
+try {
+  const swv5 = readFileSync(join(ROOT, 'sw.js'), 'utf8'), gwd5 = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-data.js'), 'utf8'), lw5 = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-lawwatch.js'), 'utf8');
+  const lwpy = join(ROOT, '..', 'jongwoon-appdata', 'collectors', 'lawwatch', 'lawwatch.py');
+  const py5 = existsSync(lwpy) ? readFileSync(lwpy, 'utf8') : '';
+  T('v405 lawwatch 연동: gw-lawwatch bg_recheck 보관 · gw-data lawwatch 동봉(heavy) · 엔진 CON_BG.recheck·배지 \'재확인 필요(개정 감지)\' · 카드 개정 감지 · appdata ③ 계약 배경 검사(bg_recheck 동봉) · sw ≥ 405',
+    /bg_recheck: bgRecheck/.test(lw5) && /lawwatch: lawwatch, clog: clogOut/.test(gwd5) && /CON_BG\.recheck = rk;/.test(html) && html.indexOf('"재확인 필요(개정 감지)"') > 0 && html.indexOf('개정 감지 \' + b.lawwatch.bg_recheck.length') > 0
+    && (!py5 || (/③ 계약 배경\(bg:law\) 재확인 감시/.test(py5) && /'bg_recheck': bg_recheck/.test(py5))) && Number((swv5.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 405);
+} catch (e) { console.log('  (v405 검사 생략 — ' + e.message + ')'); fails++; }
+
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

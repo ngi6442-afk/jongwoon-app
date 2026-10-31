@@ -1768,7 +1768,9 @@ async function handleConProcGet(event, d, R) {
   if (proc && list) { const eff = conProcReplay(proc, list, clog); proc = eff.proc; list = eff.list; state = eff.state; }
   const clogOut = { n: clog.items.length, head: clog.head || '', applied: state ? state.applied : 0, reverted: state ? state.reverted : 0, chain_ok: conClogChainOk(clog), items: clog.items.slice(-30), reverted_of: clog.items.filter((x) => x.op === 'revert' && x.of).map((x) => x.of) };
   const heavy = !!(flag.use_blob || c.member.admin);   // v404 검토 S4: 꺼짐이면 직원에게 map·bg(약 100KB) 안 보냄(앱은 null = 엔진 꺼짐)
-  return jr(200, { status: 'OK', flag: flag, proc: proc, list: list, map: heavy ? L.map : null, bg: heavy ? L.bg : null, clog: clogOut, edit_state: state, request_id: R });   // v404: map·bg 층 동봉(없으면 null)
+  let lawwatch = null;   // v405 D2: lawwatch 주간 크론이 남긴 재확인 행(bg_recheck) — 엔진이 그 행을 '재확인 필요(개정 감지)'로
+  if (heavy) { try { const lw = await blobGet(st, 'lawwatch:last'); if (lw.ok && lw.data) lawwatch = { date: String(lw.data.date || ''), ts: lw.data.ts || 0, bg_recheck: Array.isArray(lw.data.bg_recheck) ? lw.data.bg_recheck.slice(0, 100) : [] }; } catch (e) {} }
+  return jr(200, { status: 'OK', flag: flag, proc: proc, list: list, map: heavy ? L.map : null, bg: heavy ? L.bg : null, lawwatch: lawwatch, clog: clogOut, edit_state: state, request_id: R });   // v404: map·bg 층 동봉(없으면 null)
 }
 async function handleConProcEdit(event, d, R) {
   const c = await currentMember(event);

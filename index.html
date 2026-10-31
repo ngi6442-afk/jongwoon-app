@@ -9733,15 +9733,16 @@
   // ---- v404 계약 D2 기한 엔진 — 원천 = 거울 3층 map:contract:v1(두 층 매핑·단계별 due_rule, appdata contract_map.py) + 4층 bg:contract:law:v1(법령 배경, 승격본만: settings:contract.bg_ver == bg.ver).
   //      켜짐 = 거울 적용(mode blob) ∧ map 유효 ∧ bg 승격. 꺼지면 종전 그대로(시나리오 단계 기한 비움). 계산은 새 지시를 만들 때만(materializeStage, 소급 없음) · 단계 객체에는 새 키 due_src·due_badge만.
   //      due_rule.kind: manual·external = 비움(담당자 입력) · field = 계약 값(d2 착공·d3 준공) · law = bg 행 days + 기산일(기산일 없음 = '기산일 필요', 행 미승격 = '확인 필요'/'근거 미승격', 확인 30일 경과 = '재확인 필요') · immediate = 기산일 당일 · annual = 연 1회(override 우선).
-  var CON_MAP = { ok:false, scen:{}, added:{}, upper:[], sha:"" }, CON_BG = { ver:"", rows:{}, pending:{}, n:0, sha:"" };
-  function conDueClear(){ CON_MAP.ok = false; CON_MAP.scen = {}; CON_MAP.added = {}; CON_MAP.upper = []; CON_MAP.sha = ""; CON_BG.ver = ""; CON_BG.rows = {}; CON_BG.pending = {}; CON_BG.n = 0; CON_BG.sha = ""; }
+  var CON_MAP = { ok:false, scen:{}, added:{}, upper:[], sha:"" }, CON_BG = { ver:"", rows:{}, pending:{}, recheck:{}, n:0, sha:"" };
+  function conDueClear(){ CON_MAP.ok = false; CON_MAP.scen = {}; CON_MAP.added = {}; CON_MAP.upper = []; CON_MAP.sha = ""; CON_BG.ver = ""; CON_BG.rows = {}; CON_BG.pending = {}; CON_BG.recheck = {}; CON_BG.n = 0; CON_BG.sha = ""; }
   function conDueUse(b){
     conDueClear();
     var m = b.map, g = b.bg, f = b.flag || {};
     if (!(m && m.schema === 1 && m.proc_ver === "v1" && m.scen && typeof m.scen === "object")) return;
     CON_MAP.scen = m.scen; CON_MAP.added = m.added || {}; CON_MAP.upper = m.upper || []; CON_MAP.sha = m.sha || ""; CON_MAP.ok = true;
     if (!(g && g.schema === 1 && g.ver && conIsArr(g.rows) && f.bg_ver && f.bg_ver === g.ver)) return;
-    g.rows.forEach(function(r){ if (!r || !r.id) return; if (r.grade === "실측" && r.mst && isDate(r.eff) && isDate(r.checked)) CON_BG.rows[r.id] = r; else CON_BG.pending[r.id] = r; });
+    var lw = b.lawwatch || {}, rk = {}; (conIsArr(lw.bg_recheck) ? lw.bg_recheck : []).forEach(function(x){ if (x && x.id) rk[x.id] = 1; }); CON_BG.recheck = rk;   // v405: lawwatch 개정 감지 행
+    g.rows.forEach(function(r){ if (!r || !r.id) return; if (rk[r.id]){ CON_BG.pending[r.id] = r; return; } if (r.grade === "실측" && r.mst && isDate(r.eff) && isDate(r.checked)) CON_BG.rows[r.id] = r; else CON_BG.pending[r.id] = r; });
     CON_BG.ver = g.ver; CON_BG.n = g.rows.length; CON_BG.sha = g.sha || "";
   }
   function conDueOn(){ return CON_PROC_SRC.mode === "blob" && CON_MAP.ok && !!CON_BG.ver; }
@@ -9781,7 +9782,7 @@
     if (k === "field"){ out.due = conBaseDate(dr.base, c, s); out.src = out.due ? ("계약 값 " + (dr.base === "fin" ? "준공일" : "착공일")) : ""; out.badge = out.due ? "" : "기산일 필요"; return out; }
     var law = dr.law ? (CON_BG.rows[dr.law] || null) : null;
     if (k === "annual"){ out.due = conAnnualNext({ base: dr.base || (law && law.base) || "" }, dr.law || ""); out.src = out.due ? ("연 1회 " + String(dr.base || "") + (law ? " · " + law.law + " " + law.art : "")) : ""; if (!out.due) out.badge = "확인 필요"; return out; }   // 검토 B1: map base 우선(bg base는 설명문), 못 풀면 배지
-    if (!law){ out.badge = CON_BG.pending[dr.law] ? "확인 필요" : "근거 미승격"; return out; }
+    if (!law){ out.badge = CON_BG.recheck[dr.law] ? "재확인 필요(개정 감지)" : (CON_BG.pending[dr.law] ? "확인 필요" : "근거 미승격"); return out; }   // v405: lawwatch 개정 감지
     if (conDaysSince(law.checked) > 30){ out.badge = "재확인 필요"; out.src = law.law + " " + law.art; return out; }
     var base = conBaseDate(dr.base, c, s);
     if (!base){ out.badge = "기산일 필요"; out.src = law.law + " " + law.art; return out; }
@@ -10451,7 +10452,7 @@
         ["거울", has ? ("proc " + esc(String(b.proc.base_sha || b.proc.sha)) + " · list " + esc(String(b.list.base_sha || b.list.sha)) + " · 생성 " + esc(String(b.proc.built_at || "").replace("T", " ").slice(0, 16)) + (clog.applied ? ' · <b>편집 ' + clog.applied + '건</b> 재생' : ' · 편집 0')) : "없음 — appdata collectors/contract_mirror.py --push 로 만듭니다"],
         ["거울 ↔ 상수", has ? (same === true ? "같음(diff 0)" : (same === false ? "다름 — 켜면 거울이 우선" : "비교 전")) : "—"],
         ["신설 제안(카드 9)", has ? (esc(String(((b.proc.added || {}).stages || []).length)) + "단계 · " + esc(String(((b.list.added || {}).lists || []).length)) + "목록 · 활성 " + CON_PROC_SRC.added_active + "건 · 이 기기 적용 " + CON_PROC_SRC.added_applied + "건 · " + esc(String((b.proc.added || {}).status || "")) + (on ? "" : " — 거울 꺼짐: 적용 0(켜면 활성 항목만 새 계약부터)") + ((CON_PROC_SRC.added_bad || []).length ? ' · <span style="color:#B00020;">제외·표시 ' + CON_PROC_SRC.added_bad.map(function(x){ return esc(x.id) + " " + esc(x.why); }).join(" / ") + '</span>' : '')) : "—"],
-        ["배경 bg:law(D2)", (b.bg ? ("판 " + esc(String(b.bg.ver || "")) + " · 행 " + esc(String((b.bg.rows || []).length)) + " · 실측 " + esc(String((b.bg.rows || []).filter(function(r){ return r && r.grade === "실측"; }).length)) + (f.bg_ver === b.bg.ver ? " · <b>승격됨 — 기한 엔진 켜짐</b>" : " · 미승격(기한 엔진 꺼짐)")) : "없음 — 기한 엔진 꺼짐") + (b.map ? " · 매핑 " + esc(String(b.map.sha || "")) : " · 매핑 없음") + (f.annual_override && Object.keys(f.annual_override).length ? " · 연 1회 override " + esc(Object.keys(f.annual_override).join(",")) : "") + ck],   // v404
+        ["배경 bg:law(D2)", (b.bg ? ("판 " + esc(String(b.bg.ver || "")) + " · 행 " + esc(String((b.bg.rows || []).length)) + " · 실측 " + esc(String((b.bg.rows || []).filter(function(r){ return r && r.grade === "실측"; }).length)) + (f.bg_ver === b.bg.ver ? " · <b>승격됨 — 기한 엔진 켜짐</b>" : " · 미승격(기한 엔진 꺼짐)")) : "없음 — 기한 엔진 꺼짐") + (b.map ? " · 매핑 " + esc(String(b.map.sha || "")) : " · 매핑 없음") + (f.annual_override && Object.keys(f.annual_override).length ? " · 연 1회 override " + esc(Object.keys(f.annual_override).join(",")) : "") + ck + ((b.lawwatch && b.lawwatch.bg_recheck && b.lawwatch.bg_recheck.length) ? ' · <b style="color:#c00;">개정 감지 ' + b.lawwatch.bg_recheck.length + '행(' + esc(String(b.lawwatch.date || '')) + ') — 그 행은 기한 보류</b>' : "")],   // v404·v405
         ["마지막 변경", f.updated_at ? (esc(memberName(f.updated_by) || f.updated_by || "") + " · " + esc(new Date(f.updated_at + 9 * 3600000).toISOString().slice(0, 16).replace("T", " "))) : "없음"]
       ].map(function(r){ return '<div style="display:flex;gap:8px;padding:5px 2px;border-bottom:1px solid var(--line);font-size:13px;"><span style="min-width:120px;color:var(--sub);">' + r[0] + '</span><span style="overflow-wrap:anywhere;min-width:0;">' + r[1] + '</span></div>'; }).join("");
       var pv = ""; if (has){ try { pv = conAddedPreviewHtml(b); } catch(e){ pv = '<div class="empty-line" style="margin-top:6px;">카드 9 미리보기 실패 — 데이터 형식을 확인해 주세요(거울 스위치는 그대로 쓸 수 있습니다).</div>'; } }   // v402 R6: 미리보기 예외가 스위치 버튼을 지우지 않게

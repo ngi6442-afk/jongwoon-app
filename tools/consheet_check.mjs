@@ -464,6 +464,10 @@ T('준공·만기 칸: d3 없음 → "-" · 지난 날짜 → vs-dan · 완료 �
   let n5 = 0, empty5 = [], err5 = [];
   for (const key of Object.keys(MAP4.scen)) { const [type, pub] = key.split(':'); for (const row of MAP4.scen[key]) { n5++; try { const cc = mk(type, pub === 'pub', row.name); const dd = api.conStageDue(stg(cc), cc, cc.pipes[0]); if (!dd) { err5.push(key + '/' + row.name + ' 행 없음'); continue; } if (dd.due === '' && dd.badge === '' && !/^(manual|external)$/.test(row.due_rule.kind)) empty5.push(key + '/' + row.name); } catch (e) { err5.push(key + '/' + row.name + ' ' + e.message); } } }
   T('v404 배경 품질: checked 31일 경과 → 재확인 필요 · grade 확인 필요 → 확인 필요 · 81행 예외 0 · manual/external 외 due·배지 둘 다 빈 행 0', d5.badge === '재확인 필요' && d5b.badge === '확인 필요' && n5 === 81 && err5.length === 0 && empty5.length === 0, JSON.stringify({ d5, d5b, n5, err5: err5.slice(0, 3), empty5: empty5.slice(0, 5) }));
+  // 6 v405 lawwatch 개정 감지: bg_recheck에 든 행은 승격본에서 빠지고 배지 '재확인 필요(개정 감지)'
+  api.conDueUse({ map: MAP4, bg: BG4, flag: flag4, lawwatch: { date: '2026-11-03', bg_recheck: [{ id: 'law.osh.r.181.1', law: '산안법 시행규칙', mst: 288431 }] } });
+  const d6 = api.conStageDue(stg(c2), c2, c2.pipes[0]); const d6b = api.conStageDue(stg(c3), c3, c3.pipes[0]);
+  T('v405 개정 감지: 재확인 행(181조①)은 기한 보류·배지 \'재확인 필요(개정 감지)\' · 다른 행(33조)은 그대로 계산', d6.badge === '재확인 필요(개정 감지)' && d6.due === '' && d6b.due === '2026-12-31', JSON.stringify([d6, d6b]));
   api.CON_PROC_SRC.mode = 'const'; api.conDueClear(); api.asb.length = 0;
 }
 console.log(fails ? '\n계약 시트 실행 검사 실패 ' + fails + '건' : '\n계약 시트 실행 검사 전 항목 통과'); process.exit(fails ? 1 : 0);

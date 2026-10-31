@@ -25,8 +25,9 @@ exports.handler = async (event) => {
   if (!alerts.length) return jr(400, { status: 'NO_ALERTS' });
 
   try {
+    const bgRecheck = Array.isArray(d.bg_recheck) ? d.bg_recheck.slice(0, 100).map((x) => ({ id: String((x && x.id) || '').slice(0, 40), law: String((x && x.law) || '').slice(0, 60), mst: Number(x && x.mst) || 0 })).filter((x) => x.id) : [];   // v405 D2: 계약 배경 재확인 행
     await blobSet(store('gw_data'), 'lawwatch:last', {
-      schema: 1, date: String(d.date || ''), alerts: alerts.slice(0, 50), ts: Date.now(),
+      schema: 1, date: String(d.date || ''), alerts: alerts.slice(0, 50), bg_recheck: bgRecheck, ts: Date.now(),
     });
   } catch (e) {}
 

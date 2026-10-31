@@ -1,6 +1,6 @@
 # 종운 그룹웨어 — 기능 대장 (사용자 매뉴얼 원천)
 
-> 살아있는 문서. 기능 추가·변경 시 이 파일을 함께 갱신한다. 기준: v404 (2026-10-31).
+> 살아있는 문서. 기능 추가·변경 시 이 파일을 함께 갱신한다. 기준: v405 (2026-10-31).
 > 세부 변경 이력은 git 커밋 메시지(한글) 참조.
 
 ## 1. 전체 구조
@@ -788,6 +788,13 @@ PM 지시 "문서함 일단 다 올리고 등재결재랑 공개범위 만들어
 - 정정: STAGE_DOCS "완료신고" 석면해체·제거→석면해체/제거, "청구" 국세·지방세→국세/지방세 납세증명(파서가 복합 서류 이름을 나누던 2곳) → proc_v1.json 재export·거울 2층 재빌드(list sha 7eeb1ce6c1d18b44)·push.
 - 배포 전 적대 검토 7건 → 6건 반영: map_del 뒤 같은 정규식 map_add 가 무시되던 재생 순서(map_add 가 map_del 을 되살림·map_del 이 앞선 map_add 를 지움) · 기기 간 동기화 머지(csSyncFromServer)가 stage.docs[] 를 떨어뜨리던 것 → csMergeDocs(k 별 at 늦은 쪽·한쪽만 있는 항목 보존) · 서류 추가 뒤 입력 칸 비움 · 편집 textarea 줄바꿈=" / " · 되돌림 판정은 전체 기록(reverted_of) · __proto__ 키 거부. 수용 1건: 월 사건 로그 clog:contract:YYYY-MM 은 읽고-쓰기 사이 잠금이 없어 같은 초에 두 사람이 누르면 1건이 빠질 수 있다(지표용 로그, 체인은 유지 — 4일차 집계에서 빠진 수를 세지 않도록 참고).
 - 검사: servertest 절 55(40항), uismoke v401(3항), consheet_check v401(10항 — 파서·커버리지 81단계 중 79·체크/해당없음/추가/삭제·머지·html·옛 계약), proctpl diff 0. sw v401.
+
+### v405 (10/31) — 계약 D2 3일차: 법령 워치 ↔ 배경(bg:law) 재확인 연동 · 사례 색인
+- appdata `collectors/lawwatch/`: watchlist에 계약 법령 9종 추가(지방계약법·령·규칙, 건축물관리법·령, 건폐법, 건산법·규칙, 하수도법 — 첫 실행 때 기준선) · ③ 계약 배경 검사 신설: `bg_law_v1.json` 실측 행 MST가 감시 법령의 현행 MST 집합에 없으면 **개정 감지**(행 id·법령·MST = `bg_recheck`), 확인일 23일 경과면 월 1회 재확인 예고(앱은 30일 넘으면 기한 보류). 알림 POST body에 `bg_recheck` 동봉.
+- 서버: `gw-lawwatch`가 `lawwatch:last`에 bg_recheck 보관 · `con_proc_get`(켜짐 또는 관리자)이 `lawwatch {date, ts, bg_recheck}` 동봉.
+- 앱: 기한 엔진이 bg_recheck 행을 승격본에서 빼고 배지 '재확인 필요(개정 감지)' · 관리자 계약 골조 카드에 '개정 감지 n행(날짜) — 그 행은 기한 보류'. 재확인 절차 = 조문 재확인·checked 갱신 → `contract_bg.py` → `contract_mirror.py --push --verify` → [배경 승격](새 판).
+- 사례 색인(bg:case): appdata `collectors/bg_case_index.py`(PM PC 로컬 1회, Blobs `bg:contract:case:v1`만 — git 금지) — PM_첨부 _풀기 21건·노동부 LIST 146행(근로자 실명 제외, 인원 수만)·03_공사서류 29파일 → 건명·연도·종류·발주 유형·파일 수. 앱 표시 없음(D5 콘솔).
+- 검사: servertest 절 57 +1(lawwatch 동봉·bg_recheck 형식) · uismoke v405 · consheet v404 +1(개정 감지 → 배지).
 
 ### v404 (10/31) — 계약 D2 기한 엔진(거울 3층 map + 4층 bg:law, 승격 플래그) · 켜지기 전엔 화면 변화 0
 - 데이터(appdata): `data/contract/proc_map_v1.json`(두 층 매핑 — 상위 9단계 PM 10/22 원문 ↔ 하위 10목록 81단계 CON_SCEN 원문, 단계별 route·서류·입력 칸·결재 종류·who_role·co·due_rule; 빌더 `collectors/contract_map.py`, 규칙 `proc_map_rules_v1.json`) → Blobs `map:contract:v1` · `data/contract/bg_law_v1.json`(법령 배경 승격본, 행 = law·art·mst·eff·checked·grade·days·base; 빌더 `collectors/contract_bg.py`) → Blobs `bg:contract:law:v1`. `contract_mirror.py`가 추가 층을 파일 있으면 같이 push·verify.
