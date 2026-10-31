@@ -1,6 +1,6 @@
 # 종운 그룹웨어 — 기능 대장 (사용자 매뉴얼 원천)
 
-> 살아있는 문서. 기능 추가·변경 시 이 파일을 함께 갱신한다. 기준: v402 (2026-10-30).
+> 살아있는 문서. 기능 추가·변경 시 이 파일을 함께 갱신한다. 기준: v403 (2026-10-31).
 > 세부 변경 이력은 git 커밋 메시지(한글) 참조.
 
 ## 1. 전체 구조
@@ -788,6 +788,11 @@ PM 지시 "문서함 일단 다 올리고 등재결재랑 공개범위 만들어
 - 정정: STAGE_DOCS "완료신고" 석면해체·제거→석면해체/제거, "청구" 국세·지방세→국세/지방세 납세증명(파서가 복합 서류 이름을 나누던 2곳) → proc_v1.json 재export·거울 2층 재빌드(list sha 7eeb1ce6c1d18b44)·push.
 - 배포 전 적대 검토 7건 → 6건 반영: map_del 뒤 같은 정규식 map_add 가 무시되던 재생 순서(map_add 가 map_del 을 되살림·map_del 이 앞선 map_add 를 지움) · 기기 간 동기화 머지(csSyncFromServer)가 stage.docs[] 를 떨어뜨리던 것 → csMergeDocs(k 별 at 늦은 쪽·한쪽만 있는 항목 보존) · 서류 추가 뒤 입력 칸 비움 · 편집 textarea 줄바꿈=" / " · 되돌림 판정은 전체 기록(reverted_of) · __proto__ 키 거부. 수용 1건: 월 사건 로그 clog:contract:YYYY-MM 은 읽고-쓰기 사이 잠금이 없어 같은 초에 두 사람이 누르면 1건이 빠질 수 있다(지표용 로그, 체인은 유지 — 4일차 집계에서 빠진 수를 세지 않도록 참고).
 - 검사: servertest 절 55(40항), uismoke v401(3항), consheet_check v401(10항 — 파서·커버리지 81단계 중 79·체크/해당없음/추가/삭제·머지·html·옛 계약), proctpl diff 0. sw v401.
+
+### v403 (10/31) — done_if 크론 되돌리기 스냅샷 미기록 결함 수리 (45 R1 ② 첫 전환일 발견)
+- 증상: 10/31 16:40 `settings:doneif` 켬 뒤 첫 전환(후보 15 → review) 때 전환 전 일일 스냅샷 `ver:tasks:appbase:<날짜>`가 안 써짐. 원인 = gw-doneif-cron.js가 `if (!ex.ok)`로 '없음'을 판정했는데 실 Blobs의 blobGet은 없는 키를 ok:true·data:null로 준다(모의 blobGet은 ok:false라 servertest 절 51이 통과해 옴).
+- 수리: `if (!(ex.ok && ex.data))` 1줄 · servertest 절 51 켬 시험 직전에 스냅샷 키를 null로 두어 실 Blobs 동작을 재현(수리 전 실패·수리 후 통과). 10/31분은 08:57 백업 col:tasks로 같은 키에 사후 기록(note 포함).
+- 화면·데이터 변경 없음. 같은 날 R1 ③ `settings:contract.use_blob` 켬(거울 diff 0)은 데이터만, 앱 변경 없음.
 
 ### v402 (10/30) — 계약 카드 9 신설 엔진(added) 선구현 · 스위치 끈 채 (계약 D1 4일차, PM "45. 진행. 병목 시 피드백")
 - 뜻: 카드 9(계약 골조 확인, R2 — 11/4 무응답이면 추천안)의 신설 단계·목록을 앱이 읽어 **새 계약을 만들 때만** 조립하는 엔진. 켜지는 조건 = 거울 스위치(settings:contract.use_blob, 10/31 R1) 켜짐 ∧ 항목 active ∧ 두 층(proc·list) added.status 둘 다 applied ∧ 앱 검증 통과. 지금은 전부 꺼짐 → 화면·계약·지시 결과가 v401과 같다(consheet 14경우×적격 2 바이트 동일). 11/4에는 appdata `proc_added_v1.json`의 active·status만 바꿔 거울을 다시 올리면 된다(앱 배포 없음).

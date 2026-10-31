@@ -32,7 +32,7 @@ async function run(st, nowMs) {
     try {   // 전환 전 문서 일일 스냅샷 1회(ver 링과 별도 키, 되돌리기 재료)
       const sk = 'ver:tasks:appbase:' + today;
       const ex = await blobGet(st, sk);
-      if (!ex.ok) await blobSet(st, sk, { ts: nowMs, by: '앱 기준', doc: tdoc });
+      if (!(ex.ok && ex.data)) await blobSet(st, sk, { ts: nowMs, by: '앱 기준', doc: tdoc });   // v403: 실 Blobs는 없는 키를 ok:true·data:null로 준다(ok만 보면 '있음'으로 오판 → 10/31 첫 전환 때 스냅샷 미기록)
     } catch (e) {}
     last.moved = D.apply(tdoc.items, p.candidates, today);
     tdoc.updated_by = '앱 기준'; tdoc.updated_at = nowMs;

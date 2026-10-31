@@ -3305,6 +3305,7 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   r51 = await call({ action: 'doneif_set', on: true, base: 0 }, tokA); T('51 doneif_set 켬 · 감사 앱기준설정', r51.code === 200 && r51.body.on === true && auditMock.logs[auditN51].ev[0].op === '앱기준설정');
   mem.gw_data['settings:assign'] = { schema: 1, rules: {}, approver_id: 'uadmin', prev: null, updated_at: 1, updated_by: 'x' };
   pushMock.calls.length = 0;
+  mem.gw_data['ver:tasks:appbase:' + new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10)] = null;   // v403: 실 Blobs의 '없는 키'(ok:true·data:null) 재현 — 모의는 없는 키를 ok:false로 주어 스냅샷 미기록 결함을 못 잡았다(10/31)
   c51 = JSON.parse((await cron51.handler({})).body);
   const tk51 = mem.gw_data['col:tasks'].items; const tv = tk51.find((t) => t.id === 't_v'), ti = tk51.find((t) => t.id === 't_i'), toff = tk51.find((t) => t.id === 't_off'), th = tk51.find((t) => t.id === 't_h');
   const clog51 = mem.gw_data['clog:appr:' + c51.today.slice(0, 7)];
