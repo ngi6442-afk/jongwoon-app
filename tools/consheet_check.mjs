@@ -50,7 +50,7 @@ const stubs = `
   var schedN = 0; function scheduleContractSave(){ schedN++; } function saveTasksCache(){} function scheduleTasksSave(){} function renderTasks(){} function renderSummary(){} function renderContracts(){}
   function completeStageNow(){ return "done"; }
   var alerts = []; var CONTRACT_API = "contracts.json", serverItems = null, billN = 0;
-  function getToken(){ return "t"; } function ghHeaders(){ return {}; } function addDays(d){ return d; } function loadTasks(){} function loadAsb(){} function conBillToRec(){ billN++; } function canSee(){ return true; } var contractSaveTimer = null, saveNowN = 0; function doSaveContracts(){ saveNowN++; } var toasts = []; function apprToastShow(m){ toasts.push(String(m)); }
+  function getToken(){ return "t"; } function ghHeaders(){ return {}; } function loadTasks(){} function loadAsb(){} function conBillToRec(){ billN++; } function canSee(){ return true; } var contractSaveTimer = null, saveNowN = 0; function doSaveContracts(){ saveNowN++; } var toasts = []; function apprToastShow(m){ toasts.push(String(m)); }
   function b64DecodeUnicode(s){ return Buffer.from(s, "base64").toString("utf8"); }
   var fetch = function(){ if (!serverItems) return Promise.resolve({ ok: false }); return Promise.resolve({ ok: true, json: function(){ return Promise.resolve({ sha: "s", content: Buffer.from(JSON.stringify({ schema: 1, items: serverItems }), "utf8").toString("base64") }); } }); };
   var confirm = function(){ return true; }, alert = function(m){ alerts.push(String(m)); };
@@ -63,8 +63,9 @@ const stubs = `
   function curMember(){ return { id: "m1" }; } function apprGradeChipCss(){ return ""; } function renderDashboard(){}   // v402 로더·카드·startProcess 실제 실행용
 `;
 const tplLine = (html.match(/var TPL_LABELS=\{[^\r\n]*\};/) || [''])[0];
-const api = new Function('contracts', 'tasks', 'recs', stubs + tplLine + fnOf('conAttList') + scen + sheet + fnOf('stageXlsxKind') + fnOf('advanceProc') + fnOf('materializeStage') + fnOf('procStageTitle') + cut('  var CON_PROC_SRC', '  // 제목 키워드로 요소 제안') + cut('  var WASTE_BACKBONE = [', '  // @con-scen-start') + fnOf('applyPublicMilestones') + fnOf('startProcess') + `
-  return { CON_COLS, CON_SCEN, CON_PACKETS, STAGE_DOCS, conScenStages, conModalElems, stageDocsFor, csSplitTop, csParseStageDocs, csStageDocItems, csStageDocsHtml, csDocToggle, csDocNa, csDocAdd, csDocDel, csMergeDocs, csStageFields, stageXlsxKind, csRowHtml, csDetailHtml, csStageInfo, csSortRows, csPass, csEnumValues, csEndCell, csKind, csSkipStage, csJumpStage, csUnskipStage, csPacketsHtml, csLoadTpl, csApprKind, csApprSubmit, csApprOnDecided, csApprFind, csSyncFromServer, csApprSync, csApprDropped, csAlignTasksAll, toasts: toasts, saveNow: function(){ return saveNowN; }, csLinkSite, csLinkSiteLater, csOnDone, csSiteDone, csSiteHooksRetry, csNextFeb15, advanceProc, materializeStage, asb: asb, tasks: tasks, appr: apprPendingCreates, alerts: alerts, bills: function(){ return billN; }, setServer: function(items){ serverItems = items; }, pushContract: function(c){ contracts.push(c); }, popContract: function(){ contracts.pop(); }, setAsbLoaded: function(v){ asbLoaded = v; }, setTab: function(t){ conDetTab = t; }, openStage: function(k){ csStageOpen = k; }, setTpl: function(o){ csTplKeys = o; csTplErr = 0; }, setTplErr: function(v){ csTplErr = v; }, tplState: function(){ return { keys: csTplKeys, err: csTplErr, loading: csTplLoading }; }, setGw: function(f){ gwCall = f; }, conScenKey, CON_ADDED, conAddedPrep, conAddedApply, conAddedUse, conAddedClear, conScenTag, conChgWindow, conAddedPreviewHtml, conRouteKey, stageDocsOf, csStageFieldsOf, csStageNew, csApprKindOf, csChgAmtChanged, csChgCan, csChgAdd, csChgOpenAt, csStagesHtml, csDoneStage, conProcLoad, renderConProcCard, startProcess, procSrc: function(){ return CON_PROC_SRC; }, setDocEl: function(id, el){ docEls[id] = el; }, sched: function(){ return schedN; }, csApprApply, csTaskChg, csChgBase };
+const opt = (n) => { try { return fnOf(n); } catch (e) { return ''; } };   // v404: 날짜 실함수(isDate·addDays·pad) — 스텁 addDays 항등 함수 제거
+const api = new Function('contracts', 'tasks', 'recs', stubs + opt('isDate') + opt('addDays') + opt('pad') + opt('fmtDate') + tplLine + fnOf('conAttList') + scen + sheet + fnOf('stageXlsxKind') + fnOf('advanceProc') + fnOf('materializeStage') + fnOf('procStageTitle') + cut('  var CON_PROC_SRC', '  // 제목 키워드로 요소 제안') + cut('  var WASTE_BACKBONE = [', '  // @con-scen-start') + fnOf('applyPublicMilestones') + fnOf('startProcess') + `
+  return { CON_MAP, CON_BG, CON_PROC_SRC, conDueUse, conDueClear, conDueOn, conStageDue, conAnnualNext, conBaseDate, conAddBizDays, materializeStage, asb, todayStr, tasks, CON_COLS, CON_SCEN, CON_PACKETS, STAGE_DOCS, conScenStages, conModalElems, stageDocsFor, csSplitTop, csParseStageDocs, csStageDocItems, csStageDocsHtml, csDocToggle, csDocNa, csDocAdd, csDocDel, csMergeDocs, csStageFields, stageXlsxKind, csRowHtml, csDetailHtml, csStageInfo, csSortRows, csPass, csEnumValues, csEndCell, csKind, csSkipStage, csJumpStage, csUnskipStage, csPacketsHtml, csLoadTpl, csApprKind, csApprSubmit, csApprOnDecided, csApprFind, csSyncFromServer, csApprSync, csApprDropped, csAlignTasksAll, toasts: toasts, saveNow: function(){ return saveNowN; }, csLinkSite, csLinkSiteLater, csOnDone, csSiteDone, csSiteHooksRetry, csNextFeb15, advanceProc, materializeStage, asb: asb, tasks: tasks, appr: apprPendingCreates, alerts: alerts, bills: function(){ return billN; }, setServer: function(items){ serverItems = items; }, pushContract: function(c){ contracts.push(c); }, popContract: function(){ contracts.pop(); }, setAsbLoaded: function(v){ asbLoaded = v; }, setTab: function(t){ conDetTab = t; }, openStage: function(k){ csStageOpen = k; }, setTpl: function(o){ csTplKeys = o; csTplErr = 0; }, setTplErr: function(v){ csTplErr = v; }, tplState: function(){ return { keys: csTplKeys, err: csTplErr, loading: csTplLoading }; }, setGw: function(f){ gwCall = f; }, conScenKey, CON_ADDED, conAddedPrep, conAddedApply, conAddedUse, conAddedClear, conScenTag, conChgWindow, conAddedPreviewHtml, conRouteKey, stageDocsOf, csStageFieldsOf, csStageNew, csApprKindOf, csChgAmtChanged, csChgCan, csChgAdd, csChgOpenAt, csStagesHtml, csDoneStage, conProcLoad, renderConProcCard, startProcess, procSrc: function(){ return CON_PROC_SRC; }, setDocEl: function(id, el){ docEls[id] = el; }, sched: function(){ return schedN; }, csApprApply, csTaskChg, csChgBase };
 `)(contracts, tasks, recs);
 let fails = 0; const T = (n, ok, note) => { console.log((ok ? '  ✓ ' : '  ✗ ') + n + (ok ? '' : ' — ' + note)); if (!ok) fails++; };
 // 시나리오 목록
@@ -420,5 +421,49 @@ T('준공·만기 칸: d3 없음 → "-" · 지난 날짜 → vs-dan · 완료 �
   const pH = api.conAddedPrep({ schema: 2, status: 'applied', stages: [], lists: [{ id: 'lx', kind: 'list', key: 'K_x', replaces: '완료신고', match_re: '없는단계이름', value: 'v', active: true }] });
   T('v402 검토 4: 목록이 걸리는 단계 0이면 표시(soft — 파이썬은 빌드 오류)', pH.lists.length === 1 && pH.bad.some((b) => b.id === 'lx' && b.soft && /걸리는 단계 0/.test(b.why)), JSON.stringify(pH.bad));
   api.popContract(); api.popContract(); api.popContract(); api.conAddedClear();
+}
+
+// ---- v404(10/31 계약 D2): 기한 엔진 — 꺼짐 바이트 동일 · D-7 대장 기산 · D+30/D+0/immediate · annual(2/15·2월 말·override, B1 회귀) · 배경 품질 게이트(재확인 필요·확인 필요·81행 예외 0)
+{
+  const dir4 = join(ROOT, '..', 'jongwoon-appdata', 'data', 'contract');
+  const MAP4 = JSON.parse(readFileSync(join(dir4, 'proc_map_v1.json'), 'utf8')), BG4 = JSON.parse(readFileSync(join(dir4, 'bg_law_v1.json'), 'utf8'));
+  const flag4 = { use_blob: true, bg_ver: BG4.ver, annual_override: {} };
+  const mk = (type, pub, name, extra) => Object.assign({ id: 'c4', type, scen: { type, pub, combo: false, ver: 1 }, start: '2026-11-01', contract_info: { d1: '2026-11-01', d2: '', d3: '' }, pipes: [{ key: 'main', cur: 0, stages: [{ name, due: 'manual', days: null, status: 'pending', task_id: null, done_at: null, opt: 0 }] }], site_id: '' }, extra || {});
+  const stg = (c) => c.pipes[0].stages[0];
+  // 1 꺼짐 바이트 동일(거울 const): 층이 다 있어도 conDueOn false, materializeStage는 status·task_id만
+  api.CON_PROC_SRC.mode = 'const'; api.conDueUse({ map: MAP4, bg: BG4, flag: flag4 });
+  let c1 = mk('asbestos', false, '노동부 신고 서류 작성'); api.materializeStage(c1, c1.pipes[0], c1.start);
+  const off1 = !api.conDueOn() && stg(c1).status === 'open' && !!stg(c1).task_id && !('due_src' in stg(c1)) && !('due_badge' in stg(c1)) && Object.keys(stg(c1)).join(',') === 'name,due,days,status,task_id,done_at,opt';
+  api.CON_PROC_SRC.mode = 'blob'; api.conDueUse({ map: MAP4, bg: BG4, flag: { use_blob: true, bg_ver: 'v0-other', annual_override: {} } });
+  const off2 = !api.conDueOn();   // 판 불일치 = 꺼짐
+  api.conDueUse({ map: null, bg: BG4, flag: flag4 }); const off3 = !api.conDueOn();
+  T('v404 꺼짐 동일성: 거울 const·bg 판 불일치·map 없음 → 엔진 꺼짐, 단계 키 7개 그대로(새 키 0)', off1 && off2 && off3, JSON.stringify(stg(c1)));
+  // 2 켬: D-7 대장 기산(노동부 신고)
+  api.conDueUse({ map: MAP4, bg: BG4, flag: flag4 }); api.CON_PROC_SRC.flag = flag4;
+  api.asb.length = 0; api.asb.push({ id: 'site1', kind: 'asbestos', start: '2026-11-10', del: 0 });
+  let c2 = mk('asbestos', false, '노동부 신고 서류 작성', { site_id: 'site1' }); const d2 = api.conStageDue(stg(c2), c2, c2.pipes[0]);
+  let c2b = mk('asbestos', false, '노동부 신고 서류 작성'); const d2b = api.conStageDue(stg(c2b), c2b, c2b.pipes[0]);
+  api.materializeStage(c2, c2.pipes[0], c2.start); const t2 = api.tasks[api.tasks.length - 1];
+  T('v404 D-7: 대장 start 11-10 → 11-03 · src에 181조①·D-7 · 대장 없으면 기산일 필요 · materializeStage가 지시 due·단계 due_src 기록', api.conDueOn() && d2.due === '2026-11-03' && /181조①/.test(d2.src) && /D-7/.test(d2.src) && d2b.badge === '기산일 필요' && t2.due === '2026-11-03' && stg(c2).due_src === d2.src && !('due_badge' in stg(c2)), JSON.stringify([d2, d2b, t2 && t2.due]));
+  // 3 D+30 · D+0 · immediate · 영업일
+  let c3 = mk('demolition', false, '해체완료신고서류 작성'); stg(c3).vals = { fin_base: '2026-12-01' }; const d3 = api.conStageDue(stg(c3), c3, c3.pipes[0]);
+  let c3b = mk('asbestos', false, '배출신고 서류 작성', { contract_info: { d2: '2026-11-10', d3: '' } }); const d3b = api.conStageDue(stg(c3b), c3b, c3b.pipes[0]);
+  let c3c = mk('asbestos', false, '완료보고 및 실적보고'); stg(c3c).vals = { fin_date: '2026-12-05' }; const d3c = api.conStageDue(stg(c3c), c3c, c3c.pipes[0]);
+  T('v404 D+30(해체완료 12-01→12-31) · D+0(배출자 신고 = 착공일 11-10) · 지체 없이(완료보고 = 농도 결과 수령일 12-05) · 영업일 더하기(금 11-06 +5 → 11-13)', d3.due === '2026-12-31' && /D\+30/.test(d3.src) && d3b.due === '2026-11-10' && /D\+0/.test(d3b.src) && d3c.due === '2026-12-05' && /지체 없이/.test(d3c.src) && api.conAddBizDays('2026-11-06', 5) === '2026-11-13', JSON.stringify([d3, d3b, d3c]));
+  // 4 annual: 2/15 · 2월 말 · override(B1 회귀)
+  const td = api.todayStr(), y = Number(td.slice(0, 4)), feb15 = (td >= y + '-02-15' ? y + 1 : y) + '-02-15';
+  let c4 = mk('demolition', false, '실적보고'); const d4 = api.conStageDue(stg(c4), c4, c4.pipes[0]);
+  let c4b = mk('waste', false, '처리확인서 발부 및 실적보고'); const d4b = api.conStageDue(stg(c4b), c4b, c4b.pipes[0]);
+  api.CON_PROC_SRC.flag = { use_blob: true, bg_ver: BG4.ver, annual_override: { 'law.cind.r.22.1': '2027-02-20' } }; const d4c = api.conStageDue(stg(c4), c4, c4.pipes[0]); api.CON_PROC_SRC.flag = flag4;
+  T('v404 annual: 실적보고 → 다음 2/15(' + feb15 + ', B1 회귀) · 처리확인서·실적보고 → 다음 2월 말 · override 2027-02-20 우선', d4.due === feb15 && !d4.badge && /^\d{4}-02-2[89]$/.test(d4b.due) && d4c.due === '2027-02-20', JSON.stringify([d4, d4b, d4c]));
+  // 5 배경 품질 게이트: 재확인 필요(31일) · 확인 필요(grade) · 81행 예외 0 · manual/external 외 due·badge 둘 다 빈 행 0
+  const dminus = (n) => { const x = new Date(td + 'T00:00:00'); x.setDate(x.getDate() - n); return x.getFullYear() + '-' + ('0' + (x.getMonth() + 1)).slice(-2) + '-' + ('0' + x.getDate()).slice(-2); };   // todayStr 스텁 기준 상대 날짜
+  const BGx = JSON.parse(JSON.stringify(BG4)); BGx.rows.forEach((r) => { if (r.id === 'law.osh.r.181.1') r.checked = dminus(31); if (r.id === 'law.waste.r.18') r.grade = '확인 필요'; });
+  api.conDueUse({ map: MAP4, bg: BGx, flag: flag4 }); const d5 = api.conStageDue(stg(c2), c2, c2.pipes[0]); const d5b = api.conStageDue(stg(c3b), c3b, c3b.pipes[0]);
+  api.conDueUse({ map: MAP4, bg: BG4, flag: flag4 });
+  let n5 = 0, empty5 = [], err5 = [];
+  for (const key of Object.keys(MAP4.scen)) { const [type, pub] = key.split(':'); for (const row of MAP4.scen[key]) { n5++; try { const cc = mk(type, pub === 'pub', row.name); const dd = api.conStageDue(stg(cc), cc, cc.pipes[0]); if (!dd) { err5.push(key + '/' + row.name + ' 행 없음'); continue; } if (dd.due === '' && dd.badge === '' && !/^(manual|external)$/.test(row.due_rule.kind)) empty5.push(key + '/' + row.name); } catch (e) { err5.push(key + '/' + row.name + ' ' + e.message); } } }
+  T('v404 배경 품질: checked 31일 경과 → 재확인 필요 · grade 확인 필요 → 확인 필요 · 81행 예외 0 · manual/external 외 due·배지 둘 다 빈 행 0', d5.badge === '재확인 필요' && d5b.badge === '확인 필요' && n5 === 81 && err5.length === 0 && empty5.length === 0, JSON.stringify({ d5, d5b, n5, err5: err5.slice(0, 3), empty5: empty5.slice(0, 5) }));
+  api.CON_PROC_SRC.mode = 'const'; api.conDueClear(); api.asb.length = 0;
 }
 console.log(fails ? '\n계약 시트 실행 검사 실패 ' + fails + '건' : '\n계약 시트 실행 검사 전 항목 통과'); process.exit(fails ? 1 : 0);

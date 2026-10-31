@@ -1644,18 +1644,23 @@ async function handleAlertsSet(event, d, R) {
 // ---- 계약 골조·목록 거울 (v400 — 계약 D1 2일차). Blobs proc:contract:v1(골조 층: CON_TYPE_ELEMS·CON_SCEN·CON_STAGE_FIELDS·CON_SITE_CORP + added.stages)·list:contract(목록 층: STAGE_DOCS·STAGE_DOC_MAP·CON_PACKETS + added.lists)는
 //      appdata collectors/contract_mirror.py 가 쓴다(코드 상수 export + proc_added_v1 제안). 앱은 settings:contract.use_blob 가 true 일 때만 로그인 뒤 상수 자리에 거울을 덮어 쓴다(기본 false = 배포 무변화).
 //      켜기·끄기는 관리자 1클릭(prev 보존 = 되돌리기), 거울 두 층이 검증(proc_ver v1·layer·sha)을 못 넘으면 켤 수 없다(MIRROR_MISSING). 단계 이름은 어느 쪽이든 PM 원문 불변.
-const CON_PROC_KEYS = { proc: 'proc:contract:v1', list: 'list:contract', flag: 'settings:contract' };
+const CON_PROC_KEYS = { proc: 'proc:contract:v1', list: 'list:contract', flag: 'settings:contract', map: 'map:contract:v1', bg: 'bg:contract:law:v1' };   // v404 D2: map(두 층 매핑·due_rule, contract_map.py)·bg(법령 배경 승격본, contract_bg.py)
+function conProcMapOk(x) { return !!(x && typeof x === 'object' && x.schema === 1 && x.proc_ver === 'v1' && x.scen && typeof x.scen === 'object' && typeof x.sha === 'string' && x.sha.length >= 8); }
+function conProcBgOk(x) { return !!(x && typeof x === 'object' && x.schema === 1 && typeof x.ver === 'string' && x.ver.length >= 2 && Array.isArray(x.rows) && typeof x.sha === 'string' && x.sha.length >= 8); }
 function conProcLayerOk(x, layer) { return !!(x && typeof x === 'object' && x.proc_ver === 'v1' && x.layer === layer && x.consts && typeof x.consts === 'object' && typeof x.sha === 'string' && x.sha.length >= 8); }
 async function conProcReadFlag(st) {
-  let flag = { use_blob: false, updated_at: 0, updated_by: '', prev: null };
-  try { const r = await blobGet(st, CON_PROC_KEYS.flag); if (r.ok && r.data) flag = { use_blob: r.data.use_blob === true, updated_at: r.data.updated_at || 0, updated_by: r.data.updated_by || '', prev: r.data.prev || null }; } catch (e) {}
+  let flag = { use_blob: false, updated_at: 0, updated_by: '', prev: null, bg_ver: '', annual_override: {} };
+  try { const r = await blobGet(st, CON_PROC_KEYS.flag); if (r.ok && r.data) flag = { use_blob: r.data.use_blob === true, updated_at: r.data.updated_at || 0, updated_by: r.data.updated_by || '', prev: r.data.prev || null, bg_ver: typeof r.data.bg_ver === 'string' ? r.data.bg_ver : '', annual_override: (r.data.annual_override && typeof r.data.annual_override === 'object') ? r.data.annual_override : {} }; } catch (e) {}   // v404: bg_ver(배경 승격본 판)·annual_override(연 1회 기한 override)
   return flag;
 }
 async function conProcReadLayers(st) {
   let proc = null, list = null;
   try { const p = await blobGet(st, CON_PROC_KEYS.proc); if (p.ok && conProcLayerOk(p.data, 'proc')) proc = p.data; } catch (e) {}
   try { const l = await blobGet(st, CON_PROC_KEYS.list); if (l.ok && conProcLayerOk(l.data, 'list')) list = l.data; } catch (e) {}
-  return { proc: proc, list: list };
+  let map = null, bg = null;   // v404 D2 — 없으면 null(앱은 없음 = 기한 엔진 꺼짐). 두 층과 독립(불량이어도 proc·list에 영향 없음)
+  try { const m = await blobGet(st, CON_PROC_KEYS.map); if (m.ok && conProcMapOk(m.data)) map = m.data; } catch (e) {}
+  try { const g = await blobGet(st, CON_PROC_KEYS.bg); if (g.ok && conProcBgOk(g.data)) bg = g.data; } catch (e) {}
+  return { proc: proc, list: list, map: map, bg: bg };
 }
 async function handleConProcFlagSet(event, d, R) {
   const c = await currentMember(event);
@@ -1667,11 +1672,44 @@ async function handleConProcFlagSet(event, d, R) {
   if (d.base !== undefined && Number(d.base) !== Number(cur.updated_at || 0)) return jr(409, { status: 'CONFLICT', error_code: 'CON_PROC_STALE', request_id: R });
   if (cur.use_blob === d.use_blob) return jr(400, { status: 'REJECTED', error_code: 'NO_CHANGE', request_id: R });
   if (d.use_blob) { const L = await conProcReadLayers(st); if (!L.proc || !L.list) return jr(409, { status: 'CONFLICT', error_code: 'MIRROR_MISSING', request_id: R }); }
-  const doc = { schema: 1, use_blob: d.use_blob, prev: { use_blob: cur.use_blob, updated_at: cur.updated_at, updated_by: cur.updated_by }, updated_by: c.member.id, updated_at: Date.now() };
+  const doc = { schema: 1, use_blob: d.use_blob, prev: { use_blob: cur.use_blob, updated_at: cur.updated_at, updated_by: cur.updated_by, bg_ver: cur.bg_ver || '' }, bg_ver: cur.bg_ver || '', annual_override: cur.annual_override || {}, updated_by: c.member.id, updated_at: Date.now() };   // v404: 스위치 토글이 bg_ver·override를 지우지 않음(prev에도 기록 — 검토 N5)
   const w = await blobSet(st, CON_PROC_KEYS.flag, doc);
   if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
   try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'contracts', ev: [{ op: '계약골조', id: '', t: '골조·목록 거울 ' + (cur.use_blob ? '켬' : '끔') + '→' + (d.use_blob ? '켬' : '끔') }] }); } catch (e) {}
   return jr(200, { status: 'OK', use_blob: d.use_blob, updated_at: doc.updated_at, request_id: R });
+}
+// v404 D2 — 배경 승격·연 1회 override. bg_ver = 거울 4층 bg:contract:law:v1 의 ver 와 같을 때만 앱 기한 엔진이 켜진다(R2 승격 카드의 [승격] 버튼). '' = 해제(엔진 끔, 기존 계약 기한 불변·소급 없음).
+//      annual_override = { law_id: 'YYYY-MM-DD' } — 연 1회 고정일(실적신고 2/15 등)의 그해 연장 고시 대응, bg 행은 안 바꿈. 되돌리기 = 같은 액션으로 ''.
+async function handleConProcBgSet(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (!c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
+  const st = store(DATA);
+  const cur = await conProcReadFlag(st);
+  if (d.base !== undefined && Number(d.base) !== Number(cur.updated_at || 0)) return jr(409, { status: 'CONFLICT', error_code: 'CON_PROC_STALE', request_id: R });
+  const doc = { schema: 1, use_blob: cur.use_blob, prev: { use_blob: cur.use_blob, updated_at: cur.updated_at, updated_by: cur.updated_by, bg_ver: cur.bg_ver || '' }, bg_ver: cur.bg_ver || '', annual_override: Object.assign({}, cur.annual_override || {}), updated_by: c.member.id, updated_at: Date.now() };
+  const changed = [];
+  if (d.bg_ver !== undefined) {
+    const v = String(d.bg_ver || '');
+    if (v && !/^[A-Za-z0-9_.-]{2,40}$/.test(v)) return jr(400, { status: 'REJECTED', error_code: 'BAD_VALUE', request_id: R });
+    if (v) { const L = await conProcReadLayers(st); if (!L.bg || L.bg.ver !== v) return jr(409, { status: 'CONFLICT', error_code: 'BG_MISSING', request_id: R }); }
+    if (v !== (cur.bg_ver || '')) { doc.bg_ver = v; changed.push('배경 ' + (cur.bg_ver || '없음') + '→' + (v || '없음')); }
+  }
+  if (d.annual_override && typeof d.annual_override === 'object') {
+    for (const k of Object.keys(d.annual_override)) {
+      if (!/^[a-z][a-z0-9_.-]{1,40}$/.test(k)) return jr(400, { status: 'REJECTED', error_code: 'BAD_VALUE', request_id: R });
+      const v = d.annual_override[k];
+      if (v && !/^\d{4}-\d{2}-\d{2}$/.test(String(v))) return jr(400, { status: 'REJECTED', error_code: 'BAD_VALUE', request_id: R });
+      const before = doc.annual_override[k] || '';
+      if (v) doc.annual_override[k] = String(v); else delete doc.annual_override[k];
+      if ((doc.annual_override[k] || '') !== before) changed.push('연 1회 override ' + k + ' ' + (before || '없음') + '→' + (v || '없음'));   // 검토 S5: 실제 바뀐 키만
+    }
+  }
+  if (!changed.length) return jr(400, { status: 'REJECTED', error_code: 'NO_CHANGE', request_id: R });
+  const w = await blobSet(st, CON_PROC_KEYS.flag, doc);
+  if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
+  try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'contracts', ev: [{ op: '계약배경', id: '', t: changed.join(' · ') }] }); } catch (e) {}
+  return jr(200, { status: 'OK', bg_ver: doc.bg_ver, annual_override: doc.annual_override, updated_at: doc.updated_at, request_id: R });
 }
 // ---- 계약 골조·목록 편집 기록 clog:contract (v401 — 계약 D1 3일차). 거울 두 층(contract_mirror.py 출력)은 그대로 두고, 관리자 편집을 append-only 해시 체인 clog:contract 에 쌓아
 //      읽을 때마다 base 위에 재생(replay)한 "유효 층"을 돌려준다 — --push/--verify 는 base 만 보므로 편집이 지워지지도, 변환 diff 0 게이트가 깨지지도 않는다. 앱 로더(conProcLoad)는 유효 층을 받는다.
@@ -1729,7 +1767,8 @@ async function handleConProcGet(event, d, R) {
   let proc = L.proc, list = L.list, state = null;
   if (proc && list) { const eff = conProcReplay(proc, list, clog); proc = eff.proc; list = eff.list; state = eff.state; }
   const clogOut = { n: clog.items.length, head: clog.head || '', applied: state ? state.applied : 0, reverted: state ? state.reverted : 0, chain_ok: conClogChainOk(clog), items: clog.items.slice(-30), reverted_of: clog.items.filter((x) => x.op === 'revert' && x.of).map((x) => x.of) };
-  return jr(200, { status: 'OK', flag: flag, proc: proc, list: list, clog: clogOut, edit_state: state, request_id: R });
+  const heavy = !!(flag.use_blob || c.member.admin);   // v404 검토 S4: 꺼짐이면 직원에게 map·bg(약 100KB) 안 보냄(앱은 null = 엔진 꺼짐)
+  return jr(200, { status: 'OK', flag: flag, proc: proc, list: list, map: heavy ? L.map : null, bg: heavy ? L.bg : null, clog: clogOut, edit_state: state, request_id: R });   // v404: map·bg 층 동봉(없으면 null)
 }
 async function handleConProcEdit(event, d, R) {
   const c = await currentMember(event);
@@ -3144,6 +3183,7 @@ async function handlerInner(event) {
     if (d && d.action === 'alerts_set') return await handleAlertsSet(event, d, R);
     if (d && d.action === 'con_proc_get') return await handleConProcGet(event, d, R);
     if (d && d.action === 'con_proc_flag_set') return await handleConProcFlagSet(event, d, R);
+    if (d && d.action === 'con_proc_bg_set') return await handleConProcBgSet(event, d, R);   // v404
     if (d && d.action === 'con_proc_edit') return await handleConProcEdit(event, d, R);
     if (d && d.action === 'con_clog_add') return await handleConClogAdd(event, d, R);
     if (d && d.action === 'doc_settings_get') return await handleDocSettingsGet(event, d, R);

@@ -1639,7 +1639,7 @@ try {
     /function conProcLoad\(\)/.test(html) && /function conProcApplyInPlace\(/.test(html) && /function conProcValid\(/.test(html) && /function conProcRevive\(/.test(html) && /loadMembers\(\);[^\n]*\n\s*conProcLoad\(\);/.test(html)
     && html.indexOf('id="conProcCard"') > 0 && /function renderConProcCard\(\)/.test(html) && /renderAlertsCard\(\);[^\n]*\n\s*renderConProcCard\(\);/.test(html) && /action: "con_proc_get"/.test(html) && /action: "con_proc_flag_set"/.test(html)
     && /dredge:"주식회사 종운환경"/.test(html) && html.indexOf('종운환경 주식회사') < 0 && /var elems=conModalElems\(type, false\);/.test(html) && html.indexOf('{asb:1,labor:1,wst:1}:{dredge:1}') < 0
-    && /async function handleConProcGet/.test(gwd) && /async function handleConProcFlagSet/.test(gwd) && /action === 'con_proc_get'/.test(gwd) && /action === 'con_proc_flag_set'/.test(gwd) && /const CON_PROC_KEYS = \{ proc: 'proc:contract:v1', list: 'list:contract', flag: 'settings:contract' \}/.test(gwd) && /MIRROR_MISSING/.test(gwd) && /CON_PROC_STALE/.test(gwd) && /op: '계약골조'/.test(gwd)
+    && /async function handleConProcGet/.test(gwd) && /async function handleConProcFlagSet/.test(gwd) && /action === 'con_proc_get'/.test(gwd) && /action === 'con_proc_flag_set'/.test(gwd) && /const CON_PROC_KEYS = \{ proc: 'proc:contract:v1', list: 'list:contract', flag: 'settings:contract'/.test(gwd) && /MIRROR_MISSING/.test(gwd) && /CON_PROC_STALE/.test(gwd) && /op: '계약골조'/.test(gwd)
     && okAdd && okBlob && /jw-shell-v(400|4\d\d)/.test(swv), addTxt);
 } catch (e) { console.log('  (v400 검사 생략 — ' + e.message + ')'); fails++; }
 
@@ -1703,5 +1703,22 @@ try {
   const swN = Number((swv.match(/jw-shell-v(\d+)/) || ['', '0'])[1]);
   T('v402 데이터·sw: proc_added_v1 스키마 2·status pending|applied·active는 bool·pending이면 전부 비활성·id 6개 고정 · R16 거울 파일 added = 원천(빌드 누락 없음) · sw ≥ 402(숫자 비교)', okData && okBuilt && swN >= 402, dTxt + ' · sw ' + swN);
 } catch (e) { console.log('  (v402 검사 생략 — ' + e.message + ')'); fails++; }
+// ---- v404(10/31 계약 D2): 기한 엔진 — 엔진 함수·materializeStage 훅(켜짐일 때만, 새 키만)·단계 카드 meta 훅·관리자 카드 배경 행+승격 버튼·서버 con_proc_bg_set·4층 키·sw ≥404
+try {
+  const swv4 = readFileSync(join(ROOT, 'sw.js'), 'utf8');
+  const gwd4 = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-data.js'), 'utf8');
+  const sc404 = html.slice(html.indexOf('// @con-scen-start'), html.indexOf('// @con-scen-end'));
+  const fns4 = ['conDueClear', 'conDueUse', 'conDueOn', 'conMapRow', 'conStageVal', 'conBaseDate', 'conDaysSince', 'conAnnualNext', 'conStageDue'];
+  const miss4 = fns4.filter((f) => sc404.indexOf('function ' + f + '(') < 0);
+  T('v404 엔진: 함수 ' + fns4.length + '종 @con-scen · CON_MAP/CON_BG 전역 · 배지 4종 문구 · materializeStage 훅(conDueOn 뒤, 새 키 due_src·due_badge) · 단계 카드 meta 훅 · 로더 conDueClear/conDueUse',
+    miss4.length === 0 && /var CON_MAP = \{ ok:false/.test(sc404) && ['기산일 필요', '확인 필요', '근거 미승격', '재확인 필요'].every((w) => sc404.indexOf('"' + w + '"') > 0)
+    && /if\(!due && c\.scen && conDueOn\(\)\)\{ var dd = conStageDue\(s, c, pipe\);/.test(html) && /s\.due_src = dd\.src; else delete s\.due_src;/.test(html)
+    && /if \(!isSkip && !isDone && \(s\.due_badge \|\| s\.due_src\)\) meta \+=/.test(html) && /CON_PROC_SRC\.flag = b\.flag \|\| null; conDueClear\(\);/.test(html) && /try \{ conDueUse\(b\); \} catch\(e\)\{ conDueClear\(\); \}/.test(html));
+  T('v404 카드·서버: 관리자 카드 배경 행·data-conproc-bg 버튼·conProcBgSet · gw-data con_proc_bg_set 분기·handleConProcBgSet·4층 키·BG_MISSING·flag_set이 bg_ver 보존 · sw ≥ 404',
+    html.indexOf('["배경 bg:law(D2)"') > 0 && html.indexOf('data-conproc-bg=') > 0 && html.indexOf('function conProcBgSet(ver, base)') > 0
+    && /action === 'con_proc_bg_set'/.test(gwd4) && /async function handleConProcBgSet/.test(gwd4) && /map: 'map:contract:v1', bg: 'bg:contract:law:v1'/.test(gwd4) && /BG_MISSING/.test(gwd4) && /bg_ver: cur\.bg_ver \|\| '', annual_override: cur\.annual_override \|\| \{\}, updated_by: c\.member\.id/.test(gwd4)
+    && Number((swv4.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 404);
+} catch (e) { console.log('  (v404 검사 생략 — ' + e.message + ')'); fails++; }
+
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

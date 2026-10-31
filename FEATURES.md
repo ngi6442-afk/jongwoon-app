@@ -1,6 +1,6 @@
 # 종운 그룹웨어 — 기능 대장 (사용자 매뉴얼 원천)
 
-> 살아있는 문서. 기능 추가·변경 시 이 파일을 함께 갱신한다. 기준: v403 (2026-10-31).
+> 살아있는 문서. 기능 추가·변경 시 이 파일을 함께 갱신한다. 기준: v404 (2026-10-31).
 > 세부 변경 이력은 git 커밋 메시지(한글) 참조.
 
 ## 1. 전체 구조
@@ -788,6 +788,14 @@ PM 지시 "문서함 일단 다 올리고 등재결재랑 공개범위 만들어
 - 정정: STAGE_DOCS "완료신고" 석면해체·제거→석면해체/제거, "청구" 국세·지방세→국세/지방세 납세증명(파서가 복합 서류 이름을 나누던 2곳) → proc_v1.json 재export·거울 2층 재빌드(list sha 7eeb1ce6c1d18b44)·push.
 - 배포 전 적대 검토 7건 → 6건 반영: map_del 뒤 같은 정규식 map_add 가 무시되던 재생 순서(map_add 가 map_del 을 되살림·map_del 이 앞선 map_add 를 지움) · 기기 간 동기화 머지(csSyncFromServer)가 stage.docs[] 를 떨어뜨리던 것 → csMergeDocs(k 별 at 늦은 쪽·한쪽만 있는 항목 보존) · 서류 추가 뒤 입력 칸 비움 · 편집 textarea 줄바꿈=" / " · 되돌림 판정은 전체 기록(reverted_of) · __proto__ 키 거부. 수용 1건: 월 사건 로그 clog:contract:YYYY-MM 은 읽고-쓰기 사이 잠금이 없어 같은 초에 두 사람이 누르면 1건이 빠질 수 있다(지표용 로그, 체인은 유지 — 4일차 집계에서 빠진 수를 세지 않도록 참고).
 - 검사: servertest 절 55(40항), uismoke v401(3항), consheet_check v401(10항 — 파서·커버리지 81단계 중 79·체크/해당없음/추가/삭제·머지·html·옛 계약), proctpl diff 0. sw v401.
+
+### v404 (10/31) — 계약 D2 기한 엔진(거울 3층 map + 4층 bg:law, 승격 플래그) · 켜지기 전엔 화면 변화 0
+- 데이터(appdata): `data/contract/proc_map_v1.json`(두 층 매핑 — 상위 9단계 PM 10/22 원문 ↔ 하위 10목록 81단계 CON_SCEN 원문, 단계별 route·서류·입력 칸·결재 종류·who_role·co·due_rule; 빌더 `collectors/contract_map.py`, 규칙 `proc_map_rules_v1.json`) → Blobs `map:contract:v1` · `data/contract/bg_law_v1.json`(법령 배경 승격본, 행 = law·art·mst·eff·checked·grade·days·base; 빌더 `collectors/contract_bg.py`) → Blobs `bg:contract:law:v1`. `contract_mirror.py`가 추가 층을 파일 있으면 같이 push·verify.
+- 서버(gw-data.js): `con_proc_get`이 map·bg 층 동봉(없으면 null) · `settings:contract`에 `bg_ver`(승격본 판)·`annual_override`(연 1회 기한 override, {law_id: 날짜}) · 새 액션 `con_proc_bg_set`(관리자, 4층 ver 일치 없으면 BG_MISSING, 감사 '계약배경') · 스위치 토글이 bg_ver를 지우지 않음.
+- 앱(@con-scen): `conStageDue(s, c, pipe)` — map 행 due_rule.kind별 계산(manual·external 비움 / field 계약 착공·준공일 / law bg 행 days + 기산일 / immediate 기산일 당일 / annual 연 1회·override 우선), 배지 '기산일 필요'·'확인 필요'·'근거 미승격'·'재확인 필요'(확인 30일 경과). 켜짐 = 거울 적용 ∧ map ∧ bg 승격(bg_ver == bg.ver). materializeStage가 켜짐일 때만 새 지시 due를 채우고 단계에 due_src·due_badge 새 키만 둠(꺼짐 = 바이트 동일, 소급 없음).
+- 화면: 단계 탭 카드 meta에 배지·근거(법령 조문 D±n · 확인일) · 권한관리 › 계약 골조 카드에 '배경 bg:law' 행(판·행 수·실측 수·승격 여부·매핑 sha·override) + [배경 승격 — 기한 엔진 켜기]/[해제] 버튼(R2 카드의 승격 동작).
+- 검사: servertest 절 57(5항: 층 동봉·bg_set 권한/불일치/승격/override·토글 보존), uismoke v404(엔진 함수·materializeStage 훅·meta 훅·카드·서버 액션·sw ≥404), consheet_check v404 5항(꺼짐 바이트 동일·D-7 대장 기산·D+30/D+0/지체 없이/영업일·annual 2/15·2월 말·override·배경 품질 게이트 81행 — 날짜 실함수 isDate/addDays/pad/fmtDate 주입). 계획 `09_조사_문서/계약_D2_구현계획_20261031.md`.
+- 배포 전 적대 검토(하위 에이전트, 렌즈 6 — 실데이터 하네스 27항) 반영: B1 연 1회 기한이 bg base 설명문 탓에 빈 값 → map base 우선·못 풀면 '확인 필요' · S1 기산일이 단계 입력 칸인 행은 칸 저장 뒤 같은 계약 안에서 1회 재계산(지시 due 비어 있을 때만) · S2 관리자 카드에 확인 경과·30일 넘으면 재확인 안내 · S3 대가 5일 = 영업일(토·일 제외, 공휴일 미반영 명시, due_rule.unit biz) · S4 꺼짐이면 직원 응답에 map·bg 미동봉(약 100KB) · S5 override 실제 바뀐 키만 쓰기·감사 · N1 D+0 · N3 kind 오타 '규칙 불명' · N5 flag_set prev에 bg_ver · N8 로더 첫 줄 conDueClear. 보류 nit: 2/15 당일 포함(csNextFeb15 관례 유지)·pipe 인자·폰 근거 문구 줄 바꿈·지시 due 수기 수정 시 due_src 잔존(N7).
 
 ### v403 (10/31) — done_if 크론 되돌리기 스냅샷 미기록 결함 수리 (45 R1 ② 첫 전환일 발견)
 - 증상: 10/31 16:40 `settings:doneif` 켬 뒤 첫 전환(후보 15 → review) 때 전환 전 일일 스냅샷 `ver:tasks:appbase:<날짜>`가 안 써짐. 원인 = gw-doneif-cron.js가 `if (!ex.ok)`로 '없음'을 판정했는데 실 Blobs의 blobGet은 없는 키를 ok:true·data:null로 준다(모의 blobGet은 ok:false라 servertest 절 51이 통과해 옴).

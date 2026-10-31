@@ -9730,6 +9730,67 @@
     return el;
   }
   // ---- v402 카드 9 신설 엔진(계약 D1 4일차) — 원천 = 거울 added(appdata proc_added_v1.json 스키마 2). 켜짐 = 거울 스위치 ∧ 항목 active ∧ 두 층 status applied ∧ 검증 통과. 새 계약 생성 때만 조립(기존 계약 소급 없음) ----
+  // ---- v404 계약 D2 기한 엔진 — 원천 = 거울 3층 map:contract:v1(두 층 매핑·단계별 due_rule, appdata contract_map.py) + 4층 bg:contract:law:v1(법령 배경, 승격본만: settings:contract.bg_ver == bg.ver).
+  //      켜짐 = 거울 적용(mode blob) ∧ map 유효 ∧ bg 승격. 꺼지면 종전 그대로(시나리오 단계 기한 비움). 계산은 새 지시를 만들 때만(materializeStage, 소급 없음) · 단계 객체에는 새 키 due_src·due_badge만.
+  //      due_rule.kind: manual·external = 비움(담당자 입력) · field = 계약 값(d2 착공·d3 준공) · law = bg 행 days + 기산일(기산일 없음 = '기산일 필요', 행 미승격 = '확인 필요'/'근거 미승격', 확인 30일 경과 = '재확인 필요') · immediate = 기산일 당일 · annual = 연 1회(override 우선).
+  var CON_MAP = { ok:false, scen:{}, added:{}, upper:[], sha:"" }, CON_BG = { ver:"", rows:{}, pending:{}, n:0, sha:"" };
+  function conDueClear(){ CON_MAP.ok = false; CON_MAP.scen = {}; CON_MAP.added = {}; CON_MAP.upper = []; CON_MAP.sha = ""; CON_BG.ver = ""; CON_BG.rows = {}; CON_BG.pending = {}; CON_BG.n = 0; CON_BG.sha = ""; }
+  function conDueUse(b){
+    conDueClear();
+    var m = b.map, g = b.bg, f = b.flag || {};
+    if (!(m && m.schema === 1 && m.proc_ver === "v1" && m.scen && typeof m.scen === "object")) return;
+    CON_MAP.scen = m.scen; CON_MAP.added = m.added || {}; CON_MAP.upper = m.upper || []; CON_MAP.sha = m.sha || ""; CON_MAP.ok = true;
+    if (!(g && g.schema === 1 && g.ver && conIsArr(g.rows) && f.bg_ver && f.bg_ver === g.ver)) return;
+    g.rows.forEach(function(r){ if (!r || !r.id) return; if (r.grade === "실측" && r.mst && isDate(r.eff) && isDate(r.checked)) CON_BG.rows[r.id] = r; else CON_BG.pending[r.id] = r; });
+    CON_BG.ver = g.ver; CON_BG.n = g.rows.length; CON_BG.sha = g.sha || "";
+  }
+  function conDueOn(){ return CON_PROC_SRC.mode === "blob" && CON_MAP.ok && !!CON_BG.ver; }
+  function conMapRow(c, s){
+    if (!c || !s || !CON_MAP.ok) return null;
+    if (s.aid) return CON_MAP.added[s.aid] || null;
+    var sc = c.scen || {}, key = conScenRk(sc.type || c.type, !!sc.pub, !!sc.combo), rows = CON_MAP.scen[key] || [], i;
+    for (i = 0; i < rows.length; i++) if (rows[i] && rows[i].name === s.name) return rows[i];
+    return null;
+  }
+  function conStageVal(c, field){ var v = ""; (c.pipes || []).forEach(function(p){ (p.stages || []).forEach(function(x){ if (!v && x && x.vals && isDate(x.vals[field])) v = x.vals[field]; }); }); return v; }
+  function conBaseDate(base, c, s){   // 기산일 — 계약 값(d2 착공·d3 준공·start) · 단계 입력 칸(괄호 안 키나 칸 이름, 이 단계 → 다른 단계) · 현장 대장 start. 없으면 ""
+    if (!base) return "";
+    var ci = c.contract_info || {}, m = String(base).match(/\(([a-z_]+)\)/), key = m ? m[1] : String(base);
+    if (key === "st_date") return isDate(ci.d2) ? ci.d2 : (isDate(c.start) ? c.start : "");
+    if (key === "fin") return isDate(ci.d3) ? ci.d3 : "";
+    if (/대장 start/.test(base)){ var r = (c.site_id && typeof findAsb === "function") ? findAsb(c.site_id) : null; return (r && isDate(r.start)) ? r.start : ""; }
+    if (s && s.vals && isDate(s.vals[key])) return s.vals[key];
+    if (/농도 측정 결과 수령일/.test(base) && s && s.vals && isDate(s.vals.fin_date)) return s.vals.fin_date;
+    return /^[a-z_]+$/.test(key) ? conStageVal(c, key) : "";
+  }
+  function conAddBizDays(d, n){ var x = new Date(d + "T00:00:00"), step = n > 0 ? 1 : -1, left = Math.abs(n); while (left > 0){ x.setDate(x.getDate() + step); if (x.getDay() !== 0 && x.getDay() !== 6) left--; } return fmtDate(x); }   // v404 S3 토·일만 건너뜀
+  function conDaysSince(d){ if (!isDate(d)) return 9999; return Math.floor((Date.parse(todayStr() + "T00:00:00") - Date.parse(d + "T00:00:00")) / 86400000); }
+  function conAnnualNext(row, lawId){
+    var ov = (CON_PROC_SRC.flag && CON_PROC_SRC.flag.annual_override) || {};
+    if (isDate(ov[lawId])) return ov[lawId];
+    var base = String((row && row.base) || ""), td = todayStr(), y = Number(td.slice(0, 4)), m = base.match(/^(\d{1,2})\/(\d{1,2})$/);
+    if (m){ var md = ("0" + m[1]).slice(-2) + "-" + ("0" + m[2]).slice(-2); return (td >= y + "-" + md ? (y + 1) : y) + "-" + md; }
+    if (/2월\s*말/.test(base)){ var f = function(yy){ var d = new Date(yy, 2, 0); return yy + "-02-" + ("0" + d.getDate()).slice(-2); }; return td >= f(y) ? f(y + 1) : f(y); }
+    return "";
+  }
+  function conStageDue(s, c, pipe){   // 반환 {due, src, badge} 또는 null(매핑 행 없음)
+    var row = conMapRow(c, s); if (!row || !row.due_rule) return null;
+    var dr = row.due_rule, k = dr.kind || "manual", out = { due:"", src:"", badge:"" };
+    if (k === "manual" || k === "external") return out;
+    if (k !== "field" && k !== "annual" && k !== "law" && k !== "immediate"){ out.badge = "규칙 불명"; return out; }   // 검토 N3
+    if (k === "field"){ out.due = conBaseDate(dr.base, c, s); out.src = out.due ? ("계약 값 " + (dr.base === "fin" ? "준공일" : "착공일")) : ""; out.badge = out.due ? "" : "기산일 필요"; return out; }
+    var law = dr.law ? (CON_BG.rows[dr.law] || null) : null;
+    if (k === "annual"){ out.due = conAnnualNext({ base: dr.base || (law && law.base) || "" }, dr.law || ""); out.src = out.due ? ("연 1회 " + String(dr.base || "") + (law ? " · " + law.law + " " + law.art : "")) : ""; if (!out.due) out.badge = "확인 필요"; return out; }   // 검토 B1: map base 우선(bg base는 설명문), 못 풀면 배지
+    if (!law){ out.badge = CON_BG.pending[dr.law] ? "확인 필요" : "근거 미승격"; return out; }
+    if (conDaysSince(law.checked) > 30){ out.badge = "재확인 필요"; out.src = law.law + " " + law.art; return out; }
+    var base = conBaseDate(dr.base, c, s);
+    if (!base){ out.badge = "기산일 필요"; out.src = law.law + " " + law.art; return out; }
+    var days = (k === "immediate") ? 0 : (typeof dr.days_fixed === "number" ? dr.days_fixed : (typeof law.days === "number" ? law.days : null));
+    if (days === null){ out.badge = "확인 필요"; out.src = law.law + " " + law.art; return out; }
+    out.due = days ? (dr.unit === "biz" ? conAddBizDays(base, days) : addDays(base, days)) : base;   // 검토 S3: 영업일 단위(토·일 제외, 공휴일 미반영 — src에 명시)
+    out.src = law.law + " " + law.art + (k === "immediate" ? " 지체 없이" : (" D" + (days >= 0 ? "+" : "") + days + (dr.unit === "biz" ? " 영업일(공휴일 미반영)" : ""))) + " · 확인 " + String(law.checked || "").slice(5);
+    return out;
+  }
   function conScenRk(type, pub, combo){ var k = conScenKey(type, pub, combo); return CON_SCEN[k] ? k : type + ":pub"; }   // conScenStages 폴백과 같은 키
   function conIsArr(x){ return Object.prototype.toString.call(x) === "[object Array]"; }
   function conAddedRe(src){ if (typeof src !== "string" || !src || src.length > 120) return null; try { return new RegExp(src); } catch(e){ return null; } }
@@ -10349,9 +10410,9 @@
   function conProcLoad(){
     if (!curMember()) return;
     gwCall("gw-data", { action: "con_proc_get" }).then(function(res){
-      conAddedClear(); CON_PROC_SRC.added_applied = 0; CON_PROC_SRC.added_bad = [];   // v402: 어느 분기든 신설은 빈 값에서 시작
+      conAddedClear(); CON_PROC_SRC.added_applied = 0; CON_PROC_SRC.added_bad = []; conDueClear();   // v402: 어느 분기든 신설은 빈 값에서 시작 · v404 기한 엔진도(검토 N8)
       if (res.status !== 200 || !res.body){ CON_PROC_SRC.reason = "조회 실패"; return; }
-      var b = res.body, k; CON_PROC_SRC.flag = b.flag || null;
+      var b = res.body, k; CON_PROC_SRC.flag = b.flag || null; conDueClear();   // v404
       if (!b.proc || !b.list){ CON_PROC_SRC.mode = "const"; CON_PROC_SRC.reason = "거울 없음"; CON_PROC_SRC.same = null; return; }
       CON_PROC_SRC.proc_sha = b.proc.sha || ""; CON_PROC_SRC.list_sha = b.list.sha || ""; CON_PROC_SRC.built_at = b.proc.built_at || ""; CON_PROC_SRC.edits = Number(b.proc.edits || 0);   // v401: 서버가 clog:contract 재생분을 얹은 유효 층을 준다
       var inline = { CON_TYPE_ELEMS:CON_TYPE_ELEMS, CON_SCEN:CON_SCEN, CON_STAGE_FIELDS:CON_STAGE_FIELDS, CON_SITE_CORP:CON_SITE_CORP, STAGE_DOCS:STAGE_DOCS, STAGE_DOC_MAP:STAGE_DOC_MAP, CON_PACKETS:CON_PACKETS };
@@ -10373,6 +10434,7 @@
         conAddedUse(ad, CON_PROC_SRC.proc_sha); CON_PROC_SRC.added_applied = CON_ADDED.stages.length + CON_ADDED.lists.length; CON_PROC_SRC.added_bad = ad.bad;
       } catch(e){ conAddedClear(); CON_PROC_SRC.added_applied = 0; CON_PROC_SRC.added_bad = [{ id: "*", why: "검증 예외" }]; }
       CON_PROC_SRC.mode = "blob"; CON_PROC_SRC.reason = "";
+      try { conDueUse(b); } catch(e){ conDueClear(); }   // v404 D2 — map·bg 층은 거울 적용 뒤에만, 실패해도 거울은 그대로(기한 엔진만 꺼짐)
     }).catch(function(){ conAddedClear(); CON_PROC_SRC.reason = "네트워크"; });
   }
   var conProcSaving = false, conProcHead = "", conProcEditing = "", conProcEditOpen = {};
@@ -10383,22 +10445,36 @@
       var b = res.body, f = b.flag || {}, on = !!f.use_blob, has = !!(b.proc && b.list), same = CON_PROC_SRC.same, clog = b.clog || {};
       conProcHead = clog.head || "";
       var src = on ? (CON_PROC_SRC.mode === "blob" ? "거울(Blobs) — 이 화면에 적용 중" : "거울 켜짐 — 새로고침부터 적용" + (CON_PROC_SRC.reason ? " · " + esc(CON_PROC_SRC.reason) : "")) : "코드 상수(기본)";
+      var ck = ""; try { if (b.bg){ var mx = ""; (b.bg.rows || []).forEach(function(r){ if (r && String(r.checked || "") > mx) mx = String(r.checked); }); if (mx){ var ag = conDaysSince(mx); ck = " · 확인 " + esc(mx) + "(" + ag + "일 경과" + (ag > 30 ? ', <b style="color:#c00;">재확인 필요 — 기한 보류 중: appdata contract_bg.py 재실행 → 거울 push → 재승격</b>' : "") + ")"; } } } catch(e){}   // v404 검토 S2
       var rows = [
         ["현재 원천", src],
         ["거울", has ? ("proc " + esc(String(b.proc.base_sha || b.proc.sha)) + " · list " + esc(String(b.list.base_sha || b.list.sha)) + " · 생성 " + esc(String(b.proc.built_at || "").replace("T", " ").slice(0, 16)) + (clog.applied ? ' · <b>편집 ' + clog.applied + '건</b> 재생' : ' · 편집 0')) : "없음 — appdata collectors/contract_mirror.py --push 로 만듭니다"],
         ["거울 ↔ 상수", has ? (same === true ? "같음(diff 0)" : (same === false ? "다름 — 켜면 거울이 우선" : "비교 전")) : "—"],
         ["신설 제안(카드 9)", has ? (esc(String(((b.proc.added || {}).stages || []).length)) + "단계 · " + esc(String(((b.list.added || {}).lists || []).length)) + "목록 · 활성 " + CON_PROC_SRC.added_active + "건 · 이 기기 적용 " + CON_PROC_SRC.added_applied + "건 · " + esc(String((b.proc.added || {}).status || "")) + (on ? "" : " — 거울 꺼짐: 적용 0(켜면 활성 항목만 새 계약부터)") + ((CON_PROC_SRC.added_bad || []).length ? ' · <span style="color:#B00020;">제외·표시 ' + CON_PROC_SRC.added_bad.map(function(x){ return esc(x.id) + " " + esc(x.why); }).join(" / ") + '</span>' : '')) : "—"],
+        ["배경 bg:law(D2)", (b.bg ? ("판 " + esc(String(b.bg.ver || "")) + " · 행 " + esc(String((b.bg.rows || []).length)) + " · 실측 " + esc(String((b.bg.rows || []).filter(function(r){ return r && r.grade === "실측"; }).length)) + (f.bg_ver === b.bg.ver ? " · <b>승격됨 — 기한 엔진 켜짐</b>" : " · 미승격(기한 엔진 꺼짐)")) : "없음 — 기한 엔진 꺼짐") + (b.map ? " · 매핑 " + esc(String(b.map.sha || "")) : " · 매핑 없음") + (f.annual_override && Object.keys(f.annual_override).length ? " · 연 1회 override " + esc(Object.keys(f.annual_override).join(",")) : "") + ck],   // v404
         ["마지막 변경", f.updated_at ? (esc(memberName(f.updated_by) || f.updated_by || "") + " · " + esc(new Date(f.updated_at + 9 * 3600000).toISOString().slice(0, 16).replace("T", " "))) : "없음"]
       ].map(function(r){ return '<div style="display:flex;gap:8px;padding:5px 2px;border-bottom:1px solid var(--line);font-size:13px;"><span style="min-width:120px;color:var(--sub);">' + r[0] + '</span><span style="overflow-wrap:anywhere;min-width:0;">' + r[1] + '</span></div>'; }).join("");
       var pv = ""; if (has){ try { pv = conAddedPreviewHtml(b); } catch(e){ pv = '<div class="empty-line" style="margin-top:6px;">카드 9 미리보기 실패 — 데이터 형식을 확인해 주세요(거울 스위치는 그대로 쓸 수 있습니다).</div>'; } }   // v402 R6: 미리보기 예외가 스위치 버튼을 지우지 않게
       var btn = '<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">'
         + '<button type="button" style="' + apprGradeChipCss(on ? 1 : 3, true) + '" data-conproc-set="' + (on ? "0" : "1") + '" data-base="' + (f.updated_at || 0) + '"' + ((!on && !has) ? ' disabled' : '') + '>' + (on ? "거울 끄기 — 코드 상수로 되돌리기" : "거울 켜기") + '</button>'
+        + ((b.bg && f.bg_ver !== b.bg.ver) ? '<button type="button" style="' + apprGradeChipCss(3, true) + '" data-conproc-bg="' + esc(String(b.bg.ver)) + '" data-base="' + (f.updated_at || 0) + '"' + (on ? '' : ' disabled') + '>배경 승격 — 기한 엔진 켜기(' + esc(String(b.bg.ver)) + ')</button>' : '')
+        + ((b.bg && f.bg_ver && f.bg_ver === b.bg.ver) ? '<button type="button" style="' + apprGradeChipCss(1, true) + '" data-conproc-bg="" data-base="' + (f.updated_at || 0) + '">배경 승격 해제 — 기한 엔진 끄기</button>' : '')   // v404 R2 카드 '승격' 버튼(관리자)
         + (f.prev ? '<span class="empty-line">이전 값: ' + (f.prev.use_blob ? "켬" : "끔") + '</span>' : '') + '</div>';
       host.innerHTML = rows + btn + '<div class="empty-line" style="margin-top:6px;">계약 단계 목록·서류 목록·입력 칸·패킷·시행 회사 상수 7종의 원천을 바꾸는 스위치입니다(계약 D1). 기본은 코드 상수. 켜면 다음 로그인·새로고침부터 거울(편집 재생분 포함)을 읽고, 거울이 깨져 있으면 자동으로 상수로 돌아갑니다. 단계 이름은 어느 쪽이든 PM 원문 그대로입니다.</div>'
         + pv + (has ? conProcEditHtml(b) : '');
       Array.prototype.forEach.call(host.querySelectorAll("[data-conproc-set]"), function(el){ el.addEventListener("click", function(){ conProcFlagSet(el.getAttribute("data-conproc-set") === "1", Number(el.getAttribute("data-base") || 0)); }); });
+      Array.prototype.forEach.call(host.querySelectorAll("[data-conproc-bg]"), function(el){ el.addEventListener("click", function(){ conProcBgSet(el.getAttribute("data-conproc-bg") || "", Number(el.getAttribute("data-base") || 0)); }); });   // v404
       if (has) conProcBindEdit(host, b);
     }).catch(function(){ host.innerHTML = '<div class="empty-line">거울 상태를 불러오지 못했습니다(네트워크).</div>'; });
+  }
+  function conProcBgSet(ver, base){   // v404 배경 승격(bg_ver = 거울 4층 ver) / 해제('')
+    if (conProcSaving) return; conProcSaving = true;
+    gwCall("gw-data", { action: "con_proc_bg_set", bg_ver: ver, base: base }).then(function(res){
+      conProcSaving = false;
+      if (res.status !== 200){ alert("배경 승격 저장 실패 (" + ((res.body && res.body.error_code) || res.status) + ")"); return; }
+      apprToastShow(ver ? "배경 " + ver + " 승격 — 새로고침부터 새 계약의 단계 기한을 법령 근거로 채웁니다" : "배경 승격 해제 — 새로고침부터 기한 엔진이 꺼집니다");
+      renderConProcCard();
+    }).catch(function(){ conProcSaving = false; alert("배경 승격 저장 실패(네트워크)"); });
   }
   function conProcFlagSet(on, base){
     if (conProcSaving) return; conProcSaving = true;
@@ -10522,6 +10598,7 @@
     if(s.status==="open" && s.task_id && findTask(s.task_id)) return;   // v382 검토 1: 이미 열린 단계에 지시를 또 만들지 않는다
     var due = "";
     if(s.due==="auto" && s.days){ due = addDays(baseDate||todayStr(), s.days); }
+    if(!due && c.scen && conDueOn()){ var dd = conStageDue(s, c, pipe); if(dd){ due = dd.due || ""; if(dd.src) s.due_src = dd.src; else delete s.due_src; if(dd.badge) s.due_badge = dd.badge; else delete s.due_badge; } }   // v404 D2 기한 엔진 — 켜짐일 때만, 새 키만(꺼짐 = 바이트 동일)
     if(s.aw==="amt" && s.amt0==null){ s.eff0 = csChgBase(c); s.amt0 = csChgLastAmt(c)||s.eff0; }   // v402 변경계약: 현재 단계가 될 때 금액 기준을 굳힘(R15 계약액 기준, 정산액 제외)
     var t = { id:genId("t"), title:procStageTitle(c, csStageLabel(s)), detail:(stageDocsOf(s)||""), who_id:c.who_id||"", who:memberName(c.who_id||""), from:myName()||"", from_id:myId(), by:myName()||"",
       due:due, status:"open", done_at:null, done_by:null, created:todayStr(), updated:todayStr(),
@@ -10735,6 +10812,7 @@
     var ct = (p.cur < p.stages.length && p.stages[p.cur].task_id) ? findTask(p.stages[p.cur].task_id) : null, canCloseCur = !ct || ct.status === "done" || canApproveTask(ct);   // 현재 지시를 닫을 수 있는 사람(승인권)만 건너뜀·순서 변경(v382 검토 4)
     var cls = (isSkip ? ' skip' : (isDone ? ' done' : (isCur ? ' cur' : ''))) + (opt ? ' opt' : '') + (open ? ' open' : '');   // v402: 건너뜀 카드도 펼치면 한 줄 전체(종전엔 우선순위 탓에 open이 빠져 입력 칸이 넘침)
     var meta = isSkip ? '건너뜀' : (isDone ? ('완료' + (s.done_at ? ' ' + esc(s.done_at) : '')) : (isCur ? ((t && t.status === "review") ? '승인 대기' + (due ? ' · 기한 ' + esc(due) : '') : (due ? '기한 ' + esc(due) : '<span class="need-due">기한 입력</span>')) : '대기'));
+    if (!isSkip && !isDone && (s.due_badge || s.due_src)) meta += (s.due_badge ? ' · <span class="need-due">' + esc(s.due_badge) + '</span>' : '') + (s.due_src ? ' <small style="color:var(--sub);">' + esc(s.due_src) + '</small>' : '');   // v404 기한 근거·배지
     if (s.appr && !isSkip) meta += ' · 결재 ' + esc(s.appr.status || "대기") + (s.appr.decided_at ? ' ' + esc(s.appr.decided_at) : '') + (s.appr.reason ? '(' + esc(s.appr.reason) + ')' : '');   // v384
     var h = '<div class="cs-stg' + cls + '" data-cs-stg="' + esc(key) + '"><span class="n">' + (i + 1) + ' ' + esc(csStageLabel(s)) + (s.aid ? ' <small>신설</small>' : '') + (opt ? ' <small>선택</small>' : '') + '</span><span class="m">' + meta + '</span>';
     if (!open) return h + '</div>';
@@ -10880,6 +10958,7 @@
   function csSaveFields(c, p, i, panel){
     var s = p.stages[i]; if (!s || !panel) return;
     s.vals = s.vals || {};
+    if (conDueOn()){ (c.pipes || []).forEach(function(pp){ (pp.stages || []).forEach(function(x){ if (!(x && x.due_badge === "기산일 필요" && x.task_id)) return; var tt = findTask(x.task_id); if (!tt || tt.due || tt.status === "done") return; var dd2 = conStageDue(x, c, pp); if (dd2 && dd2.due){ tt.due = dd2.due; tt.updated = todayStr(); x.due_src = dd2.src || ""; delete x.due_badge; saveTasksCache(); scheduleTasksSave(); } }); }); }   // v404 검토 S1 (입력 칸 저장 뒤 — 아래 forEach가 vals를 먼저 쓰도록 setTimeout 없이 두 번째 패스에서)
     Array.prototype.forEach.call(panel.querySelectorAll("[data-cs-fld]"), function(el){ var k = el.getAttribute("data-cs-fld"), v = el.value; if (v === "") delete s.vals[k]; else s.vals[k] = (el.type === "number") ? Number(v) : v; if (k === "settle_amount"){ if (v === "") delete c.settle_amount; else c.settle_amount = Number(v); } });
     c.updated = todayStr(); scheduleContractSave(); renderContracts();
   }
