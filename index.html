@@ -10609,6 +10609,13 @@
   }
   var conProcSaving = false, conProcHead = "", conProcEditing = "", conProcEditOpen = {};
   // ---- 계약 서류 학습 카드(v411, 계약 D4 3일차) — 표시·스위치만. 규칙은 모델이 쓰고 허용 사전은 R2 카드 값(관리자가 그대로 저장) ----
+  function conLearnSunsetTxt(L){   // v412 기준선·일몰 한 칸
+    var pc = function(x){ return (typeof x === "number") ? Math.round(x * 1000) / 10 + "%" : "—"; }, md = function(ts){ return ts ? new Date(ts + 9 * 3600000).toISOString().slice(5, 10).replace("-", "/") : ""; };
+    var sn = L.sunset || null, bl = L.baseline || null, out = bl ? "기준선 " + pc(bl.avg) + "(" + (bl.n || 0) + "건, " + md(bl.ts) + ")" : "기준선 전(10건부터)";
+    if (sn && L.off) out += " · " + (sn.manual ? "수동 끔 " : "<b>자동 일몰</b> ") + md(sn.ts) + (typeof sn.base_avg === "number" ? " 기준 " + pc(sn.base_avg) + "→최근 " + pc(sn.recent_avg) : "");
+    else if (sn && sn.reset_ts) out += " · 재시작 " + md(sn.reset_ts);
+    return out;
+  }
   function renderConLearnCard(){
     var host = document.getElementById("conLearnCard"); if (!host) return;
     gwCall("gw-data", { action: "learn_pairs_get" }).then(function(res){
@@ -10616,17 +10623,22 @@
       var b = res.body, s = (b.settings && b.settings.contract) || { on: false, allow: {} }, pairs = b.pairs || [], les = b.lessons || {};
       var ST = { done_nomodel: "간극만(허용 전)", pending: "학습 대기", running: "학습 중", done: "학습 완료", fail: "실패", unmatched: "초안 선택 필요", hold: "월 상한" };
       var h = '<div style="margin-bottom:6px;"><b>' + (s.on ? "켜짐" : "꺼짐") + '</b> · 허용 양식 ' + Object.keys(s.allow || {}).length + '종 · 짝 ' + pairs.length + '건 <button class="mini-btn" data-cl-on="' + (s.on ? 0 : 1) + '" data-cl-base="' + esc(String((b.settings && b.settings.updated_at) || 0)) + '">' + (s.on ? "끄기" : "켜기") + '</button></div>';
-      h += '<div class="muted" style="font-size:12px;margin-bottom:8px;">최종본을 올리면 같은 단계의 앱 초안과 자동으로 짝이 되어 칸 단위 차이(간극)를 잽니다. 허용 사전에 든 칸만 모델이 값을 보고 규칙을 뽑고, 근거 2건이 쌓인 칸은 다음 생성 때 공란에 미리 채워집니다. 사람은 규칙을 쓰지 않습니다.</div>';
+      h += '<div class="muted" style="font-size:12px;margin-bottom:8px;">최종본을 올리면 같은 단계의 앱 초안과 자동으로 짝이 되어 칸 단위 차이(간극)를 잽니다. 허용 사전에 든 칸만 모델이 값을 보고 규칙을 뽑고, 근거 2건이 쌓인 칸은 다음 생성 때 공란에 미리 채워집니다. 사람은 규칙을 쓰지 않습니다. 양식별 첫 10건 간극이 기준선이 되고, 4주 뒤 최근 간극이 기준선보다 줄지 않은 양식은 자동으로 꺼집니다(짝·간극은 계속 잼, 켜면 기준선 재시작).</div>';
       var tk = Object.keys(les);
       if (tk.length){
-        h += '<table class="mini" style="width:100%;font-size:12px;margin-bottom:8px;"><tr><th>양식</th><th>짝</th><th>호출</th><th>규칙</th><th>간극 최근5</th><th>이전5</th><th>추세</th><th>허용 칸</th></tr>';
-        tk.forEach(function(t){ var L = les[t] || {}, g = L.gap || {}; h += '<tr><td>' + esc(t) + (L.off ? ' <small>(끔)</small>' : '') + '</td><td>' + (L.pairs || 0) + '</td><td>' + (L.calls || 0) + '</td><td>' + (L.rules_n || 0) + '</td><td>' + (g.last5_avg === null || g.last5_avg === undefined ? '—' : g.last5_avg + '%') + '</td><td>' + (g.prev5_avg === null || g.prev5_avg === undefined ? '—' : g.prev5_avg + '%') + '</td><td>' + (g.trend === 'down' ? '↓' : g.trend === 'up' ? '↑' : g.trend === 'flat' ? '→' : '—') + '</td><td>' + ((s.allow && s.allow[t]) ? s.allow[t].length : 0) + '</td></tr>'; });
+        h += '<table class="mini" style="width:100%;font-size:12px;margin-bottom:8px;"><tr><th>양식</th><th>짝</th><th>호출</th><th>규칙</th><th>간극 최근5</th><th>이전5</th><th>추세</th><th>허용 칸</th><th>기준선·일몰</th><th></th></tr>';
+        tk.forEach(function(t){ var L = les[t] || {}, g = L.gap || {}; h += '<tr><td>' + esc(t) + (L.off ? ' <small>(끔)</small>' : '') + '</td><td>' + (L.pairs || 0) + '</td><td>' + (L.calls || 0) + '</td><td>' + (L.rules_n || 0) + '</td><td>' + (g.last5_avg === null || g.last5_avg === undefined ? '—' : g.last5_avg + '%') + '</td><td>' + (g.prev5_avg === null || g.prev5_avg === undefined ? '—' : g.prev5_avg + '%') + '</td><td>' + (g.trend === 'down' ? '↓' : g.trend === 'up' ? '↑' : g.trend === 'flat' ? '→' : '—') + '</td><td>' + ((s.allow && s.allow[t]) ? s.allow[t].length : 0) + '</td><td>' + conLearnSunsetTxt(L) + '</td><td><button class="mini-btn" data-cl-tpl="' + esc(t) + '" data-cl-off="' + (L.off ? 0 : 1) + '">' + (L.off ? '켜기' : '끄기') + '</button></td></tr>'; });
         h += '</table>';
       }
       if (pairs.length){
         h += '<div style="font-size:12px;">' + pairs.slice(0, 10).map(function(p){ var g = p.gap || {}; return '<div class="item" style="padding:4px 0;"><span>' + esc(p.cid) + ' · S' + p.i + ' · ' + esc(p.tpl || '(양식 미정)') + '</span> <span class="muted">' + (ST[p.status] || esc(p.status)) + (p.diff ? ' · 바뀐 칸 ' + p.diff.changed + '/' + p.diff.compared + (p.diff.uncomparable ? ' (비교 불가 ' + p.diff.uncomparable + ')' : '') : '') + (g.score === null || g.score === undefined ? ' · 비교 불가' : ' · 간극 ' + Math.round(g.score * 100) + '%') + (p.candidates ? ' · 후보 ' + p.candidates.map(function(x){ return x.tpl; }).join('/') : '') + '</span></div>'; }).join('') + '</div>';
       } else h += '<div class="empty-line">아직 짝이 없습니다 — 단계 카드에서 [최종본↑]을 올리면 생깁니다.</div>';
       host.innerHTML = h;
+      Array.prototype.forEach.call(host.querySelectorAll("[data-cl-tpl]"), function(btn){ btn.addEventListener("click", function(){   // v412 양식별 끄기/켜기(일몰 되돌리기)
+        var t = btn.getAttribute("data-cl-tpl"), off = btn.getAttribute("data-cl-off") === "1";
+        if (!confirm("양식 " + t + " 학습을 " + (off ? "끌까요? (짝·간극은 계속 재고 이 양식의 모델 호출·주입만 멈춥니다)" : "켤까요? (기준선을 다시 세고 4주 시계가 재시작됩니다)"))) return;
+        gwCall("gw-data", { action: "learn_tpl_set", tpl: t, off: off }).then(function(r2){ if (r2.status === 200) renderConLearnCard(); else alert("저장 실패: " + ((r2.body && r2.body.error_code) || r2.status)); });
+      }); });
       Array.prototype.forEach.call(host.querySelectorAll("[data-cl-on]"), function(btn){ btn.addEventListener("click", function(){
         var on = btn.getAttribute("data-cl-on") === "1"; if (!confirm("계약 서류 학습을 " + (on ? "켤까요?" : "끌까요? (짝·간극은 계속 재고 모델 호출만 멈춥니다)"))) return;
         gwCall("gw-data", { action: "learn_settings_set", on: on, base: Number(btn.getAttribute("data-cl-base")) || 0 }).then(function(r2){ if (r2.status === 200) renderConLearnCard(); else alert("저장 실패: " + ((r2.body && r2.body.error_code) || r2.status)); });

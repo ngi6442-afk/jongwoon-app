@@ -1,6 +1,6 @@
 # 종운 그룹웨어 — 기능 대장 (사용자 매뉴얼 원천)
 
-> 살아있는 문서. 기능 추가·변경 시 이 파일을 함께 갱신한다. 기준: v411 (2026-11-01).
+> 살아있는 문서. 기능 추가·변경 시 이 파일을 함께 갱신한다. 기준: v412 (2026-11-01).
 > 세부 변경 이력은 git 커밋 메시지(한글) 참조.
 
 ## 1. 전체 구조
@@ -788,6 +788,13 @@ PM 지시 "문서함 일단 다 올리고 등재결재랑 공개범위 만들어
 - 정정: STAGE_DOCS "완료신고" 석면해체·제거→석면해체/제거, "청구" 국세·지방세→국세/지방세 납세증명(파서가 복합 서류 이름을 나누던 2곳) → proc_v1.json 재export·거울 2층 재빌드(list sha 7eeb1ce6c1d18b44)·push.
 - 배포 전 적대 검토 7건 → 6건 반영: map_del 뒤 같은 정규식 map_add 가 무시되던 재생 순서(map_add 가 map_del 을 되살림·map_del 이 앞선 map_add 를 지움) · 기기 간 동기화 머지(csSyncFromServer)가 stage.docs[] 를 떨어뜨리던 것 → csMergeDocs(k 별 at 늦은 쪽·한쪽만 있는 항목 보존) · 서류 추가 뒤 입력 칸 비움 · 편집 textarea 줄바꿈=" / " · 되돌림 판정은 전체 기록(reverted_of) · __proto__ 키 거부. 수용 1건: 월 사건 로그 clog:contract:YYYY-MM 은 읽고-쓰기 사이 잠금이 없어 같은 초에 두 사람이 누르면 1건이 빠질 수 있다(지표용 로그, 체인은 유지 — 4일차 집계에서 빠진 수를 세지 않도록 참고).
 - 검사: servertest 절 55(40항), uismoke v401(3항), consheet_check v401(10항 — 파서·커버리지 81단계 중 79·체크/해당없음/추가/삭제·머지·html·옛 계약), proctpl diff 0. sw v401.
+
+### v412 (11/1) — 계약 D4 4일차: 기준선 동결·일몰·양식별 끄기/켜기·간극 집계
+- **기준선**: 양식별 숫자 간극(cell_ratio)이 10건에 닿는 순간 첫 10건 평균을 `lessons:contract:<양식>.baseline {avg, n, first_ts, ts}`에 동결(짝 생성 때·워커 병합 뒤). 간극 이력이 60건 넘게 잘려도 기준선은 남는다. 블로그 lessons엔 키가 생기지 않는다.
+- **일몰**(설계 §5): 크론 ④ 계약 분기가 하루 1회(`learn:contract:sunset {day}`) 훑어, 모델이 1회라도 배운 양식 중 기준선 뒤 4주가 지났고 기준선 뒤 최근 10건(5건 이상) 평균이 기준선보다 줄지 않으면 `off=true` + `sunset {ts, by:'auto', base_avg, recent_avg}`. 꺼져도 짝·간극은 계속 쌓이고 규칙은 지우지 않는다. 판정은 `_lib/learn.js sunsetCheck`(순수: already_off·no_calls·no_baseline·too_early·too_few·not_improved·improving).
+- **양식별 끄기/켜기** `learn_tpl_set {tpl, off}`(관리자): 켜면 sunset 기록은 남기고(reset_ts) 기준선을 비워 시계 재시작 · 수동 끄기는 `sunset.manual`. 권한관리 › 계약 서류 학습 카드 표에 '기준선·일몰' 칸과 양식별 [끄기]/[켜기] 버튼. 감사 '학습설정'.
+- **간극 집계**(appdata `collectors/contract_gap.py`): 지표 ① cell_ratio를 짝 블롭(`learn:contract:in:*`, 좌표·횟수만)에서 양식별 n·기준선(첫 10건)·최근 평균·추세로 채운다(`--local`은 netlify blobs:list --json, Actions는 backup_list). 짝 0건이면 null + 깃발.
+- 검사: servertest 절 61 +4(기준선 동결·sunsetCheck 8경우·크론 일몰 훑기 e2e·learn_tpl_set+카드 조회) → 877 · uismoke v412. sw v412.
 
 ### v411 (11/1) — 계약 D4 3일차: 학습 워커·크론 교대·생성 주입·관리자 카드
 - **학습 워커 `gw-learn-background`**(배경 함수): 허용 사전(`settings:learn.contract.allow[양식]`)에 든 **칸만 값을** 모델에 보여주고(초안 값 · 직원 최종본 값), 허용 밖 칸은 "바뀜/안 바뀜 좌표"만 보여 규칙(field_default=칸 기본값·format·structure·content·style, ≤25)을 뽑아 `lessons:contract:<양식>`에 합친다. 사람은 규칙을 쓰지 않는다.

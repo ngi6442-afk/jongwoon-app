@@ -179,13 +179,37 @@ async function kickLearnContract(st, now) {
   const keys = (l.keys || []).filter(function (k) { return k.indexOf(T.pair_prefix) === 0; }).sort().slice(-LEARN_SCAN);
   const pairs = [];
   for (const k of keys) { const r = await blobGet(st, k); if (r.ok && r.data && typeof r.data === 'object') pairs.push(r.data); }
+  // v412 일몰 훑기 — 하루 1회(learn:contract:sunset {day}). 짝 기동과 독립.
+  let sunset = null; try { sunset = await sunsetSweep(st, now, pairs); } catch (e) { sunset = { error: (e && e.message) || 'ERR' }; }
   const cand = LN.pickPending(pairs, now, T.pair_re, 'cid');
-  if (!cand.length) return { pending: 0, scanned: pairs.length };
+  if (!cand.length) return { pending: 0, scanned: pairs.length, sunset: sunset };
   const p = cand[0];
   p.status = 'running'; p.tries = (Number(p.tries) || 0) + 1; p.ts = now;
   await blobSet(st, LN.pairKey('contract', p.id), p);
   const k = await LN.kickWorker('gw-learn-background', { pair_id: p.id });
   if (!k.ok) { p.status = 'fail'; p.code = String(k.code || 'KICKOFF_FAILED'); await blobSet(st, LN.pairKey('contract', p.id), p); }
-  return { pending: cand.length, scanned: pairs.length, started: k.ok ? p.id : '', code: k.ok ? '' : String(k.code || '') };
+  return { pending: cand.length, scanned: pairs.length, started: k.ok ? p.id : '', code: k.ok ? '' : String(k.code || ''), sunset: sunset };
 }
 exports.kickLearnContract = kickLearnContract;
+// v412 일몰(설계 §5 "4주 뒤 양식별 간극이 기준선(첫 10건) 대비 줄지 않으면 그 양식 lessons.off 자동 + 카드") — 양식은 훑은 짝의 tpl에서, 판정은 learn.sunsetCheck(순수), 하루 1회.
+// off가 되면 모델 호출·생성 주입만 멈추고 짝·간극은 계속 쌓인다. 되돌리기(켜기=기준선 재시작)는 권한관리 카드의 learn_tpl_set. 규칙은 지우지 않는다.
+const SUNSET_STAMP = 'learn:contract:sunset';
+async function sunsetSweep(st, now, pairs) {
+  const { blobSet } = require('./_lib/blobs');
+  const LN = require('./_lib/learn'); const T = LN.TYPES.contract;
+  const day = new Date(now + 9 * 3600000).toISOString().slice(0, 10);
+  const sr = await blobGet(st, SUNSET_STAMP);
+  if (sr.ok && sr.data && sr.data.day === day) return { skipped: 'done_today' };
+  const tpls = {}; (pairs || []).forEach(function (p) { if (p && typeof p.tpl === 'string' && p.tpl) tpls[p.tpl] = 1; });
+  const off = [], checked = [];
+  for (const t of Object.keys(tpls)) {
+    const lk = T.lessons_key(t); const lr = await blobGet(st, lk); const L = LN.normLessons(lr.ok ? lr.data : null);
+    const c = LN.sunsetCheck(L, now); checked.push({ tpl: t, why: c.why });
+    if (!c.due) continue;
+    L.off = true; L.sunset = { ts: now, by: 'auto', base_avg: c.base_avg, recent_avg: c.recent_avg, n_base: c.n_base, n_recent: c.n_recent }; L.updated_at = now;
+    const w = await blobSet(st, lk, L); if (w.ok) off.push(t);
+  }
+  await blobSet(st, SUNSET_STAMP, { day: day, ts: now, off: off, checked: checked.length });
+  return { day: day, checked: checked, off: off };
+}
+exports.sunsetSweep = sunsetSweep;

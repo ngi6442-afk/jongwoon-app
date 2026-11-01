@@ -93,6 +93,7 @@ exports.handler = async function (event, context) {
     if (!LN.piiScan(String(out.summary || '')).ok) out.summary = '';
     const gap = pair.gap || {};
     const merged = LN.mergeLessons(lessons, out, { rec_id: pair.cid, pair_id: pairId, ex_key: pair.tpl, ex_title: '', ex_excerpt: '', now: Date.now(), tokens: tokens, gap: { ratio: typeof gap.cell_ratio === 'number' ? gap.cell_ratio : null }, summary: out.summary, extra: { score: gap.score === undefined ? null : gap.score, kind: pair.kind || '', changed: rows.hidden_changed.length + rows.rows.filter(function (r) { return !r.same; }).length } }, T.scopes);
+    LN.freezeBaseline(merged, Date.now());   // v412
     const w = await blobSet(st, lk, merged);
     if (!w.ok) { await finish('fail', w.code || 'LESSONS_WRITE_FAILED'); return; }
     await finish('done', '', '', { rules_n: merged.rules.length, tokens: tokens, summary: cut(out.summary, 200), changes: (Array.isArray(out.changes) ? out.changes : []).slice(0, 12).map(function (c) { return { kind: String((c && c.kind) || ''), what: cut(c && c.what, 100) }; }), visible_n: rows.rows.length, hidden_changed_n: rows.hidden_changed.length });

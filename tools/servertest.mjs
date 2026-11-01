@@ -3762,4 +3762,60 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   Object.keys(mem.gw_data).filter((k) => k.indexOf('learn:contract:in:') === 0).forEach((k) => delete mem.gw_data[k]); Object.keys(mem.gw_files).filter((k) => k.indexOf('cdoc:c60') === 0).forEach((k) => delete mem.gw_files[k]);
 }
 
+{ // ---- 61(v412) 계약 D4 4일차 — 기준선 동결·일몰 판정(순수)·크론 일몰 훑기(하루 1회)·양식별 끄기/켜기 learn_tpl_set ----
+  const LN = require(join(FN, '_lib/learn.js'));
+  const DAY = 86400000; const now61 = Date.UTC(2026, 10, 1, 3, 0, 0);   // 2026-11-01 12:00 KST 고정(날짜 경계 무관)
+  // 기준선: 10건째에 동결(첫 10건 평균), 그 뒤 간극은 기준선을 바꾸지 않는다
+  let L = null; for (let i = 0; i < 12; i++) { L = LN.pushGap(L, { pair: 'p' + i, promo_id: 'c', ratio: i < 10 ? 0.5 : 0.1, score: 0.5 }, now61 - (40 - i) * DAY); LN.freezeBaseline(L, now61 - (40 - i) * DAY); }
+  const L9 = (() => { let x = null; for (let i = 0; i < 9; i++) { x = LN.pushGap(x, { ratio: 0.5 }, now61); LN.freezeBaseline(x, now61); } return x; })();
+  const Lb = LN.pushGap(null, { ratio: 0.5 }, now61);
+  T('61 기준선 동결: 10건째 평균 50%·n 10·first_ts=1건째 · 11·12건째(10%)는 기준선 불변 · 9건은 기준선 없음 · 블로그 경로(pushGap만)엔 baseline 키 없음',
+    L.baseline && L.baseline.n === 10 && Math.abs(L.baseline.avg - 0.5) < 1e-9 && L.baseline.first_ts === now61 - 40 * DAY && L.baseline.ts === now61 - 31 * DAY && L.gaps.length === 12 && !L9.baseline && !('baseline' in Lb) && !('sunset' in LN.normLessons(Lb)), JSON.stringify([L.baseline, Object.keys(Lb)]));
+  // 일몰 판정(순수)
+  const mk = (o) => Object.assign({ schema: 1, off: false, rules: [], exemplars: {}, gaps: [], stats: { pairs: 0, calls: 1, tokens: 0 } }, o);
+  const gapsAfter = (n, ratio, from) => Array.from({ length: n }, (_, i) => ({ ratio: ratio, ts: from + i * DAY }));
+  const base = { avg: 0.5, n: 10, first_ts: now61 - 40 * DAY, ts: now61 - 30 * DAY };
+  const c1 = LN.sunsetCheck(mk({ stats: { calls: 0 }, baseline: base, gaps: gapsAfter(10, 0.6, now61 - 20 * DAY) }), now61);
+  const c2 = LN.sunsetCheck(mk({ gaps: gapsAfter(12, 0.5, now61 - 12 * DAY) }), now61);
+  const c3 = LN.sunsetCheck(mk({ baseline: Object.assign({}, base, { first_ts: now61 - 20 * DAY, ts: now61 - 10 * DAY }), gaps: gapsAfter(10, 0.6, now61 - 9 * DAY) }), now61);
+  const c4 = LN.sunsetCheck(mk({ baseline: base, gaps: gapsAfter(3, 0.6, now61 - 20 * DAY) }), now61);
+  const c5 = LN.sunsetCheck(mk({ baseline: base, gaps: gapsAfter(10, 0.6, now61 - 20 * DAY) }), now61);
+  const c6 = LN.sunsetCheck(mk({ baseline: base, gaps: gapsAfter(10, 0.3, now61 - 20 * DAY) }), now61);
+  const c7 = LN.sunsetCheck(mk({ off: true, baseline: base, gaps: gapsAfter(10, 0.6, now61 - 20 * DAY) }), now61);
+  const c8 = LN.sunsetCheck(mk({ baseline: base, gaps: gapsAfter(5, 0.5, now61 - 35 * DAY).concat(gapsAfter(10, 0.5, now61 - 20 * DAY)) }), now61);   // 기준선 전 간극은 최근에 안 든다 · 같으면 due
+  T('61 sunsetCheck: 호출 0=no_calls · 기준선 없음=no_baseline · 4주 전=too_early · 기준선 뒤 5건 미만=too_few · 60%≥50%=due(not_improved) · 30%<50%=improving · 이미 off=already_off · 기준선 전 간극 제외·같으면 due',
+    c1.why === 'no_calls' && c2.why === 'no_baseline' && c3.why === 'too_early' && c4.why === 'too_few' && c4.n_recent === 3 && c5.due === true && c5.why === 'not_improved' && Math.abs(c5.recent_avg - 0.6) < 1e-9 && c5.n_recent === 10 && c6.due === false && c6.why === 'improving' && c7.why === 'already_off' && c8.due === true && c8.n_recent === 10 && !c1.due && !c2.due && !c3.due && !c4.due && !c7.due, JSON.stringify([c1.why, c2.why, c3.why, c4.why, c5, c6.why, c7.why, c8.why]));
+  // 크론 일몰 훑기 e2e — 짝 2건(asb_plan·demo_report) + lessons(기준선 30일 전·최근 10건, calls 1) → asb_plan만 off+sunset · 같은 날 2회차 done_today · 다음 날 재훑기
+  const cron61 = require(join(FN, 'gw-promo-ai-cron.js')); const st61 = blobsMock.store('gw_data');
+  mem.gw_data['learn:contract:in:lc_aaaaaaaa0061'] = { id: 'lc_aaaaaaaa0061', cid: 'c61', i: 2, dk: 'main.작성-0', tpl: 'asb_plan', draft_n: 1, final_n: 1, kind: 'xlsx_cell', status: 'done_nomodel', ts: now61 - DAY, by: 'u' };
+  mem.gw_data['learn:contract:in:lc_aaaaaaaa0062'] = { id: 'lc_aaaaaaaa0062', cid: 'c61', i: 3, dk: 'main.작성-1', tpl: 'demo_report', draft_n: 1, final_n: 1, kind: 'xlsx_cell', status: 'done_nomodel', ts: now61 - DAY, by: 'u' };
+  mem.gw_data['lessons:contract:asb_plan'] = mk({ baseline: base, gaps: gapsAfter(10, 0.6, now61 - 20 * DAY), rules: [{ id: 'r1', text: 't', scope: 'style', n: 1 }] });
+  mem.gw_data['lessons:contract:demo_report'] = mk({ baseline: base, gaps: gapsAfter(10, 0.2, now61 - 20 * DAY) });
+  delete mem.gw_data['learn:contract:sunset']; delete mem.gw_data['learn:contract:lock'];
+  const k1 = await cron61.kickLearnContract(st61, now61);
+  const LA = mem.gw_data['lessons:contract:asb_plan'], LD = mem.gw_data['lessons:contract:demo_report'];
+  const stamp1 = JSON.parse(JSON.stringify(mem.gw_data['learn:contract:sunset'] || {}));   // k3가 다음 날로 덮기 전 값
+  const k2 = await cron61.kickLearnContract(st61, now61 + 3600000);
+  const k3 = await cron61.kickLearnContract(st61, now61 + DAY + 3600000);
+  T('61 크론 일몰 훑기: asb_plan off+sunset(auto, 기준 50%→최근 60%) · demo_report(20%)는 그대로 · 규칙 보존 · 같은 날 2회차 done_today · 다음 날 재훑기(already_off·improving) · pending 0',
+    k1.pending === 0 && k1.sunset && k1.sunset.off.join() === 'asb_plan' && k1.sunset.checked.length === 2 && LA.off === true && LA.sunset && LA.sunset.by === 'auto' && Math.abs(LA.sunset.base_avg - 0.5) < 1e-9 && Math.abs(LA.sunset.recent_avg - 0.6) < 1e-9 && LA.rules.length === 1 && LD.off === false && !LD.sunset
+    && stamp1.day === '2026-11-01' && stamp1.off.join() === 'asb_plan' && k2.sunset && k2.sunset.skipped === 'done_today' && k3.sunset && k3.sunset.day === '2026-11-02' && k3.sunset.off.length === 0 && k3.sunset.checked.some((c) => c.tpl === 'asb_plan' && c.why === 'already_off') && k3.sunset.checked.some((c) => c.tpl === 'demo_report' && c.why === 'improving'), JSON.stringify([k1.sunset, k2.sunset, k3.sunset]));
+  // 양식별 켜기/끄기(관리자) — 켜면 sunset 기록은 남고(reset_ts) 기준선은 비워 시계 재시작 · 같은 값 NO_CHANGE · 직원 403 · 카드 조회에 sunset·baseline
+  const W61 = { id: 'ucon61', name: '공무직원61', admin: false, perms: { con: 'do' }, dept: '운영부' }; mem.gw_users['member:ucon61'] = W61; const tok61 = issueSession(W61).token;
+  let r61 = await call({ action: 'learn_tpl_set', tpl: 'asb_plan', off: false }, tok61, 'dev1'); const t1 = r61.code === 403;
+  r61 = await call({ action: 'learn_tpl_set', tpl: 'asb_plan', off: true }, tokA, 'dev1'); const t2 = r61.code === 400 && r61.body.error_code === 'NO_CHANGE';
+  r61 = await call({ action: 'learn_tpl_set', tpl: 'bad tpl!', off: false }, tokA, 'dev1'); const t3 = r61.code === 400 && r61.body.error_code === 'BAD_TPL';
+  r61 = await call({ action: 'learn_tpl_set', tpl: 'asb_plan', off: 'no' }, tokA, 'dev1'); const t3b = r61.code === 400 && r61.body.error_code === 'BAD_VALUE';
+  r61 = await call({ action: 'learn_tpl_set', tpl: 'asb_plan', off: false }, tokA, 'dev1'); const LA2 = mem.gw_data['lessons:contract:asb_plan'];
+  const t4 = r61.code === 200 && r61.body.off === false && r61.body.baseline === null && LA2.off === false && LA2.sunset && LA2.sunset.by === 'auto' && LA2.sunset.reset_ts > 0 && LA2.sunset.reset_by === ADMIN.id && !LA2.baseline && LA2.rules.length === 1;
+  r61 = await call({ action: 'learn_tpl_set', tpl: 'demo_report', off: true }, tokA, 'dev1'); const LD2 = mem.gw_data['lessons:contract:demo_report'];
+  const t5 = r61.code === 200 && LD2.off === true && LD2.sunset && LD2.sunset.manual === true && LD2.sunset.by === ADMIN.id && LD2.baseline && LD2.baseline.n === 10;
+  r61 = await call({ action: 'learn_pairs_get' }, tokA, 'dev1');
+  const la = r61.code === 200 ? r61.body.lessons.asb_plan : null, ld = r61.code === 200 ? r61.body.lessons.demo_report : null;
+  const t6 = la && la.off === false && la.sunset && la.sunset.reset_ts > 0 && la.baseline === null && ld && ld.off === true && ld.sunset.manual === true && ld.baseline && ld.baseline.n === 10;
+  T('61 learn_tpl_set: 직원 403 · 같은 값 NO_CHANGE · BAD_TPL · BAD_VALUE · 켜기=off false+reset_ts+기준선 비움(규칙·sunset 보존) · 수동 끄기=sunset.manual(기준선 유지) · learn_pairs_get에 sunset·baseline · 감사 학습설정',
+    t1 && t2 && t3 && t3b && t4 && t5 && t6 && auditMock.logs.some((e) => e.ev && e.ev[0] && e.ev[0].op === '학습설정' && /asb_plan 학습 켬/.test(e.ev[0].t)), JSON.stringify([t1, t2, t3, t3b, t4, t5, t6, r61.code]));
+  delete mem.gw_data['lessons:contract:asb_plan']; delete mem.gw_data['lessons:contract:demo_report']; delete mem.gw_data['learn:contract:sunset']; delete mem.gw_data['learn:contract:in:lc_aaaaaaaa0061']; delete mem.gw_data['learn:contract:in:lc_aaaaaaaa0062']; delete mem.gw_users['member:ucon61'];
+}
+
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

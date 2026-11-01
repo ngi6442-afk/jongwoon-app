@@ -1949,6 +1949,7 @@ async function cdocLearnPair(st, member, ref, idx, item, ext, b64, orig, d) {
   try {
     const lk = T.lessons_key(tpl); const lr = await blobGet(st, lk);
     const L = LN.pushGap(lr.ok ? lr.data : null, { pair: id, promo_id: ref.cid, ratio: gap.cell_ratio, score: gap.score, kind: kind, changed: diff ? diff.changed : 0, compared: diff ? diff.compared : 0, uncomparable: diff ? diff.uncomparable : 0, comparable: gap.comparable }, now);
+    LN.freezeBaseline(L, now);   // v412 첫 10건 평균 = 기준선(일몰 비교 축)
     await blobSet(st, lk, L);
   } catch (e) {}
   return { ok: true, id: id, status: status, tpl: tpl, kind: kind, gap: gap, changed: diff ? diff.changed : null, compared: diff ? diff.compared : null, uncomparable: diff ? diff.uncomparable : null };
@@ -1987,6 +1988,26 @@ async function handleLearnSettingsSet(event, d, R) {
   await cdocAudit(c.member, '학습설정', '', '계약 학습 ' + (next.on ? '켬' : '끔') + ' · 허용 양식 ' + Object.keys(next.allow).length + '종');
   return jr(200, { status: 'OK', settings: { contract: next, updated_at: doc.updated_at }, request_id: R });
 }
+// v412 양식별 학습 끄기/켜기(관리자) — 일몰(자동 끔) 되돌리기 포함. 켜면 sunset 기록은 남기고(reset_ts) 기준선을 비워 4주 시계를 다시 센다. 규칙은 어느 쪽도 지우지 않는다.
+async function handleLearnTplSet(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (!c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
+  const tpl = String(d.tpl || '').trim();
+  if (!/^[A-Za-z0-9_.-]{1,40}$/.test(tpl)) return jr(400, { status: 'REJECTED', error_code: 'BAD_TPL', request_id: R });
+  if (typeof d.off !== 'boolean') return jr(400, { status: 'REJECTED', error_code: 'BAD_VALUE', request_id: R });
+  const st = store(DATA); const lk = LN.TYPES.contract.lessons_key(tpl); const lr = await blobGet(st, lk); const L = LN.normLessons(lr.ok ? lr.data : null);
+  if (L.off === d.off) return jr(400, { status: 'REJECTED', error_code: 'NO_CHANGE', request_id: R });
+  const now = Date.now();
+  L.off = d.off;
+  if (d.off) L.sunset = { ts: now, by: c.member.id, manual: true };
+  else { if (L.sunset) L.sunset = Object.assign({}, L.sunset, { reset_ts: now, reset_by: c.member.id }); delete L.baseline; }
+  L.updated_at = now;
+  const w = await blobSet(st, lk, L);
+  if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
+  await cdocAudit(c.member, '학습설정', '', '양식 ' + tpl + (d.off ? ' 학습 끔' : ' 학습 켬(기준선 재시작)'));
+  return jr(200, { status: 'OK', tpl: tpl, off: L.off, sunset: L.sunset || null, baseline: L.baseline || null, request_id: R });
+}
 // v411 생성 주입 — 양식의 학습된 칸 기본값(field_default 규칙 중 허용 사전 안·근거 2건↑). 계약 처리 권한이면 조회. 허용 사전이 비면 빈 객체(=주입 없음).
 async function handleLearnDefaultsGet(event, d, R) {
   const c = await currentMember(event);
@@ -2014,7 +2035,7 @@ async function handleLearnPairsGet(event, d, R) {
   pairs.sort(function (a, b) { return (Number(b.ts) || 0) - (Number(a.ts) || 0); });
   const tpls = {}; pairs.forEach(function (p) { if (p.tpl) tpls[p.tpl] = 1; });
   const lessons = {};
-  for (const t of Object.keys(tpls)) { const r = await blobGet(st, LN.TYPES.contract.lessons_key(t)); const L = LN.normLessons(r.ok ? r.data : null); lessons[t] = { off: L.off, rules_n: L.rules.length, pairs: L.stats.pairs, calls: L.stats.calls, gap: LN.gapSummary(L) }; }
+  for (const t of Object.keys(tpls)) { const r = await blobGet(st, LN.TYPES.contract.lessons_key(t)); const L = LN.normLessons(r.ok ? r.data : null); lessons[t] = { off: L.off, rules_n: L.rules.length, pairs: L.stats.pairs, calls: L.stats.calls, gap: LN.gapSummary(L), sunset: L.sunset || null, baseline: L.baseline || null }; }   // v412 일몰·기준선
   const s = await learnSettings(st);
   return jr(200, { status: 'OK', pairs: pairs, lessons: lessons, settings: s, request_id: R });
 }
@@ -3588,6 +3609,7 @@ async function handlerInner(event) {
     if (d && d.action === 'learn_settings_set') return await handleLearnSettingsSet(event, d, R);
     if (d && d.action === 'learn_pairs_get') return await handleLearnPairsGet(event, d, R);
     if (d && d.action === 'learn_defaults_get') return await handleLearnDefaultsGet(event, d, R);   // v411 생성 주입(학습된 칸 기본값)
+    if (d && d.action === 'learn_tpl_set') return await handleLearnTplSet(event, d, R);   // v412 양식별 끄기/켜기(일몰 되돌리기)
     if (d && d.action === 'doc_settings_get') return await handleDocSettingsGet(event, d, R);
     if (d && d.action === 'doc_settings_set') return await handleDocSettingsSet(event, d, R);
     if (d && d.action === 'doc_att_put') return await handleDocAttPut(event, d, R);

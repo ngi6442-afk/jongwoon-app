@@ -13,6 +13,8 @@ const MAX_TRIES = 3;
 const LOCK_TTL_MS = 5 * 60 * 1000;
 const RUNNING_STALE_MS = 15 * 60 * 1000;
 const RETRY_WAIT_MS = 10 * 60 * 1000;
+// v412 일몰(설계 §5): 기준선 = 유형(양식)별 첫 10건 간극 평균(동결) · 기준선 뒤 4주 · 기준선 뒤 최근 10건(5건 이상)이 줄지 않으면 off
+const SUNSET_DAYS = 28, SUNSET_BASE_N = 10, SUNSET_RECENT_N = 10, SUNSET_MIN_AFTER = 5;
 const SCOPES4 = { style: 1, format: 1, structure: 1, content: 1 };
 
 // 유형 등록표 — 새 유형 = 여기 1행(설계 §5 '유형 등록표 1장'). 키 접두어·짝 id 형식·scope·금지 유형·월 상한.
@@ -75,6 +77,8 @@ function normLessons(x) {
   e.gaps = Array.isArray(x.gaps) ? x.gaps.slice(-MAX_GAPS) : [];
   e.stats = Object.assign({ pairs: 0, calls: 0, tokens: 0 }, (x.stats && typeof x.stats === 'object') ? x.stats : {});
   e.updated_at = Number(x.updated_at) || 0;
+  if (x.baseline && typeof x.baseline === 'object') e.baseline = x.baseline;   // v412 계약판만 쓴다(블로그 lessons엔 키가 생기지 않는다)
+  if (x.sunset && typeof x.sunset === 'object') e.sunset = x.sunset;
   return e;
 }
 // 간극 1건만 쌓기(모델 호출 없음 — 계약판 허용 사전 전, 또는 블로그 외 유형의 측정만). entry는 호출부가 좌표·횟수만 담아 넘긴다.
@@ -235,7 +239,37 @@ function fieldDefaults(L0, allowRefs) {
   return flat;
 }
 
+// ---- v412 기준선·일몰(계약판 호출부만 부른다 — 블로그 lessons 불변) ----
+function numericGaps(L) { return (L.gaps || []).filter(function (x) { return x && typeof x.ratio === 'number'; }).slice().sort(function (a, b) { return (Number(a.ts) || 0) - (Number(b.ts) || 0); }); }
+function avgRatio(arr) { return arr.length ? arr.reduce(function (s2, x) { return s2 + x.ratio; }, 0) / arr.length : null; }
+// 기준선 동결(제자리 수정): 숫자 간극이 10건에 닿는 순간 첫 10건 평균을 L.baseline에 적는다. 이미 있으면 그대로(간극이 60건 넘어 잘려도 기준선은 남는다).
+function freezeBaseline(L, now) {
+  if (!L || typeof L !== 'object' || (L.baseline && typeof L.baseline === 'object')) return L;
+  const g = numericGaps(L);
+  if (g.length < SUNSET_BASE_N) return L;
+  const b = g.slice(0, SUNSET_BASE_N);
+  L.baseline = { avg: avgRatio(b), n: b.length, first_ts: Number(b[0].ts) || 0, ts: Number(now) || Date.now() };
+  return L;
+}
+// 일몰 판정(순수) — {due, why, base_avg, recent_avg, n_base, n_recent}. why: already_off·no_calls(모델이 배운 적 없음)·no_baseline·too_early·too_few·not_improved(due)·improving
+function sunsetCheck(L0, now) {
+  const L = normLessons(L0); now = Number(now) || Date.now();
+  const out = { due: false, why: '', base_avg: null, recent_avg: null, n_base: 0, n_recent: 0 };
+  if (L.off) { out.why = 'already_off'; return out; }
+  if (!((Number(L.stats.calls) || 0) >= 1)) { out.why = 'no_calls'; return out; }
+  const b = L.baseline; if (!b || typeof b.avg !== 'number') { out.why = 'no_baseline'; return out; }
+  out.base_avg = b.avg; out.n_base = Number(b.n) || 0;
+  if (now - (Number(b.ts) || 0) < SUNSET_DAYS * 86400000) { out.why = 'too_early'; return out; }
+  const after = numericGaps(L).filter(function (x) { return (Number(x.ts) || 0) > (Number(b.ts) || 0); }).slice(-SUNSET_RECENT_N);
+  out.n_recent = after.length;
+  if (after.length < SUNSET_MIN_AFTER) { out.why = 'too_few'; return out; }
+  out.recent_avg = avgRatio(after);
+  out.due = out.recent_avg >= out.base_avg; out.why = out.due ? 'not_improved' : 'improving';
+  return out;
+}
+
 module.exports = {
+  freezeBaseline, sunsetCheck, SUNSET_DAYS, SUNSET_BASE_N, SUNSET_RECENT_N, SUNSET_MIN_AFTER,
   CONTRACT_SYSTEM, CONTRACT_SCHEMA, buildContractPrompt, PII_RE, piiScan, kickWorker, fieldDefaults,
   TYPES, MAX_RULES, RULE_CHARS, EXEMPLAR_CHARS, MAX_GAPS, MAX_TRIES, LOCK_TTL_MS, RUNNING_STALE_MS, RETRY_WAIT_MS, SCOPES4, RE_REC_ID,
   hash32, pairKey, newPairId, usageKey, ymOf,

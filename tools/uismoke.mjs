@@ -1796,5 +1796,17 @@ try {
     && Number((swv11.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 411);
 } catch (e) { console.log('  (v411 검사 생략 — ' + e.message + ')'); fails++; }
 
+// ---- v412(11/1 계약 D4 4일차): 기준선 동결 freezeBaseline · 일몰 sunsetCheck · 크론 sunsetSweep(하루 1회) · learn_tpl_set · 카드 양식별 끄기/켜기 data-cl-tpl · sw ≥412
+try {
+  const swv12 = readFileSync(join(ROOT, 'sw.js'), 'utf8'), gwd12 = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-data.js'), 'utf8'), cr12 = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-promo-ai-cron.js'), 'utf8'), ln12 = readFileSync(join(ROOT, 'netlify', 'functions', '_lib', 'learn.js'), 'utf8'), lw12 = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-learn-background.js'), 'utf8');
+  T('v412 일몰·기준선: learn.js freezeBaseline·sunsetCheck(28일·10건) · 짝 생성·워커 병합 뒤 동결 · 크론 sunsetSweep 하루 1회 스탬프 · learn_tpl_set(관리자) · 카드 기준선·일몰 칸+양식별 버튼 · sw ≥ 412',
+    /function freezeBaseline\(L, now\)/.test(ln12) && /function sunsetCheck\(L0, now\)/.test(ln12) && /SUNSET_DAYS = 28, SUNSET_BASE_N = 10/.test(ln12)
+    && gwd12.indexOf('LN.freezeBaseline(L, now)') > 0 && lw12.indexOf('LN.freezeBaseline(merged') > 0
+    && /async function sunsetSweep\(st, now, pairs\)/.test(cr12) && /sr\.data\.day === day\) return \{ skipped: 'done_today' \}/.test(cr12) && cr12.indexOf('sunset = await sunsetSweep(st, now, pairs)') > 0
+    && gwd12.indexOf("d.action === 'learn_tpl_set'") > 0 && /async function handleLearnTplSet\(/.test(gwd12) && gwd12.indexOf('delete L.baseline;') > 0
+    && html.indexOf('function conLearnSunsetTxt(L)') > 0 && html.indexOf('data-cl-tpl') > 0 && html.indexOf('action: "learn_tpl_set"') > 0 && html.indexOf('<th>기준선·일몰</th>') > 0
+    && Number((swv12.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 412);
+} catch (e) { console.log('  (v412 검사 생략 — ' + e.message + ')'); fails++; }
+
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
