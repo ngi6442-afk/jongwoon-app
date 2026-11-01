@@ -23,8 +23,10 @@ async function appendAudit(entry) {
     const doc = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data : { schema: 1, items: [] };
     doc.items.push(entry);
     if (doc.items.length > MAX_PER_MONTH) doc.items = doc.items.slice(-MAX_PER_MONTH);
-    await blobSet(st, key, doc);
-  } catch (e) { /* no-op */ }
+    const w = await blobSet(st, key, doc);
+    if (w && w.ok) return true;   // v406
+    return false;   // v406: 기록물 액션이 감사 실패를 응답에 가시화(audit:false) — 삼키는 것은 그대로
+  } catch (e) { return false; }
 }
 
 function short(v) {

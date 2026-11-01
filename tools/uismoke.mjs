@@ -1730,5 +1730,14 @@ try {
     && (!py5 || (/③ 계약 배경\(bg:law\) 재확인 감시/.test(py5) && /'bg_recheck': bg_recheck/.test(py5))) && Number((swv5.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 405);
 } catch (e) { console.log('  (v405 검사 생략 — ' + e.message + ')'); fails++; }
 
+// ---- v406(11/1 계약 D3 1일차): 서버 계약 서류함 cdoc — 7액션·RECORD_NOT_FOR_GIT·reclog·audit 반환값 · sw ≥406(앱 화면 변화 0, 2일차에 버튼)
+try {
+  const swv6 = readFileSync(join(ROOT, 'sw.js'), 'utf8'), gwd6 = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-data.js'), 'utf8'), au6 = readFileSync(join(ROOT, 'netlify', 'functions', '_lib', 'audit.js'), 'utf8');
+  T('v406 cdoc 서버: dispatch 7액션+rec_log_get · 표준 이름 정규식·RECORD_NOT_FOR_GIT(doc_att_put·doc_bulk_put) · reclog · appendAudit 반환값 · sw ≥ 406',
+    ['cdoc_put', 'cdoc_list', 'cdoc_get', 'cdoc_del', 'cdoc_restore', 'cdoc_cur', 'cdoc_purge', 'rec_log_get'].every((a) => gwd6.indexOf("d.action === '" + a + "'") > 0)
+    && (gwd6.match(/RECORD_NOT_FOR_GIT/g) || []).length >= 3 && /const CDOC_STD_RE = /.test(gwd6) && /function appendRecLog/.test(gwd6) && /if \(w && w\.ok\) return true;   \/\/ v406/.test(au6)
+    && Number((swv6.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 406);
+} catch (e) { console.log('  (v406 검사 생략 — ' + e.message + ')'); fails++; }
+
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

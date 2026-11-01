@@ -3520,4 +3520,98 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   }
 }
 
+{ // ---- 58(v406) 계약 서류함 cdoc(D3 1일차) — 권한·검증·표준 파일명·중복 노출·버전/현재 포인터·초안 3판·pii 열람·reclog·소프트 삭제/복구/영구 삭제 게이트·문서함 RECORD_NOT_FOR_GIT ----
+  const CONW = { id: 'uconw', name: '공무직원', admin: false, perms: { con: 'do' }, dept: '운영부' };
+  const CONV = { id: 'uconv', name: '열람직원', admin: false, perms: { con: 'view' }, dept: '운영부' };
+  const MGT = { id: 'umgt58', name: '관리부직원', admin: false, perms: { con: 'view' }, dept: '관리부' };
+  mem.gw_users['member:uconw'] = CONW; mem.gw_users['member:uconv'] = CONV; mem.gw_users['member:umgt58'] = MGT;
+  const tokC = issueSession(CONW).token, tokV = issueSession(CONV).token, tokM = issueSession(MGT).token;
+  mem.gw_data['col:contracts'] = { schema: 1, items: [{ id: 'c58', title: '시험 계약', scen: 'asbestos:pub', stages: [] }, { id: 'c58del', del: 1, scen: 'asbestos:pub' }], updated_at: 1 };
+  mem.gw_data['map:contract:v1'] = { schema: 1, scen: { 'asbestos:pub': [{ i: 0, name: '석면 조사', co: 'con' }, { i: 3, name: '배출신고', co: 'env' }] } };
+  mem.gw_files = mem.gw_files || {};
+  const b58 = (x) => Buffer.from(x).toString('base64');
+  const PDF58 = b58('%PDF-1.4 cdoc test'), ZIP58 = b58(Buffer.from([0x50, 0x4B, 0x03, 0x04, 0x14, 0x00, 0x63, 0x64, 0x6F, 0x63])), HTML58 = b58('<html>x</html>');
+  const base58 = { action: 'cdoc_put', cid: 'c58', i: 0, doc_key: 'asb_survey', kind: 'received', name: '석면조사결과서.pdf', data: PDF58 };
+  let r58 = await call(Object.assign({}, base58), tokV, 'dev1'); const p1 = r58.code === 403 && r58.body.error_code === 'NO_WRITE';
+  r58 = await call(Object.assign({}, base58), tokW, 'dev1'); const p2 = r58.code === 403;
+  r58 = await call(Object.assign({}, base58, { cid: 'c58del' }), tokC, 'dev1'); const p3 = r58.code === 404 && r58.body.error_code === 'NO_CONTRACT';
+  r58 = await call(Object.assign({}, base58, { kind: 'x' }), tokC, 'dev1'); const p4 = r58.code === 400 && r58.body.error_code === 'BAD_KIND';
+  r58 = await call(Object.assign({}, base58, { pii: 3 }), tokC, 'dev1'); const p5 = r58.code === 400 && r58.body.error_code === 'BAD_PII';
+  r58 = await call(Object.assign({}, base58, { name: '위장.pdf', data: HTML58 }), tokC, 'dev1'); const p6 = r58.code === 400 && r58.body.error_code === 'BAD_MAGIC';
+  r58 = await call(Object.assign({}, base58, { name: '악성.exe' }), tokC, 'dev1'); const p7 = r58.code === 400 && r58.body.error_code === 'BAD_EXT';
+  r58 = await call(Object.assign({}, base58, { doc_key: '__proto__' }), tokC, 'dev1'); const p8 = r58.code === 400 && r58.body.error_code === 'BAD_DOC_KEY';
+  r58 = await call(Object.assign({}, base58, { name: '큰.pdf', data: 'A'.repeat(6 * 1024 * 1024 + 1) }), tokC, 'dev1'); const p9 = r58.code === 413 && r58.body.error_code === 'FILE_TOO_LARGE';
+  T('58 put 거부: view 403 NO_WRITE · 권한 없음 403 · 삭제 계약 404 · kind/pii/매직/확장자/doc_key 400 · 6MB 413', p1 && p2 && p3 && p4 && p5 && p6 && p7 && p8 && p9, [p1, p2, p3, p4, p5, p6, p7, p8, p9].join());
+  const an58 = auditMock.logs.length;
+  r58 = await call(Object.assign({}, base58), tokC, 'dev1');
+  const nm = r58.body && r58.body.name;
+  const ok1 = r58.code === 200 && r58.body.n === 1 && r58.body.ver === 1 && /^Cc58_S00_asb_survey_v1_\d{8}_종운건설\.pdf$/.test(nm) && r58.body.audit === true;
+  const idx58 = () => mem.gw_data['recidx:c58'];
+  const f1 = mem.gw_files['cdoc:c58:S00:asb_survey:1'];
+  T('58 put 200: n=1 ver=1 · 표준 파일명 C<cid>_S00_<doc_key>_v1_<날짜>_종운건설.pdf(회사=거울 map co) · gw_files cdoc:c58:S00:asb_survey:1 {name 표준, orig 원래 이름, type 고정표, sha} · recidx 항목 cur=1 · 감사 기록물등록', ok1 && f1 && f1.name === nm && f1.orig === '석면조사결과서.pdf' && f1.type === 'application/pdf' && f1.sha.length === 64 && idx58().items.length === 1 && idx58().items[0].cur === 1 && idx58().items[0].pii === 0 && auditMock.logs[an58] && auditMock.logs[an58].ev[0].op === '기록물등록', JSON.stringify(r58.body).slice(0, 220));
+  r58 = await call(Object.assign({}, base58), tokC, 'dev1'); const d1 = r58.code === 409 && r58.body.error_code === 'DUP_BYTES' && r58.body.dup.length === 1 && r58.body.dup[0].n === 1;
+  r58 = await call(Object.assign({}, base58, { allow_dup: true }), tokC, 'dev1'); const d2 = r58.code === 200 && r58.body.n === 2 && r58.body.ver === 2 && idx58().items[0].cur === 0 && idx58().items[1].cur === 1;
+  T('58 중복: 같은 바이트 → 409 DUP_BYTES(dup 목록 노출) · allow_dup → 200 n=2 ver=2, 현재 포인터 이동(1→2)', d1 && d2);
+  r58 = await call({ action: 'cdoc_put', cid: 'c58', i: 3, doc_key: 'waste_report', kind: 'final', name: '배출신고서.hwpx', data: ZIP58, pii: 1 }, tokC, 'dev1');
+  const e1 = r58.code === 200 && /_종운환경\.hwpx$/.test(r58.body.name) && r58.body.n === 3; const e1b = JSON.stringify(r58.body).slice(0, 160);
+  r58 = await call({ action: 'cdoc_put', cid: 'c58', i: 7, doc_key: 'x', kind: 'final', name: 'a.pdf', data: b58('%PDF-1.4 stage7') }, tokC, 'dev1');
+  const e2 = r58.code === 200 && !/종운/.test(r58.body.name) && /_S07_x_v1_/.test(r58.body.name); const e2b = JSON.stringify(r58.body).slice(0, 160);
+  T('58 회사 접미: 단계 co env → _종운환경 · 거울에 없는 단계 → 접미 없음', e1 && e2, JSON.stringify([e1, e1b, e2, e2b]));
+  // 채움 맵 초안(파일 없이) + 최근 3판 보존
+  const fp = (k) => call({ action: 'cdoc_put', cid: 'c58', i: 0, doc_key: 'asb_plan', kind: 'draft', fill: { k: k, 공사명: '시험' } }, tokC, 'dev1');
+  r58 = await fp(1); const g1 = r58.code === 200 && r58.body.ver === 1 && /_v1_\d{8}_종운건설\.json$/.test(r58.body.name) && mem.gw_files['cdoc:c58:S00:asb_plan:' + r58.body.n].fill.k === 1;
+  const n1 = r58.body.n; await fp(2); await fp(3); r58 = await fp(4);
+  const drafts = idx58().items.filter((x) => x.dk === 'asb_plan');
+  const g2 = r58.code === 200 && r58.body.ver === 4 && r58.body.gc.length === 1 && r58.body.gc[0] === n1 && !mem.gw_files['cdoc:c58:S00:asb_plan:' + n1] && drafts.length === 4 && drafts[0].gc > 0 && drafts.filter((x) => !x.gc).length === 3 && drafts[3].cur === 1;
+  r58 = await call({ action: 'cdoc_put', cid: 'c58', i: 0, doc_key: 'asb_plan', kind: 'draft', fill: { big: 'x'.repeat(200 * 1024) } }, tokC, 'dev1'); const g3 = r58.code === 413 && r58.body.error_code === 'FILL_TOO_LARGE';
+  T('58 채움 맵 초안: 파일 없이 fill → json 표준 이름 · 4판째에 가장 오래된 바이트 gc(색인은 남음, 보존 3판) · 200KB 초과 413', g1 && g2 && g3, JSON.stringify([g1, g2, g3, r58.code]));
+  // list · get · pii · reclog
+  r58 = await call({ action: 'cdoc_list', cid: 'c58' }, tokV, 'dev1'); const l1 = r58.code === 200 && r58.body.items.length === 8 && r58.body.items.every((x) => x.sha && x.sha.length === 16 && !x.data);
+  mem.gw_users['member:uconh'] = { id: 'uconh', name: '숨김직원', admin: false, perms: { con: 'hide' } }; const tokH = issueSession(mem.gw_users['member:uconh']).token;
+  r58 = await call({ action: 'cdoc_list', cid: 'c58' }, tokH, 'dev1'); const l2 = r58.code === 403 && r58.body.error_code === 'NO_ACCESS';
+  r58 = await call({ action: 'cdoc_get', cid: 'c58', n: 1 }, tokH, 'dev1'); const l3 = r58.code === 403;
+  T('58 list: view 권한 → 8항목(gc 항목 포함, 바이트 없음·sha 16) · 명시 hide는 list·get 403 NO_ACCESS(기본 view 회원은 열람 가능)', l1 && l2 && l3, JSON.stringify([l1, l2, l3, r58.code]));
+  r58 = await call({ action: 'cdoc_get', cid: 'c58', n: 1 }, tokV, 'dev1'); const v1 = r58.code === 200 && r58.body.data === PDF58 && r58.body.type === 'application/pdf' && r58.body.logged === true;
+  const rl = Object.keys(mem.gw_data).find((k) => k.indexOf('reclog:') === 0);
+  const v2 = rl && mem.gw_data[rl].items.length === 1 && mem.gw_data[rl].items[0].bid === 'uconv' && mem.gw_data[rl].items[0].cid === 'c58' && mem.gw_data[rl].items[0].n === 1;
+  r58 = await call({ action: 'cdoc_get', cid: 'c58', n: 3 }, tokV, 'dev1'); const v3 = r58.code === 403 && r58.body.error_code === 'PII_FORBIDDEN';
+  r58 = await call({ action: 'cdoc_get', cid: 'c58', n: 3 }, tokC, 'dev1'); const v4 = r58.code === 200 && r58.body.data === ZIP58;
+  T('58 get: view → pii 0 바이트 + reclog 1건(bid·cid·n) · pii 1은 view 403 PII_FORBIDDEN, do 200', v1 && v2 && v3 && v4, JSON.stringify([v1, v2, v3, v4]));
+  r58 = await call({ action: 'cdoc_put', cid: 'c58', i: 5, doc_key: 'health', kind: 'received', name: '건진.pdf', data: b58('%PDF-1.4 health'), pii: 2 }, tokC, 'dev1'); const hn = r58.body.n;
+  r58 = await call({ action: 'cdoc_get', cid: 'c58', n: hn }, tokC, 'dev1'); const h1 = r58.code === 403 && r58.body.error_code === 'PII2_FORBIDDEN';
+  r58 = await call({ action: 'cdoc_get', cid: 'c58', n: hn }, tokM, 'dev1'); const h2 = r58.code === 400 && r58.body.error_code === 'REASON_REQUIRED';
+  r58 = await call({ action: 'cdoc_get', cid: 'c58', n: hn, reason: '노동부 제출 확인' }, tokM, 'dev1'); const h3 = r58.code === 200 && mem.gw_data[rl].items.slice(-1)[0].reason === '노동부 제출 확인' && mem.gw_data[rl].items.slice(-1)[0].pii === 2;
+  r58 = await call({ action: 'cdoc_get', cid: 'c58', n: hn, reason: '점검' }, tokA); const h4 = r58.code === 200;
+  T('58 pii 2: do 직원도 403 PII2_FORBIDDEN · 관리부는 사유 없으면 400 REASON_REQUIRED, 사유 있으면 200 + reclog(reason·pii 2) · 관리자 200', h1 && h2 && h3 && h4, JSON.stringify([h1, h2, h3, h4]));
+  // 소프트 삭제 → 현재 포인터 이전 판 · 휴지통 목록 · 복구 · 현재 지정 · 영구 삭제 게이트
+  r58 = await call({ action: 'cdoc_del', cid: 'c58', n: 2 }, tokV, 'dev1'); const s1 = r58.code === 403;
+  r58 = await call({ action: 'cdoc_del', cid: 'c58', n: 2 }, tokC, 'dev1'); const s2 = r58.code === 200 && idx58().items[1].del > 0 && idx58().items[1].cur === 0 && idx58().items[0].cur === 1 && mem.gw_files['cdoc:c58:S00:asb_survey:2'];
+  r58 = await call({ action: 'cdoc_get', cid: 'c58', n: 2 }, tokC, 'dev1'); const s3 = r58.code === 404;
+  r58 = await call({ action: 'cdoc_list', cid: 'c58', trash: true }, tokC, 'dev1'); const s4 = r58.code === 200 && r58.body.items.length === 1 && r58.body.items[0].n === 2;
+  r58 = await call({ action: 'cdoc_list', cid: 'c58' }, tokC, 'dev1'); const s5 = r58.code === 200 && !r58.body.items.some((x) => x.n === 2);
+  r58 = await call({ action: 'cdoc_purge', cid: 'c58', n: 2, confirm: true }, tokC, 'dev1'); const s6 = r58.code === 403;
+  r58 = await call({ action: 'cdoc_purge', cid: 'c58', n: 2 }, tokA); const s7 = r58.code === 400 && r58.body.error_code === 'CONFIRM_REQUIRED';
+  r58 = await call({ action: 'cdoc_purge', cid: 'c58', n: 2, confirm: true }, tokA); const s8 = r58.code === 409 && r58.body.error_code === 'TOO_EARLY';
+  r58 = await call({ action: 'cdoc_purge', cid: 'c58', n: 1, confirm: true }, tokA); const s9 = r58.code === 409 && r58.body.error_code === 'NOT_IN_TRASH';
+  T('58 보관(소프트 삭제): view 403 · do 200 → 현재 포인터 1로, 바이트 유지, get 404, 휴지통 목록 1 · 영구 삭제: 직원 403·confirm 없음 400·30일 전 409 TOO_EARLY·휴지통 아님 409', s1 && s2 && s3 && s4 && s5 && s6 && s7 && s8 && s9, [s1, s2, s3, s4, s5, s6, s7, s8, s9].join());
+  r58 = await call({ action: 'cdoc_restore', cid: 'c58', n: 2 }, tokC, 'dev1'); const t1 = r58.code === 200 && !idx58().items[1].del && idx58().items[1].cur === 0 && idx58().items[0].cur === 1;
+  r58 = await call({ action: 'cdoc_cur', cid: 'c58', n: 2 }, tokC, 'dev1'); const t2 = r58.code === 200 && idx58().items[1].cur === 1 && idx58().items[0].cur === 0;
+  r58 = await call({ action: 'cdoc_cur', cid: 'c58', n: 2 }, tokC, 'dev1'); const t3 = r58.code === 400 && r58.body.error_code === 'NO_CHANGE';
+  idx58().items[0].del = Date.now() - 31 * 86400000; idx58().items[0].cur = 0;
+  r58 = await call({ action: 'cdoc_purge', cid: 'c58', n: 1, confirm: true }, tokA);
+  const t4 = r58.code === 200 && !mem.gw_files['cdoc:c58:S00:asb_survey:1'] && idx58().items[0].purged > 0 && auditMock.logs.slice(-1)[0].ev[0].op === '기록물영구삭제';
+  r58 = await call({ action: 'cdoc_get', cid: 'c58', n: 1, reason: 'x' }, tokA); const t5 = r58.code === 404;
+  r58 = await call({ action: 'rec_log_get' }, tokC, 'dev1'); const t6 = r58.code === 403;
+  r58 = await call({ action: 'rec_log_get' }, tokA); const t7 = r58.code === 200 && r58.body.total >= 3;
+  T('58 복구(현재 포인터는 기존 유지) · 현재 지정(되돌리기)·같은 값 NO_CHANGE · 31일 지난 보관본 영구 삭제 200(바이트 없음·purged·감사) · 그 뒤 get 404 · rec_log_get 관리자만', t1 && t2 && t3 && t4 && t5 && t6 && t7, [t1, t2, t3, t4, t5, t6, t7].join());
+  // 문서함 분기 차단
+  mem.gw_data['col:documents'] = mem.gw_data['col:documents'] || { schema: 1, items: [], updated_at: 1 };
+  mem.gw_data['col:documents'].items.push({ id: 'f58', title: '계약 문서', cat: '04-03', scope: 'all', status: '등재' });
+  r58 = await call({ action: 'doc_att_put', id: 'f58', name: 'Cc58_S00_asb_survey_v1_20261101_종운건설.pdf', data: PDF58 }, tokA); const u1 = r58.code === 403 && r58.body.error_code === 'RECORD_NOT_FOR_GIT' && auditMock.logs.slice(-1)[0].ev[0].op === '기록물차단';
+  r58 = await call({ action: 'doc_bulk_put', cid: 'bulk58', items: [{ title: 'x', cat: '04-03', files: [{ name: 'Cc58_S03_waste_report_v1_20261101_종운환경.hwpx', data: ZIP58 }] }] }, tokA); const u2 = r58.code === 403 && r58.body.error_code === 'RECORD_NOT_FOR_GIT';
+  r58 = await call({ action: 'doc_att_put', id: 'f58', name: '계약서 양식.pdf', data: PDF58 }, tokA); const u3 = r58.code === 200;
+  T('58 문서함 분기 차단: 기록물 표준 이름은 doc_att_put·doc_bulk_put 403 RECORD_NOT_FOR_GIT(감사 기록물차단) · 보통 이름은 그대로 200', u1 && u2 && u3, JSON.stringify([u1, u2, u3, r58.code, r58.body.error_code]));
+  delete mem.gw_data['col:contracts']; delete mem.gw_data['map:contract:v1']; delete mem.gw_data['recidx:c58']; Object.keys(mem.gw_files).filter((k) => k.indexOf('cdoc:') === 0).forEach((k) => delete mem.gw_files[k]); if (rl) delete mem.gw_data[rl];
+}
+
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

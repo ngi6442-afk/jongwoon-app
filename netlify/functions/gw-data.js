@@ -1853,6 +1853,263 @@ async function handleConClogAdd(event, d, R) {
   return jr(200, { status: 'OK', key: key, n: doc.items.length, head: h, request_id: R });
 }
 
+// ---- 계약 서류함 cdoc(v406, 계약 D3 1일차 · 설계안 10/22 §4-1 Stored 1안) — 기록물은 Blobs만(git 경로 없음), append-only, 새 버전=새 키, 소프트 삭제 → 30일 뒤 관리자 confirm 영구 삭제(R3) ----
+// 바이트: gw_files 'cdoc:<cid>:S<nn>:<doc_key>:<n>' {name(표준 파일명), orig(올린 이름), type(확장자 고정표), kind, data|fill, by, ts, sha}
+// 색인:  gw_data  'recidx:<cid>' {schema, cid, seq, items:[{n,i,dk,kind,ver,cur,name,orig,ext,size,sha,pii,by,ts,del?,del_by?,purged?,gc?}]} — 항목은 지우지 않는다(표식만)
+// 열람 기록: gw_data 'reclog:YYYY-MM'(doclog 패턴) · 감사: col 'contracts' op 기록물등록/기록물보관/기록물복구/기록물현재/기록물영구삭제 — 실패 시 응답 audit:false
+// 표준 파일명(설계 §4-1 명명): C<cid>_S<nn>_<doc_key>_v<N>_<YYYYMMDD>[_종운환경|_종운건설].<ext> — 회사는 거울 map:contract:v1 단계 co(env/con)로 서버가 정한다. 발주처명·금액은 이름에 넣지 않는다
+// pii 0=없음(기본) 1=근로자 명단·위임장·신분증 등(contracts 'do' 또는 관리자만 열람) 2=건강진단 결과표 등 민감정보(관리자·관리부만 + 열람 사유 필수, 학습·주입 제외)
+const CDOC_KINDS = { draft: 1, final: 1, received: 1 };
+const CDOC_MAX = 6 * 1024 * 1024;                // 문서함 DOC_ATT_MAX와 같은 6MB(base64 — 그 상수는 뒤에 선언돼 직접 참조 불가) — 넷리파이 동기 함수 본문 한도. 초과는 채움 맵(fill)만 올리고 파일은 오프라인 메타(FILE_TOO_LARGE 응답에 안내)
+const CDOC_FILL_MAX = 200 * 1024;                // 채움 맵 JSON 상한(문자열 길이)
+const CDOC_PER_CON = 400;                        // 계약당 색인 항목 상한
+const CDOC_DRAFT_KEEP = 3;                       // 같은 (단계·doc_key) 초안은 최근 3판만 바이트 보존(색인 항목은 gc 표식으로 남김)
+const CDOC_TRASH_DAYS = 30;                      // 소프트 삭제 뒤 영구 삭제 가능까지
+const CDOC_DK_RE = /^[A-Za-z0-9가-힣_.-]{1,40}$/;
+const CDOC_STD_RE = /^C[A-Za-z0-9_-]{1,40}_S\d{2}_[A-Za-z0-9가-힣_.-]{1,40}_v\d+_\d{8}(_종운환경|_종운건설)?\.[a-z0-9]{1,6}$/;   // 기록물 표준 이름 — 문서함(git 경로)엔 못 들어간다(RECORD_NOT_FOR_GIT)
+const CDOC_CORP_NAME = { env: '종운환경', con: '종운건설' };
+const RECLOG_MAX = 5000;
+function cdocIdxKey(cid) { return 'recidx:' + cid; }
+function cdocKey(cid, i, dk, n) { return 'cdoc:' + cid + ':S' + String(i).padStart(2, '0') + ':' + dk + ':' + n; }
+function cdocStdName(cid, i, dk, ver, ts, corp, ext) {
+  const d = new Date(ts + 9 * 3600 * 1000);
+  const ymd = d.getUTCFullYear() + String(d.getUTCMonth() + 1).padStart(2, '0') + String(d.getUTCDate()).padStart(2, '0');
+  return 'C' + cid + '_S' + String(i).padStart(2, '0') + '_' + dk + '_v' + ver + '_' + ymd + (CDOC_CORP_NAME[corp] ? '_' + CDOC_CORP_NAME[corp] : '') + '.' + ext;
+}
+function docAttRecordName(name) { return CDOC_STD_RE.test(String(name || '')); }
+function recLogKey(month) {
+  if (month && /^\d{4}-\d{2}$/.test(month)) return 'reclog:' + month;
+  const d = new Date(Date.now() + 9 * 3600 * 1000);
+  return 'reclog:' + d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0');
+}
+async function appendRecLog(st, entry) {
+  try {
+    const key = recLogKey();
+    const r = await blobGet(st, key);
+    const doc = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data : { schema: 1, items: [] };
+    doc.items.push(entry);
+    if (doc.items.length > RECLOG_MAX) doc.items = doc.items.slice(-RECLOG_MAX);
+    const w = await blobSet(st, key, doc);
+    return !!(w && w.ok);
+  } catch (e) { return false; }
+}
+async function cdocAudit(member, op, cid, t) {
+  try { const r = await appendAudit({ ts: Date.now(), by: member.name, bid: member.id, col: 'contracts', ev: [{ op: op, id: cid, t: String(t || '').slice(0, 80) }] }); return r !== false; } catch (e) { return false; }
+}
+// 계약 항목(삭제 제외) — col:contracts
+async function conLoadItem(st, cid) {
+  const r = await blobGet(st, colKey('contracts'));
+  if (!r.ok && r.code !== 'NOT_FOUND') return { ok: false, http: 500, code: r.code };
+  const items = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data.items : [];
+  const c = items.find(function (x) { return x && x.id === cid; });
+  if (!c || c.del === 1) return { ok: false, http: 404, code: 'NO_CONTRACT' };
+  return { ok: true, c: c };
+}
+// 단계 회사(env/con) — 거울 map:contract:v1의 scen[c.scen][i].co. 거울이 없거나 단계가 없으면 ''(파일명에 회사 접미 없음)
+async function cdocCorpOf(st, c, i) {
+  try {
+    const r = await blobGet(st, CON_PROC_KEYS.map);
+    const sc = (r.ok && r.data && r.data.scen && c && c.scen && Array.isArray(r.data.scen[c.scen])) ? r.data.scen[c.scen] : null;
+    const s = sc ? sc.find(function (x) { return x && Number(x.i) === i; }) : null;
+    return (s && (s.co === 'env' || s.co === 'con')) ? s.co : '';
+  } catch (e) { return ''; }
+}
+async function cdocIdxRead(st, cid) {
+  const r = await blobGet(st, cdocIdxKey(cid));
+  if (!r.ok && r.code !== 'NOT_FOUND') return { ok: false, code: r.code };
+  const doc = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data : { schema: 1, cid: cid, seq: 0, items: [] };
+  doc.seq = Number(doc.seq) || 0; doc.cid = cid;
+  return { ok: true, doc: doc };
+}
+function cdocParseRef(d) {
+  const cid = String(d.cid || ''), i = Number(d.i), dk = String(d.doc_key || '');
+  if (!/^[A-Za-z0-9_-]{1,40}$/.test(cid)) return { err: 'BAD_CID' };
+  if (!Number.isInteger(i) || i < 0 || i > 99) return { err: 'BAD_STAGE' };
+  if (!CDOC_DK_RE.test(dk) || dk === 'constructor' || dk === '__proto__') return { err: 'BAD_DOC_KEY' };
+  return { cid: cid, i: i, dk: dk };
+}
+function cdocPublic(it) { const o = Object.assign({}, it); delete o.sha_full; return o; }
+async function handleCdocPut(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (!(await deviceApproved(event, c.member))) return jr(403, { status: 'FORBIDDEN', error_code: 'DEVICE_NOT_APPROVED', request_id: R });
+  if (permOf(c.member, 'contracts') !== 'do') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_WRITE', request_id: R });
+  const ref = cdocParseRef(d); if (ref.err) return jr(400, { status: 'REJECTED', error_code: ref.err, request_id: R });
+  const kind = String(d.kind || '');
+  if (!hasOwn(CDOC_KINDS, kind)) return jr(400, { status: 'REJECTED', error_code: 'BAD_KIND', request_id: R });
+  const pii = (d.pii === undefined || d.pii === null || d.pii === '') ? 0 : Number(d.pii);
+  if (!(pii === 0 || pii === 1 || pii === 2)) return jr(400, { status: 'REJECTED', error_code: 'BAD_PII', request_id: R });
+  const orig = String(d.name || '').trim().slice(0, 120);
+  const b64 = String(d.data || '');
+  let fill = null, ext = '';
+  if (kind === 'draft' && !b64 && d.fill && typeof d.fill === 'object' && !Array.isArray(d.fill)) {
+    // 채움 맵 JSON 초안(파일 없이) — 생성 훅 자동 보존·6MB 초과 폴백. 값에 개인정보가 섞일 수 있어 pii는 호출자가 지정(기본 0)
+    let s; try { s = JSON.stringify(d.fill); } catch (e) { return jr(400, { status: 'REJECTED', error_code: 'BAD_FILL', request_id: R }); }
+    if (!s || s.length > CDOC_FILL_MAX) return jr(413, { status: 'REJECTED', error_code: 'FILL_TOO_LARGE', request_id: R });
+    fill = JSON.parse(s); ext = 'json';
+  } else {
+    if (!orig || !b64) return jr(400, { status: 'REJECTED', error_code: 'INVALID_FILE', request_id: R });
+    ext = docAttExt(orig);
+    if (!docAttExtOk(ext)) return jr(400, { status: 'REJECTED', error_code: 'BAD_EXT', request_id: R });
+    if (b64.length > CDOC_MAX) return jr(413, { status: 'REJECTED', error_code: 'FILE_TOO_LARGE', hint: '파일은 오프라인 보관, 채움 맵(fill)만 올리기', request_id: R });
+    if (!docAttMagicOk(ext, b64)) return jr(400, { status: 'REJECTED', error_code: 'BAD_MAGIC', request_id: R });
+  }
+  const st = store(DATA);
+  const ld = await conLoadItem(st, ref.cid);
+  if (!ld.ok) return jr(ld.http, { status: ld.http === 500 ? 'ERROR' : 'REJECTED', error_code: ld.code, request_id: R });
+  const ix = await cdocIdxRead(st, ref.cid);
+  if (!ix.ok) return jr(500, { status: 'ERROR', error_code: ix.code, request_id: R });
+  const idx = ix.doc;
+  if (idx.items.length >= CDOC_PER_CON) return jr(409, { status: 'CONFLICT', error_code: 'RECIDX_FULL', request_id: R });
+  const sha = crypto.createHash('sha256').update(fill ? Buffer.from(JSON.stringify(fill), 'utf8') : Buffer.from(b64, 'base64')).digest('hex');
+  // sha256 중복 = 같은 계약 안의 살아 있는 항목과 바이트가 같음 → 상단 노출 뒤 사람 선택(allow_dup:true로 재요청). 자동 거부·자동 병합 없음
+  const dup = idx.items.filter(function (x) { return x && x.sha === sha.slice(0, 16) && !x.del && !x.purged; }).map(cdocPublic);
+  if (dup.length && d.allow_dup !== true) return jr(409, { status: 'CONFLICT', error_code: 'DUP_BYTES', dup: dup, request_id: R });
+  const same = idx.items.filter(function (x) { return x && x.i === ref.i && x.dk === ref.dk && x.kind === kind && !x.purged; });
+  const ver = same.length + 1;
+  const n = idx.seq + 1;
+  const now = Date.now();
+  const corp = await cdocCorpOf(st, ld.c, ref.i);
+  const std = cdocStdName(ref.cid, ref.i, ref.dk, ver, now, corp, ext);
+  const fkey = cdocKey(ref.cid, ref.i, ref.dk, n);
+  const rec = { name: std, orig: orig, type: fill ? 'application/json' : DOC_ATT_MIME[ext], kind: kind, cid: ref.cid, i: ref.i, dk: ref.dk, n: n, ver: ver, pii: pii, by: c.member.name, bid: c.member.id, ts: now, sha: sha };
+  if (fill) rec.fill = fill; else rec.data = b64;
+  const fw = await blobSet(store(FILES), fkey, rec);
+  if (!fw.ok) return jr(500, { status: 'ERROR', error_code: fw.code, request_id: R });
+  same.forEach(function (x) { if (x.cur) x.cur = 0; });
+  const item = { n: n, i: ref.i, dk: ref.dk, kind: kind, ver: ver, cur: 1, name: std, orig: orig || std, ext: ext, size: fill ? JSON.stringify(fill).length : b64Bytes(b64), sha: sha.slice(0, 16), pii: pii, corp: corp, by: { id: c.member.id, name: c.member.name }, ts: now };
+  if (typeof d.note === 'string' && d.note.trim()) item.note = d.note.trim().slice(0, 120);
+  idx.items.push(item); idx.seq = n;
+  // 초안 보존 상한: 같은 (단계·doc_key) 초안이 3판을 넘으면 가장 오래된 것의 바이트만 지우고 색인엔 gc 표식(append-only 유지)
+  const gcd = [];
+  if (kind === 'draft') {
+    const drafts = idx.items.filter(function (x) { return x.i === ref.i && x.dk === ref.dk && x.kind === 'draft' && !x.gc && !x.purged; }).sort(function (a, b) { return a.n - b.n; });
+    while (drafts.length > CDOC_DRAFT_KEEP) { const old = drafts.shift(); await blobDelete(store(FILES), cdocKey(ref.cid, old.i, old.dk, old.n)); old.gc = now; old.cur = 0; gcd.push(old.n); }
+  }
+  idx.updated_at = now; idx.updated_by = c.member.id;
+  const w = await blobSet(st, cdocIdxKey(ref.cid), idx);
+  if (!w.ok) { await blobDelete(store(FILES), fkey); return jr(500, { status: 'ERROR', error_code: w.code, request_id: R }); }
+  const audit = await cdocAudit(c.member, '기록물등록', ref.cid, std + (dup.length ? ' · 중복 허용' : ''));
+  return jr(200, { status: 'OK', cid: ref.cid, n: n, ver: ver, name: std, item: item, dup: dup, gc: gcd, audit: audit, request_id: R });
+}
+async function handleCdocList(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (permOf(c.member, 'contracts') === 'hide') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_ACCESS', request_id: R });
+  const cid = String(d.cid || '');
+  if (!/^[A-Za-z0-9_-]{1,40}$/.test(cid)) return jr(400, { status: 'REJECTED', error_code: 'BAD_CID', request_id: R });
+  const ix = await cdocIdxRead(store(DATA), cid);
+  if (!ix.ok) return jr(500, { status: 'ERROR', error_code: ix.code, request_id: R });
+  const items = ix.doc.items.filter(function (x) { return x && !x.purged && (d.trash === true ? !!x.del : !x.del); }).map(cdocPublic);
+  return jr(200, { status: 'OK', cid: cid, seq: ix.doc.seq, items: items, updated_at: ix.doc.updated_at || 0, request_id: R });
+}
+function cdocCanRead(m, it) {
+  if (!m || !it) return false;
+  if (m.admin) return true;
+  const p = permOf(m, 'contracts');
+  if (it.pii === 2) return String(m.dept || '') === '관리부';
+  if (it.pii === 1) return p === 'do';
+  return p !== 'hide';
+}
+async function handleCdocGet(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (!(await deviceApproved(event, c.member))) return jr(403, { status: 'FORBIDDEN', error_code: 'DEVICE_NOT_APPROVED', request_id: R });
+  if (permOf(c.member, 'contracts') === 'hide') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_ACCESS', request_id: R });
+  const cid = String(d.cid || ''), n = Number(d.n);
+  if (!/^[A-Za-z0-9_-]{1,40}$/.test(cid) || !(n >= 1)) return jr(400, { status: 'REJECTED', error_code: 'BAD_ID', request_id: R });
+  const st = store(DATA);
+  const ix = await cdocIdxRead(st, cid);
+  if (!ix.ok) return jr(500, { status: 'ERROR', error_code: ix.code, request_id: R });
+  const it = ix.doc.items.find(function (x) { return x && Number(x.n) === n; });
+  if (!it || it.purged || it.gc) return jr(404, { status: 'REJECTED', error_code: 'NO_FILE', request_id: R });
+  if (it.del && !c.member.admin) return jr(404, { status: 'REJECTED', error_code: 'NO_FILE', request_id: R });   // 보관함(휴지통)은 관리자만 연다
+  if (!cdocCanRead(c.member, it)) return jr(403, { status: 'FORBIDDEN', error_code: it.pii === 2 ? 'PII2_FORBIDDEN' : 'PII_FORBIDDEN', request_id: R });
+  const reason = typeof d.reason === 'string' ? d.reason.trim().slice(0, 80) : '';
+  if (it.pii === 2 && reason.length < 2) return jr(400, { status: 'REJECTED', error_code: 'REASON_REQUIRED', request_id: R });   // 민감정보 열람 사유 필수(개인정보보호법 23조 — 열람 기록)
+  const r = await blobGet(store(FILES), cdocKey(cid, it.i, it.dk, n));
+  if (!r.ok || !r.data) return jr(404, { status: 'REJECTED', error_code: 'NO_FILE', request_id: R });
+  const logged = await appendRecLog(st, { ts: Date.now(), bid: c.member.id, by: String(c.member.name || ''), dept: String(c.member.dept || ''), cid: cid, n: n, i: it.i, dk: it.dk, kind: it.kind, pii: it.pii, name: String(it.name || '').slice(0, 80), reason: reason });
+  if (it.pii === 2 && !logged) return jr(500, { status: 'ERROR', error_code: 'RECLOG_FAILED', request_id: R });   // 민감정보는 기록 없이는 내주지 않는다(fail-closed)
+  const out = { status: 'OK', cid: cid, n: n, name: it.name, orig: it.orig, kind: it.kind, pii: it.pii, type: r.data.fill ? 'application/json' : docAttMime(it.name), logged: logged, request_id: R };
+  if (r.data.fill) out.fill = r.data.fill; else out.data = r.data.data;
+  return jr(200, out);
+}
+// 소프트 삭제·복구·현재 포인터 — contracts 'do'. 바이트는 그대로(append-only), 색인 표식만
+async function cdocMark(event, d, R, mode) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (permOf(c.member, 'contracts') !== 'do') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_WRITE', request_id: R });
+  const cid = String(d.cid || ''), n = Number(d.n);
+  if (!/^[A-Za-z0-9_-]{1,40}$/.test(cid) || !(n >= 1)) return jr(400, { status: 'REJECTED', error_code: 'BAD_ID', request_id: R });
+  const st = store(DATA);
+  const ix = await cdocIdxRead(st, cid);
+  if (!ix.ok) return jr(500, { status: 'ERROR', error_code: ix.code, request_id: R });
+  const idx = ix.doc, it = idx.items.find(function (x) { return x && Number(x.n) === n; });
+  if (!it || it.purged || it.gc) return jr(404, { status: 'REJECTED', error_code: 'NO_FILE', request_id: R });
+  const now = Date.now();
+  const sib = function () { return idx.items.filter(function (x) { return x.i === it.i && x.dk === it.dk && x.kind === it.kind && !x.del && !x.purged && !x.gc; }); };
+  let op = '';
+  if (mode === 'del') {
+    if (it.del) return jr(400, { status: 'REJECTED', error_code: 'NO_CHANGE', request_id: R });
+    it.del = now; it.del_by = c.member.id; const wasCur = it.cur === 1; it.cur = 0;
+    if (wasCur) { const s = sib().sort(function (a, b) { return b.n - a.n; }); if (s[0]) s[0].cur = 1; }   // 현재본을 보관하면 바로 앞 판이 현재
+    op = '기록물보관';
+  } else if (mode === 'restore') {
+    if (!it.del) return jr(400, { status: 'REJECTED', error_code: 'NO_CHANGE', request_id: R });
+    delete it.del; delete it.del_by;
+    if (!sib().some(function (x) { return x.cur === 1 && x.n !== it.n; })) it.cur = 1;
+    op = '기록물복구';
+  } else if (mode === 'cur') {
+    if (it.del) return jr(400, { status: 'REJECTED', error_code: 'IN_TRASH', request_id: R });
+    if (it.cur === 1) return jr(400, { status: 'REJECTED', error_code: 'NO_CHANGE', request_id: R });
+    sib().forEach(function (x) { x.cur = 0; }); it.cur = 1;
+    op = '기록물현재';
+  }
+  idx.updated_at = now; idx.updated_by = c.member.id;
+  const w = await blobSet(st, cdocIdxKey(cid), idx);
+  if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
+  const audit = await cdocAudit(c.member, op, cid, it.name);
+  return jr(200, { status: 'OK', cid: cid, n: n, item: cdocPublic(it), audit: audit, request_id: R });
+}
+async function handleCdocDel(event, d, R) { return cdocMark(event, d, R, 'del'); }
+async function handleCdocRestore(event, d, R) { return cdocMark(event, d, R, 'restore'); }
+async function handleCdocCur(event, d, R) { return cdocMark(event, d, R, 'cur'); }
+// 영구 삭제 — 관리자 + confirm:true + 보관 30일 경과(등급표 '삭제=PM 전용' R3). 바이트 제거, 색인은 purged 표식(복구 불능)
+async function handleCdocPurge(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (!c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
+  if (d.confirm !== true) return jr(400, { status: 'REJECTED', error_code: 'CONFIRM_REQUIRED', request_id: R });
+  const cid = String(d.cid || ''), n = Number(d.n);
+  if (!/^[A-Za-z0-9_-]{1,40}$/.test(cid) || !(n >= 1)) return jr(400, { status: 'REJECTED', error_code: 'BAD_ID', request_id: R });
+  const st = store(DATA);
+  const ix = await cdocIdxRead(st, cid);
+  if (!ix.ok) return jr(500, { status: 'ERROR', error_code: ix.code, request_id: R });
+  const idx = ix.doc, it = idx.items.find(function (x) { return x && Number(x.n) === n; });
+  if (!it || it.purged) return jr(404, { status: 'REJECTED', error_code: 'NO_FILE', request_id: R });
+  if (!it.del) return jr(409, { status: 'CONFLICT', error_code: 'NOT_IN_TRASH', request_id: R });
+  if (Date.now() - Number(it.del) < CDOC_TRASH_DAYS * 86400000) return jr(409, { status: 'CONFLICT', error_code: 'TOO_EARLY', days: CDOC_TRASH_DAYS, request_id: R });
+  await blobDelete(store(FILES), cdocKey(cid, it.i, it.dk, n));
+  it.purged = Date.now(); it.purged_by = c.member.id; it.cur = 0;
+  idx.updated_at = Date.now(); idx.updated_by = c.member.id;
+  const w = await blobSet(st, cdocIdxKey(cid), idx);
+  if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
+  const audit = await cdocAudit(c.member, '기록물영구삭제', cid, it.name);
+  return jr(200, { status: 'OK', cid: cid, n: n, audit: audit, request_id: R });
+}
+async function handleRecLogGet(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (!c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
+  const month = (typeof d.month === 'string' && /^\d{4}-\d{2}$/.test(d.month)) ? d.month : '';
+  const key = recLogKey(month);
+  const r = await blobGet(store(DATA), key);
+  const items = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data.items : [];
+  const limit = Math.min(500, Math.max(1, parseInt(d.limit, 10) || 200));
+  return jr(200, { status: 'OK', month: key.slice(7), total: items.length, items: items.slice(-limit).reverse(), request_id: R });
+}
+
 // ---- 문서함 설정(v314): 분류별 기본 공개범위 + 등재 결재 게이트. 관리자 전용·감사로그·낙관락(등급표 패턴) ----
 async function handleDocSettingsGet(event, d, R) {
   const c = await currentMember(event);
@@ -2732,6 +2989,7 @@ async function handleDocAttPut(event, d, R) {
   const name = String(d.name || '').trim().slice(0, 120);
   const b64 = String(d.data || '');
   if (!docId || !name || !b64) return jr(400, { status: 'REJECTED', error_code: 'INVALID_FILE', request_id: R });
+  if (docAttRecordName(name)) { await cdocAudit(c.member, '기록물차단', docId, name); return jr(403, { status: 'FORBIDDEN', error_code: 'RECORD_NOT_FOR_GIT', request_id: R }); }   // v406: 계약 기록물은 문서함(정본·git 경로)에 못 들어간다 — 설계 §4-1 분기 차단
   const ext = docAttExt(name);
   if (!docAttExtOk(ext)) return jr(400, { status: 'REJECTED', error_code: 'BAD_EXT', request_id: R });
   if (b64.length > DOC_ATT_MAX) return jr(413, { status: 'REJECTED', error_code: 'FILE_TOO_LARGE', request_id: R });
@@ -2835,6 +3093,7 @@ async function handleDocBulkPut(event, d, R) {
       const f = (files[j] && typeof files[j] === 'object') ? files[j] : {};
       const name = String(f.name || '').trim().slice(0, 120), b64 = String(f.data || '');
       if (!name || !b64) return jr(400, { status: 'REJECTED', error_code: 'INVALID_FILE', index: i, file: j, request_id: R });
+      if (docAttRecordName(name)) return jr(403, { status: 'FORBIDDEN', error_code: 'RECORD_NOT_FOR_GIT', index: i, file: j, request_id: R });   // v406
       const ext = docAttExt(name);
       if (!docAttExtOk(ext)) return jr(400, { status: 'REJECTED', error_code: 'BAD_EXT', index: i, file: j, request_id: R });
       if (b64.length > DOC_ATT_MAX) return jr(413, { status: 'REJECTED', error_code: 'FILE_TOO_LARGE', index: i, file: j, request_id: R });
@@ -3188,6 +3447,14 @@ async function handlerInner(event) {
     if (d && d.action === 'con_proc_bg_set') return await handleConProcBgSet(event, d, R);   // v404
     if (d && d.action === 'con_proc_edit') return await handleConProcEdit(event, d, R);
     if (d && d.action === 'con_clog_add') return await handleConClogAdd(event, d, R);
+    if (d && d.action === 'cdoc_put') return await handleCdocPut(event, d, R);   // v406 계약 서류함(D3)
+    if (d && d.action === 'cdoc_list') return await handleCdocList(event, d, R);
+    if (d && d.action === 'cdoc_get') return await handleCdocGet(event, d, R);
+    if (d && d.action === 'cdoc_del') return await handleCdocDel(event, d, R);
+    if (d && d.action === 'cdoc_restore') return await handleCdocRestore(event, d, R);
+    if (d && d.action === 'cdoc_cur') return await handleCdocCur(event, d, R);
+    if (d && d.action === 'cdoc_purge') return await handleCdocPurge(event, d, R);
+    if (d && d.action === 'rec_log_get') return await handleRecLogGet(event, d, R);
     if (d && d.action === 'doc_settings_get') return await handleDocSettingsGet(event, d, R);
     if (d && d.action === 'doc_settings_set') return await handleDocSettingsSet(event, d, R);
     if (d && d.action === 'doc_att_put') return await handleDocAttPut(event, d, R);
