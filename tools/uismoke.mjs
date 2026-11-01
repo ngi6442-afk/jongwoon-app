@@ -1739,5 +1739,16 @@ try {
     && Number((swv6.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 406);
 } catch (e) { console.log('  (v406 검사 생략 — ' + e.message + ')'); fails++; }
 
+// ---- v407(11/1 계약 D3 2일차): 계약 서류함 화면 — 단계 서류 행 [최종본↑]·[수령↑]·pii 선택·기록물 줄 · 패킷 메타 우선 판정·[⬆ 올리기] · 생성 훅 초안 보존 2곳 · 이벤트 연결 · sw ≥407
+try {
+  const swv7 = readFileSync(join(ROOT, 'sw.js'), 'utf8');
+  T('v407 계약 서류함 화면: cdoc 함수군(cdocDocKey·cdocPkHit·cdocRowsHtml·csCdocPick/Upload/Open/Mark/Draft) · 서류 행 data-cs-cup 2종 · data-cs-pii 선택 · 패킷 cdocPkHit 우선·data-cs-cpk · 생성 훅 csCdocDraft 2곳 · 바인딩 5종 · CSS · sw ≥ 407',
+    ['function cdocDocKey', 'function cdocPkHit', 'function cdocRowsHtml', 'function cdocLoad', 'function csCdocPick', 'function csCdocUpload', 'function csCdocOpen', 'function csCdocMark', 'function csCdocDraft'].every((s) => html.indexOf(s) > 0)
+    && html.indexOf('data-cs-cup="\' + base + esc(d.k) + \'|final"') > 0 && html.indexOf('|received" title="수령본') > 0 && html.indexOf('<select data-cs-pii=') > 0
+    && html.indexOf('var hm = cdocPkHit(c, pk, it), hit = [];') > 0 && html.indexOf('data-cs-cpk="') > 0 && (html.match(/csCdocDraft\(c, kind, ed\);/g) || []).length === 2
+    && ['data-cs-cup', 'data-cs-cpk', 'data-cs-copen', 'data-cs-ccur', 'data-cs-cdel'].every((a) => html.indexOf('querySelectorAll("[' + a + ']")') > 0 || html.indexOf('csAct("' + a + '"') > 0)
+    && html.indexOf('[data-cs-dnew], [data-cs-pii]') > 0 && html.indexOf('.cs-cdoc-r{') > 0 && Number((swv7.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 407);
+} catch (e) { console.log('  (v407 검사 생략 — ' + e.message + ')'); fails++; }
+
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
