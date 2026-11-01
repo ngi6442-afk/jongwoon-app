@@ -1771,5 +1771,17 @@ try {
     && Number((swv9.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 409);
 } catch (e) { console.log('  (v409 검사 생략 — ' + e.message + ')'); fails++; }
 
+// ---- v410(11/1 계약 D4 1·2일차): 학습 코어 승격(claude.js·learn.js·docdiff.js) · promoai 재수출 · cdoc_put final 훅 · learn_* 3액션 · sw ≥410
+try {
+  const swv10 = readFileSync(join(ROOT, 'sw.js'), 'utf8'), gwd10 = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-data.js'), 'utf8'), pa10 = readFileSync(join(ROOT, 'netlify', 'functions', '_lib', 'promoai.js'), 'utf8'), pl10 = readFileSync(join(ROOT, 'netlify', 'functions', '_lib', 'promolearn.js'), 'utf8');
+  const has10 = (n) => { try { readFileSync(join(ROOT, 'netlify', 'functions', '_lib', n), 'utf8'); return true; } catch (e) { return false; } };
+  T('v410 학습 코어: _lib/claude.js·learn.js·docdiff.js 존재 · promoai→claude 재수출 · promolearn→learn 래퍼 · gw-data cdocLearnPair+final 훅 · learn_settings_get/set·learn_pairs_get 디스패치 · 검진·명단 제외 정규식 · sw ≥ 410',
+    has10('claude.js') && has10('learn.js') && has10('docdiff.js') && /require\('\.\/claude'\)/.test(pa10) && /require\('\.\/learn'\)/.test(pl10)
+    && gwd10.indexOf('async function cdocLearnPair(') > 0 && gwd10.indexOf("if (kind === 'final') { try { learn = await cdocLearnPair(") > 0
+    && ['learn_settings_get', 'learn_settings_set', 'learn_pairs_get'].every((a) => gwd10.indexOf("d.action === '" + a + "'") > 0)
+    && /forbid_re: \/검진\|건강\|명단\|명부\|신분증/.test(readFileSync(join(ROOT, 'netlify', 'functions', '_lib', 'learn.js'), 'utf8'))
+    && Number((swv10.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 410);
+} catch (e) { console.log('  (v410 검사 생략 — ' + e.message + ')'); fails++; }
+
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

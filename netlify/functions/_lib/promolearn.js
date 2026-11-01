@@ -8,8 +8,11 @@
 //   규칙 창고 promoai:lessons {rules[≤25], exemplars{시설키: 완성본 발췌}, gaps[간극 이력], stats, off}
 //   → 다음 생성(buildPrompt)이 규칙·예시를 데이터로 받는다. 사람(개발자)은 규칙을 쓰지 않는다.
 //
+// v410(계약 D4 1일차): 유형 공통 함수(normRules·normLessons·mergeLessons·lessonLines·exemplarFor·gapSummary·pickPending·상수)는 _lib/learn.js로 승격했고
+//   이 파일은 블로그 고유 부분(텍스트 정리·사진 마커·간극 점수·포장 간극·프롬프트·워커 기동)과 같은 서명의 얇은 래퍼만 남긴다. 키·동작 불변(servertest 절 48).
 // 이 파일은 순수 함수 + 작은 I/O 도우미. 모델 호출·블롭 쓰기는 워커·크론·API가 한다(테스트는 여기 함수들을 직접 검증).
 const { issueSession } = require('./session');
+const LN = require('./learn');
 
 const LESSONS_KEY = 'promoai:lessons';
 const PAIR_PREFIX = 'promolearn:in:';
@@ -37,18 +40,18 @@ function layoutGap(copyLines, finalLines) {
     n_copy: ct.length, n_final: ft.length,
   };
 }
+// 상수는 learn.js와 같은 값(문자 그대로 — uismoke v389가 리터럴을 본다). 다르면 모듈 로드 때 바로 멈춘다.
 const MAX_RULES = 25;
 const RULE_CHARS = 120;
 const EXEMPLAR_CHARS = 1500;
 const MAX_GAPS = 60;
 const MAX_TRIES = 3;
 const LOCK_TTL_MS = 5 * 60 * 1000;
-const RUNNING_STALE_MS = 15 * 60 * 1000;
-const RETRY_WAIT_MS = 10 * 60 * 1000;
+if (MAX_RULES !== LN.MAX_RULES || RULE_CHARS !== LN.RULE_CHARS || EXEMPLAR_CHARS !== LN.EXEMPLAR_CHARS || MAX_GAPS !== LN.MAX_GAPS || MAX_TRIES !== LN.MAX_TRIES || LOCK_TTL_MS !== LN.LOCK_TTL_MS) throw new Error('promolearn/learn 상수 불일치');
 const GAP_CHARS = 7000;                  // 편집거리 계산 상한(7,000×7,000 ≈ 0.3초)
-const SCOPES = { style: 1, format: 1, structure: 1, content: 1 };
-const RE_PAIR_ID = /^pl_[a-f0-9]{12}$/;
-const RE_REC_ID = /^[A-Za-z0-9_-]{2,48}$/;
+const SCOPES = LN.SCOPES4;
+const RE_PAIR_ID = LN.TYPES.promo.pair_re;
+const RE_REC_ID = LN.RE_REC_ID;
 
 function pairKey(id) { return PAIR_PREFIX + id; }
 function draftKey(promoId) { return 'promoai:draft:' + promoId; }
@@ -73,7 +76,7 @@ function stripMarkers(text) {
   }).join('\n').replace(/\n{3,}/g, '\n\n').trim();
 }
 function normForGap(text) {
-  return stripMarkers(text).toLowerCase().replace(/[\s ]+/g, '').replace(/[.,!?;:'"“”‘’()\[\]【】\-–—·…~]/g, '').slice(0, GAP_CHARS);
+  return stripMarkers(text).toLowerCase().replace(/[\s ]+/g, '').replace(/[.,!?;:'"“”‘’()\[\]【】\-–—·…~]/g, '').slice(0, GAP_CHARS);
 }
 function levenshtein(a, b) {
   const n = a.length, m = b.length;
@@ -114,7 +117,7 @@ function facilityKey(rec) {
   const f = String((rec && rec.facility) || '').replace(/\s+/g, '').slice(0, 20);
   return f || 'default';
 }
-function hash32(s) { let h = 2166136261; const t = String(s || ''); for (let i = 0; i < t.length; i++) { h ^= t.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; } return ('0000000' + h.toString(16)).slice(-8); }
+const hash32 = LN.hash32;
 
 // ---- 학습 프롬프트(모델이 규칙을 쓴다 — 개발자는 쓰지 않는다) ----
 const LEARN_SYSTEM = [
@@ -166,97 +169,24 @@ function buildLearnPrompt(o) {
   lines.push('위 두 글의 차이에서 규칙을 뽑고 기존 규칙과 합쳐 JSON으로만 답하십시오.');
   return { system: LEARN_SYSTEM, user: lines.join('\n'), schema: LEARN_SCHEMA };
 }
-// 모델 출력 → 규칙 목록 정리(화이트리스트·길이·개수). 금지 문자열 검사는 워커가 한다.
-function normRules(out, oldRules) {
-  const old = {}; (oldRules || []).forEach(function (r) { if (r && r.id) old[r.id] = r; });
-  const seen = {}; const res = [];
-  (Array.isArray(out && out.rules) ? out.rules : []).forEach(function (r) {
-    if (!r) return;
-    const text = String(r.text || '').replace(/\s+/g, ' ').trim().slice(0, RULE_CHARS);
-    const scope = SCOPES[r.scope] ? r.scope : 'style';
-    if (!text || seen[text]) return;
-    seen[text] = 1;
-    let id = (typeof r.keep_id === 'string' && old[r.keep_id]) ? r.keep_id : '';
-    if (!id) { for (const k in old) { if (old[k].text === text) { id = k; break; } } }
-    if (!id) id = 'r' + hash32(text);
-    // 근거 수 — 모델이 센 값과 "기존 규칙이면 +1"(모델이 안 세어도 누적되게) 중 큰 쪽
-    const modelN = Math.floor(Number(r.n) || 0);
-    const n = old[id] ? Math.max(modelN, (Number(old[id].n) || 1) + 1) : Math.max(1, modelN);
-    res.push({ id: id, text: text, scope: scope, n: n, first: old[id] ? old[id].first : 0, last: 0 });
-  });
-  return res.slice(0, MAX_RULES);
-}
-function emptyLessons() { return { schema: 1, off: false, rules: [], exemplars: {}, gaps: [], stats: { pairs: 0, calls: 0, tokens: 0 }, updated_at: 0 }; }
-function normLessons(x) {
-  const e = emptyLessons();
-  if (!x || typeof x !== 'object') return e;
-  e.off = x.off === true;
-  e.rules = Array.isArray(x.rules) ? x.rules.filter(function (r) { return r && r.id && r.text; }).slice(0, MAX_RULES) : [];
-  e.exemplars = (x.exemplars && typeof x.exemplars === 'object') ? x.exemplars : {};
-  e.gaps = Array.isArray(x.gaps) ? x.gaps.slice(-MAX_GAPS) : [];
-  e.stats = Object.assign({ pairs: 0, calls: 0, tokens: 0 }, (x.stats && typeof x.stats === 'object') ? x.stats : {});
-  e.updated_at = Number(x.updated_at) || 0;
-  return e;
-}
+// ---- 유형 공통 코어 래퍼(서명 불변) ----
+function normRules(out, oldRules) { return LN.normRules(out, oldRules, SCOPES); }
+function emptyLessons() { return LN.emptyLessons(); }
+function normLessons(x) { return LN.normLessons(x); }
 // 학습 결과 병합(순수) — ctx {promo_id, pair_id, final_title, final_body, facility, now, tokens, gap, summary}
 function mergeLessons(oldL, out, ctx) {
-  const L = normLessons(oldL);
-  const now = Number(ctx.now) || Date.now();
-  const rules = normRules(out, L.rules);
-  rules.forEach(function (r) { if (!r.first) r.first = now; r.last = now; });
-  L.rules = rules;
-  const fk = String(ctx.facility || 'default');
-  L.exemplars[fk] = { promo_id: String(ctx.promo_id || ''), title: String(ctx.final_title || '').slice(0, 80), excerpt: stripMarkers(ctx.final_body).slice(0, EXEMPLAR_CHARS), ts: now, gap: ctx.gap ? ctx.gap.ratio : null };
-  L.gaps.push({ promo_id: String(ctx.promo_id || ''), pair: String(ctx.pair_id || ''), ts: now, ratio: ctx.gap ? ctx.gap.ratio : null, lines_d: ctx.gap ? ctx.gap.lines_d : 0, heads_d: ctx.gap ? ctx.gap.heads_d : 0, photos_d: ctx.gap ? ctx.gap.photos_d : 0, summary: String(ctx.summary || '').slice(0, 200),
-    layout: (ctx.gap && ctx.gap.layout) ? { line_match: ctx.gap.layout.line_match, hr_d: ctx.gap.layout.hr_d, bold_d: ctx.gap.layout.bold_d, blank_d: ctx.gap.layout.blank_d } : null });   // v394 포장 간극(복사본 줄 계획이 있을 때만)
-  if (L.gaps.length > MAX_GAPS) L.gaps = L.gaps.slice(-MAX_GAPS);
-  L.stats.pairs = (Number(L.stats.pairs) || 0) + 1;
-  L.stats.calls = (Number(L.stats.calls) || 0) + 1;
-  L.stats.tokens = (Number(L.stats.tokens) || 0) + (Number(ctx.tokens) || 0);
-  L.updated_at = now;
-  return L;
+  const g = ctx.gap;
+  return LN.mergeLessons(oldL, out, {
+    rec_id: ctx.promo_id, pair_id: ctx.pair_id, ex_key: String(ctx.facility || 'default'), ex_title: ctx.final_title, ex_excerpt: stripMarkers(ctx.final_body),
+    now: ctx.now, tokens: ctx.tokens, gap: g, summary: ctx.summary,
+    extra: { lines_d: g ? g.lines_d : 0, heads_d: g ? g.heads_d : 0, photos_d: g ? g.photos_d : 0 },
+    layout: (g && g.layout) ? { line_match: g.layout.line_match, hr_d: g.layout.hr_d, bold_d: g.layout.bold_d, blank_d: g.layout.blank_d } : null,   // v394 포장 간극(복사본 줄 계획이 있을 때만)
+  }, SCOPES);
 }
-// 생성 프롬프트에 넣을 규칙 줄(근거 많은 순). off면 빈 배열.
-function lessonLines(L0) {
-  const L = normLessons(L0);
-  if (L.off || !L.rules.length) return [];
-  return L.rules.slice().sort(function (a, b) { return (Number(b.n) || 0) - (Number(a.n) || 0); }).slice(0, MAX_RULES)
-    .map(function (r) { return String(r.text).slice(0, RULE_CHARS) + ((Number(r.n) || 1) > 1 ? ' (근거 ' + r.n + '건)' : ''); });
-}
-// 같은 시설 완성본 예시 → 없으면 가장 최근 것. off면 null.
-function exemplarFor(L0, facility) {
-  const L = normLessons(L0);
-  if (L.off) return null;
-  const fk = String(facility || '').replace(/\s+/g, '').slice(0, 20) || 'default';
-  let ex = L.exemplars[fk] || null, key = fk;
-  if (!ex) { for (const k in L.exemplars) { const e = L.exemplars[k]; if (e && e.excerpt && (!ex || (Number(e.ts) || 0) > (Number(ex.ts) || 0))) { ex = e; key = k; } } }
-  if (!ex || !ex.excerpt) return null;
-  return { title: String(ex.title || ''), excerpt: String(ex.excerpt || '').slice(0, EXEMPLAR_CHARS), facility_key: key, promo_id: String(ex.promo_id || '') };
-}
-function gapSummary(L0) {
-  const L = normLessons(L0);
-  const g = L.gaps.filter(function (x) { return x && typeof x.ratio === 'number'; });
-  const avg = function (arr) { return arr.length ? Math.round(arr.reduce(function (s, x) { return s + x.ratio; }, 0) / arr.length * 1000) / 10 : null; };
-  const last5 = g.slice(-5), prev5 = g.slice(-10, -5);
-  const a = avg(last5), b = avg(prev5);
-  return { n: g.length, last5_avg: a, prev5_avg: b, trend: (a === null || b === null) ? '' : (a < b ? 'down' : (a > b ? 'up' : 'flat')) };
-}
-// 크론이 기동할 짝 고르기 — pending 우선, running은 15분 넘게 그대로면 죽은 것, fail은 10분 뒤 재시도(3회까지). promo_id 없는(미매칭) 짝은 제외.
-function pickPending(pairs, now) {
-  now = now || Date.now();
-  const out = [];
-  (Array.isArray(pairs) ? pairs : []).forEach(function (p) {
-    if (!p || !RE_PAIR_ID.test(String(p.id || '')) || !RE_REC_ID.test(String(p.promo_id || ''))) return;
-    const st = String(p.status || 'pending'), ts = Number(p.ts) || 0, tries = Number(p.tries) || 0;
-    // v391 화이트리스트 — 집는 상태는 pending · 죽은 running · 재시도 fail 셋만. done·unmatched·superseded(게시글로 대체)·모르는 상태는 손대지 않는다
-    // (10/20 실사고: 블랙리스트라 수집기가 'superseded'로 바꾼 폴더 짝 7건을 크론이 그대로 집어 학습 → 규칙 창고 오염 2차).
-    if (st === 'pending') { out.push(p); return; }
-    if (st === 'running') { if (now - ts >= RUNNING_STALE_MS && tries < MAX_TRIES) out.push(p); return; }
-    if (st === 'fail') { if (tries < MAX_TRIES && now - ts >= RETRY_WAIT_MS) out.push(p); return; }
-  });
-  out.sort(function (a, b) { return (Number(a.ts) || 0) - (Number(b.ts) || 0); });
-  return out;
-}
+function lessonLines(L0) { return LN.lessonLines(L0); }
+function exemplarFor(L0, facility) { return LN.exemplarFor(L0, facility, function (f) { return String(f || '').replace(/\s+/g, '').slice(0, 20); }); }
+function gapSummary(L0) { return LN.gapSummary(L0); }
+function pickPending(pairs, now) { return LN.pickPending(pairs, now, RE_PAIR_ID, 'promo_id'); }
 async function kickLearnWorker(pairId) {
   const s = issueSession({ id: '__promoai__', role: 'system' });
   if (!s.ok) return { ok: false, code: s.code || 'SERVER_CONFIG_MISSING' };

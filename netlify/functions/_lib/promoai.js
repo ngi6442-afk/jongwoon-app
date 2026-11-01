@@ -25,8 +25,11 @@
 
 // ---------- 상수 ----------
 
-const API_URL = 'https://api.anthropic.com/v1/messages';
-const API_VERSION = '2023-06-01';
+// v410(계약 D4): API 호출·오류·응답 추출·금지 문자열 검사는 _lib/claude.js로 승격 — 여기서 같은 이름으로 받아 재수출(블로그 동작 불변).
+const CL = require('./claude');
+const API_URL = CL.API_URL;
+const API_VERSION = CL.API_VERSION;
+const ApiError = CL.ApiError, callApi = CL.callApi, responseText = CL.responseText, scrubPayload = CL.scrubPayload;
 // 모델은 계약서 지정값. 이미지 입력 지원 + 비용·품질 균형.
 const MODEL = 'claude-sonnet-5';
 const MAX_PHOTOS = 30;          // 첨부분은 전부 모델이 보고 제자리에 배치해야 한다(2026-08-15 PM)
@@ -208,26 +211,7 @@ function contractForbidden(contract) {
 // obj(또는 문자열)를 직렬화해 forbidden 목록이 들어 있는지 본다.
 // 공백·쉼표를 지운 평탄화 비교를 함께 해서 '200,000' / '경상북도 포항시 맑은물사업소'의 표기 변형도 잡는다.
 // 반환 {ok:boolean, hit:string} — hit은 걸린 금지 문자열(비밀이므로 호출부가 마스킹해 로그에 남길 것).
-function scrubPayload(obj, forbidden) {
-  let s;
-  try {
-    s = (typeof obj === 'string') ? obj : JSON.stringify(obj);
-  } catch (e) {
-    return { ok: false, hit: '__SERIALIZE_FAILED__' };
-  }
-  if (s == null) s = '';
-  const flat = s.replace(/[\s,]/g, '');
-  const list = forbidden || [];
-  for (let i = 0; i < list.length; i++) {
-    const t = String(list[i] == null ? '' : list[i]).trim();
-    if (!t) continue;
-    if (s.indexOf(t) >= 0) return { ok: false, hit: t };
-    const ft = t.replace(/[\s,]/g, '');
-    // 짧은 토큰의 평탄화 비교는 오탐이 나므로 4자 이상만
-    if (ft.length >= 4 && flat.indexOf(ft) >= 0) return { ok: false, hit: t };
-  }
-  return { ok: true, hit: '' };
-}
+// (v410) scrubPayload 본체는 _lib/claude.js — 위에서 받은 같은 함수.
 
 // ---------- 3) 입력 정제(프롬프트 주입 방지) ----------
 
@@ -1168,14 +1152,7 @@ function wireBody(req) {
 
 // ---------- 7) 응답 파싱 ----------
 
-function responseText(json) {
-  const blocks = (json && json.content) || [];
-  let s = '';
-  for (let i = 0; i < blocks.length; i++) {
-    if (blocks[i] && blocks[i].type === 'text' && blocks[i].text) s += blocks[i].text;
-  }
-  return s;
-}
+// (v410) responseText 본체는 _lib/claude.js.
 
 // 구조화 출력(JSON)이 정상이면 그대로, 아니면 '제목:' 형태를 받아준다.
 function parseDraft(text) {
@@ -1304,54 +1281,10 @@ function draftWarnings(draft, photoCount, tctx) {
 
 // ---------- 8) 네트워크 (테스트 금지 — 개발 중 호출하지 않는다) ----------
 
-class ApiError extends Error {
-  constructor(code, detail, retryable) {
-    super(code + ': ' + detail);
-    this.code = code;
-    this.detail = detail;
-    this.retryable = !!retryable;
-  }
-}
+// (v410) ApiError·callApi 본체는 _lib/claude.js.
 
 // icis.js의 요청 패턴을 따른다: AbortController + finally clearTimeout, 상태코드는 직접 판정.
-async function callApi(apiKey, body, timeoutMs) {
-  const ctl = new AbortController();
-  const timer = setTimeout(function () { ctl.abort(); }, timeoutMs);
-  let res;
-  try {
-    res = await fetch(API_URL, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': API_VERSION,
-      },
-      body: JSON.stringify(body),
-      signal: ctl.signal,
-    });
-  } catch (e) {
-    const aborted = e && (e.name === 'AbortError' || /abort/i.test(String(e.message || '')));
-    // TIMEOUT은 재시도하지 않는다 — 10분짜리를 한 번 더 돌리면 백그라운드 15분 상한을 뚫고,
-    // 끊긴 요청도 서버 생성은 계속돼 요금이 두 배로 나간다. NETWORK(즉시 실패)만 재시도.
-    throw new ApiError(aborted ? 'TIMEOUT' : 'NETWORK', String((e && e.message) || e), !aborted);
-  } finally {
-    clearTimeout(timer);
-  }
-  const text = await res.text();
-  if (res.status === 401 || res.status === 403) throw new ApiError('AUTH', 'API 키가 거부되었습니다(' + res.status + ')', false);
-  if (res.status === 429) throw new ApiError('RATE_LIMIT', '요청이 몰렸습니다(429)', true);
-  if (res.status >= 500) throw new ApiError('SERVER', 'API 서버 오류(' + res.status + ')', true);
-  if (res.status >= 400) {
-    let msg = text.slice(0, 200);
-    try { const j = JSON.parse(text); if (j && j.error && j.error.message) msg = j.error.message; } catch (e) { /* 원문 사용 */ }
-    throw new ApiError('BAD_REQUEST', msg, false);
-  }
-  try {
-    return JSON.parse(text);
-  } catch (e) {
-    throw new ApiError('PARSE', '응답 JSON 파싱 실패: ' + text.slice(0, 120), true);
-  }
-}
+// (v410) callApi 본체는 _lib/claude.js — TIMEOUT 무재시도·상태코드 규칙 그대로.
 
 // 사진 -> 초안. 반환 {ok, title, body, used_tokens, model} (실패 시 {ok:false, code, detail}).
 // opts: {dry:true} 면 네트워크를 타지 않고 조립·검사 결과만 돌려준다(개발·테스트용).

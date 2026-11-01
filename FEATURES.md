@@ -1,6 +1,6 @@
 # 종운 그룹웨어 — 기능 대장 (사용자 매뉴얼 원천)
 
-> 살아있는 문서. 기능 추가·변경 시 이 파일을 함께 갱신한다. 기준: v409 (2026-11-01).
+> 살아있는 문서. 기능 추가·변경 시 이 파일을 함께 갱신한다. 기준: v410 (2026-11-01).
 > 세부 변경 이력은 git 커밋 메시지(한글) 참조.
 
 ## 1. 전체 구조
@@ -788,6 +788,16 @@ PM 지시 "문서함 일단 다 올리고 등재결재랑 공개범위 만들어
 - 정정: STAGE_DOCS "완료신고" 석면해체·제거→석면해체/제거, "청구" 국세·지방세→국세/지방세 납세증명(파서가 복합 서류 이름을 나누던 2곳) → proc_v1.json 재export·거울 2층 재빌드(list sha 7eeb1ce6c1d18b44)·push.
 - 배포 전 적대 검토 7건 → 6건 반영: map_del 뒤 같은 정규식 map_add 가 무시되던 재생 순서(map_add 가 map_del 을 되살림·map_del 이 앞선 map_add 를 지움) · 기기 간 동기화 머지(csSyncFromServer)가 stage.docs[] 를 떨어뜨리던 것 → csMergeDocs(k 별 at 늦은 쪽·한쪽만 있는 항목 보존) · 서류 추가 뒤 입력 칸 비움 · 편집 textarea 줄바꿈=" / " · 되돌림 판정은 전체 기록(reverted_of) · __proto__ 키 거부. 수용 1건: 월 사건 로그 clog:contract:YYYY-MM 은 읽고-쓰기 사이 잠금이 없어 같은 초에 두 사람이 누르면 1건이 빠질 수 있다(지표용 로그, 체인은 유지 — 4일차 집계에서 빠진 수를 세지 않도록 참고).
 - 검사: servertest 절 55(40항), uismoke v401(3항), consheet_check v401(10항 — 파서·커버리지 81단계 중 79·체크/해당없음/추가/삭제·머지·html·옛 계약), proctpl diff 0. sw v401.
+
+### v410 (11/1) — 계약 D4 1·2일차: 학습 코어 승격 + 서류 차이 재기 + 최종본 올리면 즉시 짝(화면 변화 0)
+- **PM 11/1 결정**: D4 착수 조건(1주 시범 업로드율·선행 3건)은 두지 않는다 — "AI가 만든 것과 직원이 고쳐 올린 것을 비교해 학습하고 고치는 행위를 반복"하는 루프 자체가 수단이고 PM 손은 없다. 사람 승인 단계 없음, 남는 손은 허용 사전(R2) 1회와 끄기 스위치.
+- `_lib/claude.js`(신설): Anthropic 호출 callApi·ApiError·responseText·scrubPayload를 promoai.js에서 승격, promoai는 같은 이름으로 재수출(블로그 동작·바이트 동일 — 절 48 + 승격 전후 lessons 출력 비교).
+- `_lib/learn.js`(신설): 유형 등록표 TYPES{promo, contract} + 공통 normRules·normLessons·mergeLessons·pushGap·lessonLines·exemplarFor·gapSummary·pickPending·usage 월 상한. 계약판 scope에 field_default(대상 필드 키). promolearn.js는 얇은 래퍼.
+- `_lib/docdiff.js`(신설, 내장 zlib만): zip 중앙 디렉터리 파서 · xlsx 셀 diff(채움 맵 edits ↔ 최종본: 공유문자열·inlineStr·숫자·빈칸, **수식·병합 비앵커=비교 불가**) · docx 문단 diff(LCS) · 서류 목록 집합 diff · 간극 점수(D0: 셀 비율 + 0.5·목록 + 0.5·첨부 누락, 비교 불가면 null). **반환에 셀 값·본문 없음**(좌표·횟수·비율만).
+- 서버 `cdoc_put` **final 훅**: 같은 단계의 현재 초안(생성 훅 gen.<양식> fill)과 짝 `learn:contract:in:lc_…`를 만들고 그 자리에서 diff·간극을 재어 `lessons:contract:<양식>` gaps에 쌓는다(모델 호출 없음 → status done_nomodel). 초안 양식이 둘이면 자동 판단 없이 unmatched+후보(요청에 `pair_tpl`로 지정 가능) · 초안 없으면 NO_DRAFT · **검진·명단·명부·신분증 유형은 TYPE_EXCLUDED(짝 자체 없음)** · 실패해도 올리기는 성공(응답 learn에 사유).
+- `learn_settings_get/set`(관리자): `settings:learn` {contract:{on, allow:{양식:[허용 필드…]}}} 기본 off·allow 비움 — **allow가 있는 양식의 최종본만 pending**(워커 3일차가 모델에 보낸다, 그 전엔 fail-closed). `learn_pairs_get`(관리자): 최근 짝 60 + 양식별 lessons 요약(규칙 수·짝·호출·간극 추세).
+- 아직 없음(3·4일차): 학습 워커(허용 필드만 모델에, 결과 재검사, usage 월 상한 200) · 크론 ④ 교대 기동(10분 크론 신설 금지) · 생성 주입(HTML 서류·docx 초안 자료 블록, 기본 끔) · 관리자 카드(간극 추세·끄기) · R2 허용 사전 카드 · 기준선 집계·일몰.
+- 검사: servertest 절 59 +9(diff 고정값·훅 e2e·값 미저장·제외·미매칭·설정) · promo_post_check·promo_wrap_check(블로그 회귀) · uismoke v410. sw v410.
 
 ### v409 (11/1) — Phase 0 C1-1(인사 D-H7): 도움말·사용 안내 정합(R0)
 - ⚙ **도움말**(앱 안 모달)을 현행 화면 구조로 다시 씀: 사이드바 4묶음(관리·수주·업무·개인) 그대로, 로그인 구문구 "이름 선택 + PIN" → **아이디 + PIN**(아이디 미발급이면 이름 그대로 → 로그인 뒤 ⚙ › 내 아이디 설정), 알림은 기기마다 한 번, 휴가 신청 한 줄, 안 보이는 탭=권한.

@@ -3617,4 +3617,72 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   delete mem.gw_data['col:contracts']; delete mem.gw_data['map:contract:v1']; delete mem.gw_data['recidx:c58']; Object.keys(mem.gw_files).filter((k) => k.indexOf('cdoc:') === 0).forEach((k) => delete mem.gw_files[k]); if (rl) delete mem.gw_data[rl];
 }
 
+{ // ---- 59(v410) 계약 D4 학습 코어·diff·짝 — claude.js 재수출 · learn.js 유형 공통(블로그 불변은 절 48) · docdiff(xlsx 셀·docx 문단·목록) · cdoc_put final 훅(짝·간극·값 미저장·제외·미매칭·허용 사전 게이트) · settings:learn ----
+  const CL = require(join(FN, '_lib/claude.js')), PA = require(join(FN, '_lib/promoai.js')), LN = require(join(FN, '_lib/learn.js')), DD = require(join(FN, '_lib/docdiff.js'));
+  T('59 claude.js 승격: promoai가 같은 함수를 재수출(callApi·scrubPayload·responseText·ApiError) · scrubPayload 평탄화 비교 그대로 · parseJsonOut 펜스 허용',
+    PA.callApi === CL.callApi && PA.scrubPayload === CL.scrubPayload && PA.responseText === CL.responseText && !CL.scrubPayload('금액 200,000원', ['200000']).ok && CL.scrubPayload('abc', ['200000']).ok
+    && CL.parseJsonOut('```json\n{"a":1}\n```').a === 1 && CL.parseJsonOut('x') === null && CL.responseText({ content: [{ type: 'text', text: 'a' }, { type: 'tool', text: 'b' }] }) === 'a');
+  const sc = LN.normRules({ rules: [{ text: '착공일은 계약일 +7일을 기본값으로', scope: 'field_default', field: 'start_date', n: 2, keep_id: '' }, { text: 'x', scope: 'nope', n: 1, keep_id: '' }] }, [], LN.TYPES.contract.scopes);
+  T('59 learn.js 계약판: scope field_default+field 키 보존 · 모르는 scope는 style · 짝 id lc_12hex · usage 월 상한 200·usageOk/usageAdd',
+    sc.length === 2 && sc[0].scope === 'field_default' && sc[0].field === 'start_date' && sc[1].scope === 'style' && LN.TYPES.contract.pair_re.test(LN.newPairId('contract', 'seed'))
+    && LN.TYPES.contract.monthly_cap === 200 && LN.usageOk({ calls: 199 }, 200) && !LN.usageOk({ calls: 200 }, 200) && LN.usageAdd({ ym: '2026-11', calls: 1, tokens: 5 }, '2026-11', 7).tokens === 12 && LN.usageAdd({ ym: '2026-10', calls: 9 }, '2026-11', 1).calls === 1, JSON.stringify(sc));
+  const Lg = LN.pushGap(LN.pushGap(null, { pair: 'lc_a', ratio: 0.2, comparable: true }, 10), { pair: 'lc_b', ratio: null, comparable: false }, 20);
+  T('59 pushGap(모델 호출 없음): gaps 2 · stats.pairs 2 · calls 0 · gapSummary는 ratio 숫자인 것만(n 1)', Lg.gaps.length === 2 && Lg.stats.pairs === 2 && Lg.stats.calls === 0 && LN.gapSummary(Lg).n === 1 && LN.gapSummary(Lg).last5_avg === 20);
+  // 내장 zip 작성기(stored) — 절 59 고정값용
+  const crcT = (() => { const t = new Int32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1); t[n] = c; } return t; })();
+  const crc32 = (b) => { let c = -1; for (let i = 0; i < b.length; i++) c = crcT[(c ^ b[i]) & 0xFF] ^ (c >>> 8); return (c ^ -1) >>> 0; };
+  const mkZip = (entries) => { const locals = [], cds = []; let off = 0; for (const [name, text] of entries) { const nb = Buffer.from(name), db = Buffer.from(text), crc = crc32(db); const lh = Buffer.alloc(30); lh.writeUInt32LE(0x04034b50, 0); lh.writeUInt16LE(20, 4); lh.writeUInt16LE(0, 6); lh.writeUInt16LE(0, 8); lh.writeUInt32LE(0, 10); lh.writeUInt32LE(crc, 14); lh.writeUInt32LE(db.length, 18); lh.writeUInt32LE(db.length, 22); lh.writeUInt16LE(nb.length, 26); lh.writeUInt16LE(0, 28); const cd = Buffer.alloc(46); cd.writeUInt32LE(0x02014b50, 0); cd.writeUInt16LE(20, 4); cd.writeUInt16LE(20, 6); cd.writeUInt16LE(0, 8); cd.writeUInt16LE(0, 10); cd.writeUInt32LE(0, 12); cd.writeUInt32LE(crc, 16); cd.writeUInt32LE(db.length, 20); cd.writeUInt32LE(db.length, 24); cd.writeUInt16LE(nb.length, 28); cd.writeUInt16LE(0, 30); cd.writeUInt16LE(0, 32); cd.writeUInt16LE(0, 34); cd.writeUInt16LE(0, 36); cd.writeUInt32LE(0, 38); cd.writeUInt32LE(off, 42); locals.push(lh, nb, db); cds.push(cd, nb); off += 30 + nb.length + db.length; } const cdb = Buffer.concat(cds), eocd = Buffer.alloc(22); eocd.writeUInt32LE(0x06054b50, 0); eocd.writeUInt16LE(entries.length, 8); eocd.writeUInt16LE(entries.length, 10); eocd.writeUInt32LE(cdb.length, 12); eocd.writeUInt32LE(off, 16); return Buffer.concat([...locals, cdb, eocd]); };
+  const sheet = (cells, merged) => '<?xml version="1.0"?><worksheet xmlns="x"><sheetData><row r="1">' + cells + '</row></sheetData>' + (merged ? '<mergeCells count="1"><mergeCell ref="' + merged + '"/></mergeCells>' : '') + '</worksheet>';
+  const xlsx = (cells, merged, ss) => mkZip([['[Content_Types].xml', '<Types/>'], ['xl/workbook.xml', '<workbook><sheets><sheet name="s" sheetId="1" r:id="rId1"/></sheets></workbook>'], ['xl/_rels/workbook.xml.rels', '<Relationships><Relationship Id="rId1" Type="ws" Target="worksheets/sheet1.xml"/></Relationships>'], ['xl/worksheets/sheet1.xml', sheet(cells, merged)]].concat(ss ? [['xl/sharedStrings.xml', ss]] : []));
+  // 최종본: C7 공유문자열 '시험 공사' · C10 inlineStr '포항 현장 ' · E34 숫자 12.5 · H10 수식 · C12 병합 비앵커(C11:D12 안) · H8 빈칸 · A34 바뀜
+  const FINAL = xlsx('<c r="C7" t="s"><v>0</v></c><c r="C10" t="inlineStr"><is><t xml:space="preserve">포항 현장 </t></is></c><c r="E34"><v>12.5</v></c><c r="H10"><f>SUM(A1)</f><v>3</v></c><c r="C11" t="inlineStr"><is><t>a</t></is></c><c r="C12" t="inlineStr"><is><t>b</t></is></c><c r="A34" t="inlineStr"><is><t>다른 현장</t></is></c>', 'C11:D12', '<sst><si><t>시험 공사</t></si></sst>');
+  const EDITS = [['C7', '시험 공사', 's'], ['C10', '포항 현장', 's'], ['E34', 12.5, 'n'], ['H10', '', 'b'], ['C12', '', 'b'], ['H8', '', 'b'], ['A34', '포항 현장', 's'], ['C7', '중복', 's']];
+  const dx = DD.xlsxCellDiff(EDITS, FINAL);
+  T('59 docdiff xlsx 셀: 공유문자열·inlineStr·숫자·빈칸 비교(공백 정규화) · 수식·병합 비앵커=비교 불가 2 · 바뀐 셀 1(A34) · 중복 좌표 1회 · 값은 반환에 없음',
+    dx.ok && dx.compared === 5 && dx.changed === 1 && dx.uncomparable === 2 && dx.refs_changed.join() === 'A34' && dx.refs_uncomparable.sort().join() === 'C12,H10' && dx.ratio === 0.2 && JSON.stringify(dx).indexOf('포항') < 0 && JSON.stringify(dx).indexOf('시험 공사') < 0, JSON.stringify(dx));
+  const docx = (paras) => mkZip([['[Content_Types].xml', '<Types/>'], ['word/document.xml', '<w:document><w:body>' + paras.map((p) => '<w:p><w:r><w:t>' + p + '</w:t></w:r></w:p>').join('') + '</w:body></w:document>']]);
+  const dd = DD.docxParaDiff(docx(['제1조 목적', '제2조 기간', '제3조 금액']), docx(['제1조 목적', '제2조 공사 기간', '제3조 금액', '제4조 특약']));
+  T('59 docdiff docx 문단: LCS 같은 문단 2 · 삭제 1 · 추가 2 · 본문 미반출', dd.ok && dd.same === 2 && dd.removed === 1 && dd.added === 2 && JSON.stringify(dd).indexOf('제1조') < 0, JSON.stringify(dd));
+  const ld = DD.listDiff(['착공계', '예정공정표', '현장대리인계'], [{ t: '착공계' }, { t: '예정공정표', skip: true }, { t: '안전관리계획서' }]);
+  const gs = DD.gapScore(dx, ld, 1), gnull = DD.gapScore({ ok: false }, null, 0);
+  T('59 listDiff·gapScore(D0): 추가 1·삭제 1·건너뜀 1 → delta 3 · score = 0.2 + 0.5·min(1,3/3) + 0.5·(1/5) = 0.8 · 비교 불가면 score null·comparable false',
+    ld.delta === 3 && ld.removed[0] === '현장대리인계' && gs.score === 0.8 && gs.comparable && gnull.score === null && !gnull.comparable, JSON.stringify([ld, gs]));
+  // ---- cdoc_put final 훅 e2e ----
+  const CONW9 = { id: 'uconw9', name: '공무직원9', admin: false, perms: { con: 'do' }, dept: '운영부' };
+  mem.gw_users['member:uconw9'] = CONW9; const tok9 = issueSession(CONW9).token;
+  mem.gw_data['col:contracts'] = { schema: 1, items: [{ id: 'c59', title: '학습 계약', scen: 'asbestos:pub', stages: [] }], updated_at: 1 };
+  mem.gw_data['map:contract:v1'] = { schema: 1, scen: { 'asbestos:pub': [{ i: 0, name: '석면 조사', co: 'con' }, { i: 2, name: '노동부 신고', co: 'con' }] } };
+  mem.gw_files = mem.gw_files || {};
+  const b59 = (x) => Buffer.from(x).toString('base64');
+  let r59 = await call({ action: 'cdoc_put', cid: 'c59', i: 2, doc_key: 'gen.asb_plan', kind: 'draft', pii: 1, fill: { tpl: 'asb_plan', at: '2026-11-01', edits: EDITS } }, tok9, 'dev1'); const d1 = r59.code === 200;
+  r59 = await call({ action: 'cdoc_put', cid: 'c59', i: 2, doc_key: 'main.작성-0', kind: 'final', name: '석면해체계획서.xlsx', data: b59(FINAL), pii: 1 }, tok9, 'dev1');
+  const L9 = r59.body.learn || {};
+  const pk = Object.keys(mem.gw_data).filter((k) => k.indexOf('learn:contract:in:') === 0);
+  const pair = pk.length ? mem.gw_data[pk[0]] : null;
+  const les = mem.gw_data['lessons:contract:asb_plan'];
+  T('59 final 훅: 짝 1건(tpl asb_plan·xlsx_cell·done_nomodel — 허용 사전 전 모델 호출 없음) · 응답 learn에 changed 1/compared 5 · 짝 블롭에 셀 값 없음 · lessons:contract:asb_plan gaps 1·calls 0',
+    r59.code === 200 && L9.ok && L9.status === 'done_nomodel' && L9.tpl === 'asb_plan' && L9.kind === 'xlsx_cell' && L9.changed === 1 && L9.compared === 5 && pk.length === 1 && pair && pair.draft_n === 1 && pair.final_n === 2 && pair.gap.score === 0.2
+    && JSON.stringify(pair).indexOf('포항') < 0 && JSON.stringify(pair).indexOf('시험 공사') < 0 && les && les.gaps.length === 1 && les.stats.pairs === 1 && les.stats.calls === 0, JSON.stringify([r59.code, L9, pair && pair.status]));
+  // 제외 유형(명단·검진) · 초안 없는 단계 · 초안 둘 → 미매칭(후보) · pair_tpl 지정 → 매칭
+  r59 = await call({ action: 'cdoc_put', cid: 'c59', i: 2, doc_key: 'main.수령-1', kind: 'final', name: '근로자 명단.xlsx', data: b59(FINAL), pii: 1, allow_dup: true }, tok9, 'dev1'); const ex1 = r59.code === 200 && r59.body.learn && r59.body.learn.code === 'TYPE_EXCLUDED';
+  r59 = await call({ action: 'cdoc_put', cid: 'c59', i: 0, doc_key: 'main.작성-0', kind: 'final', name: '조사.xlsx', data: b59(FINAL), pii: 0, allow_dup: true }, tok9, 'dev1'); const ex2 = r59.code === 200 && r59.body.learn && r59.body.learn.code === 'NO_DRAFT';
+  r59 = await call({ action: 'cdoc_put', cid: 'c59', i: 2, doc_key: 'gen.work_start', kind: 'draft', pii: 1, fill: { tpl: 'work_start', at: '2026-11-01', edits: [['C7', 'x', 's']] } }, tok9, 'dev1');
+  r59 = await call({ action: 'cdoc_put', cid: 'c59', i: 2, doc_key: 'main.작성-1', kind: 'final', name: '착공계.xlsx', data: b59(FINAL), pii: 0, allow_dup: true }, tok9, 'dev1'); const um = r59.body.learn || {};
+  const ex3 = r59.code === 200 && um.status === 'unmatched' && Array.isArray(um.candidates) && um.candidates.length === 2;
+  r59 = await call({ action: 'cdoc_put', cid: 'c59', i: 2, doc_key: 'main.작성-1', kind: 'final', name: '착공계2.xlsx', data: b59(FINAL), pii: 0, allow_dup: true, pair_tpl: 'work_start' }, tok9, 'dev1'); const pm = r59.body.learn || {};
+  const ex4 = r59.code === 200 && pm.ok && pm.tpl === 'work_start' && pm.changed === 1 && pm.compared === 1;
+  T('59 제외·미매칭: 명단 파일 TYPE_EXCLUDED(짝 없음) · 초안 없는 단계 NO_DRAFT · 초안 양식 둘이면 unmatched+후보 2(자동 판단 없음) · pair_tpl 지정이면 그 초안과 짝', ex1 && ex2 && ex3 && ex4, JSON.stringify([ex1, ex2, um, pm]));
+  // settings:learn — 관리자만 · on/allow 검증 · 켜고 허용하면 pending
+  r59 = await call({ action: 'learn_settings_set', on: true }, tok9, 'dev1'); const s1 = r59.code === 403;
+  r59 = await call({ action: 'learn_settings_get' }, tokA, 'dev1'); const s2 = r59.code === 200 && r59.body.settings.contract.on === false && r59.body.cap === 200;
+  r59 = await call({ action: 'learn_settings_set', allow: { 'bad key!': ['a'] } }, tokA, 'dev1'); const s3 = r59.code === 400 && r59.body.error_code === 'BAD_TPL';
+  r59 = await call({ action: 'learn_settings_set', on: true, allow: { asb_plan: ['공사명', '현장', '면적'] } }, tokA, 'dev1'); const s4 = r59.code === 200 && r59.body.settings.contract.on === true;
+  r59 = await call({ action: 'learn_settings_set', on: true }, tokA, 'dev1'); const s5 = r59.code === 400 && r59.body.error_code === 'NO_CHANGE';
+  r59 = await call({ action: 'cdoc_put', cid: 'c59', i: 2, doc_key: 'main.작성-0', kind: 'final', name: '석면해체계획서2.xlsx', data: b59(FINAL), pii: 1, allow_dup: true, pair_tpl: 'asb_plan' }, tok9, 'dev1'); const s6 = r59.code === 200 && r59.body.learn && r59.body.learn.status === 'pending';
+  r59 = await call({ action: 'learn_pairs_get' }, tokA, 'dev1'); const s7 = r59.code === 200 && r59.body.pairs.length === 4 && r59.body.lessons.asb_plan && r59.body.lessons.asb_plan.pairs === 2 && r59.body.lessons.asb_plan.calls === 0 && r59.body.settings.contract.on === true;
+  T('59 settings:learn: 직원 403 · 기본 off·cap 200 · BAD_TPL · on+allow 저장(감사 학습설정) · 같은 값 NO_CHANGE · 허용 양식의 다음 최종본은 pending(워커 몫) · learn_pairs_get 짝 4·lessons 요약', s1 && s2 && s3 && s4 && s5 && s6 && s7 && auditMock.logs.some((e) => e.ev && e.ev[0] && e.ev[0].op === '학습설정'), JSON.stringify([s1, s2, s3, s4, s5, s6, s7, r59.code]));
+  delete mem.gw_data['col:contracts']; delete mem.gw_data['map:contract:v1']; delete mem.gw_data['recidx:c59']; delete mem.gw_data['settings:learn']; delete mem.gw_data['lessons:contract:asb_plan']; delete mem.gw_data['lessons:contract:work_start'];
+  Object.keys(mem.gw_data).filter((k) => k.indexOf('learn:contract:in:') === 0).forEach((k) => delete mem.gw_data[k]); Object.keys(mem.gw_files).filter((k) => k.indexOf('cdoc:c59') === 0).forEach((k) => delete mem.gw_files[k]);
+}
+
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

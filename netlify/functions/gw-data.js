@@ -1893,6 +1893,118 @@ async function appendRecLog(st, entry) {
     return !!(w && w.ok);
   } catch (e) { return false; }
 }
+// ---- 학습 짝(v410, 계약 D4 2일차 — 설계 §5 "같은 (계약·단계)의 final 업로드 즉시 learn:contract:in 생성") ----
+// 최종본이 올라오면 같은 단계의 현재 초안(생성 훅 gen.<양식> fill, 또는 draft 파일)과 짝을 만들고 셀·문단 단위 차이와 간극을 그 자리에서 잰다(모델 호출 없음).
+// 모델 학습(규칙 뽑기)은 settings:learn.contract.on && allow[양식]이 있을 때만 pending으로 두고 워커(3일차)가 집는다 — 허용 사전(R2) 전엔 fail-closed.
+// 짝 블롭엔 좌표·횟수·비율만 들어간다(셀 값·개인정보 없음 — docdiff 반환 구조가 그렇다). 건강진단·명단 유형은 짝 자체를 만들지 않는다.
+const LN = require('./_lib/learn');
+const DD = require('./_lib/docdiff');
+const LEARN_KEY = LN.TYPES.contract.settings_key;
+async function learnSettings(st) {
+  let d = {};
+  try { const r = await blobGet(st, LEARN_KEY); if (r.ok && r.data && typeof r.data === 'object') d = r.data; } catch (e) {}
+  const c = (d.contract && typeof d.contract === 'object') ? d.contract : {};
+  return { contract: { on: c.on === true, allow: (c.allow && typeof c.allow === 'object' && !Array.isArray(c.allow)) ? c.allow : {} }, updated_at: Number(d.updated_at) || 0, updated_by: String(d.updated_by || '') };
+}
+function learnAllowed(s, tpl) { const a = s.contract.allow[tpl]; return s.contract.on === true && Array.isArray(a) && a.length > 0; }
+function learnDiffPublic(diff) {
+  if (!diff) return null;
+  const o = {};
+  ['ok', 'code', 'kind', 'compared', 'changed', 'uncomparable', 'ratio', 'n_draft', 'n_final', 'same', 'added', 'removed'].forEach(function (k) { if (diff[k] !== undefined) o[k] = diff[k]; });
+  o.refs_changed = Array.isArray(diff.refs_changed) ? diff.refs_changed : [];
+  o.refs_uncomparable = Array.isArray(diff.refs_uncomparable) ? diff.refs_uncomparable : [];
+  return o;
+}
+async function cdocLearnPair(st, member, ref, idx, item, ext, b64, orig, d) {
+  const T = LN.TYPES.contract, now = Date.now();
+  if (T.forbid_re.test(String(ref.dk || '')) || T.forbid_re.test(String(orig || ''))) return { ok: false, code: 'TYPE_EXCLUDED' };
+  const drafts = idx.items.filter(function (x) { return x && x.i === ref.i && x.kind === 'draft' && x.cur === 1 && !x.del && !x.gc && !x.purged && typeof x.dk === 'string' && x.dk.indexOf('gen.') === 0; });
+  if (!drafts.length) return { ok: false, code: 'NO_DRAFT' };
+  const want = (d && typeof d.pair_tpl === 'string') ? d.pair_tpl.trim().slice(0, 40) : '';
+  let pick = null;
+  if (want) pick = drafts.filter(function (x) { return x.dk === 'gen.' + want; })[0] || null;
+  else if (drafts.length === 1) pick = drafts[0];
+  const base = { cid: ref.cid, i: ref.i, dk: ref.dk, final_n: item.n, ts: now, by: member.id, tries: 0 };
+  if (!pick) {
+    // 같은 단계에 초안 양식이 둘 이상 — 자동 판단하지 않고 사람 선택(pair_tpl 재요청 또는 관리자 카드)으로 남긴다
+    const id = LN.newPairId('contract', ref.cid + ':' + item.n);
+    const pair = Object.assign({ id: id, tpl: '', draft_n: 0, kind: 'none', status: 'unmatched', candidates: drafts.map(function (x) { return { n: x.n, tpl: x.dk.slice(4) }; }) }, base);
+    const w = await blobSet(st, LN.pairKey('contract', id), pair);
+    return { ok: w.ok, id: id, status: 'unmatched', candidates: pair.candidates, code: w.ok ? '' : w.code };
+  }
+  const tpl = pick.dk.slice(4);
+  const dr = await blobGet(store(FILES), cdocKey(ref.cid, pick.i, pick.dk, pick.n));
+  if (!dr.ok || !dr.data) return { ok: false, code: 'DRAFT_READ_FAILED' };
+  let diff = null, kind = 'none';
+  const fb = b64 ? Buffer.from(b64, 'base64') : null;
+  if (dr.data.fill && Array.isArray(dr.data.fill.edits) && ext === 'xlsx' && fb) { diff = DD.xlsxCellDiff(dr.data.fill.edits, fb); kind = 'xlsx_cell'; }
+  else if (dr.data.data && ext === 'docx' && pick.ext === 'docx' && fb) { diff = DD.docxParaDiff(Buffer.from(String(dr.data.data), 'base64'), fb); kind = 'docx_para'; }
+  const gap = DD.gapScore(diff, null, 0);
+  const s = await learnSettings(st);
+  const status = learnAllowed(s, tpl) ? 'pending' : 'done_nomodel';
+  const id = LN.newPairId('contract', ref.cid + ':' + item.n);
+  const pair = Object.assign({ id: id, tpl: tpl, draft_n: pick.n, kind: kind, status: status, diff: learnDiffPublic(diff), gap: gap }, base);
+  const w = await blobSet(st, LN.pairKey('contract', id), pair);
+  if (!w.ok) return { ok: false, code: w.code || 'PAIR_WRITE_FAILED' };
+  try {
+    const lk = T.lessons_key(tpl); const lr = await blobGet(st, lk);
+    const L = LN.pushGap(lr.ok ? lr.data : null, { pair: id, promo_id: ref.cid, ratio: gap.cell_ratio, score: gap.score, kind: kind, changed: diff ? diff.changed : 0, compared: diff ? diff.compared : 0, uncomparable: diff ? diff.uncomparable : 0, comparable: gap.comparable }, now);
+    await blobSet(st, lk, L);
+  } catch (e) {}
+  return { ok: true, id: id, status: status, tpl: tpl, kind: kind, gap: gap, changed: diff ? diff.changed : null, compared: diff ? diff.compared : null, uncomparable: diff ? diff.uncomparable : null };
+}
+async function handleLearnSettingsGet(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (!c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
+  const s = await learnSettings(store(DATA));
+  return jr(200, { status: 'OK', settings: s, cap: LN.TYPES.contract.monthly_cap, request_id: R });
+}
+async function handleLearnSettingsSet(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (!c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
+  const st = store(DATA); const cur = await learnSettings(st);
+  const next = { on: cur.contract.on, allow: Object.assign({}, cur.contract.allow) };
+  let changed = 0;
+  if (d.on !== undefined) { if (typeof d.on !== 'boolean') return jr(400, { status: 'REJECTED', error_code: 'BAD_VALUE', request_id: R }); if (next.on !== d.on) { next.on = d.on; changed++; } }
+  if (d.allow !== undefined) {
+    if (!d.allow || typeof d.allow !== 'object' || Array.isArray(d.allow)) return jr(400, { status: 'REJECTED', error_code: 'BAD_ALLOW', request_id: R });
+    const keys = Object.keys(d.allow); if (keys.length > 20) return jr(400, { status: 'REJECTED', error_code: 'ALLOW_TOO_MANY', request_id: R });
+    const al = {};
+    for (const k of keys) {
+      if (!/^[A-Za-z0-9_.-]{1,40}$/.test(k)) return jr(400, { status: 'REJECTED', error_code: 'BAD_TPL', request_id: R });
+      const v = d.allow[k]; if (!Array.isArray(v) || v.length > 30 || v.some(function (f) { return typeof f !== 'string' || !f.trim() || f.length > 40; })) return jr(400, { status: 'REJECTED', error_code: 'BAD_FIELDS', request_id: R });
+      al[k] = v.map(function (f) { return f.trim(); });
+    }
+    if (JSON.stringify(al) !== JSON.stringify(next.allow)) { next.allow = al; changed++; }
+  }
+  if (!changed) return jr(400, { status: 'REJECTED', error_code: 'NO_CHANGE', request_id: R });
+  if (d.base !== undefined && Number(d.base) !== Number(cur.updated_at || 0)) return jr(409, { status: 'CONFLICT', error_code: 'LEARN_STALE', request_id: R });
+  const doc = { schema: 1, contract: next, prev: { contract: cur.contract, updated_at: cur.updated_at, updated_by: cur.updated_by }, updated_by: c.member.id, updated_at: Date.now() };
+  const w = await blobSet(st, LEARN_KEY, doc);
+  if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
+  await cdocAudit(c.member, '학습설정', '', '계약 학습 ' + (next.on ? '켬' : '끔') + ' · 허용 양식 ' + Object.keys(next.allow).length + '종');
+  return jr(200, { status: 'OK', settings: { contract: next, updated_at: doc.updated_at }, request_id: R });
+}
+const LEARN_LIST_MAX = 60;
+async function handleLearnPairsGet(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (!c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
+  const st = store(DATA); const pre = LN.TYPES.contract.pair_prefix;
+  const l = await blobList(st, pre);
+  if (!l.ok) return jr(500, { status: 'ERROR', error_code: l.code, request_id: R });
+  const keys = (l.keys || []).filter(function (k) { return k.indexOf(pre) === 0; }).sort().slice(-LEARN_LIST_MAX);
+  const pairs = [];
+  for (const k of keys) { const r = await blobGet(st, k); if (r.ok && r.data && typeof r.data === 'object') pairs.push(r.data); }
+  pairs.sort(function (a, b) { return (Number(b.ts) || 0) - (Number(a.ts) || 0); });
+  const tpls = {}; pairs.forEach(function (p) { if (p.tpl) tpls[p.tpl] = 1; });
+  const lessons = {};
+  for (const t of Object.keys(tpls)) { const r = await blobGet(st, LN.TYPES.contract.lessons_key(t)); const L = LN.normLessons(r.ok ? r.data : null); lessons[t] = { off: L.off, rules_n: L.rules.length, pairs: L.stats.pairs, calls: L.stats.calls, gap: LN.gapSummary(L) }; }
+  const s = await learnSettings(st);
+  return jr(200, { status: 'OK', pairs: pairs, lessons: lessons, settings: s, request_id: R });
+}
 async function cdocAudit(member, op, cid, t) {
   try { const r = await appendAudit({ ts: Date.now(), by: member.name, bid: member.id, col: 'contracts', ev: [{ op: op, id: cid, t: String(t || '').slice(0, 80) }] }); return r !== false; } catch (e) { return false; }
 }
@@ -1990,7 +2102,10 @@ async function handleCdocPut(event, d, R) {
   const w = await blobSet(st, cdocIdxKey(ref.cid), idx);
   if (!w.ok) { await blobDelete(store(FILES), fkey); return jr(500, { status: 'ERROR', error_code: w.code, request_id: R }); }
   const audit = await cdocAudit(c.member, '기록물등록', ref.cid, std + (dup.length ? ' · 중복 허용' : ''));
-  return jr(200, { status: 'OK', cid: ref.cid, n: n, ver: ver, name: std, item: item, dup: dup, gc: gcd, audit: audit, request_id: R });
+  // v410 학습 짝 — 최종본이면 같은 단계의 현재 초안과 짝을 만들고 차이·간극을 잰다(실패해도 올리기는 성공, learn에 사유만)
+  let learn = null;
+  if (kind === 'final') { try { learn = await cdocLearnPair(st, c.member, ref, idx, item, ext, b64, orig, d); } catch (e) { learn = { ok: false, code: 'LEARN_THREW' }; } }
+  return jr(200, { status: 'OK', cid: ref.cid, n: n, ver: ver, name: std, item: item, dup: dup, gc: gcd, audit: audit, learn: learn, request_id: R });
 }
 async function handleCdocList(event, d, R) {
   const c = await currentMember(event);
@@ -3456,6 +3571,9 @@ async function handlerInner(event) {
     if (d && d.action === 'cdoc_cur') return await handleCdocCur(event, d, R);
     if (d && d.action === 'cdoc_purge') return await handleCdocPurge(event, d, R);
     if (d && d.action === 'rec_log_get') return await handleRecLogGet(event, d, R);
+    if (d && d.action === 'learn_settings_get') return await handleLearnSettingsGet(event, d, R);   // v410 계약 학습 스위치·허용 사전(관리자)
+    if (d && d.action === 'learn_settings_set') return await handleLearnSettingsSet(event, d, R);
+    if (d && d.action === 'learn_pairs_get') return await handleLearnPairsGet(event, d, R);
     if (d && d.action === 'doc_settings_get') return await handleDocSettingsGet(event, d, R);
     if (d && d.action === 'doc_settings_set') return await handleDocSettingsSet(event, d, R);
     if (d && d.action === 'doc_att_put') return await handleDocAttPut(event, d, R);
