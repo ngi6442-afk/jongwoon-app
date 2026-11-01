@@ -408,6 +408,8 @@ async function handleSave(event, d, R) {
     });
     doc.items = others.concat(own);
   }
+  // v414 휴가 알림 2종(C3-1): 새 신청 → 관리자 우선기기 1발 · pending→approved/rejected → 신청자 1발. 설정으로 끌 수 있다. 실패해도 저장은 그대로.
+  if (col === 'leaves' && Array.isArray(doc.items)) { try { await notifyLeaves(store(DATA), oldItems, doc.items, c.member); } catch (e) {} }
   // 인허가 3층(2026-09-02): duties(의무 대장)는 ①구버전 클라·구형 캐시가 모르는 필드라 빠지거나 비어 오면
   // 저장 한 번에 95행+확정 이력이 통째로 증발한다(리뷰 high) — 서버가 원본을 이월. ②등재·확정 전환은 관리자 전용.
   if (col === 'licenses') {
@@ -1556,6 +1558,9 @@ const NOTIFY_EVENTS = {
   task_auto_create: { label: '자동 지시 생성 알림', options: { admins: '관리자 전원(현행)', assignee: '담당자 본인 1발(우선기기)' }, def: 'admins', rec: 'assignee' },
   task_review: { label: '완료 요청(승인 대기) 알림', options: { admins: '지시자, 없으면 관리자 전원(현행)', issuer_approver: '지시자 · 자동 지시는 배정 승인권자 1인' }, def: 'admins', rec: 'issuer_approver' },
   due_digest: { label: '만기 임박 알림 방식', options: { each: '생성 때마다 관리자 전원(현행)', summary: '아침 요약 1줄(승인권자 1인, 없으면 관리자)' }, def: 'each', rec: 'summary' },
+  // v414 C3-1 휴가 2종 — 그룹웨어규정 §11②·결재규정 §11③(신청·결과 통지)에 맞추는 것이라 기본값=켬(R0 규정 정합). 끄는 선택만 둔다.
+  leave_request: { label: '휴가 신청 알림', options: { admins: '승인자(관리자) 우선기기 1발', off: '없음(종전)' }, def: 'admins', rec: 'admins' },
+  leave_result: { label: '휴가 승인·반려 알림', options: { applicant: '신청자 본인 1발', off: '없음(종전)' }, def: 'applicant', rec: 'applicant' },
 };
 function notifyDefaults() { const o = {}; Object.keys(NOTIFY_EVENTS).forEach(function (k) { o[k] = NOTIFY_EVENTS[k].def; }); return o; }
 function notifyValid(k, v) { return Object.prototype.hasOwnProperty.call(NOTIFY_EVENTS, k) && Object.prototype.hasOwnProperty.call(NOTIFY_EVENTS[k].options, String(v)); }
@@ -1614,6 +1619,24 @@ async function handleNotifyRevert(event, d, R) {
   return jr(200, Object.assign({ status: 'OK', request_id: R }, notifyPublic({ events: ev, prev: doc.prev, updated_at: doc.updated_at, updated_by: doc.updated_by })));
 }
 // 자동 지시 생성·배정 → 담당자 본인 1발(우선기기). save·ingest 공용. 담당 없는 항목은 발송 없음(배지만). 같은 사람은 하루 한 묶음(tag로 치환).
+// v414 휴가 신청·결과 알림(C3-1). 본문에 사유·기간을 싣지 않는다(알림함 이력은 관리자 전원이 본다 — §14③ 사적 내용 금지). 반환 {req, res}=발송 수신자 수.
+async function notifyLeaves(st, oldItems, newItems, member) {
+  const nf = await notifyRead(st); const out = { req: 0, res: 0 };
+  const oldBy = {}; (oldItems || []).forEach(function (o) { if (o && o.id) oldBy[o.id] = o; });
+  const fresh = (newItems || []).filter(function (x) { return x && x.id && x.status === 'pending' && x.del !== 1 && !oldBy[x.id]; });
+  const decided = (newItems || []).filter(function (x) { const o = x && x.id && oldBy[x.id]; return o && o.status === 'pending' && (x.status === 'approved' || x.status === 'rejected') && x.member_id; });
+  if (!fresh.length && !decided.length) return out;
+  const today = new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);
+  const tc = await push.tierCtx();
+  if (nf.events.leave_request === 'admins' && fresh.length) {
+    const to = ((tc && tc.adminIds) || []).filter(function (id) { return id !== (member && member.id); });
+    if (to.length) { const names = fresh.map(function (x) { return String(x.member_name || '').slice(0, 10); }).filter(Boolean); await push.sendTo(to, { title: '휴가 신청 ' + fresh.length + '건', body: (names.slice(0, 3).join(' · ') || '신청') + ' — 휴가 탭 승인 대기', url: './', tag: 'leave-req-' + today }, { ctx: tc, primaryOnly: true, by: (member && member.name) || '' }); out.req = to.length; }
+  }
+  if (nf.events.leave_result === 'applicant' && decided.length) {
+    for (const x of decided) { try { await push.sendTo([String(x.member_id)], { title: '휴가 ' + (x.status === 'approved' ? '승인됨' : '반려됨'), body: '휴가 탭에서 확인하세요.', url: './', tag: 'leave-res-' + x.id }, { ctx: tc, primaryOnly: true, by: (member && member.name) || '' }); out.res++; } catch (e) {} }
+  }
+  return out;
+}
 async function notifyAutoCreated(st, items, by) {
   try {
     const nf = await notifyRead(st); if (nf.events.task_auto_create !== 'assignee') return 0;

@@ -78,7 +78,7 @@ function contractPlan(members, sentDoc, today) {
 }
 function contractBody(items) {
   const line = function (x) { return x.stage === 'over' ? (x.name + ' 2년 초과 ' + (-x.days) + '일(' + x.conv + ')') : x.stage === 'unknown' ? (x.name + ' 생년월일 없음 — 판정 불가') : (x.name + ' D-' + x.days + '(' + x.conv + ')'); };
-  return { title: '무기계약 전환 시계 — ' + items.length + '명', body: (items.slice(0, 3).map(line).join(' / ') + (items.length > 3 ? ' 외 ' + (items.length - 3) + '명' : '') + ' · 인사·직원 탭 칩 · 기간제법 4조 — 노무사 확인').slice(0, 200) };
+  return { title: '무기계약 전환 시계 — ' + items.length + '명', body: (items.slice(0, 3).map(line).join(' / ') + (items.length > 3 ? ' 외 ' + (items.length - 3) + '명' : '') + ' · 인사·직원 탭 칩 · 기간제법 §4①(2년 초과=무기계약 간주)·§4①5호(55세 이상 예외) — 노무사 확인').slice(0, 200) };
 }
 
 exports.handler = async function (event) {

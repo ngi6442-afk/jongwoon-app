@@ -74,6 +74,22 @@ exports.handler = async function (event) {
       }
     }
   } catch (e) { digest = { error: String(e && e.message || e).slice(0, 80) }; }
-  await stamp('gw-todo-cron', { state: 'end', ok: fails === 0, note: 'members ' + members + ' · items ' + items + ' · fails ' + fails + (digest && digest.sent ? ' · digest' : '') });
-  return { statusCode: 200, body: JSON.stringify({ ok: true, today: today, members: members, items: items, fails: fails, skipped: skipped, digest: digest }) };
+  // v414 C3-1 무기계약직 레이더 이식 — gw-duty-cron(netlify.toml 미등록이라 안 돌던 크론)의 contractPlan을 08:00 여기서 돌린다. 멱등 키는 duty:sent 공유(toml 불변·duty 함수는 그대로).
+  //   수신 = PM(tier pm, 없으면 관리자) 우선기기 1발. 단계 d90·d30 각 1회, over 매일 1회, unknown(생년월일 없음) 1회. 근거 기간제법 §4①(2년 초과 → 무기계약 간주)·§4①5호(55세 이상 체결 예외) — 판정은 노무사.
+  let radar = null;
+  try {
+    const DC = require('./gw-duty-cron');
+    const sr2 = await blobGet(st, 'duty:sent'); const sentDoc2 = (sr2.ok && sr2.data && sr2.data.keys && typeof sr2.data.keys === 'object') ? sr2.data : { schema: 1, keys: {} };
+    const ct = DC.contractPlan(ctx ? ctx.members : [], sentDoc2, today);
+    radar = { items: ct.length, sent: 0 };
+    if (ct.length) {
+      let pmIds = (ctx && Array.isArray(ctx.pmIds) && ctx.pmIds.length) ? ctx.pmIds : ((ctx && ctx.adminIds) || []);
+      if (gateOn) pmIds = pmIds.filter(function (id) { return !!activeSet[id]; });
+      if (pmIds.length) { const cm = DC.contractBody(ct); await push.sendTo(pmIds, { title: cm.title, body: cm.body, url: './', tag: 'ct-' + today }, { ctx: ctx, primaryOnly: true }); radar.sent = pmIds.length; }
+      ct.forEach(function (x) { sentDoc2.keys[x.key] = today; });
+      await blobSet(st, 'duty:sent', sentDoc2);
+    }
+  } catch (e) { radar = { error: String(e && e.message || e).slice(0, 80) }; fails++; }
+  await stamp('gw-todo-cron', { state: 'end', ok: fails === 0, note: 'members ' + members + ' · items ' + items + ' · fails ' + fails + (digest && digest.sent ? ' · digest' : '') + (radar && radar.sent ? ' · radar ' + radar.items : '') });
+  return { statusCode: 200, body: JSON.stringify({ ok: true, today: today, members: members, items: items, fails: fails, skipped: skipped, digest: digest, radar: radar }) };
 };

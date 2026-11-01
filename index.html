@@ -2725,6 +2725,7 @@
       · 로그인: ⚙ → <b>아이디 + PIN</b>. 아이디를 아직 안 만들었으면 이름을 그대로 넣고, 로그인 뒤 ⚙ › <b>내 아이디 설정</b>. 관리자는 ⚙에서 <b>회원 관리</b>.<br>
       · 알림: 쓰는 기기마다 한 번 ⚙ → <b>🔔 이 기기 알림 켜기</b>. 안 켠 기기에는 아무 알림도 오지 않습니다.<br>
       · 휴가: 개인 › 휴가 › <b>+ 휴가 신청</b>(유형·기간·사유 필수) → 관리자 승인 → 캘린더에 표시. 승인된 휴가는 <b>[취소 요청]</b>(끝난 휴가는 종료 뒤 3일까지)만 되고 관리자가 승인합니다. 📖 사용 안내 20절<br>
+      · 지시: 내게 온 지시 → <b>[완료]</b> → 승인권자 승인으로 끝(데이터가 갱신된 자동 지시는 앱이 스스로 승인 대기로). 자동 지시가 내 일이 아니면 <b>[내 것 아님]</b>. 📖 사용 안내 4절<br>
       · 안 보이는 탭은 권한(숨김/보기/처리) 때문이라 정상입니다. <b>보기</b> 권한이면 수정·완료 버튼이 없습니다.<br>
       · 앱은 기록 층입니다. 은행·세무·현장 종이 점검표는 그대로 씁니다.
     </p>
@@ -21235,7 +21236,7 @@
   }
 
   // ---- 지시 알림 설정(v396, 공통 기반 3 첫 시범 — 착수 브리핑 A3 · 카드 1-4 R1). 이벤트 3종 × 선택지 칩. 기본값=현행, 추천값 표시. 되돌리기 1클릭. 관리자만(서버 강제)·감사로그·낙관락 ----
-  var NOTIFY_EVENT_ORDER = ["task_auto_create","task_review","due_digest"];   // 서버 NOTIFY_EVENTS 키와 동일(uismoke 대조)
+  var NOTIFY_EVENT_ORDER = ["task_auto_create","task_review","due_digest","leave_request","leave_result"];   // v414 휴가 2종   // 서버 NOTIFY_EVENTS 키와 동일(uismoke 대조)
   var notifyTbl = null, notifyMeta = null, notifyBase = 0, notifySaving = false;
   function renderNotifyCard(){
     var host = document.getElementById("notifyCard"); if (!host) return;

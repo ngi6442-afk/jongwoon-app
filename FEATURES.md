@@ -1,6 +1,6 @@
 # 종운 그룹웨어 — 기능 대장 (사용자 매뉴얼 원천)
 
-> 살아있는 문서. 기능 추가·변경 시 이 파일을 함께 갱신한다. 기준: v413 (2026-11-01).
+> 살아있는 문서. 기능 추가·변경 시 이 파일을 함께 갱신한다. 기준: v414 (2026-11-02).
 > 세부 변경 이력은 git 커밋 메시지(한글) 참조.
 
 ## 1. 전체 구조
@@ -788,6 +788,12 @@ PM 지시 "문서함 일단 다 올리고 등재결재랑 공개범위 만들어
 - 정정: STAGE_DOCS "완료신고" 석면해체·제거→석면해체/제거, "청구" 국세·지방세→국세/지방세 납세증명(파서가 복합 서류 이름을 나누던 2곳) → proc_v1.json 재export·거울 2층 재빌드(list sha 7eeb1ce6c1d18b44)·push.
 - 배포 전 적대 검토 7건 → 6건 반영: map_del 뒤 같은 정규식 map_add 가 무시되던 재생 순서(map_add 가 map_del 을 되살림·map_del 이 앞선 map_add 를 지움) · 기기 간 동기화 머지(csSyncFromServer)가 stage.docs[] 를 떨어뜨리던 것 → csMergeDocs(k 별 at 늦은 쪽·한쪽만 있는 항목 보존) · 서류 추가 뒤 입력 칸 비움 · 편집 textarea 줄바꿈=" / " · 되돌림 판정은 전체 기록(reverted_of) · __proto__ 키 거부. 수용 1건: 월 사건 로그 clog:contract:YYYY-MM 은 읽고-쓰기 사이 잠금이 없어 같은 초에 두 사람이 누르면 1건이 빠질 수 있다(지표용 로그, 체인은 유지 — 4일차 집계에서 빠진 수를 세지 않도록 참고).
 - 검사: servertest 절 55(40항), uismoke v401(3항), consheet_check v401(10항 — 파서·커버리지 81단계 중 79·체크/해당없음/추가/삭제·머지·html·옛 계약), proctpl diff 0. sw v401.
+
+### v414 (11/2) — C2-3 결재 직원 안내 1장 + C3-1 인사 알림 2종·무기계약직 레이더 이식
+- **안내 1장(C2-3)**: MANUAL 4절 "받은 지시는 이렇게 끝납니다(4단계)" — 내게 온 지시 → [완료](데이터 갱신 건은 앱이 스스로 승인 대기) → 승인/반려 → [내 것 아님](자동 지시만, 배정표 신호) + 알림은 기기마다 켜기·우선기기 1대·내 할 일은 비공개. 19절 1줄·⚙ 도움말 1줄.
+- **휴가 알림 2종(C3-1)**: `save`(leaves) 뒤 `notifyLeaves` — 새 pending → 관리자(신청자 제외) 우선기기 1발(제목 '휴가 신청 n건', 본문 이름만) · pending→approved/rejected → 신청자 1발('휴가 승인됨/반려됨', 본문에 사유·기간 없음 §14③). `settings:notify` `leave_request`(admins|off)·`leave_result`(applicant|off) — 그룹웨어규정 §11②·결재규정 §11③ 정합이라 **기본값 켬(R0)**, 끄는 선택만.
+- **무기계약직 레이더 이식(C3-1)**: `gw-duty-cron`은 netlify.toml 미등록이라 v368 이후 한 번도 안 돌았다(안착 7항 ②) → `gw-todo-cron` 08:00이 `contractPlan`을 돌려 PM(없으면 관리자) 우선기기 1발, 멱등 키 `duty:sent` 공유(toml·duty 함수 불변). 본문에 기간제법 §4①·§4①5호 호수 명기. 응답 `radar {items, sent}`.
+- 검사: servertest 절 63(notify 5종 기본값·휴가 신청/결과 푸시·끔·레이더 발송·멱등) · uismoke v414(NOTIFY_EVENT_ORDER 5 동률). sw v414.
 
 ### v413 (11/1) — 결재 C2-1: [내 것 아님] + clog:appr 학습 신호 + lessons:appr(모델 없음)
 - **[내 것 아님]**(담당자 본인, 자동 지시만): 지시 탭·내게 온 지시 카드의 버튼 → `task_notmine {id}` → 서버가 담당을 비우고(`who_by 'notmine'`, `notmine {by, ts, prev}`) '담당 없음' 배지. PM에게 1줄 가지 않는다(설계 A5) — 배정표 delta로 집계. 수동 지시는 NOT_AUTO(지시자에게), 본인 아니면 NOT_ASSIGNEE, 완료 건 TASK_DONE. 감사 '내것아님'.

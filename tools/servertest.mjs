@@ -121,8 +121,9 @@ T('backup_put confirm → 200 + 저장', r.code === 200 && mem.gw_data.rt && mem
 // 13 bot_notify 키 검증 + 발송 결과
 r = await call({ action: 'bot_notify', key: 'wrong', title: 'x' });
 T('bot_notify 잘못된 키 → 403', r.code === 403);
+const pcBot13 = pushMock.calls.length;   // v414: 앞 절 leaves 저장이 휴가 신청 알림 1건을 남긴다 → 증분으로
 r = await call({ action: 'bot_notify', key: 'test-ingest-key', title: '테스트', body: 'b' });
-T('bot_notify → sent=실발송 수', r.code === 200 && r.body.sent === 1 && pushMock.calls.length === 1, JSON.stringify(r.body));
+T('bot_notify → sent=실발송 수', r.code === 200 && r.body.sent === 1 && pushMock.calls.length === pcBot13 + 1, JSON.stringify(r.body));
 
 // 14 quotes 서버 편입(견적 탭 GitHub 직행→저장 유실 실사고의 회귀 방지)
 r = await call({ action: 'save', collection: 'quotes', doc: { schema: 1, items: [{ id: 'q1', no: '202608-01' }] } }, tokA);
@@ -3881,6 +3882,54 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
     && LA3.prefixes['veh:'].who_edit === 1 && LA3.prefixes['veh:'].del === 1 && LA3.prefixes['lic:'].due_edit === 1 && LA3.prefixes['lic:'].due_med === 8 && JSON.stringify(mem.gw_data['clog:appr:' + ym62]).indexOf('2026-12-08') < 0;
   T('62 save 보호·신호: 낡은 사본 재배정 → 비운 채(clog 행 없음·배정표 같은 사람 되채움 없음) · 배정표가 다른 사람이면 채움 · 관리자 edit 재지정 통과+clog who_id edit · 기한 변경 d=8(날짜 값 미기록) · 삭제 del 행 · lessons 재집계', s1 && s2, JSON.stringify([s1, s2, r62.code, cl3, ta3.who_by, tc3 && tc3.who_id]));
   delete mem.gw_data['col:tasks']; delete mem.gw_data['clog:appr:' + ym62]; delete mem.gw_data['lessons:appr']; delete mem.gw_users['member:uwork2']; delete mem.gw_data['settings:assign'];
+}
+
+{ // ---- 63(v414) C3-1 — 휴가 알림 2종(settings:notify leave_request·leave_result, 기본 켬) · 무기계약직 레이더 todo-cron 이식(duty:sent 멱등) ----
+  const savedSend63 = pushMock.sendTo; const sent63 = [];
+  pushMock.sendTo = async (ids, p, o) => { sent63.push({ ids: ids.slice(), p: p, o: o || {} }); return { sent: ids.length, removed: 0 }; };
+  delete mem.gw_data['settings:notify'];
+  let r63 = await call({ action: 'notify_get' }, tokA);
+  T('63 notify_get: 5종 · 휴가 2종 기본값 켬(admins·applicant, R0 규정 정합) · 끄기 선택 있음', r63.code === 200 && Object.keys(r63.body.meta).length === 5 && r63.body.events.leave_request === 'admins' && r63.body.events.leave_result === 'applicant' && r63.body.meta.leave_request.options.off && r63.body.meta.leave_result.rec === 'applicant', JSON.stringify(r63.body.events));
+  // 직원 신청 → 관리자 우선기기 1발(신청자 제외)
+  const L63 = { id: 'lv63', member_id: 'uwork', member_name: '직원', type: 'annual', start: '2026-11-10', end: '2026-11-10', days: 1, reason: '개인 사정', status: 'pending', approver: '', applied: '2026-11-02', updated: '2026-11-02' };
+  mem.gw_data['col:leaves'] = { schema: 1, items: [], updated_at: 1 };
+  r63 = await call({ action: 'save', collection: 'leaves', base: 1, doc: { schema: 1, items: [L63] } }, tokW, 'dev1');
+  const q1 = sent63.length === 1 && r63.code === 200 && sent63[0].ids.indexOf('uadmin') >= 0 && sent63[0].ids.indexOf('uwork') < 0 && /휴가 신청 1건/.test(sent63[0].p.title) && /직원/.test(sent63[0].p.body) && sent63[0].p.body.indexOf('개인 사정') < 0 && sent63[0].p.body.indexOf('2026-11-10') < 0 && sent63[0].o.primaryOnly === true && /^leave-req-/.test(sent63[0].p.tag);
+  // 같은 사본 재저장(변경 없음) → 추가 발송 없음
+  const b63 = mem.gw_data['col:leaves'].updated_at;
+  r63 = await call({ action: 'save', collection: 'leaves', base: b63, doc: { schema: 1, items: [L63] } }, tokW, 'dev1'); const q2 = r63.code === 200 && sent63.length === 1;
+  // 관리자 승인 → 신청자 1발(본문에 사유·기간 없음)
+  const b63b = mem.gw_data['col:leaves'].updated_at;
+  const ap = Object.assign({}, L63, { status: 'approved', approver: '관리자', approved_at: '2026-11-02' });
+  r63 = await call({ action: 'save', collection: 'leaves', base: b63b, doc: { schema: 1, items: [ap] } }, tokA);
+  const q3 = r63.code === 200 && sent63.length === 2 && sent63[1].ids.join() === 'uwork' && sent63[1].p.title === '휴가 승인됨' && sent63[1].p.body.indexOf('개인 사정') < 0 && sent63[1].o.primaryOnly === true && sent63[1].p.tag === 'leave-res-lv63';
+  // 끄기 → 발송 없음(반려)
+  await call({ action: 'notify_set', event: 'leave_result', value: 'off' }, tokA);
+  mem.gw_data['col:leaves'] = { schema: 1, items: [Object.assign({}, L63, { id: 'lv63b' })], updated_at: 7 };
+  r63 = await call({ action: 'save', collection: 'leaves', base: 7, doc: { schema: 1, items: [Object.assign({}, L63, { id: 'lv63b', status: 'rejected' })] } }, tokA);
+  const q4 = r63.code === 200 && sent63.length === 2;
+  await call({ action: 'notify_set', event: 'leave_request', value: 'off' }, tokA);
+  mem.gw_data['col:leaves'] = { schema: 1, items: [], updated_at: 8 };
+  r63 = await call({ action: 'save', collection: 'leaves', base: 8, doc: { schema: 1, items: [Object.assign({}, L63, { id: 'lv63c' })] } }, tokW, 'dev1');
+  const q5 = r63.code === 200 && sent63.length === 2;
+  T('63 휴가 알림: 신청 → 관리자 1발(신청자 제외·우선기기·이름만, 사유·기간 없음) · 변경 없는 재저장 0 · 승인 → 신청자 1발(태그 leave-res-id) · 끄면 0(결과·신청)', q1 && q2 && q3 && q4 && q5, JSON.stringify([q1, q2, q3, q4, q5, sent63.map((x) => [x.ids, x.p.title, x.p.tag])]));
+  // 레이더 이식 — 계약직 회원 1명(입사 2025-01-10 → 전환 2027-01-10, 오늘 기준 D-60~70 → d90) → PM(여기선 관리자 uadmin=tier pm) 1발 + duty:sent 키 · 두 번째 실행 0발
+  mem.gw_users['member:uct63'] = { id: 'uct63', name: '계약직원', admin: false, perms: {}, emp_type: '계약직', hire_date: '2025-01-10', birth: '1990-05-05' };
+  Object.keys(mem.gw_data).forEach((k) => { if (/^priv:[^:]+:mytasks$/.test(k) || /^todo:sent:/.test(k)) delete mem.gw_data[k]; });
+  delete mem.gw_data['duty:sent'];
+  const cron63 = require(join(FN, 'gw-todo-cron.js'));
+  const n0 = sent63.length;
+  const o1 = JSON.parse((await cron63.handler({})).body || '{}');
+  const ds = mem.gw_data['duty:sent'];
+  const ctKeys = ds ? Object.keys(ds.keys).filter((k) => k.indexOf('ct:uct63:') === 0) : [];
+  const rad = sent63.slice(n0).filter((x) => /^ct-/.test(x.p.tag));
+  const o2 = JSON.parse((await cron63.handler({})).body || '{}');
+  const rad2 = sent63.slice(n0).filter((x) => /^ct-/.test(x.p.tag));
+  T('63 레이더 이식: 계약직 1명 d90 → ct- 태그 1발(PM 우선기기, 기간제법 §4① 호수 본문) · duty:sent ct:uct63:2027-01-10:d90 기록 · 같은 날 재실행 0발(멱등) · 응답 radar',
+    o1.ok === true && o1.radar && o1.radar.items === 1 && o1.radar.sent === 1 && rad.length === 1 && rad[0].ids.join() === 'uadmin' && rad[0].o.primaryOnly === true && /§4①/.test(rad[0].p.body) && /계약직원 D-\d+\(2027-01-10\)/.test(rad[0].p.body)
+    && ctKeys.length === 1 && ctKeys[0] === 'ct:uct63:2027-01-10:d90' && o2.radar && o2.radar.items === 0 && rad2.length === 1, JSON.stringify([o1.radar, o2.radar, ctKeys, rad.map((x) => x.p)]));
+  pushMock.sendTo = savedSend63;
+  delete mem.gw_users['member:uct63']; delete mem.gw_data['col:leaves']; delete mem.gw_data['settings:notify']; delete mem.gw_data['duty:sent'];
 }
 
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

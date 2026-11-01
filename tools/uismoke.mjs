@@ -1554,7 +1554,7 @@ try {
   const appSeg = (html.match(/var NOTIFY_EVENT_ORDER = \[([^\]]+)\]/) || ['', ''])[1];
   const appK = new Set([...appSeg.matchAll(/"([a-z_]+)"/g)].map((m) => m[1]));
   const onlyS = [...svrK].filter((k) => !appK.has(k)), onlyA = [...appK].filter((k) => !svrK.has(k));
-  T('v396 알림 이벤트 키 앱↔서버 일치(' + svrK.size + '종)', svrK.size === 3 && !onlyS.length && !onlyA.length, '서버만: ' + onlyS.join(',') + ' / 앱만: ' + onlyA.join(','));
+  T('v396 알림 이벤트 키 앱↔서버 일치(' + svrK.size + '종)', svrK.size >= 3 && !onlyS.length && !onlyA.length, '서버만: ' + onlyS.join(',') + ' / 앱만: ' + onlyA.join(','));
   const todo = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-todo-cron.js'), 'utf8');
   const swv = readFileSync(join(ROOT, 'sw.js'), 'utf8');
   T('v396 배선: 카드 id·렌더·호출·notify_get/set/revert·서버 핸들러 3·push_send 정책(삼킴·승인권자)·save/ingest notifyAutoCreated·크론 요약·sw',
@@ -1817,6 +1817,17 @@ try {
     && html.indexOf('function taskNotMineBtn(t)') > 0 && html.indexOf('function taskNotMine(id)') > 0 && (html.match(/taskNotMineBtn\(t\)/g) || []).length >= 3 && html.indexOf('action: "task_notmine"') > 0 && html.indexOf('_colBase["tasks"] = b.updated_at') > 0 && html.indexOf('t.who_by = "edit"') > 0 && html.indexOf('R1 재카드') > 0 && html.indexOf('var ls = res.body.lessons || null;') > 0
     && Number((swv13.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 413);
 } catch (e) { console.log('  (v413 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ---- v414(11/2 C2-3·C3-1): MANUAL 4절 4단계·내 것 아님 · 도움말 지시 1줄 · NOTIFY_EVENT_ORDER 5 · gw-data notifyLeaves · todo-cron 레이더 이식 · sw ≥414
+try {
+  const swv14 = readFileSync(join(ROOT, 'sw.js'), 'utf8'), gwd14 = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-data.js'), 'utf8'), man14 = readFileSync(join(ROOT, 'MANUAL.html'), 'utf8'), td14 = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-todo-cron.js'), 'utf8');
+  const ord14 = (html.match(/var NOTIFY_EVENT_ORDER = \[([^\]]+)\]/) || ['', ''])[1].replace(/["\s]/g, '');
+  T('v414 안내·휴가 알림·레이더: MANUAL 4절 4단계+내 것 아님 · 19절 · 도움말 4절 · NOTIFY_EVENT_ORDER 5(휴가 2종) · gw-data leave_request/leave_result+notifyLeaves · todo-cron contractPlan 이식(duty:sent) · sw ≥ 414',
+    man14.indexOf('받은 지시는 이렇게 끝납니다') > 0 && (man14.match(/내 것 아님/g) || []).length >= 2 && html.indexOf('📖 사용 안내 4절') > 0
+    && ord14 === 'task_auto_create,task_review,due_digest,leave_request,leave_result' && gwd14.indexOf("leave_request: {") > 0 && gwd14.indexOf("leave_result: {") > 0 && /async function notifyLeaves\(/.test(gwd14) && gwd14.indexOf('await notifyLeaves(store(DATA), oldItems, doc.items, c.member)') > 0
+    && td14.indexOf("require('./gw-duty-cron')") > 0 && td14.indexOf("blobGet(st, 'duty:sent')") > 0 && /DC\.contractPlan\(/.test(td14)
+    && Number((swv14.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 414);
+} catch (e) { console.log('  (v414 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
