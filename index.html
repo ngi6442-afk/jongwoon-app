@@ -3580,6 +3580,7 @@
     if (!title) return;
     t.title = title;
     var whoId = document.getElementById("teWho").value;
+    if (t.who_id !== whoId) t.who_by = "edit";   // v413 관리자 재지정 표식(서버 [내 것 아님] 보호 통과)
     t.who_id = whoId; t.who = memberName(whoId);
     t.due = document.getElementById("teDue").value || "";
     t.detail = document.getElementById("teDetail").value.trim();
@@ -4269,7 +4270,8 @@
       var doneBtn = canActTask(t) ? '<button class="mini-btn appr-btn" data-task-done="' + t.id + '">완료</button>' : '';
       var editBtn = canDo("tasks") ? '<button class="mini-btn" data-task-edit="' + t.id + '">수정</button>' : '';
       var docBtn = (t.proc_id && canDo("con") && t.pipe !== "chg" && !csTaskChg(t)) ? '<button class="mini-btn" data-task-doc="' + t.proc_id + '" data-task-doc-stage="' + esc(t.stage_name||"") + '">📄 서류</button>' : '';
-      ctrl = '<div class="task-ctrl">' + ddayBadge + doneBtn + docBtn + holdBtn + editBtn + '</div>';
+      var notMineBtn = taskNotMineBtn(t);   // v413
+      ctrl = '<div class="task-ctrl">' + ddayBadge + doneBtn + docBtn + holdBtn + editBtn + notMineBtn + '</div>';
     }
 
     var cls = "item task-item" + (isDone ? " checked" : "") + (t.status === "hold" ? " hold" : "") + (t.status === "review" ? " review" : "");
@@ -4381,7 +4383,7 @@
           detailHtml +
           '<div class="item-meta">' + metaBits.join('') + '</div>' +
         '</div>' +
-        '<div class="task-ctrl">' + ddayBadge + calBtn + '</div>' +
+        '<div class="task-ctrl">' + ddayBadge + calBtn + (t.status === "review" ? '' : taskNotMineBtn(t)) + '</div>' +
       '</div>';
   }
   function renderMyTasks(){
@@ -4396,9 +4398,10 @@
     host.innerHTML = list.length
       ? list.map(myTaskRowHtml).join("")
       : '<div class="loading" style="padding:14px 0;">내게 온 지시가 없습니다.</div>';
+    Array.prototype.forEach.call(host.querySelectorAll("[data-task-notmine]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); taskNotMine(el.getAttribute("data-task-notmine")); }); });   // v413
     Array.prototype.forEach.call(host.querySelectorAll("[data-mytask]"), function(el){
       el.addEventListener("click", function(e){
-        if (e.target.classList.contains("cal-btn")) return;
+        if (e.target.classList.contains("cal-btn") || e.target.classList.contains("mini-btn")) return;
         toggleTaskDone(el.getAttribute("data-mytask"));
       });
     });
@@ -4427,6 +4430,9 @@
     });
     Array.prototype.forEach.call(host.querySelectorAll("[data-task-done]"), function(el){
       el.addEventListener("click", function(e){ e.stopPropagation(); toggleTaskDone(el.getAttribute("data-task-done")); });
+    });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-task-notmine]"), function(el){   // v413
+      el.addEventListener("click", function(e){ e.stopPropagation(); taskNotMine(el.getAttribute("data-task-notmine")); });
     });
     Array.prototype.forEach.call(host.querySelectorAll("[data-task-edit]"), function(el){
       el.addEventListener("click", function(e){ e.stopPropagation(); openTaskModal(el.getAttribute("data-task-edit")); });
@@ -4685,6 +4691,19 @@
     saveTasksCache(); renderTasks(); renderSummary(); scheduleTasksSave();
   }
 
+  // v413 [내 것 아님] — 자동 지시의 담당이 본인일 때만. 서버가 담당을 비우고(who_by notmine) clog:appr에 1행 남겨 배정표 delta로 집계한다(PM 1줄 아님).
+  function taskNotMineBtn(t){ return (t && t.auto_key && t.who_id && t.who_id === myId() && t.status !== "done") ? '<button class="mini-btn" data-task-notmine="' + t.id + '" title="이 자동 지시의 담당에서 빠집니다">내 것 아님</button>' : ''; }
+  function taskNotMine(id){
+    var t = findTask(id); if (!t || !t.auto_key || t.who_id !== myId()) return;
+    if (!confirm("이 자동 지시의 담당에서 빠집니다. 관리자가 배정표를 다시 정할 때까지 '담당 없음'으로 남습니다. 계속할까요?")) return;
+    gwCall("gw-data", { action: "task_notmine", id: id }).then(function(res){
+      if (res.status !== 200){ alert("처리 실패: " + ((res.body && res.body.error_code) || res.status)); return; }
+      var b = res.body; t.who_id = ""; t.who = ""; t.who_by = "notmine"; t.notmine = b.task && b.task.notmine; t.updated = (b.task && b.task.updated) || todayStr();
+      if (b.updated_at) _colBase["tasks"] = b.updated_at;   // 서버가 지시 문서를 바꿨다 — 다음 저장의 낙관락 base
+      saveTasksCache(); renderTasks(); renderMyTasks(); renderSummary();
+      apprToastShow(b.signal && b.signal.recard ? "담당에서 빠졌습니다 — 이달 " + b.signal.prefix + " 접두어 " + b.signal.notmine + "건, 배정표 재검토 신호가 관리자에게 표시됩니다" : "담당에서 빠졌습니다 — 배정표 재검토 신호로 집계됩니다");
+    }).catch(function(){ alert("처리 실패(네트워크)"); });
+  }
   function setTaskStatus(id, status){
     var t = findTask(id);
     if (!t) return;
@@ -21177,12 +21196,14 @@
     gwCall("gw-data", { action: "assign_get" }).then(function(res){
       if (res.status !== 200 || !res.body || !res.body.rules){ host.innerHTML = '<div class="empty-line">배정표를 불러오지 못했습니다 — 새로고침 후 다시 시도해주세요.</div>'; return; }
       assignTbl = res.body.rules; assignBase = res.body.updated_at || 0;
+      var ls = res.body.lessons || null;   // v413 이달 delta(clog:appr 집계, 모델 없음)
       var rows = ASSIGN_PREFIX_ORDER.map(function(p){
-        var r = assignTbl[p] || {}; var cur = r.who_id || "";
+        var r = assignTbl[p] || {}; var cur = r.who_id || ""; var lx = (ls && ls.prefixes && ls.prefixes[p]) || null;
         return '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:7px 2px;border-bottom:1px solid var(--line);">'
           + '<span style="min-width:190px;font-size:13px;font-weight:600;">' + esc(ASSIGN_PREFIX_TXT[p] || p) + ' <span style="font-weight:400;color:var(--sub);font-size:11px;">' + esc(p) + '</span></span>'
           + '<select data-assign-who="' + esc(p) + '" style="font-size:12.5px;padding:3px 6px;">' + assignMemberOpts(cur) + '</select>'
           + (cur ? '' : '<span class="hold-chip">담당 없음</span>')
+          + (lx ? '<span style="font-size:11.5px;color:var(--sub);">' + esc(ls.ym) + ' 내 것 아님 ' + (lx.notmine || 0) + '건' + (lx.who_edit ? ' · 담당 변경 ' + lx.who_edit : '') + (lx.due_edit ? ' · 기한 변경 ' + lx.due_edit + (typeof lx.due_med === "number" ? '(중앙값 ' + (lx.due_med > 0 ? '+' : '') + lx.due_med + '일)' : '') : '') + '</span>' + (lx.recard ? '<span class="hold-chip" style="background:#fde7e7;color:#B00020;">R1 재카드</span>' : '') : '')
           + '</div>';
       }).join("");
       var apv = res.body.approver_id || "";
@@ -21193,7 +21214,8 @@
       var prev = res.body.prev;
       host.innerHTML = rows
         + '<div class="empty-line" style="margin-top:6px;">자동 지시(차량·인허가·증명서·미수·적격)의 담당을 접두어로 정합니다. 공란이면 지시 카드에 <b>담당 없음</b> 배지가 붙고 관리자에게 자동으로 가지 않습니다. 변경은 새 지시와 공란 지시에 바로 적용되고(저장·아침 수집 때 서버가 채움), 사람이 직접 지정한 담당은 바꾸지 않습니다. 변경은 감사로그에 남습니다.'
-        + (prev ? ' · 직전 표 보존 <button type="button" class="link-btn" id="assignRevertBtn">되돌리기</button>' : '') + '</div>';
+        + (prev ? ' · 직전 표 보존 <button type="button" class="link-btn" id="assignRevertBtn">되돌리기</button>' : '') + '</div>'
+        + ((ls && ls.rules && ls.rules.length) ? '<div class="empty-line" style="margin-top:4px;">이달 신호: ' + ls.rules.map(function(x){ return esc(x.text); }).join(' / ') + '</div>' : '');   // v413 delta 규칙(사람이 쓰지 않음)
       Array.prototype.forEach.call(host.querySelectorAll("[data-assign-who]"), function(sel){ sel.addEventListener("change", function(){ assignSet({ prefix: sel.getAttribute("data-assign-who"), who_id: sel.value }); }); });
       var ap = host.querySelector("[data-assign-apv]"); if (ap) ap.addEventListener("change", function(){ assignSet({ approver_id: ap.value }); });
       var rb = document.getElementById("assignRevertBtn"); if (rb) rb.addEventListener("click", function(){ if (!confirm("배정표를 직전 표로 되돌립니다. 계속할까요?")) return; assignSet({ revert: true }); });

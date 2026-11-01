@@ -1808,5 +1808,15 @@ try {
     && Number((swv12.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 412);
 } catch (e) { console.log('  (v412 검사 생략 — ' + e.message + ')'); fails++; }
 
+// ---- v413(11/1 C2-1): [내 것 아님] task_notmine · save 보호 · clog:appr 행 · _lib/apprlearn.js tally · 배정표 카드 delta · sw ≥413
+try {
+  const swv13 = readFileSync(join(ROOT, 'sw.js'), 'utf8'), gwd13 = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-data.js'), 'utf8'), al13 = readFileSync(join(ROOT, 'netlify', 'functions', '_lib', 'apprlearn.js'), 'utf8');
+  T('v413 내 것 아님: 서버 task_notmine(NOT_AUTO·NOT_ASSIGNEE)·save 보호(who_by edit 통과)·clog 행(who_id·due d·del)·apprlearn tally(RECARD 3/2인) · 앱 버튼 2곳(지시 탭·내게 온 지시)+taskNotMine(_colBase 갱신)·모달 who_by edit·배정표 카드 lessons · sw ≥ 413',
+    gwd13.indexOf("d.action === 'task_notmine'") > 0 && /async function handleTaskNotmine\(/.test(gwd13) && /'NOT_AUTO'/.test(gwd13) && /'NOT_ASSIGNEE'/.test(gwd13) && gwd13.indexOf("o.who_by === 'notmine' && t.who_id && t.who_by !== 'edit'") > 0 && gwd13.indexOf("f: 'due'") > 0 && gwd13.indexOf("f: 'del'") > 0 && /async function apprClogAppend\(/.test(gwd13)
+    && /const RECARD_N = 3;/.test(al13) && /const RECARD_WHO = 2;/.test(al13) && /function tally\(rows, ym\)/.test(al13)
+    && html.indexOf('function taskNotMineBtn(t)') > 0 && html.indexOf('function taskNotMine(id)') > 0 && (html.match(/taskNotMineBtn\(t\)/g) || []).length >= 3 && html.indexOf('action: "task_notmine"') > 0 && html.indexOf('_colBase["tasks"] = b.updated_at') > 0 && html.indexOf('t.who_by = "edit"') > 0 && html.indexOf('R1 재카드') > 0 && html.indexOf('var ls = res.body.lessons || null;') > 0
+    && Number((swv13.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 413);
+} catch (e) { console.log('  (v413 검사 생략 — ' + e.message + ')'); fails++; }
+
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

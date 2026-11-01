@@ -1,6 +1,6 @@
 # 종운 그룹웨어 — 기능 대장 (사용자 매뉴얼 원천)
 
-> 살아있는 문서. 기능 추가·변경 시 이 파일을 함께 갱신한다. 기준: v412 (2026-11-01).
+> 살아있는 문서. 기능 추가·변경 시 이 파일을 함께 갱신한다. 기준: v413 (2026-11-01).
 > 세부 변경 이력은 git 커밋 메시지(한글) 참조.
 
 ## 1. 전체 구조
@@ -788,6 +788,14 @@ PM 지시 "문서함 일단 다 올리고 등재결재랑 공개범위 만들어
 - 정정: STAGE_DOCS "완료신고" 석면해체·제거→석면해체/제거, "청구" 국세·지방세→국세/지방세 납세증명(파서가 복합 서류 이름을 나누던 2곳) → proc_v1.json 재export·거울 2층 재빌드(list sha 7eeb1ce6c1d18b44)·push.
 - 배포 전 적대 검토 7건 → 6건 반영: map_del 뒤 같은 정규식 map_add 가 무시되던 재생 순서(map_add 가 map_del 을 되살림·map_del 이 앞선 map_add 를 지움) · 기기 간 동기화 머지(csSyncFromServer)가 stage.docs[] 를 떨어뜨리던 것 → csMergeDocs(k 별 at 늦은 쪽·한쪽만 있는 항목 보존) · 서류 추가 뒤 입력 칸 비움 · 편집 textarea 줄바꿈=" / " · 되돌림 판정은 전체 기록(reverted_of) · __proto__ 키 거부. 수용 1건: 월 사건 로그 clog:contract:YYYY-MM 은 읽고-쓰기 사이 잠금이 없어 같은 초에 두 사람이 누르면 1건이 빠질 수 있다(지표용 로그, 체인은 유지 — 4일차 집계에서 빠진 수를 세지 않도록 참고).
 - 검사: servertest 절 55(40항), uismoke v401(3항), consheet_check v401(10항 — 파서·커버리지 81단계 중 79·체크/해당없음/추가/삭제·머지·html·옛 계약), proctpl diff 0. sw v401.
+
+### v413 (11/1) — 결재 C2-1: [내 것 아님] + clog:appr 학습 신호 + lessons:appr(모델 없음)
+- **[내 것 아님]**(담당자 본인, 자동 지시만): 지시 탭·내게 온 지시 카드의 버튼 → `task_notmine {id}` → 서버가 담당을 비우고(`who_by 'notmine'`, `notmine {by, ts, prev}`) '담당 없음' 배지. PM에게 1줄 가지 않는다(설계 A5) — 배정표 delta로 집계. 수동 지시는 NOT_AUTO(지시자에게), 본인 아니면 NOT_ASSIGNEE, 완료 건 TASK_DONE. 감사 '내것아님'.
+- **보호**: `save`(tasks)에서 서버가 비운 담당을 낡은 사본이 같은 사람으로 다시 올리면 비운 채 유지. 관리자 모달 재지정은 `who_by 'edit'`로 통과.
+- **clog:appr 학습 신호**(월 키, 해시 체인, 값 없음): [내 것 아님] 1행(`f who_id · why notmine · p 접두어`) + `save`에서 자동 지시의 사람 손 변경 — 담당(`why edit`)·기한(`d` = 변경 일수)·삭제. 설계 §3-14 학습 신호 ⓐⓑⓒ 재료.
+- **lessons:appr**(`_lib/apprlearn.js tally`, 모델 호출 0): 그 달 행을 접두어별로 집계 {notmine, notmine_who_n, who_edit, due_edit, due_med, del, reject, recard} + 규칙 ≤25 = 사람이 읽는 delta 문구 — **월 3건 또는 2인 → 'R1 재카드'**(브리핑 §6), 기한 변경 3건부터 중앙값 → 리드 개정 제안(bg:appr:rule R2). 사람은 규칙을 쓰지 않는다.
+- **권한관리 › 자동 지시 배정표 카드**: 접두어 행에 이달 '내 것 아님 n건 · 담당 변경 · 기한 변경(중앙값)'과 `R1 재카드` 칩, 아래 '이달 신호' 줄. `assign_get` 응답 `lessons`.
+- 검사: servertest 절 62(task_notmine 권한·NOT_AUTO·clog 행·lessons 재카드 3건·save 보호·관리자 edit 통과·기한 변경 d·assign_get lessons) · uismoke v413. sw v413.
 
 ### v412 (11/1) — 계약 D4 4일차: 기준선 동결·일몰·양식별 끄기/켜기·간극 집계
 - **기준선**: 양식별 숫자 간극(cell_ratio)이 10건에 닿는 순간 첫 10건 평균을 `lessons:contract:<양식>.baseline {avg, n, first_ts, ts}`에 동결(짝 생성 때·워커 병합 뒤). 간극 이력이 60건 넘게 잘려도 기준선은 남는다. 블로그 lessons엔 키가 생기지 않는다.

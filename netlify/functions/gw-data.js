@@ -8,6 +8,8 @@ const zlib = require('zlib');   // v378 큰 본문 gzip(응답·요청) — 10/8
 const { setupBlobContext, store, blobGet, blobSet, blobDelete, blobList } = require('./_lib/blobs');
 const { verifyToken, bearer } = require('./_lib/session');
 const { appendAudit, auditKey, diffItems } = require('./_lib/audit');
+const AL = require('./_lib/apprlearn');   // v413 결재 학습 신호(clog:appr → lessons:appr, 모델 없음)
+const DONEIF = require('./_lib/doneif');   // v413 clogAppend(해시 체인) 재사용
 const push = require('./_lib/push');
 const tier = require('./_lib/tier');   // 관리자 등급(v321) — retired 판정식 공용. 게이트는 push.tierCtx()(명시 tier·부트스트랩·퇴사 제외, 9/6 검증 S1)
 
@@ -374,6 +376,18 @@ async function handleSave(event, d, R) {
       const o = oldByA[t.id];
       if (o && o.status === 'review' && o.done_by === '앱 기준' && t.status === 'open' && !t.doneif_off) { t.status = 'review'; t.done_at = o.done_at; t.done_by = o.done_by; t.done_src = o.done_src; }
     });
+    // v413 [내 것 아님] 보호 + 학습 신호: 서버가 비운 담당(who_by notmine)을 낡은 사본이 같은 사람으로 다시 올리면 비운 채 유지(관리자 모달 재지정 who_by 'edit'은 통과).
+    //   자동 지시의 사람 손 변경(담당·기한·삭제)은 clog:appr 1행(필드명·표식·일수만, 값 없음) → lessons:appr 재집계(모델 없음).
+    const clogRows = [];
+    doc.items.forEach(function (t) {
+      if (!t || !t.auto_key) return; const o = oldByA[t.id]; if (!o) return;
+      if (o.who_by === 'notmine' && t.who_id && t.who_by !== 'edit' && o.notmine && t.who_id === o.notmine.prev) { t.who_id = ''; t.who = ''; t.who_by = 'notmine'; t.notmine = o.notmine; }
+      const p = AL.prefixOf(t.auto_key); if (!p) return;
+      if ((o.who_id || '') !== (t.who_id || '') && t.who_by !== 'notmine') clogRows.push({ id: t.id, f: 'who_id', from: o.who_id ? 'set' : '', to: t.who_id ? 'set' : '', why: 'edit', p: p, by: c.member.id });
+      if ((o.due || '') !== (t.due || '')) { const row = { id: t.id, f: 'due', from: o.due ? 'set' : '', to: t.due ? 'set' : '', why: 'edit', p: p, by: c.member.id }; const dd = AL.dayDiff(o.due, t.due); if (dd !== null) row.d = dd; clogRows.push(row); }
+      if (t.del === 1 && o.del !== 1) clogRows.push({ id: t.id, f: 'del', from: '', to: '1', why: 'edit', p: p, by: c.member.id });
+    });
+    if (clogRows.length) { try { await apprClogAppend(store(DATA), clogRows, Date.now()); } catch (e) {} }
     const blankBeforeS = {}; doc.items.forEach(function (t) { if (t && t.auto_key && !t.who_id) blankBeforeS[t.id] = 1; });
     try { const at = await assignRead(store(DATA)); if (Object.keys(at.rules || {}).length) { const ms = await assignMembers(); if (ms) assignFill(doc.items, at.rules, assignNames(ms)); } } catch (e) {}
     // v396 알림: 클라 생성기(runAutoTaskGen·recOverdueGen·runBidQualGen)가 만든 새 자동 지시 + 이번에 채워진 공란 → 담당자 본인 1발(설정 assignee일 때만)
@@ -1406,6 +1420,43 @@ async function handleApprGradesSet(event, d, R) {
   try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'approvals', ev: [{ op: '등급변경', id: kind, t: kind + ' ' + before + '→' + grade + (grade === 0 ? '(현행)' : '') }] }); } catch (e) {}
   return jr(200, { status: 'OK', grades: Object.assign({}, APPR_GRADE_DEFAULTS, stored), updated_at: doc.updated_at, request_id: R });
 }
+// ---- v413 결재 학습 신호 clog:appr → lessons:appr (C2-1) ----
+// clog 행 추가(해시 체인, 월 키) 뒤 그 달 행 전체를 집계해 lessons:appr를 다시 쓴다(모델 없음). 실패해도 지시 저장은 영향 없음.
+const APPR_LESSONS_KEY = 'lessons:appr';
+async function apprClogAppend(st, rows, nowMs) {
+  const ym = new Date(nowMs + 9 * 3600000).toISOString().slice(0, 7);
+  const ck = 'clog:appr:' + ym; const cr = await blobGet(st, ck);
+  let cd = (cr.ok && cr.data && Array.isArray(cr.data.items)) ? cr.data : null;
+  rows.forEach(function (r) { cd = DONEIF.clogAppend(cd, Object.assign({ ts: nowMs }, r)); });
+  const w = await blobSet(st, ck, cd); if (!w.ok) return { ok: false, code: w.code };
+  const L = AL.tally(cd.items, ym); L.updated_at = nowMs;
+  await blobSet(st, APPR_LESSONS_KEY, L);
+  return { ok: true, lessons: L };
+}
+async function apprLessonsRead(st) { try { const r = await blobGet(st, APPR_LESSONS_KEY); if (r.ok && r.data && r.data.prefixes) return r.data; } catch (e) {} return null; }
+// [내 것 아님](담당자 본인, 자동 지시만): 담당 비움 + who_by 'notmine' + 배지. PM 1줄 아님 — 배정표 delta로 집계(설계 A5). 수동 지시는 지시자에게(NOT_AUTO).
+async function handleTaskNotmine(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  const id = String(d.id || '').slice(0, 60); if (!id) return jr(400, { status: 'REJECTED', error_code: 'BAD_ID', request_id: R });
+  const st = store(DATA); const r = await blobGet(st, colKey('tasks'));
+  const doc = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data : null;
+  const t = doc ? doc.items.find(function (x) { return x && x.id === id && x.del !== 1; }) : null;
+  if (!t) return jr(404, { status: 'NOT_FOUND', error_code: 'NO_TASK', request_id: R });
+  if (!t.auto_key) return jr(400, { status: 'REJECTED', error_code: 'NOT_AUTO', request_id: R });
+  if (t.status === 'done') return jr(400, { status: 'REJECTED', error_code: 'TASK_DONE', request_id: R });
+  if (!t.who_id || t.who_id !== c.member.id) return jr(403, { status: 'FORBIDDEN', error_code: 'NOT_ASSIGNEE', request_id: R });
+  const now = Date.now(); const today = new Date(now + 9 * 3600000).toISOString().slice(0, 10); const prev = t.who_id;
+  t.who_id = ''; t.who = ''; t.who_by = 'notmine'; t.notmine = { by: c.member.id, ts: now, prev: prev }; t.updated = today;
+  doc.updated_by = c.member.id; doc.updated_at = now;
+  const w = await blobSet(st, colKey('tasks'), doc);
+  if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
+  const p = AL.prefixOf(t.auto_key); let L = null;
+  try { const cl = await apprClogAppend(st, [{ id: t.id, f: 'who_id', from: 'set', to: '', why: 'notmine', p: p, by: c.member.id }], now); if (cl.ok) L = cl.lessons; } catch (e) {}
+  try { await appendAudit({ ts: now, by: c.member.name, bid: c.member.id, col: 'tasks', ev: [{ op: '내것아님', id: t.id, t: String(t.title || '').slice(0, 80) }] }); } catch (e) {}
+  const px = (L && L.prefixes && L.prefixes[p]) ? L.prefixes[p] : null;
+  return jr(200, { status: 'OK', updated_at: doc.updated_at, task: { id: t.id, who_id: '', who: '', who_by: 'notmine', notmine: t.notmine, updated: today }, signal: px ? { prefix: p, notmine: px.notmine, who_n: px.notmine_who_n, recard: px.recard } : null, request_id: R });
+}
 // ---- 배정표 settings:assign (v395 — 공통 기반 1 첫 시범. 업무별 최적화 설계 3-14 appr A1 · 착수 브리핑 A2) ----
 // 자동 지시(auto_key 접두어 veh:·lic:·cert:·rec:·bid:) → 담당 who_id. 기본표 = 빈 표: 배정 없는 접두어는 '담당 없음' 배지(관리자 폴백 금지).
 // 서버가 채운 담당은 who_by='assign' — 클라 사본이 공란으로 올려도 handleSave가 이월한다(기반 9). 사람이 지정한 who_id는 건드리지 않는다.
@@ -1427,6 +1478,7 @@ function assignFill(items, rules, names) {   // 공란(who_id '')인 자동 지�
   (items || []).forEach(function (t) {
     if (!t || !t.auto_key || t.who_id || t.del === 1 || t.status === 'done') return;
     const r = assignFor(t.auto_key, rules); if (!r || !r.who_id) return;
+    if (t.who_by === 'notmine' && t.notmine && r.who_id === t.notmine.prev) return;   // v413 [내 것 아님]은 같은 사람으로 되채우지 않음(배정표가 바뀌면 채움)
     t.who_id = r.who_id; t.who = names[r.who_id] || t.who || ''; t.who_by = 'assign'; n++;
   });
   return n;
@@ -1440,7 +1492,8 @@ async function handleAssignGet(event, d, R) {
   if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
   if (!c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
   const a = await assignRead(store(DATA));
-  return jr(200, { status: 'OK', rules: a.rules, approver_id: a.approver_id || '', prefixes: ASSIGN_PREFIXES,
+  const ls = await apprLessonsRead(store(DATA));   // v413 이달 delta(내 것 아님·담당/기한 변경·재카드 신호)
+  return jr(200, { status: 'OK', rules: a.rules, approver_id: a.approver_id || '', prefixes: ASSIGN_PREFIXES, lessons: ls ? { ym: ls.ym, prefixes: ls.prefixes, rules: ls.rules } : null,
     prev: a.prev ? { updated_at: a.prev.updated_at || 0, updated_by: a.prev.updated_by || '' } : null,
     updated_at: a.updated_at || 0, updated_by: a.updated_by || '', request_id: R });
 }
@@ -3583,6 +3636,7 @@ async function handlerInner(event) {
     if (d && d.action === 'appr_grades_get') return await handleApprGradesGet(event, d, R);
     if (d && d.action === 'appr_grades_set') return await handleApprGradesSet(event, d, R);
     if (d && d.action === 'assign_get') return await handleAssignGet(event, d, R);
+    if (d && d.action === 'task_notmine') return await handleTaskNotmine(event, d, R);   // v413 [내 것 아님](담당자)
     if (d && d.action === 'assign_set') return await handleAssignSet(event, d, R);
     if (d && d.action === 'assign_revert') return await handleAssignRevert(event, d, R);
     if (d && d.action === 'notify_get') return await handleNotifyGet(event, d, R);

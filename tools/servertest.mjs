@@ -3818,4 +3818,69 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   delete mem.gw_data['lessons:contract:asb_plan']; delete mem.gw_data['lessons:contract:demo_report']; delete mem.gw_data['learn:contract:sunset']; delete mem.gw_data['learn:contract:in:lc_aaaaaaaa0061']; delete mem.gw_data['learn:contract:in:lc_aaaaaaaa0062']; delete mem.gw_users['member:ucon61'];
 }
 
+{ // ---- 62(v413) 결재 C2-1 — [내 것 아님] task_notmine · clog:appr 학습 신호 · lessons:appr 집계(모델 없음) · save 보호 ----
+  const AL = require(join(FN, '_lib/apprlearn.js'));
+  // 순수 집계
+  const rows62 = [
+    { f: 'who_id', why: 'notmine', p: 'veh:', by: 'u1' }, { f: 'who_id', why: 'notmine', p: 'veh:', by: 'u1' }, { f: 'who_id', why: 'notmine', p: 'veh:', by: 'u1' },
+    { f: 'who_id', why: 'notmine', p: 'lic:', by: 'u1' }, { f: 'who_id', why: 'notmine', p: 'lic:', by: 'u2' },
+    { f: 'who_id', why: 'notmine', p: 'rec:', by: 'u1' }, { f: 'who_id', why: 'edit', p: 'rec:', by: 'ua' },
+    { f: 'due', why: 'edit', p: 'cert:', d: 7, by: 'ua' }, { f: 'due', why: 'edit', p: 'cert:', d: 30, by: 'ua' }, { f: 'due', why: 'edit', p: 'cert:', d: 10, by: 'ua' }, { f: 'due', why: 'edit', p: 'cert:', by: 'ua' },
+    { f: 'del', why: 'edit', p: 'bid:', by: 'ua' }, { f: 'status', why: 'data:x', by: '앱 기준' }, null,
+  ];
+  const L62 = AL.tally(rows62, '2026-11');
+  T('62 tally: veh 3건 1인=재카드 · lic 2건 2인=재카드 · rec 1건+담당 변경 1=재카드 아님 · cert 기한 변경 4(일수 3건, 중앙값 10)=리드 규칙 · bid 삭제 1 · p 없는 행 무시 · 규칙 3',
+    L62.prefixes['veh:'].notmine === 3 && L62.prefixes['veh:'].notmine_who_n === 1 && L62.prefixes['veh:'].recard === true && L62.prefixes['lic:'].recard === true && L62.prefixes['lic:'].notmine_who_n === 2
+    && L62.prefixes['rec:'].recard === false && L62.prefixes['rec:'].who_edit === 1 && L62.prefixes['cert:'].due_edit === 4 && L62.prefixes['cert:'].due_med === 10 && L62.prefixes['bid:'].del === 1 && !L62.prefixes[''] && L62.rules.length === 3
+    && L62.rules.map((r) => r.id).join() === 'recard:lic::2026-11,recard:veh::2026-11,lead:cert::2026-11' && /R1 재카드/.test(L62.rules[0].text) && /\+10일/.test(L62.rules[2].text) && !('_who' in L62.prefixes['veh:']) && !('_days' in L62.prefixes['cert:']), JSON.stringify(L62).slice(0, 300));
+  T('62 prefixOf·dayDiff', AL.prefixOf('veh:12:ins:2026-11-30') === 'veh:' && AL.prefixOf('nocolon') === '' && AL.dayDiff('2026-11-01', '2026-11-08') === 7 && AL.dayDiff('2026-11-08', '2026-11-01') === -7 && AL.dayDiff('', '2026-11-01') === null, '');
+  // e2e — 직원 uwork가 담당인 자동 지시 3건 + 수동 지시 1건 + 타인 담당 1건
+  const W2 = { id: 'uwork2', name: '직원2', admin: false, perms: { tasks: 'do' } }; mem.gw_users['member:uwork2'] = W2; const tokW2 = issueSession(W2).token;
+  const mk62 = (id, key, who, extra) => Object.assign({ id: id, title: '지시 ' + id, auto_key: key, who_id: who, who: who ? '직원' : '', who_by: who ? 'assign' : '', status: 'open', from: '자동', due: '2026-11-30', created: '2026-11-01' }, extra || {});
+  mem.gw_data['col:tasks'] = { schema: 1, items: [mk62('t62a', 'veh:1:ins:2026-11-30', 'uwork'), mk62('t62b', 'veh:2:ins:2026-11-30', 'uwork'), mk62('t62c', 'veh:3:ins:2026-11-30', 'uwork'), mk62('t62m', '', 'uwork'), mk62('t62o', 'lic:9:exp:2026-12-01', 'uwork2'), mk62('t62d', 'veh:4:ins:2026-11-30', 'uwork', { status: 'done' })], updated_at: 1000 };
+  const ym62 = new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 7);
+  delete mem.gw_data['clog:appr:' + ym62]; delete mem.gw_data['lessons:appr'];
+  mem.gw_data['settings:assign'] = { schema: 1, rules: { 'veh:': { who_id: 'uwork' } }, approver_id: '', prev: null, updated_at: 5, updated_by: 'uadmin' };   // 배정표 veh:→uwork(되채움 시험)
+  let r62 = await call({ action: 'task_notmine', id: 't62m' }, tokW, 'dev1'); const n1 = r62.code === 400 && r62.body.error_code === 'NOT_AUTO';
+  r62 = await call({ action: 'task_notmine', id: 't62o' }, tokW, 'dev1'); const n2 = r62.code === 403 && r62.body.error_code === 'NOT_ASSIGNEE';
+  r62 = await call({ action: 'task_notmine', id: 't62a' }, tokA, 'dev1'); const n3 = r62.code === 403;   // 관리자여도 담당 본인이 아니면 안 됨(관리자는 [수정])
+  r62 = await call({ action: 'task_notmine', id: 't62d' }, tokW, 'dev1'); const n4 = r62.code === 400 && r62.body.error_code === 'TASK_DONE';
+  r62 = await call({ action: 'task_notmine', id: 'none' }, tokW, 'dev1'); const n5 = r62.code === 404;
+  const auditN62 = auditMock.logs.length;
+  r62 = await call({ action: 'task_notmine', id: 't62a' }, tokW, 'dev1');
+  const ta = mem.gw_data['col:tasks'].items.find((x) => x.id === 't62a'); const cl1 = mem.gw_data['clog:appr:' + ym62];
+  const n6 = r62.code === 200 && r62.body.task.who_id === '' && r62.body.task.who_by === 'notmine' && ta.who_id === '' && ta.who_by === 'notmine' && ta.notmine.prev === 'uwork' && ta.notmine.by === 'uwork' && r62.body.updated_at > 1000
+    && cl1 && cl1.items.length === 1 && cl1.items[0].f === 'who_id' && cl1.items[0].why === 'notmine' && cl1.items[0].p === 'veh:' && cl1.items[0].to === '' && cl1.items[0].h && cl1.head === cl1.items[0].h && JSON.stringify(cl1).indexOf('직원') < 0
+    && r62.body.signal && r62.body.signal.notmine === 1 && r62.body.signal.recard === false && auditMock.logs.length === auditN62 + 1 && auditMock.logs[auditN62].ev[0].op === '내것아님';
+  r62 = await call({ action: 'task_notmine', id: 't62a' }, tokW, 'dev1'); const n7 = r62.code === 403;   // 이미 비워져 본인 아님
+  T('62 task_notmine: 수동 NOT_AUTO · 타인 NOT_ASSIGNEE · 관리자도 본인 아니면 403 · 완료 TASK_DONE · 없음 404 · 성공=담당 비움+notmine{prev,by}+clog 1행(값 없음·해시)+신호 1건+감사 내것아님 · 재요청 403',
+    n1 && n2 && n3 && n4 && n5 && n6 && n7, JSON.stringify([n1, n2, n3, n4, n5, n6, n7, r62.code, cl1 && cl1.items[0]]));
+  // 월 3건째 → recard · lessons:appr · assign_get lessons
+  await call({ action: 'task_notmine', id: 't62b' }, tokW, 'dev1');
+  r62 = await call({ action: 'task_notmine', id: 't62c' }, tokW, 'dev1');
+  const LA62 = mem.gw_data['lessons:appr'];
+  const g62 = await call({ action: 'assign_get' }, tokA);
+  T('62 월 3건째: signal.recard true · lessons:appr veh 3건 1인 recard·규칙 1(R1 재카드) · assign_get lessons 동봉',
+    r62.code === 200 && r62.body.signal.recard === true && r62.body.signal.notmine === 3 && LA62 && LA62.ym === ym62 && LA62.prefixes['veh:'].notmine === 3 && LA62.prefixes['veh:'].recard === true && LA62.rules.length === 1 && /veh: 접두어 \[내 것 아님\]/.test(LA62.rules[0].text)
+    && g62.code === 200 && g62.body.lessons && g62.body.lessons.prefixes['veh:'].recard === true && g62.body.lessons.rules.length === 1, JSON.stringify([r62.body.signal, LA62 && LA62.rules]));
+  // save 보호: 낡은 사본이 t62a를 다시 uwork로 올림 → 비운 채 유지 · 관리자 모달 재지정(who_by edit) → 통과 + clog who_id edit 행 · 기한 변경 d · 삭제
+  const cur62 = mem.gw_data['col:tasks']; const base62 = cur62.updated_at;
+  const stale = JSON.parse(JSON.stringify(cur62.items)).map((t) => { if (t.id === 't62a') { t.who_id = 'uwork'; t.who = '직원'; t.who_by = 'assign'; } return t; });
+  r62 = await call({ action: 'save', collection: 'tasks', base: base62, doc: { schema: 1, items: stale } }, tokA);
+  const ta2 = mem.gw_data['col:tasks'].items.find((x) => x.id === 't62a'); const clN = mem.gw_data['clog:appr:' + ym62].items.length;
+  const tc2 = mem.gw_data['col:tasks'].items.find((x) => x.id === 't62c');
+  const s1 = r62.code === 200 && ta2.who_id === '' && ta2.who_by === 'notmine' && ta2.notmine.prev === 'uwork' && tc2.who_id === '' && clN === 3;   // 보호는 clog 행을 만들지 않고, 배정표(veh:→uwork)도 같은 사람으로 되채우지 않는다
+  await call({ action: 'assign_set', prefix: 'veh:', who_id: 'uwork2' }, tokA);   // 배정표가 다른 사람으로 바뀌면 비운 지시를 채운다
+  const b2 = mem.gw_data['col:tasks'].updated_at;
+  const edited = JSON.parse(JSON.stringify(mem.gw_data['col:tasks'].items)).map((t) => { if (t.id === 't62a') { t.who_id = 'uwork'; t.who = '직원'; t.who_by = 'edit'; } if (t.id === 't62o') { t.due = '2026-12-08'; } if (t.id === 't62b') { t.del = 1; } return t; });
+  r62 = await call({ action: 'save', collection: 'tasks', base: b2, doc: { schema: 1, items: edited } }, tokA);
+  const ta3 = mem.gw_data['col:tasks'].items.find((x) => x.id === 't62a'); const tc3 = mem.gw_data['col:tasks'].items.find((x) => x.id === 't62c'); const cl3 = mem.gw_data['clog:appr:' + ym62].items.slice(3); const LA3 = mem.gw_data['lessons:appr'];
+  const s2 = r62.code === 200 && ta3.who_id === 'uwork' && ta3.who_by === 'edit' && tc3.who_id === 'uwork2' && tc3.who_by === 'assign' && cl3.length === 3
+    && cl3.some((r) => r.id === 't62a' && r.f === 'who_id' && r.why === 'edit' && r.from === '' && r.to === 'set' && r.p === 'veh:' && r.by === 'uadmin')
+    && cl3.some((r) => r.id === 't62o' && r.f === 'due' && r.d === 8 && r.p === 'lic:') && cl3.some((r) => r.id === 't62b' && r.f === 'del' && r.to === '1')
+    && LA3.prefixes['veh:'].who_edit === 1 && LA3.prefixes['veh:'].del === 1 && LA3.prefixes['lic:'].due_edit === 1 && LA3.prefixes['lic:'].due_med === 8 && JSON.stringify(mem.gw_data['clog:appr:' + ym62]).indexOf('2026-12-08') < 0;
+  T('62 save 보호·신호: 낡은 사본 재배정 → 비운 채(clog 행 없음·배정표 같은 사람 되채움 없음) · 배정표가 다른 사람이면 채움 · 관리자 edit 재지정 통과+clog who_id edit · 기한 변경 d=8(날짜 값 미기록) · 삭제 del 행 · lessons 재집계', s1 && s2, JSON.stringify([s1, s2, r62.code, cl3, ta3.who_by, tc3 && tc3.who_id]));
+  delete mem.gw_data['col:tasks']; delete mem.gw_data['clog:appr:' + ym62]; delete mem.gw_data['lessons:appr']; delete mem.gw_users['member:uwork2']; delete mem.gw_data['settings:assign'];
+}
+
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);
