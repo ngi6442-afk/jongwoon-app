@@ -140,6 +140,8 @@ exports.handler = async function (event) {
   // ④ v389 자동 학습 — 로컬 수집기·카드가 올린 짝(직원 최종본)을 1건씩 학습 워커에 넘긴다(전역 잠금 5분, 실패 10분 뒤 재시도 3회). 모자이크(③)·생성(②)과 독립.
   let learn = null;
   try { learn = await kickLearn(st, now); } catch (e) { learn = { error: (e && e.message) || 'ERR' }; }
+  // v411 계약 D4 — 블로그 짝을 기동하지 않은 회차에만 계약 서류 짝을 교대로 1건(10분 크론 신설 금지 규칙, netlify.toml). 잠금·재시도 규칙은 블로그와 같다.
+  if (!learn || !learn.started) { try { learn = Object.assign({}, learn || {}, { contract: await kickLearnContract(st, now) }); } catch (e) { learn = Object.assign({}, learn || {}, { contract: { error: (e && e.message) || 'ERR' } }); } }
   const out = { ok: true, at: new Date(now).toISOString(), applied: ap.applied, scanned: ap.scanned, candidates: cand0.length, started: started, failed: failed, remask: remask, learn: learn };
   console.log('[사진AI 크론] ' + JSON.stringify(out));
   return { statusCode: 200, body: JSON.stringify(out) };
@@ -166,3 +168,24 @@ async function kickLearn(st, now) {
   return { pending: cand.length, scanned: pairs.length, started: k.ok ? p.id : '', code: k.ok ? '' : String(k.code || '') };
 }
 exports.kickLearn = kickLearn;
+// v411 계약 서류 짝 기동 — learn:contract:in:* 중 pending(허용 사전 있는 양식만 pending이 된다)·죽은 running·재시도 fail 1건 → gw-learn-background
+async function kickLearnContract(st, now) {
+  const { blobSet } = require('./_lib/blobs');
+  const LN = require('./_lib/learn'); const T = LN.TYPES.contract;
+  const lk = await blobGet(st, T.lock_key);
+  if (lk.ok && lk.data && Number(lk.data.ts) && now - Number(lk.data.ts) < LN.LOCK_TTL_MS) return { skipped: 'running', pair: String(lk.data.pair || '') };
+  const l = await blobList(st, T.pair_prefix);
+  if (!l.ok) return { error: l.code || 'LIST_FAILED' };
+  const keys = (l.keys || []).filter(function (k) { return k.indexOf(T.pair_prefix) === 0; }).sort().slice(-LEARN_SCAN);
+  const pairs = [];
+  for (const k of keys) { const r = await blobGet(st, k); if (r.ok && r.data && typeof r.data === 'object') pairs.push(r.data); }
+  const cand = LN.pickPending(pairs, now, T.pair_re, 'cid');
+  if (!cand.length) return { pending: 0, scanned: pairs.length };
+  const p = cand[0];
+  p.status = 'running'; p.tries = (Number(p.tries) || 0) + 1; p.ts = now;
+  await blobSet(st, LN.pairKey('contract', p.id), p);
+  const k = await LN.kickWorker('gw-learn-background', { pair_id: p.id });
+  if (!k.ok) { p.status = 'fail'; p.code = String(k.code || 'KICKOFF_FAILED'); await blobSet(st, LN.pairKey('contract', p.id), p); }
+  return { pending: cand.length, scanned: pairs.length, started: k.ok ? p.id : '', code: k.ok ? '' : String(k.code || '') };
+}
+exports.kickLearnContract = kickLearnContract;

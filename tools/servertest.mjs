@@ -3685,4 +3685,81 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   Object.keys(mem.gw_data).filter((k) => k.indexOf('learn:contract:in:') === 0).forEach((k) => delete mem.gw_data[k]); Object.keys(mem.gw_files).filter((k) => k.indexOf('cdoc:c59') === 0).forEach((k) => delete mem.gw_files[k]);
 }
 
+{ // ---- 60(v411) 계약 D4 3일차 — 학습 워커(허용 칸만 값 노출·LEAK_BLOCKED·월 상한·규칙 병합) · 크론 ④ 교대 기동 · 생성 주입 learn_defaults_get · piiScan·cellRows·fieldDefaults ----
+  const LN = require(join(FN, '_lib/learn.js')), DD = require(join(FN, '_lib/docdiff.js'));
+  T('60 piiScan: 주민번호·휴대전화·계좌(마지막 5자리↑)·4묶음 차단 · 날짜 YYYY-MM-DD·금액·면적은 통과',
+    !LN.piiScan('900101-1234567').ok && !LN.piiScan('010-1234-5678').ok && !LN.piiScan('123-456-789012').ok && !LN.piiScan('1002-123-45-6789').ok && LN.piiScan('계약일 2026-11-01 금액 12,500,000원 면적 45.75').ok, '');
+  const fd = LN.fieldDefaults({ rules: [{ id: 'r1', text: 'A34는 현장명', scope: 'field_default', field: 'A34', value: '포항 현장', n: 2 }, { id: 'r2', text: 'C7', scope: 'field_default', field: 'C7', value: 'x', n: 1 }, { id: 'r3', text: 'H8', scope: 'field_default', field: 'H8', value: 'y', n: 3 }] }, ['A34', 'C7']);
+  T('60 fieldDefaults: 허용 칸·근거 2건↑·값 있는 field_default만 → {A34} (C7은 n 1, H8은 허용 밖)', Object.keys(fd).join() === 'A34' && fd.A34 === '포항 현장', JSON.stringify(fd));
+  // 고정값(절 59와 같은 zip 작성기)
+  const crcT = (() => { const t = new Int32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1); t[n] = c; } return t; })();
+  const crc32 = (b) => { let c = -1; for (let i = 0; i < b.length; i++) c = crcT[(c ^ b[i]) & 0xFF] ^ (c >>> 8); return (c ^ -1) >>> 0; };
+  const mkZip = (entries) => { const locals = [], cds = []; let off = 0; for (const [name, text] of entries) { const nb = Buffer.from(name), db = Buffer.from(text), crc = crc32(db); const lh = Buffer.alloc(30); lh.writeUInt32LE(0x04034b50, 0); lh.writeUInt16LE(20, 4); lh.writeUInt16LE(0, 6); lh.writeUInt16LE(0, 8); lh.writeUInt32LE(0, 10); lh.writeUInt32LE(crc, 14); lh.writeUInt32LE(db.length, 18); lh.writeUInt32LE(db.length, 22); lh.writeUInt16LE(nb.length, 26); lh.writeUInt16LE(0, 28); const cd = Buffer.alloc(46); cd.writeUInt32LE(0x02014b50, 0); cd.writeUInt16LE(20, 4); cd.writeUInt16LE(20, 6); cd.writeUInt16LE(0, 8); cd.writeUInt16LE(0, 10); cd.writeUInt32LE(0, 12); cd.writeUInt32LE(crc, 16); cd.writeUInt32LE(db.length, 20); cd.writeUInt32LE(db.length, 24); cd.writeUInt16LE(nb.length, 28); cd.writeUInt16LE(0, 30); cd.writeUInt16LE(0, 32); cd.writeUInt16LE(0, 34); cd.writeUInt16LE(0, 36); cd.writeUInt32LE(0, 38); cd.writeUInt32LE(off, 42); locals.push(lh, nb, db); cds.push(cd, nb); off += 30 + nb.length + db.length; } const cdb = Buffer.concat(cds), eocd = Buffer.alloc(22); eocd.writeUInt32LE(0x06054b50, 0); eocd.writeUInt16LE(entries.length, 8); eocd.writeUInt16LE(entries.length, 10); eocd.writeUInt32LE(cdb.length, 12); eocd.writeUInt32LE(off, 16); return Buffer.concat([...locals, cdb, eocd]); };
+  const xlsx2 = (s1, s2) => mkZip([['[Content_Types].xml', '<Types/>'], ['xl/workbook.xml', '<workbook><sheets><sheet name="1.공사개요" sheetId="1" r:id="rId1"/><sheet name="3" sheetId="2" r:id="rId2"/></sheets></workbook>'], ['xl/_rels/workbook.xml.rels', '<Relationships><Relationship Id="rId1" Type="ws" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="ws" Target="worksheets/sheet2.xml"/></Relationships>'], ['xl/worksheets/sheet1.xml', '<worksheet><sheetData><row r="1">' + s1 + '</row></sheetData></worksheet>'], ['xl/worksheets/sheet2.xml', '<worksheet><sheetData><row r="1">' + s2 + '</row></sheetData></worksheet>']]);
+  const is = (r, v) => '<c r="' + r + '" t="inlineStr"><is><t xml:space="preserve">' + v + '</t></is></c>';
+  const FINAL60 = xlsx2(is('C7', '시험 공사') + is('C10', '포항 현장') + is('A34', '다른 현장') + '<c r="E34"><v>12.5</v></c>' + is('H8', '손으로 채운 값'), is('E70', '홍길동') + is('K99', '비고'));
+  const EDITS60 = [['C7', '시험 공사', 's'], ['C10', '포항 현장', 's'], ['A34', '포항 현장', 's'], ['E34', 12.5, 'n'], ['H8', '', 'b'], ['3!E70', '', 'b'], ['3!K99', '', 'b'], ['__drop_drawings__', 1, 's']];
+  const cr = DD.cellRows(EDITS60, FINAL60, ['C7', 'H8', '3!K99']);
+  T('60 cellRows(다중 시트): 허용 칸 3만 값(visible) · 허용 밖은 바뀜 좌표만(A34·3!E70, 값 없음) · 특수 항목 무시 · 안 바뀐 수 2(C10·E34)',
+    cr.ok && cr.rows.length === 3 && cr.rows.map((r) => r.ref).join() === 'C7,H8,3!K99' && cr.hidden_changed.join() === 'A34,3!E70' && cr.hidden_same_n === 2 && JSON.stringify(cr).indexOf('홍길동') < 0 && JSON.stringify(cr).indexOf('다른 현장') < 0, JSON.stringify(cr));
+  const dx2 = DD.xlsxCellDiff(EDITS60, FINAL60);
+  T('60 xlsxCellDiff 다중 시트: 3!E70·3!K99 비교(바뀜 2) · 시트 없는 좌표는 비교 불가', dx2.compared === 7 && dx2.changed === 4 && dx2.refs_changed.join() === 'A34,H8,3!E70,3!K99' && DD.xlsxCellDiff([['없는시트!A1', 'x', 's']], FINAL60).uncomparable === 1, JSON.stringify(dx2));
+  // ---- 워커 e2e ----
+  const CONW0 = { id: 'uconw0', name: '공무직원0', admin: false, perms: { con: 'do' }, dept: '운영부' }; mem.gw_users['member:uconw0'] = CONW0; const tok0 = issueSession(CONW0).token;
+  mem.gw_data['col:contracts'] = { schema: 1, items: [{ id: 'c60', title: '학습 계약', scen: 'asbestos:pub', stages: [], bid_id: 'R26BK0000' }], updated_at: 1 };
+  mem.gw_data['map:contract:v1'] = { schema: 1, scen: { 'asbestos:pub': [{ i: 2, name: '노동부 신고', co: 'con' }] } };
+  mem.gw_files = mem.gw_files || {};
+  const b60 = (x) => Buffer.from(x).toString('base64');
+  let r60 = await call({ action: 'learn_settings_set', on: true, allow: { asb_plan: ['C7', 'H8', '3!K99'] } }, tokA, 'dev1'); const w0 = r60.code === 200;
+  r60 = await call({ action: 'cdoc_put', cid: 'c60', i: 2, doc_key: 'gen.asb_plan', kind: 'draft', pii: 1, fill: { tpl: 'asb_plan', at: '2026-11-01', edits: EDITS60 } }, tok0, 'dev1');
+  r60 = await call({ action: 'cdoc_put', cid: 'c60', i: 2, doc_key: 'main.작성-0', kind: 'final', name: '석면해체계획서.xlsx', data: b60(FINAL60), pii: 1 }, tok0, 'dev1');
+  const pid60 = r60.body.learn && r60.body.learn.id; const w1 = r60.code === 200 && r60.body.learn.status === 'pending';
+  const worker60 = require(join(FN, 'gw-learn-background.js'));
+  const savedKey60 = process.env.GW_ANTHROPIC_KEY, savedUrl60 = process.env.URL, realFetch60 = global.fetch;
+  process.env.GW_ANTHROPIC_KEY = 'test-anthropic-key-0000'; process.env.URL = 'https://test.local';
+  const api60 = [];
+  global.fetch = async (url, opt) => {
+    const b = JSON.parse(opt.body || '{}'); api60.push({ url: String(url), user: ((b.messages && b.messages[0] && b.messages[0].content[0].text) || ''), body: b });
+    const text = JSON.stringify({ summary: 'H8은 매번 같은 값으로 채워졌다', changes: [{ kind: 'field_default', what: 'H8 기본값' }], rules: [{ text: 'H8 칸은 처음부터 "손으로 채운 값"으로 채운다', scope: 'field_default', n: 2, keep_id: '', field: 'H8', value: '손으로 채운 값' }, { text: 'E34 칸은 직원이 자주 고친다', scope: 'content', n: 1, keep_id: '', field: '', value: '' }, { text: '전화 010-1111-2222로 연락', scope: 'content', n: 1, keep_id: '', field: '', value: '' }, { text: 'A34에 값을 넣는다', scope: 'field_default', n: 2, keep_id: '', field: 'A34', value: '추측값' }] });
+    return { ok: true, status: 200, text: async () => JSON.stringify({ model: b.model, stop_reason: 'end_turn', usage: { input_tokens: 500, output_tokens: 80 }, content: [{ type: 'text', text: text }] }) };
+  };
+  const tokIn60 = issueSession({ id: '__promoai__', role: 'system' }).token;
+  const ev60 = (body, tok) => ({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + tok }, body: JSON.stringify(body) });
+  await worker60.handler(ev60({ pair_id: pid60 }, tokA), {}); const w2 = mem.gw_data['learn:contract:in:' + pid60].status === 'pending' && api60.length === 0;
+  await worker60.handler(ev60({ pair_id: pid60 }, tokIn60), {});
+  const P60 = mem.gw_data['learn:contract:in:' + pid60], L60 = mem.gw_data['lessons:contract:asb_plan'], U60 = mem.gw_data['usage:learn:contract:' + LN.ymOf(Date.now())];
+  const u = api60.length === 1 ? api60[0].user : '';
+  const w3 = P60.status === 'done' && P60.rules_n === 2 && P60.visible_n === 3 && P60.hidden_changed_n === 2 && u.indexOf('손으로 채운 값') > 0 && u.indexOf('시험 공사') > 0 && u.indexOf('홍길동') < 0 && u.indexOf('다른 현장') < 0 && u.indexOf('12.5') < 0 && /바뀐 칸: A34, 3!E70/.test(u);
+  const w4 = L60 && L60.rules.length === 2 && L60.rules.some((r) => r.scope === 'field_default' && r.field === 'H8' && r.value === '손으로 채운 값' && r.n === 2) && !L60.rules.some((r) => /010-1111/.test(r.text)) && !L60.rules.some((r) => r.field === 'A34') && L60.stats.calls === 1 && U60 && U60.calls === 1 && U60.tokens === 580;
+  T('60 학습 워커: 사용자 토큰 거부 · 허용 칸(C7·H8·3!K99)만 값이 프롬프트에, 허용 밖은 좌표만(이름·숫자 미노출) · 결과 재검사(전화번호 규칙 버림·허용 밖 칸 field_default 버림 → 모델 규칙 4 중 2) · lessons 규칙 2·calls 1 · usage 1회 580토큰', w0 && w1 && w2 && w3 && w4, JSON.stringify([w0, w1, w2, w3, w4, P60.status, P60.code, L60 && L60.rules.map((r) => r.field || r.scope)]));
+  // 생성 주입 — 허용 칸 H8 근거 2 → defaults {H8} · 스위치 끄면 {}
+  r60 = await call({ action: 'learn_defaults_get', tpl: 'asb_plan' }, tok0, 'dev1'); const i1 = r60.code === 200 && r60.body.on && r60.body.defaults.H8 === '손으로 채운 값' && Object.keys(r60.body.defaults).length === 1;
+  r60 = await call({ action: 'learn_settings_set', on: false }, tokA, 'dev1');
+  r60 = await call({ action: 'learn_defaults_get', tpl: 'asb_plan' }, tok0, 'dev1'); const i2 = r60.code === 200 && r60.body.on === false && Object.keys(r60.body.defaults).length === 0;
+  r60 = await call({ action: 'learn_settings_set', on: true }, tokA, 'dev1');
+  T('60 생성 주입 learn_defaults_get: 허용 칸·근거 2건 → {H8} · 스위치 끄면 {} (앱은 공란 칸에만 넣고 fill.learned에 기록)', i1 && i2, JSON.stringify([i1, i2]));
+  // LEAK_BLOCKED — 허용 칸에 전화번호 · 월 상한 hold
+  const FINAL61 = xlsx2(is('C7', '시험 공사') + is('H8', '담당 010-9999-8888'), '');
+  r60 = await call({ action: 'cdoc_put', cid: 'c60', i: 2, doc_key: 'main.작성-0', kind: 'final', name: '석면해체계획서b.xlsx', data: b60(FINAL61), pii: 1, allow_dup: true }, tok0, 'dev1'); const pid61 = r60.body.learn.id;
+  await worker60.handler(ev60({ pair_id: pid61 }, tokIn60), {}); const k1 = mem.gw_data['learn:contract:in:' + pid61].status === 'fail' && mem.gw_data['learn:contract:in:' + pid61].code === 'LEAK_BLOCKED' && api60.length === 1;
+  mem.gw_data['usage:learn:contract:' + LN.ymOf(Date.now())] = { ym: LN.ymOf(Date.now()), calls: 200, tokens: 1 };
+  r60 = await call({ action: 'cdoc_put', cid: 'c60', i: 2, doc_key: 'main.작성-0', kind: 'final', name: '석면해체계획서c.xlsx', data: b60(FINAL60), pii: 1, allow_dup: true }, tok0, 'dev1'); const pid62 = r60.body.learn.id;
+  await worker60.handler(ev60({ pair_id: pid62 }, tokIn60), {}); const k2 = mem.gw_data['learn:contract:in:' + pid62].status === 'hold' && mem.gw_data['learn:contract:in:' + pid62].code === 'USAGE_CAP' && api60.length === 1;
+  delete mem.gw_data['usage:learn:contract:' + LN.ymOf(Date.now())];
+  T('60 차단: 허용 칸에 전화번호 → LEAK_BLOCKED(호출 0) · 월 상한 200 도달 → hold USAGE_CAP(호출 0)', k1 && k2, JSON.stringify([k1, k2]));
+  // 크론 ④ 교대 — 블로그 짝 없음 → 계약 pending 1건 기동(URL gw-learn-background)
+  const cron60 = require(join(FN, 'gw-promo-ai-cron.js'));
+  mem.gw_data['learn:contract:in:' + pid62].status = 'pending'; mem.gw_data['learn:contract:in:' + pid62].tries = 0; delete mem.gw_data['learn:contract:lock'];
+  const kicks60 = []; global.fetch = async (url, opt) => { kicks60.push({ url: String(url), body: JSON.parse(opt.body || '{}') }); return { ok: true, status: 202 }; };
+  const st60 = blobsMock.store('gw_data');
+  const kc = await cron60.kickLearnContract(st60, Date.now());
+  const kc2 = await cron60.kickLearnContract(st60, Date.now());   // running(15분 미만)은 다시 집지 않는다
+  mem.gw_data['learn:contract:lock'] = { ts: Date.now(), pair: pid62 };   // 워커가 잠근 동안
+  const kc3 = await cron60.kickLearnContract(st60, Date.now());
+  T('60 크론 ④ 교대: 계약 pending 1건 → gw-learn-background 기동 · running·tries 1 · 다음 회차 pending 0 · 잠금 중이면 skipped', kc.started === pid62 && kicks60.length === 1 && /gw-learn-background$/.test(kicks60[0].url) && kicks60[0].body.pair_id === pid62 && mem.gw_data['learn:contract:in:' + pid62].status === 'running' && mem.gw_data['learn:contract:in:' + pid62].tries === 1 && kc2.pending === 0 && kc3.skipped === 'running', JSON.stringify([kc, kc2, kc3, kicks60.length]));
+  global.fetch = realFetch60; process.env.GW_ANTHROPIC_KEY = savedKey60; process.env.URL = savedUrl60;
+  delete mem.gw_data['col:contracts']; delete mem.gw_data['map:contract:v1']; delete mem.gw_data['recidx:c60']; delete mem.gw_data['settings:learn']; delete mem.gw_data['lessons:contract:asb_plan']; delete mem.gw_data['learn:contract:lock'];
+  Object.keys(mem.gw_data).filter((k) => k.indexOf('learn:contract:in:') === 0).forEach((k) => delete mem.gw_data[k]); Object.keys(mem.gw_files).filter((k) => k.indexOf('cdoc:c60') === 0).forEach((k) => delete mem.gw_files[k]);
+}
+
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

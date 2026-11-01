@@ -1745,7 +1745,7 @@ try {
   T('v407 계약 서류함 화면: cdoc 함수군(cdocDocKey·cdocPkHit·cdocRowsHtml·csCdocPick/Upload/Open/Mark/Draft) · 서류 행 data-cs-cup 2종 · data-cs-pii 선택 · 패킷 cdocPkHit 우선·data-cs-cpk · 생성 훅 csCdocDraft 2곳 · 바인딩 5종 · CSS · sw ≥ 407',
     ['function cdocDocKey', 'function cdocPkHit', 'function cdocRowsHtml', 'function cdocLoad', 'function csCdocPick', 'function csCdocUpload', 'function csCdocOpen', 'function csCdocMark', 'function csCdocDraft'].every((s) => html.indexOf(s) > 0)
     && html.indexOf('data-cs-cup="\' + base + esc(d.k) + \'|final"') > 0 && html.indexOf('|received" title="수령본') > 0 && html.indexOf('<select data-cs-pii=') > 0
-    && html.indexOf('var hm = cdocPkHit(c, pk, it), hit = [];') > 0 && html.indexOf('data-cs-cpk="') > 0 && (html.match(/csCdocDraft\(c, kind, ed\);/g) || []).length === 2
+    && html.indexOf('var hm = cdocPkHit(c, pk, it), hit = [];') > 0 && html.indexOf('data-cs-cpk="') > 0 && (html.match(/csCdocDraft\(c, kind, ed(?:, al\.learned)?\);/g) || []).length === 2
     && ['data-cs-cup', 'data-cs-cpk', 'data-cs-copen', 'data-cs-ccur', 'data-cs-cdel'].every((a) => html.indexOf('querySelectorAll("[' + a + ']")') > 0 || html.indexOf('csAct("' + a + '"') > 0)
     && html.indexOf('[data-cs-dnew], [data-cs-pii]') > 0 && html.indexOf('.cs-cdoc-r{') > 0 && Number((swv7.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 407);
 } catch (e) { console.log('  (v407 검사 생략 — ' + e.message + ')'); fails++; }
@@ -1782,6 +1782,19 @@ try {
     && /forbid_re: \/검진\|건강\|명단\|명부\|신분증/.test(readFileSync(join(ROOT, 'netlify', 'functions', '_lib', 'learn.js'), 'utf8'))
     && Number((swv10.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 410);
 } catch (e) { console.log('  (v410 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ---- v411(11/1 계약 D4 3일차): 학습 워커 gw-learn-background · 크론 ④ 교대 kickLearnContract · learn_defaults_get · 앱 xgApplyLearned(공란에만)·fill.learned · 관리자 카드 conLearnCard · sw ≥411
+try {
+  const swv11 = readFileSync(join(ROOT, 'sw.js'), 'utf8'), gwd11 = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-data.js'), 'utf8'), cr11 = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-promo-ai-cron.js'), 'utf8'), lw11 = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-learn-background.js'), 'utf8');
+  T('v411 학습 워커: 워커(내부 토큰·NOT_ALLOWED·LEAK_BLOCKED·USAGE_CAP·잠금 해제) · 크론 교대(블로그 미기동 회차만) · learn_defaults_get · xgApplyLearned 공란 전용+생성 2곳 · csCdocDraft learned · 카드 renderConLearnCard+스위치 · sw ≥ 411',
+    /v\.payload\.mid !== '__promoai__'/.test(lw11) && /'NOT_ALLOWED'/.test(lw11) && /'LEAK_BLOCKED'/.test(lw11) && /'USAGE_CAP'/.test(lw11) && /T\.lock_key, \{ ts: 0, pair: '' \}/.test(lw11) && /LN\.piiScan\(pp\.user\)/.test(lw11)
+    && /if \(!learn \|\| !learn\.started\)/.test(cr11) && /async function kickLearnContract\(/.test(cr11) && /LN\.kickWorker\('gw-learn-background'/.test(cr11)
+    && gwd11.indexOf("d.action === 'learn_defaults_get'") > 0 && gwd11.indexOf('LN.fieldDefaults(') > 0
+    && html.indexOf('function xgApplyLearned(kind, edits)') > 0 && (html.match(/xgApplyLearned\(kind, ed\)\.then\(/g) || []).length === 2 && html.indexOf('if (v === undefined || e[2] !== "b") return e;') > 0
+    && html.indexOf('function csCdocDraft(c, kind, edits, learned)') > 0 && html.indexOf('fill.learned = learned') > 0
+    && html.indexOf('id="conLearnCard"') > 0 && html.indexOf('function renderConLearnCard()') > 0 && html.indexOf('action: "learn_pairs_get"') > 0 && html.indexOf('data-cl-on') > 0
+    && Number((swv11.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 411);
+} catch (e) { console.log('  (v411 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

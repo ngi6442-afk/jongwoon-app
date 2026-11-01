@@ -60,6 +60,7 @@ function normRules(out, oldRules, scopes) {
     const n = old[id] ? Math.max(modelN, (Number(old[id].n) || 1) + 1) : Math.max(1, modelN);
     const row = { id: id, text: text, scope: scope, n: n, first: old[id] ? old[id].first : 0, last: 0 };
     if (scope === 'field_default' && typeof r.field === 'string' && r.field.trim()) row.field = r.field.trim().slice(0, 40);   // 계약판: 대상 필드 키
+    if (scope === 'field_default' && typeof r.value === 'string' && r.value.trim()) row.value = r.value.replace(/\s+/g, ' ').trim().slice(0, 120);   // 계약판: 기본값(허용 사전 안의 칸만 값이 보이므로 여기까지 온 값은 허용된 것)
     res.push(row);
   });
   return res.slice(0, MAX_RULES);
@@ -152,7 +153,90 @@ function pickPending(pairs, now, pairRe, recField) {
 function usageOk(usage, cap) { return !cap || (Number((usage || {}).calls) || 0) < cap; }
 function usageAdd(usage, ym, tokens) { const u = (usage && usage.ym === ym) ? usage : { ym: ym, calls: 0, tokens: 0 }; u.calls = (Number(u.calls) || 0) + 1; u.tokens = (Number(u.tokens) || 0) + (Number(tokens) || 0); u.ts = Date.now(); return u; }
 
+// ---- 계약 서류판 프롬프트(v411, D4 3일차) — 모델이 규칙을 쓴다. 허용 사전(R2)에 든 셀만 값이 보이고, 나머지 셀은 '바뀜/안 바뀜'만 보인다. ----
+const CONTRACT_SYSTEM = [
+  '당신은 준설·폐기물·석면·철거 회사의 계약 서류 채움 코치입니다.',
+  '회사 앱이 양식(xlsx)의 칸을 자동으로 채운 초안과, 담당 직원이 그 초안을 고쳐 제출한 최종본을 칸(셀) 단위로 비교합니다.',
+  '목표: 다음 초안이 처음부터 최종본에 가깝게 나오도록, 앱이 지킬 규칙을 뽑아 기존 규칙과 합쳐 돌려줍니다.',
+  '',
+  '규칙을 쓰는 법',
+  '- scope는 다섯 중 하나: field_default(어떤 칸을 처음부터 어떤 값·형식으로 채운다 — field에 셀 좌표, value에 그 값), format(날짜·단위·표기 형식), structure(행 순서·줄 수), content(넣는다/넣지 않는다), style(표현).',
+  '- 값이 보이는 칸에서 직원이 매번 같은 값으로 고친 칸만 field_default로 씁니다. 이 건에만 해당하는 값(공사명·금액·날짜)은 규칙이 아닙니다.',
+  '- 값이 안 보이는 칸(바뀜/안 바뀜만 있는 칸)은 "자주 바뀌는 칸"이라는 사실만 content 규칙으로 쓸 수 있고, 값을 추측해 쓰지 않습니다.',
+  '- 한 규칙은 백이십 자 이내, 한 가지만. 감상·추측은 쓰지 않습니다. 사람 이름·주민번호·연락처·계좌는 어떤 규칙에도 넣지 않습니다.',
+  '- 기존 규칙과 합칩니다: 같은 뜻이면 하나로 합치고 근거 수(n)를 더합니다. 모순되면 이번 쪽으로 고칩니다. 확인되지 않은 기존 규칙도 지우지 않고 유지합니다.',
+  '- 전체 25개 이내.',
+  '',
+  '출력은 JSON 하나: summary(이번 비교 요약 이백 자 이내) · changes(바뀐 점 목록, 각 kind=field_default|format|structure|content|style, what 백 자 이내, 최대 열둘) · rules(합쳐진 전체 규칙 목록 — text, scope, n(정수), keep_id(기존 규칙 id 또는 빈 문자열), field(field_default면 셀 좌표, 아니면 빈 문자열), value(field_default면 기본값, 아니면 빈 문자열)).',
+].join('\n');
+const CONTRACT_SCHEMA = {
+  type: 'object',
+  properties: {
+    summary: { type: 'string' },
+    changes: { type: 'array', items: { type: 'object', properties: { kind: { type: 'string', enum: ['field_default', 'format', 'structure', 'content', 'style'] }, what: { type: 'string' } }, required: ['kind', 'what'], additionalProperties: false } },
+    rules: { type: 'array', items: { type: 'object', properties: { text: { type: 'string' }, scope: { type: 'string', enum: ['field_default', 'format', 'structure', 'content', 'style'] }, n: { type: 'integer' }, keep_id: { type: 'string' }, field: { type: 'string' }, value: { type: 'string' } }, required: ['text', 'scope', 'n', 'keep_id', 'field', 'value'], additionalProperties: false } },
+  },
+  required: ['summary', 'changes', 'rules'],
+  additionalProperties: false,
+};
+// o: {tpl, rules, rows:[{ref, draft, final, visible}], hidden_changed:[ref], hidden_same_n}
+function buildContractPrompt(o) {
+  const rules = Array.isArray(o.rules) ? o.rules : [];
+  const L = [];
+  L.push('[기존 규칙 ' + rules.length + '개]  (id · scope · n · field · 규칙)');
+  if (!rules.length) L.push('(없음 — 첫 학습)');
+  rules.forEach(function (r) { L.push('- ' + r.id + ' · ' + r.scope + ' · ' + r.n + ' · ' + (r.field || '-') + ' · ' + r.text + (r.value ? ' (값: ' + r.value + ')' : '')); });
+  L.push('');
+  L.push('[양식] ' + String(o.tpl || ''));
+  L.push('');
+  L.push('[값이 보이는 칸 — 허용 사전 안] (셀 · 앱 초안 값 · 직원 최종본 값)');
+  const vis = (Array.isArray(o.rows) ? o.rows : []).filter(function (r) { return r && r.visible; });
+  if (!vis.length) L.push('(없음)');
+  vis.forEach(function (r) { L.push('- ' + r.ref + ' · ' + JSON.stringify(String(r.draft === undefined || r.draft === null ? '' : r.draft)) + ' · ' + JSON.stringify(String(r.final === undefined || r.final === null ? '' : r.final))); });
+  L.push('');
+  L.push('[값이 안 보이는 칸] 바뀐 칸: ' + ((o.hidden_changed || []).join(', ') || '(없음)') + ' · 안 바뀐 칸 수: ' + (Number(o.hidden_same_n) || 0));
+  L.push('');
+  L.push('위 차이에서 규칙을 뽑고 기존 규칙과 합쳐 JSON으로만 답하십시오.');
+  return { system: CONTRACT_SYSTEM, user: L.join('\n'), schema: CONTRACT_SCHEMA };
+}
+// 절대 금지 패턴(설계 §5 2층: 주민번호·연락처·계좌) — 마스킹하지 않고 걸리면 전송 중단(fail-closed). 호출부가 사유 코드만 남긴다(값 로그 금지).
+// 계좌 패턴은 마지막 묶음 5자리 이상(또는 4묶음) — 'YYYY-MM-DD' 날짜(4-2-2)는 잡지 않는다. 사업자번호(3-2-5)는 잡힌다(보수적 — 허용 사전에서 빼면 된다).
+const PII_RE = [/\d{6}\s*-\s*[1-4]\d{6}/, /01\d[\s-]?\d{3,4}[\s-]?\d{4}/, /\b\d{2,6}-\d{2,6}-\d{5,8}\b/, /\b\d{2,6}-\d{2,6}-\d{2,6}-\d{1,8}\b/];
+function piiScan(obj) {
+  let s; try { s = typeof obj === 'string' ? obj : JSON.stringify(obj); } catch (e) { return { ok: false, code: 'SERIALIZE' }; }
+  for (let i = 0; i < PII_RE.length; i++) { if (PII_RE[i].test(s)) return { ok: false, code: 'PII_' + i }; }
+  return { ok: true, code: '' };
+}
+// 내부 토큰으로 배경 워커 기동(블로그 kickLearnWorker와 같은 축)
+async function kickWorker(fnName, body) {
+  const { issueSession } = require('./session');
+  const s = issueSession({ id: '__promoai__', role: 'system' });
+  if (!s.ok) return { ok: false, code: s.code || 'SERVER_CONFIG_MISSING' };
+  const base = String(process.env.URL || '').replace(/\/$/, '');
+  if (!base) return { ok: false, code: 'NO_SITE_URL' };
+  try {
+    const resp = await fetch(base + '/.netlify/functions/' + fnName, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + s.token }, body: JSON.stringify(body || {}) });
+    if (!resp.ok && resp.status !== 202) return { ok: false, code: 'KICKOFF_HTTP_' + resp.status };
+    return { ok: true };
+  } catch (e) { return { ok: false, code: 'KICKOFF_FAILED' }; }
+}
+// 생성에 넣을 칸 기본값 — field_default 규칙 중 허용 사전에 든 셀·근거 2건 이상·값 있음. 반환 {ref: value}
+function fieldDefaults(L0, allowRefs) {
+  const L = normLessons(L0); const out = {};
+  if (L.off) return out;
+  const A = {}; (Array.isArray(allowRefs) ? allowRefs : []).forEach(function (r) { A[String(r).toUpperCase()] = 1; });
+  L.rules.forEach(function (r) {
+    if (!r || r.scope !== 'field_default' || !r.field || !r.value) return;
+    const ref = String(r.field).toUpperCase();
+    if (!A[ref] || (Number(r.n) || 0) < 2) return;
+    if (!out[ref] || (Number(r.n) || 0) > (out[ref].n || 0)) out[ref] = { v: String(r.value).slice(0, 120), n: Number(r.n) || 0, id: r.id };
+  });
+  const flat = {}; Object.keys(out).forEach(function (k) { flat[k] = out[k].v; });
+  return flat;
+}
+
 module.exports = {
+  CONTRACT_SYSTEM, CONTRACT_SCHEMA, buildContractPrompt, PII_RE, piiScan, kickWorker, fieldDefaults,
   TYPES, MAX_RULES, RULE_CHARS, EXEMPLAR_CHARS, MAX_GAPS, MAX_TRIES, LOCK_TTL_MS, RUNNING_STALE_MS, RETRY_WAIT_MS, SCOPES4, RE_REC_ID,
   hash32, pairKey, newPairId, usageKey, ymOf,
   normRules, emptyLessons, normLessons, pushGap, mergeLessons, lessonLines, exemplarFor, gapSummary, pickPending, usageOk, usageAdd,

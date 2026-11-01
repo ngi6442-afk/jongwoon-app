@@ -50,18 +50,8 @@ function textOf(xml) { let s = ''; const re = /<t\b[^>]*>([\s\S]*?)<\/t>/g; let 
 // 값(v)은 비교에만 쓰고 호출부가 밖으로 내보내지 않는다.
 function colNum(col) { let n = 0; for (let i = 0; i < col.length; i++) n = n * 26 + (col.charCodeAt(i) - 64); return n; }
 function refRC(ref) { const m = /^([A-Z]{1,3})(\d{1,7})$/.exec(String(ref || '').toUpperCase()); return m ? [Number(m[2]), colNum(m[1])] : null; }
-function xlsxCells(buf) {
-  const z = zipEntries(buf);
-  let sheetPath = '';
-  const wb = z['xl/workbook.xml'] ? z['xl/workbook.xml'].toString('utf8') : '';
-  const rels = z['xl/_rels/workbook.xml.rels'] ? z['xl/_rels/workbook.xml.rels'].toString('utf8') : '';
-  const first = /<sheet\b[^>]*\br:id="([^"]+)"/.exec(wb) || /<sheet\b[^>]*\bid="([^"]+)"/.exec(wb);
-  if (first && rels) { const rr = new RegExp('<Relationship\\b[^>]*\\bId="' + first[1] + '"[^>]*\\bTarget="([^"]+)"').exec(rels) || new RegExp('<Relationship\\b[^>]*\\bTarget="([^"]+)"[^>]*\\bId="' + first[1] + '"').exec(rels); if (rr) sheetPath = rr[1].replace(/^\/?(xl\/)?/, 'xl/'); }
-  if (!sheetPath || !z[sheetPath]) sheetPath = 'xl/worksheets/sheet1.xml';
-  if (!z[sheetPath]) return { ok: false, code: 'NO_SHEET', cells: {}, merged: [] };
-  const shared = [];
-  if (z['xl/sharedStrings.xml']) { const ss = z['xl/sharedStrings.xml'].toString('utf8'); const re = /<si\b[^>]*>([\s\S]*?)<\/si>/g; let m; while ((m = re.exec(ss))) shared.push(textOf(m[1])); }
-  const xml = z[sheetPath].toString('utf8'); const cells = {};
+function parseSheetXml(xml, shared) {
+  const cells = {};
   const cre = /<c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g; let m;
   while ((m = cre.exec(xml))) {
     const attrs = m[1] || '', body = m[2] || '';
@@ -78,7 +68,34 @@ function xlsxCells(buf) {
   }
   const merged = []; const mre = /<mergeCell\b[^>]*\bref="([A-Z]{1,3}\d{1,7}):([A-Z]{1,3}\d{1,7})"/g;
   while ((m = mre.exec(xml))) { const a = refRC(m[1]), b = refRC(m[2]); if (a && b) merged.push([a[0], a[1], b[0], b[1]]); }
-  return { ok: true, cells: cells, merged: merged, sheet: sheetPath };
+  return { cells: cells, merged: merged };
+}
+// 전 시트 — 앱 채움 맵의 셀 좌표는 '시트명!A1'(첫 시트는 'A1'만)이라 시트 이름으로 찾는다. 반환 {ok, sheets:{이름:{cells, merged}}, first, names, cells, merged(첫 시트 — 종전 호환)}
+function xlsxCells(buf) {
+  const z = zipEntries(buf);
+  const wb = z['xl/workbook.xml'] ? z['xl/workbook.xml'].toString('utf8') : '';
+  const rels = z['xl/_rels/workbook.xml.rels'] ? z['xl/_rels/workbook.xml.rels'].toString('utf8') : '';
+  const shared = [];
+  if (z['xl/sharedStrings.xml']) { const ss = z['xl/sharedStrings.xml'].toString('utf8'); const re = /<si\b[^>]*>([\s\S]*?)<\/si>/g; let m; while ((m = re.exec(ss))) shared.push(textOf(m[1])); }
+  const sheets = {}, names = [];
+  const sre = /<sheet\b([^>]*)\/?>/g; let m;
+  while ((m = sre.exec(wb))) {
+    const a = m[1]; const nm = /\bname="([^"]*)"/.exec(a), rid = /\br:id="([^"]+)"/.exec(a) || /\bid="([^"]+)"/.exec(a);
+    if (!nm || !rid) continue;
+    const rr = new RegExp('<Relationship\\b[^>]*\\bId="' + rid[1] + '"[^>]*\\bTarget="([^"]+)"').exec(rels) || new RegExp('<Relationship\\b[^>]*\\bTarget="([^"]+)"[^>]*\\bId="' + rid[1] + '"').exec(rels);
+    const path = rr ? rr[1].replace(/^\/?(xl\/)?/, 'xl/') : '';
+    if (!path || !z[path]) continue;
+    const name = xmlUnesc(nm[1]); names.push(name); sheets[name] = parseSheetXml(z[path].toString('utf8'), shared);
+  }
+  if (!names.length && z['xl/worksheets/sheet1.xml']) { names.push('Sheet1'); sheets.Sheet1 = parseSheetXml(z['xl/worksheets/sheet1.xml'].toString('utf8'), shared); }
+  if (!names.length) return { ok: false, code: 'NO_SHEET', sheets: {}, names: [], first: '', cells: {}, merged: [] };
+  return { ok: true, sheets: sheets, names: names, first: names[0], cells: sheets[names[0]].cells, merged: sheets[names[0]].merged };
+}
+// '시트명!A1' → {sheet, ref}. 시트 없으면 첫 시트. 좌표가 아니면 null(__drop_drawings__ 같은 특수 항목).
+function splitRef(full) {
+  const s = String(full || '').trim(); const i = s.lastIndexOf('!');
+  const sheet = i >= 0 ? s.slice(0, i).replace(/^'|'$/g, '') : '', ref = (i >= 0 ? s.slice(i + 1) : s).toUpperCase();
+  return refRC(ref) ? { sheet: sheet, ref: ref } : null;
 }
 function inMergedNonAnchor(ref, merged) {
   const rc = refRC(ref); if (!rc) return false;
@@ -96,10 +113,13 @@ function xlsxCellDiff(edits, finalBuf) {
   const seen = {};
   E.forEach(function (e) {
     if (!Array.isArray(e) || !e[0]) return;
-    const ref = String(e[0]).toUpperCase(); if (seen[ref]) return; seen[ref] = 1;
+    const sr = splitRef(e[0]); if (!sr) return;
+    const ref = (sr.sheet ? sr.sheet + '!' : '') + sr.ref; if (seen[ref]) return; seen[ref] = 1;
     const ty = String(e[2] || 's'), want = e[1];
-    const f = fx.cells[ref] || { t: 'blank', v: '' };
-    if (f.t === 'f' || f.t === 'e' || inMergedNonAnchor(ref, fx.merged)) { unc++; ru.push(ref); return; }
+    const sh = sr.sheet ? fx.sheets[sr.sheet] : fx.sheets[fx.first];
+    if (!sh) { unc++; ru.push(ref); return; }   // 최종본에 그 시트가 없음(이름 바뀜·삭제) = 비교 불가
+    const f = sh.cells[sr.ref] || { t: 'blank', v: '' };
+    if (f.t === 'f' || f.t === 'e' || inMergedNonAnchor(sr.ref, sh.merged)) { unc++; ru.push(ref); return; }
     compared++;
     let same;
     if (ty === 'b') same = normS(f.v) === '';
@@ -153,4 +173,22 @@ function gapScore(cell, list, missing) {
   return { cell_ratio: r, list_delta: list ? (Number(list.delta) || 0) : null, missing: Number(missing) || 0, score: r === null ? null : Math.round(1000 * (r + 0.5 * ld + 0.5 * ms)) / 1000, comparable: r !== null };
 }
 
-module.exports = { zipEntries, xlsxCells, xlsxCellDiff, docxParas, docxParaDiff, listDiff, gapScore, refRC, inMergedNonAnchor };
+// 허용 사전에 든 셀의 (초안 값, 최종 값) 짝 — 워커가 모델에 보낼 행. 허용 밖 셀은 바뀜 여부만(값 없음).
+function cellRows(edits, finalBuf, allowRefs) {
+  const A = {}; (Array.isArray(allowRefs) ? allowRefs : []).forEach(function (r) { const s = splitRef(r); if (s) A[(s.sheet ? s.sheet + '!' : '') + s.ref] = 1; });
+  const fx = xlsxCells(finalBuf); const rows = [], hidden_changed = []; let hidden_same = 0; const seen = {};
+  if (!fx.ok) return { ok: false, code: fx.code, rows: [], hidden_changed: [], hidden_same_n: 0 };
+  (Array.isArray(edits) ? edits : []).forEach(function (e) {
+    if (!Array.isArray(e) || !e[0]) return;
+    const sr = splitRef(e[0]); if (!sr) return;
+    const ref = (sr.sheet ? sr.sheet + '!' : '') + sr.ref; if (seen[ref]) return; seen[ref] = 1;
+    const sh = sr.sheet ? fx.sheets[sr.sheet] : fx.sheets[fx.first]; if (!sh) return;
+    const f = sh.cells[sr.ref] || { t: 'blank', v: '' }; if (f.t === 'f' || f.t === 'e') return;
+    const ty = String(e[2] || 's'), want = ty === 'b' ? '' : e[1];
+    const same = ty === 'n' ? (f.t === 'blank' ? normS(want) === '' : sameNum(f.v, want)) : normS(f.v) === normS(want);
+    if (A[ref]) rows.push({ ref: ref, draft: normS(want).slice(0, 120), final: normS(f.v).slice(0, 120), visible: true, same: same });
+    else if (!same) hidden_changed.push(ref); else hidden_same++;
+  });
+  return { ok: true, rows: rows, hidden_changed: hidden_changed.slice(0, 100), hidden_same_n: hidden_same };
+}
+module.exports = { zipEntries, xlsxCells, xlsxCellDiff, docxParas, docxParaDiff, listDiff, gapScore, refRC, inMergedNonAnchor, splitRef, cellRows };

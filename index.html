@@ -1619,6 +1619,9 @@
     <!-- 계약 골조·목록 거울(v400, 계약 D1 2일차) — 계약 상수 7종의 원천 스위치(코드 상수 ↔ Blobs 거울, 기본 상수). 거울은 appdata collectors/contract_mirror.py 가 쓴다 -->
     <div class="dash-sec" style="margin:16px 0 8px;"><h2>계약 골조·목록 거울</h2></div>
     <div class="card" id="conProcCard"><div class="loading">불러오는 중…</div></div>
+    <!-- 계약 서류 학습(v411, 계약 D4 3일차) — 양식별 짝·간극 추세·규칙 수, 스위치(켬/끔)·허용 사전(R2 카드 값). 사람은 규칙을 쓰지 않는다(PM 11/1) -->
+    <div class="dash-sec" style="margin:16px 0 8px;"><h2>계약 서류 학습</h2></div>
+    <div class="card" id="conLearnCard"><div class="loading">불러오는 중…</div></div>
     <!-- 문서함 설정(v314) — 분류별 기본 공개범위(초기 전부 비공개=관리자만 — 공개할 분류만 열기) + 등재 결재 게이트. 관리자 전용·감사로그·낙관락(등급표와 같은 결) -->
     <div class="dash-sec" style="margin:16px 0 8px;"><h2>문서함 설정</h2></div>
     <div class="card" id="docSettingsCard"><div class="loading">불러오는 중…</div></div>
@@ -8806,11 +8809,12 @@
     return gwCall("gw-data",{action:"tpl_get", key:kind}).then(function(res){
       if(res.status!==200) throw (res.status===404 ? "'"+TPL_LABELS[kind]+"' 양식 미등록" : "양식 불러오기 실패");
       var ed=xgBuildEdits(kind, c);
+      return xgApplyLearned(kind, ed).then(function(al){ ed = al.edits;   // v411 학습된 칸 기본값(공란에만)
       return fillXlsxTemplate(res.body.data, ed).then(function(blob){
         downloadBlob((document.getElementById("xgTitle").value.trim()||c.label||"서류")+"_"+TPL_LABELS[kind]+".xlsx", blob);
-        csCdocDraft(c, kind, ed);   // v407 초안 자동 보존
+        csCdocDraft(c, kind, ed, al.learned);   // v407 초안 자동 보존(+v411 학습 칸)
         return kind;
-      });
+      }); });
     });
   }
   // 후속 서류 목록 — 개인(사문서) 건은 착공계·준공계 미작성(대표 확정 규칙)
@@ -9642,12 +9646,13 @@
       gwCall("gw-data",{action:"tpl_get", key:kind}).then(function(res){
         if(res.status!==200){ alert(res.status===404?("'"+TPL_LABELS[kind]+"' 양식이 미등록입니다. [+ 양식 등록]에서 먼저 등록하세요."):"양식 불러오기 실패"); return; }
         var ed=xgBuildEdits(kind, c);
+        return xgApplyLearned(kind, ed).then(function(al){ ed = al.edits;   // v411 학습된 칸 기본값(공란에만)
         return fillXlsxTemplate(res.body.data, ed).then(function(blob){
           var nm=($("xgTitle").value.trim()||c.label||"서류")+"_"+TPL_LABELS[kind]+".xlsx";
           downloadBlob(nm, blob);
-          csCdocDraft(c, kind, ed);   // v407 초안 자동 보존
+          csCdocDraft(c, kind, ed, al.learned);   // v407 초안 자동 보존(+v411 학습 칸)
           $("xlsxGenBackdrop").classList.remove("show"); xgCtx=null;
-        });
+        }); });
       }).catch(function(e){ alert("생성 실패: "+e); })
         .finally(function(){ $("xgGo").textContent="생성·다운로드"; $("xgGo").disabled=false; });
     });
@@ -9926,11 +9931,28 @@
     }).catch(function(){ alert("처리 실패(네트워크)"); });
   }
   // 생성 훅 — 서류 생성(xlsx 채움)이 성공하면 채움 맵을 초안(draft)으로 자동 보존. 실패해도 조용히(내려받기는 이미 끝났다). pii 1 = 값에 소유주·대리인 이름이 섞일 수 있어 do 권한만 열람
-  function csCdocDraft(c, kind, edits){
+  // v411 생성 주입 — 학습된 칸 기본값(서버 learn_defaults_get: 허용 사전(R2) 안·근거 2건↑만)을 **공란('b')으로 남는 칸에만** 넣는다. 계산된 값은 덮지 않는다. 실패·없음이면 그대로.
+  function xgApplyLearned(kind, edits){
+    try {
+      if (typeof gwCall !== "function" || !canDo("con")) return Promise.resolve({ edits: edits, learned: [] });
+      return gwCall("gw-data", { action: "learn_defaults_get", tpl: cdocSan(kind, 30) }).then(function(res){
+        var dfl = (res && res.status === 200 && res.body && res.body.defaults) ? res.body.defaults : {}; var learned = [];
+        var out = (edits || []).map(function(e){
+          if (!e || typeof e[0] !== "string") return e;
+          var k = e[0].toUpperCase(); var v = dfl[k] !== undefined ? dfl[k] : (dfl[e[0]] !== undefined ? dfl[e[0]] : undefined);
+          if (v === undefined || e[2] !== "b") return e;
+          learned.push(e[0]); return [e[0], String(v), "s"];
+        });
+        return { edits: out, learned: learned };
+      }).catch(function(){ return { edits: edits, learned: [] }; });
+    } catch(e){ return Promise.resolve({ edits: edits, learned: [] }); }
+  }
+  function csCdocDraft(c, kind, edits, learned){
     try {
       if (!c || !c.id || typeof gwCall !== "function" || !canDo("con")) return;
       var p = (c.pipes || [])[0], i = (p && typeof p.cur === "number" && p.cur >= 0 && p.cur <= 99) ? p.cur : 0;
-      var r = gwCall("gw-data", { action: "cdoc_put", cid: c.id, i: i, doc_key: "gen." + cdocSan(kind, 30), kind: "draft", pii: 1, fill: { tpl: kind, at: todayStr(), edits: edits } });
+      var fill = { tpl: kind, at: todayStr(), edits: edits }; if (learned && learned.length) fill.learned = learned;   // v411 적용된 학습 칸 기록(초안 메타)
+      var r = gwCall("gw-data", { action: "cdoc_put", cid: c.id, i: i, doc_key: "gen." + cdocSan(kind, 30), kind: "draft", pii: 1, fill: fill });
       if (r && typeof r.then === "function") r.then(function(res){
         if (res && res.status === 200 && res.body && res.body.item && CDOC[c.id]){ var it = res.body.item; CDOC[c.id].items.forEach(function(x){ if (x.i === it.i && x.dk === it.dk && x.kind === "draft") x.cur = 0; }); CDOC[c.id].items.push(it); }
       }).catch(function(){});
@@ -10586,6 +10608,31 @@
     }).catch(function(){ conAddedClear(); CON_PROC_SRC.reason = "네트워크"; });
   }
   var conProcSaving = false, conProcHead = "", conProcEditing = "", conProcEditOpen = {};
+  // ---- 계약 서류 학습 카드(v411, 계약 D4 3일차) — 표시·스위치만. 규칙은 모델이 쓰고 허용 사전은 R2 카드 값(관리자가 그대로 저장) ----
+  function renderConLearnCard(){
+    var host = document.getElementById("conLearnCard"); if (!host) return;
+    gwCall("gw-data", { action: "learn_pairs_get" }).then(function(res){
+      if (res.status !== 200 || !res.body){ host.innerHTML = '<div class="empty-line">학습 상태를 불러오지 못했습니다 — 새로고침 후 다시 시도해주세요.</div>'; return; }
+      var b = res.body, s = (b.settings && b.settings.contract) || { on: false, allow: {} }, pairs = b.pairs || [], les = b.lessons || {};
+      var ST = { done_nomodel: "간극만(허용 전)", pending: "학습 대기", running: "학습 중", done: "학습 완료", fail: "실패", unmatched: "초안 선택 필요", hold: "월 상한" };
+      var h = '<div style="margin-bottom:6px;"><b>' + (s.on ? "켜짐" : "꺼짐") + '</b> · 허용 양식 ' + Object.keys(s.allow || {}).length + '종 · 짝 ' + pairs.length + '건 <button class="mini-btn" data-cl-on="' + (s.on ? 0 : 1) + '" data-cl-base="' + esc(String((b.settings && b.settings.updated_at) || 0)) + '">' + (s.on ? "끄기" : "켜기") + '</button></div>';
+      h += '<div class="muted" style="font-size:12px;margin-bottom:8px;">최종본을 올리면 같은 단계의 앱 초안과 자동으로 짝이 되어 칸 단위 차이(간극)를 잽니다. 허용 사전에 든 칸만 모델이 값을 보고 규칙을 뽑고, 근거 2건이 쌓인 칸은 다음 생성 때 공란에 미리 채워집니다. 사람은 규칙을 쓰지 않습니다.</div>';
+      var tk = Object.keys(les);
+      if (tk.length){
+        h += '<table class="mini" style="width:100%;font-size:12px;margin-bottom:8px;"><tr><th>양식</th><th>짝</th><th>호출</th><th>규칙</th><th>간극 최근5</th><th>이전5</th><th>추세</th><th>허용 칸</th></tr>';
+        tk.forEach(function(t){ var L = les[t] || {}, g = L.gap || {}; h += '<tr><td>' + esc(t) + (L.off ? ' <small>(끔)</small>' : '') + '</td><td>' + (L.pairs || 0) + '</td><td>' + (L.calls || 0) + '</td><td>' + (L.rules_n || 0) + '</td><td>' + (g.last5_avg === null || g.last5_avg === undefined ? '—' : g.last5_avg + '%') + '</td><td>' + (g.prev5_avg === null || g.prev5_avg === undefined ? '—' : g.prev5_avg + '%') + '</td><td>' + (g.trend === 'down' ? '↓' : g.trend === 'up' ? '↑' : g.trend === 'flat' ? '→' : '—') + '</td><td>' + ((s.allow && s.allow[t]) ? s.allow[t].length : 0) + '</td></tr>'; });
+        h += '</table>';
+      }
+      if (pairs.length){
+        h += '<div style="font-size:12px;">' + pairs.slice(0, 10).map(function(p){ var g = p.gap || {}; return '<div class="item" style="padding:4px 0;"><span>' + esc(p.cid) + ' · S' + p.i + ' · ' + esc(p.tpl || '(양식 미정)') + '</span> <span class="muted">' + (ST[p.status] || esc(p.status)) + (p.diff ? ' · 바뀐 칸 ' + p.diff.changed + '/' + p.diff.compared + (p.diff.uncomparable ? ' (비교 불가 ' + p.diff.uncomparable + ')' : '') : '') + (g.score === null || g.score === undefined ? ' · 비교 불가' : ' · 간극 ' + Math.round(g.score * 100) + '%') + (p.candidates ? ' · 후보 ' + p.candidates.map(function(x){ return x.tpl; }).join('/') : '') + '</span></div>'; }).join('') + '</div>';
+      } else h += '<div class="empty-line">아직 짝이 없습니다 — 단계 카드에서 [최종본↑]을 올리면 생깁니다.</div>';
+      host.innerHTML = h;
+      Array.prototype.forEach.call(host.querySelectorAll("[data-cl-on]"), function(btn){ btn.addEventListener("click", function(){
+        var on = btn.getAttribute("data-cl-on") === "1"; if (!confirm("계약 서류 학습을 " + (on ? "켤까요?" : "끌까요? (짝·간극은 계속 재고 모델 호출만 멈춥니다)"))) return;
+        gwCall("gw-data", { action: "learn_settings_set", on: on, base: Number(btn.getAttribute("data-cl-base")) || 0 }).then(function(r2){ if (r2.status === 200) renderConLearnCard(); else alert("저장 실패: " + ((r2.body && r2.body.error_code) || r2.status)); });
+      }); });
+    }).catch(function(){ host.innerHTML = '<div class="empty-line">학습 상태를 불러오지 못했습니다.</div>'; });
+  }
   function renderConProcCard(){
     var host = document.getElementById("conProcCard"); if (!host) return;
     gwCall("gw-data", { action: "con_proc_get" }).then(function(res){
@@ -20944,6 +20991,7 @@
     renderNotifyCard();   // 지시 알림 설정(v396) — 배정표 아래
     renderAlertsCard();   // 감시 경보 라벨(v399) — 알림 설정 아래
     renderConProcCard();  // 계약 골조·목록 거울(v400) — 경보 라벨 아래
+    renderConLearnCard(); // 계약 서류 학습(v411) — 거울 아래
     renderDocSettings();   // 문서함 설정(v314) — 등급표 아래
   }
   // ---- 문서함 설정(v314) — 분류별 기본 공개범위 칩 + 등재 결재 게이트. 등급표 카드와 같은 결(칩·낙관락 base·토스트·감사로그). 관리자만(서버도 강제) ----

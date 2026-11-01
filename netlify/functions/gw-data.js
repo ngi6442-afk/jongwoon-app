@@ -1987,6 +1987,19 @@ async function handleLearnSettingsSet(event, d, R) {
   await cdocAudit(c.member, '학습설정', '', '계약 학습 ' + (next.on ? '켬' : '끔') + ' · 허용 양식 ' + Object.keys(next.allow).length + '종');
   return jr(200, { status: 'OK', settings: { contract: next, updated_at: doc.updated_at }, request_id: R });
 }
+// v411 생성 주입 — 양식의 학습된 칸 기본값(field_default 규칙 중 허용 사전 안·근거 2건↑). 계약 처리 권한이면 조회. 허용 사전이 비면 빈 객체(=주입 없음).
+async function handleLearnDefaultsGet(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (permOf(c.member, 'contracts') !== 'do') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_WRITE', request_id: R });
+  const tpl = String(d.tpl || '').trim();
+  if (!/^[A-Za-z0-9_.-]{1,40}$/.test(tpl)) return jr(400, { status: 'REJECTED', error_code: 'BAD_TPL', request_id: R });
+  const st = store(DATA); const s = await learnSettings(st);
+  if (!learnAllowed(s, tpl)) return jr(200, { status: 'OK', tpl: tpl, defaults: {}, on: false, request_id: R });
+  const r = await blobGet(st, LN.TYPES.contract.lessons_key(tpl));
+  const defaults = LN.fieldDefaults(r.ok ? r.data : null, s.contract.allow[tpl]);
+  return jr(200, { status: 'OK', tpl: tpl, defaults: defaults, on: true, request_id: R });
+}
 const LEARN_LIST_MAX = 60;
 async function handleLearnPairsGet(event, d, R) {
   const c = await currentMember(event);
@@ -3574,6 +3587,7 @@ async function handlerInner(event) {
     if (d && d.action === 'learn_settings_get') return await handleLearnSettingsGet(event, d, R);   // v410 계약 학습 스위치·허용 사전(관리자)
     if (d && d.action === 'learn_settings_set') return await handleLearnSettingsSet(event, d, R);
     if (d && d.action === 'learn_pairs_get') return await handleLearnPairsGet(event, d, R);
+    if (d && d.action === 'learn_defaults_get') return await handleLearnDefaultsGet(event, d, R);   // v411 생성 주입(학습된 칸 기본값)
     if (d && d.action === 'doc_settings_get') return await handleDocSettingsGet(event, d, R);
     if (d && d.action === 'doc_settings_set') return await handleDocSettingsSet(event, d, R);
     if (d && d.action === 'doc_att_put') return await handleDocAttPut(event, d, R);
