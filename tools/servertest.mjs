@@ -3889,7 +3889,7 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   pushMock.sendTo = async (ids, p, o) => { sent63.push({ ids: ids.slice(), p: p, o: o || {} }); return { sent: ids.length, removed: 0 }; };
   delete mem.gw_data['settings:notify'];
   let r63 = await call({ action: 'notify_get' }, tokA);
-  T('63 notify_get: 5종 · 휴가 2종 기본값 켬(admins·applicant, R0 규정 정합) · 끄기 선택 있음', r63.code === 200 && Object.keys(r63.body.meta).length === 5 && r63.body.events.leave_request === 'admins' && r63.body.events.leave_result === 'applicant' && r63.body.meta.leave_request.options.off && r63.body.meta.leave_result.rec === 'applicant', JSON.stringify(r63.body.events));
+  T('63 notify_get: 5종 · 휴가 2종 기본값 켬(admins·applicant, R0 규정 정합) · 끄기 선택 있음', r63.code === 200 && Object.keys(r63.body.meta).length >= 5 && r63.body.events.leave_request === 'admins' && r63.body.events.leave_result === 'applicant' && r63.body.meta.leave_request.options.off && r63.body.meta.leave_result.rec === 'applicant', JSON.stringify(r63.body.events));
   // 직원 신청 → 관리자 우선기기 1발(신청자 제외)
   const L63 = { id: 'lv63', member_id: 'uwork', member_name: '직원', type: 'annual', start: '2026-11-10', end: '2026-11-10', days: 1, reason: '개인 사정', status: 'pending', approver: '', applied: '2026-11-02', updated: '2026-11-02' };
   mem.gw_data['col:leaves'] = { schema: 1, items: [], updated_at: 1 };
@@ -3930,6 +3930,37 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
     && ctKeys.length === 1 && ctKeys[0] === 'ct:uct63:2027-01-10:d90' && o2.radar && o2.radar.items === 0 && rad2.length === 1, JSON.stringify([o1.radar, o2.radar, ctKeys, rad.map((x) => x.p)]));
   pushMock.sendTo = savedSend63;
   delete mem.gw_users['member:uct63']; delete mem.gw_data['col:leaves']; delete mem.gw_data['settings:notify']; delete mem.gw_data['duty:sent'];
+}
+
+{ // ---- 64(v415) C3-2 입찰 알림 — bid_result each/award(낙찰 즉시 담당+PM·유찰 아침 요약) · bid_fail assignee(watch 입찰 경보에 담당 추가) ----
+  const savedSend64 = pushMock.sendTo; const sent64 = [];
+  pushMock.sendTo = async (ids, p, o) => { sent64.push({ ids: ids.slice(), p: p, o: o || {} }); return { sent: ids.length, removed: 0 }; };
+  delete mem.gw_data['settings:notify'];
+  mem.gw_data['settings:assign'] = { schema: 1, rules: { 'bid:': { who_id: 'uwork' } }, approver_id: '', prev: null, updated_at: 5, updated_by: 'uadmin' };
+  const seed64 = () => { mem.gw_data['col:bids'] = { schema: 1, items: [{ id: 'b64a', title: '포항 준설 공사', status: '응찰' }, { id: 'b64b', title: '경주 철거 공사', status: '응찰' }], updated_at: 1 }; };
+  seed64();
+  let r64 = await call({ action: 'notify_get' }, tokA); const e0 = r64.code === 200 && Object.keys(r64.body.meta).length === 7 && r64.body.events.bid_result === 'each' && r64.body.events.bid_fail === 'admins' && r64.body.meta.bid_result.rec === 'award';
+  const RES = { action: 'bids_results', key: 'test-ingest-key', results: [{ id: 'b64a', status: '낙찰', result: { state: '낙찰', winner: '종운환경', amt: 100, rate: '87.5', bidders: 3 } }, { id: 'b64b', status: '유찰', result: { state: '유찰' } }] };
+  r64 = await call(RES, null); const e1 = r64.code === 200 && sent64.length === 1 && /개찰결과 2건/.test(sent64[0].p.title) && sent64[0].ids.indexOf('uadmin') >= 0 && !sent64[0].o.primaryOnly;
+  await call({ action: 'notify_set', event: 'bid_result', value: 'award' }, tokA); seed64();
+  r64 = await call(RES, null); const e2 = r64.code === 200 && sent64.length === 2 && sent64[1].p.title === '낙찰 1건' && /포항 준설/.test(sent64[1].p.body) && sent64[1].p.body.indexOf('경주') < 0 && sent64[1].ids.indexOf('uwork') >= 0 && sent64[1].ids.indexOf('uadmin') >= 0 && sent64[1].o.primaryOnly === true && sent64[1].p.tag === 'bids-award';
+  seed64(); r64 = await call({ action: 'bids_results', key: 'test-ingest-key', results: [{ id: 'b64b', status: '유찰', result: { state: '유찰' } }] }, null); const e3 = r64.code === 200 && sent64.length === 2;
+  T('64 bid_result: 기본 each=관리자 전원 2건 · award=낙찰만 담당+PM 우선기기(유찰 제외) · 유찰만이면 즉시 없음 · meta 7종', e0 && e1 && e2 && e3, JSON.stringify([e0, e1, e2, e3, sent64.map((x) => [x.ids, x.p.title])]));
+  // 아침 요약 — 유찰(result.checked 오늘) 1건 → 입찰 담당 1발
+  Object.keys(mem.gw_data).forEach((k) => { if (/^priv:[^:]+:mytasks$/.test(k) || /^todo:sent:/.test(k)) delete mem.gw_data[k]; }); delete mem.gw_data['duty:sent'];
+  const cron64 = require(join(FN, 'gw-todo-cron.js')); const n64 = sent64.length;
+  const o64 = JSON.parse((await cron64.handler({})).body || '{}');
+  const dg = sent64.slice(n64).filter((x) => /^bids-lost-/.test(x.p.tag));
+  T('64 아침 요약 유찰: bid_result=award → 어제·오늘 유찰 1건 → 입찰 담당 우선기기 1발 · 응답 bid_digest', o64.ok === true && o64.bid_digest && o64.bid_digest.lost === 1 && o64.bid_digest.sent === true && dg.length === 1 && dg[0].ids.join() === 'uwork' && dg[0].o.primaryOnly === true && /유찰 1건/.test(dg[0].p.title) && /경주 철거/.test(dg[0].p.body), JSON.stringify([o64.bid_digest, dg.map((x) => [x.ids, x.p.title])]));
+  // bid_fail — watch 입찰 경보 태그면 담당 추가(assignee), 다른 태그는 관리자만
+  const n2 = sent64.length;
+  r64 = await call({ action: 'bot_notify', key: 'test-ingest-key', title: '⚠ 입찰 감시 경보', body: 'b', tag: 'watch-입찰-2026-11-02' }); const f1 = r64.code === 200 && sent64.length === n2 + 1 && sent64[n2].ids.indexOf('uwork') < 0;
+  await call({ action: 'notify_set', event: 'bid_fail', value: 'assignee' }, tokA);
+  r64 = await call({ action: 'bot_notify', key: 'test-ingest-key', title: '⚠ 입찰 감시 경보', body: 'b', tag: 'watch-입찰-2026-11-02' }); const f2 = r64.code === 200 && sent64.length === n2 + 2 && sent64[n2 + 1].ids.indexOf('uwork') >= 0 && sent64[n2 + 1].ids.indexOf('uadmin') >= 0;
+  r64 = await call({ action: 'bot_notify', key: 'test-ingest-key', title: '⚠ 운반일지 감시 경보', body: 'b', tag: 'watch-운반일지-2026-11-02' }); const f3 = r64.code === 200 && sent64.length === n2 + 3 && sent64[n2 + 2].ids.indexOf('uwork') < 0;
+  T('64 bid_fail: admins(기본)=담당 없음 · assignee=watch-입찰 태그에 담당 추가 · 다른 감시 태그는 그대로', f1 && f2 && f3, JSON.stringify([f1, f2, f3, sent64.slice(n2).map((x) => x.ids)]));
+  pushMock.sendTo = savedSend64;
+  delete mem.gw_data['col:bids']; delete mem.gw_data['settings:notify']; delete mem.gw_data['settings:assign'];
 }
 
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

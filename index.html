@@ -21236,7 +21236,7 @@
   }
 
   // ---- 지시 알림 설정(v396, 공통 기반 3 첫 시범 — 착수 브리핑 A3 · 카드 1-4 R1). 이벤트 3종 × 선택지 칩. 기본값=현행, 추천값 표시. 되돌리기 1클릭. 관리자만(서버 강제)·감사로그·낙관락 ----
-  var NOTIFY_EVENT_ORDER = ["task_auto_create","task_review","due_digest","leave_request","leave_result"];   // v414 휴가 2종   // 서버 NOTIFY_EVENTS 키와 동일(uismoke 대조)
+  var NOTIFY_EVENT_ORDER = ["task_auto_create","task_review","due_digest","leave_request","leave_result","bid_result","bid_fail"];   // v414 휴가 2종 · v415 입찰 2종   // 서버 NOTIFY_EVENTS 키와 동일(uismoke 대조)
   var notifyTbl = null, notifyMeta = null, notifyBase = 0, notifySaving = false;
   function renderNotifyCard(){
     var host = document.getElementById("notifyCard"); if (!host) return;

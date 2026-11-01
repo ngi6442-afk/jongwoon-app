@@ -74,6 +74,22 @@ exports.handler = async function (event) {
       }
     }
   } catch (e) { digest = { error: String(e && e.message || e).slice(0, 80) }; }
+  // v415 C3-2 bid_result=award일 때 유찰은 아침 요약 1줄(어제·오늘 개찰 유찰 n, result.checked는 UTC 날짜라 둘 다 본다) → 입찰 담당(배정표 bid:), 없으면 관리자. 우선기기.
+  let bidDigest = null;
+  try {
+    const nfr2 = await blobGet(st, 'settings:notify');
+    if (nfr2.ok && nfr2.data && nfr2.data.events && nfr2.data.events.bid_result === 'award') {
+      const br = await blobGet(st, 'col:bids'); const bids = (br.ok && br.data && Array.isArray(br.data.items)) ? br.data.items : [];
+      const yday = new Date(Date.now() + 9 * 3600000 - 86400000).toISOString().slice(0, 10);
+      const lost = bids.filter(function (b) { return b && b.del !== 1 && b.status === '유찰' && b.result && (String(b.result.checked) === today || String(b.result.checked) === yday); });
+      bidDigest = { lost: lost.length, sent: false };
+      if (lost.length) {
+        const ar2 = await blobGet(st, 'settings:assign'); const w = (ar2.ok && ar2.data && ar2.data.rules && ar2.data.rules['bid:'] && ar2.data.rules['bid:'].who_id) ? String(ar2.data.rules['bid:'].who_id) : '';
+        let to = w ? [w] : ((ctx && ctx.adminIds) || []); if (gateOn) to = to.filter(function (id) { return !!activeSet[id]; });
+        if (to.length) { await push.sendTo(to, { title: '개찰 유찰 ' + lost.length + '건(어제·오늘)', body: lost.slice(0, 3).map(function (b) { return String(b.title || '').slice(0, 28); }).join(' · ') + (lost.length > 3 ? ' 외 ' + (lost.length - 3) + '건' : '') + ' — 입찰 탭', url: './', tag: 'bids-lost-' + today }, { ctx: ctx, primaryOnly: true }); bidDigest.sent = true; }
+      }
+    }
+  } catch (e) { bidDigest = { error: String(e && e.message || e).slice(0, 80) }; }
   // v414 C3-1 무기계약직 레이더 이식 — gw-duty-cron(netlify.toml 미등록이라 안 돌던 크론)의 contractPlan을 08:00 여기서 돌린다. 멱등 키는 duty:sent 공유(toml 불변·duty 함수는 그대로).
   //   수신 = PM(tier pm, 없으면 관리자) 우선기기 1발. 단계 d90·d30 각 1회, over 매일 1회, unknown(생년월일 없음) 1회. 근거 기간제법 §4①(2년 초과 → 무기계약 간주)·§4①5호(55세 이상 체결 예외) — 판정은 노무사.
   let radar = null;
@@ -91,5 +107,5 @@ exports.handler = async function (event) {
     }
   } catch (e) { radar = { error: String(e && e.message || e).slice(0, 80) }; fails++; }
   await stamp('gw-todo-cron', { state: 'end', ok: fails === 0, note: 'members ' + members + ' · items ' + items + ' · fails ' + fails + (digest && digest.sent ? ' · digest' : '') + (radar && radar.sent ? ' · radar ' + radar.items : '') });
-  return { statusCode: 200, body: JSON.stringify({ ok: true, today: today, members: members, items: items, fails: fails, skipped: skipped, digest: digest, radar: radar }) };
+  return { statusCode: 200, body: JSON.stringify({ ok: true, today: today, members: members, items: items, fails: fails, skipped: skipped, digest: digest, radar: radar, bid_digest: bidDigest }) };
 };

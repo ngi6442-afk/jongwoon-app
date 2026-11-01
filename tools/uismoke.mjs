@@ -1824,10 +1824,21 @@ try {
   const ord14 = (html.match(/var NOTIFY_EVENT_ORDER = \[([^\]]+)\]/) || ['', ''])[1].replace(/["\s]/g, '');
   T('v414 안내·휴가 알림·레이더: MANUAL 4절 4단계+내 것 아님 · 19절 · 도움말 4절 · NOTIFY_EVENT_ORDER 5(휴가 2종) · gw-data leave_request/leave_result+notifyLeaves · todo-cron contractPlan 이식(duty:sent) · sw ≥ 414',
     man14.indexOf('받은 지시는 이렇게 끝납니다') > 0 && (man14.match(/내 것 아님/g) || []).length >= 2 && html.indexOf('📖 사용 안내 4절') > 0
-    && ord14 === 'task_auto_create,task_review,due_digest,leave_request,leave_result' && gwd14.indexOf("leave_request: {") > 0 && gwd14.indexOf("leave_result: {") > 0 && /async function notifyLeaves\(/.test(gwd14) && gwd14.indexOf('await notifyLeaves(store(DATA), oldItems, doc.items, c.member)') > 0
+    && ord14.indexOf('task_auto_create,task_review,due_digest,leave_request,leave_result') === 0 && gwd14.indexOf("leave_request: {") > 0 && gwd14.indexOf("leave_result: {") > 0 && /async function notifyLeaves\(/.test(gwd14) && gwd14.indexOf('await notifyLeaves(store(DATA), oldItems, doc.items, c.member)') > 0
     && td14.indexOf("require('./gw-duty-cron')") > 0 && td14.indexOf("blobGet(st, 'duty:sent')") > 0 && /DC\.contractPlan\(/.test(td14)
     && Number((swv14.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 414);
 } catch (e) { console.log('  (v414 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ---- v415(11/2 C3-2): 입찰 알림 bid_result/bid_fail · bidNotifyIds · todo-cron 유찰 요약 · NOTIFY_EVENT_ORDER 7 · sw ≥415
+try {
+  const swv15 = readFileSync(join(ROOT, 'sw.js'), 'utf8'), gwd15 = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-data.js'), 'utf8'), td15 = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-todo-cron.js'), 'utf8');
+  const ord15 = (html.match(/var NOTIFY_EVENT_ORDER = \[([^\]]+)\]/) || ['', ''])[1].replace(/["\s]/g, '');
+  T('v415 입찰 알림: bid_result each|award · bid_fail admins|assignee · bidNotifyIds(담당+PM) · bids_results award 분기(primaryOnly) · bot_notify watch-입찰 담당 추가 · todo-cron bids-lost 요약 · NOTIFY_EVENT_ORDER 7 · sw ≥ 415',
+    gwd15.indexOf("bid_result: {") > 0 && gwd15.indexOf("bid_fail: {") > 0 && /async function bidNotifyIds\(/.test(gwd15) && gwd15.indexOf("nfB.events.bid_result === 'award'") > 0 && gwd15.indexOf("tag: 'bids-award'") > 0 && gwd15.indexOf("/^watch-입찰/.test(tag)") > 0
+    && td15.indexOf("events.bid_result === 'award'") > 0 && td15.indexOf("tag: 'bids-lost-' + today") > 0
+    && ord15 === 'task_auto_create,task_review,due_digest,leave_request,leave_result,bid_result,bid_fail'
+    && Number((swv15.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 415);
+} catch (e) { console.log('  (v415 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

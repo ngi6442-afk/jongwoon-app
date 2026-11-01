@@ -1099,19 +1099,33 @@ async function handleBidsResults(event, d, R) {
     const w = await blobSet(st, colKey('bids'), doc);
     if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
     if (ev.length) { try { await appendAudit({ ts: Date.now(), by: '수집봇', bid: 'bot', col: 'bids', ev: ev }); } catch (e) {} }
-    // 낙찰/유찰 확정 → 관리자 웹푸시(실패해도 수신 처리는 성공으로)
+    // 낙찰/유찰 확정 → 웹푸시(실패해도 수신 처리는 성공으로). v415: settings:notify bid_result=award면 낙찰만 즉시(입찰 담당+PM 우선기기), 유찰은 gw-todo-cron 아침 요약.
     if (ev.length) {
       try {
         const tcB = await push.tierCtx();   // 스캔 1회 — 수신자 목록과 sendTo 활성 필터에 같은 컨텍스트를 쓴다
-        const ids = tcB.adminIds;
-        if (ids.length) await push.sendTo(ids, { title: '개찰결과 ' + ev.length + '건',
-          body: ev.map(function (x) { return x.t; }).join('\n').slice(0, 300), url: './', tag: 'bids-result' }, { ctx: tcB });
+        const nfB = await notifyRead(st);
+        if (nfB.events.bid_result === 'award') {
+          const aw = ev.filter(function (x) { return / → 낙찰$/.test(String(x.t || '')); });
+          if (aw.length) { const to = await bidNotifyIds(st, tcB); if (to.length) await push.sendTo(to, { title: '낙찰 ' + aw.length + '건', body: aw.map(function (x) { return x.t; }).join('\n').slice(0, 300), url: './', tag: 'bids-award' }, { ctx: tcB, primaryOnly: true }); }
+        } else {
+          const ids = tcB.adminIds;
+          if (ids.length) await push.sendTo(ids, { title: '개찰결과 ' + ev.length + '건',
+            body: ev.map(function (x) { return x.t; }).join('\n').slice(0, 300), url: './', tag: 'bids-result' }, { ctx: tcB });
+        }
       } catch (e) {}
     }
   }
   return jr(200, { status: 'OK', applied: applied, request_id: R });
 }
 
+// v415 입찰 알림 수신자 — 배정표 bid: 담당(나수진 고정, PM 10/26) + PM(tier pm, 없으면 관리자). 중복 제거.
+async function bidNotifyIds(st, tc) {
+  const out = [];
+  try { const a = await assignRead(st); const w = a.rules && a.rules['bid:'] && a.rules['bid:'].who_id; if (w) out.push(String(w)); } catch (e) {}
+  const pm = (tc && Array.isArray(tc.pmIds) && tc.pmIds.length) ? tc.pmIds : ((tc && tc.adminIds) || []);
+  pm.forEach(function (id) { if (out.indexOf(id) < 0) out.push(id); });
+  return out;
+}
 // 봇 알림(정기업무 크론 전용) — 공유 시크릿 인증. 관리자 접속과 무관하게 만기·미수 알림이 나가야 한다.
 async function handleBotNotify(event, d, R) {
   const secret = (process.env.BIDS_INGEST_KEY || '').trim();
@@ -1122,7 +1136,9 @@ async function handleBotNotify(event, d, R) {
   // 반환값은 실제 발송 결과(sent=성공한 기기 수). 관리자 수와 혼동하면 안 된다(과거 오보 원인).
   try {
     const tcN = await push.tierCtx();   // 스캔 1회 — adminIds와 sendTo 활성 필터 공용
-    const ids = tcN.adminIds;
+    const ids = tcN.adminIds.slice();
+    // v415 bid_fail=assignee: watch.py 입찰 감시 경보(태그 watch-입찰-날짜)는 입찰 담당(배정표 bid:)에게도 1발
+    try { const nfN = await notifyRead(store(DATA)); if (nfN.events.bid_fail === 'assignee' && /^watch-입찰/.test(tag)) { const a = await assignRead(store(DATA)); const w = a.rules && a.rules['bid:'] && a.rules['bid:'].who_id; if (w && ids.indexOf(String(w)) < 0) ids.push(String(w)); } } catch (e) {}
     const subs = await push.getSubs();
     const devices = ids.reduce(function (n, id) { return n + ((subs.members[id] || []).length); }, 0);
     if (!ids.length) return jr(200, { status: 'OK', sent: 0, admins: 0, devices: 0, note: '관리자 없음', request_id: R });
@@ -1561,6 +1577,9 @@ const NOTIFY_EVENTS = {
   // v414 C3-1 휴가 2종 — 그룹웨어규정 §11②·결재규정 §11③(신청·결과 통지)에 맞추는 것이라 기본값=켬(R0 규정 정합). 끄는 선택만 둔다.
   leave_request: { label: '휴가 신청 알림', options: { admins: '승인자(관리자) 우선기기 1발', off: '없음(종전)' }, def: 'admins', rec: 'admins' },
   leave_result: { label: '휴가 승인·반려 알림', options: { applicant: '신청자 본인 1발', off: '없음(종전)' }, def: 'applicant', rec: 'applicant' },
+  // v415 C3-2 입찰 2종(설계 3-1 안착 ③: 개찰 전건 관리자 푸시 → 낙찰·수집 실패만 즉시, 나머지 아침 요약). 기본=현행, 추천=★(R1 D-3 → 11/4 적용 예약). 게이트 잠금 위반 알림은 C6(변경등록 게이트) 뒤.
+  bid_result: { label: '개찰 결과 알림', options: { each: '개찰 결과마다 관리자 전원(현행)', award: '낙찰만 즉시(입찰 담당+PM 우선기기) · 유찰은 아침 요약' }, def: 'each', rec: 'award' },
+  bid_fail: { label: '입찰 수집 실패 경보 수신', options: { admins: '관리자 전원(현행)', assignee: '입찰 담당 + 관리자' }, def: 'admins', rec: 'assignee' },
 };
 function notifyDefaults() { const o = {}; Object.keys(NOTIFY_EVENTS).forEach(function (k) { o[k] = NOTIFY_EVENTS[k].def; }); return o; }
 function notifyValid(k, v) { return Object.prototype.hasOwnProperty.call(NOTIFY_EVENTS, k) && Object.prototype.hasOwnProperty.call(NOTIFY_EVENTS[k].options, String(v)); }
