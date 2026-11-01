@@ -1759,5 +1759,17 @@ try {
     && Number((swv8.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 408);
 } catch (e) { console.log('  (v408 검사 생략 — ' + e.message + ')'); fails++; }
 
+// ---- v409(11/1 Phase 0 C1-1 인사 D-H7): 도움말 구문구·사이드바 4묶음 정합 · MANUAL 20절 휴가 안내 1장 · sw ≥409
+try {
+  const swv9 = readFileSync(join(ROOT, 'sw.js'), 'utf8'), man9 = readFileSync(join(ROOT, 'MANUAL.html'), 'utf8');
+  T('v409 도움말: "이름 선택 + PIN" 0 · 아이디 + PIN · 4묶음(관리·수주·업무·개인) · 휴가 한 줄 · MANUAL 1절 아이디·20절 신청 4단계/철회/취소 요청/연차 계산/사직 · sw ≥ 409',
+    html.indexOf('이름 선택 + PIN') < 0 && html.indexOf('<b>아이디 + PIN</b>') > 0
+    && ['<b>관리</b>: 지시 / 기성·수금', '<b>수주</b>: 입찰 / 계약', '<b>업무</b>: 캘린더 / 차량', '<b>개인</b>: 내 업무'].every(function (t) { return html.indexOf(t) > 0; })
+    && html.indexOf('<b>+ 휴가 신청</b>(유형·기간·사유 필수)') > 0
+    && man9.indexOf('이름을 고르고 PIN') < 0 && man9.indexOf('아이디와 PIN을 입력합니다') > 0
+    && ['[+ 휴가 신청]', '<b>[철회]</b>', '<b>[취소 요청]</b>', '최대 25일', '사직 면담 신청', '승인·반려 알림은 아직 없습니다'].every(function (t) { return man9.indexOf(t) > 0; })
+    && Number((swv9.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 409);
+} catch (e) { console.log('  (v409 검사 생략 — ' + e.message + ')'); fails++; }
+
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
