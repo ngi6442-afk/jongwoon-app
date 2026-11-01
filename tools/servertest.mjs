@@ -3589,6 +3589,9 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   r58 = await call({ action: 'cdoc_get', cid: 'c58', n: 2 }, tokC, 'dev1'); const s3 = r58.code === 404;
   r58 = await call({ action: 'cdoc_list', cid: 'c58', trash: true }, tokC, 'dev1'); const s4 = r58.code === 200 && r58.body.items.length === 1 && r58.body.items[0].n === 2;
   r58 = await call({ action: 'cdoc_list', cid: 'c58' }, tokC, 'dev1'); const s5 = r58.code === 200 && !r58.body.items.some((x) => x.n === 2);
+  r58 = await call({ action: 'cdoc_list', cid: 'c58', all: true }, tokA); const s5a = r58.code === 200 && r58.body.items.some((x) => x.n === 2 && x.del > 0) && r58.body.items.some((x) => x.n === 1);
+  r58 = await call({ action: 'cdoc_list', cid: 'c58', all: true }, tokC, 'dev1'); const s5b = r58.code === 200 && !r58.body.items.some((x) => x.n === 2);
+  T('58 v408 list all:true: 관리자는 보관 항목 포함(n=2 del) · 직원은 플래그 무시', s5a && s5b);
   r58 = await call({ action: 'cdoc_purge', cid: 'c58', n: 2, confirm: true }, tokC, 'dev1'); const s6 = r58.code === 403;
   r58 = await call({ action: 'cdoc_purge', cid: 'c58', n: 2 }, tokA); const s7 = r58.code === 400 && r58.body.error_code === 'CONFIRM_REQUIRED';
   r58 = await call({ action: 'cdoc_purge', cid: 'c58', n: 2, confirm: true }, tokA); const s8 = r58.code === 409 && r58.body.error_code === 'TOO_EARLY';

@@ -1750,5 +1750,14 @@ try {
     && html.indexOf('[data-cs-dnew], [data-cs-pii]') > 0 && html.indexOf('.cs-cdoc-r{') > 0 && Number((swv7.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 407);
 } catch (e) { console.log('  (v407 검사 생략 — ' + e.message + ')'); fails++; }
 
+// ---- v408(11/1 계약 D3 3일차): 관리자 보관함 — cdoc_list all:true(서버 관리자 한정) · 서류 탭 cdocTrashHtml · [복구]·[영구 삭제] 바인딩 · sw ≥408
+try {
+  const swv8 = readFileSync(join(ROOT, 'sw.js'), 'utf8'), gwd8 = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-data.js'), 'utf8');
+  T('v408 보관함: 서버 all 플래그 관리자 한정 · cdocTrashHtml·csCdocPurge · 서류 탭 호출 · data-cs-crestore/cpurge 바인딩 · cdocLoad all:isAdmin() · sw ≥ 408',
+    /const all = d\.all === true && !!c\.member\.admin;/.test(gwd8) && html.indexOf('function cdocTrashHtml') > 0 && html.indexOf('function csCdocPurge') > 0 && html.indexOf('+ cdocTrashHtml(c);') > 0
+    && html.indexOf('querySelectorAll("[data-cs-crestore]")') > 0 && html.indexOf('querySelectorAll("[data-cs-cpurge]")') > 0 && html.indexOf('action: "cdoc_list", cid: c.id, all: isAdmin()') > 0
+    && Number((swv8.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 408);
+} catch (e) { console.log('  (v408 검사 생략 — ' + e.message + ')'); fails++; }
+
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

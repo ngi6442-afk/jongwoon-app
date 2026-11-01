@@ -2000,7 +2000,8 @@ async function handleCdocList(event, d, R) {
   if (!/^[A-Za-z0-9_-]{1,40}$/.test(cid)) return jr(400, { status: 'REJECTED', error_code: 'BAD_CID', request_id: R });
   const ix = await cdocIdxRead(store(DATA), cid);
   if (!ix.ok) return jr(500, { status: 'ERROR', error_code: ix.code, request_id: R });
-  const items = ix.doc.items.filter(function (x) { return x && !x.purged && (d.trash === true ? !!x.del : !x.del); }).map(cdocPublic);
+  const all = d.all === true && !!c.member.admin;   // v408: 관리자는 보관 항목까지 한 번에(보관함 화면) — 직원은 플래그 무시
+  const items = ix.doc.items.filter(function (x) { return x && !x.purged && (all || (d.trash === true ? !!x.del : !x.del)); }).map(cdocPublic);
   return jr(200, { status: 'OK', cid: cid, seq: ix.doc.seq, items: items, updated_at: ix.doc.updated_at || 0, request_id: R });
 }
 function cdocCanRead(m, it) {

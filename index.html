@@ -9817,7 +9817,7 @@
     if (e.busy || (!force && e.at && Date.now() - e.at < CDOC_TTL)) return;
     e.busy = true;
     try {
-      var r = gwCall("gw-data", { action: "cdoc_list", cid: c.id });
+      var r = gwCall("gw-data", { action: "cdoc_list", cid: c.id, all: isAdmin() });   // v408 관리자는 보관 항목 포함
       if (!r || typeof r.then !== "function"){ e.busy = false; e.at = Date.now(); return; }
       r.then(function(res){
         e.busy = false; e.at = Date.now();
@@ -9836,6 +9836,27 @@
         + '<button type="button" class="vs-chip" data-cs-copen="' + esc(c.id) + '|' + x.n + '|' + (x.pii || 0) + '">열기</button>'
         + (can ? ((x.cur !== 1 ? '<button type="button" class="vs-chip" data-cs-ccur="' + esc(c.id) + '|' + x.n + '" title="이 판을 현재본으로(되돌리기)">현재로</button>' : '') + '<button type="button" class="vs-chip" data-cs-cdel="' + esc(c.id) + '|' + x.n + '" title="보관함으로(바이트는 남음, 영구 삭제는 관리자 30일 뒤)">보관</button>') : '') + '</div>';
     }).join('') + '</div>';
+  }
+  // v408 관리자 보관함(서류 탭) — 보관(소프트 삭제)된 판: [복구] · [영구 삭제](confirm, 서버가 보관 30일 미만이면 TOO_EARLY). 직원에겐 없음
+  function cdocTrashHtml(c){
+    if (!isAdmin()) return '';
+    var l = cdocItems(c).filter(function(x){ return x && x.del && !x.purged; }).sort(function(a, b){ return b.del - a.del; });
+    if (!l.length) return '';
+    return '<div class="cs-pk cs-trash"><div class="h">보관함(계약 서류함) <small>' + l.length + '건 · 영구 삭제는 보관 30일 뒤, 관리자만</small></div>' + l.map(function(x){
+      var days = Math.floor((Date.now() - Number(x.del)) / 86400000);
+      return '<div class="it"><span class="st wait">◻</span><span class="nm">' + esc(x.orig || x.name) + ' <small>' + esc(CDOC_KIND_LABEL[x.kind] || x.kind) + ' v' + x.ver + ' · 보관 ' + esc(cdocDay(x.del)) + '(' + days + '일) · 단계 ' + (Number(x.i) + 1) + '</small></span>'
+        + '<button type="button" class="vs-chip" data-cs-crestore="' + esc(c.id) + '|' + x.n + '">복구</button>'
+        + '<button type="button" class="vs-chip" data-cs-cpurge="' + esc(c.id) + '|' + x.n + '"' + (days < 30 ? ' title="보관 30일 뒤에 할 수 있습니다"' : '') + '>영구 삭제</button></div>';
+    }).join('') + '</div>';
+  }
+  function csCdocPurge(cid, n){
+    var c = findProc(cid); if (!c || !isAdmin()) return;
+    var x = cdocItems(c).filter(function(y){ return y && y.n === n; })[0];
+    if (!confirm('영구 삭제 — 되돌릴 수 없습니다.\n' + ((x && (x.orig || x.name)) || '') + '\n정말 삭제할까요?')) return;
+    gwCall("gw-data", { action: "cdoc_purge", cid: cid, n: n, confirm: true }).then(function(res){
+      if (res.status !== 200){ var ec = (res.body && res.body.error_code) || res.status; alert(ec === "TOO_EARLY" ? "보관 30일이 지나야 영구 삭제할 수 있습니다." : ("영구 삭제 실패 (" + ec + ")")); return; }
+      cdocLoad(c, true); apprToastShow("영구 삭제됨");
+    }).catch(function(){ alert("영구 삭제 실패(네트워크)"); });
   }
   function csCdocPick(c, p, i, dk, dkRaw, kind, pii){
     if (!canDo("con") || !c || c.status === "done") return;
@@ -11131,7 +11152,7 @@
       '<button type="button" class="vs-chip" data-cs-close="1" style="margin-left:auto;">닫기 ▲</button></div>';
     h += '<div class="vs-stabs">' + [["ov", "개요"], ["st", "단계"], ["doc", "서류"], ["lk", "연결"]].map(function(t){ return '<button type="button" class="vs-stab' + (conDetTab === t[0] ? ' on' : '') + '" data-cs-tab="' + t[0] + '">' + t[1] + '</button>'; }).join("") + '</div>';
     if (conDetTab === "st"){ csApprSync(c); h += csStagesHtml(c); }   // v384: 결재 결과 동기화(60초 1회)
-    else if (conDetTab === "doc") h += csPacketsHtml(c) + (conAttBoxHtml(c) || '<div class="vs-empty">첨부가 없습니다.</div>');   // v383 서류 4종 패킷 + 첨부함
+    else if (conDetTab === "doc") h += csPacketsHtml(c) + (conAttBoxHtml(c) || '<div class="vs-empty">첨부가 없습니다.</div>') + cdocTrashHtml(c);   // v383 서류 4종 패킷 + 첨부함 · v408 관리자 보관함
     else if (conDetTab === "lk") h += csLinksHtml(c);
     else h += csOverviewHtml(c);
     if (canDo("con")) h += '<div class="vs-act">' + (conHasBldg(c) ? '<button class="mini-btn" data-con-bldg="' + esc(c.id) + '">대장</button>' : '') + '<button class="mini-btn" data-con-xlsx="' + esc(c.id) + '">생성</button><button class="mini-btn" data-con-doc="' + esc(c.id) + '">서류</button><button class="mini-btn danger" data-con-del="' + esc(c.id) + '">삭제</button></div>';
@@ -11270,6 +11291,8 @@
       Array.prototype.forEach.call(root.querySelectorAll("[data-cs-copen]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); var q = el.getAttribute("data-cs-copen").split("|"); csCdocOpen(q[0], Number(q[1]), Number(q[2])); }); });
       Array.prototype.forEach.call(root.querySelectorAll("[data-cs-ccur]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); var q = el.getAttribute("data-cs-ccur").split("|"); csCdocMark(q[0], Number(q[1]), "cur"); }); });
       Array.prototype.forEach.call(root.querySelectorAll("[data-cs-cdel]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); var q = el.getAttribute("data-cs-cdel").split("|"); csCdocMark(q[0], Number(q[1]), "del"); }); });
+      Array.prototype.forEach.call(root.querySelectorAll("[data-cs-crestore]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); var q = el.getAttribute("data-cs-crestore").split("|"); csCdocMark(q[0], Number(q[1]), "restore"); }); });   // v408 보관함
+      Array.prototype.forEach.call(root.querySelectorAll("[data-cs-cpurge]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); var q = el.getAttribute("data-cs-cpurge").split("|"); csCdocPurge(q[0], Number(q[1])); }); });
       Array.prototype.forEach.call(root.querySelectorAll("[data-cs-wladd]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); var c = findProc(el.getAttribute("data-cs-wladd")); var row = root.querySelector('[data-cs-wlform="' + (c ? c.id : "") + '"]'); if (c && row) csWlAdd(c, row); }); });
       Array.prototype.forEach.call(root.querySelectorAll("[data-cs-wldel]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); var p = el.getAttribute("data-cs-wldel").split("|"), c = findProc(p[0]); if (c) csWlDel(c, p[1]); }); });
       Array.prototype.forEach.call(root.querySelectorAll("[data-cs-fld], [data-cs-wl], [data-cs-dnew], [data-cs-pii]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); }); });
