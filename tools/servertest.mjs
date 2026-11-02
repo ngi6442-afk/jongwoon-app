@@ -3963,4 +3963,25 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   delete mem.gw_data['col:bids']; delete mem.gw_data['settings:notify']; delete mem.gw_data['settings:assign'];
 }
 
+{ // ---- 65(11/2) gw-lawwatch 수신 — 키 검증·보관 lawwatch:last·관리자 푸시·bg_recheck·푸시 실패 시 200+note(502 재발 방지) ----
+  const lw65 = require(join(FN, 'gw-lawwatch.js'));
+  const savedKey65 = process.env.BIDS_INGEST_KEY; process.env.BIDS_INGEST_KEY = 'test-ingest-key';
+  const ev65 = (body, key) => ({ httpMethod: 'POST', headers: key ? { 'x-ingest-key': key } : {}, body: JSON.stringify(body) });
+  const AL = '[법령 개정 감지] 산업안전보건법: 21374 → 22122 (20261027 공포)';
+  let r65 = await lw65.handler(ev65({ alerts: [AL] }, 'wrong')); const k1 = r65.statusCode === 403;
+  r65 = await lw65.handler(ev65({ alerts: [] }, 'test-ingest-key')); const k2 = r65.statusCode === 400;
+  const pc65 = pushMock.calls.length; delete mem.gw_data['lawwatch:last'];
+  r65 = await lw65.handler(ev65({ source: 'lawwatch', date: '2026-11-02', alerts: [AL], bg_recheck: [{ id: 'b1', law: '산업안전보건법', mst: 21374 }] }, 'test-ingest-key'));
+  const j65 = JSON.parse(r65.body); const L65 = mem.gw_data['lawwatch:last'];
+  const k3 = r65.statusCode === 200 && j65.status === 'OK' && j65.sent >= 1 && pushMock.calls.length === pc65 + 1 && /법령 워치 — 개정 1건/.test(pushMock.calls[pc65].title) && pushMock.calls[pc65].tag === 'lawwatch'
+    && L65 && L65.date === '2026-11-02' && L65.alerts.length === 1 && L65.bg_recheck.length === 1 && L65.bg_recheck[0].id === 'b1' && L65.bg_recheck[0].mst === 21374;
+  // 푸시가 던져도 보관은 남고 200 + note(수집기가 '전송 실패'로 남기지 않게)
+  const savedTC65 = pushMock.tierCtx; pushMock.tierCtx = async () => { throw new Error('MissingBlobsEnvironmentError'); };
+  delete mem.gw_data['lawwatch:last'];
+  r65 = await lw65.handler(ev65({ source: 'lawwatch', date: '2026-11-02', alerts: [AL] }, 'test-ingest-key')); const j65b = JSON.parse(r65.body);
+  const k4 = r65.statusCode === 200 && j65b.sent === 0 && /PUSH_FAILED/.test(j65b.note) && mem.gw_data['lawwatch:last'] && mem.gw_data['lawwatch:last'].alerts.length === 1;
+  pushMock.tierCtx = savedTC65; process.env.BIDS_INGEST_KEY = savedKey65; delete mem.gw_data['lawwatch:last'];
+  T('65 gw-lawwatch: 잘못된 키 403 · 경보 0 → 400 · 경보 1 → lawwatch:last 보관+bg_recheck+관리자 푸시 1(제목 개정 1건) · 푸시 예외여도 보관 뒤 200+PUSH_FAILED(502 재발 방지)', k1 && k2 && k3 && k4, JSON.stringify([k1, k2, k3, k4, j65, j65b]));
+}
+
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

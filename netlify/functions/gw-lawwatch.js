@@ -4,7 +4,7 @@
 // 인증: 수집봇 공유 시크릿(BIDS_INGEST_KEY, gw-data ingest와 동일 계열) — 헤더 x-ingest-key 또는 body.key.
 // 동작: 전문을 lawwatch:last 에 보관(추후 화면용) + 관리자 전원 푸시(알림함은 sendTo가 자동 기록).
 const push = require('./_lib/push');
-const { store, blobSet } = require('./_lib/blobs');
+const { setupBlobContext, store, blobSet } = require('./_lib/blobs');
 
 const jr = (code, obj) => ({
   statusCode: code,
@@ -14,6 +14,8 @@ const jr = (code, obj) => ({
 
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') return jr(405, { status: 'METHOD_NOT_ALLOWED' });
+  // 11/2 수리: Blob 컨텍스트 설정이 빠져 있었다(다른 함수 29/32는 호출). 첫 실제 경보(11/2 산안법)에서 tierCtx → getStore가 던져 502 — 보관·푸시 둘 다 0건.
+  try { setupBlobContext(event); } catch (e) {}
   let d = {};
   try { d = JSON.parse(event.body || '{}'); } catch (e) { return jr(400, { status: 'BAD_JSON' }); }
 
@@ -37,9 +39,14 @@ exports.handler = async (event) => {
   const title = d.title ? String(d.title).slice(0, 60) : autoTitle; // 수집기 공용화(adwatch 등)
   const body = alerts.slice(0, 3).join('\n').slice(0, 280) + (alerts.length > 3 ? ' 외 ' + (alerts.length - 3) + '건' : '');
 
-  const tcL2 = await push.tierCtx();   // 스캔 1회 — adminIds와 sendTo 활성 필터 공용
-  const ids = tcL2.adminIds;
-  if (!ids.length) return jr(200, { status: 'OK', sent: 0, note: 'NO_ADMIN_SUBS' });
-  const r = await push.sendTo(ids, { title, body, url: './', tag: 'lawwatch' }, { ctx: tcL2 });
-  return jr(200, { status: 'OK', sent: r.sent });
+  try {
+    const tcL2 = await push.tierCtx();   // 스캔 1회 — adminIds와 sendTo 활성 필터 공용
+    const ids = tcL2.adminIds;
+    if (!ids.length) return jr(200, { status: 'OK', sent: 0, note: 'NO_ADMIN_SUBS' });
+    const r = await push.sendTo(ids, { title, body, url: './', tag: 'lawwatch' }, { ctx: tcL2 });
+    return jr(200, { status: 'OK', sent: r.sent });
+  } catch (e) {
+    // 푸시가 죽어도 보관(lawwatch:last)은 끝났으니 200 — 수집기가 '전송 실패'로 오판해 다음 주까지 묻히지 않게. 사유는 응답에.
+    return jr(200, { status: 'OK', sent: 0, note: 'PUSH_FAILED: ' + String(e && e.message || e).slice(0, 80) });
+  }
 };
