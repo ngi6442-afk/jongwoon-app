@@ -2,7 +2,7 @@
 // (진짜 헤드리스 브라우저는 앱 저장소의 no-node_modules 원칙과 충돌 — 이 세션들에서 실제 결함을
 //  잡아온 검증들을 자동화한 것: ID 배선·탭 배선·앱/서버 레지스트리 일치·sw 버전업 누락)
 // 실행: node tools/uismoke.mjs
-import { readFileSync, existsSync } from 'fs';
+import { readFileSync, existsSync, readdirSync } from 'fs';
 import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -1839,6 +1839,13 @@ try {
     && ord15 === 'task_auto_create,task_review,due_digest,leave_request,leave_result,bid_result,bid_fail'
     && Number((swv15.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 415);
 } catch (e) { console.log('  (v415 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ---- (11/2) Blob 컨텍스트 전수: netlify/functions/*.js 중 store(·blobGet(·blobSet(·blobList(를 쓰는 함수는 setupBlobContext( 호출 필수 — gw-lawwatch가 빠져 첫 실제 경보가 502(11/2)
+try {
+  const fdir = join(ROOT, 'netlify', 'functions');
+  const miss = readdirSync(fdir).filter((f) => /^gw-.*\.js$/.test(f)).filter((f) => { const t = readFileSync(join(fdir, f), 'utf8'); return /\b(store|blobGet|blobSet|blobList|blobDelete)\(/.test(t) && !/setupBlobContext\(/.test(t); });
+  T('Blob 컨텍스트 전수: Blob을 쓰는 gw-*.js 전부 setupBlobContext 호출(누락 0)', miss.length === 0, '누락: ' + miss.join(', '));
+} catch (e) { console.log('  (Blob 컨텍스트 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
