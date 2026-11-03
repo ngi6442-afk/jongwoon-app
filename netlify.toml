@@ -40,6 +40,11 @@
 [functions."gw-doneif-cron"]
   schedule = "*/10 * * * *"
 
+# 아침 음성 브리핑 생성(체크 38 D1, v416) — UTC 21:30 = KST 06:30 매일(집 PC 07시 켬 전). 예약 함수는 기동만, 생성은 gw-brief-run-background(15분 한도).
+# 오늘 생성본(brief:day:<날짜>)이 있으면 다시 만들지 않는다. 수동 킥 = gw-cron-kick target 'brief'(크론 백업층·감시 자동 복구층).
+[functions."gw-brief-cron"]
+  schedule = "30 21 * * *"
+
 # 예정(등재만 — appdata data/cron_map.json): gw-digest-0730(30 22 UTC = KST 07:30, 지시 요약 전용 — 지금은 gw-todo-cron 08:00에 통합 v396).
 
 # 정적 파일은 그대로 서빙, /.netlify/functions/* 는 서버리스 함수로.

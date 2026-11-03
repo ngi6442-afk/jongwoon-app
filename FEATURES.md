@@ -1,6 +1,6 @@
 # 종운 그룹웨어 — 기능 대장 (사용자 매뉴얼 원천)
 
-> 살아있는 문서. 기능 추가·변경 시 이 파일을 함께 갱신한다. 기준: v415 (2026-11-02).
+> 살아있는 문서. 기능 추가·변경 시 이 파일을 함께 갱신한다. 기준: v416 (2026-11-03).
 > 세부 변경 이력은 git 커밋 메시지(한글) 참조.
 
 ## 1. 전체 구조
@@ -788,6 +788,13 @@ PM 지시 "문서함 일단 다 올리고 등재결재랑 공개범위 만들어
 - 정정: STAGE_DOCS "완료신고" 석면해체·제거→석면해체/제거, "청구" 국세·지방세→국세/지방세 납세증명(파서가 복합 서류 이름을 나누던 2곳) → proc_v1.json 재export·거울 2층 재빌드(list sha 7eeb1ce6c1d18b44)·push.
 - 배포 전 적대 검토 7건 → 6건 반영: map_del 뒤 같은 정규식 map_add 가 무시되던 재생 순서(map_add 가 map_del 을 되살림·map_del 이 앞선 map_add 를 지움) · 기기 간 동기화 머지(csSyncFromServer)가 stage.docs[] 를 떨어뜨리던 것 → csMergeDocs(k 별 at 늦은 쪽·한쪽만 있는 항목 보존) · 서류 추가 뒤 입력 칸 비움 · 편집 textarea 줄바꿈=" / " · 되돌림 판정은 전체 기록(reverted_of) · __proto__ 키 거부. 수용 1건: 월 사건 로그 clog:contract:YYYY-MM 은 읽고-쓰기 사이 잠금이 없어 같은 초에 두 사람이 누르면 1건이 빠질 수 있다(지표용 로그, 체인은 유지 — 4일차 집계에서 빠진 수를 세지 않도록 참고).
 - 검사: servertest 절 55(40항), uismoke v401(3항), consheet_check v401(10항 — 파서·커버리지 81단계 중 79·체크/해당없음/추가/삭제·머지·html·옛 계약), proctpl diff 0. sw v401.
+
+### v416 (11/3) — 체크 38 아침 음성 브리핑 D1(서버) — 25_사용자인식AI/D1_착수브리핑_20261102.md §3 D1, PM 11/3 "ㄱ"
+- **생성**: `gw-brief-cron`(netlify.toml `30 21 * * *` = KST 06:30 매일, 기동만·흔적 `it:cron:gw-brief-cron:last`) → `gw-brief-run-background`(15분 워커, 내부 토큰 `__brief__`) → `_lib/brief.js generate`: 집계(col:approvals PM 큐·대표 큐·금액 큰 1건, col:tasks 열림·오늘 기한·승인 대기, col:bids 사흘 안 마감·직전 평일 뒤 신규, col:vehicles 30일·경과(매각·말소 제외), col:licenses 30일, 올바로 어제 잡 로그의 그저께분) → 문장(claude-haiku-5-5 effort low, **자리표시만** — 금액·제목·숫자는 Anthropic에 안 감, 전송 직전 scrubPayload) → 숫자 자기검증 2단(채우기 전 숫자·한글 수사·자리표시 / 채운 뒤 facts 밖 숫자·길이 150~300·"그만") → 어긋나면 템플릿 글 → SSML(엔티티 치환) → Azure TTS(koreacentral, `audio-24khz-48kbitrate-mono-mp3`) → `brief:day:<날짜>`(글·메타)·`brief:mp3:<날짜>`(base64) 분리 보관 · `brief:usage:<월>`·`brief:log`(60).
+- **같은 날 생성본이 있으면 예약은 다시 만들지 않는다**(force는 관리자 [지금 1회 생성]만, 하루 5회 상한). 월 상한 가드 고정값 Azure 40만 자(F0 80%)·Claude 100만 토큰 → 넘으면 글 카드·템플릿. ElevenLabs는 호출 경로·목소리 id 칸만(키 없으면 호출 0).
+- **관리자 카드 '아침 음성 브리핑'**(권한관리 › 알림 설정 아래): 켬/끔·제공자(azure / elevenlabs는 키 있을 때만)·목소리·속도 칩(−10/0/+10%)·[목소리 확인](voices/list → `brief:voices`, 선히 유무)·[지금 1회 생성]·[미리 듣기](`brief_mp3` base64 → Audio)·오늘 생성본·사용량·최근 7일·되돌리기. 서버 `brief_get/set/revert/run/voices/mp3`(관리자 전용·낙관락 `BRIEF_STALE`·감사 '브리핑설정'·'브리핑되돌림'·'브리핑생성'). `gw-cron-kick` target `brief`(크론 백업층·감시 자동 복구층·검증용).
+- 키 값은 env에서 헤더로만(응답 env는 있음/없음). D2(집 PC 재생기·잠금해제 트리거·브리핑 토큰)·D3(정지 명령·폴백)·D4(판정 로그·상한 칸·cron_map 감시 편입)·D5(리허설)는 다음 날짜.
+- 검사: brieftest(순수 함수 25항) · servertest 절 66 · uismoke(크론 등록 대조에 gw-brief-cron, Blob 컨텍스트 전수). sw v416.
 
 ### v415 (11/2) — C3-2 입찰 알림 2종(settings:notify bid_result·bid_fail)
 - 설계 3-1 안착 ③ "개찰 전건·낙찰 지시 관리자 전원 푸시 → 낙찰·수집 2회 실패·게이트 위반만 즉시, 나머지 아침 요약". `bid_result` each(현행)|**award★**: 낙찰만 즉시 `bids-award`(입찰 담당 `settings:assign bid:` + PM, 우선기기), 유찰은 `gw-todo-cron` 08:00 요약 1줄 `bids-lost-날짜`(어제·오늘 `result.checked`, 담당 없으면 관리자). `bid_fail` admins(현행)|**assignee★**: watch.py 입찰 감시 경보(태그 `watch-입찰-날짜`)를 입찰 담당에게도.

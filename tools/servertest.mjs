@@ -3984,4 +3984,30 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   T('65 gw-lawwatch: 잘못된 키 403 · 경보 0 → 400 · 경보 1 → lawwatch:last 보관+bg_recheck+관리자 푸시 1(제목 개정 1건) · 푸시 예외여도 보관 뒤 200+PUSH_FAILED(502 재발 방지)', k1 && k2 && k3 && k4, JSON.stringify([k1, k2, k3, k4, j65, j65b]));
 }
 
+{ // ---- 66(v416) 아침 음성 브리핑(체크 38 D1) — brief_get 관리자 전용·기본값 · brief_set 검증/낙관락/NO_CHANGE/감사 · revert · brief_mp3 404→200 · brief_run 403/기동 실패 500/하루 상한 429 ----
+  delete mem.gw_data['settings:brief']; delete mem.gw_data['brief:log'];
+  const today66 = new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);
+  let r66 = await call({ action: 'brief_get' }, tokW); const g0 = r66.code === 403;
+  r66 = await call({ action: 'brief_get' }, tokA);
+  const g1 = r66.code === 200 && r66.body.values && r66.body.values.provider === 'azure' && r66.body.values.voice_azure === 'ko-KR-SunHiNeural' && r66.body.values.on === true && r66.body.doc === null && r66.body.usage && r66.body.usage.cap_azure === 400000 && r66.body.env && typeof r66.body.env.azure === 'boolean' && r66.body.rates.length === 3 && r66.body.today === today66 && !/AZURE_SPEECH_KEY|xi-api-key/.test(JSON.stringify(r66.body));
+  r66 = await call({ action: 'brief_set', field: 'rate', value: '+50%' }, tokA); const s0 = r66.code === 400 && r66.body.error_code === 'BAD_VALUE';
+  r66 = await call({ action: 'brief_set', field: 'rate', value: '+10%', base: 0 }, tokA); const s1 = r66.code === 200 && r66.body.values.rate === '+10%' && !!r66.body.prev;
+  const base66 = r66.body.updated_at;
+  r66 = await call({ action: 'brief_set', field: 'rate', value: '+10%', base: base66 }, tokA); const s2 = r66.code === 400 && r66.body.error_code === 'NO_CHANGE';
+  r66 = await call({ action: 'brief_set', field: 'on', value: false, base: 1 }, tokA); const s3 = r66.code === 409 && r66.body.error_code === 'BRIEF_STALE';
+  r66 = await call({ action: 'brief_set', field: 'on', value: false, base: base66 }, tokA); const s4 = r66.code === 200 && r66.body.values.on === false && r66.body.values.rate === '+10%';
+  const aud66 = auditMock.logs.filter((e) => e.ev && e.ev[0] && e.ev[0].op === '브리핑설정').length === 2;
+  r66 = await call({ action: 'brief_revert', base: r66.body.updated_at }, tokA); const v0 = r66.code === 200 && r66.body.values.on === true && r66.body.values.rate === '+10%';
+  r66 = await call({ action: 'brief_mp3' }, tokA); const m0 = r66.code === 404 && r66.body.error_code === 'NO_MP3';
+  mem.gw_data['brief:mp3:' + today66] = { b64: 'AAAA', bytes: 3, fmt: 'audio/mpeg' };
+  r66 = await call({ action: 'brief_mp3' }, tokA); const m1 = r66.code === 200 && r66.body.b64 === 'AAAA';
+  r66 = await call({ action: 'brief_run' }, tokW); const n0 = r66.code === 403;
+  r66 = await call({ action: 'brief_run' }, tokA); const n1 = r66.code === 500 && /KICKOFF/.test(r66.body.error_code);   // test.local은 기동 불가 — 워커 호출 경로·실패 처리만
+  mem.gw_data['brief:log'] = { schema: 1, items: [1, 2, 3, 4, 5].map((i) => ({ ts: i, date: today66, by: 'admin:uadmin', mode: 'template' })) };
+  r66 = await call({ action: 'brief_run' }, tokA); const n2 = r66.code === 429 && r66.body.error_code === 'DAILY_CAP';
+  T('66 브리핑: 비관리자 403 · 기본값(azure·선히·켬·상한·키 값 없음) · set 검증 400/낙관락 409/NO_CHANGE/감사 2 · revert · mp3 404→200 · run 403/기동 실패 500/하루 상한 429',
+    g0 && g1 && s0 && s1 && s2 && s3 && s4 && aud66 && v0 && m0 && m1 && n0 && n1 && n2, JSON.stringify([g0, g1, s0, s1, s2, s3, s4, aud66, v0, m0, m1, n0, n1, n2]));
+  Object.keys(mem.gw_data).forEach((k) => { if (/^(brief:|settings:brief)/.test(k)) delete mem.gw_data[k]; });
+}
+
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

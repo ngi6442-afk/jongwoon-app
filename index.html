@@ -1613,6 +1613,9 @@
     <!-- 알림 설정(v396, 공통 기반 3 첫 시범) — 지시 이벤트 3종의 수신자·방식. 기본값 = 현행. 변경 전 판 보존 → [되돌리기]. 관리자만(서버 강제)·감사로그·낙관락 -->
     <div class="dash-sec" style="margin:16px 0 8px;"><h2>지시 알림 설정</h2></div>
     <div class="card" id="notifyCard"><div class="loading">불러오는 중…</div></div>
+    <!-- 아침 음성 브리핑(v416, 체크 38 D1) — 매일 06:30 서버 생성(집계 → Claude 자리표시 문장 → Azure 선히 mp3). 설정(켬·제공자·목소리·속도)·오늘 생성본·사용량 상한·[목소리 확인]·[지금 1회 생성]·[미리 듣기]. 관리자만(서버 강제)·감사로그·낙관락·되돌리기 -->
+    <div class="dash-sec" style="margin:16px 0 8px;"><h2>아침 음성 브리핑</h2></div>
+    <div class="card" id="briefCard"><div class="loading">불러오는 중…</div></div>
     <!-- 감시 경보 라벨(v399, 공통 기반 14) — 감시 항목별 완충/승격/무음. IT 운영 책임자용. 라벨은 appdata watch.py가 09·16시 판정 때 읽는다 -->
     <div class="dash-sec" style="margin:16px 0 8px;"><h2>감시 경보 라벨</h2></div>
     <div class="card" id="alertsCard"><div class="loading">불러오는 중…</div></div>
@@ -21024,6 +21027,7 @@
     renderAlertsCard();   // 감시 경보 라벨(v399) — 알림 설정 아래
     renderConProcCard();  // 계약 골조·목록 거울(v400) — 경보 라벨 아래
     renderConLearnCard(); // 계약 서류 학습(v411) — 거울 아래
+    renderBriefCard();    // 아침 음성 브리핑(v416, 체크 38 D1) — 카드 자리는 알림 설정 아래(HTML 순서), 호출은 맨 뒤(uismoke v399 배선 검사 유지)
     renderDocSettings();   // 문서함 설정(v314) — 등급표 아래
   }
   // ---- 문서함 설정(v314) — 분류별 기본 공개범위 칩 + 등재 결재 게이트. 등급표 카드와 같은 결(칩·낙관락 base·토스트·감사로그). 관리자만(서버도 강제) ----
@@ -21301,6 +21305,94 @@
       renderNotifyCard();
     }).catch(function(){ notifySaving = false; alert("알림 설정 저장 실패(네트워크) — 다시 시도해주세요."); });
   }
+
+  // ---- 아침 음성 브리핑(v416, 체크 38 D1 — 25_사용자인식AI/D1_착수브리핑_20261102.md §3). 설정(켬·제공자·목소리·속도)·오늘 생성본·사용량·최근 7일·
+  //      [목소리 확인]·[지금 1회 생성]·[미리 듣기]. 관리자만(서버 강제 brief_*)·감사로그·낙관락·되돌리기 1클릭. 키 값은 서버 env에만(응답 env는 있음/없음).
+  var briefBase = 0, briefSaving = false, briefVals = null, briefAudio = null;
+  function briefFmtTs(ts){ return ts ? new Date(ts).toLocaleString("ko-KR", { hour12: false }).slice(0, 16) : "-"; }
+  function renderBriefCard(){
+    var host = document.getElementById("briefCard"); if (!host) return;
+    gwCall("gw-data", { action: "brief_get" }).then(function(res){
+      if (res.status !== 200 || !res.body || !res.body.values){ host.innerHTML = '<div class="empty-line">브리핑 설정을 불러오지 못했습니다 — 새로고침 후 다시 시도해주세요.</div>'; return; }
+      var b = res.body; briefVals = b.values; briefBase = b.updated_at || 0;
+      var chip = function(on, attr, label){ return '<button type="button" style="' + apprGradeChipCss(on ? 1 : 0, on) + '" ' + attr + '>' + label + '</button>'; };
+      var row = function(label, inner){ return '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:7px 2px;border-bottom:1px solid var(--line);"><span style="min-width:150px;font-size:13px;font-weight:600;">' + label + '</span><span style="display:inline-flex;gap:4px;flex-wrap:wrap;align-items:center;">' + inner + '</span></div>'; };
+      var v = b.values, env = b.env || {};
+      var html = row('매일 06:30 생성', chip(v.on, 'data-brief-set="on:1"', '켬') + ' ' + chip(!v.on, 'data-brief-set="on:0"', '끔(글만)'));
+      html += row('목소리 제공자', chip(v.provider === "azure", 'data-brief-set="provider:azure"', 'Azure 선히' + (env.azure ? '' : ' (키 없음)')) + ' '
+        + (env.elevenlabs ? chip(v.provider === "elevenlabs", 'data-brief-set="provider:elevenlabs"', 'ElevenLabs') : '<span class="empty-line">ElevenLabs — ELEVENLABS_API_KEY를 넣고 다음 배포 뒤 열립니다</span>'));
+      html += row('목소리', '<input id="briefVoiceAz" value="' + esc(v.voice_azure) + '" style="width:190px;font-size:12px;" placeholder="ko-KR-SunHiNeural"> <button type="button" class="link-btn" id="briefVoiceSave">저장</button>'
+        + (env.elevenlabs ? ' · ElevenLabs id <input id="briefVoiceEl" value="' + esc(v.voice_elevenlabs || "") + '" style="width:150px;font-size:12px;"> <button type="button" class="link-btn" id="briefVoiceElSave">저장</button>' : '')
+        + ' <button type="button" class="link-btn" id="briefVoicesBtn">목소리 확인</button>');
+      html += row('속도', (b.rates || []).map(function(r){ return chip(v.rate === r, 'data-brief-set="rate:' + r + '"', r === "-10%" ? "느리게" : r === "+10%" ? "빠르게" : "보통"); }).join(" "));
+      var d = b.doc;
+      var line = d ? ('생성 ' + briefFmtTs(d.ts) + ' · ' + (d.mode === "claude" ? "Claude 문장" : "템플릿" + (d.reason ? "(" + esc(d.reason) + ")" : "")) + ' · ' + d.len + '자 · '
+        + (d.mp3 && d.mp3.ok ? 'mp3 ' + Math.round((d.mp3.bytes || 0) / 1024) + 'KB' : 'mp3 없음(' + esc((d.mp3 && d.mp3.reason) || '-') + ')')
+        + (d.cols_missing && d.cols_missing.length ? ' · 못 읽은 컬렉션 ' + esc(d.cols_missing.join(",")) : '')) : '오늘 생성본 없음 — 06:30 예약 또는 [지금 1회 생성]';
+      html += '<div style="padding:8px 2px;border-bottom:1px solid var(--line);"><div style="font-size:13px;font-weight:600;">오늘(' + esc(b.today) + ') 브리핑</div><div class="empty-line">' + line + '</div>'
+        + (d ? '<div style="font-size:13px;line-height:1.6;margin-top:4px;white-space:pre-wrap;">' + esc(d.text) + '</div>' : '')
+        + '<div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap;"><button type="button" class="link-btn" id="briefRunBtn">지금 1회 생성</button>'
+        + (d && d.mp3 && d.mp3.ok ? '<button type="button" class="link-btn" id="briefPlayBtn">미리 듣기</button><button type="button" class="link-btn" id="briefStopBtn" style="display:none;">정지</button>' : '') + '</div>'
+        + (b.job ? '<div class="empty-line">마지막 실행: ' + esc(b.job.status) + ' · ' + briefFmtTs(b.job.ts) + (b.job.summary ? ' · ' + esc(b.job.summary.mode) + (b.job.summary.mp3 ? ' · mp3' : ' · mp3 없음(' + esc(b.job.summary.mp3_reason || '') + ')') : (b.job.code ? ' · ' + esc(b.job.code) : '')) + '</div>' : '') + '</div>';
+      var u = b.usage || {};
+      html += '<div class="empty-line" style="margin-top:6px;">이달 사용량 — Azure ' + (u.azure_chars || 0).toLocaleString() + '자 / 상한 ' + (u.cap_azure || 0).toLocaleString() + '자(' + (u.azure_pct || 0) + '%) · Claude ' + (u.claude_tokens || 0).toLocaleString() + '토큰 / 상한 ' + (u.cap_claude || 0).toLocaleString() + '(' + (u.claude_pct || 0) + '%) · 생성 ' + (u.runs || 0) + '회 · 상한을 넘으면 글 카드·템플릿'
+        + (b.voices ? ' · 목소리 확인 ' + briefFmtTs(b.voices.ts) + ': 한국어 ' + (b.voices.ko_count || 0) + '종, 선히 ' + (b.voices.sunhi ? '있음' : '없음') : '') + '</div>';
+      var lg = b.log || [];
+      if (lg.length) html += '<div style="font-size:12px;margin-top:6px;">' + lg.map(function(x){ return esc(briefFmtTs(x.ts)) + ' · ' + esc(x.by) + ' · ' + (x.mode === "claude" ? "Claude" : "템플릿" + (x.reason ? "(" + esc(x.reason) + ")" : "")) + ' · ' + (x.len || 0) + '자 · ' + (x.mp3 ? 'mp3' : 'mp3 없음(' + esc(x.mp3_reason || '') + ')') + ' · ' + (x.ms || 0) + 'ms'; }).join('<br>') + '</div>';
+      html += '<div class="empty-line" style="margin-top:6px;">D1 = 서버 생성·보관·이 카드까지. 집 PC 잠금해제 재생(D2)·"브리핑 그만"(D3)은 다음 날짜에. 금액·제목은 Anthropic에 가지 않고(자리표시) 키 값은 서버 환경변수에만 있습니다.'
+        + (b.prev ? ' · 직전 설정 보존 <button type="button" class="link-btn" id="briefRevertBtn">되돌리기</button>' : '') + '</div>';
+      host.innerHTML = html;
+      Array.prototype.forEach.call(host.querySelectorAll("[data-brief-set]"), function(btn){ btn.addEventListener("click", function(){ var p = btn.getAttribute("data-brief-set").split(":"); briefSet({ field: p[0], value: p[0] === "on" ? (p[1] === "1") : p[1] }); }); });
+      var vs = document.getElementById("briefVoiceSave"); if (vs) vs.addEventListener("click", function(){ briefSet({ field: "voice_azure", value: (document.getElementById("briefVoiceAz").value || "").trim() }); });
+      var ve = document.getElementById("briefVoiceElSave"); if (ve) ve.addEventListener("click", function(){ briefSet({ field: "voice_elevenlabs", value: (document.getElementById("briefVoiceEl").value || "").trim() }); });
+      var rb = document.getElementById("briefRevertBtn"); if (rb) rb.addEventListener("click", function(){ if (!confirm("브리핑 설정을 직전 판으로 되돌립니다. 계속할까요?")) return; briefSet({ revert: true }); });
+      var vb = document.getElementById("briefVoicesBtn"); if (vb) vb.addEventListener("click", briefVoices);
+      var runb = document.getElementById("briefRunBtn"); if (runb) runb.addEventListener("click", briefRun);
+      var pb = document.getElementById("briefPlayBtn"); if (pb) pb.addEventListener("click", briefPlay);
+      var sb = document.getElementById("briefStopBtn"); if (sb) sb.addEventListener("click", briefStop);
+    }).catch(function(){ host.innerHTML = '<div class="empty-line">브리핑 설정을 불러오지 못했습니다(네트워크).</div>'; });
+  }
+  function briefSet(p){
+    if (briefSaving) return;
+    if (!p.revert && briefVals && briefVals[p.field] === p.value) return;
+    briefSaving = true;
+    var body = { action: p.revert ? "brief_revert" : "brief_set", base: briefBase };
+    if (!p.revert){ body.field = p.field; body.value = p.value; }
+    gwCall("gw-data", body).then(function(res){
+      briefSaving = false;
+      if (res.status === 409){ apprToastShow("다른 관리자가 방금 브리핑 설정을 변경했습니다 — 다시 불러왔습니다"); renderBriefCard(); return; }
+      if (res.status !== 200){ if (!(res.body && res.body.error_code === "NO_CHANGE")) alert("브리핑 설정 저장 실패 (" + ((res.body && res.body.error_code) || res.status) + ")"); renderBriefCard(); return; }
+      apprToastShow(p.revert ? "브리핑 설정을 직전 판으로 되돌렸습니다" : "브리핑 설정 저장 — 다음 생성부터 적용됩니다");
+      renderBriefCard();
+    }).catch(function(){ briefSaving = false; alert("브리핑 설정 저장 실패(네트워크)"); });
+  }
+  function briefVoices(){
+    apprToastShow("Azure 목소리 목록 확인 중…");
+    gwCall("gw-data", { action: "brief_voices" }).then(function(res){
+      if (res.status !== 200){ alert("목소리 확인 실패 (" + ((res.body && res.body.error_code) || res.status) + ")"); return; }
+      apprToastShow("한국어 목소리 " + (res.body.ko_count || 0) + "종 · 선히 " + (res.body.sunhi ? "있음" : "없음"));
+      renderBriefCard();
+    }).catch(function(){ alert("목소리 확인 실패(네트워크)"); });
+  }
+  function briefRun(){
+    if (!confirm("오늘 브리핑을 지금 다시 만듭니다(Claude·Azure 유료 호출, 하루 5회 상한). 계속할까요?")) return;
+    gwCall("gw-data", { action: "brief_run" }).then(function(res){
+      if (res.status !== 200){ alert("생성 요청 실패 (" + ((res.body && res.body.error_code) || res.status) + ")"); return; }
+      apprToastShow("생성 요청됨 — 약 45초 뒤 카드가 새로 고쳐집니다");
+      setTimeout(renderBriefCard, 45000);
+    }).catch(function(){ alert("생성 요청 실패(네트워크)"); });
+  }
+  function briefPlay(){
+    gwCall("gw-data", { action: "brief_mp3" }).then(function(res){
+      if (res.status !== 200 || !res.body || !res.body.b64){ alert("mp3가 없습니다 (" + ((res.body && res.body.error_code) || res.status) + ")"); return; }
+      briefStop();
+      briefAudio = new Audio("data:" + (res.body.fmt || "audio/mpeg") + ";base64," + res.body.b64);
+      var sb = document.getElementById("briefStopBtn"); if (sb) sb.style.display = "";
+      briefAudio.onended = function(){ if (sb) sb.style.display = "none"; };
+      briefAudio.play().catch(function(){ alert("재생이 막혔습니다 — 화면을 한 번 누른 뒤 다시 시도해주세요."); });
+    }).catch(function(){ alert("mp3 불러오기 실패(네트워크)"); });
+  }
+  function briefStop(){ if (briefAudio){ try { briefAudio.pause(); } catch(e){} briefAudio = null; } var sb = document.getElementById("briefStopBtn"); if (sb) sb.style.display = "none"; }
 
   // ---- 감시 경보 라벨(v399, 공통 기반 14 · 착수 브리핑 A7 2일차). 감시 항목(appdata cron_map watch=true id)별 완충(기본)/경보 승격/7일 무음.
   //      새로 편입된 감시는 1주간 경보가 안내로 낮춰지고, 승격을 누르면 즉시 경보. 라벨은 appdata watch.py가 판정 때 it:alerts로 읽는다. 관리자 전용·감사로그 ----

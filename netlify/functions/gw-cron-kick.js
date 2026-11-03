@@ -12,9 +12,10 @@ exports.handler = async function (event, context) {
   if (!secret || String(d.key || '').trim() !== secret)
     return { statusCode: 403, body: JSON.stringify({ ok: false, code: 'BAD_INGEST_KEY' }) };
   const target = String(d.target || '');
-  if (target !== 'allbaro' && target !== 'hwakwan')
+  if (target !== 'allbaro' && target !== 'hwakwan' && target !== 'brief')
     return { statusCode: 400, body: JSON.stringify({ ok: false, code: 'BAD_TARGET' }) };
   // 크론 모듈의 handler를 그대로 실행 — event를 통째로 넘겨 blobs 컨텍스트(잠금 확인)도 스케줄 실행과 동일하게
-  const mod = require(target === 'hwakwan' ? './gw-hwakwan-cron' : './gw-allbaro-cron');
+  // v416 brief = 아침 음성 브리핑 06:30 크론(오늘 생성본이 있으면 무동작 — 멱등)
+  const mod = require(target === 'hwakwan' ? './gw-hwakwan-cron' : target === 'brief' ? './gw-brief-cron' : './gw-allbaro-cron');
   return mod.handler(event, context);
 };

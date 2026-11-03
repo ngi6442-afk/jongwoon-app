@@ -12,6 +12,7 @@ const AL = require('./_lib/apprlearn');   // v413 결재 학습 신호(clog:appr
 const DONEIF = require('./_lib/doneif');   // v413 clogAppend(해시 체인) 재사용
 const push = require('./_lib/push');
 const tier = require('./_lib/tier');   // 관리자 등급(v321) — retired 판정식 공용. 게이트는 push.tierCtx()(명시 tier·부트스트랩·퇴사 제외, 9/6 검증 S1)
+const BRIEF = require('./_lib/brief');   // v416 아침 음성 브리핑(체크 38 D1) — 설정·조회·기동(생성은 워커)
 
 const DATA = 'gw_data';
 const USERS = 'gw_users';
@@ -1703,6 +1704,104 @@ async function handleDoneifSet(event, d, R) {
   if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
   try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'tasks', ev: [{ op: '앱기준설정', id: '', t: '완료 신호 자동 전환 ' + (cur.on ? '켬' : '끔') + '→' + (d.on ? '켬' : '끔') }] }); } catch (e) {}
   return jr(200, { status: 'OK', on: d.on, updated_at: doc.updated_at, request_id: R });
+}
+// ---- 아침 음성 브리핑 settings:brief · 오늘 생성본 · 사용량(체크 38 D1, v416 — 브리핑 §3 D1 관리자 카드) ----
+// 관리자만(서버 강제). 생성은 워커(gw-brief-run-background, 내부 토큰 __brief__)가 하고 여기는 설정(기본값·prev 1판·되돌리기·감사로그·낙관락)·조회·기동·목소리 확인·mp3 꺼내기만.
+// 키 값은 어떤 응답에도 싣지 않는다 — env는 있음/없음만(brief_get.env).
+async function briefAdmin(event, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return { res: jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R }) };
+  if (!c.member.admin) return { res: jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R }) };
+  return { c: c };
+}
+function briefDocPublic(doc) {
+  if (!doc) return null;
+  return { date: doc.date, ts: doc.ts, by: doc.by, mode: doc.mode, reason: doc.reason, text: doc.text, len: doc.len, facts: doc.facts, cols_missing: doc.cols_missing || [],
+    provider: doc.provider, voice: doc.voice, rate: doc.rate, mp3: doc.mp3, claude: doc.claude, ms: doc.ms, log: doc.log || [] };
+}
+async function handleBriefGet(event, d, R) {
+  const a = await briefAdmin(event, R); if (a.res) return a.res;
+  const st = store(DATA); const today = BRIEF.kstToday();
+  const s = await BRIEF.settingsRead(st);
+  let doc = null, job = null, voices = null;
+  try { const r = await blobGet(st, 'brief:day:' + today); if (r.ok && r.data) doc = r.data; } catch (e) {}
+  try { const r = await blobGet(st, 'brief:job:last'); if (r.ok && r.data) job = r.data; } catch (e) {}
+  try { const r = await blobGet(st, 'brief:voices'); if (r.ok && r.data) voices = r.data; } catch (e) {}
+  const usage = await BRIEF.usageRead(st, today);
+  const env = BRIEF.azureEnv();
+  return jr(200, Object.assign({ status: 'OK', request_id: R, today: today, doc: briefDocPublic(doc), job: job, voices: voices,
+    usage: Object.assign(usage, BRIEF.capState(usage), { cap_azure: BRIEF.CAP_AZURE_CHARS, cap_claude: BRIEF.CAP_CLAUDE_TOKENS }),
+    env: { azure: env.ok, azure_region: env.region, elevenlabs: !!String(process.env.ELEVENLABS_API_KEY || '').trim(), claude: !!String(process.env.GW_ANTHROPIC_KEY || '').trim() },
+    log: await BRIEF.logRead(st, 7), admin_runs_per_day: BRIEF.ADMIN_RUNS_PER_DAY, model: BRIEF.MODEL }, BRIEF.settingsPublic(s)));
+}
+async function handleBriefSet(event, d, R) {
+  const a = await briefAdmin(event, R); if (a.res) return a.res; const c = a.c;
+  const field = String(d.field || '');
+  const value = (field === 'on') ? (d.value === true) : String(d.value == null ? '' : d.value).trim();
+  if (!BRIEF.settingsValid(field, value)) return jr(400, { status: 'REJECTED', error_code: 'BAD_VALUE', request_id: R });
+  const st = store(DATA); const s = await BRIEF.settingsRead(st);
+  if (d.base !== undefined && Number(d.base) !== Number(s.updated_at || 0)) return jr(409, { status: 'CONFLICT', error_code: 'BRIEF_STALE', request_id: R });
+  if (s.values[field] === value) return jr(400, { status: 'REJECTED', error_code: 'NO_CHANGE', request_id: R });
+  const next = Object.assign({}, s.values); next[field] = value;
+  const doc = { schema: 1, values: next, prev: { values: s.values, updated_at: s.updated_at || 0, updated_by: s.updated_by || '' }, updated_by: c.member.id, updated_at: Date.now() };
+  const w = await blobSet(st, BRIEF.SETTINGS_KEY, doc);
+  if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
+  try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'tasks', ev: [{ op: '브리핑설정', id: field, t: field + ' ' + String(s.values[field]) + '→' + String(value) }] }); } catch (e) {}
+  return jr(200, Object.assign({ status: 'OK', request_id: R }, BRIEF.settingsPublic({ values: next, prev: doc.prev, updated_at: doc.updated_at, updated_by: doc.updated_by })));
+}
+async function handleBriefRevert(event, d, R) {
+  const a = await briefAdmin(event, R); if (a.res) return a.res; const c = a.c;
+  const st = store(DATA); const s = await BRIEF.settingsRead(st);
+  if (!s.prev || !s.prev.values) return jr(400, { status: 'REJECTED', error_code: 'NO_PREV', request_id: R });
+  if (d.base !== undefined && Number(d.base) !== Number(s.updated_at || 0)) return jr(409, { status: 'CONFLICT', error_code: 'BRIEF_STALE', request_id: R });
+  const vals = BRIEF.settingsNormalize(s.prev.values);
+  const doc = { schema: 1, values: vals, prev: { values: s.values, updated_at: s.updated_at || 0, updated_by: s.updated_by || '' }, updated_by: c.member.id, updated_at: Date.now() };
+  const w = await blobSet(st, BRIEF.SETTINGS_KEY, doc);
+  if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
+  try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'tasks', ev: [{ op: '브리핑되돌림', id: '', t: '브리핑 설정 직전 판으로' }] }); } catch (e) {}
+  return jr(200, Object.assign({ status: 'OK', request_id: R }, BRIEF.settingsPublic({ values: vals, prev: doc.prev, updated_at: doc.updated_at, updated_by: doc.updated_by })));
+}
+// [지금 1회 생성] — 오늘 생성본이 있어도 다시 만든다(force). 유료 호출이라 하루 상한(ADMIN_RUNS_PER_DAY). 워커 기동만(202) — 결과는 brief_get.job.
+async function handleBriefRun(event, d, R) {
+  const a = await briefAdmin(event, R); if (a.res) return a.res; const c = a.c;
+  const st = store(DATA); const today = BRIEF.kstToday();
+  const recent = await BRIEF.logRead(st, 60);
+  const n = recent.filter(function (x) { return x && x.date === today && /^admin:/.test(String(x.by || '')); }).length;
+  if (n >= BRIEF.ADMIN_RUNS_PER_DAY) return jr(429, { status: 'REJECTED', error_code: 'DAILY_CAP', runs: n, request_id: R });
+  const s = require('./_lib/session').issueSession({ id: '__brief__', role: 'system' });
+  if (!s.ok) return jr(500, { status: 'ERROR', error_code: s.code || 'SERVER_CONFIG_MISSING', request_id: R });
+  const base = String(process.env.URL || '').replace(/\/$/, '');
+  if (!base) return jr(500, { status: 'ERROR', error_code: 'NO_SITE_URL', request_id: R });
+  const job = 'brief_admin_' + today + '_' + Date.now().toString(36);
+  try {
+    const resp = await fetch(base + '/.netlify/functions/gw-brief-run-background', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + s.token },
+      body: JSON.stringify({ job: job, by: 'admin:' + c.member.id, force: true }),
+    });
+    if (!resp.ok && resp.status !== 202) return jr(500, { status: 'ERROR', error_code: 'KICKOFF_HTTP_' + resp.status, request_id: R });
+  } catch (e) { return jr(500, { status: 'ERROR', error_code: 'KICKOFF_FAILED', request_id: R }); }
+  try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'tasks', ev: [{ op: '브리핑생성', id: today, t: '[지금 1회 생성] 요청 ' + job }] }); } catch (e) {}
+  return jr(200, { status: 'OK', queued: true, job: job, today: today, request_id: R });
+}
+// [목소리 확인] — Azure voices/list(실호출, 무료)에서 ko-KR 목소리와 선히 유무. 결과는 brief:voices에 보관(이름만).
+async function handleBriefVoices(event, d, R) {
+  const a = await briefAdmin(event, R); if (a.res) return a.res;
+  const st = store(DATA);
+  let v;
+  try { v = await BRIEF.azureVoices(); } catch (e) { v = { ok: false, code: String((e && e.message) || e).slice(0, 40) }; }
+  if (!v.ok) return jr(502, { status: 'ERROR', error_code: v.code || 'AZURE_FAILED', request_id: R });
+  const doc = { schema: 1, ts: Date.now(), region: v.region, total: v.total, ko: (v.ko || []).slice(0, 40), ko_count: (v.ko || []).length, sunhi: v.sunhi };
+  try { await blobSet(st, 'brief:voices', doc); } catch (e) {}
+  return jr(200, Object.assign({ status: 'OK', request_id: R }, doc));
+}
+// [미리 듣기] — 그날 mp3 base64(관리자만). 브리핑 토큰 경로는 D2.
+async function handleBriefMp3(event, d, R) {
+  const a = await briefAdmin(event, R); if (a.res) return a.res;
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(String(d.date || '')) ? String(d.date) : BRIEF.kstToday();
+  const st = store(DATA);
+  let r = null; try { r = await blobGet(st, 'brief:mp3:' + date); } catch (e) { r = null; }
+  if (!r || !r.ok || !r.data || !r.data.b64) return jr(404, { status: 'NOT_FOUND', error_code: 'NO_MP3', date: date, request_id: R });
+  return jr(200, { status: 'OK', request_id: R, date: date, fmt: r.data.fmt || 'audio/mpeg', bytes: r.data.bytes || 0, b64: r.data.b64 });
 }
 // ---- 감시 경보 라벨 it:alerts (v399 — 공통 기반 14 · 착수 브리핑 A7 2일차). 감시 항목(크론 지도 id)별 라벨 {level, until, by, ts}.
 // level: 'warn'(기본 — 편입 뒤 1주는 경보를 안내로 낮춤) · 'alert'(승격 1클릭 — 즉시 경보) · 'mute'(7일 무음, until). IT 운영 책임자(관리자) 전용·감사로그.
@@ -3686,6 +3785,12 @@ async function handlerInner(event) {
     if (d && d.action === 'notify_revert') return await handleNotifyRevert(event, d, R);
     if (d && d.action === 'doneif_get') return await handleDoneifGet(event, d, R);
     if (d && d.action === 'doneif_set') return await handleDoneifSet(event, d, R);
+    if (d && d.action === 'brief_get') return await handleBriefGet(event, d, R);   // v416 아침 음성 브리핑(체크 38 D1)
+    if (d && d.action === 'brief_set') return await handleBriefSet(event, d, R);
+    if (d && d.action === 'brief_revert') return await handleBriefRevert(event, d, R);
+    if (d && d.action === 'brief_run') return await handleBriefRun(event, d, R);
+    if (d && d.action === 'brief_voices') return await handleBriefVoices(event, d, R);
+    if (d && d.action === 'brief_mp3') return await handleBriefMp3(event, d, R);
     if (d && d.action === 'alerts_get') return await handleAlertsGet(event, d, R);
     if (d && d.action === 'alerts_set') return await handleAlertsSet(event, d, R);
     if (d && d.action === 'con_proc_get') return await handleConProcGet(event, d, R);
