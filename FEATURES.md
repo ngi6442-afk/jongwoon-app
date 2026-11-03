@@ -1,6 +1,6 @@
 # 종운 그룹웨어 — 기능 대장 (사용자 매뉴얼 원천)
 
-> 살아있는 문서. 기능 추가·변경 시 이 파일을 함께 갱신한다. 기준: v416 (2026-11-03).
+> 살아있는 문서. 기능 추가·변경 시 이 파일을 함께 갱신한다. 기준: v417 (2026-11-03).
 > 세부 변경 이력은 git 커밋 메시지(한글) 참조.
 
 ## 1. 전체 구조
@@ -788,6 +788,13 @@ PM 지시 "문서함 일단 다 올리고 등재결재랑 공개범위 만들어
 - 정정: STAGE_DOCS "완료신고" 석면해체·제거→석면해체/제거, "청구" 국세·지방세→국세/지방세 납세증명(파서가 복합 서류 이름을 나누던 2곳) → proc_v1.json 재export·거울 2층 재빌드(list sha 7eeb1ce6c1d18b44)·push.
 - 배포 전 적대 검토 7건 → 6건 반영: map_del 뒤 같은 정규식 map_add 가 무시되던 재생 순서(map_add 가 map_del 을 되살림·map_del 이 앞선 map_add 를 지움) · 기기 간 동기화 머지(csSyncFromServer)가 stage.docs[] 를 떨어뜨리던 것 → csMergeDocs(k 별 at 늦은 쪽·한쪽만 있는 항목 보존) · 서류 추가 뒤 입력 칸 비움 · 편집 textarea 줄바꿈=" / " · 되돌림 판정은 전체 기록(reverted_of) · __proto__ 키 거부. 수용 1건: 월 사건 로그 clog:contract:YYYY-MM 은 읽고-쓰기 사이 잠금이 없어 같은 초에 두 사람이 누르면 1건이 빠질 수 있다(지표용 로그, 체인은 유지 — 4일차 집계에서 빠진 수를 세지 않도록 참고).
 - 검사: servertest 절 55(40항), uismoke v401(3항), consheet_check v401(10항 — 파서·커버리지 81단계 중 79·체크/해당없음/추가/삭제·머지·html·옛 계약), proctpl diff 0. sw v401.
+
+### v417 (11/3) — 카드 10 자동 지시 서버 규칙 3건(공통 바탕 + site·veh·worker) — 09_조사_문서/착수브리핑_카드10_자동지시_20261102.md §3, PM 11/3 13:15 "착수"
+- **공통 바탕**: ① 규칙 등록표 appdata `data/appr/autotask_rules.json`(기존 4규칙 불변 + 새 3규칙, 행 추가 = R3 브리핑) ② 규칙별 스위치 `settings:autotask`(site_missing·veh_insp90·wk_missing × dry★/live/off, prev 1판·되돌리기·감사 '자동지시규칙'·낙관락 `AUTOTASK_STALE`) ③ dry 결과 보관 `it:autotask:dry`(봇 키 `autotask_dry_put`, id·수만 — `_lib/autorules.js piiScan`이 이름·전화 꼴을 거부) ④ 배정표 접두어 `site:`·`wk:` 추가(담당은 결정 2 R1) ⑤ 완료 신호 2종 `_lib/doneif.js`(site/wk 월 키 — 다음 회차 미입력 0 → 승인 대기, 크론이 대장·명부 원본 행을 `recs.__rows`로 실음) ⑥ 봇 '정기업무 n건' 푸시(auto-due)가 `task_auto_create=assignee`면 관리자 전원 생략(설정 전환 뒤 1주는 병행).
+- **집계 단일 원천** `_lib/autorules.js`(모델 호출 0): site = 준설 근로자 0명 행 + 철거·준설 소재지 공란 행(석면 근로자 없음은 제외) / veh D-90 = 회색 제외·insp_due 31~90일·기존 키 겹침 분리·건설기계류 표기 flag / worker = 2025년 이후 참여자(대장 worker_ids) 중 생년월일 6자리 아닌 사람·(참고) 연락처 공란·동명이인 쌍 수. 서버 `autotask_facts`(봇 키)로 appdata `collectors/autotask.py`가 매일 08:10 받아 스위치대로 생성(live)·보관(dry). 월 키는 KST 날짜(종전 러너 UTC 날짜 버그도 수리).
+- **명부 저장 보호(worker P0 화면 몫)**: 일용직 저장이 base/409 → 행 단위 병합(`mergeWorkers`, 같은 id는 updated 늦은 쪽) 뒤 재저장(종전 통째 덮어쓰기) · 생년월일 6자리 정규화·검증(`wkBirth6` = 서버 `birth6`과 같은 규칙, 틀린 꼴은 저장 전 반려·비움은 허용) · 동명이인 의심 토스트(자동 병합 없음) · MANUAL 14절 입력 규칙 1문단.
+- **관리자 카드 '자동 지시 규칙(카드 10)'**(배정표 아래): 규칙 3건 × 칩 + 마지막 dry 결과(site 미입력 행·연번 / veh 후보·겹침·건설기계 flag·차량번호(만료일) / wk 범위·공란·동명이인) · 되돌리기. 서버 `autotask_get/set/revert`(관리자 전용).
+- 하지 않음: 자동 삭제·이름/생년월일/연락처 값 전송·동명이인 자동 병합·발행(live 전환은 결정 4 R1 D-3 + 담당 구독·46건 정리·담당 수용 뒤). 검사: autorulestest 8 · servertest 절 67(+49 접두어 7) · uismoke(접두어 7). sw v417.
 
 ### v416 (11/3) — 체크 38 아침 음성 브리핑 D1(서버) — 25_사용자인식AI/D1_착수브리핑_20261102.md §3 D1, PM 11/3 "ㄱ"
 - **생성**: `gw-brief-cron`(netlify.toml `30 21 * * *` = KST 06:30 매일, 기동만·흔적 `it:cron:gw-brief-cron:last`) → `gw-brief-run-background`(15분 워커, 내부 토큰 `__brief__`) → `_lib/brief.js generate`: 집계(col:approvals PM 큐·대표 큐·금액 큰 1건, col:tasks 열림·오늘 기한·승인 대기, col:bids 사흘 안 마감·직전 평일 뒤 신규, col:vehicles 30일·경과(매각·말소 제외), col:licenses 30일, 올바로 어제 잡 로그의 그저께분) → 문장(claude-haiku-5-5 effort low, **자리표시만** — 금액·제목·숫자는 Anthropic에 안 감, 전송 직전 scrubPayload) → 숫자 자기검증 2단(채우기 전 숫자·한글 수사·자리표시 / 채운 뒤 facts 밖 숫자·길이 150~300·"그만") → 어긋나면 템플릿 글 → SSML(엔티티 치환) → Azure TTS(koreacentral, `audio-24khz-48kbitrate-mono-mp3`) → `brief:day:<날짜>`(글·메타)·`brief:mp3:<날짜>`(base64) 분리 보관 · `brief:usage:<월>`·`brief:log`(60).

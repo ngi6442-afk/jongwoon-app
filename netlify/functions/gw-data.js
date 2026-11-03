@@ -13,6 +13,7 @@ const DONEIF = require('./_lib/doneif');   // v413 clogAppend(해시 체인) 재
 const push = require('./_lib/push');
 const tier = require('./_lib/tier');   // 관리자 등급(v321) — retired 판정식 공용. 게이트는 push.tierCtx()(명시 tier·부트스트랩·퇴사 제외, 9/6 검증 S1)
 const BRIEF = require('./_lib/brief');   // v416 아침 음성 브리핑(체크 38 D1) — 설정·조회·기동(생성은 워커)
+const AR = require('./_lib/autorules');  // v417 자동 지시 서버 규칙 3건(카드 10) — 집계(autotask_facts)·완료 신호 공용
 
 const DATA = 'gw_data';
 const USERS = 'gw_users';
@@ -1138,6 +1139,15 @@ async function handleBotNotify(event, d, R) {
   try {
     const tcN = await push.tierCtx();   // 스캔 1회 — adminIds와 sendTo 활성 필터 공용
     const ids = tcN.adminIds.slice();
+    // v417 카드 10 공통 바탕 ⑥: 서버 봇 '정기업무 n건'(태그 auto-due)도 알림 설정 task_auto_create를 따른다 — 담당자 본인 1발이면 관리자 전원 푸시 생략.
+    // 단 설정 전환 뒤 첫 1주는 병행(설정 updated_at 기준 7일 — 브리핑 §7 '첫 1주 PM 병행').
+    if (tag === 'auto-due') {
+      try {
+        const nfA = await notifyRead(store(DATA));
+        if (nfA.events.task_auto_create === 'assignee' && (Date.now() - Number(nfA.updated_at || 0)) > 7 * 86400000)
+          return jr(200, { status: 'OK', sent: 0, admins: ids.length, devices: 0, note: 'task_auto_create=assignee — 관리자 푸시 생략(담당자 본인 1발은 ingest가 보냄)', request_id: R });
+      } catch (e) {}
+    }
     // v415 bid_fail=assignee: watch.py 입찰 감시 경보(태그 watch-입찰-날짜)는 입찰 담당(배정표 bid:)에게도 1발
     try { const nfN = await notifyRead(store(DATA)); if (nfN.events.bid_fail === 'assignee' && /^watch-입찰/.test(tag)) { const a = await assignRead(store(DATA)); const w = a.rules && a.rules['bid:'] && a.rules['bid:'].who_id; if (w && ids.indexOf(String(w)) < 0) ids.push(String(w)); } } catch (e) {}
     const subs = await push.getSubs();
@@ -1481,7 +1491,8 @@ async function handleTaskNotmine(event, d, R) {
 // 서버가 채운 담당은 who_by='assign' — 클라 사본이 공란으로 올려도 handleSave가 이월한다(기반 9). 사람이 지정한 who_id는 건드리지 않는다.
 // 변경 전 표는 prev에 1판 보존(R1 되돌리기 1클릭). 변경은 관리자만·감사로그·낙관락(등급표 패턴). 승인권자 1인(approver_id)은 저장만(승인 라우팅 연결은 A5 done_if 때).
 const ASSIGN_KEY = 'settings:assign';
-const ASSIGN_PREFIXES = { 'veh:': '차량 만기(정기검사·보험)', 'lic:': '인허가 만기·보수교육', 'cert:': '증명서 갱신(20일 주기)', 'rec:': '미수 장기화(45일)', 'bid:': '적격심사 검토' };
+const ASSIGN_PREFIXES = { 'veh:': '차량 만기(정기검사·보험)', 'lic:': '인허가 만기·보수교육', 'cert:': '증명서 갱신(20일 주기)', 'rec:': '미수 장기화(45일)', 'bid:': '적격심사 검토',
+  'site:': '현장 대장 미입력(월 1회)', 'wk:': '일용직 인적사항 미입력(월 1회)' };   // v417 카드 10 공통 바탕 ④ — site:·wk: 행 추가(담당은 결정 2, R1 D-3 뒤)
 function assignEmpty() { return { schema: 1, rules: {}, approver_id: '', prev: null, updated_at: 0, updated_by: '' }; }
 async function assignRead(st) {
   try { const r = await blobGet(st, ASSIGN_KEY); if (r.ok && r.data && r.data.rules && typeof r.data.rules === 'object') return Object.assign(assignEmpty(), r.data); } catch (e) {}
@@ -1802,6 +1813,119 @@ async function handleBriefMp3(event, d, R) {
   let r = null; try { r = await blobGet(st, 'brief:mp3:' + date); } catch (e) { r = null; }
   if (!r || !r.ok || !r.data || !r.data.b64) return jr(404, { status: 'NOT_FOUND', error_code: 'NO_MP3', date: date, request_id: R });
   return jr(200, { status: 'OK', request_id: R, date: date, fmt: r.data.fmt || 'audio/mpeg', bytes: r.data.bytes || 0, b64: r.data.b64 });
+}
+// ---- 자동 지시 서버 규칙 3건(카드 10, v417 — 착수브리핑_카드10_자동지시_20261102.md §3 공통 바탕 ①~④) ----
+// 등록표는 appdata data/appr/autotask_rules.json(규칙 추가 = 행 1개, R3 브리핑). 여기는 ② 규칙별 스위치 settings:autotask(dry·live·off, prev 1판·되돌리기·감사·낙관락),
+// 집계 autotask_facts(봇 키 — appdata autotask.py가 매일 08:10 호출, id·수만), ③ dry 결과 보관 it:autotask:dry(봇 키, PII 가드), 관리자 조회. 생성은 autotask_ingest(기존)로만.
+const AUTOTASK_KEY = 'settings:autotask';
+const AUTOTASK_RULES = {
+  site_missing: { label: '현장 대장 미입력 월 1회', key: 'site:missing:<YYYY-MM>', prefix: 'site:' },
+  veh_insp90: { label: '차량 정기검사 지시 D-90(기존 D-30 앞당김)', key: 'veh:<id>:insp:<만료일>', prefix: 'veh:' },
+  wk_missing: { label: '일용직 인적사항 미입력 월 1회', key: 'wk:missing:<YYYY-MM>', prefix: 'wk:' },
+};
+const AUTOTASK_MODES = ['dry', 'live', 'off'];
+function autotaskDefaults() { const o = {}; Object.keys(AUTOTASK_RULES).forEach(function (k) { o[k] = 'dry'; }); return o; }
+function autotaskValid(rule, mode) { return Object.prototype.hasOwnProperty.call(AUTOTASK_RULES, rule) && AUTOTASK_MODES.indexOf(String(mode)) >= 0; }
+async function autotaskRead(st) {
+  try {
+    const r = await blobGet(st, AUTOTASK_KEY);
+    if (r.ok && r.data && r.data.rules && typeof r.data.rules === 'object') {
+      const rules = autotaskDefaults();
+      Object.keys(r.data.rules).forEach(function (k) { if (autotaskValid(k, r.data.rules[k])) rules[k] = r.data.rules[k]; });
+      return { rules: rules, prev: r.data.prev || null, updated_at: r.data.updated_at || 0, updated_by: r.data.updated_by || '' };
+    }
+  } catch (e) {}
+  return { rules: autotaskDefaults(), prev: null, updated_at: 0, updated_by: '' };
+}
+function autotaskPublic(a) {
+  const meta = {}; Object.keys(AUTOTASK_RULES).forEach(function (k) { meta[k] = AUTOTASK_RULES[k]; });
+  return { rules: a.rules, meta: meta, modes: AUTOTASK_MODES, prev: a.prev ? { updated_at: a.prev.updated_at || 0, updated_by: a.prev.updated_by || '' } : null, updated_at: a.updated_at || 0, updated_by: a.updated_by || '' };
+}
+function prevMonthOf(today) { const t = String(today).split('-'); const d = new Date(Date.UTC(+t[0], +t[1] - 1, 1) - 86400000); return d.toISOString().slice(0, 7); }
+async function autotaskFacts(st) {
+  const today = new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);
+  const get = async function (name) { try { const r = await blobGet(st, colKey(name)); return (r.ok && r.data && Array.isArray(r.data.items)) ? r.data.items : []; } catch (e) { return []; } };
+  const asb = await get('asbestos'), wk = await get('workers'), veh = await get('vehicles'), tasks = await get('tasks');
+  const keys = tasks.filter(function (t) { return t && t.auto_key && t.del !== 1; }).map(function (t) { return String(t.auto_key); });
+  const openKeys = {}; tasks.forEach(function (t) { if (t && t.auto_key && t.del !== 1 && (t.status === 'open' || t.status === 'hold' || t.status === 'review')) openKeys[t.auto_key] = 1; });
+  const pm = prevMonthOf(today);
+  return { today: today, site: AR.siteMissing(asb), veh90: AR.veh90(veh, today, keys), wk: AR.wkMissing(wk, asb),
+    keys: { site: AR.siteKey(today), wk: AR.wkKey(today) },
+    exists: { site: keys.indexOf(AR.siteKey(today)) >= 0, wk: keys.indexOf(AR.wkKey(today)) >= 0 },
+    prev_open: { site: !!openKeys['site:missing:' + pm], wk: !!openKeys['wk:missing:' + pm] } };
+}
+async function handleAutotaskFacts(event, d, R) {
+  const secret = (process.env.BIDS_INGEST_KEY || '').trim();
+  if (!secret || String(d.key || '').trim() !== secret) return jr(403, { status: 'FORBIDDEN', error_code: 'BAD_INGEST_KEY', request_id: R });
+  const st = store(DATA);
+  const f = await autotaskFacts(st);
+  const pii = AR.piiScan(f);
+  if (pii) return jr(500, { status: 'ERROR', error_code: 'PII_' + pii, request_id: R });
+  const a = await autotaskRead(st);
+  return jr(200, Object.assign({ status: 'OK', request_id: R, rules: a.rules }, f));
+}
+async function handleAutotaskDryPut(event, d, R) {
+  const secret = (process.env.BIDS_INGEST_KEY || '').trim();
+  if (!secret || String(d.key || '').trim() !== secret) return jr(403, { status: 'FORBIDDEN', error_code: 'BAD_INGEST_KEY', request_id: R });
+  const dry = (d.dry && typeof d.dry === 'object') ? d.dry : null;
+  if (!dry) return jr(400, { status: 'REJECTED', error_code: 'BAD_DRY', request_id: R });
+  const pii = AR.piiScan(dry);
+  if (pii) return jr(400, { status: 'REJECTED', error_code: 'PII_' + pii, request_id: R });
+  const s = JSON.stringify(dry); if (s.length > 60000) return jr(400, { status: 'REJECTED', error_code: 'TOO_BIG', request_id: R });
+  const st = store(DATA);
+  const a = await autotaskRead(st);
+  const doc = { schema: 1, ts: Date.now(), day: String(d.day || '').slice(0, 10), by: '정기봇', run: String(d.run || '').slice(0, 40), modes: a.rules, rules: dry };
+  const w = await blobSet(st, 'it:autotask:dry', doc);
+  if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
+  return jr(200, { status: 'OK', request_id: R, ts: doc.ts });
+}
+async function handleAutotaskGet(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (!c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
+  const st = store(DATA);
+  const a = await autotaskRead(st);
+  let dry = null; try { const r = await blobGet(st, 'it:autotask:dry'); if (r.ok && r.data) dry = r.data; } catch (e) {}
+  // veh 결과 카드의 차량번호·만료일은 id로 대장에서 불러 보인다(관리자 전용 응답 — 브리핑 공통 바탕 ③)
+  let veh_items = [];
+  try {
+    const items = (dry && dry.rules && dry.rules.veh_insp90 && Array.isArray(dry.rules.veh_insp90.items)) ? dry.rules.veh_insp90.items : [];
+    if (items.length) { const r = await blobGet(st, colKey('vehicles')); const by = {}; ((r.ok && r.data && r.data.items) || []).forEach(function (v) { if (v && v.id) by[v.id] = v; });
+      veh_items = items.slice(0, 60).map(function (it) { const v = by[it.id] || {}; return { id: it.id, no: String(v.no || ''), due: it.due, days: it.days, state: String(v.state || ''), kind: String(v.kind || '').slice(0, 20) }; }); }
+  } catch (e) {}
+  return jr(200, Object.assign({ status: 'OK', request_id: R, dry: dry, veh_items: veh_items }, autotaskPublic(a)));
+}
+async function handleAutotaskSet(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (!c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
+  const rule = String(d.rule || ''), mode = String(d.mode || '');
+  if (!autotaskValid(rule, mode)) return jr(400, { status: 'REJECTED', error_code: 'BAD_RULE', request_id: R });
+  const st = store(DATA);
+  const a = await autotaskRead(st);
+  if (d.base !== undefined && Number(d.base) !== Number(a.updated_at || 0)) return jr(409, { status: 'CONFLICT', error_code: 'AUTOTASK_STALE', request_id: R });
+  if (a.rules[rule] === mode) return jr(400, { status: 'REJECTED', error_code: 'NO_CHANGE', request_id: R });
+  const next = Object.assign({}, a.rules); next[rule] = mode;
+  const doc = { schema: 1, rules: next, prev: { rules: a.rules, updated_at: a.updated_at || 0, updated_by: a.updated_by || '' }, updated_by: c.member.id, updated_at: Date.now() };
+  const w = await blobSet(st, AUTOTASK_KEY, doc);
+  if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
+  try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'tasks', ev: [{ op: '자동지시규칙', id: rule, t: AUTOTASK_RULES[rule].label + ' ' + a.rules[rule] + '→' + mode }] }); } catch (e) {}
+  return jr(200, Object.assign({ status: 'OK', request_id: R }, autotaskPublic({ rules: next, prev: doc.prev, updated_at: doc.updated_at, updated_by: doc.updated_by })));
+}
+async function handleAutotaskRevert(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (!c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
+  const st = store(DATA);
+  const a = await autotaskRead(st);
+  if (!a.prev || !a.prev.rules) return jr(400, { status: 'REJECTED', error_code: 'NO_PREV', request_id: R });
+  if (d.base !== undefined && Number(d.base) !== Number(a.updated_at || 0)) return jr(409, { status: 'CONFLICT', error_code: 'AUTOTASK_STALE', request_id: R });
+  const rules = autotaskDefaults(); Object.keys(a.prev.rules).forEach(function (k) { if (autotaskValid(k, a.prev.rules[k])) rules[k] = a.prev.rules[k]; });
+  const doc = { schema: 1, rules: rules, prev: { rules: a.rules, updated_at: a.updated_at || 0, updated_by: a.updated_by || '' }, updated_by: c.member.id, updated_at: Date.now() };
+  const w = await blobSet(st, AUTOTASK_KEY, doc);
+  if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
+  try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'tasks', ev: [{ op: '자동지시규칙되돌림', id: '', t: '규칙 스위치 직전 판으로' }] }); } catch (e) {}
+  return jr(200, Object.assign({ status: 'OK', request_id: R }, autotaskPublic({ rules: rules, prev: doc.prev, updated_at: doc.updated_at, updated_by: doc.updated_by })));
 }
 // ---- 감시 경보 라벨 it:alerts (v399 — 공통 기반 14 · 착수 브리핑 A7 2일차). 감시 항목(크론 지도 id)별 라벨 {level, until, by, ts}.
 // level: 'warn'(기본 — 편입 뒤 1주는 경보를 안내로 낮춤) · 'alert'(승격 1클릭 — 즉시 경보) · 'mute'(7일 무음, until). IT 운영 책임자(관리자) 전용·감사로그.
@@ -3791,6 +3915,11 @@ async function handlerInner(event) {
     if (d && d.action === 'brief_run') return await handleBriefRun(event, d, R);
     if (d && d.action === 'brief_voices') return await handleBriefVoices(event, d, R);
     if (d && d.action === 'brief_mp3') return await handleBriefMp3(event, d, R);
+    if (d && d.action === 'autotask_facts') return await handleAutotaskFacts(event, d, R);   // v417 카드 10(봇 키)
+    if (d && d.action === 'autotask_dry_put') return await handleAutotaskDryPut(event, d, R);
+    if (d && d.action === 'autotask_get') return await handleAutotaskGet(event, d, R);
+    if (d && d.action === 'autotask_set') return await handleAutotaskSet(event, d, R);
+    if (d && d.action === 'autotask_revert') return await handleAutotaskRevert(event, d, R);
     if (d && d.action === 'alerts_get') return await handleAlertsGet(event, d, R);
     if (d && d.action === 'alerts_set') return await handleAlertsSet(event, d, R);
     if (d && d.action === 'con_proc_get') return await handleConProcGet(event, d, R);

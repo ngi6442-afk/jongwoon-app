@@ -21,10 +21,13 @@ async function run(st, nowMs) {
   // 필요한 레코드 컬렉션만 읽는다(자격 있는 자동 지시의 접두어 기준)
   const need = {};
   tdoc.items.forEach(function (t) { if (!D.eligible(t)) return; const k = D.parseKey(t.auto_key); if (k) need[k.col] = true; });
-  const recs = {};
+  const recs = { __rows: {} };
+  if (need.workers) need.asbestos = true;   // v417 카드 10: wk 월 지시 신호는 명부+대장(참여 범위) 둘 다 본다
   for (const col of Object.keys(need)) {
     const r = await blobGet(st, 'col:' + col);
-    recs[col] = D.byId((r.ok && r.data && Array.isArray(r.data.items)) ? r.data.items : []);
+    const items = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data.items : [];
+    if (col === 'asbestos' || col === 'workers') recs.__rows[col] = items;   // v417: 집계형 신호(site·wk)는 원본 배열
+    else recs[col] = D.byId(items);
   }
   const p = D.plan(tdoc.items, recs);
   const last = { ts: nowMs, today: today, on: on, scanned: p.scanned, candidates: p.candidates.slice(0, 50), moved: 0, notified: 0 };

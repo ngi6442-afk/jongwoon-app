@@ -1534,7 +1534,7 @@ try {
   const appP = new Set([...appSeg.matchAll(/"([a-z]+:)"/g)].map((m) => m[1]));
   const appTxt = (html.match(/var ASSIGN_PREFIX_TXT = \{([^}]+)\}/) || ['', ''])[1];
   const onlyS = [...svrP].filter((k) => !appP.has(k)), onlyA = [...appP].filter((k) => !svrP.has(k));
-  T('v395 배정표 접두어 앱↔서버 일치(' + svrP.size + '종) · 라벨 표에도 전부', svrP.size === 5 && !onlyS.length && !onlyA.length && [...appP].every((k) => appTxt.indexOf('"' + k + '"') >= 0), '서버만: ' + onlyS.join(',') + ' / 앱만: ' + onlyA.join(','));
+  T('v395 배정표 접두어 앱↔서버 일치(' + svrP.size + '종 — v417 site:·wk: 포함 7) · 라벨 표에도 전부', svrP.size === 7 && !onlyS.length && !onlyA.length && [...appP].every((k) => appTxt.indexOf('"' + k + '"') >= 0), '서버만: ' + onlyS.join(',') + ' / 앱만: ' + onlyA.join(','));
   const swv = readFileSync(join(ROOT, 'sw.js'), 'utf8');
   T('v395 배선: 카드 id·렌더·호출·assign_get/set/revert 액션·담당 없음 배지·서버 핸들러 3·ingest/save 채움·sw',
     html.indexOf('id="assignCard"') > 0 && /function renderAssignCard\(\)/.test(html) && /renderApprGrades\(\);[^\n]*\n\s*renderAssignCard\(\);/.test(html)

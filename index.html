@@ -1610,6 +1610,9 @@
     <!-- 자동 지시 배정표(v395, 공통 기반 1 첫 시범) — 접두어(차량·인허가·증명서·미수·적격) → 담당. 공란 = '담당 없음' 배지(관리자 폴백 금지). 변경 전 표 1판 보존 → [되돌리기]. 관리자만(서버 강제)·감사로그·낙관락 -->
     <div class="dash-sec" style="margin:16px 0 8px;"><h2>자동 지시 배정표</h2></div>
     <div class="card" id="assignCard"><div class="loading">불러오는 중…</div></div>
+    <!-- 자동 지시 규칙 스위치(v417, 카드 10 공통 바탕 ②③) — 규칙 3건(현장 대장·차량 D-90·일용직) dry★/live/off, 마지막 dry 결과(수·id만). 관리자만(서버 강제)·감사로그·낙관락·되돌리기 -->
+    <div class="dash-sec" style="margin:16px 0 8px;"><h2>자동 지시 규칙(카드 10)</h2></div>
+    <div class="card" id="autoRulesCard"><div class="loading">불러오는 중…</div></div>
     <!-- 알림 설정(v396, 공통 기반 3 첫 시범) — 지시 이벤트 3종의 수신자·방식. 기본값 = 현행. 변경 전 판 보존 → [되돌리기]. 관리자만(서버 강제)·감사로그·낙관락 -->
     <div class="dash-sec" style="margin:16px 0 8px;"><h2>지시 알림 설정</h2></div>
     <div class="card" id="notifyCard"><div class="loading">불러오는 중…</div></div>
@@ -1790,7 +1793,7 @@
   <div class="modal">
     <h3 id="wkModalTitle">일용직 추가</h3>
     <input type="text" id="wkName" placeholder="이름" autocomplete="off">
-    <input type="text" id="wkBirth" placeholder="생년월일 (예: 81.08.17)" autocomplete="off">
+    <input type="text" id="wkBirth" placeholder="생년월일 6자리 (예: 810817)" autocomplete="off">
     <div class="hw-note" id="wkNeedNote" style="display:none;"></div>
     <span class="fld-label">직책</span>
     <select id="wkRole"><option value="반장">반장</option><option value="인부" selected>인부</option></select>
@@ -8461,19 +8464,38 @@
     });
   })();
   // ---- 일용직 명부(석면·철거 투입 인력) — 해체계획서 명단 자동 기입용 ----
-  var workers=[], wkEditId=null, wkSaveTimer=null;
+  var workers=[], wkEditId=null, wkSaveTimer=null, wkBase=0;   // v417 카드 10 worker P0: 명부 저장 낙관락(base/409 → 행 단위 병합 뒤 재저장) — 종전엔 통째 덮어쓰기
+  // v417: 생년월일 6자리 정규화('81.08.17'·'1981-08-17'·'810817' → '810817', 월·일 범위 밖이면 빈칸=미입력) — 서버 _lib/autorules.js birth6와 같은 규칙
+  function wkBirth6(s){ var d=String(s||"").replace(/\D/g,""); var six=(d.length===8)?d.slice(2):((d.length===6)?d:""); if(!six) return ""; var mo=+six.slice(2,4), da=+six.slice(4,6); if(mo<1||mo>12||da<1||da>31) return ""; return six; }
+  function mergeWorkers(local, server){   // 행 단위 병합: 같은 id는 updated(날짜)가 늦은 쪽, 같으면 로컬(지금 고친 행). 양쪽에만 있는 행은 그대로 합친다.
+    var by={}, out=[]; (server||[]).forEach(function(r){ if(r&&r.id) by[r.id]=r; });
+    (local||[]).forEach(function(r){ if(!(r&&r.id)) return; var s=by[r.id]; if(!s || String(r.updated||"")>=String(s.updated||"")) by[r.id]=r; });
+    Object.keys(by).forEach(function(id){ out.push(by[id]); });
+    return out;
+  }
+  function doSaveWorkers(){
+    return gwCall("gw-data",{action:"save",collection:"workers",doc:{schema:1,items:workers},base:wkBase}).then(function(res){
+      if(res.status===409){
+        return gwCall("gw-data",{action:"get",collection:"workers"}).then(function(r2){
+          if(r2.status===200){ var doc=(r2.body&&r2.body.doc)||{}; workers=mergeWorkers(workers, Array.isArray(doc.items)?doc.items:[]); wkBase=doc.updated_at||0; renderWorkers(); renderXgWorkers(); }
+          return doSaveWorkers();
+        });
+      }
+      if(res.status===200){ wkBase=(res.body&&res.body.updated_at)||Date.now(); }
+    }).catch(function(){});
+  }
   function liveWorkers(){ return workers.filter(function(w){ return w && w.del!==1; }); }
   function sortedWorkers(){ return liveWorkers().sort(function(a,b){ return ((a.role==="반장"?0:1)-(b.role==="반장"?0:1)) || (a.name||"").localeCompare(b.name||""); }); }
   function loadWorkers(){
     gwCall("gw-data",{action:"get",collection:"workers"}).then(function(res){
-      if(res.status===200){ workers=(res.body&&res.body.doc&&res.body.doc.items)||[]; renderWorkers(); renderXgWorkers(); }
+      if(res.status===200){ var wdoc=(res.body&&res.body.doc)||{}; workers=Array.isArray(wdoc.items)?wdoc.items:[]; wkBase=wdoc.updated_at||0; renderWorkers(); renderXgWorkers(); }   // v417 base 보관
       else if(res.status===403){ var h=document.getElementById("wkList"); if(h) h.innerHTML='<div class="empty-line">권한이 없습니다 — 권한관리에서 [일용직]을 열어주세요.</div>'; }
     }).catch(function(){});
   }
   function scheduleWorkersSave(){
     if(wkSaveTimer) clearTimeout(wkSaveTimer);
     wkSaveTimer=setTimeout(function(){
-      gwCall("gw-data",{action:"save",collection:"workers",doc:{schema:1,items:workers}}).catch(function(){});
+      doSaveWorkers();   // v417: base/409 행 단위 병합(종전 통째 덮어쓰기)
     },1200);
   }
   function wkLabel(w){ return (w.name||"")+(w.birth?"("+w.birth+")":""); }
@@ -8509,7 +8531,7 @@
   }
   function wkMissing(w){
     var m=[];
-    if(!(w&&String(w.birth||"").trim())) m.push("생년월일");
+    if(!(w&&wkBirth6(w.birth))) m.push("생년월일");   // v417: 6자리가 아니면 미입력으로 본다(서버 셈과 같은 규칙)
     if(!(w&&String(w.phone||"").trim())) m.push("연락처");
     return m;
   }
@@ -8581,14 +8603,17 @@
       var name=$("wkName").value.trim(); if(!name){ $("wkName").focus(); return; }
       var w=wkEditId?findWk(wkEditId):null;
       if(!w){ w={id:genId("w"), created:todayStr()}; workers.push(w); }
-      w.name=name; w.birth=$("wkBirth").value.trim(); w.role=$("wkRole").value;
+      var bRaw=$("wkBirth").value.trim(), b6=wkBirth6(bRaw);   // v417: 6자리 검사 — 적었는데 틀린 꼴이면 저장 전에 돌려보낸다(비워 두는 건 그대로 허용)
+      if(bRaw && !b6){ alert("생년월일은 6자리로 적어주세요(예: 810817 또는 81.08.17). 월·일이 맞는지도 봐주세요."); $("wkBirth").focus(); return; }
+      w.name=name; w.birth=b6; w.role=$("wkRole").value;
       w.phone=$("wkPhone").value.trim(); w.exam=$("wkExam").value||""; w.note=$("wkNote").value.trim();
       w.updated=todayStr();
       $("wkBackdrop").classList.remove("show"); wkEditId=null;
       scheduleWorkersSave(); renderWorkers(); renderXgWorkers();
       // 저장은 됐다. 빠진 것이 있으면 그 사실만 한 줄로 알린다(실패가 아니다 — 성공 문구 원칙 v337과 같은 결).
       var miss=wkMissing(w);
-      try{ gwToast(miss.length ? ("저장했습니다 — "+miss.join("·")+" 미입력") : "저장했습니다"); }catch(e){}
+      var dupN=liveWorkers().filter(function(x){ return x.id!==w.id && String(x.name||"").replace(/\s+/g,"")===name.replace(/\s+/g,""); }).length;   // v417: 동명이인 의심 노출(자동 병합 없음)
+      try{ gwToast((miss.length ? ("저장했습니다 — "+miss.join("·")+" 미입력") : "저장했습니다") + (dupN ? " · 같은 이름 "+dupN+"명 더 있음(동명이인 확인)" : "")); }catch(e){}
     });
     $("wkDelete").addEventListener("click",function(){
       var w=wkEditId?findWk(wkEditId):null; if(!w) return;
@@ -21028,6 +21053,7 @@
     renderConProcCard();  // 계약 골조·목록 거울(v400) — 경보 라벨 아래
     renderConLearnCard(); // 계약 서류 학습(v411) — 거울 아래
     renderBriefCard();    // 아침 음성 브리핑(v416, 체크 38 D1) — 카드 자리는 알림 설정 아래(HTML 순서), 호출은 맨 뒤(uismoke v399 배선 검사 유지)
+    renderAutoRulesCard(); // 자동 지시 규칙 스위치(v417, 카드 10) — 카드 자리는 배정표 아래
     renderDocSettings();   // 문서함 설정(v314) — 등급표 아래
   }
   // ---- 문서함 설정(v314) — 분류별 기본 공개범위 칩 + 등재 결재 게이트. 등급표 카드와 같은 결(칩·낙관락 base·토스트·감사로그). 관리자만(서버도 강제) ----
@@ -21187,8 +21213,8 @@
 
   // ---- 자동 지시 배정표(v395, 공통 기반 1 첫 시범 — 업무별 최적화 설계 3-14 A1 · 착수 브리핑 A2). 접두어 → 담당. 공란 = '담당 없음' 배지(관리자 폴백 금지).
   //      변경 전 표 1판 보존 → [되돌리기] 1클릭(R1). 관리자만(서버 강제)·감사로그·낙관락 base·토스트 — 등급표 카드와 같은 결. 승인권자 1인은 저장만(라우팅 연결은 A5). ----
-  var ASSIGN_PREFIX_ORDER = ["veh:","lic:","cert:","rec:","bid:"];   // 서버 ASSIGN_PREFIXES 키와 동일(uismoke 대조)
-  var ASSIGN_PREFIX_TXT = { "veh:":"차량 만기(정기검사·보험)", "lic:":"인허가 만기·보수교육", "cert:":"증명서 갱신(20일 주기)", "rec:":"미수 장기화(45일)", "bid:":"적격심사 검토" };
+  var ASSIGN_PREFIX_ORDER = ["veh:","lic:","cert:","rec:","bid:","site:","wk:"];   // 서버 ASSIGN_PREFIXES 키와 동일(uismoke 대조) · v417 site:·wk:(카드 10)
+  var ASSIGN_PREFIX_TXT = { "veh:":"차량 만기(정기검사·보험)", "lic:":"인허가 만기·보수교육", "cert:":"증명서 갱신(20일 주기)", "rec:":"미수 장기화(45일)", "bid:":"적격심사 검토", "site:":"현장 대장 미입력(월 1회)", "wk:":"일용직 인적사항 미입력(월 1회)" };
   var assignTbl = null, assignBase = 0, assignSaving = false;
   function assignMemberOpts(cur){
     var h = '<option value=""' + (cur ? '' : ' selected') + '>(없음 — 담당 없음 배지)</option>';
@@ -21393,6 +21419,55 @@
     }).catch(function(){ alert("mp3 불러오기 실패(네트워크)"); });
   }
   function briefStop(){ if (briefAudio){ try { briefAudio.pause(); } catch(e){} briefAudio = null; } var sb = document.getElementById("briefStopBtn"); if (sb) sb.style.display = "none"; }
+
+  // ---- 자동 지시 규칙 스위치(v417, 카드 10 공통 바탕 ②③ — 09_조사_문서/착수브리핑_카드10_자동지시_20261102.md). 규칙 3건 × dry★/live/off 칩 + 마지막 dry 결과(수·id만, 차량은 번호·만료일).
+  //      기본 dry = 발행 0(1회차 dry-run). live 전환은 결정 4(R1 D-3)·발행 게이트(담당 구독·정리·수용) 뒤. 관리자만(서버 강제)·감사로그·낙관락·되돌리기 1클릭.
+  var AUTO_RULE_ORDER = ["site_missing","veh_insp90","wk_missing"];   // 서버 AUTOTASK_RULES 키와 동일(uismoke 대조)
+  var autoRulesTbl = null, autoRulesBase = 0, autoRulesSaving = false;
+  function renderAutoRulesCard(){
+    var host = document.getElementById("autoRulesCard"); if (!host) return;
+    gwCall("gw-data", { action: "autotask_get" }).then(function(res){
+      if (res.status !== 200 || !res.body || !res.body.rules){ host.innerHTML = '<div class="empty-line">규칙 스위치를 불러오지 못했습니다 — 새로고침 후 다시 시도해주세요.</div>'; return; }
+      var b = res.body; autoRulesTbl = b.rules; autoRulesBase = b.updated_at || 0;
+      var dry = b.dry || null, dr = (dry && dry.rules) || {};
+      var modeTxt = { dry: "dry(발행 0)", live: "live(발행)", off: "off" };
+      var rows = AUTO_RULE_ORDER.map(function(k){
+        var m = (b.meta && b.meta[k]) || { label: k, key: "" }; var cur = autoRulesTbl[k];
+        var chips = (b.modes || ["dry","live","off"]).map(function(v){ var on = (cur === v); return '<button type="button" style="' + apprGradeChipCss(on ? 1 : 0, on) + '" data-ar-set="' + esc(k) + ':' + esc(v) + '">' + esc(modeTxt[v] || v) + (v === "dry" ? ' ★' : '') + '</button>'; }).join(" ");
+        var d = dr[k] || null, line = "";
+        if (d){
+          if (k === "site_missing") line = '미입력 행 ' + (d.count || 0) + '건(준설 근로자 0명 ' + ((d.by && d.by.dredge_workers) || 0) + ' · 소재지 공란 준설 ' + ((d.by && d.by.site_blank && d.by.site_blank.dredge) || 0) + '·철거 ' + ((d.by && d.by.site_blank && d.by.site_blank.demolition) || 0) + ')' + (d.seqs && d.seqs.length ? ' · 연번 ' + esc(d.seqs.slice(0, 30).join(",")) : '') + (d.would_create ? ' → 이번 달 지시 1건 생길 것' : ' → 생성 없음(' + esc(d.skip || '조건 미충족') + ')');
+          else if (k === "veh_insp90") line = '31~90일 후보 ' + (d.count || 0) + '대 · 기존 D-30 키 겹침 ' + (d.overlap || 0) + ' · 건설기계류 표기 ' + ((d.flags || []).length) + '대' + ((b.veh_items || []).length ? ' — ' + esc(b.veh_items.slice(0, 12).map(function(x){ return x.no + '(' + x.due + ')'; }).join(" · ")) + ((b.veh_items || []).length > 12 ? ' 외' : '') : '');
+          else if (k === "wk_missing") line = '2025년~ 참여자 ' + (d.scope || 0) + '명 중 생년월일 공란 ' + (d.birth_blank || 0) + '명 · (참고) 연락처 공란 ' + (d.phone_blank || 0) + '명 · 동명이인 의심 ' + (d.dup_pairs || 0) + '쌍' + (d.would_create ? ' → 이번 달 지시 1건 생길 것' : ' → 생성 없음(' + esc(d.skip || '조건 미충족') + ')');
+        }
+        return '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:7px 2px;border-bottom:1px solid var(--line);">'
+          + '<span style="min-width:190px;font-size:13px;font-weight:600;">' + esc(m.label) + ' <span style="font-weight:400;color:var(--sub);font-size:11px;">' + esc(m.key || '') + '</span></span>'
+          + '<span style="display:inline-flex;gap:4px;flex-wrap:wrap;">' + chips + '</span>'
+          + (line ? '<div style="flex-basis:100%;font-size:12px;color:var(--sub);">' + line + '</div>' : '') + '</div>';
+      }).join("");
+      var prev = b.prev;
+      host.innerHTML = rows
+        + '<div class="empty-line" style="margin-top:6px;">★ = 기본 dry(발행 0 — 매일 08:10 정기업무 봇이 수만 센다). ' + (dry ? '마지막 집계 ' + esc(new Date(dry.ts).toLocaleString("ko-KR", { hour12: false }).slice(0, 16)) + (dry.run ? ' · ' + esc(dry.run) : '') : '아직 집계 없음(다음 08:10 실행 뒤)') + '. live 전환은 결정 4(R1 D-3 예고·담당 구독·정리·수용 뒤). 담당은 배정표 site:·wk: 행(결정 2).'
+        + (prev ? ' · 직전 설정 보존 <button type="button" class="link-btn" id="autoRulesRevertBtn">되돌리기</button>' : '') + '</div>';
+      Array.prototype.forEach.call(host.querySelectorAll("[data-ar-set]"), function(btn){ btn.addEventListener("click", function(){ var p = btn.getAttribute("data-ar-set").split(":"); autoRulesSet({ rule: p[0], mode: p[1] }); }); });
+      var rb = document.getElementById("autoRulesRevertBtn"); if (rb) rb.addEventListener("click", function(){ if (!confirm("규칙 스위치를 직전 판으로 되돌립니다. 계속할까요?")) return; autoRulesSet({ revert: true }); });
+    }).catch(function(){ host.innerHTML = '<div class="empty-line">규칙 스위치를 불러오지 못했습니다(네트워크).</div>'; });
+  }
+  function autoRulesSet(p){
+    if (autoRulesSaving) return;
+    if (!p.revert && autoRulesTbl && autoRulesTbl[p.rule] === p.mode) return;
+    if (!p.revert && p.mode === "live" && !confirm("이 규칙을 live로 바꾸면 다음 08:10 실행부터 실제 지시가 생깁니다(담당 구독·46건 정리·담당 수용이 먼저). 계속할까요?")) return;
+    autoRulesSaving = true;
+    var body = { action: p.revert ? "autotask_revert" : "autotask_set", base: autoRulesBase };
+    if (!p.revert){ body.rule = p.rule; body.mode = p.mode; }
+    gwCall("gw-data", body).then(function(res){
+      autoRulesSaving = false;
+      if (res.status === 409){ apprToastShow("다른 관리자가 방금 규칙 스위치를 변경했습니다 — 다시 불러왔습니다"); renderAutoRulesCard(); return; }
+      if (res.status !== 200){ if (!(res.body && res.body.error_code === "NO_CHANGE")) alert("규칙 스위치 저장 실패 (" + ((res.body && res.body.error_code) || res.status) + ")"); renderAutoRulesCard(); return; }
+      apprToastShow(p.revert ? "규칙 스위치를 직전 판으로 되돌렸습니다" : "규칙 스위치 저장 — 다음 08:10 실행부터 적용됩니다");
+      renderAutoRulesCard();
+    }).catch(function(){ autoRulesSaving = false; alert("규칙 스위치 저장 실패(네트워크)"); });
+  }
 
   // ---- 감시 경보 라벨(v399, 공통 기반 14 · 착수 브리핑 A7 2일차). 감시 항목(appdata cron_map watch=true id)별 완충(기본)/경보 승격/7일 무음.
   //      새로 편입된 감시는 1주간 경보가 안내로 낮춰지고, 승격을 누르면 즉시 경보. 라벨은 appdata watch.py가 판정 때 it:alerts로 읽는다. 관리자 전용·감사로그 ----

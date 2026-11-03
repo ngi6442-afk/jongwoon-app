@@ -5,6 +5,7 @@
 // 증명서(cert:) 3종 업로드 신호는 문서함 첨부 분류 메타 실측 뒤(A5 2일차). 적격(bid:)은 입찰 도메인 P2.
 // 손대지 않는 것: 사람이 완료 체크한 review(done_by 실명) · done · 삭제 · 승인권자가 반려해 신호를 끈 항목(doneif_off=1) · 자동 지시 아닌 것.
 const crypto = require('crypto');
+const AR = require('./autorules');   // v417 카드 10 ⑤ 완료 신호 2종(site·wk 월 키 — 다음 회차 미입력 0) — 집계 함수를 서버 autotask_facts와 공유
 
 const DONEIF_KEY = 'settings:doneif';   // {schema:1, on:false, prev:{on}, updated_at, updated_by} — 기본 꺼짐 = dry-run(계획만 기록)
 const DONEIF_LAST = 'it:doneif:last';    // 마지막 점검 {ts, today, on, scanned, candidates[≤50], moved, notified}
@@ -16,6 +17,8 @@ function parseKey(k) {   // 'veh:<id>:insp:<due>' · 'veh:<id>:ins:<due>' · 'li
   if (p[0] === 'veh' && p.length >= 4) return { dom: 'veh', col: 'vehicles', id: p[1], kind: p[2], due: p[3] };
   if (p[0] === 'lic' && p.length >= 4) return { dom: 'lic', col: 'licenses', id: p[1], kind: p[2], due: p[3] };
   if (p[0] === 'rec' && p.length >= 3) return { dom: 'rec', col: 'receivables', id: p[1], kind: p[2] };
+  if (p[0] === 'site' && p[1] === 'missing' && p.length >= 3) return { dom: 'site', col: 'asbestos', id: '', kind: 'missing', ym: p[2] };   // v417 카드 10
+  if (p[0] === 'wk' && p[1] === 'missing' && p.length >= 3) return { dom: 'wk', col: 'workers', id: '', kind: 'missing', ym: p[2] };
   return null;
 }
 
@@ -27,6 +30,14 @@ function eligible(t) {
 function signalFor(task, recs) {
   const k = parseKey(task && task.auto_key);
   if (!k) return { ok: false, why: 'unknown_key' };
+  if (k.dom === 'site' || k.dom === 'wk') {   // v417 카드 10 ⑤: 월 지시는 레코드 1건이 아니라 집계 — 다음 회차 미입력 0이면 신호(recs.__rows = 원본 행 배열, 크론이 싣는다)
+    const rows = (recs && recs.__rows) || {};
+    if (!Array.isArray(rows.asbestos)) return { ok: false, why: 'no_rows' };
+    if (k.dom === 'site') { const n = AR.siteMissing(rows.asbestos).count; return n === 0 ? { ok: true, why: 'site.missing 0' } : { ok: false, why: 'site.missing ' + n }; }
+    if (!Array.isArray(rows.workers)) return { ok: false, why: 'no_rows' };
+    const n2 = AR.wkMissing(rows.workers, rows.asbestos).birth_blank;
+    return n2 === 0 ? { ok: true, why: 'wk.birth_blank 0' } : { ok: false, why: 'wk.birth_blank ' + n2 };
+  }
   const rec = ((recs || {})[k.col] || {})[k.id];
   if (!rec) return { ok: false, why: 'no_record' };
   if (k.dom === 'veh' || k.dom === 'lic') {

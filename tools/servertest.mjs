@@ -3183,7 +3183,7 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   let r49 = await call({ action: 'assign_get' }, tokW, 'dev1');
   T('49 assign_get 비관리자 → 403', r49.code === 403);
   r49 = await call({ action: 'assign_get' }, tokA);
-  T('49 assign_get 관리자 → 빈 표 · 접두어 5 · prev null', r49.code === 200 && Object.keys(r49.body.rules).length === 0 && Object.keys(r49.body.prefixes).length === 5 && r49.body.prev === null, JSON.stringify(r49.body).slice(0, 160));
+  T('49 assign_get 관리자 → 빈 표 · 접두어 7(v417 site:·wk:) · prev null', r49.code === 200 && Object.keys(r49.body.rules).length === 0 && Object.keys(r49.body.prefixes).length === 7 && r49.body.prev === null, JSON.stringify(r49.body).slice(0, 160));
   r49 = await call({ action: 'assign_set', prefix: 'xx:', who_id: 'uwork' }, tokA);
   T('49 assign_set 모르는 접두어 → 400 BAD_PREFIX', r49.code === 400 && r49.body.error_code === 'BAD_PREFIX', r49.code + '/' + r49.body.error_code);
   r49 = await call({ action: 'assign_set', prefix: 'veh:', who_id: 'ughost' }, tokA);
@@ -4008,6 +4008,53 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   T('66 브리핑: 비관리자 403 · 기본값(azure·선히·켬·상한·키 값 없음) · set 검증 400/낙관락 409/NO_CHANGE/감사 2 · revert · mp3 404→200 · run 403/기동 실패 500/하루 상한 429',
     g0 && g1 && s0 && s1 && s2 && s3 && s4 && aud66 && v0 && m0 && m1 && n0 && n1 && n2, JSON.stringify([g0, g1, s0, s1, s2, s3, s4, aud66, v0, m0, m1, n0, n1, n2]));
   Object.keys(mem.gw_data).forEach((k) => { if (/^(brief:|settings:brief)/.test(k)) delete mem.gw_data[k]; });
+}
+
+{ // ---- 67(v417) 카드 10 자동 지시 서버 규칙 3건 — autotask_facts(봇 키·id만·PII 가드) · dry_put · 스위치 get/set/revert(관리자·낙관락·감사) · 봇 푸시 ⑥(task_auto_create=assignee면 생략) · doneif site/wk 신호 ----
+  const today67 = new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);
+  const ym67 = today67.slice(0, 7);
+  const d37 = new Date(Date.now() + 37 * 86400000 + 9 * 3600000).toISOString().slice(0, 10);
+  mem.gw_data['col:asbestos'] = { schema: 1, items: [{ id: 'd1', kind: 'dredge', seq: 11, site: '', worker_ids: [], start: '2025-05-01' }, { id: 'd2', kind: 'dredge', seq: 12, site: '포항', worker_ids: ['w2'], start: '2025-06-01' }, { id: 'a1', kind: 'asbestos', seq: 13, site: '', worker_ids: [], start: '2026-01-01' }] };
+  mem.gw_data['col:workers'] = { schema: 1, items: [{ id: 'w2', name: '테스트', birth: '', phone: '' }] };
+  mem.gw_data['col:vehicles'] = { schema: 1, items: [{ id: 'v1', no: '11가1111', state: '운행', insp_due: d37 }, { id: 'v2', no: '22나2222', state: '매각', insp_due: d37 }] };
+  mem.gw_data['col:tasks'] = { schema: 1, items: [{ id: 't1', auto_key: 'wk:missing:' + ym67, status: 'open', title: 'x' }] };
+  delete mem.gw_data['settings:autotask']; delete mem.gw_data['it:autotask:dry'];
+  let r67 = await call({ action: 'autotask_facts', key: 'bad' }, null); const f0 = r67.code === 403;
+  r67 = await call({ action: 'autotask_facts', key: 'test-ingest-key' }, null);
+  const f1 = r67.code === 200 && r67.body.site.count === 1 && r67.body.site.ids[0] === 'd1' && r67.body.veh90.count === 1 && r67.body.veh90.items[0].id === 'v1' && r67.body.wk.scope === 1 && r67.body.wk.birth_blank === 1 && r67.body.keys.site === 'site:missing:' + ym67 && r67.body.exists.wk === true && r67.body.exists.site === false && r67.body.rules.site_missing === 'dry' && !/테스트|11가1111/.test(JSON.stringify(r67.body));
+  r67 = await call({ action: 'autotask_dry_put', key: 'test-ingest-key', day: today67, run: 'servertest', dry: { wk_missing: { name: '김' } } }, null); const p0 = r67.code === 400 && r67.body.error_code === 'PII_FIELD';
+  r67 = await call({ action: 'autotask_dry_put', key: 'test-ingest-key', day: today67, run: 'servertest', dry: { site_missing: { mode: 'dry', count: 1, ids: ['d1'], seqs: [11], by: { dredge_workers: 1, site_blank: { dredge: 1, demolition: 0 } }, would_create: true }, veh_insp90: { mode: 'dry', count: 1, items: [{ id: 'v1', due: d37, days: 37 }], overlap: 0, flags: [] }, wk_missing: { mode: 'dry', scope: 1, birth_blank: 1, phone_blank: 1, dup_pairs: 0, would_create: false, skip: '키 있음' } } }, null);
+  const p1 = r67.code === 200 && mem.gw_data['it:autotask:dry'] && mem.gw_data['it:autotask:dry'].rules.site_missing.count === 1 && mem.gw_data['it:autotask:dry'].modes.veh_insp90 === 'dry';
+  r67 = await call({ action: 'autotask_get' }, tokW); const g0 = r67.code === 403;
+  r67 = await call({ action: 'autotask_get' }, tokA); const g1 = r67.code === 200 && r67.body.rules.site_missing === 'dry' && r67.body.rules.veh_insp90 === 'dry' && r67.body.rules.wk_missing === 'dry' && r67.body.dry && r67.body.veh_items.length === 1 && r67.body.veh_items[0].no === '11가1111' && r67.body.prev === null && Object.keys(r67.body.meta).length === 3;
+  r67 = await call({ action: 'autotask_set', rule: 'veh_insp90', mode: 'maybe' }, tokA); const s0 = r67.code === 400 && r67.body.error_code === 'BAD_RULE';
+  r67 = await call({ action: 'autotask_set', rule: 'veh_insp90', mode: 'live', base: 0 }, tokA); const s1 = r67.code === 200 && r67.body.rules.veh_insp90 === 'live' && !!r67.body.prev;
+  const base67 = r67.body.updated_at;
+  r67 = await call({ action: 'autotask_set', rule: 'veh_insp90', mode: 'live', base: base67 }, tokA); const s2 = r67.code === 400 && r67.body.error_code === 'NO_CHANGE';
+  r67 = await call({ action: 'autotask_set', rule: 'site_missing', mode: 'off', base: 1 }, tokA); const s3 = r67.code === 409 && r67.body.error_code === 'AUTOTASK_STALE';
+  const aud67 = auditMock.logs.filter((e) => e.ev && e.ev[0] && e.ev[0].op === '자동지시규칙').length === 1;
+  r67 = await call({ action: 'autotask_revert', base: base67 }, tokA); const v0 = r67.code === 200 && r67.body.rules.veh_insp90 === 'dry';
+  r67 = await call({ action: 'autotask_facts', key: 'test-ingest-key' }, null); const f2 = r67.code === 200 && r67.body.rules.veh_insp90 === 'dry';
+  r67 = await call({ action: 'assign_set', prefix: 'site:', who_id: 'uwork' }, tokA); const a0 = r67.code === 200 && r67.body.rules['site:'] && r67.body.rules['site:'].who_id === 'uwork';
+  // ⑥ 봇 '정기업무 n건' 푸시 — task_auto_create=assignee(설정 8일 전)면 관리자 푸시 생략, 기본(admins)이면 그대로
+  const savedSend67 = pushMock.sendTo; const sent67 = [];
+  pushMock.sendTo = async (ids, p, o) => { sent67.push({ ids: ids.slice(), p: p }); return { sent: ids.length, removed: 0 }; };
+  delete mem.gw_data['settings:notify'];
+  r67 = await call({ action: 'bot_notify', key: 'test-ingest-key', title: '정기업무 2건', body: 'x', tag: 'auto-due' }, null); const n0 = r67.code === 200 && sent67.length === 1;
+  mem.gw_data['settings:notify'] = { schema: 1, events: { task_auto_create: 'assignee' }, prev: null, updated_at: Date.now() - 8 * 86400000, updated_by: 'uadmin' };
+  r67 = await call({ action: 'bot_notify', key: 'test-ingest-key', title: '정기업무 2건', body: 'x', tag: 'auto-due' }, null); const n1 = r67.code === 200 && r67.body.sent === 0 && /생략/.test(r67.body.note || '') && sent67.length === 1;
+  mem.gw_data['settings:notify'].updated_at = Date.now() - 86400000;   // 전환 1일 — 병행 1주 안이라 관리자 푸시 유지
+  r67 = await call({ action: 'bot_notify', key: 'test-ingest-key', title: '정기업무 2건', body: 'x', tag: 'auto-due' }, null); const n2 = r67.code === 200 && sent67.length === 2;
+  r67 = await call({ action: 'bot_notify', key: 'test-ingest-key', title: '⚠ 백업', body: 'x', tag: 'backup-stale' }, null); const n3 = r67.code === 200 && sent67.length === 3;   // 다른 태그는 영향 없음
+  pushMock.sendTo = savedSend67;
+  // ⑤ 완료 신호 — site/wk 월 키: 미입력 0이면 신호, 아니면 아님(원본 행은 recs.__rows)
+  const D67 = require(join(FN, '_lib/doneif.js'));
+  const rowsOk = { __rows: { asbestos: [{ id: 'd2', kind: 'dredge', site: '포항', worker_ids: ['w2'], start: '2025-06-01' }], workers: [{ id: 'w2', birth: '810817' }] } };
+  const rowsNo = { __rows: { asbestos: [{ id: 'd1', kind: 'dredge', site: '', worker_ids: [], start: '2025-05-01' }], workers: [{ id: 'w2', birth: '' }] } };
+  const sig = D67.signalFor({ auto_key: 'site:missing:' + ym67 }, rowsOk).ok && !D67.signalFor({ auto_key: 'site:missing:' + ym67 }, rowsNo).ok && D67.signalFor({ auto_key: 'wk:missing:' + ym67 }, rowsOk).ok && !D67.signalFor({ auto_key: 'wk:missing:' + ym67 }, { __rows: { asbestos: rowsNo.__rows.asbestos.concat([{ id: 'd2', kind: 'dredge', site: '포항', worker_ids: ['w2'], start: '2025-06-01' }]), workers: rowsNo.__rows.workers } }).ok && D67.signalFor({ auto_key: 'site:missing:' + ym67 }, {}).why === 'no_rows';
+  T('67 카드 10: facts 403/집계(site 1·veh90 1·wk 1·키·exists)·값 노출 0 · dry_put PII 거부/보관 · get 403/기본 dry·차량번호 해석 · set 검증/NO_CHANGE/409/감사 · revert · facts에 스위치 · 배정표 site: · 봇 푸시 ⑥ · 완료 신호 ⑤',
+    f0 && f1 && p0 && p1 && g0 && g1 && s0 && s1 && s2 && s3 && aud67 && v0 && f2 && a0 && n0 && n1 && n2 && n3 && sig, JSON.stringify([f0, f1, p0, p1, g0, g1, s0, s1, s2, s3, aud67, v0, f2, a0, n0, n1, n2, n3, sig]));
+  ['col:asbestos', 'col:workers', 'col:vehicles', 'col:tasks', 'settings:autotask', 'it:autotask:dry', 'settings:notify', 'settings:assign'].forEach((k) => { delete mem.gw_data[k]; });
 }
 
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);
