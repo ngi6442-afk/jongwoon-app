@@ -39,7 +39,7 @@ const f = B.computeFacts(cols, abJob, TODAY);
 T('집계 결재: PM 큐 2(승인·삭제 제외)·대표 1·최대 금액 1,200만·제목', f.appr_pm === 2 && f.appr_boss === 1 && f.appr_amt === 12000000 && f.appr_title === '포항 준설 계약 상신', JSON.stringify([f.appr_pm, f.appr_boss, f.appr_amt, f.appr_title]));
 T('집계 금지 문자열에 대기 결재 제목 전부(끝난 건·삭제 건 제외)', f.forbidden.length === 3 && f.forbidden.indexOf('운반일지 2026-10-31') >= 0 && f.forbidden.indexOf('끝난 건') < 0, JSON.stringify(f.forbidden));
 T('집계 지시: 열림 4(삭제 제외)·오늘 기한·경과 2·승인 대기 1', f.task_open === 4 && f.task_due === 2 && f.task_review === 1, JSON.stringify([f.task_open, f.task_due, f.task_review]));
-T('집계 입찰: 사흘 안 마감 2(new·검토, 패스 제외, 11/7은 4일 뒤)·직전 평일(11/2) 뒤 신규 3', f.bid_soon === 2 && f.bid_new === 3, JSON.stringify([f.bid_soon, f.bid_new]));
+T('집계 입찰: 사흘 안 마감은 검토 표시 건만 1(new 615건 소음 차단 — 11/3 첫 생성)·직전 평일(11/2) 뒤 신규 3', f.bid_soon === 1 && f.bid_new === 3, JSON.stringify([f.bid_soon, f.bid_new]));
 T('집계 차량: 30일 안 3(매각·말소 제외, 보험 11/10·정비 12/3 포함, 한 대는 검사 경과+보험 임박 둘 다)·경과 1 · 12/4는 31일이라 제외', f.veh_30 === 3 && f.veh_over === 1, JSON.stringify([f.veh_30, f.veh_over]));
 T('집계 인허가: 30일 안 2(해당없음 건너뜀·edu_due 포함·지난 것 제외)', f.lic_30 === 2, String(f.lic_30));
 T('집계 운반일지: 그저께(11/1) 5건·110.03톤·잠정 3·수집 시각', f.ab && f.ab.day === '2026-11-01' && f.ab.cnt === 5 && f.ab.ton === 110.03 && f.ab.prov === 3 && f.ab.src_ts === 1793574071313, JSON.stringify(f.ab));

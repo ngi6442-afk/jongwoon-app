@@ -102,8 +102,9 @@ function computeFacts(cols, abJob, today) {
     else if (t.status === 'review') f.task_review++;
   });
   const pw = prevWeekday(today);
+  // 입찰: 레이더가 전국 공고를 다 모으므로(new 2,400건·matched는 전건 키워드라 걸러지지 않음 — 11/3 첫 생성 '사흘 안 마감 615건') 마감 임박은 사람이 '검토'로 표시한 건만, 신규는 유입량으로.
   liveItems(cols.bids).forEach(function (b) {
-    if (b.status === 'new' || b.status === '검토') { const d = dayDiff(b.due, today); if (d !== null && d >= 0 && d <= 3) f.bid_soon++; }
+    if (b.status === '검토') { const d = dayDiff(b.due, today); if (d !== null && d >= 0 && d <= 3) f.bid_soon++; }
     if (b.status === 'new' && String(b.created || '').slice(0, 10) >= pw) f.bid_new++;
   });
   liveItems(cols.vehicles).forEach(function (v) {
@@ -153,7 +154,7 @@ function templateText(f) {
   s += '결재는 내 차례 ' + v.appr_pm + '건, 대표님 차례 ' + v.appr_boss + '건이 기다립니다. ';
   if (f.appr_amt > 0) s += (v.appr_title ? '가장 큰 건은 ' + v.appr_title + ', ' + v.appr_amt + '입니다. ' : '가장 큰 금액은 ' + v.appr_amt + '입니다. ');
   s += '지시는 열린 것 ' + v.task_open + '건 중 오늘 기한이거나 지난 것이 ' + v.task_due + '건, 승인 대기가 ' + v.task_review + '건입니다. ';
-  s += '입찰은 사흘 안 마감 ' + v.bid_soon + '건, 새로 들어온 공고 ' + v.bid_new + '건입니다. ';
+  s += '입찰은 검토 표시 중 사흘 안 마감 ' + v.bid_soon + '건, 새로 들어온 공고 ' + v.bid_new + '건입니다. ';
   s += '차량 검사·보험 만기 30일 안 ' + v.veh_30 + '대, 지난 것 ' + v.veh_over + '대, 인허가 만기 30일 안 ' + v.lic_30 + '건입니다. ';
   if (f.ab) s += '운반일지는 ' + v.ab_day + ' 기준 ' + v.ab_cnt + '건 ' + v.ab_ton + ', 잠정 ' + v.ab_prov + '건입니다. ';
   else s += '운반일지는 어제 수집 기록이 없어 오늘은 빠집니다. ';
@@ -173,7 +174,7 @@ function claudeBody(f) {
     '- 결재 내 차례 건수 {{appr_pm}} — ' + Y('appr_pm') + ' / 대표님 결재 대기 건수 {{appr_boss}} — ' + Y('appr_boss'),
     '- 내 차례 중 가장 큰 금액 {{appr_amt}} — ' + Y('appr_amt') + ' / 그 건의 제목 {{appr_title}} — ' + Y('appr_title'),
     '- 열린 지시 {{task_open}} — ' + Y('task_open') + ' / 오늘 기한이거나 지난 지시 {{task_due}} — ' + Y('task_due') + ' / 승인 대기 {{task_review}} — ' + Y('task_review'),
-    '- 입찰 사흘 안 마감 {{bid_soon}} — ' + Y('bid_soon') + ' / 직전 평일 뒤 새 공고 {{bid_new}} — ' + Y('bid_new'),
+    '- 입찰 검토 표시 중 사흘 안 마감 {{bid_soon}} — ' + Y('bid_soon') + ' / 직전 평일 뒤 새로 들어온 공고 {{bid_new}} — ' + Y('bid_new'),
     '- 차량 검사·보험 만기가 한 달 안인 차량 {{veh_30}} — ' + Y('veh_30') + ' / 기한 지난 차량 {{veh_over}} — ' + Y('veh_over'),
     '- 인허가 만기가 한 달 안인 건 {{lic_30}} — ' + Y('lic_30'),
     '- 운반일지 {{ab_day}} 기준 운반 {{ab_cnt}}건·{{ab_ton}}·잠정 {{ab_prov}} — ' + Y('ab_cnt') + '(없음이면 "운반일지 수집 기록이 없다"고 한 문장)',
@@ -314,7 +315,11 @@ async function sentence(st, f, today, log) {
   if (!sc.ok) { log.push('[문장] scrub 걸림 → 템플릿'); return { mode: 'template', reason: 'SCRUB_HIT', text: templateText(f), tokens: 0 }; }
   let json;
   try { json = await callApi(apiKey, body, TIMEOUT_MS); }
-  catch (e) { log.push('[문장] Claude 실패 ' + String((e && e.code) || e).slice(0, 40) + ' → 템플릿'); return { mode: 'template', reason: 'CLAUDE_' + String((e && e.code) || 'FAIL').slice(0, 20), text: templateText(f), tokens: 0 }; }
+  catch (e) {
+    // detail은 API 오류 문구(키 값 없음 — claude.js가 상태·메시지만 담는다). 400은 요청 형태 문제라 문구가 있어야 고친다.
+    log.push('[문장] Claude 실패 ' + String((e && e.code) || e).slice(0, 40) + (e && e.detail ? ' — ' + String(e.detail).slice(0, 160) : '') + ' → 템플릿');
+    return { mode: 'template', reason: 'CLAUDE_' + String((e && e.code) || 'FAIL').slice(0, 20), text: templateText(f), tokens: 0 };
+  }
   const tokens = usageTokens(json);
   if (json.stop_reason !== 'end_turn') { log.push('[문장] stop_reason ' + json.stop_reason + ' → 템플릿'); return { mode: 'template', reason: 'STOP_' + String(json.stop_reason || '').slice(0, 20), text: templateText(f), tokens: tokens }; }
   const raw = responseText(json);
