@@ -2218,6 +2218,7 @@ async function appendRecLog(st, entry) {
 const LN = require('./_lib/learn');
 const DD = require('./_lib/docdiff');
 const LEARN_KEY = LN.TYPES.contract.settings_key;
+const LEARN_ALLOW_MAX = 200;   // 양식당 허용 칸 상한
 async function learnSettings(st) {
   let d = {};
   try { const r = await blobGet(st, LEARN_KEY); if (r.ok && r.data && typeof r.data === 'object') d = r.data; } catch (e) {}
@@ -2255,7 +2256,8 @@ async function cdocLearnPair(st, member, ref, idx, item, ext, b64, orig, d) {
   if (!dr.ok || !dr.data) return { ok: false, code: 'DRAFT_READ_FAILED' };
   let diff = null, kind = 'none';
   const fb = b64 ? Buffer.from(b64, 'base64') : null;
-  if (dr.data.fill && Array.isArray(dr.data.fill.edits) && ext === 'xlsx' && fb) { diff = DD.xlsxCellDiff(dr.data.fill.edits, fb); kind = 'xlsx_cell'; }
+  const fillFlat = dr.data.fill ? DD.flattenEdits(dr.data.fill.edits) : null;   // v419 실제 초안은 시트별 객체 — 옛 평면 배열도 받는다
+  if (fillFlat && ext === 'xlsx' && fb) { diff = DD.xlsxCellDiff(fillFlat, fb); kind = 'xlsx_cell'; }
   else if (dr.data.data && ext === 'docx' && pick.ext === 'docx' && fb) { diff = DD.docxParaDiff(Buffer.from(String(dr.data.data), 'base64'), fb); kind = 'docx_para'; }
   const gap = DD.gapScore(diff, null, 0);
   const s = await learnSettings(st);
@@ -2293,7 +2295,8 @@ async function handleLearnSettingsSet(event, d, R) {
     const al = {};
     for (const k of keys) {
       if (!/^[A-Za-z0-9_.-]{1,40}$/.test(k)) return jr(400, { status: 'REJECTED', error_code: 'BAD_TPL', request_id: R });
-      const v = d.allow[k]; if (!Array.isArray(v) || v.length > 30 || v.some(function (f) { return typeof f !== 'string' || !f.trim() || f.length > 40; })) return jr(400, { status: 'REJECTED', error_code: 'BAD_FIELDS', request_id: R });
+      // v419 상한 30 → 200: 허용 칸은 채움 맵의 부분집합이고 가장 큰 채움 맵은 asb_plan 140칸(카드 추천값 최대 demo_report 68칸). 칸 이름 길이 40·범위 표기 금지(A5~H14는 cellRows가 인식 못 해 조용히 빠진다 — 펼쳐서 넣는다)
+      const v = d.allow[k]; if (!Array.isArray(v) || v.length > LEARN_ALLOW_MAX || v.some(function (f) { return typeof f !== 'string' || !f.trim() || f.length > 40 || f.indexOf('~') >= 0; })) return jr(400, { status: 'REJECTED', error_code: 'BAD_FIELDS', request_id: R });
       al[k] = v.map(function (f) { return f.trim(); });
     }
     if (JSON.stringify(al) !== JSON.stringify(next.allow)) { next.allow = al; changed++; }

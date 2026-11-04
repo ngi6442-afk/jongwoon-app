@@ -70,7 +70,7 @@ function parseSheetXml(xml, shared) {
   while ((m = mre.exec(xml))) { const a = refRC(m[1]), b = refRC(m[2]); if (a && b) merged.push([a[0], a[1], b[0], b[1]]); }
   return { cells: cells, merged: merged };
 }
-// 전 시트 — 앱 채움 맵의 셀 좌표는 '시트명!A1'(첫 시트는 'A1'만)이라 시트 이름으로 찾는다. 반환 {ok, sheets:{이름:{cells, merged}}, first, names, cells, merged(첫 시트 — 종전 호환)}
+// 전 시트 — 비교에 쓰는 셀 좌표는 '시트명!A1'(시트 없는 'A1'은 첫 시트 — 옛 평면 배열 호환)이라 시트 이름으로 찾는다. 반환 {ok, sheets:{이름:{cells, merged}}, first, names, cells, merged(첫 시트 — 종전 호환)}
 function xlsxCells(buf) {
   const z = zipEntries(buf);
   const wb = z['xl/workbook.xml'] ? z['xl/workbook.xml'].toString('utf8') : '';
@@ -103,6 +103,18 @@ function inMergedNonAnchor(ref, merged) {
   return false;
 }
 function normS(v) { return String(v === null || v === undefined ? '' : v).replace(/\s+/g, ' ').trim(); }
+// v419 채움 맵 정규화(한 곳) — 앱 xgBuildEdits·초안 fill.edits의 실제 형태는 {시트:[[셀,값,유형]], __drop_drawings__:[시트]} 객체. 비교는 평면 [['시트!셀',값,유형]]을 쓴다.
+// 옛 평면 배열은 그대로 돌려준다. 채움 맵이 아니면 null(호출부가 NO_FILL·kind none 처리). 저장 형식은 바꾸지 않는다(읽을 때만 편다).
+function flattenEdits(edits) {
+  if (Array.isArray(edits)) return edits;
+  if (!edits || typeof edits !== 'object') return null;
+  const out = [];
+  Object.keys(edits).forEach(function (sheet) {
+    if (sheet === '__drop_drawings__' || !Array.isArray(edits[sheet])) return;
+    edits[sheet].forEach(function (e) { if (Array.isArray(e) && e[0]) out.push([sheet + '!' + e[0], e[1], e[2]]); });
+  });
+  return out;
+}
 function sameNum(a, b) { const x = Number(a), y = Number(b); if (!isFinite(x) || !isFinite(y)) return normS(a) === normS(b); return Math.abs(x - y) <= Math.max(1e-9, Math.abs(x) * 1e-9); }
 // 채움 맵 edits [[셀, 값, 's'|'n'|'b']] ↔ 최종본 xlsx. 반환은 좌표·횟수만.
 function xlsxCellDiff(edits, finalBuf) {
@@ -191,4 +203,4 @@ function cellRows(edits, finalBuf, allowRefs) {
   });
   return { ok: true, rows: rows, hidden_changed: hidden_changed.slice(0, 100), hidden_same_n: hidden_same };
 }
-module.exports = { zipEntries, xlsxCells, xlsxCellDiff, docxParas, docxParaDiff, listDiff, gapScore, refRC, inMergedNonAnchor, splitRef, cellRows };
+module.exports = { zipEntries, xlsxCells, xlsxCellDiff, docxParas, docxParaDiff, listDiff, gapScore, refRC, inMergedNonAnchor, splitRef, cellRows, flattenEdits };

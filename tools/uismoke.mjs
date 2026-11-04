@@ -1703,6 +1703,22 @@ try {
   const swN = Number((swv.match(/jw-shell-v(\d+)/) || ['', '0'])[1]);
   T('v402 데이터·sw: proc_added_v1 스키마 2·status pending|applied·active는 bool·pending이면 전부 비활성·id 6개 고정 · R16 거울 파일 added = 원천(빌드 누락 없음) · sw ≥ 402(숫자 비교)', okData && okBuilt && swN >= 402, dTxt + ' · sw ' + swN);
 } catch (e) { console.log('  (v402 검사 생략 — ' + e.message + ')'); fails++; }
+// ---- v419(11/4 측정 결함 수리): 채움 맵 실제 형태(시트별 객체)를 세 곳이 처리 · 평면 고정값 재발 방지 — 실제 빌더를 실행해 객체 형태를 단언하고, 시험이 실제 빌더를 거치는지까지 본다 · 허용 칸 상한 ----
+try {
+  const sw419 = readFileSync(join(ROOT, 'sw.js'), 'utf8'), gw419 = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-data.js'), 'utf8'), lw419 = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-learn-background.js'), 'utf8'), dd419 = readFileSync(join(ROOT, 'netlify', 'functions', '_lib', 'docdiff.js'), 'utf8'), st419 = readFileSync(join(ROOT, 'tools', 'servertest.mjs'), 'utf8'), cs419 = readFileSync(join(ROOT, 'tools', 'consheet_check.mjs'), 'utf8');
+  const fn419 = (name) => { const i = html.indexOf('  function ' + name + '('); if (i < 0) throw new Error('함수 없음: ' + name); let d = 0, st = false; for (let j = i; j < html.length; j++) { const ch = html[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return html.slice(i, j + 1); } } throw new Error(name); };
+  const b419 = new Function(`var els = {}; var document = { getElementById: function(id){ return els[id] || (els[id] = { value: "" }); }, querySelectorAll: function(){ return []; } }; var workers = []; function alert(){} function todayStr(){ return "2026-11-04"; } ${fn419('xgBuildEdits') + fn419('koAmount') + fn419('dateSerial') + fn419('wkLabel') + fn419('findWk')} return xgBuildEdits;`)();
+  const shapes419 = ['work_start', 'work_complete', 'asb_plan', 'demo_report', 'waste_report'].map((k) => b419(k, { type: 'dredge', asb_survey: { rows: [] }, bldg_info: {}, owner_info: {} }));
+  T('v419 실제 xgBuildEdits 산출(원문 실행)은 5양식 모두 시트별 객체 — 배열로 바뀌면 이 단언과 세 곳을 같이 본다', shapes419.every((e) => e && !Array.isArray(e) && Object.keys(e).some((s) => Array.isArray(e[s]) && Array.isArray(e[s][0]))));
+  T('v419 세 곳이 평면화·시트별 처리 경유: docdiff flattenEdits 한 곳 · 짝 생성·워커가 호출 · Array.isArray(…fill.edits) 재등장 금지 · xgApplyLearned는 xgMergeLearned(시트별)·(edits||[]).map 재등장 금지 · 실패는 reportErr로 원인 남김',
+    /function flattenEdits\(edits\)/.test(dd419) && /flattenEdits \}|, flattenEdits\b/.test(dd419) && gw419.indexOf('DD.flattenEdits(dr.data.fill.edits)') > 0 && lw419.indexOf('DD.flattenEdits(dr.data.fill.edits)') > 0 && gw419.indexOf('Array.isArray(dr.data.fill.edits)') < 0 && lw419.indexOf('Array.isArray(dr.data.fill.edits)') < 0
+    && html.indexOf('function xgMergeLearned(edits, dfl)') > 0 && html.indexOf('return xgMergeLearned(edits,') > 0 && html.indexOf('(edits || []).map') < 0 && fn419('xgApplyLearned').indexOf('reportErr(') > 0 && fn419('xgMergeLearned').indexOf('"__drop_drawings__"') > 0);
+  T('v419 평면 고정값 재발 방지: servertest 절 68이 index.html의 xgBuildEdits 원문을 실행해 짝·워커·주입·fillXlsxTemplate까지 · consheet 초안 훅 고정값도 실제 빌더 산출 · 옛 평면 고정값 [{ s: "A1" 금지',
+    st419.indexOf("fnOf68('xgBuildEdits')") > 0 && st419.indexOf("fill: { tpl: 'work_start', at: '2026-11-04', edits: ED68 }") > 0 && st419.indexOf("cut68('async function fillXlsxTemplate'") > 0 && cs419.indexOf("fnOf('xgBuildEdits')") > 0 && cs419.indexOf('api.csCdocDraft(c7, \'asb_plan\', edAsb)') > 0 && cs419.indexOf("[{ s: 'A1', v: 'x' }]") < 0);
+  T('v419 허용 칸 상한: LEARN_ALLOW_MAX 200 · 범위 표기(~) 거부 · 칸 이름 40자 유지 · 옛 30 상한 재등장 금지 · sw ≥ 419',
+    /const LEARN_ALLOW_MAX = 200;/.test(gw419) && gw419.indexOf('v.length > LEARN_ALLOW_MAX') > 0 && gw419.indexOf("f.indexOf('~') >= 0") > 0 && gw419.indexOf('f.length > 40') > 0 && gw419.indexOf('v.length > 30') < 0 && Number((sw419.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 419);
+} catch (e) { console.log('  (v419 검사 생략 — ' + e.message + ')'); fails++; }
+
 // ---- v418(11/4 카드 9 PM 회신 "금액변동 시 + 계약기간 변동 시"): 상신 조건 확장 — 함수·기준일 굳힘·결재 본문·건너뜀 가드·확인창 문구, aw "amt" 값 유지 ----
 try {
   const sc418 = html.slice(html.indexOf('// @con-scen-start'), html.indexOf('// @con-scen-end'));

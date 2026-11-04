@@ -4057,4 +4057,94 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   ['col:asbestos', 'col:workers', 'col:vehicles', 'col:tasks', 'settings:autotask', 'it:autotask:dry', 'settings:notify', 'settings:assign'].forEach((k) => { delete mem.gw_data[k]; });
 }
 
+{ // ---- 68(v419) 채움 맵 실제 형태 — xgBuildEdits 실제 산출(index.html 원문 실행)로 짝 생성 → 칸 비교 → 간극 → 워커 → 학습값 → 앱 주입 → 양식 채움까지(평면 고정값이 가린 결함 재발 방지) · 허용 칸 상한 ----
+  const fs68 = require('fs');
+  const LN = require(join(FN, '_lib/learn.js')), DD = require(join(FN, '_lib/docdiff.js'));
+  const html68 = fs68.readFileSync(join(ROOT, 'index.html'), 'utf8');
+  const fnOf68 = (name) => { const i = html68.indexOf('  function ' + name + '('); if (i < 0) throw new Error('함수 없음: ' + name); let d = 0, st = false; for (let j = i; j < html68.length; j++) { const ch = html68[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return html68.slice(i, j + 1); } } throw new Error(name); };
+  const cut68 = (a, b) => { const i = html68.indexOf(a), j = html68.indexOf(b); if (i < 0 || j < 0) throw new Error('구간 ' + a); return html68.slice(i, j); };
+  // 앱 코드를 재현하지 않고 원문을 그대로 실행한다(입력 칸만 스텁)
+  const app68 = new Function('gwImpl', `
+    var els = {}, errs = [], workers = [];
+    var document = { getElementById: function(id){ return els[id] || (els[id] = { value: "" }); }, querySelectorAll: function(){ return []; } };
+    function alert(){} function todayStr(){ return "2026-11-04"; } function canDo(){ return true; } function reportErr(m){ errs.push(String(m)); }
+    function gwCall(fn, body){ return gwImpl(fn, body); }
+    ${fnOf68('xgBuildEdits') + fnOf68('koAmount') + fnOf68('dateSerial') + fnOf68('wkLabel') + fnOf68('findWk') + fnOf68('cdocSan') + fnOf68('xgMergeLearned') + fnOf68('xgApplyLearned')}
+    ${cut68('function dataUrlToBytes', 'async function readXlsx')}
+    ${cut68('var CRC_T=', 'function xmlEsc')}
+    ${cut68('function xmlEsc', '// b64 양식 + 시트별 편집')}
+    ${cut68('async function fillXlsxTemplate', 'function downloadBlob')}
+    return { set: function(o){ Object.keys(o).forEach(function(k){ els[k] = { value: o[k] }; }); }, xgBuildEdits: xgBuildEdits, xgApplyLearned: xgApplyLearned, fillXlsxTemplate: fillXlsxTemplate, errs: errs };
+  `);
+  const pending68 = { impl: null };
+  const A68 = app68((fn, body) => pending68.impl(fn, body));
+  A68.set({ xgTitle: '시험 공사', xgSite: '포항시 시험동 1', xgClient: '시험 발주처', xgAmount: '12500000', xgD1: '2026-11-01', xgD2: '2026-11-02', xgD3: '2026-11-11', xgCo: 'con' });   // 건설 = 칸이 가장 많은 분기(허용 칸 30개 초과 시험 겸)
+  const ED68 = A68.xgBuildEdits('work_start', { type: 'dredge' });
+  const DS68 = '건설공사 직접시공계획서', A18 = DS68 + '!A18';
+  const flat68 = DD.flattenEdits(ED68);
+  T('68 실제 산출 = 시트별 객체(배열 아님) → flattenEdits: 시트!셀·__drop_drawings__ 제외 · 옛 평면 배열은 그대로 · 채움 맵 아니면 null',
+    !Array.isArray(ED68) && Array.isArray(ED68.__drop_drawings__) && flat68.length > 20 && flat68.every((e) => e[0].indexOf('!') > 0 && e[0].indexOf('__drop') < 0) && flat68.some((e) => e[0] === A18 && e[2] === 'b') && DD.flattenEdits([['C7', 'x', 's']])[0][0] === 'C7' && DD.flattenEdits(null) === null && DD.flattenEdits('x') === null && DD.flattenEdits({}).length === 0, String(flat68.length));
+  // 다중 시트 zip(절 59와 같은 작성기)
+  const crcT = (() => { const t = new Int32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1); t[n] = c; } return t; })();
+  const crc32 = (b) => { let c = -1; for (let i = 0; i < b.length; i++) c = crcT[(c ^ b[i]) & 0xFF] ^ (c >>> 8); return (c ^ -1) >>> 0; };
+  const mkZip = (entries) => { const locals = [], cds = []; let off = 0; for (const [name, text] of entries) { const nb = Buffer.from(name), db = Buffer.from(text), crc = crc32(db); const lh = Buffer.alloc(30); lh.writeUInt32LE(0x04034b50, 0); lh.writeUInt16LE(20, 4); lh.writeUInt16LE(0x0800, 6); lh.writeUInt16LE(0, 8); lh.writeUInt32LE(0, 10); lh.writeUInt32LE(crc, 14); lh.writeUInt32LE(db.length, 18); lh.writeUInt32LE(db.length, 22); lh.writeUInt16LE(nb.length, 26); lh.writeUInt16LE(0, 28); const cd = Buffer.alloc(46); cd.writeUInt32LE(0x02014b50, 0); cd.writeUInt16LE(20, 4); cd.writeUInt16LE(20, 6); cd.writeUInt16LE(0x0800, 8); cd.writeUInt16LE(0, 10); cd.writeUInt32LE(0, 12); cd.writeUInt32LE(crc, 16); cd.writeUInt32LE(db.length, 20); cd.writeUInt32LE(db.length, 24); cd.writeUInt16LE(nb.length, 28); cd.writeUInt16LE(0, 30); cd.writeUInt16LE(0, 32); cd.writeUInt16LE(0, 34); cd.writeUInt16LE(0, 36); cd.writeUInt32LE(0, 38); cd.writeUInt32LE(off, 42); locals.push(lh, nb, db); cds.push(cd, nb); off += 30 + nb.length + db.length; } const cdb = Buffer.concat(cds), eocd = Buffer.alloc(22); eocd.writeUInt32LE(0x06054b50, 0); eocd.writeUInt16LE(entries.length, 8); eocd.writeUInt16LE(entries.length, 10); eocd.writeUInt32LE(cdb.length, 12); eocd.writeUInt32LE(off, 16); return Buffer.concat([...locals, cdb, eocd]); };
+  const sheets68 = Object.keys(ED68).filter((s) => s !== '__drop_drawings__');
+  const cellXml = (ref, v, ty) => (ty === 'b' || v === '' ? '<c r="' + ref + '"/>' : (ty === 'n' ? '<c r="' + ref + '"><v>' + v + '</v></c>' : '<c r="' + ref + '" t="inlineStr"><is><t xml:space="preserve">' + String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</t></is></c>'));
+  const wb68 = (override) => mkZip([['[Content_Types].xml', '<Types/>'], ['xl/workbook.xml', '<workbook><sheets>' + sheets68.map((s, i) => '<sheet name="' + s + '" sheetId="' + (i + 1) + '" r:id="rId' + (i + 1) + '"/>').join('') + '</sheets></workbook>'], ['xl/_rels/workbook.xml.rels', '<Relationships>' + sheets68.map((s, i) => '<Relationship Id="rId' + (i + 1) + '" Type="ws" Target="worksheets/sheet' + (i + 1) + '.xml"/>').join('') + '</Relationships>']].concat(sheets68.map((s, i) => ['xl/worksheets/sheet' + (i + 1) + '.xml', '<worksheet><sheetData><row r="1">' + ED68[s].map((e) => { const o = override[s + '!' + e[0]]; return o !== undefined ? cellXml(e[0], o, 's') : cellXml(e[0], e[1], e[2]); }).join('') + '</row></sheetData></worksheet>'])));
+  // 최종본 = 초안 그대로 + 공문!B14 수정 + 공란이던 A18을 직원이 채움 → 바뀐 칸 정확히 2
+  const FINAL68 = wb68({ '공문!B14': '직원이 고친 본문', [A18]: '직원이 채운 값' });
+  const CONW68 = { id: 'uconw68', name: '공무직원68', admin: false, perms: { con: 'do' }, dept: '운영부' }; mem.gw_users['member:uconw68'] = CONW68; const tok68 = issueSession(CONW68).token;
+  mem.gw_data['col:contracts'] = { schema: 1, items: [{ id: 'c68', title: '학습 계약', scen: 'dredge:pub', stages: [] }], updated_at: 1 };
+  mem.gw_data['map:contract:v1'] = { schema: 1, scen: { 'dredge:pub': [{ i: 2, name: '착공', co: 'env' }] } };
+  mem.gw_files = mem.gw_files || {};
+  const b68 = (x) => Buffer.from(x).toString('base64');
+  let r68 = await call({ action: 'cdoc_put', cid: 'c68', i: 2, doc_key: 'gen.work_start', kind: 'draft', pii: 1, fill: { tpl: 'work_start', at: '2026-11-04', edits: ED68 } }, tok68, 'dev1'); const g0 = r68.code === 200;
+  const stored68 = mem.gw_files[Object.keys(mem.gw_files).filter((k) => k.indexOf('cdoc:c68') === 0)[0]];
+  r68 = await call({ action: 'cdoc_put', cid: 'c68', i: 2, doc_key: 'main.작성-0', kind: 'final', name: '착공계.xlsx', data: b68(FINAL68), pii: 1 }, tok68, 'dev1');
+  const L68 = r68.body.learn || {};
+  const pk68 = Object.keys(mem.gw_data).filter((k) => k.indexOf('learn:contract:in:') === 0);
+  const P68 = pk68.length ? mem.gw_data[pk68[0]] : null, Ls68 = mem.gw_data['lessons:contract:work_start'];
+  T('68 실제 초안으로 짝: 저장 형식 시트별 객체 그대로 · kind xlsx_cell · 간극 null 아님(comparable·cell_ratio 숫자) · 바뀐 칸 2(공문!B14·직접시공 A18) · 짝 블롭에 값 없음 · lessons에 숫자 간극 1(기준선 재료)',
+    g0 && !Array.isArray(stored68.fill.edits) && Array.isArray(stored68.fill.edits['공문']) && r68.code === 200 && L68.ok && L68.kind === 'xlsx_cell' && L68.status === 'done_nomodel' && L68.gap && L68.gap.comparable === true && typeof L68.gap.cell_ratio === 'number' && L68.gap.cell_ratio > 0 && L68.changed === 2 && L68.compared === flat68.length && L68.uncomparable === 0 && P68 && P68.diff.refs_changed.slice().sort().join() === [A18, '공문!B14'].sort().join() && JSON.stringify(P68).indexOf('직원이') < 0 && Ls68 && Ls68.gaps.length === 1 && typeof Ls68.gaps[0].ratio === 'number', JSON.stringify([L68, P68 && P68.diff]).slice(0, 400));
+  // 워커 — NO_FILL로 죽지 않고 허용 칸 값이 시트!셀 좌표로 프롬프트에 → 규칙 → learn_defaults_get → 앱 주입 → 양식 채움
+  const allow68 = flat68.map((e) => e[0]).filter((r) => r !== DS68 + '!D33');
+  r68 = await call({ action: 'learn_settings_set', on: true, allow: { work_start: allow68 } }, tokA, 'dev1'); const w0 = r68.code === 200 && allow68.length > 30;
+  r68 = await call({ action: 'cdoc_put', cid: 'c68', i: 2, doc_key: 'main.작성-0', kind: 'final', name: '착공계2.xlsx', data: b68(FINAL68), pii: 1, allow_dup: true }, tok68, 'dev1');
+  const pid68 = r68.body.learn && r68.body.learn.id; const w1 = r68.code === 200 && r68.body.learn.status === 'pending' && r68.body.learn.kind === 'xlsx_cell';
+  const worker68 = require(join(FN, 'gw-learn-background.js'));
+  const savedKey68 = process.env.GW_ANTHROPIC_KEY, savedUrl68 = process.env.URL, realFetch68 = global.fetch;
+  process.env.GW_ANTHROPIC_KEY = 'test-anthropic-key-0000'; process.env.URL = 'https://test.local';
+  const api68 = [];
+  global.fetch = async (url, opt) => {
+    const b = JSON.parse(opt.body || '{}'); api68.push((b.messages && b.messages[0] && b.messages[0].content[0].text) || '');
+    const text = JSON.stringify({ summary: 'A18을 같은 값으로 채움', changes: [{ kind: 'field_default', what: 'A18 기본값' }], rules: [{ text: '직접시공계획서 A18은 처음부터 채운다', scope: 'field_default', n: 2, keep_id: '', field: A18, value: '직원이 채운 값' }, { text: '본문 표기를 고친다', scope: 'format', n: 1, keep_id: '', field: '', value: '' }] });
+    return { ok: true, status: 200, text: async () => JSON.stringify({ model: b.model, stop_reason: 'end_turn', usage: { input_tokens: 500, output_tokens: 80 }, content: [{ type: 'text', text: text }] }) };
+  };
+  const tokIn68 = issueSession({ id: '__promoai__', role: 'system' }).token;
+  await worker68.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + tokIn68 }, body: JSON.stringify({ pair_id: pid68 }) }, {});
+  global.fetch = realFetch68; process.env.GW_ANTHROPIC_KEY = savedKey68; process.env.URL = savedUrl68;
+  const Pw68 = mem.gw_data['learn:contract:in:' + pid68], uw68 = api68[0] || '';
+  const w2 = Pw68.status === 'done' && Pw68.code === undefined && api68.length === 1 && uw68.indexOf(A18) >= 0 && uw68.indexOf('직원이 채운 값') > 0 && uw68.indexOf(DS68 + '!D33') >= 0 === false && Pw68.visible_n === allow68.length && mem.gw_data['lessons:contract:work_start'].rules.some((r) => r.scope === 'field_default' && r.field === A18);
+  T('68 워커: NO_FILL 아님(done) · 시트!셀 좌표·허용 칸 값이 프롬프트에 · 규칙 저장 · 짝 생성에 허용 칸 30개 초과 사전이 저장됨', w0 && w1 && w2, JSON.stringify([w0, w1, Pw68.status, Pw68.code, Pw68.visible_n, allow68.length]));
+  // 앱 주입 — 서버 응답을 그대로 받아 공란 칸에만, 실제 fillXlsxTemplate으로 양식에 들어가는지까지
+  pending68.impl = async (fn, body) => { const r = await call(body, tok68, 'dev1'); return { status: r.code, body: r.body }; };
+  const al68 = await A68.xgApplyLearned('work_start', ED68);
+  const rowA18 = (ed) => ed[DS68].filter((x) => x[0] === 'A18')[0];
+  const TPL68 = wb68({}); const blob68 = await A68.fillXlsxTemplate(b68(TPL68), al68.edits);
+  const out68 = DD.xlsxCells(Buffer.from(await blob68.arrayBuffer()));
+  const i1 = !Array.isArray(al68.edits) && Object.keys(al68.edits).join() === Object.keys(ED68).join() && al68.edits.__drop_drawings__ === ED68.__drop_drawings__ && JSON.stringify(rowA18(al68.edits)) === JSON.stringify(['A18', '직원이 채운 값', 's']) && al68.learned.join() === A18 && rowA18(ED68)[2] === 'b' && A68.errs.length === 0;
+  const i2 = out68.ok && out68.sheets[DS68].cells.A18.v === '직원이 채운 값' && out68.sheets['기본정보 입력'].cells.B1.v === '시험 공사';
+  T('68 앱 주입: learn_defaults_get 응답 → 공란 칸 A18에 값 · 시트 구조·__drop_drawings__ 유지 · learned = 시트!셀 · 실제 fillXlsxTemplate 결과 파일에 값 들어감 · 다른 칸 유지 · 오류 기록 없음', i1 && i2, JSON.stringify([i1, i2, al68.learned, A68.errs]));
+  // 허용 칸 상한·형식
+  const many = (n) => Array.from({ length: n }, (_, i) => '시트!A' + (i + 1));
+  r68 = await call({ action: 'learn_settings_set', allow: { work_start: many(200) } }, tokA, 'dev1'); const c0 = r68.code === 200;
+  r68 = await call({ action: 'learn_settings_set', allow: { work_start: many(201) } }, tokA, 'dev1'); const c1 = r68.code === 400 && r68.body.error_code === 'BAD_FIELDS';
+  r68 = await call({ action: 'learn_settings_set', allow: { demo_report: ['건축물해체신고서1!A5~H14'] } }, tokA, 'dev1'); const c2 = r68.code === 400 && r68.body.error_code === 'BAD_FIELDS';
+  r68 = await call({ action: 'learn_settings_set', allow: { work_start: ['가'.repeat(41)] } }, tokA, 'dev1'); const c3 = r68.code === 400 && r68.body.error_code === 'BAD_FIELDS';
+  r68 = await call({ action: 'learn_settings_set', allow: { work_start: [' '] } }, tokA, 'dev1'); const c4 = r68.code === 400 && r68.body.error_code === 'BAD_FIELDS';
+  T('68 허용 칸 상한 200: 200칸 저장 · 201칸 BAD_FIELDS · 범위 표기(~) BAD_FIELDS · 41자 BAD_FIELDS · 빈 칸 BAD_FIELDS', c0 && c1 && c2 && c3 && c4, JSON.stringify([c0, c1, c2, c3, c4]));
+  ['col:contracts', 'map:contract:v1', 'recidx:c68', 'settings:learn', 'lessons:contract:work_start', 'learn:contract:lock', 'usage:learn:contract:' + LN.ymOf(Date.now())].forEach((k) => { delete mem.gw_data[k]; });
+  Object.keys(mem.gw_data).filter((k) => k.indexOf('learn:contract:in:') === 0).forEach((k) => delete mem.gw_data[k]); Object.keys(mem.gw_files).filter((k) => k.indexOf('cdoc:c68') === 0).forEach((k) => delete mem.gw_files[k]);
+}
+
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

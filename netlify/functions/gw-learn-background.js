@@ -61,10 +61,11 @@ exports.handler = async function (event, context) {
 
     // 재료: 초안 채움 맵(fill.edits) · 최종본 xlsx 바이트
     const dr = await blobGet(store(FILES), cdocKey(pair.cid, pair.i, 'gen.' + pair.tpl, pair.draft_n));
-    if (!dr.ok || !dr.data || !dr.data.fill || !Array.isArray(dr.data.fill.edits)) { await finish('fail', 'NO_FILL', '초안 채움 맵이 없습니다'); return; }
+    const fillFlat = (dr.ok && dr.data && dr.data.fill) ? DD.flattenEdits(dr.data.fill.edits) : null;   // v419 실제 초안은 시트별 객체 — 옛 평면 배열도 받는다
+    if (!fillFlat) { await finish('fail', 'NO_FILL', '초안 채움 맵이 없습니다'); return; }
     const fr = await blobGet(store(FILES), cdocKey(pair.cid, pair.i, pair.dk, pair.final_n));
     if (!fr.ok || !fr.data || !fr.data.data) { await finish('fail', 'NO_FINAL', '최종본 바이트가 없습니다'); return; }
-    const rows = DD.cellRows(dr.data.fill.edits, Buffer.from(String(fr.data.data), 'base64'), allow);
+    const rows = DD.cellRows(fillFlat, Buffer.from(String(fr.data.data), 'base64'), allow);
     if (!rows.ok) { await finish('fail', rows.code || 'DIFF_FAILED'); return; }
     if (!rows.rows.length && !rows.hidden_changed.length) { await finish('done', 'NO_CHANGE', '바뀐 칸 없음 — 모델 호출 생략', { rules_n: null }); return; }
 

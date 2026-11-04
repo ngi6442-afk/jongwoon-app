@@ -9980,20 +9980,36 @@
   }
   // 생성 훅 — 서류 생성(xlsx 채움)이 성공하면 채움 맵을 초안(draft)으로 자동 보존. 실패해도 조용히(내려받기는 이미 끝났다). pii 1 = 값에 소유주·대리인 이름이 섞일 수 있어 do 권한만 열람
   // v411 생성 주입 — 학습된 칸 기본값(서버 learn_defaults_get: 허용 사전(R2) 안·근거 2건↑만)을 **공란('b')으로 남는 칸에만** 넣는다. 계산된 값은 덮지 않는다. 실패·없음이면 그대로.
+  // v419 채움 맵은 {시트:[[셀,값,유형]], __drop_drawings__:[…]} 객체 — fillXlsxTemplate이 시트 이름으로 돌므로 구조를 그대로 유지한다(시트별로 새 줄만 교체). 기본값 키 = '시트!셀'. 옛 평면 배열도 받는다.
+  function xgMergeLearned(edits, dfl){
+    var learned = [], isArr = function(x){ return Object.prototype.toString.call(x) === "[object Array]"; };
+    var one = function(e, sheet){
+      if (!e || typeof e[0] !== "string") return e;
+      var ref = (sheet ? sheet + "!" : "") + e[0];
+      var k = ref.toUpperCase(); var v = dfl[k] !== undefined ? dfl[k] : (dfl[ref] !== undefined ? dfl[ref] : undefined);
+      if (v === undefined || e[2] !== "b") return e;
+      learned.push(ref); return [e[0], String(v), "s"];
+    };
+    if (isArr(edits)) return { edits: edits.map(function(e){ return one(e, ""); }), learned: learned };
+    var out = {};
+    Object.keys(edits || {}).forEach(function(sh){
+      out[sh] = (sh === "__drop_drawings__" || !isArr(edits[sh])) ? edits[sh] : edits[sh].map(function(e){ return one(e, sh); });
+    });
+    return { edits: out, learned: learned };
+  }
   function xgApplyLearned(kind, edits){
+    // v419 실패해도 초안 생성은 막지 않고 원인을 오류 기록(err_log)에 남긴다 — 이전엔 TypeError까지 조용히 삼켜 주입이 한 번도 돌지 않았다
+    var fail = function(code, err){
+      try { if (typeof reportErr === "function") reportErr("학습 칸 주입 실패 " + kind + " " + code + (err && err.message ? " " + err.message : ""), "xgApplyLearned", (err && err.stack) || ""); } catch(e2){}
+      return { edits: edits, learned: [] };
+    };
     try {
       if (typeof gwCall !== "function" || !canDo("con")) return Promise.resolve({ edits: edits, learned: [] });
       return gwCall("gw-data", { action: "learn_defaults_get", tpl: cdocSan(kind, 30) }).then(function(res){
-        var dfl = (res && res.status === 200 && res.body && res.body.defaults) ? res.body.defaults : {}; var learned = [];
-        var out = (edits || []).map(function(e){
-          if (!e || typeof e[0] !== "string") return e;
-          var k = e[0].toUpperCase(); var v = dfl[k] !== undefined ? dfl[k] : (dfl[e[0]] !== undefined ? dfl[e[0]] : undefined);
-          if (v === undefined || e[2] !== "b") return e;
-          learned.push(e[0]); return [e[0], String(v), "s"];
-        });
-        return { edits: out, learned: learned };
-      }).catch(function(){ return { edits: edits, learned: [] }; });
-    } catch(e){ return Promise.resolve({ edits: edits, learned: [] }); }
+        if (!res || res.status !== 200) return fail("HTTP_" + ((res && res.status) || 0));
+        return xgMergeLearned(edits, (res.body && res.body.defaults) ? res.body.defaults : {});
+      }).catch(function(e){ return fail("THREW", e); });
+    } catch(e){ return Promise.resolve(fail("THREW", e)); }
   }
   function csCdocDraft(c, kind, edits, learned){
     try {
