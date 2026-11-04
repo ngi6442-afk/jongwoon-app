@@ -111,7 +111,7 @@ function flattenEdits(edits) {
   const out = [];
   Object.keys(edits).forEach(function (sheet) {
     if (sheet === '__drop_drawings__' || !Array.isArray(edits[sheet])) return;
-    edits[sheet].forEach(function (e) { if (Array.isArray(e) && e[0]) out.push([sheet + '!' + e[0], e[1], e[2]]); });
+    edits[sheet].forEach(function (e) { if (Array.isArray(e) && e[0] && e[2] !== 'f') out.push([sheet + '!' + e[0], e[1], e[2]]); });   // v420 유형 f = 글자 크기만 바꾸는 줄(값을 안 쓰므로 비교 대상 아님)
   });
   return out;
 }

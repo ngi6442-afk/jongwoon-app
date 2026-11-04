@@ -7995,7 +7995,29 @@
     return new Blob(parts.concat(central,[new Uint8Array(eo.buffer)]), {type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
   }
   function xmlEsc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
-  function xlsxSetCell(xml, ref, val, kind){   // kind: s=문자열 n=숫자 b=공란 — 원본에 없는 셀은 건너뜀
+  // v420 셀 글자 크기만 바꾼 스타일을 styles.xml에 덧붙여 그 셀에 건다(원본 스타일은 그대로, 같은 조합은 재사용). st={xml, made:{}}. 파싱이 안 맞으면 손대지 않는다.
+  function xlsxCellPt(xml, ref, pt, st){
+    var m=new RegExp('<c r="'+ref+'"([^>]*?)(/?>)').exec(xml); if(!m) return xml;
+    var sm=/\ss="(\d+)"/.exec(m[1]), s0=sm?+sm[1]:0, key=s0+":"+pt;
+    if(st.made[key]===undefined){
+      var fts=/<fonts\b[^>]*>[\s\S]*?<\/fonts>/.exec(st.xml), xfs=/<cellXfs\b[^>]*>[\s\S]*?<\/cellXfs>/.exec(st.xml);
+      if(!fts||!xfs) return xml;
+      var fl=fts[0].match(/<font>[\s\S]*?<\/font>/g)||[], xl=xfs[0].match(/<xf\b[^>]*?(?:\/>|>[\s\S]*?<\/xf>)/g)||[];
+      var cnt=function(s){ return +((/\bcount="(\d+)"/.exec(s)||[0,0])[1]); };
+      if(cnt(fts[0])!==fl.length||cnt(xfs[0])!==xl.length||!xl[s0]) return xml;
+      var f0=fl[+((/\bfontId="(\d+)"/.exec(xl[s0])||[0,0])[1])]; if(!f0||!/<sz\b[^>]*\/>/.test(f0)) return xml;
+      var f1=f0.replace(/<sz\b[^>]*\/>/,'<sz val="'+pt+'"/>');
+      var x1=xl[s0].replace(/\bfontId="\d+"/,'fontId="'+fl.length+'"'); if(!/\bapplyFont=/.test(x1)) x1=x1.replace("<xf ",'<xf applyFont="1" ');
+      var grow=function(block, tag, add, n){ return block.replace("</"+tag+">",function(){ return add+"</"+tag+">"; }).replace(/\bcount="\d+"/,'count="'+n+'"'); };
+      st.xml=st.xml.replace(fts[0],function(){ return grow(fts[0],"fonts",f1,fl.length+1); });
+      st.xml=st.xml.replace(xfs[0],function(){ return grow(xfs[0],"cellXfs",x1,xl.length+1); });
+      st.made[key]=xl.length;
+    }
+    var attrs=sm?m[1].replace(/\ss="\d+"/,' s="'+st.made[key]+'"'):' s="'+st.made[key]+'"'+m[1];
+    return xml.slice(0,m.index)+'<c r="'+ref+'"'+attrs+m[2]+xml.slice(m.index+m[0].length);
+  }
+  function xlsxSetCell(xml, ref, val, kind){   // kind: s=문자열 n=숫자 b=공란 f=값 그대로(v420 글자 크기만 바꾸는 줄) — 원본에 없는 셀은 건너뜀
+    if(kind==="f") return xml;
     var re=new RegExp('<c r="'+ref+'"([^>]*?)(/>|>[\\s\\S]*?</c>)');
     var m=re.exec(xml); if(!m) return xml;
     if(m[0].indexOf("<f")>=0) return xml;   // 수식 셀 보호 — 덮으면 calcChain 고아로 파일이 안 열림(실측: 공정표 B26)
@@ -8006,7 +8028,7 @@
     else nw='<c r="'+ref+'"'+s+' t="inlineStr"><is><t xml:space="preserve">'+xmlEsc(val)+'</t></is></c>';
     return xml.slice(0,m.index)+nw+xml.slice(m.index+m[0].length);
   }
-  // b64 양식 + 시트별 편집 → 채워진 xlsx Blob. edits: {"시트명":[["C7","값","s"],...]}
+  // b64 양식 + 시트별 편집 → 채워진 xlsx Blob. edits: {"시트명":[["C7","값","s"(,글자 크기 pt)],...]}
   async function fillXlsxTemplate(b64, edits){
     var bytes=dataUrlToBytes("x,"+b64);
     var files=await unzip(bytes);
@@ -8017,13 +8039,15 @@
     var rels=dec.decode(raw["xl/_rels/workbook.xml.rels"]);
     var rid2t={}; rels.replace(/Id="([^"]+)"[^>]*Target="([^"]+)"/g, function(_,a,b){ rid2t[a]=b; return _; });
     var name2xml={}; wbx.replace(/<sheet name="([^"]+)"[^>]*r:id="([^"]+)"/g, function(_,nm,rid){ name2xml[nm]="xl/"+rid2t[rid]; return _; });
+    var stPt={xml:raw["xl/styles.xml"]?dec.decode(raw["xl/styles.xml"]):"", made:{}};
     for(var sheet in edits){
       if(sheet==="__drop_drawings__") continue;   // 예약키: 시트의 도형(옛 막대 등 잔재) 제거 지시
       var path=name2xml[sheet]; if(!path||!raw[path]) continue;
       var xml=dec.decode(raw[path]);
-      edits[sheet].forEach(function(e){ xml=xlsxSetCell(xml, e[0], e[1], e[2]); });
+      edits[sheet].forEach(function(e){ xml=xlsxSetCell(xml, e[0], e[1], e[2]); if(e[3]) xml=xlsxCellPt(xml, e[0], e[3], stPt); });
       raw[path]=enc.encode(xml);
     }
+    if(Object.keys(stPt.made).length) raw["xl/styles.xml"]=enc.encode(stPt.xml);
     (edits["__drop_drawings__"]||[]).forEach(function(sn){
       var p2=name2xml[sn]; if(!p2||!raw[p2]) return;
       raw[p2]=enc.encode(dec.decode(raw[p2]).replace(/<drawing\b[^>]*\/>/g,""));
@@ -9292,7 +9316,8 @@
                      sign:"주 식 회 사  종 운 건 설   대 표 이 사  나 종 운", addr:"경상북도 포항시 남구 정몽주로 823-10(청림동)", tel:"054-291-1202"} };
     var coKey=document.getElementById("xgCo").value||"env", co=XG_CO[coKey];
     var ed=[["B1",title,"s"],["B2",site,"s"]];
-    if(amt) ed.push(["B3",koAmount(amt),"s"]);
+    // v420 금액 표기 = 과거 실물 최다(11건 중 5건)·양식과 같은 기호. koAmount는 견적·계약 화면도 쓰므로 그대로 두고 이 칸만 바꾼다.
+    if(amt) ed.push(["B3",koAmount(amt).replace("원 정(￦ "," 원정(\\ "),"s"]);
     [["B4","xgD1"],["B5","xgD2"],["B6","xgD3"]].forEach(function(p){
       var sn=dateSerial(document.getElementById(p[1]).value);
       if(sn) ed.push([p[0],sn,"n"]);
@@ -9307,9 +9332,37 @@
     var docNo=co.no+" 제 "+today.replace(/-/g,"")+"-01 호";
     var sendDt=ty[0]+"년 "+ty[1]+"월   일";
     var gmCo=(coKey==="con") ? [["A2",co.a2,"s"],["A4",co.a4,"s"],["A29",co.sign,"s"]] : [];
+    // v420 공문 본문 = 과거 실물(착공 7·준공 7건): 글자 10pt(14건 중 12건 — 양식은 12pt라 공사명이 조금만 길어도 인쇄에서 잘림) · 닫는 따옴표 뒤 띄움 · 조사는 공사명 끝 글자 받침대로.
+    // 10pt에서도 넘치면 낱말 경계에서 다음 줄로(B14~B16). maxW = 병합 칸 폭을 10pt 굴림체 칸 수로 잰 값(한글 2칸 — 착공 95.2·준공 89.8에서 여유 1칸).
+    var gmPara=function(rest, ind, tail, maxW){
+      var last=(title.match(/[가-힣](?=[^가-힣]*$)/)||[""])[0];
+      var jo=(last&&(last.charCodeAt(0)-0xAC00)%28)?"을":"를";
+      var wrap=function(s){
+        var out=[], cur=s;
+        while(out.length<2){
+          var wd=0, cut=-1, i=0, over=false;
+          for(;i<cur.length;i++){
+            wd+=cur.charCodeAt(i)>255?2:1;
+            if(wd>maxW){ over=true; break; }
+            if(cur.charAt(i)===" "&&i>ind.length) cut=i;
+          }
+          if(!over) break;
+          if(cut<0) cut=i;   // 띄어쓰기 없는 긴 낱말은 폭에서 자른다
+          out.push(cur.slice(0,cut)); cur=ind+cur.slice(cut).trim();
+        }
+        out.push(cur);
+        return out;
+      };
+      var line='2. 귀 청과 체결한 "'+title+'" '+jo+' '+rest;
+      var lines=(wrap(line).length===1)?[line,ind+tail]:wrap(line+" "+tail);
+      var rows=[["B13","","f",10],["B18","","f",10]];
+      ["B14","B15","B16"].forEach(function(c,n){ if(lines[n]) rows.push([c,lines[n],"s",10]); });
+      return rows;
+    };
     if(kind==="work_start"){
-      var gm=[["B6",docNo,"s"],["B7",sendDt,"s"]].concat(gmCo);
-      if(title&&d2) gm.push(["B14",'2. 귀 청과 체결한 "'+title+'"를 '+ko(d2)+'부로',"s"]);
+      // v420 착공 공문 날짜만 일까지 채움(실물 7건 중 6건). 착공계·직접시공계획서 제출일은 실물 다수가 일 공란(6/7·7/7)이라 sendDt 그대로. 양식 칸이 일반 형식이라 날짜 숫자가 아닌 글자로 쓴다.
+      var gm=[["B6",docNo,"s"],["B7",ty[0]+"년 "+ty[1]+"월 "+ty[2]+"일","s"]].concat(gmCo);
+      if(title&&d2) gm=gm.concat(gmPara(ko(d2)+"부로","  ","착공하겠기에 붙임과 같이 착공계를 제출 합니다.",94));
       edits["공문"]=gm;
       edits["착공계"]=[["B16",sendDt,"s"]];   // 제출일 허브 — 공정표·현장대리인계·재직증명서·내역서갑지가 참조
       var gt=[];
@@ -9365,9 +9418,10 @@
         }
       }
     } else if(kind==="work_complete"){
-      var gm2=[["B6",docNo,"s"],["B7",sendDt,"s"]].concat(gmCo);
+      var gm2=[["B6",docNo,"s"],["B7",sendDt,"s"]].concat(gmCo);   // 준공 공문 날짜는 실물 다수(6건 중 4건)가 일 공란 — 그대로
       if(client) gm2.push(["B8",client,"s"]);   // 수신처(준공계 공문은 하드코딩)
-      if(title&&d3) gm2.push(["B14",'2. 귀 청과 체결한 "'+title+'"을 '+ko(d3)+' 부로',"s"]);
+      // v420 "부로"는 실물처럼 다음 줄 첫머리(7건 중 4건). 문구는 등록 양식(준공하였기에)을 따른다 — 옛 실물은 대부분 "준공하겠기에".
+      if(title&&d3) gm2=gm2.concat(gmPara(ko(d3),"   ","부로 준공하였기에 붙임과 같이 준공계를 제출 합니다.",88));
       edits["공문"]=gm2;
       var cq=[["B16",sendDt,"s"],["K8","","b"]];
       cq.push(["B14",co.no,"s"]);                            // 예금주

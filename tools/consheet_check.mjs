@@ -572,4 +572,34 @@ T('준공·만기 칸: d3 없음 → "-" · 지난 날짜 → vs-dan · 완료 �
   api.setGw(null);
 }
 
+{ // ---- v420 착공·준공 초안 표기(과거 실물 측정 11/4) — 실제 빌더 산출로 확인 ----
+  const set420 = (o) => Object.keys(o).forEach((id) => api.setDocEl(id, { value: o[id] }));
+  const base420 = { xgTitle: '시험 공사', xgSite: '포항시 시험동', xgClient: '시험 발주처', xgAmount: '1000000', xgD1: '2026-11-01', xgD2: '2026-11-02', xgD3: '2026-11-10', xgCo: 'env', xgOwner: '', xgAgent: '', xgAgentRrn: '', xgAgentLic: '' };
+  const cell420 = (ed, s, c) => ((ed[s] || []).filter((x) => x[0] === c)[0] || [])[1];
+  const build420 = (title) => { set420(Object.assign({}, base420, { xgTitle: title })); return { s: api.xgBuildEdits('work_start', { type: 'dredge' }), c: api.xgBuildEdits('work_complete', { type: 'dredge' }) }; };
+  const P = build420('시험 공사');
+  T('v420 금액 B3: "일금 X 원정(\\ N)" 착공·준공 같음 · koAmount 원문(견적·계약 화면 공용)은 그대로',
+    cell420(P.s, '기본정보 입력', 'B3') === '일금 일백만 원정(\\ 1,000,000)' && cell420(P.c, '기본정보 입력', 'B3') === '일금 일백만 원정(\\ 1,000,000)' && html.indexOf('"원 정(￦ "+n.toLocaleString()') > 0, cell420(P.s, '기본정보 입력', 'B3'));
+  T('v420 착공 공문: B14 따옴표 뒤 띄움·"일부로" 한 줄 · B15 양식 문장 · 짧으면 B16 안 씀',
+    cell420(P.s, '공문', 'B14') === '2. 귀 청과 체결한 "시험 공사" 를 2026년 11월 02일부로' && cell420(P.s, '공문', 'B15') === '  착공하겠기에 붙임과 같이 착공계를 제출 합니다.' && cell420(P.s, '공문', 'B16') === undefined, cell420(P.s, '공문', 'B14'));
+  const row420 = (ed, c) => (ed['공문'] || []).filter((x) => x[0] === c)[0] || [];
+  T('v420 공문 본문 글자 크기 10pt: B14·B15는 값+크기 · B13·B18은 값 그대로(유형 f) · 머리 칸(B6·B7)은 안 건드림 · 착공·준공 같음',
+    [P.s, P.c].every((ed) => row420(ed, 'B14')[3] === 10 && row420(ed, 'B15')[3] === 10 && row420(ed, 'B13')[2] === 'f' && row420(ed, 'B13')[3] === 10 && row420(ed, 'B18')[2] === 'f' && row420(ed, 'B18')[3] === 10 && row420(ed, 'B6')[3] === undefined && row420(ed, 'B7')[3] === undefined), JSON.stringify(row420(P.s, 'B13')));
+  T('v420 준공 공문: B14는 날짜까지 · B15 첫머리 "부로" + 양식 문구',
+    cell420(P.c, '공문', 'B14') === '2. 귀 청과 체결한 "시험 공사" 를 2026년 11월 10일' && cell420(P.c, '공문', 'B15') === '   부로 준공하였기에 붙임과 같이 준공계를 제출 합니다.', String(cell420(P.c, '공문', 'B15')));
+  T('v420 날짜: 착공 공문만 일까지(글자) · 착공계·직접시공계획서·준공 공문·청구서는 일 공란 유지',
+    cell420(P.s, '공문', 'B7') === '2026년 10월 13일' && cell420(P.s, '착공계', 'B16') === '2026년 10월   일' && cell420(P.s, '건설공사 직접시공계획서', 'A30') === '2026년 10월   일' && cell420(P.c, '공문', 'B7') === '2026년 10월   일' && cell420(P.c, '청구서', 'B16') === '2026년 10월   일', String(cell420(P.s, '공문', 'B7')));
+  const J = (t) => /" (을|를) /.exec(cell420(build420(t).s, '공문', 'B14'))[1];
+  T('v420 조사: 끝 한글 받침대로(용역=을·공사(3공구)=를·한글 없음=를)', J('시험 용역') === '을' && J('시험 공사(3공구)') === '를' && J('ABC-1') === '를', J('시험 용역'));
+  const wide = (s) => { let n = 0; for (let i = 0; i < s.length; i++) n += s.charCodeAt(i) > 255 ? 2 : 1; return n; };
+  const longT = '경상북도 포항시 남구 일원 하수도시설물 준설공사 및 폐기물 수집운반 처리 용역 제3공구 연간 단가 계약 변경분';
+  const L = build420(longT), joinL = (ed) => ['B14', 'B15', 'B16'].map((c) => cell420(ed, '공문', c) || '').join(' ').replace(/\s+/g, ' ').trim();
+  const fits = (ed, w) => ['B14', 'B15', 'B16'].every((c) => wide(cell420(ed, '공문', c) || '') <= w);
+  T('v420 긴 공사명: 줄마다 폭 안(착공 94·준공 88)·낱말 경계에서 나눔·이어 붙이면 문장 그대로',
+    fits(L.s, 94) && fits(L.c, 88) && joinL(L.s) === '2. 귀 청과 체결한 "' + longT + '" 을 2026년 11월 02일부로 착공하겠기에 붙임과 같이 착공계를 제출 합니다.' && joinL(L.c) === '2. 귀 청과 체결한 "' + longT + '" 을 2026년 11월 10일 부로 준공하였기에 붙임과 같이 준공계를 제출 합니다.' && row420(L.s, 'B15')[3] === 10, joinL(L.s));
+  const uncut = '가'.repeat(40); const U = build420(uncut);
+  T('v420 띄어쓰기 없는 긴 공사명: 줄마다 폭 안 · 공사명·문장 유실 없음', fits(U.s, 94) && fits(U.c, 88) && joinL(U.s).replace(/\s/g, '').indexOf(uncut) > 0 && joinL(U.s).indexOf('착공계를 제출 합니다.') > 0, joinL(U.s));
+  set420(base420);
+}
+
 console.log(fails ? '\n계약 시트 실행 검사 실패 ' + fails + '건' : '\n계약 시트 실행 검사 전 항목 통과'); process.exit(fails ? 1 : 0);

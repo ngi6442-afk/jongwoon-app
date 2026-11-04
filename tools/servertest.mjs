@@ -4135,6 +4135,18 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   const i1 = !Array.isArray(al68.edits) && Object.keys(al68.edits).join() === Object.keys(ED68).join() && al68.edits.__drop_drawings__ === ED68.__drop_drawings__ && JSON.stringify(rowA18(al68.edits)) === JSON.stringify(['A18', '직원이 채운 값', 's']) && al68.learned.join() === A18 && rowA18(ED68)[2] === 'b' && A68.errs.length === 0;
   const i2 = out68.ok && out68.sheets[DS68].cells.A18.v === '직원이 채운 값' && out68.sheets['기본정보 입력'].cells.B1.v === '시험 공사';
   T('68 앱 주입: learn_defaults_get 응답 → 공란 칸 A18에 값 · 시트 구조·__drop_drawings__ 유지 · learned = 시트!셀 · 실제 fillXlsxTemplate 결과 파일에 값 들어감 · 다른 칸 유지 · 오류 기록 없음', i1 && i2, JSON.stringify([i1, i2, al68.learned, A68.errs]));
+  // v420 글자 크기 줄(4번째 값) — 비교에서 f 제외, 실제 fillXlsxTemplate이 styles.xml에 덧붙이고 원본 스타일은 그대로
+  const PT_STY = '<styleSheet><fonts count="2" x14ac:knownFonts="1"><font><sz val="11"/><name val="A"/></font><font><b/><sz val="12"/><name val="B"/></font></fonts><cellXfs count="2"><xf numFmtId="0" fontId="0" xfId="0"/><xf numFmtId="0" fontId="1" xfId="0" applyFont="1"><alignment horizontal="left"/></xf></cellXfs></styleSheet>';
+  const ptWb = (sty) => mkZip([['[Content_Types].xml', '<Types/>'], ['xl/workbook.xml', '<workbook><sheets><sheet name="공문" sheetId="1" r:id="rId1"/></sheets></workbook>'], ['xl/_rels/workbook.xml.rels', '<Relationships><Relationship Id="rId1" Type="ws" Target="worksheets/sheet1.xml"/></Relationships>'], ['xl/styles.xml', sty], ['xl/worksheets/sheet1.xml', '<worksheet><sheetData><row r="1"><c r="C1" s="1" t="inlineStr"><is><t>머리</t></is></c></row><row r="13"><c r="B13" s="1" t="inlineStr"><is><t>본문 그대로</t></is></c></row><row r="14"><c r="B14" s="1" t="inlineStr"><is><t>옛 값</t></is></c></row></sheetData></worksheet>']]);
+  const ptEd = { '공문': [['B13', '', 'f', 10], ['B14', '새 값', 's', 10], ['C1', '머리 새 값', 's']] };
+  const ptOut = async (sty) => { const buf = Buffer.from(await (await A68.fillXlsxTemplate(b68(ptWb(sty)), ptEd)).arrayBuffer()); return { z: DD.zipEntries(buf), x: DD.xlsxCells(buf) }; };
+  const pt1 = await ptOut(PT_STY), pt1S = pt1.z['xl/styles.xml'].toString('utf8'), pt1X = pt1.z['xl/worksheets/sheet1.xml'].toString('utf8');
+  T('68 v420 글자 크기: flattenEdits는 f 줄 제외 · 값 칸은 그대로 비교', JSON.stringify(DD.flattenEdits(ptEd)) === JSON.stringify([['공문!B14', '새 값', 's'], ['공문!C1', '머리 새 값', 's']]), JSON.stringify(DD.flattenEdits(ptEd)));
+  T('68 v420 글자 크기: f 줄은 값 유지 · 두 칸이 새 스타일 하나를 공유 · 굵기·글꼴·정렬은 원본 그대로 · 지정 안 한 칸·기존 스타일은 안 바뀜 · count 갱신',
+    pt1.x.sheets['공문'].cells.B13.v === '본문 그대로' && pt1.x.sheets['공문'].cells.B14.v === '새 값' && /<c r="B13" s="2"/.test(pt1X) && /<c r="B14" s="2"/.test(pt1X) && /<c r="C1" s="1"/.test(pt1X)
+    && pt1S.indexOf('<fonts count="3"') >= 0 && pt1S.indexOf('<cellXfs count="3"') >= 0 && pt1S.indexOf('<font><b/><sz val="12"/><name val="B"/></font>') >= 0 && pt1S.indexOf('<font><b/><sz val="10"/><name val="B"/></font></fonts>') >= 0 && pt1S.indexOf('<xf numFmtId="0" fontId="2" xfId="0" applyFont="1"><alignment horizontal="left"/></xf></cellXfs>') >= 0, pt1S);
+  const pt2 = await ptOut(PT_STY.replace('<fonts count="2"', '<fonts count="9"')), pt2S = pt2.z['xl/styles.xml'].toString('utf8');
+  T('68 v420 글자 크기: styles.xml을 못 읽으면 스타일은 손대지 않고 값만 채움', pt2.x.sheets['공문'].cells.B14.v === '새 값' && pt2S.indexOf('<fonts count="9"') >= 0 && pt2S.indexOf('val="10"') < 0 && /<c r="B14" s="1"/.test(pt2.z['xl/worksheets/sheet1.xml'].toString('utf8')), pt2S.slice(0, 80));
   // 허용 칸 상한·형식
   const many = (n) => Array.from({ length: n }, (_, i) => '시트!A' + (i + 1));
   r68 = await call({ action: 'learn_settings_set', allow: { work_start: many(200) } }, tokA, 'dev1'); const c0 = r68.code === 200;
