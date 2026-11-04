@@ -2,9 +2,21 @@
 <html lang="ko"><head><meta charset="utf-8"><title>진척도 대시보드</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#181920;--surface:#1f2026;--surface2:#2a2b33;--line:#30323a;--ink:#e8e8e4;--mute:#96968f;--dim:#696964;--teal:#1D9E75;--amber:#EF9F27;--coral:#D85A30;--brand:#1D9E75;--violet:#9d8cf0;--shadow:none}
 body{font-family:'Malgun Gothic',sans-serif;background:#181920;color:#e8e8e4;width:100vw;height:100vh;overflow:hidden}
-#panel{position:absolute;right:60px;top:36vh;width:640px;max-height:calc(64vh - 50px);background:#1f2026;border:1px solid #30323a;border-radius:14px;padding:26px 32px;overflow-y:auto}
-@media (max-width:1200px){#panel{position:static;width:100%;max-height:none;border:0;border-radius:0;padding:24px 28px}}
+/* PM 11/4: 왼쪽 열 = 캘린더·시간표, 오른쪽 열 = 진척도, 두 열 모두 화면 위에서 20% 지점부터 */
+#cols{position:absolute;top:20vh;right:60px;width:1140px;height:calc(80vh - 50px);max-width:calc(100vw - 80px);display:flex;justify-content:flex-end;gap:20px;align-items:flex-start}
+#calp{flex:0 1 480px;min-width:0;max-height:100%;overflow-y:auto;font-size:13px;line-height:1.5}
+#calp .cal-card{margin-bottom:12px}
+#calp .cal-card:last-child{margin-bottom:0}
+#calp .cal-lb{max-height:clamp(60px,16vh,220px);overflow-y:auto}
+#calp .cal-it{font-size:12.5px}
+#calp .cal-day{min-height:42px}
+#calp .cal-grid.mo .cal-day{min-height:30px;padding:2px 4px}
+@media (max-height:800px){#calp .cal-legend,#calp .cal-foot{display:none}#calp .cal-day{min-height:34px}#calp .cal-grid.mo .cal-day{min-height:24px}#calp .cal-lb{max-height:10vh}#calp .cal-list{margin-top:8px;padding-top:6px}#calp .cal-card{padding:10px 12px;margin-bottom:8px}}
+#panel{flex:0 1 640px;min-width:0;max-height:100%;background:#1f2026;border:1px solid #30323a;border-radius:14px;padding:26px 32px;overflow-y:auto}
+@media (max-width:1200px){#cols{left:24px;right:24px;width:auto;max-width:none;gap:14px}#calp{flex:0 0 40%}#panel{flex:1 1 0;padding:20px 22px}}
+@media (max-width:900px){body{width:auto;height:auto;overflow:auto}#cols{position:static;display:block;height:auto}#calp{max-height:none;overflow:visible;padding:14px}#panel{max-height:none;overflow:visible;border:0;border-radius:0;padding:24px 28px}}
 h1{font-size:19px;display:inline}
 .date{color:#696964;font-size:12px;margin-left:10px}
 .hero{font-size:38px;font-weight:700;margin:12px 0 8px}
@@ -41,33 +53,88 @@ h2{font-size:13px;margin-bottom:8px}
 .view{display:none}.view.on{display:block}
 .foot{font-size:12px;color:#55554f;margin-top:12px}
 .warn{font-size:11px;color:#c8795a;background:#33231d;border-radius:6px;padding:7px 10px;margin-top:10px}
+/* ==CAL-CSS== 캘린더·하루 시간표(체크 52) — 이 구간은 빌더가 벽지에 그대로 옮긴다. 색은 위 토큰만 쓴다. */
+.cal-card{background:var(--surface); border:1px solid var(--line); border-radius:14px; box-shadow:var(--shadow); padding:12px; margin-bottom:14px}
+.cal-head{display:flex; align-items:center; gap:6px; margin-bottom:10px}
+.cal-ttl{flex:1; min-width:0; margin:0; font-size:14px; font-weight:700; letter-spacing:-.01em; color:var(--ink); line-height:1.3}
+.cal-seg{flex:none; display:inline-flex; background:var(--surface2); border:1px solid var(--line); border-radius:999px; padding:2px}
+.cal-seg button{font:inherit; font-size:12px; color:var(--mute); background:none; border:0; border-radius:999px; padding:4px 10px; cursor:pointer; white-space:nowrap}
+.cal-seg button.on{background:var(--bg); color:var(--ink); font-weight:700}
+.cal-nav{flex:none; font:inherit; font-size:13px; background:var(--surface2); color:var(--ink); border:1px solid var(--line); border-radius:8px; width:30px; height:28px; padding:0; cursor:pointer}
+.cal-legend{display:flex; flex-wrap:wrap; gap:4px 10px; font-size:11px; color:var(--mute); margin:0 0 8px}
+.cal-legend i{display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:4px; vertical-align:middle}
+.cal-k-pm{background:var(--coral)} .cal-k-ai{background:var(--teal)} .cal-k-me{background:var(--violet)} .cal-k-auto{background:var(--dim)}
+.cal-grid{display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:4px}
+.cal-dow{font-size:11px; color:var(--dim); text-align:center; padding-bottom:2px}
+.cal-dow.sun{color:var(--coral)}
+.cal-day{min-width:0; min-height:52px; border:1px solid var(--line); border-radius:9px; background:var(--surface2); padding:4px 4px 3px; cursor:pointer; display:flex; flex-direction:column; align-items:flex-start; gap:3px; font:inherit; color:inherit; text-align:left}
+.cal-day.out{opacity:.35}
+.cal-day .n{font-size:12px; font-weight:700; font-variant-numeric:tabular-nums; line-height:1.3}
+.cal-day.sun .n{color:var(--coral)}
+.cal-day.today{border-color:var(--brand); box-shadow:inset 0 0 0 1px var(--brand)}
+.cal-day.sel{background:var(--bg); border-color:var(--ink)}
+.cal-dots{display:flex; flex-wrap:wrap; gap:3px}
+.cal-dots i{width:6px; height:6px; border-radius:50%}
+.cal-dots i.off{opacity:.35}
+.cal-more{font-size:10px; color:var(--dim); line-height:1}
+.cal-list{margin-top:12px; border-top:1px solid var(--line); padding-top:10px}
+.cal-lt{font-size:13px; margin:0 0 8px; color:var(--mute); font-weight:600}
+.cal-it{display:flex; gap:8px; align-items:flex-start; padding:6px 0; border-bottom:1px dashed var(--line); font-size:13.5px; line-height:1.45; color:var(--ink)}
+.cal-it:last-child{border-bottom:0}
+.cal-chip{flex:none; font-size:10.5px; font-weight:700; border-radius:6px; padding:1px 6px; margin-top:2px; color:#fff; line-height:1.4}
+.cal-chip.pm{background:var(--coral)} .cal-chip.ai{background:var(--teal)} .cal-chip.me{background:var(--violet)} .cal-chip.auto{background:var(--dim)}
+.cal-tm{flex:none; color:var(--dim); font-variant-numeric:tabular-nums; font-size:12px; margin-top:2px}
+.cal-tx{min-width:0; overflow-wrap:anywhere}
+.cal-it.done .cal-tx{color:var(--dim)}
+.cal-it.done .cal-t{text-decoration:line-through}
+.cal-sub{display:block; font-size:11.5px; color:var(--dim)}
+.cal-sub.late{color:var(--coral)}
+.cal-empty{font-size:13px; color:var(--dim)}
+.cal-lanes{display:flex; font-size:11px; color:var(--dim); margin:0 0 2px 44px}
+.cal-lanes span:first-child{width:calc(54% - 44px)}
+.cal-tt{position:relative; margin-top:8px}
+.cal-hr{position:absolute; left:0; right:0; border-top:1px solid var(--line); font-size:10.5px; color:var(--dim); font-variant-numeric:tabular-nums}
+.cal-hr span{position:absolute; top:-8px; left:0; background:var(--surface); padding-right:4px; line-height:1.4}
+.cal-blk{position:absolute; left:44px; width:calc(52% - 44px); border-radius:8px; padding:3px 7px; font-size:12px; line-height:1.3; border-left:3px solid; overflow-wrap:anywhere; z-index:1}
+.cal-blk.me{background:var(--surface2); border-color:var(--violet)}
+.cal-blk.work{background:color-mix(in srgb, var(--coral) 10%, var(--surface)); border-color:var(--coral); border-left-style:dashed}
+.cal-blk b{display:block; font-size:11px; color:var(--mute); font-weight:600}
+.cal-pt{position:absolute; left:54%; right:0; font-size:11.5px; line-height:1.25; color:var(--mute); display:flex; gap:5px; align-items:flex-start; background:var(--surface); z-index:1}
+.cal-pt i{flex:none; width:7px; height:7px; border-radius:50%; background:var(--dim); margin-top:4px}
+.cal-pt.ai i{background:var(--teal)}
+.cal-now{position:absolute; left:36px; right:0; border-top:2px solid var(--coral); z-index:3; pointer-events:none}
+.cal-now::before{content:"지금"; position:absolute; left:-36px; top:-9px; font-size:10px; font-weight:700; color:var(--coral); background:var(--surface)}
+.cal-foot{font-size:11px; color:var(--dim); margin-top:8px; line-height:1.45}
+/* ==/CAL-CSS== */
 </style></head><body>
+<div id="cols">
+<div id="calp"></div>
 <div id="panel">
 
 <div class="view on" id="v-home">
   <h1>진척도</h1><span class="date">2026-11-04 · 클릭=상세</span>
   <div class="hero">85%<small>업무 큰틀 4개 평균</small></div>
-  <div class="row" onclick="go('v1')"><b>1&nbsp; 업무플랫폼 &nbsp;◀ 카드 10 dry 1회차 · 11/9 게이트</b><div class="track"><div class="fillb t" style="width:96%"></div><span>96</span></div></div>
+  <div class="row" onclick="go('v1')"><b>1&nbsp; 업무플랫폼 &nbsp;◀ 카드 9 v418 · 11/9 게이트</b><div class="track"><div class="fillb t" style="width:96%"></div><span>96</span></div></div>
   <div class="row" onclick="go('v2')"><b>2&nbsp; 인증·자격 &nbsp;◀ KOITA 변경신고 제출 11/2 · KOSHA 포털 접수 대기</b><div class="track"><div class="fillb" style="width:71%"></div><span>71</span></div></div>
   <div class="row" onclick="go('v3')"><b>3&nbsp; 홍보·검색노출 &nbsp;◀ 학습 재설계 D1~D3 배포 · 수집기 pyhwp 10/28</b><div class="track"><div class="fillb t" style="width:96%"></div><span>96</span></div></div>
   <div class="row" onclick="go('v4')"><b>4&nbsp; 경영 기반 &nbsp;◀ 주식회사 전환 P7 종료(10/29) · KOITA 49 제출 11/2</b><div class="track"><div class="fillb" style="width:78%"></div><span>78</span></div></div>
-  <div class="lane">★11/4 08:2x — 29 자료 요청 완료(PM) · 52 진척도 위 캘린더·일일 시간표 신설(시안 먼저) / ★11/4 0시 — 할 일 재정리(PM &quot;ㅇㅇ&quot;): 날짜순 한 판 📁 09_조사_문서\할일_한판_20261103.md · 다음 = 11/4 R1 입찰 알림·카드 9 전환·배경 승격 카드 → 11/5 카드 6 2건·적격 수리 → 11/6 카드 10 결정 2·3·28 승격 → 11/8 허용 사전 → 11/9 게이트 · 29 권민지 자료 요청 11/2 미실시 → 11/4 · 크레딧 원인 = 그때 잔액 0(18:40 Claude 문장 모드 ✓) / ★11/3 14:1x — PM 크레딧 충전 → 16 제외(14:11·14:16 재생성은 아직 &quot;credit balance too low&quot;(템플릿) = 그때 잔액 0 → 18:39 충전 뒤 18:40 Claude 문장 모드 ✓(조직 불일치 [추정] 문구는 11/4 삭제)) → PM 몫 18건 / ★11/3 14시 — 카드 10 코드(앱 v417·appdata)·1회차 dry-run(현장 대장 미입력 26행 · 차량 D-90 후보 6대(겹침 0) · 일용직 생년월일 공란 0명(2025년~ 참여 30명 중), 발행 0) → 결과 카드(결정 2·3·4 11/6) · 28 bg:lic 승격 R2 카드(11/6) → PM 몫 19건 / ★11/3 13:15 회신 — 카드 10 착수(규칙 3건 코드·1회차 dry-run) · 28 재개(bg:lic 승격 R2 카드) · 사람 테스트 종결 · 15 앱 승인 대기는 PM 몫에서 제외(앱·에이전트 몫 규칙) · 13 자치법규 = 기존 신청 [수정] 체크 · 51 한글 2014 hwpx 미지원(PM 택일) → PM 몫 18건 / ★11/3 12시 — 38 D1 서버 배포 v416(PM ㄱ 12:18 → 첫 생성 12:54 · 템플릿 — Claude 크레딧 0이라 폴백 작동 241자 · mp3 227KB · 선히 확인 ✓ 한국어 10종) · ★Anthropic 크레딧 0 실측(앱 Claude 기능 전부 폴백 — PM 충전) · 45 PM 회신: 카드 8 키 유지(종결)·카드 10 선행 해소(운영부 직접 입력 값)·푸시 구독 11/4 · PM 12:16 직접 지시 36건 정리(카드 6 남은 적용 2건) → PM 몫 20건 / ★11/3 — 45 ⓐ 알림 원인 실측(크론 사망 0 — GitHub 예약 지연 5~10h·감시 판정 결함 2·올바로 10/25 실제 0건) → 감시 자동 복구층(appdata e815df3·c31971e: 판정일 슬롯 기준·마감 전 보류·화관법/올바로 2차 킥·Actions 재발사·0건 중복 억제, dry ✓) · ⓑ 김정아 권한 항목 제외(PM 몫 22건) / ★11/2 — 45 카드 10 R3 브리핑·PM 몫 한 장·C2-2 카드 6 · 38 Azure 키·D1 브리핑 · 30 공명 도급계약 v6 체결 · 49 KOITA 변경신고 제출 · lawwatch 경보 경로 수리 · 46 오피스 모니터 해결 · 세션 화면 공백 수리 / ★11/1 — 45 D3 서류함 v406~v408 · C1 묶음 v409 · D4 학습 루프 v410~v412 · C2·C3 v413~v415 / ★10/30 — 45 R1 알림 추천값 2/3 적용 · 집 PC 윈도우 업데이트(KB5127936)·사용 시간 · 앱 데이터 git 백업 조각 형식 수리(10/29 밤) / ★10/29 밤 — 30 v5 공명 단독(⑤ 각서 유지·⑥ 공명 계좌)·위약벌 판단 자료 · 23 종료(연구실 49 분리) · 29 11/2 권민지 요청 · 45 진행·45/46 겹침 정리(예약 시각 → 사용 시간 08~21시) · 38 홈오피스 장비 도착 · 벽지생성.py 세로 모니터·단색 배경 보존 / ★10/29 — 30 v4(서약서 없이 을·병 책임)·45 D1 3일차 v401·OneDrive work 공유 전환(집 13:19·오피스 18:13, 오실행 덮어쓰기 복구)·48 병렬 불가 종결·오피스 컴 Win11 순서표·권대리 PC 가이드 / ★10/28 — 새 PC 이식(C안 윈11) 복원 완료·M365 설치(PM 23:20)·한컴 보안모듈 미해결 → 수집기 pyhwp 전환 완료 · 30 공명·현포 계약서 1028본 → v2(고철 무단 반출 50배 위약벌) → v4(측 인원 정의·수량 부족 추정·서약서 없이 을·병 책임) · 45 Phase 0 B2 D1 v400 뒤 15:12 보류 · 29 월말명세서 시안 v1 / ★10/27 — 재설계 Phase 0 착수 ㄱ(A1 기준선·A2 배정표 v395·A3~A5·A7·B1 D0) · 등급표 R0~R3 승인 · 30 새 건 공명·현포 v14 복사본 검토 / ★10/26 — C드라이브 종결(backup_v3) · PM 결정: bid 담당 나수진 고정·billing/payout/allbaro 현상 유지·나머지 ㄱ / ★10/23 — C 가득 참 사고 · 리눅스 길라잡이 · 사용량 보류 → &quot;45는 fable로&quot; → 업무별 최적화 설계 17절 / ★10/21 — 건설업 기재사항 변경 완료(P7 7/9) · PM 개입 최소화 피드백 문서 · 저녁 Fish 중국계 제외·Azure 확정·장비 주문(Brio 100·Pebble V2) / ★10/21 — KOSHA 방침 게시 완료(남은 3건) · 블로그 학습은 다음 게시글 결과 대기 · 음성 브리핑: 장비는 보유분으로 충분(Pebble 불필요), Fish Audio Drama 3는 Qwen(알리바바) 베이스·US$50만 매출 조건·35B라 API만 가능 → Azure vs Fish 택일 PM 대기 / ★10/20 저녁 — 블로그 학습 재설계 D1~D3 배포 완료(v392~v394): 실제 게시글 포장 프로필 자동 측정 → 복사 출력이 서명 삭제·굵게·구분선·문단 빈 줄을 자동 적용, 포장 간극 측정 배선. 남은 것 = 네이버 붙여넣기 실험 1회·다음 게시글 간극 / ★10/20 18:10 — 블로그 학습 재설계 D1 완료(v392): 실제 게시글 9편 포장 프로필(가운데 100%·한 줄 20/25자·간격 1칸·구분선 8/편·굵게 20%) 자동 측정·카드 표시 → D2 서버 포장 모듈·D3 복사 자동 반영 / ★10/20 오후 — PM 답 5건: KOSHA 4·6 완료, 5는 방침 게시·의견청취·편철·제안 4건 남음, 노무사 창구 있음(9 종결), 블로그 학습 재설계 ㄱ(자동 반영·줄간격·정렬, 지표 = 다음 게시글 간극, 정화조 안함), 음성 브리핑 장비 재브리핑 / ★10/20 11:24 — 블로그 학습 1차 기준선: 앱 최종 생성글 ↔ 네이버 게시글 9편 평균 차이 5.9%(10월 2편 0%), 모델 규칙 6·공종 예시 5 → PM 규칙 훑기·정화조 문구 확인 / ★10/20 오전 — 학습 출처 = 실제 네이버 게시글 v390(PM &quot;네이버 게시글과 생성기 직접 비교&quot;): RSS→본문 짝 9편, 폴더 복사본 짝 7편 대체, 복사본 흔적 규칙 비움 → 재학습 ≈90분 / ★10/20 — 블로그 자동 학습 루프 v389 배포(PM ㄱ, 모자이크 불변): 초안 보존·직원 수정본 짝·학습 워커(모델이 규칙 추출)·규칙 창고 주입·관리자 카드 + 로컬 수집기·스케줄러 09:05/16:05 → 7편 학습 가동 · 음성 브리핑 조건 2(설정값화·크롬) / ★10/19 저녁 — 음성 브리핑 결정 3 완료(선히·Azure·A안 → PM 장비·Azure 키, AI D1 대기) · 블로그 재설계 착수 브리핑(모델이 직원 수정본에서 학습: 폴더→수집기→학습 워커→규칙·예시→생성 주입·간극 카드, 3일, 결정 6·ㄱ 대기) · P7 기한 근거표(법제처 재확인) / ★10/19 오후 — 문서함 직원 출력·권한 v388 배포 + 열람용 PDF 75/75(Word·Excel·PowerPoint·한컴 COM) + 분류 기본 공개범위 적용 + 더미/관리부/관리자 실측(PM &quot;33. ㄱ지금&quot;) · 블로그 에이전트 학습 방식 브리핑(PM &quot;큰 수정&quot; 구상) · 음성 브리핑 선택지 3 재제시 · 41 일용직 사고 PM 오프라인 / ★10/19 — 문서함 직원 출력·권한 착수 브리핑(PM &quot;r&quot;=ㄱ): 열람용 PDF 도구·[보기·인쇄]·원본 권한 서버 판정·열람 기록, 결정 4 추천값, v388 2일(재확인 ㄱ 대기) / ★10/16 — 포항 소액수의 R26BK01752009 입찰무효 종결(PM): 등기 9/29 뒤 나라장터 변경등록 없이 10/8 투찰 = 지방계약법 시행규칙 42조5호 · 운반일지 14일 태웅 1건 이틀 뒤 수집에서 자동 반영(PM 판단 확인) / ★10/15 — 체크 탭 연간 업무에 KOITA 3·위험성평가 인정 4·수시 3 추가(v387, 정본 JW-02-04-001 v3·문서함 v3) · P7 기한 재계산(등기 완료 9/29 — 보험 3건 경과·10/29) / ★10/14 오후 — 철거 도급계약서 오프라인 체결 완료(PM) → JW-04-03-004 v1 정본 등재 · 조기퇴근 결재 완료(시행일 미정) · 블로그 업무 재개(10/14 장량동 상가 게시) · 주식회사 전환 완료 → P7 외부 등록 착수(체크리스트 20건) · 운반일지 숨김 권한 더미 실측(첫 보고 과장 정정) / ★10/14 — 운반일지 엑셀 수량 ≠ 화면(권민지 12·13일) 원인 실측: 엑셀을 만드는 GitHub 예약(08:25)이 매일 10:58~12:38에 돌아 오전 엑셀이 전날 아침 데이터 → v385 수집 직후 재생성·소급·놓친 변경 안내(적대 검토 11건 반영) · v386 숨김·해제·복구 운영부까지(PM ㄱ) · 배포 뒤 12일 55=55·13일 51=51 실측 / ★10/13 — 계약 탭 ③v383 서류 패킷·④v384 결재 2종+현장 대장 연결 배포(설계 ①~④ 완료, 적대 검토 4회 확정 56건 반영) · 일용직 트럭 사다리 사고 책임 검토(법령·판례 원문 30건, PM 확인 5) / ★10/12 — 철거 도급계약서 v12~v14(종운건설 = 발주자, PM 수정 반영 → 업체명 대기) · 계약 탭 ①v381 시트·②v382 시나리오 배포 · 고객센터 문의 → 앱 푸시 v380 종결(PM &quot;푸시 왔음&quot;) · 전문대 화공 육성안 / ★10/10 — 입찰 레이더 10/8 사고 3단 종결(v379 라이브·PM 화면 확인) · 철거 하도급 계약서 v4(원도급 계약서·견적 검토 내역 녹임)→v5(PM ⓐ12항 삭제 ⓑ철거 공종·공사명 추천 ⓒ장소 전부) · 주식회사 전환 P4~P6 완료(P7 외부 등록은 사업자등록증 변경 뒤) · PM 발의 2(고객센터 문의 카톡 알림·사용자 인식 AI) / ★10/8 — 종운환경 주식회사 전환(PM) → 상호 명기변경 전수 프로토콜 P1~P3 완료(앱 v377·양식 블롭 4·운영 데이터) · 입찰 레이더 앱 전송 27일 중단 수리(07:52 수신 확인) · 차량 열 폭 초기화 v376 / 10/7 철거 하도급 계약서 v2 + v1→v2 변경표시판 / 10/1 차량 폰 만기 열·끌기·유령 저장값 v373~v375 / 9/30 준설차 매뉴얼 정본 3건 등재 · 현장 탭·일용직 정재욱 이관 / 9/24 대표 홈·오피스 PC 자동실행 완료 / 9/23 번호판 전용 경로 v371·v372 · 실적 11파일 분기 배정 · 계약 탭 90일 시나리오 3종 / 9/21 석면 안전성평가 1차 B등급 71.6 · SEO 30일 판정 · 블로그 직원판 v367 · 무기계약직 레이더 v368 · 하도급 브리핑 / 9/18 운반일지 v365·v366 · 체크리스트 정리판 / 9/16 블로그 근본 수리 v360~v364 / 9/14~15 입찰 2차 판독 체계 · v355~v359. 이번 주 축(11/4): ①45 11/4 R1 입찰 알림·카드 9 전환·배경 승격 카드 → 11/5 카드 6 2건·적격 수리 → 11/6 카드 10 결정 2·3·28 승격 → 11/8 허용 사전 → 11/9 게이트 ②11/4 정재욱·권민지 푸시 구독(PM) ③29 자료 요청 완료(11/4) → 수령 +4일 착수 ④38 D2(PM 집 PC 계신 날) ⑤46 사용 시간·18 권대리·연구실 PC(PM)</div>
+  <div class="lane">★11/4 10시 — PM 회신·앱 실측: 입찰 알림 ✓ · 배경 승격 ✓ · 카드 9 금액 + 계약기간 상신 v418 · 카드 10 결정 2·3 ✓ · 대표 로그인 종결 · 계약 학습 짝 0건 원인 = 서류함 업로드 0, 과거 실물 363파일 미연결(ㄱ 대기) · 52 모바일·벽지 구현(위젯 APK 빌드 남음)</div>
   <hr>
   <h2>지금 중요한 순서 — 전체 (상위 8)</h2>
   <div class="item wait" style="margin-top:10px"><span class="m">◔</span>★18 오피스 컴 Win11 순서표·읽기 전용 사전 점검 bat + 권대리 PC 지급 가이드(10/29 저녁, 공식 출처 조사 → 반박 검증, 반박 34·누락 11 반영) — Win11: F23에서 화면 판정 먼저 → BIOS F31·EC 도구·F55d → MBR2GPT(MBR일 때만) → CSM 끄기·Secure Boot → 업그레이드(반나절·정전 대책). 권대리 PC: 백업 대조 → OneDrive 연결 해제 → 초기화+데이터 정리 → Win11 → 회사 관리용 계정·권대리 표준 계정 → 회사 명의 Office·한글. PM: 사전 점검 bat 1회 · 권대리 결정 3(권민지 주임인지·KOITA 연구실 PC인지·라이선스 구독/영구) · ★10/30 PM: 기존 오피스 컴은 KOITA 연구실 사진에 찍힘(사양 미등록) → 연구실 대체 PC 결정, 변경신고 대상 아님 · PM</div>
   <div class="item done"><span class="m">☑</span>★48 오피스 본체 2대 — PM &quot;병렬로 슈퍼컴퓨터처럼&quot; 검토(10/29, 조사·반박 검증 8에이전트): 불가(윈도우 PC 합치기 제품 없음·1GbE는 DDR5의 1/666·우리 로컬 작업 20개 중 빨라짐 0). 실익은 상시 가동(미러 백업 57%) → 대안 ① 상시 자동화 PC ② 입력 공유(Mouse Without Borders) ③ 부품 합치기 ④ 코드 개선, 추천 ①+②+④. PM 대안 선택·두 본체 사양 → ★종결(PM 17:25): 기존 오피스 컴은 권대리 지급, 집에서 가져온 구 PC가 PM 오피스 컴 — 넘기기 전 OneDrive 연결 해제·계정 로그아웃(회사 work·비밀 파일이 PM OneDrive에 있음)</div>
   <div class="item done"><span class="m">☑</span>★30 공명 단독 도급계약서(동일산업 전기로 해체 3.15억) — 10/28 1028본 → v2 50배 위약벌 → v4 측 인원 정의·수량 추정 → ★10/29 22:15 PM &quot;공명이랑 단독계약&quot; → v5(현포 &quot;병&quot; 140곳·제1조④ 연대 삭제·계약서 2통, 반박 검증 blocker 0) · PM ⑤ 선급금·각서 유지 ⑥ 공명 명의 계좌(제17조① 반영) · 판단 자료(②): 고철 시가는 50배와 따로 유지, 배수 C안(10배+누계 상한 3,150만+안전장치) 추천·50배 유지면 A′ → 남은 결정 ①소급 ②50배 구조 ③10/28 건 ④추정 조항. 📁 work\11_자료실\하도급계약서\도급계약서_위약벌50배_판단자료_20261029.md · ★10/30 PM 답: 1028본 미전달(v5 첫 제시본) · 10/28 반출은 발주자가 조용히 처리 → 결정 ①③ 해소, 남은 ②④ → ★11/2 PM &quot;현재판으로 계약체결완료&quot; = v6(11/1, 결정 ①~⑥ 종결)로 체결 · 날인본 오프라인 · 문서함 등재 안 함(PM 17:28)</div>
   <div class="item wait"><span class="m">◔</span>★46 새 PC 이식 → 두 PC 운영(10/28~29) — 복원 완료(레포·백업·pip·netlify·폰트·예약 4·게이트·장판·Graphviz/JRE·M365·크롬 확장) · 클로드 앱 MSIX 가상화로 빠진 등록 재수리(한컴 보안모듈 True·수집기 종단 성공·창 없는 실행) · OneDrive work 공유(집 13:19·오피스 18:13, 17:59 오실행 덮어쓰기 18:35 복구) · 예약 작업 = 집 PC만 · 21:25 자리 이동 규칙(한 번에 한 PC) · PM 10/29 &quot;예약작업 시간 답변&quot; → 평일 08~20시 미러·매일 09:05/12:30/16:05 → PM 정정 &quot;끄고 7시에 다시 켤거임&quot; = 밤에 끄고 07시에 켬 → 사용 시간 08~21시(업데이트는 21~8시, PM)·끌 때 &quot;업데이트 및 종료&quot;·끄는 시각 21시 이후 미정(PM)·켠 뒤 로그인 · 남은 것 = 잔여 3 조사(오피스 세션)·11/2 백업 기록 점검 · PM</div>
-  <div class="item now"><span class="m">▶</span>★45 재설계 Phase 0(10/27 ㄱ, 30.45일·11/9 게이트) — 10/26 PM 결정(bid 담당 나수진 고정·billing/payout/allbaro 현상 유지·나머지 ㄱ·계약 포함) → 10/27 A1 기준선 발행·A2 배정표 v395·A3 알림 v396·A4 감시 지도·A5 앱기준 v397·A7 흔적 v398·v399·B1 계약 D0 → 10/27 B2 D1 1일차 → 10/28 2일차 v400(골조·목록 거울, 스위치 끔) → 15:12 PM &quot;45 보류&quot; → 10/29 재개(PM &quot;다 되면 빨리&quot;) → ★D1 3일차 v401 완료(13:56 배포: clog:contract 골조·목록 편집(관리자, append-only 해시 체인)·stage.docs[] 건별 서류 체크, servertest 834·적대 검토 6건 반영, 사람 테스트 7항 미실측) → 다음 D1 4일차 added 엔진(카드 9 뒤). R1 예약(ㄱ 없이): 10/30 알림 추천값 · 10/31 done_if 켜기(후보 13 vs 14 재집계)·계약 거울 스위치 · 11/4 카드 9 무응답 → 추천안 · 11/24 발화 재집계. PM 카드(R2·R3): 8 시크릿(11/2) · 9 골조(11/4) · 1-6 푸시 구독·대표 PC 로그인 · 10 자동 지시(11/9 전) · ★PM 10/29 &quot;45. 진행. 병목 시 피드백&quot; → D1 4일차 added 엔진 선구현(스위치 끔) 착수 · ★10/30 R1 알림 추천값 2/3 적용(완료 요청→지시자·승인권자 1인, 만기→아침 요약; 자동 지시 생성은 정재욱 구독 뒤) → ★10/30 10:28 D1 4일차 v402 배포(오피스 컴, 카드 9 신설 엔진 꺼진 채 — 부록 R 16·적대 검토 13 반영, servertest 839·uismoke 213·consheet 100·거울 diff 0) → ★10/31(토) R1 ②③ 적용: done_if 켬 → 첫 크론 review 15건(재집계 15=15, 의심 1건 006거8419) · 계약 거울 스위치 켬(diff 0, 화면 효과 0) · 되돌리기 스냅샷 미기록 결함 v403 수리 → ★17:0x PM &quot;계속 밀어&quot;: D1 잔여(두 층 매핑·81단계 명시값, 거울 3층) + D2 1·2일차(법령 배경 59행 DRF 재확인·설계안 정정 6건, 거울 4층 · 앱 v404 기한 엔진 — 승격 전 화면 변화 0) → D2 3일차(법령 워치 ↔ 배경 재확인 연동 v405 — 드라이런이 산안법 10/27 개정을 잡아 5행 재확인 · 사례 색인 170행) = **D2 완료** → ★11/1(일) PM &quot;다음·병목건만 피드백&quot; → **D3 계약 서류함 1일차 서버 v406**(cdoc 7액션·기록물 Blobs만·문서함 차단) + **2일차 앱 v407**(단계 서류 행 올리기 2종·개인정보 등급·기록물 줄·패킷 메타 우선 판정·초안 자동 보존) + **3일차 v408**(관리자 보관함·안내·규정 §12② 개정 초안 파일) = **D3 코드 끝, 운영 시작은 선행 3건+규정 개정 뒤** · 11/4 R2 카드 2건(카드 9 + 배경 승격) · 병목 보고 3(정재욱·권민지 구독 0 / 규정 §12 개정 R3 / 46건 정리) → ★16시 PM &quot;다음&quot;: D4는 게이트(1주 업로드율) 대기 → **C1-1 인사 안내 v409**(도움말 4묶음·아이디 로그인·MANUAL 휴가 안내 1장) → **C1-2 인허가 R0**(bg:lic 초안 98행 법령 35종 실측·lawwatch +38·매핑표·사건표·관리표 PR #1 draft) → **C1-3 KOITA K0**(bg:koita 초안 법령 11·규칙 8·고시 1행) → C1-4 bid=ⓑ로 충족 = **C1 묶음 끝(16:3x)** · 다음 11/2 lawwatch 첫 실행·오피스 설정·카드 8 → 11/4 R2 카드 2건 → ★16:48 PM &quot;D4 아니지, 내 손으로 안 하기로&quot; → 착수 조건 폐기 → **D4 1~3일차 v410·v411 당일 완료**(학습 코어 승격·최종본 즉시 짝·셀 diff·허용 칸만 모델·공란 자동 채움·워커·크론 교대·카드) · 남은 4일차 기준선·일몰 · R2 허용 사전 카드(무응답 11/8=추천값) → ★22:4x **D4 4일차 v412 = D4 코드 끝**(기준선 동결·일몰 하루 1회·양식별 켜기/끄기·간극 집계 짝 0건) · 남은 사람 손 = R2 허용 사전 1회(무응답 11/8) → ★11/2 00:5x **C2·C3 네 건 v413~v415**([내 것 아님]·안내·휴가 알림·레이더 이식·입찰 알림) — C 잔여 9건은 PM 선행 뒤 → ★11/2 17:08 PM &quot;45. 다음&quot; → 코드 몫 끝 → **카드 10 R3 착수 브리핑**(현장·차량·명부 자동 지시, 1회차 발행 0 · 4관점 검증 확정 44건 반영·버림 6건) — PM ㄱ 대기(11/9 게이트 전, 무응답 = C5 보류) → ★11/2 20시 **C2-2 지시 정리 목록·카드 6**(라이브 65건 읽기만 · 바꾸는 것 6 = 증명서 옛 회차 5·두호천 적격 숨김, 무응답 11/5 적용·영구 삭제 0) · 발견 = 적격 지시가 낙찰방법을 안 보고 생김 → 11/5 R1 수리 · PM 승인 대기 2건(10/23~) · ★11/3 ⓐ 알림 원인 실측 → 감시 자동 복구층(크론 사망 0) · ⓑ 김정아 권한 항목 제외(PM 몫 22건) · 11/3 12시 PM 회신: 카드 8 키 유지(종결)·카드 10 선행 덧붙임 해소·푸시 구독 11/4 · PM 12:16 직접 지시 36건 정리(카드 6 남은 적용 #23·#28) · Anthropic 크레딧 0 실측 → PM 충전(PM 몫 20건) · 13:15 PM: 카드 10 착수 ㄱ·28 재개·사람 테스트 종결·앱 승인 대기는 PM 몫 아님(제외) · 14시 카드 10 v417 배포·1회차 dry-run 결과 카드(결정 2·3·4 11/6) · 28 bg:lic 승격 R2 카드(11/6) → ★11/4 0시 할 일 재정리(한 판): 11/4 R1 입찰 알림·카드 9 전환·배경 승격 카드 → 11/5 카드 6 2건·적격 수리 → 11/6 카드 10 결정 2·3·28 승격 → 11/8 허용 사전 → 11/9 게이트 · AI</div>
+  <div class="item now"><span class="m">▶</span>★45 재설계 Phase 0(10/27 ㄱ, 30.45일·11/9 게이트) — 10/26 PM 결정(bid 담당 나수진 고정·billing/payout/allbaro 현상 유지·나머지 ㄱ·계약 포함) → 10/27 A1 기준선 발행·A2 배정표 v395·A3 알림 v396·A4 감시 지도·A5 앱기준 v397·A7 흔적 v398·v399·B1 계약 D0 → 10/27 B2 D1 1일차 → 10/28 2일차 v400(골조·목록 거울, 스위치 끔) → 15:12 PM &quot;45 보류&quot; → 10/29 재개(PM &quot;다 되면 빨리&quot;) → ★D1 3일차 v401 완료(13:56 배포: clog:contract 골조·목록 편집(관리자, append-only 해시 체인)·stage.docs[] 건별 서류 체크, servertest 834·적대 검토 6건 반영, 사람 테스트 7항 미실측) → 다음 D1 4일차 added 엔진(카드 9 뒤). R1 예약(ㄱ 없이): 10/30 알림 추천값 · 10/31 done_if 켜기(후보 13 vs 14 재집계)·계약 거울 스위치 · 11/4 카드 9 무응답 → 추천안 · 11/24 발화 재집계. PM 카드(R2·R3): 8 시크릿(11/2) · 9 골조(11/4) · 1-6 푸시 구독·대표 PC 로그인 · 10 자동 지시(11/9 전) · ★PM 10/29 &quot;45. 진행. 병목 시 피드백&quot; → D1 4일차 added 엔진 선구현(스위치 끔) 착수 · ★10/30 R1 알림 추천값 2/3 적용(완료 요청→지시자·승인권자 1인, 만기→아침 요약; 자동 지시 생성은 정재욱 구독 뒤) → ★10/30 10:28 D1 4일차 v402 배포(오피스 컴, 카드 9 신설 엔진 꺼진 채 — 부록 R 16·적대 검토 13 반영, servertest 839·uismoke 213·consheet 100·거울 diff 0) → ★10/31(토) R1 ②③ 적용: done_if 켬 → 첫 크론 review 15건(재집계 15=15, 의심 1건 006거8419) · 계약 거울 스위치 켬(diff 0, 화면 효과 0) · 되돌리기 스냅샷 미기록 결함 v403 수리 → ★17:0x PM &quot;계속 밀어&quot;: D1 잔여(두 층 매핑·81단계 명시값, 거울 3층) + D2 1·2일차(법령 배경 59행 DRF 재확인·설계안 정정 6건, 거울 4층 · 앱 v404 기한 엔진 — 승격 전 화면 변화 0) → D2 3일차(법령 워치 ↔ 배경 재확인 연동 v405 — 드라이런이 산안법 10/27 개정을 잡아 5행 재확인 · 사례 색인 170행) = **D2 완료** → ★11/1(일) PM &quot;다음·병목건만 피드백&quot; → **D3 계약 서류함 1일차 서버 v406**(cdoc 7액션·기록물 Blobs만·문서함 차단) + **2일차 앱 v407**(단계 서류 행 올리기 2종·개인정보 등급·기록물 줄·패킷 메타 우선 판정·초안 자동 보존) + **3일차 v408**(관리자 보관함·안내·규정 §12② 개정 초안 파일) = **D3 코드 끝, 운영 시작은 선행 3건+규정 개정 뒤** · 11/4 R2 카드 2건(카드 9 + 배경 승격) · 병목 보고 3(정재욱·권민지 구독 0 / 규정 §12 개정 R3 / 46건 정리) → ★16시 PM &quot;다음&quot;: D4는 게이트(1주 업로드율) 대기 → **C1-1 인사 안내 v409**(도움말 4묶음·아이디 로그인·MANUAL 휴가 안내 1장) → **C1-2 인허가 R0**(bg:lic 초안 98행 법령 35종 실측·lawwatch +38·매핑표·사건표·관리표 PR #1 draft) → **C1-3 KOITA K0**(bg:koita 초안 법령 11·규칙 8·고시 1행) → C1-4 bid=ⓑ로 충족 = **C1 묶음 끝(16:3x)** · 다음 11/2 lawwatch 첫 실행·오피스 설정·카드 8 → 11/4 R2 카드 2건 → ★16:48 PM &quot;D4 아니지, 내 손으로 안 하기로&quot; → 착수 조건 폐기 → **D4 1~3일차 v410·v411 당일 완료**(학습 코어 승격·최종본 즉시 짝·셀 diff·허용 칸만 모델·공란 자동 채움·워커·크론 교대·카드) · 남은 4일차 기준선·일몰 · R2 허용 사전 카드(무응답 11/8=추천값) → ★22:4x **D4 4일차 v412 = D4 코드 끝**(기준선 동결·일몰 하루 1회·양식별 켜기/끄기·간극 집계 짝 0건) · 남은 사람 손 = R2 허용 사전 1회(무응답 11/8) → ★11/2 00:5x **C2·C3 네 건 v413~v415**([내 것 아님]·안내·휴가 알림·레이더 이식·입찰 알림) — C 잔여 9건은 PM 선행 뒤 → ★11/2 17:08 PM &quot;45. 다음&quot; → 코드 몫 끝 → **카드 10 R3 착수 브리핑**(현장·차량·명부 자동 지시, 1회차 발행 0 · 4관점 검증 확정 44건 반영·버림 6건) — PM ㄱ 대기(11/9 게이트 전, 무응답 = C5 보류) → ★11/2 20시 **C2-2 지시 정리 목록·카드 6**(라이브 65건 읽기만 · 바꾸는 것 6 = 증명서 옛 회차 5·두호천 적격 숨김, 무응답 11/5 적용·영구 삭제 0) · 발견 = 적격 지시가 낙찰방법을 안 보고 생김 → 11/5 R1 수리 · PM 승인 대기 2건(10/23~) · ★11/3 ⓐ 알림 원인 실측 → 감시 자동 복구층(크론 사망 0) · ⓑ 김정아 권한 항목 제외(PM 몫 22건) · 11/3 12시 PM 회신: 카드 8 키 유지(종결)·카드 10 선행 덧붙임 해소·푸시 구독 11/4 · PM 12:16 직접 지시 36건 정리(카드 6 남은 적용 #23·#28) · Anthropic 크레딧 0 실측 → PM 충전(PM 몫 20건) · 13:15 PM: 카드 10 착수 ㄱ·28 재개·사람 테스트 종결·앱 승인 대기는 PM 몫 아님(제외) · 14시 카드 10 v417 배포·1회차 dry-run 결과 카드(결정 2·3·4 11/6) · 28 bg:lic 승격 R2 카드(11/6) → ★11/4 0시 할 일 재정리(한 판): 11/4 R1 입찰 알림·카드 9 전환·배경 승격 카드 → 11/5 카드 6 2건·적격 수리 → 11/6 카드 10 결정 2·3·28 승격 → 11/8 허용 사전 → 11/9 게이트 → ★11/4 10시 입찰 알림 ✓·배경 승격 ✓(PM)·카드 9 금액+계약기간 상신 v418(이의 11/7)·카드 10 결정 2·3 ✓(결정 4 dry)·대표 로그인 종결·학습 짝 0건 원인 실측 · AI</div>
   <div class="item done"><span class="m">☑</span>★23 P7 외부 등록 종료(PM 10/29 &quot;23. 연구실 제외 종료&quot;) — KOITA 상호 변경신고(연구실, 나수진)만 체크 49로 분리, 재촉 없음 → ★11/2 49 제출(인정서 재발급 대기)</div>
   <div class="item wait"><span class="m">◔</span>★29 월말명세서 정리 에이전트 시안 v1 제출(10/28) — PM 결정 R2 5·R3 4 → 권민지 샘플 S1~S5 수령일 +4일 착수(샘플 전 착수 금지) → PM 10/29 &quot;11월 초 권민지에게 10월 말 명세서·정리 자료 요청&quot; → 11/2 요청 → 수령 +4일 착수 · ★11/4: 11/2 요청 실시 기록 없음 → 11/4 AI 문안·PM 발송 확인 → ★11/4 08:2x PM &quot;자료요청완료&quot; — 수령 대기, 수령일 +4일 착수 · PM</div>
-  <div class="item wait"><span class="m">◔</span>★52 진척도 위 캘린더·일일 시간표(PM 11/4 신설) — 시안 먼저(목업 승인 후 구현): 캘린더 = 할 일 한 판 날짜(PM·AI·자동)+주간 점검, 시간표 = 하루 루틴+자동 작업 시각+그날 할 일 → PM 시안 회신 대기(벽지·위젯 표시 범위도 그때) · 📁 work\00_진척도\시안_캘린더_시간표_20261104.html · PM</div>
+  <div class="item wait"><span class="m">◔</span>★52 진척도 위 캘린더·일일 시간표(PM 11/4 신설) — 시안 먼저(목업 승인 후 구현): 캘린더 = 할 일 한 판 날짜(PM·AI·자동), 시간표 = 근무+자동 작업 시각+그날 할 일 → PM 시안 회신 대기(벽지·위젯 표시 범위도 그때) · 📁 work\00_진척도\시안_캘린더_시간표_20261104.html → ★11/4 10:08 PM 시안 회신(근무 09~18·자동 줄·위젯 = 하루 시간표만·기본 2주·벽지 왼쪽 배치·시작점 위 20%) → 모바일·벽지 구현 끝(벽지 = 왼쪽 열·시작점 위 20%), 위젯은 APK 코드까지 — 빌드 환경 없음(PM 선택 대기) · PM</div>
   <div class="foot">갱신: "진척도 갱신해"(모바일 D → 이 벽지 자동 생성) · 이 판 생성 기준: 2026-11-04</div>
 </div>
 
 <div class="view" id="v1">
   <span class="back" onclick="go('v-home')">← 큰틀로</span>
-  <h1>1 업무플랫폼 — 96% · 카드 10 dry 1회차 · 11/9 게이트</h1>
+  <h1>1 업무플랫폼 — 96% · 카드 9 v418 · 11/9 게이트</h1>
   <div class="rowc" onclick="go('v1-1')" style="margin-top:10px"><b>데이터·보안</b><div class="track2"><div class="fillb t" style="width:98%"></div></div><span class="pv">98</span></div>
   <div class="rowc" onclick="go('v1-2')"><b>돈 (기성·미수)</b><div class="track2"><div class="fillb t" style="width:92%"></div></div><span class="pv">92</span></div>
   <div class="rowc" onclick="go('v1-3')"><b>운영 모듈</b><div class="track2"><div class="fillb t" style="width:93%"></div></div><span class="pv">93</span></div>
@@ -82,8 +149,8 @@ h2{font-size:13px;margin-bottom:8px}
   <div class="rowc focus" onclick="go('v1-lawwatch')"><b>법령 워치 (신규 자동화) ◀ 가동</b><div class="track2"><div class="fillb t" style="width:95%"></div></div><span class="pv">95</span></div>
   <div class="rowc focus" onclick="go('v1-12')"><b>대표 업무유연성 · 기기 배치도 ◀ 결재 3차+기안 화면 배포</b><div class="track2"><div class="fillb t" style="width:97%"></div></div><span class="pv">97</span></div>
   <div class="rowc focus" onclick="go('v1-13')"><b>관리자 기기 보안 ◀ 오피스 컴 Win11 순서표·권대리 PC 가이드 10/29</b><div class="track2"><div class="fillb" style="width:75%"></div></div><span class="pv">75</span></div>
-  <div class="rowc focus" onclick="go('v1-14')"><b>PM 개입 최소화 재설계 (Phase 0) ◀ 11/9 게이트 · 11/4 카드 9·배경 승격 · 11/5 카드 6 · 11/6 카드 10</b><div class="track2"><div class="fillb t" style="width:96%"></div></div><span class="pv">96</span></div>
-  <div class="lane">★11/4 할 일 재정리 — 다음 = 11/4 R1 입찰 알림·카드 9 전환·배경 승격 카드 → 11/5 카드 6 2건·적격 수리 → 11/6 카드 10 결정 2·3·28 승격 → 11/8 허용 사전 → 11/9 게이트 / ★11/3 14:1x 크레딧 충전 확인·16 제외(PM 몫 18건) / ★11/3 14시 카드 10 v417·1회차 dry-run·결과 카드 / ★11/3 13:15 카드 10 착수·28 재개·사람 테스트 종결·PM 몫 18건 / ★11/3 12시 45 PM 회신 — 카드 8 종결·카드 10 선행 해소·푸시 11/4·PM 직접 지시 36건 정리 · Anthropic 크레딧 0(PM 충전) → PM 몫 20건 / ★11/3 감시 자동 복구층 · 45 PM 몫 22건 / ★11/2 30 공명 도급계약 v6 체결 · 45 카드 10 R3 브리핑·C2-2 카드 6 / ★10/30 v402 계약 D1 4일차(카드 9 신설 엔진 꺼진 채)·앱 데이터 백업 조각 첫 실전·Windows 클론 CRLF 수리 / ★10/29 밤 30 v5 공명 단독·45 진행(D1 4일차 선구현)·46 두 PC 운영 정리 / ★10/29 v401 계약 D1 3일차·OneDrive work 공유 전환(집·오피스)·오피스 컴 Win11 순서표·권대리 PC 가이드 / ★10/28 v400 계약 거울(Phase 0 B2 D1 2일차)·새 PC 이식 복원 완료(한컴 보안모듈만 미해결) / ★10/27 Phase 0 착수 v395~v399(배정표·알림·앱기준·흔적) / ★10/19 문서함 직원 출력 v388 / ★10/14 운반일지 엑셀 v385·v386 / ★10/12~13 계약 탭 v381~v384 / v378·v379(10/8): 입찰 조회 응답 gzip(헤더 무관)·불러오기 실패 가시화·차량 열 폭 저장 폐지 / v355~v377(9/14~10/8): 입찰 2차 판독 체계·v359 공고문 기준 / 운반일지 v365·v366 실측 정상 / 블로그 근본 수리 v360~v364·v367 + 번호판 v371·v372 / 무기계약직 레이더 v368 / 차량 시트형 v370~v376 / 레이더 전송 수리(10/8) / 상호 변경 v377. 남은 축 = 계약 탭 실사용(11/7)·Phase 0 11/4 카드 9 데이터 전환·11/9 게이트</div>
+  <div class="rowc focus" onclick="go('v1-14')"><b>PM 개입 최소화 재설계 (Phase 0) ◀ 11/9 게이트 · 11/5 카드 6 · 11/6 28 승격 · 11/8 허용 사전(과거 실물 학습 ㄱ 대기)</b><div class="track2"><div class="fillb t" style="width:96%"></div></div><span class="pv">96</span></div>
+  <div class="lane">★11/4 10시 PM 회신 — 입찰 알림 ✓·배경 승격 ✓·카드 9 v418·카드 10 결정 2·3 ✓ / ★11/4 할 일 재정리 — 다음 = 11/4 R1 입찰 알림·카드 9 전환·배경 승격 카드 → 11/5 카드 6 2건·적격 수리 → 11/6 카드 10 결정 2·3·28 승격 → 11/8 허용 사전 → 11/9 게이트 / ★11/3 14:1x 크레딧 충전 확인·16 제외(PM 몫 18건) / ★11/3 14시 카드 10 v417·1회차 dry-run·결과 카드 / ★11/3 13:15 카드 10 착수·28 재개·사람 테스트 종결·PM 몫 18건 / ★11/3 12시 45 PM 회신 — 카드 8 종결·카드 10 선행 해소·푸시 11/4·PM 직접 지시 36건 정리 · Anthropic 크레딧 0(PM 충전) → PM 몫 20건 / ★11/3 감시 자동 복구층 · 45 PM 몫 22건 / ★11/2 30 공명 도급계약 v6 체결 · 45 카드 10 R3 브리핑·C2-2 카드 6 / ★10/30 v402 계약 D1 4일차(카드 9 신설 엔진 꺼진 채)·앱 데이터 백업 조각 첫 실전·Windows 클론 CRLF 수리 / ★10/29 밤 30 v5 공명 단독·45 진행(D1 4일차 선구현)·46 두 PC 운영 정리 / ★10/29 v401 계약 D1 3일차·OneDrive work 공유 전환(집·오피스)·오피스 컴 Win11 순서표·권대리 PC 가이드 / ★10/28 v400 계약 거울(Phase 0 B2 D1 2일차)·새 PC 이식 복원 완료(한컴 보안모듈만 미해결) / ★10/27 Phase 0 착수 v395~v399(배정표·알림·앱기준·흔적) / ★10/19 문서함 직원 출력 v388 / ★10/14 운반일지 엑셀 v385·v386 / ★10/12~13 계약 탭 v381~v384 / v378·v379(10/8): 입찰 조회 응답 gzip(헤더 무관)·불러오기 실패 가시화·차량 열 폭 저장 폐지 / v355~v377(9/14~10/8): 입찰 2차 판독 체계·v359 공고문 기준 / 운반일지 v365·v366 실측 정상 / 블로그 근본 수리 v360~v364·v367 + 번호판 v371·v372 / 무기계약직 레이더 v368 / 차량 시트형 v370~v376 / 레이더 전송 수리(10/8) / 상호 변경 v377. 남은 축 = 계약 탭 실사용(11/7)·Phase 0 11/4 카드 9 데이터 전환·11/9 게이트</div>
   <hr>
   <h2>지금 중요한 순서 — 업무플랫폼</h2>
   <div class="item done" style="margin-top:10px"><span class="m">☑</span>★공명·현포 도급계약서 v4(10/28) — 고철 무단 반출 50배 위약벌·을·병 측 인원·수량 부족 추정·서약서 없이 을·병 책임. PM 결정 ①~④ · 배포 PDF는 새 PC Word로(결정 뒤) · ★10/30 PM 답: 1028본 미전달(v5 첫 제시본) · 10/28 반출은 발주자가 조용히 처리 → 결정 ①③ 해소, 남은 ②④ → v6(11/1) 결정 종결 → ★11/2 체결 완료</div>
@@ -345,8 +412,8 @@ h2{font-size:13px;margin-bottom:8px}
 </div>
 
 <div class="view" id="v1-14"><span class="back" onclick="go('v1')">← 업무플랫폼</span>
-  <h1>PM 개입 최소화 재설계 (Phase 0) — 96 · 11/9 게이트 · 11/4 카드 9·배경 승격 · 11/5 카드 6 · 11/6 카드 10</h1>
-  <div class="item wait" style="margin-top:10px"><span class="m">◔</span>★PM 몫 18건(11/4 0시 재정리) — 지금 PM 손 9: 기한 지남 1(대표 PC 로그인 1회 — 11/2, 실시 기록 없음) · 11/4 정재욱·권민지 푸시 구독 · 카드 7 개인정보 확인 경로 · 규정 §12 개정 · PR #1 머지 · 담당 수용 1주 · 선택 2(자치법규·한글 hwpx) · 보류 C7 / 무응답이면 기본값 9: 11/4 입찰 알림·카드 9·배경 승격(무응답 = 승격) · 11/5 카드 6 지시 2건 숨김 · 11/6 카드 10 결정 2·3·28 bg:lic 승격 · 11/8 허용 사전 · 11/9 게이트 · 생성 알림 담당자 전환 / 제외 3: 김정아 지시 권한·앱 승인 대기 2건·크레딧(18:39 충전 → 18:40 Claude 문장 모드 ✓). 📁 work\09_조사_문서\할일_한판_20261103.md · work\09_조사_문서\45_PM몫_한장_20261102.md · PM</div>
+  <h1>PM 개입 최소화 재설계 (Phase 0) — 96 · 11/9 게이트 · 11/5 카드 6 · 11/6 28 승격 · 11/8 허용 사전(과거 실물 학습 ㄱ 대기)</h1>
+  <div class="item wait" style="margin-top:10px"><span class="m">◔</span>★PM 몫(11/4 10시 실측) — 지금 PM 손 8: 정재욱 구독(권민지 ✓) · 카드 7 개인정보 확인 경로 · 규정 §12 개정 · PR #1 머지 · 담당 수용 1주 · 선택 2(자치법규 — 아직 미체크·한글 hwpx) · 보류 C7 / PM 답 대기 2: 28 2행(폐기물 외 위수탁 운송 여부)·과거 실물 학습 ㄱ / 무응답이면 기본값 5: 11/5 카드 6 지시 2건 · 11/6 28 승격 · 11/8 허용 사전 · 11/9 게이트 · 생성 알림 전환 / 11/4 끝남: 대표 로그인(결재 대기 64건)·입찰 알림·배경 승격·카드 10 결정 2·3. 📁 work\09_조사_문서\할일_한판_20261103.md · work\09_조사_문서\45_PM몫_한장_20261102.md · PM</div>
   <div class="item done"><span class="m">☑</span>A1 PM 발화 기준선 발행(10/27, 10.6건/일) → 11/24 재집계(pm_utter_tally.py)</div>
   <div class="item done"><span class="m">☑</span>A2 담당 배정표 v395(10/27, 10/28 11:08 배정 34 적용·공란 1) — bid 담당 나수진 고정, billing/payout/allbaro 현상 유지</div>
   <div class="item done"><span class="m">☑</span>A3 알림 추천값 v396 · A4 감시 지도 · A5 앱기준 v397(dry-run 후보 13) · A7 흔적 v398·v399</div>
@@ -657,12 +724,190 @@ h2{font-size:13px;margin-bottom:8px}
 </div>
 
 </div>
+</div>
 <script>
 function go(id){
   document.querySelectorAll('.view').forEach(function(v){ v.classList.remove('on'); });
   var el=document.getElementById(id);
   if(el){ el.classList.add('on'); el.closest('#panel').scrollTop=0; }
 }
+</script>
+<script>
+// ==CAL-JS== 캘린더·하루 시간표(체크 52). 데이터 = D.cal, 벽지에는 빌더가 비공개 항목을 뺀 판을 넣고 이 구간을 그대로 옮긴다.
+// 그래서 이 구간에는 일정 문구를 쓰지 않는다(전부 데이터에서 온다). 앱 진척도 탭은 cal이 없어 아무것도 그리지 않는다.
+// 날짜 클릭·보기 전환은 history를 쌓지 않는다 — 폰 뒤로가기는 큰틀·차상위 이동에만 쓴다.
+var calSt = {view:'2w', sel:null, anchor:null};
+var calTimer = null;
+function calMount(root, C, opt){
+  opt = opt || {};
+  if (!root || !C) return;
+  var DOW = ['월','화','수','목','금','토','일'];
+  function pad(n){ return (n < 10 ? '0' : '') + n; }
+  function ymd(x){ return x.getFullYear() + '-' + pad(x.getMonth() + 1) + '-' + pad(x.getDate()); }
+  function parse(s){ var a = s.split('-'); return new Date(+a[0], +a[1] - 1, +a[2]); }
+  function add(x, n){ var y = new Date(x); y.setDate(y.getDate() + n); return y; }
+  function monday(x){ return add(x, -((x.getDay() + 6) % 7)); }
+  function md(s){ var a = s.split('-'); return (+a[1]) + '/' + (+a[2]); }
+  function hm(s){ var a = String(s).split(':'); return (+a[0]) * 60 + (+a[1] || 0); }
+  function esc(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  function byDow(x, dt){ return !x.dow || x.dow.indexOf(dt.getDay()) >= 0; }
+  function evOf(d){
+    var dt = parse(d);
+    return (C.events || []).filter(function(e){
+      if (e.dow) return d >= e.d && (!e.until || d <= e.until) && e.dow.indexOf(dt.getDay()) >= 0;
+      return d === e.d || (e.end && d >= e.d && d <= e.end);
+    });
+  }
+  function weekLabel(d){
+    var w = C.weeks || [], lab = '';
+    if (C.weeksEnd && d > C.weeksEnd) return '';
+    for (var i = 0; i < w.length; i++) if (d >= w[i].from) lab = w[i].t;
+    return lab;
+  }
+  // 세로 눈금 범위 = 그 표면에 실린 줄 전체(벽지는 근무·자동만이라 더 좁다). 저녁에도 지금 선이 보이게 끝은 20시 이상.
+  var H0 = 24, H1 = 20;
+  (C.routine || []).forEach(function(r){ H0 = Math.min(H0, Math.floor(hm(r.a) / 60)); H1 = Math.max(H1, Math.ceil(hm(r.b) / 60)); });
+  (C.auto || []).forEach(function(a){ H0 = Math.min(H0, Math.floor(hm(a.tm) / 60)); });
+  if (H0 >= H1) H0 = 6;
+
+  var today = ymd(new Date());
+  if (!calSt.sel){ calSt.sel = today; calSt.anchor = parse(today); }
+
+  var names = C.names || {}, chip = C.chip || {}, lanes = C.lanes || ['', ''];
+  root.innerHTML =
+    '<section class="cal-card">' +
+      '<div class="cal-head"><h2 class="cal-ttl" data-r="ttl"></h2>' +
+        '<button type="button" class="cal-nav" data-a="prev" aria-label="이전">‹</button>' +
+        '<button type="button" class="cal-nav" data-a="next" aria-label="다음">›</button>' +
+        '<div class="cal-seg"><button type="button" data-a="2w">2주</button><button type="button" data-a="mo">한 달</button></div></div>' +
+      '<div class="cal-legend">' + ['pm','ai','me','auto'].filter(function(k){ return names[k]; }).map(function(k){
+        return '<span><i class="cal-k-' + k + '"></i>' + esc(names[k]) + '</span>'; }).join('') + '</div>' +
+      '<div class="cal-grid">' + DOW.map(function(x, i){ return '<div class="cal-dow' + (i === 6 ? ' sun' : '') + '">' + x + '</div>'; }).join('') + '</div>' +
+      '<div class="cal-grid" data-r="days" style="margin-top:4px"></div>' +
+      '<div class="cal-list"><h3 class="cal-lt" data-r="lt"></h3><div class="cal-lb" data-r="lb"></div></div>' +
+    '</section>' +
+    '<section class="cal-card">' +
+      '<div class="cal-head" style="margin-bottom:6px"><h2 class="cal-ttl" data-r="ttt"></h2></div>' +
+      '<div class="cal-lanes"><span>' + esc(lanes[0]) + '</span><span>' + esc(lanes[1]) + '</span></div>' +
+      '<div class="cal-tt" data-r="tt"></div>' +
+      (C.autoNote ? '<div class="cal-foot" data-r="foot">' + esc(C.autoNote) + '</div>' : '') +
+    '</section>';
+  function el(r){ return root.querySelector('[data-r="' + r + '"]'); }
+
+  function draw(){
+    var st = calSt, start, end, title;
+    if (st.view === '2w'){
+      start = monday(st.anchor); end = add(start, 13);
+      title = (start.getMonth() + 1) + '/' + start.getDate() + ' ~ ' + (end.getMonth() + 1) + '/' + end.getDate();
+    } else {
+      var f = new Date(st.anchor.getFullYear(), st.anchor.getMonth(), 1);
+      var l = new Date(st.anchor.getFullYear(), st.anchor.getMonth() + 1, 0);
+      start = monday(f); end = add(monday(l), 6);
+      title = st.anchor.getFullYear() + '년 ' + (st.anchor.getMonth() + 1) + '월';
+    }
+    el('ttl').textContent = '캘린더 · ' + title;
+    [].forEach.call(root.querySelectorAll('.cal-seg button'), function(b){ b.className = b.getAttribute('data-a') === st.view ? 'on' : ''; });
+    var h = '';
+    for (var x = new Date(start); x <= end; x = add(x, 1)){
+      var d = ymd(x), ev = evOf(d), cls = 'cal-day';
+      if (st.view === 'mo' && x.getMonth() !== st.anchor.getMonth()) cls += ' out';
+      if (x.getDay() === 0) cls += ' sun';
+      if (d === today) cls += ' today';
+      if (d === st.sel) cls += ' sel';
+      var open = ev.filter(function(e){ return !e.done; }), done = ev.filter(function(e){ return e.done; });
+      var dots = open.concat(done).slice(0, 5).map(function(e){ return '<i class="cal-k-' + e.k + (e.done ? ' off' : '') + '"></i>'; }).join('');
+      h += '<button type="button" class="' + cls + '" data-d="' + d + '" aria-label="' + (x.getMonth() + 1) + '월 ' + x.getDate() + '일, 일정 ' + ev.length + '건"><span class="n">' + x.getDate() + '</span><span class="cal-dots">' + dots + '</span>' + (ev.length > 5 ? '<span class="cal-more">+' + (ev.length - 5) + '</span>' : '') + '</button>';
+    }
+    var days = el('days');
+    days.innerHTML = h;
+    days.className = 'cal-grid' + (st.view === 'mo' ? ' mo' : '');
+
+    var sd = parse(st.sel);
+    el('lt').textContent = (sd.getMonth() + 1) + '월 ' + sd.getDate() + '일(' + DOW[(sd.getDay() + 6) % 7] + ') 할 일' + (st.sel === today ? ' · 오늘' : '');
+    var list = evOf(st.sel), todo = list.filter(function(e){ return !e.done; }), fin = list.filter(function(e){ return e.done; });
+    el('lb').innerHTML = list.length ? todo.concat(fin).map(function(e){
+      var late = !e.done && !e.dow && (e.end || e.d) < today;
+      return '<div class="cal-it' + (e.done ? ' done' : '') + '"><span class="cal-chip ' + e.k + '">' + esc(chip[e.k] || e.k) + '</span>' +
+        (e.tm ? '<span class="cal-tm">' + esc(e.tm) + '</span>' : '') +
+        '<span class="cal-tx">' + (e.done ? '✓ ' : '') + '<span class="cal-t">' + esc(e.t) + '</span>' +
+        (e.end ? '<span class="cal-sub">' + md(e.d) + ' ~ ' + md(e.end) + (e.st ? ' [' + esc(e.st) + ']' : '') + '</span>' : (e.st ? '<span class="cal-sub">[' + esc(e.st) + ']</span>' : '')) +
+        (e.note ? '<span class="cal-sub">' + esc(e.note) + '</span>' : '') +
+        (late ? '<span class="cal-sub late">기한 지남</span>' : '') + '</span></div>';
+    }).join('') : '<div class="cal-empty">날짜가 정해진 일은 없습니다.</div>';
+    drawTT(sd);
+  }
+
+  // 벽지는 왼쪽 열 높이에 맞춰 한 시간 폭을 줄인다(opt.fit = 화면 아래 남길 px). 모바일은 40px 고정.
+  function pxPerHour(){
+    if (!opt.fit || window.innerWidth <= (opt.fitMinW || 0)) return 40;
+    var top = el('tt').getBoundingClientRect().top;
+    var foot = el('foot');
+    var room = window.innerHeight - opt.fit - top - 18 - (foot && foot.offsetHeight ? foot.offsetHeight + 8 : 0);
+    return Math.max(11, Math.min(40, Math.floor(room / (H1 - H0))));
+  }
+  function drawTT(sd){
+    var d = ymd(sd), wd = (sd.getDay() + 6) % 7, isToday = d === today, wl = weekLabel(d);
+    el('ttt').textContent = '하루 시간표 · ' + (sd.getMonth() + 1) + '/' + sd.getDate() + '(' + DOW[wd] + ')' + (isToday ? ' 오늘' : '');
+    var tt = el('tt'), px = pxPerHour(), step = px < 20 ? 2 : 1;
+    function y(tm){ return (hm(tm) - H0 * 60) / 60 * px; }
+    var h = '';
+    for (var hh = H0; hh <= H1; hh += step) h += '<div class="cal-hr" style="top:' + ((hh - H0) * px) + 'px"><span>' + pad(hh) + ':00</span></div>';
+    (C.routine || []).filter(function(r){ return byDow(r, sd) && (!r.from || d >= r.from); }).sort(function(a, b){ return hm(a.a) - hm(b.a); }).forEach(function(r){
+      var top = y(r.a), s = r.wk ? wl : (r.s || '');
+      h += '<div class="cal-blk ' + esc(r.k) + '" style="top:' + (top + 1) + 'px;min-height:' + Math.max(y(r.b) - top - 2, 18) + 'px">' + esc(r.t) + '<b>' + esc(r.a) + '~' + esc(r.b) + (s ? ' · ' + esc(s) : '') + '</b></div>';
+    });
+    var pts = (C.auto || []).filter(function(a){ return byDow(a, sd); }).map(function(a){ return {tm:a.tm, t:a.tm + ' ' + a.t, k:'auto'}; });
+    var openAi = evOf(d).filter(function(e){ return e.k === 'ai' && !e.tm && !e.done; }).length;
+    if (openAi) pts.push({tm:'10:30', t:(chip.ai || 'AI') + ' 오늘 몫 ' + openAi + '건 — 시각 없음(위 목록)', k:'ai'});
+    pts.sort(function(a, b){ return hm(a.tm) - hm(b.tm); }).forEach(function(p){
+      h += '<div class="cal-pt ' + p.k + '" style="top:' + (y(p.tm) - 8) + 'px"><i></i><span>' + esc(p.t) + '</span></div>';
+    });
+    if (isToday){
+      var n = new Date(), m = n.getHours() * 60 + n.getMinutes();
+      if (m >= H0 * 60 && m <= H1 * 60) h += '<div class="cal-now" style="top:' + ((m - H0 * 60) / 60 * px) + 'px"></div>';
+    }
+    tt.innerHTML = h;
+    // 가까운 줄·좁은 칸은 글자가 겹치지 않게 아래로 민다(세로 위치는 그만큼 근사).
+    var maxBottom = (H1 - H0) * px + (opt.fit ? 4 : 10);
+    ['.cal-blk', '.cal-pt'].forEach(function(sel){
+      var bottom = -1e9;
+      [].forEach.call(tt.querySelectorAll(sel), function(e){
+        var t = e.offsetTop;
+        if (t < bottom + 2){ t = bottom + 2; e.style.top = t + 'px'; }
+        bottom = t + e.offsetHeight;
+        if (bottom > maxBottom) maxBottom = bottom;
+      });
+    });
+    tt.style.height = maxBottom + 'px';
+  }
+
+  root.onclick = function(e){
+    var b = e.target.closest ? e.target.closest('button') : null;
+    if (!b || !root.contains(b)) return;
+    var a = b.getAttribute('data-a'), st = calSt;
+    if (b.hasAttribute('data-d')){ st.sel = b.getAttribute('data-d'); draw(); return; }
+    if (a === '2w' || a === 'mo'){ st.view = a; st.anchor = parse(st.sel); draw(); return; }
+    if (a === 'prev' || a === 'next'){
+      var s = a === 'prev' ? -1 : 1;
+      st.anchor = st.view === '2w' ? add(st.anchor, 14 * s) : new Date(st.anchor.getFullYear(), st.anchor.getMonth() + s, 1);
+      draw();
+    }
+  };
+  draw();
+  if (opt.fit) window.addEventListener('resize', draw);
+  // 1분마다 지금 선을 옮기고, 자정이 지나면 오늘을 바꾼다. 다른 화면으로 가서 root가 떨어지면 멈춘다.
+  if (calTimer) clearInterval(calTimer);
+  calTimer = setInterval(function(){
+    if (!document.body.contains(root)){ clearInterval(calTimer); calTimer = null; return; }
+    var t = ymd(new Date());
+    if (t !== today){
+      if (calSt.sel === today){ calSt.sel = t; calSt.anchor = parse(t); }
+      today = t; draw();
+    } else drawTT(parse(calSt.sel));
+  }, 60000);
+}
+// ==/CAL-JS==
+calMount(document.getElementById('calp'), {"names":{"pm":"PM 할 일","ai":"AI 할 일","auto":"자동 작업"},"chip":{"pm":"PM","ai":"AI","auto":"자동"},"lanes":["내 시간","자동·AI"],"routine":[{"dow":[1,2,3,4,5],"a":"09:00","b":"18:00","k":"work","t":"근무"}],"auto":[{"tm":"06:30","t":"음성 브리핑 생성"},{"tm":"07:23","t":"입찰 공고 수집","dow":[1,2,3,4,5]},{"tm":"08:00","t":"할 일 크론 · 08:20 백업 발사"},{"tm":"09:04","t":"감시 1차 · 09:05 블로그 학습 수집"},{"tm":"12:34","t":"감시 2차"},{"tm":"16:04","t":"감시 3차 · 16:05 블로그 학습 수집"}],"autoNote":"자동 작업은 예약 시각입니다. 입찰 수집·백업 발사·감시는 GitHub 예약이라 몇 시간 늦게 도는 날이 많고, 블로그 학습 수집은 PC가 켜져 있을 때 돕니다(놓치면 켤 때 실행).","events":[{"d":"2026-11-04","k":"pm","t":"정재욱께 \"폰 앱 알림 켜고 우선기기 지정\" 한마디","note":"권민지 ✓ 실측 · 카드 10 발행·서류함 운영·생성 알림 전환이 전부 이것 뒤"},{"d":"2026-11-04","k":"pm","t":"대표 PC 앱 로그인","note":"11/2 기한 → 11/4 완료","done":true},{"d":"2026-11-04","k":"pm","t":"29 권민지께 10월 말 명세서·정리 자료 요청","note":"다음 = 자료 수령 → 수령일 +4일 AI 착수","done":true},{"d":"2026-11-04","k":"pm","t":"52 시안 회신","done":true},{"d":"2026-11-04","k":"pm","t":"입찰 알림 2종 추천값 ㄱ · 카드 9 회신 · 카드 10 결정 2·3 ㄱ","done":true},{"d":"2026-11-04","k":"pm","t":"계약 법령 배경 bg:law 승격(09:35)","done":true},{"d":"2026-11-04","k":"ai","t":"52 위젯 APK 빌드(환경 PM 선택 대기) — 모바일·벽지는 끝"},{"d":"2026-11-04","k":"ai","t":"카드 9 코드·데이터 전환·사후 보고(v418)","done":true},{"d":"2026-11-04","k":"ai","t":"카드 6 적용 스크립트 점검 · 적격 지시 생성 조건 수리 코드(낙찰방법 확인)"},{"d":"2026-11-04","k":"ai","t":"정재욱 구독 확인 → 확인 즉시 자동 지시 생성 알림 담당자 본인 1발(R1)"},{"d":"2026-11-04","k":"ai","t":"입찰 알림 2종 R1 적용·재조회","done":true},{"d":"2026-11-04","k":"ai","t":"카드 10 결정 2 적용 · 3 추천안 확정(4는 dry 유지)","done":true},{"d":"2026-11-04","k":"ai","t":"06:30 브리핑 Claude 문장 모드 확인(38 D1 끝 조건)","done":true},{"d":"2026-11-05","k":"pm","t":"(회신만) 카드 6 지시 2건 숨김(#23 c10·#28 두호천) · R1","note":"무응답 = 숨김, 영구 삭제 없음"},{"d":"2026-11-05","k":"ai","t":"카드 6 숨김 2건 적용 · 적격 생성 수리 배포(R1)"},{"d":"2026-11-06","k":"pm","t":"(회신만) 28 인허가 bg:lic 승격 · R2 — 남은 답 = 2행 폐기물 외 위수탁 운송 있는지","note":"무응답 = 추천값 저장, 직원 화면·알림 변화 0"},{"d":"2026-11-06","k":"ai","t":"28 bg:lic 승격 저장 → 28 엔진 G2·G3 브리핑"},{"d":"2026-11-07","k":"pm","t":"31 계약 탭 목표일 — 실사용 시작 날짜 확인·빈칸 양식 7종 실물 등록"},{"d":"2026-11-07","k":"ai","t":"카드 9 이의 마감"},{"d":"2026-11-08","k":"pm","t":"(회신만) 계약 서류 학습 허용 사전 · R2 — 과거 실물 학습 ㄱ 대기","note":"무응답 = 추천값(개인정보·계좌 칸 제외) 저장·학습 켬"},{"d":"2026-11-08","k":"ai","t":"허용 사전 저장 · 학습 켬"},{"d":"2026-11-09","k":"pm","t":"게이트 보고 1장 → 뒤에 오는 카드에만 회신","note":"미발행 R2 카드는 미적용"},{"d":"2026-11-09","k":"ai","t":"Phase 0 게이트 보고 1장"},{"d":"2026-11-24","k":"ai","t":"A1 PM 발화 재집계"},{"d":"2026-11-30","k":"ai","t":"bg:law 새 판 재승격 카드 — 12/1 전"}]}, {fit:50, fitMinW:900});
 </script>
 
 <script>
