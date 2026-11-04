@@ -1840,7 +1840,7 @@ try {
   T('v413 내 것 아님: 서버 task_notmine(NOT_AUTO·NOT_ASSIGNEE)·save 보호(who_by edit 통과)·clog 행(who_id·due d·del)·apprlearn tally(RECARD 3/2인) · 앱 버튼 2곳(지시 탭·내게 온 지시)+taskNotMine(_colBase 갱신)·모달 who_by edit·배정표 카드 lessons · sw ≥ 413',
     gwd13.indexOf("d.action === 'task_notmine'") > 0 && /async function handleTaskNotmine\(/.test(gwd13) && /'NOT_AUTO'/.test(gwd13) && /'NOT_ASSIGNEE'/.test(gwd13) && gwd13.indexOf("o.who_by === 'notmine' && t.who_id && t.who_by !== 'edit'") > 0 && gwd13.indexOf("f: 'due'") > 0 && gwd13.indexOf("f: 'del'") > 0 && /async function apprClogAppend\(/.test(gwd13)
     && /const RECARD_N = 3;/.test(al13) && /const RECARD_WHO = 2;/.test(al13) && /function tally\(rows, ym\)/.test(al13)
-    && html.indexOf('function taskNotMineBtn(t)') > 0 && html.indexOf('function taskNotMine(id)') > 0 && (html.match(/taskNotMineBtn\(t\)/g) || []).length >= 3 && html.indexOf('action: "task_notmine"') > 0 && html.indexOf('_colBase["tasks"] = b.updated_at') > 0 && html.indexOf('t.who_by = "edit"') > 0 && html.indexOf('R1 재카드') > 0 && html.indexOf('var ls = res.body.lessons || null;') > 0
+    && html.indexOf('function taskNotMineBtn(t)') > 0 && html.indexOf('function taskNotMine(id)') > 0 && (html.match(/taskNotMineBtn\(t\)/g) || []).length >= 3 && html.indexOf('action: "task_notmine"') > 0 && html.indexOf('_colBase["tasks"] = b.updated_at') < 0 && html.indexOf('t.who_by = "edit"') > 0 && html.indexOf('R1 재카드') > 0 && html.indexOf('var ls = res.body.lessons || null;') > 0
     && Number((swv13.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 413);
 } catch (e) { console.log('  (v413 검사 생략 — ' + e.message + ')'); fails++; }
 
@@ -1865,6 +1865,37 @@ try {
     && ord15 === 'task_auto_create,task_review,due_digest,leave_request,leave_result,bid_result,bid_fail'
     && Number((swv15.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 415);
 } catch (e) { console.log('  (v415 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ---- v421(11/4 카드 6 재발 방지): 적격 지시는 적격심사 없는 낙찰방법으로 확인된 낙찰엔 안 만듦 · 반복 값 none은 다음 회차 안 만듦 · sw ≥421
+try {
+  const fn21 = (name) => { const i = html.indexOf('function ' + name + '('); if (i < 0) throw new Error('함수 없음: ' + name); let d = 0, st = false; for (let j = i; j < html.length; j++) { const ch = html[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return html.slice(i, j + 1); } } throw new Error(name); };
+  const DTM21 = (html.match(/var DECIDE_TO_METHOD=\{[^}]*\};/) || [''])[0];
+  const fmt21 = 'function fmtDate(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}';
+  const q21 = new Function([DTM21, fn21('methodKindOf'), fn21('bidMethodEff'), fn21('bidNoQualMethod'), fn21('addDaysStr'), fn21('runBidQualGen'), fmt21,
+    'var tasks=[], pushed=[], n=0, __bids=[], autoGenReady={tasks:true};',
+    'function isAdmin(){return true;} function todayStr(){return "2026-11-05";} function isDate(s){return /^\\d{4}-\\d{2}-\\d{2}$/.test(s||"");}',
+    'function genId(p){n++;return p+n;} function saveTasksCache(){} function scheduleTasksSave(){} function renderTasks(){} function renderSummary(){} function renderDashboard(){}',
+    'function pushNotify(a,b){pushed.push(b);} function liveBids(){return __bids;}',
+    'return { no:bidNoQualMethod, run:function(list){ __bids=list; runBidQualGen(); return {tasks:tasks,pushed:pushed}; } };'].join('\n'))();
+  const yes21 = [{ method: '소액수의견적' }, { method: '소액수의(공사)' }, { method: '협상에의한계약' }, { method: '종합평가낙찰제' }, { method: '종합심사낙찰제(공사)' }, { method: '매각 (최고가)' }, { method: '제한적최저가(낙찰하한율)' }, { method: '최저가낙찰제' }, { method: '적격심사제', ext: { mmis: 1, decide: '소액수의(견적)' } }, { source: '나라장터', method: '소액수의견적', ext: { decide: '소액수의(견적)' } }, { source: '나라장터', method: '협상에의한계약' }, { source: '누리장터', method: '소액수의견적' }];
+  const no21 = [{ method: '적격심사제' }, { method: '적격심사 낙찰제(공사)' }, { method: '' }, {}, { method: '제한경쟁' }, { method: '소액전자' }, { method: '규격가격동시입찰' }, { method: '소액수의견적', ext: { mmis: 1, decide: '적격심사' } }, { method: '적격심사제', ext: { mmis: 1, dneg: 1 } }, { source: '나라장터', method: '소액수의견적' }, { source: '나라장터', method: '최저가낙찰제' }];
+  T('v421 bidNoQualMethod: 수의·협상·종합심사·매각·최저가 = 안 만듦 / 적격·모름·낙찰방법 아닌 라벨 = 만듦 / 판정은 공고문 기준',
+    yes21.every((b) => q21.no(b) === true) && no21.every((b) => q21.no(b) === false), JSON.stringify([yes21.filter((b) => q21.no(b) !== true), no21.filter((b) => q21.no(b) !== false)]));
+  const r1 = q21.run([{ id: 'a', status: '낙찰', method: '소액수의견적', title: '수의' }, { id: 'b', status: '낙찰', method: '적격심사제', title: '적격', result: { checked: '2026-11-01' } }, { id: 'c', status: '낙찰', method: '', title: '미상' }, { id: 'd', status: '검토', method: '적격심사제', title: '검토' }]);
+  const keys21 = r1.tasks.map((t) => t.auto_key).join(',');
+  T('v421 runBidQualGen: 적격·모름 낙찰만 생성(수의·낙찰 전 제외) · 기한 = 낙찰 확인 +7일 · 푸시 1회 2건',
+    keys21 === 'bid:b:qual,bid:c:qual' && r1.tasks[0].due === '2026-11-08' && r1.tasks[1].due === '2026-11-12' && r1.pushed.length === 1 && /낙찰 2건/.test(r1.pushed[0]), keys21 + ' / ' + r1.pushed.join('|'));
+  const r2 = q21.run([{ id: 'b', status: '낙찰', method: '적격심사제', title: '적격' }, { id: 'e', status: '낙찰', method: '협상에의한계약', title: '협상' }]);
+  T('v421 runBidQualGen: 다시 돌려도 중복 없음 · 건너뛰는 낙찰만 있으면 푸시 없음', r2.tasks.length === 2 && r2.pushed.length === 1, r2.tasks.length + '/' + r2.pushed.length);
+  const rc21 = new Function([fn21('advanceRecur'), fn21('spawnNextRecur'), fmt21, 'var tasks=[]; function liveTasks(){return tasks;} function isDate(s){return /^\\d{4}-\\d{2}-\\d{2}$/.test(s||"");} function todayStr(){return "2026-11-05";} function genId(p){return p+tasks.length;}', 'return function(t){ spawnNextRecur(t); return tasks; };'].join('\n'))();
+  const n0 = rc21({ id: 'x', title: '세팅', due: '2026-11-05', recur: 'none', status: 'done' }).length;
+  const m1 = rc21({ id: 'y', title: '매월', due: '2026-11-05', recur: 'monthly', status: 'done' });
+  T('v421 spawnNextRecur: 반복 값 none = 다음 회차 없음 · monthly = 한 달 뒤 1건', n0 === 0 && m1.length === 1 && m1[0].due === '2026-12-05' && m1[0].recur === 'monthly', n0 + '/' + JSON.stringify(m1));
+  const swv21 = readFileSync(join(ROOT, 'sw.js'), 'utf8');
+  T('v421 홈 낙찰 카드: 지시를 안 만드는 낙찰은 계약 시작 대기로 표시', html.indexOf("(bidNoQualMethod(b)?' · 계약 시작 대기':' · 적격심사 기한 '+due+' ('+dd.text+')')") > 0);
+  T('v421 지시 저장: 첫 GET 실패 기기는 base 0으로 보내 409 병합 · [내 것 아님] 뒤 base를 올리지 않음', html.indexOf('var saveBase = (col === "tasks" && _colBase[col] === undefined) ? 0 : _colBase[col];') > 0 && html.indexOf('base: saveBase }') > 0 && html.indexOf('_colBase["tasks"] = b.updated_at') < 0);
+  T('v421 🔁 칩은 none에 안 뜸 · sw ≥421', html.indexOf('if (t.recur && t.recur !== "none") metaBits.push') > 0 && Number((swv21.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 421);
+} catch (e) { console.log('  (v421 검사 생략 — ' + e.message + ')'); fails++; }
 
 // ---- (11/2) Blob 컨텍스트 전수: netlify/functions/*.js 중 store(·blobGet(·blobSet(·blobList(를 쓰는 함수는 setupBlobContext( 호출 필수 — gw-lawwatch가 빠져 첫 실제 경보가 502(11/2)
 try {

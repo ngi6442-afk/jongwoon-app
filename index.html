@@ -3168,7 +3168,10 @@
     }
     var body = {}; try{ body = JSON.parse(opts.body); }catch(e){}
     var doc = {}; try{ doc = JSON.parse(b64DecodeUnicode(body.content)); }catch(e){}
-    return gwCall("gw-data", { action: "save", collection: col, doc: doc, base: _colBase[col] }).then(function(res){
+    // v421: 지시 GET이 실패해 캐시로 부팅한 기기는 base가 없어 서버 잠금을 건너뛰고 문서를 통째로 덮었다(남의 완료·새 지시 소실) → tasks는 base 0으로 보내 409 병합 경로로.
+    //   clients 등 409 처리가 없는 컬렉션은 편집이 소리 없이 사라지므로 일괄 적용하지 않는다.
+    var saveBase = (col === "tasks" && _colBase[col] === undefined) ? 0 : _colBase[col];
+    return gwCall("gw-data", { action: "save", collection: col, doc: doc, base: saveBase }).then(function(res){
       if (res.status === 401){ onSessionInvalid(); return _ghResp(401, {}); }
       // 쓰기권한 없음: 서버가 이미 막았고 재시도해도 결과가 같아 200으로 흘린다(무한 재시도 방지). 단 v331부터 조용히 넘기지 않고 표시한다 —
       // 종전에는 화면상 저장된 것처럼 보여, 권한 없는 사람이 만진 값이 사라진 것을 아무도 몰랐다.
@@ -4244,7 +4247,7 @@
     if (t.status === "hold") metaBits.push('<span class="hold-chip">보류</span>');
     if (t.status === "review") metaBits.push('<span class="review-chip">승인 대기중' + (t.done_by ? ' · ' + esc(dispName(t.done_by)) : '') + '</span>');
     if (t.scope && t.scope.length) metaBits.push('<span class="scope-chip">공개 ' + esc(scopeNames(t.scope)) + '</span>');
-    if (t.recur) metaBits.push('<span class="from-chip">🔁 ' + (RECUR_LABEL[t.recur] || "반복") + '</span>');
+    if (t.recur && t.recur !== "none") metaBits.push('<span class="from-chip">🔁 ' + (RECUR_LABEL[t.recur] || "반복") + '</span>');
     if (t.auto_key) metaBits.push('<span class="review-chip">자동 만기</span>');
     if (t.proc_id) metaBits.push(procChipHtml(t));
     if (isDone){
@@ -4618,7 +4621,7 @@
     return fmtDate(d);
   }
   function spawnNextRecur(t){
-    if (!t || !t.recur) return;
+    if (!t || !t.recur || t.recur === "none") return;   // v421: 반복 값 'none'(반복 없음)을 승인하면 한 달 뒤 회차가 또 생기던 것을 막음
     var root = t.recur_root || t.id;
     // 같은 반복 체인에 아직 열린(open/review) 회차가 있으면 중복 생성 금지
     if (liveTasks().some(function(x){ return (x.recur_root||x.id)===root && x.id!==t.id && (x.status==="open"||x.status==="review"); })) return;
@@ -4706,7 +4709,7 @@
     gwCall("gw-data", { action: "task_notmine", id: id }).then(function(res){
       if (res.status !== 200){ alert("처리 실패: " + ((res.body && res.body.error_code) || res.status)); return; }
       var b = res.body; t.who_id = ""; t.who = ""; t.who_by = "notmine"; t.notmine = b.task && b.task.notmine; t.updated = (b.task && b.task.updated) || todayStr();
-      if (b.updated_at) _colBase["tasks"] = b.updated_at;   // 서버가 지시 문서를 바꿨다 — 다음 저장의 낙관락 base
+      // v421: 여기서 낙관락 base를 올리지 않는다 — 낡은 사본을 든 탭이 다음 저장으로 문서를 덮었다. 다음 저장은 409 → 재조회·병합으로 간다.
       saveTasksCache(); renderTasks(); renderMyTasks(); renderSummary();
       apprToastShow(b.signal && b.signal.recard ? "담당에서 빠졌습니다 — 이달 " + b.signal.prefix + " 접두어 " + b.signal.notmine + "건, 배정표 재검토 신호가 관리자에게 표시됩니다" : "담당에서 빠졌습니다 — 배정표 재검토 신호로 집계됩니다");
     }).catch(function(){ alert("처리 실패(네트워크)"); });
@@ -7106,7 +7109,7 @@
         awarded.forEach(function(b){
           var base=(b.result&&isDate(b.result.checked))?b.result.checked:today;
           var due=addDaysStr(base,7), dd=vehDday(due);
-          cols[0].cards.push('<div class="pipe-card win"><b>🏆 '+esc((b.title||"").slice(0,34))+'</b><div class="s">낙찰 · 적격심사 기한 '+due+' ('+dd.text+')</div>'
+          cols[0].cards.push('<div class="pipe-card win"><b>🏆 '+esc((b.title||"").slice(0,34))+'</b><div class="s">낙찰'+(bidNoQualMethod(b)?' · 계약 시작 대기':' · 적격심사 기한 '+due+' ('+dd.text+')')+'</div>'
             +'<button class="mini-btn appr-btn" data-award-con="'+b.id+'" style="margin-top:4px;">계약 시작</button></div>');
         });
         liveBids().filter(function(b){ return bidSt(b)==="응찰"; }).slice(0,4).forEach(function(b){
@@ -16999,11 +17002,16 @@
   }
   // 낙찰 감지 → 적격심사 서류 제출 지시 자동 생성(세부기준 제5조: 통보 후 7일 이내 — 놓치면 낙찰자 결정 제외)
   function addDaysStr(iso, n){ var d=new Date(iso+"T00:00:00"); d.setDate(d.getDate()+n); return fmtDate(d); }
+  // v421(카드 6 재발 방지): 적격심사가 없는 낙찰방법으로 확인된 낙찰엔 지시를 만들지 않는다(두호천 = 소액수의견적에 생겨 87일 열려 있었음).
+  //   낙찰방법을 모르거나(unknown·compet·notmethod·other) 적격심사면 지금처럼 만든다 — 7일 제출 기한을 놓치는 쪽이 더 위험. 판정은 공고문 기준 실효값(bidMethodEff).
+  //   수의·최저가 라벨은 나라장터 API 값이 틀린 공고가 있어(판독 1,053건 중 4건) 공고문을 읽은 뒤에만 건너뛴다 — 못 읽었으면 만든다.
+  function bidNoQualMethod(b){ var me=bidMethodEff(b), k=methodKindOf(me.m); if(k==="proposal"||k==="comprehensive"||k==="sale") return true; if(k!=="negotiate"&&k!=="lowest") return false; return !(b&&b.source==="나라장터"&&me.src==="api"&&!(b.ext&&b.ext.decide)); }
   function runBidQualGen(){
     if(!isAdmin() || !autoGenReady.tasks) return;
     var created=0, today=todayStr();
     liveBids().forEach(function(b){
       if(b.status!=="낙찰") return;
+      if(bidNoQualMethod(b)) return;
       var key="bid:"+b.id+":qual";
       if(tasks.some(function(t){ return t.auto_key===key; })) return;
       var base=(b.result&&isDate(b.result.checked))?b.result.checked:today;
