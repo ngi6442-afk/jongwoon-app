@@ -1,6 +1,6 @@
 # 종운 그룹웨어 — 기능 대장 (사용자 매뉴얼 원천)
 
-> 살아있는 문서. 기능 추가·변경 시 이 파일을 함께 갱신한다. 기준: v417 (2026-11-03).
+> 살아있는 문서. 기능 추가·변경 시 이 파일을 함께 갱신한다. 기준: v418 (2026-11-04).
 > 세부 변경 이력은 git 커밋 메시지(한글) 참조.
 
 ## 1. 전체 구조
@@ -788,6 +788,13 @@ PM 지시 "문서함 일단 다 올리고 등재결재랑 공개범위 만들어
 - 정정: STAGE_DOCS "완료신고" 석면해체·제거→석면해체/제거, "청구" 국세·지방세→국세/지방세 납세증명(파서가 복합 서류 이름을 나누던 2곳) → proc_v1.json 재export·거울 2층 재빌드(list sha 7eeb1ce6c1d18b44)·push.
 - 배포 전 적대 검토 7건 → 6건 반영: map_del 뒤 같은 정규식 map_add 가 무시되던 재생 순서(map_add 가 map_del 을 되살림·map_del 이 앞선 map_add 를 지움) · 기기 간 동기화 머지(csSyncFromServer)가 stage.docs[] 를 떨어뜨리던 것 → csMergeDocs(k 별 at 늦은 쪽·한쪽만 있는 항목 보존) · 서류 추가 뒤 입력 칸 비움 · 편집 textarea 줄바꿈=" / " · 되돌림 판정은 전체 기록(reverted_of) · __proto__ 키 거부. 수용 1건: 월 사건 로그 clog:contract:YYYY-MM 은 읽고-쓰기 사이 잠금이 없어 같은 초에 두 사람이 누르면 1건이 빠질 수 있다(지표용 로그, 체인은 유지 — 4일차 집계에서 빠진 수를 세지 않도록 참고).
 - 검사: servertest 절 55(40항), uismoke v401(3항), consheet_check v401(10항 — 파서·커버리지 81단계 중 79·체크/해당없음/추가/삭제·머지·html·옛 계약), proctpl diff 0. sw v401.
+
+### v418 (11/4) — 카드 9 PM 회신 적용: 변경계약 상신 조건 = 금액 변동 또는 계약기간 변동 — PM 11/4 10:08 "변경계약 끼움형: 금액변동 시 + 계약기간 변동 시"
+- **뜻**: 변경계약(끼움형 chg 줄)의 결재 '계약 단계' 상신 조건을 금액 변동에서 금액 또는 계약기간 변동으로 넓힘. 둘 다 그대로면(물량 등) 확인창 뒤 결재 없이 완료.
+- **데이터(appdata)**: `proc_added_v1.json` change_contract `flds`에 `chg_end`(변경 후 계약기간 종료일, 날짜) 추가, `appr_when`은 amt 그대로(검증 규칙 앱·`contract_mirror.py` 불변). 카드 9 항목 전부 active + status applied(사급 (착공)·(완료), 완료신고 2종, 적격심사 수동은 추천안대로).
+- **앱**: `materializeStage`가 현재 단계가 될 때 `term0`을 굳힘(직전 완료 차수 chg_end, 없으면 계약 종료일 `contract_info.d3`) · `csChgAmtChanged` = `csChgAmtMoved`(v402 금액 판정 그대로) 또는 `csChgTermMoved`(chg_end가 있고 term0와 다름, 날짜는 숫자만 비교) · 결재 본문 `csChgApprBody`는 바뀐 것만(변경 금액·계약기간 ~→~) · [건너뜀] 가드에 chg_end · 확인창은 금액·종료일 중 빈 칸이 있고 변동이 없을 때 · 안내 문구 3곳.
+- **범위**: 새 계약부터(생성 때 `scen.chg`에 입력 칸 고정, 진행 중 계약 소급 없음), 서버 무변경. 변경계약이 승인돼도 계약 본 금액·종료일(`contract_info`)을 자동으로 고치지 않는 것은 v402와 같음(개요·기한 엔진은 원계약 종료일 기준).
+- 검사: consheet_check v418(8항 — 세 경로·기준일·2차 승계·경계·건너뜀·입력 칸) · uismoke v418(1항)+v402 리터럴 1곳 · servertest·autorulestest·proctpl 무변경 통과. sw v418.
 
 ### v417 (11/3) — 카드 10 자동 지시 서버 규칙 3건(공통 바탕 + site·veh·worker) — 09_조사_문서/착수브리핑_카드10_자동지시_20261102.md §3, PM 11/3 13:15 "착수"
 - **공통 바탕**: ① 규칙 등록표 appdata `data/appr/autotask_rules.json`(기존 4규칙 불변 + 새 3규칙, 행 추가 = R3 브리핑) ② 규칙별 스위치 `settings:autotask`(site_missing·veh_insp90·wk_missing × dry★/live/off, prev 1판·되돌리기·감사 '자동지시규칙'·낙관락 `AUTOTASK_STALE`) ③ dry 결과 보관 `it:autotask:dry`(봇 키 `autotask_dry_put`, id·수만 — `_lib/autorules.js piiScan`이 이름·전화 꼴을 거부) ④ 배정표 접두어 `site:`·`wk:` 추가(담당은 결정 2 R1) ⑤ 완료 신호 2종 `_lib/doneif.js`(site/wk 월 키 — 다음 회차 미입력 0 → 승인 대기, 크론이 대장·명부 원본 행을 `recs.__rows`로 실음) ⑥ 봇 '정기업무 n건' 푸시(auto-due)가 `task_auto_create=assignee`면 관리자 전원 생략(설정 전환 뒤 1주는 병행).

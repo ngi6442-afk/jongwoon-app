@@ -1686,7 +1686,7 @@ try {
     sh402.indexOf('function csChgAdd(') >= 0 && html.indexOf('querySelectorAll("[data-cs-chgadd]")') >= 0 && /k==="chg" \? "변경계약" : "본"/.test(html) && /s\.status = "pending"; s\.done_at = null; delete s\.off;/.test(sh402) && sh402.indexOf("(s.off ? '켜기' : '선택 복구')") >= 0
     && sh402.indexOf("var cls = (isSkip ? ' skip' : (isDone ? ' done' : (isCur ? ' cur' : ''))) + (opt ? ' opt' : '') + (open ? ' open' : '');") >= 0 && /function csDocsLost\(s\)/.test(sh402) && /if \(csDocsLost\(s\)\)\{ alert\(/.test(sh402) && /var chgN = c\.scen \? csChgOpenAt\(c, pipe, t\.stage_i\) : 0;/.test(html) && /var chgN = csChgOpenAt\(c, p, i\); if \(chgN\)\{ alert\(/.test(sh402)
     && sh402.indexOf('if (s.aid !== "change_contract" && p.key !== "chg") act += \'<button type="button" class="vs-chip" data-cs-sdoc=') >= 0 && html.indexOf('var docBtn = (t.proc_id && canDo("con") && t.pipe !== "chg" && !csTaskChg(t)) ?') >= 0 && /fp = \(s0 && s0\.aw === "amt"\) \? root\.querySelector/.test(html)
-    && ['var chgA = csChgOpenAt(c, p, i); if (chgA)', 'if(s.aid==="change_contract" && pat.source==="계약") continue;', 'var chgJ = csChgOpenAt(c, p, i); if (chgJ)', 'if (s.aw === "amt" && (csNum((s.vals || {}).chg_amt) || s.appr))', 'hold = !!(cs && cs.appr && /대기|보류|승인/.test(cs.appr.status || "")', 'if (!tl || tl.status === "done"){ csApprApply(c, p, i);'].every((x) => html.indexOf(x) >= 0), '');   // v402 적대 검토 반영 리터럴
+    && ['var chgA = csChgOpenAt(c, p, i); if (chgA)', 'if(s.aid==="change_contract" && pat.source==="계약") continue;', 'var chgJ = csChgOpenAt(c, p, i); if (chgJ)', 'if (s.aw === "amt" && (csNum((s.vals || {}).chg_amt) || (s.vals || {}).chg_end || s.appr))', 'hold = !!(cs && cs.appr && /대기|보류|승인/.test(cs.appr.status || "")', 'if (!tl || tl.status === "done"){ csApprApply(c, p, i);'].every((x) => html.indexOf(x) >= 0), '');   // v402 적대 검토 반영 리터럴
   T('v402 관리자 카드: 미리보기 try/catch 격리(R6) · 카드 9 목록 읽기 전용 행·같은 키 docs_set 확인창(R11) · 편집 예시 해 없는 값(완료신고_석면·노동부|석면 예시 0)',
     /var pv = ""; if \(has\)\{ try \{ pv = conAddedPreviewHtml\(b\); \} catch\(e\)\{/.test(html) && /\+ pv \+ \(has \? conProcEditHtml\(b\) : ''\);/.test(html) && html.indexOf('카드 9 · ') >= 0 && /은 카드 9 목록 키와 같은 이름입니다/.test(html)
     && html.indexOf('placeholder="키(예: 실적보고_추가)"') >= 0 && html.indexOf('placeholder="키(예: 완료신고_석면)"') < 0 && html.indexOf('예: 노동부|석면)') < 0, '');
@@ -1703,6 +1703,16 @@ try {
   const swN = Number((swv.match(/jw-shell-v(\d+)/) || ['', '0'])[1]);
   T('v402 데이터·sw: proc_added_v1 스키마 2·status pending|applied·active는 bool·pending이면 전부 비활성·id 6개 고정 · R16 거울 파일 added = 원천(빌드 누락 없음) · sw ≥ 402(숫자 비교)', okData && okBuilt && swN >= 402, dTxt + ' · sw ' + swN);
 } catch (e) { console.log('  (v402 검사 생략 — ' + e.message + ')'); fails++; }
+// ---- v418(11/4 카드 9 PM 회신 "금액변동 시 + 계약기간 변동 시"): 상신 조건 확장 — 함수·기준일 굳힘·결재 본문·건너뜀 가드·확인창 문구, aw "amt" 값 유지 ----
+try {
+  const sc418 = html.slice(html.indexOf('// @con-scen-start'), html.indexOf('// @con-scen-end'));
+  const fns418 = ['csChgLastEnd', 'csChgAmtMoved', 'csChgTermMoved', 'csChgAmtChanged', 'csChgApprBody'];
+  const miss418 = fns418.filter((f) => sc418.indexOf('function ' + f + '(') < 0);
+  T('v418 계약기간 변동 상신: 함수 ' + fns418.length + '종 @con-scen · csChgAmtChanged = 금액 또는 기간 · materializeStage term0 굳힘 · 결재 본문 csChgApprBody · 확인창 문구 · appr_when 검증은 amt 그대로',
+    miss418.length === 0 && /function csChgAmtChanged\(c, s\)\{ return csChgAmtMoved\(c, s\) \|\| csChgTermMoved\(s\); \}/.test(sc418)
+    && /if\(s\.aw==="amt" && s\.term0==null\) s\.term0 = csChgLastEnd\(c\)\|\|csEnd\(c\);/.test(html) && /body: \(s\.aw === "amt" \? csChgApprBody\(c, s\) : ""\)/.test(html)
+    && html.indexOf('금액·계약기간이 그대로인 변경(물량 등)이면 [확인] — 결재 없이 완료합니다.') > 0 && html.indexOf('금액이 그대로인 변경(기간·물량 등)') < 0 && /if \(s\.appr_when && s\.appr_when !== "amt"\) return bad\(s\.id, "결재 조건 불량"\);/.test(html), miss418.join(','));
+} catch (e) { console.log('  (v418 검사 생략 — ' + e.message + ')'); fails++; }
 // ---- v404(10/31 계약 D2): 기한 엔진 — 엔진 함수·materializeStage 훅(켜짐일 때만, 새 키만)·단계 카드 meta 훅·관리자 카드 배경 행+승격 버튼·서버 con_proc_bg_set·4층 키·sw ≥404
 try {
   const swv4 = readFileSync(join(ROOT, 'sw.js'), 'utf8');

@@ -10322,8 +10322,12 @@
   function csApprKind(name){ for (var i = 0; i < CON_APPR_KINDS.length; i++){ if (CON_APPR_KINDS[i][0].test(name||"")) return CON_APPR_KINDS[i][1]; } return ""; }
   function csNum(x){ return Number(String(x == null ? "" : x).replace(/[^0-9]/g, "")) || 0; }
   function csChgLastAmt(c){ var v = 0; (c.pipes || []).forEach(function(p){ (p.stages || []).forEach(function(x){ if (x.aw === "amt" && x.status === "done" && csNum((x.vals || {}).chg_amt)) v = csNum(x.vals.chg_amt); }); }); return v; }
+  function csChgLastEnd(c){ var v = ""; (c.pipes || []).forEach(function(p){ (p.stages || []).forEach(function(x){ if (x.aw === "amt" && x.status === "done" && (x.vals || {}).chg_end) v = x.vals.chg_end; }); }); return v; }   // v418 카드 9: 직전 완료 차수의 변경 후 종료일(csChgLastAmt와 같은 모양)
   function csChgBase(c){ return Number(((c && c.contract_info) || {}).amount) || 0; }   // v402 검토 2: 계약서 금액만(낙찰액 폴백·정산액 제외 — 기기마다 판정이 달라지지 않게)
-  function csChgAmtChanged(c, s){ var v = csNum((s.vals || {}).chg_amt); return (v > 0 && v !== csNum(s.amt0)) || (s.eff0 != null && csNum(csChgBase(c)) !== csNum(s.eff0)); }   // v402 R15: 두 번째 = 계약서 작성 툴 등이 계약액(contract_info.amount)을 먼저 바꾼 경우 — 정산액(settle_amount)은 제외
+  function csChgAmtMoved(c, s){ var v = csNum((s.vals || {}).chg_amt); return (v > 0 && v !== csNum(s.amt0)) || (s.eff0 != null && csNum(csChgBase(c)) !== csNum(s.eff0)); }   // v402 R15: 두 번째 = 계약서 작성 툴 등이 계약액(contract_info.amount)을 먼저 바꾼 경우 — 정산액(settle_amount)은 제외
+  function csChgTermMoved(s){ var e = (s.vals || {}).chg_end; return !!e && csNum(e) !== csNum(s.term0); }   // v418 카드 9: 종료일 칸이 비어 있으면 변동 아님, 기준 term0 = 현재 단계가 될 때 굳힘(날짜는 숫자만 비교 — 2026.12.31 = 2026-12-31)
+  function csChgAmtChanged(c, s){ return csChgAmtMoved(c, s) || csChgTermMoved(s); }   // v418 PM 11/4 "금액변동 시 + 계약기간 변동 시": 상신 조건을 넓힘(이름·aw "amt" 값은 v402 그대로)
+  function csChgApprBody(c, s){ var v = s.vals || {}, out = ""; if (csChgAmtMoved(c, s)) out += "변경 " + fmtAmount(csNum(s.amt0)) + "→" + fmtAmount(csNum(v.chg_amt) || csChgBase(c)) + "원 · "; if (csChgTermMoved(s)) out += "계약기간 " + (s.term0 || "미기재") + "→" + v.chg_end + " · "; return out; }   // v418 바뀐 것만 결재 본문에
   function csApprKindOf(c, s){ if (!s) return ""; if (!s.aid) return csApprKind(s.name); if (!s.ak) return ""; return (s.aw === "amt" && !csChgAmtChanged(c, s)) ? "" : s.ak; }   // 신설 단계는 명시값만
   function conChgItemOf(c){   // v402 R1: 생성 때 c.scen.chg에 고정한 정의 우선(원문 정규식 → 다시 컴파일, 값이 있는데 안 되면 null=버튼 없음, 빈 값=조건 없음), 없을 때만 CON_ADDED(scen.added 기록 계약만 — 소급 없음)
     var sc = c && c.scen, d, are, bre, i, a, ids;
@@ -10351,7 +10355,7 @@
     var s = p.stages[i], kind = csApprKindOf(c, s); if (!kind) return false;
     var cid = "c" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8), amt = conAmtEff(c);
     apprPendingCreates.push({ cid: cid, mid: myId(), kind: kind, title: ("[계약] " + (c.client || c.label || "") + " · " + csStageLabel(s)).slice(0, 120),
-      body: (s.aw === "amt" ? "변경 " + fmtAmount(csNum(s.amt0)) + "→" + fmtAmount(csNum((s.vals || {}).chg_amt) || csChgBase(c)) + "원 · " : "") + (csTitle(c) ? "공사명 " + csTitle(c) + " · " : "") + (amt ? "금액 " + fmtAmount(amt) + "원 · " : "") + (c.who ? "담당 " + dispName(c.who) + " · " : "") + csPub(c) + " " + csKind(c), ref: csApprRef(c, p, i) });
+      body: (s.aw === "amt" ? csChgApprBody(c, s) : "") + (csTitle(c) ? "공사명 " + csTitle(c) + " · " : "") + (amt ? "금액 " + fmtAmount(amt) + "원 · " : "") + (c.who ? "담당 " + dispName(c.who) + " · " : "") + csPub(c) + " " + csKind(c), ref: csApprRef(c, p, i) });
     apprSavePending(); apprFlushCreates();
     s.appr = { cid: cid, kind: kind, at: new Date().toISOString(), by: myName() || "", by_id: myId(), status: "대기" };
     var t = s.task_id ? findTask(s.task_id) : null;
@@ -10855,6 +10859,7 @@
     if(s.due==="auto" && s.days){ due = addDays(baseDate||todayStr(), s.days); }
     if(!due && c.scen && conDueOn()){ var dd = conStageDue(s, c, pipe); if(dd){ due = dd.due || ""; if(dd.src) s.due_src = dd.src; else delete s.due_src; if(dd.badge) s.due_badge = dd.badge; else delete s.due_badge; } }   // v404 D2 기한 엔진 — 켜짐일 때만, 새 키만(꺼짐 = 바이트 동일)
     if(s.aw==="amt" && s.amt0==null){ s.eff0 = csChgBase(c); s.amt0 = csChgLastAmt(c)||s.eff0; }   // v402 변경계약: 현재 단계가 될 때 금액 기준을 굳힘(R15 계약액 기준, 정산액 제외)
+    if(s.aw==="amt" && s.term0==null) s.term0 = csChgLastEnd(c)||csEnd(c);   // v418 카드 9: 계약기간 기준도 같이 굳힘 — 직전 완료 차수의 종료일, 없으면 계약 종료일(contract_info.d3)
     var t = { id:genId("t"), title:procStageTitle(c, csStageLabel(s)), detail:(stageDocsOf(s)||""), who_id:c.who_id||"", who:memberName(c.who_id||""), from:myName()||"", from_id:myId(), by:myName()||"",
       due:due, status:"open", done_at:null, done_by:null, created:todayStr(), updated:todayStr(),
       proc_id:c.id, proc_label:c.label, pipe:pipe.key, stage_i:pipe.cur, stage_name:s.name, stage_total:pipe.stages.length, stage_auto:(s.due==="auto") };
@@ -11143,7 +11148,7 @@
       return h;
     }).join("") + csChgBtnHtml(c) + (c.scen ? '' : '<div class="vs-empty" style="font-size:12px;">이 계약은 v382 이전 단계 목록입니다(종류·사급/관급 시나리오 아님).</div>');
   }
-  function csChgBtnHtml(c){ var ck = (c.scen && canDo("con")) ? csChgCan(c) : null; if (!ck || !ck.ok) return ""; var q = csPipeOf(c, "chg"), n = q ? q.stages.length + 1 : 1; if (n > 9) return ""; return '<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;"><button type="button" class="vs-chip" data-cs-chgadd="' + esc(c.id) + '">+ 변경계약 ' + n + '차</button><small class="empty-line" style="overflow-wrap:anywhere;">필요할 때만 · 본 단계 아래 별도 줄 · 금액이 바뀌면 결재(계약 단계)</small></div>'; }   // v402 카드 9
+  function csChgBtnHtml(c){ var ck = (c.scen && canDo("con")) ? csChgCan(c) : null; if (!ck || !ck.ok) return ""; var q = csPipeOf(c, "chg"), n = q ? q.stages.length + 1 : 1; if (n > 9) return ""; return '<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;"><button type="button" class="vs-chip" data-cs-chgadd="' + esc(c.id) + '">+ 변경계약 ' + n + '차</button><small class="empty-line" style="overflow-wrap:anywhere;">필요할 때만 · 본 단계 아래 별도 줄 · 금액·계약기간이 바뀌면 결재(계약 단계)</small></div>'; }   // v402 카드 9
   // 작업현황(준설 작업 단계) — 날짜·구간·실중량 kg·실수량 ㎥·시간·차량·근로자·사진. 준공 수량·사진대지·실적의 원천(시나리오 J2)
   var CS_WL_COLS = [["date","날짜","date"],["section","구간","text"],["kg","실중량 kg","num"],["m3","실수량 ㎥","num"],["hrs","시간","num"],["veh","차량","text"],["workers","근로자","num"],["photos","사진","num"]];
   function csWorkLogHtml(c, can){
@@ -11162,7 +11167,7 @@
   function csSkipStage(c, p, i){
     if (!canDo("con")) return;
     var s = p.stages[i]; if (!s || s.status === "done" || s.status === "skipped") return;
-    if (s.aw === "amt" && (csNum((s.vals || {}).chg_amt) || s.appr)){ alert("금액을 입력했거나 상신한 변경계약은 건너뛸 수 없습니다 — 금액을 지우고 건너뛰거나 완료로 처리해 주세요."); return; }   // v402 검토 10
+    if (s.aw === "amt" && (csNum((s.vals || {}).chg_amt) || (s.vals || {}).chg_end || s.appr)){ alert("금액·계약기간을 입력했거나 상신한 변경계약은 건너뛸 수 없습니다 — 입력을 지우고 건너뛰거나 완료로 처리해 주세요."); return; }   // v402 검토 10 · v418 계약기간 포함
     var cur = i === p.cur;
     if (cur && !csCanCloseCur(c, p)) return;
     if (!confirm('"' + s.name + '" 단계를 건너뜁니다(해당 없음).' + (cur ? ' 현재 단계라 되돌릴 수 없습니다(필요하면 지시 탭에서 처리).' : ' 되돌리려면 [선택 복구].'))) return;
@@ -11189,7 +11194,7 @@
     if (!k || !k.ok){ alert((k && k.hold) ? "본 단계가 결재 중이라 지금은 변경계약을 추가할 수 없습니다 — 결재가 끝나거나 반려된 뒤 추가해 주세요." : "변경계약은 진행 중 계약에서 착공(계약) 단계 뒤부터 준공(청구) 단계까지 추가할 수 있습니다."); return; }
     var p = csPipeOf(c, "chg"), n = p ? p.stages.length + 1 : 1;
     if (n > 9){ alert("변경계약은 9차까지 추가할 수 있습니다."); return; }
-    if (!confirm("변경계약 " + n + "차를 추가합니다 — 본 단계 목록은 그대로이고 아래 '변경계약' 줄에 붙습니다. 이 차수를 끝내기 전에는 본 줄의 준공·청구가 넘어가지 않습니다. 금액이 바뀌면 결재(계약 단계)로 갑니다.")) return;
+    if (!confirm("변경계약 " + n + "차를 추가합니다 — 본 단계 목록은 그대로이고 아래 '변경계약' 줄에 붙습니다. 이 차수를 끝내기 전에는 본 줄의 준공·청구가 넘어가지 않습니다. 금액이나 계약기간이 바뀌면 결재(계약 단계)로 갑니다.")) return;
     if (!p){ p = { key: "chg", cur: 0, stages: [] }; c.pipes.push(p); }
     var st = csStageNew({ name: k.a.name, opt: k.a.opt, aid: k.a.id, dk: k.a.docs, ak: k.a.ak, aw: k.a.aw, flds: k.a.flds }); st.round = n;
     p.stages.push(st);
@@ -11199,7 +11204,7 @@
   function csDoneStage(c, p, i){
     var s = p.stages[i]; if (!s || i !== p.cur) return;
     var chgN = csChgOpenAt(c, p, i); if (chgN){ alert("변경계약 " + chgN + "건이 아직 처리 중입니다 — 변경계약을 끝낸 뒤 이 단계를 진행해 주세요."); return; }   // v402 R3
-    if (c.scen && s.aw === "amt" && !csChgAmtChanged(c, s) && !csNum((s.vals || {}).chg_amt) && !confirm("변경 후 계약금액이 비어 있습니다.\n금액이 그대로인 변경(기간·물량 등)이면 [확인] — 결재 없이 완료합니다.\n금액이 바뀌었으면 [취소] → 금액 입력 → [입력 저장] → 계약 단계 상신.")) return;   // v402
+    if (c.scen && s.aw === "amt" && !csChgAmtChanged(c, s) && (!csNum((s.vals || {}).chg_amt) || !(s.vals || {}).chg_end) && !confirm("변경 후 계약금액·계약기간 종료일 중 비어 있는 칸이 있습니다.\n금액·계약기간이 그대로인 변경(물량 등)이면 [확인] — 결재 없이 완료합니다.\n금액이나 계약기간이 바뀌었으면 [취소] → 입력 → [입력 저장] → 계약 단계 상신.")) return;   // v402 · v418 계약기간 포함
     var ak = c.scen ? csApprKindOf(c, s) : "";
     if (ak && !(s.appr && s.appr.status === "승인")){   // v384: 계약 단계·청구 검수는 결재함으로
       if (s.appr && (s.appr.status === "대기" || s.appr.status === "보류")){ alert("이미 상신돼 있습니다(" + s.appr.status + ") — 결재함에서 승인되면 자동으로 넘어갑니다."); csApprSync(c, true); return; }

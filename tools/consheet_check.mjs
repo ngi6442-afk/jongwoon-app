@@ -48,12 +48,12 @@ const stubs = `
   var gidN = 0; function genId(p){ return p + "x" + (++gidN); }   // 고유해야 한다 — 같은 id면 findTask가 엉뚱한 지시를 집는다(검토 J 검사에서 실측)
   function myName(){ return "검사"; }
   var schedN = 0; function scheduleContractSave(){ schedN++; } function saveTasksCache(){} function scheduleTasksSave(){} function renderTasks(){} function renderSummary(){} function renderContracts(){}
-  function completeStageNow(){ return "done"; }
+  var csnN = 0; function completeStageNow(){ csnN++; return "done"; }
   var alerts = []; var CONTRACT_API = "contracts.json", serverItems = null, billN = 0;
   function getToken(){ return "t"; } function ghHeaders(){ return {}; } function loadTasks(){} function loadAsb(){} function conBillToRec(){ billN++; } function canSee(){ return true; } var contractSaveTimer = null, saveNowN = 0; function doSaveContracts(){ saveNowN++; } var toasts = []; function apprToastShow(m){ toasts.push(String(m)); }
   function b64DecodeUnicode(s){ return Buffer.from(s, "base64").toString("utf8"); }
   var fetch = function(){ if (!serverItems) return Promise.resolve({ ok: false }); return Promise.resolve({ ok: true, json: function(){ return Promise.resolve({ sha: "s", content: Buffer.from(JSON.stringify({ schema: 1, items: serverItems }), "utf8").toString("base64") }); } }); };
-  var confirm = function(){ return true; }, alert = function(m){ alerts.push(String(m)); };
+  var confirms = []; var confirm = function(m){ confirms.push(String(m)); return true; }, alert = function(m){ alerts.push(String(m)); };
   var asb = [], asbLoaded = true, SITE_KIND = { asbestos:"석면", demolition:"철거", dredge:"준설" }, apprPendingCreates = [];
   function siteKind(r){ return (r && SITE_KIND[r.kind]) ? r.kind : "asbestos"; }
   function liveSites(){ return asb.filter(function(r){ return r && r.del !== 1; }); }
@@ -65,7 +65,7 @@ const stubs = `
 const tplLine = (html.match(/var TPL_LABELS=\{[^\r\n]*\};/) || [''])[0];
 const opt = (n) => { try { return fnOf(n); } catch (e) { return ''; } };   // v404: 날짜 실함수(isDate·addDays·pad) — 스텁 addDays 항등 함수 제거
 const api = new Function('contracts', 'tasks', 'recs', stubs + opt('isDate') + opt('addDays') + opt('pad') + opt('fmtDate') + tplLine + ' var CDOC = {}, CDOC_TTL = 60000, CDOC_KIND_LABEL = { draft:"초안", final:"최종본", received:"수령" }; ' + fnOf('cdocSan') + fnOf('cdocDocKey') + fnOf('cdocPkKey') + fnOf('cdocItems') + fnOf('cdocLive') + fnOf('cdocCurOf') + fnOf('cdocPkHit') + fnOf('cdocDay') + fnOf('cdocLoad') + fnOf('cdocRowsHtml') + fnOf('cdocTrashHtml') + fnOf('csCdocDraft') + fnOf('conAttList') + scen + sheet + fnOf('stageXlsxKind') + fnOf('advanceProc') + fnOf('materializeStage') + fnOf('procStageTitle') + cut('  var CON_PROC_SRC', '  // 제목 키워드로 요소 제안') + cut('  var WASTE_BACKBONE = [', '  // @con-scen-start') + fnOf('applyPublicMilestones') + fnOf('startProcess') + `
-  return { CDOC, cdocTrashHtml, cdocDocKey, cdocPkKey, cdocLive, cdocCurOf, cdocPkHit, cdocRowsHtml, cdocLoad, csCdocDraft, CON_MAP, CON_BG, CON_PROC_SRC, conDueUse, conDueClear, conDueOn, conStageDue, conAnnualNext, conBaseDate, conAddBizDays, materializeStage, asb, todayStr, tasks, CON_COLS, CON_SCEN, CON_PACKETS, STAGE_DOCS, conScenStages, conModalElems, stageDocsFor, csSplitTop, csParseStageDocs, csStageDocItems, csStageDocsHtml, csDocToggle, csDocNa, csDocAdd, csDocDel, csMergeDocs, csStageFields, stageXlsxKind, csRowHtml, csDetailHtml, csStageInfo, csSortRows, csPass, csEnumValues, csEndCell, csKind, csSkipStage, csJumpStage, csUnskipStage, csPacketsHtml, csLoadTpl, csApprKind, csApprSubmit, csApprOnDecided, csApprFind, csSyncFromServer, csApprSync, csApprDropped, csAlignTasksAll, toasts: toasts, saveNow: function(){ return saveNowN; }, csLinkSite, csLinkSiteLater, csOnDone, csSiteDone, csSiteHooksRetry, csNextFeb15, advanceProc, materializeStage, asb: asb, tasks: tasks, appr: apprPendingCreates, alerts: alerts, bills: function(){ return billN; }, setServer: function(items){ serverItems = items; }, pushContract: function(c){ contracts.push(c); }, popContract: function(){ contracts.pop(); }, setAsbLoaded: function(v){ asbLoaded = v; }, setTab: function(t){ conDetTab = t; }, openStage: function(k){ csStageOpen = k; }, setTpl: function(o){ csTplKeys = o; csTplErr = 0; }, setTplErr: function(v){ csTplErr = v; }, tplState: function(){ return { keys: csTplKeys, err: csTplErr, loading: csTplLoading }; }, setGw: function(f){ gwCall = f; }, conScenKey, CON_ADDED, conAddedPrep, conAddedApply, conAddedUse, conAddedClear, conScenTag, conChgWindow, conAddedPreviewHtml, conRouteKey, stageDocsOf, csStageFieldsOf, csStageNew, csApprKindOf, csChgAmtChanged, csChgCan, csChgAdd, csChgOpenAt, csStagesHtml, csDoneStage, conProcLoad, renderConProcCard, startProcess, procSrc: function(){ return CON_PROC_SRC; }, setDocEl: function(id, el){ docEls[id] = el; }, sched: function(){ return schedN; }, csApprApply, csTaskChg, csChgBase };
+  return { CDOC, cdocTrashHtml, cdocDocKey, cdocPkKey, cdocLive, cdocCurOf, cdocPkHit, cdocRowsHtml, cdocLoad, csCdocDraft, CON_MAP, CON_BG, CON_PROC_SRC, conDueUse, conDueClear, conDueOn, conStageDue, conAnnualNext, conBaseDate, conAddBizDays, materializeStage, asb, todayStr, tasks, CON_COLS, CON_SCEN, CON_PACKETS, STAGE_DOCS, conScenStages, conModalElems, stageDocsFor, csSplitTop, csParseStageDocs, csStageDocItems, csStageDocsHtml, csDocToggle, csDocNa, csDocAdd, csDocDel, csMergeDocs, csStageFields, stageXlsxKind, csRowHtml, csDetailHtml, csStageInfo, csSortRows, csPass, csEnumValues, csEndCell, csKind, csSkipStage, csJumpStage, csUnskipStage, csPacketsHtml, csLoadTpl, csApprKind, csApprSubmit, csApprOnDecided, csApprFind, csSyncFromServer, csApprSync, csApprDropped, csAlignTasksAll, toasts: toasts, saveNow: function(){ return saveNowN; }, csLinkSite, csLinkSiteLater, csOnDone, csSiteDone, csSiteHooksRetry, csNextFeb15, advanceProc, materializeStage, asb: asb, tasks: tasks, appr: apprPendingCreates, alerts: alerts, bills: function(){ return billN; }, setServer: function(items){ serverItems = items; }, pushContract: function(c){ contracts.push(c); }, popContract: function(){ contracts.pop(); }, setAsbLoaded: function(v){ asbLoaded = v; }, setTab: function(t){ conDetTab = t; }, openStage: function(k){ csStageOpen = k; }, setTpl: function(o){ csTplKeys = o; csTplErr = 0; }, setTplErr: function(v){ csTplErr = v; }, tplState: function(){ return { keys: csTplKeys, err: csTplErr, loading: csTplLoading }; }, setGw: function(f){ gwCall = f; }, conScenKey, CON_ADDED, conAddedPrep, conAddedApply, conAddedUse, conAddedClear, conScenTag, conChgWindow, conAddedPreviewHtml, conRouteKey, stageDocsOf, csStageFieldsOf, csStageNew, csApprKindOf, csChgAmtChanged, csChgCan, csChgAdd, csChgOpenAt, csStagesHtml, csDoneStage, conProcLoad, renderConProcCard, startProcess, procSrc: function(){ return CON_PROC_SRC; }, setDocEl: function(id, el){ docEls[id] = el; }, sched: function(){ return schedN; }, csApprApply, csTaskChg, csChgBase, confirms: confirms, doneCalls: function(){ return csnN; } };
 `)(contracts, tasks, recs);
 let fails = 0; const T = (n, ok, note) => { console.log((ok ? '  ✓ ' : '  ✗ ') + n + (ok ? '' : ' — ' + note)); if (!ok) fails++; };
 // 시나리오 목록
@@ -358,8 +358,8 @@ T('준공·만기 칸: d3 없음 → "-" · 지난 날짜 → vs-dan · 완료 �
   const activate = (p, l) => { p.added.status = 'applied'; l.added.status = 'applied'; p.added.applied = { at: '2026-11-04' }; l.added.applied = { at: '2026-11-04' }; p.added.stages.forEach((s) => { s.active = true; }); l.added.lists.forEach((x) => { x.active = true; }); };
   const tick = () => new Promise((r) => setTimeout(r, 0));
   const load = async (res) => { api.setGw(() => (res instanceof Error ? Promise.reject(res) : Promise.resolve(res))); api.conProcLoad(); await tick(); await tick(); return { n: api.CON_ADDED.stages.length + api.CON_ADDED.lists.length, key: '완료신고_석면' in api.STAGE_DOCS, bad: (api.procSrc().added_bad || []).length, mode: api.procSrc().mode }; };
-  const L1 = await load(mkRes(false, activate)), L2 = await load(mkRes(true, (p, l) => { activate(p, l); p.added.schema = 1; })), L3 = await load(mkRes(true, activate)), L4 = await load(new Error('net')), L5 = await load(mkRes(true, (p, l) => { activate(p, l); l.added.status = 'pending'; })), L6 = await load(mkRes(true));
-  T('v402 R7 conProcLoad 실제 실행: 꺼짐+active → 신설 0·목록 키 없음 · 켬+스키마1 → 0·bad · 켬+정상 → 6·목록 키 있음 · 네트워크 예외 → 비워짐 · 두 층 status 불일치 → 0(R5) · 켬+현행 파일(전부 비활성) → 0',
+  const L1 = await load(mkRes(false, activate)), L2 = await load(mkRes(true, (p, l) => { activate(p, l); p.added.schema = 1; })), L3 = await load(mkRes(true, activate)), L4 = await load(new Error('net')), L5 = await load(mkRes(true, (p, l) => { activate(p, l); l.added.status = 'pending'; })), L6 = await load(mkRes(true, (p, l) => { p.added.status = 'pending'; l.added.status = 'pending'; p.added.applied = null; l.added.applied = null; p.added.stages.forEach((s) => { s.active = false; }); l.added.lists.forEach((x) => { x.active = false; }); }));   // v418: 현행 파일이 applied로 바뀌어도 '전부 비활성' 경로를 계속 시험(되돌리기 (a)의 모양)
+  T('v402 R7 conProcLoad 실제 실행: 꺼짐+active → 신설 0·목록 키 없음 · 켬+스키마1 → 0·bad · 켬+정상 → 6·목록 키 있음 · 네트워크 예외 → 비워짐 · 두 층 status 불일치 → 0(R5) · 켬+전부 비활성(pending) → 0',
     L1.n === 0 && !L1.key && L2.n === 0 && L2.bad > 0 && L3.n === 6 && L3.key && L3.mode === 'blob' && L4.n === 0 && !L4.key && L5.n === 0 && L5.bad > 0 && L6.n === 0 && !L6.key, JSON.stringify([L1, L2, L3, L4, L5, L6]));
   await load(mkRes(true, activate));
   const stSP = api.conScenStages('asbestos', false, false, {}), cSP = api.startProcess('asbestos', { client: 'sp', docType: 'private', stages: stSP, scen: api.conScenTag({ type: 'asbestos', pub: false, combo: false, ver: 1 }, stSP) });
@@ -373,7 +373,7 @@ T('준공·만기 칸: d3 없음 → "-" · 지난 날짜 → vs-dan · 완료 �
   const host = { innerHTML: '', querySelectorAll: () => [], querySelector: () => null };
   api.setDocEl('conProcCard', host); api.setGw(() => Promise.resolve(mkRes(false, (p) => { p.added.stages = [Object.defineProperty({}, 'id', { enumerable: true, get() { throw new Error('주입 예외'); } })]; })));   // 검토 6: 실제 예외 주입(문자열 stages는 예외를 안 던져 거짓 통과)
   api.renderConProcCard(); await tick(); await tick(); api.setDocEl('conProcCard', null);
-  T('v402 R6·R11 관리자 카드: 미리보기가 예외를 던져도(검토 6 실제 주입) [거울 켜기](data-conproc-set)·편집 절이 남고 "미리보기 실패" 한 줄 · 카드 9 목록 읽기 전용 행 · 편집 예시가 해 없는 값', /data-conproc-set=/.test(host.innerHTML) && /카드 9 미리보기 실패/.test(host.innerHTML) && /카드 9 · 비활성 · 읽기 전용/.test(host.innerHTML) && /키\(예: 실적보고_추가\)/.test(host.innerHTML) && !/노동부\|석면\)/.test(host.innerHTML), host.innerHTML.slice(0, 160));
+  T('v402 R6·R11 관리자 카드: 미리보기가 예외를 던져도(검토 6 실제 주입) [거울 켜기](data-conproc-set)·편집 절이 남고 "미리보기 실패" 한 줄 · 카드 9 목록 읽기 전용 행 · 편집 예시가 해 없는 값', /data-conproc-set=/.test(host.innerHTML) && /카드 9 미리보기 실패/.test(host.innerHTML) && /카드 9 · (비활성|활성) · 읽기 전용/.test(host.innerHTML) && /키\(예: 실적보고_추가\)/.test(host.innerHTML) && !/노동부\|석면\)/.test(host.innerHTML), host.innerHTML.slice(0, 160));
   api.setGw(null); api.conAddedClear();
   T('v402 정리(격리): conAddedClear 뒤 STAGE_DOCS에 카드 9 키 없음 · 꺼짐 동일성 다시 성립', !('완료신고_석면' in api.STAGE_DOCS) && !('완료신고_철거' in api.STAGE_DOCS) && offOk(), '');
 }
@@ -421,6 +421,52 @@ T('준공·만기 칸: d3 없음 → "-" · 지난 날짜 → vs-dan · 완료 �
   const pH = api.conAddedPrep({ schema: 2, status: 'applied', stages: [], lists: [{ id: 'lx', kind: 'list', key: 'K_x', replaces: '완료신고', match_re: '없는단계이름', value: 'v', active: true }] });
   T('v402 검토 4: 목록이 걸리는 단계 0이면 표시(soft — 파이썬은 빌드 오류)', pH.lists.length === 1 && pH.bad.some((b) => b.id === 'lx' && b.soft && /걸리는 단계 0/.test(b.why)), JSON.stringify(pH.bad));
   api.popContract(); api.popContract(); api.popContract(); api.conAddedClear();
+}
+
+// ---- v418(11/4 카드 9 PM 회신 "금액변동 시 + 계약기간 변동 시"): 변경계약 상신 조건 = 금액 또는 계약기간 — 세 경로 + 기준일 굳힘·2차 승계·결재 본문·건너뜀 가드·입력 칸 ----
+{
+  const AP3 = JSON.parse(readFileSync(join(ROOT, '..', 'jongwoon-appdata', 'data', 'contract', 'proc_added_v1.json'), 'utf8'));
+  const on3 = JSON.parse(JSON.stringify(AP3)); [...on3.stages, ...on3.lists].forEach((x) => { x.active = true; });
+  const cc3 = on3.stages.find((s) => s.id === 'change_contract');
+  if (!cc3.flds.some((f) => f[0] === 'chg_end')) cc3.flds.splice(2, 0, ['chg_end', '변경 후 계약기간 종료일', 'date']);   // 앱 먼저 배포 → 데이터 뒤집기 순서라 데이터 전환 전에도 같은 시험을 돈다
+  api.conAddedUse(api.conAddedPrep({ schema: 2, status: 'applied', stages: on3.stages, lists: on3.lists }), 'v418');
+  const stE = api.conScenStages('asbestos', true, false, {});
+  let nE = 0;
+  const mkE = (d3, id) => { const c = { id: id || ('c_v418' + (++nE)), type: 'asbestos', label: '석면철거', docType: 'public', client: 'x', contract_info: { amount: 1000, d3 }, scen: api.conScenTag({ type: 'asbestos', pub: true, combo: false, ver: 1 }, stE), status: 'active', pipes: [{ key: 'main', cur: 3, stages: stE.map((s) => api.csStageNew(s)) }] }; api.pushContract(c); api.csChgAdd(c); const q = c.pipes.find((p) => p.key === 'chg'); return { c, q, s: q.stages[0] }; };
+  const run = (x, vals) => { x.s.vals = vals; const nC = api.confirms.length, nP = api.appr.length, nD = api.doneCalls(); api.csDoneStage(x.c, x.q, 0); const shown = api.confirms.slice(nC); return { asked: shown.some((m) => /금액·계약기간이 그대로인 변경\(물량 등\)이면 \[확인\] — 결재 없이 완료/.test(m)), submitted: api.appr.length - nP, kind: (x.s.appr || {}).kind || '', body: api.appr.length > nP ? api.appr[api.appr.length - 1].body : '', done: api.doneCalls() - nD }; };
+
+  const a0 = mkE('2026-12-31');
+  T('v418 기준일 굳힘: 변경계약이 현재 단계가 될 때 term0 = 계약 종료일(contract_info.d3) · 본 줄 단계엔 term0 없음', a0.s.term0 === '2026-12-31' && !a0.c.pipes[0].stages.some((s) => 'term0' in s), String(a0.s.term0));
+  const r1 = run(a0, { chg_end: '2027-03-31' });
+  const r1b = run(mkE('2026-12-31'), { chg_amt: 1000, chg_end: '2027-03-31' });
+  T('v418 경로 ① 금액 그대로·기간만 변동 → 상신(금액 빈칸·같은 금액 둘 다) · 확인창 없음 · 결재 본문에 계약기간만(금액 변경 문구 없음)',
+    r1.submitted === 1 && r1.kind === '계약 단계' && !r1.asked && r1.done === 0 && /계약기간 2026-12-31→2027-03-31/.test(r1.body) && !/변경 1,000→/.test(r1.body) && r1b.submitted === 1 && !r1b.asked && !/변경 1,000→/.test(r1b.body), JSON.stringify({ r1, r1b }));
+  const r2 = run(mkE('2026-12-31'), {});
+  const r2b = run(mkE('2026-12-31'), { chg_end: '2026-12-31' });
+  const r2c = run(mkE('2026-12-31'), { chg_amt: 1000 });
+  const r2d = run(mkE('2026-12-31'), { chg_amt: 1000, chg_end: '2026-12-31' });
+  T('v418 경로 ② 둘 다 그대로 → 확인창 뒤 결재 없이 완료(둘 다 빈칸·같은 종료일만·같은 금액만) · 두 칸 다 같은 값으로 채우면 확인창도 없이 완료',
+    [r2, r2b, r2c].every((r) => r.asked && r.submitted === 0 && r.kind === '' && r.done === 1) && !r2d.asked && r2d.submitted === 0 && r2d.done === 1, JSON.stringify({ r2, r2b, r2c, r2d }));
+  const r3 = run(mkE('2026-12-31'), { chg_amt: 1200 });
+  const r3b = run(mkE('2026-12-31'), { chg_amt: 1200, chg_end: '2027-03-31' });
+  T('v418 경로 ③ 금액만 변동 → 상신 · 결재 본문에 금액만 / 둘 다 변동 → 상신 · 본문에 둘 다',
+    r3.submitted === 1 && r3.kind === '계약 단계' && !r3.asked && /변경 1,000→1,200원/.test(r3.body) && !/계약기간 /.test(r3.body) && r3b.submitted === 1 && /변경 1,000→1,200원/.test(r3b.body) && /계약기간 2026-12-31→2027-03-31/.test(r3b.body), JSON.stringify({ r3, r3b }));
+  const x2 = mkE('2026-12-31'); x2.s.vals = { chg_end: '2027-03-31' }; x2.s.status = 'done'; x2.q.cur = 1; api.csChgAdd(x2.c); const s2 = x2.q.stages[1];
+  s2.vals = { chg_end: '2027-03-31' }; const k2same = api.csApprKindOf(x2.c, s2); s2.vals.chg_end = '2026-12-31'; const k2back = api.csApprKindOf(x2.c, s2);
+  T('v418 2차 기준 = 직전 완료 차수의 종료일 — 1차와 같으면 결재 없음 · 원계약 종료일로 되돌리면 변동(상신)', s2.term0 === '2027-03-31' && k2same === '' && k2back === '계약 단계', JSON.stringify({ term0: s2.term0, k2same, k2back }));
+  const xN = mkE(''); const rN = run(xN, { chg_end: '2027-03-31' }); const xD = mkE('2026.12.31'); xD.s.vals = { chg_end: '2026-12-31' }; const kD = api.csApprKindOf(xD.c, xD.s);
+  const kOld = api.csApprKindOf(xD.c, { name: '변경계약', aid: 'change_contract', ak: '계약 단계', aw: 'amt', amt0: 1000, eff0: 1000, vals: { chg_end: '2026-12-31' } });
+  T('v418 경계: 계약 종료일 미기재 + 종료일 입력 → 상신(본문 미기재→) · 표기만 다른 같은 날(2026.12.31) → 변동 아님 · 기준일 없는 옛 단계 + 종료일 입력 → 상신(안전한 쪽)', rN.submitted === 1 && /계약기간 미기재→2027-03-31/.test(rN.body) && kD === '' && kOld === '계약 단계', JSON.stringify({ rN, kD, kOld }));
+  const xS = mkE('2026-12-31'); xS.s.vals = { chg_end: '2027-03-31' }; const nAS = api.alerts.length; api.csSkipStage(xS.c, xS.q, 0); const okSk = xS.s.status !== 'skipped' && api.alerts.length === nAS + 1 && /금액·계약기간을 입력했거나/.test(api.alerts[nAS]);
+  xS.s.vals = {}; api.csSkipStage(xS.c, xS.q, 0); const okSk2 = xS.s.status === 'skipped';
+  T('v418 건너뜀 가드: 종료일을 넣은 변경계약은 [건너뜀] 금지 · 입력을 지우면 건너뜀 가능', okSk && okSk2, JSON.stringify({ okSk, okSk2 }));
+  const xH = mkE('2026-12-31'); api.setTab('st'); api.openStage('chg|0'); const hH = api.csDetailHtml(xH.c);
+  const rt = JSON.parse(JSON.stringify(xH.c)); const okRt = (rt.scen.chg.flds || []).some((f) => f[0] === 'chg_end' && f[2] === 'date');
+  const okData3 = AP3.status !== 'applied' || (AP3.stages.find((s) => s.id === 'change_contract').flds.some((f) => f[0] === 'chg_end' && f[2] === 'date') && AP3.stages.find((s) => s.id === 'change_contract').appr_when === 'amt');
+  T('v418 입력 칸: 변경계약 카드에 날짜 칸 chg_end · 생성 때 고정한 정의(scen.chg)가 JSON 왕복에도 칸 유지 · 안내 문구 금액·계약기간 · 원천이 applied면 flds에 chg_end(appr_when amt 그대로)',
+    /<input type="date" data-cs-fld="chg_end"/.test(hH) && okRt && /금액·계약기간이 바뀌면 결재\(계약 단계\)/.test(hH) && okData3, JSON.stringify({ okRt, okData3 }));
+  for (let i = 0; i < nE; i++) api.popContract();
+  api.conAddedClear();
 }
 
 // ---- v404(10/31 계약 D2): 기한 엔진 — 꺼짐 바이트 동일 · D-7 대장 기산 · D+30/D+0/immediate · annual(2/15·2월 말·override, B1 회귀) · 배경 품질 게이트(재확인 필요·확인 필요·81행 예외 0)
