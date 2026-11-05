@@ -110,6 +110,14 @@ r = await call({ action: 'save', collection: 'vehicles', base: 3000, doc: { sche
 // 10 tpl 잘못된 키
 r = await call({ action: 'tpl_put', key: 'evil', data: 'AAAA' }, tokA);
 T('tpl_put 미등록 키 → 400 BAD_TPL_KEY', r.code === 400 && r.body.error_code === 'BAD_TPL_KEY');
+// v422 준설 실물 양식 키 — 등록·목록·받기
+r = await call({ action: 'tpl_put', key: 'safety_plan', name: '안전보건관리계획서.hwpx', data: 'AAAA' }, tokA);
+{
+  const r1 = r, r2 = await call({ action: 'tpl_list' }, tokA), r3 = await call({ action: 'tpl_get', key: 'safety_plan' }, tokA);
+  const t2 = (r2.body && r2.body.templates) || {}, ks = Object.keys(t2);
+  T('v422 tpl_put 새 키 200 · tpl_list에 이름 · 21키 전부 응답(미등록 null) · 순서 = 등록표 · tpl_get 본문', r1.code === 200 && r2.code === 200 && t2.safety_plan && t2.safety_plan.name === '안전보건관리계획서.hwpx' && ks.length === 21 && t2.labor_split === null && ks[0] === 'asb_plan' && ks[ks.length - 1] === 'labor_split' && r3.code === 200 && r3.body.data === 'AAAA', JSON.stringify([r1.code, r2.code, r2.body && r2.body.error_code, r3.code, ks]));
+  delete mem.gw_files['tpl:safety_plan'];
+}
 // 11 proof __index__ 자기파괴 방지
 r = await call({ action: 'proof_put', name: '__index__', data: 'AAAA' }, tokA);
 T('proof_put __index__ → 400', r.code === 400);

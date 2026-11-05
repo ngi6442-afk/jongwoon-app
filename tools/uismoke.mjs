@@ -1400,7 +1400,7 @@ try {
   const pks = [...sc.matchAll(/\{ k:"(con|start|complete|bill)", h:"[^"]+ 패킷"/g)].map((m) => m[1]);
   T('v383 CON_PACKETS 4(계약·착공·준공·청구) · gen 키는 TPL_LABELS 또는 가상 키(con_docs·quote·html_contract) · tpl_list 캐시(csLoadTpl) · 서류 탭에 csPacketsHtml + 첨부함 · [생성] 배선(html_contract → 계약서 툴, 그 외 openXlsxGen)',
     pks.join(',') === 'con,start,complete,bill'
-    && [...sc.matchAll(/t:"gen", k:"(\w+)"/g)].map((m) => m[1]).every((k) => ['con_docs', 'quote', 'html_contract'].includes(k) || new RegExp('\\b' + k + ':"').test(html.slice(html.indexOf('var TPL_LABELS='), html.indexOf('var TPL_LABELS=') + 900)))
+    && [...sc.matchAll(/t:"gen", k:"(\w+)"/g)].map((m) => m[1]).every((k) => ['con_docs', 'quote', 'html_contract', 'safety_pack'].includes(k) || new RegExp('\\b' + k + ':"').test(html.slice(html.indexOf('var TPL_LABELS='), html.indexOf('var TPL_LABELS=') + 900)))
     && /gwCall\("gw-data", \{ action:"tpl_list" \}\)/.test(sc) && /h \+= csPacketsHtml\(c\) \+ \(conAttBoxHtml\(c\)/.test(html) && /querySelectorAll\("\[data-cs-gen\]"\)/.test(html) && /openDocFromContract\(p\[0\]\); else openXlsxGen\(p\[0\], csGenKind/.test(html)
     && /\.cs-pk \.st\.gap\{/.test(html), pks.join(','));
   T('v383 검토 반영: tpl_list 실패는 캐시 null 유지 + csTplErr 쿨다운(30초) · 비200 불신 · then 2인자 · tpl_put 성공·관리 목록 수신 → csTplInvalidate/csTplSet · 모달 닫기 재그리기 · 첨부 claim 1회 + ex 제외 · 정규식 좁힘(사업자 제외 등록증·세금계산서·4대보험)',
@@ -1896,6 +1896,22 @@ try {
   T('v421 지시 저장: 첫 GET 실패 기기는 base 0으로 보내 409 병합 · [내 것 아님] 뒤 base를 올리지 않음', html.indexOf('var saveBase = (col === "tasks" && _colBase[col] === undefined) ? 0 : _colBase[col];') > 0 && html.indexOf('base: saveBase }') > 0 && html.indexOf('_colBase["tasks"] = b.updated_at') < 0);
   T('v421 🔁 칩은 none에 안 뜸 · sw ≥421', html.indexOf('if (t.recur && t.recur !== "none") metaBits.push') > 0 && Number((swv21.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 421);
 } catch (e) { console.log('  (v421 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ---- v422(11/5 체크 31): 준설 실물 양식 4항목 — 선택지·라벨·확장자·서버 키 일치 · gap 항목에 gen을 곁들여 옛 화면·거울과 호환 · 양식 파일에 개인정보를 넣지 않는 안내 · sw ≥422
+try {
+  const K22 = ['safety_plan', 'safety_risk', 'safety_rule', 'safety_emerg', 'safety_ppe', 'safety_cost', 'labor_split'], H22 = ['safety_plan', 'safety_rule', 'safety_emerg', 'safety_ppe', 'labor_split'];
+  const lab22 = (html.match(/var TPL_LABELS=\{[^\r\n]*\};/) || [''])[0], ext22 = (html.match(/var TPL_EXT=\{[^\r\n]*\};/) || [''])[0], srv22 = (gwd.match(/const TPL_KEYS = \{[^\r\n]*\};/) || [''])[0];
+  const has22 = (str, k) => new RegExp('\\b' + k + ':').test(str);
+  T('v422 양식 키 7: 앱 라벨·서버 키 모두 있음 · hwpx 5종만 확장자 예외(xlsx 2종은 기본값) · 라벨 키 ⊂ 서버 키', K22.every((k) => has22(lab22, k) && has22(srv22, k)) && H22.every((k) => has22(ext22, k + '')) && !has22(ext22, 'safety_risk') && !has22(ext22, 'safety_cost')
+    && [...lab22.matchAll(/\b(\w+):"/g)].every((m) => has22(srv22, m[1])), lab22.slice(0, 200));
+  T('v422 생성 창: 선택지 4종 · 안전보건관리비 칸 · 묶음 표(XG_SAFE_FILES) · 사용내역서는 일반 xlsx 경로(xgBuildEdits)', ['safety_plan', 'safety_pack', 'safety_cost', 'labor_split'].every((k) => html.indexOf('<option value="' + k + '">') > 0) && html.indexOf('id="xgSafeFee"') > 0 && /var XG_SAFE_FILES=\{ safety_plan:\["safety_plan"\], labor_split:\["labor_split"\], safety_pack:\["safety_risk","safety_rule","safety_emerg","safety_ppe"\] \}/.test(html) && html.indexOf('if(kind==="safety_cost"){   // v422') > 0 && html.indexOf('if(XG_SAFE_FILES[kind]){') > 0 && html.indexOf('if(XG_SAFE_FILES[kind]){') < html.indexOf('// 하드리딩 원칙: 원문(계약서·조사서·대장)에서 못 채운 값만')
+    && /document\.getElementById\("xgSafeWrap"\)\.style\.display = \(k==="safety_plan"\|\|k==="safety_cost"\)/.test(html) && /document\.getElementById\("xgSafeRecvWrap"\)\.style\.display = \(k==="labor_split"\)/.test(html));
+  T('v422 검토 반영: 이월 차단(XG_RESET_IDS에 대리인 3칸·금액·수신처) · 사용내역서 초안 안 남김 · 착공계 초안에 주민번호 칸 뺌 · 패킷 zip · tpl 읽기 실패 비200', /var XG_RESET_IDS=\["xgAgent","xgAgentRrn","xgAgentLic","xgSafeFee","xgSafeRecv",/.test(html) && html.indexOf('if(kind!=="safety_cost") csCdocDraft(c, kind, ed, al.learned);') > 0 && html.indexOf('var rrnCell = { "현장대리인계":"F13", "재직증명서":"I6" }') > 0 && html.indexOf('downloadBlob(name+"_안전 패킷.zip", zipStore(fs))') > 0 && /error_code: 'TPL_READ_FAILED'/.test(gwd) && /if \(!r\.ok && r\.code !== 'NOT_FOUND'\) return jr\(500, \{ status: 'ERROR', error_code: r\.code \|\| 'STORAGE_READ_FAILED'/.test(gwd));
+  const sc22 = html.slice(html.indexOf('// @con-scen-start'), html.indexOf('// @con-scen-end'));
+  T('v422 패킷: ✗ 4항목은 t:"gap"을 유지하고 gen(준설 한정)을 곁들임(옛 판은 ✗ 그대로) · 줄 그릴 때 gen 우선', ['safety_plan', 'safety_pack', 'safety_cost', 'labor_split'].every((k) => new RegExp('t:"gap"[^\\n]*gen:\\{ t:"gen", k:"' + k + '"[^\\n]*when:"dredge" \\}').test(sc22)) && sc22.indexOf('var it = (it0.gen && csPkWhen(c, it0.gen.when)) ? it0.gen : it0;') > 0);
+  const swv22 = readFileSync(join(ROOT, 'sw.js'), 'utf8');
+  T('v422 tpl_list 동시 읽기(키 21개) · 응답 키 순서는 TPL_KEYS 그대로 · sw ≥422', /await Promise\.all\(Object\.keys\(TPL_KEYS\)\.map\(async \(key\) =>/.test(gwd) && /for \(const key of Object\.keys\(TPL_KEYS\)\) templates\[key\] = out\[key\];/.test(gwd) && Number((swv22.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 422);
+} catch (e) { console.log('  (v422 검사 생략 — ' + e.message + ')'); fails++; }
 
 // ---- (11/2) Blob 컨텍스트 전수: netlify/functions/*.js 중 store(·blobGet(·blobSet(·blobList(를 쓰는 함수는 setupBlobContext( 호출 필수 — gw-lawwatch가 빠져 첫 실제 경보가 502(11/2)
 try {

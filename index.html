@@ -1898,6 +1898,10 @@
       <option value="quote_docs">견적서(회사별 양식 hwp)</option>
       <option value="adv_pay">선금지급신청 세트(공문+별첨2~5 hwp)</option>
       <option value="settle_doc">준공 정산합의서(사후정산 xlsx)</option>
+      <option value="safety_plan">안전보건관리계획서(준설 hwpx)</option>
+      <option value="safety_pack">안전 패킷(준설: 위험성평가·안전 수칙·비상대응·보호구 대장)</option>
+      <option value="safety_cost">산업안전보건관리비 사용내역서(준설 xlsx)</option>
+      <option value="labor_split">노무비 구분관리 서식(서식1~7 hwpx)</option>
       <option value="bid_rate">내역서 낙찰률 적용(발주처 내역서 → 낙찰가)</option>
     </select>
     <span class="fld-label">시행 회사</span>
@@ -1914,10 +1918,17 @@
       <span class="fld-label">착공일</span><input type="date" id="xgD2">
       <span class="fld-label">준공예정일</span><input type="date" id="xgD3">
       <div id="xgAgentWrap" style="display:none;">
-        <span class="fld-label">현장대리인 (미선택 시 나종운 — 양식 기본값 유지)</span>
+        <span class="fld-label" id="xgAgentLabel">현장대리인 (미선택 시 나종운 — 양식 기본값 유지)</span>
         <select id="xgAgent"><option value="">나종운 (기본)</option></select>
         <input type="text" id="xgAgentRrn" placeholder="대리인 주민등록번호 (선택 — 비우면 수기 기입)" autocomplete="off">
         <input type="text" id="xgAgentLic" placeholder="대리인 자격증명 (선택, 예: 거푸집기능사)" autocomplete="off">
+      </div>
+      <div id="xgSafeWrap" style="display:none;">
+        <input type="text" id="xgSafeFee" placeholder="안전보건관리비 편성금액(숫자만, 비우면 수기 기입)" autocomplete="off" inputmode="numeric">
+      </div>
+      <div id="xgSafeRecvWrap" style="display:none;">
+        <span class="fld-label">수신처(서식 끝 "… 귀하" 자리, 고칠 수 있습니다)</span>
+        <input type="text" id="xgSafeRecv" placeholder="수신처" autocomplete="off">
       </div>
     </div>
     <div id="xgAsbFields" style="display:none;">
@@ -8709,8 +8720,8 @@
   }
 
   // ---- 서류 양식 등록/생성 ----
-  var TPL_LABELS={asb_plan:"석면해체계획서", work_start:"착공계", work_complete:"준공계", demo_report:"해체신고서", waste_report:"폐기물배출신고서", qual_packet:"적격심사 패킷", contract_pledge:"계약이행서약서", seal_reg:"사용인감계", bond_waiver:"채권포기각서", labor_exempt:"노무비제외신청서", quote_env:"견적서(환경)", quote_con:"견적서(건설)", adv_pay:"선금지급신청 세트", settle_doc:"준공 정산합의서"};
-  var TPL_EXT={qual_packet:".hwpx", contract_pledge:".hwpx", seal_reg:".hwpx", bond_waiver:".hwpx", labor_exempt:".hwpx", quote_env:".hwpx", quote_con:".hwpx", adv_pay:".hwpx"};   // 기본 .xlsx, hwpx 양식만 예외
+  var TPL_LABELS={asb_plan:"석면해체계획서", work_start:"착공계", work_complete:"준공계", demo_report:"해체신고서", waste_report:"폐기물배출신고서", qual_packet:"적격심사 패킷", contract_pledge:"계약이행서약서", seal_reg:"사용인감계", bond_waiver:"채권포기각서", labor_exempt:"노무비제외신청서", quote_env:"견적서(환경)", quote_con:"견적서(건설)", adv_pay:"선금지급신청 세트", settle_doc:"준공 정산합의서", safety_plan:"안전보건관리계획서", safety_risk:"위험성평가표(준설)", safety_rule:"준설 작업 안전 수칙", safety_emerg:"비상상황 대응체계", safety_ppe:"안전보호구 지급 대장", safety_cost:"산업안전보건관리비 사용내역서", labor_split:"노무비 구분관리 서식"};
+  var TPL_EXT={qual_packet:".hwpx", contract_pledge:".hwpx", seal_reg:".hwpx", bond_waiver:".hwpx", labor_exempt:".hwpx", quote_env:".hwpx", quote_con:".hwpx", adv_pay:".hwpx", safety_plan:".hwpx", safety_rule:".hwpx", safety_emerg:".hwpx", safety_ppe:".hwpx", labor_split:".hwpx"};   // 기본 .xlsx, hwpx 양식만 예외
   function openTplManage(){
     if(!isAdmin()) return;
     var host=document.getElementById("tplRows");
@@ -8718,6 +8729,7 @@
     proofRefresh();
     document.getElementById("tplBackdrop").classList.add("show");
     gwCall("gw-data",{action:"tpl_list"}).then(function(res){
+      if(res.status!==200){ host.innerHTML='<div style="color:#c0392b;">목록을 불러오지 못했습니다. 잠시 뒤 다시 여세요(등록 여부와 무관).</div>'; return; }   // v422: 읽기 실패를 미등록으로 그리지 않는다
       var t=(res.body&&res.body.templates)||{};
       if(res.status===200&&res.body&&res.body.templates&&typeof csTplSet==="function") csTplSet(t);   // v383 검토: 패킷 캐시도 같은 응답으로 갱신
       host.innerHTML=Object.keys(TPL_LABELS).map(function(k){
@@ -8825,7 +8837,7 @@
   }
   var xgCtx=null, xgRateFetched=null;   // xgRateFetched: 공고 첨부에서 불러온 내역서 {name, bytes}
   // 서류 모달의 종류별 입력칸 — 계약을 바꿔 열 때 xgPrefill이 전부 비운다(직전 계약 값 잔존 방지)
-  var XG_RESET_IDS=["xqNo","xqDate","xqDue","xqPeriod","xqRecv","xqBid","xqPre","xqA","xqPerf",
+  var XG_RESET_IDS=["xgAgent","xgAgentRrn","xgAgentLic","xgSafeFee","xgSafeRecv","xqNo","xqDate","xqDue","xqPeriod","xqRecv","xqBid","xqPre","xqA","xqPerf",
     "xcRecv","xcRate",
     "xqtRecv","xqtNo","xqtDate","xqtItem","xqtSang","xqtGubun","xqtUnit","xqtQty","xqtPrice",
     "xadOrg","xadRecv","xadRef","xadDocNo","xadDate","xadLabor","xadReq","xadU1","xadU2","xadU3","xadU4","xadBank","xadAcctType","xadAcct"];
@@ -8855,7 +8867,7 @@
     ["xqBasis","xqTier","xqCredit","xqSafety","xqtVat"].forEach(function(id){ var el=document.getElementById(id); if(el) el.selectedIndex=0; });
     var _xl=document.getElementById("xqLocal"), _xp=document.getElementById("xqPledge"), _xt=document.getElementById("xqTax");
     if(_xl) _xl.checked=false; if(_xp) _xp.checked=true; if(_xt) _xt.checked=false;
-    document.getElementById("xgHint").textContent="["+(c.label||"계약")+(c.site?" · "+c.site:"")+(stage?" · "+stage+" 단계":"")+"] 등록된 양식 원본에 값을 채워 xlsx로 내려받습니다.";
+    document.getElementById("xgHint").textContent="["+(c.label||"계약")+(c.site?" · "+c.site:"")+(stage?" · "+stage+" 단계":"")+"] 등록된 양식 원본에 값을 채워 내려받습니다.";
     var isAsb=!!(c.elems&&c.elems.asb);
     var s=c.asb_survey||{}, ci=c.contract_info||{}, bi=c.bldg_info||{};   // 자동 채움: 계약값 → 계약서 → 조사서 → 대장 (하드리딩 우선, 없는 값만 확인요망)
     document.getElementById("xgKind").value = presetKind || (isAsb ? "asb_plan" : "work_start");
@@ -9087,6 +9099,65 @@
     }
     return r;
   }
+  // ---- v422 준설 실물 양식(체크 31 ✗ 4개) — 공통 값은 서류 생성 창에서 읽는다. 양식 파일에는 성명·개인 연락처가 없고, 현장책임자만 고른 사람에서 채운다(내려받은 파일에만 남는다). ----
+  var XG_SAFE_CO={ env:{name:"주식회사 종운환경", addr:"경북 포항시 남구 서원재로 1(호동)"}, con:{name:"주식회사 종운건설", addr:"경상북도 포항시 남구 정몽주로 823-10(청림동)"} };
+  var XG_SAFE_FILES={ safety_plan:["safety_plan"], labor_split:["labor_split"], safety_pack:["safety_risk","safety_rule","safety_emerg","safety_ppe"] };
+  var XG_SAFE_DONE={ safety_plan:"안전보건관리계획서 생성 완료. 안전관리담당자 성명·연락처, 현장책임자·대표 연락처(⑦ 포함), 종사자 수, 재해 건수는 빈칸입니다. 수기로 채운 뒤 제출하세요.",
+    safety_pack:"안전 패킷을 zip 파일 1개(4종)로 내려받았습니다. 수기로 채울 곳: 조직도·연락망 성명과 연락처, 보호구 대장 담당자·지급일·수량·명단, 위험성평가 평가일·승인일·참여자의 (기입) 자리.",
+    labor_split:"노무비 구분관리 서식(서식1~7) 생성 완료. 해당 서식만 골라 쓰고, 금액·계좌·하수급인은 수기로 채우세요." };
+  function xgSafeRecvOf(client){   // 실물 수신처 표기. 포항 맑은물은 계약에 사업소·본부로 섞여 있어 실물 표기로 모은다. 그 밖은 발주자 그대로(창에서 고침)
+    var c=(client||"").trim();
+    return /(^|포항시?\s*)맑은물사업(본부|소)\s*$/.test(c)?"포항시 맑은물사업본부 관리자(기업출납원)":c;
+  }
+  function xgSafeAsk(m){ return "⚠ 확인요망, 비어 있거나 확인이 필요한 값:\n· "+m.join("\n· ")+"\n\n이대로 생성할까요? (빈 값은 수기 기입)"; }
+  function xgSafetyVals(){
+    var v=function(id){ return (document.getElementById(id).value||"").trim(); };
+    var co=XG_SAFE_CO[v("xgCo")]||XG_SAFE_CO.env, client=v("xgClient");
+    var amt=parseInt(v("xgAmount").replace(/[^0-9]/g,""),10)||0, fee=parseInt(v("xgSafeFee").replace(/[^0-9]/g,""),10)||0;
+    var d1=v("xgD1"), d2=v("xgD2"), d3=v("xgD3"), ok=function(x){ return /^\d{4}-\d{2}-\d{2}$/.test(x||""); };
+    var ko=function(x){ if(!ok(x)) return ""; var p=x.split("-"); return p[0]+"년 "+p[1]+"월 "+p[2]+"일"; };
+    var dot=function(x){ return ok(x)?x.replace(/-/g,"."):""; };
+    var ag=document.getElementById("xgAgent"), w=(ag&&ag.value)?findWk(ag.value):null;
+    var base=(ok(d3)?d3:todayStr()).split("-"), start=ok(d2)?d2.split("-"):null;
+    return { amt:amt, fee:fee, tokens:{ "공사명":v("xgTitle"), "발주처":client, "수신처":v("xgSafeRecv")||xgSafeRecvOf(client),
+      "업체명":co.name, "주소":co.addr, "대표자":"나 종 운",
+      "금액표기":amt?koAmount(amt).replace("원 정(￦ "," 원정(￦"):"",   // 실물 표기. 서식 글꼴은 역슬래시를 그대로 그리므로 ￦
+      "계약일":ko(d1), "착공일":ko(d2), "준공일":ko(d3), "공사기간":(ok(d2)&&ok(d3))?dot(d2)+"~"+dot(d3):"", "작업기간":(ok(d2)&&ok(d3))?ko(d2)+"부터 "+ko(d3):"",
+      "평가년월":start?start[0]+"년 "+start[1]+"월":"        년     월", "작성년":base[0], "작성월":base[0]+"년 "+base[1]+"월   일",
+      "현장책임자":w?w.name:"나종운", "현장책임자연락처":(w&&w.phone)?w.phone:"", "안전관리비":fee?fee.toLocaleString():"            " } };
+  }
+  function xgSafetyMissing(kind, sv, c){   // c: 계약 — 창의 폴백(종류 이름·앱 시작일)이 실제 값처럼 보이는 것을 가린다
+    var t=sv.tokens, m=[], ci=(c&&c.contract_info)||{};
+    if(!t["공사명"]) m.push("공사명");
+    else if(c&&!c.title&&!ci.title&&t["공사명"]===c.label) m.push("공사명(계약에 공사명이 없어 종류 이름이 들어가 있습니다)");
+    if(!t["발주처"]) m.push("발주자");
+    if(!sv.amt) m.push("계약금액");
+    if(kind==="labor_split"){
+      if(!t["계약일"]) m.push("계약일");
+      else if(c&&!ci.d1) m.push("계약일(계약 시작일로 채웠습니다. 실제 계약일인지 확인)");
+    }
+    if(!t["착공일"]) m.push("착공일");
+    if(!t["준공일"]) m.push("준공예정일");
+    if((kind==="safety_plan"||kind==="safety_cost")&&!sv.fee) m.push("안전보건관리비 편성금액");
+    return m;
+  }
+  function xgSafetyGen(kind, name, sv){   // 등록 양식을 차례로 받아 채워 내려받는다. 하나라도 미등록이면 거기서 멈추고 알린다
+    var list=XG_SAFE_FILES[kind], i=0, made=[];
+    var next=function(){
+      if(i>=list.length) return Promise.resolve();
+      var key=list[i++];
+      return gwCall("gw-data",{action:"tpl_get", key:key}).then(function(res){
+        if(res.status!==200) throw (res.status===404?"'"+TPL_LABELS[key]+"' 양식 미등록 — [+ 양식 등록]":"양식 불러오기 실패");
+        var hwpx=TPL_EXT[key]===".hwpx";
+        return (hwpx?fillHwpxTemplate(res.body.data, sv.tokens):fillXlsxTemplate(res.body.data, {})).then(function(b){ made.push({ name:TPL_LABELS[key]+(hwpx?".hwpx":".xlsx"), blob:b }); });
+      }).then(next);
+    };
+    return next().then(function(){
+      if(made.length===1){ downloadBlob(name+"_"+made[0].name, made[0].blob); return; }
+      // 여러 파일은 zip 1개로 — 연속 다운로드는 브라우저가 막으면 1개만 내려오고 나머지가 조용히 사라진다(v422 검토 실측)
+      return Promise.all(made.map(function(f){ return f.blob.arrayBuffer().then(function(ab){ return { name:f.name, data:new Uint8Array(ab) }; }); })).then(function(fs){ downloadBlob(name+"_안전 패킷.zip", zipStore(fs)); });
+    });
+  }
   function xgToggle(){
     var k=document.getElementById("xgKind").value;
     document.getElementById("xgMoneyFields").style.display = (k==="asb_plan"||k==="waste_report") ? "none" : "";
@@ -9173,8 +9244,13 @@
       ps.innerHTML=procs.map(function(n){ return '<option value="'+esc(n)+'">'+esc(n)+(n==="㈜그린바이로"?" (석면 기본 — 업체정보 변동 확인요망)":"")+'</option>'; }).join("");
       ps.value=cur&&procs.indexOf(cur)>=0?cur:"㈜그린바이로";
     }
-    document.getElementById("xgAgentWrap").style.display = (k==="work_start") ? "" : "none";
-    if(k==="work_start"){   // 현장대리인 후보 = 일용직 명부(기본 나종운)
+    document.getElementById("xgAgentWrap").style.display = (k==="work_start"||k==="safety_plan") ? "" : "none";
+    document.getElementById("xgSafeWrap").style.display = (k==="safety_plan"||k==="safety_cost") ? "" : "none";
+    document.getElementById("xgSafeRecvWrap").style.display = (k==="labor_split") ? "" : "none";
+    if(k==="labor_split"&&!document.getElementById("xgSafeRecv").value) document.getElementById("xgSafeRecv").value=xgSafeRecvOf(document.getElementById("xgClient").value);
+    document.getElementById("xgAgentLabel").textContent = (k==="safety_plan") ? "현장책임자 (고르면 명부의 이름·연락처가 파일에 들어갑니다. 미선택 시 나종운, 연락처 빈칸)" : "현장대리인 (미선택 시 나종운 — 양식 기본값 유지)";
+    document.getElementById("xgAgentRrn").style.display = document.getElementById("xgAgentLic").style.display = (k==="safety_plan") ? "none" : "";   // v422: 계획서는 현장책임자 이름·연락처만 쓴다
+    if(k==="work_start"||k==="safety_plan"){   // 현장대리인 후보 = 일용직 명부(기본 나종운)
       var sel=document.getElementById("xgAgent"), cur=sel.value;
       sel.innerHTML='<option value="">나종운 (기본)</option>'+sortedWorkers().map(function(w){
         return '<option value="'+w.id+'">'+esc(w.name)+(w.role==="반장"?" (반장)":"")+'</option>';
@@ -9194,6 +9270,13 @@
   function xgBuildEdits(kind, c){
     var $=function(id){ return document.getElementById(id).value.trim(); };
     var title=$("xgTitle"), site=$("xgSite"), client=$("xgClient");
+    if(kind==="safety_cost"){   // v422 철강공단 3공구 실물 — 머리 칸만 채운다. 사용 내역은 수기
+      var sc=xgSafetyVals(), sct=sc.tokens;
+      var scE=[["C2",sct["업체명"],"s"],["C4",sct["주소"],"s"],["F2",title,"s"],["F6",sct["공사기간"],"s"],["C7",client,"s"],["A26",sct["작성월"],"s"],["D29","주  소 : "+sct["주소"],"s"],["D30","상  호 : "+sct["업체명"],"s"]];
+      if(sc.amt) scE.push(["C6",sc.amt,"n"]);
+      if(sc.fee) scE.push(["C8",sc.fee,"n"]);
+      return {"안전계획 갑":scE, "안전계획 을":[["A2","[공사명] "+title,"s"]], "환경계획 갑":[["F2",title,"s"]]};
+    }
     if(kind==="asb_plan"){
       var rows=(c.asb_survey&&c.asb_survey.rows)||[];
       var total=Math.round(rows.reduce(function(s,r){return s+(Number(r.area)||0);},0)*100)/100;
@@ -9717,9 +9800,21 @@
           .finally(function(){ $("xgGo").textContent="생성·다운로드"; $("xgGo").disabled=false; });
         return;
       }
+      if(XG_SAFE_FILES[kind]){   // v422 준설 실물 양식(한 파일 또는 묶음)
+        var sv=xgSafetyVals(), svM=kind==="safety_pack"?[]:xgSafetyMissing(kind, sv, c);   // 안전 패킷은 채울 값 없음
+        if(svM.length && !confirm(xgSafeAsk(svM))) return;
+        $("xgGo").textContent="생성 중…"; $("xgGo").disabled=true;
+        xgSafetyGen(kind, $("xgTitle").value.trim()||c.label||"서류", sv).then(function(){
+          alert(XG_SAFE_DONE[kind]);
+          $("xlsxGenBackdrop").classList.remove("show"); xgCtx=null;
+        }).catch(function(e){ alert("생성 실패: "+e); })
+          .finally(function(){ $("xgGo").textContent="생성·다운로드"; $("xgGo").disabled=false; });
+        return;
+      }
       // 하드리딩 원칙: 원문(계약서·조사서·대장)에서 못 채운 값만 확인요망으로 사람에게 확인
       var missing=[];
-      if(kind==="waste_report"){
+      if(kind==="safety_cost"){ var scM=xgSafetyMissing(kind, xgSafetyVals(), c); if(scM.length && !confirm(xgSafeAsk(scM))) return; }
+      else if(kind==="waste_report"){
         var cW=findProc(xgCtx.id)||{}, oiW=cW.owner_info||{};
         if(!oiW.name && !$("xgClient").value.trim()) missing.push("발주자(신분증/사업자등록증 첨부 시 자동)");
         if(!oiW.addr) missing.push("발주자 주소(증빙 첨부 시 자동)");
@@ -9755,7 +9850,7 @@
         return fillXlsxTemplate(res.body.data, ed).then(function(blob){
           var nm=($("xgTitle").value.trim()||c.label||"서류")+"_"+TPL_LABELS[kind]+".xlsx";
           downloadBlob(nm, blob);
-          csCdocDraft(c, kind, ed, al.learned);   // v407 초안 자동 보존(+v411 학습 칸)
+          if(kind!=="safety_cost") csCdocDraft(c, kind, ed, al.learned);   // v407 초안 자동 보존(+v411 학습 칸). v422 사용내역서는 안 남김 — 같은 준공 단계에 초안이 둘이면 준공계 최종본의 학습 짝이 끊긴다
           $("xlsxGenBackdrop").classList.remove("show"); xgCtx=null;
         }); });
       }).catch(function(e){ alert("생성 실패: "+e); })
@@ -10072,7 +10167,12 @@
     try {
       if (!c || !c.id || typeof gwCall !== "function" || !canDo("con")) return;
       var p = (c.pipes || [])[0], i = (p && typeof p.cur === "number" && p.cur >= 0 && p.cur <= 99) ? p.cur : 0;
-      var fill = { tpl: kind, at: todayStr(), edits: edits }; if (learned && learned.length) fill.learned = learned;   // v411 적용된 학습 칸 기록(초안 메타)
+      var keep = edits;
+      if (kind === "work_start" && edits && !Array.isArray(edits)){   // v422: 대리인 주민번호 칸(현장대리인계 F13·재직증명서 I6)은 초안에 남기지 않는다 — 내려받은 파일에만
+        var rrnCell = { "현장대리인계":"F13", "재직증명서":"I6" }; keep = {};
+        Object.keys(edits).forEach(function(sh){ keep[sh] = (rrnCell[sh] && Array.isArray(edits[sh])) ? edits[sh].filter(function(e){ return e[0] !== rrnCell[sh]; }) : edits[sh]; });
+      }
+      var fill = { tpl: kind, at: todayStr(), edits: keep }; if (learned && learned.length) fill.learned = learned;   // v411 적용된 학습 칸 기록(초안 메타)
       var r = gwCall("gw-data", { action: "cdoc_put", cid: c.id, i: i, doc_key: "gen." + cdocSan(kind, 30), kind: "draft", pii: 1, fill: fill });
       if (r && typeof r.then === "function") r.then(function(res){
         if (res && res.status === 200 && res.body && res.body.item && CDOC[c.id]){ var it = res.body.item; CDOC[c.id].items.forEach(function(x){ if (x.i === it.i && x.dk === it.dk && x.kind === "draft") x.cur = 0; }); CDOC[c.id].items.push(it); }
@@ -10298,7 +10398,7 @@
       { t:"att", k:"biz", h:"사업자등록증", re:/사업자/ },
       { t:"att", k:"reg", h:"건설업·폐기물 등록증", re:/(건설업|해체|폐기물|수집운반|운반업)[^.]*(등록증|허가증|등록수첩)|등록수첩/ },
       { t:"att", k:"pledge", h:"계약이행통합서약서", re:/서약/, when:"pub" },
-      { t:"gap", h:"안전보건관리계획서 양식", when:"pub" },
+      { t:"gap", h:"안전보건관리계획서 양식", when:"pub", gen:{ t:"gen", k:"safety_plan", h:"안전보건관리계획서", when:"dredge" } },   // 준설은 실물 양식 등록(v422), 다른 종류는 실물 등록 전까지 ✗
       { t:"gap", h:"준설 약식 계약서(사급)", when:"dredge-pri" }
     ]},
     { k:"start", h:"착공 패킷", when:"pub", items:[
@@ -10306,7 +10406,7 @@
       { t:"gen", k:"adv_pay", h:"선금지급신청 세트" },
       { t:"gen", k:"demo_report", h:"해체신고서·위임장·해체계획서", when:"demo" },
       { t:"att", k:"cert", h:"현장대리인 자격증·재직증명", re:/자격|기능사|기사|재직/ },
-      { t:"gap", h:"안전 패킷(위험성평가·작업 안전수칙·비상대응·보호구 대장)" },
+      { t:"gap", h:"안전 패킷(위험성평가·작업 안전수칙·비상대응·보호구 대장)", gen:{ t:"gen", k:"safety_pack", h:"안전 패킷(위험성평가·작업 안전수칙·비상대응·보호구 대장)", when:"dredge" } },
       { t:"gap", h:"착수계(운반·용역)", when:"waste" }
     ]},
     { k:"complete", h:"준공 패킷", when:"pub", items:[
@@ -10316,7 +10416,7 @@
       { t:"att", k:"photos", h:"사진대지", re:/사진/, ex:/보호구|안전/ },
       { t:"att", k:"weigh", h:"계량증명서(준설토)", re:/계량/, when:"dredge" },
       { t:"att", k:"super", h:"감리완료보고서(수령)", re:/감리/, when:"demo" },
-      { t:"gap", h:"산업안전보건관리비 사용내역서" },
+      { t:"gap", h:"산업안전보건관리비 사용내역서", gen:{ t:"gen", k:"safety_cost", h:"산업안전보건관리비 사용내역서", when:"dredge" } },
       { t:"gap", h:"용역완료계·처리확인서", when:"waste" },
       { t:"gap", h:"석면 완료보고서(별지 77호)", when:"asb" }
     ]},
@@ -10326,7 +10426,7 @@
       { t:"att", k:"ins", h:"4대보험 완납증명", re:/4대보험|사대보험|사회보험|건강보험|국민연금|고용보험|산재보험|보험료/, when:"pub" },
       { t:"att", k:"bank", h:"통장사본", re:/통장/ },
       { t:"att", k:"invoice", h:"세금계산서", re:/세금계산서/ },
-      { t:"gap", h:"노무비 구분관리 패킷", when:"pub" }
+      { t:"gap", h:"노무비 구분관리 패킷", when:"pub", gen:{ t:"gen", k:"labor_split", h:"노무비 구분관리 패킷(서식1~7)", when:"dredge" } }
     ]}
   ];
   function csPkWhen(c, when){
@@ -10359,6 +10459,7 @@
   // gen 항목의 실제 양식 키 — con_docs는 서약서+인감계가 핵심, quote는 회사별
   function csGenKeys(c, k){
     if (k === "con_docs") return ["contract_pledge", "seal_reg"];
+    if (k === "safety_pack") return ["safety_risk", "safety_rule", "safety_emerg", "safety_ppe"];   // v422 묶음 — 넷 다 등록돼야 ✓
     if (k === "quote") return [(c.type === "asbestos" || c.type === "demolition") ? "quote_con" : "quote_env"];
     if (k === "html_contract") return [];
     return [k];
@@ -10370,7 +10471,8 @@
     if (csTplKeys === null) csLoadTpl();
     return '<div class="cs-pks">' + CON_PACKETS.filter(function(pk){ return csPkWhen(c, pk.when); }).map(function(pk){
       var items = pk.items.filter(function(it){ return csPkWhen(c, it.when); }), nOk = 0, nAtt = 0, nGap = 0;
-      var rows = items.map(function(it){
+      var rows = items.map(function(it0){
+        var it = (it0.gen && csPkWhen(c, it0.gen.when)) ? it0.gen : it0;   // v422: 실물 양식이 등록된 종류만 생성 항목으로
         var st, sub = "", act = "";
         if (it.t === "gen"){
           var keys = csGenKeys(c, it.k), reg = csTplKeys === null ? null : keys.every(function(x){ return !!csTplKeys[x]; });
