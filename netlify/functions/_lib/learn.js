@@ -38,7 +38,11 @@ const RE_REC_ID = /^[A-Za-z0-9_-]{2,48}$/;
 
 function hash32(s) { let h = 2166136261; const t = String(s || ''); for (let i = 0; i < t.length; i++) { h ^= t.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; } return ('0000000' + h.toString(16)).slice(-8); }
 function pairKey(type, id) { return TYPES[type].pair_prefix + id; }
-function newPairId(type, seed) { return (type === 'promo' ? 'pl_' : 'lc_') + (hash32(String(seed) + ':' + Date.now()) + hash32(String(seed) + ':' + Math.random())).slice(0, 12); }
+// 계약 짝 번호는 앞 8자리가 시각(초) — 키를 정렬하면 시간순이라 크론·관리자 카드가 최근 짝을 본다(v424 검토: 무작위 번호를 정렬해 40·60개만 보던 결함)
+function newPairId(type, seed) {
+  if (type === 'promo') return 'pl_' + (hash32(String(seed) + ':' + Date.now()) + hash32(String(seed) + ':' + Math.random())).slice(0, 12);
+  return 'lc_' + ('0000000' + Math.floor(Date.now() / 1000).toString(16)).slice(-8) + hash32(String(seed) + ':' + Math.random()).slice(0, 4);
+}
 function usageKey(type, ym) { return 'usage:learn:' + type + ':' + ym; }
 function ymOf(now) { return new Date((now || Date.now()) + 9 * 3600000).toISOString().slice(0, 7); }
 
@@ -104,9 +108,13 @@ function mergeLessons(oldL, out, ctx, scopes) {
   Object.keys(ctx.extra || {}).forEach(function (k) { g[k] = ctx.extra[k]; });
   g.summary = String(ctx.summary || '').slice(0, 200);
   if (ctx.layout !== undefined) g.layout = ctx.layout;
-  L.gaps.push(g);
-  if (L.gaps.length > MAX_GAPS) L.gaps = L.gaps.slice(-MAX_GAPS);
-  L.stats.pairs = (Number(L.stats.pairs) || 0) + 1;
+  const same = g.pair ? L.gaps.filter(function (x) { return x && x.pair === g.pair; })[0] : null;   // 계약판은 올릴 때 pushGap으로 이미 한 줄 있다 — 같은 짝은 고쳐 쓴다(기준선 표본이 절반이 되지 않게)
+  if (same) { const ts0 = same.ts; Object.assign(same, g); same.ts = ts0; }
+  else {
+    L.gaps.push(g);
+    if (L.gaps.length > MAX_GAPS) L.gaps = L.gaps.slice(-MAX_GAPS);
+    L.stats.pairs = (Number(L.stats.pairs) || 0) + 1;
+  }
   L.stats.calls = (Number(L.stats.calls) || 0) + 1;
   L.stats.tokens = (Number(L.stats.tokens) || 0) + (Number(ctx.tokens) || 0);
   L.updated_at = now;
@@ -248,7 +256,7 @@ function freezeBaseline(L, now) {
   const g = numericGaps(L);
   if (g.length < SUNSET_BASE_N) return L;
   const b = g.slice(0, SUNSET_BASE_N);
-  L.baseline = { avg: avgRatio(b), n: b.length, first_ts: Number(b[0].ts) || 0, ts: Number(now) || Date.now() };
+  L.baseline = { avg: avgRatio(b), n: b.length, first_ts: Number(b[0].ts) || 0, ts: Number(now) || Date.now(), pairs: b.map(function (x) { return String(x.pair || ''); }) };
   return L;
 }
 // 일몰 판정(순수) — {due, why, base_avg, recent_avg, n_base, n_recent}. why: already_off·no_calls(모델이 배운 적 없음)·no_baseline·too_early·too_few·not_improved(due)·improving

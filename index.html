@@ -8050,6 +8050,128 @@
     var names=Object.keys(raw); names.sort(function(a,b){ return a==="mimetype"?-1:(b==="mimetype"?1:0); });
     return zipStore(names.map(function(n){ return {name:n, data:raw[n]}; }));
   }
+  // ---- v424 AI 생성본 보존(체크 31 브리핑 1단계 · PM 11/6 "두개 한번에") ----
+  // [생성] 결과를 파일째 서류함 초안(gen.<양식>)으로 남긴다. 내려받는 파일의 문서 정보(키워드 칸)에 번호 표식을 넣어, 직원이 고쳐 넣으면 어느 AI 파일의 수정본인지 서버가 바로 찾는다. 표식이 사라진 파일은 서버가 내용 일치율로 찾는다.
+  // 서버 사본에는 주민번호를 남기지 않는다(대리인 칸 비움 + 주민번호 꼴 가림 — 착공계 양식 자체에도 들어 있다). 내려받는 파일은 그대로. 저장 실패는 내려받기를 막지 않고 화면과 오류 기록에 남긴다.
+  var GEN_MARK_RE = /\s*JWG1\.[A-Za-z0-9_-]{1,40}\.[a-z0-9_]{1,30}\.[a-z0-9]{6,16}/g;
+  function genLabel(k){ return TPL_LABELS[k] || (k === "bid_rate" ? "낙찰률 적용 내역서" : k); }
+  function genMarkId(c, kind){ return "JWG1." + c.id + "." + cdocSan(kind, 30) + "." + (Math.random().toString(36) + Math.random().toString(36)).replace(/[^a-z0-9]/g, "").slice(0, 10); }
+  function genMarkHpf(xml, mark){   // hwpx Contents/content.hpf — 있는 키워드 칸에 덧붙인다(양식에 이미 값이 있는 칸이 있어 한컴이 읽는 형식 그대로)
+    var m = /<opf:meta\b[^>]*\bname="keyword"[^>]*?(?:\/>|>([\s\S]*?)<\/opf:meta>)/.exec(xml);
+    if (!m) return xml.indexOf("</opf:metadata>") > 0 ? xml.replace("</opf:metadata>", '<opf:meta name="keyword" content="text">' + mark + "</opf:meta></opf:metadata>") : xml;
+    var open = m[0].slice(0, m[0].indexOf(">") + 1).replace(/\/>$/, ">"), body = String(m[1] || "").replace(GEN_MARK_RE, "");
+    return xml.slice(0, m.index) + open + (body ? body + " " : "") + mark + "</opf:meta>" + xml.slice(m.index + m[0].length);
+  }
+  function genMarkCore(xml, mark){   // xlsx docProps/core.xml — 태그(cp:keywords). 칸이 없으면 끝에 넣고, 파일 자체가 없으면 표식 없이 둔다
+    var m = /<cp:keywords\b[^>]*?(?:\/>|>([\s\S]*?)<\/cp:keywords>)/.exec(xml);
+    if (!m) return xml.indexOf("</cp:coreProperties>") > 0 ? xml.replace("</cp:coreProperties>", "<cp:keywords>" + mark + "</cp:keywords></cp:coreProperties>") : xml;
+    var body = String(m[1] || "").replace(GEN_MARK_RE, "");
+    return xml.slice(0, m.index) + "<cp:keywords>" + (body ? body + " " : "") + mark + "</cp:keywords>" + xml.slice(m.index + m[0].length);
+  }
+  async function genMarkBlob(blob, mark){
+    var files = await unzip(new Uint8Array(await blob.arrayBuffer())), names = Object.keys(files), dec = new TextDecoder(), enc = new TextEncoder(), raw = {}, changed = false, i;
+    for (i = 0; i < names.length; i++) raw[names[i]] = files[names[i]].method === 0 ? files[names[i]].comp : await inflateRaw(files[names[i]].comp);
+    [["Contents/content.hpf", genMarkHpf], ["docProps/core.xml", genMarkCore]].forEach(function(t){
+      if (!raw[t[0]]) return;
+      var x0 = dec.decode(raw[t[0]]), x1 = t[1](x0, mark);
+      if (x1 !== x0){ raw[t[0]] = enc.encode(x1); changed = true; }
+    });
+    return changed ? zipStore(names.map(function(n){ return { name: n, data: raw[n] }; })) : blob;
+  }
+  var GEN_RRN_RE = /(^|[^0-9])\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])(\s*-?\s*)[1-8]\d{6}(?![0-9])/g;
+  function genScrubText(t){ return String(t).replace(GEN_RRN_RE, function(m, a, b){ return a + "000000" + b + "0000000"; }); }
+  var GEN_BLANK_PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";   // 1×1 투명 그림
+  async function genStoreCopy(blob, blankImages){   // 서버에 남길 사본 — 글자가 든 항목에서 주민번호 꼴을 가린다(같은 길이). 안 쓰는 공유 문자열에 남은 값까지. blankImages = 그림(자격증 스캔)을 빈 그림으로
+    var files = await unzip(new Uint8Array(await blob.arrayBuffer())), names = Object.keys(files), dec = new TextDecoder(), enc = new TextEncoder(), out = [], changed = false, i;
+    for (i = 0; i < names.length; i++){
+      var n = names[i], raw = files[n].method === 0 ? files[n].comp : await inflateRaw(files[n].comp);
+      if (blankImages && /^xl\/media\/[^\/]+\.png$/i.test(n)){ raw = dataUrlToBytes("x," + GEN_BLANK_PNG); changed = true; }
+      if (/^(?:xl\/sharedStrings\.xml|xl\/worksheets\/[^\/]+\.xml|Contents\/section\d+\.xml|Preview\/PrvText\.txt)$/i.test(n)){ var t0 = dec.decode(raw), t1 = genScrubText(t0); if (t1 !== t0){ raw = enc.encode(t1); changed = true; } }
+      out.push({ name: n, data: raw });
+    }
+    return changed ? zipStore(out) : blob;
+  }
+  function blobB64(blob){ return new Promise(function(res, rej){ var r = new FileReader(); r.onerror = function(){ rej(new Error("READ")); }; r.onload = function(){ res(String(r.result).split(",")[1] || ""); }; r.readAsDataURL(blob); }); }
+  // 서버 사본·채움 맵에 남기지 않는 사람 칸(v424 검토) — 내려받는 파일에는 그대로 들어간다. 칸 비교에는 좌표만 남는다
+  function xgPersonCells(kind, c){
+    var i, out = [];
+    if (kind === "work_start") return { "현장대리인계":["F13"], "재직증명서":["I6"] };   // 주민번호 칸(양식 기본값 포함)
+    if (kind === "asb_plan"){   // 시트 3 — 배포 명단·조직표(이름·연락처)·건강진단·교육 참석자·반장
+      for (i = 11; i <= 22; i++) out.push("C" + i);
+      for (i = 32; i <= 43; i++) out.push("G" + i, "L" + i);
+      for (i = 78; i <= 89; i++) out.push("G" + i, "J" + i, "L" + i);
+      for (i = 141; i <= 152; i++) out.push("C" + i);
+      out.push("E70");
+      return { "3": out };
+    }
+    if (kind === "waste_report" && ((c && c.owner_info) || {}).kind !== "사업자등록증") return { "신고서":["E10", "I11", "E12"], "종운수탁1p":["H10"] };   // 개인 소유주의 이름·생년월일·주소
+    if (kind === "demo_report" && c && c.docType !== "public") return { "건축물해체신고서":["C7"] };   // 사급 = 개인 소유자일 수 있다
+    return null;
+  }
+  function xgPersonRefs(cells){ var out = []; Object.keys(cells || {}).forEach(function(sh){ cells[sh].forEach(function(r){ out.push(sh + "!" + r); }); }); return out; }
+  function xgNoPerson(edits, cells){   // 서버 사본용 — 값을 안 넣었어도 양식 기본값이 있어 칸을 비운다
+    var out = {}; Object.keys(edits || {}).forEach(function(sh){ out[sh] = edits[sh]; });
+    Object.keys(cells || {}).forEach(function(sh){ var set = {}; cells[sh].forEach(function(r){ set[r] = 1; }); out[sh] = (Array.isArray(out[sh]) ? out[sh].filter(function(e){ return !set[e[0]]; }) : []).concat(cells[sh].map(function(r){ return [r, "", "b"]; })); });
+    return out;
+  }
+  function xgNoRrn(edits){ return xgNoPerson(edits, xgPersonCells("work_start")); }
+  function xgFillKeep(kind, edits, c){   // 채움 맵에서 사람 칸을 뺀다
+    var cells = xgPersonCells(kind, c);
+    if (!cells || !edits || Array.isArray(edits)) return edits;
+    var keep = {};
+    Object.keys(edits).forEach(function(sh){ var set = {}; (cells[sh] || []).forEach(function(r){ set[r] = 1; }); keep[sh] = (cells[sh] && Array.isArray(edits[sh])) ? edits[sh].filter(function(e){ return !set[e[0]]; }) : edits[sh]; });
+    return keep;
+  }
+  var genFailQ = [], genFailT = 0;   // 계약서류 4종이 함께 실패해도 토스트 하나에 모두 보이게
+  function genFail(kind, code, err){
+    try { if (typeof reportErr === "function") reportErr("AI 초안 저장 실패 " + kind + " " + code + (err && err.message ? " " + err.message : ""), "csCdocDraft", (err && err.stack) || ""); } catch(e){}
+    try {
+      if (genFailQ.indexOf(genLabel(kind)) < 0) genFailQ.push(genLabel(kind));
+      clearTimeout(genFailT); genFailT = setTimeout(function(){ genFailQ = []; }, 5000);
+      if (typeof apprToastShow === "function") apprToastShow("AI 초안" + (genFailQ.length > 1 ? " " + genFailQ.length + "종" : "") + "을 서버에 남기지 못했습니다(" + genFailQ.join("·") + "). 파일은 내려받았습니다.");
+    } catch(e){}
+  }
+  function xgKeepFile(c, kind, ext, marked, gen, o){
+    var edits = o.edits || null, cells = xgPersonCells(kind, c);
+    var mk = function(b){ return genMarkBlob(b, gen); };
+    var src = (cells && o.tpl) ? fillXlsxTemplate(o.tpl, xgNoPerson(edits, cells)).then(mk) : (o.copy ? mk(o.copy) : Promise.resolve(marked));
+    return src.then(function(b){ return genStoreCopy(b, kind === "work_start"); }).then(blobB64).then(function(b64){ return csCdocDraft(c, kind, edits, o.learned, { name: genLabel(kind) + "." + ext, data: b64, gen: gen, blank: xgPersonRefs(cells) }); }).catch(function(e){ genFail(kind, "COPY", e); if (edits) return csCdocDraft(c, kind, edits, o.learned); });
+  }
+  // 생성 창에 새로 친 값을 계약의 빈 칸에 저장(있는 값은 덮지 않는다) — 다음 서류에서 다시 치지 않게. 프리필·단계 칸에서 자동으로 들어간 값(공고명·종류 이름·변경 금액 등)은 계약 값이 아니므로 사람이 바꾼 칸만(v424 검토)
+  var xgSnap = {}, XG_SNAP_IDS = ["xgTitle", "xgSite", "xgClient", "xgD1", "xgD2", "xgD3", "xgAmount"];
+  function xgSnapTake(){ xgSnap = {}; XG_SNAP_IDS.forEach(function(id){ var el = document.getElementById(id); xgSnap[id] = el ? String(el.value || "").trim() : ""; }); }
+  function xgSaveBack(c){
+    try {
+      if (typeof cbxFillBlanks !== "function") return;
+      if (!xgCtx || xgCtx.id !== c.id) return;   // 생성 중 창을 닫고 다른 계약을 열었으면 그 값을 이 계약에 넣지 않는다
+      var val = function(id){ var el = document.getElementById(id); return el ? String(el.value || "").trim() : ""; }, ch = function(id){ var x = val(id); return x && x !== xgSnap[id] ? x : ""; }, kind = val("xgKind"), v = {};
+      var money = { work_start:1, con_docs:1, adv_pay:1, safety_plan:1, labor_split:1, safety_cost:1 }, dates = Object.prototype.hasOwnProperty.call(money, kind), owner = { demo_report:1, waste_report:1 };   // 해체신고·폐기물 신고의 그 칸은 소유자 이름이다
+      if (ch("xgTitle")) v.title = ch("xgTitle");
+      if (ch("xgSite")) v.site = ch("xgSite");
+      if (ch("xgClient") && !Object.prototype.hasOwnProperty.call(owner, kind)) v.client = ch("xgClient");
+      if (dates){
+        if (ch("xgD1")) v.d1 = ch("xgD1");
+        if (ch("xgD2")) v.d2 = ch("xgD2");
+        if (ch("xgD3")) v.d3 = ch("xgD3");
+        var amt = Number(ch("xgAmount").replace(/[^0-9]/g, "")) || 0;
+        if (amt) v.amount = amt;
+      }
+      var r = cbxFillBlanks(c, v, "서류 생성 창");
+      if (r.filled.length && typeof apprToastShow === "function"){ var msg = "계약 정보에 저장했습니다(" + r.filled.join("·") + ")"; setTimeout(function(){ apprToastShow(msg); }, 0); }   // 완료 안내창이 닫힌 뒤에 보이게
+    } catch(e){}
+  }
+  // 생성 결과 한 곳 — 표식 → 내려받기 → 초안 저장(뒤에서) → 새로 친 값 저장. o: {edits, learned, tpl(착공계 사본용 양식), noDownload, noBack}. 돌려주는 값 = 표식이 든 Blob
+  function xgOut(c, kind, name, blob, o){
+    o = o || {};
+    if (!c || !c.id || !canDo("con")){ if (!o.noDownload) downloadBlob(name, blob); return Promise.resolve(blob); }
+    var gen = genMarkId(c, kind), ext = docAttExtOf(name);
+    return genMarkBlob(blob, gen).catch(function(e){ genFail(kind, "MARK", e); return blob; }).then(function(marked){
+      if (!o.noDownload) downloadBlob(name, marked);
+      xgKeepFile(c, kind, ext, marked, gen, o);
+      if (!o.noBack) xgSaveBack(c);
+      return marked;
+    });
+  }
   // ---- 적격심사 점수(경상북도교육청 세부기준 2023.7.10 시행 — 별표1·2) ----
   // 입찰가격 산식은 세부기준 원문 그대로: 배점−20×|88−(입찰가격−A)/(예정가격−A)×100| (비율 소수5자리 반올림, 88.25%↑=예외점, 최저 2점)
   var QUAL_CFG={
@@ -8468,7 +8590,7 @@
   function liveWorkers(){ return workers.filter(function(w){ return w && w.del!==1; }); }
   function sortedWorkers(){ return liveWorkers().sort(function(a,b){ return ((a.role==="반장"?0:1)-(b.role==="반장"?0:1)) || (a.name||"").localeCompare(b.name||""); }); }
   function loadWorkers(){
-    gwCall("gw-data",{action:"get",collection:"workers"}).then(function(res){
+    return gwCall("gw-data",{action:"get",collection:"workers"}).then(function(res){
       if(res.status===200){ var wdoc=(res.body&&res.body.doc)||{}; workers=Array.isArray(wdoc.items)?wdoc.items:[]; wkBase=wdoc.updated_at||0; renderWorkers(); renderXgWorkers(); }   // v417 base 보관
       else if(res.status===403){ var h=document.getElementById("wkList"); if(h) h.innerHTML='<div class="empty-line">권한이 없습니다 — 권한관리에서 [일용직]을 열어주세요.</div>'; }
     }).catch(function(){});
@@ -8614,6 +8736,7 @@
       : '<div style="font-size:12px;color:#888;">일용직 명부가 비어 있습니다 — 인사 탭에서 등록하면 명단을 자동 기입합니다. (미선택 시 명단은 공란)</div>';
     var aw=document.getElementById("xgAgentWrap");
     if(aw && aw.style.display!=="none") xgToggle();   // 대리인 후보 목록 동기 갱신
+    if(xgCtx){ var cAg=findProc(xgCtx.id); if(cAg) xgAgentAuto(cAg); }   // 명부가 창을 연 뒤에 도착해도 단계의 현장대리인을 고른다
   }
 
   // ---- 실적 다운로드 — 완료 계약을 실적증명·기술평가 근거용 엑셀로 (로드맵 P9 연계) ----
@@ -8763,6 +8886,36 @@
     out.style.color = (D>50) ? "#C0392B" : "#1A9A6B";
     if(D>50) out.textContent += " ⚠ 요율 50% 초과 — 발주처 승인 여부 확인";
   }
+  // v424 단계 칸 값 읽기(브리핑 1단계) — 사람이 단계에 적은 값이 계약서 판독값보다 앞선다. 변경계약은 완료된 차수만. 준공 서류는 실제 준공일·정산액, 해체신고는 착수·완료일
+  function xgStageVal(c, key){ var v = ""; (c.pipes || []).forEach(function(p){ (p.stages || []).forEach(function(s){ var x = (s && s.status !== "skipped" && s.vals) ? s.vals[key] : ""; if (x !== undefined && x !== null && x !== "") v = x; }); }); return v; }   // 여러 단계에 있으면 뒤 단계 값
+  function xgDateOf(v){ var t = String(v === undefined || v === null ? "" : v).trim().replace(/[.\/]/g, "-").replace(/-$/, ""); return isDate(t) ? t : ""; }
+  function xgAuto(c, kind){
+    var ci = c.contract_info || {}, done = kind === "work_complete" || kind === "settle_doc", demo = kind === "demo_report", src = [];   // 정산합의서의 금액 칸은 당초 도급액(감액 계산 기준)이라 정산액을 넣지 않는다. 정산액은 목표 정산액 칸으로
+    var st = xgDateOf(xgStageVal(c, "st_date")), from = xgDateOf(xgStageVal(c, "work_from")), to = xgDateOf(xgStageVal(c, "work_to")), fin = xgDateOf(xgStageVal(c, "fin")), end = xgDateOf(csChgLastEnd(c));
+    var settle = Number(c.settle_amount) || 0, chg = csChgLastAmt(c), d2 = ci.d2 || "", d3 = ci.d3 || "", amt = conAmt(c) || "";
+    if (demo && from){ d2 = from; src.push("착수일"); } else if (st){ d2 = st; src.push("착공일"); }
+    if (demo && to){ d3 = to; src.push("완료일"); } else if (done && fin){ d3 = fin; src.push("준공일"); } else if (end){ d3 = end; src.push("변경 계약기간"); }
+    if (kind === "work_complete" && settle){ amt = settle; src.push("정산액"); } else if (chg){ amt = chg; src.push("변경 금액"); }
+    return { d2: d2, d3: d3, amount: amt, src: src };
+  }
+  var xgAutoPrev = null, xgHintBase = "";   // 프리필 때 넣은 값 — 종류를 바꿀 때 사람이 고치지 않은 칸만 새 값으로
+  function xgAutoApply(c, kind, first){
+    var a = xgAuto(c, kind), prev = xgAutoPrev || {};
+    [["xgD2", "d2"], ["xgD3", "d3"], ["xgAmount", "amount"]].forEach(function(m){
+      var el = document.getElementById(m[0]); if (!el) return;
+      if (first || String(el.value) === String(prev[m[1]] === undefined ? "" : prev[m[1]])){ el.value = a[m[1]] === undefined ? "" : a[m[1]]; xgSnap[m[0]] = String(el.value || "").trim(); }   // 자동으로 넣은 값은 '새로 친 값'이 아니다
+    });
+    xgAutoPrev = a;
+    var h = document.getElementById("xgHint"); if (h) h.textContent = xgHintBase + (a.src.length ? " 단계 칸 값을 읽었습니다(" + a.src.join("·") + ")." : "");
+  }
+  function xgAgentAuto(c){   // 착공 단계에 적은 현장대리인이 명부에 정확히 한 명이면 미리 고른다(동명이인·명부에 없는 이름은 안내만). 안전보건관리계획서는 연락처가 파일에 들어가므로 사람이 고를 때만
+    var el = document.getElementById("xgAgent"), kd = document.getElementById("xgKind"), rp = String(xgStageVal(c, "rep_person") || "").trim();
+    if (!el || el.value || !rp || typeof sortedWorkers !== "function" || (kd && kd.value === "safety_plan")) return;
+    var w = sortedWorkers().filter(function(x){ return x.name === rp; });
+    if (w.length === 1){ el.value = w[0].id; return; }
+    var h = document.getElementById("xgHint");
+    if (h && workers.length && h.textContent.indexOf("현장대리인을 직접") < 0) h.textContent += " 단계에 적은 현장대리인을 명부에서 한 명으로 찾지 못했습니다. 현장대리인을 직접 골라 주세요.";
+  }
   // 프리필(하드리딩 체인) — 모달 표시 없이 필드만 채움(일괄 생성에서도 사용)
   function xgPrefill(conId, presetKind, stage){
     var c=findProc(conId); if(!c) return null;
@@ -8770,13 +8923,15 @@
     xgRateFetched=null;
     var xrs=document.getElementById("xgRateSrc"); if(xrs) xrs.textContent="";
     var xrb=document.getElementById("xgRateBase"); if(xrb){ xrb.value=""; document.getElementById("xgRateTarget").value=""; document.getElementById("xgRateFile").value=""; }
+    var xst0=document.getElementById("xstTarget"); if(xst0) xst0.value="";
     // 종류별 입력칸 전체 리셋 — 프리필이 전부 if(!value) 가드라, 리셋 없이는 직전 계약의
     // 공고번호·입찰금액·예정가격·A값·보증금률·선금 값이 다음 계약 서류에 그대로 찍힌다
     XG_RESET_IDS.forEach(function(id){ var el=document.getElementById(id); if(el) el.value=""; });
     ["xqBasis","xqTier","xqCredit","xqSafety","xqtVat"].forEach(function(id){ var el=document.getElementById(id); if(el) el.selectedIndex=0; });
     var _xl=document.getElementById("xqLocal"), _xp=document.getElementById("xqPledge"), _xt=document.getElementById("xqTax");
     if(_xl) _xl.checked=false; if(_xp) _xp.checked=true; if(_xt) _xt.checked=false;
-    document.getElementById("xgHint").textContent="["+(c.label||"계약")+(c.site?" · "+c.site:"")+(stage?" · "+stage+" 단계":"")+"] 등록된 양식 원본에 값을 채워 내려받습니다.";
+    xgHintBase="["+(c.label||"계약")+(c.site?" · "+c.site:"")+(stage?" · "+stage+" 단계":"")+"] 등록된 양식 원본에 값을 채워 내려받습니다.";
+    document.getElementById("xgHint").textContent=xgHintBase;
     var isAsb=!!(c.elems&&c.elems.asb);
     var s=c.asb_survey||{}, ci=c.contract_info||{}, bi=c.bldg_info||{};   // 자동 채움: 계약값 → 계약서 → 조사서 → 대장 (하드리딩 우선, 없는 값만 확인요망)
     document.getElementById("xgKind").value = presetKind || (isAsb ? "asb_plan" : "work_start");
@@ -8786,12 +8941,16 @@
     document.getElementById("xgTitle").value = c.title||ci.title||c.label|| (s.bldg? s.bldg+" 석면해체 공사":"");
     document.getElementById("xgSite").value = c.site||ci.site||s.site||bi.site||"";
     document.getElementById("xgClient").value = c.client||ci.client||s.owner||"";
-    document.getElementById("xgAmount").value = conAmt(c)||"";   // 계약값 없으면 연동 공고 낙찰금액 폴백
     document.getElementById("xgD1").value = ci.d1||c.start||"";
-    document.getElementById("xgD2").value = ci.d2||""; document.getElementById("xgD3").value = ci.d3||"";
+    xgAutoApply(c, document.getElementById("xgKind").value, true);   // 금액·착공일·준공일 — 계약값(없으면 연동 공고 낙찰금액) 위에 v424 단계 칸 값
+    var qNo0=xgStageVal(c,"q_no"), qDt0=xgDateOf(xgStageVal(c,"q_date"));   // v424 견적 단계에 적은 번호·제출일(뒤 xgToggle은 빈 칸만 채운다)
+    if(qNo0) document.getElementById("xqtNo").value=String(qNo0);
+    if(qDt0){ var qd1=qDt0.split("-"); document.getElementById("xqtDate").value=qd1[0]+"년 "+qd1[1]+"월 "+qd1[2]+"일"; }
     document.getElementById("xgOwner").value = /교육/.test(s.owner||"") ? "경상북도 교육감" : "";
     if(!workers.length) loadWorkers(); else renderXgWorkers();
     xgToggle();
+    xgAgentAuto(c);
+    xgSnapTake();
     return c;
   }
   function openXlsxGen(conId, presetKind, stage){
@@ -8802,14 +8961,12 @@
   function xgAutoGenerate(conId, kind){
     var c=xgPrefill(conId, kind, "");
     if(!c) return Promise.reject("계약 없음");
-    return gwCall("gw-data",{action:"tpl_get", key:kind}).then(function(res){
+    return ((!workers.length&&xgStageVal(c,"rep_person"))?Promise.resolve(loadWorkers()).catch(function(){}):Promise.resolve()).then(function(){ return gwCall("gw-data",{action:"tpl_get", key:kind}); }).then(function(res){   // 단계의 현장대리인을 고를 수 있게 명부를 기다린다
       if(res.status!==200) throw (res.status===404 ? "'"+TPL_LABELS[kind]+"' 양식 미등록" : "양식 불러오기 실패");
       var ed=xgBuildEdits(kind, c);
       return xgApplyLearned(kind, ed).then(function(al){ ed = al.edits;   // v411 학습된 칸 기본값(공란에만)
       return fillXlsxTemplate(res.body.data, ed).then(function(blob){
-        downloadBlob((document.getElementById("xgTitle").value.trim()||c.label||"서류")+"_"+TPL_LABELS[kind]+".xlsx", blob);
-        csCdocDraft(c, kind, ed, al.learned);   // v407 초안 자동 보존(+v411 학습 칸)
-        return kind;
+        return xgOut(c, kind, (document.getElementById("xgTitle").value.trim()||c.label||"서류")+"_"+TPL_LABELS[kind]+".xlsx", blob, { edits: ed, learned: al.learned, tpl: res.body.data, noBack: true }).then(function(){ return kind; });   // v407 초안 자동 보존(+v411 학습 칸) · v424 파일째
       }); });
     });
   }
@@ -9050,7 +9207,7 @@
     if((kind==="safety_plan"||kind==="safety_cost")&&!sv.fee) m.push("안전보건관리비 편성금액");
     return m;
   }
-  function xgSafetyGen(kind, name, sv){   // 등록 양식을 차례로 받아 채워 내려받는다. 하나라도 미등록이면 거기서 멈추고 알린다
+  function xgSafetyGen(kind, name, sv, c){   // 등록 양식을 차례로 받아 채워 내려받는다. 하나라도 미등록이면 거기서 멈추고 알린다
     var list=XG_SAFE_FILES[kind], i=0, made=[];
     var next=function(){
       if(i>=list.length) return Promise.resolve();
@@ -9058,13 +9215,16 @@
       return gwCall("gw-data",{action:"tpl_get", key:key}).then(function(res){
         if(res.status!==200) throw (res.status===404?"'"+TPL_LABELS[key]+"' 양식 미등록 — 계약 탭 맨 위 박스에 빈 양식을 넣으세요":"양식 불러오기 실패");
         var hwpx=TPL_EXT[key]===".hwpx";
-        return (hwpx?fillHwpxTemplate(res.body.data, sv.tokens):fillXlsxTemplate(res.body.data, {})).then(function(b){ made.push({ name:TPL_LABELS[key]+(hwpx?".hwpx":".xlsx"), blob:b }); });
+        return (hwpx?fillHwpxTemplate(res.body.data, sv.tokens):fillXlsxTemplate(res.body.data, {})).then(function(b){
+          var f={ key:key, name:TPL_LABELS[key]+(hwpx?".hwpx":".xlsx"), blob:b }; made.push(f);
+          if(key==="safety_plan"&&sv.tokens["현장책임자연락처"]) return fillHwpxTemplate(res.body.data, Object.assign({}, sv.tokens, { "현장책임자연락처":"" })).then(function(cp){ f.copy=cp; });   // 서버 사본에는 현장책임자 연락처를 남기지 않는다
+        });
       }).then(next);
     };
     return next().then(function(){
-      if(made.length===1){ downloadBlob(name+"_"+made[0].name, made[0].blob); return; }
-      // 여러 파일은 zip 1개로 — 연속 다운로드는 브라우저가 막으면 1개만 내려오고 나머지가 조용히 사라진다(v422 검토 실측)
-      return Promise.all(made.map(function(f){ return f.blob.arrayBuffer().then(function(ab){ return { name:f.name, data:new Uint8Array(ab) }; }); })).then(function(fs){ downloadBlob(name+"_안전 패킷.zip", zipStore(fs)); });
+      if(made.length===1) return xgOut(c, made[0].key, name+"_"+made[0].name, made[0].blob, made[0].copy?{ copy:made[0].copy }:{}).then(function(){});
+      // 여러 파일은 zip 1개로 — 연속 다운로드는 브라우저가 막으면 1개만 내려오고 나머지가 조용히 사라진다(v422 검토 실측) · v424 초안은 파일마다 따로
+      return Promise.all(made.map(function(f){ return xgOut(c, f.key, f.name, f.blob, { noDownload:true }).then(function(b){ return b.arrayBuffer(); }).then(function(ab){ return { name:f.name, data:new Uint8Array(ab) }; }); })).then(function(fs){ downloadBlob(name+"_안전 패킷.zip", zipStore(fs)); });
     });
   }
   function xgToggle(){
@@ -9078,7 +9238,7 @@
     document.getElementById("xgQuoteWrap").style.display = (k==="quote_docs") ? "" : "none";
     document.getElementById("xgAdvWrap").style.display = (k==="adv_pay") ? "" : "none";
     document.getElementById("xgSettleWrap").style.display = (k==="settle_doc") ? "" : "none";
-    if(k==="settle_doc"){ document.getElementById("xgAgentWrap").style.display="none"; xstBuild(); }
+    if(k==="settle_doc"){ document.getElementById("xgAgentWrap").style.display="none"; xstBuild(); var xstT=document.getElementById("xstTarget"), cSt=xgCtx?findProc(xgCtx.id):null; if(xstT&&!xstT.value&&cSt&&Number(cSt.settle_amount)) xstT.value=cSt.settle_amount; }
     if(k==="adv_pay"){
       document.getElementById("xgAgentWrap").style.display="none";
       var ad0=new Date(), adDot=ad0.getFullYear()+"."+("0"+(ad0.getMonth()+1)).slice(-2)+"."+("0"+ad0.getDate()).slice(-2);
@@ -9431,7 +9591,7 @@
     if($("tplManageBtn")) $("tplManageBtn").addEventListener("click", openTplManage);
     if($("conPerfBtn")) $("conPerfBtn").addEventListener("click", conExportPerf);
     if($("tplClose")) $("tplClose").addEventListener("click", function(){ $("tplBackdrop").classList.remove("show"); if(typeof renderContracts==="function") renderContracts(); });   // v383 검토: 패킷 ✓/✗ 갱신
-    if($("xgKind")) $("xgKind").addEventListener("change", xgToggle);
+    if($("xgKind")) $("xgKind").addEventListener("change", function(){ var c0=xgCtx?findProc(xgCtx.id):null; if(c0) xgAutoApply(c0, $("xgKind").value, false); xgToggle(); if(c0) xgAgentAuto(c0); });   // v424 준공계로 바꾸면 준공일·정산액으로(사람이 고친 칸은 그대로)
     if($("xgLandBtn")) $("xgLandBtn").addEventListener("click", function(){
       var num=function(id){ return parseInt(($(id).value||"").replace(/[^0-9]/g,""),10)||0; };
       var target=num("xgRateTarget"), gNow=num("xgLandG"), fNow=num("xgLandF");
@@ -9486,9 +9646,10 @@
         var run=function(bytes){
           bidRateApply(bytes, rate).then(function(res){
             if(!res.changed){ alert("조정할 단가를 찾지 못했습니다 — '단가' 헤더가 있는 시트의 숫자 단가만 조정합니다.\n(구형 .xls면 엑셀에서 .xlsx로 저장 후 다시)"); return; }
-            downloadBlob(srcName.replace(/\.(xlsx|xls)$/i,"")+"_낙찰률적용.xlsx", res.blob);
-            alert("낙찰률 "+(rate*100).toFixed(4)+"% 적용 — 단가 "+res.changed+"개 조정("+res.sheets+"개 시트).\n파일을 열어 도급액이 낙찰가와 일치하는지 확인하고, 1원~수백원 차이는 관행대로 합계 보정하세요.");
-            $("xlsxGenBackdrop").classList.remove("show"); xgCtx=null; xgRateFetched=null;
+            return xgOut(c, "bid_rate", srcName.replace(/\.(xlsx|xls)$/i,"")+"_낙찰률적용.xlsx", res.blob, { noBack:true }).then(function(){
+              alert("낙찰률 "+(rate*100).toFixed(4)+"% 적용 — 단가 "+res.changed+"개 조정("+res.sheets+"개 시트).\n파일을 열어 도급액이 낙찰가와 일치하는지 확인하고, 1원~수백원 차이는 관행대로 합계 보정하세요.");
+              $("xlsxGenBackdrop").classList.remove("show"); xgCtx=null; xgRateFetched=null;
+            });
           }).catch(function(e){ alert("적용 실패: "+e); })
             .finally(function(){ $("xgGo").textContent="생성·다운로드"; $("xgGo").disabled=false; });
         };
@@ -9531,8 +9692,7 @@
         $("xgGo").textContent="생성 중…"; $("xgGo").disabled=true;
         gwCall("gw-data",{action:"tpl_get", key:"qual_packet"}).then(function(res){
           if(res.status!==200){ alert(res.status===404?"'적격심사 패킷' 양식이 미등록입니다. 계약 탭 맨 위 박스에 빈 양식(hwpx)을 넣으세요.":"양식 불러오기 실패"); return; }
-          return fillHwpxTemplate(res.body.data, qTokens).then(function(blob){
-            downloadBlob(($("xgTitle").value.trim()||c.label||"서류")+"_적격심사패킷.hwpx", blob);
+          return fillHwpxTemplate(res.body.data, qTokens).then(function(blob){ return xgOut(c, "qual_packet", ($("xgTitle").value.trim()||c.label||"서류")+"_적격심사패킷.hwpx", blob); }).then(function(){
             alert("적격심사 패킷 생성 — 자기평점 계 "+qualNum(qs.total)+"점.\n(산식은 김천서부초 실물 심사표로 검증 완료 — 그래도 한컴에서 값 확인 후 제출)");
             $("xlsxGenBackdrop").classList.remove("show"); xgCtx=null;
             proofBundleOffer();   // 보관함 증빙 일괄 다운로드 제안
@@ -9574,13 +9734,15 @@
           var pledgeRaw=(c&&c.bid_id)?[[/(\[  \] 예 \[ )v(\] 아니오[\s\S]{0,600}?\[)  (\] 해당없음)/g, "$1 $2 v$3"]]:null;
           return fillHwpxTemplate(r1.body.data, pledgeTokens, pledgeRaw);
         }).then(function(b1){
-          downloadBlob(cdName+"_계약이행서약서.hwpx", b1);
+          return xgOut(c, "contract_pledge", cdName+"_계약이행서약서.hwpx", b1);
+        }).then(function(){
           return gwCall("gw-data",{action:"tpl_get", key:"seal_reg"});
         }).then(function(r2){
           if(r2.status!==200) throw (r2.status===404?"'사용인감계' 양식 미등록 — 계약 탭 맨 위 박스에 빈 양식을 넣으세요":"양식 불러오기 실패");
           return fillHwpxTemplate(r2.body.data, sealTokens);
         }).then(function(b2){
-          downloadBlob(cdName+"_사용인감계.hwpx", b2);
+          return xgOut(c, "seal_reg", cdName+"_사용인감계.hwpx", b2);
+        }).then(function(){
           // 3·4번째: 채권포기각서(토큰 채움) + 노무비 적용제외 신청서(수기 서식 — 착공 시 제출). 미등록이면 조용히 건너뜀
           var waiverTokens={ "계약명":$("xgTitle").value.trim(),
             "계약기간":(cdF($("xgD1").value)&&cdF($("xgD3").value))?cdF($("xgD1").value)+"~"+cdF($("xgD3").value):"",
@@ -9588,10 +9750,10 @@
             "업체명":cdCo.name, "주소":cdCo.addr, "수신처":$("xcRecv").value.trim() };
           return gwCall("gw-data",{action:"tpl_get", key:"bond_waiver"}).then(function(r3){
             if(r3.status!==200) return null;
-            return fillHwpxTemplate(r3.body.data, waiverTokens).then(function(b3){ downloadBlob(cdName+"_채권포기각서.hwpx", b3); });
+            return fillHwpxTemplate(r3.body.data, waiverTokens).then(function(b3){ return xgOut(c, "bond_waiver", cdName+"_채권포기각서.hwpx", b3); });
           }).then(function(){ return gwCall("gw-data",{action:"tpl_get", key:"labor_exempt"}); }).then(function(r4){
             if(r4.status!==200) return null;
-            return fillHwpxTemplate(r4.body.data, {}).then(function(b4){ downloadBlob(cdName+"_노무비제외신청서.hwpx", b4); });
+            return fillHwpxTemplate(r4.body.data, {}).then(function(b4){ return xgOut(c, "labor_exempt", cdName+"_노무비제외신청서.hwpx", b4); });
           });
         }).then(function(){
           alert("계약서류 생성 완료(등록된 양식 전부)."+((c&&c.bid_id)?"\n※ 입찰 건 — 서약서 6·7번(수의 결격사유)은 '해당없음'으로 자동 체크했습니다. 생성본에서 확인만 하세요.":"")
@@ -9617,8 +9779,8 @@
         $("xgGo").textContent="생성 중…"; $("xgGo").disabled=true;
         gwCall("gw-data",{action:"tpl_get", key:"settle_doc"}).then(function(rs){
           if(rs.status!==200){ alert(rs.status===404?"'준공 정산합의서' 양식이 미등록입니다. 계약 탭 맨 위 박스에 이 계약의 정산 워크북(xlsx)을 넣으세요.":"양식 불러오기 실패"); return; }
-          return fillXlsxTemplate(rs.body.data, {'원가계산서 (정산)': stEdits}).then(function(bs){
-            downloadBlob(($("xgTitle").value.trim()||c.label||"정산")+"_정산합의서.xlsx", bs);
+          var stEd={'원가계산서 (정산)': stEdits};
+          return fillXlsxTemplate(rs.body.data, stEd).then(function(bs){ return xgOut(c, "settle_doc", ($("xgTitle").value.trim()||c.label||"정산")+"_정산합의서.xlsx", bs, { edits: stEd }); }).then(function(){
             alert("정산합의서 생성 완료 — 엑셀에서 열어 표지 금액·한글금액이 정산액과 일치하는지 확인 후 제출하세요.");
             $("xlsxGenBackdrop").classList.remove("show"); xgCtx=null;
           });
@@ -9667,8 +9829,7 @@
         $("xgGo").textContent="생성 중…"; $("xgGo").disabled=true;
         gwCall("gw-data",{action:"tpl_get", key:"adv_pay"}).then(function(ra){
           if(ra.status!==200){ alert(ra.status===404?"'선금지급신청 세트' 양식이 미등록입니다. 계약 탭 맨 위 박스에 빈 양식(hwpx)을 넣으세요.":"양식 불러오기 실패"); return; }
-          return fillHwpxTemplate(ra.body.data, adTokens).then(function(ba){
-            downloadBlob(($("xgTitle").value.trim()||c.label||"선금")+"_선금지급신청.hwpx", ba);
+          return fillHwpxTemplate(ra.body.data, adTokens).then(function(ba){ return xgOut(c, "adv_pay", ($("xgTitle").value.trim()||c.label||"선금")+"_선금지급신청.hwpx", ba); }).then(function(){
             alert("선금지급신청 세트 생성 완료 — 공문·별첨2(신청서)·별첨3(각서)·별첨4(사용계획)·별첨5(청구서)·지급조건 일체."
               +(adD?"\n적용요율 "+adD.toFixed(2)+"%"+(adD>50?" ⚠ 50% 초과 — 발주처 승인 확인":""):"")
               +"\n※ 김천 교육청 계열 서식 기반 — 타 발주처는 배포 서식과 대조 후 제출. 선금지급보증서(보증기관)는 별도 발급.");
@@ -9700,8 +9861,7 @@
         $("xgGo").textContent="생성 중…"; $("xgGo").disabled=true;
         gwCall("gw-data",{action:"tpl_get", key:qtKey}).then(function(rq){
           if(rq.status!==200){ alert(rq.status===404?("'"+TPL_LABELS[qtKey]+"' 양식이 미등록입니다. 계약 탭 맨 위 박스에 빈 양식(hwpx)을 넣으세요."):"양식 불러오기 실패"); return; }
-          return fillHwpxTemplate(rq.body.data, qtTokens).then(function(bq){
-            downloadBlob(($("xgTitle").value.trim()||c.label||"견적")+"_견적서.hwpx", bq);
+          return fillHwpxTemplate(rq.body.data, qtTokens).then(function(bq){ return xgOut(c, qtKey, ($("xgTitle").value.trim()||c.label||"견적")+"_견적서.hwpx", bq); }).then(function(){
             alert("견적서 생성 완료 — 품목 2행째부터는 한컴에서 수기 기입(합계는 자동합산). 제출 전 값 확인하세요.");
             $("xlsxGenBackdrop").classList.remove("show"); xgCtx=null;
           });
@@ -9713,7 +9873,7 @@
         var sv=xgSafetyVals(), svM=kind==="safety_pack"?[]:xgSafetyMissing(kind, sv, c);   // 안전 패킷은 채울 값 없음
         if(svM.length && !confirm(xgSafeAsk(svM))) return;
         $("xgGo").textContent="생성 중…"; $("xgGo").disabled=true;
-        xgSafetyGen(kind, $("xgTitle").value.trim()||c.label||"서류", sv).then(function(){
+        xgSafetyGen(kind, $("xgTitle").value.trim()||c.label||"서류", sv, c).then(function(){
           alert(XG_SAFE_DONE[kind]);
           $("xlsxGenBackdrop").classList.remove("show"); xgCtx=null;
         }).catch(function(e){ alert("생성 실패: "+e); })
@@ -9758,8 +9918,8 @@
         return xgApplyLearned(kind, ed).then(function(al){ ed = al.edits;   // v411 학습된 칸 기본값(공란에만)
         return fillXlsxTemplate(res.body.data, ed).then(function(blob){
           var nm=($("xgTitle").value.trim()||c.label||"서류")+"_"+TPL_LABELS[kind]+".xlsx";
-          downloadBlob(nm, blob);
-          if(kind!=="safety_cost") csCdocDraft(c, kind, ed, al.learned);   // v407 초안 자동 보존(+v411 학습 칸). v422 사용내역서는 안 남김 — 같은 준공 단계에 초안이 둘이면 준공계 최종본의 학습 짝이 끊긴다
+          return xgOut(c, kind, nm, blob, { edits: ed, learned: al.learned, tpl: res.body.data });   // v407 초안 자동 보존(+v411 학습 칸) · v424 파일째, 사용내역서도(같은 단계에 초안이 둘이어도 표식·내용으로 짝을 찾는다)
+        }).then(function(){
           $("xlsxGenBackdrop").classList.remove("show"); xgCtx=null;
         }); });
       }).catch(function(e){ alert("생성 실패: "+e); })
@@ -9969,7 +10129,7 @@
     var c = findProc(cid); if (!c || !isAdmin()) return;
     var x = cdocItems(c).filter(function(y){ return y && y.n === n; })[0];
     if (!confirm('영구 삭제 — 되돌릴 수 없습니다.\n' + ((x && (x.orig || x.name)) || '') + '\n정말 삭제할까요?')) return;
-    gwCall("gw-data", { action: "cdoc_purge", cid: cid, n: n, confirm: true }).then(function(res){
+    cbxSerial(function(){ return gwCall("gw-data", { action: "cdoc_purge", cid: cid, n: n, confirm: true }); }).then(function(res){
       if (res.status !== 200){ var ec = (res.body && res.body.error_code) || res.status; alert(ec === "TOO_EARLY" ? "보관 30일이 지나야 영구 삭제할 수 있습니다." : ("영구 삭제 실패 (" + ec + ")")); return; }
       cdocLoad(c, true); apprToastShow("영구 삭제됨");
     }).catch(function(){ alert("영구 삭제 실패(네트워크)"); });
@@ -9978,7 +10138,8 @@
     var c = findProc(cid); if (!c) return;
     var reason = "";
     if (Number(pii) === 2){ reason = prompt("민감정보 열람 사유(열람 기록에 남습니다)", ""); if (!reason || reason.trim().length < 2) return; reason = reason.trim(); }
-    apprToastShow("여는 중…");
+    var oneIt = cdocItems(c).filter(function(y){ return y && y.n === n; })[0];
+    apprToastShow(oneIt && oneIt.kind === "draft" ? "AI 초안의 서버 사본입니다. 주민번호·사람 칸은 비어 있습니다. 제출 전 채워 주세요." : "여는 중…");
     gwCall("gw-data", { action: "cdoc_get", cid: cid, n: n, reason: reason }).then(function(res){
       if (res.status !== 200 || !res.body){ alert("파일을 열 수 없습니다 (" + ((res.body && res.body.error_code) || res.status) + ")"); return; }
       if (res.body.fill){ downloadBlob(res.body.name || "draft.json", new Blob([JSON.stringify(res.body.fill, null, 1)], { type: "application/json" })); return; }   // 채움 맵 초안은 JSON으로
@@ -10011,7 +10172,7 @@
   function csCdocMark(cid, n, mode){
     var c = findProc(cid); if (!c || !canDo("con")) return;
     if (mode === "del" && !confirm("이 판을 보관함으로 옮길까요?\n(바이트는 남고, 영구 삭제는 관리자가 30일 뒤에만 할 수 있습니다)")) return;
-    gwCall("gw-data", { action: mode === "del" ? "cdoc_del" : (mode === "cur" ? "cdoc_cur" : "cdoc_restore"), cid: cid, n: n }).then(function(res){
+    cbxSerial(function(){ return gwCall("gw-data", { action: mode === "del" ? "cdoc_del" : (mode === "cur" ? "cdoc_cur" : "cdoc_restore"), cid: cid, n: n }); }).then(function(res){
       if (res.status !== 200){ alert("처리 실패 (" + ((res.body && res.body.error_code) || res.status) + ")"); return; }
       cdocLoad(c, true);   // 현재 포인터·보관 표식은 서버 색인이 원본 — 다시 읽는다
       apprToastShow(mode === "del" ? "보관함으로 옮김" : (mode === "cur" ? "현재본 지정" : "복구됨"));
@@ -10090,7 +10251,7 @@
   }
   function cbxDraftList(c){
     var seen = {}, out = [];
-    cdocItems(c).forEach(function(x){ if (!x || x.kind !== "draft" || x.cur !== 1 || x.del || x.gc || x.purged || String(x.dk).indexOf("gen.") !== 0) return; var tpl = x.dk.slice(4); if (seen[tpl]) return; seen[tpl] = 1; out.push({ tpl: tpl, n: TPL_LABELS[tpl] || tpl }); });
+    cdocItems(c).forEach(function(x){ if (!x || x.kind !== "draft" || x.cur !== 1 || x.del || x.gc || x.purged || String(x.dk).indexOf("gen.") !== 0) return; var tpl = x.dk.slice(4); if (seen[tpl]) return; seen[tpl] = 1; out.push({ tpl: tpl, n: genLabel(tpl) }); });
     return out;
   }
   function cbxCtx(scope){
@@ -10129,29 +10290,39 @@
   }
   function cbxRef(c, id){
     var q = String(id || "").split("|"), p0 = (c.pipes || [])[0], cur = (p0 && typeof p0.cur === "number" && p0.cur >= 0 && p0.cur <= 99) ? p0.cur : 0;
+    if (q[0] === "g" && q[1]) return { i: cur, dk: "fin." + cdocSan(q[1], 30), raw: "", p: p0 };   // 목록에 칸이 없는 앱 서류 — 양식별 자리(서로 판을 밀어내지 않게)
     if (q[0] === "s" && q.length >= 4){ var p = csPipeOf(c, q[1]), i = Number(q[2]), k = q.slice(3).join("|"); if (p && i >= 0) return { i: i, dk: cdocDocKey(p, { k: k }), raw: k, p: p }; }
     if (q[0] === "p" && q.length === 3) return { i: cur, dk: cdocPkKey({ k: q[1] }, { k: q[2] }), raw: "", p: p0 };
     return { i: cur, dk: "etc.box", raw: "", p: p0 };
   }
   function cbxLabel(c, id){
     if (!id) return "그 밖의 서류";
+    if (String(id).indexOf("g|") === 0) return "그 밖의 서류 › " + genLabel(String(id).slice(2));
     var d = cbxDocList(c).filter(function(x){ return x.id === id; })[0];
     return d ? (d.s + " › " + d.n) : "그 밖의 서류";
   }
+  // v424 양식 → 서류 목록 이름(양식 이름과 목록 이름이 다른 것이 있어 — 계약이행서약서·계약이행통합서약서 등)
+  // 칸 표(v424 검토) — 양식이 들어갈 목록 칸 이름. 없으면 공용 칸에 묶지 않고 양식별 자리. '노무비구분관리(해당시 선급금신청·안전보건관리계획서)' 한 칸에 서로 다른 서류가 판으로 묶이던 것·준공계가 준공검사원 칸으로 가던 것을 막는다
+  var CBX_TPL_SLOT = { work_start:/^착공계/, work_complete:/^준공계/, asb_plan:/^석면해체계획서/, demo_report:/^해체\(?철거\)?신고서|^철거.*신고서|^해체계획서/, waste_report:/^폐기물.*처리계획|^처리계획/, qual_packet:/^적격심사신청서/, contract_pledge:/^계약이행.*서약서/, seal_reg:/^사용인감계/, quote_env:/^견적서/, quote_con:/^견적서/, labor_split:/^노무비\s*구분/, bid_rate:/^설계내역서/ };
+  var CBX_TPL_RE = { work_start:/착공계/, work_complete:/준공계|준공검사/, asb_plan:/해체계획서|해체.*제거.*신고/, demo_report:/해체.*신고|철거.*신고|해체계획/, waste_report:/배출|처리계획/, qual_packet:/적격심사/, contract_pledge:/서약서/, seal_reg:/인감/, bond_waiver:/포기/, labor_exempt:/노무비.*제외|노무비/, quote_env:/견적/, quote_con:/견적/, adv_pay:/선금|선급금/, settle_doc:/정산/, safety_plan:/안전보건관리계획/, safety_risk:/위험성/, safety_rule:/안전\s*수칙/, safety_emerg:/비상/, safety_ppe:/보호구/, safety_cost:/사용내역|안전보건관리비/, labor_split:/노무비\s*구분/, bid_rate:/내역서/ };
   function cbxTarget(it, c){
-    var p = it.res || {}, cur = ((c.pipes || [])[0] || {}).cur, list = cbxDocList(c), pick = null;
+    var p = it.res || {}, cur = ((c.pipes || [])[0] || {}).cur, list = cbxDocList(c), pick = null, ord = list.filter(function(x){ return x.i === cur; }).concat(list.filter(function(x){ return x.i !== cur; })), mk = p.read === "mark" ? p.draft_tpl : "";
     if (p.target) pick = list.filter(function(x){ return x.id === p.target; })[0] || null;
-    if (!pick) pick = cbxDocMatch(list.filter(function(x){ return x.i === cur; }).concat(list.filter(function(x){ return x.i !== cur; })), p.doc_name, it.name);
-    it.tgt = pick ? pick.id : "";
-    it.kind = (pick && pick.t === "수령") ? "received" : (p.cls === "filled" ? "final" : "received");
+    if (!pick && p.draft_tpl && CBX_TPL_SLOT[p.draft_tpl]) pick = ord.filter(function(x){ return x.t !== "수령" && CBX_TPL_SLOT[p.draft_tpl].test(x.n || ""); })[0] || null;
+    if (!pick && !mk) pick = cbxDocMatch(ord, p.doc_name, it.name);
+    it.tgt = pick ? pick.id : (p.draft_tpl ? "g|" + p.draft_tpl : "");
+    it.kind = p.read === "mark" ? "final" : ((pick && pick.t === "수령") ? "received" : (p.cls === "filled" ? "final" : "received"));
   }
   // 생성 초안과 같은 양식이면 그 초안과 짝(같은 단계에 초안이 여럿이어도 서류 이름으로 정해진다)
   function cbxPairTpl(c, it){
     var p = it.res || {}; if (p.draft_tpl) return p.draft_tpl;
-    var q = cbxNorm(p.doc_name) || cbxNorm(it.name), hit = "";
-    cbxDraftList(c).forEach(function(d){ var lb = cbxNorm(d.n); if (!hit && lb && q && (q.indexOf(lb) >= 0 || lb.indexOf(q) >= 0)) hit = d.tpl; });
+    var q = cbxNorm(p.doc_name) || cbxNorm(it.name), hit = "", tx = String(p.doc_name || "") + " " + String(it.name || ""), list = cbxDraftList(c);
+    var byRe = list.filter(function(d){ return CBX_TPL_RE[d.tpl] && CBX_TPL_RE[d.tpl].test(tx); });   // 서류 제목·파일명 — 하나만 맞을 때
+    if (byRe.length === 1) return byRe[0].tpl;
+    list.forEach(function(d){ var lb = cbxNorm(d.n); if (!hit && lb && q && (q.indexOf(lb) >= 0 || lb.indexOf(q) >= 0)) hit = d.tpl; });
     return hit;
   }
+  function cbxShow(it){ setTimeout(function(){ try { var el = document.querySelector('[data-cbx-card="' + it.id + '"]'); if (el && el.scrollIntoView) el.scrollIntoView({ block: "center" }); } catch(e){} }, 0); }
   function cbxFindSame(p, vals){
     var con = vals || p.con || {}, t = cbxNorm(con.title), cl = cbxNorm(con.client), hit = null;
     if (p.contract_id) hit = findProc(p.contract_id);
@@ -10193,6 +10364,14 @@
       var cands = same ? [] : cbxBidCands(con), bid = cands.length === 1 ? cands[0] : null;
       it.bid = bid ? bid.id : ""; it.bidTitle = bid ? bid.title : ""; it.bidNo = bid ? (bid.no || bid.id || "") : ""; it.bidBase = bid ? ((bid.ext && bid.ext.bss) || bid.budget || 0) : 0; it.bidMany = cands.length > 1 ? cands.length : 0;
       it.st = "new"; cbxRedraw(it.scope); return;
+    }
+    if (r.read === "mark"){   // v424 앱이 만든 서류를 고친 파일 — 어느 계약·양식인지 표식으로 안다
+      if (!r.doc_name) r.doc_name = genLabel(r.draft_tpl);
+      var mc0 = r.contract_id ? findProc(r.contract_id) : null, mc = (mc0 && mc0.del !== 1 && mc0.status !== "done") ? mc0 : null;
+      if (mc0 && !mc){ it.scope = "top"; it.cid = ""; it.note = "끝났거나 지운 계약에서 만든 서류입니다. 넣을 계약을 골라 주세요."; cbxToPick(it, null); renderContracts(); cbxShow(it); return; }   // 막다른 실패 대신
+      if (mc && inC && mc.id !== inC.id){ it.scope = "top"; it.note = "이 파일은 다른 계약(" + (csTitle(mc) || mc.client || mc.label || "") + ")에서 만든 서류입니다. 넣을 계약을 확인해 주세요."; cbxToPick(it, mc); renderContracts(); cbxShow(it); apprToastShow("맨 위 카드에서 넣을 계약을 확인해 주세요"); return; }
+      if (mc && it.restored){ it.note = "이전에 넣다 만 파일입니다. 이 계약이 맞으면 넣어 주세요."; cbxToPick(it, mc); return; }   // 다음 접속 때 사람 없이 자동으로 넣지 않는다
+      if (mc){ it.cid = mc.id; cbxTarget(it, mc); if (it.pii > 0){ it.st = "pii"; cbxRedraw(it.scope); return; } cbxGo(it); return; }
     }
     if (r.cls === "blank" && isAdmin() && it.file){ it.tpl = r.tpl_key || ""; it.st = "blank"; if (csTplKeys === null) csLoadTpl(); cbxRedraw(it.scope); return; }
     if (r.cls === "blank" && !inC && !isAdmin()){ cbxDiscard(it); it.st = "err"; it.msg = "빈 양식으로 보입니다. 양식 등록은 관리자만 할 수 있어 저장하지 않았습니다. 관리자에게 파일을 전달해 주세요."; cbxRedraw(it.scope); return; }
@@ -10304,10 +10483,7 @@
           var dd = ref.p.stages[ref.i].docs.filter(function(x){ return x && x.k === ref.raw; })[0];
           if (dd){ dd[it.kind === "final" ? "final_ref" : "received_ref"] = item.n; c.updated = todayStr(); scheduleContractSave(); }
         }
-        var L = b.learn, lm = "";
-        if (L && L.ok && L.status === "unmatched") lm = " · 초안이 여럿이라 짝을 못 정했습니다";
-        else if (L && L.ok){ var g = L.gap || {}; lm = " · AI 초안(" + (TPL_LABELS[L.tpl] || L.tpl) + ")과 짝" + (g.cell_ratio !== null && g.cell_ratio !== undefined ? " · 간극 " + Math.round(g.cell_ratio * 100) + "%" : " · 이 형식은 비교 불가"); }
-        else if (L && L.code === "NO_DRAFT") lm = " · AI 초안이 없어 비교하지 않았습니다";
+        var lm = cbxLearnMsg(b.learn);
         it.n = item.n; it.placed = 1; it.st = "done";
         var subNote = cbxSubApply(it, c), notes = [it.note, subNote].filter(Boolean).join(" ");
         var where = it.scope === "top" ? ((csTitle(c) || c.client || c.label || "") + " · ") : "";
@@ -10316,6 +10492,13 @@
         renderContracts(); cbxRenderTop();
       });
     }).catch(function(){ cbxFail(it, '"' + it.name + '" 넣기 실패(네트워크)', "place"); });
+  }
+  function cbxLearnMsg(L){
+    if (L && L.ok && L.status === "unmatched") return " · 내용으로 가릴 수 없는 형식이거나 비슷한 초안이 여럿이라 짝을 정하지 못했습니다";
+    if (L && L.ok){ var g = L.gap || {}; return " · AI 초안(" + genLabel(L.tpl) + ")과 짝" + (g.cell_ratio !== null && g.cell_ratio !== undefined ? " · 간극 " + Math.round(g.cell_ratio * 100) + "%" : " · 이 형식은 비교 불가"); }
+    if (L && L.code === "NO_DRAFT") return " · 같은 단계에 AI 초안이 없어 비교하지 않았습니다";
+    if (L && L.code === "NO_MATCH") return " · 맞는 AI 초안을 찾지 못했습니다";
+    return "";
   }
   function cbxDiscard(it){ if (it.att && !it.placed){ try { gwCall("gw-data", { action: "att_del", id: it.att }).catch(function(){}); } catch(e){} } it.att = ""; }
   function cbxChanged(it){ var a = it.ai || {}, f = it.form || {}, out = []; ["type", "pub", "combo", "title", "client", "site", "amount", "d1", "d2", "d3", "guarantee"].forEach(function(k){ if (String(a[k] === undefined ? "" : a[k]) !== String(f[k] === undefined ? "" : f[k])) out.push(k); }); return out; }
@@ -10387,7 +10570,7 @@
     r.readAsDataURL(it.file);
   }
   // 옮기기 — 방금 넣은 카드 또는 서류함 줄의 [옮기기]
-  function cbxIdOf(c, x){ var hit = ""; cbxDocList(c).forEach(function(d){ if (hit) return; var r = cbxRef(c, d.id); if (r.dk === x.dk && (d.i < 0 || r.i === x.i)) hit = d.id; }); return hit; }   // 단계 서류 키는 단계마다 겹칠 수 있어 단계까지 맞춘다
+  function cbxIdOf(c, x){ if (String(x.dk).indexOf("fin.") === 0) return "g|" + String(x.dk).slice(4); var hit = ""; cbxDocList(c).forEach(function(d){ if (hit) return; var r = cbxRef(c, d.id); if (r.dk === x.dk && (d.i < 0 || r.i === x.i)) hit = d.id; }); return hit; }   // 단계 서류 키는 단계마다 겹칠 수 있어 단계까지 맞춘다
   function cbxMoveOpen(cid, n){
     var c = findProc(cid); if (!c || !canDo("con")) return;
     var x = cdocItems(c).filter(function(y){ return y && y.n === n; })[0]; if (!x) return;
@@ -10404,12 +10587,15 @@
     var c = findProc(it.cid); if (!c) return;
     var ref = cbxRef(c, it.tgt), to = cbxLabel(c, it.tgt), r0 = it.res || {};
     var doc = (r0.doc_name && !r0.pii && r0.read !== "none") ? r0.doc_name : "";   // 개인정보로 본 파일의 이름은 고친 판단 기록에 남기지 않는다
+    var addRe = /\|add:/, toFix = addRe.test(String(it.tgt)) ? "추가 서류" : to, fromFix = addRe.test(String(it.fromTgt || "")) ? "추가 서류" : (it.fromLabel || "");   // 직원이 적은 추가 서류 이름은 다음 판단 프롬프트로 보내지 않는다
+    var moveTpl = it.kind === "final" ? (String(it.tgt).indexOf("g|") === 0 ? String(it.tgt).slice(2) : cbxPairTpl(c, { res: { doc_name: to }, name: "" })) : "";   // 옮긴 자리의 서류 이름으로 짝을 다시 찾는다
     it.st = "placing"; cbxRedraw(it.scope);
-    cbxSerial(function(){ return gwCall("gw-data", { action: "cdoc_move", cid: c.id, n: it.n, i: ref.i, doc_key: ref.dk, kind: it.kind, pii: Number(it.pii) || 0, fix: { doc: doc, from: it.fromLabel || "", to: to } }); }).then(function(res){
+    var mvBody = { action: "cdoc_move", cid: c.id, n: it.n, i: ref.i, doc_key: ref.dk, kind: it.kind, pii: Number(it.pii) || 0, fix: { doc: doc, from: fromFix, to: toFix } }; if (moveTpl) mvBody.pair_tpl = moveTpl;
+    cbxSerial(function(){ return gwCall("gw-data", mvBody); }).then(function(res){
       var b = (res && res.body) || {};
       if (res && res.status === 400 && b.error_code === "NO_CHANGE"){ it.st = "done"; it.msg = it.name + " → 자리가 같아 그대로 두었습니다."; cbxRedraw(it.scope); return; }
       if (!res || res.status !== 200){ cbxFail(it, "옮기기 실패(" + (b.error_code || (res && res.status) || "네트워크") + ")", "move"); return; }
-      it.st = "done"; it.fromLabel = to; it.msg = it.name + " → " + to + " · " + (CDOC_KIND_LABEL[it.kind] || it.kind) + "(으)로 옮겼습니다.";
+      it.st = "done"; it.fromLabel = to; it.msg = it.name + " → " + to + " · " + (CDOC_KIND_LABEL[it.kind] || it.kind) + "(으)로 옮겼습니다." + cbxLearnMsg(b.learn);
       cdocLoad(c, true); cbxRedraw(it.scope);
     }).catch(function(){ cbxFail(it, "옮기기 실패(네트워크)", "move"); });
   }
@@ -10434,6 +10620,7 @@
   function cbxBtn(it, act, label, cls){ return '<button type="button" class="' + (cls || "vs-chip") + '" data-cbx-act="' + it.id + '|' + act + '">' + label + '</button>'; }
   function cbxDocOpts(c, sel){
     var h = '<option value="">그 밖의 서류(목록에 없음)</option>';
+    if (String(sel || "").indexOf("g|") === 0) h += '<option value="' + esc(sel) + '" selected>' + esc(cbxLabel(c, sel)) + '</option>';
     cbxDocList(c).forEach(function(d){ h += '<option value="' + esc(d.id) + '"' + (d.id === sel ? " selected" : "") + '>' + esc(d.s) + ' › ' + esc(d.n) + '</option>'; });
     return h;
   }
@@ -10489,7 +10676,8 @@
       if (row) h += '<div class="cbx-row">' + row + '</div>';
     }
     else if (it.st === "pii"){
-      h = head("🔒 " + nm + " 개인정보가 든 파일로 판단했습니다(등급 " + (it.pii || 1) + "). 노무사 회신 전까지는 앱에 올리지 않는 것이 원칙입니다.", "drop");
+      var piiCon = (it.scope === "top" && c) ? " [" + esc(csTitle(c) || c.client || c.label || "") + "]" : "";   // 맨 위 박스 — 어느 계약으로 들어가는지 보이게
+      h = head("🔒 " + nm + piiCon + (r.read === "mark" ? " 사람 정보 칸이 있는 양식입니다(등급 " : " 개인정보가 든 파일로 판단했습니다(등급 ") + (it.pii || 1) + "). 넣으면 열람이 제한됩니다. 노무사 회신 전까지는 앱에 올리지 않는 것이 원칙입니다.", "drop");
       h += '<div class="cbx-row">' + pii() + cbxBtn(it, "go", "그래도 넣기") + cbxBtn(it, "drop", "넣지 않기") + '</div>';
     }
     else if (it.st === "pick"){
@@ -10517,10 +10705,36 @@
     var drop = (canDo("con") && c.status !== "done") ? '<button type="button" class="cbx-drop cbx-in" data-cbx-drop="' + esc(c.id) + '"><strong>이 계약 서류 넣기</strong><small>끌어다 놓거나 눌러서 고릅니다. 어느 서류인지 에이전트가 정합니다.</small></button>' : "";
     return drop + cbxCardsHtml(c.id);
   }
+  // v424 서류별로 마지막 AI 판 ↔ 짝이 된 직원 최종본 ↔ 간극(브리핑 시안 '계약 펼침 서류')
+  function cdocGenHtml(c){
+    var l = cdocLive(c), can = canDo("con"), liveC = c.status !== "done", by = {}, order = [], fin = {}, num = {};
+    l.forEach(function(x){ if (x.kind !== "draft" || x.cur !== 1 || String(x.dk).indexOf("gen.") !== 0) return; var k = x.dk.slice(4); if (!by[k]) order.push(k); if (!by[k] || x.n > by[k].n) by[k] = x; });
+    // 최종본은 양식별 최신(같은 칸에 든 다른 서류에 밀려 '현재'가 아니어도), 간극은 잴 수 있었던 최신 파일에서 — 날인 스캔을 넣어도 앞서 잰 간극이 사라지지 않게
+    l.forEach(function(x){ if (x.kind !== "final" || !x.ptpl) return; if (!fin[x.ptpl] || x.n > fin[x.ptpl].n) fin[x.ptpl] = x; if (typeof x.pgap === "number" && (!num[x.ptpl] || x.n > num[x.ptpl].n)) num[x.ptpl] = x; });
+    var orphans = l.filter(function(x){ return x.kind === "final" && x.cur === 1 && !x.ptpl && (x.plearn || x.pair); }).slice(-20);
+    if (!order.length && !orphans.length) return "";
+    var day = function(x){ return cdocDay(x.ts).slice(5).replace("-", "/"); }, open = function(x, label, tip){ return (x.pii && !can) ? "" : '<button type="button" class="vs-chip" data-cs-copen="' + esc(c.id) + '|' + x.n + '|' + (x.pii || 0) + '"' + (tip ? ' title="' + esc(tip) + '"' : '') + '>' + label + '</button>'; };
+    var rows = order.map(function(k){
+      var d = by[k], f = fin[k], g = num[k], sub = "AI v" + d.ver + " " + day(d) + " · ", old = !!(g && g.pdn && g.pdn !== d.n);
+      if (f){
+        sub += "직원 최종 v" + f.ver + " " + day(f) + " · ";
+        if (g){
+          sub += "간극 " + Math.round(g.pgap * 100) + "%" + (g !== f ? "(직원 v" + g.ver + " 기준, 최신은 비교 불가 " + (f.ext || "") + ")" : "");
+          if (old){ var od = l.filter(function(y){ return y.n === g.pdn; })[0]; sub += "(AI" + (od ? " v" + od.ver : " 이전 판") + " 기준, 새 AI는 수정본 기다리는 중)"; }
+          if (g.pout) sub += " · AI가 안 채운 칸 " + g.pout;
+        } else sub += "비교 불가(" + (f.ext || "") + ")";
+      } else sub += liveC ? "직원 수정본 기다리는 중" : "최종본 없음";
+      var ok = f && !old;
+      return '<div class="it"><span class="st ' + (ok ? "ok" : "wait") + '">' + (ok ? "✓" : "◻") + '</span><span class="nm">' + esc(genLabel(k)) + '<div class="sub" style="white-space:normal;" title="' + esc(sub) + '">' + esc(sub) + '</div></span>' + open(d, "AI 사본", "서버 사본입니다. 주민번호·사람 칸은 비어 있습니다") + (f ? open(f, "최종") : "") + ((can && liveC) ? '<button type="button" class="vs-chip" data-cs-cdel="' + esc(c.id) + '|' + d.n + '" title="이 AI 초안을 보관함으로(잘못 만들었을 때)">보관</button>' : "") + '</div>';
+    }).join("");
+    var WHY = { NO_MATCH:"맞는 AI 초안을 못 찾음", NO_DRAFT:"같은 단계에 AI 초안 없음", TYPE_EXCLUDED:"학습에서 빼는 서류", DRAFT_READ_FAILED:"초안을 못 읽음", LEARN_THREW:"처리 오류" };
+    rows += orphans.map(function(x){ var why = x.pair ? "짝 못 정함(자동)" : (WHY[x.plearn] || x.plearn); return '<div class="it"><span class="st wait">◻</span><span class="nm">' + esc(x.orig || x.name) + '<div class="sub" style="white-space:normal;">직원 최종 v' + x.ver + " " + day(x) + " · 짝 없음(" + esc(why) + ')</div></span>' + open(x, "최종") + '</div>'; }).join("");
+    return '<div class="cs-pk" style="margin-bottom:10px;"><div class="h">AI 생성본 ↔ 직원 최종본 <small>' + order.length + '종 · 간극 = 직원이 고친 비율</small></div>' + rows + '</div>';
+  }
   function cbxEtcHtml(c){
-    var l = cdocLive(c, null, "etc.box");
+    var can = canDo("con") && c.status !== "done", seen = {}, dks = ["etc.box"], l = cdocLive(c).filter(function(x){ if (x.dk === "etc.box") return true; if (String(x.dk).indexOf("fin.") === 0){ if (!seen[x.dk]){ seen[x.dk] = 1; dks.push(x.dk); } return true; } return false; });
     if (!l.length) return "";
-    return '<div class="cs-pk" style="margin-bottom:10px;"><div class="h">그 밖의 서류 <small>' + l.length + '건 · 목록에 없는 서류</small></div>' + cdocRowsHtml(c, null, "etc.box", canDo("con") && c.status !== "done") + '</div>';
+    return '<div class="cs-pk" style="margin-bottom:10px;"><div class="h">그 밖의 서류 <small>' + l.length + '건 · 목록에 없는 서류</small></div>' + dks.map(function(dk){ var rows = cdocRowsHtml(c, null, dk, can); return (rows && dk !== "etc.box") ? '<div class="sub" style="margin:4px 0 0;font-weight:600;">' + esc(genLabel(dk.slice(4))) + '</div>' + rows : rows; }).join("") + '</div>';
   }
   // 맨 위 카드 — 맨 위 박스 카드와 접힌 계약의 카드. 다시 그려도 입력 중인 칸의 포커스를 지킨다
   function cbxRenderTop(){
@@ -10604,7 +10818,7 @@
     window.addEventListener("dragover", function(e){ if (currentTab === "con" && !fileInput(e) && e.dataTransfer && Array.prototype.indexOf.call(e.dataTransfer.types || [], "Files") >= 0) e.preventDefault(); });
     window.addEventListener("drop", function(e){ if (currentTab === "con" && !fileInput(e) && e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) e.preventDefault(); });
   }
-  // 생성 훅 — 서류 생성(xlsx 채움)이 성공하면 채움 맵을 초안(draft)으로 자동 보존. 실패해도 조용히(내려받기는 이미 끝났다). pii 1 = 값에 소유주·대리인 이름이 섞일 수 있어 do 권한만 열람
+  // 생성 훅 — 서류 생성이 성공하면 초안(draft)으로 보존. v424 파일째(xgOut → xgKeepFile) + xlsx는 채움 맵도(칸 비교용). pii 1 = 값에 소유주·대리인 이름이 섞일 수 있어 do 권한만 열람
   // v411 생성 주입 — 학습된 칸 기본값(서버 learn_defaults_get: 허용 사전(R2) 안·근거 2건↑만)을 **공란('b')으로 남는 칸에만** 넣는다. 계산된 값은 덮지 않는다. 실패·없음이면 그대로.
   // v419 채움 맵은 {시트:[[셀,값,유형]], __drop_drawings__:[…]} 객체 — fillXlsxTemplate이 시트 이름으로 돌므로 구조를 그대로 유지한다(시트별로 새 줄만 교체). 기본값 키 = '시트!셀'. 옛 평면 배열도 받는다.
   function xgMergeLearned(edits, dfl){
@@ -10637,21 +10851,28 @@
       }).catch(function(e){ return fail("THREW", e); });
     } catch(e){ return Promise.resolve(fail("THREW", e)); }
   }
-  function csCdocDraft(c, kind, edits, learned){
+  function csCdocDraft(c, kind, edits, learned, file, tries){
     try {
-      if (!c || !c.id || typeof gwCall !== "function" || !canDo("con")) return;
-      var p = (c.pipes || [])[0], i = (p && typeof p.cur === "number" && p.cur >= 0 && p.cur <= 99) ? p.cur : 0;
-      var keep = edits;
-      if (kind === "work_start" && edits && !Array.isArray(edits)){   // v422: 대리인 주민번호 칸(현장대리인계 F13·재직증명서 I6)은 초안에 남기지 않는다 — 내려받은 파일에만
-        var rrnCell = { "현장대리인계":"F13", "재직증명서":"I6" }; keep = {};
-        Object.keys(edits).forEach(function(sh){ keep[sh] = (rrnCell[sh] && Array.isArray(edits[sh])) ? edits[sh].filter(function(e){ return e[0] !== rrnCell[sh]; }) : edits[sh]; });
-      }
-      var fill = { tpl: kind, at: todayStr(), edits: keep }; if (learned && learned.length) fill.learned = learned;   // v411 적용된 학습 칸 기록(초안 메타)
-      var r = gwCall("gw-data", { action: "cdoc_put", cid: c.id, i: i, doc_key: "gen." + cdocSan(kind, 30), kind: "draft", pii: 1, fill: fill });
-      if (r && typeof r.then === "function") r.then(function(res){
-        if (res && res.status === 200 && res.body && res.body.item && CDOC[c.id]){ var it = res.body.item; CDOC[c.id].items.forEach(function(x){ if (x.i === it.i && x.dk === it.dk && x.kind === "draft") x.cur = 0; }); CDOC[c.id].items.push(it); }
-      }).catch(function(){});
-    } catch(e){}
+      if (!c || !c.id || typeof gwCall !== "function" || !canDo("con")) return Promise.resolve(null);
+      var p = (c.pipes || [])[0], i = (p && typeof p.cur === "number" && p.cur >= 0 && p.cur <= 99) ? p.cur : 0, n = tries || 0;
+      var body = { action: "cdoc_put", cid: c.id, i: i, doc_key: "gen." + cdocSan(kind, 30), kind: "draft", pii: 1 };
+      if (edits){ var fill = { tpl: kind, at: todayStr(), edits: xgFillKeep(kind, edits, c) }; if (learned && learned.length) fill.learned = learned; body.fill = fill; }   // v411 적용된 학습 칸 기록(초안 메타) · v422 주민번호 칸 뺌
+      if (file){ body.name = file.name; body.data = file.data; if (file.gen) body.gen = file.gen; if (file.blank && file.blank.length) body.blank = file.blank; }
+      var again = function(ms){ return new Promise(function(done){ setTimeout(function(){ done(csCdocDraft(c, kind, edits, learned, file, n + 1)); }, ms); }); };
+      return cbxSerial(function(){ return gwCall("gw-data", body); }).then(function(res){   // 한 번에 하나씩 — 서류함 색인을 동시에 고치면 판 번호가 유실된다(계약서류 4종이 한꺼번에 온다)
+        if (res && res.status === 200 && res.body && res.body.item){
+          var e = CDOC[c.id];
+          if (e){ var it = res.body.item; e.items.forEach(function(x){ if (x.i === it.i && x.dk === it.dk && x.kind === "draft") x.cur = 0; }); (res.body.gc || []).forEach(function(g){ e.items.forEach(function(x){ if (x.n === g) x.gc = 1; }); }); e.items.push(it); var act0 = document.activeElement; if (typeof renderContracts === "function" && typeof conOpenId !== "undefined" && conOpenId === c.id && !(act0 && /^(INPUT|TEXTAREA|SELECT)$/.test(act0.tagName || ""))) renderContracts(); }   // 입력 중이면 다시 그리지 않는다(폰 키보드가 닫히지 않게)
+          return res.body.item;
+        }
+        var code = (res && res.body && res.body.error_code) || (res && res.status) || "", st = res && res.status;
+        if (st === 409 && !file) return null;   // 같은 내용의 채움 맵(표식이 든 파일은 겹치지 않는다)
+        if (n > 0 && code === "DUP_BYTES"){ cdocLoad(c, true); return null; }   // 앞선 요청은 저장됐는데 응답만 끊겼다 — 실패가 아니다
+        if (file && st === 413){ genFail(kind, "TOO_LARGE"); return edits ? csCdocDraft(c, kind, edits, learned) : null; }   // 파일이 한도를 넘으면 칸 비교라도 되게 채움 맵만
+        if (((st >= 500) || code === "NO_CONTRACT") && n < 2) return again(2000);   // 새 계약 저장이 아직 안 끝났거나 일시 오류
+        genFail(kind, code); return null;
+      }).catch(function(err){ if (n < 2) return again(2000); genFail(kind, "NET", err); return null; });
+    } catch(e){ genFail(kind, "THREW", e); return Promise.resolve(null); }
   }
   function conScenRk(type, pub, combo){ var k = conScenKey(type, pub, combo); return CON_SCEN[k] ? k : type + ":pub"; }   // conScenStages 폴백과 같은 키
   function conIsArr(x){ return Object.prototype.toString.call(x) === "[object Array]"; }
@@ -11325,9 +11546,12 @@
     gwCall("gw-data", { action: "learn_pairs_get" }).then(function(res){
       if (res.status !== 200 || !res.body){ host.innerHTML = '<div class="empty-line">학습 상태를 불러오지 못했습니다 — 새로고침 후 다시 시도해주세요.</div>'; return; }
       var b = res.body, s = (b.settings && b.settings.contract) || { on: false, allow: {} }, pairs = b.pairs || [], les = b.lessons || {};
-      var ST = { done_nomodel: "간극만(허용 전)", pending: "학습 대기", running: "학습 중", done: "학습 완료", fail: "실패", unmatched: "초안 선택 필요", hold: "월 상한" };
-      var h = '<div style="margin-bottom:6px;"><b>' + (s.on ? "켜짐" : "꺼짐") + '</b> · 허용 양식 ' + Object.keys(s.allow || {}).length + '종 · 짝 ' + pairs.length + '건 <button class="mini-btn" data-cl-on="' + (s.on ? 0 : 1) + '" data-cl-base="' + esc(String((b.settings && b.settings.updated_at) || 0)) + '">' + (s.on ? "끄기" : "켜기") + '</button></div>';
-      h += '<div class="muted" style="font-size:12px;margin-bottom:8px;">고친 서류를 넣으면 앱 초안과 자동으로 짝이 되어 칸 단위 차이(간극)를 잽니다(서류 이름으로 양식이 정해지면 단계가 달라도 짝이 됩니다). 허용 사전에 든 칸만 모델이 값을 보고 규칙을 뽑고, 근거 2건이 쌓인 칸은 다음 생성 때 공란에 미리 채워집니다. 사람은 규칙을 쓰지 않습니다. 양식별 첫 10건 간극이 기준선이 되고, 4주 뒤 최근 간극이 기준선보다 줄지 않은 양식은 자동으로 꺼집니다(짝·간극은 계속 잼, 켜면 기준선 재시작).</div>';
+      var ST = { pending: "학습 대기", running: "학습 중", done: "학습 완료", fail: "실패", unmatched: "짝 못 정함(자동)", hold: "월 상한", superseded: "무효(옮김·보관)" };
+      var stOf = function(p){ if (p.status !== "done_nomodel") return ST[p.status] || esc(p.status); return p.kind === "xlsx_cell" ? "간극만(허용 전)" : (p.kind === "none" ? "짝만(비교 불가)" : "간극만(칸 비교 아님)"); };
+      var HOW = { mark: "표식", name: "이름", content: "내용", stage: "단계" }, U = b.usage || {}, unum = function(k){ return Number(U[k]) || 0; };
+      var h = '<div style="margin-bottom:6px;"><b>' + (s.on ? "켜짐" : "꺼짐") + '</b> · 허용 양식 ' + Object.keys(s.allow || {}).length + '종 · 짝 ' + (b.total || pairs.length) + '건 <button class="mini-btn" data-cl-on="' + (s.on ? 0 : 1) + '" data-cl-base="' + esc(String((b.settings && b.settings.updated_at) || 0)) + '">' + (s.on ? "끄기" : "켜기") + '</button></div>';
+      h += '<div class="muted" style="font-size:12px;margin-bottom:8px;">고친 서류를 넣으면 앱 초안과 자동으로 짝이 되어 xlsx는 칸, hwpx·docx는 문단 단위 차이(간극)를 잽니다(파일 안 표식 → 서류 이름 → 내용 일치율 순으로 찾아서, 단계가 달라도 짝이 됩니다. hwp·날인 스캔은 비교 불가로 남습니다). 허용 사전에 든 칸만 모델이 값을 보고 규칙을 뽑고, 근거 2건이 쌓인 칸은 다음 생성 때 공란에 미리 채워집니다. 사람은 규칙을 쓰지 않습니다. 양식별 첫 10건 간극이 기준선이 되고, 4주 뒤 최근 간극이 기준선보다 줄지 않은 양식은 자동으로 꺼집니다(짝·간극은 계속 잼, 켜면 기준선 재시작).</div>';
+      if (unum("pair_mark") + unum("pair_name") + unum("pair_content") + unum("pair_stage") + unum("pair_no_match") + unum("pair_no_draft") + unum("pair_unmatched")) h += '<div class="muted" style="font-size:12px;margin-bottom:8px;">이번 달 짝 찾은 경로: 표식 ' + unum("pair_mark") + ' · 이름 ' + unum("pair_name") + ' · 내용 ' + unum("pair_content") + ' · 단계 ' + unum("pair_stage") + ' · 못 정함 ' + unum("pair_unmatched") + ' · 못 찾음 ' + unum("pair_no_match") + ' · 초안 없음 ' + unum("pair_no_draft") + '</div>';   // 한컴·엑셀 저장 뒤 표식이 실제로 남는지 여기서 본다
       var tk = Object.keys(les);
       if (tk.length){
         h += '<table class="mini" style="width:100%;font-size:12px;margin-bottom:8px;"><tr><th>양식</th><th>짝</th><th>호출</th><th>규칙</th><th>간극 최근5</th><th>이전5</th><th>추세</th><th>허용 칸</th><th>기준선·일몰</th><th></th></tr>';
@@ -11335,7 +11559,7 @@
         h += '</table>';
       }
       if (pairs.length){
-        h += '<div style="font-size:12px;">' + pairs.slice(0, 10).map(function(p){ var g = p.gap || {}; return '<div class="item" style="padding:4px 0;"><span>' + esc(p.cid) + ' · S' + p.i + ' · ' + esc(p.tpl || '(양식 미정)') + '</span> <span class="muted">' + (ST[p.status] || esc(p.status)) + (p.diff ? ' · 바뀐 칸 ' + p.diff.changed + '/' + p.diff.compared + (p.diff.uncomparable ? ' (비교 불가 ' + p.diff.uncomparable + ')' : '') : '') + (g.score === null || g.score === undefined ? ' · 비교 불가' : ' · 간극 ' + Math.round(g.score * 100) + '%') + (p.candidates ? ' · 후보 ' + p.candidates.map(function(x){ return x.tpl; }).join('/') : '') + '</span></div>'; }).join('') + '</div>';
+        h += '<div style="font-size:12px;">' + pairs.filter(function(p){ return p.status !== "superseded"; }).slice(0, 10).map(function(p){ var g = p.gap || {}, cc = findProc(p.cid); return '<div class="item" style="padding:4px 0;"><span>' + esc(cc ? (csTitle(cc) || cc.client || p.cid) : p.cid) + ' · ' + (Number(p.i) + 1) + '단계 · ' + esc(p.tpl ? genLabel(p.tpl) : '(양식 미정)') + '</span> <span class="muted">' + stOf(p) + (HOW[p.how] ? ' · ' + HOW[p.how] + (typeof p.match === "number" ? ' ' + Math.round(p.match * 100) + '%' : '') : '') + (p.diff ? ' · 바뀐 ' + (/_para$/.test(p.kind || '') ? '문단' : '칸') + ' ' + p.diff.changed + '/' + p.diff.compared + (p.diff.uncomparable ? ' (비교 불가 ' + p.diff.uncomparable + ')' : '') + (p.diff.outside_changed ? ' · AI가 안 채운 칸 ' + p.diff.outside_changed : '') : '') + (g.score === null || g.score === undefined ? ' · 비교 불가' : ' · 간극 ' + Math.round(g.score * 100) + '%') + (p.candidates ? ' · 후보 ' + p.candidates.map(function(x){ return x.tpl; }).join('/') : '') + '</span></div>'; }).join('') + '</div>';
       } else h += '<div class="empty-line">아직 짝이 없습니다 — 계약 펼침의 [이 계약 서류 넣기]에 고친 서류를 넣으면 생깁니다.</div>';
       host.innerHTML = h;
       Array.prototype.forEach.call(host.querySelectorAll("[data-cl-tpl]"), function(btn){ btn.addEventListener("click", function(){   // v412 양식별 끄기/켜기(일몰 되돌리기)
@@ -11917,7 +12141,7 @@
     h += cbxBoxHtml(c);   // v423 이 계약 서류 넣기 — 입구 하나(탭마다 따로 올리던 버튼 대신)
     h += '<div class="vs-stabs">' + [["ov", "개요"], ["st", "단계"], ["doc", "서류"], ["lk", "연결"]].map(function(t){ return '<button type="button" class="vs-stab' + (conDetTab === t[0] ? ' on' : '') + '" data-cs-tab="' + t[0] + '">' + t[1] + '</button>'; }).join("") + '</div>';
     if (conDetTab === "st"){ csApprSync(c); h += csStagesHtml(c); }   // v384: 결재 결과 동기화(60초 1회)
-    else if (conDetTab === "doc") h += csPacketsHtml(c) + cbxEtcHtml(c) + conAttBoxHtml(c) + cdocTrashHtml(c);   // v383 서류 4종 패킷 · v423 그 밖의 서류·이전 첨부 · v408 관리자 보관함
+    else if (conDetTab === "doc") h += csPacketsHtml(c) + cdocGenHtml(c) + cbxEtcHtml(c) + conAttBoxHtml(c) + cdocTrashHtml(c);   // v383 서류 4종 패킷 · v424 AI 생성본 ↔ 직원 최종본 · v423 그 밖의 서류·이전 첨부 · v408 관리자 보관함
     else if (conDetTab === "lk") h += csLinksHtml(c);
     else h += csOverviewHtml(c);
     if (canDo("con")) h += '<div class="vs-act">' + (conHasBldg(c) ? '<button class="mini-btn" data-con-bldg="' + esc(c.id) + '">대장</button>' : '') + '<button class="mini-btn" data-con-xlsx="' + esc(c.id) + '">생성</button><button class="mini-btn" data-con-doc="' + esc(c.id) + '">서류</button><button class="mini-btn danger" data-con-del="' + esc(c.id) + '">삭제</button></div>';
@@ -13635,7 +13859,8 @@
     gwCall("gw-data",{action:"tpl_get", key:key}).then(function(r){
       if(r.status!==200){ alert(r.status===404?("'"+TPL_LABELS[key]+"' 양식이 미등록입니다. 계약 탭 맨 위 박스에 빈 양식을 넣으세요."):"양식 불러오기 실패"); return; }
       return fillHwpxTemplate(r.body.data, tokens).then(function(b){
-        downloadBlob((q.no||"견적")+"_"+(q.title||"견적서")+".hwpx", b);
+        var qCon=q.con_id?findProc(q.con_id):null;
+        return xgOut((qCon&&qCon.del!==1)?qCon:null, key, (q.no||"견적")+"_"+(q.title||"견적서")+".hwpx", b, { noBack:true });   // v424 계약과 이어진 견적만 서류함에(계약 전 견적은 남길 자리가 없다)
       });
     }).catch(function(e){ alert("생성 실패: "+e); });
   }

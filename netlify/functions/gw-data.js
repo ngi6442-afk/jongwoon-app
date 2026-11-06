@@ -117,100 +117,11 @@ function scopeMapSame(a, b) {
   }
   return true;
 }
-// 문서함 2층 분류(문서체계 설계안 v2 2026-09-04 §2·§6, v317) — 1층 대분류 = 업무 영역 12 + 99 미분류(앱 전용), 2층 중분류 = 문서 성격 6(전 대분류 공통).
-// 라벨은 앱 DOC_MAJOR·DOC_MINOR와 동일(uismoke 대조). cat = 'AA-BB'(72) + '99' = 73키 화이트리스트. 구 2자리 cat('03' 등)은 키가 아니라 번호 파생으로 넘어간다(마이그레이션 §6.4 전 구건)
-const DOC_MAJOR_LABEL = { '01': '01 법인·등기', '02': '02 경영·총무', '03': '03 영업·홍보', '04': '04 계약·공사', '05': '05 차량·장비', '06': '06 안전보건', '07': '07 인사·노무', '08': '08 인허가', '09': '09 인증·경영시스템', '10': '10 재무·세무', '11': '11 정보·시스템', '12': '12 기타', '99': '99 미분류' };
-const DOC_MINOR_LABEL = { '01': '01 규정·기준', '02': '02 매뉴얼·가이드', '03': '03 양식·서식', '04': '04 관리표·대장', '05': '05 계획·조직', '06': '06 자료' };
-const DOC_MAJOR_SET = Object.keys(DOC_MAJOR_LABEL).reduce(function (o, k) { o[k] = 1; return o; }, {});
-const DOC_MINOR_SET = Object.keys(DOC_MINOR_LABEL).reduce(function (o, k) { o[k] = 1; return o; }, {});
-// DOC_CAT_SET(73키)·DOC_CAT_LABEL(결재 카드 문구 '06-01 안전보건 · 규정·기준') — 앱 DOC_CATS와 같은 생성 규칙
-const DOC_CAT_SET = {}, DOC_CAT_LABEL = {};
-Object.keys(DOC_MAJOR_LABEL).forEach(function (maj) {
-  if (maj === '99') { DOC_CAT_SET['99'] = 1; DOC_CAT_LABEL['99'] = DOC_MAJOR_LABEL['99']; return; }
-  Object.keys(DOC_MINOR_LABEL).forEach(function (min) { const k = maj + '-' + min; DOC_CAT_SET[k] = 1; DOC_CAT_LABEL[k] = k + ' ' + DOC_MAJOR_LABEL[maj].slice(3) + ' · ' + DOC_MINOR_LABEL[min].slice(3); });
-});
-// 분류 파생 — cat 화이트리스트 우선, 아니면 문서번호 JW-AA-BB-NNN[-SS|-YYYY]의 앞 두 마디. 구형식 JW-05-001·번호 없음·구 분류 텍스트 → 99(텍스트 폴백 삭제 — 오배정 대신 미분류). 클라 docCatOf와 같은 규칙 유지 필수(uismoke가 정규식 동률 대조)
-function docCatOf(it) {
-  if (!it) return '99';
-  // cat은 화이트리스트만 신뢰 — 무효값을 그대로 분류로 삼으면 01 보호를 폴스루로 빠져나간다(클라와 동일 규칙)
-  if (it.cat && hasOwn(DOC_CAT_SET, String(it.cat))) return String(it.cat);
-  const s = String(it.no || '') + ' ' + String(it.title || '');
-  const m = s.match(/JW-?(\d{2})-(\d{2})-\d{3}/i);   // 4층 번호의 앞 두 마디(별지 -SS·연도판 -YYYY도 앞 두 마디) — 앱과 동일 정규식
-  if (m && hasOwn(DOC_CAT_SET, m[1] + '-' + m[2])) return m[1] + '-' + m[2];
-  return '99';
-}
-// 대분류 2자리 — 01 하드차단 판정·공개범위 설정 조회 공용(설정 키 = 대분류). 구 2자리 cat '01'은 번호 파생이 실패해도 01(마이그레이션 전 법인 문서가 99로 풀려 문서 scope로 노출되지 않게 — 클라 동일)
-function docMajorOf(it) {
-  const c = docCatOf(it);
-  if (c !== '99') return c.slice(0, 2);
-  return (it && String(it.cat) === '01') ? '01' : '99';
-}
-function docCanSee01(m) { return !!(m && (m.admin || String(m.dept || '') === '관리부')); }
+// 문서함 분류·공개범위 판정은 _lib/docscope.js 한 곳(v424 — 물어보기가 같은 판정을 쓴다)
+const { DOC_MAJOR_LABEL, DOC_MINOR_LABEL, DOC_MAJOR_SET, DOC_MINOR_SET, DOC_CAT_SET, DOC_CAT_LABEL, docCatOf, docMajorOf, docCanSee01, DOC_SETTINGS_KEY, DOC_SCOPE_CATS, DOC_SCOPE_VALS, DOC_SETTINGS_DEFAULTS, docSettings, docScopeNorm, docStatusOf, docScopeMatch, docScopeOf, docVisible } = require('./_lib/docscope');
 
-// ---- 문서함 공개범위·등재 결재(v314, PM 지시 9/4 "문서함 일단 다 올리고 등재결재랑 공개범위 만들어라 내가 선택하게" + "비공개로 다 올리라고") ----
-// 공개범위(scope): 문서 항목 scope = 'all'(전원) | 'mgmt'(관리부+관리자 — docCanSee01과 같은 축) | 'admin'(관리자만) | {ids:[회원id…]}(지정 직원+관리자).
-// 미지정 문서는 분류 기본값(settings:documents.scope_default) — 초기값은 전 분류 'admin'(전부 비공개, PM 9/4 추가 지시).
-// 공개는 PM이 설정 화면에서 분류별로 열거나 문서별 scope를 줄 때만. 01 법인은 하드차단(관리부+관리자) 유지·설정 대상 아님.
-// 등재 결재(register_gate): 'staff'(기본 — 비관리자 등재는 status '대기' + 결재함 '문서함 등재' 카드 자동 상신, 승인 시 '등재') | 'none'(즉시 등재).
-// 관리자 등재는 항상 즉시 '등재'(등급표 ① PM 전결 — PM·관리자가 올리면 그 자체가 결재). status 없는 구건(18건)은 '등재'로 취급.
-const DOC_SETTINGS_KEY = 'settings:documents';
-const DOC_SCOPE_CATS = ['02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12', '99'];   // 설정 키 = 대분류 2자리(v317 2층 분류 — 중분류 단위 설정 없음, 'AA-BB' 키는 BAD_CAT). 01 법인은 설정 불가(하드차단). 미저장 대분류는 기본 비공개
-const DOC_SCOPE_VALS = { all: 1, mgmt: 1, admin: 1 };
-const DOC_SETTINGS_DEFAULTS = { scope_default: DOC_SCOPE_CATS.reduce(function (o, cat) { o[cat] = 'admin'; return o; }, {}), register_gate: 'staff' };
-// 읽기 실패는 기본표(전부 관리자만) 폴백 = 가장 닫힌 쪽(fail-closed). 등급표(apprGrades)와 같은 병합 규칙 — 저장본이 기본표 위에 얹힌다
-async function docSettings(st) {
-  const out = { scope_default: Object.assign({}, DOC_SETTINGS_DEFAULTS.scope_default), register_gate: DOC_SETTINGS_DEFAULTS.register_gate, updated_at: 0, updated_by: '', read_failed: false };
-  try {
-    const r = await blobGet(st, DOC_SETTINGS_KEY);
-    if (r.ok && r.data) {
-      const sd = r.data.scope_default;
-      if (sd && typeof sd === 'object') DOC_SCOPE_CATS.forEach(function (cat) { if (typeof sd[cat] === 'string' && hasOwn(DOC_SCOPE_VALS, sd[cat])) out.scope_default[cat] = sd[cat]; });
-      if (r.data.register_gate === 'none' || r.data.register_gate === 'staff') out.register_gate = r.data.register_gate;
-      out.updated_at = r.data.updated_at || 0; out.updated_by = r.data.updated_by || '';
-    } else if (!r.ok && r.code !== 'NOT_FOUND') out.read_failed = true;
-  } catch (e) { out.read_failed = true; }
-  return out;
-}
-// scope 정규화 — 화이트리스트 밖 값은 버린다(무효값이 "미지정=분류 기본"으로 떨어지게). ids는 문자열만·중복 제거·상한 50
-function docScopeNorm(s) {
-  if (typeof s === 'string') return hasOwn(DOC_SCOPE_VALS, s) ? s : null;
-  if (s && typeof s === 'object' && Array.isArray(s.ids)) {
-    const seen = {}, ids = [];
-    s.ids.forEach(function (x) { if (typeof x === 'string' && x && !seen[x] && ids.length < 50) { seen[x] = 1; ids.push(x); } });
-    return { ids: ids };
-  }
-  return null;
-}
-function docStatusOf(it) { return (it && (it.status === '대기' || it.status === '반려')) ? it.status : '등재'; }
 // 재상신 멱등키 — 첫 상신 'docreg-<id>', 반려 후 재상신은 reg_n을 올려 'docreg-<id>-<n>'(닫힌 구 카드의 cid 멱등에 걸리지 않게)
 function docRegCid(it) { const n = Number(it && it.reg_n) || 1; return 'docreg-' + it.id + (n > 1 ? '-' + n : ''); }
-function docScopeMatch(sc, m) {
-  if (!m) return false;
-  if (m.admin) return true;
-  if (sc === 'all') return true;
-  if (sc === 'mgmt') return docCanSee01(m);
-  if (sc && typeof sc === 'object' && Array.isArray(sc.ids)) return sc.ids.indexOf(m.id) >= 0;
-  return false;   // 'admin'·미지정
-}
-// 유효 공개범위: 문서 scope > 분류 기본값. 01은 기본 'mgmt'(하드차단과 동일 축 — 문서 scope로 더 좁힐 수는 있어도 넓힐 수는 없다)
-function docScopeOf(it, settings) {
-  const own = docScopeNorm(it && it.scope);
-  if (own) return own;
-  const maj = docMajorOf(it);   // 분류 기본값은 대분류 단위(v317)
-  if (maj === '01') return 'mgmt';
-  return (settings && settings.scope_default && typeof settings.scope_default[maj] === 'string' && hasOwn(DOC_SCOPE_VALS, settings.scope_default[maj])) ? settings.scope_default[maj] : 'admin';
-}
-// 열람 판정(서버 하드차단 — get 필터·save 재구성 공용). 관리자 무제한. '대기'·'반려'는 등재한 본인만.
-// 등재한 본인(by.id)은 자기 문서를 항상 본다 — 자기가 올린 문서가 승인 뒤 사라지는 혼란 방지(정보 유출 없음: 본인이 쓴 내용)
-function docVisible(m, it, settings) {
-  if (!it || !m) return false;
-  if (m.admin) return true;
-  if (docMajorOf(it) === '01' && !docCanSee01(m)) return false;   // 01 하드차단(대분류 판정, v317)이 본인 예외보다 앞 — 관리자가 직원 문서를 01로 옮기면 그 직원도 못 본다(적대 검증 low6)
-  const mine = !!(it.by && it.by.id === m.id);
-  if (docStatusOf(it) !== '등재') return mine;
-  if (mine) return true;
-  return docScopeMatch(docScopeOf(it, settings), m);
-}
 // DOC_CAT_LABEL은 위 2층 분류 표에서 생성(v317)
 const DOC_SCOPE_LABEL = { all: '전원', mgmt: '관리부+관리자', admin: '관리자만' };
 function docScopeText(it, settings) {
@@ -2218,6 +2129,7 @@ async function appendRecLog(st, entry) {
 const LN = require('./_lib/learn');
 const DD = require('./_lib/docdiff');
 const BF = require('./_lib/boxfile');   // v423 넣기 박스 조각
+const BJ = require('./_lib/boxjudge');   // v424 검토 파일명 제외를 입구와 같은 기준으로
 const LEARN_KEY = LN.TYPES.contract.settings_key;
 const LEARN_ALLOW_MAX = 200;   // 양식당 허용 칸 상한
 async function learnSettings(st) {
@@ -2230,52 +2142,115 @@ function learnAllowed(s, tpl) { const a = s.contract.allow[tpl]; return s.contra
 function learnDiffPublic(diff) {
   if (!diff) return null;
   const o = {};
-  ['ok', 'code', 'kind', 'compared', 'changed', 'uncomparable', 'ratio', 'n_draft', 'n_final', 'same', 'added', 'removed'].forEach(function (k) { if (diff[k] !== undefined) o[k] = diff[k]; });
+  ['ok', 'code', 'kind', 'compared', 'changed', 'uncomparable', 'ratio', 'n_draft', 'n_final', 'same', 'added', 'removed', 'outside_changed', 'refs_outside'].forEach(function (k) { if (diff[k] !== undefined) o[k] = diff[k]; });
   o.refs_changed = Array.isArray(diff.refs_changed) ? diff.refs_changed : [];
   o.refs_uncomparable = Array.isArray(diff.refs_uncomparable) ? diff.refs_uncomparable : [];
   return o;
 }
+// v424 짝 찾는 순서(브리핑 1단계): ① 파일 안 표식 ② 서류 이름으로 정한 양식(pair_tpl) ③ 내용 일치율 ④ 비교할 수 없는 형식(hwp·pdf)은 같은 단계 초안 하나일 때만.
+// 직원에게 고르라고 하지 않는다. 일치율이 비슷한 초안이 둘 이상일 때만 미매칭으로 남긴다.
+const PAIR_MATCH_MIN = 0.5;    // 이 이상이면 그 초안의 수정본으로 본다
+const PAIR_MATCH_GAP = 0.05;   // 1등과 2등 차이가 이보다 작으면 정하지 않는다
+const PAIR_STAGE_MIN = 0.2;    // 같은 단계 초안이 하나뿐이면 많이 고친 것으로 보는 하한
+const PAIR_SCAN_MAX = 12;      // 내용을 대조할 초안 수 상한(동기 함수 시간)
 async function cdocLearnPair(st, member, ref, idx, item, ext, b64, orig, d) {
-  const T = LN.TYPES.contract, now = Date.now();
-  if (T.forbid_re.test(String(ref.dk || '')) || T.forbid_re.test(String(orig || ''))) return { ok: false, code: 'TYPE_EXCLUDED' };
-  const isDraft = function (x) { return x && x.kind === 'draft' && x.cur === 1 && !x.del && !x.gc && !x.purged && typeof x.dk === 'string' && x.dk.indexOf('gen.') === 0; };
+  const T = LN.TYPES.contract, now = Date.now(), files = store(FILES);
+  const live = function (x) { return x && x.kind === 'draft' && !x.del && !x.gc && !x.purged && typeof x.dk === 'string' && x.dk.indexOf('gen.') === 0; };
+  const isDraft = function (x) { return live(x) && x.cur === 1; };
+  const fb = b64 ? Buffer.from(b64, 'base64') : null;
+  const mark = fb ? DD.genMarkOf(fb, ext) : '';
+  let byMark = mark ? (idx.items.filter(function (x) { return live(x) && x.gen === mark; })[0] || null) : null;
+  if (byMark) {   // 표식은 그대로인데 내용이 많이 다르면(지난 파일을 복사해 고친 경우) 믿지 않는다. 잴 수 없으면 표식을 따른다
+    const mr = await blobGet(files, cdocKey(ref.cid, byMark.i, byMark.dk, byMark.n));
+    const ms = (mr.ok && mr.data) ? DD.matchScore(mr.data, byMark.ext, ext, fb) : null;
+    if (ms !== null && ms < PAIR_MATCH_MIN) byMark = null;
+  }
+  // 유형 제외: 민감정보 등급·서류 자리, 파일명은 입구와 같은 기준(서류 이름 단위 — '주민센터 철거공사'·'건강보험 완납증명'은 걸리지 않고 명단·검진·신분증은 표식이 있어도 제외)
+  if (Number(item.pii) === 2 || T.forbid_re.test(String(ref.dk || '')) || BJ.nameGuard(orig)) return { ok: false, code: 'TYPE_EXCLUDED' };
   const drafts = idx.items.filter(function (x) { return isDraft(x) && x.i === ref.i; });
+  const all = idx.items.filter(isDraft);
   const want = (d && typeof d.pair_tpl === 'string') ? d.pair_tpl.trim().slice(0, 40) : '';
-  let pick = null;
+  let pick = byMark, how = byMark ? 'mark' : '', match = null;
   // v423 넣기 박스: 서류 이름으로 양식이 정해지면(pair_tpl) 초안이 다른 단계에서 만들어졌어도 그 초안과 짝을 맺는다
-  if (want) pick = drafts.filter(function (x) { return x.dk === 'gen.' + want; })[0] || idx.items.filter(function (x) { return isDraft(x) && x.dk === 'gen.' + want; }).sort(function (a, b) { return b.n - a.n; })[0] || null;
-  else if (drafts.length === 1) pick = drafts[0];
-  if (!drafts.length && !pick) return { ok: false, code: 'NO_DRAFT' };
+  if (!pick && want) {
+    pick = drafts.filter(function (x) { return x.dk === 'gen.' + want; })[0] || all.filter(function (x) { return x.dk === 'gen.' + want; }).sort(function (a, b) { return b.n - a.n; })[0] || null;
+    const fam = { xlsx: 1, hwpx: 1, docx: 1 };
+    if (pick && fam[ext] && fam[pick.ext] && ext !== pick.ext) pick = null;   // 이름은 맞는데 형식이 다르다(hwpx 수정본 ↔ xlsx 초안) — 비교할 수 없으니 내용으로 다시 찾는다. 스캔 pdf·hwp는 이름 짝 유지
+    if (pick) how = 'name';
+  }
   const base = { cid: ref.cid, i: ref.i, dk: ref.dk, final_n: item.n, ts: now, by: member.id, tries: 0 };
-  if (!pick) {
-    // 같은 단계에 초안 양식이 둘 이상 — 자동 판단하지 않고 사람 선택(pair_tpl 재요청 또는 관리자 카드)으로 남긴다
+  const unmatched = async function (list) {
     const id = LN.newPairId('contract', ref.cid + ':' + item.n);
-    const pair = Object.assign({ id: id, tpl: '', draft_n: 0, kind: 'none', status: 'unmatched', candidates: drafts.map(function (x) { return { n: x.n, tpl: x.dk.slice(4) }; }) }, base);
+    const pair = Object.assign({ id: id, tpl: '', draft_n: 0, kind: 'none', status: 'unmatched', candidates: list.map(function (x) { return { n: x.n, tpl: x.dk.slice(4) }; }) }, base);
     const w = await blobSet(st, LN.pairKey('contract', id), pair);
     return { ok: w.ok, id: id, status: 'unmatched', candidates: pair.candidates, code: w.ok ? '' : w.code };
+  };
+  if (!pick) {
+    if (!all.length) return { ok: false, code: 'NO_DRAFT' };
+    // 비교되는 형식이면 형식이 맞는 초안만, 이 단계 먼저·최근 판 먼저 대조한다. 형식이 맞는 초안이 없으면 다른 서류
+    const fam = { xlsx: 1, hwpx: 1, docx: 1 }, cmp = !!fam[ext], fmtOk = function (x) { return ext === 'xlsx' ? (x.ext === 'xlsx' || x.ext === 'json') : x.ext === ext; };
+    const pool = cmp ? drafts.filter(fmtOk).concat(all.filter(function (x) { return x.i !== ref.i && fmtOk(x); }).sort(function (a, b) { return b.n - a.n; })) : [];
+    if (cmp && !pool.length) return { ok: false, code: 'NO_MATCH' };
+    const order = pool.slice(0, PAIR_SCAN_MAX), scored = [];
+    if (fb) {
+      for (const x of order) {
+        const dr0 = await blobGet(files, cdocKey(ref.cid, x.i, x.dk, x.n));
+        if (!dr0.ok || !dr0.data) continue;
+        const sc = DD.matchScore(dr0.data, x.ext, ext, fb);
+        if (sc !== null) scored.push({ x: x, sc: sc });
+      }
+      scored.sort(function (a, b) { return b.sc - a.sc; });
+    }
+    const top = scored[0], next = scored[1];
+    if (top && top.sc >= PAIR_MATCH_MIN) {
+      const tied = (next && top.sc - next.sc < PAIR_MATCH_GAP) ? scored.filter(function (y) { return top.sc - y.sc < PAIR_MATCH_GAP; }).map(function (y) { return y.x; }) : [top.x];
+      const oneTpl = tied.every(function (y) { return y.dk === tied[0].dk; });   // 같은 양식을 두 단계에서 만든 경우 = 최근 판과 짝
+      if (!oneTpl) return unmatched(tied);
+      pick = tied.slice().sort(function (a, b) { return b.n - a.n; })[0]; how = 'content'; match = Math.round(top.sc * 1000) / 1000;
+    } else if (scored.length) {
+      // 비교는 됐는데 맞는 초안이 없다 — 같은 단계 초안이 하나뿐이고 어느 정도 겹치면 많이 고친 수정본, 아니면 다른 서류
+      const lone = drafts.length === 1 ? scored.filter(function (y) { return y.x === drafts[0]; })[0] : null;
+      if (lone && lone.sc >= PAIR_STAGE_MIN) { pick = drafts[0]; how = 'stage'; match = Math.round(lone.sc * 1000) / 1000; }
+      else return { ok: false, code: 'NO_MATCH' };
+    } else {
+      if (cmp) return { ok: false, code: 'NO_MATCH' };   // 비교되는 형식인데 잴 재료가 없다 — 단계로 묶지 않는다
+      // 비교할 수 없는 형식(hwp·날인 스캔 pdf) — 내용으로 못 가린다
+      if (!drafts.length) return { ok: false, code: 'NO_DRAFT' };
+      if (drafts.length > 1) return unmatched(drafts);
+      pick = drafts[0]; how = 'stage';
+    }
   }
   const tpl = pick.dk.slice(4);
-  const dr = await blobGet(store(FILES), cdocKey(ref.cid, pick.i, pick.dk, pick.n));
+  const dr = await blobGet(files, cdocKey(ref.cid, pick.i, pick.dk, pick.n));
   if (!dr.ok || !dr.data) return { ok: false, code: 'DRAFT_READ_FAILED' };
   let diff = null, kind = 'none';
-  const fb = b64 ? Buffer.from(b64, 'base64') : null;
   const fillFlat = dr.data.fill ? DD.flattenEdits(dr.data.fill.edits) : null;   // v419 실제 초안은 시트별 객체 — 옛 평면 배열도 받는다
-  if (fillFlat && ext === 'xlsx' && fb) { diff = DD.xlsxCellDiff(fillFlat, fb); kind = 'xlsx_cell'; }
-  else if (dr.data.data && ext === 'docx' && pick.ext === 'docx' && fb) { diff = DD.docxParaDiff(Buffer.from(String(dr.data.data), 'base64'), fb); kind = 'docx_para'; }
+  const db = dr.data.data ? Buffer.from(String(dr.data.data), 'base64') : null;
+  const blanked = Array.isArray(dr.data.blank) ? dr.data.blank : [];   // 서버 사본에서 일부러 비운 사람 칸 — 비교에서 뺀다
+  if (fb && ext === 'xlsx') {
+    if (fillFlat && fillFlat.length) {
+      diff = DD.xlsxCellDiff(fillFlat, fb); kind = 'xlsx_cell';
+      if (db && pick.ext === 'xlsx' && diff.ok) { const o = DD.xlsxFileDiff(db, fb, fillFlat.map(function (e) { return e[0]; }).concat(blanked)); if (o.ok) { diff.outside_changed = o.changed; diff.refs_outside = o.refs_changed.slice(0, 100); } }   // AI가 안 채운 칸을 직원이 얼마나 채웠나(간극 값에는 안 넣는다)
+    } else if (db && pick.ext === 'xlsx') { diff = DD.xlsxFileDiff(db, fb, blanked); kind = 'xlsx_file'; }
+  } else if (fb && db && ext === 'docx' && pick.ext === 'docx') { diff = DD.docxParaDiff(db, fb); kind = 'docx_para'; }
+  else if (fb && db && ext === 'hwpx' && pick.ext === 'hwpx') { diff = DD.hwpxParaDiff(db, fb); kind = 'hwpx_para'; }
   const gap = DD.gapScore(diff, null, 0);
   const s = await learnSettings(st);
-  const status = learnAllowed(s, tpl) ? 'pending' : 'done_nomodel';
+  const status = (kind === 'xlsx_cell' && learnAllowed(s, tpl)) ? 'pending' : 'done_nomodel';   // 모델 학습은 칸 비교만(허용 사전이 칸 단위) — 문단 비교는 간극만
   const id = LN.newPairId('contract', ref.cid + ':' + item.n);
-  const pair = Object.assign({ id: id, tpl: tpl, draft_n: pick.n, draft_i: pick.i, kind: kind, status: status, diff: learnDiffPublic(diff), gap: gap }, base);
+  const pair = Object.assign({ id: id, tpl: tpl, draft_n: pick.n, draft_i: pick.i, kind: kind, how: how, status: status, diff: learnDiffPublic(diff), gap: gap }, base);
+  if (match !== null) pair.match = match;
   const w = await blobSet(st, LN.pairKey('contract', id), pair);
   if (!w.ok) return { ok: false, code: w.code || 'PAIR_WRITE_FAILED' };
   try {
     const lk = T.lessons_key(tpl); const lr = await blobGet(st, lk);
-    const L = LN.pushGap(lr.ok ? lr.data : null, { pair: id, promo_id: ref.cid, ratio: gap.cell_ratio, score: gap.score, kind: kind, changed: diff ? diff.changed : 0, compared: diff ? diff.compared : 0, uncomparable: diff ? diff.uncomparable : 0, comparable: gap.comparable }, now);
-    LN.freezeBaseline(L, now);   // v412 첫 10건 평균 = 기준선(일몰 비교 축)
-    await blobSet(st, lk, L);
+    if (lr.ok || lr.code === 'NOT_FOUND') {   // 읽기 실패를 빈 창고로 보고 규칙·기준선·끔 표시를 덮어쓰지 않는다(v424 검토) — 이번 간극 1줄만 빠진다
+      const L = LN.pushGap(lr.ok ? lr.data : null, { pair: id, promo_id: ref.cid, ratio: gap.cell_ratio, score: gap.score, kind: kind, changed: diff ? diff.changed : 0, compared: diff ? diff.compared : 0, uncomparable: diff ? diff.uncomparable : 0, comparable: gap.comparable }, now);
+      LN.freezeBaseline(L, now);   // v412 첫 10건 평균 = 기준선(일몰 비교 축)
+      await blobSet(st, lk, L);
+    }
   } catch (e) {}
-  return { ok: true, id: id, status: status, tpl: tpl, kind: kind, gap: gap, changed: diff ? diff.changed : null, compared: diff ? diff.compared : null, uncomparable: diff ? diff.uncomparable : null };
+  return { ok: true, id: id, status: status, tpl: tpl, kind: kind, how: how, draft_n: pick.n, gap: gap, changed: diff ? diff.changed : null, compared: diff ? diff.compared : null, uncomparable: diff ? diff.uncomparable : null, outside: (diff && Number(diff.outside_changed)) || 0 };
 }
 async function handleLearnSettingsGet(event, d, R) {
   const c = await currentMember(event);
@@ -2320,7 +2295,9 @@ async function handleLearnTplSet(event, d, R) {
   const tpl = String(d.tpl || '').trim();
   if (!/^[A-Za-z0-9_.-]{1,40}$/.test(tpl)) return jr(400, { status: 'REJECTED', error_code: 'BAD_TPL', request_id: R });
   if (typeof d.off !== 'boolean') return jr(400, { status: 'REJECTED', error_code: 'BAD_VALUE', request_id: R });
-  const st = store(DATA); const lk = LN.TYPES.contract.lessons_key(tpl); const lr = await blobGet(st, lk); const L = LN.normLessons(lr.ok ? lr.data : null);
+  const st = store(DATA); const lk = LN.TYPES.contract.lessons_key(tpl); const lr = await blobGet(st, lk);
+  if (!lr.ok && lr.code !== 'NOT_FOUND') return jr(500, { status: 'ERROR', error_code: lr.code || 'STORAGE_READ_FAILED', request_id: R });   // 읽기 실패로 규칙을 비우지 않는다
+  const L = LN.normLessons(lr.ok ? lr.data : null);
   if (L.off === d.off) return jr(400, { status: 'REJECTED', error_code: 'NO_CHANGE', request_id: R });
   const now = Date.now();
   L.off = d.off;
@@ -2353,15 +2330,18 @@ async function handleLearnPairsGet(event, d, R) {
   const st = store(DATA); const pre = LN.TYPES.contract.pair_prefix;
   const l = await blobList(st, pre);
   if (!l.ok) return jr(500, { status: 'ERROR', error_code: l.code, request_id: R });
-  const keys = (l.keys || []).filter(function (k) { return k.indexOf(pre) === 0; }).sort().slice(-LEARN_LIST_MAX);
+  const allKeys = (l.keys || []).filter(function (k) { return k.indexOf(pre) === 0; }).sort();   // 짝 번호 앞 8자리가 시각 — 정렬이 곧 시간순
+  const keys = allKeys.slice(-LEARN_LIST_MAX);
   const pairs = [];
   for (const k of keys) { const r = await blobGet(st, k); if (r.ok && r.data && typeof r.data === 'object') pairs.push(r.data); }
   pairs.sort(function (a, b) { return (Number(b.ts) || 0) - (Number(a.ts) || 0); });
   const tpls = {}; pairs.forEach(function (p) { if (p.tpl) tpls[p.tpl] = 1; });
+  try { const ll = await blobList(st, 'lessons:contract:'); if (ll.ok) (ll.keys || []).forEach(function (k) { const t = String(k).slice('lessons:contract:'.length); if (t) tpls[t] = 1; }); } catch (e) {}   // 양식 표는 최근 짝에 든 양식만이 아니라 전부
   const lessons = {};
   for (const t of Object.keys(tpls)) { const r = await blobGet(st, LN.TYPES.contract.lessons_key(t)); const L = LN.normLessons(r.ok ? r.data : null); lessons[t] = { off: L.off, rules_n: L.rules.length, pairs: L.stats.pairs, calls: L.stats.calls, gap: LN.gapSummary(L), sunset: L.sunset || null, baseline: L.baseline || null }; }   // v412 일몰·기준선
   const s = await learnSettings(st);
-  return jr(200, { status: 'OK', pairs: pairs, lessons: lessons, settings: s, request_id: R });
+  let usage = null; try { const ur = await blobGet(st, 'usage:box:' + LN.ymOf(Date.now())); if (ur.ok && ur.data) usage = ur.data; } catch (e) {}   // 이번 달 짝 경로(표식·이름·내용·단계·못 찾음) — 표식이 실제로 살아남는지 본다
+  return jr(200, { status: 'OK', pairs: pairs, total: allKeys.length, lessons: lessons, settings: s, usage: usage, request_id: R });
 }
 async function cdocAudit(member, op, cid, t) {
   try { const r = await appendAudit({ ts: Date.now(), by: member.name, bid: member.id, col: 'contracts', ev: [{ op: op, id: cid, t: String(t || '').slice(0, 80) }] }); return r !== false; } catch (e) { return false; }
@@ -2412,12 +2392,13 @@ async function handleCdocPut(event, d, R) {
   const orig = String(d.name || '').trim().slice(0, 120);
   const b64 = String(d.data || '');
   let fill = null, ext = '';
-  if (kind === 'draft' && !b64 && d.fill && typeof d.fill === 'object' && !Array.isArray(d.fill)) {
-    // 채움 맵 JSON 초안(파일 없이) — 생성 훅 자동 보존·6MB 초과 폴백. 값에 개인정보가 섞일 수 있어 pii는 호출자가 지정(기본 0)
+  if (kind === 'draft' && d.fill && typeof d.fill === 'object' && !Array.isArray(d.fill)) {
+    // 채움 맵 JSON — v424부터 파일과 함께 온다(칸 비교용). 파일 없이 오면 채움 맵만(6MB 초과 폴백). 값에 개인정보가 섞일 수 있어 pii는 호출자가 지정(기본 0)
     let s; try { s = JSON.stringify(d.fill); } catch (e) { return jr(400, { status: 'REJECTED', error_code: 'BAD_FILL', request_id: R }); }
     if (!s || s.length > CDOC_FILL_MAX) return jr(413, { status: 'REJECTED', error_code: 'FILL_TOO_LARGE', request_id: R });
     fill = JSON.parse(s); ext = 'json';
-  } else {
+  }
+  if (!fill || b64) {
     if (!orig || !b64) return jr(400, { status: 'REJECTED', error_code: 'INVALID_FILE', request_id: R });
     ext = docAttExt(orig);
     if (!docAttExtOk(ext)) return jr(400, { status: 'REJECTED', error_code: 'BAD_EXT', request_id: R });
@@ -2434,10 +2415,11 @@ async function cdocCommit(c, d, R, ref, kind, pii, orig, ext, b64, fill, att) {
   const ix = await cdocIdxRead(st, ref.cid);
   if (!ix.ok) return jr(500, { status: 'ERROR', error_code: ix.code, request_id: R });
   const idx = ix.doc;
-  if (idx.items.length >= CDOC_PER_CON) return jr(409, { status: 'CONFLICT', error_code: 'RECIDX_FULL', request_id: R });
-  const sha = crypto.createHash('sha256').update(fill ? Buffer.from(JSON.stringify(fill), 'utf8') : Buffer.from(b64, 'base64')).digest('hex');
+  if (idx.items.filter(function (x) { return x && !x.gc && !x.purged; }).length >= CDOC_PER_CON) return jr(409, { status: 'CONFLICT', error_code: 'RECIDX_FULL', request_id: R });   // 바이트가 지워진 옛 초안(gc)은 세지 않는다 — 자동 초안이 직원 최종본을 막지 않게
+  const sha = crypto.createHash('sha256').update(b64 ? Buffer.from(b64, 'base64') : Buffer.from(JSON.stringify(fill), 'utf8')).digest('hex');
   // sha256 중복 = 같은 계약 안의 살아 있는 항목과 바이트가 같음 → 상단 노출 뒤 사람 선택(allow_dup:true로 재요청). 자동 거부·자동 병합 없음
-  const dup = idx.items.filter(function (x) { return x && x.sha === sha.slice(0, 16) && !x.del && !x.purged; }).map(cdocPublic);
+  // v424 AI 초안과 바이트가 같은 최종본은 중복이 아니다(직원이 고치지 않고 그대로 넣은 파일 = 간극 0)
+  const dup = idx.items.filter(function (x) { return x && x.sha === sha.slice(0, 16) && !x.del && !x.purged && (kind === 'draft' || x.kind !== 'draft'); }).map(cdocPublic);
   if (dup.length && d.allow_dup !== true) return jr(409, { status: 'CONFLICT', error_code: 'DUP_BYTES', dup: dup, request_id: R });
   const same = idx.items.filter(function (x) { return x && x.i === ref.i && x.dk === ref.dk && x.kind === kind && !x.purged; });
   const ver = same.length + 1;
@@ -2446,14 +2428,20 @@ async function cdocCommit(c, d, R, ref, kind, pii, orig, ext, b64, fill, att) {
   const corp = await cdocCorpOf(st, ld.c, ref.i);
   const std = cdocStdName(ref.cid, ref.i, ref.dk, ver, now, corp, ext);
   const fkey = cdocKey(ref.cid, ref.i, ref.dk, n);
-  const rec = { name: std, orig: orig, type: fill ? 'application/json' : (DOC_ATT_MIME[ext] || 'application/octet-stream'), kind: kind, cid: ref.cid, i: ref.i, dk: ref.dk, n: n, ver: ver, pii: pii, by: c.member.name, bid: c.member.id, ts: now, sha: sha };
+  const rec = { name: std, orig: orig, type: (fill && !b64) ? 'application/json' : (DOC_ATT_MIME[ext] || 'application/octet-stream'), kind: kind, cid: ref.cid, i: ref.i, dk: ref.dk, n: n, ver: ver, pii: pii, by: c.member.name, bid: c.member.id, ts: now, sha: sha };
   if (fill) rec.fill = fill;
-  else if (att && att.rec.parts) { rec.att = att.id; rec.parts = att.rec.parts; }   // v423 큰 파일: 조각은 attp:에 그대로
-  else rec.data = b64;
+  if (att && att.rec.parts) { rec.att = att.id; rec.parts = att.rec.parts; }   // v423 큰 파일: 조각은 attp:에 그대로
+  else if (b64) rec.data = b64;
+  // v424 AI 초안의 표식 — 파일 안 문서 정보에 같은 번호가 들어 있다. 계약·서류가 맞을 때만 받는다
+  const genP = (kind === 'draft' && typeof d.gen === 'string') ? DD.genMarkParse(d.gen) : null;
+  const gen = (genP && genP.cid === ref.cid && 'gen.' + genP.tpl === ref.dk) ? d.gen : '';
+  if (gen) rec.gen = gen;
+  if (kind === 'draft' && Array.isArray(d.blank)) { const bl = d.blank.filter(function (x) { return typeof x === 'string' && /^[^!]{1,40}![A-Z]{1,3}\d{1,5}$/.test(x); }).slice(0, 400); if (bl.length) rec.blank = bl; }   // 서버 사본에서 비운 사람 칸(좌표만)
   const fw = await blobSet(store(FILES), fkey, rec);
   if (!fw.ok) return jr(500, { status: 'ERROR', error_code: fw.code, request_id: R });
   same.forEach(function (x) { if (x.cur) x.cur = 0; });
-  const item = { n: n, i: ref.i, dk: ref.dk, kind: kind, ver: ver, cur: 1, name: std, orig: orig || std, ext: ext, size: fill ? JSON.stringify(fill).length : b64Bytes(b64), sha: sha.slice(0, 16), pii: pii, corp: corp, by: { id: c.member.id, name: c.member.name }, ts: now };
+  const item = { n: n, i: ref.i, dk: ref.dk, kind: kind, ver: ver, cur: 1, name: std, orig: orig || std, ext: ext, size: (fill && !b64) ? JSON.stringify(fill).length : b64Bytes(b64), sha: sha.slice(0, 16), pii: pii, corp: corp, by: { id: c.member.id, name: c.member.name }, ts: now };
+  if (gen) item.gen = gen;
   if (typeof d.note === 'string' && d.note.trim()) item.note = d.note.trim().slice(0, 120);
   if (att) { item.att0 = att.id; if (att.rec.parts) item.parts = att.rec.parts; }   // v423 AI 판단 원본 parse:<att0>과 잇는 번호
   idx.items.push(item); idx.seq = n;
@@ -2478,7 +2466,7 @@ async function cdocCommit(c, d, R, ref, kind, pii, orig, ext, b64, fill, att) {
   // v410 학습 짝 — 최종본이면 같은 단계의 현재 초안과 짝을 만들고 차이·간극을 잰다(실패해도 올리기는 성공, learn에 사유만)
   let learn = null;
   if (kind === 'final') { try { learn = await cdocLearnPair(st, c.member, ref, idx, item, ext, b64, orig, d); } catch (e) { learn = { ok: false, code: 'LEARN_THREW' }; } }
-  if (learn && learn.id) { item.pair = learn.id; await cdocIdxSetPair(st, ref.cid, n, learn.id); }   // v423 옮기면 이 짝을 무효로 돌린다
+  if (learn) { cdocPairMeta(item, learn); await cdocIdxSetPair(st, ref.cid, n, learn); await boxUsageAdd(st, 'pair_' + String(learn.how || learn.status || learn.code || 'x').toLowerCase().replace(/[^a-z_]/g, '').slice(0, 20), 1); }   // v423 옮기면 이 짝을 무효로 돌린다 · v424 화면용 양식·간극, 못 맺은 사유, 이번 달 경로 건수
   return jr(200, { status: 'OK', cid: ref.cid, n: n, ver: ver, name: std, item: cdocPublic(item), dup: dup, gc: gcd, audit: audit, learn: learn, request_id: R });
 }
 // ---- v423 넣기 박스(체크 31, PM 11/5 "서류 등록 채널 하나" · 11/6 "저장 설계는 Blobs 그대로") — 파일을 먼저 gw_files에 받고(box_put), 에이전트가 종류를 판단한 뒤(gw-parse-background), 다시 보내지 않고 서류함에 넣는다(cdoc_attach)
@@ -2487,13 +2475,26 @@ const BOX_MAX_PARTS = 8;           // 8조각 ≈ 원본 26MB
 const BOX_FIX_KEY = 'box:fixes';   // 사람이 고친 판단(다음 판단 프롬프트에 들어간다) — 파일 이름·개인정보 없이 종류·자리만
 const BOX_FIX_MAX = 60;
 function boxMarkKey(id) { return 'boxp:' + id; }   // 넣다 만 파일 표식 — 넣거나 버리면 지운다(화면을 닫아도 다시 찾을 수 있게, 자동 삭제 없음)
-// 짝 번호만 다시 읽어 고쳐 쓴다 — 첫 저장과 짝 만들기 사이에 다른 사람이 쓴 색인을 덮지 않게
-async function cdocIdxSetPair(st, cid, n, pairId) {
+// 색인의 짝 정보 — 번호·양식·간극·초안 번호(좌표·비율뿐, 값 없음). 서류함 화면의 [AI 생성본 ↔ 직원 최종본] 줄이 읽는다
+function cdocPairMeta(x, L) {
+  if (!L.id) { x.plearn = String(L.code || ''); return; }   // 못 맺은 사유 — 서류 줄이 '짝 없음(사유)'로 보여 준다
+  delete x.plearn;
+  x.pair = L.id;
+  if (L.tpl) x.ptpl = L.tpl;
+  x.pgap = (L.gap && typeof L.gap.cell_ratio === 'number') ? L.gap.cell_ratio : null;
+  if (L.kind) x.pkind = L.kind;
+  if (L.draft_n) x.pdn = L.draft_n;
+  if (L.how) x.phow = L.how;
+  if (L.outside) x.pout = L.outside; else delete x.pout;
+}
+function cdocPairClear(x) { if (x.ptpl) x.pwas = x.ptpl; delete x.pair; delete x.ptpl; delete x.pgap; delete x.pkind; delete x.pdn; delete x.phow; delete x.pout; delete x.plearn; }
+// 짝 정보만 다시 읽어 고쳐 쓴다 — 첫 저장과 짝 만들기 사이에 다른 사람이 쓴 색인을 덮지 않게
+async function cdocIdxSetPair(st, cid, n, L) {
   try {
     const ix = await cdocIdxRead(st, cid);
     if (!ix.ok) return;
     const x = ix.doc.items.find(function (y) { return y && Number(y.n) === n; });
-    if (x) { x.pair = pairId; await blobSet(st, cdocIdxKey(cid), ix.doc); }
+    if (x) { cdocPairMeta(x, L); await blobSet(st, cdocIdxKey(cid), ix.doc); }
   } catch (e) {}
 }
 function boxExtOk(ext) { return docAttExtOk(ext) || ext === 'xls'; }   // xls는 옛 📎 첨부가 받던 형식이라 유지
@@ -2600,12 +2601,17 @@ async function cdocPairVoid(st, it) {
         if (lr.ok && lr.data && Array.isArray(lr.data.gaps)) {
           const before = lr.data.gaps.length;
           lr.data.gaps = lr.data.gaps.filter(function (g) { return g && g.pair !== it.pair; });
-          if (lr.data.gaps.length !== before) { if (lr.data.stats) lr.data.stats.pairs = Math.max(0, (Number(lr.data.stats.pairs) || 0) - 1); await blobSet(st, lk, lr.data); }
+          if (lr.data.gaps.length !== before) {
+            if (lr.data.stats) lr.data.stats.pairs = Math.max(0, (Number(lr.data.stats.pairs) || 0) - 1);
+            const bl = lr.data.baseline;   // 얼린 기준선에 든 짝이면 남은 간극으로 다시 잰다(잘못 묶인 값이 일몰 판단에 남지 않게)
+            if (bl && Array.isArray(bl.pairs) && bl.pairs.indexOf(it.pair) >= 0) { delete lr.data.baseline; LN.freezeBaseline(lr.data, Date.now()); }
+            await blobSet(st, lk, lr.data);
+          }
         }
       }
     }
   } catch (e) {}
-  delete it.pair;
+  cdocPairClear(it);
 }
 async function handleCdocMove(event, d, R) {
   const c = await currentMember(event);
@@ -2645,7 +2651,7 @@ async function handleCdocMove(event, d, R) {
     same.forEach(function (x) { if (x.cur) x.cur = 0; });
     await cdocPairVoid(st, it);
     it.i = ref.i; it.dk = ref.dk; it.kind = kind; it.ver = ver; it.cur = 1; it.name = std; it.corp = corp; it.moved = Date.now();
-  }
+  } else if (piiNew === 2 && it.pair) await cdocPairVoid(st, it);   // 등급만 2로 올려도 짝을 무효로(민감정보는 짝을 만들지 않는다)
   it.pii = piiNew;
   idx.updated_at = Date.now(); idx.updated_by = c.member.id;
   const w = await blobSet(st, cdocIdxKey(ref.cid), idx);
@@ -2659,13 +2665,14 @@ async function handleCdocMove(event, d, R) {
   if (!sameSlot) {
     const fix = (d.fix && typeof d.fix === 'object') ? d.fix : {};
     const docNm = String(fix.doc || '').slice(0, 40);
-    await boxFixAppend(st, { k: 'doc', doc: LN.piiScan(docNm).ok ? docNm : '', from: String(fix.from || '').slice(0, 60), to: String(fix.to || '').slice(0, 60) });   // 파일 이름은 넣지 않는다(사람 이름이 섞일 수 있다)
+    const fixSan = function (s) { const t = String(s || '').slice(0, 60); return LN.piiScan(t).ok ? t : ''; };
+    await boxFixAppend(st, { k: 'doc', doc: LN.piiScan(docNm).ok ? docNm : '', from: fixSan(fix.from), to: fixSan(fix.to) });   // 파일 이름은 넣지 않는다(사람 이름이 섞일 수 있다) · 라벨도 연락처 꼴이면 뺀다
     await boxUsageAdd(st, 'moved', 1);
     if (kind === 'final') {
       try {
         const b64 = rec.att ? await BF.attReadB64(files, rec.att, (await blobGet(files, rec.att)).data) : String(rec.data || '');
         learn = await cdocLearnPair(st, c.member, ref, idx, it, it.ext, b64, it.orig, d);
-        if (learn && learn.id) { it.pair = learn.id; await cdocIdxSetPair(st, ref.cid, n, learn.id); }
+        if (learn && learn.id) { cdocPairMeta(it, learn); await cdocIdxSetPair(st, ref.cid, n, learn); }
       } catch (e) { learn = { ok: false, code: 'LEARN_THREW' }; }
     }
   }
@@ -2710,10 +2717,13 @@ async function handleCdocList(event, d, R) {
   if (permOf(c.member, 'contracts') === 'hide') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_ACCESS', request_id: R });
   const cid = String(d.cid || '');
   if (!/^[A-Za-z0-9_-]{1,40}$/.test(cid)) return jr(400, { status: 'REJECTED', error_code: 'BAD_CID', request_id: R });
+  if (d.trash === true && !c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });   // 보관함은 관리자만(열기와 같은 기준)
+  if (!(await deviceApproved(event, c.member))) return jr(403, { status: 'FORBIDDEN', error_code: 'DEVICE_NOT_APPROVED', request_id: R });
   const ix = await cdocIdxRead(store(DATA), cid);
   if (!ix.ok) return jr(500, { status: 'ERROR', error_code: ix.code, request_id: R });
   const all = d.all === true && !!c.member.admin;   // v408: 관리자는 보관 항목까지 한 번에(보관함 화면) — 직원은 플래그 무시
-  const items = ix.doc.items.filter(function (x) { return x && !x.purged && (all || (d.trash === true ? !!x.del : !x.del)); }).map(cdocPublic);
+  // 열람 권한이 없는 항목은 올린 이름을 내주지 않는다(파일명에 사람 이름이 섞인다) — 표준 이름만
+  const items = ix.doc.items.filter(function (x) { return x && !x.purged && (all || (d.trash === true ? !!x.del : !x.del)); }).map(function (x) { const o = cdocPublic(x); if (!cdocCanRead(c.member, x)) o.orig = o.name; return o; });
   return jr(200, { status: 'OK', cid: cid, seq: ix.doc.seq, items: items, updated_at: ix.doc.updated_at || 0, request_id: R });
 }
 function cdocCanRead(m, it) {
@@ -2756,8 +2766,8 @@ async function handleCdocGet(event, d, R) {
   }
   const logged = await appendRecLog(st, { ts: Date.now(), bid: c.member.id, by: String(c.member.name || ''), dept: String(c.member.dept || ''), cid: cid, n: n, i: it.i, dk: it.dk, kind: it.kind, pii: it.pii, name: String(it.name || '').slice(0, 80), reason: reason });
   if (it.pii === 2 && !logged) return jr(500, { status: 'ERROR', error_code: 'RECLOG_FAILED', request_id: R });   // 민감정보는 기록 없이는 내주지 않는다(fail-closed)
-  const out = { status: 'OK', cid: cid, n: n, name: it.name, orig: it.orig, kind: it.kind, pii: it.pii, type: r.data.fill ? 'application/json' : docAttMime(it.name), logged: logged, request_id: R };
-  if (r.data.fill) out.fill = r.data.fill; else out.data = r.data.data;
+  const out = { status: 'OK', cid: cid, n: n, name: it.name, orig: it.orig, kind: it.kind, pii: it.pii, type: (r.data.fill && !r.data.data) ? 'application/json' : docAttMime(it.name), logged: logged, request_id: R };
+  if (r.data.data) out.data = r.data.data; else if (r.data.fill) out.fill = r.data.fill;   // v424 초안은 파일이 먼저(옛 초안은 채움 맵만)
   return jr(200, out);
 }
 // 소프트 삭제·복구·현재 포인터 — contracts 'do'. 바이트는 그대로(append-only), 색인 표식만
@@ -2765,6 +2775,8 @@ async function cdocMark(event, d, R, mode) {
   const c = await currentMember(event);
   if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
   if (permOf(c.member, 'contracts') !== 'do') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_WRITE', request_id: R });
+  if (!(await deviceApproved(event, c.member))) return jr(403, { status: 'FORBIDDEN', error_code: 'DEVICE_NOT_APPROVED', request_id: R });
+  if (mode === 'restore' && !c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });   // 복구 화면은 관리자 보관함뿐 — 복구로 '보관함은 관리자만'을 넘지 않게
   const cid = String(d.cid || ''), n = Number(d.n);
   if (!/^[A-Za-z0-9_-]{1,40}$/.test(cid) || !(n >= 1)) return jr(400, { status: 'REJECTED', error_code: 'BAD_ID', request_id: R });
   const st = store(DATA);
@@ -2779,6 +2791,7 @@ async function cdocMark(event, d, R, mode) {
     if (it.del) return jr(400, { status: 'REJECTED', error_code: 'NO_CHANGE', request_id: R });
     it.del = now; it.del_by = c.member.id; const wasCur = it.cur === 1; it.cur = 0;
     if (wasCur) { const s = sib().sort(function (a, b) { return b.n - a.n; }); if (s[0]) s[0].cur = 1; }   // 현재본을 보관하면 바로 앞 판이 현재
+    if (it.pair) await cdocPairVoid(st, it);   // 잘못 들어간 파일의 간극·학습 대기가 남지 않게
     op = '기록물보관';
   } else if (mode === 'restore') {
     if (!it.del) return jr(400, { status: 'REJECTED', error_code: 'NO_CHANGE', request_id: R });
@@ -2795,7 +2808,18 @@ async function cdocMark(event, d, R, mode) {
   const w = await blobSet(st, cdocIdxKey(cid), idx);
   if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
   const audit = await cdocAudit(c.member, op, cid, it.name);
-  return jr(200, { status: 'OK', cid: cid, n: n, item: cdocPublic(it), audit: audit, request_id: R });
+  let learn = null;
+  if (mode === 'restore' && it.kind === 'final') {   // 복구하면 짝을 다시 찾는다(직전 양식 우선)
+    try {
+      const fr = await blobGet(store(FILES), cdocKey(cid, it.i, it.dk, n));
+      if (fr.ok && fr.data) {
+        const b64 = fr.data.att ? await BF.attReadB64(store(FILES), fr.data.att, (await blobGet(store(FILES), fr.data.att)).data) : String(fr.data.data || '');
+        learn = await cdocLearnPair(st, c.member, { cid: cid, i: it.i, dk: it.dk }, idx, it, it.ext, b64, it.orig, { pair_tpl: it.pwas || '' });
+        if (learn) { cdocPairMeta(it, learn); await cdocIdxSetPair(st, cid, n, learn); }
+      }
+    } catch (e) { learn = { ok: false, code: 'LEARN_THREW' }; }
+  }
+  return jr(200, { status: 'OK', cid: cid, n: n, item: cdocPublic(it), audit: audit, learn: learn, request_id: R });
 }
 async function handleCdocDel(event, d, R) { return cdocMark(event, d, R, 'del'); }
 async function handleCdocRestore(event, d, R) { return cdocMark(event, d, R, 'restore'); }
@@ -3533,11 +3557,19 @@ async function handleTplPut(event, d, R) {
   try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'files', ev: [{ op: '양식등록', id: key, t: String(d.name || '').slice(0, 60) }] }); } catch (e) {}   // 양식 교체=서류 위조 벡터 — 무기록 금지
   return jr(200, { status: 'OK', key: key, request_id: R });
 }
+// 사람 정보가 든 양식(착공계의 주민번호·자격증 그림, 석면 계획서의 연락처 등) — 만드는 사람(처리 권한 + 승인 기기)만 받고 기록을 남긴다(v424 검토). 견적·서약서 등 나머지는 그대로
+const TPL_PERSON = { work_start: 1, work_complete: 1, asb_plan: 1, demo_report: 1, waste_report: 1, safety_plan: 1, labor_split: 1 };
 async function handleTplGet(event, d, R) {
   const c = await currentMember(event);
   if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
   if (permOf(c.member, 'contracts') === 'hide') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_ACCESS', request_id: R });
-  const r = await blobGet(store(FILES), 'tpl:' + String(d.key || ''));
+  const tplKey = String(d.key || '');
+  if (hasOwn(TPL_PERSON, tplKey)) {
+    if (permOf(c.member, 'contracts') !== 'do') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_WRITE', request_id: R });
+    if (!(await deviceApproved(event, c.member))) return jr(403, { status: 'FORBIDDEN', error_code: 'DEVICE_NOT_APPROVED', request_id: R });
+    await appendRecLog(store(DATA), { ts: Date.now(), bid: c.member.id, by: String(c.member.name || ''), dept: String(c.member.dept || ''), cid: '', n: 0, i: -1, dk: 'tpl.' + tplKey, kind: 'tpl', pii: 1, name: tplKey, reason: '' });
+  }
+  const r = await blobGet(store(FILES), 'tpl:' + tplKey);
   if (!r.ok && r.code !== 'NOT_FOUND') return jr(500, { status: 'ERROR', error_code: r.code || 'STORAGE_READ_FAILED', request_id: R });   // v422: 읽기 실패 ≠ 미등록
   if (!r.ok || !r.data) return jr(404, { status: 'REJECTED', error_code: 'NOT_FOUND', request_id: R });
   return jr(200, { status: 'OK', name: r.data.name, data: r.data.data, request_id: R });

@@ -73,6 +73,7 @@ exports.handler = async function (event) {
   const c = await currentMember(event);
   if (!c.ok) return jr(401, { ok: false, code: c.reason || 'NO_SESSION', request_id: R });
   const member = c.member;
+  if (!(await A.deviceApproved(event, member))) return jr(403, { ok: false, code: 'DEVICE_NOT_APPROVED', request_id: R });
 
   const u = await readUsage();
   const day = kstDay(), mon = day.slice(0, 7);

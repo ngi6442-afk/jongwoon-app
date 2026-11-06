@@ -49,6 +49,7 @@ exports.handler = async function (event, context) {
     pair = pr.data;
     if (pair.status === 'done' || pair.status === 'done_nomodel') return;
     if (!pair.tpl || !(pair.draft_n >= 1) || !(pair.final_n >= 1)) { await finish('unmatched', 'NO_DRAFT_PAIR', '초안 짝이 없습니다'); return; }
+    if (pair.kind && pair.kind !== 'xlsx_cell') { await finish('done_nomodel', 'NO_CELL_MAP', '문단·파일 비교는 간극만 잰다(허용 사전이 칸 단위)'); return; }   // v424 hwpx·채움 맵 없는 xlsx
     await blobSet(st, T.lock_key, { ts: Date.now(), pair: pairId });
 
     // 허용 사전 — 없으면 모델 호출 없이 끝(간극은 cdoc_put 때 이미 쟀다)
@@ -64,6 +65,13 @@ exports.handler = async function (event, context) {
     const dr = await blobGet(store(FILES), cdocKey(pair.cid, Number.isInteger(pair.draft_i) ? pair.draft_i : pair.i, 'gen.' + pair.tpl, pair.draft_n));   // v423 넣기 박스: 초안과 최종본이 다른 단계일 수 있다(draft_i)
     const fillFlat = (dr.ok && dr.data && dr.data.fill) ? DD.flattenEdits(dr.data.fill.edits) : null;   // v419 실제 초안은 시트별 객체 — 옛 평면 배열도 받는다
     if (!fillFlat) { await finish('fail', 'NO_FILL', '초안 채움 맵이 없습니다'); return; }
+    // v424 검토: 보관·영구 삭제된 최종본, 민감정보로 올린 최종본은 모델에 보내지 않는다
+    try {
+      const ixr = await blobGet(st, 'recidx:' + pair.cid);
+      const fx = (ixr.ok && ixr.data && Array.isArray(ixr.data.items)) ? ixr.data.items.filter(function (x) { return x && Number(x.n) === Number(pair.final_n); })[0] : null;
+      if (!ixr.ok && ixr.code !== 'NOT_FOUND') { await finish('fail', 'INDEX_READ_FAILED'); return; }
+      if (!fx || fx.del || fx.purged || Number(fx.pii) === 2) { await finish('done_nomodel', 'FINAL_EXCLUDED', '보관·삭제되었거나 민감정보인 최종본'); return; }
+    } catch (e) { await finish('fail', 'INDEX_READ_FAILED'); return; }
     const fr = await blobGet(store(FILES), cdocKey(pair.cid, pair.i, pair.dk, pair.final_n));
     let finalB64 = (fr.ok && fr.data && fr.data.data) ? String(fr.data.data) : '';
     if (!finalB64 && fr.ok && fr.data && fr.data.att) { try { const ar = await blobGet(store(FILES), fr.data.att); finalB64 = await BF.attReadB64(store(FILES), fr.data.att, ar.data); } catch (e) { finalB64 = ''; } }   // v423 큰 파일은 조각
@@ -72,7 +80,9 @@ exports.handler = async function (event, context) {
     if (!rows.ok) { await finish('fail', rows.code || 'DIFF_FAILED'); return; }
     if (!rows.rows.length && !rows.hidden_changed.length) { await finish('done', 'NO_CHANGE', '바뀐 칸 없음 — 모델 호출 생략', { rules_n: null }); return; }
 
-    const lk = T.lessons_key(pair.tpl); const lr = await blobGet(st, lk); const lessons = LN.normLessons(lr.ok ? lr.data : null);
+    const lk = T.lessons_key(pair.tpl); const lr = await blobGet(st, lk);
+    if (!lr.ok && lr.code !== 'NOT_FOUND') { await finish('fail', 'LESSONS_READ_FAILED'); return; }   // 읽기 실패를 빈 창고로 보고 규칙을 덮어쓰지 않는다(v424 검토)
+    const lessons = LN.normLessons(lr.ok ? lr.data : null);
     if (lessons.off) { await finish('done_nomodel', 'LESSONS_OFF', '이 양식 학습 끔'); return; }
     const pp = LN.buildContractPrompt({ tpl: pair.tpl, rules: lessons.rules, rows: rows.rows, hidden_changed: rows.hidden_changed, hidden_same_n: rows.hidden_same_n });
     // 2층 차단: 절대 금지 패턴(주민번호·연락처·계좌) → 중단 · 계약 식별자 scrub

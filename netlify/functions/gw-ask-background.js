@@ -60,6 +60,7 @@ exports.handler = async function (event) {
   const c = await currentMember(event);
   if (!c.ok) return { statusCode: 401, headers: CORS, body: '' };
   const member = c.member;
+  if (!(await A.deviceApproved(event, member))) return { statusCode: 403, headers: CORS, body: '' };
   const id = String(d.job || '');
   const q = String(d.q || '').trim().slice(0, 500);
   if (!RE_JOB.test(id) || !q) return { statusCode: 400, headers: CORS, body: '' };

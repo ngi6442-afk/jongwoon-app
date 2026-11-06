@@ -20,7 +20,7 @@ const blobsMock = {
   hooks: { beforeGet: null, beforeSet: null },   // 절 33(v327) — 느린 읽기(시간 가드)·저장 횟수 검증용 훅. 없으면 무동작
   setupBlobContext() {},
   store(n) { mem[n] = mem[n] || {}; return { name: n, toString() { return n; }, async list(o) { const pre = (o && o.prefix) || ''; return { blobs: Object.keys(mem[n] || {}).filter((k) => k.indexOf(pre) === 0).map((k) => ({ key: k })) }; } }; },
-  async blobGet(st, k) { if (blobsMock.hooks.beforeGet) await blobsMock.hooks.beforeGet(k); const s = mem[st] || {}; return (k in s) ? { ok: true, data: JSON.parse(JSON.stringify(s[k])) } : { ok: false, code: 'NOT_FOUND' }; },   // 실 Blobs처럼 get마다 새 객체(JSON 파싱) — 핸들러가 저장 전 객체를 손대도 mem에 반영되지 않는다(9/6: 거부 응답 뒤 "저장 없음" 검증의 전제)
+  async blobGet(st, k) { if (blobsMock.hooks.failGet && blobsMock.hooks.failGet(k)) return { ok: false, code: 'STORAGE_READ_FAILED' }; if (blobsMock.hooks.beforeGet) await blobsMock.hooks.beforeGet(k); const s = mem[st] || {}; return (k in s) ? { ok: true, data: JSON.parse(JSON.stringify(s[k])) } : { ok: false, code: 'NOT_FOUND' }; },   // 실 Blobs처럼 get마다 새 객체(JSON 파싱) — 핸들러가 저장 전 객체를 손대도 mem에 반영되지 않는다(9/6: 거부 응답 뒤 "저장 없음" 검증의 전제)
   async blobSet(st, k, v) { if (blobsMock.hooks.failSet && blobsMock.hooks.failSet(k)) return { ok: false, code: 'STORAGE_WRITE_FAILED' }; if (blobsMock.hooks.beforeSet) await blobsMock.hooks.beforeSet(k); mem[st] = mem[st] || {}; if (v === null) delete mem[st][k]; else mem[st][k] = JSON.parse(JSON.stringify(v)); return { ok: true }; },
   async blobDelete(st, k) { if (mem[st]) delete mem[st][k]; return { ok: true }; },
   async blobList(st) { return { ok: true, keys: Object.keys(mem[st] || {}) }; },
@@ -3582,7 +3582,8 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   T('58 list: view 권한 → 8항목(gc 항목 포함, 바이트 없음·sha 16) · 명시 hide는 list·get 403 NO_ACCESS(기본 view 회원은 열람 가능)', l1 && l2 && l3, JSON.stringify([l1, l2, l3, r58.code]));
   r58 = await call({ action: 'cdoc_get', cid: 'c58', n: 1 }, tokV, 'dev1'); const v1 = r58.code === 200 && r58.body.data === PDF58 && r58.body.type === 'application/pdf' && r58.body.logged === true;
   const rl = Object.keys(mem.gw_data).find((k) => k.indexOf('reclog:') === 0);
-  const v2 = rl && mem.gw_data[rl].items.length === 1 && mem.gw_data[rl].items[0].bid === 'uconv' && mem.gw_data[rl].items[0].cid === 'c58' && mem.gw_data[rl].items[0].n === 1;
+  const rlDoc = rl ? mem.gw_data[rl].items.filter((x) => x.kind !== 'tpl') : [];
+  const v2 = rlDoc.length === 1 && rlDoc[0].bid === 'uconv' && rlDoc[0].cid === 'c58' && rlDoc[0].n === 1;
   r58 = await call({ action: 'cdoc_get', cid: 'c58', n: 3 }, tokV, 'dev1'); const v3 = r58.code === 403 && r58.body.error_code === 'PII_FORBIDDEN';
   r58 = await call({ action: 'cdoc_get', cid: 'c58', n: 3 }, tokC, 'dev1'); const v4 = r58.code === 200 && r58.body.data === ZIP58;
   T('58 get: view → pii 0 바이트 + reclog 1건(bid·cid·n) · pii 1은 view 403 PII_FORBIDDEN, do 200', v1 && v2 && v3 && v4, JSON.stringify([v1, v2, v3, v4]));
@@ -3596,7 +3597,8 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   r58 = await call({ action: 'cdoc_del', cid: 'c58', n: 2 }, tokV, 'dev1'); const s1 = r58.code === 403;
   r58 = await call({ action: 'cdoc_del', cid: 'c58', n: 2 }, tokC, 'dev1'); const s2 = r58.code === 200 && idx58().items[1].del > 0 && idx58().items[1].cur === 0 && idx58().items[0].cur === 1 && mem.gw_files['cdoc:c58:S00:asb_survey:2'];
   r58 = await call({ action: 'cdoc_get', cid: 'c58', n: 2 }, tokC, 'dev1'); const s3 = r58.code === 404;
-  r58 = await call({ action: 'cdoc_list', cid: 'c58', trash: true }, tokC, 'dev1'); const s4 = r58.code === 200 && r58.body.items.length === 1 && r58.body.items[0].n === 2;
+  r58 = await call({ action: 'cdoc_list', cid: 'c58', trash: true }, tokC, 'dev1'); const s4a = r58.code === 403 && r58.body.error_code === 'ADMIN_ONLY';
+  r58 = await call({ action: 'cdoc_list', cid: 'c58', trash: true }, tokA); const s4 = s4a && r58.code === 200 && r58.body.items.length === 1 && r58.body.items[0].n === 2;
   r58 = await call({ action: 'cdoc_list', cid: 'c58' }, tokC, 'dev1'); const s5 = r58.code === 200 && !r58.body.items.some((x) => x.n === 2);
   r58 = await call({ action: 'cdoc_list', cid: 'c58', all: true }, tokA); const s5a = r58.code === 200 && r58.body.items.some((x) => x.n === 2 && x.del > 0) && r58.body.items.some((x) => x.n === 1);
   r58 = await call({ action: 'cdoc_list', cid: 'c58', all: true }, tokC, 'dev1'); const s5b = r58.code === 200 && !r58.body.items.some((x) => x.n === 2);
@@ -3606,7 +3608,8 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   r58 = await call({ action: 'cdoc_purge', cid: 'c58', n: 2, confirm: true }, tokA); const s8 = r58.code === 409 && r58.body.error_code === 'TOO_EARLY';
   r58 = await call({ action: 'cdoc_purge', cid: 'c58', n: 1, confirm: true }, tokA); const s9 = r58.code === 409 && r58.body.error_code === 'NOT_IN_TRASH';
   T('58 보관(소프트 삭제): view 403 · do 200 → 현재 포인터 1로, 바이트 유지, get 404, 휴지통 목록 1 · 영구 삭제: 직원 403·confirm 없음 400·30일 전 409 TOO_EARLY·휴지통 아님 409', s1 && s2 && s3 && s4 && s5 && s6 && s7 && s8 && s9, [s1, s2, s3, s4, s5, s6, s7, s8, s9].join());
-  r58 = await call({ action: 'cdoc_restore', cid: 'c58', n: 2 }, tokC, 'dev1'); const t1 = r58.code === 200 && !idx58().items[1].del && idx58().items[1].cur === 0 && idx58().items[0].cur === 1;
+  r58 = await call({ action: 'cdoc_restore', cid: 'c58', n: 2 }, tokC, 'dev1'); const t1a = r58.code === 403 && r58.body.error_code === 'ADMIN_ONLY';   // v424 검토: 복구는 관리자 보관함에서만
+  r58 = await call({ action: 'cdoc_restore', cid: 'c58', n: 2 }, tokA); const t1 = t1a && r58.code === 200 && !idx58().items[1].del && idx58().items[1].cur === 0 && idx58().items[0].cur === 1;
   r58 = await call({ action: 'cdoc_cur', cid: 'c58', n: 2 }, tokC, 'dev1'); const t2 = r58.code === 200 && idx58().items[1].cur === 1 && idx58().items[0].cur === 0;
   r58 = await call({ action: 'cdoc_cur', cid: 'c58', n: 2 }, tokC, 'dev1'); const t3 = r58.code === 400 && r58.body.error_code === 'NO_CHANGE';
   idx58().items[0].del = Date.now() - 31 * 86400000; idx58().items[0].cur = 0;
@@ -3674,9 +3677,9 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
     && JSON.stringify(pair).indexOf('포항') < 0 && JSON.stringify(pair).indexOf('시험 공사') < 0 && les && les.gaps.length === 1 && les.stats.pairs === 1 && les.stats.calls === 0, JSON.stringify([r59.code, L9, pair && pair.status]));
   // 제외 유형(명단·검진) · 초안 없는 단계 · 초안 둘 → 미매칭(후보) · pair_tpl 지정 → 매칭
   r59 = await call({ action: 'cdoc_put', cid: 'c59', i: 2, doc_key: 'main.수령-1', kind: 'final', name: '근로자 명단.xlsx', data: b59(FINAL), pii: 1, allow_dup: true }, tok9, 'dev1'); const ex1 = r59.code === 200 && r59.body.learn && r59.body.learn.code === 'TYPE_EXCLUDED';
-  r59 = await call({ action: 'cdoc_put', cid: 'c59', i: 0, doc_key: 'main.작성-0', kind: 'final', name: '조사.xlsx', data: b59(FINAL), pii: 0, allow_dup: true }, tok9, 'dev1'); const ex2 = r59.code === 200 && r59.body.learn && r59.body.learn.code === 'NO_DRAFT';
+  r59 = await call({ action: 'cdoc_put', cid: 'c59', i: 0, doc_key: 'main.작성-0', kind: 'final', name: '조사.pdf', data: b59('%PDF-1.4 조사'), pii: 0, allow_dup: true }, tok9, 'dev1'); const ex2 = r59.code === 200 && r59.body.learn && r59.body.learn.code === 'NO_DRAFT';   // v424 비교할 수 없는 형식 + 그 단계 초안 없음(xlsx면 내용 일치율로 찾는다 — 절 73)
   r59 = await call({ action: 'cdoc_put', cid: 'c59', i: 2, doc_key: 'gen.work_start', kind: 'draft', pii: 1, fill: { tpl: 'work_start', at: '2026-11-01', edits: [['C7', 'x', 's']] } }, tok9, 'dev1');
-  r59 = await call({ action: 'cdoc_put', cid: 'c59', i: 2, doc_key: 'main.작성-1', kind: 'final', name: '착공계.xlsx', data: b59(FINAL), pii: 0, allow_dup: true }, tok9, 'dev1'); const um = r59.body.learn || {};
+  r59 = await call({ action: 'cdoc_put', cid: 'c59', i: 2, doc_key: 'main.작성-1', kind: 'final', name: '착공계.pdf', data: b59('%PDF-1.4 착공'), pii: 0, allow_dup: true }, tok9, 'dev1'); const um = r59.body.learn || {};   // v424 비교할 수 없는 형식이면 종전처럼 미매칭
   const ex3 = r59.code === 200 && um.status === 'unmatched' && Array.isArray(um.candidates) && um.candidates.length === 2;
   r59 = await call({ action: 'cdoc_put', cid: 'c59', i: 2, doc_key: 'main.작성-1', kind: 'final', name: '착공계2.xlsx', data: b59(FINAL), pii: 0, allow_dup: true, pair_tpl: 'work_start' }, tok9, 'dev1'); const pm = r59.body.learn || {};
   const ex4 = r59.code === 200 && pm.ok && pm.tpl === 'work_start' && pm.changed === 1 && pm.compared === 1;
@@ -4429,6 +4432,308 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   delete mem.gw_data['recidx:c72']; delete mem.gw_data['box:fixes']; delete mem.gw_data[ukey];
   Object.keys(mem.gw_data).filter((k) => k.indexOf('learn:contract:in:') === 0 || k.indexOf('lessons:contract:') === 0).forEach((k) => delete mem.gw_data[k]);
   Object.keys(mem.gw_files).filter((k) => /^(cdoc:c72|attp:|boxp:|parse:att_)/.test(k)).forEach((k) => delete mem.gw_files[k]);
+}
+
+{ // ---- 73(v424) 체크 31 브리핑 1단계·물어보기 — 표식·hwpx 문단·내용 일치율·초안 파일째 저장·짝 정보·워커 가드·판단 표식 + 물어보기 문서 공개범위 ----
+  const DD = require(join(FN, '_lib/docdiff.js')), BJ = require(join(FN, '_lib/boxjudge.js')), pb = require(join(FN, 'gw-parse-background.js')), lw = require(join(FN, 'gw-learn-background.js')), A = require(join(FN, '_lib/ask.js'));
+  mem.gw_files = mem.gw_files || {};
+  const U = { id: 'ucon73', name: '공무73', admin: false, perms: { con: 'do' }, dept: '운영부' };
+  mem.gw_users['member:ucon73'] = U; const tk = issueSession(U).token;
+  mem.gw_data['col:contracts'] = { schema: 1, items: [{ id: 'c73', title: '표식 계약', scen: 'dredge:pub', stages: [] }, { id: 'c73b', title: '다른 계약', scen: 'dredge:pub', stages: [] }], updated_at: 1 };
+  const crcT = Array.from({ length: 256 }, (_, n) => { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; return c >>> 0; });
+  const crc = (bf) => { let c = 0xFFFFFFFF; for (const x of bf) c = crcT[(c ^ x) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
+  const mkZip = (files) => {
+    const ls = [], cd = []; let off = 0;
+    for (const nm of Object.keys(files)) {
+      const nb = Buffer.from(nm), db = Buffer.from(files[nm]), cc = crc(db);
+      const lh = Buffer.alloc(30); lh.writeUInt32LE(0x04034b50, 0); lh.writeUInt16LE(20, 4); lh.writeUInt32LE(cc, 14); lh.writeUInt32LE(db.length, 18); lh.writeUInt32LE(db.length, 22); lh.writeUInt16LE(nb.length, 26);
+      const ch = Buffer.alloc(46); ch.writeUInt32LE(0x02014b50, 0); ch.writeUInt16LE(20, 4); ch.writeUInt16LE(20, 6); ch.writeUInt32LE(cc, 16); ch.writeUInt32LE(db.length, 20); ch.writeUInt32LE(db.length, 24); ch.writeUInt16LE(nb.length, 28); ch.writeUInt32LE(off, 42);
+      ls.push(lh, nb, db); cd.push(ch, nb); off += 30 + nb.length + db.length;
+    }
+    const cdb = Buffer.concat(cd), e = Buffer.alloc(22); e.writeUInt32LE(0x06054b50, 0); e.writeUInt16LE(Object.keys(files).length, 8); e.writeUInt16LE(Object.keys(files).length, 10); e.writeUInt32LE(cdb.length, 12); e.writeUInt32LE(off, 16);
+    return Buffer.concat(ls.concat([cdb, e]));
+  };
+  const hpf = (m) => '<opf:package><opf:metadata><opf:title/><opf:meta name="keyword" content="text"' + (m ? '>' + m + '</opf:meta>' : '/>') + '</opf:metadata></opf:package>';
+  const para = (t) => '<hp:p id="0"><hp:run charPrIDRef="1"><hp:t>' + t + '</hp:t></hp:run><hp:linesegarray><hp:lineseg textpos="0"/></hp:linesegarray></hp:p>';
+  const mkHwpx = (lines, m, cell) => mkZip({ mimetype: 'application/hwp+zip', 'Contents/content.hpf': hpf(m), 'Contents/section0.xml': '<hs:sec>' + lines.map(para).join('') + (cell ? '<hp:p><hp:run><hp:tbl><hp:tr><hp:tc><hp:subList>' + para(cell) + '</hp:subList></hp:tc></hp:tr></hp:tbl><hp:t/></hp:run></hp:p>' : '') + '</hs:sec>' });
+  const mkXl = (cells, m, sheet) => mkZip({ '[Content_Types].xml': '<Types/>', 'docProps/core.xml': '<cp:coreProperties>' + (m ? '<cp:keywords>' + m + '</cp:keywords>' : '') + '</cp:coreProperties>', 'xl/workbook.xml': '<workbook xmlns:r="r"><sheets><sheet name="' + (sheet || '착공계') + '" sheetId="1" r:id="rId1"/></sheets></workbook>', 'xl/_rels/workbook.xml.rels': '<Relationships><Relationship Id="rId1" Target="worksheets/sheet1.xml"/></Relationships>', 'xl/worksheets/sheet1.xml': '<worksheet><sheetData><row r="1">' + Object.keys(cells).map((k) => /^=/.test(cells[k]) ? '<c r="' + k + '"><f>' + cells[k].slice(1) + '</f><v>1</v></c>' : '<c r="' + k + '" t="inlineStr"><is><t>' + cells[k] + '</t></is></c>').join('') + '</row></sheetData></worksheet>' });
+  const M1 = 'JWG1.c73.work_start.abc123def0', MH = 'JWG1.c73.contract_pledge.h1h2h3h4h5', MS = 'JWG1.c73.seal_reg.s1s2s3s4s5';
+  // ---- docdiff ----
+  const h1 = mkHwpx(['계약명 시험 공사', '금액 1,000원', '위와 같이 서약합니다'], MH, '칸 값');
+  const ps = DD.hwpxParas(h1);
+  T('73 hwpx 문단: 표 칸 안 문단도 한 문단 · 자기 닫는 hp:t는 건너뜀 · 빈 문단 없음', ps.length === 4 && ps.includes('칸 값') && ps[0] === '계약명 시험 공사', JSON.stringify(ps));
+  const fw = mkZip({ 'Contents/section1.xml': '<s>' + para('둘째') + '</s>', 'Contents/section0.xml': '<s><hp:p><hp:run><hp:t>가<hp:fwSpace/>나<hp:tab width="1"/>다 &amp; 라</hp:t></hp:run></hp:p></s>' });
+  T('73 hwpx 문단: 구역 번호 순서 · 공백 태그는 띄어쓰기 · 글자 복원', JSON.stringify(DD.hwpxParas(fw)) === JSON.stringify(['가 나 다 & 라', '둘째']), JSON.stringify(DD.hwpxParas(fw)));
+  const hd = DD.hwpxParaDiff(h1, mkHwpx(['계약명 시험 공사', '금액 2,000원', '위와 같이 서약합니다'], '', '칸 값'));
+  T('73 hwpx 문단 비교: 4문단 중 1 바뀜 25% · 본문 없음 · hwpx 아니면 비교 불가', hd.ok && hd.kind === 'hwpx_para' && hd.ratio === 0.25 && hd.same === 3 && JSON.stringify(hd).indexOf('시험') < 0 && DD.hwpxParaDiff(Buffer.from('xx'), h1).ok === false, JSON.stringify(hd));
+  const dx0 = mkXl({ A1: '착공계', B1: '=SUM(A1)', C1: '칸', D1: '' }), dx1 = mkXl({ A1: '착공계', B1: '=SUM(A1)', C1: '고침', E1: '새 칸' });
+  const fd = DD.xlsxFileDiff(dx0, dx1), fd2 = DD.xlsxFileDiff(dx0, dx1, ['착공계!C1']), fd3 = DD.xlsxFileDiff(dx0, mkXl({ A1: '착공계' }, '', '다른시트'));
+  T('73 xlsx 파일 비교: 수식 빼고 칸마다(바뀜 C1·추가 E1) · 건너뛸 칸 · 시트가 없으면 비교 불가 · 값 없음', fd.ok && fd.compared === 3 && fd.changed === 2 && fd2.changed === 1 && fd2.compared === 2 && fd3.uncomparable === 2 && JSON.stringify(fd).indexOf('고침') < 0, JSON.stringify([fd, fd2, fd3]));
+  T('73 표식 읽기: xlsx 키워드 · hwpx 키워드(앞에 다른 글자가 있어도, 여럿이면 끝 것) · 없으면 빈 값 · pdf 빈 값 · 잘못된 번호 해석 거부',
+    DD.genMarkOf(mkXl({ A1: 'x' }, M1), 'xlsx') === M1 && DD.genMarkOf(mkHwpx(['x'], 'www.yesform.com\n JWG1.c1.a.b1b1b1 ' + MH), 'hwpx') === MH && DD.genMarkOf(mkXl({ A1: 'x' }), 'xlsx') === '' && DD.genMarkOf(Buffer.from('%PDF'), 'pdf') === '' && JSON.stringify(DD.genMarkParse(M1)) === JSON.stringify({ cid: 'c73', tpl: 'work_start', rand: 'abc123def0' }) && DD.genMarkParse('JWG1.c 1.a.b') === null && DD.genMarkParse('') === null, DD.genMarkOf(mkXl({ A1: 'x' }, M1), 'xlsx'));
+  // ---- 초안 파일째 ----
+  const b64 = (x) => Buffer.from(x).toString('base64');
+  const FILL = { tpl: 'work_start', at: '2026-11-06', edits: { '착공계': [['A1', '착공계', 's'], ['C1', '칸', 's']] } };
+  let r = await call({ action: 'cdoc_put', cid: 'c73', i: 1, doc_key: 'gen.work_start', kind: 'draft', pii: 1, fill: FILL, name: '착공계.xlsx', data: b64(mkXl({ A1: '착공계', C1: '칸', Z1: '양식' }, M1)), gen: M1 }, tk, 'dev1');
+  const it1 = r.body.item || {}, rec1 = mem.gw_files['cdoc:c73:S01:gen.work_start:' + it1.n] || {};
+  T('73 초안 파일째: 파일·채움 맵 둘 다 저장 · 색인 ext xlsx·표식 · 표준 이름 · 열면 파일', r.code === 200 && !!rec1.data && rec1.fill && rec1.gen === M1 && it1.ext === 'xlsx' && it1.gen === M1 && /gen\.work_start_v1_\d{8}\.xlsx$/.test(it1.name), JSON.stringify([r.code, it1]));
+  r = await call({ action: 'cdoc_get', cid: 'c73', n: it1.n }, tk, 'dev1');
+  T('73 초안 열기: 파일 바이트(채움 맵 아님) · 형식 xlsx', r.code === 200 && !!r.body.data && r.body.fill === undefined && /spreadsheet/.test(r.body.type), JSON.stringify([r.code, r.body.type]));
+  r = await call({ action: 'cdoc_put', cid: 'c73', i: 1, doc_key: 'gen.seal_reg', kind: 'draft', pii: 1, name: '인감계.hwpx', data: b64(mkHwpx(['사용인감계', '위 인감을 사용합니다', '주식회사 종운환경', '대표이사'], MS)), gen: 'JWG1.cOther.seal_reg.s1s2s3s4s5' }, tk, 'dev1');
+  const itS = r.body.item || {};
+  const badGen = r.code === 200 && !itS.gen;
+  await call({ action: 'cdoc_put', cid: 'c73', i: 1, doc_key: 'gen.contract_pledge', kind: 'draft', pii: 1, name: '서약서.hwpx', data: b64(h1), gen: MH }, tk, 'dev1');
+  T('73 초안 표식 검사: 다른 계약·다른 서류 번호는 안 받음(저장은 됨) · 채움 맵 없이 파일만 가능', badGen && mem.gw_data['recidx:c73'].items.find((x) => x.dk === 'gen.contract_pledge').gen === MH, JSON.stringify(itS));
+  r = await call({ action: 'cdoc_put', cid: 'c73', i: 1, doc_key: 'gen.bad', kind: 'draft', pii: 1, fill: FILL, name: '나쁜.exe', data: b64('x') }, tk, 'dev1');
+  const badExt = r.code === 400 && r.body.error_code === 'BAD_EXT';
+  r = await call({ action: 'cdoc_put', cid: 'c73', i: 1, doc_key: 'gen.only', kind: 'draft', pii: 1, fill: { tpl: 'only', at: '2026-11-06', edits: {} } }, tk, 'dev1');
+  T('73 초안 입구: 파일 형식 검사는 채움 맵이 있어도 · 채움 맵만(옛 방식)도 받음', badExt && r.code === 200 && r.body.item.ext === 'json', JSON.stringify([badExt, r.code]));
+  await call({ action: 'cdoc_del', cid: 'c73', n: r.body.item.n }, tk, 'dev1');
+  // ---- 짝 ----
+  r = await call({ action: 'cdoc_put', cid: 'c73', i: 3, doc_key: 'main.작성-0', kind: 'final', name: '상대동 주민센터 철거공사_착공계.xlsx', data: b64(mkXl({ A1: '착공계', C1: '고친 칸', Z1: '양식', Y1: '직원이 더 씀' }, M1)) }, tk, 'dev1');
+  let L = r.body.learn || {}, it = r.body.item || {}, pair = mem.gw_data['learn:contract:in:' + L.id] || {}, ix = mem.gw_data['recidx:c73'].items.find((x) => x.n === it.n);
+  T('73 표식 짝: 다른 단계 초안도 표식으로 바로 · 파일명에 "주민"이 있어도 제외 안 함 · 칸 비교 50% · AI가 안 채운 칸(Y1) 따로 · 색인·응답에 양식·간극·초안 번호',
+    r.code === 200 && L.ok && L.how === 'mark' && L.tpl === 'work_start' && L.kind === 'xlsx_cell' && L.gap.cell_ratio === 0.5 && pair.draft_i === 1 && pair.how === 'mark' && pair.diff.outside_changed === 1 && pair.diff.refs_outside[0] === '착공계!Y1' && ix.ptpl === 'work_start' && ix.pgap === 0.5 && ix.pkind === 'xlsx_cell' && ix.pdn === it1.n && it.ptpl === 'work_start', JSON.stringify([r.code, L, ix]));
+  T('73 짝 블롭에 값 없음(좌표·횟수만)', JSON.stringify(pair).indexOf('고친 칸') < 0 && JSON.stringify(pair).indexOf('직원이 더 씀') < 0, '');
+  r = await call({ action: 'cdoc_put', cid: 'c73', i: 3, doc_key: 'main.작성-1', kind: 'final', name: '서약서 최종.hwpx', data: b64(mkHwpx(['계약명 시험 공사', '금액 2,000원', '위와 같이 서약합니다'], MH, '칸 값')) }, tk, 'dev1');
+  L = r.body.learn || {};
+  T('73 hwpx 표식 짝: 문단 비교 25% · 모델 대상 아님(done_nomodel)', L.ok && L.how === 'mark' && L.kind === 'hwpx_para' && L.gap.cell_ratio === 0.25 && L.status === 'done_nomodel' && L.tpl === 'contract_pledge', JSON.stringify(L));
+  r = await call({ action: 'cdoc_put', cid: 'c73', i: 5, doc_key: 'main.작성-2', kind: 'final', name: '이름 다른 파일.hwpx', data: b64(mkHwpx(['사용인감계', '위 인감을 사용합니다', '주식회사 종운환경', '대표이사 나종운'])) }, tk, 'dev1');
+  L = r.body.learn || {}; pair = mem.gw_data['learn:contract:in:' + L.id] || {};
+  T('73 표식 없는 파일: 내용 일치율로 찾음(같은 형식 초안 중 1등, 다른 단계여도) · 일치율 기록', L.ok && L.how === 'content' && L.tpl === 'seal_reg' && L.kind === 'hwpx_para' && pair.match === 0.75, JSON.stringify([L, pair.match]));
+  r = await call({ action: 'cdoc_put', cid: 'c73', i: 5, doc_key: 'main.작성-2', kind: 'final', name: '이름은 착공계.hwpx', pair_tpl: 'work_start', data: b64(mkHwpx(['사용인감계', '위 인감을 사용합니다', '주식회사 종운환경', '대표이사 나경일'])) }, tk, 'dev1');
+  L = r.body.learn || {};
+  T('73 이름은 xlsx 초안인데 파일은 hwpx: 형식이 달라 내용으로 다시 찾음', L.ok && L.how === 'content' && L.tpl === 'seal_reg', JSON.stringify(L));
+  r = await call({ action: 'cdoc_put', cid: 'c73', i: 5, doc_key: 'main.작성-3', kind: 'final', name: '전혀 다른.hwpx', data: b64(mkHwpx(['회의록', '참석자', '안건', '결정'])) }, tk, 'dev1');
+  T('73 내용이 전혀 다른 파일: 짝 없음 NO_MATCH(엉뚱한 초안과 안 묶음)', r.code === 200 && r.body.learn.code === 'NO_MATCH', JSON.stringify(r.body.learn));
+  r = await call({ action: 'cdoc_put', cid: 'c73', i: 1, doc_key: 'main.작성-4', kind: 'final', name: '많이 고친.xlsx', data: b64(mkXl({ A1: '착공계', C1: '전부 고침' })) }, tk, 'dev1');
+  L = r.body.learn || {};
+  T('73 표식 없는 xlsx: 칸 일치율로 찾음(50%는 많이 고친 수정본)', L.ok && L.tpl === 'work_start' && L.how === 'content', JSON.stringify(L));
+  r = await call({ action: 'cdoc_put', cid: 'c73', i: 1, doc_key: 'main.작성-5', kind: 'final', name: '스캔.pdf', data: b64('%PDF-1.4 스캔'), pair_tpl: 'work_start' }, tk, 'dev1');
+  L = r.body.learn || {}; it = r.body.item || {}; ix = mem.gw_data['recidx:c73'].items.find((x) => x.n === it.n);
+  T('73 날인 스캔 pdf: 서류 이름으로 짝 · 비교 불가(간극 없음 null) · 짝은 남음', L.ok && L.how === 'name' && L.kind === 'none' && L.gap.cell_ratio === null && ix.pgap === null && ix.ptpl === 'work_start', JSON.stringify([L, ix]));
+  r = await call({ action: 'cdoc_put', cid: 'c73', i: 1, doc_key: 'main.작성-6', kind: 'final', name: '수기.hwp', data: Buffer.from([0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1, 1, 2]).toString('base64') }, tk, 'dev1');
+  T('73 hwp 파일 + 같은 단계 초안 여럿: 내용 비교 불가라 미매칭(자동으로 안 묶음)', r.code === 200 && r.body.learn.status === 'unmatched' && r.body.learn.candidates.length === 3, JSON.stringify(r.body.learn));
+  r = await call({ action: 'cdoc_put', cid: 'c73', i: 1, doc_key: 'main.작성-7', kind: 'final', name: '건진.xlsx', pii: 2, data: b64(mkXl({ A1: '착공계', C1: '칸' }, M1)) }, tk, 'dev1');
+  T('73 민감정보 등급 2: 표식이 있어도 짝을 안 만듦', r.code === 200 && r.body.learn.code === 'TYPE_EXCLUDED', JSON.stringify(r.body.learn));
+  const sameB = b64(mkXl({ A1: '그대로' }, 'JWG1.c73.safety_cost.same000000'));
+  await call({ action: 'cdoc_put', cid: 'c73', i: 2, doc_key: 'gen.safety_cost', kind: 'draft', pii: 1, name: '내역.xlsx', data: sameB, gen: 'JWG1.c73.safety_cost.same000000' }, tk, 'dev1');
+  r = await call({ action: 'cdoc_put', cid: 'c73', i: 2, doc_key: 'main.작성-8', kind: 'final', name: '내역 그대로.xlsx', data: sameB }, tk, 'dev1');
+  L = r.body.learn || {};
+  T('73 고치지 않고 그대로 넣은 파일: 중복(409) 아님 · 파일 비교 간극 0% · 채움 맵 없는 초안도 비교(xlsx_file)', r.code === 200 && L.ok && L.how === 'mark' && L.kind === 'xlsx_file' && L.gap.cell_ratio === 0, JSON.stringify([r.code, r.body.error_code, L]));
+  const itSame = r.body.item;
+  r = await call({ action: 'cdoc_move', cid: 'c73', n: itSame.n, i: 2, doc_key: 'main.수령-1', kind: 'received' }, tk, 'dev1');
+  ix = mem.gw_data['recidx:c73'].items.find((x) => x.n === itSame.n);
+  T('73 옮기기: 수령본으로 옮기면 짝 정보(양식·간극) 지움', r.code === 200 && ix.pair === undefined && ix.ptpl === undefined && ix.pgap === undefined, JSON.stringify(ix));
+  // 초안 3판 유지
+  const gens = []; for (let i = 0; i < 4; i++) { const g = 'JWG1.c73.adv_pay.v' + i + 'v' + i + 'v' + i + 'v'; gens.push(g); r = await call({ action: 'cdoc_put', cid: 'c73', i: 4, doc_key: 'gen.adv_pay', kind: 'draft', pii: 1, name: '선금.hwpx', data: b64(mkHwpx(['선금 신청', '판 ' + i, '같은 줄', '또 같은 줄'], g)), gen: g }, tk, 'dev1'); }
+  const gcN = (r.body.gc || []).length, keys = Object.keys(mem.gw_files).filter((k) => k.indexOf('cdoc:c73:S04:gen.adv_pay:') === 0).length;
+  r = await call({ action: 'cdoc_put', cid: 'c73', i: 4, doc_key: 'main.작성-9', kind: 'final', name: '선금 옛판.hwpx', data: b64(mkHwpx(['선금 신청', '판 0', '같은 줄', '또 같은 줄'], gens[0])) }, tk, 'dev1');
+  L = r.body.learn || {};
+  T('73 초안 3판 유지: 넷째에 첫 판 바이트 삭제 · 지워진 판의 표식은 못 찾고 내용으로 현재 판과 짝', gcN === 1 && keys === 3 && L.ok && L.how === 'content' && L.tpl === 'adv_pay', JSON.stringify([gcN, keys, L]));
+  // 워커 가드
+  const svT = issueSession({ id: '__promoai__', role: 'system' }).token, pid = 'lc_aaaaaaaaaaaa';
+  mem.gw_data['settings:learn'] = { contract: { on: true, allow: { contract_pledge: ['A1'] } } };
+  mem.gw_data['learn:contract:in:' + pid] = { id: pid, cid: 'c73', i: 3, dk: 'main.작성-1', tpl: 'contract_pledge', draft_n: 1, final_n: 1, kind: 'hwpx_para', status: 'pending' };
+  await lw.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + svT }, body: JSON.stringify({ pair_id: pid }) });
+  T('73 워커: 문단 비교 짝은 모델 호출 없이 간극만(done_nomodel) — 허용 양식이어도', mem.gw_data['learn:contract:in:' + pid].status === 'done_nomodel' && mem.gw_data['learn:contract:in:' + pid].code === 'NO_CELL_MAP', JSON.stringify(mem.gw_data['learn:contract:in:' + pid]));
+  r = await call({ action: 'cdoc_put', cid: 'c73', i: 3, doc_key: 'main.작성-10', kind: 'final', name: '서약서 또.hwpx', data: b64(mkHwpx(['계약명 시험 공사', '금액 3,000원', '위와 같이 서약합니다'], MH, '칸 값')) }, tk, 'dev1');
+  T('73 허용 사전이 있어도 hwpx 짝은 pending이 아님', r.body.learn.status === 'done_nomodel', JSON.stringify(r.body.learn));
+  delete mem.gw_data['settings:learn'];
+  // ---- 판단 표식 ----
+  const realFetch = global.fetch, savedKey = process.env.GW_ANTHROPIC_KEY; let nReq = 0;
+  global.fetch = async () => { nReq++; return { status: 200, text: async () => JSON.stringify({ content: [{ type: 'text', text: JSON.stringify({ cls: 'other', sub: 'none', doc_name: '', pii: '0', title: '', amount: 0, date_contract: '', date_start: '', date_end: '', client: '', site: '', guarantee: 0, con_type: 'none', combo: false, pub: true, why_type: '', why_pub: '', our_side: '모름', target: '', contract_id: '', tpl_key: '', draft_tpl: '', why: '' }) }], usage: { input_tokens: 1, output_tokens: 1 } }) }; };
+  process.env.GW_ANTHROPIC_KEY = 'test-key';
+  try {
+    const put = async (name, buf) => (await call({ action: 'box_put', j: 0, k: 1, name: name, data: buf.toString('base64') }, tk, 'dev1')).body.id;
+    const run = async (id) => { await pb.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + tk }, body: JSON.stringify({ id: id, box: 1, ctx: {} }) }); return (mem.gw_files['parse:' + id] || {}).result || {}; };
+    const ym = new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 7), ukey = 'usage:box:' + ym;
+    let id = await put('고친 착공계.xlsx', mkXl({ A1: '착공계' }, M1)), j = await run(id);
+    T('73 판단 표식: 모델 호출 0 · 계약·양식 바로 · 채운 서류 · read mark · 착공계는 개인정보 1 · 사용량 mark 따로(calls 안 셈)', nReq === 0 && j.read === 'mark' && j.cls === 'filled' && j.contract_id === 'c73' && j.draft_tpl === 'work_start' && j.pii === 1 && mem.gw_data[ukey].mark === 1 && !mem.gw_data[ukey].calls, JSON.stringify([nReq, j, mem.gw_data[ukey]]));
+    const hDraft = ['계약명 시험 공사', '금액 1,000원', '위와 같이 서약합니다', '칸 값'];
+    id = await put('고친 서약서.hwpx', mkHwpx(hDraft, MH)); j = await run(id);
+    const ok2 = nReq === 0 && j.read === 'mark' && j.pii === 0 && j.draft_tpl === 'contract_pledge';
+    id = await put('고친 서약서2.hwpx', mkHwpx(hDraft.concat(['대리인 900101-1234567']), MH)); j = await run(id);
+    T('73 판단 표식 개인정보: 사람 칸 없는 양식 0 · 본문에 주민번호 꼴이 있으면 1', ok2 && nReq === 0 && j.pii === 1, JSON.stringify([ok2, nReq, j]));
+    id = await put('없는 표식.xlsx', mkXl({ A1: '착공계' }, 'JWG1.c73.work_start.nonexist00')); j = await run(id);
+    const ok3 = nReq === 1 && j.read !== 'mark';
+    id = await put('근로자 명단.xlsx', mkXl({ A1: '명단' }, M1)); j = await run(id);
+    T('73 판단 표식: 서류함에 없는 번호는 안 믿고 모델로 · 개인정보 파일명은 표식보다 먼저 걸러 모델도 안 부름', ok3 && nReq === 1 && j.read === 'none' && j.pii === 1, JSON.stringify([ok3, nReq, j]));
+  } finally { global.fetch = realFetch; if (savedKey === undefined) delete process.env.GW_ANTHROPIC_KEY; else process.env.GW_ANTHROPIC_KEY = savedKey; }
+  // ---- 물어보기 문서 공개범위 ----
+  const Staff = { id: 'ustaff73', name: '직원', admin: false, perms: { doc: 'view' }, dept: '운영부' }, Mgmt = { id: 'umgmt73', name: '관리', admin: false, perms: { doc: 'view' }, dept: '관리부' }, Adm = { id: 'uadm73', name: '관리자', admin: true, perms: {} }, Hide = { id: 'uhide73', name: '숨김', admin: false, perms: { doc: 'hide' } };
+  const D = (id, o) => Object.assign({ id: id, title: '문서 ' + id, cat: '02-01', no: 'JW-02-01-001' }, o);
+  const savedDocs = mem.gw_data['col:documents'], savedSet = mem.gw_data['settings:documents'];
+  mem.gw_data['col:documents'] = { schema: 1, items: [D('all', { scope: 'all' }), D('adm', { scope: 'admin' }), D('mg', { scope: 'mgmt' }), D('law', { cat: '01-01', no: 'JW-01-01-001', scope: 'all' }), D('pend', { status: '대기', by: { id: 'other' }, scope: 'all' }), D('mine', { status: '대기', by: { id: 'ustaff73' } }), D('named', { scope: { ids: ['ustaff73'] } }), D('deflt', {}), D('del', { scope: 'all', del: 1 })] };
+  mem.gw_data['settings:documents'] = { scope_default: { '02': 'admin' } };
+  const ids = async (m, q) => { const o = await A.runTool('documents', { q: q || '' }, m); return (o.rows || []).map((x) => x.제목.replace('문서 ', '')).sort().join(); };
+  const st0 = await ids(Staff), mg0 = await ids(Mgmt), ad0 = await ids(Adm), hd0 = await A.runTool('documents', {}, Hide);
+  T('73 물어보기 문서: 직원 = 전원 공개·지정·본인 대기만(관리자만·관리부·01 법인·남의 대기·분류 기본 비공개·삭제 안 나옴) · 관리부 = 관리부·01까지 · 관리자 전부 · 숨김 권한 거부', st0 === 'all,mine,named' && mg0 === 'all,law,mg' && ad0.split(',').length === 8 && /권한 없음/.test(hd0.error || ''), JSON.stringify([st0, mg0, ad0, hd0]));
+  T('73 물어보기 문서: 검색어로 비공개 문서를 찾아도 안 나옴', (await ids(Staff, '문서 adm')) === '' && (await ids(Adm, '문서 adm')) === 'adm', '');
+  mem.gw_data['col:documents'] = { schema: 1, items: Array.from({ length: 40 }, (_, i) => D('h' + i, { scope: 'admin' })).concat([D('open', { scope: 'all' })]) };
+  T('73 물어보기 문서: 자르기(25행) 전에 걸러 볼 수 있는 문서가 밀려나지 않음', (await ids(Staff)) === 'open', '');
+  const sget = blobsMock.blobGet; blobsMock.hooks.beforeGet = null;
+  delete mem.gw_data['settings:documents'];
+  mem.gw_data['col:documents'] = { schema: 1, items: [D('deflt2', {})] };
+  T('73 물어보기 문서: 설정이 없으면 기본 비공개(가장 닫힌 쪽)', (await ids(Staff)) === '', '');
+  if (savedDocs) mem.gw_data['col:documents'] = savedDocs; else delete mem.gw_data['col:documents'];
+  if (savedSet) mem.gw_data['settings:documents'] = savedSet;
+  // ---- 74 v424 독립 검토 반영 ----
+  {
+    const LN = require(join(FN, '_lib/learn.js')), A74 = require(join(FN, '_lib/ask.js'));
+    const CID = 'c74';
+    mem.gw_data['col:contracts'].items.push({ id: CID, title: '검토 계약', scen: 'dredge:pub', stages: [] });
+    const ixOf = () => mem.gw_data['recidx:' + CID];
+    const putDraft = (tpl, i, name, bytes, gen, extra) => call(Object.assign({ action: 'cdoc_put', cid: CID, i: i, doc_key: 'gen.' + tpl, kind: 'draft', pii: 1, name: name, data: b64(bytes), gen: gen }, extra || {}), tk, 'dev1');
+    const putFinal = (i, dk, name, bytes, extra) => call(Object.assign({ action: 'cdoc_put', cid: CID, i: i, doc_key: dk, kind: 'final', name: name, data: b64(bytes), allow_dup: true }, extra || {}), tk, 'dev1');
+
+    // 표식: 사람 칸 있는 양식은 1, 확인한 양식도 새 번호가 생기면 1, 양식 자체 회사 번호는 그대로 0
+    const BJ74 = require(join(FN, '_lib/boxjudge.js'));
+    const jd = (tpl, buf, db) => BJ74.markJudge('hwpx', buf, { cid: CID, tpl: tpl, draftBuf: db || null }).pii;
+    const hw = (x) => mkHwpx(x, 'JWG1.c74.x.a1b2c3d4');
+    const ph = '010-1234-5678', co = ['본문', '담당 ' + ph];
+    T('74 표식 등급: 안전 대장·비상대응·위험성평가는 1(모르는 양식도 1) · 확인한 양식 0 · 초안에 있던 회사 번호는 0 · 새로 적은 번호는 1 · 주민번호 꼴 1(쪼개진 값·다른 하이픈 포함)',
+      jd('safety_ppe', hw(['대장'])) === 1 && jd('safety_emerg', hw(['대응'])) === 1 && jd('safety_risk', hw(['평가'])) === 1 && jd('새양식', hw(['x'])) === 1 && jd('seal_reg', hw(['인감'])) === 0
+      && jd('quote_env', hw(co), hw(co)) === 0 && jd('quote_env', hw(co.concat(['기사 010-9999-0000'])), hw(co)) === 1
+      && jd('seal_reg', hw(['900101－1234567'])) === 1 && jd('seal_reg', mkZip({ 'Contents/section0.xml': '<s><hp:p><hp:run><hp:t>900101-12</hp:t></hp:run><hp:run><hp:t>34567</hp:t></hp:run></hp:p></s>' })) === 1,
+      JSON.stringify([jd('safety_ppe', hw(['대장'])), jd('quote_env', hw(co), hw(co))]));
+    T('74 파일명 가드: "공사·용역"이 들어 있어도 건강진단·신분증·명단·인적사항은 막음 · 계약서는 읽음',
+      BJ74.nameGuard('구룡포 하수박스 준설공사_건강진단 결과표.pdf') && BJ74.nameGuard('철거공사 신분증 사본.jpg') && BJ74.nameGuard('철강공단 준설공사 근로자 명단.xlsx') && BJ74.nameGuard('용역 인적사항.hwpx') && !BJ74.nameGuard('건강검진센터 철거공사 계약서.pdf') && !BJ74.nameGuard('상대동 주민센터 철거공사_착공계.xlsx'), '');
+
+    // 지난 계약 파일을 복사해 고친 파일 — 표식은 그대로, 내용은 전혀 다름
+    const MX = 'JWG1.c74.work_start.aaaabbbb01', FX = { tpl: 'work_start', at: '2026-11-06', edits: { '착공계': [['A1', '가 공사', 's'], ['B1', '가 발주처', 's'], ['C1', '1000', 's'], ['D1', '2026-01-01', 's']] } };
+    r = await putDraft('work_start', 1, '착공계.xlsx', mkXl({ A1: '가 공사', B1: '가 발주처', C1: '1000', D1: '2026-01-01', Z1: '양식' }, MX), MX, { fill: FX });
+    const dn = r.body.item.n;
+    r = await putFinal(2, 'main.a0', '다른 계약 착공계.xlsx', mkXl({ A1: '나 공사', B1: '나 발주처', C1: '2000', D1: '2027-02-02', Z1: '양식' }, MX));
+    T('74 표식 + 내용 전혀 다름: 표식을 믿지 않아 짝 없음(간극 안 쌓임)', r.code === 200 && (r.body.learn || {}).ok === false && !ixOf().items.find((x) => x.n === r.body.item.n).pair, JSON.stringify(r.body.learn));
+    r = await putFinal(2, 'main.a1', '착공계 고침.xlsx', mkXl({ A1: '가 공사', B1: '가 발주처', C1: '1500', D1: '2026-01-01', Z1: '양식' }, MX));
+    const L74 = r.body.learn || {}, nf = r.body.item.n;
+    T('74 표식 + 비슷한 내용: 표식 짝 · 색인에 찾은 경로', L74.how === 'mark' && ixOf().items.find((x) => x.n === nf).phow === 'mark' && L74.gap.cell_ratio === 0.25, JSON.stringify(L74));
+
+    // 창고 읽기 실패 때 덮지 않음
+    const lk74 = 'lessons:contract:work_start', keep = { schema: 1, off: true, rules: [{ id: 'r1', text: '규칙', scope: 'style', n: 2 }], exemplars: {}, gaps: [], stats: { pairs: 9, calls: 5, tokens: 1 }, updated_at: 1, baseline: { avg: 0.2, n: 10, ts: 1 } };
+    mem.gw_data[lk74] = JSON.parse(JSON.stringify(keep));
+    blobsMock.hooks.failGet = (k) => k === lk74;
+    r = await putFinal(2, 'main.a2', '착공계 고침2.xlsx', mkXl({ A1: '가 공사', B1: '가 발주처', C1: '1600', D1: '2026-01-01', Z1: '양식' }, MX));
+    mem.gw_users['member:uadm74'] = { id: 'uadm74', name: '관리', admin: true, perms: {} };
+    const rT = await call({ action: 'learn_tpl_set', tpl: 'work_start', off: false }, issueSession({ id: 'uadm74', name: '관리', admin: true, perms: {} }).token);
+    blobsMock.hooks.failGet = null;
+    T('74 창고 읽기 실패: 규칙·기준선·끔 표시 그대로(최종본은 들어감) · 양식 끄기·켜기는 500', r.code === 200 && mem.gw_data[lk74].rules.length === 1 && mem.gw_data[lk74].off === true && mem.gw_data[lk74].stats.calls === 5 && rT.code === 500, JSON.stringify([r.code, mem.gw_data[lk74].stats, rT.code]));
+    delete mem.gw_data[lk74];
+
+    // 다른 서류를 단계 초안에 묶지 않음
+    const CC = 'c74b'; mem.gw_data['col:contracts'].items.push({ id: CC, title: '단계 계약', scen: 'dredge:pub', stages: [] });
+    const put2 = (o) => call(Object.assign({ action: 'cdoc_put', cid: CC, allow_dup: true }, o), tk, 'dev1');
+    const MY = 'JWG1.c74b.work_start.ccccdddd01', FY = { tpl: 'work_start', at: 'x', edits: { '착공계': [['A1', '값', 's']] } };
+    await put2({ i: 0, doc_key: 'gen.work_start', kind: 'draft', pii: 1, name: '착공계.xlsx', data: b64(mkXl({ A1: '값' }, MY)), gen: MY, fill: FY });
+    let q = await put2({ i: 0, doc_key: 'main.b0', kind: 'final', name: '공사원가계산서.xlsx', data: b64(mkXl({ A1: '원가' }, '', '원가계산서')) });
+    const n1 = (q.body.learn || {}).code;
+    q = await put2({ i: 0, doc_key: 'main.b1', kind: 'final', name: '회의록.hwpx', data: b64(mkHwpx(['회의 내용'])) });
+    const n2 = (q.body.learn || {}).code;
+    q = await put2({ i: 0, doc_key: 'main.b2', kind: 'final', name: '회의록2.hwpx', data: b64(mkHwpx(['회의 내용 둘'])), pair_tpl: 'work_start' });
+    const n3 = (q.body.learn || {}).code;
+    const it3 = mem.gw_data['recidx:' + CC].items.find((x) => x.n === q.body.item.n);
+    q = await put2({ i: 0, doc_key: 'main.b3', kind: 'final', name: '날인 스캔.pdf', data: b64('%PDF-1.4 scan') });
+    T('74 무관한 파일: 시트 안 겹침·형식 다름·이름만 맞음 모두 NO_MATCH(색인에 사유) · 스캔 pdf만 단계 짝', n1 === 'NO_MATCH' && n2 === 'NO_MATCH' && n3 === 'NO_MATCH' && it3.plearn === 'NO_MATCH' && !it3.ptpl && q.body.learn.how === 'stage', JSON.stringify([n1, n2, n3, q.body.learn]));
+    T('74 이번 달 짝 경로 건수가 사용량에 쌓임', (mem.gw_data['usage:box:' + LN.ymOf(Date.now())] || {}).pair_no_match >= 3 && (mem.gw_data['usage:box:' + LN.ymOf(Date.now())] || {}).pair_stage >= 1, JSON.stringify(mem.gw_data['usage:box:' + LN.ymOf(Date.now())]));
+
+    // 보관 → 간극 지움 · 복구 → 다시 짝 · 등급 2 → 무효
+    const gapsN = () => ((mem.gw_data[lk74] || {}).gaps || []).length;
+    r = await putFinal(2, 'main.a3', '착공계 고침3.xlsx', mkXl({ A1: '가 공사', B1: '가 발주처', C1: '1700', D1: '2026-01-01', Z1: '양식' }, MX));
+    const nd = r.body.item.n, pid = r.body.learn.id, g0 = gapsN();
+    r = await call({ action: 'cdoc_del', cid: CID, n: nd }, tk, 'dev1');
+    const v0 = r.code === 200 && gapsN() === g0 - 1 && mem.gw_data['learn:contract:in:' + pid].status === 'superseded' && !ixOf().items.find((x) => x.n === nd).pair;
+    const tkA74 = issueSession({ id: 'uadm74', name: '관리', admin: true, perms: {} }).token; mem.gw_users['member:uadm74'] = { id: 'uadm74', name: '관리', admin: true, perms: {} };
+    r = await call({ action: 'cdoc_restore', cid: CID, n: nd }, tkA74);
+    const v1 = r.code === 200 && r.body.learn && r.body.learn.how === 'mark' && gapsN() === g0 && !!ixOf().items.find((x) => x.n === nd).pair;
+    T('74 보관: 짝 무효·간극 지움 · 복구: 다시 짝·간극', v0 && v1, JSON.stringify([v0, v1, gapsN(), g0]));
+    r = await call({ action: 'cdoc_move', cid: CID, n: nd, i: 2, doc_key: 'main.a3', kind: 'final', pii: 2 }, tk, 'dev1');
+    T('74 같은 자리에서 등급만 2: 짝 무효·간극 지움', r.code === 200 && !ixOf().items.find((x) => x.n === nd).pair && gapsN() === g0 - 1, JSON.stringify([r.code, r.body.error_code, gapsN()]));
+
+    // 워커: 지운 최종본은 모델에 안 보냄
+    mem.gw_data['settings:learn'] = { contract: { on: true, allow: { work_start: ['착공계!A1'] } } };
+    r = await putFinal(2, 'main.a4', '착공계 고침4.xlsx', mkXl({ A1: '가 공사 고침', B1: '가 발주처', C1: '1800', D1: '2026-01-01', Z1: '양식' }, MX));
+    const pPend = r.body.learn; const nW = r.body.item.n;
+    await call({ action: 'cdoc_del', cid: CID, n: nW }, tk, 'dev1');
+    const pairW = mem.gw_data['learn:contract:in:' + pPend.id];
+    T('74 pending 상태로 보관하면 짝이 무효로 내려간다(워커가 집지 않음)', pPend.status === 'pending' && pairW.status === 'superseded' && LN.pickPending([pairW], Date.now(), LN.TYPES.contract.pair_re, 'cid').length === 0, JSON.stringify(pairW.status));
+    delete mem.gw_data['settings:learn'];
+
+    // 사본에서 비운 칸은 비교에서 뺀다 · 색인에 AI 밖 칸 수
+    const MZ = 'JWG1.c74.safety_cost.eeeeffff01', FZ = { tpl: 'safety_cost', at: 'x', edits: { '착공계': [['A1', '머리', 's']] } };
+    await putDraft('safety_cost', 3, '사용내역서.xlsx', mkXl({ A1: '머리', F13: '' }, MZ), MZ, { fill: FZ, blank: ['착공계!F13', 'bad ref'] });
+    const recZ = Object.keys(mem.gw_files).filter((k) => k.indexOf('cdoc:c74:S03:gen.safety_cost') === 0).map((k) => mem.gw_files[k])[0];
+    r = await putFinal(3, 'main.a5', '사용내역서 고침.xlsx', mkXl({ A1: '머리', F13: '주민칸', G20: '직원이 적음', G21: '직원이 또 적음' }, MZ));
+    const itZ = ixOf().items.find((x) => x.n === r.body.item.n);
+    T('74 사본에서 비운 칸은 "AI가 안 채운 칸"에 안 셈 · 잘못된 좌표는 안 받음 · 간극 0%여도 색인에 AI 밖 칸 수', recZ.blank.length === 1 && r.body.learn.gap.cell_ratio === 0 && itZ.pout === 2, JSON.stringify([recZ.blank, r.body.learn.outside, itZ.pout]));
+
+    // 같은 양식을 두 단계에서 만든 경우 — 최근 판 · 오래된 초안이 많아도 최근 초안을 찾음
+    const CD = 'c74c'; mem.gw_data['col:contracts'].items.push({ id: CD, title: '대조 계약', scen: 'dredge:pub', stages: [] });
+    const put3 = (o) => call(Object.assign({ action: 'cdoc_put', cid: CD, allow_dup: true }, o), tk, 'dev1');
+    const lines = ['선금지급 신청서', '계약 건명 시험', '금액 일금', '위와 같이 신청합니다'];
+    await put3({ i: 1, doc_key: 'gen.adv_pay', kind: 'draft', pii: 1, name: '선금.hwpx', data: b64(mkHwpx(lines)) });
+    const dLate = (await put3({ i: 2, doc_key: 'gen.adv_pay', kind: 'draft', pii: 1, name: '선금.hwpx', data: b64(mkHwpx(lines)) })).body.item.n;
+    q = await put3({ i: 3, doc_key: 'main.c0', kind: 'final', name: '고친 선금.hwpx', data: b64(mkHwpx(lines.concat(['추가']))) });
+    T('74 같은 양식 동률: 고르게 하지 않고 최근 판과 짝', q.body.learn.ok && q.body.learn.draft_n === dLate && q.body.learn.how === 'content', JSON.stringify(q.body.learn));
+    for (let n0 = 0; n0 < 14; n0++) await put3({ i: 5, doc_key: 'gen.t' + n0, kind: 'draft', pii: 1, name: 't' + n0 + '.hwpx', data: b64(mkHwpx(['문서 ' + n0 + ' 첫째', '문서 ' + n0 + ' 둘째', '문서 ' + n0 + ' 셋째'])) });
+    q = await put3({ i: 6, doc_key: 'main.c1', kind: 'final', name: '고친 13.hwpx', data: b64(mkHwpx(['문서 13 첫째', '문서 13 둘째', '문서 13 셋째 고침'])) });
+    T('74 초안이 많아도 최근 초안부터 대조해 찾음', q.body.learn.ok && q.body.learn.tpl === 't13', JSON.stringify(q.body.learn));
+
+    // 색인 상한은 바이트 없는 옛 초안을 세지 않음
+    const CE = 'c74d'; mem.gw_data['col:contracts'].items.push({ id: CE, title: '상한 계약', scen: 'dredge:pub', stages: [] });
+    mem.gw_data['recidx:' + CE] = { schema: 1, cid: CE, seq: 400, items: Array.from({ length: 400 }, (_, n0) => ({ n: n0 + 1, i: 0, dk: 'gen.x', kind: 'draft', ver: n0 + 1, cur: 0, gc: n0 < 397 ? 1 : 0, name: 'x', sha: 's' + n0 })) };
+    q = await call({ action: 'cdoc_put', cid: CE, i: 0, doc_key: 'main.d0', kind: 'final', name: '스캔.pdf', data: b64('%PDF-1.4 d') }, tk, 'dev1');
+    T('74 색인 상한: 바이트가 지워진 옛 초안은 세지 않아 최종본이 막히지 않음', q.code === 200, JSON.stringify([q.code, q.body.error_code]));
+
+    // 짝 번호·간극 줄
+    const id1 = LN.newPairId('contract', 'a');
+    T('74 짝 번호: 형식 유지 · 앞 8자리가 시각이라 정렬이 시간순', LN.TYPES.contract.pair_re.test(id1) && id1.slice(3, 11) === ('0000000' + Math.floor(Date.now() / 1000).toString(16)).slice(-8) && /^pl_[a-f0-9]{12}$/.test(LN.newPairId('promo', 'a')), id1);
+    let Lm = LN.pushGap(null, { pair: 'lc_x', ratio: 0.5 }, 100);
+    Lm = LN.mergeLessons(Lm, { rules: [] }, { rec_id: 'c', pair_id: 'lc_x', ex_key: 't', now: 200, tokens: 5, gap: { ratio: 0.5 }, summary: '요약', extra: { kind: 'xlsx_cell' } }, LN.TYPES.contract.scopes);
+    T('74 모델이 처리한 짝도 간극 한 줄(기준선 표본이 절반이 되지 않음)', Lm.gaps.length === 1 && Lm.stats.pairs === 1 && Lm.stats.calls === 1 && Lm.gaps[0].summary === '요약' && Lm.gaps[0].ts === 100, JSON.stringify(Lm.gaps));
+
+    // 얼린 기준선에 든 짝을 무효로 하면 다시 잰다
+    const lkB = 'lessons:contract:qual_packet', gs = Array.from({ length: 11 }, (_, n0) => ({ pair: 'lc_b' + n0, ratio: n0 === 0 ? 1 : 0, ts: n0 + 1 }));
+    const LB = { schema: 1, off: false, rules: [], exemplars: {}, gaps: gs, stats: { pairs: 11, calls: 0, tokens: 0 }, updated_at: 1 }; LN.freezeBaseline(LB, 50);
+    const avg0 = LB.baseline.avg; mem.gw_data[lkB] = LB;
+    const CF = 'c74e'; mem.gw_data['col:contracts'].items.push({ id: CF, title: '기준선', scen: 'dredge:pub', stages: [] });
+    mem.gw_data['learn:contract:in:lc_b0'] = { id: 'lc_b0', tpl: 'qual_packet', status: 'done_nomodel', cid: CF };
+    mem.gw_data['recidx:' + CF] = { schema: 1, cid: CF, seq: 1, items: [{ n: 1, i: 0, dk: 'main.e0', kind: 'final', ver: 1, cur: 1, name: 'x', pair: 'lc_b0', ptpl: 'qual_packet', ext: 'pdf', sha: 'e' }] };
+    mem.gw_files['cdoc:' + CF + ':S00:main.e0:1'] = { data: b64('%PDF-1.4') };
+    r = await call({ action: 'cdoc_del', cid: CF, n: 1 }, tk, 'dev1');
+    T('74 무효가 된 짝이 기준선에 들어 있으면 남은 간극으로 다시 잰다', r.code === 200 && avg0 === 0.1 && mem.gw_data[lkB].baseline.avg === 0 && mem.gw_data[lkB].gaps.length === 10, JSON.stringify(mem.gw_data[lkB].baseline));
+
+    // 권한: 양식·목록·물어보기
+    const uV = { id: 'uview74', name: '보기', admin: false, perms: { con: 'view', site: 'hide', lic: 'view' }, dept: '운영부' }, uD = { id: 'udo74', name: '공무', admin: false, perms: { con: 'do' }, dept: '운영부' };
+    mem.gw_users['member:uview74'] = uV; mem.gw_users['member:udo74'] = uD; mem.gw_users['device:dev74'] = { status: 'approved' };
+    const tV = issueSession(uV).token, tD = issueSession(uD).token;
+    mem.gw_files['tpl:work_start'] = { name: '착공계', data: 'QQ==' }; mem.gw_files['tpl:quote_env'] = { name: '견적', data: 'QQ==' };
+    const a1 = await call({ action: 'tpl_get', key: 'work_start' }, tV, 'dev74'), a2 = await call({ action: 'tpl_get', key: 'quote_env' }, tV, 'dev74'), a3 = await call({ action: 'tpl_get', key: 'work_start' }, tD), a4 = await call({ action: 'tpl_get', key: 'work_start' }, tD, 'dev74');
+    const rlk = Object.keys(mem.gw_data).find((k) => k.indexOf('reclog:') === 0);
+    T('74 사람 정보 양식: 보기 권한 403 · 미승인 기기 403 · 처리 권한+승인 기기 200 + 열람 기록(양식 이름만) · 견적 양식은 보기 권한도 그대로',
+      a1.code === 403 && a2.code === 200 && a3.code === 403 && a3.body.error_code === 'DEVICE_NOT_APPROVED' && a4.code === 200 && mem.gw_data[rlk].items.slice(-1)[0].dk === 'tpl.work_start', JSON.stringify([a1.code, a2.code, a3.code, a4.code]));
+    delete mem.gw_files['tpl:work_start']; delete mem.gw_files['tpl:quote_env'];
+    const CG = 'c74f'; mem.gw_data['col:contracts'].items.push({ id: CG, title: '목록', scen: 'dredge:pub', stages: [] });
+    await call({ action: 'cdoc_put', cid: CG, i: 0, doc_key: 'main.f0', kind: 'received', pii: 1, name: '홍길동 재직증명.pdf', data: b64('%PDF-1.4 f') }, tk, 'dev1');
+    const l1 = await call({ action: 'cdoc_list', cid: CG }, tV, 'dev74'), l2 = await call({ action: 'cdoc_list', cid: CG }, tD, 'dev74'), l3 = await call({ action: 'cdoc_list', cid: CG }, tV);
+    T('74 서류 목록: 열람 권한 없는 개인정보 항목은 올린 이름 대신 표준 이름 · 처리 권한은 올린 이름 · 미승인 기기 403', l1.code === 200 && !/홍길동/.test(JSON.stringify(l1.body.items)) && /홍길동/.test(l2.body.items[0].orig) && l3.code === 403, JSON.stringify([l1.body.items[0].orig, l3.code]));
+    const defs = (m) => A74.toolDefs(m).map((t) => t.name);
+    const uS = { id: 'usite74', admin: false, perms: { site: 'view', lic: 'hide' }, dept: '운영부' };
+    mem.gw_data['col:licenses'] = { schema: 1, items: [{ id: 'l1', name: '전체 면허', scope: [] }, { id: 'l2', name: '관리부 면허', scope: ['dept:관리부'] }, { id: 'l3', name: '본인 면허', scope: ['uview74'] }, { id: 'l4', name: '직급 면허', scope: ['rank:과장'] }] };
+    const lics = async (m) => ((await A74.runTool('licenses', {}, m)).rows || []).map((x) => x.이름).join();
+    const rOk = await lics(uV), rMg = await lics(Object.assign({}, uV, { id: 'x', dept: '관리부' })), rRk = await lics(Object.assign({}, uV, { id: 'y', rank: '부장' })), rAd = await lics({ id: 'adm', admin: true, perms: {} });
+    delete mem.gw_data['col:licenses'];
+    T('74 물어보기 석면: 현장 권한으로 판정(인허가 권한만으로 안 나옴, 현장만 있으면 나옴) · 인허가: 공개 대상 밖은 안 나옴',
+      defs(uV).indexOf('asbestos') < 0 && defs(uS).indexOf('asbestos') >= 0 && defs(uS).indexOf('licenses') < 0 && rOk === '전체 면허,본인 면허' && rMg === '전체 면허,관리부 면허' && rRk === '전체 면허,직급 면허' && rAd.split(',').length === 4, JSON.stringify([defs(uV), rOk, rMg, rRk, rAd]));
+    const devOk = await A74.deviceApproved({ headers: { 'x-device-id': 'dev74' } }, uV), devNo = await A74.deviceApproved({ headers: {} }, uV), devAdm = await A74.deviceApproved({ headers: {} }, { admin: true });
+    T('74 물어보기 기기: 승인 기기만 · 관리자 통과', devOk && !devNo && devAdm, '');
+    ['recidx:' + CID, 'recidx:' + CC, 'recidx:' + CD, 'recidx:' + CE, 'recidx:' + CF, 'recidx:' + CG, lkB].forEach((k) => delete mem.gw_data[k]);
+    Object.keys(mem.gw_files).filter((k) => /^cdoc:c74/.test(k)).forEach((k) => delete mem.gw_files[k]);
+  }
+  // 정리
+  delete mem.gw_data['recidx:c73']; Object.keys(mem.gw_data).filter((k) => /^(learn:contract:in:|lessons:contract:|usage:box:)/.test(k)).forEach((k) => delete mem.gw_data[k]);
+  Object.keys(mem.gw_files).filter((k) => /^(cdoc:c73|boxp:|parse:att_|att_)/.test(k)).forEach((k) => delete mem.gw_files[k]);
+  delete mem.gw_data['col:contracts'];
 }
 
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

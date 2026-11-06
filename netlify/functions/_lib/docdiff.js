@@ -5,8 +5,10 @@
 const zlib = require('zlib');
 
 // ---- zip(중앙 디렉터리 기준, 로컬 헤더 폴백) ----
-function zipEntries(buf) {
+// want(이름 또는 정규식)를 주면 그 항목만 푼다 — 표식 읽기처럼 한 항목만 필요할 때
+function zipEntries(buf, want) {
   const out = {};
+  const skip = function (name) { return !!want && !(typeof want === 'string' ? name === want : want.test(name)); };
   if (!Buffer.isBuffer(buf) || buf.length < 22) return out;
   let eocd = -1;
   for (let p = buf.length - 22; p >= Math.max(0, buf.length - 65557); p--) { if (buf.readUInt32LE(p) === 0x06054b50) { eocd = p; break; } }
@@ -18,7 +20,7 @@ function zipEntries(buf) {
       const method = buf.readUInt16LE(p + 10), csize = buf.readUInt32LE(p + 20), usize = buf.readUInt32LE(p + 24);
       const nl = buf.readUInt16LE(p + 28), el = buf.readUInt16LE(p + 30), cl = buf.readUInt16LE(p + 32), lho = buf.readUInt32LE(p + 42);
       const name = buf.slice(p + 46, p + 46 + nl).toString('utf8');
-      if (lho + 30 <= buf.length && buf.readUInt32LE(lho) === 0x04034b50) {
+      if (!skip(name) && lho + 30 <= buf.length && buf.readUInt32LE(lho) === 0x04034b50) {
         const lnl = buf.readUInt16LE(lho + 26), lel = buf.readUInt16LE(lho + 28);
         const ds = lho + 30 + lnl + lel, data = buf.slice(ds, ds + csize);
         try { out[name] = method === 8 ? zlib.inflateRawSync(data) : (method === 0 ? data : null); } catch (e) { out[name] = null; }
@@ -26,7 +28,7 @@ function zipEntries(buf) {
       }
       p += 46 + nl + el + cl;
     }
-    if (Object.keys(out).length) return out;
+    if (want || Object.keys(out).length) return out;
   }
   // 폴백: 로컬 헤더 순회(크기가 헤더에 있는 파일만)
   let p = 0;
@@ -34,6 +36,7 @@ function zipEntries(buf) {
     const method = buf.readUInt16LE(p + 8), csize = buf.readUInt32LE(p + 18), nl = buf.readUInt16LE(p + 26), el = buf.readUInt16LE(p + 28);
     const name = buf.slice(p + 30, p + 30 + nl).toString('utf8'), ds = p + 30 + nl + el;
     if (!csize) break;
+    if (skip(name)) { p = ds + csize; continue; }
     try { out[name] = method === 8 ? zlib.inflateRawSync(buf.slice(ds, ds + csize)) : buf.slice(ds, ds + csize); } catch (e) { out[name] = null; }
     p = ds + csize;
   }
@@ -155,15 +158,104 @@ function lcsLen(a, b) {
   for (let i = 1; i <= n; i++) { for (let j = 1; j <= m; j++) cur[j] = a[i - 1] === b[j - 1] ? prev[j - 1] + 1 : Math.max(prev[j], cur[j - 1]); const t = prev; prev = cur; cur = t; }
   return prev[m];
 }
-// 초안 docx ↔ 최종 docx 문단 집합. 같은 문단 수 L(LCS) 기준 removed=초안−L, added=최종−L. 본문은 내보내지 않는다.
+// 초안 ↔ 최종 문단 집합. 같은 문단 수 L(LCS) 기준 removed=초안−L, added=최종−L. 본문은 내보내지 않는다.
+const PARA_CAP = 3000;
+function paraDiff(A, B, kind) {
+  const a = A.slice(0, PARA_CAP), b = B.slice(0, PARA_CAP);
+  const L = lcsLen(a, b);
+  const removed = a.length - L, added = b.length - L;
+  return { ok: true, kind: kind, n_draft: a.length, n_final: b.length, same: L, removed: removed, added: added, compared: a.length, changed: removed, uncomparable: 0, ratio: a.length ? Math.round(1000 * Math.max(removed, added) / Math.max(a.length, b.length, 1)) / 1000 : null };
+}
 function docxParaDiff(draftBuf, finalBuf) {
   const A = docxParas(draftBuf), B = docxParas(finalBuf);
   if (!A || !B) return { ok: false, code: 'NO_DOCUMENT_XML', kind: 'docx_para', compared: 0, changed: 0, uncomparable: 0 };
-  const cap = 3000; const a = A.slice(0, cap), b = B.slice(0, cap);
-  const L = lcsLen(a, b);
-  const removed = a.length - L, added = b.length - L;
-  return { ok: true, kind: 'docx_para', n_draft: a.length, n_final: b.length, same: L, removed: removed, added: added, compared: a.length, changed: removed, uncomparable: 0, ratio: a.length ? Math.round(1000 * Math.max(removed, added) / Math.max(a.length, b.length, 1)) / 1000 : null };
+  return paraDiff(A, B, 'docx_para');
 }
+// ---- hwpx 문단(v424, 브리핑 1단계) ---- Contents/section*.xml의 hp:p마다 hp:t 글자. 표 칸 안 문단도 각각 한 문단(문단 안에 문단이 있어 스택으로 읽는다). 한글에서 다시 저장해 런이 쪼개져도 글자는 같다.
+function hwpxParas(buf) {
+  const z = zipEntries(buf, /^Contents\/section\d+\.xml$/i);
+  const num = function (n) { return Number((/section(\d+)\.xml$/i.exec(n) || [0, 0])[1]); };
+  const names = Object.keys(z).sort(function (a, b) { return num(a) - num(b); });
+  if (!names.length) return null;
+  const out = [];
+  names.forEach(function (n) {
+    if (!z[n]) return;
+    const xml = z[n].toString('utf8'), stack = [];
+    const re = /<hp:p\b[^>]*?(\/?)>|<\/hp:p>|<hp:t\b[^>]*\/>|<hp:t\b[^>]*>([\s\S]*?)<\/hp:t>/g; let m;
+    while ((m = re.exec(xml))) {
+      const tok = m[0];
+      if (tok.charAt(1) === '/') { if (stack.length) { const s = normS(xmlUnesc(stack.pop())); if (s) out.push(s); } }
+      else if (tok.indexOf('<hp:p') === 0) { if (m[1] !== '/') stack.push(''); }
+      else if (m[2] !== undefined && stack.length) stack[stack.length - 1] += m[2].replace(/<hp:(?:tab|fwSpace|nbSpace|lineBreak)\b[^>]*\/?>/g, ' ').replace(/<[^>]+>/g, '');
+    }
+  });
+  return out;
+}
+function hwpxParaDiff(draftBuf, finalBuf) {
+  const A = hwpxParas(draftBuf), B = hwpxParas(finalBuf);
+  if (!A || !B) return { ok: false, code: 'NO_SECTION', kind: 'hwpx_para', compared: 0, changed: 0, uncomparable: 0 };
+  return paraDiff(A, B, 'hwpx_para');
+}
+// ---- xlsx 파일 대 파일(v424) ---- 채움 맵이 없는 초안(안전 패킷·낙찰률 내역서)과, AI가 안 채운 칸을 직원이 얼마나 고쳤는지. 수식 칸은 계산값이 따라 바뀌므로 비교하지 않는다. 좌표·횟수만 돌려준다.
+function xlsxFileDiff(draftBuf, finalBuf, skipRefs) {
+  const dx = xlsxCells(draftBuf), fx = xlsxCells(finalBuf);
+  if (!dx.ok || !fx.ok) return { ok: false, code: dx.ok ? fx.code : dx.code, kind: 'xlsx_file', compared: 0, changed: 0, uncomparable: 0, refs_changed: [], refs_uncomparable: [] };
+  const skip = {}; (Array.isArray(skipRefs) ? skipRefs : []).forEach(function (r) { const s = splitRef(r); if (s) skip[(s.sheet || dx.first) + '!' + s.ref] = 1; });
+  let compared = 0, changed = 0, unc = 0; const rc = [], ru = [];
+  dx.names.forEach(function (nm) {
+    const ds = dx.sheets[nm], fs = fx.sheets[nm], refs = {};
+    Object.keys(ds.cells).forEach(function (k) { refs[k] = 1; });
+    if (fs) Object.keys(fs.cells).forEach(function (k) { refs[k] = 1; });
+    Object.keys(refs).forEach(function (ref) {
+      const key = nm + '!' + ref; if (skip[key]) return;
+      const a = ds.cells[ref] || { t: 'blank', v: '' };
+      if (!fs) { if (a.t !== 'f' && normS(a.v) !== '') { unc++; ru.push(key); } return; }   // 최종본에 그 시트가 없음
+      const b = fs.cells[ref] || { t: 'blank', v: '' };
+      if (a.t === 'f' || b.t === 'f' || a.t === 'e' || b.t === 'e' || inMergedNonAnchor(ref, fs.merged)) return;
+      const av = normS(a.v), bv = normS(b.v);
+      if (av === '' && bv === '') return;
+      compared++;
+      const same = (a.t === 'n' && b.t === 'n') ? sameNum(a.v, b.v) : av === bv;
+      if (!same) { changed++; rc.push(key); }
+    });
+  });
+  return { ok: true, kind: 'xlsx_file', compared: compared, changed: changed, uncomparable: unc, ratio: compared ? Math.round(1000 * changed / compared) / 1000 : null, refs_changed: rc.slice(0, 200), refs_uncomparable: ru.slice(0, 100) };
+}
+// 내용 일치율 0~1 — 표식이 사라진 파일이 어느 초안의 수정본인지 찾는다. 0 = 다른 서류(형식이 다르거나 시트가 안 겹침). null = 비교할 수 없는 형식(hwp·스캔 pdf·초안에 재료 없음).
+const MATCH_FAM = { xlsx: 1, hwpx: 1, docx: 1 };
+function matchScore(rec, draftExt, finalExt, finalBuf) {
+  if (!rec || !finalBuf) return null;
+  const db = rec.data ? Buffer.from(String(rec.data), 'base64') : null;
+  if (finalExt === 'xlsx') {
+    const fill = rec.fill ? flattenEdits(rec.fill.edits) : null;
+    if (fill && fill.length) {
+      const d = xlsxCellDiff(fill, finalBuf); if (!d.ok) return null;
+      const tot = d.compared + d.uncomparable; if (!tot) return null;
+      if (d.compared / tot < 0.5) return 0;   // 채운 시트 대부분이 없다 = 다른 서류
+      if (d.ratio === null || d.ratio === undefined) return null;
+      return 1 - d.ratio;
+    }
+    if (db && draftExt === 'xlsx') { const d = xlsxFileDiff(db, finalBuf); if (!d.ok) return null; if (d.ratio === null) return d.uncomparable > 0 ? 0 : null; return 1 - d.ratio; }
+    return MATCH_FAM[draftExt] ? 0 : null;
+  }
+  if (!MATCH_FAM[finalExt]) return null;
+  if (draftExt !== finalExt) return (MATCH_FAM[draftExt] || draftExt === 'json') ? 0 : null;   // hwpx 파일 ↔ xlsx 초안
+  if (!db) return null;
+  const f = finalExt === 'hwpx' ? hwpxParas : docxParas;
+  const A = f(db), B = f(finalBuf);
+  if (!A || !B || !A.length || !B.length) return null;
+  const a = A.slice(0, PARA_CAP), b = B.slice(0, PARA_CAP);
+  return lcsLen(a, b) / Math.max(a.length, b.length);
+}
+// ---- 표식(v424) ---- 앱이 만든 파일의 문서 정보 키워드 칸(xlsx docProps/core.xml cp:keywords · hwpx Contents/content.hpf keyword)에 든 번호. 형식 JWG1.<계약>.<양식>.<난수>. 파일을 다시 저장해도 문서 정보는 남는 것이 보통이나, 사라지면 내용 일치율로 찾는다.
+const GEN_SRC = 'JWG1\\.[A-Za-z0-9_-]{1,40}\\.[a-z0-9_]{1,30}\\.[a-z0-9]{6,16}';
+const GEN_ALL = new RegExp(GEN_SRC, 'g'), GEN_ONE = new RegExp('^' + GEN_SRC + '$');
+function genMarkOf(buf, ext) {
+  const nm = ext === 'xlsx' ? 'docProps/core.xml' : (ext === 'hwpx' ? 'Contents/content.hpf' : '');
+  if (!nm || !Buffer.isBuffer(buf)) return '';
+  try { const b = zipEntries(buf, nm)[nm]; if (!b) return ''; const m = b.toString('utf8').match(GEN_ALL); return m ? m[m.length - 1] : ''; } catch (e) { return ''; }
+}
+function genMarkParse(mark) { const s = String(mark || ''); if (!GEN_ONE.test(s)) return null; const p = s.split('.'); return { cid: p[1], tpl: p[2], rand: p[3] }; }
 
 // ---- 서류 목록 집합 ----
 // base = 골조 목록 이름 배열 · cur = 건별 항목 [{t|name, skip|skipped}] → 추가·삭제·건너뜀(이름은 양식명이라 개인정보 아님)
@@ -203,4 +295,4 @@ function cellRows(edits, finalBuf, allowRefs) {
   });
   return { ok: true, rows: rows, hidden_changed: hidden_changed.slice(0, 100), hidden_same_n: hidden_same };
 }
-module.exports = { zipEntries, xlsxCells, xlsxCellDiff, docxParas, docxParaDiff, listDiff, gapScore, refRC, inMergedNonAnchor, splitRef, cellRows, flattenEdits };
+module.exports = { zipEntries, xlsxCells, xlsxCellDiff, xlsxFileDiff, docxParas, docxParaDiff, hwpxParas, hwpxParaDiff, matchScore, genMarkOf, genMarkParse, listDiff, gapScore, refRC, inMergedNonAnchor, splitRef, cellRows, flattenEdits };

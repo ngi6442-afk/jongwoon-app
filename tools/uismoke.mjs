@@ -8,7 +8,7 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const html = readFileSync(join(ROOT, 'index.html'), 'utf8');
-const gwd = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-data.js'), 'utf8');
+const gwd = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-data.js'), 'utf8') + '\n' + readFileSync(join(ROOT, 'netlify', 'functions', '_lib', 'docscope.js'), 'utf8');   // v424 문서함 판정은 _lib/docscope.js로 옮김
 const auth = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-auth.js'), 'utf8');
 
 let fails = 0;
@@ -1270,6 +1270,8 @@ try {
   const keys = (src, re) => [...((src.match(re) || ['', ''])[1]).matchAll(/(\w+)\s*:/g)].map((m) => m[1]).sort();
   const appC = keys(html, /var PERM_CLOSED = \{([^}]+)\}/);
   const svrC = keys(gwd, /const PERM_CLOSED = \{([^}]+)\}/);
+  const askS = readFileSync(join(ROOT, 'netlify/functions/_lib/ask.js'), 'utf8');
+  T('v424 검토 물어보기 권한: 기본 숨김 집합 = 서버와 같음 · 석면 도구 = 현장 권한(gw-data COL과 같음)', keys(askS, /const PERM_CLOSED = \{([^}]+)\}/).join() === svrC.join() && /asbestos: 'site'/.test(askS) && /asbestos: *'site'/.test(gwd), '');
   T('기본 숨김 집합(PERM_CLOSED) 앱↔서버 일치 + lic·site 포함(인허가=면허 · site=현장 대장, 둘 다 관리부·운영부만)',
     appC.length === 5 && same(appC, svrC) && appC.indexOf('lic') >= 0 && appC.indexOf('site') >= 0,
     '앱 [' + appC.join(',') + '] / 서버 [' + svrC.join(',') + ']');
@@ -1401,7 +1403,7 @@ try {
   T('v383 CON_PACKETS 4(계약·착공·준공·청구) · gen 키는 TPL_LABELS 또는 가상 키(con_docs·quote·html_contract) · tpl_list 캐시(csLoadTpl) · 서류 탭에 csPacketsHtml + 첨부함 · [생성] 배선(html_contract → 계약서 툴, 그 외 openXlsxGen)',
     pks.join(',') === 'con,start,complete,bill'
     && [...sc.matchAll(/t:"gen", k:"(\w+)"/g)].map((m) => m[1]).every((k) => ['con_docs', 'quote', 'html_contract', 'safety_pack'].includes(k) || new RegExp('\\b' + k + ':"').test(html.slice(html.indexOf('var TPL_LABELS='), html.indexOf('var TPL_LABELS=') + 900)))
-    && /gwCall\("gw-data", \{ action:"tpl_list" \}\)/.test(sc) && /h \+= csPacketsHtml\(c\) \+ cbxEtcHtml\(c\) \+ conAttBoxHtml\(c\)/.test(html) && /querySelectorAll\("\[data-cs-gen\]"\)/.test(html) && /openDocFromContract\(p\[0\]\); else openXlsxGen\(p\[0\], csGenKind/.test(html)
+    && /gwCall\("gw-data", \{ action:"tpl_list" \}\)/.test(sc) && /h \+= csPacketsHtml\(c\) \+ cdocGenHtml\(c\) \+ cbxEtcHtml\(c\) \+ conAttBoxHtml\(c\)/.test(html) && /querySelectorAll\("\[data-cs-gen\]"\)/.test(html) && /openDocFromContract\(p\[0\]\); else openXlsxGen\(p\[0\], csGenKind/.test(html)
     && /\.cs-pk \.st\.gap\{/.test(html), pks.join(','));
   T('v383 검토 반영: tpl_list 실패는 캐시 null 유지 + csTplErr 쿨다운(30초) · 비200 불신 · then 2인자 · tpl_put 성공·관리 목록 수신 → csTplInvalidate/csTplSet · 모달 닫기 재그리기 · 첨부 claim 1회 + ex 제외 · 정규식 좁힘(사업자 제외 등록증·세금계산서·4대보험)',
     /if \(csTplErr && Date\.now\(\) - csTplErr < 30000\) return;/.test(sc) && /if \(!\(res && res\.status === 200 && res\.body && res\.body\.templates\)\)\{ csTplErr = Date\.now\(\);/.test(sc) && /\}, function\(\)\{ csTplLoading = false; csTplErr = Date\.now\(\); renderContracts\(\); \}\);/.test(sc)
@@ -1770,7 +1772,7 @@ try {
   const swv7 = readFileSync(join(ROOT, 'sw.js'), 'utf8');
   T('v407 계약 서류함 화면(v423 올리기는 넣기 박스로): cdoc 함수군(cdocDocKey·cdocPkHit·cdocRowsHtml·csCdocOpen/Mark/Draft) · 패킷 cdocPkHit 우선 · 생성 훅 csCdocDraft 2곳 · 바인딩 4종 · CSS · sw ≥ 407',
     ['function cdocDocKey', 'function cdocPkHit', 'function cdocRowsHtml', 'function cdocLoad', 'function csCdocOpen', 'function csCdocMark', 'function csCdocDraft'].every((s) => html.indexOf(s) > 0)
-    && html.indexOf('var hm = cdocPkHit(c, pk, it), hit = [], hm2 = null;') > 0 && (html.match(/csCdocDraft\(c, kind, ed(?:, al\.learned)?\);/g) || []).length === 2
+    && html.indexOf('var hm = cdocPkHit(c, pk, it), hit = [], hm2 = null;') > 0 && (html.match(/xgOut\(c, kind, [^\n]*\{ edits: ed, learned: al\.learned, tpl: res\.body\.data/g) || []).length === 2
     && ['data-cs-cmove', 'data-cs-copen', 'data-cs-ccur', 'data-cs-cdel'].every((a) => html.indexOf('querySelectorAll("[' + a + ']")') > 0 || html.indexOf('csAct("' + a + '"') > 0)
     && html.indexOf('.cs-cdoc-r{') > 0 && Number((swv7.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 407);
 } catch (e) { console.log('  (v407 검사 생략 — ' + e.message + ')'); fails++; }
@@ -1816,7 +1818,7 @@ try {
     && /if \(!learn \|\| !learn\.started\)/.test(cr11) && /async function kickLearnContract\(/.test(cr11) && /LN\.kickWorker\('gw-learn-background'/.test(cr11)
     && gwd11.indexOf("d.action === 'learn_defaults_get'") > 0 && gwd11.indexOf('LN.fieldDefaults(') > 0
     && html.indexOf('function xgApplyLearned(kind, edits)') > 0 && (html.match(/xgApplyLearned\(kind, ed\)\.then\(/g) || []).length === 2 && html.indexOf('if (v === undefined || e[2] !== "b") return e;') > 0
-    && html.indexOf('function csCdocDraft(c, kind, edits, learned)') > 0 && html.indexOf('fill.learned = learned') > 0
+    && html.indexOf('function csCdocDraft(c, kind, edits, learned, file, tries)') > 0 && html.indexOf('fill.learned = learned') > 0
     && html.indexOf('id="conLearnCard"') > 0 && html.indexOf('function renderConLearnCard()') > 0 && html.indexOf('action: "learn_pairs_get"') > 0 && html.indexOf('data-cl-on') > 0
     && Number((swv11.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 411);
 } catch (e) { console.log('  (v411 검사 생략 — ' + e.message + ')'); fails++; }
@@ -1905,7 +1907,7 @@ try {
     && [...lab22.matchAll(/\b(\w+):"/g)].every((m) => has22(srv22, m[1])), lab22.slice(0, 200));
   T('v422 생성 창: 선택지 4종 · 안전보건관리비 칸 · 묶음 표(XG_SAFE_FILES) · 사용내역서는 일반 xlsx 경로(xgBuildEdits)', ['safety_plan', 'safety_pack', 'safety_cost', 'labor_split'].every((k) => html.indexOf('<option value="' + k + '">') > 0) && html.indexOf('id="xgSafeFee"') > 0 && /var XG_SAFE_FILES=\{ safety_plan:\["safety_plan"\], labor_split:\["labor_split"\], safety_pack:\["safety_risk","safety_rule","safety_emerg","safety_ppe"\] \}/.test(html) && html.indexOf('if(kind==="safety_cost"){   // v422') > 0 && html.indexOf('if(XG_SAFE_FILES[kind]){') > 0 && html.indexOf('if(XG_SAFE_FILES[kind]){') < html.indexOf('// 하드리딩 원칙: 원문(계약서·조사서·대장)에서 못 채운 값만')
     && /document\.getElementById\("xgSafeWrap"\)\.style\.display = \(k==="safety_plan"\|\|k==="safety_cost"\)/.test(html) && /document\.getElementById\("xgSafeRecvWrap"\)\.style\.display = \(k==="labor_split"\)/.test(html));
-  T('v422 검토 반영: 이월 차단(XG_RESET_IDS에 대리인 3칸·금액·수신처) · 사용내역서 초안 안 남김 · 착공계 초안에 주민번호 칸 뺌 · 패킷 zip · tpl 읽기 실패 비200', /var XG_RESET_IDS=\["xgAgent","xgAgentRrn","xgAgentLic","xgSafeFee","xgSafeRecv",/.test(html) && html.indexOf('if(kind!=="safety_cost") csCdocDraft(c, kind, ed, al.learned);') > 0 && html.indexOf('var rrnCell = { "현장대리인계":"F13", "재직증명서":"I6" }') > 0 && html.indexOf('downloadBlob(name+"_안전 패킷.zip", zipStore(fs))') > 0 && /error_code: 'TPL_READ_FAILED'/.test(gwd) && /if \(!r\.ok && r\.code !== 'NOT_FOUND'\) return jr\(500, \{ status: 'ERROR', error_code: r\.code \|\| 'STORAGE_READ_FAILED'/.test(gwd));
+  T('v422 검토 반영(v424 사용내역서 초안 복구): 이월 차단(XG_RESET_IDS에 대리인 3칸·금액·수신처) · 사용내역서 제외 분기 없음 · 착공계 초안에 주민번호 칸 뺌 · 패킷 zip · tpl 읽기 실패 비200', /var XG_RESET_IDS=\["xgAgent","xgAgentRrn","xgAgentLic","xgSafeFee","xgSafeRecv",/.test(html) && html.indexOf('if(kind!=="safety_cost") csCdocDraft') < 0 && html.indexOf('if (kind === "work_start") return { "현장대리인계":["F13"], "재직증명서":["I6"] }') > 0 && html.indexOf('downloadBlob(name+"_안전 패킷.zip", zipStore(fs))') > 0 && /error_code: 'TPL_READ_FAILED'/.test(gwd) && /if \(!r\.ok && r\.code !== 'NOT_FOUND'\) return jr\(500, \{ status: 'ERROR', error_code: r\.code \|\| 'STORAGE_READ_FAILED'/.test(gwd));
   const sc22 = html.slice(html.indexOf('// @con-scen-start'), html.indexOf('// @con-scen-end'));
   T('v422 패킷: ✗ 4항목은 t:"gap"을 유지하고 gen(준설 한정)을 곁들임(옛 판은 ✗ 그대로) · 줄 그릴 때 gen 우선', ['safety_plan', 'safety_pack', 'safety_cost', 'labor_split'].every((k) => new RegExp('t:"gap"[^\\n]*gen:\\{ t:"gen", k:"' + k + '"[^\\n]*when:"dredge" \\}').test(sc22)) && sc22.indexOf('var it = (it0.gen && csPkWhen(c, it0.gen.when)) ? it0.gen : it0;') > 0);
   const swv22 = readFileSync(join(ROOT, 'sw.js'), 'utf8');
@@ -1931,6 +1933,17 @@ try {
     /d\.action === 'box_pending'/.test(srv23) && /function boxMarkKey/.test(srv23) && html.indexOf('function cbxRestore') > 0 && /NOT_OWNER/.test(srv23) && html.indexOf('var fileInput = function(e)') > 0 && html.indexOf('계약서 판독 완료') < 0, '');
   T('v423 서버 확장자표는 문서함과 같고 xls만 박스 추가', /function boxExtOk\(ext\) \{ return docAttExtOk\(ext\) \|\| ext === 'xls'; \}/.test(srv23) && /ext !== "xls"/.test(html), '');
 } catch (e) { console.log('  (v423 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ---- v424(11/6 체크 31 브리핑 1단계 + 물어보기): 생성 결과 파일째 저장·표식·단계 칸 값·물어보기 공개범위 ----
+try {
+  const srv24 = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-data.js'), 'utf8'), ask24 = readFileSync(join(ROOT, 'netlify', 'functions', '_lib', 'ask.js'), 'utf8'), ds24 = readFileSync(join(ROOT, 'netlify', 'functions', '_lib', 'docscope.js'), 'utf8'), dd24 = readFileSync(join(ROOT, 'netlify', 'functions', '_lib', 'docdiff.js'), 'utf8'), pb24 = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-parse-background.js'), 'utf8'), lw24 = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-learn-background.js'), 'utf8'), sw24 = readFileSync(join(ROOT, 'sw.js'), 'utf8');
+  T('v424 물어보기: 문서 도구가 docVisible을 거침 · 판정 한 곳(_lib/docscope.js, gw-data는 가져다 씀) · sw ≥ 424', /DS\.docVisible\(member, d, ds\)/.test(ask24) && /function docVisible\(m, it, settings\)/.test(ds24) && !/function docVisible\(/.test(srv24) && /require\('\.\/_lib\/docscope'\)/.test(srv24) && Number((sw24.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 424);
+  const dl24 = [...html.matchAll(/downloadBlob\(([^\n]{0,60})/g)].map((m) => m[1]).filter((x) => !/^"(?:차량목록|전체백업|실적목록|세무)/.test(x) && !/^r2\.body\.file/.test(x) && !/^res\.body\.name/.test(x) && !/^name, /.test(x) && !/^name\+"_안전 패킷/.test(x) && !/^name, blob\)\{/.test(x));
+  T('v424 생성 경로: 양식으로 만든 파일은 전부 xgOut을 거침(직접 내려받기 없음) · 생성 12경로', dl24.length === 0 && (html.match(/xgOut\(/g) || []).length >= 13 && ['"qual_packet"', '"contract_pledge"', '"seal_reg"', '"bond_waiver"', '"labor_exempt"', '"settle_doc"', '"adv_pay"', '"bid_rate"', 'qtKey'].every((k) => html.indexOf('xgOut(c, ' + k) > 0), JSON.stringify(dl24));
+  T('v424 표식: 앱 번호 형식 = 서버 번호 형식 · 서버 사본은 주민번호 가림(genStoreCopy) · 착공계는 칸 비운 사본(xgNoRrn)', dd24.indexOf('JWG1\\\\.[A-Za-z0-9_-]{1,40}\\\\.[a-z0-9_]{1,30}\\\\.[a-z0-9]{6,16}') > 0 && html.indexOf('JWG1\\.[A-Za-z0-9_-]{1,40}\\.[a-z0-9_]{1,30}\\.[a-z0-9]{6,16}') > 0 && html.indexOf('genStoreCopy(b, kind === "work_start")') > 0 && html.indexOf('fillXlsxTemplate(o.tpl, xgNoPerson(edits, cells))') > 0);
+  T('v424 짝: 표식 → 이름 → 내용 일치율 순 · hwpx 문단 비교 · 모델은 칸 비교만 · 워커 가드 · 판단 표식(모델 호출 없음)', /how = byMark \? 'mark' : ''/.test(srv24) && /DD\.matchScore\(/.test(srv24) && /DD\.hwpxParaDiff\(db, fb\)/.test(srv24) && /kind === 'xlsx_cell' && learnAllowed/.test(srv24) && /NO_CELL_MAP/.test(lw24) && /BJ\.markJudge\(/.test(pb24));
+  T('v424 단계 칸 값: 생성 창이 xgAuto로 읽음 · 종류를 바꾸면 사람이 안 고친 칸만 · 새로 친 값은 빈 칸에 저장(xgSaveBack) · AI↔직원 줄이 서류 탭에', html.indexOf('xgAutoApply(c, document.getElementById("xgKind").value, true)') > 0 && html.indexOf('xgAutoApply(c0, $("xgKind").value, false)') > 0 && html.indexOf('if (!o.noBack) xgSaveBack(c);') > 0 && html.indexOf('h += csPacketsHtml(c) + cdocGenHtml(c) + cbxEtcHtml(c)') > 0);
+} catch (e) { console.log('  (v424 검사 생략 — ' + e.message + ')'); fails++; }
 
 try {
   const fdir = join(ROOT, 'netlify', 'functions');

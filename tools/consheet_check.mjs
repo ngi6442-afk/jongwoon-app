@@ -46,6 +46,7 @@ const stubs = `
   function conNeedsBldg(c){ return !!(c && !c.bldg_info && (c.type === "asbestos" || c.type === "demolition")); }
   function pipeLabel(k){ return k === "waste" ? "폐기물" : (k === "chg" ? "변경계약" : "본"); }
   function conAttBoxHtml(c){ return (c.attachments && c.attachments["서류함"] && c.attachments["서류함"].length) ? '<div data-catt-drop="' + c.id + '">att</div>' : ''; }
+  var xgCtx = null; function sortedWorkers(){ return workers; }
   var gidN = 0; function genId(p){ return p + "x" + (++gidN); }   // 고유해야 한다 — 같은 id면 findTask가 엉뚱한 지시를 집는다(검토 J 검사에서 실측)
   function myName(){ return "검사"; }
   var schedN = 0; function scheduleContractSave(){ schedN++; } function saveTasksCache(){} function scheduleTasksSave(){} function renderTasks(){} function renderSummary(){} function renderContracts(){}
@@ -68,8 +69,8 @@ const stubs = `
 `;
 const tplLine = (html.match(/var TPL_LABELS=\{[^\r\n]*\};/) || [''])[0] + (html.match(/var TPL_EXT=\{[^\r\n]*\};/) || [''])[0] + cut('  var XG_SAFE_CO=', '  function xgToggle(){');   // v422 준설 실물 양식 함수
 const opt = (n) => { try { return fnOf(n); } catch (e) { return ''; } };   // v404: 날짜 실함수(isDate·addDays·pad) — 스텁 addDays 항등 함수 제거
-const api = new Function('contracts', 'tasks', 'recs', stubs + opt('isDate') + opt('addDays') + opt('pad') + opt('fmtDate') + tplLine + ' var CDOC = {}, CDOC_TTL = 60000, CDOC_KIND_LABEL = { draft:"초안", final:"최종본", received:"수령" }; ' + fnOf('cdocSan') + fnOf('cdocDocKey') + fnOf('cdocPkKey') + fnOf('cdocItems') + fnOf('cdocLive') + fnOf('cdocCurOf') + fnOf('cdocPkHit') + fnOf('cdocDay') + fnOf('cdocLoad') + fnOf('cdocRowsHtml') + fnOf('cdocTrashHtml') + fnOf('csCdocDraft') + fnOf('xgBuildEdits') + fnOf('koAmount') + fnOf('dateSerial') + fnOf('wkLabel') + fnOf('findWk') + fnOf('xgMergeLearned') + fnOf('xgApplyLearned') + fnOf('conAttList') + scen + sheet + fnOf('stageXlsxKind') + fnOf('advanceProc') + fnOf('materializeStage') + fnOf('procStageTitle') + cut('  var CON_PROC_SRC', '  // 제목 키워드로 요소 제안') + cut('  var WASTE_BACKBONE = [', '  // @con-scen-start') + fnOf('applyPublicMilestones') + fnOf('startProcess') + `
-  return { cbx: { items: function(){ return cbxItems; }, idSeq: 9000, nSeq: 100, cbxApply, cbxStart, cbxCardHtml, cbxDocList, cbxRef, cbxDocMatch, cbxTarget, cbxAct, cbxTplGo, cbxMoveOpen, cbxUpload, cbxBoxHtml, cbxEtcHtml, cbxRestore, setConfirm: function(v){ confirmAns = v; }, applied: function(){ return appliedN; }, setBids: function(a){ bids = a; }, setTplKeys: function(o){ csTplKeys = o; } }, xgSafetyVals, xgSafetyMissing, xgSafetyGen, XG_SAFE_FILES, csGenKeys, xgBuildEdits, xgMergeLearned, xgApplyLearned, errCalls: errCalls, CDOC, cdocTrashHtml, cdocDocKey, cdocPkKey, cdocLive, cdocCurOf, cdocPkHit, cdocRowsHtml, cdocLoad, csCdocDraft, CON_MAP, CON_BG, CON_PROC_SRC, conDueUse, conDueClear, conDueOn, conStageDue, conAnnualNext, conBaseDate, conAddBizDays, materializeStage, asb, todayStr, tasks, CON_COLS, CON_SCEN, CON_PACKETS, STAGE_DOCS, conScenStages, conModalElems, stageDocsFor, csSplitTop, csParseStageDocs, csStageDocItems, csStageDocsHtml, csDocToggle, csDocNa, csDocAdd, csDocDel, csMergeDocs, csStageFields, stageXlsxKind, csRowHtml, csDetailHtml, csStageInfo, csSortRows, csPass, csEnumValues, csEndCell, csKind, csSkipStage, csJumpStage, csUnskipStage, csPacketsHtml, csLoadTpl, csApprKind, csApprSubmit, csApprOnDecided, csApprFind, csSyncFromServer, csApprSync, csApprDropped, csAlignTasksAll, toasts: toasts, saveNow: function(){ return saveNowN; }, csLinkSite, csLinkSiteLater, csOnDone, csSiteDone, csSiteHooksRetry, csNextFeb15, advanceProc, materializeStage, asb: asb, tasks: tasks, appr: apprPendingCreates, alerts: alerts, bills: function(){ return billN; }, setServer: function(items){ serverItems = items; }, pushContract: function(c){ contracts.push(c); }, popContract: function(){ contracts.pop(); }, setAsbLoaded: function(v){ asbLoaded = v; }, setTab: function(t){ conDetTab = t; }, openStage: function(k){ csStageOpen = k; }, setTpl: function(o){ csTplKeys = o; csTplErr = 0; }, setTplErr: function(v){ csTplErr = v; }, tplState: function(){ return { keys: csTplKeys, err: csTplErr, loading: csTplLoading }; }, setGw: function(f){ gwCall = f; }, conScenKey, CON_ADDED, conAddedPrep, conAddedApply, conAddedUse, conAddedClear, conScenTag, conChgWindow, conAddedPreviewHtml, conRouteKey, stageDocsOf, csStageFieldsOf, csStageNew, csApprKindOf, csChgAmtChanged, csChgCan, csChgAdd, csChgOpenAt, csStagesHtml, csDoneStage, conProcLoad, renderConProcCard, startProcess, procSrc: function(){ return CON_PROC_SRC; }, setDocEl: function(id, el){ docEls[id] = el; }, sched: function(){ return schedN; }, csApprApply, csTaskChg, csChgBase, confirms: confirms, doneCalls: function(){ return csnN; } };
+const api = new Function('contracts', 'tasks', 'recs', stubs + opt('isDate') + opt('addDays') + opt('pad') + opt('fmtDate') + tplLine + ' var CDOC = {}, CDOC_TTL = 60000, CDOC_KIND_LABEL = { draft:"초안", final:"최종본", received:"수령" }; ' + fnOf('cdocSan') + fnOf('cdocDocKey') + fnOf('cdocPkKey') + fnOf('cdocItems') + fnOf('cdocLive') + fnOf('cdocCurOf') + fnOf('cdocPkHit') + fnOf('cdocDay') + fnOf('cdocLoad') + fnOf('cdocRowsHtml') + fnOf('cdocTrashHtml') + fnOf('csCdocDraft') + cut('  var GEN_MARK_RE', '  // ---- 적격심사 점수') + cut('  // v424 단계 칸 값 읽기', '  // 프리필(하드리딩 체인)') + fnOf('xgBuildEdits') + fnOf('koAmount') + fnOf('dateSerial') + fnOf('wkLabel') + fnOf('findWk') + fnOf('xgMergeLearned') + fnOf('xgApplyLearned') + fnOf('conAttList') + scen + sheet + fnOf('stageXlsxKind') + fnOf('advanceProc') + fnOf('materializeStage') + fnOf('procStageTitle') + cut('  var CON_PROC_SRC', '  // 제목 키워드로 요소 제안') + cut('  var WASTE_BACKBONE = [', '  // @con-scen-start') + fnOf('applyPublicMilestones') + fnOf('startProcess') + `
+  return { v424: { genMarkHpf, genMarkCore, genScrubText, xgNoRrn, xgFillKeep, xgAuto, xgStageVal, xgDateOf, xgAgentAuto, xgSaveBack, xgSnapTake, setXgCtx: function(x){ xgCtx = x; }, xgPersonCells, xgNoPerson, xgPersonRefs, cbxPairTpl, cdocGenHtml, genLabel, genMarkId, csDetailHtml, setWorkers: function(a){ workers = a; }, setStart: function(){} }, cbx: { items: function(){ return cbxItems; }, idSeq: 9000, nSeq: 100, cbxApply, cbxStart, cbxCardHtml, cbxDocList, cbxRef, cbxDocMatch, cbxTarget, cbxAct, cbxTplGo, cbxMoveOpen, cbxUpload, cbxBoxHtml, cbxEtcHtml, cbxRestore, setConfirm: function(v){ confirmAns = v; }, applied: function(){ return appliedN; }, setBids: function(a){ bids = a; }, setTplKeys: function(o){ csTplKeys = o; } }, xgSafetyVals, xgSafetyMissing, xgSafetyGen, XG_SAFE_FILES, csGenKeys, xgBuildEdits, xgMergeLearned, xgApplyLearned, errCalls: errCalls, CDOC, cdocTrashHtml, cdocDocKey, cdocPkKey, cdocLive, cdocCurOf, cdocPkHit, cdocRowsHtml, cdocLoad, csCdocDraft, CON_MAP, CON_BG, CON_PROC_SRC, conDueUse, conDueClear, conDueOn, conStageDue, conAnnualNext, conBaseDate, conAddBizDays, materializeStage, asb, todayStr, tasks, CON_COLS, CON_SCEN, CON_PACKETS, STAGE_DOCS, conScenStages, conModalElems, stageDocsFor, csSplitTop, csParseStageDocs, csStageDocItems, csStageDocsHtml, csDocToggle, csDocNa, csDocAdd, csDocDel, csMergeDocs, csStageFields, stageXlsxKind, csRowHtml, csDetailHtml, csStageInfo, csSortRows, csPass, csEnumValues, csEndCell, csKind, csSkipStage, csJumpStage, csUnskipStage, csPacketsHtml, csLoadTpl, csApprKind, csApprSubmit, csApprOnDecided, csApprFind, csSyncFromServer, csApprSync, csApprDropped, csAlignTasksAll, toasts: toasts, saveNow: function(){ return saveNowN; }, csLinkSite, csLinkSiteLater, csOnDone, csSiteDone, csSiteHooksRetry, csNextFeb15, advanceProc, materializeStage, asb: asb, tasks: tasks, appr: apprPendingCreates, alerts: alerts, bills: function(){ return billN; }, setServer: function(items){ serverItems = items; }, pushContract: function(c){ contracts.push(c); }, popContract: function(){ contracts.pop(); }, setAsbLoaded: function(v){ asbLoaded = v; }, setTab: function(t){ conDetTab = t; }, openStage: function(k){ csStageOpen = k; }, setTpl: function(o){ csTplKeys = o; csTplErr = 0; }, setTplErr: function(v){ csTplErr = v; }, tplState: function(){ return { keys: csTplKeys, err: csTplErr, loading: csTplLoading }; }, setGw: function(f){ gwCall = f; }, conScenKey, CON_ADDED, conAddedPrep, conAddedApply, conAddedUse, conAddedClear, conScenTag, conChgWindow, conAddedPreviewHtml, conRouteKey, stageDocsOf, csStageFieldsOf, csStageNew, csApprKindOf, csChgAmtChanged, csChgCan, csChgAdd, csChgOpenAt, csStagesHtml, csDoneStage, conProcLoad, renderConProcCard, startProcess, procSrc: function(){ return CON_PROC_SRC; }, setDocEl: function(id, el){ docEls[id] = el; }, sched: function(){ return schedN; }, csApprApply, csTaskChg, csChgBase, confirms: confirms, doneCalls: function(){ return csnN; } };
 `)(contracts, tasks, recs);
 let fails = 0; const T = (n, ok, note) => { console.log((ok ? '  ✓ ' : '  ✗ ') + n + (ok ? '' : ' — ' + note)); if (!ok) fails++; };
 // 시나리오 목록
@@ -549,8 +550,8 @@ T('준공·만기 칸: d3 없음 → "-" · 지난 날짜 → vs-dan · 완료 �
   const xgInputs = { xgTitle: '시험 공사', xgSite: '포항시 시험동', xgClient: '시험 발주처', xgAmount: '1000000', xgD1: '2026-11-01', xgD2: '2026-11-02', xgD3: '2026-11-10', xgCo: 'con', xgOwner: '', xgAgent: '', xgAgentRrn: '', xgAgentLic: '', xgTon1: '1', xgTon2: '2', xgProc: '시험 처리장' };
   Object.keys(xgInputs).forEach((id) => api.setDocEl(id, { value: xgInputs[id] }));
   const edAsb = api.xgBuildEdits('asb_plan', { asb_survey: { rows: [] }, bldg_info: {} });
-  api.csCdocDraft(c7, 'asb_plan', edAsb);
-  T('v407 초안 훅: cdoc_put draft · doc_key gen.asb_plan · i = 파이프 cur(1) · pii 1 · fill {tpl, edits} · v419 edits는 실제 빌더의 시트별 객체 그대로(저장 형식 불변)', calls7.length === 1 && calls7[0].action === 'cdoc_put' && calls7[0].kind === 'draft' && calls7[0].doc_key === 'gen.asb_plan' && calls7[0].i === 1 && calls7[0].pii === 1 && calls7[0].fill.tpl === 'asb_plan' && !Array.isArray(calls7[0].fill.edits) && Array.isArray(calls7[0].fill.edits['1.공사개요']) && calls7[0].fill.edits === edAsb, JSON.stringify(calls7[0]).slice(0, 200));
+  api.csCdocDraft(c7, 'asb_plan', edAsb); await new Promise((res) => setTimeout(res, 5));   // v424 서류함 색인을 한 번에 하나씩 고치므로 다음 틱에 나간다
+  T('v407 초안 훅: cdoc_put draft · doc_key gen.asb_plan · i = 파이프 cur(1) · pii 1 · fill {tpl, edits} · v419 edits는 실제 빌더의 시트별 객체 그대로(저장 형식 불변)', calls7.length === 1 && calls7[0].action === 'cdoc_put' && calls7[0].kind === 'draft' && calls7[0].doc_key === 'gen.asb_plan' && calls7[0].i === 1 && calls7[0].pii === 1 && calls7[0].fill.tpl === 'asb_plan' && !Array.isArray(calls7[0].fill.edits) && Array.isArray(calls7[0].fill.edits['1.공사개요']) && calls7[0].fill.edits['1.공사개요'] === edAsb['1.공사개요'] && !calls7[0].fill.edits['3'].some((e) => /^(C11|L32|G78|E70)$/.test(e[0])) && calls7[0].fill.edits['3'].some((e) => e[0] === 'B99'), JSON.stringify(calls7[0]).slice(0, 200));
   // v408 보관함(관리자 스텁 isAdmin=true): 보관 항목 1(n=5) → [복구]·[영구 삭제] · 서류 탭 상세에 포함
   const th = api.cdocTrashHtml(c7);
   T('v408 보관함: 보관 항목 n=5만(삭제됨.pdf) · 복구/영구 삭제 버튼 · 30일 미만 안내 title', th.indexOf('삭제됨.pdf') > 0 && th.indexOf('data-cs-crestore="c7|5"') > 0 && th.indexOf('data-cs-cpurge="c7|5"') > 0 && th.indexOf('보관 30일 뒤') > 0 && th.indexOf('계약서.pdf') < 0, th.slice(0, 300));
@@ -638,7 +639,7 @@ T('준공·만기 칸: d3 없음 → "-" · 지난 날짜 → vs-dan · 완료 �
   T('v422 사용내역서 칸: 머리 칸 채움 · 금액·안전관리비 숫자 · 환경계획 갑 공사명 · 기본정보 시트 없음', cell('안전계획 갑', 'F2')[1] === '하수도시설물 준설공사' && cell('안전계획 갑', 'C6')[1] === 19525000 && cell('안전계획 갑', 'C6')[2] === 'n' && cell('안전계획 갑', 'C8')[1] === 312254 && cell('안전계획 갑', 'D30')[1] === '상  호 : 주식회사 종운환경' && cell('안전계획 갑', 'A26')[1] === '2026년 06월   일' && cell('환경계획 갑', 'F2')[1] === '하수도시설물 준설공사' && !ed['기본정보 입력'], JSON.stringify(ed));
   setV({ xgAmount: '', xgSafeFee: '' }); ed = api.xgBuildEdits('safety_cost', { type: 'dredge' });
   { const sent = []; api.setGw((f, d) => { sent.push(d); return Promise.resolve({ status: 200, body: {} }); });
-    api.csCdocDraft({ id: 'c_rrn', pipes: [{ cur: 2 }] }, 'work_start', { '현장대리인계': [['E13', '이름', 's'], ['F13', '000000-0000000', 's']], '재직증명서': [['I6', '000000-0000000', 's'], ['E5', '이름', 's']], '공문': [['F13', '그대로', 's']] }, []);
+    api.csCdocDraft({ id: 'c_rrn', pipes: [{ cur: 2 }] }, 'work_start', { '현장대리인계': [['E13', '이름', 's'], ['F13', '000000-0000000', 's']], '재직증명서': [['I6', '000000-0000000', 's'], ['E5', '이름', 's']], '공문': [['F13', '그대로', 's']] }, []); await new Promise((res) => setTimeout(res, 5));
     const body = JSON.stringify(sent[0] || {});
     T('v422 착공계 초안: 주민번호 칸(현장대리인계 F13·재직증명서 I6)만 빠지고 나머지·다른 시트 F13은 남음', sent.length === 1 && body.indexOf('000000-0000000') < 0 && body.indexOf('그대로') > 0 && body.indexOf('E13') > 0, body.slice(0, 200));
     api.setGw(null); }
@@ -647,6 +648,181 @@ T('준공·만기 칸: d3 없음 → "-" · 지난 날짜 → vs-dan · 완료 �
   api.setGw((f, d) => Promise.resolve({ status: 404, body: {} }));
   const err = await api.xgSafetyGen('safety_pack', '시험', api.xgSafetyVals()).then(() => '', (e) => String(e));
   T('v422 생성: 미등록이면 첫 양식 이름으로 멈춤', /위험성평가표\(준설\).*양식 미등록/.test(err), err);
+  api.setGw(null);
+}
+
+// ---- v424 체크 31 브리핑 1단계: 표식 넣기·주민번호·단계 칸 값·AI↔직원 줄·표식 카드·초안 저장 실패 처리 ----
+{
+  const V = api.v424, X = api.cbx, MK = 'JWG1.c1.work_start.abc123def0';
+  const hSelf = V.genMarkHpf('<opf:metadata><opf:meta name="creator" content="text">a</opf:meta><opf:meta name="keyword" content="text"/></opf:metadata>', MK);
+  const hText = V.genMarkHpf('<opf:meta name="keyword" content="text" xml:space="preserve">www.yesform.com\n\n</opf:meta>', MK);
+  const hNone = V.genMarkHpf('<opf:metadata><opf:title/></opf:metadata>', MK);
+  const hRe = V.genMarkHpf(hSelf, 'JWG1.c2.seal_reg.zzzzzz1111');
+  T('v424 hwpx 표식: 빈 키워드 칸 채움 · 있는 글자 뒤에 덧붙임(앞 글자 보존) · 칸이 없으면 넣음 · 다시 넣으면 옛 번호 지움 · 다른 칸 그대로', hSelf.indexOf('<opf:meta name="keyword" content="text">' + MK + '</opf:meta>') > 0 && hSelf.indexOf('name="creator"') > 0 && hText.indexOf('www.yesform.com') > 0 && hText.indexOf('xml:space="preserve"') > 0 && hText.indexOf(MK + '</opf:meta>') > 0 && hNone.indexOf(MK) > 0 && hRe.indexOf('c1.work_start') < 0 && hRe.indexOf('c2.seal_reg') > 0, hText);
+  const c1 = V.genMarkCore('<cp:coreProperties><cp:keywords></cp:keywords></cp:coreProperties>', MK), c2 = V.genMarkCore('<cp:coreProperties><cp:keywords/></cp:coreProperties>', MK), c3 = V.genMarkCore('<cp:coreProperties><dc:creator>a</dc:creator></cp:coreProperties>', MK), c4 = V.genMarkCore('<cp:coreProperties><cp:keywords>태그</cp:keywords></cp:coreProperties>', MK), c5 = V.genMarkCore('<other/>', MK);
+  T('v424 xlsx 표식: 빈 칸 · 자기 닫는 칸 · 칸 없음(끝에) · 있는 태그 뒤에 · core.xml 모양이 다르면 그대로', [c1, c2, c3].every((x) => x.indexOf('<cp:keywords>' + MK + '</cp:keywords>') > 0) && c4.indexOf('<cp:keywords>태그 ' + MK + '</cp:keywords>') > 0 && c5 === '<other/>', c4);
+  const FAKE = '850101-1' + '234567', FAKE13 = '850101' + '1234567';
+  T('v424 사본 가리기: 하이픈·띄어쓰기·13자리 · 길이 그대로 · 날짜 꼴 아닌 숫자·계좌 꼴은 그대로', V.genScrubText('값 ' + FAKE + ' 끝') === '값 000000-0000000 끝' && V.genScrubText('<v>' + FAKE13 + '</v>') === '<v>0000000000000</v>' && V.genScrubText('850101 - 1234567') === '000000 - 0000000' && V.genScrubText('금액 9999991234567') === '금액 9999991234567' && V.genScrubText('2026-11-06') === '2026-11-06' && V.genScrubText('123-45-67890') === '123-45-67890', V.genScrubText('값 ' + FAKE + ' 끝'));
+  const en = V.xgNoRrn({ '현장대리인계': [['E13', '이름', 's'], ['F13', FAKE, 's']], '공문': [['F13', '그대로', 's']] }), en2 = V.xgNoRrn({ '공문': [['B6', 'x', 's']] });
+  const cc = (ed, s, a) => (ed[s] || []).filter((x) => x[0] === a);
+  T('v424 사본 칸: 대리인을 골랐든 안 골랐든 F13·I6은 비움(양식 기본값 대비) · 다른 칸·다른 시트 F13 그대로 · 원본 안 바꿈', cc(en, '현장대리인계', 'F13').length === 1 && cc(en, '현장대리인계', 'F13')[0][2] === 'b' && cc(en, '현장대리인계', 'E13').length === 1 && cc(en, '재직증명서', 'I6')[0][2] === 'b' && cc(en, '공문', 'F13')[0][1] === '그대로' && cc(en2, '현장대리인계', 'F13')[0][2] === 'b' && JSON.stringify(V.xgFillKeep('asb_plan', { a: 1 })) === '{"a":1}', JSON.stringify(en));
+  // 단계 칸 값
+  const con = (o) => Object.assign({ id: 'c_auto', type: 'dredge', contract_info: { d2: '2026-05-01', d3: '2026-06-30', amount: 1000 }, pipes: [{ key: 'main', stages: [] }] }, o);
+  const stg = (vals, x) => Object.assign({ name: 's', status: 'done', vals: vals }, x);
+  let a = V.xgAuto(con(), 'work_start');
+  T('v424 단계 칸: 값이 없으면 계약값 그대로 · 출처 없음', a.d2 === '2026-05-01' && a.d3 === '2026-06-30' && a.amount === 1000 && a.src.length === 0, JSON.stringify(a));
+  a = V.xgAuto(con({ pipes: [{ key: 'main', stages: [stg({ st_date: '2026-05-10' }), stg({ fin: '2026-07-02', settle_amount: 900 })] }], settle_amount: 900 }), 'work_start');
+  const a2 = V.xgAuto(con({ pipes: [{ key: 'main', stages: [stg({ st_date: '2026-05-10' }), stg({ fin: '2026-07-02', settle_amount: 900 })] }], settle_amount: 900 }), 'work_complete');
+  T('v424 단계 칸: 착공일은 단계 값이 먼저 · 준공일·정산액은 준공 서류에만(착공계는 준공 예정·계약금액)', a.d2 === '2026-05-10' && a.d3 === '2026-06-30' && a.amount === 1000 && a2.d2 === '2026-05-10' && a2.d3 === '2026-07-02' && a2.amount === 900 && a2.src.join() === '착공일,준공일,정산액', JSON.stringify([a, a2]));
+  const chg = { aw: 'amt', status: 'done', vals: { chg_amt: '2,000', chg_end: '2026.08.31' } };
+  a = V.xgAuto(con({ pipes: [{ key: 'main', stages: [] }, { key: 'chg', stages: [chg, { aw: 'amt', status: 'pending', vals: { chg_amt: '9,999', chg_end: '2026-12-31' } }] }] }), 'adv_pay');
+  T('v424 단계 칸: 완료된 변경계약의 금액·종료일(점 표기도) · 진행 중 차수는 안 씀', a.amount === 2000 && a.d3 === '2026-08-31' && a.src.join() === '변경 계약기간,변경 금액', JSON.stringify(a));
+  a = V.xgAuto(con({ pipes: [{ key: 'main', stages: [stg({ work_from: '2026-05-20', work_to: '2026-05-25', st_date: '2026-05-10' })] }] }), 'demo_report');
+  const a3 = V.xgAuto(con({ pipes: [{ key: 'main', stages: [stg({ st_date: '2026-05-10' }, { status: 'skipped' }), stg({ st_date: '오타' })] }] }), 'work_start');
+  T('v424 단계 칸: 해체신고는 착수·완료일 · 건너뛴 단계와 날짜가 아닌 값은 안 씀', a.d2 === '2026-05-20' && a.d3 === '2026-05-25' && a3.d2 === '2026-05-01', JSON.stringify([a, a3]));
+  // AI ↔ 직원 줄
+  const cg = { id: 'c_gen', status: 'active', pipes: [{ key: 'main', cur: 1, stages: [] }] };
+  api.CDOC.c_gen = { loaded: true, at: Date.now(), items: [
+    { n: 1, i: 0, dk: 'gen.work_start', kind: 'draft', cur: 0, ver: 1, ts: Date.parse('2026-11-05T03:00:00Z'), pii: 1 },
+    { n: 2, i: 0, dk: 'gen.work_start', kind: 'draft', cur: 1, ver: 2, ts: Date.parse('2026-11-06T03:00:00Z'), pii: 1 },
+    { n: 3, i: 1, dk: 'gen.seal_reg', kind: 'draft', cur: 1, ver: 1, ts: Date.parse('2026-11-06T03:00:00Z'), pii: 1 },
+    { n: 4, i: 2, dk: 'gen.adv_pay', kind: 'draft', cur: 1, ver: 1, ts: Date.parse('2026-11-06T03:00:00Z'), pii: 1 },
+    { n: 5, i: 0, dk: 'main.작성-0', kind: 'final', cur: 1, ver: 1, ts: Date.parse('2026-11-08T03:00:00Z'), pii: 0, ptpl: 'work_start', pgap: 0.125, ext: 'xlsx' },
+    { n: 6, i: 2, dk: 'main.작성-1', kind: 'final', cur: 1, ver: 1, ts: Date.parse('2026-11-08T03:00:00Z'), pii: 0, ptpl: 'adv_pay', pgap: null, ext: 'pdf' },
+  ] };
+  const gh = V.cdocGenHtml(cg);
+  T('v424 AI↔직원 줄: 양식마다 현재 AI 판(옛 판 안 나옴) · 짝이 된 최종본 · 간극 % · 스캔은 비교 불가 · 기다리는 중 · 열기 버튼', (gh.match(/class="it"/g) || []).length === 3 && gh.indexOf('착공계') > 0 && gh.indexOf('AI v2 11/06 · 직원 최종 v1 11/08 · 간극 13%') > 0 && gh.indexOf('data-cs-copen="c_gen|2|1"') > 0 && gh.indexOf('data-cs-copen="c_gen|1|') < 0 && gh.indexOf('data-cs-copen="c_gen|5|0"') > 0 && gh.indexOf('직원 수정본 기다리는 중') > 0 && gh.indexOf('비교 불가(pdf)') > 0, gh);
+  api.CDOC.c_none = { loaded: true, at: Date.now(), items: [{ n: 1, i: 0, dk: 'main.작성-0', kind: 'final', cur: 1, ver: 1, ts: 1 }] };
+  T('v424 AI↔직원 줄: 초안이 없으면 안 그림', V.cdocGenHtml({ id: 'c_none' }) === '', '');
+  api.setTab('doc'); const dt = api.csDetailHtml(Object.assign({}, cg, { type: 'dredge', docType: 'public', elems: {} }));
+  T('v424 서류 탭에 줄이 들어감', dt.indexOf('AI 생성본 ↔ 직원 최종본') > 0, '');
+  delete api.CDOC.c_gen; delete api.CDOC.c_none;
+  // 표식 카드
+  const sent = [], tick = () => new Promise((res) => setTimeout(res, 5));
+  api.setGw((fn, b) => { sent.push(b); if (b.action === 'cdoc_attach') return Promise.resolve({ status: 200, body: { item: { n: ++X.nSeq, i: b.i, dk: b.doc_key, kind: b.kind, ver: 1, cur: 1, orig: 'x', name: 'x' }, gc: [], learn: { ok: true, id: 'lc_1', status: 'done_nomodel', tpl: 'work_start', how: 'mark', draft_n: 2, gap: { cell_ratio: 0.25 } } } }); return Promise.resolve({ status: 200, body: { status: 'OK', items: [] } }); });
+  const cA = mk(), cB = mk(); cA.id = 'c_mkA'; cB.id = 'c_mkB'; cA.title = '계약 에이'; cB.title = '계약 비'; cA.status = cB.status = 'active';
+  api.pushContract(cA); api.pushContract(cB);
+  const MJ = (o) => Object.assign({ doc: 'box', cls: 'filled', sub: 'none', doc_name: '', pii: 0, read: 'mark', contract_id: 'c_mkA', draft_tpl: 'seal_reg', target: '' }, o);
+  const card = (scope) => { const it = { id: ++X.idSeq, scope: scope, file: {}, name: '고친 서류.hwpx', size: 1, st: 'judge', att: 'att_mark00000000' + X.idSeq, pii: 0 }; X.items().push(it); return it; };
+  let it = card('top'); X.cbxApply(it, MJ()); await tick(); await tick();
+  const put1 = sent.filter((x) => x.action === 'cdoc_attach').slice(-1)[0] || {};
+  T('v424 표식 카드(맨 위): 묻지 않고 그 계약에 최종본으로 · 양식 짝 지정 · 끝 문구에 계약 이름', it.st === 'done' && put1.cid === 'c_mkA' && put1.kind === 'final' && put1.pair_tpl === 'seal_reg' && it.msg.indexOf('계약 에이') >= 0, JSON.stringify([it.st, put1, it.msg]));
+  it = card('c_mkB'); X.cbxApply(it, MJ()); await tick();
+  T('v424 표식 카드(다른 계약 안): 안 넣고 맨 위 카드로 · 표식의 계약 미리 선택 · 안내', it.st === 'pick' && it.scope === 'top' && it.cid === 'c_mkA' && /다른 계약/.test(it.note || ''), JSON.stringify([it.st, it.scope, it.cid, it.note]));
+  it = card('c_mkA'); const n0 = sent.length; X.cbxApply(it, MJ({ pii: 1, draft_tpl: 'work_start' })); await tick();
+  T('v424 표식 카드(개인정보 1): 넣기 전에 등급 확인 카드', it.st === 'pii' && sent.slice(n0).every((x) => x.action !== 'cdoc_attach'), it.st);
+  it = card('top'); X.cbxApply(it, MJ({ contract_id: '없는계약' })); await tick();
+  T('v424 표식 카드(계약이 지워짐): 고르게 둠', it.st === 'pick' && !it.cid, JSON.stringify([it.st, it.cid]));
+  // ---- v424 독립 검토 ----
+  const cDead = mk(); cDead.id = 'c_mkDel'; cDead.title = '지운 계약'; cDead.status = 'active'; cDead.del = 1; const cDone = mk(); cDone.id = 'c_mkDone'; cDone.title = '끝난 계약'; cDone.status = 'done';
+  api.pushContract(cDead); api.pushContract(cDone);
+  const n1a = sent.length;
+  it = card('top'); X.cbxApply(it, MJ({ contract_id: 'c_mkDel' })); await tick();
+  const dead1 = it.st === 'pick' && it.scope === 'top' && !it.cid && /끝났거나 지운/.test(it.note || '');
+  it = card('c_mkA'); X.cbxApply(it, MJ({ contract_id: 'c_mkDone' })); await tick();
+  const dead2 = it.st === 'pick' && it.scope === 'top' && !it.cid;
+  T('v424 검토 표식 카드: 지운·끝난 계약이면 넣지 않고 계약을 고르게(막다른 실패 없음)', dead1 && dead2 && sent.slice(n1a).every((x) => x.action !== 'cdoc_attach'), JSON.stringify([dead1, dead2, it.st, it.scope, it.cid]));
+  it = card('top'); it.restored = 1; const n1b = sent.length; X.cbxApply(it, MJ()); await tick();
+  T('v424 검토 표식 카드(넣다 만 파일 복구): 자동으로 넣지 않고 계약이 선택된 카드', it.st === 'pick' && it.cid === 'c_mkA' && sent.slice(n1b).every((x) => x.action !== 'cdoc_attach'), JSON.stringify([it.st, it.cid]));
+  it = card('top'); X.cbxApply(it, MJ({ pii: 1, draft_tpl: 'work_start' })); await tick();
+  const piiH = X.cbxCardHtml(it);
+  T('v424 검토 표식 개인정보 카드: "판단"이 아니라 양식 안내 · 맨 위 박스는 계약 이름', it.st === 'pii' && /사람 정보 칸이 있는 양식/.test(piiH) && /계약 에이/.test(piiH) && !/개인정보가 든 파일로 판단/.test(piiH), piiH.slice(0, 200));
+  api.popContract(); api.popContract();
+  // 새로 친 값 저장
+  const setV = (o) => Object.keys(o).forEach((id) => api.setDocEl(id, { value: o[id] }));
+  const toastAt = api.toasts.length;
+  const cS = { id: 'c_sb', label: '준설', start: '2026-11-01', site: '공고명 현장', client: '', contract_info: {}, pipes: [{ key: 'main', stages: [] }] };
+  setV({ xgKind: 'work_start', xgTitle: '공고명 공사', xgSite: '공고명 현장', xgClient: '시험 발주', xgD1: '2026-11-01', xgD2: '', xgD3: '', xgAmount: '1000' });
+  V.setXgCtx({ id: 'c_sb' }); V.xgSnapTake(); V.xgSaveBack(cS);
+  T('v424 검토 저장: 프리필 그대로면 아무것도 저장 안 함(공고명이 현장 주소로, 변경 금액이 계약금액으로 들어가지 않음)', !cS.contract_info.site && !cS.contract_info.title && !cS.contract_info.amount && !cS.contract_info.client && api.toasts.length === toastAt, JSON.stringify(cS.contract_info));
+  setV({ xgSite: '포항시 남구 1', xgAmount: '2000', xgD3: '2026-12-31', xgClient: '바꾼 발주' });
+  V.xgSaveBack(cS); await tick();
+  T('v424 검토 저장: 사람이 바꾼 칸만 빈 칸에 · 안내창 뒤에 보이는 토스트', cS.contract_info.site === '포항시 남구 1' && cS.contract_info.amount === 2000 && cS.contract_info.d3 === '2026-12-31' && cS.contract_info.client === '바꾼 발주' && !cS.contract_info.title && /계약 정보에 저장/.test(api.toasts.slice(-1)[0]), JSON.stringify(cS.contract_info));
+  const cS2 = { id: 'c_sb2', label: '준설', start: '', contract_info: {}, pipes: [{ key: 'main', stages: [] }] };
+  V.setXgCtx({ id: '다른 계약' }); setV({ xgTitle: '다른 계약 값' }); V.xgSaveBack(cS2);
+  const other0 = !cS2.contract_info.title;
+  V.setXgCtx({ id: 'c_sb2' }); setV({ xgKind: 'demo_report', xgTitle: '', xgSite: '', xgClient: '소유자', xgAmount: '', xgD1: '', xgD2: '', xgD3: '' }); api.setDocEl('xgClient', { value: '' }); V.xgSnapTake(); api.setDocEl('xgClient', { value: '소유자 이름' }); V.xgSaveBack(cS2);
+  T('v424 검토 저장: 생성 중 창을 닫고 다른 계약을 열면 저장 안 함 · 해체신고의 소유자 이름은 발주자가 아님', other0 && !cS2.contract_info.client, JSON.stringify(cS2.contract_info));
+  V.setXgCtx(null);
+  // 단계 칸·현장대리인
+  const cSet = { id: 'x', settle_amount: 900, contract_info: { amount: 1000, d3: '2026-06-30' }, pipes: [{ key: 'main', stages: [{ status: 'done', vals: { fin: '2026-07-02', settle_amount: 900 } }] }] };
+  const aSd = V.xgAuto(cSet, 'settle_doc'), aWc = V.xgAuto(cSet, 'work_complete');
+  T('v424 검토 단계 칸: 정산합의서 금액 칸은 당초 도급액(정산액 아님) · 준공계는 정산액', aSd.amount === 1000 && aSd.d3 === '2026-07-02' && aWc.amount === 900, JSON.stringify([aSd, aWc]));
+  V.setWorkers([{ id: 'w1', name: '김대리' }, { id: 'w2', name: '박과장' }, { id: 'w3', name: '박과장' }]);
+  const agEl = { value: '' }, hintEl = { textContent: '' };
+  const agT = (rp, kind) => { agEl.value = ''; hintEl.textContent = ''; api.setDocEl('xgAgent', agEl); api.setDocEl('xgKind', { value: kind || 'work_start' }); api.setDocEl('xgHint', hintEl); V.xgAgentAuto({ pipes: [{ key: 'main', stages: [{ status: 'done', vals: { rep_person: rp } }] }] }); return agEl.value; };
+  const ag1 = agT('김대리'), ag2 = agT('박과장'), hint2 = hintEl.textContent, ag3 = agT('김대리', 'safety_plan');
+  T('v424 검토 현장대리인: 명부에 한 명이면 고름 · 동명이인은 안 고르고 안내 · 안전보건관리계획서는 연락처가 들어가 자동 선택 안 함', ag1 === 'w1' && ag2 === '' && /직접 골라/.test(hint2) && ag3 === '', JSON.stringify([ag1, ag2, hint2, ag3]));
+  V.setWorkers([]); api.setDocEl('xgAgent', null); api.setDocEl('xgKind', null); api.setDocEl('xgHint', null);
+  // 사람 칸
+  const pc = V.xgPersonCells('asb_plan'), keep = V.xgNoPerson({ '3': [['C11', '이름', 's'], ['L32', '번호', 's'], ['B99', '현장', 's']], '1.공사개요': [['C7', '공사', 's']] }, pc);
+  T('v424 검토 사람 칸: 석면 계획서 명단·연락처·검진 칸은 사본에서 비움 · 다른 칸 그대로 · 사업자 소유주 신고서는 해당 없음, 개인이면 이름·주소 칸 · 좌표 목록', keep['3'].filter((e) => e[0] === 'C11')[0][2] === 'b' && keep['3'].filter((e) => e[0] === 'L32')[0][2] === 'b' && keep['3'].filter((e) => e[0] === 'B99')[0][1] === '현장' && keep['1.공사개요'][0][1] === '공사' && V.xgPersonCells('waste_report', { owner_info: { kind: '사업자등록증' } }) === null && V.xgPersonCells('waste_report', { owner_info: { kind: '신분증' } })['신고서'].indexOf('E10') >= 0 && V.xgPersonRefs(V.xgPersonCells('work_start')).join() === '현장대리인계!F13,재직증명서!I6', JSON.stringify(keep['3'].slice(0, 3)));
+  // AI ↔ 직원 줄
+  const D0 = Date.parse('2026-11-06T03:00:00Z'), F0 = Date.parse('2026-11-08T03:00:00Z');
+  const dr = (n, tpl, ver) => ({ n: n, i: 0, dk: 'gen.' + tpl, kind: 'draft', cur: 1, ver: ver || 1, ts: D0, pii: 1 });
+  const cgg = { id: 'c_g2', status: 'active', pipes: [{ key: 'main', cur: 0, stages: [] }] };
+  api.CDOC.c_g2 = { loaded: true, at: Date.now(), items: [dr(1, 'safety_rule'), dr(2, 'safety_ppe'), dr(3, 'work_start'), dr(4, 'adv_pay', 2), dr(5, 'seal_reg'),
+    { n: 11, i: 0, dk: 'etc.box', kind: 'final', cur: 0, ver: 1, ts: F0, ptpl: 'safety_rule', pgap: 0.2, ext: 'hwpx' }, { n: 12, i: 0, dk: 'etc.box', kind: 'final', cur: 1, ver: 2, ts: F0, ptpl: 'safety_ppe', pgap: 0.3, ext: 'hwpx' },
+    { n: 13, i: 0, dk: 'main.a', kind: 'final', cur: 0, ver: 1, ts: F0, ptpl: 'work_start', pgap: 0.12, ext: 'xlsx', pout: 30 }, { n: 14, i: 0, dk: 'main.a', kind: 'final', cur: 1, ver: 2, ts: F0, ptpl: 'work_start', pgap: null, ext: 'pdf' },
+    { n: 15, i: 0, dk: 'main.b', kind: 'final', cur: 1, ver: 1, ts: F0, ptpl: 'adv_pay', pgap: 0.4, pdn: 99, ext: 'hwpx' },
+    { n: 16, i: 0, dk: 'main.c', kind: 'final', cur: 1, ver: 1, ts: F0, plearn: 'NO_MATCH', orig: '회의록.hwpx', ext: 'hwpx' }] };
+  const g2 = V.cdocGenHtml(cgg);
+  T('v424 검토 AI↔직원 줄: 같은 칸에 든 다른 서류에 밀려도 짝 유지 · 날인 스캔이 앞선 간극을 덮지 않음 · AI 밖 칸 수 · 새 AI 판은 옛 판 기준 표시(✓ 아님) · 짝 없는 최종본 사유 · 사본 안내·보관 버튼 · 폰에서 줄바꿈',
+    g2.indexOf('직원 최종 v1 11/08 · 간극 20%') > 0 && g2.indexOf('간극 30%') > 0 && g2.indexOf('간극 12%(직원 v1 기준, 최신은 비교 불가 pdf)') > 0 && g2.indexOf('AI가 안 채운 칸 30') > 0 && g2.indexOf('이전 판 기준, 새 AI는 수정본 기다리는 중') > 0 && g2.indexOf('짝 없음(맞는 AI 초안을 못 찾음)') > 0 && g2.indexOf('회의록.hwpx') > 0 && g2.indexOf('AI 사본') > 0 && g2.indexOf('data-cs-cdel="c_g2|1"') > 0 && g2.indexOf('white-space:normal') > 0, g2.slice(0, 900));
+  api.CDOC.c_g3 = { loaded: true, at: Date.now(), items: [dr(1, 'seal_reg')] };
+  const g3 = V.cdocGenHtml({ id: 'c_g3', status: 'done', pipes: [] });
+  T('v424 검토 끝난 계약: "기다리는 중" 대신 최종본 없음 · 보관 버튼 없음', g3.indexOf('최종본 없음') > 0 && g3.indexOf('기다리는 중') < 0 && g3.indexOf('data-cs-cdel') < 0, g3.slice(0, 300));
+  // 이름으로 양식 찾기
+  const nm = (t, list) => { const cN = { id: 'c_nm', pipes: [] }; api.CDOC.c_nm = { loaded: true, at: Date.now(), items: list.map((k, i0) => dr(i0 + 1, k)) }; return V.cbxPairTpl(cN, { res: { doc_name: t }, name: '' }); };
+  const allD = ['contract_pledge', 'labor_exempt', 'adv_pay', 'qual_packet', 'waste_report', 'work_start'];
+  T('v424 검토 이름 찾기: 띄어쓰기가 달라도 서류 제목으로 양식 하나 · 초안에 없는 양식은 안 고름', nm('계약이행 통합서약서', allD) === 'contract_pledge' && nm('노무비 적용제외 신청서', allD) === 'labor_exempt' && nm('선금지급 신청서', allD) === 'adv_pay' && nm('적격심사 신청서', allD) === 'qual_packet' && nm('폐기물 처리계획서', allD) === 'waste_report' && nm('점심 메뉴', allD) === '', JSON.stringify(['계약이행 통합서약서', '노무비 적용제외 신청서', '선금지급 신청서', '적격심사 신청서', '폐기물 처리계획서'].map((t) => nm(t, allD))));
+  delete api.CDOC.c_g2; delete api.CDOC.c_g3; delete api.CDOC.c_nm;
+  // 자리 표 — 시나리오 전부 × 양식 전부
+  {
+    const TPL = ['work_start', 'work_complete', 'asb_plan', 'demo_report', 'waste_report', 'qual_packet', 'contract_pledge', 'seal_reg', 'bond_waiver', 'labor_exempt', 'quote_env', 'quote_con', 'adv_pay', 'settle_doc', 'safety_plan', 'safety_risk', 'safety_rule', 'safety_emerg', 'safety_ppe', 'safety_cost', 'labor_split', 'bid_rate'];
+    const scen = [['dredge', true, false], ['dredge', false, false], ['asbestos', true, false], ['asbestos', false, false], ['demolition', true, false], ['demolition', false, false], ['asbestos', true, true], ['asbestos', false, true], ['waste', true, false], ['waste', false, false]];
+    const bad = [], rows = [];
+    scen.forEach(([ty, pub, combo]) => {
+      const stages = api.conScenStages(ty, pub, combo, { qual: false }), cT = { id: 'c_tb', type: ty, docType: pub ? 'public' : 'private', elems: api.conModalElems(ty, combo), pipes: [{ key: 'main', cur: 0, stages: stages }] };
+      for (let cur = 0; cur < stages.length; cur++) {
+        cT.pipes[0].cur = cur;
+        const docs = X.cbxDocList(cT), by = {};
+        TPL.forEach((tp) => {
+          const itT = { res: { read: 'mark', draft_tpl: tp }, name: 'x' };
+          X.cbxTarget(itT, cT);
+          const d = docs.filter((x) => x.id === itT.tgt)[0], lab = d ? d.n : itT.tgt;
+          if (cur === 0) rows.push(ty + (pub ? ':관' : ':사') + (combo ? '+' : '') + ' ' + tp + ' → ' + lab);
+          const same = by[itT.tgt];
+          if (same && !(same.indexOf('quote') === 0 && tp.indexOf('quote') === 0)) bad.push([ty, pub, combo, cur, same, tp, lab].join('/'));
+          by[itT.tgt] = tp;
+          if (itT.kind !== 'final') bad.push(['종류', tp, itT.kind].join('/'));
+        });
+      }
+    });
+    if (process.env.DUMP_TPL) console.log(rows.join('\n'));
+    T('v424 검토 자리 표: 시나리오 10종 × 단계마다 × 양식 22종 — 서로 다른 양식이 한 칸에 묶이지 않음 · 전부 최종본', bad.length === 0, bad.slice(0, 8).join(' | '));
+    const pick = (ty, pub, tp) => rows.filter((x) => x.indexOf(ty + (pub ? ':관 ' : ':사 ') + tp + ' ') === 0)[0] || '';
+    T('v424 검토 자리 표: 준공계는 준공계 칸 · 선금·안전보건관리계획서·노무비제외는 양식별 자리 · 착공계는 착공계 칸', /→ 준공계/.test(pick('dredge', true, 'work_complete')) && /→ g\|adv_pay/.test(pick('dredge', true, 'adv_pay')) && /→ g\|safety_plan/.test(pick('dredge', true, 'safety_plan')) && /→ g\|labor_exempt/.test(pick('dredge', true, 'labor_exempt')) && /→ 착공계/.test(pick('dredge', true, 'work_start')), JSON.stringify([pick('dredge', true, 'work_complete'), pick('dredge', true, 'adv_pay'), pick('dredge', true, 'work_start')]));
+    const refG = X.cbxRef({ pipes: [{ key: 'main', cur: 2, stages: [] }] }, 'g|safety_rule');
+    T('v424 검토 양식별 자리: doc_key fin.<양식> · 현재 단계 · 서버 형식 통과', refG.dk === 'fin.safety_rule' && refG.i === 2 && /^[A-Za-z0-9가-힣_.-]{1,40}$/.test(refG.dk), JSON.stringify(refG));
+  }
+  // 초안 저장 응답별
+  const toastsN = api.toasts.length, errN = api.errCalls.length, c9 = { id: 'c_dr', pipes: [{ cur: 1 }] };
+  const bodies = []; let ans = { status: 200, body: { item: { n: 1, i: 1, dk: 'gen.x', kind: 'draft', cur: 1 } } };
+  api.setGw((fn, b) => { bodies.push(b); return Promise.resolve(ans); });
+  api.csCdocDraft(c9, 'safety_cost', { s: [['A1', 'v', 's']] }, [], { name: '내역.xlsx', data: 'QQ==', gen: 'JWG1.c_dr.safety_cost.abc123' }); await tick();
+  T('v424 초안 저장: 파일·채움 맵·표식을 함께 · 사용내역서도 남김', bodies.length === 1 && bodies[0].name === '내역.xlsx' && bodies[0].data === 'QQ==' && bodies[0].gen.indexOf('JWG1.c_dr') === 0 && bodies[0].fill.tpl === 'safety_cost' && bodies[0].doc_key === 'gen.safety_cost' && api.toasts.length === toastsN, JSON.stringify(bodies[0]));
+  bodies.length = 0;
+  api.setGw((fn, b) => { bodies.push(b); return Promise.resolve(b.data ? { status: 413, body: { error_code: 'FILE_TOO_LARGE' } } : ans); });
+  api.csCdocDraft(c9, 'safety_cost', { s: [['A1', 'v', 's']] }, [], { name: '내역.xlsx', data: 'QQ==', gen: 'g' }); await tick(); await tick();
+  T('v424 초안 저장 한도 초과: 알리고(화면·오류 기록) 채움 맵만 다시', bodies.length === 2 && !bodies[1].data && !!bodies[1].fill && api.toasts.length === toastsN + 1 && api.errCalls.length === errN + 1 && api.errCalls[errN][0].indexOf('TOO_LARGE') > 0, JSON.stringify(bodies.map((b) => !!b.data)));
+  api.setGw((fn, b) => { bodies.push(b); return Promise.resolve(ans); });
+  bodies.length = 0; ans = { status: 409, body: { error_code: 'DUP_BYTES' } }; const t1 = api.toasts.length;
+  api.csCdocDraft(c9, 'safety_cost', { s: [['A1', 'v', 's']] }); await tick();
+  T('v424 초안 저장: 같은 내용의 채움 맵은 조용히(실패 아님)', api.toasts.length === t1, '');
+  ans = { status: 403, body: { error_code: 'NO_WRITE' } };
+  api.csCdocDraft(c9, 'seal_reg', null, null, { name: '인감계.hwpx', data: 'QQ==', gen: 'g' }); await tick();
+  T('v424 초안 저장 거부: 화면·오류 기록에 양식 이름과 코드', api.toasts.length === t1 + 1 && api.toasts[t1].indexOf('사용인감계') >= 0 && api.errCalls[api.errCalls.length - 1][0].indexOf('NO_WRITE') > 0, api.toasts[t1]);
   api.setGw(null);
 }
 

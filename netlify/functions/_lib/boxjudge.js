@@ -120,7 +120,7 @@ function buildPrompt(name, ctx, fixes, text, mode) {
     c.docs.slice(0, 150).forEach(function (d) { L.push(cut(d.id, 80) + ' = ' + cut(d.s, 40) + ' > ' + cut(d.n, 60)); });
   }
   if (Array.isArray(c.drafts) && c.drafts.length) {
-    L.push(''); L.push('이 계약에 AI가 만든 초안(cls가 filled이고 이 초안을 고친 파일로 보이면 draft_tpl에 tpl을 쓴다, 아니면 빈 문자열):');
+    L.push(''); L.push('앱이 만들었거나 만들 수 있는 서류(cls가 filled이고 이 서류로 보이면 draft_tpl에 tpl을 쓴다, 아니면 빈 문자열):');
     c.drafts.slice(0, 40).forEach(function (d) { L.push(cut(d.tpl, 40) + ' = ' + cut(d.n, 60)); });
   }
   if (Array.isArray(c.cons) && c.cons.length) {
@@ -156,12 +156,47 @@ function normJudge(o, ctx) {
 // 개인정보 파일명 — 모델 호출 없이 판단. 학습 제외 정규식(forbid_re)은 '주민'·'건강'만으로 걸려 주민센터 계약서·건강보험 완납증명까지 막으므로 입구는 서류 이름 단위로 따로 둔다
 const GUARD_RE = /건강\s*(?:진단|검진|검사)|검진|건진|명단|명부|인적\s*사항|신분증|주민\s*등록|health|roster/i;
 const GUARD_HEALTH_RE = /건강\s*(?:진단|검진|검사)|검진|건진|health/i;
-const GUARD_EXCEPT_RE = /계약서|공사|용역/;   // '건강검진센터 철거공사 계약서' 같은 계약 문서는 내용을 읽는다
+const GUARD_EXCEPT_RE = /계약서/;   // '건강검진센터 철거공사 계약서' 같은 계약 문서는 내용을 읽는다. '…공사_건강진단 결과표'는 막는다(v424 검토)
 function nameGuard(name) {
   const n = String(name || '').normalize('NFC');
   if (!GUARD_RE.test(n) || GUARD_EXCEPT_RE.test(n)) return null;
   // doc_name은 비운다 — 파일명에 사람 이름이 섞이므로 고친 판단 기록·화면 문구로 번지지 않게
   return { doc: 'box', cls: 'received', sub: 'none', doc_name: '', pii: GUARD_HEALTH_RE.test(n) ? 2 : 1, why: '파일명이 개인정보 서류여서 내용을 읽지 않았습니다', con: null, con_type: 'none', combo: false, pub: true, why_type: '', why_pub: '', our_side: '모름', target: '', contract_id: '', tpl_key: '', draft_tpl: '', read: 'none' };
+}
+
+// v424 표식 — 앱이 만든 서류를 고친 파일. 어느 계약·양식인지 이미 알므로 모델을 부르지 않는다(비용 0·전송 0, 직원이 고를 것도 없음).
+// 개인정보 등급: 사람 칸이 없다고 확인한 양식만 0에서 시작하고(운영 양식 18종 실측 11/6), 나머지는 1. 0 후보도 파일 전체를 훑어 주민번호 꼴이나 AI 초안에 없던 휴대폰·계좌 꼴이 있으면 1.
+const MARK_PII0 = { contract_pledge: 1, seal_reg: 1, bond_waiver: 1, labor_exempt: 1, quote_env: 1, quote_con: 1, settle_doc: 1, safety_cost: 1, safety_rule: 1, bid_rate: 1, qual_packet: 1, adv_pay: 1, work_complete: 1 };
+const SCAN_RRN = [/\d{6}\s*[-\u2010-\u2015\uFF0D]\s*[1-8]\d{6}/, /(?<!\d)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])[1-8]\d{6}(?!\d)/];
+const SCAN_NUM_G = [/(?<!\d)01[016789][\s-]?\d{3,4}[\s-]?\d{4}(?!\d)/g, /(?<![\d-])\d{2,6}-\d{2,6}-\d{5,8}(?![\d-])/g];
+const SCAN_BIZ = /^\d{3}-\d{2}-\d{5}$/;   // 사업자등록번호 꼴은 계좌가 아니다
+const SCAN_PART = /\.(?:xml|hpf|txt)$/i, SCAN_JOIN = /(?:sharedStrings|comments|section\d+|masterpage\d*|header\d*|footer\d*)\.xml$/i;
+function scanParts(buf) {
+  const out = [], z = DD.zipEntries(buf);
+  Object.keys(z).forEach(function (n) {
+    if (!SCAN_PART.test(n) || !z[n]) return;
+    const x = z[n].toString('utf8'), sp = x.replace(/<[^>]+>/g, ' ');
+    out.push(sp);
+    if (SCAN_JOIN.test(n)) out.push(x.replace(/<[^>]+>/g, ''));   // 글자 조각으로 쪼개진 값
+    const m12 = /\.xml$/i.test(n) ? x.match(/<v>\d(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])[3-8]\d{6}<\/v>/) : null;   // 숫자 칸에서 앞 0이 빠진 2000년대생
+    if (m12) out.push('000000-1000000');
+  });
+  return out;
+}
+function numsOf(texts) { const seen = {}; texts.forEach(function (t) { SCAN_NUM_G.forEach(function (re) { (t.match(re) || []).forEach(function (v) { if (!SCAN_BIZ.test(v)) seen[v.replace(/[\s-]/g, '')] = 1; }); }); }); return seen; }
+// 사람 정보 꼴이 있는가 — draftBuf가 있으면 초안에 이미 있던 회사 번호는 뺀다. 못 읽으면 닫힌 쪽
+function markScan(buf, draftBuf) {
+  try {
+    const tx = scanParts(buf);
+    if (tx.some(function (t) { return SCAN_RRN.some(function (re) { return re.test(t); }); })) return true;
+    const now = numsOf(tx), base = draftBuf ? numsOf(scanParts(draftBuf)) : {};
+    return Object.keys(now).some(function (k) { return !base[k]; });
+  } catch (e) { return true; }
+}
+function markJudge(ext, buf, m) {
+  let pii = Object.prototype.hasOwnProperty.call(MARK_PII0, m.tpl) ? 0 : 1;
+  if (!pii && markScan(buf, m.draftBuf || null)) pii = 1;
+  return { doc: 'box', cls: 'filled', sub: 'none', doc_name: '', pii: pii, why: '앱이 만든 서류의 표식으로 찾았습니다', con: null, con_type: 'none', combo: false, pub: true, why_type: '', why_pub: '', our_side: '모름', target: '', contract_id: m.cid, tpl_key: '', draft_tpl: m.tpl, read: 'mark' };
 }
 
 async function judgeBox(a) {
@@ -198,4 +233,4 @@ async function judgeBox(a) {
   return res;
 }
 
-module.exports = { judgeBox, normJudge, nameGuard, buildPrompt, hwpPrvText, extractText, maskRrn, SCHEMA };
+module.exports = { judgeBox, normJudge, nameGuard, markJudge, markScan, buildPrompt, hwpPrvText, extractText, maskRrn, SCHEMA };

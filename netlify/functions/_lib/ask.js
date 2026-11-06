@@ -11,11 +11,12 @@
 // 비용(2026-09-10 실측 34문항): 1문항 평균 입력 4,930 · 출력 521 토큰 · 왕복 2.1 · 8.4초.
 //   입력의 77%가 고정비(도구 설명서 8개 + 규칙이 왕복마다 재전송)라 **프롬프트 캐싱**을 건다.
 const { store, blobGet } = require('./blobs');
+const DS = require('./docscope');
 
 const DATA = 'gw_data';
 
-const PERM_CLOSED = { quote: 1, promo: 1, hr: 1, lic: 1 };   // gw-data와 같은 집합
-const COL = { vehicles: 'veh', licenses: 'lic', asbestos: 'lic', contracts: 'con',
+const PERM_CLOSED = { quote: 1, promo: 1, hr: 1, lic: 1, site: 1 };   // gw-data와 같은 집합(uismoke 대조)
+const COL = { vehicles: 'veh', licenses: 'lic', asbestos: 'site', contracts: 'con',
   clients: 'cli', documents: 'doc', bids: 'bid', tasks: 'tasks', workers: 'wk' };
 
 const ROW_CAP = 25;          // 도구 한 번이 돌려주는 최대 행 — 원장을 통째로 보내지 않는다
@@ -43,7 +44,30 @@ async function items(col) {
   const doc = (r.ok && r.data) ? r.data : { items: [] };
   return (doc.items || []).filter((x) => x && x.del !== 1);
 }
+// 승인 기기만(v424 검토) — gw-data와 같은 판정. 화면은 승인 대기 화면으로 막지만 토큰은 이미 받은 상태라 서버에서도 닫는다
+async function deviceApproved(event, member) {
+  if (member && member.admin) return true;
+  const h = (event && event.headers) || {};
+  const id = String(h['x-device-id'] || '').trim();
+  if (!id) return false;
+  const r = await blobGet(store('gw_users'), `device:${id}`);
+  return !!(r.ok && r.data && r.data.status === 'approved');
+}
 const S = (v) => String(v == null ? '' : v);
+// 인허가 공개 대상(앱 scopeIncludes와 같은 규칙) — 비어 있으면 전체, 관리자 통과, 모르는 토큰은 닫힌 쪽
+const RANKS = ['대표', '이사', '부장', '차장', '과장', '대리', '주임', '사원'];
+function scopeHas(scope, m) {
+  if (m && m.admin) return true;
+  if (!Array.isArray(scope) || !scope.length) return true;
+  if (!m) return false;
+  return scope.some((tk) => {
+    if (typeof tk !== 'string') return false;
+    if (tk === m.id) return true;
+    if (tk.indexOf('dept:') === 0) return !!m.dept && m.dept === tk.slice(5);
+    if (tk.indexOf('rank:') === 0) { const ti = RANKS.indexOf(tk.slice(5)), mi = RANKS.indexOf(m.rank); return ti >= 0 && mi >= 0 && mi <= ti; }
+    return false;
+  });
+}
 const hit = (row, q, fields) => {
   if (!q) return true;
   const t = S(q).toLowerCase().replace(/\s+/g, '');
@@ -77,7 +101,8 @@ const TOOLS = [
   { name: 'licenses', col: 'licenses',
     description: '인허가·면허 조회. 종류·기관·번호·취득일·만기·등급. q로 이름을 거른다. 만기 임박만 보려면 due_within_days.',
     schema: { type: 'object', properties: { q: { type: 'string' }, due_within_days: { type: 'number' } } },
-    run: async (a) => (await items('licenses'))
+    run: async (a, member) => (await items('licenses'))
+      .filter((l) => scopeHas(l.scope, member))   // v424 검토: 화면 licVisible과 같은 판정 — 자르기 전에
       .filter((l) => hit(l, a.q, ['name', 'org', 'no', 'kind']))
       .filter((l) => {
         if (a.due_within_days == null) return true;
@@ -106,12 +131,14 @@ const TOOLS = [
       .map((c) => ({ 상호: c.name, 사업자번호: c.biz_no, 담당자: c.contact, 연락처: c.phone, 메모: S(c.note).slice(0, 60) })) },
 
   { name: 'documents', col: 'documents',
-    description: '문서함 검색. 문서번호·제목·분류·상태만 돌려준다. **첨부 본문은 돌려주지 않는다.** q로 제목·번호를 거른다.',
+    description: '문서함 검색. 이 사람이 문서함 화면에서 볼 수 있는 문서만, 문서번호·제목·분류·상태를 돌려준다. **첨부 본문은 돌려주지 않는다.** q로 제목·번호를 거른다.',
     schema: { type: 'object', properties: { q: { type: 'string' } } },
-    run: async (a) => (await items('documents'))
+    // v424 문서함 화면과 같은 판정(공개범위·01 법인·남의 대기·반려) — 자르기 전에 거른다. 설정을 못 읽으면 가장 닫힌 쪽
+    run: async (a, member) => { const ds = await DS.docSettings(store(DATA)); return (await items('documents'))
+      .filter((d) => DS.docVisible(member, d, ds))
       .filter((d) => hit(d, a.q, ['title', 'id', 'cat', 'no']))
       .slice(0, ROW_CAP)
-      .map((d) => ({ 번호: d.no || d.id, 제목: d.title, 분류: d.cat, 상태: d.status })) },
+      .map((d) => ({ 번호: d.no || d.id, 제목: d.title, 분류: d.cat, 상태: d.status })); } },
 
   { name: 'bids', col: 'bids', admin_only: true,
     description: '입찰 공고 조회(관리자 전용). 공고명·기관·마감·기초금액·낙찰방법·하한율 판독 상태. q로 공고명·기관을 거른다.',
@@ -260,4 +287,4 @@ async function saveRow(row, r) {
 }
 
 
-module.exports = { TOOLS, SYSTEM, METER_Q, ROW_CAP, MAX_TURNS, toolDefs, runTool, permOf, ask };
+module.exports = { TOOLS, SYSTEM, METER_Q, ROW_CAP, MAX_TURNS, toolDefs, runTool, permOf, ask, deviceApproved, scopeHas };

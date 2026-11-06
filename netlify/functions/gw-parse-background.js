@@ -8,16 +8,38 @@ const { parseAttachment } = require('./_lib/asbestos');
 const BF = require('./_lib/boxfile');
 const BJ = require('./_lib/boxjudge');
 const LN = require('./_lib/learn');
+const DD = require('./_lib/docdiff');
 
 const FILES = 'gw_files';
 const DATA = 'gw_data';
 const USERS = 'gw_users';
 const BOX_KINDS = { asbestos: 1, bldg: 1, biz: 1, contract: 1 };
 
+// v424 표식 찾기 — 파일 안 번호가 그 계약 서류함의 AI 초안과 맞을 때만 믿는다(개인정보 파일명은 먼저 걸러진다)
+async function boxMark(name, b64) {
+  if (BJ.nameGuard(name)) return null;
+  const ext = String((String(name || '').match(/\.([a-z0-9]+)$/i) || [0, ''])[1]).toLowerCase();
+  if (ext !== 'xlsx' && ext !== 'hwpx') return null;
+  const buf = Buffer.from(b64, 'base64'), mark = DD.genMarkOf(buf, ext), p = DD.genMarkParse(mark);
+  if (!p) return null;
+  const ix = await blobGet(store(DATA), 'recidx:' + p.cid);
+  const item = (ix.ok && ix.data && Array.isArray(ix.data.items)) ? ix.data.items.find(function (x) { return x && x.kind === 'draft' && x.gen === mark && !x.purged; }) : null;
+  if (!item) return null;
+  // 지난 계약 파일을 복사해 새 계약 값으로 고친 파일 — 표식은 그대로라 내용이 많이 다르면 믿지 않고 보통 판단으로 보낸다(v424 검토)
+  const key = 'cdoc:' + p.cid + ':S' + String(item.i).padStart(2, '0') + ':' + item.dk + ':' + item.n;
+  const dr = await blobGet(store(FILES), key);
+  if (dr.ok && dr.data) {
+    const sc = DD.matchScore(dr.data, item.ext, ext, buf);
+    if (sc !== null && sc < 0.5) return null;
+  }
+  const db = (dr.ok && dr.data && dr.data.data) ? Buffer.from(String(dr.data.data), 'base64') : null;
+  return BJ.markJudge(ext, buf, { cid: p.cid, tpl: String(item.dk).slice(4), draftBuf: db });
+}
 async function boxUsage(res) {
   try {
     const key = 'usage:box:' + LN.ymOf(Date.now()), r = await blobGet(store(DATA), key);
     const u = (r.ok && r.data && typeof r.data === 'object') ? r.data : {};
+    if (res && res.read === 'mark') { u.mark = (Number(u.mark) || 0) + 1; await blobSet(store(DATA), key, u); return; }   // 표식으로 찾은 파일 — 모델 호출 없음
     u.calls = (Number(u.calls) || 0) + 1;
     u.in = (Number(u.in) || 0) + (Number(res && res.usage && res.usage.in) || 0);
     u.out = (Number(u.out) || 0) + (Number(res && res.usage && res.usage.out) || 0);
@@ -69,7 +91,8 @@ exports.handler = async function (event, context) {
       let fixes = [];
       try { const fr = await blobGet(store(DATA), 'box:fixes'); if (fr.ok && fr.data && Array.isArray(fr.data.items)) fixes = fr.data.items; } catch (e) {}
       let res = null;
-      try { res = await BJ.judgeBox({ name: r.data.name, b64: b64, ctx: (d.ctx && typeof d.ctx === 'object') ? d.ctx : {}, fixes: fixes }); } catch (e) { res = { error: 'PARSE_FAILED' }; }
+      try { res = await boxMark(r.data.name, b64); } catch (e) { res = null; }
+      if (!res) { try { res = await BJ.judgeBox({ name: r.data.name, b64: b64, ctx: (d.ctx && typeof d.ctx === 'object') ? d.ctx : {}, fixes: fixes }); } catch (e) { res = { error: 'PARSE_FAILED' }; } }
       await save({ result: res });
       if (!res || res.read !== 'none') await boxUsage(res);
       return;
