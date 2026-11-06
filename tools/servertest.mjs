@@ -4727,6 +4727,22 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
       defs(uV).indexOf('asbestos') < 0 && defs(uS).indexOf('asbestos') >= 0 && defs(uS).indexOf('licenses') < 0 && rOk === '전체 면허,본인 면허' && rMg === '전체 면허,관리부 면허' && rRk === '전체 면허,직급 면허' && rAd.split(',').length === 4, JSON.stringify([defs(uV), rOk, rMg, rRk, rAd]));
     const devOk = await A74.deviceApproved({ headers: { 'x-device-id': 'dev74' } }, uV), devNo = await A74.deviceApproved({ headers: {} }, uV), devAdm = await A74.deviceApproved({ headers: {} }, { admin: true });
     T('74 물어보기 기기: 승인 기기만 · 관리자 통과', devOk && !devNo && devAdm, '');
+    // v426 양식 주민번호·백업 흔적
+    const rrnFake = '900101-' + '1234567';
+    let q6 = await call({ action: 'tpl_put', key: 'work_start', name: '착공계.xlsx', data: b64(mkXl({ A1: '현장대리인', F13: rrnFake })) }, tkA74);
+    const q6a = q6.code === 400 && q6.body.error_code === 'TPL_HAS_RRN';
+    q6 = await call({ action: 'tpl_put', key: 'seal_reg', name: '인감계.hwpx', data: b64(mkHwpx(['인감', rrnFake])) }, tkA74);
+    const q6b = q6.code === 400 && q6.body.error_code === 'TPL_HAS_RRN';
+    q6 = await call({ action: 'tpl_put', key: 'work_start', name: '착공계.xlsx', data: b64(mkXl({ A1: '현장대리인', F13: '' })) }, tkA74);
+    const q6c = q6.code === 200 && !!mem.gw_files['tpl:work_start'];
+    delete mem.gw_files['tpl:work_start'];
+    T('76 v426 양식 등록: 주민번호 꼴이 든 파일은 거부(xlsx·hwpx) · 값이 없으면 등록', q6a && q6b && q6c, JSON.stringify([q6a, q6b, q6c, q6.code]));
+    const secOld = process.env.BIDS_INGEST_KEY; process.env.BIDS_INGEST_KEY = 'test-secret-74';
+    const s1 = await call({ action: 'backup_stamp', secret: 'wrong', fn: 'files_backup', ok: true }), s2 = await call({ action: 'backup_stamp', secret: 'test-secret-74', fn: 'col:contracts', ok: true }), s3 = await call({ action: 'backup_stamp', secret: 'test-secret-74', fn: 'files_backup', ok: true, n: 12, bytes: 3456, note: '새 2' });
+    const sd = mem.gw_data['it:cron:files_backup:last'] || {};
+    T('76 v426 백업 흔적: 키가 틀리면 403 · 정해진 이름만 · 끝 흔적(ok·건수·용량·시각)', s1.code === 403 && s2.code === 400 && s3.code === 200 && sd.state === 'end' && sd.ok === true && sd.n === 12 && sd.bytes === 3456 && sd.ts > 0, JSON.stringify(sd));
+    if (secOld === undefined) delete process.env.BIDS_INGEST_KEY; else process.env.BIDS_INGEST_KEY = secOld;
+    delete mem.gw_data['it:cron:files_backup:last'];
     // v425 자동 초안 표시
     const CL5 = 'c74g'; mem.gw_data['col:contracts'].items.push({ id: CL5, title: '자동 초안', scen: 'dredge:pub', stages: [] });
     const pL5 = (o) => call(Object.assign({ action: 'cdoc_put', cid: CL5, allow_dup: true }, o), tk, 'dev1');

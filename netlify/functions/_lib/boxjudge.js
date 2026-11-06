@@ -193,6 +193,8 @@ function markScan(buf, draftBuf) {
     return Object.keys(now).some(function (k) { return !base[k]; });
   } catch (e) { return true; }
 }
+// 주민등록번호 꼴만(양식 등록 검사용) — 못 읽는 파일은 false(hwp 등 등록 가능한 형식이 아니면 앞에서 걸린다)
+function rrnScan(buf) { try { return scanParts(buf).some(function (t) { return SCAN_RRN.some(function (re) { return re.test(t); }); }); } catch (e) { return false; } }
 function markJudge(ext, buf, m) {
   let pii = Object.prototype.hasOwnProperty.call(MARK_PII0, m.tpl) ? 0 : 1;
   if (!pii && markScan(buf, m.draftBuf || null)) pii = 1;
@@ -233,4 +235,4 @@ async function judgeBox(a) {
   return res;
 }
 
-module.exports = { judgeBox, normJudge, nameGuard, markJudge, markScan, buildPrompt, hwpPrvText, extractText, maskRrn, SCHEMA };
+module.exports = { judgeBox, normJudge, nameGuard, markJudge, markScan, rrnScan, buildPrompt, hwpPrvText, extractText, maskRrn, SCHEMA };

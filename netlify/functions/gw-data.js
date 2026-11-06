@@ -3507,6 +3507,16 @@ async function handleBackupGet(event, d, R) {
   return jr(200, { status: 'OK', key: key, data: data, request_id: R });
 }
 
+// v426 PC 예약 작업 흔적 — 첨부 증분 백업(collectors/files_backup.py)이 끝나면 남긴다. watch.py가 cron_map 'stamp'로 신선도를 본다(PC가 꺼져 있어도 경보가 나게)
+const BACKUP_STAMP_FN = { files_backup: 1 };
+async function handleBackupStamp(event, d, R) {
+  if (!backupAuthed(d)) return jr(403, { status: 'FORBIDDEN', error_code: 'BAD_SECRET', request_id: R });
+  const fn = String(d.fn || '');
+  if (!BACKUP_STAMP_FN[fn]) return jr(400, { status: 'REJECTED', error_code: 'BAD_FN', request_id: R });
+  await require('./_lib/cronstamp').stamp(fn, { state: 'end', ok: d.ok === true, note: String(d.note || '').slice(0, 120), n: Number(d.n) || 0, bytes: Number(d.bytes) || 0 });
+  return jr(200, { status: 'OK', request_id: R });
+}
+
 // 백업 복원 — 백업 스냅샷(gw_backup.json)의 한 키를 Blobs로 되돌린다.
 // git 이력 시점복구가 못 덮는 영역(양식 템플릿·증빙 보관함·푸시 구독·입찰 데이터·오류 로그)이 대상.
 // 사람 확인 원칙: dry=true로 먼저 미리보기(현재 vs 복원본 건수), confirm=true 없으면 쓰지 않는다.
@@ -3555,6 +3565,8 @@ async function handleTplPut(event, d, R) {
   if (!TPL_KEYS[key]) return jr(400, { status: 'REJECTED', error_code: 'BAD_TPL_KEY', request_id: R });
   const b64 = String(d.data || '');
   if (!b64 || b64.length > ATT_MAX) return jr(400, { status: 'REJECTED', error_code: 'INVALID_FILE', request_id: R });
+  // v426 양식에 주민등록번호 값을 넣지 않는다(PM 11/6 "착공계양식주민번호빼") — 옛 파일을 다시 등록해도 값이 돌아오지 않게
+  if (BJ.rrnScan(Buffer.from(b64, 'base64'))) return jr(400, { status: 'REJECTED', error_code: 'TPL_HAS_RRN', request_id: R });
   const w = await blobSet(store(FILES), 'tpl:' + key, { name: String(d.name || '').slice(0, 120), data: b64, by: c.member.name, ts: Date.now() });
   if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
   try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'files', ev: [{ op: '양식등록', id: key, t: String(d.name || '').slice(0, 60) }] }); } catch (e) {}   // 양식 교체=서류 위조 벡터 — 무기록 금지
@@ -4185,6 +4197,7 @@ async function handlerInner(event) {
     if (d && d.action === 'bid_sheet') return await handleBidSheet(event, d, R);
     if (d && d.action === 'backup_list') return await handleBackupList(event, d, R);
     if (d && d.action === 'backup_get') return await handleBackupGet(event, d, R);
+    if (d && d.action === 'backup_stamp') return await handleBackupStamp(event, d, R);
     if (d && d.action === 'backup_put') return await handleBackupPut(event, d, R);
     if (d && d.action === 'tpl_put') return await handleTplPut(event, d, R);
     if (d && d.action === 'tpl_get') return await handleTplGet(event, d, R);

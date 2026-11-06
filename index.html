@@ -1947,9 +1947,9 @@
       <span class="fld-label">착공일</span><input type="date" id="xgD2">
       <span class="fld-label">준공예정일</span><input type="date" id="xgD3">
       <div id="xgAgentWrap" style="display:none;">
-        <span class="fld-label" id="xgAgentLabel">현장대리인 (미선택 시 나종운 — 양식 기본값 유지)</span>
+        <span class="fld-label" id="xgAgentLabel">현장대리인 (미선택 시 나종운)</span>
         <select id="xgAgent"><option value="">나종운 (기본)</option></select>
-        <input type="text" id="xgAgentRrn" placeholder="대리인 주민등록번호 (선택 — 비우면 수기 기입)" autocomplete="off">
+        <input type="text" id="xgAgentRrn" placeholder="대리인 주민등록번호 (양식에 넣어 두지 않습니다. 비우면 손으로 적습니다)" autocomplete="off">
         <input type="text" id="xgAgentLic" placeholder="대리인 자격증명 (선택, 예: 거푸집기능사)" autocomplete="off">
       </div>
       <div id="xgSafeWrap" style="display:none;">
@@ -8095,7 +8095,7 @@
   // 서버 사본·채움 맵에 남기지 않는 사람 칸(v424 검토) — 내려받는 파일에는 그대로 들어간다. 칸 비교에는 좌표만 남는다
   function xgPersonCells(kind, c){
     var i, out = [];
-    if (kind === "work_start") return { "현장대리인계":["F13"], "재직증명서":["I6"] };   // 주민번호 칸(양식 기본값 포함)
+    if (kind === "work_start") return { "현장대리인계":["F13"], "재직증명서":["I6"] };   // 주민번호 칸 — 양식에서는 뺐다(v426). 창에 친 값은 내려받는 파일에만
     if (kind === "asb_plan"){   // 시트 3 — 배포 명단·조직표(이름·연락처)·건강진단·교육 참석자·반장
       for (i = 11; i <= 22; i++) out.push("C" + i);
       for (i = 32; i <= 43; i++) out.push("G" + i, "L" + i);
@@ -9435,7 +9435,7 @@
     document.getElementById("xgSafeWrap").style.display = (k==="safety_plan"||k==="safety_cost") ? "" : "none";
     document.getElementById("xgSafeRecvWrap").style.display = (k==="labor_split") ? "" : "none";
     if(k==="labor_split"&&!document.getElementById("xgSafeRecv").value) document.getElementById("xgSafeRecv").value=xgSafeRecvOf(document.getElementById("xgClient").value);
-    document.getElementById("xgAgentLabel").textContent = (k==="safety_plan") ? "현장책임자 (고르면 명부의 이름·연락처가 파일에 들어갑니다. 미선택 시 나종운, 연락처 빈칸)" : "현장대리인 (미선택 시 나종운 — 양식 기본값 유지)";
+    document.getElementById("xgAgentLabel").textContent = (k==="safety_plan") ? "현장책임자 (고르면 명부의 이름·연락처가 파일에 들어갑니다. 미선택 시 나종운, 연락처 빈칸)" : "현장대리인 (미선택 시 나종운)";
     document.getElementById("xgAgentRrn").style.display = document.getElementById("xgAgentLic").style.display = (k==="safety_plan") ? "none" : "";   // v422: 계획서는 현장책임자 이름·연락처만 쓴다
     if(k==="work_start"||k==="safety_plan"){   // 현장대리인 후보 = 일용직 명부(기본 나종운)
       var sel=document.getElementById("xgAgent"), cur=sel.value;
@@ -9689,6 +9689,9 @@
                                  ["E14",(ag.role||"인부"),"s"],["F14",lic,lic?"s":"b"]];
           edits["재직증명서"]=[["E5",ag.name,"s"],["I6",rrn,rrn?"s":"b"],["E6","","b"],["E7","","b"],["E8","","b"]];
         }
+      } else {   // v426 양식에서 주민번호 값을 뺐다(PM 11/6) — 기본 대리인도 창에 친 값이 있으면 그 칸에 넣는다. 없으면 빈칸(손으로)
+        var rrn0=document.getElementById("xgAgentRrn").value.trim();
+        if(rrn0){ edits["현장대리인계"]=[["F13",rrn0,"s"]]; edits["재직증명서"]=[["I6",rrn0,"s"]]; }
       }
     } else if(kind==="work_complete"){
       var gm2=[["B6",docNo,"s"],["B7",sendDt,"s"]].concat(gmCo);   // 준공 공문 날짜는 실물 다수(6건 중 4건)가 일 공란 — 그대로
@@ -9946,6 +9949,7 @@
           if(!$("xgAmount").value.trim()) missing.push("금액");
           if(!$("xgD1").value) missing.push("계약일");
           if(kind==="work_start"&&!$("xgD2").value) missing.push("착공일");
+          if(kind==="work_start"&&!$("xgAgentRrn").value.trim()) missing.push("현장대리인 주민등록번호(양식에 넣어 두지 않습니다. 창에 치거나 파일에 손으로 적습니다)");
           if(!$("xgD3").value) missing.push(kind==="work_start"?"준공예정일":"준공일");
         } else if(!$("xgOwner").value.trim()) missing.push("소유주");
       }
@@ -10624,7 +10628,7 @@
     r.onerror = function(){ cbxFail(it, "파일을 읽지 못했습니다."); };
     r.onload = function(){
       gwCall("gw-data", { action: "tpl_put", key: key, name: it.name, data: String(r.result).split(",")[1] || "" }).then(function(res){
-        if (!res || res.status !== 200){ it.st = "blank"; cbxRedraw(it.scope); alert("양식 등록 실패(" + ((res && res.body && res.body.error_code) || (res && res.status) || "네트워크") + ")"); return; }
+        if (!res || res.status !== 200){ it.st = "blank"; cbxRedraw(it.scope); var tplCode = (res && res.body && res.body.error_code) || (res && res.status) || "네트워크"; alert(tplCode === "TPL_HAS_RRN" ? "이 파일에 주민등록번호 꼴 값이 있어 양식으로 등록하지 않았습니다. 값을 지운 뒤 다시 넣어 주세요." : "양식 등록 실패(" + tplCode + ")"); return; }
         cbxDiscard(it); if (csTplKeys) csTplKeys[key] = 1; it.st = "done"; it.n = 0; it.msg = it.name + " → '" + TPL_LABELS[key] + "' 양식으로 등록했습니다.";
         renderContracts(); cbxRenderTop();
       }).catch(function(){ it.st = "blank"; cbxRedraw(it.scope); alert("양식 등록 실패(네트워크)"); });

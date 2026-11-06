@@ -758,6 +758,14 @@ T('준공·만기 칸: d3 없음 → "-" · 지난 날짜 → vs-dan · 완료 �
   // 사람 칸
   const pc = V.xgPersonCells('asb_plan'), keep = V.xgNoPerson({ '3': [['C11', '이름', 's'], ['L32', '번호', 's'], ['B99', '현장', 's']], '1.공사개요': [['C7', '공사', 's']] }, pc);
   T('v424 검토 사람 칸: 석면 계획서 명단·연락처·검진 칸은 사본에서 비움 · 다른 칸 그대로 · 사업자 소유주 신고서는 해당 없음, 개인이면 이름·주소 칸 · 좌표 목록', keep['3'].filter((e) => e[0] === 'C11')[0][2] === 'b' && keep['3'].filter((e) => e[0] === 'L32')[0][2] === 'b' && keep['3'].filter((e) => e[0] === 'B99')[0][1] === '현장' && keep['1.공사개요'][0][1] === '공사' && V.xgPersonCells('waste_report', { owner_info: { kind: '사업자등록증' } }) === null && V.xgPersonCells('waste_report', { owner_info: { kind: '신분증' } })['신고서'].indexOf('E10') >= 0 && V.xgPersonRefs(V.xgPersonCells('work_start')).join() === '현장대리인계!F13,재직증명서!I6', JSON.stringify(keep['3'].slice(0, 3)));
+  // v426 양식에 주민번호가 없으니 기본 대리인도 창에 친 값으로
+  const FK26 = '850101-' + '1234567';
+  const rrnEl = { value: FK26 }; ['xgTitle', 'xgSite', 'xgClient', 'xgAmount', 'xgD1', 'xgD2', 'xgD3', 'xgAgent', 'xgAgentLic'].forEach((id) => api.setDocEl(id, { value: id === 'xgD2' ? '2026-11-10' : (id === 'xgD3' ? '2026-12-20' : (id === 'xgD1' ? '2026-11-01' : '')) })); api.setDocEl('xgCo', { value: 'env' }); api.setDocEl('xgAgentRrn', rrnEl);
+  const ed26 = api.xgBuildEdits('work_start', { id: 'c_26', label: 'x', contract_info: {}, pipes: [] }); rrnEl.value = '';
+  const ed26b = api.xgBuildEdits('work_start', { id: 'c_26', label: 'x', contract_info: {}, pipes: [] });
+  T('v426 착공계: 대리인 미선택 + 창에 친 주민번호 → F13·I6에만 · 안 치면 그 시트를 건드리지 않음(빈 양식 그대로)', cc(ed26, '현장대리인계', 'F13')[0][1] === FK26 && cc(ed26, '재직증명서', 'I6')[0][1] === FK26 && !ed26b['현장대리인계'] && !ed26b['재직증명서'], JSON.stringify([ed26['현장대리인계'], ed26b['현장대리인계']]));
+  const keep26 = V.xgNoPerson(ed26, V.xgPersonCells('work_start'));
+  T('v426 착공계: 창에 친 값도 서버 사본에는 안 남음', cc(keep26, '현장대리인계', 'F13')[0][2] === 'b' && cc(keep26, '재직증명서', 'I6')[0][2] === 'b', JSON.stringify(keep26['현장대리인계']));
   // AI ↔ 직원 줄
   const D0 = Date.parse('2026-11-06T03:00:00Z'), F0 = Date.parse('2026-11-08T03:00:00Z');
   const dr = (n, tpl, ver) => ({ n: n, i: 0, dk: 'gen.' + tpl, kind: 'draft', cur: 1, ver: ver || 1, ts: D0, pii: 1 });
