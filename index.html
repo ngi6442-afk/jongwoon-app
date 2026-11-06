@@ -739,7 +739,6 @@
   .cs-cdoc-r{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:12px;margin:2px 0;}
   .cs-cdoc-r small{color:var(--sub);}
   .cs-cdoc-r small.pii{color:#B00020;}
-  .cs-docs select[data-cs-pii]{font-size:12px;margin-left:6px;}
   .cs-doc-add input{flex:1;min-width:0;font-size:12px;}
   .cs-stg.open{grid-column:1 / -1;cursor:default;}
   .cs-stg small{color:var(--sub);font-weight:400;}
@@ -763,6 +762,34 @@
   .cs-pk .st.ok{color:var(--brand);} .cs-pk .st.att{color:#2a5fa8;} .cs-pk .st.gap{color:#B0332A;} .cs-pk .st.wait{color:#9AA09C;}
   .cs-pk .nm{flex:1;min-width:0;}
   .cs-pk .sub{color:var(--sub);font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  /* v423 넣기 박스 */
+  .cbx{display:flex;gap:10px;align-items:stretch;flex-wrap:wrap;margin:0 0 8px;}
+  .cbx-drop{flex:1 1 260px;display:block;width:100%;box-sizing:border-box;border:2px dashed #B9C7BF;border-radius:10px;background:#fff;color:inherit;font:inherit;padding:14px 12px;text-align:center;cursor:pointer;}
+  .cbx-drop strong{display:block;font-size:14px;}
+  .cbx-drop small{display:block;color:var(--sub);font-size:12px;margin-top:3px;}
+  .cbx-drop:hover,.cbx-drop:focus-visible{border-color:var(--brand);}
+  .cbx-drop.on{border-color:var(--brand);background:#EEF8F3;}
+  .cbx-drop.cbx-in{padding:9px 10px;margin:6px 0 8px;}
+  .cbx-drop.cbx-in strong{font-size:13px;}
+  .cbx-side{flex:0 0 auto;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:3px;min-width:96px;}
+  .cbx-side small{color:var(--sub);font-size:11.5px;}
+  .cbx-side button{min-height:36px;padding:6px 14px;}
+  .cbx-card{border:1px solid var(--line);border-radius:10px;background:#fff;padding:9px 11px;margin:0 0 8px;font-size:13px;text-align:left;}
+  .cbx-card .cbx-h{display:flex;gap:8px;align-items:flex-start;}
+  .cbx-card .cbx-h .t{flex:1;min-width:0;overflow-wrap:anywhere;}
+  .cbx-card .warn{color:#A5561B;font-size:12.5px;margin-top:5px;}
+  .cbx-two{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:10px;margin-top:8px;}
+  .cbx-kv{display:grid;grid-template-columns:72px minmax(0,1fr);gap:3px 8px;margin:0;font-size:12.5px;}
+  .cbx-kv dt{color:var(--sub);}
+  .cbx-kv dd{margin:0;overflow-wrap:anywhere;}
+  .cbx-kv small{color:var(--sub);display:block;font-size:11.5px;}
+  .cbx-kv input,.cbx-kv select{width:100%;box-sizing:border-box;font-size:12.5px;padding:3px 5px;border:1px solid var(--line);border-radius:4px;}
+  .cbx-ai{display:inline-block;font-size:10.5px;padding:0 5px;border-radius:999px;background:#E8F0FB;color:#2A5FA8;margin-left:4px;vertical-align:1px;}
+  .cbx-stages{margin:4px 0 0;padding-left:20px;font-size:12.5px;}
+  .cbx-row{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px;}
+  .cbx-row select{max-width:100%;font-size:12.5px;padding:3px 5px;border:1px solid var(--line);border-radius:4px;}
+  .cbx-row .cbx-go{background:var(--brand);color:#fff;border:0;border-radius:6px;padding:6px 14px;font:inherit;font-weight:600;cursor:pointer;}
+  @media (max-width:859px){ .cbx-two{grid-template-columns:minmax(0,1fr);} }
   #conDetailCard{display:none;}
   @media (max-width:859px){
     .vs col.cs-c-client{width:30% !important;}
@@ -1451,9 +1478,13 @@
   <!-- 계약·프로세스 -->
   <section class="view" id="view-con">
     <div class="dash-sec" style="margin-bottom:8px;"><h2>계약 <span class="cnt" id="conHead"></span></h2></div>
-    <button class="link-btn" id="conStartBtn">+ 계약 시작</button>
+    <div class="cbx" id="conBox" style="display:none;">
+      <button type="button" class="cbx-drop" data-cbx-drop="top"><strong>계약서나 서류를 여기에 끌어다 놓으세요</strong><small>폰은 눌러서 고릅니다. 에이전트가 새 계약서·고친 서류·받은 서류·빈 양식을 가려 제자리에 넣습니다.</small></button>
+      <div class="cbx-side"><button type="button" class="mini-btn" id="conStartBtn">직접 생성</button><small>계약서가 없을 때</small></div>
+    </div>
+    <div id="conBoxCards"></div>
     <button class="link-btn" id="docGenBtn">+ 서류 출력</button>
-    <button class="link-btn" id="tplManageBtn" style="display:none;">+ 양식 등록</button>
+    <button class="link-btn" id="tplManageBtn" style="display:none;">양식 목록</button>
     <button class="link-btn" id="conPerfBtn" style="display:none;">실적 다운로드</button>
     <div class="card" id="conList"><div class="loading">불러오는 중…</div></div>
     <div class="card" id="conDetailCard"></div>   <!-- v381 폰(859px 이하) 상세 카드 — PC에서는 표 안에 펼침 -->
@@ -1672,7 +1703,7 @@
         <button id="famAddBtn">기록</button>
       </div>
     </div>
-    <div style="font-size:12px;color:var(--sub);margin:6px 2px 10px;">조기퇴근은 대표 결재를 <b>수기 확인</b>한 뒤 기록합니다(결재함 구현 전까지). 기록자가 확인자로 남습니다.</div>
+    <div style="font-size:12px;color:var(--sub);margin:6px 2px 10px;">조기퇴근은 ✍ 기안의 <b>조기퇴근</b> 결재 결과를 확인한 뒤 기록합니다. 결재와 이 대장은 자동으로 이어지지 않습니다. 기록자가 확인자로 남습니다.</div>
     <div class="card" id="famList"><div class="loading">불러오는 중…</div></div>
 
     <div class="dash-sec" style="margin:20px 0 6px;"><h2>분기 리포트</h2></div>
@@ -1868,14 +1899,12 @@
 
 <div class="modal-backdrop" id="tplBackdrop">
   <div class="modal">
-    <h3>서류 양식 등록 (관리자)</h3>
-    <p style="margin-bottom:8px;color:#888;font-size:13px;">원본 양식 xlsx를 서버에 영구 보관합니다. 생성할 때마다 원본을 복사해 채우므로 양식이 오염되지 않습니다. 재등록하면 교체됩니다.</p>
+    <h3>서류 양식 목록 (관리자)</h3>
+    <p style="margin-bottom:8px;color:#888;font-size:13px;">등록·교체는 계약 탭 맨 위 박스에 빈 양식을 넣으면 됩니다. 생성할 때마다 원본을 복사해 채우므로 양식이 오염되지 않습니다.</p>
     <div id="tplRows"></div>
     <div style="border-top:1px dashed var(--line);margin-top:10px;padding-top:8px;">
       <b style="font-size:13px;">적격심사 증빙 보관함</b>
-      <div style="font-size:12px;color:#888;margin:2px 0 6px;">반복 제출하는 고정 증빙(등기부·신용확인서·안전성통보서·등록증·자격증 등 PDF)을 올려두면 적격심사 생성 때 일괄 다운로드됩니다. 갱신되면 같은 파일명으로 재업로드.</div>
-      <button class="mini-btn" id="proofUpBtn">📎 증빙 올리기(여러 개 가능)</button>
-      <input type="file" id="proofFile" accept=".pdf,.jpg,.jpeg,.png" multiple style="display:none;">
+      <div style="font-size:12px;color:#888;margin:2px 0 6px;">반복 제출하는 고정 증빙(등기부·신용확인서·안전성통보서·등록증·자격증 등)은 계약 탭 맨 위 박스에 넣으면 여기에 보관되고, 적격심사 생성 때 일괄 다운로드됩니다. 갱신되면 같은 파일명으로 다시 넣으세요.</div>
       <div id="proofRows" style="margin-top:6px;font-size:12px;"></div>
     </div>
     <button class="secondary" id="tplClose" style="margin-top:8px;">닫기</button>
@@ -2734,16 +2763,17 @@
   <div class="modal">
     <h3>도움말</h3>
     <p style="text-align:left;line-height:1.7;">
-      · <b>홈</b>: 만기·미수·지시·결재를 한눈에<br>
-      · <b>관리</b>: 지시 / 기성·수금 / 거래처 / 인사·직원 / 인사·일용직<br>
-      · <b>수주</b>: 입찰 / 계약 / 견적서 / 부동산<br>
-      · <b>업무</b>: 캘린더 / 차량 / 인허가 / 문서함<br>
-      · <b>개인</b>: 내 업무(내게 온 지시·내 할 일·주기 체크) / 휴가<br><br>
-      · 로그인: ⚙ → <b>아이디 + PIN</b>. 아이디를 아직 안 만들었으면 이름을 그대로 넣고, 로그인 뒤 ⚙ › <b>내 아이디 설정</b>. 관리자는 ⚙에서 <b>회원 관리</b>.<br>
+      · <b>홈</b>: 직원은 오늘 내 것(내게 온 지시·내 상신·주기 체크·내 할 일), 관리자는 만기·미수·결재를 한눈에, 대표는 결재함<br>
+      · <b>관리</b>: 지시 / 기성·수금 / 거래처 / 인사·직원 / 인사·일용직 / 진척도<br>
+      · <b>수주</b>: 입찰 / 계약 / 견적서 / 홍보 / 부동산<br>
+      · <b>업무</b>: 캘린더 / 차량 / 화관법 / 운반일지 / 현장 / 인허가 / 문서함<br>
+      · <b>개인</b>: 내 업무(내게 온 지시·내 할 일·주기 체크) / 휴가 / 물어보기<br><br>
+      · 로그인: ⚙ → <b>아이디 + PIN</b>. 아이디를 아직 안 만들었으면 이름을 그대로 넣고, 로그인 뒤 ⚙ › <b>내 아이디 설정</b>. 회원 추가·수정과 기기 승인은 관리자가 <b>인사·직원</b> 탭의 직원 카드에서 합니다.<br>
       · 알림: 쓰는 기기마다 한 번 ⚙ → <b>🔔 이 기기 알림 켜기</b>. 안 켠 기기에는 아무 알림도 오지 않습니다.<br>
-      · 휴가: 개인 › 휴가 › <b>+ 휴가 신청</b>(유형·기간·사유 필수) → 관리자 승인 → 캘린더에 표시. 승인된 휴가는 <b>[취소 요청]</b>(끝난 휴가는 종료 뒤 3일까지)만 되고 관리자가 승인합니다. 📖 사용 안내 20절<br>
-      · 지시: 내게 온 지시 → <b>[완료]</b> → 승인권자 승인으로 끝(데이터가 갱신된 자동 지시는 앱이 스스로 승인 대기로). 자동 지시가 내 일이 아니면 <b>[내 것 아님]</b>. 📖 사용 안내 4절<br>
-      · 안 보이는 탭은 권한(숨김/보기/처리) 때문이라 정상입니다. <b>보기</b> 권한이면 수정·완료 버튼이 없습니다.<br>
+      · 휴가: 개인 › 휴가 › <b>+ 휴가 신청</b>(유형·기간·사유 필수) → 관리자 승인 → 연차·반차·반반차는 캘린더에 표시. 승인된 휴가는 <b>[취소 요청]</b>(끝난 휴가는 종료 뒤 3일까지)만 되고 관리자가 승인합니다. 📖 사용 안내 20절<br>
+      · 지시: 내게 온 지시 줄을 눌러 완료 체크(지시 탭은 <b>[완료]</b>) → 승인권자 승인으로 끝. 관리자가 완료 신호 자동 전환을 켜 두면 데이터가 갱신된 자동 지시는 앱이 스스로 승인 대기로 올립니다. 자동 지시가 내 일이 아니면 <b>[내 것 아님]</b>. 📖 사용 안내 4절<br>
+      · 계약 서류: 계약 탭 맨 위 박스나 펼친 계약의 <b>이 계약 서류 넣기</b>에 끌어다 놓으면 에이전트가 제자리에 넣습니다. 계약서가 없으면 <b>직접 생성</b>. 📖 사용 안내 7절<br>
+      · 안 보이는 탭은 권한(숨김/보기/수행) 때문이라 정상입니다. <b>보기</b> 권한이면 수정·완료 버튼이 없습니다.<br>
       · 앱은 기록 층입니다. 은행·세무·현장 종이 점검표는 그대로 씁니다.
     </p>
     <button class="secondary" id="helpClose">닫기</button>
@@ -5873,8 +5903,6 @@
     }).catch(function(e){ alert("복구 실패: "+e); })
       .finally(function(){ btn.disabled=false; btn.textContent="복구 실행"; });
   });
-  document.getElementById("proofUpBtn").addEventListener("click", function(){ document.getElementById("proofFile").click(); });
-  document.getElementById("proofFile").addEventListener("change", function(){ proofUpload(this.files); this.value=""; });
   document.getElementById("errLogClose").addEventListener("click", function(){ document.getElementById("errLogBackdrop").classList.remove("show"); });
   document.getElementById("auditClose").addEventListener("click", function(){ document.getElementById("auditBackdrop").classList.remove("show"); });
   document.getElementById("auditBackdrop").addEventListener("click", function(e){ if(e.target===this) this.classList.remove("show"); });
@@ -6186,6 +6214,7 @@
     rd.readAsDataURL(f);
   });
   document.getElementById("conStartBtn").addEventListener("click", openConStart);
+  cbxInit();   // v423 넣기 박스
   document.getElementById("conStartSave").addEventListener("click", saveConStart);
   document.getElementById("conType").addEventListener("change", renderConScen);   // v382: 종류·사급/관급·혼합 체크 → 단계 목록 미리보기
   document.getElementById("conDoc").addEventListener("change", renderConScen);
@@ -7748,7 +7777,6 @@
   }
 
   // ---- 계약 서류함(첨부·드래그) — 계약 단위로 통합 보관, 판독 시 값 추출. 담당자(계약 권한)가 첨부 ----
-  var ATT_MAX = 6 * 1024 * 1024;   // 개별 6MB 상한(용량·개인정보 최소화)
   function findTask(id){ for(var i=0;i<tasks.length;i++){ if(tasks[i].id===id) return tasks[i]; } return null; }
   // 기존 단계별 첨부(구버전 데이터)도 합쳐서 [{key,i,a}]로
   function conAttList(c){
@@ -7766,45 +7794,8 @@
       var del = canDo("con") ? ' <button class="mini-btn" data-catt-del="'+c.id+'|'+esc(x.key)+'|'+x.i+'">✕</button>' : '';
       return '<div style="margin:2px 0;">📎 '+esc(a.name)+' <span style="color:#888;font-size:12px;">('+Math.round((a.size||0)/1024)+'KB)</span>'+badge+rev+del+'</div>';
     }).join('');
-    var add = (canDo("con") && c.status!=="done") ? '<button class="mini-btn" data-catt-add="'+c.id+'">📎 서류 첨부</button> <span style="color:#888;font-size:12px;">(끌어다 놓기 가능 — 석면조사서는 자동 판독)</span>' : '';
-    if(!rows && !add) return '';
-    return '<div data-catt-drop="'+c.id+'" style="margin-top:6px;padding:6px 8px;border:1px dashed #bbb;border-radius:6px;">'+rows+add+'</div>';
-  }
-  function conPickAttach(conId){
-    var inp=document.createElement("input"); inp.type="file"; inp.multiple=true;
-    inp.accept=".pdf,.hwp,.hwpx,.xlsx,.xls,.jpg,.jpeg,.png";
-    inp.addEventListener("change", function(){ if(inp.files&&inp.files.length) conAddAttach(conId, inp.files); });
-    inp.click();
-  }
-  // 첨부: 원본은 서버 blob(att_put), 계약엔 참조·판독결과만. 석면 계약이면 Claude 판독.
-  function conAddAttach(conId, files){
-    var c=findProc(conId); if(!c) return;
-    if(!c.attachments) c.attachments={};
-    if(!c.attachments["서류함"]) c.attachments["서류함"]=[];
-    var arr=c.attachments["서류함"];
-    var isAsb = !!(c.elems&&c.elems.asb);
-    Array.prototype.forEach.call(files, function(f){
-      if(f.size>ATT_MAX){ alert('"'+f.name+'"는 6MB를 넘어 첨부할 수 없습니다.'); return; }
-      // 문서종류: 파일명 우선(계약서→계약 판독, 석면·조사→조사서 판독), 그 외 석면 계약이면 조사서로
-      var kind = /등록증|신분증|면허증/.test(f.name) ? "biz"
-        : (/대장/.test(f.name) ? "bldg" : (/계약/.test(f.name) ? "contract" : (/석면|조사/.test(f.name) ? "asbestos" : "")));   // 그 외 파일은 판독 없이 보관만
-      var r=new FileReader();
-      r.onload=function(){
-        var entry={ name:f.name, size:f.size, type:f.type||"", id:"", parsed:"올리는 중…", added:todayStr() };
-        arr.push(entry); renderContracts();
-        gwCall("gw-data", { action:"att_put", name:f.name, type:f.type||"", data:String(r.result).split(",")[1]||"", kind:kind })
-          .then(function(res){
-            var b=(res&&res.body)||{};
-            if(!res || res.status!==200){ entry.parsed="업불러오기 실패("+((b&&b.error_code)||res.status||"네트워크")+")"; renderContracts(); return; }
-            entry.id=b.id||"";
-            if(b.parse_pending){ entry.parsed="판독 중…(수 분 걸릴 수 있음)"; asbBgParse(entry, c); }
-            else entry.parsed="";
-            scheduleContractSave(); renderContracts();
-          })
-          .catch(function(){ entry.parsed="업불러오기 실패"; renderContracts(); });
-      };
-      r.readAsDataURL(f);
-    });
+    if(!rows) return '';   // v423 올리기는 넣기 박스 하나로 — 여기는 옛 첨부 목록(열람·검수·삭제)만
+    return '<div style="margin-top:6px;padding:6px 8px;border:1px dashed #bbb;border-radius:6px;"><div style="color:#888;font-size:12px;margin-bottom:2px;">이전에 첨부한 파일</div>'+rows+'</div>';
   }
   // 현재 단계(이름 패턴 일치)를 완료 처리 — 승인권 있으면 완료+다음 단계 생성, 없으면 완료요청까지
   function completeStageNow(c, pat, pipeKey){   // v382 검토 7: pipeKey를 주면 그 파이프만(옛 2파이프 계약의 같은 이름 단계 혼동 방지)
@@ -7843,32 +7834,6 @@
         addr:p.addr||"", from:entry.name, checked:todayStr()};
       if(!c.client && p.name) c.client=p.name;
     }
-    else if(p.doc==="contract"){
-      entry.parsed="계약서: "+(p.title||"공사명?")+(p.amount?" · "+Number(p.amount).toLocaleString()+"원":"")+(p.date_contract?" · "+p.date_contract:"");
-      entry.con=p;
-      c.contract_info={title:p.title||"", amount:p.amount||0, d1:p.date_contract||"", d2:p.date_start||"", d3:p.date_end||"",
-        client:p.client||"", site:p.site||"", guarantee:p.guarantee||0, from:entry.name, checked:todayStr()};
-      // 계약에 비어 있는 기본 정보는 채움(기존 값은 보존)
-      if(!c.title && p.title) c.title=p.title;
-      if(!c.client && p.client) c.client=p.client;
-      if(!c.site && p.site) c.site=p.site;
-      // 철거·석면 건은 주소로 건축물대장 자동 조회(조용히 저장 — 카드에 🏢 칩 표시)
-      if(c.elems && (c.elems.asb||c.elems.demo||c.elems.permit) && (p.site||c.site) && !c.bldg_info) conBldgLookup(c.id, p.site||c.site, true);
-      // 공사명 키워드로 요소 누락 의심 알림(자동 변경 없음 — 사람 확인 원칙)
-      var kwEl=[["asb",/석면/,"석면"],["demo",/철거|해체/,"철거"],["waste",/폐기물/,"폐기물"],["dredge",/준설/,"준설"]];
-      var missEl=kwEl.filter(function(k){ return k[1].test(p.title||"") && !(c.elems&&c.elems[k[0]]); }).map(function(k){ return k[2]; });
-      if(missEl.length) alert("⚠ 공사명에 '"+missEl.join("·")+"' 키워드가 있는데 이 계약의 공사 요소에는 빠져 있습니다.\n요소가 누락되면 해당 서류 단계가 생성되지 않으니 계약 설정을 확인하세요.");
-      // 계약서 확보 = 계약 단계 완료 조건 → 확인 후 다음 단계(착공)로 진행 + 착공계 작성 제안
-      setTimeout(function(){
-        var sum=(p.title||entry.name)+(p.amount?" · "+Number(p.amount).toLocaleString()+"원":"")+(p.date_contract?" · 계약일 "+p.date_contract:"");
-        if(!confirm("계약서 판독 완료\n"+sum+"\n\n계약 단계를 완료하고 다음 단계로 진행할까요?")) return;
-        var r=completeStageNow(c, /계약/, "main");
-        if(r==="done"){
-          if(confirm("착공 단계로 넘어갔습니다. 착공계를 지금 작성할까요? (판독값 자동 입력)")) openXlsxGen(c.id, "work_start", "착공");
-        } else if(r==="review"){ alert("완료 요청으로 올렸습니다 — 승인권자가 승인하면 다음 단계가 생성됩니다."); }
-        else { alert("현재 단계가 '계약'이 아니라 자동 진행하지 않았습니다. 지시 탭에서 진행하세요."); }
-      }, 200);
-    }
     else if(p.judge){
       var area=(p.rows||[]).reduce(function(s,x){return s+(x.area||0);},0);
       entry.parsed="석면 "+(p.rows||[]).length+"행·"+ (Math.round(area*100)/100) +"㎡ · 신고대상 "+(p.judge.target?"예":"아니오");
@@ -7878,28 +7843,6 @@
       if(p.judge.target) setTimeout(function(){ alert("석면조사서 판독 — 노동부 신고대상입니다.\n\n"+p.judge.reasons.join("\n")+"\n\n※ 판독값은 검수 후 확정하세요. '노동부신고' 단계가 없으면 추가하세요."); },100);
     } else { entry.parsed="판독됨"; }
     scheduleContractSave(); renderContracts();
-  }
-  // 백그라운드 판독 트리거 + 폴링(5초 간격 최대 3분). 백그라운드 미지원(404)이면 동기 폴백.
-  function asbBgParse(entry, c){
-    function poll(n){
-      if(n>36){ entry.parsed="판독 시간 초과 — 첨부를 지웠다 다시 올려보세요"; renderContracts(); return; }
-      setTimeout(function(){
-        gwCall("gw-data",{action:"att_parse_status", id:entry.id}).then(function(res){
-          if(res.body && res.body.status==="OK"){ applyAsbParse(entry, c, res.body.parsed); }
-          else poll(n+1);
-        }).catch(function(){ poll(n+1); });
-      }, 5000);
-    }
-    gwCall("gw-parse-background", {id:entry.id}).then(function(r){
-      if(r.status===404){   // 백그라운드 함수 미지원 → 동기 시도(타임아웃 위험 감수)
-        return gwCall("gw-data",{action:"att_parse", id:entry.id}).then(function(res){
-          applyAsbParse(entry, c, (res.body&&res.body.parsed)||{error:"HTTP_"+res.status});
-          return "done";
-        });
-      }
-      return null;
-    }).then(function(done){ if(done!=="done") poll(0); })
-      .catch(function(){ poll(0); });
   }
   function conDelAttach(conId, key, i){
     var c=findProc(conId); if(!c||!c.attachments) return;
@@ -8736,27 +8679,8 @@
         var cur=t[k];
         return '<div style="display:flex;align-items:center;gap:8px;margin:6px 0;">'
           +'<b style="width:110px;">'+TPL_LABELS[k]+'</b>'
-          +'<span style="flex:1;font-size:12px;color:'+(cur?'#1A9A6B':'#c0392b')+';">'+(cur?('등록됨 · '+esc(cur.name||"")):'미등록')+'</span>'
-          +'<button class="mini-btn" data-tpl-up="'+k+'">'+(cur?'교체':'등록')+'</button></div>';
+          +'<span style="flex:1;font-size:12px;color:'+(cur?'#1A9A6B':'#c0392b')+';">'+(cur?('등록됨 · '+esc(cur.name||"")):'미등록')+'</span></div>';
       }).join("");
-      Array.prototype.forEach.call(host.querySelectorAll("[data-tpl-up]"), function(el){
-        el.addEventListener("click", function(){
-          var key=el.getAttribute("data-tpl-up");
-          var inp=document.createElement("input"); inp.type="file"; inp.accept=TPL_EXT[key]||".xlsx";
-          inp.addEventListener("change", function(){
-            var f=inp.files&&inp.files[0]; if(!f) return;
-            var r=new FileReader();
-            r.onload=function(){
-              el.textContent="올리는 중…";
-              gwCall("gw-data",{action:"tpl_put", key:key, name:f.name, data:String(r.result).split(",")[1]||""})
-                .then(function(res){ if(res.status===200){ if(typeof csTplInvalidate==="function") csTplInvalidate(); openTplManage(); if(typeof renderContracts==="function") renderContracts(); } else { alert("등록 실패: "+((res.body&&res.body.error_code)||res.status)); el.textContent="등록"; } })
-                .catch(function(){ alert("등록 실패(네트워크)"); el.textContent="등록"; });
-            };
-            r.readAsDataURL(f);
-          });
-          inp.click();
-        });
-      });
     }).catch(function(){ host.innerHTML='<div style="color:#c0392b;">목록을 불러오지 못했습니다.</div>'; });
   }
   // 적격심사 증빙 보관함 — 관리자 업로드·목록·삭제 + 생성 시 일괄 다운로드
@@ -8776,21 +8700,6 @@
         });
       });
     }).catch(function(){ host.innerHTML='<span style="color:#c0392b;">목록 불러오기 실패</span>'; });
-  }
-  function proofUpload(files){
-    var arr=Array.prototype.slice.call(files||[]);
-    if(!arr.length) return;
-    var i=0;
-    (function next(){
-      if(i>=arr.length){ proofRefresh(); return; }
-      var f=arr[i++];
-      var r=new FileReader();
-      r.onload=function(){
-        gwCall("gw-data",{action:"proof_put", name:f.name, data:String(r.result).split(",")[1]||""})
-          .then(next).catch(function(){ alert("업불러오기 실패: "+f.name); next(); });
-      };
-      r.readAsDataURL(f);
-    })();
   }
   // 적격심사 생성 직후 호출 — 보관 증빙 일괄 다운로드 제안
   function proofBundleOffer(){
@@ -9147,7 +9056,7 @@
       if(i>=list.length) return Promise.resolve();
       var key=list[i++];
       return gwCall("gw-data",{action:"tpl_get", key:key}).then(function(res){
-        if(res.status!==200) throw (res.status===404?"'"+TPL_LABELS[key]+"' 양식 미등록 — [+ 양식 등록]":"양식 불러오기 실패");
+        if(res.status!==200) throw (res.status===404?"'"+TPL_LABELS[key]+"' 양식 미등록 — 계약 탭 맨 위 박스에 빈 양식을 넣으세요":"양식 불러오기 실패");
         var hwpx=TPL_EXT[key]===".hwpx";
         return (hwpx?fillHwpxTemplate(res.body.data, sv.tokens):fillXlsxTemplate(res.body.data, {})).then(function(b){ made.push({ name:TPL_LABELS[key]+(hwpx?".hwpx":".xlsx"), blob:b }); });
       }).then(next);
@@ -9621,7 +9530,7 @@
         };
         $("xgGo").textContent="생성 중…"; $("xgGo").disabled=true;
         gwCall("gw-data",{action:"tpl_get", key:"qual_packet"}).then(function(res){
-          if(res.status!==200){ alert(res.status===404?"'적격심사 패킷' 양식이 미등록입니다. [+ 양식 등록]에서 hwpx 템플릿을 등록하세요.":"양식 불러오기 실패"); return; }
+          if(res.status!==200){ alert(res.status===404?"'적격심사 패킷' 양식이 미등록입니다. 계약 탭 맨 위 박스에 빈 양식(hwpx)을 넣으세요.":"양식 불러오기 실패"); return; }
           return fillHwpxTemplate(res.body.data, qTokens).then(function(blob){
             downloadBlob(($("xgTitle").value.trim()||c.label||"서류")+"_적격심사패킷.hwpx", blob);
             alert("적격심사 패킷 생성 — 자기평점 계 "+qualNum(qs.total)+"점.\n(산식은 김천서부초 실물 심사표로 검증 완료 — 그래도 한컴에서 값 확인 후 제출)");
@@ -9659,7 +9568,7 @@
         var cdName=$("xgTitle").value.trim()||c.label||"계약";
         $("xgGo").textContent="생성 중…"; $("xgGo").disabled=true;
         gwCall("gw-data",{action:"tpl_get", key:"contract_pledge"}).then(function(r1){
-          if(r1.status!==200) throw (r1.status===404?"'계약이행서약서' 양식 미등록 — [+ 양식 등록]":"양식 불러오기 실패");
+          if(r1.status!==200) throw (r1.status===404?"'계약이행서약서' 양식 미등록 — 계약 탭 맨 위 박스에 빈 양식을 넣으세요":"양식 불러오기 실패");
           // 입찰(적격심사) 건: 6·7번(수의 결격사유) 소항목의 [아니오] 체크를 풀고 [해당없음]에 체크 — 짝 단위 치환이라
           // 임금체불 항목(별개 조건, [ v] 예 형태)은 걸리지 않는다. 같은 길이 치환(lineseg 무해).
           var pledgeRaw=(c&&c.bid_id)?[[/(\[  \] 예 \[ )v(\] 아니오[\s\S]{0,600}?\[)  (\] 해당없음)/g, "$1 $2 v$3"]]:null;
@@ -9668,7 +9577,7 @@
           downloadBlob(cdName+"_계약이행서약서.hwpx", b1);
           return gwCall("gw-data",{action:"tpl_get", key:"seal_reg"});
         }).then(function(r2){
-          if(r2.status!==200) throw (r2.status===404?"'사용인감계' 양식 미등록 — [+ 양식 등록]":"양식 불러오기 실패");
+          if(r2.status!==200) throw (r2.status===404?"'사용인감계' 양식 미등록 — 계약 탭 맨 위 박스에 빈 양식을 넣으세요":"양식 불러오기 실패");
           return fillHwpxTemplate(r2.body.data, sealTokens);
         }).then(function(b2){
           downloadBlob(cdName+"_사용인감계.hwpx", b2);
@@ -9707,7 +9616,7 @@
         stEdits.push(['L26', sr.profitRate, 'n']);   // 조정 이윤율 — 표지·감액계는 워크북 수식이 자동 연동
         $("xgGo").textContent="생성 중…"; $("xgGo").disabled=true;
         gwCall("gw-data",{action:"tpl_get", key:"settle_doc"}).then(function(rs){
-          if(rs.status!==200){ alert(rs.status===404?"'준공 정산합의서' 양식이 미등록입니다. [+ 양식 등록]에서 이 계약의 정산 워크북(xlsx)을 등록하세요.":"양식 불러오기 실패"); return; }
+          if(rs.status!==200){ alert(rs.status===404?"'준공 정산합의서' 양식이 미등록입니다. 계약 탭 맨 위 박스에 이 계약의 정산 워크북(xlsx)을 넣으세요.":"양식 불러오기 실패"); return; }
           return fillXlsxTemplate(rs.body.data, {'원가계산서 (정산)': stEdits}).then(function(bs){
             downloadBlob(($("xgTitle").value.trim()||c.label||"정산")+"_정산합의서.xlsx", bs);
             alert("정산합의서 생성 완료 — 엑셀에서 열어 표지 금액·한글금액이 정산액과 일치하는지 확인 후 제출하세요.");
@@ -9757,7 +9666,7 @@
           "은행명":$("xadBank").value.trim(), "예금종류":$("xadAcctType").value.trim(), "계좌번호":$("xadAcct").value.trim() };
         $("xgGo").textContent="생성 중…"; $("xgGo").disabled=true;
         gwCall("gw-data",{action:"tpl_get", key:"adv_pay"}).then(function(ra){
-          if(ra.status!==200){ alert(ra.status===404?"'선금지급신청 세트' 양식이 미등록입니다. [+ 양식 등록]에서 hwpx 템플릿을 등록하세요.":"양식 불러오기 실패"); return; }
+          if(ra.status!==200){ alert(ra.status===404?"'선금지급신청 세트' 양식이 미등록입니다. 계약 탭 맨 위 박스에 빈 양식(hwpx)을 넣으세요.":"양식 불러오기 실패"); return; }
           return fillHwpxTemplate(ra.body.data, adTokens).then(function(ba){
             downloadBlob(($("xgTitle").value.trim()||c.label||"선금")+"_선금지급신청.hwpx", ba);
             alert("선금지급신청 세트 생성 완료 — 공문·별첨2(신청서)·별첨3(각서)·별첨4(사용계획)·별첨5(청구서)·지급조건 일체."
@@ -9790,7 +9699,7 @@
         var qtKey=($("xgCo").value==="con")?"quote_con":"quote_env";
         $("xgGo").textContent="생성 중…"; $("xgGo").disabled=true;
         gwCall("gw-data",{action:"tpl_get", key:qtKey}).then(function(rq){
-          if(rq.status!==200){ alert(rq.status===404?("'"+TPL_LABELS[qtKey]+"' 양식이 미등록입니다. [+ 양식 등록]에서 hwpx 템플릿을 등록하세요."):"양식 불러오기 실패"); return; }
+          if(rq.status!==200){ alert(rq.status===404?("'"+TPL_LABELS[qtKey]+"' 양식이 미등록입니다. 계약 탭 맨 위 박스에 빈 양식(hwpx)을 넣으세요."):"양식 불러오기 실패"); return; }
           return fillHwpxTemplate(rq.body.data, qtTokens).then(function(bq){
             downloadBlob(($("xgTitle").value.trim()||c.label||"견적")+"_견적서.hwpx", bq);
             alert("견적서 생성 완료 — 품목 2행째부터는 한컴에서 수기 기입(합계는 자동합산). 제출 전 값 확인하세요.");
@@ -9841,10 +9750,10 @@
           if(!$("xgD3").value) missing.push(kind==="work_start"?"준공예정일":"준공일");
         } else if(!$("xgOwner").value.trim()) missing.push("소유주");
       }
-      if(missing.length && !confirm("⚠ 확인요망 — 원문(계약서·조사서·대장)에서 찾지 못한 값:\n· "+missing.join("\n· ")+"\n\n빈칸(수기 기입)으로 두고 생성할까요?\n(값을 아신다면 취소 후 입력하거나, 해당 서류를 서류함에 첨부하면 자동으로 채워집니다)")) return;
+      if(missing.length && !confirm("⚠ 확인요망 — 원문(계약서·조사서·대장)에서 찾지 못한 값:\n· "+missing.join("\n· ")+"\n\n빈칸(수기 기입)으로 두고 생성할까요?\n(값을 아신다면 취소 후 입력하거나, 해당 서류를 계약의 넣기 박스에 넣으면 자동으로 채워집니다)")) return;
       $("xgGo").textContent="생성 중…"; $("xgGo").disabled=true;
       gwCall("gw-data",{action:"tpl_get", key:kind}).then(function(res){
-        if(res.status!==200){ alert(res.status===404?("'"+TPL_LABELS[kind]+"' 양식이 미등록입니다. [+ 양식 등록]에서 먼저 등록하세요."):"양식 불러오기 실패"); return; }
+        if(res.status!==200){ alert(res.status===404?("'"+TPL_LABELS[kind]+"' 양식이 미등록입니다. 계약 탭 맨 위 박스에 빈 양식을 넣으세요."):"양식 불러오기 실패"); return; }
         var ed=xgBuildEdits(kind, c);
         return xgApplyLearned(kind, ed).then(function(al){ ed = al.edits;   // v411 학습된 칸 기본값(공란에만)
         return fillXlsxTemplate(res.body.data, ed).then(function(blob){
@@ -10041,7 +9950,7 @@
       var lab = (CDOC_KIND_LABEL[x.kind] || x.kind) + ' v' + x.ver + (x.cur === 1 ? ' <b>현재</b>' : '') + (x.pii ? ' <small class="pii">개인정보 ' + x.pii + '</small>' : '');
       return '<div class="cs-cdoc-r"><span>📄 ' + lab + ' · ' + esc(x.orig || x.name) + ' <small>' + esc(cdocDay(x.ts)) + ' ' + esc((x.by && x.by.name) || "") + '</small></span>'
         + '<button type="button" class="vs-chip" data-cs-copen="' + esc(c.id) + '|' + x.n + '|' + (x.pii || 0) + '">열기</button>'
-        + (can ? ((x.cur !== 1 ? '<button type="button" class="vs-chip" data-cs-ccur="' + esc(c.id) + '|' + x.n + '" title="이 판을 현재본으로(되돌리기)">현재로</button>' : '') + '<button type="button" class="vs-chip" data-cs-cdel="' + esc(c.id) + '|' + x.n + '" title="보관함으로(바이트는 남음, 영구 삭제는 관리자 30일 뒤)">보관</button>') : '') + '</div>';
+        + (can ? ((x.cur !== 1 ? '<button type="button" class="vs-chip" data-cs-ccur="' + esc(c.id) + '|' + x.n + '" title="이 판을 현재본으로(되돌리기)">현재로</button>' : '') + (x.kind !== "draft" ? '<button type="button" class="vs-chip" data-cs-cmove="' + esc(c.id) + '|' + x.n + '" title="다른 서류·종류로 옮기기(고친 내용은 다음 판단에 쓰입니다)">옮기기</button>' : '') + '<button type="button" class="vs-chip" data-cs-cdel="' + esc(c.id) + '|' + x.n + '" title="보관함으로(바이트는 남음, 영구 삭제는 관리자 30일 뒤)">보관</button>') : '') + '</div>';
     }).join('') + '</div>';
   }
   // v408 관리자 보관함(서류 탭) — 보관(소프트 삭제)된 판: [복구] · [영구 삭제](confirm, 서버가 보관 30일 미만이면 TOO_EARLY). 직원에겐 없음
@@ -10065,42 +9974,6 @@
       cdocLoad(c, true); apprToastShow("영구 삭제됨");
     }).catch(function(){ alert("영구 삭제 실패(네트워크)"); });
   }
-  function csCdocPick(c, p, i, dk, dkRaw, kind, pii){
-    if (!canDo("con") || !c || c.status === "done") return;
-    var inp = document.createElement("input"); inp.type = "file"; inp.accept = ".pdf,.docx,.xlsx,.pptx,.hwp,.hwpx,.jpg,.jpeg,.png";
-    inp.addEventListener("change", function(){ var f = inp.files && inp.files[0]; if (f) csCdocUpload(c, p, i, dk, dkRaw, kind, pii, f, false); });
-    inp.click();
-  }
-  function csCdocUpload(c, p, i, dk, dkRaw, kind, pii, f, allowDup){
-    if (DOC_ATT_EXT.indexOf(docAttExtOf(f.name)) < 0){ alert('"' + f.name + '"는 허용되지 않는 형식입니다(pdf·docx·xlsx·pptx·hwp·hwpx·jpg·png).'); return; }
-    if (f.size > DOC_ATT_MAX){ alert('"' + f.name + '"는 4.5MB를 넘어 올릴 수 없습니다(서버 전송 한도) — 파일은 오프라인 보관하고 값만 입력해 주세요.'); return; }
-    apprToastShow("올리는 중… " + f.name);
-    var r = new FileReader();
-    r.onload = function(){
-      var body = { action: "cdoc_put", cid: c.id, i: i, doc_key: dk, kind: kind, pii: Number(pii) || 0, name: f.name, data: String(r.result).split(",")[1] || "" };
-      if (allowDup) body.allow_dup = true;
-      gwCall("gw-data", body).then(function(res){
-        if (res.status === 409 && res.body && res.body.error_code === "DUP_BYTES"){
-          var d0 = (res.body.dup || [])[0];
-          if (confirm("같은 내용의 파일이 이미 있습니다" + (d0 ? " — " + (d0.orig || d0.name) + " (" + (CDOC_KIND_LABEL[d0.kind] || d0.kind) + " v" + d0.ver + ")" : "") + ".\n그래도 새 판으로 올릴까요?")) csCdocUpload(c, p, i, dk, dkRaw, kind, pii, f, true);
-          return;
-        }
-        if (res.status !== 200 || !res.body || !res.body.item){ alert('"' + f.name + '" 올리기 실패 (' + ((res.body && res.body.error_code) || res.status) + (res.status === 413 ? " — 파일은 오프라인 보관, 값만 입력" : "") + ')'); return; }
-        var e = CDOC[c.id] || (CDOC[c.id] = { items: [], at: 0, busy: false, err: "", loaded: true }), it = res.body.item;
-        e.items.forEach(function(x){ if (x.i === it.i && x.dk === it.dk && x.kind === it.kind) x.cur = 0; });
-        (res.body.gc || []).forEach(function(n){ e.items.forEach(function(x){ if (x.n === n) x.gc = 1; }); });
-        e.items.push(it);
-        if (dkRaw && p && p.stages && p.stages[i] && conIsArr(p.stages[i].docs)){   // 건별 서류 항목에 참조 번호(final_ref/received_ref) — 목록은 굳어 있을 때만(골조 목록을 여기서 굳히지 않는다)
-          var dd = p.stages[i].docs.filter(function(x){ return x && x.k === dkRaw; })[0];
-          if (dd){ dd[kind === "final" ? "final_ref" : "received_ref"] = it.n; c.updated = todayStr(); scheduleContractSave(); }
-        }
-        apprToastShow("올림 — " + it.name + (res.body.audit === false ? " (감사 기록 실패 — 파일은 저장됨)" : ""));
-        renderContracts();
-      }).catch(function(){ alert('"' + f.name + '" 올리기 실패(네트워크)'); });
-    };
-    r.onerror = function(){ alert('"' + f.name + '" 읽기 실패'); };
-    r.readAsDataURL(f);
-  }
   function csCdocOpen(cid, n, pii){
     var c = findProc(cid); if (!c) return;
     var reason = "";
@@ -10109,16 +9982,30 @@
     gwCall("gw-data", { action: "cdoc_get", cid: cid, n: n, reason: reason }).then(function(res){
       if (res.status !== 200 || !res.body){ alert("파일을 열 수 없습니다 (" + ((res.body && res.body.error_code) || res.status) + ")"); return; }
       if (res.body.fill){ downloadBlob(res.body.name || "draft.json", new Blob([JSON.stringify(res.body.fill, null, 1)], { type: "application/json" })); return; }   // 채움 맵 초안은 JSON으로
-      if (!res.body.data){ alert("파일 내용이 없습니다"); return; }
       var name = res.body.name || "file", ext = docAttExtOf(name);
       var mime = Object.prototype.hasOwnProperty.call(DOC_ATT_MIME, ext) ? DOC_ATT_MIME[ext] : "application/octet-stream";   // 응답 type 불신 — 확장자 고정표(문서함 high1과 같은 규칙)
-      var bin = atob(res.body.data), len = bin.length, u8 = new Uint8Array(len);
-      for (var j = 0; j < len; j++) u8[j] = bin.charCodeAt(j);
-      var url = URL.createObjectURL(new Blob([u8], { type: mime })), a = document.createElement("a");
-      a.href = url; a.target = "_blank"; a.rel = "noopener";
-      if (!Object.prototype.hasOwnProperty.call(DOC_ATT_INLINE, ext)) a.download = name;
-      document.body.appendChild(a); a.click(); document.body.removeChild(a);
-      setTimeout(function(){ URL.revokeObjectURL(url); }, 60000);
+      var show = function(b64){
+        var bin = atob(b64), len = bin.length, u8 = new Uint8Array(len);
+        for (var j = 0; j < len; j++) u8[j] = bin.charCodeAt(j);
+        var url = URL.createObjectURL(new Blob([u8], { type: mime })), a = document.createElement("a");
+        a.href = url; a.target = "_blank"; a.rel = "noopener";
+        if (!Object.prototype.hasOwnProperty.call(DOC_ATT_INLINE, ext)) a.download = name;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        setTimeout(function(){ URL.revokeObjectURL(url); }, 60000);
+      };
+      if (res.body.parts){   // v423 큰 파일은 조각으로 받아 잇는다
+        var total = Number(res.body.parts), got = [], next = function(j){
+          if (j >= total){ show(got.join("")); return; }
+          apprToastShow("여는 중… " + (j + 1) + "/" + total);
+          gwCall("gw-data", { action: "cdoc_get", cid: cid, n: n, reason: reason, part: j }).then(function(r2){
+            if (r2.status !== 200 || !r2.body || !r2.body.data){ alert("파일을 열 수 없습니다 (" + ((r2.body && r2.body.error_code) || r2.status) + ")"); return; }
+            got.push(r2.body.data); next(j + 1);
+          }).catch(function(){ alert("파일을 열 수 없습니다(네트워크)"); });
+        };
+        next(0); return;
+      }
+      if (!res.body.data){ alert("파일 내용이 없습니다"); return; }
+      show(res.body.data);
     }).catch(function(){ alert("파일을 열 수 없습니다(네트워크)"); });
   }
   function csCdocMark(cid, n, mode){
@@ -10129,6 +10016,593 @@
       cdocLoad(c, true);   // 현재 포인터·보관 표식은 서버 색인이 원본 — 다시 읽는다
       apprToastShow(mode === "del" ? "보관함으로 옮김" : (mode === "cur" ? "현재본 지정" : "복구됨"));
     }).catch(function(){ alert("처리 실패(네트워크)"); });
+  }
+  // ---- v423 넣기 박스(체크 31, PM 11/5 "서류 등록 채널이 최소 세개" · "+계약시작 두 갈래" · 11/6 "저장은 Blobs 그대로") ----
+  // 입구 하나: 파일을 먼저 서버에 받고(box_put, 큰 파일은 조각) → 에이전트가 종류를 판단(gw-parse-background) → 계약서면 유형·단계 카드([이대로 시작]), 서류면 계약 안에서는 제자리에 바로 넣고 [다른 서류로] 1번으로 고친다. 맨 위 박스는 어느 계약인지 한 번 확인받는다(계약을 건너 옮기는 길이 없어서).
+  // 저장소는 그대로 gw_files·recidx. AI 판단은 parse:<att>에, 사람이 고친 것은 box:fixes에 남아 다음 판단에 들어간다. 넣다 만 파일은 boxp: 표식으로 다음에 다시 잇는다(자동 삭제 없음).
+  var CBX_MAX = 25 * 1024 * 1024, CBX_PART = 4400000, CBX_POLL_MS = 4000, CBX_POLL_N = 75;
+  var CBX_ACCEPT = ".pdf,.docx,.xlsx,.xls,.pptx,.hwp,.hwpx,.jpg,.jpeg,.png";
+  var cbxItems = [], cbxSeq = 0, cbxTopHtml = "", cbxRestored = false;
+  var cbxQ = Promise.resolve();
+  function cbxSerial(fn){ var p = cbxQ.then(fn, fn); cbxQ = p.catch(function(){}); return p; }   // 여러 파일을 한 번에 넣어도 서류함 색인을 한 번에 하나만 고치게(동시 저장 시 판 번호 유실 방지)
+  function cbxOf(id){ for (var i = 0; i < cbxItems.length; i++) if (cbxItems[i].id === id) return cbxItems[i]; return null; }
+  function cbxRedraw(scope){ if (scope === "top") cbxRenderTop(); else { renderContracts(); cbxRenderTop(); } }
+  function cbxRemove(it){ cbxItems = cbxItems.filter(function(x){ return x !== it; }); cbxRedraw(it.scope); }
+  function cbxPick(scope){
+    if (!canDo("con")) return;
+    var inp = document.createElement("input"); inp.type = "file"; inp.multiple = true; inp.accept = CBX_ACCEPT;
+    inp.addEventListener("change", function(){ if (inp.files && inp.files.length) cbxAdd(inp.files, scope); });
+    inp.click();
+  }
+  function cbxAdd(files, scope){
+    if (!canDo("con")) return;
+    Array.prototype.forEach.call(files, function(f){
+      var ext = docAttExtOf(f.name);
+      if (DOC_ATT_EXT.indexOf(ext) < 0 && ext !== "xls"){ alert('"' + f.name + '"는 넣을 수 없는 형식입니다(pdf·hwp·hwpx·docx·xlsx·xls·pptx·jpg·png).'); return; }
+      if (f.size > CBX_MAX){ alert('"' + f.name + '"는 25MB를 넘어 넣을 수 없습니다. 쪽을 나누거나 해상도를 낮춰 주세요.'); return; }
+      var it = { id: ++cbxSeq, scope: scope, file: f, name: f.name, size: f.size, st: "up", pct: 0, att: "", pii: 0 };
+      cbxItems.push(it);
+      cbxUpload(it);
+    });
+    cbxRedraw(scope);
+  }
+  function cbxFail(it, msg, at){ it.st = "err"; it.msg = msg; it.errAt = at || ""; cbxRedraw(it.scope); }
+  function cbxUpload(it){
+    var r = new FileReader();
+    r.onerror = function(){ cbxFail(it, "파일을 읽지 못했습니다."); };
+    r.onload = function(){
+      var b64 = String(r.result).split(",")[1] || "", k = Math.max(1, Math.ceil(b64.length / CBX_PART)), j = 0, retry = 0;
+      var next = function(){
+        if (!cbxOf(it.id)) return;   // 닫은 카드
+        it.pct = Math.round(100 * j / k); cbxRedraw(it.scope);
+        gwCall("gw-data", { action: "box_put", id: it.att, j: j, k: k, name: it.name, size: it.size, data: b64.slice(j * CBX_PART, (j + 1) * CBX_PART) }).then(function(res){
+          if (res && res.status >= 500 && retry++ < 2){ setTimeout(next, 1500); return; }
+          if (!res || res.status !== 200 || !res.body || !res.body.id){ cbxFail(it, "올리기 실패(" + ((res && res.body && res.body.error_code) || (res && res.status) || "네트워크") + ")", "up"); return; }
+          it.att = res.body.id; j++; retry = 0;
+          if (j < k) next(); else cbxJudge(it);
+        }).catch(function(){ if (retry++ < 2) setTimeout(next, 1500); else cbxFail(it, "올리기 실패(네트워크)", "up"); });
+      };
+      next();
+    };
+    r.readAsDataURL(it.file);
+  }
+  // 서류 목록(초안 포함)을 읽어 둔 뒤 진행 — 개요 탭에서 바로 넣어도 초안 짝이 맺히게
+  function cbxDocsReady(c){
+    var e = c && CDOC[c.id];
+    if (!c || (e && e.loaded && Date.now() - e.at < CDOC_TTL)) return Promise.resolve();
+    return gwCall("gw-data", { action: "cdoc_list", cid: c.id, all: isAdmin() }).then(function(res){
+      if (res && res.status === 200 && res.body && res.body.items){ var x = CDOC[c.id] || (CDOC[c.id] = { items: [], at: 0, busy: false, err: "", loaded: false }); x.items = res.body.items; x.at = Date.now(); x.loaded = true; x.err = ""; }
+    }).catch(function(){});
+  }
+  // 판단에 넘길 목록 — 계약 안이면 그 계약의 서류·초안, 맨 위면 진행 중인 계약(사급 계약은 개인 이름·주소가 섞일 수 있어 공사명만)
+  function cbxDocList(c){
+    var out = [];
+    (c.pipes || []).forEach(function(p){
+      (p.stages || []).forEach(function(s, i){
+        if (s.status === "skipped") return;
+        csStageDocItems(s).forEach(function(d){ if (d.st !== "na") out.push({ id: "s|" + p.key + "|" + i + "|" + d.k, n: d.n, s: csStageLabel(s), t: d.t || "", i: i }); });
+      });
+    });
+    CON_PACKETS.filter(function(pk){ return csPkWhen(c, pk.when); }).forEach(function(pk){
+      pk.items.filter(function(it){ return it.t === "att" && csPkWhen(c, it.when); }).forEach(function(it){ out.push({ id: "p|" + pk.k + "|" + it.k, n: it.h, s: pk.h, t: "수령", i: -1 }); });
+    });
+    return out;
+  }
+  function cbxDraftList(c){
+    var seen = {}, out = [];
+    cdocItems(c).forEach(function(x){ if (!x || x.kind !== "draft" || x.cur !== 1 || x.del || x.gc || x.purged || String(x.dk).indexOf("gen.") !== 0) return; var tpl = x.dk.slice(4); if (seen[tpl]) return; seen[tpl] = 1; out.push({ tpl: tpl, n: TPL_LABELS[tpl] || tpl }); });
+    return out;
+  }
+  function cbxCtx(scope){
+    var ctx = {};
+    if (scope !== "top"){ var c = findProc(scope); if (c){ ctx.docs = cbxDocList(c).slice(0, 150).map(function(d){ return { id: d.id, n: d.n, s: d.s }; }); ctx.drafts = cbxDraftList(c); } }
+    else ctx.cons = liveContracts().filter(function(c){ return c.status !== "done"; }).slice(0, 60).map(function(c){ var pub = c.docType === "public"; return { id: c.id, t: csTitle(c) || c.label || "", c: pub ? (c.client || "") : "", s: pub ? (c.site || "") : "" }; });
+    if (isAdmin()) ctx.tpls = Object.keys(TPL_LABELS).map(function(k){ return { k: k, n: TPL_LABELS[k] }; });
+    return ctx;
+  }
+  function cbxJudge(it){
+    it.st = "judge"; cbxRedraw(it.scope);
+    var go = function(){ cbxPoll(it, 0, "box"); }, c = it.scope !== "top" ? findProc(it.scope) : null;
+    cbxDocsReady(c).then(function(){ return gwCall("gw-parse-background", { id: it.att, box: 1, ctx: cbxCtx(it.scope) }); }).then(go).catch(go);
+  }
+  function cbxPoll(it, n, want){
+    if (!cbxOf(it.id)) return;   // 버린 카드
+    if (n > CBX_POLL_N){ if (want === "box") cbxApply(it, { error: "시간 초과" }); else { it.subDone = 1; it.subFail = "시간 초과"; cbxPlace(it, false, 0); } return; }
+    setTimeout(function(){
+      gwCall("gw-data", { action: "att_parse_status", id: it.att }).then(function(res){
+        var p = (res && res.body && res.body.status === "OK") ? res.body.parsed : null;
+        if (want === "box"){ if (p) cbxApply(it, p); else cbxPoll(it, n + 1, want); return; }
+        if (p && p.doc !== "box") cbxSubDone(it, p); else cbxPoll(it, n + 1, want);
+      }).catch(function(){ cbxPoll(it, n + 1, want); });
+    }, CBX_POLL_MS);
+  }
+  function cbxNorm(s){ return String(s || "").replace(/\.[a-z0-9]{1,5}$/i, "").replace(/[\s()\[\]·_\-,.]/g, "").toLowerCase(); }
+  // 판단이 자리를 못 고른 경우의 보조 — 서류 이름·파일명과 목록 이름 대조(앞쪽 우선)
+  function cbxDocMatch(list, docName, fileName){
+    var a = cbxNorm(docName), b = cbxNorm(fileName), best = null, bs = 0;
+    list.forEach(function(d){
+      var n = cbxNorm(d.n), s = 0; if (n.length < 2) return;
+      [a, b].forEach(function(q){ if (!q) return; if (q === n) s = Math.max(s, 3); else if (q.indexOf(n) >= 0) s = Math.max(s, 2 + n.length / 100); else if (n.indexOf(q) >= 0 && q.length >= 2) s = Math.max(s, 1.5); });
+      if (s > bs){ bs = s; best = d; }
+    });
+    return bs >= 1.5 ? best : null;
+  }
+  function cbxRef(c, id){
+    var q = String(id || "").split("|"), p0 = (c.pipes || [])[0], cur = (p0 && typeof p0.cur === "number" && p0.cur >= 0 && p0.cur <= 99) ? p0.cur : 0;
+    if (q[0] === "s" && q.length >= 4){ var p = csPipeOf(c, q[1]), i = Number(q[2]), k = q.slice(3).join("|"); if (p && i >= 0) return { i: i, dk: cdocDocKey(p, { k: k }), raw: k, p: p }; }
+    if (q[0] === "p" && q.length === 3) return { i: cur, dk: cdocPkKey({ k: q[1] }, { k: q[2] }), raw: "", p: p0 };
+    return { i: cur, dk: "etc.box", raw: "", p: p0 };
+  }
+  function cbxLabel(c, id){
+    if (!id) return "그 밖의 서류";
+    var d = cbxDocList(c).filter(function(x){ return x.id === id; })[0];
+    return d ? (d.s + " › " + d.n) : "그 밖의 서류";
+  }
+  function cbxTarget(it, c){
+    var p = it.res || {}, cur = ((c.pipes || [])[0] || {}).cur, list = cbxDocList(c), pick = null;
+    if (p.target) pick = list.filter(function(x){ return x.id === p.target; })[0] || null;
+    if (!pick) pick = cbxDocMatch(list.filter(function(x){ return x.i === cur; }).concat(list.filter(function(x){ return x.i !== cur; })), p.doc_name, it.name);
+    it.tgt = pick ? pick.id : "";
+    it.kind = (pick && pick.t === "수령") ? "received" : (p.cls === "filled" ? "final" : "received");
+  }
+  // 생성 초안과 같은 양식이면 그 초안과 짝(같은 단계에 초안이 여럿이어도 서류 이름으로 정해진다)
+  function cbxPairTpl(c, it){
+    var p = it.res || {}; if (p.draft_tpl) return p.draft_tpl;
+    var q = cbxNorm(p.doc_name) || cbxNorm(it.name), hit = "";
+    cbxDraftList(c).forEach(function(d){ var lb = cbxNorm(d.n); if (!hit && lb && q && (q.indexOf(lb) >= 0 || lb.indexOf(q) >= 0)) hit = d.tpl; });
+    return hit;
+  }
+  function cbxFindSame(p, vals){
+    var con = vals || p.con || {}, t = cbxNorm(con.title), cl = cbxNorm(con.client), hit = null;
+    if (p.contract_id) hit = findProc(p.contract_id);
+    if (hit) return hit;
+    liveContracts().forEach(function(c){
+      if (hit || c.status === "done") return;
+      var ct = cbxNorm(csTitle(c));
+      if (t && ct && (t === ct || (t.length >= 8 && ct.indexOf(t) >= 0) || (ct.length >= 8 && t.indexOf(ct) >= 0))) hit = c;
+    });
+    if (!hit && cl){ var sameCl = liveContracts().filter(function(c){ return c.status !== "done" && !csTitle(c) && cbxNorm(c.client) === cl; }); if (sameCl.length === 1) hit = sameCl[0]; }   // 공사명이 비어 있고 발주처가 같은 계약 1건
+    return hit;
+  }
+  // 낙찰 공고 후보 — 이미 계약에 연결된 공고는 빼고 끝까지 모은다. 1건일 때만 자동 연결
+  function cbxBidCands(con){
+    try {
+      var t = cbxNorm(con && con.title); if (!t || t.length < 6 || typeof bids === "undefined" || !bids) return [];
+      var arr = Array.isArray(bids) ? bids : (bids.items || []);
+      return arr.filter(function(b){ if (!b || b.status !== "낙찰") return false; var bt = cbxNorm(b.title); if (!(bt && (bt === t || (t.length >= 8 && bt.indexOf(t) >= 0) || (bt.length >= 8 && t.indexOf(bt) >= 0)))) return false; return !liveContracts().some(function(c){ return c.bid_id === b.id; }); });
+    } catch(e){ return []; }
+  }
+  function cbxApply(it, p){
+    if (!cbxOf(it.id)) return;
+    it.res = p || { error: "결과 없음" };
+    var r = it.res, inC = it.scope !== "top" ? findProc(it.scope) : null;
+    if (r.error){
+      // 판단 실패 — 파일을 버리지 않고 직접 고르게. 내용을 모르므로 등급 기본은 1(열람 제한), 옛 파일명 규칙으로 전용 판독 후보만 추정
+      it.note = "판독하지 못했습니다(" + r.error + "). 넣을 자리와 개인정보 등급을 골라 주세요.";
+      it.res = { cls: "other", pii: 1, sub: /석면|조사/.test(it.name) ? "asbestos_survey" : (/사업자\s*등록증/.test(it.name) ? "biz" : "none"), doc_name: "" };
+      it.pii = 1;
+      cbxToPick(it, inC); return;
+    }
+    it.pii = Number(r.pii) || 0;
+    if (r.cls === "contract"){
+      if (inC){ cbxContractInto(it, inC); return; }
+      var con = r.con || {}, type = r.con_type === "none" ? "" : (r.con_type || "");
+      it.form = { type: type, pub: r.pub !== false, combo: !!r.combo, title: con.title || "", client: con.client || "", site: con.site || "", amount: con.amount || "", d1: con.d1 || "", d2: con.d2 || "", d3: con.d3 || "", guarantee: con.guarantee || "", who: myId() };
+      it.ai = JSON.parse(JSON.stringify(it.form)); it.edit = !type;
+      var same = cbxFindSame(r); it.same = same ? same.id : "";
+      var cands = same ? [] : cbxBidCands(con), bid = cands.length === 1 ? cands[0] : null;
+      it.bid = bid ? bid.id : ""; it.bidTitle = bid ? bid.title : ""; it.bidNo = bid ? (bid.no || bid.id || "") : ""; it.bidBase = bid ? ((bid.ext && bid.ext.bss) || bid.budget || 0) : 0; it.bidMany = cands.length > 1 ? cands.length : 0;
+      it.st = "new"; cbxRedraw(it.scope); return;
+    }
+    if (r.cls === "blank" && isAdmin() && it.file){ it.tpl = r.tpl_key || ""; it.st = "blank"; if (csTplKeys === null) csLoadTpl(); cbxRedraw(it.scope); return; }
+    if (r.cls === "blank" && !inC && !isAdmin()){ cbxDiscard(it); it.st = "err"; it.msg = "빈 양식으로 보입니다. 양식 등록은 관리자만 할 수 있어 저장하지 않았습니다. 관리자에게 파일을 전달해 주세요."; cbxRedraw(it.scope); return; }
+    if (r.cls === "proof" && !inC && isAdmin() && it.file){ it.st = "proof"; cbxRedraw(it.scope); return; }
+    if (!inC){ cbxToPick(it, r.contract_id ? findProc(r.contract_id) : null); return; }   // 맨 위 박스: 어느 계약인지 한 번 확인(AI가 고른 계약은 미리 선택)
+    it.cid = inC.id; cbxTarget(it, inC);
+    if (it.pii > 0){ it.st = "pii"; cbxRedraw(it.scope); return; }
+    cbxGo(it);
+  }
+  function cbxToPick(it, c){
+    it.cid = c ? c.id : (it.cid || ""); it.st = "pick";
+    var cc = it.cid ? findProc(it.cid) : null;
+    if (cc) cbxTarget(it, cc); else { it.tgt = ""; it.kind = "received"; }
+    cbxRedraw(it.scope);
+  }
+  // 비어 있는 칸만 채운다 — 낙찰 계약(공사명·금액만 있음)도 날짜·현장·보증금이 채워지게. 이미 있는 값은 덮지 않고 다른 값만 돌려준다(변경계약 값이 원계약을 덮지 않게)
+  function cbxFillBlanks(c, v, from){
+    var ci = c.contract_info || {}, filled = [], diff = [];
+    [["title", "공사명"], ["client", "발주자"], ["site", "현장"], ["d1", "계약일"], ["d2", "착공일"], ["d3", "준공일"]].forEach(function(m){
+      var k = m[0], nv = String(v[k] || ""); if (!nv) return;
+      if (!ci[k]){ ci[k] = nv; filled.push(m[1]); }
+      else if (String(ci[k]) !== nv && (k === "d1" || k === "d2" || k === "d3")) diff.push(m[1] + " " + ci[k] + " → " + nv);
+    });
+    [["amount", "금액"], ["guarantee", "보증금"]].forEach(function(m){
+      var k = m[0], nv = Number(v[k]) || 0; if (!nv) return;
+      if (!Number(ci[k])){ ci[k] = nv; filled.push(m[1]); }
+      else if (Number(ci[k]) !== nv) diff.push(m[1] + " " + fmtAmount(ci[k]) + " → " + fmtAmount(nv));
+    });
+    if (filled.length){
+      ci.from = ci.from || from; ci.checked = todayStr(); c.contract_info = ci;
+      if (!c.title && v.title) c.title = v.title;
+      if (!c.client && v.client) c.client = v.client;
+      if (!c.site && v.site) c.site = v.site;
+      c.updated = todayStr(); scheduleContractSave();
+      if (c.elems && (c.elems.asb || c.elems.demo || c.elems.permit) && (v.site || c.site) && !c.bldg_info) conBldgLookup(c.id, v.site || c.site, true);
+    }
+    return { filled: filled, diff: diff };
+  }
+  // 진행 중인 계약에 넣는 계약서 — 카드에서 고친 값이 있으면 그 값으로. 계약서 자리에 이미 파일이 있으면 원계약서를 가리지 않게 다른 자리로(변경계약서·위수탁 계약서 등)
+  function cbxContractInto(it, c){
+    var r = it.res || {}, vals = it.form || r.con || {}, notes = [];
+    if (r.our_side === "갑") notes.push("우리 회사가 발주자(갑)인 계약으로 보여 계약 정보를 채우지 않았습니다.");
+    else {
+      var fb = cbxFillBlanks(c, vals, it.name);
+      if (fb.filled.length) notes.push("계약 정보를 채웠습니다(" + fb.filled.join("·") + ").");
+      if (fb.diff.length) notes.push("이미 있는 계약 정보와 다릅니다(" + fb.diff.join(", ") + "). 덮어쓰지 않았습니다. 변경계약이면 단계 탭에서 처리해 주세요.");
+      var miss = [["asb", /석면/, "석면"], ["demo", /철거|해체/, "철거"], ["waste", /폐기물/, "폐기물"], ["dredge", /준설/, "준설"]].filter(function(k){ return k[1].test(String(vals.title || "")) && !(c.elems && c.elems[k[0]]); }).map(function(k){ return k[2]; });
+      if (miss.length) notes.push("공사명에 '" + miss.join("·") + "'이(가) 있는데 이 계약의 공사 요소에는 빠져 있습니다. 해당 서류 단계가 없을 수 있으니 확인해 주세요.");
+    }
+    if (it.form) cbxReportFix(it);
+    var hasMain = cdocLive(c, null, "pk.con.contract").some(function(x){ return x.cur === 1 && x.kind !== "draft"; }), list = cbxDocList(c), tgt = "";
+    if (r.target && r.target !== "p|con|contract" && list.some(function(d){ return d.id === r.target; })) tgt = r.target;
+    else if (!hasMain) tgt = "p|con|contract";
+    else { var m = cbxDocMatch(list.filter(function(d){ return d.id !== "p|con|contract"; }), r.doc_name, it.name); tgt = m ? m.id : ""; notes.push("계약서 자리에 이미 파일이 있어 다른 자리에 넣었습니다. 맞지 않으면 옮겨 주세요."); }
+    it.note = notes.join(" ");
+    it.cid = c.id; it.tgt = tgt; it.kind = "received"; it.conDoc = 1;
+    if (it.pii > 0 && !it.piiOk){ it.st = "pii"; cbxRedraw(it.scope); return; }
+    cbxPlace(it, false, 0);
+  }
+  // 석면조사서·상대 사업자등록증은 값을 뽑는다. 개인정보로 판단된 파일과 파일명 가드에 걸린 파일은 값을 뽑지 않는다(모델에 다시 보내지 않게). 결과는 서류함에 들어간 뒤에 반영(중복 취소 때 값이 덮이지 않게)
+  function cbxGo(it){
+    var p = it.res || {}, sub = p.sub;
+    if (it.cid && !it.subDone && !Number(it.pii) && p.read !== "none" && (sub === "asbestos_survey" || sub === "biz")){
+      it.st = "sub"; cbxRedraw(it.scope);
+      var go = function(){ cbxPoll(it, 0, "sub"); };
+      gwCall("gw-parse-background", { id: it.att, box: 1, kind: sub === "biz" ? "biz" : "asbestos" }).then(go).catch(go);
+      return;
+    }
+    cbxPlace(it, false, 0);
+  }
+  function cbxSubDone(it, p){ it.subDone = 1; it.subRes = p; cbxPlace(it, false, 0); }
+  function cbxSubApply(it, c){
+    var p = it.subRes, fail = it.subFail || (p && p.error), note = "";
+    if (!p && !fail) return "";
+    if (!c.attachments) c.attachments = {};
+    if (!c.attachments["서류함"]) c.attachments["서류함"] = [];
+    var arr = c.attachments["서류함"], entry = { name: it.name, size: it.size, type: (it.file && it.file.type) || "", id: "", parsed: "", added: todayStr() };   // 판독 결과 칸(검수 버튼) — 파일은 서류함에
+    if (fail){ entry.parsed = "판독 실패(" + fail + ") — 수동 확인"; arr.push(entry); c.updated = todayStr(); scheduleContractSave(); return "값을 읽지 못했습니다(" + fail + "). 값은 직접 확인해 주세요."; }
+    if (p.judge && c.asb_survey && c.asb_survey.confirmed) return "검수 확정된 조사서 값이 있어 덮지 않았습니다.";
+    if (p.doc === "biz" && c.owner_info && c.owner_info.name && p.name && c.owner_info.name !== p.name) return "이미 있는 발주처 정보(" + c.owner_info.name + ")와 달라 덮지 않았습니다.";
+    arr.push(entry);
+    applyAsbParse(entry, c, p);
+    note = entry.parsed || "";
+    if (entry.asb){ it.reviewIdx = arr.indexOf(entry); note += " 값을 검수해 확정해 주세요."; }
+    return note;
+  }
+  function cbxPlace(it, allowDup, tries){
+    var c = findProc(it.cid); if (!c){ cbxFail(it, "계약을 찾지 못했습니다."); return; }
+    it.st = "placing"; cbxRedraw(it.scope);
+    (it.startMsg ? Promise.resolve() : cbxDocsReady(c)).then(function(){
+      var ref = cbxRef(c, it.tgt), body = { action: "cdoc_attach", cid: c.id, i: ref.i, doc_key: ref.dk, kind: it.kind || "received", pii: Number(it.pii) || 0, att: it.att };
+      if (body.kind === "final"){ var tpl = cbxPairTpl(c, it); if (tpl) body.pair_tpl = tpl; }
+      if (allowDup) body.allow_dup = true;
+      return cbxSerial(function(){ return gwCall("gw-data", body); }).then(function(res){
+        var b = (res && res.body) || {};
+        if (res && res.status === 409 && b.error_code === "DUP_BYTES"){
+          var d0 = (b.dup || [])[0];
+          if (confirm('"' + it.name + '"\n같은 내용의 파일이 이미 있습니다' + (d0 ? " — " + (d0.orig || d0.name) + " (" + (CDOC_KIND_LABEL[d0.kind] || d0.kind) + " v" + d0.ver + ")" : "") + ".\n그래도 새 판으로 넣을까요?")) cbxPlace(it, true, 0);
+          else { cbxDiscard(it); cbxRemove(it); }
+          return;
+        }
+        if (res && res.status === 404 && b.error_code === "NO_CONTRACT" && tries < 10){ setTimeout(function(){ cbxPlace(it, allowDup, tries + 1); }, 1500); return; }   // 새 계약 저장이 아직 안 끝남
+        if (!res || res.status !== 200 || !b.item){ cbxFail(it, '"' + it.name + '" 넣기 실패(' + (b.error_code || (res && res.status) || "네트워크") + ")", "place"); return; }
+        var e = CDOC[c.id] || (CDOC[c.id] = { items: [], at: 0, busy: false, err: "", loaded: true }), item = b.item;
+        e.items.forEach(function(x){ if (x.i === item.i && x.dk === item.dk && x.kind === item.kind) x.cur = 0; });
+        (b.gc || []).forEach(function(n){ e.items.forEach(function(x){ if (x.n === n) x.gc = 1; }); });
+        e.items.push(item);
+        if (ref.raw && ref.p && ref.p.stages && ref.p.stages[ref.i] && conIsArr(ref.p.stages[ref.i].docs)){   // 건별 서류 항목에 참조 번호 — 목록은 굳어 있을 때만
+          var dd = ref.p.stages[ref.i].docs.filter(function(x){ return x && x.k === ref.raw; })[0];
+          if (dd){ dd[it.kind === "final" ? "final_ref" : "received_ref"] = item.n; c.updated = todayStr(); scheduleContractSave(); }
+        }
+        var L = b.learn, lm = "";
+        if (L && L.ok && L.status === "unmatched") lm = " · 초안이 여럿이라 짝을 못 정했습니다";
+        else if (L && L.ok){ var g = L.gap || {}; lm = " · AI 초안(" + (TPL_LABELS[L.tpl] || L.tpl) + ")과 짝" + (g.cell_ratio !== null && g.cell_ratio !== undefined ? " · 간극 " + Math.round(g.cell_ratio * 100) + "%" : " · 이 형식은 비교 불가"); }
+        else if (L && L.code === "NO_DRAFT") lm = " · AI 초안이 없어 비교하지 않았습니다";
+        it.n = item.n; it.placed = 1; it.st = "done";
+        var subNote = cbxSubApply(it, c), notes = [it.note, subNote].filter(Boolean).join(" ");
+        var where = it.scope === "top" ? ((csTitle(c) || c.client || c.label || "") + " · ") : "";
+        it.note = "";
+        it.msg = (it.startMsg ? it.startMsg + " " : "") + it.name + " → " + where + cbxLabel(c, it.tgt) + " · " + (CDOC_KIND_LABEL[it.kind] || it.kind) + " v" + item.ver + lm + (notes ? ". " + notes : "");
+        renderContracts(); cbxRenderTop();
+      });
+    }).catch(function(){ cbxFail(it, '"' + it.name + '" 넣기 실패(네트워크)', "place"); });
+  }
+  function cbxDiscard(it){ if (it.att && !it.placed){ try { gwCall("gw-data", { action: "att_del", id: it.att }).catch(function(){}); } catch(e){} } it.att = ""; }
+  function cbxChanged(it){ var a = it.ai || {}, f = it.form || {}, out = []; ["type", "pub", "combo", "title", "client", "site", "amount", "d1", "d2", "d3", "guarantee"].forEach(function(k){ if (String(a[k] === undefined ? "" : a[k]) !== String(f[k] === undefined ? "" : f[k])) out.push(k); }); return out; }
+  // 사람이 판단을 그대로 뒀는지 고쳤는지 보고 — 공사명은 관급만(사급은 개인 이름이 섞일 수 있다)
+  function cbxReportFix(it){
+    var f = it.form || {}, a = it.ai || {}, changed = cbxChanged(it);
+    if (it.fixSent) return changed;
+    it.fixSent = 1;
+    var pub = !!f.pub, combo = !!f.combo && (f.type === "asbestos" || f.type === "demolition");
+    var clsChanged = changed.some(function(k){ return k === "type" || k === "pub" || k === "combo"; });
+    try { gwCall("gw-data", clsChanged ? { action: "box_fix", title: pub ? (f.title || "") : "", from: { type: a.type, pub: a.pub, combo: a.combo }, to: { type: f.type, pub: pub, combo: combo } } : { action: "box_fix", ok: true }).catch(function(){}); } catch(e){}
+    return changed;
+  }
+  // 계약서로 새 계약 시작 — 단계는 유형·사급관급으로 정해진 PM 원문 그대로. 계약서가 있으면 견적 단계는 지난 것으로
+  function cbxStart(it){
+    var f = it.form || {};
+    if (!f.type){ alert("계약 유형을 골라 주세요."); it.edit = true; cbxRedraw(it.scope); return; }
+    if (!f.client && !f.site && !f.title){ alert("공사명·발주자·현장 중 하나는 있어야 합니다."); it.edit = true; cbxRedraw(it.scope); return; }
+    if (!it.forceNew){ var same = cbxFindSame(it.res || {}, f); if (same && same.id !== it.same){ it.same = same.id; cbxRedraw(it.scope); return; } }   // 같이 넣은 다른 파일이 먼저 만든 계약 등 — 다시 묻는다
+    if (it.bid && liveContracts().some(function(c){ return c.bid_id === it.bid; })){ it.bid = ""; it.bidTitle = ""; it.bidNo = ""; it.bidBase = 0; }   // 같은 낙찰 공고에 계약 2건 방지
+    var type = f.type, pub = !!f.pub, combo = !!f.combo && (type === "asbestos" || type === "demolition"), elems = conModalElems(type, combo), stages = conScenStages(type, pub, combo, { qual: false });
+    var cinfo = { title: f.title || "", amount: Number(f.amount) || 0, d1: f.d1 || "", d2: f.d2 || "", d3: f.d3 || "", client: f.client || "", site: f.site || "", guarantee: Number(f.guarantee) || 0, from: it.bid ? "낙찰 공고(" + it.bidNo + ")" : it.name, file: it.name, checked: todayStr() };
+    if (it.bidBase) cinfo.base = it.bidBase;
+    var nc = startProcess(type, { client: f.client || "", site: f.site || "", start: todayStr(), who: f.who || "", docType: pub ? "public" : "private", title: f.title || "", cinfo: cinfo, stages: stages, elems: elems, scen: conScenTag({ type: type, pub: pub, combo: combo, ver: 1 }, stages), bid_id: it.bid || "", doneFirst: stages.length > 1 && /견적/.test((stages[0] && stages[0].name) || "") });
+    if (!nc){ alert("계약 생성 실패 — 유형 템플릿(" + type + ") 누락. 관리자에게 문의."); return; }
+    nc.box = { at: todayStr(), att: it.att, ai: it.ai || {}, fixed: cbxReportFix(it) };   // 출력(AI 판단)과 입력(사람 값)을 계약에 함께 남긴다
+    if (nc.elems && (nc.elems.asb || nc.elems.demo || nc.elems.permit) && (f.site) && !nc.bldg_info) conBldgLookup(nc.id, f.site, true);
+    csSaveNow();   // 서류함이 계약을 찾을 수 있게 바로 저장
+    conOpenId = nc.id; conDetTab = "doc";
+    var p0 = nc.pipes[0], cur = p0.stages[p0.cur];
+    it.startMsg = "계약을 시작했습니다. 단계 " + p0.stages.length + "개, 지금 단계 " + ((cur && csStageLabel(cur)) || "") + ".";
+    it.cid = nc.id; it.tgt = "p|con|contract"; it.kind = "received"; it.conDoc = 1; it.note = "";
+    cbxPlace(it, false, 0);
+  }
+  function cbxTplGo(it){
+    var key = it.tpl; if (!key || !TPL_LABELS[key]){ alert("어느 양식인지 골라 주세요."); return; }
+    var want = TPL_EXT[key] || ".xlsx";
+    if ("." + docAttExtOf(it.name) !== want){ alert("'" + TPL_LABELS[key] + "' 양식은 " + want + " 파일이어야 합니다."); return; }
+    if (!it.file || it.size > DOC_ATT_MAX){ alert("양식은 4.3MB까지만 등록할 수 있습니다."); return; }
+    var ask = function(reg){ if (reg && !confirm("이미 등록된 '" + TPL_LABELS[key] + "' 양식을 이 파일로 교체할까요?")) return; cbxTplSend(it, key); };
+    if (csTplKeys) ask(!!csTplKeys[key]);
+    else gwCall("gw-data", { action: "tpl_list" }).then(function(res){ if (res && res.status === 200 && res.body && res.body.templates){ csTplSet(res.body.templates); ask(!!csTplKeys[key]); } else ask(true); }).catch(function(){ ask(true); });   // 목록을 못 받으면 항상 묻는다
+  }
+  function cbxTplSend(it, key){
+    it.st = "placing"; cbxRedraw(it.scope);
+    var r = new FileReader();
+    r.onerror = function(){ cbxFail(it, "파일을 읽지 못했습니다."); };
+    r.onload = function(){
+      gwCall("gw-data", { action: "tpl_put", key: key, name: it.name, data: String(r.result).split(",")[1] || "" }).then(function(res){
+        if (!res || res.status !== 200){ it.st = "blank"; cbxRedraw(it.scope); alert("양식 등록 실패(" + ((res && res.body && res.body.error_code) || (res && res.status) || "네트워크") + ")"); return; }
+        cbxDiscard(it); if (csTplKeys) csTplKeys[key] = 1; it.st = "done"; it.n = 0; it.msg = it.name + " → '" + TPL_LABELS[key] + "' 양식으로 등록했습니다.";
+        renderContracts(); cbxRenderTop();
+      }).catch(function(){ it.st = "blank"; cbxRedraw(it.scope); alert("양식 등록 실패(네트워크)"); });
+    };
+    r.readAsDataURL(it.file);
+  }
+  function cbxProofGo(it){
+    if (!it.file || it.size > DOC_ATT_MAX){ alert("증빙은 4.3MB까지만 보관함에 넣을 수 있습니다. 계약 서류로 넣어 주세요."); return; }
+    it.st = "placing"; cbxRedraw(it.scope);
+    var r = new FileReader();
+    r.onerror = function(){ cbxFail(it, "파일을 읽지 못했습니다."); };
+    r.onload = function(){
+      gwCall("gw-data", { action: "proof_put", name: it.name, data: String(r.result).split(",")[1] || "" }).then(function(res){
+        if (!res || res.status !== 200){ it.st = "proof"; cbxRedraw(it.scope); alert("증빙 보관 실패(" + ((res && res.body && res.body.error_code) || (res && res.status) || "네트워크") + ")"); return; }
+        cbxDiscard(it); it.st = "done"; it.n = 0; it.msg = it.name + " → 적격심사 증빙 보관함에 넣었습니다.";
+        cbxRedraw(it.scope);
+      }).catch(function(){ it.st = "proof"; cbxRedraw(it.scope); alert("증빙 보관 실패(네트워크)"); });
+    };
+    r.readAsDataURL(it.file);
+  }
+  // 옮기기 — 방금 넣은 카드 또는 서류함 줄의 [옮기기]
+  function cbxIdOf(c, x){ var hit = ""; cbxDocList(c).forEach(function(d){ if (hit) return; var r = cbxRef(c, d.id); if (r.dk === x.dk && (d.i < 0 || r.i === x.i)) hit = d.id; }); return hit; }   // 단계 서류 키는 단계마다 겹칠 수 있어 단계까지 맞춘다
+  function cbxMoveOpen(cid, n){
+    var c = findProc(cid); if (!c || !canDo("con")) return;
+    var x = cdocItems(c).filter(function(y){ return y && y.n === n; })[0]; if (!x) return;
+    var it = cbxItems.filter(function(y){ return y.st === "move" && y.cid === cid && y.n === n; })[0];   // 같은 판 카드는 하나만
+    if (!it){
+      it = { id: ++cbxSeq, scope: cid, st: "move", cid: cid, n: n, name: x.orig || x.name, kind: x.kind, pii: Number(x.pii) || 0, tgt: cbxIdOf(c, x), res: {}, placed: 1 };
+      it.fromLabel = cbxLabel(c, it.tgt);
+      cbxItems.push(it);
+    }
+    conOpenId = cid; cbxRedraw(cid);
+    setTimeout(function(){ try { var el = document.querySelector('[data-cbx-card="' + it.id + '"]'); if (el && el.scrollIntoView) el.scrollIntoView({ block: "center" }); } catch(e){} }, 0);   // 아래쪽 줄에서 눌러도 카드가 보이게
+  }
+  function cbxMoveGo(it){
+    var c = findProc(it.cid); if (!c) return;
+    var ref = cbxRef(c, it.tgt), to = cbxLabel(c, it.tgt), r0 = it.res || {};
+    var doc = (r0.doc_name && !r0.pii && r0.read !== "none") ? r0.doc_name : "";   // 개인정보로 본 파일의 이름은 고친 판단 기록에 남기지 않는다
+    it.st = "placing"; cbxRedraw(it.scope);
+    cbxSerial(function(){ return gwCall("gw-data", { action: "cdoc_move", cid: c.id, n: it.n, i: ref.i, doc_key: ref.dk, kind: it.kind, pii: Number(it.pii) || 0, fix: { doc: doc, from: it.fromLabel || "", to: to } }); }).then(function(res){
+      var b = (res && res.body) || {};
+      if (res && res.status === 400 && b.error_code === "NO_CHANGE"){ it.st = "done"; it.msg = it.name + " → 자리가 같아 그대로 두었습니다."; cbxRedraw(it.scope); return; }
+      if (!res || res.status !== 200){ cbxFail(it, "옮기기 실패(" + (b.error_code || (res && res.status) || "네트워크") + ")", "move"); return; }
+      it.st = "done"; it.fromLabel = to; it.msg = it.name + " → " + to + " · " + (CDOC_KIND_LABEL[it.kind] || it.kind) + "(으)로 옮겼습니다.";
+      cdocLoad(c, true); cbxRedraw(it.scope);
+    }).catch(function(){ cbxFail(it, "옮기기 실패(네트워크)", "move"); });
+  }
+  // 넣다 만 파일 다시 잇기 — 판단 중 화면을 닫았거나 넣기 전에 멈춘 파일
+  function cbxRestore(){
+    if (typeof gwCall !== "function") return;
+    try {
+      gwCall("gw-data", { action: "box_pending" }).then(function(res){
+        var items = (res && res.status === 200 && res.body && res.body.items) || [];
+        items.forEach(function(x){
+          if (cbxItems.some(function(y){ return y.att === x.id; })) return;
+          var it = { id: ++cbxSeq, scope: "top", file: null, name: x.name, size: x.size, st: "pick", pct: 0, att: x.id, pii: 1, restored: 1, res: { cls: "other", pii: 1, sub: "none", doc_name: "" } };
+          cbxItems.push(it);
+          if (x.open){ it.st = "err"; it.msg = x.name + " 올리다 멈춘 파일입니다. ✕를 누르면 지워집니다."; it.errAt = ""; return; }
+          if (x.parsed && !x.parsed.error && x.parsed.doc === "box") cbxApply(it, x.parsed);
+          else { it.note = "이전에 넣다 만 파일입니다. 어디에 넣을지 골라 주세요."; cbxToPick(it, null); }
+        });
+        cbxRenderTop();
+      }).catch(function(){});
+    } catch(e){}
+  }
+  function cbxBtn(it, act, label, cls){ return '<button type="button" class="' + (cls || "vs-chip") + '" data-cbx-act="' + it.id + '|' + act + '">' + label + '</button>'; }
+  function cbxDocOpts(c, sel){
+    var h = '<option value="">그 밖의 서류(목록에 없음)</option>';
+    cbxDocList(c).forEach(function(d){ h += '<option value="' + esc(d.id) + '"' + (d.id === sel ? " selected" : "") + '>' + esc(d.s) + ' › ' + esc(d.n) + '</option>'; });
+    return h;
+  }
+  function cbxKindOpts(kind){ return [["final", "최종본(우리가 고친 것)"], ["received", "수령본(받은 것)"]].map(function(o){ return '<option value="' + o[0] + '"' + (kind === o[0] ? " selected" : "") + '>' + o[1] + '</option>'; }).join(""); }
+  function cbxPiiOpts(v){ return [[0, "개인정보 없음"], [1, "개인정보 1(명단·신분증·재직증명)"], [2, "민감정보 2(건강진단)"]].map(function(o){ return '<option value="' + o[0] + '"' + (Number(v) === o[0] ? " selected" : "") + '>' + o[1] + '</option>'; }).join(""); }
+  function cbxConOpts(sel){
+    var h = '<option value="">계약 선택…</option>';
+    liveContracts().filter(function(c){ return c.status !== "done"; }).forEach(function(c){ h += '<option value="' + esc(c.id) + '"' + (c.id === sel ? " selected" : "") + '>' + esc((c.client ? c.client + " · " : "") + (csTitle(c) || c.site || c.label || c.id)) + '</option>'; });
+    return h;
+  }
+  function cbxNewHtml(it){
+    var f = it.form, r = it.res || {}, combo = !!f.combo && (f.type === "asbestos" || f.type === "demolition");
+    var st = f.type ? conScenStages(f.type, !!f.pub, combo, { qual: false }) : [];
+    var fi = function(k, type, ph){ return '<input type="' + type + '" data-cbx-f="' + it.id + '|' + k + '" value="' + esc(f[k] === undefined ? "" : String(f[k])) + '"' + (ph ? ' placeholder="' + esc(ph) + '"' : "") + ' autocomplete="off">'; };
+    var ai = '<span class="cbx-ai">AI 판단</span>', kv;
+    var typeSel = '<select data-cbx-f="' + it.id + '|type"><option value="">유형 선택…</option>' + [["asbestos", "석면철거"], ["demolition", "건축물철거"], ["waste", "폐기물 수집·운반"], ["dredge", "준설·시설공사"]].map(function(o){ return '<option value="' + o[0] + '"' + (f.type === o[0] ? " selected" : "") + '>' + o[1] + '</option>'; }).join("") + '</select>';
+    var pubSel = '<select data-cbx-f="' + it.id + '|pub"><option value="1"' + (f.pub ? " selected" : "") + '>관급(공문서)</option><option value="0"' + (f.pub ? "" : " selected") + '>사급(사문서)</option></select>';
+    var typeLabel = { asbestos: "석면철거", demolition: "건축물철거", waste: "폐기물 수집·운반", dredge: "준설·시설공사" }[f.type] || "판단 못 함";
+    if (it.edit){
+      kv = '<dt>종류</dt><dd>' + typeSel + ((f.type === "asbestos" || f.type === "demolition") ? '<label style="font-size:12px;display:block;margin-top:3px;"><input type="checkbox" style="width:auto;" data-cbx-f="' + it.id + '|combo"' + (f.combo ? " checked" : "") + '> 석면 + 철거를 한 건으로</label>' : "") + '</dd><dt>사급/관급</dt><dd>' + pubSel + '</dd>'
+        + '<dt>공사명</dt><dd>' + fi("title", "text") + '</dd><dt>발주자</dt><dd>' + fi("client", "text") + '</dd><dt>현장</dt><dd>' + fi("site", "text") + '</dd><dt>금액</dt><dd>' + fi("amount", "number") + '</dd><dt>계약일</dt><dd>' + fi("d1", "date") + '</dd><dt>착공</dt><dd>' + fi("d2", "date") + '</dd><dt>준공</dt><dd>' + fi("d3", "date") + '</dd><dt>담당</dt><dd><select data-cbx-who="' + it.id + '" data-cbx-f="' + it.id + '|who"></select></dd>';
+    } else {
+      kv = '<dt>종류</dt><dd>' + esc(typeLabel) + (combo ? " + 철거" : "") + ai + (r.why_type ? '<small>근거: ' + esc(r.why_type) + '</small>' : "") + '</dd><dt>사급/관급</dt><dd>' + (f.pub ? "관급" : "사급") + ai + (r.why_pub ? '<small>근거: ' + esc(r.why_pub) + '</small>' : "") + '</dd>'
+        + '<dt>공사명</dt><dd>' + esc(f.title || "(없음)") + '</dd><dt>발주자</dt><dd>' + esc(f.client || "(없음)") + '</dd><dt>현장</dt><dd>' + esc(f.site || "(없음)") + '</dd><dt>금액</dt><dd>' + (f.amount ? fmtAmount(Number(f.amount)) + "원" : "(없음)") + '</dd><dt>계약일</dt><dd>' + esc(f.d1 || "(없음)") + '</dd><dt>착공·준공</dt><dd>' + esc((f.d2 || "(없음)") + " ~ " + (f.d3 || "(없음)")) + '</dd><dt>담당</dt><dd><select data-cbx-who="' + it.id + '" data-cbx-f="' + it.id + '|who"></select></dd>';
+    }
+    var same = it.same ? findProc(it.same) : null, h = '<div class="cbx-h"><span class="t">📄 ' + esc(it.name) + ' 판독 끝. ' + (same ? "진행 중인 계약의 계약서로 보입니다." : "새 계약서로 판단했습니다.") + '</span>' + cbxBtn(it, "drop", "✕") + '</div>';
+    if (same) h += '<div class="warn">' + esc((same.client ? same.client + " · " : "") + (csTitle(same) || same.site || same.label || "")) + '</div>';
+    if (r.our_side === "갑") h += '<div class="warn">우리 회사가 발주자(갑)인 계약으로 보입니다. 하도급·위탁을 주는 계약이면 이 흐름이 맞는지 확인해 주세요.</div>';
+    if (r.read === "name") h += '<div class="warn">본문을 읽지 못해 파일명으로만 판단했습니다. 값을 확인해 주세요.</div>';
+    if (Number(it.pii) > 0) h += '<div class="warn">개인정보가 든 파일로 판단했습니다(등급 ' + it.pii + '). 넣으면 열람이 제한됩니다.</div>';
+    if (it.bid) h += '<div class="warn">낙찰 공고와 연결합니다: ' + esc(it.bidTitle || "") + ' ' + cbxBtn(it, "nobid", "연결 안 함") + '</div>';
+    else if (it.bidMany) h += '<div class="warn">이름이 비슷한 낙찰 공고가 ' + it.bidMany + '건이라 연결하지 않았습니다. 입찰 탭에서 확인해 주세요.</div>';
+    h += '<div class="cbx-two"><dl class="cbx-kv">' + kv + '</dl><div><b>만들어질 단계 ' + st.length + '개</b> <small style="color:var(--sub);">PM 원문 그대로</small><ol class="cbx-stages">' + st.map(function(s){ return '<li>' + esc(s.name) + '</li>'; }).join("") + '</ol></div></div>';
+    h += '<div class="cbx-row">' + (same ? cbxBtn(it, "into", "이 계약에 넣기", "cbx-go") + cbxBtn(it, "startnew", "새 계약으로 시작") : cbxBtn(it, "start", "이대로 시작", "cbx-go")) + cbxBtn(it, "edit", it.edit ? "고치기 닫기" : "고치기") + cbxBtn(it, "asdoc", "계약서 아님, 서류로") + '</div>';
+    return h;
+  }
+  function cbxCardHtml(it){
+    var head = function(txt, x){ return '<div class="cbx-h"><span class="t">' + txt + '</span>' + (x ? cbxBtn(it, x, "✕") : "") + '</div>'; }, nm = esc(it.name), c = it.cid ? findProc(it.cid) : null, r = it.res || {}, h = "", admin = isAdmin() && !!it.file;
+    var pii = function(){ return '<select data-cbx-f="' + it.id + '|pii" title="개인정보 등급 — 1·2는 열람이 제한됩니다">' + cbxPiiOpts(it.pii) + '</select>'; };
+    if (it.st === "up") h = head("📤 " + nm + " 올리는 중… " + (it.pct || 0) + "%", "drop");
+    else if (it.st === "judge") h = head("🔎 " + nm + " 에이전트가 읽는 중입니다. 큰 파일은 몇 분 걸립니다.", "drop");
+    else if (it.st === "sub") h = head("🔎 " + nm + " 값을 뽑는 중입니다.");
+    else if (it.st === "placing") h = head("📥 " + nm + " 넣는 중…");
+    else if (it.st === "new") h = cbxNewHtml(it);
+    else if (it.st === "err") h = head("⚠ " + esc(it.msg || "실패했습니다."), "close") + (it.errAt && (it.errAt !== "up" || it.file) ? '<div class="cbx-row">' + cbxBtn(it, "retry", "다시 넣기", "cbx-go") + '</div>' : "");
+    else if (it.st === "done"){
+      h = head("✓ " + esc(it.msg || ""), "close");
+      var row = "";
+      if (it.n) row += cbxBtn(it, "moveopen", "다른 서류로");
+      if (it.reviewIdx !== undefined && c) row += cbxBtn(it, "review", "검수");
+      if (it.conDoc && c){ var p0 = (c.pipes || [])[0], cs = p0 && p0.stages && p0.stages[p0.cur]; if (cs && /계약/.test(cs.name || "") && !it.stageAsked) row += cbxBtn(it, "stagedone", "계약 단계 완료"); row += cbxBtn(it, "gowork", "착공계 작성"); }
+      if (admin && it.scope === "top" && it.n) row += cbxBtn(it, "toblank", "양식으로 등록");
+      if (row) h += '<div class="cbx-row">' + row + '</div>';
+    }
+    else if (it.st === "pii"){
+      h = head("🔒 " + nm + " 개인정보가 든 파일로 판단했습니다(등급 " + (it.pii || 1) + "). 노무사 회신 전까지는 앱에 올리지 않는 것이 원칙입니다.", "drop");
+      h += '<div class="cbx-row">' + pii() + cbxBtn(it, "go", "그래도 넣기") + cbxBtn(it, "drop", "넣지 않기") + '</div>';
+    }
+    else if (it.st === "pick"){
+      h = head("❓ " + nm + " " + esc(it.note || (r.doc_name ? r.doc_name + "(으)로 읽었습니다. " + (it.cid ? "이 계약이 맞으면 넣어 주세요." : "어느 계약 서류인지 골라 주세요.") : "어디에 넣을지 골라 주세요.")), "drop");
+      if (Number(it.pii) > 0) h += '<div class="warn">개인정보가 든 파일일 수 있습니다(등급 ' + it.pii + '). 노무사 회신 전까지는 앱에 올리지 않는 것이 원칙입니다. 넣으면 열람이 제한됩니다.</div>';
+      h += '<div class="cbx-row">' + (it.scope === "top" ? '<select data-cbx-f="' + it.id + '|cid">' + cbxConOpts(it.cid) + '</select>' : "") + (c ? '<select data-cbx-f="' + it.id + '|tgt">' + cbxDocOpts(c, it.tgt) + '</select><select data-cbx-f="' + it.id + '|kind">' + cbxKindOpts(it.kind) + '</select>' : "") + pii() + cbxBtn(it, "place", "넣기", "cbx-go") + (admin ? cbxBtn(it, "toblank", "양식으로 등록") + cbxBtn(it, "toproof", "증빙 보관함에 넣기") : "") + '</div>';
+    }
+    else if (it.st === "blank"){
+      h = head("📋 " + nm + " 빈 양식으로 판단했습니다.", "drop");
+      h += '<div class="cbx-row"><select data-cbx-f="' + it.id + '|tpl"><option value="">어느 양식인가요…</option>' + Object.keys(TPL_LABELS).map(function(k){ return '<option value="' + k + '"' + (it.tpl === k ? " selected" : "") + '>' + esc(TPL_LABELS[k]) + (csTplKeys && csTplKeys[k] ? " (등록됨 → 교체)" : "") + '</option>'; }).join("") + '</select>' + cbxBtn(it, "tpl", "양식으로 등록", "cbx-go") + cbxBtn(it, "asdoc", "양식 아님, 계약 서류로") + '</div>';
+    }
+    else if (it.st === "proof"){
+      h = head("🗂 " + nm + " 회사 증빙으로 판단했습니다(" + esc(r.doc_name || "") + ").", "drop");
+      h += '<div class="cbx-row">' + cbxBtn(it, "proof", "적격심사 증빙 보관함에 넣기", "cbx-go") + cbxBtn(it, "asdoc", "증빙 아님, 계약 서류로") + '</div>';
+    }
+    else if (it.st === "move"){
+      h = head("↪ " + nm + " 어디로 옮길까요?", "close");
+      h += c ? '<div class="cbx-row"><select data-cbx-f="' + it.id + '|tgt">' + cbxDocOpts(c, it.tgt) + '</select><select data-cbx-f="' + it.id + '|kind">' + cbxKindOpts(it.kind) + '</select>' + pii() + cbxBtn(it, "move", "옮기기", "cbx-go") + '</div>' : "";
+    }
+    var away = it.scope !== "top" && it.scope !== conOpenId ? findProc(it.scope) : null;   // 접힌 계약의 카드는 맨 위에 보인다
+    return '<div class="cbx-card" data-cbx-card="' + it.id + '">' + (away ? '<div class="warn" style="margin:0 0 4px;">' + esc((away.client ? away.client + " · " : "") + (csTitle(away) || away.site || away.label || "")) + '</div>' : "") + h + '</div>';
+  }
+  function cbxCardsHtml(scope){ return cbxItems.filter(function(x){ return x.scope === scope; }).map(cbxCardHtml).join(""); }
+  function cbxBoxHtml(c){
+    var drop = (canDo("con") && c.status !== "done") ? '<button type="button" class="cbx-drop cbx-in" data-cbx-drop="' + esc(c.id) + '"><strong>이 계약 서류 넣기</strong><small>끌어다 놓거나 눌러서 고릅니다. 어느 서류인지 에이전트가 정합니다.</small></button>' : "";
+    return drop + cbxCardsHtml(c.id);
+  }
+  function cbxEtcHtml(c){
+    var l = cdocLive(c, null, "etc.box");
+    if (!l.length) return "";
+    return '<div class="cs-pk" style="margin-bottom:10px;"><div class="h">그 밖의 서류 <small>' + l.length + '건 · 목록에 없는 서류</small></div>' + cdocRowsHtml(c, null, "etc.box", canDo("con") && c.status !== "done") + '</div>';
+  }
+  // 맨 위 카드 — 맨 위 박스 카드와 접힌 계약의 카드. 다시 그려도 입력 중인 칸의 포커스를 지킨다
+  function cbxRenderTop(){
+    var host = document.getElementById("conBoxCards"); if (!host) return;
+    var h = cbxItems.filter(function(x){ return x.scope === "top" || x.scope !== conOpenId; }).map(cbxCardHtml).join("");
+    if (h === cbxTopHtml) return;
+    var a = document.activeElement, key = (a && a.getAttribute && host.contains(a)) ? a.getAttribute("data-cbx-f") : null, caret = (key && a.selectionStart !== null && a.selectionStart !== undefined) ? a.selectionStart : null;
+    cbxTopHtml = h; host.innerHTML = h;
+    cbxBind(host);
+    if (key){ var el = host.querySelector('[data-cbx-f="' + key + '"]'); if (el){ el.focus(); if (caret !== null && el.setSelectionRange){ try { el.setSelectionRange(caret, caret); } catch(e){} } } }
+  }
+  function cbxAct(it, act){
+    var c = it.cid ? findProc(it.cid) : null;
+    if (act === "drop" || act === "close"){ cbxDiscard(it); cbxRemove(it); }
+    else if (act === "edit"){ it.edit = !it.edit; cbxRedraw(it.scope); }
+    else if (act === "start") cbxStart(it);
+    else if (act === "startnew"){ it.forceNew = 1; cbxStart(it); }
+    else if (act === "nobid"){ it.bid = ""; it.bidTitle = ""; it.bidNo = ""; it.bidBase = 0; it.bidMany = 0; cbxRedraw(it.scope); }
+    else if (act === "into"){ var sc = findProc(it.same); if (sc) cbxDocsReady(sc).then(function(){ it.piiOk = 1; cbxContractInto(it, sc); }); }
+    else if (act === "go"){ it.piiOk = 1; it.subDone = it.subDone || 0; if (it.conDoc) cbxPlace(it, false, 0); else cbxGo(it); }
+    else if (act === "place"){ if (!it.cid){ alert("계약을 골라 주세요."); return; } it.note = ""; cbxGo(it); }
+    else if (act === "tpl") cbxTplGo(it);
+    else if (act === "proof") cbxProofGo(it);
+    else if (act === "toblank"){ it.tpl = (it.res && it.res.tpl_key) || ""; it.st = "blank"; if (csTplKeys === null) csLoadTpl(); cbxRedraw(it.scope); }
+    else if (act === "toproof"){ it.st = "proof"; cbxRedraw(it.scope); }
+    else if (act === "asdoc"){ it.res = Object.assign({}, it.res, { cls: "received" }); cbxToPick(it, it.scope !== "top" ? findProc(it.scope) : null); }   // 등급은 그대로 둔다
+    else if (act === "moveopen"){ if (c){ it.fromLabel = cbxLabel(c, it.tgt); it.st = "move"; cbxRedraw(it.scope); } }
+    else if (act === "move") cbxMoveGo(it);
+    else if (act === "retry"){
+      if (it.errAt === "up"){ cbxDiscard(it); it.st = "up"; it.pct = 0; cbxUpload(it); cbxRedraw(it.scope); }
+      else if (it.errAt === "place") cbxPlace(it, false, 0);
+      else if (it.errAt === "move"){ it.st = "move"; cbxRedraw(it.scope); }
+    }
+    else if (act === "review"){ if (c && it.reviewIdx !== undefined) openAsbReview(c.id, "서류함", it.reviewIdx); }
+    else if (act === "stagedone"){
+      if (!c) return;
+      it.stageAsked = 1;
+      var r = completeStageNow(c, /계약/, "main");
+      if (r === "done") apprToastShow("다음 단계로 넘어갔습니다");
+      else if (r === "review") apprToastShow("완료 요청으로 올렸습니다 — 승인권자가 승인하면 다음 단계가 생성됩니다");
+      else if (r === "none") apprToastShow("현재 단계가 계약 단계가 아니어서 자동 진행하지 않았습니다");
+      cbxRedraw(it.scope);
+    }
+    else if (act === "gowork"){ if (c) openXlsxGen(c.id, "work_start", "착공"); }
+  }
+  function cbxBind(root){
+    if (!root) return;
+    Array.prototype.forEach.call(root.querySelectorAll("[data-cbx-drop]"), function(el){
+      var scope = el.getAttribute("data-cbx-drop");
+      el.addEventListener("click", function(e){ e.stopPropagation(); cbxPick(scope); });
+      el.addEventListener("dragover", function(e){ e.preventDefault(); e.stopPropagation(); el.classList.add("on"); });
+      el.addEventListener("dragleave", function(){ el.classList.remove("on"); });
+      el.addEventListener("drop", function(e){ e.preventDefault(); e.stopPropagation(); el.classList.remove("on"); var f = e.dataTransfer && e.dataTransfer.files; if (f && f.length) cbxAdd(f, scope); });
+    });
+    Array.prototype.forEach.call(root.querySelectorAll("[data-cbx-act]"), function(el){
+      el.addEventListener("click", function(e){ e.stopPropagation(); var q = el.getAttribute("data-cbx-act").split("|"), it = cbxOf(Number(q[0])); if (it) cbxAct(it, q[1]); });
+    });
+    Array.prototype.forEach.call(root.querySelectorAll("[data-cbx-who]"), function(el){ var it = cbxOf(Number(el.getAttribute("data-cbx-who"))); fillMemberSelect(el, it && it.form ? it.form.who : ""); });
+    Array.prototype.forEach.call(root.querySelectorAll("[data-cbx-f]"), function(el){
+      var q = el.getAttribute("data-cbx-f").split("|"), it = cbxOf(Number(q[0])), k = q[1];
+      if (!it) return;
+      el.addEventListener("click", function(e){ e.stopPropagation(); });
+      var write = function(){
+        if (k === "tgt" || k === "kind" || k === "tpl"){ it[k] = el.value; return; }
+        if (k === "pii"){ it.pii = Number(el.value) || 0; return; }
+        if (k === "cid"){ it.cid = el.value; var c0 = it.cid ? findProc(it.cid) : null; if (c0) cbxDocsReady(c0).then(function(){ cbxTarget(it, c0); cbxRedraw(it.scope); }); else cbxRedraw(it.scope); return; }
+        if (!it.form) return;
+        if (k === "pub") it.form.pub = el.value === "1";
+        else if (k === "combo") it.form.combo = !!el.checked;
+        else it.form[k] = el.value;
+        if (k === "type" || k === "pub" || k === "combo") cbxRedraw(it.scope);   // 단계 미리보기 갱신
+      };
+      el.addEventListener(el.tagName === "SELECT" || el.type === "checkbox" ? "change" : "input", write);
+    });
+  }
+  function cbxInit(){
+    var box = document.getElementById("conBox");
+    if (box) cbxBind(box);
+    // 박스 밖에 떨어뜨려도 브라우저가 파일을 열어 앱을 떠나지 않게(계약 탭에서만, 파일 칸은 그대로)
+    var fileInput = function(e){ return e.target && e.target.tagName === "INPUT" && e.target.type === "file"; };
+    window.addEventListener("dragover", function(e){ if (currentTab === "con" && !fileInput(e) && e.dataTransfer && Array.prototype.indexOf.call(e.dataTransfer.types || [], "Files") >= 0) e.preventDefault(); });
+    window.addEventListener("drop", function(e){ if (currentTab === "con" && !fileInput(e) && e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) e.preventDefault(); });
   }
   // 생성 훅 — 서류 생성(xlsx 채움)이 성공하면 채움 맵을 초안(draft)으로 자동 보존. 실패해도 조용히(내려받기는 이미 끝났다). pii 1 = 값에 소유주·대리인 이름이 섞일 수 있어 do 권한만 열람
   // v411 생성 주입 — 학습된 칸 기본값(서버 learn_defaults_get: 허용 사전(R2) 안·근거 2건↑만)을 **공란('b')으로 남는 칸에만** 넣는다. 계산된 값은 덮지 않는다. 실패·없음이면 그대로.
@@ -10466,27 +10940,30 @@
   }
   function csGenKind(c, k){ return k === "quote" ? "quote_docs" : k; }
   function csPacketsHtml(c){
-    var atts = conAttList(c).map(function(x){ return x.a && x.a.name ? x.a.name : ""; }), can = canDo("con") && c.status !== "done", admin = isAdmin(), claimed = {};
+    var atts = conAttList(c).map(function(x){ return x.a && x.a.name ? x.a.name : ""; }), can = canDo("con") && c.status !== "done", admin = isAdmin(), claimed = {}, claimedN = {};
     cdocLoad(c);   // v407   // claimed: 파일 번호 → 이미 어느 항목이 차지함(v383 검토: 사업자등록증 1장이 등록증까지 채우던 오탐)
+    var cdocOthers = cdocLive(c).filter(function(x){ return x.kind !== "draft" && x.cur === 1 && String(x.dk).indexOf("pk.") !== 0 && String(x.dk).indexOf("gen.") !== 0; });   // v423 단계 서류·그 밖의 서류에 든 파일도 패킷 항목으로 판정
     if (csTplKeys === null) csLoadTpl();
     return '<div class="cs-pks">' + CON_PACKETS.filter(function(pk){ return csPkWhen(c, pk.when); }).map(function(pk){
       var items = pk.items.filter(function(it){ return csPkWhen(c, it.when); }), nOk = 0, nAtt = 0, nGap = 0;
       var rows = items.map(function(it0){
         var it = (it0.gen && csPkWhen(c, it0.gen.when)) ? it0.gen : it0;   // v422: 실물 양식이 등록된 종류만 생성 항목으로
-        var st, sub = "", act = "";
+        var st, sub = "", act = "", rowsAfter = "";
         if (it.t === "gen"){
           var keys = csGenKeys(c, it.k), reg = csTplKeys === null ? null : keys.every(function(x){ return !!csTplKeys[x]; });
           if (reg === null){ st = '<span class="st wait">…</span>'; sub = csTplErr ? "양식 목록 확인 실패 — 잠시 뒤 다시 시도합니다(등록 여부 아님)" : "양식 확인 중"; }
           else if (reg){ st = '<span class="st ok">✓</span>'; sub = "생성 가능"; nOk++; if (can) act = '<button type="button" class="vs-chip" data-cs-gen="' + esc(c.id) + '|' + esc(it.k) + '">생성</button>'; }
-          else { st = '<span class="st gap">✗</span>'; sub = "양식 미등록(" + keys.map(function(x){ return TPL_LABELS[x] || x; }).join("·") + ")" + (admin ? " — [+ 양식 등록]" : ""); nGap++; }
+          else { st = '<span class="st gap">✗</span>'; sub = "양식 미등록(" + keys.map(function(x){ return TPL_LABELS[x] || x; }).join("·") + ")" + (admin ? " — 맨 위 박스에 빈 양식을 넣으세요" : ""); nGap++; }
         } else if (it.t === "att"){
-          var hm = cdocPkHit(c, pk, it), hit = [];   // v407: 기록물 메타(현재 수령본·최종본)가 먼저, 없으면 종전 첨부 파일명 정규식
-          if (!hm) atts.forEach(function(n, ai){ if (!claimed[ai] && it.re.test(n) && !(it.ex && it.ex.test(n))){ claimed[ai] = 1; hit.push(n); } });
-          if (hm){ st = '<span class="st att">◻</span>'; sub = "올림 · " + (hm.orig || hm.name) + " v" + hm.ver + (hm.pii ? " · 개인정보 " + hm.pii : ""); nAtt++; act = '<button type="button" class="vs-chip" data-cs-copen="' + esc(c.id) + '|' + hm.n + '|' + (hm.pii || 0) + '">열기</button>'; }
+          var hm = cdocPkHit(c, pk, it), hit = [], hm2 = null;   // v407: 기록물 메타(현재 수령본·최종본)가 먼저, 없으면 종전 첨부 파일명 정규식
+          if (!hm) cdocOthers.forEach(function(x){ var nm0 = x.orig || x.name || ""; if (!hm2 && !claimedN[x.n] && it.re.test(nm0) && !(it.ex && it.ex.test(nm0))){ claimedN[x.n] = 1; hm2 = x; } });
+          if (!hm && !hm2) atts.forEach(function(n, ai){ if (!claimed[ai] && it.re.test(n) && !(it.ex && it.ex.test(n))){ claimed[ai] = 1; hit.push(n); } });
+          if (hm){ st = '<span class="st att">◻</span>'; sub = "올림 · " + (hm.orig || hm.name) + " v" + hm.ver + (hm.pii ? " · 개인정보 " + hm.pii : ""); nAtt++; act = '<button type="button" class="vs-chip" data-cs-copen="' + esc(c.id) + '|' + hm.n + '|' + (hm.pii || 0) + '">열기</button>'; rowsAfter = cdocRowsHtml(c, null, cdocPkKey(pk, it), can); }
+          else if (hm2){ st = '<span class="st att">◻</span>'; sub = "올림 · " + (hm2.orig || hm2.name) + " v" + hm2.ver + " (다른 서류 칸)" + (hm2.pii ? " · 개인정보 " + hm2.pii : ""); nAtt++; act = '<button type="button" class="vs-chip" data-cs-copen="' + esc(c.id) + '|' + hm2.n + '|' + (hm2.pii || 0) + '">열기</button>'; }
           else if (hit.length){ st = '<span class="st att">◻</span>'; sub = "첨부됨 · " + hit[0] + (hit.length > 1 ? " 외 " + (hit.length - 1) : ""); nAtt++; }
-          else { st = '<span class="st wait">◻</span>'; sub = "첨부 필요"; if (can) act = '<button type="button" class="vs-chip" data-cs-cpk="' + esc(c.id) + '|' + esc(pk.k) + '|' + esc(it.k) + '" title="수령본 올리기(계약 서류함 — 판·열람 기록)">⬆ 올리기</button><button type="button" class="vs-chip" data-catt-add="' + esc(c.id) + '">📎</button>'; }
+          else { st = '<span class="st wait">◻</span>'; sub = "첨부 필요"; }   // v423 올리기는 넣기 박스 하나로
         } else { st = '<span class="st gap">✗</span>'; sub = "양식 없음 — 실물 등록 예정"; nGap++; }
-        return '<div class="it">' + st + '<span class="nm">' + esc(it.h) + '<div class="sub">' + esc(sub) + '</div></span>' + act + '</div>';
+        return '<div class="it">' + st + '<span class="nm">' + esc(it.h) + '<div class="sub">' + esc(sub) + '</div></span>' + act + '</div>' + rowsAfter;
       }).join("");
       return '<div class="cs-pk"><div class="h">' + esc(pk.h) + '<small>생성 ' + nOk + ' · 첨부 ' + nAtt + ' · 빈칸 ' + nGap + '</small></div>' + rows + '</div>';
     }).join("") + '</div>';
@@ -10850,7 +11327,7 @@
       var b = res.body, s = (b.settings && b.settings.contract) || { on: false, allow: {} }, pairs = b.pairs || [], les = b.lessons || {};
       var ST = { done_nomodel: "간극만(허용 전)", pending: "학습 대기", running: "학습 중", done: "학습 완료", fail: "실패", unmatched: "초안 선택 필요", hold: "월 상한" };
       var h = '<div style="margin-bottom:6px;"><b>' + (s.on ? "켜짐" : "꺼짐") + '</b> · 허용 양식 ' + Object.keys(s.allow || {}).length + '종 · 짝 ' + pairs.length + '건 <button class="mini-btn" data-cl-on="' + (s.on ? 0 : 1) + '" data-cl-base="' + esc(String((b.settings && b.settings.updated_at) || 0)) + '">' + (s.on ? "끄기" : "켜기") + '</button></div>';
-      h += '<div class="muted" style="font-size:12px;margin-bottom:8px;">최종본을 올리면 같은 단계의 앱 초안과 자동으로 짝이 되어 칸 단위 차이(간극)를 잽니다. 허용 사전에 든 칸만 모델이 값을 보고 규칙을 뽑고, 근거 2건이 쌓인 칸은 다음 생성 때 공란에 미리 채워집니다. 사람은 규칙을 쓰지 않습니다. 양식별 첫 10건 간극이 기준선이 되고, 4주 뒤 최근 간극이 기준선보다 줄지 않은 양식은 자동으로 꺼집니다(짝·간극은 계속 잼, 켜면 기준선 재시작).</div>';
+      h += '<div class="muted" style="font-size:12px;margin-bottom:8px;">고친 서류를 넣으면 앱 초안과 자동으로 짝이 되어 칸 단위 차이(간극)를 잽니다(서류 이름으로 양식이 정해지면 단계가 달라도 짝이 됩니다). 허용 사전에 든 칸만 모델이 값을 보고 규칙을 뽑고, 근거 2건이 쌓인 칸은 다음 생성 때 공란에 미리 채워집니다. 사람은 규칙을 쓰지 않습니다. 양식별 첫 10건 간극이 기준선이 되고, 4주 뒤 최근 간극이 기준선보다 줄지 않은 양식은 자동으로 꺼집니다(짝·간극은 계속 잼, 켜면 기준선 재시작).</div>';
       var tk = Object.keys(les);
       if (tk.length){
         h += '<table class="mini" style="width:100%;font-size:12px;margin-bottom:8px;"><tr><th>양식</th><th>짝</th><th>호출</th><th>규칙</th><th>간극 최근5</th><th>이전5</th><th>추세</th><th>허용 칸</th><th>기준선·일몰</th><th></th></tr>';
@@ -10859,7 +11336,7 @@
       }
       if (pairs.length){
         h += '<div style="font-size:12px;">' + pairs.slice(0, 10).map(function(p){ var g = p.gap || {}; return '<div class="item" style="padding:4px 0;"><span>' + esc(p.cid) + ' · S' + p.i + ' · ' + esc(p.tpl || '(양식 미정)') + '</span> <span class="muted">' + (ST[p.status] || esc(p.status)) + (p.diff ? ' · 바뀐 칸 ' + p.diff.changed + '/' + p.diff.compared + (p.diff.uncomparable ? ' (비교 불가 ' + p.diff.uncomparable + ')' : '') : '') + (g.score === null || g.score === undefined ? ' · 비교 불가' : ' · 간극 ' + Math.round(g.score * 100) + '%') + (p.candidates ? ' · 후보 ' + p.candidates.map(function(x){ return x.tpl; }).join('/') : '') + '</span></div>'; }).join('') + '</div>';
-      } else h += '<div class="empty-line">아직 짝이 없습니다 — 단계 카드에서 [최종본↑]을 올리면 생깁니다.</div>';
+      } else h += '<div class="empty-line">아직 짝이 없습니다 — 계약 펼침의 [이 계약 서류 넣기]에 고친 서류를 넣으면 생깁니다.</div>';
       host.innerHTML = h;
       Array.prototype.forEach.call(host.querySelectorAll("[data-cl-tpl]"), function(btn){ btn.addEventListener("click", function(){   // v412 양식별 끄기/켜기(일몰 되돌리기)
         var t = btn.getAttribute("data-cl-tpl"), off = btn.getAttribute("data-cl-off") === "1";
@@ -11264,7 +11741,7 @@
     if (can){
       if (isCur && t && t.status !== "done"){
         if (s.aid !== "change_contract" && p.key !== "chg") act += '<button type="button" class="vs-chip" data-cs-sdoc="' + esc(c.id) + '|' + esc(s.name) + '">📄 서류</button>';
-        else act += '<span class="vs-chip" style="cursor:default;opacity:.7;" title="변경계약서 양식 등록 전 — 계약 탭 서류함에 첨부">변경계약서: 서류함 첨부</span>';   // v402 R4: 계약서 작성 툴이 원계약 contract_info를 덮어쓰지 않게
+        else act += '<span class="vs-chip" style="cursor:default;opacity:.7;" title="변경계약서 양식 등록 전 — 위 넣기 박스에 넣으세요">변경계약서: 넣기 박스</span>';   // v402 R4: 계약서 작성 툴이 원계약 contract_info를 덮어쓰지 않게
         var ak = c.scen ? csApprKindOf(c, s) : "";   // v384 결재 2종: 계약·청구 단계는 [완료] 대신 결재함 상신 → 승인되면 자동 진행
         if (ak && s.appr && s.appr.status === "대기") act += '<span class="vs-chip" style="cursor:default;opacity:.7;">결재 대기 중(' + esc(ak) + ')</span>';
         else if (ak && s.appr && s.appr.status === "보류") act += '<span class="vs-chip" style="cursor:default;opacity:.7;">결재 보류(' + esc(ak) + ')</span>';
@@ -11287,16 +11764,14 @@
     items.forEach(function(d){ if (d.st === "done") nDone++; else if (d.st === "na") nNa++; if (d.add) nAdd++; });
     var base = esc(c.id) + '|' + esc(p.key) + '|' + i + '|';
     cdocLoad(c);   // v407 기록물 목록(60초 캐시)
-    var h = '<div class="cs-docs" data-cs-dpanel="' + esc(key) + '"><div class="cs-pipe-h">서류 ' + items.length + '건 · 완료 ' + nDone + (nNa ? ' · 해당없음 ' + nNa : '') + (nAdd ? ' · 추가 ' + nAdd : '') + (fixed ? '' : ' <small style="font-weight:400;">(골조 목록 — 체크하면 이 계약의 목록으로 굳습니다)</small>')
-      + (can ? ' <select data-cs-pii="' + esc(key) + '" title="올리는 파일의 개인정보 등급 — 1·2는 열람이 제한됩니다"><option value="0">개인정보 없음</option><option value="1">개인정보 1(명단·신분증)</option><option value="2">민감정보 2(건강진단)</option></select>' : '') + '</div>';
+    var h = '<div class="cs-docs" data-cs-dpanel="' + esc(key) + '"><div class="cs-pipe-h">서류 ' + items.length + '건 · 완료 ' + nDone + (nNa ? ' · 해당없음 ' + nNa : '') + (nAdd ? ' · 추가 ' + nAdd : '') + (fixed ? '' : ' <small style="font-weight:400;">(골조 목록 — 체크하면 이 계약의 목록으로 굳습니다)</small>') + '</div>';
     if (!items.length) h += '<div class="vs-empty" style="font-size:12px;">이 단계에 등록된 서류 목록이 없습니다.</div>';
     if (csDocsLost(s)) h += '<div class="vs-empty" style="font-size:12px;color:#B00020;">서류 목록 원천을 불러오지 못했습니다 — 새로고침 뒤 체크해 주세요(지금 체크하면 표준 항목이 빠진 채 굳습니다).</div>';   // v402 R1
     h += items.map(function(d){
       var na = d.st === "na", done = d.st === "done";
       return '<div class="cs-doc' + (na ? ' na' : (done ? ' done' : '')) + '"><input type="checkbox" data-cs-dchk="' + base + esc(d.k) + '"' + (done ? ' checked' : '') + ((can && !na) ? '' : ' disabled') + '>'
         + (d.t ? '<small>[' + esc(d.t) + ']</small>' : '') + '<span class="nm">' + esc(d.n) + '</span>' + (d.add ? '<small>추가</small>' : '') + (d.at && d.st !== "todo" ? '<small>' + esc(d.at) + '</small>' : '')
-        + (can ? (d.add ? '<button type="button" class="vs-chip" data-cs-ddel="' + base + esc(d.k) + '" title="추가분 삭제">✕</button>' : '<button type="button" class="vs-chip" data-cs-dna="' + base + esc(d.k) + '">' + (na ? '복구' : '해당없음') + '</button>') : '')
-        + ((can && !na) ? '<button type="button" class="vs-chip" data-cs-cup="' + base + esc(d.k) + '|final" title="담당자가 고친 최종본 올리기(계약 서류함)">최종본↑</button><button type="button" class="vs-chip" data-cs-cup="' + base + esc(d.k) + '|received" title="수령본(필증·공문·계산서 사본) 올리기">수령↑</button>' : '') + '</div>'
+        + (can ? (d.add ? '<button type="button" class="vs-chip" data-cs-ddel="' + base + esc(d.k) + '" title="추가분 삭제">✕</button>' : '<button type="button" class="vs-chip" data-cs-dna="' + base + esc(d.k) + '">' + (na ? '복구' : '해당없음') + '</button>') : '') + '</div>'
         + cdocRowsHtml(c, i, cdocDocKey(p, d), can);   // v407 기록물(판·현재·열기·보관)
     }).join("");
     if (can) h += '<div class="cs-doc-add"><input type="text" data-cs-dnew="' + esc(key) + '" maxlength="80" placeholder="서류 추가(이름)" autocomplete="off"><button type="button" class="vs-chip" data-cs-dadd="' + base + '-">추가</button></div>';
@@ -11439,9 +11914,10 @@
     var h = '<div class="vs-dh"><b>' + esc(c.label || csKind(c)) + '</b>' + (c.client ? '<span style="color:var(--sub);">' + esc(c.client) + '</span>' : '') +
       (c.docType === "public" ? '<span class="from-chip">공문서</span>' : '<span class="scope-chip">사문서</span>') + (c.status === "done" ? '<span class="done-by">✓ 완료</span>' : '') +
       '<button type="button" class="vs-chip" data-cs-close="1" style="margin-left:auto;">닫기 ▲</button></div>';
+    h += cbxBoxHtml(c);   // v423 이 계약 서류 넣기 — 입구 하나(탭마다 따로 올리던 버튼 대신)
     h += '<div class="vs-stabs">' + [["ov", "개요"], ["st", "단계"], ["doc", "서류"], ["lk", "연결"]].map(function(t){ return '<button type="button" class="vs-stab' + (conDetTab === t[0] ? ' on' : '') + '" data-cs-tab="' + t[0] + '">' + t[1] + '</button>'; }).join("") + '</div>';
     if (conDetTab === "st"){ csApprSync(c); h += csStagesHtml(c); }   // v384: 결재 결과 동기화(60초 1회)
-    else if (conDetTab === "doc") h += csPacketsHtml(c) + (conAttBoxHtml(c) || '<div class="vs-empty">첨부가 없습니다.</div>') + cdocTrashHtml(c);   // v383 서류 4종 패킷 + 첨부함 · v408 관리자 보관함
+    else if (conDetTab === "doc") h += csPacketsHtml(c) + cbxEtcHtml(c) + conAttBoxHtml(c) + cdocTrashHtml(c);   // v383 서류 4종 패킷 · v423 그 밖의 서류·이전 첨부 · v408 관리자 보관함
     else if (conDetTab === "lk") h += csLinksHtml(c);
     else h += csOverviewHtml(c);
     if (canDo("con")) h += '<div class="vs-act">' + (conHasBldg(c) ? '<button class="mini-btn" data-con-bldg="' + esc(c.id) + '">대장</button>' : '') + '<button class="mini-btn" data-con-xlsx="' + esc(c.id) + '">생성</button><button class="mini-btn" data-con-doc="' + esc(c.id) + '">서류</button><button class="mini-btn danger" data-con-del="' + esc(c.id) + '">삭제</button></div>';
@@ -11450,7 +11926,7 @@
   function csPanelOf(el){ var e = el; while (e && e.getAttribute && !(e.getAttribute("data-cs-fpanel") || e.getAttribute("data-cs-wlform") || e.getAttribute("data-cs-dpanel"))) e = e.parentNode; return (e && e.getAttribute) ? e : null; }
   function csSnapInputs(root){
     var out = []; if (!root) return out;
-    Array.prototype.forEach.call(root.querySelectorAll("[data-cs-fld], [data-cs-wl], [data-cs-dnew], [data-cs-pii]"), function(el){ if (el.value === "") return; var pan = csPanelOf(el); if (!pan) return; out.push({ p: pan.getAttribute("data-cs-fpanel") || (pan.getAttribute("data-cs-wlform") ? "wl:" + pan.getAttribute("data-cs-wlform") : "dp:" + pan.getAttribute("data-cs-dpanel")), k: el.getAttribute("data-cs-fld") || el.getAttribute("data-cs-wl") || "dnew", v: el.value }); });
+    Array.prototype.forEach.call(root.querySelectorAll("[data-cs-fld], [data-cs-wl], [data-cs-dnew]"), function(el){ if (el.value === "") return; var pan = csPanelOf(el); if (!pan) return; out.push({ p: pan.getAttribute("data-cs-fpanel") || (pan.getAttribute("data-cs-wlform") ? "wl:" + pan.getAttribute("data-cs-wlform") : "dp:" + pan.getAttribute("data-cs-dpanel")), k: el.getAttribute("data-cs-fld") || el.getAttribute("data-cs-wl") || "dnew", v: el.value }); });
     return out;
   }
   function csRestoreInputs(root, snap){
@@ -11460,7 +11936,9 @@
   function conSetPaneW(wrap){ try { wrap.style.setProperty("--vs-panew", wrap.clientWidth + "px"); } catch(e){} }
   function renderContracts(){
     var host=document.getElementById("conList"); if(!host) return;
-    var startBtn=document.getElementById("conStartBtn"); if(startBtn) startBtn.style.display = canDo("con") ? "block" : "none";
+    var conBox=document.getElementById("conBox"); if(conBox) conBox.style.display = canDo("con") ? "flex" : "none";   // v423 맨 바깥 두 갈래: 넣기 박스 / 직접 생성
+    cbxRenderTop();   // 접힌 계약의 카드도 맨 위에
+    if(!cbxRestored && canDo("con")){ cbxRestored = true; cbxRestore(); }   // 넣다 만 파일 다시 잇기
     var dgBtn=document.getElementById("docGenBtn"); if(dgBtn) dgBtn.style.display = canDo("con") ? "block" : "none";
     var tmBtn=document.getElementById("tplManageBtn"); if(tmBtn) tmBtn.style.display = isAdmin() ? "block" : "none";
     var pfBtn=document.getElementById("conPerfBtn"); if(pfBtn) pfBtn.style.display = canDo("con") ? "block" : "none";
@@ -11537,14 +12015,9 @@
         if(addr) conBldgLookup(c.id, addr, false);
       });
     });
-    Array.prototype.forEach.call(root.querySelectorAll("[data-catt-add]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); conPickAttach(el.getAttribute("data-catt-add")); }); });
     Array.prototype.forEach.call(root.querySelectorAll("[data-catt-del]"), function(el){ el.addEventListener("click", function(e){ e.preventDefault(); e.stopPropagation(); var p=el.getAttribute("data-catt-del").split("|"); conDelAttach(p[0], p[1], +p[2]); }); });
     Array.prototype.forEach.call(root.querySelectorAll("[data-catt-rev]"), function(el){ el.addEventListener("click", function(e){ e.preventDefault(); e.stopPropagation(); var p=el.getAttribute("data-catt-rev").split("|"); openAsbReview(p[0], p[1], +p[2]); }); });
-    Array.prototype.forEach.call(root.querySelectorAll("[data-catt-drop]"), function(el){
-      el.addEventListener("dragover", function(e){ e.preventDefault(); el.style.background="#EEF5FF"; });
-      el.addEventListener("dragleave", function(){ el.style.background=""; });
-      el.addEventListener("drop", function(e){ e.preventDefault(); el.style.background=""; var f=e.dataTransfer && e.dataTransfer.files; if(f&&f.length) conAddAttach(el.getAttribute("data-catt-drop"), f); });
-    });
+    cbxBind(root);   // v423 넣기 박스·판단 카드
   }
   function bindConSheet(host, dcard){
     [host, dcard].forEach(function(root){
@@ -11575,8 +12048,7 @@
       csAct("data-cs-dna", function(c, p, i, el){ csDocNa(c, p, i, el.getAttribute("data-cs-dna").split("|")[3]); });
       csAct("data-cs-ddel", function(c, p, i, el){ csDocDel(c, p, i, el.getAttribute("data-cs-ddel").split("|")[3]); });
       csAct("data-cs-dadd", function(c, p, i){ var inp = root.querySelector('[data-cs-dpanel="' + p.key + '|' + i + '"] [data-cs-dnew]'); if (!inp) return; var nm = inp.value; inp.value = ""; csDocAdd(c, p, i, nm); });
-      csAct("data-cs-cup", function(c, p, i, el){ var q = el.getAttribute("data-cs-cup").split("|"), sel = root.querySelector('[data-cs-dpanel="' + p.key + '|' + i + '"] [data-cs-pii]'); csCdocPick(c, p, i, cdocDocKey(p, { k: q[3] }), q[3], q[4], sel ? Number(sel.value) : 0); });   // v407 계약 서류함
-      Array.prototype.forEach.call(root.querySelectorAll("[data-cs-cpk]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); var q = el.getAttribute("data-cs-cpk").split("|"), c = findProc(q[0]); if (!c) return; var p = (c.pipes || [])[0], i = (p && typeof p.cur === "number") ? p.cur : 0; csCdocPick(c, p, i, cdocPkKey({ k: q[1] }, { k: q[2] }), "", "received", 0); }); });
+      Array.prototype.forEach.call(root.querySelectorAll("[data-cs-cmove]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); var q = el.getAttribute("data-cs-cmove").split("|"); cbxMoveOpen(q[0], Number(q[1])); }); });   // v423 다른 서류로 옮기기
       Array.prototype.forEach.call(root.querySelectorAll("[data-cs-copen]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); var q = el.getAttribute("data-cs-copen").split("|"); csCdocOpen(q[0], Number(q[1]), Number(q[2])); }); });
       Array.prototype.forEach.call(root.querySelectorAll("[data-cs-ccur]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); var q = el.getAttribute("data-cs-ccur").split("|"); csCdocMark(q[0], Number(q[1]), "cur"); }); });
       Array.prototype.forEach.call(root.querySelectorAll("[data-cs-cdel]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); var q = el.getAttribute("data-cs-cdel").split("|"); csCdocMark(q[0], Number(q[1]), "del"); }); });
@@ -11584,7 +12056,7 @@
       Array.prototype.forEach.call(root.querySelectorAll("[data-cs-cpurge]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); var q = el.getAttribute("data-cs-cpurge").split("|"); csCdocPurge(q[0], Number(q[1])); }); });
       Array.prototype.forEach.call(root.querySelectorAll("[data-cs-wladd]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); var c = findProc(el.getAttribute("data-cs-wladd")); var row = root.querySelector('[data-cs-wlform="' + (c ? c.id : "") + '"]'); if (c && row) csWlAdd(c, row); }); });
       Array.prototype.forEach.call(root.querySelectorAll("[data-cs-wldel]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); var p = el.getAttribute("data-cs-wldel").split("|"), c = findProc(p[0]); if (c) csWlDel(c, p[1]); }); });
-      Array.prototype.forEach.call(root.querySelectorAll("[data-cs-fld], [data-cs-wl], [data-cs-dnew], [data-cs-pii]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); }); });
+      Array.prototype.forEach.call(root.querySelectorAll("[data-cs-fld], [data-cs-wl], [data-cs-dnew]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); }); });
       Array.prototype.forEach.call(root.querySelectorAll(".vs-det-in, #conDetailCard"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); }); });   // 펼침 안 클릭이 행 토글로 번지지 않게
     });
     Array.prototype.forEach.call(host.querySelectorAll("tr.vs-r"), function(tr){
@@ -11630,7 +12102,7 @@
   function openConStart(){
     if(!canDo("con")) return;
     lastBidForCon=null;
-    var csh=document.getElementById("conStartBackdrop").querySelector("h3"); if(csh) csh.textContent="계약 시작";   // 낙찰 자동오픈 제목 잔상 제거
+    var csh=document.getElementById("conStartBackdrop").querySelector("h3"); if(csh) csh.textContent="직접 생성";   // 낙찰 자동오픈 제목 잔상 제거 · v423 맨 바깥 두 갈래의 둘째
     document.getElementById("conType").value="asbestos";
     document.getElementById("conDoc").value="public";
     document.getElementById("conClient").value="";
@@ -13161,7 +13633,7 @@
       "수량":q.qty||"", "단가":q.price?Number(q.price).toLocaleString():"", "금액":amt?amt.toLocaleString():"" };
     var key=(q.co==="con")?"quote_con":"quote_env";
     gwCall("gw-data",{action:"tpl_get", key:key}).then(function(r){
-      if(r.status!==200){ alert(r.status===404?("'"+TPL_LABELS[key]+"' 양식이 미등록입니다. [+ 양식 등록]에서 등록하세요."):"양식 불러오기 실패"); return; }
+      if(r.status!==200){ alert(r.status===404?("'"+TPL_LABELS[key]+"' 양식이 미등록입니다. 계약 탭 맨 위 박스에 빈 양식을 넣으세요."):"양식 불러오기 실패"); return; }
       return fillHwpxTemplate(r.body.data, tokens).then(function(b){
         downloadBlob((q.no||"견적")+"_"+(q.title||"견적서")+".hwpx", b);
       });
@@ -17092,6 +17564,7 @@
   function bidToContract(bidId){
     var b=findBid(bidId); if(!b) return;
     openConStart();
+    var bh=document.getElementById("conStartBackdrop").querySelector("h3"); if(bh) bh.textContent="계약 시작";   // v423 낙찰 전환 창 제목은 그대로
     document.getElementById("conClient").value=b.org||"";
     document.getElementById("conSite").value=b.title||"";
     lastBidForCon=b;

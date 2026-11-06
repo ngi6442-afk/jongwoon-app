@@ -21,7 +21,7 @@ const blobsMock = {
   setupBlobContext() {},
   store(n) { mem[n] = mem[n] || {}; return { name: n, toString() { return n; }, async list(o) { const pre = (o && o.prefix) || ''; return { blobs: Object.keys(mem[n] || {}).filter((k) => k.indexOf(pre) === 0).map((k) => ({ key: k })) }; } }; },
   async blobGet(st, k) { if (blobsMock.hooks.beforeGet) await blobsMock.hooks.beforeGet(k); const s = mem[st] || {}; return (k in s) ? { ok: true, data: JSON.parse(JSON.stringify(s[k])) } : { ok: false, code: 'NOT_FOUND' }; },   // 실 Blobs처럼 get마다 새 객체(JSON 파싱) — 핸들러가 저장 전 객체를 손대도 mem에 반영되지 않는다(9/6: 거부 응답 뒤 "저장 없음" 검증의 전제)
-  async blobSet(st, k, v) { if (blobsMock.hooks.beforeSet) await blobsMock.hooks.beforeSet(k); mem[st] = mem[st] || {}; if (v === null) delete mem[st][k]; else mem[st][k] = JSON.parse(JSON.stringify(v)); return { ok: true }; },
+  async blobSet(st, k, v) { if (blobsMock.hooks.failSet && blobsMock.hooks.failSet(k)) return { ok: false, code: 'STORAGE_WRITE_FAILED' }; if (blobsMock.hooks.beforeSet) await blobsMock.hooks.beforeSet(k); mem[st] = mem[st] || {}; if (v === null) delete mem[st][k]; else mem[st][k] = JSON.parse(JSON.stringify(v)); return { ok: true }; },
   async blobDelete(st, k) { if (mem[st]) delete mem[st][k]; return { ok: true }; },
   async blobList(st) { return { ok: true, keys: Object.keys(mem[st] || {}) }; },
 };
@@ -4165,6 +4165,270 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   T('68 허용 칸 상한 200: 200칸 저장 · 201칸 BAD_FIELDS · 범위 표기(~) BAD_FIELDS · 41자 BAD_FIELDS · 빈 칸 BAD_FIELDS', c0 && c1 && c2 && c3 && c4, JSON.stringify([c0, c1, c2, c3, c4]));
   ['col:contracts', 'map:contract:v1', 'recidx:c68', 'settings:learn', 'lessons:contract:work_start', 'learn:contract:lock', 'usage:learn:contract:' + LN.ymOf(Date.now())].forEach((k) => { delete mem.gw_data[k]; });
   Object.keys(mem.gw_data).filter((k) => k.indexOf('learn:contract:in:') === 0).forEach((k) => delete mem.gw_data[k]); Object.keys(mem.gw_files).filter((k) => k.indexOf('cdoc:c68') === 0).forEach((k) => delete mem.gw_files[k]);
+}
+
+{ // ---- 72(v423) 넣기 박스 — box_put 조각 · cdoc_attach(작은 파일·큰 파일·중복·초안 짝) · cdoc_get 조각 · cdoc_move · box_fix · 판단 모듈·백그라운드 ----
+  const fsz = require('fs');
+  const BJ = require(join(FN, '_lib/boxjudge.js'));
+  const BF = require(join(FN, '_lib/boxfile.js'));
+  const pb = require(join(FN, 'gw-parse-background.js'));
+  const U72 = { id: 'ucon72', name: '공무72', admin: false, perms: { con: 'do' }, dept: '운영부' }, U72B = { id: 'ucon72b', name: '공무72B', admin: false, perms: { con: 'do' }, dept: '운영부' };
+  mem.gw_users['member:ucon72'] = U72; mem.gw_users['member:ucon72b'] = U72B;
+  const tk = issueSession(U72).token, tkB = issueSession(U72B).token;
+  const b = (x) => Buffer.from(x).toString('base64');
+  mem.gw_files = mem.gw_files || {};
+  mem.gw_data['col:contracts'] = { schema: 1, items: [{ id: 'c72', title: '박스 계약', scen: 'dredge:pub', stages: [] }], updated_at: 1 };
+  const PDF = (s) => b('%PDF-1.4 ' + s);
+  // box_put 입구 검사
+  let r = await call({ action: 'box_put', j: 0, k: 1, name: 'a.pdf', data: PDF('x') }, tokW, 'dev1');
+  const g1 = r.code === 403 && r.body.error_code === 'NO_WRITE';
+  r = await call({ action: 'box_put', j: 0, k: 1, name: 'a.pdf', data: PDF('x') }, tk);
+  const g2 = r.code === 403 && r.body.error_code === 'DEVICE_NOT_APPROVED';
+  r = await call({ action: 'box_put', j: 0, k: 1, name: 'a.exe', data: PDF('x') }, tk, 'dev1');
+  const g3 = r.code === 400 && r.body.error_code === 'BAD_EXT';
+  r = await call({ action: 'box_put', j: 0, k: 1, name: 'a.pdf', data: b('not pdf at all') }, tk, 'dev1');
+  const g4 = r.code === 400 && r.body.error_code === 'BAD_MAGIC';
+  r = await call({ action: 'box_put', j: 0, k: 9, name: 'a.pdf', data: PDF('x') }, tk, 'dev1');
+  const g5 = r.code === 400 && r.body.error_code === 'BAD_PART';
+  r = await call({ action: 'box_put', j: 0, k: 1, name: 'a.pdf', data: 'A'.repeat(4400004) }, tk, 'dev1');
+  const g6 = r.code === 413 && r.body.error_code === 'PART_TOO_LARGE';
+  T('72 box_put 입구: 계약 권한 없음 403 · 승인 기기 없음 403 · 형식·매직 400 · 조각 수 상한 400 · 조각 크기 413', g1 && g2 && g3 && g4 && g5 && g6, JSON.stringify([g1, g2, g3, g4, g5, g6]));
+  r = await call({ action: 'box_put', j: 0, k: 1, name: '옛파일.xls', data: Buffer.from([0xD0, 0xCF, 0x11, 0xE0, 1, 2, 3, 4]).toString('base64') }, tk, 'dev1');
+  T('72 box_put: xls(OLE)는 받는다(옛 📎이 받던 형식)', r.code === 200 && !!r.body.id, r.code + '/' + r.body.error_code);
+  // 작은 파일 → 서류함
+  r = await call({ action: 'box_put', j: 0, k: 1, name: '착공계 수령.pdf', size: 12, data: PDF('small') }, tk, 'dev1');
+  const idS = r.body.id, recS = mem.gw_files[idS];
+  T('72 box_put 1조각: 본 레코드에 통째로(kind box·올린 사람) · done', r.code === 200 && r.body.done === true && recS && recS.kind === 'box' && recS.bid === 'ucon72' && recS.data === PDF('small') && !recS.parts, JSON.stringify(r.body));
+  mem.gw_files['parse:' + idS] = { ts: 1, result: { doc: 'box', cls: 'received' } };
+  r = await call({ action: 'cdoc_attach', cid: 'c72', i: 1, doc_key: 'pk.con.contract', kind: 'draft', att: idS }, tk, 'dev1');
+  const k1 = r.code === 400 && r.body.error_code === 'BAD_KIND';
+  r = await call({ action: 'cdoc_attach', cid: 'cNope', i: 1, doc_key: 'pk.con.contract', kind: 'received', att: idS }, tk, 'dev1');
+  const k2 = r.code === 404 && r.body.error_code === 'NO_CONTRACT' && !!mem.gw_files[idS];
+  r = await call({ action: 'cdoc_attach', cid: 'c72', i: 1, doc_key: 'pk.con.contract', kind: 'received', att: idS }, tk, 'dev1');
+  const itS = r.body.item || {}, fkS = 'cdoc:c72:S01:pk.con.contract:' + itS.n;
+  T('72 cdoc_attach 작은 파일: 종류 검사 400 · 계약 없음 404(파일 남음, 저장 재시도 가능) · 바이트를 서류함으로 옮기고 첨부 레코드 삭제 · AI 판단 parse:<att>는 남음 · 잇는 번호 att0는 색인에만(응답·목록에 안 나감)',
+    k1 && k2 && r.code === 200 && mem.gw_files[fkS] && mem.gw_files[fkS].data === PDF('small') && !mem.gw_files[idS] && !!mem.gw_files['parse:' + idS] && mem.gw_data['recidx:c72'].items.find((x) => x.n === itS.n).att0 === idS && itS.att0 === undefined && itS.orig === '착공계 수령.pdf', JSON.stringify([k1, k2, r.code, itS]));
+  r = await call({ action: 'cdoc_attach', cid: 'c72', i: 1, doc_key: 'pk.con.contract', kind: 'received', att: idS }, tk, 'dev1');
+  T('72 cdoc_attach 두 번: 없어진 첨부 404', r.code === 404 && r.body.error_code === 'NOT_FOUND', r.code + '/' + r.body.error_code);
+  // 큰 파일 조각
+  const P0 = PDF('AAAA'.repeat(40)), body = P0.slice(0, 80), body2 = P0.slice(80, 160), body3 = P0.slice(160);
+  r = await call({ action: 'box_put', j: 0, k: 3, name: '스캔 계약서.pdf', size: 999, data: body }, tk, 'dev1');
+  const idB = r.body.id, open0 = mem.gw_files[idB] && mem.gw_files[idB].open === 1 && r.body.done === false;
+  const r2 = await call({ action: 'box_put', id: idB, j: 1, k: 3, name: '스캔 계약서.pdf', data: body2 }, tkB, 'dev1');
+  const notOwner = r2.code === 409 && r2.body.error_code === 'BAD_UPLOAD';
+  const r3 = await call({ action: 'cdoc_attach', cid: 'c72', i: 1, doc_key: 'pk.con.bond', kind: 'received', att: idB }, tk, 'dev1');
+  const midAttach = r3.code === 409 && r3.body.error_code === 'PART_MISSING';
+  await call({ action: 'box_put', id: idB, j: 1, k: 3, name: '스캔 계약서.pdf', data: body2 }, tk, 'dev1');
+  r = await call({ action: 'box_put', id: idB, j: 2, k: 3, name: '스캔 계약서.pdf', data: body3 }, tk, 'dev1');
+  const mB = mem.gw_files[idB];
+  T('72 box_put 3조각: 첫 조각 뒤 미완 표식 · 남의 조각 409 · 미완이면 서류함에 못 넣음(409) · 마지막에 done·표식 제거·parts 3 · 조각 키 3',
+    open0 && notOwner && midAttach && r.body.done === true && mB && !mB.open && mB.parts === 3 && !mB.data && mem.gw_files[BF.attPartKey(idB, 2)].data === body3, JSON.stringify([open0, notOwner, midAttach, r.body, mB]));
+  T('72 boxfile: 조각을 이으면 원본 base64', (await BF.attReadB64('gw_files', idB, mB)) === P0, '');
+  r = await call({ action: 'cdoc_attach', cid: 'c72', i: 1, doc_key: 'pk.con.bond', kind: 'received', att: idB }, tk, 'dev1');
+  const itB = r.body.item || {}, fkB = 'cdoc:c72:S01:pk.con.bond:' + itB.n;
+  T('72 cdoc_attach 큰 파일: 조각은 그대로, 서류함 레코드는 참조(att·parts, data 없음) · 첨부에 taken 표식 · 색인 parts',
+    r.code === 200 && mem.gw_files[fkB].att === idB && mem.gw_files[fkB].parts === 3 && !mem.gw_files[fkB].data && mem.gw_files[idB].taken.n === itB.n && itB.parts === 3, JSON.stringify([r.code, mem.gw_files[fkB], itB]));
+  const r4 = await call({ action: 'cdoc_attach', cid: 'c72', i: 2, doc_key: 'x', kind: 'received', att: idB }, tk, 'dev1');
+  const r5 = await call({ action: 'att_del', id: idB }, tk, 'dev1');
+  T('72 넣은 뒤 다시 넣기 409 ALREADY_TAKEN · att_del로 조각을 못 지움(409)', r4.code === 409 && r4.body.error_code === 'ALREADY_TAKEN' && r5.code === 409 && !!mem.gw_files[BF.attPartKey(idB, 0)], JSON.stringify([r4.code, r5.code]));
+  const lg0 = ((mem.gw_data[Object.keys(mem.gw_data).find((x) => x.indexOf('reclog:') === 0)] || {}).items || []).length;
+  r = await call({ action: 'cdoc_get', cid: 'c72', n: itB.n }, tk, 'dev1');
+  const gm = r.code === 200 && r.body.parts === 3 && !r.body.data;
+  let joined = '';
+  for (let j = 0; j < 3; j++) { const rp = await call({ action: 'cdoc_get', cid: 'c72', n: itB.n, part: j }, tk, 'dev1'); joined += rp.body.data || ''; }
+  const rx = await call({ action: 'cdoc_get', cid: 'c72', n: itB.n, part: 3 }, tk, 'dev1');
+  const lg1 = ((mem.gw_data[Object.keys(mem.gw_data).find((x) => x.indexOf('reclog:') === 0)] || {}).items || []).length;
+  T('72 cdoc_get 큰 파일: 첫 호출은 조각 수만 · part로 받아 이으면 원본 · 범위 밖 400 · 열람 기록 1번만', gm && joined === P0 && rx.code === 400 && lg1 === lg0 + 1, JSON.stringify([gm, joined === P0, rx.code, lg0, lg1]));
+  // 중복
+  r = await call({ action: 'box_put', j: 0, k: 1, name: '같은내용.pdf', data: PDF('small') }, tk, 'dev1'); const idD = r.body.id;
+  r = await call({ action: 'cdoc_attach', cid: 'c72', i: 3, doc_key: 'etc.box', kind: 'received', att: idD }, tk, 'dev1');
+  const dup1 = r.code === 409 && r.body.error_code === 'DUP_BYTES' && !!mem.gw_files[idD];
+  r = await call({ action: 'cdoc_attach', cid: 'c72', i: 3, doc_key: 'etc.box', kind: 'received', att: idD, allow_dup: true }, tk, 'dev1');
+  T('72 같은 내용: 409 DUP_BYTES(파일 남음) → allow_dup이면 넣음', dup1 && r.code === 200 && !mem.gw_files[idD], JSON.stringify([dup1, r.code]));
+  // 초안 짝 — 다른 단계 초안·같은 단계 초안 둘
+  const XLSX = fsz.existsSync(join(ROOT, 'tools', 'out')) ? null : null;
+  const mkXlsx = () => {   // 최소 xlsx(저장식 zip)
+    const crc = (bf) => { let c, t = crc._t || (crc._t = Array.from({ length: 256 }, (_, n) => { c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; return c >>> 0; })); c = 0xFFFFFFFF; for (const x of bf) c = t[(c ^ x) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
+    const files = { '[Content_Types].xml': '<Types/>', 'xl/workbook.xml': '<workbook xmlns:r="r"><sheets><sheet name="Sheet1" sheetId="1" r:id="rId1"/></sheets></workbook>', 'xl/_rels/workbook.xml.rels': '<Relationships><Relationship Id="rId1" Target="worksheets/sheet1.xml"/></Relationships>', 'xl/worksheets/sheet1.xml': '<worksheet><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>착공계</t></is></c><c r="B1" t="inlineStr"><is><t>고친값</t></is></c></row></sheetData></worksheet>' };
+    const ls = [], cd = []; let off = 0;
+    for (const nm of Object.keys(files)) {
+      const nb = Buffer.from(nm), db = Buffer.from(files[nm]), cc = crc(db);
+      const lh = Buffer.alloc(30); lh.writeUInt32LE(0x04034b50, 0); lh.writeUInt16LE(20, 4); lh.writeUInt32LE(cc, 14); lh.writeUInt32LE(db.length, 18); lh.writeUInt32LE(db.length, 22); lh.writeUInt16LE(nb.length, 26);
+      const ch = Buffer.alloc(46); ch.writeUInt32LE(0x02014b50, 0); ch.writeUInt16LE(20, 4); ch.writeUInt16LE(20, 6); ch.writeUInt32LE(cc, 16); ch.writeUInt32LE(db.length, 20); ch.writeUInt32LE(db.length, 24); ch.writeUInt16LE(nb.length, 28); ch.writeUInt32LE(off, 42);
+      ls.push(lh, nb, db); cd.push(ch, nb); off += 30 + nb.length + db.length;
+    }
+    const cdb = Buffer.concat(cd), e = Buffer.alloc(22); e.writeUInt32LE(0x06054b50, 0); e.writeUInt16LE(Object.keys(files).length, 8); e.writeUInt16LE(Object.keys(files).length, 10); e.writeUInt32LE(cdb.length, 12); e.writeUInt32LE(off, 16);
+    return Buffer.concat(ls.concat([cdb, e]));
+  };
+  const xb = mkXlsx(), EDITS72 = { Sheet1: [['A1', '착공계', 's'], ['B1', '초안값', 's']] };
+  await call({ action: 'cdoc_put', cid: 'c72', i: 1, doc_key: 'gen.work_start', kind: 'draft', pii: 1, fill: { tpl: 'work_start', at: '2026-11-06', edits: EDITS72 } }, tk, 'dev1');
+  await call({ action: 'cdoc_put', cid: 'c72', i: 2, doc_key: 'gen.safety_cost', kind: 'draft', pii: 1, fill: { tpl: 'safety_cost', at: '2026-11-06', edits: EDITS72 } }, tk, 'dev1');
+  await call({ action: 'cdoc_put', cid: 'c72', i: 2, doc_key: 'gen.work_complete', kind: 'draft', pii: 1, fill: { tpl: 'work_complete', at: '2026-11-06', edits: EDITS72 } }, tk, 'dev1');
+  r = await call({ action: 'box_put', j: 0, k: 1, name: '착공계_최종.xlsx', data: xb.toString('base64') }, tk, 'dev1'); const idX = r.body.id;
+  r = await call({ action: 'cdoc_attach', cid: 'c72', i: 2, doc_key: 'main.작성-0', kind: 'final', att: idX, pair_tpl: 'work_start' }, tk, 'dev1');
+  const Lx = r.body.learn || {}, pairX = mem.gw_data['learn:contract:in:' + Lx.id] || {}, itX = r.body.item || {};
+  T('72 짝: 초안이 다른 단계(1)에 있어도 서류 이름으로 정한 양식(pair_tpl)이면 짝 · draft_i 기록 · 칸 비교 간극 50% · 색인에 짝 번호',
+    r.code === 200 && Lx.ok && Lx.tpl === 'work_start' && pairX.draft_i === 1 && pairX.i === 2 && Lx.gap && Lx.gap.cell_ratio === 0.5 && itX.pair === Lx.id, JSON.stringify([r.code, Lx, pairX, itX.pair]));
+  r = await call({ action: 'box_put', j: 0, k: 1, name: '착공계_또.xlsx', data: Buffer.concat([xb, Buffer.from([0])]).toString('base64') }, tk, 'dev1'); const idX2 = r.body.id;
+  r = await call({ action: 'cdoc_attach', cid: 'c72', i: 2, doc_key: 'main.작성-1', kind: 'final', att: idX2 }, tk, 'dev1');
+  T('72 짝: 양식을 못 정하고 같은 단계 초안이 둘이면 종전처럼 미매칭(자동 판단 없음)', r.code === 200 && r.body.learn && r.body.learn.status === 'unmatched', JSON.stringify(r.body.learn));
+  // 옮기기
+  const fixes0 = (mem.gw_data['box:fixes'] || { items: [] }).items.length;
+  const lessonsWS = () => (mem.gw_data['lessons:contract:work_start'] || { gaps: [] }).gaps.filter((g) => g.pair === Lx.id).length;
+  const lessBefore = lessonsWS();
+  r = await call({ action: 'cdoc_move', cid: 'c72', n: itX.n, i: 3, doc_key: 'main.수령-0', kind: 'received', fix: { doc: '착공계', from: '착공 › 착공계', to: '준공 › 공문' } }, tk, 'dev1');
+  const oldK = 'cdoc:c72:S02:main.작성-0:' + itX.n, newK = 'cdoc:c72:S03:main.수령-0:' + itX.n, idxM = mem.gw_data['recidx:c72'], itM = idxM.items.find((x) => x.n === itX.n), fx = mem.gw_data['box:fixes'].items.slice(-1)[0];
+  T('72 cdoc_move: 바이트 키 이동 · 색인(단계·서류·종류·판·현재) 갱신 · 옛 짝 superseded·간극 행 제거 · 고친 내용은 box:fixes(파일 이름 없음) · 감사',
+    r.code === 200 && !mem.gw_files[oldK] && !!mem.gw_files[newK] && mem.gw_files[newK].kind === 'received' && itM.i === 3 && itM.dk === 'main.수령-0' && itM.kind === 'received' && itM.cur === 1 && itM.ver === 1 && !itM.pair && pairX && mem.gw_data['learn:contract:in:' + Lx.id].status === 'superseded' && lessBefore === 1 && lessonsWS() === 0 && mem.gw_data['box:fixes'].items.length === fixes0 + 1 && fx.k === 'doc' && fx.doc === '착공계' && JSON.stringify(fx).indexOf('최종.xlsx') < 0, JSON.stringify([r.code, itM, fx, lessBefore]));
+  r = await call({ action: 'cdoc_move', cid: 'c72', n: itX.n, i: 3, doc_key: 'main.수령-0', kind: 'received' }, tk, 'dev1');
+  const nc1 = r.code === 400 && r.body.error_code === 'NO_CHANGE';
+  const drN = mem.gw_data['recidx:c72'].items.find((x) => x.kind === 'draft').n;
+  r = await call({ action: 'cdoc_move', cid: 'c72', n: drN, i: 3, doc_key: 'a', kind: 'received' }, tk, 'dev1');
+  const nc2 = r.code === 400 && r.body.error_code === 'BAD_KIND';
+  r = await call({ action: 'cdoc_move', cid: 'c72', n: itX.n, i: 2, doc_key: 'main.작성-0', kind: 'final', pair_tpl: 'work_start' }, tk, 'dev1');
+  T('72 cdoc_move: 같은 자리 400 · 초안은 못 옮김 · 최종본 자리로 되돌리면 새 짝', nc1 && nc2 && r.code === 200 && r.body.learn && r.body.learn.ok && r.body.item.pair === r.body.learn.id, JSON.stringify([nc1, nc2, r.code, r.body.learn]));
+  // 자리는 그대로, 종류만·등급만
+  r = await call({ action: 'box_put', j: 0, k: 1, name: 'K1.pdf', data: PDF('kf1') }, tk, 'dev1'); const kf1 = (await call({ action: 'cdoc_attach', cid: 'c72', i: 6, doc_key: 'etc.box', kind: 'received', att: r.body.id }, tk, 'dev1')).body.item;
+  const kKey = 'cdoc:c72:S06:etc.box:' + kf1.n;
+  r = await call({ action: 'cdoc_move', cid: 'c72', n: kf1.n, i: 6, doc_key: 'etc.box', kind: 'final' }, tk, 'dev1');
+  const kOk = r.code === 200 && !!mem.gw_files[kKey] && mem.gw_files[kKey].kind === 'final' && mem.gw_data['recidx:c72'].items.find((x) => x.n === kf1.n).kind === 'final';
+  const kGet = await call({ action: 'cdoc_get', cid: 'c72', n: kf1.n }, tk, 'dev1');
+  T('72 cdoc_move 자리는 그대로·종류만: 바이트가 안 지워짐(같은 키) · 열림', kOk && kGet.code === 200 && kGet.body.data === PDF('kf1'), JSON.stringify([kOk, kGet.code, kGet.body.error_code]));
+  blobsMock.hooks.failSet = (k) => k === 'recidx:c72';
+  r = await call({ action: 'cdoc_move', cid: 'c72', n: kf1.n, i: 6, doc_key: 'etc.box', kind: 'received' }, tk, 'dev1');
+  blobsMock.hooks.failSet = null;
+  T('72 cdoc_move 색인 저장 실패: 500 · 같은 키면 원본 되돌림(파일 유지·종류 그대로)', r.code === 500 && !!mem.gw_files[kKey] && mem.gw_files[kKey].kind === 'final' && mem.gw_files[kKey].data === PDF('kf1'), JSON.stringify([r.code, mem.gw_files[kKey] && mem.gw_files[kKey].kind]));
+  r = await call({ action: 'cdoc_move', cid: 'c72', n: kf1.n, i: 6, doc_key: 'etc.box', kind: 'final', pii: 1 }, tk, 'dev1');
+  const pChanged = r.code === 200 && mem.gw_data['recidx:c72'].items.find((x) => x.n === kf1.n).pii === 1 && mem.gw_files[kKey].pii === 1 && !!mem.gw_files[kKey].data;
+  const fixN0 = (mem.gw_data['box:fixes'] || { items: [] }).items.length;
+  r = await call({ action: 'cdoc_move', cid: 'c72', n: kf1.n, i: 6, doc_key: 'etc.box', kind: 'final', pii: 1 }, tk, 'dev1');
+  T('72 cdoc_move 등급만 고치기: 색인·레코드 반영 · 같은 값이면 NO_CHANGE · 자리 고침으로 안 셈', pChanged && r.code === 400 && r.body.error_code === 'NO_CHANGE' && (mem.gw_data['box:fixes'] || { items: [] }).items.length === fixN0, JSON.stringify([pChanged, r.code]));
+  r = await call({ action: 'cdoc_move', cid: 'c72', n: kf1.n, i: 7, doc_key: 'etc.box', kind: 'final', fix: { doc: '010-1234-5678 명단', from: 'A', to: 'B' } }, tk, 'dev1');
+  T('72 고친 판단 기록: 전화번호 꼴 문서명은 저장 안 함', r.code === 200 && mem.gw_data['box:fixes'].items.slice(-1)[0].doc === '', JSON.stringify(mem.gw_data['box:fixes'].items.slice(-1)[0]));
+  // 현재본 이동: 같은 자리에 둘 → 현재본을 옮기면 앞 판이 현재
+  r = await call({ action: 'box_put', j: 0, k: 1, name: 'A1.pdf', data: PDF('a1') }, tk, 'dev1'); const a1 = (await call({ action: 'cdoc_attach', cid: 'c72', i: 4, doc_key: 'main.수령-9', kind: 'received', att: r.body.id }, tk, 'dev1')).body.item;
+  r = await call({ action: 'box_put', j: 0, k: 1, name: 'A2.pdf', data: PDF('a2') }, tk, 'dev1'); const a2 = (await call({ action: 'cdoc_attach', cid: 'c72', i: 4, doc_key: 'main.수령-9', kind: 'received', att: r.body.id }, tk, 'dev1')).body.item;
+  await call({ action: 'cdoc_move', cid: 'c72', n: a2.n, i: 5, doc_key: 'main.수령-8', kind: 'received' }, tk, 'dev1');
+  const ia1 = mem.gw_data['recidx:c72'].items.find((x) => x.n === a1.n);
+  T('72 cdoc_move: 현재본을 옮기면 옛 자리의 앞 판이 현재로', ia1.cur === 1, JSON.stringify(ia1));
+  // 영구 삭제
+  await call({ action: 'cdoc_del', cid: 'c72', n: itB.n }, tk, 'dev1');
+  mem.gw_data['recidx:c72'].items.find((x) => x.n === itB.n).del = Date.now() - 31 * 86400000;
+  mem.gw_files['parse:' + idB] = { ts: 1, bid: 'ucon72', result: { doc: 'box', cls: 'received' } };
+  r = await call({ action: 'cdoc_purge', cid: 'c72', n: itB.n, confirm: true }, tokA, 'dev1');
+  T('72 영구 삭제: 큰 파일은 조각·본 레코드·판독값까지', r.code === 200 && !mem.gw_files[BF.attPartKey(idB, 0)] && !mem.gw_files[idB] && !mem.gw_files[fkB] && !mem.gw_files['parse:' + idB], r.code + '/' + r.body.error_code);
+  // 넣다 만 파일 — 표식·목록·재전송
+  r = await call({ action: 'box_put', j: 0, k: 2, name: '멈춤.pdf', data: PDF('s0') }, tk, 'dev1'); const idO = r.body.id;
+  let pd = await call({ action: 'box_pending' }, tk, 'dev1');
+  const pdOpen = (pd.body.items || []).find((x) => x.id === idO);
+  const pdOther = await call({ action: 'box_pending' }, tkB, 'dev1');
+  await call({ action: 'box_put', id: idO, j: 1, k: 2, name: '멈춤.pdf', data: b('s1') }, tk, 'dev1');
+  r = await call({ action: 'box_put', id: idO, j: 1, k: 2, name: '멈춤.pdf', data: b('s1') }, tk, 'dev1');
+  const resend = r.code === 200 && r.body.done === true;
+  mem.gw_files['parse:' + idO] = { ts: 1, bid: 'ucon72', result: { doc: 'box', cls: 'filled' } };
+  pd = await call({ action: 'box_pending' }, tk, 'dev1');
+  const pdDone = (pd.body.items || []).find((x) => x.id === idO);
+  mem.gw_files['boxp:' + idO].ts = Date.now() - 2 * 86400000;
+  const pdAdmin = await call({ action: 'box_pending' }, tokA, 'dev1');
+  T('72 넣다 만 파일: 본인 목록(미완 표시) · 남에겐 안 보임 · 마지막 조각 재전송은 성공 · 판단 결과 함께 · 관리자는 하루 지난 남의 것도', pdOpen && pdOpen.open === 1 && !(pdOther.body.items || []).some((x) => x.id === idO) && resend && pdDone && pdDone.parsed.cls === 'filled' && (pdAdmin.body.items || []).some((x) => x.id === idO), JSON.stringify([pdOpen, resend, pdDone]));
+  r = await call({ action: 'cdoc_attach', cid: 'c72', i: 7, doc_key: 'etc.box', kind: 'received', att: idO }, tk, 'dev1');
+  pd = await call({ action: 'box_pending' }, tk, 'dev1');
+  const noMark = !mem.gw_files['boxp:' + idO] && !(pd.body.items || []).some((x) => x.id === idO);
+  r = await call({ action: 'box_put', j: 0, k: 1, name: '버릴.pdf', data: PDF('bin') }, tk, 'dev1'); const idBin = r.body.id, had = !!mem.gw_files['boxp:' + idBin];
+  await call({ action: 'att_del', id: idBin }, tk, 'dev1');
+  T('72 넣다 만 표식: 넣으면 지움 · 버리면 지움', noMark && had && !mem.gw_files['boxp:' + idBin], JSON.stringify([noMark, had]));
+  // att_del — 넣기 전 버리기
+  r = await call({ action: 'box_put', j: 0, k: 2, name: '버림.pdf', data: PDF('d0') }, tk, 'dev1'); const idZ = r.body.id;
+  await call({ action: 'box_put', id: idZ, j: 1, k: 2, name: '버림.pdf', data: b('x') }, tk, 'dev1');
+  r = await call({ action: 'att_del', id: idZ }, tk, 'dev1');
+  T('72 넣기 전 버리기: 조각까지 지움', r.code === 200 && !mem.gw_files[idZ] && !mem.gw_files[BF.attPartKey(idZ, 0)] && !mem.gw_files[BF.attPartKey(idZ, 1)], '');
+  // box_fix
+  const ym = new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 7), ukey = 'usage:box:' + ym;
+  r = await call({ action: 'box_fix', ok: true }, tk);
+  const okN = mem.gw_data[ukey].ok;
+  const f0 = mem.gw_data['box:fixes'].items.length;
+  r = await call({ action: 'box_fix', title: '하수도 준설', from: { type: 'demolition', pub: true, x: 'y' }, to: { type: 'dredge', pub: true } }, tk);
+  const fr0 = mem.gw_data['box:fixes'].items.slice(-1)[0];
+  T('72 box_fix: 그대로 뒀으면 ok만 세고, 고쳤으면 box:fixes에 분류값만(다른 키 버림) · 사용량 placed·moved 계수', okN === 1 && mem.gw_data['box:fixes'].items.length === f0 + 1 && fr0.k === 'contract' && fr0.to.type === 'dredge' && fr0.from.x === undefined && mem.gw_data[ukey].fixed === 1 && mem.gw_data[ukey].placed >= 5 && mem.gw_data[ukey].moved >= 2, JSON.stringify([okN, fr0, mem.gw_data[ukey]]));
+  for (let i = 0; i < 70; i++) await call({ action: 'box_fix', title: 't' + i, from: { type: 'a' }, to: { type: 'b' } }, tk);
+  T('72 box_fix 상한: 60행만 남김', mem.gw_data['box:fixes'].items.length === 60, String(mem.gw_data['box:fixes'].items.length));
+  // ---- 판단 모듈 ----
+  const ctx = { docs: [{ id: 's|main|2|작성:0', n: '착공계', s: '착공서류 작성' }], cons: [{ id: 'c1', t: '공사', c: '공단', s: '현장' }], tpls: [{ k: 'work_start', n: '착공계' }], drafts: [{ tpl: 'work_start', n: '착공계' }] };
+  const nj = BJ.normJudge({ cls: 'contract', sub: 'none', doc_name: '계약서', pii: '0', title: '공사', amount: 1000, date_contract: '2026-11-06', date_start: '2026년', date_end: '', client: '010-1234-5678', site: '포항', guarantee: 0, con_type: 'dredge', combo: false, pub: true, why_type: '준설', why_pub: '공단', our_side: '을', target: '없는id', contract_id: 'c1', tpl_key: 'nope', draft_tpl: 'work_start', why: '' }, ctx);
+  T('72 판단 정리: 목록 밖 id 버림 · 날짜 형식 · 연락처 꼴 칸 비움 · 값 유지', nj.cls === 'contract' && nj.target === '' && nj.contract_id === 'c1' && nj.tpl_key === '' && nj.draft_tpl === 'work_start' && nj.con.d1 === '2026-11-06' && nj.con.d2 === '' && nj.con.client === '' && nj.con.title === '공사' && nj.con_type === 'dredge', JSON.stringify(nj));
+  const nj2 = BJ.normJudge({ cls: '이상', pii: '2', con_type: 'dredge', title: '값', target: 's|main|2|작성:0' }, ctx);
+  T('72 판단 정리: 모르는 종류 other · 계약서가 아니면 계약 값 없음 · 민감 등급 2', nj2.cls === 'other' && nj2.con === null && nj2.con_type === 'none' && nj2.pii === 2 && nj2.target === 's|main|2|작성:0', JSON.stringify(nj2));
+  const g70 = BJ.nameGuard('2026 건강진단 결과표.pdf'), g71 = BJ.nameGuard('근로자 명단.xlsx'), g72 = BJ.nameGuard('대표 신분증.jpg'), g73 = BJ.nameGuard('착공계.xlsx');
+  T('72 개인정보 파일명: 건강진단 2 · 명단 1 · 신분증 1(값 판독 없음 sub none) · 모델 안 씀(read none) · 문서 이름도 비움 · 일반 파일은 통과', g70.pii === 2 && g70.read === 'none' && g70.doc_name === '' && g71.pii === 1 && g72.sub === 'none' && g73 === null, JSON.stringify([g70, g71, g72, g73]));
+  const pass72 = ['상대동 주민센터 석면철거공사 계약서.pdf', '국민건강보험공단 포항지사 석면해체공사 계약서.pdf', '건강증진센터 철거공사 계약서.hwp', '건강보험 완납증명서.pdf', '주민설명회 자료.pdf', '건강검진센터 철거공사 계약서.pdf'].filter((n) => BJ.nameGuard(n)).length;
+  const h72 = ['김철수 건강 진단 결과표.pdf', '일반건강검사 결과.pdf', 'health_check_2026.pdf', '검진표.jpg'].filter((n) => (BJ.nameGuard(n) || {}).pii === 2).length;
+  T('72 입구 가드: 주민센터·건강보험공단 계약서·건강보험 완납증명은 안 막음 · 건강진단 표기 변형은 등급 2 · NFD 파일명도 잡음', pass72 === 0 && h72 === 4 && !!BJ.nameGuard('근로자 명단.xlsx'.normalize('NFD')), JSON.stringify([pass72, h72]));
+  T('72 본문 주민번호 꼴 가림: 하이픈·외국인등록번호·13자리', BJ.maskRrn('홍 900101-1234567 끝') === '홍 [주민번호 가림] 끝' && BJ.maskRrn('850101-5234567') === '[주민번호 가림]' && BJ.maskRrn('A1=8501011234567') === 'A1=[주민번호 가림]' && BJ.maskRrn('금액 1234567890123') === '금액 1234567890123', BJ.maskRrn('A1=8501011234567'));
+  const pr = BJ.buildPrompt('a.xlsx', ctx, [{ k: 'doc', doc: '착공계', from: 'A', to: 'B' }, { k: 'contract', title: '공사', from: { type: 'demolition' }, to: { type: 'dredge' } }], '본문 900101-1234567', 'text');
+  T('72 프롬프트: 서류·계약·양식·초안 목록 · 사람이 고친 판단 · 본문은 가려서', /s\|main\|2\|작성:0 = 착공서류 작성 > 착공계/.test(pr) && /c1 = 공단/.test(pr) && /work_start = 착공계/.test(pr) && /착공계 서류: A → B/.test(pr) && /type demolition→dredge/.test(pr) && pr.indexOf('900101-1234567') < 0, pr.slice(-400));
+  T('72 extractText: 최소 xlsx 칸 글자', /A1=착공계/.test(BJ.extractText('xlsx', xb)) && BJ.extractText('pdf', xb) === '', BJ.extractText('xlsx', xb));
+  // 모델 호출 mock — 형식·재시도·백그라운드 저장
+  const realFetch = global.fetch, savedKey = process.env.GW_ANTHROPIC_KEY, reqs = []; let mode = 'ok';
+  const judgeOut = { cls: 'filled', sub: 'none', doc_name: '착공계', pii: '0', title: '', amount: 0, date_contract: '', date_start: '', date_end: '', client: '', site: '', guarantee: 0, con_type: 'none', combo: false, pub: true, why_type: '', why_pub: '', our_side: '모름', target: 's|main|2|작성:0', contract_id: '', tpl_key: '', draft_tpl: 'work_start', why: '제목' };
+  global.fetch = async (url, o) => { const q = JSON.parse(o.body); reqs.push(q); if (mode === 'err500') return { status: 500, text: async () => 'x' }; if (mode === 'err500once') { mode = 'ok'; return { status: 500, text: async () => 'x' }; } return { status: 200, text: async () => JSON.stringify({ content: [{ type: 'text', text: JSON.stringify(judgeOut) }], usage: { input_tokens: 100, output_tokens: 20 } }) }; };
+  process.env.GW_ANTHROPIC_KEY = 'test-key';
+  try {
+    let j1 = await BJ.judgeBox({ name: '착공계.pdf', b64: PDF('x'), ctx: ctx, fixes: [] });
+    const q1 = reqs[reqs.length - 1];
+    T('72 judgeBox pdf: document 블록 + 구조화 출력(스키마) · 정리된 결과 · read vision · 사용량', q1.messages[0].content[0].type === 'document' && q1.output_config.format.type === 'json_schema' && j1.doc === 'box' && j1.cls === 'filled' && j1.target === 's|main|2|작성:0' && j1.read === 'vision' && j1.usage.in === 100, JSON.stringify(j1));
+    await BJ.judgeBox({ name: '착공계.xlsx', b64: xb.toString('base64'), ctx: {}, fixes: [] });
+    const q2 = reqs[reqs.length - 1];
+    T('72 judgeBox xlsx: 파일을 그대로 안 보내고 본문 글자만', q2.messages[0].content.length === 1 && q2.messages[0].content[0].type === 'text' && /A1=착공계/.test(q2.messages[0].content[0].text), JSON.stringify(q2.messages[0].content[0]).slice(0, 200));
+    const n0 = reqs.length; const j3 = await BJ.judgeBox({ name: '건강진단.pdf', b64: PDF('x'), ctx: {}, fixes: [] });
+    T('72 judgeBox 개인정보 파일명: 모델 호출 0', reqs.length === n0 && j3.read === 'none' && j3.pii === 2, '');
+    mode = 'err500once'; const n1 = reqs.length; const j4 = await BJ.judgeBox({ name: '착공계.pdf', b64: PDF('x'), ctx: {}, fixes: [] });
+    T('72 judgeBox 서버 오류 1회 재시도', reqs.length === n1 + 2 && j4.doc === 'box', String(reqs.length - n1));
+    mode = 'err500'; const j5 = await BJ.judgeBox({ name: '착공계.pdf', b64: PDF('x'), ctx: {}, fixes: [] }); mode = 'ok';
+    T('72 judgeBox 계속 실패: error만 돌려줌', j5.error === 'SERVER', JSON.stringify(j5));
+    // 백그라운드
+    r = await call({ action: 'box_put', j: 0, k: 2, name: '착공계_판단.pdf', data: PDF('p0') }, tk, 'dev1'); const idP = r.body.id;
+    await call({ action: 'box_put', id: idP, j: 1, k: 2, name: '착공계_판단.pdf', data: b('p1') }, tk, 'dev1');
+    const u0 = (mem.gw_data[ukey].calls || 0), nq = reqs.length;
+    await pb.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + tkB }, body: JSON.stringify({ id: idP, box: 1, ctx: ctx }) });
+    const notOwn = !mem.gw_files['parse:' + idP] && reqs.length === nq;
+    await pb.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + tk }, body: JSON.stringify({ id: idP, box: 1, ctx: ctx }) });
+    const pr1 = mem.gw_files['parse:' + idP], qp = reqs[reqs.length - 1];
+    T('72 백그라운드: 남이 올린 파일은 판독 안 함 · 조각을 이어 모델에 · 사람이 고친 판단이 프롬프트에 · 결과 parse:<id> · 사용량 calls', notOwn && pr1.result.doc === 'box' && pr1.result.cls === 'filled' && qp.messages[0].content[0].source.data === PDF('p0') + b('p1') && /사람이 최근에 고친 판단/.test(qp.messages[0].content[1].text) && mem.gw_data[ukey].calls === u0 + 1, JSON.stringify([notOwn, pr1.result.doc, mem.gw_data[ukey]]));
+    r = await call({ action: 'att_parse_status', id: idP }, tk, 'dev1');
+    const psOwn = r.body.status === 'OK' && r.body.parsed.doc === 'box';
+    r = await call({ action: 'att_parse_status', id: idP }, tkB, 'dev1');
+    const psOther = r.code === 403 && r.body.error_code === 'NOT_OWNER';
+    r = await call({ action: 'att_parse_status', id: idP }, tokA, 'dev1');
+    const psAdmin = r.body.status === 'OK';
+    const U72H = { id: 'uhide72', name: '숨김72', admin: false, perms: { con: 'hide' } }; mem.gw_users['member:uhide72'] = U72H;
+    r = await call({ action: 'att_parse_status', id: idP }, issueSession(U72H).token, 'dev1');
+    T('72 att_parse_status: 올린 사람·관리자만(남 403 · 계약 숨김 403)', psOwn && psOther && psAdmin && r.code === 403, JSON.stringify([psOwn, psOther, psAdmin, r.code]));
+    // 남이 부른 판독은 판단 원본을 덮지 않는다 · 전용 판독은 파일명 가드를 지난다 · 버린 파일에 결과를 되살리지 않는다
+    const before = JSON.stringify(mem.gw_files['parse:' + idP]);
+    await pb.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + tkB }, body: JSON.stringify({ id: idP, box: 1, ctx: {} }) });
+    const keep1 = JSON.stringify(mem.gw_files['parse:' + idP]) === before;
+    r = await call({ action: 'box_put', j: 0, k: 1, name: '대표 신분증.jpg', data: Buffer.from([0xFF, 0xD8, 0xFF, 0, 1, 2, 3, 4]).toString('base64') }, tk, 'dev1'); const idG = r.body.id, nq2 = reqs.length;
+    await pb.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + tk }, body: JSON.stringify({ id: idG, box: 1, kind: 'biz' }) });
+    const guardKind = reqs.length === nq2 && mem.gw_files['parse:' + idG].result.error === 'PII_NAME';
+    r = await call({ action: 'box_put', j: 0, k: 1, name: '착공계_버림.pdf', data: PDF('gone') }, tk, 'dev1'); const idV = r.body.id, ff = global.fetch;
+    global.fetch = async (u, o) => { delete mem.gw_files[idV]; return ff(u, o); };
+    await pb.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + tk }, body: JSON.stringify({ id: idV, box: 1, ctx: {} }) });
+    global.fetch = ff;
+    T('72 백그라운드: 남이 불러도 원본 유지 · 신분증 파일명은 전용 판독도 모델 호출 0 · 판단 중 버리면 결과를 안 씀', keep1 && guardKind && !mem.gw_files['parse:' + idV], JSON.stringify([keep1, guardKind, !!mem.gw_files['parse:' + idV]]));
+    // 큰 파일·잘림
+    const nq3 = reqs.length;
+    const jBig = await BJ.judgeBox({ name: '큰 스캔.pdf', b64: 'A'.repeat(31000004), ctx: {}, fixes: [] });
+    const qBig = reqs[reqs.length - 1];
+    T('72 judgeBox 요청 한도를 넘는 PDF: 파일을 안 보내고 파일명으로만 판단', reqs.length === nq3 + 1 && qBig.messages[0].content.length === 1 && qBig.messages[0].content[0].type === 'text' && jBig.read === 'name', JSON.stringify([jBig.read, qBig.messages[0].content.length]));
+    const ff2 = global.fetch; global.fetch = async () => ({ status: 200, text: async () => JSON.stringify({ stop_reason: 'max_tokens', content: [{ type: 'text', text: '{"cls":' }], usage: { input_tokens: 9, output_tokens: 6000 } }) });
+    const jCut = await BJ.judgeBox({ name: '착공계.pdf', b64: PDF('x'), ctx: {}, fixes: [] });
+    global.fetch = ff2;
+    T('72 judgeBox 답이 잘리면 MAX_TOKENS 오류 + 사용량', jCut.error === 'MAX_TOKENS' && jCut.usage.out === 6000, JSON.stringify(jCut));
+  } finally { global.fetch = realFetch; if (savedKey === undefined) delete process.env.GW_ANTHROPIC_KEY; else process.env.GW_ANTHROPIC_KEY = savedKey; }
+  // 정리 — 뒤 절에 영향 없게
+  delete mem.gw_data['recidx:c72']; delete mem.gw_data['box:fixes']; delete mem.gw_data[ukey];
+  Object.keys(mem.gw_data).filter((k) => k.indexOf('learn:contract:in:') === 0 || k.indexOf('lessons:contract:') === 0).forEach((k) => delete mem.gw_data[k]);
+  Object.keys(mem.gw_files).filter((k) => /^(cdoc:c72|attp:|boxp:|parse:att_)/.test(k)).forEach((k) => delete mem.gw_files[k]);
 }
 
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

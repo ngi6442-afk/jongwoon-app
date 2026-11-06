@@ -9,6 +9,7 @@ const { verifyToken, bearer } = require('./_lib/session');
 const LN = require('./_lib/learn');
 const DD = require('./_lib/docdiff');
 const CL = require('./_lib/claude');
+const BF = require('./_lib/boxfile');
 
 const DATA = 'gw_data', FILES = 'gw_files';
 const TIMEOUT_MS = 180000;
@@ -60,12 +61,14 @@ exports.handler = async function (event, context) {
     if (!LN.usageOk(usage && usage.ym === ym ? usage : null, T.monthly_cap)) { await finish('hold', 'USAGE_CAP', '월 상한 ' + T.monthly_cap + '회 — 다음 달'); return; }
 
     // 재료: 초안 채움 맵(fill.edits) · 최종본 xlsx 바이트
-    const dr = await blobGet(store(FILES), cdocKey(pair.cid, pair.i, 'gen.' + pair.tpl, pair.draft_n));
+    const dr = await blobGet(store(FILES), cdocKey(pair.cid, Number.isInteger(pair.draft_i) ? pair.draft_i : pair.i, 'gen.' + pair.tpl, pair.draft_n));   // v423 넣기 박스: 초안과 최종본이 다른 단계일 수 있다(draft_i)
     const fillFlat = (dr.ok && dr.data && dr.data.fill) ? DD.flattenEdits(dr.data.fill.edits) : null;   // v419 실제 초안은 시트별 객체 — 옛 평면 배열도 받는다
     if (!fillFlat) { await finish('fail', 'NO_FILL', '초안 채움 맵이 없습니다'); return; }
     const fr = await blobGet(store(FILES), cdocKey(pair.cid, pair.i, pair.dk, pair.final_n));
-    if (!fr.ok || !fr.data || !fr.data.data) { await finish('fail', 'NO_FINAL', '최종본 바이트가 없습니다'); return; }
-    const rows = DD.cellRows(fillFlat, Buffer.from(String(fr.data.data), 'base64'), allow);
+    let finalB64 = (fr.ok && fr.data && fr.data.data) ? String(fr.data.data) : '';
+    if (!finalB64 && fr.ok && fr.data && fr.data.att) { try { const ar = await blobGet(store(FILES), fr.data.att); finalB64 = await BF.attReadB64(store(FILES), fr.data.att, ar.data); } catch (e) { finalB64 = ''; } }   // v423 큰 파일은 조각
+    if (!finalB64) { await finish('fail', 'NO_FINAL', '최종본 바이트가 없습니다'); return; }
+    const rows = DD.cellRows(fillFlat, Buffer.from(finalB64, 'base64'), allow);
     if (!rows.ok) { await finish('fail', rows.code || 'DIFF_FAILED'); return; }
     if (!rows.rows.length && !rows.hidden_changed.length) { await finish('done', 'NO_CHANGE', '바뀐 칸 없음 — 모델 호출 생략', { rules_n: null }); return; }
 

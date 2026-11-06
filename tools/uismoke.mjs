@@ -1355,8 +1355,8 @@ try {
     && seg.indexOf('querySelectorAll("tr.vs-r")') >= 0 && seg.indexOf('th[data-cs-sort]') >= 0 && seg.indexOf('querySelector("[data-cs-reset]")') >= 0
     && ['data-cf', 'data-cs-chip', 'data-cs-rs', 'data-cs-tab', 'data-cs-close', 'data-cs-sdoc'].every((a) => seg.indexOf('querySelectorAll("[' + a + ']")') >= 0)
     && (seg.match(/colspan="' \+ csN \+ '"/g) || []).length === 2 && ids.has('conDetailCard') && /#conDetailCard\{display:none;\}/.test(html) && /#conDetailCard\{display:block;margin-top:8px;\}/.test(html), '');
-  T('v381 종전 행 버튼·첨부 배선(data-con-del/doc/xlsx/bldg · data-catt-add/del/rev/drop)이 펼침 안에서 그대로 묶인다',
-    ['data-con-del', 'data-con-doc', 'data-con-xlsx', 'data-con-bldg', 'data-catt-add', 'data-catt-del', 'data-catt-rev', 'data-catt-drop'].every((a) => seg.indexOf('querySelectorAll("[' + a + ']")') >= 0), '');
+  T('v381 종전 행 버튼·첨부 배선(data-con-del/doc/xlsx/bldg · data-catt-del/rev, v423 올리기는 넣기 박스 cbxBind)이 펼침 안에서 그대로 묶인다',
+    ['data-con-del', 'data-con-doc', 'data-con-xlsx', 'data-con-bldg', 'data-catt-del', 'data-catt-rev'].every((a) => seg.indexOf('querySelectorAll("[' + a + ']")') >= 0) && seg.indexOf('cbxBind(root)') >= 0, '');
   T('v381 CSS: .cs-stg 단계 카드(done/cur) · .cs-bar 진행 막대 · 폰 열 폭 4(cs-c-client/site/stage/end) · 시트 블록의 저장 호출은 v382 단계 입력·작업현황(새 키 vals/work_log/settle_amount) 7함수뿐(v401 csDocAfter 포함)',
     /\.cs-stg\.done\{/.test(html) && /\.cs-stg\.cur\{/.test(html) && /\.cs-bar i\{/.test(html) && ['client', 'site', 'stage', 'end'].every((k) => new RegExp('\\.vs col\\.cs-c-' + k + '\\{width:\\d+% !important;\\}').test(html))
     && (seg.match(/scheduleContractSave\(\)/g) || []).length === (seg.match(/function (csSkipStage|csUnskipStage|csJumpStage|csSaveFields|csWlAdd|csWlDel|csDocAfter|csChgAdd)\(/g) || []).length, '');   // v401 csDocAfter(서류 체크리스트) 추가
@@ -1401,11 +1401,11 @@ try {
   T('v383 CON_PACKETS 4(계약·착공·준공·청구) · gen 키는 TPL_LABELS 또는 가상 키(con_docs·quote·html_contract) · tpl_list 캐시(csLoadTpl) · 서류 탭에 csPacketsHtml + 첨부함 · [생성] 배선(html_contract → 계약서 툴, 그 외 openXlsxGen)',
     pks.join(',') === 'con,start,complete,bill'
     && [...sc.matchAll(/t:"gen", k:"(\w+)"/g)].map((m) => m[1]).every((k) => ['con_docs', 'quote', 'html_contract', 'safety_pack'].includes(k) || new RegExp('\\b' + k + ':"').test(html.slice(html.indexOf('var TPL_LABELS='), html.indexOf('var TPL_LABELS=') + 900)))
-    && /gwCall\("gw-data", \{ action:"tpl_list" \}\)/.test(sc) && /h \+= csPacketsHtml\(c\) \+ \(conAttBoxHtml\(c\)/.test(html) && /querySelectorAll\("\[data-cs-gen\]"\)/.test(html) && /openDocFromContract\(p\[0\]\); else openXlsxGen\(p\[0\], csGenKind/.test(html)
+    && /gwCall\("gw-data", \{ action:"tpl_list" \}\)/.test(sc) && /h \+= csPacketsHtml\(c\) \+ cbxEtcHtml\(c\) \+ conAttBoxHtml\(c\)/.test(html) && /querySelectorAll\("\[data-cs-gen\]"\)/.test(html) && /openDocFromContract\(p\[0\]\); else openXlsxGen\(p\[0\], csGenKind/.test(html)
     && /\.cs-pk \.st\.gap\{/.test(html), pks.join(','));
   T('v383 검토 반영: tpl_list 실패는 캐시 null 유지 + csTplErr 쿨다운(30초) · 비200 불신 · then 2인자 · tpl_put 성공·관리 목록 수신 → csTplInvalidate/csTplSet · 모달 닫기 재그리기 · 첨부 claim 1회 + ex 제외 · 정규식 좁힘(사업자 제외 등록증·세금계산서·4대보험)',
     /if \(csTplErr && Date\.now\(\) - csTplErr < 30000\) return;/.test(sc) && /if \(!\(res && res\.status === 200 && res\.body && res\.body\.templates\)\)\{ csTplErr = Date\.now\(\);/.test(sc) && /\}, function\(\)\{ csTplLoading = false; csTplErr = Date\.now\(\); renderContracts\(\); \}\);/.test(sc)
-    && /if\(res\.status===200\)\{ if\(typeof csTplInvalidate==="function"\) csTplInvalidate\(\); openTplManage\(\);/.test(html) && /typeof csTplSet==="function"\) csTplSet\(t\);/.test(html) && /\$\("tplBackdrop"\)\.classList\.remove\("show"\); if\(typeof renderContracts==="function"\) renderContracts\(\); \}\);/.test(html)
+    && /cbxDiscard\(it\); if \(csTplKeys\) csTplKeys\[key\] = 1;/.test(html) && /typeof csTplSet==="function"\) csTplSet\(t\);/.test(html) && /\$\("tplBackdrop"\)\.classList\.remove\("show"\); if\(typeof renderContracts==="function"\) renderContracts\(\); \}\);/.test(html)
     && /if \(!claimed\[ai\] && it\.re\.test\(n\) && !\(it\.ex && it\.ex\.test\(n\)\)\)\{ claimed\[ai\] = 1; hit\.push\(n\); \}/.test(sc) && /k:"reg", h:"건설업·폐기물 등록증", re:\/\(건설업\|해체\|폐기물\|수집운반\|운반업\)/.test(sc) && /k:"invoice", h:"세금계산서", re:\/세금계산서\//.test(sc) && /k:"ins", h:"4대보험 완납증명", re:\/4대보험/.test(sc) && !/re:\/보험\|완납\//.test(sc), '');
 } catch (e) { console.log('  (v383 검사 생략 — ' + e.message + ')'); fails++; }
 
@@ -1768,12 +1768,11 @@ try {
 // ---- v407(11/1 계약 D3 2일차): 계약 서류함 화면 — 단계 서류 행 [최종본↑]·[수령↑]·pii 선택·기록물 줄 · 패킷 메타 우선 판정·[⬆ 올리기] · 생성 훅 초안 보존 2곳 · 이벤트 연결 · sw ≥407
 try {
   const swv7 = readFileSync(join(ROOT, 'sw.js'), 'utf8');
-  T('v407 계약 서류함 화면: cdoc 함수군(cdocDocKey·cdocPkHit·cdocRowsHtml·csCdocPick/Upload/Open/Mark/Draft) · 서류 행 data-cs-cup 2종 · data-cs-pii 선택 · 패킷 cdocPkHit 우선·data-cs-cpk · 생성 훅 csCdocDraft 2곳 · 바인딩 5종 · CSS · sw ≥ 407',
-    ['function cdocDocKey', 'function cdocPkHit', 'function cdocRowsHtml', 'function cdocLoad', 'function csCdocPick', 'function csCdocUpload', 'function csCdocOpen', 'function csCdocMark', 'function csCdocDraft'].every((s) => html.indexOf(s) > 0)
-    && html.indexOf('data-cs-cup="\' + base + esc(d.k) + \'|final"') > 0 && html.indexOf('|received" title="수령본') > 0 && html.indexOf('<select data-cs-pii=') > 0
-    && html.indexOf('var hm = cdocPkHit(c, pk, it), hit = [];') > 0 && html.indexOf('data-cs-cpk="') > 0 && (html.match(/csCdocDraft\(c, kind, ed(?:, al\.learned)?\);/g) || []).length === 2
-    && ['data-cs-cup', 'data-cs-cpk', 'data-cs-copen', 'data-cs-ccur', 'data-cs-cdel'].every((a) => html.indexOf('querySelectorAll("[' + a + ']")') > 0 || html.indexOf('csAct("' + a + '"') > 0)
-    && html.indexOf('[data-cs-dnew], [data-cs-pii]') > 0 && html.indexOf('.cs-cdoc-r{') > 0 && Number((swv7.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 407);
+  T('v407 계약 서류함 화면(v423 올리기는 넣기 박스로): cdoc 함수군(cdocDocKey·cdocPkHit·cdocRowsHtml·csCdocOpen/Mark/Draft) · 패킷 cdocPkHit 우선 · 생성 훅 csCdocDraft 2곳 · 바인딩 4종 · CSS · sw ≥ 407',
+    ['function cdocDocKey', 'function cdocPkHit', 'function cdocRowsHtml', 'function cdocLoad', 'function csCdocOpen', 'function csCdocMark', 'function csCdocDraft'].every((s) => html.indexOf(s) > 0)
+    && html.indexOf('var hm = cdocPkHit(c, pk, it), hit = [], hm2 = null;') > 0 && (html.match(/csCdocDraft\(c, kind, ed(?:, al\.learned)?\);/g) || []).length === 2
+    && ['data-cs-cmove', 'data-cs-copen', 'data-cs-ccur', 'data-cs-cdel'].every((a) => html.indexOf('querySelectorAll("[' + a + ']")') > 0 || html.indexOf('csAct("' + a + '"') > 0)
+    && html.indexOf('.cs-cdoc-r{') > 0 && Number((swv7.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 407);
 } catch (e) { console.log('  (v407 검사 생략 — ' + e.message + ')'); fails++; }
 
 // ---- v408(11/1 계약 D3 3일차): 관리자 보관함 — cdoc_list all:true(서버 관리자 한정) · 서류 탭 cdocTrashHtml · [복구]·[영구 삭제] 바인딩 · sw ≥408
@@ -1793,7 +1792,7 @@ try {
     && ['<b>관리</b>: 지시 / 기성·수금', '<b>수주</b>: 입찰 / 계약', '<b>업무</b>: 캘린더 / 차량', '<b>개인</b>: 내 업무'].every(function (t) { return html.indexOf(t) > 0; })
     && html.indexOf('<b>+ 휴가 신청</b>(유형·기간·사유 필수)') > 0
     && man9.indexOf('이름을 고르고 PIN') < 0 && man9.indexOf('아이디와 PIN을 입력합니다') > 0
-    && ['[+ 휴가 신청]', '<b>[철회]</b>', '<b>[취소 요청]</b>', '최대 25일', '사직 면담 신청', '승인·반려 알림은 아직 없습니다'].every(function (t) { return man9.indexOf(t) > 0; })
+    && ['[+ 휴가 신청]', '<b>[철회]</b>', '<b>[취소 요청]</b>', '최대 25일', '사직 면담 신청', '승인·반려되면 알림 켠 기기로 알림이 옵니다'].every(function (t) { return man9.indexOf(t) > 0; })
     && Number((swv9.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 409);
 } catch (e) { console.log('  (v409 검사 생략 — ' + e.message + ')'); fails++; }
 
@@ -1914,6 +1913,25 @@ try {
 } catch (e) { console.log('  (v422 검사 생략 — ' + e.message + ')'); fails++; }
 
 // ---- (11/2) Blob 컨텍스트 전수: netlify/functions/*.js 중 store(·blobGet(·blobSet(·blobList(를 쓰는 함수는 setupBlobContext( 호출 필수 — gw-lawwatch가 빠져 첫 실제 경보가 502(11/2)
+// ---- v423(11/6 체크 31): 넣기 박스 — 입구 하나 · 계약 시작 맨 바깥 두 갈래 · 옛 입구 제거 · 서버 액션 · 판단 모듈 ----
+try {
+  const srv23 = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-data.js'), 'utf8'), pb23 = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-parse-background.js'), 'utf8');
+  T('v423 맨 바깥 두 갈래: 넣기 박스(data-cbx-drop="top") + [직접 생성](conStartBtn) · + 계약 시작 문구 없음 · + 양식 등록 버튼 없음(관리자 양식 목록만) · 그대로인 버튼 서류 출력·실적 다운로드',
+    ids.has('conBox') && ids.has('conBoxCards') && html.indexOf('data-cbx-drop="top"') > 0 && />직접 생성<\/button>/.test(html) && html.indexOf('>+ 계약 시작<') < 0 && html.indexOf('>+ 양식 등록<') < 0 && />양식 목록<\/button>/.test(html) && ids.has('docGenBtn') && ids.has('conPerfBtn') && html.indexOf('[+ 양식 등록]') < 0, '');
+  T('v423 옛 입구 제거: 양식 등록 버튼·증빙 올리기·📎 첨부·끌어놓기·최종본↑·수령↑·⬆ 올리기·개인정보 선택 칸이 화면 코드에 없음',
+    ['data-tpl-up', 'proofUpBtn', 'proofFile', 'data-catt-add', 'data-catt-drop', 'data-cs-cup', 'data-cs-cpk', 'data-cs-pii', 'function csCdocPick', 'function csCdocUpload', 'function conAddAttach', 'function conPickAttach', 'function asbBgParse', 'function proofUpload'].every((s) => html.indexOf(s) < 0), '');
+  T('v423 박스 함수군: 올리기(조각)·판단·카드·새 계약·서류함 넣기·옮기기·양식·증빙 · 계약 안 박스(csDetailHtml) · 그 밖의 서류 · 판 밖 드롭 방지 · 초기화 · CSS',
+    ['function cbxAdd', 'function cbxUpload', 'function cbxJudge', 'function cbxApply', 'function cbxStart', 'function cbxPlace', 'function cbxMoveGo', 'function cbxTplGo', 'function cbxProofGo', 'function cbxCardHtml', 'function cbxBind', 'function cbxInit'].every((s) => html.indexOf(s) > 0)
+    && html.indexOf('h += cbxBoxHtml(c);') > 0 && html.indexOf('cbxInit();') > 0 && /window\.addEventListener\("drop"/.test(html) && html.indexOf('.cbx-drop{') > 0 && html.indexOf('.cbx-card{') > 0, '');
+  T('v423 큰 파일: 조각 상수 앱·서버 일치(4,400,000자·4의 배수) · 25MB ≤ 8조각 · 열기 조각 받기(part)',
+    /CBX_PART = 4400000/.test(html) && /BOX_PART_B64 = 4400000/.test(srv23) && 4400000 % 4 === 0 && Math.ceil(25 * 1024 * 1024 * 4 / 3 / 4400000) <= 8 && /BOX_MAX_PARTS = 8/.test(srv23) && /part: j \}\)\.then/.test(html), '');
+  T('v423 서버 액션 4종 라우팅 · 공통 저장 cdocCommit(cdoc_put·cdoc_attach) · 백그라운드 판단·전용 판독',
+    ['box_put', 'cdoc_attach', 'cdoc_move', 'box_fix'].every((a) => srv23.indexOf("d.action === '" + a + "'") > 0) && (srv23.match(/return cdocCommit\(/g) || []).length === 2 && /BJ\.judgeBox\(/.test(pb23) && /r\.data\.bid !== m\.data\.id/.test(pb23), '');
+  T('v423 넣다 만 파일: 서버 box_pending·표식 boxp · 앱 cbxRestore · 판독 조회 권한 · 판 밖 드롭은 파일 칸 제외 · 옛 계약서 판독 분기 없음',
+    /d\.action === 'box_pending'/.test(srv23) && /function boxMarkKey/.test(srv23) && html.indexOf('function cbxRestore') > 0 && /NOT_OWNER/.test(srv23) && html.indexOf('var fileInput = function(e)') > 0 && html.indexOf('계약서 판독 완료') < 0, '');
+  T('v423 서버 확장자표는 문서함과 같고 xls만 박스 추가', /function boxExtOk\(ext\) \{ return docAttExtOk\(ext\) \|\| ext === 'xls'; \}/.test(srv23) && /ext !== "xls"/.test(html), '');
+} catch (e) { console.log('  (v423 검사 생략 — ' + e.message + ')'); fails++; }
+
 try {
   const fdir = join(ROOT, 'netlify', 'functions');
   const miss = readdirSync(fdir).filter((f) => /^gw-.*\.js$/.test(f)).filter((f) => { const t = readFileSync(join(fdir, f), 'utf8'); return /\b(store|blobGet|blobSet|blobList|blobDelete)\(/.test(t) && !/setupBlobContext\(/.test(t); });

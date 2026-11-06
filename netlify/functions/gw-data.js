@@ -2217,6 +2217,7 @@ async function appendRecLog(st, entry) {
 // 짝 블롭엔 좌표·횟수·비율만 들어간다(셀 값·개인정보 없음 — docdiff 반환 구조가 그렇다). 건강진단·명단 유형은 짝 자체를 만들지 않는다.
 const LN = require('./_lib/learn');
 const DD = require('./_lib/docdiff');
+const BF = require('./_lib/boxfile');   // v423 넣기 박스 조각
 const LEARN_KEY = LN.TYPES.contract.settings_key;
 const LEARN_ALLOW_MAX = 200;   // 양식당 허용 칸 상한
 async function learnSettings(st) {
@@ -2237,12 +2238,14 @@ function learnDiffPublic(diff) {
 async function cdocLearnPair(st, member, ref, idx, item, ext, b64, orig, d) {
   const T = LN.TYPES.contract, now = Date.now();
   if (T.forbid_re.test(String(ref.dk || '')) || T.forbid_re.test(String(orig || ''))) return { ok: false, code: 'TYPE_EXCLUDED' };
-  const drafts = idx.items.filter(function (x) { return x && x.i === ref.i && x.kind === 'draft' && x.cur === 1 && !x.del && !x.gc && !x.purged && typeof x.dk === 'string' && x.dk.indexOf('gen.') === 0; });
-  if (!drafts.length) return { ok: false, code: 'NO_DRAFT' };
+  const isDraft = function (x) { return x && x.kind === 'draft' && x.cur === 1 && !x.del && !x.gc && !x.purged && typeof x.dk === 'string' && x.dk.indexOf('gen.') === 0; };
+  const drafts = idx.items.filter(function (x) { return isDraft(x) && x.i === ref.i; });
   const want = (d && typeof d.pair_tpl === 'string') ? d.pair_tpl.trim().slice(0, 40) : '';
   let pick = null;
-  if (want) pick = drafts.filter(function (x) { return x.dk === 'gen.' + want; })[0] || null;
+  // v423 넣기 박스: 서류 이름으로 양식이 정해지면(pair_tpl) 초안이 다른 단계에서 만들어졌어도 그 초안과 짝을 맺는다
+  if (want) pick = drafts.filter(function (x) { return x.dk === 'gen.' + want; })[0] || idx.items.filter(function (x) { return isDraft(x) && x.dk === 'gen.' + want; }).sort(function (a, b) { return b.n - a.n; })[0] || null;
   else if (drafts.length === 1) pick = drafts[0];
+  if (!drafts.length && !pick) return { ok: false, code: 'NO_DRAFT' };
   const base = { cid: ref.cid, i: ref.i, dk: ref.dk, final_n: item.n, ts: now, by: member.id, tries: 0 };
   if (!pick) {
     // 같은 단계에 초안 양식이 둘 이상 — 자동 판단하지 않고 사람 선택(pair_tpl 재요청 또는 관리자 카드)으로 남긴다
@@ -2263,7 +2266,7 @@ async function cdocLearnPair(st, member, ref, idx, item, ext, b64, orig, d) {
   const s = await learnSettings(st);
   const status = learnAllowed(s, tpl) ? 'pending' : 'done_nomodel';
   const id = LN.newPairId('contract', ref.cid + ':' + item.n);
-  const pair = Object.assign({ id: id, tpl: tpl, draft_n: pick.n, kind: kind, status: status, diff: learnDiffPublic(diff), gap: gap }, base);
+  const pair = Object.assign({ id: id, tpl: tpl, draft_n: pick.n, draft_i: pick.i, kind: kind, status: status, diff: learnDiffPublic(diff), gap: gap }, base);
   const w = await blobSet(st, LN.pairKey('contract', id), pair);
   if (!w.ok) return { ok: false, code: w.code || 'PAIR_WRITE_FAILED' };
   try {
@@ -2395,7 +2398,7 @@ function cdocParseRef(d) {
   if (!CDOC_DK_RE.test(dk) || dk === 'constructor' || dk === '__proto__') return { err: 'BAD_DOC_KEY' };
   return { cid: cid, i: i, dk: dk };
 }
-function cdocPublic(it) { const o = Object.assign({}, it); delete o.sha_full; return o; }
+function cdocPublic(it) { const o = Object.assign({}, it); delete o.sha_full; delete o.att0; return o; }   // v423 att0(판단 원본 번호)는 밖으로 내주지 않는다
 async function handleCdocPut(event, d, R) {
   const c = await currentMember(event);
   if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
@@ -2421,6 +2424,10 @@ async function handleCdocPut(event, d, R) {
     if (b64.length > CDOC_MAX) return jr(413, { status: 'REJECTED', error_code: 'FILE_TOO_LARGE', hint: '파일은 오프라인 보관, 채움 맵(fill)만 올리기', request_id: R });
     if (!docAttMagicOk(ext, b64)) return jr(400, { status: 'REJECTED', error_code: 'BAD_MAGIC', request_id: R });
   }
+  return cdocCommit(c, d, R, ref, kind, pii, orig, ext, b64, fill, null);
+}
+// 서류함에 넣는 공통 끝부분 — cdoc_put(본문 바이트)·cdoc_attach(넣기 박스, 이미 올라온 att). att={id,rec}: 작은 파일은 바이트를 옮기고 att를 지운다, 조각 파일은 조각을 그대로 두고 참조한다
+async function cdocCommit(c, d, R, ref, kind, pii, orig, ext, b64, fill, att) {
   const st = store(DATA);
   const ld = await conLoadItem(st, ref.cid);
   if (!ld.ok) return jr(ld.http, { status: ld.http === 500 ? 'ERROR' : 'REJECTED', error_code: ld.code, request_id: R });
@@ -2439,13 +2446,16 @@ async function handleCdocPut(event, d, R) {
   const corp = await cdocCorpOf(st, ld.c, ref.i);
   const std = cdocStdName(ref.cid, ref.i, ref.dk, ver, now, corp, ext);
   const fkey = cdocKey(ref.cid, ref.i, ref.dk, n);
-  const rec = { name: std, orig: orig, type: fill ? 'application/json' : DOC_ATT_MIME[ext], kind: kind, cid: ref.cid, i: ref.i, dk: ref.dk, n: n, ver: ver, pii: pii, by: c.member.name, bid: c.member.id, ts: now, sha: sha };
-  if (fill) rec.fill = fill; else rec.data = b64;
+  const rec = { name: std, orig: orig, type: fill ? 'application/json' : (DOC_ATT_MIME[ext] || 'application/octet-stream'), kind: kind, cid: ref.cid, i: ref.i, dk: ref.dk, n: n, ver: ver, pii: pii, by: c.member.name, bid: c.member.id, ts: now, sha: sha };
+  if (fill) rec.fill = fill;
+  else if (att && att.rec.parts) { rec.att = att.id; rec.parts = att.rec.parts; }   // v423 큰 파일: 조각은 attp:에 그대로
+  else rec.data = b64;
   const fw = await blobSet(store(FILES), fkey, rec);
   if (!fw.ok) return jr(500, { status: 'ERROR', error_code: fw.code, request_id: R });
   same.forEach(function (x) { if (x.cur) x.cur = 0; });
   const item = { n: n, i: ref.i, dk: ref.dk, kind: kind, ver: ver, cur: 1, name: std, orig: orig || std, ext: ext, size: fill ? JSON.stringify(fill).length : b64Bytes(b64), sha: sha.slice(0, 16), pii: pii, corp: corp, by: { id: c.member.id, name: c.member.name }, ts: now };
   if (typeof d.note === 'string' && d.note.trim()) item.note = d.note.trim().slice(0, 120);
+  if (att) { item.att0 = att.id; if (att.rec.parts) item.parts = att.rec.parts; }   // v423 AI 판단 원본 parse:<att0>과 잇는 번호
   idx.items.push(item); idx.seq = n;
   // 초안 보존 상한: 같은 (단계·doc_key) 초안이 3판을 넘으면 가장 오래된 것의 바이트만 지우고 색인엔 gc 표식(append-only 유지)
   const gcd = [];
@@ -2457,10 +2467,242 @@ async function handleCdocPut(event, d, R) {
   const w = await blobSet(st, cdocIdxKey(ref.cid), idx);
   if (!w.ok) { await blobDelete(store(FILES), fkey); return jr(500, { status: 'ERROR', error_code: w.code, request_id: R }); }
   const audit = await cdocAudit(c.member, '기록물등록', ref.cid, std + (dup.length ? ' · 중복 허용' : ''));
+  if (att) {
+    try {
+      if (att.rec.parts) await blobSet(store(FILES), att.id, Object.assign({}, att.rec, { taken: { cid: ref.cid, n: n } }));   // 같은 파일을 두 번 넣지 못하게 표식(조각은 서류함이 참조)
+      else await blobDelete(store(FILES), att.id);
+      await blobDelete(store(FILES), boxMarkKey(att.id));
+    } catch (e) {}
+    await boxUsageAdd(st, 'placed', 1);
+  }
   // v410 학습 짝 — 최종본이면 같은 단계의 현재 초안과 짝을 만들고 차이·간극을 잰다(실패해도 올리기는 성공, learn에 사유만)
   let learn = null;
   if (kind === 'final') { try { learn = await cdocLearnPair(st, c.member, ref, idx, item, ext, b64, orig, d); } catch (e) { learn = { ok: false, code: 'LEARN_THREW' }; } }
-  return jr(200, { status: 'OK', cid: ref.cid, n: n, ver: ver, name: std, item: item, dup: dup, gc: gcd, audit: audit, learn: learn, request_id: R });
+  if (learn && learn.id) { item.pair = learn.id; await cdocIdxSetPair(st, ref.cid, n, learn.id); }   // v423 옮기면 이 짝을 무효로 돌린다
+  return jr(200, { status: 'OK', cid: ref.cid, n: n, ver: ver, name: std, item: cdocPublic(item), dup: dup, gc: gcd, audit: audit, learn: learn, request_id: R });
+}
+// ---- v423 넣기 박스(체크 31, PM 11/5 "서류 등록 채널 하나" · 11/6 "저장 설계는 Blobs 그대로") — 파일을 먼저 gw_files에 받고(box_put), 에이전트가 종류를 판단한 뒤(gw-parse-background), 다시 보내지 않고 서류함에 넣는다(cdoc_attach)
+const BOX_PART_B64 = 4400000;      // 조각 1개 base64 상한(4의 배수 — 이어 붙이면 원본 base64). 동기 함수 본문 6MB 안쪽
+const BOX_MAX_PARTS = 8;           // 8조각 ≈ 원본 26MB
+const BOX_FIX_KEY = 'box:fixes';   // 사람이 고친 판단(다음 판단 프롬프트에 들어간다) — 파일 이름·개인정보 없이 종류·자리만
+const BOX_FIX_MAX = 60;
+function boxMarkKey(id) { return 'boxp:' + id; }   // 넣다 만 파일 표식 — 넣거나 버리면 지운다(화면을 닫아도 다시 찾을 수 있게, 자동 삭제 없음)
+// 짝 번호만 다시 읽어 고쳐 쓴다 — 첫 저장과 짝 만들기 사이에 다른 사람이 쓴 색인을 덮지 않게
+async function cdocIdxSetPair(st, cid, n, pairId) {
+  try {
+    const ix = await cdocIdxRead(st, cid);
+    if (!ix.ok) return;
+    const x = ix.doc.items.find(function (y) { return y && Number(y.n) === n; });
+    if (x) { x.pair = pairId; await blobSet(st, cdocIdxKey(cid), ix.doc); }
+  } catch (e) {}
+}
+function boxExtOk(ext) { return docAttExtOk(ext) || ext === 'xls'; }   // xls는 옛 📎 첨부가 받던 형식이라 유지
+function boxMagicOk(ext, b64) {
+  if (ext !== 'xls') return docAttMagicOk(ext, b64);
+  try { const h = Buffer.from(String(b64 || '').slice(0, 8), 'base64'); return h[0] === 0xD0 && h[1] === 0xCF && h[2] === 0x11 && h[3] === 0xE0; } catch (e) { return false; }
+}
+async function boxUsageAdd(st, field, n) {
+  try {
+    const key = 'usage:box:' + LN.ymOf(Date.now()), r = await blobGet(st, key);
+    const u = (r.ok && r.data && typeof r.data === 'object') ? r.data : {};
+    u[field] = (Number(u[field]) || 0) + n;
+    await blobSet(st, key, u);
+  } catch (e) {}
+}
+async function boxFixAppend(st, row) {
+  try {
+    const r = await blobGet(st, BOX_FIX_KEY);
+    const doc = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data : { schema: 1, items: [] };
+    doc.items.push(Object.assign({ ts: Date.now() }, row));
+    if (doc.items.length > BOX_FIX_MAX) doc.items = doc.items.slice(-BOX_FIX_MAX);
+    await blobSet(st, BOX_FIX_KEY, doc);
+  } catch (e) {}
+}
+async function handleBoxPut(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (!(await deviceApproved(event, c.member))) return jr(403, { status: 'FORBIDDEN', error_code: 'DEVICE_NOT_APPROVED', request_id: R });
+  if (permOf(c.member, 'contracts') !== 'do') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_WRITE', request_id: R });
+  const name = String(d.name || '').trim().slice(0, 120), b64 = String(d.data || ''), k = Number(d.k), j = Number(d.j);
+  if (!name || !b64) return jr(400, { status: 'REJECTED', error_code: 'INVALID_FILE', request_id: R });
+  if (!Number.isInteger(k) || k < 1 || k > BOX_MAX_PARTS || !Number.isInteger(j) || j < 0 || j >= k) return jr(400, { status: 'REJECTED', error_code: 'BAD_PART', request_id: R });
+  if (b64.length > BOX_PART_B64) return jr(413, { status: 'REJECTED', error_code: 'PART_TOO_LARGE', request_id: R });
+  const ext = docAttExt(name);
+  if (!boxExtOk(ext)) return jr(400, { status: 'REJECTED', error_code: 'BAD_EXT', request_id: R });
+  if (j === 0 && !boxMagicOk(ext, b64)) return jr(400, { status: 'REJECTED', error_code: 'BAD_MAGIC', request_id: R });
+  const files = store(FILES), now = Date.now();
+  let id = String(d.id || ''), main = null;
+  if (j === 0) id = 'att_' + crypto.randomBytes(8).toString('hex');
+  else {
+    if (!/^att_[a-f0-9]{16}$/i.test(id)) return jr(400, { status: 'REJECTED', error_code: 'BAD_ID', request_id: R });
+    const mr = await blobGet(files, id);
+    if (!mr.ok || !mr.data || mr.data.kind !== 'box' || mr.data.bid !== c.member.id || Number(mr.data.parts) !== k) return jr(409, { status: 'CONFLICT', error_code: 'BAD_UPLOAD', request_id: R });
+    if (!mr.data.open) {
+      if (j === k - 1) return jr(200, { status: 'OK', id: id, j: j, k: k, done: true, request_id: R });   // 마지막 조각 재전송(응답을 못 받은 경우) — 이미 끝남
+      return jr(409, { status: 'CONFLICT', error_code: 'BAD_UPLOAD', request_id: R });
+    }
+    main = mr.data;
+  }
+  const head = { name: name, type: DOC_ATT_MIME[ext] || 'application/octet-stream', kind: 'box', by: c.member.name, bid: c.member.id, ts: now, size: Number(d.size) > 0 ? Math.round(Number(d.size)) : b64Bytes(b64) };
+  if (k === 1) {
+    const w1 = await blobSet(files, id, Object.assign(head, { data: b64 }));
+    if (!w1.ok) return jr(500, { status: 'ERROR', error_code: w1.code, request_id: R });
+  } else {
+    const wp = await blobSet(files, BF.attPartKey(id, j), { bid: c.member.id, data: b64 });
+    if (!wp.ok) return jr(500, { status: 'ERROR', error_code: wp.code, request_id: R });
+    if (j === 0 || j === k - 1) {
+      const m2 = Object.assign({}, main || head, { parts: k });
+      if (j === k - 1) delete m2.open; else m2.open = 1;
+      const wm = await blobSet(files, id, m2);
+      if (!wm.ok) return jr(500, { status: 'ERROR', error_code: wm.code, request_id: R });
+    }
+  }
+  const done = j === k - 1;
+  if (j === 0) { try { await blobSet(files, boxMarkKey(id), { id: id, name: name, size: head.size, by: c.member.name, bid: c.member.id, ts: now }); } catch (e) {} }
+  if (done) { try { await appendAudit({ ts: now, by: c.member.name, bid: c.member.id, col: 'files', ev: [{ op: '첨부등록', id: id, t: name.slice(0, 60) }] }); } catch (e) {} }
+  return jr(200, { status: 'OK', id: id, j: j, k: k, done: done, request_id: R });
+}
+async function handleCdocAttach(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (!(await deviceApproved(event, c.member))) return jr(403, { status: 'FORBIDDEN', error_code: 'DEVICE_NOT_APPROVED', request_id: R });
+  if (permOf(c.member, 'contracts') !== 'do') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_WRITE', request_id: R });
+  const ref = cdocParseRef(d); if (ref.err) return jr(400, { status: 'REJECTED', error_code: ref.err, request_id: R });
+  const kind = String(d.kind || '');
+  if (kind !== 'final' && kind !== 'received') return jr(400, { status: 'REJECTED', error_code: 'BAD_KIND', request_id: R });
+  const pii = (d.pii === undefined || d.pii === null || d.pii === '') ? 0 : Number(d.pii);
+  if (!(pii === 0 || pii === 1 || pii === 2)) return jr(400, { status: 'REJECTED', error_code: 'BAD_PII', request_id: R });
+  const id = String(d.att || '');
+  if (!/^att_[a-f0-9]{16}$/i.test(id)) return jr(400, { status: 'REJECTED', error_code: 'BAD_ID', request_id: R });
+  const ar = await blobGet(store(FILES), id);
+  if (!ar.ok && ar.code !== 'NOT_FOUND') return jr(500, { status: 'ERROR', error_code: ar.code || 'STORAGE_READ_FAILED', request_id: R });
+  if (!ar.ok || !ar.data) return jr(404, { status: 'REJECTED', error_code: 'NOT_FOUND', request_id: R });
+  if (ar.data.kind !== 'box') return jr(400, { status: 'REJECTED', error_code: 'NOT_BOX', request_id: R });
+  if (ar.data.taken) return jr(409, { status: 'CONFLICT', error_code: 'ALREADY_TAKEN', taken: ar.data.taken, request_id: R });
+  const orig = String(ar.data.name || '').slice(0, 120), ext = docAttExt(orig);
+  if (!boxExtOk(ext)) return jr(400, { status: 'REJECTED', error_code: 'BAD_EXT', request_id: R });
+  let b64 = '';
+  try { b64 = await BF.attReadB64(store(FILES), id, ar.data); } catch (e) { return jr(409, { status: 'CONFLICT', error_code: 'PART_MISSING', request_id: R }); }
+  if (!b64) return jr(400, { status: 'REJECTED', error_code: 'INVALID_FILE', request_id: R });
+  return cdocCommit(c, d, R, ref, kind, pii, orig, ext, b64, null, { id: id, rec: ar.data });
+}
+// 옮기기 — 판단이 틀렸을 때 다른 서류·종류로. 바이트 키를 새 자리로 옮기고, 옛 자리 현재본을 되돌리고, 옛 짝을 무효로 돌린 뒤, 고친 내용을 다음 판단 재료로 남긴다
+async function cdocPairVoid(st, it) {
+  if (!it.pair) return;
+  try {
+    const k = LN.pairKey('contract', it.pair), r = await blobGet(st, k);
+    if (r.ok && r.data) {
+      const tpl = r.data.tpl;
+      r.data.status = 'superseded'; r.data.ts = Date.now();
+      await blobSet(st, k, r.data);
+      if (tpl) {
+        const lk = LN.TYPES.contract.lessons_key(tpl), lr = await blobGet(st, lk);
+        if (lr.ok && lr.data && Array.isArray(lr.data.gaps)) {
+          const before = lr.data.gaps.length;
+          lr.data.gaps = lr.data.gaps.filter(function (g) { return g && g.pair !== it.pair; });
+          if (lr.data.gaps.length !== before) { if (lr.data.stats) lr.data.stats.pairs = Math.max(0, (Number(lr.data.stats.pairs) || 0) - 1); await blobSet(st, lk, lr.data); }
+        }
+      }
+    }
+  } catch (e) {}
+  delete it.pair;
+}
+async function handleCdocMove(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (!(await deviceApproved(event, c.member))) return jr(403, { status: 'FORBIDDEN', error_code: 'DEVICE_NOT_APPROVED', request_id: R });
+  if (permOf(c.member, 'contracts') !== 'do') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_WRITE', request_id: R });
+  const ref = cdocParseRef(d); if (ref.err) return jr(400, { status: 'REJECTED', error_code: ref.err, request_id: R });
+  const n = Number(d.n), kind = String(d.kind || '');
+  if (!(n >= 1)) return jr(400, { status: 'REJECTED', error_code: 'BAD_ID', request_id: R });
+  if (kind !== 'final' && kind !== 'received') return jr(400, { status: 'REJECTED', error_code: 'BAD_KIND', request_id: R });
+  const st = store(DATA), files = store(FILES);
+  const ld = await conLoadItem(st, ref.cid);
+  if (!ld.ok) return jr(ld.http, { status: ld.http === 500 ? 'ERROR' : 'REJECTED', error_code: ld.code, request_id: R });
+  const ix = await cdocIdxRead(st, ref.cid);
+  if (!ix.ok) return jr(500, { status: 'ERROR', error_code: ix.code, request_id: R });
+  const idx = ix.doc, it = idx.items.find(function (x) { return x && Number(x.n) === n; });
+  if (!it || it.purged || it.gc || it.del) return jr(404, { status: 'REJECTED', error_code: 'NO_FILE', request_id: R });
+  if (it.kind === 'draft') return jr(400, { status: 'REJECTED', error_code: 'BAD_KIND', request_id: R });
+  if (!cdocCanRead(c.member, it)) return jr(403, { status: 'FORBIDDEN', error_code: it.pii === 2 ? 'PII2_FORBIDDEN' : 'PII_FORBIDDEN', request_id: R });
+  const piiNew = (d.pii === undefined || d.pii === null || d.pii === '') ? (Number(it.pii) || 0) : Number(d.pii);
+  if (!(piiNew === 0 || piiNew === 1 || piiNew === 2)) return jr(400, { status: 'REJECTED', error_code: 'BAD_PII', request_id: R });
+  const sameSlot = it.i === ref.i && it.dk === ref.dk && it.kind === kind;
+  if (sameSlot && piiNew === (Number(it.pii) || 0)) return jr(400, { status: 'REJECTED', error_code: 'NO_CHANGE', request_id: R });
+  const oldKey = cdocKey(ref.cid, it.i, it.dk, n), newKey = cdocKey(ref.cid, ref.i, ref.dk, n), sameKey = oldKey === newKey;   // 키에 종류·등급이 없어 종류만 바꾸면 같은 키다
+  const r = await blobGet(files, oldKey);
+  if (!r.ok || !r.data) return jr(404, { status: 'REJECTED', error_code: 'NO_FILE', request_id: R });
+  const same = idx.items.filter(function (x) { return x !== it && x.i === ref.i && x.dk === ref.dk && x.kind === kind && !x.purged; });
+  const ver = sameSlot ? it.ver : same.length + 1, corp = await cdocCorpOf(st, ld.c, ref.i), ts = Number(it.ts) || Date.now();
+  const std = sameSlot ? it.name : cdocStdName(ref.cid, ref.i, ref.dk, ver, ts, corp, it.ext);
+  const rec = Object.assign({}, r.data, { name: std, kind: kind, i: ref.i, dk: ref.dk, ver: ver, pii: piiNew });
+  const fw = await blobSet(files, newKey, rec);
+  if (!fw.ok) return jr(500, { status: 'ERROR', error_code: fw.code, request_id: R });
+  if (!sameSlot) {
+    const wasCur = it.cur === 1;
+    const sibOld = idx.items.filter(function (x) { return x !== it && x.i === it.i && x.dk === it.dk && x.kind === it.kind && !x.del && !x.purged && !x.gc; }).sort(function (a, b) { return b.n - a.n; });
+    if (wasCur && sibOld[0]) sibOld[0].cur = 1;
+    same.forEach(function (x) { if (x.cur) x.cur = 0; });
+    await cdocPairVoid(st, it);
+    it.i = ref.i; it.dk = ref.dk; it.kind = kind; it.ver = ver; it.cur = 1; it.name = std; it.corp = corp; it.moved = Date.now();
+  }
+  it.pii = piiNew;
+  idx.updated_at = Date.now(); idx.updated_by = c.member.id;
+  const w = await blobSet(st, cdocIdxKey(ref.cid), idx);
+  if (!w.ok) {
+    if (sameKey) await blobSet(files, oldKey, r.data); else await blobDelete(files, newKey);   // 같은 키면 지우지 말고 되돌린다
+    return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
+  }
+  if (!sameKey) await blobDelete(files, oldKey);
+  const audit = await cdocAudit(c.member, sameSlot ? '기록물등급변경' : '기록물옮김', ref.cid, std);
+  let learn = null;
+  if (!sameSlot) {
+    const fix = (d.fix && typeof d.fix === 'object') ? d.fix : {};
+    const docNm = String(fix.doc || '').slice(0, 40);
+    await boxFixAppend(st, { k: 'doc', doc: LN.piiScan(docNm).ok ? docNm : '', from: String(fix.from || '').slice(0, 60), to: String(fix.to || '').slice(0, 60) });   // 파일 이름은 넣지 않는다(사람 이름이 섞일 수 있다)
+    await boxUsageAdd(st, 'moved', 1);
+    if (kind === 'final') {
+      try {
+        const b64 = rec.att ? await BF.attReadB64(files, rec.att, (await blobGet(files, rec.att)).data) : String(rec.data || '');
+        learn = await cdocLearnPair(st, c.member, ref, idx, it, it.ext, b64, it.orig, d);
+        if (learn && learn.id) { it.pair = learn.id; await cdocIdxSetPair(st, ref.cid, n, learn.id); }
+      } catch (e) { learn = { ok: false, code: 'LEARN_THREW' }; }
+    }
+  }
+  return jr(200, { status: 'OK', cid: ref.cid, n: n, item: cdocPublic(it), learn: learn, audit: audit, request_id: R });
+}
+// 계약 시작 카드에서 사람이 판단을 그대로 뒀는지(ok) 고쳤는지 — 고친 것만 box:fixes에 쌓는다. 값은 유형·사급관급 같은 분류뿐
+async function handleBoxFix(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (permOf(c.member, 'contracts') !== 'do') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_WRITE', request_id: R });
+  const st = store(DATA), ok = d.ok === true;
+  const san = function (o) { const out = {}; ['type', 'pub', 'combo', 'cls'].forEach(function (k) { if (o && typeof o === 'object' && o[k] !== undefined && o[k] !== null) out[k] = String(o[k]).slice(0, 20); }); return out; };
+  await boxUsageAdd(st, ok ? 'ok' : 'fixed', 1);
+  const title = String(d.title || '').slice(0, 60);
+  if (!ok) await boxFixAppend(st, { k: 'contract', title: LN.piiScan(title).ok ? title : '', from: san(d.from), to: san(d.to) });   // 공사명은 관급 계약만 앱이 보낸다(사급은 개인 이름이 섞일 수 있다)
+  return jr(200, { status: 'OK', request_id: R });
+}
+// 넣다 만 파일 — 판단 중 화면을 닫았거나 넣기 전에 멈춘 파일. 본인 것(관리자는 하루 지난 남의 것까지)을 돌려줘 카드로 다시 잇는다. 자동 삭제 없음
+async function handleBoxPending(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (permOf(c.member, 'contracts') !== 'do') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_WRITE', request_id: R });
+  const files = store(FILES), l = await blobList(files, 'boxp:');
+  if (!l.ok) return jr(500, { status: 'ERROR', error_code: l.code, request_id: R });
+  const now = Date.now(), out = [];
+  for (const k of l.keys.filter(function (x) { return x.indexOf('boxp:') === 0; }).slice(0, 200)) {
+    const r = await blobGet(files, k);
+    if (!r.ok || !r.data) continue;
+    const m = r.data, mine = m.bid === c.member.id;
+    if (!mine && !(c.member.admin && now - Number(m.ts) > 86400000)) continue;
+    const ar = await blobGet(files, m.id);
+    if (!ar.ok || !ar.data) { await blobDelete(files, k); continue; }   // 본 파일이 이미 없으면 표식만 정리
+    if (ar.data.open) { out.push({ id: m.id, name: m.name, size: m.size, by: m.by, ts: m.ts, open: 1 }); continue; }   // 조각이 덜 온 파일 — 버리기만 가능
+    const pr = await blobGet(files, 'parse:' + m.id);
+    out.push({ id: m.id, name: m.name, size: m.size, by: m.by, ts: m.ts, parsed: (pr.ok && pr.data) ? pr.data.result : null });
+  }
+  return jr(200, { status: 'OK', items: out, request_id: R });
 }
 async function handleCdocList(event, d, R) {
   const c = await currentMember(event);
@@ -2500,6 +2742,18 @@ async function handleCdocGet(event, d, R) {
   if (it.pii === 2 && reason.length < 2) return jr(400, { status: 'REJECTED', error_code: 'REASON_REQUIRED', request_id: R });   // 민감정보 열람 사유 필수(개인정보보호법 23조 — 열람 기록)
   const r = await blobGet(store(FILES), cdocKey(cid, it.i, it.dk, n));
   if (!r.ok || !r.data) return jr(404, { status: 'REJECTED', error_code: 'NO_FILE', request_id: R });
+  if (r.data.att) {   // v423 큰 파일 — 첫 호출은 조각 수만, 열람 기록은 첫 조각에서(민감정보는 조각마다, fail-closed)
+    if (d.part === undefined || d.part === null) return jr(200, { status: 'OK', cid: cid, n: n, name: it.name, orig: it.orig, kind: it.kind, pii: it.pii, type: docAttMime(it.name), parts: r.data.parts, request_id: R });
+    const j = Number(d.part);
+    if (!Number.isInteger(j) || j < 0 || j >= Number(r.data.parts)) return jr(400, { status: 'REJECTED', error_code: 'BAD_PART', request_id: R });
+    if (j === 0 || it.pii === 2) {
+      const lg = await appendRecLog(st, { ts: Date.now(), bid: c.member.id, by: String(c.member.name || ''), dept: String(c.member.dept || ''), cid: cid, n: n, i: it.i, dk: it.dk, kind: it.kind, pii: it.pii, name: String(it.name || '').slice(0, 80), reason: reason });
+      if (it.pii === 2 && !lg) return jr(500, { status: 'ERROR', error_code: 'RECLOG_FAILED', request_id: R });
+    }
+    const pr = await blobGet(store(FILES), BF.attPartKey(r.data.att, j));
+    if (!pr.ok || !pr.data) return jr(404, { status: 'REJECTED', error_code: 'NO_FILE', request_id: R });
+    return jr(200, { status: 'OK', cid: cid, n: n, part: j, parts: r.data.parts, data: pr.data.data, request_id: R });
+  }
   const logged = await appendRecLog(st, { ts: Date.now(), bid: c.member.id, by: String(c.member.name || ''), dept: String(c.member.dept || ''), cid: cid, n: n, i: it.i, dk: it.dk, kind: it.kind, pii: it.pii, name: String(it.name || '').slice(0, 80), reason: reason });
   if (it.pii === 2 && !logged) return jr(500, { status: 'ERROR', error_code: 'RECLOG_FAILED', request_id: R });   // 민감정보는 기록 없이는 내주지 않는다(fail-closed)
   const out = { status: 'OK', cid: cid, n: n, name: it.name, orig: it.orig, kind: it.kind, pii: it.pii, type: r.data.fill ? 'application/json' : docAttMime(it.name), logged: logged, request_id: R };
@@ -2561,6 +2815,13 @@ async function handleCdocPurge(event, d, R) {
   if (!it || it.purged) return jr(404, { status: 'REJECTED', error_code: 'NO_FILE', request_id: R });
   if (!it.del) return jr(409, { status: 'CONFLICT', error_code: 'NOT_IN_TRASH', request_id: R });
   if (Date.now() - Number(it.del) < CDOC_TRASH_DAYS * 86400000) return jr(409, { status: 'CONFLICT', error_code: 'TOO_EARLY', days: CDOC_TRASH_DAYS, request_id: R });
+  const pr0 = await blobGet(store(FILES), cdocKey(cid, it.i, it.dk, n));
+  if (pr0.ok && pr0.data && pr0.data.att) {   // v423 큰 파일은 조각과 본 레코드까지
+    const am = await blobGet(store(FILES), pr0.data.att);
+    if (am.ok && am.data) await BF.attDeleteParts(store(FILES), pr0.data.att, am.data);
+    await blobDelete(store(FILES), pr0.data.att);
+  }
+  if (it.att0) await blobDelete(store(FILES), 'parse:' + it.att0);   // v423 판독값도 함께(개인정보 항목의 값이 남지 않게)
   await blobDelete(store(FILES), cdocKey(cid, it.i, it.dk, n));
   it.purged = Date.now(); it.purged_by = c.member.id; it.cur = 0;
   idx.updated_at = Date.now(); idx.updated_by = c.member.id;
@@ -3079,8 +3340,10 @@ async function handleAttParse(event, d, R) {
 async function handleAttParseStatus(event, d, R) {
   const c = await currentMember(event);
   if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (permOf(c.member, 'contracts') === 'hide') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_ACCESS', request_id: R });
   const r = await blobGet(store(FILES), 'parse:' + String(d.id || ''));
   if (!r.ok || !r.data) return jr(200, { status: 'PENDING', request_id: R });
+  if (r.data.bid && r.data.bid !== c.member.id && !c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'NOT_OWNER', request_id: R });   // v423 넣기 박스 판독값은 올린 사람·관리자만
   return jr(200, { status: 'OK', parsed: r.data.result, request_id: R });
 }
 
@@ -3324,6 +3587,10 @@ async function handleAttDel(event, d, R) {
   if (permOf(c.member, 'contracts') !== 'do') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_WRITE', request_id: R });
   // att_ 프리픽스 강제 — 없으면 tpl:/proof:(proof:__index__ 포함)를 비관리자가 삭제할 수 있다(gw-parse-background와 동일 검사)
   if (String(d.id || '').indexOf('att_') !== 0) return jr(400, { status: 'REJECTED', error_code: 'BAD_ID', request_id: R });
+  const am0 = await blobGet(store(FILES), String(d.id || ''));
+  if (am0.ok && am0.data && am0.data.taken) return jr(409, { status: 'CONFLICT', error_code: 'ALREADY_TAKEN', request_id: R });   // v423 서류함이 참조하는 조각은 여기서 지우지 않는다(서류함 보관·영구 삭제 경로로)
+  if (am0.ok && am0.data && am0.data.parts) await BF.attDeleteParts(store(FILES), String(d.id || ''), am0.data);
+  if (am0.ok && am0.data && am0.data.kind === 'box') await blobDelete(store(FILES), boxMarkKey(String(d.id || '')));
   await blobDelete(store(FILES), String(d.id || ''));
   await blobDelete(store(FILES), 'parse:' + String(d.id || ''));
   // v353: 가린 판·상태 동반 삭제 — 실패를 삼키지 않는다(고아 mask가 att_get으로 되살아나지 않게 감사에 남긴다)
@@ -3937,6 +4204,11 @@ async function handlerInner(event) {
     if (d && d.action === 'con_proc_bg_set') return await handleConProcBgSet(event, d, R);   // v404
     if (d && d.action === 'con_proc_edit') return await handleConProcEdit(event, d, R);
     if (d && d.action === 'con_clog_add') return await handleConClogAdd(event, d, R);
+    if (d && d.action === 'box_put') return await handleBoxPut(event, d, R);   // v423 넣기 박스
+    if (d && d.action === 'cdoc_attach') return await handleCdocAttach(event, d, R);
+    if (d && d.action === 'cdoc_move') return await handleCdocMove(event, d, R);
+    if (d && d.action === 'box_fix') return await handleBoxFix(event, d, R);
+    if (d && d.action === 'box_pending') return await handleBoxPending(event, d, R);
     if (d && d.action === 'cdoc_put') return await handleCdocPut(event, d, R);   // v406 계약 서류함(D3)
     if (d && d.action === 'cdoc_list') return await handleCdocList(event, d, R);
     if (d && d.action === 'cdoc_get') return await handleCdocGet(event, d, R);

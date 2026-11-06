@@ -54,19 +54,22 @@ const stubs = `
   function getToken(){ return "t"; } function ghHeaders(){ return {}; } function loadTasks(){} function loadAsb(){} function conBillToRec(){ billN++; } function canSee(){ return true; } var contractSaveTimer = null, saveNowN = 0; function doSaveContracts(){ saveNowN++; } var toasts = []; function apprToastShow(m){ toasts.push(String(m)); }
   function b64DecodeUnicode(s){ return Buffer.from(s, "base64").toString("utf8"); }
   var fetch = function(){ if (!serverItems) return Promise.resolve({ ok: false }); return Promise.resolve({ ok: true, json: function(){ return Promise.resolve({ sha: "s", content: Buffer.from(JSON.stringify({ schema: 1, items: serverItems }), "utf8").toString("base64") }); } }); };
-  var confirms = []; var confirm = function(m){ confirms.push(String(m)); return true; }, alert = function(m){ alerts.push(String(m)); };
+  var confirms = [], confirmAns = true; var confirm = function(m){ confirms.push(String(m)); return confirmAns; }, alert = function(m){ alerts.push(String(m)); };
   var asb = [], asbLoaded = true, SITE_KIND = { asbestos:"석면", demolition:"철거", dredge:"준설" }, apprPendingCreates = [];
   function siteKind(r){ return (r && SITE_KIND[r.kind]) ? r.kind : "asbestos"; }
   function liveSites(){ return asb.filter(function(r){ return r && r.del !== 1; }); }
   function findAsb(id){ for (var i = 0; i < asb.length; i++) if (asb[i].id === id) return asb[i]; return null; }
   function scheduleAsbSave(){} function apprSavePending(){} function apprFlushCreates(){} function myId(){ return "m1"; } function memberName(){ return ""; } function fmtDate(d){ return d.toISOString().slice(0, 10); } 
   var gwCall = null; var Date = globalThis.Date;
+  var DOC_ATT_MAX = Math.floor(4.3 * 1024 * 1024); var DOC_ATT_EXT = ["pdf","docx","xlsx","pptx","hwp","hwpx","jpg","jpeg","png"]; function docAttExtOf(name){ var m = String(name || "").toLowerCase().match(/\.([a-z0-9]+)$/); return m ? m[1] : ""; }   // v423 넣기 박스 실행용
+  function liveContracts(){ return contracts.filter(function(c){ return c && c.del !== 1; }); } function conBldgLookup(){} function fillMemberSelect(){} var bids = [], currentTab = "con"; var appliedN = 0; function applyAsbParse(e){ appliedN++; e.parsed = "판독"; }
+  var FileReader = function(){ var self = this; this.readAsDataURL = function(f){ self.result = f._dataurl; setTimeout(function(){ self.onload(); }, 0); }; };
   function curMember(){ return { id: "m1" }; } function apprGradeChipCss(){ return ""; } function renderDashboard(){}   // v402 로더·카드·startProcess 실제 실행용
 `;
 const tplLine = (html.match(/var TPL_LABELS=\{[^\r\n]*\};/) || [''])[0] + (html.match(/var TPL_EXT=\{[^\r\n]*\};/) || [''])[0] + cut('  var XG_SAFE_CO=', '  function xgToggle(){');   // v422 준설 실물 양식 함수
 const opt = (n) => { try { return fnOf(n); } catch (e) { return ''; } };   // v404: 날짜 실함수(isDate·addDays·pad) — 스텁 addDays 항등 함수 제거
 const api = new Function('contracts', 'tasks', 'recs', stubs + opt('isDate') + opt('addDays') + opt('pad') + opt('fmtDate') + tplLine + ' var CDOC = {}, CDOC_TTL = 60000, CDOC_KIND_LABEL = { draft:"초안", final:"최종본", received:"수령" }; ' + fnOf('cdocSan') + fnOf('cdocDocKey') + fnOf('cdocPkKey') + fnOf('cdocItems') + fnOf('cdocLive') + fnOf('cdocCurOf') + fnOf('cdocPkHit') + fnOf('cdocDay') + fnOf('cdocLoad') + fnOf('cdocRowsHtml') + fnOf('cdocTrashHtml') + fnOf('csCdocDraft') + fnOf('xgBuildEdits') + fnOf('koAmount') + fnOf('dateSerial') + fnOf('wkLabel') + fnOf('findWk') + fnOf('xgMergeLearned') + fnOf('xgApplyLearned') + fnOf('conAttList') + scen + sheet + fnOf('stageXlsxKind') + fnOf('advanceProc') + fnOf('materializeStage') + fnOf('procStageTitle') + cut('  var CON_PROC_SRC', '  // 제목 키워드로 요소 제안') + cut('  var WASTE_BACKBONE = [', '  // @con-scen-start') + fnOf('applyPublicMilestones') + fnOf('startProcess') + `
-  return { xgSafetyVals, xgSafetyMissing, xgSafetyGen, XG_SAFE_FILES, csGenKeys, xgBuildEdits, xgMergeLearned, xgApplyLearned, errCalls: errCalls, CDOC, cdocTrashHtml, cdocDocKey, cdocPkKey, cdocLive, cdocCurOf, cdocPkHit, cdocRowsHtml, cdocLoad, csCdocDraft, CON_MAP, CON_BG, CON_PROC_SRC, conDueUse, conDueClear, conDueOn, conStageDue, conAnnualNext, conBaseDate, conAddBizDays, materializeStage, asb, todayStr, tasks, CON_COLS, CON_SCEN, CON_PACKETS, STAGE_DOCS, conScenStages, conModalElems, stageDocsFor, csSplitTop, csParseStageDocs, csStageDocItems, csStageDocsHtml, csDocToggle, csDocNa, csDocAdd, csDocDel, csMergeDocs, csStageFields, stageXlsxKind, csRowHtml, csDetailHtml, csStageInfo, csSortRows, csPass, csEnumValues, csEndCell, csKind, csSkipStage, csJumpStage, csUnskipStage, csPacketsHtml, csLoadTpl, csApprKind, csApprSubmit, csApprOnDecided, csApprFind, csSyncFromServer, csApprSync, csApprDropped, csAlignTasksAll, toasts: toasts, saveNow: function(){ return saveNowN; }, csLinkSite, csLinkSiteLater, csOnDone, csSiteDone, csSiteHooksRetry, csNextFeb15, advanceProc, materializeStage, asb: asb, tasks: tasks, appr: apprPendingCreates, alerts: alerts, bills: function(){ return billN; }, setServer: function(items){ serverItems = items; }, pushContract: function(c){ contracts.push(c); }, popContract: function(){ contracts.pop(); }, setAsbLoaded: function(v){ asbLoaded = v; }, setTab: function(t){ conDetTab = t; }, openStage: function(k){ csStageOpen = k; }, setTpl: function(o){ csTplKeys = o; csTplErr = 0; }, setTplErr: function(v){ csTplErr = v; }, tplState: function(){ return { keys: csTplKeys, err: csTplErr, loading: csTplLoading }; }, setGw: function(f){ gwCall = f; }, conScenKey, CON_ADDED, conAddedPrep, conAddedApply, conAddedUse, conAddedClear, conScenTag, conChgWindow, conAddedPreviewHtml, conRouteKey, stageDocsOf, csStageFieldsOf, csStageNew, csApprKindOf, csChgAmtChanged, csChgCan, csChgAdd, csChgOpenAt, csStagesHtml, csDoneStage, conProcLoad, renderConProcCard, startProcess, procSrc: function(){ return CON_PROC_SRC; }, setDocEl: function(id, el){ docEls[id] = el; }, sched: function(){ return schedN; }, csApprApply, csTaskChg, csChgBase, confirms: confirms, doneCalls: function(){ return csnN; } };
+  return { cbx: { items: function(){ return cbxItems; }, idSeq: 9000, nSeq: 100, cbxApply, cbxStart, cbxCardHtml, cbxDocList, cbxRef, cbxDocMatch, cbxTarget, cbxAct, cbxTplGo, cbxMoveOpen, cbxUpload, cbxBoxHtml, cbxEtcHtml, cbxRestore, setConfirm: function(v){ confirmAns = v; }, applied: function(){ return appliedN; }, setBids: function(a){ bids = a; }, setTplKeys: function(o){ csTplKeys = o; } }, xgSafetyVals, xgSafetyMissing, xgSafetyGen, XG_SAFE_FILES, csGenKeys, xgBuildEdits, xgMergeLearned, xgApplyLearned, errCalls: errCalls, CDOC, cdocTrashHtml, cdocDocKey, cdocPkKey, cdocLive, cdocCurOf, cdocPkHit, cdocRowsHtml, cdocLoad, csCdocDraft, CON_MAP, CON_BG, CON_PROC_SRC, conDueUse, conDueClear, conDueOn, conStageDue, conAnnualNext, conBaseDate, conAddBizDays, materializeStage, asb, todayStr, tasks, CON_COLS, CON_SCEN, CON_PACKETS, STAGE_DOCS, conScenStages, conModalElems, stageDocsFor, csSplitTop, csParseStageDocs, csStageDocItems, csStageDocsHtml, csDocToggle, csDocNa, csDocAdd, csDocDel, csMergeDocs, csStageFields, stageXlsxKind, csRowHtml, csDetailHtml, csStageInfo, csSortRows, csPass, csEnumValues, csEndCell, csKind, csSkipStage, csJumpStage, csUnskipStage, csPacketsHtml, csLoadTpl, csApprKind, csApprSubmit, csApprOnDecided, csApprFind, csSyncFromServer, csApprSync, csApprDropped, csAlignTasksAll, toasts: toasts, saveNow: function(){ return saveNowN; }, csLinkSite, csLinkSiteLater, csOnDone, csSiteDone, csSiteHooksRetry, csNextFeb15, advanceProc, materializeStage, asb: asb, tasks: tasks, appr: apprPendingCreates, alerts: alerts, bills: function(){ return billN; }, setServer: function(items){ serverItems = items; }, pushContract: function(c){ contracts.push(c); }, popContract: function(){ contracts.pop(); }, setAsbLoaded: function(v){ asbLoaded = v; }, setTab: function(t){ conDetTab = t; }, openStage: function(k){ csStageOpen = k; }, setTpl: function(o){ csTplKeys = o; csTplErr = 0; }, setTplErr: function(v){ csTplErr = v; }, tplState: function(){ return { keys: csTplKeys, err: csTplErr, loading: csTplLoading }; }, setGw: function(f){ gwCall = f; }, conScenKey, CON_ADDED, conAddedPrep, conAddedApply, conAddedUse, conAddedClear, conScenTag, conChgWindow, conAddedPreviewHtml, conRouteKey, stageDocsOf, csStageFieldsOf, csStageNew, csApprKindOf, csChgAmtChanged, csChgCan, csChgAdd, csChgOpenAt, csStagesHtml, csDoneStage, conProcLoad, renderConProcCard, startProcess, procSrc: function(){ return CON_PROC_SRC; }, setDocEl: function(id, el){ docEls[id] = el; }, sched: function(){ return schedN; }, csApprApply, csTaskChg, csChgBase, confirms: confirms, doneCalls: function(){ return csnN; } };
 `)(contracts, tasks, recs);
 let fails = 0; const T = (n, ok, note) => { console.log((ok ? '  ✓ ' : '  ✗ ') + n + (ok ? '' : ' — ' + note)); if (!ok) fails++; };
 // 시나리오 목록
@@ -104,7 +107,7 @@ if (contracts.length) {
 // v383 패킷
 api.setTpl(null);
 let c3 = mk(); let ph = api.csPacketsHtml(c3);
-T('v383 패킷(준설 관급, 양식 목록 전): 패킷 4 · gen 항목은 "양식 확인 중" · 첨부 필요 항목에 📎(data-catt-add)', (ph.match(/class="cs-pk"/g) || []).length === 4 && /양식 확인 중/.test(ph) && /data-catt-add=/.test(ph), '');
+T('v383 패킷(준설 관급, 양식 목록 전): 패킷 4 · gen 항목은 "양식 확인 중" · 첨부 필요 항목은 표시만(v423 올리기 버튼 없음 — 넣기 박스 하나)', (ph.match(/class="cs-pk"/g) || []).length === 4 && /양식 확인 중/.test(ph) && /첨부 필요/.test(ph) && !/data-catt-add=|data-cs-cpk=/.test(ph), '');
 api.setTpl({ work_start: 1, work_complete: 1, settle_doc: 1, contract_pledge: 1, seal_reg: 1, quote_env: 1 });
 c3.attachments = { '서류함': [{ name: '철강공단 계약서류준비.pdf' }, { name: '계량증명서_구룡포.pdf' }, { name: '통장사본.jpg' }] };
 ph = api.csPacketsHtml(c3);
@@ -332,7 +335,7 @@ T('준공·만기 칸: d3 없음 → "-" · 지난 날짜 → vs-dan · 완료 �
   T('v402 단계 탭: "변경계약 2건" 머리 · [+ 변경계약 3차](창 안) · 사급 신설 배지·기본 꺼짐 단계 [켜기] · 미리보기에 (착공)·(완료)·완료신고_석면·변경계약 별도 줄',
     /변경계약 2건/.test(h9) && /data-cs-chgadd="c_v402a">\+ 변경계약 3차/.test(h9) && /<small>신설<\/small>/.test(hP) && /data-cs-unskip="[^"]*">켜기</.test(hP) && /\(착공\)/.test(pvH) && /\(완료\)/.test(pvH) && /완료신고_석면/.test(pvH) && /별도 줄/.test(pvH), h9.slice(0, 160));
   api.openStage('chg|1'); const h13 = api.csStagesHtml(c8); api.openStage('');
-  T('v402 R4: 변경계약 단계 카드에 📄 서류 버튼 없음(계약서 작성 툴이 원계약 contract_info를 덮지 않게) · 서류함 첨부 안내', !/data-cs-sdoc="c_v402a\|변경계약"/.test(h13) && /변경계약서: 서류함 첨부/.test(h13), '');
+  T('v402 R4: 변경계약 단계 카드에 📄 서류 버튼 없음(계약서 작성 툴이 원계약 contract_info를 덮지 않게) · 넣기 박스 안내', !/data-cs-sdoc="c_v402a\|변경계약"/.test(h13) && /변경계약서: 넣기 박스/.test(h13), '');
   const allC = (bk['col:contracts'].items || []), pBefore = JSON.stringify(allC.map((x) => x.pipes)); let ex11 = 0;
   for (const tab of ['ov', 'st', 'doc', 'lk']) { api.setTab(tab); allC.forEach((x) => { try { api.csDetailHtml(x); } catch (e) { ex11++; } }); }
   T('v402 옛 계약 호환(켬 상태): 백업 ' + allC.length + '건(삭제 포함) 4탭 렌더 예외 0 · 렌더 전후 pipes 같음', ex11 === 0 && JSON.stringify(allC.map((x) => x.pipes)) === pBefore, String(ex11));
@@ -535,9 +538,9 @@ T('준공·만기 칸: d3 없음 → "-" · 지난 날짜 → vs-dan · 완료 �
   const hitC = api.cdocPkHit(c7, { k: 'con' }, { k: 'contract' }), hitB = api.cdocPkHit(c7, { k: 'con' }, { k: 'biz' });
   T('v407 패킷 메타 우선: contract 항목은 기록물 n=4로 판정 · 보관된 biz는 미판정(정규식 폴백)', hitC && hitC.n === 4 && hitB === null, JSON.stringify([hitC && hitC.n, hitB]));
   api.setTab('doc'); const pk7 = api.csPacketsHtml(c7);
-  T('v407 패킷 HTML: 계약서 행 "올림 · 계약서.pdf v1" + [열기] · 사업자등록증 행 "첨부 필요" + [⬆ 올리기]·[📎]', pk7.indexOf('올림 · 계약서.pdf v1') > 0 && pk7.indexOf('data-cs-copen="c7|4|0"') > 0 && pk7.indexOf('data-cs-cpk="c7|con|biz"') > 0 && pk7.indexOf('data-catt-add="c7"') > 0, pk7.slice(0, 300));
+  T('v407 패킷 HTML: 계약서 행 "올림 · 계약서.pdf v1" + [열기] · 사업자등록증 행 "첨부 필요"(v423 줄마다 올리기 없음)', pk7.indexOf('올림 · 계약서.pdf v1') > 0 && pk7.indexOf('data-cs-copen="c7|4|0"') > 0 && pk7.indexOf('첨부 필요') > 0 && pk7.indexOf('data-cs-cpk=') < 0 && pk7.indexOf('data-catt-add=') < 0, pk7.slice(0, 300));
   const dh = api.csStageDocsHtml(c7, p7, 1, 'main|1', true);
-  T('v407 서류 행: pii 선택 · 항목마다 [최종본↑]·[수령↑](data-cs-cup …|final / |received) · 기록물 줄 2(v2 현재·개인정보 1 / v1 [현재로]) · 열기 버튼 pii 전달 · 추가 항목도 버튼', dh.indexOf('<select data-cs-pii="main|1"') > 0 && dh.indexOf('data-cs-cup="c7|main|1|수령:0|final"') > 0 && dh.indexOf('data-cs-cup="c7|main|1|수령:0|received"') > 0 && dh.indexOf('data-cs-cup="c7|main|1|add:x1|final"') > 0
+  T('v407 서류 행(v423 줄마다 올리기·pii 선택 없음): 기록물 줄 2(v2 현재·개인정보 1 / v1 [현재로]) · 열기 버튼 pii 전달', dh.indexOf('data-cs-pii') < 0 && dh.indexOf('data-cs-cup=') < 0
     && (dh.match(/cs-cdoc-r/g) || []).length === 2 && dh.indexOf('수령 v2 <b>현재</b> <small class="pii">개인정보 1</small>') > 0 && dh.indexOf('data-cs-copen="c7|2|1"') > 0 && dh.indexOf('data-cs-ccur="c7|1"') > 0 && dh.indexOf('data-cs-ccur="c7|2"') < 0, dh.slice(0, 400));
   const dh0 = api.csStageDocsHtml(c7, p7, 1, 'main|1', false);
   T('v407 권한 없음(can=false): 올리기·pii 선택·보관 없음, [열기]는 있음', dh0.indexOf('data-cs-cup=') < 0 && dh0.indexOf('data-cs-pii') < 0 && dh0.indexOf('data-cs-cdel') < 0 && dh0.indexOf('data-cs-copen="c7|2|1"') > 0);
@@ -645,6 +648,214 @@ T('준공·만기 칸: d3 없음 → "-" · 지난 날짜 → vs-dan · 완료 �
   const err = await api.xgSafetyGen('safety_pack', '시험', api.xgSafetyVals()).then(() => '', (e) => String(e));
   T('v422 생성: 미등록이면 첫 양식 이름으로 멈춤', /위험성평가표\(준설\).*양식 미등록/.test(err), err);
   api.setGw(null);
+}
+
+// ---- v423 넣기 박스(체크 31): 판단 결과 → 카드·새 계약·서류함 넣기·옮기기·조각 올리기 실제 실행 ----
+{
+  const X = api.cbx, sent = [];
+  const tick = () => new Promise((res) => setTimeout(res, 5));
+  const attach = (b) => ({ status: 200, body: { item: { n: ++X.nSeq, i: b.i, dk: b.doc_key, kind: b.kind, ver: 1, cur: 1, orig: 'x', name: 'x' }, gc: [], learn: b.kind === 'final' ? { ok: true, id: 'lc_1', status: 'done_nomodel', tpl: b.pair_tpl || 'work_start', gap: { cell_ratio: 0.125 } } : null } });
+  api.setGw((fn, b) => { sent.push(Object.assign({ fn: fn }, b)); if (b.action === 'cdoc_attach') return Promise.resolve(attach(b)); return Promise.resolve({ status: 200, body: { status: 'OK', id: 'att_part0000000001' } }); });
+  const lastSent = (a) => sent.filter((s) => s.action === a).slice(-1)[0];
+  const newIt = (scope, name) => { const it = { id: ++X.idSeq, scope: scope, name: name, size: 10, file: { type: 'application/pdf' }, st: 'judge', att: 'att_00000000000000' + (X.idSeq % 90 + 10) }; X.items().push(it); return it; };
+  const CONP = { doc: 'box', cls: 'contract', sub: 'none', doc_name: '공사도급계약서', pii: 0, read: 'vision', con: { title: '하수도시설물 준설공사', amount: 19525000, d1: '2026-11-06', d2: '2026-11-10', d3: '2026-12-10', client: '시험공단', site: '포항시 시험동', guarantee: 100 }, con_type: 'dredge', combo: false, pub: true, why_type: '공사명에 준설', why_pub: '공단', our_side: '을', target: '', contract_id: '', tpl_key: '', draft_tpl: '' };
+  const it1 = newIt('top', '계약서_<시험>.pdf');
+  X.cbxApply(it1, CONP);
+  const h1 = X.cbxCardHtml(it1);
+  T('v423 계약서 판단 → 새 계약 카드: 유형·사급관급 AI 판단+근거 · 값 · 만들어질 단계(준설 관급 PM 원문) · [이대로 시작]·[고치기] · 파일 이름 이스케이프',
+    it1.st === 'new' && it1.form.type === 'dredge' && it1.edit === false && /새 계약서로 판단/.test(h1) && /준설·시설공사<span class="cbx-ai">AI 판단/.test(h1) && /근거: 공사명에 준설/.test(h1) && /19,525,000원/.test(h1) && h1.indexOf('<li>' + api.CON_SCEN['dredge:pub'][0] + '</li>') > 0 && /data-cbx-act="\d+\|start"/.test(h1) && /data-cbx-act="\d+\|edit"/.test(h1) && h1.indexOf('<시험>') < 0, h1.slice(0, 300));
+  const nBefore = contracts.length;
+  X.cbxStart(it1);
+  await tick(); await tick();
+  const nc = contracts[contracts.length - 1], s0 = api.CON_SCEN['dredge:pub'];
+  T('v423 [이대로 시작]: 계약 1건 생성(공사명·발주자·금액·날짜·보증금 contract_info · 관급 · 시나리오 태그) · 첫 단계가 견적이면 지난 것으로 · AI 판단을 계약에 보존',
+    contracts.length === nBefore + 1 && nc.title === '하수도시설물 준설공사' && nc.client === '시험공단' && nc.contract_info.amount === 19525000 && nc.contract_info.d3 === '2026-12-10' && nc.contract_info.guarantee === 100 && nc.docType === 'public' && nc.scen.type === 'dredge' && (/견적/.test(s0[0]) ? nc.pipes[0].cur === 1 && nc.pipes[0].stages[0].status === 'done' : nc.pipes[0].cur === 0) && nc.box.ai.type === 'dredge' && nc.box.fixed.length === 0, JSON.stringify([nc.title, nc.pipes[0].cur, nc.box]));
+  const at1 = lastSent('cdoc_attach'), fx1 = lastSent('box_fix');
+  T('v423 시작 뒤: 계약서를 계약 패킷 자리(pk.con.contract·수령)에 넣음 · 판단 그대로면 ok만 보고 · 카드 완료 문구', at1 && at1.doc_key === 'pk.con.contract' && at1.kind === 'received' && at1.cid === nc.id && at1.i === nc.pipes[0].cur && fx1 && fx1.ok === true && it1.st === 'done' && /계약을 시작했습니다/.test(it1.msg) && api.saveNow() > 0, JSON.stringify([at1, fx1, it1.st, it1.msg]));
+  // 고친 뒤 시작 — 고친 분류가 다음 판단 재료로
+  const it2 = newIt('top', '철거계약.pdf');
+  X.cbxApply(it2, Object.assign({}, CONP, { con_type: 'none', con: Object.assign({}, CONP.con, { title: '다른 공사 표기 전혀 다름' }) }));
+  const edit0 = it2.edit === true && /유형 선택…/.test(X.cbxCardHtml(it2));
+  const alerts0 = api.alerts.length; X.cbxStart(it2);
+  const blocked = api.alerts.length === alerts0 + 1 && it2.st === 'new';
+  it2.form.type = 'demolition'; it2.form.pub = false; X.cbxStart(it2); await tick(); await tick();
+  const fx2 = lastSent('box_fix'), nc2 = contracts[contracts.length - 1];
+  T('v423 유형 판단 못 함: 고치기 칸이 열리고 유형 없이는 시작 안 됨 · 고쳐서 시작하면 box_fix에 from→to · 계약에 고친 칸 기록 · 사급', edit0 && blocked && fx2 && !fx2.ok && fx2.to.type === 'demolition' && fx2.from.type === '' && nc2.docType === 'private' && nc2.box.fixed.indexOf('type') >= 0, JSON.stringify([edit0, blocked, fx2]));
+  // 같은 계약 찾기
+  const it3 = newIt('top', '계약서 사본.pdf');
+  X.cbxApply(it3, Object.assign({}, CONP, { contract_id: nc.id }));
+  const h3 = X.cbxCardHtml(it3);
+  T('v423 진행 중 계약과 일치: "이 계약에 넣기"가 먼저, 새 계약으로 시작도 가능', it3.same === nc.id && /진행 중인 계약의 계약서로 보입니다/.test(h3) && /\|into"/.test(h3) && /\|startnew"/.test(h3), h3.slice(0, 200));
+  const it3b = newIt('top', '계약서2.pdf');
+  X.cbxApply(it3b, Object.assign({}, CONP, { contract_id: '' }));
+  T('v423 공사명이 같으면 판단이 못 찾아도 코드가 같은 계약을 찾음', it3b.same === nc.id, it3b.same);
+  // 계약 안에 넣은 계약서 — 비었으면 채우고 있으면 덮지 않음
+  const emptyC = api.startProcess('dredge', { client: '빈계약', site: '', start: '2026-10-13', who: '', docType: 'public', stages: api.conScenStages('dredge', true, false, { qual: false }), elems: { dredge: 1 }, scen: { type: 'dredge', pub: true, combo: false, ver: 1 } });
+  const it4 = newIt(emptyC.id, '계약서.pdf'); X.cbxApply(it4, CONP); await tick();
+  T('v423 계약 안 박스 + 계약서: 빈 계약 정보를 채움 · 계약 패킷 자리에 넣음', emptyC.contract_info && emptyC.contract_info.title === '하수도시설물 준설공사' && emptyC.title === '하수도시설물 준설공사' && lastSent('cdoc_attach').doc_key === 'pk.con.contract' && it4.st === 'done', JSON.stringify([emptyC.contract_info, it4.st]));
+  const it5 = newIt(emptyC.id, '변경계약서.pdf'); X.cbxApply(it5, Object.assign({}, CONP, { con: Object.assign({}, CONP.con, { amount: 30000000 }) })); await tick();
+  T('v423 이미 값이 있으면 덮지 않고 다른 값만 알림(변경계약 값이 원계약을 덮지 않게)', emptyC.contract_info.amount === 19525000 && /금액 19,525,000 → 30,000,000/.test(it5.msg) && /덮어쓰지 않았습니다/.test(it5.msg), it5.msg);
+  // 서류 — 자리·종류·짝
+  const docs = X.cbxDocList(emptyC), wsDoc = docs.filter((d) => /착공계/.test(d.n) && d.id.indexOf('s|') === 0)[0], ctDoc = docs.filter((d) => d.id === 'p|con|contract')[0];
+  T('v423 서류 목록: 단계 서류(s|파이프|단계|항목) + 패킷 첨부 항목(p|패킷|항목) · 자리 변환 doc_key · 없으면 그 밖의 서류', !!wsDoc && !!ctDoc && X.cbxRef(emptyC, wsDoc.id).dk.indexOf('main.') === 0 && X.cbxRef(emptyC, 'p|con|contract').dk === 'pk.con.contract' && X.cbxRef(emptyC, '').dk === 'etc.box', JSON.stringify(docs.slice(0, 3)));
+  T('v423 이름 대조 보조: 착공계 파일명 → 착공계 · 무관한 이름 → 없음', (X.cbxDocMatch(docs, '', '착공계_최종.xlsx') || {}).n === wsDoc.n && X.cbxDocMatch(docs, '점심 메뉴', '메뉴.pdf') === null, '');
+  const it6 = newIt(emptyC.id, '착공계_최종.xlsx');
+  X.cbxApply(it6, { doc: 'box', cls: 'filled', sub: 'none', doc_name: '착공계', pii: 0, target: wsDoc.id, draft_tpl: 'work_start', con: null }); await tick();
+  const at6 = lastSent('cdoc_attach');
+  T('v423 고친 서류: 판단한 자리에 바로 넣음(확인 없음) · 최종본 · 초안 양식 지정(pair_tpl) · 카드에 자리·간극·[다른 서류로]', at6.kind === (wsDoc.t === '수령' ? 'received' : 'final') && at6.doc_key === X.cbxRef(emptyC, wsDoc.id).dk && at6.pair_tpl === 'work_start' && it6.st === 'done' && /간극 13%/.test(it6.msg) && /\|moveopen"/.test(X.cbxCardHtml(it6)), JSON.stringify([at6, it6.msg]));
+  const it7 = newIt(emptyC.id, '필증.pdf'); X.cbxApply(it7, { doc: 'box', cls: 'received', sub: 'none', doc_name: '점심 메뉴', pii: 0, target: '', con: null }); await tick();
+  T('v423 자리를 못 고르면 그 밖의 서류에 넣고 알림 · 수령본', lastSent('cdoc_attach').doc_key === 'etc.box' && lastSent('cdoc_attach').kind === 'received' && /그 밖의 서류/.test(it7.msg), it7.msg);
+  // 개인정보 — 넣기 전에 경고
+  const nAt0 = sent.filter((s) => s.action === 'cdoc_attach').length;
+  const it8 = newIt(emptyC.id, '명단.pdf'); X.cbxApply(it8, { doc: 'box', cls: 'received', sub: 'none', doc_name: '명단', pii: 1, target: '', con: null });
+  const h8 = X.cbxCardHtml(it8);
+  T('v423 개인정보 판단: 바로 안 넣고 경고 카드(노무사 회신 전 원칙) · 넣기를 눌러야 등급과 함께 넣음', it8.st === 'pii' && /노무사 회신 전/.test(h8) && sent.filter((s) => s.action === 'cdoc_attach').length === nAt0, h8.slice(0, 200));
+  X.cbxAct(it8, 'go'); await tick();
+  T('v423 개인정보 [그래도 넣기]: pii 1로 넣음', lastSent('cdoc_attach').pii === 1, JSON.stringify(lastSent('cdoc_attach')));
+  // 전용 판독(석면조사서·상대 사업자등록증)은 값을 먼저 뽑는다
+  const it9 = newIt(emptyC.id, '석면조사결과서.pdf'); X.cbxApply(it9, { doc: 'box', cls: 'received', sub: 'asbestos_survey', doc_name: '석면조사 결과서', pii: 0, target: '', con: null });
+  const pb9 = sent.filter((s) => s.fn === 'gw-parse-background').slice(-1)[0];
+  T('v423 석면조사서: 넣기 전에 전용 판독 요청(kind asbestos)', it9.st === 'sub' && pb9 && pb9.kind === 'asbestos' && pb9.id === it9.att, JSON.stringify(pb9));
+  X.items().splice(X.items().indexOf(it9), 1);
+  // 맨 위 + 서류 — 계약을 못 찾으면 고르게
+  const it10 = newIt('top', '공문.pdf'); X.cbxApply(it10, { doc: 'box', cls: 'filled', sub: 'none', doc_name: '공문', pii: 0, target: '', contract_id: '', con: null });
+  const h10 = X.cbxCardHtml(it10);
+  T('v423 맨 위 박스 + 계약 모름: 계약 고르기 카드 · 고르면 서류 칸이 생김', it10.st === 'pick' && /계약 선택…/.test(h10) && h10.indexOf('|tgt"') < 0, h10.slice(0, 200));
+  it10.cid = emptyC.id; X.cbxTarget(it10, emptyC); const h10b = X.cbxCardHtml(it10);
+  T('v423 계약 고른 뒤: 서류·종류 선택 + 넣기', h10b.indexOf('|tgt"') > 0 && h10b.indexOf('|kind"') > 0 && /\|place"/.test(h10b), '');
+  const it11 = newIt('top', '오류.pdf'); X.cbxApply(it11, { error: 'SERVER' });
+  T('v423 판독 실패: 사유를 보이고 직접 고르게(파일은 안 버림)', it11.st === 'pick' && /판독하지 못했습니다\(SERVER\)/.test(X.cbxCardHtml(it11)) && it11.att, X.cbxCardHtml(it11).slice(0, 200));
+  // 빈 양식·증빙(관리자)
+  const it12 = newIt('top', '착공계양식.xlsx'); X.cbxApply(it12, { doc: 'box', cls: 'blank', sub: 'none', doc_name: '착공계', pii: 0, tpl_key: 'work_start', con: null });
+  const h12 = X.cbxCardHtml(it12);
+  T('v423 빈 양식(관리자): 양식 선택(판단값 선택됨) + 등록 + "양식 아님" · 확장자 다르면 막음', it12.st === 'blank' && /value="work_start" selected/.test(h12) && /\|tpl"/.test(h12) && /\|asdoc"/.test(h12), h12.slice(0, 200));
+  const al0 = api.alerts.length; it12.name = '착공계양식.hwpx'; X.cbxTplGo(it12);
+  T('v423 양식 확장자 불일치: 경고만, 등록 안 함', api.alerts.length === al0 + 1 && !lastSent('tpl_put'), api.alerts.slice(-1)[0]);
+  const it13 = newIt('top', '등록증.pdf'); X.cbxApply(it13, { doc: 'box', cls: 'proof', sub: 'none', doc_name: '건설업 등록증', pii: 0, con: null });
+  T('v423 회사 증빙(관리자): 보관함 넣기 카드', it13.st === 'proof' && /적격심사 증빙 보관함/.test(X.cbxCardHtml(it13)), '');
+  // 옮기기
+  api.CDOC[emptyC.id] = { items: [{ n: 41, i: X.cbxRef(emptyC, wsDoc.id).i, dk: X.cbxRef(emptyC, wsDoc.id).dk, kind: 'final', ver: 1, cur: 1, orig: '착공계.xlsx', name: 'x' }, { n: 42, i: 0, dk: 'gen.work_start', kind: 'draft', ver: 1, cur: 1, orig: 'd', name: 'd' }], at: Date.now(), busy: false, err: '', loaded: true };
+  const rows = api.cdocRowsHtml(emptyC, X.cbxRef(emptyC, wsDoc.id).i, X.cbxRef(emptyC, wsDoc.id).dk, true), rowsD = api.cdocRowsHtml(emptyC, 0, 'gen.work_start', true);
+  T('v423 서류함 줄: 최종본에 [옮기기], 초안엔 없음', rows.indexOf('data-cs-cmove="' + emptyC.id + '|41"') > 0 && rowsD.indexOf('data-cs-cmove') < 0, rows.slice(0, 200));
+  const nI = X.items().length; X.cbxMoveOpen(emptyC.id, 41); const mv = X.items()[nI];
+  T('v423 [옮기기] 카드: 지금 자리가 선택돼 있음', mv.st === 'move' && mv.tgt === wsDoc.id && mv.kind === 'final', JSON.stringify(mv));
+  mv.tgt = 'p|con|contract'; mv.kind = 'received'; X.cbxAct(mv, 'move'); await tick();
+  const ms = lastSent('cdoc_move');
+  T('v423 옮기기 전송: 새 자리·종류·고친 내용(from·to 이름) · 카드 완료', ms && ms.n === 41 && ms.doc_key === 'pk.con.contract' && ms.kind === 'received' && /착공계/.test(ms.fix.from) && /계약서/.test(ms.fix.to) && mv.st === 'done', JSON.stringify(ms));
+  // 조각 올리기
+  const big = 'data:application/pdf;base64,' + 'QUJD'.repeat(2500000);   // base64 1000만 자
+  const up = { id: ++X.idSeq, scope: 'top', name: '스캔.pdf', size: 7500000, file: { _dataurl: big }, st: 'up', pct: 0, att: '' }; X.items().push(up);
+  const n0 = sent.length; X.cbxUpload(up);
+  for (let i = 0; i < 20; i++) await tick();
+  const parts = sent.slice(n0).filter((s) => s.action === 'box_put');
+  X.items().splice(X.items().indexOf(up), 1);
+  T('v423 조각 올리기: 3조각(4,400,000자·4의 배수) · 순서대로 · 잇으면 원본 · 둘째부터 같은 id · 끝나면 판단 요청(문맥 포함)', parts.length === 3 && parts.every((p, i) => p.j === i && p.k === 3 && p.data.length <= 4400000 && (i === 2 || p.data.length % 4 === 0)) && parts.map((p) => p.data).join('') === big.split(',')[1] && parts[1].id === 'att_part0000000001' && sent.slice(n0).some((s) => s.fn === 'gw-parse-background' && s.box === 1 && s.ctx && Array.isArray(s.ctx.cons)), JSON.stringify(parts.map((p) => [p.j, p.data.length, p.id])));
+  // 박스 HTML
+  const bx = X.cbxBoxHtml(emptyC), bxDone = X.cbxBoxHtml(Object.assign({}, emptyC, { status: 'done', id: 'zz' }));
+  T('v423 계약 안 박스: 진행 중엔 있음 · 완료 계약엔 없음', bx.indexOf('data-cbx-drop="' + emptyC.id + '"') > 0 && bxDone.indexOf('data-cbx-drop') < 0, '');
+  api.CDOC[emptyC.id].items.push({ n: 43, i: 0, dk: 'etc.box', kind: 'received', ver: 1, cur: 1, orig: '기타.pdf', name: 'x' });
+  T('v423 그 밖의 서류 칸: 목록에 없는 서류를 보여 줌', /그 밖의 서류/.test(X.cbxEtcHtml(emptyC)) && /기타\.pdf/.test(X.cbxEtcHtml(emptyC)), X.cbxEtcHtml(emptyC).slice(0, 160));
+  // ---- 독립 검토 반영 ----
+  const mkC = (who, extra) => { const c0 = api.startProcess('dredge', Object.assign({ client: who, site: '', start: '2026-10-13', who: '', docType: 'public', stages: api.conScenStages('dredge', true, false, { qual: false }), elems: { dredge: 1 }, scen: { type: 'dredge', pub: true, combo: false, ver: 1 } }, extra || {})); return c0; };
+  // 이 계약에 넣기: 고친 값
+  const cF = mkC('고침계약'), itF = newIt('top', '고친계약서.pdf');
+  X.cbxApply(itF, Object.assign({}, CONP, { con_type: 'dredge', contract_id: cF.id })); itF.form.amount = 1100000; itF.form.title = '사람이 고친 공사명'; X.cbxAct(itF, 'into'); for (let i = 0; i < 4; i++) await tick();
+  T('v423 [이 계약에 넣기]: 카드에서 고친 값으로 채움 · 그대로 보고(ok)', cF.contract_info.amount === 1100000 && cF.contract_info.title === '사람이 고친 공사명' && itF.st === 'done' && lastSent('box_fix') && lastSent('box_fix').ok === true, JSON.stringify([cF.contract_info, itF.st]));
+  // 낙찰 계약: 빈 칸만 채움
+  const cB = mkC('낙찰계약', { title: '낙찰 공고 공사', cinfo: { title: '낙찰 공고 공사', amount: 5000000, d1: '', d2: '', d3: '', client: '시험', site: '', guarantee: 0, from: '낙찰 공고(1)' } }), itB = newIt(cB.id, '계약서.pdf');
+  X.cbxApply(itB, Object.assign({}, CONP, { con: Object.assign({}, CONP.con, { amount: 5500000 }) })); for (let i = 0; i < 4; i++) await tick();
+  T('v423 낙찰 계약 + 계약서: 빈 날짜·현장·보증금만 채움 · 금액은 덮지 않고 다른 값 알림 · from 유지', cB.contract_info.d3 === '2026-12-10' && cB.contract_info.d1 === '2026-11-06' && cB.contract_info.site === '포항시 시험동' && cB.contract_info.guarantee === 100 && cB.contract_info.amount === 5000000 && cB.contract_info.from === '낙찰 공고(1)' && /금액 5,000,000 → 5,500,000/.test(itB.msg), JSON.stringify([cB.contract_info, itB.msg]));
+  T('v423 계약서 카드: [계약 단계 완료]·[착공계 작성]', /\|gowork"/.test(X.cbxCardHtml(itB)), X.cbxCardHtml(itB).slice(0, 200));
+  // 계약서 자리 — 원계약서를 가리지 않음
+  const nA0 = sent.filter((s0) => s0.action === 'cdoc_attach').length, itC2 = newIt(cB.id, '변경계약서.pdf');
+  X.cbxApply(itC2, Object.assign({}, CONP, { doc_name: '변경계약서' })); for (let i = 0; i < 4; i++) await tick();
+  const atC2 = sent.filter((s0) => s0.action === 'cdoc_attach').slice(nA0)[0];
+  T('v423 계약서 자리에 파일이 있으면 그 자리에 안 넣음(원계약서를 가리지 않게)', atC2 && atC2.doc_key !== 'pk.con.contract' && /다른 자리에 넣었습니다/.test(itC2.msg), JSON.stringify([atC2 && atC2.doc_key, itC2.msg]));
+  // 우리가 갑
+  const cG = mkC('갑계약'), itG = newIt(cG.id, '하도급계약서.pdf');
+  X.cbxApply(itG, Object.assign({}, CONP, { our_side: '갑' })); for (let i = 0; i < 4; i++) await tick();
+  T('v423 우리가 도급인(갑)인 계약서: 계약 정보를 안 채우고 서류만 넣고 알림', !(cG.contract_info && cG.contract_info.amount) && /채우지 않았습니다/.test(itG.msg), JSON.stringify([cG.contract_info, itG.msg]));
+  // 맨 위 + AI가 고른 계약: 한 번 확인
+  const nA1 = sent.filter((s0) => s0.action === 'cdoc_attach').length, itT = newIt('top', '공문.pdf');
+  X.cbxApply(itT, { doc: 'box', cls: 'filled', sub: 'none', doc_name: '공문', pii: 0, target: '', contract_id: cB.id, con: null });
+  const htT = X.cbxCardHtml(itT);
+  T('v423 맨 위 박스 + AI가 고른 계약: 바로 안 넣고 그 계약이 선택된 확인 카드', itT.st === 'pick' && itT.cid === cB.id && sent.filter((s0) => s0.action === 'cdoc_attach').length === nA1 && htT.indexOf('value="' + cB.id + '" selected') > 0, htT.slice(0, 200));
+  X.cbxAct(itT, 'place'); for (let i = 0; i < 4; i++) await tick();
+  T('v423 확인 뒤 넣기: 완료 문구에 계약 이름', itT.st === 'done' && /낙찰 공고 공사/.test(itT.msg), itT.msg);
+  // 판단 실패·등급
+  const itE = newIt('top', '스캔0012.jpg'); X.cbxApply(itE, { error: 'BAD_REQUEST' });
+  const heE = X.cbxCardHtml(itE);
+  T('v423 판독 실패: 등급 기본 1 · 등급 선택 칸 · 관리자는 양식·증빙 길도', itE.pii === 1 && /\|pii"/.test(heE) && /\|toblank"/.test(heE) && /\|toproof"/.test(heE), heE.slice(0, 300));
+  const itE2 = newIt('top', '석면조사서 스캔.pdf'); X.cbxApply(itE2, { error: 'SERVER' });
+  T('v423 판독 실패 + 옛 파일명 규칙: 석면조사서 후보로 전용 판독 대상', itE2.res.sub === 'asbestos_survey', JSON.stringify(itE2.res));
+  const itP = newIt('top', '자격증.pdf'); X.cbxApply(itP, { doc: 'box', cls: 'proof', sub: 'none', doc_name: '자격증', pii: 1, con: null }); X.cbxAct(itP, 'asdoc');
+  T('v423 [증빙 아님, 계약 서류로]: 등급을 지우지 않음', itP.st === 'pick' && itP.pii === 1, String(itP.pii));
+  // 전용 판독: 개인정보 파일은 값을 안 뽑음 · 결과는 넣은 뒤 반영 · 중복 취소면 안 덮음 · 확정 조사서 안 덮음
+  const nPb = sent.filter((s0) => s0.fn === 'gw-parse-background').length, itK = newIt(cB.id, '대표 신분증.jpg');
+  X.cbxApply(itK, { doc: 'box', cls: 'received', sub: 'biz', doc_name: '신분증', pii: 1, read: 'vision', con: null }); X.cbxAct(itK, 'go'); for (let i = 0; i < 4; i++) await tick();
+  T('v423 개인정보로 판단한 파일: 전용 판독 요청 0(모델에 다시 안 보냄)', sent.filter((s0) => s0.fn === 'gw-parse-background').length === nPb && itK.st === 'done', String(sent.filter((s0) => s0.fn === 'gw-parse-background').length - nPb));
+  const appl0 = X.applied();
+  const itS = newIt(cB.id, '석면조사서.pdf'); itS.res = { cls: 'received', sub: 'asbestos_survey', pii: 0 }; itS.pii = 0; itS.cid = cB.id; itS.tgt = ''; itS.kind = 'received'; itS.subDone = 1; itS.subRes = { judge: { target: true, reasons: [] }, rows: [] };
+  api.setGw((fn, b) => { sent.push(Object.assign({ fn: fn }, b)); if (b.action === 'cdoc_attach') return Promise.resolve({ status: 409, body: { error_code: 'DUP_BYTES', dup: [] } }); return Promise.resolve({ status: 200, body: { status: 'OK' } }); });
+  X.setConfirm(false); X.cbxAct(itS, 'go'); for (let i = 0; i < 4; i++) await tick(); X.setConfirm(true);
+  T('v423 중복 취소: 판독 값을 반영하지 않음 · 파일 버림', X.applied() === appl0 && X.items().indexOf(itS) < 0 && lastSent('att_del'), String(X.applied() - appl0));
+  api.setGw((fn, b) => { sent.push(Object.assign({ fn: fn }, b)); if (b.action === 'cdoc_attach') return Promise.resolve(attach(b)); return Promise.resolve({ status: 200, body: { status: 'OK', id: 'att_part0000000001' } }); });
+  cB.asb_survey = { confirmed: true, area: 123 }; const itS2 = newIt(cB.id, '석면조사서2.pdf'); itS2.res = { cls: 'received', sub: 'asbestos_survey', pii: 0 }; itS2.pii = 0; itS2.cid = cB.id; itS2.tgt = ''; itS2.kind = 'received'; itS2.subDone = 1; itS2.subRes = { judge: { target: false, reasons: [] }, rows: [] };
+  X.cbxAct(itS2, 'go'); for (let i = 0; i < 4; i++) await tick();
+  T('v423 검수 확정된 조사서: 값을 덮지 않고 알림', X.applied() === appl0 && cB.asb_survey.area === 123 && /검수 확정된/.test(itS2.msg), itS2.msg);
+  cB.owner_info = { name: '기존 발주처' }; const itO = newIt(cB.id, '사업자등록증.pdf'); itO.res = { cls: 'received', sub: 'biz', pii: 0 }; itO.pii = 0; itO.cid = cB.id; itO.tgt = ''; itO.kind = 'received'; itO.subDone = 1; itO.subRes = { doc: 'biz', name: '다른 상호' };
+  X.cbxAct(itO, 'go'); for (let i = 0; i < 4; i++) await tick();
+  T('v423 다른 발주처 등록증: owner_info를 덮지 않고 알림', cB.owner_info.name === '기존 발주처' && /덮지 않았습니다/.test(itO.msg), itO.msg);
+  // 실패 카드
+  api.setGw((fn, b) => { sent.push(Object.assign({ fn: fn }, b)); if (b.action === 'cdoc_attach') return Promise.resolve({ status: 500, body: { error_code: 'X' } }); return Promise.resolve({ status: 200, body: { status: 'OK' } }); });
+  const itR = newIt(cB.id, '실패.pdf'); itR.res = { cls: 'received', sub: 'none', pii: 0 }; itR.cid = cB.id; itR.tgt = ''; itR.kind = 'received'; X.cbxAct(itR, 'place'); for (let i = 0; i < 4; i++) await tick();
+  const hR = X.cbxCardHtml(itR);
+  api.setGw((fn, b) => { sent.push(Object.assign({ fn: fn }, b)); if (b.action === 'cdoc_attach') return Promise.resolve(attach(b)); return Promise.resolve({ status: 200, body: { status: 'OK', id: 'att_part0000000001' } }); });
+  X.cbxAct(itR, 'retry'); for (let i = 0; i < 4; i++) await tick();
+  T('v423 넣기 실패: [다시 넣기] 카드 → 다시 넣으면 성공', itR.st === 'done' && /\|retry"/.test(hR), hR.slice(0, 200));
+  const itX = newIt(cB.id, '닫을.pdf'); itX.st = 'err'; itX.msg = '실패'; const nDel = sent.filter((s0) => s0.action === 'att_del').length; X.cbxAct(itX, 'close');
+  T('v423 실패 카드 ✕: 서버 파일도 지움 · 넣은 카드 ✕는 안 지움', sent.filter((s0) => s0.action === 'att_del').length === nDel + 1 && (X.cbxAct(itR, 'close'), sent.filter((s0) => s0.action === 'att_del').length === nDel + 1), String(sent.filter((s0) => s0.action === 'att_del').length - nDel));
+  // 시작 시점 재확인·낙찰 연결
+  const itD1 = newIt('top', '계약서 원본.pdf'), itD2 = newIt('top', '계약서 날인본.pdf');
+  X.setBids([{ id: 'b1', status: '낙찰', title: '두 파일 시험 하수도 준설공사', no: 'N1' }]);
+  const conD = Object.assign({}, CONP.con, { title: '두 파일 시험 하수도 준설공사' });
+  X.cbxApply(itD1, Object.assign({}, CONP, { con: conD })); X.cbxApply(itD2, Object.assign({}, CONP, { con: conD }));
+  const bidOk = itD1.bid === 'b1' && itD2.bid === 'b1' && /낙찰 공고와 연결합니다/.test(X.cbxCardHtml(itD1)) && /\|nobid"/.test(X.cbxCardHtml(itD1));
+  X.cbxStart(itD1); for (let i = 0; i < 4; i++) await tick();
+  const ncD = contracts.filter((c0) => c0.bid_id === 'b1')[0], nBefore2 = contracts.length;
+  X.cbxStart(itD2);
+  T('v423 같이 넣은 계약서: 앞 파일이 만든 계약을 알아채고 다시 물음(2건 안 생김) · 입찰 칸 출처는 공고', bidOk && ncD && ncD.contract_info.from === '낙찰 공고(N1)' && contracts.length === nBefore2 && itD2.same === ncD.id && itD2.st === 'new', JSON.stringify([bidOk, itD2.same]));
+  X.cbxAct(itD2, 'startnew'); for (let i = 0; i < 4; i++) await tick();
+  const ncD2 = contracts[contracts.length - 1];
+  T('v423 [새 계약으로 시작]: 사람이 고르면 만들되 같은 낙찰 공고는 다시 연결 안 함', contracts.length === nBefore2 + 1 && ncD2.bid_id === '', String(ncD2.bid_id));
+  X.setBids([{ id: 'b2', status: '낙찰', title: '후보 시험 공사명 긴 이름 2025', no: 'A' }, { id: 'b3', status: '낙찰', title: '후보 시험 공사명 긴 이름 2026', no: 'B' }]);
+  const itM = newIt('top', '계약서3.pdf'); X.cbxApply(itM, Object.assign({}, CONP, { con: Object.assign({}, CONP.con, { title: '후보 시험 공사명 긴 이름' }) }));
+  T('v423 낙찰 후보 여럿: 자동 연결 안 하고 알림', itM.bid === '' && itM.bidMany === 2 && /2건이라 연결하지 않았습니다/.test(X.cbxCardHtml(itM)), X.cbxCardHtml(itM).slice(0, 200));
+  X.setBids([]);
+  // 양식 — 목록이 비었으면 읽고 묻기
+  const itTp = newIt('top', '착공계양식.xlsx'); itTp.tpl = 'work_start'; X.setTplKeys(null); const cf0 = api.confirms.length;
+  api.setGw((fn, b) => { sent.push(Object.assign({ fn: fn }, b)); if (b.action === 'tpl_list') return Promise.resolve({ status: 503, body: {} }); return Promise.resolve({ status: 200, body: {} }); });
+  X.setConfirm(false); X.cbxTplGo(itTp); for (let i = 0; i < 4; i++) await tick(); X.setConfirm(true);
+  T('v423 양식 목록을 못 읽으면 항상 교체 확인(취소하면 등록 안 함)', api.confirms.length === cf0 + 1 && !sent.some((s0) => s0.action === 'tpl_put'), String(api.confirms.length - cf0));
+  const itTb = newIt('top', '큰양식.xlsx'); itTb.tpl = 'work_start'; itTb.size = 5 * 1024 * 1024; const alB = api.alerts.length; X.setTplKeys({}); X.cbxTplGo(itTb);
+  T('v423 큰 파일은 양식 등록 전에 막음(카드 유지)', api.alerts.length === alB + 1 && !sent.some((s0) => s0.action === 'tpl_put'), api.alerts.slice(-1)[0]);
+  // 옮기기 카드 하나만
+  const nI2 = X.items().length; X.cbxMoveOpen(emptyC.id, 41); X.cbxMoveOpen(emptyC.id, 41);
+  T('v423 [옮기기] 두 번 눌러도 카드 하나', X.items().length === nI2 + 1, String(X.items().length - nI2));
+  // 패킷 줄
+  const pkH = (api.setTab('doc'), api.csPacketsHtml(emptyC));
+  api.CDOC[emptyC.id].items.push({ n: 44, i: 1, dk: 'pk.con.bond', kind: 'received', ver: 1, cur: 1, orig: '보증증권.pdf', name: 'x' }, { n: 45, i: 1, dk: 'main.수령-9', kind: 'received', ver: 1, cur: 1, orig: '통장사본.pdf', name: 'x' });
+  const pkH2 = api.csPacketsHtml(emptyC);
+  T('v423 패킷 줄: 넣은 파일에 [옮기기]·[보관] · 다른 칸에 든 파일도 이름으로 판정', pkH2.indexOf('data-cs-cmove="' + emptyC.id + '|44"') > 0 && pkH2.indexOf('data-cs-cdel="' + emptyC.id + '|44"') > 0 && /올림 · 통장사본\.pdf v1 \(다른 서류 칸\)/.test(pkH2), pkH2.slice(0, 200));
+  // 넣다 만 파일 다시 잇기
+  api.setGw((fn, b) => { if (b.action === 'box_pending') return Promise.resolve({ status: 200, body: { items: [{ id: 'att_r1', name: '넣다만.pdf', size: 9, parsed: { doc: 'box', cls: 'filled', doc_name: '공문', pii: 0, sub: 'none' } }, { id: 'att_r2', name: '멈춘.pdf', size: 9, open: 1 }, { id: 'att_r3', name: '판단전.pdf', size: 9, parsed: null }] } }); return Promise.resolve({ status: 200, body: {} }); });
+  const nI3 = X.items().length; X.cbxRestore(); for (let i = 0; i < 3; i++) await tick();
+  const rs = X.items().slice(nI3);
+  T('v423 넣다 만 파일: 판단 있으면 이어서 · 조각이 덜 왔으면 지우기만 · 판단 없으면 직접 고르기', rs.length === 3 && rs[0].st === 'pick' && rs[0].res.cls === 'filled' && rs[1].st === 'err' && !/\|retry"/.test(X.cbxCardHtml(rs[1])) && rs[2].st === 'pick' && /이전에 넣다 만/.test(X.cbxCardHtml(rs[2])), JSON.stringify(rs.map((r0) => [r0.st, r0.errAt])));
+  api.setGw(null);
+  contracts.filter((c0) => /^(고침계약|낙찰계약|갑계약)$/.test(c0.client || '') || (c0.contract_info && /두 파일 시험/.test(c0.contract_info.title || ''))).forEach((c0) => { const i = contracts.indexOf(c0); if (i >= 0) contracts.splice(i, 1); });
+  [nc, nc2, emptyC].forEach((c) => { const i = contracts.indexOf(c); if (i >= 0) contracts.splice(i, 1); });
+  X.items().length = 0;
 }
 
 console.log(fails ? '\n계약 시트 실행 검사 실패 ' + fails + '건' : '\n계약 시트 실행 검사 전 항목 통과'); process.exit(fails ? 1 : 0);
