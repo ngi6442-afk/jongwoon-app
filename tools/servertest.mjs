@@ -4727,6 +4727,14 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
       defs(uV).indexOf('asbestos') < 0 && defs(uS).indexOf('asbestos') >= 0 && defs(uS).indexOf('licenses') < 0 && rOk === '전체 면허,본인 면허' && rMg === '전체 면허,관리부 면허' && rRk === '전체 면허,직급 면허' && rAd.split(',').length === 4, JSON.stringify([defs(uV), rOk, rMg, rRk, rAd]));
     const devOk = await A74.deviceApproved({ headers: { 'x-device-id': 'dev74' } }, uV), devNo = await A74.deviceApproved({ headers: {} }, uV), devAdm = await A74.deviceApproved({ headers: {} }, { admin: true });
     T('74 물어보기 기기: 승인 기기만 · 관리자 통과', devOk && !devNo && devAdm, '');
+    // v425 자동 초안 표시
+    const CL5 = 'c74g'; mem.gw_data['col:contracts'].items.push({ id: CL5, title: '자동 초안', scen: 'dredge:pub', stages: [] });
+    const pL5 = (o) => call(Object.assign({ action: 'cdoc_put', cid: CL5, allow_dup: true }, o), tk, 'dev1');
+    const dL5 = await pL5({ i: 0, doc_key: 'gen.seal_reg', kind: 'draft', pii: 1, name: '인감계.hwpx', data: b64(mkHwpx(['사용인감계', '위 인감', '회사'])), late: true });
+    const fL5 = await pL5({ i: 0, doc_key: 'fin.seal_reg', kind: 'final', name: '인감계 직원본.hwpx', data: b64(mkHwpx(['사용인감계', '위 인감 고침', '회사'])), pair_tpl: 'seal_reg', late: true });
+    const lL5 = fL5.body.learn || {};
+    T('75 v425 자동 초안: 색인·짝·간극 줄에 표시 · 양식별 자리(fin.) 통과 · 최종본에는 표시 안 함', dL5.body.item.late === 1 && lL5.late === true && lL5.how === 'name' && mem.gw_data['learn:contract:in:' + lL5.id].late === 1 && !fL5.body.item.late && mem.gw_data['lessons:contract:seal_reg'].gaps.slice(-1)[0].late === 1, JSON.stringify([dL5.body.item.late, lL5]));
+    delete mem.gw_data['recidx:' + CL5]; delete mem.gw_data['lessons:contract:seal_reg'];
     ['recidx:' + CID, 'recidx:' + CC, 'recidx:' + CD, 'recidx:' + CE, 'recidx:' + CF, 'recidx:' + CG, lkB].forEach((k) => delete mem.gw_data[k]);
     Object.keys(mem.gw_files).filter((k) => /^cdoc:c74/.test(k)).forEach((k) => delete mem.gw_files[k]);
   }

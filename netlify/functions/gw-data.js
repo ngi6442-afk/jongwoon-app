@@ -2240,17 +2240,18 @@ async function cdocLearnPair(st, member, ref, idx, item, ext, b64, orig, d) {
   const id = LN.newPairId('contract', ref.cid + ':' + item.n);
   const pair = Object.assign({ id: id, tpl: tpl, draft_n: pick.n, draft_i: pick.i, kind: kind, how: how, status: status, diff: learnDiffPublic(diff), gap: gap }, base);
   if (match !== null) pair.match = match;
+  if (pick.late) pair.late = 1;
   const w = await blobSet(st, LN.pairKey('contract', id), pair);
   if (!w.ok) return { ok: false, code: w.code || 'PAIR_WRITE_FAILED' };
   try {
     const lk = T.lessons_key(tpl); const lr = await blobGet(st, lk);
     if (lr.ok || lr.code === 'NOT_FOUND') {   // 읽기 실패를 빈 창고로 보고 규칙·기준선·끔 표시를 덮어쓰지 않는다(v424 검토) — 이번 간극 1줄만 빠진다
-      const L = LN.pushGap(lr.ok ? lr.data : null, { pair: id, promo_id: ref.cid, ratio: gap.cell_ratio, score: gap.score, kind: kind, changed: diff ? diff.changed : 0, compared: diff ? diff.compared : 0, uncomparable: diff ? diff.uncomparable : 0, comparable: gap.comparable }, now);
+      const L = LN.pushGap(lr.ok ? lr.data : null, { pair: id, promo_id: ref.cid, ratio: gap.cell_ratio, score: gap.score, kind: kind, changed: diff ? diff.changed : 0, compared: diff ? diff.compared : 0, uncomparable: diff ? diff.uncomparable : 0, comparable: gap.comparable, late: pick.late ? 1 : 0 }, now);
       LN.freezeBaseline(L, now);   // v412 첫 10건 평균 = 기준선(일몰 비교 축)
       await blobSet(st, lk, L);
     }
   } catch (e) {}
-  return { ok: true, id: id, status: status, tpl: tpl, kind: kind, how: how, draft_n: pick.n, gap: gap, changed: diff ? diff.changed : null, compared: diff ? diff.compared : null, uncomparable: diff ? diff.uncomparable : null, outside: (diff && Number(diff.outside_changed)) || 0 };
+  return { ok: true, id: id, status: status, tpl: tpl, kind: kind, how: how, draft_n: pick.n, gap: gap, changed: diff ? diff.changed : null, compared: diff ? diff.compared : null, uncomparable: diff ? diff.uncomparable : null, outside: (diff && Number(diff.outside_changed)) || 0, late: !!pick.late };
 }
 async function handleLearnSettingsGet(event, d, R) {
   const c = await currentMember(event);
@@ -2436,12 +2437,14 @@ async function cdocCommit(c, d, R, ref, kind, pii, orig, ext, b64, fill, att) {
   const genP = (kind === 'draft' && typeof d.gen === 'string') ? DD.genMarkParse(d.gen) : null;
   const gen = (genP && genP.cid === ref.cid && 'gen.' + genP.tpl === ref.dk) ? d.gen : '';
   if (gen) rec.gen = gen;
+  if (kind === 'draft' && d.late === true) rec.late = 1;   // v425 최종본을 올릴 때 자동으로 만든 초안(직원이 받아서 고친 것이 아니다 — 간극 해석이 다르다)
   if (kind === 'draft' && Array.isArray(d.blank)) { const bl = d.blank.filter(function (x) { return typeof x === 'string' && /^[^!]{1,40}![A-Z]{1,3}\d{1,5}$/.test(x); }).slice(0, 400); if (bl.length) rec.blank = bl; }   // 서버 사본에서 비운 사람 칸(좌표만)
   const fw = await blobSet(store(FILES), fkey, rec);
   if (!fw.ok) return jr(500, { status: 'ERROR', error_code: fw.code, request_id: R });
   same.forEach(function (x) { if (x.cur) x.cur = 0; });
   const item = { n: n, i: ref.i, dk: ref.dk, kind: kind, ver: ver, cur: 1, name: std, orig: orig || std, ext: ext, size: (fill && !b64) ? JSON.stringify(fill).length : b64Bytes(b64), sha: sha.slice(0, 16), pii: pii, corp: corp, by: { id: c.member.id, name: c.member.name }, ts: now };
   if (gen) item.gen = gen;
+  if (rec.late) item.late = 1;
   if (typeof d.note === 'string' && d.note.trim()) item.note = d.note.trim().slice(0, 120);
   if (att) { item.att0 = att.id; if (att.rec.parts) item.parts = att.rec.parts; }   // v423 AI 판단 원본 parse:<att0>과 잇는 번호
   idx.items.push(item); idx.seq = n;
