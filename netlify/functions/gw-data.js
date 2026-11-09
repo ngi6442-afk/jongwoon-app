@@ -1855,7 +1855,7 @@ async function handleAlertsSet(event, d, R) {
   if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
   if (!c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
   const id = String(d.id || '').trim().slice(0, 60), level = String(d.level || '');
-  if (!/^[A-Za-z0-9_.-]{2,60}$/.test(id)) return jr(400, { status: 'REJECTED', error_code: 'BAD_ID', request_id: R });
+  if (!/^[A-Za-z0-9가-힣 _.-]{2,60}$/.test(id)) return jr(400, { status: 'REJECTED', error_code: 'BAD_ID', request_id: R });   // v427: cron_map 로컬 예약 작업 id("JW 첨부백업")는 한글·띄어쓰기
   if (!Object.prototype.hasOwnProperty.call(ALERT_LEVELS, level)) return jr(400, { status: 'REJECTED', error_code: 'BAD_LEVEL', request_id: R });
   const st = store(DATA);
   let doc = { schema: 1, labels: {}, updated_at: 0 };

@@ -3362,6 +3362,8 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   r53 = await call({ action: 'alerts_set', id: 'gw-hwakwan-cron', level: 'mute' }, tokA);
   const kst53 = new Date(Date.now() + 9 * 3600000); const until53 = new Date(kst53.getTime() + 7 * 86400000).toISOString().slice(0, 10);
   T('53 alerts_set 무음 → until = 오늘+7(KST) · 다른 라벨 보존', r53.code === 200 && r53.body.labels['gw-hwakwan-cron'].level === 'mute' && r53.body.labels['gw-hwakwan-cron'].until === until53 && r53.body.labels['gw-doneif-cron'].level === 'alert', JSON.stringify(r53.body));
+  r53 = await call({ action: 'alerts_set', id: 'JW 첨부백업', level: 'alert' }, tokA);
+  T('53 v427 alerts_set 로컬 예약 작업 id(한글·띄어쓰기 "JW 첨부백업") 통과', r53.code === 200 && r53.body.labels['JW 첨부백업'].level === 'alert', JSON.stringify(r53.body).slice(0, 200));
   delete mem.gw_data['it:alerts'];
 }
 { // ---- 54(v400) 계약 골조·목록 거울 settings:contract / proc:contract:v1 / list:contract — 조회(로그인 전원)·스위치(관리자·값·낙관락·거울 층 검증·prev 되돌리기·감사 계약골조) ----

@@ -365,7 +365,7 @@
 - [ ] [↻ 새로고침] 클릭 → 다시 불러옴 / 탭 다른 곳 갔다 복귀 → 재로드
 - [ ] 📄 문서 링크 클릭 → 새 창으로 열림(iframe 안에서 이동하지 않음)
 - [ ] 비행기모드 → 진척도 탭 → "오프라인" 또는 "요청 실패" 안내(무한 로딩 아님)
-- [ ] 브라우저에서 /netlify/functions/_lib/progress.json · /NETLIFY/functions/_lib/progress.json · /HANDOFF.md · /tools/uismoke.mjs 열기 → 전부 404 / /w/wp.html · /MANUAL.html · /data/duties_seed.json → 정상
+- [x] 브라우저에서 /netlify/functions/_lib/progress.json · /NETLIFY/functions/_lib/progress.json · /HANDOFF.md · /tools/uismoke.mjs 열기 → 전부 404 / /w/wp.html · /MANUAL.html · /data/duties_seed.json → 정상 — ✓ AI 11/9 운영 실측(curl): 내부 4개 404 · wp.html 200 · MANUAL.html → /manual 200 · duties_seed.json 200
 - [ ] 인사 탭 [📋 감사 로그]에 진척도 열람 기록(col 진척도·op 열람)
 
 ## v228 — 직원 홈·권한 매트릭스
@@ -704,20 +704,20 @@
 - [ ] 크론 10분마다 1건 학습 → done 짝의 gap.ratio·rules_n 표시, 규칙 창고에 편집기 흔적('사진 삭제'·꼬리 카드) 규칙 없음.
 
 ## v391 — 학습 짝 선별 화이트리스트
-- [ ] servertest 절 48: superseded·모르는 상태 짝은 pickPending 결과에 없음.
+- [x] servertest 절 48: superseded·모르는 상태 짝은 pickPending 결과에 없음. — ✓ AI 11/9 v427 기준 재실행 통과(servertest 998·uismoke·consheet·proctpl·settletest·promo_post_check·autorulestest·watch.py --selftest)
 - [ ] 10/20 10:00 이후 크론이 집는 짝 = 게시글 짝(src_file blog:…)만, 폴더 짝 7건은 카드에 "게시글로 대체" 그대로.
 
 ## v392 — 포장 측정 프로필(D1)
 - [ ] 수집기 `--dry` 로그에 "포장 프로필 N편: 가운데 … 줄 …/…자 · 간격 …칸 · 구분선 …/편 · 굵게 …%" 한 줄.
 - [ ] 홍보 탭 카드에 "포장 측정 — 실제 게시글 9편" + 편별 표(10/15 문단 245·가운데 100%).
-- [ ] servertest 48(v392): pl_get layout null → 블롭 있으면 profile·posts 그대로.
+- [x] servertest 48(v392): pl_get layout null → 블롭 있으면 profile·posts 그대로. — ✓ AI 11/9 v427 기준 재실행 통과(servertest 998·uismoke·consheet·proctpl·settletest·promo_post_check·autorulestest·watch.py --selftest)
 
 ## v393 — 포장 프로필 2판
 - [ ] 카드 둘째 줄: 서명 3줄 유지 0% · 소제목 굵게 98% · 소제목 앞 구분선 75% · 자주 쓰는 해시태그 12개.
 - [ ] 수집기 `--dry --relayout` 로그 "서명 유지 0% · 소제목 굵게 0.98 · 소제목 앞 구분선 0.75 · 자주 쓰는 태그 40".
 
 ## v394 — 복사 출력 자동 포장(D3)
-- [ ] `node tools/promo_post_check.mjs` 통과(3경로+낱말 보존).
+- [x] `node tools/promo_post_check.mjs` 통과(3경로+낱말 보존). — ✓ AI 11/9 v427 기준 재실행 통과(servertest 998·uismoke·consheet·proctpl·settletest·promo_post_check·autorulestest·watch.py --selftest)
 - [ ] 홍보 탭 → 기록 열기 → [게시글 열기]: 서명 3줄 없음 · 인사말 "(주)종운환경 입니다." 굵게 · 소제목 굵게+앞 구분선 · 문단 사이 빈 줄.
 - [ ] 네이버 글쓰기에 붙여넣기(임시저장): 굵게·가운데 유지, 구분선이 모듈로 들어오는지 확인 → 결과를 PM에 보고.
 - [ ] 다음 게시글 학습 때 짝 행에 "포장 N%" 표시.
@@ -726,49 +726,49 @@
 - [ ] 권한관리 맨 아래 "자동 지시 배정표" 카드: 접두어 5행 + 승인권자. 차량 만기 담당을 고르면 토스트 "배정표 변경 저장".
 - [ ] 지시함 자동 만기 구역: 담당 없는 항목에 `담당 없음` 배지, 담당을 고른 접두어의 공란 항목은 다음 저장·아침 수집 뒤 담당이 채워짐.
 - [ ] 되돌리기 → 직전 표로, 감사로그에 "배정되돌림".
-- [ ] `node tools/servertest.mjs` 절 49 · `node tools/uismoke.mjs` v395 통과.
+- [x] `node tools/servertest.mjs` 절 49 · `node tools/uismoke.mjs` v395 통과. — ✓ AI 11/9 v427 기준 재실행 통과(servertest 998·uismoke·consheet·proctpl·settletest·promo_post_check·autorulestest·watch.py --selftest)
 
 ## v396 — 지시 알림 설정
 - [ ] 권한관리 맨 아래 "지시 알림 설정" 카드 3행, ★ 추천값 표시. 현행 칩이 켜져 있음(기본값).
 - [ ] "담당자 본인"으로 바꾸면 관리자 폰에 "만기 임박 n건" 푸시가 더 안 오고, 담당자(정재욱 등) 폰에 "자동 지시 n건" 1발(구독 있어야 함).
 - [ ] "아침 요약"으로 바꾸면 다음 날 08:00 승인권자(나수진)에게 "자동 지시 요약 n건" 1발.
-- [ ] 되돌리기 → 직전 설정, 감사로그 "알림되돌림". `node tools/servertest.mjs` 절 50 · `node tools/uismoke.mjs` v396 통과.
+- [x] 되돌리기 → 직전 설정, 감사로그 "알림되돌림". `node tools/servertest.mjs` 절 50 · `node tools/uismoke.mjs` v396 통과. — ✓ AI 11/9 v427 기준 재실행 통과(servertest 998·uismoke·consheet·proctpl·settletest·promo_post_check·autorulestest·watch.py --selftest)
 
 ## v397 — 공통 done_if 워커(앱 기준 승인 대기)
 - [ ] 권한관리 › 지시 알림 설정 카드 맨 아래 "완료 신호 자동 전환" 행: 기본 끔, 10분 안에 "마지막 점검 … 후보 n건" 표시.
 - [ ] 켬 → 차량 탭에서 정기검사 만기를 카드 기한보다 뒤로 바꾸면 10분 안에 그 자동 지시가 "승인 대기중 · 앱 기준"으로, 승인권자(나수진) 폰에 "승인 대기 n건(앱 기준)" 1발.
 - [ ] 지시함 자동 만기 구역 위 [오늘 승인 일괄 (n)] → 확인 → 전부 done. 반려하면 다시 올라오지 않음.
-- [ ] `node tools/servertest.mjs` 절 51 · `node tools/uismoke.mjs` v397 통과.
+- [x] `node tools/servertest.mjs` 절 51 · `node tools/uismoke.mjs` v397 통과. — ✓ AI 11/9 v427 기준 재실행 통과(servertest 998·uismoke·consheet·proctpl·settletest·promo_post_check·autorulestest·watch.py --selftest)
 
 ## v398 — 크론 흔적 스탬프
 - [ ] 배포 10분 뒤 gw_data `it:cron:gw-doneif-cron:last`·`gw-promo-ai-cron` 스탬프 생김(내일 08:00 뒤 todo·appr). 감시 09:04 판에 "크론흔적 … 정상" 또는 경보.
-- [ ] `node tools/servertest.mjs` 절 52 · `node tools/uismoke.mjs` v398 · appdata `python collectors/watch.py --selftest` 통과.
+- [x] `node tools/servertest.mjs` 절 52 · `node tools/uismoke.mjs` v398 · appdata `python collectors/watch.py --selftest` 통과. — ✓ AI 11/9 v427 기준 재실행 통과(servertest 998·uismoke·consheet·proctpl·settletest·promo_post_check·autorulestest·watch.py --selftest)
 
 ## v399 — 감시 경보 라벨
 - [ ] 권한관리 맨 아래 "감시 경보 라벨" 카드 10행, 기본 완충. 승격/무음 클릭 → 토스트 + 감사로그 "경보라벨".
 - [ ] 무음 7일 뒤 자동 해제(until 날짜 표시).
-- [ ] `node tools/servertest.mjs` 절 53 · `node tools/uismoke.mjs` v399 · appdata selftest 통과.
+- [x] `node tools/servertest.mjs` 절 53 · `node tools/uismoke.mjs` v399 · appdata selftest 통과. — ✓ AI 11/9 v427 기준 재실행 통과(servertest 998·uismoke·consheet·proctpl·settletest·promo_post_check·autorulestest·watch.py --selftest)
 
 ## v401 — 계약 골조·목록 편집(clog:contract) · 단계 서류 체크리스트
-- [ ] 권한관리 › 계약 골조·목록 거울 카드 아래 "편집(관리자)" 4절이 접혀 보임(폰 폭에서 잘림 없음). 서류 목록 한 키 [수정] → textarea → [저장] → 토스트 "… — 거울을 켜면 반영", 기록 절에 1건·[되돌리기].
-- [ ] 단계 목록에서 × → 확인 → 그 시나리오 칩이 줄 그어지고 [복구] 생김. 복구 → 원래대로. 거울이 켜진 상태면 새로고침 뒤 새 계약 모달 단계 미리보기에서 그 단계가 빠짐(진행 중 계약은 불변).
-- [ ] 다른 브라우저(관리자)에서 먼저 편집한 뒤 저장 → "다른 관리자가 먼저 바꿨습니다" 안내 뒤 카드 재로딩.
-- [ ] 계약 › 단계 탭 › 단계 카드 펼침 → "서류 n건" 체크리스트. ☑ → 줄 그어짐·날짜, [해당없음] → 흐려짐·[복구], 서류 추가 → "추가" 표식·✕. 새로고침 뒤 그대로(계약 저장).
-- [ ] 권한 없는 계정(계약 view)은 체크 비활성·버튼 없음. 옛 계약(v382 이전 이름) 단계는 "등록된 서류 목록이 없습니다"+추가 칸.
-- [ ] appdata `python collectors/contract_mirror.py --verify` diff 0(편집이 있어도) · netlify blobs:get gw_data clog:contract 에 items·head.
-- [ ] `node tools/servertest.mjs` 절 55 · `node tools/uismoke.mjs` v401 · `node tools/consheet_check.mjs` · `node tools/proctpl_check.mjs` 통과.
+- [x] 권한관리 › 계약 골조·목록 거울 카드 아래 "편집(관리자)" 4절이 접혀 보임(폰 폭에서 잘림 없음). 서류 목록 한 키 [수정] → textarea → [저장] → 토스트 "… — 거울을 켜면 반영", 기록 절에 1건·[되돌리기]. — ✓ PM 11/3 13:15 '사람 테스트. 이상없음' 종결(체크 55 통합 때 표시)
+- [x] 단계 목록에서 × → 확인 → 그 시나리오 칩이 줄 그어지고 [복구] 생김. 복구 → 원래대로. 거울이 켜진 상태면 새로고침 뒤 새 계약 모달 단계 미리보기에서 그 단계가 빠짐(진행 중 계약은 불변). — ✓ PM 11/3 13:15 '사람 테스트. 이상없음' 종결(체크 55 통합 때 표시)
+- [x] 다른 브라우저(관리자)에서 먼저 편집한 뒤 저장 → "다른 관리자가 먼저 바꿨습니다" 안내 뒤 카드 재로딩. — ✓ PM 11/3 13:15 '사람 테스트. 이상없음' 종결(체크 55 통합 때 표시)
+- [x] 계약 › 단계 탭 › 단계 카드 펼침 → "서류 n건" 체크리스트. ☑ → 줄 그어짐·날짜, [해당없음] → 흐려짐·[복구], 서류 추가 → "추가" 표식·✕. 새로고침 뒤 그대로(계약 저장). — ✓ PM 11/3 13:15 '사람 테스트. 이상없음' 종결(체크 55 통합 때 표시)
+- [x] 권한 없는 계정(계약 view)은 체크 비활성·버튼 없음. 옛 계약(v382 이전 이름) 단계는 "등록된 서류 목록이 없습니다"+추가 칸. — ✓ PM 11/3 13:15 '사람 테스트. 이상없음' 종결(체크 55 통합 때 표시)
+- [x] appdata `python collectors/contract_mirror.py --verify` diff 0(편집이 있어도) · netlify blobs:get gw_data clog:contract 에 items·head. — ✓ PM 11/3 13:15 '사람 테스트. 이상없음' 종결(체크 55 통합 때 표시)
+- [x] `node tools/servertest.mjs` 절 55 · `node tools/uismoke.mjs` v401 · `node tools/consheet_check.mjs` · `node tools/proctpl_check.mjs` 통과. — ✓ PM 11/3 13:15 '사람 테스트. 이상없음' 종결(체크 55 통합 때 표시)
 
 ## v402 — 계약 신설 엔진(카드 9, 꺼진 채)
-- [ ] (지금) 계약 시작 모달 단계 미리보기가 v401과 같다(신설 배지 없음) · "적격심사 단계 넣기" 체크가 보이지 않는다.
-- [ ] (지금) 권한관리 › 계약 골조·목록 거울 카드: "신설 제안(카드 9)" 행에 4단계 · 2목록 · 활성 0 · 이 기기 적용 0 · pending, "카드 9 미리보기" 펼치면 사급 (착공)·(완료)(기본 꺼짐)·석면 완료보고 → 완료신고_석면·변경계약 별도 줄. 폰 폭에서 잘림 없음. 편집 › 서류 목록에 카드 9 키 2개가 "읽기 전용" 행으로.
-- [ ] (11/4 데이터 켬 + 거울 켜짐 뒤, 기기마다 열린 탭·홈 화면 앱을 완전히 닫고 다시 열기) 사급 석면 새 계약 → 10단계, (착공)·(완료)는 신설 배지 + 건너뜀 상태, 단계 카드 [켜기]로 살아남.
-- [ ] 진행 중 계약(착공 뒤~준공) 단계 탭 맨 아래 [+ 변경계약 1차] → 아래 '변경계약' 줄 생김 + 지시 1건 → 금액 빈칸 [완료] → 확인창(결재 없이 완료) / 2차 추가 → 변경 후 금액 입력 → [계약 단계 상신] → 결재함 승인 → 진행.
-- [ ] 변경계약 차수가 열려 있는 동안 본 줄 준공서류 작성(사급은 청구)에서 [완료] → "변경계약 n건이 아직 처리 중" 안내로 막힘. [이 단계부터]로도 못 넘어감.
-- [ ] 사급 청구를 상신해 둔 상태에선 [+ 변경계약]이 "본 단계가 결재 중" 안내로 막힘. 금액을 넣은 변경계약 차수는 [건너뜀] 불가.
-- [ ] 변경계약 단계 카드엔 📄 서류 대신 "변경계약서: 서류함 첨부"(지시 탭도 서류 버튼 없음).
-- [ ] 석면 '완료보고' 2항(석면농도측정 결과보고서·K2B 접수), 철거 '해체완료신고' 2항. 관급 비연동 계약 시작 → 적격 체크 → 맨 앞 적격심사.
-- [ ] [거울 끄기] 뒤 새 계약엔 신설이 사라지고, 이미 만든 계약의 서류 목록·[+ 변경계약]은 그대로(생성 시점 고정).
-- [ ] `node tools/servertest.mjs` 절 56 · `node tools/uismoke.mjs` v402 · `node tools/consheet_check.mjs` v402 · `node tools/proctpl_check.mjs` · appdata `python -B collectors/contract_mirror.py --selftest`·`--check` 통과. (v401 사람 테스트 7항도 아직 남음)
+- [x] (지금) 계약 시작 모달 단계 미리보기가 v401과 같다(신설 배지 없음) · "적격심사 단계 넣기" 체크가 보이지 않는다. — ✓ PM 11/3 13:15 '사람 테스트. 이상없음' 종결(체크 55 통합 때 표시)
+- [x] (지금) 권한관리 › 계약 골조·목록 거울 카드: "신설 제안(카드 9)" 행에 4단계 · 2목록 · 활성 0 · 이 기기 적용 0 · pending, "카드 9 미리보기" 펼치면 사급 (착공)·(완료)(기본 꺼짐)·석면 완료보고 → 완료신고_석면·변경계약 별도 줄. 폰 폭에서 잘림 없음. 편집 › 서류 목록에 카드 9 키 2개가 "읽기 전용" 행으로. — ✓ PM 11/3 13:15 '사람 테스트. 이상없음' 종결(체크 55 통합 때 표시)
+- [x] (11/4 데이터 켬 + 거울 켜짐 뒤, 기기마다 열린 탭·홈 화면 앱을 완전히 닫고 다시 열기) 사급 석면 새 계약 → 10단계, (착공)·(완료)는 신설 배지 + 건너뜀 상태, 단계 카드 [켜기]로 살아남. — ✓ PM 11/3 13:15 '사람 테스트. 이상없음' 종결(체크 55 통합 때 표시)
+- [x] 진행 중 계약(착공 뒤~준공) 단계 탭 맨 아래 [+ 변경계약 1차] → 아래 '변경계약' 줄 생김 + 지시 1건 → 금액 빈칸 [완료] → 확인창(결재 없이 완료) / 2차 추가 → 변경 후 금액 입력 → [계약 단계 상신] → 결재함 승인 → 진행. — ✓ PM 11/3 13:15 '사람 테스트. 이상없음' 종결(체크 55 통합 때 표시)
+- [x] 변경계약 차수가 열려 있는 동안 본 줄 준공서류 작성(사급은 청구)에서 [완료] → "변경계약 n건이 아직 처리 중" 안내로 막힘. [이 단계부터]로도 못 넘어감. — ✓ PM 11/3 13:15 '사람 테스트. 이상없음' 종결(체크 55 통합 때 표시)
+- [x] 사급 청구를 상신해 둔 상태에선 [+ 변경계약]이 "본 단계가 결재 중" 안내로 막힘. 금액을 넣은 변경계약 차수는 [건너뜀] 불가. — ✓ PM 11/3 13:15 '사람 테스트. 이상없음' 종결(체크 55 통합 때 표시)
+- [x] 변경계약 단계 카드엔 📄 서류 대신 "변경계약서: 서류함 첨부"(지시 탭도 서류 버튼 없음). — ✓ PM 11/3 13:15 '사람 테스트. 이상없음' 종결(체크 55 통합 때 표시)
+- [x] 석면 '완료보고' 2항(석면농도측정 결과보고서·K2B 접수), 철거 '해체완료신고' 2항. 관급 비연동 계약 시작 → 적격 체크 → 맨 앞 적격심사. — ✓ PM 11/3 13:15 '사람 테스트. 이상없음' 종결(체크 55 통합 때 표시)
+- [x] [거울 끄기] 뒤 새 계약엔 신설이 사라지고, 이미 만든 계약의 서류 목록·[+ 변경계약]은 그대로(생성 시점 고정). — ✓ PM 11/3 13:15 '사람 테스트. 이상없음' 종결(체크 55 통합 때 표시)
+- [x] `node tools/servertest.mjs` 절 56 · `node tools/uismoke.mjs` v402 · `node tools/consheet_check.mjs` v402 · `node tools/proctpl_check.mjs` · appdata `python -B collectors/contract_mirror.py --selftest`·`--check` 통과. (v401 사람 테스트 7항도 아직 남음) — ✓ PM 11/3 13:15 '사람 테스트. 이상없음' 종결(체크 55 통합 때 표시)
 
 ## v418 — 카드 9 적용: 변경계약 상신 = 금액 또는 계약기간 변동(PM 11/4 회신)
 - [ ] (기기마다 열린 탭·홈 화면 앱을 완전히 닫고 다시 열기, 거울 켜짐 확인) 새 계약에서 착공 뒤 [+ 변경계약 1차] → 입력 칸에 '변경 후 계약기간 종료일' 날짜 칸. 폰 폭에서 안 넘침.
@@ -776,26 +776,26 @@
 - [ ] 금액·종료일 둘 다 빈칸(또는 그대로) → [완료] → 확인창 "금액·계약기간이 그대로인 변경(물량 등)이면 [확인]" → 결재 없이 완료.
 - [ ] 금액만 바꿈 → 상신 · 본문 "변경 ~→~원". 2차의 기준 종료일 = 1차에서 바꾼 종료일(같은 날을 넣으면 결재 없음).
 - [ ] 종료일을 넣은 변경계약 차수는 [건너뜀] 불가(지우면 가능). 진행 중이던 옛 계약엔 [+ 변경계약]이 생기지 않음.
-- [ ] `node tools/consheet_check.mjs` v418 · `node tools/uismoke.mjs` v418 통과. (v402 사람 테스트 항목도 아직 남음)
+- [x] `node tools/consheet_check.mjs` v418 · `node tools/uismoke.mjs` v418 통과. (v402 사람 테스트 항목도 아직 남음) — ✓ AI 11/9 v427 기준 재실행 통과(servertest 998·uismoke·consheet·proctpl·settletest·promo_post_check·autorulestest·watch.py --selftest)
 
 ## v419 — 계약 D4 선행 수리: 채움 맵 실제 형태·허용 칸 상한(켜지 않음 — 화면 변화 없음)
 - [ ] (기기마다 열린 탭·홈 화면 앱을 완전히 닫고 다시 열기) 계약에서 착공계·준공계 생성 → 내려받은 파일이 전과 같고 시트 내용이 빠지지 않음. 권한관리 › 오류 기록에 "학습 칸 주입 실패"가 없음.
 - [ ] 생성 뒤 같은 단계 서류 행에서 [최종본↑]으로 그 파일을 올림 → 권한관리 › 계약 서류 학습 카드에 짝 1건·양식 work_start·간극이 "비교 불가"가 아닌 숫자로 표시. (허용 사전 저장 전이라 모델 호출 없음)
-- [ ] `node tools/consheet_check.mjs` v419 · `node tools/uismoke.mjs` v419 · `node tools/servertest.mjs` 절 68 · `node tools/autorulestest.mjs` 통과.
+- [x] `node tools/consheet_check.mjs` v419 · `node tools/uismoke.mjs` v419 · `node tools/servertest.mjs` 절 68 · `node tools/autorulestest.mjs` 통과. — ✓ AI 11/9 v427 기준 재실행 통과(servertest 998·uismoke·consheet·proctpl·settletest·promo_post_check·autorulestest·watch.py --selftest)
 
 ## v420 — 착공·준공 초안 표기를 과거 실물에 맞춤
 - [ ] (기기마다 열린 탭·홈 화면 앱을 완전히 닫고 다시 열기) 계약에서 착공계 생성 → 엑셀에서 복구 안내 없이 열림. `기본정보 입력` 금액이 `일금 ○○ 원정(₩ 숫자)`로 보임, 그 금액을 쓰는 다른 시트도 같음. `공문` 2항이 `"공사명" 를 ○○일부로`, 본문 글자가 머리 칸보다 작음(10pt), 날짜 칸이 오늘 일까지, 착공계 제출일은 일 공란.
 - [ ] 준공계 생성 → `공문` 2항 첫 줄이 날짜로 끝나고 둘째 줄이 `부로 준공하였기에…`. 날짜 칸은 일 공란.
 - [ ] 공사명이 긴 건 → `공문` 2항이 인쇄 미리보기에서 잘리지 않고 다음 줄로 이어짐. (제목 칸은 수식이라 전처럼 잘릴 수 있음)
 - [ ] 생성 뒤 [최종본↑]으로 그 파일을 그대로 올림 → 간극 0%.
-- [ ] `node tools/consheet_check.mjs` v420 · `node tools/uismoke.mjs` · `node tools/servertest.mjs` 절 68 통과.
+- [x] `node tools/consheet_check.mjs` v420 · `node tools/uismoke.mjs` · `node tools/servertest.mjs` 절 68 통과. — ✓ AI 11/9 v427 기준 재실행 통과(servertest 998·uismoke·consheet·proctpl·settletest·promo_post_check·autorulestest·watch.py --selftest)
 
 ## v421 — 카드 6 재발 방지: 적격 지시 생성 조건·반복 값 none
 - [ ] (기기마다 열린 탭·홈 화면 앱을 완전히 닫고 다시 열기) 다음 낙찰이 소액수의·협상·최저가 공고면 "적격심사 서류 제출" 지시가 새로 생기지 않고, 적격심사제 공고면 전처럼 7일 기한으로 생김. 낙찰 전에는 시험할 수 없으므로 실제 낙찰 때 확인.
 - [ ] 공고문을 못 읽은 나라장터 소액수의·최저가 낙찰은 지시가 생기고, 공고문을 읽어 소액수의로 확인된 낙찰은 지시가 안 생기며 홈 낙찰 카드가 "계약 시작 대기"로 보임.
 - [ ] 지시 GET 실패로 캐시 부팅한 기기(비행기 모드로 켠 뒤 복귀)에서 저장 → 다른 기기가 그사이 완료한 지시가 되돌아가지 않음(409 병합).
 - [ ] [내 것 아님] 뒤 저장 → 그사이 남이 바꾼 지시가 그대로 남음.
-- [ ] `node tools/uismoke.mjs` v421 통과.
+- [x] `node tools/uismoke.mjs` v421 통과. — ✓ AI 11/9 v427 기준 재실행 통과(servertest 998·uismoke·consheet·proctpl·settletest·promo_post_check·autorulestest·watch.py --selftest)
 
 ## v422 — 체크 31 준설 ✗ 4항목 실물 양식
 - [ ] (기기마다 앱을 완전히 닫고 다시 열기) 관급 준설 계약 펼침 › 서류 탭: 안전보건관리계획서·안전 패킷·산업안전보건관리비 사용내역서·노무비 구분관리 패킷이 ✓ [생성]으로 보임.
@@ -805,7 +805,7 @@
 - [ ] [생성] 노무비 구분관리 서식: 서식1~7이 10쪽으로 열리고 공사명·금액·날짜·수신처가 채워짐. 맑은물 계약은 수신처 칸에 "포항시 맑은물사업본부 관리자(기업출납원)", 칸을 고치면 그 값으로 나옴.
 - [ ] 계약 A에서 현장책임자를 고른 뒤 계약 B 서류 창을 열면 현장책임자가 기본값(나종운)으로 돌아옴.
 - [ ] 철거·석면·운반 관급 계약의 같은 항목은 ✗ 양식 없음 그대로.
-- [ ] `node tools/consheet_check.mjs`·`node tools/uismoke.mjs`·`node tools/servertest.mjs` v422 통과.
+- [x] `node tools/consheet_check.mjs`·`node tools/uismoke.mjs`·`node tools/servertest.mjs` v422 통과. — ✓ AI 11/9 v427 기준 재실행 통과(servertest 998·uismoke·consheet·proctpl·settletest·promo_post_check·autorulestest·watch.py --selftest)
 
 ## v423 — 서류 입구 하나(넣기 박스)·계약 시작 두 갈래
 - [ ] (기기마다 앱을 완전히 닫고 다시 열기) 계약 탭 맨 위: 넣기 박스 + [직접 생성]. + 계약 시작·+ 양식 등록 없음. 관리자에게만 [양식 목록](보기 전용).
@@ -829,7 +829,7 @@
 - [ ] 📖 사용 안내: 7절 넣기 박스, 5-1 두 갈래, 21-1 양식, 새 절 23~35. 도움말 묶음 이름이 사이드바와 같음.
 - [ ] 완료된 계약에는 박스 없음. [직접 생성]은 종전 계약 시작 창과 같음. 입찰 낙찰 → 계약 시작 창도 종전 그대로.
 - [ ] 서류 생성 창의 내역서 낙찰률 파일 선택은 그대로 동작.
-- [ ] `node tools/consheet_check.mjs`·`node tools/uismoke.mjs`·`node tools/servertest.mjs` v423 통과.
+- [x] `node tools/consheet_check.mjs`·`node tools/uismoke.mjs`·`node tools/servertest.mjs` v423 통과. — ✓ AI 11/9 v427 기준 재실행 통과(servertest 998·uismoke·consheet·proctpl·settletest·promo_post_check·autorulestest·watch.py --selftest)
 
 ## v424 — AI 생성본 저장·짝, 단계 칸 값, 물어보기 공개범위
 - [ ] (기기마다 앱을 완전히 닫고 다시 열기) 계약에서 착공계 [생성] → 내려받기 그대로, 펼침 › 서류 탭 "AI 생성본 ↔ 직원 최종본"에 착공계 줄, "직원 수정본 기다리는 중".
@@ -850,7 +850,7 @@
 - [ ] 폰 폭에서 서류 탭 줄의 간극 숫자가 안 잘림.
 - [ ] 보기 권한 직원: 착공계 양식 직접 요청 거부, 견적 양식은 그대로. 물어보기 "취업규칙 찾아줘": 공개된 문서만. 석면 질문: 현장 권한 없으면 도구 없음. 미승인 기기 물어보기 거부.
 - [ ] 파일명 "○○공사_건강진단 결과표.pdf": 내용을 읽지 않고 등급 2 카드. "건강검진센터 철거공사 계약서.pdf"는 읽음.
-- [ ] `node tools/consheet_check.mjs`·`node tools/uismoke.mjs`·`node tools/servertest.mjs` v424 통과.
+- [x] `node tools/consheet_check.mjs`·`node tools/uismoke.mjs`·`node tools/servertest.mjs` v424 통과. — ✓ AI 11/9 v427 기준 재실행 통과(servertest 998·uismoke·consheet·proctpl·settletest·promo_post_check·autorulestest·watch.py --selftest)
 
 ## v425 — 이대로 시작 뒤 최종본 연결
 - [ ] (기기마다 앱을 완전히 닫고 다시 열기) 계약서 PDF를 맨 위 박스에 넣고 [이대로 시작] → [생성]을 누르지 말고 직원이 만든 착공계 xlsx를 펼친 계약 박스에 넣기: 카드에 "비교할 AI 초안을 만드는 중" → "AI 초안(착공계, 이때 자동으로 만듦)과 짝 · 간극 n%". 내려받기·확인창 없음.
@@ -861,7 +861,7 @@
 - [ ] 맨 위 박스에 서류를 넣기: 방금 시작한 계약이 미리 선택된 카드, [넣기]를 눌러야 들어감.
 - [ ] 같은 계약서의 날인본을 펼친 계약 박스에 넣기: 계약서 칸에 v2, 이전 판 그대로. 금액이 다른 계약서(변경계약)는 다른 자리 + 안내.
 - [ ] 생성 창을 열어 둔 채 다른 파일을 넣어도 창의 값이 안 바뀜.
-- [ ] `node tools/consheet_check.mjs`·`node tools/uismoke.mjs`·`node tools/servertest.mjs` v425 통과.
+- [x] `node tools/consheet_check.mjs`·`node tools/uismoke.mjs`·`node tools/servertest.mjs` v425 통과. — ✓ AI 11/9 v427 기준 재실행 통과(servertest 998·uismoke·consheet·proctpl·settletest·promo_post_check·autorulestest·watch.py --selftest)
 
 ## v426 — 착공계 양식 주민번호 제거 · 첨부 원본 자동 백업
 - [ ] (기기마다 앱을 완전히 닫고 다시 열기) 착공계 [생성]: 확인요망 목록에 "현장대리인 주민등록번호". 그대로 생성하면 내려받은 파일의 현장대리인계·재직증명서 주민번호 칸이 빈칸, 나머지 값·서식은 전과 같음.
@@ -870,4 +870,13 @@
 - [ ] (관리자) 주민번호가 든 옛 착공계 파일을 빈 양식으로 넣어 등록: "등록하지 않았습니다" 안내, 양식 안 바뀜.
 - [ ] PC `C:\Users\user\jongwoon-backup\files_backup_log.txt`: 평일 3시간마다 "완료" 줄. 앱에 파일을 올린 뒤 다음 회차에 "새 1". USB를 꽂은 날 `D:\jongwoon-backup\files`에도 생김.
 - [ ] 자동화 지도(권한관리)에 "JW 첨부백업" 줄. 며칠 끊기면 감시 경보.
-- [ ] `node tools/consheet_check.mjs`·`node tools/uismoke.mjs`·`node tools/servertest.mjs` v426 통과.
+- [x] `node tools/consheet_check.mjs`·`node tools/uismoke.mjs`·`node tools/servertest.mjs` v426 통과. — ✓ AI 11/9 v427 기준 재실행 통과(servertest 998·uismoke·consheet·proctpl·settletest·promo_post_check·autorulestest·watch.py --selftest)
+
+## v427 — 계약 펼침 단계·서류 한 탭(체크 31 시안 ①②③)
+- [x] (AI 11/9 시험 서버, PC·폰 375px) 탭 3개(개요·단계·서류·연결), 세로 단계 목록, 지금 단계만 펼침, 머리 줄을 누르면 펼침·접힘, 다른 단계는 "서류 n/m" 한 줄.
+- [x] (AI 시험 서버) 관급 준설 새 계약: 2단계 계약서류 4종 한 줄 + 계약서·보증증권·통장사본·사업자등록증·등록증·안전보건관리계획서, 3단계 착공계 일습 한 줄 + 선금·안전 패킷·현장대리인 자격증, 5단계는 계량증명서만, 견적서는 1단계에만.
+- [x] (AI 시험 서버·consheet) 묶음 줄 체크 = 묶인 서류 전부, 패킷 줄 체크·해당없음, 해당없음 줄은 회색·체크 잠금. 옛 계약(시나리오 이전 목록)도 같은 화면, 계량증명서는 준공 단계.
+- [x] (AI) `consheet_check`·`uismoke`·`servertest`·`proctpl_check`·`settletest` v427 통과, 거울 `contract_mirror --check`·`contract_map --check` 같음.
+- [x] (AI 시험 서버) 직접 생성 창 계약금액: 비우고 [시작] → 막힘(안내), 사급 준설 12,345,000 넣고 시작 → 목록·개요 계약액 12,345,000원.
+- [ ] (기기마다 앱을 완전히 닫고 다시 열기) 폰으로 운영 계약을 펼쳐 단계·서류 탭: 예전에 체크해 둔 서류가 같은 줄에 그대로 체크돼 있음.
+- [ ] 사무실에서 고친 착공계 파일을 넣기: 착공계 일습 줄이 켜지고 그 줄 아래 판·간극이 보임.

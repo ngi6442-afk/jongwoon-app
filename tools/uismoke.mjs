@@ -1353,7 +1353,7 @@ try {
   T('v381 시트 블록: CON_COLS 8열(발주처·현장·종류·사급/관급·계약액·단계·준공·담당) · 폰 숨김 4열(kind/pub/amount/who) · 칩 6 · 상태 키 jw_con_sheet',
     cols.join(',') === 'client,site,kind,pub,amount,stage,end,who' && (seg.match(/hs:1/g) || []).length === 4 && /CON_CHIPS = \[\["", "전체"\], \["active"/.test(seg) && /CON_SHEET_KEY = "jw_con_sheet"/.test(seg), cols.join(','));
   T('v381 배선: renderContracts가 시트 블록 안 · 종전 카드형은 renderContractsCards로 보존 · 펼침 4탭(ov/st/doc/lk) · 행/정렬/필터/칩/초기화/폭끌기/탭/닫기/단계서류 핸들러 · colspan=csN 2곳 · 폰 상세 카드 id',
-    /function renderContracts\(\)\{/.test(seg) && !/function renderContractsCards\(\)\{/.test(html) && /\[\["ov", "개요"\], \["st", "단계"\], \["doc", "서류"\], \["lk", "연결"\]\]/.test(seg)
+    /function renderContracts\(\)\{/.test(seg) && !/function renderContractsCards\(\)\{/.test(html) && /\[\["ov", "개요"\], \["st", "단계·서류"\], \["lk", "연결"\]\]/.test(seg)   // v427 단계·서류 한 탭
     && seg.indexOf('querySelectorAll("tr.vs-r")') >= 0 && seg.indexOf('th[data-cs-sort]') >= 0 && seg.indexOf('querySelector("[data-cs-reset]")') >= 0
     && ['data-cf', 'data-cs-chip', 'data-cs-rs', 'data-cs-tab', 'data-cs-close', 'data-cs-sdoc'].every((a) => seg.indexOf('querySelectorAll("[' + a + ']")') >= 0)
     && (seg.match(/colspan="' \+ csN \+ '"/g) || []).length === 2 && ids.has('conDetailCard') && /#conDetailCard\{display:none;\}/.test(html) && /#conDetailCard\{display:block;margin-top:8px;\}/.test(html), '');
@@ -1361,7 +1361,7 @@ try {
     ['data-con-del', 'data-con-doc', 'data-con-xlsx', 'data-con-bldg', 'data-catt-del', 'data-catt-rev'].every((a) => seg.indexOf('querySelectorAll("[' + a + ']")') >= 0) && seg.indexOf('cbxBind(root)') >= 0, '');
   T('v381 CSS: .cs-stg 단계 카드(done/cur) · .cs-bar 진행 막대 · 폰 열 폭 4(cs-c-client/site/stage/end) · 시트 블록의 저장 호출은 v382 단계 입력·작업현황(새 키 vals/work_log/settle_amount) 7함수뿐(v401 csDocAfter 포함)',
     /\.cs-stg\.done\{/.test(html) && /\.cs-stg\.cur\{/.test(html) && /\.cs-bar i\{/.test(html) && ['client', 'site', 'stage', 'end'].every((k) => new RegExp('\\.vs col\\.cs-c-' + k + '\\{width:\\d+% !important;\\}').test(html))
-    && (seg.match(/scheduleContractSave\(\)/g) || []).length === (seg.match(/function (csSkipStage|csUnskipStage|csJumpStage|csSaveFields|csWlAdd|csWlDel|csDocAfter|csChgAdd)\(/g) || []).length, '');   // v401 csDocAfter(서류 체크리스트) 추가
+    && (seg.match(/scheduleContractSave\(\)/g) || []).length === (seg.match(/function (csSkipStage|csUnskipStage|csJumpStage|csSaveFields|csWlAdd|csWlDel|csDocAfter|csChgAdd|csRowAct)\(/g) || []).length, '');   // v401 csDocAfter(서류 체크리스트) · v427 csRowAct(묶음·패킷 줄, 새 키 pkst)
 } catch (e) { console.log('  (v381 검사 생략 — ' + e.message + ')'); fails++; }
 
 // ---- v382: 시나리오 조립(종류 × 사급/관급 → 단계 목록, PM 원문) · 선택 단계 · 작업현황 · 정산액 · 카드형 제거 ----
@@ -1391,7 +1391,7 @@ try {
     /if\(!s \|\| s\.status==="done" \|\| s\.status==="skipped" \|\| t\.stage_i < pipe\.cur\) return;/.test(html) && /if\(s\.status==="open" && s\.task_id && findTask\(s\.task_id\)\) return;/.test(html)
     && /function completeStageNow\(c, pat, pipeKey\)\{/.test(html) && /if\(pipeKey && p\.key!==pipeKey\) continue;/.test(html) && /if\(t\.status==="review"\) return "review";/.test(html)
     && /var ccOpen = !!\(cc && cc\.status !== "done"/.test(html) && /completeStageNow\(cc, \/수금확인\|입금확인\/\)/.test(html) && /qdf=\/견적\/\.test/.test(html)
-    && /if \(el\.classList\.contains\("open"\)\) return;/.test(html) && /function csSnapInputs\(root\)/.test(html) && /csRestoreInputs\(host, snap\); csRestoreInputs\(dcard, snap\);/.test(html)
+    && /csStgSet\(c, p, i, !csStgIsOpen\(c, p, i\)\); renderContracts\(\);/.test(html) && /function csSnapInputs\(root\)/.test(html)   // v427 머리 줄·[접기] 버튼으로만 펼침/접힘 && /csRestoreInputs\(host, snap\); csRestoreInputs\(dcard, snap\);/.test(html)
     && /function csCanCloseCur\(c, p\)/.test(html) && /청구 단계를 건너뛰면 기성\(미수\) 등록이 생기지 않습니다/.test(html) && /if \(p\.stages\[i\]\.status === "skipped"\)\{ p\.stages\[i\]\.status = "pending";/.test(html)
     && /completeStageNow\(c, csExactRe\(s\.name\), p\.key\)/.test(html) && /\[\/면적\/,"석면조사"\]/.test(html), '');
 } catch (e) { console.log('  (v382 검토 검사 생략 — ' + e.message + ')'); fails++; }
@@ -1403,12 +1403,12 @@ try {
   T('v383 CON_PACKETS 4(계약·착공·준공·청구) · gen 키는 TPL_LABELS 또는 가상 키(con_docs·quote·html_contract) · tpl_list 캐시(csLoadTpl) · 서류 탭에 csPacketsHtml + 첨부함 · [생성] 배선(html_contract → 계약서 툴, 그 외 openXlsxGen)',
     pks.join(',') === 'con,start,complete,bill'
     && [...sc.matchAll(/t:"gen", k:"(\w+)"/g)].map((m) => m[1]).every((k) => ['con_docs', 'quote', 'html_contract', 'safety_pack'].includes(k) || new RegExp('\\b' + k + ':"').test(html.slice(html.indexOf('var TPL_LABELS='), html.indexOf('var TPL_LABELS=') + 900)))
-    && /gwCall\("gw-data", \{ action:"tpl_list" \}\)/.test(sc) && /h \+= csPacketsHtml\(c\) \+ cdocGenHtml\(c\) \+ cbxEtcHtml\(c\) \+ conAttBoxHtml\(c\)/.test(html) && /querySelectorAll\("\[data-cs-gen\]"\)/.test(html) && /openDocFromContract\(p\[0\]\); else openXlsxGen\(p\[0\], csGenKind/.test(html)
+    && /gwCall\("gw-data", \{ action:"tpl_list" \}\)/.test(sc) && /h \+= csStagesHtml\(c\); h \+= cbxEtcHtml\(c\) \+ csMoreHtml\(c\) \+ conAttBoxHtml\(c\) \+ cdocTrashHtml\(c\);/.test(html) && /ev = csPkEval\(c, pk, it0, X\)/.test(html) && /querySelectorAll\("\[data-cs-gen\]"\)/.test(html) && /openDocFromContract\(p\[0\]\); else openXlsxGen\(p\[0\], csGenKind/.test(html)   // v427 패킷 항목은 단계·서류 줄로(같은 판정 csPkEval)
     && /\.cs-pk \.st\.gap\{/.test(html), pks.join(','));
   T('v383 검토 반영: tpl_list 실패는 캐시 null 유지 + csTplErr 쿨다운(30초) · 비200 불신 · then 2인자 · tpl_put 성공·관리 목록 수신 → csTplInvalidate/csTplSet · 모달 닫기 재그리기 · 첨부 claim 1회 + ex 제외 · 정규식 좁힘(사업자 제외 등록증·세금계산서·4대보험)',
     /if \(csTplErr && Date\.now\(\) - csTplErr < 30000\) return;/.test(sc) && /if \(!\(res && res\.status === 200 && res\.body && res\.body\.templates\)\)\{ csTplErr = Date\.now\(\);/.test(sc) && /\}, function\(\)\{ csTplLoading = false; csTplErr = Date\.now\(\); renderContracts\(\); \}\);/.test(sc)
     && /cbxDiscard\(it\); if \(csTplKeys\) csTplKeys\[key\] = 1;/.test(html) && /typeof csTplSet==="function"\) csTplSet\(t\);/.test(html) && /\$\("tplBackdrop"\)\.classList\.remove\("show"\); if\(typeof renderContracts==="function"\) renderContracts\(\); \}\);/.test(html)
-    && /if \(!claimed\[ai\] && it\.re\.test\(n\) && !\(it\.ex && it\.ex\.test\(n\)\)\)\{ claimed\[ai\] = 1; hit\.push\(n\); \}/.test(sc) && /k:"reg", h:"건설업·폐기물 등록증", re:\/\(건설업\|해체\|폐기물\|수집운반\|운반업\)/.test(sc) && /k:"invoice", h:"세금계산서", re:\/세금계산서\//.test(sc) && /k:"ins", h:"4대보험 완납증명", re:\/4대보험/.test(sc) && !/re:\/보험\|완납\//.test(sc), '');
+    && /if \(!X\.claimed\[ai\] && it\.re\.test\(n\) && !\(it\.ex && it\.ex\.test\(n\)\)\)\{ X\.claimed\[ai\] = 1; hit\.push\(n\); \}/.test(sc) && /k:"reg", h:"건설업·폐기물 등록증", re:\/\(건설업\|해체\|폐기물\|수집운반\|운반업\)/.test(sc) && /k:"invoice", h:"세금계산서", re:\/세금계산서\//.test(sc) && /k:"ins", h:"4대보험 완납증명", re:\/4대보험/.test(sc) && !/re:\/보험\|완납\//.test(sc), '');
 } catch (e) { console.log('  (v383 검사 생략 — ' + e.message + ')'); fails++; }
 
 // ---- v384: 결재 2종 배선 + 현장 대장 연결 (10/13 적대 검토 1·2차 반영) ----
@@ -1652,7 +1652,7 @@ try {
   const sheet401 = html.slice(html.indexOf('// @con-sheet-start'), html.indexOf('  function renderContracts(){'));
   T('v401 서류 항목화: csSplitTop·csParseStageDocs·csStageDocItems(@con-scen) · 단계 카드 csStageDocsHtml 호출 · 체크리스트 6함수 · 배선 4(dchk/dna/ddel/dadd) · 입력 보존(dpanel/dnew) · CSS .cs-docs/.cs-doc · con_clog_add 호출 · STAGE_DOCS 완료신고·청구 "/" 표기',
     /function csSplitTop\(/.test(seg401) && /function csParseStageDocs\(/.test(seg401) && /function csStageDocItems\(/.test(seg401)
-    && /h \+= csStageDocsHtml\(c, p, i, key, can\);/.test(sheet401) && ['csStageDocsHtml', 'csDocsOf', 'csDocFind', 'csDocLog', 'csDocToggle', 'csDocNa', 'csDocAdd', 'csDocDel'].every((f) => sheet401.indexOf('function ' + f + '(') >= 0)
+    && /h \+= csStageDocsHtml\(c, p, i, key, can, fm\);/.test(sheet401) && ['csStageDocsHtml', 'csDocsOf', 'csDocFind', 'csDocLog', 'csDocToggle', 'csDocNa', 'csDocAdd', 'csDocDel'].every((f) => sheet401.indexOf('function ' + f + '(') >= 0)
     && ['data-cs-dchk', 'data-cs-dna', 'data-cs-ddel', 'data-cs-dadd'].every((a) => html.indexOf('csAct("' + a + '"') >= 0) && sheet401.indexOf('[data-cs-fld], [data-cs-wl], [data-cs-dnew]') >= 0 && sheet401.indexOf('e.getAttribute("data-cs-dpanel")') >= 0
     && /\.cs-docs\{/.test(html) && /\.cs-doc\.na \.nm\{/.test(html) && /action: "con_clog_add"/.test(sheet401)
     && seg401.indexOf('"완료신고":"[작성] 석면해체/제거 완료신고(노동부)"') >= 0 && seg401.indexOf('[수령] 국세/지방세 납세증명·4대보험 완납증명·하도급지킴이') >= 0 && html.indexOf('석면해체·제거 완료신고') < 0, '');
@@ -1687,7 +1687,7 @@ try {
   T('v402 시트: csChgAdd(@con-sheet)·버튼 배선 data-cs-chgadd · pipeLabel chg · csUnskipStage delete s.off · [켜기] 라벨 · R1 csDocsLost(굳히지 않음) · R3 본 줄 잠금(advanceProc·csDoneStage) · R4 변경계약 서류 버튼 숨김(단계 카드·지시 탭) · R15 완료 전 입력 칸 저장',
     sh402.indexOf('function csChgAdd(') >= 0 && html.indexOf('querySelectorAll("[data-cs-chgadd]")') >= 0 && /k==="chg" \? "변경계약" : "본"/.test(html) && /s\.status = "pending"; s\.done_at = null; delete s\.off;/.test(sh402) && sh402.indexOf("(s.off ? '켜기' : '선택 복구')") >= 0
     && sh402.indexOf("var cls = (isSkip ? ' skip' : (isDone ? ' done' : (isCur ? ' cur' : ''))) + (opt ? ' opt' : '') + (open ? ' open' : '');") >= 0 && /function csDocsLost\(s\)/.test(sh402) && /if \(csDocsLost\(s\)\)\{ alert\(/.test(sh402) && /var chgN = c\.scen \? csChgOpenAt\(c, pipe, t\.stage_i\) : 0;/.test(html) && /var chgN = csChgOpenAt\(c, p, i\); if \(chgN\)\{ alert\(/.test(sh402)
-    && sh402.indexOf('if (s.aid !== "change_contract" && p.key !== "chg") act += \'<button type="button" class="vs-chip" data-cs-sdoc=') >= 0 && html.indexOf('var docBtn = (t.proc_id && canDo("con") && t.pipe !== "chg" && !csTaskChg(t)) ?') >= 0 && /fp = \(s0 && s0\.aw === "amt"\) \? root\.querySelector/.test(html)
+    && sh402.indexOf('if (s.aid !== "change_contract" && p.key !== "chg"){ if (!csStgGenCovered(c, s, rows)) act += \'<button type="button" class="vs-chip" data-cs-sdoc=') >= 0 && html.indexOf('var docBtn = (t.proc_id && canDo("con") && t.pipe !== "chg" && !csTaskChg(t)) ?') >= 0 && /fp = \(s0 && s0\.aw === "amt"\) \? root\.querySelector/.test(html)
     && ['var chgA = csChgOpenAt(c, p, i); if (chgA)', 'if(s.aid==="change_contract" && pat.source==="계약") continue;', 'var chgJ = csChgOpenAt(c, p, i); if (chgJ)', 'if (s.aw === "amt" && (csNum((s.vals || {}).chg_amt) || (s.vals || {}).chg_end || s.appr))', 'hold = !!(cs && cs.appr && /대기|보류|승인/.test(cs.appr.status || "")', 'if (!tl || tl.status === "done"){ csApprApply(c, p, i);'].every((x) => html.indexOf(x) >= 0), '');   // v402 적대 검토 반영 리터럴
   T('v402 관리자 카드: 미리보기 try/catch 격리(R6) · 카드 9 목록 읽기 전용 행·같은 키 docs_set 확인창(R11) · 편집 예시 해 없는 값(완료신고_석면·노동부|석면 예시 0)',
     /var pv = ""; if \(has\)\{ try \{ pv = conAddedPreviewHtml\(b\); \} catch\(e\)\{/.test(html) && /\+ pv \+ \(has \? conProcEditHtml\(b\) : ''\);/.test(html) && html.indexOf('카드 9 · ') >= 0 && /은 카드 9 목록 키와 같은 이름입니다/.test(html)
@@ -1944,8 +1944,25 @@ try {
   T('v425 최종본 연결: 넣기가 초안 없으면 xgDraftMake 먼저(내려받기·값 저장·확인창 없음) · 창과 같은 토큰 함수 · 파일이 들어오면 단계 체크 · 사람이 쓰는 창은 안 건드림', /prep = xgDraftMake\(c, tpl\)/.test(html) && /o = \{ noDownload: true, noBack: true, wait: true, late: true \}/.test(html) && /var cdT=xgConTok\(c\)/.test(html) && /var qtT=xgQuoteTok\(\)/.test(html) && /var adT=xgAdvTok\(\)/.test(html) && /dd\.st = "done"; dd\.auto = 1/.test(html) && /back\.classList\.contains\("show"\)\) \|\| xgLateOn/.test(html));
   T('v424 표식: 앱 번호 형식 = 서버 번호 형식 · 서버 사본은 주민번호 가림(genStoreCopy) · 착공계는 칸 비운 사본(xgNoRrn)', dd24.indexOf('JWG1\\\\.[A-Za-z0-9_-]{1,40}\\\\.[a-z0-9_]{1,30}\\\\.[a-z0-9]{6,16}') > 0 && html.indexOf('JWG1\\.[A-Za-z0-9_-]{1,40}\\.[a-z0-9_]{1,30}\\.[a-z0-9]{6,16}') > 0 && html.indexOf('genStoreCopy(b, kind === "work_start")') > 0 && html.indexOf('fillXlsxTemplate(o.tpl, xgNoPerson(edits, cells))') > 0);
   T('v424 짝: 표식 → 이름 → 내용 일치율 순 · hwpx 문단 비교 · 모델은 칸 비교만 · 워커 가드 · 판단 표식(모델 호출 없음)', /how = byMark \? 'mark' : ''/.test(srv24) && /DD\.matchScore\(/.test(srv24) && /DD\.hwpxParaDiff\(db, fb\)/.test(srv24) && /kind === 'xlsx_cell' && learnAllowed/.test(srv24) && /NO_CELL_MAP/.test(lw24) && /BJ\.markJudge\(/.test(pb24));
-  T('v424 단계 칸 값: 생성 창이 xgAuto로 읽음 · 종류를 바꾸면 사람이 안 고친 칸만 · 새로 친 값은 빈 칸에 저장(xgSaveBack) · AI↔직원 줄이 서류 탭에', html.indexOf('xgAutoApply(c, document.getElementById("xgKind").value, true)') > 0 && html.indexOf('xgAutoApply(c0, $("xgKind").value, false)') > 0 && html.indexOf('if (!o.noBack) xgSaveBack(c);') > 0 && html.indexOf('h += csPacketsHtml(c) + cdocGenHtml(c) + cbxEtcHtml(c)') > 0);
+  T('v424 단계 칸 값: 생성 창이 xgAuto로 읽음 · 종류를 바꾸면 사람이 안 고친 칸만 · 새로 친 값은 빈 칸에 저장(xgSaveBack) · AI↔직원 줄이 서류 탭에', html.indexOf('xgAutoApply(c, document.getElementById("xgKind").value, true)') > 0 && html.indexOf('xgAutoApply(c0, $("xgKind").value, false)') > 0 && html.indexOf('if (!o.noBack) xgSaveBack(c);') > 0 && html.indexOf('var L = cdocGenLine(c, tpl, fm.G)') > 0 && html.indexOf('return h + cdocGenHtml(c, fm.shown);') > 0);   // v427 AI↔직원 줄은 서류 줄 안 · 줄에 없는 양식만 아래 칸
 } catch (e) { console.log('  (v424 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ---- v427(11/9 체크 31 시안 ①②③ ㄱ): 계약 펼침 단계·서류 한 탭 — 묶음 한 줄 · 지금 단계만 펼침 · 5단계 계량증명서만 · 같은 서류 한 줄 · 저장 그대로 ----
+try {
+  const sw27 = readFileSync(join(ROOT, 'sw.js'), 'utf8'), sh27 = html.slice(html.indexOf('// @con-sheet-start'), html.indexOf('  function renderContracts(){')), sc27 = html.slice(html.indexOf('// @con-scen-start'), html.indexOf('// @con-scen-end'));
+  const bks = [...sh27.matchAll(/\{ k:"(\w+)", pri:"[^"]+", h:"/g)].map((m) => m[1]);
+  T('v427 ① 묶음 4(착공계·준공계·청구서·계약서류 4종) · 대표 서류가 없으면 안 묶음 · 관급만', bks.join(',') === 'work_start,work_complete,bill_doc,con_docs' && /if \(!mem\.some\(function\(d\)\{ return csDocBase\(d\.n\) === b\.pri; \}\)\) return;/.test(sh27) && /if \(pub && p\.key !== "chg"\) CS_BUNDLES\.forEach/.test(sh27) && /if \(p\.key === "chg"\) return;/.test(sh27), bks.join(','));   // 검토 반영: 변경계약 줄은 묶음·합치기 없음
+  T('v427 ② 지금 단계만 펼침(누른 단계는 계약마다 기억) · 머리 줄 버튼(aria-expanded) · CSS 세로 목록', /return i === p\.cur && c\.status !== "done"; \}/.test(sh27) && /class="cs-sh" data-cs-stg="/.test(sh27) && /aria-expanded="' \+ \(open \? 'true' : 'false'\)/.test(sh27) && /\.cs-stages\{display:flex;flex-direction:column;/.test(html) && /\.cs-sh\{all:unset;/.test(html), '');
+  const iK = sc27.indexOf('[/계량|반입/,"계량"]'), iJ = sc27.indexOf('[/준공|계량|반입/,"준공"]');
+  T('v427 ③ 준설토 계량·반입 = 계량증명서(STAGE_DOCS 계량 · 매핑이 준공보다 앞) · 패킷 계량증명서는 그 단계 줄로', /"계량":"\[수령\] 계량증명서"/.test(sc27) && iK > 0 && iJ > iK && /"complete\|weigh":\{ m:\/\^계량증명서\$\/, st:\/계량\|반입\/ \}/.test(sh27), '');
+  T('v427 저장 그대로: 줄 체크는 종전 csDocToggle/csDocNa 또는 csRowAct(stage.docs 값·패킷 줄 c.pkst) · doc_key 함수 안 바뀜 · 상자에 주는 목록(cbxDocList) 안 바뀜 · 배선 data-cs-rchk/rna',
+    /function cdocDocKey\(p, d\)\{ return cdocSan\(\(p && p\.key\) \|\| "main", 12\) \+ "\." \+ cdocSan\(d && d\.k, 27\); \}/.test(html) && /\(c\.pkst = c\.pkst \|\| \{\}\)\[e0\.ik\] = to;/.test(sh27) && /querySelectorAll\("\[data-cs-rchk\], \[data-cs-rna\]"\)/.test(html) && /csAct\("data-cs-dchk"/.test(html) && /CON_PACKETS\.filter\(function\(pk\)\{ return csPkWhen\(c, pk\.when\); \}\)\.forEach\(function\(pk\)\{\s*pk\.items\.filter\(function\(it\)\{ return it\.t === "att" && csPkWhen\(c, it\.when\); \}\)/.test(html), '');
+  T('v427 탭 3개 · [생성]은 서류 줄(단계 📄 서류는 그 양식이 줄에 없을 때만) · 아래쪽 [생성][서류] → 다른 서류 만들기 · sw ≥ 427',
+    /var tab = conDetTab === "doc" \? "st" : conDetTab;/.test(sh27) && /function csStgGenCovered\(c, s, rows\)/.test(sh27) && /function csMoreHtml\(c\)/.test(sh27) && !/data-con-xlsx="' \+ esc\(c\.id\) \+ '">생성<\/button><button class="mini-btn" data-con-doc=/.test(html) && Number((sw27.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 427, '');
+  T('v427 직접 생성 계약금액(PM 11/9 "직접생성은 다 계약금액이 들어가야지"): 창에 금액 칸·미정 체크 · 비우면 시작 안 함 · 낙찰 두 길 모두 낙찰 금액 미리 · 계약 정보 amount 저장 · 개요 미정 표시',
+    ids.has('conAmount') && ids.has('conAmtTbd') && /if\(!amt && !amtTbd\)\{ alert\("계약금액\(원\)을 입력하세요/.test(html) && /function conAmtFromBid\(b\)/.test(html) && (html.match(/conAmtFromBid\(b\);/g) || []).length === 2
+    && /if\(amt\)\{ if\(bcinfo\) bcinfo\.amount=amt; else bcinfo=\{ title:"", amount:amt,/.test(html) && /c\.amount_tbd \? "미정\(견적 전, "/.test(html) && /var am0=document\.getElementById\("conAmount"\); if\(am0\) am0\.value="";/.test(html), '');
+} catch (e) { console.log('  (v427 검사 생략 — ' + e.message + ')'); fails++; }
 
 try {
   const fdir = join(ROOT, 'netlify', 'functions');
