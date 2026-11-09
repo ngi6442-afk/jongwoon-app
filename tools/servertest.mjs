@@ -5020,4 +5020,97 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   mem.gw_users = savedUsers77;
 }
 
+{ // ---- 78(v433) 메뉴 56 6단계 — 현장 대장 '특별교육 미이수'(site_edu_gap, 읽기 전용): 안전 권한 없는 현장 권한자에게 서버가 투입 인원 중 유효한 특별교육 기록이 없는 사람 이름만.
+  //   응답 코드만이 아니라 이유 코드(error_code)·현장별 이름·응답 키·저장 0까지 본다. 실 Blobs는 없는 키를 ok·data null로 준다(운영 col:edu 지금 상태) — mock에서는 값 null로 심어 흉내(mock은 없는 키를 NOT_FOUND로 줌).
+  const savedUsers78 = JSON.parse(JSON.stringify(mem.gw_users));
+  const had78 = {}; ['col:asbestos', 'col:edu', 'col:workers'].forEach((k) => { had78[k] = Object.prototype.hasOwnProperty.call(mem.gw_data, k) ? JSON.parse(JSON.stringify(mem.gw_data[k])) : undefined; });
+  mem.gw_users['device:dev1'] = { status: 'approved' };
+  const mk78 = (id, extra) => { mem.gw_users['member:' + id] = Object.assign({ id, name: id, role: '직원', admin: false, perms: {} }, extra); return issueSession(mem.gw_users['member:' + id]).token; };
+  mk78('p78a', { name: '갑돌78' }); mk78('p78b', { name: '을순78' }); mk78('p78del', { name: '지운회원78', del: 1 }); mk78('p78out', { name: '외부인78' });   // 투입 인원(회원) · 지운 회원 · 어느 현장에도 없는 회원
+  const tKja78 = mk78('u78kja', { name: '김정아형78', perms: { site: 'do', lic: 'do', wk: 'do' } });       // 현장 수행·안전 없음
+  const tView78 = mk78('u78view', { name: '현장보기78', perms: { site: 'view' } });                       // 현장 보기만
+  const tMin78 = mk78('u78min', { name: '권민지형78', perms: { safety: 'do', site: 'hide', lic: 'view' } });   // 안전 수행·현장 숨김
+  const tNone78 = mk78('u78none', { name: '현장없음78', perms: { veh: 'view' } });                         // site 값 없음 = 기본 숨김(gw-data PERM_CLOSED)
+  mem.gw_data['col:asbestos'] = { schema: 1, items: [
+    { id: 'a78run', kind: 'asbestos', status: 'run', member_ids: ['p78a', 'p78b', 'p78del'], worker_ids: ['w78a', 'w78del', 'w78b'] },
+    { id: 'a78plan', kind: 'dredge', status: 'plan', member_ids: '[]', worker_ids: '["w78a"]' },   // 준설도 검사 · 문자열 칸(9/2 일괄 입력 모양)
+    { id: 'a78zero', kind: 'demolition', status: 'plan', member_ids: [], worker_ids: [] },         // 투입 0명(지금 운영 진행·예정 2건 모양)
+    { id: 'a78done', kind: 'asbestos', status: 'done', member_ids: ['p78a'], worker_ids: ['w78a'] },
+    { id: 'a78gone', kind: 'asbestos', status: 'run', del: 1, member_ids: ['p78a'], worker_ids: [] },
+  ], updated_at: 780 };
+  mem.gw_data['col:workers'] = { schema: 1, items: [{ id: 'w78a', name: '일용갑78' }, { id: 'w78b', name: '일용을78' }, { id: 'w78del', name: '지운일용78', del: 1 }], updated_at: 781 };
+  const EDU78 = [
+    { id: 'e78a', ptype: 'member', pid: 'p78b', kind: 'special', date: '2026-10-01', next: '', hours: 16, note: '노트78' },
+    { id: 'e78b', ptype: 'worker', pid: 'w78b', kind: 'special', date: '2026-10-02', next: '' },
+    { id: 'e78c', ptype: 'member', pid: 'p78a', kind: 'spec_med', date: '2026-10-03', next: '2027-10-03' },   // 건강진단만 — 갑돌 미이수
+  ];
+  mem.gw_data['col:edu'] = { schema: 1, items: JSON.parse(JSON.stringify(EDU78)), updated_at: 782 };
+  const WANT78 = { a78run: ['갑돌78', '일용갑78'], a78plan: ['일용갑78'], a78zero: [] };
+  const audit0_78 = auditMock.logs.length, snap78 = JSON.stringify([mem.gw_data['col:asbestos'], mem.gw_data['col:edu'], mem.gw_data['col:workers']]);
+  const gap78 = (tok, dev) => call({ action: 'site_edu_gap' }, tok, dev);
+
+  // ① 현장 수행(김정아형)·현장 보기·관리자 → 200 · 현장별 이름 = 지운·종결 대장 빼고, 유효한 특별교육 기록이 없는 투입 인원만(건강진단만 있는 갑돌 포함 · 이수한 을순·일용을 · 지운 회원·지운 일용직 빼고)
+  const rK78 = await gap78(tKja78, 'dev1'), rV78 = await gap78(tView78, 'dev1'), rA78 = await gap78(tokA);
+  T('78 v433 site_edu_gap: 현장 수행(김정아형)·현장 보기·관리자 → 200 · ok·has_edu true · 현장별 이름 = 진행 a78run [갑돌78, 일용갑78](건강진단만 있는 사람은 미이수 · 이수자·지운 회원·지운 일용직 빠짐) · 준설 문자열 칸 a78plan [일용갑78] · 투입 0명 a78zero [] · 종결·지운 대장 없음 · 세 사람 같은 답',
+    [rK78, rV78, rA78].every((x) => x.code === 200 && x.body.ok === true && x.body.status === 'OK' && x.body.has_edu === true && JSON.stringify(x.body.gaps) === JSON.stringify(WANT78)),
+    [rK78, rV78, rA78].map((x) => x.code + '/' + JSON.stringify(x.body.gaps)).join(' | '));
+  // ② 응답에 이름 밖 값 없음 — 키 = status·ok·has_edu·gaps·request_id · 이름은 그 현장 투입 인원 안에서만 · 교육 기록 값(이수일·종류·다음 예정·시간·메모)·투입 인원 밖 이름·지운 회원·지운 일용직 0
+  const pool78 = { a78run: ['갑돌78', '을순78', '일용갑78', '일용을78'], a78plan: ['일용갑78'], a78zero: [] };
+  const rj78 = JSON.stringify(rK78.body);
+  const leak78 = ['2026-10', '2027-10', 'spec_med', 'special', '노트78', '"hours"', '"next"', '"date"', '"pid"', '"ptype"', '"kind"', '외부인78', '지운회원78', '지운일용78', '을순78', '일용을78', 'a78done', 'a78gone'].filter((w) => rj78.indexOf(w) >= 0);
+  T('78 v433 응답 = 이름만: 응답 키 status·ok·has_edu·gaps·request_id · 이름은 그 현장 투입 인원 안에서만 · 교육 기록 값(이수일·종류·다음 예정·시간·메모)·투입 인원 밖 이름(외부인)·지운 회원·지운 일용직·이수자·종결·지운 대장 0 · 같은 사람의 교육 기록 읽기(get edu)는 여전히 403 NO_ACCESS',
+    Object.keys(rK78.body).sort().join(',') === 'gaps,has_edu,ok,request_id,status' && Object.keys(rK78.body.gaps).every((id) => Array.isArray(pool78[id]) && rK78.body.gaps[id].every((n) => pool78[id].indexOf(n) >= 0)) && leak78.length === 0
+    && (await call({ action: 'get', collection: 'edu' }, tKja78, 'dev1')).body.error_code === 'NO_ACCESS',
+    'leak: ' + leak78.join(',') + ' / keys ' + Object.keys(rK78.body).join(','));
+  // ③ 거절 — 현장 숨김(권민지형) · site 값 없음(기본 숨김) → 403 NO_ACCESS · 기기 미승인·기기 머리 없음 → 403 DEVICE_NOT_APPROVED · 비로그인 → 401 · 이유 코드까지
+  const rM78 = await gap78(tMin78, 'dev1'), rN78 = await gap78(tNone78, 'dev1'), rD78 = await gap78(tKja78, 'devX'), rD2_78 = await gap78(tKja78), rU78 = await gap78(null);
+  T('78 v433 거절: 현장 숨김(권민지형 — 안전 수행이어도) · site 값 없음(기본 숨김) → 403 NO_ACCESS · 미승인 기기·기기 머리 없음 → 403 DEVICE_NOT_APPROVED · 비로그인 → 401 · 거절 응답에 이름 0',
+    rM78.code === 403 && rM78.body.error_code === 'NO_ACCESS' && rN78.code === 403 && rN78.body.error_code === 'NO_ACCESS'
+    && rD78.code === 403 && rD78.body.error_code === 'DEVICE_NOT_APPROVED' && rD2_78.code === 403 && rD2_78.body.error_code === 'DEVICE_NOT_APPROVED' && rU78.code === 401
+    && [rM78, rN78, rD78, rD2_78, rU78].every((x) => x.body.gaps === undefined && JSON.stringify(x.body).indexOf('갑돌78') < 0),
+    [rM78, rN78, rD78, rD2_78, rU78].map((x) => x.code + '/' + x.body.error_code).join(' | '));
+  // ④ 교육 기록 0건 → has_edu false · 이름 안 보냄(gaps {}) — 없는 키(실 Blobs ok·data null) · 빈 목록 · 지운 기록만
+  mem.gw_data['col:edu'] = null; const rE0_78 = await gap78(tKja78, 'dev1');
+  mem.gw_data['col:edu'] = { schema: 1, items: [], updated_at: 783 }; const rE1_78 = await gap78(tKja78, 'dev1');
+  mem.gw_data['col:edu'] = { schema: 1, items: EDU78.map((e) => Object.assign({}, e, { del: 1 })), updated_at: 784 }; const rE2_78 = await gap78(tKja78, 'dev1');
+  T('78 v433 교육 기록 0건 → 200 · has_edu false · 이름 안 보냄(gaps {} — 앱은 "교육 기록 없음 — 이수 여부 미확인"만 그림): 없는 키(실 Blobs ok·data null — 운영 col:edu 지금) · 빈 목록 · 지운 기록만',
+    [rE0_78, rE1_78, rE2_78].every((x) => x.code === 200 && x.body.ok === true && x.body.has_edu === false && JSON.stringify(x.body.gaps) === '{}'),
+    [rE0_78, rE1_78, rE2_78].map((x) => x.code + '/' + x.body.has_edu + '/' + JSON.stringify(x.body.gaps)).join(' | '));
+  mem.gw_data['col:edu'] = { schema: 1, items: JSON.parse(JSON.stringify(EDU78)), updated_at: 782 };
+  // ⑤ 삭제된 일용직 제외(명부에서 지운 사람이 대장에 남아 있어도) · 일용직 이름을 되살리면 다시 나옴(같은 판정이 명부를 본다는 대조)
+  mem.gw_data['col:workers'].items[2].del = 0; const rW1_78 = await gap78(tKja78, 'dev1');
+  mem.gw_data['col:workers'].items[2].del = 1; const rW2_78 = await gap78(tKja78, 'dev1');
+  T('78 v433 삭제된 일용직 제외: 명부에서 지운 일용직(지운일용78)은 대장 투입 인원에 남아 있어도 이름 없음 · 대조 — 지움을 풀면 [갑돌78, 일용갑78, 지운일용78]',
+    rW2_78.body.gaps && rW2_78.body.gaps.a78run.join(',') === '갑돌78,일용갑78' && rW1_78.body.gaps && rW1_78.body.gaps.a78run.join(',') === '갑돌78,일용갑78,지운일용78',
+    JSON.stringify([rW1_78.body.gaps, rW2_78.body.gaps]));
+  // ⑥ 일용직 권한 숨김(현장 보기 + wk 숨김 — v433 검토: 그 사람은 명부 읽기가 403인데 일용직 이름을 받았다) → 일용직은 이름 대신 현장별 수만(wk_n) ·
+  //    직원 이름은 그대로 · 명부 읽기(get workers)는 여전히 403 NO_ACCESS · 일용직 권한이 있는 사람(김정아형·현장 보기·관리자) 응답엔 wk_n 없음 · 교육 0건이면 gaps {}·wk_n {}
+  const tWkH78 = mk78('u78wkh', { name: '일용직숨김78', perms: { site: 'view', wk: 'hide' } });
+  const rH78 = await gap78(tWkH78, 'dev1'), rHw78 = await call({ action: 'get', collection: 'workers' }, tWkH78, 'dev1');
+  mem.gw_data['col:edu'] = { schema: 1, items: [], updated_at: 785 }; const rH0_78 = await gap78(tWkH78, 'dev1');
+  mem.gw_data['col:edu'] = { schema: 1, items: JSON.parse(JSON.stringify(EDU78)), updated_at: 782 };
+  const rjH78 = JSON.stringify(rH78.body);
+  T('78 v433 일용직 권한 숨김(현장 보기 + 일용직 숨김): 200 · 직원 이름만(a78run [갑돌78]·a78plan []·a78zero []) · 일용직은 현장별 수만 wk_n {a78run 1, a78plan 1, a78zero 0}(지운 일용직·이수자는 세지 않음) · 응답 키 status·ok·has_edu·gaps·wk_n·request_id · 일용직 이름 0 · 명부 읽기는 여전히 403 NO_ACCESS · 일용직 권한 있는 사람(김정아형·현장 보기·관리자) 응답엔 wk_n 없음 · 교육 0건이면 gaps {}·wk_n {}',
+    rH78.code === 200 && rH78.body.ok === true && rH78.body.has_edu === true
+    && JSON.stringify(rH78.body.gaps) === JSON.stringify({ a78run: ['갑돌78'], a78plan: [], a78zero: [] }) && JSON.stringify(rH78.body.wk_n) === JSON.stringify({ a78run: 1, a78plan: 1, a78zero: 0 })
+    && Object.keys(rH78.body).sort().join(',') === 'gaps,has_edu,ok,request_id,status,wk_n' && ['일용갑78', '일용을78', '지운일용78'].every((w) => rjH78.indexOf(w) < 0)
+    && rHw78.code === 403 && rHw78.body.error_code === 'NO_ACCESS'
+    && [rK78, rV78, rA78].every((x) => !Object.prototype.hasOwnProperty.call(x.body, 'wk_n'))
+    && rH0_78.code === 200 && rH0_78.body.has_edu === false && JSON.stringify(rH0_78.body.gaps) === '{}' && JSON.stringify(rH0_78.body.wk_n) === '{}',
+    rH78.code + '/' + rjH78 + ' / get workers ' + rHw78.code + '/' + rHw78.body.error_code + ' / edu0 ' + JSON.stringify(rH0_78.body));
+  // ⑦ 읽기 실패 → 500(빈 결과로 '미이수 없음'을 그리지 않게 — 앱은 '확인 못 함') · 대장·교육·명부 각각 · 회원 명부 미가용 MEMBERS_UNAVAILABLE · 저장·감사 로그 0
+  const fail0_78 = blobsMock.hooks.failGet, fails78 = [];
+  for (const k of ['col:asbestos', 'col:edu', 'col:workers']) { blobsMock.hooks.failGet = (key) => key === k; const x = await gap78(tKja78, 'dev1'); fails78.push(x.code + '/' + x.body.error_code + '/' + (x.body.gaps === undefined)); }
+  blobsMock.hooks.failGet = fail0_78;
+  const lm0_78 = pushMock.loadMembers; pushMock.loadMembers = async () => { const a = []; a.unavailable = true; return a; };
+  const rMu78 = await gap78(tKja78, 'dev1'); pushMock.loadMembers = lm0_78;
+  T('78 v433 읽기 실패 → 500(빈 결과를 내지 않음): 대장·교육·명부 각각 STORAGE_READ_FAILED · 회원 명부 미가용 MEMBERS_UNAVAILABLE · 실패 응답에 gaps 없음 · 이 절의 호출 전부 저장 0(대장·교육·명부 그대로)·감사 로그 0',
+    fails78.join(',') === '500/STORAGE_READ_FAILED/true,500/STORAGE_READ_FAILED/true,500/STORAGE_READ_FAILED/true' && rMu78.code === 500 && rMu78.body.error_code === 'MEMBERS_UNAVAILABLE' && rMu78.body.gaps === undefined
+    && JSON.stringify([mem.gw_data['col:asbestos'], mem.gw_data['col:edu'], mem.gw_data['col:workers']]) === snap78 && auditMock.logs.length === audit0_78,
+    fails78.join(',') + ' / ' + rMu78.code + '/' + rMu78.body.error_code + ' / audit +' + (auditMock.logs.length - audit0_78));
+
+  mem.gw_users = savedUsers78;
+  ['col:asbestos', 'col:edu', 'col:workers'].forEach((k) => { if (had78[k] === undefined) delete mem.gw_data[k]; else mem.gw_data[k] = had78[k]; });
+}
+
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

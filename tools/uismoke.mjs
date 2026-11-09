@@ -3,6 +3,7 @@
 //  잡아온 검증들을 자동화한 것: ID 배선·탭 배선·앱/서버 레지스트리 일치·sw 버전업 누락)
 // 실행: node tools/uismoke.mjs
 import { readFileSync, existsSync, readdirSync } from 'fs';
+import { createRequire } from 'module';   // v433 서버 순수 함수(_lib/siteedu.js)를 앱 규칙과 같은 표본에서 실행해 대조
 import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -985,6 +986,8 @@ try {
       'var SITE_KIND = { asbestos:"석면", demolition:"철거", dredge:"준설" }; var siteFilter = "", siteQ = "";',
       'function renderSiteFilter(){} function canDo(){ return false; } function fmtAmount(v){ return String(v); } function openAsb(){} function openSiteWorkers(){}',
       fnSrc('siteKind'), fnSrc('liveSites'), fnSrc('siteLabel'),
+      // v433: renderSites의 특별교육 줄 = siteEduLine — 안전 권한형(canSee 참)이면 종전처럼 asbNoSpecial로 그린다(이 재현의 강도 그대로). 안전 권한 없는 쪽은 v433 묶음 ②가 본다
+      'function canSee(){ return true; } var siteEduGap = null, siteEduGapSig = {};', fnSrc('siteGapSig'), fnSrc('siteEduLine'),
       fnSrc('asbWorkerNames'), fnSrc('asbNoSpecial'), fnSrc('sheetRow'), fnSrc('bindFold'), fnSrc('renderSites'),
       'return { renderSites: renderSites, normAsbRow: normAsbRow, asList: asList };',
     ].join('\n'))(items, DOM);
@@ -1140,6 +1143,7 @@ try {
       'var SITE_KIND = { asbestos:"석면", demolition:"철거", dredge:"준설" }; var siteFilter = "", siteQ = "";',
       'function renderSiteFilter(){} function canDo(){ return false; } function fmtAmount(v){ return String(v); } function openAsb(){} function openSiteWorkers(){}',
       fnSrc('siteKind'), fnSrc('liveSites'), fnSrc('siteLabel'),
+      'function canSee(){ return true; } var siteEduGap = null, siteEduGapSig = {};', fnSrc('siteGapSig'), fnSrc('siteEduLine'),   // v433 특별교육 줄(안전 권한형 = 종전 화면)
       fnSrc('asbWorkerNames'), fnSrc('asbNoSpecial'), fnSrc('sheetRow'), fnSrc('bindFold'), fnSrc('renderSites'),
       'return { renderSites: renderSites };',
     ].join('\n'))([
@@ -3312,6 +3316,350 @@ try {
     && tlHome32.indexOf('옛 줄이 없음') > 0 && tlHome32.indexOf("'(삭제된 일용직)'로 보이지 않음") > 0 && tlPhone32.indexOf('알약이 늘 줄 오른쪽') > 0,
     JSON.stringify({ li: m281li32, pm: cbPM32.map((l) => l.slice(0, 60)), ft8: ft8_32.length, tl: [tlMove32.length, tlHome32.length, tlPhone32.length] }));
 } catch (e) { console.log('  (v432 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ---- v433(11/10 메뉴 56 6단계, PM 11/9 "56. ㄱ" — 확인 항목 기본안 '이름으로'): 현장 대장 '특별교육 미이수' 표시 바로잡기(앱·서버) — 브리핑 steps[5]·코드 지도 code.steps[4]
+//      (지도에서는 5단계 — 브리핑이 순서를 바꿨고, 지도의 '인원수만'은 PM ㄱ으로 이름). 안전 권한 없는 현장 권한자(김정아·정재욱)는 교육 기록을 못 읽어 투입 인원 전원이 '미이수'로 그려졌다
+//      → 서버 site_edu_gap이 현장별 '유효한 특별교육 기록이 없는 투입 인원 이름'만(교육 기록 자체·건강진단·이수일은 안 보냄).
+//      ① 앱·서버 규칙 대조(실행) — index.html asbNoSpecial·eduHasValidSpecial·eduLatest·asList·memberName·findMember·dispName·tierOfMember를 뽑아 서버 _lib/siteedu.js와 같은 표본·같은 사람·같은 순서
+//      ② 특별교육 줄 넷(siteEduLine 실행) ③ 서버 응답에 이름 밖 값 없음 ④ 읽기(loadAsb·loadSiteEduGap·doSaveAsb 실행 — 안전 권한자는 새 액션을 안 부름) ⑤ 정적(서버 분기·검사 순서·앱 자리) ⑥ 문서
+try {
+  const fn33 = (name) => { const i = html.indexOf('function ' + name + '('); if (i < 0) throw new Error('함수 없음: ' + name); let d = 0, st = false; for (let j = i; j < html.length; j++) { const ch = html[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return html.slice(i, j + 1); } } throw new Error('중괄호 짝 안 맞음: ' + name); };
+  const fnIn33 = (src, name) => { const i = src.indexOf('function ' + name + '('); if (i < 0) return ''; let d = 0, st = false; for (let j = i; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i, j + 1); } } return ''; };
+  const rd33 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const req33 = createRequire(import.meta.url);
+  const SE33 = req33(join(ROOT, 'netlify', 'functions', '_lib', 'siteedu.js')), tier33 = req33(join(ROOT, 'netlify', 'functions', '_lib', 'tier.js'));
+  const lib33 = rd33('netlify/functions/_lib/siteedu.js'), gd33 = rd33('netlify/functions/gw-data.js');
+  const TIERTXT33 = (html.match(/var TIER_TXT = \{[^}]*\};/) || [''])[0];
+  if (!TIERTXT33) throw new Error('TIER_TXT 없음');
+
+  // ① 표본 — 서버는 회원 레코드 전부(지운 회원 포함, 순서 섞임), 앱은 member_list(지운 회원 빼고 seq 순 — 손으로 적음: 서버 정렬과 독립)
+  const M33 = [
+    { id: 'mDup', name: '나종운', seq: 50, admin: false, role: '직원' },                 // 대표와 이름이 같은 직원 — 앱 dispName은 이름으로 명부의 첫 회원(seq 1 대표)을 찾아 '대표님'
+    { id: 'm1', name: '갑돌', seq: 10, admin: false, role: '직원' },
+    { id: 'mDel', name: '지운사람', seq: 11, admin: false, del: 1 },                      // 지운 회원 — member_list에 없음 → 빠짐
+    { id: 'mBoss', name: '나종운', seq: 1, admin: true, role: '대표', tier: 'boss' },
+    { id: 'm2', name: '을순', seq: 12, admin: false },
+    { id: 'mRet', name: '퇴사자', seq: 13, admin: false, leave_date: '2020-01-31' },     // 퇴사자 — member_list에 남음(이름 나옴)
+    { id: 'mOut', name: '외부인', seq: 14, admin: false },                                // 어느 현장에도 없음
+    { id: 'mNoName', seq: 15, admin: false },                                              // 이름 없음 → 빠짐
+    { id: 'wSame', name: '김일용', seq: 16, admin: false },                                // 일용직 김일용과 이름 같은 직원(다른 사람)
+  ];
+  const MLIST33 = ['mBoss', 'm1', 'm2', 'mRet', 'mOut', 'mNoName', 'wSame', 'mDup'].map((id) => M33.find((m) => m.id === id));
+  const W33 = [
+    { id: 'w1', name: '일용하나' }, { id: 'w2', name: '지운일용', del: 1 }, { id: 'w3', name: '김일용' }, { id: 'w4', name: '김일용' },
+    { id: 'w5', name: '박일용' }, { id: 'w6', name: '' }, { id: 'w7', name: '옛이름', del: 1 }, { id: 'w7', name: '새이름' }, { id: 'w8', name: '이수일용' },
+  ];
+  const E33 = [
+    { id: 'e1', ptype: 'member', pid: 'm2', kind: 'special', date: '2026-03-02', next: '' },
+    { id: 'e2', ptype: 'member', pid: 'm1', kind: 'special', date: '2026-03-03', next: '', del: 1 },     // 지운 기록 → 갑돌 미이수
+    { id: 'e3', ptype: 'member', pid: 'm1', kind: 'regular', date: '2026-04-01', next: '2026-10-01' },   // special 아닌 기록
+    { id: 'e4', ptype: 'worker', pid: 'w3', kind: 'special', date: '2025-01-05', next: '' },
+    { id: 'e5', ptype: 'worker', pid: 'w3', kind: 'special', date: '2026-02-05', next: '' },             // 기록 여러 건
+    { id: 'e6', ptype: 'member', pid: 'w5', kind: 'special', date: '2026-05-05', next: '' },             // 대상(ptype)이 다름 → 일용직 w5 미이수
+    { id: 'e7', ptype: 'worker', pid: 'w8', kind: 'special', date: '2026-06-06', next: '' },
+    { id: 'e8', ptype: 'worker', pid: 'w1', kind: 'pre_med', date: '2026-06-07', next: '' },             // 건강진단 → 미이수
+    { id: 'e9', ptype: 'member', pid: 'mRet', kind: 'spec_med', date: '2026-06-08', next: '2027-06-08' },
+  ];
+  const S33 = [
+    { id: 's1', kind: 'asbestos', status: 'run', member_ids: ['m1', 'm2', 'mDel', 'mRet', 'mBoss', 'mDup', 'mNoName', '__all__', 'dept:관리부', 'wSame'], worker_ids: ['w1', 'w2', 'w3', 'w4', 'w5', 'w6', 'w7', 'w8', 'wX'] },
+    { id: 's2', kind: 'asbestos', status: 'done', member_ids: ['m1'], worker_ids: ['w1'] },
+    { id: 's3', kind: 'asbestos', status: 'run', del: 1, member_ids: ['m1'], worker_ids: ['w1'] },
+    { id: 's4', status: 'plan', member_ids: '["m1"]', worker_ids: 'w1, w4' },
+    { id: 's5', kind: 'dredge', status: 'run', member_ids: [], worker_ids: ['w1'] },
+    { id: 's6', kind: 'demolition', status: 'plan', member_ids: [], worker_ids: [] },
+    { id: 's7', kind: 'asbestos', member_ids: '[]', worker_ids: '[w1,' },
+    { id: 's8', kind: 'asbestos', status: 'run', member_ids: ['m2'], worker_ids: ['w3', 'w8'] },
+  ];
+  const proj33 = (m) => ({ id: m.id, name: m.name, role: m.role, rank: m.rank, dept: m.dept, seq: m.seq, admin: m.admin, dev: m.dev, tier: m.tier, on_loa: m.on_loa, del: m.del, retired: tier33.retired(m) });   // 비관리자(권민지형) member_list 투영 — gw-auth handleMemberList 칸
+  const noTier33 = (m) => { const x = Object.assign({}, m); delete x.tier; return x; };
+  const appApi33 = (members, workers, edu) => new Function('__m', '__w', '__e', [
+    'var members = __m, workers = __w, edu = __e;',
+    fn33('pad'), fn33('fmtDate'), fn33('todayStr'), fn33('asList'), TIERTXT33,
+    fn33('memberRetired'), fn33('tierBootstrap'), fn33('tierOfMember'), fn33('isBossMember'), fn33('dispName'),
+    fn33('liveMembers'), fn33('findMember'), fn33('memberName'),
+    fn33('liveEdu'), fn33('eduLatest'), fn33('eduHasValidSpecial'), fn33('asbNoSpecial'), fn33('asbWorkerNames'), fn33('normAsbRow'),
+    'return { gap: asbNoSpecial, names: asbWorkerNames, norm: normAsbRow };'].join('\n'))(members, workers, edu);
+  const appGaps33 = (sites, members, workers, edu) => { const a = appApi33(members, workers, edu); const out = {}; JSON.parse(JSON.stringify(sites)).forEach((r) => { if (!r || r.del === 1 || r.status === 'done') return; a.norm(r); out[r.id] = a.gap(r); }); return out; };   // 앱 = renderSites가 그리는 줄(지운 줄 뺌) · siteEduLine 종결 건너뜀 · 입구 normAsbRow
+  const V33 = [
+    { n: '관리자형', app: MLIST33, svr: M33, edu: E33 },
+    { n: '권민지형 투영', app: MLIST33.map(proj33), svr: M33, edu: E33 },
+    { n: '교육 0건', app: MLIST33, svr: M33, edu: [] },
+    { n: '지운 기록만', app: MLIST33, svr: M33, edu: E33.map((e) => Object.assign({}, e, { del: 1 })) },
+    { n: '부트스트랩(명시 등급 없음)', app: MLIST33.map(noTier33), svr: M33.map(noTier33), edu: E33 },
+  ];
+  const cmp33 = V33.map((v) => { const a = appGaps33(S33, v.app, W33, v.edu), s = SE33.siteEduGaps(S33, v.edu, W33, v.svr); return { n: v.n, same: JSON.stringify(a) === JSON.stringify(s.gaps), keys: Object.keys(s.gaps).join(','), has: s.has_edu, a, s: s.gaps }; });
+  const EXP_S1_33 = '갑돌,퇴사자,대표님,대표님,전사,김일용,일용하나,김일용,박일용,새이름';
+  const EXP_ALL33 = '갑돌,을순,퇴사자,대표님,대표님,전사,김일용,일용하나,김일용,김일용,박일용,새이름,이수일용';
+  T('v433 ① 앱·서버 규칙 대조(실행 — index.html asbNoSpecial·eduHasValidSpecial·eduLatest·asList·memberName·dispName·tierOfMember ↔ _lib/siteedu.js siteEduGaps, 같은 표본 5벌: 관리자형·권민지형 투영(retired 불리언)·교육 0건·지운 기록만·명시 등급 없음): 현장마다 같은 사람·같은 순서 · 지운·종결 대장 없음(s1·s4~s8) · 준설·철거·문자열 칸·깨진 JSON 칸 그대로 · 지운 회원·지운 일용직·이름 없음·토큰·없는 id 빠짐 · 지운 기록·special 아닌 기록·다른 대상 기록은 이수 아님 · 기록 여러 건·동명이인 · 대표(같은 이름 직원도 명부 첫 회원으로) 대표님 · 퇴사자 이름 · __all__ 전사 · has_edu(교육 0건·지운 기록만 = false)',
+    cmp33.every((c) => c.same && c.keys === 's1,s4,s5,s6,s7,s8')
+    && cmp33[0].s.s1.join(',') === EXP_S1_33 && cmp33[0].s.s4.join(',') === '갑돌,일용하나,김일용' && cmp33[0].s.s5.join(',') === '일용하나' && cmp33[0].s.s6.length === 0 && cmp33[0].s.s7.length === 0 && cmp33[0].s.s8.length === 0
+    && cmp33[0].has === true && cmp33[1].has === true && cmp33[2].has === false && cmp33[3].has === false && cmp33[4].has === true
+    && cmp33[1].s.s1.join(',') === EXP_S1_33 && cmp33[2].s.s1.join(',') === EXP_ALL33 && cmp33[3].s.s1.join(',') === EXP_ALL33 && cmp33[4].s.s1.join(',') === EXP_S1_33,
+    JSON.stringify(cmp33.map((c) => ({ n: c.n, same: c.same, keys: c.keys, has: c.has, app: c.a.s1, svr: c.s.s1 }))));
+  // ①-2 일용직 권한 숨김(opts.workerNames false — 일용직 권한 wk가 숨김인 사람, v433 검토): 이름은 직원만, 일용직은 현장별 수만(wk_n) —
+  //      앱 asbNoSpecial에 직원 칸만·일용직 칸만 넣어 돌린 결과와 같다(같은 표본 5벌) · 기본(이름)에는 wk_n 키 없음
+  const hid33 = V33.map((v) => {
+    const a = appApi33(v.app, W33, v.edu), s = SE33.siteEduGaps(S33, v.edu, W33, v.svr, { workerNames: false }), mo = {}, wc = {};
+    JSON.parse(JSON.stringify(S33)).forEach((r) => { if (!r || r.del === 1 || r.status === 'done') return; a.norm(r); mo[r.id] = a.gap(Object.assign({}, r, { worker_ids: [] })); wc[r.id] = a.gap(Object.assign({}, r, { member_ids: [] })).length; });
+    return { n: v.n, keys: Object.keys(s).join(','), same: JSON.stringify(s.gaps) === JSON.stringify(mo) && JSON.stringify(s.wk_n) === JSON.stringify(wc), s };
+  });
+  const hasWk33 = (o) => Object.prototype.hasOwnProperty.call(o, 'wk_n');
+  T('v433 ①-2 일용직 권한 숨김(siteEduGaps opts.workerNames false — 일용직 권한이 숨김인 사람): 같은 표본 5벌에서 이름 = 앱이 직원 칸만으로 낸 사람 · wk_n = 앱이 일용직 칸만으로 낸 사람 수(지운 일용직·이름 없음·없는 id·이수자는 안 셈) · 결과 키 has_edu·gaps·wk_n · 기본(이름)은 wk_n 키 없음',
+    hid33.every((h) => h.same && h.keys === 'has_edu,gaps,wk_n') && !hasWk33(SE33.siteEduGaps(S33, E33, W33, M33)) && !hasWk33(SE33.siteEduGaps(S33, E33, W33, M33, { workerNames: true })) && !hasWk33(SE33.siteEduGaps(S33, E33, W33, M33, {}))
+    && hid33[0].s.gaps.s1.join(',') === '갑돌,퇴사자,대표님,대표님,전사,김일용' && hid33[0].s.wk_n.s1 === 4 && hid33[0].s.wk_n.s4 === 2 && hid33[0].s.wk_n.s5 === 1 && hid33[0].s.wk_n.s6 === 0 && hid33[2].s.wk_n.s1 === 6,
+    JSON.stringify(hid33.map((h) => ({ n: h.n, same: h.same, keys: h.keys, gaps: h.s.gaps.s1, wk: h.s.wk_n }))));
+  // ①-3 서명 줄 고르기 = 서버 판정 줄(v433 검토 — 같은 id 두 줄에서 앞 줄 사람 이름이 뒤 줄에 그려졌다): 앱 siteGapSigs가 서명을 남기는 줄과 서버 gaps의 키가 같고,
+  //      같은 id가 두 줄이면 지운·종결 줄을 뺀 뒤 첫 줄
+  const sigApi33 = new Function([fn33('asList'), fn33('siteGapSig'), fn33('siteGapSigs'), 'return { one: siteGapSig, all: siteGapSigs };'].join('\n'))();
+  const DUP33 = S33.concat([
+    { id: 's8', status: 'run', member_ids: ['m1'], worker_ids: [] },                                                // s8 두 번째 줄 — 앞 줄만
+    { id: 'dd', status: 'done', member_ids: ['m2'] }, { id: 'dd', status: 'run', member_ids: ['m1'] },              // 종결 줄 뒤의 같은 id — 진행 줄
+    { id: 'dz', del: 1, status: 'run', member_ids: ['m2'] }, { id: 'dz', status: 'plan', member_ids: ['mRet'] },     // 지운 줄 뒤의 같은 id — 뒤 줄
+    { id: '__proto__', status: 'run', member_ids: ['m1'] }, { status: 'run', member_ids: ['m1'] }, { id: 7, status: 'run', member_ids: ['m2'], worker_ids: ['w1'] },
+  ]);
+  const dSig33 = sigApi33.all(JSON.parse(JSON.stringify(DUP33))), dSvr33 = SE33.siteEduGaps(DUP33, E33, W33, M33);
+  T('v433 ①-3 서명 줄 고르기(앱 siteGapSigs ↔ 서버 siteEduGaps): 서명이 있는 줄 = 서버가 판정한 줄(지운·종결·id 없음·__proto__ 빼고) · 같은 id 두 줄은 앞 줄(s8 = 원래 줄) · 종결·지운 줄 뒤의 같은 id는 뒤 줄(dd·dz) · 숫자 id는 글자 키 · 서명 = 그 줄의 member_ids·worker_ids(문자열 칸도 같은 서명)',
+    Object.keys(dSig33).join(',') === Object.keys(dSvr33.gaps).join(',') && Object.keys(dSig33).join(',') === '7,s1,s4,s5,s6,s7,s8,dd,dz'
+    && dSig33.s8 === JSON.stringify([['m2'], ['w3', 'w8']]) && dSvr33.gaps.s8.length === 0 && dSig33.dd === JSON.stringify([['m1'], []]) && dSvr33.gaps.dd.join(',') === '갑돌'
+    && dSig33.dz === JSON.stringify([['mRet'], []]) && dSvr33.gaps.dz.join(',') === '퇴사자' && dSig33['7'] === JSON.stringify([['m2'], ['w1']]) && dSvr33.gaps['7'].join(',') === '일용하나' && !Object.prototype.hasOwnProperty.call(dSig33, '__proto__')
+    && dSig33.s4 === JSON.stringify([['m1'], ['w1', 'w4']]) && dSig33.s4 === sigApi33.one({ member_ids: ['m1'], worker_ids: ['w1', 'w4'] }),
+    JSON.stringify({ sig: Object.keys(dSig33), svr: Object.keys(dSvr33.gaps), s8: dSig33.s8, dd: dSig33.dd, dz: dSig33.dz }));
+
+  // ② 특별교육 줄 — siteEduLine 실행(권한·서버 응답·서명별). 투입 인원 = '참여 근로자' 줄과 같은 풀이(asbWorkerNames — 지운·없는 사람·토큰은 사람 아님, v433 검토),
+  //    일용직 권한이 없으면(명부 안 읽음) worker_ids만 있어도 사람이 있는 것으로 · 서버 wk_n = 이름 없는 일용직 수
+  const sig33 = (r) => JSON.stringify([Array.isArray(r.member_ids) ? r.member_ids : [], Array.isArray(r.worker_ids) ? r.worker_ids : []]);
+  const L33 = [
+    { id: 'L1', status: 'run', member_ids: ['m1'], worker_ids: ['w1'] },
+    { id: 'L0', status: 'plan', member_ids: [], worker_ids: [] },
+    { id: 'LD', status: 'done', member_ids: ['m1'], worker_ids: [] },
+    { id: 'LX', status: 'run', member_ids: ['m1'], worker_ids: [] },
+    { id: 'LS', status: 'run', member_ids: ['m1'], worker_ids: ['w1'] },
+    { id: 'LE', status: 'run', member_ids: ['m1'], worker_ids: [] },
+    { id: 'LH', status: 'plan', member_ids: [], worker_ids: ['w1'] },
+    { id: 'LG', status: 'run', member_ids: ['mGone', 'dept:관리부'], worker_ids: ['wD', 'wGone'] },   // 지운·없는 사람·토큰뿐 = 참여 근로자 '미지정' → 줄 없음
+    { id: 'LW', status: 'run', member_ids: [], worker_ids: ['w2'] },
+  ];
+  const G33 = { has_edu: true, gaps: { L1: ['갑돌', '일용하나'], L0: [], LD: ['갑돌'], LS: ['갑돌'], LE: [], LH: ['<img src=x>'], LG: [], LW: [] } };
+  const GS33 = {}; L33.forEach((r) => { GS33[r.id] = sig33(r); }); GS33.LS = JSON.stringify([['m1'], []]);   // LS = 답이 판정한 뒤 화면에서 일용직을 넣은 줄(서명 다름)
+  const lineApi33 = (perm, gap, sig, edu, wk) => new Function('__perm', '__asb', '__gap', '__sig', '__edu', '__wk', [
+    'function canSee(m){ return (__perm[m] || "hide") !== "hide"; }',
+    'var asb = __asb, workers = __wk || [{ id: "w1", name: "일용하나" }, { id: "w2", name: "일용둘" }, { id: "wD", name: "지운일용", del: 1 }], members = [{ id: "m1", name: "갑돌" }], edu = __edu || [];',
+    fn33('esc'), fn33('asList'), fn33('sheetRow'),
+    'function findMember(id){ for(var i=0;i<members.length;i++){ if(members[i].id===id) return members[i]; } return null; }',
+    fn33('memberName'), 'function dispName(n){ return n||""; }',
+    fn33('liveEdu'), fn33('eduLatest'), fn33('eduHasValidSpecial'), fn33('asbNoSpecial'), fn33('asbWorkerNames'),
+    'var siteEduGap = __gap, siteEduGapSig = __sig;', fn33('siteGapSig'), fn33('siteEduLine'), fn33('liveSites'), fn33('siteEduLines'),
+    'return { line: function(id){ for (var i = 0; i < asb.length; i++){ if (asb[i] && asb[i].id === id) return siteEduLine(asb[i]); } return null; }, lines: siteEduLines };'].join('\n'))(perm, JSON.parse(JSON.stringify(L33)), gap, sig, edu, wk);
+  const KJA33 = { site: 'do', lic: 'do', wk: 'do' }, KJAH33 = { site: 'do', wk: 'hide' }, SAFE33 = { safety: 'do', site: 'do', wk: 'do' };
+  const ln33 = (perm, gap, sig, edu, wk) => { const a = lineApi33(perm, gap, sig, edu, wk); const o = {}; L33.forEach((r) => { o[r.id] = a.line(r.id); }); return o; };
+  const row33 = (v, cls) => '<tr><th>특별교육</th><td' + (cls ? ' class="' + cls + '"' : '') + '>' + v + '</td></tr>';
+  const NAMES2_33 = '<tr><th>특별교육</th><td class="warn"><b>미이수 2명</b> — 갑돌, 일용하나 (배치 전 이수 필요)</td></tr>';
+  const UNK33 = '<tr><th>특별교육</th><td class="warn">확인 못 함 — 현장 칸을 다시 열면 다시 확인합니다</td></tr>';
+  const DIRTY33 = '<tr><th>특별교육</th><td class="warn">확인 못 함 — 바뀐 투입 인원은 저장된 뒤 다시 확인합니다</td></tr>';
+  const WAIT33 = '<tr><th>특별교육</th><td>확인 중</td></tr>';
+  const NOEDU33 = '<tr><th>특별교육</th><td class="warn">교육 기록 없음 — 이수 여부 미확인</td></tr>';
+  const NONE33 = '<tr><th>특별교육</th><td>미이수 없음</td></tr>';
+  const kOk33 = ln33(KJA33, G33, GS33), kWait33 = ln33(KJA33, undefined, {}), kNull33 = ln33(KJA33, null, {}), kNoEdu33 = ln33(KJA33, { has_edu: false, gaps: {} }, {});
+  const sApp33 = ln33(SAFE33, { has_edu: true, gaps: { L1: ['다른사람'] } }, GS33), sNull33 = ln33(SAFE33, null, {});
+  const sDone33 = ln33(SAFE33, null, {}, [{ id: 'x1', ptype: 'member', pid: 'm1', kind: 'special', date: '2026-01-01' }, { id: 'x2', ptype: 'worker', pid: 'w1', kind: 'special', date: '2026-01-01' }, { id: 'x3', ptype: 'worker', pid: 'w2', kind: 'special', date: '2026-01-01' }]);
+  // 일용직 권한 숨김(명부를 안 읽어 workers 빈 배열): 서버 wk_n을 '일용직 n명'으로 · 이상한 wk_n(글자·음수·NaN·무한)은 0 · 소수는 내림
+  const GH33 = { has_edu: true, gaps: { L1: ['갑돌'], LX: ['갑돌'], LS: [], LE: [], LH: [], LG: [], LW: [] }, wk_n: { L1: 1, LX: 0, LH: 0, LG: 0, LW: 1, LE: 0 } };
+  const kH33 = ln33(KJAH33, GH33, GS33, [], []), kHodd33 = ln33(KJAH33, { has_edu: true, gaps: GH33.gaps, wk_n: { L1: '3', LW: -1, LE: NaN, LH: Infinity, LX: 2.7 } }, GS33, [], []);
+  const kLines33 = lineApi33(KJA33, null, {}).lines(), kLines0_33 = new Function('__s', '__k', [   // 투입 인원 0명뿐인 대장(지금 운영 — 진행·예정 2건)이면 어떤 응답(첫 답 전 포함)에서도 보이는 특별교육 줄 0
+    'function canSee(m){ return (__k[m] || "hide") !== "hide"; } var asb = __s, workers = [], members = [];', fn33('esc'), fn33('asList'), fn33('sheetRow'), 'function asbNoSpecial(){ return []; }',
+    'function findMember(){ return null; }', fn33('memberName'), 'function dispName(n){ return n||""; }', fn33('asbWorkerNames'),
+    'var siteEduGap, siteEduGapSig = {};', fn33('siteGapSig'), fn33('siteEduLine'), fn33('liveSites'), fn33('siteEduLines'),
+    'var w = siteEduLines(); siteEduGap = null; var a = siteEduLines(); siteEduGap = { has_edu: false, gaps: {} }; var b = siteEduLines(); siteEduGap = { has_edu: true, gaps: { o1: [], o2: [] }, wk_n: null }; return [w, a, b, siteEduLines()];'].join('\n'))([{ id: 'o1', status: 'plan', member_ids: [], worker_ids: [] }, { id: 'o2', status: 'run', member_ids: '[]', worker_ids: '[]' }], KJA33);
+  T('v433 ② 특별교육 줄(siteEduLine 실행): 김정아형(안전 없음·일용직 수행) — 서버 이름 "미이수 2명 — 갑돌, 일용하나 (배치 전 이수 필요)" · 이름 없음 "미이수 없음"(warn 아님) · 이 세션 첫 답 전(undefined) "확인 중"(warn 아님) · 물음 실패(null)·그 대장이 답에 없음 = "확인 못 함 — 현장 칸을 다시 열면 다시 확인합니다" · 답이 판정한 대장과 투입 인원이 다른 줄(서명 다름) = "확인 못 함 — 바뀐 투입 인원은 저장된 뒤 다시 확인합니다"(어느 쪽도 전원을 미이수로 그리지 않음) · 교육 기록 0건(has_edu false) = "교육 기록 없음 — 이수 여부 미확인"(서명이 달라도) · 투입 0명·종결·지운·없는 사람·토큰뿐(참여 근로자 미지정) = 줄 없음 · 이름은 이스케이프 / 일용직 권한 숨김 — 서버 wk_n을 "갑돌 외 일용직 1명"·"일용직 1명"으로, 이상한 wk_n은 0·소수는 내림, worker_ids만 있어도 줄 / 안전 권한형 — 서버 응답과 무관하게 앱 판정(asbNoSpecial) 이름, 모두 이수면 줄 없음(종전) · 투입 0명 대장뿐이면 어떤 응답(첫 답 전 포함)에서도 줄 0',
+    kOk33.L1 === NAMES2_33 && kOk33.L0 === '' && kOk33.LD === '' && kOk33.LX === UNK33 && kOk33.LS === DIRTY33 && kOk33.LE === NONE33 && kOk33.LG === '' && kOk33.LW === NONE33
+    && kOk33.LH.indexOf('&lt;img src=x&gt;') > 0 && kOk33.LH.indexOf('<img') < 0 && kOk33.LH.indexOf('<b>미이수 1명</b>') > 0
+    && ['L1', 'LX', 'LS', 'LE', 'LH', 'LW'].every((k) => kWait33[k] === WAIT33) && kWait33.L0 === '' && kWait33.LD === '' && kWait33.LG === ''
+    && kNull33.L1 === UNK33 && kNull33.LE === UNK33 && kNull33.LS === UNK33 && kNull33.L0 === '' && kNull33.LD === '' && kNull33.LG === '' && [kNull33, kWait33].every((o) => Object.keys(o).every((k) => (o[k] || '').indexOf('<b>미이수') < 0))
+    && kNoEdu33.L1 === NOEDU33 && kNoEdu33.LS === NOEDU33 && kNoEdu33.LX === NOEDU33 && kNoEdu33.L0 === '' && kNoEdu33.LD === '' && kNoEdu33.LG === ''
+    && kH33.L1 === row33('<b>미이수 2명</b> — 갑돌 외 일용직 1명 (배치 전 이수 필요)', 'warn') && kH33.LX === row33('<b>미이수 1명</b> — 갑돌 (배치 전 이수 필요)', 'warn') && kH33.LW === row33('<b>미이수 1명</b> — 일용직 1명 (배치 전 이수 필요)', 'warn')
+    && kH33.LS === DIRTY33 && kH33.LE === NONE33 && kH33.LH === NONE33 && kH33.LG === NONE33 && kH33.L0 === '' && kH33.LD === ''
+    && kHodd33.L1 === row33('<b>미이수 1명</b> — 갑돌 (배치 전 이수 필요)', 'warn') && kHodd33.LW === NONE33 && kHodd33.LE === NONE33 && kHodd33.LH === NONE33 && kHodd33.LX === row33('<b>미이수 3명</b> — 갑돌 외 일용직 2명 (배치 전 이수 필요)', 'warn')
+    && sApp33.L1 === NAMES2_33 && sApp33.L0 === '' && sApp33.LD === '' && sApp33.LG === '' && sApp33.LE === '<tr><th>특별교육</th><td class="warn"><b>미이수 1명</b> — 갑돌 (배치 전 이수 필요)</td></tr>' && sApp33.LW === row33('<b>미이수 1명</b> — 일용둘 (배치 전 이수 필요)', 'warn') && sNull33.L1 === NAMES2_33
+    && sDone33.L1 === '' && sDone33.LE === '' && sDone33.LH === '' && sDone33.LW === ''
+    && kLines33.split('\n').length === L33.length && kLines33.indexOf(UNK33) >= 0 && kLines0_33.every((s) => s === '\n'),
+    JSON.stringify({ k: kOk33, wait: kWait33, null: kNull33, noedu: kNoEdu33, wkh: kH33, odd: kHodd33, safe: sApp33, safeDone: sDone33, zero: kLines0_33 }));
+
+  // ③ 서버 응답에 이름 밖 값 없음 — 순수 함수 결과 키 = has_edu·gaps, gaps 값 = 이름(문자열) 배열만, 이름은 그 현장 투입 인원(앱 asbWorkerNames 다중집합) 안에서만,
+  //    교육 기록 값(이수일·종류·다음 예정·pid·ptype)·투입 인원 밖 이름(외부인)·지운 회원·지운 일용직·이수자 이름 없음 / 핸들러 200 응답 글자 = status·ok·has_edu·gaps·request_id(교육 0건이면 gaps {})
+  const o33 = SE33.siteEduGaps(S33, E33, W33, M33), oj33 = JSON.stringify(o33);
+  const sub33 = (arr, pool) => { const p = pool.slice(); return arr.every((n) => { const i = p.indexOf(n); if (i < 0) return false; p.splice(i, 1); return true; }); };
+  const appA33 = appApi33(MLIST33, W33, E33);
+  const inPool33 = Object.keys(o33.gaps).every((id) => sub33(o33.gaps[id], appA33.names(JSON.parse(JSON.stringify(S33.find((x) => x.id === id))))));
+  const leak33 = ['2026-', '2025-', 'special', 'regular', 'pre_med', 'spec_med', '"next"', '"date"', '"pid"', '"ptype"', '"kind"', '"del"', '"status"', '"member_ids"', '외부인', '지운사람', '지운일용', '이수일용', '을순', '옛이름'].filter((w) => oj33.indexOf(w) >= 0);
+  const hSrc33 = fnIn33(gd33, 'handleSiteEduGap');
+  const res200_33 = (hSrc33.match(/return jr\(200, [^\n]*\);/g) || []);
+  // 일용직 권한 숨김(opts.workerNames false): 결과 키 has_edu·gaps·wk_n · wk_n = 현장별 0 이상 정수(gaps와 같은 현장) · 일용직에게만 있는 이름(일용하나·박일용·새이름·이수일용·지운일용·옛이름) 0
+  const oh33 = SE33.siteEduGaps(S33, E33, W33, M33, { workerNames: false }), ohj33 = JSON.stringify(oh33);
+  const leakH33 = ['일용하나', '박일용', '새이름', '이수일용', '지운일용', '옛이름', '2026-', 'special', '"pid"', '"date"', '"next"', '외부인', '지운사람'].filter((w) => ohj33.indexOf(w) >= 0);
+  T('v433 ③ 서버 응답에 이름 밖 값 없음: 결과 키 has_edu·gaps · gaps 값 = 이름 문자열 배열 · 이름은 그 현장 투입 인원 안(다중집합) · 교육 기록 값(이수일·종류·next·pid·ptype)·외부인·지운 회원·지운 일용직·이수자 이름 0 · 일용직 권한 숨김 결과 = has_edu·gaps·wk_n(현장별 0 이상 정수)·일용직 이름 0 · 핸들러 200 응답 1곳 = status·ok·has_edu·gaps(교육 0건이면 {})·일용직 권한 숨김이면 wk_n(교육 0건이면 {})·request_id',
+    Object.keys(o33).join(',') === 'has_edu,gaps' && Object.keys(o33.gaps).every((k) => Array.isArray(o33.gaps[k]) && o33.gaps[k].every((n) => typeof n === 'string' && n.length > 0))
+    && inPool33 && leak33.length === 0
+    && Object.keys(oh33).join(',') === 'has_edu,gaps,wk_n' && Object.keys(oh33.wk_n).join(',') === Object.keys(oh33.gaps).join(',') && Object.keys(oh33.wk_n).every((k) => Number.isInteger(oh33.wk_n[k]) && oh33.wk_n[k] >= 0) && leakH33.length === 0
+    && res200_33.length === 1 && res200_33[0] === "return jr(200, Object.assign({ status: 'OK', ok: true, has_edu: out.has_edu, gaps: out.has_edu ? out.gaps : {} }, wkSee ? {} : { wk_n: out.has_edu ? out.wk_n : {} }, { request_id: R }));",
+    JSON.stringify({ keys: Object.keys(o33), pool: inPool33, leak: leak33, hidKeys: Object.keys(oh33), leakH: leakH33, res: res200_33 }));
+
+  // ④ 읽기 — loadAsb·loadSiteEduGap·doSaveAsb 실행(진짜 Promise, 응답은 시험이 정함): 김정아형·현장 보기형 = 대장을 받은 뒤 site_edu_gap 1번(서명 = 받은 대장) · 관리자·안전 권한형 = 0번 ·
+  //    권민지형(현장 숨김) = 아무것도 안 읽음 · 줄이 바뀐 때만 다시 그림(투입 0명뿐이면 다시 그림 0) · 첫 답 전 '확인 중' · 실패·이상한 응답 = 확인 못 함 · 늦게 온 옛 응답 무시 ·
+  //    저장 서명 = 보낸 대장(응답 전에 또 고친 줄은 '저장된 뒤' — v433 검토) · 저장 실패로 저장 대기가 남아도 다시 열면 손대지 않은 줄은 이름 · 일용직 권한 숨김 = 서버 wk_n
+  const flush33 = () => new Promise((r) => setTimeout(r, 0));
+  const settle33 = (p) => Promise.race([Promise.resolve(p), new Promise((r) => setTimeout(() => r('timeout'), 50))]);   // 결함으로 끝나지 않는 약속이 시험 틀을 멈추지 않게
+  const GAPDECL33 = (html.match(/var siteEduGap\b[^;\n]*;/) || [''])[0];   // 앱의 첫 상태 선언을 그대로(첫 답 전 = undefined — 바꾸면 아래 '확인 중'이 ✗)
+  const loadApi33 = (perm, resp, wk) => { const log = []; const api = new Function('__perm', '__log', '__resp', '__wk', [
+    'function canSee(m){ return (__perm[m] || "hide") !== "hide"; }',
+    'var asb = [], asbBase = 0, asbPending = false, asbLoaded = false, asbSaveTimer = null;',
+    'var members = [{ id: "m1", name: "갑돌" }, { id: "m2", name: "을순" }], workers = __wk || [{ id: "w1", name: "일용하나" }];',
+    'function findMember(id){ for(var i=0;i<members.length;i++){ if(members[i].id===id) return members[i]; } return null; } function dispName(n){ return n||""; } function mergeDel(){ return 1; }',
+    'function gwCall(fn, body){ var k = body.action + (body.collection ? ":" + body.collection : ""); __log.push(k); var r = __resp[k]; if (typeof r === "function") r = r(); if (r instanceof Error) return Promise.reject(r); return (r && typeof r.then === "function") ? r : Promise.resolve(r || { status: 500, body: {} }); }',
+    'function csSiteHooksRetry(){ __log.push("hooks"); } function renderSites(){ __log.push("renderSites"); } function renderCalendar(){} function renderWorkers(){}',
+    'function asbNoSpecial(){ return ["(앱 판정)"]; }',
+    fn33('asList'), fn33('memberName'), fn33('asbWorkerNames'), fn33('mergeAsb'), fn33('normAsbRow'), fn33('liveAsb'), fn33('liveSites'), fn33('esc'), fn33('sheetRow'),
+    GAPDECL33, 'var siteEduGapSig = {}, siteEduGapSeq = 0;',
+    fn33('siteGapSig'), fn33('siteGapSigs'), fn33('siteEduLine'), fn33('siteEduLines'), fn33('loadSiteEduGap'), fn33('loadAsb'), fn33('doSaveAsb'),
+    'return { load: loadAsb, save: doSaveAsb, gap: loadSiteEduGap, sigs: function(){ return siteGapSigs(asb); }, st: function(){ return { g: siteEduGap, s: siteEduGapSig, seq: siteEduGapSeq }; }, line: function(id){ for (var i = 0; i < asb.length; i++){ if (asb[i].id === id) return siteEduLine(asb[i]); } return null; },',
+    '  edit: function(id, mids){ for (var i = 0; i < asb.length; i++){ if (asb[i].id === id) asb[i].member_ids = mids; } }, setPending: function(p){ asbPending = p; }, pending: function(){ return asbPending; } };'].join('\n'))(perm, log, resp, wk); return { api, log }; };
+  const A_ASB33 = () => ({ status: 200, body: { doc: { items: [{ id: 'a1', status: 'run', member_ids: ['m1'], worker_ids: ['w1'] }, { id: 'a2', status: 'plan', member_ids: [], worker_ids: [] }, { id: 'a3', status: 'run', member_ids: ['m2'], worker_ids: [] }], updated_at: 7 } } });
+  const A_GAP33 = () => ({ status: 200, body: { status: 'OK', ok: true, has_edu: true, gaps: { a1: ['갑돌'], a2: [], a3: ['을순'] } } });
+  const k33 = loadApi33(KJA33, { 'get:asbestos': A_ASB33, site_edu_gap: A_GAP33 }); const kv33 = await k33.api.load(); await flush33();
+  const kSt33 = k33.api.st(), kLog33 = k33.log.join(','), kL1_33 = k33.api.line('a1');
+  const v33 = loadApi33({ site: 'view' }, { 'get:asbestos': A_ASB33, site_edu_gap: A_GAP33 }); await v33.api.load(); await flush33();
+  const s33 = loadApi33(SAFE33, { 'get:asbestos': A_ASB33, site_edu_gap: A_GAP33, 'save:asbestos': { status: 200, body: { updated_at: 9 } } }); const sv33 = await s33.api.load(); await flush33(); const sGap33 = s33.api.gap(); s33.api.setPending(true); await s33.api.save(); await flush33();
+  const adm33 = loadApi33({ safety: 'do', site: 'do', lic: 'do', con: 'do', wk: 'do' }, { 'get:asbestos': A_ASB33, site_edu_gap: A_GAP33 }); await adm33.api.load(); await flush33();
+  const p33 = loadApi33({ safety: 'do' }, { 'get:asbestos': A_ASB33, site_edu_gap: A_GAP33 }); const pv33 = p33.api.load(); const pGap33 = p33.api.gap(); await flush33();
+  // 지금 운영 모양(진행·예정 2건 모두 투입 0명, 교육 0건) — 응답이 와도 다시 그림 0
+  const z33 = loadApi33(KJA33, { 'get:asbestos': () => ({ status: 200, body: { doc: { items: [{ id: 'o1', status: 'plan', member_ids: [], worker_ids: [] }, { id: 'o2', status: 'run', member_ids: '[]', worker_ids: '[]' }, { id: 'o3', status: 'done', member_ids: ['m1'] }], updated_at: 3 } } }), site_edu_gap: () => ({ status: 200, body: { status: 'OK', ok: true, has_edu: false, gaps: {} } }) });
+  await z33.api.load(); await flush33();
+  // 이 세션 첫 답 전 = '확인 중'(경고 아님 — 요청 전부터 '확인 못 함'이 경고색으로 뜨던 것, v433 검토) → 답이 오면 이름(그 줄이 바뀌어 다시 그림 1번)
+  const wq33 = []; const w33 = loadApi33(KJA33, { 'get:asbestos': A_ASB33, site_edu_gap: () => new Promise((res) => { wq33.push(res); }) }); await w33.api.load(); await flush33();
+  const wA1_33 = w33.api.line('a1'), wA2_33 = w33.api.line('a2'), wLog0_33 = w33.log.join(','), wG0_33 = w33.api.st().g;
+  if (typeof wq33[0] === 'function') wq33[0](A_GAP33()); await flush33();
+  const wLog1_33 = w33.log.join(','), wA1b_33 = w33.api.line('a1');
+  // 실패·이상한 응답 → 응답 없음(확인 못 함) — 받은 이름을 지우고 그 줄이 바뀌었으니 다시 그림 · 이미 응답 없음이면 다시 그림 없음 · 서명 없이 물으면(부르는 쪽 결함) 이름을 그리지 않음
+  const f33r = { 'get:asbestos': A_ASB33, site_edu_gap: A_GAP33 }, f33 = loadApi33(KJA33, f33r); await f33.api.load(); await flush33(); f33.log.length = 0;
+  f33r.site_edu_gap = () => new Error('net'); const fr0_33 = await f33.api.gap(f33.api.sigs()); const fSt0_33 = f33.api.st(), fLog0_33 = f33.log.join(','), fL0_33 = f33.api.line('a1'); f33.log.length = 0;   // 받은 이름 → 네트워크 실패(catch 갈래)
+  f33r.site_edu_gap = A_GAP33; await f33.api.gap(f33.api.sigs()); const fBack33 = f33.api.line('a1'); f33.log.length = 0;                                                                           // 다시 받음
+  f33r.site_edu_gap = () => ({ status: 500, body: { status: 'ERROR', error_code: 'STORAGE_READ_FAILED' } }); const fr1_33 = await f33.api.gap(f33.api.sigs()); const fSt1_33 = f33.api.st(), fLog1_33 = f33.log.join(','), fL1_33 = f33.api.line('a1'); f33.log.length = 0;   // 받은 이름 → 500(then 갈래)
+  f33r.site_edu_gap = () => new Error('net'); const fr2_33 = await f33.api.gap(f33.api.sigs()); const fLog2_33 = f33.log.join(','); f33.log.length = 0;                                     // 이미 응답 없음 → 또 실패 = 다시 그림 0
+  f33r.site_edu_gap = A_GAP33; await f33.api.gap(); const fNoSig33 = f33.api.line('a1'), fNoSigS33 = JSON.stringify(f33.api.st().s); f33.log.length = 0;                       // 서명 없이 물음 → 받아도 모든 줄 '저장된 뒤'
+  const odd33 =[{ status: 200, body: { status: 'OK', has_edu: true, gaps: { a1: [] } } }, { status: 200, body: { ok: true, has_edu: true, gaps: [] } }, { status: 403, body: { status: 'FORBIDDEN', error_code: 'NO_ACCESS', ok: true, has_edu: true, gaps: { a1: [] } } }].map((x) => { const o = loadApi33(KJA33, { 'get:asbestos': A_ASB33, site_edu_gap: () => x }); return o; });
+  for (const o of odd33) { await o.api.load(); await flush33(); }
+  // 늦게 온 옛 응답 — 두 번 묻고 둘째가 먼저 오면 첫째는 버린다
+  const pend33 = []; const h33 = loadApi33(KJA33, { 'get:asbestos': A_ASB33, site_edu_gap: () => new Promise((res) => { pend33.push(res); }) }); await h33.api.load(); const hq2_33 = h33.api.gap(); await flush33();
+  const hN33 = pend33.length, hRes33 = (i, v) => { if (typeof pend33[i] === 'function') pend33[i](v); };   // 물은 횟수가 어긋나도(결함) 시험 틀이 터지지 않고 아래 단언이 ✗로 잡게
+  hRes33(1, { status: 200, body: { ok: true, has_edu: true, gaps: { a1: ['새답'], a2: [], a3: [] } } }); await flush33(); hRes33(0, { status: 200, body: { ok: true, has_edu: true, gaps: { a1: ['옛답'], a2: [], a3: [] } } }); await flush33();
+  for (let i = 2; i < pend33.length; i++) hRes33(i, { status: 500, body: {} }); await flush33();
+  const hSt33 = h33.api.st(), hq2v33 = await Promise.race([Promise.resolve(hq2_33), flush33().then(() => 'timeout')]);
+  // 화면에서 투입 인원을 바꾼 줄 = '저장된 뒤'(다른 줄은 이름 그대로)
+  const e33r = { 'get:asbestos': A_ASB33, site_edu_gap: A_GAP33 }, e33 = loadApi33(KJA33, e33r); await e33.api.load(); await flush33();
+  e33.api.edit('a1', ['m1', 'm9']); e33.api.setPending(true); const eA1_33 = e33.api.line('a1'), eA3_33 = e33.api.line('a3'); e33.log.length = 0;
+  // 저장 응답 전에 또 고침(v433 검토): 첫 저장(m1·m9)이 200이어도 그 뒤 고친 a1(m1·m9·m2)은 '저장된 뒤' — 서명 = 보낸 대장(화면 대장이 아님), 손대지 않은 a3은 이름 그대로
+  const svq33 = [], svRes33 = (i, v) => { if (typeof svq33[i] === 'function') svq33[i](v); };
+  e33r['save:asbestos'] = () => new Promise((res) => { svq33.push(res); });
+  e33r.site_edu_gap = () => ({ status: 200, body: { ok: true, has_edu: true, gaps: { a1: ['갑돌', '신입'], a2: [], a3: ['을순'] } } });   // 서버 = 첫 저장본(m1·m9)을 판정
+  const eP1_33 = e33.api.save(); await flush33();
+  e33.api.edit('a1', ['m1', 'm9', 'm2']); e33.api.setPending(true);
+  svRes33(0, { status: 200, body: { updated_at: 11 } }); await settle33(eP1_33); await flush33();
+  const eA1c_33 = e33.api.line('a1'), eSig1_33 = e33.api.st().s.a1, eA3c_33 = e33.api.line('a3'), eLog1_33 = e33.log.join(','); e33.log.length = 0;
+  // 다음 저장(타이머 몫 — 여기선 직접) 성공 → 보낸 대장으로 다시 확인해 새 이름
+  e33r.site_edu_gap = () => ({ status: 200, body: { ok: true, has_edu: true, gaps: { a1: ['갑돌', '신입', '을순'], a2: [], a3: ['을순'] } } });
+  const eP2_33 = e33.api.save(); await flush33(); svRes33(1, { status: 200, body: { updated_at: 12 } }); await settle33(eP2_33); await flush33();
+  const eLog33 = e33.log.join(','), ePend33 = e33.api.pending(), eA1b_33 = e33.api.line('a1');
+  // 저장 실패로 저장 대기가 남은 채 현장 칸을 다시 열기(v433 검토): 서명 = 받은 대장 → 손대지 않은 줄은 이름, 고친 줄만 '저장된 뒤'(종전엔 모든 줄이 계속 '확인 못 함')
+  const x33 = loadApi33(KJA33, { 'get:asbestos': A_ASB33, site_edu_gap: A_GAP33, 'save:asbestos': () => new Error('net') }); await x33.api.load(); await flush33();
+  x33.api.edit('a1', ['m1', 'm2']); x33.api.setPending(true); await settle33(x33.api.save()); await flush33(); x33.log.length = 0;
+  const xv33 = await settle33(x33.api.load()); await flush33();
+  const xLog33 = x33.log.join(','), xPend33 = x33.api.pending(), xA1_33 = x33.api.line('a1'), xA3_33 = x33.api.line('a3'), xSig33 = x33.api.st().s.a1;
+  // 일용직 권한 숨김(명부를 안 읽어 workers 빈 배열): 서버 wk_n을 받아 '갑돌 외 일용직 1명'
+  const wh33 = loadApi33({ site: 'do', wk: 'hide' }, { 'get:asbestos': A_ASB33, site_edu_gap: () => ({ status: 200, body: { status: 'OK', ok: true, has_edu: true, gaps: { a1: ['갑돌'], a2: [], a3: ['을순'] }, wk_n: { a1: 1, a2: 0, a3: 0 } } }) }, []); await wh33.api.load(); await flush33();
+  const whA1_33 = wh33.api.line('a1'), whG33 = wh33.api.st().g, whLog33 = wh33.log.join(',');
+  const NAMEA3_33 = '<tr><th>특별교육</th><td class="warn"><b>미이수 1명</b> — 을순 (배치 전 이수 필요)</td></tr>';
+  T('v433 ④ 읽기(loadAsb·loadSiteEduGap·doSaveAsb 실행): 김정아형(현장 수행·안전 없음) = 대장 → 훅 → 그림 → site_edu_gap 1번(서명 = 받은 대장) → 그 줄이 바뀌어 다시 그림 1번(a1 "미이수 1명 — 갑돌") · 현장 보기형도 같음 · 안전 권한형·관리자형 = site_edu_gap 0번(대장 읽기·저장 뒤에도, 직접 불러도) · 권민지형(현장 숨김) = 아무것도 안 읽음 · 지금 운영 모양(투입 0명뿐·교육 0건) = 응답이 와도 다시 그림 0 · 첫 답 전 "확인 중"(앱 첫 상태 선언 그대로) → 답 오면 이름 · 500·네트워크 실패·ok 없음·gaps 배열·403 = 응답 없음(받은 이름 지움 → 확인 못 함, 이미 없음이면 다시 그림 0) · 서명 없이 물으면 이름 안 그림 · 늦게 온 옛 응답 버림 · 투입 인원을 바꾼 줄만 "저장된 뒤" · 저장 응답 전에 또 고친 줄은 저장 200 뒤에도 "저장된 뒤"(서명 = 보낸 대장) → 다음 저장 성공 뒤 새 이름 · 저장 실패로 저장 대기가 남아도 다시 열면 손대지 않은 줄은 이름 · 일용직 권한 숨김 = wk_n "갑돌 외 일용직 1명"',
+    kv33 === true && kLog33 === 'get:asbestos,hooks,renderSites,site_edu_gap,renderSites' && kSt33.g && kSt33.g.has_edu === true && kSt33.g.gaps.a1.join(',') === '갑돌' && kSt33.s.a1 === JSON.stringify([['m1'], ['w1']]) && kSt33.seq === 1
+    && kL1_33 === '<tr><th>특별교육</th><td class="warn"><b>미이수 1명</b> — 갑돌 (배치 전 이수 필요)</td></tr>'
+    && v33.log.join(',') === 'get:asbestos,hooks,renderSites,site_edu_gap,renderSites'
+    && sv33 === true && sGap33 === undefined && s33.log.join(',') === 'get:asbestos,hooks,renderSites,save:asbestos' && s33.api.st().seq === 0 && s33.api.pending() === false
+    && adm33.log.join(',') === 'get:asbestos,hooks,renderSites' && adm33.api.st().seq === 0
+    && pv33 === undefined && pGap33 === undefined && p33.log.length === 0
+    && z33.log.join(',') === 'get:asbestos,hooks,renderSites,site_edu_gap' && z33.api.st().g && z33.api.st().g.has_edu === false
+    && GAPDECL33 === 'var siteEduGap;' && wA1_33 === WAIT33 && wA2_33 === '' && wG0_33 === undefined && wLog0_33 === 'get:asbestos,hooks,renderSites,site_edu_gap' && wLog1_33 === wLog0_33 + ',renderSites' && wA1b_33 === kL1_33
+    && fr0_33 === false && fSt0_33.g === null && JSON.stringify(fSt0_33.s) === '{}' && fLog0_33 === 'site_edu_gap,renderSites' && fL0_33 === UNK33 && fBack33 === kL1_33
+    && fr1_33 === false && fSt1_33.g === null && JSON.stringify(fSt1_33.s) === '{}' && fLog1_33 === 'site_edu_gap,renderSites' && fL1_33 === UNK33
+    && fr2_33 === false && fLog2_33 === 'site_edu_gap' && fNoSig33 === DIRTY33 && fNoSigS33 === '{}'
+    && odd33.every((o) => o.api.st().g === null && o.log.join(',') === 'get:asbestos,hooks,renderSites,site_edu_gap,renderSites' && o.api.line('a1') === UNK33)
+    && hN33 === 2 && hSt33.g && hSt33.g.gaps.a1.join(',') === '새답' && hSt33.seq === 2 && hq2v33 === true
+    && eA1_33 === DIRTY33 && eA3_33 === NAMEA3_33
+    && eA1c_33 === DIRTY33 && eSig1_33 === JSON.stringify([['m1', 'm9'], ['w1']]) && eA3c_33 === NAMEA3_33 && eLog1_33 === 'save:asbestos,site_edu_gap'
+    && eLog33 === 'save:asbestos,site_edu_gap,renderSites' && ePend33 === false && eA1b_33 === '<tr><th>특별교육</th><td class="warn"><b>미이수 3명</b> — 갑돌, 신입, 을순 (배치 전 이수 필요)</td></tr>'
+    && xv33 === true && xPend33 === true && xLog33 === 'get:asbestos,hooks,renderSites,site_edu_gap' && xA1_33 === DIRTY33 && xA3_33 === NAMEA3_33 && xSig33 === JSON.stringify([['m1'], ['w1']])
+    && whA1_33 === '<tr><th>특별교육</th><td class="warn"><b>미이수 2명</b> — 갑돌 외 일용직 1명 (배치 전 이수 필요)</td></tr>' && whG33 && whG33.wk_n && whG33.wk_n.a1 === 1 && whLog33 === 'get:asbestos,hooks,renderSites,site_edu_gap,renderSites',
+    JSON.stringify({ k: [kv33, kLog33, kSt33.seq, kL1_33], v: v33.log, s: [sv33, sGap33, s33.log], adm: adm33.log, p: [pv33, pGap33, p33.log], z: z33.log, w: [GAPDECL33, wA1_33, wA2_33, wLog0_33, wLog1_33, wA1b_33], f: [fr0_33, fLog0_33, fL0_33, fBack33, fr1_33, fLog1_33, fr2_33, fLog2_33, fL1_33, fNoSig33, fNoSigS33], odd: odd33.map((o) => [o.log.join(','), o.api.st().g]), h: [hN33, hSt33.seq, hSt33.g && hSt33.g.gaps.a1, hq2v33], e: [eA1_33, eA3_33, eA1c_33, eSig1_33, eA3c_33, eLog1_33, eLog33, ePend33, eA1b_33], x: [xv33, xPend33, xLog33, xA1_33, xA3_33, xSig33], wh: [whA1_33, whG33 && whG33.wk_n, whLog33] }));
+
+  // ⑤ 정적 — 서버: 분기 1곳·검사 순서(로그인 → 기기 승인 → 현장 숨김 NO_ACCESS → 읽기)·읽기 실패·회원 명부 미가용 500·쓰기·감사·알림 0·판정은 _lib/siteedu.js만(저장소·네트워크 없음)
+  //           앱: renderSites의 특별교육 줄 = siteEduLine(asbNoSpecial 직접 부름 0) · site_edu_gap 부르는 곳 = loadSiteEduGap 1곳 · loadAsb·doSaveAsb 200 갈래만 부름(안전 권한 아닐 때) · 현황 구간(@safety-now)은 손대지 않음
+  const htmlNC33 = html.split('\n').map((ln) => ln.replace(/(^|[^:"'])\/\/.*$/, '$1')).join('\n');
+  const iCm33 = hSrc33.indexOf('currentMember(event)'), iDev33 = hSrc33.indexOf("error_code: 'DEVICE_NOT_APPROVED'"), iAcc33 = hSrc33.indexOf("if (permOf(c.member, 'asbestos') === 'hide') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_ACCESS', request_id: R });"), iWk33 = hSrc33.indexOf("const wkSee = permOf(c.member, 'workers') !== 'hide';"), iRd33 = hSrc33.indexOf('blobGet(');
+  const hNC33 = hSrc33.split('\n').map((ln) => ln.replace(/(^|[^:"'])\/\/.*$/, '$1')).join('\n');
+  const sfA33 = html.indexOf('// @safety-now-start'), sfB33 = html.indexOf('// @safety-now-end'), sfSec33 = (sfA33 >= 0 && sfB33 > sfA33) ? html.slice(sfA33, sfB33) : '';
+  const rs33 = fn33('renderSites'), la33 = fn33('loadAsb'), ds33 = fn33('doSaveAsb'), sel33 = fn33('siteEduLine'), lg33 = fn33('loadSiteEduGap');
+  T('v433 ⑤ 정적: gw-data 분기 site_edu_gap 1곳 → handleSiteEduGap · 검사 순서 로그인 → 기기 승인(DEVICE_NOT_APPROVED) → permOf(member,"asbestos") 숨김 403 NO_ACCESS → 일용직 권한(permOf workers) → 읽기 · 대장·교육·명부·회원 명부를 함께 읽음(Promise.all 1번 — 차례 읽기 await 0) · 대장·교육·명부 읽기 실패 500 · 회원 명부 미가용 500 MEMBERS_UNAVAILABLE · 핸들러에 쓰기·감사·알림 0 · 판정 = SITEEDU.siteEduGaps 1번(workerNames: wkSee) · _lib/siteedu.js는 저장소·네트워크·환경 변수 0(순수) · 앱 renderSites = siteEduLine(r)(asbNoSpecial 직접 0) · siteEduLine의 asbNoSpecial은 안전 권한 갈래에만 · 투입 인원 = asbWorkerNames(일용직 권한 없으면 worker_ids) · 첫 상태 선언 var siteEduGap;(undefined) · site_edu_gap 글자 = loadSiteEduGap 1곳 · loadSiteEduGap은 화면 대장으로 서명하지 않음(부르는 쪽이 넘김) · loadAsb는 그림 뒤 안전 권한이 아닐 때만 받은 대장 서명으로 · doSaveAsb는 보내기 전 서명 → 200 갈래에서만 그 서명으로 · 현황 구간에 siteEdu 0',
+    (gd33.match(/d\.action === 'site_edu_gap'/g) || []).length === 1 && /if \(d && d\.action === 'site_edu_gap'\) return await handleSiteEduGap\(event, d, R\);/.test(gd33)
+    && iCm33 > 0 && iDev33 > iCm33 && iAcc33 > iDev33 && iWk33 > iAcc33 && iRd33 > iWk33
+    && /if \(bad\) return jr\(500, \{ status: 'ERROR', error_code: bad\.code \|\| 'STORAGE_READ_FAILED', request_id: R \}\);/.test(hSrc33) && /const bad = \[ra, re, rw\]\.filter\(function \(x\) \{ return !x\.ok; \}\)\[0\];/.test(hSrc33)
+    && /const got = await Promise\.all\(\[blobGet\(st, colKey\('asbestos'\)\), blobGet\(st, colKey\('edu'\)\), blobGet\(st, colKey\('workers'\)\), push\.loadMembers\(\)\]\);/.test(hSrc33) && /const ra = got\[0\], re = got\[1\], rw = got\[2\], ms = got\[3\];/.test(hSrc33)
+    && (hNC33.match(/\bawait\b/g) || []).length === 3 && (hNC33.match(/blobGet\(/g) || []).length === 3 && (hNC33.match(/loadMembers\(/g) || []).length === 1
+    && /if \(!Array\.isArray\(ms\) \|\| ms\.unavailable\) return jr\(500, \{ status: 'ERROR', error_code: 'MEMBERS_UNAVAILABLE', request_id: R \}\);/.test(hSrc33)
+    && !/blobSet|blobDelete|appendAudit|sendTo|verSnapshot/.test(hSrc33) && (hSrc33.match(/SITEEDU\.siteEduGaps\(/g) || []).length === 1 && /SITEEDU\.siteEduGaps\(items\(ra\), items\(re\), items\(rw\), ms, \{ workerNames: wkSee \}\)/.test(hSrc33) && /const SITEEDU = require\('\.\/_lib\/siteedu'\);/.test(gd33)
+    && !/require\('\.\/(?:blobs|push|audit|session|claude)'\)|fetch\(|process\.env|blobGet|blobSet/.test(lib33) && /require\('\.\/tier'\)/.test(lib33)
+    && /\+ siteEduLine\(r\)/.test(rs33) && rs33.indexOf('asbNoSpecial(') < 0 && /if \(canSee\("safety"\)\) names = asbNoSpecial\(r\);/.test(sel33) && (sel33.match(/asbNoSpecial\(/g) || []).length === 1
+    && /if \(!asbWorkerNames\(r\)\.length && !\(!canSee\("wk"\) && asList\(r\.worker_ids\)\.length\)\) return "";/.test(sel33)
+    && (html.match(/var siteEduGap\b[^;\n]*;/g) || []).join('|') === 'var siteEduGap;'
+    && (htmlNC33.match(/site_edu_gap/g) || []).length === 1 && lg33.indexOf('gwCall("gw-data", { action: "site_edu_gap" })') > 0 && /if \(canSee\("safety"\) \|\| !canSee\("site"\)\) return;/.test(lg33) && !/liveAsb\(|liveSites\(\)\.forEach|asbPending/.test(lg33)
+    && /renderSites\(\); renderCalendar\(\); renderWorkers\(\);[^\n]*\n\s*if \(!canSee\("safety"\)\) loadSiteEduGap\(siteGapSigs\(ri\)\);/.test(la33) && (la33.match(/loadSiteEduGap\(/g) || []).length === 1
+    && /function doSaveAsb\(\)\{\n\s*var sent = canSee\("safety"\) \? null : siteGapSigs\(asb\);[^\n]*\n\s*return gwCall\("gw-data",\{action:"save",collection:"asbestos",doc:\{schema:1,items:asb\},base:asbBase\}\)/.test(ds33)
+    && /if\(res\.status===200\)\{ asbBase=\(res\.body&&res\.body\.updated_at\)\|\|Date\.now\(\); asbPending=false; if\(!canSee\("safety"\)\) loadSiteEduGap\(sent\); \}/.test(ds33) && (ds33.match(/loadSiteEduGap\(/g) || []).length === 1
+    && (htmlNC33.match(/loadSiteEduGap\(/g) || []).length === 3 && (htmlNC33.match(/siteGapSigs\(/g) || []).length === 3 && sfSec33.length > 1000 && !/siteEdu|site_edu_gap|siteGapSig/.test(sfSec33),
+    JSON.stringify({ order: [iCm33, iDev33, iAcc33, iWk33, iRd33], awaits: (hNC33.match(/\bawait\b/g) || []).length, callers: (htmlNC33.match(/loadSiteEduGap\(/g) || []).length, sigs: (htmlNC33.match(/siteGapSigs\(/g) || []).length, gapStr: (htmlNC33.match(/site_edu_gap/g) || []).length }));
+
+  // ⑥ 문서 — MANUAL 28절 특별교육 줄(안전 권한 쪽과 현장 칸만 보는 쪽을 나눔 — 셋째·넷째 줄이 대상 없이 적혀 관리자 화면과 어긋났다, v433 검토) · 21-9 안내 ·
+  //      FEATURES 기준·v433 절·§7 · TESTLIST v433(체크 칸 전부 AI 몫 — 화면 칸은 '(AI 시험 화면 대상', PM 0, 닫힌 [x]도 같은 내용 검사) · CLAUDE.md · sw ≥ 433
+  //      낱말이 아니라 문장으로 고정한다(종전 '이름만'은 28절의 다른 문장 '이름만 넣어'에 늘 걸렸고, 뜻을 뒤집어도 낱말이 남아 통과했다)
+  const man33 = rd33('MANUAL.html'), ft33 = rd33('FEATURES.md'), tl33 = rd33('TESTLIST.md'), cl33 = rd33('CLAUDE.md'), sw33 = rd33('sw.js');
+  const secM33 = (a, b) => { const i = man33.indexOf(a); return i < 0 ? '' : man33.slice(i, man33.indexOf(b, i + a.length)); };
+  const m28_33 = secM33('<h2 id="s28">', '<h3 id="s28-1">'), m219_33 = secM33('<h3>21-9.', '<h3>21-10.');
+  const liOf33 = (src, head) => { const i = src.indexOf(head); if (i < 0) return ''; let d = 0; const re = /<li\b|<\/li>/g; re.lastIndex = i; let m; while ((m = re.exec(src))) { if (m[0] === '</li>') { d--; if (d === 0) return src.slice(i, m.index + 5); } else d++; } return ''; };   // head에서 시작하는 li 하나(안쪽 목록 포함)
+  const liSafe33 = liOf33(m28_33, '<li>안전 권한이 있는 분'), liSite33 = liOf33(m28_33, '<li>안전 권한 없이 현장 칸만 보는 분'), out28_33 = liSite33 ? m28_33.split(liSite33).join('') : m28_33;
+  const M28SITE33 = ['기록이 없는 사람의 <b>이름만</b> 골라 보내 줍니다(교육 종류·이수일·건강진단은 오지 않습니다).', '모두 이수했으면 <b>미이수 없음</b>입니다.', '일용직 권한이 없는 분에게는 일용직이 이름 없이 <b>일용직 n명</b>으로만 나옵니다',
+    '<li><b>교육 기록 없음 — 이수 여부 미확인</b> — 교육·검진 기록이 아직 한 건도 없을 때입니다(전원을 미이수로 그리지 않습니다).', '<li><b>확인 중</b> — 현장 칸을 처음 열어 서버 답을 기다리는 잠깐입니다.</li>',
+    '<li><b>확인 못 함 — 현장 칸을 다시 열면 다시 확인합니다</b> — 서버에서 답을 받지 못했을 때입니다.</li>', '<li><b>확인 못 함 — 바뀐 투입 인원은 저장된 뒤 다시 확인합니다</b> — 근로자를 넣거나 뺀 뒤 저장이 끝나기 전입니다(저장되면 저절로 바뀝니다).', '앱을 새로고침(F5)한 뒤 근로자를 다시 넣어 주세요.'];
+  const m28miss33 = M28SITE33.filter((s) => liSite33.indexOf(s) < 0);
+  const tlv33 = (() => { const i = tl33.indexOf('\n## v433'); if (i < 0) return ''; const j = tl33.indexOf('\n## ', i + 5); return tl33.slice(i, j < 0 ? tl33.length : j); })();
+  const cb33 = tlv33.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), cbNotAi33 = cb33.filter((l) => !/^\s*[-*+] \[[ xX]\] \(AI[ 가)]/.test(l)), cbPM33 = cb33.filter((l) => /PM/.test(l));
+  const cbOf33 = (key) => cb33.filter((l) => l.indexOf(key) >= 0 && /^- \[[ x]\] \(AI 시험 화면 대상/.test(l))[0] || '';   // AI가 시험 뒤 [x]로 닫아도 같은 내용 검사
+  const tlK33 = cbOf33('김정아·정재욱형'), tlR33 = cbOf33('시험 교육 기록'), tlF33 = cbOf33('서버 응답 실패'), tlA33 = cbOf33('관리자형'), tlW33 = cbOf33('일용직 숨김형'), tlS33 = cbOf33('저장 실패 뒤 다시 열기');
+  const ftv33 = (() => { const i = ft33.indexOf('\n### v433 (11/10)'); if (i < 0) return ''; const j = ft33.indexOf('\n### ', i + 5); return ft33.slice(i, j < 0 ? ft33.length : j); })();
+  const ft7_33 = ft33.split('\n').filter((ln) => ln.indexOf('- **안전**(v428') === 0)[0] || '';
+  T('v433 ⑥ 문서: MANUAL 28절 특별교육 줄(안전 권한 li = 앱 계산 이름·없으면 줄 없음·기록 0건이면 전원 미이수, 그 li에 "교육 기록 없음"·"확인 못 함" 없음 / 안전 권한 없이 현장 칸만 li = 서버가 고른 이름만(종류·이수일·건강진단 안 옴 — 문장 그대로)·"미이수 없음"·일용직 n명 · 하위 목록 "교육 기록 없음 — 이수 여부 미확인"(전원을 미이수로 그리지 않습니다 — 문장 그대로)·"확인 중"·"확인 못 함" 둘(새로고침 안내) — 이 넷은 그 li 밖에 없음 · 투입 0명은 줄 없음) · 21-9 안내 · FEATURES 기준 ≥ v433·v433 절(site_edu_gap·_lib/siteedu.js·has_edu·wk_n·siteGapSigs·확인 중·알려진 한계·uismoke v433·servertest 78)·§7 안전 줄 · TESTLIST v433 체크 칸 전부 AI 몫(화면 칸 6 = 김정아·정재욱형·시험 교육 기록·서버 응답 실패·관리자형·일용직 숨김형·저장 실패 뒤 다시 열기 — 열린 [ ]·닫힌 [x] 모두 같은 내용 검사, PM 0) · CLAUDE.md(site_edu_gap·_lib/siteedu.js·siteGapSigs·wk_n·알려진 한계·두 벌) · sw ≥ 433',
+    m28_33.indexOf('보는 분의 권한에 따라 이렇게 나옵니다') > 0 && m28_33.indexOf('<b>미이수 n명 — 이름</b>으로 보여 줍니다') > 0 && m28_33.indexOf('투입 인원이 없는 현장은 이 줄이 없습니다') > 0
+    && liSafe33.indexOf('미이수자가 없으면 줄이 없습니다') > 0 && liSafe33.indexOf('교육·검진 기록이 아직 한 건도 없으면 투입 인원 전원이 미이수로 나옵니다') > 0 && liSafe33.indexOf('교육 기록 없음') < 0 && liSafe33.indexOf('확인 못 함') < 0 && liSafe33.indexOf('<ul>') < 0
+    && liSite33.length > 0 && m28miss33.length === 0 && liSite33.indexOf('<ul>') > 0
+    && out28_33.indexOf('교육 기록 없음') < 0 && out28_33.indexOf('확인 못 함') < 0 && out28_33.indexOf('<b>확인 중</b>') < 0 && out28_33.indexOf('일용직 n명') < 0
+    && m219_33.indexOf('서버가 기록이 없는 사람의 이름만 골라') > 0 && m219_33.indexOf('(28절)') > 0
+    && Number((ft33.match(/기준: v(\d+) /) || [0, 0])[1]) >= 433 && ['`site_edu_gap`', '`_lib/siteedu.js`', '`has_edu`', '`wk_n`', '`siteGapSigs`', '교육 기록 없음 — 이수 여부 미확인', '확인 못 함 — 바뀐 투입 인원은 저장된 뒤 다시 확인합니다', "'확인 중'", '미이수 없음', 'uismoke v433', 'servertest 78', '`siteEduLine`', '`loadSiteEduGap', '**알려진 한계', '투입 인원(member_ids·worker_ids)을 바꿔 저장한 뒤'].every((w) => ftv33.indexOf(w) > 0)
+    && ft7_33.indexOf('특별교육 줄') > 0 && ft7_33.indexOf('v433') > 0
+    && tlv33.length > 0 && cb33.length >= 7 && cbNotAi33.length === 0 && cbPM33.length === 0 && tlv33.indexOf('PM 몫') < 0 && cb33.some((l) => /^- \[x\] \(AI\) `uismoke`/.test(l))
+    && tlK33.indexOf('투입 인원 0명') > 0 && tlK33.indexOf('교육 기록 없음 — 이수 여부 미확인') > 0 && tlK33.indexOf('375px') > 0
+    && tlR33.indexOf('미이수 없음') > 0 && tlR33.indexOf("'확인 중'") > 0 && tlR33.indexOf('확인 못 함 — 바뀐 투입 인원은 저장된 뒤 다시 확인합니다') > 0 && tlR33.indexOf('지운 일용직') > 0 && tlR33.indexOf("참여 근로자 '미지정'") > 0
+    && tlF33.indexOf('확인 못 함') > 0 && tlF33.indexOf('전원을 미이수로 그리지 않음') > 0
+    && tlA33.indexOf('site_edu_gap 요청 0건') > 0 && tlA33.indexOf('권민지형') > 0
+    && tlW33.indexOf('일용직 n명') > 0 && tlW33.indexOf('일용직 이름 0') > 0 && tlW33.indexOf('wk_n') > 0 && tlS33.indexOf('손대지 않은 다른 현장 줄은 서버 이름 그대로') > 0 && tlS33.indexOf('저장된 뒤') > 0
+    && ['`site_edu_gap`', '`_lib/siteedu.js`', 'uismoke v433', '`siteGapSigs`', '`wk_n`', '알려진 한계'].every((w) => cl33.indexOf(w) > 0)
+    && Number((sw33.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 433,
+    JSON.stringify({ m28: m28_33.length, liSafe: liSafe33.length, liSite: liSite33.length, m28miss: m28miss33.map((s) => s.slice(0, 30)), m219: m219_33.length, ftv: ftv33.length, ft7: ft7_33.length, tl: tlv33.length, cb: cb33.length, notAi: cbNotAi33.map((l) => l.slice(0, 40)), pm: cbPM33.map((l) => l.slice(0, 40)), tlc: [tlK33.length, tlR33.length, tlF33.length, tlA33.length, tlW33.length, tlS33.length] }));
+} catch (e) { console.log('  (v433 검사 생략 — ' + e.message + ')'); fails++; }
 
 try {
   const fdir = join(ROOT, 'netlify', 'functions');

@@ -13507,6 +13507,7 @@
       asbBase = doc.updated_at||0; asbLoaded = true;
       if (!(opt && opt.noHooks) && typeof csSiteHooksRetry === "function"){ try { csSiteHooksRetry(); } catch(e){} }   // v384: 보류된 계약 연결·종결 · v432 현황 읽기는 건너뜀
       renderSites(); renderCalendar(); renderWorkers();   // v356: 일용직 목록의 참여 칩 갱신
+      if (!canSee("safety")) loadSiteEduGap(siteGapSigs(ri));   // v433: 안전 권한이 없으면 특별교육 줄은 서버가 고른 이름으로 — 서명 = 서버가 판정할 대장(받은 ri · 저장 대기 중 화면에서 바뀐 줄만 '저장된 뒤'), 이 세션 첫 답 전에는 '확인 중'
       return true;
     }).catch(function(){ return false; });
   }
@@ -13514,6 +13515,7 @@
   // v335의 safeRender(개별 try/catch + 닫기 보장 + 실패 토스트)는 v336에서 걷어냈다 —
   // 덮는 층이 아니라 던지는 원인(asList)과 순서(afterSave)를 고쳤기 때문. 위 gwToast 아래 주석 참조.
   function doSaveAsb(){
+    var sent = canSee("safety") ? null : siteGapSigs(asb);   // v433: 지금 보내는 대장의 줄별 투입 인원 서명(gwCall이 이 자리에서 글로 굳힌다) — 200이면 서버가 판정할 대장이 바로 이것
     return gwCall("gw-data",{action:"save",collection:"asbestos",doc:{schema:1,items:asb},base:asbBase}).then(function(res){
       if(res.status===409){
         return gwCall("gw-data",{action:"get",collection:"asbestos"}).then(function(r2){
@@ -13521,7 +13523,7 @@
           return doSaveAsb();
         });
       }
-      if(res.status===200){ asbBase=(res.body&&res.body.updated_at)||Date.now(); asbPending=false; }
+      if(res.status===200){ asbBase=(res.body&&res.body.updated_at)||Date.now(); asbPending=false; if(!canSee("safety")) loadSiteEduGap(sent); }   // v433: 저장한 대장(보낸 서명)으로 특별교육 줄 다시 확인 — 응답 전에 또 고친 줄은 다음 저장 뒤까지 '확인 못 함'(화면 대장으로 서명하면 옛 이름이 확인된 것처럼 그려짐 — v433 검토)
     }).catch(function(){});
   }
   function asbWorkerNames(r){
@@ -13542,6 +13544,78 @@
       for(var i=0;i<workers.length;i++){ if(workers[i].id===id && workers[i].del!==1){ out.push(workers[i].name||""); break; } }
     });
     return out.filter(Boolean);
+  }
+  // v433(메뉴 56 6단계, PM 11/9 "56. ㄱ" — 확인 항목 기본안 '이름으로'): 현장 대장 '특별교육' 줄.
+  //   안전 권한(교육·검진 기록 읽기)이 없는 현장 권한자(김정아·정재욱)는 교육 기록을 못 읽어 종전엔 투입 인원 전원이 '미이수'로 그려졌다.
+  //   그 사람은 서버 site_edu_gap이 현장마다 골라 준 '유효한 특별교육 기록이 없는 투입 인원 이름'만 쓴다(교육 기록 자체·건강진단·이수일은 오지 않음).
+  //   판정 규칙은 서버 _lib/siteedu.js = 위 asbNoSpecial·eduHasValidSpecial(두 벌 — uismoke v433이 같은 표본에서 같은 사람을 내는지 대조, 바꾸면 동시에).
+  var siteEduGap;           // 서버 답 {has_edu, gaps:{대장id:[이름…]}, wk_n:{대장id:수}|null} · undefined = 이 세션 첫 답 전('확인 중') · null = 마지막 물음 실패('확인 못 함')
+  var siteEduGapSig = {};   // 그 답이 판정한 대장의 줄별 투입 인원 서명(siteGapSigs — 대장 읽기면 받은 대장, 저장 뒤면 보낸 대장) — 화면 줄과 다르면(저장 전 변경·저장 실패) '확인 못 함 — 저장된 뒤'
+  var siteEduGapSeq = 0;    // 요청 순번 — 늦게 온 옛 응답이 새 응답을 덮지 않게
+  function siteGapSig(r){ return JSON.stringify([asList(r && r.member_ids), asList(r && r.worker_ids)]); }
+  // 대장 목록 → 줄별 서명. 서버 _lib/siteedu.js가 판정하는 줄과 같은 줄만: 지운 줄·종결·id 없음은 빼고, 같은 id가 두 줄이면 앞 줄
+  //   (뒤 줄은 서명이 달라 '확인 못 함' — 앞 줄 사람 이름을 뒤 줄에 그리지 않게, v433 검토)
+  function siteGapSigs(items){
+    var out = {};
+    (Array.isArray(items) ? items : []).forEach(function(r){
+      if (!r || typeof r !== "object" || r.del === 1 || r.status === "done" || r.id == null) return;
+      var k = String(r.id);
+      if (k === "__proto__" || Object.prototype.hasOwnProperty.call(out, k)) return;
+      out[k] = siteGapSig(r);
+    });
+    return out;
+  }
+  // 줄 넷(종결 현장·투입 인원이 없는 현장은 줄 없음 — 종전과 같음). 투입 인원 = '참여 근로자' 줄과 같은 풀이(asbWorkerNames — 지운 회원·지운 일용직·토큰은 사람 아님, v433 검토);
+  //   일용직 권한이 없는 분은 명부를 안 읽어 일용직을 못 푸니 worker_ids가 있으면 있는 것으로 본다(서버가 일용직은 수만 준다).
+  //   ① 안전 권한 = 종전처럼 앱이 교육 기록으로 계산한 이름(asbNoSpecial — 없으면 줄 없음 · 교육 기록이 0건이면 투입 인원 전원)
+  //   ② 교육 기록 0건(서버 has_edu false) = '교육 기록 없음 — 이수 여부 미확인'
+  //   ③ 답을 못 씀 = 이 세션 첫 답 전 '확인 중'(경고 아님) · 물음 실패 '확인 못 함 — 현장 칸을 다시 열면 다시 확인합니다' ·
+  //      답이 판정한 대장과 화면 줄의 투입 인원이 다름(저장 전 변경·저장 실패) '확인 못 함 — 바뀐 투입 인원은 저장된 뒤 다시 확인합니다' — 어느 쪽도 전원을 미이수로 그리지 않는다
+  //   ④ 그 밖 = 서버가 준 이름(일용직 권한이 없으면 일용직은 이름 없이 '일용직 n명' — 서버 wk_n), 없으면 '미이수 없음'
+  function siteEduLine(r){
+    if (!r || r.status === "done") return "";
+    var names, k = 0;
+    if (canSee("safety")) names = asbNoSpecial(r);
+    else {
+      if (!asbWorkerNames(r).length && !(!canSee("wk") && asList(r.worker_ids).length)) return "";
+      var g = siteEduGap, id = String(r.id);
+      if (g === undefined) return sheetRow("특별교육", "확인 중");
+      if (!g) return sheetRow("특별교육", "확인 못 함 — 현장 칸을 다시 열면 다시 확인합니다", "warn");
+      if (!g.has_edu) return sheetRow("특별교육", "교육 기록 없음 — 이수 여부 미확인", "warn");
+      if (!Object.prototype.hasOwnProperty.call(siteEduGapSig, id) || siteEduGapSig[id] !== siteGapSig(r)) return sheetRow("특별교육", "확인 못 함 — 바뀐 투입 인원은 저장된 뒤 다시 확인합니다", "warn");
+      var n = (g.gaps && Object.prototype.hasOwnProperty.call(g.gaps, id)) ? g.gaps[id] : null;
+      if (!Array.isArray(n)) return sheetRow("특별교육", "확인 못 함 — 현장 칸을 다시 열면 다시 확인합니다", "warn");
+      var w = (g.wk_n && Object.prototype.hasOwnProperty.call(g.wk_n, id)) ? g.wk_n[id] : 0;
+      k = (typeof w === "number" && isFinite(w) && w > 0) ? Math.floor(w) : 0;
+      names = n.filter(Boolean).map(String);
+      if (!names.length && !k) return sheetRow("특별교육", "미이수 없음");
+    }
+    if (!names.length && !k) return "";
+    return sheetRow("특별교육", '<b>미이수 '+(names.length+k)+'명</b> — '+esc(names.join(", "))+(k ? (names.length ? " 외 " : "")+"일용직 "+k+"명" : "")+' (배치 전 이수 필요)', "warn");
+  }
+  function siteEduLines(){ return liveSites().map(siteEduLine).join("\n"); }
+  // 서버에 묻기 — 안전 권한이면 묻지 않는다(①은 앱이 교육 기록으로 판정). loadAsb가 대장을 받은 뒤·대장 저장이 끝난 뒤 부른다.
+  //   sig = 서버가 판정할 대장의 줄별 서명(siteGapSigs — loadAsb는 받은 대장, doSaveAsb는 보낸 대장). 없으면 모든 줄이 '저장된 뒤'(이름을 그리지 않음).
+  //   보이는 특별교육 줄이 그대로면 다시 그리지 않는다(펼쳐 둔 줄이 접히지 않게 — 투입 인원 0명인 지금 운영 현장은 다시 그림 0)
+  function loadSiteEduGap(sig){
+    if (canSee("safety") || !canSee("site")) return;
+    var seq = ++siteEduGapSeq;
+    sig = (sig && typeof sig === "object") ? sig : {};
+    return gwCall("gw-data", { action: "site_edu_gap" }).then(function(res){
+      if (seq !== siteEduGapSeq) return false;
+      var b = (res && res.body) || {}, ok = !!(res && res.status === 200 && b.ok === true && b.gaps && typeof b.gaps === "object" && !Array.isArray(b.gaps));
+      var before = siteEduLines();
+      siteEduGap = ok ? { has_edu: b.has_edu === true, gaps: b.gaps, wk_n: (b.wk_n && typeof b.wk_n === "object" && !Array.isArray(b.wk_n)) ? b.wk_n : null } : null;
+      siteEduGapSig = ok ? sig : {};
+      if (siteEduLines() !== before) renderSites();
+      return ok;
+    }).catch(function(){
+      if (seq !== siteEduGapSeq) return false;
+      var before = siteEduLines();
+      siteEduGap = null; siteEduGapSig = {};
+      if (siteEduLines() !== before) renderSites();
+      return false;
+    });
   }
   // 접기 줄 배선(v343 공용) — 펼침은 화면 안에서만 산다(저장하지 않는다). 목록을 다시 그리면 도로 접힌다.
   // querySelectorAll의 forEach는 구형 브라우저에 없어 Array.prototype.forEach.call로 돈다(앱 전역 규칙).
@@ -13691,8 +13765,7 @@
             (names.length ? '<b class="num">'+names.length+'명</b> · '+esc(names.join(", ")) : "<b>미지정</b>")
             + (can ? ' <button class="mini-btn" data-site-wk="'+esc(r.id)+'" style="margin-left:6px;">근로자 추가</button>' : ""),
             names.length?"":"warn")
-        + (function(){ var m=(r.status==="done")?[]:asbNoSpecial(r);
-             return m.length ? sheetRow("특별교육", '<b>미이수 '+m.length+'명</b> — '+esc(m.join(", "))+' (배치 전 이수 필요)', "warn") : ""; })()
+        + siteEduLine(r)   // v433 특별교육 줄 넷(안전 권한 = 앱 판정 · 그 밖 = 서버 site_edu_gap 이름)
         + (k==="asbestos" && r.conc ? sheetRow("공기 중 농도", '<span class="num">'+esc(r.conc)+'</span> 개/㎤') : "")
         + (k==="asbestos" && r.waste_no ? sheetRow("폐기물 인계번호", esc(r.waste_no)) : "")
         + (ks.no ? sheetRow("키스콘 신고", '<span class="num">'+esc(ks.no)+'</span> · '+esc(ks.year)+'년 · '+esc(ks.biz)) : "")
@@ -20052,7 +20125,7 @@
     document.getElementById("sfPaneSite").style.display = (name === "site") ? "" : "none";
     document.getElementById("sfPaneEdu").style.display = (name === "edu") ? "" : "none";
     if (name === "now") sfNowOpen();   // v432 현황 — 이 칸을 열 때만 교육·현장 대장·진행 계약 서류함을 읽는다(읽기만, @safety-now 구간)
-    if (name === "site"){ renderSites(); loadAsb(); if (canSee("safety")) loadEdu(); if (canSee("wk")) loadWorkers(); }   // 옛 현장 탭을 열 때 하던 읽기 그대로 · v430 교육 기록은 안전 권한일 때만(현장 칸의 특별교육 미이수 판정이 쓴다 — 없으면 종전처럼 기록 없음으로)
+    if (name === "site"){ renderSites(); loadAsb(); if (canSee("safety")) loadEdu(); if (canSee("wk")) loadWorkers(); }   // 옛 현장 탭을 열 때 하던 읽기 그대로 · v430 교육 기록은 안전 권한일 때만(현장 칸의 특별교육 미이수 판정 asbNoSpecial이 쓴다) — 안전 권한이 없으면 v433부터 loadAsb가 대장을 받은 뒤 서버 특별교육 판정(loadSiteEduGap — 미이수자 이름만, siteEduLine 줄 넷)을 묻는다
     if (name === "edu"){
       renderEdu(); loadEdu();
       // 일용직 이름은 명부에서 — 명부가 교육 기록보다 늦게 오면 일용직 줄이 '(삭제된 일용직)'으로 남는다(loadWorkers는 renderEdu를 부르지 않음).

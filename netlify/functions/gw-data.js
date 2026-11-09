@@ -14,6 +14,7 @@ const push = require('./_lib/push');
 const tier = require('./_lib/tier');   // 관리자 등급(v321) — retired 판정식 공용. 게이트는 push.tierCtx()(명시 tier·부트스트랩·퇴사 제외, 9/6 검증 S1)
 const BRIEF = require('./_lib/brief');   // v416 아침 음성 브리핑(체크 38 D1) — 설정·조회·기동(생성은 워커)
 const AR = require('./_lib/autorules');  // v417 자동 지시 서버 규칙 3건(카드 10) — 집계(autotask_facts)·완료 신호 공용
+const SITEEDU = require('./_lib/siteedu');   // v433 현장 대장 '특별교육 미이수' 판정(앱 asbNoSpecial·eduHasValidSpecial과 같은 규칙 — uismoke v433 대조)
 
 const DATA = 'gw_data';
 const USERS = 'gw_users';
@@ -252,6 +253,33 @@ async function handleGet(event, d, R) {
     doc = Object.assign({}, doc, { items: doc.items.filter(function (it) { return docVisible(c.member, it, ds); }) });
   }
   return jr(200, { status: 'OK', collection: col, doc, can_write: p === 'do', request_id: R });
+}
+
+// v433(메뉴 56 6단계 — PM 11/9 "56. ㄱ", 확인 항목 기본안 '이름으로'): 현장 대장 '특별교육 미이수'(읽기 전용).
+//   안전 권한(col:edu 읽기)이 없는 현장 권한자는 교육 기록을 못 읽어 종전엔 투입 인원 전원이 '미이수'로 그려졌다.
+//   현장 대장을 볼 수 있으면(permOf(member,'asbestos') = site가 숨김 아님) 현장(대장 id)마다 '투입 인원 중 유효한 특별교육 기록이 없는 사람 이름'만 돌려준다:
+//   { ok, has_edu, gaps: { 대장id: [이름…] } } — 교육 기록 자체(종류·이수일·다음 예정·건강진단)·투입 인원 밖의 이름은 보내지 않는다.
+//   판정 = _lib/siteedu.js(앱 asbNoSpecial과 같은 규칙). 교육 기록이 0건이면 이름을 보내지 않는다(앱은 '교육 기록 없음 — 이수 여부 미확인'만 그림).
+//   일용직 권한(col:workers = wk)이 숨김인 사람에게는 일용직 이름 대신 현장별 수만 wk_n으로(v433 검토 — 그 사람은 명부 읽기가 403이고 v433 전 화면에도 일용직 이름이 없었다).
+//   대장·교육·명부·회원 명부 중 하나라도 못 읽으면 500 — 빈 결과로 '미이수 없음'을 그리지 않게(앱은 '확인 못 함'). 감사 로그 없음(읽기).
+//   알려진 한계(PM ② '이름으로'와 같은 정보 등급으로 받아들임 — 막으려면 PM 결정): 현장 수행 권한자는 진행·예정 줄의 투입 인원을 바꿔 저장한 뒤 물으면
+//   그 사람들의 석면 특별교육 기록 유무를 알 수 있다(이수일·종류·건강진단은 안 옴 — 그 저장은 감사 로그·버전 링에 남는다).
+async function handleSiteEduGap(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (!(await deviceApproved(event, c.member))) return jr(403, { status: 'FORBIDDEN', error_code: 'DEVICE_NOT_APPROVED', request_id: R });
+  if (permOf(c.member, 'asbestos') === 'hide') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_ACCESS', request_id: R });
+  const wkSee = permOf(c.member, 'workers') !== 'hide';   // 일용직 명부 권한(wk) — 숨김이면 일용직은 이름 대신 수만
+  const st = store(DATA);
+  // 넷을 함께 읽는다(v433 검토 — 차례로 읽으면 답이 늦어 앱의 '확인 중'이 길어진다). 회원 레코드는 전부(지운 회원 포함 — siteedu가 앱 member_list와 같은 범위로 거른다)
+  const got = await Promise.all([blobGet(st, colKey('asbestos')), blobGet(st, colKey('edu')), blobGet(st, colKey('workers')), push.loadMembers()]);
+  const ra = got[0], re = got[1], rw = got[2], ms = got[3];
+  const bad = [ra, re, rw].filter(function (x) { return !x.ok; })[0];
+  if (bad) return jr(500, { status: 'ERROR', error_code: bad.code || 'STORAGE_READ_FAILED', request_id: R });
+  if (!Array.isArray(ms) || ms.unavailable) return jr(500, { status: 'ERROR', error_code: 'MEMBERS_UNAVAILABLE', request_id: R });
+  const items = function (x) { return (x.data && Array.isArray(x.data.items)) ? x.data.items : []; };   // 없는 키(실 Blobs ok·data null — 운영 col:edu 지금 상태) = 0건
+  const out = SITEEDU.siteEduGaps(items(ra), items(re), items(rw), ms, { workerNames: wkSee });
+  return jr(200, Object.assign({ status: 'OK', ok: true, has_edu: out.has_edu, gaps: out.has_edu ? out.gaps : {} }, wkSee ? {} : { wk_n: out.has_edu ? out.wk_n : {} }, { request_id: R }));
 }
 
 async function handleSave(event, d, R) {
@@ -4182,6 +4210,7 @@ async function handlerInner(event) {
       return jr(200, { status: 'OK', doc: (mr.ok && mr.data) ? mr.data : { schema: 1, rows: [] }, request_id: R });
     }
     if (d && d.action === 'get') return await handleGet(event, d, R);
+    if (d && d.action === 'site_edu_gap') return await handleSiteEduGap(event, d, R);   // v433 현장 대장 특별교육 미이수(이름만 — 안전 권한 없는 현장 권한자용)
     if (d && d.action === 'save') return await handleSave(event, d, R);
     if (d && d.action === 'audit') return await handleAudit(event, d, R);
     if (d && d.action === 'ver_list') return await handleVerList(event, d, R);
