@@ -1755,12 +1755,12 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   };
   const tokSoo = issueSession(mem.gw_users['member:usoo']).token;   // 관리자(비개발자) = 나수진 자리
   const tokDev = issueSession(mem.gw_users['member:udev']).token;
-  const PRESET_WORKER = { tasks: 'do', veh: 'view', rec: 'view', lic: 'view', site: 'hide', check: 'do', con: 'view', cli: 'view', doc: 'view', wk: 'view', quote: 'hide', promo: 'hide', safety: 'hide' };   // v430 safety(안전 › 교육·검진) 끝에 — cleanPerms 순서 = gw-auth MODULES
+  const PRESET_WORKER = { tasks: 'do', veh: 'view', rec: 'view', lic: 'view', site: 'hide', check: 'do', con: 'view', cli: 'view', doc: 'view', wk: 'view', quote: 'hide', promo: 'hide', safety: 'hide', hw: 'hide' };   // v430 safety(안전 › 교육·검진)·v431 hw(화관법) 끝에 — cleanPerms 순서 = gw-auth MODULES
   let r34 = await callA34({ action: 'member_upsert', name: '새직원', role: '직원', rank: '사원', dept: '폐기물팀', pin: '1234', hire_date: '2026-09-08', emp_type: '계약직' }, tokSoo);
   const made = Object.values(mem.gw_users).find((x) => x && x.name === '새직원');
   T('관리자(비개발자)가 직원 등록 → 200 · admin false · dev 없음 · 계약직 저장', r34.code === 200 && !!made && made.admin === false && made.dev === undefined && made.role === '직원' && made.emp_type === '계약직', r34.code + '/' + r34.body.error_code);
   T('등록분 perms = 서버 프리셋(클라 값 아님)', !!made && JSON.stringify(made.perms) === JSON.stringify(PRESET_WORKER), made && JSON.stringify(made.perms));
-  r34 = await callA34({ action: 'member_upsert', name: '권한도둑', role: '직원', pin: '1234', perms: { tasks: 'do', veh: 'do', rec: 'do', lic: 'do', check: 'do', con: 'do', cli: 'do', doc: 'do', wk: 'do', quote: 'do', promo: 'do', safety: 'do' } }, tokSoo);   // v430 safety도 실어 보냄 — 서버 프리셋(숨김)으로 덮여야 한다
+  r34 = await callA34({ action: 'member_upsert', name: '권한도둑', role: '직원', pin: '1234', perms: { tasks: 'do', veh: 'do', rec: 'do', lic: 'do', check: 'do', con: 'do', cli: 'do', doc: 'do', wk: 'do', quote: 'do', promo: 'do', safety: 'do', hw: 'do' } }, tokSoo);   // v430 safety·v431 hw도 실어 보냄 — 서버 프리셋(숨김)으로 덮여야 한다
   const thief = Object.values(mem.gw_users).find((x) => x && x.name === '권한도둑');
   T('관리자가 perms를 직접 실어 보내도(구버전 앱) → 200이되 서버 프리셋으로 덮어씀(권한 도배 차단)', r34.code === 200 && !!thief && JSON.stringify(thief.perms) === JSON.stringify(PRESET_WORKER), r34.code + '/' + (thief && JSON.stringify(thief.perms)));
   r34 = await callA34({ action: 'member_upsert', id: 'uw1', perms: { tasks: 'do', veh: 'do', rec: 'do', lic: 'do', check: 'do', con: 'do', cli: 'do', doc: 'do', wk: 'do', quote: 'do', promo: 'do' } }, tokSoo);
@@ -4859,20 +4859,21 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   const a4_76 = await callA76({ action: 'member_upsert', id: 'upm76', perms: Object.assign({}, p3_76, { safety: 'admin' }) }, tDev76);
   const p4_76 = Object.assign({}, (mem.gw_users['member:upm76'] || {}).perms), f4_76 = aud76(L4_76, 'upm76');
   // 키 순서만 MODULES와 다른 저장값(김정아형 — site가 끝)에 인사 정보만 저장 → cleanPerms가 순서만 바꿈 → 감사에 권한 항목 없음(직급만)
-  const PK_76 = { safety: 'hide', tasks: 'hide', veh: 'do', rec: 'hide', lic: 'do', check: 'do', con: 'do', cli: 'hide', doc: 'view', wk: 'do', quote: 'hide', promo: 'hide', site: 'do' };
+  //   v431: hw(화관법)도 MODULES에 늘어 저장값에 hw가 있어야 '순서만 다른' 경우가 된다 — 앞쪽에 둔다(순서는 여전히 MODULES와 다름)
+  const PK_76 = { safety: 'hide', hw: 'hide', tasks: 'hide', veh: 'do', rec: 'hide', lic: 'do', check: 'do', con: 'do', cli: 'hide', doc: 'view', wk: 'do', quote: 'hide', promo: 'hide', site: 'do' };
   mem.gw_users['member:ukja76'] = { id: 'ukja76', name: '김정아형76', role: '직원', admin: false, perms: JSON.parse(JSON.stringify(PK_76)) };
   const L5_76 = auditMock.logs.length;
   const a5_76 = await callA76({ action: 'member_upsert', id: 'ukja76', rank: '대리' }, tDev76);
   const f5_76 = aud76(L5_76, 'ukja76'), p5_76 = (mem.gw_users['member:ukja76'] || {}).perms || {};
-  T('76 v430 검토 감사 로그 권한 = 바뀐 칸만: safety 없이 저장(숨김으로 굳음) → "safety:-" → "safety:hide" · 칸 1번 → "safety:hide" → "safety:do" · 이상한 값 → "safety:do" → "safety:hide" · 인사 정보만 저장 → 권한 항목 없음(직급만) · 키 순서만 바뀐 저장(김정아형) → 권한 항목 없음',
-    !!f1_76 && JSON.stringify(f1_76.perms) === JSON.stringify(['safety:-', 'safety:hide']) && !!f2_76 && JSON.stringify(f2_76.perms) === JSON.stringify(['safety:hide', 'safety:do'])
+  T('76 v430 검토 감사 로그 권한 = 바뀐 칸만: safety 없이 저장(숨김으로 굳음 — v431 hw도 같은 저장에서 함께 굳어 "safety:-,hw:-" → "safety:hide,hw:hide") · 칸 1번 → "safety:hide" → "safety:do" · 이상한 값 → "safety:do" → "safety:hide" · 인사 정보만 저장 → 권한 항목 없음(직급만) · 키 순서만 바뀐 저장(김정아형) → 권한 항목 없음',
+    !!f1_76 && JSON.stringify(f1_76.perms) === JSON.stringify(['safety:-,hw:-', 'safety:hide,hw:hide']) && !!f2_76 && JSON.stringify(f2_76.perms) === JSON.stringify(['safety:hide', 'safety:do'])
     && !!f3_76 && !!f3_76.rank && f3_76.perms === undefined && !!f4_76 && JSON.stringify(f4_76.perms) === JSON.stringify(['safety:do', 'safety:hide'])
     && a5_76.code === 200 && !!f5_76 && !!f5_76.rank && f5_76.perms === undefined && JSON.stringify(Object.keys(p5_76)) !== JSON.stringify(Object.keys(PK_76)) && Object.keys(PK_76).every((k) => p5_76[k] === PK_76[k]),
     JSON.stringify({ f1: f1_76 && f1_76.perms, f2: f2_76 && f2_76.perms, f3: f3_76 && Object.keys(f3_76), f4: f4_76 && f4_76.perms, f5: f5_76 && Object.keys(f5_76) }));
-  T('76 v430 회원 저장 cleanPerms: safety 없이 저장 → "hide"로 굳음(보기로 열리지 않음) · 칸 1번(숨김→수행) 저장 → "do" · perms 없는 인사 정보 저장 → "do" 유지 · 이상한 값 → "hide" · 다른 키는 그대로 · 키 순서 = gw-auth MODULES(끝 safety)',
+  T('76 v430 회원 저장 cleanPerms: safety 없이 저장 → "hide"로 굳음(보기로 열리지 않음) · 칸 1번(숨김→수행) 저장 → "do" · perms 없는 인사 정보 저장 → "do" 유지 · 이상한 값 → "hide" · 다른 키는 그대로 · 키 순서 = gw-auth MODULES(끝 safety·hw — v431)',
     a1_76.code === 200 && p1_76.safety === 'hide' && p1_76.veh === 'do' && p1_76.lic === 'view' && p1_76.site === 'hide'
     && a2_76.code === 200 && p2_76.safety === 'do' && a3_76.code === 200 && p3_76.safety === 'do' && a4_76.code === 200 && p4_76.safety === 'hide' && p4_76.promo === 'do'
-    && Object.keys(p2_76).pop() === 'safety' && Object.keys(p2_76).length === 13,
+    && Object.keys(p2_76).slice(-2).join(',') === 'safety,hw' && Object.keys(p2_76).length === 14,
     JSON.stringify([a1_76.code, p1_76.safety, a2_76.code, p2_76.safety, a3_76.code, p3_76.safety, a4_76.code, p4_76.safety, Object.keys(p2_76).length]));
   // ⑤ 새 회원 등록의 safety — 관리자(비개발자)의 직원 등록은 서버 표(ROLE_OPEN_PERMS)로 '숨김'(클라가 safety:'do'를 실어 보내도 무시) ·
   //    개발자 등록은 앱이 보내는 직책 프리셋(index.html ROLE_PRESET을 뽑아 그대로 보냄)이 저장돼 팀장·현장직도 '숨김'(PM ② — 팀장도 숨김)
@@ -4889,7 +4890,7 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
     const pre = appPre76(rl);
     const x = await callA76({ action: 'member_upsert', name: '새' + rl + '76', role: rl, pin: '1234', admin: false, perms: pre }, tDev76);
     const m = find76('새' + rl + '76');
-    madeDev76.push(x.code + ':' + (m && m.perms ? m.perms.safety : '-') + ':' + (m && m.perms && Object.keys(pre).length === 13 && Object.keys(pre).every((k) => m.perms[k] === pre[k]) ? 'same' : 'diff'));
+    madeDev76.push(x.code + ':' + (m && m.perms ? m.perms.safety : '-') + ':' + (m && m.perms && Object.keys(pre).length === 14 && Object.keys(pre).every((k) => m.perms[k] === pre[k]) ? 'same' : 'diff'));   // v431 hw로 프리셋 키 14
   }
   T('76 v430 새 회원 safety: 관리자(비개발자) 직원 등록 → 서버 프리셋 "hide"(클라가 do를 실어 보내도 무시)·admin false · 개발자가 앱 직책 프리셋으로 팀장·현장직 등록 → 프리셋 그대로 저장, safety "hide"(팀장도)',
     xw76.code === 200 && mw76 && mw76.perms.safety === 'hide' && mw76.perms.tasks === 'do' && mw76.admin === false && madeDev76.join(',') === '200:hide:same,200:hide:same',
@@ -4897,6 +4898,126 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
 
   mem.gw_users = savedUsers76;
   ['col:edu', 'col:asbestos'].forEach((k) => { if (had76[k] === undefined) delete mem.gw_data[k]; else mem.gw_data[k] = had76[k]; });
+}
+
+{ // ---- 77(v431) 메뉴 56 4-1 — 화관법 권한 키(hw) 등록만: 회원 저장이 hw 값(수행·보기)을 지키고(cleanPerms가 버리지 않음) 값이 없으면 '숨김'으로 굳힌다 ·
+  //   감사 로그에 바뀐 칸 · 새 회원 직책 프리셋 숨김 · 제출(gw-hwakwan)은 4-1에서 아직 hw를 보지 않는다(⑥ — 4-2에서 뒤집음: 그때는 숨김·보기 → 403 NO_WRITE).
+  //   배포 뒤 PM 순서(브리핑 deploy): 권한관리 '화관법' 열 김정아 칸 1번(수행) · 권민지·정재욱 칸 각 2번(수행 → 보기). 응답 코드만이 아니라 이유 코드(error_code·code)·저장값·감사 줄까지 본다.
+  const gwa77 = require(join(FN, 'gw-auth.js'));
+  const callA77 = async (body, tok) => { const x = await gwa77.handler({ httpMethod: 'POST', headers: { authorization: tok ? 'Bearer ' + tok : '' }, body: JSON.stringify(body) }); return { code: x.statusCode, body: JSON.parse(x.body || '{}') }; };
+  const savedUsers77 = JSON.parse(JSON.stringify(mem.gw_users));
+  mem.gw_users['device:dev1'] = { status: 'approved' };
+  mem.gw_users['member:udev77'] = { id: 'udev77', name: '개발자77', role: '개발자', admin: true, dev: true, perms: {}, tier: 'pm' };
+  mem.gw_users['member:usoo77'] = { id: 'usoo77', name: '경리77', role: '관리자', admin: true, perms: {}, tier: 'admin' };   // 관리자(비개발자) = 나수진 자리
+  const tDev77 = issueSession(mem.gw_users['member:udev77']).token, tSoo77 = issueSession(mem.gw_users['member:usoo77']).token;
+  // v430 배포 뒤 저장값 모양(safety는 있고 hw는 없음 — cleanPerms 13키) — 운영부 세 분 자리
+  const base77 = (o) => Object.assign({ tasks: 'hide', veh: 'do', rec: 'hide', lic: 'view', site: 'hide', check: 'do', con: 'do', cli: 'hide', doc: 'view', wk: 'view', quote: 'hide', promo: 'hide', safety: 'hide' }, o || {});
+  const put77 = (id, name, role, perms, dept) => { mem.gw_users['member:' + id] = { id, name, role, dept: dept || '운영부', admin: false, perms }; };
+  const KJA77 = base77({ lic: 'do', site: 'do', wk: 'do' });
+  put77('ukja77', '김정아형77', '팀장', JSON.parse(JSON.stringify(KJA77)));
+  put77('ukmj77', '권민지형77', '직원', base77({ safety: 'do' }));
+  put77('ujjw77', '정재욱형77', '직원', base77({ site: 'do', wk: 'do' }));
+  const pOf77 = (id) => Object.assign({}, (mem.gw_users['member:' + id] || {}).perms);
+  const aud77 = (from, id) => { const e = auditMock.logs.slice(from).filter((l) => l.col === 'member').map((l) => (l.ev || []).find((x) => x.id === id && x.op === '수정')).filter(Boolean)[0]; return e ? (e.f || {}) : null; };
+  // 권한관리 칸 저장 = pmSave 모양(perms만 부분 전송 — 표에 보이는 그 사람 perms 전체 + 누른 칸) → 응답·저장값·감사 줄
+  const cell77 = async (id, hw, tok) => { const L = auditMock.logs.length; const r = await callA77({ action: 'member_upsert', id, perms: Object.assign(pOf77(id), { hw }) }, tok || tDev77); return { r, p: pOf77(id), f: aud77(L, id) }; };
+  const ok77 = (x) => x.r.code === 200 && x.r.body.status === 'OK' && !x.r.body.error_code && !!x.r.body.member && x.r.body.member.perms.hw === x.p.hw;
+
+  // ① 김정아 1번(숨김 → 수행) · 권민지 2번 연달아(1초 안 — 표가 '보기' 한 번만 저장) · 정재욱 2번을 띄워서(수행 저장 뒤 보기 저장)
+  const k1 = await cell77('ukja77', 'do'), m1 = await cell77('ukmj77', 'view'), j1 = await cell77('ujjw77', 'do'), j2 = await cell77('ujjw77', 'view');
+  T('77 v431 권한관리 \'화관법\' 칸 저장(perms만 부분 전송 — PM 순서): 김정아형 1번 → hw "do" · 권민지형 2번 연달아 → "view" · 정재욱형 2번 띄워서 → "do" 뒤 "view" — 200 OK·이유 코드 없음·응답 회원 값 = 저장값 · 감사 로그 = 바뀐 칸만("hw:-" → "hw:do" · "hw:-" → "hw:view" · "hw:-" → "hw:do" · "hw:do" → "hw:view") · 다른 13키 값 그대로 · 키 14개·끝 safety·hw',
+    [k1, m1, j1, j2].every(ok77) && k1.p.hw === 'do' && m1.p.hw === 'view' && j1.p.hw === 'do' && j2.p.hw === 'view'
+    && JSON.stringify(k1.f && k1.f.perms) === '["hw:-","hw:do"]' && JSON.stringify(m1.f && m1.f.perms) === '["hw:-","hw:view"]'
+    && JSON.stringify(j1.f && j1.f.perms) === '["hw:-","hw:do"]' && JSON.stringify(j2.f && j2.f.perms) === '["hw:do","hw:view"]'
+    && Object.keys(KJA77).every((k) => k1.p[k] === KJA77[k]) && m1.p.safety === 'do'
+    && [k1, m1, j2].every((x) => Object.keys(x.p).length === 14 && Object.keys(x.p).slice(-2).join(',') === 'safety,hw'),
+    JSON.stringify({ k: [k1.r.code, k1.r.body.error_code, k1.p.hw, k1.f && k1.f.perms], m: [m1.r.code, m1.p.hw, m1.f && m1.f.perms], j: [j1.f && j1.f.perms, j2.f && j2.f.perms, j2.p.hw] }));
+
+  // ② 그 뒤 권한과 무관한 저장(인사 카드 — perms 미전송)과 같은 사람의 다른 칸 저장에도 hw 값이 남는다
+  let L77 = auditMock.logs.length;
+  const k2 = await callA77({ action: 'member_upsert', id: 'ukja77', rank: '대리' }, tSoo77);   // 관리자(비개발자)의 인사 정보 저장
+  const k2p = pOf77('ukja77'), k2f = aud77(L77, 'ukja77');
+  L77 = auditMock.logs.length;
+  const m2 = await callA77({ action: 'member_upsert', id: 'ukmj77', perms: Object.assign(pOf77('ukmj77'), { veh: 'view' }) }, tDev77);   // 차량 칸 — 표는 hw를 그대로 실어 보낸다
+  const m2p = pOf77('ukmj77'), m2f = aud77(L77, 'ukmj77');
+  T('77 v431 hw 값이 남음: 인사 정보만 저장(관리자, perms 미전송) → 김정아형 hw "do" 그대로·감사에 권한 항목 없음(직급만) · 같은 사람 다른 칸(차량) 저장 → 권민지형 hw "view" 그대로·감사 = "veh:do" → "veh:view"만',
+    k2.code === 200 && k2.body.status === 'OK' && !k2.body.error_code && k2p.hw === 'do' && mem.gw_users['member:ukja77'].rank === '대리' && !!k2f && !!k2f.rank && k2f.perms === undefined
+    && m2.code === 200 && !m2.body.error_code && m2p.hw === 'view' && m2p.veh === 'view' && JSON.stringify(m2f && m2f.perms) === '["veh:do","veh:view"]',
+    JSON.stringify({ k: [k2.code, k2.body.error_code, k2p.hw, k2f && Object.keys(k2f)], m: [m2.code, m2p.hw, m2f && m2f.perms] }));
+
+  // ③ hw 없이 저장 → '숨김'으로 굳음(보기로 열리지 않음) · 이상한 값 → '숨김'
+  //    갱신 전 캐시 앱(v430)의 권한관리 표에는 '화관법' 열이 없다 — 받은 목록이 부여 전이면 hw를 빼고 보낼 수 있고, 그러면 준 값이 '숨김'으로 돌아간다(서버는 '보기'를 채우지 않는다)
+  L77 = auditMock.logs.length;
+  const pj3 = pOf77('ujjw77'); delete pj3.hw;
+  const j3 = await callA77({ action: 'member_upsert', id: 'ujjw77', perms: pj3 }, tDev77);
+  const j3p = pOf77('ujjw77'), j3f = aud77(L77, 'ujjw77');
+  L77 = auditMock.logs.length;
+  const m3 = await callA77({ action: 'member_upsert', id: 'ukmj77', perms: Object.assign(pOf77('ukmj77'), { hw: 'admin' }) }, tDev77);
+  const m3p = pOf77('ukmj77'), m3f = aud77(L77, 'ukmj77');
+  put77('uold77', '옛저장값77', '직원', { tasks: 'hide', veh: 'view' }, '폐기물팀');   // safety·hw 둘 다 없는 옛 저장값
+  L77 = auditMock.logs.length;
+  const o3 = await callA77({ action: 'member_upsert', id: 'uold77', rank: '사원' }, tSoo77);
+  const o3p = pOf77('uold77'), o3f = aud77(L77, 'uold77');
+  const o3b = (o3f && o3f.perms && o3f.perms[0] ? o3f.perms[0].split(',') : []), o3a = (o3f && o3f.perms && o3f.perms[1] ? o3f.perms[1].split(',') : []);
+  T('77 v431 hw 없이 저장 → "hide"로 굳음(보기로 열리지 않음): 옛 캐시 앱처럼 hw를 빼고 보낸 칸 저장 → 정재욱형 "view" → "hide"(감사 "hw:view" → "hw:hide") · 이상한 값("admin") → "hide"(감사 "hw:view" → "hw:hide") · hw가 아예 없던 회원의 인사 정보 저장(관리자) → "hide"로 굳고 감사에 "hw:-" → "hw:hide"',
+    j3.code === 200 && !j3.body.error_code && j3p.hw === 'hide' && JSON.stringify(j3f && j3f.perms) === '["hw:view","hw:hide"]'
+    && m3.code === 200 && !m3.body.error_code && m3p.hw === 'hide' && JSON.stringify(m3f && m3f.perms) === '["hw:view","hw:hide"]'
+    && o3.code === 200 && !o3.body.error_code && o3p.hw === 'hide' && o3b.indexOf('hw:-') >= 0 && o3a.indexOf('hw:hide') >= 0 && o3b.length === o3a.length,
+    JSON.stringify({ j: [j3.code, j3p.hw, j3f && j3f.perms], m: [m3.code, m3p.hw, m3f && m3f.perms], o: [o3.code, o3p.hw, o3b.length, o3a.length] }));
+
+  // ④ 이유 코드 — 관리자(비개발자)의 '화관법' 칸 저장은 403 DEV_ONLY(권한 편집은 개발자만 — 21-2) · 직원 토큰(본인 칸)은 403 ADMIN_ONLY · 둘 다 저장값 그대로
+  const before77 = pOf77('ukja77');
+  const x1 = await callA77({ action: 'member_upsert', id: 'ukja77', perms: Object.assign(pOf77('ukja77'), { hw: 'hide' }) }, tSoo77);
+  const x2 = await callA77({ action: 'member_upsert', id: 'ukja77', perms: Object.assign(pOf77('ukja77'), { hw: 'view' }) }, issueSession(mem.gw_users['member:ukja77']).token);
+  T('77 v431 이유 코드: 관리자(비개발자)가 \'화관법\' 칸을 바꾸면 403 DEV_ONLY · 직원 토큰(본인 칸)이면 403 ADMIN_ONLY — 둘 다 저장값 그대로(김정아형 hw "do")',
+    x1.code === 403 && x1.body.error_code === 'DEV_ONLY' && x2.code === 403 && x2.body.error_code === 'ADMIN_ONLY' && before77.hw === 'do' && JSON.stringify(pOf77('ukja77')) === JSON.stringify(before77),
+    [x1.code, x1.body.error_code, x2.code, x2.body.error_code, pOf77('ukja77').hw].join('/'));
+
+  // ⑤ 새 회원 hw — 관리자(비개발자)의 직원 등록은 서버 표(ROLE_OPEN_PERMS)로 '숨김'(클라가 hw:'do'를 실어 보내도) · 개발자 등록은 앱 ROLE_PRESET(index.html에서 뽑아 그대로 보냄)
+  const find77 = (nm) => Object.values(mem.gw_users).find((u) => u && u.name === nm);
+  const xw77 = await callA77({ action: 'member_upsert', name: '경리등록77', role: '직원', pin: '1234', perms: { hw: 'do', safety: 'do', tasks: 'do' } }, tSoo77);
+  const mw77 = find77('경리등록77');
+  const src77 = require('fs').readFileSync(join(ROOT, 'index.html'), 'utf8');
+  const appPre77 = (rl) => { const mm = src77.match(new RegExp('"' + rl + '":\\s*\\{admin:(?:true|false),\\s*(?:dev:true,\\s*)?perms:\\{([^}]*)\\}')); const o = {}; if (mm) [...mm[1].matchAll(/(\w+):"(\w+)"/g)].forEach((x) => { o[x[1]] = x[2]; }); return o; };
+  const madeDev77 = [];
+  for (const rl of ['팀장', '직원', '현장직', '관리자']) {
+    const pre = appPre77(rl), adm = rl === '관리자';
+    const x = await callA77({ action: 'member_upsert', name: '새' + rl + '77', role: rl, pin: adm ? 'password77' : '1234', admin: adm, perms: pre }, tDev77);
+    const m = find77('새' + rl + '77');
+    madeDev77.push(rl + ':' + x.code + ':' + (pre.hw || '-') + ':' + (m && m.perms ? m.perms.hw : '-'));
+  }
+  T('77 v431 새 회원 hw: 관리자(비개발자) 직원 등록 → 서버 프리셋 "hide"(클라가 hw:"do"를 실어 보내도 무시)·admin false · 개발자가 앱 직책 프리셋으로 등록 → 팀장·직원·현장직 "hide"(PM ③ — 부서·직책 단위로 주지 않음), 관리자 "do"(관리자는 어차피 수행 고정)',
+    xw77.code === 200 && !xw77.body.error_code && !!mw77 && mw77.perms.hw === 'hide' && mw77.perms.tasks === 'do' && mw77.admin === false
+    && madeDev77.join(',') === '팀장:200:hide:hide,직원:200:hide:hide,현장직:200:hide:hide,관리자:200:do:do',
+    [xw77.code, xw77.body.error_code, mw77 && mw77.perms.hw].join(':') + ' / ' + madeDev77.join(','));
+
+  // ⑥ 4-1 경계 — 화관법 제출 API(gw-hwakwan)는 아직 hw를 보지 않는다: 값이 숨김·보기·수행·없음 어느 쪽이어도 지금처럼 현황을 읽고 제출 요청이 입력·환경 검사까지 간다.
+  //    4-2에서 뒤집음(그때는 숨김·보기 → 403 NO_WRITE, 수행·관리자만 통과 — 브리핑 steps[3].tests). 이 시험은 실제 제출(워커 기동)까지 가지 않게 화관법 계정 환경변수를 비운다.
+  const hwk77 = require(join(FN, 'gw-hwakwan.js'));
+  const ICIS77 = require(join(FN, '_lib/icis.js'));
+  const callH77 = async (body, tok) => { const x = await hwk77.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + tok, 'x-device-id': 'dev1' }, body: JSON.stringify(body) }); return { code: x.statusCode, body: JSON.parse(x.body || '{}') }; };
+  const env77 = { id: process.env.GW_ICIS_ID, pw: process.env.GW_ICIS_PW };
+  delete process.env.GW_ICIS_ID; delete process.env.GW_ICIS_PW;
+  put77('uhide77', '김호태형77', '직원', base77({ hw: 'hide' }), '준설팀');
+  put77('unohw77', '값없음hw77', '현장직', base77(), '폐기물팀');
+  mem.gw_users['member:ujjw77'].perms.hw = 'view';
+  const kst77 = (d) => new Date(Date.now() + 9 * 3600000 + d * 86400000).toISOString().slice(0, 10);
+  const sub77 = { action: 'hw_waste_submit', vehicleNo: ICIS77.WASTE_VEHICLES[0], scenario: Object.keys(ICIS77.SCENARIOS)[0], date: kst77(3), time: '09:00' };
+  const jobs77 = () => Object.keys(mem.gw_data).filter((k) => k.indexOf('hwakwan:job:') === 0).length;
+  const jobs0_77 = jobs77(), res77 = [];
+  for (const id of ['uhide77', 'ujjw77', 'ukja77', 'unohw77']) {
+    const tok = issueSession(mem.gw_users['member:' + id]).token;
+    const s = await callH77({ action: 'hw_status' }, tok), w = await callH77(sub77, tok);
+    res77.push(id + ':' + (mem.gw_users['member:' + id].perms.hw || '-') + ':' + s.code + '/' + (s.body.ok === true ? 'ok' : s.body.code) + ':' + w.code + '/' + w.body.code);
+  }
+  const jobs1_77 = jobs77();
+  if (env77.id !== undefined) process.env.GW_ICIS_ID = env77.id;
+  if (env77.pw !== undefined) process.env.GW_ICIS_PW = env77.pw;
+  T('77 v431 4-1 경계 — 화관법 제출 API는 아직 hw를 보지 않음(4-2에서 뒤집음: 숨김·보기 → 403 NO_WRITE): hw 숨김(김호태형)·보기(정재욱형)·수행(김정아형)·값 없음 네 사람 모두 hw_status 200 · 폐기물 제출 요청은 권한 거절 없이 입력·환경 검사까지 감(이 시험 환경은 화관법 계정이 없어 400 ENV_MISSING — 403 0건) · 작업 기록 0',
+    res77.join(',') === 'uhide77:hide:200/ok:400/ENV_MISSING,ujjw77:view:200/ok:400/ENV_MISSING,ukja77:do:200/ok:400/ENV_MISSING,unohw77:-:200/ok:400/ENV_MISSING' && jobs1_77 === jobs0_77,
+    res77.join(' · ') + ' / 작업 ' + jobs0_77 + '→' + jobs1_77);
+
+  mem.gw_users = savedUsers77;
 }
 
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

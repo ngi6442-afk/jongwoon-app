@@ -13,7 +13,7 @@ const { appendAudit, short } = require('./_lib/audit');
 const tier = require('./_lib/tier');   // 관리자 등급(v321)
 
 const USERS = 'gw_users';
-const MODULES = ['tasks', 'veh', 'rec', 'lic', 'site', 'check', 'con', 'cli', 'doc', 'wk', 'quote', 'promo', 'safety'];   // wk(일용직) 누락으로 cleanPerms가 매 저장마다 버려 숨김·수행 설정이 불가능했음(프런트 레지스트리와 일치 필수 — uismoke v430이 앱 MODULES와 순서까지 대조). quote=견적서·promo=홍보·safety=안전 › 교육·검진(v430, 셋 다 기본 숨김 — 명시 부여만)
+const MODULES = ['tasks', 'veh', 'rec', 'lic', 'site', 'check', 'con', 'cli', 'doc', 'wk', 'quote', 'promo', 'safety', 'hw'];   // wk(일용직) 누락으로 cleanPerms가 매 저장마다 버려 숨김·수행 설정이 불가능했음(프런트 레지스트리와 일치 필수 — uismoke v430이 앱 MODULES와 순서까지 대조). quote=견적서·promo=홍보·safety=안전 › 교육·검진(v430)·hw=화관법(v431 메뉴 56 4-1 — 키만, gw-data 컬렉션 없음·제출 검사는 4-2에서 gw-hwakwan), 넷 다 기본 숨김 — 명시 부여만
 const LOCK_THRESHOLD = 5;                 // 연속 실패 허용 횟수
 const LOCK_MS = 15 * 60 * 1000;           // 잠금 시간(15분)
 function lockKey(name) { return `lock:${String(name).trim().toLowerCase()}`; }
@@ -94,15 +94,17 @@ const ROLE_OPEN = { '팀장': 1, '직원': 1, '현장직': 1 };
 function roleOpen(r) { return Object.prototype.hasOwnProperty.call(ROLE_OPEN, String(r || '')); }
 // 일반 직책 기본 권한 — 앱 ROLE_PRESET과 같은 값(uismoke v430이 3직책 전부 대조, servertest가 직원 줄 대조). 관리자가 만든 회원의 perms는 클라 값이 아니라 이 표에서 온다(권한 상승 차단).
 //   v430 safety: 3직책 모두 숨김(PM 11/9 ② "권민지 1명" — 팀장도 숨김, 부여는 권한관리 표에서 한 분씩)
+//   v431 hw(화관법): 3직책 모두 숨김(PM 11/9 ③ "관리+운영만" — 부서 단위로 한꺼번에 주지 않고 운영부 3명만 권한관리 표에서 한 분씩, 키는 safety 뒤 끝)
 const ROLE_OPEN_PERMS = {
-  '팀장':   { tasks: 'do', veh: 'do', rec: 'do', lic: 'do', site: 'do', check: 'do', con: 'view', cli: 'view', doc: 'view', wk: 'do', quote: 'hide', promo: 'hide', safety: 'hide' },
-  '직원':   { tasks: 'do', veh: 'view', rec: 'view', lic: 'view', site: 'hide', check: 'do', con: 'view', cli: 'view', doc: 'view', wk: 'view', quote: 'hide', promo: 'hide', safety: 'hide' },
-  '현장직': { tasks: 'do', veh: 'view', rec: 'hide', lic: 'hide', site: 'hide', check: 'do', con: 'hide', cli: 'hide', doc: 'view', wk: 'hide', quote: 'hide', promo: 'hide', safety: 'hide' }
+  '팀장':   { tasks: 'do', veh: 'do', rec: 'do', lic: 'do', site: 'do', check: 'do', con: 'view', cli: 'view', doc: 'view', wk: 'do', quote: 'hide', promo: 'hide', safety: 'hide', hw: 'hide' },
+  '직원':   { tasks: 'do', veh: 'view', rec: 'view', lic: 'view', site: 'hide', check: 'do', con: 'view', cli: 'view', doc: 'view', wk: 'view', quote: 'hide', promo: 'hide', safety: 'hide', hw: 'hide' },
+  '현장직': { tasks: 'do', veh: 'view', rec: 'hide', lic: 'hide', site: 'hide', check: 'do', con: 'hide', cli: 'hide', doc: 'view', wk: 'hide', quote: 'hide', promo: 'hide', safety: 'hide', hw: 'hide' }
 };
 // 값이 없는 모듈의 기본값 — 닫고 시작하는 모듈(gw-data PERM_CLOSED와 같은 집합)은 'hide'다.
 // 종전엔 무조건 'view'라, 새 모듈을 MODULES에 넣는 순간 전 직원에게 열렸다(2026-09-10 site 추가 때 잡힘).
 // v430 safety 추가 — 모든 회원 저장이 cleanPerms를 거치므로 여기서 빠지면 다음 저장 때 직원 교육·건강진단 날짜가 '보기'로 열린다(기본 숨김 4곳 uismoke v430 대조)
-const CLOSED_DEFAULT = { quote: 1, promo: 1, hr: 1, lic: 1, site: 1, safety: 1 };
+// v431 hw(화관법) 추가 — 여기서 빠지면 다음 저장 때 모든 직원 hw가 '보기'로 채워져, 4-2에서 탭을 켜는 순간 현장 부서에 화관법이 다시 열린다
+const CLOSED_DEFAULT = { quote: 1, promo: 1, hr: 1, lic: 1, site: 1, safety: 1, hw: 1 };
 function cleanPerms(p) { const out = {}; MODULES.forEach(function (k) { out[k] = (p && (p[k] === 'do' || p[k] === 'view' || p[k] === 'hide')) ? p[k] : (CLOSED_DEFAULT[k] ? 'hide' : 'view'); }); return out; }
 
 async function listMembers(st) {
