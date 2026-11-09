@@ -897,8 +897,17 @@
   .view.readonly .mini-btn,
   .view.readonly .link-btn{display:none !important;}
   .view.readonly .mini-btn[data-doc-att-open]{display:inline-block !important;}   /* v369: 문서함 첨부 [열기]는 열람(보기) 권한의 통로 — 서버 doc_att_get이 docVisible로 판정하므로 화면에서 지우지 않는다(PM 9/22 "직원들이 뽑을 수가 없다") */
+  .view.readonly .mini-btn[data-go-tab]{display:inline-block !important;}   /* v428: 옮긴 화면으로 가는 길 안내 버튼은 아무것도 바꾸지 않으므로 보기 권한 화면에서도 남긴다 — 갈 곳을 못 보는 사람에게는 applySafetyPerms가 감싼 쪽을 숨긴다(이 !important는 버튼 자신의 인라인 display를 이기므로 버튼이 아니라 감싸개로: 인허가 석면 안내는 버튼 감싸개 asbMovedGo만 — 글 줄은 510ed20처럼 남김, 인사 두 화면 교육 안내는 줄째) */
+  /* v428 안전 탭 칸(.sf-pane) — 보기 권한 readonly는 바깥 view-safety가 아니라 칸에만 건다(MODULE_VIEW.site=sfPaneSite). 바깥에 걸면 칸 칩까지 숨는다 */
+  .sf-pane.readonly .add-row,
+  .sf-pane.readonly .del-x,
+  .sf-pane.readonly .mini-btn,
+  .sf-pane.readonly .link-btn,
+  .sf-pane.readonly .sec-hd-add{display:none !important;}
   .tab-btn.perm-hidden{display:none !important;}
   .nav-group.perm-hidden{display:none !important;}
+  .lsub-btn.perm-hidden{display:none !important;}   /* v428 칸 칩도 권한으로 숨긴다(MODULE_TAB.site=sfChipSite) */
+  #eduScopeBar .vs-chip.on{background:#EAF3EF;color:var(--brand-dark);border-color:var(--brand);font-weight:700;}   /* v428 검토: 칸 안 대상 칩(직원/일용직)은 옅은 선택 표시 — 칸 칩(.lsub-btn.active, 진한 초록)과 위계를 나눈다(PM 시안 .mchip.on). 색은 .hw-opt.sel과 같은 값, 차량·계약의 .vs-chip.on은 그대로 */
   .prog-frame{display:block;width:100%;height:calc(100vh - 170px);height:calc(100dvh - 170px);min-height:480px;border:1px solid var(--line);border-radius:12px;background:var(--card);}
   .todo-due-in{font-size:12px;padding:3px 6px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);max-width:132px;}
   #myTodoDue{flex:0 0 auto;width:138px;min-width:0;}
@@ -1084,7 +1093,7 @@
   .cal-dots{display:flex;flex-wrap:wrap;gap:3px;align-content:flex-start;}
   .cal-dot{display:inline-block;width:7px;height:7px;border-radius:50%;flex:0 0 auto;}
   .cal-more{font-size:9px;font-weight:700;color:var(--sub);line-height:7px;}
-  .dot-veh{background:#2f6fd0;} .dot-lic{background:#7a4fd0;} .dot-tasks{background:#1A9A6B;} .dot-rec{background:#e0872f;} .dot-leave{background:#c74b7e;}
+  .dot-veh{background:#2f6fd0;} .dot-lic{background:#7a4fd0;} .dot-tasks{background:#1A9A6B;} .dot-rec{background:#e0872f;} .dot-leave{background:#c74b7e;} .dot-hr{background:#0e7c8c;}   /* v428 교육 예정(hr) — 색이 없어 흰 글씨 칩이 안 보였다 */
   .cal-chips{display:none;flex-direction:column;gap:2px;width:100%;}
   .cal-chip{font-size:11px;line-height:1.35;color:#fff;border-radius:4px;padding:1px 5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;}
   .cal-chip-more{font-size:10px;font-weight:700;color:var(--sub);padding:0 3px;}
@@ -1105,7 +1114,7 @@
   .cal-day-item{display:flex;align-items:center;gap:9px;padding:9px 2px;border-top:1px solid var(--line);cursor:pointer;}
   .cal-day-item:active{background:var(--bg);}
   .cal-badge{font-size:11px;font-weight:800;color:#fff;border-radius:6px;padding:3px 8px;white-space:nowrap;flex:0 0 auto;}
-  .ev-veh{background:#2f6fd0;} .ev-lic{background:#7a4fd0;} .ev-tasks{background:#1A9A6B;} .ev-rec{background:#e0872f;} .ev-leave{background:#c74b7e;}
+  .ev-veh{background:#2f6fd0;} .ev-lic{background:#7a4fd0;} .ev-tasks{background:#1A9A6B;} .ev-rec{background:#e0872f;} .ev-leave{background:#c74b7e;} .ev-hr{background:#0e7c8c;}
   .cal-day-main{flex:1;min-width:0;}
   .cal-day-label{font-size:14px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .cal-day-sub{font-size:12px;color:var(--sub);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
@@ -1144,14 +1153,13 @@
     <button class="tab-btn" data-tab="con" id="tabConBtn">계약</button>
     <button class="tab-btn" data-tab="quote" id="tabQuoteBtn">견적서</button>
     <button class="tab-btn perm-hidden" data-tab="promo" id="tabPromoBtn">홍보</button>
-    <button class="tab-btn perm-hidden" data-tab="onbid" id="tabOnbidBtn">부동산</button>
     <div class="nav-divider"></div>
     <div class="nav-group">업무</div>
     <button class="tab-btn" data-tab="cal" id="tabCalBtn">캘린더</button>
     <button class="tab-btn" data-tab="veh" id="tabVehBtn">차량</button>
     <button class="tab-btn" data-tab="hwakwan" id="tabHwakwanBtn">화관법</button>
     <button class="tab-btn" data-tab="allbaro" id="tabAllbaroBtn">운반일지</button>
-    <button class="tab-btn perm-hidden" data-tab="site" id="tabSiteBtn">현장</button>
+    <button class="tab-btn perm-hidden" data-tab="safety" id="tabSafetyBtn">안전</button>
     <button class="tab-btn" data-tab="lic" id="tabLicBtn">인허가</button>
     <button class="tab-btn" data-tab="doc" id="tabDocBtn">문서함</button>
     <div class="nav-divider"></div>
@@ -1455,10 +1463,11 @@
       <button class="link-btn" id="licGradeBtn" title="신용평가확인서·안전성평가 통보서(pdf/이미지)를 판독해 등급·만료일을 인허가에 자동 반영">🧠 등급확인서 판독</button>
     </div>
 
-    <!-- 석면 작업 이력은 2026-09-10에 [현장] 탭으로 옮겼다(석면·철거·준설을 한 대장에서 본다).
-         데이터는 제자리(col:asbestos)에 두고 권한키만 lic → site로 나눴다. 여기엔 길만 남긴다. -->
-    <div class="hw-note" style="margin-top:22px;">석면 작업 이력은 <b>[현장]</b> 탭으로 옮겼습니다 — 철거·준설과 한 대장에서 봅니다.
-      <button class="mini-btn" id="asbMovedBtn" style="margin-left:6px;">현장 탭 열기</button></div>
+    <!-- 석면 작업 이력은 2026-09-10에 [현장] 탭으로, v428(11/9)에 안전 › 현장 칸으로 옮겼다(석면·철거·준설을 한 대장에서 본다).
+         데이터는 제자리(col:asbestos)에 두고 권한키만 lic → site로 나눴다. 여기엔 길만 남긴다.
+         글 줄은 인허가를 보는 사람 모두에게(510ed20과 같음), [안전 › 현장 열기] 버튼은 현장 칸을 볼 수 있는 사람에게만 — 감싸개 asbMovedGo째 숨긴다(applySafetyPerms). -->
+    <div class="hw-note" id="asbMovedNote" style="margin-top:22px;">석면 작업 이력은 <b>안전 › 현장</b>으로 옮겼습니다 — 철거·준설과 한 대장에서 봅니다.
+      <span id="asbMovedGo"><button class="mini-btn" id="asbMovedBtn" data-go-tab="safety:site" style="margin-left:6px;">안전 › 현장 열기</button></span></div>
     <!-- 옛 석면 블록은 v350에서 제거(현장 탭 PM 확인 2026-09-11). 화면은 현장 탭(renderSites)이 그린다.
          (v355: renderAsb·빈 요소 제거 — 9/9 저장 사고 회귀검사는 현장 탭 renderSites에 붙였다)
          그 검사를 renderSites로 옮길 때 함께 지운다. 화면에는 아무것도 안 보인다. -->
@@ -1479,8 +1488,14 @@
     </div>
   </section>
 
-  <!-- 입찰(공고 수집) — 관리자 전용 -->
+  <!-- 입찰(공고 수집) — 관리자 전용. v428(메뉴 56 1단계): 옛 부동산 탭(온비드)을 [공고 | 부동산] 칸으로 들였다 — 서버 권한 키는 둘 다 bid 그대로.
+       칸 전환은 감싸개(bidLayerList·bidLayerOnbid)로 하고, 안쪽 bidSection·onbidSection의 관리자 표시 토글(applyPerms·renderOnbid)은 그대로 둔다. -->
   <section class="view" id="view-bid">
+    <div class="lsub-bar" id="bidSubBar">
+      <button class="lsub-btn active" data-lsub="list" id="bidChipList">공고</button>
+      <button class="lsub-btn" data-lsub="onbid" id="bidChipOnbid">부동산</button>
+    </div>
+    <div id="bidLayerList">
     <div id="bidSection">
       <div class="dash-sec" style="margin-bottom:8px;display:flex;align-items:baseline;gap:10px;"><h2 style="flex:1;">입찰 <span class="cnt" id="bidHead"></span></h2><button class="mini-btn" id="bidRefreshBtn">↻ 지금 수집</button><button class="mini-btn" id="bidPurgeBtn" title="미검토 항목을 비우고 새 필터로 다시 수집">🧹 재수집</button><button class="mini-btn" id="bidCalcBtn" title="기초금액·예가범위·낙찰하한율로 투찰 범위 계산">🧮 계산기</button><button class="mini-btn" id="bidStatsBtn" title="낙찰 투찰률 실측 분포 — 공종·경북·발주처·슬레이트">📊 통계</button></div>
       <div class="card" id="bidStatsWrap" style="display:none;padding:12px;font-size:13px;"></div>
@@ -1489,6 +1504,18 @@
       <input type="search" id="bidSearch" placeholder="공고 검색(공고명·기관)" autocomplete="off" style="width:100%;padding:9px 12px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;font-size:14px;box-sizing:border-box;">
       <div class="card" id="bidList"><div class="loading">불러오는 중…</div></div>
       <button class="link-btn" id="bidAddBtn">+ 수동 등록 (사기업·기타)</button>
+    </div>
+    </div>
+    <!-- 부동산(온비드 공매) — 관리자 전용. v428 전에는 사이드바의 따로 된 부동산 탭이었다 -->
+    <div id="bidLayerOnbid" style="display:none;">
+    <div id="onbidSection">
+      <div class="dash-sec" style="margin-bottom:8px;"><h2>부동산 (온비드 공매) <span class="cnt" id="obHead"></span></h2></div>
+      <div style="font-size:12px;color:var(--sub);margin:-4px 0 8px;">전국 · 매각 · 감정가 5억~50억 · 토지/공장·산업/상가·업무. 마감 임박순, 150건씩 표시.</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;" id="obFilterBar"></div>
+      <input type="search" id="obSearch" placeholder="소재지·물건 검색 (예: 포항, 경상북도)" autocomplete="off" style="width:100%;padding:9px 12px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;font-size:14px;box-sizing:border-box;">
+      <div class="card" id="obList"><div class="loading">불러오는 중…</div></div>
+      <button class="link-btn" id="obMoreBtn" style="display:none;">더보기</button>
+    </div>
     </div>
   </section>
 
@@ -1505,18 +1532,6 @@
     <button class="link-btn" id="conPerfBtn" style="display:none;">실적 다운로드</button>
     <div class="card" id="conList"><div class="loading">불러오는 중…</div></div>
     <div class="card" id="conDetailCard"></div>   <!-- v381 폰(859px 이하) 상세 카드 — PC에서는 표 안에 펼침 -->
-  </section>
-
-  <!-- 부동산(온비드 공매) — 관리자 전용 -->
-  <section class="view" id="view-onbid">
-    <div id="onbidSection">
-      <div class="dash-sec" style="margin-bottom:8px;"><h2>부동산 (온비드 공매) <span class="cnt" id="obHead"></span></h2></div>
-      <div style="font-size:12px;color:var(--sub);margin:-4px 0 8px;">전국 · 매각 · 감정가 5억~50억 · 토지/공장·산업/상가·업무. 마감 임박순, 150건씩 표시.</div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;" id="obFilterBar"></div>
-      <input type="search" id="obSearch" placeholder="소재지·물건 검색 (예: 포항, 경상북도)" autocomplete="off" style="width:100%;padding:9px 12px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;font-size:14px;box-sizing:border-box;">
-      <div class="card" id="obList"><div class="loading">불러오는 중…</div></div>
-      <button class="link-btn" id="obMoreBtn" style="display:none;">더보기</button>
-    </div>
   </section>
 
   <!-- 거래처 -->
@@ -1547,11 +1562,9 @@
     <div class="card" id="hrNewPanel" style="display:none;margin-top:8px;"></div>
     <button class="link-btn" id="hrAddBtn">+ 직원 추가</button>
 
-    <div class="dash-sec" style="margin:22px 0 8px;">
-      <h2>교육·건강진단 이력 <span class="cnt" id="eduHrHead"></span></h2>
-    </div>
-    <div class="card" id="eduHrList"><div class="loading">불러오는 중…</div></div>
-    <button class="link-btn" id="eduHrAddBtn">+ 이력 추가</button>
+    <!-- v428: 교육·건강진단 이력(직원)은 안전 › 교육·검진 한 목록으로 옮겼다. 안내 줄은 교육·검진 칸을 볼 수 있는 사람에게만(applySafetyPerms). -->
+    <div class="hw-note" id="eduMovedHr" style="margin:22px 0 4px;display:none;">교육·건강진단 이력은 <b>안전 › 교육·검진</b>으로 옮겼습니다 — 직원·일용직을 한 목록에서 봅니다.
+      <button class="mini-btn" id="eduMovedHrBtn" data-go-tab="safety:edu:member" style="margin-left:6px;">안전 › 교육·검진 열기</button></div>
 
     <button class="link-btn" id="permMgmtBtn">🔑 권한관리</button>
     <button class="link-btn" id="famBtn">👪 가족친화 실적</button>
@@ -1588,9 +1601,18 @@
     </div>
   </section>
 
-  <!-- 현장(석면·철거·준설) — 2026-09-10 인허가 탭에서 분리. 한 대장을 종류로 갈라 본다.
-       석면은 산안법 제164조⑥ 30년 보존이라 데이터는 옮기지 않고 종류 칸만 더했다. -->
-  <section class="view" id="view-site">
+  <!-- 안전(v428, 메뉴 56 1단계 — 사이드바 옛 '현장' 자리를 이어받음). 칸: 현장(옛 현장 탭 화면 그대로) · 교육·검진(옛 인사 두 화면의 이력을 한 목록으로).
+       현황·사고·평가 칸은 다음 단계. 1단계는 권한 키를 바꾸지 않는다 — 현장 칸 = site, 교육·검진 칸 = hr(관리자, 서버 col:edu도 hr).
+       탭은 볼 칸이 하나라도 있을 때, 칸 칩 줄은 칸이 2개 이상일 때만 보인다(safetyPanes·applySafetyPerms) — 현장만 보는 사람은 칩 줄 없이 옛 현장 화면이 바로 열린다.
+       보기 권한 readonly는 칸(.sf-pane)에만 건다(MODULE_VIEW.site=sfPaneSite). -->
+  <section class="view" id="view-safety">
+    <div class="lsub-bar" id="sfSubBar">
+      <button class="lsub-btn active" data-lsub="site" id="sfChipSite">현장</button>
+      <button class="lsub-btn" data-lsub="edu" id="sfChipEdu">교육·검진</button>
+    </div>
+    <!-- 현장(석면·철거·준설) — 2026-09-10 인허가 탭에서 분리, v428 안전 탭 칸으로. 한 대장을 종류로 갈라 본다.
+         석면은 산안법 제164조⑥ 30년 보존이라 데이터는 옮기지 않고 종류 칸만 더했다. -->
+    <div class="sf-pane" id="sfPaneSite">
     <div class="sec-hd">
       <button type="button" class="sec-hd-t" style="cursor:default;"><span>현장</span> <span class="cnt" id="siteHead"></span></button>
       <button type="button" class="sec-hd-add" id="siteAddBtn">+ 현장 추가</button>
@@ -1598,6 +1620,20 @@
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;" id="siteFilterBar"></div>
     <input type="search" id="siteSearch" placeholder="공사명·발주처·소재지 검색" autocomplete="off" style="width:100%;padding:9px 12px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;font-size:14px;box-sizing:border-box;">
     <div class="card" id="siteList"><div class="loading">불러오는 중…</div></div>
+    </div>
+    <!-- 교육·검진 — 옛 인사·직원(직원)·인사·일용직(일용직) 두 목록을 대상 칩 하나로. 저장은 그대로 col:edu. -->
+    <div class="sf-pane" id="sfPaneEdu" style="display:none;">
+    <div class="sec-hd">
+      <button type="button" class="sec-hd-t" style="cursor:default;"><span>교육·건강진단 이력</span> <span class="cnt" id="eduHead"></span></button>
+      <button type="button" class="sec-hd-add" id="eduAddBtn">+ 이력 추가</button>
+    </div>
+    <div class="vs-tools" id="eduScopeBar">
+      <button type="button" class="vs-chip on" data-edu-scope="member">직원</button>
+      <button type="button" class="vs-chip" data-edu-scope="worker">일용직</button>
+    </div>
+    <div style="font-size:12px;color:var(--sub);margin:-2px 0 8px;">검진은 날짜·종류만 적고 결과·소견은 넣지 않습니다(결과표 원본은 관리부 보관).</div>
+    <div class="card" id="eduList"><div class="loading">불러오는 중…</div></div>
+    </div>
   </section>
 
   <!-- 견적서 (문서번호 관리·발행 이력) -->
@@ -1626,11 +1662,10 @@
     <div class="card" id="wkList"><div class="loading">불러오는 중…</div></div>
     <button class="link-btn" id="wkAddBtn">+ 일용직 추가</button>
 
-    <div class="dash-sec" style="margin:22px 0 8px;" id="eduWkSec">
-      <h2>교육·건강진단 이력 <span class="cnt" id="eduWkHead"></span></h2>
-    </div>
-    <div class="card" id="eduWkList"><div class="loading">불러오는 중…</div></div>
-    <button class="link-btn" id="eduWkAddBtn">+ 이력 추가</button>
+    <!-- v428: 교육·건강진단 이력(일용직)은 안전 › 교육·검진 한 목록으로 옮겼다. 비관리자에게 보이던 빈 이력 칸(저장도 서버가 막던 자리)은 없앴고,
+         안내 줄은 교육·검진 칸을 볼 수 있는 사람에게만(applySafetyPerms). -->
+    <div class="hw-note" id="eduMovedWk" style="margin:22px 0 4px;display:none;">일용직 교육·건강진단 이력은 <b>안전 › 교육·검진</b>(일용직)으로 옮겼습니다.
+      <button class="mini-btn" id="eduMovedWkBtn" data-go-tab="safety:edu:worker" style="margin-left:6px;">안전 › 교육·검진 열기</button></div>
   </section>
 
   <!-- 권한관리 (인사 하위 · 관리자 전용) — 매트릭스: 셀 클릭마다 수행→보기→숨김 순환, 사람 단위 자동 저장 -->
@@ -2785,9 +2820,10 @@
     <p style="text-align:left;line-height:1.7;">
       · <b>홈</b>: 직원은 오늘 내 것(내게 온 지시·내 상신·주기 체크·내 할 일), 관리자는 만기·미수·결재를 한눈에, 대표는 결재함<br>
       · <b>관리</b>: 지시 / 기성·수금 / 거래처 / 인사·직원 / 인사·일용직 / 진척도<br>
-      · <b>수주</b>: 입찰 / 계약 / 견적서 / 홍보 / 부동산<br>
-      · <b>업무</b>: 캘린더 / 차량 / 화관법 / 운반일지 / 현장 / 인허가 / 문서함<br>
-      · <b>개인</b>: 내 업무(내게 온 지시·내 할 일·주기 체크) / 휴가 / 물어보기<br><br>
+      · <b>수주</b>: 입찰 / 계약 / 견적서 / 홍보<br>
+      · <b>업무</b>: 캘린더 / 차량 / 화관법 / 운반일지 / 안전 / 인허가 / 문서함<br>
+      · <b>개인</b>: 물어보기 / 내 업무(내게 온 지시·내 할 일·주기 체크) / 휴가<br>
+      · 탭 안 칸: <b>입찰</b> = 공고 / 부동산, <b>안전</b> = 현장 / 교육·검진(옛 현장 탭은 안전 › 현장, 옛 부동산 탭은 입찰 › 부동산). 볼 수 있는 칸이 하나뿐이면 칸 줄 없이 바로 열립니다.<br><br>
       · 로그인: ⚙ → <b>아이디 + PIN</b>. 아이디를 아직 안 만들었으면 이름을 그대로 넣고, 로그인 뒤 ⚙ › <b>내 아이디 설정</b>. 회원 추가·수정과 기기 승인은 관리자가 <b>인사·직원</b> 탭의 직원 카드에서 합니다.<br>
       · 알림: 쓰는 기기마다 한 번 ⚙ → <b>🔔 이 기기 알림 켜기</b>. 안 켠 기기에는 아무 알림도 오지 않습니다.<br>
       · 휴가: 개인 › 휴가 › <b>+ 휴가 신청</b>(유형·기간·사유 필수) → 관리자 승인 → 연차·반차·반반차는 캘린더에 표시. 승인된 휴가는 <b>[취소 요청]</b>(끝난 휴가는 종료 뒤 3일까지)만 되고 관리자가 승인합니다. 📖 사용 안내 20절<br>
@@ -2916,8 +2952,8 @@
 
   // 모듈 레지스트리 — 신규 탭 추가 시 여기 5곳(MODULES/MODULE_TAB/MODULE_VIEW/MOD_LABEL/ROLE_PRESET)에 등록하면 권한관리 UI·게이팅에 자동 반영. 모듈 id = 백엔드 gw-data COL 권한키와 일치시킬 것.
   var MODULES = ["tasks", "veh", "rec", "lic", "site", "check", "con", "cli", "doc", "wk", "quote", "promo"];  // 일감(bid)은 관리자 전용 고정이라 권한 목록에서 제외. quote=견적서·promo=홍보(둘 다 기본 숨김)
-  var MODULE_TAB = {tasks:"tabTasksBtn", veh:"tabVehBtn", rec:"tabRecBtn", lic:"tabLicBtn", site:"tabSiteBtn", check:"tabCheckBtn", con:"tabConBtn", cli:"tabCliBtn", doc:"tabDocBtn", wk:"tabWkBtn", quote:"tabQuoteBtn", promo:"tabPromoBtn"};  // bid는 계약 탭 내 섹션(자체 탭 없음)
-  var MODULE_VIEW = {tasks:"view-tasks", veh:"view-veh", rec:"view-rec", lic:"view-lic", site:"view-site", check:"view-check", con:"view-con", cli:"view-cli", doc:"view-doc", wk:"view-workers", quote:"view-quote", promo:"view-promo"};  // bid 섹션은 applyPerms에서 canSee로 표시
+  var MODULE_TAB = {tasks:"tabTasksBtn", veh:"tabVehBtn", rec:"tabRecBtn", lic:"tabLicBtn", site:"sfChipSite", check:"tabCheckBtn", con:"tabConBtn", cli:"tabCliBtn", doc:"tabDocBtn", wk:"tabWkBtn", quote:"tabQuoteBtn", promo:"tabPromoBtn"};  // bid는 계약 탭 내 섹션(자체 탭 없음) · v428 site는 탭 버튼이 아니라 안전 탭 안 현장 칩(탭 버튼 tabSafetyBtn은 applySafetyPerms가 칸 단위로 판정)
+  var MODULE_VIEW = {tasks:"view-tasks", veh:"view-veh", rec:"view-rec", lic:"view-lic", site:"sfPaneSite", check:"view-check", con:"view-con", cli:"view-cli", doc:"view-doc", wk:"view-workers", quote:"view-quote", promo:"view-promo"};  // bid 섹션은 applyPerms에서 canSee로 표시 · v428 site 보기 권한 readonly는 현장 칸(sfPaneSite)에만 — 바깥 view-safety에 걸면 칩 줄까지 숨는다
   var ROLE_PRESET = {
     // 개발자 = 시스템 영역(계정·기기·권한·복원) 담당. 업무 서열과 별개 축이라 대표를 대체하지 않는다.
     "개발자": {admin:true,  dev:true, perms:{tasks:"do", veh:"do", rec:"do", lic:"do", site:"do", check:"do", con:"do", cli:"do", doc:"do", wk:"do", quote:"do", promo:"do"}},
@@ -3051,6 +3087,8 @@
   // [{no,lic,duty,cycle,basis,law,confirm('확정'|'조건부'),precheck,unit('사업장'|'차량'|'개인'),precheck_answer,base_date,confirmed_by,confirmed_at,updated}]
   var duties = [];
   var licLayer = "cert"; // 인허가 서브탭 상태(cert|duty|month) — 세션 임시
+  var safetyLayer = "site"; // v428 안전 탭 칸(site|edu) — 세션 임시, 탭을 다시 열면 볼 수 있는 첫 칸
+  var bidLayer = "list";    // v428 입찰 탭 칸(list=공고|onbid=부동산) — 세션 임시, 탭을 다시 열면 공고
   var dutyQ = "";
   var dutyOpen = {};     // {no:true} 상세 펼침 — 세션 임시
   var licSha = null;
@@ -5500,7 +5538,19 @@
   var TAB_LABELS = {dash:"홈",tasks:"지시",rec:"기성·수금",cli:"거래처",bid:"입찰",con:"계약",onbid:"부동산",hr:"인사",cal:"캘린더",veh:"차량",hwakwan:"화관법",allbaro:"운반일지",lic:"인허가",doc:"문서함",check:"내 업무",leave:"휴가",perm:"권한관리",fam:"가족친화 실적",progress:"진척도"};
   function closeNav(){ var tb=document.getElementById("tabbar"); if(tb) tb.classList.remove("open"); }
   function updateNavToggle(name){ var nt=document.getElementById("navToggle"); if(nt) nt.textContent = "☰"; }
+  // v428(메뉴 56 1단계): 탭 이름 해석. 옛 이름은 새 자리로 잇는다 — 옛 '현장' 탭 → 안전 › 현장 칸, 옛 '부동산' 탭 → 입찰 › 부동산 칸.
+  //   '탭:칸'(예 "safety:edu")으로 칸까지 고른다. 바로가기·캘린더·전역 검색·서버가 옛 이름을 넘겨도 여기서 받는다(서버 파일은 그대로).
+  var TAB_ALIAS = { site:["safety","site"], onbid:["bid","onbid"] };
+  function tabRoute(name){
+    var s = String(name || "dash"), layer = "", ci = s.indexOf(":");
+    if (ci >= 0){ layer = s.slice(ci + 1); s = s.slice(0, ci); }
+    if (Object.prototype.hasOwnProperty.call(TAB_ALIAS, s)){ var al = TAB_ALIAS[s]; s = al[0]; if (!layer) layer = al[1]; }
+    return { tab: s || "dash", layer: layer };
+  }
   function switchTab(name){
+    var rt = tabRoute(name);
+    name = rt.tab;
+    if (name === "safety" && !safetyPanes().length) name = "dash";   // 볼 칸이 없는 사람에게 남은 옛 길(바로가기·캘린더)은 홈으로
     var prevTab = currentTab;
     currentTab = name;
     Array.prototype.forEach.call(document.querySelectorAll(".tab-btn"), function(b){
@@ -5512,7 +5562,7 @@
     document.getElementById("view-veh").classList.toggle("active", name === "veh");
     document.getElementById("view-rec").classList.toggle("active", name === "rec");
     document.getElementById("view-ask").classList.toggle("active", name === "ask");
-    document.getElementById("view-site").classList.toggle("active", name === "site");
+    document.getElementById("view-safety").classList.toggle("active", name === "safety");
     document.getElementById("view-lic").classList.toggle("active", name === "lic");
     document.getElementById("view-check").classList.toggle("active", name === "check");
     document.getElementById("view-doc").classList.toggle("active", name === "doc");
@@ -5520,7 +5570,6 @@
     document.getElementById("view-con").classList.toggle("active", name === "con");
     document.getElementById("view-cal").classList.toggle("active", name === "cal");
     document.getElementById("view-bid").classList.toggle("active", name === "bid");
-    document.getElementById("view-onbid").classList.toggle("active", name === "onbid");
     document.getElementById("view-hr").classList.toggle("active", name === "hr");
     document.getElementById("view-workers").classList.toggle("active", name === "workers");
     document.getElementById("view-perm").classList.toggle("active", name === "perm");
@@ -5539,17 +5588,16 @@
 
     if (name === "cal") renderCalendar();
     if (name === "dash" && prevTab !== "dash") renderDashboard();   // 탭 "복귀" 시만 재렌더(타 탭 체류 중 폴 갱신 반영) — 재클릭은 종전대로 no-op(직원 홈 입력 중 유실 방지)
-    // 석면 대장은 인허가 탭 안에 있고, 투입 근로자 이름을 일용직 명부에서 끌어오므로 둘을 같이 읽는다
     if (name === "ask") renderAskTab();
-    if (name === "site"){ renderSites(); loadAsb(); loadEdu(); if(canSee("wk")) loadWorkers(); }
+    // 석면 대장(안전 › 현장 칸)은 투입 근로자 이름을 일용직 명부에서 끌어오므로 둘을 같이 읽는다 — 칸 전환·읽기는 setSafetyLayer(칸 없으면 볼 수 있는 첫 칸)
+    if (name === "safety") setSafetyLayer(rt.layer);
     if (name === "lic"){ setLicLayer("cert"); loadEdu(); }   // 전역검색·캘린더 점프가 의무/이번달 층 위에 내려앉지 않게 ①층 복귀
-    if (name === "hr"){ renderHrRoster(); renderEdu(); loadEdu(); if(canSee("wk")) loadWorkers(); }
-    if (name === "workers"){ renderWorkers(); loadWorkers(); renderEdu(); loadEdu(); loadAsb(); }   // v356: 참여 칩은 현장 대장(asb)이 있어야 붙는다
+    if (name === "hr"){ renderHrRoster(); loadEdu(); if(canSee("wk")) loadWorkers(); }   // v428 교육 이력 목록은 안전 › 교육·검진으로(loadEdu는 3단계까지 유지)
+    if (name === "workers"){ renderWorkers(); loadWorkers(); loadEdu(); loadAsb(); }   // v356: 참여 칩은 현장 대장(asb)이 있어야 붙는다 · v428 교육 이력 목록은 안전 › 교육·검진으로
     if (name === "perm") renderPermMgmt();
     if (name === "fam"){ renderFam(); loadFam(); }
     if (name === "leave") renderLeaves();
-    if (name === "bid") renderBids();
-    if (name === "onbid") renderOnbid();
+    if (name === "bid") setBidLayer(rt.layer);   // v428 칸 없으면 공고 — 옛 부동산 탭(onbid)은 tabRoute가 bid:onbid로 잇는다
   }
 
   // ---- 진척도(관리자 전용, 2026-09-03) ----
@@ -5688,7 +5736,7 @@
 
   // ---- 캘린더(통합 만기·마감) ----
   var calState = { y:0, m:0, sel:null };
-  var CAL_LABEL = { veh:"차량", lic:"인허가", tasks:"지시", rec:"기성", leave:"휴가" };
+  var CAL_LABEL = { veh:"차량", lic:"인허가", hr:"교육", tasks:"지시", rec:"기성", leave:"휴가" };   // v428 hr(교육·건강진단 다음 예정) 추가 — 없어서 배지가 'undefined'였다. calEvents의 mod는 전부 여기에 있어야 한다(uismoke v428)
   // 시작~종료(포함) 각 날짜에 콜백. 잘못된 값·과도한 범위는 방어.
   function eachDate(start, end, fn){
     if(!isDate(start)) return;
@@ -5708,21 +5756,21 @@
   function calInit(){ var d = new Date(); calState.y = d.getFullYear(); calState.m = d.getMonth(); if(!calState.sel) calState.sel = todayStr(); }
   function calEvents(){
     var ev = [];
-    function add(date, mod, label, sub){ if (isDate(date)) ev.push({ date:date, mod:mod, label:label, sub:sub||"" }); }
+    function add(date, mod, label, sub, go){ if (isDate(date)) ev.push({ date:date, mod:mod, label:label, sub:sub||"", go:go||"" }); }   // v428 go = 누르면 열 자리('탭:칸', 없으면 mod 탭)
     if (canSee("veh")) vehicles.forEach(function(v){ if (v.del === 1) return; add(v.insp_due, "veh", (v.no||"차량")+" 검사 만기", v.driver||""); add(v.ins_due, "veh", (v.no||"차량")+" 보험 만기", v.insurer||"");
       (v.history||[]).forEach(function(h){ if(h.kind==="현장") add(h.date, "veh", "🚚 "+(v.no||"차량")+" 현장", h.content||""); }); });
     if (canSee("lic")) licenses.forEach(function(l){ if (l.del === 1 || !licVisible(l)) return; add(l.expiry, "lic", (l.name||"인허가")+" 만료", l.org||""); add(l.edu_due, "lic", (l.name||"인허가")+" 교육", l.org||""); });
-    // 석면 작업 — 날짜 하나(시작일)에서 신고 마감까지 파생시킨다. 사람이 따로 넣지 않는다.
+    // 석면 작업 — 날짜 하나(시작일)에서 신고 마감까지 파생시킨다. 사람이 따로 넣지 않는다. 누르면 안전 › 현장(v428)
     if (canSee("lic")) liveAsb().forEach(function(r){
       var nm = r.title || "석면 작업";
-      add(r.start, "lic", "🦺 "+nm+" 착수", r.site||"");
-      add(r.end,   "lic", "🦺 "+nm+" 종료", r.site||"");
-      if (r.status !== "done") add(asbNotifyDue(r), "lic", "⚠ "+nm+" 작업신고 마감", "착수 7일 전");
-      if (isDate(r.end) && !r.conc) add(r.end, "lic", "🧪 "+nm+" 농도측정", "완료 후 지체 없이");
+      add(r.start, "lic", "🦺 "+nm+" 착수", r.site||"", "safety:site");
+      add(r.end,   "lic", "🦺 "+nm+" 종료", r.site||"", "safety:site");
+      if (r.status !== "done") add(asbNotifyDue(r), "lic", "⚠ "+nm+" 작업신고 마감", "착수 7일 전", "safety:site");
+      if (isDate(r.end) && !r.conc) add(r.end, "lic", "🧪 "+nm+" 농도측정", "완료 후 지체 없이", "safety:site");
     });
-    // 교육·건강진단 다음 예정일 — 주기가 없는 종류(관리자교육·배치전진단)는 next가 비어 있어 뜨지 않는다
+    // 교육·건강진단 다음 예정일 — 주기가 없는 종류(관리자교육·배치전진단)는 next가 비어 있어 뜨지 않는다. 누르면 안전 › 교육·검진(v428)
     if (canSee("hr")) liveEdu().forEach(function(r){
-      add(r.next, "hr", "📚 "+eduPersonName(r)+" "+eduKindLabel(r.kind), "다음 예정");
+      add(r.next, "hr", "📚 "+eduPersonName(r)+" "+eduKindLabel(r.kind), "다음 예정", "safety:edu:"+(r.ptype==="worker"?"worker":"member"));   // 칸 + 대상 칩(일용직 기록이면 일용직 목록으로)
     });
     tasks.forEach(function(t){ if (t.del === 1 || t.status === "done") return; if (!taskVisible(t)) return; add(t.due, "tasks", t.title||"지시", t.who_id==="__all__" ? "전사" : (t.who_id ? dispNameById(t.who_id) : dispName(t.who||""))); });   // who는 이름 문자열 — id 조회에 넣으면 담당자가 항상 공백이었음
     if (canSee("rec")) receivables.forEach(function(r){ if (r.del === 1 || r.paid || !recVisible(r)) return; add(r.billed, "rec", (r.client||"미수")+" 청구", r.amount ? fmtAmount(r.amount)+"원" : ""); });
@@ -5784,12 +5832,12 @@
     var wd = ["일","월","화","수","목","금","토"][new Date(ds+"T00:00:00").getDay()];
     var head = '<div class="cal-day-head">' + ds + ' (' + wd + ') · ' + evs.length + '건</div>';
     if (!evs.length){ panel.innerHTML = head + '<div class="cal-day-empty">일정 없음</div>'; return; }
-    var order = { veh:1, lic:2, tasks:3, rec:4, leave:5 };
+    var order = { veh:1, lic:2, hr:3, tasks:4, rec:5, leave:6 };
     evs.sort(function(a,b){ return (order[a.mod]||9) - (order[b.mod]||9); });
     var html = head;
     evs.forEach(function(e){
       var dd = ddayInfo(e.date);
-      html += '<div class="cal-day-item" data-cal-go="'+e.mod+'"><span class="cal-badge ev-'+e.mod+'">'+CAL_LABEL[e.mod]+'</span>'
+      html += '<div class="cal-day-item" data-cal-go="'+esc(e.go||e.mod)+'"><span class="cal-badge ev-'+e.mod+'">'+CAL_LABEL[e.mod]+'</span>'   // v428 이동 대상 = go('탭:칸') 없으면 mod 탭
         + '<div class="cal-day-main"><div class="cal-day-label">'+esc(e.label)+'</div>'
         + (e.sub ? '<div class="cal-day-sub">'+esc(e.sub)+'</div>' : '') + '</div>'
         + '<span class="dday '+(dd.cls||"")+'">'+dd.text+'</span></div>';
@@ -6115,7 +6163,7 @@
       });
     }
   })();
-  // 현장 탭 배선(v347)
+  // 현장 탭 배선(v347) — v428부터 안전 탭 현장 칸(sfPaneSite), id는 그대로
   (function(){
     var q=document.getElementById("siteSearch");
     if(q) q.addEventListener("input", function(){ siteQ=this.value; renderSites(); });
@@ -6169,10 +6217,23 @@
     });
   }
   bindSecFold("licFold", "licFoldBody", "jw-fold-lic");
-  (function(){ var mv=document.getElementById("asbMovedBtn"); if(mv) mv.addEventListener("click", function(){ switchTab("site"); }); })();
+  // v428 길 안내 버튼(data-go-tab='탭:칸', 교육은 '탭:칸:대상') — 옮긴 화면으로 바로 간다. 교육 안내는 대상 칩(직원/일용직)까지 맞춘다(setSafetyLayer).
+  Array.prototype.forEach.call(document.querySelectorAll("[data-go-tab]"), function(b){
+    b.addEventListener("click", function(){ switchTab(b.getAttribute("data-go-tab")); });
+  });
   // 인허가 3층 서브탭·의무 대장 배선
   Array.prototype.forEach.call(document.querySelectorAll("#licSubBar .lsub-btn"), function(b){
     b.addEventListener("click", function(){ setLicLayer(b.getAttribute("data-lsub")); });
+  });
+  // v428 안전 탭 칸(현장·교육·검진)·입찰 탭 칸(공고·부동산) — 인허가 칩과 같은 방식
+  Array.prototype.forEach.call(document.querySelectorAll("#sfSubBar .lsub-btn"), function(b){
+    b.addEventListener("click", function(){ setSafetyLayer(b.getAttribute("data-lsub")); });
+  });
+  Array.prototype.forEach.call(document.querySelectorAll("#bidSubBar .lsub-btn"), function(b){
+    b.addEventListener("click", function(){ setBidLayer(b.getAttribute("data-lsub")); });
+  });
+  Array.prototype.forEach.call(document.querySelectorAll("#eduScopeBar [data-edu-scope]"), function(b){
+    b.addEventListener("click", function(){ eduViewScope = (b.getAttribute("data-edu-scope") === "worker") ? "worker" : "member"; renderEdu(); });
   });
   document.getElementById("dutySearch").addEventListener("input", function(){ dutyQ = this.value.trim(); renderDuties(); });
   document.getElementById("dutyPreSave").addEventListener("click", saveDutyFromModal);
@@ -6183,8 +6244,7 @@
   document.getElementById("asbCancel").addEventListener("click", closeAsb);
   document.getElementById("asbStart").addEventListener("change", asbUpdateDerived);
   document.getElementById("asbEnd").addEventListener("change", asbUpdateDerived);
-  document.getElementById("eduHrAddBtn").addEventListener("click", function(){ openEdu(null, "member"); });
-  document.getElementById("eduWkAddBtn").addEventListener("click", function(){ openEdu(null, "worker"); });
+  document.getElementById("eduAddBtn").addEventListener("click", function(){ openEdu(null, eduViewScope); });   // v428 두 버튼(직원·일용직) → 안전 › 교육·검진 한 버튼(고른 대상 칩)
   document.getElementById("eduSave").addEventListener("click", saveEdu);
   document.getElementById("eduDelete").addEventListener("click", deleteEdu);
   document.getElementById("eduCancel").addEventListener("click", closeEdu);
@@ -11562,7 +11622,7 @@
     if (!c.task_hook && csSiteKindOf(c)){   // 매년 2/15 실적신고 할 일(건설업 등록 — 통합실적관리시스템) — 같은 제목이 열려 있으면 안 만든다
       var title = "실적신고(2/15) — " + (csTitle(c) || c.site || c.label || "");
       if (!tasks.some(function(t){ return t && t.del !== 1 && t.title === title && t.status !== "done"; })){
-        tasks.push({ id: genId("t"), title: title, detail: "통합실적관리시스템(icms.or.kr) 연도별 신고 — 현장 탭 대장(계약액 행)과 계약 탭 연결 탭의 실적 초안(업종·금액·계약일)을 확인하고 신고. 신고번호 입력 칸은 후속(현재는 메모로)", who_id: c.who_id || "", who: memberName(c.who_id || ""), from: myName() || "", from_id: myId(), by: myName() || "",
+        tasks.push({ id: genId("t"), title: title, detail: "통합실적관리시스템(icms.or.kr) 연도별 신고 — 안전 › 현장 대장(계약액 행)과 계약 탭 연결 탭의 실적 초안(업종·금액·계약일)을 확인하고 신고. 신고번호 입력 칸은 후속(현재는 메모로)", who_id: c.who_id || "", who: memberName(c.who_id || ""), from: myName() || "", from_id: myId(), by: myName() || "",
           due: csNextFeb15(), status: "open", done_at: null, done_by: null, created: todayStr(), updated: todayStr(), con_ref: c.id });
         saveTasksCache(); scheduleTasksSave();
       }
@@ -13729,7 +13789,7 @@
   ];
   function eduKindDef(k){ for(var i=0;i<EDU_KINDS.length;i++){ if(EDU_KINDS[i].k===k) return EDU_KINDS[i]; } return null; }
   function eduKindLabel(k){ var d=eduKindDef(k); return d?d.n:(k||""); }
-  var edu = [], eduBase = 0, eduPending = false, eduSaveTimer = null, eduEditId = null, eduScope = "member";
+  var edu = [], eduBase = 0, eduPending = false, eduSaveTimer = null, eduEditId = null, eduScope = "member", eduViewScope = "member";   // v428 eduViewScope = 안전 › 교육·검진 목록의 대상 칩(member 직원 | worker 일용직), eduScope = 이력 창의 대상
   function liveEdu(){ return edu.filter(function(r){ return r && r.del!==1; }); }
   function findEdu(id){ for(var i=0;i<edu.length;i++){ if(edu[i].id===id) return edu[i]; } return null; }
   function mergeEdu(local, remote){
@@ -13789,7 +13849,7 @@
     var today=todayStr(), soon=addDays(today,30);
     var over=list.filter(function(r){ return isDate(r.next) && r.next<today; }).length;
     if(head) head.textContent = list.length ? ("총 "+list.length+"건"+(over?" · 경과 "+over:"")) : "";
-    if(!list.length){ host.innerHTML='<div class="empty-line">등록된 이력이 없습니다. 아래 [+ 이력 추가]로 시작하세요.</div>'; return; }
+    if(!list.length){ host.innerHTML='<div class="empty-line">등록된 이력이 없습니다. [+ 이력 추가]로 시작하세요.</div>'; return; }   // v428 추가 버튼은 칸 머리 줄(오른쪽 위)
     var html="";
     list.forEach(function(r){
       var chip="";
@@ -13808,9 +13868,11 @@
       b.addEventListener("click", function(){ openEdu(b.getAttribute("data-edu-edit")); });
     });
   }
+  // v428: 옛 두 목록(인사·직원 화면의 직원 이력 · 인사·일용직 화면의 일용직 이력)을 안전 › 교육·검진 한 목록으로 — 대상은 칩(eduScopeBar)으로 고른다
   function renderEdu(){
-    renderEduInto("eduHrList","eduHrHead","member");
-    renderEduInto("eduWkList","eduWkHead","worker");
+    var bar=document.getElementById("eduScopeBar");
+    if(bar) Array.prototype.forEach.call(bar.querySelectorAll("[data-edu-scope]"), function(b){ b.classList.toggle("on", b.getAttribute("data-edu-scope")===eduViewScope); });
+    renderEduInto("eduList","eduHead",eduViewScope);
   }
   function eduFillPersons(scope, sel){
     var s=document.getElementById("eduPerson"); if(!s) return;
@@ -19517,6 +19579,47 @@
     if (d) d.textContent = duties.length ? String(duties.length) : "";
   }
 
+  // ---- v428(메뉴 56 1단계) 안전 탭 칸·입찰 탭 칸 — 인허가 setLicLayer와 같은 방식(.lsub-bar 칩 + 칸 감싸개) ----
+  // 안전 탭에서 지금 볼 수 있는 칸. 1단계는 권한 키를 바꾸지 않는다: 현장 칸 = site, 교육·검진 칸 = hr(관리자 전용 — 서버 col:edu도 hr).
+  //   3단계(safety 권한 등록)에서 교육·검진 판정을 safety로 바꾼다. 탭 표시·칩·첫 칸 고르기가 모두 이 목록 하나를 본다.
+  function safetyPanes(){
+    var out = [];
+    if (canSee("site")) out.push("site");
+    if (canSee("hr")) out.push("edu");
+    return out;
+  }
+  function setSafetyLayer(name){
+    var panes = safetyPanes(), sub = "", ci = String(name || "").indexOf(":");
+    if (ci >= 0){ sub = String(name).slice(ci + 1); name = String(name).slice(0, ci); }   // "edu:worker" = 교육·검진 칸 + 대상 칩(캘린더·인사 두 화면 안내가 넘긴다)
+    if (panes.indexOf(name) < 0) name = panes.length ? panes[0] : "site";   // 칸을 안 고르면(사이드바) 볼 수 있는 첫 칸
+    if (name === "edu" && (sub === "member" || sub === "worker")) eduViewScope = sub;
+    safetyLayer = name;
+    var bar = document.getElementById("sfSubBar");
+    if (bar) Array.prototype.forEach.call(bar.querySelectorAll(".lsub-btn"), function(b){
+      b.classList.toggle("active", b.getAttribute("data-lsub") === name);
+    });
+    document.getElementById("sfPaneSite").style.display = (name === "site") ? "" : "none";
+    document.getElementById("sfPaneEdu").style.display = (name === "edu") ? "" : "none";
+    if (name === "site"){ renderSites(); loadAsb(); loadEdu(); if (canSee("wk")) loadWorkers(); }   // 옛 현장 탭을 열 때 하던 읽기 그대로
+    if (name === "edu"){
+      renderEdu(); loadEdu();
+      // 일용직 이름은 명부에서 — 명부가 교육 기록보다 늦게 오면 일용직 줄이 '(삭제된 일용직)'으로 남는다(loadWorkers는 renderEdu를 부르지 않음).
+      //   명부가 온 뒤 아직 이 칸이면 한 번 더 그린다(v428 검토: 캘린더 교육 예정 → 일용직 목록 길에서 바로 드러나던 경합. 공용 loadWorkers는 그대로)
+      if (canSee("wk")){ var wkp = loadWorkers(); if (wkp && typeof wkp.then === "function") wkp.then(function(){ if (currentTab === "safety" && safetyLayer === "edu") renderEdu(); }); }
+    }
+  }
+  function setBidLayer(name){
+    if (name !== "onbid") name = "list";   // 칸을 안 고르면 공고
+    bidLayer = name;
+    var bar = document.getElementById("bidSubBar");
+    if (bar) Array.prototype.forEach.call(bar.querySelectorAll(".lsub-btn"), function(b){
+      b.classList.toggle("active", b.getAttribute("data-lsub") === name);
+    });
+    document.getElementById("bidLayerList").style.display = (name === "list") ? "" : "none";
+    document.getElementById("bidLayerOnbid").style.display = (name === "onbid") ? "" : "none";
+    if (name === "onbid") renderOnbid(); else renderBids();
+  }
+
   function dutyBadges(d){
     var h = "";
     if (d.unit === "차량") h += '<span class="duty-badge unit">차량</span> ';
@@ -21620,12 +21723,11 @@
     var bidSec = document.getElementById("bidSection");
     if (bidSec) bidSec.style.display = isAdmin() ? "" : "none";   // 일감은 관리자 전용(서버도 강제)
     var obSec = document.getElementById("onbidSection");
-    if (obSec) obSec.style.display = isAdmin() ? "" : "none";     // 공매·부동산도 관리자 전용
+    if (obSec) obSec.style.display = isAdmin() ? "" : "none";     // 공매·부동산도 관리자 전용 — v428부터 입찰 탭 안 부동산 칸
     var bidTab = document.getElementById("tabBidBtn");
     if (bidTab) bidTab.classList.toggle("perm-hidden", !isAdmin());
-    var obTab = document.getElementById("tabOnbidBtn");
-    if (obTab) obTab.classList.toggle("perm-hidden", !isAdmin());
-    if ((currentTab === "bid" || currentTab === "onbid") && !isAdmin()) switchTab("dash");
+    if (currentTab === "bid" && !isAdmin()) switchTab("dash");
+    applySafetyPerms();   // v428 안전 탭(옛 현장 자리) — 칸 단위 판정
     // 인사·직원 탭: 대표·관리자 전용 / 인사·일용직은 wk 권한(모듈 루프에서 처리)
     var adminUser = isAdmin();
     var hrBtn = document.getElementById("tabHrBtn");
@@ -21651,6 +21753,29 @@
     })();
     updateUserChip();
     updateApprovalBadges();
+  }
+  // v428 안전 탭: applyPerms는 키와 탭이 1:1이라고 보지만 안전 탭은 칸(현장=site, 교육·검진=hr) 두 키로 판정한다.
+  //   현장 칩은 MODULES 루프(MODULE_TAB.site=sfChipSite)가 숨기고, 여기서는 탭 버튼·교육 칩·칩 줄·길 안내(인허가 석면 안내 버튼·인사 두 화면 교육 안내 줄)를 맞춘다.
+  function applySafetyPerms(){
+    var panes = safetyPanes();
+    var tab = document.getElementById("tabSafetyBtn");
+    if (tab) tab.classList.toggle("perm-hidden", !panes.length);   // 볼 칸이 하나도 없으면 탭째 숨김(김호태·현장 8명)
+    var chipEdu = document.getElementById("sfChipEdu");
+    if (chipEdu) chipEdu.classList.toggle("perm-hidden", panes.indexOf("edu") < 0);
+    var bar = document.getElementById("sfSubBar");
+    if (bar) bar.style.display = panes.length > 1 ? "" : "none";   // 칩이 1개 이하면 칩 줄째 숨김 — 현장만 보는 사람은 옛 현장 화면 그대로
+    if (currentTab === "safety"){
+      if (!panes.length) switchTab("dash");
+      else if (panes.indexOf(safetyLayer) < 0) setSafetyLayer(panes[0]);
+    }
+    // 길 안내는 갈 곳을 볼 수 있는 사람에게만 — 인허가 → 안전 › 현장, 인사 두 화면 → 안전 › 교육·검진(비관리자의 빈 이력 칸은 없앰)
+    //   인허가 석면 안내는 버튼만 숨기고 글 줄은 남긴다(510ed20과 같음 — 1단계 브리핑에 권민지형 화면 변화 없음, v428 검토). 버튼은 CSS !important라 감싸개로 숨긴다
+    var asbGo = document.getElementById("asbMovedGo");
+    if (asbGo) asbGo.style.display = panes.indexOf("site") >= 0 ? "" : "none";
+    ["eduMovedHr", "eduMovedWk"].forEach(function(id){
+      var el = document.getElementById(id);
+      if (el) el.style.display = panes.indexOf("edu") >= 0 ? "" : "none";
+    });
   }
 
   function saveUsersCache(){ try{ localStorage.setItem(USERS_CACHE_KEY, JSON.stringify({members: members})); }catch(e){} }

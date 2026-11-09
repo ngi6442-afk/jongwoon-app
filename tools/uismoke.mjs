@@ -1791,7 +1791,7 @@ try {
   const swv9 = readFileSync(join(ROOT, 'sw.js'), 'utf8'), man9 = readFileSync(join(ROOT, 'MANUAL.html'), 'utf8');
   T('v409 도움말: "이름 선택 + PIN" 0 · 아이디 + PIN · 4묶음(관리·수주·업무·개인) · 휴가 한 줄 · MANUAL 1절 아이디·20절 신청 4단계/철회/취소 요청/연차 계산/사직 · sw ≥ 409',
     html.indexOf('이름 선택 + PIN') < 0 && html.indexOf('<b>아이디 + PIN</b>') > 0
-    && ['<b>관리</b>: 지시 / 기성·수금', '<b>수주</b>: 입찰 / 계약', '<b>업무</b>: 캘린더 / 차량', '<b>개인</b>: 내 업무'].every(function (t) { return html.indexOf(t) > 0; })
+    && ['<b>관리</b>: 지시 / 기성·수금', '<b>수주</b>: 입찰 / 계약', '<b>업무</b>: 캘린더 / 차량', '<b>개인</b>: 물어보기'].every(function (t) { return html.indexOf(t) > 0; })   // v428 개인 순서 = 사이드바(물어보기 / 내 업무 / 휴가)
     && html.indexOf('<b>+ 휴가 신청</b>(유형·기간·사유 필수)') > 0
     && man9.indexOf('이름을 고르고 PIN') < 0 && man9.indexOf('아이디와 PIN을 입력합니다') > 0
     && ['[+ 휴가 신청]', '<b>[철회]</b>', '<b>[취소 요청]</b>', '최대 25일', '사직 면담 신청', '승인·반려되면 알림 켠 기기로 알림이 옵니다'].every(function (t) { return man9.indexOf(t) > 0; })
@@ -1963,6 +1963,249 @@ try {
     ids.has('conAmount') && ids.has('conAmtTbd') && /if\(!amt && !amtTbd\)\{ alert\("계약금액\(원\)을 입력하세요/.test(html) && /function conAmtFromBid\(b\)/.test(html) && (html.match(/conAmtFromBid\(b\);/g) || []).length === 2
     && /if\(amt\)\{ if\(bcinfo\) bcinfo\.amount=amt; else bcinfo=\{ title:"", amount:amt,/.test(html) && /c\.amount_tbd \? "미정\(견적 전, "/.test(html) && /var am0=document\.getElementById\("conAmount"\); if\(am0\) am0\.value="";/.test(html), '');
 } catch (e) { console.log('  (v427 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ---- v428(11/9 메뉴 56 1단계, PM "56. ㄱ"): 탭 자리 옮기기 — 현장 → 안전 › 현장 칸 · 교육 이력 한 목록(안전 › 교육·검진) · 부동산 → 입찰 › 부동산 칸.
+//      데이터·권한 키(MODULES·COL)·서버는 그대로. 옛 id를 지우고 배선을 남기면 부팅이 멈춘다(null.addEventListener) — 옛 이름 0개부터 보고,
+//      칸 판정·별칭·캘린더 이동·교육 한 목록은 index.html에서 함수를 뽑아 실제로 돌려 본다.
+try {
+  const sw28 = readFileSync(join(ROOT, 'sw.js'), 'utf8'), man28 = readFileSync(join(ROOT, 'MANUAL.html'), 'utf8');
+  const fn28 = (name) => { const i = html.indexOf('function ' + name + '('); if (i < 0) throw new Error('함수 없음: ' + name); let d = 0, st = false; for (let j = i; j < html.length; j++) { const ch = html[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return html.slice(i, j + 1); } } throw new Error('중괄호 짝 안 맞음: ' + name); };
+  const sec28 = (id) => { const i = html.indexOf('<section class="view" id="' + id + '">'); if (i < 0) throw new Error('뷰 없음: ' + id); return html.slice(i, html.indexOf('</section>', i)); };
+  // 여는 태그부터 div 짝이 닫히는 곳까지(문자열 구간이 아니라 실제 포함 관계 — 칸 밖으로 밀려난 요소를 잡는다)
+  const divBlock28 = (src, openTag) => { const i = src.indexOf(openTag); if (i < 0) return ''; const re = /<div\b|<\/div>/g; re.lastIndex = i; let d = 0, m; while ((m = re.exec(src))) { d += m[0] === '</div>' ? -1 : 1; if (d === 0) return src.slice(i, m.index + 6); } return ''; };
+  const once28 = (id) => html.split('id="' + id + '"').length === 2;
+
+  // ① 옛 이름 0
+  const OLD28 = ['id="view-site"', 'id="view-onbid"', 'tabSiteBtn', 'tabOnbidBtn', 'data-tab="site"', 'data-tab="onbid"', 'switchTab("site")', 'switchTab("onbid")', '"view-site"', '"view-onbid"', 'eduHrList', 'eduHrHead', 'eduHrAddBtn', 'eduWkList', 'eduWkHead', 'eduWkAddBtn', 'eduWkSec'];
+  const left28 = OLD28.filter((s) => html.indexOf(s) >= 0);
+  T('v428 옛 이름 0: 뷰 view-site·view-onbid · 탭 버튼 tabSiteBtn·tabOnbidBtn · data-tab site·onbid · switchTab("site"/"onbid") · 인사 두 화면 교육 목록 id 7종 — 남은 것 없음 · renderEduInto 호출은 한 목록 1곳(eduList·eduHead·고른 대상)',
+    left28.length === 0 && (html.match(/renderEduInto\(/g) || []).length === 2 && html.indexOf('renderEduInto("eduList","eduHead",eduViewScope)') > 0, '남음: ' + left28.join(', '));
+
+  // ② 사이드바 순서·칸 수
+  const nav28 = html.slice(html.indexOf('<nav class="tabbar" id="tabbar">'), html.indexOf('</nav>'));
+  const tabs28 = [...nav28.matchAll(/data-tab="([\w-]+)"/g)].map((m) => m[1]);
+  const WANT28 = 'dash,tasks,rec,cli,hr,workers,progress,bid,con,quote,promo,cal,veh,hwakwan,allbaro,safety,lic,doc,ask,check,leave';
+  const ia28 = tabs28.indexOf('allbaro');
+  T('v428 사이드바 21칸(관리자 22 → 21, 부동산 빠짐) 순서 그대로 · 업무 묶음 운반일지 → 안전 → 인허가(옛 현장 자리) · 안전 버튼 tabSafetyBtn = 처음엔 숨김(perm-hidden)·글자 "안전"',
+    tabs28.join(',') === WANT28 && tabs28.length === 21 && ia28 > 0 && tabs28[ia28 + 1] === 'safety' && tabs28[ia28 + 2] === 'lic'
+    && /<button class="tab-btn perm-hidden" data-tab="safety" id="tabSafetyBtn">안전<\/button>/.test(nav28), tabs28.join(','));
+
+  // ③ 칸 구조 — 현장 id 5개가 view-safety의 현장 칸 안 · 교육 칸 · 입찰 칸
+  const vs28 = sec28('view-safety'), vb28 = sec28('view-bid');
+  const bar28 = divBlock28(vs28, '<div class="lsub-bar" id="sfSubBar">'), pSite28 = divBlock28(vs28, '<div class="sf-pane" id="sfPaneSite">'), pEdu28 = divBlock28(vs28, '<div class="sf-pane" id="sfPaneEdu" style="display:none;">');
+  const SITE5 = ['siteHead', 'siteAddBtn', 'siteFilterBar', 'siteSearch', 'siteList'];
+  T('v428 안전 탭 칸: 칩 줄 sfSubBar(현장 sfChipSite · 교육·검진 sfChipEdu, .lsub-btn) · 현장 칸 sfPaneSite(.sf-pane) 안에 현장 id 5개(siteHead·siteAddBtn·siteFilterBar·siteSearch·siteList, 각 1번) · 교육 칸 sfPaneEdu(.sf-pane, 처음 숨김) 안에 eduHead·eduAddBtn·대상 칩(eduScopeBar 직원 member/일용직 worker)·eduList',
+    /<button class="lsub-btn active" data-lsub="site" id="sfChipSite">현장<\/button>/.test(bar28) && /<button class="lsub-btn" data-lsub="edu" id="sfChipEdu">교육·검진<\/button>/.test(bar28)
+    && /<div class="sf-pane" id="sfPaneSite">/.test(vs28) && /<div class="sf-pane" id="sfPaneEdu" style="display:none;">/.test(vs28)
+    && SITE5.every((id) => pSite28.indexOf('id="' + id + '"') >= 0 && once28(id))
+    && ['eduHead', 'eduAddBtn', 'eduScopeBar', 'eduList'].every((id) => pEdu28.indexOf('id="' + id + '"') >= 0 && once28(id))
+    && /data-edu-scope="member">직원</.test(pEdu28) && /data-edu-scope="worker">일용직</.test(pEdu28), SITE5.filter((id) => pSite28.indexOf('id="' + id + '"') < 0 || !once28(id)).join(','));
+  const bBar28 = divBlock28(vb28, '<div class="lsub-bar" id="bidSubBar">'), bList28 = divBlock28(vb28, '<div id="bidLayerList">'), bOb28 = divBlock28(vb28, '<div id="bidLayerOnbid" style="display:none;">');
+  T('v428 입찰 탭 칸: 칩 줄 bidSubBar(공고 list · 부동산 onbid) · 감싸개 bidLayerList 안 bidSection·bidList · bidLayerOnbid(처음 숨김) 안 onbidSection·obHead·obList·obFilterBar·obSearch·obMoreBtn(옛 부동산 화면, 각 1번)',
+    /<button class="lsub-btn active" data-lsub="list" id="bidChipList">공고<\/button>/.test(bBar28) && /<button class="lsub-btn" data-lsub="onbid" id="bidChipOnbid">부동산<\/button>/.test(bBar28)
+    && bList28.indexOf('id="bidSection"') >= 0 && bList28.indexOf('id="bidList"') >= 0 && once28('bidSection') && once28('bidList') && /<div id="bidLayerOnbid" style="display:none;">/.test(vb28)
+    && ['onbidSection', 'obHead', 'obList', 'obFilterBar', 'obSearch', 'obMoreBtn'].every((id) => bOb28.indexOf('id="' + id + '"') >= 0 && once28(id)), '');
+
+  {
+    const bChips = [{ a: 'list' }, { a: 'onbid' }].map((x) => { const s = new Set(); return { getAttribute: () => x.a, classList: { toggle: (c, on) => { if (on) s.add(c); else s.delete(c); }, contains: (c) => s.has(c) } }; });
+    const BD = { bidSubBar: { querySelectorAll: () => bChips }, bidLayerList: { style: {} }, bidLayerOnbid: { style: {} } };
+    const blog = [];
+    const bapi = new Function('__D', '__log', ['var document = { getElementById: function(id){ return __D[id] || null; } }; var bidLayer = "list";',
+      'function renderBids(){ __log.push("bids"); } function renderOnbid(){ __log.push("onbid"); }', fn28('setBidLayer'), 'return { set: setBidLayer, layer: function(){ return bidLayer; } };'].join('\n'))(BD, blog);
+    const bst = () => [bapi.layer(), BD.bidLayerList.style.display === '' ? 'L+' : 'L-', BD.bidLayerOnbid.style.display === '' ? 'O+' : 'O-', bChips[0].classList.contains('active') ? 'c1' : '', bChips[1].classList.contains('active') ? 'c2' : '', blog[blog.length - 1]].join(',');
+    bapi.set(''); const b1 = bst(); bapi.set('onbid'); const b2 = bst(); bapi.set('zz'); const b3 = bst();
+    T('v428 입찰 칸 전환(setBidLayer 실행): 칸 없음·모르는 칸 = 공고(목록 그림) · onbid = 부동산(온비드 그림) · 칩 active가 따라감 — 사이드바 입찰은 늘 공고부터, 옛 부동산 길은 부동산 칸',
+      b1 === 'list,L+,O-,c1,,bids' && b2 === 'onbid,L-,O+,,c2,onbid' && b3 === 'list,L+,O-,c1,,bids', [b1, b2, b3].join(' / '));
+  }
+
+  // ④ switchTab 별칭 — tabRoute를 뽑아 실제로 돌린다
+  const TA28 = (html.match(/var TAB_ALIAS = \{[^\n]*\};/) || [''])[0];
+  const route28 = new Function([TA28, fn28('tabRoute'), 'return tabRoute;'].join('\n'))();
+  const R28 = (n) => { const r = route28(n); return r.tab + '|' + r.layer; };
+  const cases28 = [['site', 'safety|site'], ['onbid', 'bid|onbid'], ['safety:edu', 'safety|edu'], ['safety:edu:worker', 'safety|edu:worker'], ['safety', 'safety|'], ['site:edu', 'safety|edu'], ['onbid:list', 'bid|list'], ['bid', 'bid|'], ['lic', 'lic|'], ['', 'dash|'], [undefined, 'dash|'], ['constructor', 'constructor|'], ['toString', 'toString|']];
+  const bad28 = cases28.filter((c) => R28(c[0]) !== c[1]);
+  const swt28 = fn28('switchTab');
+  T('v428 switchTab 별칭(tabRoute 실행): site → 안전·현장 · onbid → 입찰·부동산 · "탭:칸" · 적은 칸이 별칭 칸보다 우선 · 빈 값 → 홈 · 객체 원형 이름은 별칭 아님 / switchTab이 맨 앞(currentTab보다 먼저)에서 풀고 안전·입찰은 칸으로 넘김 · 볼 칸 없으면 홈 · 인사 탭에서 교육 목록을 그리지 않음',
+    TA28.length > 0 && bad28.length === 0
+    && swt28.indexOf('var rt = tabRoute(name);') > 0 && swt28.indexOf('var rt = tabRoute(name);') < swt28.indexOf('currentTab = name;')
+    && swt28.indexOf('if (name === "safety" && !safetyPanes().length) name = "dash";') > 0 && swt28.indexOf('if (name === "safety" && !safetyPanes().length) name = "dash";') < swt28.indexOf('currentTab = name;')
+    && swt28.indexOf('getElementById("view-safety").classList.toggle("active", name === "safety")') > 0
+    && swt28.indexOf('if (name === "safety") setSafetyLayer(rt.layer);') > 0 && swt28.indexOf('if (name === "bid") setBidLayer(rt.layer);') > 0 && swt28.indexOf('renderEdu()') < 0,
+    JSON.stringify(bad28.map((c) => [c[0], R28(c[0])])));
+
+  // ⑤ 이동 대상이 전부 실재 — 길 안내 버튼(data-go-tab)·캘린더 go·옛 이름이 있는 뷰와 그 탭의 칸으로 풀린다
+  const layers28 = { safety: [...bar28.matchAll(/data-lsub="(\w+)"/g)].map((m) => m[1]), bid: [...bBar28.matchAll(/data-lsub="(\w+)"/g)].map((m) => m[1]) };
+  const eduScopes28 = [...pEdu28.matchAll(/data-edu-scope="(\w+)"/g)].map((m) => m[1]);
+  // '탭:칸'(+ 교육·검진은 ':대상') 하나가 있는 뷰·그 탭의 칸·교육 대상 칩으로 풀리는지
+  const goOk28 = (g) => { const r = route28(g); if (!ids.has('view-' + r.tab)) return false; if (!r.layer) return true; const p = r.layer.split(':'); if ((layers28[r.tab] || []).indexOf(p[0]) < 0) return false; if (p.length === 1) return true; return r.tab === 'safety' && p[0] === 'edu' && p.length === 2 && eduScopes28.indexOf(p[1]) >= 0; };
+  const cal28 = fn28('calEvents');
+  // v428 검토: '탭:칸' 글자는 기존 2번 검사(switchTab("이름") → view-이름, [\w-]+)에 안 걸린다 — switchTab 글자 호출(" ' 둘 다)과
+  //   data-home-go·data-inbox-go·data-cal-go 속성의 칸 형식도 여기서 함께 푼다(11/9 기준 0건 — 앞으로 생기면 safety:sites 같은 오타를 잡는다)
+  const colonSw28 = [...html.matchAll(/switchTab\((["'])(\w+:[\w:]+)\1\)/g)].map((m) => m[2]);
+  const colonGo28 = [...html.matchAll(/data-(?:home|inbox|cal)-go="(\w+:[\w:]+)"/g)].map((m) => m[1]);
+  const goT28 = [...new Set([...[...html.matchAll(/data-go-tab="([\w:]+)"/g)].map((m) => m[1]), ...[...cal28.matchAll(/"(\w+:\w+)"\)/g)].map((m) => m[1]), ...colonSw28, ...colonGo28, 'site', 'onbid'])];
+  const badGo28 = goT28.filter((g) => !goOk28(g));
+  T('v428 이동 대상 ' + goT28.length + '개(길 안내 data-go-tab·캘린더 go·옛 이름 site/onbid·switchTab 글자와 data-home/inbox/cal-go의 \'탭:칸\' ' + (colonSw28.length + colonGo28.length) + '개)가 전부 있는 뷰·그 탭의 칸·교육 대상 칩으로 풀림 · 길 안내 버튼 3개(인허가 → 안전 › 현장, 인사·직원 → 교육·검진 직원, 인사·일용직 → 교육·검진 일용직, 교육 안내 줄은 처음 숨김 · 인허가 석면 안내는 글 줄이 처음부터 보이고 버튼만 감싸개 asbMovedGo 안) · 일부러 틀린 대상은 안 풀림 · 옛 교육 이력 제목 없음',
+    goT28.length >= 5 && badGo28.length === 0 && layers28.safety.join() === 'site,edu' && layers28.bid.join() === 'list,onbid' && eduScopes28.join() === 'member,worker'
+    && ['safety:nope', 'safety:edu:boss', 'safety:site:worker', 'nowhere', 'bid:edu'].every((g) => !goOk28(g))
+    && /<div class="hw-note" id="asbMovedNote" style="margin-top:22px;">[^<]*<b>안전 › 현장<\/b>[^<]*<span id="asbMovedGo"><button class="mini-btn" id="asbMovedBtn" data-go-tab="safety:site" style="margin-left:6px;">안전 › 현장 열기<\/button><\/span><\/div>/.test(sec28('view-lic'))
+    && /id="eduMovedHrBtn" data-go-tab="safety:edu:member"/.test(sec28('view-hr')) && /id="eduMovedWkBtn" data-go-tab="safety:edu:worker"/.test(sec28('view-workers'))
+    && /querySelectorAll\("\[data-go-tab\]"\), function\(b\)\{\s*b\.addEventListener\("click", function\(\)\{ switchTab\(b\.getAttribute\("data-go-tab"\)\); \}\);/.test(html)
+    && /<div class="hw-note" id="eduMovedHr" style="[^"]*display:none;">/.test(html) && /<div class="hw-note" id="eduMovedWk" style="[^"]*display:none;">/.test(html)
+    && sec28('view-hr').indexOf('<h2>교육·건강진단 이력') < 0 && sec28('view-workers').indexOf('<h2>교육·건강진단 이력') < 0,
+    '안 풀림: ' + badGo28.join(', ') + ' / 칸 ' + JSON.stringify(layers28));
+
+  // ⑥ 캘린더 이동 대상 — calEvents를 뽑아 실제로 돌린다
+  const calApi28 = new Function([
+    'var vehicles = [{ no:"12가3456", insp_due:"2026-12-01", ins_due:"2026-12-02", history:[{ kind:"현장", date:"2026-11-20" }] }], licenses = [{ name:"석면해체업", expiry:"2027-01-01", edu_due:"2026-12-10" }], tasks = [{ title:"지시", due:"2026-11-30", status:"open" }], receivables = [{ client:"갑", billed:"2026-11-15", amount:1000 }];',
+    'function canSee(){ return true; } function isAdmin(){ return true; } function licVisible(){ return true; } function taskVisible(){ return true; } function recVisible(){ return true; }',
+    'function isDate(s){ return /^\\d{4}-\\d{2}-\\d{2}$/.test(s||""); } function fmtAmount(v){ return String(v); } function dispName(n){ return n||""; } function dispNameById(){ return ""; } function memberName(){ return "홍"; }',
+    'function liveAsb(){ return [{ title:"남성초", start:"2026-11-20", end:"2026-11-25", status:"plan", site:"포항" }]; } function asbNotifyDue(){ return "2026-11-13"; }',
+    'function liveEdu(){ return [{ ptype:"member", pid:"u1", kind:"regular", date:"2026-06-01", next:"2026-12-01" }, { ptype:"worker", pid:"w1", kind:"spec_med", date:"2026-04-01", next:"2027-04-01" }]; } function eduPersonName(){ return "홍"; } function eduKindLabel(){ return "정기교육(근로자)"; }',
+    'function liveLeaves(){ return [{ type:"annual", status:"approved", member_id:"u1", start:"2026-11-26", end:"2026-11-26" }]; } function isPartialLeave(){ return false; } function leaveCalVisible(){ return true; } function leaveTypeLabel(){ return "연차"; }',
+    fn28('pad'), fn28('fmtDate'), fn28('eachDate'), cal28, 'return calEvents;'].join('\n'))();
+  const ev28 = calApi28();
+  const isAsb28 = (e) => /🦺|⚠|🧪/.test(e.label);
+  const asbEv28 = ev28.filter(isAsb28), eduEv28 = ev28.filter((e) => e.mod === 'hr'), licEv28 = ev28.filter((e) => e.mod === 'lic' && !isAsb28(e));
+  T('v428 캘린더 이동(calEvents 실행): 석면 일정 4건(착수·종료·신고 마감·농도측정) go = safety:site · 교육 예정 mod hr go = safety:edu:대상(직원 member·일용직 worker — 그 목록으로 열림) · 그 밖(인허가 2·차량·지시·기성·휴가)은 go 없음(mod 탭) · go 전부 풀림 · 날짜 칸 줄 data-cal-go = go||mod',
+    asbEv28.length === 4 && asbEv28.every((e) => e.mod === 'lic' && e.go === 'safety:site') && eduEv28.length === 2 && eduEv28.map((e) => e.go).join() === 'safety:edu:member,safety:edu:worker'
+    && licEv28.length === 2 && ev28.filter((e) => e.mod !== 'hr' && !isAsb28(e)).every((e) => e.go === '') && ev28.length === 14 && ev28.filter((e) => e.go).every((e) => goOk28(e.go))
+    && fn28('renderCalDay').indexOf('data-cal-go="\'+esc(e.go||e.mod)+\'"') > 0, JSON.stringify(ev28.map((e) => e.mod + ':' + (e.go || '-'))));
+
+  // ⑦ CAL_LABEL이 calEvents의 mod 전부를 덮는다(정적 + 실행) · mod마다 칩·점 색
+  const LBL28 = (html.match(/var CAL_LABEL = \{([^}]*)\}/) || ['', ''])[1];
+  const labKeys28 = [...LBL28.matchAll(/(\w+)\s*:\s*"/g)].map((m) => m[1]);
+  const addMods28 = [...new Set([...cal28.matchAll(/\badd\((?:[^()]|\([^()]*\))*?,\s*"(\w+)"\s*,/g)].map((m) => m[1]))].sort();
+  const runMods28 = [...new Set(ev28.map((e) => e.mod))].sort();
+  const noLbl28 = [...new Set(addMods28.concat(runMods28))].filter((m) => labKeys28.indexOf(m) < 0);
+  const noCss28 = addMods28.filter((m) => !new RegExp('\\.ev-' + m + '\\{background:#[0-9a-fA-F]{6};\\}').test(html) || !new RegExp('\\.dot-' + m + '\\{background:#[0-9a-fA-F]{6};\\}').test(html));
+  T('v428 CAL_LABEL이 calEvents의 mod 전부(' + addMods28.join('·') + ')를 덮음 — 교육 hr "교육"(배지 "undefined" 수리) · mod마다 .ev-·.dot- 색(흰 글씨 칩이 안 보이던 것)',
+    addMods28.join(',') === 'hr,leave,lic,rec,tasks,veh' && runMods28.join(',') === addMods28.join(',') && noLbl28.length === 0 && /\bhr:"교육"/.test(LBL28) && noCss28.length === 0,
+    '라벨 없음: ' + noLbl28.join(',') + ' / 색 없음: ' + noCss28.join(',') + ' / add ' + addMods28.join(',') + ' / 실행 ' + runMods28.join(','));
+
+  // ⑧ CSS — 칸 readonly·칩 숨김·이동 버튼 예외 · 기존 895~899행 묶음과 600행 그대로
+  T('v428 CSS: .sf-pane.readonly가 .view.readonly와 같은 5종(add-row·del-x·mini-btn·link-btn·sec-hd-add)을 숨김 · .lsub-btn.perm-hidden · 이동 버튼(data-go-tab)은 보기 권한 화면에서도 보임 · 교육 대상 칩(#eduScopeBar) 켜짐은 옅은 선택 표시(칸 칩 진한 초록과 위계 구분 — 시안 .mchip.on), 공용 .vs-chip.on은 그대로 · 기존 895~899행 묶음(v369 예외 순서 포함)·600행 그대로',
+    /\.sf-pane\.readonly \.add-row,\r?\n  \.sf-pane\.readonly \.del-x,\r?\n  \.sf-pane\.readonly \.mini-btn,\r?\n  \.sf-pane\.readonly \.link-btn,\r?\n  \.sf-pane\.readonly \.sec-hd-add\{display:none !important;\}/.test(html)
+    && /\.lsub-btn\.perm-hidden\{display:none !important;\}/.test(html) && /\.view\.readonly \.mini-btn\[data-go-tab\]\{display:inline-block !important;\}/.test(html)
+    && /\n  #eduScopeBar \.vs-chip\.on\{background:#EAF3EF;color:var\(--brand-dark\);border-color:var\(--brand\);font-weight:700;\}/.test(html) && /\n  \.vs-chip\.on\{background:var\(--brand\);color:#fff;border-color:var\(--brand\);\}/.test(html)
+    && /<div class="vs-tools" id="eduScopeBar">/.test(html)
+    && /  \.view\.readonly \.add-row,\r?\n  \.view\.readonly \.del-x,\r?\n  \.view\.readonly \.mini-btn,\r?\n  \.view\.readonly \.link-btn\{display:none !important;\}\r?\n  \.view\.readonly \.mini-btn\[data-doc-att-open\]\{display:inline-block !important;\}/.test(html)
+    && /\.view\.readonly \.sec-hd-add\{display:none !important;\}/.test(html), '');
+
+  // ⑨ 레지스트리 — site는 칩·칸을 가리키고, MODULES 키마다 탭·뷰 id가 실재
+  const MT28 = (html.match(/var MODULE_TAB = \{([^}]+)\}/) || ['', ''])[1], MV28 = (html.match(/var MODULE_VIEW = \{([^}]+)\}/) || ['', ''])[1];
+  const modsReg28 = ((html.match(/var MODULES = \[([^\]]+)\]/) || ['', ''])[1].match(/"(\w+)"/g) || []).map((s) => s.replace(/"/g, ''));
+  const mt28 = {}, mv28 = {};
+  [...MT28.matchAll(/(\w+):"(\w+)"/g)].forEach((m) => { mt28[m[1]] = m[2]; });
+  [...MV28.matchAll(/(\w+):"([\w-]+)"/g)].forEach((m) => { mv28[m[1]] = m[2]; });
+  const regBad28 = modsReg28.filter((k) => !ids.has(mt28[k]) || !ids.has(mv28[k]));
+  T('v428 레지스트리: MODULE_TAB.site = 현장 칩(sfChipSite) · MODULE_VIEW.site = 현장 칸(sfPaneSite — readonly는 칸에만, 바깥 view-safety엔 안 검) · tabSafetyBtn은 레지스트리 밖 · MODULES ' + modsReg28.length + '키마다 탭·뷰 id 실재',
+    mt28.site === 'sfChipSite' && mv28.site === 'sfPaneSite' && MV28.indexOf('view-safety') < 0 && MT28.indexOf('tabSafetyBtn') < 0 && modsReg28.length >= 12 && regBad28.length === 0,
+    '없는 id: ' + regBad28.map((k) => k + '→' + mt28[k] + '/' + mv28[k]).join(', '));
+
+  // ⑩ 안전 탭 칸 판정 — safetyPanes·applySafetyPerms·setSafetyLayer를 뽑아 사람 유형별로 돌린다(권한 키는 지금 그대로: 현장 = site, 교육·검진 = hr)
+  const mkC28 = () => { const s = new Set(); return { add: (c) => s.add(c), remove: (c) => s.delete(c), toggle: (c, on) => { if (on === undefined ? !s.has(c) : on) s.add(c); else s.delete(c); return s.has(c); }, contains: (c) => s.has(c) }; };
+  const mkE28 = (id, attrs) => ({ id, attrs: attrs || {}, classList: mkC28(), style: {}, getAttribute(n) { return this.attrs[n] === undefined ? null : this.attrs[n]; }, querySelectorAll: () => [] });
+  const runSf28 = (perm, cur, layer) => {
+    const chips = [mkE28('sfChipSite', { 'data-lsub': 'site' }), mkE28('sfChipEdu', { 'data-lsub': 'edu' })];
+    const D = { tabSafetyBtn: mkE28('tabSafetyBtn'), sfChipEdu: chips[1], sfSubBar: mkE28('sfSubBar'), asbMovedNote: mkE28('asbMovedNote'), asbMovedGo: mkE28('asbMovedGo'), eduMovedHr: mkE28('eduMovedHr'), eduMovedWk: mkE28('eduMovedWk'), sfPaneSite: mkE28('sfPaneSite'), sfPaneEdu: mkE28('sfPaneEdu') };
+    D.sfSubBar.querySelectorAll = () => chips;
+    const log = [], pend = [];   // pend = 명부 읽기(loadWorkers)가 끝났을 때 부를 콜백 — 시험이 도착 시점을 고른다
+    const api = new Function('__D', '__perm', '__log', '__cur', '__layer', '__pend', [
+      'var document = { getElementById: function(id){ return __D[id] || null; } };',
+      'var currentTab = __cur, safetyLayer = __layer, eduViewScope = "member";',
+      'function canSee(m){ return (__perm[m] || "hide") !== "hide"; }',
+      'function switchTab(n){ __log.push("switch:" + n); }',
+      'function renderSites(){ __log.push("renderSites"); } function loadAsb(){ __log.push("loadAsb"); } function loadEdu(){ __log.push("loadEdu"); } function loadWorkers(){ __log.push("loadWorkers"); return { then: function(f){ __pend.push(f); } }; } function renderEdu(){ __log.push("renderEdu:" + eduViewScope); }',
+      fn28('safetyPanes'), fn28('setSafetyLayer'), fn28('applySafetyPerms'),
+      'return { panes: safetyPanes, apply: applySafetyPerms, set: setSafetyLayer, layer: function(){ return safetyLayer; }, scope: function(){ return eduViewScope; }, cur: function(t){ currentTab = t; } };'].join('\n'))(D, perm, log, cur, layer, pend);
+    return { D, log, api, chips, pend };
+  };
+  // S = 인허가 석면 안내 버튼(감싸개 asbMovedGo) — 글 줄(asbMovedNote)은 따로 본다
+  const st28 = (r) => (r.D.tabSafetyBtn.classList.contains('perm-hidden') ? 'T-' : 'T+') + (r.D.sfChipEdu.classList.contains('perm-hidden') ? 'E-' : 'E+') + (r.D.sfSubBar.style.display === 'none' ? 'B-' : 'B+')
+    + (r.D.asbMovedGo.style.display === 'none' ? 'S-' : 'S+') + ((r.D.eduMovedHr.style.display === 'none' && r.D.eduMovedWk.style.display === 'none') ? 'H-' : ((r.D.eduMovedHr.style.display === '' && r.D.eduMovedWk.style.display === '') ? 'H+' : 'H?'));
+  const A28 = runSf28({ site: 'do', hr: 'do', wk: 'do' }, 'dash', 'site'); A28.api.apply();
+  const J28 = runSf28({ site: 'do', lic: 'view', wk: 'do' }, 'dash', 'site'); J28.api.apply();
+  const K28 = runSf28({ site: 'hide', lic: 'view', wk: 'view' }, 'safety', 'site'); K28.api.apply();
+  const A3_28 = runSf28({ site: 'do', hr: 'do' }, 'safety', 'gone'); A3_28.api.apply();
+  const A2_28 = runSf28({ site: 'do', hr: 'do' }, 'safety', 'site'); A2_28.api.set('edu');
+  const J2_28 = runSf28({ site: 'do' }, 'safety', 'site'); J2_28.api.set('edu');
+  const W28 = runSf28({ site: 'do', hr: 'do' }, 'safety', 'site'); W28.api.set('edu:worker');
+  const J3_28 = runSf28({ site: 'do' }, 'safety', 'site'); J3_28.api.set('edu:worker');
+  const ap28 = fn28('applyPerms');
+  T('v428 안전 탭 칸 판정(실행): 관리자 = 탭·교육 칩·칩 줄·안내 전부 · 현장 권한만(김정아·정재욱형) = 탭 보임·교육 칩·칩 줄 숨김(옛 현장 화면 그대로)·교육 안내 숨김 · 둘 다 없음(권민지·김호태형) = 탭·인허가 석면 안내 버튼 숨김(글 줄은 그대로 — 510ed20과 같음), 안전 탭이면 홈 · 없는 칸이면 첫 칸 · 교육 칸 요청도 못 보면 현장 칸 · "edu:worker"면 교육 칸 일용직 목록(못 보면 대상도 안 바꿈) / applyPerms가 빈 묶음 숨김보다 먼저 부름 · 부동산 탭 줄 없음',
+    JSON.stringify(A28.api.panes()) === '["site","edu"]' && st28(A28) === 'T+E+B+S+H+'
+    && JSON.stringify(J28.api.panes()) === '["site"]' && st28(J28) === 'T+E-B-S+H-'
+    && JSON.stringify(K28.api.panes()) === '[]' && st28(K28) === 'T-E-B-S-H-' && K28.log.indexOf('switch:dash') >= 0
+    && [A28, J28, K28].every((r) => r.D.asbMovedNote.style.display !== 'none') && fn28('applySafetyPerms').indexOf('asbMovedNote') < 0
+    && A3_28.api.layer() === 'site' && A3_28.log.indexOf('renderSites') >= 0 && A3_28.log.indexOf('switch:dash') < 0
+    && A2_28.api.layer() === 'edu' && A2_28.D.sfPaneEdu.style.display === '' && A2_28.D.sfPaneSite.style.display === 'none' && A2_28.log.indexOf('renderEdu:member') >= 0 && A2_28.log.indexOf('loadEdu') >= 0 && A2_28.chips[1].classList.contains('active') && !A2_28.chips[0].classList.contains('active')
+    && J2_28.api.layer() === 'site' && J2_28.D.sfPaneSite.style.display === '' && J2_28.D.sfPaneEdu.style.display === 'none' && J2_28.log.indexOf('renderSites') >= 0 && J2_28.log.indexOf('loadAsb') >= 0
+    && W28.api.layer() === 'edu' && W28.api.scope() === 'worker' && W28.log.indexOf('renderEdu:worker') >= 0
+    && J3_28.api.layer() === 'site' && J3_28.api.scope() === 'member' && J3_28.log.indexOf('renderSites') >= 0
+    && ap28.indexOf('applySafetyPerms();') > 0 && ap28.indexOf('applySafetyPerms();') < ap28.indexOf('빈 그룹 숨김') && ap28.indexOf('"onbid"') < 0 && ap28.indexOf('if (currentTab === "bid" && !isAdmin()) switchTab("dash");') > 0,
+    [st28(A28), st28(J28), st28(K28), K28.log.join(','), A3_28.api.layer(), A2_28.api.layer(), J2_28.api.layer()].join(' / '));
+
+  // ⑩-2 (v428 검토) 명부가 교육 기록보다 늦게 오는 경합 — 도착 시점을 시험이 골라 setSafetyLayer를 돌린다
+  const nR28 = (r, s) => r.log.filter((x) => x === s).length;
+  const fire28 = (r) => r.pend.splice(0).forEach((f) => f());
+  const WK1_28 = runSf28({ site: 'do', hr: 'do', wk: 'do' }, 'safety', 'site'); WK1_28.api.set('edu:worker');
+  const wk1a28 = nR28(WK1_28, 'renderEdu:worker'), wk1p28 = WK1_28.pend.length; fire28(WK1_28); const wk1b28 = nR28(WK1_28, 'renderEdu:worker');
+  const WK2_28 = runSf28({ site: 'do', hr: 'do', wk: 'do' }, 'safety', 'site'); WK2_28.api.set('edu'); WK2_28.api.cur('dash'); fire28(WK2_28);
+  const WK3_28 = runSf28({ site: 'do', hr: 'do', wk: 'do' }, 'safety', 'site'); WK3_28.api.set('edu'); WK3_28.api.set('site'); fire28(WK3_28);
+  const WK4_28 = runSf28({ site: 'do', hr: 'do' }, 'safety', 'site'); WK4_28.api.set('edu');
+  const WK5_28 = runSf28({ site: 'do', wk: 'do' }, 'safety', 'site'); WK5_28.api.set('site');
+  T('v428 검토 수리 — 명부가 교육 기록보다 늦게 와도 교육·검진 일용직 이름을 다시 그림(setSafetyLayer 실행, 도착 시점을 시험이 고름): 안전 › 교육·검진(일용직)을 열면 그리고 → 명부 읽기 → 명부가 오면 아직 그 칸이라 한 번 더 그림(\'(삭제된 일용직)\' 잔상 없음) · 그 사이 다른 탭이나 현장 칸으로 갔으면 안 그림 · 일용직 권한 없으면 명부를 안 읽음 · 현장 칸 읽기는 옛 현장 탭 그대로(명부 기다리지 않음)',
+    wk1a28 === 1 && wk1p28 === 1 && wk1b28 === 2 && WK1_28.log.indexOf('loadEdu') >= 0
+    && nR28(WK2_28, 'renderEdu:member') === 1 && nR28(WK3_28, 'renderEdu:member') === 1 && WK3_28.api.layer() === 'site'
+    && WK4_28.log.indexOf('loadWorkers') < 0 && WK4_28.pend.length === 0 && nR28(WK4_28, 'renderEdu:member') === 1
+    && WK5_28.log.indexOf('loadWorkers') >= 0 && WK5_28.pend.length === 0 && nR28(WK5_28, 'renderSites') === 1,
+    [wk1a28, wk1p28, wk1b28, nR28(WK2_28, 'renderEdu:member'), nR28(WK3_28, 'renderEdu:member'), WK4_28.log.join(','), WK5_28.pend.length].join(' / '));
+
+  // ⑪ 교육·검진 한 목록 — renderEdu를 뽑아 대상 칩별로 돌린다
+  const kIdx28 = html.indexOf('var EDU_KINDS'), EDU28 = html.slice(kIdx28, html.indexOf('];', kIdx28) + 2);
+  const mkL28 = () => ({ innerHTML: '', textContent: '', querySelectorAll: () => [] });
+  const eChips28 = [mkE28('m', { 'data-edu-scope': 'member' }), mkE28('w', { 'data-edu-scope': 'worker' })];
+  const ED28 = { eduList: mkL28(), eduHead: mkL28(), eduScopeBar: { querySelectorAll: () => eChips28 } };
+  const eduApi28 = new Function('__D', [
+    'var document = { getElementById: function(id){ return __D[id] || null; } };',
+    'var edu = [{ id:"e1", ptype:"member", pid:"u1", kind:"regular", date:"2026-06-01", next:"2099-12-01" }, { id:"e2", ptype:"worker", pid:"w1", kind:"special", date:"2026-05-01", next:"" }, { id:"e3", ptype:"worker", pid:"w1", kind:"spec_med", date:"2026-04-01", next:"2099-04-01" }];',
+    'var workers = [{ id:"w1", name:"김일용" }], members = [{ id:"u1", name:"홍직원" }], eduViewScope = "member";',
+    fn28('pad'), fn28('fmtDate'), fn28('todayStr'), fn28('esc'), fn28('addDays'), fn28('isDate'),
+    'function findMember(id){ for(var i=0;i<members.length;i++){ if(members[i].id===id) return members[i]; } return null; }',
+    'function memberName(id){ var m=findMember(id); return m?m.name:""; } function dispName(n){ return n||""; }',
+    EDU28, fn28('eduKindDef'), fn28('eduKindLabel'), fn28('eduPersonName'), fn28('liveEdu'), fn28('renderEduInto'), fn28('renderEdu'),
+    'return { render: renderEdu, scope: function(s){ eduViewScope = s; } };'].join('\n'))(ED28);
+  eduApi28.render();
+  const mH28 = ED28.eduHead.textContent, mL28 = ED28.eduList.innerHTML, mOn28 = eChips28[0].classList.contains('on') && !eChips28[1].classList.contains('on');
+  eduApi28.scope('worker'); eduApi28.render();
+  const wH28 = ED28.eduHead.textContent, wL28 = ED28.eduList.innerHTML, wOn28 = eChips28[1].classList.contains('on') && !eChips28[0].classList.contains('on');
+  T('v428 교육·검진 한 목록(renderEdu 실행): 대상 칩 직원 = 직원 이력만(총 1건) · 일용직 = 일용직 이력만(총 2건) · 칩 on이 따라감 · [+ 이력 추가]는 고른 대상으로(openEdu(null, eduViewScope)) · 칩 배선 · renderEduInto(hostId, headId, scope) 모양 그대로',
+    mH28 === '총 1건' && mL28.indexOf('홍직원') >= 0 && mL28.indexOf('김일용') < 0 && mOn28
+    && wH28 === '총 2건' && wL28.indexOf('김일용') >= 0 && wL28.indexOf('홍직원') < 0 && wOn28
+    && /function renderEduInto\(hostId, headId, scope\)\{/.test(html) && /getElementById\("eduAddBtn"\)\.addEventListener\("click", function\(\)\{ openEdu\(null, eduViewScope\); \}\);/.test(html)
+    && /querySelectorAll\("#eduScopeBar \[data-edu-scope\]"\)/.test(html) && /querySelectorAll\("#sfSubBar \.lsub-btn"\)/.test(html) && /querySelectorAll\("#bidSubBar \.lsub-btn"\)/.test(html),
+    [mH28, wH28, mOn28, wOn28].join(' / '));
+
+  // ⑫ 도움말·MANUAL 1절 4묶음 = 사이드바(라벨을 사이드바에서 뽑아 대조) · 옛 위치 문장 0 · sw ≥ 428
+  const grp28 = {}; let g28 = '';
+  nav28.split('\n').forEach((ln) => { const gm = ln.match(/<div class="nav-group">([^<]+)<\/div>/); if (gm) { g28 = gm[1]; grp28[g28] = []; return; } const bm = ln.match(/<button class="tab-btn[^"]*" data-tab="[\w-]+" id="\w+">([^<]+?)\s*(?:<span|<\/button>)/); if (bm && g28) grp28[g28].push(bm[1].trim()); });
+  const help28 = html.slice(html.indexOf('<div class="modal-backdrop" id="helpBackdrop">'), html.indexOf('id="helpClose"'));
+  const man1_28 = man28.slice(man28.indexOf('<h2 id="s1">'), man28.indexOf('<h2 id="s2">'));
+  const helpLn28 = (g) => { const m = help28.match(new RegExp('<b>' + g + '</b>: ([^<]+)<br>')); return m ? m[1].replace(/\([^)]*\)/g, '').trim() : ''; };
+  const manLn28 = (g) => { const m = man1_28.match(new RegExp('<li><b>' + g + '</b> — ([^<]+)</li>')); return m ? m[1].trim() : ''; };
+  const G4_28 = ['관리', '수주', '업무', '개인'];
+  const helpBad28 = G4_28.filter((g) => !grp28[g] || helpLn28(g) !== grp28[g].join(' / ')), manBad28 = G4_28.filter((g) => !grp28[g] || manLn28(g) !== grp28[g].join(' / '));
+  const OLDMAN28 = ['온비드 물건은 부동산 탭에 따로 모입니다', '현장 탭에 <b>미이수</b>', '인사·직원 탭(직원 대상)과 인사·일용직 탭(일용직 대상) 아래에 있습니다', '<h2 id="s12">12. 부동산', '<h2 id="s28">28. 현장', '홍보 / 부동산', '운반일지 / 현장 /', '>부동산 (온비드)</a>', '>현장 — 석면·철거·준설 대장</a>'];
+  const oldMan28 = OLDMAN28.filter((s) => man28.indexOf(s) >= 0);
+  T('v428 도움말·MANUAL 1절 4묶음 = 사이드바 라벨 그대로(관리 6 · 수주 4 · 업무 7 · 개인 3 — 수주 입찰/계약/견적서/홍보 · 업무 …/운반일지/안전/인허가/문서함 · 개인 물어보기/내 업무/휴가) · 탭 안 칸 안내(입찰 = 공고/부동산, 안전 = 현장/교육·검진) · MANUAL 12·28·21-9절 새 자리 · 옛 위치 문장 0 · sw ≥ 428',
+    G4_28.map((g) => (grp28[g] || []).length).join(',') === '6,4,7,3' && grp28['수주'].join('/') === '입찰/계약/견적서/홍보' && grp28['업무'].join('/') === '캘린더/차량/화관법/운반일지/안전/인허가/문서함' && grp28['개인'].join('/') === '물어보기/내 업무/휴가'
+    && helpBad28.length === 0 && manBad28.length === 0 && help28.indexOf('<b>입찰</b> = 공고 / 부동산, <b>안전</b> = 현장 / 교육·검진') > 0 && man1_28.indexOf('<b>입찰</b> = 공고 / 부동산, <b>안전</b> = 현장 / 교육·검진') > 0
+    && help28.indexOf('홍보 / 부동산') < 0 && help28.indexOf('운반일지 / 현장 /') < 0 && oldMan28.length === 0
+    && man28.indexOf('<h2 id="s12">12. 입찰 › 부동산 (온비드)') > 0 && man28.indexOf('<h2 id="s28">28. 안전 › 현장 — 석면·철거·준설 대장') > 0 && man28.indexOf('<h3>21-9. 교육·건강진단 이력 (안전 › 교육·검진)</h3>') > 0
+    && Number((sw28.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 428,
+    '도움말 어긋남: ' + helpBad28.map((g) => g + '[' + helpLn28(g) + ' ≠ ' + (grp28[g] || []).join(' / ') + ']').join(' ') + ' / MANUAL 어긋남: ' + manBad28.join(',') + ' / MANUAL 옛 문장: ' + oldMan28.join(' | '));
+} catch (e) { console.log('  (v428 검사 생략 — ' + e.message + ')'); fails++; }
 
 try {
   const fdir = join(ROOT, 'netlify', 'functions');
