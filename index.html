@@ -908,6 +908,28 @@
   .nav-group.perm-hidden{display:none !important;}
   .lsub-btn.perm-hidden{display:none !important;}   /* v428 칸 칩도 권한으로 숨긴다(MODULE_TAB.site=sfChipSite) */
   #eduScopeBar .vs-chip.on{background:#EAF3EF;color:var(--brand-dark);border-color:var(--brand);font-weight:700;}   /* v428 검토: 칸 안 대상 칩(직원/일용직)은 옅은 선택 표시 — 칸 칩(.lsub-btn.active, 진한 초록)과 위계를 나눈다(PM 시안 .mchip.on). 색은 .hw-opt.sel과 같은 값, 차량·계약의 .vs-chip.on은 그대로 */
+  /* v432 안전 › 현황(읽기 전용) — 블록 6개(.dash-sec), 줄 = .item(누르면 원래 자리, 완료 버튼 없음). 상태 알약 .sfn-pill: ok 완료 · am 미완·임박 · bad 지남·실패 · 기본 회색(예정·주기 문구).
+     폰 375px: 칩 줄은 .lsub-bar flex-wrap(칩 3개 = 약 210px, 한 줄), 줄 안 글은 줄바꿈(.item-meta nowrap을 풀어 잘리지 않게) */
+  .sfn-note{font-size:12px;color:var(--sub);background:#EFF5F2;border-radius:8px;padding:8px 11px;margin:-2px 0 12px;line-height:1.5;}
+  .sfn-src{font-size:11.5px;color:var(--sub);margin:-4px 0 6px 4px;}
+  .sfn-row{align-items:flex-start;flex-wrap:nowrap;}   /* v432 검토: 폰(640px 이하) 공용 규칙(.item 줄바꿈 + 본문 기준폭 62%)이면 긴 알약('승인 대기'·'현재 대상 아님' …)만 아랫줄 왼쪽으로 떨어져 블록 안 알약 자리가 섞였다 — 현황 줄은 알약을 늘 오른쪽에 */
+  .sfn-row .item-body{flex:1 1 0;}
+  .dash-sec.sfn-blk > .card{padding:0;}   /* 줄(.item)이 없는 카드(빈 안내·펼침만)에 공용 자동 여백이 붙어 펼침 줄이 14px 들여써지던 것 — 현황 카드는 줄·빈 안내가 제 여백을 갖는다 */
+  .sfn-blk > h2{flex-wrap:wrap;gap:2px 8px;}   /* 머리 숫자(완료 n · 미완 n …)가 제목과 한 줄에 안 들면 제목 아래로(두 칸으로 나란히 접히지 않게) */
+  .sfn-row.sfn-static{cursor:default;}
+  .sfn-row.sfn-static:active{background:transparent;}
+  .sfn-id{flex:0 0 auto;min-width:44px;font-size:11.5px;font-weight:800;color:var(--sub);padding-top:2px;}
+  .sfn-t{font-size:13.5px;font-weight:700;line-height:1.4;color:var(--text);word-break:keep-all;overflow-wrap:anywhere;}
+  .sfn-row .item-meta{white-space:normal;overflow:visible;text-overflow:clip;word-break:keep-all;overflow-wrap:anywhere;}
+  .sfn-pill{flex:0 0 auto;display:inline-block;font-size:11.5px;font-weight:800;padding:1px 8px;border-radius:999px;white-space:nowrap;background:#EEF2F0;color:var(--sub);}
+  .sfn-pill.ok{background:#E3F2E9;color:var(--brand-dark);}
+  .sfn-pill.am{background:#FCEFDD;color:var(--amber);}
+  .sfn-pill.bad{background:#FBE7E3;color:#B0332A;}
+  .sfn-foot{font-size:11.5px;color:var(--sub);margin:6px 4px 0;line-height:1.5;}
+  .sfn-more > summary{list-style:none;cursor:pointer;padding:8px 14px;font-size:12.5px;font-weight:700;color:var(--brand-dark);}
+  .sfn-more[open] > summary{border-bottom:1px solid var(--line);}
+  .sfn-more > summary::-webkit-details-marker{display:none;}
+  .sfn-go{background:transparent;border:1px solid var(--line);border-radius:8px;color:var(--brand-dark);font-size:12.5px;font-weight:700;padding:6px 10px;margin-top:6px;cursor:pointer;}
   .prog-frame{display:block;width:100%;height:calc(100vh - 170px);height:calc(100dvh - 170px);min-height:480px;border:1px solid var(--line);border-radius:12px;background:var(--card);}
   .todo-due-in{font-size:12px;padding:3px 6px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);max-width:132px;}
   #myTodoDue{flex:0 0 auto;width:138px;min-width:0;}
@@ -1601,14 +1623,24 @@
     </div>
   </section>
 
-  <!-- 안전(v428, 메뉴 56 1단계 — 사이드바 옛 '현장' 자리를 이어받음). 칸: 현장(옛 현장 탭 화면 그대로) · 교육·검진(옛 인사 두 화면의 이력을 한 목록으로).
-       현황·사고·평가 칸은 다음 단계. 권한 키: 현장 칸 = site, 교육·검진 칸 = safety(v430 3단계 — 종전 hr 관리자 전용, 서버 col:edu도 safety).
-       탭은 볼 칸이 하나라도 있을 때(안전·현장 권한 중 하나), 칸 칩 줄은 칸이 2개 이상일 때만 보인다(safetyPanes·applySafetyPerms) — 현장만 보는 사람은 칩 줄 없이 옛 현장 화면이 바로 열린다.
+  <!-- 안전(v428, 메뉴 56 1단계 — 사이드바 옛 '현장' 자리를 이어받음). 칸: 현황(v432 5단계 — 읽기 전용) · 현장(옛 현장 탭 화면 그대로) · 교육·검진(옛 인사 두 화면의 이력을 한 목록으로).
+       사고·평가 칸은 2차. 권한 키: 현황 칸 = safety(관리자·권민지 — 칩 하나에 키가 없어 MODULE_TAB 밖, applySafetyPerms가 숨김), 현장 칸 = site, 교육·검진 칸 = safety(v430 3단계 — 종전 hr 관리자 전용, 서버 col:edu도 safety).
+       탭은 볼 칸이 하나라도 있을 때(안전·현장 권한 중 하나), 칸 칩 줄은 칸이 2개 이상일 때만 보인다(safetyPanes·applySafetyPerms) — 현장만 보는 사람은 칩 줄 없이 옛 현장 화면이 바로 열린다. 볼 수 있으면 현황이 첫 칸.
        칩 숨김·보기 권한 readonly는 칸마다(MODULE_TAB site=sfChipSite·safety=sfChipEdu, MODULE_VIEW site=sfPaneSite·safety=sfPaneEdu) — 바깥 view-safety에는 걸지 않는다. -->
   <section class="view" id="view-safety">
     <div class="lsub-bar" id="sfSubBar">
+      <button class="lsub-btn" data-lsub="now" id="sfChipNow">현황</button>
       <button class="lsub-btn active" data-lsub="site" id="sfChipSite">현장</button>
       <button class="lsub-btn" data-lsub="edu" id="sfChipEdu">교육·검진</button>
+    </div>
+    <!-- 현황(v432, 메뉴 56 5단계 — PM 11/9 "56. ㄱ" 브리핑 steps[4]): 안전 체크 26개 · 중처법 반기 점검 · 30일 기한 · 계약 안전 서류 · 인정·평가(7단계 자리) · 확인 필요를 한 화면에.
+         읽기 전용 — 완료·입력 버튼은 없고 줄을 누르면 원래 자리(내 업무 · 안전 › 현장·교육·검진 · 인허가 의무 대장 · 계약 단계·서류 · 문서함 06)로 간다. 그리기는 renderSafetyNow(// @safety-now 구간) -->
+    <div class="sf-pane" id="sfPaneNow" style="display:none;">
+    <div class="sec-hd">
+      <button type="button" class="sec-hd-t" style="cursor:default;"><span>현황</span> <span class="cnt" id="sfNowHead"></span></button>
+    </div>
+    <div class="sfn-note">읽기 전용입니다 — 완료·입력은 원래 자리(내 업무 · 안전 › 현장·교육·검진 · 인허가 · 계약 단계·서류)에서 합니다. 줄을 누르면 그 자리로 갑니다.</div>
+    <div id="sfNowHost"><div class="loading">불러오는 중…</div></div>
     </div>
     <!-- 현장(석면·철거·준설) — 2026-09-10 인허가 탭에서 분리, v428 안전 탭 칸으로. 한 대장을 종류로 갈라 본다.
          석면은 산안법 제164조⑥ 30년 보존이라 데이터는 옮기지 않고 종류 칸만 더했다. -->
@@ -2823,7 +2855,7 @@
       · <b>수주</b>: 입찰 / 계약 / 견적서 / 홍보<br>
       · <b>업무</b>: 캘린더 / 차량 / 화관법 / 운반일지 / 안전 / 인허가 / 문서함<br>
       · <b>개인</b>: 물어보기 / 내 업무(내게 온 지시·내 할 일·주기 체크) / 휴가<br>
-      · 탭 안 칸: <b>입찰</b> = 공고 / 부동산, <b>안전</b> = 현장 / 교육·검진(옛 현장 탭은 안전 › 현장, 옛 부동산 탭은 입찰 › 부동산). 볼 수 있는 칸이 하나뿐이면 칸 줄 없이 바로 열립니다.<br><br>
+      · 탭 안 칸: <b>입찰</b> = 공고 / 부동산, <b>안전</b> = 현황 / 현장 / 교육·검진(옛 현장 탭은 안전 › 현장, 옛 부동산 탭은 입찰 › 부동산 · 현황은 읽기 전용 — 완료는 원래 자리에서). 볼 수 있는 칸이 하나뿐이면 칸 줄 없이 바로 열립니다.<br><br>
       · 로그인: ⚙ → <b>아이디 + PIN</b>. 아이디를 아직 안 만들었으면 이름을 그대로 넣고, 로그인 뒤 ⚙ › <b>내 아이디 설정</b>. 회원 추가·수정과 기기 승인은 관리자가 <b>인사·직원</b> 탭의 직원 카드에서 합니다.<br>
       · 알림: 쓰는 기기마다 한 번 ⚙ → <b>🔔 이 기기 알림 켜기</b>. 안 켠 기기에는 아무 알림도 오지 않습니다.<br>
       · 휴가: 개인 › 휴가 › <b>+ 휴가 신청</b>(유형·기간·사유 필수) → 관리자 승인 → 연차·반차·반반차는 캘린더에 표시. 승인된 휴가는 <b>[취소 요청]</b>(끝난 휴가는 종료 뒤 3일까지)만 되고 관리자가 승인합니다. 📖 사용 안내 20절<br>
@@ -3095,7 +3127,7 @@
   // [{no,lic,duty,cycle,basis,law,confirm('확정'|'조건부'),precheck,unit('사업장'|'차량'|'개인'),precheck_answer,base_date,confirmed_by,confirmed_at,updated}]
   var duties = [];
   var licLayer = "cert"; // 인허가 서브탭 상태(cert|duty|month) — 세션 임시
-  var safetyLayer = "site"; // v428 안전 탭 칸(site|edu) — 세션 임시, 탭을 다시 열면 볼 수 있는 첫 칸
+  var safetyLayer = "site"; // v428 안전 탭 칸(now|site|edu — v432 현황 now) — 세션 임시, 탭을 다시 열면 볼 수 있는 첫 칸(안전 권한이면 현황)
   var bidLayer = "list";    // v428 입찰 탭 칸(list=공고|onbid=부동산) — 세션 임시, 탭을 다시 열면 공고
   var dutyQ = "";
   var dutyOpen = {};     // {no:true} 상세 펼침 — 세션 임시
@@ -7177,6 +7209,7 @@
     if (!host) return;
     if (curMemberObj && isBossMember(curMemberObj) && isAdmin()){ renderBossHome(host); return; }   // 대표 홈=결재함(9/2)
     if (curMemberObj && !isAdmin()){ renderStaffHome(host); return; }   // 직원 홈(S2-B) — 관리자 홈은 아래 현행 그대로
+    if (canSee("safety") && !sfNowHomeEduAsked){ sfNowHomeEduAsked = true; loadEdu(); }   // v432 만기 목록의 교육·검진 줄 — 관리자 홈을 처음 그릴 때 1번 읽음(도착하면 loadEdu가 홈을 다시 그린다, 읽기만)
     var today = todayStr();
     var seeVeh = canSee("veh"), seeLic = canSee("lic"), seeTasks = canSee("tasks"), seeRec = canSee("rec");
     var me = myName();
@@ -7303,19 +7336,25 @@
     html += '</div></div>';
     }
 
-    if (urgentLic.length){
-      html += '<div class="dash-sec"><h2>인허가·보수교육 만기 <span class="cnt">' + urgentLic.length + '</span></h2><div class="card">';
-      html += urgentLic.map(function(x){
+    // v432 교육·검진 다음 예정 30일(안전 권한 — 관리자는 늘)을 같은 목록·같은 형식으로 합친다(새 타일 없음, 타일 숫자도 그대로). 날짜순, 같은 날이면 인허가 먼저(안정 정렬)
+    var eduHome = canSee("safety") ? sfNowEduDue(30) : [];
+    // v432 검토: 일용직 줄의 이름은 명부(workers)에서 오는데 로그인·관리자 홈은 명부를 읽지 않는다 — 일용직 줄이 있고 명부가 비었으면 1번 읽고, 도착하면 홈일 때만 다시 그린다(읽기만, 받기 전 이름은 '일용직')
+    if (!sfNowHomeWkAsked && !workers.length && canSee("wk") && eduHome.some(function(x){ return x.r.ptype === "worker"; })){ sfNowHomeWkAsked = true; var wkp = loadWorkers(); if (wkp && typeof wkp.then === "function") wkp.then(function(){ if (currentTab === "dash") renderDashboard(); }); }
+    if (urgentLic.length || eduHome.length){
+      var dueMix = urgentLic.map(function(x){
         var l = x.lic;
         var kindAttr = x.kind === "만료" ? "exp" : "edu";
-        return '<div class="item veh-item">' +
+        return { d: x.dd.diff, h: '<div class="item veh-item">' +
           '<div class="item-body">' +
             '<div class="item-title">' + esc(l.name) + '</div>' +
             '<div class="item-meta"><span>' + x.kind + ' ' + x.date + '</span><span class="own-badge ' + (l.org === "종운건설" ? "lease" : "self") + '">' + esc(l.org || "") + '</span></div>' +
           '</div>' +
           '<div class="task-ctrl"><span class="dday' + (x.dd.cls ? ' ' + x.dd.cls : '') + '">' + x.dd.text + '</span></div>' +
-        '</div>';
-      }).join("");
+        '</div>' };
+      }).concat(eduHome.map(function(x){ return { d: x.dd.diff, h: sfNowHomeEduRow(x) }; }));
+      dueMix.sort(function(a, b){ return a.d - b.d; });
+      html += '<div class="dash-sec"><h2>인허가·보수교육 만기' + (eduHome.length ? ' · 교육·검진' : '') + ' <span class="cnt">' + dueMix.length + '</span></h2><div class="card">';
+      html += dueMix.map(function(x){ return x.h; }).join("");
       html += '</div></div>';
     }
 
@@ -13455,18 +13494,21 @@
     });
     return Object.keys(byId).map(function(k){ return byId[k]; });
   }
-  function loadAsb(){
+  // v432: 읽기 결과를 돌려준다(성공 true · 실패 false — 안전 › 현황이 '불러오지 못함'을 그 블록에만 쓰려고). 부르는 쪽이 안 받으면 종전과 같다.
+  //   opt.noHooks = 현황이 부를 때 — 보류된 계약 연결·종결(csSiteHooksRetry → csSiteDone, 대장·계약 저장이 날 수 있음)을 돌리지 않는다(현황은 읽기만). 현장 칸·계약 쪽 읽기는 종전대로 돌린다
+  function loadAsb(opt){
     if(!canSee("site")) return;   // v429: 현장 대장 = 현장 권한(서버 col:asbestos도 site — 인허가 lic만 있으면 403). 종전 lic 판정이라 현장 권한만 있는 사람은 목록이 비었다
-    gwCall("gw-data",{action:"get",collection:"asbestos"}).then(function(res){
-      if(res.status!==200) return;
+    return gwCall("gw-data",{action:"get",collection:"asbestos"}).then(function(res){
+      if(res.status!==200) return false;
       var doc=(res.body&&res.body.doc)||{};
       var ri=Array.isArray(doc.items)?doc.items:[];
       asb = asbPending ? mergeAsb(asb, ri) : ri;   // 저장 대기 중이면 로컬 우선(로드 덮어쓰기 금지)
       asb.forEach(normAsbRow);                     // v336: 모양 교정은 입구에서 1회 — 다음 저장 때 서버 기록도 배열로 정리된다
       asbBase = doc.updated_at||0; asbLoaded = true;
-      if (typeof csSiteHooksRetry === "function"){ try { csSiteHooksRetry(); } catch(e){} }   // v384: 보류된 계약 연결·종결
+      if (!(opt && opt.noHooks) && typeof csSiteHooksRetry === "function"){ try { csSiteHooksRetry(); } catch(e){} }   // v384: 보류된 계약 연결·종결 · v432 현황 읽기는 건너뜀
       renderSites(); renderCalendar(); renderWorkers();   // v356: 일용직 목록의 참여 칩 갱신
-    }).catch(function(){});
+      return true;
+    }).catch(function(){ return false; });
   }
   function scheduleAsbSave(){ asbPending=true; if(asbSaveTimer) clearTimeout(asbSaveTimer); asbSaveTimer=setTimeout(doSaveAsb,1200); }
   // v335의 safeRender(개별 try/catch + 닫기 보장 + 실패 토스트)는 v336에서 걷어냈다 —
@@ -13785,6 +13827,388 @@
     afterSave(renderSites, renderCalendar);
   }
 
+  // @safety-now-start — v432 안전 › 현황(메뉴 56 5단계, PM 11/9 "56. ㄱ" — 브리핑 steps[4] · 코드 지도 code.steps[5] · 시안 메뉴안전탭_시안_20261109 현황 칸).
+  //   읽기 전용: 원장(주기 체크 records · 인허가 문서 duties·licenses · col:contracts·계약 서류함 · col:asbestos · col:edu)을 읽어 블록 6개로 보여 주고, 줄을 누르면 원래 자리로 간다.
+  //   이 구간에는 저장 호출·완료 버튼이 없다(uismoke v432가 지킴) — 완료·입력은 내 업무 · 계약 단계·서류 · 인허가 · 안전 › 현장·교육·검진에서.
+  //   블록 = ① 이번 주기 안전 점검(check) ② 중처법 반기 점검(check) ③ 30일 기한(교육 = safety · 현장 = site · 의무 대장 = lic) ④ 계약 안전 서류(con) ⑤ 인정·평가(lic — 7단계 자리) ⑥ 확인 필요(문서함 06 바로가기 = doc).
+  //   볼 권한이 없는 블록·줄은 '0건'이 아니라 숨긴다 — 체크 줄은 내 업무와 같은 checkItemVisible, 의무 대장 줄은 그 인허가 행의 licVisible(이름으로 이음).
+  var SF_NOW_CHECK = ["w1", "m1", "m3", "q1", "h1", "h2", "h3", "h4", "h5", "h6", "h7", "y1", "y2", "y3", "y4", "y5", "y6", "y11", "y15", "y16", "y17", "y18", "su1", "su3", "su5", "su6"];   // 안전 항목 26개 — id만 둔다(문구·주기·담당은 GROUPS·SUDSI에서 그대로 읽음)
+  // 중대재해처벌법 시행령 제4조·제5조② 반기 점검 줄 → 맞춘 내 업무 항목(코드 지도 code.steps[5], 줄 글은 PM 11/9 시안 그대로). id가 없는 줄은 상태 고정
+  var SF_NOW_JCB = [
+    { no: "1호", t: "안전·보건 목표와 경영방침", id: "y2" },
+    { no: "3호", t: "유해·위험요인 확인·개선 절차 점검", id: "h2" },
+    { no: "4호", t: "인력·시설·장비 구비, 예산 편성·집행", id: "y3" },
+    { no: "5호", t: "안전보건관리책임자 등 권한·예산·평가", id: "h3" },
+    { no: "7호", t: "종사자 의견 청취·개선 이행 점검", id: "h1" },
+    { no: "8호", t: "중대산업재해 대비 매뉴얼 점검", id: "h4" },
+    { no: "9호", t: "도급·용역·위탁 안전 기준·절차 점검", id: "h5" },
+    { no: "5조②3·4", t: "유해·위험 작업 교육 실시 점검", id: "h7", m: "체크 문구에 조항 표기가 없고 특별교육 포함 여부도 적혀 있지 않음" },
+    { no: "5조②1·2", t: "안전·보건 관계 법령 의무이행 점검", id: "", p: "항목 없음", pc: "bad", m: "내 업무에 해당 체크가 없어 빈칸으로 둡니다" },
+    { no: "2·6호", t: "전담 조직 · 안전관리자 등 배치", id: "", p: "현재 대상 아님", pc: "", m: "종운환경이 상시 20명이 되면 안전보건관리담당자 선임 대상" }
+  ];
+  // 인허가 의무 대장 안전 행(data/duties_seed.json no) — 기한 엔진(체크 28 G2·G3, gw-duty-cron 미등록) 배포 전까지 D-n 없이 주기 문구만. 61행(운반 관리대장 기록)은 안전 행이 아니라 뺀다
+  var SF_NOW_DUTY = { cycle: [4, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 27, 28, 29, 30, 51, 52, 53, 55, 56, 57, 59], event: [32], na: [62] };   // event 32 = 태양광 중대한 사고 통보(따로 판정) · na 62 = 차량만 보유한 운반업 비대상
+  // 계약 안전 서류 = v427 패킷 줄 키(csPkIk — 패킷|항목). 판정은 csFlow 줄 + csRowState 그대로(읽기만)
+  var SF_NOW_CON = [{ k: "con|safety_plan", s: "안전보건관리계획서" }, { k: "start|safety_pack", s: "안전 패킷" }, { k: "complete|safety_cost", s: "산업안전보건관리비 사용내역서" }, { k: "complete|석면 완료보고서(별지 77호)", s: "석면 완료보고서" }];
+  // '확인 필요' — 데이터 없이 조문과 해당 여부만(PM 11/9 시안 그대로 — 설계 조사 law.go.kr 확인분)
+  var SF_NOW_CONFIRM = [
+    { id: "하도급", t: "협의체 매월 · 순회점검 · 합동점검", p: "해당 시", m: "산안법 제64조" },
+    { id: "밀폐", t: "작업 전 산소·유해가스 측정 기록 3년", p: "해당 시", m: "안전보건규칙 제619조의2" },
+    { id: "폭염", t: "체감온도·조치 일자별 기록(그해 12월 31일까지 보관)", p: "해당 시", m: "안전보건규칙 제562조" },
+    { id: "장비", t: "안전검사 대상 장비 보유 여부", p: "확인 필요", m: "산안법 제93조" },
+    { id: "지입", t: "지입·위탁 기사(특수형태근로종사자) 교육 해당 여부", p: "확인 필요", m: "산안법 제77조" },
+    { id: "작업", t: "해체·굴착 사전조사 · 작업계획서", p: "해당 시", m: "안전보건규칙 제38조" }
+  ];
+  var SF_NOW_TICK_MAX = 90;   // 읽는 중(기본 원장·서류함)이면 1초마다 다시 그림 — 90번(약 90초) 넘으면 '불러오지 못함'(서류함은 그 계약을 읽기 시작한 때부터 셈 — 다시 그림은 많아야 180번)
+  var SF_NOW_FRESH = 30000;   // v432 검토: 현황이 읽은 교육·현장 대장·명부는 30초 안이면 다시 열어도 다시 읽지 않는다(칩을 오가며 같은 GET이 거듭 나가지 않게)
+  var sfNowSt = { edu: "", asb: "" }, sfNowFold = {}, sfNowTimer = null, sfNowTicks = 0, sfNowHomeEduAsked = false;   // 읽기 결과(""·wait·ok·fail) · 펼침(화면 안에서만) · 다시 그림 타이머
+  var sfNowAt = {}, sfNowCdocT0 = {}, sfNowHomeWkAsked = false, sfNowLastHtml = "";   // 마지막으로 받은 시각(edu·asb·wk) · 서류함 읽기를 시작한 틱(계약 id) · 관리자 홈 명부 1번 읽음 · 마지막으로 그린 글(같으면 칸을 갈아끼우지 않음)
+  function sfNowSee(){ return { check: canSee("check"), lic: canSee("lic"), con: canSee("con"), site: canSee("site"), doc: canSee("doc") }; }
+  function sfNowItem(id){
+    for (var i = 0; i < GROUPS.length; i++){
+      for (var j = 0; j < GROUPS[i].items.length; j++){ if (GROUPS[i].items[j].id === id) return { type: GROUPS[i].type, it: GROUPS[i].items[j] }; }
+    }
+    for (var k = 0; k < SUDSI.length; k++){ if (SUDSI[k].id === id) return { type: "sudsi", it: SUDSI[k] }; }
+    return null;
+  }
+  // 기한 달(1~12, 없으면 0) — 반기 = 6·12월(제목 '반기 (6월·12월 일괄 가능)'), 연간 = 제목의 '(N월)'·'(상반기)'. 주간·월간·분기는 0
+  function sfNowDueMonth(type, title){
+    if (type === "half") return String(CURRENT_KEYS.half).slice(-1) === "1" ? 6 : 12;
+    if (type !== "yearly") return 0;
+    var s = String(title || ""), m = s.match(/\((\d{1,2})월\)/);
+    if (m) return Number(m[1]);
+    return /\(상반기\)/.test(s) ? 6 : 0;
+  }
+  // 이번 주기 상태 — 내 업무와 같은 records[type][CURRENT_KEYS[type]] · 승인 대기(review). n = 머리 숫자 묶음(ok 완료 · am 미완 · bad 지남 · plan 예정 · su 수시), o = 줄 순서(지남 → 미완 → 예정 → 완료 → 수시)
+  function sfNowState(type, id, title){
+    if (type === "sudsi") return { t: "수시", c: "", n: "su", o: 4 };
+    var key = CURRENT_KEYS[type], rec = records[type] && records[type][key], done = rec && rec[id];
+    if (done) return { t: "완료", c: "ok", n: "ok", o: 3, d: String(done) };
+    var rv = getReview(type, key, id);
+    if (rv) return { t: "승인 대기", c: "am", n: "am", o: 1, by: rv.by || "" };
+    if (type === "weekly") return todayStr() > String(CURRENT_KEYS.weekly) ? { t: "지남", c: "bad", n: "bad", o: 0 } : { t: "오늘", c: "am", n: "am", o: 1 };   // 매주 (월요일)
+    var due = sfNowDueMonth(type, title), cm = Number(String(CURRENT_KEYS.monthly).slice(5, 7));
+    if (due && cm > due) return { t: "지남", c: "bad", n: "bad", o: 0 };
+    if (due && cm === due) return { t: "이번 달", c: "am", n: "am", o: 1 };
+    if (due) return { t: due + "월", c: "", n: "plan", o: 2 };
+    return { t: "미완", c: "am", n: "am", o: 1 };
+  }
+  function sfNowPill(t, c){ return '<span class="sfn-pill' + (c ? " " + c : "") + '">' + esc(t) + '</span>'; }
+  // 한 줄 — go가 있으면 누르면 원래 자리(sfNowGo), 없으면 안내 줄. 완료·입력 칸은 두지 않는다
+  function sfNowRow(id, title, meta, pt, pc, go){
+    return '<div class="item sfn-row' + (go ? '" data-sfn-go="' + esc(go) + '" role="button" tabindex="0"' : ' sfn-static"') + '>'
+      + '<span class="sfn-id">' + esc(id) + '</span>'
+      + '<div class="item-body"><div class="sfn-t">' + esc(title) + '</div>' + (meta ? '<div class="item-meta">' + esc(meta) + '</div>' : '') + '</div>'
+      + (pt ? sfNowPill(pt, pc) : '') + '</div>';
+  }
+  function sfNowBlock(key, title, cnt, src, body, foot){
+    return '<div class="dash-sec sfn-blk" data-sfn-blk="' + esc(key) + '"><h2>' + esc(title) + (cnt ? ' <span class="cnt">' + esc(cnt) + '</span>' : '') + '</h2>'
+      + (src ? '<div class="sfn-src">' + esc(src) + '</div>' : '')
+      + '<div class="card">' + body + '</div>'
+      + (foot ? '<div class="sfn-foot">' + foot + '</div>' : '') + '</div>';
+  }
+  function sfNowFoldHtml(key, label, inner){ return '<details class="sfn-more" data-sfn-fold="' + esc(key) + '"' + (sfNowFold[key] ? ' open' : '') + '><summary>' + esc(label) + '</summary>' + inner + '</details>'; }
+  function sfNowEmpty(t){ return '<div class="empty-line">' + esc(t) + '</div>'; }
+  // 읽기 상태 — 서버에서 받았거나(_colBase) 캐시로 들고 있으면 ok, 오프라인이거나 기다림이 다하면 fail, 아니면 wait
+  function sfNowColSt(col, has){
+    if ((typeof _colBase !== "undefined" && _colBase && Object.prototype.hasOwnProperty.call(_colBase, col)) || has) return "ok";
+    return (isOffline || sfNowTicks >= SF_NOW_TICK_MAX) ? "fail" : "wait";
+  }
+  function sfNowLd(s){ return (s === "ok" || s === "fail") ? s : (sfNowTicks >= SF_NOW_TICK_MAX ? "fail" : "wait"); }
+  // 실패 안내는 읽는 곳에 따라 — 교육·현장 대장은 현황 칸을 열 때 읽으므로 '다시 열면', 주기 체크·인허가·계약 목록(boot)은 앱이 처음 한 번 읽는 원장이라 현황을 다시 열어도 안 읽는다(새로고침)
+  function sfNowWaitRow(id, title, st, boot){ return st === "fail" ? sfNowRow(id, title, boot ? "앱을 새로고침하면 다시 읽습니다" : "현황 칸을 다시 열면 새로 읽습니다", "불러오지 못함", "bad", "") : sfNowRow(id, title, "", "불러오는 중…", "", ""); }
+  // ① 이번 주기 안전 점검 — 26개 중 이 사람에게 공개된 항목(내 업무와 같은 checkItemVisible)
+  function sfNowChecks(){
+    var T = "① 이번 주기 안전 점검", st = sfNowColSt("checklist", Object.keys(records || {}).length > 0);
+    if (st !== "ok") return { h: sfNowBlock("check", T, "", "내 업무 안전 항목", sfNowWaitRow("체크", "주기 체크 기록", st, true), ""), pend: st === "wait" };
+    var rows = [], n = { ok: 0, am: 0, bad: 0, plan: 0, su: 0 };
+    SF_NOW_CHECK.forEach(function(id, ord){
+      var f = sfNowItem(id);
+      if (!f || !checkItemVisible(id)) return;   // 공개범위 — 관리자·담당 본인·공개 대상만(PM이 닫아 둔 범위를 현황이 우회하지 않게)
+      var s = sfNowState(f.type, id, f.it.title), an = checkAssignee[id] ? scopeNames([checkAssignee[id]]) : "", who = an ? "담당 " + an : (f.it.who || "");
+      var meta = [TYPE_LABEL[f.type] || "수시", who, s.d ? "✓ " + s.d : "", s.by ? "요청 " + s.by : ""].filter(Boolean).join(" · ") + " · 내 업무 ›";
+      n[s.n]++;
+      rows.push({ o: s.o * 100 + ord, h: sfNowRow(id, f.it.title, meta, s.t, s.c, "check:" + id) });
+    });
+    if (!rows.length) return null;   // 볼 수 있는 항목이 없으면 블록째 숨김('0건' 아님)
+    rows.sort(function(a, b){ return a.o - b.o; });
+    var hs = rows.map(function(r){ return r.h; });
+    var body = hs.slice(0, 6).join("") + (hs.length > 6 ? sfNowFoldHtml("check", "나머지 " + (hs.length - 6) + "개 펼치기 ▼", hs.slice(6).join("")) : "");
+    var cnt = ["완료 " + n.ok, "미완 " + n.am, "지남 " + n.bad].concat(n.plan ? ["예정 " + n.plan] : []).concat(n.su ? ["수시 " + n.su] : []).join(" · ");
+    return { h: sfNowBlock("check", T, cnt, "내 업무 안전 항목 " + rows.length + "개", body, "완료 처리는 내 업무에서만 합니다(줄을 누르면 내 업무의 그 항목으로). 수시 항목은 일이 생길 때 하는 것이라 완료 표시가 없습니다."), pend: false };
+  }
+  // ② 중처법 반기 점검 — 줄 상태 = 맞춘 내 업무 항목의 이번 주기(그 항목이 공개범위 밖이면 줄째 뺀다)
+  function sfNowJcb(){
+    var T = "② 중처법 반기 점검", st = sfNowColSt("checklist", Object.keys(records || {}).length > 0), hk = String(CURRENT_KEYS.half);
+    var per = hk.slice(0, 4) + (hk.slice(-1) === "1" ? " 상반기" : " 하반기"), src = "중대재해처벌법 시행령 제4조 · 제5조②";
+    if (st !== "ok") return { h: sfNowBlock("jcb", T, per, src, sfNowWaitRow("체크", "주기 체크 기록", st, true), ""), pend: st === "wait" };
+    var rows = [];
+    SF_NOW_JCB.forEach(function(x){
+      if (!x.id){ rows.push(sfNowRow(x.no, x.t, x.m, x.p, x.pc, "")); return; }
+      var f = sfNowItem(x.id);
+      if (!f || !checkItemVisible(x.id)) return;
+      var s = sfNowState(f.type, x.id, f.it.title);
+      rows.push(sfNowRow(x.no, x.t, x.id + " " + f.it.title + (x.m ? " · " + x.m : ""), s.t, s.c, "check:" + x.id));
+    });
+    return { h: sfNowBlock("jcb", T, per, src, rows.join(""), "진행 표시입니다. 완료 기록에 날짜만 남아 시행령 제13조 이행 서면(5년 보관)으로 쓰기에는 약하므로 3차 시안에서 보강합니다."), pend: false };
+  }
+  // ③ — 교육·검진 다음 예정이 오늘+days 안(지난 것 포함). 현황 ③·관리자 홈 만기 목록이 같이 쓴다(읽기만).
+  //   v432 검토: 교육 기록은 이력이라(다시 이수하면 새 행, 옛 행의 next는 그대로) 같은 사람·같은 종류는 가장 최근 이수분만 본다 — 앱 만기 판정 규칙 eduLatest 그대로.
+  //   옛 행의 지난 next가 다음 이수 뒤에도 '기한 경과'로 남지 않게. 퇴사자·명부에서 지워진 일용직의 기록도 이력으로만 두고 뺀다(sfNowEduLive)
+  function sfNowEduDue(days){
+    var lim = addDays(todayStr(), days), out = [], best = {};
+    liveEdu().forEach(function(r){
+      if (!isDate(r.next) || r.next > lim) return;
+      var key = r.ptype + "|" + r.pid + "|" + r.kind;
+      if (!Object.prototype.hasOwnProperty.call(best, key)) best[key] = eduLatest(r.ptype, r.pid, r.kind);
+      if (best[key] !== r || !sfNowEduLive(r)) return;
+      out.push({ r: r, dd: vehDday(r.next) });
+    });
+    out.sort(function(a, b){ return a.dd.diff - b.dd.diff; });
+    return out;
+  }
+  // 기한 줄에 올릴 사람인가 — 퇴사자(memberRetired)·지운 회원·명부에서 지워진 일용직은 뺀다. 회원 목록·명부를 아직 못 받았으면 가릴 수 없으니 남긴다
+  function sfNowEduLive(r){
+    var i, m;
+    if (r.ptype === "worker"){
+      if (!workers.length) return true;
+      for (i = 0; i < workers.length; i++){ if (workers[i].id === r.pid) return workers[i].del !== 1; }
+      return false;
+    }
+    if (!members.length) return true;
+    m = findMember(r.pid);
+    return !!m && m.del !== 1 && !memberRetired(m);
+  }
+  // 기한 줄의 이름 — 명부(일용직)·회원 목록을 아직 못 받았으면 '일용직'·'직원'으로만('(삭제된 일용직)'·'(퇴사자)'로 잘못 보이지 않게 — 관리자 홈은 명부를 읽지 않고 그려질 수 있다)
+  function sfNowEduName(r){
+    if (r.ptype === "worker" ? !workers.length : !members.length) return r.ptype === "worker" ? "일용직" : "직원";
+    return eduPersonName(r);
+  }
+  // 관리자 홈 만기 목록 한 줄 — 인허가 줄과 같은 형식(.item.veh-item · 메타 · D-day). 누르면 안전 › 교육·검진 그 대상 목록(data-inbox-go — 홈의 기존 이동 배선)
+  function sfNowHomeEduRow(x){
+    var r = x.r, go = r.ptype === "worker" ? "safety:edu:worker" : "safety:edu:member";
+    return '<div class="item veh-item" data-inbox-go="' + go + '" style="cursor:pointer;">' +
+      '<div class="item-body">' +
+        '<div class="item-title">' + esc(sfNowEduName(r)) + ' · ' + esc(eduKindLabel(r.kind)) + '</div>' +
+        '<div class="item-meta"><span>다음 예정 ' + esc(r.next) + '</span><span class="own-badge self">' + (r.ptype === "worker" ? "일용직" : "직원") + ' · 교육·검진</span></div>' +
+      '</div>' +
+      '<div class="task-ctrl"><span class="dday' + (x.dd.cls ? ' ' + x.dd.cls : '') + '">' + x.dd.text + '</span></div>' +
+    '</div>';
+  }
+  function sfNowLicKey(s){ return String(s || "").replace(/\([^)]*\)/g, "").replace(/[\s·ㆍ]/g, "").replace(/(등록|허가|신고)$/, ""); }
+  // 의무 대장 행 → 이름이 이어지는 인허가 행들('석면해체·제거업 등록(종운건설)' ↔ '석면해체·제거업'). 없으면 빈 배열.
+  //   v432 검토: 의무 줄 글에 회사(종운건설·종운환경)가 있으면 이름이 맞는 행 가운데 그 회사(l.org) 행을 고른다 — 같은 업종이 두 회사에 따로 등록돼도 다른 회사 행의 공개범위로 판정하지 않게
+  function sfNowDutyLics(d){
+    var s = String((d && d.lic) || ""), k = sfNowLicKey(s), org = (s.match(/\((종운건설|종운환경)/) || [])[1] || "", hit = [];
+    if (k.length < 4) return hit;
+    liveLic().forEach(function(l){ var lk = sfNowLicKey(l.name); if (lk.length >= 4 && (k.indexOf(lk) === 0 || lk.indexOf(k) === 0)) hit.push(l); });
+    if (org && hit.length > 1){ var same = hit.filter(function(l){ return l.org === org; }); if (same.length) hit = same; }
+    return hit;
+  }
+  // 인허가 행 공개범위 — 그 행을 못 보는 사람에게는 그 의무 줄도 뺀다. 이어지는 행이 없으면 블록 권한대로, 회사로도 하나를 못 고르면 이어지는 행을 모두 볼 때만(좁은 쪽)
+  function sfNowDutyVisible(d){ return sfNowDutyLics(d).every(function(l){ return licVisible(l); }); }
+  function sfNowDutyPart(){
+    var st = sfNowColSt("licenses", licRemoteOk || duties.length > 0);
+    if (st !== "ok") return { h: sfNowWaitRow("의무", "인허가 의무 대장", st, true), pend: st === "wait" };
+    var by = {}, rows = [], nc = 0;
+    liveDuties().forEach(function(d){ if (d && d.no != null) by[d.no] = d; });
+    if (!Object.keys(by).length) return { h: sfNowRow("의무", "인허가 의무 대장이 비어 있습니다", "인허가 › 의무 대장에서 등재표를 불러오면 여기에 주기가 보입니다", "비어 있음", "", "duty"), pend: false };
+    SF_NOW_DUTY.cycle.forEach(function(no){ var d = by[no]; if (!d || !sfNowDutyVisible(d)) return; nc++; rows.push(sfNowRow(no + "행", d.duty || "", [d.lic, d.cycle].filter(Boolean).join(" · "), "주기 문구", "", "duty")); });
+    SF_NOW_DUTY.event.forEach(function(no){ var d = by[no]; if (!d || !sfNowDutyVisible(d)) return; rows.push(sfNowRow(no + "행", d.duty || "", [d.lic, d.cycle].filter(Boolean).join(" · ") + " — 산안법 중대재해 보고와 따로 판정", "따로 판정", "", "duty")); });
+    SF_NOW_DUTY.na.forEach(function(no){ var d = by[no]; if (!d || !sfNowDutyVisible(d)) return; rows.push(sfNowRow(no + "행", d.duty || "", (d.lic ? d.lic + " · " : "") + "차량만 보유한 운반업은 비대상(보관·저장·상하차 설비를 두면 다시 판정)", "해당 없음", "", "duty")); });
+    if (!rows.length) return { h: "", pend: false };
+    return { h: sfNowFoldHtml("duty", "의무 대장 안전 행 " + nc + "개 — 주기 문구만(D-n은 기한 엔진 배포 뒤) ▼", rows.join("")), pend: false };
+  }
+  // ③ 다가오는 기한 30일 — 현장 대장(현장 권한: 작업신고 마감·특별교육 미이수·완료 후 농도 미입력·30년 보존 만료) · 교육·검진 다음 예정 · 인허가 의무 대장(인허가 권한, 주기 문구만)
+  function sfNowDue(see){
+    var T = "③ 다가오는 기한 30일", today = todayStr(), lim = addDays(today, 30), past = addDays(today, -30);
+    var dated = [], other = [], notes = [], src = [], pend = false, es = sfNowLd(sfNowSt.edu);
+    if (see.site){
+      src.push("현장 대장");
+      var as = sfNowLd(sfNowSt.asb);
+      if (as === "ok"){
+        var bad = 0;
+        liveSites().forEach(function(r){ try {
+          var k = siteKind(r), nm = siteLabel(r) + " · " + (r.title || "(공사명 없음)"), due, dd, ns, keep;
+          if (k === "asbestos" && r.status !== "done"){
+            due = asbNotifyDue(r);
+            if (isDate(due) && due <= lim && (due >= today || r.status === "plan")){ dd = vehDday(due); dated.push({ d: dd.diff, h: sfNowRow("현장", nm + " · 석면 작업신고 마감", "착수 " + r.start + " 7일 전 신고 · 마감 " + due, dd.diff < 0 ? "지남" : dd.text, dd.diff <= 7 ? "bad" : "am", "site") }); }
+          }
+          if (r.status !== "done" && es === "ok"){
+            ns = asbNoSpecial(r);   // 현장 칸과 같은 판정(교육·검진 기록 기준)
+            if (ns.length) other.push(liveEdu().length
+              ? sfNowRow("현장", nm + " · 특별교육 미이수", ns.slice(0, 5).join(", ") + (ns.length > 5 ? " 외 " + (ns.length - 5) + "명" : "") + " — 배치 전 이수 필요", ns.length + "명", "am", "site")
+              : sfNowRow("현장", nm + " · 특별교육", "교육·검진 기록이 0건이라 투입 " + ns.length + "명 모두 이수 여부 미확인", "기록 없음", "", "site"));
+          }
+          if (k === "asbestos" && isDate(r.end) && r.end <= today && r.end >= past && !String(r.conc || "").trim()) other.push(sfNowRow("현장", nm + " · 완료 후 석면농도 미입력", "작업 종료 " + r.end + " · 1㎤당 0.01개 이하 확인·보고", "미입력", "am", "site"));
+          keep = k === "asbestos" ? asbKeepUntil(r) : "";
+          if (isDate(keep) && keep >= today && keep <= lim){ dd = vehDday(keep); dated.push({ d: dd.diff, h: sfNowRow("현장", nm + " · 기록 보존 만료", "종료 " + r.end + " + 30년(산안법 제164조⑥) — 만료 뒤 처리는 관리자 판단", dd.text, "", "site") }); }
+        } catch(e){ bad++; } });   // 모양이 깨진 기록 한 건이 블록 전체를 막지 않게 — 건수만 알린다
+        if (bad) notes.push(sfNowRow("현장", "현장 대장 기록 " + bad + "건을 읽지 못했습니다", "안전 › 현장에서 그 기록을 확인하세요", "확인 필요", "bad", "site"));
+      } else { notes.push(sfNowWaitRow("현장", "현장 대장", as)); if (as === "wait") pend = true; }
+    }
+    src.push("교육·검진");
+    if (es === "ok"){
+      if (!liveEdu().length) notes.push(sfNowRow("교육", "교육·검진 다음 예정", "첫 입력 전에는 계산할 날짜가 없습니다", "기록 없음", "", "edu:member"));
+      else sfNowEduDue(30).forEach(function(x){ var r = x.r, w = r.ptype === "worker"; dated.push({ d: x.dd.diff, h: sfNowRow("교육", sfNowEduName(r) + " · " + eduKindLabel(r.kind), "다음 예정 " + r.next + " · " + (w ? "일용직" : "직원"), x.dd.diff < 0 ? "기한 경과" : x.dd.text, x.dd.diff < 0 ? "bad" : (x.dd.diff <= 7 ? "am" : ""), w ? "edu:worker" : "edu:member") }); });
+    } else { notes.push(sfNowWaitRow("교육", "교육·검진 기록", es)); if (es === "wait") pend = true; }
+    var duty = { h: "", pend: false };
+    if (see.lic){ src.push("인허가 의무 대장"); duty = sfNowDutyPart(); if (duty.pend) pend = true; }
+    dated.sort(function(a, b){ return a.d - b.d; });
+    var n = dated.length + other.length, body = dated.map(function(x){ return x.h; }).join("") + other.join("") + notes.join("");
+    if (!body) body = sfNowEmpty("30일 안에 다가오는 기한이 없습니다.");
+    return { h: sfNowBlock("due", T, n ? n + "건" : "", src.join(" · "), body + duty.h, see.lic ? "의무 대장 안전 행 = 4·14·15·16~24·27~30·32·51~53·55~57·59행(61행 제외, 62행 '해당 없음'). 기한 엔진(체크 28)이 배포되기 전까지 D-n 없이 주기 문구만 보입니다." : ""), pend: pend };
+  }
+  // ④ 계약 안전 서류 — 이 계약에 걸리는 키(v427 패킷 표·단계·서류 줄과 같은 csPkWhen 판정 — 패킷·항목 둘 다)
+  function sfNowConKeys(c){
+    var out = [];
+    SF_NOW_CON.forEach(function(x){
+      var p = x.k.split("|")[0], hit = false;
+      CON_PACKETS.forEach(function(pk){
+        if (hit || pk.k !== p || !csPkWhen(c, pk.when)) return;
+        pk.items.forEach(function(it0){ if (!hit && csPkIk(pk, it0) === x.k && csPkWhen(c, it0.when)) hit = true; });
+      });
+      if (hit) out.push(x);
+    });
+    return out;
+  }
+  // [{k, s, st}] — v427 csFlow 줄을 패킷 키(e.ik)로 찾아 csRowState 판정 그대로(done ✓ · todo ✗ · na 해당없음, 줄을 못 찾으면 "")
+  function sfNowConDocs(c){
+    var keys = sfNowConKeys(c);
+    if (!keys.length) return [];
+    var fm = csFlow(c), rows = [];
+    Object.keys(fm.st).forEach(function(k){ (fm.st[k] || []).forEach(function(r){ rows.push(r); }); });
+    (fm.loose || []).forEach(function(r){ rows.push(r); });
+    return keys.map(function(x){
+      var r = null;
+      rows.forEach(function(q){ if (!r && (q.pk || []).some(function(e){ return e.ik === x.k; })) r = q; });
+      return { k: x.k, s: x.s, st: r ? csRowState(c, r, fm) : "" };
+    });
+  }
+  // 서류함 읽기 상태 — 기다림은 그 계약의 읽기를 시작한 틱(sfNowCdocT0, 현황을 열 때 읽은 계약은 0)부터 센다
+  function sfNowCdocSt(c){ var e = (typeof CDOC !== "undefined" && CDOC) ? CDOC[c.id] : null; if (e && e.loaded) return "ok"; if (e && e.err && !e.busy) return "fail"; return (sfNowTicks - (sfNowCdocT0[c.id] || 0)) >= SF_NOW_TICK_MAX ? "fail" : "wait"; }
+  function sfNowCons(){
+    var T = "④ 계약 안전 서류", st = sfNowColSt("contracts", contracts.length > 0), src = "진행 중 계약 · 누르면 그 계약의 단계·서류";
+    if (st !== "ok") return { h: sfNowBlock("con", T, "", src, sfNowWaitRow("계약", "계약 목록", st, true), ""), pend: st === "wait" };
+    var act = liveContracts().filter(function(c){ return c.status !== "done"; }), rows = [], none = 0, miss = 0, pend = false;
+    act.sort(function(a, b){ return String(b.start || "").localeCompare(String(a.start || "")); });
+    act.forEach(function(c){
+      var keys = sfNowConKeys(c);
+      if (!keys.length){ none++; return; }
+      // v432 검토: 현황을 연 뒤에 도착한 계약(로그인 직후 계약 목록보다 현황을 먼저 연 경우 등)도 서류함을 1번 읽는다 — 종전엔 연 순간의 목록만 읽어 90초 '확인 중' 뒤 '확인 실패'로 끝났다.
+      //   cdocLoad가 바로 자리(busy)를 만들어 다시 부르지 않고(60초 캐시 그대로), 기다림은 이때부터 센다
+      if (typeof CDOC !== "undefined" && CDOC && !CDOC[c.id]){ sfNowCdocT0[c.id] = sfNowTicks; cdocLoad(c); }
+      var nm = [c.client, csSiteText(c)].filter(Boolean).join(" · ") || c.label || "(계약)", cs = sfNowCdocSt(c), go = "con:" + c.id;
+      if (cs === "wait"){ pend = true; rows.push(sfNowRow(csKind(c), nm, keys.map(function(x){ return x.s; }).join(" · ") + " — 서류함 확인 중", "확인 중", "", go)); return; }
+      if (cs === "fail"){ rows.push(sfNowRow(csKind(c), nm, "계약 서류함을 불러오지 못함 — 계약 단계·서류에서 직접 확인", "확인 실패", "bad", go)); return; }
+      var docs = null, nT = 0, nD = 0;
+      try { docs = sfNowConDocs(c); } catch(e){ docs = null; }
+      if (!docs){ rows.push(sfNowRow(csKind(c), nm, "이 계약의 단계·서류를 읽지 못함 — 계약 단계·서류에서 직접 확인", "확인 실패", "bad", go)); return; }   // 한 건이 블록 전체를 막지 않게
+      docs.forEach(function(d){ if (d.st === "done" || d.st === "todo"){ nT++; if (d.st === "done") nD++; } });
+      if (nD < nT) miss++;
+      rows.push(sfNowRow(csKind(c), nm, docs.map(function(d){ return d.s + " " + (d.st === "done" ? "✓" : (d.st === "na" ? "해당없음" : (d.st === "todo" ? "✗" : "-"))); }).join(" · ") + " · 단계·서류 ›", nT ? nD + "/" + nT : "해당없음", !nT ? "" : (nD === nT ? "ok" : "am"), go));
+    });
+    var body = rows.join("") || sfNowEmpty(act.length ? "진행 중 계약에 걸리는 안전 서류가 없습니다." : "진행 중인 계약이 없습니다.");
+    var foot = "실물 양식은 아직 준설만 들어와 있습니다 — 그 밖의 종류는 양식이 없어 ✗로 남습니다(v427 판정 그대로)." + (none ? " 안전 서류 줄이 없는 진행 계약 " + none + "건(사급 등)은 뺐습니다." : "");
+    return { h: sfNowBlock("con", T, rows.length ? "진행 " + rows.length + "건" + (miss ? " · 빠짐 " + miss : "") : "", src, body, esc(foot)), pend: pend };
+  }
+  // ⑤ 인정·평가 — 7단계 자리(KOSHA 인정 행·석면 안전성평가 등급·등록기준은 7단계에서 인허가 원장을 읽어 채운다)
+  function sfNowEval(){
+    return { h: sfNowBlock("eval", "⑤ 인정·평가", "", "인허가 원장 · 입력은 관리자", sfNowRow("7단계", "KOSHA 위험성평가 인정 단계 · 석면 안전성평가 등급 · 등록기준 인력·장비", "7단계에서 채웁니다. 회사 구분(종운환경·종운건설)도 회사별 상시근로자 수를 넣은 뒤 그때 켭니다.", "7단계에서 채움", "", ""), ""), pend: false };
+  }
+  // ⑥ 확인 필요 — 조문과 해당 여부만 + 문서함 06 안전보건 바로가기(문서함 권한)
+  function sfNowConfirm(see){
+    var rows = SF_NOW_CONFIRM.map(function(x){ return sfNowRow(x.id, x.t, x.m, x.p, "", ""); }).join("");
+    var foot = see.doc ? '<button type="button" class="sfn-go" data-sfn-go="doc06">문서함 › ' + esc(DOC_MAJOR["06"] || "06 안전보건") + ' 열기 ›</button>' : "";
+    return { h: sfNowBlock("confirm", "⑥ 확인 필요", "", "데이터 없이 조문과 해당 여부만", rows, foot), pend: false };
+  }
+  // 줄을 누르면 원래 자리로 — 이동·펼침만(완료·저장 없음).
+  //   v432 검토: 앱은 탭을 바꿔도 창 스크롤을 그대로 두므로 도착한 자리로 굴린다(못 찾으면 맨 위 — 현황 아래쪽에서 누른 이동이 도착 화면 중간·끝에 떨어지지 않게)
+  function sfNowGo(v){
+    var s = String(v || ""), i = s.indexOf(":"), k = i < 0 ? s : s.slice(0, i), a = i < 0 ? "" : s.slice(i + 1);
+    if (k === "check"){ switchTab("check"); if (!sfNowScrollTo("#listHost .item", "data-id", a) && !(/^su\d/.test(a) && sfNowScrollSudsi(a))) sfNowTop(); return; }   // 수시 항목은 내 업무 '수시' 칸(#sudsiHost)에 있다
+    if (k === "site"){ switchTab("safety:site"); sfNowTop(); return; }
+    if (k === "edu"){ if (a === "worker") switchTab("safety:edu:worker"); else switchTab("safety:edu:member"); sfNowTop(); return; }
+    if (k === "duty"){ switchTab("lic"); setLicLayer("duty"); sfNowTop(); return; }
+    if (k === "con"){
+      var c = findProc(a);
+      if (!c) return;
+      // 계약 표의 칩·필터(기기별 — '완료'·'사급' 칩, 검색어)가 그 계약을 거르면 펼침이 그려지지 않는다 — 이번 이동만 '필터 초기화'와 같게 풀어 그린다(기기 저장은 하지 않음 — 다음에 칩을 누르면 그때 저장)
+      if (!csPass(c, conSheet.f, conSheet.chip)){ conSheet.f = {}; conSheet.chip = ""; }
+      conOpenId = a; conDetTab = "st"; switchTab("con"); renderContracts();
+      if (window.innerWidth < 860){ var dc = document.getElementById("conDetailCard"); if (dc && dc.scrollIntoView) dc.scrollIntoView({ block: "start" }); else sfNowTop(); }   // 폰은 상세가 표 아래 카드 — 계약 줄을 직접 누를 때와 같은 자리
+      else if (!sfNowScrollTo("[data-cs-row]", "data-cs-row", a)) sfNowTop();
+      return;
+    }
+    if (k === "doc06"){ docOpenCats["06"] = true; switchTab("doc"); renderDocuments(); if (!sfNowScrollTo("[data-doc-acc]", "data-doc-acc", "06", "start")) sfNowTop(); return; }
+  }
+  function sfNowScrollTo(sel, attr, val, block){
+    try { var els = document.querySelectorAll(sel), j; for (j = 0; j < els.length; j++){ if (els[j].getAttribute(attr) === val){ if (els[j].scrollIntoView) els[j].scrollIntoView({ block: block || "center" }); return true; } } } catch(e){}
+    return false;
+  }
+  // 수시 항목 — 내 업무 '수시' 칸(#sudsiHost, #listHost 밖)의 줄은 data-id 없이 제목으로 그려진다(renderSudsi). 제목이 같은 줄로, 못 찾으면 그 칸 머리로
+  function sfNowScrollSudsi(id){
+    var f = sfNowItem(id), els, j, t, h;
+    try {
+      els = document.querySelectorAll("#sudsiHost .item");
+      for (j = 0; j < els.length; j++){ t = els[j].querySelector(".item-title"); if (f && t && t.textContent === f.it.title){ els[j].scrollIntoView({ block: "center" }); return true; } }
+      h = document.getElementById("sudsiHost");
+      if (h && h.parentNode && h.parentNode.scrollIntoView){ h.parentNode.scrollIntoView({ block: "start" }); return true; }
+    } catch(e){}
+    return false;
+  }
+  function sfNowTop(){ try { window.scrollTo(0, 0); } catch(e){} }
+  // 읽기 — 기존 로더를 부르고 결과(ok·fail)만 적는다. 로더가 promise를 안 주면(권한 없음) fail. 30초 안에 받은 것은 다시 부르지 않는다(SF_NOW_FRESH)
+  function sfNowLoad(key, fn, arg){
+    if (sfNowSt[key] === "ok" && sfNowAt[key] && Date.now() - sfNowAt[key] < SF_NOW_FRESH) return;
+    var p = null;
+    try { p = fn(arg); } catch(e){ p = null; }
+    if (!p || typeof p.then !== "function"){ sfNowSt[key] = "fail"; return; }
+    if (sfNowSt[key] !== "ok") sfNowSt[key] = "wait";
+    p.then(function(ok){ sfNowSt[key] = ok ? "ok" : "fail"; if (ok) sfNowAt[key] = Date.now(); sfNowRefresh(); }, function(){ sfNowSt[key] = "fail"; sfNowRefresh(); });
+  }
+  // 현황 칸을 열 때만(setSafetyLayer "now") — 교육(안전 권한)·현장 대장(현장 권한, 보류된 계약 연결·종결 훅 없이)·명부(이름)·안전 서류가 걸리는 진행 계약의 서류함을 읽고 그린다
+  function sfNowOpen(){
+    sfNowTicks = 0; sfNowCdocT0 = {};
+    sfNowLoad("edu", loadEdu);
+    if (canSee("site")) sfNowLoad("asb", loadAsb, { noHooks: true }); else sfNowSt.asb = "";
+    if (canSee("wk") && !(sfNowAt.wk && Date.now() - sfNowAt.wk < SF_NOW_FRESH)){ var wp = loadWorkers(); if (wp && typeof wp.then === "function") wp.then(function(){ if (workers.length) sfNowAt.wk = Date.now(); sfNowRefresh(); }, sfNowRefresh); }
+    if (canSee("con")) liveContracts().forEach(function(c){ if (c.status !== "done" && sfNowConKeys(c).length) cdocLoad(c); });
+    renderSafetyNow();
+  }
+  function sfNowRefresh(){ if (currentTab === "safety" && safetyLayer === "now") renderSafetyNow(); }
+  function sfNowTry(key, title, fn){
+    try { return fn(); } catch(e){ try { console.warn("안전 현황 " + title, e); } catch(e2){} return { h: sfNowBlock(key, title, "", "", sfNowEmpty("불러오지 못함"), ""), pend: false }; }
+  }
+  function renderSafetyNow(){
+    var host = document.getElementById("sfNowHost");
+    if (!host) return;
+    if (sfNowTimer){ clearTimeout(sfNowTimer); sfNowTimer = null; }
+    if (!canSee("safety")){ host.innerHTML = ""; sfNowLastHtml = ""; return; }   // 현황 = 안전 권한(관리자·권민지) — 칩·칸도 safetyPanes·applySafetyPerms가 숨긴다
+    var see = sfNowSee(), out = [], pend = false;
+    var add = function(o){ if (!o) return; out.push(o.h); if (o.pend) pend = true; };
+    if (see.check){ add(sfNowTry("check", "① 이번 주기 안전 점검", sfNowChecks)); add(sfNowTry("jcb", "② 중처법 반기 점검", sfNowJcb)); }
+    add(sfNowTry("due", "③ 다가오는 기한 30일", function(){ return sfNowDue(see); }));
+    if (see.con) add(sfNowTry("con", "④ 계약 안전 서류", sfNowCons));
+    if (see.lic) add(sfNowTry("eval", "⑤ 인정·평가", sfNowEval));
+    add(sfNowTry("confirm", "⑥ 확인 필요", function(){ return sfNowConfirm(see); }));
+    var head = document.getElementById("sfNowHead");
+    if (head) head.textContent = todayStr() + " 기준";
+    var html = out.join("");
+    if (html !== sfNowLastHtml){   // v432 검토: 기다리는 동안 매초 다시 그려도 글이 같으면 칸을 갈아끼우지 않는다(누르던 줄·포커스가 날아가지 않게)
+      host.innerHTML = html; sfNowLastHtml = html;
+      Array.prototype.forEach.call(host.querySelectorAll("[data-sfn-go]"), function(el){
+        el.addEventListener("click", function(){ sfNowGo(el.getAttribute("data-sfn-go")); });
+        if (el.tagName !== "BUTTON") el.addEventListener("keydown", function(e){ if (e.key === "Enter" || e.key === " "){ e.preventDefault(); sfNowGo(el.getAttribute("data-sfn-go")); } });
+      });
+      Array.prototype.forEach.call(host.querySelectorAll("details[data-sfn-fold]"), function(el){
+        el.addEventListener("toggle", function(){ sfNowFold[el.getAttribute("data-sfn-fold")] = !!el.open; });
+      });
+    }
+    if (pend && sfNowTicks < SF_NOW_TICK_MAX * 2) sfNowTimer = setTimeout(function(){ sfNowTimer = null; sfNowTicks++; sfNowRefresh(); }, 1000);   // 기다림은 블록마다 90번에서 끝난다(늦게 시작한 서류함도 180번 안) — 2배는 안전 한도
+  }
+  // @safety-now-end
+
   // ═══ 교육·건강진단 이력 ════════════════════════════════════════════════
   // 주기는 전부 원문 확정분이다(인허가_만기주기_조사 석면 섹션, 2·3차 재검증 완료).
   // months=0 은 "주기 없음" — 석면 관리자교육은 현행 고시에 보수교육 조항이 없어
@@ -13816,14 +14240,16 @@
   }
   function loadEdu(){
     if(!canSee("safety")) return;   // v430 교육·건강진단 기록 = 안전 권한(서버 COL edu:'safety' — 종전 hr 관리자 전용)
-    gwCall("gw-data",{action:"get",collection:"edu"}).then(function(res){
-      if(res.status!==200) return;
+    return gwCall("gw-data",{action:"get",collection:"edu"}).then(function(res){   // v432: 읽기 결과를 돌려준다(성공 true · 실패 false — 안전 › 현황 '불러오지 못함')
+      if(res.status!==200) return false;
       var doc=(res.body&&res.body.doc)||{};
       var ri=Array.isArray(doc.items)?doc.items:[];
       edu = eduPending ? mergeEdu(edu, ri) : ri;
       eduBase = doc.updated_at||0;
       renderEdu(); renderCalendar(); renderSites();
-    }).catch(function(){});
+      if (isAdmin() && currentTab === "dash") renderDashboard();   // v432 관리자 홈 만기 목록의 교육·검진 다음 예정 줄 — 홈이 보일 때만(다른 화면이면 홈으로 돌아올 때 switchTab이 다시 그린다)
+      return true;
+    }).catch(function(){ return false; });
   }
   function scheduleEduSave(){ eduPending=true; if(eduSaveTimer) clearTimeout(eduSaveTimer); eduSaveTimer=setTimeout(doSaveEdu,1200); }
   function doSaveEdu(){
@@ -19603,10 +20029,11 @@
   }
 
   // ---- v428(메뉴 56 1단계) 안전 탭 칸·입찰 탭 칸 — 인허가 setLicLayer와 같은 방식(.lsub-bar 칩 + 칸 감싸개) ----
-  // 안전 탭에서 지금 볼 수 있는 칸: 현장 칸 = site, 교육·검진 칸 = safety(v430 메뉴 56 3단계 — 종전 hr 관리자 전용, 서버 col:edu도 safety).
-  //   탭 표시(둘 중 하나라도)·칩 줄·첫 칸 고르기·볼 칸이 없을 때 홈이 모두 이 목록 하나를 본다.
+  // 안전 탭에서 지금 볼 수 있는 칸: 현황 칸 = safety(v432 5단계 — 맨 앞, 읽기 전용), 현장 칸 = site, 교육·검진 칸 = safety(v430 메뉴 56 3단계 — 종전 hr 관리자 전용, 서버 col:edu도 safety).
+  //   탭 표시(둘 중 하나라도)·칩 줄·첫 칸 고르기(볼 수 있으면 현황)·볼 칸이 없을 때 홈이 모두 이 목록 하나를 본다.
   function safetyPanes(){
     var out = [];
+    if (canSee("safety")) out.push("now");
     if (canSee("site")) out.push("site");
     if (canSee("safety")) out.push("edu");
     return out;
@@ -19621,8 +20048,10 @@
     if (bar) Array.prototype.forEach.call(bar.querySelectorAll(".lsub-btn"), function(b){
       b.classList.toggle("active", b.getAttribute("data-lsub") === name);
     });
+    document.getElementById("sfPaneNow").style.display = (name === "now") ? "" : "none";
     document.getElementById("sfPaneSite").style.display = (name === "site") ? "" : "none";
     document.getElementById("sfPaneEdu").style.display = (name === "edu") ? "" : "none";
+    if (name === "now") sfNowOpen();   // v432 현황 — 이 칸을 열 때만 교육·현장 대장·진행 계약 서류함을 읽는다(읽기만, @safety-now 구간)
     if (name === "site"){ renderSites(); loadAsb(); if (canSee("safety")) loadEdu(); if (canSee("wk")) loadWorkers(); }   // 옛 현장 탭을 열 때 하던 읽기 그대로 · v430 교육 기록은 안전 권한일 때만(현장 칸의 특별교육 미이수 판정이 쓴다 — 없으면 종전처럼 기록 없음으로)
     if (name === "edu"){
       renderEdu(); loadEdu();
@@ -21790,6 +22219,8 @@
     if (tab) tab.classList.toggle("perm-hidden", !panes.length);   // 볼 칸이 하나도 없으면(안전·현장 권한 둘 다 숨김) 탭째 숨김(김호태·현장 8명)
     var bar = document.getElementById("sfSubBar");
     if (bar) bar.style.display = panes.length > 1 ? "" : "none";   // 칩이 1개 이하면 칩 줄째 숨김 — 현장만 보는 사람은 옛 현장 화면 그대로
+    var nowChip = document.getElementById("sfChipNow");   // v432 현황 칩 = 안전 권한(칩 하나에 권한 키가 없어 MODULE_TAB 밖 — 여기서 숨긴다. 현장·교육·검진 칩은 MODULES 루프)
+    if (nowChip) nowChip.classList.toggle("perm-hidden", panes.indexOf("now") < 0);
     if (currentTab === "safety"){
       if (!panes.length) switchTab("dash");
       else if (panes.indexOf(safetyLayer) < 0) setSafetyLayer(panes[0]);

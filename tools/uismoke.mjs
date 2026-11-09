@@ -1436,7 +1436,8 @@ try {
     && /if \(c\.site_hook === "none"\) delete c\.site_hook;/.test(sc) && /if \(c\.scen && c\.status === "done"\) csSiteDone\(c\);/.test(sc)
     && /if\(opts\.scen\)\{ try \{ csLinkSiteLater\(c\); \} catch\(e\)\{\} \}/.test(html) && /if\(c\.status==="done"\) csOnDone\(c\);/.test(html) && /if \(c\.status === "done"\) csOnDone\(c\); \}/.test(html)
     && /function csOnDone\(c\)\{\s+if \(!c \|\| !c\.scen \|\| c\.status !== "done"\) return;/.test(sc) && /c\.task_hook = todayStr\(\);/.test(sc) && /if \(!c \|\| !c\.scen \|\| \(c\.site_hook && c\.site_hook !== "none"\) \|\| !c\.site_id/.test(sc) && /if \(!r\) return false;   \/\/ 로컬에 없음/.test(sc) && /c\.site_hook = todayStr\(\);/.test(sc) && !/done_hook/.test(html)
-    && /asbBase = doc\.updated_at\|\|0; asbLoaded = true;\s+if \(typeof csSiteHooksRetry === "function"\)/.test(html) && /asbLoaded && typeof csSiteHooksRetry === "function"\)\{ try \{ csSiteHooksRetry\(\); \}/.test(html) && /title = "실적신고\(2\/15\) — "/.test(sc)
+    // v432: loadAsb의 보류 훅 줄에 현황 읽기 예외(opt.noHooks)가 붙었다 — 그 밖의 부름(현장 칸·계약 쪽)은 종전대로 훅을 돌린다(실행 검사는 v432 묶음 ⑧)
+    && /asbBase = doc\.updated_at\|\|0; asbLoaded = true;\s+if \(!\(opt && opt\.noHooks\) && typeof csSiteHooksRetry === "function"\)\{ try \{ csSiteHooksRetry\(\); \}/.test(html) && /asbLoaded && typeof csSiteHooksRetry === "function"\)\{ try \{ csSiteHooksRetry\(\); \}/.test(html) && /title = "실적신고\(2\/15\) — "/.test(sc)
     && /querySelectorAll\("\[data-cs-site\]"\)/.test(html) && /var r = csLinkSiteLater\(c\); alert\(typeof r === "object"/.test(html) && /현장 대장 열람 권한 필요/.test(html) && !/approval_apply|task_done_by_approval/.test(gwd), '');
 } catch (e) { console.log('  (v384 검사 생략 — ' + e.message + ')'); fails++; }
 
@@ -2052,8 +2053,8 @@ try {
   const goT28 = [...new Set([...[...html.matchAll(/data-go-tab="([\w:]+)"/g)].map((m) => m[1]), ...[...cal28.matchAll(/"(\w+:\w+)"\)/g)].map((m) => m[1]), ...colonSw28, ...colonGo28, 'site', 'onbid'])];
   const badGo28 = goT28.filter((g) => !goOk28(g));
   T('v428 이동 대상 ' + goT28.length + '개(길 안내 data-go-tab·캘린더 go·옛 이름 site/onbid·switchTab 글자와 data-home/inbox/cal-go의 \'탭:칸\' ' + (colonSw28.length + colonGo28.length) + '개)가 전부 있는 뷰·그 탭의 칸·교육 대상 칩으로 풀림 · 길 안내 버튼 3개(인허가 → 안전 › 현장, 인사·직원 → 교육·검진 직원, 인사·일용직 → 교육·검진 일용직, 교육 안내 줄은 처음 숨김 · 인허가 석면 안내는 글 줄이 처음부터 보이고 버튼만 감싸개 asbMovedGo 안) · 일부러 틀린 대상은 안 풀림 · 옛 교육 이력 제목 없음',
-    goT28.length >= 5 && badGo28.length === 0 && layers28.safety.join() === 'site,edu' && layers28.bid.join() === 'list,onbid' && eduScopes28.join() === 'member,worker'
-    && ['safety:nope', 'safety:edu:boss', 'safety:site:worker', 'nowhere', 'bid:edu'].every((g) => !goOk28(g))
+    goT28.length >= 5 && badGo28.length === 0 && layers28.safety.join() === 'now,site,edu' && layers28.bid.join() === 'list,onbid' && eduScopes28.join() === 'member,worker'   // v432 안전 칸 = 현황(맨 앞)·현장·교육·검진
+    && ['safety:nope', 'safety:edu:boss', 'safety:site:worker', 'safety:now:member', 'nowhere', 'bid:edu'].every((g) => !goOk28(g))
     && /<div class="hw-note" id="asbMovedNote" style="margin-top:22px;">[^<]*<b>안전 › 현장<\/b>[^<]*<span id="asbMovedGo"><button class="mini-btn" id="asbMovedBtn" data-go-tab="safety:site" style="margin-left:6px;">안전 › 현장 열기<\/button><\/span><\/div>/.test(sec28('view-lic'))
     && /id="eduMovedHrBtn" data-go-tab="safety:edu:member"/.test(sec28('view-hr')) && /id="eduMovedWkBtn" data-go-tab="safety:edu:worker"/.test(sec28('view-workers'))
     && /querySelectorAll\("\[data-go-tab\]"\), function\(b\)\{\s*b\.addEventListener\("click", function\(\)\{ switchTab\(b\.getAttribute\("data-go-tab"\)\); \}\);/.test(html)
@@ -2122,9 +2123,10 @@ try {
   const regStmt28 = ['var MODULES = \\[[^\\]]+\\];', 'var MODULE_TAB = \\{[^}]+\\};', 'var MODULE_VIEW = \\{[^}]+\\};'].map((re) => { const m = html.match(new RegExp(re)); if (!m) throw new Error('레지스트리 문장 없음: ' + re); return m[0]; });
   const mkC28 = () => { const s = new Set(); return { add: (c) => s.add(c), remove: (c) => s.delete(c), toggle: (c, on) => { if (on === undefined ? !s.has(c) : on) s.add(c); else s.delete(c); return s.has(c); }, contains: (c) => s.has(c) }; };
   const mkE28 = (id, attrs) => ({ id, attrs: attrs || {}, classList: mkC28(), style: {}, getAttribute(n) { return this.attrs[n] === undefined ? null : this.attrs[n]; }, querySelectorAll: () => [] });
+  //    v432: 현황 칩(sfChipNow — 맨 앞, 안전 권한, MODULE_TAB 밖이라 applySafetyPerms가 숨김)·칸(sfPaneNow)을 시험 틀에 싣고, 현황을 열 때 부르는 sfNowOpen은 기록만 하는 가짜(본체 실행은 v432 묶음)
   const runSf28 = (perm, cur, layer) => {
-    const chips = [mkE28('sfChipSite', { 'data-lsub': 'site' }), mkE28('sfChipEdu', { 'data-lsub': 'edu' })];
-    const D = { tabSafetyBtn: mkE28('tabSafetyBtn'), sfChipSite: chips[0], sfChipEdu: chips[1], sfSubBar: mkE28('sfSubBar'), asbMovedNote: mkE28('asbMovedNote'), asbMovedGo: mkE28('asbMovedGo'), eduMovedHr: mkE28('eduMovedHr'), eduMovedWk: mkE28('eduMovedWk'), sfPaneSite: mkE28('sfPaneSite'), sfPaneEdu: mkE28('sfPaneEdu') };
+    const chips = [mkE28('sfChipNow', { 'data-lsub': 'now' }), mkE28('sfChipSite', { 'data-lsub': 'site' }), mkE28('sfChipEdu', { 'data-lsub': 'edu' })];
+    const D = { tabSafetyBtn: mkE28('tabSafetyBtn'), sfChipNow: chips[0], sfChipSite: chips[1], sfChipEdu: chips[2], sfSubBar: mkE28('sfSubBar'), asbMovedNote: mkE28('asbMovedNote'), asbMovedGo: mkE28('asbMovedGo'), eduMovedHr: mkE28('eduMovedHr'), eduMovedWk: mkE28('eduMovedWk'), sfPaneNow: mkE28('sfPaneNow'), sfPaneSite: mkE28('sfPaneSite'), sfPaneEdu: mkE28('sfPaneEdu') };
     D.sfSubBar.querySelectorAll = () => chips;
     const log = [], pend = [];   // pend = 명부 읽기(loadWorkers)가 끝났을 때 부를 콜백 — 시험이 도착 시점을 고른다
     const api = new Function('__D', '__perm', '__log', '__cur', '__layer', '__pend', [
@@ -2132,15 +2134,16 @@ try {
       'var currentTab = __cur, safetyLayer = __layer, eduViewScope = "member";',
       'function permOf(m){ return __perm[m] || "hide"; } function canSee(m){ return permOf(m) !== "hide"; }',
       'function switchTab(n){ __log.push("switch:" + n); }',
-      'function renderSites(){ __log.push("renderSites"); } function loadAsb(){ __log.push("loadAsb"); } function loadEdu(){ __log.push("loadEdu"); } function loadWorkers(){ __log.push("loadWorkers"); return { then: function(f){ __pend.push(f); } }; } function renderEdu(){ __log.push("renderEdu:" + eduViewScope); }',
+      'function renderSites(){ __log.push("renderSites"); } function loadAsb(){ __log.push("loadAsb"); } function loadEdu(){ __log.push("loadEdu"); } function loadWorkers(){ __log.push("loadWorkers"); return { then: function(f){ __pend.push(f); } }; } function renderEdu(){ __log.push("renderEdu:" + eduViewScope); } function sfNowOpen(){ __log.push("sfNowOpen"); }',
       regStmt28.join('\n'), 'function modLoop(){', modLoop28, '}',
       fn28('safetyPanes'), fn28('setSafetyLayer'), fn28('applySafetyPerms'),
       'return { panes: safetyPanes, apply: function(){ modLoop(); applySafetyPerms(); }, set: setSafetyLayer, layer: function(){ return safetyLayer; }, scope: function(){ return eduViewScope; }, cur: function(t){ currentTab = t; } };'].join('\n'))(D, perm, log, cur, layer, pend);
     return { D, log, api, chips, pend };
   };
-  // S = 인허가 석면 안내 버튼(감싸개 asbMovedGo) — 글 줄(asbMovedNote)은 따로 본다
-  const st28 = (r) => (r.D.tabSafetyBtn.classList.contains('perm-hidden') ? 'T-' : 'T+') + (r.D.sfChipEdu.classList.contains('perm-hidden') ? 'E-' : 'E+') + (r.D.sfSubBar.style.display === 'none' ? 'B-' : 'B+')
+  // S = 인허가 석면 안내 버튼(감싸개 asbMovedGo) — 글 줄(asbMovedNote)은 따로 본다 · N = 현황 칩(v432)
+  const st28 = (r) => (r.D.tabSafetyBtn.classList.contains('perm-hidden') ? 'T-' : 'T+') + (r.D.sfChipNow.classList.contains('perm-hidden') ? 'N-' : 'N+') + (r.D.sfChipEdu.classList.contains('perm-hidden') ? 'E-' : 'E+') + (r.D.sfSubBar.style.display === 'none' ? 'B-' : 'B+')
     + (r.D.asbMovedGo.style.display === 'none' ? 'S-' : 'S+') + ((r.D.eduMovedHr.style.display === 'none' && r.D.eduMovedWk.style.display === 'none') ? 'H-' : ((r.D.eduMovedHr.style.display === '' && r.D.eduMovedWk.style.display === '') ? 'H+' : 'H?'));
+  const paneSt28 = (r) => ['sfPaneNow', 'sfPaneSite', 'sfPaneEdu'].map((id) => (r.D[id].style.display === '' ? '+' : '-')).join('') + ' ' + r.chips.map((c) => (c.classList.contains('active') ? '*' : '.')).join('');
   const A28 = runSf28({ site: 'do', safety: 'do', wk: 'do' }, 'dash', 'site'); A28.api.apply();
   const J28 = runSf28({ site: 'do', lic: 'view', wk: 'do' }, 'dash', 'site'); J28.api.apply();
   const K28 = runSf28({ site: 'hide', lic: 'view', wk: 'view' }, 'safety', 'site'); K28.api.apply();
@@ -2149,19 +2152,25 @@ try {
   const J2_28 = runSf28({ site: 'do' }, 'safety', 'site'); J2_28.api.set('edu');
   const W28 = runSf28({ site: 'do', safety: 'do' }, 'safety', 'site'); W28.api.set('edu:worker');
   const J3_28 = runSf28({ site: 'do' }, 'safety', 'site'); J3_28.api.set('edu:worker');
+  const M28 = runSf28({ safety: 'do', lic: 'view', wk: 'view' }, 'safety', 'site'); M28.api.apply();   // v432 권민지형 — 현장 칸에 있었으면 첫 칸(현황)으로
+  const A0_28 = runSf28({ site: 'do', safety: 'do' }, 'safety', 'site'); A0_28.api.set('');   // v432 사이드바로 열면(칸 안 고름) 첫 칸 = 현황
+  const J0_28 = runSf28({ site: 'do' }, 'safety', 'site'); J0_28.api.set('now');   // v432 현장만 보는 사람이 현황 길로 와도 현장 칸
   const ap28 = fn28('applyPerms');
-  T('v428 안전 탭 칸 판정(실행 — v430부터 교육·검진 = safety, 칩은 MODULES 루프): 관리자 = 탭·교육 칩·칩 줄·안내 전부 · 현장 권한만(김정아·정재욱형) = 탭 보임·교육 칩·칩 줄 숨김(옛 현장 화면 그대로)·교육 안내 숨김 · 둘 다 없음(김호태·현장 8명형 — 권민지형은 v430 묶음) = 탭·인허가 석면 안내 버튼 숨김(글 줄은 그대로 — 510ed20과 같음), 안전 탭이면 홈 · 없는 칸이면 첫 칸 · 교육 칸 요청도 못 보면 현장 칸 · "edu:worker"면 교육 칸 일용직 목록(못 보면 대상도 안 바꿈) / applyPerms가 빈 묶음 숨김보다 먼저 부름 · 부동산 탭 줄 없음',
-    JSON.stringify(A28.api.panes()) === '["site","edu"]' && st28(A28) === 'T+E+B+S+H+'
-    && JSON.stringify(J28.api.panes()) === '["site"]' && st28(J28) === 'T+E-B-S+H-'
-    && JSON.stringify(K28.api.panes()) === '[]' && st28(K28) === 'T-E-B-S-H-' && K28.log.indexOf('switch:dash') >= 0
-    && [A28, J28, K28].every((r) => r.D.asbMovedNote.style.display !== 'none') && fn28('applySafetyPerms').indexOf('asbMovedNote') < 0
-    && A3_28.api.layer() === 'site' && A3_28.log.indexOf('renderSites') >= 0 && A3_28.log.indexOf('switch:dash') < 0
-    && A2_28.api.layer() === 'edu' && A2_28.D.sfPaneEdu.style.display === '' && A2_28.D.sfPaneSite.style.display === 'none' && A2_28.log.indexOf('renderEdu:member') >= 0 && A2_28.log.indexOf('loadEdu') >= 0 && A2_28.chips[1].classList.contains('active') && !A2_28.chips[0].classList.contains('active')
-    && J2_28.api.layer() === 'site' && J2_28.D.sfPaneSite.style.display === '' && J2_28.D.sfPaneEdu.style.display === 'none' && J2_28.log.indexOf('renderSites') >= 0 && J2_28.log.indexOf('loadAsb') >= 0
+  T('v428 안전 탭 칸 판정(실행 — v430부터 교육·검진 = safety, 칩은 MODULES 루프 · v432 현황 칩·칸 맨 앞): 관리자 = 탭·현황·교육 칩·칩 줄·안내 전부 · 현장 권한만(김정아·정재욱형) = 탭 보임·현황·교육 칩·칩 줄 숨김(옛 현장 화면 그대로)·교육 안내 숨김, 현황 길로 와도 현장 칸 · 권민지형(안전만) = 탭·현황·교육 칩·칩 줄(칩 2개) 보임·석면 안내 버튼 숨김, 현장 칸에 있었으면 현황으로 · 둘 다 없음(김호태·현장 8명형) = 탭·인허가 석면 안내 버튼 숨김(글 줄은 그대로 — 510ed20과 같음), 안전 탭이면 홈 · 없는 칸·칸 안 고름이면 첫 칸(안전 권한이면 현황 — 현황 칸만 보이고 칩 현황만 켜짐·sfNowOpen 1번) · 교육 칸 요청도 못 보면 현장 칸 · "edu:worker"면 교육 칸 일용직 목록(못 보면 대상도 안 바꿈) / applyPerms가 빈 묶음 숨김보다 먼저 부름 · 부동산 탭 줄 없음',
+    JSON.stringify(A28.api.panes()) === '["now","site","edu"]' && st28(A28) === 'T+N+E+B+S+H+'
+    && JSON.stringify(J28.api.panes()) === '["site"]' && st28(J28) === 'T+N-E-B-S+H-'
+    && JSON.stringify(K28.api.panes()) === '[]' && st28(K28) === 'T-N-E-B-S-H-' && K28.log.indexOf('switch:dash') >= 0
+    && JSON.stringify(M28.api.panes()) === '["now","edu"]' && st28(M28) === 'T+N+E+B+S-H+' && M28.api.layer() === 'now' && M28.log.filter((x) => x === 'sfNowOpen').length === 1 && M28.log.indexOf('switch:dash') < 0 && paneSt28(M28) === '+-- *..'
+    && [A28, J28, K28, M28].every((r) => r.D.asbMovedNote.style.display !== 'none') && fn28('applySafetyPerms').indexOf('asbMovedNote') < 0
+    && A3_28.api.layer() === 'now' && A3_28.log.indexOf('sfNowOpen') >= 0 && A3_28.log.indexOf('renderSites') < 0 && A3_28.log.indexOf('switch:dash') < 0 && paneSt28(A3_28) === '+-- *..'
+    && A0_28.api.layer() === 'now' && A0_28.log.join(',') === 'sfNowOpen' && paneSt28(A0_28) === '+-- *..'
+    && J0_28.api.layer() === 'site' && J0_28.log.indexOf('sfNowOpen') < 0 && J0_28.log.indexOf('renderSites') >= 0 && paneSt28(J0_28) === '-+- .*.'
+    && A2_28.api.layer() === 'edu' && paneSt28(A2_28) === '--+ ..*' && A2_28.log.indexOf('renderEdu:member') >= 0 && A2_28.log.indexOf('loadEdu') >= 0 && A2_28.log.indexOf('sfNowOpen') < 0
+    && J2_28.api.layer() === 'site' && paneSt28(J2_28) === '-+- .*.' && J2_28.log.indexOf('renderSites') >= 0 && J2_28.log.indexOf('loadAsb') >= 0
     && W28.api.layer() === 'edu' && W28.api.scope() === 'worker' && W28.log.indexOf('renderEdu:worker') >= 0
     && J3_28.api.layer() === 'site' && J3_28.api.scope() === 'member' && J3_28.log.indexOf('renderSites') >= 0
     && ap28.indexOf('applySafetyPerms();') > 0 && ap28.indexOf('applySafetyPerms();') < ap28.indexOf('빈 그룹 숨김') && ap28.indexOf('"onbid"') < 0 && ap28.indexOf('if (currentTab === "bid" && !isAdmin()) switchTab("dash");') > 0,
-    [st28(A28), st28(J28), st28(K28), K28.log.join(','), A3_28.api.layer(), A2_28.api.layer(), J2_28.api.layer()].join(' / '));
+    [st28(A28), st28(J28), st28(K28), st28(M28), K28.log.join(','), A3_28.api.layer(), A0_28.api.layer(), J0_28.api.layer(), A2_28.api.layer(), J2_28.api.layer(), paneSt28(A3_28), paneSt28(A2_28)].join(' / '));
 
   // ⑩-2 (v428 검토) 명부가 교육 기록보다 늦게 오는 경합 — 도착 시점을 시험이 골라 setSafetyLayer를 돌린다
   const nR28 = (r, s) => r.log.filter((x) => x === s).length;
@@ -2217,7 +2226,7 @@ try {
   const oldMan28 = OLDMAN28.filter((s) => man28.indexOf(s) >= 0);
   T('v428 도움말·MANUAL 1절 4묶음 = 사이드바 라벨 그대로(관리 6 · 수주 4 · 업무 7 · 개인 3 — 수주 입찰/계약/견적서/홍보 · 업무 …/운반일지/안전/인허가/문서함 · 개인 물어보기/내 업무/휴가) · 탭 안 칸 안내(입찰 = 공고/부동산, 안전 = 현장/교육·검진) · MANUAL 12·28·21-9절 새 자리 · 옛 위치 문장 0 · sw ≥ 428',
     G4_28.map((g) => (grp28[g] || []).length).join(',') === '6,4,7,3' && grp28['수주'].join('/') === '입찰/계약/견적서/홍보' && grp28['업무'].join('/') === '캘린더/차량/화관법/운반일지/안전/인허가/문서함' && grp28['개인'].join('/') === '물어보기/내 업무/휴가'
-    && helpBad28.length === 0 && manBad28.length === 0 && help28.indexOf('<b>입찰</b> = 공고 / 부동산, <b>안전</b> = 현장 / 교육·검진') > 0 && man1_28.indexOf('<b>입찰</b> = 공고 / 부동산, <b>안전</b> = 현장 / 교육·검진') > 0
+    && helpBad28.length === 0 && manBad28.length === 0 && help28.indexOf('<b>입찰</b> = 공고 / 부동산, <b>안전</b> = 현황 / 현장 / 교육·검진') > 0 && man1_28.indexOf('<b>입찰</b> = 공고 / 부동산, <b>안전</b> = 현황 / 현장 / 교육·검진') > 0   // v432 안전 칸에 현황(맨 앞)
     && help28.indexOf('홍보 / 부동산') < 0 && help28.indexOf('운반일지 / 현장 /') < 0 && oldMan28.length === 0
     && man28.indexOf('<h2 id="s12">12. 입찰 › 부동산 (온비드)') > 0 && man28.indexOf('<h2 id="s28">28. 안전 › 현장 — 석면·철거·준설 대장') > 0 && man28.indexOf('<h3>21-9. 교육·건강진단 이력 (안전 › 교육·검진)</h3>') > 0
     && Number((sw28.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 428,
@@ -2242,8 +2251,12 @@ try {
   const cal29 = fn29('calEvents');
   const calAsbOk29 = /if \(canSee\("site"\)\) liveAsb\(\)\.forEach\(function\(r\)\{/.test(cal29) && /if \(canSee\("lic"\)\) licenses\.forEach\(/.test(cal29) && cnt29(cal29, LIC29) === 1 && cnt29(cal29, SITE29) === 1;
   // 파일 전체: canSee('lic')가 남은 줄은 인허가 줄뿐 — 현장 대장 낱말(asb·Asb·Sites·site_id·현장 대장)과 같은 줄에 없음
-  const licLines29 = html.split('\n').filter((ln) => /canSee\(\s*["']lic["']\s*\)/.test(ln));
-  const licLeak29 = licLines29.filter((ln) => /asb|Asb|Sites|site_id|현장 대장/.test(ln));
+  //   v432: 안전 › 현황 구간(// @safety-now-start ~ end)의 블록 권한 줄(sfNowSee — ③ 의무 대장·⑤ 인정·평가 = 인허가 권한)은 v432 묶음 ①-2가 따로 센다(구간 안 1줄·현장 대장 낱말 0).
+  //   여기 '3줄'은 구간 밖만 센다 — 낱말 검사(licLeak29)는 종전대로 파일 전체 줄을 본다
+  const sfn29a = html.indexOf('// @safety-now-start'), sfn29b = html.indexOf('// @safety-now-end');
+  const html29x = (sfn29a >= 0 && sfn29b > sfn29a) ? html.slice(0, sfn29a) + html.slice(sfn29b) : html;
+  const licLines29 = html29x.split('\n').filter((ln) => /canSee\(\s*["']lic["']\s*\)/.test(ln));
+  const licLeak29 = html.split('\n').filter((ln) => /canSee\(\s*["']lic["']\s*\)/.test(ln)).filter((ln) => /asb|Asb|Sites|site_id|현장 대장/.test(ln));
   // 그대로 둘 인허가 판정 3줄 = 캘린더 인허가 만료·교육 · 홈 만기(seeLic) · 전역 검색 인허가 — lic → site 바꾸기가 너무 넓게 번지는 실수를 막는다(v429 검토)
   const licKeep29 = /seeLic = canSee\("lic"\)/.test(fn29('renderDashboard')) && /add\("lic","인허가",canSee\("lic"\)/.test(html);
   // [대장 연결] 안내의 noperm 문구도 현장 권한으로(지금은 닿지 않는 갈래 — csLinkSiteLater가 canDo("site")를 먼저 본다)
@@ -2494,9 +2507,10 @@ try {
   // ⑨ applyPerms 전체 실행 — 사람 유형별(실제 원문: MODULES 루프 → 일반 강제 이동 → applySafetyPerms)
   const mkCl30 = () => { const s = new Set(); return { add: (c) => s.add(c), remove: (c) => s.delete(c), toggle: (c, on) => { if (on === undefined ? !s.has(c) : on) s.add(c); else s.delete(c); return s.has(c); }, contains: (c) => s.has(c) }; };
   const mkEl30 = (id, attrs) => ({ id, attrs: attrs || {}, classList: mkCl30(), style: {}, getAttribute(n) { return this.attrs[n] === undefined ? null : this.attrs[n]; }, querySelectorAll: () => [] });
+  //    v432: 현황 칩(sfChipNow — applySafetyPerms가 안전 권한으로 숨김)·칸(sfPaneNow)을 싣고 sfNowOpen은 기록만 하는 가짜. 서명에 N(현황 칩) 추가
   const runAp30 = (who, perm, cur, layer) => {
-    const chips = [mkEl30('sfChipSite', { 'data-lsub': 'site' }), mkEl30('sfChipEdu', { 'data-lsub': 'edu' })];
-    const D = { tabSafetyBtn: mkEl30('tabSafetyBtn'), sfChipSite: chips[0], sfChipEdu: chips[1], sfSubBar: mkEl30('sfSubBar'), sfPaneSite: mkEl30('sfPaneSite'), sfPaneEdu: mkEl30('sfPaneEdu'), asbMovedNote: mkEl30('asbMovedNote'), asbMovedGo: mkEl30('asbMovedGo'), eduMovedHr: mkEl30('eduMovedHr'), eduMovedWk: mkEl30('eduMovedWk'), tabLicBtn: mkEl30('tabLicBtn'), 'view-lic': mkEl30('view-lic') };
+    const chips = [mkEl30('sfChipNow', { 'data-lsub': 'now' }), mkEl30('sfChipSite', { 'data-lsub': 'site' }), mkEl30('sfChipEdu', { 'data-lsub': 'edu' })];
+    const D = { tabSafetyBtn: mkEl30('tabSafetyBtn'), sfChipNow: chips[0], sfChipSite: chips[1], sfChipEdu: chips[2], sfSubBar: mkEl30('sfSubBar'), sfPaneNow: mkEl30('sfPaneNow'), sfPaneSite: mkEl30('sfPaneSite'), sfPaneEdu: mkEl30('sfPaneEdu'), asbMovedNote: mkEl30('asbMovedNote'), asbMovedGo: mkEl30('asbMovedGo'), eduMovedHr: mkEl30('eduMovedHr'), eduMovedWk: mkEl30('eduMovedWk'), tabLicBtn: mkEl30('tabLicBtn'), 'view-lic': mkEl30('view-lic') };
     D.sfSubBar.querySelectorAll = () => chips;
     const log = [];
     const st = new Function('__D', '__who', '__perm', '__log', '__cur', '__layer', [
@@ -2504,13 +2518,13 @@ try {
       'var currentTab = __cur, safetyLayer = __layer, eduViewScope = "member";',
       'function isAdmin(){ return __who === "admin"; } function permOf(m){ return isAdmin() ? "do" : (__perm[m] || "hide"); } function canSee(m){ return permOf(m) !== "hide"; } function canDo(m){ return permOf(m) === "do"; }',
       'function switchTab(n){ __log.push("switch:" + n); currentTab = n; } function updateUserChip(){} function updateApprovalBadges(){}',
-      'function renderSites(){ __log.push("renderSites"); } function loadAsb(){} function loadEdu(){ __log.push("loadEdu"); } function loadWorkers(){ return { then: function(){} }; } function renderEdu(){ __log.push("renderEdu"); }',
+      'function renderSites(){ __log.push("renderSites"); } function loadAsb(){} function loadEdu(){ __log.push("loadEdu"); } function loadWorkers(){ return { then: function(){} }; } function renderEdu(){ __log.push("renderEdu"); } function sfNowOpen(){ __log.push("sfNowOpen"); }',
       regStmt30.join('\n'), fn30('safetyPanes'), fn30('setSafetyLayer'), fn30('applySafetyPerms'), fn30('applyPerms'),
       'applyPerms(); return { cur: currentTab, layer: safetyLayer };'].join('\n'))(D, who, perm, log, cur, layer);
     const hid = (id) => D[id].classList.contains('perm-hidden'), ro = (id) => D[id].classList.contains('readonly');
     const H = D.eduMovedHr.style.display, W = D.eduMovedWk.style.display;
     return { D, log, st, home: log.indexOf('switch:dash') >= 0,
-      sig: (hid('tabSafetyBtn') ? 'T-' : 'T+') + (hid('sfChipSite') ? 'S-' : 'S+') + (hid('sfChipEdu') ? 'E-' : 'E+') + (D.sfSubBar.style.display === 'none' ? 'B-' : 'B+') + (ro('sfPaneSite') ? 'r' : '') + (ro('sfPaneEdu') ? 'R' : '') + (H === '' && W === '' ? 'H+' : (H === 'none' && W === 'none' ? 'H-' : 'H?')) };
+      sig: (hid('tabSafetyBtn') ? 'T-' : 'T+') + (hid('sfChipNow') ? 'N-' : 'N+') + (hid('sfChipSite') ? 'S-' : 'S+') + (hid('sfChipEdu') ? 'E-' : 'E+') + (D.sfSubBar.style.display === 'none' ? 'B-' : 'B+') + (ro('sfPaneSite') ? 'r' : '') + (ro('sfPaneEdu') ? 'R' : '') + (ro('sfPaneNow') ? 'X' : '') + (H === '' && W === '' ? 'H+' : (H === 'none' && W === 'none' ? 'H-' : 'H?')) };
   };
   const A30 = runAp30('admin', {}, 'safety', 'site');
   const K30 = runAp30('staff', { safety: 'do', site: 'hide', lic: 'view', wk: 'view', veh: 'do', con: 'do' }, 'safety', 'site');   // 권민지형(PM 부여 뒤)
@@ -2520,12 +2534,12 @@ try {
   const V2_30 = runAp30('staff', { safety: 'do', site: 'view' }, 'safety', 'site');
   const N30 = runAp30('staff', { veh: 'view', check: 'do', doc: 'view', wk: 'view' }, 'safety', 'site');   // 김호태·현장형
   const O30 = runAp30('staff', { hr: 'do', site: 'hide' }, 'safety', 'site');   // 옛 키 hr만
-  T('v430 applyPerms 실행(실제 원문 — MODULES 루프·일반 강제 이동·applySafetyPerms): 관리자 = 탭·현장·교육 칩·칩 줄·교육 안내 · 권민지형(안전 수행·현장 숨김) = 탭·교육 칩만(칩 줄 없음)·현장 칸에 있었으면 교육 칸으로 옮겨 읽음·교육 안내 보임·홈으로 안 감 · 김정아·정재욱형(현장 수행·안전 없음) = 탭·현장 칩만, 안전 탭에 있어도 홈으로 안 튕김(일반 강제 이동에서 safety 제외) · 가상형 안전 보기 = 교육 칸만 읽기 전용(현장 칸 버튼 그대로) · 현장 보기 = 현장 칸만 읽기 전용 · 둘 다 없음·옛 hr 키만 = 탭 숨김·홈 · 칩 숨김은 MODULES 루프 한 곳(applySafetyPerms에 sfChipEdu 없음)',
-    A30.sig === 'T+S+E+B+H+' && !A30.home && A30.st.layer === 'site'
-    && K30.sig === 'T+S-E+B-H+' && !K30.home && K30.st.layer === 'edu' && K30.log.indexOf('loadEdu') >= 0 && K30.D['view-lic'].classList.contains('readonly')
-    && J30.sig === 'T+S+E-B-H-' && !J30.home && J30.st.cur === 'safety' && J30.st.layer === 'site' && Jw30.sig === 'T+S+E-B-H-' && !Jw30.home
-    && V30.sig === 'T+S+E+B+RH+' && !V30.home && V2_30.sig === 'T+S+E+B+rH+' && !V2_30.home
-    && N30.sig === 'T-S-E-B-H-' && N30.home && O30.sig === 'T-S-E-B-H-' && O30.home
+  T('v430 applyPerms 실행(실제 원문 — MODULES 루프·일반 강제 이동·applySafetyPerms · v432 현황 칩 N): 관리자 = 탭·현황·현장·교육 칩·칩 줄·교육 안내 · 권민지형(안전 수행·현장 숨김) = 탭·현황·교육 칩(칩 줄 보임 — 칩 2개, v432)·현장 칸에 있었으면 첫 칸 현황으로 옮겨 읽음(sfNowOpen)·교육 안내 보임·홈으로 안 감 · 김정아·정재욱형(현장 수행·안전 없음) = 탭·현장 칩만(현황 칩 없음), 안전 탭에 있어도 홈으로 안 튕김(일반 강제 이동에서 safety 제외) · 가상형 안전 보기 = 교육 칸만 읽기 전용(현장 칸 버튼 그대로·현황 칸은 읽기 전용 표시 없음 — 버튼이 없다) · 현장 보기 = 현장 칸만 읽기 전용 · 둘 다 없음·옛 hr 키만 = 탭·현황 칩 숨김·홈 · 칩 숨김은 MODULES 루프 한 곳(applySafetyPerms에 sfChipEdu 없음)',
+    A30.sig === 'T+N+S+E+B+H+' && !A30.home && A30.st.layer === 'site' && A30.log.indexOf('sfNowOpen') < 0
+    && K30.sig === 'T+N+S-E+B+H+' && !K30.home && K30.st.layer === 'now' && K30.log.filter((x) => x === 'sfNowOpen').length === 1 && K30.D.sfPaneNow.style.display === '' && K30.D.sfPaneEdu.style.display === 'none' && K30.D['view-lic'].classList.contains('readonly')
+    && J30.sig === 'T+N-S+E-B-H-' && !J30.home && J30.st.cur === 'safety' && J30.st.layer === 'site' && Jw30.sig === 'T+N-S+E-B-H-' && !Jw30.home
+    && V30.sig === 'T+N+S+E+B+RH+' && !V30.home && V30.st.layer === 'edu' && V2_30.sig === 'T+N+S+E+B+rH+' && !V2_30.home
+    && N30.sig === 'T-N-S-E-B-H-' && N30.home && O30.sig === 'T-N-S-E-B-H-' && O30.home
     && fn30('applySafetyPerms').indexOf('sfChipEdu') < 0,
     [A30, K30, J30, Jw30, V30, V2_30, N30, O30].map((r) => r.sig + (r.home ? '→홈' : '') + '@' + r.st.layer).join(' / '));
 
@@ -2581,7 +2595,7 @@ try {
   const m15_30 = sec30('<h2 id="s15">', '<h2 id="s16">'), m212_30 = sec30('<h3>21-2. 권한관리</h3>', '<h3>21-3.'), m219_30 = sec30('<h3>21-9.', '<h3>21-10.'), m28_30 = sec30('<h2 id="s28">', '<h2 id="s29">');
   T('v430 문서: MANUAL 15절 교육 일정 "(안전 권한이 있는 분만" · 21-2 "\'안전\' 열이 안전 › 교육·검진 칸"·기본 숨김(팀장도)·관리자 수행 고정·한 번 누르면 수행 · 21-9·28절·14절 교육·검진 = 안전 권한(관리자 전용 문장 0) · CLAUDE.md "3단계 전까지 레지스트리 밖" 0·등록 13곳·MODULE_TAB.safety · sw ≥ 430',
     m15_30.indexOf('<li>교육·건강진단 다음 예정일 📚(안전 권한이 있는 분만, <b>교육</b> 배지)</li>') > 0 && m15_30.indexOf('📚(관리자만') < 0
-    && m212_30.indexOf("'안전' 열이 안전 › 교육·검진 칸") > 0 && m212_30.indexOf('<b>안전</b>(교육·검진)도 기본 숨김입니다(새 회원은 팀장도 숨김, 관리자 행은 수행 고정)') > 0 && m212_30.indexOf('숨김 칸을 <b>한 번</b> 누르면 수행') > 0
+    && m212_30.indexOf("'안전' 열이 안전 › 교육·검진 칸") > 0 && m212_30.indexOf('<b>안전</b>(교육·검진·현황)도 기본 숨김입니다(새 회원은 팀장도 숨김, 관리자 행은 수행 고정)') > 0 && m212_30.indexOf('숨김 칸을 <b>한 번</b> 누르면 수행') > 0   // v432 검토: 목록 항목에도 현황 칸(같은 안전 열) — 같은 강도로 새 글자
     && m219_30.indexOf('권한관리 <b>안전</b> 열(21-2)') > 0 && m219_30.indexOf('칸에 있습니다(관리자)') < 0
     && m28_30.indexOf('교육·검진 칸은 안전 권한을 받은 분에게만') > 0 && man30.indexOf('교육·검진 칸은 관리자에게만') < 0 && man30.indexOf('(관리자, 21-9)') < 0
     && cl30.indexOf('3단계 전까지 레지스트리 밖') < 0 && cl30.indexOf('등록 13곳') > 0 && cl30.indexOf('`MODULE_TAB.safety = sfChipEdu`') > 0
@@ -2759,7 +2773,7 @@ try {
   T('v431 문서: MANUAL 21-2 \'화관법\' 열(기본 숨김·관리자 수행 고정·아직 화면·제출에 적용되지 않음·한 번 수행·두 번 보기·한 분씩) · 27절 안내(\'화관법\' 열은 아직 적용 전 — 지금은 모두에게 열림) · FEATURES 기준 v431·v431 절·§8 열 순서 차량·화관법·안전 · CLAUDE.md 화관법 줄(MODULE_TAB·MODULE_VIEW에 넣지 않음·4-2) · TESTLIST v431 절(김정아·권민지·정재욱 운영 저장값·16명 칸, 체크 칸 전부 AI 몫 — PM·관리자·표식 없는 칸 0) · sw ≥ 431',
     m212_31.indexOf('<li><b>화관법</b> 열도 기본 숨김입니다(새 회원은 팀장도 숨김, 관리자 행은 수행 고정, 2026-11 v431). <b>아직 화면·제출에 적용되지 않습니다</b>') > 0 && m212_31.indexOf('숨김 칸을 <b>한 번</b> 누르면 수행, 두 번 누르면 보기입니다 — 부서 단위로 한꺼번에 주지 말고 한 분씩 주세요(27절).') > 0
     && m27_31.indexOf("권한관리 표에 <b>'화관법' 열</b>이 생겼지만(2026-11 v431) <b>아직 적용되지 않습니다</b>. 지금은 열 값과 관계없이 로그인한 모든 분에게 이 탭과 폐기물 제출이 예전처럼 열려 있습니다.") > 0
-    && /기준: v431 /.test(ft31) && ft31.indexOf('\n### v431 (11/10)') > 0 && ft8_31.indexOf('차량·화관법·안전·현장·인허가·문서함') > 0
+    && Number((ft31.match(/기준: v(\d+) /) || [0, 0])[1]) >= 431 && ft31.indexOf('\n### v431 (11/10)') > 0 && ft8_31.indexOf('차량·화관법·안전·현장·인허가·문서함') > 0   // v432: 기준은 다음 판으로 올라간다 — '= sw 판'은 맨 앞 검사가 본다
     && cl31.indexOf('- **화관법(hw) 키**(v431 메뉴 56 4-1') >= 0 && cl31.indexOf('**`MODULE_TAB`·`MODULE_VIEW`에 넣지 않는다**') > 0 && cl31.indexOf('예외: 화관법 hw는 gw-data에 저장 데이터가 없어 `COL`에 없다') > 0
     && tlv31.indexOf('김정아 hw=do') > 0 && tlv31.indexOf('권민지 hw=view') > 0 && tlv31.indexOf('정재욱 hw=view') > 0 && tlv31.indexOf('16명') > 0 && tlv31.indexOf('PM 몫') < 0
     && cb31.length >= 6 && cbNotAi31.length === 0
@@ -2783,6 +2797,521 @@ try {
     && /if \(!\(c\.member\.admin \|\| c\.member\.dev\)\) return jr\(403, \{ ok: false, code: 'ADMIN_ONLY'/.test(fnSrc31(hwk31, 'handleRunNow')),
     JSON.stringify({ pm: ftPm31.length, op: tlOp31.length, p: m212p31.length, a: m213_31.length }));
 } catch (e) { console.log('  (v431 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ---- v432(11/10 메뉴 56 5단계, PM 11/9 "56. ㄱ"): 안전 › 현황(읽기 전용, 앱만) — 브리핑 steps[4]·코드 지도 code.steps[5](지도에서는 6단계).
+//      ① 상수 대조(안전 항목 26개 id · 의무 대장 번호 · 계약 안전 서류 키) ①-2 구간 안 인허가 판정 줄 ② 읽기 전용(구간에 저장 호출·서버 직접 호출·원장 대입·완료 조작·완료 버튼·입력 0,
+//      구간이 부르는 바깥 함수 = 허용 목록, 읽기 로더는 get만, 관리자 홈 변경도 저장 0) ③ 칩·칸 정적 + 칩 3개 줄(폰 375px 폭·flex-wrap) + 칩 줄 표시 규칙 실행
+//      ④ renderSafetyNow 실행 — 관리자형·권민지형(가상 safety 수행)·현장만형(김정아형)·블록 권한 가상형·읽기 실패형·기다림형·블록 오류형 ⑤ 이동(sfNowGo 실행)
+//      ⑥ 읽기(sfNowOpen·loadEdu·loadAsb 실행 — 현황을 열 때만, 현황 읽기는 보류 훅 없이) ⑦ 관리자 홈 만기 목록(교육·검진 줄 합침, 새 타일 없음) ⑧ 문서·sw
+//      v432 검토 반영(지적 28건 재확인 뒤): ①-3 중처법 쌍 · ②-2 간접 저장 길·noHooks 1곳·계약 표 상태 · ③-2 폰 줄 배치 CSS · ④-2 실패 안내 · ④-3 타이머 실제 실행 · ④-4 날짜 갈래 · ④-5 빈 자료 · ④-6 의무 대장 회사 잇기 · ⑧-2 문서 내용
+//      + 표본에 30일 경계 현장 4·교육 옛 이력·퇴사자·지운 일용직, ⑤ 수시 줄·도착 자리·계약 칩 풀기·폰 상세 카드, ⑥ 30초 안 다시 열기·force 없음·홈일 때만, ⑦ 명부 1번 읽기
+try {
+  const fn32 = (name) => { const i = html.indexOf('function ' + name + '('); if (i < 0) throw new Error('함수 없음: ' + name); let d = 0, st = false; for (let j = i; j < html.length; j++) { const ch = html[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return html.slice(i, j + 1); } } throw new Error('중괄호 짝 안 맞음: ' + name); };
+  const rd32 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const sw32 = rd32('sw.js'), man32 = rd32('MANUAL.html'), cl32 = rd32('CLAUDE.md'), ft32 = rd32('FEATURES.md'), tl32 = rd32('TESTLIST.md');
+  const stmt32 = (src, re) => { const m = src.match(re); if (!m) throw new Error('문장 없음: ' + re); return m[0]; };
+  const sA32 = html.indexOf('// @safety-now-start'), sB32 = html.indexOf('// @safety-now-end');
+  if (sA32 < 0 || sB32 < sA32 || html.indexOf('// @safety-now-start', sA32 + 5) >= 0 || html.indexOf('// @safety-now-end', sB32 + 5) >= 0) throw new Error('@safety-now 구간 표식이 없거나 두 번');
+  const sec32 = html.slice(sA32, sB32);
+  const code32 = sec32.split('\n').map((ln) => ln.replace(/(^|[^:"'])\/\/.*$/, '$1')).join('\n');   // 주석을 뺀 코드
+
+  // ① 상수 — 안전 항목 26개(GROUPS·SUDSI id — 문구는 거기서 읽음) · 의무 대장 번호(duties_seed no, 61 없음) · 계약 안전 서류 키(CON_PACKETS 항목 키)
+  const ids32 = ((sec32.match(/var SF_NOW_CHECK = \[([^\]]+)\]/) || ['', ''])[1].match(/"(\w+)"/g) || []).map((s) => s.replace(/"/g, ''));
+  const WANT32 = 'w1,m1,m3,q1,h1,h2,h3,h4,h5,h6,h7,y1,y2,y3,y4,y5,y6,y11,y15,y16,y17,y18,su1,su3,su5,su6';
+  const grpSrc32 = html.slice(html.indexOf('var GROUPS = ['), html.indexOf('var TYPE_LABEL = '));
+  const sudSrc32 = html.slice(html.indexOf('var SUDSI = ['), html.indexOf('];', html.indexOf('var SUDSI = [')) + 2);
+  const itemRe32 = /\{id:"(\w+)", title:"([^"]+)"/g;
+  const gItems32 = [...grpSrc32.matchAll(itemRe32)].map((m) => [m[1], m[2]]), sItems32 = [...sudSrc32.matchAll(itemRe32)].map((m) => [m[1], m[2]]);
+  const known32 = new Map(gItems32.concat(sItems32));
+  const miss32 = ids32.filter((id) => !known32.has(id)), dupT32 = ids32.filter((id) => known32.has(id) && sec32.indexOf(known32.get(id)) >= 0);
+  T('v432 ① 안전 항목 26개(SF_NOW_CHECK) = 코드 지도 목록 그대로(w1·m1·m3·q1·h1~h7·y1~y6·y11·y15~y18·su1·su3·su5·su6) · 전부 GROUPS(' + gItems32.length + ')·SUDSI(' + sItems32.length + ')에 실재 · 겹침 0 · 제목을 구간에 다시 적지 않음(sfNowItem이 GROUPS·SUDSI에서 읽음 — 문구 그대로)',
+    ids32.join(',') === WANT32 && new Set(ids32).size === 26 && miss32.length === 0 && dupT32.length === 0 && gItems32.length >= 30 && sItems32.length === 6
+    && /if \(GROUPS\[i\]\.items\[j\]\.id === id\)/.test(fn32('sfNowItem')) && /if \(SUDSI\[k\]\.id === id\)/.test(fn32('sfNowItem')),
+    '없음: ' + miss32.join(',') + ' / 제목 다시 적음: ' + dupT32.join(',') + ' / ' + ids32.join(','));
+  const seedNo32 = new Set((JSON.parse(rd32('data/duties_seed.json')).items || []).map((d) => d.no));
+  const dM32 = sec32.match(/var SF_NOW_DUTY = \{ cycle: \[([^\]]+)\], event: \[([^\]]+)\], na: \[([^\]]+)\] \};/);
+  const nums32 = (s) => String(s || '').split(',').map((x) => Number(x.trim())).filter((x) => !isNaN(x));
+  const dC32 = dM32 ? nums32(dM32[1]) : [], dE32 = dM32 ? nums32(dM32[2]) : [], dN32 = dM32 ? nums32(dM32[3]) : [], dAll32 = dC32.concat(dE32, dN32);
+  // ③ 꼬리말 표기(브리핑 그대로 '4·14·15·16~24·…' — 인허가별로 끊음)를 펼친 번호 = 주기 문구 + 따로 판정 상수(어긋나면 화면 안내와 실제 줄이 다르다)
+  const footM32 = sec32.match(/의무 대장 안전 행 = ([\d·~]+)행\(61행 제외, 62행 '해당 없음'\)/);
+  const footNos32 = footM32 ? footM32[1].split('·').reduce((a, p) => { const q = p.split('~').map(Number); if (q.length === 2) { for (let n = q[0]; n <= q[1]; n++) a.push(n); } else a.push(q[0]); return a; }, []) : [];
+  T('v432 ① 의무 대장 번호(SF_NOW_DUTY): 주기 문구 23행(4·14·15·16~24·27~30·51~53·55~57·59) + 따로 판정 32 + 해당 없음 62 = 전부 data/duties_seed.json no에 실재 · 61 없음(시드에는 있음) · 겹침 0 · ③ 꼬리말 표기(' + (footM32 ? footM32[1] : '없음') + ')를 펼친 번호 = 주기 문구 + 32',
+    !!dM32 && dC32.join(',') === '4,14,15,16,17,18,19,20,21,22,23,24,27,28,29,30,51,52,53,55,56,57,59' && dE32.join(',') === '32' && dN32.join(',') === '62'
+    && dAll32.every((n) => seedNo32.has(n)) && dAll32.indexOf(61) < 0 && new Set(dAll32).size === dAll32.length && seedNo32.has(61)
+    && footNos32.slice().sort((x, y) => x - y).join(',') === dC32.concat(dE32).sort((x, y) => x - y).join(','),
+    JSON.stringify({ c: dC32, e: dE32, n: dN32, notSeed: dAll32.filter((n) => !seedNo32.has(n)), foot: footNos32 }));
+  const cpSrc32 = html.slice(html.indexOf('  var CON_PACKETS = ['), html.indexOf('  function csPkWhen('));
+  const pkApi32 = new Function([cpSrc32, fn32('csPkIk'), 'return { P: CON_PACKETS, ik: csPkIk };'].join('\n'))();
+  const iks32 = []; pkApi32.P.forEach((pk) => pk.items.forEach((it0) => iks32.push(pkApi32.ik(pk, it0))));
+  const conM32 = [...stmt32(sec32, /var SF_NOW_CON = \[[^\n]*\];/).matchAll(/\{ k: "([^"]+)", s: "([^"]+)" \}/g)].map((m) => [m[1], m[2]]);
+  T('v432 ① 계약 안전 서류 키(SF_NOW_CON) 4개 = con|safety_plan · start|safety_pack · complete|safety_cost · complete|석면 완료보고서(별지 77호) — 전부 v427 패킷 항목 키(csPkIk)로 실재',
+    conM32.map((x) => x[0]).join(',') === 'con|safety_plan,start|safety_pack,complete|safety_cost,complete|석면 완료보고서(별지 77호)' && conM32.every((x) => iks32.indexOf(x[0]) >= 0) && iks32.length > 20,
+    JSON.stringify(conM32) + ' / 패킷 키 ' + iks32.length);
+  // ①-3 (v432 검토) 중처법 줄 ↔ 내 업무 항목 매핑을 쌍으로 못 박는다(코드 지도 code.steps[5]·브리핑 steps[4]) — 3호↔7호(h2↔h1)처럼 같은 반기 항목끼리 바꿔도 알약이 같아 실행 검사로는 안 잡혔다.
+  //      GROUPS 제목의 '(4조N호)' 표식(h1 (중처법 4조7호)·h2 (4조3호)·h3 (4조5호)·h4 (4조8호)·h5 (4조9호))과도 교차 대조
+  const jcbSrc32 = stmt32(sec32, /var SF_NOW_JCB = \[[\s\S]*?\n  \];/);
+  const jcbP32 = [...jcbSrc32.matchAll(/\{ no: "([^"]+)", t: "[^"]+", id: "(\w*)"/g)].map((m) => [m[1], m[2]]);
+  const jcbMark32 = jcbP32.filter((x) => /^\d호$/.test(x[0]) && x[1]).map((x) => { const t = known32.get(x[1]) || ''; const mk = (t.match(/4조(\d)호/) || [])[1]; return mk ? (mk + '호' === x[0] ? 'ok' : x[0] + '≠' + x[1] + '(' + mk + '호)') : 'none:' + x[1]; });
+  T('v432 ①-3 중처법 줄 ↔ 항목 쌍(SF_NOW_JCB) = 1호:y2 · 3호:h2 · 4호:y3 · 5호:h3 · 7호:h1 · 8호:h4 · 9호:h5 · 5조②3·4:h7 · 5조②1·2:(없음) · 2·6호:(없음) — 순서 그대로 · 제목에 (4조N호) 표식이 있는 항목(h1~h5)은 표식 번호 = 줄 번호, 표식 없는 y2·y3는 쌍 글자로만',
+    jcbP32.map((x) => x.join(':')).join(',') === '1호:y2,3호:h2,4호:y3,5호:h3,7호:h1,8호:h4,9호:h5,5조②3·4:h7,5조②1·2:,2·6호:'
+    && jcbMark32.filter((s) => s === 'ok').length === 5 && jcbMark32.filter((s) => s !== 'ok').join(',') === 'none:y2,none:y3',
+    JSON.stringify({ pairs: jcbP32, mark: jcbMark32 }));
+  // ①-2 구간 안 인허가 판정 = 블록 권한 줄 sfNowSee 1줄(③ 의무 대장·⑤ 인정·평가) — v429의 '파일 전체 3줄'은 구간 밖만 센다(현장 대장 낱말 검사는 파일 전체 그대로)
+  const licIn32 = sec32.split('\n').filter((ln) => /canSee\(\s*["']lic["']\s*\)/.test(ln));
+  T('v432 ①-2 구간 안 인허가 판정 = 블록 권한 줄 sfNowSee 1줄뿐(check·lic·con·site·doc 다섯 키) · 그 줄에 현장 대장 낱말 0',
+    licIn32.length === 1 && /function sfNowSee\(\)\{ return \{ check: canSee\("check"\), lic: canSee\("lic"\), con: canSee\("con"\), site: canSee\("site"\), doc: canSee\("doc"\) \}; \}/.test(licIn32[0]) && !/asb|Asb|Sites|site_id|현장 대장/.test(licIn32[0]),
+    licIn32.map((s) => s.trim().slice(0, 80)).join(' | '));
+
+  // ② 읽기 전용 — 구간 코드(주석 뺌)에 저장 호출·서버 직접 호출·저장소·원장 대입·완료 조작 0, 마크업에 완료 버튼·체크·입력 0 · 구간이 부르는 바깥 함수 = 허용 목록(읽기·그리기·이동) · 읽기 로더는 get만
+  const saveHits32 = code32.match(/\b(?:schedule\w*Save|doSave\w*|save\w*|\w+Save)\s*\(/g) || [];
+  const gw32 = code32.match(/\b(?:gwCall|fetch|_rawFetch|XMLHttpRequest|sendBeacon)\b/g) || [];
+  const store32 = code32.match(/\b(?:localStorage|sessionStorage|indexedDB)\b/g) || [];
+  const ledgerAsg32 = code32.match(/(?<![.\w$])(?:records|customItems|checkScopes|checkAssignee|checkReview|licenses|duties|contracts|asb|edu|workers|documents|members|tasks|CDOC)\s*(?:\[[^\]\n]*\]|\.\w+)*\s*(?:=(?!=)|\+\+|--|\+=|-=)/g) || [];
+  const propAsg32 = code32.match(/\.(?:pkst|status|st|del|docs|scope|assignee|items|next|date|done_at|updated|conc|worker_ids|member_ids)\s*(?:=(?!=)|\+\+|--)/g) || [];
+  const mut32 = code32.match(/\b(?:toggleItem|approveCheck|rejectCheck|toggleTaskDone|csRowAct|csDocToggle|csDocNa|csDocAdd|csDocDel|csDoneStage|csSkipStage|csJumpStage|csUnskipStage|saveEdu|deleteEdu|saveAsb|deleteAsb|openEdu|openAsb|openLicModal|saveLicFromModal|deleteLicFromModal|hardDelete|bulkDelete|bulkRestore|reportErr|csSiteHooksRetry|csSiteDone|csLinkSite)\s*\(/g) || [];
+  const ctl32 = sec32.match(/data-cs-(?:done|rchk|dchk|rna|dna|skip|jump|gen)|data-chk-(?:approve|reject)|data-mytask|data-home-check|data-todo-toggle|data-scope-id|appr-btn|type="checkbox"|<input|<select|<textarea|>\s*완료\s*</g) || [];
+  const defs32 = new Set([...code32.matchAll(/function\s+([A-Za-z_$][\w$]*)\s*\(/g)].map((m) => m[1]));
+  const locals32 = new Set([...code32.matchAll(/var\s+([A-Za-z_$][\w$]*)\s*=\s*function/g)].map((m) => m[1]).concat(['fn']));   // fn = sfNowLoad가 받는 로더
+  const KW32 = new Set(['if', 'for', 'while', 'switch', 'catch', 'function', 'return', 'typeof', 'new']);
+  //   허용 목록의 renderContracts(그리기)에는 알려진 간접 저장 길이 1개 있다(v432 검토 — v432 전부터 계약 탭 동작): 계약 탭에 '단계·서류'로 펼쳐 둔 계약이 있으면
+  //   renderContracts → csDetailHtml → csApprSync(계약당 60초 1회 — 결재 결과 동기화) → 결재가 바뀌었을 때만 scheduleContractSave. cdocLoad 응답도 renderContracts를 부른다.
+  //   현황 구간이 내는 직접 저장은 0이고, 이 길은 아래 ②-2가 모양을 못 박고 문서(FEATURES·TESTLIST·CLAUDE.md)가 예외로 적는다 — 길이 늘거나 바뀌면 ②-2가 터진다
+  const ALLOW32 = ['canSee', 'checkItemVisible', 'scopeNames', 'getReview', 'todayStr', 'addDays', 'isDate', 'vehDday', 'esc', 'liveEdu', 'eduPersonName', 'eduKindLabel', 'eduLatest', 'findMember', 'memberRetired', 'liveLic', 'licVisible', 'liveDuties', 'liveSites', 'siteKind', 'siteLabel', 'asbNotifyDue', 'asbKeepUntil', 'asbNoSpecial',
+    'csPkWhen', 'csPkIk', 'csFlow', 'csRowState', 'liveContracts', 'csSiteText', 'csKind', 'csPass', 'findProc', 'switchTab', 'setLicLayer', 'renderContracts', 'renderDocuments', 'loadEdu', 'loadAsb', 'loadWorkers', 'cdocLoad', 'String', 'Number', 'setTimeout', 'clearTimeout'];
+  const calls32 = [...new Set([...code32.matchAll(/(?<![.\w$])([A-Za-z_$][\w$]*)\s*\(/g)].map((m) => m[1]))].filter((n) => !KW32.has(n) && !defs32.has(n) && !locals32.has(n));
+  const outside32 = calls32.filter((n) => ALLOW32.indexOf(n) < 0);
+  const getOnly32 = (name, act) => { const b = fn32(name); return (b.indexOf('action:"' + act + '"') >= 0 || b.indexOf('action: "' + act + '"') >= 0) && !/action:\s*"(?:save|[a-z_]*(?:put|upsert|del|set|add|purge|restore|cur|mark))"/.test(b) && !/\b(?:schedule\w*Save|doSave\w*)\s*\(/.test(b); };
+  const rdb32 = fn32('renderDashboard');
+  const homeNew32 = rdb32.slice(rdb32.indexOf('var eduHome = '), rdb32.indexOf("html += dueMix.map(") + 60) + (rdb32.match(/\n[^\n]*sfNowHomeEduAsked[^\n]*/) || [''])[0];
+  T('v432 ② 읽기 전용(정적): @safety-now 구간에 저장 호출 ' + saveHits32.length + ' · 서버 직접 호출 ' + gw32.length + ' · 저장소 ' + store32.length + ' · 원장 대입 ' + (ledgerAsg32.length + propAsg32.length) + ' · 완료 조작 호출 ' + mut32.length + ' · 완료 버튼·체크·입력 칸 ' + ctl32.length + ' = 전부 0 · 구간이 부르는 바깥 함수 ' + calls32.length + '개 = 읽기·그리기·이동 허용 목록 안 · 읽기 로더 4개(loadEdu·loadAsb·loadWorkers·cdocLoad)는 get·cdoc_list만 · 현황 읽기의 loadAsb는 보류 훅 없이({ noHooks: true }) · 관리자 홈 변경 줄도 저장 0',
+    saveHits32.length === 0 && gw32.length === 0 && store32.length === 0 && ledgerAsg32.length === 0 && propAsg32.length === 0 && mut32.length === 0 && ctl32.length === 0 && outside32.length === 0 && calls32.length >= 20
+    && getOnly32('loadEdu', 'get') && getOnly32('loadAsb', 'get') && getOnly32('loadWorkers', 'get') && getOnly32('cdocLoad', 'cdoc_list')
+    && /sfNowLoad\("asb", loadAsb, \{ noHooks: true \}\)/.test(code32) && (code32.match(/loadAsb/g) || []).length === 1
+    && homeNew32.length > 200 && !/\b(?:schedule\w*Save|doSave\w*|save\w*|\w+Save|gwCall)\s*\(/.test(homeNew32),
+    JSON.stringify({ save: saveHits32, gw: gw32, store: store32, asg: ledgerAsg32.concat(propAsg32), mut: mut32, ctl: ctl32, outside: outside32 }));
+  // ②-2 (v432 검토) ① 알려진 간접 저장 길(renderContracts → csDetailHtml → csApprSync → scheduleContractSave)의 모양 그대로 — 단계·서류 칸에서만·60초 1회·바뀐 때만 저장, cdocLoad 응답은 renderContracts만
+  //      ② 보류 훅 우회(noHooks)는 파일 전체에서 현황의 loadAsb 부름 1곳뿐이고 opt.noHooks는 loadAsb 안에서만 읽는다(다른 읽기 경로가 계약 연결·종결 훅을 조용히 끄지 않게)
+  //      ③ 현황이 바꾸는 계약 표 상태는 sfNowGo 계약 이동의 '칩·필터 풀기' 한 줄뿐(기기 저장 conSheetSave 0)
+  const csd32 = fn32('csDetailHtml'), cas32 = fn32('csApprSync'), cdl32 = fn32('cdocLoad');
+  const pathOk32 = (csd32.match(/csApprSync\(/g) || []).length === 1 && /if \(tab === "st"\)\{ csApprSync\(c\);/.test(csd32)
+    && /if \(!force && csApprSyncAt\[c\.id\] && now - csApprSyncAt\[c\.id\] < 60000\) return;/.test(cas32) && (cas32.match(/scheduleContractSave\(\)/g) || []).length === 1 && /if \(changed\)\{ c\.updated = todayStr\(\); scheduleContractSave\(\); renderContracts\(\); \}/.test(cas32)
+    && (cdl32.match(/renderContracts\(\)/g) || []).length === 2 && !/\b(?:schedule\w*Save|doSave\w*|csApprSync)\s*\(/.test(cdl32);
+  const htmlNC32 = html.split('\n').map((ln) => ln.replace(/(^|[^:"'])\/\/.*$/, '$1')).join('\n');   // 줄 주석을 뺀 파일 전체(설명 글의 낱말은 세지 않는다)
+  const noHookN32 = (htmlNC32.match(/noHooks\s*:/g) || []).length, optNH32 = (htmlNC32.match(/\.noHooks\b/g) || []).length, optNHin32 = (fn32('loadAsb').match(/opt\.noHooks/g) || []).length;
+  const conAsg32 = code32.match(/conSheet(?:\.\w+|\[[^\]\n]*\])?\s*(?:=(?!=)|\+\+|--)/g) || [];
+  //      ④ 허용 목록 함수를 부르는 자리도 고정 — 이동·그리기(switchTab·setLicLayer·renderContracts·renderDocuments)는 sfNowGo 안에서만, 로더(loadEdu·loadAsb·loadWorkers)는 sfNowOpen 1곳씩,
+  //         서류함(cdocLoad)은 sfNowOpen·sfNowCons 1곳씩 — 허용 함수라도 다시 그림·그리기 길에 새로 끼우면(예: sfNowRefresh가 renderContracts를 늘 부름 → 결재 동기화 길이 매초) 터진다
+  const nc32 = (s) => s.split('\n').map((ln) => ln.replace(/(^|[^:"'])\/\/.*$/, '$1')).join('\n');
+  const goB32 = nc32(fn32('sfNowGo')), openB32 = nc32(fn32('sfNowOpen')), consB32 = nc32(fn32('sfNowCons'));
+  const cnt32 = (src, nm) => (src.match(new RegExp('(?<![.\\w$])' + nm + '\\s*\\(', 'g')) || []).length;   // 부름
+  const ref32 = (src, nm) => (src.match(new RegExp('(?<![.\\w$])' + nm + '\\b', 'g')) || []).length;      // 부름 + 넘김(sfNowLoad("edu", loadEdu))
+  const siteCalls32 = ['switchTab', 'setLicLayer', 'renderContracts', 'renderDocuments'].map((nm) => nm + ':' + cnt32(code32, nm) + '/' + cnt32(goB32, nm))
+    .concat(['loadEdu', 'loadAsb', 'loadWorkers'].map((nm) => nm + ':' + ref32(code32, nm) + '/' + ref32(openB32, nm)), ['cdocLoad:' + cnt32(code32, 'cdocLoad') + '/' + cnt32(openB32, 'cdocLoad') + '+' + cnt32(consB32, 'cdocLoad')]);
+  const siteOk32 = ['switchTab', 'setLicLayer', 'renderContracts', 'renderDocuments'].every((nm) => cnt32(code32, nm) > 0 && cnt32(code32, nm) === cnt32(goB32, nm))
+    && ['loadEdu', 'loadAsb', 'loadWorkers'].every((nm) => ref32(code32, nm) === 1 && ref32(openB32, nm) === 1)
+    && cnt32(code32, 'cdocLoad') === 2 && cnt32(openB32, 'cdocLoad') === 1 && cnt32(consB32, 'cdocLoad') === 1;
+  T('v432 ②-2 간접 저장 길·훅 우회·계약 표 상태·부르는 자리: renderContracts의 알려진 저장 길 1개 그대로(csDetailHtml이 단계·서류 칸에서만 csApprSync · 60초 1회 · 바뀐 때만 scheduleContractSave 1곳 · cdocLoad 응답은 renderContracts 2곳만) · "noHooks: true" 파일 전체 ' + noHookN32 + '곳(현황 loadAsb 부름만) · opt.noHooks는 loadAsb 안 ' + optNHin32 + '/' + optNH32 + ' · 현황이 바꾸는 계약 표 상태 = sfNowGo의 칩·필터 풀기 2개(기기 저장 0) · 이동·그리기 함수는 sfNowGo 안에서만·로더는 sfNowOpen 1곳씩·서류함은 sfNowOpen·sfNowCons 1곳씩',
+    pathOk32 && noHookN32 === 1 && /sfNowLoad\("asb", loadAsb, \{ noHooks: true \}\)/.test(htmlNC32) && optNH32 === optNHin32 && optNHin32 === 1
+    && conAsg32.length === 2 && /if \(!csPass\(c, conSheet\.f, conSheet\.chip\)\)\{ conSheet\.f = \{\}; conSheet\.chip = ""; \}/.test(fn32('sfNowGo')) && !/conSheetSave/.test(code32)
+    && siteOk32,
+    JSON.stringify({ path: pathOk32, noHooks: noHookN32, opt: [optNHin32, optNH32], conAsg: conAsg32, site: siteCalls32 }));
+
+  // ③ 칩·칸(정적) — 칩 줄 [현황 | 현장 | 교육·검진](현황 맨 앞) · 현황 칸(처음 숨김, sfNowHost·sfNowHead) · 현황 칩·칸은 레지스트리 밖(안전 권한 — applySafetyPerms가 숨김) · safetyPanes 맨 앞 now
+  //    폰 375px(#app 좌우 16px → 343px): 칩 3개 폭(글꼴 13px — 큰 글자 1.3배까지)이 한 줄에 들고, 넘쳐도 .lsub-bar flex-wrap:wrap이라 가로로 밀리지 않음
+  const divBlock32 = (src, openTag) => { const i = src.indexOf(openTag); if (i < 0) return ''; const re = /<div\b|<\/div>/g; re.lastIndex = i; let d = 0, m; while ((m = re.exec(src))) { d += m[0] === '</div>' ? -1 : 1; if (d === 0) return src.slice(i, m.index + 6); } return ''; };
+  const vs32 = (() => { const i = html.indexOf('<section class="view" id="view-safety">'); return i < 0 ? '' : html.slice(i, html.indexOf('</section>', i)); })();
+  const bar32 = divBlock32(vs32, '<div class="lsub-bar" id="sfSubBar">'), pNow32 = divBlock32(vs32, '<div class="sf-pane" id="sfPaneNow" style="display:none;">');
+  const chips32 = [...bar32.matchAll(/<button class="lsub-btn(?: active)?" data-lsub="(\w+)" id="(\w+)">([^<]+)<\/button>/g)].map((m) => [m[1], m[2], m[3]]);
+  const cssBar32 = (html.match(/\.lsub-bar\{([^}]*)\}/) || ['', ''])[1], cssBtn32 = (html.match(/\.lsub-btn\{([^}]*)\}/) || ['', ''])[1];
+  const fs32 = Number((cssBtn32.match(/font-size:(\d+(?:\.\d+)?)px/) || [0, 0])[1]), pd32 = (cssBtn32.match(/padding:(\d+)px (\d+)px/) || [0, 0, 0]).map(Number), gap32 = Number((cssBar32.match(/gap:(\d+)px/) || [0, 0])[1]);
+  const wTxt32 = (t, f) => [...t].reduce((s, ch) => s + (/[가-힣]/.test(ch) ? f : (ch === '·' ? f * 0.45 : f * 0.6)), 0);
+  const wBar32 = (f) => chips32.reduce((s, c) => s + wTxt32(c[2], f) + pd32[2] * 2 + 2, 0) + gap32 * (chips32.length - 1);
+  const appPad32 = Number(((html.match(/#app\{[^}]*padding:(\d+)px (\d+)px/) || [0, 0, 0])[2])), avail32 = 375 - appPad32 * 2;
+  const MT32 = (html.match(/var MODULE_TAB = \{([^}]+)\}/) || ['', ''])[1], MV32 = (html.match(/var MODULE_VIEW = \{([^}]+)\}/) || ['', ''])[1];
+  T('v432 ③ 칩·칸(정적): 칩 줄 = 현황 sfChipNow(맨 앞) · 현장 · 교육·검진 · 현황 칸 sfPaneNow(.sf-pane, 처음 숨김) 안에 sfNowHead·sfNowHost·읽기 전용 안내 · 현황 칩·칸은 MODULE_TAB·MODULE_VIEW 밖 · safetyPanes 맨 앞 now(안전 권한)·applySafetyPerms가 현황 칩을 안전 권한으로 숨김 · 폰 375px 칩 줄 폭 ' + Math.round(wBar32(fs32)) + 'px(큰 글자 1.3배 ' + Math.round(wBar32(fs32 * 1.3)) + 'px) ≤ ' + avail32 + 'px · .lsub-bar flex-wrap:wrap · 칩 flex:none',
+    chips32.map((c) => c.join(':')).join(',') === 'now:sfChipNow:현황,site:sfChipSite:현장,edu:sfChipEdu:교육·검진'
+    && pNow32.indexOf('id="sfNowHost"') > 0 && pNow32.indexOf('id="sfNowHead"') > 0 && pNow32.indexOf('읽기 전용입니다') > 0 && html.split('id="sfPaneNow"').length === 2 && html.split('id="sfNowHost"').length === 2
+    && MT32.indexOf('sfChipNow') < 0 && MV32.indexOf('sfPaneNow') < 0
+    && /var out = \[\];\s+if \(canSee\("safety"\)\) out\.push\("now"\);\s+if \(canSee\("site"\)\) out\.push\("site"\);/.test(fn32('safetyPanes'))
+    && /var nowChip = document\.getElementById\("sfChipNow"\);[^\n]*\n\s+if \(nowChip\) nowChip\.classList\.toggle\("perm-hidden", panes\.indexOf\("now"\) < 0\);/.test(fn32('applySafetyPerms'))
+    && /document\.getElementById\("sfPaneNow"\)\.style\.display = \(name === "now"\) \? "" : "none";/.test(fn32('setSafetyLayer')) && /if \(name === "now"\) sfNowOpen\(\);/.test(fn32('setSafetyLayer'))
+    && /flex-wrap:wrap/.test(cssBar32) && /flex:none/.test(cssBtn32) && fs32 === 13 && pd32[2] === 14 && appPad32 === 16 && wBar32(fs32 * 1.3) <= avail32 && /\.sfn-row \.item-meta\{white-space:normal;/.test(html),
+    JSON.stringify({ chips: chips32, w: [wBar32(fs32), wBar32(fs32 * 1.3)], avail: avail32 }));
+  // ③-2 (v432 검토) 폰 줄 배치(CSS 값 — 화면 실측은 TESTLIST 375px 칸): 공용 640px 규칙(.item 줄바꿈 + 본문 기준폭 62%)을 현황 줄만 덮어 알약이 늘 오른쪽(.sfn-row nowrap · 본문 flex:1 1 0 — 공용 .item-body 62%보다 구체적),
+  //      줄 없는 카드의 공용 자동 여백(.card:not(:has(> .item)) — 특정도 0,3,0)을 같은 특정도 + 뒤 순서로 0 · 블록 머리 숫자가 넘치면 제목 아래로(h2 flex-wrap)
+  const cssAt32 = (sel) => { const i = html.indexOf(sel + '{'); return i < 0 ? { i: -1, b: '' } : { i, b: html.slice(i + sel.length + 1, html.indexOf('}', i)) }; };
+  const cRow32 = cssAt32('  .sfn-row'), cBody32 = cssAt32('  .sfn-row .item-body'), cCard32 = cssAt32('  .dash-sec.sfn-blk > .card'), cH2_32 = cssAt32('  .sfn-blk > h2'), cAuto32 = html.indexOf('.card:not(:has(> .item)):not(:has(> .add-row)){padding:12px 14px;}'), cMq32 = html.indexOf('    .item-body{flex:1 1 62%;}');
+  T('v432 ③-2 폰 줄 배치(CSS): .sfn-row flex-wrap:nowrap · .sfn-row .item-body flex:1 1 0(공용 640px 규칙 뒤) · .dash-sec.sfn-blk > .card padding:0(공용 자동 여백 규칙 뒤) · .sfn-blk > h2 flex-wrap:wrap',
+    /flex-wrap:nowrap/.test(cRow32.b) && /align-items:flex-start/.test(cRow32.b) && /^flex:1 1 0;?$/.test(cBody32.b) && cBody32.i > cMq32 && cMq32 > 0
+    && /^padding:0;?$/.test(cCard32.b) && cCard32.i > cAuto32 && cAuto32 > 0 && /flex-wrap:wrap/.test(cH2_32.b) && cH2_32.i > html.indexOf('  .dash-sec h2{'),
+    JSON.stringify({ row: cRow32.b, body: cBody32.b, card: cCard32.b, h2: cH2_32.b }));
+  // ③ 실행 — 칩 줄 표시 규칙(safetyPanes·applySafetyPerms·setSafetyLayer 실제 원문, 칩 숨김 루프는 v428 ⑩이 같이 봄): 관리자(칩 3) 줄 보임·현황 칩 보임 / 권민지형(칩 2 — 현황·교육) 줄 보임 / 김정아형(칩 1) 줄 숨김·현황 칩 숨김
+  const mkC32 = () => { const s = new Set(); return { toggle: (c, on) => { if (on) s.add(c); else s.delete(c); }, contains: (c) => s.has(c) }; };
+  const bar3_32 = (perm) => {
+    const el = (id, a) => ({ id, attrs: a || {}, classList: mkC32(), style: {}, getAttribute(n) { return this.attrs[n] === undefined ? null : this.attrs[n]; }, querySelectorAll: () => [] });
+    const D = { tabSafetyBtn: el('tabSafetyBtn'), sfSubBar: el('sfSubBar'), sfChipNow: el('sfChipNow', { 'data-lsub': 'now' }), asbMovedGo: el('asbMovedGo'), eduMovedHr: el('eduMovedHr'), eduMovedWk: el('eduMovedWk') };
+    new Function('__D', '__perm', ['var document = { getElementById: function(id){ return __D[id] || null; } }; var currentTab = "dash", safetyLayer = "site";',
+      'function canSee(m){ return (__perm[m] || "hide") !== "hide"; }', fn32('safetyPanes'), fn32('applySafetyPerms'), 'applySafetyPerms();'].join('\n'))(D, perm);
+    return (D.sfSubBar.style.display === 'none' ? 'B-' : 'B+') + (D.sfChipNow.classList.contains('perm-hidden') ? 'N-' : 'N+') + (D.tabSafetyBtn.classList.contains('perm-hidden') ? 'T-' : 'T+');
+  };
+  const b3a32 = bar3_32({ safety: 'do', site: 'do' }), b3k32 = bar3_32({ safety: 'do' }), b3v32 = bar3_32({ safety: 'view' }), b3j32 = bar3_32({ site: 'do' }), b3n32 = bar3_32({});
+  T('v432 ③ 칩 줄 표시 규칙(실행): 관리자형(칩 3) = 줄·현황 칩·탭 보임 · 권민지형(안전 수행 — 칩 2) = 줄·현황 칩 보임 · 안전 보기(가상) = 현황 칩 보임(읽기 전용 화면) · 김정아형(현장만 — 칩 1) = 줄 숨김(옛 현장 화면 그대로)·현황 칩 숨김 · 둘 다 없음 = 탭 숨김',
+    b3a32 === 'B+N+T+' && b3k32 === 'B+N+T+' && b3v32 === 'B+N+T+' && b3j32 === 'B-N-T+' && b3n32 === 'B-N-T-', [b3a32, b3k32, b3v32, b3j32, b3n32].join(' / '));
+
+  // ④ renderSafetyNow 실행 — 구간 원문 + 앱 원문 판정 함수(checkItemVisible·licVisible·asbNoSpecial·csPkWhen …)를 그대로 싣고, csFlow·csRowState만 표본(계약 판정의 같은 결과는 consheet가 본다)
+  const SRC32 = {
+    groups: stmt32(html, /var GROUPS = \[[\s\S]*?\n  \];/), sudsi: stmt32(html, /var SUDSI = \[[\s\S]*?\n  \];/), typeLabel: stmt32(html, /var TYPE_LABEL = \{[^}]*\};/), rank: stmt32(html, /var RANK_LIST = \[[^\]]*\];/),
+    eduKinds: stmt32(html, /var EDU_KINDS = \[[\s\S]*?\n  \];/), siteKind: stmt32(html, /var SITE_KIND = \{[^}]*\};/), conKind: stmt32(html, /var CON_KIND_LABEL = \{[^}]*\};/), docMajor: stmt32(html, /var DOC_MAJOR = \{[^}]*\};/), packets: cpSrc32,
+  };
+  const seedBy32 = {}; (JSON.parse(rd32('data/duties_seed.json')).items || []).forEach((d) => { seedBy32[d.no] = d; });
+  const TODAY32 = '2026-11-10';
+  // v432 검토: r1 = 퇴사자형(교육 기록 e7은 기한 줄에서 빠져야 함)
+  const mem32 = [{ id: 'a1', name: '관리자1', admin: true }, { id: 'a2', name: '관리자2', admin: true }, { id: 'a3', name: '관리자3', admin: true }, { id: 'k2', name: '권민지형', dept: '운영부', rank: '사원' }, { id: 'j1', name: '김정아형', dept: '운영부', rank: '대리' }, { id: 'r1', name: '퇴사자형', dept: '운영부', retired: true }];
+  // 주기 키 — 앱 periodKeys와 같은 규칙(오늘을 바꿔 상반기·월요일·기한 달 갈래도 돌린다, v432 검토)
+  const ck32 = (t) => { const d = new Date(t + 'T00:00:00'), p = (n) => (n < 10 ? '0' : '') + n, wd = d.getDay(), mon = new Date(d); mon.setDate(d.getDate() + (wd === 0 ? -6 : 1 - wd)); const y = d.getFullYear(), m = d.getMonth() + 1; return { weekly: mon.getFullYear() + '-' + p(mon.getMonth() + 1) + '-' + p(mon.getDate()), monthly: y + '-' + p(m), quarterly: y + '-Q' + Math.ceil(m / 3), half: y + '-H' + (m <= 6 ? 1 : 2), yearly: '' + y }; };
+  const base32 = (over, today) => {
+    const TD = today || TODAY32, ck = ck32(TD);
+    const o = {
+      today: TD, admin: true, perm: {}, me: { id: 'a1', admin: true }, members: mem32, workers: [{ id: 'w1', name: '김일용' }, { id: 'w2', name: '지운일용', del: 1 }],
+      records: { weekly: {}, monthly: {}, quarterly: { [ck.quarterly]: { q1: '2026-10-05' } }, half: { [ck.half]: { h4: '2026-11-02' } }, yearly: { [ck.yearly]: { y2: '2026-01-20', y11: '2026-01-15' } } },
+      review: { monthly: { [ck.monthly]: { m1: { by: '권민지형', date: '2026-11-08' } } } }, assignee: { w1: 'k2', m1: 'k2' }, scopes: { h3: ['a1', 'a2', 'a3'], h6: ['a1'], y5: ['dept:운영부'] },
+      // e6 = 같은 사람·같은 종류의 옛 이수(다음 예정 지남 — e2가 최근이라 빠져야 함) · e7 퇴사자 · e8 명부에서 지운 일용직 · e9 명부에 없는 일용직 — 넷 다 기한 줄 없음(v432 검토)
+      edu: [{ id: 'e1', ptype: 'worker', pid: 'w1', kind: 'special', date: '2026-09-01', next: '' }, { id: 'e2', ptype: 'member', pid: 'k2', kind: 'regular', date: '2026-05-20', next: '2026-11-20' }, { id: 'e3', ptype: 'worker', pid: 'w1', kind: 'spec_med', date: '2025-10-01', next: '2026-11-01' }, { id: 'e4', ptype: 'member', pid: 'a2', kind: 'super', date: '2026-01-01', next: '2027-01-01' }, { id: 'e5', ptype: 'member', pid: 'k2', kind: 'regular', date: '2026-05-01', next: '2026-11-15', del: 1 },
+        { id: 'e6', ptype: 'member', pid: 'k2', kind: 'regular', date: '2025-11-12', next: '2026-05-12' }, { id: 'e7', ptype: 'member', pid: 'r1', kind: 'spec_med', date: '2025-11-15', next: '2026-11-15' }, { id: 'e8', ptype: 'worker', pid: 'w2', kind: 'spec_med', date: '2025-11-18', next: '2026-11-18' }, { id: 'e9', ptype: 'worker', pid: 'w9', kind: 'regular', date: '2026-05-19', next: '2026-11-19' },
+        // e10 = 검토 지적 그대로의 꼴: 옛 이수(다음 예정 지남)가 있고 새 이수(e4)의 다음 예정은 30일 밖 — 옛 줄도 새 줄도 없어야 함
+        { id: 'e10', ptype: 'member', pid: 'a2', kind: 'super', date: '2025-01-01', next: '2026-01-01' }],
+      asb: [{ id: 's1', kind: 'asbestos', title: '남성초 석면', status: 'plan', start: '2026-11-20', end: '2026-11-25', member_ids: ['k2'], worker_ids: ['w1'] },
+        { id: 's2', kind: 'asbestos', title: '영일만 슬레이트', status: 'done', start: '2026-10-20', end: '2026-10-31', conc: '', member_ids: [], worker_ids: [] },
+        { id: 's3', kind: 'asbestos', title: '구룡포 옛 현장', status: 'done', start: '1996-11-01', end: '1996-11-20', conc: '0.001', member_ids: [], worker_ids: [] },
+        { id: 's4', kind: 'dredge', title: '형산강 준설 현장', status: 'run', member_ids: [], worker_ids: [] },
+        { id: 's5', kind: 'asbestos', title: '지운 현장', status: 'plan', start: '2026-11-15', del: 1 },
+        { id: 's6', kind: 'asbestos', title: '진행중 석면', status: 'run', start: '2026-11-01', end: '2026-12-01', member_ids: [], worker_ids: [] },
+        // 30일 경계(v432 검토): s7 예정·마감 지남(보여야 함) · s8 예정·마감 30일 밖 · s9 종료 30일 넘은 농도 미입력 · s10 보존 이미 만료 — s8~s10은 줄 없음
+        { id: 's7', kind: 'asbestos', title: '경계 예정 지남', status: 'plan', start: '2026-11-12', member_ids: [], worker_ids: [] },
+        { id: 's8', kind: 'asbestos', title: '경계 먼 예정', status: 'plan', start: '2027-01-30', member_ids: [], worker_ids: [] },
+        { id: 's9', kind: 'asbestos', title: '경계 오래된 종료', status: 'done', start: '2026-07-20', end: '2026-08-01', conc: '', member_ids: [], worker_ids: [] },
+        { id: 's10', kind: 'asbestos', title: '경계 보존 지난 현장', status: 'done', start: '1994-12-01', end: '1995-01-01', conc: '0.001', member_ids: [], worker_ids: [] }],
+      licenses: [{ id: 'lseed13', name: '석면해체·제거업', scope: ['a1'] }, { id: 'lseed07', name: '화물자동차 운송사업' }, { id: 'lseed11', name: '발전사업 허가(태양광)' }, { id: 'lseed08', name: '유해화학물질 운반업' }],
+      duties: [4, 16, 32, 61, 62].map((n) => seedBy32[n]),
+      contracts: [{ id: 'c1', type: 'dredge', docType: 'public', status: 'run', client: '포항시<img src=x>', site: '형산강', title: '형산강 하천 정비', start: '2026-10-01', pipes: [] },
+        { id: 'c2', type: 'asbestos', docType: 'public', elems: { asb: 1 }, status: 'run', client: '교육청', site: '남성초', start: '2026-11-05', pipes: [] },
+        { id: 'c3', type: 'waste', docType: 'private', status: 'run', client: '사급 고객', start: '2026-08-01', pipes: [] },
+        { id: 'c4', type: 'dredge', docType: 'public', status: 'done', client: '끝난 계약', start: '2026-07-01', pipes: [] },
+        { id: 'c5', type: 'demolition', docType: 'public', status: 'run', client: '시청', start: '2026-09-01', pipes: [] },
+        { id: 'c6', type: 'dredge', docType: 'public', status: 'run', client: '깨진 계약', __throw: 1, pipes: [] }],
+      cdoc: { c1: { loaded: true, busy: false, err: '' }, c5: { loaded: false, busy: false, err: '500' }, c6: { loaded: true, busy: false, err: '' } },
+      flows: { c1: { st: { 'main|0': [{ id: 'p~con~safety_plan', pk: [{ ik: 'con|safety_plan' }], refs: [], __st: 'done' }], 'main|1': [{ id: 'p~start~safety_pack', pk: [{ ik: 'start|safety_pack' }], refs: [], __st: 'todo' }, { id: 's~x', pk: [], refs: [{}], __st: 'done' }] }, loose: [{ id: 'p~complete~safety_cost', pk: [{ ik: 'complete|safety_cost' }], refs: [], __st: 'na' }] } },
+      licOk: true, offline: false, colBase: { checklist: 1, contracts: 1, licenses: 1 }, st: { edu: 'ok', asb: 'ok' }, ticks: 0, dutyThrow: false,
+    };
+    return Object.assign(o, over || {});
+  };
+  // v432 검토: 타이머 콜백을 모아 실제로 돌린다(runTimers — 다시 그림이 틱을 세고 끝나는지, 그 사이 로더를 부르지 않는지) · cdocLoad는 기록하고 앱처럼 바로 자리(busy)를 만든다(늦게 온 계약 읽기)
+  //   로더(loadEdu·loadAsb·loadWorkers)는 기록만 — 현황 그리기·다시 그림은 이것들을 부르면 안 된다(열 때 sfNowOpen만)
+  const run32 = (o) => {
+    const host = { innerHTML: '', querySelectorAll: () => { calls.qsa++; return []; } }, head = { textContent: '' }, timers = [], calls = { flow: [], state: [], cdoc: [], load: [], qsa: 0 };   // qsa = 칸을 갈아끼우고 줄을 다시 묶은 횟수 × 2
+    const D = { sfNowHost: host, sfNowHead: head };
+    const api = new Function('__o', '__D', '__timers', '__calls', [
+      'var document = { getElementById: function(id){ return __D[id] || null; }, querySelectorAll: function(){ return []; } }; var console = { warn: function(){} };',
+      'var __perm = __o.perm || {}, __admin = !!__o.admin, __me = __o.me || null, __cbs = [], __tid = 0;',
+      'function isAdmin(){ return __admin; } function permOf(m){ return __admin ? "do" : (__perm[m] || "hide"); } function canSee(m){ return permOf(m) !== "hide"; } function canDo(m){ return permOf(m) === "do"; }',
+      'function curMember(){ return __me; } function getMemberId(){ return __me && __me.id; }',
+      'var members = __o.members, workers = __o.workers, records = __o.records, checkReview = __o.review, checkAssignee = __o.assignee, checkScopes = __o.scopes;',
+      'var edu = __o.edu, asb = __o.asb, licenses = __o.licenses, duties = __o.duties, contracts = __o.contracts, CDOC = __o.cdoc, licRemoteOk = !!__o.licOk, isOffline = !!__o.offline, _colBase = __o.colBase;',
+      'function findMember(id){ for (var i = 0; i < members.length; i++){ if (members[i].id === id) return members[i]; } return null; } function dispName(n){ return n || ""; } function isBossMember(){ return false; }',
+      'function todayStr(){ return __o.today; } function setTimeout(f, ms){ __timers.push(ms); var id = ++__tid; __cbs.push({ id: id, f: f }); return id; } function clearTimeout(id){ for (var i = 0; i < __cbs.length; i++){ if (__cbs[i].id === id){ __cbs.splice(i, 1); return; } } }',
+      'function cdocLoad(c, force){ __calls.cdoc.push(c.id + (force === undefined ? "" : ":" + force)); if (!CDOC[c.id]) CDOC[c.id] = { items: [], at: 0, busy: true, err: "", loaded: false }; }',
+      'function loadEdu(){ __calls.load.push("edu"); } function loadAsb(){ __calls.load.push("asb"); } function loadWorkers(){ __calls.load.push("wk"); }',
+      'function csFlow(c){ __calls.flow.push(c.id); if (c.__throw) throw new Error("깨진 계약"); return __o.flows[c.id] || { st: {}, loose: [] }; }',
+      'function csRowState(c, r, fm){ __calls.state.push([c.id, r.__st, fm === __o.flows[c.id]]); return r.__st; }',
+      __o_dutyFn32(o),
+      SRC32.groups, SRC32.sudsi, SRC32.typeLabel, SRC32.rank, SRC32.eduKinds, SRC32.siteKind, SRC32.conKind, SRC32.docMajor, SRC32.packets,
+      fn32('pad'), fn32('fmtDate'), fn32('mondayOfWeek'), fn32('periodKeys'), 'var CURRENT_KEYS = periodKeys(new Date(__o.today + "T00:00:00"));',
+      fn32('esc'), fn32('isDate'), fn32('addDays'), fn32('vehDday'), fn32('asList'), fn32('memberName'), fn32('memberRetired'), fn32('scopeIncludes'), fn32('checkItemVisible'), fn32('getReview'), fn32('scopeNames'),
+      fn32('liveEdu'), fn32('eduKindDef'), fn32('eduKindLabel'), fn32('eduPersonName'), fn32('eduLatest'), fn32('eduHasValidSpecial'),
+      fn32('liveSites'), fn32('siteKind'), fn32('siteLabel'), fn32('asbNotifyDue'), fn32('asbKeepUntil'), fn32('asbNoSpecial'),
+      fn32('liveLic'), fn32('licVisible'), fn32('liveContracts'), fn32('csPkWhen'), fn32('csPkIk'), fn32('csTitle'), fn32('csSiteText'), fn32('csKind'), fn32('findProc'),
+      'var currentTab = "safety", safetyLayer = "now";',
+      sec32,
+      'sfNowSt.edu = __o.st.edu; sfNowSt.asb = __o.st.asb; sfNowTicks = __o.ticks || 0;',
+      'return { render: function(){ renderSafetyNow(); return __D.sfNowHost.innerHTML; }, setTicks: function(n){ sfNowTicks = n; }, max: function(){ return SF_NOW_TICK_MAX; }, eduDue: sfNowEduDue, homeRow: sfNowHomeEduRow, ck: function(){ return CURRENT_KEYS; },',
+      '  runTimers: function(n){ var k = 0; while (__cbs.length && k < n){ var t = __cbs.shift(); t.f(); k++; } return k; }, pending: function(){ return __cbs.length; }, ticks: function(){ return sfNowTicks; }, html: function(){ return __D.sfNowHost.innerHTML; },',
+      '  setCons: function(cs){ contracts = cs; _colBase.contracts = 1; }, cdocSet: function(id, p){ var e = CDOC[id] || (CDOC[id] = {}); for (var k in p) e[k] = p[k]; }, setWorkers: function(w){ workers = w; } };'].join('\n'))(o, D, timers, calls);
+    return { out: api.render(), head: head.textContent, timers, calls, api };
+  };
+  function __o_dutyFn32(o) { return o.dutyThrow ? 'function liveDuties(){ throw new Error("깨진 의무 대장"); }' : fn32('liveDuties'); }
+  const blk32 = (out, k) => { const i = out.indexOf('data-sfn-blk="' + k + '"'); if (i < 0) return ''; const j = out.indexOf('data-sfn-blk="', i + 10); return out.slice(i, j < 0 ? out.length : j); };
+  const order32 = (out) => [...out.matchAll(/data-sfn-blk="(\w+)"/g)].map((m) => m[1]).join(',');
+  const rowIds32 = (s) => [...s.matchAll(/<span class="sfn-id">([^<]*)<\/span>/g)].map((m) => m[1]);
+  const pillOf32 = (s, id) => { const m = s.match(new RegExp('<span class="sfn-id">' + id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '<\\/span>[\\s\\S]*?<span class="sfn-pill([^"]*)">([^<]*)<\\/span><\\/div>')); return m ? (m[1].trim() || '-') + ':' + m[2] : ''; };
+  const gos32 = (out) => [...out.matchAll(/data-sfn-go="([^"]+)"/g)].map((m) => m[1]);
+  const goOk32 = (g) => /^check:(w1|m1|m3|q1|h[1-7]|y[1-6]|y11|y1[5-8]|su[1356])$/.test(g) || /^(site|duty|doc06|edu:member|edu:worker)$/.test(g) || /^con:c\d$/.test(g);
+
+  const A32 = run32(base32());
+  const aChk32 = blk32(A32.out, 'check'), aJcb32 = blk32(A32.out, 'jcb'), aDue32 = blk32(A32.out, 'due'), aCon32 = blk32(A32.out, 'con'), aCf32 = blk32(A32.out, 'confirm');
+  const aHead32 = rowIds32(aChk32.slice(0, aChk32.indexOf('<details')));
+  T('v432 ④ renderSafetyNow 관리자형(실행): 블록 순서 ①②③④⑤⑥ · ① 26줄(머리 숫자 완료 4·미완 7·지남 4·예정 7·수시 4 — 내 업무와 같은 이번 주기 records·승인 대기 review) · 앞 6줄 = 지남(w1 월요일 지남·y1 상반기·y3·y15 1월) → 미완(m1 승인 대기·m3), 나머지 20개는 펼침 안 · h3(공개범위 관리자 3명)도 보임 · 문구 = GROUPS 원문 · 머리 "기준 날짜"',
+    order32(A32.out) === 'check,jcb,due,con,eval,confirm' && aChk32.indexOf('<span class="cnt">완료 4 · 미완 7 · 지남 4 · 예정 7 · 수시 4</span>') > 0 && rowIds32(aChk32).length === 26
+    && aHead32.join(',') === 'w1,y1,y3,y15,m1,m3' && aChk32.indexOf('나머지 20개 펼치기') > 0
+    && pillOf32(aChk32, 'w1') === 'bad:지남' && pillOf32(aChk32, 'm1') === 'am:승인 대기' && pillOf32(aChk32, 'q1') === 'ok:완료' && pillOf32(aChk32, 'h2') === '-:12월' && pillOf32(aChk32, 'y4') === '-:12월' && pillOf32(aChk32, 'y5') === 'am:미완' && pillOf32(aChk32, 'su1') === '-:수시'
+    && aChk32.indexOf('>h3<') > 0 && aChk32.indexOf(known32.get('h3')) > 0 && aChk32.indexOf(known32.get('w1').replace(/\(/g, '(')) > 0 && aChk32.indexOf('담당 권민지형') > 0 && A32.head === '2026-11-10 기준',
+    order32(A32.out) + ' / ' + aHead32.join(',') + ' / ' + (aChk32.match(/<span class="cnt">[^<]*<\/span>/) || [''])[0]);
+  T('v432 ④ 관리자형 ② 중처법 반기 점검: 2026 하반기 · 10줄(1호 y2 완료 · 3호 h2 12월 · 4호 y3 지남 · 5호 h3 · 7호 h1 · 8호 h4 완료 · 9호 h5 · 5조②3·4 h7 · 5조②1·2 항목 없음(빨강, 누를 곳 없음) · 2·6호 현재 대상 아님) · 줄 메타 = 맞춘 항목 id + GROUPS 원문',
+    aJcb32.indexOf('<span class="cnt">2026 하반기</span>') > 0 && rowIds32(aJcb32).join(',') === '1호,3호,4호,5호,7호,8호,9호,5조②3·4,5조②1·2,2·6호'
+    && pillOf32(aJcb32, '1호') === 'ok:완료' && pillOf32(aJcb32, '3호') === '-:12월' && pillOf32(aJcb32, '4호') === 'bad:지남' && pillOf32(aJcb32, '8호') === 'ok:완료' && pillOf32(aJcb32, '5조②1·2') === 'bad:항목 없음' && pillOf32(aJcb32, '2·6호') === '-:현재 대상 아님'
+    && aJcb32.indexOf('y2 ' + known32.get('y2')) > 0 && aJcb32.indexOf('data-sfn-go="check:y2"') > 0 && !/data-sfn-go="[^"]*"[^>]*>\s*<span class="sfn-id">5조②1·2/.test(aJcb32),
+    rowIds32(aJcb32).join(','));
+  const dueIds32 = rowIds32(aDue32.slice(0, aDue32.indexOf('<details')));
+  T('v432 ④ 관리자형 ③ 30일 기한: 7건 날짜순(교육 기한 경과 D+9 → 예정 현장의 지난 작업신고 마감(지남) → 석면 작업신고 마감 D-3(예정 현장, 7일 안 빨강) → 보존 만료 D-10(1996 종료 + 30년) → 교육 D-10) 다음 특별교육 미이수 1명(권민지형 — 일용직은 이수)·완료 후 농도 미입력(10/31 종료) · 지운 현장·진행 중 현장의 지난 신고 마감·준설 현장·지운 교육·30일 밖 교육 없음 · 30일 경계(v432 검토): 마감 30일 밖 예정 현장·종료 30일 넘은 농도 미입력·보존 이미 만료 = 줄 없음 · 교육 이력(v432 검토): 같은 사람·같은 종류의 옛 이수(다음 예정 지남)·퇴사자·명부에서 지운 일용직·명부에 없는 일용직 = 줄 없음 · 의무 대장 펼침(4·16행 주기 문구 2개 · 32행 따로 판정 · 62행 해당 없음 · 61행 없음) · 출처 = 현장 대장 · 교육·검진 · 인허가 의무 대장',
+    aDue32.indexOf('<span class="cnt">7건</span>') > 0 && aDue32.indexOf('<div class="sfn-src">현장 대장 · 교육·검진 · 인허가 의무 대장</div>') > 0
+    && dueIds32.join(',') === '교육,현장,현장,현장,교육,현장,현장' && /기한 경과[\s\S]*경계 예정 지남 · 석면 작업신고 마감[\s\S]*남성초 석면 · 석면 작업신고 마감[\s\S]*기록 보존 만료[\s\S]*정기교육\(근로자\)[\s\S]*특별교육 미이수[\s\S]*완료 후 석면농도 미입력/.test(aDue32)
+    && aDue32.indexOf('<span class="sfn-pill bad">D-3</span>') > 0 && aDue32.indexOf('<span class="sfn-pill bad">기한 경과</span>') > 0 && aDue32.indexOf('구룡포 옛 현장 · 기록 보존 만료') > 0 && aDue32.indexOf('<span class="sfn-pill am">1명</span>') > 0 && aDue32.indexOf('권민지형 — 배치 전 이수 필요') > 0
+    && /경계 예정 지남 · 석면 작업신고 마감<\/div><div class="item-meta">착수 2026-11-12 7일 전 신고 · 마감 2026-11-05<\/div><\/div><span class="sfn-pill bad">지남<\/span>/.test(aDue32)
+    && ['경계 먼 예정', '경계 오래된 종료', '경계 보존 지난 현장'].every((t) => aDue32.indexOf(t) < 0)
+    && ['2026-05-12', '퇴사자형', '지운일용', '2026-11-18', '2026-11-19', '2026-01-01', '정기교육(관리감독자)', '(삭제된 일용직)', '(퇴사자)'].every((t) => A32.out.indexOf(t) < 0) && (aDue32.slice(0, aDue32.indexOf('<details')).match(/정기교육\(근로자\)/g) || []).length === 1
+    && aDue32.indexOf('지운 현장') < 0 && aDue32.indexOf('진행중 석면 · 석면 작업신고') < 0 && aDue32.indexOf('형산강 준설 현장') < 0 && aDue32.indexOf('2027-01-01') < 0 && aDue32.indexOf('2026-11-15') < 0
+    && aDue32.indexOf('의무 대장 안전 행 2개') > 0 && rowIds32(aDue32).filter((x) => /행$/.test(x)).join(',') === '4행,16행,32행,62행' && aDue32.indexOf('61행 제외') > 0 && aDue32.indexOf('>61행<') < 0
+    && pillOf32(aDue32, '32행') === '-:따로 판정' && pillOf32(aDue32, '62행') === '-:해당 없음' && pillOf32(aDue32, '16행') === '-:주기 문구',
+    dueIds32.join(',') + ' / ' + (aDue32.match(/<span class="cnt">[^<]*<\/span>/) || [''])[0]);
+  T('v432 ④ 관리자형 ④ 계약 안전 서류: 진행 계약만(끝난 계약 빼고) 시작일 최근 순 · 관급 준설 = 안전보건관리계획서 ✓ · 안전 패킷 ✗ · 산업안전보건관리비 사용내역서 해당없음 → 1/2(csFlow 줄을 패킷 키로 찾아 csRowState 판정 그대로, 같은 fm) · 관급 석면 = 서류함 받기 전이라 "확인 중"(석면 완료보고서 포함 4종 — csPkWhen) · 서류함 오류 = "확인 실패" · 계약 한 건이 깨져도 그 줄만 "확인 실패" · 사급(안전 서류 줄 없음)은 꼬리말 건수 · csFlow는 서류함을 받은 계약만 · 발주처 글자는 이스케이프',
+    aCon32.indexOf('<span class="cnt">진행 4건 · 빠짐 1</span>') > 0 && rowIds32(aCon32).join(',') === '석면,준설,철거,준설'
+    && aCon32.indexOf('안전보건관리계획서 ✓ · 안전 패킷 ✗ · 산업안전보건관리비 사용내역서 해당없음 · 단계·서류 ›') > 0 && aCon32.indexOf('<span class="sfn-pill am">1/2</span>') > 0
+    && aCon32.indexOf('안전보건관리계획서 · 안전 패킷 · 산업안전보건관리비 사용내역서 · 석면 완료보고서 — 서류함 확인 중') > 0 && aCon32.indexOf('<span class="sfn-pill">확인 중</span>') > 0
+    && (aCon32.match(/<span class="sfn-pill bad">확인 실패<\/span>/g) || []).length === 2 && aCon32.indexOf('안전 서류 줄이 없는 진행 계약 1건') > 0 && aCon32.indexOf('끝난 계약') < 0
+    && A32.calls.flow.join(',') === 'c1,c6' && A32.calls.state.length === 3 && A32.calls.state.every((x) => x[0] === 'c1' && x[2] === true) && A32.out.indexOf('<img') < 0 && aCon32.indexOf('포항시&lt;img src=x&gt;') > 0,
+    rowIds32(aCon32).join(',') + ' / flow ' + A32.calls.flow.join(',') + ' / ' + (aCon32.match(/<span class="cnt">[^<]*<\/span>/) || [''])[0]);
+  T('v432 ④ 관리자형 ⑤⑥·통째: ⑤ 인정·평가 = "7단계에서 채움" 안내만 · ⑥ 확인 필요 6줄(하도급·밀폐·폭염·장비·지입·작업 — 조문만, 누를 곳 없음) + 문서함 › 06 안전보건 열기 · 화면 전체에 완료 버튼·체크·입력 칸 0(버튼은 문서함 바로가기 1개) · 줄 이동 대상 전부 알려진 자리 · 읽는 중(석면 계약 서류함)이라 1초 뒤 다시 그림 1번',
+    blk32(A32.out, 'eval').indexOf('7단계에서 채움') > 0 && rowIds32(aCf32).join(',') === '하도급,밀폐,폭염,장비,지입,작업' && (aCf32.match(/data-sfn-go=/g) || []).length === 1 && aCf32.indexOf('data-sfn-go="doc06">문서함 › 06 안전보건 열기 ›</button>') > 0
+    && (A32.out.match(/<button/g) || []).length === 1 && !/<input|<select|<textarea|type="checkbox"|data-cs-|data-chk-|완료<\/button>/.test(A32.out)
+    && gos32(A32.out).length > 20 && gos32(A32.out).every(goOk32) && A32.timers.join(',') === '1000',
+    JSON.stringify({ gos: gos32(A32.out).filter((g) => !goOk32(g)), timers: A32.timers }));
+
+  // 권민지형(가상 safety 수행 — PM 부여 뒤): 공개범위 걸린 h3(관리자 3명)·h6(관리자 1명)는 ①에도 ②(5호)에도 없고, 운영부 공개 y5는 보임 · 현장 권한 없음 → ③에 현장 줄·출처 없음 · 인허가 행 공개범위(석면해체·제거업 = 관리자만) → 16행 빠짐
+  const K32 = run32(base32({ admin: false, me: { id: 'k2', dept: '운영부', rank: '사원' }, perm: { safety: 'do', check: 'do', lic: 'view', con: 'do', site: 'hide', doc: 'view', wk: 'view' } }));
+  const kChk32 = blk32(K32.out, 'check'), kJcb32 = blk32(K32.out, 'jcb'), kDue32 = blk32(K32.out, 'due');
+  T('v432 ④ 권민지형(실행 — 안전 수행·현장 숨김·인허가 보기): 공개범위가 걸린 h3(안전보건 담당자 업무수행 평가 — 관리자 3명)·h6가 ① 줄·② 5호·화면 어디에도 없음(id·문구 0) · 운영부 공개 y5와 본인 담당 w1·m1은 보임 · ① 24줄(예정 5) · 현장 블록 줄·출처 없음(현장 권한) · 의무 대장 16행(인허가 행 공개범위 밖) 빠지고 4·32·62행만 · ④⑤⑥·문서함 바로가기 그대로',
+    order32(K32.out) === 'check,jcb,due,con,eval,confirm' && K32.out.indexOf('>h3<') < 0 && K32.out.indexOf(known32.get('h3')) < 0 && K32.out.indexOf('>h6<') < 0 && K32.out.indexOf(known32.get('h6')) < 0 && K32.out.indexOf('check:h3') < 0
+    && kJcb32.indexOf('>5호<') < 0 && rowIds32(kJcb32).length === 9 && kChk32.indexOf('>y5<') > 0 && kChk32.indexOf('>w1<') > 0 && rowIds32(kChk32).length === 24 && kChk32.indexOf('예정 5 · 수시 4') > 0
+    && kDue32.indexOf('<div class="sfn-src">교육·검진 · 인허가 의무 대장</div>') > 0 && rowIds32(kDue32).indexOf('현장') < 0 && kDue32.indexOf('석면') < 0
+    && rowIds32(kDue32).filter((x) => /행$/.test(x)).join(',') === '4행,32행,62행' && kDue32.indexOf('의무 대장 안전 행 1개') > 0
+    && blk32(K32.out, 'con').indexOf('1/2') > 0 && K32.out.indexOf('data-sfn-go="doc06"') > 0,
+    order32(K32.out) + ' / ① ' + rowIds32(kChk32).length + ' / ③ ' + rowIds32(kDue32).join(','));
+  const J32 = run32(base32({ admin: false, me: { id: 'j1', dept: '운영부' }, perm: { site: 'do', lic: 'do', check: 'do', con: 'do', doc: 'view', wk: 'do' } }));
+  const V32 = run32(base32({ admin: false, me: { id: 'k2', dept: '운영부' }, perm: { safety: 'do', site: 'do' } }));
+  T('v432 ④ 현장만형(김정아형 — 안전 권한 없음) = 현황을 그리지 않음(빈 칸·타이머 0) · 블록 권한 가상형(안전·현장만, 체크·인허가·계약·문서함 숨김) = ①②④⑤ 블록째 없음("0건" 아님)·③ 현장·교육 줄만(의무 대장·꼬리말 없음)·⑥ 문서함 바로가기 없음',
+    J32.out === '' && J32.timers.length === 0
+    && order32(V32.out) === 'due,confirm' && V32.out.indexOf('0건') < 0 && blk32(V32.out, 'due').indexOf('석면 작업신고 마감') > 0 && V32.out.indexOf('의무 대장') < 0 && V32.out.indexOf('doc06') < 0 && blk32(V32.out, 'due').indexOf('<div class="sfn-src">현장 대장 · 교육·검진</div>') > 0,
+    'J ' + J32.out.length + ' / V ' + order32(V32.out));
+  const E32 = run32(base32({ st: { edu: 'fail', asb: 'fail' }, colBase: { checklist: 1 }, offline: true, contracts: [], duties: [], licOk: false }));
+  const F32 = run32(base32({ st: { edu: 'wait', asb: 'ok' }, colBase: { checklist: 1, licenses: 1 }, contracts: [] }));
+  const f1_32 = F32.out, f1t32 = F32.timers.length; F32.api.setTicks(F32.api.max()); const f2_32 = F32.api.render();
+  const C32 = run32(base32()), c1_32 = blk32(C32.out, 'con'), c1t32 = C32.timers.length; C32.api.setTicks(C32.api.max()); const c2_32 = blk32(C32.api.render(), 'con');   // 서류함 기다림(석면 계약)도 90번이면 '확인 실패'
+  const G32 = run32(base32({ dutyThrow: true }));
+  T('v432 ④ 읽기 실패·기다림(실행): 교육·현장 대장 읽기 실패·오프라인 = 그 블록 줄에만 "불러오지 못함"(③ 현장 대장·교육·검진 기록·인허가 의무 대장, ④ 계약 목록) — ①②⑤⑥은 그대로 · 아직 읽는 중 = "불러오는 중…"·1초 뒤 다시 그림 1번 · 기다림이 다하면(90번) "불러오지 못함"·더 안 그림 · 블록 안에서 오류가 나면 그 블록만 "불러오지 못함"(①④는 그대로)',
+    /현장 대장[\s\S]{0,140}불러오지 못함/.test(blk32(E32.out, 'due')) && /교육·검진 기록[\s\S]{0,140}불러오지 못함/.test(blk32(E32.out, 'due')) && /인허가 의무 대장[\s\S]{0,140}불러오지 못함/.test(blk32(E32.out, 'due')) && /계약 목록[\s\S]{0,140}불러오지 못함/.test(blk32(E32.out, 'con'))
+    && order32(E32.out) === 'check,jcb,due,con,eval,confirm' && rowIds32(blk32(E32.out, 'check')).length === 26 && E32.timers.length === 0
+    && /계약 목록[\s\S]{0,100}불러오는 중…/.test(blk32(f1_32, 'con')) && /교육·검진 기록[\s\S]{0,100}불러오는 중…/.test(blk32(f1_32, 'due')) && f1t32 === 1
+    && /계약 목록[\s\S]{0,140}불러오지 못함/.test(blk32(f2_32, 'con')) && /교육·검진 기록[\s\S]{0,140}불러오지 못함/.test(blk32(f2_32, 'due')) && F32.timers.length === 1
+    && c1t32 === 1 && c1_32.indexOf('<span class="sfn-pill">확인 중</span>') > 0 && c2_32.indexOf('확인 중') < 0 && (c2_32.match(/<span class="sfn-pill bad">확인 실패<\/span>/g) || []).length === 3 && C32.timers.length === 1
+    && blk32(G32.out, 'due').indexOf('불러오지 못함') > 0 && blk32(G32.out, 'due').indexOf('석면 작업신고 마감') < 0 && rowIds32(blk32(G32.out, 'check')).length === 26 && blk32(G32.out, 'con').indexOf('1/2') > 0,
+    JSON.stringify({ e: order32(E32.out), f: [f1t32, F32.timers.length], g: order32(G32.out) }));
+  // ④-2 (v432 검토) 실패 안내가 읽는 곳에 맞음 — 교육·현장 대장(현황이 읽음) = '현황 칸을 다시 열면 새로 읽습니다' · 주기 체크·인허가·계약 목록(앱이 처음 한 번 읽는 원장) = '앱을 새로고침하면 다시 읽습니다'
+  const E2_32 = run32(base32({ st: { edu: 'fail', asb: 'fail' }, colBase: {}, records: {}, offline: true, contracts: [], duties: [], licOk: false }));
+  const msg32 = (out, k, title) => { const m = blk32(out, k).match(new RegExp('<div class="sfn-t">' + title + '</div><div class="item-meta">([^<]*)</div></div><span class="sfn-pill bad">불러오지 못함</span>')); return m ? m[1] : ''; };
+  const msgs32 = [msg32(E2_32.out, 'due', '현장 대장'), msg32(E2_32.out, 'due', '교육·검진 기록'), msg32(E2_32.out, 'check', '주기 체크 기록'), msg32(E2_32.out, 'jcb', '주기 체크 기록'), msg32(E2_32.out, 'due', '인허가 의무 대장'), msg32(E2_32.out, 'con', '계약 목록')];
+  T('v432 ④-2 실패 안내 = 읽는 곳대로: 현장 대장·교육·검진 기록 "현황 칸을 다시 열면 새로 읽습니다" · 주기 체크(①②)·인허가 의무 대장·계약 목록 "앱을 새로고침하면 다시 읽습니다"(현황이 다시 읽지 않는 원장) · 옛 문구 "다시 열면 새로 읽습니다"만 쓰는 줄 0',
+    msgs32.join('|') === '현황 칸을 다시 열면 새로 읽습니다|현황 칸을 다시 열면 새로 읽습니다|앱을 새로고침하면 다시 읽습니다|앱을 새로고침하면 다시 읽습니다|앱을 새로고침하면 다시 읽습니다|앱을 새로고침하면 다시 읽습니다'
+    && !/<div class="item-meta">다시 열면 새로 읽습니다<\/div>/.test(E2_32.out), msgs32.join(' | '));
+  // ④-3 (v432 검토) 다시 그림 타이머를 실제로 돌린다(모은 콜백 실행 — 종전 시험 틀은 콜백을 버렸다)
+  //   Q: 교육 기다림 + 서류함 기다림(관급 석면) = 1초마다 틱이 늘고 90번에서 '불러오지 못함'·'확인 실패'로 끝나며 타이머가 멈춤 · 그 사이 로더(교육·현장 대장·명부) 0번 · 서류함 읽기는 그리기 첫 번에 1번(60초 캐시 — force 없음)
+  //   R: 계약 목록이 현황을 연 뒤 50번째 틱에 도착 = 그때 진행 계약 4건의 서류함을 1번씩 읽고(종전엔 0번 — 90초 뒤 거짓 '확인 실패') 기다림을 그때부터 센다 —
+  //      100번째 틱에도 받지 못한 계약은 '확인 중'(90을 넘었지만 시작+90 전), 받은 계약은 판정(1/2), 141번째 틱에 나머지 '확인 실패'로 끝남 · 로더 0번
+  const Q32 = run32(base32({ st: { edu: 'wait', asb: 'ok' } }));
+  const qRun32 = Q32.api.runTimers(400), qOut32 = Q32.api.html();
+  const R32 = run32(base32({ colBase: { checklist: 1, licenses: 1 }, contracts: [], cdoc: {} }));
+  const r0_32 = blk32(R32.out, 'con'), rRun1_32 = R32.api.runTimers(50), rCdoc0_32 = R32.calls.cdoc.join(',');
+  R32.api.setCons(base32().contracts); const rRun2_32 = R32.api.runTimers(9); const rCdoc1_32 = R32.calls.cdoc.join(',');
+  R32.api.cdocSet('c1', { loaded: true, busy: false }); const rRun3_32 = R32.api.runTimers(40); const r100_32 = blk32(R32.api.html(), 'con'), rT100_32 = R32.api.ticks();
+  const rRun4_32 = R32.api.runTimers(400), rEnd32 = blk32(R32.api.html(), 'con');
+  T('v432 ④-3 다시 그림 타이머(실행 — 콜백을 실제로 돌림): 기다림 = 틱 ' + Q32.api.ticks() + '번에서 멈춤(교육 "불러오지 못함"·석면 계약 "확인 실패", 남은 타이머 0) · 다시 그림 중 로더 0번·서류함 읽기는 첫 그림 1번(force 없음)·칸 갈아끼우기는 글이 바뀐 2번뿐 / 늦게 온 계약 = 도착 틱에 서류함 4건 1번씩 · 100번째 틱에도 "확인 중"·받은 계약은 1/2 · 141번째 틱에 "확인 실패" 3건으로 끝 · 로더 0번',
+    qRun32 === 90 && Q32.api.ticks() === 90 && Q32.api.pending() === 0 && /교육·검진 기록[\s\S]{0,140}불러오지 못함/.test(blk32(qOut32, 'due')) && (blk32(qOut32, 'con').match(/<span class="sfn-pill bad">확인 실패<\/span>/g) || []).length === 3 && blk32(qOut32, 'con').indexOf('확인 중') < 0
+    && Q32.calls.load.length === 0 && Q32.calls.cdoc.join(',') === 'c2' && Q32.calls.qsa === 4   // 91번 그렸어도 칸을 갈아끼운 것은 글이 바뀐 2번(처음·90번째)뿐
+    && /계약 목록[\s\S]{0,100}불러오는 중…/.test(r0_32) && rRun1_32 === 50 && rCdoc0_32 === '' && rRun2_32 === 9 && rCdoc1_32 === 'c2,c1,c5,c6'
+    && rRun3_32 === 40 && rT100_32 === 99 && (r100_32.match(/<span class="sfn-pill">확인 중<\/span>/g) || []).length === 3 && r100_32.indexOf('<span class="sfn-pill am">1/2</span>') > 0
+    && R32.api.ticks() === 141 && R32.api.pending() === 0 && (rEnd32.match(/<span class="sfn-pill bad">확인 실패<\/span>/g) || []).length === 3 && rEnd32.indexOf('확인 중') < 0 && rEnd32.indexOf('1/2') > 0
+    && R32.calls.cdoc.join(',') === 'c2,c1,c5,c6' && R32.calls.load.length === 0 && rRun4_32 === 42,
+    JSON.stringify({ q: [qRun32, Q32.api.ticks(), Q32.api.pending(), Q32.calls.load, Q32.calls.cdoc], r: [rRun1_32, rCdoc0_32, rRun2_32, rCdoc1_32, rRun3_32, rT100_32, rRun4_32, R32.api.ticks(), R32.api.pending(), R32.calls.load] }));
+  // ④-4 (v432 검토) 다른 날짜 갈래 — 상반기·월요일(2027-03-08): h* 알약 "6월"·② 머리 "2027 상반기"·w1 "오늘"·y1 (상반기) "6월"·y3 (1월) 지남 · 기한 달(2026-12-02): y4 (12월)·h* "이번 달"·w1 지남(화요일 뒤)
+  const D1_32 = run32(base32({}, '2027-03-08')), D2_32 = run32(base32({}, '2026-12-02'));
+  const d1c32 = blk32(D1_32.out, 'check'), d1j32 = blk32(D1_32.out, 'jcb'), d2c32 = blk32(D2_32.out, 'check'), d2j32 = blk32(D2_32.out, 'jcb');
+  T('v432 ④-4 날짜 갈래(실행): 2027-03-08(월·상반기) = w1 오늘 · h2 6월 · h4 완료 · y1 6월 · y3 지남 · m1 승인 대기 · ② 2027 상반기·3호 6월·8호 완료 / 2026-12-02(수·12월) = y4 이번 달 · h2 이번 달 · w1 지남 · ② 2026 하반기·3호 이번 달',
+    pillOf32(d1c32, 'w1') === 'am:오늘' && pillOf32(d1c32, 'h2') === '-:6월' && pillOf32(d1c32, 'h4') === 'ok:완료' && pillOf32(d1c32, 'y1') === '-:6월' && pillOf32(d1c32, 'y3') === 'bad:지남' && pillOf32(d1c32, 'm1') === 'am:승인 대기'
+    && d1j32.indexOf('<span class="cnt">2027 상반기</span>') > 0 && pillOf32(d1j32, '3호') === '-:6월' && pillOf32(d1j32, '8호') === 'ok:완료' && D1_32.head === '2027-03-08 기준'
+    && pillOf32(d2c32, 'y4') === 'am:이번 달' && pillOf32(d2c32, 'h2') === 'am:이번 달' && pillOf32(d2c32, 'w1') === 'bad:지남' && d2j32.indexOf('<span class="cnt">2026 하반기</span>') > 0 && pillOf32(d2j32, '3호') === 'am:이번 달',
+    [pillOf32(d1c32, 'w1'), pillOf32(d1c32, 'h2'), pillOf32(d1c32, 'y1'), pillOf32(d1c32, 'y3'), (d1j32.match(/<span class="cnt">[^<]*<\/span>/) || [''])[0], pillOf32(d2c32, 'y4'), pillOf32(d2c32, 'h2'), pillOf32(d2c32, 'w1')].join(' / '));
+  // ④-5 (v432 검토) 빈 자료 갈래 — 교육 기록 0건(운영 col:edu 지금 상태) = 투입 인원이 있는 진행 석면 현장은 '특별교육 · 기록 없음'(미이수 경보 아님) + '교육·검진 다음 예정 · 기록 없음' 2줄 ·
+  //      체크 권한은 있는데 볼 항목 0개 = ① 블록째 없음('0건' 아님, ②는 조문 줄 2개만) · 명부를 아직 못 받았으면 일용직 줄 이름 '일용직'('(삭제된 일용직)' 아님)
+  const E0_32 = run32(base32({ edu: [] })), e0Due32 = blk32(E0_32.out, 'due');
+  const allScope32 = {}; WANT32.split(',').forEach((id) => { allScope32[id] = ['a1']; });
+  const Z0_32 = run32(base32({ admin: false, me: { id: 'j1', dept: '운영부' }, perm: { safety: 'do', check: 'do' }, assignee: {}, scopes: allScope32 }));
+  const W0_32 = run32(base32({ workers: [] })), w0Due32 = blk32(W0_32.out, 'due'), w0Ed32 = W0_32.api.eduDue(30), w0Row32 = w0Ed32.length ? W0_32.api.homeRow(w0Ed32[0]) : '';
+  T('v432 ④-5 빈 자료(실행): 교육 기록 0건 = "기록 없음" 2줄(남성초 석면 · 특별교육 — 투입 2명 이수 여부 미확인 · 교육·검진 다음 예정)·"특별교육 미이수" 0 · 볼 체크 항목 0개 = ① 블록 없음·"0건" 0·② 조문 줄 2개 · 명부 없음 = 일용직 줄 "일용직 · 특수건강진단"(현황 ③·관리자 홈 줄 모두 "(삭제된 일용직)" 0)',
+    (e0Due32.match(/<span class="sfn-pill">기록 없음<\/span>/g) || []).length === 2 && e0Due32.indexOf('남성초 석면 · 특별교육</div><div class="item-meta">교육·검진 기록이 0건이라 투입 2명 모두 이수 여부 미확인') > 0 && e0Due32.indexOf('특별교육 미이수') < 0 && e0Due32.indexOf('교육·검진 다음 예정</div>') > 0
+    && order32(Z0_32.out) === 'jcb,due,confirm' && Z0_32.out.indexOf('0건') < 0 && rowIds32(blk32(Z0_32.out, 'jcb')).join(',') === '5조②1·2,2·6호'
+    && W0_32.out.indexOf('(삭제된 일용직)') < 0 && w0Due32.indexOf('일용직 · 특수건강진단') > 0 && w0Ed32.length > 0 && w0Ed32[0].r.id === 'e3' && w0Row32.indexOf('<div class="item-title">일용직 · 특수건강진단</div>') > 0,
+    JSON.stringify({ e0: (e0Due32.match(/<span class="sfn-pill">기록 없음<\/span>/g) || []).length, z: order32(Z0_32.out), w0: w0Ed32.map((x) => x.r.id) }));
+  // ④-6 (v432 검토) 의무 대장 → 인허가 행 잇기에 회사를 본다 — 같은 이름 인허가가 두 회사에 따로 있고 한쪽만 공개범위면: 의무 줄 글의 회사 행으로 판정(종운건설 행만 닫힘 → 16행 빠짐), 회사로 못 고르면 모두 볼 때만
+  const lic2_32 = (scopeOn) => [{ id: 'lA', name: '석면해체·제거업', org: '종운환경' }, { id: 'lB', name: '석면해체·제거업', org: '종운건설', scope: scopeOn === 'B' ? ['a1'] : undefined }, { id: 'lseed07', name: '화물자동차 운송사업' }, { id: 'lseed11', name: '발전사업 허가(태양광)' }, { id: 'lseed08', name: '유해화학물질 운반업' }].map((l) => { if (scopeOn === 'A' && l.id === 'lA') l.scope = ['a1']; return l; });
+  const kOrg32 = (s) => rowIds32(blk32(run32(base32({ admin: false, me: { id: 'k2', dept: '운영부', rank: '사원' }, perm: { safety: 'do', lic: 'view' }, licenses: lic2_32(s) })).out, 'due')).filter((x) => /행$/.test(x)).join(',');
+  const kB32 = kOrg32('B'), kA32 = kOrg32('A'), kN32 = kOrg32('');
+  // 회사가 없는 의무 줄(4행 '화물자동차 운송사업 허가(확인요)')에 같은 이름 인허가가 둘이고 둘째만 공개범위면 — 모두 볼 때만(좁은 쪽, 처음 맞는 행만 보던 종전이면 보임)
+  const kC32 = rowIds32(blk32(run32(base32({ admin: false, me: { id: 'k2', dept: '운영부', rank: '사원' }, perm: { safety: 'do', lic: 'view' }, licenses: [{ id: 'lA', name: '석면해체·제거업', org: '종운환경' }, { id: 'lB', name: '석면해체·제거업', org: '종운건설' }, { id: 'lT1', name: '화물자동차 운송사업', org: '종운환경' }, { id: 'lT2', name: '화물자동차 운송사업', org: '종운건설', scope: ['a1'] }, { id: 'lseed11', name: '발전사업 허가(태양광)' }, { id: 'lseed08', name: '유해화학물질 운반업' }] })).out, 'due')).filter((x) => /행$/.test(x)).join(',');
+  T('v432 ④-6 의무 대장 ↔ 인허가 행(회사): 같은 이름 두 회사 — 종운건설 행만 공개범위 = 16행(석면해체·제거업 등록(종운건설)) 빠짐 · 종운환경 행만 공개범위 = 16행 보임 · 공개범위 없음 = 보임 · 회사 없는 줄(4행 화물)에 같은 이름 둘·둘째만 공개범위 = 빠짐(모두 볼 때만)',
+    kB32 === '4행,32행,62행' && kA32 === '4행,16행,32행,62행' && kN32 === '4행,16행,32행,62행' && kC32 === '16행,32행,62행', [kB32, kA32, kN32, kC32].join(' / '));
+
+  // ⑤ 이동 — sfNowGo 실행(완료·저장 없이 원래 자리로): 내 업무(그 항목으로 굴림) · 안전 › 현장·교육·검진(대상) · 인허가 의무 대장 · 계약 단계·서류(그 계약 펼침) · 문서함 06 서랍
+  //    v432 검토: 도착 자리로 굴림(못 찾으면 맨 위 'top' — 앱은 탭을 바꿔도 창 스크롤을 그대로 둔다) · 수시 줄은 내 업무 '수시' 칸의 그 줄(제목)로, 없으면 그 칸 머리로 ·
+  //    계약 줄 = 표 칩·필터가 그 계약을 거르면 이번 이동만 풀고 그림(기기 저장 없음) · 폰(860px 밑)은 표 아래 상세 카드로 · 문서함 06 = 06 서랍 머리로(block start)
+  const goRun32 = (v, opt) => {
+    const o = Object.assign({ w: 1200, chip: '', f: {} }, opt || {});
+    const log = [], scrolled = [];
+    const el = (attrs, title) => ({ getAttribute: (n) => attrs[n], scrollIntoView: (so) => scrolled.push(JSON.stringify(attrs) + '@' + ((so && so.block) || '')), querySelector: (s) => (s === '.item-title' && title != null ? { textContent: title } : null) });
+    const sud = [el({ sudsi: 'su1' }, known32.get('su1')), el({ sudsi: 'su3' }, known32.get('su3'))];
+    const api = new Function('__log', '__el', '__sud', '__w', '__chip', '__f', [
+      'var conOpenId = null, conDetTab = "ov", docOpenCats = {}, contracts = [{ id: "c1", status: "run", docType: "public", client: "포항시" }], conSheet = { k: "stage", d: 1, f: __f, chip: __chip };',
+      'function findProc(id){ for (var i = 0; i < contracts.length; i++){ if (contracts[i].id === id) return contracts[i]; } return null; }',
+      'function csPass(c, f, chip){ __log.push("csPass:" + (chip || "-") + (f && Object.keys(f).length ? "+f" : "")); if (chip === "done") return c.status === "done"; if (chip === "pri") return c.docType !== "public"; if (f && f.client) return String(c.client || "").indexOf(f.client) >= 0; return true; }',
+      'function switchTab(n){ __log.push("switch:" + n); } function setLicLayer(n){ __log.push("lic:" + n); } function renderContracts(){ __log.push("renderContracts:" + conOpenId + ":" + conDetTab + ":" + conSheet.chip); } function renderDocuments(){ __log.push("renderDocuments:" + !!docOpenCats["06"]); }',
+      'var document = { querySelectorAll: function(sel){ __log.push("qsa:" + sel); if (sel === "#listHost .item") return [__el({ "data-id": "m1" }), __el({ "data-id": "w1" })]; if (sel === "[data-cs-row]") return [__el({ "data-cs-row": "c1" })]; if (sel === "#sudsiHost .item") return __sud; if (sel === "[data-doc-acc]") return [__el({ "data-doc-acc": "05" }), __el({ "data-doc-acc": "06" })]; return []; },',
+      '  getElementById: function(id){ __log.push("gid:" + id); return id === "conDetailCard" ? __el({ card: "conDetailCard" }) : (id === "sudsiHost" ? { parentNode: __el({ group: "sudsi" }) } : null); } };',
+      'var window = { innerWidth: __w, scrollTo: function(){ __log.push("top"); } };',
+      SRC32.groups, SRC32.sudsi, fn32('sfNowItem'), fn32('sfNowGo'), fn32('sfNowScrollTo'), fn32('sfNowScrollSudsi'), fn32('sfNowTop'),
+      'return { go: sfNowGo, st: function(){ return [conOpenId, conDetTab, !!docOpenCats["06"], conSheet.chip, JSON.stringify(conSheet.f)].join("|"); } };'].join('\n'))(log, el, sud, o.w, o.chip, o.f);
+    api.go(v);
+    return log.join(',') + ' #' + scrolled.join('') + ' #' + api.st();
+  };
+  const TA32 = stmt32(html, /var TAB_ALIAS = \{[^\n]*\};/), route32 = new Function([TA32, fn32('tabRoute'), 'return tabRoute;'].join('\n'))();
+  const goTabs32 = ['safety:site', 'safety:edu:worker', 'safety:edu:member', 'check', 'lic', 'con', 'doc'];
+  const tabsOk32 = goTabs32.every((g) => { const r = route32(g); if (!ids.has('view-' + r.tab)) return false; if (r.tab !== 'safety') return !r.layer; const p = r.layer.split(':'); return ['now', 'site', 'edu'].indexOf(p[0]) >= 0 && (p.length === 1 || (p[0] === 'edu' && ['member', 'worker'].indexOf(p[1]) >= 0)); });
+  const gr32 = { chk: goRun32('check:w1'), su1: goRun32('check:su1'), su5: goRun32('check:su5'), chkX: goRun32('check:zz'), site: goRun32('site'), ew: goRun32('edu:worker'), em: goRun32('edu:member'), eb: goRun32('edu:boss'), duty: goRun32('duty'),
+    con: goRun32('con:c1'), conPri: goRun32('con:c1', { chip: 'pri' }), conF: goRun32('con:c1', { f: { client: '시청' } }), conOk: goRun32('con:c1', { chip: 'pub' }), conPh: goRun32('con:c1', { w: 375 }), conX: goRun32('con:zz'), doc: goRun32('doc06'), none: goRun32('zz') };
+  const N32 = ' #|ov|false||{}';
+  T('v432 ⑤ 이동(sfNowGo 실행): 체크 줄 → 내 업무 + 그 항목으로 굴림 · 수시 줄(su1·su3·su5·su6) → 내 업무 "수시" 칸의 그 줄(제목으로 — #listHost 밖·data-id 없음), 숨은 항목이면 그 칸 머리로 · 못 찾은 항목은 맨 위 · 현장 줄 → 안전 › 현장 · 교육 줄 → 안전 › 교육·검진 그 대상(모르는 대상은 직원) · 의무 대장 → 인허가 › 의무 대장(셋 다 맨 위에서) · 계약 줄 → 계약 탭에서 그 계약 펼침(단계·서류 칸) + PC는 그 줄로·폰(375px)은 표 아래 상세 카드로 굴림 · 표 칩(사급)·필터(검색어)가 그 계약을 거르면 이번만 풀고(칩 전체·필터 빔 — 그린 뒤 상태) 거르지 않는 칩(관급)은 그대로 · 없는 계약은 아무것도 안 함 · 문서함 06 → 06 서랍 펼친 채 그 서랍 머리로 · 모르는 값은 아무것도 안 함 · 이동 대상 탭·칸 전부 실재(tabRoute)',
+    gr32.chk === 'switch:check,qsa:#listHost .item #{"data-id":"w1"}@center' + N32
+    && gr32.su1 === 'switch:check,qsa:#listHost .item,qsa:#sudsiHost .item #{"sudsi":"su1"}@center' + N32 && gr32.su5 === 'switch:check,qsa:#listHost .item,qsa:#sudsiHost .item,gid:sudsiHost #{"group":"sudsi"}@start' + N32
+    && gr32.chkX === 'switch:check,qsa:#listHost .item,top #' + N32
+    && gr32.site === 'switch:safety:site,top #' + N32 && gr32.ew === 'switch:safety:edu:worker,top #' + N32 && gr32.em === 'switch:safety:edu:member,top #' + N32 && gr32.eb === gr32.em
+    && gr32.duty === 'switch:lic,lic:duty,top #' + N32
+    && gr32.con === 'csPass:-,switch:con,renderContracts:c1:st:,qsa:[data-cs-row] #{"data-cs-row":"c1"}@center #c1|st|false||{}'
+    && gr32.conPri === 'csPass:pri,switch:con,renderContracts:c1:st:,qsa:[data-cs-row] #{"data-cs-row":"c1"}@center #c1|st|false||{}'
+    && gr32.conF === 'csPass:-+f,switch:con,renderContracts:c1:st:,qsa:[data-cs-row] #{"data-cs-row":"c1"}@center #c1|st|false||{}'
+    && gr32.conOk === 'csPass:pub,switch:con,renderContracts:c1:st:pub,qsa:[data-cs-row] #{"data-cs-row":"c1"}@center #c1|st|false|pub|{}'
+    && gr32.conPh === 'csPass:-,switch:con,renderContracts:c1:st:,gid:conDetailCard #{"card":"conDetailCard"}@start #c1|st|false||{}'
+    && gr32.conX === ' #' + N32 && gr32.doc === 'switch:doc,renderDocuments:true,qsa:[data-doc-acc] #{"data-doc-acc":"06"}@start #|ov|true||{}' && gr32.none === ' #' + N32 && tabsOk32,
+    JSON.stringify(gr32));
+
+  // ⑥ 읽기 — sfNowOpen 실행(현황 칸을 열 때만): 교육(안전) · 현장 대장(현장 권한 — { noHooks: true }) · 명부(일용직 권한) · 서류함은 안전 서류가 걸리는 진행 계약만 → 결과를 적고 그 칸이면 다시 그림
+  //    v432 검토: 가짜 cdocLoad가 두 번째 인자(force)를 기록 — 현황 읽기는 60초 캐시를 쓴다(force 없음) · 시계(Date.now)를 시험이 정해 30초 안 다시 열기 = 받은 로더를 다시 안 부름(SF_NOW_FRESH)
+  const openRun32 = (perm, admin) => {
+    const log = [], thens = [];
+    const th = (name) => ({ then: (ok, ng) => { thens.push({ name, ok, ng }); } });
+    const api = new Function('__perm', '__admin', '__log', '__th', '__cons', [
+      'function isAdmin(){ return __admin; } function canSee(m){ return __admin || (__perm[m] || "hide") !== "hide"; }',
+      'var __now = 1000000; var Date = { now: function(){ return __now; } };',
+      'var contracts = __cons, currentTab = "safety", safetyLayer = "now", workers = [{ id: "w1", name: "김일용" }];',
+      SRC32.packets, fn32('csPkWhen'), fn32('csPkIk'), fn32('liveContracts'), stmt32(sec32, /var SF_NOW_CON = \[[^\n]*\];/),
+      stmt32(sec32, /var SF_NOW_TICK_MAX = \d+;/), stmt32(sec32, /var SF_NOW_FRESH = \d+;/), 'var sfNowSt = { edu: "", asb: "" }, sfNowTicks = 5, sfNowAt = {}, sfNowCdocT0 = { c9: 3 };',
+      'function loadEdu(a){ __log.push("loadEdu:" + JSON.stringify(a === undefined ? null : a)); return __th("edu"); }',
+      'function loadAsb(a){ __log.push("loadAsb:" + JSON.stringify(a === undefined ? null : a)); return __th("asb"); }',
+      'function loadWorkers(){ __log.push("loadWorkers"); return __th("wk"); } function cdocLoad(c, force){ __log.push("cdocLoad:" + c.id + (force === undefined ? "" : ":" + force)); } function renderSafetyNow(){ __log.push("render"); }',
+      fn32('sfNowConKeys'), fn32('sfNowLoad'), fn32('sfNowRefresh'), fn32('sfNowOpen'),
+      'sfNowOpen(); return { st: function(){ return sfNowSt.edu + "/" + sfNowSt.asb + "/" + sfNowTicks + "/" + JSON.stringify(sfNowCdocT0); }, leave: function(){ currentTab = "dash"; }, back: function(){ currentTab = "safety"; },',
+      '  again: function(ms){ __now += ms; __log.length = 0; sfNowOpen(); return __log.join(","); } };'].join('\n'))(perm, admin, log, th, base32().contracts);
+    return { log, thens, api };
+  };
+  const oA32 = openRun32({}, true), oA0_32 = oA32.log.join(','), oA0st32 = oA32.api.st();
+  const fire32 = (r, name, v) => { const t = r.thens.filter((x) => x.name === name)[0]; if (t) t.ok(v); return !!t; };   // 그 로더를 안 불렀으면 false — 아래 단언이 ✗로 잡는다(시험 틀이 터지지 않게)
+  const fE32 = fire32(oA32, 'edu', true), fS32 = fire32(oA32, 'asb', false); const oA1st32 = oA32.api.st(), oA1n32 = oA32.log.filter((x) => x === 'render').length;
+  oA32.api.leave(); const fW32 = fire32(oA32, 'wk'); const oA2n32 = oA32.log.filter((x) => x === 'render').length;
+  oA32.api.back();
+  const oAg1_32 = oA32.api.again(10000), oAg2_32 = oA32.api.again(25000);   // 10초 뒤(받은 교육·명부는 다시 안 읽음, 실패한 현장 대장은 다시) · 그 뒤 25초(교육·명부 받은 지 35초 — 다시 읽음)
+  const oK32 = openRun32({ safety: 'do', con: 'do', wk: 'view' }, false), oN32 = openRun32({ safety: 'do' }, false);
+  const ldRun32 = (name, status, opt, admin, tab) => {
+    const log = [];
+    const api = new Function('__log', '__status', '__admin', '__tab', [
+      'function canSee(){ return true; } function isAdmin(){ return __admin; } var currentTab = __tab || "dash";',
+      'var asb = [], asbBase = 0, asbPending = false, asbLoaded = false, edu = [], eduBase = 0, eduPending = false;',
+      'function gwCall(fn, body){ __log.push(fn + ":" + body.action + ":" + body.collection); var res = { status: __status, body: { doc: { items: [{ id: "x1" }], updated_at: 5 } } }; return { then: function(f){ var v; try { v = f(res); } catch(e){ return { catch: function(g){ return g(e); } }; } return { catch: function(){ return v; } }; } }; }',
+      'function mergeAsb(a){ return a; } function normAsbRow(r){ return r; } function mergeEdu(a){ return a; }',
+      'function csSiteHooksRetry(){ __log.push("hooks"); } function renderSites(){ __log.push("renderSites"); } function renderCalendar(){ __log.push("renderCalendar"); } function renderWorkers(){ __log.push("renderWorkers"); } function renderEdu(){ __log.push("renderEdu"); } function renderDashboard(){ __log.push("renderDashboard"); }',
+      fn32('loadAsb'), fn32('loadEdu'), 'return { asb: loadAsb, edu: loadEdu };'].join('\n'))(log, status, admin, tab);
+    const v = api[name](opt);
+    return v + ':' + log.join(',');
+  };
+  const la32 = [ldRun32('asb', 200, { noHooks: true }), ldRun32('asb', 200), ldRun32('asb', 500, { noHooks: true }), ldRun32('edu', 200, undefined, true), ldRun32('edu', 200, undefined, false), ldRun32('edu', 403, undefined, true), ldRun32('edu', 200, undefined, true, 'safety'), ldRun32('edu', 200, undefined, true, 'cal')];
+  T('v432 ⑥ 읽기(sfNowOpen·loadAsb·loadEdu 실행): 현황을 열면 교육 읽기 · 현장 대장 읽기({ noHooks: true } — 보류된 계약 연결·종결 훅은 안 돎, 현장 칸·계약 쪽 읽기는 종전대로 훅) · 명부 · 서류함은 안전 서류가 걸리는 진행 계약만(관급 진행 4건 — 사급·끝난 계약 빼고, 60초 캐시 — force 없음) → 그리기 1번 · 열 때 서류함 기다림 시작 틱 초기화 · 결과(성공 true·실패 false)를 적고 그 칸이면 다시 그림 · 다른 데로 가면 안 그림 · 30초 안에 다시 열면 받은 교육·명부는 다시 안 읽고 실패한 현장 대장만 다시(35초 뒤엔 모두) · 권민지형(현장 숨김) = 현장 대장·훅 없음 · 계약 숨김 = 서류함 안 읽음 · 로더는 성공 true·실패 false를 돌려주고 관리자가 홈에 있을 때만 교육 도착 때 홈(만기 목록)도 다시 그림(안전 탭·캘린더면 안 그림)',
+    oA0_32 === 'loadEdu:null,loadAsb:{"noHooks":true},loadWorkers,cdocLoad:c1,cdocLoad:c2,cdocLoad:c5,cdocLoad:c6,render' && oA0st32 === 'wait/wait/0/{}' && fE32 && fS32 && fW32 && oA1st32 === 'ok/fail/0/{}' && oA1n32 === 3 && oA2n32 === 3
+    && oAg1_32 === 'loadAsb:{"noHooks":true},cdocLoad:c1,cdocLoad:c2,cdocLoad:c5,cdocLoad:c6,render' && oAg2_32 === 'loadEdu:null,loadAsb:{"noHooks":true},loadWorkers,cdocLoad:c1,cdocLoad:c2,cdocLoad:c5,cdocLoad:c6,render'
+    && oK32.log.join(',') === 'loadEdu:null,loadWorkers,cdocLoad:c1,cdocLoad:c2,cdocLoad:c5,cdocLoad:c6,render' && oK32.api.st() === 'wait//0/{}' && oN32.log.join(',') === 'loadEdu:null,render'
+    && la32[0] === 'true:gw-data:get:asbestos,renderSites,renderCalendar,renderWorkers' && la32[1] === 'true:gw-data:get:asbestos,hooks,renderSites,renderCalendar,renderWorkers' && la32[2] === 'false:gw-data:get:asbestos'
+    && la32[3] === 'true:gw-data:get:edu,renderEdu,renderCalendar,renderSites,renderDashboard' && la32[4] === 'true:gw-data:get:edu,renderEdu,renderCalendar,renderSites' && la32[5] === 'false:gw-data:get:edu'
+    && la32[6] === 'true:gw-data:get:edu,renderEdu,renderCalendar,renderSites' && la32[7] === 'true:gw-data:get:edu,renderEdu,renderCalendar,renderSites',
+    JSON.stringify({ open: [oA0_32, oA0st32, oA1st32, oA1n32, oA2n32, oAg1_32, oAg2_32], k: oK32.log, n: oN32.log, load: la32 }));
+
+  // ⑦ 관리자 홈 만기 목록 — 교육·검진 다음 예정 30일 줄(sfNowEduDue·sfNowHomeEduRow 실행)이 인허가 줄과 같은 형식으로 한 목록에(새 타일 없음 — KPI·이번 주 기한 숫자 그대로) · 누르면 안전 › 교육·검진 그 대상 목록
+  const ed32 = A32.api.eduDue(30), hr3 = ed32.length ? A32.api.homeRow(ed32[0]) : '', hr2 = ed32.length > 1 ? A32.api.homeRow(ed32[1]) : '';
+  const licRow32 = (rdb32.match(/return \{ d: x\.dd\.diff, h: '<div class="item veh-item">' \+/) || [''])[0];
+  const tiles32 = rdb32.slice(rdb32.indexOf("var tiles = '';"), rdb32.indexOf('var html = \'<div class="dash-date">\''));
+  const inGo32 = [hr3, hr2].map((h) => (h.match(/data-inbox-go="([^"]+)"/) || ['', ''])[1]);
+  T('v432 ⑦ 관리자 홈 만기 목록(실행 + 정적): 교육·검진 다음 예정이 오늘+30일 안(지난 것 포함, 지운 기록·날짜 없음·30일 밖·같은 사람·같은 종류의 옛 이수·퇴사자·지운 일용직 빼고) = 2줄 날짜순 · 교육 도착 때 홈 다시 그림은 홈일 때만 · 일용직 줄이 있고 명부가 비었으면 명부 1번 읽고 홈일 때만 다시 그림(이름 sfNowEduName) · 줄 = 인허가 줄과 같은 형식(.item.veh-item · .item-title · .item-meta · .task-ctrl .dday D-day 색) + 누르면 안전 › 교육·검진 그 대상(data-inbox-go — 홈의 기존 이동 배선) · renderDashboard: 인허가·보수교육 만기 목록에 합쳐 날짜순(머리 "· 교육·검진")·안전 권한일 때만 · 관리자 홈을 처음 그릴 때 교육 1번 읽음 · 타일(새 타일 0·이번 주 기한 숫자)에 교육 없음',
+    ed32.map((x) => x.r.id).join(',') === 'e3,e2' && hr3.indexOf('<div class="item veh-item" data-inbox-go="safety:edu:worker" style="cursor:pointer;">') === 0 && hr3.indexOf('<div class="item-title">김일용 · 특수건강진단</div>') > 0 && hr3.indexOf('<span class="dday red">D+9</span>') > 0
+    && hr2.indexOf('data-inbox-go="safety:edu:member"') > 0 && hr2.indexOf('<span class="dday orange">D-10</span>') > 0 && hr2.indexOf('<div class="item-meta"><span>다음 예정 2026-11-20</span>') > 0
+    && inGo32.every((g) => { const r = route32(g); return ids.has('view-' + r.tab) && r.tab === 'safety' && /^edu:(member|worker)$/.test(r.layer); })
+    && licRow32.length > 0 && /var eduHome = canSee\("safety"\) \? sfNowEduDue\(30\) : \[\];/.test(rdb32) && /if \(urgentLic\.length \|\| eduHome\.length\)\{/.test(rdb32)
+    && /\}\)\.concat\(eduHome\.map\(function\(x\)\{ return \{ d: x\.dd\.diff, h: sfNowHomeEduRow\(x\) \}; \}\)\);/.test(rdb32) && /dueMix\.sort\(function\(a, b\)\{ return a\.d - b\.d; \}\);/.test(rdb32) && /<h2>인허가·보수교육 만기' \+ \(eduHome\.length \? ' · 교육·검진' : ''\) \+ ' <span class="cnt">' \+ dueMix\.length/.test(rdb32)
+    && rdb32.indexOf('if (canSee("safety") && !sfNowHomeEduAsked){ sfNowHomeEduAsked = true; loadEdu(); }') > rdb32.indexOf('renderStaffHome(host); return; }') && /querySelectorAll\("\[data-inbox-go\]"\)/.test(rdb32)
+    && tiles32.length > 300 && !/edu|교육/.test(tiles32) && !/eduHome/.test(rdb32.slice(rdb32.indexOf('var week7 = '), rdb32.indexOf('var tiles = '))) && /if \(isAdmin\(\) && currentTab === "dash"\) renderDashboard\(\);/.test(fn32('loadEdu'))
+    // v432 검토: 일용직 줄이 있고 명부가 비었으면 명부를 1번 읽고 도착하면 홈일 때만 다시 그림(이름 — 받기 전은 sfNowEduName의 '일용직')
+    && /if \(!sfNowHomeWkAsked && !workers\.length && canSee\("wk"\) && eduHome\.some\(function\(x\)\{ return x\.r\.ptype === "worker"; \}\)\)\{ sfNowHomeWkAsked = true; var wkp = loadWorkers\(\); if \(wkp && typeof wkp\.then === "function"\) wkp\.then\(function\(\)\{ if \(currentTab === "dash"\) renderDashboard\(\); \}\); \}/.test(rdb32)
+    && rdb32.indexOf('sfNowHomeWkAsked = true') > rdb32.indexOf('var eduHome = ') && rdb32.indexOf('sfNowHomeWkAsked = true') < rdb32.indexOf('if (urgentLic.length || eduHome.length){') && /esc\(sfNowEduName\(r\)\)/.test(fn32('sfNowHomeEduRow')) && fn32('sfNowHomeEduRow').indexOf('eduPersonName') < 0,
+    JSON.stringify({ ed: ed32.map((x) => x.r.id), go: inGo32, tiles: tiles32.length }));
+
+  // ⑧ 문서 — FEATURES 기준·v432 절·§1·§7 · MANUAL 1절(칸 목록)·3절(관리자 홈 만기 목록)·21-2(안전 열 = 현황 칸도)·28절 안내·28-1(현황 — 읽기 전용, 완료는 제자리) · CLAUDE.md 안전 탭 줄 · TESTLIST v432(체크 칸 전부 AI 몫 — 화면 4종·게이트) · sw ≥ 432
+  const sec32m = (a, b) => { const i = man32.indexOf(a); return i < 0 ? '' : man32.slice(i, man32.indexOf(b, i + a.length)); };
+  const m28_32 = sec32m('<h2 id="s28">', '<h2 id="s29">'), m281_32 = sec32m('<h3 id="s28-1">', '<!-- 29 -->'), m3_32 = sec32m('<h2 id="s3">', '<h2 id="s4">'), m212_32 = sec32m('<h3>21-2. 권한관리</h3>', '<h3>21-3.');
+  const tlv32 = (() => { const i = tl32.indexOf('\n## v432'); if (i < 0) return ''; const j = tl32.indexOf('\n## ', i + 5); return tl32.slice(i, j < 0 ? tl32.length : j); })();
+  const cb32 = tlv32.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), cbNotAi32 = cb32.filter((l) => !/^\s*[-*+] \[[ xX]\] \(AI[ 가)]/.test(l));
+  const ftv32 = (() => { const i = ft32.indexOf('\n### v432 (11/10)'); if (i < 0) return ''; const j = ft32.indexOf('\n### ', i + 5); return ft32.slice(i, j < 0 ? ft32.length : j); })();
+  const ft1_32 = ft32.split('\n').filter((ln) => ln.indexOf('- **업무**:') === 0)[0] || '', ft7_32 = ft32.split('\n').filter((ln) => ln.indexOf('- **안전**(v428') === 0)[0] || '';
+  T('v432 ⑧ 문서: FEATURES 기준 v432·v432 절(읽기 전용·블록 6개·현황을 열 때만 읽음·관리자 홈 교육 줄·검사)·§1 업무 줄·§7 안전 줄에 현황 · MANUAL 1절 칸 목록 "현황 / 현장 / 교육·검진"·3절 관리자 홈 만기 목록에 교육·검진·21-2 안전 열 = 현황 칸도·28절 안내에 현황 칸·28-1 현황(현황은 읽기 전용, 완료는 제자리 · 블록 6개 · 공개범위) · CLAUDE.md 안전 탭 줄(현황 칸 sfChipNow·sfPaneNow, @safety-now 구간, 레지스트리 밖) · TESTLIST v432 체크 칸 전부 AI 몫(관리자형·권민지형·김정아형·375px·게이트, PM 몫 0) · sw ≥ 432',
+    Number((ft32.match(/기준: v(\d+) /) || [0, 0])[1]) >= 432 && ftv32.indexOf('읽기 전용') > 0 && ftv32.indexOf('sfNowOpen') > 0 && ftv32.indexOf('관리자 홈') > 0 && ftv32.indexOf('uismoke v432') > 0 && ft1_32.indexOf('**현황**') > 0 && ft7_32.indexOf('**현황**') > 0
+    && man32.indexOf('<b>안전</b> = 현황 / 현장 / 교육·검진') > 0 && m3_32.indexOf('교육·검진 다음 예정') > 0 && m212_32.indexOf('현황 칸') > 0 && m28_32.indexOf('현황 칸') > 0
+    && m281_32.indexOf('현황은 읽기 전용') > 0 && m281_32.indexOf('완료') > 0 && m281_32.indexOf('원래 자리') > 0 && m281_32.indexOf('공개범위') > 0 && man32.indexOf('<a href="#s28">안전 › 현장 — 석면·철거·준설 대장 · 현황(28-1)</a>') > 0
+    && cl32.indexOf('`sfChipNow`') > 0 && cl32.indexOf('`sfPaneNow`') > 0 && cl32.indexOf('@safety-now') > 0
+    && tlv32.indexOf('관리자형') > 0 && tlv32.indexOf('권민지형') > 0 && tlv32.indexOf('김정아형') > 0 && tlv32.indexOf('375px') > 0 && tlv32.indexOf('PM 몫') < 0 && cb32.length >= 5 && cbNotAi32.length === 0 && cb32.some((l) => /^- \[x\] \(AI\) `uismoke`/.test(l))
+    && Number((sw32.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 432,
+    JSON.stringify({ ftv: ftv32.length, m281: m281_32.length, tl: tlv32.length, cb: cb32.length, notAi: cbNotAi32.map((l) => l.slice(0, 40)) }));
+  // ⑧-2 (v432 검토) 문서를 낱말 몇 개가 아니라 내용으로 — MANUAL 28-1 여섯 묶음 이름(목록 머리)·① 상태 '오늘'·'이번 달'·⑤ 7단계('다음 단계에서' 0)·실패 안내 둘(다시 열면 / 새로고침)·간접 동기화 예외·교육 최근 이수분 ·
+  //      21-2 목록 항목(교육·검진·현황) · FEATURES v432 절(h3 공개범위·checkItemVisible·licVisible·csApprSync 예외·eduLatest·오늘/이번 달·회사 잇기·30초·서류함 시작 틱)·§8 안전 열 = 현황 칸 ·
+  //      CLAUDE.md(noHooks 1곳·csApprSync 예외·conSheetSave 없음) · TESTLIST v432 체크 칸에 'PM' 0(사람 몫 칸 없음)·저장 예외·수시 줄·옛 이력 줄
+  const m281li32 = [...m281_32.matchAll(/<li><b>([^<]+)<\/b> — /g)].map((m) => m[1]).join(',');
+  const ft8_32 = ft32.split('\n').filter((ln) => ln.indexOf('- **권한관리 매트릭스**') === 0)[0] || '';
+  const cbPM32 = cb32.filter((l) => /PM/.test(l));
+  //      화면 칸은 칸마다 본다(게이트 칸에도 같은 낱말이 있어 절 전체 낱말 검사는 칸 하나가 지워져도 통과했다 — 결함 심기 3회차)
+  const cbOf32 = (key) => cb32.filter((l) => l.indexOf(key) >= 0 && /^- \[[ x]\] \(AI 시험 화면 대상/.test(l))[0] || '';   // 11/10: AI가 시험 뒤 [x]로 닫아도 같은 내용 검사(열린 칸만 보면 닫는 순간 실패)
+  const tlMove32 = cbOf32('관리자형 이동'), tlHome32 = cbOf32('관리자 홈:'), tlPhone32 = cbOf32('폰 375px(큰 글자 포함)');
+  T('v432 ⑧-2 문서 내용: MANUAL 28-1 묶음 6개 이름 그대로·① 오늘·이번 달·지남(화요일)·⑤ 7단계·실패 안내 2갈래·결재 결과 맞추기 예외·가장 최근 이수 기록 · 21-2 목록 (교육·검진·현황) · FEATURES v432 절 h3·checkItemVisible·licVisible·csApprSync·eduLatest·sfNowDutyLics·SF_NOW_FRESH·sfNowCdocT0·오늘·이번 달 · §8 안전 열 = 현황 칸 · CLAUDE.md noHooks·csApprSync·conSheetSave · TESTLIST v432 체크 칸 PM 0 · 화면 칸마다(이동 칸 = 저장 예외 csApprSync·수시 줄·폰 상세 카드 · 관리자 홈 칸 = 옛 줄 없음·(삭제된 일용직) 없음 · 375px 칸 = 알약 늘 오른쪽)',
+    m281li32 === '이번 주기 안전 점검,중처법 반기 점검,다가오는 기한 30일,계약 안전 서류,인정·평가,확인 필요'
+    && /<b>오늘<\/b>은 매주\(월요일\) 항목의 월요일 당일/.test(m281_32) && /<b>이번 달<\/b>은 기한 달/.test(m281_32) && /화요일이 되도록 아직/.test(m281_32) && m281_32.indexOf('(7단계 — 인정·평가 칸에서 채웁니다)') > 0 && m281_32.indexOf('다음 단계에서 채웁니다') < 0
+    && m281_32.indexOf('현황 칸을 다시 열면 새로 읽고') > 0 && m281_32.indexOf('<b>앱을 새로고침</b>해야 다시 읽습니다') > 0 && m281_32.indexOf('칸을 다시 열면 새로 읽습니다.</li>') < 0 && m281_32.indexOf('결재 결과 맞추기') > 0 && m281_32.indexOf('<b>가장 최근 이수 기록</b>만') > 0 && m281_32.indexOf("내 업무 아래 '수시' 칸의 그 줄로") > 0
+    && m212_32.indexOf('<li><b>안전</b>(교육·검진·현황)도 기본 숨김') > 0 && m212_32.indexOf('교육·검진 목록과 현황 칸만') > 0
+    && ['h3(안전보건 담당자 업무수행 평가, 공개범위 관리자 3명)는 권민지 현황의 ①에도 ② 5호에도 없다', '`checkItemVisible`', '`licVisible`', '`csApprSync`', '`eduLatest`', '`sfNowDutyLics`', '`SF_NOW_FRESH`', '`sfNowCdocT0`', '오늘(매주 항목 — 월요일 당일)', '이번 달(기한 달', '폰(860px 밑)은 표 아래 상세 카드'].every((w) => ftv32.indexOf(w) > 0)
+    && ft8_32.indexOf('안전 › 현황 칸(v432') > 0
+    && ['noHooks', 'csApprSync', 'conSheetSave'].every((w) => cl32.indexOf(w) > 0)
+    && cbPM32.length === 0
+    && tlMove32.indexOf("예외: 계약 탭에 '단계·서류'로 펼쳐 둔 계약이 있으면") > 0 && tlMove32.indexOf('csApprSync') > 0 && tlMove32.indexOf("'수시' 칸의 그 줄") > 0 && tlMove32.indexOf('폰은 표 아래 상세 카드로 굴림') > 0
+    && tlHome32.indexOf('옛 줄이 없음') > 0 && tlHome32.indexOf("'(삭제된 일용직)'로 보이지 않음") > 0 && tlPhone32.indexOf('알약이 늘 줄 오른쪽') > 0,
+    JSON.stringify({ li: m281li32, pm: cbPM32.map((l) => l.slice(0, 60)), ft8: ft8_32.length, tl: [tlMove32.length, tlHome32.length, tlPhone32.length] }));
+} catch (e) { console.log('  (v432 검사 생략 — ' + e.message + ')'); fails++; }
 
 try {
   const fdir = join(ROOT, 'netlify', 'functions');
