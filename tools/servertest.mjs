@@ -76,8 +76,9 @@ T('미지 컬렉션 → 400', r.code === 400);
 r = await call({ action: 'get', collection: 'bids' }, tokW, 'dev1');
 T('비관리자 bids → 403 ADMIN_ONLY', r.code === 403 && r.body.error_code === 'ADMIN_ONLY');
 // 4b edu(교육·건강진단 대장)는 인사 탭이 관리자 전용인데 서버 permOf 기본 view라 비관리자가 API로 전 직원 검진 기록을 읽을 수 있던 구멍(9/4) — 닫고 시작
+//    v430(메뉴 56 3단계): 키가 hr → safety(권한관리 '안전' 열)로 바뀌었다. 안전 권한을 받지 않은 직원은 여전히 403(safety도 기본 숨김) — 보기/수행 짝은 절 76
 r = await call({ action: 'get', collection: 'edu' }, tokW, 'dev1');
-T('비관리자 edu(hr) → 403 NO_ACCESS(기본 숨김)', r.code === 403 && r.body.error_code === 'NO_ACCESS', r.code + '/' + r.body.error_code);
+T('비관리자 edu(safety 미지정) → 403 NO_ACCESS(기본 숨김)', r.code === 403 && r.body.error_code === 'NO_ACCESS', r.code + '/' + r.body.error_code);
 // 5 기기 미승인 차단
 r = await call({ action: 'get', collection: 'tasks' }, tokW, 'devX');
 T('미승인 기기 → 403 DEVICE_NOT_APPROVED', r.code === 403 && r.body.error_code === 'DEVICE_NOT_APPROVED');
@@ -1754,12 +1755,12 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   };
   const tokSoo = issueSession(mem.gw_users['member:usoo']).token;   // 관리자(비개발자) = 나수진 자리
   const tokDev = issueSession(mem.gw_users['member:udev']).token;
-  const PRESET_WORKER = { tasks: 'do', veh: 'view', rec: 'view', lic: 'view', site: 'hide', check: 'do', con: 'view', cli: 'view', doc: 'view', wk: 'view', quote: 'hide', promo: 'hide' };
+  const PRESET_WORKER = { tasks: 'do', veh: 'view', rec: 'view', lic: 'view', site: 'hide', check: 'do', con: 'view', cli: 'view', doc: 'view', wk: 'view', quote: 'hide', promo: 'hide', safety: 'hide' };   // v430 safety(안전 › 교육·검진) 끝에 — cleanPerms 순서 = gw-auth MODULES
   let r34 = await callA34({ action: 'member_upsert', name: '새직원', role: '직원', rank: '사원', dept: '폐기물팀', pin: '1234', hire_date: '2026-09-08', emp_type: '계약직' }, tokSoo);
   const made = Object.values(mem.gw_users).find((x) => x && x.name === '새직원');
   T('관리자(비개발자)가 직원 등록 → 200 · admin false · dev 없음 · 계약직 저장', r34.code === 200 && !!made && made.admin === false && made.dev === undefined && made.role === '직원' && made.emp_type === '계약직', r34.code + '/' + r34.body.error_code);
   T('등록분 perms = 서버 프리셋(클라 값 아님)', !!made && JSON.stringify(made.perms) === JSON.stringify(PRESET_WORKER), made && JSON.stringify(made.perms));
-  r34 = await callA34({ action: 'member_upsert', name: '권한도둑', role: '직원', pin: '1234', perms: { tasks: 'do', veh: 'do', rec: 'do', lic: 'do', check: 'do', con: 'do', cli: 'do', doc: 'do', wk: 'do', quote: 'do', promo: 'do' } }, tokSoo);
+  r34 = await callA34({ action: 'member_upsert', name: '권한도둑', role: '직원', pin: '1234', perms: { tasks: 'do', veh: 'do', rec: 'do', lic: 'do', check: 'do', con: 'do', cli: 'do', doc: 'do', wk: 'do', quote: 'do', promo: 'do', safety: 'do' } }, tokSoo);   // v430 safety도 실어 보냄 — 서버 프리셋(숨김)으로 덮여야 한다
   const thief = Object.values(mem.gw_users).find((x) => x && x.name === '권한도둑');
   T('관리자가 perms를 직접 실어 보내도(구버전 앱) → 200이되 서버 프리셋으로 덮어씀(권한 도배 차단)', r34.code === 200 && !!thief && JSON.stringify(thief.perms) === JSON.stringify(PRESET_WORKER), r34.code + '/' + (thief && JSON.stringify(thief.perms)));
   r34 = await callA34({ action: 'member_upsert', id: 'uw1', perms: { tasks: 'do', veh: 'do', rec: 'do', lic: 'do', check: 'do', con: 'do', cli: 'do', doc: 'do', wk: 'do', quote: 'do', promo: 'do' } }, tokSoo);
@@ -2130,6 +2131,25 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
     r.code === 403 && r.body.error_code === 'NO_ACCESS' && rLicD.code === 200, [r.code, r.body.error_code, rLicD.code].join('/'));
   delete mem.gw_users['member:uwork'].perms.lic;
   if (licSeeded) delete mem.gw_data['col:licenses'];
+  // ⑥ v430(v429 검토 반려분 이월): 현장 대장 쓰기 짝 — 쓰기는 현장 '수행'만(gw-data handleSave: permOf !== 'do' → 403 NO_WRITE). 30년 보존 대장이라 쓰기 쪽이 읽기보다 위험한데,
+  //    종전 석면 저장 시험 4회는 전부 관리자 토큰이라 '보기도 저장 허용'·'인허가 키로 판정' 같은 결함이 걸리지 않았다. 이유 코드·기록 수까지 본다(⑤의 읽기 짝과 같은 직원·기기)
+  const asbBefore6 = JSON.parse(JSON.stringify(mem.gw_data['col:asbestos'])), baseW6 = asbBefore6.updated_at, nW6 = asbBefore6.items.length;
+  mem.gw_users['member:uwork'].perms.site = 'view';
+  r = await call({ action: 'save', collection: 'asbestos', base: baseW6, doc: { schema: 1, items: [] } }, tokW, 'dev1');
+  T('석면(v430 쓰기 짝 ①): site 보기 직원의 대장 저장 → 403 NO_WRITE · 기록 수 그대로(' + nW6 + '건)·updated_at 그대로',
+    r.code === 403 && r.body.error_code === 'NO_WRITE' && mem.gw_data['col:asbestos'].items.length === nW6 && nW6 === 2 && mem.gw_data['col:asbestos'].updated_at === baseW6, [r.code, r.body.error_code, mem.gw_data['col:asbestos'].items.length].join('/'));
+  delete mem.gw_users['member:uwork'].perms.site;
+  mem.gw_users['member:uwork'].perms.lic = 'do';
+  r = await call({ action: 'save', collection: 'asbestos', base: baseW6, doc: { schema: 1, items: [] } }, tokW, 'dev1');
+  T('석면(v430 쓰기 짝 ②): lic 수행만·site 미지정 직원의 대장 저장 → 403 NO_WRITE(인허가 수행이 현장 대장 쓰기를 열지 않음) · 기록 그대로',
+    r.code === 403 && r.body.error_code === 'NO_WRITE' && mem.gw_data['col:asbestos'].items.length === nW6 && mem.gw_data['col:asbestos'].updated_at === baseW6, [r.code, r.body.error_code].join('/'));
+  delete mem.gw_users['member:uwork'].perms.lic;
+  mem.gw_users['member:uwork'].perms.site = 'do';
+  r = await call({ action: 'save', collection: 'asbestos', base: baseW6, doc: { schema: 1, items: asbBefore6.items.concat([{ id: 'a3', title: '쓰기 짝', status: 'plan', member_ids: [], worker_ids: [] }]) } }, tokW, 'dev1');
+  T('석면(v430 쓰기 짝 ③): site 수행 직원의 대장 저장 → 200 · ' + (nW6 + 1) + '건·저장자 = 그 직원(시험 뒤 원복)',
+    r.code === 200 && mem.gw_data['col:asbestos'].items.length === nW6 + 1 && mem.gw_data['col:asbestos'].updated_by === 'uwork', [r.code, r.body.error_code, mem.gw_data['col:asbestos'].items.length].join('/'));
+  delete mem.gw_users['member:uwork'].perms.site;
+  mem.gw_data['col:asbestos'] = asbBefore6;   // 원복(버전 링 스냅샷 ver:asbestos:*는 이 절 뒤에서 쓰지 않는다)
 
   delete mem.gw_data['col:asbestos'];
 }
@@ -4780,6 +4800,103 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   delete mem.gw_data['recidx:c73']; Object.keys(mem.gw_data).filter((k) => /^(learn:contract:in:|lessons:contract:|usage:box:)/.test(k)).forEach((k) => delete mem.gw_data[k]);
   Object.keys(mem.gw_files).filter((k) => /^(cdoc:c73|boxp:|parse:att_|att_)/.test(k)).forEach((k) => delete mem.gw_files[k]);
   delete mem.gw_data['col:contracts'];
+}
+
+{ // ---- 76(v430) 메뉴 56 3단계 — 새 권한 '안전'(safety): 교육·건강진단 기록(col:edu) 키 hr → safety · 기본 숨김 · 보기/수행 짝 · 옛 hr 키 무효 · 회원 저장 cleanPerms가 safety를 '숨김'으로 굳힘 · 일반 3직책 등록 프리셋 숨김 ----
+  //   하나라도 어긋나면 직원 건강진단 날짜가 열리거나(보기 채움) 기록 담당이 못 쓴다. 응답 코드만이 아니라 이유 코드(error_code)·기록 수까지 본다.
+  const gwa76 = require(join(FN, 'gw-auth.js'));
+  const callA76 = async (body, tok) => { const x = await gwa76.handler({ httpMethod: 'POST', headers: { authorization: tok ? 'Bearer ' + tok : '' }, body: JSON.stringify(body) }); return { code: x.statusCode, body: JSON.parse(x.body || '{}') }; };
+  const savedUsers76 = JSON.parse(JSON.stringify(mem.gw_users));
+  const had76 = {}; ['col:edu', 'col:asbestos'].forEach((k) => { had76[k] = Object.prototype.hasOwnProperty.call(mem.gw_data, k) ? JSON.parse(JSON.stringify(mem.gw_data[k])) : undefined; });
+  const E0_76 = [{ id: 'e1', ptype: 'member', pid: 'usv76', kind: 'regular', date: '2026-06-01', next: '2026-12-01', updated: '2026-06-01' }];
+  mem.gw_data['col:edu'] = { schema: 1, items: JSON.parse(JSON.stringify(E0_76)), updated_at: 760 };
+  mem.gw_data['col:asbestos'] = { schema: 1, items: [{ id: 'a1', title: '현장', status: 'plan' }], updated_at: 761 };
+  mem.gw_users['device:dev1'] = { status: 'approved' };
+  const mk76 = (id, perms) => { mem.gw_users['member:' + id] = { id, name: id, role: '직원', admin: false, perms }; return issueSession(mem.gw_users['member:' + id]).token; };
+  const tView76 = mk76('usv76', { safety: 'view' }), tDo76 = mk76('usd76', { safety: 'do' }), tHr76 = mk76('ushr76', { hr: 'do' }), tSite76 = mk76('ussite76', { site: 'do' });
+
+  // ① 안전 보기 → 읽기 200(1건·can_write false) · 저장 403 NO_WRITE · 기록·updated_at 그대로
+  const gV76 = await call({ action: 'get', collection: 'edu' }, tView76, 'dev1');
+  let r76 = await call({ action: 'save', collection: 'edu', base: 760, doc: { schema: 1, items: [] } }, tView76, 'dev1');
+  T('76 v430 안전 보기 → edu 읽기 200(1건·can_write false) · 저장 403 NO_WRITE(이유 코드까지) · 기록 1건·updated_at 그대로',
+    gV76.code === 200 && gV76.body.doc && gV76.body.doc.items.length === 1 && gV76.body.can_write === false && r76.code === 403 && r76.body.error_code === 'NO_WRITE'
+    && mem.gw_data['col:edu'].items.length === 1 && mem.gw_data['col:edu'].updated_at === 760,
+    [gV76.code, gV76.body.can_write, r76.code, r76.body.error_code, mem.gw_data['col:edu'].items.length].join('/'));
+  // ② 안전 수행 → 저장 200 · 다시 읽으면 2건 · can_write true · 저장자 = 그 직원 (뒤에 원복)
+  r76 = await call({ action: 'save', collection: 'edu', base: 760, doc: { schema: 1, items: E0_76.concat([{ id: 'e2', ptype: 'worker', pid: 'w1', kind: 'special', date: '2026-11-09', next: '', updated: '2026-11-09' }]) } }, tDo76, 'dev1');
+  const gD76 = await call({ action: 'get', collection: 'edu' }, tDo76, 'dev1');
+  T('76 v430 안전 수행 → edu 저장 200 · 다시 읽으면 2건·can_write true · 저장자 = 그 직원',
+    r76.code === 200 && gD76.code === 200 && gD76.body.doc.items.length === 2 && gD76.body.can_write === true && mem.gw_data['col:edu'].updated_by === 'usd76',
+    [r76.code, r76.body.error_code, gD76.body.doc && gD76.body.doc.items.length, mem.gw_data['col:edu'].updated_by].join('/'));
+  mem.gw_data['col:edu'] = { schema: 1, items: JSON.parse(JSON.stringify(E0_76)), updated_at: 760 };   // 원복
+  // ③ 옛 키 hr 수행만(v430 전 열쇠) → 읽기 403 NO_ACCESS·저장 403 NO_WRITE / 현장 수행만 → 교육 기록 읽기 403 NO_ACCESS(같은 사람 현장 대장은 200 — 권한 값 자체는 살아 있음)
+  const gH76 = await call({ action: 'get', collection: 'edu' }, tHr76, 'dev1');
+  const sH76 = await call({ action: 'save', collection: 'edu', base: 760, doc: { schema: 1, items: [] } }, tHr76, 'dev1');
+  const gS76 = await call({ action: 'get', collection: 'edu' }, tSite76, 'dev1');
+  const gSa76 = await call({ action: 'get', collection: 'asbestos' }, tSite76, 'dev1');
+  T('76 v430 옛 키 hr 수행만 → edu 읽기 403 NO_ACCESS · 저장 403 NO_WRITE(기록 그대로) · 현장 수행만 → edu 읽기 403 NO_ACCESS(같은 사람 현장 대장 읽기는 200)',
+    gH76.code === 403 && gH76.body.error_code === 'NO_ACCESS' && sH76.code === 403 && sH76.body.error_code === 'NO_WRITE' && mem.gw_data['col:edu'].items.length === 1 && mem.gw_data['col:edu'].updated_at === 760
+    && gS76.code === 403 && gS76.body.error_code === 'NO_ACCESS' && gSa76.code === 200,
+    [gH76.code, gH76.body.error_code, sH76.code, sH76.body.error_code, gS76.code, gS76.body.error_code, gSa76.code].join('/'));
+
+  // ④ 회원 저장 = cleanPerms — 권한관리 칸 저장(perms만 부분 전송)에 safety가 없으면 '숨김'으로 굳음 · 칸 1번(숨김→수행) 저장은 'do' · perms 없는 인사 정보 저장은 유지 · 이상한 값은 '숨김'
+  mem.gw_users['member:udev76'] = { id: 'udev76', name: '개발자76', role: '개발자', admin: true, dev: true, perms: {}, tier: 'pm' };
+  const tDev76 = issueSession(mem.gw_users['member:udev76']).token;
+  const P0_76 = { tasks: 'hide', veh: 'do', rec: 'hide', lic: 'view', site: 'hide', check: 'do', con: 'do', cli: 'hide', doc: 'view', wk: 'view', quote: 'view', promo: 'do' };   // 권민지형(11/9 백업의 저장값 — safety 키 없음)
+  mem.gw_users['member:upm76'] = { id: 'upm76', name: '권민지형76', role: '직원', admin: false, perms: JSON.parse(JSON.stringify(P0_76)) };
+  // 감사 로그(v430 검토): 그 저장이 남긴 회원 '수정' 줄의 필드(f) — 권한은 바뀐 칸만 '키:값'(종전엔 perms JSON 통째를 80자에서 잘라 뒤쪽 safety 변경이 전후 같은 글자로 남았다)
+  const aud76 = (from, id) => { const e = auditMock.logs.slice(from).filter((l) => l.col === 'member').map((l) => (l.ev || []).find((x) => x.id === id && x.op === '수정')).filter(Boolean)[0]; return e ? (e.f || {}) : null; };
+  const L1_76 = auditMock.logs.length;
+  const a1_76 = await callA76({ action: 'member_upsert', id: 'upm76', perms: P0_76 }, tDev76);
+  const p1_76 = Object.assign({}, (mem.gw_users['member:upm76'] || {}).perms), f1_76 = aud76(L1_76, 'upm76');
+  const L2_76 = auditMock.logs.length;
+  const a2_76 = await callA76({ action: 'member_upsert', id: 'upm76', perms: Object.assign({}, p1_76, { safety: 'do' }) }, tDev76);
+  const p2_76 = Object.assign({}, (mem.gw_users['member:upm76'] || {}).perms), f2_76 = aud76(L2_76, 'upm76');
+  const L3_76 = auditMock.logs.length;
+  const a3_76 = await callA76({ action: 'member_upsert', id: 'upm76', rank: '주임' }, tDev76);
+  const p3_76 = Object.assign({}, (mem.gw_users['member:upm76'] || {}).perms), f3_76 = aud76(L3_76, 'upm76');
+  const L4_76 = auditMock.logs.length;
+  const a4_76 = await callA76({ action: 'member_upsert', id: 'upm76', perms: Object.assign({}, p3_76, { safety: 'admin' }) }, tDev76);
+  const p4_76 = Object.assign({}, (mem.gw_users['member:upm76'] || {}).perms), f4_76 = aud76(L4_76, 'upm76');
+  // 키 순서만 MODULES와 다른 저장값(김정아형 — site가 끝)에 인사 정보만 저장 → cleanPerms가 순서만 바꿈 → 감사에 권한 항목 없음(직급만)
+  const PK_76 = { safety: 'hide', tasks: 'hide', veh: 'do', rec: 'hide', lic: 'do', check: 'do', con: 'do', cli: 'hide', doc: 'view', wk: 'do', quote: 'hide', promo: 'hide', site: 'do' };
+  mem.gw_users['member:ukja76'] = { id: 'ukja76', name: '김정아형76', role: '직원', admin: false, perms: JSON.parse(JSON.stringify(PK_76)) };
+  const L5_76 = auditMock.logs.length;
+  const a5_76 = await callA76({ action: 'member_upsert', id: 'ukja76', rank: '대리' }, tDev76);
+  const f5_76 = aud76(L5_76, 'ukja76'), p5_76 = (mem.gw_users['member:ukja76'] || {}).perms || {};
+  T('76 v430 검토 감사 로그 권한 = 바뀐 칸만: safety 없이 저장(숨김으로 굳음) → "safety:-" → "safety:hide" · 칸 1번 → "safety:hide" → "safety:do" · 이상한 값 → "safety:do" → "safety:hide" · 인사 정보만 저장 → 권한 항목 없음(직급만) · 키 순서만 바뀐 저장(김정아형) → 권한 항목 없음',
+    !!f1_76 && JSON.stringify(f1_76.perms) === JSON.stringify(['safety:-', 'safety:hide']) && !!f2_76 && JSON.stringify(f2_76.perms) === JSON.stringify(['safety:hide', 'safety:do'])
+    && !!f3_76 && !!f3_76.rank && f3_76.perms === undefined && !!f4_76 && JSON.stringify(f4_76.perms) === JSON.stringify(['safety:do', 'safety:hide'])
+    && a5_76.code === 200 && !!f5_76 && !!f5_76.rank && f5_76.perms === undefined && JSON.stringify(Object.keys(p5_76)) !== JSON.stringify(Object.keys(PK_76)) && Object.keys(PK_76).every((k) => p5_76[k] === PK_76[k]),
+    JSON.stringify({ f1: f1_76 && f1_76.perms, f2: f2_76 && f2_76.perms, f3: f3_76 && Object.keys(f3_76), f4: f4_76 && f4_76.perms, f5: f5_76 && Object.keys(f5_76) }));
+  T('76 v430 회원 저장 cleanPerms: safety 없이 저장 → "hide"로 굳음(보기로 열리지 않음) · 칸 1번(숨김→수행) 저장 → "do" · perms 없는 인사 정보 저장 → "do" 유지 · 이상한 값 → "hide" · 다른 키는 그대로 · 키 순서 = gw-auth MODULES(끝 safety)',
+    a1_76.code === 200 && p1_76.safety === 'hide' && p1_76.veh === 'do' && p1_76.lic === 'view' && p1_76.site === 'hide'
+    && a2_76.code === 200 && p2_76.safety === 'do' && a3_76.code === 200 && p3_76.safety === 'do' && a4_76.code === 200 && p4_76.safety === 'hide' && p4_76.promo === 'do'
+    && Object.keys(p2_76).pop() === 'safety' && Object.keys(p2_76).length === 13,
+    JSON.stringify([a1_76.code, p1_76.safety, a2_76.code, p2_76.safety, a3_76.code, p3_76.safety, a4_76.code, p4_76.safety, Object.keys(p2_76).length]));
+  // ⑤ 새 회원 등록의 safety — 관리자(비개발자)의 직원 등록은 서버 표(ROLE_OPEN_PERMS)로 '숨김'(클라가 safety:'do'를 실어 보내도 무시) ·
+  //    개발자 등록은 앱이 보내는 직책 프리셋(index.html ROLE_PRESET을 뽑아 그대로 보냄)이 저장돼 팀장·현장직도 '숨김'(PM ② — 팀장도 숨김)
+  //    (관리자(비개발자)의 팀장·현장직 신규 등록은 v430 전부터 403 DEV_ONLY — 새 회원 직책을 기본값 '직원'과 비교해 직책 변경으로 본다. 이 절 범위 밖, 보고만)
+  mem.gw_users['member:usoo76'] = { id: 'usoo76', name: '경리76', role: '관리자', admin: true, perms: {}, tier: 'admin' };
+  const tSoo76 = issueSession(mem.gw_users['member:usoo76']).token;
+  const find76 = (nm) => Object.values(mem.gw_users).find((u) => u && u.name === nm);
+  const xw76 = await callA76({ action: 'member_upsert', name: '새직원76', role: '직원', pin: '1234', perms: { safety: 'do', tasks: 'do' } }, tSoo76);
+  const mw76 = find76('새직원76');
+  const src76 = require('fs').readFileSync(join(ROOT, 'index.html'), 'utf8');
+  const appPre76 = (rl) => { const mm = src76.match(new RegExp('"' + rl + '":\\s*\\{admin:false, perms:\\{([^}]*)\\}')); const o = {}; if (mm) [...mm[1].matchAll(/(\w+):"(\w+)"/g)].forEach((x) => { o[x[1]] = x[2]; }); return o; };
+  const madeDev76 = [];
+  for (const rl of ['팀장', '현장직']) {
+    const pre = appPre76(rl);
+    const x = await callA76({ action: 'member_upsert', name: '새' + rl + '76', role: rl, pin: '1234', admin: false, perms: pre }, tDev76);
+    const m = find76('새' + rl + '76');
+    madeDev76.push(x.code + ':' + (m && m.perms ? m.perms.safety : '-') + ':' + (m && m.perms && Object.keys(pre).length === 13 && Object.keys(pre).every((k) => m.perms[k] === pre[k]) ? 'same' : 'diff'));
+  }
+  T('76 v430 새 회원 safety: 관리자(비개발자) 직원 등록 → 서버 프리셋 "hide"(클라가 do를 실어 보내도 무시)·admin false · 개발자가 앱 직책 프리셋으로 팀장·현장직 등록 → 프리셋 그대로 저장, safety "hide"(팀장도)',
+    xw76.code === 200 && mw76 && mw76.perms.safety === 'hide' && mw76.perms.tasks === 'do' && mw76.admin === false && madeDev76.join(',') === '200:hide:same,200:hide:same',
+    [xw76.code, mw76 && mw76.perms.safety].join(':') + ' / ' + madeDev76.join(','));
+
+  mem.gw_users = savedUsers76;
+  ['col:edu', 'col:asbestos'].forEach((k) => { if (had76[k] === undefined) delete mem.gw_data[k]; else mem.gw_data[k] = had76[k]; });
 }
 
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

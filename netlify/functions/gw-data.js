@@ -18,7 +18,7 @@ const AR = require('./_lib/autorules');  // v417 자동 지시 서버 규칙 3�
 const DATA = 'gw_data';
 const USERS = 'gw_users';
 // 컬렉션 → 권한키
-const COL = { tasks: 'tasks', vehicles: 'veh', receivables: 'rec', licenses: 'lic', checklist: 'check', documents: 'doc', clients: 'cli', contracts: 'con', leaves: 'leaves', bids: 'bid', onbid: 'bid', workers: 'wk', quotes: 'quote', promo: 'promo', family: 'fam', asbestos: 'site', edu: 'hr' };  // onbid=공매·부동산(관리자 전용), workers=일용직 명부(wk), quotes=견적서 탭 독립 권한(영업 문서 — 계약 파이프라인의 견적 "서류" 생성은 별개로 con 권한), promo=홍보(현장 기록→블로그·갤러리), family=가족친화 실적 대장(혁신⑧ — bids처럼 관리자 전용 서버 강제), asbestos=현장 대장(안전 › 현장, site 권한, 30년 보존 — 석면·철거·준설, 2026-09-10 인허가 lic에서 분리 · 안전성평가 전산화 항목)
+const COL = { tasks: 'tasks', vehicles: 'veh', receivables: 'rec', licenses: 'lic', checklist: 'check', documents: 'doc', clients: 'cli', contracts: 'con', leaves: 'leaves', bids: 'bid', onbid: 'bid', workers: 'wk', quotes: 'quote', promo: 'promo', family: 'fam', asbestos: 'site', edu: 'safety' };  // onbid=공매·부동산(관리자 전용), workers=일용직 명부(wk), quotes=견적서 탭 독립 권한(영업 문서 — 계약 파이프라인의 견적 "서류" 생성은 별개로 con 권한), promo=홍보(현장 기록→블로그·갤러리), family=가족친화 실적 대장(혁신⑧ — bids처럼 관리자 전용 서버 강제), asbestos=현장 대장(안전 › 현장, site 권한, 30년 보존 — 석면·철거·준설, 2026-09-10 인허가 lic에서 분리 · 안전성평가 전산화 항목), edu=직원·일용직 교육·건강진단 기록(안전 › 교육·검진, safety 권한 — v430 메뉴 56 3단계, 종전 hr 관리자 전용)
 // 사용자별 비공개 컬렉션(본인만 접근, 회원 id로 분리 저장)
 const PRIVATE_COL = { mytasks: true };
 
@@ -39,12 +39,14 @@ async function currentMember(event) {
 // 기본 숨김 모듈(닫고 시작 — 명시 부여만). 앱 index.html의 PERM_CLOSED와 같은 집합이어야 하고 uismoke가 대조한다.
 //   quote 견적서 = 영업 직렬에게만
 //   promo  홍보  = 홍보 담당에게만
-//   hr     교육·건강진단 대장 = 인사 탭이 관리자 전용인데 서버가 view로 열려 있던 구멍(9/4 uismoke 실사고 조사)
+//   hr     인사 = 인사 탭은 관리자 전용 — 교육·건강진단 대장이 view로 열려 있던 구멍(9/4 uismoke 실사고 조사)에서 닫았다. 그 대장은 v430부터 safety 키(아래), hr은 남겨 둔다
+//   safety 안전 › 교육·검진(col:edu — 직원 교육·건강진단 날짜) = v430(PM 11/9 ② 권민지 1명) 명시 부여만. 여기서 빠지면 safety 값이 없는 회원(배포 직후 전원)의
+//          읽기가 저장을 기다리지 않고 바로 '보기'로 열린다(저장 때 '보기'를 채우는 쪽은 gw-auth CLOSED_DEFAULT — 둘 다 uismoke v430 4곳 대조)
 //   site   현장 대장(석면·철거·준설) = 2026-09-10 인허가에서 분리. 관리부·운영부만(PM 결정).
 //          면허 만기 관리(lic)와 현장 이력은 보는 사람도 쓰는 사람도 갈라질 일이라 키를 나눴다.
 //   lic    인허가·면허 = PM 2026-09-10 "인허가 석면은 운영 및 관리부만".
 //          기본이 view라 명시적으로 닫지 않은 현장 직원 4명에게 근로자 인적사항(30년 보존 대장)이 열려 있었다.
-const PERM_CLOSED = { quote: 1, promo: 1, hr: 1, lic: 1, site: 1 };
+const PERM_CLOSED = { quote: 1, promo: 1, hr: 1, lic: 1, site: 1, safety: 1 };
 function permOf(member, col) {
   if (member.admin) return 'do';
   const key = COL[col];

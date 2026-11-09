@@ -37,12 +37,14 @@ const appTpl = grabKeys(html, 'var TPL_LABELS='), svrTpl = grabKeys(gwd, 'const 
 const onlyApp = [...appTpl].filter((k) => !svrTpl.has(k)), onlySvr = [...svrTpl].filter((k) => !appTpl.has(k));
 T('양식 키 앱↔서버 일치(' + appTpl.size + '종)', !onlyApp.length && !onlySvr.length, '앱만: ' + onlyApp + ' / 서버만: ' + onlySvr);
 
-// 4) 권한 레지스트리: gw-auth MODULES == gw-data COL 값 − {leaves(전원 저장 설계), bid·fam(관리자 고정 — 서버 ADMIN_ONLY)·hr(인사 탭 관리자 전용 — edu는 서버가 비관리자에게 본인분만)}
+// 4) 권한 레지스트리: gw-auth MODULES == gw-data COL 값 − {leaves(전원 저장 설계), bid·fam(관리자 고정 — 서버 ADMIN_ONLY)}
 //    — 'wk' 누락으로 일용직 권한이 저장마다 증발했던 실사고의 재발 방지
+//    (v430 정정: 종전 예외 hr의 주석 'edu는 서버가 비관리자에게 본인분만'은 코드에 없던 말이다 — 서버는 edu를 hr 기본 숨김으로 통째 막았고,
+//     v430부터 COL edu = 'safety'(권한관리 '안전' 열)라 hr은 COL 값에 없다. 예외에서 빼서 hr이 COL 값으로 되돌아오면 여기서 걸린다)
 const mods = new Set((auth.match(/const MODULES = \[([^\]]+)\]/) || [])[1].match(/'(\w+)'/g).map((s) => s.replace(/'/g, '')));
 const colSeg = (gwd.match(/const COL = \{([^}]+)\}/) || [])[1];
 const colVals = new Set([...colSeg.matchAll(/:\s*'(\w+)'/g)].map((m) => m[1]));
-colVals.delete('leaves'); colVals.delete('bid'); colVals.delete('fam'); colVals.delete('hr');
+colVals.delete('leaves'); colVals.delete('bid'); colVals.delete('fam');
 const dm = [...colVals].filter((v) => !mods.has(v)), dx = [...mods].filter((v) => !colVals.has(v));
 T('권한 레지스트리 auth↔data 일치', !dm.length && !dx.length, 'auth 누락: ' + dm + ' / auth 잉여: ' + dx);
 
@@ -250,7 +252,8 @@ try {
   T('v369 문서함 [열기] 직원 표시: .view.readonly .mini-btn 숨김의 예외로 [data-doc-att-open] 버튼은 남는다(보기 권한 열람 통로) · 행 렌더의 열기 버튼이 그 속성을 갖는다',
     /\.view\.readonly \.mini-btn\[data-doc-att-open\]\{display:inline-block !important;\}/.test(idx) && /class="mini-btn" style="[^"]*" data-doc-att-open="' \+ esc\(d\.id\) \+ '\|' \+ Number\(f\.n\) \+ '">열기<\/button>/.test(idx)
     && idx.indexOf('.view.readonly .mini-btn[data-doc-att-open]') > idx.indexOf('.view.readonly .link-btn{display:none !important;}'), '');
-  T('v365 권한 재확인: refreshMemberPerms(5분 간격·verify·perms/admin/dev/tier 비교·바뀌면 토스트+새로고침) · visibilitychange 배선', /function refreshMemberPerms\(\)/.test(idx) && /permRefreshAt < 5 \* 60 \* 1000/.test(idx) && /JSON\.stringify\(cur\.perms \|\| \{\}\) !== JSON\.stringify\(nm\.perms \|\| \{\}\)/.test(idx) && /gwToast\("권한이 바뀌었습니다 — 화면을 새로 고칩니다"/.test(idx) && /if \(!document\.hidden\) refreshMemberPerms\(\);/.test(idx), '');
+  // v430 검토: perms 비교가 저장 글자(JSON.stringify)에서 실효값(permsSameEff — 실행 검사는 v430 묶음 ⑪-2)으로 바뀌었다 — 이 줄은 비교 4가지(perms·admin·dev·tier)가 한 식에 다 있는지를 본다
+  T('v365 권한 재확인: refreshMemberPerms(5분 간격·verify·perms(v430부터 실효값 permsSameEff)/admin/dev/tier 비교·바뀌면 토스트+새로고침) · visibilitychange 배선', /function refreshMemberPerms\(\)/.test(idx) && /permRefreshAt < 5 \* 60 \* 1000/.test(idx) && /var changed = !permsSameEff\(cur, nm\) \|\| !!cur\.admin !== !!nm\.admin \|\| !!cur\.dev !== !!nm\.dev \|\| String\(cur\.tier \|\| ""\) !== String\(nm\.tier \|\| ""\);/.test(idx) && /function permsSameEff\(a, b\)\{/.test(idx) && /gwToast\("권한이 바뀌었습니다 — 화면을 새로 고칩니다"/.test(idx) && /if \(!document\.hidden\) refreshMemberPerms\(\);/.test(idx), '');
   const wrapSrc = (idx.match(/\/\/ @promo-wrap-start([\s\S]*?)\/\/ @promo-wrap-end/) || ['', ''])[1];
   T('v363·v367 복사 HTML 서식(직원판): 줄나눔 구간(@promo-wrap) 12~26자·promoLinesOf·뒤보기 없음 · pushText=한 줄=한 <p>(margin:0) · 소제목 앞 pushBlank · 사진 묶음 위아래 pushBlank·캡션 없음 · 고정 머리(PROMO_HEAD_SIG 3줄+PROMO_GREET env/con)+빈 줄 · 꼬리 promoTailHtml(org)+promoTagsHtml(5개씩) · 호출부 p.tags · 제목 h2 가운데 · 꼬리 5곳 가운데',
     /var PROMO_WRAP_LO=12, PROMO_WRAP_HI=26;/.test(wrapSrc) && /function promoWrapSense\(t, lo, hi, commaFirst\)/.test(wrapSrc) && /function promoLinesOf\(t\)/.test(wrapSrc) && !/\(\?<[=!]/.test(wrapSrc)
@@ -1272,8 +1275,8 @@ try {
   const svrC = keys(gwd, /const PERM_CLOSED = \{([^}]+)\}/);
   const askS = readFileSync(join(ROOT, 'netlify/functions/_lib/ask.js'), 'utf8');
   T('v424 검토 물어보기 권한: 기본 숨김 집합 = 서버와 같음 · 석면 도구 = 현장 권한(gw-data COL과 같음)', keys(askS, /const PERM_CLOSED = \{([^}]+)\}/).join() === svrC.join() && /asbestos: 'site'/.test(askS) && /asbestos: *'site'/.test(gwd), '');
-  T('기본 숨김 집합(PERM_CLOSED) 앱↔서버 일치 + lic·site 포함(인허가=면허 · site=현장 대장, 둘 다 관리부·운영부만)',
-    appC.length === 5 && same(appC, svrC) && appC.indexOf('lic') >= 0 && appC.indexOf('site') >= 0,
+  T('기본 숨김 집합(PERM_CLOSED) 앱↔서버 일치 + lic·site·safety 포함(인허가=면허 · site=현장 대장, 둘 다 관리부·운영부만 · safety=안전 › 교육·검진, v430 명시 부여만) — 6개',
+    appC.length === 6 && same(appC, svrC) && appC.indexOf('lic') >= 0 && appC.indexOf('site') >= 0 && appC.indexOf('safety') >= 0,
     '앱 [' + appC.join(',') + '] / 서버 [' + svrC.join(',') + ']');
   T('앱 permOf·pmVal 둘 다 PERM_CLOSED를 쓴다(집합이 함수마다 따로 놀지 않게)',
     /return \(m\.perms && m\.perms\[mod\]\) \|\| \(PERM_CLOSED\[mod\] \? "hide" : "view"\);/.test(html)
@@ -2103,37 +2106,44 @@ try {
     mt28.site === 'sfChipSite' && mv28.site === 'sfPaneSite' && MV28.indexOf('view-safety') < 0 && MT28.indexOf('tabSafetyBtn') < 0 && modsReg28.length >= 12 && regBad28.length === 0,
     '없는 id: ' + regBad28.map((k) => k + '→' + mt28[k] + '/' + mv28[k]).join(', '));
 
-  // ⑩ 안전 탭 칸 판정 — safetyPanes·applySafetyPerms·setSafetyLayer를 뽑아 사람 유형별로 돌린다(권한 키는 지금 그대로: 현장 = site, 교육·검진 = hr)
+  // ⑩ 안전 탭 칸 판정 — safetyPanes·applySafetyPerms·setSafetyLayer를 뽑아 사람 유형별로 돌린다(권한 키: 현장 = site, 교육·검진 = safety — v430 3단계, 1단계엔 hr)
+  //    v430: 두 칩(MODULE_TAB site=sfChipSite·safety=sfChipEdu)은 applyPerms의 MODULES 루프가 숨긴다 — 그 루프 원문을 뽑아 applySafetyPerms 앞에 같이 돌린다(applyPerms와 같은 순서)
+  const ap28src = fn28('applyPerms'), ml28i = ap28src.indexOf('MODULES.forEach(function(mod){');
+  let ml28j = -1; { let d = 0, st = false; for (let j = ml28i; ml28i >= 0 && j < ap28src.length; j++) { const ch = ap28src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) { ml28j = j; break; } } } }
+  if (ml28i < 0 || ml28j < 0 || ap28src.slice(ml28j + 1, ml28j + 3) !== ');') throw new Error('applyPerms MODULES 루프를 못 뽑음');
+  const modLoop28 = ap28src.slice(ml28i, ml28j + 1) + ');';
+  const regStmt28 = ['var MODULES = \\[[^\\]]+\\];', 'var MODULE_TAB = \\{[^}]+\\};', 'var MODULE_VIEW = \\{[^}]+\\};'].map((re) => { const m = html.match(new RegExp(re)); if (!m) throw new Error('레지스트리 문장 없음: ' + re); return m[0]; });
   const mkC28 = () => { const s = new Set(); return { add: (c) => s.add(c), remove: (c) => s.delete(c), toggle: (c, on) => { if (on === undefined ? !s.has(c) : on) s.add(c); else s.delete(c); return s.has(c); }, contains: (c) => s.has(c) }; };
   const mkE28 = (id, attrs) => ({ id, attrs: attrs || {}, classList: mkC28(), style: {}, getAttribute(n) { return this.attrs[n] === undefined ? null : this.attrs[n]; }, querySelectorAll: () => [] });
   const runSf28 = (perm, cur, layer) => {
     const chips = [mkE28('sfChipSite', { 'data-lsub': 'site' }), mkE28('sfChipEdu', { 'data-lsub': 'edu' })];
-    const D = { tabSafetyBtn: mkE28('tabSafetyBtn'), sfChipEdu: chips[1], sfSubBar: mkE28('sfSubBar'), asbMovedNote: mkE28('asbMovedNote'), asbMovedGo: mkE28('asbMovedGo'), eduMovedHr: mkE28('eduMovedHr'), eduMovedWk: mkE28('eduMovedWk'), sfPaneSite: mkE28('sfPaneSite'), sfPaneEdu: mkE28('sfPaneEdu') };
+    const D = { tabSafetyBtn: mkE28('tabSafetyBtn'), sfChipSite: chips[0], sfChipEdu: chips[1], sfSubBar: mkE28('sfSubBar'), asbMovedNote: mkE28('asbMovedNote'), asbMovedGo: mkE28('asbMovedGo'), eduMovedHr: mkE28('eduMovedHr'), eduMovedWk: mkE28('eduMovedWk'), sfPaneSite: mkE28('sfPaneSite'), sfPaneEdu: mkE28('sfPaneEdu') };
     D.sfSubBar.querySelectorAll = () => chips;
     const log = [], pend = [];   // pend = 명부 읽기(loadWorkers)가 끝났을 때 부를 콜백 — 시험이 도착 시점을 고른다
     const api = new Function('__D', '__perm', '__log', '__cur', '__layer', '__pend', [
       'var document = { getElementById: function(id){ return __D[id] || null; } };',
       'var currentTab = __cur, safetyLayer = __layer, eduViewScope = "member";',
-      'function canSee(m){ return (__perm[m] || "hide") !== "hide"; }',
+      'function permOf(m){ return __perm[m] || "hide"; } function canSee(m){ return permOf(m) !== "hide"; }',
       'function switchTab(n){ __log.push("switch:" + n); }',
       'function renderSites(){ __log.push("renderSites"); } function loadAsb(){ __log.push("loadAsb"); } function loadEdu(){ __log.push("loadEdu"); } function loadWorkers(){ __log.push("loadWorkers"); return { then: function(f){ __pend.push(f); } }; } function renderEdu(){ __log.push("renderEdu:" + eduViewScope); }',
+      regStmt28.join('\n'), 'function modLoop(){', modLoop28, '}',
       fn28('safetyPanes'), fn28('setSafetyLayer'), fn28('applySafetyPerms'),
-      'return { panes: safetyPanes, apply: applySafetyPerms, set: setSafetyLayer, layer: function(){ return safetyLayer; }, scope: function(){ return eduViewScope; }, cur: function(t){ currentTab = t; } };'].join('\n'))(D, perm, log, cur, layer, pend);
+      'return { panes: safetyPanes, apply: function(){ modLoop(); applySafetyPerms(); }, set: setSafetyLayer, layer: function(){ return safetyLayer; }, scope: function(){ return eduViewScope; }, cur: function(t){ currentTab = t; } };'].join('\n'))(D, perm, log, cur, layer, pend);
     return { D, log, api, chips, pend };
   };
   // S = 인허가 석면 안내 버튼(감싸개 asbMovedGo) — 글 줄(asbMovedNote)은 따로 본다
   const st28 = (r) => (r.D.tabSafetyBtn.classList.contains('perm-hidden') ? 'T-' : 'T+') + (r.D.sfChipEdu.classList.contains('perm-hidden') ? 'E-' : 'E+') + (r.D.sfSubBar.style.display === 'none' ? 'B-' : 'B+')
     + (r.D.asbMovedGo.style.display === 'none' ? 'S-' : 'S+') + ((r.D.eduMovedHr.style.display === 'none' && r.D.eduMovedWk.style.display === 'none') ? 'H-' : ((r.D.eduMovedHr.style.display === '' && r.D.eduMovedWk.style.display === '') ? 'H+' : 'H?'));
-  const A28 = runSf28({ site: 'do', hr: 'do', wk: 'do' }, 'dash', 'site'); A28.api.apply();
+  const A28 = runSf28({ site: 'do', safety: 'do', wk: 'do' }, 'dash', 'site'); A28.api.apply();
   const J28 = runSf28({ site: 'do', lic: 'view', wk: 'do' }, 'dash', 'site'); J28.api.apply();
   const K28 = runSf28({ site: 'hide', lic: 'view', wk: 'view' }, 'safety', 'site'); K28.api.apply();
-  const A3_28 = runSf28({ site: 'do', hr: 'do' }, 'safety', 'gone'); A3_28.api.apply();
-  const A2_28 = runSf28({ site: 'do', hr: 'do' }, 'safety', 'site'); A2_28.api.set('edu');
+  const A3_28 = runSf28({ site: 'do', safety: 'do' }, 'safety', 'gone'); A3_28.api.apply();
+  const A2_28 = runSf28({ site: 'do', safety: 'do' }, 'safety', 'site'); A2_28.api.set('edu');
   const J2_28 = runSf28({ site: 'do' }, 'safety', 'site'); J2_28.api.set('edu');
-  const W28 = runSf28({ site: 'do', hr: 'do' }, 'safety', 'site'); W28.api.set('edu:worker');
+  const W28 = runSf28({ site: 'do', safety: 'do' }, 'safety', 'site'); W28.api.set('edu:worker');
   const J3_28 = runSf28({ site: 'do' }, 'safety', 'site'); J3_28.api.set('edu:worker');
   const ap28 = fn28('applyPerms');
-  T('v428 안전 탭 칸 판정(실행): 관리자 = 탭·교육 칩·칩 줄·안내 전부 · 현장 권한만(김정아·정재욱형) = 탭 보임·교육 칩·칩 줄 숨김(옛 현장 화면 그대로)·교육 안내 숨김 · 둘 다 없음(권민지·김호태형) = 탭·인허가 석면 안내 버튼 숨김(글 줄은 그대로 — 510ed20과 같음), 안전 탭이면 홈 · 없는 칸이면 첫 칸 · 교육 칸 요청도 못 보면 현장 칸 · "edu:worker"면 교육 칸 일용직 목록(못 보면 대상도 안 바꿈) / applyPerms가 빈 묶음 숨김보다 먼저 부름 · 부동산 탭 줄 없음',
+  T('v428 안전 탭 칸 판정(실행 — v430부터 교육·검진 = safety, 칩은 MODULES 루프): 관리자 = 탭·교육 칩·칩 줄·안내 전부 · 현장 권한만(김정아·정재욱형) = 탭 보임·교육 칩·칩 줄 숨김(옛 현장 화면 그대로)·교육 안내 숨김 · 둘 다 없음(김호태·현장 8명형 — 권민지형은 v430 묶음) = 탭·인허가 석면 안내 버튼 숨김(글 줄은 그대로 — 510ed20과 같음), 안전 탭이면 홈 · 없는 칸이면 첫 칸 · 교육 칸 요청도 못 보면 현장 칸 · "edu:worker"면 교육 칸 일용직 목록(못 보면 대상도 안 바꿈) / applyPerms가 빈 묶음 숨김보다 먼저 부름 · 부동산 탭 줄 없음',
     JSON.stringify(A28.api.panes()) === '["site","edu"]' && st28(A28) === 'T+E+B+S+H+'
     && JSON.stringify(J28.api.panes()) === '["site"]' && st28(J28) === 'T+E-B-S+H-'
     && JSON.stringify(K28.api.panes()) === '[]' && st28(K28) === 'T-E-B-S-H-' && K28.log.indexOf('switch:dash') >= 0
@@ -2149,11 +2159,11 @@ try {
   // ⑩-2 (v428 검토) 명부가 교육 기록보다 늦게 오는 경합 — 도착 시점을 시험이 골라 setSafetyLayer를 돌린다
   const nR28 = (r, s) => r.log.filter((x) => x === s).length;
   const fire28 = (r) => r.pend.splice(0).forEach((f) => f());
-  const WK1_28 = runSf28({ site: 'do', hr: 'do', wk: 'do' }, 'safety', 'site'); WK1_28.api.set('edu:worker');
+  const WK1_28 = runSf28({ site: 'do', safety: 'do', wk: 'do' }, 'safety', 'site'); WK1_28.api.set('edu:worker');
   const wk1a28 = nR28(WK1_28, 'renderEdu:worker'), wk1p28 = WK1_28.pend.length; fire28(WK1_28); const wk1b28 = nR28(WK1_28, 'renderEdu:worker');
-  const WK2_28 = runSf28({ site: 'do', hr: 'do', wk: 'do' }, 'safety', 'site'); WK2_28.api.set('edu'); WK2_28.api.cur('dash'); fire28(WK2_28);
-  const WK3_28 = runSf28({ site: 'do', hr: 'do', wk: 'do' }, 'safety', 'site'); WK3_28.api.set('edu'); WK3_28.api.set('site'); fire28(WK3_28);
-  const WK4_28 = runSf28({ site: 'do', hr: 'do' }, 'safety', 'site'); WK4_28.api.set('edu');
+  const WK2_28 = runSf28({ site: 'do', safety: 'do', wk: 'do' }, 'safety', 'site'); WK2_28.api.set('edu'); WK2_28.api.cur('dash'); fire28(WK2_28);
+  const WK3_28 = runSf28({ site: 'do', safety: 'do', wk: 'do' }, 'safety', 'site'); WK3_28.api.set('edu'); WK3_28.api.set('site'); fire28(WK3_28);
+  const WK4_28 = runSf28({ site: 'do', safety: 'do' }, 'safety', 'site'); WK4_28.api.set('edu');
   const WK5_28 = runSf28({ site: 'do', wk: 'do' }, 'safety', 'site'); WK5_28.api.set('site');
   T('v428 검토 수리 — 명부가 교육 기록보다 늦게 와도 교육·검진 일용직 이름을 다시 그림(setSafetyLayer 실행, 도착 시점을 시험이 고름): 안전 › 교육·검진(일용직)을 열면 그리고 → 명부 읽기 → 명부가 오면 아직 그 칸이라 한 번 더 그림(\'(삭제된 일용직)\' 잔상 없음) · 그 사이 다른 탭이나 현장 칸으로 갔으면 안 그림 · 일용직 권한 없으면 명부를 안 읽음 · 현장 칸 읽기는 옛 현장 탭 그대로(명부 기다리지 않음)',
     wk1a28 === 1 && wk1p28 === 1 && wk1b28 === 2 && WK1_28.log.indexOf('loadEdu') >= 0
@@ -2348,6 +2358,233 @@ try {
     && man28_29.indexOf('캘린더 표시도 이 칸과 같은 현장 권한으로 정해지고(인허가 권한과 따로), 캘린더에서 누르면 이 칸이 열립니다.') > 0
     && man29.indexOf('캘린더 표시는 인허가 권한이 있는 분에게만') < 0, '');
 } catch (e) { console.log('  (v429 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ---- v430(11/9 메뉴 56 3단계, PM "56. ㄱ"): 새 권한 '안전'(safety) 등록 — 앱 7곳·서버 6곳 한 커밋, 교육 기록(col:edu) 키 hr → safety.
+//      기본 숨김 자리가 빠지면 직원 건강진단 날짜가 열린다(gw-data PERM_CLOSED = 키 없는 회원(배포 직후 전원)의 읽기가 바로 · gw-auth CLOSED_DEFAULT = 저장 때 cleanPerms가 '보기'를 채움, 9/10 site 선례) — 자리끼리 대조하고,
+//      판정(applyPerms 전체·calEvents·loadEdu·교육 쓰기 3함수·doSaveEdu·pmVal·gw-auth cleanPerms)은 원문을 뽑아 사람 유형별로 실제로 돌린다.
+try {
+  const fn30 = (name) => { const i = html.indexOf('function ' + name + '('); if (i < 0) throw new Error('함수 없음: ' + name); let d = 0, st = false; for (let j = i; j < html.length; j++) { const ch = html[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return html.slice(i, j + 1); } } throw new Error('중괄호 짝 안 맞음: ' + name); };
+  const sw30 = readFileSync(join(ROOT, 'sw.js'), 'utf8'), man30 = readFileSync(join(ROOT, 'MANUAL.html'), 'utf8'), cl30 = readFileSync(join(ROOT, 'CLAUDE.md'), 'utf8');
+  const ask30 = readFileSync(join(ROOT, 'netlify/functions/_lib/ask.js'), 'utf8'), gd30 = readFileSync(join(ROOT, 'netlify/functions/gw-data.js'), 'utf8');
+  const keys30 = (src, re) => { const m = src.match(re); return m ? [...m[1].matchAll(/(\w+)\s*:/g)].map((x) => x[1]).sort() : []; };
+  const list30 = (src, re, q) => { const m = src.match(re); return m ? (m[1].match(new RegExp(q + '(\\w+)' + q, 'g')) || []).map((s) => s.split(q).join('')) : []; };
+  const regStmt30 = ['var MODULES = \\[[^\\]]+\\];', 'var MODULE_TAB = \\{[^}]+\\};', 'var MODULE_VIEW = \\{[^}]+\\};'].map((re) => { const m = html.match(new RegExp(re)); if (!m) throw new Error('레지스트리 문장 없음: ' + re); return m[0]; });
+
+  // ① 기본 숨김 4곳 = 같은 집합(safety 포함) — 종전 대조는 3곳뿐이었고 cleanPerms가 실제로 쓰는 gw-auth CLOSED_DEFAULT가 빠져 있었다
+  const c4_30 = { '앱 PERM_CLOSED': keys30(html, /var PERM_CLOSED = \{([^}]+)\}/), 'gw-data PERM_CLOSED': keys30(gd30, /const PERM_CLOSED = \{([^}]+)\}/), 'gw-auth CLOSED_DEFAULT': keys30(auth, /const CLOSED_DEFAULT = \{([^}]+)\}/), '_lib/ask.js PERM_CLOSED': keys30(ask30, /const PERM_CLOSED = \{([^}]+)\}/) };
+  const c4v30 = Object.values(c4_30).map((a) => a.join(','));
+  T('v430 기본 숨김 4곳(앱 PERM_CLOSED · gw-data PERM_CLOSED · gw-auth CLOSED_DEFAULT(cleanPerms가 저장 때 쓰는 곳) · _lib/ask.js PERM_CLOSED) = 같은 집합 · safety·site·lic 포함',
+    c4v30.every((s) => s.length > 0 && s === c4v30[0]) && c4_30['앱 PERM_CLOSED'].indexOf('safety') >= 0 && c4_30['앱 PERM_CLOSED'].indexOf('site') >= 0 && c4_30['앱 PERM_CLOSED'].indexOf('lic') >= 0,
+    JSON.stringify(c4_30));
+
+  // ② 앱 MODULES = gw-auth MODULES(순서까지 — cleanPerms가 저장하는 키 목록·순서) · safety 끝 · MOD_LABEL · PERM_ORDER safety 바로 뒤 site
+  const am30 = list30(html, /var MODULES = \[([^\]]+)\]/, '"'), gm30 = list30(auth, /const MODULES = \[([^\]]+)\]/, "'");
+  const ML30 = {}; [...((html.match(/var MOD_LABEL = \{([^}]+)\}/) || ['', ''])[1]).matchAll(/(\w+):"([^"]+)"/g)].forEach((m) => { ML30[m[1]] = m[2]; });
+  const PO30 = list30(html, /var PERM_ORDER = \[([^\]]+)\]/, '"');
+  T('v430 앱 MODULES = gw-auth MODULES(순서까지 — cleanPerms가 저장하는 키) · safety는 둘 다 끝 · MOD_LABEL safety "안전"(키마다 라벨) · PERM_ORDER에서 safety 바로 뒤 site(같은 안전 탭 칩 짝)',
+    am30.length >= 13 && am30.join(',') === gm30.join(',') && am30[am30.length - 1] === 'safety' && ML30.safety === '안전' && am30.every((k) => !!ML30[k])
+    && PO30.indexOf('safety') >= 0 && PO30[PO30.indexOf('safety') + 1] === 'site',
+    '앱 ' + am30.join(',') + ' / auth ' + gm30.join(',') + ' / PERM_ORDER ' + PO30.join(','));
+
+  // ③ 직책 프리셋 — 앱 ROLE_PRESET 6직책 키 = MODULES · 일반 3직책 = gw-auth ROLE_OPEN_PERMS 키·값 · safety 관리 3직책 수행 / 일반 3직책 숨김(PM ② — 팀장도)
+  const pre30 = {}; [...html.matchAll(/"(개발자|대표|관리자|팀장|직원|현장직)":\s*\{admin:(?:true|false),\s*(?:dev:true,\s*)?perms:\{([^}]*)\}/g)].forEach((m) => { const o = {}; [...m[2].matchAll(/(\w+):"(\w+)"/g)].forEach((x) => { o[x[1]] = x[2]; }); pre30[m[1]] = o; });
+  const open30 = {}; [...auth.matchAll(/'(팀장|직원|현장직)':\s*\{([^}]*)\}/g)].forEach((m) => { const o = {}; [...m[2].matchAll(/(\w+):\s*'(\w+)'/g)].forEach((x) => { o[x[1]] = x[2]; }); open30[m[1]] = o; });
+  const kv30 = (o) => JSON.stringify(Object.keys(o || {}).sort().map((k) => [k, o[k]]));
+  const R6_30 = ['개발자', '대표', '관리자', '팀장', '직원', '현장직'], R3_30 = ['팀장', '직원', '현장직'];
+  const preKeys30 = R6_30.every((r) => pre30[r] && Object.keys(pre30[r]).sort().join(',') === am30.slice().sort().join(','));
+  const openEq30 = R3_30.every((r) => open30[r] && kv30(pre30[r]) === kv30(open30[r]));
+  T('v430 직책 프리셋: 앱 ROLE_PRESET 6직책 키 = MODULES · 일반 3직책(팀장·직원·현장직) = 서버 gw-auth ROLE_OPEN_PERMS 키·값(관리자 등록분 권한이 화면과 같게) · safety = 관리 3직책 수행 / 일반 3직책 숨김(PM ② — 팀장도 숨김) · 직원 줄 맨 끝 safety(servertest가 직원 줄 글자를 서버 표와 대조)',
+    Object.keys(pre30).length === 6 && Object.keys(open30).length === 3 && preKeys30 && openEq30
+    && ['개발자', '대표', '관리자'].every((r) => pre30[r].safety === 'do') && R3_30.every((r) => pre30[r].safety === 'hide' && open30[r].safety === 'hide')
+    && Object.keys(pre30['직원']).pop() === 'safety',
+    JSON.stringify({ app: R6_30.map((r) => r + ':' + (pre30[r] ? pre30[r].safety : '-')), srv: R3_30.map((r) => r + ':' + (open30[r] ? open30[r].safety : '-')), keys: preKeys30, same: openEq30 }));
+
+  // ④ 서버 COL edu = safety · hr은 COL 값에 없음 · gw-auth cleanPerms를 뽑아 실제로 돌린다(safety 없는 perms → hide)
+  const colMap30 = {}; [...((gd30.match(/const COL = \{([^}]+)\}/) || ['', ''])[1]).matchAll(/(\w+):\s*'(\w+)'/g)].forEach((m) => { colMap30[m[1]] = m[2]; });
+  const cleanP30 = new Function([(auth.match(/const MODULES = \[[^\]]+\];/) || [''])[0], (auth.match(/const CLOSED_DEFAULT = \{[^}]+\};/) || [''])[0], (auth.match(/function cleanPerms\(p\) \{[^\n]*\}/) || [''])[0], 'return cleanPerms;'].join('\n'))();
+  const cpA30 = cleanP30({ tasks: 'do', site: 'do' }), cpB30 = cleanP30({ safety: 'do' }), cpC30 = cleanP30({ safety: 'admin' }), cpD30 = cleanP30(undefined);
+  T('v430 서버: gw-data COL edu = "safety"(종전 hr — 권한관리 \'안전\' 열과 같은 키) · COL 값에 hr 없음 · asbestos = site 그대로 · gw-auth cleanPerms 실행 — safety 없이 저장(권한관리 칸·구버전 앱) → "hide"로 굳음, 이상한 값도 "hide", 받은 "do"는 그대로 · 저장 키 = gw-auth MODULES',
+    colMap30.edu === 'safety' && Object.values(colMap30).indexOf('hr') < 0 && colMap30.asbestos === 'site'
+    && cpA30.safety === 'hide' && cpA30.tasks === 'do' && cpA30.site === 'do' && cpB30.safety === 'do' && cpC30.safety === 'hide' && cpD30.safety === 'hide' && cpD30.lic === 'hide' && cpD30.tasks === 'view'
+    && Object.keys(cpA30).join(',') === gm30.join(','),
+    JSON.stringify({ edu: colMap30.edu, a: cpA30.safety, b: cpB30.safety, c: cpC30.safety, d: cpD30.safety }));
+
+  // ⑤ 앱 hr 권한 판정 0곳 · 교육 기록 읽기 = canSee("safety") 자리 · 교육을 안 보여 주는 화면의 loadEdu 0
+  const hrLeft30 = (html.match(/(?:canSee|canDo|permOf)\(\s*["']hr["']\s*\)/g) || []).length;
+  const swt30 = fn30('switchTab'), sfl30 = fn30('setSafetyLayer');
+  const swLn30 = (t) => swt30.split('\n').filter((ln) => ln.indexOf('if (name === "' + t + '")') >= 0)[0] || '';
+  T('v430 앱 hr 권한 판정 0곳(canSee·canDo·permOf("hr")) · 교육 기록 읽기 = canSee("safety") — loadEdu 첫 줄 · calEvents 교육 일정 · safetyPanes 교육 칸 · 캘린더를 열 때(switchTab의 loadEdu는 이 1곳) · 안전 › 현장 칸은 안전 권한일 때만 · 인허가·인사·일용직 화면은 loadEdu 0(교육을 안 보여 줌)',
+    hrLeft30 === 0
+    && /function loadEdu\(\)\{\s*\n\s*if\(!canSee\("safety"\)\) return;/.test(html)
+    && /if \(canSee\("safety"\)\) liveEdu\(\)\.forEach\(/.test(fn30('calEvents')) && /if \(canSee\("safety"\)\) out\.push\("edu"\);/.test(fn30('safetyPanes'))
+    && (swt30.match(/loadEdu\(/g) || []).length === 1 && swLn30('cal').indexOf('if (name === "cal"){ renderCalendar(); if (canSee("safety")) loadEdu(); }') >= 0
+    && ['lic', 'hr', 'workers'].every((t) => swLn30(t) && swLn30(t).indexOf('loadEdu') < 0)
+    && /if \(name === "site"\)\{ renderSites\(\); loadAsb\(\); if \(canSee\("safety"\)\) loadEdu\(\);/.test(sfl30),
+    'hr 판정 ' + hrLeft30 + '곳 / switchTab loadEdu ' + (swt30.match(/loadEdu\(/g) || []).length);
+
+  // ⑥ 교육 쓰기 3함수 첫 줄 canDo("safety") 가드 — 실행: 수행이 아니면 알리고 아무것도 안 함 / 수행이면 그대로 진행
+  const guard30 = (name) => { const b = fn30(name); return b.slice(b.indexOf('{') + 1).trim().indexOf('if(!canDo("safety")){ alert(EDU_NO_WRITE); return; }') === 0; };
+  const eduRun30 = (perm, which) => {
+    const log = [], els = {};
+    const el = (id) => els[id] || (els[id] = { id, value: '', textContent: '', innerHTML: '', style: {}, classList: { add: () => log.push('show:' + id), remove: () => {} } });
+    const api = new Function('__perm', '__log', '__el', [
+      'var document = { getElementById: function(id){ return __el(id); } };',
+      'function canDo(m){ return __perm[m] === "do"; } function canSee(m){ return (__perm[m] || "hide") !== "hide"; } function alert(s){ __log.push("alert:" + s); } function confirm(){ __log.push("confirm"); return true; }',
+      'var edu = [{ id:"e1", ptype:"member", pid:"u1", kind:"regular", date:"2026-06-01", next:"2026-12-01", updated:"2026-06-01" }], eduEditId = null, eduScope = "member";',
+      (html.match(/var EDU_NO_WRITE = "[^"\n]*";/) || [''])[0],
+      'function findEdu(id){ for(var i=0;i<edu.length;i++){ if(edu[i].id===id) return edu[i]; } return null; }',
+      'var EDU_KINDS = []; function eduFillPersons(){ __log.push("fill"); } function eduUpdateNotes(){} function isDate(s){ return /^\\d{4}-\\d{2}-\\d{2}$/.test(s||""); } function genId(){ return "e9"; } function todayStr(){ return "2026-11-09"; } function esc(s){ return String(s); }',
+      'function scheduleEduSave(){ __log.push("save"); } function closeEdu(){ __log.push("close"); } function gwToast(){ __log.push("toast"); } function afterSave(){ __log.push("render"); }',
+      'function renderEdu(){} function renderCalendar(){} function renderSites(){}',
+      fn30('openEdu'), fn30('saveEdu'), fn30('deleteEdu'),
+      'return { open: function(){ openEdu(null, "member"); }, save: function(){ eduEditId = "e1"; document.getElementById("eduPerson").value = "member:u1"; document.getElementById("eduDate").value = "2026-06-02"; saveEdu(); }, del: function(){ eduEditId = "e1"; deleteEdu(); }, edu: function(){ return edu; } };'].join('\n'))(perm, log, el);
+    api[which]();
+    return { log, edu: api.edu() };
+  };
+  const onlyAlert30 = (r) => r.log.length === 1 && r.log[0].indexOf('alert:교육·검진 기록을 추가·수정·삭제할 권한이 없습니다') === 0;
+  const eo1 = eduRun30({ safety: 'view' }, 'open'), eo2 = eduRun30({ safety: 'do' }, 'open'), eo3 = eduRun30({ hr: 'do' }, 'open');
+  const es1 = eduRun30({ safety: 'view' }, 'save'), es2 = eduRun30({ safety: 'do' }, 'save'), es3 = eduRun30({ hr: 'do' }, 'save');
+  const ed1 = eduRun30({ safety: 'view' }, 'del'), ed2 = eduRun30({ safety: 'do' }, 'del'), ed3 = eduRun30({}, 'del');
+  T('v430 교육 쓰기 3함수(openEdu·saveEdu·deleteEdu) 첫 줄 canDo("safety") 가드(실행): 안전 보기·옛 hr 수행·권한 없음 = 알림 1번뿐(창 안 열림·저장 예약 0·기록 그대로·삭제 확인도 안 물음) / 안전 수행 = 창 열림·저장(닫기·토스트·다시 그림)·삭제 표시 그대로',
+    ['openEdu', 'saveEdu', 'deleteEdu'].every(guard30)
+    && [eo1, eo3, es1, es3, ed1, ed3].every(onlyAlert30) && es1.edu[0].date === '2026-06-01' && ed1.edu[0].del === undefined
+    && eo2.log.indexOf('show:eduBackdrop') >= 0 && eo2.log.every((x) => x.indexOf('alert') !== 0)
+    && es2.log.join(',') === 'save,close,toast,render' && es2.edu[0].date === '2026-06-02'
+    && ed2.log.join(',') === 'confirm,save,close,render' && ed2.edu[0].del === 1,
+    JSON.stringify({ open: [eo1.log, eo2.log.slice(-1)], save: [es1.log, es2.log], del: [ed1.log, ed2.log] }));
+
+  // ⑦ doSaveEdu — 서버 거절(403 NO_WRITE)을 알린다(종전엔 조용히 삼켜 '저장했습니다'만 남았다)·보류 해제 / 200은 조용히
+  //    v430 검토: 같은 403이라도 기기 승인 취소(DEVICE_NOT_APPROVED — 서버 handleSave가 권한보다 먼저 본다)는 기기 안내 + 보류 유지(로컬 변경을 버리지 않음)
+  const dse30 = (status, code) => { const log = []; const api = new Function('__st', '__code', '__log', ['var edu = [], eduBase = 0, eduPending = true;',
+    'function gwCall(fn, body){ __log.push(fn + ":" + body.action + ":" + body.collection); return { then: function(f){ f({ status: __st, body: __code ? { error_code: __code } : {} }); return { catch: function(){} }; } }; }',
+    'function gwToast(m, w){ __log.push("toast:" + (w ? "warn:" : "") + m); } function mergeEdu(a){ return a; }',
+    fn30('doSaveEdu'), 'doSaveEdu(); return { pending: function(){ return eduPending; } };'].join('\n'))(status, code, log); return { log, pending: api.pending() }; };
+  const ds403_30 = dse30(403, 'NO_WRITE'), ds403n_30 = dse30(403), ds403d_30 = dse30(403, 'DEVICE_NOT_APPROVED'), ds200_30 = dse30(200), ds500_30 = dse30(500);
+  const noWr30 = (r) => r.log.length === 2 && r.log[0] === 'gw-data:save:edu' && r.log[1].indexOf('toast:warn:교육·검진 기록 저장 권한이 없어 서버가 이 변경을 받지 않았습니다') === 0 && r.pending === false;
+  T('v430 doSaveEdu: 서버 거절 403 NO_WRITE(안전 수행이 아님 — 이유 코드가 없는 403도)면 경고 토스트 "교육·검진 기록 저장 권한이 없어 서버가 이 변경을 받지 않았습니다"·보류 해제(다음 읽기 때 서버 값) / 403 DEVICE_NOT_APPROVED(기기 승인 취소)면 "승인되지 않은 기기입니다" 안내·권한 문구 없음·보류 유지 / 200은 토스트 없음 / 그 밖의 오류는 종전대로(보류 유지)',
+    noWr30(ds403_30) && noWr30(ds403n_30)
+    && ds403d_30.log.length === 2 && ds403d_30.log[1].indexOf('toast:warn:승인되지 않은 기기입니다 — 관리자에게 기기 승인을 요청하세요.') === 0 && ds403d_30.log[1].indexOf('저장 권한이 없어') < 0 && ds403d_30.pending === true
+    && ds200_30.log.join(',') === 'gw-data:save:edu' && ds200_30.pending === false && ds500_30.log.join(',') === 'gw-data:save:edu' && ds500_30.pending === true,
+    JSON.stringify({ a: ds403_30, n: ds403n_30, d: ds403d_30, b: ds200_30, c: ds500_30 }));
+
+  // ⑧ 레지스트리 자리(정적) — 칩·칸 · 안전 탭 버튼은 MODULE_TAB 값에 없음 · view-safety도 MODULE_VIEW 값에 없음
+  const MT30 = {}, MV30 = {};
+  [...((html.match(/var MODULE_TAB = \{([^}]+)\}/) || ['', ''])[1]).matchAll(/(\w+):"([\w-]+)"/g)].forEach((m) => { MT30[m[1]] = m[2]; });
+  [...((html.match(/var MODULE_VIEW = \{([^}]+)\}/) || ['', ''])[1]).matchAll(/(\w+):"([\w-]+)"/g)].forEach((m) => { MV30[m[1]] = m[2]; });
+  const vs30 = (() => { const i = html.indexOf('<section class="view" id="view-safety">'); return i < 0 ? '' : html.slice(i, html.indexOf('</section>', i)); })();
+  const bar30 = (() => { const i = vs30.indexOf('<div class="lsub-bar" id="sfSubBar">'); return i < 0 ? '' : vs30.slice(i, vs30.indexOf('</div>', i)); })();
+  T('v430 레지스트리 자리(정적): MODULE_TAB.safety = 교육·검진 칩(sfChipEdu — 안전 탭 칩 줄 sfSubBar 안 .lsub-btn) · MODULE_VIEW.safety = 교육·검진 칸(sfPaneEdu — .sf-pane, 보기 readonly는 칸에만) · 안전 탭 버튼 tabSafetyBtn은 MODULE_TAB 값에 없음 · view-safety도 MODULE_VIEW 값에 없음(걸면 현장 칸 버튼까지 숨는다) · 두 표 키 = MODULES',
+    MT30.safety === 'sfChipEdu' && MV30.safety === 'sfPaneEdu' && Object.values(MT30).indexOf('tabSafetyBtn') < 0 && Object.values(MV30).indexOf('view-safety') < 0
+    && bar30.indexOf('<button class="lsub-btn" data-lsub="edu" id="sfChipEdu">교육·검진</button>') > 0 && /<div class="sf-pane" id="sfPaneEdu" style="display:none;">/.test(vs30)
+    && Object.keys(MT30).sort().join(',') === am30.slice().sort().join(',') && Object.keys(MV30).sort().join(',') === am30.slice().sort().join(','),
+    JSON.stringify({ tab: MT30.safety, view: MV30.safety }));
+
+  // ⑨ applyPerms 전체 실행 — 사람 유형별(실제 원문: MODULES 루프 → 일반 강제 이동 → applySafetyPerms)
+  const mkCl30 = () => { const s = new Set(); return { add: (c) => s.add(c), remove: (c) => s.delete(c), toggle: (c, on) => { if (on === undefined ? !s.has(c) : on) s.add(c); else s.delete(c); return s.has(c); }, contains: (c) => s.has(c) }; };
+  const mkEl30 = (id, attrs) => ({ id, attrs: attrs || {}, classList: mkCl30(), style: {}, getAttribute(n) { return this.attrs[n] === undefined ? null : this.attrs[n]; }, querySelectorAll: () => [] });
+  const runAp30 = (who, perm, cur, layer) => {
+    const chips = [mkEl30('sfChipSite', { 'data-lsub': 'site' }), mkEl30('sfChipEdu', { 'data-lsub': 'edu' })];
+    const D = { tabSafetyBtn: mkEl30('tabSafetyBtn'), sfChipSite: chips[0], sfChipEdu: chips[1], sfSubBar: mkEl30('sfSubBar'), sfPaneSite: mkEl30('sfPaneSite'), sfPaneEdu: mkEl30('sfPaneEdu'), asbMovedNote: mkEl30('asbMovedNote'), asbMovedGo: mkEl30('asbMovedGo'), eduMovedHr: mkEl30('eduMovedHr'), eduMovedWk: mkEl30('eduMovedWk'), tabLicBtn: mkEl30('tabLicBtn'), 'view-lic': mkEl30('view-lic') };
+    D.sfSubBar.querySelectorAll = () => chips;
+    const log = [];
+    const st = new Function('__D', '__who', '__perm', '__log', '__cur', '__layer', [
+      'var document = { getElementById: function(id){ return __D[id] || null; }, querySelectorAll: function(){ return []; } };',
+      'var currentTab = __cur, safetyLayer = __layer, eduViewScope = "member";',
+      'function isAdmin(){ return __who === "admin"; } function permOf(m){ return isAdmin() ? "do" : (__perm[m] || "hide"); } function canSee(m){ return permOf(m) !== "hide"; } function canDo(m){ return permOf(m) === "do"; }',
+      'function switchTab(n){ __log.push("switch:" + n); currentTab = n; } function updateUserChip(){} function updateApprovalBadges(){}',
+      'function renderSites(){ __log.push("renderSites"); } function loadAsb(){} function loadEdu(){ __log.push("loadEdu"); } function loadWorkers(){ return { then: function(){} }; } function renderEdu(){ __log.push("renderEdu"); }',
+      regStmt30.join('\n'), fn30('safetyPanes'), fn30('setSafetyLayer'), fn30('applySafetyPerms'), fn30('applyPerms'),
+      'applyPerms(); return { cur: currentTab, layer: safetyLayer };'].join('\n'))(D, who, perm, log, cur, layer);
+    const hid = (id) => D[id].classList.contains('perm-hidden'), ro = (id) => D[id].classList.contains('readonly');
+    const H = D.eduMovedHr.style.display, W = D.eduMovedWk.style.display;
+    return { D, log, st, home: log.indexOf('switch:dash') >= 0,
+      sig: (hid('tabSafetyBtn') ? 'T-' : 'T+') + (hid('sfChipSite') ? 'S-' : 'S+') + (hid('sfChipEdu') ? 'E-' : 'E+') + (D.sfSubBar.style.display === 'none' ? 'B-' : 'B+') + (ro('sfPaneSite') ? 'r' : '') + (ro('sfPaneEdu') ? 'R' : '') + (H === '' && W === '' ? 'H+' : (H === 'none' && W === 'none' ? 'H-' : 'H?')) };
+  };
+  const A30 = runAp30('admin', {}, 'safety', 'site');
+  const K30 = runAp30('staff', { safety: 'do', site: 'hide', lic: 'view', wk: 'view', veh: 'do', con: 'do' }, 'safety', 'site');   // 권민지형(PM 부여 뒤)
+  const J30 = runAp30('staff', { site: 'do', lic: 'do', wk: 'do', veh: 'do' }, 'safety', 'site');   // 김정아형
+  const Jw30 = runAp30('staff', { site: 'do', lic: 'view', wk: 'do', veh: 'do' }, 'safety', 'site');   // 정재욱형
+  const V30 = runAp30('staff', { safety: 'view', site: 'do' }, 'safety', 'edu');   // 가상형(안전 보기·현장 수행)
+  const V2_30 = runAp30('staff', { safety: 'do', site: 'view' }, 'safety', 'site');
+  const N30 = runAp30('staff', { veh: 'view', check: 'do', doc: 'view', wk: 'view' }, 'safety', 'site');   // 김호태·현장형
+  const O30 = runAp30('staff', { hr: 'do', site: 'hide' }, 'safety', 'site');   // 옛 키 hr만
+  T('v430 applyPerms 실행(실제 원문 — MODULES 루프·일반 강제 이동·applySafetyPerms): 관리자 = 탭·현장·교육 칩·칩 줄·교육 안내 · 권민지형(안전 수행·현장 숨김) = 탭·교육 칩만(칩 줄 없음)·현장 칸에 있었으면 교육 칸으로 옮겨 읽음·교육 안내 보임·홈으로 안 감 · 김정아·정재욱형(현장 수행·안전 없음) = 탭·현장 칩만, 안전 탭에 있어도 홈으로 안 튕김(일반 강제 이동에서 safety 제외) · 가상형 안전 보기 = 교육 칸만 읽기 전용(현장 칸 버튼 그대로) · 현장 보기 = 현장 칸만 읽기 전용 · 둘 다 없음·옛 hr 키만 = 탭 숨김·홈 · 칩 숨김은 MODULES 루프 한 곳(applySafetyPerms에 sfChipEdu 없음)',
+    A30.sig === 'T+S+E+B+H+' && !A30.home && A30.st.layer === 'site'
+    && K30.sig === 'T+S-E+B-H+' && !K30.home && K30.st.layer === 'edu' && K30.log.indexOf('loadEdu') >= 0 && K30.D['view-lic'].classList.contains('readonly')
+    && J30.sig === 'T+S+E-B-H-' && !J30.home && J30.st.cur === 'safety' && J30.st.layer === 'site' && Jw30.sig === 'T+S+E-B-H-' && !Jw30.home
+    && V30.sig === 'T+S+E+B+RH+' && !V30.home && V2_30.sig === 'T+S+E+B+rH+' && !V2_30.home
+    && N30.sig === 'T-S-E-B-H-' && N30.home && O30.sig === 'T-S-E-B-H-' && O30.home
+    && fn30('applySafetyPerms').indexOf('sfChipEdu') < 0,
+    [A30, K30, J30, Jw30, V30, V2_30, N30, O30].map((r) => r.sig + (r.home ? '→홈' : '') + '@' + r.st.layer).join(' / '));
+
+  // ⑩ 캘린더 교육 일정·loadEdu 실행 — 안전 보기·수행이면 보이고 읽음 / 옛 hr 수행·현장 수행·없음 = 0·안 읽음(서버 col:edu도 safety라 읽으면 403)
+  const calE30 = (perm) => new Function('__perm', ['var vehicles = [], tasks = [], receivables = [], licenses = [];',
+    'function canSee(m){ return (__perm[m] || "hide") !== "hide"; } function canDo(m){ return __perm[m] === "do"; } function isAdmin(){ return false; } function licVisible(){ return true; } function taskVisible(){ return true; } function recVisible(){ return true; }',
+    'function isDate(s){ return /^\\d{4}-\\d{2}-\\d{2}$/.test(s||""); } function fmtAmount(v){ return String(v); } function dispName(n){ return n||""; } function dispNameById(){ return ""; } function memberName(){ return ""; }',
+    'function liveAsb(){ return []; } function asbNotifyDue(){ return ""; }',
+    'function liveEdu(){ return [{ ptype:"member", pid:"u1", kind:"regular", date:"2026-06-01", next:"2026-12-01" }, { ptype:"worker", pid:"w1", kind:"spec_med", date:"2026-04-01", next:"2027-04-01" }]; } function eduPersonName(){ return "홍"; } function eduKindLabel(){ return "정기"; }',
+    'function liveLeaves(){ return []; } function isPartialLeave(){ return false; } function leaveCalVisible(){ return false; } function leaveTypeLabel(){ return ""; }',
+    fn30('pad'), fn30('fmtDate'), fn30('eachDate'), fn30('calEvents'), 'return calEvents().filter(function(e){ return e.mod === "hr"; }).length;'].join('\n'))(perm);
+  const le30 = (perm) => { const calls = []; new Function('__perm', '__calls', ['function canSee(m){ return (__perm[m] || "hide") !== "hide"; } function canDo(m){ return __perm[m] === "do"; }',
+    'function gwCall(fn, body){ __calls.push(fn + ":" + body.action + ":" + body.collection); return { then: function(){ return { catch: function(){} }; } }; }',
+    fn30('loadEdu'), 'loadEdu();'].join('\n'))(perm, calls); return calls.join(','); };
+  const ce30 = [calE30({ safety: 'view' }), calE30({ safety: 'do' }), calE30({ hr: 'do' }), calE30({ site: 'do' }), calE30({})];
+  const lo30 = [le30({ safety: 'view' }), le30({ safety: 'do' }), le30({ hr: 'do' }), le30({ site: 'do' }), le30({})];
+  T('v430 캘린더 교육 일정·loadEdu 실행: 안전 보기·수행 = 교육 예정 2건·gw-data get edu / 옛 hr 수행만·현장 수행만·권한 없음 = 0건·읽지 않음',
+    ce30.join(',') === '2,2,0,0,0' && lo30.join('|') === 'gw-data:get:edu|gw-data:get:edu|||',
+    JSON.stringify({ cal: ce30, load: lo30 }));
+
+  // ⑪ 권한관리 표 안전 칸 — 값이 없는 직원은 숨김으로 보이고 한 번 누르면 수행(PM이 권민지 칸 1번 — 브리핑 deploy) · 머리 열 … 차량 / 안전 / 현장 / 인허가 …
+  const pm30 = new Function([(html.match(/var PERM_CLOSED = \{[^}]+\};/) || [''])[0], (html.match(/var PM_TXT = \{[^}]+\};/) || [''])[0], (html.match(/var PM_NEXT = \{[^}]+\};/) || [''])[0], fn30('pmVal'),
+    'return { v: pmVal, next: PM_NEXT, txt: PM_TXT };'].join('\n'))();
+  const kmj30 = { perms: { tasks: 'hide', veh: 'do', site: 'hide', lic: 'view', wk: 'view' } };
+  T('v430 권한관리 표 안전 칸(pmVal 실행): 안전 값이 없는 직원은 "숨김"으로 보이고 한 번 누르면 "수행"(PM이 권민지 칸 1번) · 두 번이면 "보기" · 머리 열 순서 … 차량 / 안전 / 현장 / 인허가 …',
+    pm30.v(kmj30, 'safety') === 'hide' && pm30.next[pm30.v(kmj30, 'safety')] === 'do' && pm30.txt[pm30.next.hide] === '수행' && pm30.next[pm30.next.hide] === 'view'
+    && PO30.map((k) => ML30[k]).join(' / ').indexOf('차량 / 안전 / 현장 / 인허가') >= 0,
+    pm30.v(kmj30, 'safety') + ' → ' + pm30.next[pm30.v(kmj30, 'safety')] + ' / ' + PO30.map((k) => ML30[k]).join(' / '));
+
+  // ⑪-2 (v430 검토) 권한 재확인(refreshMemberPerms) = 실효값 비교 — 권한과 무관한 회원 저장(인사 카드·휴직·사직 승인·복직)도 서버 cleanPerms가 빈 safety를 '숨김'으로 채우고
+  //      키 순서를 MODULES 순으로 바꾼다. 저장 글자 비교면 배포 뒤 첫 저장 때 그 직원 앱이 '권한이 바뀌었습니다' 새로고침(입력 중 창 유실) — 실제 gw-auth cleanPerms 출력(④ cleanP30)으로 돌린다
+  const rmp30 = (cur, nm) => { const log = []; new Function('__cur', '__nm', '__log', [regStmt30[0], (html.match(/var PERM_CLOSED = \{[^}]+\};/) || [''])[0], fn30('pmVal'), fn30('permsSameEff'),
+    'var curMemberObj = __cur, permRefreshAt = 0, localStorage = { setItem: function(){} }, location = { reload: function(){ __log.push("reload"); } };',
+    'function gwToken(){ return "tok"; } function curMember(){ return curMemberObj; } function setTimeout(f){ f(); } function gwToast(m){ __log.push("toast:" + m); }',
+    'function gwCall(fn, body){ __log.push(fn + ":" + body.action); return { then: function(f){ f({ status: 200, body: { valid: true, member: __nm } }); return { catch: function(){} }; } }; }',
+    fn30('refreshMemberPerms'), 'refreshMemberPerms();'].join('\n'))(cur, nm, log); return log; };
+  const kja30 = { tasks: 'hide', veh: 'do', rec: 'hide', lic: 'do', check: 'do', con: 'do', cli: 'hide', doc: 'view', wk: 'do', quote: 'hide', promo: 'hide', site: 'do' };   // 김정아형 저장값 모양(site가 끝, safety 없음)
+  const kjaSv30 = cleanP30(kja30);   // 권한과 무관한 저장(인사 카드 등) 뒤 서버 저장값 — safety 'hide' 채움·MODULES 순
+  const mem30 = (perms, extra) => Object.assign({ id: 'u1', name: '직원', admin: false, perms: perms }, extra || {});
+  const rA30 = rmp30(mem30(kja30), mem30(kjaSv30)), rG30 = rmp30(mem30({}), mem30(cleanP30({})));
+  const rB30 = rmp30(mem30(kjaSv30), mem30(Object.assign({}, kjaSv30, { safety: 'do' }))), rC30 = rmp30(mem30(kja30), mem30(Object.assign({}, kjaSv30, { safety: 'do' })));
+  const rD30 = rmp30(mem30(kja30), mem30(Object.assign({}, kjaSv30, { safety: 'view' }))), rE30 = rmp30(mem30(kjaSv30), mem30(kjaSv30, { tier: 'admin' }));
+  const rF30 = rmp30(mem30(Object.assign({ bid: 'do' }, kja30)), mem30(kjaSv30));   // 옛 기록에만 남은 키(실효 수행 → 기본 보기)가 저장 때 지워짐
+  const rel30 = (l) => l.indexOf('reload') >= 0 && l.some((x) => x.indexOf('toast:권한이 바뀌었습니다') === 0);
+  T('v430 검토 권한 재확인 실효 비교(refreshMemberPerms 실행 — 서버 cleanPerms 출력 그대로): 권한과 무관한 회원 저장(빈 safety → 숨김·키 순서 바뀜)·값이 하나도 없던 회원이 기본값으로 굳음 = 새로고침 없음 · 안전 숨김/값 없음 → 수행·보기 = "권한이 바뀌었습니다" 새로고침 · 등급만 바뀜·옛 기록에만 남은 키의 실효값이 바뀜 = 새로고침(종전 그대로)',
+    JSON.stringify(kja30) !== JSON.stringify(kjaSv30) && kjaSv30.safety === 'hide'
+    && rA30.join(',') === 'gw-auth:verify' && rG30.join(',') === 'gw-auth:verify' && [rB30, rC30, rD30, rE30, rF30].every(rel30),
+    JSON.stringify({ a: rA30, g: rG30, b: rB30, c: rC30, d: rD30, e: rE30, f: rF30 }));
+
+  // ⑫ 문서 — MANUAL 15·21-2·21-9·28절 · CLAUDE.md 예외 줄이 실제 등록 상태 · sw ≥ 430
+  const sec30 = (a, b) => { const i = man30.indexOf(a); return i < 0 ? '' : man30.slice(i, man30.indexOf(b, i + a.length)); };
+  const m15_30 = sec30('<h2 id="s15">', '<h2 id="s16">'), m212_30 = sec30('<h3>21-2. 권한관리</h3>', '<h3>21-3.'), m219_30 = sec30('<h3>21-9.', '<h3>21-10.'), m28_30 = sec30('<h2 id="s28">', '<h2 id="s29">');
+  T('v430 문서: MANUAL 15절 교육 일정 "(안전 권한이 있는 분만" · 21-2 "\'안전\' 열이 안전 › 교육·검진 칸"·기본 숨김(팀장도)·관리자 수행 고정·한 번 누르면 수행 · 21-9·28절·14절 교육·검진 = 안전 권한(관리자 전용 문장 0) · CLAUDE.md "3단계 전까지 레지스트리 밖" 0·등록 13곳·MODULE_TAB.safety · sw ≥ 430',
+    m15_30.indexOf('<li>교육·건강진단 다음 예정일 📚(안전 권한이 있는 분만, <b>교육</b> 배지)</li>') > 0 && m15_30.indexOf('📚(관리자만') < 0
+    && m212_30.indexOf("'안전' 열이 안전 › 교육·검진 칸") > 0 && m212_30.indexOf('<b>안전</b>(교육·검진)도 기본 숨김입니다(새 회원은 팀장도 숨김, 관리자 행은 수행 고정)') > 0 && m212_30.indexOf('숨김 칸을 <b>한 번</b> 누르면 수행') > 0
+    && m219_30.indexOf('권한관리 <b>안전</b> 열(21-2)') > 0 && m219_30.indexOf('칸에 있습니다(관리자)') < 0
+    && m28_30.indexOf('교육·검진 칸은 안전 권한을 받은 분에게만') > 0 && man30.indexOf('교육·검진 칸은 관리자에게만') < 0 && man30.indexOf('(관리자, 21-9)') < 0
+    && cl30.indexOf('3단계 전까지 레지스트리 밖') < 0 && cl30.indexOf('등록 13곳') > 0 && cl30.indexOf('`MODULE_TAB.safety = sfChipEdu`') > 0
+    && Number((sw30.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 430, '');
+  // ⑫-2 (v430 검토) 한 층만 고친 문서 — FEATURES §1 업무 줄 · MANUAL 21절 도입(관리자 전용 절이지만 21-9는 안전 권한 직원에게도) · 28절 → 21-9 · CLAUDE.md 기본 숨김 자리별로 터지는 곳
+  const ft30 = readFileSync(join(ROOT, 'FEATURES.md'), 'utf8');
+  const ft1_30 = ft30.split('\n').filter((ln) => ln.indexOf('- **업무**:') === 0)[0] || '';
+  const m21i_30 = sec30('<h2 id="s21">', '<h3>21-1.');
+  T('v430 검토 문서: FEATURES §1 업무 줄 교육·검진 = "안전 권한"("교육·건강진단 이력, 관리자" 0곳) · MANUAL 21절 도입이 21-9 예외(안전 열을 받은 직원에게도 보임)를 말함 · 28절 안내가 교육·검진 칸 쓰는 법 21-9로 이음 · CLAUDE.md 기본 숨김 4곳 = 자리별(gw-data 빠짐 = 키 없는 회원 읽기가 바로 열림 · gw-auth 빠짐 = 저장 때 cleanPerms) — "한 곳이라도 빠지면 cleanPerms가" 한 기전 문장 0',
+    ft1_30.indexOf('**교육·검진**(교육·건강진단 이력, 안전 권한') > 0 && ft30.indexOf('교육·건강진단 이력, 관리자') < 0
+    && m21i_30.indexOf('<b>21-9 교육·건강진단 이력</b>은 권한관리 <b>안전</b> 열을 받은 직원에게도 보입니다') > 0
+    && m28_30.indexOf('교육·검진 칸 쓰는 법은 21-9에 있습니다') > 0
+    && cl30.indexOf('gw-data `PERM_CLOSED`가 빠지면 그 키 값이 없는 회원(새 키 배포 직후 전원)의 서버 읽기가 저장을 기다리지 않고 바로') > 0 && cl30.indexOf('gw-auth `CLOSED_DEFAULT`가 빠지면 회원 저장 때 `cleanPerms`가') > 0
+    && cl30.indexOf("이 한 곳이라도 빠지면 모든 회원 저장이 거치는 `cleanPerms`가 '보기'를 채워 전원에게 열린다") < 0,
+    JSON.stringify({ f1: ft1_30.slice(0, 40), m21: m21i_30.length, m28: m28_30.length }));
+} catch (e) { console.log('  (v430 검사 생략 — ' + e.message + ')'); fails++; }
 
 try {
   const fdir = join(ROOT, 'netlify', 'functions');

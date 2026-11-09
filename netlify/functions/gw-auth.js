@@ -13,7 +13,7 @@ const { appendAudit, short } = require('./_lib/audit');
 const tier = require('./_lib/tier');   // 관리자 등급(v321)
 
 const USERS = 'gw_users';
-const MODULES = ['tasks', 'veh', 'rec', 'lic', 'site', 'check', 'con', 'cli', 'doc', 'wk', 'quote', 'promo'];   // wk(일용직) 누락으로 cleanPerms가 매 저장마다 버려 숨김·수행 설정이 불가능했음(프런트 레지스트리와 일치 필수). quote=견적서·promo=홍보(둘 다 기본 숨김 — 명시 부여만)
+const MODULES = ['tasks', 'veh', 'rec', 'lic', 'site', 'check', 'con', 'cli', 'doc', 'wk', 'quote', 'promo', 'safety'];   // wk(일용직) 누락으로 cleanPerms가 매 저장마다 버려 숨김·수행 설정이 불가능했음(프런트 레지스트리와 일치 필수 — uismoke v430이 앱 MODULES와 순서까지 대조). quote=견적서·promo=홍보·safety=안전 › 교육·검진(v430, 셋 다 기본 숨김 — 명시 부여만)
 const LOCK_THRESHOLD = 5;                 // 연속 실패 허용 횟수
 const LOCK_MS = 15 * 60 * 1000;           // 잠금 시간(15분)
 function lockKey(name) { return `lock:${String(name).trim().toLowerCase()}`; }
@@ -92,15 +92,17 @@ function safeMember(m) { if (!m) return null; const { pin_salt, pin_hash, ...s }
 // 이 직책의 회원 등록·직책 변경은 관리자(비개발자)도 할 수 있다. 관리자·대표·개발자 지정은 종전대로 개발자만.
 const ROLE_OPEN = { '팀장': 1, '직원': 1, '현장직': 1 };
 function roleOpen(r) { return Object.prototype.hasOwnProperty.call(ROLE_OPEN, String(r || '')); }
-// 일반 직책 기본 권한 — 앱 ROLE_PRESET과 같은 값(uismoke가 대조). 관리자가 만든 회원의 perms는 클라 값이 아니라 이 표에서 온다(권한 상승 차단).
+// 일반 직책 기본 권한 — 앱 ROLE_PRESET과 같은 값(uismoke v430이 3직책 전부 대조, servertest가 직원 줄 대조). 관리자가 만든 회원의 perms는 클라 값이 아니라 이 표에서 온다(권한 상승 차단).
+//   v430 safety: 3직책 모두 숨김(PM 11/9 ② "권민지 1명" — 팀장도 숨김, 부여는 권한관리 표에서 한 분씩)
 const ROLE_OPEN_PERMS = {
-  '팀장':   { tasks: 'do', veh: 'do', rec: 'do', lic: 'do', site: 'do', check: 'do', con: 'view', cli: 'view', doc: 'view', wk: 'do', quote: 'hide', promo: 'hide' },
-  '직원':   { tasks: 'do', veh: 'view', rec: 'view', lic: 'view', site: 'hide', check: 'do', con: 'view', cli: 'view', doc: 'view', wk: 'view', quote: 'hide', promo: 'hide' },
-  '현장직': { tasks: 'do', veh: 'view', rec: 'hide', lic: 'hide', site: 'hide', check: 'do', con: 'hide', cli: 'hide', doc: 'view', wk: 'hide', quote: 'hide', promo: 'hide' }
+  '팀장':   { tasks: 'do', veh: 'do', rec: 'do', lic: 'do', site: 'do', check: 'do', con: 'view', cli: 'view', doc: 'view', wk: 'do', quote: 'hide', promo: 'hide', safety: 'hide' },
+  '직원':   { tasks: 'do', veh: 'view', rec: 'view', lic: 'view', site: 'hide', check: 'do', con: 'view', cli: 'view', doc: 'view', wk: 'view', quote: 'hide', promo: 'hide', safety: 'hide' },
+  '현장직': { tasks: 'do', veh: 'view', rec: 'hide', lic: 'hide', site: 'hide', check: 'do', con: 'hide', cli: 'hide', doc: 'view', wk: 'hide', quote: 'hide', promo: 'hide', safety: 'hide' }
 };
 // 값이 없는 모듈의 기본값 — 닫고 시작하는 모듈(gw-data PERM_CLOSED와 같은 집합)은 'hide'다.
 // 종전엔 무조건 'view'라, 새 모듈을 MODULES에 넣는 순간 전 직원에게 열렸다(2026-09-10 site 추가 때 잡힘).
-const CLOSED_DEFAULT = { quote: 1, promo: 1, hr: 1, lic: 1, site: 1 };
+// v430 safety 추가 — 모든 회원 저장이 cleanPerms를 거치므로 여기서 빠지면 다음 저장 때 직원 교육·건강진단 날짜가 '보기'로 열린다(기본 숨김 4곳 uismoke v430 대조)
+const CLOSED_DEFAULT = { quote: 1, promo: 1, hr: 1, lic: 1, site: 1, safety: 1 };
 function cleanPerms(p) { const out = {}; MODULES.forEach(function (k) { out[k] = (p && (p[k] === 'do' || p[k] === 'view' || p[k] === 'hide')) ? p[k] : (CLOSED_DEFAULT[k] ? 'hide' : 'view'); }); return out; }
 
 async function listMembers(st) {
@@ -379,7 +381,14 @@ async function handleMemberUpsert(st, event, d, R) {
       const a = b[k], v = m[k];
       if ((typeof a === 'object' ? JSON.stringify(a) : a) !== (typeof v === 'object' ? JSON.stringify(v) : v) && !(a == null && v == null)) f[k] = [short(a), short(v)];
     }
-    if (before && JSON.stringify(before.perms || {}) !== JSON.stringify(m.perms || {})) f.perms = [short(before.perms), short(m.perms)];
+    // v430(검토): 권한은 바뀐 칸만 '키:값'으로 남긴다(값이 없던 칸은 '-', 키 수만큼이라 절단 안 함). 종전엔 perms JSON 통째를 80자에서 잘라(short)
+    //   뒤쪽 키(wk·quote·promo·safety)만 바꾼 저장이 전후 같은 글자로 남았다 — PM이 권민지 '안전' 칸을 숨김→수행으로 바꾼 기록이 안 보임. 키 순서만 바뀐 저장(cleanPerms 정렬)은 남기지 않는다
+    if (before) {
+      const bp = before.perms || {}, ap = m.perms || {};
+      const pk = Object.keys(ap).concat(Object.keys(bp).filter(function (k) { return !Object.prototype.hasOwnProperty.call(ap, k); }));
+      const ch = pk.filter(function (k) { return bp[k] !== ap[k]; });
+      if (ch.length) f.perms = [ch.map(function (k) { return k + ':' + (bp[k] || '-'); }).join(','), ch.map(function (k) { return k + ':' + (ap[k] || '-'); }).join(',')];
+    }
     if (d.pin) f.PIN = ['', '변경'];
     if (!before || Object.keys(f).length) {
       await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'member',
