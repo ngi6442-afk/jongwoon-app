@@ -1023,7 +1023,7 @@
   .scope-chip{display:inline-block;font-size:11px;padding:1px 8px;border-radius:999px;background:#EDE9F2;color:#5B4B85;font-weight:600;}
   .mismatch-chip{display:inline-block;font-size:11px;padding:1px 8px;border-radius:999px;background:#FBE7E3;color:#B0332A;font-weight:700;}
 
-  /* 반응형: 모바일=상단 탭, PC=좌측 세로 사이드바 */
+  /* 반응형: 폰(859px 이하)=☰ 세로 목록, PC=좌측 사이드바 */
   .views{min-width:0;}
   @media (min-width: 860px){
     #app{max-width:1060px;padding:16px 22px 48px;}
@@ -2950,7 +2950,7 @@
   var USERS_CACHE_KEY = "jw_app_users_cache";
   var MEMBER_KEY = "jw_app_member";
 
-  // 모듈 레지스트리 — 신규 탭 추가 시 여기 5곳(MODULES/MODULE_TAB/MODULE_VIEW/MOD_LABEL/ROLE_PRESET)에 등록하면 권한관리 UI·게이팅에 자동 반영. 모듈 id = 백엔드 gw-data COL 권한키와 일치시킬 것.
+  // 모듈 레지스트리 — 신규 탭 추가 시 6곳(MODULES/MODULE_TAB/MODULE_VIEW/MOD_LABEL/ROLE_PRESET/PERM_ORDER — PERM_ORDER는 그 탭의 사이드바 자리, 기본 숨김 모듈은 PERM_CLOSED도)에 등록하면 권한관리 UI·게이팅에 자동 반영(v429: 권한관리 표·인사 카드는 permModList = PERM_ORDER 중 MODULES에 있는 것만 — PERM_ORDER에서 빠지면 두 곳 다 열이 없다). 모듈 id = 백엔드 gw-data COL 권한키와 일치시킬 것.
   var MODULES = ["tasks", "veh", "rec", "lic", "site", "check", "con", "cli", "doc", "wk", "quote", "promo"];  // 일감(bid)은 관리자 전용 고정이라 권한 목록에서 제외. quote=견적서·promo=홍보(둘 다 기본 숨김)
   var MODULE_TAB = {tasks:"tabTasksBtn", veh:"tabVehBtn", rec:"tabRecBtn", lic:"tabLicBtn", site:"sfChipSite", check:"tabCheckBtn", con:"tabConBtn", cli:"tabCliBtn", doc:"tabDocBtn", wk:"tabWkBtn", quote:"tabQuoteBtn", promo:"tabPromoBtn"};  // bid는 계약 탭 내 섹션(자체 탭 없음) · v428 site는 탭 버튼이 아니라 안전 탭 안 현장 칩(탭 버튼 tabSafetyBtn은 applySafetyPerms가 칸 단위로 판정)
   var MODULE_VIEW = {tasks:"view-tasks", veh:"view-veh", rec:"view-rec", lic:"view-lic", site:"sfPaneSite", check:"view-check", con:"view-con", cli:"view-cli", doc:"view-doc", wk:"view-workers", quote:"view-quote", promo:"view-promo"};  // bid 섹션은 applyPerms에서 canSee로 표시 · v428 site 보기 권한 readonly는 현장 칸(sfPaneSite)에만 — 바깥 view-safety에 걸면 칩 줄까지 숨는다
@@ -5535,7 +5535,6 @@
   });
 
   // ---- 탭 ----
-  var TAB_LABELS = {dash:"홈",tasks:"지시",rec:"기성·수금",cli:"거래처",bid:"입찰",con:"계약",onbid:"부동산",hr:"인사",cal:"캘린더",veh:"차량",hwakwan:"화관법",allbaro:"운반일지",lic:"인허가",doc:"문서함",check:"내 업무",leave:"휴가",perm:"권한관리",fam:"가족친화 실적",progress:"진척도"};
   function closeNav(){ var tb=document.getElementById("tabbar"); if(tb) tb.classList.remove("open"); }
   function updateNavToggle(name){ var nt=document.getElementById("navToggle"); if(nt) nt.textContent = "☰"; }
   // v428(메뉴 56 1단계): 탭 이름 해석. 옛 이름은 새 자리로 잇는다 — 옛 '현장' 탭 → 안전 › 현장 칸, 옛 '부동산' 탭 → 입찰 › 부동산 칸.
@@ -5761,7 +5760,8 @@
       (v.history||[]).forEach(function(h){ if(h.kind==="현장") add(h.date, "veh", "🚚 "+(v.no||"차량")+" 현장", h.content||""); }); });
     if (canSee("lic")) licenses.forEach(function(l){ if (l.del === 1 || !licVisible(l)) return; add(l.expiry, "lic", (l.name||"인허가")+" 만료", l.org||""); add(l.edu_due, "lic", (l.name||"인허가")+" 교육", l.org||""); });
     // 석면 작업 — 날짜 하나(시작일)에서 신고 마감까지 파생시킨다. 사람이 따로 넣지 않는다. 누르면 안전 › 현장(v428)
-    if (canSee("lic")) liveAsb().forEach(function(r){
+    //   v429: 현장 대장은 현장 권한(site)으로 판정 — 서버 col:asbestos와 같은 키. 배지·점(mod "lic")은 그대로(범례·배지는 PM 시안 결정 대기)
+    if (canSee("site")) liveAsb().forEach(function(r){
       var nm = r.title || "석면 작업";
       add(r.start, "lic", "🦺 "+nm+" 착수", r.site||"", "safety:site");
       add(r.end,   "lic", "🦺 "+nm+" 종료", r.site||"", "safety:site");
@@ -7211,7 +7211,7 @@
     if (isAdmin() && awarded.length) tiles += '<div class="stat-tile alert"><div class="lbl">🏆 낙찰 — 계약 대기</div><div class="val">' + awarded.length + '<span class="unit">건</span></div></div>';
     if (seeRec) tiles += '<div class="stat-tile' + (over45 ? ' alert' : '') + '"><div class="lbl">미수 ' + unpaid.length + '건' + (over45?' (45일↑ '+over45+')':'') + '</div><div class="val money">' + (unpaidSum ? (fmtAmount(unpaidSum) + '<span class="unit">원</span>') : '0') + '</div></div>';
     tiles += '<div class="stat-tile' + (overdueTot ? ' alert' : '') + '"><div class="lbl">이번 주 기한·만기</div><div class="val">' + week7 + '<span class="unit">건</span></div></div>';
-    tiles += '<div class="stat-tile"><div class="lbl">결재 대기</div><div class="val">' + reviewCount + '<span class="unit">건</span></div></div>';
+    tiles += '<div class="stat-tile"><div class="lbl">승인 대기</div><div class="val">' + reviewCount + '<span class="unit">건</span></div></div>';   // v429 이름만 '결재 대기' → '승인 대기' — 값은 아래 승인 대기함과 같은 approvalInboxItems 수
     if (isAdmin()){ var bidN = bidNewCount(); if (bidN) tiles += '<div class="stat-tile"><div class="lbl">새 입찰</div><div class="val">' + bidN + '<span class="unit">건</span></div></div>'; }
     var myChecks = myCheckCount();
     if (canSee("check") || myChecks) tiles += '<div class="stat-tile"><div class="lbl">주기업무</div><div class="val">' + myChecks + '<span class="unit">건</span></div></div>';
@@ -11579,12 +11579,12 @@
   function csSiteKindOf(c){ if (!c) return ""; if (SITE_KIND[c.type]) return c.type; if (c.elems && c.elems.asb) return "asbestos"; if (c.elems && (c.elems.demo || c.elems.permit)) return "demolition"; return ""; }
   function csNorm(s){ return String(s || "").toLowerCase().replace(/[\s()\-·,.㈜]/g, "").replace(/주식회사|유한회사/g, ""); }
   var csSiteLinkQueue = {};
-  // 계약 시작·[대장 연결] 공통 입구 — 대장을 아직 못 받았으면 받아서(열람 권한 lic) 연결 큐에, 받았으면 바로. 반환: 대장 행 | "wait" | "noperm" | "skip" | "none"
+  // 계약 시작·[대장 연결] 공통 입구 — 대장을 아직 못 받았으면 받아서(열람 권한 site — v429, 서버 col:asbestos와 같은 키) 연결 큐에, 받았으면 바로. 반환: 대장 행 | "wait" | "noperm" | "skip" | "none"
   function csLinkSiteLater(c){
     if (!c || !csSiteKindOf(c) || !canDo("site")) return "skip";
     var loaded = (typeof asbLoaded === "undefined" || asbLoaded);
     if (!loaded || (c.site_id && !findAsb(c.site_id))){   // 못 받았거나, 가리키는 대장이 로컬에 없다(다른 기기 생성·갱신 전) → 다시 받아 보고 결정(F8)
-      if (typeof canSee === "function" && !canSee("lic")) return "noperm";
+      if (typeof canSee === "function" && !canSee("site")) return "noperm";
       csSiteLinkQueue[c.id] = 1; if (typeof loadAsb === "function") loadAsb(); return "wait";
     }
     return csLinkSite(c, true) || "none";
@@ -11632,7 +11632,8 @@
   // 대장 종결 — 대장을 받은 상태에서 행을 찾았을 때만 site_hook. 못 받았으면 받아 오게 하고 보류(loadAsb 완료 → csSiteHooksRetry)
   function csSiteDone(c){
     if (!c || !c.scen || (c.site_hook && c.site_hook !== "none") || !c.site_id || c.status !== "done" || typeof findAsb !== "function") return false;
-    if (typeof asbLoaded !== "undefined" && !asbLoaded){ if (typeof canSee === "function" && canSee("lic") && typeof loadAsb === "function") loadAsb(); return false; }
+    if (typeof asbLoaded !== "undefined" && !asbLoaded){ if (typeof canSee === "function" && canSee("site") && typeof loadAsb === "function") loadAsb(); return false; }
+    if (typeof canDo === "function" && !canDo("site")) return false;   // v429 검토: 대장 종결·실적 초안·site_hook은 현장 수행 기기만 — 보기 기기는 서버가 대장 저장을 NO_WRITE로 거절하는데 계약에는 site_hook이 남아 다시 돌지 않는다. 보류하면 현장 수행 기기가 loadAsb 뒤 csSiteHooksRetry로 처리
     var r = findAsb(c.site_id), amt = conAmtEff(c);
     if (!r) return false;   // 로컬에 없음(다른 기기 생성·갱신 전) — 표식 없이 보류, 다음 loadAsb 때 재시도(F8: 없음 ≠ 삭제)
     if (r.del === 1){ if (c.site_hook !== "none"){ c.site_hook = "none"; c.updated = todayStr(); scheduleContractSave(); } return false; }   // 대장이 삭제됨 — 할 일 없음(재연결하면 해제)
@@ -12518,11 +12519,11 @@
     items.push(["입찰", c.bid_id ? (ci.from || c.bid_id) : "없음"]);
     items.push(["건축물대장", bi ? ((bi.site || "") + " · " + (bi.total_floor || 0) + "㎡") : "없음"]);
     var sr = (c.site_id && typeof findAsb === "function") ? findAsb(c.site_id) : null, sk = csSiteKindOf(c), asbOk = (typeof asbLoaded === "undefined" || asbLoaded); if (sr && sr.del === 1) sr = null;
-    items.push(["현장 대장", sr ? ((sr.title || "") + " · " + (sr.status === "done" ? "종결" : (sr.status === "run" ? "진행" : "예정")) + (sr.ks ? " · 실적 " + (sr.ks.no ? sr.ks.no : "초안") + (sr.ks.amount ? " " + fmtAmount(sr.ks.amount) + "원" : "") : "")) : (sk ? (!canDo("site") ? "연결 없음(현장 권한 필요)" : (!asbOk ? (canSee("lic") ? "대장을 아직 불러오지 않음 — [대장 연결]을 누르면 받아서 연결합니다" : "연결 없음(현장 대장 열람 권한 필요)") : (c.site_id ? "연결했던 대장이 삭제됨 — [대장 연결]로 다시 연결" : "연결 없음 — [대장 연결]로 찾거나 새로 만듭니다"))) : "해당 없음(운반)")]);
+    items.push(["현장 대장", sr ? ((sr.title || "") + " · " + (sr.status === "done" ? "종결" : (sr.status === "run" ? "진행" : "예정")) + (sr.ks ? " · 실적 " + (sr.ks.no ? sr.ks.no : "초안") + (sr.ks.amount ? " " + fmtAmount(sr.ks.amount) + "원" : "") : "")) : (sk ? (!canDo("site") ? "연결 없음(현장 권한 필요)" : (!asbOk ? (canSee("site") ? "대장을 아직 불러오지 않음 — [대장 연결]을 누르면 받아서 연결합니다" : "연결 없음(현장 대장 열람 권한 필요)") : (c.site_id ? "연결했던 대장이 삭제됨 — [대장 연결]로 다시 연결" : "연결 없음 — [대장 연결]로 찾거나 새로 만듭니다"))) : "해당 없음(운반)")]);
     var ap = []; (c.pipes || []).forEach(function(p){ (p.stages || []).forEach(function(s){ if (s.appr) ap.push(s.name + ": " + s.appr.kind + " " + (s.appr.status || "대기") + (s.appr.decided_at ? " " + s.appr.decided_at : "") + (s.appr.decided_by ? " · " + s.appr.decided_by : "")); }); });
     items.push(["결재", ap.length ? ap.join(" / ") : (c.scen ? "상신 없음 — 계약·청구 단계의 [상신]으로 올립니다" : "옛 계약(결재 배선 없음)")]);
     var h = '<div class="cs-links">' + items.map(function(p){ return '<div class="cs-lk"><div class="k">' + p[0] + '</div><div class="v">' + esc(p[1]) + '</div></div>'; }).join("") + '</div>';
-    if (!sr && sk && canDo("site") && (asbOk || canSee("lic"))) h += '<div class="cs-act"><button type="button" class="vs-chip" data-cs-site="' + esc(c.id) + '">대장 연결</button></div>';
+    if (!sr && sk && canDo("site") && (asbOk || canSee("site"))) h += '<div class="cs-act"><button type="button" class="vs-chip" data-cs-site="' + esc(c.id) + '">대장 연결</button></div>';
     return h;
   }
   // 상세 — PC는 행 아래 펼침, 폰은 표 아래 카드(#conDetailCard). 하위 탭 개요/단계·서류/연결(v427 단계·서류 한 탭). 편집·생성은 기존 모달·툴 그대로
@@ -12652,7 +12653,7 @@
       Array.prototype.forEach.call(root.querySelectorAll("[data-cs-rchk], [data-cs-rna]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); var na = el.hasAttribute("data-cs-rna"), v = String(el.getAttribute(na ? "data-cs-rna" : "data-cs-rchk") || ""), j = v.indexOf("|"); if (j > 0) csRowAct(v.slice(0, j), v.slice(j + 1), na ? "na" : "chk"); }); });   // v427 묶음·합친 줄·패킷 줄
       var csAct = function(attr, fn){ Array.prototype.forEach.call(root.querySelectorAll("[" + attr + "]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); var p = el.getAttribute(attr).split("|"), c = findProc(p[0]); if (!c) return; var pipe = csPipeOf(c, p[1]), i = Number(p[2]); if (!pipe || isNaN(i)) return; fn(c, pipe, i, el); }); }); };
       Array.prototype.forEach.call(root.querySelectorAll("[data-cs-gen]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); var p = el.getAttribute("data-cs-gen").split("|"); if (p[1] === "html_contract") openDocFromContract(p[0]); else openXlsxGen(p[0], csGenKind(findProc(p[0]) || {}, p[1])); }); });   // v383 패킷 [생성]
-      Array.prototype.forEach.call(root.querySelectorAll("[data-cs-site]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); var c = findProc(el.getAttribute("data-cs-site")); if (!c) return; var r = csLinkSiteLater(c); alert(typeof r === "object" ? ("현장 대장에 연결했습니다: " + (r.title || "")) : (r === "wait" ? "현장 대장을 불러오는 중입니다 — 받는 대로 연결합니다(잠시 뒤 연결 탭 확인)." : (r === "noperm" ? "현장 대장 열람 권한(인허가)이 없어 연결할 수 없습니다." : "연결할 수 없습니다(현장 권한 또는 종류)."))); renderContracts(); }); });   // v384
+      Array.prototype.forEach.call(root.querySelectorAll("[data-cs-site]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); var c = findProc(el.getAttribute("data-cs-site")); if (!c) return; var r = csLinkSiteLater(c); alert(typeof r === "object" ? ("현장 대장에 연결했습니다: " + (r.title || "")) : (r === "wait" ? "현장 대장을 불러오는 중입니다 — 받는 대로 연결합니다(잠시 뒤 연결 탭 확인)." : (r === "noperm" ? "현장 대장 열람 권한(현장)이 없어 연결할 수 없습니다." :"연결할 수 없습니다(현장 권한 또는 종류)."))); renderContracts(); }); });   // v384
       csAct("data-cs-done", function(c, p, i){ var s0 = p.stages[i], fp = (s0 && s0.aw === "amt") ? root.querySelector('[data-cs-fpanel="' + p.key + '|' + i + '"]') : null; if (fp) csSaveFields(c, p, i, fp); csDoneStage(c, p, i); });   // v402 R15: 변경계약은 입력 칸 값을 먼저 저장한 뒤 판정
       csAct("data-cs-skip", function(c, p, i){ csSkipStage(c, p, i); });
       csAct("data-cs-unskip", function(c, p, i){ csUnskipStage(c, p, i); });
@@ -13446,7 +13447,7 @@
     return Object.keys(byId).map(function(k){ return byId[k]; });
   }
   function loadAsb(){
-    if(!canSee("lic")) return;
+    if(!canSee("site")) return;   // v429: 현장 대장 = 현장 권한(서버 col:asbestos도 site — 인허가 lic만 있으면 403). 종전 lic 판정이라 현장 권한만 있는 사람은 목록이 비었다
     gwCall("gw-data",{action:"get",collection:"asbestos"}).then(function(res){
       if(res.status!==200) return;
       var doc=(res.body&&res.body.doc)||{};
@@ -22351,7 +22352,9 @@
   }
   // 권한관리(별도 화면) — 매트릭스 표(S2-C, PM 지시): 셀 클릭마다 수행→보기→숨김 순환, 사람 단위 디바운스 자동 저장.
   // 구 아코디언(사람 펼침 → 드롭다운 → 저장 버튼)은 클릭 수가 많아 폐기 — 시안 표와 형태 일치.
-  var PERM_ORDER = ["tasks","rec","cli","con","quote","promo","veh","lic","site","doc","check","wk"];   // MODULES와 반드시 일치(uismoke가 검사) — wk·promo 누락 사고 2회
+  // 권한 열 순서 한 벌 = 사이드바 순서(v429): 관리 지시·기성·수금·거래처·일용직 → 수주 계약·견적서·홍보 → 업무 차량·안전(현장 칸 site)·인허가·문서함 → 개인 내 업무(주기 체크).
+  //   권한관리 표와 인사 카드 숨김 블록이 이것 하나를 쓴다(permModList). 새 키는 사이드바 자리에 — 3단계 safety는 site 앞, 4단계 hw는 veh 뒤(uismoke v429가 사이드바 순서를 대조)
+  var PERM_ORDER = ["tasks","rec","cli","wk","con","quote","promo","veh","site","lic","doc","check"];   // MODULES와 반드시 일치(uismoke 4a) — wk·promo 누락 사고 2회
   function pmVal(m, mod){ return (m.perms && m.perms[mod]) || (PERM_CLOSED[mod] ? "hide" : "view"); }   // 표시·순환 기본값 = permOf와 동일 집합(PERM_CLOSED 한 곳)
   var PM_TXT = { do: "수행", view: "보기", hide: "숨김" };
   var PM_NEXT = { do: "view", view: "hide", hide: "do" };
@@ -22928,12 +22931,10 @@
     var bdNote = document.getElementById("meBaseDateNote");
     if (bdNote){ if (m && m.annual_base_date){ bdNote.style.display=""; bdNote.textContent = "기준일 " + m.annual_base_date + " · 이후 사용분을 차감해 잔여 계산"; } else { bdNote.style.display="none"; bdNote.textContent=""; } }
     var perms = m ? (m.perms||{}) : ROLE_PRESET["직원"].perms;
-    // 모듈별 권한 표시 순서 = 사이드바 메뉴 순서 (관리: 지시·기성·거래처 / 담당: 업무·차량·인허가·계약·문서함)
-    var permOrder = ["tasks","rec","cli","check","veh","lic","con","doc"].filter(function(x){ return MODULES.indexOf(x) >= 0; });
-    MODULES.forEach(function(x){ if (permOrder.indexOf(x) < 0) permOrder.push(x); });
-    var manageMods = { tasks:1, rec:1, cli:1, hr:1 };  // 관리 그룹(사이드바와 동일)
+    // 모듈별 권한 표시 순서 = 권한관리 표와 같은 한 벌(PERM_ORDER = 사이드바 순서, v429 — 두 번째 순서 목록은 지움). 이 블록(#mePermsWrap)은 숨김이고 저장은 perms를 보내지 않는다
+    var manageMods = { tasks:1, rec:1, cli:1, hr:1, wk:1 };  // 관리 그룹(사이드바와 동일 — 인사·일용직 wk 포함, v429) 다음에 구분선
     var dividerDone = false;
-    document.getElementById("mePerms").innerHTML = permOrder.map(function(mod){
+    document.getElementById("mePerms").innerHTML = permModList().map(function(mod){
       var line = "";
       if (!dividerDone && !manageMods[mod]){ line = '<div class="perm-divider"></div>'; dividerDone = true; }
       var v = perms[mod] || "view";

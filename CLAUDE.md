@@ -28,11 +28,11 @@
 - 단계 완료 시 이 파일과 가이드를 실태에 맞게 갱신한다.
 
 ## 신규 탭/모듈 추가 규칙 (필수)
-- **탭을 새로 만들면 반드시 모듈 레지스트리에 등록**해 권한관리·게이팅에 자동 반영한다. 등록 위치 5곳: `MODULES` 배열 + `MODULE_TAB`(탭버튼 id) + `MODULE_VIEW`(뷰 id) + `MOD_LABEL`(한글명) + `ROLE_PRESET`(대표/관리자=do, 직원=기본값). 권한관리 UI(`#mePerms`)는 `MODULES.map(MOD_LABEL[mod])`로 자동 생성되므로 등록만 하면 셀렉트가 자동 추가된다.
+- **탭을 새로 만들면 반드시 모듈 레지스트리에 등록**해 권한관리·게이팅에 자동 반영한다. 등록 위치 6곳: `MODULES` 배열 + `MODULE_TAB`(탭버튼 id) + `MODULE_VIEW`(뷰 id) + `MOD_LABEL`(한글명) + `ROLE_PRESET`(대표/관리자=do, 직원=기본값) + `PERM_ORDER`(권한 열 순서 한 벌 = 사이드바 순서 — 그 탭의 사이드바 자리에 넣는다, v429. uismoke 4a가 MODULES와 같은 집합인지, v429 묶음이 사이드바 순서인지 대조). 권한관리 표(`renderPermMgmt`)와 인사 카드 숨김 블록(`#mePerms`)은 `permModList()`(= PERM_ORDER 중 MODULES에 있는 것)로 생성되므로 등록만 하면 열·셀렉트가 자동 추가된다.
 - **모듈 id = 백엔드 `gw-data.js`의 `COL` 권한키와 반드시 일치**시킨다(예: 계약 con, 거래처 cli, 문서함 doc). 데이터 컬렉션이 있으면 `COL`에 `컬렉션명:'모듈id'` 추가 + 프런트 `_urlCollection`에 매핑.
 - **탭 내 mutating 동작은 `canDo("모듈id")` 가드**, 뷰는 `MODULE_VIEW` readonly로 자동 게이팅.
 - 예외: **관리자 전용 고정 탭**(bid/hr/fam/perm/progress)은 `MODULES`에 등록하지 않는다(부동산 onbid는 v428부터 따로 된 탭이 아니라 입찰 탭 안 [부동산] 칸 — `switchTab("bid:onbid")`, 옛 이름 onbid는 별칭) — 권한관리 매트릭스에 노출되면 안 되는 탭이라 applyPerms의 `isAdmin()` 게이트 2줄 + 서버 403(ADMIN_ONLY)만으로 게이팅한다(2026-09-03 명문화).
-- 예외: **안전(safety) 탭**(v428, 메뉴 56 1단계 — 옛 현장 자리)은 3단계 전까지 레지스트리 밖이다. 탭 버튼 `tabSafetyBtn`·칩·칸 표시는 `safetyPanes()`(현장 칸 = `site`, 교육·검진 칸 = `hr`)와 `applySafetyPerms()`가 정한다. `MODULE_TAB.site = sfChipSite`(현장 칩)·`MODULE_VIEW.site = sfPaneSite`(보기 권한 readonly는 칸에만)라 site의 탭·뷰 id는 탭 버튼·뷰가 아니라 칩·칸이다. **safety 권한 키는 위 등록 규칙대로 미리 넣지 않는다** — 3단계에서 앱 7곳(MODULES·MODULE_TAB·MODULE_VIEW·MOD_LABEL·ROLE_PRESET·PERM_ORDER·PERM_CLOSED)·서버 6곳(gw-data COL·PERM_CLOSED, gw-auth MODULES·ROLE_OPEN_PERMS·CLOSED_DEFAULT, _lib/ask.js PERM_CLOSED — 기본 숨김 4곳 포함)을 한 커밋으로 등록한다(기본 숨김이 한 곳이라도 빠지면 저장 때 '보기'가 채워져 교육·검진이 전원에게 열린다). uismoke v428 ⑨가 `tabSafetyBtn`이 MODULE_TAB 밖인지 지킨다.
+- 예외: **안전(safety) 탭**(v428, 메뉴 56 1단계 — 옛 현장 자리)은 3단계 전까지 레지스트리 밖이다. 탭 버튼 `tabSafetyBtn`·칩·칸 표시는 `safetyPanes()`(현장 칸 = `site`, 교육·검진 칸 = `hr`)와 `applySafetyPerms()`가 정한다. `MODULE_TAB.site = sfChipSite`(현장 칩)·`MODULE_VIEW.site = sfPaneSite`(보기 권한 readonly는 칸에만)라 site의 탭·뷰 id는 탭 버튼·뷰가 아니라 칩·칸이다. **safety 권한 키는 위 등록 규칙대로 미리 넣지 않는다** — 3단계에서 앱 7곳(MODULES·MODULE_TAB·MODULE_VIEW·MOD_LABEL·ROLE_PRESET·PERM_ORDER(사이드바 순서 — site 앞)·PERM_CLOSED)·서버 6곳(gw-data COL·PERM_CLOSED, gw-auth MODULES·ROLE_OPEN_PERMS·CLOSED_DEFAULT, _lib/ask.js PERM_CLOSED — 기본 숨김 4곳 포함)을 한 커밋으로 등록한다(기본 숨김이 한 곳이라도 빠지면 저장 때 '보기'가 채워져 교육·검진이 전원에게 열린다). uismoke v428 ⑨가 `tabSafetyBtn`이 MODULE_TAB 밖인지 지킨다.
 - **담당/지시 배정은 회원 id로 매칭(자연어 이름 금지)**: 담당 입력칸(taskWho/teWho/conWho/reAssignee)은 **회원 드롭다운(`fillMemberSelect`, value=회원 id, `__all__`=전사, ""=담당없음)**. 태스크는 `who_id`(+표시용 `who`=이름)·`from_id`를 저장. 인박스/가시성은 `taskForMe(t)`(담당 id=본인 OR 전사 OR 지시자 id=본인, 구데이터는 이름 호환)로 판정. 신규 직원도 id 매칭이라 자동 동작. 이름 문자열 매칭은 폐기(오타·동명이인으로 전달 깨짐).
 - ⚠️ **개인 인박스("내게 온 지시")·"내가 할 일"은 권한과 무관하게 항상 노출**: 업무(check) 탭은 `applyPerms`에서 절대 숨기지 않으며(특례), 그 안의 주기 체크리스트만 `.check-only`로 check 권한 게이팅. 지시(tasks) 권한이 hide여도 담당/지시자에게 배정된 미완료 지시는 반드시 보여야 한다.
 
@@ -64,7 +64,7 @@
 ## 앱 구조 메모
 - 앱 명칭: **종운 그룹웨어**(manifest/title). 좌상단 헤더는 `종운환경 · 종운건설`.
 - 탭: `홈`(대시보드·기본) / `지시`(tasks·관리자 등록/관리) / `차량`(vehicles) / `기성`(receivables·구 수금) / `인허가`(licenses) / `업무`(구 주기업무: 상단 "내게 온 지시" 개인 인박스 + 주기 체크리스트, 내부 id는 `check` 유지).
-- **반응형**: 모바일=상단 가로 탭(세그먼트), PC(≥860px)=좌측 세로 사이드바 + 우측 콘텐츠. `.layout`(flex)/`.tabbar`/`.views` 구조, 미디어쿼리로 전환.
+- **반응형**: 폰(859px 이하)=헤더 ☰ 버튼으로 여는 세로 목록(묶음 제목·구분선 포함), PC(≥860px)=좌측 세로 사이드바 + 우측 콘텐츠. `.layout`(flex)/`.tabbar`/`.views` 구조, 미디어쿼리로 전환.
 - 데이터 파일별로 독립 로드·저장·충돌병합(sha 기반 PUT, 409/422 시 재조회 후 id 병합). tasks·receivables·licenses·vehicles 모두 병합 키 item.id, del=1 우선. (vehicles도 이제 편집 저장)
 - 대시보드 만기(경과·임박)는 차량 + 인허가를 합산. 만기·지시 행의 `캘린더` 버튼은 .ics 알람 연동.
 - SW 셸 캐시는 cache-first이므로 index.html 변경 시 sw.js의 `SHELL_CACHE` 버전을 반드시 올린다(현재 jw-shell-v15).

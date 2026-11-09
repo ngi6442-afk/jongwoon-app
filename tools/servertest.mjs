@@ -2099,17 +2099,37 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   T('석면: 재조회한 base로 재저장하면 200 — 새 기록이 1건만 늘어난다(중복은 화면 오해에서 생겼지 저장에서 생기지 않았다)',
     r.code === 200 && mem.gw_data['col:asbestos'].items.length === 2, String(r.code) + '/' + mem.gw_data['col:asbestos'].items.length);
 
-  // ④ 석면 대장은 인허가(lic) 권한을 공유한다. 이 대장에는 근로자 인적사항(30년 보존)이 들어간다.
-  //    v339(PM 2026-09-10 "인허가 석면은 운영 및 관리부만"): 기본값을 view → hide로 뒤집었다.
-  //    권한을 명시로 받은 사람만 열린다. 아래 두 검사가 그 사실을 고정한다(전에는 반대 사실을 고정하고 있었다).
+  // ④ 석면 대장(현장 대장 — 석면·철거·준설, 안전 › 현장)은 현장(site) 권한으로 연다(gw-data COL asbestos:'site').
+  //    2026-09-10 인허가(lic)에서 분리했다(이 절의 옛 주석·라벨은 lic 공유로 적혀 있었다 — v429에 바로잡음). 이 대장에는 근로자 인적사항(30년 보존)이 들어간다.
+  //    v339(PM 2026-09-10 "인허가 석면은 운영 및 관리부만", c463117): lic 기본값을 view → hide로 뒤집었다(그때 석면 대장은 lic를 함께 썼다).
+  //    v347(같은 날, df1c818): 현장(site) 키 신설 — COL asbestos lic → site, PERM_CLOSED에 site(처음부터 닫힘). v347이 이 절을 안 고쳐 v429까지 라벨이 lic로 남았다.
+  //    권한을 명시로 받은 사람만 열린다. 아래 검사들이 그 사실을 고정한다(전에는 반대 사실을 고정하고 있었다). 이유 코드까지 본다 — 기기 미승인(DEVICE_NOT_APPROVED) 같은 다른 403으로 통과하지 않게(v429 검토).
   r = await call({ action: 'get', collection: 'asbestos' }, tokW, 'dev1');
-  T('석면: lic 미지정 직원은 차단된다(v339 기본 숨김 — 관리부·운영부만 명시 부여)', r.code === 403, String(r.code));
+  T('석면: site 미지정 직원은 차단된다(기본 숨김 — 관리부·운영부만 명시 부여)', r.code === 403 && r.body.error_code === 'NO_ACCESS', String(r.code) + '/' + r.body.error_code);
   r = await call({ action: 'get', collection: 'licenses' }, tokW, 'dev1');
-  T('인허가: lic 미지정 직원도 같은 규칙으로 차단(석면과 같은 권한을 공유하므로 한쪽만 열리면 안 된다)', r.code === 403, String(r.code));
-  mem.gw_users['member:uwork'].perms.lic = 'hide';
+  T('인허가: lic 미지정 직원도 차단된다(v339 기본 숨김 — 키는 현장 대장 site와 따로)', r.code === 403 && r.body.error_code === 'NO_ACCESS', String(r.code) + '/' + r.body.error_code);
+  mem.gw_users['member:uwork'].perms.site = 'hide';
   r = await call({ action: 'get', collection: 'asbestos' }, tokW, 'dev1');
-  T('석면: lic=숨김으로 지정한 직원은 차단된다(대장은 lic 권한을 공유)', r.code === 403, String(r.code) + '/' + r.body.error_code);
+  T('석면: site=숨김으로 지정한 직원은 차단된다(대장 키는 현장 site)', r.code === 403 && r.body.error_code === 'NO_ACCESS', String(r.code) + '/' + r.body.error_code);
+  delete mem.gw_users['member:uwork'].perms.site;
+  // ⑤ v429(메뉴 56 2단계): 앱의 현장 대장 판정 6곳(loadAsb·캘린더 석면 일정·계약 연결 탭 4곳 — csLinkSiteLater 1·csSiteDone 1·csLinksHtml 2)을 canSee('lic') → canSee('site')로 맞춘 근거 —
+  //    서버는 대장을 현장 권한 하나로 연다. 현장 보기만 있고 인허가가 숨김인 사람은 읽고, 인허가 수행만 있고 현장 권한이 없는 사람은 못 읽는다.
+  //    (같은 직원의 인허가 읽기를 함께 봐서 권한 값이 실제로 먹었는지 확인 — 인허가 문서가 없으면 mock이 500을 내므로 이 절에서만 빈 문서를 둔다)
+  const licSeeded = !Object.prototype.hasOwnProperty.call(mem.gw_data, 'col:licenses');
+  if (licSeeded) mem.gw_data['col:licenses'] = { schema: 1, items: [], updated_at: 1 };
+  mem.gw_users['member:uwork'].perms.site = 'view';
+  r = await call({ action: 'get', collection: 'asbestos' }, tokW, 'dev1');
+  const rLicH = await call({ action: 'get', collection: 'licenses' }, tokW, 'dev1');
+  T('석면(v429): site 보기 · lic 미지정(숨김) 직원은 대장을 읽는다(200, 2건) — 인허가 권한 없이 현장 권한 하나로 열린다',
+    r.code === 200 && Array.isArray(r.body.doc && r.body.doc.items) && r.body.doc.items.length === 2 && rLicH.code === 403, [r.code, r.body.doc && r.body.doc.items && r.body.doc.items.length, rLicH.code].join('/'));
+  delete mem.gw_users['member:uwork'].perms.site;
+  mem.gw_users['member:uwork'].perms.lic = 'do';
+  r = await call({ action: 'get', collection: 'asbestos' }, tokW, 'dev1');
+  const rLicD = await call({ action: 'get', collection: 'licenses' }, tokW, 'dev1');
+  T('석면(v429): lic 수행만 있고 site 미지정인 직원은 차단된다(403 NO_ACCESS) — 같은 직원의 인허가 읽기는 200(권한 자체는 살아 있음)',
+    r.code === 403 && r.body.error_code === 'NO_ACCESS' && rLicD.code === 200, [r.code, r.body.error_code, rLicD.code].join('/'));
   delete mem.gw_users['member:uwork'].perms.lic;
+  if (licSeeded) delete mem.gw_data['col:licenses'];
 
   delete mem.gw_data['col:asbestos'];
 }

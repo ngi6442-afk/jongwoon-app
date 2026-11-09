@@ -1424,7 +1424,7 @@ try {
     && /function csAlignTasksAll\(\)/.test(sc) && /if \(typeof csAlignTasksAll === "function"\)\{ try \{ csAlignTasksAll\(\); \}/.test(html)
     && /if\(c\.scen && csApprKindOf\(c, s\) && !\(s\.appr && s\.appr\.status==="승인"\)\)\{/.test(html) && /return adv===false \? "locked" : "done";/.test(html) && /var adv = advanceProc\(t\);   \/\/ v384 2차 F5/.test(html)
     && /indexOf\("con:"\) === 0\)\{   \/\/ v384/.test(html) && /indexOf\("con:"\) === 0 && typeof csApprOnDecided === "function"\)\{ try \{ csApprOnDecided\(it\); \}/.test(html) && /csApprSync\(c\); h \+= csStagesHtml\(c\);/.test(html) && /csApprSync\(c, true\); return; \}/.test(html) && /data-cs-done="' \+ esc\(c\.id\) \+ '\|' \+ esc\(key\) \+ '">' \+ esc\(ak\) \+ ' 상신</.test(html), '');
-  T('v384 대장: csLinkSiteLater(미로드·로컬에 없는 대장 → lic 있으면 loadAsb+큐) · csLinkSite(asbLoaded 가드·자기 con_id 행 재연결·삭제 대장 재연결·종결 대장 제외·공사명 또는 발주처+현장·none 해제·옛 계약은 연결만) · startProcess → csLinkSiteLater · csOnDone(scen, task_hook) · csSiteDone(scen, site_hook, 없음≠삭제) · loadAsb/loadContracts → csSiteHooksRetry · 연결 탭 안내 + [대장 연결] · 서버 변경 없음',
+  T('v384 대장: csLinkSiteLater(미로드·로컬에 없는 대장 → 현장 열람 권한(site — v429) 있으면 loadAsb+큐) · csLinkSite(asbLoaded 가드·자기 con_id 행 재연결·삭제 대장 재연결·종결 대장 제외·공사명 또는 발주처+현장·none 해제·옛 계약은 연결만) · startProcess → csLinkSiteLater · csOnDone(scen, task_hook) · csSiteDone(scen, site_hook, 없음≠삭제) · loadAsb/loadContracts → csSiteHooksRetry · 연결 탭 안내 + [대장 연결] · 서버 변경 없음',
     /function csLinkSiteLater\(c\)/.test(sc) && /if \(!loaded \|\| \(c\.site_id && !findAsb\(c\.site_id\)\)\)\{/.test(sc) && /csSiteLinkQueue\[c\.id\] = 1; if \(typeof loadAsb === "function"\) loadAsb\(\); return "wait";/.test(sc)
     && /if \(typeof asbLoaded !== "undefined" && !asbLoaded\) return null;/.test(sc) && /var hit = liveSites\(\)\.filter\(function\(r\)\{ return r\.con_id === c\.id; \}\)\[0\] \|\| null;/.test(sc) && /\|\| r\.con_id \|\| r\.status === "done"\) return;/.test(sc) && /\(sameClient && st && \(rs === st \|\| rt === st\)\)\) hit = r;/.test(sc) && !/r\.start === c\.start/.test(sc)
     && /if \(c\.site_hook === "none"\) delete c\.site_hook;/.test(sc) && /if \(c\.scen && c\.status === "done"\) csSiteDone\(c\);/.test(sc)
@@ -2206,6 +2206,148 @@ try {
     && Number((sw28.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 428,
     '도움말 어긋남: ' + helpBad28.map((g) => g + '[' + helpLn28(g) + ' ≠ ' + (grp28[g] || []).join(' / ') + ']').join(' ') + ' / MANUAL 어긋남: ' + manBad28.join(',') + ' / MANUAL 옛 문장: ' + oldMan28.join(' | '));
 } catch (e) { console.log('  (v428 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ---- v429(11/9 메뉴 56 2단계, PM "56. ㄱ"): 작은 정리 — 직원 화면 변화 없음. 권한 키 등록·서버 동작은 그대로(3·4단계 일).
+//      ① 현장 대장 판정 canSee('lic') 6곳 → canSee('site')(서버 col:asbestos = site라 이미 403) — 캘린더 석면 일정의 배지·점(mod lic)은 그대로(PM 시안 결정 대기)
+//      ② 권한 열 순서 한 벌(PERM_ORDER = 사이드바 순서 — 인사 카드 숨김 블록의 두 번째 순서 permOrder를 지우고 permModList) ③ 쓰지 않는 TAB_LABELS 삭제
+//      ④ 관리자 홈 KPI '결재 대기' → '승인 대기'(값은 approvalInboxItems 수 그대로). 판정은 index.html에서 함수를 뽑아 권한별로 실제로 돌려 본다.
+//      검토 반영(같은 커밋): csSiteDone 쓰기 판정 = 현장 수행(canDo site) · 그대로 둘 인허가 판정 3줄 고정 · [대장 연결] 안내 '(현장)' · 열 순서 엄격 증가(같은 탭 짝은 3단계 safety>site만) · MANUAL 15·28절 문장
+try {
+  const fn29 = (name) => { const i = html.indexOf('function ' + name + '('); if (i < 0) throw new Error('함수 없음: ' + name); let d = 0, st = false; for (let j = i; j < html.length; j++) { const ch = html[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return html.slice(i, j + 1); } } throw new Error('중괄호 짝 안 맞음: ' + name); };
+  const sw29 = readFileSync(join(ROOT, 'sw.js'), 'utf8'), man29 = readFileSync(join(ROOT, 'MANUAL.html'), 'utf8');
+  const LIC29 = /canSee\(\s*["']lic["']\s*\)/g, SITE29 = /canSee\(\s*["']site["']\s*\)/g;
+  const cnt29 = (s, re) => (s.match(re) || []).length;
+  const permStub29 = 'function canSee(m){ return (__perm[m] || "hide") !== "hide"; } function canDo(m){ return __perm[m] === "do"; }';
+
+  // ① 현장 대장 판정 6곳 — 네 함수에 canSee('lic') 0 · canSee('site') 자리 수 그대로 · 캘린더는 석면 블록만 site(인허가 만료·교육 줄은 lic 그대로)
+  const SITE6_29 = { csLinkSiteLater: 1, csSiteDone: 1, csLinksHtml: 2, loadAsb: 1 };
+  const siteBad29 = Object.keys(SITE6_29).filter((f) => { const s = fn29(f); return cnt29(s, LIC29) !== 0 || cnt29(s, SITE29) !== SITE6_29[f]; });
+  const cal29 = fn29('calEvents');
+  const calAsbOk29 = /if \(canSee\("site"\)\) liveAsb\(\)\.forEach\(function\(r\)\{/.test(cal29) && /if \(canSee\("lic"\)\) licenses\.forEach\(/.test(cal29) && cnt29(cal29, LIC29) === 1 && cnt29(cal29, SITE29) === 1;
+  // 파일 전체: canSee('lic')가 남은 줄은 인허가 줄뿐 — 현장 대장 낱말(asb·Asb·Sites·site_id·현장 대장)과 같은 줄에 없음
+  const licLines29 = html.split('\n').filter((ln) => /canSee\(\s*["']lic["']\s*\)/.test(ln));
+  const licLeak29 = licLines29.filter((ln) => /asb|Asb|Sites|site_id|현장 대장/.test(ln));
+  // 그대로 둘 인허가 판정 3줄 = 캘린더 인허가 만료·교육 · 홈 만기(seeLic) · 전역 검색 인허가 — lic → site 바꾸기가 너무 넓게 번지는 실수를 막는다(v429 검토)
+  const licKeep29 = /seeLic = canSee\("lic"\)/.test(fn29('renderDashboard')) && /add\("lic","인허가",canSee\("lic"\)/.test(html);
+  // [대장 연결] 안내의 noperm 문구도 현장 권한으로(지금은 닿지 않는 갈래 — csLinkSiteLater가 canDo("site")를 먼저 본다)
+  const alert29 = html.indexOf('현장 대장 열람 권한(인허가)') < 0 && html.indexOf('"현장 대장 열람 권한(현장)이 없어 연결할 수 없습니다."') > 0;
+  T('v429 현장 대장 판정 6곳(calEvents 석면 일정 · csLinkSiteLater · csSiteDone · csLinksHtml 문구·[대장 연결] · loadAsb) = canSee("site"), canSee("lic") 0곳(서버 col:asbestos = site) · 캘린더 인허가 만료·교육 줄만 lic 그대로 · 파일 전체 lic 판정 3줄(캘린더 인허가 · 홈 seeLic · 전역 검색 인허가 — 지금 ' + licLines29.length + '줄)에 현장 대장 낱말 0 · [대장 연결] 안내 "열람 권한(현장)"',
+    siteBad29.length === 0 && calAsbOk29 && licLeak29.length === 0 && licLines29.length === 3 && licKeep29 && alert29,
+    '어긋난 함수: ' + siteBad29.join(',') + ' / 캘린더 ' + calAsbOk29 + ' / lic 줄 ' + licLines29.length + ' · 그대로 둘 줄 ' + licKeep29 + ' / 안내 ' + alert29 + ' / 새는 줄: ' + licLeak29.map((s) => s.trim().slice(0, 90)).join(' | '));
+
+  // ① 실행 — calEvents·loadAsb를 뽑아 권한별로 돌린다(현장 보기만 / 인허가만 / 둘 다 / 없음)
+  const calRun29 = (perm) => new Function('__perm', [
+    'var vehicles = [], tasks = [], receivables = [], licenses = [{ name:"석면해체업", expiry:"2027-01-01", edu_due:"2026-12-10" }];',
+    permStub29, 'function isAdmin(){ return false; } function licVisible(){ return true; } function taskVisible(){ return true; } function recVisible(){ return true; }',
+    'function isDate(s){ return /^\\d{4}-\\d{2}-\\d{2}$/.test(s||""); } function fmtAmount(v){ return String(v); } function dispName(n){ return n||""; } function dispNameById(){ return ""; } function memberName(){ return ""; }',
+    'function liveAsb(){ return [{ title:"남성초", start:"2026-11-20", end:"2026-11-25", status:"plan", site:"포항" }]; } function asbNotifyDue(){ return "2026-11-13"; }',
+    'function liveEdu(){ return []; } function eduPersonName(){ return ""; } function eduKindLabel(){ return ""; }',
+    'function liveLeaves(){ return []; } function isPartialLeave(){ return false; } function leaveCalVisible(){ return false; } function leaveTypeLabel(){ return ""; }',
+    fn29('pad'), fn29('fmtDate'), fn29('eachDate'), cal29, 'return calEvents();'].join('\n'))(perm);
+  const isAsb29 = (e) => /🦺|⚠|🧪/.test(e.label);
+  const nAsb29 = (ev) => ev.filter(isAsb29).length, nLic29 = (ev) => ev.filter((e) => e.mod === 'lic' && !isAsb29(e)).length;
+  const cS29 = calRun29({ site: 'view' }), cL29 = calRun29({ lic: 'do' }), cB29 = calRun29({ site: 'do', lic: 'view' }), cN29 = calRun29({});
+  const asbLoad29 = (perm) => { const calls = []; new Function('__perm', '__calls', [permStub29,
+    'function gwCall(fn, body){ __calls.push(fn + ":" + body.action + ":" + body.collection); return { then: function(){ return { catch: function(){} }; } }; }',
+    fn29('loadAsb'), 'loadAsb();'].join('\n'))(perm, calls); return calls.join(','); };
+  const la29 = [asbLoad29({ site: 'view' }), asbLoad29({ lic: 'do' }), asbLoad29({ site: 'hide', lic: 'view' }), asbLoad29({ site: 'do', lic: 'hide' })];
+  T('v429 현장 대장 판정 실행(calEvents·loadAsb를 뽑아 권한별로 돌림): 현장 보기만·인허가 숨김(1단계 남은 걱정 "안전 › 현장 목록이 비어 보임"의 사람) = 대장을 읽고(gw-data get asbestos) 석면 일정 4건 · 인허가만(권민지형) = 대장을 안 읽고 석면 일정 0·인허가 일정 2 · 둘 다(김정아·정재욱형) = 4+2, 석면 배지·점 mod lic·이동 safety:site 그대로 · 없음 = 0',
+    nAsb29(cS29) === 4 && nLic29(cS29) === 0 && nAsb29(cL29) === 0 && nLic29(cL29) === 2 && nAsb29(cB29) === 4 && nLic29(cB29) === 2 && cN29.length === 0
+    && cB29.filter(isAsb29).every((e) => e.mod === 'lic' && e.go === 'safety:site')
+    && la29[0] === 'gw-data:get:asbestos' && la29[1] === '' && la29[2] === '' && la29[3] === 'gw-data:get:asbestos',
+    JSON.stringify({ cal: [cS29, cL29, cB29, cN29].map((ev) => nAsb29(ev) + '+' + nLic29(ev)), load: la29 }));
+
+  // ① 실행 — 계약 연결 탭(csLinkSiteLater·csSiteDone·csLinksHtml): 대장을 못 받은 기기에서 현장 권한이면 받아서 연결
+  const csl29 = (perm) => { const log = []; const r = new Function('__perm', '__log', ['var asbLoaded = false, csSiteLinkQueue = {};', permStub29,
+    'function csSiteKindOf(){ return "asbestos"; } function findAsb(){ return null; } function loadAsb(){ __log.push("loadAsb"); } function csLinkSite(){ __log.push("link"); return null; }',
+    fn29('csLinkSiteLater'), 'return csLinkSiteLater({ id:"c1", type:"asbestos" });'].join('\n'))(perm, log); return r + (log.length ? '+' + log.join('+') : ''); };
+  const csd29 = (perm) => { const log = []; const r = new Function('__perm', '__log', ['var asbLoaded = false;', permStub29,
+    'function findAsb(){ return null; } function loadAsb(){ __log.push("loadAsb"); }',
+    fn29('csSiteDone'), 'return csSiteDone({ id:"c1", scen:"asbestos:pub", site_id:"a1", status:"done" });'].join('\n'))(perm, log); return r + (log.length ? '+' + log.join('+') : ''); };
+  const clh29 = (perm) => new Function('__perm', ['var asbLoaded = false;', permStub29,
+    'function csRec(){ return null; } function fmtAmount(v){ return String(v); } function findAsb(){ return null; } function csSiteKindOf(){ return "asbestos"; }',
+    fn29('esc'), fn29('csLinksHtml'), 'return csLinksHtml({ id:"c1", type:"asbestos", pipes:[] });'].join('\n'))(perm);
+  const cl29 = [csl29({ site: 'do' }), csl29({ site: 'do', lic: 'do' }), csl29({ lic: 'do' }), csl29({ site: 'view', lic: 'do' })];
+  const cd29 = [csd29({ site: 'do' }), csd29({ site: 'view' }), csd29({ lic: 'do' })];
+  const hS29 = clh29({ site: 'do' }), hL29 = clh29({ site: 'view', lic: 'do' });
+  T('v429 계약 연결 탭 실행(csLinkSiteLater·csSiteDone·csLinksHtml): 대장을 아직 못 받은 기기 — 현장 수행·인허가 숨김이어도 대장을 받아 연결 큐에("wait", 종전 lic 판정이면 "noperm") · 종결 훅도 대장을 받으러 감 · 연결 탭 "대장을 아직 불러오지 않음" + [대장 연결] / 현장 권한이 수행이 아니면 건너뜀·버튼 없음·"현장 권한 필요"',
+    cl29.join(',') === 'wait+loadAsb,wait+loadAsb,skip,skip' && cd29.join(',') === 'false+loadAsb,false+loadAsb,false'
+    && hS29.indexOf('대장을 아직 불러오지 않음') >= 0 && hS29.indexOf('data-cs-site="c1"') >= 0 && hL29.indexOf('연결 없음(현장 권한 필요)') >= 0 && hL29.indexOf('data-cs-site=') < 0,
+    JSON.stringify({ link: cl29, done: cd29, html: [hS29.indexOf('data-cs-site="c1"') >= 0, hL29.indexOf('현장 권한 필요') >= 0] }));
+
+  // ① 실행(v429 검토) — csSiteDone 쓰기 판정: 대장을 받은 기기(①로 현장 보기만 있어도 받는다)에서 행을 찾았을 때 대장 종결·실적 초안·site_hook은 현장 수행만
+  const csdW29 = (perm, del) => { const log = [], row = { id: 'a1', kind: 'asbestos', title: '남성초', status: 'run' }, c = { id: 'c1', type: 'asbestos', scen: 'asbestos:pub', site_id: 'a1', status: 'done' };
+    if (del) row.del = 1;
+    const r = new Function('__perm', '__log', '__row', '__c', ['var asbLoaded = true;', permStub29,
+      'var CON_SITE_BIZ = { asbestos:"비계ㆍ구조물해체공사업" }, CON_SITE_CORP = { asbestos:"주식회사 종운건설" };',
+      'function findAsb(){ return __row; } function loadAsb(){ __log.push("loadAsb"); } function conAmtEff(){ return 1000; } function csSiteKindOf(){ return "asbestos"; } function todayStr(){ return "2026-11-09"; }',
+      'function scheduleAsbSave(){ __log.push("asbSave"); } function scheduleContractSave(){ __log.push("conSave"); }',
+      fn29('csSiteDone'), 'return csSiteDone(__c);'].join('\n'))(perm, log, row, c);
+    return [r, row.status, c.site_hook || '-', (row.ks && row.ks.draft) ? 'draft' : '-', log.join('+') || '-'].join('/'); };
+  const cw29 = [csdW29({ site: 'do', con: 'do' }), csdW29({ site: 'view', con: 'do' }), csdW29({ site: 'view', con: 'do' }, true), csdW29({ site: 'do', con: 'do' }, true)];
+  T('v429 검토 csSiteDone 쓰기 판정(대장을 받은 기기에서 실행): 현장 수행 = 대장 종결·실적 초안·site_hook(대장·계약 저장) · 현장 보기 + 계약 수행 = 아무것도 안 씀(서버는 보기 권한의 대장 저장을 NO_WRITE로 거절 — 계약에만 site_hook이 남아 다시 안 도는 어긋남 차단, 현장 수행 기기가 loadAsb 뒤 csSiteHooksRetry로 처리) · 삭제된 대장의 "none" 표식도 현장 수행만',
+    cw29.join(',') === 'true/done/2026-11-09/draft/asbSave+conSave,false/run/-/-/-,false/run/-/-/-,false/run/none/-/conSave',
+    JSON.stringify(cw29));
+
+  // ② 권한 열 순서 한 벌 = 사이드바 순서 — 모듈마다 사이드바 탭으로 풀어(site는 안전 탭 안 현장 칩) 순서를 대조, 인사 카드 숨김 블록은 뽑아서 돌림
+  const nav29 = html.slice(html.indexOf('<nav class="tabbar" id="tabbar">'), html.indexOf('</nav>'));
+  const navBtn29 = [...nav29.matchAll(/data-tab="([\w-]+)" id="(\w+)"/g)].map((m) => ({ tab: m[1], id: m[2] }));
+  const MT29 = {}; [...((html.match(/var MODULE_TAB = \{([^}]+)\}/) || ['', ''])[1]).matchAll(/(\w+):"(\w+)"/g)].forEach((m) => { MT29[m[1]] = m[2]; });
+  const views29 = [...html.matchAll(/<section class="view" id="view-([\w-]+)">/g)].map((m) => m[1]);
+  const secOf29 = (t) => { const i = html.indexOf('<section class="view" id="view-' + t + '">'); return html.slice(i, html.indexOf('</section>', i)); };
+  const tabOf29 = (k) => { const id = MT29[k]; if (!id) return ''; const b = navBtn29.find((x) => x.id === id); if (b) return b.tab; return views29.find((t) => secOf29(t).indexOf('id="' + id + '"') >= 0) || ''; };
+  const PO29 = ((html.match(/var PERM_ORDER = \[([^\]]+)\]/) || ['', ''])[1].match(/"(\w+)"/g) || []).map((s) => s.replace(/"/g, ''));
+  const pos29 = PO29.map((k) => navBtn29.findIndex((x) => x.tab === tabOf29(k)));
+  // 사이드바 자리는 엄격히 증가 — 같은 탭으로 풀리는 열은 허용한 짝만(v429 검토: 종전 '같은 탭 1쌍 허용'은 아무 짝이나 통과시켜, 인허가가 안전 탭으로 풀리는 결함도 놓쳤다).
+  //   허용 짝 = 3단계 계획(코드 지도 code.steps[2]): 안전(safety — MODULE_TAB sfChipEdu)·현장(site — sfChipSite) 열은 둘 다 안전 탭 안 칩이라 같은 자리로 풀린다 — 안전 열이 현장 열 바로 앞
+  const SAME29 = { 'safety>site': 1 };
+  const same29 = pos29.map((p, i) => (i > 0 && p >= 0 && p === pos29[i - 1]) ? PO29[i - 1] + '>' + PO29[i] : '').filter(Boolean);
+  const mono29 = pos29.every((p, i) => p >= 0 && (i === 0 || p > pos29[i - 1] || (p === pos29[i - 1] && SAME29[PO29[i - 1] + '>' + PO29[i]] === 1)));
+  const codeOnly29 = html.split('\n').map((ln) => ln.replace(/\/\/.*$/, '')).join('\n');
+  const ome29 = fn29('openMemberEdit');
+  const pI29 = ome29.indexOf('var manageMods'), pJ29 = ome29.indexOf('}).join("");', pI29);
+  const permSnip29 = (pI29 >= 0 && pJ29 > pI29) ? ome29.slice(pI29, pJ29 + '}).join("");'.length) : '';
+  const stmt29 = (re) => (html.match(re) || [''])[0];
+  const D29 = { mePerms: { innerHTML: '' } };
+  new Function('__D', ['var document = { getElementById: function(id){ return __D[id] || null; } };',
+    stmt29(/var MODULES = \[[^\]]+\];/), stmt29(/var PERM_ORDER = \[[^\]]+\];/), stmt29(/var MOD_LABEL = \{[^}]+\};/), fn29('permModList'),
+    'var perms = {};', permSnip29].join('\n'))(D29);
+  const meRows29 = [...D29.mePerms.innerHTML.matchAll(/<div class="perm-divider"><\/div>|data-perm="(\w+)"/g)].map((m) => m[1] || '|');
+  const mg29 = nav29.slice(nav29.indexOf('<div class="nav-group">관리</div>'), nav29.indexOf('<div class="nav-divider">'));
+  const mgTabs29 = [...mg29.matchAll(/data-tab="([\w-]+)"/g)].map((m) => m[1]);
+  const mgMods29 = PO29.filter((k) => mgTabs29.indexOf(tabOf29(k)) >= 0);
+  const wantRows29 = mgMods29.concat(['|'], PO29.filter((k) => mgMods29.indexOf(k) < 0));
+  const ML29 = {}; [...stmt29(/var MOD_LABEL = \{[^}]+\};/).matchAll(/(\w+):"([^"]+)"/g)].forEach((m) => { ML29[m[1]] = m[2]; });
+  const manCols29 = PO29.map((k) => ML29[k]).join(' / ');
+  T('v429 권한 열 순서 한 벌 = 사이드바 순서(' + PO29.join('·') + '): 모듈마다 사이드바 탭으로 풀리고(site = 안전 탭 안 현장 칩) 사이드바 자리가 엄격히 증가(같은 탭 짝은 3단계 safety>site만 — 지금 ' + (same29.join('·') || '0') + ') · PERM_ORDER를 쓰는 코드는 permModList 하나(권한관리 표·인사 카드) · 인사 카드 숨김 블록(openMemberEdit 실행) = 같은 순서 + 관리 묶음(' + mgMods29.join('·') + ') 뒤 구분선 1개 · MANUAL 21-2 열 목록 = 같은 순서',
+    PO29.length >= 12 && mono29 && same29.every((s) => SAME29[s] === 1) && new Set(pos29).size === PO29.length - same29.length && (codeOnly29.match(/\bPERM_ORDER\b/g) || []).length === 2 && /function permModList\(\)\{ return PERM_ORDER\.filter\(/.test(html)
+    && /var mods = permModList\(\);/.test(fn29('renderPermMgmt')) && /getElementById\("mePerms"\)\.innerHTML = permModList\(\)\.map\(/.test(ome29)
+    && meRows29.join(',') === wantRows29.join(',') && mgMods29.join(',') === 'tasks,rec,cli,wk' && man29.indexOf('표의 열은 사이드바 순서와 같습니다 — ' + manCols29 + '.') > 0,
+    'PERM_ORDER ' + PO29.join(',') + ' → 사이드바 자리 ' + pos29.join(',') + ' (같은 탭 짝 ' + (same29.join(',') || '없음') + ') / 인사 카드 ' + meRows29.join(',') + ' (기대 ' + wantRows29.join(',') + ') / MANUAL 열 ' + manCols29);
+
+  T('v429 쓰지 않는 상수·두 번째 순서 0곳: TAB_LABELS(부동산 onbid 잔재 포함) · permOrder 없음',
+    html.indexOf('TAB_LABELS') < 0 && !/\bpermOrder\b/.test(html) && !/onbid:"부동산"/.test(html), '');
+
+  // ④ 관리자 홈 KPI 이름 — 값은 그대로(승인 대기함과 같은 수)
+  const rd29 = fn29('renderDashboard');
+  T('v429 관리자 홈 KPI 이름 "승인 대기"(종전 "결재 대기") — 값은 그대로 approvalInboxItems 수(아래 승인 대기함 머리 숫자와 같음) · 대표 결재함 배지(🧾 aria-label 결재 대기)는 그대로',
+    /tiles \+= '<div class="stat-tile"><div class="lbl">승인 대기<\/div><div class="val">' \+ reviewCount \+ '<span class="unit">건<\/span><\/div><\/div>';/.test(rd29)
+    && /var inbox = approvalInboxItems\(\);\s*\n\s*var reviewCount = inbox\.length;/.test(rd29) && /승인 대기함 <span class="cnt">' \+ inbox\.length/.test(rd29)
+    && html.indexOf('<div class="lbl">결재 대기</div>') < 0 && /aria-label="결재 대기"/.test(html), '');
+
+  T('v429 주석 정리: CSS "폰(859px 이하)=☰ 세로 목록, PC=좌측 사이드바"(옛 "모바일=상단 탭" 없음) · gw-data COL 주석 asbestos = 현장 대장(안전 › 현장, site 권한, 30년 보존), "lic 권한을 공유" 없음 · 매핑 asbestos:\'site\' 그대로 · sw ≥ 429',
+    html.indexOf('/* 반응형: 폰(859px 이하)=☰ 세로 목록, PC=좌측 사이드바 */') > 0 && html.indexOf('모바일=상단 탭') < 0
+    && gwd.indexOf('asbestos=현장 대장(안전 › 현장, site 권한, 30년 보존') > 0 && gwd.indexOf('lic 권한을 공유') < 0 && /asbestos: 'site'/.test((gwd.match(/const COL = \{([^}]+)\}/) || ['', ''])[1])
+    && Number((sw29.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 429, '');
+
+  // MANUAL 15·28절 — 캘린더 현장 일정 = 현장 권한(①로 옛 문장 "인허가 권한이 있는 분에게만"이 틀린 말이 되어 고침 — 되돌림 방지, v429 검토). 15절 괄호는 목록 머리(네 일정 모두)에
+  const man15_29 = man29.slice(man29.indexOf('<h2 id="s15">'), man29.indexOf('<h2 id="s16">'));
+  const man28_29 = man29.slice(man29.indexOf('<h2 id="s28">'), man29.indexOf('<h2 id="s29">'));
+  T('v429 MANUAL 15·28절 캘린더 현장 일정 = 현장 권한: 15절 "작업 일정(현장 권한이 있는 분만) — 착수·종료 · 작업신고 마감 · 농도측정"(괄호가 네 일정 모두에 걸림) · 28절 "캘린더 표시도 이 칸과 같은 현장 권한으로 정해지고(인허가 권한과 따로)" · 옛 문장 "캘린더 표시는 인허가 권한이 있는 분에게만" 0',
+    man15_29.indexOf('<li>현장 대장(안전 › 현장)의 작업 일정(현장 권한이 있는 분만) — 착수·종료 🦺, 작업신고 마감 ⚠, 농도측정 🧪</li>') > 0
+    && man28_29.indexOf('캘린더 표시도 이 칸과 같은 현장 권한으로 정해지고(인허가 권한과 따로), 캘린더에서 누르면 이 칸이 열립니다.') > 0
+    && man29.indexOf('캘린더 표시는 인허가 권한이 있는 분에게만') < 0, '');
+} catch (e) { console.log('  (v429 검사 생략 — ' + e.message + ')'); fails++; }
 
 try {
   const fdir = join(ROOT, 'netlify', 'functions');
