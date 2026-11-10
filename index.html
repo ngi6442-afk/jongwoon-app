@@ -1131,7 +1131,7 @@
     .layout{gap:16px;}
     .tabbar{width:168px;}
     .views>.view{max-width:808px;}
-    #view-tasks,#view-rec,#view-cli,#view-workers,#view-con,#view-veh,#view-perm{max-width:none;}   /* v439 지시(#view-tasks) · v440 기성(#view-rec) · v441 거래처(#view-cli) · v442 일용직(#view-workers)을 더함 — v443에서 #view-bid를 더함 */
+    #view-tasks,#view-rec,#view-cli,#view-workers,#view-bid,#view-con,#view-veh,#view-perm{max-width:none;}   /* v439 지시(#view-tasks) · v440 기성(#view-rec) · v441 거래처(#view-cli) · v442 일용직(#view-workers) · v443 입찰(#view-bid — 부동산 칸은 v444까지 옛 카드)을 더함 */
     #sfPaneNow,#view-perm>:not(#permRoster){max-width:808px;}
     #recAddCard,#recImportCard,#recAbCard,#recAgingSummary{max-width:808px;}   /* v440 기성: 표만 넓고, 머리 버튼으로 펼치는 카드 셋(청구 등록·홈택스 불러오기·운반 실적)·거래처별 미수 집계는 지금 읽기 폭 808 그대로 */
   }
@@ -1169,6 +1169,13 @@
   /* v442 일용직 표(45-1 다섯째 판 — 명세 sections[key=workers]): 이름 칸 '동명' 칩(이름 뒤 4px — 운영 백업 실측 이름 + 칩 73px / 100의 안 폭 83) · 현장 권한이 없을 때 표 위 안내 한 줄 · 검토 반영: 현장 대장을 아직 못 읽었을 때 안내 한 줄(#wkAsbNote — 같은 꼴) */
   .wk-dup{margin-left:4px;}
   #wkSiteNote,#wkAsbNote{font-size:12.5px;color:var(--sub);margin:0 0 6px;}
+  /* v443 입찰 공고 표(45-1 여섯째 판 — 명세 sections[key=bids]): 상태 칸 칩(검토 scope-chip·투찰/낙찰 from-chip)도 표 줄에서는 여백 4px(상태 56의 안 폭 39 — 맑은 고딕 11px 굵게 두 글자 22 + 8 = 30, 여백 8이면 38로 1px 남음) ·
+     공고명 '지역 확인'·낙찰방법 '미판독' 배지는 칸 오른쪽 끝에 띄움(float — 긴 공고명·낙찰방법이 말줄임에 잘려도 배지는 보임, 배지가 글보다 앞에 와야 함) · ↗ 칸은 여백 0(34의 안 폭 33 — 링크 '↗' 11.9) · 펼침 공고서 칸 */
+  #bidList .vs.vs-fit tr.vs-r td .scope-chip,#bidList .vs.vs-fit tr.vs-r td .from-chip{padding:1px 4px;}
+  .vs.vs-fit td .bid-flag{float:right;margin-left:4px;}
+  .vs.vs-fit td.bid-go{padding:0;text-align:center;}
+  .vs.vs-fit td.bid-go a{display:block;line-height:31px;text-decoration:none;color:var(--brand-dark,#1F5A3C);font-weight:700;}
+  .bid-docs{border:1px solid #E4E7EA;border-radius:6px;padding:6px 10px;margin-top:2px;display:grid;gap:3px;font-size:13px;}
   @media (min-width:1280px){
     #view-tasks>.card.scope-host{display:flex;align-items:center;}
     #view-tasks>.card.scope-host>.add-row{flex:0 0 auto;padding:10px 14px 10px 0 !important;}
@@ -1626,9 +1633,10 @@
     <div id="bidSection">
       <div class="dash-sec" style="margin-bottom:8px;display:flex;align-items:baseline;gap:10px;"><h2 style="flex:1;">입찰 <span class="cnt" id="bidHead"></span></h2><button class="mini-btn" id="bidRefreshBtn">↻ 지금 수집</button><button class="mini-btn" id="bidPurgeBtn" title="미검토 항목을 비우고 새 필터로 다시 수집">🧹 재수집</button><button class="mini-btn" id="bidCalcBtn" title="기초금액·예가범위·낙찰하한율로 투찰 범위 계산">🧮 계산기</button><button class="mini-btn" id="bidStatsBtn" title="낙찰 투찰률 실측 분포 — 공종·경북·발주처·슬레이트">📊 통계</button></div>
       <div class="card" id="bidStatsWrap" style="display:none;padding:12px;font-size:13px;"></div>
-      <div style="font-size:12px;color:var(--sub);margin:-4px 0 8px;">입찰 공고는 지역·업종(보유면허)·낙찰방법 자격 필터를 통과한 참가 가능 건입니다. 마감이 14일 넘게 지난 신규·패스 공고는 매일 자동 정리됩니다(검토·응찰·낙찰·유찰은 보존). 칩의 <b>지역</b>=실제 참가제한 내용. <span style="background:#FFF3CD;border-radius:4px;padding:0 5px;">노란 카드</span>=지역이 '공고서 참조'인데 자동 판독으로 확인 못 한 건 — 원문에서 직접 확인.</div>
+      <div style="font-size:12px;color:var(--sub);margin:-4px 0 8px;">입찰 공고는 지역·업종(보유면허)·낙찰방법 자격 필터를 통과한 참가 가능 건입니다. 마감이 14일 넘게 지난 신규·패스 공고는 매일 자동 정리됩니다(검토·응찰·낙찰·유찰은 보존). <span id="bidGuideCard">칩의 <b>지역</b>=실제 참가제한 내용. <span style="background:#FFF3CD;border-radius:4px;padding:0 5px;">노란 카드</span>=지역이 '공고서 참조'인데 자동 판독으로 확인 못 한 건 — 원문에서 직접 확인.</span><span id="bidGuideSheet" style="display:none;"><b>지역</b> 칸(넓은 화면)·펼침의 지역제한=실제 참가제한 내용. <span class="need-chip">지역 확인</span>(지역 칸 노랑 '공고서 참조')=지역이 '공고서 참조'인데 자동 판독으로 확인 못 한 건 — 원문에서 직접 확인.</span></div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;" id="bidFilterBar"></div>
       <input type="search" id="bidSearch" placeholder="공고 검색(공고명·기관)" autocomplete="off" style="width:100%;padding:9px 12px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;font-size:14px;box-sizing:border-box;">
+      <div id="bidBanner" style="display:none;"></div>   <!-- v443 PC 표 갈래의 배너 3종(수집 미실행·어댑터 실패·불러오기 실패) 자리 — 폰 옛 목록은 #bidList 안 맨 위(옛 본문 그대로) -->
       <div class="card" id="bidList"><div class="loading">불러오는 중…</div></div>
       <button class="link-btn" id="bidAddBtn">+ 수동 등록 (사기업·기타)</button>
     </div>
@@ -3418,6 +3426,7 @@
     cliLoaded = false; cliDirty = {};   // v441 검토: 비운 거래처 대장은 '아직 못 읽음'(빈 목록을 저장하지 않게 — loadClients가 200에서 다시 켬)
     wkLoaded = false;   // v442: 일용직 명부도 '아직 못 읽음'으로(loadWorkers가 200에서 다시 켬 — 빈 명부 저장 막음)
     wkPending = false; wkDirty = {}; wkEduSt = "";   // v442 검토: 저장 대기·이 기기에서 고친 줄 표시·③ 건강진단용 교육 기록 읽기 상태도 비움(다음 사람이 앞사람 표시로 합치거나 '읽음'으로 보지 않게)
+    bidsLoaded = false; bidsSaveHeld = false;   // v443: 비운 공고 목록은 '아직 못 읽음'(loadBids가 200에서 다시 켬 — 빈 목록 + 수동 등록 1건 저장이 서버 일감 문서를 덮지 않게)
     records = {};
     abStatus = null; abDay = { day: "", data: null, loading: false, error: "" }; abPresets = { items: null, loading: false, saving: false, error: "" };
     abManual = { day: "", items: [], loaded: false, timer: null, saving: false, dirty: false, savedTs: 0, bad: 0, err: "", errBad: false, pendingRender: false };
@@ -6499,7 +6508,7 @@
   document.getElementById("baSave").addEventListener("click", saveBidAdd);
   document.getElementById("baCancel").addEventListener("click", function(){ document.getElementById("bidAddBackdrop").classList.remove("show"); });
   document.getElementById("bidAddBackdrop").addEventListener("click", function(e){ if(e.target===this) this.classList.remove("show"); });
-  document.getElementById("bidSearch").addEventListener("input", function(){ bidSearchTerm=this.value.toLowerCase().trim(); renderBids(); });
+  document.getElementById("bidSearch").addEventListener("input", function(){ bidSearchTerm=this.value.toLowerCase().trim(); if(bidSheetCur!=="sheet") renderBids(); });   // v443: PC 표 갈래는 부품이 이 칸을 검색칸으로 씀(def.search.el — 한글 조합 끝난 뒤 150ms·공고번호·매칭어 포함) · 폰 옛 목록은 종전대로 바로 그림(공고명·기관)
   document.getElementById("obSearch").addEventListener("input", function(){ obSearchTerm=this.value.toLowerCase().trim(); obShow=150; renderOnbid(); });
   document.getElementById("obMoreBtn").addEventListener("click", function(){ obShow+=150; renderOnbid(); });
   document.getElementById("bidRefreshBtn").addEventListener("click", function(){
@@ -7135,10 +7144,11 @@
   //     phone:"legacy"(기본 — 폰이면 그 탭의 지금 그리기 함수 legacy()를 그대로 부름, 지우거나 바꾸지 않음 — PM 11/10 15:56) | "sheet"(폰 열 lv1·--pw %·가로로 안 굴러가는 표·누른 행 상세는 표 아래 .vs-detcard)
   //                     legacy는 옛 그리기 본문이어야 한다(탭의 새 입구 함수 — vsSheetRender를 부르는 함수 — 를 넘기면 서로 불러 끝나지 않음)
   //     onMode(m)       갈래("legacy"|"sheet")가 정해질 때마다 — 탭의 다른 요소 보이기·숨기기
-  //     골라 쓰기: search:{ id, ph, text(r) } 표 위 검색칸 · sel:{ set() 선택 지도, can() 필수(없으면 선택 칸을 그리지 않음 — 보기 권한 CSS는 .sel-box를 못 숨김), acts:[{ h, danger, run(ids) }], keep 숨은 선택 남김 }
+  //     골라 쓰기: search:{ id, ph, text(r) } 표 위 검색칸(el: 탭에 이미 있는 검색칸 id면 표 위에 새로 그리지 않고 그 칸을 검색칸으로 — v443 입찰 #bidSearch, vsSheetExtQ) · sel:{ set() 선택 지도, can() 필수(없으면 선택 칸을 그리지 않음 — 보기 권한 CSS는 .sel-box를 못 숨김), acts:[{ h, danger, run(ids) }], keep 숨은 선택 남김 }
   //                  — 지우기(지시·기성)/이력 추가(사람별 의무) · 전체선택은 그린 행만(접힌 묶음·더보기 밖 행은 빠짐 — 명세 fixes_with ⓗ '보이는 행만')
   //                · group:{ of(r) 묶음 키("" = 본 행), label(g, n, open), order:[…], auto({q,f,chip}) 저절로 펼침 } · page:150 더보기(한도 뒤 줄은 묶음 머리까지 그리지 않음)
   //                · count(r) '보이는 n / 전체 m'에 셀 줄(v441 거래처 — 대장 밖 묶음 줄 빼기, 묶음 머리가 그 수를 셈 · 없으면 행 전부)
+  //                · total(r) '전체 m'을 '전체' 칩과 같은 규칙으로 셀 줄(v443 입찰 — '전체' 칩이 목록 규칙인 표 · 모집단 칩이 켜졌으면 '/ 지남 m' — vsSheetCountTxt)
   //   }
   // 그리기는 vsSheetRender(def) 하나(갈래 함수). 창 폭이 860·1280·1600 경계를 넘으면 그린 단계가 바뀐 표만 다시 그린다 — 보이는 표는 바로, 숨은 표는 보일 때(ResizeObserver) 한 번.
   // 다른 화면에서 표로 오는 입구 둘(탭 구간의 이어받기 함수만 부름 — 기기 기억은 저장 안 함): 찾아가기 vsSheetSeek(def, q)(v439 — 칩·거르기를 이번만 풀고 검색어) · 그 행 열기 vsSheetReveal(def, id)(v440 — 그 행을 가린 칩·거르기·검색어·묶음·더보기만 풀고 펼침)
@@ -7258,7 +7268,9 @@
     go.forEach(function(g){ var op = gauto || !!inst.grp[g]; flat.push({ g: g, n: gm[g].length, open: op }); if (op) gm[g].forEach(function(r){ flat.push({ r: r, g: g }); }); });
     // 더보기 — 그리는 줄을 page행씩: 한도에 닿으면 그 뒤 줄은 묶음 머리까지 그리지 않고(행 없는 묶음 머리가 더 보기 위에 붙지 않게) 남은 행(접힌 묶음 안 행 포함)만 센다
     //   건수·합계는 거른 행 전체 · 전체선택은 그린 행(drawn)만
-    var page = Number(def.page) || 0, lim = page ? Math.max(page, Number(inst.limit) || 0) : 0, shown = 0, cut = 0, out = [], drawn = [], stop = false;
+    var page = Number(def.page) || 0, lim = page ? Math.max(page, Number(inst.limit) || 0) : 0, shown = 0, cut = 0, out = [], drawn = [], stop = false, nOp = 0, j;
+    //   펼친 행이 한도 밖이면(v443 검토 — 정렬 열 값이 바뀌어 뒤로 간 줄: 입찰 상태 머리로 정렬한 채 [검토]) 이번 그림만 그 행까지 page 단위로 늘린다(기억 inst.limit은 그대로 — 닫으면 원래 한도)
+    if (lim && open){ for (j = 0; j < flat.length; j++){ if (flat[j].r){ nOp++; if (flat[j].r === open) break; } } if (j < flat.length && nOp > lim) lim = Math.ceil(nOp / page) * page; }
     flat.forEach(function(e){ if (!stop && lim && shown >= lim) stop = true; if (stop){ cut += e.r ? 1 : (e.open ? 0 : e.n); return; } if (e.r){ shown++; drawn.push(e.r); } out.push(e); });
     M = { stage: stage, phone: phone, cols: cols, all: all, uni: uni, rows: rows, flat: out, drawn: drawn, cut: cut, sort: s, open: open, idOf: idOf, minw: vsSheetMinW(inst, cols) };
     M.ctx = { phone: phone, stage: stage, cols: cols, n: rows.length, m: uni.length, unit: def.unit || "건", sort: s, q: inst.q, close: '<button type="button" class="vs-chip" data-vs-close="1" style="margin-left:auto;">닫기 ▲</button>' };
@@ -7317,9 +7329,21 @@
     rows.forEach(function(r){ live[String(def.id ? def.id(r) : r.id)] = 1; });
     return Object.keys(set).filter(function(id){ return set[id] && live[id]; });
   }
+  // 건수 글 '보이는 n / 전체 m' — n = 거른 행(칩·검색어·거르기 줄), m = 모집단(켜진 모집단 칩 밖 줄 — 검색어·거르기 줄과 상관없음). count(r)이면 그 줄만(v441 거래처).
+  //   정의 옵션 total(r)(v443 검토 — 입찰: '전체' 칩이 행 원천 전부가 아니라 목록 규칙인 표): m = 모집단 중 total을 지나가는 줄('전체' 칩과 같은 수 — 한 줄에 '전체' 숫자가 둘 보이지 않게),
+  //   모집단 칩이 켜졌으면 그 칩 이름과 모집단 수('… / 지남 m건'). total이 없는 정의(지시·기성·거래처·일용직)는 종전 그대로
+  function vsSheetCountTxt(def, inst, M){
+    var unit = def.unit || "건", cnt = def.count || null, pop = null, h = "전체", m;
+    if (typeof def.total === "function"){
+      (def.chips || []).forEach(function(g){ var on = vsChipOn(inst, g); if (on && on.pop) pop = on; });
+      if (pop){ h = pop.h; m = cnt ? M.uni.filter(cnt).length : M.uni.length; }
+      else m = M.uni.filter(function(r){ return def.total(r) && (!cnt || cnt(r)); }).length;
+    } else m = cnt ? M.uni.filter(cnt).length : M.uni.length;
+    return '보이는 ' + vsN(cnt ? M.rows.filter(cnt).length : M.rows.length) + unit + ' / ' + esc(h) + ' ' + vsN(m) + unit;
+  }
   function vsSheetHtml(def, inst, M){
     var unit = def.unit || "건", cols = M.cols, nv = cols.length, canSel = !!(def.sel && typeof def.sel.can === "function" && def.sel.can()), h = "", ft, cn;   // 선택 칸은 정의에 can()이 있고 참일 때만(권한 검사를 빠뜨리면 닫힘 — .view.readonly CSS는 .sel-box·.sel-bar를 못 숨김)
-    if (def.search) h += '<input type="search" class="vs-q"' + (def.search.id ? ' id="' + esc(def.search.id) + '"' : '') + ' data-vs-q="1" value="' + esc(inst.q || "") + '" placeholder="' + esc(def.search.ph || "검색") + '" autocomplete="off">';
+    if (def.search && !def.search.el) h += '<input type="search" class="vs-q"' + (def.search.id ? ' id="' + esc(def.search.id) + '"' : '') + ' data-vs-q="1" value="' + esc(inst.q || "") + '" placeholder="' + esc(def.search.ph || "검색") + '" autocomplete="off">';   // el = 탭에 이미 있는 검색칸(v443 — 표 위에 그리지 않음, vsSheetExtQ)
     if (!M.all.length) return h + '<div class="empty-line">' + esc(def.none || "자료가 없습니다.") + '</div>';
     if (canSel) h += vsSheetSelBar(def, M);
     h += '<div class="' + vsCls(["vs-tools", def.chipStyle === "light" ? "vs-light" : ""]) + '">';
@@ -7331,7 +7355,7 @@
         h += '<button type="button" class="' + vsCls(["vs-chip", it.warn ? "warn" : "", it.pc && it !== on ? "vs-pc" : "", it === on ? "on" : ""]) + '" data-vs-chip="' + esc(g.g + "|" + it.k) + '"' + (it.tip ? ' title="' + esc(it.tip) + '"' : '') + '>' + esc(it.h) + (n == null ? '' : ' ' + vsN(n)) + '</button>';
       });
     });
-    h += '<button type="button" class="vs-chip" data-vs-reset="1" title="거르기 줄·칩·검색어 지우기">필터 초기화</button><span class="vs-count">보이는 ' + vsN(def.count ? M.rows.filter(def.count).length : M.rows.length) + unit + ' / 전체 ' + vsN(def.count ? M.uni.filter(def.count).length : M.uni.length) + unit + '</span></div>';   // count(r) — 셈에 넣을 줄(v441 거래처: 대장 밖 묶음 줄 빼고 — 묶음 머리가 그 수를 셈), 없으면 행 전부(지시·기성 그대로)
+    h += '<button type="button" class="vs-chip" data-vs-reset="1" title="거르기 줄·칩·검색어 지우기">필터 초기화</button><span class="vs-count">' + vsSheetCountTxt(def, inst, M) + '</span></div>';   // count(r) — 셈에 넣을 줄(v441 거래처: 대장 밖 묶음 줄 빼고 — 묶음 머리가 그 수를 셈), 없으면 행 전부(지시·기성 그대로) · total(r) — v443 입찰
     h += '<div class="vs-wrap" data-vs-wrap="1"><table class="vs vs-fit" data-vs-table="1" style="--vs-minw:' + M.minw + 'px;"><colgroup>';
     cols.forEach(function(c){ h += '<col data-vs-col="' + esc(c.k) + '" style="' + (M.phone ? '--pw:' + (Number(c.pw) || 0) + '%;' : (c.fill ? '' : 'width:' + vsColW(inst, c) + 'px;')) + '">'; });
     h += '</colgroup><thead><tr>';
@@ -7404,6 +7428,27 @@
     inst.timers[tk] = setTimeout(function(){ delete inst.timers[tk]; if (kind === "q") vsSheetSetQ(def, v); else vsSheetFilter(def, k, v); }, VS_TYPE_MS);
   }
   function vsComposing(host){ var a = document.activeElement; return !!(a && a.__vsComp && host.contains && host.contains(a)); }   // 이 자리의 거르기 줄·검색칸이 한글 조합 중인가
+  // 탭에 이미 있는 검색칸을 이 표의 검색칸으로(def.search.el = 그 id — v443 입찰: 명세 '검색칸 #bidSearch 그대로'). 표 위에 검색칸을 새로 그리지 않고 그 칸의 글이 검색어(inst.q)다.
+  //   배선은 표를 처음 그릴 때 한 번(그 칸은 다시 그려도 같은 요소라 쌓이지 않음 — 요소 표시 __vsExtQ): 한글 조합이 끝난 뒤 150ms(vsSheetTyping과 같은 규칙 · 그 칸은 새 요소로 바뀌지 않아 조합이 끊기지 않음).
+  //   폰 legacy 갈래면 검색어만 받아 두고 그리지 않는다(옛 본문은 탭의 옛 배선이 그린다). 그릴 때마다 칸 글을 검색어에 맞춘다(필터 초기화·그 행 열기·찾아가기·보는 사람 바뀜이 검색어를 바꿨을 때) —
+  //   그 칸에 커서가 있거나 치던 글이 기다리는 중이면 건드리지 않는다
+  function vsSheetExtQ(def, inst){
+    var id = def.search && def.search.el, el = id ? document.getElementById(id) : null, tk = "x:" + id;
+    if (!el) return;
+    if (!el.__vsExtQ){
+      el.__vsExtQ = 1;
+      el.addEventListener("compositionstart", function(){ var I = vsInst(def); el.__vsComp = true; if (I.timers[tk]){ clearTimeout(I.timers[tk]); delete I.timers[tk]; } });
+      el.addEventListener("compositionend", function(){ el.__vsComp = false; vsSheetExtQueue(def, el, tk); });
+      el.addEventListener("input", function(e){ if (el.__vsComp || (e && e.isComposing)) return; vsSheetExtQueue(def, el, tk); });
+      if (!inst.q && el.value) inst.q = String(el.value);   // 배선 전(폰 옛 목록 갈래 — 탭의 옛 배선만 있던 때)에 친 글을 검색어로 받는다(넓힌 첫 그림이 그 글을 지우지 않게)
+    }
+    if (document.activeElement !== el && !inst.timers[tk] && el.value !== (inst.q || "")) el.value = inst.q || "";
+  }
+  function vsSheetExtQueue(def, el, tk){
+    var inst = vsInst(def), v = el.value;
+    if (inst.timers[tk]) clearTimeout(inst.timers[tk]);
+    inst.timers[tk] = setTimeout(function(){ delete inst.timers[tk]; if (inst.mode !== "sheet"){ inst.q = String(v == null ? "" : v); return; } vsSheetSetQ(def, v); }, VS_TYPE_MS);
+  }
   function vsSheetBindDet(def, root, M){ root.addEventListener("click", function(e){ if (e && e.stopPropagation) e.stopPropagation(); }); if (typeof def.bind === "function" && M.open) def.bind(root, M.open, M.ctx); }   // 펼침 안 누름이 행 토글로 번지지 않게 + 정의의 버튼 배선
   function vsSheetBind(def, inst, host, M){
     var each = function(sel, fn){ Array.prototype.forEach.call(host.querySelectorAll(sel), fn); };
@@ -7478,14 +7523,22 @@
   //   검색어는 그 행이 안 걸리면 비움 · 접힌 묶음은 펼침 · 더보기 한도는 그 행이 그려질 때까지 늘림. 기기 기억(정렬·거르기·칩)은 이 부름에서 저장하지 않는다(다음 칩·거르기·정렬 누름 때 그때 상태로 저장).
   //   치던 글 타이머는 지운다(기다리던 거르기·검색이 연 뒤에 걸려 그 행을 다시 숨기지 않게). 펼쳐 그린 뒤 그 행을 화면 가운데로 굴린다.
   //   돌려줌 = 그 행을 그렸나 · 행 원천(보이는 행 — 권한·공개범위 밖·지운 행은 없음)에 없거나 폰 legacy 갈래면 아무것도 바꾸지 않고 false
-  function vsSheetReveal(def, id){
-    var inst = vsInst(def), stage = vsStage(), all, r = null, i, t, M, host, el, g, guard = 0, sel;
+  //   셋째 인자 onlyHidden(v443 검토 — 새 줄 열기 bidSheetShowNew): 그 행이 칩·거르기 줄·검색어·묶음에 가리지 않았으면(더보기 한도 밖이어도) 아무것도 바꾸지 않고 그렸나만 돌려준다
+  //   (종전 탭들은 그린 줄에 없으면 = 가림이었지만 더보기가 있는 표는 150줄 밖도 그렇게 보여, 가리지 않은 새 줄에 한도를 늘려 수백 줄을 그리고 펼쳤다)
+  function vsSheetReveal(def, id, onlyHidden){
+    var inst = vsInst(def), stage = vsStage(), all, r = null, i, t, M, host, el, g, guard = 0, sel, gk;
     if (stage <= 1 && def.phone !== "sheet") return false;
     vsSheetViewer(def, inst);   // 보는 사람이 바뀌었으면 먼저 비운다(아래에서 연 행이 그리기 첫머리에서 지워지지 않게)
     id = String(id == null ? "" : id);
     all = (typeof def.rows === "function" ? def.rows() : def.rows) || [];
     for (i = 0; i < all.length; i++){ if (String(def.id ? def.id(all[i]) : all[i].id) === id){ r = all[i]; break; } }
     if (!r || !id) return false;
+    sel = '[data-vs-row="' + vsAttrQ(id) + '"]';
+    if (onlyHidden){
+      gk = def.group ? String(def.group.of(r) || "") : "";
+      if (vsSheetQOk(def, inst, r) && (def.chips || []).every(function(x){ return vsSheetGroupOk(x, vsChipOn(inst, x), r); }) && vsSheetPassF(def, r, inst.st.f, vsSheetCols(def, stage))
+        && (!gk || !!inst.grp[gk] || !!(typeof def.group.auto === "function" && def.group.auto({ q: inst.q, f: inst.st.f, chip: inst.st.chip })))){ host = document.getElementById(def.host); return !!(host && host.querySelector && host.querySelector(sel)); }
+    }
     for (t in inst.timers){ if (Object.prototype.hasOwnProperty.call(inst.timers, t)) clearTimeout(inst.timers[t]); }
     inst.timers = {};
     if (!vsSheetQOk(def, inst, r)) inst.q = "";
@@ -7494,12 +7547,12 @@
     if (def.group){ g = String(def.group.of(r) || ""); if (g) inst.grp[g] = true; }
     inst.open = id; inst.prune = true;
     if (Number(def.page) > 0){
+      inst.open = null;   // 한도는 펼침과 상관없이 그 행이 그려질 때까지 늘려 둔다(닫아도 그 행까지 보이게 — v440 그대로 · vsSheetModel의 '펼친 행은 이번 그림만 그 행까지'에 기대지 않음, v443 검토)
       for (;;){ M = vsSheetModel(def, inst, stage); if (!M.cut || M.drawn.some(function(x){ return M.idOf(x) === id; }) || ++guard > 1000) break; inst.limit = Math.max(Number(def.page), Number(inst.limit) || 0) + Number(def.page); }
       inst.open = id;
     }
     vsSheetRender(def);
     host = document.getElementById(def.host);
-    sel = '[data-vs-row="' + vsAttrQ(id) + '"]';
     el = host && host.querySelector ? host.querySelector(sel) : null;
     if (el && el.scrollIntoView){ try { el.scrollIntoView({ block: "center" }); } catch(e){ el.scrollIntoView(); } }
     return !!el;
@@ -7585,6 +7638,7 @@
     }
     inst.mode = "sheet";
     if (typeof def.onMode === "function") def.onMode("sheet");
+    if (def.search && def.search.el) vsSheetExtQ(def, inst);   // v443 탭에 이미 있는 검색칸(배선 한 번·칸 글 맞춤)
     if (host) vsSheetPaint(def, inst, host, stage);
     return "sheet";
   }
@@ -7655,6 +7709,7 @@
     if (def.sel && (typeof def.sel.can !== "function")) bad.push("sel.can");
     if (def.group && typeof def.group.of !== "function") bad.push("group");
     if (def.count != null && typeof def.count !== "function") bad.push("count");
+    if (def.total != null && typeof def.total !== "function") bad.push("total");
     if (ph === "sheet"){ vsSheetCols(def, 1).forEach(function(c){ pw += Number(c.pw) || 0; }); if (Math.abs(pw - 100) > 0.5) bad.push("pw:" + pw); }
     else if (ph !== "legacy") bad.push("phone");
     else if (typeof def.legacy !== "function") bad.push("legacy");
@@ -8325,7 +8380,7 @@
         });
         liveBids().filter(function(b){ return bidSt(b)==="응찰"; }).slice(0,4).forEach(function(b){
           var fr=bidFloorRange(b);
-          cols[0].cards.push('<div class="pipe-card" data-inbox-go="bid"><b>'+esc((b.title||"").slice(0,34))+'</b><div class="s">투찰'+(b.due?' · 마감 '+esc(b.due):'')+(fr?' · 투찰≥'+fmtAmount(fr.lo):'')+'</div></div>');
+          cols[0].cards.push('<div class="pipe-card" data-bid-go="'+esc(b.id)+'"><b>'+esc((b.title||"").slice(0,34))+'</b><div class="s">투찰'+(b.due?' · 마감 '+esc(b.due):'')+(fr?' · 투찰≥'+fmtAmount(fr.lo):'')+'</div></div>');   // v443 누르면 입찰 탭 + 그 공고 펼침(PC 표 — 폰 옛 목록은 종전처럼 입찰 탭으로만 이동)
         });
         cols[0].sub=(awarded.length?("낙찰 "+awarded.length+" · "):"")+"투찰 "+liveBids().filter(function(b){return bidSt(b)==="응찰";}).length;
       } else { cols[0].sub="관리자 전용"; }
@@ -8452,6 +8507,9 @@
     });
     Array.prototype.forEach.call(host.querySelectorAll("[data-inbox-go]"), function(el){
       el.addEventListener("click", function(){ switchTab(el.getAttribute("data-inbox-go")); });
+    });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-bid-go]"), function(el){
+      el.addEventListener("click", function(){ bidSheetHomeRow(el.getAttribute("data-bid-go")); });   // v443 홈 투찰 카드 = 입찰 탭 + 그 공고 펼침(vsSheetReveal — 칩·거르기에 걸려 있으면 그때만 풂, 폰 옛 목록은 탭 이동만)
     });
     updateApprovalBadges();
   }
@@ -16229,18 +16287,27 @@
   // 투찰(응찰)한 건은 개찰결과(낙찰/유찰) 대기라 마감이 지나도 남긴다. 삭제는 안 한다(사람 확인 원칙).
   function bidExpired(b){ var st=bidSt(b); return !!(b.due && b.due<todayStr() && (st==="new"||st==="검토")); }
   var bidsLoadErr = null;   // v378: 불러오기 실패를 '공고 없음'과 구분해 보여 준다(10/8 실사고 — 6MB 한도로 실패했는데 화면은 "수집된 공고가 없습니다")
+  // v443: bidsLoaded = 공고 문서를 읽었나(loadBids의 200에서만 켬 — 404·실패·로그아웃 clearSessionData에서 끔). 못 읽은 채(앱을 켠 직후 6.7MB를 받는 중·읽기 실패 — 빈 배열)에
+  //   [+ 수동 등록]을 저장하면 낙관락 base가 없어(_colBase는 GET 200에서만) 서버 일감 문서가 이 기기의 1건 + health·awards 없음으로 통째로 바뀐다(일감은 저장마다 버전 링을 남기지 않음 — VER_SKIP).
+  //   그래서 수동 등록 [저장]은 안내(BID_UNREAD_MSG)만 하고 다시 읽으며, doSaveBids도 보내지 않고 미뤄 둔다(bidsSaveHeld — 읽기 200 뒤 병합해 저장 · v441 cliLoaded·v442 wkLoaded와 같은 꼴)
+  var bidsLoaded = false, bidsSaveHeld = false;
+  var bidsLoading = 0;   // v443 검토: 읽는 중인 일감 GET 수 — 수동 등록 [저장]의 다시 읽기는 읽는 중이 아닐 때만(누를 때마다 6.7MB GET이 겹치고 늦은 실패 답이 읽은 화면에 실패 배너를 띄우던 것 — v441 cliLoading과 같은 꼴)
+  var BID_UNREAD_MSG = "입찰 공고를 아직 읽지 못했습니다 — 잠시 뒤 다시 해 보시고, 계속 이러면 위 안내의 [다시 불러오기]나 새로고침 뒤 다시 해 주세요. (읽기 전에 저장하면 서버 공고 목록이 이 화면 목록으로 바뀔 수 있어 막습니다)";
   function loadBids(){
     var token=getToken(); if(!token) return;
-    fetch(BIDS_API, {headers:ghHeaders()}).then(function(resp){
-      if(resp.status===404){ bidsSha=null; bids=[]; bidsLoadErr=null; renderBids(); return; }
+    bidsLoading++;
+    var lp=fetch(BIDS_API, {headers:ghHeaders()}).then(function(resp){
+      if(resp.status===404){ bidsSha=null; bids=[]; bidsLoaded=false; bidsLoadErr=null; renderBids(); return; }   // v443: gw 대역에서 빈 문서는 200으로 온다 — 404는 못 읽음(빈 목록을 저장하지 않게)
       if(!resp.ok) throw new Error("HTTP "+resp.status);
-      return resp.json().then(function(json){ bidsSha=json.sha; var p=JSON.parse(b64DecodeUnicode(json.content)); var ri=(p&&p.items)||[]; bidsHealth=(p&&p.health)||null; bidsAwards=(p&&p.awards)||null; bids = bidsPending ? mergeBidsLocal(bids, ri) : ri; bidsLoadErr=null; renderBids(); renderDashboard(); runBidQualGen(); autoGenReady.bids=true; runAwardAutoCon(); });
+      return resp.json().then(function(json){ bidsSha=json.sha; var p=JSON.parse(b64DecodeUnicode(json.content)); var ri=(p&&p.items)||[]; bidsHealth=(p&&p.health)||null; bidsAwards=(p&&p.awards)||null; bids = bidsPending ? mergeBidsLocal(bids, ri) : ri; bidsLoaded=true; bidsLoadErr=null; renderBids(); renderDashboard(); runBidQualGen(); autoGenReady.bids=true; runAwardAutoCon(); if(bidsSaveHeld){ bidsSaveHeld=false; scheduleBidsSave(); } });   // v443 읽음 표시 · 못 읽어 미뤄 둔 저장은 병합한 뒤 다시 잡음
     }).catch(function(e){ bidsLoadErr={ msg:String((e&&e.message)||e||"오류"), ts:Date.now() }; renderBids(); });
+    lp.then(function(){ bidsLoading--; }, function(){ bidsLoading--; });   // v443 검토: 읽기가 끝나면(200·404·실패 모두) 읽는 중 수를 내림
   }
   function scheduleBidsSave(){ bidsPending=true; if(bidsSaveTimer) clearTimeout(bidsSaveTimer); bidsSaveTimer=setTimeout(doSaveBids,1200); }
   function mergeBidsLocal(local,remote){ var byId={}; (local||[]).forEach(function(b){if(b&&b.id)byId[b.id]=b;}); (remote||[]).forEach(function(x){if(!x||!x.id)return;var c=byId[x.id];if(!c){byId[x.id]=x;}else{var w=(x.updated||"")>(c.updated||"")?x:c;var m=Object.assign({},(w===x?c:x),w);if(c.del===1||x.del===1)m.del=mergeDel(c,x);byId[x.id]=m;}}); return Object.keys(byId).map(function(k){return byId[k];}); }
   function doSaveBids(){
     var token=getToken(); if(!token) return;
+    if(!bidsLoaded){ bidsSaveHeld=true; return; }   // v443: 못 읽은 공고 문서는 보내지 않는다(위 bidsLoaded — 수동 등록 [저장]이 먼저 막고 알림 · 읽기 200 뒤 병합해 다시 잡음)
     // 수집봇이 심어둔 health·awards(계산기 실측선)는 앱 저장 시 보존 — 안 넣으면 다음 저장에 날아간다
     var bdoc={schema:1,items:bids};
     if(bidsHealth) bdoc.health=bidsHealth;
@@ -19969,7 +20036,7 @@
       total+=hits.length;
       html+='<div style="font-weight:700;margin:8px 0 2px;">'+s.label+' <span style="color:#888;font-weight:400;">'+hits.length+'</span></div>';
       hits.forEach(function(x){
-        html+='<div class="gs-hit" data-gs-tab="'+s.tab+'"'+(s.searchId?' data-gs-sid="'+s.searchId+'"':'')+(s.tab==="rec"&&x&&x.id?' data-gs-id="'+esc(x.id)+'"':'')+(s.tab==="cli"&&x&&x.id?' data-gs-id="'+esc(x.id)+'"':'')
+        html+='<div class="gs-hit" data-gs-tab="'+s.tab+'"'+(s.searchId?' data-gs-sid="'+s.searchId+'"':'')+(s.tab==="rec"&&x&&x.id?' data-gs-id="'+esc(x.id)+'"':'')+(s.tab==="cli"&&x&&x.id?' data-gs-id="'+esc(x.id)+'"':'')+(s.tab==="bid"&&x&&x.id?' data-gs-id="'+esc(x.id)+'"':'')
           +' style="padding:5px 6px;border-bottom:1px solid var(--line);cursor:pointer;border-radius:6px;">'
           +'<b>'+esc(String(s.title(x)).slice(0,70))+'</b>'
           +(s.sub(x)?'<br><span style="color:#888;">'+esc(String(s.sub(x)).slice(0,80))+'</span>':'')+'</div>';
@@ -19984,6 +20051,7 @@
         if(sid==="taskSearch" && taskSheetFromGs(gq)) return;   // v439 지시 표: 칩·거르기 줄을 이번만 풀고 검색어(기억된 '완료' 칩·거르기에 누른 지시가 숨지 않게) — 폰 옛 목록이면 false(검색칸 없음 — 아래 옛 길)
         if(sid==="recSearch" && recSheetFromGs(gq, el.getAttribute("data-gs-id"))) return;   // v440 기성 표: 같은 길 + 누른 그 행 열기(입금 완료 건이면 '입금 완료' 칩) — 폰 옛 목록이면 false(아래 옛 검색칸 recSearch)
         if(sid==="cliSearch" && cliSheetFromGs(gq, el.getAttribute("data-gs-id"))) return;   // v441 거래처 표: 칩·거르기 줄을 이번만 풀고 검색어 + 누른 그 행 열기 — 폰 옛 목록이면 false(아래 옛 검색칸 cliSearch)
+        if(sid==="bidSearch" && bidSheetFromGs(gq, el.getAttribute("data-gs-id"))) return;   // v443 입찰 공고 표: 같은 길(검색칸은 탭의 #bidSearch 그대로 — 부품이 칸 글을 맞춤) + 누른 그 공고 열기(지남·패스 건이면 그 칩) — 폰 옛 목록이면 false(아래 옛 검색칸 길)
         if(sid){ var si=document.getElementById(sid); if(si){ si.value=gq; si.dispatchEvent(new Event("input")); } }
       });
     });
@@ -20094,7 +20162,8 @@
     }
   }
   function conAmtFromBid(b){ var am=document.getElementById("conAmount"), v=Number((b && b.result && b.result.amt) || 0); if(am) am.value = v > 0 ? v.toLocaleString() : ""; }
-  function renderBids(){
+  // v443: 옛 그리기 본문(v442 renderBids 본문 글자 그대로 — 폰 859px 이하 phone:"legacy"가 부름, uismoke v443이 해시로 대조). 입찰 탭 입구 renderBids는 아래 @bid-sheet 구간의 갈래 함수
+  function renderBidsLegacy(){
     var host=document.getElementById("bidList"); if(!host) return;
     var all=liveBids();
     // 필터바(상태 칩)
@@ -20314,6 +20383,357 @@
     var badge=document.getElementById("bidTabBadge");
     if(badge){ var n=bidNewCount(); badge.textContent=n; badge.classList.toggle("hide",n===0||!isAdmin()); badge.classList.toggle("red",n>0); }
   }
+  // @bid-sheet-start
+  // v443(45-1 여섯째 판 — 명세 09_조사_문서/표형탭_시안_자료_20261110/엑셀형탭_명세_20261110.json sections[key=bids] · 단계지시_v443_입찰공고.json · PM 11/10 15:56 결정 ② 행 끝 처리 버튼은 지시 표에만 —
+  //   입찰 공고의 상태 버튼(검토·투찰·패스 등)은 펼침 맨 위 · 입찰은 관리자 3명만(서버 ADMIN_ONLY)):
+  // PC(860px 이상) = 공통 부품(vsSheetRender) 표 한 장 — 자리는 폰 옛 목록과 같은 #bidList. 칸 칩(공고 | 부동산)·머리(#bidHead)·버튼 4개·통계·안내·배너 3종·검색칸 #bidSearch·[+ 수동 등록]은 그대로 —
+  //   표 갈래에서는 옛 상태 칩 줄(#bidFilterBar)만 숨기고(부품 칩 줄이 대신), 배너는 표 위 #bidBanner에(옛 목록은 #bidList 안 맨 위), 검색칸은 부품 옵션 search.el로 그 칸 그대로(공고명·기관 + 공고번호·매칭어),
+  //   안내 줄의 '노란 카드' 글은 표 갈래에서 '지역 확인' 글로(#bidGuideCard ↔ #bidGuideSheet).
+  //   열 9(명세 순서): 공고명(신규 굵게 · 지역 열이 숨는 단계(1599 이하)면 칸 오른쪽 끝 '지역 확인' 배지) · 상태(칩 색 그대로 — 낙찰은 칸에서 '낙찰'(🏆는 title·펼침), 학습 자동패스는 '패스' + title) · 발주기관 ·
+  //   지역(rgn_ref면 노랑 '공고서 참조') · 낙찰방법(원문 라벨 그대로 — 공고문 기준 불일치는 빨강 '⚠ 공고문 판독값', '적격심사 아님' 명시(neg)는 빨강 '⚠ 낙찰방법 미상', 나라장터 공고문 미판독은 '미판독' 배지 ·
+  //   거르기는 갈래 10가지(BID_KIND_TXT — neg는 '미확인')) · 추정가격 · 투찰 하한('≥ 하한가' — 그 공고문에서 읽은 하한율로만(bidFloorRange) · 못 읽으면 노랑 '하한율 미판독'·'낙찰방법 미상', 회색 '해당 없음'·'산정 안 함' —
+  //   추정값으로 채우지 않음) · 마감(좁은 칸 꼴 — 3일 내 노랑 'D-n' · 지난 신규·검토 빨강 '경과 n일' · 낙찰·유찰·패스·지난 투찰은 회색 · 날짜는 title) · ↗(원문 — 사이트 홈은 title)
+  // 칩 한 묶음(옅은 선택): 전체(목록과 같은 규칙 — 패스·마감 지난 낙찰·유찰 뺌: 옛 칩 수 920 → 917, 11/10 실측) · 신규 · 검토 · 투찰 · 낙찰 · 유찰 · 패스 · 지남(.warn — 모집단 칩: 다른 칩에서 모두 빠짐) ·
+  //   지역 확인 · 방법 불일치 · 하한율 미판독(셋은 '전체' 범위 안 — 판정은 옛 카드 표시와 같음: 노란 카드 rgn_ref · 빨강 낙찰방법 칩 bidMethodEff src doc/neg · '하한율 미판독' 칩 bidLwltState unread)
+  // 150줄씩 + [150건 더 보기] — 칩 수·'보이는 n / 전체 m'·합계 줄은 거른 행 전체 기준(부품). '전체 m'은 '전체' 칩과 같은 목록 규칙(정의 total — v443 검토), 지남 칩이면 '/ 지남 m'.
+  //   펼친 줄은 정렬로 150줄 밖에 가도 그 줄까지 그리고(부품 — 이번 그림만), 상태를 바꿔 자리를 옮긴 줄은 화면으로 굴린다(bidSheetFollow). 기본 정렬 마감 ▲(마감 없는 줄은 방향과 상관없이 뒤).
+  // 줄 누르기 = 펼침: 머리(공고명·상태·출처·D-day·기관·입찰서 마감) → 상태 버튼·[↩]·[계약 시작](canDo("bid") — 관리자)·[원문↗]/[사이트↗]+[번호복사]·[🧮 이 공고로 계산] → 하위 탭 개찰결과(있을 때 맨 앞) | 입찰정보(17 + 기관 4칸) |
+  //   금액·투찰(+ 참고·기관개찰) | 공고서 (n) — 칸 값·원칙 문구('참고(산정 미사용)'·'미판독 — 공고문 확인'·'추정값으로 채우지 않습니다' 등)는 옛 펼침 표(renderBidsLegacy)와 같은 식 그대로(bidSheetPairs —
+  //   uismoke v443이 같은 공고에서 두 펼침의 칸·값을 글자째 대조, 한쪽만 고치지 말 것). 누름은 펼침 칸 root 하나(bidSheetBindAct) → bidSheetAct가 지금 규칙(canDo("bid")·그 상태의 다음 단계)을 다시 보고
+  //   기존 함수(setBidStatus·undoBidStatus·bidToContract·openBidCalc)를 부른다 · 연속 누름 막기 BID_ACT_GAP(0.5초·더블클릭 둘째 누름 — [검토]를 누르면 같은 자리에 [투찰]이 온다, v439와 같은 꼴).
+  // 폰(859px 이하) = phone:"legacy" — 옛 그리기 본문 renderBidsLegacy(v442 renderBids 본문 그대로)를 부른다. 퀴즈 2번 답(C063)이 '폰도 새 표'면 정의의 phone 한 줄만 "sheet"(폰 열 공고명 54 · 상태 18(짧은 글) · 마감 'D-2' 28 % · 폰 합계 — 미리 넣어 둠).
+  // 칸 폭 — 운영 백업 11/10 20:16 사본 실측(맑은 고딕 advance — 표 12.5px·첫 열 굵게 13px·배지 11px 굵게 + 여백 12·선 2, 칸 안 폭 = 폭 − 17, 값은 옮기지 않고 길이만 · 공고 2,512건):
+  //   공고명 남는 폭 최소 280(굵게 최대 829.6 — 1,880줄이 263을 넘어 말줄임 + title · '지역 확인' 배지 65.9는 오른쪽 끝) · 상태 56(칩 두 글자 여백 4 → 30 / 39 · 머리 + 정렬 화살표 38 / 39 · '낙찰 🏆'는 41.2라 칸에서 🏆를 뺌) ·
+  //   발주기관 128 → 124(최대 379.4 — 1,467줄이 넘어 말줄임 + title, 1280 단계 열 합이 한도라 못 넓힘) · 지역 76 → 104(값 최대 82.6 · '공고서 참조' 굵게 66.9 · 합계 '지역 확인 999' 굵게 80.5 / 안 폭 87 — 76이면 안 폭 59에 63줄·노랑 칸이 잘림) ·
+  //   낙찰방법 116 → 148('미판독' 배지 47 + 4 뒤 글 자리 80 — 116이면 48로 '적격심…' · '⚠ 낙찰방법 미상' 굵게 92.1 · 최대 225.6은 말줄임 + title) · 추정가격 108 → 112(12자리 금액 90.9 / 108의 안 폭 91 — 0.1px 남아 반올림에 잘릴 수 있음) ·
+  //   투찰 하한 124 → 112('≥ 금액' 최대 90.2 · 배지 '하한율 미판독'·'낙찰방법 미상' 83.9 · 합계 '산정 9,999' 굵게 61.7 / 안 폭 95) · 마감 112 → 92(좁은 칸 꼴 — '경과 n일' 굵게 최대 63.6 · 합계 '3일 내 9,999' 굵게 73.3 / 안 폭 75 ·
+  //   넓은 꼴 'YYYY-MM-DD D-n'은 112에서도 D-10부터 잘림(보통 97.6 > 95)) · ↗ 34(여백 0 — '↗' 11.9 / 33). 단계별 열 합 722 / 958 / 1,062(명세 722 / 958 / 1,034 — 1600 단계만 지역 +28) ≤ 742 / 962 / 1,282.
+  var BID_SHEET_DEF = null, bidSheetCur = "", bidDetTab = "", bidDetRow = "", bidActAt = 0;
+  var BID_ACT_GAP = 500;   // 처리 누름 뒤 0.5초 안 누름·더블클릭 둘째 누름은 버림(v439 TASK_ACT_GAP과 같은 꼴)
+  var BID_INFO = null;     // 줄마다 판정(상태·지남·목록 규칙·낙찰방법 실효값·갈래·판독 상태·하한율 상태·투찰 범위·마감 일수) — 같은 실행 안에서는 다시 쓰고 다음 일(마이크로태스크)에 버림(v442 WK_IDX와 같은 꼴 — 칩 11개·칸·합계가 같은 계산을 되풀이하지 않게)
+  var BID_KIND_TXT = { qual: "적격심사", negotiate: "수의시담·지명", proposal: "협상", comprehensive: "종합평가·종합심사", lowest: "최저가", sale: "매각·공매", compet: "제한경쟁·일반경쟁", notmethod: "낙찰방법 미수집", other: "기타", unknown: "미확인" };   // 낙찰방법 거르기 갈래(methodKindOf — 계산기 bcQualLine과 같은 분류 · neg는 값이 없어 unknown = '미확인')
+  var BID_ST_ORDER = { "new": 0, "검토": 1, "응찰": 2, "낙찰": 3, "유찰": 4, "패스": 5 };   // 상태 칸 정렬(진행 순서)
+  var BID_ST_CHIP = { "new": '<span class="review-chip">신규</span>', "검토": '<span class="scope-chip">검토</span>', "응찰": '<span class="from-chip">투찰</span>', "낙찰": '<span class="from-chip">낙찰 🏆</span>', "유찰": '<span class="hold-chip">유찰</span>', "패스": '<span class="hold-chip">패스</span>' };   // 옛 카드 stChip과 같은 칩(펼침 머리 — 표 칸의 낙찰은 🏆를 뺌)
+  var BID_DASH = '<span style="color:#9AA09C;">-</span>';
+  var BID_RGN_T = "지역이 '공고서 참조'인데 자동 판독으로 확인 못 한 건 — 원문에서 직접 확인";   // 옛 안내 줄 '노란 카드' 글과 같은 말
+  var BID_MU_T = "공고문에서 낙찰방법을 아직 못 읽었습니다(수집기 문형 미매치). API 라벨로 표시 중 — 공고문에서 확인해 주세요";   // 옛 카드 '낙찰방법 미판독' 칩 title 그대로
+  var BID_ALL_T = "지남(마감 지난 신규·검토)·패스·마감 지난 낙찰·유찰을 뺀 공고 — 마감 없는 공고와 마감이 지나 개찰을 기다리는 투찰은 들어감(목록과 같은 규칙)";   // '전체' 칩 title = bidListRule 그대로(v443 검토 — 종전 '마감 전 공고 중 …'은 마감 없는 줄·지난 투찰이 든다는 것을 빠뜨렸다)
+  var BID_NEW_FAR_MSG = "새 공고를 등록했습니다 — 지금 정렬로는 150줄 밖이라 바로 보이지 않습니다(표 끝 [150건 더 보기] 또는 검색칸에 공고명)";   // 새 수동 등록이 칩·거르기·검색어는 지나가는데 150줄 밖일 때(bidSheetShowNew — v443 검토)
+  var BID_KV_WIDE = { "낙찰방법": 1, "지역제한": 1, "업종제한": 1, "낙찰방법 판독": 1, "입찰서접수": 1, "개찰일시": 1, "현장(소재지)": 1, "매칭": 1, "낙찰하한율": 1, "투찰범위(하한)": 1, "참고·기관개찰": 1 };   // 펼침 키·값 칸에서 한 줄 전부를 쓰는 긴 값
+  // '전체' = 목록과 같은 규칙(옛 renderBidsLegacy의 'all' 거르기 그대로): 지남(마감 지난 신규·검토) 아님 · 패스 아님 · 마감 지난 낙찰·유찰 아님(v349)
+  function bidListRule(b){ var st = bidSt(b); if (bidExpired(b) || st === "패스") return false; return !(b.due && b.due < todayStr() && (st === "낙찰" || st === "유찰")); }
+  function bidInfo(b){
+    var k = "#" + String(b && b.id), x, cur, st, me, dd;
+    if (!BID_INFO){ BID_INFO = cur = {}; try { Promise.resolve().then(function(){ if (BID_INFO === cur) BID_INFO = null; }); } catch(e){} }
+    x = BID_INFO[k];
+    if (x && x.b === b) return x;
+    st = bidSt(b); me = bidMethodEff(b); dd = /^\d{4}-\d{2}-\d{2}$/.test(String(b.due || "")) ? vehDday(b.due).diff : null;
+    x = { b: b, st: st, exp: bidExpired(b), all: bidListRule(b), me: me, kind: methodKindOf(me.m), ds: bidDecideState(b), ls: bidLwltState(b), fr: bidFloorRange(b), dd: dd,
+      grey: st === "낙찰" || st === "유찰" || st === "패스" || (st === "응찰" && dd != null && dd < 0) };   // 마감 칸 회색 — 판단이 끝났거나(낙찰·유찰·패스) 투찰한 뒤 마감이 지난 줄(개찰 대기 — 빨강으로 다그치지 않음)
+    x.soon = !x.grey && dd != null && dd >= 0 && dd <= 3;   // 3일 내(노랑) — 합계 줄 '3일 내'와 같은 판정
+    BID_INFO[k] = x;
+    return x;
+  }
+  // 값(정렬·거르기·고르기) — 빈 값 ""는 방향과 상관없이 뒤. 상태는 진행 순서, 낙찰방법은 칸에 보이는 원문 라벨(거르기는 열 옵션 ft = 갈래), 투찰 하한은 하한가
+  function bidSheetVal(r, k){
+    var i;
+    if (k === "title") return r.title || "";
+    if (k === "org") return r.org || "";
+    if (k === "region") return r.rgn_ref ? "공고서 참조" : (r.region || "");
+    if (k === "budget") return Number(r.budget) || "";
+    if (k === "due") return r.due || "";
+    i = bidInfo(r);
+    if (k === "st") return BID_ST_ORDER[i.st] == null ? 9 : BID_ST_ORDER[i.st];
+    if (k === "method") return i.me.src === "doc" ? i.me.m : (i.me.src === "neg" ? "낙찰방법 미상" : (r.method || ""));
+    if (k === "floor") return i.fr ? i.fr.lo : "";
+    return "";
+  }
+  function bidSheetMiss(ext){ var miss = []; if (!parseFloat(ext.bss)) miss.push("기초금액"); if (!/%\s*~/.test(String(ext.rng || ""))) miss.push("예가범위"); return miss.length ? miss.join("·") + " 미확보" : "입력값 부족"; }   // 옛 펼침 '투찰범위(하한)'의 빠진 값 글과 같은 판정
+  function bidSheetCell(r, c, ctx){
+    var k = c.k, i, t, o, mu, ext = r.ext || {};
+    if (k === "title"){ t = String(r.title || "-"); return { html: ((r.rgn_ref && ctx.stage < 4) ? '<span class="need-chip bid-flag" title="' + esc(BID_RGN_T) + '">지역 확인</span>' : '') + esc(t), cls: bidSt(r) === "new" ? "vs-b" : "", title: t + (r.rgn_ref ? " · 지역 확인 — " + BID_RGN_T : "") }; }   // 배지는 글보다 앞(float — 말줄임에 안 잘림) · 지역 열(1600~)이 보이면 배지 대신 그 칸 노랑
+    if (k === "org") return r.org ? { html: esc(r.org), title: String(r.org) } : BID_DASH;
+    if (k === "region"){ if (r.rgn_ref) return { html: "공고서 참조", cls: "vs-warn", title: (r.region ? r.region + " · " : "") + BID_RGN_T }; return r.region ? { html: esc(r.region), title: String(r.region) } : BID_DASH; }
+    if (k === "budget") return r.budget ? { html: fmtAmount(r.budget), title: fmtAmount(r.budget) + "원" } : BID_DASH;
+    if (k === "link"){ if (!r.url) return ""; return { html: '<a href="' + esc(r.url) + '" target="_blank" rel="noopener" title="' + (bidHasDeepLink(r) ? '원문 열기(새 창)' : '이 기관은 공고별 링크가 없어 사이트 홈으로 갑니다 — 공고번호는 펼침의 [번호복사]') + '">↗</a>', cls: "bid-go" }; }
+    i = bidInfo(r);
+    if (k === "st"){
+      t = BID_LABEL[i.st] || i.st;
+      if (ctx.phone) return { html: esc(t), title: t };   // 폰 sheet(준비) — 짧은 글
+      if (i.st === "낙찰") return { html: '<span class="from-chip">낙찰</span>', title: "낙찰 🏆 — [계약 시작]은 줄을 펼쳐서" };
+      return { html: BID_ST_CHIP[i.st] || esc(t), title: (i.st === "패스" && r.auto_pass) ? "패스 — 자동패스(학습)" : t };
+    }
+    if (k === "method"){
+      if (i.me.src === "doc") return { html: '⚠ ' + esc(i.me.m), cls: "vs-dan", title: "API 낙찰방법(" + i.me.api + ")과 공고문 판독(" + i.me.doc + ")이 어긋납니다 — 공고문 기준으로 표시·계산합니다(PM 9/16). 근거: " + (ext.dctx || "") };   // 옛 카드 빨강 칩 title 그대로
+      if (i.me.src === "neg") return { html: "⚠ 낙찰방법 미상", cls: "vs-dan", title: "API는 " + i.me.api + "인데 공고문에 적격심사 아님이 명시돼 있습니다 — 낙찰방법 미상으로 둡니다(공고문 확인)" };
+      t = String(r.method || ""); mu = i.ds === "unread" && r.source === "나라장터";   // 옛 카드 '낙찰방법 미판독' 칩과 같은 판정
+      return { html: (mu ? '<span class="need-chip bid-flag" title="' + esc(BID_MU_T) + '">미판독</span>' : '') + (t ? esc(t) : BID_DASH), title: (t || "낙찰방법 없음") + (mu ? " · 낙찰방법 미판독 — " + BID_MU_T : "") };
+    }
+    if (k === "floor"){
+      if (i.fr) return { html: "≥ " + fmtAmount(i.fr.lo), title: "낙찰하한가 범위(예가 추첨에 따라) " + fmtAmount(i.fr.lo) + " ~ " + fmtAmount(i.fr.hi) + "원 — 이 위에서 투찰" + (i.fr.a ? " · A값 반영" : "") + " · 하한율 " + i.fr.lwlt + "%는 이 공고문에서 읽은 값" + ((ext.a && !i.fr.a) ? " ⚠ 공고문에는 A값 감액 문구가 있으나 조달청 기초금액 공개에는 A값 합산이 없습니다(A값 0으로 계산) — 공고문에서 A값 적용 여부를 확인하십시오." : "") };
+      if (i.ls === "unread") return { html: '<span class="need-chip">하한율 미판독</span>', title: "이 공고의 낙찰하한율을 공고문에서 읽지 못했습니다. 유사공고 통계로 채우지 않습니다(진화설계 v2.1 P3·P5) — 공고문에서 확인해 계산기에 직접 넣으십시오." };
+      if (i.ls === "method_unknown") return { html: '<span class="need-chip">낙찰방법 미상</span>', title: i.me.src === "neg" ? "공고문에 적격심사 아님이 명시돼 낙찰방법이 미상입니다(API " + i.me.api + ") — 하한율 적용 여부·낙찰자 결정방법을 공고문에서 확인해야 합니다." : "낙찰방법 자리에 참가자격·입찰방식 문자열만 있습니다(수자원·국방·포스코 등). 낙찰자 결정방법을 공고문에서 확인해야 합니다." };   // neg(공고문 '적격심사 아님' — 하한율 없으면 여기)는 옆 낙찰방법 칸과 같은 사유(v443 검토 — 옛 카드 칩 title은 수자원·국방 꼴 사유 하나뿐이라 같은 줄 두 칸이 다른 이유를 댔다)
+      if (i.ls === "none") return { html: '<span style="color:#9AA09C;">해당 없음</span>', title: "해당 없음 — 이 낙찰방법은 낙찰하한율 개념이 없습니다" };
+      return { html: '<span style="color:#9AA09C;">산정 안 함</span>', title: "산정 안 함 — " + bidSheetMiss(ext) + " (하한율 " + ext.lwlt + "%는 판독됨 — 계산기에서 기초금액·예가범위를 넣으면 나옵니다)" };   // read인데 범위 없음(철도공단 등) — 미판독이라 부르지 않음(옛 펼침과 같은 말)
+    }
+    if (k === "due" || k === "due_ph"){ o = vsDateCell(r.due, { soon: 3, grey: i.grey, phone: k === "due_ph" }); return { html: o.html, cls: o.cls, title: o.title ? o.title + (ext.close ? " · 입찰서 마감 " + ext.close : "") : "" }; }
+    return "";
+  }
+  // 합계 줄(거른 행 전체 — 150줄만 그려도) — 공고명 칸 '합계 n건'(지역 열이 숨는 단계면 ' · 지역 확인 n') · 지역 칸 '지역 확인 n'(1600~) · 낙찰방법 칸 '불일치 n' · 투찰 하한 칸 '산정 n' · 마감 칸 '3일 내 n' / 폰 sheet = 공고명·마감 두 칸
+  function bidSheetFoot(rows, ctx){
+    var nR = 0, nM = 0, nF = 0, n3 = 0, o;
+    rows.forEach(function(b){ var i = bidInfo(b); if (b.rgn_ref) nR++; if (i.me.src !== "api") nM++; if (i.fr) nF++; if (i.soon) n3++; });
+    if (ctx.phone) return { title: "합계 " + vsN(rows.length) + "건", due_ph: "3일 내 " + vsN(n3) };
+    o = { title: "합계 " + vsN(rows.length) + "건" + ((ctx.stage < 4 && nR) ? " · 지역 확인 " + vsN(nR) : ""), method: "불일치 " + vsN(nM), floor: "산정 " + vsN(nF), due: "3일 내 " + vsN(n3) };
+    if (ctx.stage >= 4) o.region = "지역 확인 " + vsN(nR);
+    return o;
+  }
+  // 펼침 칸 값 — 옛 펼침 표(renderBidsLegacy의 t1·t2·t3·t4·공고서)와 같은 식(값이 빈 칸은 옛 tbl처럼 빼고 그림 — bidSheetKv). 입찰정보 = t1 17칸 + 기관 4칸(공고기관·수요기관·담당자·전화번호) ·
+  //   금액·투찰 = t2 6칸 + 참고·기관개찰 · 개찰결과 = t4 6칸 · 공고서 = 첨부 + 원문 페이지. ★원칙 문구(참고(산정 미사용)·미판독 — 공고문 확인·추정값으로 채우지 않습니다 등)를 바꾸면 옛 본문과 함께(uismoke v443 ②가 글자째 대조)
+  function bidSheetPairs(b){
+    var ext = b.ext || {}, rs = b.result || null, docsHtml = "";
+    var info = [
+      ["공고번호", esc(b.no||"")], ["발주처공고", esc(ext.ref||"")],
+      ["공고종류", esc(ext.kind_n||"")], ["계약방법", esc(ext.cntrct||"")],
+      ["낙찰방법", (function(){ var me=bidMethodEff(b);
+        if(me.src==="doc") return '<span style="color:#9B2C2C;">'+esc(me.m)+' (공고문 기준)</span> <span style="color:#888;">API: '+esc(me.api)+'</span>';
+        if(me.src==="neg") return '<span style="color:#9B2C2C;">낙찰방법 미상 — 공고문에 적격심사 아님 명시</span> <span style="color:#888;">API: '+esc(me.api)+'</span>';
+        return esc(me.api); })()], ["공고일", esc(b.posted||"")],
+      ["지역제한", (esc(ext.rgns||b.region||"")+(b.rgn_ref?' <span style="color:#B7791F;">(공고서 확인 필요)</span>':''))], ["업종제한", esc(ext.lics||"")],
+      ["낙찰방법 판독", (function(){ var st=bidDecideState(b), aN=(ext.a?" · A값 감액 방식":""), srcTxt=(ext.dsrc==="fb")?" (하한율에서 추정)":(ext.dsrc==="doc"?" (공고문 문장)":"");
+        if(st==="mismatch") return '<span style="color:#9B2C2C;">⚠ 불일치 — 공고문 '+esc(ext.decide||"적격심사 아님")+srcTxt+' · API '+esc(b.method||"")+' → 공고문 기준</span>'+(ext.dctx?'<br><span style="color:#888;">근거: '+esc(ext.dctx)+'</span>':'')+aN;
+        if(st==="read") return esc(ext.decide)+srcTxt+' <span style="color:#888;">(API와 일치)</span>'+aN;
+        if(st==="unread") return '<span style="color:#B7791F;">⚠ 미판독 — 공고문 확인</span>'+aN;
+        return '<span style="color:#888;">읽을 첨부 없음</span>'+aN; })()],
+      ["산출근거", (ext.src?esc(ext.src)+" 위임(공고문 명기)":"")],
+      ["산정 출처", (function(){ var c=String(ext.calc||""); if(!c) return ""; if(c==="exp") return "공고문 하한율 명기"; if(c==="api") return "API 하한율(공고문 미확인)"; if(c.indexOf("del:")===0) return esc(c.slice(4))+" 위임"; if(c==="none") return "하한율 개념 없음"; return "미판독"; })()],
+      ["입찰서접수", ((ext.begin?esc(ext.begin)+" ~ ":"")+esc(ext.close||b.due||""))],
+      ["개찰일시", (esc(ext.openg||"")+(ext.openg_p?" · "+esc(ext.openg_p):""))],
+      ["참가등록마감", esc(ext.reg_due||"")], ["현장(소재지)", esc(ext.site||"")],
+      ["공동수급", esc(ext.joint||"")], ["매칭", esc((b.matched||[]).join(", "))],
+      ["공고기관", esc(b.org||"")], ["수요기관", esc(ext.dmin||"")],
+      ["담당자", esc(ext.ofcl||"")], ["전화번호", esc(ext.tel||"")]
+    ];
+    var money = [
+      ["기초금액", (ext.bss?fmtAmount(ext.bss)+"원":"")], ["추정가격", (b.budget?fmtAmount(b.budget)+"원":"")],
+      ["예가범위", (esc(ext.rng||"")+(ext.prc_m?" ("+esc(ext.prc_m)+")":""))],
+      ["낙찰하한율", (function(){
+        var s=bidLwltState(b);
+        if(s==="read") return esc(ext.lwlt)+"% <span style='color:#888;'>(이 공고문 판독값)</span>";
+        if(s==="none") return "<span style='color:#888;'>해당 없음 — 이 낙찰방법은 낙찰하한율 개념이 없습니다</span>";
+        var lab=(s==="method_unknown")?"낙찰방법 미상 — 공고문 확인":"미판독 — 공고문 확인";
+        var lm=lwltRefMode((b.kind||"")+(b.title||""), ext.bss||b.budget);
+        return "<span style='color:#B7791F;'>⚠ "+lab+"</span>"+(lm?("<br><span style='color:#888;'>참고(산정 미사용): 유사 조건("+esc(lm.key)+") 공고 명기 하한율 최빈 "+lm.v+"% · n="+lm.n+" — 이 공고 값이 아니라 넣지 않았습니다</span>"):"");
+      })()],
+      ["A값(합산)", (ext.aamt?fmtAmount(ext.aamt)+"원"+(ext.a?"":" <span style='color:#888;'>(기초금액 공개값)</span>"):"")],
+      ["투찰범위(하한)", (function(){
+        var fr=bidFloorRange(b);
+        if(fr) return fmtAmount(fr.lo)+" ~ "+fmtAmount(fr.hi)+"원 <span style='color:#888;'>(예가 추첨 범위"+(fr.a?" · A값 반영":"")+" · 하한율 "+fr.lwlt+"% 판독값 — 최대값 이상이면 항상 통과)</span>";
+        var s=bidLwltState(b);
+        if(s==="none") return "";
+        if(s==="read"){
+          var miss=[]; if(!parseFloat(ext.bss)) miss.push("기초금액"); if(!/%\s*~/.test(String(ext.rng||""))) miss.push("예가범위");
+          return "<span style='color:#B7791F;'>산정 안 함 — "+(miss.length?miss.join("·")+" 미확보":"입력값 부족")+"</span> <span style='color:#888;'>(하한율 "+esc(ext.lwlt)+"%는 판독됨 — 계산기에서 기초금액·예가범위를 넣으면 나옵니다)</span>";
+        }
+        return "<span style='color:#B7791F;'>산정 안 함 — "+(s==="method_unknown"?"낙찰방법 미상":"낙찰하한율 미판독")+"</span> <span style='color:#888;'>(추정값으로 채우지 않습니다)</span>";
+      })()],
+      ["참고·기관개찰", (function(){ var o=orgStatChip(b.org); return o ? (o.med+"% 중앙값"+(o.q1?" · Q1~Q3 "+o.q1+"~"+o.q3+"%":"")+" · n="+o.n+" <span style='color:#888;'>(참고(산정 미사용) — 지난 개찰 결과 예정가 대비 실측이지 이 공고 하한율이 아닙니다"+(o.low?" · 88%대 저가 경쟁 — 하한율 확인":"")+")</span>") : ""; })()]
+    ];
+    var res = rs ? [
+      ["결과", esc(rs.state||"")], ["확인일", esc(rs.checked||"")],
+      ["낙찰자", esc(rs.winner||"")], ["낙찰금액", (rs.amt?fmtAmount(rs.amt)+"원":"")],
+      ["투찰률", (rs.rate?esc(rs.rate)+"%":"")], ["참여업체", (rs.bidders?rs.bidders+"개사":"")]
+    ] : null;
+    if(b.docs && b.docs.length){ docsHtml = b.docs.map(function(d){ return '<a href="'+esc(d.u)+'" target="_blank" rel="noopener" style="display:block;">📄 '+esc(d.n)+'</a>'; }).join(""); }
+    if(b.url) docsHtml += '<a href="'+esc(b.url)+'" target="_blank" rel="noopener" style="display:block;">🔗 원문 페이지'+(b.no?' (공고번호 '+esc(b.no)+')':'')+'</a>';
+    return { info: info, money: money, res: res, docs: docsHtml || '<span style="color:#888;">첨부 정보 없음 — 원문 페이지에서 확인</span>' };
+  }
+  function bidSheetKv(pairs){
+    var ps = (pairs || []).filter(function(p){ return p[1]; });
+    if (!ps.length) return '<div class="vs-empty">이 칸에 들어올 값이 없습니다 — 원문 페이지에서 확인해 주세요</div>';
+    return '<div class="vs-kv">' + ps.map(function(p){ return '<div' + (BID_KV_WIDE[p[0]] ? ' style="grid-column:1/-1;"' : '') + '><div class="k">' + p[0] + '</div><div class="v">' + p[1] + '</div></div>'; }).join("") + '</div>';
+  }
+  // 하위 탭 — 개찰결과(있을 때 맨 앞) · 입찰정보 · 금액·투찰 · 공고서 (첨부 수)
+  function bidSheetTabs(b){ var a = []; if (b.result) a.push({ k: "res", h: "개찰결과" }); a.push({ k: "info", h: "입찰정보" }, { k: "money", h: "금액·투찰" }, { k: "docs", h: "공고서 (" + ((b.docs && b.docs.length) || 0) + ")" }); return a; }
+  // 고른 하위 탭 — 다른 줄을 펼치면 첫 탭부터(메모리만) · 그 줄에 없는 탭(개찰결과)이면 첫 탭
+  function bidSheetTabOf(b, tabs){ var id = String(b.id); if (bidDetRow !== id){ bidDetRow = id; bidDetTab = ""; } if (!tabs.some(function(x){ return x.k === bidDetTab; })) bidDetTab = tabs[0].k; return bidDetTab; }
+  // 펼침 — 머리 → 버튼 줄(상태 버튼·[↩]·[계약 시작]은 canDo("bid")만 — 결정 ② 펼침 맨 위) → 하위 탭 → 고른 탭 내용
+  function bidSheetDetail(b, ctx){
+    var i = bidInfo(b), st = i.st, ext = b.ext || {}, tabs = bidSheetTabs(b), t = bidSheetTabOf(b, tabs), P = bidSheetPairs(b), dd = b.due ? ddayInfo(b.due) : null, act = [], sub = [], bno, h;
+    if (b.org) sub.push(esc(b.org));
+    if (ext.close || b.due) sub.push("입찰서 마감 " + esc(ext.close || b.due));
+    h = '<div class="vs-dh"><b>' + esc(b.title || "-") + '</b>' + (BID_ST_CHIP[st] || '') + '<span class="own-badge ' + (b.source === "수동" ? "lease" : "self") + '">' + esc(b.source || "-") + '</span>'
+      + (dd ? '<span class="dday ' + (dd.cls || "") + '">' + dd.text + '</span>' : '') + (sub.length ? '<span class="vs-dsub">' + sub.join(" · ") + '</span>' : '') + ctx.close + '</div>';
+    if (canDo("bid")){
+      (BID_NEXT[st] || []).forEach(function(s){ act.push('<button type="button" class="mini-btn' + ((s[0] === "응찰" || s[0] === "낙찰") ? ' appr-btn' : '') + '" data-bid-act="st" data-bid-v="' + esc(s[0]) + '" data-bid-id="' + esc(b.id) + '">' + esc(s[1]) + '</button>'); });
+      if (BID_PREV[st]) act.push('<button type="button" class="mini-btn" data-bid-act="undo" data-bid-id="' + esc(b.id) + '" title="' + esc(BID_LABEL[BID_PREV[st]]) + '(으)로 되돌리기">↩</button>');
+      if (st === "낙찰") act.push('<button type="button" class="mini-btn appr-btn" data-bid-act="con" data-bid-id="' + esc(b.id) + '">계약 시작</button>');
+    }
+    if (b.url && bidHasDeepLink(b)) act.push('<a class="mini-btn" href="' + esc(b.url) + '" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center;">원문↗</a>');
+    else if (b.url){
+      act.push('<a class="mini-btn" href="' + esc(b.url) + '" target="_blank" rel="noopener" title="이 기관은 공고별 링크가 없어 사이트 홈으로 갑니다 — 공고번호를 복사해 검색하세요" style="text-decoration:none;display:inline-flex;align-items:center;">사이트↗</a>');
+      bno = bidNoOf(b);
+      if (bno) act.push('<button type="button" class="mini-btn" data-bid-act="copy" data-bid-v="' + esc(bno) + '" title="공고번호 복사 → 사이트 검색창에 붙여넣기">번호복사</button>');
+    }
+    if (ext.bss || b.budget) act.push('<button type="button" class="mini-btn" data-bid-act="calc" data-bid-id="' + esc(b.id) + '">🧮 이 공고로 계산</button>');
+    if (act.length) h += '<div class="vs-act" style="margin-top:2px;">' + act.join("") + '</div>';
+    h += '<div class="vs-stabs">' + tabs.map(function(x){ return '<button type="button" class="vs-stab' + (x.k === t ? ' on' : '') + '" data-bid-tab="' + x.k + '">' + esc(x.h) + '</button>'; }).join("") + '</div>';
+    if (t === "res") h += bidSheetKv(P.res);
+    else if (t === "money") h += bidSheetKv(P.money);
+    else if (t === "docs") h += '<div class="bid-docs">' + P.docs + '</div>';
+    else h += bidSheetKv(P.info);
+    return h;
+  }
+  // 공고번호 복사(옛 카드 [번호복사]와 같은 길 — 클립보드가 안 되면 prompt)
+  function bidSheetCopy(no, el){
+    var done = function(){ if (!el) return; var t = el.textContent; el.textContent = "복사됨"; setTimeout(function(){ el.textContent = t; }, 1200); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(no).then(done, function(){ window.prompt("공고번호(복사하세요)", no); });
+    else window.prompt("공고번호(복사하세요)", no);
+  }
+  // 누름 — 지금 규칙을 다시 본다(화면에 남은 옛 버튼·흉내 누름도): 상태 바꾸기·되돌리기·계약 시작은 canDo("bid")(setBidStatus·undoBidStatus 첫 줄과 같음), 상태 버튼은 그 공고의 지금 상태에서 갈 수 있는 단계(BID_NEXT)일 때만
+  function bidSheetAct(act, id, v, el){
+    var b, ext, at;
+    if (act === "copy"){ if (v) bidSheetCopy(v, el); return; }
+    b = findBid(id); if (!b || b.del === 1) return;
+    if (act === "calc"){ ext = b.ext || {}; openBidCalc({bss: ext.bss||b.budget||"", rng: ext.rng||"", lwlt: ext.lwlt||"", org: b.org||"", kind: (b.kind||"")+(b.title||""), a: ext.a, aamt: ext.aamt||0, src: ext.src||"", method: bidMethodEff(b).m||"", budget: b.budget||0}); return; }   // 옛 카드 [🧮 이 공고로 계산]과 같은 인자
+    if (!canDo("bid")) return;
+    if (act === "st"){ if ((BID_NEXT[bidSt(b)] || []).some(function(s){ return s[0] === v; })){ at = bidSheetRowAt(id); setBidStatus(id, v); bidSheetFollow(id, at); } return; }
+    if (act === "undo"){ at = bidSheetRowAt(id); undoBidStatus(id); bidSheetFollow(id, at); return; }
+    if (act === "con" && bidSt(b) === "낙찰") bidToContract(id);
+  }
+  // 상태를 바꾼 줄이 정렬 자리를 옮겼으면(상태 머리로 정렬한 채 — 기본 마감 정렬에서는 그 자리 그대로라 굴리지 않음) 그 줄을 화면 가운데로 굴린다(v443 검토 — 부품은 펼친 줄을 더보기 한도 밖이어도 그린다)
+  function bidSheetRowAt(id){ var host = document.getElementById("bidList"), L = (host && host.querySelectorAll) ? host.querySelectorAll("[data-vs-row]") : [], i; for (i = 0; i < L.length; i++){ if (L[i].getAttribute("data-vs-row") === String(id)) return i; } return -1; }
+  function bidSheetFollow(id, at){
+    var now = bidSheetRowAt(id), host, el;
+    if (bidSheetCur !== "sheet" || now < 0 || now === at) return;
+    host = document.getElementById("bidList"); el = host.querySelector('[data-vs-row="' + vsAttrQ(id) + '"]');
+    if (el && el.scrollIntoView){ try { el.scrollIntoView({ block: "center" }); } catch(e){ el.scrollIntoView(); } }
+  }
+  // 위임 배선 하나 — 펼침 칸 root 안: 하위 탭(data-bid-tab — 읽기 토글, 칩 건수 그대로 다시 그림) · 버튼(data-bid-act). 상태를 바꾸는 누름은 더블클릭 둘째 누름·처리 뒤 0.5초 안 누름을 버린다
+  function bidSheetBindAct(root){
+    root.addEventListener("click", function(e){
+      var el = e && e.target, a = null, t = null;
+      while (el && el !== root){
+        if (el.getAttribute){ a = el.getAttribute("data-bid-act"); t = el.getAttribute("data-bid-tab"); if (a != null || t != null) break; }
+        el = el.parentNode;
+      }
+      if (!el || el === root) return;
+      if (e.stopPropagation) e.stopPropagation();
+      if (t != null){ bidDetTab = t; vsSheetRenderKeep(bidSheetDef()); return; }
+      if (a === "st" || a === "undo" || a === "con"){
+        if ((e.detail || 0) >= 2 || (bidActAt && Date.now() - bidActAt < BID_ACT_GAP)) return;
+        bidActAt = Date.now();
+      }
+      bidSheetAct(a, el.getAttribute("data-bid-id"), el.getAttribute("data-bid-v"), el);
+    });
+  }
+  // 머리 글·배너·탭 배지 — 옛 본문(renderBidsLegacy)과 같은 식(표 갈래에서는 옛 본문이 돌지 않으므로 여기서 · uismoke v443이 두 갈래의 글을 대조)
+  function bidSheetHead(){
+    var all = liveBids(), nExp = all.filter(bidExpired).length;
+    var hts = (bidsHealth && bidsHealth.ts) ? ("자동 수집 " + new Date(bidsHealth.ts).toLocaleString("ko-KR", {month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"}) + " · ") : "";
+    return all.length ? (hts + "총 " + all.length + " · 신규 " + bidNewCount() + (nExp ? " · 지남 " + nExp : "")) : (bidsLoadErr ? "불러오기 실패" : "");
+  }
+  function bidSheetBanner(){
+    var banner = "", hFails, ageDays;
+    if (bidsHealth){
+      hFails = (bidsHealth.adapters || []).filter(function(a){ return !a.ok; });
+      ageDays = (Date.now() - (bidsHealth.ts || 0)) / 86400000;
+      if (ageDays > 3.5) banner += '<div style="background:#FDECEA;border:1px solid #F5C6CB;color:#842029;border-radius:8px;padding:8px 12px;margin-bottom:8px;font-size:13px;">⚠️ 자동 수집이 ' + Math.floor(ageDays) + '일째 실행되지 않았습니다. 수집 시스템 점검이 필요합니다.</div>';
+      if (hFails.length) banner += '<div style="background:#FFF8E1;border:1px solid #F0E3B2;color:#7A5E00;border-radius:8px;padding:8px 12px;margin-bottom:8px;font-size:13px;">⚠️ 수집 실패: <b>' + hFails.map(function(a){ return esc(a.name); }).join(", ") + '</b> — API 기준이나 사이트 구조가 바뀌었을 수 있습니다.<br><span style="font-size:12px;">' + hFails.map(function(a){ return esc(a.name) + ": " + esc((a.error || "").slice(0, 80)); }).join(" · ") + ' (마지막 시도 ' + new Date(bidsHealth.ts).toLocaleString("ko-KR") + ')</span></div>';
+    }
+    if (bidsLoadErr) banner = '<div style="background:#FDECEA;border:1px solid #F5C6CB;color:#842029;border-radius:8px;padding:8px 12px;margin-bottom:8px;font-size:13px;">⚠️ 서버에서 공고를 불러오지 못했습니다 (' + esc(bidsLoadErr.msg) + ', ' + new Date(bidsLoadErr.ts).toLocaleTimeString("ko-KR") + '). 공고는 서버에 그대로 있고 이 화면만 비어 있습니다 — 수집·재수집을 누르지 마십시오. <button type="button" class="mini-btn" id="bidReloadBtn">다시 불러오기</button></div>' + banner;
+    return banner;
+  }
+  function bidSheetBadge(){ var badge = document.getElementById("bidTabBadge"), n; if (badge){ n = bidNewCount(); badge.textContent = n; badge.classList.toggle("hide", n === 0 || !isAdmin()); badge.classList.toggle("red", n > 0); } }
+  // 갈래가 정해질 때마다(부품 onMode) — 표 갈래: 옛 상태 칩 줄 숨김·안내 줄 '지역 확인' 글·검색칸 안내 글·머리 글·배너(#bidBanner + [다시 불러오기] 배선)·탭 배지.
+  //   폰 갈래(legacy): 옛 상태 칩 줄·'노란 카드' 글을 되살리고 배너 자리를 비움 · 옛 검색어(bidSearchTerm)를 검색칸 글에 맞춤(표 갈래에서 부품이 칸 글을 바꿨을 수 있음 — 필터 초기화·찾아가기)
+  function bidSheetMode(m){
+    var g = function(id){ return document.getElementById(id); }, sheet = m === "sheet", fb = g("bidFilterBar"), bn = g("bidBanner"), gc = g("bidGuideCard"), gs = g("bidGuideSheet"), q = g("bidSearch"), head = g("bidHead"), rb;
+    bidSheetCur = sheet ? "sheet" : "legacy";
+    if (fb) fb.style.display = sheet ? "none" : "flex";   // 옛 칩 줄은 HTML 인라인 display:flex로만 줄 배치(gap·줄바꿈) — 빈 값을 넣으면 그 선언이 지워져 block이 되어 칩이 붙는다(v443 검토)
+    if (gc) gc.style.display = sheet ? "none" : "";
+    if (gs) gs.style.display = sheet ? "" : "none";
+    if (q) q.placeholder = sheet ? "공고 검색(공고명·기관·공고번호·매칭어)" : "공고 검색(공고명·기관)";
+    if (!sheet){ if (bn){ bn.innerHTML = ""; bn.style.display = "none"; } if (q) bidSearchTerm = String(q.value || "").toLowerCase().trim(); return; }
+    if (head) head.textContent = bidSheetHead();
+    if (bn){
+      bn.innerHTML = bidSheetBanner(); bn.style.display = bn.innerHTML ? "" : "none";
+      rb = bn.querySelector("#bidReloadBtn"); if (rb) rb.addEventListener("click", function(){ rb.disabled = true; rb.textContent = "불러오는 중…"; loadBids(); });   // 배너 안에서 찾음(옛 목록 갈래의 같은 id 단추는 #bidList 안 — 갈래마다 하나뿐)
+    }
+    bidSheetBadge();
+  }
+  // 검색칸(#bidSearch) 글 — 앞머리는 전역 검색(gsSources 입찰 줄 + gsRun hay)이 보는 글과 같은 꼴(공고명 · 기관 · 마감 날짜)이라 전역 검색에서 찾은 글자가 표에도 걸린다 · 그 뒤 공고번호·매칭어(명세 kept '공고번호·매칭어 더함')
+  function bidSheetSearchText(r){ return [(r.title || "") + " " + (r.org || "") + (r.due ? " · 마감 " + r.due : ""), bidNoOf(r), (r.matched || []).join(" ")].join(" "); }
+  // 정의 하나(만들어 두고 다시 씀 — 함수들이 전역을 그때그때 읽음)
+  function bidSheetDef(){
+    var d = BID_SHEET_DEF;
+    if (!d){
+      d = BID_SHEET_DEF = {
+        key: "jw_bid_sheet", host: "bidList", unit: "건",
+        empty: "조건에 맞는 공고가 없습니다.",
+        cols: [
+          { k: "title", h: "공고명", f: "text", fill: 1, min: 280, pw: 54, b: 0 },   // 신규만 굵게(칸 cls vs-b) — 첫 열 기본 굵게를 끔
+          { k: "st", h: "상태", w: 56, f: "none", pw: 18 },
+          { k: "org", h: "발주기관", w: 124, f: "text", lv: 3 },   // 명세 128 → 124(실측 — 위 칸 폭 줄)
+          { k: "region", h: "지역", w: 104, f: "enum", lv: 4 },   // 명세 76 → 104
+          { k: "method", h: "낙찰방법", w: 148, f: "enum", lv: 2, ft: function(r){ return BID_KIND_TXT[bidInfo(r).kind] || "미확인"; } },   // 명세 116 → 148 · 칸은 원문 라벨, 거르기는 갈래
+          { k: "budget", h: "추정가격", w: 112, f: "none", num: 1, lv: 3 },   // 명세 108 → 112
+          { k: "floor", h: "투찰 하한", w: 112, f: "none", num: 1, lv: 2 },   // 명세 124 → 112
+          { k: "due", h: "마감", w: 92, f: "none", lv: 2 },   // 명세 112 → 92(좁은 칸 꼴)
+          { k: "link", h: "↗", w: 34, f: "none", lv: 2, nosort: 1 },
+          { k: "due_ph", h: "마감", f: "none", ph: 1, pw: 28, sortAs: "due" }   // 폰 전용(phone:"sheet"일 때) 'D-2' — 정렬 별칭 = 마감
+        ],
+        rows: liveBids,
+        id: function(r){ return r.id; },
+        val: bidSheetVal, cell: bidSheetCell,
+        chips: [{ g: "st", items: [
+          { k: "", h: "전체", tip: BID_ALL_T, test: function(r){ return bidInfo(r).all; } },
+          { k: "new", h: "신규", test: function(r){ return bidInfo(r).st === "new"; } },
+          { k: "검토", h: "검토", test: function(r){ return bidInfo(r).st === "검토"; } },
+          { k: "응찰", h: "투찰", test: function(r){ return bidInfo(r).st === "응찰"; } },
+          { k: "낙찰", h: "낙찰", test: function(r){ return bidInfo(r).st === "낙찰"; } },
+          { k: "유찰", h: "유찰", test: function(r){ return bidInfo(r).st === "유찰"; } },
+          { k: "패스", h: "패스", test: function(r){ return bidInfo(r).st === "패스"; } },
+          { k: "expired", h: "지남", warn: 1, pop: 1, tip: "마감이 지났는데 아직 판단 전(신규·검토)인 공고 — 다른 칩에서는 모두 빠집니다", test: function(r){ return bidInfo(r).exp; } },
+          { k: "rgn", h: "지역 확인", tip: BID_RGN_T + "(전체 칩 범위)", test: function(r){ return bidInfo(r).all && !!r.rgn_ref; } },
+          { k: "mmis", h: "방법 불일치", tip: "API 낙찰방법과 공고문 판독이 어긋나 공고문 기준으로 보이는 공고(빨강 낙찰방법 — 공고문에 '적격심사 아님'만 명시된 '⚠ 낙찰방법 미상' 포함, 전체 칩 범위)", test: function(r){ var i = bidInfo(r); return i.all && i.me.src !== "api"; } },
+          { k: "lwlt", h: "하한율 미판독", tip: "하한율이 있어야 할 낙찰방법인데 공고문에서 하한율을 못 읽은 공고 — 유사공고 통계로 채우지 않습니다(전체 칩 범위)", test: function(r){ var i = bidInfo(r); return i.all && i.ls === "unread"; } }
+        ] }],
+        chipCount: 1, chipStyle: "light",
+        total: function(r){ return bidInfo(r).all; },   // v443 검토: 건수 글 '/ 전체 m'도 '전체' 칩과 같은 목록 규칙(종전 모집단 = 지남만 뺀 줄이라 칩 '전체 917' 옆에 '전체 969') · 지남 칩이면 '/ 지남 m'
+        sort: { k: "due", d: 1 },
+        foot: bidSheetFoot, detail: bidSheetDetail,
+        bind: function(root){ bidSheetBindAct(root); },
+        search: { el: "bidSearch", text: bidSheetSearchText },   // 탭에 이미 있는 검색칸 그대로(부품 vsSheetExtQ — 표 위에 새로 그리지 않음)
+        page: 150,   // 150줄씩 + [150건 더 보기](명세 — 917줄을 한 번에 그리지 않음)
+        phone: "legacy",   // 퀴즈 2번 답이 '폰도 새 표'면 이 한 줄만 "sheet"
+        legacy: renderBidsLegacy,   // 옛 그리기 본문(입구 renderBids를 넘기면 부품 재진입 가드로 폰 화면이 빈다 — v438)
+        onMode: bidSheetMode
+      };
+    }
+    d.none = bidsLoadErr ? "불러오기 실패 — 위 안내의 [다시 불러오기]" : (bidsLoaded ? "수집된 공고가 없습니다. (평일 아침 자동 수집)" : "공고를 불러오는 중입니다 — 계속 비어 있으면 새로고침해 주세요.");   // 못 읽은 목록을 '없음'으로 보이지 않게(v441·v442와 같음)
+    return d;
+  }
+  // 입찰 탭 공고 칸 입구 — 갈래 함수 하나(PC = 표, 폰 = 옛 본문). 줄 판정(BID_INFO)은 그릴 때마다 새로
+  function renderBids(){
+    if (!document.getElementById("bidList")) return;
+    BID_INFO = null;
+    vsSheetRender(bidSheetDef());
+  }
+  // 다른 화면에서 공고로 오는 길(이어받기 — 부품 입구는 이 구간에서만): 전역 검색 = 칩·거르기를 이번만 풀고 검색어 + 누른 그 공고 열기(지남·패스 건이면 그 칩으로) · 홈 투찰 카드 = 탭 이동 + 그 공고 열기 ·
+  //   새 수동 등록 = 기억된 칩·거르기·검색어에 가리면 그때만 열기(vsSheetReveal 셋째 인자 onlyHidden — v443 검토: 가리지 않았는데 150줄 밖이면(마감 없는 공고는 마감순 맨 뒤)
+  //   한도를 늘려 수백 줄을 그리지 않고 알림만 — BID_NEW_FAR_MSG). 폰 옛 목록(legacy)이면 부품이 false(아무것도 안 바꿈 — 종전 길)
+  function bidSheetFromGs(q, id){ var def = bidSheetDef(); if (!vsSheetSeek(def, q)) return false; if (id) vsSheetReveal(def, id); return true; }
+  function bidSheetHomeRow(id){ switchTab("bid"); return vsSheetReveal(bidSheetDef(), id); }
+  function bidSheetShowNew(id){
+    var host = document.getElementById("bidList");
+    if (bidSheetCur !== "sheet" || !host || !host.querySelector) return false;
+    if (host.querySelector('[data-vs-row="' + vsAttrQ(id) + '"]')) return true;
+    if (vsSheetReveal(bidSheetDef(), id, true)) return true;
+    gwToast(BID_NEW_FAR_MSG, false, 6000);
+    return false;
+  }
+  // @bid-sheet-end
   // 낙찰 건 → 계약 시작(입찰 카드·대시보드 배너 공용)
   function bidToContract(bidId){
     var b=findBid(bidId); if(!b) return;
@@ -20382,12 +20802,15 @@
   }
   function saveBidAdd(){
     var t=document.getElementById("baTitle").value.trim(); if(!t){ alert("공고명을 입력하세요."); return; }
-    bids.push({ id:genId("bid"), source:"수동", kind:"입찰", title:t, org:document.getElementById("baOrg").value.trim(),
+    if(!bidsLoaded){ alert(BID_UNREAD_MSG); if(!bidsLoading) loadBids(); return; }   // v443: 못 읽은 공고 목록에 더하지 않는다(위 bidsLoaded) — 다시 읽고 창은 그대로(읽히면 다시 [저장]) · 읽는 중이면 또 읽지 않음(bidsLoading — v443 검토)
+    var nb={ id:genId("bid"), source:"수동", kind:"입찰", title:t, org:document.getElementById("baOrg").value.trim(),
       region:"", due:document.getElementById("baDue").value||"", budget:0, url:document.getElementById("baUrl").value.trim(),
-      matched:[], status:"new", created:todayStr(), updated:todayStr() });
+      matched:[], status:"new", created:todayStr(), updated:todayStr() };
+    bids.push(nb);
     scheduleBidsSave();
     document.getElementById("bidAddBackdrop").classList.remove("show");
     renderBids(); renderDashboard();
+    bidSheetShowNew(nb.id);   // v443 PC 표: 기억된 칩·거르기(패스·지남 등)·검색어에 새 공고가 가리면 그때만 그 줄을 연다(폰 옛 목록은 아무것도 안 함)
   }
 
   // ---- 공매·부동산(onbid.json) — 온비드, 일감과 분리 ----
