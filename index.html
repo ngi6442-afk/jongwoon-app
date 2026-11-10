@@ -1119,7 +1119,7 @@
   /* v438 화면 폭(45-1 #1 — 명세 09_조사_문서/표형탭_시안_자료_20261110/엑셀형탭_명세_20261110.json common.width_plan·css). PC 860px 이상만 — 폰(859px 이하) 틀은 그대로.
      틀(#app)은 탭과 무관하게 같은 폭이라 탭을 옮겨도 사이드바가 안 움직인다. 본문 = 창 − 233(860~1279: 여백 16·사이드바 168·간격 16) · 창 − 269(1280~1599: 여백 22·사이드바 184·간격 24) ·
      1600 이상은 #app 최대 1,680(본문 최대 1,428) — 창 폭은 세로 스크롤바 17px 포함(1024 창 791 · 1366 창 1,097 · 1920 창 1,428 — uismoke v438 ①이 이 CSS를 읽어 계산해 명세 width_plan.table과 대조).
-     넓히는 화면은 id로만(section 태그·class 그대로 — uismoke가 '<section class="view" id=…>' 글자를 찾는다): v438은 계약·차량·권한관리 셋, v439에 지시·v440에 기성·v441에 거래처(표로 바꾼 판) — 일용직·입찰은 그 탭을 표로 바꾸는 판(v442~v443)에서 하나씩 더한다(옛 카드 목록이 1,428px로 늘어지지 않게). 나머지 화면은 808 그대로(사이드바 옆 왼쪽 정렬),
+     넓히는 화면은 id로만(section 태그·class 그대로 — uismoke가 '<section class="view" id=…>' 글자를 찾는다): v438은 계약·차량·권한관리 셋, v439에 지시·v440에 기성·v441에 거래처·v442에 일용직(표로 바꾼 판) — 입찰은 그 탭을 표로 바꾸는 판(v443)에서 더한다(옛 카드 목록이 1,428px로 늘어지지 않게). 나머지 화면은 808 그대로(사이드바 옆 왼쪽 정렬),
      권한관리는 권한 표(#permRoster)만 넓고 그 밖 카드는 808. 안전(#view-safety)은 56 판(v445)에서 넓히는 목록에 더한다(그때도 현황 #sfPaneNow는 808 — 미리 둠).
      ★퀴즈 1번 대안('메뉴 자리 고정·본문만 오른쪽으로')을 고르시면 860 묶음 #app 줄 끝에 margin:0 0 0 max(0px, calc((100% - 1060px) / 2)); 하나만 더한다 — 1600 묶음 #app{max-width:1680px;}는 남긴다
        (margin-left가 100% 기준이라 상한을 남겨도 메뉴는 고정 · 지우면 2560 창 본문이 약 1,550으로 늘어 명세 why_1680과 어긋나고 계약·차량 펼침도 더 넓어짐)
@@ -1131,7 +1131,7 @@
     .layout{gap:16px;}
     .tabbar{width:168px;}
     .views>.view{max-width:808px;}
-    #view-tasks,#view-rec,#view-cli,#view-con,#view-veh,#view-perm{max-width:none;}   /* v439 지시(#view-tasks) · v440 기성(#view-rec) · v441 거래처(#view-cli)를 더함 — v442~v443에서 #view-workers·#view-bid를 탭 판마다 더함 */
+    #view-tasks,#view-rec,#view-cli,#view-workers,#view-con,#view-veh,#view-perm{max-width:none;}   /* v439 지시(#view-tasks) · v440 기성(#view-rec) · v441 거래처(#view-cli) · v442 일용직(#view-workers)을 더함 — v443에서 #view-bid를 더함 */
     #sfPaneNow,#view-perm>:not(#permRoster){max-width:808px;}
     #recAddCard,#recImportCard,#recAbCard,#recAgingSummary{max-width:808px;}   /* v440 기성: 표만 넓고, 머리 버튼으로 펼치는 카드 셋(청구 등록·홈택스 불러오기·운반 실적)·거래처별 미수 집계는 지금 읽기 폭 808 그대로 */
   }
@@ -1166,6 +1166,9 @@
   .cli-unp{color:#B0332A;}
   .vs-hist tr.cli-conrow{cursor:pointer;}
   .vs-hist tr.cli-conrow:hover td{background:#F7FAF8;}
+  /* v442 일용직 표(45-1 다섯째 판 — 명세 sections[key=workers]): 이름 칸 '동명' 칩(이름 뒤 4px — 운영 백업 실측 이름 + 칩 73px / 100의 안 폭 83) · 현장 권한이 없을 때 표 위 안내 한 줄 · 검토 반영: 현장 대장을 아직 못 읽었을 때 안내 한 줄(#wkAsbNote — 같은 꼴) */
+  .wk-dup{margin-left:4px;}
+  #wkSiteNote,#wkAsbNote{font-size:12.5px;color:var(--sub);margin:0 0 6px;}
   @media (min-width:1280px){
     #view-tasks>.card.scope-host{display:flex;align-items:center;}
     #view-tasks>.card.scope-host>.add-row{flex:0 0 auto;padding:10px 14px 10px 0 !important;}
@@ -1789,10 +1792,12 @@
     <div class="card" id="promoLearnCard" style="display:none;font-size:12.5px;"></div>
   </section>
 
-  <!-- 인사·일용직 (권한 설정 가능) -->
+  <!-- 인사·일용직 (권한 설정 가능) — v442 PC(860px 이상)는 #wkList 자리에 표(현장 권한이 없으면 표 위 #wkSiteNote 한 줄), 폰은 옛 목록 그대로 -->
   <section class="view" id="view-workers">
     <div class="dash-sec" style="margin-bottom:8px;"><h2>일용직 <span class="cnt" id="wkHead"></span></h2></div>
     <div style="font-size:13px;color:var(--sub);margin-bottom:6px;">석면·철거 투입 인력 명부 — 해체계획서 명단 자동 기입에 사용됩니다.</div>
+    <div id="wkAsbNote" style="display:none;">현장 대장을 아직 읽지 못했습니다 — 최근 참여·참여·종류와 참여 칩은 대장을 읽은 뒤 보입니다(계속 이러면 새로고침해 주세요)</div>
+    <div id="wkSiteNote" style="display:none;">현장 이력은 현장 권한이 있어야 보입니다</div>
     <div class="card" id="wkList"><div class="loading">불러오는 중…</div></div>
     <button class="link-btn" id="wkAddBtn">+ 일용직 추가</button>
 
@@ -1997,11 +2002,15 @@
     <p id="swSub" style="margin:0 0 10px;"></p>
     <input type="search" id="swSearch" placeholder="이름 검색" autocomplete="off">
     <div class="mchecks" id="swList" style="max-height:220px;"></div>
+    <!-- v442 검토: 명부 등재(+ 새 일용직)는 일용직 수행 권한만 — openSiteWorkers가 권한을 보고 등재 칸 묶음(swNewWrap)과 안내 한 줄(swNoWkNote) 중 하나만 보인다(서버 명부 저장도 수행이 아니면 403 NO_WRITE) -->
+    <div id="swNewWrap">
     <div class="hw-note" style="margin-bottom:10px;">명부에 없는 사람은 아래에 이름만 넣고 [+ 새 일용직]을 누르면 바로 등재됩니다. 생년월일·연락처는 나중에 인사·일용직 탭에서 채우면 됩니다.</div>
     <div style="display:flex;gap:8px;">
       <input type="text" id="swNewName" placeholder="새 일용직 이름" autocomplete="off" style="flex:1;margin-bottom:10px;">
       <button class="mini-btn" id="swNewBtn" style="height:42px;white-space:nowrap;">+ 새 일용직</button>
     </div>
+    </div>
+    <div class="hw-note" id="swNoWkNote" style="display:none;margin-bottom:10px;">명부에 있는 사람만 고를 수 있습니다 — 명부에 새로 등재하려면 일용직 수행 권한이 필요합니다(등재는 인사·일용직 담당에게 부탁해 주세요).</div>
     <button class="primary" id="swSave">이 현장에 넣기</button>
     <button class="secondary" id="swCancel">취소</button>
   </div>
@@ -2016,8 +2025,8 @@
     <span class="fld-label">직책</span>
     <select id="wkRole"><option value="반장">반장</option><option value="인부" selected>인부</option></select>
     <input type="text" id="wkPhone" placeholder="연락처" autocomplete="off">
-    <span class="fld-label">건강진단일 (선택)</span>
-    <input type="date" id="wkExam">
+    <!-- v442: 건강진단일 칸은 뺐다(운영 입력 0건 — 건강정보는 안전 권한 안에서만). 배치전·특수건강진단은 안전 › 교육·검진(일용직)에 적고, 해체계획서 ③ 건강진단은 그 기록에서 채운다(안전 권한) -->
+    <div class="hw-note" id="wkExamMoved" style="font-size:12px;display:none;">건강진단(배치전·특수) 날짜는 <b>안전 › 교육·검진</b>(일용직)에 적습니다 — 석면해체계획서 ③ 건강진단은 그 기록에서 채웁니다(안전 권한).</div>
     <input type="text" id="wkNote" placeholder="비고 (선택 — 교육이수 등)" autocomplete="off">
     <button class="primary" id="wkSave">저장</button>
     <button class="danger" id="wkDelete" style="display:none;">삭제</button>
@@ -3407,6 +3416,8 @@
     tasks = []; vehicles = []; receivables = []; licenses = []; duties = []; documents = []; contracts = []; leaves = [];
     bids = []; onbids = []; quotes = []; promoItems = []; clients = []; myTodos = []; members = []; apprItems = []; myApprItems = []; fam = []; edu = [];
     cliLoaded = false; cliDirty = {};   // v441 검토: 비운 거래처 대장은 '아직 못 읽음'(빈 목록을 저장하지 않게 — loadClients가 200에서 다시 켬)
+    wkLoaded = false;   // v442: 일용직 명부도 '아직 못 읽음'으로(loadWorkers가 200에서 다시 켬 — 빈 명부 저장 막음)
+    wkPending = false; wkDirty = {}; wkEduSt = "";   // v442 검토: 저장 대기·이 기기에서 고친 줄 표시·③ 건강진단용 교육 기록 읽기 상태도 비움(다음 사람이 앞사람 표시로 합치거나 '읽음'으로 보지 않게)
     records = {};
     abStatus = null; abDay = { day: "", data: null, loading: false, error: "" }; abPresets = { items: null, loading: false, saving: false, error: "" };
     abManual = { day: "", items: [], loaded: false, timer: null, saving: false, dirty: false, savedTs: 0, bad: 0, err: "", errBad: false, pendingRender: false };
@@ -6692,11 +6703,13 @@
     if(cancel) cancel.addEventListener("click", function(){ document.getElementById("swBackdrop").classList.remove("show"); swSiteId=null; });
     var nb=document.getElementById("swNewBtn");
     if(nb) nb.addEventListener("click", function(){
+      if(!canDo("wk")){ alert(WK_NO_ADD_MSG); return; }   // v442 검토: 명부 등재는 일용직 수행만(서버 명부 저장도 수행이 아니면 403 NO_WRITE) — 종전엔 보기 권한도 이 기기 명부에 넣고 '등재했습니다'가 떴고(서버는 거절 · 현장 대장에는 명부에 없는 id가 남음), 숨김이면 아래 '못 읽은 명부' 안내만 되풀이됐다
       var nm=document.getElementById("swNewName").value.trim();
       if(!nm){ document.getElementById("swNewName").focus(); return; }
+      if(!wkLoaded){ alert(WK_UNREAD_MSG); var lp=loadWorkers(); if(lp&&typeof lp.then==="function") lp.then(function(){ renderSwList(); }); return; }   // v442: 못 읽은 명부에 더하지 않는다(일용직 명부 wkLoaded — 읽기 전 저장은 서버 명부를 이 목록으로 바꿀 수 있음) · 검토: 다시 읽은 명부를 현장 창 목록에도 그린다(명부를 못 본 채 같은 사람을 새로 등재하지 않게)
       var w={ id:genId("w"), created:todayStr(), name:nm, birth:"", role:"인부", phone:"", exam:"",
               note:"현장에서 바로 등재(2026-09-10 이후) — 생년월일·연락처 확인 요망", updated:todayStr() };
-      workers.push(w); scheduleWorkersSave(); renderWorkers();
+      workers.push(w); wkMarkDirty(w.id); scheduleWorkersSave(); renderWorkers();
       document.getElementById("swNewName").value=""; swQ=""; document.getElementById("swSearch").value="";
       renderSwList();
       // 새로 만든 사람은 바로 체크해 둔다 — 넣으려고 만든 것이다
@@ -9732,36 +9745,66 @@
   })();
   // ---- 일용직 명부(석면·철거 투입 인력) — 해체계획서 명단 자동 기입용 ----
   var workers=[], wkEditId=null, wkSaveTimer=null, wkBase=0;   // v417 카드 10 worker P0: 명부 저장 낙관락(base/409 → 행 단위 병합 뒤 재저장) — 종전엔 통째 덮어쓰기
+  // v442: wkLoaded = 명부를 읽었나(loadWorkers·409 다시 읽기의 200에서만 켬 — 로그아웃 clearSessionData에서 끔). 못 읽은 채(읽는 중·실패 — 빈 배열)에는 창 [저장]·[삭제]·현장 창 [+ 새 일용직]을
+  //   안내(WK_UNREAD_MSG)로 막고 doSaveWorkers도 보내지 않는다(v441 cliLoaded와 같은 꼴 — 서버 낙관락이 base 0을 409로 돌려 대개 막지만, 서버가 직전 문서를 못 읽은 때는 낙관락이 걸리지 않아
+  //   빈 목록 + 새 1명이 명부를 통째로 바꿀 수 있었다). wkPending = 저장 대기(scheduleWorkersSave ~ 저장 200) — 그사이 읽기(탭에 다시 옴 등)가 오면 통째로 바꾸지 않고 행 단위로 합친다
+  //   (asbPending·eduPending과 같은 꼴 — 종전엔 저장 1.2초 안에 온 읽기 답이 방금 고친 줄을 덮어 그 고침이 저장에서 빠졌다)
+  var wkLoaded=false, wkPending=false;
+  var WK_UNREAD_MSG="일용직 명부를 아직 읽지 못했습니다 — 잠시 뒤 다시 해 보시고, 계속 이러면 새로고침한 뒤 다시 해 주세요. (읽기 전에 저장하면 서버 명부가 이 화면 목록으로 바뀔 수 있어 막습니다)";
+  // v442 검토: wkDirty = 이 기기에서 고쳤는데 아직 서버에 들어가지 않은 일용직 id → 고친 횟수(wkMarkDirty — 창 [저장]·창 [삭제]·현장 창 [+ 새 일용직], 명부를 고치는 길은 이 셋뿐).
+  //   저장 대기 중 읽기·저장 409 병합(mergeWorkers)은 이 줄만 이 기기 것으로 합친다(v441 cliDirty와 같은 꼴 — 명부를 고치는 새 길을 만들면 wkMarkDirty를 같이). 저장 200이면 보낸 횟수 그대로인 줄만 지운다
+  var wkDirty={};
+  var WK_NO_ADD_MSG="명부에 새로 등재하려면 일용직 수행 권한이 필요합니다 — 명부에 있는 사람만 고를 수 있습니다(등재는 인사·일용직 담당에게 부탁해 주세요).";
+  function wkMarkDirty(id){ if(id!=null) wkDirty[id]=(wkDirty[id]||0)+1; }
   // v417: 생년월일 6자리 정규화('81.08.17'·'1981-08-17'·'810817' → '810817', 월·일 범위 밖이면 빈칸=미입력) — 서버 _lib/autorules.js birth6와 같은 규칙
   function wkBirth6(s){ var d=String(s||"").replace(/\D/g,""); var six=(d.length===8)?d.slice(2):((d.length===6)?d:""); if(!six) return ""; var mo=+six.slice(2,4), da=+six.slice(4,6); if(mo<1||mo>12||da<1||da>31) return ""; return six; }
-  function mergeWorkers(local, server){   // 행 단위 병합: 같은 id는 updated(날짜)가 늦은 쪽, 같으면 로컬(지금 고친 행). 양쪽에만 있는 행은 그대로 합친다.
-    var by={}, out=[]; (server||[]).forEach(function(r){ if(r&&r.id) by[r.id]=r; });
-    (local||[]).forEach(function(r){ if(!(r&&r.id)) return; var s=by[r.id]; if(!s || String(r.updated||"")>=String(s.updated||"")) by[r.id]=r; });
-    Object.keys(by).forEach(function(id){ out.push(by[id]); });
+  // 행 단위 병합(v442 검토 — v441 cliMergeRemote와 같은 꼴): 서버 명부(순서·내용)를 바탕으로 이 기기에서 고친 줄(wkDirty)만 이 기기 것으로 바꾸고, 이 기기에만 있는 줄은 고친 줄(새 사람)만 끝에 더한다.
+  //   고치지 않은 줄은 서버 것 — 종전(v417) '늦은 쪽·같으면 로컬'은 updated가 날짜 단위라 같은 날 다른 기기가 고치거나 지운 줄을 이 기기 묵은 사본이 되돌렸다(다음 저장이 base를 새로 받아 409도 안 남)
+  function mergeWorkers(local, server){
+    var by={}, seen={}, out=[];
+    (server||[]).forEach(function(r){ if(r&&r.id) by[r.id]=r; });
+    (local||[]).forEach(function(r){ if(r&&r.id&&wkDirty[r.id]) by[r.id]=r; });
+    (server||[]).forEach(function(r){ if(r&&r.id&&!seen[r.id]){ seen[r.id]=1; out.push(by[r.id]); } });
+    (local||[]).forEach(function(r){ if(r&&r.id&&wkDirty[r.id]&&!seen[r.id]){ seen[r.id]=1; out.push(r); } });
     return out;
   }
   function doSaveWorkers(){
+    if(!wkLoaded) return Promise.resolve();   // v442: 못 읽은 명부는 보내지 않는다(위 wkLoaded — 고치는 길이 먼저 막고 알린다)
+    var sent={}; Object.keys(wkDirty).forEach(function(id){ sent[id]=wkDirty[id]; });   // v442 검토: 이번에 보내는 고친 횟수 — 보내는 사이 또 고친 줄은 성공해도 표시를 남긴다(다음 저장이 보냄)
     return gwCall("gw-data",{action:"save",collection:"workers",doc:{schema:1,items:workers},base:wkBase}).then(function(res){
       if(res.status===409){
         return gwCall("gw-data",{action:"get",collection:"workers"}).then(function(r2){
-          if(r2.status===200){ var doc=(r2.body&&r2.body.doc)||{}; workers=mergeWorkers(workers, Array.isArray(doc.items)?doc.items:[]); wkBase=doc.updated_at||0; renderWorkers(); renderXgWorkers(); }
+          if(r2.status===200){ var doc=(r2.body&&r2.body.doc)||{}; workers=mergeWorkers(workers, Array.isArray(doc.items)?doc.items:[]); wkBase=doc.updated_at||0; wkLoaded=true; renderWorkers(); renderXgWorkers(); }
           return doSaveWorkers();
         });
       }
-      if(res.status===200){ wkBase=(res.body&&res.body.updated_at)||Date.now(); }
+      if(res.status===200){ wkBase=(res.body&&res.body.updated_at)||Date.now(); Object.keys(sent).forEach(function(id){ if(wkDirty[id]===sent[id]) delete wkDirty[id]; }); if(!wkSaveTimer) wkPending=false; }   // v442: 보내는 사이 또 고쳐 저장이 다시 잡혔으면(wkSaveTimer) 대기 표시를 남긴다
+      // v442 검토: 서버 거절(403) — doSaveEdu(v430)와 같은 갈래. 기기 승인 취소(DEVICE_NOT_APPROVED — 서버가 권한보다 먼저 봄)는 권한 문제가 아니라 대기·고친 줄 표시를 남기고 기기 안내만.
+      //   권한(NO_WRITE — 일용직 수행이 아님 · 권한이 바뀐 직후 등)이면 서버가 이 변경을 받을 일이 없으므로 대기·표시·잡힌 저장을 내리고 서버 명부를 다시 읽는다
+      //   (종전엔 403을 삼켜 대기 표시가 켜진 채 남아, 그 뒤 읽기마다 이 기기에만 있는 줄이 병합으로 살아남았다 — 표·현장 창·서류 명단 후보에 서버에 없는 사람)
+      if(res.status===403){
+        if((res.body&&res.body.error_code)==="DEVICE_NOT_APPROVED") gwToast("승인되지 않은 기기입니다 — 관리자에게 기기 승인을 요청하세요.\n일용직 명부 변경은 아직 서버에 저장되지 않았습니다.", true);
+        else {
+          wkPending=false; wkDirty={}; if(wkSaveTimer){ clearTimeout(wkSaveTimer); wkSaveTimer=null; }
+          gwToast("일용직 명부 저장 권한이 없어 서버가 이 변경을 받지 않았습니다.\n명부를 서버 값으로 다시 읽습니다.", true);
+          loadWorkers();
+        }
+      }
     }).catch(function(){});
   }
   function liveWorkers(){ return workers.filter(function(w){ return w && w.del!==1; }); }
   function sortedWorkers(){ return liveWorkers().sort(function(a,b){ return ((a.role==="반장"?0:1)-(b.role==="반장"?0:1)) || (a.name||"").localeCompare(b.name||""); }); }
   function loadWorkers(){
     return gwCall("gw-data",{action:"get",collection:"workers"}).then(function(res){
-      if(res.status===200){ var wdoc=(res.body&&res.body.doc)||{}; workers=Array.isArray(wdoc.items)?wdoc.items:[]; wkBase=wdoc.updated_at||0; renderWorkers(); renderXgWorkers(); }   // v417 base 보관
+      if(res.status===200){ var wdoc=(res.body&&res.body.doc)||{}, wi=Array.isArray(wdoc.items)?wdoc.items:[]; if(wkPending) workers=mergeWorkers(workers, wi); else { workers=wi; wkDirty={}; } wkBase=wdoc.updated_at||0; wkLoaded=true; renderWorkers(); renderXgWorkers(); }   // v417 base 보관 · v442 읽음 표시 · 저장 대기 중이면 행 단위 병합(로드 덮어쓰기 금지 — 검토: 이 기기에서 고친 줄만 이 기기 것) · 대기가 없으면 서버 명부 그대로(고친 줄 표시도 비움)
       else if(res.status===403){ var h=document.getElementById("wkList"); if(h) h.innerHTML='<div class="empty-line">권한이 없습니다 — 권한관리에서 [일용직]을 열어주세요.</div>'; }
     }).catch(function(){});
   }
   function scheduleWorkersSave(){
+    wkPending=true;   // v442 저장 대기(위 wkPending)
     if(wkSaveTimer) clearTimeout(wkSaveTimer);
     wkSaveTimer=setTimeout(function(){
+      wkSaveTimer=null;
       doSaveWorkers();   // v417: base/409 행 단위 병합(종전 통째 덮어쓰기)
     },1200);
   }
@@ -9803,7 +9846,8 @@
     return m;
   }
   function findWk(id){ for(var i=0;i<workers.length;i++){ if(workers[i].id===id) return workers[i]; } return null; }
-  function renderWorkers(){
+  // v442: 폰(859px 이하) 옛 그리기 본문 — v441 renderWorkers 본문 글자 그대로(이름만 바꿈 · uismoke v442가 해시로 대조, 고치면 폰 화면이 바뀐다). 일용직 탭 입구 renderWorkers는 @wk-sheet 구간의 갈래 함수
+  function renderWorkersLegacy(){
     var host=document.getElementById("wkList"); if(!host) return;
     var list=sortedWorkers();
     var need=0; list.forEach(function(w){ if(wkMissing(w).length) need++; });
@@ -9840,6 +9884,241 @@
     });
     bindFold(host, "data-wk-fold", "wkBd-");
   }
+  // @wk-sheet-start
+  // v442(45-1 다섯째 판 — 명세 09_조사_문서/표형탭_시안_자료_20261110/엑셀형탭_명세_20261110.json sections[key=workers] · 단계지시_v442_일용직.json · PM 11/10 15:56 결정 ⑤ 표에서 칸 바로 고치기 없음 — 펼침 [수정] 창에서만):
+  // PC(860px 이상) = 공통 부품(vsSheetRender) 표 한 장 — 자리는 폰 옛 목록과 같은 #wkList(v441 거래처처럼 두 갈래가 한 자리를 씀).
+  //   열 7(명세 순서): 이름(같은 이름이면 '동명' 칩 — 띄어쓰기만 빼고 같은 글자, wkSave 동명이인 토스트와 같은 판정) · 역할 · 생년월일(6자리 꼴이 아니면 노랑 — 빈 값은 '미입력') ·
+  //   최근 참여('(석면) n일 전' — PM 9/14 표기, 옛 목록 칩 wkKindChips와 같은 글) · 참여 'n회' · 종류(석면·철거·준설 — 값이 여럿이면 부품 열 옵션 multi) · 메모(남는 폭). 연락처는 펼침에만.
+  //   참여 셈은 현장 대장(asb — 지운 줄 빼고)의 worker_ids에서 새로(wkSheetIdx — 한 현장에 같은 id가 여럿이어도 한 번 · 명부에서 지운 사람은 줄이 없음). wkKindCounts는 그대로(폰 옛 목록·[근로자 추가] 칩이 씀 —
+  //   옛 펼침 '참여 현장' 칸이 v356 뒤 늘 빈칸이던 것은 표 펼침 '참여 현장 (n)'이 대신함). 현장 대장이 늦게 오면 loadAsb가 renderWorkers를 불러 다시 그린다 —
+  //   검토 반영(11/11): 받기 전·못 받았으면(asbLoaded) '참여 없음'으로 단정하지 않고 '확인 중'(아래 wkAsbOk·#wkAsbNote), 로그인 창 '전환'은 applyPerms가 대장도 읽음.
+  //   현장 권한이 없으면(canSee site — 현장 대장을 못 받음 · 로그인 창 '전환'으로 메모리에 남은 대장도 쓰지 않음) 참여 3열·칩 2개·합계 '1년 내'·참여 현장 하위 탭을 그리지 않고 표 위에 '현장 이력은 현장 권한이 있어야 보입니다'(#wkSiteNote)
+  //   — 정의 하나에 열·칩을 권한(wkSheetSig)마다 한 벌로 바꿔 끼운다(v441 cliSheetDef와 같은 꼴).
+  //   칸 폭은 명세 그대로 — 운영 백업 11/10 20:16 사본 실측(맑은 고딕, 값은 옮기지 않음): 이름 + '동명' 칩 최대 73 / 안 폭 83 · 최근 참여(일수 4자리) 93.9 / 103 · 참여 머리 + 정렬 화살표 38 / 39 · 종류 '석면·준설' 52.7 / 67
+  //   ('석면·철거·준설' 80.5는 넘지만 운영 0줄 — 줄임표 + title) · 합계 줄 '미입력 155' 굵게 63.6 / 75 · '1년 내 155' 62.7 / 103. 단계별 열 합 702 / 702 / 702(현장 권한 없음 442 — 한도 742 / 962 / 1,282 안).
+  // 줄 누르기 = 펼침(머리: 이름·역할·빠진 항목·같은 이름·현장 대장 n건 → 하위 탭 인적사항 | 참여 현장 (n) — 최근 5건 + [전부 보기 (n)] .vs-chip(읽기 토글) → [수정] .mini-btn(일용직 수행 — 누름 길 wkSheetAct가 권한을 다시 봄)).
+  //   배선은 펼침 칸 root 하나(wkSheetBindAct — 자리 #wkList에는 걸지 않음). 바꾸는 일은 [수정] 창 하나(6자리 검사·동명이인 토스트·저장 충돌 병합 — 창 안 [삭제]).
+  // 폰(859px 이하) = phone:"legacy" — 옛 그리기 본문 renderWorkersLegacy(접는 줄 + 세로표 — 본문 글자 그대로)를 부른다. 퀴즈 2번 답(C063) 전이라 '폰도 새 표'면 phone 한 줄만 "sheet"
+  //   (폰 열 이름 32 · 생년월일 30 · 최근 참여 38 % — 현장 권한이 없으면 이름 52 · 생년월일 48, 폰 합계 — 미리 넣어 둠).
+  // 그대로 두는 것: [+ 일용직 추가]·[수정] 창·창 안 [삭제] · 6자리 검사 · 동명이인 토스트 · 저장 충돌 병합 · 명부 배열 · loadWorkers · sortedWorkers(서류 생성·교육·홈이 같이 씀) · 교육·검진 안내 줄(#eduMovedWk — applySafetyPerms).
+  var WK_SHEET_DEF = null, WK_SHEET_COLS = {}, WK_SHEET_CHIPS = {}, wkSheetCur = "", wkDetTab = "", wkDetRow = "", wkDetAll = "";
+  var WK_DASH = '<span style="color:#9AA09C;">-</span>';
+  // v442 검토: 현장 대장을 이 세션에서 아직 못 읽었으면(asbLoaded — 읽는 중·실패·현장 권한 없는 앞사람에서 로그인 창 '전환') 빈 대장을 '참여 없음'으로 단정하지 않는다 —
+  //   참여 3열 = 회색 '확인 중'(최근 참여 — 맑은 고딕 12.5px 41.9 / 안 폭 103)·'…'(참여·종류 — 9.2 / 안 폭 39·67, 참여 칸에 '확인 중'은 41.9라 넘침) + title, 합계 '1년 내 —'(굵게 53.8 / 103), '1년 내 참여'·'참여 기록 없음' 칩은 아무도 안 걸림, 펼침 '현장 대장 확인 중',
+  //   표 위 #wkAsbNote. 칩 묶음은 그대로(대장 읽기 전후로 칩 묶음이 바뀌면 첫 그림에서 기기에 기억된 칩을 부품이 버린다 — vsSheetLoad). 대장이 오면 loadAsb가 renderWorkers를 불러 다시 그림(명세 위험 '늦게 옴')
+  var WK_WAIT_T = "현장 대장을 아직 읽지 못했습니다 — 읽은 뒤 다시 그립니다";
+  function wkAsbOk(){ return typeof asbLoaded === "undefined" || !!asbLoaded; }
+  var WK_DET_N = 5;   // 펼침 '참여 현장' 처음에 보이는 건수(명세 — 최근 5건)
+  var WK_IDX = null;  // 참여 셈·같은 이름 셈 — 그릴 때마다 새로(renderWorkers가 비움), 같은 실행 안에서는 다시 쓰고 다음 일(마이크로태스크)에 저절로 버린다(v441 CLI_LINK와 같은 꼴)
+  function wkNameKey(s){ return String(s == null ? "" : s).replace(/\s+/g, ""); }   // 동명이인 판정 — wkSave 토스트와 같은 규칙(띄어쓰기만 빼고 글자째)
+  function wkSiteKind(r){ return (r && r.kind && WK_KIND_LABEL[r.kind]) ? r.kind : "asbestos"; }   // 종류가 없거나 모르는 값이면 석면(wkKindCounts와 같음)
+  // 묶어 셈 — 현장 대장(지운 줄 빼고)을 한 번 훑어 사람 id → { n 참여 현장 수 · kinds {종류:1} · last {kind, date, title} 가장 늦은 날짜(종료일, 없으면 시작일 — wkKindCounts와 같은 판정) · sites 현장(최근 먼저, 날짜 없는 현장은 뒤) }
+  //   + 같은 이름 수(지우지 않은 명부). 열쇠는 '#' 앞붙임(__proto__ 같은 id·이름이 객체 속성과 겹치지 않게)
+  function wkSheetIdx(){
+    var part = {}, dup = {}, x;
+    if (WK_IDX) return WK_IDX;
+    liveAsb().forEach(function(r){
+      var k = wkSiteKind(r), d = String(r.end || r.start || ""), seen = {};
+      asList(r.worker_ids).forEach(function(id){
+        var p, key = "#" + String(id == null ? "" : id);
+        if (key === "#" || seen[key]) return;
+        seen[key] = 1;
+        p = part[key] || (part[key] = { n: 0, kinds: {}, last: null, sites: [] });
+        p.n++; p.kinds[k] = 1; p.sites.push(r);
+        if (!p.last || d > p.last.date) p.last = { kind: k, date: d, title: r.title || "" };
+      });
+    });
+    Object.keys(part).forEach(function(key){ part[key].sites.sort(function(a, b){ var s1 = String(a.end || a.start || ""), s2 = String(b.end || b.start || ""); return s1 < s2 ? 1 : (s1 > s2 ? -1 : 0); }); });
+    liveWorkers().forEach(function(w){ var k = wkNameKey(w.name); if (k) dup["#" + k] = (dup["#" + k] || 0) + 1; });
+    x = WK_IDX = { part: part, dup: dup };
+    try { Promise.resolve().then(function(){ if (WK_IDX === x) WK_IDX = null; }); } catch(e){}
+    return x;
+  }
+  function wkPart(w){ return (w && wkSheetIdx().part["#" + String(w.id)]) || null; }
+  function wkDupN(w){ var k = wkNameKey(w && w.name); return k ? Math.max(0, (wkSheetIdx().dup["#" + k] || 0) - 1) : 0; }
+  function wkDays(ds){ return Math.round((new Date(todayStr() + "T00:00:00") - new Date(ds + "T00:00:00")) / 86400000); }   // wkAgoText와 같은 셈(오늘 − 날짜, 일)
+  function wkRecentText(p){ return "(" + WK_KIND_LABEL[p.last.kind] + ") " + wkAgoText(p.last.date); }   // PM 9/14 표기 — 옛 목록 칩(wkKindChips)과 같은 글
+  function wkYearAgo(){ var t = todayStr(); return (Number(t.slice(0, 4)) - 1) + t.slice(4); }   // 1년 전 같은 날(글자 비교 — 2/29도 그대로)
+  function wkIn1y(w){ var p = wkAsbOk() ? wkPart(w) : null; return !!(p && p.last && isDate(p.last.date) && p.last.date >= wkYearAgo()); }   // 1년 내 참여 = 마지막 참여일이 1년 전 같은 날 이후(앞으로 잡힌 현장 포함) · 대장을 못 읽었으면 아무도 아님(위 wkAsbOk)
+  function wkKinds(p){ return WK_KIND_ORDER.filter(function(k){ return p && p.kinds[k]; }).map(function(k){ return WK_KIND_LABEL[k]; }); }
+  // 값(거르기·고르기 목록·정렬 기본) — 빈 값은 ""(정렬에서 방향과 상관없이 뒤). 생년월일은 6자리(아니면 적힌 글), 참여 열은 현장 대장에 없으면 빈 값
+  function wkSheetVal(r, k){
+    var p;
+    if (k === "name") return r.name || "";
+    if (k === "role") return r.role || "인부";
+    if (k === "birth") return wkBirth6(r.birth) || String(r.birth == null ? "" : r.birth).trim();
+    if (k === "note") return r.note || "";
+    p = wkAsbOk() ? wkPart(r) : null;   // 대장을 못 읽었으면 참여 열 값은 빈 값(정렬 뒤·거르기 목록 없음)
+    if (!p) return "";
+    if (k === "recent") return wkRecentText(p);
+    if (k === "cnt") return p.n;
+    if (k === "kinds") return wkKinds(p).join("·");
+    return "";
+  }
+  // 정렬 값만 따로 — 최근 참여는 '며칠 전' 수(▲ = 최근 먼저 · 앞으로 잡힌 현장은 음수라 맨 앞 · 날짜를 모르면 빈 값 — 뒤)
+  function wkSheetSv(r, k){ var p; if (k === "recent"){ p = wkAsbOk() ? wkPart(r) : null; return (p && p.last && isDate(p.last.date)) ? wkDays(p.last.date) : ""; } return wkSheetVal(r, k); }
+  function wkSheetCell(r, c, ctx){
+    var k = c.k, p, t, n, b;
+    if (k === "name"){ n = wkDupN(r); return { html: esc(r.name || "(이름 없음)") + (n ? '<span class="rec-st chg wk-dup" title="같은 이름이 ' + n + '명 더 있습니다(동명이인 확인)">동명</span>' : ''), title: (r.name || "") + (n ? " · 같은 이름이 " + n + "명 더 있습니다(동명이인 확인)" : "") }; }
+    if (k === "role") return { html: esc(r.role || "인부"), title: r.role || "인부" };
+    if (k === "birth"){
+      b = wkBirth6(r.birth); t = String(r.birth == null ? "" : r.birth).trim();
+      if (b) return { html: esc(b), title: b };
+      if (t) return { html: esc(t), cls: "vs-warn", title: "6자리 꼴이 아닙니다 — [수정]에서 6자리(예: 810817)로 고쳐 주세요" };
+      return { html: "미입력", cls: "vs-warn", title: "석면 대장(30년 보존)에 들어가는 항목입니다 — [수정]에서 6자리로" };
+    }
+    if (k === "note") return r.note ? { html: esc(r.note), title: String(r.note) } : WK_DASH;
+    if (!wkAsbOk()) return { html: '<span style="color:#9AA09C;">' + (k === "recent" ? "확인 중" : "…") + '</span>', title: WK_WAIT_T };   // v442 검토: 못 읽은 대장을 '-'(참여 없음)로 보이지 않게
+    p = wkPart(r);
+    if (!p) return WK_DASH;
+    if (k === "recent"){ t = wkRecentText(p); return { html: esc(t), title: (p.last.title || "") + (isDate(p.last.date) ? " · " + p.last.date : "") }; }
+    if (k === "cnt") return { html: p.n + "회", title: "현장 대장 " + p.n + "건" };
+    if (k === "kinds"){ t = wkKinds(p).join("·"); return { html: esc(t), title: t }; }
+    return "";
+  }
+  // 합계 줄 — 이름 칸 '합계 n명' · 생년월일 칸 '미입력 n'(6자리 꼴이 아닌 것 포함 — '생년월일 미입력' 칩과 같은 판정) · 최근 참여 칸 '1년 내 n'(현장 권한만)
+  function wkSheetFoot(rows, ctx){
+    var nb = 0, ny = 0, site = canSee("site"), o;
+    rows.forEach(function(r){ if (!wkBirth6(r.birth)) nb++; if (site && wkIn1y(r)) ny++; });
+    o = { name: "합계 " + rows.length + "명", birth: "미입력 " + nb };
+    if (site) o.recent = wkAsbOk() ? "1년 내 " + ny : '1년 내 <span style="color:#9AA09C;" title="' + WK_WAIT_T + '">—</span>';   // v442 검토: 못 읽은 대장이면 0이 아니라 —
+    return o;
+  }
+  // 하위 탭 — 인적사항 · 참여 현장 (n)(현장 권한만 — 없으면 탭 줄 없이 인적사항만)
+  function wkSheetTabs(r){ var a = [{ k: "info", h: "인적사항" }], p; if (canSee("site")){ p = wkPart(r); a.push({ k: "site", h: "참여 현장 (" + (!wkAsbOk() ? "확인 중" : (p ? p.n : 0)) + ")" }); } return a; }
+  // 고른 하위 탭·[전부 보기] — 다른 줄을 펼치면 인적사항·최근 5건부터 · 권한이 바뀌어 없는 탭이면 첫 탭(메모리만)
+  function wkSheetTabOf(r, tabs){
+    var id = String(r.id), ok = function(k){ return tabs.some(function(x){ return x.k === k; }); };
+    if (wkDetRow !== id){ wkDetRow = id; wkDetTab = ""; wkDetAll = ""; }
+    if (!ok(wkDetTab)) wkDetTab = tabs[0].k;
+    return wkDetTab;
+  }
+  function wkSheetKv(k, v, wide){ return '<div' + (wide ? ' style="grid-column:1/-1;"' : '') + '><div class="k">' + esc(k) + '</div><div class="v">' + v + '</div></div>'; }
+  // 인적사항 — 생년월일 · 역할 · 연락처(표에는 없음 — 여기만) · 등록일 · 메모(전문)
+  function wkSheetInfo(r){
+    var b = wkBirth6(r.birth), raw = String(r.birth == null ? "" : r.birth).trim(), ph = String(r.phone == null ? "" : r.phone).trim();
+    return '<div class="vs-kv">'
+      + wkSheetKv("생년월일", b ? esc(b) : (raw ? esc(raw) + ' <span class="need-chip">6자리 꼴 아님</span>' : '<span class="need-chip">미입력</span>'))
+      + wkSheetKv("역할", esc(r.role || "인부"))
+      + wkSheetKv("연락처", ph ? esc(ph) : '<span class="need-chip">미입력</span>')
+      + wkSheetKv("등록일", isDate(r.created) ? esc(r.created) : WK_DASH)
+      + wkSheetKv("메모", r.note ? esc(r.note) : WK_DASH, 1)
+      + '</div>' + (b ? '' : '<div class="vs-dsub" style="margin-top:6px;">생년월일은 석면 대장(산안법 30년 보존)에 들어가는 항목입니다 — [수정]에서 6자리로 채워 주세요</div>');
+  }
+  function wkSheetTerm(s){ var a = isDate(s.start) ? s.start : "", b = isDate(s.end) ? s.end : ""; return a && b ? a + " ~ " + b : (a ? a + " ~" : (b ? "~ " + b : "날짜 없음")); }
+  // 참여 현장 — 최근 먼저 5건(전부 보기면 전부): 기간 · 종류 · 현장(대장 제목)
+  function wkSheetSites(r){
+    var p = wkPart(r), L;
+    if (!wkAsbOk()) return '<div class="vs-empty">현장 대장을 아직 읽지 못했습니다 — 읽은 뒤 이 칸을 다시 그립니다(계속 이러면 새로고침해 주세요)</div>';   // v442 검토(위 wkAsbOk)
+    if (!p) return '<div class="vs-empty">참여한 현장이 없습니다 — 현장 대장(안전 › 현장)의 투입 인원에 이 사람이 없습니다</div>';
+    L = wkDetAll === String(r.id) ? p.sites : p.sites.slice(0, WK_DET_N);
+    return '<table class="vs-hist" style="max-width:760px;"><thead><tr><th>기간</th><th>종류</th><th>현장(대장 제목)</th></tr></thead><tbody>'
+      + L.map(function(s){ return '<tr><td>' + esc(wkSheetTerm(s)) + '</td><td>' + esc(WK_KIND_LABEL[wkSiteKind(s)]) + '</td><td>' + esc(s.title || "(제목 없음)") + '</td></tr>'; }).join("")
+      + '</tbody></table>' + (p.n > L.length ? '<div class="vs-dsub" style="margin-top:4px;">최근 ' + L.length + '건 — 모두 ' + p.n + '건</div>' : '');
+  }
+  // 펼침 — 머리(이름·역할·빠진 항목·같은 이름·현장 대장 n건(현장 권한) · [닫기 ▲]) → 하위 탭 → 고른 탭 내용 → 버튼([전부 보기 (n)]·[수정])
+  function wkSheetDetail(r, ctx){
+    var tabs = wkSheetTabs(r), t = wkSheetTabOf(r, tabs), site = canSee("site"), ok = wkAsbOk(), p = (site && ok) ? wkPart(r) : null, n = wkDupN(r), btn = [], h;
+    h = '<div class="vs-dh"><b>' + esc(r.name || "(이름 없음)") + '</b>'
+      + '<span class="' + (r.role === "반장" ? "from-chip" : "scope-chip") + '">' + esc(r.role || "인부") + '</span>'
+      + wkMissing(r).map(function(m){ return '<span class="need-chip">' + esc(m) + ' 미입력</span>'; }).join("")
+      + (n ? '<span class="rec-st chg" title="동명이인 확인 — 합치지 않습니다(다른 사람일 수 있음)">같은 이름 ' + n + '명 더</span>' : '')
+      + (site ? '<span class="vs-dsub">' + (!ok ? '현장 대장 확인 중' : (p ? '현장 대장 ' + p.n + '건' + (p.last && isDate(p.last.date) ? ' · 최근 ' + esc(p.last.date) : '') : '현장 대장 참여 없음')) + '</span>' : '')
+      + ctx.close + '</div>';
+    if (tabs.length > 1) h += '<div class="vs-stabs">' + tabs.map(function(x){ return '<button type="button" class="vs-stab' + (x.k === t ? ' on' : '') + '" data-wk-tab="' + x.k + '">' + esc(x.h) + '</button>'; }).join("") + '</div>';
+    h += t === "site" ? wkSheetSites(r) : wkSheetInfo(r);
+    if (t === "site" && p && p.n > WK_DET_N) btn.push('<button type="button" class="vs-chip" data-wk-all="' + esc(r.id) + '">' + (wkDetAll === String(r.id) ? '최근 ' + WK_DET_N + '건만' : '전부 보기 (' + p.n + ')') + '</button>');   // 읽기 토글 — 보기 권한도 누름
+    if (canDo("wk")) btn.push('<button type="button" class="mini-btn" data-wk-act="edit" data-wk-id="' + esc(r.id) + '">수정</button>');
+    return h + (btn.length ? '<div class="vs-act">' + btn.join("") + '</div>' : '');
+  }
+  // 누름 — [수정]만(일용직 수행 · 화면에 없는·지운 사람은 아무것도 안 함). 실제 일은 기존 수정 창(openWkModal — 저장 길 그대로)
+  function wkSheetAct(act, id){ var w; if (!canDo("wk")) return; if (act === "edit"){ w = findWk(id); if (w && w.del !== 1) openWkModal(id); } }
+  // 위임 배선 하나 — 펼침 칸 root 안: 하위 탭(data-wk-tab)·[전부 보기](data-wk-all — 읽기 토글, 칩 건수 그대로 다시 그림) · [수정](data-wk-act)
+  function wkSheetBindAct(root){
+    root.addEventListener("click", function(e){
+      var el = e && e.target, a = null, t = null, all = null;
+      while (el && el !== root){
+        if (el.getAttribute){ a = el.getAttribute("data-wk-act"); t = el.getAttribute("data-wk-tab"); all = el.getAttribute("data-wk-all"); if (a != null || t != null || all != null) break; }
+        el = el.parentNode;
+      }
+      if (!el || el === root) return;
+      if (e.stopPropagation) e.stopPropagation();
+      if (a != null){ wkSheetAct(a, el.getAttribute("data-wk-id")); return; }
+      if (t != null) wkDetTab = t; else wkDetAll = (wkDetAll === all) ? "" : all;
+      vsSheetRenderKeep(wkSheetDef());
+    });
+  }
+  // 갈래가 정해질 때마다(부품 onMode) — 표 갈래: 제목 건수(옛 본문과 같은 글)·[+ 일용직 추가](일용직 수행)·현장 권한 안내 줄. 폰 갈래(legacy): 안내 줄만 숨김(제목·추가 버튼은 옛 본문이 정함)
+  function wkSheetMode(m){
+    var g = function(id){ return document.getElementById(id); }, sheet = m === "sheet", note = g("wkSiteNote"), anote = g("wkAsbNote"), head = g("wkHead"), add = g("wkAddBtn"), list, need = 0;
+    wkSheetCur = sheet ? "sheet" : "legacy";
+    if (note) note.style.display = (sheet && !canSee("site")) ? "" : "none";
+    if (anote) anote.style.display = (sheet && canSee("site") && !wkAsbOk()) ? "" : "none";   // v442 검토: 현장 권한은 있는데 대장을 아직 못 읽음(위 wkAsbOk)
+    if (!sheet) return;
+    list = liveWorkers(); list.forEach(function(w){ if (wkMissing(w).length) need++; });
+    if (head) head.textContent = list.length ? (list.length + "명" + (need ? " · 인적사항 미입력 " + need + "명" : "")) : "";
+    if (add) add.style.display = canDo("wk") ? "block" : "none";
+  }
+  // 권한(현장 보기) — 열·칩은 권한마다 한 벌(같은 권한이면 같은 배열 — 부품의 칩 건수 다시 쓰기가 배열이 같은지를 봄)
+  function wkSheetSig(){ return canSee("site") ? "s" : ""; }
+  function wkSheetCols(sig){
+    var site = sig.indexOf("s") >= 0, a = [];
+    a.push({ k: "name", h: "이름", w: 100, f: "text", pw: site ? 32 : 52 });
+    a.push({ k: "role", h: "역할", w: 60, f: "enum", lv: 2 });
+    a.push({ k: "birth", h: "생년월일", w: 92, f: "none", pw: site ? 30 : 48 });
+    if (site){
+      a.push({ k: "recent", h: "최근 참여", w: 120, f: "none", pw: 38 });
+      a.push({ k: "cnt", h: "참여", w: 56, f: "none", lv: 2, num: 1 });
+      a.push({ k: "kinds", h: "종류", w: 84, f: "enum", lv: 2, multi: 1, ft: function(r){ var p = wkAsbOk() ? wkPart(r) : null; return p ? wkKinds(p).join(VS_MULTI_SEP) : ""; } });   // 값이 여럿(석면·준설) — 고르기 목록은 낱 종류, 거르기는 그 종류를 품은 사람(v440 multi)
+    }
+    a.push({ k: "note", h: "메모", f: "text", fill: 1, min: 190, lv: 2 });
+    return a;
+  }
+  function wkSheetChips(sig){
+    var items = [{ k: "", h: "전체", tip: "명부 전부(지운 사람 빼고)" }];
+    items.push({ k: "nobirth", h: "생년월일 미입력", tip: "생년월일이 비었거나 6자리 꼴이 아닌 사람 — 석면 대장(산안법 30년 보존)에 들어가는 항목", test: function(r){ return !wkBirth6(r.birth); } });
+    if (sig.indexOf("s") >= 0){
+      items.push({ k: "y1", h: "1년 내 참여", tip: "마지막 참여(현장 대장 종료일, 없으면 시작일)가 1년 안인 사람", test: wkIn1y });
+      items.push({ k: "nopart", h: "참여 기록 없음", tip: "현장 대장 어디에도 투입 인원으로 들어가 있지 않은 사람", test: function(r){ return wkAsbOk() && !wkPart(r); } });   // 대장을 못 읽었으면 아무도 안 걸림(전원 '기록 없음'으로 보이지 않게)
+    }
+    return [{ g: "st", items: items }];
+  }
+  // 정의 하나(만들어 두고 다시 씀 — 함수들이 전역을 그때그때 읽음) · 권한이 바뀌면 열·칩만 그 권한 것으로
+  function wkSheetDef(){
+    var sig = wkSheetSig(), d = WK_SHEET_DEF;
+    if (!d){
+      d = WK_SHEET_DEF = {
+        key: "jw_wk_sheet", host: "wkList", unit: "명",
+        none: "등록된 일용직이 없습니다.", empty: "조건에 맞는 일용직이 없습니다.",
+        rows: sortedWorkers,
+        id: function(r){ return r.id; },
+        val: wkSheetVal, sv: wkSheetSv, cell: wkSheetCell,
+        sort: { k: "name", d: 1 },
+        foot: wkSheetFoot, detail: wkSheetDetail,
+        bind: function(root){ wkSheetBindAct(root); },
+        phone: "legacy",   // 퀴즈 2번 답이 '폰도 새 표'면 이 한 줄만 "sheet"
+        legacy: renderWorkersLegacy,   // 옛 그리기 본문(입구 renderWorkers를 넘기면 부품 재진입 가드로 폰 화면이 빈다 — v438)
+        onMode: wkSheetMode
+      };
+    }
+    if (d.sig !== sig){ d.sig = sig; d.cols = WK_SHEET_COLS[sig] || (WK_SHEET_COLS[sig] = wkSheetCols(sig)); d.chips = WK_SHEET_CHIPS[sig] || (WK_SHEET_CHIPS[sig] = wkSheetChips(sig)); }
+    d.none = wkLoaded ? "등록된 일용직이 없습니다." : "일용직 명부를 불러오는 중입니다 — 계속 비어 있으면 새로고침해 주세요.";   // 못 읽은 명부를 '없음'으로 보이지 않게(v441 거래처와 같음)
+    return d;
+  }
+  // 일용직 탭 입구 — 갈래 함수 하나(PC = 표, 폰 = 옛 본문). 참여·같은 이름 셈은 그릴 때마다 새로
+  function renderWorkers(){
+    if (!document.getElementById("wkList")) return;
+    WK_IDX = null;
+    vsSheetRender(wkSheetDef());
+  }
+  // 새 일용직([+ 일용직 추가] 창 저장): PC 표에 그 줄이 그려졌으면 그대로(펼치지 않음), 기억된 칩·거르기에 가려 안 보이면 그때만 그 줄을 연다(v441 cliSheetShowNew와 같은 꼴 — 기기 기억은 덮지 않음)
+  function wkSheetShowNew(id){
+    var host = document.getElementById("wkList");
+    if (wkSheetCur !== "sheet" || !host || !host.querySelector) return false;
+    if (host.querySelector('[data-vs-row="' + vsAttrQ(id) + '"]')) return true;
+    return vsSheetReveal(wkSheetDef(), id);
+  }
+  // @wk-sheet-end
   function openWkModal(id){
     wkEditId=id||null;
     var w=id?findWk(id):null;
@@ -9847,8 +10126,7 @@
     document.getElementById("wkName").value=w?(w.name||""):"";
     document.getElementById("wkBirth").value=w?(w.birth||""):"";
     document.getElementById("wkRole").value=(w&&w.role)||"인부";
-    document.getElementById("wkPhone").value=w?(w.phone||""):"";
-    document.getElementById("wkExam").value=(w&&isDate(w.exam))?w.exam:"";
+    document.getElementById("wkPhone").value=w?(w.phone||""):"";   // v442: 건강진단일 칸(wkExam)은 뺐다 — 저장된 exam 값은 건드리지 않는다
     document.getElementById("wkNote").value=w?(w.note||""):"";
     document.getElementById("wkDelete").style.display=w?"block":"none";
     // v345: 빠진 항목을 열 때 미리 알린다. 저장은 그래도 된다 — 막지 않는다.
@@ -9867,25 +10145,28 @@
     $("wkAddBtn").addEventListener("click",function(){ openWkModal(null); });
     $("wkCancel").addEventListener("click",function(){ $("wkBackdrop").classList.remove("show"); wkEditId=null; });
     $("wkSave").addEventListener("click",function(){
+      if(!wkLoaded){ alert(WK_UNREAD_MSG); loadWorkers(); return; }   // v442: 못 읽은 명부에 더하거나 고치지 않는다(위 wkLoaded) — 다시 읽고 창은 그대로
       var name=$("wkName").value.trim(); if(!name){ $("wkName").focus(); return; }
-      var w=wkEditId?findWk(wkEditId):null;
-      if(!w){ w={id:genId("w"), created:todayStr()}; workers.push(w); }
+      var w=wkEditId?findWk(wkEditId):null, isNew=!w;
       var bRaw=$("wkBirth").value.trim(), b6=wkBirth6(bRaw);   // v417: 6자리 검사 — 적었는데 틀린 꼴이면 저장 전에 돌려보낸다(비워 두는 건 그대로 허용)
       if(bRaw && !b6){ alert("생년월일은 6자리로 적어주세요(예: 810817 또는 81.08.17). 월·일이 맞는지도 봐주세요."); $("wkBirth").focus(); return; }
+      if(!w){ w={id:genId("w"), created:todayStr()}; workers.push(w); }   // v442: 새 사람은 6자리 검사를 지난 뒤에 넣는다(종전엔 검사에 돌려보내도 이름 없는 새 줄이 명부에 남았다)
       w.name=name; w.birth=b6; w.role=$("wkRole").value;
-      w.phone=$("wkPhone").value.trim(); w.exam=$("wkExam").value||""; w.note=$("wkNote").value.trim();
-      w.updated=todayStr();
+      w.phone=$("wkPhone").value.trim(); w.note=$("wkNote").value.trim();   // v442: 건강진단일 칸은 뺐다(저장된 exam 값은 그대로)
+      w.updated=todayStr(); wkMarkDirty(w.id);   // v442 검토: 이 기기에서 고친 줄(대기 중 읽기·409 병합에서 이 줄만 이 기기 것)
       $("wkBackdrop").classList.remove("show"); wkEditId=null;
       scheduleWorkersSave(); renderWorkers(); renderXgWorkers();
+      if(isNew) wkSheetShowNew(w.id);   // v442: PC 표에서 기억된 칩·거르기에 가려 안 보이면 그 줄을 연다(보이면 그대로)
       // 저장은 됐다. 빠진 것이 있으면 그 사실만 한 줄로 알린다(실패가 아니다 — 성공 문구 원칙 v337과 같은 결).
       var miss=wkMissing(w);
       var dupN=liveWorkers().filter(function(x){ return x.id!==w.id && String(x.name||"").replace(/\s+/g,"")===name.replace(/\s+/g,""); }).length;   // v417: 동명이인 의심 노출(자동 병합 없음)
       try{ gwToast((miss.length ? ("저장했습니다 — "+miss.join("·")+" 미입력") : "저장했습니다") + (dupN ? " · 같은 이름 "+dupN+"명 더 있음(동명이인 확인)" : "")); }catch(e){}
     });
     $("wkDelete").addEventListener("click",function(){
+      if(!wkLoaded){ alert(WK_UNREAD_MSG); loadWorkers(); return; }   // v442(위 wkLoaded)
       var w=wkEditId?findWk(wkEditId):null; if(!w) return;
       if(!confirm(w.name+" 님을 명부에서 삭제할까요?")) return;
-      w.del=1; w.updated=todayStr();
+      w.del=1; w.updated=todayStr(); wkMarkDirty(w.id);   // v442 검토(위 wkDirty)
       $("wkBackdrop").classList.remove("show"); wkEditId=null;
       scheduleWorkersSave(); renderWorkers(); renderXgWorkers();
     });
@@ -9897,10 +10178,44 @@
     host.innerHTML = list.length
       ? '<span class="fld-label">투입 인력 선택 — 명단 4곳·인원수 자동 기입 (관리자 나종운 자동 포함)</span>'
         + list.map(function(w){ return '<label style="display:inline-flex;gap:4px;align-items:center;margin:2px 10px 2px 0;font-size:13px;"><input type="checkbox" data-xgw="'+w.id+'"> '+esc(w.name)+(w.role==="반장"?" (반장)":"")+'</label>'; }).join("")
+        + '<div id="xgExamNote" style="font-size:12px;color:#888;margin-top:4px;">'+esc(wkExamNote())+'</div>'   // v442 ③ 건강진단 출처 안내(두 갈래)
       : '<div style="font-size:12px;color:#888;">일용직 명부가 비어 있습니다 — 인사 탭에서 등록하면 명단을 자동 기입합니다. (미선택 시 명단은 공란)</div>';
     var aw=document.getElementById("xgAgentWrap");
     if(aw && aw.style.display!=="none") xgToggle();   // 대리인 후보 목록 동기 갱신
     if(xgCtx){ var cAg=findProc(xgCtx.id); if(cAg) xgAgentAuto(cAg); }   // 명부가 창을 연 뒤에 도착해도 단계의 현장대리인을 고른다
+  }
+  // v442 해체계획서 ③ 건강진단(유무·검진일) 출처 — 두 갈래(명세 AI 결정: 건강정보는 안전 권한 안에서만 · 명부 건강진단일 칸은 뺌, 운영 입력 0건):
+  //   안전 권한(canSee safety)이면 교육·검진 기록(일용직 · 배치전건강진단 pre_med·특수건강진단 spec_med 중 가장 최근 이수일 — 같은 사람·같은 종류는 eduLatest 가장 최근 1건),
+  //   아니면 빈칸 + '안전 담당 확인'(생성 창 안내 줄 · [생성] 확인요망). 권한이 없으면 메모리에 남은 교육 기록(로그인 창 '전환')도 읽지 않는다. 명부의 옛 exam 값은 쓰지 않는다
+  function wkExamDate(w){
+    var d="";
+    if(!w || !canSee("safety")) return "";
+    [eduLatest("worker", w.id, "pre_med"), eduLatest("worker", w.id, "spec_med")].forEach(function(r){ if(r && isDate(r.date) && r.date>d) d=r.date; });
+    return d;
+  }
+  function wkExamNote(){ return canSee("safety") ? "③ 건강진단(유무·검진일)은 안전 › 교육·검진 기록(배치전·특수건강진단 가장 최근 날짜)으로 채웁니다 — 기록이 없는 사람은 빈칸" : "③ 건강진단(유무·검진일)은 빈칸으로 둡니다 — 안전 담당 확인(건강진단 기록은 안전 권한)"; }
+  // [생성] 확인요망 한 줄 — 고른 투입 인력이 있을 때만: 안전 권한이 없으면 '빈칸 — 안전 담당 확인', 교육·검진 기록을 아직 못 읽었으면 '아직 못 읽어 빈칸'(검토 반영 — 종전엔 기록이 있어도 '기록이 없는 사람 n명'),
+  //   있으면 ③ 칸에 들어가는 사람(xgBuildEdits와 같은 순서 — 반장 먼저·이름 — 앞 12명, 13명째부터는 양식에 안 들어감) 중 기록이 없는 사람 수(없으면 빈 글)
+  function wkExamMissing(ws){
+    var n=0, L;
+    if(!ws || !ws.length) return "";
+    if(!canSee("safety")) return "③ 건강진단(유무·검진일) — 빈칸, 안전 담당 확인(건강진단 기록은 안전 권한)";
+    if(wkEduSt!=="ok") return "③ 건강진단(유무·검진일) — 교육·검진 기록을 아직 읽지 못해 빈칸입니다(잠시 뒤 다시 [생성]하면 기록으로 채웁니다)";
+    L=ws.slice().sort(function(a,b){ return ((a.role==="반장"?0:1)-(b.role==="반장"?0:1)) || (a.name||"").localeCompare(b.name||""); }).slice(0,12);
+    L.forEach(function(w){ if(!wkExamDate(w)) n++; });
+    return n ? "③ 건강진단 기록이 없는 사람 "+n+"명 — 빈칸(안전 › 교육·검진에서 확인)" : "";
+  }
+  // v442 검토: ③ 건강진단에 쓰는 교육·검진 기록 읽기 — 석면해체계획서를 고를 때만(xgToggle)·[생성] 때 못 읽었으면 다시, 이 세션에서 한 번(종전 v442 초안은 xgPrefill이 서류 종류와 상관없이
+  //   생성 창을 열 때마다·계약 패킷 서류마다 다시 읽었다 — 운영은 교육 기록 키가 없어 늘 비어 있으므로 매번 읽고 안전 탭·캘린더·현장·홈까지 다시 그렸다).
+  //   wkEduSt: "" 안 읽음 · "wait" 읽는 중 · "ok" 읽음 · "fail" 못 읽음(다음에 그 서류를 고르거나 [생성]하면 다시) — [생성] 확인요망(wkExamMissing)이 '기록 없음'과 '아직 못 읽음'을 가른다. 로그아웃(clearSessionData)에서 비움
+  var wkEduSt = "";
+  function wkEduEnsure(){
+    var p;
+    if(!canSee("safety") || wkEduSt==="ok" || wkEduSt==="wait") return;
+    p=loadEdu();
+    if(!p || typeof p.then!=="function") return;
+    wkEduSt="wait";
+    p.then(function(ok){ wkEduSt = ok ? "ok" : "fail"; }, function(){ wkEduSt="fail"; });
   }
 
   // ---- 실적 다운로드 — 완료 계약을 실적증명·기술평가 근거용 엑셀로 (로드맵 P9 연계) ----
@@ -10112,7 +10427,7 @@
     if(qDt0){ var qd1=qDt0.split("-"); document.getElementById("xqtDate").value=qd1[0]+"년 "+qd1[1]+"월 "+qd1[2]+"일"; }
     document.getElementById("xgOwner").value = /교육/.test(s.owner||"") ? "경상북도 교육감" : "";
     if(!workers.length) loadWorkers(); else renderXgWorkers();
-    xgToggle();
+    xgToggle();   // v442 검토: 석면해체계획서면 xgToggle이 ③ 건강진단용 교육·검진 기록을 이 세션에서 한 번 읽는다(wkEduEnsure — 종전 v442 초안은 여기서 서류 종류와 상관없이 매번 읽었다)
     xgAgentAuto(c);
     xgSnapTake();
     return c;
@@ -10513,6 +10828,7 @@
     var k=document.getElementById("xgKind").value;
     document.getElementById("xgMoneyFields").style.display = (k==="asb_plan"||k==="waste_report") ? "none" : "";
     document.getElementById("xgAsbFields").style.display = (k==="asb_plan") ? "" : "none";
+    if(k==="asb_plan") wkEduEnsure();   // v442 검토: ③ 건강진단(안전 권한 — wkExamDate)용 교육·검진 기록을 이 서류를 고를 때만·세션에 한 번
     document.getElementById("xgWasteWrap").style.display = (k==="waste_report") ? "" : "none";
     document.getElementById("xgRateWrap").style.display = (k==="bid_rate") ? "" : "none";
     document.getElementById("xgQualWrap").style.display = (k==="qual_packet") ? "" : "none";
@@ -10672,11 +10988,11 @@
         var w2=sel[wi];
         e3.push(["G"+r2,(w2?wkLabel(w2):""),(w2?"s":"b")],["L"+r2,(w2&&w2.phone?w2.phone:""),(w2&&w2.phone?"s":"b")]);
       }
-      for(r2=78,wi=0; r2<90; r2++,wi++){                                  // ③건강진단(성명·유무·검진일)
-        var w3=sel[wi];
+      for(r2=78,wi=0; r2<90; r2++,wi++){                                  // ③건강진단(성명·유무·검진일) — v442 안전 권한이면 교육·검진 기록(배치전·특수건진 가장 최근 날짜), 아니면 빈칸(wkExamDate — 명부 건강진단일 칸은 뺌)
+        var w3=sel[wi], ex3=w3?wkExamDate(w3):"";
         e3.push(["G"+r2,(w3?w3.name:""),(w3?"s":"b")],
-                ["J"+r2,(w3&&w3.exam?"유":""),(w3&&w3.exam?"s":"b")],
-                ["L"+r2,(w3&&w3.exam?w3.exam:""),(w3&&w3.exam?"s":"b")]);
+                ["J"+r2,(ex3?"유":""),(ex3?"s":"b")],
+                ["L"+r2,ex3,(ex3?"s":"b")]);
       }
       for(r2=141,wi=0; r2<153; r2++,wi++){                                // ④교육 참석자(관리자는 R140 고정)
         var w4=sel[wi]; e3.push(["C"+r2,(w4?w4.name:""),(w4?"s":"b")]);
@@ -11116,6 +11432,11 @@
           if(kind==="work_start"&&!$("xgAgentRrn").value.trim()) missing.push("현장대리인 주민등록번호(양식에 넣어 두지 않습니다. 창에 치거나 파일에 손으로 적습니다)");
           if(!$("xgD3").value) missing.push(kind==="work_start"?"준공예정일":"준공일");
         } else if(!$("xgOwner").value.trim()) missing.push("소유주");
+        if(kind==="asb_plan"){   // v442 ③ 건강진단 — 고른 투입 인력이 있을 때 빈칸이 될 칸(안전 권한이 없으면 '안전 담당 확인')
+          var exWs=[]; Array.prototype.forEach.call(document.querySelectorAll("[data-xgw]:checked"),function(inp){ var wx=findWk(inp.getAttribute("data-xgw")); if(wx) exWs.push(wx); });
+          wkEduEnsure();   // v442 검토: 교육·검진 기록을 못 읽었으면 지금 다시 읽기 시작(확인요망은 '아직 못 읽어 빈칸' — 잠시 뒤 다시 [생성])
+          var exM=wkExamMissing(exWs); if(exM) missing.push(exM);
+        }
       }
       if(missing.length && !confirm("⚠ 확인요망 — 원문(계약서·조사서·대장)에서 찾지 못한 값:\n· "+missing.join("\n· ")+"\n\n빈칸(수기 기입)으로 두고 생성할까요?\n(값을 아신다면 취소 후 입력하거나, 해당 서류를 계약의 넣기 박스에 넣으면 자동으로 채워집니다)")) return;
       $("xgGo").textContent="생성 중…"; $("xgGo").disabled=true;
@@ -14872,15 +15193,27 @@
     document.getElementById("swSub").textContent = siteLabel(r)+" · "+(r.title||"");
     document.getElementById("swSearch").value="";
     document.getElementById("swNewName").value="";
+    // v442 검토: 명부 등재 칸(+ 새 일용직)은 일용직 수행만 — 아니면 '명부에 있는 사람만' 안내 한 줄(누름 길도 다시 봄 · 서버 명부 저장도 수행이 아니면 403)
+    var cw=canDo("wk"), nw=document.getElementById("swNewWrap"), nn=document.getElementById("swNoWkNote");
+    if(nw) nw.style.display=cw?"":"none";
+    if(nn) nn.style.display=cw?"none":"";
     renderSwList();
     document.getElementById("swBackdrop").classList.add("show");
+    // v442 검토: 명부를 아직 못 읽었으면(일용직 권한이 있는데 읽는 중·실패) 지금 다시 읽어 이 창 목록을 그린다 — 빈 목록을 보고 명부에 있는 사람을 새로 등재하지 않게
+    if(!wkLoaded && canSee("wk")){ var lp=loadWorkers(); if(lp&&typeof lp.then==="function") lp.then(function(){ if(swSiteId===id) renderSwList(); }); }
+  }
+  // v442 검토: 현장 창 목록이 비었을 때 글 — 일용직 숨김(명부를 못 읽음) · 명부를 아직 못 읽음 · 보기(등재 칸 없음) · 수행(아래에서 등재)을 가른다(종전엔 늘 '아래에서 바로 등재하세요' — 못 읽은 명부에서 같은 사람을 새로 등재하게 이끌었다)
+  function swEmptyText(){
+    if(!canSee("wk")) return "일용직 명부를 볼 권한이 없습니다 — 권한관리 [일용직]이 '보기' 이상이어야 근로자를 고를 수 있습니다.";
+    if(!wkLoaded) return "일용직 명부를 불러오는 중입니다 — 잠시 뒤 다시 보입니다(계속 비어 있으면 창을 닫았다 다시 열어 주세요).";
+    return canDo("wk") ? "명부에 사람이 없습니다 — 아래에서 바로 등재하세요." : "명부에 사람이 없습니다 — 명부 등재는 일용직 수행 권한이 있는 분이 합니다.";
   }
   function renderSwList(){
     var host=document.getElementById("swList"); if(!host) return;
     var r=swSiteId?findAsb(swSiteId):null, sel=asList(r&&r.worker_ids);
     var q=swQ.trim().toLowerCase();
     var list=sortedWorkers().filter(function(w){ return !q || (w.name||"").toLowerCase().indexOf(q)>=0; });
-    if(!list.length){ host.innerHTML='<div class="empty-line">명부에 사람이 없습니다 — 아래에서 바로 등재하세요.</div>'; return; }
+    if(!list.length){ host.innerHTML='<div class="empty-line">'+esc(swEmptyText())+'</div>'; return; }
     var kc = wkKindCounts();
     host.innerHTML=list.map(function(w){
       var on=sel.indexOf(w.id)>=0, miss=wkMissing(w);
@@ -24433,7 +24766,7 @@
     var pgBtn = document.getElementById("tabProgressBtn");
     if (pgBtn) pgBtn.classList.toggle("perm-hidden", !adminUser);   // 진척도 — 관리자 전용(서버 gw-progress도 강제)
     if (currentTab === "progress" && !adminUser) switchTab("dash");
-    if (currentTab === "workers" && !canSee("wk")) switchTab("dash");
+    if (currentTab === "workers"){ if (!canSee("wk")) switchTab("dash"); else { renderWorkers(); loadAsb(); } }   // v442: 볼 수 있으면 다시 그린다 — 로그인 창 '전환'은 새로고침 없이 이 함수만 돌아, 앞사람 권한(현장 보기)으로 그린 일용직 표의 참여 열·칩이 남는다(화관법 줄과 같은 꼴) · 검토: 현장 대장도 읽는다(현장 권한 없는 앞사람은 대장을 못 받았다 — loadAsb는 현장 권한이 없으면 바로 돌아가고, 받으면 renderWorkers를 다시 부름. 받기 전에는 참여 칸 '확인 중')
     if (currentTab === "hwakwan"){ if (!canSee("hw")) switchTab("dash"); else renderHwakwan(); }   // v434 화관법 — 탭 이름(hwakwan)과 키(hw)가 달라 위 일반 강제 이동이 못 잡는다(workers ↔ wk와 같은 전용 줄). 볼 수 있으면 다시 그린다(검토 반영 11/10): 로그인 창 '전환'은 새로고침 없이 afterLogin → 이 함수만 돌아, 앞사람 권한으로 그려 둔 폐기물 칸·보기 안내·▶ 지금 실행이 남는다(.view.readonly CSS는 제출 칸을 못 숨김). 이 함수는 로그인·부팅 때만 불리므로(권한이 바뀌면 새로고침) 입력 중 다시 그림은 없다
     // 빈 그룹 숨김(S2-B): 권한으로 탭이 전부 사라진 사이드바 그룹은 제목·구분선도 숨긴다 — 직원 화면 뼈대 정리
     (function(){
@@ -24471,7 +24804,7 @@
     //   인허가 석면 안내는 버튼만 숨기고 글 줄은 남긴다(510ed20과 같음 — 1단계 브리핑에 권민지형 화면 변화 없음, v428 검토). 버튼은 CSS !important라 감싸개로 숨긴다
     var asbGo = document.getElementById("asbMovedGo");
     if (asbGo) asbGo.style.display = panes.indexOf("site") >= 0 ? "" : "none";
-    ["eduMovedHr", "eduMovedWk"].forEach(function(id){
+    ["eduMovedHr", "eduMovedWk", "wkExamMoved"].forEach(function(id){   // v442 검토: 일용직 수정 창의 '건강진단 날짜는 안전 › 교육·검진에' 안내 줄(wkExamMoved)도 같은 규칙(명세 kept '교육·검진 안내 줄(안전 칸을 볼 수 있는 사람만)')
       var el = document.getElementById(id);
       if (el) el.style.display = panes.indexOf("edu") >= 0 ? "" : "none";
     });

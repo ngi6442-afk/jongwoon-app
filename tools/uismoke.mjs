@@ -4766,7 +4766,7 @@ try {
   const viewW38 = (win, id) => { const b = body38(win), own = decl38(win, '#view-' + id, 'max-width'), base = decl38(win, '.views>.view', 'max-width'), mx = own != null ? own : base; return (!mx || mx === 'none') ? b : Math.min(b, parseFloat(mx)); };
   //   명세 width_plan.table(창 → 본문, 스크롤바 17 포함): 1024 791 · 1100 867 · 1280 1011 · 1366 1097 · 1440 1171 · 1536 1267 · 1600 1331 · 1920·2560 1428
   const WT38 = { 1024: 791, 1100: 867, 1280: 1011, 1366: 1097, 1440: 1171, 1536: 1267, 1600: 1331, 1920: 1428, 2560: 1428 };
-  const WIDE38 = ['tasks', 'rec', 'cli', 'con', 'veh', 'perm'];   // 명세 reading_width 9개 중 v438은 계약·차량·권한관리 · v439에 지시(#view-tasks) · v440에 기성(#view-rec) · v441에 거래처(#view-cli — 표로 바꾼 판) — 일용직·입찰은 각 탭 판(v442~v443), 안전(#view-safety)은 56 판(v445)에서 더한다
+  const WIDE38 = ['tasks', 'rec', 'cli', 'workers', 'con', 'veh', 'perm'];   // 명세 reading_width 9개 중 v438은 계약·차량·권한관리 · v439에 지시(#view-tasks) · v440에 기성(#view-rec) · v441에 거래처(#view-cli) · v442에 일용직(#view-workers — 표로 바꾼 판) — 입찰은 탭 판(v443), 안전(#view-safety)은 56 판(v445)에서 더한다
   const views38 = [...html.matchAll(/<(?:section|div) class="view(?: active)?" id="view-([a-z]+)">/g)].map((m) => m[1]);
   const SECS38 = ['tasks', 'veh', 'hwakwan', 'allbaro', 'rec', 'cal', 'lic', 'bid', 'con', 'cli', 'doc', 'hr', 'progress', 'ask', 'safety', 'quote', 'promo', 'workers', 'perm', 'fam', 'leave'];
   const secs38 = [...html.matchAll(/<section class="view" id="view-([a-z]+)">/g)].map((m) => m[1]);
@@ -4774,7 +4774,7 @@ try {
   const vBad38 = [1366, 1920].map((w) => views38.filter((id) => viewW38(w, id) !== (WIDE38.indexOf(id) >= 0 ? body38(w) : 808)).join('/')).join('|') + '|' + views38.filter((id) => viewW38(1024, id) !== body38(1024)).join('/');
   const perm38 = decl38(1366, '#view-perm>:not(#permRoster)', 'max-width') === '808px' && decl38(1920, '#view-perm>:not(#permRoster)', 'max-width') === '808px' && decl38(1920, '#permRoster', 'max-width') == null && decl38(1920, '#sfPaneNow', 'max-width') === '808px';
   const phone38 = decl38(859, '#app', 'max-width') === '560px' && padLR38(decl38(859, '#app', 'padding')).join() === '16,16' && decl38(859, '.views>.view', 'max-width') == null && decl38(375, '.tabbar', 'width') == null && decl38(859, '.layout', 'gap') == null;
-  T('v438 ① 화면 폭(head <style>을 읽어 계산 — 창 폭 − 스크롤바 17): 본문 = 명세 width_plan.table(±2px) 1024 791 · 1100 867 · 1280 1011 · 1366 1097 · 1440 1171 · 1536 1267 · 1600 1331 · 1920·2560 1428 · 넓히는 화면 id 6개(지시·기성·거래처·계약·차량·권한관리 — v439에 지시·v440에 기성·v441에 거래처를 더함, 일용직·입찰은 각 탭 판 v442~v443, 안전은 v445)만 1366·1920에서 본문 폭, 그 밖 화면(안전 포함)은 808 · 1024 창은 모두 본문 폭(791 < 808) · 권한관리는 권한 표(#permRoster)만 넓고 그 밖 카드·안전 현황(#sfPaneNow) 808 · 859px 이하 틀 그대로(#app 최대 560·여백 16, 간격·사이드바 폭·읽기 폭 규칙 없음) · section 태그 21개 class="view" 그대로(class 더하지 않음)',
+  T('v438 ① 화면 폭(head <style>을 읽어 계산 — 창 폭 − 스크롤바 17): 본문 = 명세 width_plan.table(±2px) 1024 791 · 1100 867 · 1280 1011 · 1366 1097 · 1440 1171 · 1536 1267 · 1600 1331 · 1920·2560 1428 · 넓히는 화면 id 7개(지시·기성·거래처·일용직·계약·차량·권한관리 — v439에 지시·v440에 기성·v441에 거래처·v442에 일용직을 더함, 입찰은 탭 판 v443, 안전은 v445)만 1366·1920에서 본문 폭, 그 밖 화면(안전 포함)은 808 · 1024 창은 모두 본문 폭(791 < 808) · 권한관리는 권한 표(#permRoster)만 넓고 그 밖 카드·안전 현황(#sfPaneNow) 808 · 859px 이하 틀 그대로(#app 최대 560·여백 16, 간격·사이드바 폭·읽기 폭 규칙 없음) · section 태그 21개 class="view" 그대로(class 더하지 않음)',
     wBad38.length === 0 && vBad38 === '||' && views38.length === 23 && perm38 && phone38 && JSON.stringify(secs38) === JSON.stringify(SECS38) && !/<section class="view [^"]*" id=/.test(html),
     JSON.stringify({ body: Object.keys(WT38).map((w) => w + ':' + body38(+w)), viewBad: vBad38, views: views38.length, perm38, phone38, secs: secs38.length }));
 
@@ -5191,20 +5191,22 @@ try {
     && dc2_38 === 'vs-warn:D-3,:D-4' && JSON.stringify(cks2_38) === JSON.stringify(['chipsort:st|done', 'sortAs:reg', 'sel', 'sel.can', 'group', 'pop:st|old', '']),
     JSON.stringify({ dc: dc38.map((x) => x.cls + ':' + x.html), cks38, dc2_38, cks2_38 }));
 
-  // ⑫ 정적 — 계약·차량 표는 ResizeObserver 한 줄씩(vsPaneObserve(host) — 그리기마다 불러도 자리에 한 번만 걸림) 말고 무변 · 부품을 쓰는 탭 3개(v439 지시·v440 기성·v441 거래처 — 일용직 v442부터 탭 판마다 이 줄을 고친다) · pointer(마우스 이벤트 없음) · 150ms·조합
+  // ⑫ 정적 — 계약·차량 표는 ResizeObserver 한 줄씩(vsPaneObserve(host) — 그리기마다 불러도 자리에 한 번만 걸림) 말고 무변 · 부품을 쓰는 탭 4개(v439 지시·v440 기성·v441 거래처·v442 일용직 — 입찰 v443부터 탭 판마다 이 줄을 고친다) · pointer(마우스 이벤트 없음) · 150ms·조합
   //   · 저장은 한 곳(def.key에 k,d,f,chip) · ResizeObserver 하나·콜백은 rAF · 경계 matchMedia 3개 · 새 CSS(.vs.vs-fit 폭·폰 --pw·.vs-detcard·td.num·옅은 칩) · 기존 .vs 규칙(min-width 1160·폰 0) 그대로
-  //   v439 '부품을 쓰는 탭 0' → '지시 1개' → v440 '지시·기성 2개' → v441 '지시·기성·거래처 3개'(같은 강도): 부품을 부르는 곳은 @task-sheet·@rec-sheet·@cli-sheet 구간 하나씩(구간마다 vsSheetRender 1번·정의 key 1개 —
-  //     "jw_task_sheet"·"jw_rec_sheet"·"jw_cli_sheet" · host 1개 — "taskList"·"recSheet"·"cliList")이고 네 구간 밖은 vsSheet*·vsDateCell·VS_INST 0, 부품 저장 이름 8개 중 @vs-sheet 구간 밖에 나오는 이름은 그 셋(각 1번)
+  //   v439 '부품을 쓰는 탭 0' → '지시 1개' → v440 '지시·기성 2개' → v441 '지시·기성·거래처 3개' → v442 '지시·기성·거래처·일용직 4개'(같은 강도): 부품을 부르는 곳은 @task-sheet·@rec-sheet·@cli-sheet·@wk-sheet 구간 하나씩
+  //     (구간마다 vsSheetRender 1번·정의 key 1개 — "jw_task_sheet"·"jw_rec_sheet"·"jw_cli_sheet"·"jw_wk_sheet" · host 1개 — "taskList"·"recSheet"·"cliList"·"wkList")이고 다섯 구간 밖은 vsSheet*·vsDateCell·VS_INST 0,
+  //     부품 저장 이름 8개 중 @vs-sheet 구간 밖에 나오는 이름은 그 넷(각 1번)
   const outside38 = html.slice(0, html.indexOf('// @vs-sheet-start')) + html.slice(html.indexOf('// @vs-sheet-end'));
   const blkOf38 = (a, b) => { const i = html.indexOf(a), j = html.indexOf(b); return (i < 0 || j < i) ? '' : html.slice(i, j); };
-  const tsb38 = blkOf38('// @task-sheet-start', '// @task-sheet-end'), rsb38 = blkOf38('// @rec-sheet-start', '// @rec-sheet-end'), csb38 = blkOf38('// @cli-sheet-start', '// @cli-sheet-end');
-  const outside2_38 = [tsb38, rsb38, csb38].reduce((s, b) => (b ? s.replace(b, '') : s), outside38);
+  const tsb38 = blkOf38('// @task-sheet-start', '// @task-sheet-end'), rsb38 = blkOf38('// @rec-sheet-start', '// @rec-sheet-end'), csb38 = blkOf38('// @cli-sheet-start', '// @cli-sheet-end'), wsb38 = blkOf38('// @wk-sheet-start', '// @wk-sheet-end');
+  const outside2_38 = [tsb38, rsb38, csb38, wsb38].reduce((s, b) => (b ? s.replace(b, '') : s), outside38);
   const keysOut38 = ['jw_task_sheet', 'jw_rec_sheet', 'jw_cli_sheet', 'jw_wk_sheet', 'jw_bid_sheet', 'jw_ob_sheet', 'jw_site_sheet', 'jw_edu_sheet'].filter((k) => outside38.indexOf(k) >= 0);
-  const use38 = tsb38.length > 0 && rsb38.length > 0 && csb38.length > 0 && (outside2_38.match(/\bvsSheet\w*\(|\bvsDateCell\(|\bVS_INST\b/g) || []).length === 0
+  const use38 = tsb38.length > 0 && rsb38.length > 0 && csb38.length > 0 && wsb38.length > 0 && (outside2_38.match(/\bvsSheet\w*\(|\bvsDateCell\(|\bVS_INST\b/g) || []).length === 0
     && (tsb38.match(/\bvsSheetRender\(/g) || []).length === 1 && (tsb38.match(/key: "jw_task_sheet"/g) || []).length === 1 && (tsb38.match(/\bhost: "taskList"/g) || []).length === 1
     && (rsb38.match(/\bvsSheetRender\(/g) || []).length === 1 && (rsb38.match(/key: "jw_rec_sheet"/g) || []).length === 1 && (rsb38.match(/\bhost: "recSheet"/g) || []).length === 1
     && (csb38.match(/\bvsSheetRender\(/g) || []).length === 1 && (csb38.match(/key: "jw_cli_sheet"/g) || []).length === 1 && (csb38.match(/\bhost: "cliList"/g) || []).length === 1
-    && JSON.stringify(keysOut38) === '["jw_task_sheet","jw_rec_sheet","jw_cli_sheet"]' && (outside38.match(/jw_task_sheet/g) || []).length === 1 && (outside38.match(/jw_rec_sheet/g) || []).length === 1 && (outside38.match(/jw_cli_sheet/g) || []).length === 1;
+    && (wsb38.match(/\bvsSheetRender\(/g) || []).length === 1 && (wsb38.match(/key: "jw_wk_sheet"/g) || []).length === 1 && (wsb38.match(/\bhost: "wkList"/g) || []).length === 1
+    && JSON.stringify(keysOut38) === '["jw_task_sheet","jw_rec_sheet","jw_cli_sheet","jw_wk_sheet"]' && (outside38.match(/jw_task_sheet/g) || []).length === 1 && (outside38.match(/jw_rec_sheet/g) || []).length === 1 && (outside38.match(/jw_cli_sheet/g) || []).length === 1 && (outside38.match(/jw_wk_sheet/g) || []).length === 1;
   const rv38 = fn38(html, 'renderVehicles'), rc38 = fn38(html, 'renderContracts');
   const V38 = mk38({ width: 1366 }), vh38 = V38.env.mkHost('vehList'); vh38.innerHTML = '<div class="vs-wrap"><table class="vs"></table></div>';
   V38.api.paneObs(vh38); V38.api.paneObs(vh38); V38.env.roCb([{ target: vh38 }]); V38.env.flushRaf();
@@ -5227,8 +5229,8 @@ try {
     && decl38(1000, '.vs td.num', 'text-align') == null && decl38(1000, '.vs td .sel-box', 'margin-right') == null && decl38(1000, '.vs td .sel-box', 'vertical-align') == null && decl38(1000, '.vs.vs-fit td .sel-box', 'margin-right') === '6px'
     && decl38(375, '.sel-bar.vs-selbar', 'flex-wrap') === 'wrap' && decl38(375, '.sel-bar.vs-selbar', 'padding') === '2px 2px 8px' && decl38(375, '.vs-selbar', 'padding') == null
     && /@media \(pointer:coarse\)\{ \.vs\.vs-fit \.vs-rs\{width:14px;\} \}/.test(css38);
-  T('v438 ⑫ 정적: 계약·차량 그리기에 vsPaneObserve(host) 한 줄씩(파일에서 이 둘뿐 — 여러 번 불러도 자리에 한 번 걸림·--vs-panew = 칸 폭·창을 줄이면 다음 그림에 다시 잼 1048 → 900·data-vs-host 없음) · 부품을 쓰는 탭 3개 — v439 지시·v440 기성·v441 거래처(@task-sheet·@rec-sheet·@cli-sheet 구간 하나씩: 구간마다 vsSheetRender 1번·정의 key 1개(jw_task_sheet·jw_rec_sheet·jw_cli_sheet)·host 1개(taskList·recSheet·cliList) · 네 구간 밖 vsSheet*·vsDateCell·VS_INST 0 · 부품 저장 이름은 jw_task_sheet·jw_rec_sheet·jw_cli_sheet만) · 끌기는 pointer(document pointermove·pointerup·pointercancel — mouse 이벤트 0) · 150ms·compositionstart/end·isComposing · 저장 한 곳(def.key에 k,d,f,chip) · ResizeObserver 하나·콜백은 rAF · 경계 matchMedia 3개 · CSS .vs.vs-fit(860~ 폭 100%·최소 --vs-minw)·폰 col --pw·.vs-detcard(PC 숨김·폰 보임)·.vs.vs-fit td.num 오른쪽·옅은 칩 · 기존 .vs(min-width 1160·폰 0·폰 col 0) 그대로 · 검토 반영: 펼침 폭 상한 max-width 100%(계약·차량 [닫기 ▲] 잘림) · .vs td.num·.vs td .sel-box 규칙 없음(새 표만) · .sel-bar.vs-selbar 줄바꿈·여백 · 터치 손잡이 14px',
-    ro38 && st38 && css2_38 && css3_38, JSON.stringify({ ro38, ro38a, ro38b, st38, use38, keysOut38, css2_38, css3_38, cliSeg: csb38.length }));
+  T('v438 ⑫ 정적: 계약·차량 그리기에 vsPaneObserve(host) 한 줄씩(파일에서 이 둘뿐 — 여러 번 불러도 자리에 한 번 걸림·--vs-panew = 칸 폭·창을 줄이면 다음 그림에 다시 잼 1048 → 900·data-vs-host 없음) · 부품을 쓰는 탭 4개 — v439 지시·v440 기성·v441 거래처·v442 일용직(@task-sheet·@rec-sheet·@cli-sheet·@wk-sheet 구간 하나씩: 구간마다 vsSheetRender 1번·정의 key 1개(jw_task_sheet·jw_rec_sheet·jw_cli_sheet·jw_wk_sheet)·host 1개(taskList·recSheet·cliList·wkList) · 다섯 구간 밖 vsSheet*·vsDateCell·VS_INST 0 · 부품 저장 이름은 jw_task_sheet·jw_rec_sheet·jw_cli_sheet·jw_wk_sheet만) · 끌기는 pointer(document pointermove·pointerup·pointercancel — mouse 이벤트 0) · 150ms·compositionstart/end·isComposing · 저장 한 곳(def.key에 k,d,f,chip) · ResizeObserver 하나·콜백은 rAF · 경계 matchMedia 3개 · CSS .vs.vs-fit(860~ 폭 100%·최소 --vs-minw)·폰 col --pw·.vs-detcard(PC 숨김·폰 보임)·.vs.vs-fit td.num 오른쪽·옅은 칩 · 기존 .vs(min-width 1160·폰 0·폰 col 0) 그대로 · 검토 반영: 펼침 폭 상한 max-width 100%(계약·차량 [닫기 ▲] 잘림) · .vs td.num·.vs td .sel-box 규칙 없음(새 표만) · .sel-bar.vs-selbar 줄바꿈·여백 · 터치 손잡이 14px',
+    ro38 && st38 && css2_38 && css3_38, JSON.stringify({ ro38, ro38a, ro38b, st38, use38, keysOut38, css2_38, css3_38, cliSeg: csb38.length, wkSeg: wsb38.length }));
 
   // ⑬ 문서 — FEATURES 기준 v438·v438 절(문장 고정)·자리 글 GATES_V438 0 · TESTLIST v438 체크 칸 = 화면 칸 4개 '[ ] (AI 시험 화면 대상' + 게이트 칸 '[x] (AI)' 5종(PM 몫 0) · MANUAL 1절 화면 폭 한 줄 · CLAUDE.md 폭·부품 줄 · sw v438 이상
   const ft38 = rd38('FEATURES.md'), tl38 = rd38('TESTLIST.md'), man38 = rd38('MANUAL.html'), cl38 = rd38('CLAUDE.md'), sw38 = rd38('sw.js');
@@ -7076,6 +7078,618 @@ try {
     && rv22.length === 1 && ['읽기를 끊은', '두 창', '９００１０１－１２３４５６７', '확인 창', '375'].every((s) => rv22[0].indexOf(s) > 0) && cbGate17.length === 1 && cbGate17[0].indexOf('검토 반영 뒤') > 0,
     JSON.stringify({ ft: FT_PINS22.filter((s) => ftv17.indexOf(s) < 0), old: OLD22, cl: CL_PINS22.filter((s) => cl17.indexOf(s) < 0), man: MAN_PINS22.filter((s) => man10.indexOf(s) < 0), man35: man35.indexOf('계약(계약 권한이 있을 때)'), rv: rv22.length, gate: cbGate17.length && cbGate17[0].indexOf('검토 반영 뒤') }));
 } catch (e) { console.log('  (v441 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ---- v442(11/11 — 45-1 다섯째 판: 인사·일용직 › 일용직 명부를 엑셀형 표로 · PM 11/10 15:56 결정 ⑤ 표에서 칸 바로 고치기 없음(펼침 [수정] 창에서만) · AI 결정: 교육·검진 열 없음(건강정보는 안전 권한 안) —
+//      09_조사_문서/표형탭_시안_자료_20261110/단계지시_v442_일용직.json · 엑셀형탭_명세_20261110.json sections[key=workers]):
+//      시험 틀 = v441과 같은 작은 DOM(innerHTML을 넣으면 여는 태그마다 요소를 새로 만듦 · 창 폭은 가짜 matchMedia · 가짜 시계·타이머) + index.html의 실제 함수를 그대로 돌린다 —
+//      명부(wkBirth6·mergeWorkers·doSaveWorkers·loadWorkers·scheduleWorkersSave·sortedWorkers·wkKindCounts·wkKindChips·wkMissing·옛 본문 renderWorkersLegacy·openWkModal·창 배선 IIFE) ·
+//      해체계획서(xgBuildEdits·wkExamDate·wkExamNote·wkExamMissing·renderXgWorkers) · 교육(liveEdu·eduLatest) · @vs-sheet 구간 · @wk-sheet 구간. 서버(gwCall)는 큐에서 답을 꺼내는 대역. 오늘 = 2026-11-11.
+//      ① 정의·칸 폭·단계 합 ② 참여 셈 = 현장 대장 worker_ids ③ 현장 권한 없음 ④ 동명 칩 ⑤ 생년월일 미입력 노랑 ⑥ 펼침·[전부 보기]·[수정] ⑦ 수정 창 건강진단일 칸 없음 ⑧ 해체계획서 ③ 건강진단 두 갈래
+//      ⑨ 폰 legacy ⑩ 대장 늦게 도착·다시 셈 ⑪ 못 읽은 명부 ⑫ 새 일용직 열기 ⑬ 넓힘·CSS·정적 ⑭ 폰 sheet 준비 ⑮ 저장 대기 중 읽기·409 병합 ⑯ 문서
+//      검토 반영(11/11): ⑰ 현장 창 [+ 새 일용직] 권한 ⑱ 저장 403 ⑲ 고친 줄만 이 기기 것(wkDirty) ⑳ 현장 대장 못 읽음 ㉑ 로그인 창 '전환' 대장 읽기 ㉒ 수정 창 건강진단 안내 줄 권한 ㉓ ③ 교육 기록 읽기·12명 ㉔ 검토 문서
+//      (같은 강도로 고친 검사: ⑧ 교육 읽기 자리 · ⑩ 받기 전 '확인 중' · ⑪ 처리기 막는 줄 · ⑬ applyPerms 일용직 줄·#wkAsbNote CSS · ⑮ 고친 표시·같은 날 서버 줄)
+try {
+  const rd42 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const own42 = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+  const fn42 = (src, name) => { const i = src.indexOf('function ' + name + '('); if (i < 0) throw new Error('함수 없음: ' + name); let d = 0, st = false; for (let j = i; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i, j + 1); } } throw new Error('중괄호 짝 안 맞음: ' + name); };
+  const line42 = (src, head) => { const i = src.indexOf(head); if (i < 0) throw new Error('줄 없음: ' + head); return src.slice(i, src.indexOf('\n', i)); };
+  const blkOf42 = (a, b) => { const i = html.indexOf(a), j = html.indexOf(b); if (i < 0 || j < i) throw new Error(a + ' 구간 없음'); return html.slice(i, j); };
+  const sha42 = (s) => createHash('sha256').update(s).digest('hex');
+  const body42 = (name) => fn42(html, name).replace(/^function [\w$]+/, '').replace(/\r\n/g, '\n');
+  const blk42 = blkOf42('// @vs-sheet-start', '// @vs-sheet-end'), wsb42 = blkOf42('// @wk-sheet-start', '// @wk-sheet-end');
+  const unesc42 = (s) => String(s).replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+  const mq42 = (q, w) => { if (q == null) return true; if (/print/.test(q)) return false; const a = /\(min-width:\s*(\d+)px\)/.exec(q), b = /\(max-width:\s*(\d+)px\)/.exec(q); if (!a && !b) return false; return (!a || w >= +a[1]) && (!b || w <= +b[1]); };
+  // 사람 — 관리자A · 안전 담당형 S(안전 수행·현장 수행·일용직 보기) · 차량 담당형 V(안전 숨김·현장 수행·일용직 수행) · 일용직 보기·현장 숨김 N(11/10 운영 실측 1명 꼴)
+  const U42 = { A: { id: 'm1', name: '관리자A', admin: true }, S: { id: 'm2', name: '안전담당', perms: { wk: 'view', site: 'do', safety: 'do' } }, V: { id: 'm3', name: '차량담당', perms: { wk: 'do', site: 'do' } }, N: { id: 'm4', name: '보기직원', perms: { wk: 'view' } } };
+  // 명부 — w1 김일용(6자리·연락처·메모) · w2 박반장(반장·생년월일 빈 칸·옛 건강진단일 exam 값) · w3 '이 동명'·w4 '이동명'(띄어쓰기만 다른 같은 이름) · w5 최없음(6자리 꼴 아님) · w6 지운 '이동명' · w7 한준설 · w8 오참여없음
+  const W042 = (o) => Object.assign({ birth: '', role: '인부', phone: '', note: '', created: '2025-01-02', updated: '2026-09-01' }, o);
+  const WKS42 = () => [W042({ id: 'w1', name: '김일용', birth: '810817', phone: '010-1111-2222', note: '석면 해체 경력 6년 — 반장 보조 가능', created: '2025-03-04' }), W042({ id: 'w2', name: '박반장', role: '반장', exam: '2026-01-01' }),
+    W042({ id: 'w3', name: '이 동명', birth: '650101' }), W042({ id: 'w4', name: '이동명', birth: '700202' }), W042({ id: 'w5', name: '최없음', birth: '811399' }), W042({ id: 'w6', name: '이동명', del: 1 }),
+    W042({ id: 'w7', name: '한준설', birth: '700505' }), W042({ id: 'w8', name: '오참여없음' })];
+  // 현장 대장 — s1 석면(w1 두 번·w2) · s2 준설(문자열 JSON worker_ids) · s3 종류 없음 = 석면(쉼표 글 worker_ids, 종료일 없음) · s4 지운 현장(w2·w4) · s5 철거 날짜 없음(w4·명부에 없는 w99) ·
+  //   s6~s9 석면 옛 현장(w1 — 참여 6건, 최근 5건 넘음) · s10 앞으로 잡힌 석면(w5 — 20일 후)
+  const S042 = (o) => Object.assign({ kind: 'asbestos', start: '', end: '', worker_ids: [] }, o);
+  const ASB42 = () => [S042({ id: 's1', title: '가동 석면', start: '2026-10-01', end: '2026-10-10', worker_ids: ['w1', 'w2', 'w1'] }), S042({ id: 's2', kind: 'dredge', title: '나천 준설', start: '2025-06-01', end: '2025-06-30', worker_ids: '["w1","w7"]' }),
+    S042({ id: 's3', kind: '', title: '다동 석면', start: '2024-03-01', worker_ids: 'w7, w3' }), S042({ id: 's4', title: '지운 현장', start: '2026-11-01', end: '2026-11-05', worker_ids: ['w2', 'w4'], del: 1 }),
+    S042({ id: 's5', kind: 'demolition', title: '라동 철거', worker_ids: ['w4', 'w99'] }), S042({ id: 's6', title: '마동 석면', start: '2023-01-10', end: '2023-01-20', worker_ids: ['w1'] }),
+    S042({ id: 's7', title: '바동 석면', start: '2022-05-01', end: '2022-05-03', worker_ids: ['w1'] }), S042({ id: 's8', title: '사동 석면', start: '2021-07-01', end: '2021-07-02', worker_ids: ['w1'] }),
+    S042({ id: 's9', title: '아동 석면', start: '2020-02-02', end: '2020-02-05', worker_ids: ['w1'] }), S042({ id: 's10', title: '자동 예정', start: '2026-12-01', worker_ids: ['w5'] })];
+  // 교육·검진 기록 — w1 배치전(2025-03-01)·특수(2026-02-01)·특별교육(건강 아님) · w2는 직원(member) 기록뿐 · w7 지운 특수·날짜 아닌 배치전
+  const EDU42 = () => [{ id: 'e1', ptype: 'worker', pid: 'w1', kind: 'pre_med', date: '2025-03-01' }, { id: 'e2', ptype: 'worker', pid: 'w1', kind: 'spec_med', date: '2026-02-01' }, { id: 'e3', ptype: 'worker', pid: 'w1', kind: 'special', date: '2026-05-01' },
+    { id: 'e4', ptype: 'member', pid: 'w2', kind: 'spec_med', date: '2026-07-01' }, { id: 'e5', ptype: 'worker', pid: 'w7', kind: 'spec_med', date: '2026-03-03', del: 1 }, { id: 'e6', ptype: 'worker', pid: 'w7', kind: 'pre_med', date: '확인 중' }];
+  //   검토 반영(11/11): 고친 줄 표시(wkMarkDirty)·③ 교육 기록 읽기(wkEduEnsure)·현장 창(openSiteWorkers·swEmptyText·renderSwList·swChecked·findAsb + 현장 탭 배선 IIFE — [+ 새 일용직] 실제 처리기)·applyPerms 일용직 줄(apWk)을 함께 싣는다
+  const REAL42 = ['esc', 'isDate', 'asList', 'liveAsb', 'wkBirth6', 'wkMarkDirty', 'mergeWorkers', 'doSaveWorkers', 'liveWorkers', 'sortedWorkers', 'loadWorkers', 'scheduleWorkersSave', 'wkLabel', 'wkKindCounts', 'wkAgoText', 'wkKindChips', 'wkMissing', 'findWk',
+    'renderWorkersLegacy', 'openWkModal', 'sheetRow', 'bindFold', 'liveEdu', 'eduLatest', 'wkExamDate', 'wkExamNote', 'wkExamMissing', 'wkEduEnsure', 'renderXgWorkers', 'xgBuildEdits', 'findAsb', 'openSiteWorkers', 'swEmptyText', 'renderSwList', 'swChecked'];
+  const VARS42 = ['  var workers=[], wkEditId=null', '  var wkLoaded=false, wkPending=false;', '  var WK_UNREAD_MSG=', '  var wkDirty={};', '  var WK_NO_ADD_MSG=', '  var wkEduSt = ', '  var swSiteId=null, swQ="";', '  var WK_KIND_LABEL = ', '  var WK_KIND_ORDER = '].map((h) => line42(html, h));
+  const iife42 = (() => { const k = html.indexOf('    if(!$("wkAddBtn")) return;'), s = html.lastIndexOf('  (function(){', k), e = html.indexOf('\n  })();', k); if (k < 0 || s < 0 || e < 0) throw new Error('일용직 창 배선 없음'); return html.slice(s, e + '\n  })();'.length); })();
+  const siteIife42 = (() => { const k = html.indexOf('  // 현장 탭 배선(v347)'), s = html.indexOf('  (function(){', k), e = html.indexOf('\n  })();', k); if (k < 0 || s < 0 || e < 0 || html.slice(s, e).indexOf('swNewBtn') < 0) throw new Error('현장 탭 배선 없음'); return html.slice(s, e + '\n  })();'.length); })();
+  const apWk42 = line42(fn42(html, 'applyPerms'), '    if (currentTab === "workers")');   // applyPerms의 일용직 줄(로그인 창 '전환' — 검토 반영 ㉑이 그대로 돌림)
+  const PRE42 = [
+    'var asb = ENV.asb, edu = ENV.edu, asbLoaded = ENV.asbLoaded !== false, xgCtx = null, xgLateOn = false, siteQ = "", currentTab = ENV.tab || "workers";',
+    'function loadEdu(){ ENV.log.push("loadEdu"); var v = ENV.eduRes.length ? ENV.eduRes.shift() : true; return Promise.resolve(v); }',
+    'function loadAsb(){ ENV.log.push("loadAsb"); } function switchTab(n){ ENV.log.push("switch:" + n); currentTab = n; }',
+    'function renderSites(){} function renderCalendar(){} function openAsb(){} function afterSave(){} function siteLabel(){ return "석면"; } function scheduleAsbSave(){ ENV.log.push("asbSave"); }',
+    'function todayStr(){ return "2026-11-11"; }',
+    'function genId(p){ ENV.gid++; return p + "N" + ENV.gid; }',
+    'function curMember(){ return ENV.user; } function myId(){ return ENV.user ? ENV.user.id : ""; }',
+    'function isAdmin(){ return !!(ENV.user && ENV.user.admin); }',
+    'function permOf(mod){ var u = ENV.user; if (!u) return "hide"; if (u.admin) return "do"; return (u.perms && u.perms[mod]) || "hide"; }',
+    'function canDo(mod){ return permOf(mod) === "do"; } function canSee(mod){ return permOf(mod) !== "hide"; }',
+    'function confirm(msg){ ENV.log.push("confirm:" + msg); return ENV.confirmAns !== false; }',
+    'function alert(msg){ ENV.log.push("alert:" + msg); }',
+    'function gwToast(msg){ ENV.log.push("toast:" + msg); }',
+    'function xgToggle(){ ENV.log.push("xgToggle"); } function findProc(){ return null; } function xgAgentAuto(){}',
+    'function gwCall(fn, body){ ENV.gw.push(body.action + ":" + body.collection + (body.base !== undefined ? ":base=" + body.base : "") + (body.doc ? ":" + body.doc.items.map(function(w){ return w.id + (w.note ? "=" + w.note : "") + (w.del === 1 ? "(del)" : ""); }).join(",") : "")); var r = ENV.gwQ.shift() || { status: 599 }; return Promise.resolve({ status: r.status, body: r.body || {} }); }'].join('\n');
+  const SRC42 = [PRE42].concat(VARS42, ['workers = ENV.workers; wkLoaded = ENV.loaded !== false; wkEduSt = ENV.eduSt == null ? "ok" : ENV.eduSt;'], REAL42.map((n) => fn42(html, n)), [blk42, wsb42, iife42, siteIife42,
+    'function apWk(){', apWk42, '}',
+    'return { render: renderWorkers, legacy: renderWorkersLegacy, def: wkSheetDef, inst: vsInst, vs: vsSheetRender, check: vsSheetCheckDef, minW: vsSheetMinW, cols: vsSheetCols, budget: VS_STAGE_BUDGET, reveal: vsSheetReveal,'
+    + ' wks: function(){ return workers; }, setAsb: function(a){ asb = a; }, setEdu: function(e){ edu = e; }, loaded: function(){ return wkLoaded; }, pending: function(){ return wkPending; }, base: function(){ return wkBase; }, timer: function(){ return wkSaveTimer; },'
+    + ' load: loadWorkers, save: doSaveWorkers, sched: scheduleWorkersSave, openModal: openWkModal, kc: wkKindCounts, chips: wkKindChips, build: xgBuildEdits, exDate: wkExamDate, exNote: wkExamNote, exMiss: wkExamMissing, xgw: renderXgWorkers,'
+    + ' showNew: wkSheetShowNew, idx: wkSheetIdx, unread: WK_UNREAD_MSG, noAdd: WK_NO_ADD_MSG, mark: wkMarkDirty, dirty: function(){ return wkDirty; }, merge: mergeWorkers,'
+    + ' setAsbLoaded: function(v){ asbLoaded = v; }, eduSt: function(){ return wkEduSt; }, setEduSt: function(v){ wkEduSt = v; }, eduEnsure: wkEduEnsure, openSw: openSiteWorkers, swList: renderSwList, swEmpty: swEmptyText, apWk: apWk, tab: function(){ return currentTab; } };']).join('\n');
+  // 작은 DOM — 선택자는 태그·#id·.class·[속성]·[속성="값"]을 붙여 쓴 것까지(자손 결합자 없음 — v441과 같은 꼴)
+  const match42 = (el, sel) => {
+    const re = /(#[\w-]+)|(\.[\w-]+)|(\[[\w-]+(?:="(?:[^"\\]|\\.)*")?\])|([a-zA-Z][\w-]*)/g; let m, at = 0;
+    while ((m = re.exec(sel))) {
+      if (m.index !== at) throw new Error('시험 DOM이 모르는 선택자: ' + sel); at = re.lastIndex;
+      if (m[1]) { if (el.getAttribute('id') !== m[1].slice(1)) return false; }
+      else if (m[2]) { if (!el.classList.contains(m[2].slice(1))) return false; }
+      else if (m[3]) { const a = /^\[([\w-]+)(?:="((?:[^"\\]|\\.)*)")?\]$/.exec(m[3]); if (a[2] === undefined) { if (!el.hasAttribute(a[1])) return false; } else if (el.getAttribute(a[1]) !== a[2].replace(/\\(.)/g, '$1')) return false; }
+      else if (m[4]) { if (!el.tagName || el.tagName !== m[4].toUpperCase()) return false; }
+    }
+    if (!at || at !== sel.length) throw new Error('시험 DOM이 모르는 선택자: ' + sel);
+    return true;
+  };
+  const mkCls42 = (s) => { const c = new Set(String(s || '').split(/\s+/).filter(Boolean)); return { toggle: (k, on) => { if (on === undefined ? !c.has(k) : on) c.add(k); else c.delete(k); }, contains: (k) => c.has(k), add: (k) => c.add(k), remove: (k) => c.delete(k) }; };
+  const mk42 = (o) => {
+    o = o || {};
+    const env = { width: o.width || 1366, user: o.user || U42.A, workers: o.workers || WKS42(), asb: o.asb || ASB42(), edu: o.edu || EDU42(), loaded: o.loaded, gw: [], gwQ: (o.gwQ || []).slice(), xgSel: [],
+      asbLoaded: o.asbLoaded, eduSt: o.eduSt, eduRes: (o.eduRes || []).slice(), tab: o.tab,
+      mql: [], store: Object.assign({}, o.store || {}), timers: [], now: 100000, log: [], raf: [], ro: [], roCb: null, cw: 1048, confirmAns: true, gid: 0 };
+    const doc = { activeElement: null, byId: {} };
+    doc.getElementById = (id) => doc.byId[id] || null;
+    doc.querySelector = (sel) => { env.log.push('qs:' + sel); return null; };
+    doc.querySelectorAll = (sel) => (sel === '[data-xgw]:checked' ? env.xgSel.map((id) => ({ getAttribute: (n) => (n === 'data-xgw' ? id : null) })) : []);
+    doc.addEventListener = () => {}; doc.removeEventListener = () => {};
+    const mkEl = (tag, attrs) => {
+      const el = { tagName: tag.toUpperCase(), attrs, L: {}, scrollLeft: 0, scrollTop: 0, parentNode: null };
+      Object.defineProperty(el, 'clientWidth', { get: () => env.cw });
+      el.getAttribute = (n) => (own42(attrs, n) ? unesc42(attrs[n]) : null);
+      el.setAttribute = (n, v) => { attrs[n] = String(v); };
+      el.hasAttribute = (n) => own42(attrs, n);
+      el.type = attrs.type || ''; el.value = own42(attrs, 'value') ? unesc42(attrs.value) : ''; el.checked = own42(attrs, 'checked'); el.disabled = own42(attrs, 'disabled');
+      const sp = {}; String(attrs.style || '').split(';').forEach((p) => { const k = p.indexOf(':'); if (k > 0) sp[p.slice(0, k).trim()] = p.slice(k + 1).trim(); });
+      el.style = { sp, setProperty: (k, v) => { sp[k] = String(v); }, getPropertyValue: (k) => sp[k] || '' };
+      el.classList = mkCls42(attrs.class);
+      el.addEventListener = (t, f) => { (el.L[t] = el.L[t] || []).push(f); };
+      el.fire = (t, ev) => { const e = Object.assign({ target: el, type: t, stopped: false }, ev || {}); e.stopPropagation = () => { e.stopped = true; }; e.preventDefault = () => {}; (el.L[t] || []).slice().forEach((f) => f(e)); return e; };
+      el.focus = () => { doc.activeElement = el; };
+      el.closest = (sel) => (match42(el, sel) ? el : null);
+      el.selectionStart = el.tagName === 'INPUT' ? el.value.length : null;
+      el.setSelectionRange = (a) => { el.selectionStart = a; };
+      el.scrollIntoView = () => { env.log.push('into:' + (el.getAttribute('data-vs-row') || el.getAttribute('data-vs-detcard') || '')); };
+      return el;
+    };
+    env.mkEl = mkEl;
+    env.mkHost = (id) => {
+      const host = { id, tagName: 'DIV', attrs: { id }, _h: '', _t: '', els: [], visible: true, style: { display: '' }, L: {}, value: '' };
+      host.getAttribute = (n) => (own42(host.attrs, n) ? host.attrs[n] : null);
+      host.setAttribute = (n, v) => { host.attrs[n] = String(v); };
+      host.hasAttribute = (n) => own42(host.attrs, n);
+      host.getClientRects = () => ((host.visible && host.style.display !== 'none') ? [{}] : []);
+      host.contains = (el) => host.els.indexOf(el) >= 0;
+      host.querySelectorAll = (sel) => host.els.filter((e) => match42(e, sel));
+      host.querySelector = (sel) => host.els.find((e) => match42(e, sel)) || null;
+      host.addEventListener = (t, f) => { env.log.push('host-listener:' + id + ':' + t); (host.L[t] = host.L[t] || []).push(f); };   // 자리(host)에 건 배선은 기록(표 자리 wkList에는 0이어야 — v438 규칙)
+      host.classList = mkCls42('');
+      host.focus = () => { doc.activeElement = host; env.log.push('focus:' + id); };
+      Object.defineProperty(host, 'innerHTML', { get: () => host._h, set: (v) => {
+        host._h = String(v); host.els = [];
+        for (const t of host._h.matchAll(/<([a-zA-Z][\w-]*)((?:[^<>"]|"[^"]*")*)>/g)) { const attrs = {}; for (const a of t[2].matchAll(/([\w-]+)(?:="([^"]*)")?/g)) attrs[a[1]] = a[2] === undefined ? '' : a[2]; host.els.push(mkEl(t[1], attrs)); }
+      } });
+      Object.defineProperty(host, 'textContent', { get: () => host._t, set: (v) => { host._t = String(v); } });
+      doc.byId[id] = host;
+      return host;
+    };
+    env.host = (id) => doc.byId[id];
+    ['wkList', 'wkHead', 'wkAddBtn', 'wkSiteNote', 'wkAsbNote', 'view-workers', 'wkModalTitle', 'wkName', 'wkBirth', 'wkRole', 'wkPhone', 'wkNote', 'wkDelete', 'wkNeedNote', 'wkBackdrop', 'wkSave', 'wkCancel',
+      'xgWorkers', 'xgAgentWrap', 'xgTitle', 'xgSite', 'xgClient', 'xgOwner',
+      'siteSearch', 'siteAddBtn', 'swSearch', 'swCancel', 'swNewBtn', 'swSave', 'swNewName', 'swList', 'swSub', 'swBackdrop', 'swNewWrap', 'swNoWkNote'].forEach((id) => env.mkHost(id));
+    env.host('wkList').innerHTML = '<div class="loading">불러오는 중…</div>';
+    env.host('wkSiteNote').style.display = 'none'; env.host('wkAsbNote').style.display = 'none'; env.host('swNoWkNote').style.display = 'none';
+    const win = { get innerWidth() { return env.width; }, matchMedia: (q) => ({ media: q, get matches() { return mq42(q, env.width); }, addEventListener: (t, f) => { env.mql.push(f); } }), requestAnimationFrame: (f) => { env.raf.push(f); } };
+    const ls = { getItem: (k) => (own42(env.store, k) ? env.store[k] : null), setItem: (k, v) => { env.log.push('store:' + k); env.store[k] = String(v); }, removeItem: (k) => { delete env.store[k]; } };
+    const stF = (f, ms) => { const t = { id: env.timers.length + 1, f, at: env.now + ms, done: false }; env.timers.push(t); return t.id; };
+    const ctF = (id) => { env.timers.forEach((t) => { if (t.id === id) t.done = true; }); };
+    function RO(cb) { env.roCb = cb; this.observe = (t) => { env.ro.push(t); }; }
+    class FD extends Date { static now() { return env.now; } }
+    const api = new Function('window', 'document', 'localStorage', 'setTimeout', 'clearTimeout', 'ResizeObserver', 'ENV', 'Date', SRC42)(win, doc, ls, stF, ctF, RO, env, FD);
+    env.breakAll = () => { env.mql.slice().forEach((f) => f({})); };
+    env.runTimers = () => { env.timers.filter((t) => !t.done).forEach((t) => { t.done = true; t.f(); }); };
+    env.click = (id) => { (env.host(id).L.click || []).slice().forEach((f) => f({ target: env.host(id) })); };
+    return { api, env, doc, host: env.host('wkList') };
+  };
+  const flush42 = () => new Promise((r) => setTimeout(r, 0));
+  const order42 = (h) => [...h.matchAll(/data-vs-row="([^"]*)"/g)].map((m) => m[1]).join(',');
+  const cnt42 = (h) => (/<span class="vs-count">([^<]*)<\/span>/.exec(h) || ['', ''])[1];
+  const rowSeg42 = (h, id) => (new RegExp('<tr class="vs-r[^"]*" data-vs-row="' + id + '">([\\s\\S]*?)</tr>').exec(h) || ['', ''])[1];
+  const cells42 = (h, id) => [...rowSeg42(h, id).matchAll(/<td([^>]*)>([\s\S]*?)<\/td>/g)].map((m) => [m[1], m[2]]);
+  const ctxt42 = (h, id) => cells42(h, id).map((c) => c[1].replace(/<[^>]+>/g, '')).join('|');   // 칸 글(태그 뺌)
+  const heads42 = (h) => [...h.matchAll(/<th[^>]*data-vs-sort="(\w+)"/g)].map((m) => m[1]).join(',');
+  const chips42 = (h) => [...h.matchAll(/data-vs-chip="st\|(\w*)"[^>]*>([^<]*)</g)].map((m) => m[1] + ':' + m[2]).join('|');
+  const foot42 = (h) => ((/<tfoot><tr>([\s\S]*?)<\/tr><\/tfoot>/.exec(h) || ['', ''])[1].match(/<td[^>]*>([\s\S]*?)<\/td>/g) || []).map((s) => s.replace(/^<td[^>]*>|<\/td>$/g, '')).join('|');
+  const tabs42 = (h) => [...h.matchAll(/<button type="button" class="vs-stab( on)?" data-wk-tab="(\w+)">([^<]*)<\/button>/g)].map((m) => m[3] + (m[1] ? '*' : '')).join('|');
+  const det42 = (h) => (/<div class="vs-det-in" data-vs-det="[^"]*">([\s\S]*?)<\/div><\/td><\/tr>/.exec(h) || ['', ''])[1];
+  const acts42 = (h) => { const m = /<div class="vs-act">([\s\S]*?)<\/div>/.exec(h); return m ? [...m[1].matchAll(/<button type="button" class="([^"]*)"[^>]*>([^<]*)<\/button>/g)].map((x) => x[1] + ':' + x[2]).join(',') : ''; };
+  const hist42 = (h) => [...h.matchAll(/<tr><td>([^<]*)<\/td><td>([^<]*)<\/td><td>([^<]*)<\/td><\/tr>/g)].map((m) => m[1] + '/' + m[2] + '/' + m[3]).join(' · ');
+  const kvKeys42 = (h) => [...h.matchAll(/<div class="k">([^<]*)<\/div>/g)].map((m) => m[1]).join('·');
+  // 누르는 도우미는 행·버튼·펼침이 없으면 멈추지 않고 빠짐(miss42)만 적는다 — 결함 하나가 이 묶음을 '검사 생략'으로 끝내 뒤 검사까지 건너뛰지 않게(v441과 같은 까닭) · 검사마다 시작할 때 빠짐 수를 잡고 끝에서 늘지 않았는지 본다
+  const miss42 = [];
+  const openRow42 = (X, id) => { const row = X.host.querySelector('[data-vs-row="' + id + '"]'); if (!row) { miss42.push('행 없음 ' + id); return false; } row.fire('click', { target: row }); return true; };
+  const chip42 = (X, k) => { const el = X.host.querySelector('[data-vs-chip="st|' + k + '"]'); if (!el) { miss42.push('칩 없음 ' + k); return false; } el.fire('click'); return true; };
+  const press42 = (X, attr, val) => { const det = X.host.querySelector('[data-vs-det]') || X.host.querySelector('[data-vs-detcard]'), L = X.host.els.filter((e) => e.getAttribute(attr) === val), b = L[L.length - 1]; if (!det || !b) { miss42.push('펼침 안 요소 없음 ' + attr + '=' + val); return false; } det.fire('click', { target: b }); return true; };
+  const fake42 = (X, act, id) => { const det = X.host.querySelector('[data-vs-det]'); if (!det) { miss42.push('펼침 없음(흉내 ' + act + ')'); return false; } const b = X.env.mkEl('button', { type: 'button', class: 'mini-btn', 'data-wk-act': act, 'data-wk-id': id }); det.fire('click', { target: b }); return true; };   // 화면에 없는 버튼을 만들어 누름(누름 길의 지금 규칙을 봄)
+  const noMiss42 = (m0) => miss42.length === m0;
+  const sortBy42 = (X, k) => { const th = X.host.querySelector('[data-vs-sort="' + k + '"]'); if (!th) { miss42.push('머리 없음 ' + k); return false; } th.fire('click', { target: th }); return true; };
+  const ORD42 = 'w1,w2,w8,w3,w4,w5,w7';   // 이름 ▲(김일용·박반장·오참여없음·이 동명·이동명·최없음·한준설)
+
+  // ① 정의·칸 폭(명세 그대로 — 운영 백업 실측으로 확인)·단계 합: vsSheetCheckDef 통과(관리자·현장 권한 없음 × phone legacy·sheet — 폰 열 % 합 100) · 관리자 열 7 = 명세 순서
+  //   (이름 100 text·폰 32 / 역할 60 lv2 enum / 생년월일 92·폰 30 / 최근 참여 120·폰 38 / 참여 56 lv2 숫자 / 종류 84 lv2 enum multi / 메모 남는 폭 최소 190 lv2) · 단계 합 702/702/702 ≤ 한도(= CSS 본문 폭 − 49) ·
+  //   현장 권한 없음 = 열 4(이름·역할·생년월일·메모 — 폰 52·48) 442/442/442 · key jw_wk_sheet · host wkList · 단위 명 · 검색칸 없음 · 기본 정렬 이름 ▲ · phone legacy · legacy = renderWorkersLegacy · 선택 칸·묶음·더보기 없음 ·
+  //   같은 권한이면 같은 정의(열 배열도 같음), 권한이 바뀌면 열을 다시 고름
+  const X1 = mk42(), d1 = X1.api.def();
+  const ck1 = [U42.A, U42.S, U42.V, U42.N].map((u) => { X1.env.user = u; const d = X1.api.def(); return [X1.api.check(d).join(','), X1.api.check(Object.assign({}, d, { phone: 'sheet' })).join(',')].join('/'); });
+  const colsOf1 = (u) => { X1.env.user = u; const s = X1.api.def().cols.map((c) => [c.k, c.h, c.w || 0, c.f, c.lv || 1, c.pw || 0, c.fill ? 'fill' + c.min : '', c.num ? 'num' : '', c.multi ? 'multi' : ''].join(':')).join('|'); X1.env.user = U42.A; return s; };
+  const COLS42 = 'name:이름:100:text:1:32:::|role:역할:60:enum:2:0:::|birth:생년월일:92:none:1:30:::|recent:최근 참여:120:none:1:38:::|cnt:참여:56:none:2:0::num:|kinds:종류:84:enum:2:0:::multi|note:메모:0:text:2:0:fill190::';
+  const COLSN42 = 'name:이름:100:text:1:52:::|role:역할:60:enum:2:0:::|birth:생년월일:92:none:1:48:::|note:메모:0:text:2:0:fill190::';
+  const sums1 = (u) => { X1.env.user = u; const d = X1.api.def(); const s = [2, 3, 4].map((st) => X1.api.minW({ colw: {} }, X1.api.cols(d, st))); X1.env.user = U42.A; return s.join('/'); };
+  const css42 = (() => { const i = html.indexOf('<style>'), j = html.indexOf('</style>', i); return html.slice(i + 7, j).replace(/\/\*[\s\S]*?\*\//g, ''); })();
+  const rules42 = [];
+  const parse42 = (src, media) => { let i = 0; while (i < src.length) { const ob = src.indexOf('{', i); if (ob < 0) break; const head = src.slice(i, ob).trim(); let d = 1, j = ob + 1; for (; j < src.length && d > 0; j++) { if (src[j] === '{') d++; else if (src[j] === '}') d--; } const bd = src.slice(ob + 1, j - 1); if (/^@media/.test(head)) parse42(bd, head.slice(6).trim()); else if (!/^@/.test(head)) { const decl = {}; bd.split(';').forEach((p) => { const k = p.indexOf(':'); if (k > 0) decl[p.slice(0, k).trim()] = p.slice(k + 1).trim(); }); rules42.push({ media, sels: head.split(',').map((s) => s.trim().replace(/\s*>\s*/g, '>').replace(/\s+/g, ' ')), decl }); } i = j; } };
+  parse42(css42, null);
+  const decl42 = (w, sel, prop) => { let v = null; rules42.forEach((r) => { if (mq42(r.media, w) && r.sels.indexOf(sel) >= 0 && own42(r.decl, prop)) v = r.decl[prop]; }); return v; };
+  const pad42 = (v) => { const p = String(v || '0px').trim().split(/\s+/).map((x) => parseFloat(x) || 0); const r = p.length === 1 ? p[0] : p[1]; return [p.length === 4 ? p[3] : r, r]; };
+  const bodyW42 = (win) => { const W = win - 17, mx = decl42(win, '#app', 'max-width'), appW = (!mx || mx === 'none') ? W : Math.min(W, parseFloat(mx)), lr = pad42(decl42(win, '#app', 'padding')); return appW - lr[0] - lr[1] - (parseFloat(decl42(win, '.tabbar', 'width')) || 0) - (parseFloat(decl42(win, '.layout', 'gap')) || 0); };
+  const viewW42 = (win) => { const b = bodyW42(win), own = decl42(win, '#view-workers', 'max-width'), base = decl42(win, '.views>.view', 'max-width'), mx = own != null ? own : base; return (!mx || mx === 'none') ? b : Math.min(b, parseFloat(mx)); };
+  const body1 = [1024, 1280, 1600].map((w) => Math.round(bodyW42(w))), bud1 = [2, 3, 4].map((s) => X1.api.budget[s]);
+  const sumA1 = sums1(U42.A).split('/').map(Number);
+  const fit1 = [0, 1, 2].every((i) => sumA1[i] <= bud1[i] && Math.abs(bud1[i] + 49 - body1[i]) <= 2);
+  X1.env.user = U42.A; const colsA1 = X1.api.def().cols; X1.env.user = U42.N; const colsN1 = X1.api.def().cols; X1.env.user = U42.V; const colsV1 = X1.api.def().cols; X1.env.user = U42.A; const colsA1b = X1.api.def().cols;
+  T('v442 ① 일용직 표 정의·칸 폭·단계 합: vsSheetCheckDef 통과(관리자·안전 담당형·차량 담당형·현장 권한 없음 × phone legacy·sheet) · 관리자 열 7 = 이름 100 text(폰 32) · 역할 60 lv2 enum · 생년월일 92(폰 30) · 최근 참여 120(폰 38) · 참여 56 lv2 숫자 · 종류 84 lv2 enum multi · 메모 남는 폭 최소 190 lv2(명세 폭 그대로 — 운영 백업 실측: 이름 + 동명 칩 73/83 · 최근 참여 4자리 일수 93.9/103 · 참여 머리 + 화살표 38/39 · 종류 52.7/67) · 단계 합 702/702/702 ≤ 한도 ' + bud1.join('/') + '(= CSS 본문 폭 ' + body1.join('/') + ' − 49) · 현장 권한 없음 = 열 4(이름·역할·생년월일·메모 — 폰 52·48) 442/442/442 · key jw_wk_sheet · host wkList · 단위 명 · 검색칸 없음 · 기본 정렬 이름 ▲ · phone legacy · legacy = renderWorkersLegacy · 선택 칸·묶음·더보기 없음 · 같은 권한이면 같은 정의(열 배열도 같음), 권한이 바뀌면 열을 다시 고름',
+    ck1.every((s) => s === '/') && colsOf1(U42.A) === COLS42 && colsOf1(U42.N) === COLSN42 && sums1(U42.A) === '702/702/702' && sums1(U42.N) === '442/442/442'
+    && JSON.stringify(bud1) === '[742,962,1282]' && JSON.stringify(body1) === '[791,1011,1331]' && fit1
+    && d1.key === 'jw_wk_sheet' && d1.host === 'wkList' && d1.unit === '명' && !d1.search && d1.sort.k === 'name' && d1.sort.d === 1 && d1.phone === 'legacy' && d1.legacy === X1.api.legacy && !d1.sel && !d1.group && !d1.page
+    && colsA1 === colsA1b && colsA1 === colsV1 && colsA1 !== colsN1,
+    JSON.stringify({ ck1, cols: colsOf1(U42.A), colsN: colsOf1(U42.N), sums: [sums1(U42.A), sums1(U42.N)], bud1, body1 }));
+
+  // ② 참여 셈 = 현장 대장 worker_ids(지운 현장 빼고 · 한 현장에 같은 id 두 번이면 한 번 · 문자열 JSON·쉼표 글 worker_ids · 명부에 없는 id는 줄 없음 · 지운 사람 줄 없음):
+  //   시험이 대장을 따로 세어(앱 함수 없이) 표 칸(최근 참여·참여·종류)과 맞춰 본다 · 최근 참여 글 = 옛 목록 칩(wkKindChips — PM 9/14 표기)과 같은 글 · 1년 내 참여(마지막 참여일 ≥ 2025-11-11, 앞으로 잡힌 현장 포함)·참여 기록 없음 칩 행
+  const m2 = miss42.length, X2 = mk42(); X2.api.render(); const h2 = X2.host._h;
+  const ago2 = (ds) => { if (!/^\d{4}-\d{2}-\d{2}$/.test(ds)) return '날짜 미상'; const n = Math.round((new Date('2026-11-11T00:00:00') - new Date(ds + 'T00:00:00')) / 86400000); return n === 0 ? '오늘' : (n > 0 ? n + '일 전' : (-n) + '일 후'); };
+  const LBL2 = { asbestos: '석면', demolition: '철거', dredge: '준설' };
+  const ids2 = (v) => (Array.isArray(v) ? v : (String(v).trim().charAt(0) === '[' ? JSON.parse(v) : String(v).split(',').map((s) => s.trim()).filter(Boolean)));
+  const exp2 = {}; ASB42().filter((r) => r.del !== 1).forEach((r) => { const k = LBL2[r.kind] ? r.kind : 'asbestos', d = String(r.end || r.start || ''); [...new Set(ids2(r.worker_ids))].forEach((id) => { const e = exp2[id] || (exp2[id] = { n: 0, k: {}, d: null, kind: '' }); e.n++; e.k[k] = 1; if (e.d === null || d > e.d) { e.d = d; e.kind = k; } }); });
+  const want2 = WKS42().filter((w) => w.del !== 1).map((w) => { const e = exp2[w.id]; return w.id + '=' + (e ? '(' + LBL2[e.kind] + ') ' + ago2(e.d) + '|' + e.n + '회|' + ['asbestos', 'demolition', 'dredge'].filter((k) => e.k[k]).map((k) => LBL2[k]).join('·') : '-|-|-'); }).join(' ; ');
+  const got2 = WKS42().filter((w) => w.del !== 1).map((w) => w.id + '=' + cells42(h2, w.id).slice(3, 6).map((c) => c[1].replace(/<[^>]+>/g, '')).join('|')).join(' ; ');
+  const kc2 = X2.api.kc(), chipT2 = ['w1', 'w2', 'w3', 'w4', 'w5', 'w7'].every((id) => X2.api.chips(kc2, id).indexOf('>' + cells42(h2, id)[3][1] + '</span>') > 0);
+  const t2 = [cells42(h2, 'w1')[3][0], cells42(h2, 'w4')[3][1], rowSeg42(h2, 'w6') === '' && h2.indexOf('w99') < 0];
+  chip42(X2, 'y1'); const y2 = order42(X2.host._h), fy2 = foot42(X2.host._h); chip42(X2, 'nopart'); const n2 = order42(X2.host._h); chip42(X2, 'nobirth'); const b2 = order42(X2.host._h); chip42(X2, '');
+  T('v442 ② 참여 셈 = 현장 대장 worker_ids(실행 — 시험이 대장을 따로 세어 대조): 최근 참여·참여 n회·종류 = ' + want2 + ' · 지운 현장(s4) 빼고·한 현장 같은 id 두 번(s1 w1)은 한 번·문자열 JSON·쉼표 글 worker_ids·종류 없음 = 석면·날짜 없는 현장 = "날짜 미상" · 지운 사람(w6)·명부에 없는 id(w99) 줄 없음 · 최근 참여 글 = 옛 목록 칩(wkKindChips)과 같은 글(title 현장 제목 · 날짜) · 칩 1년 내 참여 = w1,w2,w5(앞으로 잡힌 현장 포함 — 합계 "1년 내 3") · 참여 기록 없음 = w8 · 생년월일 미입력 = w2,w8,w5(6자리 꼴 아님 포함)',
+    got2 === want2 && chipT2 && t2[0] === ' title="가동 석면 · 2026-10-10"' && t2[1] === '(철거) 날짜 미상' && t2[2] === true
+    && y2 === 'w1,w2,w5' && fy2 === '합계 3명||미입력 2|1년 내 3|||' && n2 === 'w8' && b2 === 'w2,w8,w5' && noMiss42(m2),
+    JSON.stringify({ got2, want2, chipT2, t2, y2, fy2, n2, b2, miss: miss42.slice(m2) }));
+
+  // ③ 현장 권한 없음(일용직 보기·현장 숨김 — 운영 1명 꼴): 대장이 메모리에 남아 있어도(로그인 창 '전환') 참여 3열·칩 2개·합계 '1년 내'·참여 현장 탭·머리 '현장 대장 n건' 없음 + 표 위 안내 줄(#wkSiteNote 보임 — 글 '현장 이력은 현장 권한이 있어야 보입니다') ·
+  //   관리자 = 안내 줄 숨김·열 7 · 같은 기기에서 관리자 → 현장 권한 없음 → 관리자로 바꾸면 열·칩·안내 줄이 그때 사람 것으로(새로고침 없음)
+  const m3 = miss42.length, X3 = mk42({ user: U42.N }); X3.api.render(); const h3 = X3.host._h, note3 = X3.env.host('wkSiteNote').style.display;
+  openRow42(X3, 'w1'); const d3 = det42(X3.host._h);
+  const X3b = mk42(); X3b.api.render(); const nA3 = X3b.env.host('wkSiteNote').style.display, hA3 = heads42(X3b.host._h); X3b.env.user = U42.N; X3b.api.render(); const nN3 = X3b.env.host('wkSiteNote').style.display, hN3 = heads42(X3b.host._h), cN3 = chips42(X3b.host._h);
+  X3b.env.user = U42.A; X3b.api.render(); const nA3b = X3b.env.host('wkSiteNote').style.display, hA3b = heads42(X3b.host._h);
+  const noteHtml3 = /<div id="wkSiteNote" style="display:none;">현장 이력은 현장 권한이 있어야 보입니다<\/div>\s*<div class="card" id="wkList">/.test(html);
+  T('v442 ③ 현장 권한 없음(실행): 열 이름·역할·생년월일·메모(최근 참여·참여·종류 없음) · 칩 전체·생년월일 미입력(1년 내 참여·참여 기록 없음 없음) · 합계 "합계 7명||미입력 3|" · 표 위 안내 줄 보임(HTML 글 그대로·표 자리 바로 위) · 펼침 = 탭 줄 없음·인적사항만·"현장 대장" 글 0·참여 현장 0 / 관리자 = 안내 줄 숨김·열 7 · 한 기기 관리자 → 보기 직원 → 관리자 = 열·칩·안내 줄이 그때 사람 것으로',
+    heads42(h3) === 'name,role,birth,note' && chips42(h3) === ':전체|nobirth:생년월일 미입력' && foot42(h3) === '합계 7명||미입력 3|' && note3 === '' && noteHtml3
+    && d3.indexOf('data-wk-tab') < 0 && d3.indexOf('<div class="k">생년월일</div>') > 0 && d3.indexOf('현장 대장') < 0 && d3.indexOf('참여 현장') < 0
+    && nA3 === 'none' && hA3 === 'name,role,birth,recent,cnt,kinds,note' && nN3 === '' && hN3 === 'name,role,birth,note' && cN3 === ':전체|nobirth:생년월일 미입력' && nA3b === 'none' && hA3b === hA3 && noMiss42(m3),
+    JSON.stringify({ heads: heads42(h3), chips: chips42(h3), foot: foot42(h3), note3, noteHtml3, d3: d3.slice(0, 200), nA3, nN3, nA3b, hN3, miss: miss42.slice(m3) }));
+
+  // ④ 동명 칩: 띄어쓰기만 다른 같은 이름(w3 '이 동명'·w4 '이동명') = 이름 칸 뒤 '동명' 칩(title '같은 이름이 1명 더 있습니다(동명이인 확인)' · 칸 title도) · 지운 같은 이름(w6)은 세지 않음 · 다른 이름 칩 0 ·
+  //   펼침 머리 '같은 이름 1명 더' · 셋째 같은 이름이 생기면 '2명 더' · 이름 거르기 '동명'은 칩 글에 걸리지 않음(값 = 이름)
+  const m4 = miss42.length, X4 = mk42(); X4.api.render(); const h4 = X4.host._h;
+  const DUP4 = '<span class="rec-st chg wk-dup" title="같은 이름이 1명 더 있습니다(동명이인 확인)">동명</span>';
+  const c4 = [cells42(h4, 'w3')[0][1], cells42(h4, 'w4')[0][1], cells42(h4, 'w1')[0][1], cells42(h4, 'w3')[0][0]];
+  openRow42(X4, 'w4'); const dh4 = det42(X4.host._h);
+  X4.api.wks().push(W042({ id: 'w9', name: '이동 명' })); X4.api.render(); const c4b = cells42(X4.host._h, 'w9')[0][1];
+  T('v442 ④ 동명 칩(실행): w3·w4 이름 칸 = 이름 + 동명 칩(title 같은 이름 1명 더) · 칸 title "이 동명 · 같은 이름이 1명 더 있습니다(동명이인 확인)" · w1 칩 없음 · 지운 w6은 안 셈 · 펼침 머리 "같은 이름 1명 더" · 셋째(w9 "이동 명")가 생기면 "같은 이름이 2명 더" · 첫 열 굵게',
+    c4[0] === '이 동명' + DUP4 && c4[1] === '이동명' + DUP4 && c4[2] === '김일용' && c4[3] === ' class="vs-b" title="이 동명 · 같은 이름이 1명 더 있습니다(동명이인 확인)"'
+    && dh4.indexOf('<span class="rec-st chg" title="동명이인 확인 — 합치지 않습니다(다른 사람일 수 있음)">같은 이름 1명 더</span>') > 0 && c4b === '이동 명<span class="rec-st chg wk-dup" title="같은 이름이 2명 더 있습니다(동명이인 확인)">동명</span>' && noMiss42(m4),
+    JSON.stringify({ c4, c4b, dh4: dh4.slice(0, 300), miss: miss42.slice(m4) }));
+
+  // ⑤ 생년월일: 빈 값 = 노랑 칸(vs-warn) '미입력'(title 30년 보존 항목) · 6자리 꼴 아님(w5 '811399') = 노랑 칸에 적힌 글(title 6자리로 고쳐 달라) · 6자리 = 숫자 그대로(노랑 없음) · 합계 '미입력 3' · 머리 정렬(빈 값 뒤)
+  const m5 = miss42.length, X5 = mk42(); X5.api.render(); const h5 = X5.host._h;
+  const b5 = ['w2', 'w5', 'w1'].map((id) => cells42(h5, id)[2]);
+  sortBy42(X5, 'birth'); const o5 = order42(X5.host._h);
+  T('v442 ⑤ 생년월일 미입력 노랑(실행): w2 빈 값 = class vs-warn·"미입력"·title "석면 대장(30년 보존)에 들어가는 항목입니다 — [수정]에서 6자리로" · w5 "811399"(6자리 꼴 아님) = vs-warn·적힌 글·title "6자리 꼴이 아닙니다 …" · w1 "810817" = 색 없음 · 합계 "미입력 3" · 생년월일 ▲ = 650101(w3)·700202(w4)·700505(w7)·810817(w1)·811399(w5) 뒤 빈 값(w2·w8)',
+    b5[0][0] === ' class="vs-warn" title="석면 대장(30년 보존)에 들어가는 항목입니다 — [수정]에서 6자리로"' && b5[0][1] === '미입력'
+    && b5[1][0] === ' class="vs-warn" title="6자리 꼴이 아닙니다 — [수정]에서 6자리(예: 810817)로 고쳐 주세요"' && b5[1][1] === '811399' && b5[2][0] === ' title="810817"' && b5[2][1] === '810817'
+    && foot42(h5).split('|')[2] === '미입력 3' && o5 === 'w3,w4,w7,w1,w5,w2,w8' && noMiss42(m5),
+    JSON.stringify({ b5, foot: foot42(h5), o5, miss: miss42.slice(m5) }));
+
+  // ⑥ 칸 글·정렬·펼침: 1366 첫 줄 순서 이름 ▲ = ' + ORD42 + ' · 칸 글(w1) · 최근 참여 ▲ = 최근 먼저(앞으로 잡힌 w5가 맨 앞 · 같은 날은 명부 순서 · 날짜 모름·참여 없음은 뒤) · 종류 거르기(multi) '준설' = w1·w7 · 1년 내 경계 ·
+  //   펼침(관리자 w1): 머리(이름·인부·현장 대장 6건 · 최근 2026-10-10·[닫기 ▲]) · 탭 인적사항*·참여 현장 (6) · 인적사항 키 생년월일·역할·연락처·등록일·메모(연락처는 펼침에만 — 표 줄 글 0) · 참여 현장 = 최근 5건(기간·종류·제목) +
+  //   '최근 5건 — 모두 6건' · [전부 보기 (6)](.vs-chip) → 6건·[최근 5건만] → 5건 · [수정](.mini-btn) = 수정 창(제목 '김일용 수정'·창 열림) · 보기 권한(안전 담당형) = [수정] 없음·흉내 눌러도 창 안 열림·[전부 보기]는 있음 · 다른 줄을 펴면 인적사항부터
+  const m6 = miss42.length, X6 = mk42(); X6.api.render(); const h6 = X6.host._h;
+  const o6 = order42(h6), r6 = ctxt42(h6, 'w1');
+  sortBy42(X6, 'recent'); const or6 = order42(X6.host._h); sortBy42(X6, 'name');
+  const fk6 = X6.host.querySelector('[data-vf="kinds"]'); const opt6 = (/<select data-vf="kinds">([\s\S]*?)<\/select>/.exec(X6.host._h) || ['', ''])[1].replace(/<option value="([^"]*)"[^>]*>[^<]*<\/option>/g, '$1;');
+  if (fk6) { fk6.value = '준설'; fk6.fire('change'); } const ok6 = order42(X6.host._h); const fk6b = X6.host.querySelector('[data-vf="kinds"]'); if (fk6b) { fk6b.value = ''; fk6b.fire('change'); }
+  openRow42(X6, 'w1'); const dA6 = det42(X6.host._h);
+  const s6 = [tabs42(dA6), kvKeys42(dA6), dA6.indexOf('<div class="v">010-1111-2222</div>') > 0, X6.host._h.replace(dA6, '').indexOf('010-1111-2222') < 0, /<div class="vs-dh"><b>김일용<\/b><span class="scope-chip">인부<\/span><span class="vs-dsub">현장 대장 6건 · 최근 2026-10-10<\/span><button type="button" class="vs-chip" data-vs-close="1"/.test(dA6), acts42(dA6)];
+  press42(X6, 'data-wk-tab', 'site'); const dS6 = det42(X6.host._h); s6.push(tabs42(dS6), hist42(dS6), dS6.indexOf('최근 5건 — 모두 6건') > 0, acts42(dS6));
+  press42(X6, 'data-wk-all', 'w1'); const dS6b = det42(X6.host._h); s6.push(hist42(dS6b).split(' · ').length, acts42(dS6b));
+  press42(X6, 'data-wk-all', 'w1'); s6.push(hist42(det42(X6.host._h)).split(' · ').length);
+  press42(X6, 'data-wk-act', 'edit'); s6.push(X6.env.host('wkModalTitle').textContent, X6.env.host('wkBackdrop').classList.contains('show'));
+  openRow42(X6, 'w7'); s6.push(tabs42(det42(X6.host._h)));
+  const X6v = mk42({ user: U42.S }); X6v.api.render(); openRow42(X6v, 'w1'); press42(X6v, 'data-wk-tab', 'site'); const dV6 = det42(X6v.host._h); fake42(X6v, 'edit', 'w1');
+  s6.push(acts42(dV6), X6v.env.host('wkBackdrop').classList.contains('show'), X6v.env.host('wkModalTitle').textContent);
+  const X6b = mk42({ workers: [W042({ id: 'b1', name: '경계안' }), W042({ id: 'b2', name: '경계밖' })], asb: [S042({ id: 'q1', title: 'q1', start: '2025-11-01', end: '2025-11-11', worker_ids: ['b1'] }), S042({ id: 'q2', title: 'q2', start: '2025-11-01', end: '2025-11-10', worker_ids: ['b2'] })] });
+  X6b.api.render(); chip42(X6b, 'y1'); const by6 = order42(X6b.host._h);
+  T('v442 ⑥ 칸 글·정렬·펼침(실행): 이름 ▲ ' + ORD42 + ' · w1 칸 "김일용|인부|810817|(석면) 32일 전|6회|석면·준설|석면 해체 경력 6년 — 반장 보조 가능" · 최근 참여 ▲ = w5(20일 후)·w2·w1(32일 전 — 같은 날은 명부 순서 반장 먼저)·w7(499)·w3(985)·w8·w4(참여 없음·날짜 미상 뒤) · 종류 고르기 = 석면;준설;철거(낱값) · "준설" 거르기 = w1,w7 · 1년 내 경계 = 2025-11-11 끝 포함·11-10 끝 빠짐 · 펼침 w1 = 머리(김일용·인부·현장 대장 6건 · 최근 2026-10-10·닫기) · 탭 인적사항*|참여 현장 (6) · 키 생년월일·역할·연락처·등록일·메모 · 연락처는 펼침에만 · 참여 현장 = 2026-10-01 ~ 2026-10-10/석면/가동 석면 … 최근 5건 + "최근 5건 — 모두 6건" · [전부 보기 (6)] vs-chip·[수정] mini-btn → 6건·[최근 5건만] → 5건 · [수정] = 창 "김일용 수정" 열림 · 다른 줄(w7)은 인적사항부터 · 보기 권한 = [전부 보기]만·흉내 [수정] 창 안 열림',
+    o6 === ORD42 && r6 === '김일용|인부|810817|(석면) 32일 전|6회|석면·준설|석면 해체 경력 6년 — 반장 보조 가능' && or6 === 'w5,w2,w1,w7,w3,w8,w4' && opt6 === ';석면;준설;철거;' && ok6 === 'w1,w7' && by6 === 'b1'
+    && JSON.stringify(s6) === JSON.stringify(['인적사항*|참여 현장 (6)', '생년월일·역할·연락처·등록일·메모', true, true, true, 'mini-btn:수정',
+      '인적사항|참여 현장 (6)*', '2026-10-01 ~ 2026-10-10/석면/가동 석면 · 2025-06-01 ~ 2025-06-30/준설/나천 준설 · 2023-01-10 ~ 2023-01-20/석면/마동 석면 · 2022-05-01 ~ 2022-05-03/석면/바동 석면 · 2021-07-01 ~ 2021-07-02/석면/사동 석면', true, 'vs-chip:전부 보기 (6),mini-btn:수정',
+      6, 'vs-chip:최근 5건만,mini-btn:수정', 5, '김일용 수정', true, '인적사항*|참여 현장 (2)', 'vs-chip:전부 보기 (6)', false, '']) && noMiss42(m6),
+    JSON.stringify({ o6, r6, or6, opt6, ok6, by6, s6, miss: miss42.slice(m6) }));
+
+  // ⑦ 수정 창에 건강진단일 칸 없음: HTML에 id="wkExam"·'건강진단일 (선택)' 0 · 옮긴 안내 줄(#wkExamMoved — 안전 › 교육·검진) · 실행: openWkModal(w2) 정상(건강진단일 칸 없이) → [저장] = 이름·역할 그대로·옛 exam 값 그대로(지우지 않음)·저장 예약 1 ·
+  //   index.html에 .exam 읽기는 옛 본문(renderWorkersLegacy — 해시 고정) 2곳뿐 · getElementById("wkExam") 0 · 새 사람은 6자리 검사를 지난 뒤에 넣음(검사에 돌려보내면 명부 그대로 — 이름 없는 새 줄 0)
+  const m7 = miss42.length, X7 = mk42(); X7.api.render(); X7.api.openModal('w2'); const E7 = X7.env;
+  E7.host('wkNote').value = '메모 고침'; E7.click('wkSave');
+  const w2_7 = X7.api.wks().find((w) => w.id === 'w2') || {};
+  E7.click('wkAddBtn'); E7.host('wkName').value = '새사람'; E7.host('wkBirth').value = '991399'; const n7a = X7.api.wks().length; E7.click('wkSave'); const n7b = X7.api.wks().length, al7 = E7.log.filter((l) => /^alert:/.test(l)).length;
+  const exHtml7 = html.indexOf('id="wkExam"') < 0 && html.indexOf('건강진단일 (선택)') < 0 && html.indexOf('getElementById("wkExam")') < 0 && /<div class="hw-note" id="wkExamMoved" [^>]*>건강진단\(배치전·특수\) 날짜는 <b>안전 › 교육·검진<\/b>\(일용직\)에 적습니다/.test(html);
+  const exRead7 = (html.match(/\.exam\b/g) || []).length === 2 && (fn42(html, 'renderWorkersLegacy').match(/\.exam\b/g) || []).length === 2;
+  T('v442 ⑦ 수정 창 건강진단일 칸 없음: HTML id="wkExam"·"건강진단일 (선택)"·getElementById("wkExam") 0 · 옮긴 안내 줄 #wkExamMoved(안전 › 교육·검진) · 실행: w2 창 열기 → [저장] = 메모 고침·옛 exam 2026-01-01 그대로·역할 반장 그대로·저장 예약 · .exam 읽기는 옛 본문 2곳뿐(표·창·해체계획서 0) · 새 사람 6자리 검사에 돌려보내면 명부 길이 그대로(알림 1 — 이름 없는 새 줄 0)',
+    exHtml7 && exRead7 && w2_7.note === '메모 고침' && w2_7.exam === '2026-01-01' && w2_7.role === '반장' && X7.api.timer() != null && n7b === n7a && al7 === 1 && noMiss42(m7),
+    JSON.stringify({ exHtml7, exRead7, w2: [w2_7.note, w2_7.exam, w2_7.role], n7: [n7a, n7b], al7, miss: miss42.slice(m7) }));
+
+  // ⑧ 해체계획서 ③ 건강진단 출처 — 두 갈래(실행 — 실제 xgBuildEdits): 고른 투입 인력 w1·w2·w7(반장 먼저 정렬 = 박반장·김일용·한준설) ·
+  //   안전 권한(관리자·안전 담당형) = 김일용 J '유' · L 2026-02-01(배치전 2025-03-01·특수 2026-02-01 중 가장 최근 — 특별교육 기록은 건강 아님) · 박반장(직원 기록·옛 exam 값뿐) 빈칸 · 한준설(지운 특수·날짜 아닌 배치전) 빈칸 ·
+  //   안전 권한 없음(차량 담당형 — 교육 기록이 메모리에 있어도) = J·L 모두 빈칸 · 이름(G)은 두 갈래 같음 · 안내 줄(wkExamNote)·확인요망 한 줄(wkExamMissing) 두 갈래 · 고른 사람 없으면 확인요망 0 · 생성 창 투입 인력 칸에 안내 줄
+  const X8 = mk42(); X8.env.xgSel = ['w1', 'w2', 'w7']; ['xgTitle', 'xgSite', 'xgClient', 'xgOwner'].forEach((id) => { X8.env.host(id).value = 't'; });
+  const cell8 = (ed, ref) => { const r = (ed['3'] || []).find((x) => x[0] === ref); return r ? r[1] + '/' + r[2] : '?'; };
+  const pick8 = (ed) => ['G78', 'J78', 'L78', 'G79', 'J79', 'L79', 'G80', 'J80', 'L80', 'J81', 'L81'].map((r) => cell8(ed, r)).join(',');
+  const edA8 = pick8(X8.api.build('asb_plan', { asb_survey: { rows: [] }, bldg_info: {} }));
+  const exA8 = [X8.api.exNote(), X8.api.exMiss(['w1', 'w2', 'w7'].map((id) => X8.api.wks().find((w) => w.id === id))), X8.api.exMiss([]), X8.api.exDate(X8.api.wks().find((w) => w.id === 'w1'))];
+  X8.api.xgw(); const xgA8 = X8.env.host('xgWorkers')._h;
+  X8.env.user = U42.S; const edS8 = pick8(X8.api.build('asb_plan', { asb_survey: { rows: [] }, bldg_info: {} }));
+  X8.env.user = U42.V; const edV8 = pick8(X8.api.build('asb_plan', { asb_survey: { rows: [] }, bldg_info: {} }));
+  const exV8 = [X8.api.exNote(), X8.api.exMiss(['w1'].map((id) => X8.api.wks().find((w) => w.id === id))), X8.api.exDate(X8.api.wks().find((w) => w.id === 'w1'))];
+  X8.api.xgw(); const xgV8 = X8.env.host('xgWorkers')._h;
+  const gen8 = fn42(html, 'xgBuildEdits'), prefill8 = fn42(html, 'xgPrefill');
+  //   검토 반영(11/11): 교육 기록 읽기는 생성 창 열기(xgPrefill)에서 빼고 석면해체계획서를 고를 때(xgToggle → wkEduEnsure — 세션 한 번)·[생성] 확인요망 앞(못 읽었으면 다시)으로 — 같은 강도로 세 자리를 글자째(실행은 ㉓)
+  const st8 = /var w3=sel\[wi\], ex3=w3\?wkExamDate\(w3\):"";\s*\n\s*e3\.push\(\["G"\+r2,\(w3\?w3\.name:""\),\(w3\?"s":"b"\)\],\s*\n\s*\["J"\+r2,\(ex3\?"유":""\),\(ex3\?"s":"b"\)\],\s*\n\s*\["L"\+r2,ex3,\(ex3\?"s":"b"\)\]\);/.test(gen8) && gen8.indexOf('.exam') < 0
+    && /if\(kind==="asb_plan"\)\{[^\n]*\n\s*var exWs=\[\]; Array\.prototype\.forEach\.call\(document\.querySelectorAll\("\[data-xgw\]:checked"\),function\(inp\)\{ var wx=findWk\(inp\.getAttribute\("data-xgw"\)\); if\(wx\) exWs\.push\(wx\); \}\);\s*\n\s*wkEduEnsure\(\);[^\n]*\n\s*var exM=wkExamMissing\(exWs\); if\(exM\) missing\.push\(exM\);/.test(html)
+    && !/\bloadEdu\b/.test(prefill8) && /\n    if\(k==="asb_plan"\) wkEduEnsure\(\);/.test(fn42(html, 'xgToggle')) && /if\(!w \|\| !canSee\("safety"\)\) return "";/.test(fn42(html, 'wkExamDate'));
+  T('v442 ⑧ 해체계획서 ③ 건강진단 출처(실행 — 실제 xgBuildEdits·wkExamDate): 관리자 = 박반장·김일용·한준설 · 김일용 J "유"·L 2026-02-01(배치전·특수 중 가장 최근 — 특별교육 기록 안 씀) · 박반장(직원 기록·옛 exam 값) 빈칸 · 한준설(지운 기록·날짜 아닌 기록) 빈칸 · 81행 빈칸 · 안전 담당형 같음 · 안전 권한 없음(차량 담당형 — 기록이 메모리에 있어도) = J·L 모두 빈칸·이름 그대로 · 안내 줄 두 갈래("교육·검진 기록 … 가장 최근 날짜" / "빈칸으로 둡니다 — 안전 담당 확인") · 확인요망 두 갈래("기록이 없는 사람 2명" / "빈칸, 안전 담당 확인")·고른 사람 없으면 0 · 생성 창 투입 인력 칸에 그 안내 줄 · 정적: ③ 줄·[생성] 확인요망 한 줄(그 앞 wkEduEnsure — 검토)·교육 읽기는 생성 창 열기(xgPrefill)에 없고 석면해체계획서를 고를 때(xgToggle → wkEduEnsure)·권한 없으면 빈 값',
+    edA8 === '박반장/s,/b,/b,김일용/s,유/s,2026-02-01/s,한준설/s,/b,/b,/b,/b' && edS8 === edA8 && edV8 === '박반장/s,/b,/b,김일용/s,/b,/b,한준설/s,/b,/b,/b,/b'
+    && JSON.stringify(exA8) === JSON.stringify(['③ 건강진단(유무·검진일)은 안전 › 교육·검진 기록(배치전·특수건강진단 가장 최근 날짜)으로 채웁니다 — 기록이 없는 사람은 빈칸', '③ 건강진단 기록이 없는 사람 2명 — 빈칸(안전 › 교육·검진에서 확인)', '', '2026-02-01'])
+    && JSON.stringify(exV8) === JSON.stringify(['③ 건강진단(유무·검진일)은 빈칸으로 둡니다 — 안전 담당 확인(건강진단 기록은 안전 권한)', '③ 건강진단(유무·검진일) — 빈칸, 안전 담당 확인(건강진단 기록은 안전 권한)', ''])
+    && xgA8.indexOf('<div id="xgExamNote" style="font-size:12px;color:#888;margin-top:4px;">' + exA8[0] + '</div>') > 0 && xgV8.indexOf('>' + exV8[0] + '</div>') > 0 && st8,
+    JSON.stringify({ edA8, edS8, edV8, exA8, exV8, st8 }));
+
+  // ⑨ 폰 legacy(375): 옛 본문 renderWorkersLegacy = v441 renderWorkers 본문 글자째(sha256) · wkKindCounts·sortedWorkers 무변(해시) · 375 실행 = 옛 접는 줄(data-wk-fold)·표 글 0·제목 '7명 · 인적사항 미입력 n명'·[+ 일용직 추가] block·안내 줄 숨김(현장 권한 없음이어도) ·
+  //   1366(경계 넘김) = 표·옛 줄 0 → 다시 375 = 옛 줄·표 글 0 · 폰에서 새 일용직 열기(wkSheetShowNew) = false·굴림 없음
+  const LEG_SHA42 = '2b6d134222b7bfd48fe4557d4862345a30a35207368e0382f91c746cfd63e88e', KC_SHA42 = '1a8d585e1743f0ef5b57a530b8ab6f38150d399fb0d8c7bb386550b9b6080b06', SW_SHA42 = '1c2293fcf0fdc10e34d3235f0bce760bf0d4ee269eb75e9de8ee969c668dc9a6';
+  const hsh9 = [sha42(body42('renderWorkersLegacy')) === LEG_SHA42, sha42(body42('wkKindCounts')) === KC_SHA42, sha42(body42('sortedWorkers')) === SW_SHA42];
+  const X9 = mk42({ width: 375, user: U42.N }); X9.api.render(); const p9 = [(X9.host._h.match(/data-wk-fold=/g) || []).length, X9.host._h.indexOf('data-vs-row') < 0, X9.env.host('wkHead').textContent, X9.env.host('wkAddBtn').style.display, X9.env.host('wkSiteNote').style.display, X9.host.getAttribute('data-vs-mode')];
+  X9.env.width = 1366; X9.env.breakAll(); p9.push(order42(X9.host._h), X9.host._h.indexOf('data-wk-fold') < 0, X9.env.host('wkSiteNote').style.display);
+  X9.env.width = 375; X9.env.breakAll(); p9.push((X9.host._h.match(/data-wk-fold=/g) || []).length, X9.host._h.indexOf('data-vs-row') < 0, X9.env.host('wkSiteNote').style.display, X9.api.showNew('w1'), X9.env.log.filter((l) => /^into:/.test(l)).length);
+  T('v442 ⑨ 폰 legacy(375): 옛 본문 renderWorkersLegacy = v441 renderWorkers 본문 글자째(sha256 ' + LEG_SHA42.slice(0, 12) + '…) · wkKindCounts·sortedWorkers 무변(해시) · 실행(현장 권한 없음) = 옛 접는 줄 7·표 글 0·제목 "7명 · 인적사항 미입력 6명"(옛 본문 글 — 생년월일·연락처 둘 다 있는 w1만 빠짐)·[+ 일용직 추가] none(보기 권한)·안내 줄 숨김·자리 legacy → 1366 = 표(이름 ▲)·옛 줄 0·안내 줄 보임 → 다시 375 = 옛 줄 7·표 글 0·안내 줄 숨김 · 폰 새 일용직 열기 = false·굴림 0',
+    hsh9.every(Boolean) && JSON.stringify(p9) === JSON.stringify([7, true, '7명 · 인적사항 미입력 6명', 'none', 'none', 'legacy', ORD42, true, '', 7, true, 'none', false, 0]),
+    JSON.stringify({ hsh9, p9 }));
+
+  // ⑩ 현장 대장 늦게 도착: 대장 받기 전(asbLoaded false — 검토 반영 11/11: 종전엔 빈 대장을 '-'·참여 기록 없음 7명·1년 내 0으로 단정했다) = 참여 칸 '확인 중|…|…'·참여 기록 없음 0명·합계 '1년 내 —' →
+  //   대장이 오면(loadAsb가 asbLoaded를 켜고 renderWorkers를 부름 — 정적) 그때 셈(그릴 때마다 새로 — 셈을 묵혀 두지 않음) · 현장 대장에서 사람을 빼고 다시 그리면 그 줄 '-'(읽은 대장에 없음) · 같은 실행 안에서는 셈을 다시 쓰고 다음 일(마이크로태스크)에 버림
+  const m10 = miss42.length, X10 = mk42({ asb: [], asbLoaded: false }); X10.api.render(); const a10 = [ctxt42(X10.host._h, 'w1'), foot42(X10.host._h).replace(/<[^>]+>/g, '')];
+  chip42(X10, 'nopart'); a10.push(order42(X10.host._h)); chip42(X10, '');
+  X10.api.setAsb(ASB42()); X10.api.setAsbLoaded(true); X10.api.render(); a10.push(ctxt42(X10.host._h, 'w1').split('|').slice(3, 6).join('|'), foot42(X10.host._h));
+  const asb10 = ASB42(); asb10.forEach((r) => { if (Array.isArray(r.worker_ids)) r.worker_ids = r.worker_ids.filter((x) => x !== 'w2'); }); X10.api.setAsb(asb10); X10.api.render(); a10.push(ctxt42(X10.host._h, 'w2').split('|').slice(3, 6).join('|'));
+  const ix10a = X10.api.idx(), ix10b = X10.api.idx(); await flush42(); const ix10c = X10.api.idx();
+  const la10 = fn42(html, 'loadAsb');
+  T('v442 ⑩ 현장 대장 늦게 도착(실행): 받기 전(asbLoaded false) = w1 참여 칸 "확인 중|…|…"·합계 "1년 내 —"·참여 기록 없음 0명(검토 반영 — 종전 "-|-|-"·"1년 내 0"·7명) → 대장 도착 뒤 다시 그림 = w1 "(석면) 32일 전|6회|석면·준설"·합계 "1년 내 3" → w2를 대장에서 빼고 다시 그림 = w2 "-|-|-"(셈을 묵혀 두지 않음) · 같은 실행 안 셈 재사용·다음 일에 버림 · 정적: loadAsb가 대장을 받은 뒤(asbLoaded = true) renderSites → renderCalendar → renderWorkers',
+    a10[0] === '김일용|인부|810817|확인 중|…|…|석면 해체 경력 6년 — 반장 보조 가능' && a10[1] === '합계 7명||미입력 3|1년 내 —|||' && a10[2] === '' && a10[3] === '(석면) 32일 전|6회|석면·준설' && a10[4] === '합계 7명||미입력 3|1년 내 3|||' && a10[5] === '-|-|-'
+    && ix10a === ix10b && ix10c !== ix10a && /asbLoaded = true;[\s\S]*renderSites\(\); renderCalendar\(\); renderWorkers\(\);/.test(la10) && noMiss42(m10),
+    JSON.stringify({ a10, same: ix10a === ix10b, fresh: ix10c !== ix10a, miss: miss42.slice(m10) }));
+
+  // ⑪ 못 읽은 명부(wkLoaded false — 읽는 중·실패·로그아웃 뒤): 표 = '일용직 명부를 불러오는 중입니다' · [+ 일용직 추가] 창 [저장] = 안내 1(WK_UNREAD_MSG)·명부 0·저장 요청 0·다시 읽기 1·창 열린 채 · doSaveWorkers = 요청 0 ·
+  //   읽기 200 = 읽음·서버 명부·base 777 → [저장] = 새 사람·저장 예약 → 저장 요청(base=777) · 수정 창 [삭제]도 못 읽었으면 안내 · 정적: clearSessionData가 끔 · 현장 창 [+ 새 일용직]도 막음(일용직 권한이면 다시 읽기)
+  const X11 = mk42({ workers: [], loaded: false, gwQ: [{ status: 200, body: { doc: { items: [W042({ id: 'sv1', name: '서버사람', updated: '2026-10-01' })], updated_at: 777 } } }, { status: 200, body: { updated_at: 778 } }] });
+  X11.api.render(); const s11 = [X11.host._h.indexOf('일용직 명부를 불러오는 중입니다 — 계속 비어 있으면 새로고침해 주세요.') > 0, X11.host._h.indexOf('등록된 일용직이 없습니다.') < 0];
+  X11.env.click('wkAddBtn'); X11.env.host('wkName').value = '새사람'; X11.env.click('wkSave');
+  s11.push(X11.env.log.filter((l) => l === 'alert:' + X11.api.unread).length, X11.api.wks().length, X11.env.gw.join(','), X11.env.host('wkBackdrop').classList.contains('show'));
+  X11.api.save(); s11.push(X11.env.gw.length);
+  await flush42(); await flush42();
+  s11.push(X11.api.loaded(), X11.api.wks().map((w) => w.id).join(','), X11.api.base());
+  X11.env.click('wkSave'); X11.env.runTimers(); await flush42(); await flush42();
+  s11.push(X11.api.wks().length, X11.env.gw.slice(1).join(','));
+  const X11d = mk42({ loaded: false }); X11d.api.openModal('w1'); X11d.env.click('wkDelete'); s11.push(X11d.env.log.filter((l) => /^alert:일용직 명부를 아직 읽지 못했습니다/.test(l)).length, (X11d.api.wks().find((w) => w.id === 'w1') || {}).del === 1, X11d.env.log.some((l) => /^confirm:/.test(l)));
+  //   검토 반영(11/11): 현장 창 처리기는 권한 막음(⑰이 실행) 다음에 못 읽은 명부 막음 — 다시 읽은 뒤 현장 창 목록도 그림 · 둘 다 새 사람을 만들기 전
+  const swH11 = html.indexOf('    if(nb) nb.addEventListener("click", function(){'), swP11 = html.indexOf('      if(!canDo("wk")){ alert(WK_NO_ADD_MSG); return; }   // v442 검토', swH11);
+  const sw11 = html.indexOf('      if(!wkLoaded){ alert(WK_UNREAD_MSG); var lp=loadWorkers(); if(lp&&typeof lp.then==="function") lp.then(function(){ renderSwList(); }); return; }   // v442', swH11), swNew11 = html.indexOf('      var w={ id:genId("w"), created:todayStr(), name:nm, birth:"", role:"인부", phone:"", exam:"",', swH11);
+  const st11 = /\n\s*wkLoaded = false;/.test(fn42(html, 'clearSessionData')) && swH11 > 0 && swP11 > swH11 && swP11 - swH11 < 60 && sw11 > swP11 && swNew11 > sw11 && swNew11 - sw11 < 600
+    && (html.match(/wkLoaded=true/g) || []).length === 2 && /if\(!wkLoaded\) return Promise\.resolve\(\);/.test(fn42(html, 'doSaveWorkers'));
+  T('v442 ⑪ 못 읽은 명부(실행): 표 "일용직 명부를 불러오는 중입니다"(없음 글 아님) · [저장] = 안내 1·명부 0·요청 = 다시 읽기(get)뿐·창 열린 채 · 저장 함수 직접 = 요청 0 · 읽기 200 = 읽음·서버 명부 sv1·base 777 · 다시 [저장] = 새 사람(2명)·저장 1번(base=777·sv1,wN1) · 못 읽은 채 수정 창 [삭제] = 안내 1·지우지 않음·확인 창 0 · 정적: clearSessionData가 끔 · 읽음으로 켜는 곳 2(loadWorkers·409 다시 읽기) · doSaveWorkers 첫 줄 막음 · 현장 창 [+ 새 일용직]도 새 사람을 만들기 전에 막음(검토 반영: 처리기 첫 줄 권한 막음 다음 — 다시 읽으면 현장 창 목록도 그림)',
+    JSON.stringify(s11) === JSON.stringify([true, true, 1, 0, 'get:workers', true, 1, true, 'sv1', 777, 2, 'save:workers:base=777:sv1,wN1', 1, false, false]) && st11,
+    JSON.stringify({ s11, st11 }));
+
+  // ⑫ 새 일용직 열기: 기억된 칩 '1년 내 참여'(기기 저장 jw_wk_sheet) 위에서 [+ 일용직 추가] 저장 = 그 칩이 새 사람을 가림 → 전체 칩으로 풀고 새 줄 펼침·굴림·기기 기억 그대로 · 기본 칩 = 새 줄 보이고 펼침 없음 · 수정(새 사람 아님)은 열지 않음
+  const ST12 = JSON.stringify({ k: '', d: 1, f: {}, chip: { st: 'y1' } });
+  const X12 = mk42({ store: { jw_wk_sheet: ST12 } }); X12.api.render(); const s12 = [order42(X12.host._h)];
+  X12.env.click('wkAddBtn'); X12.env.host('wkName').value = '신입'; X12.env.click('wkSave');
+  const nid12 = (X12.api.wks().find((w) => w.name === '신입') || {}).id;
+  s12.push(nid12, /class="vs-chip on" data-vs-chip="st\|"/.test(X12.host._h), X12.host._h.indexOf('data-vs-det="' + nid12 + '"') > 0, X12.env.log.indexOf('into:' + nid12) >= 0, X12.env.store.jw_wk_sheet === ST12);
+  const X12b = mk42(); X12b.api.render(); X12b.env.click('wkAddBtn'); X12b.env.host('wkName').value = '신입2'; X12b.env.click('wkSave'); const nid12b = (X12b.api.wks().find((w) => w.name === '신입2') || {}).id;
+  s12.push(X12b.host._h.indexOf('data-vs-row="' + nid12b + '"') > 0, X12b.host._h.indexOf('data-vs-det=') < 0);
+  X12.api.openModal('w2'); X12.env.host('wkNote').value = 'x'; const into12 = X12.env.log.filter((l) => /^into:/.test(l)).length; X12.env.click('wkSave'); s12.push(X12.env.log.filter((l) => /^into:/.test(l)).length === into12);
+  T('v442 ⑫ 새 일용직 열기(실행): 기억된 "1년 내 참여" 칩 = w1,w2,w5 → [+ 일용직 추가] "신입" 저장 = 전체 칩으로 풀림·새 줄 펼침·굴림·기기 기억(jw_wk_sheet) 그대로 · 기본 칩 = 새 줄 보이고 펼침 없음 · 있던 사람 수정 저장은 열지 않음',
+    JSON.stringify(s12) === JSON.stringify(['w1,w2,w5', 'wN1', true, true, true, true, true, true, true]),
+    JSON.stringify(s12));
+
+  // ⑬ 넓힘·CSS·정적: #view-workers 본문 폭(1024 791 · 1366 1,097 · 1920 1,428 ±2 — 860부터 max-width none, 859 이하 규칙 없음) · .wk-dup 4px · #wkSiteNote 글자 · @wk-sheet 구간 —
+  //   배선 = 펼침 칸 root 하나(wkSheetBindAct) · 부품 부름 = 그리기 1·다시 그리기(칩 건수 그대로) 1·그 행 열기 1 · 구간 안 localStorage 0 · 입구 renderWorkers 한 곳(구간 안)·옛 본문·창은 구간 밖 · switchTab 일용직 줄 그대로 ·
+  //   applyPerms 일용직 줄 = 볼 수 있으면 다시 그림(로그인 창 '전환') · section·자리·HTML · 모든 시험 틀에서 자리(wkList)에 건 리스너 0
+  const w13 = [1024, 1366, 1920].map((w) => Math.round(viewW42(w)));
+  const css13 = decl42(1366, '#view-workers', 'max-width') === 'none' && decl42(859, '#view-workers', 'max-width') == null && decl42(1366, '.wk-dup', 'margin-left') === '4px' && decl42(1366, '#wkSiteNote', 'font-size') === '12.5px' && decl42(1366, '#wkAsbNote', 'font-size') === '12.5px';
+  const ael13 = (wsb42.match(/addEventListener\(/g) || []).length, root13 = (wsb42.match(/root\.addEventListener\("click"/g) || []).length;
+  const st13 = (wsb42.match(/\bvsSheetRender\(/g) || []).length === 1 && (wsb42.match(/\bvsSheetRenderKeep\(/g) || []).length === 1 && (wsb42.match(/\bvsSheetReveal\(/g) || []).length === 1 && (wsb42.match(/\bvsSheetSeek\(/g) || []).length === 0 && !/localStorage/.test(wsb42)
+    && (html.match(/function renderWorkers\(/g) || []).length === 1 && wsb42.indexOf('function renderWorkers(') > 0 && wsb42.indexOf('function renderWorkersLegacy(') < 0 && wsb42.indexOf('function openWkModal(') < 0
+    && /\n    if \(name === "workers"\)\{ renderWorkers\(\); loadWorkers\(\); loadAsb\(\); \}/.test(fn42(html, 'switchTab'))
+    && /if \(currentTab === "workers"\)\{ if \(!canSee\("wk"\)\) switchTab\("dash"\); else \{ renderWorkers\(\); loadAsb\(\); \} \}/.test(fn42(html, 'applyPerms')) && fn42(html, 'applyPerms').indexOf('if (currentTab === "workers" && !canSee("wk")) switchTab("dash");') < 0
+    && /<section class="view" id="view-workers">/.test(html) && /<div class="card" id="wkList"><div class="loading">불러오는 중…<\/div><\/div>\s*<button class="link-btn" id="wkAddBtn">\+ 일용직 추가<\/button>/.test(html)
+    && /if\(isNew\) wkSheetShowNew\(w\.id\);/.test(html) && (html.match(/wkSheetShowNew\(/g) || []).length === 2;
+  const hostL13 = [X1, X2, X3, X3b, X4, X5, X6, X6v, X6b, X7, X8, X9, X10, X11, X12, X12b].some((X) => X.env.log.some((l) => /^host-listener:wkList:/.test(l)));
+  T('v442 ⑬ 넓힘·CSS·정적: #view-workers 본문 폭 1024 ' + w13[0] + ' · 1366 ' + w13[1] + ' · 1920 ' + w13[2] + '(명세 791 · 1,097 · 1,428 ±2 — 860부터 max-width none·859 이하 규칙 없음) · .wk-dup 4px·#wkSiteNote·#wkAsbNote 12.5px · @wk-sheet 배선 = 펼침 칸 root 하나 · 부품 부름 = 그리기 1·다시 그리기 1·그 행 열기 1·찾아가기 0 · 구간 안 localStorage 0 · 입구 renderWorkers 한 곳(구간 안)·옛 본문·창은 구간 밖 · switchTab 일용직 줄 그대로(renderWorkers·loadWorkers·loadAsb) · applyPerms 일용직 줄 = 못 보면 홈·보면 다시 그림 + 현장 대장 읽기(검토 반영 — 옛 한 줄 0) · section·자리·[+ 일용직 추가](HTML) · 새 일용직 열기는 창 저장 한 곳 · 자리(wkList)에 건 리스너 0(모든 시험 틀)',
+    Math.abs(w13[0] - 791) <= 2 && Math.abs(w13[1] - 1097) <= 2 && Math.abs(w13[2] - 1428) <= 2 && css13 && ael13 === 1 && root13 === 1 && st13 && !hostL13,
+    JSON.stringify({ w13, css13, ael13, root13, st13, hostL13 }));
+
+  // ⑭ 폰 sheet 준비(phone 한 줄만 바꾸면 되게): 정의 검사 통과 · 열 3 = 이름 --pw 32%·생년월일 30%·최근 참여 38% · 현장 권한 없음 = 52%·48% · 합계 '합계 7명|미입력 3|1년 내 3' · 줄 누름 = 표 아래 상세 카드(표 안 펼침 없음)·탭 인적사항*·참여 현장 (6)
+  const m14 = miss42.length;
+  const X14 = mk42({ width: 375 }), d14 = Object.assign({}, X14.api.def(), { phone: 'sheet' }); X14.api.vs(d14);
+  const cg14 = (h) => [...h.matchAll(/<col data-vs-col="(\w+)" style="([^"]*)">/g)].map((m) => m[1] + '=' + m[2]).join(',');
+  const h14 = X14.host._h, c14 = cg14(h14), f14 = foot42(h14);
+  openRow42(X14, 'w1'); const dc14 = [/<div class="vs-detcard" data-vs-detcard="w1">/.test(X14.host._h), X14.host._h.indexOf('<tr class="vs-det">') < 0, tabs42(X14.host._h)];
+  const X14n = mk42({ width: 375, user: U42.N }), d14n = Object.assign({}, X14n.api.def(), { phone: 'sheet' }); X14n.api.vs(d14n); const c14n = cg14(X14n.host._h);
+  T('v442 ⑭ 폰 sheet 준비: 정의 검사 통과 · 열 3 = name --pw 32%·birth 30%·recent 38% · 현장 권한 없음 = 52%·48% · 합계 "합계 7명|미입력 3|1년 내 3" · 줄 누름 = 표 아래 상세 카드(표 안 펼침 없음)·탭 인적사항*|참여 현장 (6)',
+    X14.api.check(d14).length === 0 && c14 === 'name=--pw:32%;,birth=--pw:30%;,recent=--pw:38%;' && c14n === 'name=--pw:52%;,birth=--pw:48%;' && f14 === '합계 7명|미입력 3|1년 내 3'
+    && JSON.stringify(dc14) === JSON.stringify([true, true, '인적사항*|참여 현장 (6)']) && noMiss42(m14),
+    JSON.stringify({ c14, c14n, f14, dc14, miss: miss42.slice(m14) }));
+
+  // ⑮ 저장 대기 중 읽기·409 병합(실행 — 실제 scheduleWorkersSave·loadWorkers·doSaveWorkers): 고친 줄 저장 대기 중(1.2초 안)에 읽기 답이 오면 통째로 바꾸지 않고 행 단위 병합(이 기기 고침 w1=mine·서버에만 있는 sv2 둘 다) →
+  //   저장 = 합친 목록·base 새 값 → 200 = 대기 풀림 · 대기 없을 때 읽기 = 서버 명부로 바꿈(이 기기에만 있던 줄 빠짐) · 409 = 다시 읽기(get) → 합쳐 다시 저장(base 새 값) · 보내는 사이 또 고치면 대기 표시 남음
+  //   검토 반영(11/11 — 고친 줄만 이 기기 것 wkDirty): 고침은 실제 창 [저장](고친 표시 1)·도우미 mark로 · 409 대장에 같은 날 다른 기기가 고친 줄(z9 — 이 기기는 안 고침)을 넣어 서버 것이 이기는지 · 저장 200이면 보낸 표시를 지움 · 보내는 사이 또 고친 줄은 표시가 남음(다음 저장이 지움)
+  const s15 = [];
+  const X15 = mk42({ workers: [W042({ id: 'w1', name: '김일용', note: 'old', updated: '2026-10-01' })], gwQ: [{ status: 200, body: { doc: { items: [W042({ id: 'w1', name: '김일용', note: 'server', updated: '2026-10-05' }), W042({ id: 'sv2', name: '서버둘' })], updated_at: 901 } } }, { status: 200, body: { updated_at: 902 } }] });
+  X15.api.openModal('w1'); X15.env.host('wkNote').value = 'mine'; X15.env.click('wkSave'); s15.push(X15.api.pending(), JSON.stringify(X15.api.dirty()));
+  X15.api.load(); await flush42(); await flush42(); s15.push(X15.api.wks().map((w) => w.id + '=' + w.note).join(','), X15.api.base());
+  X15.env.runTimers(); await flush42(); await flush42(); s15.push(X15.env.gw.join(' / '), X15.api.pending(), X15.api.base(), Object.keys(X15.api.dirty()).join(','));
+  const X15b = mk42({ workers: [W042({ id: 'z1', name: '이기기만' })], gwQ: [{ status: 200, body: { doc: { items: [W042({ id: 'sv3', name: '서버셋' })], updated_at: 911 } } }] });
+  X15b.api.load(); await flush42(); await flush42(); s15.push(X15b.api.wks().map((w) => w.id).join(','));
+  const X15c = mk42({ workers: [W042({ id: 'w1', name: '김일용', note: 'mine', updated: '2026-11-11' }), W042({ id: 'z9', name: '구줄', note: 'stale', updated: '2026-11-11' })],
+    gwQ: [{ status: 409 }, { status: 200, body: { doc: { items: [W042({ id: 'w1', name: '김일용', note: 'srv', updated: '2026-11-01' }), W042({ id: 'z9', name: '구줄', note: 'fresh', updated: '2026-11-11' }), W042({ id: 'sv4', name: '서버넷' })], updated_at: 921 } } }, { status: 200, body: { updated_at: 922 } }] });
+  X15c.api.mark('w1'); X15c.api.sched(); X15c.env.runTimers(); for (let i = 0; i < 6; i++) await flush42(); s15.push(X15c.env.gw.join(' / '), X15c.api.pending(), X15c.api.base(), Object.keys(X15c.api.dirty()).join(','));
+  const X15d = mk42({ gwQ: [{ status: 200, body: { updated_at: 931 } }, { status: 200, body: { updated_at: 932 } }] });
+  X15d.api.mark('w1'); X15d.api.sched(); X15d.env.runTimers(); X15d.api.mark('w1'); X15d.api.sched(); for (let i = 0; i < 4; i++) await flush42(); s15.push(X15d.api.pending(), JSON.stringify(X15d.api.dirty()));
+  X15d.env.runTimers(); for (let i = 0; i < 4; i++) await flush42(); s15.push(X15d.api.pending(), JSON.stringify(X15d.api.dirty()));
+  T('v442 ⑮ 저장 대기 중 읽기·409 병합(실행): 창 [저장] = 대기 표시·고친 표시 w1 1 → 대기 중 읽기 = 행 단위 병합 w1=mine,sv2= · base 901 → 요청 get 뒤 저장 1번(base=901·w1=mine,sv2)·대기 풀림·base 902·고친 표시 지움 · 대기 없을 때 읽기 = 서버 명부 sv3(이 기기에만 있던 z1 빠짐 — 종전 그대로) · 409 = save → get → save(base=921·w1=mine — 고친 줄·z9=fresh — 안 고친 줄은 같은 날이어도 서버 것(검토 반영 — 종전 stale)·sv4)·대기 풀림·base 922·표시 지움 · 보내는 사이 또 고치면 대기·고친 표시(w1 2) 남음 → 다음 저장 200 = 둘 다 풀림',
+    JSON.stringify(s15) === JSON.stringify([true, '{"w1":1}', 'w1=mine,sv2=', 901, 'get:workers / save:workers:base=901:w1=mine,sv2', false, 902, '', 'sv3',
+      'save:workers:base=0:w1=mine,z9=stale / get:workers / save:workers:base=921:w1=mine,z9=fresh,sv4', false, 922, '', true, '{"w1":2}', false, '{}']),
+    JSON.stringify(s15));
+
+  // ⑯ 문서 — FEATURES 기준 ≥ v442·v442 절(문장 고정)·자리 글 GATES_V442 0 · TESTLIST v442 = 화면 칸 '[ ] (AI 시험 화면 대상'(≥4 — PM 몫 0) + 게이트 칸 '[x] (AI) `uismoke`'(5종·결함 심기) ·
+  //   MANUAL 14절(PC 표·칩·동명·생년월일·참여 현장·현장 권한 안내·휴대폰 목록·건강진단일 칸 이동 — 옛 '검진일을 넣습니다'·'검진일이 바뀌면 갱신합니다' 없앰)·해체계획서 줄(③ 건강진단 두 갈래) · CLAUDE.md 일용직 표 줄·화면 폭·부품 줄 · sw ≥ 442
+  const ft16 = rd42('FEATURES.md'), tl16 = rd42('TESTLIST.md'), man16 = rd42('MANUAL.html'), cl16 = rd42('CLAUDE.md'), sw16 = rd42('sw.js');
+  const sec16 = (src, head) => { const i = src.indexOf(head); if (i < 0) return ''; const j = src.indexOf(head.slice(0, head.indexOf(' ') + 1), i + head.length); return src.slice(i, j < 0 ? src.length : j); };
+  const ftv16 = sec16(ft16, '\n### v442 (11/11)'), tlv16 = sec16(tl16, '\n## v442 ');
+  const FT_PINS42 = ['**표 한 장(PC 860px 이상)**', '`// @wk-sheet-start ~ end`', '**열 7(명세 순서)**', '`wkSheetDef`', '**참여 셈 = 현장 대장 worker_ids**', '`wkSheetIdx`', '**현장 권한이 없으면**', '`#wkSiteNote`', '**동명 칩**', '**생년월일**',
+    '**줄 누르기 = 펼침**', '[전부 보기 (n)]', '**수정 창 건강진단일 칸 뺌**', '**해체계획서 ③ 건강진단 — 두 갈래**', '`wkExamDate`', '안전 담당 확인', '**못 읽은 명부**', '`wkLoaded`', '`WK_UNREAD_MSG`', '**저장 대기 중 읽기**', '`wkPending`',
+    '**새 일용직**', '`wkSheetShowNew`', '**로그인 창 \'전환\'**', '**폰(859px 이하)은 지금 화면 그대로**', '`renderWorkersLegacy`', '`#view-workers`', '**칸 폭(실측)**', '702 / 702 / 702', '지시·기성·거래처·일용직 4개'];
+  const CL_PINS42 = ['**일용직 표(v442 — 45-1 다섯째 판)**', '`// @wk-sheet-start ~ end`', '`renderWorkersLegacy`', '`wkSheetDef`', '`wkSheetIdx`', '`wkExamDate`', '`wkLoaded`', '`wkPending`', '`WK_UNREAD_MSG`', 'v442에 일용직 `#view-workers`', "'지시·기성·거래처·일용직 4개'"];
+  const tcb16 = tlv16.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l));
+  const cbScr16 = tcb16.filter((l) => /^- \[[ x]\] \(AI 시험 화면 대상[,) —]/.test(l)), cbGate16 = tcb16.filter((l) => /^- \[x\] \(AI\) `uismoke`\(/.test(l));
+  const man14 = (() => { const i = man16.indexOf('<h2 id="s14">'), j = man16.indexOf('<h2 id="s15">'); return i < 0 || j < i ? '' : man16.slice(i, j); })();
+  const MAN14_PINS42 = ['<b>PC(넓은 화면) — 표</b> (2026-11 v442)', '<b>동명</b>', '<b>미입력</b>', '<span class="btn">참여 현장 (n)</span>', '<span class="btn">전부 보기 (n)</span>', '<b>현장 이력은 현장 권한이 있어야 보입니다</b>',
+    '<b>휴대폰 — 목록</b> (예전 모양 그대로)', '<b>건강진단일 칸은 없어졌습니다</b>', '<b>안전 › 교육·검진</b>', '안전 담당 확인'];
+  const asbRow16 = (/<td><b>석면해체계획서<\/b><\/td>[\s\S]*?<\/tr>/.exec(man16) || [''])[0];   // 6절 서류 표의 석면해체계획서 줄(③ 건강진단 두 갈래)
+  T('v442 ⑯ 문서: FEATURES 기준 ≥ v442·v442 절(표 한 장·열 7·참여 셈·현장 권한·동명·생년월일·펼침·건강진단일 칸·③ 두 갈래·못 읽은 명부·저장 대기·새 일용직·전환·폰 legacy·넓힘·칸 폭 실측·단계 합·검사 고침 — 문장 고정)·자리 글 GATES_V442 0 · TESTLIST v442 = 화면 칸 "[ ] (AI 시험 화면 대상"(≥4 — 1366·1920 표·현장 권한별·③ 건강진단 두 갈래(안전 담당 확인)·폰 375) + 게이트 칸 1개 "[x] (AI) `uismoke`"(consheet_check·proctpl_check·settletest·servertest·결함 심기) · PM 0 · MANUAL 14절(PC 표·폰 목록·건강진단일 칸 이동 — 옛 "검진일" 줄 없앰)·석면해체계획서 줄(③ 두 갈래) · CLAUDE.md 일용직 표 줄·화면 폭·부품 줄 · sw ≥ 442',
+    Number((ft16.match(/기준: v(\d+) /) || [0, 0])[1]) >= 442 && ftv16.length > 0 && FT_PINS42.every((s) => ftv16.indexOf(s) > 0) && ftv16.indexOf('GATES_V442') < 0
+    && tlv16.length > 0 && cbScr16.length >= 4 && cbGate16.length === 1 && tcb16.length === cbScr16.length + 1 && tcb16.every((l) => l.indexOf('PM') < 0) && tlv16.indexOf('GATES_V442') < 0
+    && ['`consheet_check`', '`proctpl_check`', '`settletest`', '`servertest`', '결함 심기'].every((g) => cbGate16[0].indexOf(g) > 0)
+    && cbScr16.some((l) => l.indexOf('1366') > 0 && l.indexOf('1920') > 0) && cbScr16.some((l) => l.indexOf('375') > 0) && cbScr16.some((l) => l.indexOf('현장 권한별') > 0) && cbScr16.some((l) => l.indexOf('③ 건강진단') > 0 && l.indexOf('안전 담당 확인') > 0)
+    && MAN14_PINS42.every((s) => man14.indexOf(s) > 0) && man14.indexOf('검진일을 넣습니다') < 0 && man14.indexOf('검진일이 바뀌면 갱신합니다') < 0 && man14.indexOf('이름·생년·검진일이 틀리면') < 0
+    && asbRow16.indexOf('③ 건강진단') > 0 && asbRow16.indexOf('안전 담당 확인') > 0
+    && CL_PINS42.every((s) => cl16.indexOf(s) > 0) && Number((sw16.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 442,
+    JSON.stringify({ ft: FT_PINS42.filter((s) => ftv16.indexOf(s) < 0).map((s) => s.slice(0, 30)), gates: [ftv16.indexOf('GATES_V442'), tlv16.indexOf('GATES_V442')], cl: CL_PINS42.filter((s) => cl16.indexOf(s) < 0), man14: MAN14_PINS42.filter((s) => man14.indexOf(s) < 0), asbRow: asbRow16.slice(0, 80), cb: tcb16.length, scr: cbScr16.length, gate: cbGate16.length, pm: tcb16.filter((l) => l.indexOf('PM') >= 0).map((l) => l.slice(0, 40)), sw: (sw16.match(/jw-shell-v(\d+)/) || [0, 0])[1] }));
+
+  // ---- v442 검토 반영(11/11 — 검토 3관점(권한·개인정보 · 데이터 정확성 · 회귀) 지적 13건: 고침 10(같은 지적 묶어 7곳) · 문서 서술만 1 · 범위 밖 2) — ⑰~㉔ ----
+  // ⑰ 현장 창 [+ 새 일용직] 권한(실제 현장 탭 배선 IIFE·openSiteWorkers·renderSwList): 일용직 보기·현장 수행(S — 11/10 운영 1명 꼴) = 등재 칸 묶음 숨김·'명부에 있는 사람만' 안내 · 눌러도 권한 안내(WK_NO_ADD_MSG) 1·명부 그대로·저장 예약 0·'등재했습니다' 0 ·
+  //   일용직 숨김·현장 수행 = 목록 '명부를 볼 권한이 없습니다'·누르면 권한 안내(종전 '못 읽은 명부' 안내만 되풀이)·명부 읽기 0 · 일용직 수행 = 등재 칸 보임 → 새 사람 1·고친 표시·저장 예약·토스트 ·
+  //   명부를 못 읽은 채 창 열기 = 목록 '불러오는 중' + 다시 읽기 → 명부가 오면 창 목록에 그 사람들 · 읽기가 또 실패한 채 누르면 못 읽은 명부 안내 + 다시 읽기 → 창 목록(새 사람 0) · 빈 명부 글 권한별 · HTML 묶음
+  const m17 = miss42.length, s17 = [];
+  const U17H = { id: 'm5', name: '현장만', perms: { site: 'do' } };
+  const X17a = mk42({ user: U42.S }); X17a.api.openSw('s1'); X17a.env.host('swNewName').value = '새사람'; const n17a = X17a.api.wks().length; X17a.env.click('swNewBtn');
+  s17.push(X17a.env.host('swNewWrap').style.display, X17a.env.host('swNoWkNote').style.display, X17a.env.log.filter((l) => l === 'alert:' + X17a.api.noAdd).length, X17a.api.wks().length - n17a, X17a.api.timer() == null, X17a.env.log.some((l) => /^toast:명부에 등재했습니다/.test(l)), X17a.env.gw.length);
+  const X17h = mk42({ user: U17H, workers: [], loaded: false }); X17h.api.openSw('s1'); const h17 = X17h.env.host('swList')._h; X17h.env.host('swNewName').value = '새사람'; X17h.env.click('swNewBtn');
+  s17.push(h17.indexOf('일용직 명부를 볼 권한이 없습니다') > 0, X17h.env.host('swNewWrap').style.display, X17h.env.log.filter((l) => l === 'alert:' + X17h.api.noAdd).length, X17h.env.log.filter((l) => l === 'alert:' + X17h.api.unread).length, X17h.env.gw.length, X17h.api.wks().length);
+  const X17v = mk42({ user: U42.V }); X17v.api.openSw('s1'); X17v.env.host('swNewName').value = '새사람'; const n17v = X17v.api.wks().length; X17v.env.click('swNewBtn');
+  const nw17 = X17v.api.wks().find((w) => w.name === '새사람') || {};
+  s17.push(X17v.env.host('swNewWrap').style.display, X17v.env.host('swNoWkNote').style.display, X17v.api.wks().length - n17v, X17v.api.dirty()[nw17.id], X17v.api.timer() != null, X17v.env.log.some((l) => /^toast:명부에 등재했습니다/.test(l)));
+  const RO17 = { status: 200, body: { doc: { items: [W042({ id: 'r1', name: '가명부' }), W042({ id: 'r2', name: '나명부' })], updated_at: 1701 } } };
+  const X17u = mk42({ user: U42.V, workers: [], loaded: false, gwQ: [RO17] }); X17u.api.openSw('s1'); const u17a = X17u.env.host('swList')._h; await flush42(); await flush42();
+  s17.push(u17a.indexOf('일용직 명부를 불러오는 중입니다') > 0, X17u.env.gw.join(','), (X17u.env.host('swList')._h.match(/data-sw="r\d"/g) || []).join(','));
+  const X17f = mk42({ user: U42.V, workers: [], loaded: false, gwQ: [{ status: 599 }, RO17] }); X17f.api.openSw('s1'); await flush42(); await flush42(); X17f.env.host('swNewName').value = '새사람'; X17f.env.click('swNewBtn'); await flush42(); await flush42();
+  s17.push(X17f.env.log.filter((l) => l === 'alert:' + X17f.api.unread).length, X17f.env.gw.join(','), (X17f.env.host('swList')._h.match(/data-sw="r\d"/g) || []).join(','), X17f.api.wks().length);
+  s17.push(mk42({ user: U42.S, workers: [] }).api.swEmpty(), mk42({ user: U42.V, workers: [] }).api.swEmpty());
+  const html17 = /<div id="swNewWrap">\s*<div class="hw-note"[^>]*>명부에 없는 사람은[^<]*<\/div>\s*<div style="display:flex;gap:8px;">\s*<input type="text" id="swNewName"[^>]*>\s*<button class="mini-btn" id="swNewBtn"[^>]*>\+ 새 일용직<\/button>\s*<\/div>\s*<\/div>\s*<div class="hw-note" id="swNoWkNote" style="display:none;[^"]*">명부에 있는 사람만 고를 수 있습니다/.test(html);
+  T('v442 ⑰ 현장 창 [+ 새 일용직] 권한(검토 반영 — 실제 현장 탭 배선·openSiteWorkers·renderSwList): 일용직 보기·현장 수행 = 등재 칸 숨김·"명부에 있는 사람만" 안내·누르면 권한 안내 1·명부 그대로·저장 예약 0·등재 토스트 0·요청 0 · 일용직 숨김·현장 수행 = 목록 "명부를 볼 권한이 없습니다"·등재 칸 숨김·누르면 권한 안내(못 읽은 명부 안내 0)·명부 읽기 0 · 일용직 수행 = 등재 칸 보임·새 사람 1·고친 표시 1·저장 예약·토스트 · 못 읽은 명부로 창 열기 = "불러오는 중"·다시 읽기 → 창 목록 r1,r2 · 또 실패한 채 누르면 못 읽은 명부 안내 1 + 다시 읽기 → 창 목록 r1,r2·새 사람 0 · 빈 명부 글(보기 "명부 등재는 일용직 수행 권한이 있는 분이 합니다"·수행 "아래에서 바로 등재하세요") · HTML 등재 칸 묶음 swNewWrap + 안내 swNoWkNote',
+    JSON.stringify(s17) === JSON.stringify(['none', '', 1, 0, true, false, 0, true, 'none', 1, 0, 0, 0, '', 'none', 1, 1, true, true, true, 'get:workers', 'data-sw="r1",data-sw="r2"', 1, 'get:workers,get:workers', 'data-sw="r1",data-sw="r2"', 2,
+      '명부에 사람이 없습니다 — 명부 등재는 일용직 수행 권한이 있는 분이 합니다.', '명부에 사람이 없습니다 — 아래에서 바로 등재하세요.']) && html17 && noMiss42(m17),
+    JSON.stringify({ s17, html17, miss: miss42.slice(m17) }));
+
+  // ⑱ 저장 403(검토 반영 — doSaveEdu v430과 같은 갈래): 권한 거절(NO_WRITE) = 대기·고친 표시·보내는 사이 잡힌 저장을 내리고 경고 토스트 1 + 서버 명부 다시 읽기 → 이 기기에만 있던 새 사람이 빠진 서버 명부 그대로(유령 줄 0 — 종전엔 대기 표시가 남아
+  //   그 뒤 읽기마다 병합으로 살아남음) · 그 뒤 읽기도 통째 바꿈 · 기기 미승인(DEVICE_NOT_APPROVED) = 대기·고친 표시 남김·기기 안내 토스트·다시 읽기 0 · 정적: 403 갈래(기기 미승인 먼저)
+  const s18 = [];
+  const SV18 = { status: 200, body: { doc: { items: [W042({ id: 'w1', name: '김일용' })], updated_at: 1801 } } };
+  const X18 = mk42({ user: U42.V, workers: [W042({ id: 'w1', name: '김일용' })], gwQ: [{ status: 403, body: { error_code: 'NO_WRITE' } }, SV18, SV18] });
+  X18.env.click('wkAddBtn'); X18.env.host('wkName').value = '유령'; X18.env.click('wkSave'); s18.push(X18.api.wks().length, X18.api.pending(), Object.keys(X18.api.dirty()).length);
+  X18.env.runTimers(); X18.api.sched(); for (let i = 0; i < 6; i++) await flush42();
+  s18.push(X18.api.pending(), JSON.stringify(X18.api.dirty()), X18.api.timer() == null, X18.env.log.filter((l) => /^toast:일용직 명부 저장 권한이 없어 서버가 이 변경을 받지 않았습니다/.test(l)).length, X18.env.gw.map((g) => g.split(':').slice(0, 2).join(':')).join(','), X18.api.wks().map((w) => w.id).join(','));
+  X18.api.load(); await flush42(); await flush42(); s18.push(X18.api.wks().map((w) => w.id).join(','));
+  const X18d = mk42({ user: U42.V, gwQ: [{ status: 403, body: { error_code: 'DEVICE_NOT_APPROVED' } }] }); X18d.api.mark('w1'); X18d.api.sched(); X18d.env.runTimers(); for (let i = 0; i < 4; i++) await flush42();
+  s18.push(X18d.api.pending(), JSON.stringify(X18d.api.dirty()), X18d.env.log.filter((l) => /^toast:승인되지 않은 기기입니다/.test(l)).length, X18d.env.gw.length);
+  const ds18 = fn42(html, 'doSaveWorkers');
+  const st18 = /if\(res\.status===403\)\{\s*\n\s*if\(\(res\.body&&res\.body\.error_code\)==="DEVICE_NOT_APPROVED"\) gwToast\(/.test(ds18) && /wkPending=false; wkDirty=\{\}; if\(wkSaveTimer\)\{ clearTimeout\(wkSaveTimer\); wkSaveTimer=null; \}/.test(ds18) && /\n\s*loadWorkers\(\);\r?\n/.test(ds18);
+  T('v442 ⑱ 저장 403(검토 반영 — 실제 doSaveWorkers·loadWorkers): 권한 거절(NO_WRITE) = 대기 풀림·고친 표시 {}·보내는 사이 잡힌 저장도 내림·경고 토스트 1·요청 save → get(서버 명부 다시 읽기) → 명부 w1(이 기기에만 있던 "유령" 빠짐) · 그 뒤 읽기 = 서버 명부 그대로(병합 아님) · 기기 미승인 = 대기·고친 표시 남김·기기 안내 토스트 1·다시 읽기 0 · 정적: 403 갈래(기기 미승인 먼저)',
+    JSON.stringify(s18) === JSON.stringify([2, true, 1, false, '{}', true, 1, 'save:workers,get:workers', 'w1', 'w1', true, '{"w1":1}', 1, 1]) && st18,
+    JSON.stringify({ s18, st18 }));
+
+  // ⑲ 고친 줄만 이 기기 것(검토 반영 — 실제 mergeWorkers·창 [저장]·[+ 일용직 추가]·[삭제]·loadWorkers): 이 기기가 읽어 둔 x1·x3(오늘 날짜)을 다른 기기가 오늘 다시 고치고(x1)·지운(x3) 뒤, 이 기기가 y1을 고치고·새 사람을 넣고·d1을 지워
+  //   저장 대기 중에 읽기 답이 오면 = x1·x3 서버 것(종전 '늦은 쪽·같으면 로컬'은 updated가 날짜 단위라 이 기기 묵은 값·되살림) · y1·d1·새 사람 = 이 기기 것 · 이 기기에만 있던 안 고친 줄(q1) 빠짐 → 다음 저장이 그대로 보냄·표시 지움
+  const s19 = [], T19 = '2026-11-11';
+  const LOC19 = () => [W042({ id: 'x1', name: '가엑스', note: 'x-old', updated: T19 }), W042({ id: 'x3', name: '다엑스', note: 'x3-old', updated: T19 }), W042({ id: 'y1', name: '나와이', note: 'y-old', updated: '2026-10-01' }), W042({ id: 'q1', name: '라큐', note: 'q', updated: '2026-10-01' }), W042({ id: 'd1', name: '마디', note: 'd', updated: '2026-10-01' })];
+  const SRV19 = () => [W042({ id: 'x1', name: '가엑스', note: 'x-other', updated: T19 }), W042({ id: 'x3', name: '다엑스', note: 'x3-old', updated: T19, del: 1 }), W042({ id: 'y1', name: '나와이', note: 'y-old', updated: '2026-10-01' }), W042({ id: 'd1', name: '마디', note: 'd', updated: '2026-10-01' })];
+  const X19 = mk42({ workers: LOC19(), gwQ: [{ status: 200, body: { doc: { items: SRV19(), updated_at: 1901 } } }, { status: 200, body: { updated_at: 1902 } }] });
+  X19.api.openModal('y1'); X19.env.host('wkNote').value = 'y-mine'; X19.env.click('wkSave');
+  X19.env.click('wkAddBtn'); X19.env.host('wkName').value = '바새'; X19.env.click('wkSave');
+  X19.api.openModal('d1'); X19.env.click('wkDelete');
+  const nid19 = (X19.api.wks().find((w) => w.name === '바새') || {}).id;
+  const row19 = (w) => w.id + '=' + w.note + (w.del === 1 ? '(del)' : '');
+  s19.push(Object.keys(X19.api.dirty()).sort().join(','));
+  X19.api.load(); await flush42(); await flush42(); s19.push(X19.api.wks().map(row19).join(','));
+  X19.env.runTimers(); await flush42(); await flush42(); s19.push(X19.env.gw[1] || '', Object.keys(X19.api.dirty()).join(','), X19.api.pending());
+  const X19b = mk42({ workers: [W042({ id: 'z1', name: '이기기만' })], gwQ: [{ status: 200, body: { doc: { items: [W042({ id: 'sv5', name: '서버다섯' })], updated_at: 1911 } } }] });
+  X19b.api.mark('z1'); X19b.api.load(); await flush42(); await flush42(); s19.push(X19b.api.wks().map((w) => w.id).join(','), JSON.stringify(X19b.api.dirty()));   // 대기 없는 읽기 = 서버 명부 그대로 + 고친 표시도 비움(남은 표시가 다음 병합에서 옛 줄을 살리지 않게)
+  T('v442 ⑲ 고친 줄만 이 기기 것(검토 반영 — 실제 mergeWorkers·창 [저장]·[+ 일용직 추가]·[삭제]·loadWorkers): 고친 표시 = d1·새 사람·y1 · 저장 대기 중 읽기 = x1 서버(같은 날 다른 기기 고침)·x3 서버(같은 날 지움)·y1 이 기기 고침·d1 이 기기 지움 · q1(이 기기에만·안 고침) 빠짐 · 새 사람 끝 → 저장 1번이 그대로 보냄(base 1901)·표시 지움·대기 풀림 · 대기 없는 읽기 = 서버 명부(sv5)·고친 표시 비움',
+    JSON.stringify(s19) === JSON.stringify(['d1,' + nid19 + ',y1', 'x1=x-other,x3=x3-old(del),y1=y-mine,d1=d(del),' + nid19 + '=', 'save:workers:base=1901:x1=x-other,x3=x3-old(del),y1=y-mine,d1=d(del),' + nid19, '', false, 'sv5', '{}']) && nid19 === 'wN1',
+    JSON.stringify({ s19, nid19 }));
+
+  // ⑳ 현장 대장 못 읽음(검토 반영 — asbLoaded false: 읽는 중·실패·현장 권한 없는 앞사람에서 전환): 최근 참여 칸 회색 '확인 중'(title 대장 못 읽음) · 표 위 #wkAsbNote(현장 권한 안내 줄은 숨김) · '1년 내 참여'·'참여 기록 없음' 칩 0명(빈 표 글 — 전원 '기록 없음'으로 보이지 않게) ·
+  //   펼침 탭 '참여 현장 (확인 중)'·머리 '현장 대장 확인 중'·탭 안 '아직 읽지 못했습니다'·[전부 보기] 없음 · 기기에 기억된 '참여 기록 없음' 칩은 첫 그림이 못 읽은 대장이어도 켜진 채(부품이 버리지 않음) → 대장이 오면 w8·기기 기억 그대로 ·
+  //   읽은 빈 대장(asbLoaded true)은 종전대로 '-'·참여 기록 없음 7명 · 현장 권한 없음은 #wkAsbNote 숨김 · 폰 legacy도 숨김 · HTML 안내 줄(#wkSiteNote 앞 — ③의 '#wkSiteNote 바로 뒤 표 자리' 그대로)
+  const m20 = miss42.length, s20 = [];
+  const X20 = mk42({ asb: [], asbLoaded: false }); X20.api.render(); const h20 = X20.host._h;
+  s20.push(cells42(h20, 'w1')[3][0], cells42(h20, 'w1')[3][1], X20.env.host('wkAsbNote').style.display, X20.env.host('wkSiteNote').style.display);
+  chip42(X20, 'y1'); s20.push(order42(X20.host._h), X20.host._h.indexOf('class="vs-none">조건에 맞는 일용직이 없습니다.</td>') > 0); chip42(X20, 'nopart'); s20.push(order42(X20.host._h)); chip42(X20, '');
+  openRow42(X20, 'w1'); const d20 = det42(X20.host._h); s20.push(tabs42(d20), d20.indexOf('<span class="vs-dsub">현장 대장 확인 중</span>') > 0);
+  press42(X20, 'data-wk-tab', 'site'); const d20b = det42(X20.host._h); s20.push(d20b.indexOf('현장 대장을 아직 읽지 못했습니다') > 0, acts42(d20b));
+  const ST20 = JSON.stringify({ k: '', d: 1, f: {}, chip: { st: 'nopart' } });
+  const X20s = mk42({ asb: [], asbLoaded: false, store: { jw_wk_sheet: ST20 } }); X20s.api.render(); s20.push(/class="vs-chip on" data-vs-chip="st\|nopart"/.test(X20s.host._h), order42(X20s.host._h));
+  X20s.api.setAsb(ASB42()); X20s.api.setAsbLoaded(true); X20s.api.render(); s20.push(/class="vs-chip on" data-vs-chip="st\|nopart"/.test(X20s.host._h), order42(X20s.host._h), X20s.env.store.jw_wk_sheet === ST20, X20s.env.host('wkAsbNote').style.display);
+  const X20e = mk42({ asb: [] }); X20e.api.render(); chip42(X20e, 'nopart'); s20.push(ctxt42(X20e.host._h, 'w1').split('|').slice(3, 6).join('|'), order42(X20e.host._h));
+  const X20n = mk42({ user: U42.N, asb: [], asbLoaded: false }); X20n.api.render(); s20.push(X20n.env.host('wkAsbNote').style.display, X20n.env.host('wkSiteNote').style.display);
+  const X20p = mk42({ width: 375, asb: [], asbLoaded: false }); X20p.api.render(); s20.push(X20p.env.host('wkAsbNote').style.display);
+  // 대장 일부가 메모리에 있어도(받기 전에 이 기기에서 만든 현장 등) 못 읽은 동안은 셈·합계·칩·정렬·거르기 목록에 쓰지 않는다(명부 순서 그대로 — 반장 먼저·이름)
+  const X20q = mk42({ asbLoaded: false }); X20q.api.render(); s20.push(foot42(X20q.host._h).replace(/<[^>]+>/g, '')); chip42(X20q, 'y1'); s20.push(order42(X20q.host._h)); chip42(X20q, '');
+  sortBy42(X20q, 'cnt'); s20.push(order42(X20q.host._h)); sortBy42(X20q, 'recent'); s20.push(order42(X20q.host._h)); sortBy42(X20q, 'name');
+  s20.push((/<select data-vf="kinds">([\s\S]*?)<\/select>/.exec(X20q.host._h) || ['', ''])[1].replace(/<option value="([^"]*)"[^>]*>[^<]*<\/option>/g, '$1;'));
+  const noteHtml20 = /<div id="wkAsbNote" style="display:none;">현장 대장을 아직 읽지 못했습니다 — [^<]*<\/div>\s*<div id="wkSiteNote"/.test(html);
+  T('v442 ⑳ 현장 대장 못 읽음(검토 반영 — asbLoaded false): 최근 참여 칸 회색 "확인 중"(title 대장 못 읽음) · 표 위 #wkAsbNote 보임·#wkSiteNote 숨김 · "1년 내 참여"·"참여 기록 없음" 칩 0명(빈 표 글) · 펼침 탭 인적사항*|참여 현장 (확인 중)·머리 "현장 대장 확인 중" · 참여 현장 탭 "아직 읽지 못했습니다"·[전부 보기] 없음 · 기억된 "참여 기록 없음" 칩은 첫 그림이 못 읽은 대장이어도 켜진 채(0명) → 대장이 오면 w8·기기 기억 그대로·안내 줄 숨김 · 읽은 빈 대장 = "-|-|-"·참여 기록 없음 7명(종전) · 현장 권한 없음 = #wkAsbNote 숨김·#wkSiteNote 보임 · 폰 legacy = 숨김 · 대장 일부가 메모리에 있어도 못 읽은 동안 = 합계 "1년 내 —"·1년 내 참여 0명·참여·최근 참여 정렬 = 명부 순서 그대로·종류 고르기 목록 빔 · HTML 안내 줄(#wkSiteNote 앞)',
+    JSON.stringify(s20) === JSON.stringify([' title="현장 대장을 아직 읽지 못했습니다 — 읽은 뒤 다시 그립니다"', '<span style="color:#9AA09C;">확인 중</span>', '', 'none', '', true, '', '인적사항*|참여 현장 (확인 중)', true, true, 'mini-btn:수정',
+      true, '', true, 'w8', true, 'none', '-|-|-', ORD42, 'none', '', 'none', '합계 7명||미입력 3|1년 내 —|||', '', 'w2,w1,w8,w3,w4,w5,w7', 'w2,w1,w8,w3,w4,w5,w7', ';']) && noteHtml20 && noMiss42(m20),
+    JSON.stringify({ s20, noteHtml20, miss: miss42.slice(m20) }));
+
+  // ㉑ 로그인 창 '전환' = 현장 대장 읽기(검토 반영 — applyPerms 일용직 줄을 그대로 돌림 apWk): 일용직 보기·현장 숨김(N — 대장을 받은 적 없음, asbLoaded false)으로 그린 표(열 4) → 관리자로 전환 = 다시 그림 + 대장 읽기 1(종전 0 — 탭을 나갔다 와야 했다) ·
+  //   받기 전 참여 칸 '확인 중'(종전 '-'·참여 기록 없음 7명·1년 내 0) → 대장이 오면 그 사람 셈 · 일용직 숨김으로 전환 = 홈(대장 읽기 0)
+  const m21 = miss42.length, s21 = [];
+  const X21 = mk42({ user: U42.N, asb: [], asbLoaded: false }); X21.api.render(); s21.push(heads42(X21.host._h));
+  X21.env.user = U42.A; X21.api.apWk(); s21.push(X21.env.log.filter((l) => l === 'loadAsb').length, heads42(X21.host._h), ctxt42(X21.host._h, 'w1').split('|').slice(3, 6).join('|'), X21.env.host('wkAsbNote').style.display, X21.env.host('wkSiteNote').style.display);
+  X21.api.setAsb(ASB42()); X21.api.setAsbLoaded(true); X21.api.render(); s21.push(ctxt42(X21.host._h, 'w1').split('|').slice(3, 6).join('|'), X21.env.host('wkAsbNote').style.display);
+  const X21h = mk42({ asb: [] }); X21h.api.render(); X21h.env.user = { id: 'm6', name: '숨김', perms: { site: 'do' } }; X21h.api.apWk(); s21.push(X21h.env.log.filter((l) => l === 'switch:dash').length, X21h.env.log.filter((l) => l === 'loadAsb').length, X21h.api.tab());
+  T('v442 ㉑ 로그인 창 전환 = 현장 대장 읽기(검토 반영 — 실제 applyPerms 일용직 줄): 일용직 보기·현장 숨김으로 그린 표(열 4) → 관리자로 전환 = 대장 읽기 1·열 7·참여 칸 "확인 중|…|…"(종전 "-|-|-")·#wkAsbNote 보임·#wkSiteNote 숨김 → 대장 도착 = "(석면) 32일 전|6회|석면·준설"·안내 줄 숨김 · 일용직 숨김으로 전환 = 홈 1·대장 읽기 0',
+    JSON.stringify(s21) === JSON.stringify(['name,role,birth,note', 1, 'name,role,birth,recent,cnt,kinds,note', '확인 중|…|…', '', 'none', '(석면) 32일 전|6회|석면·준설', 'none', 1, 0, 'dash']) && noMiss42(m21),
+    JSON.stringify({ s21, miss: miss42.slice(m21) }));
+
+  // ㉒ 수정 창 '건강진단(배치전·특수) 날짜는 안전 › 교육·검진에' 안내 줄(#wkExamMoved — 검토 반영): 명세 kept '교육·검진 안내 줄(안전 칸을 볼 수 있는 사람만)' — 실제 applySafetyPerms가 #eduMovedWk와 같은 규칙으로 켜고 끔
+  //   (관리자·안전 담당형 = 보임 · 차량 담당형(일용직 수행·안전 숨김 — 11/10 운영 비관리자 일용직 수행 3명 중 2명 꼴)·보기 직원 = 숨김 — 종전엔 늘 보여 열 수 없는 칸으로 안내) · HTML 처음 숨김(#eduMovedWk와 같음)
+  const runSf42 = (u) => {
+    const mkE = (id) => ({ id, style: {}, classList: mkCls42(''), getAttribute: () => null, querySelectorAll: () => [] });
+    const D = {}; ['tabSafetyBtn', 'sfSubBar', 'sfChipNow', 'asbMovedGo', 'eduMovedHr', 'eduMovedWk', 'wkExamMoved'].forEach((id) => { D[id] = mkE(id); });
+    new Function('__D', '__u', ['var document = { getElementById: function(id){ return __D[id] || null; } };', 'var currentTab = "workers", safetyLayer = "site";',
+      'function permOf(m){ if (__u.admin) return "do"; return (__u.perms && __u.perms[m]) || "hide"; } function canSee(m){ return permOf(m) !== "hide"; }',
+      'function switchTab(){} function setSafetyLayer(){}', fn42(html, 'safetyPanes'), fn42(html, 'applySafetyPerms'), 'applySafetyPerms();'].join('\n'))(D, u);
+    return D.wkExamMoved.style.display + '/' + D.eduMovedWk.style.display;
+  };
+  const sf22 = [U42.A, U42.S, U42.V, U42.N].map(runSf42);
+  const html22 = /<div class="hw-note" id="wkExamMoved" style="font-size:12px;display:none;">/.test(html) && /\["eduMovedHr", "eduMovedWk", "wkExamMoved"\]\.forEach\(/.test(fn42(html, 'applySafetyPerms'));
+  T('v442 ㉒ 수정 창 건강진단 안내 줄 = 안전 칸을 볼 수 있는 사람만(검토 반영 — 실제 applySafetyPerms): 관리자·안전 담당형 = 보임(#eduMovedWk와 같음) · 차량 담당형(일용직 수행·안전 숨김)·보기 직원 = 숨김 · HTML 처음 숨김 · 같은 forEach 한 줄',
+    JSON.stringify(sf22) === JSON.stringify(['/', '/', 'none/none', 'none/none']) && html22,
+    JSON.stringify({ sf22, html22 }));
+
+  // ㉓ 해체계획서 ③ 교육·검진 기록 읽기(검토 반영 — 실제 wkEduEnsure·wkExamMissing·xgBuildEdits): 안전 권한·안 읽음 = 읽기 1·"wait" → 200 = "ok" → 다시 불러도 읽기 0(세션 한 번 — 종전 v442 초안은 생성 창을 열 때마다·서류 종류와 상관없이) ·
+  //   읽기 실패 = "fail" → 다시 부르면 읽기 1 → "ok" · 안전 권한 없음 = 읽기 0·상태 그대로 · [생성] 확인요망: 못 읽음("wait"·"fail") = '아직 읽지 못해 빈칸'(종전 '기록이 없는 사람 n명') ·
+  //   13명을 고르면 ③ 칸에 들어가는 앞 12명만 셈(xgBuildEdits와 같은 순서 — 반장 먼저·이름): 13번째(기록 없음)는 안 셈·③ 칸에도 없음 · 그 사람이 반장이면 셈·③ 첫 칸 · 정적: 로그아웃에서 상태 비움·막는 줄
+  //   + 검토 묶음 시험 틀 전부 자리(wkList)에 건 리스너 0
+  const s23 = [];
+  const X23 = mk42({ eduSt: '', eduRes: [true] }); X23.api.eduEnsure(); s23.push(X23.env.log.filter((l) => l === 'loadEdu').length, X23.api.eduSt()); await flush42(); s23.push(X23.api.eduSt()); X23.api.eduEnsure(); s23.push(X23.env.log.filter((l) => l === 'loadEdu').length);
+  const X23f = mk42({ eduSt: '', eduRes: [false, true] }); X23f.api.eduEnsure(); await flush42(); s23.push(X23f.api.eduSt()); X23f.api.eduEnsure(); await flush42(); s23.push(X23f.env.log.filter((l) => l === 'loadEdu').length, X23f.api.eduSt());
+  const X23v = mk42({ user: U42.V, eduSt: '' }); X23v.api.eduEnsure(); s23.push(X23v.env.log.filter((l) => l === 'loadEdu').length, X23v.api.eduSt());
+  const w1_23 = X23.api.wks().find((w) => w.id === 'w1');
+  X23.api.setEduSt('wait'); s23.push(X23.api.exMiss([w1_23])); X23.api.setEduSt('fail'); s23.push(X23.api.exMiss([w1_23])); X23.api.setEduSt('ok'); s23.push(X23.api.exMiss([w1_23]));
+  const W23 = [], E23 = [];   // 13명 — 가01~가12(인부·특수건진 기록 있음) + 하마지막(인부·기록 없음 — 이름 순 맨 뒤)
+  for (let i = 1; i <= 12; i++) { W23.push(W042({ id: 'k' + i, name: '가' + String(i).padStart(2, '0') })); E23.push({ id: 'ek' + i, ptype: 'worker', pid: 'k' + i, kind: 'spec_med', date: '2026-0' + (1 + (i % 9)) + '-01' }); }
+  W23.push(W042({ id: 'k13', name: '하마지막' }));
+  const X23c = mk42({ workers: W23, edu: E23 }), all23 = X23c.api.wks().slice();
+  X23c.env.xgSel = all23.map((w) => w.id); ['xgTitle', 'xgSite', 'xgClient', 'xgOwner'].forEach((id) => { X23c.env.host(id).value = 't'; });
+  const g23 = (ed) => (ed['3'] || []).filter((x) => /^G(7[89]|8\d)$/.test(x[0])).map((x) => x[1]).filter(Boolean);
+  s23.push(X23c.api.exMiss(all23)); const gA23 = g23(X23c.api.build('asb_plan', { asb_survey: { rows: [] }, bldg_info: {} })); s23.push(gA23.length, gA23.indexOf('하마지막'));
+  all23[12].role = '반장'; s23.push(X23c.api.exMiss(all23)); s23.push(g23(X23c.api.build('asb_plan', { asb_survey: { rows: [] }, bldg_info: {} }))[0]);
+  const st23 = /\n\s*wkPending = false; wkDirty = \{\}; wkEduSt = "";/.test(fn42(html, 'clearSessionData')) && /if\(!canSee\("safety"\) \|\| wkEduSt==="ok" \|\| wkEduSt==="wait"\) return;/.test(fn42(html, 'wkEduEnsure'))
+    && /if\(wkEduSt!=="ok"\) return /.test(fn42(html, 'wkExamMissing')) && /\.slice\(0,12\);/.test(fn42(html, 'wkExamMissing'));
+  const hostL23 = [X17a, X17h, X17v, X17u, X17f, X18, X18d, X19, X19b, X20, X20s, X20e, X20n, X20p, X20q, X21, X21h, X23, X23f, X23v, X23c].some((X) => X.env.log.some((l) => /^host-listener:wkList:/.test(l)));
+  const MISS23 = '③ 건강진단(유무·검진일) — 교육·검진 기록을 아직 읽지 못해 빈칸입니다(잠시 뒤 다시 [생성]하면 기록으로 채웁니다)';
+  T('v442 ㉓ 해체계획서 ③ 교육·검진 기록 읽기(검토 반영 — 실제 wkEduEnsure·wkExamMissing·xgBuildEdits): 안전 권한 = 읽기 1·"wait" → "ok" → 다시 불러도 읽기 0(세션 한 번) · 실패 = "fail" → 다시 부르면 읽기(모두 2) → "ok" · 안전 권한 없음 = 읽기 0 · 확인요망 "wait"·"fail" = "아직 읽지 못해 빈칸" / "ok" = 기록 있으면 빈 글 · 13명 = 앞 12명만 셈(13번째 기록 없음 = 빈 글·③ 칸 12명에 없음) · 13번째가 반장이면 "1명"·③ 첫 칸 · 정적: 로그아웃에서 비움·막는 줄·12명 자름 · 검토 묶음 시험 틀 자리(wkList) 리스너 0',
+    JSON.stringify(s23) === JSON.stringify([1, 'wait', 'ok', 1, 'fail', 2, 'ok', 0, '', MISS23, MISS23, '', '', 12, -1, '③ 건강진단 기록이 없는 사람 1명 — 빈칸(안전 › 교육·검진에서 확인)', '하마지막']) && st23 && !hostL23,
+    JSON.stringify({ s23, st23, hostL23 }));
+
+  // ㉔ 검토 반영 문서 — FEATURES v442 절 '검토 반영(11/11)' 줄(문장 고정 — 고침 ①~⑦·문서 서술만·범위 밖·칸 폭 실측) · TESTLIST v442 검토 화면 칸 '[ ] (AI 시험 화면 대상 — 검토 반영(11/11)' 하나(①~⑥)·게이트 칸에 검토 반영 실행 ·
+  //   MANUAL 14절(현장 대장 못 읽음 안내·건강진단 문장 고침 — 옛 '건강 정보는 안전 권한 안에서만' 0)·현장 절 [근로자 추가](새 일용직 등재 = 일용직 수행만) · CLAUDE.md 일용직 표 줄 검토 반영 · 대장 읽기 실패는 asbLoaded를 켜지 않음(정적)
+  const ft24 = sec16(rd42('FEATURES.md'), '\n### v442 (11/11)'), tl24 = sec16(rd42('TESTLIST.md'), '\n## v442 '), man24 = rd42('MANUAL.html'), cl24 = rd42('CLAUDE.md');
+  const FT_REV42 = ['**검토 반영(11/11)**', '**현장 창 [+ 새 일용직] = 일용직 수행만**', '`WK_NO_ADD_MSG`', '`#swNewWrap`', '`#swNoWkNote`', '`swEmptyText`', '**저장 403**', 'DEVICE_NOT_APPROVED', 'NO_WRITE', '`loadWorkers()`',
+    '**병합은 이 기기에서 고친 줄만**', '`wkDirty`', '`wkMarkDirty`', '**현장 대장을 아직 못 읽음**', '`wkAsbOk`', '`#wkAsbNote`', "'1년 내 —'", "'확인 중' 41.9", "'…' 9.2", '53.8', '**로그인 창 \'전환\' = 대장도 읽음**', '`renderWorkers(); loadAsb();`',
+    '**수정 창 안내 줄 `#wkExamMoved`**', '`applySafetyPerms`', '**해체계획서 ③ 교육 기록 읽기**', '`wkEduEnsure`', '`wkEduSt`', '앞 12명', "'아직 읽지 못해 빈칸'", '문서 서술만:', '범위 밖(받아들임', 'C063'];
+  const CL_REV42 = ['검토 반영(11/11): **병합은 이 기기에서 고친 줄만**', '`wkDirty`', '`wkMarkDirty`', '`WK_NO_ADD_MSG`', '`#swNoWkNote`', '`swEmptyText`', '`wkAsbOk`', '`#wkAsbNote`', '`renderWorkers(); loadAsb();`', '`#wkExamMoved`', '`wkEduEnsure`', '`wkEduSt`'];
+  const cb24 = tl24.split(/\r?\n/).filter((l) => /^- \[ \] \(AI 시험 화면 대상 — 검토 반영\(11\/11\)/.test(l)), gate24 = tl24.split(/\r?\n/).filter((l) => /^- \[x\] \(AI\) `uismoke`\(/.test(l));
+  const man14_24 = (() => { const i = man24.indexOf('<h2 id="s14">'), j = man24.indexOf('<h2 id="s15">'); return i < 0 || j < i ? '' : man24.slice(i, j); })();
+  const liSw24 = (/<li><span class="btn">근로자 추가<\/span>로 참여 근로자를 넣습니다\.[^\n]*<\/li>/.exec(man24) || [''])[0];
+  const la24 = fn42(html, 'loadAsb');
+  const doc24 = FT_REV42.filter((s) => ft24.indexOf(s) < 0).concat(CL_REV42.filter((s) => cl24.indexOf(s) < 0).map((s) => 'CL ' + s));
+  T('v442 ㉔ 검토 반영 문서: FEATURES v442 절 "검토 반영(11/11)"(①~⑦·문서 서술만·범위 밖 C063·칸 폭 실측 41.9·9.2·53.8 — 문장 고정) · TESTLIST 검토 화면 칸 1(①~⑥ — 명부에 있는 사람만·확인 중·전환·안내 줄·교육 기록 읽기·유령 줄 0)·게이트 칸에 "검토 반영 뒤(11/11" + 결함 심기 · MANUAL 14절 현장 대장 못 읽음(<b>확인 중</b>)·"건강진단 기록은 안전 권한 안에서 적습니다"(옛 "건강 정보는 안전 권한 안에서만" 0) · 현장 절 [근로자 추가] = 새 일용직 등재는 일용직 수행만(<b>명부에 있는 사람만 고를 수 있습니다</b>) · CLAUDE.md 일용직 표 줄 검토 반영 · 정적: loadAsb는 200에서만 asbLoaded를 켬(실패면 "확인 중" 그대로)',
+    doc24.length === 0 && cb24.length === 1 && ['명부에 있는 사람만 고를 수 있습니다', "'확인 중'", "로그인 창 '전환'", '건강진단 안내 줄', '교육 기록 읽기', '유령 줄 0'].every((s) => cb24[0].indexOf(s) > 0) && cb24[0].indexOf('PM') < 0
+    && gate24.length === 1 && gate24[0].indexOf('검토 반영 뒤(11/11') > 0 && gate24[0].indexOf('결함 심기', gate24[0].indexOf('검토 반영 뒤(11/11')) > 0
+    && man14_24.indexOf('현장 대장(안전 › 현장)을 아직 불러오지 못했으면 최근 참여 칸이 <b>확인 중</b>') > 0 && man14_24.indexOf('건강진단 기록은 안전 권한 안에서 적습니다') > 0 && man24.indexOf('건강 정보는 안전 권한 안에서만') < 0
+    && liSw24.indexOf('새 일용직 등재는 일용직 수행 권한이 있는 분만 합니다') > 0 && liSw24.indexOf('<b>명부에 있는 사람만 고를 수 있습니다</b>') > 0
+    && /if\(res\.status!==200\) return false;[\s\S]*asbLoaded = true;/.test(la24) && (la24.match(/asbLoaded = true/g) || []).length === 1,
+    JSON.stringify({ doc24: doc24.map((s) => s.slice(0, 40)), cb: cb24.length, gate: gate24.length, gateRev: gate24.length ? gate24[0].indexOf('검토 반영 뒤(11/11') : -2, liSw: liSw24.slice(0, 60) }));
+} catch (e) { console.log('  (v442 검사 생략 — ' + e.message + ')'); fails++; }
 
 try {
   const fdir = join(ROOT, 'netlify', 'functions');
