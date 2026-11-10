@@ -7,6 +7,7 @@
 // 이 함수는 검증·기동·조회만 한다(일반 함수 10초 한도 안에서 끝나는 일만).
 // 자격증명은 Netlify 환경변수 GW_ICIS_ID / GW_ICIS_PW — 코드·저장소엔 절대 없다.
 // 제출은 정부 규제 민원이라 되돌릴 수 없다 — 여기서 입력을 화이트리스트로 걸러 잘못된 기동 자체를 막는다.
+// 사람 요청 권한(v434 메뉴 56 4-2): 화관법 권한 hw — 폐기물 제출은 '수행'만, 조회는 '숨김'이면 거절(아래 hwPerm). 크론·워커·지금 실행은 hw를 보지 않는다.
 const crypto = require('crypto');
 const { setupBlobContext, store, blobGet, blobSet } = require('./_lib/blobs');
 const { issueSession, verifyToken, bearer } = require('./_lib/session');
@@ -57,6 +58,19 @@ async function deviceApproved(event, member) {
   const r = await blobGet(store(USERS), `device:${id}`);
   return !!(r.ok && r.data && r.data.status === 'approved');
 }
+// 화관법 권한(hw) — v434(메뉴 56 4-2, PM 11/9 ③ "관리+운영만"). gw-data permOf·앱 permOf와 같은 규칙: 관리자는 'do',
+//   아니면 회원 perms.hw, 값이 없으면 기본 숨김 'hide'(hw는 기본 숨김 4곳 — 앱·gw-data PERM_CLOSED·gw-auth CLOSED_DEFAULT·ask.js에 있다).
+//   사람 요청에만 쓴다: 조회(hw_status·hw_job)는 숨김이면 403 NO_ACCESS, 폐기물 제출(hw_waste_submit)은 수행이 아니면 403 NO_WRITE(gw-data 저장처럼 숨김·보기 모두 —
+//   입력 검사보다 먼저). 제품 자동 제출 크론(gw-hwakwan-cron → 워커 직행)·워커(내부 토큰만)·'지금 실행'(hw_run_now — 관리자·개발자 ADMIN_ONLY 종전대로)에는 hw 검사를 더하지 않는다.
+function hwPerm(member) {
+  if (member && member.admin) return 'do';
+  return (member && member.perms && member.perms.hw) || 'hide';
+}
+// v434 검토 반영(11/10): 거절 몸체에 사람 말 error를 붙인다(code는 그대로 — 새 앱은 code로 판정: hwFailText NO_WRITE = HW_NO_WRITE, 숨김은 화관법 탭이 없다).
+//   배포 전부터 열려 있던 옛 앱(v433 이하)은 NO_WRITE·NO_ACCESS를 몰라 error를 제출 결과 괄호 안·현황 카드에 그대로 보여 준다 —
+//   error가 없으면 'HTTP 403'·'NO_ACCESS'만 보이고 제출 결과는 '접수 여부를 먼저 확인한 뒤 다시 제출' 안내가 된다(거절 이유가 안 보임).
+const HW_ERR_NO_WRITE = '화관법 수행 권한이 없어 제출하지 않았습니다 — 폐기물 운반계획서는 권한관리 화관법 열이 수행인 분만 낼 수 있습니다. 이 요청은 정부에 제출되지 않았습니다.';
+const HW_ERR_NO_ACCESS = '화관법 권한이 없습니다(권한관리 화관법 열이 숨김) — 필요하면 관리자에게 알려 주세요.';
 
 // 백그라운드 워커 기동 — 내부 토큰(mid='__hwakwan__')으로만 인증. 사용자 토큰은 워커에 넘기지 않는다.
 async function kickBackground(job, mode, params) {
@@ -174,12 +188,13 @@ async function handler(event) {
   if (!c.ok) return jr(401, { ok: false, code: c.reason || 'NO_SESSION', request_id: R });
   if (!(await deviceApproved(event, c.member))) return jr(403, { ok: false, code: 'DEVICE_NOT_APPROVED', request_id: R });
   const st = store(DATA);
+  const hp = hwPerm(c.member);   // v434 화관법 권한 — 로그인·기기 승인 뒤, 액션별로(지금 실행은 보지 않음)
   try {
     switch (d && d.action) {
-      case 'hw_status': return await handleStatus(st, R);
-      case 'hw_waste_submit': return await handleWasteSubmit(st, c, d, R);
+      case 'hw_status': if (hp === 'hide') return jr(403, { ok: false, code: 'NO_ACCESS', error: HW_ERR_NO_ACCESS, request_id: R }); return await handleStatus(st, R);
+      case 'hw_waste_submit': if (hp !== 'do') return jr(403, { ok: false, code: 'NO_WRITE', error: HW_ERR_NO_WRITE, request_id: R }); return await handleWasteSubmit(st, c, d, R);
       case 'hw_run_now': return await handleRunNow(st, c, d, R);
-      case 'hw_job': return await handleJob(st, d, R);
+      case 'hw_job': if (hp === 'hide') return jr(403, { ok: false, code: 'NO_ACCESS', error: HW_ERR_NO_ACCESS, request_id: R }); return await handleJob(st, d, R);
       default: return jr(400, { ok: false, code: 'UNKNOWN_ACTION', request_id: R });
     }
   } catch (e) {

@@ -4900,8 +4900,8 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   ['col:edu', 'col:asbestos'].forEach((k) => { if (had76[k] === undefined) delete mem.gw_data[k]; else mem.gw_data[k] = had76[k]; });
 }
 
-{ // ---- 77(v431) 메뉴 56 4-1 — 화관법 권한 키(hw) 등록만: 회원 저장이 hw 값(수행·보기)을 지키고(cleanPerms가 버리지 않음) 값이 없으면 '숨김'으로 굳힌다 ·
-  //   감사 로그에 바뀐 칸 · 새 회원 직책 프리셋 숨김 · 제출(gw-hwakwan)은 4-1에서 아직 hw를 보지 않는다(⑥ — 4-2에서 뒤집음: 그때는 숨김·보기 → 403 NO_WRITE).
+{ // ---- 77(v431) 메뉴 56 4-1 — 화관법 권한 키(hw) 등록: 회원 저장이 hw 값(수행·보기)을 지키고(cleanPerms가 버리지 않음) 값이 없으면 '숨김'으로 굳힌다 ·
+  //   감사 로그에 바뀐 칸 · 새 회원 직책 프리셋 숨김 · ⑥ 제출(gw-hwakwan) — 4-1 동안은 hw를 안 봤고 v434(4-2)에서 뒤집었다: 숨김·값 없음은 조회 403 NO_ACCESS·제출 403 NO_WRITE, 보기는 제출 403 NO_WRITE(더 자세한 것은 79절).
   //   배포 뒤 PM 순서(브리핑 deploy): 권한관리 '화관법' 열 김정아 칸 1번(수행) · 권민지·정재욱 칸 각 2번(수행 → 보기). 응답 코드만이 아니라 이유 코드(error_code·code)·저장값·감사 줄까지 본다.
   const gwa77 = require(join(FN, 'gw-auth.js'));
   const callA77 = async (body, tok) => { const x = await gwa77.handler({ httpMethod: 'POST', headers: { authorization: tok ? 'Bearer ' + tok : '' }, body: JSON.stringify(body) }); return { code: x.statusCode, body: JSON.parse(x.body || '{}') }; };
@@ -4991,8 +4991,8 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
     && madeDev77.join(',') === '팀장:200:hide:hide,직원:200:hide:hide,현장직:200:hide:hide,관리자:200:do:do',
     [xw77.code, xw77.body.error_code, mw77 && mw77.perms.hw].join(':') + ' / ' + madeDev77.join(','));
 
-  // ⑥ 4-1 경계 — 화관법 제출 API(gw-hwakwan)는 아직 hw를 보지 않는다: 값이 숨김·보기·수행·없음 어느 쪽이어도 지금처럼 현황을 읽고 제출 요청이 입력·환경 검사까지 간다.
-  //    4-2에서 뒤집음(그때는 숨김·보기 → 403 NO_WRITE, 수행·관리자만 통과 — 브리핑 steps[3].tests). 이 시험은 실제 제출(워커 기동)까지 가지 않게 화관법 계정 환경변수를 비운다.
+  // ⑥ v434(4-2)에서 뒤집음 — 화관법 API(gw-hwakwan)가 hw를 본다(브리핑 steps[3].tests): 조회(hw_status)는 숨김·값 없음(기본 숨김)이면 403 NO_ACCESS, 보기·수행은 200 ·
+  //    폐기물 제출은 수행이 아니면 403 NO_WRITE(숨김·보기·값 없음 — 입력 검사보다 먼저), 수행은 검사를 지나 입력·환경 검사까지. 이 시험은 실제 제출(워커 기동)까지 가지 않게 화관법 계정 환경변수를 비운다(400 ENV_MISSING).
   const hwk77 = require(join(FN, 'gw-hwakwan.js'));
   const ICIS77 = require(join(FN, '_lib/icis.js'));
   const callH77 = async (body, tok) => { const x = await hwk77.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + tok, 'x-device-id': 'dev1' }, body: JSON.stringify(body) }); return { code: x.statusCode, body: JSON.parse(x.body || '{}') }; };
@@ -5005,16 +5005,17 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   const sub77 = { action: 'hw_waste_submit', vehicleNo: ICIS77.WASTE_VEHICLES[0], scenario: Object.keys(ICIS77.SCENARIOS)[0], date: kst77(3), time: '09:00' };
   const jobs77 = () => Object.keys(mem.gw_data).filter((k) => k.indexOf('hwakwan:job:') === 0).length;
   const jobs0_77 = jobs77(), res77 = [];
+  const e77 = (r) => (r.code === 403 ? ((typeof r.body.error === 'string' && r.body.error.length > 10) ? '+글' : '-글') : '');   // v434 검토: 403 몸체에 사람 말 error(옛 앱이 괄호 안·현황 카드에 보여 줌)
   for (const id of ['uhide77', 'ujjw77', 'ukja77', 'unohw77']) {
     const tok = issueSession(mem.gw_users['member:' + id]).token;
     const s = await callH77({ action: 'hw_status' }, tok), w = await callH77(sub77, tok);
-    res77.push(id + ':' + (mem.gw_users['member:' + id].perms.hw || '-') + ':' + s.code + '/' + (s.body.ok === true ? 'ok' : s.body.code) + ':' + w.code + '/' + w.body.code);
+    res77.push(id + ':' + (mem.gw_users['member:' + id].perms.hw || '-') + ':' + s.code + '/' + (s.body.ok === true ? 'ok' : s.body.code) + e77(s) + ':' + w.code + '/' + w.body.code + e77(w));
   }
   const jobs1_77 = jobs77();
   if (env77.id !== undefined) process.env.GW_ICIS_ID = env77.id;
   if (env77.pw !== undefined) process.env.GW_ICIS_PW = env77.pw;
-  T('77 v431 4-1 경계 — 화관법 제출 API는 아직 hw를 보지 않음(4-2에서 뒤집음: 숨김·보기 → 403 NO_WRITE): hw 숨김(김호태형)·보기(정재욱형)·수행(김정아형)·값 없음 네 사람 모두 hw_status 200 · 폐기물 제출 요청은 권한 거절 없이 입력·환경 검사까지 감(이 시험 환경은 화관법 계정이 없어 400 ENV_MISSING — 403 0건) · 작업 기록 0',
-    res77.join(',') === 'uhide77:hide:200/ok:400/ENV_MISSING,ujjw77:view:200/ok:400/ENV_MISSING,ukja77:do:200/ok:400/ENV_MISSING,unohw77:-:200/ok:400/ENV_MISSING' && jobs1_77 === jobs0_77,
+  T('77 v431→v434 4-2 — 화관법 API가 hw를 봄: hw 숨김(김호태형)·값 없음 = hw_status 403 NO_ACCESS·폐기물 제출 403 NO_WRITE · 보기(정재욱형) = hw_status 200·제출 403 NO_WRITE · 수행(김정아형) = hw_status 200·제출은 권한 검사를 지나 입력·환경 검사까지(이 시험 환경은 화관법 계정이 없어 400 ENV_MISSING) · 403 몸체마다 사람 말 error(검토 반영 — 글 전문은 79절) · 작업 기록 0',
+    res77.join(',') === 'uhide77:hide:403/NO_ACCESS+글:403/NO_WRITE+글,ujjw77:view:200/ok:403/NO_WRITE+글,ukja77:do:200/ok:400/ENV_MISSING,unohw77:-:403/NO_ACCESS+글:403/NO_WRITE+글' && jobs1_77 === jobs0_77,
     res77.join(' · ') + ' / 작업 ' + jobs0_77 + '→' + jobs1_77);
 
   mem.gw_users = savedUsers77;
@@ -5111,6 +5112,114 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
 
   mem.gw_users = savedUsers78;
   ['col:asbestos', 'col:edu', 'col:workers'].forEach((k) => { if (had78[k] === undefined) delete mem.gw_data[k]; else mem.gw_data[k] = had78[k]; });
+}
+
+{ // ---- 79(v434) 메뉴 56 4-2 — 화관법 사람 요청 권한(hw): gw-hwakwan hwPerm(관리자 do · 회원 perms.hw · 값 없으면 hide — 기본 숨김).
+  //   폐기물 제출은 수행만(숨김·보기·값 없음 403 NO_WRITE — 입력 검사·작업 기록·워커 기동·감사 로그보다 먼저) · 관리자는 기기 머리 없이도 통과 · 비관리자 기기 미승인 403 DEVICE_NOT_APPROVED ·
+  //   조회(hw_status·hw_job)는 숨김이면 403 NO_ACCESS · 지금 실행(hw_run_now)은 hw를 안 봄(관리자·개발자 ADMIN_ONLY만) · 제품 자동 제출 크론·워커는 권한 검사 없음(실행 + 원문).
+  //   실제 외부 제출로 나가지 않게: global.fetch 흉내(워커 기동 주소만 받아 202 — 다른 주소는 막고 기록), 화관법 계정은 가짜 값(워커는 기동 흉내라 icis 호출 0, 워커 실행 시험은 계정을 비워 ENV_MISSING) — 끝나면 되돌림.
+  //   응답 코드만이 아니라 이유 코드(code)·작업 기록·기동 몸체·토큰 주인·감사 줄까지 본다.
+  const savedUsers79 = JSON.parse(JSON.stringify(mem.gw_users));
+  const env79 = { id: process.env.GW_ICIS_ID, pw: process.env.GW_ICIS_PW, url: process.env.URL };
+  const realFetch79 = global.fetch, realNow79 = Date.now, bg079 = blobsMock.hooks.beforeGet;
+  const hwKeys079 = new Set(Object.keys(mem.gw_data).filter((k) => k.indexOf('hwakwan:') === 0));   // 이 절이 만든 작업 기록만 끝에 지운다
+  const kicks79 = [], stray79 = [];
+  const setEnv79 = (k, v) => { if (v === undefined) delete process.env[k]; else process.env[k] = v; };
+  try {
+    process.env.URL = 'https://test.local'; process.env.GW_ICIS_ID = 'test-id-79'; process.env.GW_ICIS_PW = 'test-pw-79';
+    global.fetch = async (url, opt) => {
+      if (String(url) === 'https://test.local/.netlify/functions/gw-hwakwan-run-background') { kicks79.push({ auth: String((opt && opt.headers && opt.headers.Authorization) || ''), body: JSON.parse((opt && opt.body) || '{}') }); return { ok: true, status: 202 }; }
+      stray79.push(String(url)); throw new Error('시험 중 외부 호출 금지: ' + url);
+    };
+    const hwk79 = require(join(FN, 'gw-hwakwan.js')), ICIS79 = require(join(FN, '_lib/icis.js')), { verifyToken: vt79 } = require(join(FN, '_lib/session.js'));
+    mem.gw_users['device:dev1'] = { status: 'approved' };
+    const mk79 = (id, extra) => { mem.gw_users['member:' + id] = Object.assign({ id, name: id, role: '직원', admin: false, perms: {} }, extra); return issueSession(mem.gw_users['member:' + id]).token; };
+    const tAdm79 = mk79('u79adm', { name: '관리자79', role: '관리자', admin: true });
+    const tDo79 = mk79('u79do', { name: '김정아형79', role: '팀장', perms: { hw: 'do', site: 'do' } });
+    const tView79 = mk79('u79view', { name: '권민지형79', perms: { hw: 'view', safety: 'do' } });
+    const tHide79 = mk79('u79hide', { name: '김호태형79', perms: { hw: 'hide', veh: 'view' } });
+    const tNone79 = mk79('u79none', { name: '현장형79', role: '현장직', perms: { veh: 'view', check: 'do' } });   // hw 값 없음 = 기본 숨김(배포 직후 현장 부서 모양)
+    const tDev79 = mk79('u79dev', { name: '개발자형79', role: '개발자', dev: true, perms: { hw: 'hide' } });   // 관리자 아닌 개발자 + 화관법 숨김 — 지금 실행은 hw를 안 본다
+    const callH79 = async (body, tok, dev) => { const x = await hwk79.handler({ httpMethod: 'POST', headers: Object.assign({ authorization: 'Bearer ' + tok }, dev === undefined ? { 'x-device-id': 'dev1' } : (dev ? { 'x-device-id': dev } : {})), body: JSON.stringify(body) }); return { code: x.statusCode, body: JSON.parse(x.body || '{}') }; };
+    const kstOf79 = (ms) => new Date(ms + 9 * 3600000).toISOString().slice(0, 10);
+    const sub79 = { action: 'hw_waste_submit', vehicleNo: ICIS79.WASTE_VEHICLES[0], scenario: Object.keys(ICIS79.SCENARIOS)[0], date: kstOf79(Date.now() + 3 * 86400000), time: '09:00' };
+    const jobs79 = () => Object.keys(mem.gw_data).filter((k) => k.indexOf('hwakwan:job:') === 0);
+    const aud79 = (op) => auditMock.logs.filter((l) => l.col === 'hwakwan' && (l.ev || []).some((e) => e.op === op)).length;
+    const jb0 = jobs79().length, au0 = aud79('폐기물제출요청');
+    // ① 제출 권한
+    const sH = await callH79(sub79, tHide79), sV = await callH79(sub79, tView79), sN = await callH79(sub79, tNone79);
+    const kA = kicks79.length, jA = jobs79().length, auA = aud79('폐기물제출요청');
+    const sDx = await callH79(sub79, tDo79, 'devX'), sDn = await callH79(sub79, tDo79, '');
+    const kB = kicks79.length, jB = jobs79().length;
+    const sD = await callH79(sub79, tDo79), sA = await callH79(sub79, tAdm79, '');
+    const kC = kicks79.length, jC = jobs79().length, auC = aud79('폐기물제출요청');
+    const tokOk79 = (k) => { const v = vt79(k.auth.replace(/^Bearer /, '')); return v.ok && v.payload.mid === '__hwakwan__'; };
+    const kickOk79 = (k, job) => tokOk79(k) && k.body.job === job && k.body.mode === 'waste' && k.body.params && k.body.params.vehicleNo === sub79.vehicleNo && k.body.params.scenario === sub79.scenario && k.body.params.date === sub79.date && k.body.params.time === sub79.time;
+    const jobBy79 = (id) => { const j = mem.gw_data['hwakwan:job:' + id]; return j ? j.status + '/' + j.mode + '/' + j.by : '-'; };
+    //   v434 검토: 거절 몸체의 사람 말 error 전문(옛 v433 앱은 NO_WRITE·NO_ACCESS를 몰라 이 글을 제출 결과 괄호 안·현황 카드에 보여 준다 — 새 앱은 code로 판정)
+    const NW79 = '화관법 수행 권한이 없어 제출하지 않았습니다 — 폐기물 운반계획서는 권한관리 화관법 열이 수행인 분만 낼 수 있습니다. 이 요청은 정부에 제출되지 않았습니다.';
+    const NA79 = '화관법 권한이 없습니다(권한관리 화관법 열이 숨김) — 필요하면 관리자에게 알려 주세요.';
+    const no79 = (r) => r.code === 403 && r.body.ok === false && r.body.code === 'NO_WRITE' && r.body.error === NW79 && !r.body.job;
+    T('79 v434 폐기물 제출 권한(hw): 숨김(김호태형)·보기(권민지형)·값 없음(현장형) → 403 NO_WRITE·몸체 error "화관법 수행 권한이 없어 제출하지 않았습니다 … 정부에 제출되지 않았습니다."(작업 기록·워커 기동·감사 0) · 수행(김정아형) → 200 작업 번호 · 관리자(기기 머리 없이) → 200 · 수행이어도 기기 미승인(devX)·기기 머리 없음 → 403 DEVICE_NOT_APPROVED(기동 0) · 워커 기동 2번 = 내부 토큰(mid __hwakwan__ — 회원 토큰 아님)·mode waste·보낸 값 그대로·응답 작업 번호와 같음 · 작업 기록 2(queued·누른 사람 이름) · 감사 "폐기물제출요청" 2 · 외부 호출 0',
+      [sH, sV, sN].every(no79) && kA === 0 && jA === jb0 && auA === au0
+      && [sDx, sDn].every((r) => r.code === 403 && r.body.code === 'DEVICE_NOT_APPROVED') && kB === 0 && jB === jb0
+      && sD.code === 200 && sD.body.ok === true && /^hw_waste_/.test(sD.body.job || '') && sA.code === 200 && sA.body.ok === true && /^hw_waste_/.test(sA.body.job || '') && sD.body.job !== sA.body.job
+      && kC === 2 && kickOk79(kicks79[0], sD.body.job) && kickOk79(kicks79[1], sA.body.job)
+      && jC === jb0 + 2 && jobBy79(sD.body.job) === 'queued/waste/김정아형79' && jobBy79(sA.body.job) === 'queued/waste/관리자79' && auC === au0 + 2 && stray79.length === 0,
+      JSON.stringify({ h: [sH.code, sH.body.code], v: [sV.code, sV.body.code], n: [sN.code, sN.body.code], dx: [sDx.code, sDx.body.code], dn: [sDn.code, sDn.body.code], d: [sD.code, sD.body.job], a: [sA.code, sA.body.job], kicks: [kA, kB, kC], jobs: [jb0, jA, jB, jC], aud: [au0, auA, auC], stray: stray79 }));
+    // ② 권한 검사가 입력 검사보다 먼저
+    const bad79 = Object.assign({}, sub79, { vehicleNo: '없는차량79' });
+    const bV = await callH79(bad79, tView79), bH = await callH79(Object.assign({}, sub79, { date: '2000-01-01' }), tHide79), bD = await callH79(bad79, tDo79);
+    T('79 v434 권한 검사가 입력 검사보다 먼저: 보기 + 없는 차량 → 403 NO_WRITE(400 BAD_VEHICLE 아님) · 숨김 + 지난 날짜 → 403 NO_WRITE(400 DATE_RANGE 아님) · 수행 + 없는 차량 → 400 BAD_VEHICLE(종전 입력 검사) · 기동 그대로 2',
+      no79(bV) && no79(bH) && bD.code === 400 && bD.body.code === 'BAD_VEHICLE' && kicks79.length === 2,
+      [bV.code, bV.body.code, bH.code, bH.body.code, bD.code, bD.body.code, kicks79.length].join('/'));
+    // ③ 조회 — 숨김만 거절(보기는 현황·작업을 본다)
+    const qs79 = {};
+    for (const [k, t] of [['hide', tHide79], ['none', tNone79], ['view', tView79], ['do', tDo79], ['admin', tAdm79]]) { const r = await callH79({ action: 'hw_status' }, t); qs79[k] = r.code + '/' + (r.body.ok === true ? 'ok' : r.body.code) + (r.body.scenarios ? '+노선' : '') + (r.code === 403 ? (r.body.error === NA79 ? '+글' : '-글') : ''); }
+    const jH = await callH79({ action: 'hw_job', job: sD.body.job }, tHide79), jN = await callH79({ action: 'hw_job', job: sD.body.job }, tNone79);
+    mem.gw_data['hwakwan:job:hw_waste_nope79'] = null;   // 실 Blobs는 없는 키를 ok·data null로 준다 — mock은 없는 키를 NOT_FOUND로 주므로 값 null로 심어 흉내(78절과 같은 방식)
+    const jV = await callH79({ action: 'hw_job', job: sD.body.job }, tView79), jX = await callH79({ action: 'hw_job', job: 'hw_waste_nope79' }, tView79);
+    T('79 v434 조회: hw_status 숨김·값 없음 → 403 NO_ACCESS·몸체 error "화관법 권한이 없습니다(권한관리 화관법 열이 숨김) …" · 보기·수행·관리자 → 200(노선 목록 포함) · hw_job 숨김·값 없음 → 403 NO_ACCESS(같은 error) · 보기 → 200(그 작업 queued) · 없는 작업은 보기도 404 JOB_NOT_FOUND(권한 검사를 지나 종전 처리)',
+      JSON.stringify(qs79) === JSON.stringify({ hide: '403/NO_ACCESS+글', none: '403/NO_ACCESS+글', view: '200/ok+노선', do: '200/ok+노선', admin: '200/ok+노선' })
+      && [jH, jN].every((r) => r.code === 403 && r.body.code === 'NO_ACCESS' && r.body.error === NA79 && r.body.status === undefined) && jV.code === 200 && jV.body.ok === true && jV.body.status === 'queued' && jX.code === 404 && jX.body.code === 'JOB_NOT_FOUND',
+      JSON.stringify({ qs: qs79, jh: [jH.code, jH.body.code], jn: [jN.code, jN.body.code], jv: [jV.code, jV.body.status], jx: [jX.code, jX.body.code] }));
+    // ④ 지금 실행·크론·워커에는 hw 검사 없음
+    const rDev = await callH79({ action: 'hw_run_now' }, tDev79), sDev = await callH79({ action: 'hw_status' }, tDev79), rDo = await callH79({ action: 'hw_run_now' }, tDo79);
+    const kRun = kicks79[kicks79.length - 1], nRun = kicks79.length;
+    const cron79 = require(join(FN, 'gw-hwakwan-cron.js'));
+    const shift79 = ((3 - new Date(realNow79() + 9 * 3600000).getUTCDay()) + 7) % 7, fake79 = realNow79() + shift79 * 86400000;   // 시계를 KST 수요일로(크론은 주말엔 아무것도 안 함)
+    let cronR = null, cronTok = null, memReads79 = 0;
+    blobsMock.hooks.beforeGet = async (k) => { if (String(k).indexOf('member:') === 0) memReads79++; if (bg079) await bg079(k); };
+    Date.now = () => fake79;
+    try {
+      const x = await cron79.handler({});
+      cronR = { code: x.statusCode, body: JSON.parse(x.body || '{}') };
+      const ck = kicks79[kicks79.length - 1];
+      cronTok = ck && kicks79.length === nRun + 1 ? vt79(ck.auth.replace(/^Bearer /, '')) : null;
+    } finally { Date.now = realNow79; blobsMock.hooks.beforeGet = bg079; }
+    const ckB = kicks79[kicks79.length - 1].body;
+    const wk79 = require(join(FN, 'gw-hwakwan-run-background.js'));
+    setEnv79('GW_ICIS_ID', undefined); setEnv79('GW_ICIS_PW', undefined);
+    const sysTok79 = issueSession({ id: '__hwakwan__', role: 'system' }).token;
+    await wk79.handler({ headers: { authorization: 'Bearer ' + tHide79 }, body: JSON.stringify({ job: 'hw_waste_t79a', mode: 'waste', params: sub79 }) });
+    await wk79.handler({ headers: { authorization: 'Bearer ' + sysTok79 }, body: JSON.stringify({ job: 'hw_waste_t79b', mode: 'waste', params: sub79 }) });
+    const wA = mem.gw_data['hwakwan:job:hw_waste_t79a'], wB = mem.gw_data['hwakwan:job:hw_waste_t79b'];
+    const fs79 = require('fs');
+    const srcC79 = fs79.readFileSync(join(FN, 'gw-hwakwan-cron.js'), 'utf8'), srcW79 = fs79.readFileSync(join(FN, 'gw-hwakwan-run-background.js'), 'utf8'), srcK79 = fs79.readFileSync(join(FN, 'gw-cron-kick.js'), 'utf8');
+    const noPerm79 = [srcC79, srcW79, srcK79].every((s) => s.length > 300 && !/\bperms\b|permOf|hwPerm|canDo|NO_WRITE|NO_ACCESS|member:/.test(s));
+    T('79 v434 지금 실행·크론·워커에는 hw 검사 없음: 관리자 아닌 개발자 + 화관법 숨김 → hw_run_now 200(제품 노선 기동 mode daily·내부 토큰) · 같은 사람 hw_status 403 NO_ACCESS(조회는 hw로) · 수행이어도 관리자·개발자가 아니면 hw_run_now 403 ADMIN_ONLY(종전) · 크론(시계를 KST 수요일로) 200·기동 1번(mid __hwakwan__·mode daily·D+3 하루·작업 hw_cron_<오늘>)·회원 읽기 0 · 워커 = 회원 토큰이면 기록 0, 내부 토큰이면 권한을 안 보고 진행(화관법 계정 없음 → ENV_MISSING, 외부 제출 0) · 크론·워커·크론 킥 원문에 권한 판정 0 · 외부 호출 0',
+      rDev.code === 200 && rDev.body.ok === true && /^hw_run_/.test(rDev.body.job || '') && !!kRun && kRun.body.mode === 'daily' && kRun.body.job === rDev.body.job && tokOk79(kRun)
+      && sDev.code === 403 && sDev.body.code === 'NO_ACCESS' && rDo.code === 403 && rDo.body.code === 'ADMIN_ONLY'
+      && !!cronR && cronR.code === 200 && cronR.body.ok === true && cronR.body.job === 'hw_cron_' + kstOf79(fake79) && kicks79.length === nRun + 1 && !!cronTok && cronTok.ok && cronTok.payload.mid === '__hwakwan__'
+      && ckB.mode === 'daily' && JSON.stringify(ckB.params && ckB.params.targetDays) === JSON.stringify([kstOf79(fake79 + 3 * 86400000)]) && memReads79 === 0
+      && wA === undefined && !!wB && wB.status === 'fail' && wB.code === 'ENV_MISSING' && noPerm79 && stray79.length === 0,
+      JSON.stringify({ dev: [rDev.code, rDev.body.code || rDev.body.job], devS: [sDev.code, sDev.body.code], doRun: [rDo.code, rDo.body.code], cron: cronR, cronMid: cronTok && cronTok.payload && cronTok.payload.mid, ck: ckB, memReads: memReads79, wA: !!wA, wB: wB && [wB.status, wB.code], noPerm: noPerm79, stray: stray79 }));
+  } finally {
+    global.fetch = realFetch79; Date.now = realNow79; blobsMock.hooks.beforeGet = bg079;
+    setEnv79('GW_ICIS_ID', env79.id); setEnv79('GW_ICIS_PW', env79.pw); setEnv79('URL', env79.url);
+    mem.gw_users = savedUsers79;
+    Object.keys(mem.gw_data).filter((k) => k.indexOf('hwakwan:') === 0 && !hwKeys079.has(k)).forEach((k) => { delete mem.gw_data[k]; });
+  }
 }
 
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

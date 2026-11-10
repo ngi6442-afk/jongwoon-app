@@ -13,7 +13,7 @@ const { appendAudit, short } = require('./_lib/audit');
 const tier = require('./_lib/tier');   // 관리자 등급(v321)
 
 const USERS = 'gw_users';
-const MODULES = ['tasks', 'veh', 'rec', 'lic', 'site', 'check', 'con', 'cli', 'doc', 'wk', 'quote', 'promo', 'safety', 'hw'];   // wk(일용직) 누락으로 cleanPerms가 매 저장마다 버려 숨김·수행 설정이 불가능했음(프런트 레지스트리와 일치 필수 — uismoke v430이 앱 MODULES와 순서까지 대조). quote=견적서·promo=홍보·safety=안전 › 교육·검진(v430)·hw=화관법(v431 메뉴 56 4-1 — 키만, gw-data 컬렉션 없음·제출 검사는 4-2에서 gw-hwakwan), 넷 다 기본 숨김 — 명시 부여만
+const MODULES = ['tasks', 'veh', 'rec', 'lic', 'site', 'check', 'con', 'cli', 'doc', 'wk', 'quote', 'promo', 'safety', 'hw'];   // wk(일용직) 누락으로 cleanPerms가 매 저장마다 버려 숨김·수행 설정이 불가능했음(프런트 레지스트리와 일치 필수 — uismoke v430이 앱 MODULES와 순서까지 대조). quote=견적서·promo=홍보·safety=안전 › 교육·검진(v430)·hw=화관법(v431 메뉴 56 4-1 등록 — gw-data 컬렉션 없음 · v434 4-2부터 앱 탭 숨김·gw-hwakwan 폐기물 제출 수행 검사), 넷 다 기본 숨김 — 명시 부여만
 const LOCK_THRESHOLD = 5;                 // 연속 실패 허용 횟수
 const LOCK_MS = 15 * 60 * 1000;           // 잠금 시간(15분)
 function lockKey(name) { return `lock:${String(name).trim().toLowerCase()}`; }
@@ -103,7 +103,7 @@ const ROLE_OPEN_PERMS = {
 // 값이 없는 모듈의 기본값 — 닫고 시작하는 모듈(gw-data PERM_CLOSED와 같은 집합)은 'hide'다.
 // 종전엔 무조건 'view'라, 새 모듈을 MODULES에 넣는 순간 전 직원에게 열렸다(2026-09-10 site 추가 때 잡힘).
 // v430 safety 추가 — 모든 회원 저장이 cleanPerms를 거치므로 여기서 빠지면 다음 저장 때 직원 교육·건강진단 날짜가 '보기'로 열린다(기본 숨김 4곳 uismoke v430 대조)
-// v431 hw(화관법) 추가 — 여기서 빠지면 다음 저장 때 모든 직원 hw가 '보기'로 채워져, 4-2에서 탭을 켜는 순간 현장 부서에 화관법이 다시 열린다
+// v431 hw(화관법) 추가 — 여기서 빠지면 다음 저장 때 모든 직원 hw가 '보기'로 채워져, 탭을 켠 v434(4-2)부터 현장 부서에 화관법이 다시 열린다
 const CLOSED_DEFAULT = { quote: 1, promo: 1, hr: 1, lic: 1, site: 1, safety: 1, hw: 1 };
 function cleanPerms(p) { const out = {}; MODULES.forEach(function (k) { out[k] = (p && (p[k] === 'do' || p[k] === 'view' || p[k] === 'hide')) ? p[k] : (CLOSED_DEFAULT[k] ? 'hide' : 'view'); }); return out; }
 
