@@ -4727,6 +4727,523 @@ try {
     JSON.stringify({ ft: FT_PINS37.filter((s) => ftv37.indexOf(s) < 0).map((s) => s.slice(0, 30)), gates: [ftv37.indexOf('GATES_V437'), tlv37.indexOf('GATES_V437')], cb: cb37.length, notAi: cbNotAi37.map((l) => l.slice(0, 40)), pm: cbPM37.map((l) => l.slice(0, 40)), ops: cb37[1] ? TL_OPS37.filter((s) => cb37[1].indexOf(s) < 0).map((s) => s.slice(0, 30)) : 'none', man: [row37.indexOf(MAN_PIN37), row37.indexOf(MAN_LIM37)], tl396: tl396Row37.map((l) => [l.indexOf(TL396_PIN37), l.indexOf('8일째')]), sw: (sw37.match(/jw-shell-v(\d+)/) || [0, 0])[1] }));
 } catch (e) { console.log('  (v437 검사 생략 — ' + e.message + ')'); fails++; }
 
+// ---- v438(11/10 PM '45-1. #1.①ㄱ' — 09_조사_문서/표형탭_시안_자료_20261110/단계지시_v438_공통부품_폭.json · 엑셀형탭_명세_20261110.json common · 착수브리핑_20261110.md):
+//      엑셀형 표 공통 부품(vsSheet — index.html // @vs-sheet 구간) + PC 화면 폭(#app·사이드바·간격 단계 · 넓히는 화면은 id로만). 이번 판에는 부품을 쓰는 탭이 없어(탭 옮기기는 v439부터)
+//      이 하네스에 가짜 정의(명세 지시 표 모양 — 열 10개 · 단계별 열 합 696/944/1174)를 넣어 부품을 실제로 돌린다. 작은 DOM: host.innerHTML을 넣으면 여는 태그마다 요소(속성·value·checked·style·리스너)를
+//      새로 만든다(v435 하네스와 같은 방식 — 다시 그리면 요소가 새로 생김). 창 폭은 가짜 matchMedia가 env.width로 판정, 시계·타이머·rAF·ResizeObserver도 가짜.
+//      ① 화면 폭(head <style>을 읽어 계산 — 창 폭 − 스크롤바 17 = 명세 width_plan.table) ② 단계별 colgroup 열 수·CSS 숨김 ③ 칩 AND·모집단 칩·칩 건수·건수 글 ④ 정렬 ▲▼·빈 값·rank·칩별 기본 정렬·정렬 별칭
+//      ⑤ 거르기 150ms·한글 조합·칸마다 따로 기다림·enum 바로 ⑥ 폭 끌기(pointer)·끈 뒤 남는 열 ≥ 최소 폭·40~600·리스너 해제·끈 폭 저장 안 함 ⑦ localStorage 키 이름·저장 모양·옛 기억 거르기
+//      ⑧ 다시 그릴 때 펼침·입력값(data-keep)·포커스·커서·스크롤 ⑨ 폰 갈래(legacy = 옛 그리기 함수 그대로 · sheet = 폰 열·--pw·상세 카드)·경계 넘을 때 한 번만·숨은 표는 보일 때(ResizeObserver)
+//      ⑩ 골라 쓰기(선택 — 보이는 행만·숨은 선택 · 묶음 행 · 더보기 · 검색칸) ⑪ 날짜 칸 규칙·정의 검사 ⑫ 정적(계약·차량 ResizeObserver 한 줄·부품을 쓰는 탭 0·pointer·CSS) ⑬ 문서
+try {
+  const rd38 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const own38 = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+  const fn38 = (src, name) => { const i = src.indexOf('function ' + name + '('); if (i < 0) throw new Error('함수 없음: ' + name); let d = 0, st = false; for (let j = i; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i, j + 1); } } throw new Error('중괄호 짝 안 맞음: ' + name); };
+  // ① 화면 폭 — head <style>의 규칙을 읽어(주석 빼고, @media 안팎) 창 폭마다 마지막으로 이기는 값을 고른다(같은 선택자끼리 — 이 검사가 보는 선택자는 다른 선택자와 겹쳐 이기지 않는다)
+  const css38 = (() => { const i = html.indexOf('<style>'), j = html.indexOf('</style>', i); if (i < 0 || j < 0) throw new Error('head <style> 없음'); return html.slice(i + 7, j).replace(/\/\*[\s\S]*?\*\//g, ''); })();
+  const rules38 = [];
+  const parse38 = (src, media) => {
+    let i = 0;
+    while (i < src.length) {
+      const ob = src.indexOf('{', i); if (ob < 0) break;
+      const head = src.slice(i, ob).trim();
+      let d = 1, j = ob + 1; for (; j < src.length && d > 0; j++) { if (src[j] === '{') d++; else if (src[j] === '}') d--; }
+      const body = src.slice(ob + 1, j - 1);
+      if (/^@media/.test(head)) parse38(body, head.slice(6).trim());
+      else if (!/^@/.test(head)) { const decl = {}; body.split(';').forEach((p) => { const k = p.indexOf(':'); if (k > 0) decl[p.slice(0, k).trim()] = p.slice(k + 1).trim(); }); rules38.push({ media, sels: head.split(',').map((s) => s.trim().replace(/\s*>\s*/g, '>').replace(/\s+/g, ' ')), decl }); }
+      i = j;
+    }
+  };
+  parse38(css38, null);
+  const mq38 = (q, w) => { if (q == null) return true; if (/print/.test(q)) return false; const a = /\(min-width:\s*(\d+)px\)/.exec(q), b = /\(max-width:\s*(\d+)px\)/.exec(q); if (!a && !b) return false; return (!a || w >= +a[1]) && (!b || w <= +b[1]); };
+  const decl38 = (w, sel, prop) => { let v = null; rules38.forEach((r) => { if (mq38(r.media, w) && r.sels.indexOf(sel) >= 0 && own38(r.decl, prop)) v = r.decl[prop]; }); return v; };
+  const SB38 = 17;   // 세로 스크롤바 — html{scrollbar-gutter:stable}라 늘 비켜 둔다(명세 width_plan 표가 이 값으로 계산)
+  const padLR38 = (v) => { const p = String(v || '0px').trim().split(/\s+/).map((x) => parseFloat(x) || 0); const r = p.length === 1 ? p[0] : p[1]; return [p.length === 4 ? p[3] : r, r]; };
+  //   ★퀴즈 1번 대안(index.html v438 CSS 주석 — 860 묶음 #app 줄에 margin-left 하나, 1600 묶음 1680 상한은 남김)을 쓰게 되면 body38의 appW를 min(W − margin-left, max-width)로(margin-left = max(0, (W − 1060) / 2)) 고치고
+  //     WT38 기대값 9개 중 8개를 대안 값으로 함께 고친다: 1024 791(그대로) · 1100 856 · 1280 910 · 1366 953 · 1440 990 · 1536 1038 · 1600 1070 · 1920 1230 · 2560 1428 — MANUAL 1절·FEATURES v438·CLAUDE.md 폭 숫자도 같은 변경에서
+  const body38 = (win) => { const W = win - SB38, mx = decl38(win, '#app', 'max-width'), appW = (!mx || mx === 'none') ? W : Math.min(W, parseFloat(mx)), lr = padLR38(decl38(win, '#app', 'padding')); return appW - lr[0] - lr[1] - (parseFloat(decl38(win, '.tabbar', 'width')) || 0) - (parseFloat(decl38(win, '.layout', 'gap')) || 0); };
+  const viewW38 = (win, id) => { const b = body38(win), own = decl38(win, '#view-' + id, 'max-width'), base = decl38(win, '.views>.view', 'max-width'), mx = own != null ? own : base; return (!mx || mx === 'none') ? b : Math.min(b, parseFloat(mx)); };
+  //   명세 width_plan.table(창 → 본문, 스크롤바 17 포함): 1024 791 · 1100 867 · 1280 1011 · 1366 1097 · 1440 1171 · 1536 1267 · 1600 1331 · 1920·2560 1428
+  const WT38 = { 1024: 791, 1100: 867, 1280: 1011, 1366: 1097, 1440: 1171, 1536: 1267, 1600: 1331, 1920: 1428, 2560: 1428 };
+  const WIDE38 = ['con', 'veh', 'perm'];   // 명세 reading_width 9개 중 v438은 계약·차량·권한관리만 — 지시·기성·거래처·일용직·입찰은 각 탭 판(v439~v443), 안전(#view-safety)은 56 판(v445)에서 더한다
+  const views38 = [...html.matchAll(/<(?:section|div) class="view(?: active)?" id="view-([a-z]+)">/g)].map((m) => m[1]);
+  const SECS38 = ['tasks', 'veh', 'hwakwan', 'allbaro', 'rec', 'cal', 'lic', 'bid', 'con', 'cli', 'doc', 'hr', 'progress', 'ask', 'safety', 'quote', 'promo', 'workers', 'perm', 'fam', 'leave'];
+  const secs38 = [...html.matchAll(/<section class="view" id="view-([a-z]+)">/g)].map((m) => m[1]);
+  const wBad38 = Object.keys(WT38).filter((w) => Math.abs(body38(+w) - WT38[w]) > 2);
+  const vBad38 = [1366, 1920].map((w) => views38.filter((id) => viewW38(w, id) !== (WIDE38.indexOf(id) >= 0 ? body38(w) : 808)).join('/')).join('|') + '|' + views38.filter((id) => viewW38(1024, id) !== body38(1024)).join('/');
+  const perm38 = decl38(1366, '#view-perm>:not(#permRoster)', 'max-width') === '808px' && decl38(1920, '#view-perm>:not(#permRoster)', 'max-width') === '808px' && decl38(1920, '#permRoster', 'max-width') == null && decl38(1920, '#sfPaneNow', 'max-width') === '808px';
+  const phone38 = decl38(859, '#app', 'max-width') === '560px' && padLR38(decl38(859, '#app', 'padding')).join() === '16,16' && decl38(859, '.views>.view', 'max-width') == null && decl38(375, '.tabbar', 'width') == null && decl38(859, '.layout', 'gap') == null;
+  T('v438 ① 화면 폭(head <style>을 읽어 계산 — 창 폭 − 스크롤바 17): 본문 = 명세 width_plan.table(±2px) 1024 791 · 1100 867 · 1280 1011 · 1366 1097 · 1440 1171 · 1536 1267 · 1600 1331 · 1920·2560 1428 · 넓히는 화면 id 3개(계약·차량·권한관리 — 지시·기성·거래처·일용직·입찰은 각 탭 판 v439~v443, 안전은 v445)만 1366·1920에서 본문 폭, 그 밖 화면(안전 포함)은 808 · 1024 창은 모두 본문 폭(791 < 808) · 권한관리는 권한 표(#permRoster)만 넓고 그 밖 카드·안전 현황(#sfPaneNow) 808 · 859px 이하 틀 그대로(#app 최대 560·여백 16, 간격·사이드바 폭·읽기 폭 규칙 없음) · section 태그 21개 class="view" 그대로(class 더하지 않음)',
+    wBad38.length === 0 && vBad38 === '||' && views38.length === 23 && perm38 && phone38 && JSON.stringify(secs38) === JSON.stringify(SECS38) && !/<section class="view [^"]*" id=/.test(html),
+    JSON.stringify({ body: Object.keys(WT38).map((w) => w + ':' + body38(+w)), viewBad: vBad38, views: views38.length, perm38, phone38, secs: secs38.length }));
+
+  // ② 이후 — 부품 하네스
+  const blk38 = (() => { const i = html.indexOf('// @vs-sheet-start'), j = html.indexOf('// @vs-sheet-end'); if (i < 0 || j < i) throw new Error('@vs-sheet 구간 없음'); return html.slice(i, j); })();
+  const unesc38 = (s) => String(s).replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+  const mk38 = (o) => {
+    o = o || {};
+    const env = { width: o.width || 1366, mql: [], store: Object.assign({}, o.store || {}), sets: [], timers: [], now: 100000, log: [], raf: [], ro: [], roCb: null, paints: 0, cw: 1048 };   // cw = 요소 clientWidth(창 크기 바뀜 흉내)
+    const doc = { activeElement: null, L: {}, byId: {} };
+    doc.getElementById = (id) => doc.byId[id] || null;
+    doc.addEventListener = (t, f) => { (doc.L[t] = doc.L[t] || []).push(f); };
+    doc.removeEventListener = (t, f) => { doc.L[t] = (doc.L[t] || []).filter((g) => g !== f); };
+    const mkEl = (tag, attrs) => {
+      const el = { tagName: tag.toUpperCase(), attrs, L: {}, scrollLeft: 0, scrollTop: 0, parentNode: null };
+      Object.defineProperty(el, 'clientWidth', { get: () => env.cw });
+      el.getAttribute = (n) => (own38(attrs, n) ? unesc38(attrs[n]) : null);
+      el.setAttribute = (n, v) => { attrs[n] = String(v); };
+      el.hasAttribute = (n) => own38(attrs, n);
+      el.type = attrs.type || '';
+      el.value = own38(attrs, 'value') ? unesc38(attrs.value) : '';
+      el.checked = own38(attrs, 'checked');
+      const sp = {}; String(attrs.style || '').split(';').forEach((p) => { const k = p.indexOf(':'); if (k > 0) sp[p.slice(0, k).trim()] = p.slice(k + 1).trim(); });
+      el.style = { sp, setProperty: (k, v) => { sp[k] = String(v); }, getPropertyValue: (k) => sp[k] || '' };
+      Object.defineProperty(el.style, 'width', { get: () => sp.width || '', set: (v) => { sp.width = String(v); } });
+      const cls = new Set(String(attrs.class || '').split(/\s+/).filter(Boolean));
+      el.classList = { toggle: (c, on) => { if (on === undefined ? !cls.has(c) : on) cls.add(c); else cls.delete(c); }, contains: (c) => cls.has(c) };
+      el.addEventListener = (t, f) => { (el.L[t] = el.L[t] || []).push(f); };
+      el.fire = (t, ev) => { const e = Object.assign({ target: el, type: t, stopped: false }, ev || {}); e.stopPropagation = () => { e.stopped = true; }; e.preventDefault = () => {}; (el.L[t] || []).slice().forEach((f) => f(e)); return e; };
+      el.focus = () => { doc.activeElement = el; };
+      el.selectionStart = el.tagName === 'INPUT' ? el.value.length : null;
+      el.setSelectionRange = (a) => { el.selectionStart = a; env.log.push('caret:' + a); };
+      el.scrollIntoView = () => { env.log.push('into:' + (el.getAttribute('data-vs-detcard') || '')); };
+      return el;
+    };
+    const match = (el, sel) => {
+      let m = /^\[([\w-]+)\]$/.exec(sel); if (m) return el.hasAttribute(m[1]);
+      m = /^\[([\w-]+)="((?:[^"\\]|\\.)*)"\]$/.exec(sel); if (m) return el.getAttribute(m[1]) === m[2].replace(/\\(.)/g, '$1');
+      m = /^\.([\w-]+)$/.exec(sel); if (m) return el.classList.contains(m[1]);
+      throw new Error('시험 DOM이 모르는 선택자: ' + sel);
+    };
+    env.mkHost = (id) => {
+      const host = { id, attrs: {}, _h: '', els: [], visible: true };
+      host.getAttribute = (n) => (own38(host.attrs, n) ? host.attrs[n] : null);
+      host.setAttribute = (n, v) => { host.attrs[n] = String(v); };
+      host.getClientRects = () => (host.visible ? [{}] : []);
+      host.contains = (el) => host.els.indexOf(el) >= 0;
+      host.querySelectorAll = (sel) => host.els.filter((e) => match(e, sel));
+      host.querySelector = (sel) => host.els.find((e) => match(e, sel)) || null;
+      Object.defineProperty(host, 'innerHTML', { get: () => host._h, set: (v) => {
+        host._h = String(v); host.els = [];
+        for (const t of host._h.matchAll(/<([a-zA-Z][\w-]*)((?:[^<>"]|"[^"]*")*)>/g)) { const attrs = {}; for (const a of t[2].matchAll(/([\w-]+)(?:="([^"]*)")?/g)) attrs[a[1]] = a[2] === undefined ? '' : a[2]; host.els.push(mkEl(t[1], attrs)); }
+        env.paints++;
+      } });
+      doc.byId[id] = host;
+      return host;
+    };
+    const win = { get innerWidth() { return env.width; }, matchMedia: (q) => ({ media: q, get matches() { return mq38(q, env.width); }, addEventListener: (t, f) => { env.mql.push(f); } }), requestAnimationFrame: (f) => { env.raf.push(f); } };
+    const ls = o.throwStore ? { getItem: () => { throw new Error('저장소 막힘'); }, setItem: () => { throw new Error('저장소 막힘'); }, removeItem: () => { throw new Error('저장소 막힘'); } }   // 개인 창·저장소 차단 흉내
+      : { getItem: (k) => (own38(env.store, k) ? env.store[k] : null), setItem: (k, v) => { env.sets.push(k); env.store[k] = String(v); }, removeItem: (k) => { delete env.store[k]; } };
+    const stF = (f, ms) => { const t = { id: env.timers.length + 1, f, at: env.now + ms, done: false }; env.timers.push(t); return t.id; };
+    const ctF = (id) => { env.timers.forEach((t) => { if (t.id === id) t.done = true; }); };
+    class FD extends Date { static now() { return env.now; } }
+    function RO(cb) { env.roCb = cb; this.observe = (t) => { env.ro.push(t); }; }
+    const api = new Function('window', 'document', 'localStorage', 'setTimeout', 'clearTimeout', 'Date', 'ResizeObserver', [
+      fn38(html, 'esc'), 'function todayStr(){ return "2026-11-10"; }', fn38(html, 'vehDday'), blk38,
+      'return { render: vsSheetRender, inst: vsInst, filter: vsSheetFilter, setQ: vsSheetSetQ, reset: vsSheetReset, paneObs: vsPaneObserve, cols: vsSheetCols, minW: vsSheetMinW, check: vsSheetCheckDef, date: vsDateCell, KEYS: VS_SHEET_KEYS, BUDGET: VS_STAGE_BUDGET };'].join('\n'))(win, doc, ls, stF, ctF, FD, RO);
+    env.tick = (ms) => { env.now += ms; let t; while ((t = env.timers.filter((x) => !x.done && x.at <= env.now).sort((a, b) => a.at - b.at)[0])) { t.done = true; t.f(); } };
+    env.flushRaf = () => { env.raf.splice(0).forEach((f) => f()); };
+    env.breakAll = () => { env.mql.slice().forEach((f) => f({})); };
+    return { api, env, doc };
+  };
+  // 가짜 정의 — 명세 지시 표 모양(열 10개: 지시 내용 남는 폭 최소 220·폰 52% / 구분 108 lv2 / 계약 단계 160 lv3 / 담당 76 lv2 / 기한 144 폰 24% / 상태 88 폰 24% / 등록일 88 lv3 / 공개 110 lv4 / 완료 120 lv4 / 처리 60 lv2 정렬 없음)
+  const TODAY38 = '2026-11-10';
+  const C38 = () => [
+    { k: 't', h: '지시 내용', f: 'text', fill: 1, min: 220, pw: 52 }, { k: 'kind', h: '구분', w: 108, f: 'enum', lv: 2 }, { k: 'stage', h: '계약 단계', w: 160, f: 'text', lv: 3 },
+    { k: 'who', h: '담당', w: 76, f: 'enum', lv: 2 }, { k: 'due', h: '기한', w: 144, f: 'none', pw: 24 }, { k: 'st', h: '상태', w: 88, f: 'enum', pw: 24 },
+    { k: 'reg', h: '등록일', w: 88, f: 'none', lv: 3 }, { k: 'scope', h: '공개', w: 110, f: 'text', lv: 4 }, { k: 'done', h: '완료', w: 120, f: 'none', lv: 4 },
+    { k: 'act', h: '처리', w: 60, f: 'none', lv: 2, nosort: 1 }];
+  const ROWS38 = [
+    { id: 'a', t: '가 준설 착공계 제출', kind: '일반', stage: '3/9 착공', who: '김', due: '2026-11-05', st: '진행', reg: '2026-11-01', scope: '', done: '' },
+    { id: 'b', t: '나 차량 정기검사', kind: '자동', stage: '', who: '이', due: '2026-11-12', st: '대기', reg: '2026-10-13', scope: '관리부', done: '' },
+    { id: 'c', t: '다 준설토 성분분석', kind: '계약', stage: '4/9 폐기물', who: '김', due: '', st: '진행', reg: '2026-11-03', scope: '', done: '' },
+    { id: 'd', t: '라 사진대지 양식', kind: '일반', stage: '', who: '박', due: '2026-11-01', st: '보류', reg: '2026-10-20', scope: '', done: '' },
+    { id: 'e', t: '마 보험 갱신 검토', kind: '일반', stage: '', who: '이', due: '2026-10-01', st: '완료', reg: '2026-09-15', scope: '', done: '2026-11-03' },
+    { id: 'f', t: '바 증명서 발급', kind: '자동', stage: '', who: '김', due: '2026-09-01', st: '완료', reg: '2026-08-29', scope: '', done: '2026-11-08' },
+    { id: 'g', t: '사 옛 공고 검토', kind: '일반', stage: '', who: '박', due: '2026-10-20', st: '진행', reg: '2026-10-01', scope: '', done: '', old: 1 }];
+  const CH38 = () => [
+    { g: 'st', items: [{ k: '', h: '진행 중', test: (r) => r.st !== '완료' }, { k: 'over', h: '기한 경과', warn: 1, test: (r) => r.st !== '완료' && !!r.due && r.due < TODAY38 }, { k: 'done', h: '완료', test: (r) => r.st === '완료', sort: { k: 'done', d: -1 } }, { k: 'all', h: '전체', pc: 1 }] },
+    { g: 'kd', items: [{ k: '', h: '구분 전체' }, { k: 'auto', h: '자동', test: (r) => r.kind === '자동' }] }];
+  const def38 = (o, log) => Object.assign({
+    key: 'jw_task_sheet', host: 'vsT', unit: '건', none: '지시가 없습니다.', empty: '조건에 맞는 지시가 없습니다.', cols: C38(), rows: () => ROWS38, id: (r) => r.id, val: (r, k) => r[k],
+    cell: (r, c) => (c.k === 'act' ? '<button type="button" class="mini-btn" data-x-done="' + r.id + '">완료</button>' : null), rowCls: (r) => (r.st === '보류' ? 'grey' : ''),
+    chips: CH38(), sort: { k: 'due', d: 1 }, rank: (r) => (r.st === '보류' ? 1 : 0),
+    foot: (rows) => ({ due: '경과 ' + rows.filter((r) => r.due && r.due < TODAY38 && r.st !== '완료').length }),
+    detail: (r, ctx) => '<div class="vs-dh"><b>' + r.t + '</b>' + ctx.close + '</div><input type="text" data-keep="memo" value=""><button type="button" class="mini-btn" data-x-edit="' + r.id + '">수정</button>',
+    bind: (root, r) => { if (log) log.push('bind:' + r.id); }, legacy: () => { if (log) log.push('legacy'); },
+  }, o || {});
+  const order38 = (h) => [...h.matchAll(/data-vs-row="([^"]*)"/g)].map((m) => m[1]).join('');
+  const cg38 = (h) => ((h.match(/<colgroup>([\s\S]*?)<\/colgroup>/) || ['', ''])[1].match(/<col /g) || []).length;
+  const th38 = (h) => ((h.match(/<thead><tr>([\s\S]*?)<\/tr>/) || ['', ''])[1].match(/<th[ >]/g) || []).length;
+  const arrows38 = (h) => [...h.matchAll(/data-vs-sort="(\w+)"[^>]*>[^<]*<span class="vs-ar">(▲|▼)<\/span>/g)].map((m) => m[1] + m[2]).join(',') || '-';
+  const cnt38 = (h) => (/<span class="vs-count">([^<]*)<\/span>/.exec(h) || ['', ''])[1];
+  const chipTxt38 = (h, gk) => (new RegExp('data-vs-chip="' + gk.replace('|', '\\|') + '"[^>]*>([^<]*)</button>').exec(h) || ['', '?'])[1];
+  const click38 = (host, sel, ev) => { const el = host.querySelector(sel); if (!el) throw new Error('시험 표에 없음: ' + sel); return el.fire('click', ev); };
+  const minw38 = (h) => Number((/--vs-minw:(\d+)px/.exec(h) || [0, 0])[1]);
+
+  // ② 단계별 colgroup 열 수(그 단계에 보이는 열만 — v374 교훈) · 머리 칸 수 · --vs-minw = 명세 단계별 열 합 · CSS 숨김 class · 처리 열(정렬 없음) · 남는 폭 열에 끌기 손잡이 없음
+  const stg38 = [1000, 1366, 1920].map((w) => { const X = mk38({ width: w }), h = X.env.mkHost('vsT'); X.api.render(def38()); return { cg: cg38(h._h), th: th38(h._h), minw: minw38(h._h), h: h._h }; });
+  const P38 = mk38({ width: 375 }), hP38 = P38.env.mkHost('vsT'); P38.api.render(def38({ phone: 'sheet' }));
+  const h4_38 = stg38[2].h;
+  T('v438 ② 단계별 colgroup·CSS 숨김: 열 수 860~1279 6 · 1280~1599 8 · 1600~ 10 · 폰 표 3(머리 칸 수도 같음) · 표 최소 폭(--vs-minw) = 명세 단계별 열 합 696 · 944 · 1174(남는 폭 열은 최소 220) · 칸 class lv2 vs-hs · lv3 vs-hs vs-l3 · lv4 vs-hs vs-l4 · lv1 없음 · 처리 열 = 정렬 없음(vs-ns, data-vs-sort 없음) · 남는 폭 열(지시 내용)에는 끌기 손잡이 없음 · CSS: 1279 이하 .vs .vs-l3 숨김·1280부터 보임 / 1599 이하 .vs .vs-l4 숨김·1600부터 보임',
+    stg38.map((s) => s.cg + '/' + s.th + '/' + s.minw).join(',') === '6/6/696,8/8/944,10/10/1174' && cg38(hP38._h) === 3 && th38(hP38._h) === 3
+    && /<th class="vs-hs" data-vs-sort="kind" title="누르면 정렬">구분/.test(h4_38) && /<th class="vs-hs vs-l3" data-vs-sort="stage"/.test(h4_38) && /<th class="vs-hs vs-l4" data-vs-sort="scope"/.test(h4_38) && /<th data-vs-sort="t" title="누르면 정렬">지시 내용<\/th>/.test(h4_38)
+    && /<th class="vs-hs vs-ns">처리<span class="vs-rs" data-vs-rs="act"/.test(h4_38) && !/data-vs-sort="act"/.test(h4_38) && !/data-vs-rs="t"/.test(h4_38) && /<col data-vs-col="t" style="">/.test(h4_38)
+    && decl38(1279, '.vs .vs-l3', 'display') === 'none' && decl38(1280, '.vs .vs-l3', 'display') == null && decl38(1599, '.vs .vs-l4', 'display') === 'none' && decl38(1600, '.vs .vs-l4', 'display') == null,
+    JSON.stringify({ stg: stg38.map((s) => s.cg + '/' + s.th + '/' + s.minw), phone: cg38(hP38._h) + '/' + th38(hP38._h) }));
+
+  // ③ 칩 — 묶음 안 하나·묶음끼리 AND · 건수 글 '보이는 n건 / 전체 m건' · 0건 글 · 모집단 칩(pop — 켜지지 않았으면 그 칩 행을 모든 칩에서 뺌) · 칩 건수(chipCount = 그 칩을 누르면 보일 건수)
+  const A38 = mk38({ width: 1366 }), hA38 = A38.env.mkHost('vsT'), dA38 = def38(); A38.api.render(dA38);
+  const ch38 = [[order38(hA38._h), cnt38(hA38._h)]];
+  click38(hA38, '[data-vs-chip="st|over"]'); ch38.push([order38(hA38._h), cnt38(hA38._h)]);
+  click38(hA38, '[data-vs-chip="kd|auto"]'); ch38.push([order38(hA38._h), cnt38(hA38._h), /<td colspan="8" class="vs-none">조건에 맞는 지시가 없습니다\.<\/td>/.test(hA38._h)]);
+  click38(hA38, '[data-vs-chip="st|"]'); ch38.push([order38(hA38._h)]);
+  click38(hA38, '[data-vs-chip="st|done"]'); ch38.push([order38(hA38._h)]);
+  click38(hA38, '[data-vs-chip="st|all"]'); ch38.push([order38(hA38._h)]);
+  click38(hA38, '[data-vs-chip="kd|"]'); ch38.push([order38(hA38._h), cnt38(hA38._h)]);
+  const onCls38 = /class="vs-chip on" data-vs-chip="st\|all"/.test(hA38._h) && /class="vs-chip warn" data-vs-chip="st\|over"/.test(hA38._h) && /class="vs-chip on" data-vs-chip="kd\|"/.test(hA38._h);
+  const popCh38 = () => [{ g: 'st', items: [{ k: '', h: '진행 중', test: (r) => r.st !== '완료' }, { k: 'old', h: '지남', pop: 1, warn: 1, test: (r) => !!r.old }, { k: 'all', h: '전체' }] }, CH38()[1]];
+  const B38 = mk38({ width: 1366 }), hB38 = B38.env.mkHost('vsT'), dB38 = def38({ chips: popCh38(), chipCount: 1 }); B38.api.render(dB38);
+  const pop38 = [order38(hB38._h), cnt38(hB38._h), ['st|', 'st|old', 'st|all', 'kd|', 'kd|auto'].map((k) => chipTxt38(hB38._h, k)).join(',')];
+  click38(hB38, '[data-vs-chip="st|old"]'); pop38.push(order38(hB38._h), cnt38(hB38._h));
+  click38(hB38, '[data-vs-chip="kd|auto"]'); pop38.push(order38(hB38._h), ['st|', 'st|old', 'st|all', 'kd|', 'kd|auto'].map((k) => chipTxt38(hB38._h, k)).join(','));
+  //   칩 건수 = 그 칩을 실제로 눌렀을 때 '보이는 n건'(같은 시험 틀에서 눌러 보고 원래 칩으로 되돌림 — 기본·거르기 줄·검색어+전체 세 상태에서 칩 5개 모두) · 건수가 안 바뀌는 누름(행 펼침·닫기·정렬)은 칩 판정을 다시 안 부름(직전 건수 — v438 검토 '누를 때마다 칩 판정 수만 번')
+  const num38 = (h, k) => Number((new RegExp('data-vs-chip="' + k.replace('|', '\\|') + '"[^>]*>[^<]* (\\d+)</button>').exec(h) || [0, -1])[1]);
+  const vis38 = (h) => Number((/<span class="vs-count">보이는 (\d+)/.exec(h) || [0, -1])[1]);
+  const onOf38 = (h, g) => (new RegExp('class="vs-chip[^"]* on" data-vs-chip="(' + g + '\\|[^"]*)"').exec(h) || [0, ''])[1];
+  const eqCnt38 = (host) => { const bad = []; ['st|', 'st|old', 'st|all', 'kd|', 'kd|auto'].forEach((k) => { const shown = num38(host._h, k), back = onOf38(host._h, k.split('|')[0]); click38(host, '[data-vs-chip="' + k + '"]'); const got = vis38(host._h); if (shown !== got) bad.push(k + ':' + shown + '≠' + got); click38(host, '[data-vs-chip="' + back + '"]'); }); return bad.join(','); };
+  let tc38 = 0;
+  const cntCh38 = () => [popCh38()[0], { g: 'kd', items: [{ k: '', h: '구분 전체' }, { k: 'auto', h: '자동', test: (r) => { tc38++; return r.kind === '자동'; } }] }];
+  const E38 = mk38({ width: 1366 }), hE38 = E38.env.mkHost('vsT'), dE38 = def38({ chips: cntCh38(), chipCount: 1, search: { text: (r) => r.t } }); E38.api.render(dE38);
+  const eq38 = [eqCnt38(hE38)];
+  E38.api.filter(dE38, 'who', '김'); eq38.push(eqCnt38(hE38));
+  E38.api.setQ(dE38, '준설'); click38(hE38, '[data-vs-chip="st|all"]'); eq38.push(eqCnt38(hE38), order38(hE38._h));
+  tc38 = 0; click38(hE38, '[data-vs-row="a"]'); click38(hE38, '[data-vs-close]'); click38(hE38, '[data-vs-sort="who"]'); const tcKeep38 = tc38;
+  tc38 = 0; E38.api.filter(dE38, 'who', ''); const tcNew38 = tc38;
+  T('v438 ③ 칩: 기본(진행 중) gabcd "보이는 5건 / 전체 7건" · 기한 경과 gad "보이는 3건" · 경과 AND 자동 = 0건(빈 줄 "조건에 맞는 지시가 없습니다.") · 진행 중 AND 자동 b · 완료 AND 자동 f · 전체 AND 자동 fb · 전체 7건 fegabcd · 켜진 칩만 on·빨강 칩 warn · 모집단 칩(지남 pop): 기본은 지남 행(g)을 빼고 abcd "보이는 4건 / 전체 6건"·칩 건수 "진행 중 4·지남 1·전체 6·구분 전체 4·자동 1" → 지남 g "보이는 1건 / 전체 1건" → 지남 AND 자동 0건·칩 건수 "진행 중 1·지남 0·전체 2·구분 전체 1·자동 0" · 칩 건수 = 그 칩을 눌렀을 때 보이는 건수(기본·담당 김·검색 "준설"+전체 세 상태 × 칩 5개) · 행 펼침·닫기·정렬 때 안 켜진 칩 판정 0번(직전 건수) · 거르기를 바꾸면 다시 셈',
+    JSON.stringify(ch38) === JSON.stringify([['gabcd', '보이는 5건 / 전체 7건'], ['gad', '보이는 3건 / 전체 7건'], ['', '보이는 0건 / 전체 7건', true], ['b'], ['f'], ['fb'], ['fegabcd', '보이는 7건 / 전체 7건']]) && onCls38
+    && JSON.stringify(pop38) === JSON.stringify(['abcd', '보이는 4건 / 전체 6건', '진행 중 4,지남 1,전체 6,구분 전체 4,자동 1', 'g', '보이는 1건 / 전체 1건', '', '진행 중 1,지남 0,전체 2,구분 전체 1,자동 0'])
+    && JSON.stringify(eq38) === JSON.stringify(['', '', '', 'ac']) && tcKeep38 === 0 && tcNew38 > 0,
+    JSON.stringify({ ch38, onCls38, pop38, eq38, tcKeep38, tcNew38 }));
+
+  // ④ 정렬 — 머리 누름 ▲▼(같은 열은 방향만) · 빈 값(기한 없는 c)은 방향과 상관없이 뒤 · rank(보류 d)는 방향과 상관없이 맨 뒤 · 처리 열은 정렬 없음 · 칩별 기본 정렬(완료 = 완료일 최근 먼저, 사람 정렬은 그 칩으로 가거나 나올 때만 풀림)
+  //   · 정렬 별칭(경과 = 등록일 반대 — sortAs·sortRev: 경과 머리 ▲·등록일 머리 ▼) · 1600 이상에서 완료 칩 = 완료 머리 ▼
+  const S38 = mk38({ width: 1366 }), hS38 = S38.env.mkHost('vsT'), dS38 = def38(); S38.api.render(dS38);
+  const so38 = [[order38(hS38._h), arrows38(hS38._h)]];
+  click38(hS38, '[data-vs-sort="due"]'); so38.push([order38(hS38._h), arrows38(hS38._h)]);
+  click38(hS38, '[data-vs-sort="due"]'); so38.push([order38(hS38._h), arrows38(hS38._h)]);
+  click38(hS38, '[data-vs-sort="who"]'); so38.push([order38(hS38._h), arrows38(hS38._h)]);
+  click38(hS38, '[data-vs-chip="st|done"]'); so38.push([order38(hS38._h), arrows38(hS38._h)]);
+  click38(hS38, '[data-vs-chip="st|"]'); so38.push([order38(hS38._h), arrows38(hS38._h)]);
+  click38(hS38, '[data-vs-sort="who"]'); click38(hS38, '[data-vs-chip="st|over"]'); so38.push([order38(hS38._h), arrows38(hS38._h)]);
+  const S4_38 = mk38({ width: 1920 }), hS4_38 = S4_38.env.mkHost('vsT'), dS4_38 = def38(); S4_38.api.render(dS4_38); click38(hS4_38, '[data-vs-chip="st|done"]');
+  const al38 = mk38({ width: 1366 }), hAl38 = al38.env.mkHost('vsT'), dAl38 = def38({ cols: C38().concat([{ k: 'age', h: '경과', w: 64, f: 'none', lv: 2, sortAs: 'reg', sortRev: 1 }]) }); al38.api.render(dAl38);
+  click38(hAl38, '[data-vs-sort="age"]'); const alias38 = [order38(hAl38._h), arrows38(hAl38._h)]; click38(hAl38, '[data-vs-sort="age"]'); alias38.push(order38(hAl38._h), arrows38(hAl38._h));
+  //   1920에서 고른 lv4 열(공개) 정렬은 1366으로 좁히면 안 보이는 열이라 기본 정렬(기한 ▲)로 · 기억(st.k)은 남아 다시 넓히면 공개 ▲(v438 검토 — 안 보이는 열로 정렬된 채 ▲▼가 어디에도 없던 것)
+  const HS38 = mk38({ width: 1920 }), hHS38 = HS38.env.mkHost('vsT'), dHS38 = def38(); HS38.api.render(dHS38); click38(hHS38, '[data-vs-sort="scope"]');
+  const hs38 = [order38(hHS38._h), arrows38(hHS38._h)]; HS38.env.width = 1366; HS38.env.breakAll(); hs38.push(order38(hHS38._h), arrows38(hHS38._h), HS38.api.inst(dHS38).st.k);
+  click38(hHS38, '[data-vs-sort="due"]'); hs38.push(arrows38(hHS38._h)); HS38.env.width = 1920; HS38.env.breakAll(); hs38.push(arrows38(hHS38._h));
+  const HS2_38 = mk38({ width: 1920 }), hHS2_38 = HS2_38.env.mkHost('vsT'), dHS2_38 = def38(); HS2_38.api.render(dHS2_38); click38(hHS2_38, '[data-vs-sort="scope"]'); HS2_38.env.width = 1366; HS2_38.env.breakAll(); HS2_38.env.width = 1920; HS2_38.env.breakAll(); hs38.push(order38(hHS2_38._h), arrows38(hHS2_38._h));
+  T('v438 ④ 정렬: 기본 기한 ▲ gabcd(빈 기한 c는 뒤·보류 d는 맨 뒤) → 기한 머리 ▼ bagcd(c·d 그대로 뒤) → ▲ gabcd → 담당 ▲ acgbd · 완료 칩(칩별 기본 정렬 완료일 ↓ — 사람 정렬 풀림) fe → 진행 중으로 나오면 정의 기본 기한 ▲ gabcd → 담당 정렬 뒤 기한 경과 칩(기본 정렬 없는 칩)은 담당 ▲ 그대로 agd · 1600 이상 완료 칩 = 완료 머리 ▼ · 정렬 별칭 경과(= 등록일 반대): 누르면 등록일 최근 먼저 cabgd·경과 ▲·등록일 ▼ → 다시 누르면 gbacd·경과 ▼·등록일 ▲ · 1920에서 공개(lv4) ▲ bacgd → 1366이면 안 보이는 열이라 기본 기한 ▲ gabcd(기억 scope 남음) → 기한 머리 = 기본 기한 ▼로 뒤집힘 → 1920으로 넓히면 기한 ▼ 그대로 / 공개 ▲ 뒤 좁혔다 넓히면 공개 ▲ 되살림',
+    JSON.stringify(so38) === JSON.stringify([['gabcd', 'due▲'], ['bagcd', 'due▼'], ['gabcd', 'due▲'], ['acgbd', 'who▲'], ['fe', '-'], ['gabcd', 'due▲'], ['agd', 'who▲']])
+    && order38(hS4_38._h) === 'fe' && arrows38(hS4_38._h) === 'done▼' && JSON.stringify(alias38) === JSON.stringify(['cabgd', 'reg▼,age▲', 'gbacd', 'reg▲,age▼'])
+    && JSON.stringify(hs38) === JSON.stringify(['bacgd', 'scope▲', 'gabcd', 'due▲', 'scope', 'due▼', 'due▼', 'bacgd', 'scope▲']),
+    JSON.stringify({ so38, s4: [order38(hS4_38._h), arrows38(hS4_38._h)], alias38, hs38 }));
+
+  // ⑤ 거르기 줄 — 글자 칸은 마지막 입력 150ms 뒤 한 번만(149ms엔 안 그림) · 한글 조합 중(compositionstart~end — isComposing 없이 오는 input도)엔 안 그리고 compositionend 뒤 150ms · 칸마다 따로 기다림(다른 칸을 쳐도 앞 칸 글이 안 사라짐) · 고르기(enum)는 바로 · 칩과 AND
+  const F38 = mk38({ width: 1366 }), hF38 = F38.env.mkHost('vsT'), dF38 = def38(); F38.api.render(dF38);
+  const pf38 = F38.env.paints, fr38 = [];
+  let ti38 = hF38.querySelector('[data-vf="t"]'); ti38.value = '준설'; ti38.fire('input', {});
+  fr38.push(F38.env.paints - pf38); F38.env.tick(149); fr38.push(F38.env.paints - pf38); F38.env.tick(1); fr38.push(F38.env.paints - pf38, order38(hF38._h));
+  ti38 = hF38.querySelector('[data-vf="t"]'); ti38.fire('compositionstart'); ti38.value = '성'; ti38.fire('input', { isComposing: true }); ti38.fire('input', {}); F38.env.tick(300); fr38.push(F38.env.paints - pf38);
+  ti38.fire('compositionend'); F38.env.tick(149); fr38.push(F38.env.paints - pf38); F38.env.tick(1); fr38.push(F38.env.paints - pf38, order38(hF38._h));
+  F38.api.reset(dF38);
+  const ta38 = hF38.querySelector('[data-vf="t"]'), tb38 = hF38.querySelector('[data-vf="stage"]');
+  ta38.value = '착공'; ta38.fire('input', {}); F38.env.tick(50); tb38.value = '/9'; tb38.fire('input', {}); F38.env.tick(150); fr38.push(order38(hF38._h));
+  F38.api.reset(dF38); const pe38 = F38.env.paints; const se38 = hF38.querySelector('[data-vf="who"]'); se38.value = '박'; se38.fire('change'); fr38.push(F38.env.paints - pe38, order38(hF38._h), cnt38(hF38._h));
+  //   두 음절(한글은 음절마다 앞 음절 compositionend → 곧바로 다음 compositionstart — v438 검토 '준서ㄹ'): '준' 확정 뒤 '서' 조합 중 300ms = 0번·같은 요소(앞 음절이 건 150ms를 compositionstart가 지움 — 포커스 없이 봄)
+  //   → 마지막 compositionend 뒤 149ms 0번·150ms 1번, 걸린 거르기 "준서"
+  F38.api.reset(dF38); F38.doc.activeElement = null; const p2_38 = F38.env.paints, t2_38 = hF38.querySelector('[data-vf="t"]');
+  t2_38.fire('compositionstart'); t2_38.value = '준'; t2_38.fire('input', { isComposing: true }); t2_38.fire('compositionend'); t2_38.fire('compositionstart'); t2_38.value = '준서'; t2_38.fire('input', { isComposing: true }); F38.env.tick(300);
+  const syl38 = [F38.env.paints - p2_38, hF38.querySelector('[data-vf="t"]') === t2_38];
+  t2_38.fire('compositionend'); F38.env.tick(149); syl38.push(F38.env.paints - p2_38); F38.env.tick(1); syl38.push(F38.env.paints - p2_38, F38.api.inst(dF38).st.f.t || '');
+  //   조합 중인 칸에 포커스가 있을 때 다른 일(자료 갱신·다른 칸 거르기)로 다시 그리면 미룸 = 0번·같은 요소 → 그 칸의 compositionend 뒤 150ms에 1번(담당 김 AND "준설" = ac)
+  F38.api.reset(dF38); const p3_38 = F38.env.paints, t3_38 = hF38.querySelector('[data-vf="t"]');
+  t3_38.focus(); t3_38.fire('compositionstart'); t3_38.value = '준설'; t3_38.fire('input', { isComposing: true }); F38.api.render(dF38); F38.api.filter(dF38, 'who', '김');
+  const dfr38 = [F38.env.paints - p3_38, hF38.querySelector('[data-vf="t"]') === t3_38];
+  t3_38.fire('compositionend'); F38.env.tick(150); dfr38.push(F38.env.paints - p3_38, order38(hF38._h));
+  //   치던 중 [필터 초기화] = 기다리던 150ms도 지움(초기화 뒤 옛 글이 다시 걸리지 않음)
+  F38.api.reset(dF38); F38.doc.activeElement = null; const t4_38 = hF38.querySelector('[data-vf="t"]'); t4_38.value = '준설'; t4_38.fire('input', {}); F38.env.tick(50); F38.api.reset(dF38); const p4_38 = F38.env.paints; F38.env.tick(300);
+  const rst38 = [F38.env.paints - p4_38, JSON.stringify(F38.api.inst(dF38).st.f), order38(hF38._h)];
+  T('v438 ⑤ 거르기 줄: 글자 칸 "준설" → 바로 0번·149ms 0번·150ms 1번 그림(ac) · 한글 조합 중 input(isComposing·없음 둘 다) 300ms 지나도 0번 → compositionend 뒤 149ms 0번·150ms 1번(c) · 칸마다 따로 기다림: 지시 내용 "착공" 50ms 뒤 계약 단계 "/9" = 둘 다 걸려 a(앞 칸 글이 사라지면 ac) · 담당 고르기 "박"은 바로 1번 = gd "보이는 2건 / 전체 7건"(칩 진행 중과 AND) · 두 음절 "준서": 둘째 음절 조합 중 300ms 0번·같은 요소 → 마지막 compositionend 뒤 149ms 0번·150ms 1번("준서") · 조합 중 다른 일로 그림 = 미룸(0번·같은 요소) → compositionend 뒤 1번(ac) · 치던 중 필터 초기화 = 기다리던 거르기도 지움(초기화 뒤 0번·거르기 없음·gabcd)',
+    JSON.stringify(fr38) === JSON.stringify([0, 0, 1, 'ac', 1, 1, 2, 'c', 'a', 1, 'gd', '보이는 2건 / 전체 7건'])
+    && JSON.stringify(syl38) === JSON.stringify([0, true, 0, 1, '준서']) && JSON.stringify(dfr38) === JSON.stringify([0, true, 1, 'ac']) && JSON.stringify(rst38) === JSON.stringify([0, '{}', 'gabcd']),
+    JSON.stringify({ fr38, syl38, dfr38, rst38 }));
+
+  // ⑥ 폭 끌기 — pointer 이벤트(pointerdown은 손잡이, pointermove·pointerup·pointercancel은 document — 놓으면 셋 다 해제) · 40~600 · 끌기 중 --vs-minw = 끈 폭을 반영한 고정 열 합 + 남는 열 최소 폭
+  //   → 표 칸 742·1048·1065에서 남는 열(지시 내용) = max(표 칸, --vs-minw) − 고정 열 합 ≥ 220 · 놓은 직후 머리 누름은 정렬 안 함(400ms) · 다시 그려도 끈 폭 유지(메모리) · 끈 폭은 기기 저장 안 함 · 오른쪽 단추는 끌기 아님
+  const G38 = mk38({ width: 1366 }), hG38 = G38.env.mkHost('vsT'), dG38 = def38(); G38.api.render(dG38);
+  hG38.querySelector('[data-vs-rs="stage"]').fire('pointerdown', { button: 0, clientX: 500 });
+  const lisOn38 = (G38.doc.L.pointermove || []).length === 1 && (G38.doc.L.pointerup || []).length === 1 && (G38.doc.L.pointercancel || []).length === 1;
+  G38.doc.L.pointermove[0]({ clientX: 800 });
+  const colSt38 = hG38.querySelector('[data-vs-col="stage"]').style.width, tblW38 = hG38.querySelector('[data-vs-table]').style.getPropertyValue('--vs-minw');
+  const fixed38 = 108 + 460 + 76 + 144 + 88 + 88 + 60, fill38 = [742, 1048, 1065].map((w) => Math.max(w, parseFloat(tblW38)) - fixed38);
+  G38.doc.L.pointerup[0]({});
+  const lisOff38 = !(G38.doc.L.pointermove || []).length && !(G38.doc.L.pointerup || []).length && !(G38.doc.L.pointercancel || []).length;
+  hG38.querySelector('[data-vs-rs="kind"]').fire('pointerdown', { button: 0, clientX: 0 }); G38.doc.L.pointermove[0]({ clientX: -1000 });
+  const kMin38 = hG38.querySelector('[data-vs-col="kind"]').style.width; G38.doc.L.pointermove[0]({ clientX: 5000 }); const kMax38 = hG38.querySelector('[data-vs-col="kind"]').style.width; G38.doc.L.pointerup[0]({});
+  click38(hG38, '[data-vs-sort="kind"]'); const noSort38 = arrows38(hG38._h) === 'due▲';
+  G38.env.now += 500; click38(hG38, '[data-vs-sort="kind"]'); const sorted38 = arrows38(hG38._h) === 'kind▲';
+  const keepW38 = /<col data-vs-col="stage" style="width:460px;">/.test(hG38._h) && /<col data-vs-col="kind" style="width:600px;">/.test(hG38._h) && minw38(hG38._h) === 220 + 600 + 460 + 76 + 144 + 88 + 88 + 60;
+  const stored38 = G38.env.store.jw_task_sheet || '';
+  hG38.querySelector('[data-vs-rs="kind"]').fire('pointerdown', { button: 2, clientX: 0 }); const rb38 = !(G38.doc.L.pointermove || []).length;
+  //   끌기를 시작한 포인터 하나만(v438 검토): 다른 손가락(pointerId 2)의 이동·놓기 무시 → 시작한 손가락 이동만 반영·놓으면 끝 · 보조 포인터(isPrimary false)는 시작 안 함
+  //   · 마우스 단추 없이 움직이면(창 밖에서 놓쳐 pointerup이 안 옴) 끌기 끝·폭 그대로 · 끄는 중 다른 일로 다시 그려도 새 표의 col·--vs-minw가 손을 따라감
+  const GP38 = mk38({ width: 1366 }), hGP38 = GP38.env.mkHost('vsT'), dGP38 = def38(); GP38.api.render(dGP38);
+  const kw38 = () => hGP38.querySelector('[data-vs-col="kind"]').style.width, nmv38 = () => (GP38.doc.L.pointermove || []).length;
+  const pmv38 = (ev) => { (GP38.doc.L.pointermove || []).slice().forEach((f) => f(ev)); }, pup38 = (ev) => { (GP38.doc.L.pointerup || []).slice().forEach((f) => f(ev)); };   // 리스너가 없으면 아무 일 없음(결함이면 이 검사가 ✗ — 시험 틀이 멈추지 않게)
+  hGP38.querySelector('[data-vs-rs="kind"]').fire('pointerdown', { button: 0, clientX: 0, pointerId: 1, pointerType: 'touch', isPrimary: true });
+  pmv38({ clientX: 50, pointerId: 2, pointerType: 'touch' }); const pid38 = [kw38()];
+  pup38({ pointerId: 2, pointerType: 'touch' }); pid38.push(nmv38());
+  pmv38({ clientX: 30, pointerId: 1, pointerType: 'touch' }); pid38.push(kw38());
+  pup38({ pointerId: 1, pointerType: 'touch' }); pid38.push(nmv38());
+  hGP38.querySelector('[data-vs-rs="kind"]').fire('pointerdown', { button: 0, clientX: 0, pointerId: 3, pointerType: 'touch', isPrimary: false }); pid38.push(nmv38());
+  hGP38.querySelector('[data-vs-rs="kind"]').fire('pointerdown', { button: 0, clientX: 0, pointerId: 4, pointerType: 'mouse', buttons: 1 });
+  pmv38({ clientX: 200, pointerId: 4, pointerType: 'mouse', buttons: 0 }); pid38.push(nmv38(), kw38());
+  pup38({}); GP38.doc.L.pointermove = []; GP38.doc.L.pointerup = []; GP38.doc.L.pointercancel = [];   // 앞 단계가 깨졌을 때 남은 리스너를 치워 아래 '끄는 중 다시 그림'만 따로 봄
+  hGP38.querySelector('[data-vs-rs="kind"]').fire('pointerdown', { button: 0, clientX: 0 }); GP38.api.render(dGP38); pmv38({ clientX: 100 });
+  pid38.push(kw38(), hGP38.querySelector('[data-vs-table]').style.getPropertyValue('--vs-minw')); pup38({}); pid38.push(nmv38());
+  T('v438 ⑥ 폭 끌기(pointer): 손잡이 pointerdown → document pointermove·pointerup·pointercancel 1개씩 · 계약 단계 +300 = col 460px·--vs-minw 1244px(= 944 + 300) · 표 칸 742/1048/1065에서 남는 열 ' + fill38.join('/') + ' ≥ 최소 220 · 놓으면 리스너 0 · 40~600(−1000 → 40px · +5000 → 600px) · 놓은 직후 머리 누름은 정렬 안 함·500ms 뒤 정렬 · 다시 그려도 끈 폭(460·600)과 --vs-minw 유지 · 기기 저장에 끈 폭 없음 · 오른쪽 단추는 끌기 아님 · 다른 손가락 이동(108px 그대로)·놓기(리스너 남음) 무시 → 시작한 손가락 +30 = 138px → 놓으면 0 · 보조 포인터는 시작 안 함 · 마우스 단추 없이 움직이면 끝(리스너 0·138px 그대로) · 끄는 중 다시 그려도 새 표 col 238px·--vs-minw 1074px(= 944 + 130)',
+    lisOn38 && colSt38 === '460px' && tblW38 === '1244px' && fill38.every((x) => x >= 220) && lisOff38 && kMin38 === '40px' && kMax38 === '600px' && noSort38 && sorted38 && keepW38
+    && stored38.length > 0 && stored38.indexOf('460') < 0 && stored38.indexOf('600') < 0 && stored38.indexOf('colw') < 0 && rb38
+    && JSON.stringify(pid38) === JSON.stringify(['108px', 1, '138px', 0, 0, 0, '138px', '238px', '1074px', 0]),
+    JSON.stringify({ lisOn38, colSt38, tblW38, fill38, lisOff38, kMin38, kMax38, noSort38, sorted38, keepW38, stored38, rb38, pid38 }));
+
+  // ⑦ 기기 기억(localStorage) — 저장 이름은 명세 common.memory 8개(jw_*_sheet)뿐 · 저장은 def.key 하나에 {k,d,f,chip}만(끈 폭·검색어·펼침 없음) · 옛 기억은 정의에 있는 열·칩·값만 받아들임 · 깨진 기억이면 빈 상태로(던지지 않음)
+  const K38 = mk38({ width: 1366, store: { jw_task_sheet: JSON.stringify({ k: 'who', d: -1, f: { t: '준설', bogus: 'x', due: 'y' }, chip: { st: 'over', kd: 'nope', zz: 'q' }, colw: { t: 500 } }) } });
+  const hK38 = K38.env.mkHost('vsT'), dK38 = def38(); K38.api.render(dK38);
+  const kst38 = K38.api.inst(dK38).st, kld38 = [kst38.k, kst38.d, JSON.stringify(kst38.f), JSON.stringify(kst38.chip), Object.keys(K38.api.inst(dK38).colw).length, order38(hK38._h), arrows38(hK38._h)];
+  click38(hK38, '[data-vs-chip="kd|auto"]');
+  const ksv38 = JSON.parse(K38.env.store.jw_task_sheet);
+  const K2_38 = mk38({ width: 1366, store: { jw_task_sheet: '{깨짐' } }); K2_38.env.mkHost('vsT'); const kr2_38 = K2_38.api.render(def38()), kb2_38 = JSON.stringify(K2_38.api.inst(def38()).st);
+  //   저장소가 던지면(개인 창·사이트 데이터 차단 — getItem·setItem 모두) 그리기·칩 누름·거르기가 오류 없이 되고 상태는 메모리에 남음(v438 검토)
+  let thr38 = '';
+  try { const K3_38 = mk38({ width: 1366, throwStore: 1 }), hK3_38 = K3_38.env.mkHost('vsT'), dK3_38 = def38(); thr38 = K3_38.api.render(dK3_38); click38(hK3_38, '[data-vs-chip="kd|auto"]'); K3_38.api.filter(dK3_38, 'who', '이'); thr38 += ':' + order38(hK3_38._h) + ':' + JSON.stringify(K3_38.api.inst(dK3_38).st.chip) + JSON.stringify(K3_38.api.inst(dK3_38).st.f); } catch (e) { thr38 = '던짐 ' + e.message; }
+  T('v438 ⑦ 기기 기억: 저장 이름 = 명세 8개(jw_task_sheet·jw_rec_sheet·jw_cli_sheet·jw_wk_sheet·jw_bid_sheet·jw_ob_sheet·jw_site_sheet·jw_edu_sheet — 계약·차량 키 아님) · 옛 기억 읽기 = 정렬 담당 ▼·거르기는 정의에 있는 글자/고르기 열만(모르는 열·거르기 없음 열 버림)·칩은 있는 값만·끈 폭은 안 읽음 → 기한 경과 AND "준설" = a · 칩을 누르면 jw_task_sheet 한 곳에만 저장·키는 k,d,f,chip 넷뿐 · 깨진 기억은 빈 상태로 그림 · 저장소가 던져도(읽기·쓰기) 그리기·칩·거르기 오류 없음(자동 AND 담당 이 = b, 상태는 메모리)',
+    JSON.stringify(K38.api.KEYS) === JSON.stringify(['jw_task_sheet', 'jw_rec_sheet', 'jw_cli_sheet', 'jw_wk_sheet', 'jw_bid_sheet', 'jw_ob_sheet', 'jw_site_sheet', 'jw_edu_sheet'])
+    && JSON.stringify(kld38) === JSON.stringify(['who', -1, '{"t":"준설"}', '{"st":"over"}', 0, 'a', 'who▼'])
+    && K38.env.sets.length >= 1 && K38.env.sets.every((k) => k === 'jw_task_sheet') && Object.keys(ksv38).join() === 'k,d,f,chip' && ksv38.chip.kd === 'auto' && ksv38.chip.st === 'over' && ksv38.f.t === '준설'
+    && kr2_38 === 'sheet' && kb2_38 === '{"k":"","d":1,"f":{},"chip":{}}' && thr38 === 'sheet:b:{"kd":"auto"}{"who":"이"}',
+    JSON.stringify({ kld38, sets: K38.env.sets, ksv38, kr2_38, kb2_38, thr38 }));
+
+  // ⑧ 다시 그릴 때(자료 갱신·폴링 같은 다른 일로) — 펼친 행 · 펼침 안 입력값(data-keep) · 거르기 칸 포커스·치던 글·커서 · 표 칸 스크롤(가로·세로) 그대로 · 행 안 버튼 누름은 펼침으로 안 번짐 · [닫기 ▲] · 거르기로 빠진 펼친 행은 닫힘 · 펼침 배선(bind) 불림
+  const lg8 = [], R38 = mk38({ width: 1366 }), hR38 = R38.env.mkHost('vsT'), dR38 = def38({}, lg8); R38.api.render(dR38);
+  click38(hR38, '[data-vs-row="a"]');
+  const o1_38 = /<tr class="vs-r open" data-vs-row="a">/.test(hR38._h) && /data-vs-det="a"/.test(hR38._h) && lg8.indexOf('bind:a') >= 0;
+  hR38.querySelector('[data-keep="memo"]').value = '적던 글';
+  const w0_38 = hR38.querySelector('[data-vs-wrap]'); w0_38.scrollLeft = 120; w0_38.scrollTop = 33;
+  const f0_38 = hR38.querySelector('[data-vf="t"]'); f0_38.value = '가 준'; f0_38.focus(); f0_38.selectionStart = 2;
+  const pr38 = R38.env.paints; R38.api.render(dR38);
+  const f1_38 = hR38.querySelector('[data-vf="t"]'), w1_38 = hR38.querySelector('[data-vs-wrap]');
+  const o2_38 = R38.env.paints === pr38 + 1 && hR38.querySelector('[data-keep="memo"]').value === '적던 글' && /data-vs-det="a"/.test(hR38._h) && w1_38 !== w0_38 && w1_38.scrollLeft === 120 && w1_38.scrollTop === 33
+    && R38.doc.activeElement === f1_38 && f1_38 !== f0_38 && f1_38.value === '가 준' && R38.env.log.indexOf('caret:2') >= 0;
+  const trB38 = hR38.querySelector('[data-vs-row="b"]'); trB38.fire('click', { target: { tagName: 'BUTTON', parentNode: trB38 } });
+  const o3_38 = !/data-vs-det="b"/.test(hR38._h) && /data-vs-det="a"/.test(hR38._h);
+  click38(hR38, '[data-vs-close]'); const o4_38 = !/data-vs-det=/.test(hR38._h) && R38.api.inst(dR38).open === null;
+  click38(hR38, '[data-vs-row="b"]'); const o5a38 = /data-vs-det="b"/.test(hR38._h); R38.api.filter(dR38, 'who', '김'); const o5_38 = o5a38 && !/data-vs-det=/.test(hR38._h) && R38.api.inst(dR38).open === null && order38(hR38._h) === 'ac';
+  //   data-keep은 같은 행이 펼쳐져 있을 때만(v438 검토 — A를 연 채 B를 누르면 A에 적던 글이 B 칸에 들어가 B로 저장): a 펼침 메모 칸에 포커스·"A에 적던 글"·커서 3 → 다른 일로 다시 그림 = 같은 칸에 포커스·커서 3·글 그대로
+  //   → b 행 누름 = b 칸은 b 값 "B메모"·포커스는 b 칸으로 안 감 · 라디오(data-keep 같은 이름 둘)는 value 그대로·고른 것 유지 · 다른 자리(다른 표·창)에 있는 포커스는 가져오지 않음
+  const dK8 = (detail) => def38({ detail }), mem8 = (r, ctx) => '<div class="vs-dh"><b>' + r.t + '</b>' + ctx.close + '</div><input type="text" data-keep="memo" value="' + (r.id === 'b' ? 'B메모' : '') + '">';
+  const R2_38 = mk38({ width: 1366 }), hR2_38 = R2_38.env.mkHost('vsT'), dR2_38 = dK8(mem8); R2_38.api.render(dR2_38); click38(hR2_38, '[data-vs-row="a"]');
+  let m8 = hR2_38.querySelector('[data-keep="memo"]'); m8.value = 'A에 적던 글'; m8.focus(); m8.selectionStart = 3; R2_38.env.log.length = 0; R2_38.api.render(dR2_38);
+  const m8b = hR2_38.querySelector('[data-keep="memo"]'), o6_38 = m8b !== m8 && m8b.value === 'A에 적던 글' && R2_38.doc.activeElement === m8b && R2_38.env.log.indexOf('caret:3') >= 0;
+  click38(hR2_38, '[data-vs-row="b"]'); const m8c = hR2_38.querySelector('[data-keep="memo"]'), o7_38 = /data-vs-det="b"/.test(hR2_38._h) && m8c.value === 'B메모' && R2_38.doc.activeElement !== m8c;
+  const R3_38 = mk38({ width: 1366 }), hR3_38 = R3_38.env.mkHost('vsT'), dR3_38 = dK8(() => '<input type="radio" name="pk" data-keep="pick" value="1" checked><input type="radio" name="pk" data-keep="pick" value="2">'); R3_38.api.render(dR3_38); click38(hR3_38, '[data-vs-row="a"]');
+  let rd8 = hR3_38.querySelectorAll('[data-keep="pick"]'); rd8[0].checked = false; rd8[1].checked = true; R3_38.api.render(dR3_38); rd8 = hR3_38.querySelectorAll('[data-keep="pick"]');
+  const o8_38 = rd8.map((e) => e.value + ':' + e.checked).join() === '1:false,2:true';
+  const R4_38 = mk38({ width: 1366 }), hR4_38 = R4_38.env.mkHost('vsT'), hO38 = R4_38.env.mkHost('vsOther'); R4_38.api.render(def38()); hO38.innerHTML = '<input type="text" data-vf="t" value="다른 표">';
+  const oe38 = hO38.querySelector('[data-vf="t"]'); oe38.focus(); R4_38.api.render(def38()); const o9_38 = R4_38.doc.activeElement === oe38;
+  T('v438 ⑧ 다시 그릴 때 유지: 행 누름 = 한 건 펼침(open·data-vs-det·펼침 배선 bind) · 다른 일로 다시 그려도 펼친 행·펼침 안 입력값 "적던 글"(data-keep)·거르기 칸 포커스(새 요소)·치던 글 "가 준"·커서 2·표 칸 스크롤 120/33 그대로 · 행 안 버튼 누름은 펼침으로 안 번짐 · [닫기 ▲]로 접힘 · 펼친 행이 거르기로 빠지면 닫힘 · 펼침 칸(data-keep) 포커스·커서 3·글 유지 → 다른 행 누르면 그 행 값(B메모)·포커스 안 옮김 · 라디오 value·고른 것 유지 · 다른 자리 포커스는 안 가져옴',
+    o1_38 && o2_38 && o3_38 && o4_38 && o5_38 && o6_38 && o7_38 && o8_38 && o9_38, JSON.stringify({ o1_38, o2_38, o3_38, o4_38, o5_38, o6_38, o7_38, o8_38, o9_38, log: R38.env.log }));
+
+  // ⑨ 폰 갈래 — legacy(기본): 859px 이하면 탭의 지금 그리기 함수를 인자 없이 그대로 부르고 그 자리 글은 옛 함수 몫(부품이 덧쓰지 않음) · PC 표가 있던 자리면 먼저 비움 · 경계 넘을 때 한 번만(같은 단계 안·같은 경계 두 번째는 다시 안 그림)
+  //   sheet: 폰 열(lv1) 3·--pw 52/24/24·끌기 손잡이 없음·PC 전용 칩은 vs-pc·누른 행 상세는 표 아래 .vs-detcard(표 안 펼침 없음)+화면 안으로 · PC로 넘어가면 표 안 펼침 · 숨은 표는 경계 때 stale만, 보일 때 ResizeObserver 콜백 → 다음 그림(rAF)에 한 번
+  const lq38 = [], Q38 = mk38({ width: 375 }), hQ38 = Q38.env.mkHost('vsT');
+  const dQ38 = def38({ legacy: function () { lq38.push('legacy:' + arguments.length); hQ38.innerHTML = '<div class="item">옛 화면</div>'; } });
+  const rq38 = Q38.api.render(dQ38);
+  const q1_38 = rq38 === 'legacy' && lq38.join() === 'legacy:0' && hQ38._h === '<div class="item">옛 화면</div>' && hQ38.getAttribute('data-vs-mode') === 'legacy' && Q38.env.paints === 1;
+  const lq2_38 = [], Q2_38 = mk38({ width: 1366 }), hQ2_38 = Q2_38.env.mkHost('vsT');
+  const dQ2_38 = def38({ legacy: () => { lq2_38.push(hQ2_38._h.indexOf('data-vs-wrap') >= 0 ? 'legacy:표 남음' : 'legacy:빈 자리'); } });
+  Q2_38.api.render(dQ2_38); const pq38 = Q2_38.env.paints;
+  Q2_38.env.width = 375; Q2_38.env.breakAll(); Q2_38.env.breakAll();
+  const q2_38 = lq2_38.join() === 'legacy:빈 자리' && hQ2_38._h === '' && Q2_38.env.paints === pq38 + 1 && Q2_38.env.mql.length === 3;
+  Q2_38.env.width = 1366; Q2_38.env.breakAll(); Q2_38.env.breakAll();
+  const q3_38 = /data-vs-wrap/.test(hQ2_38._h) && lq2_38.length === 1 && Q2_38.env.paints === pq38 + 2;
+  const Q3_38 = mk38({ width: 1366 }), hQ3_38 = Q3_38.env.mkHost('vsT'), dQ3_38 = def38(); Q3_38.api.render(dQ3_38); const pq3_38 = Q3_38.env.paints;
+  Q3_38.env.width = 1700; Q3_38.env.breakAll(); const q4a38 = Q3_38.env.paints === pq3_38 + 1 && cg38(hQ3_38._h) === 10; Q3_38.env.width = 1710; Q3_38.env.breakAll();
+  const q4_38 = q4a38 && Q3_38.env.paints === pq3_38 + 1;
+  const SP38 = mk38({ width: 375 }), hSP38 = SP38.env.mkHost('vsT'), dSP38 = def38({ phone: 'sheet' }); const rs38 = SP38.api.render(dSP38);
+  const s1_38 = rs38 === 'sheet' && cg38(hSP38._h) === 3 && (hSP38._h.match(/--pw:\d+%/g) || []).join() === '--pw:52%,--pw:24%,--pw:24%' && !/data-vs-rs=/.test(hSP38._h) && /class="vs-chip vs-pc" data-vs-chip="st\|all"/.test(hSP38._h) && SP38.api.check(dSP38).length === 0;
+  click38(hSP38, '[data-vs-row="b"]');
+  const s2_38 = /<div class="vs-detcard" data-vs-detcard="b">/.test(hSP38._h) && !/class="vs-det"/.test(hSP38._h) && SP38.env.log.indexOf('into:b') >= 0;
+  SP38.env.width = 1366; SP38.env.breakAll();
+  const s3_38 = /data-vs-det="b"/.test(hSP38._h) && !/data-vs-detcard/.test(hSP38._h) && cg38(hSP38._h) === 8;
+  const H38 = mk38({ width: 1366 }), hH38 = H38.env.mkHost('vsT'), dH38 = def38(); H38.api.render(dH38);
+  hH38.visible = false; const ph38 = H38.env.paints; H38.env.width = 1000; H38.env.breakAll();
+  const h1_38 = H38.env.paints === ph38 && H38.api.inst(dH38).stale === true && H38.env.ro.length === 1 && H38.env.ro[0] === hH38 && hH38.getAttribute('data-vs-host') === 'jw_task_sheet';
+  hH38.visible = true; H38.env.roCb([{ target: hH38 }]); const h2_38 = H38.env.paints === ph38;
+  H38.env.flushRaf(); const h3_38 = H38.env.paints === ph38 + 1 && cg38(hH38._h) === 6 && H38.api.inst(dH38).stale === false;
+  H38.env.roCb([{ target: hH38 }]); H38.env.flushRaf(); const h4_38b = H38.env.paints === ph38 + 1 && hH38.querySelector('.vs-wrap').style.getPropertyValue('--vs-panew') === '1048px';
+  //   경계값(v438 검토 — 859/860 · 1279/1280 · 1599/1600): sheet 정의 colgroup 열 수 3·6·6·8·8·10 · 갈래가 정해질 때마다 onMode(375 legacy → 옛 함수 → 1366 sheet)
+  //   · legacy가 갈래 함수를 다시 부르는 잘못된 정의(새 입구를 넘김)도 한 번만 부르고 멈추지 않음 · 숨은 동안 ResizeObserver 콜백이 와도 안 그림 · 같은 단계 안 경계 알림(1366 → 1300)은 stale을 안 붙여 보여도 다시 안 그림
+  const bnd38 = [859, 860, 1279, 1280, 1599, 1600].map((w) => { const X = mk38({ width: w }), h = X.env.mkHost('vsT'); X.api.render(def38({ phone: 'sheet' })); return cg38(h._h); }).join(',');
+  const om38 = [], OM38 = mk38({ width: 375 }); OM38.env.mkHost('vsT'); const dOM38 = def38({ onMode: (m) => om38.push(m), legacy: () => om38.push('옛 함수') }); OM38.api.render(dOM38); OM38.env.width = 1366; OM38.env.breakAll();
+  let rec38 = 0, recE38 = ''; const RC38 = mk38({ width: 375 }); RC38.env.mkHost('vsT'); const dRC38 = def38({ legacy: () => { rec38++; if (rec38 > 20) throw new Error('끝나지 않음'); RC38.api.render(dRC38); } });
+  try { RC38.api.render(dRC38); } catch (e) { recE38 = e.message; }
+  const H2_38 = mk38({ width: 1366 }), hH2_38 = H2_38.env.mkHost('vsT'), dH2_38 = def38(); H2_38.api.render(dH2_38);
+  hH2_38.visible = false; const ph2_38 = H2_38.env.paints; H2_38.env.width = 1000; H2_38.env.breakAll(); H2_38.env.roCb([{ target: hH2_38 }]); H2_38.env.flushRaf();
+  const hid38 = [H2_38.env.paints - ph2_38, H2_38.api.inst(dH2_38).stale];
+  const H3_38 = mk38({ width: 1366 }), hH3_38 = H3_38.env.mkHost('vsT'), dH3_38 = def38(); H3_38.api.render(dH3_38);
+  hH3_38.visible = false; const ph3_38 = H3_38.env.paints; H3_38.env.width = 1300; H3_38.env.breakAll(); hid38.push(H3_38.api.inst(dH3_38).stale); hH3_38.visible = true; H3_38.env.roCb([{ target: hH3_38 }]); H3_38.env.flushRaf(); hid38.push(H3_38.env.paints - ph3_38);
+  T('v438 ⑨ 폰 갈래·경계: legacy(기본) 375px = 옛 그리기 함수를 인자 없이 1번·그 자리 글 그대로(부품이 덧쓰지 않음) · PC 표 → 375px 경계(matchMedia 3개 각 두 번) = 표를 먼저 비우고 옛 함수 1번만 → 1366 = 표 1번만 · 1366 → 1700 = 1번(10열)·1710 = 다시 안 그림 · sheet 375px = 폰 열 3·--pw 52/24/24·끌기 손잡이 없음·PC 전용 칩 vs-pc·정의 검사 통과 → 행 누름 = 표 아래 .vs-detcard(표 안 펼침 없음)·화면 안으로 → 1366 = 표 안 펼침(8열) · 숨은 표: 경계 때 다시 안 그리고 stale·ResizeObserver는 자리(host)에 한 번·data-vs-host → 보일 때 콜백 안에서는 안 그리고 다음 그림(rAF)에 1번(6열) → 같은 단계면 다시 안 그림·--vs-panew = 칸 폭 · 경계값 859/860/1279/1280/1599/1600 열 수 3·6·6·8·8·10 · onMode legacy→옛 함수→sheet · legacy 재진입 1번(멈추지 않음) · 숨은 동안 RO 콜백 0번 · 같은 단계 안 경계 알림은 stale 없음·다시 안 그림',
+    q1_38 && q2_38 && q3_38 && q4_38 && s1_38 && s2_38 && s3_38 && h1_38 && h2_38 && h3_38 && h4_38b
+    && bnd38 === '3,6,6,8,8,10' && om38.join() === 'legacy,옛 함수,sheet' && rec38 === 1 && recE38 === '' && JSON.stringify(hid38) === JSON.stringify([0, true, false, 0]),
+    JSON.stringify({ q1_38, q2_38, q3_38, q4_38, s1_38, s2_38, s3_38, h1_38, h2_38, h3_38, h4_38b, lq38, lq2_38, bnd38, om38, rec38, recE38, hid38 }));
+
+  // ⑩ 골라 쓰기 — 선택(보이는 행만 체크·전체선택은 보이는 행만·칩을 바꾸면 숨은 선택 풂/keep이면 '숨은 선택 n'·동작은 행 원천에 있는 선택 id) · 묶음 행(기본 접힘·누르면 펼침·글자 거르기면 저절로) · 더보기(page씩·건수·합계는 전체) · 표 위 검색칸(id·150ms·초기화·저장 안 함)
+  const sel38 = {}, ran38 = [], SL38 = mk38({ width: 1366 }), hSL38 = SL38.env.mkHost('vsT');
+  const dSL38 = def38({ sel: { set: () => sel38, can: () => true, acts: [{ h: '선택 삭제', danger: 1, run: (ids) => ran38.push(ids.slice().sort().join('')) }] } }); SL38.api.render(dSL38);
+  const se0_38 = /전체선택\(보이는 5건\)/.test(hSL38._h) && (hSL38._h.match(/data-vs-sel="/g) || []).length === 5 && /data-vs-selact="0" disabled/.test(hSL38._h) && /<td class="vs-b" title="사 옛 공고 검토"><input type="checkbox" class="sel-box" data-vs-sel="g">사 옛 공고 검토<\/td>/.test(hSL38._h);
+  const sa38 = hSL38.querySelector('[data-vs-selall]'); sa38.checked = true; sa38.fire('change');
+  const se1_38 = Object.keys(sel38).sort().join('') === 'abcdg' && /선택 삭제 \(5\)/.test(hSL38._h);
+  click38(hSL38, '[data-vs-chip="kd|auto"]'); const se2_38 = Object.keys(sel38).join('') === 'b';
+  click38(hSL38, '[data-vs-selact="0"]'); const se3_38 = ran38.join() === 'b';
+  const cb38 = hSL38.querySelector('[data-vs-sel="b"]'); cb38.checked = false; cb38.fire('change'); const se4_38 = Object.keys(sel38).length === 0;
+  const selK38 = {}, SK38 = mk38({ width: 1366 }), hSK38 = SK38.env.mkHost('vsT'), dSK38 = def38({ sel: { set: () => selK38, can: () => true, keep: 1, acts: [{ h: '이력 추가', run: () => {} }] } }); SK38.api.render(dSK38);
+  const sk38 = hSK38.querySelector('[data-vs-selall]'); sk38.checked = true; sk38.fire('change'); click38(hSK38, '[data-vs-chip="kd|auto"]');
+  const se5_38 = Object.keys(selK38).length === 5 && /· 숨은 선택 4/.test(hSK38._h) && /이력 추가 \(5\)/.test(hSK38._h) && /전체선택\(보이는 1건\)/.test(hSK38._h);
+  const GR38 = mk38({ width: 1366 }), hGR38 = GR38.env.mkHost('vsT'), dGR38 = def38({ group: { of: (r) => (r.old ? 'old' : ''), label: () => '지난 자료', auto: (s) => !!(s.q || Object.keys(s.f).some((k) => s.f[k])) } }); GR38.api.render(dGR38);
+  const gr38 = [order38(hGR38._h), /<tr class="vs-grp" data-vs-grp="old"><td colspan="8"><div class="vs-grp-in"><span class="car">▸<\/span>지난 자료<span class="n">1건<\/span>/.test(hGR38._h)];
+  click38(hGR38, '[data-vs-grp="old"]'); gr38.push(order38(hGR38._h), /<tr class="vs-grp open" data-vs-grp="old">/.test(hGR38._h));
+  click38(hGR38, '[data-vs-grp="old"]'); gr38.push(order38(hGR38._h));
+  GR38.api.filter(dGR38, 't', '옛'); gr38.push(order38(hGR38._h));
+  const MO38 = mk38({ width: 1366 }), hMO38 = MO38.env.mkHost('vsT'), dMO38 = def38({ page: 2 }); MO38.api.render(dMO38);
+  const mo38 = [order38(hMO38._h), /data-vs-more="1">2건 더 보기<\/button><span class="n">남은 3건<\/span>/.test(hMO38._h), cnt38(hMO38._h), /<td>합계 5건<\/td>/.test(hMO38._h)];
+  click38(hMO38, '[data-vs-more]'); mo38.push(order38(hMO38._h), /남은 1건/.test(hMO38._h));
+  click38(hMO38, '[data-vs-chip="st|all"]'); mo38.push(order38(hMO38._h));
+  const SQ38 = mk38({ width: 1366 }), hSQ38 = SQ38.env.mkHost('vsT'), dSQ38 = def38({ search: { id: 'taskSearch', ph: '지시 검색', text: (r) => r.t + ' ' + r.who } }); SQ38.api.render(dSQ38);
+  const sq38 = [/<input type="search" class="vs-q" id="taskSearch" data-vs-q="1" value="" placeholder="지시 검색" autocomplete="off">/.test(hSQ38._h)];
+  const qi38 = hSQ38.querySelector('[data-vs-q]'); qi38.value = '성분'; qi38.fire('input', {}); SQ38.env.tick(149); sq38.push(order38(hSQ38._h)); SQ38.env.tick(1); sq38.push(order38(hSQ38._h), cnt38(hSQ38._h));
+  click38(hSQ38, '[data-vs-reset]'); sq38.push(order38(hSQ38._h), hSQ38.querySelector('[data-vs-q]').value, (SQ38.env.store.jw_task_sheet || '').indexOf('성분') < 0);
+  //   전체선택 = 그린 행만(v438 검토 — 명세 ⓗ '보이는 행만' · 사람별 의무 '접힘 + 선택 이력 추가'·기성 '선택 삭제 + 더보기'): 접힌 묶음 g 빠짐 abcd "(보이는 4건)"·"(4)" → 묶음을 펼쳐도 g는 안 고른 채(전체선택 체크 풀림·숨은 선택 없음)
+  //   / 더보기(page 2) = 그린 ga만 "(보이는 2건)" → 더 보기 뒤 새로 그린 b·c는 안 고름
+  const selg38 = [], sg38 = {}, SG38 = mk38({ width: 1366 }), hSG38 = SG38.env.mkHost('vsT'), dSG38 = def38({ sel: { set: () => sg38, can: () => true, acts: [{ h: '선택 삭제', run: () => {} }] }, group: { of: (r) => (r.old ? 'old' : ''), label: () => '지난 자료' } }); SG38.api.render(dSG38);
+  const sga38 = hSG38.querySelector('[data-vs-selall]'); sga38.checked = true; sga38.fire('change'); selg38.push(Object.keys(sg38).sort().join(''), /전체선택\(보이는 4건\)/.test(hSG38._h), /선택 삭제 \(4\)/.test(hSG38._h));
+  click38(hSG38, '[data-vs-grp="old"]'); selg38.push(order38(hSG38._h), /data-vs-selall="1" checked/.test(hSG38._h), /숨은 선택/.test(hSG38._h));
+  const sp38 = {}, SPg38 = mk38({ width: 1366 }), hSPg38 = SPg38.env.mkHost('vsT'), dSPg38 = def38({ page: 2, sel: { set: () => sp38, can: () => true, acts: [{ h: '선택 삭제', run: () => {} }] } }); SPg38.api.render(dSPg38);
+  const spa38 = hSPg38.querySelector('[data-vs-selall]'); spa38.checked = true; spa38.fire('change'); const selp38 = [Object.keys(sp38).sort().join(''), /전체선택\(보이는 2건\)/.test(hSPg38._h)];
+  click38(hSPg38, '[data-vs-more]'); selp38.push(order38(hSPg38._h), /data-vs-selall="1" checked/.test(hSPg38._h), Object.keys(sp38).sort().join(''));
+  //   행 원천에서 사라진 선택(다른 사람이 지움)은 '숨은 선택'·(n)에 안 셈 = 동작에 넘어가는 수와 같음 · 거르기 줄·검색어를 바꿔도 숨은 행 선택 풂(칩과 같음) · can() 없는 sel은 선택 칸을 안 그림
+  const sv38 = { a: 1, b: 1 }, svRan38 = [], rowsV38 = { v: ROWS38 }, SV38 = mk38({ width: 1366 }), hSV38 = SV38.env.mkHost('vsT'), dSV38 = def38({ rows: () => rowsV38.v, sel: { set: () => sv38, can: () => true, acts: [{ h: '선택 삭제', run: (ids) => svRan38.push(ids.join('')) }] } }); SV38.api.render(dSV38);
+  rowsV38.v = ROWS38.filter((r) => r.id !== 'b'); SV38.api.render(dSV38); click38(hSV38, '[data-vs-selact="0"]'); const selv38 = [/숨은 선택/.test(hSV38._h), /선택 삭제 \(1\)/.test(hSV38._h), svRan38.join()];
+  const sf38 = {}, SF38 = mk38({ width: 1366 }), hSF38 = SF38.env.mkHost('vsT'), dSF38 = def38({ search: { text: (r) => r.t }, sel: { set: () => sf38, can: () => true, acts: [{ h: '선택 삭제', run: () => {} }] } }); SF38.api.render(dSF38);
+  const sfa38 = hSF38.querySelector('[data-vs-selall]'); sfa38.checked = true; sfa38.fire('change'); SF38.api.filter(dSF38, 'who', '김'); const self38 = [Object.keys(sf38).sort().join('')]; SF38.api.setQ(dSF38, '착공'); self38.push(Object.keys(sf38).sort().join(''));
+  const NC38 = mk38({ width: 1366 }), hNC38 = NC38.env.mkHost('vsT'); NC38.api.render(def38({ sel: { set: () => ({}), acts: [{ h: '선택 삭제', run: () => {} }] } })); const selc38 = !/data-vs-sel/.test(hNC38._h);
+  //   bindRows 뿌리 = 그릴 때마다 새로 생기는 표 칸(.vs-wrap — 자리 host 아님, 위임 배선이 쌓이지 않게) · 더보기 한도 뒤 묶음 머리는 그리지 않고 남은 행(접힌 묶음 안 포함)만 셈 · 정렬을 바꾸면 더보기는 처음 page
+  const brs38 = [], BR38 = mk38({ width: 1366 }), hBR38 = BR38.env.mkHost('vsT'), dBR38 = def38({ bindRows: (root) => { brs38.push(root); } }); BR38.api.render(dBR38); BR38.api.render(dBR38);
+  const br38 = brs38.length === 2 && brs38[0] !== hBR38 && brs38[0] !== brs38[1] && brs38.every((r) => r.getAttribute('data-vs-wrap') === '1');
+  const RG38 = [0, 1, 2, 3, 4, 5].map((i) => ({ id: 'r' + i, t: 'x' + i, due: '2026-12-0' + (i + 1), st: '진행' })).concat([{ id: 'p', t: 'p', due: '2026-12-20', st: '진행', grp: 'A' }, { id: 'q', t: 'q', due: '2026-12-21', st: '진행', grp: 'B' }]);
+  const seq38 = (h) => [...h.matchAll(/data-vs-(row|grp|more)="([^"]*)"/g)].map((m) => (m[1] === 'row' ? m[2] : (m[1] === 'grp' ? '[' + m[2] + ']' : '+'))).join(' ') + ' 남은 ' + ((/남은 (\d+)/.exec(h) || [0, 0])[1]);
+  const mg38 = [];
+  const more38 = (h) => { const el = h.querySelector('[data-vs-more]'); if (el) el.fire('click', {}); };   // 더 보기가 없으면 누르지 않음(결함이면 이 검사가 ✗ — 시험 틀이 멈추지 않게)
+  [true, false].forEach((au) => { const X = mk38({ width: 1366 }), h = X.env.mkHost('vsT'); X.api.render(def38({ rows: () => RG38, page: 3, group: { of: (r) => r.grp || '', label: (g) => '묶음 ' + g, auto: () => au } })); mg38.push(seq38(h._h)); more38(h); mg38.push(seq38(h._h)); more38(h); mg38.push(seq38(h._h)); });
+  const MS38 = mk38({ width: 1366 }), hMS38 = MS38.env.mkHost('vsT'), dMS38 = def38({ page: 2 }); MS38.api.render(dMS38); click38(hMS38, '[data-vs-more]'); const ms38 = [order38(hMS38._h)]; click38(hMS38, '[data-vs-sort="who"]'); ms38.push(order38(hMS38._h));
+  T('v438 ⑩ 골라 쓰기: 선택 — 체크는 보이는 5행만·첫 칸 굵게·동작 버튼은 선택 0이면 막힘 → 전체선택 = 보이는 행만(완료 e·f 빠짐) abcdg "(5)" → 칩을 바꾸면 숨은 행 선택 풂(b만) → 동작은 b → 체크 풀면 0 · keep 정의는 남기고 "· 숨은 선택 4"·"(5)" / 묶음 행 — 기본 접힘 abcd + "▸ 지난 자료 1건" → 누르면 abcdg(open) → 다시 접힘 → 글자 거르기면 저절로 펼침 g / 더보기(page 2) — ga + "2건 더 보기 · 남은 3건"·건수·합계는 5건 → gabc·남은 1건 → 칩을 바꾸면 처음 page fe / 검색칸 — id taskSearch·149ms 그대로·150ms c "보이는 1건 / 전체 7건" → 필터 초기화로 검색어도 지움·검색어는 저장 안 함 · 전체선택 = 그린 행만(접힌 묶음 g 빠짐 abcd "(보이는 4건)"·"(4)" → 펼쳐도 g 안 고름 / 더보기 ga "(보이는 2건)" → 더 보기 뒤 b·c 안 고름) · 사라진 행 선택은 숨은 선택·(n)에 안 셈(동작 a) · 거르기 줄·검색어를 바꿔도 숨은 선택 풂(ac → a) · can 없는 sel은 선택 칸 없음 · bindRows 뿌리 = 매번 새 표 칸 · 더보기 한도 뒤 묶음 머리 안 그림·남은 행(접힌 묶음 포함) · 정렬하면 더보기 처음 page',
+    se0_38 && se1_38 && se2_38 && se3_38 && se4_38 && se5_38
+    && JSON.stringify(gr38) === JSON.stringify(['abcd', true, 'abcdg', true, 'abcd', 'g'])
+    && JSON.stringify(mo38) === JSON.stringify(['ga', true, '보이는 5건 / 전체 7건', true, 'gabc', true, 'fe'])
+    && JSON.stringify(sq38) === JSON.stringify([true, 'gabcd', 'c', '보이는 1건 / 전체 7건', 'gabcd', '', true])
+    && JSON.stringify(selg38) === JSON.stringify(['abcd', true, true, 'abcdg', false, false]) && JSON.stringify(selp38) === JSON.stringify(['ag', true, 'gabc', false, 'ag'])
+    && JSON.stringify(selv38) === JSON.stringify([false, true, 'a']) && JSON.stringify(self38) === JSON.stringify(['ac', 'a']) && selc38 && br38
+    && JSON.stringify(mg38) === JSON.stringify(['r0 r1 r2 + 남은 5', 'r0 r1 r2 r3 r4 r5 + 남은 2', 'r0 r1 r2 r3 r4 r5 [A] p [B] q 남은 0', 'r0 r1 r2 + 남은 5', 'r0 r1 r2 r3 r4 r5 + 남은 2', 'r0 r1 r2 r3 r4 r5 [A] [B] 남은 0'])
+    && JSON.stringify(ms38) === JSON.stringify(['gabc', 'ac']),
+    JSON.stringify({ se: [se0_38, se1_38, se2_38, se3_38, se4_38, se5_38], gr38, mo38, sq38, selg38, selp38, selv38, self38, selc38, br38, mg38, ms38 }));
+
+  // ⑪ 날짜 칸 규칙 하나(명세 glossary — 오늘 2026-11-10) · 정의 검사(vsSheetCheckDef — 다음 판 탭 정의가 지킬 것)
+  const DC38 = mk38({}).api, dc38 = [DC38.date('2026-11-05', { wide: 1 }), DC38.date('2026-11-05'), DC38.date('2026-11-05', { phone: 1 }), DC38.date('2026-11-12'), DC38.date('2026-11-12', { wide: 1 }), DC38.date('2026-11-20', { wide: 1 }),
+    DC38.date('2026-11-15', { red: 7, soon: 30 }), DC38.date('2026-11-25', { red: 7, soon: 30 }), DC38.date('2026-12-20', { red: 7, soon: 30 }), DC38.date('2026-11-05', { grey: 1, wide: 1 }), DC38.date(''), DC38.date('2026/11/05')];
+  const dOk38 = dc38[0].html === '2026-11-05 경과 5일' && dc38[0].cls === 'vs-dan' && dc38[0].sv === -5 && dc38[1].html === '경과 5일' && dc38[1].title === '2026-11-05' && dc38[2].html === 'D+5' && dc38[2].cls === 'vs-dan'
+    && dc38[3].html === 'D-2' && dc38[3].cls === 'vs-warn' && dc38[4].html === '2026-11-12 D-2' && dc38[4].cls === 'vs-warn' && dc38[5].cls === '' && dc38[5].html === '2026-11-20 <span style="color:var(--sub);">D-10</span>'
+    && dc38[6].html === 'D-5' && dc38[6].cls === 'vs-dan' && dc38[7].html === 'D-15' && dc38[7].cls === 'vs-warn' && dc38[8].cls === '' && dc38[9].cls === '' && dc38[9].html === '2026-11-05 <span style="color:#9AA09C;">D+5</span>'
+    && dc38[10].sv === null && dc38[10].html === '<span style="color:#9AA09C;">-</span>' && dc38[11].sv === null;
+  const ck38 = (o) => DC38.check(def38(o)).join(',');
+  const cks38 = [ck38({}), ck38({ key: 'jw_veh_sheet' }), ck38({ sort: { k: 'reg', d: 1 } }), ck38({ phone: 'sheet', cols: C38().map((c) => (c.k === 'st' ? Object.assign({}, c, { pw: 30 }) : c)) }), ck38({ legacy: null }),
+    ck38({ cols: C38().concat([{ k: 'x', h: 'x', w: 200, lv: 2 }]) }), ck38({ cols: C38().concat([{ k: 't', h: '겹침', w: 10 }]) }), ck38({ cols: C38().concat([{ k: 'y', h: 'y', w: 10, f: 'date' }]) }),
+    ck38({ cols: C38().concat([{ k: 'z', h: 'z', w: 10, lv: 5 }]) }), ck38({ cols: C38().concat([{ k: 'p', h: 'p', w: 10, ph: 1, lv: 2 }]) }), ck38({ cols: C38().concat([{ k: 'f2', h: 'f2', fill: 1, min: 10 }]) }), ck38({ phone: 'card' })];
+  //   임박 기본 3일 경계(용어표 '지시·입찰 3일'): D-3 노랑 · D-4 색 없음 / 정의 검사 더함(v438 검토): 칩별 기본 정렬 키 오타 · sortAs가 없는 열 · sel.set 함수 아님 · sel.can 없음 · group.of 함수 아님 · 모집단 칩 test 없음 · 맞는 sel·group·칩 정렬은 통과
+  const dc2_38 = [DC38.date('2026-11-13'), DC38.date('2026-11-14')].map((x) => x.cls + ':' + x.html.replace(/<[^>]+>/g, '')).join(',');
+  const cks2_38 = [ck38({ chips: [{ g: 'st', items: [{ k: '', h: '진행 중', test: (r) => r.st !== '완료' }, { k: 'done', h: '완료', test: (r) => r.st === '완료', sort: { k: 'donee', d: -1 } }] }] }),
+    ck38({ cols: C38().map((c) => (c.k === 'reg' ? Object.assign({}, c, { sortAs: 'regi' }) : c)) }), ck38({ sel: { set: {}, can: () => true } }), ck38({ sel: { set: () => ({}) } }), ck38({ group: { of: 'old' } }),
+    ck38({ chips: [{ g: 'st', items: [{ k: '', h: '진행 중', test: (r) => r.st !== '완료' }, { k: 'old', h: '지남', pop: 1 }] }] }), ck38({ sel: { set: () => ({}), can: () => true }, group: { of: () => '' } })];
+  T('v438 ⑪ 날짜 칸 규칙(오늘 11-10): 지남 넓은 칸 "2026-11-05 경과 5일"(vs-dan)·좁은 칸 "경과 5일"(날짜는 title)·폰 "D+5" · 임박(기본 3일) 좁은 "D-2"·넓은 "2026-11-12 D-2"(vs-warn)·D-3 노랑·D-4 색 없음 · 그 밖 날짜 + 회색 D-10 · 현장 신고형(red 7·soon 30) D-5 빨강·D-15 노랑·D-40 색 없음 · grey는 색 없이 · 빈 값·다른 꼴 "-"(정렬 값 없음) / 정의 검사: 가짜 지시 정의 통과 · 계약·차량 키 · 기본 정렬이 1280 열 · 폰 % 합 106 · legacy 함수 없음 · 열 합 초과(860 896·1280 1144·1600 1374) · 열 키 겹침 · 거르기 종류 · lv 5 · 폰 전용인데 lv2 · 남는 폭 열 둘 · phone 값 · 칩 정렬 키 오타 · sortAs 없는 열 · sel.set · sel.can · group.of · 모집단 칩 test · 맞는 sel·group 통과',
+    dOk38 && JSON.stringify(cks38) === JSON.stringify(['', 'key', 'sort', 'pw:106', 'legacy', 'sum2:896,sum3:1144,sum4:1374', 'col:t', 'f:y', 'lv:z', 'ph:p', 'fill', 'phone'])
+    && dc2_38 === 'vs-warn:D-3,:D-4' && JSON.stringify(cks2_38) === JSON.stringify(['chipsort:st|done', 'sortAs:reg', 'sel', 'sel.can', 'group', 'pop:st|old', '']),
+    JSON.stringify({ dc: dc38.map((x) => x.cls + ':' + x.html), cks38, dc2_38, cks2_38 }));
+
+  // ⑫ 정적 — 계약·차량 표는 ResizeObserver 한 줄씩(vsPaneObserve(host) — 그리기마다 불러도 자리에 한 번만 걸림) 말고 무변 · 이번 판은 부품을 쓰는 탭 0(v439부터 이 줄을 고친다) · pointer(마우스 이벤트 없음) · 150ms·조합
+  //   · 저장은 한 곳(def.key에 k,d,f,chip) · ResizeObserver 하나·콜백은 rAF · 경계 matchMedia 3개 · 새 CSS(.vs.vs-fit 폭·폰 --pw·.vs-detcard·td.num·옅은 칩) · 기존 .vs 규칙(min-width 1160·폰 0) 그대로
+  const outside38 = html.slice(0, html.indexOf('// @vs-sheet-start')) + html.slice(html.indexOf('// @vs-sheet-end'));
+  const rv38 = fn38(html, 'renderVehicles'), rc38 = fn38(html, 'renderContracts');
+  const V38 = mk38({ width: 1366 }), vh38 = V38.env.mkHost('vehList'); vh38.innerHTML = '<div class="vs-wrap"><table class="vs"></table></div>';
+  V38.api.paneObs(vh38); V38.api.paneObs(vh38); V38.env.roCb([{ target: vh38 }]); V38.env.flushRaf();
+  const ro38a = vh38.querySelector('.vs-wrap').style.getPropertyValue('--vs-panew');
+  V38.env.cw = 900; V38.env.roCb([{ target: vh38 }]); const ro38b = vh38.querySelector('.vs-wrap').style.getPropertyValue('--vs-panew'); V38.env.flushRaf();   // 창을 줄이면 다시 잼(명세 ⓔ의 뜻 — 첫 값만이 아니라) · 콜백 안에서는 안 바꾸고 다음 그림에
+  const ro38 = V38.env.ro.length === 1 && ro38a === '1048px' && ro38b === '1048px' && vh38.querySelector('.vs-wrap').style.getPropertyValue('--vs-panew') === '900px' && vh38.getAttribute('data-vs-host') == null;
+  const st38 = (rv38.match(/\bvsPaneObserve\(host\);/g) || []).length === 1 && (rc38.match(/\bvsPaneObserve\(host\);/g) || []).length === 1 && (outside38.match(/\bvsPaneObserve\(/g) || []).length === 2
+    && (outside38.match(/\bvsSheet\w*\(|\bvsDateCell\(|\bVS_INST\b/g) || []).length === 0
+    && /addEventListener\("pointerdown"/.test(blk38) && /document\.addEventListener\("pointermove", mv\); document\.addEventListener\("pointerup", up\); document\.addEventListener\("pointercancel", up\);/.test(blk38) && !/mousedown|mousemove|mouseup/.test(blk38)
+    && /var VS_TYPE_MS = 150;/.test(blk38) && /"compositionstart"/.test(blk38) && /"compositionend"/.test(blk38) && /e\.isComposing/.test(blk38)
+    && (blk38.match(/localStorage\.setItem\(/g) || []).length === 1 && /localStorage\.setItem\(def\.key, JSON\.stringify\(\{ k: st\.k, d: st\.d, f: st\.f, chip: st\.chip \}\)\)/.test(blk38)
+    && (blk38.match(/new ResizeObserver\(/g) || []).length === 1 && /vsRaf\(function\(\)\{/.test(blk38) && /\["\(max-width:859px\)", "\(min-width:1280px\)", "\(min-width:1600px\)"\]\.forEach/.test(blk38);
+  const css2_38 = decl38(1000, '.vs.vs-fit', 'width') === '100%' && decl38(1000, '.vs.vs-fit', 'min-width') === 'var(--vs-minw,0px)' && decl38(859, '.vs.vs-fit', 'min-width') == null
+    && decl38(375, '.vs.vs-fit col', 'width') === 'var(--pw,0) !important' && decl38(860, '.vs.vs-fit col', 'width') == null && decl38(1000, '.vs-detcard', 'display') === 'none' && decl38(859, '.vs-detcard', 'display') === 'block'
+    && decl38(1000, '.vs.vs-fit td.num', 'text-align') === 'right' && decl38(1000, '.vs-tools.vs-light .vs-chip.on', 'background') === '#EAF3EF'
+    && decl38(1000, '.vs', 'min-width') === '1160px' && decl38(375, '.vs', 'min-width') === '0' && decl38(375, '.vs col', 'width') === '0 !important';
+  //   v438 검토 반영 CSS: 계약·차량 펼침 폭 상한(.vs tr.vs-det>td>.vs-det-in max-width 100% — 넓은 창에서 표 칸이 표보다 넓어 [닫기 ▲]가 잘림) · 숫자 칸·체크 상자는 새 표만(.vs td.num·.vs td .sel-box 없음 — 차량 번호 칸 체크 v437 모양)
+  //   · 선택 막대는 .sel-bar.vs-selbar(뒤쪽 .sel-bar를 이김 — 여백 2/2/8·줄바꿈) · 터치 기기 손잡이 14px
+  const css3_38 = decl38(1920, '.vs tr.vs-det>td>.vs-det-in', 'max-width') === '100%' && decl38(1920, '.vs-det-in', 'width') === 'var(--vs-panew,100%)'
+    && decl38(1000, '.vs td.num', 'text-align') == null && decl38(1000, '.vs td .sel-box', 'margin-right') == null && decl38(1000, '.vs td .sel-box', 'vertical-align') == null && decl38(1000, '.vs.vs-fit td .sel-box', 'margin-right') === '6px'
+    && decl38(375, '.sel-bar.vs-selbar', 'flex-wrap') === 'wrap' && decl38(375, '.sel-bar.vs-selbar', 'padding') === '2px 2px 8px' && decl38(375, '.vs-selbar', 'padding') == null
+    && /@media \(pointer:coarse\)\{ \.vs\.vs-fit \.vs-rs\{width:14px;\} \}/.test(css38);
+  T('v438 ⑫ 정적: 계약·차량 그리기에 vsPaneObserve(host) 한 줄씩(파일에서 이 둘뿐 — 여러 번 불러도 자리에 한 번 걸림·--vs-panew = 칸 폭·창을 줄이면 다음 그림에 다시 잼 1048 → 900·data-vs-host 없음) · 이번 판은 부품을 쓰는 탭 0(구간 밖 vsSheet*·vsDateCell·VS_INST 0) · 끌기는 pointer(document pointermove·pointerup·pointercancel — mouse 이벤트 0) · 150ms·compositionstart/end·isComposing · 저장 한 곳(def.key에 k,d,f,chip) · ResizeObserver 하나·콜백은 rAF · 경계 matchMedia 3개 · CSS .vs.vs-fit(860~ 폭 100%·최소 --vs-minw)·폰 col --pw·.vs-detcard(PC 숨김·폰 보임)·.vs.vs-fit td.num 오른쪽·옅은 칩 · 기존 .vs(min-width 1160·폰 0·폰 col 0) 그대로 · 검토 반영: 펼침 폭 상한 max-width 100%(계약·차량 [닫기 ▲] 잘림) · .vs td.num·.vs td .sel-box 규칙 없음(새 표만) · .sel-bar.vs-selbar 줄바꿈·여백 · 터치 손잡이 14px',
+    ro38 && st38 && css2_38 && css3_38, JSON.stringify({ ro38, ro38a, ro38b, st38, css2_38, css3_38 }));
+
+  // ⑬ 문서 — FEATURES 기준 v438·v438 절(문장 고정)·자리 글 GATES_V438 0 · TESTLIST v438 체크 칸 = 화면 칸 4개 '[ ] (AI 시험 화면 대상' + 게이트 칸 '[x] (AI)' 5종(PM 몫 0) · MANUAL 1절 화면 폭 한 줄 · CLAUDE.md 폭·부품 줄 · sw v438 이상
+  const ft38 = rd38('FEATURES.md'), tl38 = rd38('TESTLIST.md'), man38 = rd38('MANUAL.html'), cl38 = rd38('CLAUDE.md'), sw38 = rd38('sw.js');
+  const sec38 = (src, head) => { const i = src.indexOf(head); if (i < 0) return ''; const j = src.indexOf(head.slice(0, head.indexOf(' ') + 1), i + head.length); return src.slice(i, j < 0 ? src.length : j); };
+  const ftv38 = sec38(ft38, '\n### v438 (11/10)'), tlv38 = sec38(tl38, '\n## v438 ');
+  const FT_PINS38 = ['860~1279 = `#app` 최대 폭 없음·여백 16·사이드바 168·간격 16(본문 = 창 − 233)', '1600 이상 = `#app` 최대 1,680(본문 최대 1,428)', '**안전(`#view-safety`)은 56 판(v445)에서**',
+    '`margin:0 0 0 max(0px, calc((100% - 1060px) / 2));`', '`vsSheetRender(def)` 하나로 그린다', '끈 열 폭·검색어·펼침은 메모리만', '`phone:"legacy"`(기본) = 그 탭의 지금 그리기 함수(def.legacy)를 그대로 부름',
+    '`vsPaneObserve(host)` 한 줄씩만', '**이번 판에서 보이는 변화는 PC 폭뿐**', 'ResizeObserver 콜백은 다음 그림(rAF)에 고친다', '그래서 이 다섯 화면은 이번 판에서 808 그대로이고, 표로 바뀌는 판에서 넓어진다',
+    // 검토 반영(11/10) 문장 — 대안 주석·펼침 폭·전체선택·한글 조합·data-keep·sel.can·bindRows 뿌리
+    '1600 묶음 `#app{max-width:1680px;}`는 남긴다', '9개 중 8개가 바뀌므로', '**전체선택은 그린 행만**', '`.vs tr.vs-det>td>.vs-det-in{max-width:100%}`', 'compositionstart가 그 칸의 150ms를 지우고',
+    '같은 행이 펼쳐져 있을 때만 값·포커스를 되살림', '`sel.can()`이 있고 참일 때만 선택 칸을 그림', '`bindRows(root)`의 root는 그릴 때마다 새로 생기는 표 칸'];
+  const CL_PINS38 = ['**PC 화면 폭(v438 — 45-1 첫 판)**', '**엑셀형 표 공통 부품(vsSheet, v438)**', '`vsSheetCheckDef(def)`', '`#view-con·#view-veh·#view-perm`',
+    '1600 묶음 1,680 상한은 남김', '`.vs tr.vs-det>td>.vs-det-in{max-width:100%}`', '`sel`은 `can()` 필수', '`bindRows(root)`의 root는 매번 새 표 칸'];
+  const tcb38 = tlv38.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l));
+  const cbScr38 = tcb38.filter((l) => /^- \[[ x]\] \(AI 시험 화면 대상[,) —]/.test(l)), cbGate38 = tcb38.filter((l) => /^- \[x\] \(AI\) `uismoke`\(/.test(l));
+  const man1_38 = (() => { const i = man38.indexOf('<h2 id="s1">'), j = man38.indexOf('<h2 id="s2">'); return i < 0 || j < i ? '' : man38.slice(i, j); })();
+  T('v438 ⑬ 문서: FEATURES 기준 ≥ v438·v438 절(폭 단계·안전은 v445·퀴즈 1번 대안 CSS·vsSheetRender 하나·기억 범위·폰 legacy·계약·차량 한 줄·보이는 변화는 PC 폭뿐·rAF·다섯 화면은 각 탭 판에서 넓힘 + 검토 반영 8문장(1680 상한 남김·바뀌는 값 8개·전체선택 그린 행만·펼침 폭 상한·compositionstart·data-keep 같은 행·sel.can·bindRows 뿌리) — 문장 고정)·자리 글 GATES_V438 0 · TESTLIST v438 체크 칸 = 화면 칸 4개 "[ ]/[x] (AI 시험 화면 대상"(v435·v436과 같은 꼴 — 시험 화면으로 닫으면 [x])(계약·차량 펼침 [닫기 ▲]·한글 두 음절 포함) + 게이트 칸 1개 "[x] (AI) `uismoke`"(consheet_check·proctpl_check·settletest·servertest·결함 심기) · PM 0 · MANUAL 1절 "넓은 모니터에서는 … (2026-11 v438)" · CLAUDE.md 폭·부품 줄(vsSheetCheckDef·검토 반영 4) · sw ≥ 438',
+    Number((ft38.match(/기준: v(\d+) /) || [0, 0])[1]) >= 438 && ftv38.length > 0 && FT_PINS38.every((s) => ftv38.indexOf(s) > 0) && ftv38.indexOf('GATES_V438') < 0
+    && tlv38.length > 0 && tcb38.length === 5 && cbScr38.length === 4 && cbGate38.length === 1 && tcb38.every((l) => l.indexOf('PM') < 0) && tlv38.indexOf('GATES_V438') < 0
+    && ['`consheet_check`', '`proctpl_check`', '`settletest`', '`servertest`', '결함 심기'].every((g) => cbGate38[0].indexOf(g) > 0)
+    && cbScr38.some((l) => l.indexOf('[닫기 ▲]') > 0 && l.indexOf('1536') > 0) && cbScr38.some((l) => l.indexOf('두 음절') > 0)
+    && /<p><b>넓은 모니터에서는<\/b> 표로 보는 화면 — 지시 · 기성·수금 · 거래처 · 인사·일용직 · 입찰 · 계약 · 차량 · 권한관리\(권한 표\) — 이 창 폭에 맞춰 넓어져 옆으로 끌 일이 줄어듭니다/.test(man1_38) && man1_38.indexOf('휴대폰 화면은 바뀌지 않습니다(2026-11 v438)') > 0
+    && CL_PINS38.every((s) => cl38.indexOf(s) > 0)
+    && Number((sw38.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 438,
+    JSON.stringify({ ft: FT_PINS38.filter((s) => ftv38.indexOf(s) < 0).map((s) => s.slice(0, 30)), cl: CL_PINS38.filter((s) => cl38.indexOf(s) < 0).map((s) => s.slice(0, 30)), gates: [ftv38.indexOf('GATES_V438'), tlv38.indexOf('GATES_V438')], cb: tcb38.length, scr: cbScr38.length, gate: cbGate38.length, pm: tcb38.filter((l) => l.indexOf('PM') >= 0).map((l) => l.slice(0, 40)), man: man1_38.indexOf('넓은 모니터'), sw: (sw38.match(/jw-shell-v(\d+)/) || [0, 0])[1] }));
+} catch (e) { console.log('  (v438 검사 생략 — ' + e.message + ')'); fails++; }
+
 try {
   const fdir = join(ROOT, 'netlify', 'functions');
   const miss = readdirSync(fdir).filter((f) => /^gw-.*\.js$/.test(f)).filter((f) => { const t = readFileSync(join(fdir, f), 'utf8'); return /\b(store|blobGet|blobSet|blobList|blobDelete)\(/.test(t) && !/setupBlobContext\(/.test(t); });

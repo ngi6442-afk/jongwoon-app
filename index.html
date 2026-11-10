@@ -705,6 +705,35 @@
   @media (min-width:860px){
     .vs th.vs-ph,.vs td.vs-ph{display:none;}
   }
+  /* v438 엑셀형 표 공통 부품(vsSheet — // @vs-sheet 구간). 새 표는 .vs.vs-fit: 위 .vs 규칙(min-width 1160·고정 머리·거르기 줄·첫 열·합계)은 그대로 쓰고 폭만 바꾼다(계약·차량 표와 검사 글자 무변).
+     PC는 표 = 칸 폭 100%·최소 --vs-minw(남는 폭을 받지 않는 열 합 + 남는 폭 열 최소 폭 — 끌기 중에도 다시 잼), 폰은 열마다 col의 --pw 하나(가로로 안 굴러감)·누른 행 상세는 표 아래 .vs-detcard.
+     단계 숨김: colgroup에는 그 단계에 보이는 열만(v374 교훈) + CSS로도 — lv3 = vs-l3(1279 이하 숨김) · lv4 = vs-l4(1599 이하 숨김) · lv2 이상 = vs-hs(폰 숨김) · 폰 전용 = vs-ph(PC 숨김) */
+  .vs.vs-fit td.num{text-align:right;}
+  .vs thead th.vs-ns{cursor:default;}
+  .vs td.vs-none{position:static;text-align:center;color:var(--sub);}
+  .vs.vs-fit td .sel-box{display:inline-block;vertical-align:-4px;margin-right:6px;}   /* 숫자 칸·체크 상자는 새 표(.vs-fit)만 — 차량 표 번호 칸 체크(selBoxHtml)·계약 펼침 안 표는 v437 모양 그대로(v438 검토) */
+  .vs tr.vs-det>td>.vs-det-in{max-width:100%;}   /* 펼침 폭 = 표 칸 폭(--vs-panew)과 표 폭 중 작은 쪽 — 계약(1,160)·차량(1,344) 표는 열 합에 묶여 넓은 창에서 표 칸보다 좁아, 펼침이 칸 overflow:hidden에 잘려 [닫기 ▲]·오른쪽 칸이 안 보였다(v438 검토) */
+  .vs tr.vs-grp>td,.vs tr.vs-more>td{position:static;height:auto;padding:0;background:#F3F6F4;border-right:0;}
+  .vs tr.vs-grp>td{border-top:2px solid #DDE5E0;cursor:pointer;}
+  .vs-grp-in{position:sticky;left:0;width:var(--vs-panew,100%);box-sizing:border-box;display:flex;align-items:center;gap:8px;padding:9px 12px;font-size:13px;font-weight:700;color:var(--text,#222);white-space:nowrap;}
+  .vs-grp-in .n{font-size:12px;font-weight:400;color:var(--sub);}
+  .vs-grp-in .car{font-size:11px;color:var(--sub);}
+  .vs-q{display:block;width:100%;box-sizing:border-box;padding:9px 12px;margin:0 0 8px;border:1px solid var(--line);border-radius:8px;font-size:14px;background:#fff;color:inherit;}
+  .sel-bar.vs-selbar{padding:2px 2px 8px;flex-wrap:wrap;row-gap:6px;}   /* 뒤쪽 .sel-bar(한 줄 고정·여백 7/15)를 이기게 특이도를 올림 — 폰 375에서 '숨은 선택'·동작 버튼이 넘치면 다음 줄로(카드 overflow:hidden에 잘리지 않게) */
+  .vs-tools.vs-light .vs-chip.on{background:#EAF3EF;color:var(--brand-dark);border-color:var(--brand);font-weight:700;}   /* 칸 칩 아래 표(입찰 공고·부동산·현장·사람별 의무)는 옅은 선택 — v428 #eduScopeBar와 같은 값. 칸 칩 없는 표는 계약·차량처럼 진한 초록(.vs-chip.on) */
+  .vs-tools.vs-light .vs-chip.warn.on{background:#FBEAE8;color:#B0332A;border-color:#B0332A;}
+  .vs-detcard{display:none;border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:#FAFCFB;}
+  .vs.vs-fit .vs-rs{touch-action:none;}
+  @media (pointer:coarse){ .vs.vs-fit .vs-rs{width:14px;} }   /* 860px 이상 터치 기기(태블릿·터치 노트북) — 손가락으로 잡히게(폰은 손잡이를 그리지 않음) */
+  @media (min-width:860px){
+    .vs.vs-fit{width:100%;min-width:var(--vs-minw,0px);}
+  }
+  @media (max-width:1279px){ .vs .vs-l3{display:none;} }
+  @media (max-width:1599px){ .vs .vs-l4{display:none;} }
+  @media (max-width:859px){
+    .vs.vs-fit col{width:var(--pw,0) !important;}
+    .vs-detcard{display:block;margin-top:8px;}
+  }
 
   /* v381 계약 시트형 — .vs-* 공용(표·칩·펼침), 계약 전용은 .cs-* 만 추가 */
   .cs-num{text-align:right;}
@@ -1062,11 +1091,10 @@
   /* 반응형: 폰(859px 이하)=☰ 세로 목록, PC=좌측 사이드바 */
   .views{min-width:0;}
   @media (min-width: 860px){
-    #app{max-width:1060px;padding:16px 22px 48px;}
-    .layout{display:flex;align-items:flex-start;gap:24px;}
+    /* v438: #app 폭·여백, .layout 간격, .tabbar 폭은 바로 아래 'v438 화면 폭' 묶음 한 곳에서 정한다(종전 #app 최대 1060·여백 22·간격 24·사이드바 184 = 본문 808 고정) */
+    .layout{display:flex;align-items:flex-start;}
     .tabbar{
       flex-direction:column;
-      width:184px;
       flex-shrink:0;
       gap:5px;
       background:transparent;
@@ -1087,6 +1115,32 @@
     .nav-group{display:block;font-size:11px;font-weight:800;color:var(--sub);letter-spacing:.02em;padding:14px 8px 4px;}
     .nav-divider{flex:none;width:100%;height:1px;align-self:auto;margin:9px 0 3px;}
     .views{flex:1;}
+  }
+  /* v438 화면 폭(45-1 #1 — 명세 09_조사_문서/표형탭_시안_자료_20261110/엑셀형탭_명세_20261110.json common.width_plan·css). PC 860px 이상만 — 폰(859px 이하) 틀은 그대로.
+     틀(#app)은 탭과 무관하게 같은 폭이라 탭을 옮겨도 사이드바가 안 움직인다. 본문 = 창 − 233(860~1279: 여백 16·사이드바 168·간격 16) · 창 − 269(1280~1599: 여백 22·사이드바 184·간격 24) ·
+     1600 이상은 #app 최대 1,680(본문 최대 1,428) — 창 폭은 세로 스크롤바 17px 포함(1024 창 791 · 1366 창 1,097 · 1920 창 1,428 — uismoke v438 ①이 이 CSS를 읽어 계산해 명세 width_plan.table과 대조).
+     넓히는 화면은 id로만(section 태그·class 그대로 — uismoke가 '<section class="view" id=…>' 글자를 찾는다): 이번 판은 계약·차량·권한관리 셋 — 지시·기성·거래처·일용직·입찰은 그 탭을 표로 바꾸는 판(v439~v443)에서 하나씩 더한다(옛 카드 목록이 1,428px로 늘어지지 않게). 나머지 화면은 808 그대로(사이드바 옆 왼쪽 정렬),
+     권한관리는 권한 표(#permRoster)만 넓고 그 밖 카드는 808. 안전(#view-safety)은 56 판(v445)에서 넓히는 목록에 더한다(그때도 현황 #sfPaneNow는 808 — 미리 둠).
+     ★퀴즈 1번 대안('메뉴 자리 고정·본문만 오른쪽으로')을 고르시면 860 묶음 #app 줄 끝에 margin:0 0 0 max(0px, calc((100% - 1060px) / 2)); 하나만 더한다 — 1600 묶음 #app{max-width:1680px;}는 남긴다
+       (margin-left가 100% 기준이라 상한을 남겨도 메뉴는 고정 · 지우면 2560 창 본문이 약 1,550으로 늘어 명세 why_1680과 어긋나고 계약·차량 펼침도 더 넓어짐)
+       → 메뉴 왼쪽 끝이 1280 이상 창에서 지금(v437) 자리 그대로(1920 창 약 444px — 계획대로면 약 134px), 860~1279 창은 6px 왼쪽 · #app 오른쪽 끝이 창 약 2,317까지는 창 오른쪽(스크롤바 앞)이라 머리 줄 오른쪽 버튼(🔍·🔔·이름·⚙)도 그리로(1920 창 #app 오른쪽 끝 1,903 — 지금 1,482 · 계획 1,792 · 2560 창은 1,680 상한으로 2,422)
+       · 본문(스크롤바 17 포함) 1024 791 · 1100 856 · 1280 910 · 1366 953 · 1440 990 · 1536 1038 · 1600 1070 · 1920 1230 · 2560 1428(9개 중 8개가 바뀜)
+       · 바꿀 때 함께 고칠 곳: uismoke v438 ①(body38에 margin-left · WT38 기대값 8개) · MANUAL 1절 폭 숫자 · FEATURES v438 · CLAUDE.md 'PC 화면 폭' 줄 */
+  @media (min-width:860px){
+    #app{max-width:none;padding:16px 16px 48px;}
+    .layout{gap:16px;}
+    .tabbar{width:168px;}
+    .views>.view{max-width:808px;}
+    #view-con,#view-veh,#view-perm{max-width:none;}   /* v439~v443에서 #view-tasks·#view-rec·#view-cli·#view-workers·#view-bid를 탭 판마다 더함 */
+    #sfPaneNow,#view-perm>:not(#permRoster){max-width:808px;}
+  }
+  @media (min-width:1280px){
+    #app{padding:16px 22px 48px;}
+    .layout{gap:24px;}
+    .tabbar{width:184px;}
+  }
+  @media (min-width:1600px){
+    #app{max-width:1680px;}
   }
 
   /* 모바일: 탭바를 햄버거 드롭다운으로 */
@@ -6674,6 +6728,485 @@
       '<span class="dday' + (cls ? ' ' + cls : '') + '" title="' + esc(dateStr) + '">' + dd.text + '</span>';
   }
 
+  // ---- v438 엑셀형 표 공통 부품(45-1 첫 판 — PM 11/10 '45-1. #1.①ㄱ', 명세 09_조사_문서/표형탭_시안_자료_20261110/엑셀형탭_명세_20261110.json common · 착수브리핑_20261110.md) ----
+  // @vs-sheet-start
+  // 계약 탭 표(칩·머리 정렬·거르기 줄·폭 끌기·고정 첫 열·한 건 펼침·합계 줄)를 부품 하나로 — 탭마다 정의(def)만 넘긴다. 이번 판(v438)에는 이 부품을 쓰는 탭이 없다(탭 옮기기는 v439부터).
+  // 계약·차량 표는 옮기지 않는다(다음 묶음 — 창 크기 변화에 --vs-panew 다시 재기 한 줄만, vsPaneObserve).
+  //   def = {
+  //     key:"jw_task_sheet"  저장 이름(VS_SHEET_KEYS 중 하나 — 기기별 localStorage에 정렬·거르기·칩만, 서버로 안 보냄. 끈 열 폭은 메모리만 — 10/8 PM)
+  //     host:"taskList"      그릴 자리 id(다시 그려도 그대로인 요소)     unit:"건"|"명"|"곳"     none:"자료가 없을 때 글"     empty:"거르기 결과 0건 글"
+  //     cols:[{ k 키, h 머리 글, w 기본 폭(px), f "text"|"enum"|"none"(거르기 줄), lv 1 폰부터 · 2 PC 860부터 · 3 1280부터 · 4 1600부터,
+  //             num 숫자(td.num 오른쪽 정렬), fill 남는 폭 받기(+min 최소 폭 — 끌기 손잡이 없음), sortAs 정렬 별칭(그 키로 정렬, sortRev면 방향 반대 — 기성 경과 = 청구일 반대),
+  //             nosort 정렬 안 함(행 끝 처리 열), ph 폰 전용(PC에서 안 보임), pw 폰 % 폭(phone:"sheet"일 때 — 폰 열 합 100), ft(r) 거르기 글자(없으면 val), b:0 첫 열 굵게 끔 }]
+  //     rows()          행 원천 = 보이는 행(taskVisible·recVisible 등 권한·공개범위를 거른 배열) — 칩 건수·합계·검색·더보기·전체선택·선택 동작이 모두 이것만(명세 review_additions)
+  //     id(r)           행 id(없으면 r.id)     val(r, k) 정렬·거르기·고르기 값(빈 값 ""·null은 방향과 상관없이 뒤)     sv(r, k) 정렬 값만 따로(선택)
+  //     cell(r, c, ctx) 칸 → 글(html) 또는 { html, cls, title } (없으면 val을 이스케이프)     rowCls(r) 행 class(grey 등)
+  //     chips:[{ g 묶음 키, items:[{ k, h, test(r), warn 빨강, sort:{k,d} 칩별 기본 정렬, pop 모집단 칩(켜지지 않았으면 그 칩 행을 모든 칩에서 뺌 — 입찰 '지남'), pc PC에서만, tip }] }]
+  //                     묶음 안은 하나만 켜짐(첫 항목 = 기본), 묶음끼리 AND     chipStyle:"light" 칸 칩 아래 표(옅은 선택)     chipCount:1 칩에 건수
+  //     sort:{k,d}      기본 정렬(860 단계에 보이는 열로)     rank(r, k, 기본 정렬인가) 음수 맨 앞 · 양수 뒤(방향과 상관없이 — 보류·회색·중복 의심 등)
+  //     foot(rows, ctx) { 열 키: 합계 줄 글(html) } — 첫 열은 없으면 '합계 n건'
+  //     detail(r, ctx)  펼침 html(ctx.close = [닫기 ▲] 버튼 글 · 펼침 안 입력칸은 data-keep="이름" — 다시 그려도 같은 행이 펼쳐져 있을 때만 값·포커스를 되살림, 체크·라디오는 이름+value로)
+  //     bind(root, r, ctx) 펼침 안 버튼 배선     bindRows(root, ctx) 행 안 버튼(처리 열) 배선 — root는 표 칸(.vs-wrap, 그릴 때마다 새 요소라 root에 위임 배선해도 쌓이지 않음 · 자리 host는 넘기지 않는다)
+  //     phone:"legacy"(기본 — 폰이면 그 탭의 지금 그리기 함수 legacy()를 그대로 부름, 지우거나 바꾸지 않음 — PM 11/10 15:56) | "sheet"(폰 열 lv1·--pw %·가로로 안 굴러가는 표·누른 행 상세는 표 아래 .vs-detcard)
+  //                     legacy는 옛 그리기 본문이어야 한다(탭의 새 입구 함수 — vsSheetRender를 부르는 함수 — 를 넘기면 서로 불러 끝나지 않음)
+  //     onMode(m)       갈래("legacy"|"sheet")가 정해질 때마다 — 탭의 다른 요소 보이기·숨기기
+  //     골라 쓰기: search:{ id, ph, text(r) } 표 위 검색칸 · sel:{ set() 선택 지도, can() 필수(없으면 선택 칸을 그리지 않음 — 보기 권한 CSS는 .sel-box를 못 숨김), acts:[{ h, danger, run(ids) }], keep 숨은 선택 남김 }
+  //                  — 지우기(지시·기성)/이력 추가(사람별 의무) · 전체선택은 그린 행만(접힌 묶음·더보기 밖 행은 빠짐 — 명세 fixes_with ⓗ '보이는 행만')
+  //                · group:{ of(r) 묶음 키("" = 본 행), label(g, n, open), order:[…], auto({q,f,chip}) 저절로 펼침 } · page:150 더보기(한도 뒤 줄은 묶음 머리까지 그리지 않음)
+  //   }
+  // 그리기는 vsSheetRender(def) 하나(갈래 함수). 창 폭이 860·1280·1600 경계를 넘으면 그린 단계가 바뀐 표만 다시 그린다 — 보이는 표는 바로, 숨은 표는 보일 때(ResizeObserver) 한 번.
+  var VS_SHEET_KEYS = ["jw_task_sheet", "jw_rec_sheet", "jw_cli_sheet", "jw_wk_sheet", "jw_bid_sheet", "jw_ob_sheet", "jw_site_sheet", "jw_edu_sheet"];   // 명세 common.memory — 계약·차량(jw_con_sheet·jw_veh_sheet)은 모양이 달라 이 부품이 쓰지 않는다
+  var VS_TYPE_MS = 150;                 // 거르기 줄·검색칸: 한글 조합이 끝난 뒤 150ms 쉬었다가 다시 그림
+  var VS_W_MIN = 40, VS_W_MAX = 600;    // 머리 오른쪽 끌어 폭
+  var VS_FILL_MIN = 80;                 // 남는 폭 열에 min이 없을 때
+  var VS_STAGE_BUDGET = { 2: 742, 3: 962, 4: 1282 };   // 단계별 열 합 상한(명세 common.responsive — 1024 창 표 칸 742 · 1280 창 962 · 1600 창 1,282) — 정의 검사 vsSheetCheckDef가 본다
+  var VS_INST = {};                     // 저장 이름 → 표 상태(정의·정렬·거르기·칩·끈 폭·펼침·검색어·묶음 펼침·더보기·그린 단계)
+  var vsRo = null;                      // ResizeObserver 하나 — 자리(host)마다 한 번 걸고 풀지 않는다(자리는 다시 그려도 그대로인 요소)
+  function vsN(n){ var x = Number(n) || 0; return x.toLocaleString ? x.toLocaleString() : String(x); }
+  function vsCls(a){ return a.filter(function(x){ return !!x; }).join(" "); }
+  function vsAttrQ(v){ return String(v == null ? "" : v).replace(/\\/g, "\\\\").replace(/"/g, '\\"'); }
+  function vsMq(q){ try { return window.matchMedia(q).matches; } catch(e){ return null; } }
+  // 단계 — 1 폰(859px 이하) · 2 PC 860~1279 · 3 1280~1599 · 4 1600 이상(CSS 경계와 같은 matchMedia)
+  function vsStage(){
+    var p = vsMq("(max-width:859px)"), w;
+    if (p === null){ w = window.innerWidth || 1024; return w < 860 ? 1 : (w < 1280 ? 2 : (w < 1600 ? 3 : 4)); }
+    return p ? 1 : (vsMq("(min-width:1600px)") ? 4 : (vsMq("(min-width:1280px)") ? 3 : 2));
+  }
+  function vsLv(c){ var lv = Math.floor(Number(c.lv) || 1); return lv < 1 ? 1 : (lv > 4 ? 4 : lv); }
+  // 그 단계에 보이는 열 — 폰은 lv1(폰 전용 포함), PC는 폰 전용을 빼고 lv ≤ 단계
+  function vsSheetCols(def, stage){ return (def.cols || []).filter(function(c){ return stage <= 1 ? vsLv(c) === 1 : (!c.ph && vsLv(c) <= stage); }); }
+  // 칸 class — 단계 숨김을 CSS로도: lv2 이상 vs-hs(폰 숨김) · lv3 vs-l3(1279 이하) · lv4 vs-l4(1599 이하) · 폰 전용 vs-ph(PC 숨김) · 숫자 num
+  function vsColCls(c){ var lv = vsLv(c), a = []; if (c.ph) a.push("vs-ph"); else if (lv >= 2) a.push("vs-hs"); if (lv === 3) a.push("vs-l3"); else if (lv === 4) a.push("vs-l4"); if (c.num) a.push("num"); return a.join(" "); }
+  function vsColOf(def, k){ var cs = def.cols || [], i; for (i = 0; i < cs.length; i++){ if (cs[i].k === k) return cs[i]; } return null; }
+  function vsColW(inst, c){ var w = Number(inst.colw[c.k]); return (w >= VS_W_MIN && w <= VS_W_MAX) ? w : (Number(c.w) || 100); }
+  // 표 최소 폭(--vs-minw) = 남는 폭을 받지 않는 열 폭 합(끈 폭 반영) + 남는 폭 열 최소 폭 — table-layout:fixed에서 남는 폭 열이 0으로 눌리지 않게
+  function vsSheetMinW(inst, cols){ var s = 0; cols.forEach(function(c){ s += c.fill ? (Number(c.min) || VS_FILL_MIN) : vsColW(inst, c); }); return s; }
+  function vsSheetBlank(){ return { k: "", d: 1, f: {}, chip: {} }; }
+  // 기기별 기억 읽기 — 정의에 없는 열·칩·값은 버린다(정의가 바뀌어도 옛 기억에 깨지지 않게)
+  function vsSheetLoad(def){
+    var st = vsSheetBlank(), o = null, cols = def.cols || [];
+    try { o = JSON.parse(localStorage.getItem(def.key) || "null"); } catch(e){ o = null; }
+    if (!o || typeof o !== "object") return st;
+    if (typeof o.k === "string" && o.k && cols.some(function(c){ return !c.nosort && (c.sortAs || c.k) === o.k; })) st.k = o.k;
+    if (o.d === -1) st.d = -1;
+    if (o.f && typeof o.f === "object") cols.forEach(function(c){ var v = o.f[c.k]; if ((c.f === "text" || c.f === "enum") && typeof v === "string" && v) st.f[c.k] = v; });
+    if (o.chip && typeof o.chip === "object") (def.chips || []).forEach(function(g){ var v = o.chip[g.g]; if (typeof v === "string" && g.items.some(function(it){ return it.k === v; })) st.chip[g.g] = v; });
+    return st;
+  }
+  function vsSheetSave(def){ var st = vsInst(def).st; try { localStorage.setItem(def.key, JSON.stringify({ k: st.k, d: st.d, f: st.f, chip: st.chip })); } catch(e){} }   // 정렬·거르기·칩만 — 끈 열 폭(colw)·검색어·펼침은 저장하지 않는다
+  function vsInst(def){
+    var inst = VS_INST[def.key];
+    if (!inst) inst = VS_INST[def.key] = { st: vsSheetLoad(def), colw: {}, open: null, q: "", limit: 0, grp: {}, mode: "", stageR: 0, stale: false, timers: {}, dragAt: 0, prune: false, last: null, keepN: false, chipN: null, chipNk: null, inLegacy: false };
+    inst.def = def;
+    return inst;
+  }
+  function vsChipOn(inst, g){ var k = inst.st.chip[g.g], i; if (typeof k === "string"){ for (i = 0; i < g.items.length; i++){ if (g.items[i].k === k) return g.items[i]; } } return g.items[0] || null; }
+  function vsChipGroup(def, gk){ var gs = def.chips || [], i; for (i = 0; i < gs.length; i++){ if (gs[i].g === gk) return gs[i]; } return null; }
+  // 모집단 — 켜지지 않은 pop 칩에 걸리는 행은 모든 칩에서 빼고, 켜진 pop 칩이면 그 칩 행만. sw = { g, it }는 칩 건수를 셀 때 그 묶음만 바꿔 본다
+  function vsSheetUni(def, inst, all, sw){
+    var pops = [];
+    (def.chips || []).forEach(function(g){ var on = (sw && sw.g === g) ? sw.it : vsChipOn(inst, g); g.items.forEach(function(it){ if (it.pop) pops.push({ it: it, on: it === on }); }); });
+    if (!pops.length) return all;
+    return all.filter(function(r){ var i, hit; for (i = 0; i < pops.length; i++){ hit = !!pops[i].it.test(r); if (pops[i].on ? !hit : hit) return false; } return true; });
+  }
+  // 칩 — 묶음마다 켜진 칩 하나, 묶음끼리 AND
+  function vsSheetPassChips(def, inst, r, sw){
+    var gs = def.chips || [], i, on;
+    for (i = 0; i < gs.length; i++){ on = (sw && sw.g === gs[i]) ? sw.it : vsChipOn(inst, gs[i]); if (on && !on.pop && typeof on.test === "function" && !on.test(r)) return false; }
+    return true;
+  }
+  function vsVal(def, r, k){ return def.val ? def.val(r, k) : (r ? r[k] : ""); }
+  function vsFiltText(def, r, c){ var v = c.ft ? c.ft(r) : vsVal(def, r, c.k); return String(v == null ? "" : v).trim(); }
+  // 거르기 줄 — 지금 단계에 보이는 열만(숨은 열에 기억된 거르기는 그 열이 다시 보이면 다시 걸림). text = 부분 일치(대소문자 무시) · enum = 정확히 같음 · 칩과 AND
+  function vsSheetPassF(def, r, f, cols){
+    var i, c, q;
+    for (i = 0; i < cols.length; i++){
+      c = cols[i]; q = f[c.k]; if (!q) continue;
+      if (c.f === "enum"){ if (vsFiltText(def, r, c) !== q) return false; }
+      else if (c.f === "text"){ if (vsFiltText(def, r, c).toLowerCase().indexOf(String(q).toLowerCase()) < 0) return false; }
+    }
+    return true;
+  }
+  function vsSheetQOk(def, inst, r){ var q = String(inst.q || "").trim().toLowerCase(); if (!q || !def.search || typeof def.search.text !== "function") return true; return String(def.search.text(r) || "").toLowerCase().indexOf(q) >= 0; }
+  function vsSheetEnum(def, rows, c){ var seen = {}, out = []; rows.forEach(function(r){ var t = vsFiltText(def, r, c); if (t && !seen[t]){ seen[t] = 1; out.push(t); } }); out.sort(function(a, b){ return a.localeCompare(b, "ko"); }); return out; }
+  function vsEmpty(v){ return v == null || v === "" || (typeof v === "number" && isNaN(v)); }
+  // 지금 정렬 — 사람이 머리를 눌렀으면 그 열(cols = 지금 단계에 보이는 열에 있을 때만 — 넓은 창에서 고른 lv3·lv4 열은 좁히면 아래 기본 정렬로, 기억 st.k는 남겨 다시 넓히면 되살림),
+  //   아니면 켜진 칩의 기본 정렬(지시 '완료' = 완료일 최근 먼저), 아니면 정의의 기본 정렬
+  function vsSheetSortOf(def, inst, cols){
+    var s = null, ks = (cols || []).filter(function(c){ return !c.nosort; }).map(function(c){ return c.sortAs || c.k; });
+    if (inst.st.k && ks.indexOf(inst.st.k) >= 0) return { k: inst.st.k, d: inst.st.d === -1 ? -1 : 1, user: true };
+    (def.chips || []).forEach(function(g){ var on = vsChipOn(inst, g); if (!s && on && on.sort) s = on.sort; });
+    s = s || def.sort || { k: ((def.cols || [])[0] || {}).k, d: 1 };
+    return { k: s.k, d: s.d === -1 ? -1 : 1, user: false };
+  }
+  // 정렬 — rank(음수 맨 앞 · 양수 뒤, 방향과 상관없이) → 빈 값은 방향과 상관없이 뒤 → 값(숫자끼리 빼기, 그 밖 글자 ko) × 방향 → 같으면 원래 순서
+  function vsSheetSortRows(def, rows, s){
+    var a = rows.map(function(r, i){ return { r: r, i: i, v: def.sv ? def.sv(r, s.k) : vsVal(def, r, s.k), rk: def.rank ? (Number(def.rank(r, s.k, !s.user)) || 0) : 0 }; });
+    a.sort(function(x, y){
+      var xe, ye, c = 0;
+      if (x.rk !== y.rk) return x.rk - y.rk;
+      xe = vsEmpty(x.v); ye = vsEmpty(y.v);
+      if (xe !== ye) return xe ? 1 : -1;
+      if (!xe) c = (typeof x.v === "number" && typeof y.v === "number") ? x.v - y.v : String(x.v).localeCompare(String(y.v), "ko");
+      return c ? c * s.d : x.i - y.i;
+    });
+    return a.map(function(x){ return x.r; });
+  }
+  // 모델(DOM 없음) — 보이는 열 · 모집단 · 거른 행(정렬) · 펼친 행 · 묶음·더보기를 펼친 그릴 줄 · 표 최소 폭
+  function vsSheetModel(def, inst, stage){
+    var all = (typeof def.rows === "function" ? def.rows() : def.rows) || [], phone = stage <= 1, cols = vsSheetCols(def, stage);
+    var idOf = function(r){ return String(def.id ? def.id(r) : (r && r.id)); };
+    var uni = vsSheetUni(def, inst, all, null);
+    var rows = uni.filter(function(r){ return vsSheetQOk(def, inst, r) && vsSheetPassChips(def, inst, r, null) && vsSheetPassF(def, r, inst.st.f, cols); });
+    var s = vsSheetSortOf(def, inst, cols), open = null, i, M;
+    rows = vsSheetSortRows(def, rows, s);
+    if (inst.open != null){ for (i = 0; i < rows.length; i++){ if (idOf(rows[i]) === inst.open){ open = rows[i]; break; } } if (!open) inst.open = null; }   // 거르기로 빠진 행은 닫는다
+    // 묶음 행 — 묶음 키가 있는 행은 본 행 뒤에 묶음마다(정렬 순서 그대로), 펼침은 메모리만(inst.grp) · auto면 저절로 펼침(검색·글자 거르기 등)
+    var flat = [], gm = {}, go = [], gauto = !!(def.group && typeof def.group.auto === "function" && def.group.auto({ q: inst.q, f: inst.st.f, chip: inst.st.chip }));
+    rows.forEach(function(r){ var g = def.group ? String(def.group.of(r) || "") : ""; if (!g){ flat.push({ r: r }); return; } if (!gm[g]){ gm[g] = []; go.push(g); } gm[g].push(r); });
+    if (def.group && def.group.order){ go.sort(function(a, b){ var x = def.group.order.indexOf(a), y = def.group.order.indexOf(b); return (x < 0 ? 999 : x) - (y < 0 ? 999 : y); }); }
+    go.forEach(function(g){ var op = gauto || !!inst.grp[g]; flat.push({ g: g, n: gm[g].length, open: op }); if (op) gm[g].forEach(function(r){ flat.push({ r: r, g: g }); }); });
+    // 더보기 — 그리는 줄을 page행씩: 한도에 닿으면 그 뒤 줄은 묶음 머리까지 그리지 않고(행 없는 묶음 머리가 더 보기 위에 붙지 않게) 남은 행(접힌 묶음 안 행 포함)만 센다
+    //   건수·합계는 거른 행 전체 · 전체선택은 그린 행(drawn)만
+    var page = Number(def.page) || 0, lim = page ? Math.max(page, Number(inst.limit) || 0) : 0, shown = 0, cut = 0, out = [], drawn = [], stop = false;
+    flat.forEach(function(e){ if (!stop && lim && shown >= lim) stop = true; if (stop){ cut += e.r ? 1 : (e.open ? 0 : e.n); return; } if (e.r){ shown++; drawn.push(e.r); } out.push(e); });
+    M = { stage: stage, phone: phone, cols: cols, all: all, uni: uni, rows: rows, flat: out, drawn: drawn, cut: cut, sort: s, open: open, idOf: idOf, minw: vsSheetMinW(inst, cols) };
+    M.ctx = { phone: phone, stage: stage, cols: cols, n: rows.length, m: uni.length, unit: def.unit || "건", sort: s, q: inst.q, close: '<button type="button" class="vs-chip" data-vs-close="1" style="margin-left:auto;">닫기 ▲</button>' };
+    return M;
+  }
+  // 칩 건수(chipCount) — 칩마다 '그 칩을 누르면 보일 건수'(같은 묶음만 그 칩으로 바꾸고 나머지 묶음·검색어·거르기 줄은 지금 그대로 = vsSheetUni·vsSheetPassChips와 같은 규칙).
+  //   행마다 검색어·거르기 줄과 칩 판정(test)을 한 번씩만 계산해 묶음별로 모은다(칩 수만큼 행 원천을 다시 거르지 않음 — 입찰 2천여 행 × 칩 12개). 돌려줌 [묶음][칩] 건수
+  function vsSheetChipCounts(def, inst, M){
+    var gs = def.chips || [], onI = gs.map(function(g){ return g.items.indexOf(vsChipOn(inst, g)); }), res = gs.map(function(g){ return g.items.map(function(){ return 0; }); });
+    M.all.forEach(function(r){
+      var hit, ok, nBad = 0, bad = -1;
+      if (!vsSheetQOk(def, inst, r) || !vsSheetPassF(def, r, inst.st.f, M.cols)) return;
+      hit = gs.map(function(g){ return g.items.map(function(it){ return typeof it.test === "function" ? !!it.test(r) : true; }); });
+      // 묶음 gi에서 칩 ii가 켜졌을 때 이 행이 그 묶음을 지나가나 — 보통 칩은 그 판정, 모집단(pop) 칩은 켜진 것은 걸리고 안 켜진 것은 안 걸려야(ii < 0 = 켜진 칩 없음)
+      ok = function(gi, ii){ var its = gs[gi].items, j; if (ii >= 0 && !its[ii].pop && !hit[gi][ii]) return false; for (j = 0; j < its.length; j++){ if (its[j].pop && (j === ii) !== hit[gi][j]) return false; } return true; };
+      gs.forEach(function(g, gi){ if (!ok(gi, onI[gi])){ nBad++; bad = gi; } });
+      gs.forEach(function(g, gi){ if (nBad > 1 || (nBad === 1 && bad !== gi)) return; g.items.forEach(function(it, ii){ if (ok(gi, ii)) res[gi][ii]++; }); });   // 다른 묶음이 다 지나갈 때만 이 묶음 칩들을 센다
+    });
+    return res;
+  }
+  // 펼침·닫기·묶음·더보기·선택·정렬처럼 건수가 바뀌지 않는 누름(vsSheetRenderKeep)은 직전 그림의 건수를 다시 쓴다 — 단계·행 수·칩 정의가 같을 때만
+  function vsSheetChipNs(def, inst, M){
+    var k = inst.chipNk;
+    if (!(inst.keepN && inst.chipN && k && k.stage === M.stage && k.n === M.all.length && k.chips === def.chips)) inst.chipN = vsSheetChipCounts(def, inst, M);
+    inst.chipNk = { stage: M.stage, n: M.all.length, chips: def.chips };
+    return inst.chipN;
+  }
+  function vsSheetRowHtml(def, M, r, id, open, canSel){
+    var cells = "", rc = def.rowCls ? (def.rowCls(r) || "") : "";
+    M.cols.forEach(function(c, i){
+      var o = def.cell ? def.cell(r, c, M.ctx) : null, html, cl = vsColCls(c), ti = "", v;
+      if (o == null){ v = vsVal(def, r, c.k); html = esc(v == null ? "" : v); ti = v == null ? "" : String(v); }
+      else if (typeof o === "object"){ html = o.html == null ? "" : String(o.html); if (o.cls) cl = vsCls([cl, o.cls]); ti = o.title || ""; }
+      else html = String(o);
+      if (i === 0){ if (c.b !== 0) cl = vsCls([cl, "vs-b"]); if (canSel) html = '<input type="checkbox" class="sel-box" data-vs-sel="' + esc(id) + '"' + ((def.sel.set() || {})[id] ? ' checked' : '') + '>' + html; }
+      cells += '<td' + (cl ? ' class="' + cl + '"' : '') + (ti ? ' title="' + esc(ti) + '"' : '') + '>' + html + '</td>';
+    });
+    return '<tr class="' + vsCls(["vs-r", rc, open ? "open" : ""]) + '" data-vs-row="' + esc(id) + '">' + cells + '</tr>';
+  }
+  // 선택 막대 — 전체선택은 그린 행(M.drawn — 접힌 묶음·더보기 밖 행 빠짐)만 · '숨은 선택 n' = 행 원천에 있는데 표에 안 그린 선택(keep 정의의 거르기에 가린 행·접힌 묶음·더보기 밖)
+  //   · 동작 버튼 (n) = 그린 행 선택 + 숨은 선택 = 동작에 넘어가는 수(vsSheetSelIds — 행 원천에서 사라진 id는 세지 않음)
+  function vsSheetSelBar(def, M){
+    var set = def.sel.set() || {}, dm = {}, live = {}, nOn = 0, hid = 0, nVis = M.drawn.length, unit = def.unit || "건", h, n;
+    M.drawn.forEach(function(r){ var id = M.idOf(r); dm[id] = 1; if (set[id]) nOn++; });
+    M.all.forEach(function(r){ live[M.idOf(r)] = 1; });
+    Object.keys(set).forEach(function(id){ if (set[id] && live[id] && !dm[id]) hid++; });
+    n = nOn + hid;
+    h = '<div class="sel-bar vs-selbar" data-vs-selbar="1"><input type="checkbox" class="sel-box" data-vs-selall="1"' + (nVis && nOn === nVis ? ' checked' : '') + (nVis ? '' : ' disabled') + '><span class="selall-label">전체선택(보이는 ' + vsN(nVis) + unit + ')</span>';
+    if (hid) h += '<span class="selall-label">· 숨은 선택 ' + vsN(hid) + '</span>';
+    (def.sel.acts || []).forEach(function(a, i){ h += '<button type="button" class="' + vsCls(["mini-btn", a.danger ? "danger" : ""]) + '" data-vs-selact="' + i + '"' + (n ? '' : ' disabled') + (i === 0 ? ' style="margin-left:auto;"' : '') + '>' + esc(a.h) + (n ? ' (' + vsN(n) + ')' : '') + '</button>'; });
+    return h + '</div>';
+  }
+  // 선택된 id — 행 원천(def.rows)에 아직 있는 것만(숨은 선택을 남기는 정의면 거르기에 가려진 것도 — 선택 막대가 '숨은 선택 n'으로 알림)
+  function vsSheetSelIds(def){
+    var set = (def.sel && def.sel.set()) || {}, live = {}, rows = (typeof def.rows === "function" ? def.rows() : def.rows) || [];
+    rows.forEach(function(r){ live[String(def.id ? def.id(r) : r.id)] = 1; });
+    return Object.keys(set).filter(function(id){ return set[id] && live[id]; });
+  }
+  function vsSheetHtml(def, inst, M){
+    var unit = def.unit || "건", cols = M.cols, nv = cols.length, canSel = !!(def.sel && typeof def.sel.can === "function" && def.sel.can()), h = "", ft, cn;   // 선택 칸은 정의에 can()이 있고 참일 때만(권한 검사를 빠뜨리면 닫힘 — .view.readonly CSS는 .sel-box·.sel-bar를 못 숨김)
+    if (def.search) h += '<input type="search" class="vs-q"' + (def.search.id ? ' id="' + esc(def.search.id) + '"' : '') + ' data-vs-q="1" value="' + esc(inst.q || "") + '" placeholder="' + esc(def.search.ph || "검색") + '" autocomplete="off">';
+    if (!M.all.length) return h + '<div class="empty-line">' + esc(def.none || "자료가 없습니다.") + '</div>';
+    if (canSel) h += vsSheetSelBar(def, M);
+    h += '<div class="' + vsCls(["vs-tools", def.chipStyle === "light" ? "vs-light" : ""]) + '">';
+    cn = def.chipCount ? vsSheetChipNs(def, inst, M) : null;
+    (def.chips || []).forEach(function(g, gi){
+      var on = vsChipOn(inst, g);
+      g.items.forEach(function(it, ii){
+        var n = cn ? cn[gi][ii] : null;
+        h += '<button type="button" class="' + vsCls(["vs-chip", it.warn ? "warn" : "", it.pc && it !== on ? "vs-pc" : "", it === on ? "on" : ""]) + '" data-vs-chip="' + esc(g.g + "|" + it.k) + '"' + (it.tip ? ' title="' + esc(it.tip) + '"' : '') + '>' + esc(it.h) + (n == null ? '' : ' ' + vsN(n)) + '</button>';
+      });
+    });
+    h += '<button type="button" class="vs-chip" data-vs-reset="1" title="거르기 줄·칩·검색어 지우기">필터 초기화</button><span class="vs-count">보이는 ' + vsN(M.rows.length) + unit + ' / 전체 ' + vsN(M.uni.length) + unit + '</span></div>';
+    h += '<div class="vs-wrap" data-vs-wrap="1"><table class="vs vs-fit" data-vs-table="1" style="--vs-minw:' + M.minw + 'px;"><colgroup>';
+    cols.forEach(function(c){ h += '<col data-vs-col="' + esc(c.k) + '" style="' + (M.phone ? '--pw:' + (Number(c.pw) || 0) + '%;' : (c.fill ? '' : 'width:' + vsColW(inst, c) + 'px;')) + '">'; });
+    h += '</colgroup><thead><tr>';
+    cols.forEach(function(c){
+      var on = !c.nosort && M.sort.k === (c.sortAs || c.k), up = M.sort.d * (c.sortRev ? -1 : 1) === 1, cl = vsCls([vsColCls(c), on ? "sorted" : "", c.nosort ? "vs-ns" : ""]);
+      h += '<th' + (cl ? ' class="' + cl + '"' : '') + (c.nosort ? '' : ' data-vs-sort="' + esc(c.k) + '" title="누르면 정렬"') + '>' + esc(c.h) + (on ? '<span class="vs-ar">' + (up ? '▲' : '▼') + '</span>' : '') + (M.phone || c.fill ? '' : '<span class="vs-rs" data-vs-rs="' + esc(c.k) + '" title="끌어서 폭 조절"></span>') + '</th>';
+    });
+    h += '</tr><tr class="vs-filt">';
+    cols.forEach(function(c){
+      var q = inst.st.f[c.k] || "", cl = vsColCls(c), th = '<th' + (cl ? ' class="' + cl + '"' : '') + '>', opts;
+      if (c.f === "enum"){ opts = vsSheetEnum(def, M.uni, c); if (q && opts.indexOf(q) < 0) opts.unshift(q); h += th + '<select data-vf="' + esc(c.k) + '"><option value="">전체</option>' + opts.map(function(t){ return '<option value="' + esc(t) + '"' + (t === q ? ' selected' : '') + '>' + esc(t) + '</option>'; }).join("") + '</select></th>'; }
+      else if (c.f === "text") h += th + '<input type="text" data-vf="' + esc(c.k) + '" value="' + esc(q) + '" placeholder="검색" autocomplete="off"></th>';
+      else h += th + '</th>';
+    });
+    h += '</tr></thead><tbody>';
+    if (!M.rows.length) h += '<tr><td colspan="' + nv + '" class="vs-none">' + esc(def.empty || "조건에 맞는 행이 없습니다.") + '</td></tr>';
+    M.flat.forEach(function(e){
+      var id, op;
+      if (!e.r){ h += '<tr class="' + vsCls(["vs-grp", e.open ? "open" : ""]) + '" data-vs-grp="' + esc(e.g) + '"><td colspan="' + nv + '"><div class="vs-grp-in"><span class="car">' + (e.open ? '▾' : '▸') + '</span>' + (def.group && def.group.label ? def.group.label(e.g, e.n, e.open) : esc(e.g)) + '<span class="n">' + vsN(e.n) + unit + '</span></div></td></tr>'; return; }
+      id = M.idOf(e.r); op = M.open === e.r;
+      h += vsSheetRowHtml(def, M, e.r, id, op, canSel);
+      if (op && !M.phone) h += '<tr class="vs-det"><td colspan="' + nv + '"><div class="vs-det-in" data-vs-det="' + esc(id) + '">' + (def.detail ? def.detail(e.r, M.ctx) : '') + '</div></td></tr>';
+    });
+    if (M.cut) h += '<tr class="vs-more"><td colspan="' + nv + '"><div class="vs-grp-in"><button type="button" class="vs-chip" data-vs-more="1">' + vsN(def.page) + unit + ' 더 보기</button><span class="n">남은 ' + vsN(M.cut) + unit + '</span></div></td></tr>';
+    ft = (def.foot ? def.foot(M.rows, M.ctx) : null) || {};
+    h += '</tbody><tfoot><tr>';
+    cols.forEach(function(c, i){ var t = Object.prototype.hasOwnProperty.call(ft, c.k) ? ft[c.k] : (i === 0 ? '합계 ' + vsN(M.rows.length) + unit : ''), cl = vsColCls(c); h += '<td' + (cl ? ' class="' + cl + '"' : '') + '>' + (t == null ? '' : t) + '</td>'; });
+    h += '</tr></tfoot></table></div>';
+    if (M.phone && M.open) h += '<div class="vs-detcard" data-vs-detcard="' + esc(M.idOf(M.open)) + '">' + (def.detail ? def.detail(M.open, M.ctx) : '') + '</div>';   // 폰: 누른 행 상세는 표 아래 카드(표 안 펼침 대신)
+    return h;
+  }
+  // 다시 그리기 전 상태 — 표 칸 스크롤 · 펼친 행 id · 펼침 안 입력값(data-keep) · 포커스(거르기 줄·검색칸·data-keep)와 그 글·커서
+  //   data-keep 값·포커스는 같은 행이 펼쳐져 있을 때만 되살린다(A를 연 채 B를 누르면 A에 적던 글이 B의 같은 이름 칸에 들어가 B로 저장되지 않게 — v438 검토)
+  function vsSheetDetId(host){ var d = host.querySelector("[data-vs-det]") || host.querySelector("[data-vs-detcard]"); return d ? (d.getAttribute("data-vs-det") || d.getAttribute("data-vs-detcard") || "") : ""; }
+  function vsKeepKey(el){ var k = el.getAttribute("data-keep"); return (el.type === "checkbox" || el.type === "radio") ? k + "|" + el.value : k; }   // 체크·라디오는 이름+value(같은 이름 여럿), 글 칸·고르기는 이름
+  function vsSheetSnap(host){
+    var s = { sl: 0, st: 0, det: vsSheetDetId(host), keep: {}, fa: "", fk: "", fv: null, fc: null }, w = host.querySelector("[data-vs-wrap]"), a = document.activeElement, ats = ["data-vf", "data-vs-q", "data-keep"], i;
+    if (w){ s.sl = w.scrollLeft || 0; s.st = w.scrollTop || 0; }
+    Array.prototype.forEach.call(host.querySelectorAll("[data-keep]"), function(el){ s.keep[vsKeepKey(el)] = (el.type === "checkbox" || el.type === "radio") ? { c: !!el.checked } : { v: el.value }; });
+    if (a && a.getAttribute && host.contains && host.contains(a)){ for (i = 0; i < ats.length; i++){ if (a.getAttribute(ats[i]) != null){ s.fa = ats[i]; s.fk = ats[i] === "data-keep" ? vsKeepKey(a) : a.getAttribute(ats[i]); s.fv = a.value; s.fc = a.selectionStart != null ? a.selectionStart : null; break; } } }
+    return s;
+  }
+  function vsSheetRestore(host, s){
+    var w = host.querySelector("[data-vs-wrap]"), same = vsSheetDetId(host) === s.det, fe = null;
+    if (w){ w.scrollLeft = s.sl; w.scrollTop = s.st; if (w.classList) w.classList.toggle("scrolled", s.sl > 0); }
+    if (same) Array.prototype.forEach.call(host.querySelectorAll("[data-keep]"), function(el){ var k = vsKeepKey(el), o = Object.prototype.hasOwnProperty.call(s.keep, k) ? s.keep[k] : null; if (!o) return; if ("c" in o) el.checked = o.c; else if ("v" in o && el.value !== o.v) el.value = o.v; });
+    if (!s.fa || (s.fa === "data-keep" && !same)) return;
+    if (s.fa === "data-keep") Array.prototype.forEach.call(host.querySelectorAll("[data-keep]"), function(el){ if (!fe && vsKeepKey(el) === s.fk) fe = el; });
+    else fe = host.querySelector("[" + s.fa + '="' + vsAttrQ(s.fk) + '"]');
+    if (!fe) return;
+    if (s.fa !== "data-keep" && s.fv != null && fe.tagName !== "SELECT" && fe.value !== s.fv) fe.value = s.fv;   // 150ms 안에 다른 일로 다시 그려도 치던 글이 남게(곧 거르기에 걸림)
+    try { fe.focus(); } catch(e){}
+    if (s.fc != null && fe.setSelectionRange){ try { fe.setSelectionRange(s.fc, s.fc); } catch(e){} }
+  }
+  function vsInteractive(e, stop){ var el = e && e.target; while (el && el !== stop){ if (el.tagName && /^(BUTTON|INPUT|SELECT|TEXTAREA|A|LABEL)$/.test(el.tagName)) return true; el = el.parentNode; } return false; }   // 행 안 버튼·체크·링크 누름은 펼침으로 번지지 않게
+  function vsSetPaneW(w){ try { var pw = w.clientWidth + "px"; if (w.clientWidth && w.style.getPropertyValue("--vs-panew") !== pw) w.style.setProperty("--vs-panew", pw); } catch(e){} }
+  // 거르기 줄·검색칸 글자 — 한글 조합 중이면 기다리고(compositionend 뒤), 마지막 입력 150ms 뒤 한 번만 다시 그림(조합 표시는 요소마다 — 다시 그리면 새 요소라 남지 않음 · 칸마다 따로 기다림)
+  //   한글은 음절마다 앞 음절 compositionend → 곧바로 다음 음절 compositionstart라, compositionstart가 그 칸의 150ms를 지운다(지우지 않으면 두 음절째 조합 중에 칸을 새로 그려 '준서ㄹ' — v438 검토)
+  //   → 마지막 음절이 확정된 뒤(띄어쓰기·Enter·칸 이동) 150ms에 거르기가 걸린다. 조합 중에 다른 일(자료 갱신 등)로 그리면 vsSheetPaint가 미루고 이 칸의 compositionend가 다시 그린다
+  function vsTypeKey(el, kind){ return kind + ":" + el.getAttribute(kind === "q" ? "data-vs-q" : "data-vf"); }
+  function vsSheetTyping(def, el, kind){
+    el.addEventListener("click", function(e){ if (e && e.stopPropagation) e.stopPropagation(); });
+    el.addEventListener("compositionstart", function(){ var inst = vsInst(def), tk = vsTypeKey(el, kind); el.__vsComp = true; if (inst.timers[tk]){ clearTimeout(inst.timers[tk]); delete inst.timers[tk]; } });
+    el.addEventListener("compositionend", function(){ el.__vsComp = false; vsSheetQueue(def, el, kind); });
+    el.addEventListener("input", function(e){ if (el.__vsComp || (e && e.isComposing)) return; vsSheetQueue(def, el, kind); });
+  }
+  function vsSheetQueue(def, el, kind){
+    var inst = vsInst(def), k = el.getAttribute(kind === "q" ? "data-vs-q" : "data-vf"), v = el.value, tk = vsTypeKey(el, kind);
+    if (inst.timers[tk]) clearTimeout(inst.timers[tk]);
+    inst.timers[tk] = setTimeout(function(){ delete inst.timers[tk]; if (kind === "q") vsSheetSetQ(def, v); else vsSheetFilter(def, k, v); }, VS_TYPE_MS);
+  }
+  function vsComposing(host){ var a = document.activeElement; return !!(a && a.__vsComp && host.contains && host.contains(a)); }   // 이 자리의 거르기 줄·검색칸이 한글 조합 중인가
+  function vsSheetBindDet(def, root, M){ root.addEventListener("click", function(e){ if (e && e.stopPropagation) e.stopPropagation(); }); if (typeof def.bind === "function" && M.open) def.bind(root, M.open, M.ctx); }   // 펼침 안 누름이 행 토글로 번지지 않게 + 정의의 버튼 배선
+  function vsSheetBind(def, inst, host, M){
+    var each = function(sel, fn){ Array.prototype.forEach.call(host.querySelectorAll(sel), fn); };
+    each("[data-vs-chip]", function(el){ el.addEventListener("click", function(){ var v = el.getAttribute("data-vs-chip"), j = v.indexOf("|"); vsSheetChip(def, v.slice(0, j), v.slice(j + 1)); }); });
+    each("[data-vs-reset]", function(el){ el.addEventListener("click", function(){ vsSheetReset(def); }); });
+    each("[data-vs-sort]", function(el){ el.addEventListener("click", function(e){ if (e && e.target && e.target.getAttribute && e.target.getAttribute("data-vs-rs") != null) return; if (inst.dragAt && Date.now() - inst.dragAt < 400) return; vsSheetSortBy(def, el.getAttribute("data-vs-sort")); }); });   // 끌기를 마친 놓기가 머리 누름(정렬)으로 번지지 않게
+    each("[data-vf]", function(el){ if (el.tagName === "SELECT"){ el.addEventListener("click", function(e){ if (e && e.stopPropagation) e.stopPropagation(); }); el.addEventListener("change", function(){ vsSheetFilter(def, el.getAttribute("data-vf"), el.value); }); } else vsSheetTyping(def, el, "f"); });
+    each("[data-vs-q]", function(el){ vsSheetTyping(def, el, "q"); });
+    each("[data-vs-rs]", function(el){ el.addEventListener("pointerdown", function(e){ vsSheetDragStart(def, inst, host, el, e); }); el.addEventListener("click", function(e){ if (e && e.stopPropagation) e.stopPropagation(); }); });
+    each("[data-vs-row]", function(el){ el.addEventListener("click", function(e){ if (vsInteractive(e, el)) return; vsSheetToggle(def, el.getAttribute("data-vs-row")); }); });
+    each("[data-vs-close]", function(el){ el.addEventListener("click", function(e){ if (e && e.stopPropagation) e.stopPropagation(); inst.open = null; vsSheetRenderKeep(def); }); });
+    each("[data-vs-grp]", function(el){ el.addEventListener("click", function(){ var g = el.getAttribute("data-vs-grp"); inst.grp[g] = !inst.grp[g]; vsSheetRenderKeep(def); }); });
+    each("[data-vs-more]", function(el){ el.addEventListener("click", function(e){ if (e && e.stopPropagation) e.stopPropagation(); inst.limit = Math.max(Number(def.page) || 0, Number(inst.limit) || 0) + (Number(def.page) || 0); vsSheetRenderKeep(def); }); });
+    if (def.sel){
+      each("[data-vs-sel]", function(el){ el.addEventListener("click", function(e){ if (e && e.stopPropagation) e.stopPropagation(); }); el.addEventListener("change", function(){ var set = def.sel.set(), id = el.getAttribute("data-vs-sel"); if (el.checked) set[id] = 1; else delete set[id]; vsSheetRenderKeep(def); }); });
+      each("[data-vs-selall]", function(el){ el.addEventListener("change", function(){ var set = def.sel.set(); M.drawn.forEach(function(r){ var id = M.idOf(r); if (el.checked) set[id] = 1; else delete set[id]; }); vsSheetRenderKeep(def); }); });   // 전체선택은 보이는 행만(명세 fixes_with ⓗ) = 그린 행 — 접힌 묶음·더보기 밖 행은 고르지 않는다(사람별 의무 '이력 추가'·지우기가 화면에 안 나온 행으로 번지지 않게)
+      each("[data-vs-selact]", function(el){ el.addEventListener("click", function(){ var a = (def.sel.acts || [])[Number(el.getAttribute("data-vs-selact"))]; if (a && typeof a.run === "function") a.run(vsSheetSelIds(def)); }); });
+    }
+    each("[data-vs-det]", function(root){ vsSheetBindDet(def, root, M); });
+    each("[data-vs-detcard]", function(root){ vsSheetBindDet(def, root, M); });
+    each("[data-vs-wrap]", function(w){ if (typeof def.bindRows === "function") def.bindRows(w, M.ctx); });   // 행 안 버튼 배선 — 뿌리는 그릴 때마다 새로 생기는 표 칸(자리 host에 위임 배선하면 그릴 때마다 리스너가 쌓여 처리 버튼이 여러 번 돎)
+    each("[data-vs-wrap]", function(w){ w.addEventListener("scroll", function(){ w.classList.toggle("scrolled", w.scrollLeft > 0); }); vsSetPaneW(w); });
+  }
+  function vsSheetChip(def, g, k){
+    var inst = vsInst(def), grp = vsChipGroup(def, g), it = null, prev, i;
+    if (!grp) return "";
+    for (i = 0; i < grp.items.length; i++){ if (grp.items[i].k === k) it = grp.items[i]; }
+    if (!it) return "";
+    prev = vsChipOn(inst, grp);
+    if ((prev && prev.sort) || it.sort) inst.st.k = "";   // 칩별 기본 정렬 — 기본 정렬이 있는 칩으로 가거나 거기서 나오면 사람 정렬을 풀어 그 칩(또는 정의)의 기본 정렬로
+    inst.st.chip[g] = k; inst.limit = 0; inst.prune = true;
+    vsSheetSave(def);
+    return vsSheetRender(def);
+  }
+  function vsSheetReset(def){
+    var inst = vsInst(def), t;
+    for (t in inst.timers){ if (Object.prototype.hasOwnProperty.call(inst.timers, t)) clearTimeout(inst.timers[t]); }
+    inst.timers = {}; inst.st.f = {}; inst.st.chip = {}; inst.q = ""; inst.limit = 0; inst.prune = true;
+    vsSheetSave(def);
+    return vsSheetRender(def);
+  }
+  function vsSheetSortBy(def, k){
+    var inst = vsInst(def), c = vsColOf(def, k), cur, sk;
+    if (!c || c.nosort) return "";
+    sk = c.sortAs || c.k; cur = vsSheetSortOf(def, inst, vsSheetCols(def, inst.stageR || vsStage()));
+    inst.st.d = cur.k === sk ? -cur.d : (c.sortRev ? -1 : 1);   // 같은 열이면 방향만 뒤집고, 새 열은 ▲부터(별칭 반대 열은 그 열 머리에 ▲가 보이게)
+    inst.st.k = sk; inst.limit = 0;
+    vsSheetSave(def);
+    return vsSheetRenderKeep(def);   // 정렬은 칩 건수를 바꾸지 않는다
+  }
+  function vsSheetFilter(def, k, v){ var inst = vsInst(def); if (v) inst.st.f[k] = String(v); else delete inst.st.f[k]; inst.limit = 0; inst.prune = true; vsSheetSave(def); return vsSheetRender(def); }
+  function vsSheetSetQ(def, q){ var inst = vsInst(def); inst.q = String(q == null ? "" : q); inst.limit = 0; inst.prune = true; return vsSheetRender(def); }   // 검색어는 기기에 저장하지 않는다(전역 검색이 searchId로 넣을 때도 이것)
+  function vsSheetToggle(def, id){
+    var inst = vsInst(def), r, host, d;
+    inst.open = (inst.open === id) ? null : id;
+    r = vsSheetRenderKeep(def);
+    if (inst.open && r === "sheet" && inst.stageR <= 1){ host = document.getElementById(def.host); d = host && host.querySelector("[data-vs-detcard]"); if (d && d.scrollIntoView){ try { d.scrollIntoView({ block: "start", behavior: "smooth" }); } catch(e){ d.scrollIntoView(); } } }
+    return r;
+  }
+  // 머리 오른쪽 끌어 폭 — pointer 이벤트(마우스·펜·터치 한 길), 40~600px. 끌기 중에도 --vs-minw를 다시 잰다(남는 폭 열이 0으로 눌리지 않게). 끈 폭은 메모리만(새로고침이면 기본 폭)
+  //   끌기를 시작한 포인터 하나만 따른다(보조 포인터로는 시작 안 함 · 다른 손가락·손바닥의 이동·놓기는 무시) · 마우스 단추 없이 움직이면(창 밖에서 놓쳐 pointerup이 안 옴) 끌기를 끝낸다
+  //   · 끄는 중에 다른 일로 다시 그려도 지금 표의 col·표를 매번 다시 찾아 고친다
+  function vsSheetDragStart(def, inst, host, rs, e){
+    var k = rs.getAttribute("data-vs-rs"), c = vsColOf(def, k), pid, x0, w0, same, mv, up;
+    if (!c || c.fill || !e || (e.button != null && e.button !== 0) || e.isPrimary === false) return;
+    if (e.preventDefault) e.preventDefault();
+    if (e.stopPropagation) e.stopPropagation();
+    pid = e.pointerId;
+    if (pid != null && rs.setPointerCapture){ try { rs.setPointerCapture(pid); } catch(err){} }
+    x0 = e.clientX; w0 = vsColW(inst, c);
+    same = function(ev){ return !ev || pid == null || ev.pointerId == null || ev.pointerId === pid; };
+    mv = function(ev){
+      var w, col, tb;
+      if (!same(ev)) return;
+      if (ev.pointerType === "mouse" && ev.buttons != null && !(ev.buttons & 1)){ up(ev); return; }
+      w = Math.max(VS_W_MIN, Math.min(VS_W_MAX, Math.round(w0 + (ev.clientX - x0)))); inst.colw[k] = w;
+      col = host.querySelector('[data-vs-col="' + vsAttrQ(k) + '"]'); tb = host.querySelector("[data-vs-table]");
+      if (col) col.style.width = w + "px";
+      if (tb) tb.style.setProperty("--vs-minw", vsSheetMinW(inst, vsSheetCols(def, inst.stageR || vsStage())) + "px");
+    };
+    up = function(ev){ if (!same(ev)) return; document.removeEventListener("pointermove", mv); document.removeEventListener("pointerup", up); document.removeEventListener("pointercancel", up); inst.dragAt = Date.now(); };
+    document.addEventListener("pointermove", mv); document.addEventListener("pointerup", up); document.addEventListener("pointercancel", up);
+  }
+  // 표 그리기(PC·폰 표) — 상태 남기기 → 그리기 → 배선 → 상태 되살리기. 칩·거르기·검색을 바꾼 뒤면 숨은 행의 선택은 푼다(명세 review_additions — 남기는 정의는 선택 막대에 '숨은 선택 n')
+  //   이 자리의 거르기 줄·검색칸이 한글 조합 중이면 그리지 않고 미룬다(입력칸이 새 요소로 바뀌면 조합이 끊김) — 그 칸의 compositionend가 150ms 뒤 다시 그린다(그때 바뀐 자료·단계·숨은 선택 풀기까지)
+  function vsSheetPaint(def, inst, host, stage){
+    var M, snap, set, vm;
+    if (vsComposing(host)) return inst.last;
+    M = vsSheetModel(def, inst, stage);
+    if (def.sel && inst.prune && !def.sel.keep){ set = def.sel.set() || {}; vm = {}; M.rows.forEach(function(r){ vm[M.idOf(r)] = 1; }); Object.keys(set).forEach(function(id){ if (!vm[id]) delete set[id]; }); }
+    inst.prune = false;
+    snap = vsSheetSnap(host);
+    host.innerHTML = vsSheetHtml(def, inst, M);
+    host.setAttribute("data-vs-mode", "sheet");
+    vsSheetBind(def, inst, host, M);
+    vsSheetRestore(host, snap);
+    inst.last = M;
+    return M;
+  }
+  // 갈래 함수 하나 — 폰(859px 이하)이고 phone이 "legacy"(기본)면 그 탭의 지금 그리기 함수(def.legacy)를 그대로 부르고(그 자리에 PC 표가 남아 있으면 먼저 비움), 아니면 표를 그린다. 돌려줌 "legacy"|"sheet"
+  //   legacy 안에서 이 함수가 다시 불리면(정의에 옛 본문 대신 vsSheetRender를 부르는 새 입구를 잘못 넘김) 그 안쪽 부름은 아무것도 안 하고 돌아간다 — 폰에서 서로 불러 멈추지 않게
+  function vsSheetRender(def){
+    var inst = vsInst(def), stage = vsStage(), host = document.getElementById(def.host);
+    if (inst.inLegacy) return "legacy";
+    inst.stageR = stage; inst.stale = false;
+    if (host) vsPaneObserve(host, def.key);
+    if (stage <= 1 && def.phone !== "sheet"){
+      inst.mode = "legacy";
+      if (host && host.getAttribute("data-vs-mode") === "sheet") host.innerHTML = "";
+      if (host) host.setAttribute("data-vs-mode", "legacy");
+      if (typeof def.onMode === "function") def.onMode("legacy");
+      if (typeof def.legacy === "function"){ inst.inLegacy = true; try { def.legacy(); } finally { inst.inLegacy = false; } }
+      return "legacy";
+    }
+    inst.mode = "sheet";
+    if (typeof def.onMode === "function") def.onMode("sheet");
+    if (host) vsSheetPaint(def, inst, host, stage);
+    return "sheet";
+  }
+  // 칩 건수가 바뀌지 않는 누름(펼침·닫기·묶음·더보기·선택·정렬)의 다시 그리기 — 직전 그림의 칩 건수를 다시 쓴다(vsSheetChipNs). 표시는 이 부름 동안만
+  function vsSheetRenderKeep(def){ var inst = vsInst(def); inst.keepN = true; try { return vsSheetRender(def); } finally { inst.keepN = false; } }
+  function vsVisible(host){ try { return !!(host && host.getClientRects && host.getClientRects().length); } catch(e){ return false; } }
+  // 창 폭이 860·1280·1600 경계를 넘으면(matchMedia change) 그린 단계가 바뀐 표만 — 보이는 표는 바로 한 번, 숨은 표는 표시(stale)만 해 두고 보일 때 ResizeObserver가 한 번
+  function vsSheetOnBreak(){
+    var s = vsStage();
+    Object.keys(VS_INST).forEach(function(k){
+      var inst = VS_INST[k], host;
+      if (!inst.mode || inst.stageR === s) return;
+      host = document.getElementById(inst.def.host);
+      if (vsVisible(host)) vsSheetRender(inst.def); else inst.stale = true;
+    });
+  }
+  try { ["(max-width:859px)", "(min-width:1280px)", "(min-width:1600px)"].forEach(function(q){ var m = window.matchMedia(q); if (m.addEventListener) m.addEventListener("change", vsSheetOnBreak); else if (m.addListener) m.addListener(vsSheetOnBreak); }); } catch(e){}
+  function vsRaf(fn){ if (window.requestAnimationFrame) window.requestAnimationFrame(fn); else setTimeout(fn, 16); }
+  function vsRoCb(entries){
+    var hosts = [];
+    entries.forEach(function(en){ hosts.push(en.target); });
+    vsRaf(function(){   // 콜백 안에서 크기를 바꾸면 'ResizeObserver loop' 오류(window error → 오류 로그)라 다음 그림에 고친다
+      hosts.forEach(function(host){
+        var w = host.querySelector ? host.querySelector(".vs-wrap") : null, k = host.getAttribute ? host.getAttribute("data-vs-host") : null, inst = k ? VS_INST[k] : null;
+        if (w) vsSetPaneW(w);
+        if (inst && inst.mode && (inst.stale || inst.stageR !== vsStage()) && vsVisible(host)) vsSheetRender(inst.def);
+      });
+    });
+  }
+  // 창·칸 크기가 바뀌면 펼침 칸 폭(--vs-panew)을 다시 잰다 — 새 부품 표와 계약·차량 표(명세 fixes_with ⓔ — 두 표의 그리기에 이 한 줄씩). 자리(host)는 다시 그려도 그대로라 한 번만 걸고 풀지 않는다
+  function vsPaneObserve(host, key){
+    if (!host) return;
+    if (key) host.setAttribute("data-vs-host", key);
+    if (host.__vsObs) return;
+    try { if (typeof ResizeObserver !== "function") return; if (!vsRo) vsRo = new ResizeObserver(vsRoCb); vsRo.observe(host); host.__vsObs = 1; } catch(e){}
+  }
+  // 날짜 칸 규칙 하나(명세 glossary · fixes_with ⓚ) — 지남 = 빨강: 넓은 칸(o.wide — 140px 이상) 'YYYY-MM-DD 경과 n일' · 좁은 칸 '경과 n일'(날짜는 title) · 폰 전용 열(o.phone) 'D+n'
+  //   임박 = 노랑 'YYYY-MM-DD D-n'(좁은 칸 'D-n') — 기준은 탭마다 o.soon(기본 3 — 지시·입찰 3 · 현장 신고·사람별 의무 30), o.red = 이 일수 안이면 지나지 않아도 빨강(현장 신고 7)
+  //   그 밖 = 날짜 + 회색 D-n(좁은 칸은 회색 D-n, 날짜는 title) · 빈 값 '-' · o.grey(보류·완료·회색 상태)는 색 없이. sv = 정렬 값(오늘부터 남은 날 — 빈 값 null)
+  function vsDateCell(d, o){
+    var s = String(d == null ? "" : d), dd, n, past, red, warn, rel, ds;
+    o = o || {};
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return { html: '<span style="color:#9AA09C;">-</span>', cls: "", title: "", sv: null };
+    dd = vehDday(s); n = dd.diff; ds = esc(s); rel = n < 0 ? "D+" + (-n) : "D-" + n;
+    if (o.grey) return { html: o.phone ? rel : (o.wide ? ds + ' <span style="color:#9AA09C;">' + rel + '</span>' : '<span style="color:#9AA09C;">' + rel + '</span>'), cls: "", title: s, sv: n };
+    past = n < 0; red = past || (Number(o.red) > 0 && n <= Number(o.red)); warn = !red && n <= (o.soon == null ? 3 : Number(o.soon));
+    if (o.phone) return { html: rel, cls: red ? "vs-dan" : (warn ? "vs-warn" : ""), title: s, sv: n };
+    if (past) return { html: o.wide ? ds + ' 경과 ' + (-n) + '일' : '경과 ' + (-n) + '일', cls: "vs-dan", title: s, sv: n };
+    if (red || warn) return { html: o.wide ? ds + ' ' + rel : rel, cls: red ? "vs-dan" : "vs-warn", title: s, sv: n };
+    return { html: o.wide ? ds + ' <span style="color:var(--sub);">' + rel + '</span>' : '<span style="color:var(--sub);">' + rel + '</span>', cls: "", title: s, sv: n };
+  }
+  // 정의 검사(시험·개발용 — 화면에서는 부르지 않음): 저장 이름(VS_SHEET_KEYS) · 그릴 자리 · 열 키 겹침·거르기 종류·lv 1~4 정수·폰 전용은 lv1 · 남는 폭 열은 하나까지 · 정렬 별칭(sortAs)은 있는 열 키
+  //   · 기본 정렬은 860 단계에 보이는 열(별칭 포함 — fixes_with ⓖ) · 칩별 기본 정렬은 정렬되는 열 키(오타면 모든 값이 빈 값이라 조용히 원래 순서) · 모집단 칩은 test 함수
+  //   · sel이면 set·can 함수 · group이면 of 함수 · 폰 갈래(legacy면 legacy 함수, sheet면 폰 열 % 합 100) · 단계별 열 합 ≤ VS_STAGE_BUDGET — 문제 목록(빈 배열 = 통과)
+  function vsSheetCheckDef(def){
+    var bad = [], seen = {}, cols = def.cols || [], ph = def.phone || "legacy", s2, sAll, pw = 0;
+    if (VS_SHEET_KEYS.indexOf(def.key) < 0) bad.push("key");
+    if (!def.host) bad.push("host");
+    if (!cols.length) bad.push("cols");
+    cols.forEach(function(c){ var lv = Number(c.lv == null ? 1 : c.lv); if (!c.k || seen[c.k]) bad.push("col:" + c.k); seen[c.k] = 1; if (["text", "enum", "none"].indexOf(c.f || "none") < 0) bad.push("f:" + c.k); if (!(lv >= 1 && lv <= 4) || Math.floor(lv) !== lv) bad.push("lv:" + c.k); if (c.ph && lv !== 1) bad.push("ph:" + c.k); });
+    cols.forEach(function(c){ if (c.sortAs && !vsColOf(def, c.sortAs)) bad.push("sortAs:" + c.k); });
+    if (cols.filter(function(c){ return c.fill; }).length > 1) bad.push("fill");
+    s2 = vsSheetCols(def, 2).filter(function(c){ return !c.nosort; }).map(function(c){ return c.sortAs || c.k; });
+    if (def.sort && s2.indexOf(def.sort.k) < 0) bad.push("sort");
+    sAll = cols.filter(function(c){ return !c.nosort; }).map(function(c){ return c.sortAs || c.k; });
+    (def.chips || []).forEach(function(g){ (g.items || []).forEach(function(it){ if (it.sort && sAll.indexOf(it.sort.k) < 0) bad.push("chipsort:" + g.g + "|" + it.k); if (it.pop && typeof it.test !== "function") bad.push("pop:" + g.g + "|" + it.k); }); });
+    if (def.sel && (typeof def.sel.set !== "function")) bad.push("sel");
+    if (def.sel && (typeof def.sel.can !== "function")) bad.push("sel.can");
+    if (def.group && typeof def.group.of !== "function") bad.push("group");
+    if (ph === "sheet"){ vsSheetCols(def, 1).forEach(function(c){ pw += Number(c.pw) || 0; }); if (Math.abs(pw - 100) > 0.5) bad.push("pw:" + pw); }
+    else if (ph !== "legacy") bad.push("phone");
+    else if (typeof def.legacy !== "function") bad.push("legacy");
+    [2, 3, 4].forEach(function(s){ var w = vsSheetMinW({ colw: {} }, vsSheetCols(def, s)); if (w > VS_STAGE_BUDGET[s]) bad.push("sum" + s + ":" + w); });
+    return bad;
+  }
+  // @vs-sheet-end
+
   // ---- v370 차량 시트형(A안 뼈대) + 폰 2단(C안) — PM 9/21 "추천 ㄱ"·9/22 "ㄱ". 화면 층만 교체: 데이터 모델(col:vehicles)·저장·권한·서류출력·vehicleTypeOf(no·type) 무변경 ----
   // @veh-sheet-start
   // 열 정의: hs=PC 전용(폰에서 숨김), ph=폰 전용(검사·보험 중 가까운 만기 하나). f=필터 종류(text 부분일치 / enum 정확일치 / none)
@@ -6885,6 +7418,7 @@
       wrap.classList.toggle("scrolled", sl > 0);
       vehSetPaneW(wrap);
     }
+    vsPaneObserve(host);   // v438 창 크기 변화에 --vs-panew 다시 잼(ResizeObserver — 명세 fixes_with ⓔ, 차량 표는 그 밖 그대로)
     bindVehSheet(host, dcard);
     if (focusKey){ var fe = host.querySelector('[data-vf="' + focusKey + '"]'); if (fe){ fe.focus(); if (caret != null && fe.setSelectionRange){ try { fe.setSelectionRange(caret, caret); } catch(e){} } } }
     renderSelBar("veh");
@@ -12721,6 +13255,7 @@
       wrap.classList.toggle("scrolled", sl > 0);
       conSetPaneW(wrap);
     }
+    vsPaneObserve(host);   // v438 창 크기 변화에 --vs-panew 다시 잼(ResizeObserver — 명세 fixes_with ⓔ, 계약 표는 그 밖 그대로)
     bindConSheet(host, dcard);
     if (focusKey){ var fe = host.querySelector('[data-cf="' + focusKey + '"]'); if (fe){ fe.focus(); if (caret != null && fe.setSelectionRange){ try { fe.setSelectionRange(caret, caret); } catch(e){} } } }
   }
