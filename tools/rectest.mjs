@@ -19,7 +19,8 @@ const src = [
 eval('(function(){' + src + '\nglobalThis.__r={readXlsx,recImportMap};})()');
 const { readXlsx, recImportMap } = globalThis.__r;
 
-const FILE = 'C:/Users/user/Desktop/작업/세금계산서목록.xlsx';
+// 11/10 v440: 옛 PC 경로(Desktop/작업)가 없어 돌지 않던 것 — 실물 표본은 OneDrive work 13_보관(두 PC 같은 경로), 다른 파일은 인자로
+const FILE = process.argv[2] || 'C:/Users/user/OneDrive/work/13_보관/세금계산서목록.xlsx';
 const b64 = readFileSync(FILE).toString('base64');
 const sheets = await readXlsx('x,' + b64);
 console.log('시트: ' + sheets.map((s) => s.name + '(' + s.grid.length + '행)').join(', '));
@@ -42,7 +43,8 @@ console.log('회사 자동판별: 환경 ' + co.env + ' / 건설 ' + co.con + ' 
 console.log('합계액 총액: ' + sumTotal.toLocaleString() + '원');
 console.log('공급가액+세액 불일치: ' + badAmt + '건 / 작성일자 형식오류: ' + badDate + '건');
 console.log('샘플 3건:');
-recs.slice(0, 3).forEach((r) => console.log('  ' + [r.billed, r.co, r.client, r.desc.slice(0, 20), r.amount.toLocaleString(), r.nts.slice(0, 12)].join(' | ')));
+// 값(거래처·내역·금액·승인번호)은 찍지 않는다 — 길이·꼴만(11/10 v440)
+recs.slice(0, 3).forEach((r) => console.log('  ' + [r.billed, r.co, '거래처 ' + String(r.client || '').length + '자', '내역 ' + String(r.desc || '').length + '자', '금액 ' + String(Math.abs(r.amount)).length + '자리' + (r.amount < 0 ? '(음수)' : ''), '승인번호 ' + String(r.nts || '').length + '자'].join(' | ')));
 
 if (badAmt) fails.push('금액 정합 불일치 ' + badAmt + '건');
 if (badDate) fails.push('날짜 형식오류 ' + badDate + '건');

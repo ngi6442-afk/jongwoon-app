@@ -4766,7 +4766,7 @@ try {
   const viewW38 = (win, id) => { const b = body38(win), own = decl38(win, '#view-' + id, 'max-width'), base = decl38(win, '.views>.view', 'max-width'), mx = own != null ? own : base; return (!mx || mx === 'none') ? b : Math.min(b, parseFloat(mx)); };
   //   명세 width_plan.table(창 → 본문, 스크롤바 17 포함): 1024 791 · 1100 867 · 1280 1011 · 1366 1097 · 1440 1171 · 1536 1267 · 1600 1331 · 1920·2560 1428
   const WT38 = { 1024: 791, 1100: 867, 1280: 1011, 1366: 1097, 1440: 1171, 1536: 1267, 1600: 1331, 1920: 1428, 2560: 1428 };
-  const WIDE38 = ['tasks', 'con', 'veh', 'perm'];   // 명세 reading_width 9개 중 v438은 계약·차량·권한관리 · v439에 지시(#view-tasks — 표로 바꾼 판) — 기성·거래처·일용직·입찰은 각 탭 판(v440~v443), 안전(#view-safety)은 56 판(v445)에서 더한다
+  const WIDE38 = ['tasks', 'rec', 'con', 'veh', 'perm'];   // 명세 reading_width 9개 중 v438은 계약·차량·권한관리 · v439에 지시(#view-tasks) · v440에 기성(#view-rec — 표로 바꾼 판) — 거래처·일용직·입찰은 각 탭 판(v441~v443), 안전(#view-safety)은 56 판(v445)에서 더한다
   const views38 = [...html.matchAll(/<(?:section|div) class="view(?: active)?" id="view-([a-z]+)">/g)].map((m) => m[1]);
   const SECS38 = ['tasks', 'veh', 'hwakwan', 'allbaro', 'rec', 'cal', 'lic', 'bid', 'con', 'cli', 'doc', 'hr', 'progress', 'ask', 'safety', 'quote', 'promo', 'workers', 'perm', 'fam', 'leave'];
   const secs38 = [...html.matchAll(/<section class="view" id="view-([a-z]+)">/g)].map((m) => m[1]);
@@ -4774,7 +4774,7 @@ try {
   const vBad38 = [1366, 1920].map((w) => views38.filter((id) => viewW38(w, id) !== (WIDE38.indexOf(id) >= 0 ? body38(w) : 808)).join('/')).join('|') + '|' + views38.filter((id) => viewW38(1024, id) !== body38(1024)).join('/');
   const perm38 = decl38(1366, '#view-perm>:not(#permRoster)', 'max-width') === '808px' && decl38(1920, '#view-perm>:not(#permRoster)', 'max-width') === '808px' && decl38(1920, '#permRoster', 'max-width') == null && decl38(1920, '#sfPaneNow', 'max-width') === '808px';
   const phone38 = decl38(859, '#app', 'max-width') === '560px' && padLR38(decl38(859, '#app', 'padding')).join() === '16,16' && decl38(859, '.views>.view', 'max-width') == null && decl38(375, '.tabbar', 'width') == null && decl38(859, '.layout', 'gap') == null;
-  T('v438 ① 화면 폭(head <style>을 읽어 계산 — 창 폭 − 스크롤바 17): 본문 = 명세 width_plan.table(±2px) 1024 791 · 1100 867 · 1280 1011 · 1366 1097 · 1440 1171 · 1536 1267 · 1600 1331 · 1920·2560 1428 · 넓히는 화면 id 4개(지시·계약·차량·권한관리 — v439에 지시를 더함, 기성·거래처·일용직·입찰은 각 탭 판 v440~v443, 안전은 v445)만 1366·1920에서 본문 폭, 그 밖 화면(안전 포함)은 808 · 1024 창은 모두 본문 폭(791 < 808) · 권한관리는 권한 표(#permRoster)만 넓고 그 밖 카드·안전 현황(#sfPaneNow) 808 · 859px 이하 틀 그대로(#app 최대 560·여백 16, 간격·사이드바 폭·읽기 폭 규칙 없음) · section 태그 21개 class="view" 그대로(class 더하지 않음)',
+  T('v438 ① 화면 폭(head <style>을 읽어 계산 — 창 폭 − 스크롤바 17): 본문 = 명세 width_plan.table(±2px) 1024 791 · 1100 867 · 1280 1011 · 1366 1097 · 1440 1171 · 1536 1267 · 1600 1331 · 1920·2560 1428 · 넓히는 화면 id 5개(지시·기성·계약·차량·권한관리 — v439에 지시·v440에 기성을 더함, 거래처·일용직·입찰은 각 탭 판 v441~v443, 안전은 v445)만 1366·1920에서 본문 폭, 그 밖 화면(안전 포함)은 808 · 1024 창은 모두 본문 폭(791 < 808) · 권한관리는 권한 표(#permRoster)만 넓고 그 밖 카드·안전 현황(#sfPaneNow) 808 · 859px 이하 틀 그대로(#app 최대 560·여백 16, 간격·사이드바 폭·읽기 폭 규칙 없음) · section 태그 21개 class="view" 그대로(class 더하지 않음)',
     wBad38.length === 0 && vBad38 === '||' && views38.length === 23 && perm38 && phone38 && JSON.stringify(secs38) === JSON.stringify(SECS38) && !/<section class="view [^"]*" id=/.test(html),
     JSON.stringify({ body: Object.keys(WT38).map((w) => w + ':' + body38(+w)), viewBad: vBad38, views: views38.length, perm38, phone38, secs: secs38.length }));
 
@@ -5191,17 +5191,19 @@ try {
     && dc2_38 === 'vs-warn:D-3,:D-4' && JSON.stringify(cks2_38) === JSON.stringify(['chipsort:st|done', 'sortAs:reg', 'sel', 'sel.can', 'group', 'pop:st|old', '']),
     JSON.stringify({ dc: dc38.map((x) => x.cls + ':' + x.html), cks38, dc2_38, cks2_38 }));
 
-  // ⑫ 정적 — 계약·차량 표는 ResizeObserver 한 줄씩(vsPaneObserve(host) — 그리기마다 불러도 자리에 한 번만 걸림) 말고 무변 · 부품을 쓰는 탭 1개(v439 지시 — 기성 v440부터 탭 판마다 이 줄을 고친다) · pointer(마우스 이벤트 없음) · 150ms·조합
+  // ⑫ 정적 — 계약·차량 표는 ResizeObserver 한 줄씩(vsPaneObserve(host) — 그리기마다 불러도 자리에 한 번만 걸림) 말고 무변 · 부품을 쓰는 탭 2개(v439 지시·v440 기성 — 거래처 v441부터 탭 판마다 이 줄을 고친다) · pointer(마우스 이벤트 없음) · 150ms·조합
   //   · 저장은 한 곳(def.key에 k,d,f,chip) · ResizeObserver 하나·콜백은 rAF · 경계 matchMedia 3개 · 새 CSS(.vs.vs-fit 폭·폰 --pw·.vs-detcard·td.num·옅은 칩) · 기존 .vs 규칙(min-width 1160·폰 0) 그대로
-  //   v439 '부품을 쓰는 탭 0' → '지시 1개'(같은 강도): 부품을 부르는 곳은 @task-sheet 구간 하나(vsSheetRender 1번·정의 key "jw_task_sheet" 1개·host "taskList")이고 두 구간 밖은 vsSheet*·vsDateCell·VS_INST 0,
-  //     부품 저장 이름 8개 중 @vs-sheet 구간 밖에 나오는 이름은 jw_task_sheet 하나(그 구간 안 1번)
+  //   v439 '부품을 쓰는 탭 0' → '지시 1개' → v440 '지시·기성 2개'(같은 강도): 부품을 부르는 곳은 @task-sheet·@rec-sheet 구간 하나씩(구간마다 vsSheetRender 1번·정의 key 1개 — "jw_task_sheet"·"jw_rec_sheet" ·
+  //     host 1개 — "taskList"·"recSheet")이고 세 구간 밖은 vsSheet*·vsDateCell·VS_INST 0, 부품 저장 이름 8개 중 @vs-sheet 구간 밖에 나오는 이름은 jw_task_sheet·jw_rec_sheet 둘(각 1번)
   const outside38 = html.slice(0, html.indexOf('// @vs-sheet-start')) + html.slice(html.indexOf('// @vs-sheet-end'));
-  const tsb38 = (() => { const i = html.indexOf('// @task-sheet-start'), j = html.indexOf('// @task-sheet-end'); return (i < 0 || j < i) ? '' : html.slice(i, j); })();
-  const outside2_38 = tsb38 ? outside38.replace(tsb38, '') : outside38;
+  const blkOf38 = (a, b) => { const i = html.indexOf(a), j = html.indexOf(b); return (i < 0 || j < i) ? '' : html.slice(i, j); };
+  const tsb38 = blkOf38('// @task-sheet-start', '// @task-sheet-end'), rsb38 = blkOf38('// @rec-sheet-start', '// @rec-sheet-end');
+  const outside2_38 = [tsb38, rsb38].reduce((s, b) => (b ? s.replace(b, '') : s), outside38);
   const keysOut38 = ['jw_task_sheet', 'jw_rec_sheet', 'jw_cli_sheet', 'jw_wk_sheet', 'jw_bid_sheet', 'jw_ob_sheet', 'jw_site_sheet', 'jw_edu_sheet'].filter((k) => outside38.indexOf(k) >= 0);
-  const use38 = tsb38.length > 0 && (outside2_38.match(/\bvsSheet\w*\(|\bvsDateCell\(|\bVS_INST\b/g) || []).length === 0
+  const use38 = tsb38.length > 0 && rsb38.length > 0 && (outside2_38.match(/\bvsSheet\w*\(|\bvsDateCell\(|\bVS_INST\b/g) || []).length === 0
     && (tsb38.match(/\bvsSheetRender\(/g) || []).length === 1 && (tsb38.match(/key: "jw_task_sheet"/g) || []).length === 1 && (tsb38.match(/\bhost: "taskList"/g) || []).length === 1
-    && JSON.stringify(keysOut38) === '["jw_task_sheet"]' && (outside38.match(/jw_task_sheet/g) || []).length === 1;
+    && (rsb38.match(/\bvsSheetRender\(/g) || []).length === 1 && (rsb38.match(/key: "jw_rec_sheet"/g) || []).length === 1 && (rsb38.match(/\bhost: "recSheet"/g) || []).length === 1
+    && JSON.stringify(keysOut38) === '["jw_task_sheet","jw_rec_sheet"]' && (outside38.match(/jw_task_sheet/g) || []).length === 1 && (outside38.match(/jw_rec_sheet/g) || []).length === 1;
   const rv38 = fn38(html, 'renderVehicles'), rc38 = fn38(html, 'renderContracts');
   const V38 = mk38({ width: 1366 }), vh38 = V38.env.mkHost('vehList'); vh38.innerHTML = '<div class="vs-wrap"><table class="vs"></table></div>';
   V38.api.paneObs(vh38); V38.api.paneObs(vh38); V38.env.roCb([{ target: vh38 }]); V38.env.flushRaf();
@@ -5224,7 +5226,7 @@ try {
     && decl38(1000, '.vs td.num', 'text-align') == null && decl38(1000, '.vs td .sel-box', 'margin-right') == null && decl38(1000, '.vs td .sel-box', 'vertical-align') == null && decl38(1000, '.vs.vs-fit td .sel-box', 'margin-right') === '6px'
     && decl38(375, '.sel-bar.vs-selbar', 'flex-wrap') === 'wrap' && decl38(375, '.sel-bar.vs-selbar', 'padding') === '2px 2px 8px' && decl38(375, '.vs-selbar', 'padding') == null
     && /@media \(pointer:coarse\)\{ \.vs\.vs-fit \.vs-rs\{width:14px;\} \}/.test(css38);
-  T('v438 ⑫ 정적: 계약·차량 그리기에 vsPaneObserve(host) 한 줄씩(파일에서 이 둘뿐 — 여러 번 불러도 자리에 한 번 걸림·--vs-panew = 칸 폭·창을 줄이면 다음 그림에 다시 잼 1048 → 900·data-vs-host 없음) · 부품을 쓰는 탭 1개 — v439 지시(@task-sheet 구간 하나: vsSheetRender 1번·정의 key jw_task_sheet 1개·host taskList · 두 구간 밖 vsSheet*·vsDateCell·VS_INST 0 · 부품 저장 이름은 jw_task_sheet만) · 끌기는 pointer(document pointermove·pointerup·pointercancel — mouse 이벤트 0) · 150ms·compositionstart/end·isComposing · 저장 한 곳(def.key에 k,d,f,chip) · ResizeObserver 하나·콜백은 rAF · 경계 matchMedia 3개 · CSS .vs.vs-fit(860~ 폭 100%·최소 --vs-minw)·폰 col --pw·.vs-detcard(PC 숨김·폰 보임)·.vs.vs-fit td.num 오른쪽·옅은 칩 · 기존 .vs(min-width 1160·폰 0·폰 col 0) 그대로 · 검토 반영: 펼침 폭 상한 max-width 100%(계약·차량 [닫기 ▲] 잘림) · .vs td.num·.vs td .sel-box 규칙 없음(새 표만) · .sel-bar.vs-selbar 줄바꿈·여백 · 터치 손잡이 14px',
+  T('v438 ⑫ 정적: 계약·차량 그리기에 vsPaneObserve(host) 한 줄씩(파일에서 이 둘뿐 — 여러 번 불러도 자리에 한 번 걸림·--vs-panew = 칸 폭·창을 줄이면 다음 그림에 다시 잼 1048 → 900·data-vs-host 없음) · 부품을 쓰는 탭 2개 — v439 지시·v440 기성(@task-sheet·@rec-sheet 구간 하나씩: 구간마다 vsSheetRender 1번·정의 key 1개(jw_task_sheet·jw_rec_sheet)·host 1개(taskList·recSheet) · 세 구간 밖 vsSheet*·vsDateCell·VS_INST 0 · 부품 저장 이름은 jw_task_sheet·jw_rec_sheet만) · 끌기는 pointer(document pointermove·pointerup·pointercancel — mouse 이벤트 0) · 150ms·compositionstart/end·isComposing · 저장 한 곳(def.key에 k,d,f,chip) · ResizeObserver 하나·콜백은 rAF · 경계 matchMedia 3개 · CSS .vs.vs-fit(860~ 폭 100%·최소 --vs-minw)·폰 col --pw·.vs-detcard(PC 숨김·폰 보임)·.vs.vs-fit td.num 오른쪽·옅은 칩 · 기존 .vs(min-width 1160·폰 0·폰 col 0) 그대로 · 검토 반영: 펼침 폭 상한 max-width 100%(계약·차량 [닫기 ▲] 잘림) · .vs td.num·.vs td .sel-box 규칙 없음(새 표만) · .sel-bar.vs-selbar 줄바꿈·여백 · 터치 손잡이 14px',
     ro38 && st38 && css2_38 && css3_38, JSON.stringify({ ro38, ro38a, ro38b, st38, use38, keysOut38, css2_38, css3_38 }));
 
   // ⑬ 문서 — FEATURES 기준 v438·v438 절(문장 고정)·자리 글 GATES_V438 0 · TESTLIST v438 체크 칸 = 화면 칸 4개 '[ ] (AI 시험 화면 대상' + 게이트 칸 '[x] (AI)' 5종(PM 몫 0) · MANUAL 1절 화면 폭 한 줄 · CLAUDE.md 폭·부품 줄 · sw v438 이상
@@ -5463,13 +5465,16 @@ try {
   const det3 = {}; ['b', 'c', 'd', 'p'].forEach((id) => { openRow39(X3, id); det3[id] = detActs39(X3.host._h); });
   const Y3 = mk39({ user: U39.B }); Y3.api.render();
   const b3 = [order39(Y3.host._h), cnt39(Y3.host._h), acts39(Y3.host._h)];
+  const Y3r = mk39({ user: Object.assign({}, U39.B, { perms: { tasks: 'do', con: 'do', rec: 'view' } }) }); Y3r.api.render();   // 같은 직원B에 기성 보기 권한 = 기성 연동 l 보임(기성을 아직 못 받은 화면 — 종전 규칙)
+  const b3r = [order39(Y3r.host._h), cnt39(Y3r.host._h)];
   const detB3 = {}; ['b', 'h', 'p', 'c'].forEach((id) => { openRow39(Y3, id); detB3[id] = detActs39(Y3.host._h); });
-  T('v439 ③ 처리 버튼 권한별: 관리자 처리 열 a 완료·h 승인·b 승인·g 완료·l 완료·i 완료·n 완료·p 완료·c 완료·d 재개 · 펼침 b(승인 대기) 승인·반려·완료취소·삭제 / c(계약 단계) 완료·📄 서류·보류·수정·삭제 / d(보류) 완료·재개·수정·삭제 / p(남의 자동) 완료·보류·수정·삭제 · 직원B(지시 수행) 행 = a,h,b,g,l,n,p,c,d(관리자 전용 i 빠짐) "보이는 9건 / 전체 11건" · 처리 열 b 없음(앱 기준 자동은 승인권자 아님)·h 승인(자기가 지시)·d 재개 · 펼침 b 완료취소·삭제 / h 승인·반려·완료취소·삭제 / p(자기 담당 자동) 완료·보류·수정·내 것 아님·삭제 / c 완료·📄 서류(계약 수행)·보류·수정·삭제',
+  T('v439 ③ 처리 버튼 권한별: 관리자 처리 열 a 완료·h 승인·b 승인·g 완료·l 완료·i 완료·n 완료·p 완료·c 완료·d 재개 · 펼침 b(승인 대기) 승인·반려·완료취소·삭제 / c(계약 단계) 완료·📄 서류·보류·수정·삭제 / d(보류) 완료·재개·수정·삭제 / p(남의 자동) 완료·보류·수정·삭제 · 직원B(지시 수행·기성 숨김) 행 = a,h,b,g,n,p,c,d(관리자 전용 i 빠짐 · 기성 연동 입금확인 l도 빠짐 — v440 검토: 기성을 못 보면 빈 공개범위 기성 연동 지시도 안 보임) "보이는 8건 / 전체 10건" · 처리 열 b 없음(앱 기준 자동은 승인권자 아님)·h 승인(자기가 지시)·d 재개 · 펼침 b 완료취소·삭제 / h 승인·반려·완료취소·삭제 / p(자기 담당 자동) 완료·보류·수정·내 것 아님·삭제 / c 완료·📄 서류(계약 수행)·보류·수정·삭제',
     a3 === 'a:done,h:approve,b:approve,g:done,l:done,i:done,n:done,p:done,c:done,d:resume'
     && det3.b === 'approve,reject,cancel,del' && det3.c === 'done,doc,hold,edit,del' && det3.d === 'done,resume,edit,del' && det3.p === 'done,hold,edit,del'
-    && b3[0] === 'a,h,b,g,l,n,p,c,d' && b3[1] === '보이는 9건 / 전체 11건' && b3[2] === 'a:done,h:approve,b:-,g:done,l:done,n:done,p:done,c:done,d:resume'
+    && b3[0] === 'a,h,b,g,n,p,c,d' && b3[1] === '보이는 8건 / 전체 10건' && b3[2] === 'a:done,h:approve,b:-,g:done,n:done,p:done,c:done,d:resume'
+    && JSON.stringify(b3r) === '["a,h,b,g,l,n,p,c,d","보이는 9건 / 전체 11건"]'
     && detB3.b === 'cancel,del' && detB3.h === 'approve,reject,cancel,del' && detB3.p === 'done,hold,edit,notmine,del' && detB3.c === 'done,doc,hold,edit,del',
-    JSON.stringify({ a3, det3, b3, detB3 }));
+    JSON.stringify({ a3, det3, b3, b3r, detB3 }));
 
   // ④ 처리·펼침 버튼 동작(관리자) — 처리 열 누름은 행 펼침으로 번지지 않음(같은 행 요소·펼침 없음) · [완료] = 승인 대기(완료 요청자·승인권자 푸시) · [승인] = 완료 + 반복 다음 회차(한 달 뒤) / 계약 단계 진행(advanceProc)
   //   · [재개] · 펼침 [📄 서류]·[반려](앱 기준이면 완료 신호 끔)·[보류]·[수정]·[삭제](확인 — 휴지통)·[되돌리기] · 확인 창 취소면 그대로 · 보기 권한 흉내 누름은 무시
@@ -5600,10 +5605,10 @@ try {
   const kb11 = zl().querySelector('[data-selid="k"]'); kb11.checked = true; kb11.fire('change');
   Z11.env.user = U39.B; zl().querySelector('.delpurge-btn').fire('click'); zd11.push(Z11.api.tasks().some((t) => t.id === 'k'));   // 관리자 화면에 남은 [영구삭제]를 직원B가 누름 = 무시
   Z11.env.user = U39.A; Z11.api.render(); zl().querySelector('.delpurge-btn').fire('click'); zd11.push(Z11.api.tasks().some((t) => t.id === 'k'), Z11.env.log.indexOf('confirm:선택한 1건을 영구 삭제합니다.\n복구 불가! 계속할까요?') >= 0);
-  T('v439 ⑪ 제목·합계·일괄·삭제된 지시: 제목 "진행 중 10 · 기한 경과 1" · 1366 합계 "합계 10건|자동 3|계약 1|보류 1|경과 1 · 3일 내 1|대기 2|(등록일)|(처리)"(보류는 담당 칸 — 상태 칸 88px에 \'대기 n · 보류 n\'이 안 들어가 잘리던 것, 검토 반영) · 1000 합계 구분 칸 "자동 3 · 계약 1"(title)·담당 칸 "보류 1" · [오늘 승인 일괄 (1)] 보임 → 누름 = 확인 → b 완료·계약 진행 호출·알림 → 버튼 숨김·제목 "진행 중 9" · 직원B: 제목 "진행 중 9 · 기한 경과 1"·일괄 숨김(승인권자 아님) · 삭제된 지시 보기 (1)(j만 — 관리자 전용 k 빠짐)·미리 고른 k 풂·[선택 복구]만([영구삭제] 없음) · 관리자: (2) j·k·[영구삭제] → 직원B로 바뀐 뒤 누름 = 무시(k 남음) → 관리자 누름 = 확인 → k 영구 삭제',
+  T('v439 ⑪ 제목·합계·일괄·삭제된 지시: 제목 "진행 중 10 · 기한 경과 1" · 1366 합계 "합계 10건|자동 3|계약 1|보류 1|경과 1 · 3일 내 1|대기 2|(등록일)|(처리)"(보류는 담당 칸 — 상태 칸 88px에 \'대기 n · 보류 n\'이 안 들어가 잘리던 것, 검토 반영) · 1000 합계 구분 칸 "자동 3 · 계약 1"(title)·담당 칸 "보류 1" · [오늘 승인 일괄 (1)] 보임 → 누름 = 확인 → b 완료·계약 진행 호출·알림 → 버튼 숨김·제목 "진행 중 9" · 직원B(기성 숨김): 제목 "진행 중 8 · 기한 경과 1"(기성 연동 입금확인 l 빠짐 — v440 검토)·일괄 숨김(승인권자 아님) · 삭제된 지시 보기 (1)(j만 — 관리자 전용 k 빠짐)·미리 고른 k 풂·[선택 복구]만([영구삭제] 없음) · 관리자: (2) j·k·[영구삭제] → 직원B로 바뀐 뒤 누름 = 무시(k 남음) → 관리자 누름 = 확인 → k 영구 삭제',
     JSON.stringify(t11) === '["진행 중 10 · 기한 경과 1","inline-block","오늘 승인 일괄 (1)"]' && ft11 === '합계 10건|자동 3|계약 1|보류 1|경과 1 · 3일 내 1|대기 2||'
     && ft11b === '합계 10건|<span title="자동 3건 · 계약 단계 1건">자동 3 · 계약 1</span>|보류 1|경과 1 · 3일 내 1|대기 2|' && JSON.stringify(t11b) === '["done",true,true,"none","진행 중 9 · 기한 경과 1"]'
-    && JSON.stringify(yt11) === '["진행 중 9 · 기한 경과 1","none","block","삭제된 지시 보기 (1)",""]' && JSON.stringify(yd11) === '["삭제된 지시 숨기기","data-selid=\\"j\\"",true,true]'
+    && JSON.stringify(yt11) === '["진행 중 8 · 기한 경과 1","none","block","삭제된 지시 보기 (1)",""]' && JSON.stringify(yd11) === '["삭제된 지시 숨기기","data-selid=\\"j\\"",true,true]'
     && JSON.stringify(zd11) === '["삭제된 지시 숨기기","data-selid=\\"j\\",data-selid=\\"k\\"",true,true,false,true]',
     JSON.stringify({ t11, ft11, ft11b, t11b, yt11, yd11, zd11 }));
 
@@ -5722,6 +5727,729 @@ try {
     JSON.stringify(s16a) === '["섭외","섭외",true,"h"]' && JSON.stringify(s16b) === '["","",true,0,"h,b",true,true]',
     JSON.stringify({ s16a, s16b }));
 } catch (e) { console.log('  (v439 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ---- v440(11/10 — 45-1 셋째 판: 관리 › 기성·수금 탭을 엑셀형 표로 · PM 11/10 15:56 결정 ③ '계산서 발행'·'불일치' 표시를 펼침 버튼으로 되살림(발행은 관리자만 — 입금확인 지시 생성·발행 취소면 그 지시 제거,
+//      불일치는 기성 수행) — 09_조사_문서/표형탭_시안_자료_20261110/단계지시_v440_기성수금.json · 엑셀형탭_명세_20261110.json sections[key=receivables]):
+//      시험 틀 = v439와 같은 작은 DOM(innerHTML을 넣으면 여는 태그마다 요소를 새로 만듦 · 창 폭은 가짜 matchMedia · 가짜 시계) + index.html의 실제 함수를 그대로 돌린다 —
+//      기성 판정·처리(recVisible·toggleRecReview·toggleRecPaid·toggleRecInvoice·toggleRecMismatch·toggleRecHl·createRecTask·completeRecTask·reopenRecTask·removeRecTask·saveRecModal·recTaxExport)
+//      · 옛 목록(renderReceivablesLegacy·recRowHtml·bindRecHandlers·renderSelBar·renderDeletedList) · 홈택스 불러오기(xlsxRows·recImportMap·recImportPlan·recImportApply·showRecImportPreview·confirmRecImport·handleRecImportFile)
+//      · 지시 판정(taskVisible·taskForMe) · @vs-sheet 구간 · @rec-sheet 구간 · 머리 버튼·끌어 놓기 배선(index.html의 그 줄들을 잘라 실행). 저장·탭 이동·수정 창은 기록만 남기는 대역. 오늘 = 2026-11-10.
+//      운영 기성 0건이라 홈택스 불러오기는 홈택스 매출 목록 꼴(머리 묶음 '공급자 정보'·'공급받는자 정보' — OneDrive\work\13_보관 실물 표본의 머리 줄 구조)을 본뜬 가짜 파일을 시험 안에서 만들어 쓴다(실제 거래처 값 없음).
+//      ① 정의 ② 처리 상태 열·칸 글·기본 정렬 ③ 칩·머리 정렬 ④ 합계 줄 ⑤ 펼침 키·값·버튼 권한별 ⑥ 계산서 발행/발행 취소(관리자 — 입금확인 지시 생성·제거, 검수 ✓ 뒤) ⑦ 불일치(기성 수행)·금액 확인함·수정 창
+//      ⑧ 입금·검수·★·삭제·누름 길 권한 ⑨ 줄 누르기 = 펼침(★ 저장 안 함) ⑩ 공급받는자 번호 가림 ⑪ 보기 권한 ⑫ 세무 내보내기 ⑬ 홈 미수 줄 → 그 행 열기 ⑭ 부품 그 행 열기(모집단 칩·묶음·더보기)
+//      ⑮ 폰 legacy ⑯ 폰 sheet 준비 ⑰ 머리 버튼·끌어 놓기 ⑱ 홈택스 불러오기(지시 겹침 없음) ⑲ 선택 삭제·삭제된 기성 ⑳ 연속 누름 막기 ㉑ 전역 검색 → 표 ㉒ 넓힘·CSS·정적 ㉓ 문서
+try {
+  const rd40 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const own40 = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+  const fn40 = (src, name) => { const i = src.indexOf('function ' + name + '('); if (i < 0) throw new Error('함수 없음: ' + name); let d = 0, st = false; for (let j = i; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i, j + 1); } } throw new Error('중괄호 짝 안 맞음: ' + name); };
+  const line40 = (src, head) => { const i = src.indexOf(head); if (i < 0) throw new Error('줄 없음: ' + head); return src.slice(i, src.indexOf('\n', i)); };
+  const blkOf40 = (a, b) => { const i = html.indexOf(a), j = html.indexOf(b); if (i < 0 || j < i) throw new Error(a + ' 구간 없음'); return html.slice(i, j); };
+  const body40 = (name) => fn40(html, name).replace(/^function [\w$]+/, '').replace(/\r\n/g, '\n');
+  const sha40 = (s) => createHash('sha256').update(s).digest('hex');
+  const blk40 = blkOf40('// @vs-sheet-start', '// @vs-sheet-end'), rsb40 = blkOf40('// @rec-sheet-start', '// @rec-sheet-end');
+  const wireAt40 = html.indexOf('    // v440 기성 표 갈래(PC): 제목 줄 머리 버튼'), wire40 = wireAt40 < 0 ? '' : html.slice(wireAt40, html.indexOf('\n  })();', wireAt40));
+  if (!wire40) throw new Error('머리 버튼·끌어 놓기 배선 줄 없음');
+  const unesc40 = (s) => String(s).replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+  const mq40 = (q, w) => { if (q == null) return true; if (/print/.test(q)) return false; const a = /\(min-width:\s*(\d+)px\)/.exec(q), b = /\(max-width:\s*(\d+)px\)/.exec(q); if (!a && !b) return false; return (!a || w >= +a[1]) && (!b || w <= +b[1]); };
+  // 사람(11/10 권한 실측 꼴): 관리자A · 기성 수행 비관리자 직원B(지금 0명 — 팀장 프리셋 꼴, 계약 수행) · 기성 보기 직원C(1명 — .view.readonly)
+  const MEM40 = [{ id: 'm0', name: '나종운', role: '대표', admin: true }, { id: 'm1', name: '관리자A', admin: true }, { id: 'm2', name: '직원B', perms: { rec: 'do', con: 'do', tasks: 'do' } }, { id: 'm3', name: '직원C', perms: { rec: 'view' } }];
+  const U40 = { A: MEM40[1], B: MEM40[2], C: MEM40[3] };
+  const PROC40 = [{ id: 'c1', title: '○○동 하천 준설공사', site: '○○동 하천', label: '준설', pipes: [] }];
+  // 기성 표본(오늘 11-10) — r1 검수 대기(직접 등록·담당 직원B) · r2 검수 ✓(계약 연동·담당 직원B) · r3·r4 중복 의심 짝(r4는 홈택스 발행·공급받는자 사업자번호) · r5 발행 + 불일치(입금확인 지시 t5) 101일
+  //   · r6 회사 미지정·★·금액 없음 66일 · r7 입금 11-03 + 금액 바뀜(홈택스·개인 번호) · r8 입금 11-08 · r9 관리자 전용(공개범위) · r10·r11 지운 기성(r11 관리자 전용) · z1~z35 입금 완료(관리자 전용 — 옛 목록 30건 자르기 밖)
+  const R040 = (o) => Object.assign({ client: '', desc: '', co: '', amount: 0, billed: '', invoice: false, paid: null, due_hint: '', note: '', assignee: '', scope: [], task_id: null, mismatch: false, created: '2026-09-01', updated: '2026-09-01' }, o);
+  const FIX40 = () => {
+    const L = [
+      R040({ id: 'r1', client: '가나건설', desc: '10월 철거 기성', co: 'con', amount: 5500000, billed: '2026-10-20', assignee: 'm2' }),
+      R040({ id: 'r2', client: '다라환경', desc: '9월 운반', co: 'env', amount: 8250000, billed: '2026-09-30', assignee: 'm2', reviewed: { by: '관리자A', date: '2026-10-01' }, site: '○○동 하천', con_id: 'c1', note: '계약 연동' }),
+      R040({ id: 'r3', client: '마바상사', desc: '9월 운반 재등록', co: 'env', amount: 3300000, billed: '2026-09-15' }),
+      R040({ id: 'r4', client: '마바상사', desc: '9월 운반', co: 'env', amount: 3300000, billed: '2026-09-15', invoice: true, src: 'hometax', nts: '20260915-41000001-00000001', docno: 'D-9001', supply: 3000000, tax: 300000, purpose: '청구', client_num: '123-45-67890' }),
+      R040({ id: 'r5', client: '사아공단', desc: '준설토 운반', co: 'env', amount: 22000000, billed: '2026-08-01', invoice: true, mismatch: true, task_id: 't5', supply: 20000000, tax: 2000000 }),
+      R040({ id: 'r6', client: '자차개발', desc: '창고 철거 잔금', billed: '2026-09-05', hl: 1 }),
+      R040({ id: 'r7', client: '카타물산', desc: '폐합성수지 처리 9월', co: 'env', amount: 4180000, billed: '2026-10-01', invoice: true, paid: '2026-11-03', recheck: 1, src: 'hometax', nts: '20261001-41000001-00000007', client_num: '900101-1234567' }),
+      R040({ id: 'r8', client: '파하시', desc: '하수관로 준설 10월', co: 'env', amount: 12980000, billed: '2026-10-15', invoice: true, reviewed: { by: '관리자A', date: '2026-10-16' }, paid: '2026-11-08' }),
+      R040({ id: 'r9', client: '관리자 전용 건', desc: '내부', co: 'con', amount: 1000000, billed: '2026-10-30', scope: ['m1'] }),
+      R040({ id: 'r10', client: '지운 건', amount: 100, billed: '2026-10-02', del: 1 }),
+      R040({ id: 'r11', client: '지운 관리자 건', amount: 200, billed: '2026-10-03', del: 1, scope: ['m1'] })];
+    for (let q = 1; q <= 35; q++) { const d = new Date(Date.UTC(2026, 8, 1 + q)); L.push(R040({ id: 'z' + q, client: '지난 거래 ' + q, co: 'env', amount: 1000 * q, billed: '2026-07-01', invoice: true, paid: d.toISOString().slice(0, 10), scope: ['m1'] })); }
+    return L;
+  };
+  const TASKS40 = () => [{ id: 't5', title: '입금확인: 사아공단 준설토 운반 22,000,000원', detail: '금액 불일치 — 확인 필요', who_id: '', who: '', scope: ['m1'], from: '기성', from_id: 'm1', due: '2026-08-01', status: 'open', done_at: null, done_by: null, rec_id: 'r5', created: '2026-08-01', updated: '2026-08-01' }];
+  const REAL40 = ['esc', 'isDate', 'vehDday', 'liveRec', 'findRec', 'fmtAmount', 'recVisible', 'liveTasks', 'findTask', 'taskForMe', 'taskVisible', 'findRecTask', 'findOpenRecTask', 'createRecTask', 'completeRecTask', 'reopenRecTask', 'removeRecTask',
+    'recTaxExport', 'addReceivable', 'toggleRecReview', 'toggleRecPaid', 'toggleRecInvoice', 'toggleRecMismatch', 'toggleRecHl', 'saveRecModal', 'closeRecModal', 'recAging', 'recRowHtml', 'renderRecAging', 'recMatchesSearch', 'unpaidReceivables',
+    'renderReceivablesLegacy', 'bindRecHandlers', 'recSortCmp', 'fillRecSort', 'selCount', 'selBoxHtml', 'bindSelBoxes', 'renderSelBar', 'hardDelete', 'bulkDelete', 'bulkRestore', 'renderDeletedList',
+    'moduleArr', 'moduleLive', 'moduleDeleted', 'moduleCan', 'moduleFind', 'saveModule', 'scheduleModuleSave', 'renderModuleList', 'renderModule', 'csTitle', 'csSiteText',
+    'impEsc', 'xlsxUnescape', 'xlsxCol', 'xlsxZip', 'xlsxEntry', 'xlsxSS', 'xlsxSheet', 'xlsxRows', 'recImportMap', 'recImportPlan', 'recNewRec', 'recImportApply', 'handleRecImportFile', 'showRecImportPreview', 'confirmRecImport'];
+  const VARS40 = ['  var showRecAging = ', '  var recSearchTerm = ', '  var recSort = ', '  var REC_SORTS = ', '  var pendingImport = ', '  var editingRecId = '].map((h) => line40(html, h));
+  const PRE40 = [
+    'var receivables = ENV.recs, tasks = ENV.tasks, contracts = ENV.procs, members = ENV.members, vehicles = [];',
+    'var showDeletedRec = false, showRecPaid = false;',
+    'var selSets = { tasks:{}, veh:{}, rec:{} }, delSelSets = { tasks:{}, veh:{}, rec:{} };',
+    'function todayStr(){ return "2026-11-10"; }',
+    'function genId(p){ ENV.gid++; return p + "N" + ENV.gid; }',
+    'function curMember(){ return ENV.user; } function myId(){ return ENV.user ? ENV.user.id : ""; } function myName(){ return ENV.user ? ENV.user.name : ""; }',
+    'function isAdmin(){ return !!(ENV.user && ENV.user.admin); }',
+    'function permOf(mod){ var u = ENV.user; if (!u) return "hide"; if (u.admin) return "do"; return (u.perms && u.perms[mod]) || "hide"; }',
+    'function canDo(mod){ return permOf(mod) === "do"; } function canSee(mod){ return permOf(mod) !== "hide"; }',
+    'function findMember(id){ for (var i = 0; i < members.length; i++){ if (members[i].id === id) return members[i]; } return null; }',
+    'function memberName(id){ if (!id) return ""; if (id === "__all__") return "전사"; var m = findMember(id); return m ? m.name : ""; }',
+    'function dispName(n){ return n === "나종운" ? "대표님" : (n || ""); }',
+    'function dispNameById(id){ if (!id) return ""; var m = findMember(id); return m ? (m.name === "나종운" ? "대표님" : m.name) : ""; }',
+    'function scopeIncludes(scope, m){ if (!scope || !scope.length) return true; if (!m) return false; return scope.indexOf(m.id) >= 0; }',
+    'function scopeNames(tk){ return (tk || []).map(function(id){ var m = findMember(id); return m ? m.name : null; }).filter(Boolean).join(", "); }',
+    'function getCheckedMembers(){ return ENV.checked || []; }',
+    'function findProc(id){ for (var i = 0; i < contracts.length; i++){ if (contracts[i].id === id) return contracts[i]; } return null; }',
+    'function confirm(msg){ ENV.log.push("confirm:" + msg); return ENV.confirmAns !== false; }',
+    'function alert(msg){ ENV.log.push("alert:" + msg); } function prompt(q, d){ ENV.log.push("prompt:" + q); return ENV.promptAns == null ? d : ENV.promptAns; }',
+    'function saveRecCache(){ ENV.log.push("recCache"); } function scheduleRecSave(){ ENV.log.push("recSave"); }',
+    'function saveTasksCache(){ ENV.log.push("taskCache"); } function scheduleTasksSave(){ ENV.log.push("taskSave"); }',
+    'function saveVehiclesCache(){} function scheduleVehSave(){} function renderVehicles(){} function findVeh(){ return null; } function pushNotify(){}',
+    'function renderTasks(){ ENV.log.push("tasks"); } function renderMyTasks(){} function renderSummary(){} function renderDashboard(){ ENV.log.push("dash"); }',
+    'function openRecModal(id){ if (!canDo("rec")) return; ENV.log.push("edit:" + id); }',
+    'function switchTab(n){ ENV.log.push("tab:" + n); }',
+    'function completeStageNow(){ return "none"; }',
+    'function buildSimpleXlsx(name, rows){ ENV.xlsx = { name: name, rows: rows }; return "blob"; } function downloadBlob(n){ ENV.log.push("download:" + n); }'].join('\n');
+  const SRC40 = [PRE40].concat(REAL40.map((n) => fn40(html, n)), VARS40, [blk40, rsb40, 'function recWire40(){\n' + wire40 + '\n}',
+    'return { render: renderReceivables, def: recSheetDef, vs: vsSheetRender, inst: vsInst, filter: vsSheetFilter, setQ: vsSheetSetQ, check: vsSheetCheckDef, minW: vsSheetMinW, cols: vsSheetCols, reveal: vsSheetReveal,'
+    + ' tv: taskVisible, addRec: addReceivable, homeRows: recSheetHomeRows, closeModal: closeRecModal,'
+    + ' legacy: renderReceivablesLegacy, act: recSheetAct, del: recSheetDelete, panel: recSheetPanel, dropOk: recSheetDropOk, homeRow: recSheetHomeRow, fromGs: recSheetFromGs, sText: recSheetSearchText,'
+    + ' rowHtml: recRowHtml, bindRec: bindRecHandlers, tax: recTaxExport, saveModal: saveRecModal, setEditing: function(id){ editingRecId = id; }, imp: handleRecImportFile, impConfirm: confirmRecImport, wire: recWire40,'
+    + ' recs: function(){ return receivables; }, tasks: function(){ return tasks; }, sel: function(){ return selSets; }, delSel: function(){ return delSelSets; }, setShowDel: function(v){ showDeletedRec = v; } };']).join('\n');
+  // 작은 DOM — 선택자는 태그·#id·.class·[속성]·[속성="값"]을 붙여 쓴 것까지(자손 결합자 없음). closest는 자기 자신만(평평한 DOM)
+  const match40 = (el, sel) => {
+    const re = /(#[\w-]+)|(\.[\w-]+)|(\[[\w-]+(?:="(?:[^"\\]|\\.)*")?\])|([a-zA-Z][\w-]*)/g; let m, at = 0;
+    while ((m = re.exec(sel))) {
+      if (m.index !== at) throw new Error('시험 DOM이 모르는 선택자: ' + sel); at = re.lastIndex;
+      if (m[1]) { if (el.getAttribute('id') !== m[1].slice(1)) return false; }
+      else if (m[2]) { if (!el.classList.contains(m[2].slice(1))) return false; }
+      else if (m[3]) { const a = /^\[([\w-]+)(?:="((?:[^"\\]|\\.)*)")?\]$/.exec(m[3]); if (a[2] === undefined) { if (!el.hasAttribute(a[1])) return false; } else if (el.getAttribute(a[1]) !== a[2].replace(/\\(.)/g, '$1')) return false; }
+      else if (m[4]) { if (!el.tagName || el.tagName !== m[4].toUpperCase()) return false; }
+    }
+    if (!at || at !== sel.length) throw new Error('시험 DOM이 모르는 선택자: ' + sel);
+    return true;
+  };
+  const mkCls40 = (s) => { const c = new Set(String(s || '').split(/\s+/).filter(Boolean)); return { toggle: (k, on) => { if (on === undefined ? !c.has(k) : on) c.add(k); else c.delete(k); }, contains: (k) => c.has(k), add: (k) => c.add(k), remove: (k) => c.delete(k), list: () => [...c].join(' ') }; };
+  const mk40 = (o) => {
+    o = o || {};
+    const env = { width: o.width || 1366, user: o.user || U40.A, recs: o.recs || FIX40(), tasks: o.tasks || TASKS40(), procs: PROC40.map((c) => Object.assign({}, c)), members: MEM40, mql: [], store: Object.assign({}, o.store || {}), timers: [], now: 100000, log: [], raf: [], ro: [], roCb: null, cw: 1048, confirmAns: true, gid: 0, checked: [] };
+    const doc = { activeElement: null, byId: {} };
+    doc.getElementById = (id) => doc.byId[id] || null;
+    doc.addEventListener = () => {}; doc.removeEventListener = () => {};
+    const mkEl = (tag, attrs) => {
+      const el = { tagName: tag.toUpperCase(), attrs, L: {}, scrollLeft: 0, scrollTop: 0, parentNode: null, _ih: '' };
+      Object.defineProperty(el, 'clientWidth', { get: () => env.cw });
+      Object.defineProperty(el, 'innerHTML', { get: () => el._ih, set: (v) => { el._ih = String(v); } });
+      el.getAttribute = (n) => (own40(attrs, n) ? unesc40(attrs[n]) : null);
+      el.setAttribute = (n, v) => { attrs[n] = String(v); };
+      el.hasAttribute = (n) => own40(attrs, n);
+      el.type = attrs.type || '';
+      el.value = own40(attrs, 'value') ? unesc40(attrs.value) : '';
+      el.checked = own40(attrs, 'checked');
+      el.disabled = own40(attrs, 'disabled');
+      const sp = {}; String(attrs.style || '').split(';').forEach((p) => { const k = p.indexOf(':'); if (k > 0) sp[p.slice(0, k).trim()] = p.slice(k + 1).trim(); });
+      el.style = { sp, setProperty: (k, v) => { sp[k] = String(v); }, getPropertyValue: (k) => sp[k] || '' };
+      el.classList = mkCls40(attrs.class);
+      el.addEventListener = (t, f) => { (el.L[t] = el.L[t] || []).push(f); };
+      el.fire = (t, ev) => { const e = Object.assign({ target: el, type: t, stopped: false }, ev || {}); e.stopPropagation = () => { e.stopped = true; }; e.preventDefault = () => {}; (el.L[t] || []).slice().forEach((f) => f(e)); return e; };
+      el.focus = () => { doc.activeElement = el; };
+      el.closest = (sel) => (match40(el, sel) ? el : null);
+      el.selectionStart = el.tagName === 'INPUT' ? el.value.length : null;
+      el.setSelectionRange = (a) => { el.selectionStart = a; };
+      el.scrollIntoView = () => { env.log.push('into:' + (el.getAttribute('data-vs-row') || el.getAttribute('data-vs-detcard') || '')); };
+      return el;
+    };
+    env.mkEl = mkEl;
+    env.mkHost = (id) => {
+      const host = { id, tagName: 'DIV', attrs: { id }, _h: '', _t: '', els: [], visible: true, onclick: null, style: { display: '' }, L: {}, value: '' };
+      host.getAttribute = (n) => (own40(host.attrs, n) ? host.attrs[n] : null);
+      host.setAttribute = (n, v) => { host.attrs[n] = String(v); };
+      host.hasAttribute = (n) => own40(host.attrs, n);
+      host.getClientRects = () => ((host.visible && host.style.display !== 'none') ? [{}] : []);   // display:none이면 상자 없음(실제 브라우저와 같게 — v440 검토: 폰 갈래가 표 자리를 숨기면 860 경계에서 표로 못 돌아오던 것을 ⑮가 잡게)
+      host.contains = (el) => host.els.indexOf(el) >= 0;
+      host.querySelectorAll = (sel) => host.els.filter((e) => match40(e, sel));
+      host.querySelector = (sel) => host.els.find((e) => match40(e, sel)) || null;
+      host.addEventListener = (t, f) => { env.log.push('host-listener:' + id + ':' + t); (host.L[t] = host.L[t] || []).push(f); };   // 자리(host)에 건 배선은 기록(표 자리 recSheet에는 0이어야 — v438 규칙)
+      host.fire = (t, ev) => { const e = Object.assign({ target: host, type: t, defaultPrevented: false }, ev || {}); e.preventDefault = () => { e.defaultPrevented = true; env.log.push('prevent:' + t); }; e.stopPropagation = () => {}; (host.L[t] || []).slice().forEach((f) => f(e)); return e; };
+      host.classList = mkCls40('');
+      host.focus = () => { doc.activeElement = host; env.log.push('focus:' + id); };
+      Object.defineProperty(host, 'innerHTML', { get: () => host._h, set: (v) => {
+        host._h = String(v); host.els = [];
+        for (const t of host._h.matchAll(/<([a-zA-Z][\w-]*)((?:[^<>"]|"[^"]*")*)>/g)) { const attrs = {}; for (const a of t[2].matchAll(/([\w-]+)(?:="([^"]*)")?/g)) attrs[a[1]] = a[2] === undefined ? '' : a[2]; host.els.push(mkEl(t[1], attrs)); }
+      } });
+      Object.defineProperty(host, 'textContent', { get: () => host._t, set: (v) => { host._t = String(v); } });
+      doc.byId[id] = host;
+      return host;
+    };
+    env.host = (id) => doc.byId[id];
+    ['recSheet', 'recList', 'recPaidList', 'recPaidToggle', 'recHead', 'recTopHead', 'recSelBar', 'recDeletedToggle', 'recDeletedList', 'recAgingToggle', 'recAgingSummary', 'recListHead', 'recSearch',
+      'recAddCard', 'recImportCard', 'recAbCard', 'recAddOpen', 'recImpOpen', 'recAbOpen', 'recClient', 'recDesc', 'recAmount', 'recBilled', 'recCo', 'recImpCo', 'recImpMsg', 'recImpSummary', 'recImpPreview', 'recImpBackdrop', 'recEditBackdrop', 'view-rec', 'dashHost',
+      'reCo', 'reClient', 'reDesc', 'reAmount', 'reBilled', 'reAssignee', 'vsT'].forEach((id) => env.mkHost(id));
+    ['recAddOpen', 'recImpOpen', 'recAbOpen'].forEach((id, i) => { env.host(id).setAttribute('data-rec-panel', ['add', 'imp', 'ab'][i]); env.host(id).style.display = 'none'; });   // HTML 그대로(처음엔 숨김 — 갈래가 정함)
+    env.host('recSheet').style.display = 'none'; env.host('recImpCo').value = 'env';
+    const win = { get innerWidth() { return env.width; }, matchMedia: (q) => ({ media: q, get matches() { return mq40(q, env.width); }, addEventListener: (t, f) => { env.mql.push(f); } }), requestAnimationFrame: (f) => { env.raf.push(f); } };
+    const ls = { getItem: (k) => (own40(env.store, k) ? env.store[k] : null), setItem: (k, v) => { env.log.push('store:' + k); env.store[k] = String(v); }, removeItem: (k) => { delete env.store[k]; } };
+    const stF = (f, ms) => { const t = { id: env.timers.length + 1, f, at: env.now + ms, done: false }; env.timers.push(t); return t.id; };
+    const ctF = (id) => { env.timers.forEach((t) => { if (t.id === id) t.done = true; }); };
+    function RO(cb) { env.roCb = cb; this.observe = (t) => { env.ro.push(t); }; }
+    class FD extends Date { static now() { return env.now; } }
+    const api = new Function('window', 'document', 'localStorage', 'setTimeout', 'clearTimeout', 'ResizeObserver', 'ENV', 'Date', SRC40)(win, doc, ls, stF, ctF, RO, env, FD);
+    env.tick = (ms) => { env.now += ms; let t; while ((t = env.timers.filter((x) => !x.done && x.at <= env.now).sort((a, b) => a.at - b.at)[0])) { t.done = true; t.f(); } };
+    env.breakAll = () => { env.mql.slice().forEach((f) => f({})); };
+    return { api, env, doc, host: env.host('recSheet') };
+  };
+  const order40 = (h) => [...h.matchAll(/data-vs-row="([^"]*)"/g)].map((m) => m[1]).join(',');
+  const cnt40 = (h) => (/<span class="vs-count">([^<]*)<\/span>/.exec(h) || ['', ''])[1];
+  const rowSeg40 = (h, id) => (new RegExp('<tr class="vs-r[^"]*" data-vs-row="' + id + '">([\\s\\S]*?)</tr>').exec(h) || ['', ''])[1];
+  const cells40 = (h, id) => [...rowSeg40(h, id).matchAll(/<td([^>]*)>([\s\S]*?)<\/td>/g)].map((m) => [m[1], m[2]]);
+  const detActs40 = (h) => { const m = /<div class="vs-act">([\s\S]*?)<\/div>/.exec(h); return m ? [...m[1].matchAll(/data-rec-act="(\w+)"/g)].map((x) => x[1]).join(',') : '(펼침 없음)'; };
+  const kvKeys40 = (h) => [...h.matchAll(/<div class="k">([^<]*)<\/div>/g)].map((m) => m[1]).join('·');
+  const kvVal40 = (h, k) => (new RegExp('<div class="k">' + k.replace(/[()]/g, '\\$&') + '</div><div class="v">([\\s\\S]*?)</div></div>').exec(h) || ['', '?'])[1];
+  const foot40 = (h) => ((/<tfoot><tr>([\s\S]*?)<\/tr><\/tfoot>/.exec(h) || ['', ''])[1].match(/<td[^>]*>([\s\S]*?)<\/td>/g) || []).map((s) => s.replace(/^<td[^>]*>|<\/td>$/g, '')).join('|');
+  const openRow40 = (X, id) => { const row = X.host.querySelector('[data-vs-row="' + id + '"]'); if (!row) throw new Error('행 없음: ' + id); row.fire('click', { target: row }); };
+  const chip40 = (X, k) => { const el = X.host.querySelector('[data-vs-chip="st|' + k + '"]'); if (!el) throw new Error('칩 없음: ' + k); el.fire('click'); };
+  const ev40 = (X, b, o) => { o = o || {}; if (!o.fast) X.env.now += 1000; return o.detail ? { target: b, detail: o.detail } : { target: b }; };
+  const pressDet40 = (X, act, id, o) => {   // 펼침 안 버튼 → 펼침 칸(위임 배선) — 누르기 전 가짜 시계 1초(연속 누름 막기 0.5초 밖)
+    const host = X.host, det = host.querySelector('[data-vs-det]') || host.querySelector('[data-vs-detcard]'), L = host.els.filter((e) => e.getAttribute('data-rec-act') === act && e.getAttribute('data-rec-id') === id), b = L[L.length - 1];
+    if (!det || !b) throw new Error('펼침 버튼 없음: ' + act + ':' + id);
+    det.fire('click', ev40(X, b, o));
+  };
+  const fake40 = (X, act, id) => { const det = X.host.querySelector('[data-vs-det]'); if (!det) throw new Error('펼침 없음'); const b = X.env.mkEl('button', { type: 'button', class: 'mini-btn', 'data-rec-act': act, 'data-rec-id': id }); det.fire('click', ev40(X, b)); };   // 화면에 없는 버튼을 만들어 누름(누름 길의 지금 규칙을 봄)
+  const rc40 = (X, id) => X.api.recs().find((r) => r.id === id) || {};
+  const liveT40 = (X, rid) => X.api.tasks().filter((t) => t.rec_id === rid && t.del !== 1);
+  const ADMIN_ORDER40 = 'r3,r4,r6,r2,r1,r9,r5';
+  const Z40 = Array.from({ length: 35 }, (_, i) => 'z' + (35 - i)).join(',');
+
+  // ① 정의 — vsSheetCheckDef 통과(폰 legacy·sheet 둘 다 — 폰 열 % 합 100) · 열 12(명세 순서·폭·거르기·단계·폰 % — 처리 상태 90·공급가액 104·세액 88·승인번호 196은 실측으로 넓힘) · 단계별 열 합 738/874/1262 · 칩 7 · 저장 이름·자리·검색칸·page·기본 정렬·legacy
+  const X1 = mk40(), d1 = X1.api.def();
+  const ck1 = X1.api.check(d1), ck1s = X1.api.check(Object.assign({}, d1, { phone: 'sheet' }));
+  const cols1 = d1.cols.map((c) => [c.k, c.h, c.w || 0, c.f, c.lv || 1, c.pw || 0, c.fill ? 'fill' + c.min : '', c.num ? 'num' : '', c.sortAs ? 'as:' + c.sortAs + (c.sortRev ? '-' : '') : ''].join(':')).join('|');
+  const COLS40 = 'client:거래처:150:text:1:46:::|co:회사:64:enum:3:0:::|desc:내역:0:text:2:0:fill160::|billed:청구일:88:none:2:0:::|age:경과:64:none:1:22:::as:billed-|amt:금액(원):110:none:1:32::num:|st:처리 상태:90:enum:2:0:::|chk:확인:76:enum:2:0:::|who:담당:72:enum:3:0:::|nts:승인번호:196:text:4:0:::|supply:공급가액(원):104:none:4:0::num:|tax:세액(원):88:none:4:0::num:';
+  const sums1 = [2, 3, 4].map((s) => X1.api.minW({ colw: {} }, X1.api.cols(d1, s))).join('/');
+  const chips1 = d1.chips.length + '|' + d1.chips[0].items.map((it) => it.k + ':' + it.h + (it.warn ? '!' : '') + (it.pc ? '@pc' : '') + (it.sort ? '>' + it.sort.k + it.sort.d : '')).join('|');
+  T('v440 ① 기성 표 정의: vsSheetCheckDef 통과(phone legacy·sheet 둘 다 — 폰 열 거래처 46·경과 22·금액 32 % 합 100) · 열 12 = 명세 순서(거래처 150 text·폰 46 / 회사 64 lv3 enum / 내역 남는 폭 최소 160 lv2 / 청구일 88 lv2 / 경과 64·폰 22·정렬 별칭 청구일 반대 / 금액(원) 110 숫자·폰 32 / 처리 상태 90 enum / 확인 76 enum / 담당 72 lv3 enum / 승인번호 150 lv4 text / 공급가액(원) 104 lv4 숫자 / 세액(원) 88 lv4 숫자 — 처리 상태·공급가액·세액은 실측으로 넓힘) · 단계별 열 합 738/874/1216(한도 742/962/1282 안) · 칩 한 묶음 7개(미수 기본·입금 완료(입금일 ↓)·검수 대기·60일 넘음·90일 넘음 빨강·확인 필요·전체 — 검수 대기·60일·전체는 PC 전용) · key jw_rec_sheet · host recSheet · 검색칸 recSheetQ · page 500 · 기본 정렬 청구일 ▲ · phone legacy · legacy = renderReceivablesLegacy · sel.can · bind(펼침 배선) · 행 끝 처리 열 없음',
+    ck1.length === 0 && ck1s.length === 0 && cols1 === COLS40 && sums1 === '738/874/1262'
+    && chips1 === '1|:미수|paid:입금 완료>st-1|rv:검수 대기@pc|d60:60일 넘음@pc|d90:90일 넘음!|chk:확인 필요|all:전체@pc'
+    && d1.key === 'jw_rec_sheet' && d1.host === 'recSheet' && d1.search && d1.search.id === 'recSheetQ' && d1.page === 500 && d1.sort.k === 'billed' && d1.sort.d === 1 && d1.phone === 'legacy' && d1.legacy === X1.api.legacy
+    && typeof d1.onMode === 'function' && d1.sel && typeof d1.sel.can === 'function' && typeof d1.bind === 'function' && !d1.bindRows && !d1.cols.some((c) => c.nosort) && X1.api.def() === d1,
+    JSON.stringify({ ck1, ck1s, cols1: cols1 === COLS40 ? 'ok' : cols1, sums1, chips1 }));
+
+  // ② 처리 상태 열(검수 대기 → 검수 ✓ → 발행 → 입금 MM-DD) · 칸 글(★ · 회사 미지정 노랑 · 경과 칩 30·60·90 — 입금은 '-' · 확인 = 중복 의심·불일치·금액 바뀜 · 금액 없음 '-') · 기본 정렬(중복 의심 맨 위 · 불일치 맨 아래 · 그 사이 청구일 ▲)
+  const X2 = mk40(); X2.api.render(); const h2 = () => X2.host._h;
+  const o2 = [order40(h2()), cnt40(h2())];
+  const c2 = (id) => cells40(h2(), id);
+  const st2 = ['r1', 'r2', 'r4', 'r5'].map((id) => c2(id)[6][1]).join('|');
+  const ag2 = ['r1', 'r2', 'r6', 'r5'].map((id) => c2(id)[4][1]).join('|');
+  const ck2 = ['r3', 'r4', 'r5', 'r1'].map((id) => c2(id)[7][1]).join('|');
+  const r6c = c2('r6');
+  const cellOk2 = r6c[0][0] === ' class="vs-b" title="자차개발"' && r6c[0][1] === '<input type="checkbox" class="sel-box" data-vs-sel="r6"><span class="rec-star" title="★ 표시">★</span> 자차개발'
+    && r6c[1][1] === '<span class="rec-st wait">미지정</span>' && /title="회사\(환경·건설\)를 정하지 않음/.test(r6c[1][0]) && r6c[5][1] === '<span style="color:#9AA09C;">-</span>' && r6c[5][0] === ' class="num"'
+    && c2('r1')[1][1] === '건설' && c2('r2')[1][1] === '환경' && c2('r6')[4][0] === ' title="청구일 2026-09-05 · 경과 66일"' && c2('r1')[5][1] === '5,500,000' && c2('r1')[8][1] === '직원B' && c2('r3')[8][1] === '<span style="color:#9AA09C;">-</span>';
+  chip40(X2, 'paid'); const c7 = cells40(h2(), 'r7');
+  const paid2 = [c7[6][1], c7[4][1], c7[7][1], /class="vs-r grey" data-vs-row="r7"/.test(h2())];
+  T('v440 ② 처리 상태 열·칸 글·기본 정렬: 미수(처음 화면) = "' + ADMIN_ORDER40 + '"(중복 의심 r3·r4 맨 위 · 청구일 ▲ · 불일치 r5 맨 아래) "보이는 7건 / 전체 44건" · 처리 상태 r1 검수 대기 · r2 검수 ✓(title 검수자·날짜) · r4·r5 발행 · r7 "입금 11-03"(title 입금일) · 경과 칩 21일 age0 · 41일 age30 · 66일 age60 · 101일 age90(title 청구일·경과) · 입금 줄 경과 "-" · 확인 r3·r4 중복 의심 · r5 불일치 · r7 금액 바뀜 · 없음 "-" · 거래처 칸 = 선택 체크 + ★(hl) + 이름(title) · 회사 미지정 노랑 칩·환경·건설 · 금액 없음 "-"(숫자 칸) · 입금 줄 회색',
+    o2[0] === ADMIN_ORDER40 && o2[1] === '보이는 7건 / 전체 44건'
+    && st2 === '<span class="rec-st wait">검수 대기</span>|<span class="rec-st ok" title="검수 관리자A · 2026-10-01">검수 ✓</span>|<span class="rec-st inv">발행</span>|<span class="rec-st inv">발행</span>'
+    && ag2 === '<span class="rec-age age0">21일</span>|<span class="rec-age age30">41일</span>|<span class="rec-age age60">66일</span>|<span class="rec-age age90">101일</span>'
+    && ck2 === '<span class="rec-st dup">중복 의심</span>|<span class="rec-st dup">중복 의심</span>|<span class="rec-st mm">불일치</span>|<span style="color:#9AA09C;">-</span>'
+    && cellOk2 && paid2[0] === '<span class="rec-st paid" title="입금 2026-11-03">입금 11-03</span>' && paid2[1] === '<span style="color:#9AA09C;">-</span>' && paid2[2] === '<span class="rec-st chg">금액 바뀜</span>' && paid2[3] === true,
+    JSON.stringify({ o2, st2, ag2, ck2, cellOk2, r6: r6c.slice(0, 2), paid2 }));
+
+  // ③ 칩·머리 정렬 — 입금 완료 = 입금일 최근 먼저·자르지 않음(37건 > 옛 목록 30건) · 검수 대기 · 60일·90일 넘음 · 확인 필요(입금 뒤 금액 바뀜 포함) · 전체 · 머리 금액 누름 = 값 순(중복·불일치 자리 안 바꿈 — 기본 정렬일 때만)
+  //   · 처리 상태 머리 = 단계 순 · 경과 머리 = 청구일 반대(▲ 경과 적은 것부터) · 처리 상태 고르기 = 검수 대기·검수 ✓·발행·입금
+  const X3 = mk40(); X3.api.render(); const h3 = () => X3.host._h, ch3 = {};
+  ['paid', 'rv', 'd60', 'd90', 'chk', 'all'].forEach((k) => { chip40(X3, k); ch3[k] = [order40(h3()), cnt40(h3())]; });
+  chip40(X3, '');
+  const sortTo3 = (k) => { const el = X3.host.querySelector('[data-vs-sort="' + k + '"]'); if (!el) throw new Error('머리 없음: ' + k); el.fire('click', { target: el }); return order40(h3()); };
+  const ar3 = () => [...h3().matchAll(/data-vs-sort="(\w+)"[^>]*>[^<]*<span class="vs-ar">(▲|▼)<\/span>/g)].map((m) => m[1] + m[2]).join(',');
+  const s3 = [sortTo3('amt'), sortTo3('st'), sortTo3('age'), ar3()];
+  const stOpts3 = ((/<select data-vf="st">([\s\S]*?)<\/select>/.exec(h3()) || ['', ''])[1].match(/<option value="[^"]*"/g) || []).map((s) => s.slice(15, -1)).filter(Boolean).sort().join('|');
+  T('v440 ③ 칩·머리 정렬: 입금 완료 = r8(11-08)·r7(11-03)·z35…z1(입금일 최근 먼저) "보이는 37건 / 전체 44건"(옛 목록 30건 자르기 없음) · 검수 대기 = r3,r6,r1,r9 · 60일 넘음 = r6,r5 · 90일 넘음 = r5 · 확인 필요 = r3,r4,r7(입금 뒤 금액 바뀜),r5 · 전체 44건(중복 맨 위·불일치 맨 아래) · 머리 금액 ▲ = r9,r3,r4,r1,r2,r5,r6(고른 정렬엔 중복·불일치 자리 없음 · 금액 없음 뒤) · 처리 상태 머리 = 검수 대기 r1,r3,r6,r9 → 검수 ✓ r2 → 발행 r4,r5 · 경과 머리(별칭 청구일 반대) = r9,r1,r2,r3,r4,r6,r5 · 화살표 청구일 ▼·경과 ▲ · 처리 상태 고르기 4가지',
+    JSON.stringify(ch3.paid) === JSON.stringify(['r8,r7,' + Z40, '보이는 37건 / 전체 44건']) && ch3.rv[0] === 'r3,r6,r1,r9' && ch3.d60[0] === 'r6,r5' && ch3.d90[0] === 'r5' && ch3.chk[0] === 'r3,r4,r7,r5'
+    && ch3.all[0] === 'r3,r4,' + Array.from({ length: 35 }, (_, i) => 'z' + (i + 1)).join(',') + ',r6,r2,r7,r8,r1,r9,r5' && ch3.all[1] === '보이는 44건 / 전체 44건'
+    && JSON.stringify(s3) === JSON.stringify(['r9,r3,r4,r1,r2,r5,r6', 'r1,r3,r6,r9,r2,r4,r5', 'r9,r1,r2,r3,r4,r6,r5', 'billed▼,age▲']) && stOpts3 === ['검수 대기', '검수 ✓', '발행', '입금'].sort().join('|'),
+    JSON.stringify({ ch3: Object.keys(ch3).map((k) => k + ':' + ch3[k][0].slice(0, 30) + ':' + ch3[k][1]), s3, stOpts3 }));
+
+  // ④ 합계 줄 — 1366(9열): 합계 n건 · 청구일 칸 '최대 n일'(경과 칸에 안 들어가 시안대로 — title) · 금액 합 · 검수 대기 n · 확인 n / 1920(12열): + 공급가액·세액 합 / 860~1279(7열) / 칩을 바꾸면 그 행들로
+  const X4 = mk40(); X4.api.render(); const f4a = foot40(X4.host._h);
+  const X4b = mk40({ width: 1920 }); X4b.api.render(); const f4b = foot40(X4b.host._h);
+  const X4c = mk40({ width: 1000 }); X4c.api.render(); const f4c = foot40(X4c.host._h);
+  chip40(X4, 'paid'); const f4d = foot40(X4.host._h);
+  const MX4 = '<span title="미수 최대 경과 101일">최대 101일</span>';
+  T('v440 ④ 합계 줄: 1366 "합계 7건|(회사)|(내역)|최대 101일(청구일 칸 — title 미수 최대 경과)|(경과)|43,350,000|검수 대기 4|확인 3|(담당)" · 1920 + 공급가액 23,000,000·세액 2,300,000 · 1000 7열 · 입금 완료 칩 = 최대 일수 없음·검수 대기 0·확인 1(금액 바뀜)',
+    f4a === '합계 7건|||' + MX4 + '||43,350,000|검수 대기 4|확인 3|' && f4b === '합계 7건|||' + MX4 + '||43,350,000|검수 대기 4|확인 3|||23,000,000|2,300,000'
+    && f4c === '합계 7건||' + MX4 + '||43,350,000|검수 대기 4|확인 3' && f4d === '합계 37건|||||17,790,000|검수 대기 0|확인 1|',
+    JSON.stringify({ f4a, f4b, f4c, f4d }));
+
+  // ⑤ 펼침 키·값·버튼 권한별 — 관리자: 키·값 15칸(+ 메모·금액 바뀜은 있을 때만, 계약은 계약 권한일 때만) · 버튼 명세 순서 / 기성 수행 직원B: 검수·입금·발행 없음 / 보기 직원C: 버튼 0·계약 칸 없음
+  const X5 = mk40(); X5.api.render(); chip40(X5, 'all');
+  const det5 = {}, kv5 = {};
+  ['r1', 'r2', 'r4', 'r5', 'r6', 'r7', 'r8'].forEach((id) => { openRow40(X5, id); det5[id] = detActs40(X5.host._h); kv5[id] = kvKeys40(X5.host._h); if (id === 'r2') kv5.r2v = ['출처', '검수', '계약', '현장', '메모', '공개 범위', '담당', '입금'].map((k) => kvVal40(X5.host._h, k)); if (id === 'r5') kv5.r5v = ['연결 지시', '공급가액 · 세액', '검수', '출처'].map((k) => kvVal40(X5.host._h, k)); if (id === 'r7') kv5.r7v = ['금액 바뀜', '입금'].map((k) => kvVal40(X5.host._h, k)); if (id === 'r1') kv5.dh = (/<div class="vs-dh">([\s\S]*?)<\/div>/.exec(X5.host._h) || ['', ''])[1]; });
+  const Y5 = mk40({ user: U40.B }); Y5.api.render(); chip40(Y5, 'all'); const detB5 = {};
+  ['r1', 'r5', 'r7'].forEach((id) => { openRow40(Y5, id); detB5[id] = detActs40(Y5.host._h); if (id === 'r5') detB5.r5task = kvVal40(Y5.host._h, '연결 지시'); });
+  const Z5 = mk40({ user: U40.C }); Z5.api.render(); chip40(Z5, 'all'); const detC5 = {};
+  ['r1', 'r2'].forEach((id) => { openRow40(Z5, id); detC5[id] = detActs40(Z5.host._h); detC5[id + 'k'] = kvKeys40(Z5.host._h); });
+  const KV15 = '회사·청구일·금액·공급가액 · 세액·영수/청구·승인번호·공급받는자 번호·출처·검수·입금·담당·공개 범위·현장·연결 지시·계약';
+  T('v440 ⑤ 펼침 키·값·버튼: 관리자 r1 키·값 15칸(회사·청구일·금액·공급가액 · 세액·영수/청구·승인번호·공급받는자 번호·출처·검수·입금·담당·공개 범위·현장·연결 지시·계약) · r2 + 메모 · r7 + 금액 바뀜 · 머리 = 거래처·내역·처리 상태·경과 칩·[닫기 ▲] · 값: 출처 계약 연동/홈택스 불러오기 · 검수 "관리자A · 2026-10-01"/"발행 건이라 검수 없음" · 계약 ○○동 하천 준설공사 · 연결 지시 제목(진행) · 공개 범위 비면 전체공개 · 버튼(명세 순서) r1 검수·입금완료·불일치 표시·★·수정·삭제(검수 전이라 계산서 발행 없음) / r2 검수 해제·입금완료·계산서 발행·… / r4·r5 입금완료·발행 취소·불일치(표시/해제)·… / r6 ★ 표시 해제 / r7(입금·발행) 미수전환·발행 취소·금액 확인함·… / r8(입금·발행) 미수전환·발행 취소·★·수정·삭제(v440 검토 — 입금된 줄도 발행 표시를 바꿈) · 직원B(기성 수행) r1 불일치 표시·★·수정·삭제 / r5(발행) 불일치 해제·★·수정 / r7(입금) 금액 확인함·★·수정(v440 검토 — 비관리자 [삭제]는 검수 전·발행 전·미수 줄만) · 연결 지시를 못 보면 "입금확인 지시 (진행)" · 직원C(보기) 버튼 0·계약 칸 없음',
+    kv5.r1 === KV15 && kv5.r2 === KV15 + '·메모' && kv5.r7 === KV15 + '·금액 바뀜' && kv5.r4 === KV15
+    && /^<b>가나건설<\/b><span class="vs-dsub">10월 철거 기성<\/span><span class="rec-st wait">검수 대기<\/span><span class="rec-age age0">경과 21일<\/span><button type="button" class="vs-chip" data-vs-close="1"/.test(kv5.dh)
+    && JSON.stringify(kv5.r2v) === JSON.stringify(['계약 연동', '관리자A · 2026-10-01', '○○동 하천 준설공사', '○○동 하천', '계약 연동', '<span style="color:#9AA09C;">전체공개</span>', '직원B', '미수'])
+    && JSON.stringify(kv5.r5v) === JSON.stringify(['입금확인: 사아공단 준설토 운반 22,000,000원 <span class="vs-dsub">(진행)</span>', '20,000,000 · 2,000,000', '<span style="color:#9AA09C;">발행 건이라 검수 없음</span>', '직접 등록'])
+    && kv5.r7v[0].indexOf('<span class="rec-st chg">금액 바뀜</span>') === 0 && kv5.r7v[1] === '2026-11-03'
+    && det5.r1 === 'review,pay,mm,hl,edit,del' && det5.r2 === 'unreview,pay,inv,mm,hl,edit,del' && det5.r4 === 'pay,uninv,mm,hl,edit,del' && det5.r5 === 'pay,uninv,unmm,hl,edit,del'
+    && det5.r6 === 'review,pay,mm,unhl,edit,del' && det5.r7 === 'unpay,uninv,rechk,hl,edit,del' && det5.r8 === 'unpay,uninv,hl,edit,del'
+    && detB5.r1 === 'mm,hl,edit,del' && detB5.r5 === 'unmm,hl,edit' && detB5.r7 === 'rechk,hl,edit' && detB5.r5task === '입금확인 지시 <span class="vs-dsub">(진행)</span>'
+    && detC5.r1 === '' && detC5.r2 === '' && detC5.r2k === KV15.replace('·계약', '') + '·메모',
+    JSON.stringify({ det5, detB5, detC5, kv5: { r1: kv5.r1 === KV15, r2v: kv5.r2v, r5v: kv5.r5v, r7v: kv5.r7v, dh: kv5.dh.slice(0, 80) } }));
+
+  // ⑥ 계산서 발행/발행 취소(결정 ③ — 관리자만, 검수 ✓ 뒤): r2 [계산서 발행] = 발행 + 입금확인 지시 1건(rec_id·task_id·담당·기한=청구일) → 같은 자리 [발행 취소] → 지시 지움(del)·task_id 비움·검수 ✓로
+  //   → 다시 발행 = 살아 있는 지시 1건 · 이미 발행이면 흉내 누름 [계산서 발행] 무시(지시 안 늘어남) · 검수 전(r1) 흉내 누름 [계산서 발행] 무시 · 홈택스 발행 건(r4) [발행 취소] = 확인 창(취소면 그대로) · 직원B 흉내 누름 [계산서 발행] 무시
+  //   버튼·행이 없으면 멈추지 않고 표시만('!…' — 결함이 이 묶음을 '검사 생략'으로 끝내 뒤 검사까지 건너뛰지 않게, v439 ⑭와 같은 까닭 · ⑥·⑲)
+  const X6 = mk40(), L6 = X6.env.log, s6 = []; X6.api.render(); chip40(X6, 'all');
+  const sf6 = (fn, tag) => { try { fn(); } catch (e) { s6.push('!' + tag); } };
+  sf6(() => { openRow40(X6, 'r2'); pressDet40(X6, 'inv', 'r2'); }, '발행 r2');
+  const t6a = liveT40(X6, 'r2'); s6.push(rc40(X6, 'r2').invoice, t6a.length, t6a[0] && t6a[0].title, t6a[0] && t6a[0].who_id, t6a[0] && t6a[0].due, rc40(X6, 'r2').task_id === (t6a[0] && t6a[0].id), detActs40(X6.host._h), (cells40(X6.host._h, 'r2')[6] || [])[1]);
+  sf6(() => fake40(X6, 'inv', 'r2'), '흉내 발행 r2'); s6.push(liveT40(X6, 'r2').length);
+  sf6(() => pressDet40(X6, 'uninv', 'r2'), '발행 취소 r2'); s6.push(rc40(X6, 'r2').invoice, liveT40(X6, 'r2').length, X6.api.tasks().filter((t) => t.rec_id === 'r2' && t.del === 1).length, rc40(X6, 'r2').task_id, String((cells40(X6.host._h, 'r2')[6] || [])[1]).indexOf('검수 ✓') > 0);
+  sf6(() => pressDet40(X6, 'inv', 'r2'), '다시 발행 r2'); s6.push(liveT40(X6, 'r2').length, X6.api.tasks().filter((t) => t.rec_id === 'r2').length);
+  sf6(() => { openRow40(X6, 'r1'); fake40(X6, 'inv', 'r1'); }, '흉내 발행 r1'); s6.push(rc40(X6, 'r1').invoice, liveT40(X6, 'r1').length);
+  X6.env.confirmAns = false; sf6(() => { openRow40(X6, 'r4'); pressDet40(X6, 'uninv', 'r4'); }, '발행 취소 r4 취소'); s6.push(rc40(X6, 'r4').invoice, L6.filter((l) => /^confirm:홈택스에서 불러온 발행 건입니다/.test(l)).length); X6.env.confirmAns = true;
+  sf6(() => pressDet40(X6, 'uninv', 'r4'), '발행 취소 r4'); s6.push(rc40(X6, 'r4').invoice, detActs40(X6.host._h));
+  const Y6 = mk40({ user: U40.B }); Y6.api.render(); chip40(Y6, 'all'); sf6(() => { openRow40(Y6, 'r2'); fake40(Y6, 'inv', 'r2'); fake40(Y6, 'uninv', 'r5'); }, '직원B 흉내'); const yb6 = [rc40(Y6, 'r2').invoice, liveT40(Y6, 'r2').length, rc40(Y6, 'r5').invoice];
+  T('v440 ⑥ 계산서 발행/발행 취소(결정 ③): 관리자 r2(검수 ✓) [계산서 발행] = 발행·입금확인 지시 1건("입금확인: 다라환경 9월 운반 8,250,000원"·담당 직원B·기한 청구일 09-30·task_id 연결)·펼침 버튼 입금완료·발행 취소·…·처리 상태 발행 → 흉내 [계산서 발행] 다시 = 지시 그대로 1건 → [발행 취소] = 발행 해제·지시 지움(del 1)·task_id 비움·검수 ✓로 → 다시 [계산서 발행] = 살아 있는 지시 1건(지운 것 포함 2건) · 검수 전 r1 흉내 [계산서 발행] = 무시 · 홈택스 발행 r4 [발행 취소] = 확인 창 "홈택스에서 불러온 발행 건입니다…"(취소면 그대로·확인이면 해제 → 검수 대기라 [검수]) · 직원B(기성 수행) 흉내 [계산서 발행]·[발행 취소] = 무시',
+    JSON.stringify(s6) === JSON.stringify([true, 1, '입금확인: 다라환경 9월 운반 8,250,000원', 'm2', '2026-09-30', true, 'pay,uninv,mm,hl,edit,del', '<span class="rec-st inv">발행</span>', 1, false, 0, 1, null, true, 1, 2, false, 0, true, 1, false, 'review,pay,mm,hl,edit,del'])
+    && JSON.stringify(yb6) === JSON.stringify([false, 0, true]),
+    JSON.stringify({ s6, yb6 }));
+
+  // ⑦ 불일치(기성 수행)·금액 확인함·수정 창: 직원B [불일치 표시] r1 = mismatch·확인 칸 불일치 · r5 [불일치 해제] = 해제 + 연결 지시 메모 지움 → 다시 표시 = 메모 "금액 불일치 — 확인 필요" · 직원C(보기) 흉내 [불일치 표시] 무시
+  //   · [금액 확인함] r7 = recheck 0(지운 값이 병합에서 되살지 않게 0)·확인 칸 '-' · [수정] 저장(saveRecModal) = 금액 바뀜도 0 · [수정] = 수정 창(openRecModal)
+  const X7 = mk40({ user: U40.B }); X7.api.render(); chip40(X7, 'all');
+  openRow40(X7, 'r1'); pressDet40(X7, 'mm', 'r1'); const s7 = [rc40(X7, 'r1').mismatch, cells40(X7.host._h, 'r1')[7][1]];
+  openRow40(X7, 'r5'); pressDet40(X7, 'unmm', 'r5'); s7.push(rc40(X7, 'r5').mismatch, X7.api.tasks()[0].detail); pressDet40(X7, 'mm', 'r5'); s7.push(rc40(X7, 'r5').mismatch, X7.api.tasks()[0].detail);
+  openRow40(X7, 'r7'); pressDet40(X7, 'rechk', 'r7'); s7.push(rc40(X7, 'r7').recheck, cells40(X7.host._h, 'r7')[7][1], detActs40(X7.host._h));
+  openRow40(X7, 'r2'); pressDet40(X7, 'edit', 'r2'); s7.push(X7.env.log.indexOf('edit:r2') >= 0);
+  const Z7 = mk40({ user: U40.C }); Z7.api.render(); openRow40(Z7, 'r1'); fake40(Z7, 'mm', 'r1'); s7.push(rc40(Z7, 'r1').mismatch);
+  //   수정 창 저장(검토 반영): PC 표 펼침 [수정]으로 연 창만 '금액 바뀜'을 지움(폰 목록·홈 줄 [수정]은 그 표시를 안 보여 줌 — 그대로 1) · 금액 칸 앞 '-'는 남김(수정세금계산서 음수가 저장 때 양수로 뒤집히지 않게)
+  const form7 = (X, v) => ['reCo', 'reClient', 'reDesc', 'reAmount', 'reBilled', 'reAssignee'].forEach((id, i) => { X.env.host(id).value = v[i]; });
+  const W7 = mk40(); const w7 = W7.api.recs().find((r) => r.id === 'r7'); form7(W7, ['env', '카타물산', '폐합성수지 처리 9월', '4,180,000', '2026-10-01', '']);
+  W7.api.setEditing('r7'); W7.api.saveModal(); s7.push(w7.recheck, w7.amount);
+  const V7 = mk40(); V7.api.render(); chip40(V7, 'all'); openRow40(V7, 'r7'); pressDet40(V7, 'edit', 'r7'); form7(V7, ['env', '카타물산', '폐합성수지 처리 9월', '4,180,000', '2026-10-01', '']); V7.api.setEditing('r7'); V7.api.saveModal(); s7.push(rc40(V7, 'r7').recheck);
+  const U7 = mk40(); U7.api.render(); chip40(U7, 'all'); openRow40(U7, 'r7'); pressDet40(U7, 'edit', 'r7'); U7.api.closeModal();   // 표에서 연 창을 [취소]로 닫은 뒤 다른 길(홈 줄 [수정])로 같은 줄을 열어 저장 = 표 표시가 남지 않음(금액 바뀜 그대로)
+  form7(U7, ['env', '카타물산', '폐합성수지 처리 9월', '4,180,000', '2026-10-01', '']); U7.api.setEditing('r7'); U7.api.saveModal(); s7.push(rc40(U7, 'r7').recheck);
+  const N7 = mk40(); const n7 = N7.api.recs().find((r) => r.id === 'r6'); n7.amount = -1100000; form7(N7, ['', '자차개발', '창고 철거 잔금', '-1,100,000', '2026-09-05', '']); N7.api.setEditing('r6'); N7.api.saveModal(); s7.push(n7.amount);
+  const om7 = /document\.getElementById\("reAmount"\)\.value = r\.amount \? \(Number\(r\.amount\) < 0 \? "-" : ""\) \+ fmtAmount\(r\.amount\) : "";/.test(fn40(html, 'openRecModal'));
+  T('v440 ⑦ 불일치(기성 수행)·금액 확인함·수정: 직원B [불일치 표시] r1 = 불일치·확인 칸 불일치 칩 · r5 [불일치 해제] = 해제·연결 지시 메모 지움 → [불일치 표시] = 메모 "금액 불일치 — 확인 필요" · [금액 확인함] r7 = 금액 바뀜 0·확인 칸 "-"·버튼에서 빠짐(입금 줄이라 [삭제]도 없음) · [수정] = 수정 창 · 직원C(보기) 흉내 [불일치 표시] 무시 · 수정 창 저장 — 폰·홈 줄 길(표 [수정]을 거치지 않음) = 금액 바뀜 1 그대로 · 표 펼침 [수정]으로 연 창 = 금액 바뀜 0(검토 반영) · 표에서 연 창을 닫고 다른 길로 연 저장 = 1 그대로 · 음수 금액 "-1,100,000" 저장 = -1100000(부호 유지) · 수정 창 금액 칸 = 부호 붙여 채움(정적)',
+    JSON.stringify(s7) === JSON.stringify([true, '<span class="rec-st mm">불일치</span>', false, '', true, '금액 불일치 — 확인 필요', 0, '<span style="color:#9AA09C;">-</span>', 'hl,edit', true, false, 1, 4180000, 0, 1, -1100000]) && om7,
+    JSON.stringify({ s7, om7 }));
+
+  // ⑧ 입금·검수·★·삭제·누름 길 권한(관리자): [검수] r6 = 검수자·날짜 · [검수 해제] r2 = 확인 창 → 검수 대기 · [입금완료] r5 = 입금 오늘·불일치 지움·연결 지시 완료 → 입금 완료 칩 [미수전환] = 미수·지시 다시 진행
+  //   · 검수 전 r1 [입금완료] = 확인 창 '검수 없이' · [삭제] r3 = 확인 창·휴지통(del 1) · 직원B 흉내 [입금완료]·[검수]·[미수전환] 무시 · 화면에 없는(관리자 전용) r9를 직원B가 흉내 누름 = 무시
+  const X8 = mk40(), L8 = X8.env.log; X8.api.render(); chip40(X8, 'all');
+  openRow40(X8, 'r6'); pressDet40(X8, 'review', 'r6'); const s8 = [JSON.stringify(rc40(X8, 'r6').reviewed)];
+  openRow40(X8, 'r2'); pressDet40(X8, 'unreview', 'r2'); s8.push(rc40(X8, 'r2').reviewed, L8.some((l) => /^confirm:검수를 해제할까요\?/.test(l)));
+  openRow40(X8, 'r5'); pressDet40(X8, 'pay', 'r5'); s8.push(rc40(X8, 'r5').paid, rc40(X8, 'r5').mismatch, X8.api.tasks()[0].status);
+  pressDet40(X8, 'unpay', 'r5'); s8.push(rc40(X8, 'r5').paid, X8.api.tasks()[0].status);
+  openRow40(X8, 'r1'); pressDet40(X8, 'pay', 'r1'); s8.push(rc40(X8, 'r1').paid, L8.some((l) => l === 'confirm:이 청구는 관리부 검수 전입니다. 검수 없이 입금 처리할까요?'));
+  openRow40(X8, 'r3'); pressDet40(X8, 'del', 'r3'); s8.push(rc40(X8, 'r3').del, L8.some((l) => /^confirm:이 기성을 삭제할까요\? \(나중에 복구 가능\)\n마바상사 3,300,000원$/.test(l)), order40(X8.host._h).split(',').indexOf('r3'));
+  const Y8 = mk40({ user: U40.B }); Y8.api.render(); chip40(Y8, 'all'); openRow40(Y8, 'r6'); ['pay:r6', 'review:r6', 'unpay:r7', 'del:r9', 'hl:r9'].forEach((x) => fake40(Y8, x.split(':')[0], x.split(':')[1]));
+  s8.push(rc40(Y8, 'r6').paid, rc40(Y8, 'r6').reviewed || null, rc40(Y8, 'r7').paid, rc40(Y8, 'r9').del || 0, rc40(Y8, 'r9').hl || 0);
+  T('v440 ⑧ 입금·검수·★·삭제·누름 길 권한: [검수] r6 = {관리자A·2026-11-10} · [검수 해제] r2 = 확인 창 → 해제 · [입금완료] r5 = 입금 11-10·불일치 지움·연결 지시 완료 → [미수전환] = 미수·지시 다시 진행 · 검수 전 r1 [입금완료] = 확인 창 "검수 없이 입금 처리할까요?" · [삭제] r3 = 확인 창(거래처·금액)·휴지통·행 빠짐 · 직원B 흉내 [입금완료]·[검수]·[미수전환] 무시 · 화면 밖(관리자 전용) r9 흉내 [삭제]·[★ 표시] 무시',
+    JSON.stringify(s8) === JSON.stringify(['{"by":"관리자A","date":"2026-11-10"}', null, true, '2026-11-10', false, 'done', null, 'open', '2026-11-10', true, 1, true, -1, null, null, '2026-11-03', 0, 0]),
+    JSON.stringify(s8));
+
+  // ⑨ 줄 누르기 = 펼침(★ 저장 안 함 — 명세 '줄 누르기 뜻이 바뀜'): r6 줄 누름 = 펼침·hl 1 그대로·저장 0 → 다시 누름 = 닫힘 → [★ 표시 해제] = hl 0·저장 → 거래처 칸 ★ 없음 → r1 [★ 표시] = hl 1
+  const X9 = mk40(), L9 = X9.env.log; X9.api.render(); const n9 = L9.length;
+  openRow40(X9, 'r6'); const s9 = [/data-vs-det="r6"/.test(X9.host._h), rc40(X9, 'r6').hl, L9.slice(n9).filter((l) => /^(recCache|recSave)$/.test(l)).length];
+  openRow40(X9, 'r6'); s9.push(X9.host._h.indexOf('data-vs-det=') < 0, rc40(X9, 'r6').hl);
+  openRow40(X9, 'r6'); pressDet40(X9, 'unhl', 'r6'); s9.push(rc40(X9, 'r6').hl, L9.indexOf('recCache') >= 0 && L9.indexOf('recSave') >= 0, cells40(X9.host._h, 'r6')[0][1].indexOf('★') < 0);
+  openRow40(X9, 'r1'); pressDet40(X9, 'hl', 'r1'); s9.push(rc40(X9, 'r1').hl, cells40(X9.host._h, 'r1')[0][1].indexOf('<span class="rec-star" title="★ 표시">★</span> 가나건설') > 0);
+  T('v440 ⑨ 줄 누르기 = 펼침(★ 저장 안 함): r6(★) 줄 누름 = 펼침·hl 1 그대로·저장 0 → 다시 누름 = 닫힘 → 펼침 [★ 표시 해제] = hl 0·저장·거래처 칸 ★ 없음 · r1 [★ 표시] = hl 1·거래처 칸 ★',
+    JSON.stringify(s9) === JSON.stringify([true, 1, 0, true, 1, 0, true, true, 1, true]), JSON.stringify(s9));
+
+  // ⑩ 공급받는자 번호 가림(명세 — 10자리 사업자번호 꼴만 그대로, 그 밖 '개인(번호 숨김)', 원문은 관리자): r4 123-45-67890(모두) · r7 개인 번호 = 직원B·C '개인(번호 숨김)'(화면 글 어디에도 그 번호 없음)·관리자 원문
+  //   · 줄표 없는 10자리도 사업자번호 꼴로 · 검색칸 글에 공급받는자 번호 없음(그 번호로 찾으면 0건)
+  const viewBiz10 = (user, id) => { const X = mk40({ user }); X.api.render(); chip40(X, 'all'); openRow40(X, id); return [kvVal40(X.host._h, '공급받는자 번호'), X.host._h.indexOf('900101') < 0 && X.host._h.indexOf('1234567') < 0]; };
+  const b10 = [viewBiz10(U40.B, 'r7'), viewBiz10(U40.C, 'r7'), viewBiz10(U40.A, 'r7'), viewBiz10(U40.B, 'r4')];
+  const X10 = mk40(); X10.api.recs().find((r) => r.id === 'r1').client_num = '1234567890'; X10.api.render(); chip40(X10, 'all'); openRow40(X10, 'r1'); const b10b = kvVal40(X10.host._h, '공급받는자 번호');
+  X10.api.setQ(X10.api.def(), '900101'); const q10 = [order40(X10.host._h), X10.api.sText(rc40(X10, 'r7')).indexOf('900101') < 0];
+  T('v440 ⑩ 공급받는자 번호 가림: r7 개인 번호 = 직원B·직원C "개인(번호 숨김)"(표·펼침 글 어디에도 번호 없음) · 관리자 = 원문 + "(원문 — 관리자만 보임)" · r4 사업자번호 꼴 = 직원B에게도 123-45-67890 · 줄표 없는 10자리 1234567890 = 123-45-67890 · 검색칸 글에 공급받는자 번호 없음("900101"로 찾으면 0건)',
+    JSON.stringify(b10) === JSON.stringify([['<span style="color:#9AA09C;">개인(번호 숨김)</span>', true], ['<span style="color:#9AA09C;">개인(번호 숨김)</span>', true], ['900101-1234567 <span class="vs-dsub">(원문 — 관리자만 보임)</span>', false], ['123-45-67890', true]])
+    && b10b === '123-45-67890' && JSON.stringify(q10) === '["",true]',
+    JSON.stringify({ b10, b10b, q10 }));
+
+  // ⑪ 보기 권한(직원C — 기성 'view' → .view.readonly): 머리 버튼 3개 숨김 · 선택 칸·선택 막대 없음 · 펼침 버튼 0 · 그린 버튼 전부 .vs-chip 또는 .mini-btn · 삭제된 기성 링크 숨김 · 카드 펼치기 안 됨
+  //   · CSS .view.readonly .mini-btn 숨김(머리 버튼·세무 내보내기는 .mini-btn) · 직원B(수행)는 머리 버튼 3개 보임
+  const X11 = mk40({ user: U40.C }); X11.api.render(); openRow40(X11, 'r1');
+  const h11 = X11.host._h, btn11 = [...h11.matchAll(/<button([^>]*)>/g)].map((m) => (/class="([^"]*)"/.exec(m[1]) || ['', ''])[1]);
+  const hb11 = ['recAddOpen', 'recImpOpen', 'recAbOpen'].map((id) => X11.env.host(id).style.display).join(',');
+  const pn11 = [X11.api.panel('add'), ['recAddCard', 'recImportCard', 'recAbCard'].map((id) => X11.env.host(id).style.display).join(',')];
+  const Y11 = mk40({ user: U40.B }); Y11.api.render(); const hbB11 = ['recAddOpen', 'recImpOpen', 'recAbOpen'].map((id) => Y11.env.host(id).style.display).join(',');
+  const css11 = (() => { const i = html.indexOf('<style>'), j = html.indexOf('</style>', i); return html.slice(i + 7, j).replace(/\/\*[\s\S]*?\*\//g, ''); })();
+  const ro11 = /\.view\.readonly \.add-row,\s*\.view\.readonly \.del-x,\s*\.view\.readonly \.mini-btn,\s*\.view\.readonly \.link-btn\{display:none !important;\}/.test(css11);
+  const hbHtml11 = ['recAddOpen', 'recImpOpen', 'recAbOpen'].every((id) => new RegExp('<button type="button" class="mini-btn rec-hbtn" id="' + id + '" data-rec-panel="(add|imp|ab)" style="display:none;"').test(html)) && /<button class="mini-btn" id="recTaxBtn">📤 세무 내보내기\(월\)<\/button>/.test(html);
+  T('v440 ⑪ 보기 권한(직원C): 머리 버튼 3개 숨김(display none) · 카드 펼치기 안 됨(셋 다 숨김) · 선택 칸·선택 막대 없음 · 펼침 버튼 0 · 표·펼침 버튼 ' + btn11.length + '개 전부 vs-chip 또는 mini-btn · 삭제된 기성 링크 숨김 · CSS .view.readonly .mini-btn·.add-row·.link-btn 숨김 · 머리 버튼·세무 내보내기 = .mini-btn(HTML) · 직원B(수행)는 머리 버튼 3개 보임',
+    hb11 === 'none,none,none' && JSON.stringify(pn11) === '[false,"none,none,none"]' && h11.indexOf('sel-box') < 0 && h11.indexOf('data-vs-selbar') < 0 && detActs40(h11) === '' && btn11.length >= 8
+    && btn11.every((c) => /(^| )(vs-chip|mini-btn)( |$)/.test(c)) && X11.env.host('recDeletedToggle').style.display === 'none' && ro11 && hbHtml11 && hbB11 === ',,',
+    JSON.stringify({ hb11, pn11, btn: btn11.filter((c) => !/(^| )(vs-chip|mini-btn)( |$)/.test(c)), sel: h11.indexOf('sel-box'), det: detActs40(h11), del: X11.env.host('recDeletedToggle').style.display, ro11, hbHtml11, hbB11 }));
+
+  // ⑫ 세무 내보내기(명세 — 관리자 전체, 그 밖 기성 수행은 보이는 건만 + 첫 줄 '보이는 n건만'): 10월 = 관리자 4건(r1·r7·r8·r9 — 관리자 전용 r9 포함, 첫 줄 = 머리) · 직원B 3건(r9 빠짐) + 첫 줄 '보이는 3건만 …' · 보기 권한은 내보내지 않음
+  const ex12 = (user) => { const X = mk40({ user }); X.env.promptAns = '2026-10'; X.api.tax(); const rows = (X.env.xlsx && X.env.xlsx.rows) || []; return [rows.length ? rows[0].join('/') : '(없음)', rows.filter((r) => /^\d{8}-|^$/.test(String(r[10] || '')) && r.length === 11 && r[1] && r[0] !== '회사').map((r) => r[1]).sort().join(','), X.env.log.filter((l) => /^download:/.test(l)).length]; };
+  const e12 = [ex12(U40.A), ex12(U40.B), ex12(U40.C)];
+  T('v440 ⑫ 세무 내보내기: 관리자 = 10월 4건(가나건설·관리자 전용 건·카타물산·파하시)·첫 줄 머리(회사/거래처/…) · 직원B(기성 수행) = 보이는 3건만(관리자 전용 건 빠짐) + 첫 줄 "보이는 3건만 — 이 계정에 보이는(담당·공개범위) 기성만 담았습니다. 전체는 관리자가 내보냅니다." · 직원C(보기) = 내보내지 않음',
+    JSON.stringify(e12) === JSON.stringify([['회사/거래처/사업자번호/내역/공급가액/세액/합계(금액)/작성/청구일/계산서/입금일/승인번호', '가나건설,관리자 전용 건,카타물산,파하시', 1],
+      ['보이는 3건만 — 이 계정에 보이는(담당·공개범위) 기성만 담았습니다. 전체는 관리자가 내보냅니다.', '가나건설,카타물산,파하시', 1], ['(없음)', '', 0]]),
+    JSON.stringify(e12));
+
+  // ⑬ 홈 '미수' 줄 → 기성 탭 그 행 열기(PC — 칩·거르기·검색어에 걸려 있으면 그때만 풀고 기기 기억은 덮지 않음): 기억 = 입금 완료 칩·거래처 거르기 '파하'·금액 ▼ → r3 누름 = 탭 이동·미수 칩·거르기 풂·정렬 그대로·r3 펼침·굴림
+  //   · 검색어 '가나'에 걸린 r3도 열림(검색어 비움) · 행 원천 밖(관리자 전용 r9를 직원B가)·없는 id = false · 폰 375 legacy = ★ 하이라이트 그대로(탭 이동 없음) · 홈 줄 배선 = bindRecHandlers(host, recSheetHomeRow)
+  const MEM13 = JSON.stringify({ k: 'amt', d: -1, f: { client: '파하' }, chip: { st: 'paid' } });
+  const X13 = mk40({ store: { jw_rec_sheet: MEM13 } }), L13 = X13.env.log; X13.api.render(); const pre13 = [order40(X13.host._h)];
+  const r13 = X13.api.homeRow('r3');
+  const s13 = [r13, L13.indexOf('tab:rec') >= 0, /class="vs-chip on" data-vs-chip="st\|"/.test(X13.host._h), ((/<input type="text" data-vf="client" value="([^"]*)"/.exec(X13.host._h) || [0, '?'])[1]), order40(X13.host._h), /data-vs-det="r3"/.test(X13.host._h), L13.indexOf('into:r3') >= 0, X13.env.store.jw_rec_sheet === MEM13, L13.filter((l) => l === 'store:jw_rec_sheet').length];
+  X13.api.setQ(X13.api.def(), '가나'); s13.push(order40(X13.host._h)); s13.push(X13.api.homeRow('r4'), X13.api.inst(X13.api.def()).q, /data-vs-det="r4"/.test(X13.host._h));
+  const Y13 = mk40({ user: U40.B }); Y13.api.render(); const y13 = [Y13.api.homeRow('r9'), Y13.api.homeRow('없음'), Y13.host._h.indexOf('data-vs-det=') < 0];
+  const P13 = mk40({ width: 375 }), LP13 = P13.env.log; P13.api.render(); const p13 = [P13.api.homeRow('r1'), rc40(P13, 'r1').hl, LP13.some((l) => /^tab:/.test(l))];
+  // 홈 줄 배선(실제 recRowHtml·bindRecHandlers) — 1366 줄 누름 = recSheetHomeRow(탭 이동·펼침) · 버튼 누름은 줄 누름이 아님 · 375 = 하이라이트
+  const H13 = mk40(), dh13 = H13.env.host('dashHost'); dh13.innerHTML = H13.api.rowHtml(rc40(H13, 'r2'), false); H13.api.bindRec(dh13, H13.api.homeRow);
+  const row13 = dh13.querySelector('.rec-item[data-rec-row]'); row13.fire('click', { target: row13 }); const hh13 = [H13.env.log.indexOf('tab:rec') >= 0, /data-vs-det="r2"/.test(H13.host._h)];
+  const pay13 = dh13.querySelector('[data-rec-pay]'); hh13.push(!!pay13); if (pay13) { const n = H13.env.log.filter((l) => l === 'tab:rec').length; row13.fire('click', { target: pay13 }); hh13.push(H13.env.log.filter((l) => l === 'tab:rec').length === n); }
+  const dashLine13 = /bindRecHandlers\(host, recSheetHomeRow\);/.test(fn40(html, 'renderDashboard')) && /\(typeof onRow === "function" \? onRow : toggleRecHl\)\(el\.getAttribute\("data-rec-row"\)\);/.test(fn40(html, 'bindRecHandlers'));
+  T('v440 ⑬ 홈 미수 줄 → 그 행 열기(PC): 기억(입금 완료 칩·거래처 "파하"·금액 ▼) 화면 r8 → r3 누름 = 탭 이동(rec)·미수 칩·거래처 거르기 풂·정렬(금액 ▼) 그대로 r5,r2,r1,r3,r4,r9,r6·r3 펼침·그 줄로 굴림·기기 기억 안 덮음(저장 0) · 검색어 "가나"(r1만)에 걸린 r4 = 검색어 비우고 펼침 · 직원B가 관리자 전용 r9·없는 id = false(아무것도 안 바꿈) · 폰 375 legacy = false·★ 하이라이트 그대로(탭 이동 없음) · 실제 홈 줄(recRowHtml + bindRecHandlers(host, recSheetHomeRow)) 누름 = 탭 이동·그 행 펼침, 줄 안 [입금완료] 누름은 줄 누름 아님 · renderDashboard 배선 줄·bindRecHandlers onRow 줄(정적)',
+    pre13[0] === 'r8' && JSON.stringify(s13) === JSON.stringify([true, true, true, '', 'r5,r2,r1,r3,r4,r9,r6', true, true, true, 0, 'r1', true, '', true]) && JSON.stringify(y13) === '[false,false,true]'
+    && JSON.stringify(p13) === '[false,1,false]' && JSON.stringify(hh13) === '[true,true,true,true]' && dashLine13,
+    JSON.stringify({ pre13, s13, y13, p13, hh13, dashLine13 }));
+
+  // ⑭ 부품 그 행 열기(vsSheetReveal — 정의 하나로 따로): 모집단 칩(입찰 '지남' 꼴)에 빠진 행 = 그 칩으로 · 접힌 묶음 안 행 = 묶음 펼침 · 더보기 밖 행 = 한도 늘림 · 칩·거르기·묶음을 풀어도 기기 기억 안 덮음 · 없는 id·폰 legacy = false
+  const RV14 = Array.from({ length: 9 }, (_, i) => ({ id: 'a' + i, t: '줄 ' + i, n: i })).concat([{ id: 'o1', t: '지난 줄', n: 20, old: 1 }, { id: 'g1', t: '묶음 줄', n: 21, grp: '묶음' }]);
+  const d14 = { key: 'jw_cli_sheet', host: 'vsT', unit: '건', cols: [{ k: 't', h: '이름', f: 'text', fill: 1, min: 200, pw: 100 }, { k: 'n', h: '번호', w: 80, f: 'none', lv: 2 }], rows: () => RV14, id: (r) => r.id, val: (r, k) => r[k],
+    chips: [{ g: 'st', items: [{ k: '', h: '진행', test: (r) => !r.old }, { k: 'old', h: '지남', pop: 1, test: (r) => !!r.old }, { k: 'all', h: '전체' }] }], sort: { k: 'n', d: 1 }, group: { of: (r) => r.grp || '', label: (g) => g }, page: 3, legacy: () => {} };
+  const X14 = mk40(), V14 = X14.env.host('vsT'); X14.api.vs(d14); const s14 = [order40(V14._h)];
+  s14.push(X14.api.reveal(d14, 'o1'), order40(V14._h), /data-vs-det="o1"/.test(V14._h), /class="vs-chip on" data-vs-chip="st\|old"/.test(V14._h));
+  s14.push(X14.api.reveal(d14, 'g1'), order40(V14._h), /data-vs-det="g1"/.test(V14._h));
+  s14.push(X14.api.reveal(d14, 'a7'), order40(V14._h), /data-vs-det="a7"/.test(V14._h));
+  s14.push(X14.api.reveal(d14, '없음'), X14.env.log.filter((l) => l === 'store:jw_cli_sheet').length);
+  const P14 = mk40({ width: 375 }); P14.api.vs(d14); s14.push(P14.api.reveal(d14, 'a1'));
+  T('v440 ⑭ 부품 그 행 열기(vsSheetReveal): 처음 a0,a1,a2(더보기 3) → 모집단 칩(지남)에 빠진 o1 = 지남 칩으로 켜고 펼침 → 접힌 묶음 안 g1 = 진행 칩으로 돌아와 묶음 펼침 → 더보기 밖 a7 = 한도 늘려 a0~a7까지 그리고 펼침 · 없는 id = false · 기기 저장 0 · 폰 375 legacy 정의 = false',
+    JSON.stringify(s14) === JSON.stringify(['a0,a1,a2', true, 'o1', true, true, true, 'a0,a1,a2,a3,a4,a5,a6,a7,a8,g1', true, true, 'a0,a1,a2,a3,a4,a5,a6,a7,a8,g1', true, false, 0, false]),
+    JSON.stringify(s14));
+
+  // ⑮ 폰 legacy(859px 이하 — 퀴즈 2번 답 확인 중이라 지금 화면 그대로): 옛 본문 renderReceivablesLegacy = v439(260df1b) renderReceivables 본문 글자째(해시) · 홈 줄 recRowHtml 무변(해시) · 375 실행 = 옛 미수 카드 줄·
+  //   표 자리 숨김·머리 버튼 숨김·카드 셋 보임·제목 건수 없음 · 옛 줄 누름 = ★ 하이라이트(종전) → 1366(경계 한 번) = 표·옛 요소 숨김·제목 '미수 n건 · 금액' → 다시 375 = 옛 목록·카드 되살림
+  const LEG_SHA40 = 'f6e1386b497c2d844f3b147c1d71d605f666fb1f7e5c1117b9d1e27b89e6dc02', ROW_SHA40 = '63a5f46ec2efcd8e30bd3109addb0c411ebd99d997f683aea04a881086204e3e';
+  const X15 = mk40({ width: 375 }), E15 = X15.env, H15 = (id) => E15.host(id); const r15 = X15.api.render();
+  const vis15 = () => ['recSheet', 'recList', 'recListHead', 'recSearch', 'recPaidToggle', 'recAddCard', 'recImportCard', 'recAbCard', 'recAddOpen', 'recImpOpen', 'recAbOpen'].map((id) => H15(id).style.display || '·').join(',');
+  const card15 = () => (H15('recSheet').classList.contains('card') ? 'card' : '-') + '/' + (H15('recSheet').style.marginTop || '');   // 표 자리: 표 갈래 = 카드·위 여백 10px · 폰 갈래 = 카드 뗀 빈 칸(높이 0, display:none 아님 — 검토 반영)
+  const s15a = [r15 === undefined, (H15('recList')._h.match(/class="item rec-item/g) || []).length, X15.host._h.indexOf('data-vs-') < 0, vis15(), H15('recTopHead').textContent, H15('recHead').textContent, H15('recSelBar').style.display, card15()];
+  const lr15 = H15('recList').querySelector('[data-rec-row="r6"]'); lr15.fire('click', { target: lr15 }); s15a.push(rc40(X15, 'r6').hl);
+  E15.width = 1366; E15.breakAll();
+  const s15b = [X15.host._h.indexOf('data-vs-table') > 0, vis15(), H15('recTopHead').textContent, H15('recSelBar').style.display, H15('recPaidList').style.display, card15()];
+  E15.width = 375; E15.breakAll();
+  const s15c = [(H15('recList')._h.match(/class="item rec-item/g) || []).length, vis15(), H15('recTopHead').textContent, card15(), X15.host._h.indexOf('data-vs-') < 0];
+  const leg15 = sha40(body40('renderReceivablesLegacy')), row15 = sha40(body40('recRowHtml'));
+  T('v440 ⑮ 폰 legacy(375): 옛 본문 renderReceivablesLegacy = v439 renderReceivables 본문 글자째(sha256 ' + LEG_SHA40.slice(0, 12) + '…) · 홈 줄 recRowHtml 무변(' + ROW_SHA40.slice(0, 12) + '…) · 실행 = 옛 미수 카드 7줄·표 글 0·표 자리는 카드를 뗀 빈 칸(display:none이 아님 — 검토 반영: 숨기면 부품이 보임·크기 변화를 못 봐 860 경계에서 표로 못 돌아왔다, 시험 틀 getClientRects도 display:none이면 상자 없음)·옛 목록·미수 제목·검색칸·입금 완료 보기 보임·카드 셋 보임·머리 버튼 숨김·제목 건수 없음·미수 제목 "7건 · 43,350,000원"·선택 막대 flex · 옛 줄 누름 = ★ 하이라이트(종전) → 1366(경계 한 번) = 표(자리 다시 카드·위 여백 10px)·옛 요소 숨김·카드 셋 접힘·머리 버튼 보임·제목 "미수 7건 · 43,350,000원"·선택 막대·입금 완료 목록 숨김 → 다시 375 = 옛 카드 7줄·카드 셋·옛 요소 되살림·제목 건수 걷음·표 글 0',
+    leg15 === LEG_SHA40 && row15 === ROW_SHA40
+    && JSON.stringify(s15a) === JSON.stringify([true, 7, true, '·,·,·,·,·,·,·,·,none,none,none', '', '7건 · 43,350,000원', 'flex', '-/0', 0])
+    && JSON.stringify(s15b) === JSON.stringify([true, '·,none,none,none,none,none,none,none,·,·,·', '미수 7건 · 43,350,000원', 'none', 'none', 'card/10px'])
+    && JSON.stringify(s15c) === JSON.stringify([7, '·,·,·,·,·,·,·,·,none,none,none', '', '-/0', true]),
+    JSON.stringify({ leg: leg15.slice(0, 12), row: row15.slice(0, 12), s15a, s15b, s15c }));
+
+  // ⑯ 폰 sheet 준비(퀴즈 2번 답이 '폰도 새 표'면 정의 phone 한 줄만 "sheet"): 폰 열 3(거래처 46·경과 22·금액 32 % — 합 100) · 폰 합계 '합계 n건 · n일(최대 — title) · 금액' · 검수 대기·60일·전체 칩 PC 전용 · 행 누름 = 표 아래 상세 카드(내역·청구일·금액·담당 + 버튼)
+  const X16 = mk40({ width: 375 }), d16 = Object.assign({}, X16.api.def(), { phone: 'sheet' }); X16.api.vs(d16);
+  const h16 = X16.host._h, cg16 = [...h16.matchAll(/<col data-vs-col="(\w+)" style="([^"]*)">/g)].map((m) => m[1] + '=' + m[2]).join(',');
+  const pc16 = ['rv', 'd60', 'all'].every((k) => new RegExp('class="vs-chip vs-pc" data-vs-chip="st\\|' + k + '"').test(h16)) && /class="vs-chip on" data-vs-chip="st\|"/.test(h16) && !/vs-pc" data-vs-chip="st\|(paid|d90|chk)"/.test(h16);
+  openRow40(X16, 'r1'); const dc16 = [/<div class="vs-detcard" data-vs-detcard="r1">/.test(X16.host._h), X16.host._h.indexOf('<tr class="vs-det">') < 0, kvKeys40(X16.host._h), detActs40(X16.host._h)];
+  T('v440 ⑯ 폰 sheet 준비(phone 한 줄만 바꾸면 되게): 정의 검사 통과 · 열 3 = client --pw 46%·age 22%·amt 32% · 합계 "합계 7건|101일(title 최대)|43,350,000" · 검수 대기·60일 넘음·전체 칩 vs-pc(폰 숨김) — 미수·입금 완료·90일·확인 필요는 폰에도 · 행 누름 = 표 아래 상세 카드(표 안 펼침 없음)·키·값 내역·청구일·금액·담당·버튼 검수·입금완료·불일치 표시·★·수정·삭제',
+    X16.api.check(d16).length === 0 && cg16 === 'client=--pw:46%;,age=--pw:22%;,amt=--pw:32%;' && foot40(h16) === '합계 7건|<span title="미수 최대 경과 101일">101일</span>|43,350,000' && pc16
+    && JSON.stringify(dc16) === JSON.stringify([true, true, '내역·청구일·금액·담당', 'review,pay,mm,hl,edit,del']),
+    JSON.stringify({ cg16, foot: foot40(h16), pc16, dc16 }));
+
+  // ⑰ 머리 버튼·끌어 놓기(index.html의 배선 줄을 잘라 실행): [+ 청구 등록] = 청구 등록 칸만 펼침(누름 표시 on·거래처 칸 포커스) → [홈택스 불러오기] = 그 칸만 → 다시 누름 = 접힘 · 파일을 끌어 오면(dragenter·dragover Files) 불러오기 칸 저절로·기본 동작 막음
+  //   · 놓기 칸 밖에 놓으면 불러오기(handleRecImportFile — .xlsx 아니면 안내 글) · 놓기 칸이 먼저 처리했으면(defaultPrevented) 건너뜀 · 파일 아닌 끌기·보기 권한·폰 legacy = 아무것도 안 함
+  const X17 = mk40(); X17.api.render(); X17.api.wire(); const E17 = X17.env, H17 = (id) => E17.host(id);
+  const cards17 = () => ['recAddCard', 'recImportCard', 'recAbCard'].map((id) => (H17(id).style.display === 'none' ? '-' : 'O')).join('') + ':' + ['recAddOpen', 'recImpOpen', 'recAbOpen'].map((id) => (H17(id).classList.contains('on') ? 'on' : '-')).join('');
+  const s17 = [cards17()];
+  H17('recAddOpen').fire('click'); s17.push(cards17(), E17.log.indexOf('focus:recClient') >= 0);
+  H17('recImpOpen').fire('click'); s17.push(cards17()); H17('recImpOpen').fire('click'); s17.push(cards17());
+  const de17 = H17('view-rec').fire('dragenter', { dataTransfer: { types: ['Files'] } }); s17.push(cards17(), de17.defaultPrevented);
+  H17('recImpMsg').textContent = ''; const dr17 = H17('view-rec').fire('drop', { dataTransfer: { types: ['Files'], files: [{ name: 'a.txt' }] } }); s17.push(dr17.defaultPrevented, H17('recImpMsg').textContent);
+  H17('recImpMsg').textContent = ''; H17('view-rec').fire('drop', { defaultPrevented: true, dataTransfer: { types: ['Files'], files: [{ name: 'b.txt' }] } }); s17.push(H17('recImpMsg').textContent);
+  H17('recImpOpen').fire('click'); const dt17 = H17('view-rec').fire('dragover', { dataTransfer: { types: ['text/plain'] } }); s17.push(cards17(), dt17.defaultPrevented);
+  const Y17 = mk40({ user: U40.C }); Y17.api.render(); Y17.api.wire(); const dy17 = Y17.env.host('view-rec').fire('dragenter', { dataTransfer: { types: ['Files'] } }); s17.push(dy17.defaultPrevented, Y17.env.host('recImportCard').style.display);
+  const P17 = mk40({ width: 375 }); P17.api.render(); P17.api.wire(); const dp17 = P17.env.host('view-rec').fire('dragenter', { dataTransfer: { types: ['Files'] } }); P17.env.host('recAddOpen').fire('click'); s17.push(dp17.defaultPrevented, ['recAddCard', 'recImportCard', 'recAbCard'].map((id) => P17.env.host(id).style.display).join(','));
+  T('v440 ⑰ 머리 버튼·끌어 놓기: 처음 카드 셋 접힘 → [+ 청구 등록] = 그 칸만 펼침·누름 표시·거래처 칸 포커스 → [홈택스 불러오기] = 그 칸만 → 다시 누름 = 다 접힘 · 파일 끌어 오기(dragenter Files) = 불러오기 칸 저절로·기본 동작 막음 · 놓기 칸 밖에 놓음 = 불러오기(.txt면 ".xlsx 파일만 지원합니다.") · 놓기 칸이 먼저 처리(defaultPrevented) = 건너뜀 · 파일 아닌 끌기 = 그대로(막지 않음) · 보기 권한·폰 legacy = 아무것도 안 함(폰은 카드 셋 그대로 펼쳐 둠)',
+    JSON.stringify(s17) === JSON.stringify(['---:---', 'O--:on--', true, '-O-:-on-', '---:---', '-O-:-on-', true, true, '.xlsx 파일만 지원합니다.', '', '---:---', false, false, 'none', false, ',,']),
+    JSON.stringify(s17));
+
+  // ⑱ 홈택스 불러오기 미리보기·반영(운영 기성 0건 — 홈택스 매출 목록 꼴 가짜 파일, 실제 거래처 값 없음): 신규 3·취소 1·파일 안 승인번호 겹침 1·매입 빠짐 → 미리보기 글 → 반영 = 홈택스 발행 건(회사 공급자 번호로 환경)
+  //   · 지시 겹침 없음(불러오기는 입금확인 지시를 만들지 않음 — 표의 [계산서 발행]으로 지시가 있는 r2와 같은 계산서를 불러와도 지시 그대로 1건, 불러온 줄에는 [계산서 발행] 없이 [발행 취소]) · 직접 등록 r1과 같은 거래처·금액·청구일 = 둘 다 중복 의심
+  //   · 개인 번호 줄 = 직원B에게 '개인(번호 숨김)' · 취소 줄 = 그 기성 휴지통 · 다시 불러오면 취소·신규 0(지시 그대로)
+  const zlib40 = createRequire(import.meta.url)('zlib');
+  const mkXlsx40 = (rows) => {
+    const x = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const col = (i) => { let s = ''; i++; while (i) { const m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = Math.floor((i - 1) / 26); } return s; };
+    const xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>'
+      + rows.map((r, ri) => '<row r="' + (ri + 1) + '">' + r.map((v, ci) => (v === '' || v == null) ? '' : (typeof v === 'number' ? '<c r="' + col(ci) + (ri + 1) + '"><v>' + v + '</v></c>' : '<c r="' + col(ci) + (ri + 1) + '" t="inlineStr"><is><t>' + x(v) + '</t></is></c>')).join('') + '</row>').join('') + '</sheetData></worksheet>';
+    const data = Buffer.from(xml, 'utf8'), nb = Buffer.from('xl/worksheets/sheet1.xml', 'utf8'), crc = zlib40.crc32(data) >>> 0;
+    const lh = Buffer.alloc(30); lh.writeUInt32LE(0x04034b50, 0); lh.writeUInt16LE(20, 4); lh.writeUInt32LE(crc, 14); lh.writeUInt32LE(data.length, 18); lh.writeUInt32LE(data.length, 22); lh.writeUInt16LE(nb.length, 26);
+    const cd = Buffer.alloc(46); cd.writeUInt32LE(0x02014b50, 0); cd.writeUInt16LE(20, 4); cd.writeUInt16LE(20, 6); cd.writeUInt32LE(crc, 16); cd.writeUInt32LE(data.length, 20); cd.writeUInt32LE(data.length, 24); cd.writeUInt16LE(nb.length, 28); cd.writeUInt32LE(0, 42);
+    const cdLen = 46 + nb.length, eo = Buffer.alloc(22); eo.writeUInt32LE(0x06054b50, 0); eo.writeUInt16LE(1, 8); eo.writeUInt16LE(1, 10); eo.writeUInt32LE(cdLen, 12); eo.writeUInt32LE(30 + nb.length + data.length, 16);
+    const all = Buffer.concat([lh, nb, data, cd, nb, eo]);
+    return all.buffer.slice(all.byteOffset, all.byteOffset + all.byteLength);
+  };
+  const GRP18 = ['번호', '문서기본항목', '', '', '', '', '', '', '', '', '', '', '공급자 정보', '', '공급받는자 정보', ''];
+  const HDR18 = ['번호', '문서번호', '신고번호', '작성일자', '입/출구분', '영수/청구', '대표품목', '공급가액', '세액', '합계액', '상태', '비고', '상호명', '사업자번호', '상호명', '사업자번호'];
+  const ROWS18 = [GRP18, HDR18,
+    [1, 'D-0001', '20261101-41000001-00000011', '2026-11-01', '매출', '청구', '11월 폐기물 운반', 1000000, 100000, 1100000, '확인', '', '종운환경(가상)', '506-81-48535', '가상상사(주)', '123-45-67890'],
+    [2, 'D-0002', '20261102-41000001-00000012', '2026-11-02', '매출', '영수', '개인 의뢰 철거', 2000000, 200000, 2200000, '확인', '', '종운환경(가상)', '5068148535', '가상개인', '900101-1234567'],
+    [3, 'D-0003', '20261103-41000001-00000013', '2026-11-03', '매입', '청구', '매입 건', 500000, 50000, 550000, '확인', '', '가상매입처', '111-11-11111', '종운환경(가상)', '506-81-48535'],
+    [4, 'D-9001', '20260915-41000001-00000001', '2026-09-15', '매출', '청구', '9월 운반', 3000000, 300000, 3300000, '취소', '', '종운환경(가상)', '506-81-48535', '마바상사', '123-45-67890'],
+    [5, 'D-0005', '20261101-41000001-00000011', '2026-11-01', '매출', '청구', '11월 폐기물 운반', 1000000, 100000, 1100000, '확인', '', '종운환경(가상)', '506-81-48535', '가상상사(주)', '123-45-67890'],
+    [6, 'D-0006', '20261020-41000001-00000016', '2026-10-20', '매출', '청구', '10월 철거 기성', 5000000, 500000, 5500000, '확인', '', '종운환경(가상)', '506-81-48535', '가나건설', '222-22-22222'],
+    [7, 'D-0007', '20260930-41000001-00000017', '2026-09-30', '매출', '청구', '9월 운반', 7500000, 750000, 8250000, '확인', '', '종운환경(가상)', '506-81-48535', '다라환경', '333-33-33333']];
+  const FILE18 = mkXlsx40(ROWS18);
+  const X18 = mk40(), E18 = X18.env, L18 = E18.log; X18.api.render(); chip40(X18, 'all');
+  openRow40(X18, 'r2'); pressDet40(X18, 'inv', 'r2'); const tN18 = X18.api.tasks().length, t2N18 = liveT40(X18, 'r2').length;
+  const nRec18 = X18.api.recs().length;
+  X18.api.imp({ name: '홈택스_매출.xlsx', arrayBuffer: () => Promise.resolve(FILE18) }); for (let i = 0; i < 6; i++) await new Promise((r) => setTimeout(r, 0));
+  const pv18 = [E18.host('recImpBackdrop').classList.contains('show'), E18.host('recImpSummary')._h.replace(/<[^>]+>/g, ''), (E18.host('recImpPreview')._h.match(/신규|갱신|중복의심|취소/g) || []).join(',')];
+  X18.api.impConfirm();
+  const recs18 = X18.api.recs(), nw18 = recs18.slice(nRec18), hk = nw18.map((r) => [r.client, r.src, r.invoice, r.co, r.amount, r.billed, r.nts.slice(-2)].join('/'));
+  const s18 = [pv18[0], recs18.length - nRec18, rc40(X18, 'r4').del, E18.host('recImpMsg').textContent, X18.api.tasks().length === tN18, liveT40(X18, 'r2').length === t2N18 && t2N18 === 1, nw18.every((r) => liveT40(X18, r.id).length === 0 && !r.task_id)];
+  X18.api.render();
+  const idH1 = nw18[0].id, idH2 = nw18[1].id, idH6 = nw18[3].id, idH7 = nw18[4].id;
+  openRow40(X18, idH1); s18.push(detActs40(X18.host._h), cells40(X18.host._h, idH1)[6][1], kvVal40(X18.host._h, '출처'), cells40(X18.host._h, idH1)[7][1], cells40(X18.host._h, nw18[2].id)[7][1]);
+  s18.push(cells40(X18.host._h, idH6)[7][1], cells40(X18.host._h, 'r1')[7][1], cells40(X18.host._h, idH7)[7][1], cells40(X18.host._h, 'r2')[7][1]);
+  openRow40(X18, idH7); s18.push(detActs40(X18.host._h));
+  const Y18 = mk40({ user: U40.B, recs: recs18.map((r) => Object.assign({}, r)), tasks: X18.api.tasks().map((t) => Object.assign({}, t)) }); Y18.api.render(); chip40(Y18, 'all'); openRow40(Y18, idH2);
+  s18.push(kvVal40(Y18.host._h, '공급받는자 번호'), Y18.host._h.indexOf('900101') < 0);
+  X18.api.imp({ name: '홈택스_매출.xlsx', arrayBuffer: () => Promise.resolve(FILE18) }); for (let i = 0; i < 6; i++) await new Promise((r) => setTimeout(r, 0));
+  s18.push(E18.host('recImpSummary')._h.replace(/<[^>]+>/g, '').split('신규 미수')[0]);
+  T('v440 ⑱ 홈택스 불러오기(가짜 매출 목록 — 머리 묶음 공급자·공급받는자 정보): 미리보기 열림·"신규 4건 · 갱신 0건 · 취소반영 1건 · 이미있음 0건 · 중복 의심 1건 / 신규 미수 합계 17,050,000원"(매입 줄 빠짐) → 반영 = 5줄 더함(신규 4 + 파일 안 겹침 1)·취소 줄의 r4 휴지통·"반영 완료 — 신규 4 · 갱신 0 · 취소 1 · 중복 의심 1건(상단 확인 후 삭제)" · 지시 겹침 없음(불러오기로 지시 0건 · 표에서 발행한 r2의 입금확인 지시 그대로 1건 · 불러온 줄 task_id 없음) · 불러온 줄 = 처리 상태 발행·출처 홈택스 불러오기·펼침 버튼 입금완료·발행 취소·…(계산서 발행 없음) · 파일 안 겹침 두 줄 = 중복 의심 · 직접 등록 r1·표에서 발행한 r2와 같은 거래처·금액·청구일 줄 = 양쪽 중복 의심 · 개인 번호 줄 = 직원B "개인(번호 숨김)"(글 어디에도 번호 없음) · 같은 파일 다시 = 신규 0·취소 0·이미있음 4',
+    JSON.stringify(pv18) === JSON.stringify([true, '신규 4건 · 갱신 0건 · 취소반영 1건 · 이미있음 0건 · 중복 의심 1건신규 미수 합계 17,050,000원※ 파일 안에 승인번호가 겹치는 행입니다. 그대로 추가한 뒤 목록 상단에 빨간 \'중복 의심\'으로 표시되니 확인 후 삭제하세요.', '신규,신규,신규,신규,중복의심,취소'])
+    && JSON.stringify(hk) === JSON.stringify(['가상상사(주)/hometax/true/env/1100000/2026-11-01/11', '가상개인/hometax/true/env/2200000/2026-11-02/12', '가상상사(주)/hometax/true/env/1100000/2026-11-01/11', '가나건설/hometax/true/env/5500000/2026-10-20/16', '다라환경/hometax/true/env/8250000/2026-09-30/17'])
+    && JSON.stringify(s18) === JSON.stringify([true, 5, 1, '반영 완료 — 신규 4 · 갱신 0 · 취소 1 · 중복 의심 1건(상단 확인 후 삭제)', true, true, true,
+      'pay,uninv,mm,hl,edit,del', '<span class="rec-st inv">발행</span>', '홈택스 불러오기', '<span class="rec-st dup">중복 의심</span>', '<span class="rec-st dup">중복 의심</span>',
+      '<span class="rec-st dup">중복 의심</span>', '<span class="rec-st dup">중복 의심</span>', '<span class="rec-st dup">중복 의심</span>', '<span class="rec-st dup">중복 의심</span>', 'pay,uninv,mm,hl,edit,del',
+      '<span style="color:#9AA09C;">개인(번호 숨김)</span>', true, '신규 0건 · 갱신 0건 · 취소반영 0건 · 이미있음 4건 · 중복 의심 1건']),
+    JSON.stringify({ pv18, hk, s18 }));
+
+  // ⑲ 선택 삭제·삭제된 기성(보이는 건만): 전체선택 = 그린 행(미수 7) → 칩을 바꾸면 숨은 선택 풂 · 직원B: 안 보이는 r9를 미리 골라 둬도 [선택 삭제 (1)] → r1만 · 삭제 함수를 r9·r3으로 직접 불러도 r3만 · 진행 중 연결 지시는 지움(r5 → t5)
+  //   · 삭제된 기성 = 보이는 것만(직원B r10 · 관리자 r10·r11) · [영구삭제] 관리자만(직원B 화면에 없음 · 관리자 화면에 남은 버튼을 직원B가 눌러도 무시)
+  const s19 = [], q19 = (h, sel) => h.querySelector(sel) || { checked: false, fire: () => { s19.push('!' + sel); } };   // 요소가 없으면 멈추지 않고 표시만(⑥과 같은 까닭)
+  const X19 = mk40(); X19.api.render(); const sa19 = q19(X19.host, '[data-vs-selall]'); sa19.checked = true; sa19.fire('change');
+  s19.push(Object.keys(X19.api.sel().rec).sort().join(','), (/전체선택\(보이는 (\d+)건\)/.exec(X19.host._h) || [0, ''])[1]); chip40(X19, 'paid'); s19.push(Object.keys(X19.api.sel().rec).length);
+  chip40(X19, ''); X19.api.del(['r5'], false); s19.push(rc40(X19, 'r5').del, X19.api.tasks()[0].del, X19.env.log.indexOf('confirm:1건을 삭제할까요? (나중에 복구 가능)') >= 0);
+  const Y19 = mk40({ user: U40.B }); Y19.api.sel().rec.r9 = 1; Y19.api.render(); const cb19 = q19(Y19.host, '[data-vs-sel="r1"]'); cb19.checked = true; cb19.fire('change');
+  s19.push((/data-vs-selact="0"[^>]*>([^<]*)<\/button>/.exec(Y19.host._h) || [0, ''])[1]); q19(Y19.host, '[data-vs-selact="0"]').fire('click'); s19.push(rc40(Y19, 'r1').del, rc40(Y19, 'r9').del || 0);
+  Y19.api.del(['r9', 'r3'], false); s19.push(rc40(Y19, 'r9').del || 0, rc40(Y19, 'r3').del);
+  Y19.api.setShowDel(true); Y19.api.render(); const yl19 = Y19.env.host('recDeletedList')._h; s19.push(Y19.env.host('recDeletedToggle').textContent, (yl19.match(/data-selid="(\w+)"/g) || []).map((s) => s.slice(12, -1)).sort().join(','), yl19.indexOf('delpurge-btn') < 0);
+  const Z19 = mk40(); Z19.api.setShowDel(true); Z19.api.render(); const zl19 = () => Z19.env.host('recDeletedList');
+  s19.push(Z19.env.host('recDeletedToggle').textContent, (zl19()._h.match(/data-selid="(\w+)"/g) || []).map((s) => s.slice(12, -1)).sort().join(','), zl19()._h.indexOf('delpurge-btn') > 0);
+  const kb19 = q19(zl19(), '[data-selid="r11"]'); kb19.checked = true; kb19.fire('change');
+  Z19.env.user = U40.B; q19(zl19(), '.delpurge-btn').fire('click'); s19.push(Z19.api.recs().some((r) => r.id === 'r11'));
+  Z19.env.user = U40.A; Z19.api.render(); q19(zl19(), '.delpurge-btn').fire('click'); s19.push(Z19.api.recs().some((r) => r.id === 'r11'));
+  T('v440 ⑲ 선택 삭제·삭제된 기성: 전체선택 = 그린 행 7건(미수 — 관리자 전용 r9 포함·입금 완료 빠짐) "(보이는 7건)" → 입금 완료 칩 = 숨은 선택 풂 · 삭제 함수 r5 = 휴지통·진행 중 입금확인 지시 t5 지움·확인 "1건을 삭제할까요?" · 직원B: 안 보이는 r9를 미리 골라 둬도 [선택 삭제 (1)] → r1만 · r9·r3 직접 = r3만 · 삭제된 기성 보기 = 직원B r1·r10·r3(관리자 전용 r11 빠짐)·[영구삭제] 없음 / 관리자 (2) r10·r11·[영구삭제] → 직원B로 바뀐 뒤 누름 = 무시 → 관리자 누름 = 영구 삭제',
+    JSON.stringify(s19) === JSON.stringify(['r1,r2,r3,r4,r5,r6,r9', '7', 0, 1, 1, true, '선택 삭제 (1)', 1, 0, 0, 1, '삭제된 기성 숨기기', 'r1,r10,r3', true, '삭제된 기성 숨기기', 'r10,r11', true, true, false]),
+    JSON.stringify(s19));
+
+  // ⑳ 연속 누름 막기(v439 taskSheetBindAct와 같은 꼴 — 누름 하나가 표를 다시 그려 같은 자리에 다음 버튼): 전체 칩 r1 [입금완료] 뒤 같은 자리 [미수전환] → 바로(0ms)·499ms 누름 버림 → 500ms 통과 · 더블클릭 둘째 누름(detail 2) 버림 · 시계가 뒤로 가면 막지 않음 · 자리(recSheet)에 리스너 0
+  const X20 = mk40(), s20 = []; X20.api.render(); chip40(X20, 'all'); openRow40(X20, 'r1');
+  const pd20 = (act, id, o) => { try { pressDet40(X20, act, id, o); } catch (e) { s20.push('!' + act + ':' + id); } };
+  pd20('pay', 'r1'); s20.push(rc40(X20, 'r1').paid, detActs40(X20.host._h).split(',')[0]);
+  pd20('unpay', 'r1', { fast: true }); s20.push(rc40(X20, 'r1').paid);
+  X20.env.now += 499; pd20('unpay', 'r1', { fast: true }); s20.push(rc40(X20, 'r1').paid);
+  X20.env.now += 1; pd20('unpay', 'r1', { fast: true }); s20.push(rc40(X20, 'r1').paid);
+  pd20('review', 'r1', { detail: 2 }); s20.push(rc40(X20, 'r1').reviewed || null);
+  pd20('review', 'r1'); s20.push(JSON.stringify(rc40(X20, 'r1').reviewed || null));
+  X20.env.now -= 60000; pd20('unreview', 'r1', { fast: true }); s20.push(rc40(X20, 'r1').reviewed || null);
+  const hostL20 = [X1, X2, X3, X4, X5, X6, X7, X8, X9, X11, X13, X15, X16, X17, X18, X19, X20, Y5, Y6, Y8, Y11, Y13, Y18, Y19, Z5, Z7, Z19].some((X) => X.env.log.some((l) => /^host-listener:recSheet:/.test(l)));
+  T('v440 ⑳ 연속 누름 막기: 전체 칩 r1 [입금완료] = 입금·같은 자리 첫 버튼 [미수전환] → 바로·499ms 누름 버림 → 500ms 통과(미수) · 더블클릭 둘째 누름(detail 2) [검수] 버림 → 따로 누른 [검수] 통과 · 시계가 뒤로 가면 막지 않음([검수 해제]) · 표 자리(recSheet)에 리스너 0(모든 시험 틀 — 배선은 펼침 칸 root 하나)',
+    JSON.stringify(s20) === JSON.stringify(['2026-11-10', 'unpay', '2026-11-10', '2026-11-10', null, null, '{"by":"관리자A","date":"2026-11-10"}', null]) && !hostL20,
+    JSON.stringify({ s20, hostL20 }));
+
+  // ㉑ 전역 검색 → 표: 기성 항목 = recVisible(비관리자에게 남의 기성 0) · 검색칸 글 앞머리 = gsRun이 보는 글 · recSheetFromGs = 칩·거르기 이번만 풀고 검색어 + 누른 그 행 열기(입금 완료 건 = 입금 완료 칩) · 폰 legacy = false · gsRun 배선 줄(정적)
+  const X21 = mk40({ store: { jw_rec_sheet: JSON.stringify({ k: '', d: 1, f: { client: '가나' }, chip: { st: 'rv' } }) } }); X21.api.render();
+  const hay21 = (x) => ((x.client || '') + (x.amount ? ' · ' + Number(x.amount).toLocaleString('en-US') + '원' : '')) + ' ' + ((x.desc || '') + (x.paid ? ' · 수금 ' + x.paid : ' · 미수')) + ' ' + (x.detail || '') + ' ' + (x.site || '');
+  const head21 = X21.api.recs().filter((r) => r.del !== 1).every((r) => X21.api.sText(r).indexOf(hay21(r)) === 0);
+  const g21 = [X21.api.fromGs('파하시', 'r8'), order40(X21.host._h), /class="vs-chip on" data-vs-chip="st\|paid"/.test(X21.host._h), /data-vs-det="r8"/.test(X21.host._h), X21.host.querySelector('[data-vs-q]').value, ((/<input type="text" data-vf="client" value="([^"]*)"/.exec(X21.host._h) || [0, '?'])[1])];
+  const P21 = mk40({ width: 375 }); P21.api.render(); g21.push(P21.api.fromGs('파하시', 'r8'), P21.api.inst(P21.api.def()).q);
+  const gsL21 = /add\("rec","기성·미수",canSee\("rec"\),function\(\)\{return liveRec\(\)\.filter\(recVisible\);\},/.test(html)
+    && /if\(sid==="recSearch" && recSheetFromGs\(gq, el\.getAttribute\("data-gs-id"\)\)\) return;/.test(fn40(html, 'gsRun')) && /\(s\.tab==="rec"&&x&&x\.id\?' data-gs-id="'\+esc\(x\.id\)\+'"':''\)/.test(fn40(html, 'gsRun'))
+    && /function recSheetFromGs\(q, id\)\{ var def = recSheetDef\(\); if \(!vsSheetSeek\(def, q\)\) return false; if \(id\) vsSheetReveal\(def, id\); return true; \}/.test(rsb40);
+  T('v440 ㉑ 전역 검색 → 표: 검색칸 글 앞머리 = 전역 검색 hay(거래처 · 금액원 · 내역 · 수금 날짜/미수 · 상세 · 현장 — 지운 것 빼고 전부) · 기억(검수 대기 칩·거래처 "가나") 위에서 "파하시"·r8(입금 완료) 누름 = 거르기 풀고 검색어·입금 완료 칩으로 r8 펼침 · 폰 375 legacy = false·검색어 안 넣음 · gsSources 기성 = liveRec().filter(recVisible) · gsRun = 기성 줄에 data-gs-id·recSheetFromGs(gq, id) · recSheetFromGs = vsSheetSeek + vsSheetReveal',
+    head21 && JSON.stringify(g21) === JSON.stringify([true, 'r8', true, true, '파하시', '', false, '']) && gsL21,
+    JSON.stringify({ head21, g21, gsL21 }));
+
+  // ㉒ 넓힘·CSS·정적 — #view-rec 본문 폭(1024 791 · 1366 1,097 · 1920 1,428 ±2 — 860부터 max-width none, 859 이하 규칙 없음) · 펼치는 카드 셋·거래처별 미수 집계는 808(폰 규칙 없음) · 칸 안 칩 여백 4px(.rec-st) · 머리 버튼 누름 표시
+  //   · 구간 규칙: @rec-sheet 구간의 배선(addEventListener)은 펼침 칸 root 하나(recSheetBindAct) + 삭제된 기성 3(전체선택·복구·영구삭제) · 저장소에 직접 쓰기 0 · vsSheet* 부름 = 그리기 1·찾아가기 1·그 행 열기 2
+  const rules22 = [];
+  const parse22 = (src, media) => { let i = 0; while (i < src.length) { const ob = src.indexOf('{', i); if (ob < 0) break; const head = src.slice(i, ob).trim(); let d = 1, j = ob + 1; for (; j < src.length && d > 0; j++) { if (src[j] === '{') d++; else if (src[j] === '}') d--; } const body = src.slice(ob + 1, j - 1); if (/^@media/.test(head)) parse22(body, head.slice(6).trim()); else if (!/^@/.test(head)) { const decl = {}; body.split(';').forEach((p) => { const k = p.indexOf(':'); if (k > 0) decl[p.slice(0, k).trim()] = p.slice(k + 1).trim(); }); rules22.push({ media, sels: head.split(',').map((s) => s.trim().replace(/\s*>\s*/g, '>').replace(/\s+/g, ' ')), decl }); } i = j; } };
+  parse22(css11, null);
+  const decl22 = (w, sel, prop) => { let v = null; rules22.forEach((r) => { if (mq40(r.media, w) && r.sels.indexOf(sel) >= 0 && own40(r.decl, prop)) v = r.decl[prop]; }); return v; };
+  const pad22 = (v) => { const p = String(v || '0px').trim().split(/\s+/).map((x) => parseFloat(x) || 0); const r = p.length === 1 ? p[0] : p[1]; return [p.length === 4 ? p[3] : r, r]; };
+  const bodyW22 = (win) => { const W = win - 17, mx = decl22(win, '#app', 'max-width'), appW = (!mx || mx === 'none') ? W : Math.min(W, parseFloat(mx)), lr = pad22(decl22(win, '#app', 'padding')); return appW - lr[0] - lr[1] - (parseFloat(decl22(win, '.tabbar', 'width')) || 0) - (parseFloat(decl22(win, '.layout', 'gap')) || 0); };
+  const viewW22 = (win) => { const b = bodyW22(win), own = decl22(win, '#view-rec', 'max-width'), base = decl22(win, '.views>.view', 'max-width'), mx = own != null ? own : base; return (!mx || mx === 'none') ? b : Math.min(b, parseFloat(mx)); };
+  const w22 = [1024, 1366, 1920].map((w) => Math.round(viewW22(w)));
+  const cards22 = ['#recAddCard', '#recImportCard', '#recAbCard', '#recAgingSummary'].every((s) => decl22(1366, s, 'max-width') === '808px' && decl22(1920, s, 'max-width') === '808px' && decl22(859, s, 'max-width') == null);
+  const css22 = decl22(1366, '.rec-st', 'padding') === '1px 4px' && decl22(1366, '.rec-st', 'font-size') === '11px' && decl22(1366, '.mini-btn.rec-hbtn.on', 'background') === '#EAF3EF' && decl22(1366, '#view-rec', 'max-width') === 'none' && decl22(859, '#view-rec', 'max-width') == null;
+  const ael22 = (rsb40.match(/addEventListener\(/g) || []).length, root22 = (rsb40.match(/root\.addEventListener\("click"/g) || []).length;
+  const st22 = (rsb40.match(/\bvsSheetRender\(/g) || []).length === 1 && (rsb40.match(/\bvsSheetSeek\(/g) || []).length === 1 && (rsb40.match(/\bvsSheetReveal\(/g) || []).length === 2 && !/localStorage/.test(rsb40)
+    && /<section class="view" id="view-rec">/.test(html) && /<div class="card" id="recSheet" style="display:none;margin-top:10px;"><\/div>/.test(html) && /<div class="card" id="recAddCard">/.test(html) && /<div class="dash-sec" id="recListHead" style="margin:14px 0 6px;">/.test(html)
+    && (html.match(/function renderReceivables\(/g) || []).length === 1 && rsb40.indexOf('function renderReceivables(') > 0 && rsb40.indexOf('function renderReceivablesLegacy(') < 0;
+  T('v440 ㉒ 넓힘·CSS·정적: #view-rec 본문 폭 1024 ' + w22[0] + ' · 1366 ' + w22[1] + ' · 1920 ' + w22[2] + '(명세 791 · 1,097 · 1,428 ±2 — 860부터 max-width none·859 이하 규칙 없음) · 펼치는 카드 셋·거래처별 미수 집계 808(폰 규칙 없음) · 칸 안 칩 .rec-st 여백 4px·11px · 머리 버튼 누름 표시 · @rec-sheet 구간 배선 = 펼침 칸 root 하나 + 삭제된 기성 3 · 부품 부름 = 그리기 1·찾아가기 1·그 행 열기 2 · 구간 안 localStorage 0 · section·표 자리·카드 id·미수 제목 id(HTML) · 입구 renderReceivables 한 곳(@rec-sheet 구간)·옛 본문은 구간 밖',
+    Math.abs(w22[0] - 791) <= 2 && Math.abs(w22[1] - 1097) <= 2 && Math.abs(w22[2] - 1428) <= 2 && cards22 && css22 && ael22 === 4 && root22 === 1 && st22,
+    JSON.stringify({ w22, cards22, css22, ael22, root22, st22 }));
+
+  // ㉓ 문서 — FEATURES 기준 ≥ v440·v440 절(문장 고정)·자리 글 GATES_V440 0 · TESTLIST v440 = 화면 칸 '[ ] (AI 시험 화면 대상'(≥4 — PM 몫 0) + 게이트 칸 '[x] (AI) `uismoke`'(5종·결함 심기) · MANUAL 3절(홈 미수 줄)·9절(PC 표·폰 목록) · CLAUDE.md 기성 표 줄·부품 줄 · sw ≥ 440
+  const ft23 = rd40('FEATURES.md'), tl23 = rd40('TESTLIST.md'), man23 = rd40('MANUAL.html'), cl23 = rd40('CLAUDE.md'), sw23 = rd40('sw.js');
+  const sec23 = (src, head) => { const i = src.indexOf(head); if (i < 0) return ''; const j = src.indexOf(head.slice(0, head.indexOf(' ') + 1), i + head.length); return src.slice(i, j < 0 ? src.length : j); };
+  const ftv23 = sec23(ft23, '\n### v440 (11/10)'), tlv23 = sec23(tl23, '\n## v440 ');
+  const FT_PINS40 = ['**표 한 장(PC 860px 이상)**', '**처리 상태 한 열**', '검수 대기 → 검수 ✓ → 발행 → 입금 MM-DD', '**줄 누르기 = 펼침**', '**계산서 발행·불일치 표시를 펼침 버튼으로 되살림**', '검수 ✓ 뒤', '**공급받는자 번호**', '개인(번호 숨김)',
+    '**세무 내보내기**', '보이는 n건만', '**홈 \'미수\' 줄**', '`vsSheetReveal(def, id)`', '**폰(859px 이하)은 지금 화면 그대로**', '`renderReceivablesLegacy`', '`#view-rec`', '**칸 폭(실측)**', '738 / 874 / 1,262', '지시·기성 2개', '**지시 겹침 없음**'];
+  const CL_PINS40 = ['**기성·수금 표(v440 — 45-1 셋째 판)**', '`renderReceivablesLegacy`', '`// @rec-sheet-start ~ end`', '`recSheetAct`', '`REC_ACT_GAP`', '`recSheetHomeRow`', '그 행 열기 `vsSheetReveal(def, id)`', '`#view-rec`'];
+  const tcb23 = tlv23.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l));
+  const cbScr23 = tcb23.filter((l) => /^- \[[ x]\] \(AI 시험 화면 대상[,) —]/.test(l)), cbGate23 = tcb23.filter((l) => /^- \[x\] \(AI\) `uismoke`\(/.test(l));
+  const man3 = (() => { const i = man23.indexOf('<h2 id="s3">'), j = man23.indexOf('<h2 id="s4">'); return i < 0 || j < i ? '' : man23.slice(i, j); })();
+  const man9 = (() => { const i = man23.indexOf('<h2 id="s9">'), j = man23.indexOf('<h2 id="s10">'); return i < 0 || j < i ? '' : man23.slice(i, j); })();
+  const MAN9_PINS40 = ['<b>PC(넓은 화면) — 표</b>', '(2026-11 v440)', '<b>처리 상태</b>', '<span class="btn">계산서 발행</span>', '<span class="btn">발행 취소</span>', '<span class="btn">불일치 표시</span>', '<span class="btn">금액 확인함</span>', '<span class="btn">★ 표시</span>',
+    '개인(번호 숨김)', '보이는 n건만', '<b>휴대폰 — 목록</b>', '<span class="btn">+ 청구 등록</span>', '<span class="btn">홈택스 불러오기</span>', '<span class="btn">운반 실적</span>'];
+  T('v440 ㉓ 문서: FEATURES 기준 ≥ v440·v440 절(표 한 장·처리 상태·줄 누르기·결정 ③·검수 ✓ 뒤·공급받는자 번호·세무 내보내기·홈 미수 줄·vsSheetReveal·폰 legacy·넓힘·칸 폭 실측·단계 합·검사 고침·지시 겹침 없음 — 문장 고정)·자리 글 GATES_V440 0 · TESTLIST v440 = 화면 칸 "[ ] (AI 시험 화면 대상"(≥4 — 1366·1920 표·발행·폰 375·보기 권한) + 게이트 칸 1개 "[x] (AI) `uismoke`"(consheet_check·proctpl_check·settletest·servertest·결함 심기) · PM 0 · MANUAL 3절(홈 미수 줄 → 그 줄 펼침)·9절(PC 표·처리 상태·머리 버튼·펼침 버튼·번호 가림·내보내기·휴대폰 목록 — 옛 "발행을 체크하는 칸이 없습니다" 없앰) · CLAUDE.md 기성 표 줄·부품 줄 · sw ≥ 440',
+    Number((ft23.match(/기준: v(\d+) /) || [0, 0])[1]) >= 440 && ftv23.length > 0 && FT_PINS40.every((s) => ftv23.indexOf(s) > 0) && ftv23.indexOf('GATES_V440') < 0
+    && tlv23.length > 0 && cbScr23.length >= 4 && cbGate23.length === 1 && tcb23.length === cbScr23.length + 1 && tcb23.every((l) => l.indexOf('PM') < 0) && tlv23.indexOf('GATES_V440') < 0
+    && ['`consheet_check`', '`proctpl_check`', '`settletest`', '`servertest`', '결함 심기'].every((g) => cbGate23[0].indexOf(g) > 0)
+    && cbScr23.some((l) => l.indexOf('1366') > 0 && l.indexOf('1920') > 0) && cbScr23.some((l) => l.indexOf('375') > 0) && cbScr23.some((l) => l.indexOf('보기 권한') > 0) && cbScr23.some((l) => l.indexOf('계산서 발행') > 0)
+    && man3.indexOf('미수 줄을 누르면 기성·수금 탭의 그 줄이 펼쳐집니다') > 0 && MAN9_PINS40.every((s) => man9.indexOf(s) > 0) && man9.indexOf('앱에는 발행을 체크하는 칸이 없습니다') < 0
+    && CL_PINS40.every((s) => cl23.indexOf(s) > 0) && Number((sw23.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 440,
+    JSON.stringify({ ft: FT_PINS40.filter((s) => ftv23.indexOf(s) < 0).map((s) => s.slice(0, 30)), cl: CL_PINS40.filter((s) => cl23.indexOf(s) < 0), man9: MAN9_PINS40.filter((s) => man9.indexOf(s) < 0), man3: man3.indexOf('미수 줄을 누르면'), cb: tcb23.length, scr: cbScr23.length, gate: cbGate23.length, pm: tcb23.filter((l) => l.indexOf('PM') >= 0).map((l) => l.slice(0, 40)), sw: (sw23.match(/jw-shell-v(\d+)/) || [0, 0])[1] }));
+
+  // ---- v440 검토 반영(11/10 — 돈 흐름·권한 / 표·칩·합계 정확성 / 회귀 세 렌즈 지적 중 맞는 것): ㉔ 기성 연동 지시 공개범위 ㉕ 중복 의심(승인번호)·홈 줄 ㉖ 음수 금액 ㉗ 발행 버튼(입금 줄·재발행·다시 불러오기·비관리자 불러오기)
+  //      ㉘ 세무 내보내기 번호 가림 ㉙ 삭제(비관리자 절단선·짝 지시 옮김) ㉚ 확인 칸 거르기(부품 multi) ㉛ 새 청구가 칩에 가리면 열기 — 표 자리 legacy 숨김(860 경계)은 ⑮, 수정 창 '금액 바뀜'·음수 부호는 ⑦
+  // ㉔ 기성 연동 지시 공개범위(taskVisible): 관리자가 빈 공개범위 기성 r2(담당 직원B)에 [계산서 발행] → 입금확인 지시(공개범위 빈 채) · 표본 넷 = 그 지시 · 미수 45일 자동(auto_key rec:r6:over45·빈 공개범위·담당 없음) ·
+  //   관리자 전용 기성 r9에 달린 빈 공개범위 지시 · 기성 연동 아닌 빈 공개범위 지시 — 지시 보기·기성 숨김 직원D 0001 · 기성 보기 직원C 1101 · 담당 직원B 1101 · 관리자 1111 · 직원D가 담당·지시자면 보임 · 지시 탭(taskSheetRows)·전역 검색이 taskVisible(정적)
+  const X24 = mk40(), E24 = X24.env; X24.api.render(); chip40(X24, 'all'); openRow40(X24, 'r2'); pressDet40(X24, 'inv', 'r2');
+  const t24 = liveT40(X24, 'r2')[0] || {}, D24 = { id: 'm4', name: '직원D', perms: { tasks: 'view' } };
+  const smp24 = [t24, { id: 'ta', title: '미수 확인: 자차개발', who_id: '', who: '', scope: [], from: '자동', from_id: '', auto_key: 'rec:r6:over45', status: 'open' },
+    { id: 'tb', title: '입금확인: 관리자 전용 건', who_id: '', who: '', scope: [], from: '기성', from_id: 'm1', rec_id: 'r9', status: 'open' }, { id: 'tc', title: '일반 지시', who_id: 'm1', who: '관리자A', scope: [], from: '관리자A', from_id: 'm1', status: 'open' }];
+  const as24 = (u) => { E24.user = u; return smp24.map((t) => (X24.api.tv(t) ? 1 : 0)).join(''); };
+  const s24 = [(t24.scope || ['?']).length, t24.rec_id, as24(D24), as24(U40.C), as24(U40.B), as24(U40.A)];
+  E24.user = D24; s24.push(X24.api.tv(Object.assign({}, t24, { who_id: 'm4' })) ? 1 : 0, X24.api.tv(Object.assign({}, t24, { from_id: 'm4', from: '직원D' })) ? 1 : 0); E24.user = U40.A;
+  const st24 = /function taskSheetRows\(\)\{ return liveTasks\(\)\.filter\(taskVisible\); \}/.test(html) && /add\("tasks","지시",canSee\("tasks"\),function\(\)\{return tasks\.filter\(function\(t\)\{return t&&t\.del!==1&&t\.status!=="done"&&taskVisible\(t\);\}\);\}/.test(html);
+  T('v440 ㉔ 기성 연동 지시 공개범위(검토 반영 — taskVisible): 빈 공개범위 기성 r2 [계산서 발행] = 공개범위 빈 입금확인 지시(rec_id r2) · [그 지시·미수 45일 자동·관리자 전용 기성 지시·일반 지시] 지시 보기·기성 숨김 직원D 0001(기성 연동은 안 보임 — 종전 1111) · 기성 보기 직원C 1101 · 담당 직원B 1101 · 관리자 1111 · 직원D가 담당이면·지시자면 보임 · 지시 탭 행 원천·전역 검색 = taskVisible(정적)',
+    JSON.stringify(s24) === JSON.stringify([0, 'r2', '0001', '1101', '1101', '1111', 1, 1]) && st24,
+    JSON.stringify({ s24, st24 }));
+
+  // ㉕ 중복 의심(검토 반영 — 승인번호): 같은 거래처·금액·청구일 묶음 — 승인번호가 서로 다른 홈택스 두 줄 h1·h2 = 짝 아님 · 같은 승인번호 두 번 h3·h4 = 짝 · 홈택스 h5 + 직접 등록 h6 = 짝 · 직접 r3 + 홈택스 r4 = 짝 ·
+  //   홈 '미수' 줄(recSheetHomeRows): PC = 표와 같은 판정의 사본(기록에 _dup 안 씀) · 짝 하나(h6)를 지우면 h5 칩 사라짐 · 폰 375 = 옛 열쇠(승인번호 안 봄 — 옛 목록과 같음) · renderDashboard가 그 사본으로 그림(정적)
+  const H25 = (o) => R040(Object.assign({ co: 'env', amount: 1100000, billed: '2026-11-01', invoice: true, src: 'hometax' }, o));
+  const recs25 = () => FIX40().concat([H25({ id: 'h1', client: '가상상사', nts: 'N-1' }), H25({ id: 'h2', client: '가상상사', nts: 'N-2' }), H25({ id: 'h3', client: '나라상사', nts: 'N-3' }), H25({ id: 'h4', client: '나라상사', nts: 'N-3' }),
+    H25({ id: 'h5', client: '다다상사', nts: 'N-5' }), R040({ id: 'h6', client: '다다상사', co: 'env', amount: 1100000, billed: '2026-11-01' })]);
+  const X25 = mk40({ recs: recs25() }); X25.api.render();
+  const ck25 = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'r3', 'r4'].map((id) => (/rec-st dup/.test((cells40(X25.host._h, id)[7] || ['', ''])[1]) ? 1 : 0)).join('');
+  const home25 = (X) => X.api.homeRows(X.api.recs().filter((r) => r.del !== 1 && !r.paid)).filter((c) => c._dup).map((c) => c.id).sort().join(',');
+  const s25 = [ck25, home25(X25), X25.api.recs().some((r) => own40(r, '_dup'))];
+  rc40(X25, 'h6').del = 1; s25.push(home25(X25));
+  const P25 = mk40({ width: 375, recs: recs25() }); s25.push(home25(P25));
+  const dash25 = /recSheetHomeRows\(unpaid\)\.map\(function\(r\)\{ return recRowHtml\(r, false\); \}\)/.test(fn40(html, 'renderDashboard'));
+  T('v440 ㉕ 중복 의심(검토 반영 — 승인번호): 확인 칸 h1·h2(승인번호 다름) 0·0 · h3·h4(같은 승인번호) 1·1 · h5·h6(홈택스 + 직접 등록) 1·1 · r3·r4 1·1 · 홈 미수 줄 PC = 표와 같은 짝 h3,h4,h5,h6,r3,r4(사본 — 기록에 _dup 없음) · h6을 지우면 h3,h4,r3,r4 · 폰 375 홈 = 옛 열쇠 h1~h6·r3·r4 · renderDashboard = recSheetHomeRows(unpaid) 사본으로 recRowHtml(정적)',
+    JSON.stringify(s25) === JSON.stringify(['00111111', 'h3,h4,h5,h6,r3,r4', false, 'h3,h4,r3,r4', 'h1,h2,h3,h4,h5,h6,r3,r4']) && dash25,
+    JSON.stringify({ s25, dash25 }));
+
+  // ㉖ 음수 금액(검토 반영 — 홈택스 수정세금계산서): 1920 표 칸 금액·공급가액·세액 '-' + 빨강(.rec-neg) · 양수 칸은 종전 글 · 합계 줄 = 부호 있는 합 · 금액 ▲ 정렬 = 음수 맨 앞(부호 보임) · 펼침 금액·공급가액 · 세액 부호 ·
+  //   제목 '미수 n건 · 금액'(음수만이면 '-…원') · 그 거래처만 검색하면 합계 줄도 음수 · 검색칸에서 '-1,100,000'으로 찾음 · CSS .rec-neg
+  const recs26 = () => [R040({ id: 'n1', client: '수정상사', desc: '수정', co: 'env', amount: -1100000, supply: -1000000, tax: -100000, billed: '2026-10-01', invoice: true, src: 'hometax', nts: 'M-1' }),
+    R040({ id: 'p1', client: '정상상사', desc: '정상', co: 'env', amount: 3300000, supply: 3000000, tax: 300000, billed: '2026-10-02', invoice: true, src: 'hometax', nts: 'M-2' }),
+    R040({ id: 'p2', client: '작은상사', desc: '작은', co: 'env', amount: 550000, supply: 500000, tax: 50000, billed: '2026-09-30', invoice: true, src: 'hometax', nts: 'M-3' })];
+  const X26 = mk40({ width: 1920, recs: recs26(), tasks: [] }); X26.api.render(); const h26 = () => X26.host._h, NG26 = (s) => '<span class="rec-neg">' + s + '</span>';
+  const s26 = [cells40(h26(), 'n1')[5][1], cells40(h26(), 'n1')[10][1], cells40(h26(), 'n1')[11][1], cells40(h26(), 'p1')[5][1], foot40(h26()), X26.env.host('recTopHead').textContent, order40(h26())];
+  openRow40(X26, 'n1'); s26.push(kvVal40(h26(), '금액'), kvVal40(h26(), '공급가액 · 세액'));
+  const so26 = X26.host.querySelector('[data-vs-sort="amt"]'); so26.fire('click', { target: so26 }); s26.push(order40(h26()));
+  X26.api.setQ(X26.api.def(), '수정상사'); s26.push(foot40(h26())); X26.api.setQ(X26.api.def(), '-1,100,000'); s26.push(order40(h26()));
+  const X26n = mk40({ recs: [recs26()[0]], tasks: [] }); X26n.api.render(); s26.push(X26n.env.host('recTopHead').textContent);
+  const F26 = '<span title="미수 최대 경과 41일">최대 41일</span>', F26n = '<span title="미수 최대 경과 40일">최대 40일</span>';
+  T('v440 ㉖ 음수 금액(검토 반영 — 수정세금계산서): 1920 n1 금액 -1,100,000·공급가액 -1,000,000·세액 -100,000(빨강 .rec-neg) · 양수 3,300,000 그대로 · 합계 줄 2,750,000·2,500,000·250,000(부호 있는 합 = 칸 글 합) · 제목 "미수 3건 · 2,750,000원" · 펼침 금액 "-1,100,000원"·공급가액 · 세액 "-1,000,000 · -100,000" · 금액 ▲ = n1,p2,p1 · 수정상사만 = 합계 줄 -1,100,000·-1,000,000·-100,000 · 검색 "-1,100,000" = n1 · 음수만 = 제목 "미수 1건 · -1,100,000원" · CSS .rec-neg',
+    JSON.stringify(s26) === JSON.stringify([NG26('-1,100,000'), NG26('-1,000,000'), NG26('-100,000'), '3,300,000', '합계 3건|||' + F26 + '||2,750,000|검수 대기 0|확인 0|||2,500,000|250,000', '미수 3건 · 2,750,000원', 'p2,n1,p1',
+      NG26('-1,100,000') + '원', NG26('-1,000,000') + ' · ' + NG26('-100,000'), 'n1,p2,p1', '합계 1건|||' + F26n + '||' + NG26('-1,100,000') + '|검수 대기 0|확인 0|||' + NG26('-1,000,000') + '|' + NG26('-100,000'), 'n1', '미수 1건 · -1,100,000원'])
+    && /\.rec-neg\{color:#B0332A;\}/.test(html),
+    JSON.stringify(s26));
+
+  // ㉗ 발행 버튼(검토 반영): 입금된 r8(검수 ✓·발행) [발행 취소] = 표시만 지움(지시 0 그대로) → [계산서 발행] = 표시만(지시 안 생김) · r2 [계산서 발행] → 담당이 그 지시 완료 → [발행 취소](완료 지시는 그대로) → [계산서 발행] = 열린 지시 1건 + 완료 1건 ·
+  //   홈택스 r4 [발행 취소] 뒤 관리자가 같은 계산서가 든 목록을 다시 불러오면 = 미리보기 '갱신 1'(+ 새 줄 1) → 반영 = r4 발행 되살림·지시 0 · 직원B(기성 수행 비관리자)가 불러온 새 줄 = 처음부터 검수 대기(서버 절단선과 같은 invoice false)
+  const X27 = mk40(), s27 = []; X27.api.render(); chip40(X27, 'all');
+  const sf27 = (fn, tag) => { try { fn(); } catch (e) { s27.push('!' + tag); } };   // 버튼이 없으면 멈추지 않고 표시만(⑥과 같은 까닭)
+  sf27(() => { openRow40(X27, 'r8'); pressDet40(X27, 'uninv', 'r8'); }, '입금 발행 취소'); s27.push(rc40(X27, 'r8').invoice, X27.api.tasks().filter((t) => t.rec_id === 'r8').length, detActs40(X27.host._h));
+  sf27(() => pressDet40(X27, 'inv', 'r8'), '입금 발행'); s27.push(rc40(X27, 'r8').invoice, X27.api.tasks().filter((t) => t.rec_id === 'r8').length);
+  sf27(() => { openRow40(X27, 'r2'); pressDet40(X27, 'inv', 'r2'); }, '발행 r2'); (liveT40(X27, 'r2')[0] || {}).status = 'done';
+  sf27(() => pressDet40(X27, 'uninv', 'r2'), '발행 취소 r2'); sf27(() => pressDet40(X27, 'inv', 'r2'), '재발행 r2');
+  s27.push(liveT40(X27, 'r2').filter((t) => t.status !== 'done').length, liveT40(X27, 'r2').filter((t) => t.status === 'done').length, (liveT40(X27, 'r2').find((t) => t.status !== 'done') || {}).id === rc40(X27, 'r2').task_id);
+  sf27(() => { openRow40(X27, 'r4'); pressDet40(X27, 'uninv', 'r4'); }, '발행 취소 r4'); s27.push(rc40(X27, 'r4').invoice);
+  const ROWS27 = [GRP18, HDR18, [1, 'D-9001', '20260915-41000001-00000001', '2026-09-15', '매출', '청구', '9월 운반', 3000000, 300000, 3300000, '확인', '', '종운환경(가상)', '506-81-48535', '마바상사', '123-45-67890'],
+    [2, 'D-0101', '20261105-41000001-00000101', '2026-11-05', '매출', '청구', '11월 운반', 1000000, 100000, 1100000, '확인', '', '종운환경(가상)', '506-81-48535', '새상사', '444-44-44444']];
+  const FILE27 = mkXlsx40(ROWS27), nT27 = X27.api.tasks().length;
+  X27.api.imp({ name: '홈택스_매출.xlsx', arrayBuffer: () => Promise.resolve(FILE27) }); for (let i = 0; i < 6; i++) await new Promise((r) => setTimeout(r, 0));
+  s27.push(X27.env.host('recImpSummary')._h.replace(/<[^>]+>/g, '').split('신규 미수')[0]); X27.api.impConfirm(); s27.push(rc40(X27, 'r4').invoice, X27.api.tasks().length === nT27);
+  const Y27 = mk40({ user: U40.B }); Y27.api.render(); Y27.api.imp({ name: '홈택스_매출.xlsx', arrayBuffer: () => Promise.resolve(FILE27) }); for (let i = 0; i < 6; i++) await new Promise((r) => setTimeout(r, 0));
+  Y27.api.impConfirm(); const yn27 = Y27.api.recs().find((r) => r.nts === '20261105-41000001-00000101') || {}; Y27.api.render(); chip40(Y27, 'all');
+  s27.push(yn27.invoice, (cells40(Y27.host._h, yn27.id || '?')[6] || ['', ''])[1]);
+  //   task_id가 완료된 지시를 가리킨 채 발행 표시만 빠진 줄(담당 완료 뒤 다른 기기 병합 등) — [계산서 발행] = 새 열린 지시(완료 지시를 '진행 중'으로 보지 않음)
+  (liveT40(X27, 'r2').find((t) => t.status !== 'done') || {}).status = 'done'; rc40(X27, 'r2').invoice = false; X27.api.render();
+  sf27(() => { openRow40(X27, 'r2'); pressDet40(X27, 'inv', 'r2'); }, '완료 지시 가리킨 채 발행'); s27.push(liveT40(X27, 'r2').filter((t) => t.status !== 'done').length, liveT40(X27, 'r2').length);
+  T('v440 ㉗ 발행 버튼(검토 반영): 입금 r8 [발행 취소] = 발행 표시만 지움·지시 0·펼침에 [계산서 발행] → [계산서 발행] = 표시만·지시 0 · r2 발행 → 담당 완료 → [발행 취소] → [계산서 발행] = 열린 지시 1·완료 1·task_id = 새 지시(종전 findRecTask는 완료 지시를 \'이미 있음\'으로 봐 0) · 홈택스 r4 [발행 취소] → 관리자가 같은 계산서 목록을 다시 불러옴 = "신규 1건 · 갱신 1건 · 취소반영 0건 · 이미있음 0건" → 반영 = 발행 되살림·지시 안 늘어남 · 직원B가 불러온 새 줄 = invoice false·처리 상태 검수 대기 · task_id가 완료 지시를 가리킨 채 발행 표시만 빠진 r2 [계산서 발행] = 열린 지시 1(모두 3)',
+    JSON.stringify(s27) === JSON.stringify([false, 0, 'unpay,inv,hl,edit,del', true, 0, 1, 1, true, false, '신규 1건 · 갱신 1건 · 취소반영 0건 · 이미있음 0건', true, true, false, '<span class="rec-st wait">검수 대기</span>', 1, 3]),
+    JSON.stringify(s27));
+
+  // ㉘ 세무 내보내기 공급받는자 번호(검토 반영): 관리자 = 원문(개인 900101-1234567 그대로) · 직원B(기성 수행) = 사업자번호 꼴만 NNN-NN-NNNNN(줄표 없는 10자리도), 개인은 '개인(번호 숨김)' — 파일 어디에도 그 번호 없음 · 번호 없는 줄은 빈칸
+  const ex28 = (user) => { const recs = FIX40(); recs.find((r) => r.id === 'r1').client_num = '1234567890'; const X = mk40({ user, recs }); X.env.promptAns = '2026-10'; X.api.tax(); const rows = (X.env.xlsx && X.env.xlsx.rows) || []; const col = (c) => (rows.find((r) => r[1] === c) || [])[2]; return [col('카타물산'), col('가나건설'), col('파하시'), JSON.stringify(rows).indexOf('900101') < 0]; };
+  const e28 = [ex28(U40.A), ex28(U40.B)];
+  T('v440 ㉘ 세무 내보내기 공급받는자 번호(검토 반영): 관리자 = 카타물산 "900101-1234567"(원문)·가나건설 "1234567890"·번호 없는 파하시 빈칸 · 직원B = 카타물산 "개인(번호 숨김)"·가나건설 "123-45-67890"·파하시 빈칸·파일 글에 900101 없음',
+    JSON.stringify(e28) === JSON.stringify([['900101-1234567', '1234567890', '', false], ['개인(번호 숨김)', '123-45-67890', '', true]]), JSON.stringify(e28));
+
+  // ㉙ 삭제(검토 반영): 직원B(기성 수행 비관리자) [삭제]는 검수 전·발행 전·미수 줄만 — r1 있음 · r2(검수 ✓) 없음 · 흉내 누름 r2 무시 · 삭제 함수 r2·r5만 = 안내만(지우지 않음) · r1·r5 = r1만 + 확인 창에 '1건은 … 뺐습니다' ·
+  //   관리자: 직접 등록 r3(홈택스 r4와 중복 의심 짝)에 [검수] → [계산서 발행] = 입금확인 지시 → r3 [삭제] = 지시를 지우지 않고 r4로 옮김(rec_id r4·r4.task_id·확인 창 문구·r3 task_id 비움) → r4 [입금완료] = 그 지시 완료
+  const Y29 = mk40({ user: U40.B }), LY29 = Y29.env.log; Y29.api.render(); chip40(Y29, 'all');
+  openRow40(Y29, 'r1'); const s29 = [detActs40(Y29.host._h)]; openRow40(Y29, 'r2'); s29.push(detActs40(Y29.host._h)); fake40(Y29, 'del', 'r2'); s29.push(rc40(Y29, 'r2').del || 0);
+  Y29.api.del(['r2', 'r5'], false); s29.push(rc40(Y29, 'r2').del || 0, rc40(Y29, 'r5').del || 0, LY29.indexOf('alert:검수·발행·입금된 기성은 관리자만 지울 수 있습니다.') >= 0);
+  Y29.api.del(['r1', 'r5'], false); s29.push(rc40(Y29, 'r1').del || 0, rc40(Y29, 'r5').del || 0, LY29.indexOf('confirm:1건을 삭제할까요? (나중에 복구 가능)\n(검수·발행·입금된 1건은 관리자만 지울 수 있어 뺐습니다)') >= 0);
+  const X29 = mk40(), LX29 = X29.env.log; X29.api.render(); chip40(X29, 'all'); openRow40(X29, 'r3'); pressDet40(X29, 'review', 'r3'); pressDet40(X29, 'inv', 'r3');
+  const t29 = liveT40(X29, 'r3')[0] || {}; s29.push(t29.status);
+  X29.api.del(['r3'], true); s29.push(rc40(X29, 'r3').del, t29.del || 0, t29.rec_id, rc40(X29, 'r4').task_id === t29.id, rc40(X29, 'r3').task_id, LX29.some((l) => /^confirm:이 기성을 삭제할까요\? \(나중에 복구 가능\)\n마바상사 3,300,000원\n진행 중인 입금확인 지시 1건은 지우지 않고 남는 '중복 의심' 짝 줄\(같은 거래처·금액·청구일\)로 옮깁니다\.$/.test(l)));
+  openRow40(X29, 'r4'); pressDet40(X29, 'pay', 'r4'); s29.push(rc40(X29, 'r4').paid, t29.status);
+  T('v440 ㉙ 삭제(검토 반영): 직원B 펼침 r1 [삭제] 있음 · r2(검수 ✓) 없음 · 흉내 [삭제] r2 무시 · r2·r5만 고름 = 안내 "검수·발행·입금된 기성은 관리자만 지울 수 있습니다."·안 지움 · r1·r5 = r1만·확인 창 "…(검수·발행·입금된 1건은 관리자만 지울 수 있어 뺐습니다)" · 관리자 r3 [검수] → [계산서 발행](지시 진행) → r3 삭제 = 지시를 r4로 옮김(지시 살아 있음·rec_id r4·r4.task_id·r3 task_id 비움·확인 창 문구) → r4 [입금완료] = 그 지시 완료',
+    JSON.stringify(s29) === JSON.stringify(['mm,hl,edit,del', 'mm,hl,edit', 0, 0, 0, true, 1, 0, true, 'open', 1, 0, 'r4', true, null, true, '2026-11-10', 'done']),
+    JSON.stringify(s29));
+
+  // ㉚ 확인 칸 거르기(검토 반영 — 부품 multi): r3에 불일치를 더해 표시가 둘(중복 의심 · 불일치) · 고르기 목록 = 낱 표시 '금액 바뀜|불일치|중복 의심'(짝 글 없음) · '불일치' = r3,r5 · '중복 의심' = r3,r4 · 칸 글은 첫 표시·title 전부 · 정의 검사가 enum 아닌 multi를 잡음
+  const recs30 = FIX40(); recs30.find((r) => r.id === 'r3').mismatch = true;
+  const X30 = mk40({ recs: recs30 }); X30.api.render(); chip40(X30, 'all');
+  const opts30 = ((/<select data-vf="chk">([\s\S]*?)<\/select>/.exec(X30.host._h) || ['', ''])[1].match(/<option value="[^"]*"/g) || []).map((s) => s.slice(15, -1)).filter(Boolean).join('|');
+  const c30 = cells40(X30.host._h, 'r3')[7] || ['', ''];
+  X30.api.filter(X30.api.def(), 'chk', '불일치'); const f30a = order40(X30.host._h); X30.api.filter(X30.api.def(), 'chk', '중복 의심'); const f30b = order40(X30.host._h); X30.api.filter(X30.api.def(), 'chk', '');
+  const bad30 = X30.api.check(Object.assign({}, X30.api.def(), { cols: X30.api.def().cols.map((c) => (c.k === 'chk' ? Object.assign({}, c, { f: 'text' }) : c)) }));
+  T('v440 ㉚ 확인 칸 거르기(검토 반영 — 부품 multi): 고르기 목록 "금액 바뀜|불일치|중복 의심" · 불일치 = r3(중복 의심 + 불일치),r5 · 중복 의심 = r3,r4 · r3 칸 = 첫 표시 중복 의심·title "중복 의심 · 불일치" · 정의 검사 multi:chk(enum 아님)',
+    opts30 === '금액 바뀜|불일치|중복 의심' && f30a === 'r3,r5' && f30b === 'r3,r4' && c30[1] === '<span class="rec-st dup">중복 의심</span>' && / title="중복 의심 · 불일치"/.test(c30[0]) && bad30.indexOf('multi:chk') >= 0,
+    JSON.stringify({ opts30, f30a, f30b, c30, bad30 }));
+
+  // ㉛ 새 청구(검토 반영 — addReceivable 끝 recSheetShowNew): 기억 '입금 완료' 칩에서 [+ 청구 등록] = 새 줄이 가려 있으면 미수 칩으로 풀어 그 줄을 열고 굴림(기기 기억 안 덮음) · 기본 미수 칩에서 등록 = 그 줄 보이고 펼치지 않음(이어서 넣기) · 폰 375 = 굴림 없음(옛 목록)
+  const MEM31 = JSON.stringify({ k: '', d: 1, f: {}, chip: { st: 'paid' } });
+  const add31 = (X, c) => { ['recClient', 'recDesc', 'recAmount', 'recBilled', 'recCo'].forEach((id, i) => { X.env.host(id).value = [c, '새 청구', '1,000', '2026-11-10', 'env'][i]; }); X.api.addRec(); const L = X.api.recs(); return L[L.length - 1].id; };
+  const X31 = mk40({ store: { jw_rec_sheet: MEM31 } }); X31.api.render(); const id31 = add31(X31, '새거래처');
+  const s31 = [rc40(X31, id31).client, /class="vs-chip on" data-vs-chip="st\|"/.test(X31.host._h), new RegExp('data-vs-det="' + id31 + '"').test(X31.host._h), X31.env.log.indexOf('into:' + id31) >= 0, X31.env.store.jw_rec_sheet === MEM31];
+  const Y31 = mk40(); Y31.api.render(); const id31b = add31(Y31, '또거래처'); s31.push(new RegExp('data-vs-row="' + id31b + '"').test(Y31.host._h), Y31.host._h.indexOf('data-vs-det=') < 0);
+  const P31 = mk40({ width: 375 }); P31.api.render(); add31(P31, '폰거래처'); s31.push(P31.env.log.some((l) => /^into:/.test(l)));
+  T('v440 ㉛ 새 청구(검토 반영): 기억 입금 완료 칩 화면에서 등록 = 미수 칩으로 풀고 새 줄 펼침·굴림·기기 기억 그대로 · 기본 미수 칩 = 새 줄 보이고 펼침 없음 · 폰 375 = 굴림 없음',
+    JSON.stringify(s31) === JSON.stringify(['새거래처', true, true, true, true, true, true, false]), JSON.stringify(s31));
+
+  // ㉜ 검토 반영 문서 — FEATURES v440 '검토 반영' 묶음(문장 고정) · MANUAL 9절(중복 의심 조건·직접 등록 줄 지우기·마이너스·입금 줄 발행·다시 불러오기·비관리자 삭제·기성 연동 지시 공개·내보내기 번호·새 청구) · CLAUDE.md(헬퍼·공개·기성 표 줄·부품 multi·legacy 자리)
+  //   · TESTLIST v440 화면 칸 '검토 반영' 한 줄 + 게이트 칸에 검토 반영 결함 심기
+  const FT_REV40 = ['**검토 반영(11/10', '**기성 연동 지시 공개범위**', '**중복 의심 = 승인번호까지**', '**홈 미수 줄 중복 의심**', '**음수 금액**', '`recSheetMoney`', '**입금된 줄의 발행 표시**', '`recSheetInvPaid`', '**다시 불러오면 발행 표시**',
+    '**비관리자 삭제**', '`recSheetDelOk`', '**짝 줄로 옮김**', '**재발행 지시**', '`findOpenRecTask`', '**확인 칸 거르기**', '`multi`', '**새 청구**', '`recSheetShowNew`', '**폰 갈래 표 자리**', 'PM 결정 대기'];
+  const MAN_REV40 = ['승인번호가 서로 다른 계산서는 같은 날 같은 금액이어도 중복이 아니고', '<b>직접 등록한 줄</b>', '<b>마이너스 금액</b>', '이미 입금된 건은 발행 표시만 바뀌고', '관리자가 같은 목록을 다시 불러오면 발행 표시가 되살아남', '<b>검수·발행·입금 전 줄만</b>',
+    '<b>그 기성을 볼 수 있는 분에게만</b>', '세무 내보내기 파일도 관리자만 원문', '그때만 풀어 그 줄을 펼쳐 줍니다'];
+  const CL_REV40 = ['/findOpenRecTask`(v440 검토', '**기성 연동 지시 공개**', '`recSheetHomeRows(unpaid)`', '`recSheetMoney`/`recSheetMoneyHtml`', '`recSheetDelOk`', '`recEditSheet`', '`recSheetShowNew`', '열 옵션 `multi`', '자리 host를 display:none으로 숨기지 말 것'];
+  const rv32 = cbScr23.filter((l) => l.indexOf('검토 반영') > 0);
+  T('v440 ㉜ 검토 반영 문서: FEATURES v440 검토 반영 묶음 ' + FT_REV40.length + '개 문장 고정 · MANUAL 9절 ' + MAN_REV40.length + '개 · CLAUDE.md ' + CL_REV40.length + '개 · TESTLIST v440 화면 칸 "검토 반영" 1줄(기성 숨김 지시·짝 옮김·마이너스·입금 줄 발행·삭제·새 청구·375 → 1366·확인 칸 거르기) · 게이트 칸에 검토 반영 결함 심기',
+    FT_REV40.every((s) => ftv23.indexOf(s) > 0) && MAN_REV40.every((s) => man9.indexOf(s) > 0) && CL_REV40.every((s) => cl23.indexOf(s) > 0)
+    && rv32.length === 1 && ['기성 숨김', '옮깁니다', '마이너스', '입금된 줄', '[삭제] 없음', '[+ 청구 등록]', '1366으로 넓히면', "'불일치'"].every((s) => rv32[0].indexOf(s) > 0) && cbGate23.length === 1 && cbGate23[0].indexOf('검토 반영') > 0,
+    JSON.stringify({ ft: FT_REV40.filter((s) => ftv23.indexOf(s) < 0), man: MAN_REV40.filter((s) => man9.indexOf(s) < 0), cl: CL_REV40.filter((s) => cl23.indexOf(s) < 0), rv: rv32.length, gate: cbGate23.length && cbGate23[0].indexOf('검토 반영') }));
+} catch (e) { console.log('  (v440 검사 생략 — ' + e.message + ')'); fails++; }
 
 try {
   const fdir = join(ROOT, 'netlify', 'functions');
