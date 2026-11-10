@@ -6410,6 +6410,7 @@
     if (name === "safety" && !safetyPanes().length) name = "dash";   // 볼 칸이 없는 사람에게 남은 옛 길(바로가기·캘린더)은 홈으로
     if (name === "hwakwan" && !canSee("hw")) name = "dash";   // v434 화관법 숨김(hw)이면 어떤 길(바로가기·옛 화면·별칭)로 와도 홈 — 빈 화면·서버 403 NO_ACCESS 대신
     if (name === "stmt" && !canSee("stmt")) name = "dash";   // 29 판② 월말명세서 숨김이면 어떤 길로 와도 홈(서버 gw-stmt도 403 NO_ACCESS)
+    if (name === "stmt" && !canSee("veh")) name = "dash";    // 29 판② 차량 숨김이면 명세서도 못 엶(줄에 차량 번호 — 서버 gw-stmt 403 NO_VEH_ACCESS, 검토 반영)
     var prevTab = currentTab;
     currentTab = name;
     Array.prototype.forEach.call(document.querySelectorAll(".tab-btn"), function(b){
@@ -8267,25 +8268,35 @@
       .map(function(v){ return '<option value="' + esc(v.no) + '">' + esc([v.type || "", v.own || "", v.state || ""].filter(function(s){ return !!s; }).join(" · ")) + '</option>'; }).join("") + '</datalist>';
   }
   function stmtVehExact(t){ var n = String(t || "").replace(/\s/g, ""), hit = null, many = false; if (!n) return ""; if (n === "공용") return "_common"; liveVehicles().forEach(function(v){ if (String(v.no || "").replace(/\s/g, "") === n){ if (hit) many = true; hit = v; } }); return (hit && !many) ? hit.id : ""; }
-  // 차량 칸을 바꿨을 때(목록에서 고르거나 친 뒤 칸을 떠남) — 번호 칸과 똑같으면 바로, 아니면 서버 stmt_match(별칭 → 현재 번호 → 옛 번호 → 끝 4자리 — 판① 규칙 한 곳). 여러 대·처음 보는 번호는 비워 둔다(붉음 — 고르기는 판③)
+  // 칸 글 → 차량: 목록 번호와 똑같으면 그 차 · 아니면 마지막으로 대조된 글(e.vm — 불러온 줄의 판독 글·서버 대조 결과)과 같으면 그때 차량.
+  //   (검토 반영 med) 친 글을 원래 글로 되돌리면 값이 포커스 때와 같아 change가 안 나 다시 대조되지 않았고, 서버가 붙여 준 차량이 풀린 채 저장됐다(용구 거래처는 붉지도 않음)
+  function stmtVehOfText(e, t){ var n = String(t || "").trim(); return stmtVehExact(n) || ((e.vm && e.vm.t === n) ? e.vm.veh : ""); }
+  // 그 줄의 지금 객체 — 저장 응답이 줄 객체를 갈아 끼웠으면(stmtEdLoad) 같은 줄 id로 찾음(검토: 대조 응답이 화면에 없는 옛 객체에 붙어 사라짐)
+  function stmtRowOf(ed, e){ var i; if (ed.rows.indexOf(e) >= 0) return e; if (!e.r) return null; for (i = 0; i < ed.rows.length; i++){ if (ed.rows[i].r === e.r) return ed.rows[i]; } return null; }
+  // 차량 칸을 떠날 때(목록에서 고르면 input에서 바로) — 번호 칸과 똑같거나 마지막 대조 글과 같으면 바로, 아니면 서버 stmt_match(별칭 → 현재 번호 → 옛 번호 → 끝 4자리 — 판① 규칙 한 곳).
+  //   여러 대·처음 보는 번호는 비워 둔다(붉음 — 고르기는 판③) · 같은 글을 이미 묻는 중이면 또 묻지 않음(change·focusout 둘 다 옴)
   function stmtVehMatch(i){
     var ed = STMT.ed, e = ed && ed.rows[i], t, id, tok;
     if (!e) return;
-    t = String(e.vin || "").trim(); e.vhint = "";
-    id = stmtVehExact(t);
-    if (!t || id){ e.veh = id; stmtEdRefresh(); return; }
-    e.veh = ""; e.vhint = "찾는 중…"; tok = e.vtok = (e.vtok || 0) + 1; stmtEdRefresh();
+    t = String(e.vin || "").trim();
+    id = stmtVehOfText(e, t);
+    if (!t || id){ e.veh = id; e.vhint = ""; e.vreq = ""; stmtEdRefresh(); return; }
+    if (e.vreq === t) return;
+    e.veh = ""; e.vhint = "찾는 중…"; e.vreq = t; tok = e.vtok = (e.vtok || 0) + 1; stmtEdRefresh();
     gwCall("gw-stmt", { action: "stmt_match", raws: [t.slice(0, 40)] }).then(function(res){
-      var m;
+      var m, cur;
       if (STMT.ed !== ed || e.vtok !== tok) return;
-      if (res.status === 401){ onSessionInvalid(); return; }
+      e.vreq = "";
+      cur = stmtRowOf(ed, e);
+      if (!cur || stmtVraw(cur.vin) !== stmtVraw(t)) return;   // 그 사이 글이 바뀌었으면 버림
+      if (res.status === 401){ cur.vhint = "로그인이 풀려 대조하지 못했습니다"; stmtEdRefresh(); onSessionInvalid(); return; }
       m = (res.status === 200 && res.body && Array.isArray(res.body.matches)) ? res.body.matches[0] : null;
-      if (m && m.veh){ e.veh = m.veh; e.vhint = (m.how === "old" || m.how === "old4") ? "옛 번호로 찾음" : (m.how === "alias" ? "별칭으로 찾음" : ""); ed.editN = (ed.editN || 0) + 1; }   // 저장이 오가는 중이면 응답이 이 차량을 지우지 않게(stmtEdDone)
-      else if (m && m.how === "multi") e.vhint = "여러 대 — 번호를 더 넣거나 목록에서 골라 주세요";
-      else if (m) e.vhint = "처음 보는 번호 — 목록에서 골라 주세요";
-      else e.vhint = STMT_ERR[(res.body || {}).error_code] || "번호를 대조하지 못했습니다";
+      if (m && m.veh){ cur.veh = m.veh; cur.vm = { t: t, veh: m.veh }; cur.vhint = (m.how === "old" || m.how === "old4") ? "옛 번호로 찾음" : (m.how === "alias" ? "별칭으로 찾음" : ""); ed.dirty = true; ed.editN = (ed.editN || 0) + 1; }   // 저장이 오가는 중이면 응답이 이 차량을 지우지 않게(stmtEdDone)
+      else if (m && m.how === "multi") cur.vhint = "여러 대 — 번호를 더 넣거나 목록에서 골라 주세요";
+      else if (m) cur.vhint = "처음 보는 번호 — 목록에서 골라 주세요";
+      else cur.vhint = STMT_ERR[(res.body || {}).error_code] || "번호를 대조하지 못했습니다";
       stmtEdRefresh();
-    }).catch(function(){ if (STMT.ed !== ed || e.vtok !== tok) return; e.vhint = "번호를 대조하지 못했습니다(네트워크)"; stmtEdRefresh(); });
+    }).catch(function(){ var cur; if (STMT.ed !== ed || e.vtok !== tok) return; e.vreq = ""; cur = stmtRowOf(ed, e); if (cur){ cur.vhint = "번호를 대조하지 못했습니다(네트워크)"; stmtEdRefresh(); } });
   }
 
   // ---- 월 보드(장 1) ----
@@ -8457,6 +8468,7 @@
   function stmtErrText(res){
     var b = (res && res.body) || {}, code = b.error_code || b.code || "";
     if (res && res.status === 404 && !code) return "서버 함수(gw-stmt)가 아직 배포되지 않았습니다.";
+    if (/^(DRAFT_)?PII_\d+$/.test(code)) return "전화·계좌·주민번호 꼴 글이 있어 저장하지 않았습니다(품목·비고·차량 칸을 봐 주세요).";
     return STMT_ERR[code] || ("처리하지 못했습니다(" + (code || ("HTTP " + (res ? res.status : "?"))) + ")");
   }
   function stmtLoadMonth(){
@@ -8467,16 +8479,18 @@
     gwCall("gw-stmt", { action: "stmt_month", ym: ym }).then(function(res){
       if (seq !== STMT.mseq) return;   // 그 사이 달·사람이 바뀌었으면 버림
       STMT.loading = false;
-      if (res.status === 401){ onSessionInvalid(); return; }
+      if (res.status === 401){ STMT.err = "로그인이 풀렸습니다 — 다시 로그인해 주세요."; STMT.errCode = ""; stmtMonthDone(); onSessionInvalid(); return; }
       if (res.status === 200 && res.body && res.body.status === "OK" && Array.isArray(res.body.cfg)){ STMT.month = res.body; STMT.err = ""; STMT.errCode = ""; }
-      else { STMT.month = null; STMT.err = stmtErrText(res); STMT.errCode = (res.body && res.body.error_code) || ""; }
-      if (currentTab === "stmt") renderStmt();
+      else { if (!STMT.ed) STMT.month = null; STMT.err = stmtErrText(res); STMT.errCode = (res.body && res.body.error_code) || ""; }   // 상세를 연 채면 앞서 읽은 달을 둠(다시 불러오기·보드 칸이 쓰는 거래처 목록)
+      stmtMonthDone();
     }).catch(function(){
       if (seq !== STMT.mseq) return;
       STMT.loading = false; STMT.err = "네트워크 오류 — 연결 상태를 확인해 주세요."; STMT.errCode = "";
-      if (currentTab === "stmt") renderStmt();
+      stmtMonthDone();
     });
   }
+  // 달 응답 뒤 — 상세를 연 채면 요약 숫자만(편집 표를 다시 그리면 치던 칸의 포커스·한글 조합이 끊김 — 검토 반영), 아니면 보드째
+  function stmtMonthDone(){ if (currentTab !== "stmt") return; if (STMT.ed) stmtRenderStats(); else renderStmt(); }
   function stmtReindex(ym, then){
     if (!canDo("stmt")) return;
     gwCall("gw-stmt", { action: "stmt_reindex", ym: ym }).then(function(res){
@@ -8500,7 +8514,7 @@
   function stmtNewRid(ed){ var used = {}, k; ed.rows.forEach(function(e){ if (e.r) used[e.r] = 1; }); k = Math.max(Number(ed.ridN) || 0, ed.rows.length) + 1; while (used["h" + k.toString(36)]) k++; ed.ridN = k; return "h" + k.toString(36); }
   function stmtNewRow(ed){ return { r: stmtNewRid(ed), date: "", veh: "", vin: "", item: "", kind: (ed.vendor && ed.vendor.kind) || "", use: "", qty: "", unit: "", amt: "", vat: "", tire: null, how: "hand", note: "", vhint: "" }; }
   function stmtEdRow(x){   // 서버 줄 → 편집 줄(글)
-    return { r: x.r || "", date: stmtDateOut(x.date), veh: x.veh || "", vin: x.vraw || "", item: x.item || "", kind: x.kind || "", use: x.use || "",
+    return { r: x.r || "", date: stmtDateOut(x.date), veh: x.veh || "", vin: x.vraw || "", vm: { t: x.vraw || "", veh: x.veh || "" }, item: x.item || "", kind: x.kind || "", use: x.use || "",
       qty: x.qty == null ? "" : stmtDecStr(x.qty, x.qd), unit: x.unit == null ? "" : stmtDecStr(x.unit, x.ud), amt: x.amt == null ? "" : stmtNum(x.amt), vat: x.vat == null ? "" : stmtNum(x.vat),
       tire: x.tire || null, how: x.how || "hand", note: x.note || "", vhint: "" };
   }
@@ -8522,16 +8536,17 @@
     ed.hasPrev = !!(d && d.prev);
     ed.dirty = false; ed.saving = false; ed.stale = false; ed.vsubSig = null; ed.editN = 0; ed.saveN = 0;
   }
-  function stmtOpen(vk){
+  function stmtOpen(vk, again){   // again = 상세의 [다시 불러오기] — 보드 행 확인 없이(달 읽기가 실패해 보드가 비어도 열림 — 거래처는 서버가 확인)
     var seq, ok = false;
     stmtBoardRows().forEach(function(r){ if (r.vk === vk) ok = true; });
+    if (again && typeof vk === "string" && /^v\d{2,3}$/.test(vk)) ok = true;
     if (!ok || !canSee("stmt")) return;
     seq = ++STMT.eseq;
     STMT.ed = { ym: STMT.ym, vk: vk, loading: true, err: "", msg: "", vendor: null, rows: [] };
     renderStmt();
     gwCall("gw-stmt", { action: "stmt_get", ym: STMT.ed.ym, vk: vk }).then(function(res){
       if (seq !== STMT.eseq || !STMT.ed || STMT.ed.vk !== vk) return;
-      if (res.status === 401){ onSessionInvalid(); return; }
+      if (res.status === 401){ STMT.ed.loading = false; STMT.ed.err = "로그인이 풀렸습니다 — 다시 로그인한 뒤 열어 주세요."; if (currentTab === "stmt") renderStmt(); onSessionInvalid(); return; }
       if (res.status === 200 && res.body && res.body.status === "OK" && res.body.vendor) stmtEdLoad(res.body);
       else { STMT.ed.loading = false; STMT.ed.err = stmtErrText(res); }
       if (currentTab === "stmt") renderStmt();
@@ -8539,6 +8554,7 @@
   }
   function stmtCloseEd(){
     var ed = STMT.ed;
+    if (ed && ed.saving) return;   // 저장 응답을 받은 뒤에(검토 반영 — 저장 중에 나가면 확인 창 문구와 달리 서버 저장은 그대로 끝나고, 보드가 색인 갱신 전을 읽음)
     if (ed && ed.dirty && !confirm("저장하지 않은 줄이 있습니다. 월 보드로 나갈까요?\n(나가면 고친 내용이 사라집니다)")) return;
     STMT.ed = null; STMT.eseq++; STMT.err = ""; STMT.errCode = "";
     stmtLoadMonth(); renderStmt();   // 저장한 것이 보드에 보이게 그 달을 다시 읽음(읽는 동안은 보던 보드)
@@ -8569,13 +8585,16 @@
       qty = stmtDecimal(e.qty, 1e7); unit = stmtDecimal(e.unit, 1e10); amt = stmtMoney(e.amt, true); vat = ed.basis === "total" ? null : stmtMoney(e.vat, true);
       date = stmtDateIn(e.date, ed.ym); item = stmtText(e.item, 40); note = stmtText(e.note, 60);
       if (qty === undefined) bf.qty = 1; if (unit === undefined) bf.unit = 1; if (amt === undefined) bf.amt = 1; if (vat === undefined) bf.vat = 1; if (date === undefined) bf.date = 1;
-      if (item === null || stmtPii(e.item)) bf.item = 1; if (note === null || stmtPii(e.note)) bf.note = 1; if (stmtPii(e.vin)) bf.vin = 1;
+      // 개인정보 꼴은 보낼 값(정리한 글)으로 — 서버도 그 값을 봄(검토: 차량 칸 '010/1234/5678'은 글자를 걸러 '01012345678'이 되고, 품목 공백 두 칸은 한 칸으로 접혀 서버만 걸렸음)
+      if (item === null || stmtPii(item)) bf.item = 1; if (note === null || stmtPii(note)) bf.note = 1; if (stmtPii(stmtVraw(e.vin))) bf.vin = 1;
       row = { r: e.r || "", date: date || "", veh: e.veh || "", vraw: stmtVraw(e.vin), item: item || "", kind: e.kind || "", use: e.use || "", qty: qty ? qty.n : null, qd: qty ? qty.d : 0, unit: unit ? unit.n : null, ud: unit ? unit.d : 0,
         amt: (amt === undefined ? null : amt), vat: (vat === undefined ? null : vat), tire: e.kind === "tire" ? (e.tire || null) : null, how: e.how || "hand", note: note || "" };
       out.parsed.push(row); out.idx.push(i);
       if (Object.keys(bf).length){ out.badf[i] = bf; out.errs.push((i + 1) + "번 줄 " + Object.keys(bf).map(function(f){ return lb[f] || f; }).join("·")); }
       out.rows.push({ r: row.r, date: row.date, veh: row.veh, vraw: row.vraw, item: row.item, kind: row.kind, use: row.use, qty: stmtNumStr(e.qty), unit: stmtNumStr(e.unit), amt: row.amt, vat: row.vat, tire: row.tire, how: row.how, note: row.note });
     });
+    // 서버 cleanRows와 같은 꼴로 한 번 더(줄들의 품목·비고·번호 글·타이어 위치를 한 JSON으로) — 칸마다 본 것과 다르게 칸 사이에서만 걸리면 문서 오류로
+    if (!out.errs.length && stmtPii(JSON.stringify(out.rows.map(function(x){ return [x.item, x.note, x.vraw, x.tire ? x.tire.pos : ""]; })))){ out.docErr.pii = 1; out.errs.push("전화·계좌·주민번호 꼴 글(품목·비고·차량 칸)"); }
     inv = stmtInvIn(ed.inv); carry = stmtCarryIn(ed.carry); stated = stmtMoney(ed.stated, true); vsub = stmtVsubIn(ed.vsub, out.vsubBad);
     if (inv === undefined){ out.docErr.inv = 1; out.errs.push("계산서 칸(세 칸 모두 숫자 — 비우려면 네 칸 다)"); inv = null; }
     if (carry === undefined){ out.docErr.carry = 1; out.errs.push("잔액 칸(네 칸 모두 숫자 — 비우려면 네 칸 다)"); carry = null; }
@@ -8660,7 +8679,8 @@
     if (p.errs.length) a.push('<span class="st-no">형식 ' + p.errs.length + '곳 — 고쳐야 저장됩니다</span>');
     if (d.inv){
       if (c.mode === "total") a.push('<span>줄 합 ' + stmtNum(c.sum_amt) + ' = 계산서 합계 ' + stmtNum(d.inv.total) + ok(!has("inv")) + df(c.inv_diff) + '</span>');
-      else if (c.mode === "supvat") a.push('<span>공급가 합 ' + stmtNum(c.sum_amt) + ' = 계산서 공급가 ' + stmtNum(d.inv.supply) + ok(c.sup_diff === 0) + df(c.sup_diff) + ' · 세액 합 ' + stmtNum(c.sum_vat) + ' = ' + stmtNum(d.inv.vat) + ok(!has("inv") || c.sup_diff !== 0) + '</span>');
+      else if (c.mode === "supvat") a.push('<span>공급가 합 ' + stmtNum(c.sum_amt) + ' = 계산서 공급가 ' + stmtNum(d.inv.supply) + ok(c.sup_diff === 0) + df(c.sup_diff) + ' · 세액 합 ' + stmtNum(c.sum_vat) + ' = ' + stmtNum(d.inv.vat)
+        + ok(Math.abs(c.vat_diff) <= p.parsed.filter(function(x){ return x.vat !== null && x.vat !== undefined; }).length) + (c.vat_diff ? ' <span class="st-mute">' + stmtDiff(c.vat_diff) + '</span>' : '') + '</span>');   // 세액은 세액 칸 있는 줄 수 원까지(서버 checkDoc과 같은 허용 — 검토: 공급가가 틀리면 세액이 틀려도 ✓였음)
       else a.push('<span>공급가 합 ' + stmtNum(c.sum_amt) + ' = 계산서 공급가 ' + stmtNum(d.inv.supply) + ok(!has("inv")) + df(c.sup_diff) + '</span>');
       if (has("inv_sum")) a.push('<span class="st-no">계산서 공급가 + 세액 ≠ 합계</span>');
     }
@@ -8711,6 +8731,7 @@
     stmtSetHtml("stmtCk", stmtCkHtml(ed, p));
     stmtSetHtml("stmtFoot", stmtFootHtml(p));
     stmtSetHtml("stmtEdMsg", stmtMsgHtml(ed));
+    Array.prototype.forEach.call(host.querySelectorAll('[data-st-act="back"],[data-st-act="reload"]'), function(b){ b.disabled = !!ed.saving; });   // 저장 중에는 나가기·다시 불러오기 꺼짐
     stmtBtn("add", w, !ed.saving);
     stmtBtn("save", w, !ed.saving && !p.errs.length);
     stmtBtn("done", w, !ed.saving && !p.errs.length && p.chk.ok);
@@ -8739,7 +8760,7 @@
     var b = res.body || {}, code = b.error_code || "", at;
     if (STMT.ed !== ed) return;
     ed.saving = false;
-    if (res.status === 401){ onSessionInvalid(); return; }
+    if (res.status === 401){ ed.msg = "로그인이 풀려 처리하지 않았습니다 — 다시 로그인한 뒤 다시 눌러 주세요(고친 내용은 화면에 남아 있습니다)."; ed.msgBad = true; stmtEdRefresh(); onSessionInvalid(); return; }
     if (res.status === 200 && b.status === "OK" && b.doc && p && (ed.editN || 0) !== ed.saveN){
       ed.doc = b.doc; ed.base = Number(b.doc.updated_at) || ed.base; ed.status = b.doc.status; ed.reopen = false; ed.hasPrev = !!b.doc.prev; ed.draft = b.doc.draft || null; ed.dirty = true;
       ed.msg = okTxt + " — " + (STMT_ST[b.doc.status] || "") + " · 저장하는 사이에 고친 칸이 있어 그 칸은 아직 저장 전입니다"; ed.msgBad = true;
@@ -8780,7 +8801,7 @@
       i = Number(t.getAttribute("data-i")); x = ed.rows[i];
       if (!x || STMT_RFIELDS.indexOf(f) < 0) return;
       x[f] = t.value;
-      if (f === "vin"){ x.vtok = (x.vtok || 0) + 1; x.vhint = ""; x.veh = stmtVehExact(t.value); }   // 목록에서 고르면 그 자리에서 · 치는 중이면 칸을 떠날 때(change) 서버 대조
+      if (f === "vin"){ x.vtok = (x.vtok || 0) + 1; x.vhint = ""; x.vreq = ""; x.veh = stmtVehOfText(x, t.value); }   // 목록에서 고르거나 마지막 대조 글로 되돌리면 그 자리에서 · 치는 중이면 칸을 떠날 때(change·focusout) 서버 대조
     } else if (d != null){
       if (STMT_DPATHS.indexOf(d) < 0 || d === "basis") return;   // 기준은 change에서(열이 바뀜)
       stmtPathSet(ed, d, t.value);
@@ -8804,6 +8825,13 @@
     }
     stmtEdRefresh();
   }
+  // 차량 칸을 떠날 때 — 글은 있는데 차량이 비었으면 대조(값이 포커스 때와 같으면 change가 안 와서 — 검토 반영)
+  function stmtOnBlur(e){
+    var ed = STMT.ed, t = e && e.target, i, x;
+    if (!ed || !t || !t.getAttribute || t.getAttribute("data-f") !== "vin" || !stmtEdW(ed)) return;
+    i = Number(t.getAttribute("data-i")); x = ed.rows[i];
+    if (x && !x.veh && String(x.vin || "").trim()) stmtVehMatch(i);
+  }
   function stmtOnClick(e){
     var host = document.getElementById("stmtEditor"), el = e && e.target, act, ed = STMT.ed, i, x;
     while (el && el !== host && !(el.getAttribute && el.getAttribute("data-st-act") != null)) el = el.parentNode;
@@ -8811,7 +8839,7 @@
     act = el.getAttribute("data-st-act");
     if (act === "back"){ stmtCloseEd(); return; }
     if (!ed) return;
-    if (act === "reload"){ if (!ed.dirty || confirm("최신 판을 다시 불러올까요?\n(지금 화면의 고친 내용은 사라집니다)")) { ed.dirty = false; stmtOpen(ed.vk); } return; }
+    if (act === "reload"){ if (!ed.saving && (!ed.dirty || confirm("최신 판을 다시 불러올까요?\n(지금 화면의 고친 내용은 사라집니다)"))) stmtOpen(ed.vk, true); return; }
     if (!canDo("stmt") || ed.saving) return;
     if (act === "add" && stmtEdW(ed)){
       ed.rows.push(stmtNewRow(ed)); ed.dirty = true; ed.editN = (ed.editN || 0) + 1; stmtEdRender();
@@ -8833,6 +8861,7 @@
     host.addEventListener("input", stmtOnInput);
     host.addEventListener("change", stmtOnChange);
     host.addEventListener("click", stmtOnClick);
+    host.addEventListener("focusout", stmtOnBlur);
     if (pv) pv.addEventListener("click", function(){ stmtMonth(-1); });
     if (nx) nx.addEventListener("click", function(){ stmtMonth(1); });
   }
@@ -28297,6 +28326,8 @@
       var view = document.getElementById(MODULE_VIEW[mod]);
       if (view) view.classList.toggle("readonly", permOf(mod) === "view");
     });
+    // 29 판② 월말명세서 탭은 차량(veh)도 보여야 — 명세서 줄에 차량 번호가 들어 있어 서버 gw-stmt가 차량 숨김을 403 NO_VEH_ACCESS로 거절(검토 반영 — 탭만 보이고 오류 카드만 뜨던 것)
+    (function(){ var sb = document.getElementById("tabStmtBtn"); if (sb && !canSee("veh")) sb.classList.add("perm-hidden"); })();
     // 주기 체크리스트 영역만 check 권한으로 표시/숨김(인박스·내 할 일은 항상 노출)
     var showCheck = canSee("check");
     Array.prototype.forEach.call(document.querySelectorAll(".check-only"), function(el){ el.style.display = showCheck ? "" : "none"; });
@@ -28321,6 +28352,7 @@
     if (pgBtn) pgBtn.classList.toggle("perm-hidden", !adminUser);   // 진척도 — 관리자 전용(서버 gw-progress도 강제)
     if (currentTab === "progress" && !adminUser) switchTab("dash");
     if (currentTab === "workers"){ if (!canSee("wk")) switchTab("dash"); else { renderWorkers(); loadAsb(); } }   // v442: 볼 수 있으면 다시 그린다 — 로그인 창 '전환'은 새로고침 없이 이 함수만 돌아, 앞사람 권한(현장 보기)으로 그린 일용직 표의 참여 열·칩이 남는다(화관법 줄과 같은 꼴) · 검토: 현장 대장도 읽는다(현장 권한 없는 앞사람은 대장을 못 받았다 — loadAsb는 현장 권한이 없으면 바로 돌아가고, 받으면 renderWorkers를 다시 부름. 받기 전에는 참여 칸 '확인 중')
+    if (currentTab === "stmt" && !canSee("veh")) switchTab("dash");   // 29 판② 차량 숨김이면 명세서도 홈으로(서버 NO_VEH_ACCESS — 검토 반영)
     if (currentTab === "stmt" && canSee("stmt")) renderStmt();   // 29 판② — 숨김이면 위 일반 강제 이동(탭 이름 = 키)이 홈으로. 볼 수 있으면 다시 그린다: 로그인 창 '전환'은 새로고침 없이 이 함수만 돌아, 보는 사람이 바뀌면 renderStmt(stmtViewer)가 앞사람이 연 상세·고치던 줄을 비운다
     if (currentTab === "hwakwan"){ if (!canSee("hw")) switchTab("dash"); else renderHwakwan(); }   // v434 화관법 — 탭 이름(hwakwan)과 키(hw)가 달라 위 일반 강제 이동이 못 잡는다(workers ↔ wk와 같은 전용 줄). 볼 수 있으면 다시 그린다(검토 반영 11/10): 로그인 창 '전환'은 새로고침 없이 afterLogin → 이 함수만 돌아, 앞사람 권한으로 그려 둔 폐기물 칸·보기 안내·▶ 지금 실행이 남는다(.view.readonly CSS는 제출 칸을 못 숨김). 이 함수는 로그인·부팅 때만 불리므로(권한이 바뀌면 새로고침) 입력 중 다시 그림은 없다
     // 빈 그룹 숨김(S2-B): 권한으로 탭이 전부 사라진 사이드바 그룹은 제목·구분선도 숨긴다 — 직원 화면 뼈대 정리

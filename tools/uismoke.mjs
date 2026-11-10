@@ -11943,6 +11943,7 @@ try {
       'return { STMT: STMT, KIND: STMT_KIND, USE: STMT_USE, GAP: STMT_GAP_CLASSES, check: stmtCheck, gap: stmtGap, money: stmtMoney, dec: stmtDecimal, pii: stmtPii, dateIn: stmtDateIn, vraw: stmtVraw,',
       '  collect: stmtEdCollect, edLoad: stmtEdLoad, edRow: stmtEdRow, newRow: stmtNewRow, edW: stmtEdW, rowHtml: stmtEdRowHtml, ckHtml: stmtCkHtml, footHtml: stmtFootHtml, vehHtml: stmtVehHtml,',
       '  def: stmtSheetDef, rows: stmtBoardRows, rowSt: stmtRowSt, cards: stmtBoardCards, viewer: stmtViewer, reset: stmtReset,',
+      '  onInput: stmtOnInput, onBlur: stmtOnBlur, vehOfText: stmtVehOfText, rowOf: stmtRowOf, closeEd: stmtCloseEd,',
       '  checkDef: vsSheetCheckDef, inst: vsInst, model: vsSheetModel, html: vsSheetHtml, chipN: vsSheetChipCounts };'].join('\n'))(env, VEH29);
     return { env, api };
   };
@@ -12070,6 +12071,39 @@ try {
     && /if \(STMT\.bound \|\| !host\) return;\n\s*STMT\.bound = true;/.test(fnOf29s('stmtBindOnce')) && (ssb29.match(/addEventListener\("input"/g) || []).length === 1
     && clsOk6 && acts6.length === 6 && acts6.every((a) => srvActs6.indexOf(a) >= 0) && !/how: "vision"|"vision"/.test(ssb29.replace(/\/\/[^\n]*/g, '')),
     J({ acts6, btnCls6 }));
+
+  // ⑦ 화면 결함 검토 반영(11/10 — 재현된 7건): 차량 칸 글을 쳤다 되돌리면 대조된 차량이 되살아남(change가 안 와도) · 저장 응답이 줄 객체를 갈아 끼워도 같은 줄 id로 찾음 ·
+  //    개인정보 꼴은 보낼 값(정리한 글)으로 · 공급가+세액 명세의 세액 ✓는 세액 차로 · 저장 중 [‹ 월 보드] 막음 · 상세를 연 채 달 응답은 요약만 · [다시 불러오기]는 보드 확인 없이 · 401 안내 · 차량 숨김이면 탭 숨김
+  const X7 = mk29s(), V07 = { vk: 'v07', name: '가온상사', group: 'veh', kind: 'urea', basis: 'supply', carry: false };
+  X7.api.STMT.ed = { ym: '2026-10', vk: 'v07', loading: true, err: '', msg: '', vendor: V07, rows: [] };
+  X7.api.edLoad({ vendor: V07, doc: { rows: [CR({ r: 'q1', veh: 'veh_b', vraw: '7900', kind: 'urea', amt: 1000 })], status: 'doing', basis: 'supply', group: 'veh', updated_at: 9, inv: { date: '', supply: 2000, vat: 500, total: 2500 }, stated: null } });
+  const ed7 = X7.api.STMT.ed;
+  const fi7 = (f, i, v) => ({ target: { getAttribute: (n) => (n === 'data-f' ? f : (n === 'data-i' ? String(i) : null)), value: v } });
+  const v7 = [];
+  X7.api.onInput(fi7('vin', 0, '79001')); v7.push(ed7.rows[0].veh);
+  X7.api.onInput(fi7('vin', 0, '7900')); v7.push(ed7.rows[0].veh);
+  X7.api.onInput(fi7('vin', 0, '22나0002(구7900)')); v7.push(ed7.rows[0].veh);
+  X7.api.onInput(fi7('vin', 0, '')); v7.push(ed7.rows[0].veh);
+  const old7 = ed7.rows[0]; ed7.rows = ed7.rows.map((x) => Object.assign({}, x));   // 저장 응답이 줄 객체를 갈아 끼운 모양
+  const rowOf7 = X7.api.rowOf(ed7, old7) === ed7.rows[0];
+  ed7.rows[0].vin = '010/1234/5678'; ed7.rows[0].item = '연락 010 1234  5678'; ed7.rows[0].amt = '1,000'; ed7.rows[0].vat = '100';
+  const p7 = X7.api.collect(ed7);
+  ed7.rows[0].vin = '7900'; ed7.rows[0].item = '요소수'; const p7b = X7.api.collect(ed7), ck7 = X7.api.ckHtml(ed7, p7b);
+  ed7.saving = true; X7.api.closeEd(); const stay7 = X7.api.STMT.ed === ed7; ed7.saving = false;
+  const lm7 = fnOf29s('stmtLoadMonth'), md7 = fnOf29s('stmtMonthDone'), dn7 = fnOf29s('stmtEdDone'), vm7 = fnOf29s('stmtVehMatch'), op7 = fnOf29s('stmtOpen'), oc7 = fnOf29s('stmtOnClick'), rf7 = fnOf29s('stmtEdRefresh');
+  const sw7 = fnOf29s('switchTab'), ap7 = fnOf29s('applyPerms');
+  T('29 판② ⑦ 화면 결함 검토 반영: 차량 칸 "79001" → 차량 풀림 · "7900"(대조된 글)로 되돌리면 그 차량 · 목록 번호 그대로 = 그 차 · 빈칸 = 없음 · 줄 객체를 갈아 끼워도 같은 줄 id로 찾음 · 개인정보 꼴을 보낼 값으로(차량 "010/1234/5678" → 글자 거른 값 · 품목 공백 두 칸 → 접은 값) · 공급가+세액 명세 세액 100 ≠ 500 → ▲(종전 ✓) · 저장 중 [‹ 월 보드] 안 됨 · 달 응답은 상세를 연 채면 요약만(stmtMonthDone) · 상세를 연 채 달 읽기가 실패해도 달을 비우지 않음 · [다시 불러오기] = stmtOpen(…, true)(보드 확인 없이) · 저장 중 나가기·다시 불러오기 버튼 꺼짐 · 401 안내 4곳(달·열기·저장·차량 대조) · 칸을 떠날 때 차량 빈 줄 대조(focusout) · 차량 숨김이면 switchTab 홈(currentTab 정하기 전)·applyPerms 홈·탭 버튼 숨김',
+    J(v7) === '["","veh_b","veh_b",""]' && rowOf7
+    && !!p7.badf[0] && p7.badf[0].vin === 1 && p7.badf[0].item === 1
+    && /세액 합 100 = 500 <span class="st-no">▲<\/span>/.test(ck7) && stay7
+    && /if \(STMT\.ed\) stmtRenderStats\(\); else renderStmt\(\);/.test(md7) && (lm7.match(/stmtMonthDone\(\);/g) || []).length === 3 && /if \(!STMT\.ed\) STMT\.month = null;/.test(lm7)
+    && /stmtOpen\(ed\.vk, true\)/.test(oc7) && /if \(again && typeof vk === "string" && \/\^v\\d\{2,3\}\$\/\.test\(vk\)\) ok = true;/.test(op7)
+    && /\[data-st-act="back"\],\[data-st-act="reload"\]/.test(rf7) && /b\.disabled = !!ed\.saving;/.test(rf7)
+    && /로그인이 풀려 처리하지 않았습니다/.test(dn7) && /로그인이 풀려 대조하지 못했습니다/.test(vm7) && /로그인이 풀렸습니다 — 다시 로그인한 뒤 열어 주세요/.test(op7) && /로그인이 풀렸습니다 — 다시 로그인해 주세요/.test(lm7)
+    && /host\.addEventListener\("focusout", stmtOnBlur\);/.test(fnOf29s('stmtBindOnce')) && /if \(x && !x\.veh && String\(x\.vin \|\| ""\)\.trim\(\)\) stmtVehMatch\(i\);/.test(fnOf29s('stmtOnBlur'))
+    && sw7.indexOf('if (name === "stmt" && !canSee("veh")) name = "dash";') > 0 && sw7.indexOf('if (name === "stmt" && !canSee("veh")) name = "dash";') < sw7.indexOf('currentTab = name;')
+    && /if \(currentTab === "stmt" && !canSee\("veh"\)\) switchTab\("dash"\);/.test(ap7) && /var sb = document\.getElementById\("tabStmtBtn"\); if \(sb && !canSee\("veh"\)\) sb\.classList\.add\("perm-hidden"\);/.test(ap7),
+    J({ v7, rowOf7, badf: p7.badf, stay7 }));
 } catch (e) { console.log('  (29 판② 검사 생략 — ' + e.message + ')'); fails++; }
 
 try {
