@@ -5222,4 +5222,143 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   }
 }
 
+{ // ---- 80(v436) 메뉴 56 7단계 — 안전 설정 settings:safety(현황 ⑤ 인정·평가·회사 구분 — PM 11/10 ⓐ '안전 설정 따로', 인허가 행 kosha_cert 안 씀).
+  //   읽기 safety_settings_get = 로그인·기기 승인 뒤 관리자 또는 안전 권한(숨김 아님) · 쓰기 safety_settings_set = 관리자만 · 값 검사 400 · 낙관락 409 · prev 1판 · 감사 1줄.
+  //   응답 코드만이 아니라 이유 코드(error_code)·저장값·prev·감사 줄(f 바뀐 칸)·저장 0까지 본다. 실 Blobs는 없는 키를 ok·data null로 준다(운영 지금 — settings:safety 없음) — mock에서는 값 null로 심어 흉내(78절과 같은 방식).
+  const savedUsers80 = JSON.parse(JSON.stringify(mem.gw_users));
+  const KEY80 = 'settings:safety', had80 = Object.prototype.hasOwnProperty.call(mem.gw_data, KEY80) ? JSON.parse(JSON.stringify(mem.gw_data[KEY80])) : undefined;
+  mem.gw_users['device:dev1'] = { status: 'approved' };
+  const mk80 = (id, extra) => { mem.gw_users['member:' + id] = Object.assign({ id, name: id, role: '직원', admin: false, perms: {} }, extra); return issueSession(mem.gw_users['member:' + id]).token; };
+  const tMin80 = mk80('u80min', { name: '권민지형80', perms: { safety: 'do', lic: 'view' } });                 // 안전 수행
+  const tKja80 = mk80('u80kja', { name: '김정아형80', perms: { safety: 'view', site: 'do', lic: 'do' } });     // 안전 보기
+  const tJw80 = mk80('u80jw', { name: '정재욱형80', perms: { site: 'do', lic: 'view' } });                     // safety 값 없음 = 기본 숨김(gw-data PERM_CLOSED)
+  const tHide80 = mk80('u80hide', { name: '안전숨김80', perms: { safety: 'hide', site: 'do' } });              // 명시 숨김
+  const tAdm80 = mk80('u80adm', { name: '관리자80', role: '관리자', admin: true });
+  const get80 = (tok, dev) => call({ action: 'safety_settings_get' }, tok, dev);
+  const set80 = (body, tok, dev) => call(Object.assign({ action: 'safety_settings_set' }, body), tok, dev);
+  const aud80 = () => auditMock.logs.filter((l) => l.col === 'safety');
+  const K80 = (o) => Object.assign({ stage: 'none', apply_no: '', applied_on: '', review_on: '', decided_on: '', expires_on: '', rate_year: '', checks: [] }, o || {});
+  const V80 = (k, h) => ({ kosha: K80(k), headcount: Object.assign({ env: '', con: '' }, h || {}) });
+  mem.gw_data[KEY80] = null;   // 운영 지금 상태(키 없음)
+  const audit0_80 = aud80().length;
+
+  // ① 읽기 권한 — 안전 수행·보기·관리자 200(저장값 없음 = settings null) · 안전 값 없음(기본 숨김)·명시 숨김 403 NO_ACCESS · 기기 미승인 403 · 비로그인 401
+  const gMin80 = await get80(tMin80, 'dev1'), gKja80 = await get80(tKja80, 'dev1'), gAdm80 = await get80(tokA), gAdm2_80 = await get80(tAdm80);
+  const gJw80 = await get80(tJw80, 'dev1'), gHide80 = await get80(tHide80, 'dev1'), gDevX80 = await get80(tKja80, 'devX'), gNoDev80 = await get80(tKja80), gNo80 = await get80(null);
+  T('80 v436 읽기 권한(safety_settings_get): 안전 수행(권민지형)·안전 보기(김정아형)·관리자(기기 머리 없이도) → 200 · 저장값 없음(운영 지금) = settings null·updated_at 0·updated_by ""·prev null · 응답 키 status·settings·updated_at·updated_by·prev·request_id / 안전 값 없음(정재욱형 — 기본 숨김)·명시 숨김 → 403 NO_ACCESS · 기기 미승인·기기 머리 없음 → 403 DEVICE_NOT_APPROVED · 비로그인 → 401 · 거절 몸체에 settings 없음',
+    [gMin80, gKja80, gAdm80, gAdm2_80].every((x) => x.code === 200 && x.body.status === 'OK' && x.body.settings === null && x.body.updated_at === 0 && x.body.updated_by === '' && x.body.prev === null && Object.keys(x.body).sort().join(',') === 'prev,request_id,settings,status,updated_at,updated_by')
+    && [gJw80, gHide80].every((x) => x.code === 403 && x.body.error_code === 'NO_ACCESS') && [gDevX80, gNoDev80].every((x) => x.code === 403 && x.body.error_code === 'DEVICE_NOT_APPROVED') && gNo80.code === 401
+    && [gJw80, gHide80, gDevX80, gNoDev80, gNo80].every((x) => x.body.settings === undefined),
+    [gMin80, gKja80, gAdm80, gAdm2_80, gJw80, gHide80, gDevX80, gNoDev80, gNo80].map((x) => x.code + '/' + (x.body.error_code || '') + '/' + JSON.stringify(x.body.settings)).join(' | '));
+
+  // ② 쓰기 거절 — 관리자가 아니면 안전 수행이어도 403 ADMIN_ONLY(저장 0·감사 0)
+  const good80 = V80({ stage: 'applied', apply_no: 'K-2026-0001', applied_on: '2026-11-12' }, { env: 18, con: 4 });
+  const wMin80 = await set80(Object.assign({ base: 0 }, good80), tMin80, 'dev1'), wKja80 = await set80(Object.assign({ base: 0 }, good80), tKja80, 'dev1'), wJw80 = await set80(Object.assign({ base: 0 }, good80), tJw80, 'dev1'), wNo80 = await set80(Object.assign({ base: 0 }, good80), null);
+  T('80 v436 쓰기 거절(safety_settings_set): 안전 수행(권민지형)·안전 보기(김정아형)·안전 없음(정재욱형) → 403 ADMIN_ONLY(현황은 읽기 전용 — 고치기는 관리자) · 비로그인 401 · 저장 0(키 그대로 null)·감사 0',
+    [wMin80, wKja80, wJw80].every((x) => x.code === 403 && x.body.error_code === 'ADMIN_ONLY' && x.body.settings === undefined) && wNo80.code === 401 && mem.gw_data[KEY80] === null && aud80().length === audit0_80,
+    [wMin80, wKja80, wJw80, wNo80].map((x) => x.code + '/' + x.body.error_code).join(' | '));
+
+  // ③ 관리자 저장 1(저장값 없음 → base 0) — 알려진 칸만 · prev null · 감사 1줄(바뀐 칸 f) · 권민지형 읽기 = 같은 값
+  const w1_80 = await set80(Object.assign({ base: 0, extra: 'x' }, good80, { kosha: Object.assign({ junk: 1 }, good80.kosha, { apply_no: '  K-2026-0001  ' }) }), tokA);
+  const st1_80 = JSON.parse(JSON.stringify(mem.gw_data[KEY80] || null)), au1_80 = aud80().slice(audit0_80);
+  const g1_80 = await get80(tMin80, 'dev1');
+  T('80 v436 관리자 저장 1(저장값 없음 → base 0): 200 · 응답 = 읽기와 같은 꼴(settings·updated_at·updated_by uadmin·prev null) · 저장값 = 알려진 칸만(모르는 칸 junk·extra 버림 · 접수번호 앞뒤 공백 정리 · 인원 숫자) · schema 1 · prev null(처음) · 감사 1줄(col safety · op 안전설정 · id settings:safety · 바뀐 칸 f: KOSHA 단계 (입력 전)→접수 · 접수번호 · 접수일 · 상시근로자 두 칸 · 글 t) · 권민지형 읽기 = 같은 값·같은 updated_at',
+    w1_80.code === 200 && w1_80.body.status === 'OK' && JSON.stringify(w1_80.body.settings) === JSON.stringify(good80) && w1_80.body.updated_by === 'uadmin' && w1_80.body.updated_at > 0 && w1_80.body.prev === null
+    && !!st1_80 && st1_80.schema === 1 && st1_80.prev === null && st1_80.updated_by === 'uadmin' && st1_80.updated_at === w1_80.body.updated_at && JSON.stringify(st1_80.kosha) === JSON.stringify(good80.kosha) && JSON.stringify(st1_80.headcount) === '{"env":18,"con":4}' && st1_80.extra === undefined && st1_80.kosha.junk === undefined
+    && au1_80.length === 1 && au1_80[0].by === '관리자' && au1_80[0].bid === 'uadmin' && au1_80[0].ev.length === 1 && au1_80[0].ev[0].op === '안전설정' && au1_80[0].ev[0].id === KEY80
+    && JSON.stringify(au1_80[0].ev[0].f) === JSON.stringify({ 'kosha.stage': ['(입력 전)', '접수'], 'kosha.apply_no': ['', 'K-2026-0001'], 'kosha.applied_on': ['', '2026-11-12'], 'headcount.env': ['', '18'], 'headcount.con': ['', '4'] })
+    && au1_80[0].ev[0].t === 'KOSHA 단계 (입력 전)→접수 · 접수번호 —→K-2026-0001 · 접수일 —→2026-11-12 · 상시근로자 종운환경 —→18 · 상시근로자 종운건설 —→4'
+    && g1_80.code === 200 && JSON.stringify(g1_80.body.settings) === JSON.stringify(w1_80.body.settings) && g1_80.body.updated_at === w1_80.body.updated_at && g1_80.body.updated_by === 'uadmin',
+    JSON.stringify({ w1: [w1_80.code, w1_80.body.error_code, w1_80.body.settings], st1: st1_80, au: au1_80.map((a) => a.ev) }));
+
+  // ④ 관리자 저장 2(다른 관리자 · base = 저장 1의 updated_at) — prev = 저장 1 한 판 · 감사 +1(바뀐 칸만)
+  const good2_80 = V80({ stage: 'certified', apply_no: 'K-2026-0001', applied_on: '2026-11-12', review_on: '2026-12-01', decided_on: '2027-01-05', expires_on: '2030-01-04', rate_year: '2028', checks: [{ date: '2027-06-01', note: '공단 사후점검 적합' }] }, { env: '20', con: 0 });
+  const w2_80 = await set80(Object.assign({ base: w1_80.body.updated_at }, good2_80), tAdm80);
+  const st2_80 = JSON.parse(JSON.stringify(mem.gw_data[KEY80] || null)), au2_80 = aud80().slice(audit0_80);
+  T('80 v436 관리자 저장 2(다른 관리자 · base = 저장 1의 updated_at): 200 · 인원 숫자 글 "20" → 20 · 0명 그대로 · prev = 저장 1 한 판(kosha·headcount·updated_at·updated_by — prev 안의 prev 없음, 응답 prev = 날·사람만) · updated_at이 커짐 · 감사 +1줄(바뀐 칸만 — 접수번호·접수일은 같아 빠짐)',
+    w2_80.code === 200 && w2_80.body.updated_by === 'u80adm' && w2_80.body.updated_at > w1_80.body.updated_at && !!st2_80 && JSON.stringify(st2_80.headcount) === '{"env":20,"con":0}' && st2_80.kosha.stage === 'certified' && st2_80.kosha.checks.length === 1 && st2_80.kosha.checks[0].note === '공단 사후점검 적합'
+    && JSON.stringify(st2_80.prev) === JSON.stringify({ kosha: st1_80.kosha, headcount: st1_80.headcount, updated_at: st1_80.updated_at, updated_by: 'uadmin' }) && JSON.stringify(w2_80.body.prev) === JSON.stringify({ updated_at: st1_80.updated_at, updated_by: 'uadmin' })
+    && au2_80.length === 2 && Object.keys(au2_80[1].ev[0].f).join(',') === 'kosha.stage,kosha.review_on,kosha.decided_on,kosha.expires_on,kosha.rate_year,kosha.checks,headcount.env,headcount.con' && au2_80[1].by === '관리자80',
+    JSON.stringify({ w2: [w2_80.code, w2_80.body.error_code], prev: st2_80 && st2_80.prev, f: au2_80[1] && au2_80[1].ev[0].f }));
+
+  // ⑤ 값 검사 → 400(이유 코드) · 저장 0·감사 0 · 틀린 값 + 낡은 base = 400(값 검사가 먼저)
+  const base2_80 = st2_80 ? st2_80.updated_at : -1, snap2_80 = JSON.stringify(mem.gw_data[KEY80]), aud2n80 = aud80().length;
+  const BAD80 = [
+    ['BAD_STAGE', { kosha: K80({ stage: 'approved' }) }], ['BAD_STAGE', { kosha: K80({ stage: '' }) }],
+    ['BAD_DATE', { kosha: K80({ applied_on: '2026-13-01' }) }], ['BAD_DATE', { kosha: K80({ expires_on: '2026-02-30' }) }], ['BAD_DATE', { kosha: K80({ review_on: '20261110' }) }], ['BAD_DATE', { kosha: K80({ decided_on: 20261110 }) }],
+    ['BAD_HEADCOUNT', { headcount: { env: -1, con: 4 } }], ['BAD_HEADCOUNT', { headcount: { env: 1000, con: 4 } }], ['BAD_HEADCOUNT', { headcount: { env: 3.5, con: 4 } }], ['BAD_HEADCOUNT', { headcount: { env: 'abc', con: 4 } }], ['BAD_HEADCOUNT', { headcount: { env: 18, con: '1000' } }], ['BAD_HEADCOUNT', { headcount: { env: true, con: 4 } }],
+    ['BAD_TEXT', { kosha: K80({ apply_no: 'x'.repeat(41) }) }], ['BAD_TEXT', { kosha: K80({ apply_no: 12 }) }],
+    ['BAD_YEAR', { kosha: K80({ rate_year: '27' }) }], ['BAD_YEAR', { kosha: K80({ rate_year: '1999' }) }],
+    ['BAD_CHECKS', { kosha: K80({ checks: Array.from({ length: 11 }, (_, i) => ({ date: '2027-03-' + (10 + i), note: '' })) }) }], ['BAD_CHECKS', { kosha: K80({ checks: [{ note: '날짜 없음' }] }) }], ['BAD_CHECKS', { kosha: K80({ checks: [{ date: '2027-02-30', note: '' }] }) }],
+    ['BAD_CHECKS', { kosha: K80({ checks: [{ date: '2027-03-01', note: 'x'.repeat(101) }] }) }], ['BAD_CHECKS', { kosha: K80({ checks: 'x' }) }],
+    ['BAD_VALUE', { kosha: null }], ['BAD_VALUE', { headcount: [18, 4] }], ['BAD_VALUE', { kosha: 'none' }],
+  ];
+  const badR80 = [];
+  for (const [want, over] of BAD80) { const r = await set80(Object.assign({ base: base2_80 }, V80({}, { env: 18, con: 4 }), over), tokA); badR80.push(r.code === 400 && r.body.error_code === want ? '' : want + '≠' + r.code + '/' + r.body.error_code); }
+  const badStale80 = await set80(Object.assign({ base: 1 }, V80({ stage: 'nope' })), tokA);
+  T('80 v436 값 검사 → 400 이유 코드: 단계(approved·빈칸) BAD_STAGE · 날짜(13월·2월 30일·20261110·숫자) BAD_DATE · 인원(-1·1000·3.5·abc·"1000"·true) BAD_HEADCOUNT · 접수번호(41자·숫자) BAD_TEXT · 요율 연도(27·1999) BAD_YEAR · 사후점검(11건·날짜 없음·없는 날짜·메모 101자·배열 아님) BAD_CHECKS · kosha·headcount 모양(null·배열·글) BAD_VALUE · 틀린 값 + 낡은 base = 400(값 검사가 먼저) · 전부 저장 0·감사 0',
+    badR80.length === BAD80.length && badR80.every((s) => s === '') && badStale80.code === 400 && badStale80.body.error_code === 'BAD_STAGE' && JSON.stringify(mem.gw_data[KEY80]) === snap2_80 && aud80().length === aud2n80,
+    badR80.filter(Boolean).join(' | ') + ' / 틀린 값+낡은 base ' + badStale80.code + '/' + badStale80.body.error_code);
+
+  // ⑥ 낙관락 → 409 SAFETY_STALE(낡은 base · base 없음 · 다른 값) · 저장 0·감사 0 / ⑦ 같은 값 → 400 NO_CHANGE(인원 글 "20"·"0"이어도 같은 값)
+  const sOld80 = await set80(Object.assign({ base: w1_80.body.updated_at }, V80({ stage: 'review' })), tokA), sNone80 = await set80(V80({ stage: 'review' }), tokA), sOther80 = await set80(Object.assign({ base: base2_80 + 1 }, V80({ stage: 'review' })), tokA);
+  const sSame80 = await set80(Object.assign({ base: base2_80 }, { kosha: st2_80 ? st2_80.kosha : null, headcount: { env: '20', con: '0' } }), tokA);
+  T('80 v436 낙관락·같은 값: 낡은 base(저장 1의 updated_at — 저장 2 뒤)·base 없음(새 액션 — base를 안 보내는 옛 앱 없음)·다른 값 → 409 SAFETY_STALE · 저장값 그대로 같은 값(인원 "20"·"0" 글) → 400 NO_CHANGE · 전부 저장 0·감사 0',
+    [sOld80, sNone80, sOther80].every((x) => x.code === 409 && x.body.error_code === 'SAFETY_STALE') && sSame80.code === 400 && sSame80.body.error_code === 'NO_CHANGE'
+    && JSON.stringify(mem.gw_data[KEY80]) === snap2_80 && aud80().length === aud2n80,
+    [sOld80, sNone80, sOther80, sSame80].map((x) => x.code + '/' + x.body.error_code).join(' | '));
+
+  // ⑧ 읽기 실패·깨진 저장값 → 500(빈 값으로 '입력 전'을 그리거나 그 위에 쓰지 않음) · 다른 길(get collection)로는 못 읽음
+  const fg080 = blobsMock.hooks.failGet; blobsMock.hooks.failGet = (k) => k === KEY80;
+  const fG80 = await get80(tMin80, 'dev1'), fS80 = await set80(Object.assign({ base: base2_80 }, V80({ stage: 'review' })), tokA);
+  blobsMock.hooks.failGet = fg080;
+  const fSnap80 = JSON.stringify(mem.gw_data[KEY80]);
+  mem.gw_data[KEY80] = { schema: 1, kosha: { stage: 'weird' }, headcount: {}, updated_at: 5 };   // 모양이 깨진 저장값(손으로 고친 블롭 등)
+  const iG80 = await get80(tMin80, 'dev1'), iS80 = await set80(Object.assign({ base: 5 }, V80({ stage: 'review' })), tokA), iSnap80 = JSON.stringify(mem.gw_data[KEY80]);
+  const oc1_80 = await call({ action: 'get', collection: 'settings:safety' }, tokA), oc2_80 = await call({ action: 'get', collection: 'safety' }, tokA);
+  T('80 v436 읽기 실패·깨진 저장값 → 500: 읽기 실패 = 읽기 STORAGE_READ_FAILED(settings 없음)·쓰기 SETTINGS_READ_FAILED(저장 0) · 깨진 저장값 = 읽기 SETTINGS_INVALID·쓰기 SETTINGS_READ_FAILED(그대로) · 다른 길 get collection(settings:safety·safety) → 400 UNKNOWN_COLLECTION · 감사 0',
+    fG80.code === 500 && fG80.body.error_code === 'STORAGE_READ_FAILED' && fG80.body.settings === undefined && fS80.code === 500 && fS80.body.error_code === 'SETTINGS_READ_FAILED' && fSnap80 === snap2_80
+    && iG80.code === 500 && iG80.body.error_code === 'SETTINGS_INVALID' && iS80.code === 500 && iS80.body.error_code === 'SETTINGS_READ_FAILED' && iSnap80 === JSON.stringify({ schema: 1, kosha: { stage: 'weird' }, headcount: {}, updated_at: 5 })
+    && [oc1_80, oc2_80].every((x) => x.code === 400 && x.body.error_code === 'UNKNOWN_COLLECTION') && aud80().length === aud2n80,
+    [fG80, fS80, iG80, iS80, oc1_80, oc2_80].map((x) => x.code + '/' + x.body.error_code).join(' | '));
+
+  // ⑨ (v436 검토 반영) 상한 딱 그 값은 통과 · 빈칸 ↔ 0명은 다른 값 — 새로 시작(키 없음 = base 0). 41자·101자·11건·1000 거절은 ⑤, 여기는 그 바로 아래가 통과하는지(비교를 >=로 바꾸면 앱이 보내는 값을 서버가 거절)
+  mem.gw_data[KEY80] = null;
+  const aud9n80 = aud80().length;
+  const edge80 = V80({ stage: 'certified', apply_no: 'A'.repeat(40), checks: Array.from({ length: 10 }, (_, i) => ({ date: '2027-03-' + (10 + i), note: i === 0 ? 'n'.repeat(100) : '' })) }, { env: 999, con: '' });
+  const e1_80 = await set80(Object.assign({ base: 0 }, edge80), tokA), eSt1_80 = JSON.parse(JSON.stringify(mem.gw_data[KEY80] || null));
+  const e2_80 = await set80(Object.assign({ base: e1_80.body.updated_at }, edge80, { headcount: { env: 999, con: 0 } }), tokA), eAu2_80 = aud80().slice(-1)[0], eCon2_80 = mem.gw_data[KEY80] && mem.gw_data[KEY80].headcount.con;
+  const e3_80 = await set80(Object.assign({ base: e2_80.body.updated_at }, edge80), tokA), eAu3_80 = aud80().slice(-1)[0], eCon3_80 = mem.gw_data[KEY80] && mem.gw_data[KEY80].headcount.con;
+  T('80 v436 상한 경계·빈칸↔0(검토 반영): 접수번호 40자·메모 100자·사후점검 10건·인원 999 → 200(그대로 저장) · 빈칸 → 0명 = 200(같은 값 아님 — 저장 0)·감사 f {"headcount.con": ["", "0"]}·글 "상시근로자 종운건설 —→0" · 0명 → 빈칸 = 200·감사 f {"headcount.con": ["0", ""]} · 감사 +3줄',
+    e1_80.code === 200 && !!eSt1_80 && eSt1_80.kosha.apply_no === 'A'.repeat(40) && eSt1_80.kosha.checks.length === 10 && eSt1_80.kosha.checks[0].note === 'n'.repeat(100) && eSt1_80.headcount.env === 999 && eSt1_80.headcount.con === ''
+    && e2_80.code === 200 && eCon2_80 === 0 && !!eAu2_80 && JSON.stringify(eAu2_80.ev[0].f) === JSON.stringify({ 'headcount.con': ['', '0'] }) && eAu2_80.ev[0].t === '상시근로자 종운건설 —→0'
+    && e3_80.code === 200 && eCon3_80 === '' && !!eAu3_80 && JSON.stringify(eAu3_80.ev[0].f) === JSON.stringify({ 'headcount.con': ['0', ''] }) && aud80().length === aud9n80 + 3,
+    JSON.stringify({ e: [e1_80.code + '/' + (e1_80.body.error_code || ''), e2_80.code + '/' + (e2_80.body.error_code || ''), e3_80.code + '/' + (e3_80.body.error_code || '')], f2: eAu2_80 && eAu2_80.ev[0].f, f3: eAu3_80 && eAu3_80.ev[0].f }));
+
+  // ⑩ (v436 검토 반영) 사후점검 — 같은 값 판정은 정규화한 값째: 한 줄에 둘을 적은 1건('적합 / 2028-06-01 적합') → 2건으로 나눔 = 감사용 납작한 글은 같아도 200(NO_CHANGE 아님)
+  //   감사 글은 건수 + 뺀 줄·더한 줄(이어 붙여 80자에서 자르던 때는 긴 이력의 뒤쪽 줄을 고치면 이전·새 값이 같게 찍혔다) · 순서만 바꿈 = '순서만 바뀜' · 정말 같은 값은 NO_CHANGE 그대로
+  const one80 = V80({ stage: 'certified', checks: [{ date: '2027-06-01', note: '적합 / 2028-06-01 적합' }] }, { env: 18, con: 4 });
+  const two80 = V80({ stage: 'certified', checks: [{ date: '2027-06-01', note: '적합' }, { date: '2028-06-01', note: '적합' }] }, { env: 18, con: 4 });
+  const c1_80 = await set80(Object.assign({ base: e3_80.body.updated_at }, one80), tokA);
+  const c2_80 = await set80(Object.assign({ base: c1_80.body.updated_at }, two80), tokA), cSt2_80 = JSON.parse(JSON.stringify(mem.gw_data[KEY80] || null)), cAu2_80 = aud80().slice(-1)[0];
+  const long80 = V80({ stage: 'certified', checks: [{ date: '2027-06-01', note: '가'.repeat(90) }, { date: '2028-06-01', note: '적합' }, { date: '2029-06-01', note: '적합' }] }, { env: 18, con: 4 });
+  const c3_80 = await set80(Object.assign({ base: c2_80.body.updated_at }, long80), tokA);
+  const long2_80 = JSON.parse(JSON.stringify(long80)); long2_80.kosha.checks[2].note = '부적합 — 시정 요구';
+  const c4_80 = await set80(Object.assign({ base: c3_80.body.updated_at }, long2_80), tokA), cAu4_80 = aud80().slice(-1)[0];
+  const swap80 = JSON.parse(JSON.stringify(long2_80)); swap80.kosha.checks = [swap80.kosha.checks[1], swap80.kosha.checks[0], swap80.kosha.checks[2]];
+  const c5_80 = await set80(Object.assign({ base: c4_80.body.updated_at }, swap80), tokA), cAu5_80 = aud80().slice(-1)[0], audC5n80 = aud80().length, snapC5_80 = JSON.stringify(mem.gw_data[KEY80]);
+  const c6_80 = await set80(Object.assign({ base: c5_80.body.updated_at }, swap80), tokA);
+  T('80 v436 사후점검 같은 값 판정·감사 글(검토 반영): 1건("적합 / 2028-06-01 적합") → 같은 글 2건 = 200·2건 저장·감사 f "1건 · 뺌 …" → "2건 · 더함 …" · 긴 이력(첫 메모 90자) 3번째 줄만 고침 = 감사 f "3건 · 뺌 2029-06-01 적합" → "3건 · 더함 2029-06-01 부적합 — 시정 요구"(이전 ≠ 새)·글 t 같은 뜻 · 순서만 바꿈 = 200·"3건" → "3건 · 순서만 바뀜" · 정말 같은 값 = 400 NO_CHANGE(저장 0·감사 0)',
+    c1_80.code === 200 && c2_80.code === 200 && !!cSt2_80 && JSON.stringify(cSt2_80.kosha.checks) === JSON.stringify(two80.kosha.checks)
+    && !!cAu2_80 && JSON.stringify(cAu2_80.ev[0].f) === JSON.stringify({ 'kosha.checks': ['1건 · 뺌 2027-06-01 적합 / 2028-06-01 적합', '2건 · 더함 2027-06-01 적합 / 2028-06-01 적합'] })
+    && c3_80.code === 200 && c4_80.code === 200 && !!cAu4_80 && JSON.stringify(cAu4_80.ev[0].f) === JSON.stringify({ 'kosha.checks': ['3건 · 뺌 2029-06-01 적합', '3건 · 더함 2029-06-01 부적합 — 시정 요구'] })
+    && cAu4_80.ev[0].t === '사후점검 3건 · 뺌 2029-06-01 적합→3건 · 더함 2029-06-01 부적합 — 시정 요구'
+    && c5_80.code === 200 && !!cAu5_80 && JSON.stringify(cAu5_80.ev[0].f) === JSON.stringify({ 'kosha.checks': ['3건', '3건 · 순서만 바뀜'] })
+    && c6_80.code === 400 && c6_80.body.error_code === 'NO_CHANGE' && aud80().length === audC5n80 && JSON.stringify(mem.gw_data[KEY80]) === snapC5_80,
+    JSON.stringify({ c: [c1_80, c2_80, c3_80, c4_80, c5_80, c6_80].map((x) => x.code + '/' + (x.body.error_code || '')), f2: cAu2_80 && cAu2_80.ev[0].f, f4: cAu4_80 && cAu4_80.ev[0].f, f5: cAu5_80 && cAu5_80.ev[0].f }));
+
+  mem.gw_users = savedUsers80;
+  if (had80 === undefined) delete mem.gw_data[KEY80]; else mem.gw_data[KEY80] = had80;
+}
+
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

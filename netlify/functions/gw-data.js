@@ -2939,6 +2939,156 @@ async function handleDocSettingsSet(event, d, R) {
   try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'documents', ev: [{ op: '문서함설정', id: '-', t: evText }] }); } catch (e) {}
   return jr(200, { status: 'OK', settings: { scope_default: docS.scope_default, register_gate: docS.register_gate }, updated_at: docS.updated_at, request_id: R });
 }
+
+// ---- 안전 설정 settings:safety(v436 — 메뉴 56 7단계 '인정·평가 칸과 회사 구분', PM 11/10 08:19 ⓐ '45방식이랑 별개 방식임. 계약탭처럼 따로 설계된거임' = 안전 설정 따로) ----
+// 안전 › 현황 ⑤ 인정·평가·회사 구분이 읽는 값 한 벌. KOSHA 위험성평가 인정은 인허가 목록(col:licenses)에 행으로 넣지 않는다 — 인허가 행을 읽는 앱·서버 소비처(자동 지시·캘린더·검색·브리핑·물어보기·크론)는 무변.
+//   값 = { kosha: { stage: none(미인정)·applied(접수)·review(심사)·certified(인정), apply_no(접수번호 40자), applied_on·review_on·decided_on·expires_on(YYYY-MM-DD 또는 빈칸),
+//                   rate_year(요율 반영 연도 네 자리 또는 빈칸), checks: [{ date(필수), note(100자) }](사후점검 이력, 10건 상한) },
+//          headcount: { env, con }(회사별 상시근로자 수 — 정수 0~999 또는 빈칸, 둘 다 있어야 현황 회사 구분이 켜짐) } + updated_at·updated_by·prev(직전 1판).
+//   읽기 safety_settings_get = 로그인 → 기기 승인(403 DEVICE_NOT_APPROVED) → 관리자 또는 안전 권한(permKey 'safety' — 현황 칸·col:edu와 같은 키)이 숨김이 아니면 200, 숨김이면 403 NO_ACCESS.
+//     저장값이 없으면 settings null·updated_at 0. 읽기 실패·모양이 깨진 저장값은 500(빈 값으로 '미인정(입력 전)'을 그리지 않게).
+//   쓰기 safety_settings_set = 로그인 → 관리자만(403 ADMIN_ONLY — 안전 수행도 거절, 현황은 읽기 전용) → 값 검사(400 BAD_VALUE·BAD_STAGE·BAD_TEXT·BAD_DATE·BAD_YEAR·BAD_CHECKS·BAD_HEADCOUNT)
+//     → 직전 읽기(실패 500 SETTINGS_READ_FAILED) → 낙관락(base가 저장된 updated_at과 다르면 409 SAFETY_STALE — base 없음도 409: 새 액션이라 base를 안 보내는 옛 앱이 없다)
+//     → 같은 값 400 NO_CHANGE(정규화한 값째 비교 — 감사용 납작한 글로 비교하면 사후점검 1건 'A / B'와 2건 A·B가 같은 글이 돼 고친 것이 막힌다, v436 검토)
+//     → 저장(prev = 직전 1판) → 감사 1줄(col safety · op 안전설정 · 바뀐 칸 f — 사후점검은 'n건 · 뺌 …' → 'm건 · 더함 …'). 이 키 이름을 쓰는 서버 코드는 이 두 핸들러뿐(uismoke v436 대조) —
+//     백업 내보내기·복원(backup_list·backup_get·backup_put)은 키 이름 없이 gw_data 키 전부를 다룬다(복원한 값도 safetyRead가 다시 검사해 깨졌으면 500).
+//   알려진 한계(기존 settings:assign·notify·문서함 설정 핸들러와 같은 꼴): 읽기 → base 검사 → 쓰기가 원자적이지 않아, 두 관리자가 같은 base로 거의 동시에 저장하면 둘 다 200이고 마지막 쓰기가 이긴다
+//     (먼저 쓴 값은 prev에도 안 남고 감사 2줄로만 드러남 — @netlify/blobs 8.2.0에 조건부 쓰기가 없다. 원자화는 조건부 쓰기를 들일 때 settings 핸들러 전체를 함께).
+const SAFETY_KEY = 'settings:safety';
+const SAFETY_STAGES = ['none', 'applied', 'review', 'certified'];
+const SAFETY_STAGE_LABEL = { none: '미인정', applied: '접수', review: '심사', certified: '인정' };
+const SAFETY_DATES = ['applied_on', 'review_on', 'decided_on', 'expires_on'];
+const SAFETY_LIMIT = { apply_no: 40, note: 100, checks: 10, head: 999 };
+const SAFETY_FIELD_LABEL = { 'kosha.stage': 'KOSHA 단계', 'kosha.apply_no': '접수번호', 'kosha.applied_on': '접수일', 'kosha.review_on': '심사일', 'kosha.decided_on': '인정일(결정일)', 'kosha.expires_on': '만료일',
+  'kosha.rate_year': '요율 연도', 'kosha.checks': '사후점검', 'headcount.env': '상시근로자 종운환경', 'headcount.con': '상시근로자 종운건설' };
+// 키 이름으로 권한 — permOf는 컬렉션 이름을 받는다(COL에 없는 'safety'를 넘기면 기본 '보기'가 돼 숨김이 새어 나간다). 규칙은 permOf와 같다(관리자 do · perms[키] · 값 없으면 기본 숨김 표 PERM_CLOSED)
+function permKey(member, key) {
+  if (member.admin) return 'do';
+  return (member.perms && member.perms[key]) || (PERM_CLOSED[key] ? 'hide' : 'view');
+}
+function safetyDate(v) {   // 빈칸 또는 달력에 있는 날짜 YYYY-MM-DD → 그 글 · 아니면 null
+  if (v === undefined || v === null || v === '') return '';
+  if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return null;
+  const t = new Date(v + 'T00:00:00Z');
+  return (!isNaN(t.getTime()) && t.toISOString().slice(0, 10) === v) ? v : null;
+}
+function safetyText(v, max) {   // 빈칸 허용 글(앞뒤 공백 정리) — 글이 아니거나 너무 길면 null
+  if (v === undefined || v === null) return '';
+  if (typeof v !== 'string') return null;
+  const s = v.trim();
+  return s.length > max ? null : s;
+}
+function safetyHead(v) {   // 상시근로자 수 — 정수 0~999(숫자 또는 숫자 글) 또는 빈칸('') · 아니면 null
+  if (v === undefined || v === null || v === '') return '';
+  if (typeof v === 'string') { const s = v.trim(); return /^\d{1,3}$/.test(s) ? Number(s) : null; }
+  return (typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= SAFETY_LIMIT.head) ? v : null;
+}
+function safetyYear(v) {   // 요율 반영 연도 — 네 자리(2000~2100) 또는 빈칸 · 아니면 null
+  if (v === undefined || v === null || v === '') return '';
+  if (typeof v !== 'string' && typeof v !== 'number') return null;
+  const s = String(v).trim();
+  if (!/^\d{4}$/.test(s)) return null;
+  const y = Number(s);
+  return (y >= 2000 && y <= 2100) ? s : null;
+}
+// 요청 몸체(또는 저장값) → { v } | { code } — 알려진 칸만 다시 만든다(모르는 칸은 버림)
+function safetyClean(d) {
+  const k = d && d.kosha, h = d && d.headcount;
+  if (!k || typeof k !== 'object' || Array.isArray(k) || !h || typeof h !== 'object' || Array.isArray(h)) return { code: 'BAD_VALUE' };
+  if (typeof k.stage !== 'string' || SAFETY_STAGES.indexOf(k.stage) < 0) return { code: 'BAD_STAGE' };
+  const kosha = { stage: k.stage };
+  const no = safetyText(k.apply_no, SAFETY_LIMIT.apply_no);
+  if (no === null) return { code: 'BAD_TEXT' };
+  kosha.apply_no = no;
+  for (const dk of SAFETY_DATES) { const dv = safetyDate(k[dk]); if (dv === null) return { code: 'BAD_DATE' }; kosha[dk] = dv; }
+  const ry = safetyYear(k.rate_year);
+  if (ry === null) return { code: 'BAD_YEAR' };
+  kosha.rate_year = ry;
+  const cs = (k.checks === undefined || k.checks === null) ? [] : k.checks;
+  if (!Array.isArray(cs) || cs.length > SAFETY_LIMIT.checks) return { code: 'BAD_CHECKS' };
+  kosha.checks = [];
+  for (const x of cs) {
+    if (!x || typeof x !== 'object' || Array.isArray(x)) return { code: 'BAD_CHECKS' };
+    const cd = safetyDate(x.date), cn = safetyText(x.note, SAFETY_LIMIT.note);
+    if (!cd || cn === null) return { code: 'BAD_CHECKS' };   // 사후점검 줄은 날짜 필수
+    kosha.checks.push({ date: cd, note: cn });
+  }
+  const env = safetyHead(h.env), con = safetyHead(h.con);
+  if (env === null || con === null) return { code: 'BAD_HEADCOUNT' };
+  return { v: { kosha: kosha, headcount: { env: env, con: con } } };
+}
+// { ok, doc|null, v|null, at, by } — 읽기 실패·모양이 깨진 저장값은 ok:false(빈 값으로 덮거나 '입력 전'으로 그리지 않게). 없는 키(실 Blobs ok·data null) = 입력 전
+async function safetyRead(st) {
+  const r = await blobGet(st, SAFETY_KEY);
+  if (!r.ok) return { ok: false, code: r.code || 'STORAGE_READ_FAILED' };
+  if (r.data === null || r.data === undefined) return { ok: true, doc: null, v: null, at: 0, by: '' };
+  if (typeof r.data !== 'object' || Array.isArray(r.data)) return { ok: false, code: 'SETTINGS_INVALID' };
+  const c = safetyClean(r.data);
+  if (!c.v) return { ok: false, code: 'SETTINGS_INVALID' };
+  return { ok: true, doc: r.data, v: c.v, at: Number(r.data.updated_at) || 0, by: String(r.data.updated_by || '') };
+}
+function safetyOut(s, R) {   // 읽기·쓰기 응답 같은 꼴 — 앱 sfSetApply가 그대로 받는다
+  const p = s.doc && s.doc.prev;
+  return jr(200, { status: 'OK', settings: s.v, updated_at: s.at, updated_by: s.by, prev: p ? { updated_at: Number(p.updated_at) || 0, updated_by: String(p.updated_by || '') } : null, request_id: R });
+}
+// 사후점검 한 건 = 줄 글 '날짜 메모'(날짜는 늘 YYYY-MM-DD 10자 · 메모는 앞뒤 공백을 정리해 둠 — 줄 글과 한 건이 1:1)
+function safetyCheckLines(v) {
+  const cs = (v && v.kosha && Array.isArray(v.kosha.checks)) ? v.kosha.checks : [];
+  return cs.map(function (x) { return x.date + (x.note ? ' ' + x.note : ''); });
+}
+function safetyFlat(v) {   // 감사 줄 비교용 납작한 글 — 저장값이 없으면 단계 '(입력 전)' · 사후점검은 건수만(바뀐 줄은 safetyDiff가 줄 목록으로)
+  const k = (v && v.kosha) || {}, h = (v && v.headcount) || {};
+  return { 'kosha.stage': v ? (SAFETY_STAGE_LABEL[k.stage] || '') : '(입력 전)', 'kosha.apply_no': k.apply_no || '', 'kosha.applied_on': k.applied_on || '', 'kosha.review_on': k.review_on || '',
+    'kosha.decided_on': k.decided_on || '', 'kosha.expires_on': k.expires_on || '', 'kosha.rate_year': k.rate_year || '',
+    'kosha.checks': safetyCheckLines(v).length + '건',
+    'headcount.env': (h.env === '' || h.env === undefined) ? '' : String(h.env), 'headcount.con': (h.con === '' || h.con === undefined) ? '' : String(h.con) };
+}
+// { 칸: [이전, 새] } — 감사 로그 ev.f 규약(값 80자 절단). 사후점검은 줄 목록으로 비교: 'n건 · 뺌 …' → 'm건 · 더함 …'(같은 줄 여럿은 개수까지 — 다중 집합 차이),
+//   뺀 줄·더한 줄이 없으면 '순서만 바뀜'. 이어 붙인 한 글을 80자에서 자르면 긴 이력의 뒤쪽 줄을 고쳐도 이전·새 값이 같게 찍혔다(v436 검토)
+function safetyDiff(a, b) {
+  const fa = safetyFlat(a), fb = safetyFlat(b), la = safetyCheckLines(a), lb = safetyCheckLines(b), out = {};
+  Object.keys(fb).forEach(function (k) {
+    if (k === 'kosha.checks') {
+      if (JSON.stringify(la) === JSON.stringify(lb)) return;
+      const added = lb.slice(), gone = [];
+      la.forEach(function (x) { const i = added.indexOf(x); if (i >= 0) added.splice(i, 1); else gone.push(x); });
+      out[k] = [(fa[k] + (gone.length ? ' · 뺌 ' + gone.join(' / ') : '')).slice(0, 80),
+        (fb[k] + (added.length ? ' · 더함 ' + added.join(' / ') : (gone.length ? '' : ' · 순서만 바뀜'))).slice(0, 80)];
+      return;
+    }
+    if (fa[k] !== fb[k]) out[k] = [fa[k].slice(0, 80), fb[k].slice(0, 80)];
+  });
+  return out;
+}
+async function handleSafetySettingsGet(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (!(await deviceApproved(event, c.member))) return jr(403, { status: 'FORBIDDEN', error_code: 'DEVICE_NOT_APPROVED', request_id: R });
+  if (permKey(c.member, 'safety') === 'hide') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_ACCESS', request_id: R });
+  const s = await safetyRead(store(DATA));
+  if (!s.ok) return jr(500, { status: 'ERROR', error_code: s.code, request_id: R });
+  return safetyOut(s, R);
+}
+async function handleSafetySettingsSet(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (!c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });   // 안전 수행(권민지)도 거절 — 현황은 읽기 전용, 고치기는 관리자
+  const nv = safetyClean(d);
+  if (!nv.v) return jr(400, { status: 'REJECTED', error_code: nv.code, request_id: R });
+  const st = store(DATA);
+  const cur = await safetyRead(st);
+  if (!cur.ok) return jr(500, { status: 'ERROR', error_code: 'SETTINGS_READ_FAILED', request_id: R });   // 읽기 실패 위에 쓰면 저장돼 있던 값이 사라진다 — 거부
+  if (d.base === undefined || Number(d.base) !== cur.at) return jr(409, { status: 'CONFLICT', error_code: 'SAFETY_STALE', request_id: R });
+  if (cur.v && JSON.stringify(cur.v) === JSON.stringify(nv.v)) return jr(400, { status: 'REJECTED', error_code: 'NO_CHANGE', request_id: R });   // 정규화한 값째(safetyClean이 칸 순서를 고정) — 감사 글은 판정에 안 씀
+  const chg = safetyDiff(cur.v, nv.v);
+  const doc = { schema: 1, kosha: nv.v.kosha, headcount: nv.v.headcount, prev: cur.doc ? { kosha: cur.v.kosha, headcount: cur.v.headcount, updated_at: cur.at, updated_by: cur.by } : null,
+    updated_by: c.member.id, updated_at: Math.max(Date.now(), cur.at + 1) };   // 같은 ms 두 저장도 낙관락 토큰이 달라지게
+  const w = await blobSet(st, SAFETY_KEY, doc);
+  if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
+  const t = Object.keys(chg).map(function (k) { return SAFETY_FIELD_LABEL[k] + ' ' + (chg[k][0] || '—') + '→' + (chg[k][1] || '—'); }).join(' · ').slice(0, 300);
+  try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'safety', ev: [{ op: '안전설정', id: SAFETY_KEY, t: t, f: chg }] }); } catch (e) {}
+  return safetyOut({ doc: doc, v: nv.v, at: doc.updated_at, by: doc.updated_by }, R);
+}
 async function approvalsDoc(st) {
   const r = await blobGet(st, colKey('approvals'));
   // 읽기 실패를 빈 문서로 위조하면 다음 쓰기가 대장 전체를 1건짜리로 덮는다(클라 shim과 같은 원칙) — 실패는 실패로 반환
@@ -4305,6 +4455,8 @@ async function handlerInner(event) {
     if (d && d.action === 'learn_tpl_set') return await handleLearnTplSet(event, d, R);   // v412 양식별 끄기/켜기(일몰 되돌리기)
     if (d && d.action === 'doc_settings_get') return await handleDocSettingsGet(event, d, R);
     if (d && d.action === 'doc_settings_set') return await handleDocSettingsSet(event, d, R);
+    if (d && d.action === 'safety_settings_get') return await handleSafetySettingsGet(event, d, R);   // v436 안전 설정(현황 ⑤ 인정·평가·회사 구분) — 안전 권한 읽기
+    if (d && d.action === 'safety_settings_set') return await handleSafetySettingsSet(event, d, R);   // v436 관리자만
     if (d && d.action === 'doc_att_put') return await handleDocAttPut(event, d, R);
     if (d && d.action === 'doc_att_get') return await handleDocAttGet(event, d, R);
     if (d && d.action === 'doc_att_del') return await handleDocAttDel(event, d, R);

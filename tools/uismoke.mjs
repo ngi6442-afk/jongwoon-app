@@ -2868,6 +2868,7 @@ try {
 //      ⑥ 읽기(sfNowOpen·loadEdu·loadAsb 실행 — 현황을 열 때만, 현황 읽기는 보류 훅 없이) ⑦ 관리자 홈 만기 목록(교육·검진 줄 합침, 새 타일 없음) ⑧ 문서·sw
 //      v432 검토 반영(지적 28건 재확인 뒤): ①-3 중처법 쌍 · ②-2 간접 저장 길·noHooks 1곳·계약 표 상태 · ③-2 폰 줄 배치 CSS · ④-2 실패 안내 · ④-3 타이머 실제 실행 · ④-4 날짜 갈래 · ④-5 빈 자료 · ④-6 의무 대장 회사 잇기 · ⑧-2 문서 내용
 //      + 표본에 30일 경계 현장 4·교육 옛 이력·퇴사자·지운 일용직, ⑤ 수시 줄·도착 자리·계약 칩 풀기·폰 상세 카드, ⑥ 30초 안 다시 열기·force 없음·홈일 때만, ⑦ 명부 1번 읽기
+let SFNOW32 = null;   // v436: 이 묶음의 현황 시험 틀(run32 — 구간 원문을 실제 판정 함수와 함께 실행)·표본(base32)·자르기 도구를 v436 묶음이 다시 쓴다(없으면 v436 묶음은 '검사 생략' = 실패)
 try {
   const fn32 = (name) => { const i = html.indexOf('function ' + name + '('); if (i < 0) throw new Error('함수 없음: ' + name); let d = 0, st = false; for (let j = i; j < html.length; j++) { const ch = html[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return html.slice(i, j + 1); } } throw new Error('중괄호 짝 안 맞음: ' + name); };
   const rd32 = (p) => readFileSync(join(ROOT, p), 'utf8');
@@ -2939,16 +2940,17 @@ try {
   //   허용 목록의 renderContracts(그리기)에는 알려진 간접 저장 길이 1개 있다(v432 검토 — v432 전부터 계약 탭 동작): 계약 탭에 '단계·서류'로 펼쳐 둔 계약이 있으면
   //   renderContracts → csDetailHtml → csApprSync(계약당 60초 1회 — 결재 결과 동기화) → 결재가 바뀌었을 때만 scheduleContractSave. cdocLoad 응답도 renderContracts를 부른다.
   //   현황 구간이 내는 직접 저장은 0이고, 이 길은 아래 ②-2가 모양을 못 박고 문서(FEATURES·TESTLIST·CLAUDE.md)가 예외로 적는다 — 길이 늘거나 바뀌면 ②-2가 터진다
+  //   v436: isAdmin = ⑤ [고치기] 버튼 글을 관리자에게만 그리는 판정(읽기만 — 누름 배선·창·저장은 구간 밖 @safety-set, v436 묶음 ⑦이 지킴)
   const ALLOW32 = ['canSee', 'checkItemVisible', 'scopeNames', 'getReview', 'todayStr', 'addDays', 'isDate', 'vehDday', 'esc', 'liveEdu', 'eduPersonName', 'eduKindLabel', 'eduLatest', 'findMember', 'memberRetired', 'liveLic', 'licVisible', 'liveDuties', 'liveSites', 'siteKind', 'siteLabel', 'asbNotifyDue', 'asbKeepUntil', 'asbNoSpecial',
-    'csPkWhen', 'csPkIk', 'csFlow', 'csRowState', 'liveContracts', 'csSiteText', 'csKind', 'csPass', 'findProc', 'switchTab', 'setLicLayer', 'renderContracts', 'renderDocuments', 'loadEdu', 'loadAsb', 'loadWorkers', 'cdocLoad', 'String', 'Number', 'setTimeout', 'clearTimeout'];
+    'csPkWhen', 'csPkIk', 'csFlow', 'csRowState', 'liveContracts', 'csSiteText', 'csKind', 'csPass', 'findProc', 'switchTab', 'setLicLayer', 'renderContracts', 'renderDocuments', 'loadEdu', 'loadAsb', 'loadWorkers', 'cdocLoad', 'isAdmin', 'String', 'Number', 'setTimeout', 'clearTimeout'];
   const calls32 = [...new Set([...code32.matchAll(/(?<![.\w$])([A-Za-z_$][\w$]*)\s*\(/g)].map((m) => m[1]))].filter((n) => !KW32.has(n) && !defs32.has(n) && !locals32.has(n));
   const outside32 = calls32.filter((n) => ALLOW32.indexOf(n) < 0);
   const getOnly32 = (name, act) => { const b = fn32(name); return (b.indexOf('action:"' + act + '"') >= 0 || b.indexOf('action: "' + act + '"') >= 0) && !/action:\s*"(?:save|[a-z_]*(?:put|upsert|del|set|add|purge|restore|cur|mark))"/.test(b) && !/\b(?:schedule\w*Save|doSave\w*)\s*\(/.test(b); };
   const rdb32 = fn32('renderDashboard');
   const homeNew32 = rdb32.slice(rdb32.indexOf('var eduHome = '), rdb32.indexOf("html += dueMix.map(") + 60) + (rdb32.match(/\n[^\n]*sfNowHomeEduAsked[^\n]*/) || [''])[0];
-  T('v432 ② 읽기 전용(정적): @safety-now 구간에 저장 호출 ' + saveHits32.length + ' · 서버 직접 호출 ' + gw32.length + ' · 저장소 ' + store32.length + ' · 원장 대입 ' + (ledgerAsg32.length + propAsg32.length) + ' · 완료 조작 호출 ' + mut32.length + ' · 완료 버튼·체크·입력 칸 ' + ctl32.length + ' = 전부 0 · 구간이 부르는 바깥 함수 ' + calls32.length + '개 = 읽기·그리기·이동 허용 목록 안 · 읽기 로더 4개(loadEdu·loadAsb·loadWorkers·cdocLoad)는 get·cdoc_list만 · 현황 읽기의 loadAsb는 보류 훅 없이({ noHooks: true }) · 관리자 홈 변경 줄도 저장 0',
+  T('v432 ② 읽기 전용(정적): @safety-now 구간에 저장 호출 ' + saveHits32.length + ' · 서버 직접 호출 ' + gw32.length + ' · 저장소 ' + store32.length + ' · 원장 대입 ' + (ledgerAsg32.length + propAsg32.length) + ' · 완료 조작 호출 ' + mut32.length + ' · 완료 버튼·체크·입력 칸 ' + ctl32.length + ' = 전부 0 · 구간이 부르는 바깥 함수 ' + calls32.length + '개 = 읽기·그리기·이동 허용 목록 안 · 읽기 로더 5개(loadEdu·loadAsb·loadWorkers·cdocLoad · v436 loadSafetySet)는 get·cdoc_list·safety_settings_get만 · 현황 읽기의 loadAsb는 보류 훅 없이({ noHooks: true }) · 관리자 홈 변경 줄도 저장 0',
     saveHits32.length === 0 && gw32.length === 0 && store32.length === 0 && ledgerAsg32.length === 0 && propAsg32.length === 0 && mut32.length === 0 && ctl32.length === 0 && outside32.length === 0 && calls32.length >= 20
-    && getOnly32('loadEdu', 'get') && getOnly32('loadAsb', 'get') && getOnly32('loadWorkers', 'get') && getOnly32('cdocLoad', 'cdoc_list')
+    && getOnly32('loadEdu', 'get') && getOnly32('loadAsb', 'get') && getOnly32('loadWorkers', 'get') && getOnly32('cdocLoad', 'cdoc_list') && getOnly32('loadSafetySet', 'safety_settings_get')
     && /sfNowLoad\("asb", loadAsb, \{ noHooks: true \}\)/.test(code32) && (code32.match(/loadAsb/g) || []).length === 1
     && homeNew32.length > 200 && !/\b(?:schedule\w*Save|doSave\w*|save\w*|\w+Save|gwCall)\s*\(/.test(homeNew32),
     JSON.stringify({ save: saveHits32, gw: gw32, store: store32, asg: ledgerAsg32.concat(propAsg32), mut: mut32, ctl: ctl32, outside: outside32 }));
@@ -2968,12 +2970,13 @@ try {
   const goB32 = nc32(fn32('sfNowGo')), openB32 = nc32(fn32('sfNowOpen')), consB32 = nc32(fn32('sfNowCons'));
   const cnt32 = (src, nm) => (src.match(new RegExp('(?<![.\\w$])' + nm + '\\s*\\(', 'g')) || []).length;   // 부름
   const ref32 = (src, nm) => (src.match(new RegExp('(?<![.\\w$])' + nm + '\\b', 'g')) || []).length;      // 부름 + 넘김(sfNowLoad("edu", loadEdu))
+  //   v436: 안전 설정 로더 loadSafetySet도 같은 규칙(구간 안 1곳 = sfNowOpen — 다시 그림·그리기 길에서 읽지 않음)
   const siteCalls32 = ['switchTab', 'setLicLayer', 'renderContracts', 'renderDocuments'].map((nm) => nm + ':' + cnt32(code32, nm) + '/' + cnt32(goB32, nm))
-    .concat(['loadEdu', 'loadAsb', 'loadWorkers'].map((nm) => nm + ':' + ref32(code32, nm) + '/' + ref32(openB32, nm)), ['cdocLoad:' + cnt32(code32, 'cdocLoad') + '/' + cnt32(openB32, 'cdocLoad') + '+' + cnt32(consB32, 'cdocLoad')]);
+    .concat(['loadEdu', 'loadAsb', 'loadWorkers', 'loadSafetySet'].map((nm) => nm + ':' + ref32(code32, nm) + '/' + ref32(openB32, nm)), ['cdocLoad:' + cnt32(code32, 'cdocLoad') + '/' + cnt32(openB32, 'cdocLoad') + '+' + cnt32(consB32, 'cdocLoad')]);
   const siteOk32 = ['switchTab', 'setLicLayer', 'renderContracts', 'renderDocuments'].every((nm) => cnt32(code32, nm) > 0 && cnt32(code32, nm) === cnt32(goB32, nm))
-    && ['loadEdu', 'loadAsb', 'loadWorkers'].every((nm) => ref32(code32, nm) === 1 && ref32(openB32, nm) === 1)
+    && ['loadEdu', 'loadAsb', 'loadWorkers', 'loadSafetySet'].every((nm) => ref32(code32, nm) === 1 && ref32(openB32, nm) === 1)
     && cnt32(code32, 'cdocLoad') === 2 && cnt32(openB32, 'cdocLoad') === 1 && cnt32(consB32, 'cdocLoad') === 1;
-  T('v432 ②-2 간접 저장 길·훅 우회·계약 표 상태·부르는 자리: renderContracts의 알려진 저장 길 1개 그대로(csDetailHtml이 단계·서류 칸에서만 csApprSync · 60초 1회 · 바뀐 때만 scheduleContractSave 1곳 · cdocLoad 응답은 renderContracts 2곳만) · "noHooks: true" 파일 전체 ' + noHookN32 + '곳(현황 loadAsb 부름만) · opt.noHooks는 loadAsb 안 ' + optNHin32 + '/' + optNH32 + ' · 현황이 바꾸는 계약 표 상태 = sfNowGo의 칩·필터 풀기 2개(기기 저장 0) · 이동·그리기 함수는 sfNowGo 안에서만·로더는 sfNowOpen 1곳씩·서류함은 sfNowOpen·sfNowCons 1곳씩',
+  T('v432 ②-2 간접 저장 길·훅 우회·계약 표 상태·부르는 자리: renderContracts의 알려진 저장 길 1개 그대로(csDetailHtml이 단계·서류 칸에서만 csApprSync · 60초 1회 · 바뀐 때만 scheduleContractSave 1곳 · cdocLoad 응답은 renderContracts 2곳만) · "noHooks: true" 파일 전체 ' + noHookN32 + '곳(현황 loadAsb 부름만) · opt.noHooks는 loadAsb 안 ' + optNHin32 + '/' + optNH32 + ' · 현황이 바꾸는 계약 표 상태 = sfNowGo의 칩·필터 풀기 2개(기기 저장 0) · 이동·그리기 함수는 sfNowGo 안에서만·로더(v436 안전 설정 loadSafetySet 포함)는 sfNowOpen 1곳씩·서류함은 sfNowOpen·sfNowCons 1곳씩',
     pathOk32 && noHookN32 === 1 && /sfNowLoad\("asb", loadAsb, \{ noHooks: true \}\)/.test(htmlNC32) && optNH32 === optNHin32 && optNHin32 === 1
     && conAsg32.length === 2 && /if \(!csPass\(c, conSheet\.f, conSheet\.chip\)\)\{ conSheet\.f = \{\}; conSheet\.chip = ""; \}/.test(fn32('sfNowGo')) && !/conSheetSave/.test(code32)
     && siteOk32,
@@ -3064,7 +3067,9 @@ try {
         { id: 'c6', type: 'dredge', docType: 'public', status: 'run', client: '깨진 계약', __throw: 1, pipes: [] }],
       cdoc: { c1: { loaded: true, busy: false, err: '' }, c5: { loaded: false, busy: false, err: '500' }, c6: { loaded: true, busy: false, err: '' } },
       flows: { c1: { st: { 'main|0': [{ id: 'p~con~safety_plan', pk: [{ ik: 'con|safety_plan' }], refs: [], __st: 'done' }], 'main|1': [{ id: 'p~start~safety_pack', pk: [{ ik: 'start|safety_pack' }], refs: [], __st: 'todo' }, { id: 's~x', pk: [], refs: [{}], __st: 'done' }] }, loose: [{ id: 'p~complete~safety_cost', pk: [{ ik: 'complete|safety_cost' }], refs: [], __st: 'na' }] } },
-      licOk: true, offline: false, colBase: { checklist: 1, contracts: 1, licenses: 1 }, st: { edu: 'ok', asb: 'ok' }, ticks: 0, dutyThrow: false,
+      licOk: true, offline: false, colBase: { checklist: 1, contracts: 1, licenses: 1 }, st: { edu: 'ok', asb: 'ok', set: 'ok' }, ticks: 0, dutyThrow: false,
+      // v436 안전 설정(settings:safety — @safety-set 구간의 상태 sfSet·sfSetDay·sfSetBy) — 기본 = 받았고 저장값 없음(운영 지금 상태 '미인정(입력 전)'). st.set을 안 준 표본은 'ok'(종전 표본은 설정과 무관)
+      set: null, setDay: '', setBy: '',
     };
     return Object.assign(o, over || {});
   };
@@ -3094,8 +3099,9 @@ try {
       fn32('liveSites'), fn32('siteKind'), fn32('siteLabel'), fn32('asbNotifyDue'), fn32('asbKeepUntil'), fn32('asbNoSpecial'),
       fn32('liveLic'), fn32('licVisible'), fn32('liveContracts'), fn32('csPkWhen'), fn32('csPkIk'), fn32('csTitle'), fn32('csSiteText'), fn32('csKind'), fn32('findProc'),
       'var currentTab = "safety", safetyLayer = "now";',
+      'var sfSet = __o.set === undefined ? null : __o.set, sfSetDay = __o.setDay || "", sfSetBy = __o.setBy || "";', stmt32(html, /var QUAL_DEF=\{[\s\S]*?\} \};/),   // v436 ⑤ — 안전 설정 상태(구간 밖 @safety-set 선언)·적격 계수(앱 등급 글)
       sec32,
-      'sfNowSt.edu = __o.st.edu; sfNowSt.asb = __o.st.asb; sfNowTicks = __o.ticks || 0;',
+      'sfNowSt.edu = __o.st.edu; sfNowSt.asb = __o.st.asb; sfNowSt.set = (__o.st.set === undefined ? "ok" : __o.st.set); sfNowTicks = __o.ticks || 0;',
       'return { render: function(){ renderSafetyNow(); return __D.sfNowHost.innerHTML; }, setTicks: function(n){ sfNowTicks = n; }, max: function(){ return SF_NOW_TICK_MAX; }, eduDue: sfNowEduDue, homeRow: sfNowHomeEduRow, ck: function(){ return CURRENT_KEYS; },',
       '  runTimers: function(n){ var k = 0; while (__cbs.length && k < n){ var t = __cbs.shift(); t.f(); k++; } return k; }, pending: function(){ return __cbs.length; }, ticks: function(){ return sfNowTicks; }, html: function(){ return __D.sfNowHost.innerHTML; },',
       '  setCons: function(cs){ contracts = cs; _colBase.contracts = 1; }, cdocSet: function(id, p){ var e = CDOC[id] || (CDOC[id] = {}); for (var k in p) e[k] = p[k]; }, setWorkers: function(w){ workers = w; } };'].join('\n'))(o, D, timers, calls);
@@ -3108,6 +3114,7 @@ try {
   const pillOf32 = (s, id) => { const m = s.match(new RegExp('<span class="sfn-id">' + id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '<\\/span>[\\s\\S]*?<span class="sfn-pill([^"]*)">([^<]*)<\\/span><\\/div>')); return m ? (m[1].trim() || '-') + ':' + m[2] : ''; };
   const gos32 = (out) => [...out.matchAll(/data-sfn-go="([^"]+)"/g)].map((m) => m[1]);
   const goOk32 = (g) => /^check:(w1|m1|m3|q1|h[1-7]|y[1-6]|y11|y1[5-8]|su[1356])$/.test(g) || /^(site|duty|doc06|edu:member|edu:worker)$/.test(g) || /^con:c\d$/.test(g);
+  SFNOW32 = { run32, base32, blk32, order32, rowIds32, pillOf32, gos32, goOk32, seedBy32, mem32 };
 
   const A32 = run32(base32());
   const aChk32 = blk32(A32.out, 'check'), aJcb32 = blk32(A32.out, 'jcb'), aDue32 = blk32(A32.out, 'due'), aCon32 = blk32(A32.out, 'con'), aCf32 = blk32(A32.out, 'confirm');
@@ -3142,9 +3149,10 @@ try {
     && (aCon32.match(/<span class="sfn-pill bad">확인 실패<\/span>/g) || []).length === 2 && aCon32.indexOf('안전 서류 줄이 없는 진행 계약 1건') > 0 && aCon32.indexOf('끝난 계약') < 0
     && A32.calls.flow.join(',') === 'c1,c6' && A32.calls.state.length === 3 && A32.calls.state.every((x) => x[0] === 'c1' && x[2] === true) && A32.out.indexOf('<img') < 0 && aCon32.indexOf('포항시&lt;img src=x&gt;') > 0,
     rowIds32(aCon32).join(',') + ' / flow ' + A32.calls.flow.join(',') + ' / ' + (aCon32.match(/<span class="cnt">[^<]*<\/span>/) || [''])[0]);
-  T('v432 ④ 관리자형 ⑤⑥·통째: ⑤ 인정·평가 = "7단계에서 채움" 안내만 · ⑥ 확인 필요 6줄(하도급·밀폐·폭염·장비·지입·작업 — 조문만, 누를 곳 없음) + 문서함 › 06 안전보건 열기 · 화면 전체에 완료 버튼·체크·입력 칸 0(버튼은 문서함 바로가기 1개) · 줄 이동 대상 전부 알려진 자리 · 읽는 중(석면 계약 서류함)이라 1초 뒤 다시 그림 1번',
-    blk32(A32.out, 'eval').indexOf('7단계에서 채움') > 0 && rowIds32(aCf32).join(',') === '하도급,밀폐,폭염,장비,지입,작업' && (aCf32.match(/data-sfn-go=/g) || []).length === 1 && aCf32.indexOf('data-sfn-go="doc06">문서함 › 06 안전보건 열기 ›</button>') > 0
-    && (A32.out.match(/<button/g) || []).length === 1 && !/<input|<select|<textarea|type="checkbox"|data-cs-|data-chk-|완료<\/button>/.test(A32.out)
+  //   v436: ⑤ 자리 안내('7단계에서 채움')가 7단계 줄 셋으로 바뀌었다 — 버튼은 문서함 바로가기 + 관리자 ⑤ [고치기](data-sfn-set — 이동 data-sfn-go 아님) 2개(줄 내용은 v436 묶음 ①~⑥)
+  T('v432 ④ 관리자형 ⑤⑥·통째: ⑤ 인정·평가 = v436 줄 셋(KOSHA · 석면 · 등록 — 이 표본은 의무 대장 17·18행 없음)·"7단계에서 채움" 0 · ⑥ 확인 필요 6줄(하도급·밀폐·폭염·장비·지입·작업 — 조문만, 누를 곳 없음) + 문서함 › 06 안전보건 열기 · 화면 전체에 완료 버튼·체크·입력 칸 0(버튼은 문서함 바로가기 1개 + v436 ⑤ [고치기] 1개 — 관리자) · 줄 이동 대상 전부 알려진 자리 · 읽는 중(석면 계약 서류함)이라 1초 뒤 다시 그림 1번',
+    rowIds32(blk32(A32.out, 'eval')).join(',') === 'KOSHA,석면,등록' && A32.out.indexOf('7단계에서 채움') < 0 && rowIds32(aCf32).join(',') === '하도급,밀폐,폭염,장비,지입,작업' && (aCf32.match(/data-sfn-go=/g) || []).length === 1 && aCf32.indexOf('data-sfn-go="doc06">문서함 › 06 안전보건 열기 ›</button>') > 0
+    && (A32.out.match(/<button/g) || []).length === 2 && (blk32(A32.out, 'eval').match(/<button type="button" class="sfn-go" data-sfn-set="1">고치기<\/button>/g) || []).length === 1 && !/<input|<select|<textarea|type="checkbox"|data-cs-|data-chk-|완료<\/button>/.test(A32.out)
     && gos32(A32.out).length > 20 && gos32(A32.out).every(goOk32) && A32.timers.join(',') === '1000',
     JSON.stringify({ gos: gos32(A32.out).filter((g) => !goOk32(g)), timers: A32.timers }));
 
@@ -3160,9 +3168,10 @@ try {
     order32(K32.out) + ' / ① ' + rowIds32(kChk32).length + ' / ③ ' + rowIds32(kDue32).join(','));
   const J32 = run32(base32({ admin: false, me: { id: 'j1', dept: '운영부' }, perm: { site: 'do', lic: 'do', check: 'do', con: 'do', doc: 'view', wk: 'do' } }));
   const V32 = run32(base32({ admin: false, me: { id: 'k2', dept: '운영부' }, perm: { safety: 'do', site: 'do' } }));
-  T('v432 ④ 현장만형(김정아형 — 안전 권한 없음) = 현황을 그리지 않음(빈 칸·타이머 0) · 블록 권한 가상형(안전·현장만, 체크·인허가·계약·문서함 숨김) = ①②④⑤ 블록째 없음("0건" 아님)·③ 현장·교육 줄만(의무 대장·꼬리말 없음)·⑥ 문서함 바로가기 없음',
+  //   v436: ⑤는 원천이 안전 설정이라 현황을 보는 사람 모두에게(종전 v432 자리 표시는 인허가 권한) — 인허가 권한이 없으면 ⑤ 안의 의무 대장 글만 빠진다('의무 대장' 낱말 0 그대로)
+  T('v432 ④ 현장만형(김정아형 — 안전 권한 없음) = 현황을 그리지 않음(빈 칸·타이머 0) · 블록 권한 가상형(안전·현장만, 체크·인허가·계약·문서함 숨김) = ①②④ 블록째 없음("0건" 아님)·③ 현장·교육 줄만(의무 대장·꼬리말 없음)·⑤ 인정·평가는 보임(v436 — 의무 대장 글 없음)·⑥ 문서함 바로가기 없음',
     J32.out === '' && J32.timers.length === 0
-    && order32(V32.out) === 'due,confirm' && V32.out.indexOf('0건') < 0 && blk32(V32.out, 'due').indexOf('석면 작업신고 마감') > 0 && V32.out.indexOf('의무 대장') < 0 && V32.out.indexOf('doc06') < 0 && blk32(V32.out, 'due').indexOf('<div class="sfn-src">현장 대장 · 교육·검진</div>') > 0,
+    && order32(V32.out) === 'due,eval,confirm' && V32.out.indexOf('0건') < 0 && blk32(V32.out, 'due').indexOf('석면 작업신고 마감') > 0 && V32.out.indexOf('의무 대장') < 0 && V32.out.indexOf('doc06') < 0 && blk32(V32.out, 'due').indexOf('<div class="sfn-src">현장 대장 · 교육·검진</div>') > 0,
     'J ' + J32.out.length + ' / V ' + order32(V32.out));
   const E32 = run32(base32({ st: { edu: 'fail', asb: 'fail' }, colBase: { checklist: 1 }, offline: true, contracts: [], duties: [], licOk: false }));
   const F32 = run32(base32({ st: { edu: 'wait', asb: 'ok' }, colBase: { checklist: 1, licenses: 1 }, contracts: [] }));
@@ -3219,7 +3228,7 @@ try {
   const W0_32 = run32(base32({ workers: [] })), w0Due32 = blk32(W0_32.out, 'due'), w0Ed32 = W0_32.api.eduDue(30), w0Row32 = w0Ed32.length ? W0_32.api.homeRow(w0Ed32[0]) : '';
   T('v432 ④-5 빈 자료(실행): 교육 기록 0건 = "기록 없음" 2줄(남성초 석면 · 특별교육 — 투입 2명 이수 여부 미확인 · 교육·검진 다음 예정)·"특별교육 미이수" 0 · 볼 체크 항목 0개 = ① 블록 없음·"0건" 0·② 조문 줄 2개 · 명부 없음 = 일용직 줄 "일용직 · 특수건강진단"(현황 ③·관리자 홈 줄 모두 "(삭제된 일용직)" 0)',
     (e0Due32.match(/<span class="sfn-pill">기록 없음<\/span>/g) || []).length === 2 && e0Due32.indexOf('남성초 석면 · 특별교육</div><div class="item-meta">교육·검진 기록이 0건이라 투입 2명 모두 이수 여부 미확인') > 0 && e0Due32.indexOf('특별교육 미이수') < 0 && e0Due32.indexOf('교육·검진 다음 예정</div>') > 0
-    && order32(Z0_32.out) === 'jcb,due,confirm' && Z0_32.out.indexOf('0건') < 0 && rowIds32(blk32(Z0_32.out, 'jcb')).join(',') === '5조②1·2,2·6호'
+    && order32(Z0_32.out) === 'jcb,due,eval,confirm' && Z0_32.out.indexOf('0건') < 0 && rowIds32(blk32(Z0_32.out, 'jcb')).join(',') === '5조②1·2,2·6호'   // v436 ⑤는 안전 권한이면 보임(인허가 권한 없음 — 의무 대장 글 없이)
     && W0_32.out.indexOf('(삭제된 일용직)') < 0 && w0Due32.indexOf('일용직 · 특수건강진단') > 0 && w0Ed32.length > 0 && w0Ed32[0].r.id === 'e3' && w0Row32.indexOf('<div class="item-title">일용직 · 특수건강진단</div>') > 0,
     JSON.stringify({ e0: (e0Due32.match(/<span class="sfn-pill">기록 없음<\/span>/g) || []).length, z: order32(Z0_32.out), w0: w0Ed32.map((x) => x.r.id) }));
   // ④-6 (v432 검토) 의무 대장 → 인허가 행 잇기에 회사를 본다 — 같은 이름 인허가가 두 회사에 따로 있고 한쪽만 공개범위면: 의무 줄 글의 회사 행으로 판정(종운건설 행만 닫힘 → 16행 빠짐), 회사로 못 고르면 모두 볼 때만
@@ -3282,21 +3291,22 @@ try {
       'var __now = 1000000; var Date = { now: function(){ return __now; } };',
       'var contracts = __cons, currentTab = "safety", safetyLayer = "now", workers = [{ id: "w1", name: "김일용" }];',
       SRC32.packets, fn32('csPkWhen'), fn32('csPkIk'), fn32('liveContracts'), stmt32(sec32, /var SF_NOW_CON = \[[^\n]*\];/),
-      stmt32(sec32, /var SF_NOW_TICK_MAX = \d+;/), stmt32(sec32, /var SF_NOW_FRESH = \d+;/), 'var sfNowSt = { edu: "", asb: "" }, sfNowTicks = 5, sfNowAt = {}, sfNowCdocT0 = { c9: 3 };',
+      stmt32(sec32, /var SF_NOW_TICK_MAX = \d+;/), stmt32(sec32, /var SF_NOW_FRESH = \d+;/), 'var sfNowSt = { edu: "", asb: "", set: "" }, sfNowTicks = 5, sfNowAt = {}, sfNowCdocT0 = { c9: 3 };',
       'function loadEdu(a){ __log.push("loadEdu:" + JSON.stringify(a === undefined ? null : a)); return __th("edu"); }',
       'function loadAsb(a){ __log.push("loadAsb:" + JSON.stringify(a === undefined ? null : a)); return __th("asb"); }',
       'function loadWorkers(){ __log.push("loadWorkers"); return __th("wk"); } function cdocLoad(c, force){ __log.push("cdocLoad:" + c.id + (force === undefined ? "" : ":" + force)); } function renderSafetyNow(){ __log.push("render"); }',
+      'function loadSafetySet(a){ __log.push("loadSafetySet:" + JSON.stringify(a === undefined ? null : a)); return __th("set"); }',   // v436 안전 설정 읽기(현황을 열 때 — 교육 다음)
       fn32('sfNowConKeys'), fn32('sfNowLoad'), fn32('sfNowRefresh'), fn32('sfNowOpen'),
-      'sfNowOpen(); return { st: function(){ return sfNowSt.edu + "/" + sfNowSt.asb + "/" + sfNowTicks + "/" + JSON.stringify(sfNowCdocT0); }, leave: function(){ currentTab = "dash"; }, back: function(){ currentTab = "safety"; },',
+      'sfNowOpen(); return { st: function(){ return sfNowSt.edu + "/" + sfNowSt.asb + "/" + sfNowSt.set + "/" + sfNowTicks + "/" + JSON.stringify(sfNowCdocT0); }, leave: function(){ currentTab = "dash"; }, back: function(){ currentTab = "safety"; },',
       '  again: function(ms){ __now += ms; __log.length = 0; sfNowOpen(); return __log.join(","); } };'].join('\n'))(perm, admin, log, th, base32().contracts);
     return { log, thens, api };
   };
   const oA32 = openRun32({}, true), oA0_32 = oA32.log.join(','), oA0st32 = oA32.api.st();
   const fire32 = (r, name, v) => { const t = r.thens.filter((x) => x.name === name)[0]; if (t) t.ok(v); return !!t; };   // 그 로더를 안 불렀으면 false — 아래 단언이 ✗로 잡는다(시험 틀이 터지지 않게)
-  const fE32 = fire32(oA32, 'edu', true), fS32 = fire32(oA32, 'asb', false); const oA1st32 = oA32.api.st(), oA1n32 = oA32.log.filter((x) => x === 'render').length;
+  const fE32 = fire32(oA32, 'edu', true), fS32 = fire32(oA32, 'asb', false), fT32 = fire32(oA32, 'set', true); const oA1st32 = oA32.api.st(), oA1n32 = oA32.log.filter((x) => x === 'render').length;   // v436 안전 설정(set)도 받음
   oA32.api.leave(); const fW32 = fire32(oA32, 'wk'); const oA2n32 = oA32.log.filter((x) => x === 'render').length;
   oA32.api.back();
-  const oAg1_32 = oA32.api.again(10000), oAg2_32 = oA32.api.again(25000);   // 10초 뒤(받은 교육·명부는 다시 안 읽음, 실패한 현장 대장은 다시) · 그 뒤 25초(교육·명부 받은 지 35초 — 다시 읽음)
+  const oAg1_32 = oA32.api.again(10000), oAg2_32 = oA32.api.again(25000);   // 10초 뒤(받은 교육·안전 설정·명부는 다시 안 읽음, 실패한 현장 대장은 다시) · 그 뒤 25초(받은 지 35초 — 다시 읽음)
   const oK32 = openRun32({ safety: 'do', con: 'do', wk: 'view' }, false), oN32 = openRun32({ safety: 'do' }, false);
   const ldRun32 = (name, status, opt, admin, tab) => {
     const log = [];
@@ -3311,10 +3321,10 @@ try {
     return v + ':' + log.join(',');
   };
   const la32 = [ldRun32('asb', 200, { noHooks: true }), ldRun32('asb', 200), ldRun32('asb', 500, { noHooks: true }), ldRun32('edu', 200, undefined, true), ldRun32('edu', 200, undefined, false), ldRun32('edu', 403, undefined, true), ldRun32('edu', 200, undefined, true, 'safety'), ldRun32('edu', 200, undefined, true, 'cal')];
-  T('v432 ⑥ 읽기(sfNowOpen·loadAsb·loadEdu 실행): 현황을 열면 교육 읽기 · 현장 대장 읽기({ noHooks: true } — 보류된 계약 연결·종결 훅은 안 돎, 현장 칸·계약 쪽 읽기는 종전대로 훅) · 명부 · 서류함은 안전 서류가 걸리는 진행 계약만(관급 진행 4건 — 사급·끝난 계약 빼고, 60초 캐시 — force 없음) → 그리기 1번 · 열 때 서류함 기다림 시작 틱 초기화 · 결과(성공 true·실패 false)를 적고 그 칸이면 다시 그림 · 다른 데로 가면 안 그림 · 30초 안에 다시 열면 받은 교육·명부는 다시 안 읽고 실패한 현장 대장만 다시(35초 뒤엔 모두) · 권민지형(현장 숨김) = 현장 대장·훅 없음 · 계약 숨김 = 서류함 안 읽음 · 로더는 성공 true·실패 false를 돌려주고 관리자가 홈에 있을 때만 교육 도착 때 홈(만기 목록)도 다시 그림(안전 탭·캘린더면 안 그림)',
-    oA0_32 === 'loadEdu:null,loadAsb:{"noHooks":true},loadWorkers,cdocLoad:c1,cdocLoad:c2,cdocLoad:c5,cdocLoad:c6,render' && oA0st32 === 'wait/wait/0/{}' && fE32 && fS32 && fW32 && oA1st32 === 'ok/fail/0/{}' && oA1n32 === 3 && oA2n32 === 3
-    && oAg1_32 === 'loadAsb:{"noHooks":true},cdocLoad:c1,cdocLoad:c2,cdocLoad:c5,cdocLoad:c6,render' && oAg2_32 === 'loadEdu:null,loadAsb:{"noHooks":true},loadWorkers,cdocLoad:c1,cdocLoad:c2,cdocLoad:c5,cdocLoad:c6,render'
-    && oK32.log.join(',') === 'loadEdu:null,loadWorkers,cdocLoad:c1,cdocLoad:c2,cdocLoad:c5,cdocLoad:c6,render' && oK32.api.st() === 'wait//0/{}' && oN32.log.join(',') === 'loadEdu:null,render'
+  T('v432 ⑥ 읽기(sfNowOpen·loadAsb·loadEdu 실행): 현황을 열면 교육 읽기 · v436 안전 설정 읽기(loadSafetySet — 교육 다음, 안전 권한) · 현장 대장 읽기({ noHooks: true } — 보류된 계약 연결·종결 훅은 안 돎, 현장 칸·계약 쪽 읽기는 종전대로 훅) · 명부 · 서류함은 안전 서류가 걸리는 진행 계약만(관급 진행 4건 — 사급·끝난 계약 빼고, 60초 캐시 — force 없음) → 그리기 1번 · 열 때 서류함 기다림 시작 틱 초기화 · 결과(성공 true·실패 false)를 적고 그 칸이면 다시 그림 · 다른 데로 가면 안 그림 · 30초 안에 다시 열면 받은 교육·안전 설정·명부는 다시 안 읽고 실패한 현장 대장만 다시(35초 뒤엔 모두) · 권민지형(현장 숨김) = 현장 대장·훅 없음 · 계약 숨김 = 서류함 안 읽음 · 로더는 성공 true·실패 false를 돌려주고 관리자가 홈에 있을 때만 교육 도착 때 홈(만기 목록)도 다시 그림(안전 탭·캘린더면 안 그림)',
+    oA0_32 === 'loadEdu:null,loadSafetySet:null,loadAsb:{"noHooks":true},loadWorkers,cdocLoad:c1,cdocLoad:c2,cdocLoad:c5,cdocLoad:c6,render' && oA0st32 === 'wait/wait/wait/0/{}' && fE32 && fS32 && fT32 && fW32 && oA1st32 === 'ok/fail/ok/0/{}' && oA1n32 === 4 && oA2n32 === 4
+    && oAg1_32 === 'loadAsb:{"noHooks":true},cdocLoad:c1,cdocLoad:c2,cdocLoad:c5,cdocLoad:c6,render' && oAg2_32 === 'loadEdu:null,loadSafetySet:null,loadAsb:{"noHooks":true},loadWorkers,cdocLoad:c1,cdocLoad:c2,cdocLoad:c5,cdocLoad:c6,render'
+    && oK32.log.join(',') === 'loadEdu:null,loadSafetySet:null,loadWorkers,cdocLoad:c1,cdocLoad:c2,cdocLoad:c5,cdocLoad:c6,render' && oK32.api.st() === 'wait//wait/0/{}' && oN32.log.join(',') === 'loadEdu:null,loadSafetySet:null,render'
     && la32[0] === 'true:gw-data:get:asbestos,renderSites,renderCalendar,renderWorkers' && la32[1] === 'true:gw-data:get:asbestos,hooks,renderSites,renderCalendar,renderWorkers' && la32[2] === 'false:gw-data:get:asbestos'
     && la32[3] === 'true:gw-data:get:edu,renderEdu,renderCalendar,renderSites,renderDashboard' && la32[4] === 'true:gw-data:get:edu,renderEdu,renderCalendar,renderSites' && la32[5] === 'false:gw-data:get:edu'
     && la32[6] === 'true:gw-data:get:edu,renderEdu,renderCalendar,renderSites' && la32[7] === 'true:gw-data:get:edu,renderEdu,renderCalendar,renderSites',
@@ -3362,9 +3372,11 @@ try {
   //      화면 칸은 칸마다 본다(게이트 칸에도 같은 낱말이 있어 절 전체 낱말 검사는 칸 하나가 지워져도 통과했다 — 결함 심기 3회차)
   const cbOf32 = (key) => cb32.filter((l) => l.indexOf(key) >= 0 && /^- \[[ x]\] \(AI 시험 화면 대상/.test(l))[0] || '';   // 11/10: AI가 시험 뒤 [x]로 닫아도 같은 내용 검사(열린 칸만 보면 닫는 순간 실패)
   const tlMove32 = cbOf32('관리자형 이동'), tlHome32 = cbOf32('관리자 홈:'), tlPhone32 = cbOf32('폰 375px(큰 글자 포함)');
-  T('v432 ⑧-2 문서 내용: MANUAL 28-1 묶음 6개 이름 그대로·① 오늘·이번 달·지남(화요일)·⑤ 7단계·실패 안내 2갈래·결재 결과 맞추기 예외·가장 최근 이수 기록 · 21-2 목록 (교육·검진·현황) · FEATURES v432 절 h3·checkItemVisible·licVisible·csApprSync·eduLatest·sfNowDutyLics·SF_NOW_FRESH·sfNowCdocT0·오늘·이번 달 · §8 안전 열 = 현황 칸 · CLAUDE.md noHooks·csApprSync·conSheetSave · TESTLIST v432 체크 칸 PM 0 · 화면 칸마다(이동 칸 = 저장 예외 csApprSync·수시 줄·폰 상세 카드 · 관리자 홈 칸 = 옛 줄 없음·(삭제된 일용직) 없음 · 375px 칸 = 알약 늘 오른쪽)',
+  T('v432 ⑧-2 문서 내용: MANUAL 28-1 묶음 6개 이름 그대로·① 오늘·이번 달·지남(화요일)·⑤ 7단계(v436 — KOSHA 인정 줄 설명, 옛 자리 글 0)·실패 안내 2갈래·결재 결과 맞추기 예외·가장 최근 이수 기록 · 21-2 목록 (교육·검진·현황) · FEATURES v432 절 h3·checkItemVisible·licVisible·csApprSync·eduLatest·sfNowDutyLics·SF_NOW_FRESH·sfNowCdocT0·오늘·이번 달 · §8 안전 열 = 현황 칸 · CLAUDE.md noHooks·csApprSync·conSheetSave · TESTLIST v432 체크 칸 PM 0 · 화면 칸마다(이동 칸 = 저장 예외 csApprSync·수시 줄·폰 상세 카드 · 관리자 홈 칸 = 옛 줄 없음·(삭제된 일용직) 없음 · 375px 칸 = 알약 늘 오른쪽)',
     m281li32 === '이번 주기 안전 점검,중처법 반기 점검,다가오는 기한 30일,계약 안전 서류,인정·평가,확인 필요'
-    && /<b>오늘<\/b>은 매주\(월요일\) 항목의 월요일 당일/.test(m281_32) && /<b>이번 달<\/b>은 기한 달/.test(m281_32) && /화요일이 되도록 아직/.test(m281_32) && m281_32.indexOf('(7단계 — 인정·평가 칸에서 채웁니다)') > 0 && m281_32.indexOf('다음 단계에서 채웁니다') < 0
+    && /<b>오늘<\/b>은 매주\(월요일\) 항목의 월요일 당일/.test(m281_32) && /<b>이번 달<\/b>은 기한 달/.test(m281_32) && /화요일이 되도록 아직/.test(m281_32) && m281_32.indexOf('다음 단계에서 채웁니다') < 0
+    // v436: ⑤ 자리 안내('(7단계 — 인정·평가 칸에서 채웁니다)')가 7단계 실제 줄 설명으로 바뀌었다 — 옛 자리 글 0 + ⑤ 항목이 KOSHA 인정으로 시작(내용 고정은 v436 묶음 ⑨)
+    && m281_32.indexOf('인정·평가 칸에서 채웁니다') < 0 && /<li><b>인정·평가<\/b> — KOSHA 위험성평가 인정 단계/.test(m281_32)
     && m281_32.indexOf('현황 칸을 다시 열면 새로 읽고') > 0 && m281_32.indexOf('<b>앱을 새로고침</b>해야 다시 읽습니다') > 0 && m281_32.indexOf('칸을 다시 열면 새로 읽습니다.</li>') < 0 && m281_32.indexOf('결재 결과 맞추기') > 0 && m281_32.indexOf('<b>가장 최근 이수 기록</b>만') > 0 && m281_32.indexOf("내 업무 아래 '수시' 칸의 그 줄로") > 0
     && m212_32.indexOf('<li><b>안전</b>(교육·검진·현황)도 기본 숨김') > 0 && m212_32.indexOf('교육·검진 목록과 현황 칸만') > 0
     && ['h3(안전보건 담당자 업무수행 평가, 공개범위 관리자 3명)는 권민지 현황의 ①에도 ② 5호에도 없다', '`checkItemVisible`', '`licVisible`', '`csApprSync`', '`eduLatest`', '`sfNowDutyLics`', '`SF_NOW_FRESH`', '`sfNowCdocT0`', '오늘(매주 항목 — 월요일 당일)', '이번 달(기한 달', '폰(860px 밑)은 표 아래 상세 카드'].every((w) => ftv32.indexOf(w) > 0)
@@ -4326,6 +4338,337 @@ try {
     && Number((sw35.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 435,
     JSON.stringify({ m28: m28_35.length, man: m28_35.indexOf(MAN35), ftv: ftv35.length, ftMiss: FT_PINS35.filter((s) => ftv35.indexOf(s) < 0).map((s) => s.slice(0, 30)), ft7: ft7_35.indexOf(FT7_PIN35), tl: tlv35.length, cb: cb35.length, notAi: cbNotAi35.map((l) => l.slice(0, 40)), pm: cbPM35.map((l) => l.slice(0, 40)), scr: cbScr35.map((l) => l.slice(0, 50)), tlMiss: TL_PINS35.filter((w) => tlv35.indexOf(w) < 0), clMiss: CL_PINS35.filter((s) => clSafe35.indexOf(s) < 0).map((s) => s.slice(0, 30)) }));
 } catch (e) { console.log('  (v435 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ---- v436(11/10 메뉴 56 7단계 '인정·평가 칸과 회사 구분' — PM 11/10 08:19 ⓐ '45방식이랑 별개 방식임. 계약탭처럼 따로 설계된거임' = 안전 설정 따로(인허가 kosha_cert 행 안 씀),
+//      09_조사_문서/메뉴안전탭_자료_20261109/단계지시_v436_7인정평가.json · 브리핑 steps[6] · 코드 지도 code.steps[6]):
+//      현황 ⑤ 인정·평가 = KOSHA 위험성평가 인정(안전 설정 settings:safety) · 석면 안전성평가 'B 71.6 · 앱 반영 대기' · 등록기준 줄 + 맨 위 회사 구분(회사별 상시근로자 수 두 칸이 다 있을 때만) · 관리자만 [고치기]
+//      ① 설정 없음(운영 지금) ② 회사 구분 문턱 ③ KOSHA 단계·날짜·만료 경고 ④ 석면·등록기준·의무 대장 줄(권한·공개범위·교육 이수자 수) ⑤ 설정 읽기 상태(기다림·실패) — ①~⑤는 v432 현황 시험 틀(run32) 그대로
+//      ⑥ @safety-set 실행(읽기·창·저장·409 새로 읽기·값 검사·연타·네트워크) ⑦ 정적(현황 구간 저장·서버 호출 0 그대로 · [고치기] 배선은 구간 밖 위임 · 인허가 코드에 kosha_cert 0 · settings:safety를 읽는 서버 경로는 두 핸들러뿐 ·
+//      서버 검사 순서·permKey · 앱↔서버 단계·한도 같음) ⑧ CSS·창 마크업·감사 라벨 ⑨ 문서(MANUAL 28-1·FEATURES v436·§7·TESTLIST v436 AI 몫·CLAUDE.md·sw)
+try {
+  if (!SFNOW32) throw new Error('v432 현황 시험 틀(SFNOW32) 없음');
+  const H36 = SFNOW32, rd36 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const fn36 = (src, name) => { const i = src.indexOf('function ' + name + '('); if (i < 0) throw new Error('함수 없음: ' + name); let d = 0, st = false; for (let j = i; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i, j + 1); } } throw new Error('중괄호 짝 안 맞음: ' + name); };
+  //   한 줄 = 그 줄 머리 <div class="item …">(누를 곳 data-sfn-go가 여기) ~ 다음 줄 머리 앞
+  const row36 = (s, id) => { const k = '<span class="sfn-id">' + id + '</span>', R = '<div class="item sfn-row'; const i = s.indexOf(k); if (i < 0) return ''; const a = s.lastIndexOf(R, i), j = s.indexOf(R, i); return s.slice(a < 0 ? i : a, j < 0 ? s.length : j); };
+  const pills36 = (s, id) => [...row36(s, id).matchAll(/<span class="sfn-pill([^"]*)">([^<]*)<\/span>/g)].map((m) => (m[1].trim() || '-') + ':' + m[2]).join('|');
+  const meta36 = (s, id) => (row36(s, id).match(/<div class="item-meta">([^<]*)<\/div>/) || ['', ''])[1];
+  const title36 = (s, id) => (row36(s, id).match(/<div class="sfn-t">([\s\S]*?)<\/div>/) || ['', ''])[1];
+  const addD36 = (s, n) => { const d = new Date(s + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+  const TD36 = '2026-11-10', seed36 = H36.seedBy32, dut36 = [4, 16, 17, 18, 32, 61, 62].map((n) => seed36[n]);
+  const EQUIP36 = 'HEPA 음압기 · 음압기록장치 · HEPA 진공청소기 · 위생설비 · 송기마스크·전동식 호흡보호구 · 습윤장치';
+  const KS36 = (o) => Object.assign({ stage: 'none', apply_no: '', applied_on: '', review_on: '', decided_on: '', expires_on: '', rate_year: '', checks: [] }, o || {});
+  const SET36 = (k, h) => ({ kosha: KS36(k), headcount: Object.assign({ env: '', con: '' }, h || {}) });
+  const ev36 = (o) => { const r = H36.run32(H36.base32(Object.assign({ duties: dut36 }, o || {}))); return { r, out: r.out, ev: H36.blk32(r.out, 'eval'), corp: H36.blk32(r.out, 'corp') }; };
+  const STEPS36 = (on) => '<span class="sfn-steps">' + [['none', '미인정'], ['applied', '접수'], ['review', '심사'], ['certified', '인정']].map((s) => '<i' + (s[0] === on ? ' class="on"' : '') + '>' + s[1] + '</i>').join('') + '</span>';
+  const SET_BTN36 = '<button type="button" class="sfn-go" data-sfn-set="1">고치기</button>';
+  const HINT36 = '회사 구분(맨 위)은 회사별 상시근로자 수 두 칸을 다 넣은 뒤에 켜집니다.';
+
+  // ① 설정 없음(운영 지금 — settings:safety 키가 없다) — 관리자형
+  const A36 = ev36();
+  T('v436 ① 설정 없음(운영 지금 — 저장값 없음, 관리자): ⑤ 줄 = KOSHA · 석면 · 등록 · 17행 · 18행 · KOSHA "위험성평가 인정" + 단계 표시(미인정만 칠함)·알약 "미인정(입력 전)"·"관리자가 단계·날짜를 넣기 전입니다" · 회사 구분 블록 없음(블록 순서 그대로 ①부터) · 석면 알약 "B 71.6 · 앱 반영 대기"(2026 결과 · 앱 적격 계산 등급 D · 다음 평가 시기 = 의무 대장 16행 문구 · 누르면 의무 대장) · 등록기준 "관리자교육 0/2명"·장비 6종 문구 · 17·18행 = 의무 대장 글(누르면 의무 대장) · 출처 "안전 설정 · 입력은 관리자" · 꼬리 회사 구분 안내 + [고치기] 1개',
+    H36.rowIds32(A36.ev).join(',') === 'KOSHA,석면,등록,17행,18행' && title36(A36.ev, 'KOSHA') === '위험성평가 인정 ' + STEPS36('none') && pills36(A36.ev, 'KOSHA') === '-:미인정(입력 전)' && meta36(A36.ev, 'KOSHA') === '관리자가 단계·날짜를 넣기 전입니다'
+    && H36.order32(A36.out) === 'check,jcb,due,con,eval,confirm' && A36.corp === ''
+    && pills36(A36.ev, '석면') === 'am:B 71.6 · 앱 반영 대기' && title36(A36.ev, '석면') === '석면 안전성평가(종운건설) — 2026 결과'
+    && meta36(A36.ev, '석면') === '앱 적격 계산 등급은 아직 D · 통보서를 반영할 때 입찰 카드·의무 대장 16행까지 한 번에 고칩니다 · 다음 평가 시기(의무 대장 16행): ' + seed36[16].cycle && row36(A36.ev, '석면').indexOf('data-sfn-go="duty"') > 0
+    && pills36(A36.ev, '등록') === 'am:관리자교육 0/2명' && meta36(A36.ev, '등록').indexOf(' · 장비 6종: ' + EQUIP36 + ' — 인력이 바뀌면 다시 확인') > 0
+    && title36(A36.ev, '17행') === seed36[17].duty && title36(A36.ev, '18행') === seed36[18].duty && pills36(A36.ev, '17행') === '-:주기 문구' && row36(A36.ev, '18행').indexOf('data-sfn-go="duty"') > 0
+    && A36.ev.indexOf('<div class="sfn-src">안전 설정 · 입력은 관리자</div>') > 0 && A36.ev.indexOf(HINT36) > 0 && (A36.ev.match(/data-sfn-set=/g) || []).length === 1 && A36.ev.indexOf(SET_BTN36) > 0,
+    JSON.stringify({ ids: H36.rowIds32(A36.ev), kp: pills36(A36.ev, 'KOSHA'), kt: title36(A36.ev, 'KOSHA'), sp: pills36(A36.ev, '석면'), sm: meta36(A36.ev, '석면'), rp: pills36(A36.ev, '등록'), order: H36.order32(A36.out) }));
+
+  // ② 회사 구분 — 두 칸이 다 있을 때만 맨 위 · 문턱 배지(5명 · 종운환경 20명)
+  const K36base = { admin: false, me: { id: 'k2', dept: '운영부', rank: '사원' }, perm: { safety: 'do', check: 'do', lic: 'view', con: 'do', site: 'hide', doc: 'view', wk: 'view' } };
+  const C36 = (env, con, o) => ev36(Object.assign({ set: SET36({}, { env: env, con: con }) }, o || {}));
+  const c1 = C36(18, ''), c2 = C36('', 4), c3 = C36(18, 4), c4 = C36(20, 5), c5 = C36(50, 49), c6 = C36(0, 0), c7 = C36(19, 4), c8 = C36('18', 4), c9 = C36(18, 4, { st: { edu: 'ok', asb: 'ok', set: 'fail' } }), c10 = C36(18, 4, K36base);
+  //   알약은 짧게(폰 375px — 알약은 줄바꿈 없음), 뜻·조문은 메타 줄
+  const M5a36 = '중대재해처벌법·정기교육 적용(상시 5명 이상)', M5b36 = '중대재해처벌법·정기교육 제외(상시 5명 미만 — 특별교육은 적용)', M20a36 = '안전보건관리담당자 선임 대상(폐기물 수집·운반업 20~49명)', M20b36 = '안전보건관리담당자는 20명부터(폐기물 수집·운반업)', M50_36 = '50명 이상 — 안전관리 인력 선임 기준 다시 확인';
+  T('v436 ② 회사 구분(맨 위 — 회사별 상시근로자 수 두 칸이 다 있을 때만): 한 칸만(18·빈칸 / 빈칸·4)·숫자 글("18")·설정 읽기 실패 = 블록 없음(⑤ 꼬리에 켜는 안내 — 읽기 실패면 두 칸 옛 값이 있어도) · 두 칸(18·4) = 맨 위 블록(순서 corp → ① …)·줄 종운환경·종운건설 "상시근로자 n명" · 문턱 배지(짧은 알약 + 메타 뜻): 5명(중처법·정기교육) 이상 am "5명↑ 중처법 적용"·미만 회색 "5명 미만" / 종운환경만 20명(안전보건관리담당자) — 19까지 알약 없이 메타 "20명부터"·20~49 am "20명↑ 담당자 선임"·50 이상 bad "50명↑ 기준 확인" / 0·0도 켜짐 · 켜지면 ⑤ 꼬리 안내 없음 · 근거 조문 꼬리 · 권민지형(비관리자)도 같은 블록',
+    [c1, c2, c8, c9].every((x) => x.corp === '' && H36.order32(x.out).indexOf('corp') < 0) && c1.ev.indexOf(HINT36) > 0 && c9.ev.indexOf(HINT36) > 0
+    && H36.order32(c3.out) === 'corp,check,jcb,due,con,eval,confirm' && H36.rowIds32(c3.corp).join(',') === '종운환경,종운건설' && title36(c3.corp, '종운환경') === '상시근로자 18명' && title36(c3.corp, '종운건설') === '상시근로자 4명'
+    && pills36(c3.corp, '종운환경') === 'am:5명↑ 중처법 적용' && meta36(c3.corp, '종운환경') === M5a36 + ' · ' + M20b36 && pills36(c3.corp, '종운건설') === '-:5명 미만' && meta36(c3.corp, '종운건설') === M5b36 && c3.ev.indexOf(HINT36) < 0
+    && pills36(c4.corp, '종운환경') === 'am:5명↑ 중처법 적용|am:20명↑ 담당자 선임' && meta36(c4.corp, '종운환경') === M5a36 + ' · ' + M20a36 && pills36(c4.corp, '종운건설') === 'am:5명↑ 중처법 적용' && meta36(c4.corp, '종운건설') === M5a36
+    && pills36(c5.corp, '종운환경') === 'am:5명↑ 중처법 적용|bad:50명↑ 기준 확인' && meta36(c5.corp, '종운환경') === M5a36 + ' · ' + M50_36 && pills36(c5.corp, '종운건설') === 'am:5명↑ 중처법 적용'
+    && pills36(c6.corp, '종운환경') === '-:5명 미만' && meta36(c6.corp, '종운환경') === M5b36 + ' · ' + M20b36 && title36(c6.corp, '종운건설') === '상시근로자 0명'
+    && pills36(c7.corp, '종운환경') === 'am:5명↑ 중처법 적용' && meta36(c7.corp, '종운환경') === M5a36 + ' · ' + M20b36
+    && c10.corp === c3.corp && c3.corp.indexOf('산업안전보건법 시행령 제24조') > 0 && c3.corp.indexOf('중대재해처벌법 제3조') > 0 && c3.corp.indexOf('<div class="sfn-src">안전 설정의 회사별 상시근로자 수</div>') > 0,
+    JSON.stringify({ order: H36.order32(c3.out), p: [pills36(c3.corp, '종운환경'), pills36(c4.corp, '종운환경'), pills36(c5.corp, '종운환경'), pills36(c6.corp, '종운환경')], m: [meta36(c3.corp, '종운환경'), meta36(c3.corp, '종운건설')], off: [c1, c2, c8, c9].map((x) => x.corp.length) }));
+
+  // ③ KOSHA 인정 줄 — 단계·날짜·만료 90일 경고(오늘 2026-11-10)
+  const k1 = ev36({ set: SET36({ stage: 'none' }) });
+  const k2 = ev36({ set: SET36({ stage: 'applied', apply_no: 'K-2026-0001', applied_on: '2026-11-12' }) });
+  const k3 = ev36({ set: SET36({ stage: 'review', applied_on: '2026-11-12', review_on: '2026-12-01' }) });
+  const k4 = ev36({ set: SET36({ stage: 'certified', decided_on: '2024-01-09', expires_on: addD36(TD36, 60), checks: [{ date: '2025-03-01', note: '적합' }, { date: '2026-03-02', note: '' }], rate_year: '2027' }), setDay: '2026-11-10', setBy: 'a2' });
+  const k5 = ev36({ set: SET36({ stage: 'certified', expires_on: addD36(TD36, 90) }) }), k6 = ev36({ set: SET36({ stage: 'certified', expires_on: addD36(TD36, 91) }) });
+  const k7 = ev36({ set: SET36({ stage: 'certified', expires_on: '2026-11-01' }) }), k8 = ev36({ set: SET36({ stage: 'certified' }) });
+  const k9 = ev36({ set: SET36({ stage: 'applied', apply_no: '<b>x</b>', expires_on: addD36(TD36, 30) }) });   // 재인정 접수 중에도 옛 인정 만료 경고 · 접수번호 글자는 이스케이프
+  //   (v436 검토 반영) 만료 당일(D-0)은 아직 인정(ok)·경고 am · 만료가 지난 인정은 단계 알약을 초록으로 두지 않음(am) · 결정일 글은 인정일 때만 '인정', 그 밖(불인정 뒤 미인정·심사 중)은 '결정'
+  const k10 = ev36({ set: SET36({ stage: 'certified', expires_on: TD36 }) }), k11 = ev36({ set: SET36({ stage: 'none', decided_on: '2026-12-01' }) }), k12 = ev36({ set: SET36({ stage: 'review', decided_on: '2026-12-01', expires_on: '2026-11-01' }) });
+  T('v436 ③ KOSHA 인정 줄: 저장한 미인정 = "미인정"(입력 전 아님) · 접수 = am "접수"·접수번호·접수일 · 심사 = am "심사"·접수일·심사일 · 인정 = ok "인정" + 만료 60일 "만료 D-60"(am)·90일 "만료 D-90"·91일 경고 없음·만료 당일 "만료 D-0"(인정 ok 그대로)·지남 = 인정 am(초록 아님) + "만료 지남"(bad)·만료일 없음 "만료일 미입력" · 결정일 = 인정이면 "인정 날짜"·미인정·심사면 "결정 날짜"(검토 반영) · 사후점검 2회(최근 날짜)·요율 반영 연도 · 단계 표시는 그 단계만 칠함 · 접수 중에도 만료 경고 · 글자 이스케이프 · 출처에 마지막 고침 날·사람',
+    pills36(k1.ev, 'KOSHA') === '-:미인정' && title36(k1.ev, 'KOSHA') === '위험성평가 인정 ' + STEPS36('none') && meta36(k1.ev, 'KOSHA') === ''
+    && pills36(k2.ev, 'KOSHA') === 'am:접수' && title36(k2.ev, 'KOSHA') === '위험성평가 인정 ' + STEPS36('applied') && meta36(k2.ev, 'KOSHA') === '접수번호 K-2026-0001 · 접수 2026-11-12'
+    && pills36(k3.ev, 'KOSHA') === 'am:심사' && title36(k3.ev, 'KOSHA') === '위험성평가 인정 ' + STEPS36('review') && meta36(k3.ev, 'KOSHA') === '접수 2026-11-12 · 심사 2026-12-01'
+    && pills36(k4.ev, 'KOSHA') === 'ok:인정|am:만료 D-60' && title36(k4.ev, 'KOSHA') === '위험성평가 인정 ' + STEPS36('certified') && meta36(k4.ev, 'KOSHA') === '인정 2024-01-09 · 만료 ' + addD36(TD36, 60) + ' · 사후점검 2회(최근 2026-03-02) · 요율 반영 2027년'
+    && pills36(k5.ev, 'KOSHA') === 'ok:인정|am:만료 D-90' && pills36(k6.ev, 'KOSHA') === 'ok:인정' && pills36(k7.ev, 'KOSHA') === 'am:인정|bad:만료 지남' && pills36(k8.ev, 'KOSHA') === 'ok:인정' && meta36(k8.ev, 'KOSHA') === '만료일 미입력'
+    && pills36(k9.ev, 'KOSHA') === 'am:접수|am:만료 D-30' && k9.ev.indexOf('&lt;b&gt;x&lt;/b&gt;') > 0 && k9.ev.indexOf('<b>x</b>') < 0
+    && pills36(k10.ev, 'KOSHA') === 'ok:인정|am:만료 D-0' && meta36(k10.ev, 'KOSHA') === '만료 ' + TD36
+    && pills36(k11.ev, 'KOSHA') === '-:미인정' && meta36(k11.ev, 'KOSHA') === '결정 2026-12-01' && pills36(k12.ev, 'KOSHA') === 'am:심사|bad:만료 지남' && meta36(k12.ev, 'KOSHA') === '결정 2026-12-01 · 만료 2026-11-01'
+    && k4.ev.indexOf('<div class="sfn-src">안전 설정 · 마지막 고침 2026-11-10 관리자2 · 입력은 관리자</div>') > 0,
+    JSON.stringify([k1, k2, k3, k4, k5, k6, k7, k8, k9, k10, k11, k12].map((x) => pills36(x.ev, 'KOSHA') + ' / ' + meta36(x.ev, 'KOSHA'))));
+
+  // ④ 석면·등록기준·의무 대장 줄 — 사람별(의무 대장 글은 인허가 권한 + 그 행 공개범위) · 관리자교육 이수자 수
+  const KJ36 = { admin: false, me: { id: 'j1', dept: '운영부' }, perm: { safety: 'view', site: 'do', lic: 'do', check: 'do', con: 'do', doc: 'view', wk: 'do' }, licenses: [{ id: 'lseed13', name: '석면해체·제거업' }, { id: 'lseed07', name: '화물자동차 운송사업' }, { id: 'lseed11', name: '발전사업 허가(태양광)' }, { id: 'lseed08', name: '유해화학물질 운반업' }] };
+  //   p3 = 안전만(인허가 권한 없음) + 공개범위 없는 인허가 행 — 공개범위가 아니라 인허가 권한 판정으로 의무 대장 글이 빠지는지(공개범위 걸린 표본이면 권한 판정을 빼도 숨어 못 잡는다 — 결함 심기 1회차)
+  const p1 = ev36(K36base), p2 = ev36(KJ36), p3 = ev36({ admin: false, me: { id: 'k2' }, perm: { safety: 'do' }, licenses: KJ36.licenses });
+  const p4 = ev36({ licOk: false, colBase: { checklist: 1, contracts: 1 }, duties: [] }), p5 = ev36({ dutyThrow: true });
+  const MG36 = [{ id: 'g1', ptype: 'member', pid: 'a2', kind: 'manager', date: '2020-05-01', next: '' }, { id: 'g2', ptype: 'member', pid: 'a2', kind: 'manager', date: '2021-05-01', next: '' }, { id: 'g3', ptype: 'member', pid: 'k2', kind: 'manager', date: '2022-05-01', next: '' },
+    { id: 'g4', ptype: 'member', pid: 'r1', kind: 'manager', date: '2019-05-01', next: '' }, { id: 'g5', ptype: 'worker', pid: 'w2', kind: 'manager', date: '2019-05-01', next: '' }, { id: 'g6', ptype: 'member', pid: 'j1', kind: 'manager', date: '2019-05-01', next: '', del: 1 }, { id: 'g7', ptype: 'member', pid: 'j1', kind: 'special', date: '2019-05-01', next: '' }];
+  const g2 = ev36({ edu: MG36 }), g1 = ev36({ edu: MG36.filter((x) => x.pid === 'a2') }), g0 = ev36({ edu: [] }), gw = ev36({ st: { edu: 'wait', asb: 'ok', set: 'ok' } }), gf = ev36({ st: { edu: 'fail', asb: 'ok', set: 'ok' } });
+  //   (v436 검토 반영) 명부에 있는 일용직(w1 김일용)의 관리자교육 기록 — n/2명(ok 판정)은 직원만, 일용직은 메타에 '세지 않음'(직원 1 + 일용직 1이 '2/2명' ok로 보이지 않게)
+  const GW36 = { id: 'g8', ptype: 'worker', pid: 'w1', kind: 'manager', date: '2020-01-01', next: '' }, GW2_36 = { id: 'g9', ptype: 'worker', pid: 'w1', kind: 'manager', date: '2021-01-01', next: '' };
+  const g1w = ev36({ edu: MG36.filter((x) => x.pid === 'a2').concat([GW36, GW2_36]) }), g2w = ev36({ edu: MG36.concat([GW36]) });
+  const MGM36 = '교육·검진의 석면해체·제거관리자교육 이수 직원(사람 수 — 자격 요건은 따로 확인)', MGW36 = ' · 일용직 이수자 1명은 세지 않음(전담 인력에 넣을지는 따로 확인)';
+  T('v436 ④ 석면·등록기준·의무 대장 줄: 권민지형(안전 수행·인허가 보기 — 석면해체·제거업 행이 관리자 공개범위) = ⑤ 줄 KOSHA·석면·등록뿐·"의무 대장"·"다음 평가 시기" 0·석면 줄 누를 곳 없음·[고치기] 0 · 김정아형(안전 보기·인허가 수행·공개범위 없음) = 16행 다음 평가 시기·17·18행 보임·[고치기] 0 · 안전만(인허가 없음) = 의무 대장 글 0 · 인허가 아직 못 받음 = 17·18행 없음 · 의무 대장이 깨져도 ⑤ KOSHA·석면·등록 줄 그대로 · 관리자교육 이수자 = 직원 사람 수(같은 사람 기록 둘 = 1명 · 퇴사자·지운 일용직·지운 기록·다른 종류 빼고) 2 → "2/2명" ok · 1 → "1/2명" am · 직원 1 + 명부 일용직 1(기록 둘) = "1/2명" am(ok 아님)·메타 "일용직 이수자 1명은 세지 않음" · 직원 2 + 일용직 1 = "2/2명" ok·같은 메타 · 일용직 없으면 그 글 없음 · 기록 0건 "기록 없음" · 교육 읽는 중 "확인 중" · 실패 "불러오지 못함"(bad)',
+    H36.rowIds32(p1.ev).join(',') === 'KOSHA,석면,등록' && p1.ev.indexOf('의무 대장') < 0 && p1.ev.indexOf('다음 평가 시기') < 0 && row36(p1.ev, '석면').indexOf('data-sfn-go') < 0 && p1.ev.indexOf('data-sfn-set') < 0 && meta36(p1.ev, '석면') === '앱 적격 계산 등급은 아직 D · 통보서를 반영할 때 함께 고칩니다'
+    && H36.rowIds32(p2.ev).join(',') === 'KOSHA,석면,등록,17행,18행' && meta36(p2.ev, '석면').indexOf(' · 다음 평가 시기(의무 대장 16행): ' + seed36[16].cycle) > 0 && p2.ev.indexOf('data-sfn-set') < 0
+    && H36.rowIds32(p3.ev).join(',') === 'KOSHA,석면,등록' && p3.ev.indexOf('의무 대장') < 0 && p3.ev.indexOf('data-sfn-set') < 0
+    && H36.rowIds32(p4.ev).join(',') === 'KOSHA,석면,등록' && H36.rowIds32(p5.ev).join(',') === 'KOSHA,석면,등록' && p5.ev.indexOf('불러오지 못함') < 0
+    && pills36(g2.ev, '등록') === 'ok:관리자교육 2/2명' && pills36(g1.ev, '등록') === 'am:관리자교육 1/2명' && pills36(g0.ev, '등록') === '-:기록 없음' && meta36(g0.ev, '등록').indexOf('교육·검진 기록을 넣기 전에는 이수자를 셀 수 없습니다') === 0
+    && pills36(gw.ev, '등록') === '-:확인 중' && pills36(gf.ev, '등록') === 'bad:불러오지 못함'
+    && meta36(g2.ev, '등록').indexOf(MGM36 + ' · 장비 6종: ') === 0 && meta36(g2.ev, '등록').indexOf('일용직') < 0
+    && pills36(g1w.ev, '등록') === 'am:관리자교육 1/2명' && meta36(g1w.ev, '등록').indexOf(MGM36 + MGW36 + ' · 장비 6종: ') === 0
+    && pills36(g2w.ev, '등록') === 'ok:관리자교육 2/2명' && meta36(g2w.ev, '등록').indexOf(MGM36 + MGW36 + ' · 장비 6종: ') === 0,
+    JSON.stringify({ p1: H36.rowIds32(p1.ev), p2: H36.rowIds32(p2.ev), p4: H36.rowIds32(p4.ev), p5: H36.rowIds32(p5.ev), g: [pills36(g2.ev, '등록'), pills36(g1.ev, '등록'), pills36(g0.ev, '등록'), pills36(gw.ev, '등록'), pills36(gf.ev, '등록'), pills36(g1w.ev, '등록'), pills36(g2w.ev, '등록')], gm: [meta36(g1w.ev, '등록').slice(0, 90), meta36(g2.ev, '등록').slice(0, 60)] }));
+
+  // ⑤ 설정 읽기 상태 — 기다림(다시 그림)·실패·기다림이 다함
+  const W036 = { contracts: [], colBase: { checklist: 1, contracts: 1, licenses: 1 } };   // 계약 서류함 기다림 없음 — ⑤만 기다리게
+  const s1 = ev36(Object.assign({ st: { edu: 'ok', asb: 'ok', set: 'wait' }, set: SET36({}, { env: 18, con: 4 }) }, W036)), s0 = ev36(W036);
+  const s2 = ev36({ st: { edu: 'ok', asb: 'ok', set: 'fail' }, set: SET36({ stage: 'certified' }, { env: 18, con: 4 }) });
+  const s3 = H36.run32(H36.base32(Object.assign({ duties: dut36, st: { edu: 'ok', asb: 'ok', set: 'wait' } }, W036))); s3.api.setTicks(s3.api.max()); const s3ev = H36.blk32(s3.api.render(), 'eval');
+  T('v436 ⑤ 설정 읽기 상태: 읽는 중 = KOSHA 줄 "불러오는 중…"·1초 뒤 다시 그림(기다리는 것이 ⑤뿐인 표본 — 다 받으면 타이머 0)·회사 구분 없음(두 칸이 있어도)·[고치기] 없음 · 실패 = KOSHA 줄 "불러오지 못함"·"현황 칸을 다시 열면 새로 읽습니다"·회사 구분·[고치기] 없음(관리자여도) · 기다림이 다하면(90번) 실패와 같음 · 석면·등록 줄은 그대로',
+    pills36(s1.ev, 'KOSHA') === '-:불러오는 중…' && s1.r.timers.join(',') === '1000' && s0.r.timers.length === 0 && s1.corp === '' && s1.ev.indexOf('data-sfn-set') < 0 && H36.rowIds32(s1.ev).join(',') === 'KOSHA,석면,등록,17행,18행'
+    && pills36(s2.ev, 'KOSHA') === 'bad:불러오지 못함' && meta36(s2.ev, 'KOSHA') === '현황 칸을 다시 열면 새로 읽습니다' && s2.corp === '' && s2.ev.indexOf('data-sfn-set') < 0 && title36(s2.ev, 'KOSHA') === 'KOSHA 위험성평가 인정(안전 설정)'
+    && pills36(s3ev, 'KOSHA') === 'bad:불러오지 못함' && pills36(s2.ev, '석면') === 'am:B 71.6 · 앱 반영 대기' && pills36(s2.ev, '등록') === 'am:관리자교육 0/2명',
+    JSON.stringify({ s1: [pills36(s1.ev, 'KOSHA'), s1.r.timers, s0.r.timers], s2: pills36(s2.ev, 'KOSHA'), s3: pills36(s3ev, 'KOSHA') }));
+
+  // ⑥ @safety-set 실행 — 구간 원문을 가짜 문서·gwCall(동기 약속)로 돌린다: 읽기 · 창 채우기 · 저장(200·409 새로 읽기·NO_CHANGE·값 오류·연타·네트워크) · 창 값 검사(서버와 같은 규칙)
+  const ssA36 = html.indexOf('// @safety-set-start'), ssB36 = html.indexOf('// @safety-set-end');
+  if (ssA36 < 0 || ssB36 < ssA36 || html.indexOf('// @safety-set-start', ssA36 + 5) >= 0 || html.indexOf('// @safety-set-end', ssB36 + 5) >= 0) throw new Error('@safety-set 구간 표식이 없거나 두 번');
+  const ssSec36 = html.slice(ssA36, ssB36);
+  const runSet36 = (o) => {
+    const log = [], els = {};
+    const el = (id) => { if (!els[id]) { const s = new Set(); els[id] = { id, value: '', textContent: '', classList: { add: (c) => s.add(c), remove: (c) => s.delete(c), contains: (c) => s.has(c) } }; } return els[id]; };
+    const api = new Function('__o', '__log', '__el', [
+      'var document = { getElementById: function(id){ return __el(id); } }; var __resp = (__o.resp || []).slice();',
+      'function isAdmin(){ return !!__o.admin; } function canSee(m){ return m === "safety" ? __o.see !== false : true; }',
+      'function alert(m){ __log.push("alert:" + m); } function gwToast(m, w){ __log.push("toast:" + m + (w ? ":warn" : "")); } function sfNowRefresh(){ __log.push("refresh"); }',
+      'function __ok(v){ return { then: function(f){ var r = f(v); return (r && typeof r.then === "function") ? r : __ok(r); }, catch: function(){ return this; } }; }',
+      'function __ng(e){ return { then: function(){ return __ng(e); }, catch: function(g){ return __ok(g(e)); } }; }',
+      'function gwCall(fn, body){ __log.push("call:" + JSON.stringify(body)); var r = __resp.shift() || { status: 500, body: {} }; if (r.hang) return { then: function(){ return { catch: function(){} }; } }; if (r.net) return __ng(new Error("net")); return __ok(r); }',
+      fn36(html, 'pad'), fn36(html, 'fmtDate'), fn36(html, 'isDate'),
+      ssSec36,
+      'return { load: loadSafetySet, open: sfSetOpen, save: sfSetSave, read: sfSetRead, st: function(){ return { set: sfSet, base: sfSetBase, day: sfSetDay, by: sfSetBy, saving: sfSetSaving }; } };'].join('\n'))(o, log, el);
+    return { api, log, el, shown: () => el('sfSetBackdrop').classList.contains('show'), calls: () => log.filter((x) => x.indexOf('call:') === 0).map((x) => JSON.parse(x.slice(5))) };
+  };
+  const T1_36 = 1762700000000, T3_36 = 1762800000000, dayOf36 = (ms) => { const d = new Date(ms), p = (n) => (n < 10 ? '0' : '') + n; return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); };
+  const S1_36 = SET36({ stage: 'certified', apply_no: 'K-1', applied_on: '2023-10-01', review_on: '2023-11-01', decided_on: '2024-01-09', expires_on: '2027-01-08', rate_year: '2025', checks: [{ date: '2025-03-01', note: '적합' }, { date: '2026-03-02', note: '' }] }, { env: 18, con: 4 });
+  const S3_36 = SET36({ stage: 'review', applied_on: '2026-11-12' }, { env: 30, con: 6 });
+  const G1_36 = { status: 200, body: { status: 'OK', settings: S1_36, updated_at: T1_36, updated_by: 'a2', prev: null } };
+  const x0 = runSet36({ admin: true, see: false }), xl0 = x0.api.load();
+  const x1 = runSet36({ admin: true, resp: [G1_36, { status: 200, body: { status: 'OK', settings: S3_36, updated_at: T1_36 + 5, updated_by: 'a1' } }] });
+  let xr1 = null; x1.api.load().then((v) => { xr1 = v; }); const xs1 = x1.api.st(); x1.api.open();
+  const xf1 = ['sfSetStage', 'sfSetApplyNo', 'sfSetApplied', 'sfSetReview', 'sfSetDecided', 'sfSetExpires', 'sfSetRateYear', 'sfSetChecks', 'sfSetHeadEnv', 'sfSetHeadCon'].map((id) => x1.el(id).value).join('|');
+  const xstamp1 = x1.el('sfSetStamp').textContent, xshow1 = x1.shown();
+  x1.el('sfSetHeadEnv').value = '20'; x1.el('sfSetChecks').value = '2025-03-01 적합\n\n  2026-03-02   \n'; x1.api.save();
+  const xc1 = x1.calls(), xs1b = x1.api.st();
+  const WANT1_36 = { action: 'safety_settings_set', base: T1_36, kosha: { stage: 'certified', apply_no: 'K-1', applied_on: '2023-10-01', review_on: '2023-11-01', decided_on: '2024-01-09', expires_on: '2027-01-08', rate_year: '2025', checks: [{ date: '2025-03-01', note: '적합' }, { date: '2026-03-02', note: '' }] }, headcount: { env: 20, con: 4 } };
+  const x2 = runSet36({ admin: true, resp: [G1_36, { status: 409, body: { status: 'CONFLICT', error_code: 'SAFETY_STALE' } }, { status: 200, body: { status: 'OK', settings: S3_36, updated_at: T3_36, updated_by: 'a3' } }] });
+  x2.api.load(); x2.api.open(); x2.el('sfSetHeadEnv').value = '25'; x2.api.save();
+  const x3 = runSet36({ admin: true, resp: [G1_36, { status: 409, body: { error_code: 'SAFETY_STALE' } }, { status: 500, body: {} }] }); x3.api.load(); x3.api.open(); x3.api.save();
+  const x4 = runSet36({ admin: true, resp: [G1_36, { status: 400, body: { error_code: 'NO_CHANGE' } }] }); x4.api.load(); x4.api.open(); x4.api.save();
+  const x5 = runSet36({ admin: true, resp: [G1_36, { status: 400, body: { error_code: 'BAD_DATE' } }] }); x5.api.load(); x5.api.open(); x5.api.save();
+  const x6 = runSet36({ admin: false, resp: [G1_36] }); x6.api.load(); x6.api.open(); const x6show = x6.shown(); x6.api.save();
+  const x8 = runSet36({ admin: true, resp: [G1_36, { hang: true }] }); x8.api.load(); x8.api.open(); x8.api.save(); x8.api.save();
+  const x9 = runSet36({ admin: true, resp: [G1_36, { net: true }] }); x9.api.load(); x9.api.open(); x9.api.save();
+  const NOW36 = '안전 설정은 관리자만 고칩니다(현황은 읽기 전용).';
+  T('v436 ⑥ @safety-set 실행(읽기·창·저장): 안전 권한 없음 = 읽기 안 부름 · 읽기 200 = true·값·낙관락 토큰(updated_at)·마지막 고친 날·사람 · [고치기] 창 = 관리자만 열림·지금 값으로 채움(사후점검 한 줄에 "날짜 메모")·"마지막 고침 날" · 저장 = safety_settings_set 1번(base = 받은 updated_at · 빈 줄·앞뒤 공백 정리 · 인원 숫자) → 200이면 값·토큰 갱신·창 닫힘·"저장했습니다"·현황 다시 그림 · 409 = 새로 읽기(get) → 창을 새 값으로 채움·"다른 곳에서 먼저 고쳤습니다 — 새로 읽었습니다"(경고)·현황 다시 그림·창 그대로 · 409 뒤 새로 읽기 실패 = 알림 · NO_CHANGE = 창 닫힘·"바뀐 것이 없습니다" · 400 값 오류 = 이유 알림·창 그대로 · 비관리자 = 창 안 열림·저장 0 · 응답 기다리는 중 두 번째 저장 0 · 네트워크 실패 = 알림·저장 중 풀림',
+    xl0 === undefined && x0.calls().length === 0
+    && xr1 === true && JSON.stringify(xs1.set) === JSON.stringify(S1_36) && xs1.base === T1_36 && xs1.day === dayOf36(T1_36) && xs1.by === 'a2' && x1.calls()[0].action === 'safety_settings_get' && Object.keys(x1.calls()[0]).length === 1
+    && xshow1 && xf1 === 'certified|K-1|2023-10-01|2023-11-01|2024-01-09|2027-01-08|2025|2025-03-01 적합\n2026-03-02|18|4' && xstamp1 === '마지막 고침 ' + dayOf36(T1_36)
+    && xc1.length === 2 && JSON.stringify(xc1[1]) === JSON.stringify(WANT1_36) && JSON.stringify(xs1b.set) === JSON.stringify(S3_36) && xs1b.base === T1_36 + 5 && xs1b.by === 'a1' && !x1.shown() && x1.log.indexOf('toast:저장했습니다') >= 0 && x1.log.indexOf('refresh') >= 0 && xs1b.saving === false
+    && x2.calls().map((c) => c.action).join(',') === 'safety_settings_get,safety_settings_set,safety_settings_get' && x2.calls()[1].base === T1_36 && x2.calls()[1].headcount.env === 25
+    && x2.shown() && x2.el('sfSetStage').value === 'review' && x2.el('sfSetHeadEnv').value === '30' && x2.el('sfSetHeadCon').value === '6' && x2.api.st().base === T3_36 && x2.log.indexOf('toast:다른 곳에서 먼저 고쳤습니다 — 새로 읽었습니다:warn') >= 0 && x2.log.indexOf('refresh') >= 0
+    && x3.log.indexOf('alert:다른 곳에서 먼저 고쳤는데 새 값을 읽지 못했습니다 — 창을 닫고 현황 칸을 다시 열어 주세요.') >= 0 && !x3.log.some((l) => l.indexOf('toast:') === 0) && x3.api.st().base === T1_36
+    && !x4.shown() && x4.log.indexOf('toast:바뀐 것이 없습니다') >= 0
+    && x5.shown() && x5.log.indexOf('alert:안전 설정 저장 실패 (날짜가 맞지 않습니다)') >= 0
+    && !x6show && x6.log.filter((l) => l === 'alert:' + NOW36).length === 2 && x6.calls().length === 1
+    && x8.calls().length === 2 && x8.api.st().saving === true
+    && x9.log.indexOf('alert:안전 설정 저장 실패(네트워크) — 다시 시도해 주세요.') >= 0 && x9.api.st().saving === false,
+    JSON.stringify({ xs1: [xr1, xs1.base, xs1.day, xs1.by], xf1, xstamp1, xc1, x2: [x2.calls().map((c) => c.action), x2.el('sfSetHeadEnv').value, x2.log], x3: x3.log, x4: x4.log, x5: x5.log, x6: [x6show, x6.log], x8: x8.calls().length, x9: x9.log }));
+  //   ⑥-3 (v436 검토 반영) 409(새로 읽기 성공·실패)·400 값 오류·NO_CHANGE 뒤에도 다시 저장이 나가는지(저장 중 표시가 풀림 — MANUAL '새 값을 확인하고 다시 고쳐 저장하세요'·TESTLIST 낙관락 칸의 그 흐름)
+  //        · 첫 읽기 실패(401 · 403 NO_ACCESS · 403 기기 미승인 · 500 · 몸체 없음 · 네트워크) = false·값 없음·토큰 0(성공으로 적으면 현황이 '미인정(입력 전)'과 [고치기]를 그린다) · 저장값 0명은 창에 '0'(빈칸 아님)
+  const OK2_36 = (at) => ({ status: 200, body: { status: 'OK', settings: S3_36, updated_at: at, updated_by: 'a1' } });
+  const r409_36 = runSet36({ admin: true, resp: [G1_36, { status: 409, body: { status: 'CONFLICT', error_code: 'SAFETY_STALE' } }, { status: 200, body: { status: 'OK', settings: S3_36, updated_at: T3_36, updated_by: 'a3' } }, OK2_36(T3_36 + 7)] });
+  r409_36.api.load(); r409_36.api.open(); r409_36.el('sfSetHeadEnv').value = '25'; r409_36.api.save(); const r409s36 = r409_36.api.st().saving; r409_36.el('sfSetHeadEnv').value = '31'; r409_36.api.save();
+  const r409f36 = runSet36({ admin: true, resp: [G1_36, { status: 409, body: { error_code: 'SAFETY_STALE' } }, { status: 500, body: {} }, OK2_36(T1_36 + 9)] });
+  r409f36.api.load(); r409f36.api.open(); r409f36.api.save(); const r409fs36 = r409f36.api.st().saving; r409f36.api.save();
+  const r400_36 = runSet36({ admin: true, resp: [G1_36, { status: 400, body: { error_code: 'BAD_DATE' } }, OK2_36(T1_36 + 3)] });
+  r400_36.api.load(); r400_36.api.open(); r400_36.api.save(); const r400s36 = r400_36.api.st().saving; r400_36.api.save();
+  const rNC36 = runSet36({ admin: true, resp: [G1_36, { status: 400, body: { error_code: 'NO_CHANGE' } }, OK2_36(T1_36 + 4)] });
+  rNC36.api.load(); rNC36.api.open(); rNC36.api.save(); const rNCs36 = rNC36.api.st().saving; rNC36.api.open(); rNC36.el('sfSetHeadCon').value = '5'; rNC36.api.save();
+  const lr36 = (resp) => { const x = runSet36({ admin: true, resp: [resp] }); let v = 'none'; const p = x.api.load(); if (p && typeof p.then === 'function') p.then((r) => { v = r; }); const s = x.api.st(); return v === false && s.set === null && s.base === 0 && s.day === '' && s.by === '' && x.calls().length === 1; };
+  const LR36 = [['401', { status: 401, body: { status: 'UNAUTHORIZED', error_code: 'NO_SESSION' } }], ['403 NO_ACCESS', { status: 403, body: { status: 'FORBIDDEN', error_code: 'NO_ACCESS' } }], ['403 기기', { status: 403, body: { status: 'FORBIDDEN', error_code: 'DEVICE_NOT_APPROVED' } }],
+    ['500', { status: 500, body: { status: 'ERROR', error_code: 'SETTINGS_INVALID' } }], ['몸체 없음', { status: 200, body: null }], ['네트워크', { net: true }]];
+  const lrRes36 = LR36.map((x) => lr36(x[1]));
+  const z36 = runSet36({ admin: true, resp: [{ status: 200, body: { status: 'OK', settings: SET36({}, { env: 0, con: '' }), updated_at: T1_36, updated_by: 'a2' } }] }); z36.api.load(); z36.api.open();
+  T('v436 ⑥-3 다시 저장·첫 읽기 실패·0명(검토 반영): 409 → 새로 읽음 → 값을 고쳐 다시 저장 = 네 번째 요청 safety_settings_set(base = 새로 읽은 updated_at · 고친 인원)·"저장했습니다"·창 닫힘 · 409 뒤 새로 읽기 실패·400 값 오류·NO_CHANGE 뒤에도 저장 중 표시가 풀려 다시 저장 요청이 나감 · 첫 읽기 401·403 NO_ACCESS·403 기기 미승인·500·몸체 없음·네트워크 = false·sfSet null·토큰 0·마지막 고침 없음 · 저장값 0명 = 창에 "0"(빈칸 아님)·빈칸은 빈칸',
+    r409s36 === false && r409_36.calls().map((c) => c.action).join(',') === 'safety_settings_get,safety_settings_set,safety_settings_get,safety_settings_set' && r409_36.calls()[3].base === T3_36 && r409_36.calls()[3].headcount.env === 31 && r409_36.calls()[3].headcount.con === 6
+    && r409_36.log.indexOf('toast:저장했습니다') >= 0 && !r409_36.shown() && r409_36.api.st().saving === false && r409_36.api.st().base === T3_36 + 7
+    && r409fs36 === false && r409f36.calls().length === 4 && r409f36.calls()[3].action === 'safety_settings_set' && r409f36.calls()[3].base === T1_36 && r409f36.log.indexOf('toast:저장했습니다') >= 0
+    && r400s36 === false && r400_36.calls().length === 3 && r400_36.calls()[2].action === 'safety_settings_set' && r400_36.log.indexOf('toast:저장했습니다') >= 0
+    && rNCs36 === false && rNC36.calls().length === 3 && rNC36.calls()[2].action === 'safety_settings_set' && rNC36.calls()[2].headcount.con === 5 && rNC36.log.indexOf('toast:저장했습니다') >= 0
+    && lrRes36.every(Boolean) && z36.el('sfSetHeadEnv').value === '0' && z36.el('sfSetHeadCon').value === '',
+    JSON.stringify({ s: [r409s36, r409fs36, r400s36, rNCs36], c409: r409_36.calls().map((c) => c.action + (c.base ? ':' + c.base : '')), n: [r409f36.calls().length, r400_36.calls().length, rNC36.calls().length], lr: LR36.map((x, i) => x[0] + ':' + lrRes36[i]), z: [z36.el('sfSetHeadEnv').value, z36.el('sfSetHeadCon').value] }));
+  //   창 값 검사 — 서버 safetyClean과 같은 규칙(서버가 다시 본다): 하나씩 틀리게 넣으면 그 이유 알림·저장 요청 0
+  const bad36 = [['sfSetHeadEnv', '-1', '상시근로자 수는 0~999 사이 정수로 넣거나 비워 두세요.'], ['sfSetHeadCon', '1000', '상시근로자 수는 0~999 사이 정수로 넣거나 비워 두세요.'], ['sfSetHeadEnv', '3.5', '상시근로자 수는 0~999 사이 정수로 넣거나 비워 두세요.'], ['sfSetHeadCon', 'abc', '상시근로자 수는 0~999 사이 정수로 넣거나 비워 두세요.'],
+    ['sfSetRateYear', '27', '요율 반영 연도는 네 자리(예: 2027)로 넣거나 비워 두세요.'], ['sfSetRateYear', '1999', '요율 반영 연도는 네 자리(예: 2027)로 넣거나 비워 두세요.'], ['sfSetApplyNo', 'x'.repeat(41), '접수번호는 40자까지입니다.'],
+    ['sfSetApplied', '2026-02-30', '날짜는 달력에서 고르거나 YYYY-MM-DD로 넣어 주세요.'], ['sfSetExpires', '20271108', '날짜는 달력에서 고르거나 YYYY-MM-DD로 넣어 주세요.'], ['sfSetStage', 'approved', '인정 단계를 고르세요.'],
+    ['sfSetChecks', '공단 점검', "사후점검 이력은 한 줄에 '날짜 메모'(예: 2027-03-15 공단 사후점검 적합)로 넣어 주세요."], ['sfSetChecks', '2027-02-30 점검', "사후점검 이력은 한 줄에 '날짜 메모'(예: 2027-03-15 공단 사후점검 적합)로 넣어 주세요."],
+    ['sfSetChecks', '2027-03-15 ' + 'x'.repeat(101), '사후점검 메모는 한 줄 100자까지입니다.'], ['sfSetChecks', Array.from({ length: 11 }, (_, i) => '2027-03-' + String(i + 10) + ' 점검').join('\n'), '사후점검 이력은 10건까지입니다.']];
+  const badRes36 = bad36.map((b) => { const x = runSet36({ admin: true, resp: [G1_36] }); x.api.load(); x.api.open(); x.el(b[0]).value = b[1]; x.api.save(); return x.log.indexOf('alert:' + b[2]) >= 0 && x.calls().length === 1 && x.shown(); });
+  const okE36 = runSet36({ admin: true, resp: [G1_36, { hang: true }] }); okE36.api.load(); okE36.api.open(); okE36.el('sfSetHeadEnv').value = ''; okE36.el('sfSetHeadCon').value = '0'; okE36.el('sfSetChecks').value = Array.from({ length: 10 }, (_, i) => '2027-03-' + String(i + 10) + ' 점검').join('\n'); okE36.api.save();
+  const okC36 = okE36.calls()[1] || {};
+  T('v436 ⑥-2 창 값 검사(서버와 같은 규칙 — 서버 safetyClean이 다시 봄): 인원 -1·1000·3.5·abc · 요율 연도 27·1999 · 접수번호 41자 · 날짜 2026-02-30·20271108 · 단계 approved · 사후점검 날짜 없는 줄·없는 날짜·메모 101자·11줄 = 그 이유 알림·저장 요청 0·창 그대로 / 빈칸·0명·10줄은 보냄(env "" · con 0 · checks 10)',
+    badRes36.every(Boolean) && okC36.action === 'safety_settings_set' && okC36.headcount && okC36.headcount.env === '' && okC36.headcount.con === 0 && okC36.kosha.checks.length === 10,
+    JSON.stringify({ bad: bad36.map((b, i) => b[0] + '=' + b[1].slice(0, 12) + ':' + badRes36[i]), ok: okC36.headcount }));
+
+  // ⑥-4 (v436 검토 반영) 한 기기 사람 전환 — 로그인 창 '전환'은 새로고침 없이 afterLogin → applyPerms → applySafetyPerms만 돈다(render()에 현황이 없다).
+  //      실제 safetyPanes·setSafetyLayer·applySafetyPerms를 돌려, 현황 칸에 있었고 다음 사람도 현황을 볼 수 있으면 현황을 다시 여는지(sfNowOpen 1번 — 관리자 [고치기]·공개범위 줄이 앞사람 권한으로 남지 않게)
+  const mkCl36 = () => { const s = new Set(); return { add: (c) => s.add(c), remove: (c) => s.delete(c), toggle: (c, on) => { if (on === undefined ? !s.has(c) : on) s.add(c); else s.delete(c); return s.has(c); }, contains: (c) => s.has(c) }; };
+  const swRun36 = (perm, cur, layer) => {
+    const els = {}, log = [];
+    const el = (id) => els[id] || (els[id] = { id, classList: mkCl36(), style: {}, getAttribute: () => null, querySelectorAll: () => [] });
+    new Function('__el', '__perm', '__log', '__cur', '__layer', [
+      'var document = { getElementById: function(id){ return __el(id); } };',
+      'var currentTab = __cur, safetyLayer = __layer, eduViewScope = "member";',
+      'function canSee(m){ return __perm === "admin" || (__perm[m] || "hide") !== "hide"; }',
+      'function switchTab(n){ __log.push("switch:" + n); currentTab = n; }',
+      'function renderSites(){ __log.push("renderSites"); } function loadAsb(){} function loadEdu(){} function loadWorkers(){ return { then: function(){} }; } function renderEdu(){ __log.push("renderEdu"); } function sfNowOpen(){ __log.push("sfNowOpen"); }',
+      fn36(html, 'safetyPanes'), fn36(html, 'setSafetyLayer'), fn36(html, 'applySafetyPerms'),
+      'applySafetyPerms(); __log.push("at:" + safetyLayer + "@" + currentTab);'].join('\n'))(el, perm, log, cur, layer);
+    return log.join(',');
+  };
+  const swK36 = swRun36({ safety: 'do', lic: 'view' }, 'safety', 'now'), swA36 = swRun36('admin', 'safety', 'now'), swV36 = swRun36({ safety: 'view', site: 'do' }, 'safety', 'now');
+  const swE36 = swRun36({ safety: 'do' }, 'safety', 'edu'), swS36 = swRun36('admin', 'safety', 'site'), swD36 = swRun36({ safety: 'do' }, 'dash', 'now'), swJ36 = swRun36({ site: 'do' }, 'safety', 'now'), swN36 = swRun36({ veh: 'view' }, 'safety', 'now');
+  T('v436 ⑥-4 한 기기 사람 전환(실제 applySafetyPerms — 검토 반영): 현황 칸에 있었고 다음 사람이 현황을 볼 수 있으면(권민지형·관리자·김정아형 안전 보기) 현황을 다시 엶(sfNowOpen 1번 · 칸 그대로) · 교육·현장 칸이면 다시 열지 않음 · 홈이면 0 · 현황을 못 보는 사람(현장만) = 현장 칸으로(종전) · 아무 칸도 없음 = 홈(종전)',
+    swK36 === 'sfNowOpen,at:now@safety' && swA36 === 'sfNowOpen,at:now@safety' && swV36 === 'sfNowOpen,at:now@safety'
+    && swE36 === 'at:edu@safety' && swS36 === 'at:site@safety' && swD36 === 'at:now@dash' && swJ36 === 'renderSites,at:site@safety' && swN36 === 'switch:dash,at:now@dash',
+    [swK36, swA36, swV36, swE36, swS36, swD36, swJ36, swN36].join(' | '));
+
+  // ⑦ 정적 — 앱: 현황 구간은 저장·서버 호출 0 그대로([고치기]는 버튼 글만 — 관리자·읽기 ok일 때) · 누름 배선은 구간 밖 #sfNowHost 위임 1곳 · 서버 액션 글자는 @safety-set 구간에만 · 창·저장 함수 첫 줄 관리자 가드
+  //          서버: 분기 1곳씩 · 읽기 검사 순서(로그인 → 기기 승인 → permKey 'safety' 숨김 NO_ACCESS → 읽기) · 쓰기 순서(로그인 → 관리자 → 값 검사 → 읽기 → 낙관락 → 같은 값 → 저장 → 감사) · permKey = permOf와 같은 규칙(safety 기본 숨김)
+  //          범위: 인허가 코드(앱·서버·물어보기·브리핑·크론)에 kosha_cert 0 · settings:safety 글자는 gw-data.js 한 곳(코드 1줄 — 이 키 이름을 쓰는 서버 코드는 safetyRead·쓰기 핸들러뿐, 백업 내보내기·복원은 키 이름 없이 gw_data 키 전부를 다룸) · 인허가 소비처에 안전 설정 흔적 0 · 앱↔서버 단계·한도 같음
+  const nc36 = (s) => s.split('\n').map((ln) => ln.replace(/(^|[^:"'])\/\/.*$/, '$1')).join('\n');
+  const htmlNC36 = nc36(html), gd36 = rd36('netlify/functions/gw-data.js'), gdNC36 = nc36(gd36);
+  const sA36 = html.indexOf('// @safety-now-start'), sB36 = html.indexOf('// @safety-now-end'), secNC36 = nc36(html.slice(sA36, sB36)), ssNC36 = nc36(ssSec36);
+  const walk36 = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap((d) => d.isDirectory() ? (d.name === 'node_modules' || d.name === '_models' ? [] : walk36(join(dir, d.name))) : (/\.(js|mjs|ts)$/.test(d.name) ? [join(dir, d.name)] : []));
+  const srv36 = walk36(join(ROOT, 'netlify'));
+  const kc36 = [join(ROOT, 'index.html')].concat(srv36).filter((p) => readFileSync(p, 'utf8').indexOf('kosha_cert') >= 0).map((p) => p.slice(ROOT.length + 1));
+  const ssKey36 = srv36.filter((p) => readFileSync(p, 'utf8').indexOf('settings:safety') >= 0).map((p) => p.slice(ROOT.length + 1).replace(/\\/g, '/'));
+  const hG36 = fn36(gd36, 'handleSafetySettingsGet'), hS36 = fn36(gd36, 'handleSafetySettingsSet'), sR36 = fn36(gd36, 'safetyRead'), pK36 = fn36(gd36, 'permKey');
+  const ix36 = (s, t) => s.indexOf(t);
+  const ordG36 = [ix36(hG36, 'await currentMember(event)'), ix36(hG36, "error_code: 'DEVICE_NOT_APPROVED'"), ix36(hG36, "if (permKey(c.member, 'safety') === 'hide') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_ACCESS', request_id: R });"), ix36(hG36, 'await safetyRead(store(DATA))')];
+  const ordS36 = [ix36(hS36, 'await currentMember(event)'), ix36(hS36, "if (!c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });"), ix36(hS36, 'const nv = safetyClean(d);'), ix36(hS36, 'const cur = await safetyRead(st);'),
+    ix36(hS36, "if (d.base === undefined || Number(d.base) !== cur.at) return jr(409, { status: 'CONFLICT', error_code: 'SAFETY_STALE', request_id: R });"), ix36(hS36, "error_code: 'NO_CHANGE'"), ix36(hS36, 'await blobSet(st, SAFETY_KEY, doc)'), ix36(hS36, "col: 'safety', ev: [{ op: '안전설정'")];
+  const inc36 = (a) => a.every((v, i) => v > 0 && (i === 0 || v > a[i - 1]));
+  const srvStages36 = (gd36.match(/const SAFETY_STAGES = \[([^\]]+)\];/) || ['', ''])[1].replace(/\s/g, ''), appStages36 = (html.match(/var SF_SET_STAGES = \[([^\]]+)\];/) || ['', ''])[1].replace(/\s/g, '').replace(/"/g, "'");
+  const kosha36 = [...(html.match(/var SF_NOW_KOSHA = \[([^;]+)\];/) || ['', ''])[1].matchAll(/\["(\w+)", "([^"]+)"\]/g)].map((m) => m[1] + ':' + m[2]).join(',');
+  const lim36 = (gd36.match(/const SAFETY_LIMIT = \{ apply_no: (\d+), note: (\d+), checks: (\d+), head: (\d+) \};/) || []).slice(1).join(',');
+  const rdF36 = fn36(html, 'sfSetRead'), opF36 = fn36(html, 'sfSetOpen'), svF36 = fn36(html, 'sfSetSave'), ldF36 = fn36(html, 'loadSafetySet');
+  const licFns36 = ['renderLicenses', 'calEvents', 'licVisible', 'liveLic', 'renderDashboard'].map((f) => fn36(html, f)).join('\n');
+  const deleg36 = (htmlNC36.match(/document\.getElementById\("sfNowHost"\)\.addEventListener\("click", function\(e\)\{\n\s*var t = e\.target;\n\s*while \(t && t !== this\)\{ if \(t\.getAttribute && t\.getAttribute\("data-sfn-set"\) !== null\)\{ sfSetOpen\(\); return; \} t = t\.parentNode; \}\n\s*\}\);/g) || []).length;
+  T('v436 ⑦ 정적: 현황 구간 = 저장·서버 호출·창 함수 부름·안전 설정 상태 대입 0 · 첫 상태(sfNowSt.set "" · sfSet null · base 0) · [고치기]는 버튼 글 1곳(설정 읽기 ok + 관리자일 때만) · 누름 배선 = 구간 밖 #sfNowHost 위임 1곳(sfSetOpen) · 저장·취소 버튼 배선 · 서버 액션 글자(safety_settings_get·set)는 @safety-set 구간에만 1번씩 · sfSetOpen·sfSetSave 첫 줄 관리자 가드·저장은 base 동봉 · 읽기는 안전 권한만 / 서버: 분기 1곳씩 · 읽기 순서 로그인 → 기기 승인 → 안전 숨김 NO_ACCESS → 읽기 · 쓰기 순서 로그인 → 관리자 → 값 검사 → 읽기 → 낙관락(base 없음도 409) → 같은 값 → 저장 → 감사(col safety) · permKey = permOf 규칙(safety 기본 숨김) · 이 키는 safetyRead(읽기)·쓰기 핸들러(저장)에서만 / 범위: kosha_cert 0(앱·netlify 전부) · settings:safety = gw-data.js 한 곳(코드 1줄) · 인허가 소비처(renderLicenses·calEvents·licVisible·liveLic·renderDashboard)에 안전 설정 흔적 0 · 단계 앱 = 서버 = 현황 표시 · 한도 40·100·10·999 앱 = 서버',
+    !/\bgwCall\b|\bsfSet(?:Open|Save|Close|Fill|Read|Apply)\b|\bsfSet(?:Base|Day|By|Saving)?\s*=(?!=)|safety_settings_/.test(secNC36) && (secNC36.match(/data-sfn-set/g) || []).length === 1 && /\(ss === "ok" && isAdmin\(\) \? ' <button type="button" class="sfn-go" data-sfn-set="1">고치기<\/button>' : ""\)/.test(secNC36)
+    && deleg36 === 1 && (htmlNC36.match(/data-sfn-set/g) || []).length === 2 && (htmlNC36.match(/(?<!function )\bsfSetOpen\(\)/g) || []).length === 1
+    && /document\.getElementById\("sfSetSave"\)\.addEventListener\("click", sfSetSave\);/.test(htmlNC36) && /document\.getElementById\("sfSetCancel"\)\.addEventListener\("click", sfSetClose\);/.test(htmlNC36)
+    && (htmlNC36.match(/safety_settings_get/g) || []).length === 1 && (htmlNC36.match(/safety_settings_set/g) || []).length === 1 && (ssNC36.match(/safety_settings_(?:get|set)/g) || []).length === 2
+    && /^function sfSetOpen\(\)\{\n\s*if \(!isAdmin\(\)\)\{ alert\(SF_SET_NO_WRITE\); return; \}/.test(opF36) && /^function sfSetSave\(\)\{\n\s*if \(!isAdmin\(\)\)\{ alert\(SF_SET_NO_WRITE\); return; \}/.test(svF36) && /action: "safety_settings_set", base: sfSetBase, kosha: f\.v\.kosha, headcount: f\.v\.headcount/.test(svF36)
+    && /^function loadSafetySet\(\)\{\n\s*if \(!canSee\("safety"\)\) return;/.test(ldF36)
+    && /var sfNowSt = \{ edu: "", asb: "", set: "" \}/.test(secNC36) && /var sfSet = null, sfSetBase = 0, sfSetDay = "", sfSetBy = "", sfSetSaving = false;/.test(ssNC36)   // 첫 상태 = 아직 안 읽음(""→ 기다림) — "ok"로 시작하면 읽기 전에 '미인정(입력 전)'을 그린다(시험 틀은 상태를 덮어써 실행으로는 못 잡음)
+    && (gd36.match(/d\.action === 'safety_settings_get'\) return await handleSafetySettingsGet\(event, d, R\);/g) || []).length === 1 && (gd36.match(/d\.action === 'safety_settings_set'\) return await handleSafetySettingsSet\(event, d, R\);/g) || []).length === 1
+    && inc36(ordG36) && inc36(ordS36) && !/blobSet|appendAudit/.test(hG36)
+    && /if \(member\.admin\) return 'do';\s*return \(member\.perms && member\.perms\[key\]\) \|\| \(PERM_CLOSED\[key\] \? 'hide' : 'view'\);/.test(pK36) && /const PERM_CLOSED = \{[^}]*\bsafety: 1\b/.test(gd36)
+    && (gdNC36.match(/SAFETY_KEY/g) || []).length === 4 && /blobGet\(st, SAFETY_KEY\)/.test(sR36) && (gdNC36.match(/blobGet\(st, SAFETY_KEY\)/g) || []).length === 1 && (gdNC36.match(/blobSet\(st, SAFETY_KEY, doc\)/g) || []).length === 1 && (gdNC36.match(/\bsafetyRead\(/g) || []).length === 3
+    && kc36.length === 0 && ssKey36.join(',') === 'netlify/functions/gw-data.js' && (gdNC36.match(/settings:safety/g) || []).length === 1
+    && !/sfSet|safety_settings|settings:safety|kosha/i.test(licFns36)
+    && srvStages36 === "'none','applied','review','certified'" && appStages36 === srvStages36 && kosha36 === 'none:미인정,applied:접수,review:심사,certified:인정' && lim36 === '40,100,10,999'
+    && /k\.apply_no\.length > 40/.test(rdF36) && /lines\.length > 10/.test(rdF36) && /\.length > 100\)/.test(rdF36) && /\/\^\\d\{1,3\}\$\//.test(rdF36),
+    JSON.stringify({ deleg: deleg36, set: (htmlNC36.match(/data-sfn-set/g) || []).length, ordG: ordG36, ordS: ordS36, keyN: (gdNC36.match(/SAFETY_KEY/g) || []).length, kc: kc36, ssKey: ssKey36, st: [srvStages36, appStages36, kosha36], lim: lim36 }));
+
+  // ⑧ CSS·창 마크업·감사 라벨
+  const divB36 = (src, openTag) => { const i = src.indexOf(openTag); if (i < 0) return ''; const re = /<div\b|<\/div>/g; re.lastIndex = i; let d = 0, m; while ((m = re.exec(src))) { d += m[0] === '</div>' ? -1 : 1; if (d === 0) return src.slice(i, m.index + 6); } return ''; };
+  const mod36 = divB36(html, '<div class="modal-backdrop" id="sfSetBackdrop">');
+  const opts36 = [...(mod36.match(/<select id="sfSetStage">([\s\S]*?)<\/select>/) || ['', ''])[1].matchAll(/<option value="(\w+)">([^<]+)<\/option>/g)].map((m) => m[1] + ':' + m[2]).join(',');
+  //   (v436 검토 반영) 감사 기록 화면의 바뀐 칸 라벨 — 앱 AUDIT_FIELD_LABEL의 kosha.*·headcount.* 10개 = 서버 SAFETY_FIELD_LABEL(같은 순서·같은 글). 없으면 감사 화면에 영어 경로가 그대로 나왔다
+  const srvLab36 = [...((gd36.match(/const SAFETY_FIELD_LABEL = \{([\s\S]*?)\};/) || ['', ''])[1]).matchAll(/'((?:kosha|headcount)\.\w+)': '([^']+)'/g)].map((m) => m[1] + '=' + m[2]);
+  const appLab36 = [...((html.match(/var AUDIT_FIELD_LABEL = \{([^;]*?)\};/) || ['', ''])[1]).matchAll(/"((?:kosha|headcount)\.\w+)":"([^"]+)"/g)].map((m) => m[1] + '=' + m[2]);
+  const flatKeys36 = [...((fn36(gd36, 'safetyFlat').match(/return \{([\s\S]*?)\};/) || ['', ''])[1]).matchAll(/'((?:kosha|headcount)\.\w+)':/g)].map((m) => m[1]);
+  T('v436 ⑧ CSS·창: .sfn-pills(알약 여럿 세로 — 오른쪽 정렬)·.sfn-steps(단계 표시, 지금 단계만 칠함) · 창 #sfSetBackdrop(.modal-backdrop — 1개) = 단계 고르기 미인정·접수·심사·인정 · 접수번호 40자 · 날짜 4칸(type=date — 접수·심사·인정·만료) · 요율 연도 4자 · 사후점검 여러 줄 · 인원 두 칸(3자·숫자 자판) · 저장·취소 · 마지막 고침 줄 · 감사 기록 화면 라벨 safety = 안전 설정 · 바뀐 칸 라벨 10개 앱 = 서버(검토 반영 — 서버 감사 칸 = safetyFlat 칸과도 같음)',
+    html.indexOf('  .sfn-pills{flex:0 0 auto;display:flex;flex-direction:column;align-items:flex-end;gap:3px;}') > 0 && html.indexOf('  .sfn-steps i.on{background:var(--brand);color:#fff;}') > 0 && html.indexOf('  .sfn-steps{display:inline-flex;flex-wrap:wrap;') > 0
+    && mod36.length > 500 && html.split('id="sfSetBackdrop"').length === 2 && opts36 === 'none:미인정,applied:접수,review:심사,certified:인정'
+    && /<input type="text" id="sfSetApplyNo"[^>]*maxlength="40"/.test(mod36) && ['sfSetApplied', 'sfSetReview', 'sfSetDecided', 'sfSetExpires'].every((id) => new RegExp('<input type="date" id="' + id + '">').test(mod36))
+    && /<input type="text" id="sfSetRateYear"[^>]*maxlength="4"/.test(mod36) && /<textarea id="sfSetChecks"/.test(mod36) && ['sfSetHeadEnv', 'sfSetHeadCon'].every((id) => new RegExp('<input type="text" id="' + id + '"[^>]*inputmode="numeric" maxlength="3"').test(mod36))
+    && /<button class="primary" id="sfSetSave">저장<\/button>/.test(mod36) && /<button class="secondary" id="sfSetCancel">취소<\/button>/.test(mod36) && /id="sfSetStamp"/.test(mod36)
+    && /var AUDIT_COL_LABEL = \{[^}]*safety:"안전 설정"\}/.test(html)
+    && srvLab36.length === 10 && appLab36.join('|') === srvLab36.join('|') && flatKeys36.join(',') === srvLab36.map((s) => s.split('=')[0]).join(','),
+    JSON.stringify({ mod: mod36.length, opts: opts36, srv: srvLab36, app: appLab36, flat: flatKeys36 }));
+
+  // ⑨ 문서 — MANUAL 28-1(⑤ 줄 설명·회사 구분·관리자 [고치기] 절차·주의 — 문장 고정) · FEATURES 기준 ≥ v436·v436 절(문장 고정)·§7 안전 줄 · TESTLIST v436(체크 칸 전부 AI 몫 — 화면 칸 '(AI 시험 화면 대상' 정확히 6개·순서, PM 0, 게이트 칸 [x]) · CLAUDE.md 안전 탭 줄(규칙 문장 고정) · 자리 글(GATES_·GATE_) 0 · sw ≥ 436
+  const man36 = rd36('MANUAL.html'), ft36 = rd36('FEATURES.md'), tl36 = rd36('TESTLIST.md'), cl36 = rd36('CLAUDE.md'), sw36 = rd36('sw.js');
+  const m281_36 = (() => { const i = man36.indexOf('<h3 id="s28-1">'); return i < 0 ? '' : man36.slice(i, man36.indexOf('<!-- 29 -->', i)); })();
+  const MAN_PINS36 = ['<b>관리자만</b> 이 칸 ⑤ 인정·평가의 <span class="btn">고치기</span>로 넣습니다(2026-11 v436',
+    '<li><b>인정·평가</b> — KOSHA 위험성평가 인정 단계(미인정 · 접수 · 심사 · 인정 — 지금 단계에 색이 칠해짐)와 접수번호·날짜·사후점검 횟수·요율 반영 연도, 석면 안전성평가 <b>B 71.6 · 앱 반영 대기</b>',
+    '석면해체·제거업 등록기준(전담 인력 2명 — 교육·검진에 넣은 석면해체·제거관리자교육 이수 직원 수 <b>관리자교육 n/2명</b> · 장비 6종) 세 줄입니다',
+    "일용직의 이수 기록은 이 수에 넣지 않고 '일용직 이수자 n명은 세지 않음'으로 따로 적습니다(전담 인력에 넣을지는 따로 확인)",   // v436 검토 반영 — 직원만 셈
+    '인허가 권한이 있고 그 인허가 행(석면해체·제거업)의 공개 대상이기도 한 분에게만 의무 대장 16행(다음 평가 시기)·17·18행 글도 함께 나오고',   // v436 검토 반영 — 공개범위 조건(옛 '인허가 권한이 있으면'은 아래 0번 대조)
+    "아직 아무도 넣지 않았으면 KOSHA 줄은 <b>미인정(입력 전)</b>입니다. 인정 만료가 90일 안이면 <b>만료 D-n</b>, 지나면 <b>만료 지남</b> 경고가 붙습니다(만료가 지나면 '인정' 표시도 초록이 아닌 주황입니다). 재인정·사후점검 할 일 알림은 지금처럼 내 업무 y15~y18이 합니다",
+    '<p><b>회사 구분(맨 위)</b><br>회사별 상시근로자 수(종운환경·종운건설) 두 칸을 다 넣은 뒤에만 현황 맨 위에 나옵니다. 처음에는 꺼져 있고, 한 칸이라도 비우면 다시 꺼집니다.',
+    '<p><b>관리자 — 안전 설정 넣기(KOSHA 인정 상태 · 회사별 인원)</b></p>', '관리자에게만 보입니다(안전 권한만 있는 분은 읽기만 합니다).', "사후점검 이력(한 줄에 '날짜 메모', 예: 2027-03-15 공단 사후점검 적합 — 10건까지)",
+    '회사별 상시근로자 수(종운환경 · 종운건설)를 0~999 사이 숫자로 넣습니다. 두 칸을 다 넣으면 현황 맨 위 회사 구분이 켜집니다.', '<b>다른 곳에서 먼저 고쳤습니다 — 새로 읽었습니다</b>가 뜨고 창이 새 값으로 바뀝니다',
+    '현황은 아무것도 저장하지 않습니다(관리자의 ⑤ <span class="btn">고치기</span> 창만 안전 설정을 저장합니다).'];
+  const ftv36 = (() => { const i = ft36.indexOf('\n### v436 (11/10)'); if (i < 0) return ''; const j = ft36.indexOf('\n### ', i + 5); return ft36.slice(i, j < 0 ? ft36.length : j); })();
+  const ft7_36 = ft36.split('\n').filter((ln) => ln.indexOf('- **안전**(v428') === 0)[0] || '';
+  const FT_PINS36 = ['인허가 목록(col:licenses)에 행으로 넣지 않고 새 설정 블롭 `settings:safety` 하나에 둔다(PM ⓐ)', "판정은 새 `permKey(member,'safety')`", 'base 없음도 409, 새 액션이라 base를 안 보내는 옛 앱이 없다',
+    '**⑤는 현황을 보는 사람 모두**', '회사별 상시근로자 수 두 칸이 다 있을 때만(처음엔 꺼짐', '설계 시안의 회사 칩 거르기(전체·종운환경·종운건설)와 공사금액 문턱(2천만·4천만·1억·20억·50억)은 넣지 않았다',
+    '**[고치기]는 관리자에게만**', '`// @safety-set-start ~ end` 구간', "만료 90일 안이면 '만료 D-n'(am)·지나면 '만료 지남'(bad) 경고 칩", "알약 'B 71.6 · 앱 반영 대기'", '사람 단위 — 같은 사람 기록 여럿은 1명',
+    // v436 검토 반영 — 같은 값 판정·사후점검 감사 글·동시 저장 한계·직원만 셈·만료 지난 인정·결정일·사람 전환·백업 경로
+    '같은 값 400 NO_CHANGE(정규화한 값째 비교', "사후점검은 줄 목록으로 비교해 'n건 · 뺌 …' → 'm건 · 더함 …'", '동시 저장은 마지막 쓰기가 이긴다', '이수 직원 수 \'관리자교육 n/2명\'(직원만 센다',
+    '인정인데 만료가 지났으면 am', "단계가 인정이 아니면 '결정'", '`applySafetyPerms`가 현황을 다시 연다', '키 이름 없이 gw_data 키 전부를 다루므로'];
+  const FT7_PIN36 = "v436부터 ⑤ 인정·평가 = KOSHA 위험성평가 인정 단계·석면 안전성평가 'B 71.6 · 앱 반영 대기'·등록기준 줄(원천 = 안전 설정 settings:safety — 인허가 목록에 넣지 않음, 고치기는 관리자만 ⑤ [고치기]) · 맨 위 회사 구분은 회사별 상시근로자 수 두 칸을 다 넣은 뒤에만";
+  const tlv36 = (() => { const i = tl36.indexOf('\n## v436'); if (i < 0) return ''; const j = tl36.indexOf('\n## ', i + 5); return tl36.slice(i, j < 0 ? tl36.length : j); })();
+  const cb36 = tlv36.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), cbNotAi36 = cb36.filter((l) => !/^\s*[-*+] \[[ xX]\] \(AI[ 가)]/.test(l)), cbPM36 = cb36.filter((l) => /PM/.test(l));
+  const cbScr36 = cb36.filter((l) => /^- \[[ x]\] \(AI 시험 화면 대상/.test(l));
+  const TL_HEADS36 = ['관리자형 설정 없음(운영 지금):', '관리자 [고치기]:', '낙관락:', '권민지형(안전 수행 · 인허가 보기', '김정아형(안전 보기 + 현장·인허가 수행', '다른 곳 그대로:'];
+  const tlHeadOk36 = cbScr36.length === TL_HEADS36.length && TL_HEADS36.every((h, i) => cbScr36[i].indexOf(h) > 0 && cbScr36.filter((l) => l.indexOf(h) > 0).length === 1);
+  //   (v436 검토 반영) 화면 칸의 기대 글 = 실제 화면 글 — [고치기] 칸이 인용하는 회사 구분 알약·메타·알림 글은 index.html에도 그대로 있어야 한다(폰 폭 때문에 알약을 줄이기 전 글이 남아 AI 시험 화면이 거짓 실패하던 것) ·
+  //   인원 칸은 3자까지라 '1000'은 칠 수 없음 → '-1' · 알약 둘(세로) 확인은 설정 없음 칸이 아니라 [고치기] 칸의 만료 D-60 뒤 · 권민지형 칸에 한 기기 전환
+  const TL_PINS36 = ['5명↑ 중처법 적용', '중대재해처벌법·정기교육 적용(상시 5명 이상)', '안전보건관리담당자는 20명부터(폐기물 수집·운반업)', "'5명 미만'", '중대재해처벌법·정기교육 제외(상시 5명 미만 — 특별교육은 적용)', '상시근로자 수는 0~999 사이 정수로 넣거나 비워 두세요.', '바뀐 것이 없습니다', '저장했습니다', '아직 저장한 적 없음'];
+  const tlLine36 = (h) => cbScr36.filter((l) => l.indexOf(h) > 0)[0] || '';
+  const tlFix36 = tlLine36('관리자 [고치기]:');
+  const tlPinOk36 = TL_PINS36.every((s) => tlFix36.indexOf(s) > 0 && html.indexOf(s.replace(/^'|'$/g, '')) > 0) && tlFix36.indexOf("인원 '1000'") < 0 && tlFix36.indexOf("인원 '-1'") > 0 && tlFix36.indexOf("'만료 D-60' 칩 — 폰 375px에서 알약 둘(인정·만료 D-60)이 오른쪽에 세로로") > 0
+    && tlLine36('관리자형 설정 없음(운영 지금):').indexOf('알약 둘이 오른쪽에 세로로') < 0 && tlLine36('권민지형(안전 수행 · 인허가 보기').indexOf("로그인 창 '전환'으로 권민지형 로그인 → 새로고침 없이 현황이 다시 그려져 [고치기] 없음") > 0;   // 11/10 시험 서버 실측: 운영 석면해체·제거업 행(lseed13)은 공개범위 칸이 없어 권민지형에게도 17·18행이 보임 — '16~18행 없음' 문구를 걷어 냄
+  const clSafe36 = cl36.split(/\r?\n/).filter((l) => l.indexOf('- **안전(safety) 탭**') === 0)[0] || '';
+  const CL_PINS36 = ['**현황 ⑤ 인정·평가·회사 구분**(v436', '**안전 설정 `settings:safety`**', '인허가 코드에 kosha_cert·면허 판정 함수를 만들지 않는다', "키 이름 판정은 `permKey`(같은 규칙)로 — `permOf(member,'safety')`는 COL에 없어 기본 '보기'가 된다",
+    '**`// @safety-set-start ~ end` 구간**', '누름은 `#sfNowHost` 위임 배선 한 곳',
+    // v436 검토 반영 — 백업 경로 문구 · 같은 값 판정 · 직원만 셈 · 사람 전환 다시 열기
+    '이 키 이름을 쓰는 서버 코드는 두 핸들러뿐임을 지킴', '같은 값 판정(NO_CHANGE)은 정규화한 값째', "등록기준 '관리자교육 n/2명'은 직원만 센다", '`applySafetyPerms`가 `setSafetyLayer("now")`로 다시 연다'];
+  T('v436 ⑨ 문서: MANUAL 28-1 = 관리자만 ⑤ [고치기] 예외 · ⑤ 줄 설명(단계 표시·B 71.6 · 앱 반영 대기·관리자교육 n/2명 = 이수 직원 수(일용직은 세지 않음 — 검토 반영)·의무 대장 글은 인허가 권한 + 그 행 공개 대상(옛 \'인허가 권한이 있으면\' 0 — 검토 반영)·미인정(입력 전)·만료 D-n/지남(지나면 인정 주황)·y15~y18) · 회사 구분(맨 위 — 두 칸 다 넣은 뒤에만) · 관리자 안전 설정 넣기 절차(관리자에게만·사후점검 한 줄 날짜 메모·0~999·409 안내) · 주의(고치기 창만 저장) — 문장 고정 · 묶음 이름 6개 그대로 · FEATURES 기준 ≥ v436·v436 절(문장 고정)·§7 안전 줄(문장 고정) · TESTLIST v436 체크 칸 전부 AI 몫(화면 칸 정확히 6개 — 관리자형·[고치기]·낙관락·권민지형·김정아형·다른 곳 순, PM 0, 게이트 칸 [x] uismoke)·화면 칸 기대 글 = 실제 화면 글(TL_PINS36 — [고치기] 칸 회사 구분 알약·메타·알림이 index.html에도, \'1000\' 대신 \'-1\', 알약 둘은 만료 D-60 뒤, 권민지형 칸 한 기기 전환 — 검토 반영) · CLAUDE.md 안전 탭 줄(규칙 문장 고정) · 자리 글(GATES_V436·GATE_) 0 · sw ≥ 436',
+    MAN_PINS36.every((s) => m281_36.indexOf(s) > 0) && [...m281_36.matchAll(/<li><b>([^<]+)<\/b> — /g)].map((m) => m[1]).join(',') === '이번 주기 안전 점검,중처법 반기 점검,다가오는 기한 30일,계약 안전 서류,인정·평가,확인 필요'
+    && m281_36.indexOf('인허가 권한이 있으면 의무 대장 16행') < 0 && m281_36.indexOf('석면해체·제거관리자교육 이수자 수 <b>') < 0
+    && Number((ft36.match(/기준: v(\d+) /) || [0, 0])[1]) >= 436 && ftv36.length > 0 && FT_PINS36.every((s) => ftv36.indexOf(s) > 0) && ft7_36.indexOf(FT7_PIN36) > 0 && ftv36.indexOf('GATES_V436') < 0
+    && tlv36.length > 0 && cb36.length >= 7 && cbNotAi36.length === 0 && cbPM36.length === 0 && tlv36.indexOf('PM 몫') < 0 && tlHeadOk36 && tlPinOk36 && cb36.some((l) => /^- \[x\] \(AI\) `uismoke`/.test(l)) && !/GATE_/.test(tlv36)
+    && CL_PINS36.every((s) => clSafe36.indexOf(s) > 0) && Number((sw36.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 436,
+    JSON.stringify({ man: MAN_PINS36.filter((s) => m281_36.indexOf(s) < 0).map((s) => s.slice(0, 30)), ft: FT_PINS36.filter((s) => ftv36.indexOf(s) < 0).map((s) => s.slice(0, 30)), ft7: ft7_36.indexOf(FT7_PIN36), gates: [ftv36.indexOf('GATES_V436'), /GATE_/.test(tlv36)], cb: cb36.length, notAi: cbNotAi36.map((l) => l.slice(0, 40)), pm: cbPM36.map((l) => l.slice(0, 40)), scr: cbScr36.map((l) => l.slice(0, 40)), tl: [tlPinOk36, TL_PINS36.filter((s) => tlFix36.indexOf(s) < 0 || html.indexOf(s.replace(/^'|'$/g, '')) < 0)], cl: CL_PINS36.filter((s) => clSafe36.indexOf(s) < 0).map((s) => s.slice(0, 30)) }));
+} catch (e) { console.log('  (v436 검사 생략 — ' + e.message + ')'); fails++; }
 
 try {
   const fdir = join(ROOT, 'netlify', 'functions');

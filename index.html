@@ -931,6 +931,11 @@
   .sfn-more[open] > summary{border-bottom:1px solid var(--line);}
   .sfn-more > summary::-webkit-details-marker{display:none;}
   .sfn-go{background:transparent;border:1px solid var(--line);border-radius:8px;color:var(--brand-dark);font-size:12.5px;font-weight:700;padding:6px 10px;margin-top:6px;cursor:pointer;}
+  /* v436 ⑤ 인정·평가·회사 구분 — 알약 여럿(인정 단계 + 만료 경고 · 회사 문턱)은 세로로 쌓아 폰에서도 본문 폭을 덜 먹게, KOSHA 단계 표시(미인정·접수·심사·인정)는 지금 단계만 칠함 */
+  .sfn-pills{flex:0 0 auto;display:flex;flex-direction:column;align-items:flex-end;gap:3px;}
+  .sfn-steps{display:inline-flex;flex-wrap:wrap;gap:3px;margin-left:4px;vertical-align:1px;}
+  .sfn-steps i{font-style:normal;font-size:11px;font-weight:700;padding:0 6px;border-radius:999px;background:#EEF2F0;color:var(--sub);}
+  .sfn-steps i.on{background:var(--brand);color:#fff;}
   .prog-frame{display:block;width:100%;height:calc(100vh - 170px);height:calc(100dvh - 170px);min-height:480px;border:1px solid var(--line);border-radius:12px;background:var(--card);}
   .todo-due-in{font-size:12px;padding:3px 6px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);max-width:132px;}
   #myTodoDue{flex:0 0 auto;width:138px;min-width:0;}
@@ -1642,13 +1647,13 @@
       <button class="lsub-btn active" data-lsub="site" id="sfChipSite">현장</button>
       <button class="lsub-btn" data-lsub="edu" id="sfChipEdu">교육·검진</button>
     </div>
-    <!-- 현황(v432, 메뉴 56 5단계 — PM 11/9 "56. ㄱ" 브리핑 steps[4]): 안전 체크 26개 · 중처법 반기 점검 · 30일 기한 · 계약 안전 서류 · 인정·평가(7단계 자리) · 확인 필요를 한 화면에.
+    <!-- 현황(v432, 메뉴 56 5단계 — PM 11/9 "56. ㄱ" 브리핑 steps[4]): 안전 체크 26개 · 중처법 반기 점검 · 30일 기한 · 계약 안전 서류 · 인정·평가(v436 7단계 — 안전 설정 settings:safety, 관리자만 [고치기]) · 확인 필요를 한 화면에(v436 회사 구분은 회사별 인원 두 칸을 넣은 뒤 맨 위).
          읽기 전용 — 완료·입력 버튼은 없고 줄을 누르면 원래 자리(내 업무 · 안전 › 현장·교육·검진 · 인허가 의무 대장 · 계약 단계·서류 · 문서함 06)로 간다. 그리기는 renderSafetyNow(// @safety-now 구간) -->
     <div class="sf-pane" id="sfPaneNow" style="display:none;">
     <div class="sec-hd">
       <button type="button" class="sec-hd-t" style="cursor:default;"><span>현황</span> <span class="cnt" id="sfNowHead"></span></button>
     </div>
-    <div class="sfn-note">읽기 전용입니다 — 완료·입력은 원래 자리(내 업무 · 안전 › 현장·교육·검진 · 인허가 · 계약 단계·서류)에서 합니다. 줄을 누르면 그 자리로 갑니다.</div>
+    <div class="sfn-note">읽기 전용입니다 — 완료·입력은 원래 자리(내 업무 · 안전 › 현장·교육·검진 · 인허가 · 계약 단계·서류)에서 합니다. 줄을 누르면 그 자리로 갑니다. 원래 자리가 따로 없는 안전 설정(KOSHA 인정 상태·회사별 인원)만 관리자가 ⑤의 [고치기]로 넣습니다.</div>
     <div id="sfNowHost"><div class="loading">불러오는 중…</div></div>
     </div>
     <!-- 현장(석면·철거·준설) — 2026-09-10 인허가 탭에서 분리, v428 안전 탭 칸으로. 한 대장을 종류로 갈라 본다.
@@ -2488,6 +2493,41 @@
     <button class="primary" id="eduSave">저장</button>
     <button class="danger" id="eduDelete">삭제</button>
     <button class="secondary" id="eduCancel">취소</button>
+  </div>
+</div>
+
+<!-- v436 안전 설정(settings:safety — 메뉴 56 7단계): 현황 ⑤ [고치기](관리자만). KOSHA 위험성평가 인정 단계·날짜·사후점검 · 회사별 상시근로자 수 — 인허가 목록에는 넣지 않는다 -->
+<div class="modal-backdrop" id="sfSetBackdrop">
+  <div class="modal">
+    <h3>안전 설정 — 인정·평가 · 회사별 인원</h3>
+    <div id="sfSetStamp" class="empty-line" style="margin:-2px 2px 8px;"></div>
+    <span class="fld-label">KOSHA 위험성평가 인정 단계</span>
+    <select id="sfSetStage">
+      <option value="none">미인정</option>
+      <option value="applied">접수</option>
+      <option value="review">심사</option>
+      <option value="certified">인정</option>
+    </select>
+    <input type="text" id="sfSetApplyNo" placeholder="접수번호 (선택)" maxlength="40" autocomplete="off">
+    <span class="fld-label">접수일</span>
+    <input type="date" id="sfSetApplied">
+    <span class="fld-label">심사일</span>
+    <input type="date" id="sfSetReview">
+    <span class="fld-label">인정일(결정일)</span>
+    <input type="date" id="sfSetDecided">
+    <span class="fld-label">만료일</span>
+    <input type="date" id="sfSetExpires">
+    <div class="empty-line" style="margin:-2px 2px 8px;">인정되면 유효 3년 — 재인정은 만료 3개월 전부터입니다. 만료 90일 안이면 현황에 경고 칩이 붙고, 할 일 알림은 지금처럼 내 업무 y15~y18이 합니다.</div>
+    <input type="text" id="sfSetRateYear" placeholder="요율 반영 연도 (선택, 예: 2027)" inputmode="numeric" maxlength="4" autocomplete="off">
+    <span class="fld-label">사후점검 이력 (한 줄에 '날짜 메모', 10건까지)</span>
+    <textarea id="sfSetChecks" rows="3" placeholder="2027-03-15 공단 사후점검 적합" style="width:100%;padding:12px;border-radius:10px;border:1px solid var(--line);font-size:14px;font-family:inherit;resize:vertical;margin-bottom:10px;box-sizing:border-box;"></textarea>
+    <span class="fld-label">회사별 상시근로자 수 (두 칸을 다 넣어야 현황 맨 위 회사 구분이 켜집니다)</span>
+    <div style="display:flex;gap:8px;">
+      <input type="text" id="sfSetHeadEnv" placeholder="종운환경 (명)" inputmode="numeric" maxlength="3" autocomplete="off" style="flex:1 1 0;min-width:0;">
+      <input type="text" id="sfSetHeadCon" placeholder="종운건설 (명)" inputmode="numeric" maxlength="3" autocomplete="off" style="flex:1 1 0;min-width:0;">
+    </div>
+    <button class="primary" id="sfSetSave">저장</button>
+    <button class="secondary" id="sfSetCancel">취소</button>
   </div>
 </div>
 
@@ -6303,6 +6343,13 @@
   document.getElementById("eduCancel").addEventListener("click", closeEdu);
   document.getElementById("eduKind").addEventListener("change", function(){ eduUpdateNotes(); eduAutoNext(); });
   document.getElementById("eduDate").addEventListener("change", eduAutoNext);
+  // v436 현황 ⑤ [고치기](관리자에게만 그려짐 — 버튼 글은 @safety-now 구간 sfNowEval) — 칸을 다시 그려도 그대로 듣게 #sfNowHost에 한 번 위임. 창·저장은 @safety-set 구간
+  document.getElementById("sfNowHost").addEventListener("click", function(e){
+    var t = e.target;
+    while (t && t !== this){ if (t.getAttribute && t.getAttribute("data-sfn-set") !== null){ sfSetOpen(); return; } t = t.parentNode; }
+  });
+  document.getElementById("sfSetSave").addEventListener("click", sfSetSave);
+  document.getElementById("sfSetCancel").addEventListener("click", sfSetClose);
   // P5c 등급확인서 판독 → 인허가 자동 반영(사람 확인 후). 등급 문자가 기존과 다르면 점수 계수(QUAL_DEF)도 갱신 필요하다고 경고.
   document.getElementById("licGradeBtn").addEventListener("click", function(){ if(isAdmin()) document.getElementById("licGradeFile").click(); });
   document.getElementById("licGradeFile").addEventListener("change", function(){
@@ -13956,7 +14003,8 @@
   // @safety-now-start — v432 안전 › 현황(메뉴 56 5단계, PM 11/9 "56. ㄱ" — 브리핑 steps[4] · 코드 지도 code.steps[5] · 시안 메뉴안전탭_시안_20261109 현황 칸).
   //   읽기 전용: 원장(주기 체크 records · 인허가 문서 duties·licenses · col:contracts·계약 서류함 · col:asbestos · col:edu)을 읽어 블록 6개로 보여 주고, 줄을 누르면 원래 자리로 간다.
   //   이 구간에는 저장 호출·완료 버튼이 없다(uismoke v432가 지킴) — 완료·입력은 내 업무 · 계약 단계·서류 · 인허가 · 안전 › 현장·교육·검진에서.
-  //   블록 = ① 이번 주기 안전 점검(check) ② 중처법 반기 점검(check) ③ 30일 기한(교육 = safety · 현장 = site · 의무 대장 = lic) ④ 계약 안전 서류(con) ⑤ 인정·평가(lic — 7단계 자리) ⑥ 확인 필요(문서함 06 바로가기 = doc).
+  //   블록 = (맨 위 회사 구분 — v436, 회사별 상시근로자 수 두 칸이 다 있을 때만) ① 이번 주기 안전 점검(check) ② 중처법 반기 점검(check) ③ 30일 기한(교육 = safety · 현장 = site · 의무 대장 = lic) ④ 계약 안전 서류(con)
+  //   ⑤ 인정·평가(v436 7단계 — 안전 설정 settings:safety, 현황을 보는 사람 모두 · 의무 대장 줄만 lic) ⑥ 확인 필요(문서함 06 바로가기 = doc).
   //   볼 권한이 없는 블록·줄은 '0건'이 아니라 숨긴다 — 체크 줄은 내 업무와 같은 checkItemVisible, 의무 대장 줄은 그 인허가 행의 licVisible(이름으로 이음).
   var SF_NOW_CHECK = ["w1", "m1", "m3", "q1", "h1", "h2", "h3", "h4", "h5", "h6", "h7", "y1", "y2", "y3", "y4", "y5", "y6", "y11", "y15", "y16", "y17", "y18", "su1", "su3", "su5", "su6"];   // 안전 항목 26개 — id만 둔다(문구·주기·담당은 GROUPS·SUDSI에서 그대로 읽음)
   // 중대재해처벌법 시행령 제4조·제5조② 반기 점검 줄 → 맞춘 내 업무 항목(코드 지도 code.steps[5], 줄 글은 PM 11/9 시안 그대로). id가 없는 줄은 상태 고정
@@ -13987,7 +14035,7 @@
   ];
   var SF_NOW_TICK_MAX = 90;   // 읽는 중(기본 원장·서류함)이면 1초마다 다시 그림 — 90번(약 90초) 넘으면 '불러오지 못함'(서류함은 그 계약을 읽기 시작한 때부터 셈 — 다시 그림은 많아야 180번)
   var SF_NOW_FRESH = 30000;   // v432 검토: 현황이 읽은 교육·현장 대장·명부는 30초 안이면 다시 열어도 다시 읽지 않는다(칩을 오가며 같은 GET이 거듭 나가지 않게)
-  var sfNowSt = { edu: "", asb: "" }, sfNowFold = {}, sfNowTimer = null, sfNowTicks = 0, sfNowHomeEduAsked = false;   // 읽기 결과(""·wait·ok·fail) · 펼침(화면 안에서만) · 다시 그림 타이머
+  var sfNowSt = { edu: "", asb: "", set: "" }, sfNowFold = {}, sfNowTimer = null, sfNowTicks = 0, sfNowHomeEduAsked = false;   // 읽기 결과(""·wait·ok·fail — set = v436 안전 설정 settings:safety) · 펼침(화면 안에서만) · 다시 그림 타이머
   var sfNowAt = {}, sfNowCdocT0 = {}, sfNowHomeWkAsked = false, sfNowLastHtml = "";   // 마지막으로 받은 시각(edu·asb·wk) · 서류함 읽기를 시작한 틱(계약 id) · 관리자 홈 명부 1번 읽음 · 마지막으로 그린 글(같으면 칸을 갈아끼우지 않음)
   function sfNowSee(){ return { check: canSee("check"), lic: canSee("lic"), con: canSee("con"), site: canSee("site"), doc: canSee("doc") }; }
   function sfNowItem(id){
@@ -14238,9 +14286,108 @@
     var foot = "실물 양식은 아직 준설만 들어와 있습니다 — 그 밖의 종류는 양식이 없어 ✗로 남습니다(v427 판정 그대로)." + (none ? " 안전 서류 줄이 없는 진행 계약 " + none + "건(사급 등)은 뺐습니다." : "");
     return { h: sfNowBlock("con", T, rows.length ? "진행 " + rows.length + "건" + (miss ? " · 빠짐 " + miss : "") : "", src, body, esc(foot)), pend: pend };
   }
-  // ⑤ 인정·평가 — 7단계 자리(KOSHA 인정 행·석면 안전성평가 등급·등록기준은 7단계에서 인허가 원장을 읽어 채운다)
-  function sfNowEval(){
-    return { h: sfNowBlock("eval", "⑤ 인정·평가", "", "인허가 원장 · 입력은 관리자", sfNowRow("7단계", "KOSHA 위험성평가 인정 단계 · 석면 안전성평가 등급 · 등록기준 인력·장비", "7단계에서 채웁니다. 회사 구분(종운환경·종운건설)도 회사별 상시근로자 수를 넣은 뒤 그때 켭니다.", "7단계에서 채움", "", ""), ""), pend: false };
+  // ⑤ 인정·평가(v436 — 메뉴 56 7단계 · PM 11/10 ⓐ '안전 설정 따로': KOSHA 인정은 인허가 행이 아니라 안전 설정 settings:safety — 현황을 열 때 sfNowLoad("set", loadSafetySet)로 읽는다)
+  //   줄 셋 = KOSHA 위험성평가 인정 단계(+ 날짜 · 만료 90일 안 경고 칩 — 재인정·사후점검 할 일은 지금처럼 내 업무 y15~y18) · 석면 안전성평가 'B 71.6 · 앱 반영 대기'(QUAL_DEF·의무 대장 16행은 그대로,
+  //   다음 평가 시기 = 16행 문구) · 석면해체·제거업 등록기준(전담 인력 2명 = 교육·검진의 석면해체·제거관리자교육 이수자 수 · 장비 6종 문구 · 의무 대장 17·18행 문구).
+  //   현황을 보는 사람 모두(안전 권한 — 설정 읽기와 같은 권한) · 의무 대장 글은 인허가 권한이고 그 행의 공개범위일 때만(sfNowDutyVisible — ③과 같은 판정).
+  //   [고치기]는 관리자에게만 버튼 글만 그린다 — 누름 배선(#sfNowHost 위임)·창·저장은 이 구간 밖(@safety-set). 이 구간은 저장·서버 호출 0 그대로
+  var SF_NOW_KOSHA = [["none", "미인정"], ["applied", "접수"], ["review", "심사"], ["certified", "인정"]];
+  var SF_NOW_KOSHA_WARN = 90;   // 인정 만료 경고 칩 — 만료 90일 안('만료 D-n'), 지나면 '만료 지남'
+  var SF_NOW_ASB_EVAL = { t: "B 71.6", y: "2026" };   // 석면해체·제거작업 안전성평가 2026 결과(종운건설, PM 9/21) — 통보서 반영(QUAL_DEF·lgrade_safe·의무 대장 16행)은 별건, 그전까지 '앱 반영 대기'
+  var SF_NOW_EQUIP = "HEPA 음압기 · 음압기록장치 · HEPA 진공청소기 · 위생설비 · 송기마스크·전동식 호흡보호구 · 습윤장치";   // 등록기준 장비 6종(산안법 시행령 제92조·별표28 — 시안 문구 그대로)
+  // 알약 여럿·제목에 단계 표시가 있는 줄(⑤ KOSHA·회사 구분) — sfNowRow와 같은 틀(.item.sfn-row). titleHtml은 이미 이스케이프한 글
+  function sfNowRowP(id, titleHtml, meta, pills, go){
+    return '<div class="item sfn-row' + (go ? '" data-sfn-go="' + esc(go) + '" role="button" tabindex="0"' : ' sfn-static"') + '>'
+      + '<span class="sfn-id">' + esc(id) + '</span>'
+      + '<div class="item-body"><div class="sfn-t">' + titleHtml + '</div>' + (meta ? '<div class="item-meta">' + esc(meta) + '</div>' : '') + '</div>'
+      + (pills.length ? '<span class="sfn-pills">' + pills.join("") + '</span>' : '') + '</div>';
+  }
+  // 의무 대장 그 번호 줄(③처럼 같은 번호는 뒤 줄) — 그 인허가 행을 볼 수 있을 때만, 아니면 null
+  function sfNowDutyNo(no){
+    var hit = null;
+    liveDuties().forEach(function(d){ if (d && d.no != null && Number(d.no) === no) hit = d; });
+    return (hit && sfNowDutyVisible(hit)) ? hit : null;
+  }
+  // 석면해체·제거관리자교육(교육 종류 manager) 이수자 수 — 사람 단위(같은 사람 기록 여럿은 1명) · 퇴사자·명부에서 지운 일용직은 빼고(sfNowEduLive — ③과 같은 판정)
+  //   v436 검토: 등록기준 '관리자교육 n/2명'(ok 판정)은 직원만 n으로 센다 — 교육 종류는 직원·일용직이 같이 써서 일용직도 이 기록을 가질 수 있는데,
+  //   일용직을 전담 인력에 넣을 수 있는지는 원문 확인 전이라 판정하지 않는다(일용직 이수자는 w로 따로 — 메타 줄에 '세지 않음')
+  function sfNowEduMgr(){
+    var seen = {}, n = 0, w = 0;
+    liveEdu().forEach(function(r){ if (r.kind !== "manager" || !sfNowEduLive(r)) return; var k = r.ptype + "|" + r.pid; if (!seen[k]){ seen[k] = 1; if (r.ptype === "worker") w++; else n++; } });
+    return { n: n, w: w };
+  }
+  // KOSHA 위험성평가 인정 줄 — 단계 표시(미인정·접수·심사·인정) + 알약(단계 · 만료 90일 안 경고). 저장값이 없으면 '미인정(입력 전)'
+  function sfNowKosha(){
+    var v = sfSet && sfSet.kosha, st = v ? String(v.stage || "none") : "none", lab = "미인정", pills = [], meta = [], last = "", cs, dd, i;
+    for (i = 0; i < SF_NOW_KOSHA.length; i++){ if (SF_NOW_KOSHA[i][0] === st) lab = SF_NOW_KOSHA[i][1]; }
+    var steps = SF_NOW_KOSHA.map(function(s){ return '<i' + (s[0] === st ? ' class="on"' : '') + '>' + esc(s[1]) + '</i>'; }).join("");
+    if (!v){
+      pills.push(sfNowPill("미인정(입력 전)", ""));
+      meta.push("관리자가 단계·날짜를 넣기 전입니다");
+    } else {
+      dd = isDate(v.expires_on) ? vehDday(v.expires_on) : null;
+      pills.push(sfNowPill(lab, st === "certified" ? (dd && dd.diff < 0 ? "am" : "ok") : (st === "none" ? "" : "am")));   // v436 검토: 인정인데 만료가 지났으면 초록(ok)으로 두지 않는다(맨 위 초록만 보면 유효한 인정으로 읽힘 — 아래 '만료 지남'과 같이)
+      if (v.apply_no) meta.push("접수번호 " + v.apply_no);
+      if (isDate(v.applied_on)) meta.push("접수 " + v.applied_on);
+      if (isDate(v.review_on)) meta.push("심사 " + v.review_on);
+      if (isDate(v.decided_on)) meta.push((st === "certified" ? "인정 " : "결정 ") + v.decided_on);   // v436 검토: 창 칸은 '인정일(결정일)' — 불인정 뒤 미인정으로 두고 결정일을 넣으면 '인정 날짜'로 읽히지 않게
+      if (dd){
+        meta.push("만료 " + v.expires_on);
+        if (dd.diff < 0) pills.push(sfNowPill("만료 지남", "bad"));
+        else if (dd.diff <= SF_NOW_KOSHA_WARN) pills.push(sfNowPill("만료 " + dd.text, "am"));
+      } else if (st === "certified") meta.push("만료일 미입력");
+      cs = Array.isArray(v.checks) ? v.checks : [];
+      cs.forEach(function(c){ if (c && isDate(c.date) && c.date > last) last = c.date; });
+      if (cs.length) meta.push("사후점검 " + cs.length + "회" + (last ? "(최근 " + last + ")" : ""));
+      if (v.rate_year) meta.push("요율 반영 " + v.rate_year + "년");
+    }
+    return sfNowRowP("KOSHA", '위험성평가 인정 <span class="sfn-steps">' + steps + '</span>', meta.join(" · "), pills, "");
+  }
+  // ⑤ 블록 — see = sfNowSee()(의무 대장 줄은 인허가 권한일 때만). 설정을 읽는 중·실패는 KOSHA 줄에만(석면 평가·등록기준 줄은 그대로)
+  function sfNowEval(see){
+    var T = "⑤ 인정·평가", rows = [], pend = false, ss = sfNowLd(sfNowSt.set), es = sfNowLd(sfNowSt.edu), dq = {}, mp, mm, mg, bm;
+    if (see.lic && sfNowColSt("licenses", licRemoteOk || duties.length > 0) === "ok"){
+      try { [16, 17, 18].forEach(function(no){ dq[no] = sfNowDutyNo(no); }); } catch(e){ dq = {}; }   // 의무 대장이 깨져도 이 블록의 다른 줄은 그대로
+    }
+    if (ss === "ok") rows.push(sfNowKosha());
+    else { rows.push(sfNowWaitRow("KOSHA", "KOSHA 위험성평가 인정(안전 설정)", ss)); if (ss === "wait") pend = true; }
+    var q = (typeof QUAL_DEF !== "undefined" && QUAL_DEF && QUAL_DEF.con && QUAL_DEF.con.safety) ? String(QUAL_DEF.con.safety.v || "") : "";
+    rows.push(sfNowRowP("석면", esc("석면 안전성평가(종운건설) — " + SF_NOW_ASB_EVAL.y + " 결과"),
+      [(q ? "앱 적격 계산 등급은 아직 " + q : ""), dq[16] ? "통보서를 반영할 때 입찰 카드·의무 대장 16행까지 한 번에 고칩니다" : "통보서를 반영할 때 함께 고칩니다", dq[16] ? "다음 평가 시기(의무 대장 16행): " + (dq[16].cycle || "") : ""].filter(Boolean).join(" · "),
+      [sfNowPill(SF_NOW_ASB_EVAL.t + " · 앱 반영 대기", "am")], dq[16] ? "duty" : ""));
+    if (es === "ok"){
+      if (!liveEdu().length){ mp = sfNowPill("기록 없음", ""); mm = "교육·검진 기록을 넣기 전에는 이수자를 셀 수 없습니다"; }
+      else { mg = sfNowEduMgr(); mp = sfNowPill("관리자교육 " + mg.n + "/2명", mg.n >= 2 ? "ok" : "am"); mm = "교육·검진의 석면해체·제거관리자교육 이수 직원(사람 수 — 자격 요건은 따로 확인)" + (mg.w ? " · 일용직 이수자 " + mg.w + "명은 세지 않음(전담 인력에 넣을지는 따로 확인)" : ""); }
+    } else { mp = sfNowPill(es === "wait" ? "확인 중" : "불러오지 못함", es === "wait" ? "" : "bad"); mm = es === "wait" ? "교육·검진 기록을 읽는 중" : "교육·검진 기록 — 현황 칸을 다시 열면 새로 읽습니다"; if (es === "wait") pend = true; }
+    rows.push(sfNowRowP("등록", esc("석면해체·제거업 등록기준 — 전담 인력 2명 · 장비 6종"), mm + " · 장비 6종: " + SF_NOW_EQUIP + " — 인력이 바뀌면 다시 확인", [mp], ""));
+    [17, 18].forEach(function(no){ var d = dq[no]; if (d) rows.push(sfNowRow(no + "행", d.duty || "", [d.lic, d.cycle].filter(Boolean).join(" · "), "주기 문구", "", "duty")); });
+    bm = sfSetBy ? findMember(sfSetBy) : null;
+    var src = "안전 설정" + (sfSetDay ? " · 마지막 고침 " + sfSetDay + (bm && bm.name ? " " + bm.name : "") : "") + " · 입력은 관리자";
+    var foot = esc("재인정(만료 3개월 전부터)·사후점검·요율 통지 할 일은 지금처럼 내 업무 y15~y18이 알립니다." + (ss === "ok" && sfNowHeadOn() ? "" : " 회사 구분(맨 위)은 회사별 상시근로자 수 두 칸을 다 넣은 뒤에 켜집니다."))   // 안내는 맨 위 블록이 안 보일 때만(sfNowCorp와 같은 조건)
+      + (ss === "ok" && isAdmin() ? ' <button type="button" class="sfn-go" data-sfn-set="1">고치기</button>' : "");
+    return { h: sfNowBlock("eval", T, "", src, rows.join(""), foot), pend: pend };
+  }
+  // 회사 구분(v436) — 안전 설정의 회사별 상시근로자 수 두 칸이 다 있을 때만 현황 맨 위에(처음엔 꺼짐 — 한 칸이라도 비면 블록째 없음).
+  //   문턱 배지 = 시안 법령 표에서 원문 '확인'된 사람 수 문턱만: 상시 5명(중대재해처벌법 제3조 · 산업안전보건법 제29조 정기교육 — 특별교육은 5명 미만에도) ·
+  //   20명(산업안전보건법 시행령 제24조 — 폐기물 수집·운반업 20~49명 안전보건관리담당자, 종운환경만). 공사금액 문턱·회사로 거르기는 아직(블록별 회사 판정이 정해지지 않음)
+  var SF_NOW_CORP = [{ k: "env", n: "종운환경", t20: true }, { k: "con", n: "종운건설", t20: false }];
+  function sfNowHeadN(v){ return typeof v === "number" && v >= 0 && v <= 999 && v % 1 === 0; }
+  function sfNowHeadOn(){ var h = sfSet && sfSet.headcount; return !!(h && sfNowHeadN(h.env) && sfNowHeadN(h.con)); }
+  function sfNowCorp(){
+    if (sfNowLd(sfNowSt.set) !== "ok" || !sfNowHeadOn()) return null;
+    var h = sfSet.headcount;
+    //   알약은 짧게(폰 375px에서 본문 폭을 덜 먹게 — 알약은 줄바꿈 없음), 문턱의 뜻·조문은 메타 줄
+    var rows = SF_NOW_CORP.map(function(c){
+      var n = h[c.k], pills = [n >= 5 ? sfNowPill("5명↑ 중처법 적용", "am") : sfNowPill("5명 미만", "")];
+      var meta = [n >= 5 ? "중대재해처벌법·정기교육 적용(상시 5명 이상)" : "중대재해처벌법·정기교육 제외(상시 5명 미만 — 특별교육은 적용)"];
+      if (c.t20){
+        if (n >= 50){ pills.push(sfNowPill("50명↑ 기준 확인", "bad")); meta.push("50명 이상 — 안전관리 인력 선임 기준 다시 확인"); }
+        else if (n >= 20){ pills.push(sfNowPill("20명↑ 담당자 선임", "am")); meta.push("안전보건관리담당자 선임 대상(폐기물 수집·운반업 20~49명)"); }
+        else meta.push("안전보건관리담당자는 20명부터(폐기물 수집·운반업)");
+      }
+      return sfNowRowP(c.n, esc("상시근로자 " + n + "명"), meta.join(" · "), pills, "");
+    });
+    return { h: sfNowBlock("corp", "회사 구분", "", "안전 설정의 회사별 상시근로자 수", rows.join(""), esc("문턱 = 상시 5명(중대재해처벌법 제3조 · 산업안전보건법 제29조 정기교육 — 특별교육은 5명 미만에도 적용) · 20명(산업안전보건법 시행령 제24조 — 폐기물 수집·운반업 20~49명 안전보건관리담당자, 종운환경). 공사금액 문턱과 회사로 거르기는 아직 없습니다.")), pend: false };
   }
   // ⑥ 확인 필요 — 조문과 해당 여부만 + 문서함 06 안전보건 바로가기(문서함 권한)
   function sfNowConfirm(see){
@@ -14297,6 +14444,7 @@
   function sfNowOpen(){
     sfNowTicks = 0; sfNowCdocT0 = {};
     sfNowLoad("edu", loadEdu);
+    sfNowLoad("set", loadSafetySet);   // v436 ⑤ 인정·평가·회사 구분 — 안전 설정(settings:safety, 안전 권한 읽기). 로더는 이 구간 밖(@safety-set)
     if (canSee("site")) sfNowLoad("asb", loadAsb, { noHooks: true }); else sfNowSt.asb = "";
     if (canSee("wk") && !(sfNowAt.wk && Date.now() - sfNowAt.wk < SF_NOW_FRESH)){ var wp = loadWorkers(); if (wp && typeof wp.then === "function") wp.then(function(){ if (workers.length) sfNowAt.wk = Date.now(); sfNowRefresh(); }, sfNowRefresh); }
     if (canSee("con")) liveContracts().forEach(function(c){ if (c.status !== "done" && sfNowConKeys(c).length) cdocLoad(c); });
@@ -14313,10 +14461,11 @@
     if (!canSee("safety")){ host.innerHTML = ""; sfNowLastHtml = ""; return; }   // 현황 = 안전 권한(관리자·권민지) — 칩·칸도 safetyPanes·applySafetyPerms가 숨긴다
     var see = sfNowSee(), out = [], pend = false;
     var add = function(o){ if (!o) return; out.push(o.h); if (o.pend) pend = true; };
+    add(sfNowTry("corp", "회사 구분", sfNowCorp));   // v436 맨 위 — 회사별 상시근로자 수 두 칸이 다 있을 때만(없으면 null = 블록 없음)
     if (see.check){ add(sfNowTry("check", "① 이번 주기 안전 점검", sfNowChecks)); add(sfNowTry("jcb", "② 중처법 반기 점검", sfNowJcb)); }
     add(sfNowTry("due", "③ 다가오는 기한 30일", function(){ return sfNowDue(see); }));
     if (see.con) add(sfNowTry("con", "④ 계약 안전 서류", sfNowCons));
-    if (see.lic) add(sfNowTry("eval", "⑤ 인정·평가", sfNowEval));
+    add(sfNowTry("eval", "⑤ 인정·평가", function(){ return sfNowEval(see); }));   // v436 원천이 안전 설정이라 현황을 보는 사람 모두(종전 v432 자리 표시는 인허가 권한) — 의무 대장 줄만 see.lic
     add(sfNowTry("confirm", "⑥ 확인 필요", function(){ return sfNowConfirm(see); }));
     var head = document.getElementById("sfNowHead");
     if (head) head.textContent = todayStr() + " 기준";
@@ -14334,6 +14483,96 @@
     if (pend && sfNowTicks < SF_NOW_TICK_MAX * 2) sfNowTimer = setTimeout(function(){ sfNowTimer = null; sfNowTicks++; sfNowRefresh(); }, 1000);   // 기다림은 블록마다 90번에서 끝난다(늦게 시작한 서류함도 180번 안) — 2배는 안전 한도
   }
   // @safety-now-end
+
+  // @safety-set-start — v436 안전 설정(settings:safety — 메뉴 56 7단계, PM 11/10 ⓐ '안전 설정 따로'): 현황 ⑤ 인정·평가·회사 구분이 읽는 값과 관리자 [고치기] 창.
+  //   현황 구간(@safety-now)은 저장·서버 호출 0이라 읽기 로더·창·저장을 여기 둔다. 서버 gw-data safety_settings_get(안전 권한 — 숨김 403)·safety_settings_set(관리자만 — 값 검사 400·낙관락 409·prev 1판·감사 1줄).
+  //   KOSHA 위험성평가 인정은 인허가 목록(licenses)에 행으로 넣지 않는다 — 인허가 화면·자동 지시·캘린더·검색·브리핑은 무변.
+  var sfSet = null, sfSetBase = 0, sfSetDay = "", sfSetBy = "", sfSetSaving = false;   // 받은 값({ kosha, headcount } — 저장값이 없으면 null) · 낙관락 토큰(저장된 updated_at) · 마지막으로 고친 날·사람 id · 저장 중(연타 방지)
+  var SF_SET_STAGES = ["none", "applied", "review", "certified"];
+  var SF_SET_NO_WRITE = "안전 설정은 관리자만 고칩니다(현황은 읽기 전용).";
+  var SF_SET_STALE = "다른 곳에서 먼저 고쳤습니다 — 새로 읽었습니다";
+  var SF_SET_ERR = { BAD_VALUE: "보낸 값의 모양이 맞지 않습니다", BAD_STAGE: "인정 단계가 맞지 않습니다", BAD_TEXT: "접수번호는 40자까지입니다", BAD_DATE: "날짜가 맞지 않습니다",
+    BAD_YEAR: "요율 반영 연도는 네 자리입니다", BAD_CHECKS: "사후점검 이력(10건까지, 줄마다 날짜)이 맞지 않습니다", BAD_HEADCOUNT: "상시근로자 수는 0~999 정수입니다",
+    ADMIN_ONLY: "관리자만 고칠 수 있습니다", SETTINGS_READ_FAILED: "저장된 값을 읽지 못했습니다 — 잠시 뒤 다시 저장해 주세요" };
+  // 읽기 — 현황을 열 때 sfNowOpen이 sfNowLoad("set", loadSafetySet)로 부른다(결과 true/false). 안전 권한이 없으면 부르지 않음(서버도 숨김 403 NO_ACCESS)
+  function loadSafetySet(){
+    if (!canSee("safety")) return;
+    return gwCall("gw-data", { action: "safety_settings_get" }).then(function(res){
+      if (res.status !== 200 || !res.body) return false;
+      sfSetApply(res.body);
+      return true;
+    }).catch(function(){ return false; });
+  }
+  // 읽기·저장 응답(같은 꼴 { settings, updated_at, updated_by })을 상태에 담는다
+  function sfSetApply(b){
+    sfSet = (b.settings && typeof b.settings === "object") ? b.settings : null;
+    sfSetBase = Number(b.updated_at) || 0;
+    sfSetDay = sfSetBase ? fmtDate(new Date(sfSetBase)) : "";
+    sfSetBy = String(b.updated_by || "");
+  }
+  // [고치기] — 현황 ⑤ 버튼(관리자에게만 그려짐, #sfNowHost 위임 배선). 창을 지금 값으로 채워 연다
+  function sfSetOpen(){
+    if (!isAdmin()){ alert(SF_SET_NO_WRITE); return; }
+    sfSetFill(sfSet);
+    document.getElementById("sfSetBackdrop").classList.add("show");
+  }
+  function sfSetClose(){ document.getElementById("sfSetBackdrop").classList.remove("show"); }
+  function sfSetFill(v){
+    var k = (v && v.kosha) || {}, h = (v && v.headcount) || {};
+    var put = function(id, x){ document.getElementById(id).value = (x === undefined || x === null) ? "" : String(x); };
+    put("sfSetStage", SF_SET_STAGES.indexOf(k.stage) >= 0 ? k.stage : "none");
+    put("sfSetApplyNo", k.apply_no); put("sfSetApplied", k.applied_on); put("sfSetReview", k.review_on); put("sfSetDecided", k.decided_on); put("sfSetExpires", k.expires_on); put("sfSetRateYear", k.rate_year);
+    put("sfSetChecks", (Array.isArray(k.checks) ? k.checks : []).map(function(c){ return (c && c.date ? c.date : "") + (c && c.note ? " " + c.note : ""); }).join("\n"));
+    put("sfSetHeadEnv", h.env); put("sfSetHeadCon", h.con);
+    document.getElementById("sfSetStamp").textContent = sfSetBase ? "마지막 고침 " + sfSetDay : "아직 저장한 적 없음 — 현황에는 '미인정(입력 전)'";
+  }
+  function sfSetDateOk(s){ if (!isDate(s)) return false; var t = new Date(s + "T00:00:00"); return !isNaN(t.getTime()) && fmtDate(t) === s; }
+  // 창 → 보낼 값 { v } | { err } — 서버 값 검사와 같은 규칙(서버가 다시 본다)
+  function sfSetRead(){
+    var g = function(id){ return String(document.getElementById(id).value || "").trim(); }, i, m;
+    var k = { stage: g("sfSetStage"), apply_no: g("sfSetApplyNo"), applied_on: g("sfSetApplied"), review_on: g("sfSetReview"), decided_on: g("sfSetDecided"), expires_on: g("sfSetExpires"), rate_year: g("sfSetRateYear"), checks: [] };
+    if (SF_SET_STAGES.indexOf(k.stage) < 0) return { err: "인정 단계를 고르세요." };
+    if (k.apply_no.length > 40) return { err: "접수번호는 40자까지입니다." };
+    var ds = ["applied_on", "review_on", "decided_on", "expires_on"];
+    for (i = 0; i < ds.length; i++){ if (k[ds[i]] && !sfSetDateOk(k[ds[i]])) return { err: "날짜는 달력에서 고르거나 YYYY-MM-DD로 넣어 주세요." }; }
+    if (k.rate_year && !(/^\d{4}$/.test(k.rate_year) && Number(k.rate_year) >= 2000 && Number(k.rate_year) <= 2100)) return { err: "요율 반영 연도는 네 자리(예: 2027)로 넣거나 비워 두세요." };
+    var lines = String(document.getElementById("sfSetChecks").value || "").split(/\r?\n/).map(function(s){ return s.trim(); }).filter(Boolean);
+    if (lines.length > 10) return { err: "사후점검 이력은 10건까지입니다." };
+    for (i = 0; i < lines.length; i++){
+      m = lines[i].match(/^(\d{4}-\d{2}-\d{2})(?:\s+(.*))?$/);
+      if (!m || !sfSetDateOk(m[1])) return { err: "사후점검 이력은 한 줄에 '날짜 메모'(예: 2027-03-15 공단 사후점검 적합)로 넣어 주세요." };
+      if ((m[2] || "").trim().length > 100) return { err: "사후점검 메모는 한 줄 100자까지입니다." };
+      k.checks.push({ date: m[1], note: (m[2] || "").trim() });
+    }
+    var hn = function(s){ return s === "" ? "" : (/^\d{1,3}$/.test(s) ? Number(s) : null); };
+    var env = hn(g("sfSetHeadEnv")), con = hn(g("sfSetHeadCon"));
+    if (env === null || con === null) return { err: "상시근로자 수는 0~999 사이 정수로 넣거나 비워 두세요." };
+    return { v: { kosha: k, headcount: { env: env, con: con } } };
+  }
+  // 저장 — 관리자만(서버도 ADMIN_ONLY) · 받은 때의 updated_at을 base로(낙관락). 409 = 다른 관리자·다른 기기가 먼저 고침 → 새로 읽어 창을 새 값으로 채우고 알린다(사람이 새 값을 보고 다시 결정)
+  function sfSetSave(){
+    if (!isAdmin()){ alert(SF_SET_NO_WRITE); return; }
+    if (sfSetSaving) return;
+    var f = sfSetRead();
+    if (f.err){ alert(f.err); return; }
+    sfSetSaving = true;
+    gwCall("gw-data", { action: "safety_settings_set", base: sfSetBase, kosha: f.v.kosha, headcount: f.v.headcount }).then(function(res){
+      sfSetSaving = false;
+      var code = (res.body && res.body.error_code) || "";
+      if (res.status === 200 && res.body){ sfSetApply(res.body); sfSetClose(); gwToast("저장했습니다"); sfNowRefresh(); return; }
+      if (res.status === 400 && code === "NO_CHANGE"){ sfSetClose(); gwToast("바뀐 것이 없습니다"); return; }
+      if (res.status === 409){
+        var p = loadSafetySet();
+        if (p && typeof p.then === "function") p.then(function(ok){
+          if (!ok){ alert("다른 곳에서 먼저 고쳤는데 새 값을 읽지 못했습니다 — 창을 닫고 현황 칸을 다시 열어 주세요."); return; }
+          sfSetFill(sfSet); sfNowRefresh(); gwToast(SF_SET_STALE, true);
+        });
+        return;
+      }
+      alert("안전 설정 저장 실패 (" + (SF_SET_ERR[code] || code || res.status) + ")");
+    }).catch(function(){ sfSetSaving = false; alert("안전 설정 저장 실패(네트워크) — 다시 시도해 주세요."); });
+  }
+  // @safety-set-end
 
   // ═══ 교육·건강진단 이력 ════════════════════════════════════════════════
   // 주기는 전부 원문 확정분이다(인허가_만기주기_조사 석면 섹션, 2·3차 재검증 완료).
@@ -22360,6 +22599,7 @@
     if (currentTab === "safety"){
       if (!panes.length) switchTab("dash");
       else if (panes.indexOf(safetyLayer) < 0) setSafetyLayer(panes[0]);
+      else if (safetyLayer === "now") setSafetyLayer("now");   // v436 검토: 로그인 창 '전환'은 새로고침 없이 afterLogin → applyPerms만 돈다 — 현황을 볼 수 있는 다음 사람에게 앞사람 권한으로 그린 현황(관리자 [고치기]·공개범위 걸린 의무 대장 줄)이 남지 않게 다시 연다(sfNowOpen — 30초 캐시·현황 구간 저장 0 그대로, 화관법 v434와 같은 꼴). 이 함수는 로그인·부팅 때만 불리고 부팅 때는 홈이라 두 번 열 일이 없다
     }
     // 길 안내는 갈 곳을 볼 수 있는 사람에게만 — 인허가 → 안전 › 현장, 인사 두 화면 → 안전 › 교육·검진(비관리자의 빈 이력 칸은 없앰)
     //   인허가 석면 안내는 버튼만 숨기고 글 줄은 남긴다(510ed20과 같음 — 1단계 브리핑에 권민지형 화면 변화 없음, v428 검토). 버튼은 CSS !important라 감싸개로 숨긴다
@@ -22895,8 +23135,9 @@
 
   var MOD_LABEL = {tasks:"지시", veh:"차량", hw:"화관법", rec:"기성·수금", lic:"인허가", safety:"안전", site:"현장", check:"주기 체크", con:"계약", cli:"거래처", doc:"문서함", bid:"입찰", wk:"일용직", quote:"견적서", promo:"홍보"};   // check 권한은 주기 체크리스트 영역만 제어(내게 온 지시·내 할 일은 전원) — 탭 이름(내 업무)과 구분 · hw = 화관법 탭(v431 열 · v434 탭 숨김·폐기물 제출 수행 검사)
   // ---- 감사 로그 뷰어(관리자 전용, 서버 기록 열람) ----
-  var AUDIT_COL_LABEL = {tasks:"지시", vehicles:"차량", receivables:"기성", licenses:"인허가", checklist:"업무", documents:"문서함", clients:"거래처", contracts:"계약", leaves:"휴가", family:"가족친화", member:"회원", login:"로그인", progress:"진척도"};
-  var AUDIT_FIELD_LABEL = {status:"상태", title:"제목", who:"담당", who_id:"담당", due:"기한", amount:"금액", paid:"입금", del:"삭제", scope:"공개범위", stage:"단계", cancel_req:"취소요청", name:"이름", role:"직책", rank:"직급", dept:"부서", admin:"관리자", perms:"권한", hire_date:"입사일", leave_date:"퇴사일", seq:"연번", annual_base:"잔여연차기준", annual_base_date:"기준일", annual_days:"연차수동", loa_days:"휴직누적", on_loa:"휴직중", loa_start:"휴직시작", loa_end:"휴직종료", annual_paid:"연차수당포함", emp_type:"고용형태", birth:"생년월일", annual_basis:"연차기준", reason:"사유", approver:"승인자", done_by:"완료자", detail:"상세", recur:"반복", hl:"하이라이트", mismatch:"불일치", PIN:"PIN", tier:"관리자등급", deleted_at:"삭제일", deleted_by:"삭제자", restored_at:"복구일", restored_by:"복구자"};
+  var AUDIT_COL_LABEL = {tasks:"지시", vehicles:"차량", receivables:"기성", licenses:"인허가", checklist:"업무", documents:"문서함", clients:"거래처", contracts:"계약", leaves:"휴가", family:"가족친화", member:"회원", login:"로그인", progress:"진척도", safety:"안전 설정"};   // v436 safety = 현황 ⑤ 안전 설정(settings:safety) 고침
+  var AUDIT_FIELD_LABEL = {status:"상태", title:"제목", who:"담당", who_id:"담당", due:"기한", amount:"금액", paid:"입금", del:"삭제", scope:"공개범위", stage:"단계", cancel_req:"취소요청", name:"이름", role:"직책", rank:"직급", dept:"부서", admin:"관리자", perms:"권한", hire_date:"입사일", leave_date:"퇴사일", seq:"연번", annual_base:"잔여연차기준", annual_base_date:"기준일", annual_days:"연차수동", loa_days:"휴직누적", on_loa:"휴직중", loa_start:"휴직시작", loa_end:"휴직종료", annual_paid:"연차수당포함", emp_type:"고용형태", birth:"생년월일", annual_basis:"연차기준", reason:"사유", approver:"승인자", done_by:"완료자", detail:"상세", recur:"반복", hl:"하이라이트", mismatch:"불일치", PIN:"PIN", tier:"관리자등급", deleted_at:"삭제일", deleted_by:"삭제자", restored_at:"복구일", restored_by:"복구자",
+    "kosha.stage":"KOSHA 단계", "kosha.apply_no":"접수번호", "kosha.applied_on":"접수일", "kosha.review_on":"심사일", "kosha.decided_on":"인정일(결정일)", "kosha.expires_on":"만료일", "kosha.rate_year":"요율 연도", "kosha.checks":"사후점검", "headcount.env":"상시근로자 종운환경", "headcount.con":"상시근로자 종운건설"};   // v436 검토: 안전 설정 감사 줄의 바뀐 칸(f) — 서버 gw-data SAFETY_FIELD_LABEL과 같은 글(uismoke v436 ⑧이 대조), 없으면 감사 화면에 영어 경로(kosha.stage)가 그대로 나왔다
   var auditMonthCur = "";
   function auditMonthShift(delta){
     var p = auditMonthCur.split("-"), y = +p[0], mo = +p[1] + delta;
