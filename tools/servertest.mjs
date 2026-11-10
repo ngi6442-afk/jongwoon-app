@@ -3287,11 +3287,18 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   r50 = await call({ action: 'notify_set', event: 'task_auto_create', value: 'assignee', base: 0 }, tokA);
   T('50 notify_set 생성→담당자 본인 · 감사 알림변경', r50.code === 200 && r50.body.events.task_auto_create === 'assignee' && auditMock.logs.length === auditN50 + 1 && auditMock.logs[auditN50].ev[0].op === '알림변경', JSON.stringify(r50.body).slice(0, 160));
   let base50 = r50.body.updated_at;
+  // v437: 전환 직후(settings:notify updated_at = 방금 저장)는 병행 7일 안 — 클라 auto-due 관리자 푸시를 삼키지 않고 종전처럼 관리자 전원에게(직원이 쏘면 관리자 수만큼).
+  //       7일이 지나면 종전처럼 삼킨다(sent 0 suppressed) — 저장 시각을 7일 1분 앞당겨 흉내, 끝나면 되돌림(뒤 낙관락 base50). 경우별 행렬은 81절
   pushMock.calls.length = 0;
   r50 = await call({ action: 'push_send', to: '__admins__', title: '만기 임박 1건', body: 'x', tag: 'auto-due' }, tokW, 'dev1');
-  T('50 assignee 모드: 클라 auto-due 관리자 푸시는 서버가 삼킴(sent 0 suppressed) · 다른 태그는 그대로', r50.code === 200 && r50.body.sent === 0 && r50.body.suppressed === 'task_auto_create' && pushMock.calls.length === 0, JSON.stringify(r50.body));
+  T('50 assignee 전환 직후(병행 7일 안 — v437): 클라 auto-due 관리자 푸시는 삼키지 않고 그대로(sent = 관리자 수 · suppressed 없음 · 발송 1)', r50.code === 200 && r50.body.sent === adminsN50 && !('suppressed' in r50.body) && pushMock.calls.length === 1 && pushMock.calls[0].tag === 'auto-due', JSON.stringify(r50.body) + ' admins ' + adminsN50);
+  mem.gw_data['settings:notify'].updated_at = base50 - 7 * 86400000 - 60000;
+  pushMock.calls.length = 0;
+  r50 = await call({ action: 'push_send', to: '__admins__', title: '만기 임박 1건', body: 'x', tag: 'auto-due' }, tokW, 'dev1');
+  T('50 assignee 전환 7일 1분 뒤(병행 끝): 클라 auto-due 관리자 푸시는 서버가 삼킴(sent 0 suppressed) · 다른 태그는 그대로', r50.code === 200 && r50.body.sent === 0 && r50.body.suppressed === 'task_auto_create' && pushMock.calls.length === 0, JSON.stringify(r50.body));
   r50 = await call({ action: 'push_send', to: '__admins__', title: '기타', body: 'x', tag: 'etc' }, tokW, 'dev1');
   T('50 assignee 모드: 다른 태그 __admins__는 종전대로(sent = 관리자 수)', r50.code === 200 && r50.body.sent === adminsN50, JSON.stringify(r50.body));
+  mem.gw_data['settings:notify'].updated_at = base50;
   // save: 새 자동 지시 → 배정표로 담당 채움 → 담당자 본인 1발(우선기기)
   mem.gw_data['settings:assign'] = { schema: 1, rules: { 'veh:': { who_id: 'uwork' } }, approver_id: '', prev: null, updated_at: 5, updated_by: 'x' };
   mem.gw_data['col:tasks'] = { schema: 1, items: [] };
@@ -5359,6 +5366,145 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
 
   mem.gw_users = savedUsers80;
   if (had80 === undefined) delete mem.gw_data[KEY80]; else mem.gw_data[KEY80] = had80;
+}
+
+{ // ---- 81(v437) 45 C026 — 자동 지시 생성 알림 '담당자 본인' 전환 뒤 첫 7일 관리자 병행을 앱 경로에도(게이트 보고 5-2 1-a · 게이트 ③ '1주 병행' 맞춤, 서버만).
+  //   판정 한 곳 notifyParallelOn(settings:notify updated_at 기준 7일 — 없거나 0이면 병행 끝)을 봇 경로(bot_notify 태그 auto-due)와 앱 경로(push_send __admins__ 태그 auto-due·rec-over·bid-qual)가 같이 쓴다.
+  //   병행 중 = 앱 경로는 삼키지 않고 종전처럼 관리자 전원(보낸 사람 제외) · 봇 경로도 관리자 전원 / 병행 끝 = 앱 경로 sent 0·suppressed 'task_auto_create' · 봇 경로 sent 0·'관리자 푸시 생략' 안내.
+  //   담당자 1발(save → notifyAutoCreated)은 병행과 상관없이 나간다 · admins 모드·설정 없음은 지금처럼 나감 · 다른 태그·__admins__ 아닌 대상은 영향 없음.
+  //   응답 코드만이 아니라 받는 사람 id·이유 코드(suppressed)·응답 키 목록·안내 글(note)까지 본다. 경계 = 7일 ± 1분 + 시계를 멈춘 정확한 7일(≤)·1ms 뒤.
+  //   검토 반영(11/10): ⑧ 옛 블롭에서 실제 notify_set으로 전환 = 병행 시작(저장 시각·다른 칸·prev·감사) · ⑨ 알려진 한계(다른 칸·되돌리기 = 병행 7일 다시) 동작 고정.
+  const savedUsers81 = JSON.parse(JSON.stringify(mem.gw_users)), savedSend81 = pushMock.sendTo, realNow81 = Date.now;
+  const keep81 = {}; ['settings:notify', 'settings:assign', 'col:tasks'].forEach((k) => { keep81[k] = Object.prototype.hasOwnProperty.call(mem.gw_data, k) ? JSON.parse(JSON.stringify(mem.gw_data[k])) : undefined; });
+  const sent81 = [];
+  try {
+    mem.gw_users['device:dev1'] = { status: 'approved' };
+    const mk81 = (id, extra) => { mem.gw_users['member:' + id] = Object.assign({ id, name: id, role: '직원', admin: false, perms: {} }, extra); return issueSession(mem.gw_users['member:' + id]).token; };
+    mk81('u81adm', { name: '관리자81', role: '관리자', admin: true, tier: 'admin' });   // 관리자가 둘 이상이어야 '보낸 사람 제외'가 보인다
+    const tWk81 = mk81('u81wk', { name: '정재욱형81', perms: { tasks: 'do', veh: 'do' } });
+    pushMock.sendTo = async (ids, p) => { sent81.push({ ids: ids.slice().sort(), tag: p.tag }); return { sent: ids.length, removed: 0 }; };
+    const adm81 = (await pushMock.adminIds()).slice().sort(), admNoA81 = adm81.filter((id) => id !== 'uadmin');
+    const D81 = 86400000, TAGS81 = ['auto-due', 'rec-over', 'bid-qual'];
+    const nf81 = (ev, at) => { const d = { schema: 1, events: { task_auto_create: ev }, prev: null, updated_by: 'uadmin' }; if (at !== undefined) d.updated_at = at; mem.gw_data['settings:notify'] = d; };
+    const app81 = async (tag, tok, dev, to) => { sent81.length = 0; const x = await call({ action: 'push_send', to: to || '__admins__', title: '자동 지시', body: 'x', tag: tag }, tok, dev); return { code: x.code, body: x.body, s: sent81.slice() }; };
+    const bot81 = async (tag) => { sent81.length = 0; const x = await call({ action: 'bot_notify', key: 'test-ingest-key', title: '정기업무 1건', body: 'x', tag: tag }, null); return { code: x.code, body: x.body, s: sent81.slice() }; };
+    const ks81 = (b) => Object.keys(b).sort().join(',');
+    const went81 = (x, want, tag) => x.code === 200 && x.body.status === 'OK' && ks81(x.body) === 'request_id,sent,skipped,status' && x.body.sent === want.length && x.body.skipped === 0 && x.s.length === 1 && x.s[0].ids.join(',') === want.join(',') && x.s[0].tag === tag;
+    const ate81 = (x) => x.code === 200 && x.body.status === 'OK' && ks81(x.body) === 'request_id,sent,status,suppressed' && x.body.sent === 0 && x.body.suppressed === 'task_auto_create' && x.s.length === 0;
+    const botWent81 = (x, tag) => x.code === 200 && x.body.status === 'OK' && ks81(x.body) === 'admins,devices,removed,request_id,sent,status' && x.body.sent === adm81.length && x.body.admins === adm81.length && x.s.length === 1 && x.s[0].ids.join(',') === adm81.join(',') && x.s[0].tag === (tag || 'auto-due');
+    const botAte81 = (x) => x.code === 200 && x.body.status === 'OK' && ks81(x.body) === 'admins,devices,note,request_id,sent,status' && x.body.sent === 0 && x.body.devices === 0 && x.body.admins === adm81.length && x.body.note === 'task_auto_create=assignee — 관리자 푸시 생략(담당자 본인 1발은 ingest가 보냄)' && x.s.length === 0;
+    //   한 상태에서 앱 경로(직원이 쏨 · 관리자가 쏨 × 태그 셋)와 봇 경로(auto-due)를 함께 돌려 둘이 같은 판정인지 본다
+    const run81 = async () => { const w = [], a = []; for (const tg of TAGS81) { w.push(await app81(tg, tWk81, 'dev1')); a.push(await app81(tg, tokA)); } return { w, a, b: await bot81('auto-due') }; };
+    const on81 = (r) => r.w.every((x, i) => went81(x, adm81, TAGS81[i])) && r.a.every((x, i) => went81(x, admNoA81, TAGS81[i])) && botWent81(r.b);
+    const off81 = (r) => r.w.every(ate81) && r.a.every(ate81) && botAte81(r.b);
+    const sh81 = (r) => JSON.stringify({ w: r.w.map((x) => [x.body.sent, x.body.suppressed || '', x.s.length]), a: r.a.map((x) => [x.body.sent, x.body.suppressed || '', x.s.length]), b: [r.b.body.sent, r.b.body.note || '', r.b.s.length] });
+
+    // ① 병행 중 — 전환 직후(updated_at = 지금) · 7일 1분 전: 앱 경로 세 태그 모두 관리자 전원(직원이 쏘면 관리자 전원, 관리자가 쏘면 본인 빼고 — 종전 규칙) · 봇 경로도 관리자 전원
+    nf81('assignee', Date.now()); const rNow81 = await run81();
+    nf81('assignee', Date.now() - 7 * D81 + 60000); const rIn81 = await run81();
+    T('81 v437 병행 중(전환 직후 · 7일 1분 전): 앱 경로 auto-due·rec-over·bid-qual 관리자 푸시를 삼키지 않음 — 직원이 쏘면 관리자 전원 · 관리자가 쏘면 본인 빼고(종전 규칙) · 응답 키 status·sent·skipped·request_id(suppressed 없음) · 봇 경로 auto-due도 관리자 전원(응답 키 admins·devices·removed)',
+      adm81.length >= 2 && admNoA81.length === adm81.length - 1 && on81(rNow81) && on81(rIn81), sh81(rNow81) + ' / ' + sh81(rIn81) + ' adm ' + adm81.join(','));
+
+    // ② 병행 끝 — 7일 1분 뒤 · updated_at 없음 · 0: 앱 경로 세 태그 모두 삼킴(sent 0 · suppressed 'task_auto_create' · 발송 0) · 봇 경로 생략(sent 0 · devices 0 · 안내 글)
+    nf81('assignee', Date.now() - 7 * D81 - 60000); const rOut81 = await run81();
+    nf81('assignee'); const rNone81 = await run81();
+    nf81('assignee', 0); const rZero81 = await run81();
+    T('81 v437 병행 끝(7일 1분 뒤 · updated_at 없음 · 0): 앱 경로 세 태그 모두 서버가 삼킴(응답 키 status·sent·suppressed·request_id = sent 0 · suppressed task_auto_create · 발송 0 — 직원·관리자 같음) · 봇 경로 auto-due도 생략(sent 0 · devices 0 · 안내 글 그대로 · 발송 0)',
+      off81(rOut81) && off81(rNone81) && off81(rZero81), sh81(rOut81) + ' / ' + sh81(rNone81) + ' / ' + sh81(rZero81));
+
+    // ③ 경계(시계를 멈춤): 저장 뒤 정확히 7일 = 병행 중(≤) · 7일 1ms 뒤 = 끝 · 저장 시각이 1분 미래(서버 사이 시계 차) = 병행 중 · 숫자 아닌 깨진 값 = 끝(없음과 같음)
+    const T0_81 = realNow81(); Date.now = () => T0_81;
+    nf81('assignee', T0_81 - 7 * D81); const rEq81 = await run81();
+    nf81('assignee', T0_81 - 7 * D81 - 1); const rEq1_81 = await run81();
+    nf81('assignee', T0_81 + 60000); const rFut81 = await run81();
+    nf81('assignee', 'abc'); const rBad81 = await run81();
+    Date.now = realNow81;
+    T('81 v437 경계(시계 멈춤): 저장 뒤 정확히 7일 = 병행 중(≤ — 앱 세 태그·봇 모두 관리자 전원) · 7일 1ms 뒤 = 병행 끝(앱 삼킴·봇 생략) · 저장 시각이 1분 미래(서버 사이 시계 차) = 병행 중 · 숫자 아닌 깨진 값 = 병행 끝(없음과 같음)',
+      on81(rEq81) && off81(rEq1_81) && on81(rFut81) && off81(rBad81), [rEq81, rEq1_81, rFut81, rBad81].map(sh81).join(' / '));
+
+    // ④ admins 모드(30일 전 저장 · 방금 저장)·설정 없음(기본 admins) → 지금처럼 나감 — 병행 판정을 타지 않음
+    nf81('admins', Date.now() - 30 * D81); const rA1_81 = await run81();
+    nf81('admins', Date.now()); const rA2_81 = await run81();
+    delete mem.gw_data['settings:notify']; const rA3_81 = await run81();
+    T('81 v437 task_auto_create = admins(30일 전 저장 · 방금 저장)·설정 없음(기본 admins): 앱 경로 세 태그·봇 경로 모두 지금처럼 관리자 전원(직원이 쏘면 전원 · 관리자가 쏘면 본인 빼고)',
+      on81(rA1_81) && on81(rA2_81) && on81(rA3_81), [rA1_81, rA2_81, rA3_81].map(sh81).join(' / '));
+
+    // ⑤ 다른 태그·다른 대상은 영향 없음 — 병행 끝(assignee, 8일 전)에도: task-rv-(완료 요청 — task_review 기본 admins라 관리자 전원)·auto-new-(서버 담당자 1발 태그)·비슷한 이름·그 밖 · __admins__ 아닌 대상(회원 id) · 봇 경로 다른 태그(backup-stale·rec-over)
+    nf81('assignee', Date.now() - 8 * D81);
+    const o81 = [];
+    for (const tg of ['task-rv-t81', 'auto-new-u81wk-2026-11-13', 'auto-due-x', 'x-auto-due', 'etc']) o81.push({ tg, x: await app81(tg, tWk81, 'dev1') });
+    const toOne81 = await app81('auto-due', tokA, undefined, 'u81wk');
+    const bOther81 = [await bot81('backup-stale'), await bot81('rec-over')];
+    T('81 v437 다른 태그·대상은 영향 없음(병행 끝 assignee에서도): 앱 경로 task-rv-·auto-new-·auto-due-x·x-auto-due·etc = 관리자 전원(suppressed 없음) · 대상이 회원 id(__admins__ 아님)면 auto-due도 그 사람에게 · 봇 경로 backup-stale·rec-over = 관리자 전원(봇은 auto-due만 판정)',
+      o81.every((o) => went81(o.x, adm81, o.tg)) && went81(toOne81, ['u81wk'], 'auto-due') && botWent81(bOther81[0], 'backup-stale') && botWent81(bOther81[1], 'rec-over'),
+      JSON.stringify(o81.map((o) => [o.tg, o.x.body.sent, o.x.body.suppressed || ''])) + ' one ' + JSON.stringify(toOne81.body) + ' bot ' + JSON.stringify(bOther81.map((x) => x.body)));
+
+    // ⑥ 담당자 1발(save → notifyAutoCreated)은 병행과 상관없이 나간다: 병행 중 = 담당자 1발 + 앱 관리자 푸시 둘 다 · 병행 끝 = 담당자 1발 그대로 + 앱 관리자 푸시는 삼킴
+    mem.gw_data['settings:assign'] = { schema: 1, rules: { 'veh:': { who_id: 'u81wk' } }, approver_id: '', prev: null, updated_at: 5, updated_by: 'x' };
+    mem.gw_data['col:tasks'] = { schema: 1, items: [] };
+    const today81 = new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);
+    const save81 = async (id, key) => { sent81.length = 0; const items = JSON.parse(JSON.stringify(mem.gw_data['col:tasks'].items)); items.push({ id, title: '81가' + id + ' 정기검사 갱신', auto_key: key, who_id: '', who: '', status: 'open', from: '자동', due: '2026-11-20' }); const x = await call({ action: 'save', collection: 'tasks', doc: { schema: 1, items } }, tokA); return { code: x.code, s: sent81.slice() }; };
+    const one81 = (x) => x.code === 200 && x.s.length === 1 && x.s[0].ids.join(',') === 'u81wk' && x.s[0].tag === 'auto-new-u81wk-' + today81;
+    nf81('assignee', Date.now());
+    const sv1_81 = await save81('t81a', 'veh:81a:insp:2026-11-20'), ap1_81 = await app81('auto-due', tokA);
+    nf81('assignee', Date.now() - 7 * D81 - 60000);
+    const sv2_81 = await save81('t81b', 'veh:81b:insp:2026-11-20'), ap2_81 = await app81('auto-due', tokA);
+    T('81 v437 담당자 1발(save → notifyAutoCreated)은 병행과 상관없이: 병행 중 = 담당자 1발(auto-new-담당-오늘 · 받는 사람 담당 1명) + 앱 auto-due 관리자 푸시(본인 빼고) 둘 다 · 병행 끝 = 담당자 1발 그대로(앞서 알린 지시는 다시 안 보냄) + 앱 관리자 푸시는 삼킴',
+      one81(sv1_81) && went81(ap1_81, admNoA81, 'auto-due') && one81(sv2_81) && ate81(ap2_81), JSON.stringify([sv1_81, ap1_81.body, sv2_81, ap2_81.body]));
+
+    // ⑦ 판정 한 곳(원문, 주석 뺌): notifyParallelOn 정의 1 · 상수 NOTIFY_PARALLEL_MS = 7일 한 줄 · 봇·앱 두 핸들러가 1번씩 부름(그 밖 호출 0) · 두 핸들러 안에 updated_at·86400000 식 0(7일 식을 다시 풀어 쓰지 않음) · 담당자 1발은 병행 판정을 안 봄
+    const src81 = require('fs').readFileSync(join(FN, 'gw-data.js'), 'utf8');
+    const nc81 = (s) => s.split('\n').map((ln) => ln.replace(/(^|[^:"'])\/\/.*$/, '$1')).join('\n');
+    const fnb81 = (name) => { const i = src81.indexOf('function ' + name + '('); if (i < 0) return ''; let dd = 0, st = false; for (let j = i; j < src81.length; j++) { const ch = src81[j]; if (ch === '{') { dd++; st = true; } else if (ch === '}') { dd--; if (st && dd === 0) return nc81(src81.slice(i, j + 1)); } } return ''; };
+    const srcNC81 = nc81(src81), bB81 = fnb81('handleBotNotify'), bA81 = fnb81('handlePushSend'), bN81 = fnb81('notifyAutoCreated'), bP81 = fnb81('notifyParallelOn');
+    T('81 v437 판정 한 곳(원문 — 주석 뺌): notifyParallelOn 정의 1(지금 − updated_at ≤ NOTIFY_PARALLEL_MS, 없음·0 → 0) · 상수 NOTIFY_PARALLEL_MS = 7 * 86400000 한 줄 · 봇(handleBotNotify)·앱(handlePushSend) 핸들러가 1번씩 부름 · 그 밖 호출 0 · 두 핸들러 안에 updated_at·86400000 0 · notifyAutoCreated는 병행 판정을 안 봄',
+      (srcNC81.match(/\bfunction notifyParallelOn\(/g) || []).length === 1 && bP81 === 'function notifyParallelOn(nf) { return (Date.now() - Number((nf && nf.updated_at) || 0)) <= NOTIFY_PARALLEL_MS; }'
+      && (srcNC81.match(/\bconst NOTIFY_PARALLEL_MS = 7 \* 86400000;/g) || []).length === 1 && (srcNC81.match(/\bNOTIFY_PARALLEL_MS\b/g) || []).length === 2
+      && (srcNC81.match(/\bnotifyParallelOn\(/g) || []).length === 3 && (bB81.match(/\bnotifyParallelOn\(/g) || []).length === 1 && (bA81.match(/\bnotifyParallelOn\(/g) || []).length === 1
+      && /if \(nfA\.events\.task_auto_create === 'assignee' && !notifyParallelOn\(nfA\)\)/.test(bB81) && bA81.indexOf("if (nfP && nfP.events.task_auto_create === 'assignee' && /^(auto-due|rec-over|bid-qual)$/.test(tagP) && !notifyParallelOn(nfP)) return jr(200, { status: 'OK', sent: 0, suppressed: 'task_auto_create', request_id: R });") > 0
+      && !/updated_at|86400000/.test(bB81) && !/updated_at|86400000/.test(bA81) && bN81.length > 100 && !/notifyParallelOn|NOTIFY_PARALLEL_MS/.test(bN81),
+      JSON.stringify({ def: bP81, calls: (srcNC81.match(/\bnotifyParallelOn\(/g) || []).length, bot: (bB81.match(/\bnotifyParallelOn\(/g) || []).length, app: (bA81.match(/\bnotifyParallelOn\(/g) || []).length, inline: [/updated_at|86400000/.test(bB81), /updated_at|86400000/.test(bA81)] }));
+
+    // ⑧ 실제 저장 경로(검토 반영 — 50절은 블롭 없는 첫 저장, ①~⑥은 updated_at을 직접 심어 저장 핸들러를 안 탄다): 운영 11/13 모양 그대로 옛 블롭(5칸 · 30일 전 저장)이 있는 상태에서
+    //    notify_set(task_auto_create → assignee, base = 옛 저장 시각) → 응답·블롭 updated_at = 전환 시각(호출 구간 안 — 병행 시작) · 다른 칸 그대로(휴가 2종은 블롭에 없어 기본값) · prev = 옛 판 · 감사 '알림변경' 1줄
+    //    · 곧바로 앱 세 태그·봇 관리자 전원 / 저장 시각을 8일 전으로 옮기면 병행 끝 — 전환 때 옛 updated_at을 그대로 두면(병행 0일) 여기서 터진다
+    const OLD81 = { task_auto_create: 'admins', task_review: 'issuer_approver', due_digest: 'summary', bid_result: 'award', bid_fail: 'assignee' };
+    const WANT81 = Object.assign({}, OLD81, { task_auto_create: 'assignee', leave_request: 'admins', leave_result: 'applicant' });
+    const evSame81 = (ev, want) => !!ev && Object.keys(want).every((k) => ev[k] === want[k]);
+    const oldAt81 = Date.now() - 30 * D81;
+    mem.gw_data['settings:notify'] = { schema: 1, events: Object.assign({}, OLD81), prev: null, updated_by: 'r1-20261104', updated_at: oldAt81 };
+    const aud81 = auditMock.logs.length, tSet81 = Date.now();
+    const set81 = await call({ action: 'notify_set', event: 'task_auto_create', value: 'assignee', base: oldAt81 }, tokA);
+    const tSetEnd81 = Date.now(), blob81 = JSON.parse(JSON.stringify(mem.gw_data['settings:notify'] || {}));
+    const rSet81 = await run81();
+    mem.gw_data['settings:notify'].updated_at = Date.now() - 8 * D81; const rSetOut81 = await run81();
+    T('81 v437 실제 저장 경로(검토 반영 — 운영처럼 옛 블롭 5칸·30일 전 저장에서 notify_set으로 assignee 전환): 응답·블롭 updated_at = 전환 시각(호출 구간 안 — 병행 시작) · 다른 칸 그대로(완료 요청·만기 임박·개찰·수집 실패, 휴가 2종 기본값) · prev = 옛 판(30일 전·admins) · 감사 알림변경 1줄 · 곧바로 앱 세 태그·봇 관리자 전원 · 저장 시각을 8일 전으로 옮기면 병행 끝(앱 삼킴·봇 생략)',
+      set81.code === 200 && set81.body.updated_at >= tSet81 && set81.body.updated_at <= tSetEnd81 && blob81.updated_at === set81.body.updated_at
+      && evSame81(set81.body.events, WANT81) && evSame81(blob81.events, WANT81) && !!blob81.prev && blob81.prev.updated_at === oldAt81 && evSame81(blob81.prev.events, OLD81)
+      && auditMock.logs.length === aud81 + 1 && auditMock.logs[aud81].ev[0].op === '알림변경' && auditMock.logs[aud81].ev[0].id === 'task_auto_create'
+      && on81(rSet81) && off81(rSetOut81),
+      JSON.stringify({ code: set81.code, at: [set81.body.updated_at - tSet81, blob81.updated_at === set81.body.updated_at], ev: set81.body.events, prev: blob81.prev ? [blob81.prev.updated_at === oldAt81, blob81.prev.events] : null, aud: auditMock.logs.length - aud81 }) + ' ' + sh81(rSet81) + ' / ' + sh81(rSetOut81));
+
+    // ⑨ 알려진 한계 고정(검토 반영 — FEATURES v437·MANUAL 21-12·gw-data 주석에 적은 동작): assignee인 채 병행이 끝난 뒤(8일 전 저장) 다른 칸을 바꾸거나(notify_set 만기 임박)
+    //    [되돌리기](notify_revert)를 하면 저장 시각이 새로 찍혀 병행 7일이 다시 시작된다 — 칸별 시각을 들이면 이 항목과 그 문서들을 함께 고친다(문서만 조용히 틀어지지 않게)
+    mem.gw_data['settings:notify'].updated_at = Date.now() - 8 * D81;
+    const rLimOff81 = await run81();
+    const bDg81 = mem.gw_data['settings:notify'].updated_at, tDg81 = Date.now();
+    const dg81 = await call({ action: 'notify_set', event: 'due_digest', value: 'each', base: bDg81 }, tokA);
+    const rDg81 = await run81();
+    mem.gw_data['settings:notify'].updated_at = Date.now() - 8 * D81;
+    const bRv81 = mem.gw_data['settings:notify'].updated_at, tRv81 = Date.now();
+    const rv81 = await call({ action: 'notify_revert', base: bRv81 }, tokA);
+    const nfRv81 = JSON.parse(JSON.stringify(mem.gw_data['settings:notify'] || {}));
+    const rRv81 = await run81();
+    T('81 v437 알려진 한계 고정(검토 반영): assignee인 채 병행이 끝난 뒤(8일 전 저장 — 앱 삼킴·봇 생략) 다른 칸 notify_set(만기 임박 → each)·[되돌리기] notify_revert(→ summary)를 하면 저장 시각이 새로 찍혀 병행 7일이 다시 시작(앱 세 태그·봇 관리자 전원) · task_auto_create는 assignee 그대로 · 칸별 시각을 들이면 이 항목·FEATURES v437·MANUAL 21-12·gw-data 주석을 함께 고친다',
+      off81(rLimOff81) && dg81.code === 200 && dg81.body.updated_at >= tDg81 && dg81.body.events.task_auto_create === 'assignee' && dg81.body.events.due_digest === 'each' && on81(rDg81)
+      && rv81.code === 200 && rv81.body.updated_at >= tRv81 && rv81.body.events.task_auto_create === 'assignee' && rv81.body.events.due_digest === 'summary' && nfRv81.updated_at === rv81.body.updated_at && on81(rRv81),
+      JSON.stringify({ dg: [dg81.code, dg81.body.updated_at - tDg81, dg81.body.events && dg81.body.events.due_digest], rv: [rv81.code, rv81.body.updated_at - tRv81, rv81.body.events && rv81.body.events.due_digest] }) + ' ' + [rLimOff81, rDg81, rRv81].map(sh81).join(' / '));
+  } finally {
+    Date.now = realNow81; pushMock.sendTo = savedSend81; mem.gw_users = savedUsers81;
+    Object.keys(keep81).forEach((k) => { if (keep81[k] === undefined) delete mem.gw_data[k]; else mem.gw_data[k] = keep81[k]; });
+  }
 }
 
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

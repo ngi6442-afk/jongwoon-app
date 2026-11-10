@@ -1083,11 +1083,11 @@ async function handleBotNotify(event, d, R) {
     const tcN = await push.tierCtx();   // 스캔 1회 — adminIds와 sendTo 활성 필터 공용
     const ids = tcN.adminIds.slice();
     // v417 카드 10 공통 바탕 ⑥: 서버 봇 '정기업무 n건'(태그 auto-due)도 알림 설정 task_auto_create를 따른다 — 담당자 본인 1발이면 관리자 전원 푸시 생략.
-    // 단 설정 전환 뒤 첫 1주는 병행(설정 updated_at 기준 7일 — 브리핑 §7 '첫 1주 PM 병행').
+    // 단 설정 전환 뒤 첫 1주는 병행(설정 updated_at 기준 7일 — 브리핑 §7 '첫 1주 PM 병행'). v437부터 판정은 notifyParallelOn 한 곳 — 앱 경로 handlePushSend와 같은 함수.
     if (tag === 'auto-due') {
       try {
         const nfA = await notifyRead(store(DATA));
-        if (nfA.events.task_auto_create === 'assignee' && (Date.now() - Number(nfA.updated_at || 0)) > 7 * 86400000)
+        if (nfA.events.task_auto_create === 'assignee' && !notifyParallelOn(nfA))
           return jr(200, { status: 'OK', sent: 0, admins: ids.length, devices: 0, note: 'task_auto_create=assignee — 관리자 푸시 생략(담당자 본인 1발은 ingest가 보냄)', request_id: R });
       } catch (e) {}
     }
@@ -1290,10 +1290,11 @@ async function handlePushSend(event, d, R) {
     let ids;
     const tc = await push.tierCtx();   // 회원 스캔 1회 — __admins__ 목록과 수신자 활성 필터(push.sendTo opts.ctx)에 함께 쓴다(v329)
     // v396 알림 설정: ① 자동 지시 생성이 '담당자 본인'이면 클라의 관리자 전원 푸시(auto-due·rec-over·bid-qual)는 서버가 삼킨다(서버가 save 때 담당자에게 보냄)
+    //                    v437: 단 전환 뒤 첫 7일(notifyParallelOn — 봇 경로와 같은 함수)은 삼키지 않고 종전처럼 관리자 전원(보낸 사람 제외)에게 보낸다(병행). 담당자 1발은 병행 중에도 save·ingest가 보냄
     //                 ② 완료 요청이 '지시자·승인권자'이면 __admins__ 대신 배정표 승인권자 1인에게만(승인권자 비면 종전대로)
     const tagP = String(payload.tag || '');
     const nfP = (to === '__admins__') ? await notifyRead(store(DATA)) : null;
-    if (nfP && nfP.events.task_auto_create === 'assignee' && /^(auto-due|rec-over|bid-qual)$/.test(tagP)) return jr(200, { status: 'OK', sent: 0, suppressed: 'task_auto_create', request_id: R });
+    if (nfP && nfP.events.task_auto_create === 'assignee' && /^(auto-due|rec-over|bid-qual)$/.test(tagP) && !notifyParallelOn(nfP)) return jr(200, { status: 'OK', sent: 0, suppressed: 'task_auto_create', request_id: R });
     if (d.self === true) ids = [c.member.id];
     else if (to === '__admins__') {
       ids = tc.adminIds.filter(function (id) { return id !== c.member.id; });   // 본인 행동 알림은 본인 제외
@@ -1521,7 +1522,7 @@ async function handleAssignRevert(event, d, R) {
 }
 // ---- 알림 설정 settings:notify (v396 — 공통 기반 3 첫 시범. 착수 브리핑 A3 · 카드 1-4 R1) ----
 // 지시 이벤트 3종의 수신자·방식을 설정값으로. 기본값(블롭 없음) = 현행(관리자 전원·생성 때마다). R1: D-3 예고 뒤 추천값 적용, prev 1판·되돌리기 1클릭.
-//  task_auto_create: 자동 지시 생성 → admins(현행, 클라 push_send __admins__) | assignee(담당자 본인 1발·우선기기, 서버가 save·ingest 때 발송, 클라 관리자 푸시는 서버가 삼킴)
+//  task_auto_create: 자동 지시 생성 → admins(현행, 클라 push_send __admins__) | assignee(담당자 본인 1발·우선기기, 서버가 save·ingest 때 발송, 클라 관리자 푸시는 서버가 삼킴 — 단 전환 뒤 첫 7일은 관리자 병행, v437 notifyParallelOn)
 //  task_review: 완료 요청 → admins(현행: 지시자 없으면 관리자 전원) | issuer_approver(지시자 · 자동 지시는 배정표 승인권자 1인)
 //  due_digest: 만기 임박 → each(현행: 생성 때마다 관리자 전원) | summary(아침 크론 요약 1줄 — 승인권자 1인, 없으면 관리자)
 const NOTIFY_KEY = 'settings:notify';
@@ -1549,6 +1550,14 @@ async function notifyRead(st) {
   } catch (e) {}
   return { events: notifyDefaults(), prev: null, updated_at: 0, updated_by: '' };
 }
+// v437 자동 지시 생성 알림 '담당자 본인' 전환 뒤 첫 7일 관리자 병행 — 판정 한 곳(게이트 ③ '1주 병행' · 브리핑 §7 '첫 1주 PM 병행').
+//   봇 경로 handleBotNotify(태그 auto-due '정기업무 n건')와 앱 경로 handlePushSend(__admins__ · 태그 auto-due·rec-over·bid-qual)가 이 함수 하나를 같이 쓴다:
+//   task_auto_create가 assignee여도 병행 중이면 관리자 전원 푸시를 삼키지 않고, 병행이 끝나면 삼킨다. 담당자 1발(notifyAutoCreated — save·ingest)은 병행과 상관없이 나간다.
+//   기준 = settings:notify의 updated_at(설정을 마지막으로 저장한 시각): 지금 − updated_at ≤ 7일이면 병행 중. updated_at이 없거나 0이면 병행 끝(종전 봇 경로와 같음).
+//   알려진 한계: updated_at은 칸별 시각이 아니라 settings:notify 한 벌의 시각이라 다른 칸(완료 요청·만기 임박·휴가·개찰·수집 실패)을 바꾸거나 되돌려도 새로 찍혀
+//   병행 7일이 다시 시작된다(봇 경로도 같은 동작 — 칸별 시각은 v437 범위 밖).
+const NOTIFY_PARALLEL_MS = 7 * 86400000;
+function notifyParallelOn(nf) { return (Date.now() - Number((nf && nf.updated_at) || 0)) <= NOTIFY_PARALLEL_MS; }
 function notifyPublic(nf) {
   const meta = {}; Object.keys(NOTIFY_EVENTS).forEach(function (k) { meta[k] = { label: NOTIFY_EVENTS[k].label, options: NOTIFY_EVENTS[k].options, def: NOTIFY_EVENTS[k].def, rec: NOTIFY_EVENTS[k].rec }; });
   return { events: nf.events, meta: meta, prev: nf.prev ? { updated_at: nf.prev.updated_at || 0, updated_by: nf.prev.updated_by || '' } : null, updated_at: nf.updated_at || 0, updated_by: nf.updated_by || '' };

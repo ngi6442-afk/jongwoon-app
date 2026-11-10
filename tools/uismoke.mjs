@@ -4670,6 +4670,63 @@ try {
     JSON.stringify({ man: MAN_PINS36.filter((s) => m281_36.indexOf(s) < 0).map((s) => s.slice(0, 30)), ft: FT_PINS36.filter((s) => ftv36.indexOf(s) < 0).map((s) => s.slice(0, 30)), ft7: ft7_36.indexOf(FT7_PIN36), gates: [ftv36.indexOf('GATES_V436'), /GATE_/.test(tlv36)], cb: cb36.length, notAi: cbNotAi36.map((l) => l.slice(0, 40)), pm: cbPM36.map((l) => l.slice(0, 40)), scr: cbScr36.map((l) => l.slice(0, 40)), tl: [tlPinOk36, TL_PINS36.filter((s) => tlFix36.indexOf(s) < 0 || html.indexOf(s.replace(/^'|'$/g, '')) < 0)], cl: CL_PINS36.filter((s) => clSafe36.indexOf(s) < 0).map((s) => s.slice(0, 30)) }));
 } catch (e) { console.log('  (v436 검사 생략 — ' + e.message + ')'); fails++; }
 
+// ---- v437(11/10 체크 45 C026 — 게이트 보고 5-2 1-a '앱 경로 병행 빈틈', 09_조사_문서/45_밀린몫_자료_20261110/45_게이트보고_20261110.md · 서버만):
+//      자동 지시 생성 알림 '담당자 본인' 전환 뒤 첫 7일 관리자 병행을 앱 경로(handlePushSend)에도 — 봇 경로(handleBotNotify)와 같은 판정 함수 notifyParallelOn 한 곳(동작은 servertest 50·81절)
+//      ① 정적(서버) — 판정 함수·상수 한 곳 · 두 핸들러가 같이 부름 · 핸들러 안에 7일 식 0 · 삼킴 응답·봇 생략 안내 그대로 · 병행 중 받는 사람 = 종전 규칙(보낸 사람 제외) · 담당자 1발은 병행을 안 봄
+//      ② 문서 — FEATURES 기준 ≥ v437·v437 절(문장 고정) · TESTLIST v437(체크 칸 둘 다 AI 몫 — 화면 칸 없음 · 게이트 칸 [x] · 운영 적용 뒤 확인 칸 · PM 0) · MANUAL 21-12 '지시 알림 설정' 한 줄 · 자리 글(GATES_V437) 0 · sw ≥ 437
+//         검토 반영(11/10): 앱 카드 안내 글 한계·운영 적용 방법(배포 먼저·적용 시각·병합 쓰기·다른 칸 확인)·삼킴 판정 방법 문장 · MANUAL 한계 괄호 · TESTLIST v396 메모(같은 시각까지 — '8일째' 0)
+try {
+  const rd37 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const nc37 = (s) => s.split('\n').map((ln) => ln.replace(/(^|[^:"'])\/\/.*$/, '$1')).join('\n');
+  const fn37 = (src, name) => { const i = src.indexOf('function ' + name + '('); if (i < 0) throw new Error('함수 없음: ' + name); let d = 0, st = false; for (let j = i; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i, j + 1); } } throw new Error('중괄호 짝 안 맞음: ' + name); };
+  const gd37 = rd37('netlify/functions/gw-data.js'), gdNC37 = nc37(gd37);
+  const bot37 = nc37(fn37(gd37, 'handleBotNotify')), app37 = nc37(fn37(gd37, 'handlePushSend')), auto37 = nc37(fn37(gd37, 'notifyAutoCreated')), par37 = nc37(fn37(gd37, 'notifyParallelOn'));
+  T('v437 ① 정적(서버): notifyParallelOn = 지금 − updated_at(없음·0 → 0) ≤ NOTIFY_PARALLEL_MS 한 줄 · 상수 NOTIFY_PARALLEL_MS = 7 * 86400000 한 줄(쓰는 곳은 이 함수뿐) · 호출 2곳 = 봇 handleBotNotify(auto-due 생략 조건)·앱 handlePushSend(삼킴 조건) · 두 핸들러 안에 updated_at·86400000 0 · 삼킴 응답 {sent 0, suppressed task_auto_create}·봇 생략 안내 글 그대로 · 병행 중 받는 사람 = 관리자 전원에서 보낸 사람 제외(종전) · notifyAutoCreated는 병행 판정을 안 봄',
+    par37 === 'function notifyParallelOn(nf) { return (Date.now() - Number((nf && nf.updated_at) || 0)) <= NOTIFY_PARALLEL_MS; }'
+    && (gdNC37.match(/\nconst NOTIFY_PARALLEL_MS = 7 \* 86400000;[ \t]*\n/g) || []).length === 1 && (gdNC37.match(/\bNOTIFY_PARALLEL_MS\b/g) || []).length === 2
+    && (gdNC37.match(/\bnotifyParallelOn\(/g) || []).length === 3 && (bot37.match(/\bnotifyParallelOn\(/g) || []).length === 1 && (app37.match(/\bnotifyParallelOn\(/g) || []).length === 1
+    && bot37.indexOf("if (nfA.events.task_auto_create === 'assignee' && !notifyParallelOn(nfA))\n          return jr(200, { status: 'OK', sent: 0, admins: ids.length, devices: 0, note: 'task_auto_create=assignee — 관리자 푸시 생략(담당자 본인 1발은 ingest가 보냄)', request_id: R });") > 0
+    && app37.indexOf("if (nfP && nfP.events.task_auto_create === 'assignee' && /^(auto-due|rec-over|bid-qual)$/.test(tagP) && !notifyParallelOn(nfP)) return jr(200, { status: 'OK', sent: 0, suppressed: 'task_auto_create', request_id: R });") > 0
+    && app37.indexOf('ids = tc.adminIds.filter(function (id) { return id !== c.member.id; });') > 0
+    && !/updated_at|86400000/.test(bot37) && !/updated_at|86400000/.test(app37) && auto37.length > 100 && !/notifyParallelOn|NOTIFY_PARALLEL_MS/.test(auto37),
+    JSON.stringify({ par: par37, n: (gdNC37.match(/\bnotifyParallelOn\(/g) || []).length, bot: (bot37.match(/\bnotifyParallelOn\(/g) || []).length, app: (app37.match(/\bnotifyParallelOn\(/g) || []).length, inline: [/updated_at|86400000/.test(bot37), /updated_at|86400000/.test(app37)] }));
+
+  const ft37 = rd37('FEATURES.md'), tl37 = rd37('TESTLIST.md'), man37 = rd37('MANUAL.html'), sw37 = rd37('sw.js');
+  const ftv37 = (() => { const i = ft37.indexOf('\n### v437 (11/10)'); if (i < 0) return ''; const j = ft37.indexOf('\n### ', i + 5); return ft37.slice(i, j < 0 ? ft37.length : j); })();
+  const FT_PINS37 = ['**판정 한 곳**: gw-data `notifyParallelOn(nf)`', '상수 `NOTIFY_PARALLEL_MS = 7 * 86400000` 한 줄', 'updated_at이 없거나 0이면 병행 끝(종전 봇 경로와 같음)', '봇 경로·앱 경로가 같은 함수를 부른다',
+    '병행 중이면 삼키지 않고 종전처럼 관리자 전원에게 보낸다(보낸 사람 제외 규칙 그대로', '병행이 끝나면 종전처럼 삼킨다', '**담당자 1발 그대로**', '`notifyAutoCreated`', '병행을 보지 않는다',
+    '**알려진 한계**', '다른 칸(완료 요청·만기 임박·휴가·개찰·수집 실패)을 바꾸거나 [되돌리기]를 눌러도 updated_at이 새로 찍혀 병행 7일이 다시 시작된다', '11/13(금) R1', 'TESTLIST v437 칸에 적는다',
+    // 검토 반영(11/10): 한계 동작 고정(servertest 81 ⑨) · 앱 카드 안내 글(index.html renderNotifyCard)은 첫 7일 병행을 말하지 않음(다음 앱 판) · 운영 적용 방법(배포 먼저 · 적용 시각 · 병합 쓰기) · 삼킴 판정 방법
+    'servertest 81 ⑨가 이 동작을 고정', '앱 카드 안내 글(index.html `renderNotifyCard`', '도 같은 판에서 고쳤다', '11/13~11/20 사이 관리자 폰에 만기·미수·적격 푸시가 계속 와도 정상 병행이다',   // 11/10 코디네이터: 카드 안내 글을 같은 판에서 고침(아래 CARD_PIN37도 index.html에서 고정)
+    '적용은 v437이 운영에 배포된 뒤', '블롭을 직접 써도 updated_at은 적용 시각(ms 정수)으로 새로 찍는다', '적용 뒤 읽은 updated_at이 적용 시각이 아니면(예: 11/4 10:21 그대로) 병행이 걸리지 않은 것이므로 바로 다시 쓴다',
+    'events를 고정값으로 통째 덮지 않는다', '삼킴은 push:log·감사에 흔적이 남지 않는다'];
+  const tlv37 = (() => { const i = tl37.indexOf('\n## v437'); if (i < 0) return ''; const j = tl37.indexOf('\n## ', i + 5); return tl37.slice(i, j < 0 ? tl37.length : j); })();
+  const cb37 = tlv37.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), cbNotAi37 = cb37.filter((l) => !/^\s*[-*+] \[[ xX]\] \(AI[ 가)]/.test(l)), cbPM37 = cb37.filter((l) => /PM/.test(l));
+  const TL_OPS37 = ['settings:notify', 'updated_at', '병행이 끝나는 때(updated_at + 7일)', '담당자 1발', '병행 7일이 다시 시작',
+    // 검토 반영(11/10): 배포 먼저 · 적용 시각(ms)으로 새로 찍기 · 고정값 통째 덮기 금지 · 다른 칸 그대로 확인 · 옛 시각 그대로면 다시 씀 · 끝나는 때 = 11/20 적용 시각 · 삼킴 판정 방법(흔적 없음 → push:log)
+    'v437이 운영에 배포된 뒤인지 확인', 'updated_at은 적용 시각(ms 정수)으로 새로 찍고', 'events를 고정값으로 통째 덮지 않음', '다른 칸 그대로인지',
+    '적용 전 값(11/4 10:21) 그대로면 병행이 안 걸린 것이므로 바로 다시 씀', '끝나는 때 = 11/20 적용 시각과 같은 시각', '삼킴은 push:log·감사에 흔적이 남지 않으므로',
+    "같은 지시의 관리자 발송(auto-due·rec-over·bid-qual · 봇 '정기업무 n건')은 없는지로 판정"];
+  const row37 = (() => { const i = man37.indexOf('<h3>21-12.'); if (i < 0) return ''; const k = man37.indexOf('<tr><td><b>지시 알림 설정</b></td>', i); if (k < 0) return ''; return man37.slice(k, man37.indexOf('</tr>', k)); })();
+  const MAN_PIN37 = '자동 지시 생성 알림을 담당자 본인으로 바꾼 뒤 첫 7일은 관리자에게도 같이 갑니다';
+  const CARD_PIN37 = '관리자 전원에게 가던 만기·미수·적격 푸시는 바꾼 뒤 첫 7일(이 카드의 다른 알림을 바꾸면 그때부터 7일) 동안은 같이 가다가 그 뒤 멈춥니다';   // 앱 '지시 알림 설정' 카드 안내 글(index.html renderNotifyCard) — 옛 '푸시가 멈추고, 담당자에게 우선기기 1발만' 0
+  const html37 = rd37('index.html');
+  const MAN_LIM37 = '(이 카드의 다른 알림을 바꾸거나 되돌려도 그때부터 7일이 다시 시작됩니다, 2026-11 v437)';   // 알려진 한계(servertest 81 ⑨가 동작 고정) — 검토 반영
+  //   TESTLIST v396 '담당자 본인' 칸 메모: 병행은 저장 시각 + 7×24시간(같은 시각)까지 — '8일째부터'처럼 날짜로 끊지 않는다(8일째 아침 정상 병행을 실패로 볼 수 있음, 검토 반영)
+  const tl396_37 = (() => { const i = tl37.indexOf('\n## v396 '); if (i < 0) return ''; const j = tl37.indexOf('\n## ', i + 5); return tl37.slice(i, j < 0 ? tl37.length : j); })();
+  const tl396Row37 = tl396_37.split(/\r?\n/).filter((l) => l.indexOf('"담당자 본인"으로 바꾸면') >= 0);
+  const TL396_PIN37 = '(v437부터 바꾼 시각부터 7일 — 11/13 적용이면 11/20 같은 시각까지 — 관리자 폰에도 같이 옴, 그 뒤부터 안 옴)';
+  T('v437 ② 문서: FEATURES 기준 ≥ v437·v437 절(판정 한 곳·상수 한 줄·없음/0 = 끝·같은 함수·앱 경로 병행 중 보냄/끝나면 삼킴·담당자 1발 그대로·알려진 한계(다른 칸·되돌리기 = 7일 다시)·11/13 R1 적용 때 TESTLIST 칸 — 문장 고정)·자리 글 GATES_V437 0 · TESTLIST v437 체크 칸 둘 다 AI 몫(게이트 칸 [x] servertest·uismoke·consheet_check·proctpl_check·settletest · 운영 적용 뒤 확인 칸 settings:notify updated_at·끝나는 때·담당자 1발·다시 시작 · 화면 칸 없음 · PM 0) · MANUAL 21-12 지시 알림 설정 줄에 \'담당자 본인으로 바꾼 뒤 첫 7일은 관리자에게도 같이 갑니다\' · sw ≥ 437 · 검토 반영 고정: FEATURES 한계 동작 고정(81 ⑨)·앱 카드 안내 글 한계·운영 적용 방법(배포 먼저·적용 시각·병합 쓰기)·삼킴 판정 / TESTLIST 운영 칸 같은 뜻 8 / MANUAL 한계 괄호 / TESTLIST v396 메모(같은 시각까지 · 8일째 0)',
+    Number((ft37.match(/기준: v(\d+) /) || [0, 0])[1]) >= 437 && ftv37.length > 0 && FT_PINS37.every((s) => ftv37.indexOf(s) > 0) && ftv37.indexOf('GATES_V437') < 0
+    && html37.indexOf(CARD_PIN37) > 0 && html37.indexOf('만기·미수·적격 푸시가 멈추고, 담당자에게 우선기기 1발만 갑니다') < 0
+    && tlv37.length > 0 && cb37.length === 2 && cbNotAi37.length === 0 && cbPM37.length === 0 && tlv37.indexOf('PM 몫') < 0 && tlv37.indexOf('GATES_V437') < 0 && cb37.every((l) => l.indexOf('(AI 시험 화면 대상') < 0)
+    && /^- \[x\] \(AI\) `servertest`\(/.test(cb37[0]) && ['`uismoke`', '`consheet_check`', '`proctpl_check`', '`settletest`'].every((g) => cb37[0].indexOf(g) > 0)
+    && /^- \[[ x]\] \(AI 운영 적용 뒤 확인 — 11\/13\(금\) R1/.test(cb37[1]) && TL_OPS37.every((s) => cb37[1].indexOf(s) > 0)
+    && row37.indexOf(MAN_PIN37) > 0 && row37.indexOf(MAN_LIM37) > row37.indexOf(MAN_PIN37) && Number((sw37.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 437
+    && tl396Row37.length === 1 && tl396Row37[0].indexOf(TL396_PIN37) > 0 && tl396Row37[0].indexOf('8일째') < 0,
+    JSON.stringify({ ft: FT_PINS37.filter((s) => ftv37.indexOf(s) < 0).map((s) => s.slice(0, 30)), gates: [ftv37.indexOf('GATES_V437'), tlv37.indexOf('GATES_V437')], cb: cb37.length, notAi: cbNotAi37.map((l) => l.slice(0, 40)), pm: cbPM37.map((l) => l.slice(0, 40)), ops: cb37[1] ? TL_OPS37.filter((s) => cb37[1].indexOf(s) < 0).map((s) => s.slice(0, 30)) : 'none', man: [row37.indexOf(MAN_PIN37), row37.indexOf(MAN_LIM37)], tl396: tl396Row37.map((l) => [l.indexOf(TL396_PIN37), l.indexOf('8일째')]), sw: (sw37.match(/jw-shell-v(\d+)/) || [0, 0])[1] }));
+} catch (e) { console.log('  (v437 검사 생략 — ' + e.message + ')'); fails++; }
+
 try {
   const fdir = join(ROOT, 'netlify', 'functions');
   const miss = readdirSync(fdir).filter((f) => /^gw-.*\.js$/.test(f)).filter((f) => { const t = readFileSync(join(fdir, f), 'utf8'); return /\b(store|blobGet|blobSet|blobList|blobDelete)\(/.test(t) && !/setupBlobContext\(/.test(t); });
