@@ -4766,7 +4766,7 @@ try {
   const viewW38 = (win, id) => { const b = body38(win), own = decl38(win, '#view-' + id, 'max-width'), base = decl38(win, '.views>.view', 'max-width'), mx = own != null ? own : base; return (!mx || mx === 'none') ? b : Math.min(b, parseFloat(mx)); };
   //   명세 width_plan.table(창 → 본문, 스크롤바 17 포함): 1024 791 · 1100 867 · 1280 1011 · 1366 1097 · 1440 1171 · 1536 1267 · 1600 1331 · 1920·2560 1428
   const WT38 = { 1024: 791, 1100: 867, 1280: 1011, 1366: 1097, 1440: 1171, 1536: 1267, 1600: 1331, 1920: 1428, 2560: 1428 };
-  const WIDE38 = ['tasks', 'rec', 'con', 'veh', 'perm'];   // 명세 reading_width 9개 중 v438은 계약·차량·권한관리 · v439에 지시(#view-tasks) · v440에 기성(#view-rec — 표로 바꾼 판) — 거래처·일용직·입찰은 각 탭 판(v441~v443), 안전(#view-safety)은 56 판(v445)에서 더한다
+  const WIDE38 = ['tasks', 'rec', 'cli', 'con', 'veh', 'perm'];   // 명세 reading_width 9개 중 v438은 계약·차량·권한관리 · v439에 지시(#view-tasks) · v440에 기성(#view-rec) · v441에 거래처(#view-cli — 표로 바꾼 판) — 일용직·입찰은 각 탭 판(v442~v443), 안전(#view-safety)은 56 판(v445)에서 더한다
   const views38 = [...html.matchAll(/<(?:section|div) class="view(?: active)?" id="view-([a-z]+)">/g)].map((m) => m[1]);
   const SECS38 = ['tasks', 'veh', 'hwakwan', 'allbaro', 'rec', 'cal', 'lic', 'bid', 'con', 'cli', 'doc', 'hr', 'progress', 'ask', 'safety', 'quote', 'promo', 'workers', 'perm', 'fam', 'leave'];
   const secs38 = [...html.matchAll(/<section class="view" id="view-([a-z]+)">/g)].map((m) => m[1]);
@@ -4774,7 +4774,7 @@ try {
   const vBad38 = [1366, 1920].map((w) => views38.filter((id) => viewW38(w, id) !== (WIDE38.indexOf(id) >= 0 ? body38(w) : 808)).join('/')).join('|') + '|' + views38.filter((id) => viewW38(1024, id) !== body38(1024)).join('/');
   const perm38 = decl38(1366, '#view-perm>:not(#permRoster)', 'max-width') === '808px' && decl38(1920, '#view-perm>:not(#permRoster)', 'max-width') === '808px' && decl38(1920, '#permRoster', 'max-width') == null && decl38(1920, '#sfPaneNow', 'max-width') === '808px';
   const phone38 = decl38(859, '#app', 'max-width') === '560px' && padLR38(decl38(859, '#app', 'padding')).join() === '16,16' && decl38(859, '.views>.view', 'max-width') == null && decl38(375, '.tabbar', 'width') == null && decl38(859, '.layout', 'gap') == null;
-  T('v438 ① 화면 폭(head <style>을 읽어 계산 — 창 폭 − 스크롤바 17): 본문 = 명세 width_plan.table(±2px) 1024 791 · 1100 867 · 1280 1011 · 1366 1097 · 1440 1171 · 1536 1267 · 1600 1331 · 1920·2560 1428 · 넓히는 화면 id 5개(지시·기성·계약·차량·권한관리 — v439에 지시·v440에 기성을 더함, 거래처·일용직·입찰은 각 탭 판 v441~v443, 안전은 v445)만 1366·1920에서 본문 폭, 그 밖 화면(안전 포함)은 808 · 1024 창은 모두 본문 폭(791 < 808) · 권한관리는 권한 표(#permRoster)만 넓고 그 밖 카드·안전 현황(#sfPaneNow) 808 · 859px 이하 틀 그대로(#app 최대 560·여백 16, 간격·사이드바 폭·읽기 폭 규칙 없음) · section 태그 21개 class="view" 그대로(class 더하지 않음)',
+  T('v438 ① 화면 폭(head <style>을 읽어 계산 — 창 폭 − 스크롤바 17): 본문 = 명세 width_plan.table(±2px) 1024 791 · 1100 867 · 1280 1011 · 1366 1097 · 1440 1171 · 1536 1267 · 1600 1331 · 1920·2560 1428 · 넓히는 화면 id 6개(지시·기성·거래처·계약·차량·권한관리 — v439에 지시·v440에 기성·v441에 거래처를 더함, 일용직·입찰은 각 탭 판 v442~v443, 안전은 v445)만 1366·1920에서 본문 폭, 그 밖 화면(안전 포함)은 808 · 1024 창은 모두 본문 폭(791 < 808) · 권한관리는 권한 표(#permRoster)만 넓고 그 밖 카드·안전 현황(#sfPaneNow) 808 · 859px 이하 틀 그대로(#app 최대 560·여백 16, 간격·사이드바 폭·읽기 폭 규칙 없음) · section 태그 21개 class="view" 그대로(class 더하지 않음)',
     wBad38.length === 0 && vBad38 === '||' && views38.length === 23 && perm38 && phone38 && JSON.stringify(secs38) === JSON.stringify(SECS38) && !/<section class="view [^"]*" id=/.test(html),
     JSON.stringify({ body: Object.keys(WT38).map((w) => w + ':' + body38(+w)), viewBad: vBad38, views: views38.length, perm38, phone38, secs: secs38.length }));
 
@@ -5191,19 +5191,20 @@ try {
     && dc2_38 === 'vs-warn:D-3,:D-4' && JSON.stringify(cks2_38) === JSON.stringify(['chipsort:st|done', 'sortAs:reg', 'sel', 'sel.can', 'group', 'pop:st|old', '']),
     JSON.stringify({ dc: dc38.map((x) => x.cls + ':' + x.html), cks38, dc2_38, cks2_38 }));
 
-  // ⑫ 정적 — 계약·차량 표는 ResizeObserver 한 줄씩(vsPaneObserve(host) — 그리기마다 불러도 자리에 한 번만 걸림) 말고 무변 · 부품을 쓰는 탭 2개(v439 지시·v440 기성 — 거래처 v441부터 탭 판마다 이 줄을 고친다) · pointer(마우스 이벤트 없음) · 150ms·조합
+  // ⑫ 정적 — 계약·차량 표는 ResizeObserver 한 줄씩(vsPaneObserve(host) — 그리기마다 불러도 자리에 한 번만 걸림) 말고 무변 · 부품을 쓰는 탭 3개(v439 지시·v440 기성·v441 거래처 — 일용직 v442부터 탭 판마다 이 줄을 고친다) · pointer(마우스 이벤트 없음) · 150ms·조합
   //   · 저장은 한 곳(def.key에 k,d,f,chip) · ResizeObserver 하나·콜백은 rAF · 경계 matchMedia 3개 · 새 CSS(.vs.vs-fit 폭·폰 --pw·.vs-detcard·td.num·옅은 칩) · 기존 .vs 규칙(min-width 1160·폰 0) 그대로
-  //   v439 '부품을 쓰는 탭 0' → '지시 1개' → v440 '지시·기성 2개'(같은 강도): 부품을 부르는 곳은 @task-sheet·@rec-sheet 구간 하나씩(구간마다 vsSheetRender 1번·정의 key 1개 — "jw_task_sheet"·"jw_rec_sheet" ·
-  //     host 1개 — "taskList"·"recSheet")이고 세 구간 밖은 vsSheet*·vsDateCell·VS_INST 0, 부품 저장 이름 8개 중 @vs-sheet 구간 밖에 나오는 이름은 jw_task_sheet·jw_rec_sheet 둘(각 1번)
+  //   v439 '부품을 쓰는 탭 0' → '지시 1개' → v440 '지시·기성 2개' → v441 '지시·기성·거래처 3개'(같은 강도): 부품을 부르는 곳은 @task-sheet·@rec-sheet·@cli-sheet 구간 하나씩(구간마다 vsSheetRender 1번·정의 key 1개 —
+  //     "jw_task_sheet"·"jw_rec_sheet"·"jw_cli_sheet" · host 1개 — "taskList"·"recSheet"·"cliList")이고 네 구간 밖은 vsSheet*·vsDateCell·VS_INST 0, 부품 저장 이름 8개 중 @vs-sheet 구간 밖에 나오는 이름은 그 셋(각 1번)
   const outside38 = html.slice(0, html.indexOf('// @vs-sheet-start')) + html.slice(html.indexOf('// @vs-sheet-end'));
   const blkOf38 = (a, b) => { const i = html.indexOf(a), j = html.indexOf(b); return (i < 0 || j < i) ? '' : html.slice(i, j); };
-  const tsb38 = blkOf38('// @task-sheet-start', '// @task-sheet-end'), rsb38 = blkOf38('// @rec-sheet-start', '// @rec-sheet-end');
-  const outside2_38 = [tsb38, rsb38].reduce((s, b) => (b ? s.replace(b, '') : s), outside38);
+  const tsb38 = blkOf38('// @task-sheet-start', '// @task-sheet-end'), rsb38 = blkOf38('// @rec-sheet-start', '// @rec-sheet-end'), csb38 = blkOf38('// @cli-sheet-start', '// @cli-sheet-end');
+  const outside2_38 = [tsb38, rsb38, csb38].reduce((s, b) => (b ? s.replace(b, '') : s), outside38);
   const keysOut38 = ['jw_task_sheet', 'jw_rec_sheet', 'jw_cli_sheet', 'jw_wk_sheet', 'jw_bid_sheet', 'jw_ob_sheet', 'jw_site_sheet', 'jw_edu_sheet'].filter((k) => outside38.indexOf(k) >= 0);
-  const use38 = tsb38.length > 0 && rsb38.length > 0 && (outside2_38.match(/\bvsSheet\w*\(|\bvsDateCell\(|\bVS_INST\b/g) || []).length === 0
+  const use38 = tsb38.length > 0 && rsb38.length > 0 && csb38.length > 0 && (outside2_38.match(/\bvsSheet\w*\(|\bvsDateCell\(|\bVS_INST\b/g) || []).length === 0
     && (tsb38.match(/\bvsSheetRender\(/g) || []).length === 1 && (tsb38.match(/key: "jw_task_sheet"/g) || []).length === 1 && (tsb38.match(/\bhost: "taskList"/g) || []).length === 1
     && (rsb38.match(/\bvsSheetRender\(/g) || []).length === 1 && (rsb38.match(/key: "jw_rec_sheet"/g) || []).length === 1 && (rsb38.match(/\bhost: "recSheet"/g) || []).length === 1
-    && JSON.stringify(keysOut38) === '["jw_task_sheet","jw_rec_sheet"]' && (outside38.match(/jw_task_sheet/g) || []).length === 1 && (outside38.match(/jw_rec_sheet/g) || []).length === 1;
+    && (csb38.match(/\bvsSheetRender\(/g) || []).length === 1 && (csb38.match(/key: "jw_cli_sheet"/g) || []).length === 1 && (csb38.match(/\bhost: "cliList"/g) || []).length === 1
+    && JSON.stringify(keysOut38) === '["jw_task_sheet","jw_rec_sheet","jw_cli_sheet"]' && (outside38.match(/jw_task_sheet/g) || []).length === 1 && (outside38.match(/jw_rec_sheet/g) || []).length === 1 && (outside38.match(/jw_cli_sheet/g) || []).length === 1;
   const rv38 = fn38(html, 'renderVehicles'), rc38 = fn38(html, 'renderContracts');
   const V38 = mk38({ width: 1366 }), vh38 = V38.env.mkHost('vehList'); vh38.innerHTML = '<div class="vs-wrap"><table class="vs"></table></div>';
   V38.api.paneObs(vh38); V38.api.paneObs(vh38); V38.env.roCb([{ target: vh38 }]); V38.env.flushRaf();
@@ -5226,8 +5227,8 @@ try {
     && decl38(1000, '.vs td.num', 'text-align') == null && decl38(1000, '.vs td .sel-box', 'margin-right') == null && decl38(1000, '.vs td .sel-box', 'vertical-align') == null && decl38(1000, '.vs.vs-fit td .sel-box', 'margin-right') === '6px'
     && decl38(375, '.sel-bar.vs-selbar', 'flex-wrap') === 'wrap' && decl38(375, '.sel-bar.vs-selbar', 'padding') === '2px 2px 8px' && decl38(375, '.vs-selbar', 'padding') == null
     && /@media \(pointer:coarse\)\{ \.vs\.vs-fit \.vs-rs\{width:14px;\} \}/.test(css38);
-  T('v438 ⑫ 정적: 계약·차량 그리기에 vsPaneObserve(host) 한 줄씩(파일에서 이 둘뿐 — 여러 번 불러도 자리에 한 번 걸림·--vs-panew = 칸 폭·창을 줄이면 다음 그림에 다시 잼 1048 → 900·data-vs-host 없음) · 부품을 쓰는 탭 2개 — v439 지시·v440 기성(@task-sheet·@rec-sheet 구간 하나씩: 구간마다 vsSheetRender 1번·정의 key 1개(jw_task_sheet·jw_rec_sheet)·host 1개(taskList·recSheet) · 세 구간 밖 vsSheet*·vsDateCell·VS_INST 0 · 부품 저장 이름은 jw_task_sheet·jw_rec_sheet만) · 끌기는 pointer(document pointermove·pointerup·pointercancel — mouse 이벤트 0) · 150ms·compositionstart/end·isComposing · 저장 한 곳(def.key에 k,d,f,chip) · ResizeObserver 하나·콜백은 rAF · 경계 matchMedia 3개 · CSS .vs.vs-fit(860~ 폭 100%·최소 --vs-minw)·폰 col --pw·.vs-detcard(PC 숨김·폰 보임)·.vs.vs-fit td.num 오른쪽·옅은 칩 · 기존 .vs(min-width 1160·폰 0·폰 col 0) 그대로 · 검토 반영: 펼침 폭 상한 max-width 100%(계약·차량 [닫기 ▲] 잘림) · .vs td.num·.vs td .sel-box 규칙 없음(새 표만) · .sel-bar.vs-selbar 줄바꿈·여백 · 터치 손잡이 14px',
-    ro38 && st38 && css2_38 && css3_38, JSON.stringify({ ro38, ro38a, ro38b, st38, use38, keysOut38, css2_38, css3_38 }));
+  T('v438 ⑫ 정적: 계약·차량 그리기에 vsPaneObserve(host) 한 줄씩(파일에서 이 둘뿐 — 여러 번 불러도 자리에 한 번 걸림·--vs-panew = 칸 폭·창을 줄이면 다음 그림에 다시 잼 1048 → 900·data-vs-host 없음) · 부품을 쓰는 탭 3개 — v439 지시·v440 기성·v441 거래처(@task-sheet·@rec-sheet·@cli-sheet 구간 하나씩: 구간마다 vsSheetRender 1번·정의 key 1개(jw_task_sheet·jw_rec_sheet·jw_cli_sheet)·host 1개(taskList·recSheet·cliList) · 네 구간 밖 vsSheet*·vsDateCell·VS_INST 0 · 부품 저장 이름은 jw_task_sheet·jw_rec_sheet·jw_cli_sheet만) · 끌기는 pointer(document pointermove·pointerup·pointercancel — mouse 이벤트 0) · 150ms·compositionstart/end·isComposing · 저장 한 곳(def.key에 k,d,f,chip) · ResizeObserver 하나·콜백은 rAF · 경계 matchMedia 3개 · CSS .vs.vs-fit(860~ 폭 100%·최소 --vs-minw)·폰 col --pw·.vs-detcard(PC 숨김·폰 보임)·.vs.vs-fit td.num 오른쪽·옅은 칩 · 기존 .vs(min-width 1160·폰 0·폰 col 0) 그대로 · 검토 반영: 펼침 폭 상한 max-width 100%(계약·차량 [닫기 ▲] 잘림) · .vs td.num·.vs td .sel-box 규칙 없음(새 표만) · .sel-bar.vs-selbar 줄바꿈·여백 · 터치 손잡이 14px',
+    ro38 && st38 && css2_38 && css3_38, JSON.stringify({ ro38, ro38a, ro38b, st38, use38, keysOut38, css2_38, css3_38, cliSeg: csb38.length }));
 
   // ⑬ 문서 — FEATURES 기준 v438·v438 절(문장 고정)·자리 글 GATES_V438 0 · TESTLIST v438 체크 칸 = 화면 칸 4개 '[ ] (AI 시험 화면 대상' + 게이트 칸 '[x] (AI)' 5종(PM 몫 0) · MANUAL 1절 화면 폭 한 줄 · CLAUDE.md 폭·부품 줄 · sw v438 이상
   const ft38 = rd38('FEATURES.md'), tl38 = rd38('TESTLIST.md'), man38 = rd38('MANUAL.html'), cl38 = rd38('CLAUDE.md'), sw38 = rd38('sw.js');
@@ -6450,6 +6451,631 @@ try {
     && rv32.length === 1 && ['기성 숨김', '옮깁니다', '마이너스', '입금된 줄', '[삭제] 없음', '[+ 청구 등록]', '1366으로 넓히면', "'불일치'"].every((s) => rv32[0].indexOf(s) > 0) && cbGate23.length === 1 && cbGate23[0].indexOf('검토 반영') > 0,
     JSON.stringify({ ft: FT_REV40.filter((s) => ftv23.indexOf(s) < 0), man: MAN_REV40.filter((s) => man9.indexOf(s) < 0), cl: CL_REV40.filter((s) => cl23.indexOf(s) < 0), rv: rv32.length, gate: cbGate23.length && cbGate23[0].indexOf('검토 반영') }));
 } catch (e) { console.log('  (v440 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ---- v441(11/11 — 45-1 넷째 판: 관리 › 거래처 탭을 엑셀형 표로 · PM 11/10 15:56 결정 ④ 계약·기성에는 있는데 대장에 없는 이름을 표 아래 묶음으로 모아 [대장에 추가](상호만 채운 새 거래처) —
+//      거래처 수행 권한만, 자동으로 넣지 않음 · AI 결정 R1 이름 맞추기 '(주)'·'주식회사'·띄어쓰기 무시, 사업자번호 먼저 — 09_조사_문서/표형탭_시안_자료_20261110/단계지시_v441_거래처.json ·
+//      엑셀형탭_명세_20261110.json sections[key=clients]):
+//      시험 틀 = v440과 같은 작은 DOM(innerHTML을 넣으면 여는 태그마다 요소를 새로 만듦 · 창 폭은 가짜 matchMedia · 가짜 시계) + index.html의 실제 함수를 그대로 돌린다 —
+//      거래처 잇기(cliNameKey·cliResolve·cliLinkIdx·cliUnpaid·cliContracts·cliRelatedDocs) · 옛 목록·옛 상세 창(renderClientsLegacy·openCliDetail) · 추가·수정 창(openCliModal·saveCliModal·deleteCliFromModal)
+//      · 기성 판정(liveRec·recVisible·recAging·recSheetMoney·recSheetBizFmt) · @vs-sheet 구간 · @cli-sheet 구간. 저장·탭 이동·계약 그리기는 기록만 남기는 대역. 오늘 = 2026-11-10.
+//      ① 정의·칸 폭·단계 합 ② 권한별 열·칩·하위 탭 ③ 칸 글·정렬 ④ 합계 줄 ⑤ 이름 맞추기 ⑥ 대장 밖 묶음·[대장에 추가] ⑦ 13자리 막음·개인 거래처 ⑧ [삭제] 확인 창 ⑨ 펼침 하위 탭·계약 줄
+//      ⑩ 이메일·주소(거래처 수행만) ⑪ 폰 legacy ⑫ 전역 검색 ⑬ 새 거래처 열기·같은 거래처 확인 ⑭ 넓힘·CSS·정적 ⑮ 연속 누름 막기 ⑯ 폰 sheet 준비 ⑰ 문서
+try {
+  const rd41 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const own41 = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+  const fn41 = (src, name) => { const i = src.indexOf('function ' + name + '('); if (i < 0) throw new Error('함수 없음: ' + name); let d = 0, st = false; for (let j = i; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i, j + 1); } } throw new Error('중괄호 짝 안 맞음: ' + name); };
+  const line41 = (src, head) => { const i = src.indexOf(head); if (i < 0) throw new Error('줄 없음: ' + head); return src.slice(i, src.indexOf('\n', i)); };
+  const blkOf41 = (a, b) => { const i = html.indexOf(a), j = html.indexOf(b); if (i < 0 || j < i) throw new Error(a + ' 구간 없음'); return html.slice(i, j); };
+  const body41 = (name) => fn41(html, name).replace(/^function [\w$]+/, '').replace(/\r\n/g, '\n');
+  const sha41 = (s) => createHash('sha256').update(s).digest('hex');
+  const blk41 = blkOf41('// @vs-sheet-start', '// @vs-sheet-end'), csb41 = blkOf41('// @cli-sheet-start', '// @cli-sheet-end');
+  const unesc41 = (s) => String(s).replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+  const mq41 = (q, w) => { if (q == null) return true; if (/print/.test(q)) return false; const a = /\(min-width:\s*(\d+)px\)/.exec(q), b = /\(max-width:\s*(\d+)px\)/.exec(q); if (!a && !b) return false; return (!a || w >= +a[1]) && (!b || w <= +b[1]); };
+  // 사람 — 관리자A · 직원B(거래처·기성·계약 수행 — 지금 0명, 수행 꼴) · 직원C(거래처 보기·기성 보기·계약 숨김 — 11/10 운영 실측 1명 꼴) · 직원D(거래처 수행·기성·계약·문서함 숨김) · 직원E(거래처 보기·계약 보기·기성 숨김)
+  const MEM41 = [{ id: 'm1', name: '관리자A', admin: true }, { id: 'm2', name: '직원B', perms: { cli: 'do', rec: 'do', con: 'do', doc: 'view' } }, { id: 'm3', name: '직원C', perms: { cli: 'view', rec: 'view', doc: 'view' } },
+    { id: 'm4', name: '직원D', perms: { cli: 'do' } }, { id: 'm5', name: '직원E', perms: { cli: 'view', con: 'view' } }];
+  const U41 = { A: MEM41[0], B: MEM41[1], C: MEM41[2], D: MEM41[3], E: MEM41[4] };
+  // 대장 — c1 (주)가나건설(번호·담당·연락처·이메일·주소·메모) · c2 다라 환경(번호 빈 칸·처리업소) · c3 개인고객(개인) · c4 마바상사(옛 13자리 값) · c5 사아(2자·줄표 없는 10자리) · c6 가나건설(c1과 같은 열쇠 — 대장 안 겹침) · c7 지운 거래처
+  const C041 = (o) => Object.assign({ name: '', biz_no: '', contact: '', phone: '', email: '', address: '', note: '', waste_proc: 0, created: '2026-01-05', updated: '2026-03-01' }, o);
+  const CLIS41 = () => [C041({ id: 'c1', name: '(주)가나건설', biz_no: '123-45-67890', contact: '김가나', phone: '054-123-4567', email: 'ga@ex.kr', address: '포항시 남구 가나로 1', note: '주요 발주처' }),
+    C041({ id: 'c2', name: '다라 환경', phone: '010-1111-2222', waste_proc: 1 }), C041({ id: 'c3', name: '개인고객', indiv: 1 }), C041({ id: 'c4', name: '마바상사', biz_no: '9001011234567', contact: '이마바', phone: '010-3333-4444' }),
+    C041({ id: 'c5', name: '사아', biz_no: '2223344444', contact: '박사아', phone: '010-5555-6666' }), C041({ id: 'c6', name: '가나건설' }), C041({ id: 'c7', name: '지운상사', del: 1 })];
+  // 기성 — r1·r2 '(주)'·띄어쓰기만 다른 가나건설 · r3 이름은 '사아'인데 공급받는자 번호가 c1과 같음(번호 먼저) · r4 입금 · r5 사아 · r6 사아공단(부분 일치 안 함 → 대장 밖) ·
+  //   r7 (주)신규상사(10자리 번호) + r8 신규상사(입금) = 대장 밖 한 줄(표기 2가지) · r9 관리자 전용(공개범위) · r10 지운 기성
+  const R041 = (o) => Object.assign({ client: '', desc: '', amount: 0, billed: '', paid: null, scope: [], assignee: '' }, o);
+  const RECS41 = () => [R041({ id: 'r1', client: '가나건설', desc: '10월 철거', amount: 5500000, billed: '2026-10-20' }), R041({ id: 'r2', client: '가나 건설', desc: '9월 철거', amount: 1000000, billed: '2026-09-01' }),
+    R041({ id: 'r3', client: '사아', desc: '번호로 이어짐', amount: 2000000, billed: '2026-08-01', client_num: '1234567890' }), R041({ id: 'r4', client: '다라환경', desc: '입금됨', amount: 3300000, billed: '2026-09-15', paid: '2026-11-01' }),
+    R041({ id: 'r5', client: '사아', desc: '견적', amount: 700000, billed: '2026-10-01' }), R041({ id: 'r6', client: '사아공단', desc: '준설토', amount: 22000000, billed: '2026-07-01' }),
+    R041({ id: 'r7', client: '(주)신규상사', desc: '첫 거래', amount: 1100000, billed: '2026-10-25', client_num: '333-22-11111' }), R041({ id: 'r8', client: '신규상사', desc: '입금 완료', amount: 500000, billed: '2026-09-25', paid: '2026-10-05' }),
+    R041({ id: 'r9', client: '관리자전용', desc: '내부', amount: 100000, billed: '2026-10-30', scope: ['m1'] }), R041({ id: 'r10', client: '가나건설', amount: 999, billed: '2026-10-02', del: 1 })];
+  // 계약 — k1·k2 가나건설(진행·완료) · k3 새발주처 + k4 '새 발주처'(대장 밖 한 줄) · k5 사아 · k6 지운 계약 · k7 거래처 빈 칸
+  const PROCS41 = () => [{ id: 'k1', client: '(주)가나건설', status: 'run', title: '○○동 철거', label: '건축물철거', start: '2026-09-01', pipes: [] }, { id: 'k2', client: '가나건설', status: 'done', label: '석면철거', start: '2026-03-02', pipes: [] },
+    { id: 'k3', client: '새발주처', status: 'run', label: '폐기물', start: '2026-10-10', pipes: [] }, { id: 'k4', client: '새 발주처', status: 'done', label: '폐기물', start: '2026-05-10', pipes: [] },
+    { id: 'k5', client: '사아', status: 'run', label: '준설', start: '2026-10-01', pipes: [] }, { id: 'k6', client: '가나건설', status: 'run', label: '지운 계약', del: 1, pipes: [] }, { id: 'k7', client: '', status: 'run', label: '거래처 없음', pipes: [] }];
+  const DOCS41 = () => [{ id: 'd1', title: '가나건설 계약서', no: 'JW-04-01-001' }, { id: 'd2', title: '사아공단 협약', no: 'JW-04-01-002' }, { id: 'd3', title: '사아 견적', no: 'JW-04-01-003' }, { id: 'd4', title: '사아 지운 문서', no: 'JW-04-01-004', del: 1 }];
+  const REAL41 = ['esc', 'isDate', 'vehDday', 'fmtAmount', 'recAging', 'liveRec', 'recVisible', 'liveContracts', 'csTitle', 'recSheetMoney', 'recSheetMoneyHtml', 'recSheetBizFmt', 'bindFold', 'sheetRow',
+    'findCli', 'cliLinkReset', 'cliNameKey', 'cliDigits', 'cliBiz13', 'cliBizShown', 'cliBizHay', 'cliResolve', 'cliLinkIdx', 'cliUnpaid', 'cliContracts', 'cliRelatedDocs', 'cliDelMsg', 'cliTwinOf', 'cliIndivSync', 'cliMarkDirty', 'cliReloadIfUnread',
+    'openCliDetail', 'renderClientsLegacy', 'openCliModal', 'closeCliModal', 'saveCliModal', 'deleteCliFromModal'];
+  const VARS41 = ['  var CLI_LINK = ', '  var CLI_BIZ13_MSG = ', '  var CLI_UNREAD_MSG = '].map((h) => line41(html, h));
+  const PRE41 = [
+    'var clients = ENV.clis, receivables = ENV.recs, contracts = ENV.procs, documents = ENV.docs, members = ENV.members;',
+    'var cliLoaded = ENV.loaded !== false, cliDirty = {}, cliLoading = 0;',   // v441 검토: 대장을 읽었나(기본 읽음 — ⑱이 못 읽은 상태를 봄) · 이 기기에서 고친 거래처(저장 대역은 기록만) · 읽는 중 GET 수(읽기 대역은 기록만 — ⑲가 실제 함수로 봄)
+    'function loadClients(){ ENV.log.push("cliLoad"); }',
+    'var cliSearchTerm = "", editingCliId = null, conSheet = ENV.conSheet, conOpenId = null, conDetTab = "ov";',
+    'function todayStr(){ return "2026-11-10"; }',
+    'function genId(p){ ENV.gid++; return p + "N" + ENV.gid; }',
+    'function curMember(){ return ENV.user; } function myId(){ return ENV.user ? ENV.user.id : ""; }',
+    'function isAdmin(){ return !!(ENV.user && ENV.user.admin); }',
+    'function permOf(mod){ var u = ENV.user; if (!u) return "hide"; if (u.admin) return "do"; return (u.perms && u.perms[mod]) || "hide"; }',
+    'function canDo(mod){ return permOf(mod) === "do"; } function canSee(mod){ return permOf(mod) !== "hide"; }',
+    'function scopeIncludes(scope, m){ if (!scope || !scope.length) return true; if (!m) return false; return scope.indexOf(m.id) >= 0; }',
+    'function findProc(id){ for (var i = 0; i < contracts.length; i++){ if (contracts[i].id === id) return contracts[i]; } return null; }',
+    'function csPass(c, f, chip){ return !(chip === "done" && c.status !== "done") && !(f && f.client && String(c.client || "").indexOf(f.client) < 0); }',   // 계약 표 칩·거르기 대역('완료' 칩·거래처 거르기)
+    'function confirm(msg){ ENV.log.push("confirm:" + msg); return ENV.confirmAns !== false; }',
+    'function alert(msg){ ENV.log.push("alert:" + msg); }',
+    'function saveClients(){ ENV.log.push("cliSave"); }',
+    'function switchTab(n){ ENV.log.push("tab:" + n); }',
+    'function renderContracts(){ ENV.log.push("renderContracts:" + conOpenId + ":" + conDetTab + ":" + conSheet.chip + ":" + JSON.stringify(conSheet.f)); }'].join('\n');
+  const SRC41 = [PRE41].concat(REAL41.map((n) => fn41(html, n)), VARS41, [blk41, csb41,
+    'return { render: renderClients, legacy: renderClientsLegacy, def: cliSheetDef, inst: vsInst, vs: vsSheetRender, check: vsSheetCheckDef, minW: vsSheetMinW, cols: vsSheetCols, filter: vsSheetFilter, setQ: vsSheetSetQ, reveal: vsSheetReveal,'
+    + ' unpaid: cliUnpaid, cons: cliContracts, docs: cliRelatedDocs, idx: cliLinkIdx, reset: cliLinkReset, key: cliNameKey, shown: cliBizShown, sText: cliSheetSearchText, fromGs: cliSheetFromGs, act: cliSheetAct, goCon: cliSheetGoCon,'
+    + ' openModal: openCliModal, saveModal: saveCliModal, delModal: deleteCliFromModal, closeModal: closeCliModal, sync: cliIndivSync, detail: openCliDetail, setTerm: function(t){ cliSearchTerm = t; }, setEditing: function(id){ editingCliId = id; },'
+    + ' clis: function(){ return clients; }, budget: VS_STAGE_BUDGET, con: function(){ return [conOpenId, conDetTab, conSheet.chip, JSON.stringify(conSheet.f)].join("|"); },'
+    + ' hay: cliBizHay, biz13: cliBiz13, onTab: cliSheetOnTab, setLoaded: function(v){ cliLoaded = !!v; }, dirty: function(){ return JSON.stringify(cliDirty); } };']).join('\n');
+  // 작은 DOM — 선택자는 태그·#id·.class·[속성]·[속성="값"]을 붙여 쓴 것까지(자손 결합자 없음)
+  const match41 = (el, sel) => {
+    const re = /(#[\w-]+)|(\.[\w-]+)|(\[[\w-]+(?:="(?:[^"\\]|\\.)*")?\])|([a-zA-Z][\w-]*)/g; let m, at = 0;
+    while ((m = re.exec(sel))) {
+      if (m.index !== at) throw new Error('시험 DOM이 모르는 선택자: ' + sel); at = re.lastIndex;
+      if (m[1]) { if (el.getAttribute('id') !== m[1].slice(1)) return false; }
+      else if (m[2]) { if (!el.classList.contains(m[2].slice(1))) return false; }
+      else if (m[3]) { const a = /^\[([\w-]+)(?:="((?:[^"\\]|\\.)*)")?\]$/.exec(m[3]); if (a[2] === undefined) { if (!el.hasAttribute(a[1])) return false; } else if (el.getAttribute(a[1]) !== a[2].replace(/\\(.)/g, '$1')) return false; }
+      else if (m[4]) { if (!el.tagName || el.tagName !== m[4].toUpperCase()) return false; }
+    }
+    if (!at || at !== sel.length) throw new Error('시험 DOM이 모르는 선택자: ' + sel);
+    return true;
+  };
+  const mkCls41 = (s) => { const c = new Set(String(s || '').split(/\s+/).filter(Boolean)); return { toggle: (k, on) => { if (on === undefined ? !c.has(k) : on) c.add(k); else c.delete(k); }, contains: (k) => c.has(k), add: (k) => c.add(k), remove: (k) => c.delete(k) }; };
+  const mk41 = (o) => {
+    o = o || {};
+    const env = { width: o.width || 1366, user: o.user || U41.A, clis: o.clis || CLIS41(), recs: o.recs || RECS41(), procs: o.procs || PROCS41(), docs: o.docs || DOCS41(), members: MEM41, conSheet: { k: 'stage', d: 1, f: {}, chip: o.conChip || '' }, loaded: o.loaded,
+      mql: [], store: Object.assign({}, o.store || {}), timers: [], now: 100000, log: [], raf: [], ro: [], roCb: null, cw: 1048, confirmAns: true, gid: 0 };
+    const doc = { activeElement: null, byId: {} };
+    doc.getElementById = (id) => doc.byId[id] || null;
+    doc.querySelector = (sel) => { env.log.push('qs:' + sel); return null; };
+    doc.addEventListener = () => {}; doc.removeEventListener = () => {};
+    const mkEl = (tag, attrs) => {
+      const el = { tagName: tag.toUpperCase(), attrs, L: {}, scrollLeft: 0, scrollTop: 0, parentNode: null };
+      Object.defineProperty(el, 'clientWidth', { get: () => env.cw });
+      el.getAttribute = (n) => (own41(attrs, n) ? unesc41(attrs[n]) : null);
+      el.setAttribute = (n, v) => { attrs[n] = String(v); };
+      el.hasAttribute = (n) => own41(attrs, n);
+      el.type = attrs.type || ''; el.value = own41(attrs, 'value') ? unesc41(attrs.value) : ''; el.checked = own41(attrs, 'checked'); el.disabled = own41(attrs, 'disabled');
+      const sp = {}; String(attrs.style || '').split(';').forEach((p) => { const k = p.indexOf(':'); if (k > 0) sp[p.slice(0, k).trim()] = p.slice(k + 1).trim(); });
+      el.style = { sp, setProperty: (k, v) => { sp[k] = String(v); }, getPropertyValue: (k) => sp[k] || '' };
+      el.classList = mkCls41(attrs.class);
+      el.addEventListener = (t, f) => { (el.L[t] = el.L[t] || []).push(f); };
+      el.fire = (t, ev) => { const e = Object.assign({ target: el, type: t, stopped: false }, ev || {}); e.stopPropagation = () => { e.stopped = true; }; e.preventDefault = () => {}; (el.L[t] || []).slice().forEach((f) => f(e)); return e; };
+      el.focus = () => { doc.activeElement = el; };
+      el.closest = (sel) => (match41(el, sel) ? el : null);
+      el.selectionStart = el.tagName === 'INPUT' ? el.value.length : null;
+      el.setSelectionRange = (a) => { el.selectionStart = a; };
+      el.scrollIntoView = () => { env.log.push('into:' + (el.getAttribute('data-vs-row') || el.getAttribute('data-vs-detcard') || '')); };
+      return el;
+    };
+    env.mkEl = mkEl;
+    env.mkHost = (id) => {
+      const host = { id, tagName: 'DIV', attrs: { id }, _h: '', _t: '', els: [], visible: true, style: { display: '' }, L: {}, value: '' };
+      host.getAttribute = (n) => (own41(host.attrs, n) ? host.attrs[n] : null);
+      host.setAttribute = (n, v) => { host.attrs[n] = String(v); };
+      host.hasAttribute = (n) => own41(host.attrs, n);
+      host.getClientRects = () => ((host.visible && host.style.display !== 'none') ? [{}] : []);
+      host.contains = (el) => host.els.indexOf(el) >= 0;
+      host.querySelectorAll = (sel) => host.els.filter((e) => match41(e, sel));
+      host.querySelector = (sel) => host.els.find((e) => match41(e, sel)) || null;
+      host.addEventListener = (t, f) => { env.log.push('host-listener:' + id + ':' + t); (host.L[t] = host.L[t] || []).push(f); };   // 자리(host)에 건 배선은 기록(표 자리 cliList에는 0이어야 — v438 규칙)
+      host.classList = mkCls41('');
+      host.focus = () => { doc.activeElement = host; env.log.push('focus:' + id); };
+      Object.defineProperty(host, 'innerHTML', { get: () => host._h, set: (v) => {
+        host._h = String(v); host.els = [];
+        for (const t of host._h.matchAll(/<([a-zA-Z][\w-]*)((?:[^<>"]|"[^"]*")*)>/g)) { const attrs = {}; for (const a of t[2].matchAll(/([\w-]+)(?:="([^"]*)")?/g)) attrs[a[1]] = a[2] === undefined ? '' : a[2]; host.els.push(mkEl(t[1], attrs)); }
+      } });
+      Object.defineProperty(host, 'textContent', { get: () => host._t, set: (v) => { host._t = String(v); } });
+      doc.byId[id] = host;
+      return host;
+    };
+    env.host = (id) => doc.byId[id];
+    ['cliList', 'cliHead', 'cliAddBtn', 'cliSearch', 'cliModalTitle', 'cliName', 'cliBizNo', 'cliIndiv', 'cliContact', 'cliPhone', 'cliEmail', 'cliAddr', 'cliNote', 'cliWasteProc', 'cliDelete', 'cliBackdrop',
+      'cliDetailTitle', 'cliDetailBody', 'cliDetailEdit', 'cliDetailBackdrop', 'view-cli'].forEach((id) => env.mkHost(id));
+    env.host('cliList').innerHTML = '<div class="loading">불러오는 중…</div>';
+    const win = { get innerWidth() { return env.width; }, matchMedia: (q) => ({ media: q, get matches() { return mq41(q, env.width); }, addEventListener: (t, f) => { env.mql.push(f); } }), requestAnimationFrame: (f) => { env.raf.push(f); } };
+    const ls = { getItem: (k) => (own41(env.store, k) ? env.store[k] : null), setItem: (k, v) => { env.log.push('store:' + k); env.store[k] = String(v); }, removeItem: (k) => { delete env.store[k]; } };
+    const stF = (f, ms) => { const t = { id: env.timers.length + 1, f, at: env.now + ms, done: false }; env.timers.push(t); return t.id; };
+    const ctF = (id) => { env.timers.forEach((t) => { if (t.id === id) t.done = true; }); };
+    function RO(cb) { env.roCb = cb; this.observe = (t) => { env.ro.push(t); }; }
+    class FD extends Date { static now() { return env.now; } }
+    const api = new Function('window', 'document', 'localStorage', 'setTimeout', 'clearTimeout', 'ResizeObserver', 'ENV', 'Date', SRC41)(win, doc, ls, stF, ctF, RO, env, FD);
+    env.breakAll = () => { env.mql.slice().forEach((f) => f({})); };
+    return { api, env, doc, host: env.host('cliList') };
+  };
+  const order41 = (h) => [...h.matchAll(/data-vs-row="([^"]*)"/g)].map((m) => m[1]).join(',');
+  const cnt41 = (h) => (/<span class="vs-count">([^<]*)<\/span>/.exec(h) || ['', ''])[1];
+  const rowSeg41 = (h, id) => (new RegExp('<tr class="vs-r[^"]*" data-vs-row="' + id.replace(/[()]/g, '\\$&') + '">([\\s\\S]*?)</tr>').exec(h) || ['', ''])[1];
+  const cells41 = (h, id) => [...rowSeg41(h, id).matchAll(/<td([^>]*)>([\s\S]*?)<\/td>/g)].map((m) => [m[1], m[2]]);
+  const heads41 = (h) => [...h.matchAll(/<th[^>]*data-vs-sort="(\w+)"/g)].map((m) => m[1]).join(',');
+  const chips41 = (h) => [...h.matchAll(/data-vs-chip="st\|(\w*)"[^>]*>([^<]*)</g)].map((m) => m[1] + ':' + m[2]).join('|');
+  const foot41 = (h) => ((/<tfoot><tr>([\s\S]*?)<\/tr><\/tfoot>/.exec(h) || ['', ''])[1].match(/<td[^>]*>([\s\S]*?)<\/td>/g) || []).map((s) => s.replace(/^<td[^>]*>|<\/td>$/g, '')).join('|');
+  const tabs41 = (h) => [...h.matchAll(/<button type="button" class="vs-stab( on)?" data-cli-tab="(\w+)"(?: title="[^"]*")?>([^<]*)<\/button>/g)].map((m) => m[3] + (m[1] ? '*' : '')).join('|');   // 검토: 관련 문서 탭은 title(찾는 법 안내)
+  const acts41 = (h) => { const m = /<div class="vs-act">([\s\S]*?)<\/div>/.exec(h); return m ? [...m[1].matchAll(/data-cli-act="(\w+)"/g)].map((x) => x[1]).join(',') : ''; };
+  const kvKeys41 = (h) => [...h.matchAll(/<div class="k">([^<]*)<\/div>/g)].map((m) => m[1]).join('·');
+  const kvVal41 = (h, k) => (new RegExp('<div class="k">' + k + '</div><div class="v">([\\s\\S]*?)</div></div>').exec(h) || ['', '?'])[1];
+  // 누르는 도우미는 행·버튼·펼침이 없으면 멈추지 않고 빠짐(miss41)만 적는다 — 결함 하나가 이 묶음을 '검사 생략'으로 끝내 뒤 검사까지 건너뛰지 않게(v440 ⑥·⑲와 같은 까닭) ·
+  //   검사마다 시작할 때 빠짐 수(m0)를 잡고 끝에서 늘지 않았는지 본다(그 검사 안에서 빠진 누름은 그 검사 ✗)
+  const miss41 = [];
+  const openRow41 = (X, id) => { const row = X.host.querySelector('[data-vs-row="' + id + '"]'); if (!row) { miss41.push('행 없음 ' + id); return false; } row.fire('click', { target: row }); return true; };
+  const chip41 = (X, k) => { const el = X.host.querySelector('[data-vs-chip="st|' + k + '"]'); if (!el) { miss41.push('칩 없음 ' + k); return false; } el.fire('click'); return true; };
+  const grp41 = (X) => { const el = X.host.querySelector('[data-vs-grp="out"]'); if (!el) { miss41.push('묶음 없음'); return false; } el.fire('click'); return true; };
+  const ev41 = (X, b, o) => { o = o || {}; if (!o.fast) X.env.now += 1000; return o.detail ? { target: b, detail: o.detail } : { target: b }; };
+  const press41 = (X, attr, val, o) => {   // 펼침 안 버튼·하위 탭·계약 줄 → 펼침 칸(위임 배선) — 누르기 전 가짜 시계 1초(연속 누름 막기 0.5초 밖)
+    const det = X.host.querySelector('[data-vs-det]') || X.host.querySelector('[data-vs-detcard]'), L = X.host.els.filter((e) => e.getAttribute(attr) === val), b = L[L.length - 1];
+    if (!det || !b) { miss41.push('펼침 안 요소 없음 ' + attr + '=' + val); return false; }
+    det.fire('click', ev41(X, b, o)); return true;
+  };
+  const fake41 = (X, act, id) => { const det = X.host.querySelector('[data-vs-det]'); if (!det) { miss41.push('펼침 없음(흉내 ' + act + ')'); return false; } const b = X.env.mkEl('button', { type: 'button', class: 'mini-btn', 'data-cli-act': act, 'data-cli-id': id }); det.fire('click', ev41(X, b)); return true; };   // 화면에 없는 버튼을 만들어 누름(누름 길의 지금 규칙을 봄)
+  const noMiss41 = (m0) => miss41.length === m0;
+  const cl41 = (X, id) => X.api.clis().find((c) => c.id === id) || {};
+  const ids41 = (L) => L.map((x) => x.id).join(',');
+  const ORD41 = 'c1,c6,c3,c2,c4,c5';
+
+  // ① 정의·칸 폭(운영 백업 실측)·단계 합: vsSheetCheckDef 통과(사람 5 꼴 × phone legacy·sheet — 폰 열 % 합 100) · 관리자 열 10 = 명세 순서(상호 196 · 사업자번호 118 lv2 · 담당자 84 lv3 · 연락처 118 · 미수 130 숫자 ·
+  //   계약 104 lv3 · 처리업소 80 lv3 enum · 메모 남는 폭 최소 132 lv2 · 이메일 150 lv4 · 주소 170 lv4) · 단계 합 694/962/1282 ≤ 한도 742/962/1282 — 한도 = CSS로 계산한 본문 폭(1024 791 · 1280 1011 · 1600 1331) − 49 ·
+  //   권한 조합별 단계 합(직원C 694/858/858 · 직원D 564/728/1048 · 직원E 564/832/832) · 저장 이름·자리·단위·검색칸·기본 정렬·phone legacy·legacy = renderClientsLegacy·묶음·선택 없음·같은 권한이면 같은 정의·열 배열
+  const X1 = mk41(), d1 = X1.api.def();
+  const ck1 = [U41.A, U41.B, U41.C, U41.D, U41.E].map((u) => { X1.env.user = u; const d = X1.api.def(); return [X1.api.check(d).join(','), X1.api.check(Object.assign({}, d, { phone: 'sheet' })).join(',')].join('/'); });
+  X1.env.user = U41.A;
+  const cols1 = X1.api.def().cols.map((c) => [c.k, c.h, c.w || 0, c.f, c.lv || 1, c.pw || 0, c.fill ? 'fill' + c.min : '', c.num ? 'num' : ''].join(':')).join('|');
+  const COLS41 = 'name:상호:196:text:1:38::|biz:사업자번호:118:text:2:0::|contact:담당자:84:text:3:0::|phone:연락처:118:text:1:36::|unpaid:미수:130:none:1:26::num|con:계약:104:none:3:0::|proc:처리업소:80:enum:3:0::|note:메모:0:text:2:0:fill132:|email:이메일:150:text:4:0::|addr:주소:170:text:4:0::';
+  const sums1 = (u) => { X1.env.user = u; const d = X1.api.def(); const s = [2, 3, 4].map((st) => X1.api.minW({ colw: {} }, X1.api.cols(d, st))); X1.env.user = U41.A; return s.join('/'); };
+  const css41 = (() => { const i = html.indexOf('<style>'), j = html.indexOf('</style>', i); return html.slice(i + 7, j).replace(/\/\*[\s\S]*?\*\//g, ''); })();
+  const rules41 = [];
+  const parse41 = (src, media) => { let i = 0; while (i < src.length) { const ob = src.indexOf('{', i); if (ob < 0) break; const head = src.slice(i, ob).trim(); let d = 1, j = ob + 1; for (; j < src.length && d > 0; j++) { if (src[j] === '{') d++; else if (src[j] === '}') d--; } const bd = src.slice(ob + 1, j - 1); if (/^@media/.test(head)) parse41(bd, head.slice(6).trim()); else if (!/^@/.test(head)) { const decl = {}; bd.split(';').forEach((p) => { const k = p.indexOf(':'); if (k > 0) decl[p.slice(0, k).trim()] = p.slice(k + 1).trim(); }); rules41.push({ media, sels: head.split(',').map((s) => s.trim().replace(/\s*>\s*/g, '>').replace(/\s+/g, ' ')), decl }); } i = j; } };
+  parse41(css41, null);
+  const decl41 = (w, sel, prop) => { let v = null; rules41.forEach((r) => { if (mq41(r.media, w) && r.sels.indexOf(sel) >= 0 && own41(r.decl, prop)) v = r.decl[prop]; }); return v; };
+  const pad41 = (v) => { const p = String(v || '0px').trim().split(/\s+/).map((x) => parseFloat(x) || 0); const r = p.length === 1 ? p[0] : p[1]; return [p.length === 4 ? p[3] : r, r]; };
+  const bodyW41 = (win) => { const W = win - 17, mx = decl41(win, '#app', 'max-width'), appW = (!mx || mx === 'none') ? W : Math.min(W, parseFloat(mx)), lr = pad41(decl41(win, '#app', 'padding')); return appW - lr[0] - lr[1] - (parseFloat(decl41(win, '.tabbar', 'width')) || 0) - (parseFloat(decl41(win, '.layout', 'gap')) || 0); };
+  const viewW41 = (win) => { const b = bodyW41(win), own = decl41(win, '#view-cli', 'max-width'), base = decl41(win, '.views>.view', 'max-width'), mx = own != null ? own : base; return (!mx || mx === 'none') ? b : Math.min(b, parseFloat(mx)); };
+  const body1 = [1024, 1280, 1600].map((w) => Math.round(bodyW41(w))), bud1 = [2, 3, 4].map((s) => X1.api.budget[s]);
+  const sumA1 = sums1(U41.A).split('/').map(Number);
+  const fit1 = [0, 1, 2].every((i) => sumA1[i] <= bud1[i] && Math.abs(bud1[i] + 49 - body1[i]) <= 2);
+  X1.env.user = U41.A; const colsA1 = X1.api.def().cols; X1.env.user = U41.C; const dC1 = X1.api.def(), colsC1 = dC1.cols; X1.env.user = U41.A; const colsA1b = X1.api.def().cols;
+  T('v441 ① 거래처 표 정의·칸 폭·단계 합: vsSheetCheckDef 통과(관리자·직원B·C·D·E × phone legacy·sheet) · 관리자 열 10 = 상호 196 · 사업자번호 118 lv2 · 담당자 84 lv3 · 연락처 118 · 미수 130 숫자 · 계약 104 lv3 · 처리업소 80 lv3 enum · 메모 남는 폭 최소 132 lv2 · 이메일 150 lv4 · 주소 170 lv4(명세 180·96·72·150·180에서 운영 백업 실측으로 바꿈 — 폰 % 상호 38·연락처 36·미수 26) · 단계 합 관리자 694/962/1282 ≤ 한도 ' + bud1.join('/') + '(= CSS 본문 폭 ' + body1.join('/') + ' − 49) · 직원C 694/858/858 · 직원D 564/728/1048 · 직원E 564/832/832 · key jw_cli_sheet · host cliList · 단위 곳 · 검색칸 cliSheetQ · 기본 정렬 상호 ▲ · phone legacy · legacy = renderClientsLegacy · 묶음 out(대장 밖) · 선택 칸 없음 · 같은 권한이면 같은 정의(열 배열도 같음), 권한이 바뀌면 열을 다시 고름',
+    ck1.every((s) => s === '/') && cols1 === COLS41 && sums1(U41.A) === '694/962/1282' && sums1(U41.C) === '694/858/858' && sums1(U41.D) === '564/728/1048' && sums1(U41.E) === '564/832/832'
+    && JSON.stringify(bud1) === '[742,962,1282]' && JSON.stringify(body1) === '[791,1011,1331]' && fit1
+    && d1.key === 'jw_cli_sheet' && d1.host === 'cliList' && d1.unit === '곳' && d1.search && d1.search.id === 'cliSheetQ' && d1.sort.k === 'name' && d1.sort.d === 1 && d1.phone === 'legacy' && d1.legacy === X1.api.legacy
+    && typeof d1.group.of === 'function' && d1.group.of({ out: 1 }) === 'out' && d1.group.of({}) === '' && !d1.sel && typeof d1.bind === 'function' && typeof d1.onMode === 'function'
+    && X1.api.def() === d1 && dC1 === d1 && colsA1b === colsA1 && colsC1 !== colsA1 && colsC1.length === 7 && colsA1.length === 10,
+    JSON.stringify({ ck1, cols1: cols1 === COLS41 ? 'ok' : cols1, sums: [U41.A, U41.C, U41.D, U41.E].map(sums1), bud1, body1 }));
+
+  // ② 권한별 열·칩·하위 탭(1920 창 — 모든 단계 열): 관리자 = 열 10·칩 5·하위 탭 개요·미수·계약·관련 문서·버튼 수정·삭제·대장 밖 묶음 / 직원C(거래처 보기·기성 보기·계약 숨김) = 계약 열·'계약 진행 중' 칩·계약 탭·이메일·주소·묶음·버튼 없음 /
+  //   직원D(거래처 수행·기성·계약·문서함 숨김) = 미수·계약 열·칩 없음·하위 탭 줄 없음(개요 하나)·버튼 수정·삭제·묶음 없음(모을 원천을 볼 수 없음) / 직원E(거래처 보기·계약 보기·기성 숨김) = 미수 열·칩·탭 없음·계약 있음
+  const m2 = miss41.length;
+  const view2 = (u) => { const X = mk41({ width: 1920, user: u }); X.api.render(); const h0 = X.host._h; openRow41(X, 'c1'); const h = X.host._h; return { heads: heads41(h0), chips: chips41(h0), tabs: tabs41(h), acts: acts41(h), grp: /data-vs-grp="out"/.test(h0), n: cnt41(h0), kv: kvKeys41(h) }; };
+  const v2 = { A: view2(U41.A), C: view2(U41.C), D: view2(U41.D), E: view2(U41.E) };
+  const KV41 = '사업자번호·담당자·연락처·이메일·주소·처리업소·메모·등록일·고친 날', KVv41 = '사업자번호·담당자·연락처·처리업소·메모·등록일·고친 날';
+  T('v441 ② 권한별 열·칩·하위 탭: 관리자 열 name…addr 10 · 칩 전체·미수 있음·계약 진행 중·처리업소·정보 비어 있음 · c1 하위 탭 개요*·미수 (3)·계약 (2)·관련 문서 (0) · 버튼 수정·삭제 · 묶음 있음 "보이는 6곳 / 전체 6곳"(검토 — 대장 줄만, 묶음 4곳은 머리에) / 직원C(기성 보기·계약 숨김) = 열 7(계약·이메일·주소 없음)·칩 4(계약 진행 중 없음)·탭 개요·미수·관련 문서·버튼 0·묶음 없음 "6곳"·개요에 이메일·주소 없음 / 직원D(기성·계약 숨김·거래처 수행) = 열 8(미수·계약 없음, 이메일·주소 있음)·칩 3·탭 줄 없음·버튼 수정·삭제·묶음 없음 / 직원E(기성 숨김·계약 보기) = 열 7(미수·이메일·주소 없음)·칩 전체·계약 진행 중·처리업소·정보 비어 있음·탭 개요·계약 (2)',
+    v2.A.heads === 'name,biz,contact,phone,unpaid,con,proc,note,email,addr' && v2.A.chips === ':전체|unpaid:미수 있음|con:계약 진행 중|proc:처리업소|blank:정보 비어 있음' && v2.A.tabs === '개요*|미수 (3)|계약 (2)|관련 문서 (0)' && v2.A.acts === 'edit,del' && v2.A.grp && v2.A.n === '보이는 6곳 / 전체 6곳' && v2.A.kv === KV41
+    && v2.C.heads === 'name,biz,contact,phone,unpaid,proc,note' && v2.C.chips === ':전체|unpaid:미수 있음|proc:처리업소|blank:정보 비어 있음' && v2.C.tabs === '개요*|미수 (3)|관련 문서 (0)' && v2.C.acts === '' && !v2.C.grp && v2.C.n === '보이는 6곳 / 전체 6곳' && v2.C.kv === KVv41
+    && v2.D.heads === 'name,biz,contact,phone,proc,note,email,addr' && v2.D.chips === ':전체|proc:처리업소|blank:정보 비어 있음' && v2.D.tabs === '' && v2.D.acts === 'edit,del' && !v2.D.grp && v2.D.kv === KV41
+    && v2.E.heads === 'name,biz,contact,phone,con,proc,note' && v2.E.chips === ':전체|con:계약 진행 중|proc:처리업소|blank:정보 비어 있음' && v2.E.tabs === '개요*|계약 (2)' && v2.E.acts === '' && !v2.E.grp && v2.E.kv === KVv41 && noMiss41(m2),
+    JSON.stringify({ v2, miss: miss41.slice(m2) }));
+
+  // ③ 칸 글·정렬(관리자 1366): 상호 ▲ = c1,c6,c3,c2,c4,c5(+ 묶음 머리 접힘) · 사업자번호 c1 123-45-67890 · c2 노랑 '미입력' · c3 회색 '개인(사업자 없음)' · c4 노랑 '13자리(숨김)'(원문은 화면 글 어디에도 없음) · c5 줄표 없는 10자리 → 222-33-44444 ·
+  //   미수 c1 빨강 '8,500,000원 · 3건'(title) · 없음 '-' · 계약 c1 '진행 1 · 완료 1' · c5 '진행 1 · 완료 0' · 처리업소 c2 · 첫 열 굵게 + title · 미수 머리 ▲ = c5,c1 그다음 빈 값(대장 순서) · 1100 창 열 5
+  const X3 = mk41(); X3.api.render(); const h3 = X3.host._h, c3 = (id) => cells41(h3, id);
+  const s3 = [order41(h3), c3('c1')[1][1], c3('c2')[1][1], c3('c3')[1][1], c3('c4')[1][1], c3('c5')[1][1], c3('c1')[4][1], c3('c1')[4][0], c3('c2')[4][1], c3('c1')[5][1], c3('c5')[5][1], c3('c2')[6][1], c3('c1')[0][0], c3('c4')[1][0]];
+  const raw3 = h3.indexOf('9001011234567') < 0 && h3.indexOf('900101-1234567') < 0;
+  const grpH3 = /<tr class="vs-grp" data-vs-grp="out"><td colspan="8"><div class="vs-grp-in"><span class="car">▸<\/span>대장에 없는 이름 <span class="vs-dsub">[^<]*<\/span><span class="n">4곳<\/span><\/div><\/td><\/tr>/.test(h3) && h3.indexOf('data-vs-row="out:') < 0;
+  const so3 = X3.host.querySelector('[data-vs-sort="unpaid"]'); if (so3) so3.fire('click', { target: so3 }); const s3b = order41(X3.host._h);
+  const X3c = mk41({ width: 1100 }); X3c.api.render(); const s3c = heads41(X3c.host._h);
+  const DASH41 = '<span style="color:#9AA09C;">-</span>';
+  T('v441 ③ 칸 글·정렬(1366): 상호 ▲ ' + ORD41 + ' + 묶음 머리 "대장에 없는 이름 … 4곳"(접힘 — 대장 밖 줄 안 그림) · 사업자번호 123-45-67890 · 미입력(노랑 rec-st wait) · 개인(사업자 없음)(회색 rec-st paid) · 13자리(숨김)(노랑, title 지우라는 글 — 원문 0) · 222-33-44444(줄표 없는 10자리) · 미수 빨강 "8,500,000원 · 3건"(title) · 없음 "-" · 계약 "진행 1 · 완료 1"·"진행 1 · 완료 0" · 처리업소 · 첫 열 굵게·title · 미수 머리 ▲ = c5,c1,c2,c3,c4,c6(빈 값 뒤 — 대장 순서) · 1100 창 열 5(상호·사업자번호·연락처·미수·메모)',
+    JSON.stringify(s3) === JSON.stringify([ORD41, '123-45-67890', '<span class="rec-st wait">미입력</span>', '<span class="rec-st paid">개인(사업자 없음)</span>', '<span class="rec-st wait">13자리(숨김)</span>', '222-33-44444',
+      '<span class="cli-unp">8,500,000원 · 3건</span>', ' class="num" title="미수 8,500,000원 · 3건"', DASH41, '진행 1 · 완료 1', '진행 1 · 완료 0', '처리업소', ' class="vs-b" title="(주)가나건설"', ' class="vs-hs" title="사업자번호 칸에 13자리 번호(주민·법인등록번호 꼴)가 있습니다 — 원문은 보이지 않습니다, [수정]에서 지워 주세요"'])
+    && raw3 && grpH3 && !!so3 && s3b === 'c5,c1,c2,c3,c4,c6' && s3c === 'name,biz,phone,unpaid,note',
+    JSON.stringify({ s3, raw3, grpH3, s3b, s3c }));
+
+  // ④ 합계 줄(묶음 줄 빼고): 1366 '합계 6곳 | 미입력 2(개인·13자리는 안 셈) | | | 미수 9,200,000원 · 4건(title) | 진행 2 | 1곳(title 처리업소 1곳) | ' · '미수 있음' 칩(대장 c1·c5 + 묶음 줄 셋) = 합계 2곳·미입력 0·같은 미수·진행 2·0곳 ·
+  //   직원C(기성 보기·계약 숨김 1366) = 계약 칸 없이 '합계 6곳|미입력 2|||미수|1곳|'
+  const m4 = miss41.length;
+  const X4 = mk41(); X4.api.render(); const f4a = foot41(X4.host._h); chip41(X4, 'unpaid'); const f4b = foot41(X4.host._h), o4b = [order41(X4.host._h), cnt41(X4.host._h)];
+  const X4c = mk41({ user: U41.C }); X4c.api.render(); const f4c = foot41(X4c.host._h);
+  const UN4 = '<span title="미수 9,200,000원 · 4건">9,200,000원</span>';   // 11/11 시험 화면: PC 합계 줄 미수 = 금액만(건수는 title — 1억 넘는 합 + 건수가 130px 칸에서 잘림)
+  T('v441 ④ 합계 줄(묶음 줄 빼고): 관리자 1366 "합계 6곳|미입력 2|||9,200,000원(title 미수 9,200,000원 · 4건)|진행 2|1곳(title 처리업소 1곳)|" · 미수 있음 칩 = c1,c5(+ 묶음 셋 접힘) "보이는 2곳 / 전체 6곳"(검토 — 대장 줄만)·합계 2곳·미입력 0·진행 2·0곳 · 직원C = "합계 6곳|미입력 2|||9,200,000원 · 4건|1곳|"',
+    f4a === '합계 6곳|미입력 2|||' + UN4 + '|진행 2|<span title="처리업소 1곳">1곳</span>|' && f4b === '합계 2곳|미입력 0|||' + UN4 + '|진행 2|<span title="처리업소 0곳">0곳</span>|'
+    && JSON.stringify(o4b) === JSON.stringify(['c1,c5', '보이는 2곳 / 전체 6곳']) && f4c === '합계 6곳|미입력 2|||' + UN4 + '|<span title="처리업소 1곳">1곳</span>|' && noMiss41(m4),
+    JSON.stringify({ f4a, f4b, o4b, f4c, miss: miss41.slice(m4) }));
+
+  // ⑤ 이름 맞추기(AI 결정 R1): 열쇠 '(주) 가나 건설'·'가나건설 주식회사'·'㈜가나건설' = '가나건설' · 'Ga Na' = 'gana' · '주식회사'만 = '' · c1 미수 = r1(가나건설)·r2(가나 건설)·r3(이름은 '사아'지만 번호가 c1과 같음 — 번호 먼저) ·
+  //   c5(사아) 미수 = r5만(r3은 번호로 c1 · 사아공단 r6은 부분 일치 안 함) · c6(c1과 같은 열쇠) = 미수·계약 0(대장 순서 첫 거래처에만 — 두 번 세지 않음) · 계약 c1 = k1·k2 · c5 = k5 ·
+  //   대장 밖 줄 = 사아공단·신규상사(표기 2가지 '(주)신규상사'·'신규상사' — 한 줄, 이름 = 먼저 나온 표기, 번호 333-22-11111)·관리자전용·새발주처(표기 2가지) · 보이는 미수 7건 = 대장 4 + 대장 밖 3(빠짐·겹침 0) ·
+  //   대장 밖 거래처(대장에 없는 사아공단 꼴)는 같은 규칙으로 직접 · 옛 목록(폰)도 같은 미수 글
+  const X5 = mk41(), A5 = X5.api;
+  const k5 = [A5.key('(주) 가나 건설'), A5.key('가나건설 주식회사'), A5.key('㈜가나건설'), A5.key('Ga Na'), A5.key('주식회사'), A5.key(' （주）가나 건설 ')];
+  const cl5 = (id) => cl41(X5, id);
+  const u5 = ['c1', 'c5', 'c6', 'c2'].map((id) => ids41(A5.unpaid(cl5(id)))), k5c = ['c1', 'c5', 'c6'].map((id) => ids41(A5.cons(cl5(id))));
+  const ix5 = A5.idx(), out5 = ix5.out.map((o) => o.id + ':' + o.name + ':' + Object.keys(o.raws).length + ':' + o.recAll + '/' + o.recs.length + ':' + o.cons.length + ':' + o.biz).join('|');
+  const vis5 = RECS41().filter((r) => r.del !== 1 && !r.paid && (!r.scope.length || r.scope.indexOf('m1') >= 0)).length;
+  const tot5 = ix5.live.reduce((s, c) => s + A5.unpaid(c).length, 0) + ix5.out.reduce((s, o) => s + o.recs.length, 0);
+  const fb5 = ids41(A5.unpaid({ id: 'zz', name: '사아 공단' }));
+  const P5 = mk41({ width: 375 }); P5.api.render(); const leg5 = (/data-cli-fold="c1"[\s\S]*?<span class="asb-end num" style="color:#B0332A;">([^<]*)<\/span>/.exec(P5.host._h) || ['', ''])[1];
+  T('v441 ⑤ 이름 맞추기(R1 — \'(주)\'·\'주식회사\'·띄어쓰기 무시, 사업자번호 먼저): 열쇠 가나건설 ×3·gana·빈 열쇠·전각 괄호 · c1 미수 r1,r2,r3(r3 = 이름 사아·번호 c1 → c1) · c5 r5만(사아공단 부분 일치 0) · c6(같은 열쇠 둘째) 0 · c2(입금 r4) 0 · 계약 c1 k1,k2 · c5 k5 · c6 0 · 대장 밖 사아공단·신규상사(표기 2·기성 2/미수 1·번호 3332211111)·관리자전용·새발주처(표기 2·계약 2) · 보이는 미수 ' + vis5 + '건 = 대장 + 대장 밖 · 대장 밖 거래처는 직접 같은 규칙(사아 공단 → r6) · 폰 옛 목록 c1 "미수 8,500,000원 · 3건"',
+    JSON.stringify(k5) === JSON.stringify(['가나건설', '가나건설', '가나건설', 'gana', '', '가나건설']) && JSON.stringify(u5) === JSON.stringify(['r1,r2,r3', 'r5', '', '']) && JSON.stringify(k5c) === JSON.stringify(['k1,k2', 'k5', ''])
+    && out5 === 'out:사아공단:사아공단:1:1/1:0:|out:신규상사:(주)신규상사:2:2/1:0:3332211111|out:관리자전용:관리자전용:1:1/1:0:|out:새발주처:새발주처:2:0/0:2:' && tot5 === vis5 && vis5 === 7 && fb5 === 'r6' && leg5 === '미수 8,500,000원 · 3건',
+    JSON.stringify({ k5, u5, k5c, out5, tot5, vis5, fb5, leg5 }));
+
+  // ⑥ 대장 밖 묶음·[대장에 추가](결정 ④ — 거래처 수행만): 관리자 묶음 머리 누름 = 대장 밖 줄 넷(회색 vs-r grey · 미수 사아공단 22,000,000원 · 1건 · 계약 새발주처 진행 1 · 완료 1 · 그 밖 '-') · 직원B(수행·비관리자) = 관리자 전용 기성 이름 빠진 셋 ·
+  //   직원C·E(보기)·D(원천 숨김) = 묶음 없음 · 신규상사 줄 펼침 = '대장에 없음'·안내(계약 0건 · 기성 2건(미수 1) · 표기 2가지 · 번호 333-22-11111)·탭 미수 (1)*·계약 (0)·버튼 대장에 추가 →
+  //   누름 = 새 거래처 1(상호 '(주)신규상사'만 · 그 밖 칸 빈 값·처리업소 0 · 등록·고친 날 오늘) · 저장 1 · 그 줄 묶음에서 빠짐(머리 3곳) · 새 거래처 미수 = r7 · 같은 줄을 흉내 누름 = 안내 '이미 …'·새로 안 만듦 · 직원C 흉내 누름 = 안 만듦
+  const m6 = miss41.length;
+  const X6 = mk41(); X6.api.render(); grp41(X6); const h6 = X6.host._h;
+  const s6 = [order41(h6), /class="vs-r grey" data-vs-row="out:사아공단"/.test(h6), (cells41(h6, 'out:사아공단')[4] || [])[1], (cells41(h6, 'out:새발주처')[5] || [])[1], (cells41(h6, 'out:새발주처')[1] || [])[1]];
+  const out6 = (u) => { const X = mk41({ user: u }); X.api.render(); const g = /data-vs-grp="out"/.test(X.host._h); if (g) grp41(X); return (g ? 'G:' : '-:') + (order41(X.host._h).split(',').filter((x) => /^out:/.test(x)).join(',') || '0'); };
+  const o6 = [out6(U41.B), out6(U41.C), out6(U41.D), out6(U41.E)];
+  openRow41(X6, 'out:신규상사'); const hd6 = X6.host._h;
+  const det6 = [/<div class="vs-dh"><b>\(주\)신규상사<\/b><span class="rec-st wait">대장에 없음<\/span>/.test(hd6), (/<div class="vs-dsub" style="margin:0 0 6px;">([^<]*)<\/div>/.exec(hd6) || ['', ''])[1], tabs41(hd6), acts41(hd6)];
+  const n6 = X6.api.clis().length, L6 = X6.env.log; press41(X6, 'data-cli-act', 'addout');
+  const nc6 = X6.api.clis()[X6.api.clis().length - 1] || {};
+  const s6b = [X6.api.clis().length - n6, JSON.stringify(nc6), L6.filter((l) => l === 'cliSave').length, order41(X6.host._h).split(',').filter((x) => /^out:/.test(x)).join(','), (/<span class="n">(\d+)곳<\/span>/.exec(X6.host._h) || ['', ''])[1], ids41(X6.api.unpaid(nc6))];
+  openRow41(X6, 'out:사아공단'); fake41(X6, 'addout', 'out:신규상사');   // 이미 대장에 넣은 이름을 다른 줄의 펼침에서 흉내 누름(다른 기기·묵은 화면)
+  s6b.push(X6.api.clis().length - n6 - 1, L6.some((l) => /^alert:이미 거래처 대장에 이어진 이름입니다/.test(l)));
+  const Y6 = mk41({ user: U41.C }); Y6.api.render(); openRow41(Y6, 'c1'); const n6c = Y6.api.clis().length; fake41(Y6, 'addout', 'out:사아공단'); s6b.push(Y6.api.clis().length - n6c);
+  T('v441 ⑥ 대장 밖 묶음·[대장에 추가](결정 ④): 관리자 묶음 머리 누름 = 대장 밖 줄 4(회색)·사아공단 미수 22,000,000원 · 1건·새발주처 계약 진행 1 · 완료 1·사업자번호 칸 "-" · 직원B(수행) 3줄(관리자 전용 기성 이름 빠짐) · 직원C·D·E 묶음 없음 · 신규상사 펼침 = 대장에 없음·안내(계약 0건 · 기성 2건(미수 1) · 표기 2가지 · 번호 333-22-11111 · [대장에 추가] 설명)·탭 미수 (1)*·계약 (0)·버튼 대장에 추가 → 누름 = 새 거래처 1(상호만 — 그 밖 빈 값·처리업소 0·오늘)·저장 1·묶음 3곳·새 거래처 미수 r7 · 같은 이름 다시(흉내) = 안내·새로 안 만듦 · 직원C 흉내 = 안 만듦',
+    JSON.stringify(s6) === JSON.stringify([ORD41 + ',out:신규상사,out:관리자전용,out:사아공단,out:새발주처', true, '<span class="cli-unp">22,000,000원 · 1건</span>', '진행 1 · 완료 1', DASH41])
+    && JSON.stringify(o6) === JSON.stringify(['G:out:신규상사,out:사아공단,out:새발주처', '-:0', '-:0', '-:0'])
+    && det6[0] && det6[1] === "계약 0건 · 기성 2건(미수 1)에 이 상호가 있는데 거래처 대장에는 없습니다 · 표기 2가지('(주)'·띄어쓰기만 다름) · 기성 공급받는자 번호 333-22-11111 — [대장에 추가]는 상호만 채운 새 거래처를 만듭니다(사업자번호·담당자 등은 추가한 뒤 [수정])"
+    && det6[2] === '미수 (1)*|계약 (0)' && det6[3] === 'addout'
+    && JSON.stringify(s6b) === JSON.stringify([1, '{"id":"clN1","created":"2026-11-10","name":"(주)신규상사","biz_no":"","contact":"","phone":"","email":"","address":"","note":"","waste_proc":0,"updated":"2026-11-10"}', 1, 'out:관리자전용,out:사아공단,out:새발주처', '3', 'r7', 0, true, 0]) && noMiss41(m6),
+    JSON.stringify({ s6, o6, det6, s6b, miss: miss41.slice(m6) }));
+
+  // ⑦ 13자리 막음·개인 거래처: 새 거래처 '900101-1234567'·'9001011234567' 저장 = 안내(CLI_BIZ13_MSG)·저장 0·번호 칸 포커스 · 개인 거래처 체크면 번호 칸 잠금(disabled·자리 글)·저장 = biz_no 빈 칸·indiv 1·표 칸 '개인(사업자 없음)' ·
+  //   10자리 '123-45-67899' 저장됨 · 옛 13자리(c4) 수정 창 = 원문이 칸에 보이고(지우라고) 그대로 저장하면 막힘 · 개인 체크를 끄면 indiv 0 · 13자리 원문은 검색 글·보이는 글(cliBizShown)·펼침에 없음
+  const m7 = miss41.length;
+  const X7 = mk41(), E7 = X7.env, H7 = (id) => E7.host(id); X7.api.render();
+  const form7 = (nm, bz, ind) => { X7.api.openModal(null); H7('cliName').value = nm; H7('cliBizNo').value = bz; H7('cliIndiv').checked = !!ind; };
+  const n7 = X7.api.clis().length;
+  const MSG7 = 'alert:' + "사업자번호 칸에는 13자리 번호(주민·법인등록번호 꼴)를 넣을 수 없습니다. 개인 거래처면 '개인 거래처(사업자 없음)'에 체크하고 번호 칸은 비워 두세요. (사업자번호를 둘 이상 적을 때는 쉼표로 나눠 주세요)";
+  form7('새고객', '900101-1234567'); X7.api.saveModal(); const s7 = [X7.api.clis().length - n7, E7.log.filter((l) => l === MSG7).length, E7.log.indexOf('focus:cliBizNo') >= 0];
+  form7('새고객', '9001011234567'); X7.api.saveModal(); s7.push(X7.api.clis().length - n7);
+  form7('개인손님', '900101-1234567', true); X7.api.saveModal(); const ind7 = X7.api.clis().find((c) => c.name === '개인손님') || {};
+  s7.push(ind7.biz_no, ind7.indiv, X7.api.clis().length - n7);
+  const sync7 = /document\.getElementById\("cliIndiv"\)\.checked = !!\(c && c\.indiv\); cliIndivSync\(\);/.test(fn41(html, 'openCliModal'));   // 창을 열 때 체크 상태로 칸 잠금을 맞춤(정적)
+  X7.api.openModal(null); H7('cliIndiv').checked = true; X7.api.sync(); s7.push(H7('cliBizNo').disabled, H7('cliBizNo').placeholder);
+  H7('cliIndiv').checked = false; X7.api.sync(); s7.push(H7('cliBizNo').disabled, H7('cliBizNo').placeholder);
+  form7('정상상사', '123-45-67899'); X7.api.saveModal(); s7.push((X7.api.clis().find((c) => c.name === '정상상사') || {}).biz_no);
+  X7.api.openModal('c4'); s7.push(H7('cliBizNo').value); X7.api.saveModal(); s7.push(cl41(X7, 'c4').updated, cl41(X7, 'c4').biz_no);
+  X7.api.openModal('c3'); s7.push(H7('cliIndiv').checked); H7('cliIndiv').checked = false; H7('cliBizNo').value = '555-55-55555'; X7.api.saveModal(); s7.push(cl41(X7, 'c3').indiv, cl41(X7, 'c3').biz_no);
+  X7.api.render(); openRow41(X7, 'c4'); const hd7 = X7.host._h;
+  s7.push(X7.api.shown(cl41(X7, 'c4')), X7.api.sText(cl41(X7, 'c4')).indexOf('9001011234567') < 0, hd7.indexOf('9001011234567') < 0 && hd7.indexOf('900101') < 0, X7.api.shown(cl41(X7, 'c3')) === '555-55-55555', X7.api.shown({ indiv: 1, biz_no: '' }));
+  // 검토(11/11 — 13자리 판정이 '숫자가 모두 13개'였다): 다른 번호와 함께 적은 주민번호·한 자리 더 친 14자리·전각 숫자·띄어쓰기·'ㅡ' 줄표 = 저장 막음(안내 1번씩)·보이는 글·검색 글 빈 글·옛 값이면 표·펼침에 원문 0('13자리(숨김)')
+  //   / 가린 번호·쉼표로 나눈 사업자번호 둘·10자리·전화번호 꼴 = 그대로 저장(막지 않음)
+  const BYP7 = ['900101-1234567 / 123-45-67890', '123-45-67890, 대표 900101-1234567', '900101-12345678', '９００１０１－１２３４５６７', '900101 1234567', '900101ㅡ1234567'];
+  const OK7 = ['900101-1******', '123-45-67890, 234-56-78901', '5556667777', '010-1234-5678'];
+  const a7 = E7.log.filter((l) => l === MSG7).length;
+  const byp7 = BYP7.map((v, i) => {
+    const n = X7.api.clis().length; form7('우회상사' + i, v); X7.api.saveModal();
+    const Y = mk41({ clis: [C041({ id: 'b1', name: '옛값상사', biz_no: v })], recs: [], procs: [] }); Y.api.render(); const ht = Y.host._h; openRow41(Y, 'b1'); const hd = Y.host._h;
+    const raw0 = [ht, hd].every((h) => h.indexOf(v) < 0 && h.indexOf('1234567') < 0 && h.indexOf('１２３４５６７') < 0) && /13자리\(숨김\)/.test(ht);
+    return [X7.api.clis().length - n, X7.api.biz13(v), X7.api.shown({ biz_no: v }), X7.api.hay({ biz_no: v }), Y.api.sText(cl41(Y, 'b1')).indexOf('1234567') < 0 && Y.api.sText(cl41(Y, 'b1')).indexOf('１２３４５６７') < 0, raw0].join(':');
+  });
+  const ok7 = OK7.map((v, i) => { const n = X7.api.clis().length; form7('정상거래' + i, v); X7.api.saveModal(); return [X7.api.clis().length - n, X7.api.biz13(v)].join(':'); });
+  const ba7 = E7.log.filter((l) => l === MSG7).length - a7;
+  T('v441 ⑦ 13자리 막음·개인 거래처: "900101-1234567"·"9001011234567" 저장 = 안내 1번씩(CLI_BIZ13_MSG — 쉼표 안내 포함)·저장 0·번호 칸 포커스 · 개인 거래처 체크 + 그 번호 = biz_no 빈 칸·indiv 1(저장 1) · 체크하면 번호 칸 잠금·자리 글 "개인 거래처 — 사업자번호 없음", 풀면 다시 "사업자번호 (선택)" · 10자리 123-45-67899 저장 · 옛 13자리 c4 수정 창 = 원문이 칸에(지우라고)·그대로 저장 = 막힘(고친 날·값 그대로) · 개인 c3 수정 창 체크 보임 → 끄고 번호 = indiv 0·번호 저장 · 13자리 원문은 보이는 글·검색 글·펼침 0 · 개인은 "개인(사업자 없음)" · 검토: 다른 번호와 함께·14자리·전각·띄어쓰기·ㅡ 줄표 6꼴 = 막음(안내 6)·숨김(표·펼침·검색 글·보이는 글·hay 0) / 가린 번호·쉼표로 나눈 둘·10자리·전화 꼴 = 저장',
+    JSON.stringify(s7) === JSON.stringify([0, 1, true, 0, '', 1, 1, true, '개인 거래처 — 사업자번호 없음', false, '사업자번호 (선택)', '123-45-67899', '9001011234567', '2026-03-01', '9001011234567', true, 0, '555-55-55555', '', true, true, true, '개인(사업자 없음)']) && sync7 && noMiss41(m7)
+    && byp7.every((s) => s === '0:true:::true:true') && ok7.every((s) => s === '1:false') && ba7 === BYP7.length,
+    JSON.stringify({ s7, sync7, byp7, ok7, ba7, miss: miss41.slice(m7) }));
+
+  // ⑧ [삭제] 확인 창(명세 — 종전 deleteCliFromModal에 확인 없음): 펼침 [삭제] 취소 = 그대로·확인 글(상호·지운 표시만 남김) → 확인 = del 1·고친 날 오늘·저장·줄 빠짐 · 수정 창 [삭제](폰 옛 목록·PC 같은 창) 취소 = 그대로 → 확인 = 지움 ·
+  //   c5 지운 뒤 그 이름의 기성·계약은 대장 밖 묶음 '사아'로 · 직원C(보기) 흉내 [삭제] = 그대로 · 직원D(수행) = 지움
+  const m8 = miss41.length;
+  const X8 = mk41(), E8 = X8.env; X8.api.render(); openRow41(X8, 'c2');
+  E8.confirmAns = false; press41(X8, 'data-cli-act', 'del'); const s8 = [cl41(X8, 'c2').del || 0, E8.log.filter((l) => l === 'confirm:' + "이 거래처를 대장에서 삭제할까요?\n다라 환경\n(지운 표시만 남깁니다 — 미수·계약 기록은 그대로이고, 그 이름은 표 아래 '대장에 없는 이름'으로 다시 보일 수 있습니다)").length];
+  E8.confirmAns = true; press41(X8, 'data-cli-act', 'del'); s8.push(cl41(X8, 'c2').del, cl41(X8, 'c2').updated, E8.log.filter((l) => l === 'cliSave').length, order41(X8.host._h).split(',').indexOf('c2'));
+  X8.api.setEditing('c5'); E8.confirmAns = false; X8.api.delModal(); s8.push(cl41(X8, 'c5').del || 0); E8.confirmAns = true; X8.api.setEditing('c5'); X8.api.delModal(); s8.push(cl41(X8, 'c5').del, X8.api.idx().out.map((o) => o.id).indexOf('out:사아') >= 0);
+  const Y8 = mk41({ user: U41.C }); Y8.api.render(); openRow41(Y8, 'c1'); fake41(Y8, 'del', 'c1'); s8.push(cl41(Y8, 'c1').del || 0);
+  const Z8 = mk41({ user: U41.D }); Z8.api.render(); openRow41(Z8, 'c6'); press41(Z8, 'data-cli-act', 'del'); s8.push(cl41(Z8, 'c6').del || 0);
+  const dm8 = /if \(c && !confirm\(cliDelMsg\(c\)\)\) return;/.test(fn41(html, 'deleteCliFromModal'));
+  T('v441 ⑧ [삭제] 확인 창: 펼침 [삭제] 취소 = 그대로·확인 글 1(상호 다라 환경·지운 표시만 남김) → 확인 = del 1·고친 날 2026-11-10·저장 1·줄 빠짐 · 수정 창 [삭제] 취소 = 그대로 → 확인 = 지움 → 그 이름(사아)의 기성·계약이 대장 밖 묶음으로 · 직원C 흉내 = 그대로 · 직원D(수행) = 지움 · deleteCliFromModal 확인 줄(정적)',
+    JSON.stringify(s8) === JSON.stringify([0, 1, 1, '2026-11-10', 1, -1, 0, 1, true, 0, 1]) && dm8 && noMiss41(m8), JSON.stringify({ s8, dm8, miss: miss41.slice(m8) }));
+
+  // ⑨ 펼침 하위 탭·계약 줄: c1 개요(키·값·같은 상호 1곳 더 안내) → 미수 (3) 탭 = 청구일 순 r3,r2,r1(경과 칩)·합 '8,500,000원 · 3건' → 계약 (2) 탭 = k1(진행)·k2(완료) 줄(누를 수 있음) → k1 누름 = 계약 탭 이동·
+  //   그 계약 펼침(개요)·계약 표 '완료' 칩·거래처 거르기가 k1을 거르면 이번만 풂 · 다른 줄(c5)을 펼치면 개요부터 · c5 관련 문서 (2)(사아공단 협약·사아 견적 — 짧은 상호 안내) · 직원D(계약 숨김) 계약 이동 = false
+  const m9 = miss41.length;
+  const X9 = mk41({ conChip: 'done' }); X9.api.render(); openRow41(X9, 'c1'); const h9a = X9.host._h;
+  const s9 = [tabs41(h9a), /같은 상호\(또는 사업자번호\)의 거래처가 대장에 1곳 더 있습니다/.test(h9a), kvVal41(h9a, '사업자번호'), kvVal41(h9a, '처리업소')];
+  press41(X9, 'data-cli-tab', 'rec'); const h9b = X9.host._h;
+  s9.push(tabs41(h9b), [...h9b.matchAll(/<tr><td>(2026-\d\d-\d\d)<\/td><td>([^<]*)<\/td><td><span class="rec-age (\w+)">(\d+)일<\/span><\/td><td class="num">([^<]*)<\/td><\/tr>/g)].map((m) => m.slice(1).join(':')).join('|'), /<div class="vs-dsub" style="margin-top:4px;">8,500,000원 · 3건<\/div>/.test(h9b));
+  press41(X9, 'data-cli-tab', 'con'); const h9c = X9.host._h;
+  s9.push(tabs41(h9c), [...h9c.matchAll(/<tr class="cli-conrow" data-cli-con="(\w+)" title="계약 탭에서 펼침"><td>([^<]*)<\/td><td><span class="(\w+)-chip">([^<]*)<\/span><\/td><td>([^<]*)<\/td><\/tr>/g)].map((m) => m.slice(1).join(':')).join('|'));
+  press41(X9, 'data-cli-con', 'k1'); s9.push(X9.api.con(), X9.env.log.filter((l) => /^tab:|^renderContracts:/.test(l)).join(','), X9.env.log.indexOf('qs:[data-cs-row="k1"]') >= 0);
+  openRow41(X9, 'c5'); const h9d = X9.host._h; s9.push(tabs41(h9d)); press41(X9, 'data-cli-tab', 'doc'); const h9e = X9.host._h;
+  s9.push(tabs41(h9e), [...h9e.matchAll(/<tr><td>(JW-[\d-]+)<\/td><td>([^<]*)<\/td><\/tr>/g)].map((m) => m[1] + ' ' + m[2]).join('|'), /상호가 짧아\(2자 이하\) 이름이 들어간 다른 문서가 섞였을 수 있습니다/.test(h9e));
+  const Z9 = mk41({ user: U41.D }); s9.push(Z9.api.goCon('k1'), Z9.env.log.some((l) => /^tab:/.test(l)));
+  T('v441 ⑨ 펼침 하위 탭·계약 줄: c1 개요* · 같은 상호 1곳 더 안내 · 사업자번호 123-45-67890 · 처리업소 아니오 → 미수 (3)* = r3 08-01 경과 101일 age90 · r2 09-01 70일 age60 · r1 10-20 21일 age0 · 금액 2,000,000·1,000,000·5,500,000 · 합 8,500,000원 · 3건 → 계약 (2)* = k1 ○○동 철거 진행 2026-09-01 · k2 석면철거 완료 2026-03-02 → k1 누름 = 계약 탭·conOpenId k1·개요·완료 칩 풂·그 줄로 굴림 · c5 펼침 = 개요부터 → 관련 문서 (2) = 사아공단 협약·사아 견적 + 짧은 상호 안내 · 직원D(계약 숨김) 이동 = false·탭 이동 0',
+    JSON.stringify(s9) === JSON.stringify(['개요*|미수 (3)|계약 (2)|관련 문서 (0)', true, '123-45-67890', '아니오',
+      '개요|미수 (3)*|계약 (2)|관련 문서 (0)', '2026-08-01:번호로 이어짐:age90:101:2,000,000|2026-09-01:9월 철거:age60:70:1,000,000|2026-10-20:10월 철거:age0:21:5,500,000', true,
+      '개요|미수 (3)|계약 (2)*|관련 문서 (0)', 'k1:○○동 철거:review:진행:2026-09-01|k2:석면철거:from:완료:2026-03-02',
+      'k1|ov||{}', 'tab:con,renderContracts:k1:ov::{}', true, '개요*|미수 (1)|계약 (1)|관련 문서 (2)', '개요|미수 (1)|계약 (1)|관련 문서 (2)*', 'JW-04-01-002 사아공단 협약|JW-04-01-003 사아 견적', true, false, false]) && noMiss41(m9),
+    JSON.stringify({ s9, miss: miss41.slice(m9) }));
+
+  // ⑩ 이메일·주소(거래처 수행만 — 명세 열·누가 보나): 1920 관리자·직원B·D = 열·펼침 개요·검색 글에 있음 / 직원C·E(보기) = 표·펼침 화면 글 어디에도 없음·검색 글에도 없음(이메일로 찾으면 0)
+  const m10 = miss41.length;
+  const ea10 = (u) => { const X = mk41({ width: 1920, user: u }); X.api.render(); openRow41(X, 'c1'); const h = X.host._h; const q = X.api.sText(cl41(X, 'c1')); X.api.setQ(X.api.def(), 'ga@ex'); return [h.indexOf('ga@ex.kr') >= 0, h.indexOf('포항시 남구 가나로 1') >= 0, q.indexOf('ga@ex.kr') >= 0, order41(X.host._h)].join(':'); };
+  const s10 = [U41.A, U41.B, U41.D, U41.C, U41.E].map(ea10);
+  T('v441 ⑩ 이메일·주소(거래처 수행만): 관리자·직원B·D = 표·펼침·검색 글에 있음(이메일로 찾으면 c1) · 직원C·E = 화면 글·검색 글 0(이메일로 찾으면 0건)',
+    JSON.stringify(s10) === JSON.stringify(['true:true:true:c1', 'true:true:true:c1', 'true:true:true:c1', 'false:false:false:', 'false:false:false:']) && noMiss41(m10), JSON.stringify({ s10, miss: miss41.slice(m10) }));
+
+  // ⑪ 폰 legacy(375): 옛 본문 renderClientsLegacy = v440 renderClients 본문 글자째(sha256) · cliRelatedDocs 무변(같은 계산) · 실행 = 옛 접는 줄 6·표 글 0·옛 검색칸 보임·제목 '6곳'(옛 본문)·[+ 거래처 추가] 보임 · 옛 [상세 ›] = 같은 이름 맞추기
+  //   (c1 '미수 3건 · 8,500,000원') · 1366(경계 한 번) = 표·옛 검색칸 숨김·제목 '6곳' → 다시 375 = 옛 목록·검색칸 되살림 · 폰에서 찾아가기(fromGs) = false
+  const LEG_SHA41 = '912da23c84606cf530731dc5765550b31a870919041f61fbf224089c164632eb', DOC_SHA41 = '95b7bd75fc3d30294f4174f3d2968d1bbe45718c9998f03ec3143fa0b9dc5c25';
+  const X11 = mk41({ width: 375 }), E11 = X11.env, H11 = (id) => E11.host(id); const r11 = X11.api.render();
+  const s11a = [r11 === undefined, (X11.host._h.match(/class="item asb-item"/g) || []).length, X11.host._h.indexOf('data-vs-') < 0, H11('cliSearch').style.display, H11('cliHead').textContent, H11('cliAddBtn').style.display, X11.host.getAttribute('data-vs-mode')];
+  const dt11 = X11.host.querySelector('[data-cli-detail="c1"]'); if (dt11) dt11.fire('click', { target: dt11 }); s11a.push((/<div class="crm-h">미수 <span>([^<]*)<\/span>/.exec(H11('cliDetailBody')._h) || ['', ''])[1]);
+  E11.width = 1366; E11.breakAll(); const s11b = [X11.host._h.indexOf('data-vs-table') > 0, H11('cliSearch').style.display, H11('cliHead').textContent, X11.host.getAttribute('data-vs-mode')];
+  E11.width = 375; E11.breakAll(); const s11c = [(X11.host._h.match(/class="item asb-item"/g) || []).length, H11('cliSearch').style.display, X11.host._h.indexOf('data-vs-table') < 0, X11.api.fromGs('가나', 'c1'), X11.api.inst(X11.api.def()).q];
+  const leg11 = sha41(body41('renderClientsLegacy')), doc11 = sha41(body41('cliRelatedDocs'));
+  T('v441 ⑪ 폰 legacy(375): 옛 본문 renderClientsLegacy = v440 renderClients 본문 글자째(sha256 ' + LEG_SHA41.slice(0, 12) + '…) · cliRelatedDocs 무변(' + DOC_SHA41.slice(0, 12) + '…) · 실행 = 옛 접는 줄 6·표 글 0·옛 검색칸 보임·제목 "6곳"·[+ 거래처 추가] block·자리 legacy · 옛 [상세 ›] c1 "3건 · 8,500,000원"(같은 이름 맞추기) → 1366 = 표·옛 검색칸 숨김·제목 "6곳" → 다시 375 = 옛 줄 6·검색칸 되살림·표 글 0 · 폰 찾아가기 false·검색어 안 넣음',
+    leg11 === LEG_SHA41 && doc11 === DOC_SHA41 && JSON.stringify(s11a) === JSON.stringify([true, 6, true, '', '6곳', 'block', 'legacy', '3건 · 8,500,000원'])
+    && JSON.stringify(s11b) === JSON.stringify([true, 'none', '6곳', 'sheet']) && JSON.stringify(s11c) === JSON.stringify([6, '', true, false, '']),
+    JSON.stringify({ leg: leg11.slice(0, 12), doc: doc11.slice(0, 12), s11a, s11b, s11c }));
+
+  // ⑫ 전역 검색 → 표: 검색칸 글 앞머리 = 전역 검색 hay(상호 · 사업자번호 보이는 글 · 상세 · 현장) · 기억(처리업소 칩·상호 거르기 '다라') 위에서 '가나'·c1 누름 = 칩·거르기 풀고 검색어 '가나'·c1 펼침·기기 기억 그대로 ·
+  //   gsSources 거래처 줄 = cliBizShown(13자리 숨김) · gsRun = 거래처 줄에 data-gs-id·cliSheetFromGs(gq, id)·기성 줄 그대로 · 표 검색칸에서 '123-45'(줄표 꼴)·'2223344444'(원문) 모두 찾음
+  const MEM12 = JSON.stringify({ k: '', d: 1, f: { name: '다라' }, chip: { st: 'proc' } });
+  const X12 = mk41({ store: { jw_cli_sheet: MEM12 } }); X12.api.render(); const pre12 = order41(X12.host._h);
+  const hay12 = (x) => (x.name || '') + ' ' + X12.api.hay(x) + ' ' + (x.detail || '') + ' ' + (x.site || '');   // 검토: 전역 검색 줄 = cliBizHay(개인·13자리 빈 글)
+  const head12 = X12.api.clis().filter((c) => c.del !== 1).every((c) => X12.api.sText(c).indexOf(hay12(c)) === 0);
+  const g12 = [pre12, X12.api.fromGs('가나', 'c1'), order41(X12.host._h), /data-vs-det="c1"/.test(X12.host._h), (X12.host.querySelector('[data-vs-q]') || {}).value, /class="vs-chip on" data-vs-chip="st\|"/.test(X12.host._h), X12.env.store.jw_cli_sheet === MEM12];
+  X12.api.setQ(X12.api.def(), '123-45'); g12.push(order41(X12.host._h)); X12.api.setQ(X12.api.def(), '2223344444'); g12.push(order41(X12.host._h));
+  const gs12 = /add\("cli","거래처",canSee\("cli"\),function\(\)\{return clients\.filter\(function\(c\)\{return c&&c\.del!==1;\}\);\},function\(x\)\{return x\.name\|\|"";\},function\(x\)\{return cliBizHay\(x\);\},"cliSearch"\);/.test(html)
+    && /if\(sid==="cliSearch" && cliSheetFromGs\(gq, el\.getAttribute\("data-gs-id"\)\)\) return;/.test(fn41(html, 'gsRun')) && /\(s\.tab==="cli"&&x&&x\.id\?' data-gs-id="'\+esc\(x\.id\)\+'"':''\)/.test(fn41(html, 'gsRun'))
+    && /\(s\.tab==="rec"&&x&&x\.id\?' data-gs-id="'\+esc\(x\.id\)\+'"':''\)/.test(fn41(html, 'gsRun'))
+    && /function cliSheetFromGs\(q, id\)\{ var def = cliSheetDef\(\); CLI_LINK = null; if \(!vsSheetSeek\(def, q\)\) return false; if \(id\) vsSheetReveal\(def, id\); return true; \}/.test(csb41);
+  T('v441 ⑫ 전역 검색 → 표: 검색칸 글 앞머리 = 전역 검색 hay(지운 것 빼고 전부) · 기억(처리업소 칩·상호 거르기 "다라" — 처음 c2) 위에서 "가나"·c1 누름 = true·c1,c6·c1 펼침·검색칸 "가나"·전체 칩·기기 기억 그대로 · 검색 "123-45" = c1 · "2223344444" = c5 · gsSources 거래처 줄 cliBizHay(검토 — 개인·13자리 빈 글) · gsRun 거래처 data-gs-id·cliSheetFromGs·기성 줄 그대로 · cliSheetFromGs = vsSheetSeek + vsSheetReveal',
+    head12 && JSON.stringify(g12) === JSON.stringify(['c2', true, 'c1,c6', true, '가나', true, true, 'c1', 'c5']) && gs12,
+    JSON.stringify({ head12, g12, gs12 }));
+
+  // ⑬ 새 거래처 열기·같은 거래처 확인: 기억 '처리업소' 칩 화면에서 [+ 거래처 추가] 저장 = 전체 칩으로 풀고 새 줄 펼침·굴림·기기 기억 그대로 · 기본 칩 = 새 줄 보이고 펼침 없음 · 폰 375 = 굴림 없음 ·
+  //   '가나 건설'(c1·c6과 같은 열쇠) 새로 넣기 = 확인 창(상호 같음) 취소면 저장 0 · 다른 이름 + c1 사업자번호 = 확인 창(사업자번호 같음) · c1 연락처만 고침 = 확인 창 없음 · 이름이 같아도 사업자번호가 서로 다르면 확인 없음
+  const MEM13 = JSON.stringify({ k: '', d: 1, f: {}, chip: { st: 'proc' } });
+  const add13 = (X, nm, bz) => { X.api.openModal(null); X.env.host('cliName').value = nm; X.env.host('cliBizNo').value = bz || ''; X.env.host('cliIndiv').checked = false; X.api.saveModal(); const L = X.api.clis(); return L[L.length - 1].id; };
+  const X13 = mk41({ store: { jw_cli_sheet: MEM13 } }); X13.api.render(); const id13 = add13(X13, '새로운상사');
+  const s13 = [cl41(X13, id13).name, /class="vs-chip on" data-vs-chip="st\|"/.test(X13.host._h), new RegExp('data-vs-det="' + id13 + '"').test(X13.host._h), X13.env.log.indexOf('into:' + id13) >= 0, X13.env.store.jw_cli_sheet === MEM13];
+  const Y13 = mk41(); Y13.api.render(); const id13b = add13(Y13, '또다른상사'); s13.push(new RegExp('data-vs-row="' + id13b + '"').test(Y13.host._h), Y13.host._h.indexOf('data-vs-det=') < 0);
+  const P13 = mk41({ width: 375 }); P13.api.render(); add13(P13, '폰상사'); s13.push(P13.env.log.some((l) => /^into:/.test(l)));
+  const Q13 = mk41(), LQ13 = Q13.env.log; Q13.api.render(); const n13 = Q13.api.clis().length; Q13.env.confirmAns = false;
+  add13(Q13, '가나 건설'); s13.push(Q13.api.clis().length - n13, LQ13.filter((l) => l === "confirm:대장에 같은 거래처가 있는 것 같습니다 — (주)가나건설 (상호 같음 — '(주)'·'주식회사'·띄어쓰기 무시)\n그래도 저장할까요?").length);
+  add13(Q13, '다른이름', '1234567890'); s13.push(Q13.api.clis().length - n13, LQ13.filter((l) => l === 'confirm:대장에 같은 거래처가 있는 것 같습니다 — (주)가나건설 (사업자번호 같음)\n그래도 저장할까요?').length);
+  const nq13 = LQ13.filter((l) => /^confirm:/.test(l)).length; Q13.api.openModal('c1'); Q13.env.host('cliPhone').value = '054-999-9999'; Q13.api.saveModal(); s13.push(cl41(Q13, 'c1').phone, LQ13.filter((l) => /^confirm:/.test(l)).length - nq13);
+  Q13.env.confirmAns = true; const nq13b = LQ13.filter((l) => /^confirm:/.test(l)).length; add13(Q13, '사아', '999-99-99999'); s13.push(LQ13.filter((l) => /^confirm:/.test(l)).length - nq13b, Q13.api.clis().length - n13);   // c5 사아(222-33-44444)와 상호는 같고 번호가 서로 다름 = 다른 회사
+  T('v441 ⑬ 새 거래처 열기·같은 거래처 확인: 기억 처리업소 칩에서 [+ 거래처 추가] = 전체 칩으로 풀고 새 줄 펼침·굴림·기기 기억 그대로 · 기본 칩 = 새 줄 보이고 펼침 없음 · 폰 375 = 굴림 없음 · "가나 건설" = 확인 창(상호 같음)·취소면 저장 0 · "다른이름" + c1 번호 = 확인 창(사업자번호 같음) · c1 연락처만 고침 = 확인 0·저장 · 같은 상호라도 사업자번호가 서로 다르면 확인 0·저장',
+    JSON.stringify(s13) === JSON.stringify(['새로운상사', true, true, true, true, true, true, false, 0, 1, 0, 1, '054-999-9999', 0, 0, 1]), JSON.stringify(s13));
+
+  // ⑭ 넓힘·CSS·정적: #view-cli 본문 폭(1024 791 · 1366 1,097 · 1920 1,428 ±2 — 860부터 max-width none, 859 이하 규칙 없음) · .cli-unp 빨강 · 계약 줄 커서 · @cli-sheet 구간 —
+  //   배선 = 펼침 칸 root 하나(cliSheetBindAct) · 부품 부름 = 그리기 1·다시 그리기(칩 건수 그대로) 1·찾아가기 1·그 행 열기 2 · 구간 안 localStorage 0 · 입구 renderClients 한 곳(구간 안)·옛 본문은 구간 밖 ·
+  //   switchTab 거래처 줄 · section·자리·옛 검색칸·수정 창 개인 거래처 체크(HTML) · 모든 시험 틀에서 자리(cliList)에 건 리스너 0
+  const w14 = [1024, 1366, 1920].map((w) => Math.round(viewW41(w)));
+  const css14 = decl41(1366, '#view-cli', 'max-width') === 'none' && decl41(859, '#view-cli', 'max-width') == null && decl41(1366, '.cli-unp', 'color') === '#B0332A' && decl41(1366, '.vs-hist tr.cli-conrow', 'cursor') === 'pointer';
+  const ael14 = (csb41.match(/addEventListener\(/g) || []).length, root14 = (csb41.match(/root\.addEventListener\("click"/g) || []).length;
+  const st14 = (csb41.match(/\bvsSheetRender\(/g) || []).length === 1 && (csb41.match(/\bvsSheetRenderKeep\(/g) || []).length === 1 && (csb41.match(/\bvsSheetSeek\(/g) || []).length === 1 && (csb41.match(/\bvsSheetReveal\(/g) || []).length === 2 && !/localStorage/.test(csb41)
+    && (html.match(/function renderClients\(/g) || []).length === 1 && csb41.indexOf('function renderClients(') > 0 && csb41.indexOf('function renderClientsLegacy(') < 0 && csb41.indexOf('function openCliDetail(') < 0
+    && /\n    if \(name === "cli"\) cliSheetOnTab\(\);/.test(fn41(html, 'switchTab')) && (fn41(html, 'switchTab').match(/renderClients\(/g) || []).length === 0
+    && /function cliSheetOnTab\(\)\{ cliReloadIfUnread\(\); if \(cliSheetCur !== "legacy"\) renderClients\(\); \}/.test(csb41)
+    && /<section class="view" id="view-cli">/.test(html) && /<div class="card" id="cliList"><div class="loading">불러오는 중…<\/div><\/div>/.test(html) && /<input type="search" id="cliSearch" /.test(html)
+    && /<label [^>]*><input type="checkbox" id="cliIndiv"> 개인 거래처\(사업자 없음\)/.test(html) && /document\.getElementById\("cliIndiv"\)\.addEventListener\("change", cliIndivSync\);/.test(html)
+    && /function openCliDetail\(id\)\{\n    cliLinkReset\(\);/.test(html.replace(/\r\n/g, '\n'));
+  const hostL14 = [X1, X3, X4, X5, X6, X7, X8, X9, X11, X12, X13, Y6, Y8, Z8, Q13].some((X) => X.env.log.some((l) => /^host-listener:cliList:/.test(l)));
+  T('v441 ⑭ 넓힘·CSS·정적: #view-cli 본문 폭 1024 ' + w14[0] + ' · 1366 ' + w14[1] + ' · 1920 ' + w14[2] + '(명세 791 · 1,097 · 1,428 ±2 — 860부터 max-width none·859 이하 규칙 없음) · .cli-unp 빨강·계약 줄 커서 · @cli-sheet 배선 = 펼침 칸 root 하나 · 부품 부름 = 그리기 1·다시 그리기 1·찾아가기 1·그 행 열기 2 · 구간 안 localStorage 0 · 입구 renderClients 한 곳(구간 안)·옛 본문·옛 상세 창은 구간 밖 · switchTab 거래처 줄 = cliSheetOnTab(검토 — 못 읽은 대장 다시 읽기·폰 옛 목록은 다시 그리지 않음, switchTab 안 renderClients 0) · section·자리·옛 검색칸·개인 거래처 체크·배선(HTML) · 옛 상세 창 첫 줄 cliLinkReset · 자리(cliList)에 건 리스너 0(모든 시험 틀)',
+    Math.abs(w14[0] - 791) <= 2 && Math.abs(w14[1] - 1097) <= 2 && Math.abs(w14[2] - 1428) <= 2 && css14 && ael14 === 1 && root14 === 1 && st14 && !hostL14,
+    JSON.stringify({ w14, css14, ael14, root14, st14, hostL14 }));
+
+  // ⑮ 연속 누름 막기: 대장 밖 새발주처 [대장에 추가] = 새 거래처 → 바로(0.5초 안) 사아공단 줄 [대장에 추가] = 버림 → 1초 뒤 = 만듦 · 더블클릭 둘째 누름(detail 2) = 버림 · 하위 탭 누름은 막지 않음
+  const m15 = miss41.length;
+  const X15 = mk41(), s15 = []; X15.api.render(); grp41(X15); openRow41(X15, 'out:새발주처'); const n15 = X15.api.clis().length;
+  press41(X15, 'data-cli-act', 'addout'); s15.push(X15.api.clis().length - n15);
+  openRow41(X15, 'out:사아공단'); press41(X15, 'data-cli-act', 'addout', { fast: true }); s15.push(X15.api.clis().length - n15);
+  X15.env.now += 600; press41(X15, 'data-cli-act', 'addout', { fast: true, detail: 2 }); s15.push(X15.api.clis().length - n15);
+  press41(X15, 'data-cli-act', 'addout'); s15.push(X15.api.clis().length - n15);
+  openRow41(X15, 'c1'); press41(X15, 'data-cli-tab', 'rec', { fast: true }); s15.push(tabs41(X15.host._h));
+  T('v441 ⑮ 연속 누름 막기: 대장에 추가 = 1 → 0.5초 안 다른 줄 누름 버림(1) → 더블클릭 둘째 누름 버림(1) → 1초 뒤 = 2 · 하위 탭 누름은 막지 않음(미수 (3)*)',
+    JSON.stringify(s15) === JSON.stringify([1, 1, 1, 2, '개요|미수 (3)*|계약 (2)|관련 문서 (0)']) && noMiss41(m15), JSON.stringify({ s15, miss: miss41.slice(m15) }));
+
+  // ⑯ 폰 sheet 준비(phone 한 줄만 바꾸면 되게): 정의 검사 통과 · 열 3 = 상호 --pw 38%·연락처 36%·미수 26%(직원D = 미수 없이 52·48) · 합계 '합계 6곳||미수' · 줄 누름 = 표 아래 상세 카드(하위 탭·개요)
+  const m16 = miss41.length;
+  const X16 = mk41({ width: 375 }), d16 = Object.assign({}, X16.api.def(), { phone: 'sheet' }); X16.api.vs(d16);
+  const cg16 = (h) => [...h.matchAll(/<col data-vs-col="(\w+)" style="([^"]*)">/g)].map((m) => m[1] + '=' + m[2]).join(',');
+  const h16 = X16.host._h, c16 = cg16(h16), f16 = foot41(h16);
+  openRow41(X16, 'c1'); const dc16 = [/<div class="vs-detcard" data-vs-detcard="c1">/.test(X16.host._h), X16.host._h.indexOf('<tr class="vs-det">') < 0, tabs41(X16.host._h)];
+  const X16d = mk41({ width: 375, user: U41.D }), d16d = Object.assign({}, X16d.api.def(), { phone: 'sheet' }); X16d.api.vs(d16d); const c16d = cg16(X16d.host._h);
+  T('v441 ⑯ 폰 sheet 준비: 정의 검사 통과 · 열 3 = name --pw 38%·phone 36%·unpaid 26% · 직원D(미수 없음) = 52%·48% · 합계 "합계 6곳||9,200,000원 · 4건" · 줄 누름 = 표 아래 상세 카드(표 안 펼침 없음)·하위 탭 개요*·미수 (3)·계약 (2)·관련 문서 (0)',
+    X16.api.check(d16).length === 0 && c16 === 'name=--pw:38%;,phone=--pw:36%;,unpaid=--pw:26%;' && c16d === 'name=--pw:52%;,phone=--pw:48%;' && f16 === '합계 6곳||<span title="미수 9,200,000원 · 4건">9,200,000원 · 4건</span>'   // 폰 sheet 준비 합계는 건수까지(11/11 PC만 금액만으로 바꿈)
+    && JSON.stringify(dc16) === JSON.stringify([true, true, '개요*|미수 (3)|계약 (2)|관련 문서 (0)']) && noMiss41(m16),
+    JSON.stringify({ c16, c16d, f16, dc16, miss: miss41.slice(m16) }));
+
+  // ⑰ 문서 — FEATURES 기준 ≥ v441·v441 절(문장 고정)·자리 글 GATES_V441 0 · TESTLIST v441 = 화면 칸 '[ ]/[x] (AI 시험 화면 대상'(≥5 — PM 몫 0) + 게이트 칸 '[x] (AI) `uismoke`'(5종·결함 심기) ·
+  //   MANUAL 10절(PC 표·사업자번호 표시·칩·하위 탭·대장에 없는 이름·13자리·개인 거래처·같은 거래처 확인·삭제 확인·휴대폰 목록 — 옛 '상세 ›를 누르면 … 한 번에 보입니다' 없앰)·35절(상세 › = 폰 목록) · CLAUDE.md 거래처 표 줄·화면 폭·부품 줄 · sw ≥ 441
+  const ft17 = rd41('FEATURES.md'), tl17 = rd41('TESTLIST.md'), man17 = rd41('MANUAL.html'), cl17 = rd41('CLAUDE.md'), sw17 = rd41('sw.js');
+  const sec17 = (src, head) => { const i = src.indexOf(head); if (i < 0) return ''; const j = src.indexOf(head.slice(0, head.indexOf(' ') + 1), i + head.length); return src.slice(i, j < 0 ? src.length : j); };
+  const ftv17 = sec17(ft17, '\n### v441 (11/11)'), tlv17 = sec17(tl17, '\n## v441 ');
+  const FT_PINS41 = ['**표 한 장(PC 860px 이상)**', '`// @cli-sheet-start ~ end`', '**열 10(명세 순서)·권한**', '`cliSheetDef`', '**사업자번호 칸**', '**13자리(주민·법인등록번호 꼴)는 저장에서 막는다**', '**줄 누르기 = 펼침 · 하위 탭**', '**[삭제] 확인 창**',
+    '**대장에 없는 이름 묶음(결정 ④)**', '`cliSheetAddOut`', '**이름 맞추기(AI 결정 R1', '`cliNameKey`', '**한 번에 묶어 셈**', '**실측(운영 백업', '대장 밖 묶음 줄 5', '**합계 줄(묶음 줄 빼고)**', '**같은 거래처 확인**', '**새 거래처**', '`cliSheetShowNew`',
+    '**폰(859px 이하)은 지금 화면 그대로**', '`renderClientsLegacy`', '`#view-cli`', '**칸 폭(실측)**', '694 / 1280 962 / 1600 1,282', '지시·기성·거래처 3개'];
+  const CL_PINS41 = ['**거래처 표(v441 — 45-1 넷째 판)**', '`// @cli-sheet-start ~ end`', '`renderClientsLegacy`', '`cliSheetDef`', '`cliNameKey`', '`cliLinkIdx`', '`cliSheetAddOut`', '`CLI_BIZ13_MSG`', '`CLI_ACT_GAP`', 'v441에 거래처 `#view-cli`', "'지시·기성·거래처 3개'"];
+  const tcb17 = tlv17.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l));
+  const cbScr17 = tcb17.filter((l) => /^- \[[ x]\] \(AI 시험 화면 대상[,) —]/.test(l)), cbGate17 = tcb17.filter((l) => /^- \[x\] \(AI\) `uismoke`\(/.test(l));
+  const man10 = (() => { const i = man17.indexOf('<h2 id="s10">'), j = man17.indexOf('<h2 id="s11">'); return i < 0 || j < i ? '' : man17.slice(i, j); })();
+  const man35 = (() => { const i = man17.indexOf('<h2 id="s35">'); return i < 0 ? '' : man17.slice(i, man17.indexOf('</div>', i)); })();
+  const MAN10_PINS41 = ['<b>PC(넓은 화면) — 표</b> (2026-11 v441)', "<b>'(주)'·'주식회사'·띄어쓰기를 빼고</b>", '<b>미입력</b>', '<b>개인(사업자 없음)</b>', '<b>13자리(숨김)</b>', '<b>주민등록번호 같은 13자리 번호는 사업자번호 칸에 넣을 수 없습니다</b>',
+    '<span class="btn">미수 (n)</span>', '<span class="btn">계약 (n)</span>', '<b>대장에 없는 이름</b>', '<span class="btn">대장에 추가</span>', '"그래도 저장할까요?"', '삭제는 확인 창을 거칩니다', '<b>휴대폰 — 목록</b> (예전 모양 그대로)'];
+  T('v441 ⑰ 문서: FEATURES 기준 ≥ v441·v441 절(표 한 장·열 권한·칩·사업자번호 칸·13자리 막음·하위 탭·삭제 확인·대장 밖 묶음·이름 맞추기·한 번에 묶어 셈·실측·합계 줄·같은 거래처 확인·새 거래처·폰 legacy·넓힘·칸 폭 실측·단계 합·검사 고침 — 문장 고정)·자리 글 GATES_V441 0 · TESTLIST v441 = 화면 칸 "[ ] (AI 시험 화면 대상"(≥5 — 1366·1920 표·펼침·대장에 추가·보기 권한·13자리·폰 375) + 게이트 칸 1개 "[x] (AI) `uismoke`"(consheet_check·proctpl_check·settletest·servertest·결함 심기) · PM 0 · MANUAL 10절(PC 표·폰 목록 — 옛 "상세 ›를 누르면 … 한 번에" 없앰)·35절(상세 › = 휴대폰 목록) · CLAUDE.md 거래처 표 줄·화면 폭·부품 줄 · sw ≥ 441',
+    Number((ft17.match(/기준: v(\d+) /) || [0, 0])[1]) >= 441 && ftv17.length > 0 && FT_PINS41.every((s) => ftv17.indexOf(s) > 0) && ftv17.indexOf('GATES_V441') < 0
+    && tlv17.length > 0 && cbScr17.length >= 5 && cbGate17.length === 1 && tcb17.length === cbScr17.length + 1 && tcb17.every((l) => l.indexOf('PM') < 0) && tlv17.indexOf('GATES_V441') < 0
+    && ['`consheet_check`', '`proctpl_check`', '`settletest`', '`servertest`', '결함 심기'].every((g) => cbGate17[0].indexOf(g) > 0)
+    && cbScr17.some((l) => l.indexOf('1366') > 0 && l.indexOf('1920') > 0) && cbScr17.some((l) => l.indexOf('375') > 0) && cbScr17.some((l) => l.indexOf('보기') > 0) && cbScr17.some((l) => l.indexOf('[대장에 추가]') > 0) && cbScr17.some((l) => l.indexOf('13자리') > 0)
+    && MAN10_PINS41.every((s) => man10.indexOf(s) > 0) && man10.indexOf('<span class="btn">상세 ›</span>를 누르면 그 거래처의 미수·계약·관련 문서가 한 번에 보입니다') < 0 && man35.indexOf('휴대폰 목록에서 거래처 줄을 펼쳐 <span class="btn">상세 ›</span>를 누르면') > 0
+    && CL_PINS41.every((s) => cl17.indexOf(s) > 0) && Number((sw17.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 441,
+    JSON.stringify({ ft: FT_PINS41.filter((s) => ftv17.indexOf(s) < 0).map((s) => s.slice(0, 30)), gates: [ftv17.indexOf('GATES_V441'), tlv17.indexOf('GATES_V441')], cl: CL_PINS41.filter((s) => cl17.indexOf(s) < 0), man10: MAN10_PINS41.filter((s) => man10.indexOf(s) < 0), man35: man35.indexOf('휴대폰 목록에서'), cb: tcb17.length, scr: cbScr17.length, gate: cbGate17.length, pm: tcb17.filter((l) => l.indexOf('PM') >= 0).map((l) => l.slice(0, 40)), sw: (sw17.match(/jw-shell-v(\d+)/) || [0, 0])[1] }));
+
+  // ---- v441 검토 반영(11/11 — 검토 2관점 '권한·개인정보'·'연결 정확성'·'회귀' 지적 13건 중 고친 것) ----
+  // ⑱ 대장을 못 읽었을 때(cliLoaded false — 읽는 중·GET 실패·404·로그아웃 뒤): 빈 대장이면 계약·기성 상호가 모두 '대장에 없음'으로 보이고, [대장에 추가]가 base 없는 저장으로 서버 대장을 통째로 바꿀 수 있었다 →
+  //   관리자 표 = 대장 밖 묶음 없음·'불러오는 중' 안내 · [대장에 추가](누름 길) = 안내 CLI_UNREAD_MSG·새 거래처 0·저장 0 · 추가 창 [저장] = 안내·저장 0·창 열린 채 · 탭에 오면 다시 읽기(cliLoad) ·
+  //   읽은 뒤 = 묶음(빈 대장이면 계약·기성 상호 7곳) · 대장 줄이 메모리에 남아 있어도(404 뒤 등) 묶음 없음 · 읽은 빈 대장 + 원천 0 = '등록된 거래처가 없습니다.' ·
+  //   정적: loadClients 200 = 읽음·고친 표시 비움(읽음으로 바꾸는 곳은 여기뿐) / 404 = 못 읽음 · saveClients 첫 줄 · clearSessionData · online 처리기 · cliSheetRows · 창 저장·[대장에 추가] 첫 막음
+  const m18 = miss41.length;
+  const MSGU41 = 'alert:' + '거래처 대장을 아직 읽지 못했습니다 — 잠시 뒤 다시 해 보시고, 계속 이러면 새로고침한 뒤 다시 해 주세요. (읽기 전에 저장하면 서버 대장이 이 화면 목록으로 바뀔 수 있어 막습니다)';
+  const X18 = mk41({ clis: [], loaded: false }), E18 = X18.env, L18 = E18.log; X18.api.render(); const h18 = X18.host._h;
+  const s18 = [/data-vs-grp="out"/.test(h18), /거래처 대장을 불러오는 중입니다 — 계속 비어 있으면 새로고침해 주세요\./.test(h18)];
+  X18.api.act('addout', 'out:가나건설'); s18.push(X18.api.clis().length, L18.filter((l) => l === MSGU41).length, L18.filter((l) => l === 'cliSave').length);
+  X18.api.openModal(null); E18.host('cliName').value = '새상사'; X18.api.saveModal();
+  s18.push(X18.api.clis().length, L18.filter((l) => l === MSGU41).length, L18.filter((l) => l === 'cliSave').length, E18.host('cliBackdrop').classList.contains('show'));
+  X18.api.onTab(); s18.push(L18.filter((l) => l === 'cliLoad').length);
+  X18.api.setLoaded(true); X18.api.render(); s18.push((/data-vs-grp="out"[\s\S]*?<span class="n">(\d+)곳<\/span>/.exec(X18.host._h) || ['', ''])[1]);
+  const Y18 = mk41({ loaded: false }); Y18.api.render(); const y18 = [/data-vs-grp="out"/.test(Y18.host._h), cnt41(Y18.host._h), order41(Y18.host._h)];
+  const Z18 = mk41({ clis: [], recs: [], procs: [] }); Z18.api.render(); const z18 = /<div class="empty-line">등록된 거래처가 없습니다\.<\/div>/.test(Z18.host._h);
+  const lc18 = fn41(html, 'loadClients').replace(/\r\n/g, '\n'), sc18 = fn41(html, 'saveClients').replace(/\r\n/g, '\n'), cs18 = fn41(html, 'clearSessionData');
+  const onl18 = (() => { const i = html.indexOf('window.addEventListener("online"'), j = html.indexOf('// ---- 탭 ----', i); return i < 0 || j < i ? '' : html.slice(i, j); })();
+  const st18 = /if \(resp\.status === 404\)\{ cliSha = null; clients = \[\]; cliLoaded = false; renderClients\(\); return; \}/.test(lc18) && /clients = \(p && p\.items\) \|\| \[\]; cliLoaded = true; cliDirty = \{\}; renderClients\(\);/.test(lc18)
+    && (html.match(/cliLoaded = true/g) || []).length === 1 && /^function saveClients\(retried\)\{\n    var token = getToken\(\); if \(!token\) return;\n    if \(!cliLoaded\) return;/.test(sc18)
+    && /cliLoaded = false; cliDirty = \{\};/.test(cs18) && /\n    cliReloadIfUnread\(\);/.test(onl18) && /function cliReloadIfUnread\(\)\{ if \(!cliLoaded && !cliLoading\) loadClients\(\); \}/.test(html)
+    && /\n    cliLoading\+\+;\n/.test(lc18) && /\}\)\.catch\(function\(\)\{ renderClients\(\); \}\)\.then\(function\(\)\{ cliLoading--; \}, function\(\)\{ cliLoading--; \}\);/.test(lc18)
+    && /function cliSheetRows\(\)\{ var x = cliLinkIdx\(\); return \(canDo\("cli"\) && cliLoaded\) \? x\.live\.concat\(x\.out\) : x\.live\.slice\(\); \}/.test(csb41)
+    && /\n    if \(!canDo\("cli"\)\) return;\n    if \(!cliLoaded\)\{ alert\(CLI_UNREAD_MSG\); return; \}/.test(fn41(html, 'saveCliModal').replace(/\r\n/g, '\n')) && /if \(!cliLoaded\)\{ alert\(CLI_UNREAD_MSG\); return false; \}/.test(fn41(csb41, 'cliSheetAddOut'));
+  T('v441 ⑱ 검토 — 대장을 못 읽었을 때: 관리자 빈 대장 = 묶음 없음·"불러오는 중" 안내 · [대장에 추가] = 안내 1·새 거래처 0·저장 0 · 추가 창 [저장] = 안내 1·저장 0·창 열린 채 · 탭에 오면 다시 읽기 1 · 읽은 뒤 = 묶음 7곳 · 대장 줄이 메모리에 있어도 못 읽음이면 묶음 없음(보이는 6곳 / 전체 6곳) · 읽은 빈 대장·원천 0 = "등록된 거래처가 없습니다." · 정적(loadClients 200 읽음·404 못 읽음 · 읽음으로 바꾸는 곳 1 · saveClients·창 저장·[대장에 추가] 첫 막음 · clearSessionData · online 처리기 · cliSheetRows)',
+    JSON.stringify(s18) === JSON.stringify([false, true, 0, 1, 0, 0, 2, 0, true, 1, '7']) && JSON.stringify(y18) === JSON.stringify([false, '보이는 6곳 / 전체 6곳', ORD41]) && z18 && st18 && noMiss41(m18),
+    JSON.stringify({ s18, y18, z18, st18, miss: miss41.slice(m18) }));
+
+  // ⑲ 거래처 저장 409(그사이 다른 기기가 저장 — 종전엔 소리 없이 삼켜 이 저장과 그 뒤 이 기기 저장이 새로고침 때까지 모두 버려졌다): 실제 함수(loadClients·saveClients·cliSaveConflict·cliMergeRemote·cliMarkDirty·cliTwinOf·
+  //   cliNameKey·cliDigits·b64*)를 차례대로 답하는 가짜 fetch로 — ① 409 → 다시 읽기 → 합친 목록을 한 번 더 저장(고친 a1 = 이 기기 · 안 고친 b1 = 서버(다른 기기 수정) · 서버 새 r1 · 이 기기 새 n1 끝에), 성공 뒤 고친 표시 비움·알림 0 ·
+  //   ② 다른 기기가 같은 거래처('사아')를 먼저 넣고 이 기기가 '(주)사아'를 넣음 = 둘 다 남기고 알림 1 ③ 409 두 번 = '계속 바뀌어' 알림·요청 3번에서 멈춤·고친 표시 남음 ④ 다시 읽기 실패 = '이번 저장이 들어가지 않았습니다' 알림 ·
+  //   ⑤ 못 읽은 대장 = 요청 0 ⑥ 보내는 사이 또 고친 거래처는 성공해도 고친 표시가 남음 · 안 고친 성공 = 비움 ⑦ loadClients 200 = 읽음·서버 목록·고친 표시 비움 / 404 = 못 읽음·빈 목록 / 실패 = 그대로
+  const flush41 = () => new Promise((r) => setTimeout(r, 0));
+  const RS19 = ['cliNameKey', 'cliDigits', 'cliTwinOf', 'cliMarkDirty', 'loadClients', 'cliReloadIfUnread', 'saveClients', 'cliSaveConflict', 'cliMergeRemote', 'b64DecodeUnicode', 'b64EncodeUnicode'].map((n) => fn41(html, n));
+  const mk19 = (local, loaded, q) => {
+    const env = { calls: [], sent: [], log: [], q: q.slice(), local, loaded };
+    const src = ['var clients = ENV.local, cliSha = null, cliLoaded = ENV.loaded, cliDirty = {}, cliLoading = 0, CLIENT_API = "https://api.github.com/repos/x/contents/data/clients.json";',
+      'function getToken(){ return "t"; } function ghHeaders(){ return {}; } function renderClients(){ ENV.log.push("render"); } function alert(m){ ENV.log.push("alert:" + m); }',
+      'function fetch(u, o){ var m = (o && o.method) || "GET", r = ENV.q.shift() || { status: 599 }, body; ENV.calls.push(m + ":" + r.status);',
+      '  if (m === "PUT"){ try { ENV.sent.push(JSON.parse(b64DecodeUnicode(JSON.parse(o.body).content)).items.map(function(c){ return c.id + "=" + (c.note || "") + (c.del === 1 ? "(del)" : ""); }).join(",")); } catch(e){ ENV.sent.push("?"); } }',
+      '  body = r.items ? { sha: "gw", content: b64EncodeUnicode(JSON.stringify({ schema: 1, items: r.items })) } : (m === "PUT" && r.status === 200 ? { content: { sha: "gw" } } : {});',
+      '  return Promise.resolve({ status: r.status, ok: r.status >= 200 && r.status < 300, json: function(){ return Promise.resolve(body); } }); }']
+      .concat(RS19, ['return { save: saveClients, load: loadClients, reload: cliReloadIfUnread, mark: cliMarkDirty, clis: function(){ return clients; }, dirty: function(){ return JSON.stringify(cliDirty); }, loaded: function(){ return cliLoaded; }, loading: function(){ return cliLoading; } };']).join('\n');
+    return { api: new Function('ENV', src)(env), env };
+  };
+  const CL19 = (id, nm, note) => ({ id, name: nm, biz_no: '', note, updated: '2026-11-01' });
+  const al19 = (E) => E.log.filter((l) => /^alert:/.test(l)).map((l) => l.slice(6)).join('|');
+  const A19 = mk19([CL19('a1', '가나', 'old'), CL19('b1', '다라', 'old')], true, [{ status: 409 }, { status: 200, items: [CL19('a1', '가나', 'server'), CL19('b1', '다라', 'other'), CL19('r1', '사아', 'remote')] }, { status: 200 }]);
+  A19.api.clis()[0].note = 'mine'; A19.api.mark('a1'); A19.api.clis().push(CL19('n1', '신규', 'new')); A19.api.mark('n1'); A19.api.save(); await flush41(); await flush41();
+  const s19 = [A19.env.calls.join(','), A19.env.sent.join(' / '), A19.api.dirty(), al19(A19.env), A19.env.log.filter((l) => l === 'render').length];
+  const B19 = mk19([CL19('a1', '가나', 'old')], true, [{ status: 409 }, { status: 200, items: [CL19('a1', '가나', 'old'), CL19('r2', '사아', 'remote')] }, { status: 200 }]);
+  B19.api.clis().push(CL19('n2', '(주)사아', 'mine')); B19.api.mark('n2'); B19.api.save(); await flush41(); await flush41();
+  s19.push(B19.env.sent.join(' / '), B19.env.log.filter((l) => /^alert:/.test(l)).join('|'));
+  const C19 = mk19([CL19('a1', '가나', 'old')], true, [{ status: 409 }, { status: 200, items: [CL19('a1', '가나', 'x')] }, { status: 409 }, { status: 200 }]);
+  C19.api.clis()[0].note = 'mine'; C19.api.mark('a1'); C19.api.save(); await flush41(); await flush41();
+  s19.push(C19.env.calls.join(','), al19(C19.env), C19.api.dirty());
+  const D19 = mk19([CL19('a1', '가나', 'old')], true, [{ status: 409 }, { status: 500 }]); D19.api.mark('a1'); D19.api.save(); await flush41(); await flush41();
+  s19.push(D19.env.calls.join(','), al19(D19.env));
+  const E19 = mk19([CL19('a1', '가나', 'old')], false, [{ status: 200 }]); E19.api.mark('a1'); E19.api.save(); await flush41(); s19.push(E19.env.calls.length);
+  const F19 = mk19([CL19('a1', '가나', 'old')], true, [{ status: 200 }]); F19.api.mark('a1'); F19.api.save(); F19.api.mark('a1'); await flush41(); await flush41(); s19.push(F19.api.dirty());
+  const G19 = mk19([CL19('a1', '가나', 'old')], true, [{ status: 200 }]); G19.api.mark('a1'); G19.api.save(); await flush41(); await flush41(); s19.push(G19.api.dirty());
+  const H19 = mk19([CL19('z1', 'z', 'z')], false, [{ status: 200, items: [CL19('s1', '서버', 's')] }]); H19.api.mark('z1'); H19.api.load(); await flush41(); await flush41();
+  const I19 = mk19([CL19('z1', 'z', 'z')], true, [{ status: 404 }]); I19.api.load(); await flush41(); await flush41();
+  const J19 = mk19([CL19('z1', 'z', 'z')], true, [{ status: 500 }]); J19.api.load(); await flush41(); await flush41();
+  s19.push([H19.api.loaded(), ids41(H19.api.clis()), H19.api.dirty()].join(':'), [I19.api.loaded(), I19.api.clis().length].join(':'), [J19.api.loaded(), ids41(J19.api.clis())].join(':'));
+  // ⑧ 고치는 길마다 고친 표시(cliMarkDirty — 빠지면 409 병합 때 그 고침이 서버 것에 덮임): 수정 창 저장(c1) · 수정 창 삭제(c5) · 표 [삭제](c2) · [대장에 추가](새 거래처) · 취소한 삭제는 표시 없음
+  const m19 = miss41.length, K19 = mk41(), EK19 = K19.env; K19.api.render(); K19.api.openModal('c1'); EK19.host('cliPhone').value = '054-000-0000'; K19.api.saveModal();
+  K19.api.setEditing('c5'); K19.api.delModal(); openRow41(K19, 'c2'); press41(K19, 'data-cli-act', 'del');
+  EK19.confirmAns = false; openRow41(K19, 'c6'); press41(K19, 'data-cli-act', 'del'); EK19.confirmAns = true;
+  grp41(K19); openRow41(K19, 'out:새발주처'); press41(K19, 'data-cli-act', 'addout');
+  s19.push(K19.api.dirty());
+  // ⑨ 못 읽은 대장 다시 읽기(cliReloadIfUnread — 탭 이동·온라인)는 읽는 중이면 또 읽지 않음(겹친 늦은 답이 그사이 고친 목록·고친 표시를 덮지 않게) · 실패 뒤 = 다시 읽음 · 읽은 뒤 = 안 읽음
+  const M19 = mk19([], false, [{ status: 500 }, { status: 200, items: [CL19('s2', '서버2', 's')] }]);
+  M19.api.reload(); const mA19 = M19.api.loading(); M19.api.reload(); M19.api.reload(); await flush41(); await flush41();
+  const mB19 = [M19.env.calls.join(','), M19.api.loading(), M19.api.loaded()].join(':');
+  M19.api.reload(); await flush41(); await flush41(); const mC19 = [M19.env.calls.join(','), M19.api.loaded(), ids41(M19.api.clis()), M19.api.loading()].join(':');
+  M19.api.reload(); await flush41(); s19.push([mA19, mB19, mC19, M19.env.calls.length].join('|'));
+  T('v441 ⑲ 검토 — 거래처 저장 409: ① PUT 409 → GET → PUT(합친 목록 a1=mine·b1=other·r1=remote·n1=new)·고친 표시 비움·알림 0·다시 그림 1 · ② 같은 거래처를 다른 기기가 먼저 = 둘 다 남김·알림 1("(주)사아 ↔ 사아") · ③ 409 두 번 = 요청 3번·"계속 바뀌어" 알림·고친 표시 남음 · ④ 다시 읽기 실패 = "이번 저장이 들어가지 않았습니다" · ⑤ 못 읽은 대장 = 요청 0 · ⑥ 보내는 사이 또 고침 = 고친 표시 남음(2) · 그냥 성공 = 비움 · ⑦ loadClients 200 = 읽음·서버 목록·고친 표시 비움 / 404 = 못 읽음·빈 목록 / 500 = 그대로 · ⑧ 고친 표시 = 수정 창 저장 c1·수정 창 삭제 c5·표 [삭제] c2·[대장에 추가] 새 거래처(취소한 삭제 c6은 없음) · ⑨ 못 읽은 대장 다시 읽기 = 읽는 중이면 또 안 읽음(요청 1)·실패 뒤 다시·읽은 뒤 안 읽음',
+    noMiss41(m19) && JSON.stringify(s19) === JSON.stringify(['PUT:409,GET:200,PUT:200', 'a1=mine,b1=old,n1=new / a1=mine,b1=other,r1=remote,n1=new', '{}', '', 1,
+      'a1=old,n2=mine / a1=old,r2=remote,n2=mine', 'alert:다른 기기에서 같은 거래처가 먼저 대장에 들어왔습니다 — 대장에 같은 거래처가 둘 있습니다: (주)사아 ↔ 사아\n하나를 [삭제]해 주세요(지운 표시만 남습니다).',
+      'PUT:409,GET:200,PUT:409', '거래처 대장이 다른 기기에서 계속 바뀌어 저장하지 못했습니다 — 새로고침한 뒤 다시 해 주세요.', '{"a1":1}', 'PUT:409,GET:500', '거래처 대장이 다른 기기에서 바뀌어 이번 저장이 들어가지 않았습니다 — 새로고침한 뒤 다시 해 주세요.', 0, '{"a1":2}', '{}',
+      'true:s1:{}', 'false:0', 'true:z1', '{"c1":1,"c5":1,"c2":1,"clN1":1}', '1|GET:500:0:false|GET:500,GET:200:true:s2:0|2']),
+    JSON.stringify({ s19, miss: miss41.slice(m19) }));
+
+  // ⑳ 번호가 다르면 다른 회사(R1 '사업자번호 먼저' — 같은 거래처 확인 cliTwinOf와 같은 판정): 대장 '(주)대성'(111-11-11111) · 기성 v1 '대성'(222-22-22222) = 안 붙고 대장 밖 '대성' · v2 '대성'(번호 없음) = 붙음 ·
+  //   v3 '대 성'(1111111111) = 번호로 붙음 · 같은 열쇠의 번호 빈 거래처 '대성'이 대장에 있으면 v1은 그쪽 · 대장 밖(지운 거래처) 직접 조회도 같은 판정 / 같은 공급받는자 번호의 다른 이름 '가나'·'가나상사' = 대장 밖 두 줄·
+  //   펼침 안내(같은 번호의 다른 이름 · 상호가 같은 대장 거래처) · [대장에 추가] = 확인 창 — 취소 = 0곳, 확인 = 1곳(그 뒤에도 '가나상사'는 대장 밖 — 번호를 넣기 전) · '대성' [대장에 추가] = 확인 창(상호가 같은 대장 거래처) → 새 '대성'이 v1을 받음
+  const m20 = miss41.length;
+  const REC20 = [R041({ id: 'v1', client: '대성', amount: 1000, billed: '2026-10-01', client_num: '222-22-22222' }), R041({ id: 'v2', client: '대성', amount: 2000, billed: '2026-10-02' }), R041({ id: 'v3', client: '대 성', amount: 3000, billed: '2026-10-03', client_num: '1111111111' }),
+    R041({ id: 'g1', client: '가나', amount: 100, billed: '2026-10-04', client_num: '333-22-11111' }), R041({ id: 'g2', client: '가나상사', amount: 200, billed: '2026-10-05', client_num: '3332211111' })];
+  const CLI20 = () => [C041({ id: 'd1', name: '(주)대성', biz_no: '111-11-11111' })];
+  const X20 = mk41({ clis: CLI20(), recs: REC20, procs: [] }), A20 = X20.api, E20 = X20.env;
+  const s20 = [ids41(A20.unpaid(cl41(X20, 'd1'))), A20.idx().out.map((o) => o.id + '[' + o.biz + ']').join(' | '), ids41(A20.unpaid({ id: 'zz', name: '대성', biz_no: '111-11-11111' }))];
+  const Y20 = mk41({ clis: CLI20().concat([C041({ id: 'd2', name: '대성' })]), recs: REC20, procs: [] }); s20.push(ids41(Y20.api.unpaid(cl41(Y20, 'd1'))) + '/' + ids41(Y20.api.unpaid(cl41(Y20, 'd2'))), Y20.api.idx().out.map((o) => o.id).join(','));
+  X20.api.render(); grp41(X20); openRow41(X20, 'out:가나'); const info20 = (h) => (/<div class="vs-dsub" style="margin:0 0 6px;">([^<]*)<\/div>/.exec(h) || ['', ''])[1];
+  s20.push(info20(X20.host._h));
+  const n20 = A20.clis().length; E20.confirmAns = false; press41(X20, 'data-cli-act', 'addout'); s20.push(A20.clis().length - n20);
+  E20.confirmAns = true; press41(X20, 'data-cli-act', 'addout'); s20.push(A20.clis().length - n20, E20.log.filter((l) => /^confirm:'가나'을\(를\)/.test(l)).length, A20.idx().out.map((o) => o.id).join(','));
+  const cf20a = E20.log.filter((l) => /^confirm:/.test(l))[0] || '';
+  openRow41(X20, 'out:대성'); s20.push(info20(X20.host._h)); press41(X20, 'data-cli-act', 'addout');
+  const cf20b = E20.log.filter((l) => /^confirm:'대성'/.test(l))[0] || '', nd20 = A20.clis()[A20.clis().length - 1] || {};
+  s20.push(nd20.name, nd20.biz_no, ids41(A20.unpaid(nd20)), ids41(A20.unpaid(cl41(X20, 'd1'))));
+  T('v441 ⑳ 검토 — 번호가 다르면 다른 회사 · 같은 번호의 다른 이름: (주)대성(111) 미수 = v2,v3(v1 = 다른 번호 → 대장 밖) · 대장 밖 대성[2222222222]·가나[3332211111]·가나상사[3332211111] · 지운 거래처 직접 조회 = v2,v3 · 번호 빈 "대성"이 있으면 v1은 그쪽(v2,v3/v1)·대장 밖 2줄 · 가나 펼침 안내 = 같은 번호(333-22-11111)의 다른 이름 가나상사 · [대장에 추가] = 확인 창 취소 0곳·확인 1곳 → 가나상사는 대장 밖 그대로 · 대성 펼침 안내 = 상호가 같은 대장 거래처 (주)대성 · [대장에 추가] = 확인 창 → 새 대성(번호 빈 칸)이 v1을 받음·(주)대성 = v2,v3',
+    JSON.stringify(s20) === JSON.stringify(['v2,v3', 'out:대성[2222222222] | out:가나[3332211111] | out:가나상사[3332211111]', 'v2,v3', 'v2,v3/v1', 'out:가나,out:가나상사',
+      '계약 0건 · 기성 1건(미수 1)에 이 상호가 있는데 거래처 대장에는 없습니다 · 기성 공급받는자 번호 333-22-11111 · 같은 공급받는자 번호(333-22-11111)의 다른 대장 밖 이름: 가나상사(같은 회사면 하나만 추가하고 [수정]에서 사업자번호를 넣으면 나머지도 이어짐) — [대장에 추가]는 상호만 채운 새 거래처를 만듭니다(사업자번호·담당자 등은 추가한 뒤 [수정])',
+      0, 1, 2, 'out:대성,out:가나상사',
+      '계약 0건 · 기성 1건(미수 1)에 이 상호가 있는데 거래처 대장에는 없습니다 · 기성 공급받는자 번호 222-22-22222 · 상호가 같은 대장 거래처: (주)대성(기성 공급받는자 번호가 달라 잇지 않음) — [대장에 추가]는 상호만 채운 새 거래처를 만듭니다(사업자번호·담당자 등은 추가한 뒤 [수정])',
+      '대성', '', 'v1', 'v2,v3'])
+    && cf20a === "confirm:'가나'을(를) 대장에 추가할까요?\n같은 공급받는자 번호(333-22-11111)의 다른 이름도 대장 밖에 있습니다: 가나상사 — 같은 회사면 하나만 추가하고 [수정]에서 사업자번호를 넣으면 나머지도 그 거래처에 이어집니다."
+    && cf20b === "confirm:'대성'을(를) 대장에 추가할까요?\n상호가 같은 거래처가 대장에 있습니다: (주)대성 — 이 이름의 기성은 공급받는자 번호가 달라 잇지 않았습니다(다른 회사면 추가하고 [수정]에서 사업자번호를 넣으세요)." && noMiss41(m20),
+    JSON.stringify({ s20, cf20a, cf20b, miss: miss41.slice(m20) }));
+
+  // ㉑ 관련 문서 찾는 법(셈은 cliRelatedDocs 그대로 — 명세 kept): 관련 문서 탭 title·탭 안 첫 줄 = '상호 글자가 그대로 … (주)·띄어쓰기가 다른 제목은 빠짐'(+ 짧은 상호 안내), 0건 빈 안내에도 ·
+  //   옛 [상세 ›] 창(폰): 13자리 원문 0·'13자리(숨김)' · 개인 '개인(사업자 없음)' · 계약 숨김 회원(직원D)은 메모리에 계약이 있어도 계약 절·관련 문서 절 0 · 관리자 c5 = 계약 1건·관련 문서 2건 ·
+  //   탭에 다시 옴: 폰 legacy = 옛 목록을 다시 그리지 않음(펼친 줄 그대로)·PC = 다시 그림·처음(아직 안 그림) = 그림 · 전역 검색 hay(cliBizHay) = 개인·13자리 빈 글·10자리 원문, 표 검색 글 뒤쪽에 '개인(사업자 없음)'(앞머리는 hay 꼴) ·
+  //   부품 count(정의에 있을 때만 — 지시·기성 정의 없음 · 함수 아니면 정의 검사 'count')
+  const m21 = miss41.length;
+  const X21 = mk41(); X21.api.render(); openRow41(X21, 'c1'); press41(X21, 'data-cli-tab', 'doc'); const h21a = X21.host._h;
+  openRow41(X21, 'c5'); press41(X21, 'data-cli-tab', 'doc'); const h21b = X21.host._h;
+  const tip21 = (h) => (/data-cli-tab="doc" title="([^"]*)"/.exec(h) || ['', ''])[1];
+  const s21 = [tip21(h21a), /<div class="vs-empty">관련 문서 없음 — 상호 글자가 그대로 제목에 들어간 문서함 문서를 모읍니다\('\(주\)'·띄어쓰기가 다른 제목은 빠짐\)<\/div>/.test(h21a), tip21(h21b),
+    /<div class="vs-dsub" style="margin:0 0 4px;">문서함 제목에 상호 글자가 그대로 들어간 문서 — &#39;\(주\)&#39;·띄어쓰기가 다른 제목은 빠집니다 · 상호가 짧아\(2자 이하\) 이름이 들어간 다른 문서가 섞였을 수 있습니다<\/div>/.test(h21b)];
+  const P21 = mk41({ width: 375 }), HP21 = (id) => P21.env.host(id); P21.api.render(); P21.api.detail('c4'); const b21a = HP21('cliDetailBody')._h; P21.api.detail('c3'); const b21b = HP21('cliDetailBody')._h; P21.api.detail('c5'); const b21c = HP21('cliDetailBody')._h;
+  const Q21 = mk41({ width: 375, user: U41.D }); Q21.api.render(); Q21.api.detail('c5'); const b21d = Q21.env.host('cliDetailBody')._h;   // c5 사아 = 계약 k5·관련 문서 2건이 메모리에 있는 거래처
+  s21.push(b21a.indexOf('9001011234567') < 0 && /13자리\(숨김\)/.test(b21a), /<div class="crm-info">개인\(사업자 없음\)<\/div>/.test(b21b), /계약 <span>1건<\/span>/.test(b21c) && /관련 문서 <span>2건<\/span>/.test(b21c), /crm-h">계약 /.test(b21d) || /관련 문서/.test(b21d));
+  const re21 = (w, first) => { const X = mk41({ width: w }); if (!first) X.api.render(); X.host.innerHTML = 'MARK'; X.api.onTab(); return X.host._h === 'MARK' ? 'kept' : (/data-vs-table/.test(X.host._h) ? 'sheet' : (/class="item asb-item"/.test(X.host._h) ? 'legacy' : '?')); };
+  s21.push(re21(375), re21(1366), re21(375, true));
+  const H21 = mk41(), hy21 = (id) => H21.api.hay(cl41(H21, id));
+  s21.push([hy21('c1'), hy21('c3'), hy21('c4'), hy21('c5')].join('|'), H21.api.sText(cl41(H21, 'c3')).indexOf('개인(사업자 없음)') > 0 && H21.api.sText(cl41(H21, 'c3')).indexOf('개인고객 ' + hy21('c3') + ' ') === 0);
+  const tsb21 = blkOf41('// @task-sheet-start', '// @task-sheet-end'), rsb21 = blkOf41('// @rec-sheet-start', '// @rec-sheet-end');
+  s21.push(!/\bcount\s*:/.test(tsb21) && !/\bcount\s*:/.test(rsb21) && /\bcount: function\(r\)\{ return !r\.out; \},/.test(csb41), X1.api.check(Object.assign({}, d1, { count: 1 })).indexOf('count') >= 0 && X1.api.check(d1).indexOf('count') < 0);
+  T('v441 ㉑ 검토 — 관련 문서 찾는 법·옛 상세 창·탭 이동·검색 글·건수: 관련 문서 탭 title·첫 줄 안내("상호 글자가 그대로 … (주)·띄어쓰기가 다른 제목은 빠짐" + 2자 이하면 섞임 안내)·0건 빈 안내 · 옛 [상세 ›] = 13자리 원문 0("13자리(숨김)")·개인 "개인(사업자 없음)"·관리자 c5 계약 1·관련 문서 2·계약 숨김 직원D = 계약·관련 문서 절 0 · 탭에 다시 옴: 폰 = 그대로·PC = 표·처음 = 옛 목록 · hay c1 원문·c3 개인 빈 글·c4 13자리 빈 글·c5 원문 · 표 검색 글 뒤쪽 "개인(사업자 없음)" · count는 거래처 정의만(정의 검사)',
+    JSON.stringify(s21) === JSON.stringify(["문서함 제목에 상호 글자가 그대로 들어간 문서 — &#39;(주)&#39;·띄어쓰기가 다른 제목은 빠집니다", true,
+      "문서함 제목에 상호 글자가 그대로 들어간 문서 — &#39;(주)&#39;·띄어쓰기가 다른 제목은 빠집니다 · 상호가 짧아(2자 이하) 이름이 들어간 다른 문서가 섞였을 수 있습니다", true,
+      true, true, true, false, 'kept', 'sheet', 'legacy', '123-45-67890|||2223344444', true, true, true]) && noMiss41(m21),
+    JSON.stringify({ s21, miss: miss41.slice(m21) }));
+
+  // ㉒ 검토 반영 문서: FEATURES v441 '검토 반영(11/11' 줄(못 읽은 대장·409 병합·13자리 판정·번호가 다르면 다른 회사·count·관련 문서 안내·탭 이동·운영 사본 다시 잼)과 실제와 달랐던 옛 서술 0
+  //   ('같은 거래처를 두 번 만들 길 없음'·switchTab이 renderClients를 부른다) · CLAUDE.md 거래처 표 줄(옛 '어디에도 원문을 그리지 않는다' 0)·부품 줄 count · MANUAL 10절·35절 · TESTLIST v441 검토 반영 화면 칸·게이트 칸 '검토 반영 뒤'
+  const FT_PINS22 = ['**검토 반영(11/11', '`cliLoaded`', '`CLI_UNREAD_MSG`', '`cliSaveConflict`', '`cliDirty`', '`cliMarkDirty`', '`cliMergeRemote`', '`cliBiz13`', '`cliBizHay`', '`count(r)`', '`cliSheetDocNote`', '`cliSheetOnTab()`',
+    '번호가 달라 안 붙인 기성 0', "'보이는 2곳 / 전체 2곳' + 묶음 5곳", '물어보기 서버 clients 도구(`_lib/ask.js`)', '기성 탭 \'거래처별 미수 집계\''];
+  const CL_PINS22 = ['`cliLoaded`', '`CLI_UNREAD_MSG`', '`cliSaveConflict`', '`cliMarkDirty`', '`cliMergeRemote`', '`cliBizHay`', '`cliSheetOnTab`', '`cliSheetDocNote`', '정의 옵션 `count(r)`', '`cliSheetOutSibs`'];
+  const MAN_PINS22 = ['전각 숫자로 적거나 다른 번호와 함께 적어도 같습니다', '쉼표로 나눠 주세요', '거래처 목록을 아직 불러오지 못했을 때', '대장 거래처만 셉니다', "'(주)'·띄어쓰기가 다른 제목은 빠지고", '누를 때 한 번 더 묻습니다', '상호가 같아도 다른 회사로 보고 묶지 않습니다'];
+  const OLD22 = [ftv17.indexOf('같은 거래처를 두 번 만들 길 없음'), ftv17.indexOf('`switchTab("cli")`가 `renderClients()`를 부른다'), cl17.indexOf('옛 13자리 값은 표·펼침·검색 글 어디에도 원문을 그리지 않는다'), cl17.indexOf('switchTab("cli")는 다시 그림')];
+  const rv22 = cbScr17.filter((l) => l.indexOf('검토 반영(11/11)') > 0);
+  T('v441 ㉒ 검토 반영 문서: FEATURES v441 검토 반영 줄(못 읽은 대장·409 병합·13자리 판정·번호 다르면 다른 회사·count·관련 문서 안내·탭 이동·남긴 것·운영 사본 다시 잼) · 옛 서술 0(두 번 만들 길 없음·switchTab renderClients·어디에도 원문·switchTab 다시 그림) · CLAUDE.md 거래처 표·부품 줄 · MANUAL 10절(13자리 꼴·못 읽은 때·건수·관련 문서·확인 창·번호 다르면 다른 회사)·35절(계약·문서함 권한) · TESTLIST 검토 반영 화면 칸 1(못 읽은 대장·두 창·13자리·확인 창·375) · 게이트 칸 "검토 반영 뒤"',
+    FT_PINS22.every((s) => ftv17.indexOf(s) > 0) && OLD22.every((i) => i < 0) && CL_PINS22.every((s) => cl17.indexOf(s) > 0) && MAN_PINS22.every((s) => man10.indexOf(s) > 0)
+    && man35.indexOf('계약(계약 권한이 있을 때)·관련 문서(문서함 권한이 있을 때)') > 0
+    && rv22.length === 1 && ['읽기를 끊은', '두 창', '９００１０１－１２３４５６７', '확인 창', '375'].every((s) => rv22[0].indexOf(s) > 0) && cbGate17.length === 1 && cbGate17[0].indexOf('검토 반영 뒤') > 0,
+    JSON.stringify({ ft: FT_PINS22.filter((s) => ftv17.indexOf(s) < 0), old: OLD22, cl: CL_PINS22.filter((s) => cl17.indexOf(s) < 0), man: MAN_PINS22.filter((s) => man10.indexOf(s) < 0), man35: man35.indexOf('계약(계약 권한이 있을 때)'), rv: rv22.length, gate: cbGate17.length && cbGate17[0].indexOf('검토 반영 뒤') }));
+} catch (e) { console.log('  (v441 검사 생략 — ' + e.message + ')'); fails++; }
 
 try {
   const fdir = join(ROOT, 'netlify', 'functions');

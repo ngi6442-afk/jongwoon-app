@@ -1119,7 +1119,7 @@
   /* v438 화면 폭(45-1 #1 — 명세 09_조사_문서/표형탭_시안_자료_20261110/엑셀형탭_명세_20261110.json common.width_plan·css). PC 860px 이상만 — 폰(859px 이하) 틀은 그대로.
      틀(#app)은 탭과 무관하게 같은 폭이라 탭을 옮겨도 사이드바가 안 움직인다. 본문 = 창 − 233(860~1279: 여백 16·사이드바 168·간격 16) · 창 − 269(1280~1599: 여백 22·사이드바 184·간격 24) ·
      1600 이상은 #app 최대 1,680(본문 최대 1,428) — 창 폭은 세로 스크롤바 17px 포함(1024 창 791 · 1366 창 1,097 · 1920 창 1,428 — uismoke v438 ①이 이 CSS를 읽어 계산해 명세 width_plan.table과 대조).
-     넓히는 화면은 id로만(section 태그·class 그대로 — uismoke가 '<section class="view" id=…>' 글자를 찾는다): v438은 계약·차량·권한관리 셋, v439에 지시·v440에 기성(표로 바꾼 판) — 거래처·일용직·입찰은 그 탭을 표로 바꾸는 판(v441~v443)에서 하나씩 더한다(옛 카드 목록이 1,428px로 늘어지지 않게). 나머지 화면은 808 그대로(사이드바 옆 왼쪽 정렬),
+     넓히는 화면은 id로만(section 태그·class 그대로 — uismoke가 '<section class="view" id=…>' 글자를 찾는다): v438은 계약·차량·권한관리 셋, v439에 지시·v440에 기성·v441에 거래처(표로 바꾼 판) — 일용직·입찰은 그 탭을 표로 바꾸는 판(v442~v443)에서 하나씩 더한다(옛 카드 목록이 1,428px로 늘어지지 않게). 나머지 화면은 808 그대로(사이드바 옆 왼쪽 정렬),
      권한관리는 권한 표(#permRoster)만 넓고 그 밖 카드는 808. 안전(#view-safety)은 56 판(v445)에서 넓히는 목록에 더한다(그때도 현황 #sfPaneNow는 808 — 미리 둠).
      ★퀴즈 1번 대안('메뉴 자리 고정·본문만 오른쪽으로')을 고르시면 860 묶음 #app 줄 끝에 margin:0 0 0 max(0px, calc((100% - 1060px) / 2)); 하나만 더한다 — 1600 묶음 #app{max-width:1680px;}는 남긴다
        (margin-left가 100% 기준이라 상한을 남겨도 메뉴는 고정 · 지우면 2560 창 본문이 약 1,550으로 늘어 명세 why_1680과 어긋나고 계약·차량 펼침도 더 넓어짐)
@@ -1131,7 +1131,7 @@
     .layout{gap:16px;}
     .tabbar{width:168px;}
     .views>.view{max-width:808px;}
-    #view-tasks,#view-rec,#view-con,#view-veh,#view-perm{max-width:none;}   /* v439 지시(#view-tasks) · v440 기성(#view-rec)을 더함 — v441~v443에서 #view-cli·#view-workers·#view-bid를 탭 판마다 더함 */
+    #view-tasks,#view-rec,#view-cli,#view-con,#view-veh,#view-perm{max-width:none;}   /* v439 지시(#view-tasks) · v440 기성(#view-rec) · v441 거래처(#view-cli)를 더함 — v442~v443에서 #view-workers·#view-bid를 탭 판마다 더함 */
     #sfPaneNow,#view-perm>:not(#permRoster){max-width:808px;}
     #recAddCard,#recImportCard,#recAbCard,#recAgingSummary{max-width:808px;}   /* v440 기성: 표만 넓고, 머리 버튼으로 펼치는 카드 셋(청구 등록·홈택스 불러오기·운반 실적)·거래처별 미수 집계는 지금 읽기 폭 808 그대로 */
   }
@@ -1161,6 +1161,11 @@
   .rec-star{color:#C98A00;}
   .rec-neg{color:#B0332A;}   /* v440 검토: 홈택스 수정세금계산서 음수 금액(부호 '-' + 빨강 — 표 칸·합계 줄·펼침) */
   .mini-btn.rec-hbtn.on{background:#EAF3EF;color:var(--brand-dark);border-color:var(--brand);}
+  /* v441 거래처 표(45-1 넷째 판 — 명세 sections[key=clients]): 미수 칸 '○원 · n건' 빨강(보통 굵기 — 1억 미만 합 + 두 자리 건수까지 130px 칸 안 폭에 듦, 맑은 고딕 실측) ·
+     펼침 '계약' 하위 탭의 줄은 누르면 계약 탭에서 그 계약을 펼친다(누를 수 있는 줄 표시) */
+  .cli-unp{color:#B0332A;}
+  .vs-hist tr.cli-conrow{cursor:pointer;}
+  .vs-hist tr.cli-conrow:hover td{background:#F7FAF8;}
   @media (min-width:1280px){
     #view-tasks>.card.scope-host{display:flex;align-items:center;}
     #view-tasks>.card.scope-host>.add-row{flex:0 0 auto;padding:10px 14px 10px 0 !important;}
@@ -1653,7 +1658,7 @@
     <div class="card" id="conDetailCard"></div>   <!-- v381 폰(859px 이하) 상세 카드 — PC에서는 표 안에 펼침 -->
   </section>
 
-  <!-- 거래처 -->
+  <!-- 거래처 — v441 PC(860px 이상)는 #cliList 자리에 표(검색칸 cliSheetQ가 표 위 · 아래 #cliSearch는 폰 옛 목록 검색칸 — 전역 검색 searchId), 폰은 옛 목록 그대로 -->
   <section class="view" id="view-cli">
     <div class="dash-sec" style="margin-bottom:8px;"><h2>거래처 <span class="cnt" id="cliHead"></span></h2></div>
     <input type="search" id="cliSearch" placeholder="거래처 검색(상호·사업자번호)" autocomplete="off" style="width:100%;padding:9px 12px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;font-size:14px;box-sizing:border-box;">
@@ -1949,6 +1954,7 @@
     <h3 id="cliModalTitle">거래처 추가</h3>
     <input type="text" id="cliName" placeholder="상호(거래처명)" autocomplete="off">
     <input type="text" id="cliBizNo" placeholder="사업자번호 (선택)" autocomplete="off">
+    <label style="display:flex;gap:6px;align-items:center;margin:0 0 6px;font-size:13px;"><input type="checkbox" id="cliIndiv"> 개인 거래처(사업자 없음) — 사업자번호 칸은 비워 둡니다(주민번호는 넣지 않음)</label>
     <input type="text" id="cliContact" placeholder="담당자 (선택)" autocomplete="off">
     <input type="text" id="cliPhone" placeholder="연락처 (선택)" autocomplete="off">
     <input type="text" id="cliEmail" placeholder="이메일 (선택)" autocomplete="off">
@@ -3400,6 +3406,7 @@
   function clearSessionData(){
     tasks = []; vehicles = []; receivables = []; licenses = []; duties = []; documents = []; contracts = []; leaves = [];
     bids = []; onbids = []; quotes = []; promoItems = []; clients = []; myTodos = []; members = []; apprItems = []; myApprItems = []; fam = []; edu = [];
+    cliLoaded = false; cliDirty = {};   // v441 검토: 비운 거래처 대장은 '아직 못 읽음'(빈 목록을 저장하지 않게 — loadClients가 200에서 다시 켬)
     records = {};
     abStatus = null; abDay = { day: "", data: null, loading: false, error: "" }; abPresets = { items: null, loading: false, saving: false, error: "" };
     abManual = { day: "", items: [], loaded: false, timer: null, saving: false, dirty: false, savedTs: 0, bad: 0, err: "", errBad: false, pendingRender: false };
@@ -3442,7 +3449,7 @@
     var body = {}; try{ body = JSON.parse(opts.body); }catch(e){}
     var doc = {}; try{ doc = JSON.parse(b64DecodeUnicode(body.content)); }catch(e){}
     // v421: 지시 GET이 실패해 캐시로 부팅한 기기는 base가 없어 서버 잠금을 건너뛰고 문서를 통째로 덮었다(남의 완료·새 지시 소실) → tasks는 base 0으로 보내 409 병합 경로로.
-    //   clients 등 409 처리가 없는 컬렉션은 편집이 소리 없이 사라지므로 일괄 적용하지 않는다.
+    //   409 처리가 없는 컬렉션은 편집이 소리 없이 사라지므로 일괄 적용하지 않는다(clients는 v441 검토부터 대장을 못 읽었으면 저장 자체를 안 하고(cliLoaded) 409는 다시 읽어 합친 뒤 한 번 더 — cliSaveConflict).
     var saveBase = (col === "tasks" && _colBase[col] === undefined) ? 0 : _colBase[col];
     return gwCall("gw-data", { action: "save", collection: col, doc: doc, base: saveBase }).then(function(res){
       if (res.status === 401){ onSessionInvalid(); return _ghResp(401, {}); }
@@ -6029,6 +6036,7 @@
       loadLicenses();
       loadUsers();
     }
+    cliReloadIfUnread();   // v441 검토: 오프라인 콜드 스타트·읽기 실패로 거래처 대장을 못 읽은 채면(읽는 중이 아니면) 다시 읽음 — 못 읽은 동안은 저장·대장에 추가를 막아 이 기기에 고친 것이 없음
   });
 
   // ---- 탭 ----
@@ -6094,6 +6102,7 @@
     if (name === "perm") renderPermMgmt();
     if (name === "fam"){ renderFam(); loadFam(); }
     if (name === "leave") renderLeaves();
+    if (name === "cli") cliSheetOnTab();   // v441 거래처 표의 미수·계약 열·'대장에 없는 이름'은 기성·계약에서 끌어오므로(그쪽이 나중에 읽혀도) PC 표면 탭에 올 때마다 다시 그림 — 칩·정렬·펼침은 부품 기억 그대로 · 폰 옛 목록은 다시 그리지 않음(검토 — 펼친 줄이 접히지 않게) · 대장을 못 읽었으면 다시 읽음
     if (name === "bid") setBidLayer(rt.layer);   // v428 칸 없으면 공고 — 옛 부동산 탭(onbid)은 tabRoute가 bid:onbid로 잇는다
   }
 
@@ -6958,6 +6967,7 @@
   document.getElementById("cliSave").addEventListener("click", saveCliModal);
   document.getElementById("cliDelete").addEventListener("click", deleteCliFromModal);
   document.getElementById("cliCancel").addEventListener("click", closeCliModal);
+  document.getElementById("cliIndiv").addEventListener("change", cliIndivSync);   // v441 개인 거래처면 사업자번호 칸을 잠금(저장 때 비움)
   document.getElementById("cliBackdrop").addEventListener("click", function(e){ if (e.target === this) closeCliModal(); });
   document.getElementById("cliDetailClose").addEventListener("click", function(){ document.getElementById("cliDetailBackdrop").classList.remove("show"); });
   document.getElementById("cliDetailBackdrop").addEventListener("click", function(e){ if (e.target === this) this.classList.remove("show"); });
@@ -7115,6 +7125,7 @@
   //     골라 쓰기: search:{ id, ph, text(r) } 표 위 검색칸 · sel:{ set() 선택 지도, can() 필수(없으면 선택 칸을 그리지 않음 — 보기 권한 CSS는 .sel-box를 못 숨김), acts:[{ h, danger, run(ids) }], keep 숨은 선택 남김 }
   //                  — 지우기(지시·기성)/이력 추가(사람별 의무) · 전체선택은 그린 행만(접힌 묶음·더보기 밖 행은 빠짐 — 명세 fixes_with ⓗ '보이는 행만')
   //                · group:{ of(r) 묶음 키("" = 본 행), label(g, n, open), order:[…], auto({q,f,chip}) 저절로 펼침 } · page:150 더보기(한도 뒤 줄은 묶음 머리까지 그리지 않음)
+  //                · count(r) '보이는 n / 전체 m'에 셀 줄(v441 거래처 — 대장 밖 묶음 줄 빼기, 묶음 머리가 그 수를 셈 · 없으면 행 전부)
   //   }
   // 그리기는 vsSheetRender(def) 하나(갈래 함수). 창 폭이 860·1280·1600 경계를 넘으면 그린 단계가 바뀐 표만 다시 그린다 — 보이는 표는 바로, 숨은 표는 보일 때(ResizeObserver) 한 번.
   // 다른 화면에서 표로 오는 입구 둘(탭 구간의 이어받기 함수만 부름 — 기기 기억은 저장 안 함): 찾아가기 vsSheetSeek(def, q)(v439 — 칩·거르기를 이번만 풀고 검색어) · 그 행 열기 vsSheetReveal(def, id)(v440 — 그 행을 가린 칩·거르기·검색어·묶음·더보기만 풀고 펼침)
@@ -7307,7 +7318,7 @@
         h += '<button type="button" class="' + vsCls(["vs-chip", it.warn ? "warn" : "", it.pc && it !== on ? "vs-pc" : "", it === on ? "on" : ""]) + '" data-vs-chip="' + esc(g.g + "|" + it.k) + '"' + (it.tip ? ' title="' + esc(it.tip) + '"' : '') + '>' + esc(it.h) + (n == null ? '' : ' ' + vsN(n)) + '</button>';
       });
     });
-    h += '<button type="button" class="vs-chip" data-vs-reset="1" title="거르기 줄·칩·검색어 지우기">필터 초기화</button><span class="vs-count">보이는 ' + vsN(M.rows.length) + unit + ' / 전체 ' + vsN(M.uni.length) + unit + '</span></div>';
+    h += '<button type="button" class="vs-chip" data-vs-reset="1" title="거르기 줄·칩·검색어 지우기">필터 초기화</button><span class="vs-count">보이는 ' + vsN(def.count ? M.rows.filter(def.count).length : M.rows.length) + unit + ' / 전체 ' + vsN(def.count ? M.uni.filter(def.count).length : M.uni.length) + unit + '</span></div>';   // count(r) — 셈에 넣을 줄(v441 거래처: 대장 밖 묶음 줄 빼고 — 묶음 머리가 그 수를 셈), 없으면 행 전부(지시·기성 그대로)
     h += '<div class="vs-wrap" data-vs-wrap="1"><table class="vs vs-fit" data-vs-table="1" style="--vs-minw:' + M.minw + 'px;"><colgroup>';
     cols.forEach(function(c){ h += '<col data-vs-col="' + esc(c.k) + '" style="' + (M.phone ? '--pw:' + (Number(c.pw) || 0) + '%;' : (c.fill ? '' : 'width:' + vsColW(inst, c) + 'px;')) + '">'; });
     h += '</colgroup><thead><tr>';
@@ -7630,6 +7641,7 @@
     if (def.sel && (typeof def.sel.set !== "function")) bad.push("sel");
     if (def.sel && (typeof def.sel.can !== "function")) bad.push("sel.can");
     if (def.group && typeof def.group.of !== "function") bad.push("group");
+    if (def.count != null && typeof def.count !== "function") bad.push("count");
     if (ph === "sheet"){ vsSheetCols(def, 1).forEach(function(c){ pw += Number(c.pw) || 0; }); if (Math.abs(pw - 100) > 0.5) bad.push("pw:" + pw); }
     else if (ph !== "legacy") bad.push("phone");
     else if (typeof def.legacy !== "function") bad.push("legacy");
@@ -19597,7 +19609,7 @@
     var add=function(tab,label,ok,list,title,sub,searchId){ if(ok) S.push({tab:tab,label:label,list:list,title:title,sub:sub,searchId:searchId||null}); };
     add("con","계약",canSee("con"),function(){return liveContracts();},function(x){return (x.title||x.label||"")+(x.client?" · "+x.client:"");},function(x){return x.site||"";});
     add("tasks","지시",canSee("tasks"),function(){return tasks.filter(function(t){return t&&t.del!==1&&t.status!=="done"&&taskVisible(t);});},function(x){return x.title||"";},function(x){return (x.who||"")+(x.due?" · 기한 "+x.due:"");},"taskSearch");   // v439 지시 탭과 같은 행 원천(taskVisible — 비관리자에게 남의 지시 제목이 검색으로 보이지 않게) · 누르면 표 위 검색칸(taskSearch)에 글자(폰 옛 목록은 검색칸이 없어 탭만 옮김)
-    add("cli","거래처",canSee("cli"),function(){return clients.filter(function(c){return c&&c.del!==1;});},function(x){return x.name||"";},function(x){return x.biz_no||"";},"cliSearch");
+    add("cli","거래처",canSee("cli"),function(){return clients.filter(function(c){return c&&c.del!==1;});},function(x){return x.name||"";},function(x){return cliBizHay(x);},"cliSearch");   // v441 사업자번호 칸의 13자리(주민·법인등록번호 꼴)는 검색 줄·검색 글에 넣지 않음(cliBizHay — 개인 거래처도 빈 글: 검토 — '개인'으로 찾은 줄을 폰에서 누르면 옛 검색칸이 빈 목록이 됐다) · 누르면 표 검색칸 + 그 행 열기(폰 옛 목록은 옛 검색칸 cliSearch)
     add("rec","기성·미수",canSee("rec"),function(){return liveRec().filter(recVisible);},function(x){return (x.client||"")+(x.amount?" · "+fmtAmount(x.amount)+"원":"");},function(x){return (x.desc||"")+(x.paid?" · 수금 "+x.paid:" · 미수");},"recSearch");   // v440 기성 탭과 같은 행 원천(recVisible — 비관리자에게 남의 기성이 검색으로 보이지 않게) · 누르면 표 검색칸 + 그 행 열기(폰 옛 목록은 옛 검색칸 recSearch)
     add("quote","견적서",canSee("quote"),function(){return liveQuotes();},function(x){return (x.no||"")+" · "+(x.title||"");},function(x){return x.recv||"";});
     add("veh","차량",canSee("veh"),function(){return liveVehicles();},function(x){return (x.no||"")+" · "+(x.type||"");},function(x){return x.driver||x.own||"";},"vehSearch");
@@ -19624,7 +19636,7 @@
       total+=hits.length;
       html+='<div style="font-weight:700;margin:8px 0 2px;">'+s.label+' <span style="color:#888;font-weight:400;">'+hits.length+'</span></div>';
       hits.forEach(function(x){
-        html+='<div class="gs-hit" data-gs-tab="'+s.tab+'"'+(s.searchId?' data-gs-sid="'+s.searchId+'"':'')+(s.tab==="rec"&&x&&x.id?' data-gs-id="'+esc(x.id)+'"':'')
+        html+='<div class="gs-hit" data-gs-tab="'+s.tab+'"'+(s.searchId?' data-gs-sid="'+s.searchId+'"':'')+(s.tab==="rec"&&x&&x.id?' data-gs-id="'+esc(x.id)+'"':'')+(s.tab==="cli"&&x&&x.id?' data-gs-id="'+esc(x.id)+'"':'')
           +' style="padding:5px 6px;border-bottom:1px solid var(--line);cursor:pointer;border-radius:6px;">'
           +'<b>'+esc(String(s.title(x)).slice(0,70))+'</b>'
           +(s.sub(x)?'<br><span style="color:#888;">'+esc(String(s.sub(x)).slice(0,80))+'</span>':'')+'</div>';
@@ -19638,6 +19650,7 @@
         switchTab(tab);
         if(sid==="taskSearch" && taskSheetFromGs(gq)) return;   // v439 지시 표: 칩·거르기 줄을 이번만 풀고 검색어(기억된 '완료' 칩·거르기에 누른 지시가 숨지 않게) — 폰 옛 목록이면 false(검색칸 없음 — 아래 옛 길)
         if(sid==="recSearch" && recSheetFromGs(gq, el.getAttribute("data-gs-id"))) return;   // v440 기성 표: 같은 길 + 누른 그 행 열기(입금 완료 건이면 '입금 완료' 칩) — 폰 옛 목록이면 false(아래 옛 검색칸 recSearch)
+        if(sid==="cliSearch" && cliSheetFromGs(gq, el.getAttribute("data-gs-id"))) return;   // v441 거래처 표: 칩·거르기 줄을 이번만 풀고 검색어 + 누른 그 행 열기 — 폰 옛 목록이면 false(아래 옛 검색칸 cliSearch)
         if(sid){ var si=document.getElementById(sid); if(si){ si.value=gq; si.dispatchEvent(new Event("input")); } }
       });
     });
@@ -20146,49 +20159,158 @@
   var cliSha = null;
   var cliSearchTerm = "";
   var editingCliId = null;
+  // v441 검토: 이 세션에서 서버 거래처 대장을 읽었나(GET 200 — 404·실패·로그아웃이면 아님). 못 읽었으면(읽는 중 포함) 표 아래 '대장에 없는 이름'·[대장에 추가]·추가·수정 창 저장·saveClients를 막는다 —
+  //   빈 대장(clients = [])을 저장하면 낙관락 base도 없어(_colBase는 GET 200에서만) 서버가 거래처 대장 전체를 이 기기 목록으로 통째 바꾼다(버전 링 복구로만 되돌림)
+  var cliLoaded = false;
+  // v441 검토: 이 기기에서 고쳤는데 아직 서버에 들어가지 않은 거래처 id → 고친 횟수(cliMarkDirty). 저장이 409(그사이 다른 기기가 저장)로 튕기면 서버 대장을 다시 읽어 이 거래처들만 이 기기 것으로 합친다(cliMergeRemote)
+  var cliDirty = {};
+  // v441 검토: 읽는 중인 거래처 GET 수 — 못 읽은 대장 다시 읽기(탭 이동·온라인 — cliReloadIfUnread)는 읽는 중이 아닐 때만(겹친 늦은 답이 그사이 고친 목록·고친 표시를 덮지 않게)
+  var cliLoading = 0;
   function findCli(id){ for (var i=0;i<clients.length;i++){ if (clients[i].id === id) return clients[i]; } return null; }
   function loadClients(){
     var token = getToken(); if (!token) return;
+    cliLoading++;
     fetch(CLIENT_API, {headers: ghHeaders()}).then(function(resp){
-      if (resp.status === 404){ cliSha = null; clients = []; renderClients(); return; }
+      if (resp.status === 404){ cliSha = null; clients = []; cliLoaded = false; renderClients(); return; }   // v441 검토: gw 대역에서 빈 대장은 200(빈 문서)으로 온다 — 404는 읽기 실패로(빈 목록을 저장하지 않게)
       if (!resp.ok) throw new Error("HTTP " + resp.status);
-      return resp.json().then(function(json){ cliSha = json.sha; var p = JSON.parse(b64DecodeUnicode(json.content)); clients = (p && p.items) || []; renderClients(); });
-    }).catch(function(){ renderClients(); });
+      return resp.json().then(function(json){ cliSha = json.sha; var p = JSON.parse(b64DecodeUnicode(json.content)); clients = (p && p.items) || []; cliLoaded = true; cliDirty = {}; renderClients(); });
+    }).catch(function(){ renderClients(); }).then(function(){ cliLoading--; }, function(){ cliLoading--; });
   }
-  function saveClients(){
+  function cliReloadIfUnread(){ if (!cliLoaded && !cliLoading) loadClients(); }
+  function cliMarkDirty(id){ if (id != null) cliDirty[id] = (cliDirty[id] || 0) + 1; }
+  function saveClients(retried){
     var token = getToken(); if (!token) return;
+    if (!cliLoaded) return;   // v441 검토: 대장을 못 읽은 채로는 보내지 않는다(위 cliLoaded) — 고치는 길(창 저장·[대장에 추가])이 먼저 막고 알린다
+    var sent = {}; Object.keys(cliDirty).forEach(function(id){ sent[id] = cliDirty[id]; });   // 이번에 보내는 고친 횟수 — 보내는 사이 또 고친 거래처는 성공해도 남김(다음 저장이 보냄)
     var body = JSON.stringify({schema: 1, items: clients});
     var payload = {message: "clients: 업데이트", content: b64EncodeUnicode(body), branch: "main"};
     if (cliSha) payload.sha = cliSha;
     fetch(CLIENT_API, {method: "PUT", headers: Object.assign({"Content-Type":"application/json"}, ghHeaders()), body: JSON.stringify(payload)}).then(function(resp){
       if (resp.status === 401) return;
-      return resp.json().then(function(json){ cliSha = json.content && json.content.sha; });
+      if (resp.status === 409) return cliSaveConflict(retried);   // v441 검토: 종전엔 409를 소리 없이 삼켜 이 저장과 그 뒤 이 기기 저장이 새로고침 때까지 모두 버려졌다
+      return resp.json().then(function(json){ cliSha = json.content && json.content.sha; if (resp.ok) Object.keys(sent).forEach(function(id){ if (cliDirty[id] === sent[id]) delete cliDirty[id]; }); });
     }).catch(function(){});
   }
+  // v441 검토: 저장이 409 — 서버 대장을 다시 읽어(낙관락 base도 새로) 이 기기에서 고친 거래처(cliDirty)만 이 기기 것으로 합친 뒤 한 번 더 저장. 또 튕기거나 다시 읽기에 실패하면 알림(새로고침).
+  //   그사이 다른 기기가 같은 거래처(상호 열쇠·사업자번호 — cliTwinOf)를 먼저 넣었으면 둘 다 남기고 알림(중복·삭제는 사람 확인 — 자동으로 빼거나 합치지 않음)
+  function cliSaveConflict(retried){
+    if (retried){ alert("거래처 대장이 다른 기기에서 계속 바뀌어 저장하지 못했습니다 — 새로고침한 뒤 다시 해 주세요."); return; }
+    return fetch(CLIENT_API, {headers: ghHeaders()}).then(function(r){
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json().then(function(j){
+        var p = JSON.parse(b64DecodeUnicode(j.content)), m = cliMergeRemote((p && p.items) || []);
+        clients = m.items; cliSha = j.sha; renderClients(); saveClients(true);
+        if (m.twins.length) alert("다른 기기에서 같은 거래처가 먼저 대장에 들어왔습니다 — 대장에 같은 거래처가 둘 있습니다: " + m.twins.join(", ") + "\n하나를 [삭제]해 주세요(지운 표시만 남습니다).");
+      });
+    }).catch(function(){ alert("거래처 대장이 다른 기기에서 바뀌어 이번 저장이 들어가지 않았습니다 — 새로고침한 뒤 다시 해 주세요."); });
+  }
+  // 409 병합 — 서버 대장 순서·내용을 바탕으로, 이 기기에서 고친 거래처만 이 기기 것으로 바꾸거나(같은 id) 끝에 더함(새 거래처). 고치지 않은 거래처는 서버 것(다른 기기 수정이 이 기기 묵은 사본에 덮이지 않게)
+  function cliMergeRemote(remote){
+    var byId = {}, seen = {}, items = [], twins = [], rl = [];
+    remote.forEach(function(c){ if (c && c.id){ byId[c.id] = c; if (c.del !== 1) rl.push(c); } });
+    clients.forEach(function(c){ if (c && c.id && cliDirty[c.id]) byId[c.id] = c; });
+    remote.forEach(function(c){ if (c && c.id && !seen[c.id]){ seen[c.id] = 1; items.push(byId[c.id]); } });
+    clients.forEach(function(c){ var tw; if (!c || !c.id || !cliDirty[c.id] || seen[c.id]) return; seen[c.id] = 1; items.push(c); if (c.del !== 1){ tw = cliTwinOf(c.name, c.biz_no, c.id, rl); if (tw) twins.push((c.name || "(상호없음)") + " ↔ " + (tw.c.name || "(상호없음)")); } });
+    return { items: items, twins: twins };
+  }
+  // v441 이름 맞추기·미수·계약 잇기(AI 결정 R1 — 화면 연결만 바뀌고 저장 값은 그대로라 되돌릴 수 있음 · 폰 옛 목록·옛 [상세 ›] 창도 같은 함수):
+  //   상호는 '(주)'·'㈜'·'주식회사'·띄어쓰기를 빼고(영문 대소문자 무시 — cliNameKey) 글자가 같을 때만 잇는다. 부분 일치는 하지 않는다(짧은 상호가 다른 이름 안에 들어가 엉뚱한 거래처에 붙지 않게).
+  //   기성은 공급받는자 번호(숫자만)가 대장 사업자번호와 같은 거래처가 먼저(지금 미수 규칙), 없으면 상호 열쇠 — 단 두 번호가 모두 10자리이고 서로 다른 거래처에는 상호가 같아도 붙이지 않는다(v441 검토 — 같은 거래처 확인
+  //   cliTwinOf와 같은 판정: 번호가 다르면 다른 회사, 붙일 거래처가 없으면 대장 밖 묶음으로 사람에게 보임). 번호·열쇠가 같은 거래처가 대장에 여럿이면 대장 순서 첫 거래처 하나에만 붙인다
+  //   (한 건이 두 거래처에 두 번 세어지지 않게 — 종전엔 같은 이름 거래처마다 같은 미수가 보였다). 계약은 상호 열쇠만(계약에는 거래처 번호 칸이 없음). 미수 = 입금 전·보이는 기성(recVisible)만(종전 그대로).
+  //   한 번에 묶어 센다(cliLinkIdx — 대장·기성·계약을 한 번씩만 훑음 · 거래처가 수백이어도 거래처마다 기성 전체를 다시 훑지 않음). 그릴 때마다 새로 만들고(renderClients·옛 상세 창·표 이어받기),
+  //   같은 실행 안에서는 다시 쓰며 다음 일(마이크로태스크)에 저절로 버린다. 대장에 이어지지 않은 상호 = out(표 아래 '대장에 없는 이름' 묶음 — 계약은 계약 권한, 기성은 기성 권한일 때만 모음)
+  var CLI_LINK = null;
+  var CLI_BIZ13_MSG = "사업자번호 칸에는 13자리 번호(주민·법인등록번호 꼴)를 넣을 수 없습니다. 개인 거래처면 '개인 거래처(사업자 없음)'에 체크하고 번호 칸은 비워 두세요. (사업자번호를 둘 이상 적을 때는 쉼표로 나눠 주세요)";
+  var CLI_UNREAD_MSG = "거래처 대장을 아직 읽지 못했습니다 — 잠시 뒤 다시 해 보시고, 계속 이러면 새로고침한 뒤 다시 해 주세요. (읽기 전에 저장하면 서버 대장이 이 화면 목록으로 바뀔 수 있어 막습니다)";
+  function cliLinkReset(){ CLI_LINK = null; }
+  function cliNameKey(s){ return String(s == null ? "" : s).replace(/（/g, "(").replace(/）/g, ")").replace(/\s+/g, "").replace(/\(주\)|㈜|주식회사/g, "").toLowerCase(); }
+  function cliDigits(s){ return String(s == null ? "" : s).replace(/[^0-9]/g, ""); }
+  // 사업자번호 칸의 13자리(주민·법인등록번호 꼴) — 전각 숫자는 반각으로 바꾸고 띄어쓰기·줄표(- ‐ ‑ ‒ – — ― − － ㅡ)를 뺀 뒤 숫자가 13자리 이상 이어지면 참(v441 검토: '숫자가 모두 13개'만 보던 것은
+  //   사업자번호와 함께 적거나·한 자리 더 치거나·전각으로 적은 주민번호가 빠졌다). 입력은 막고(saveCliModal) 옛 값은 PC 표·펼침·검색 글·전역 검색 줄·옛 [상세 ›] 창에 원문을 그리지 않는다(수정 창 칸에만 — 지우라고).
+  //   가린 번호('900101-1******')·10자리는 그대로 통과 · 사업자번호 둘을 띄어쓰기만으로 이으면 13자리 넘게 이어져 막힘(안내 글이 쉼표로 나누라고 함) · 예외(해시 고정·서버 — 원문 그대로): 폰 옛 목록 renderClientsLegacy · 물어보기 _lib/ask.js
+  function cliBiz13(s){ var t = String(s == null ? "" : s).replace(/[０-９]/g, function(ch){ return String.fromCharCode(ch.charCodeAt(0) - 0xFEE0); }).replace(/[\s\-‐-―−－ㅡ]/g, ""); return /\d{13}/.test(t); }
+  // 사업자번호 보이는 글(옛 [상세 ›] 창) — 개인 거래처 '개인(사업자 없음)' · 13자리는 빈 글(원문 숨김) · 그 밖 적은 그대로
+  function cliBizShown(c){ if (!c) return ""; if (c.indiv) return "개인(사업자 없음)"; return cliBiz13(c.biz_no) ? "" : String(c.biz_no == null ? "" : c.biz_no).trim(); }
+  // 사업자번호 검색 글(전역 검색 줄·hay, 표 검색 글 앞머리 — v441 검토): 개인 거래처·13자리는 빈 글. '개인(사업자 없음)'을 hay에 넣으면 '개인'·'사업자'로 찾은 개인 거래처를 폰에서 누를 때
+  //   옛 검색칸(상호·사업자번호·담당자만 봄 — 해시 고정)이 빈 목록이 됐다 — 그 글은 표 검색 글 뒤쪽에만(PC 표에서는 '개인'으로 찾힘)
+  function cliBizHay(c){ if (!c || c.indiv) return ""; return cliBiz13(c.biz_no) ? "" : String(c.biz_no == null ? "" : c.biz_no).trim(); }
+  // 기성·계약 → 대장 거래처: 번호(숫자)가 같은 대장 거래처가 먼저, 없으면 상호 열쇠가 같은 거래처를 대장 순서로 — 두 번호가 모두 10자리이고 서로 다르면 건너뜀(위 주석 — 계약은 번호 없음), 없으면 null(대장 밖)
+  function cliResolve(x, name, num){
+    var b = cliDigits(num), k, L, i, cb;
+    if (b && x.byBn["#" + b]) return x.byBn["#" + b];
+    k = cliNameKey(name); L = k ? (x.byNm["#" + k] || []) : [];
+    for (i = 0; i < L.length; i++){ cb = cliDigits(L[i].biz_no); if (b.length === 10 && cb.length === 10 && cb !== b) continue; return L[i]; }
+    return null;
+  }
+  function cliLinkIdx(){
+    var x, outs = {}, order = [], seeRec, seeCon, addOut;
+    if (CLI_LINK) return CLI_LINK;
+    x = { live: [], ids: {}, byBn: {}, byNm: {}, rec: {}, con: {}, out: [], outBy: {} };
+    clients.forEach(function(c){ var b, k; if (!c || c.del === 1) return; x.live.push(c); x.ids[c.id] = 1; b = cliDigits(c.biz_no); k = cliNameKey(c.name); if (b && !x.byBn["#" + b]) x.byBn["#" + b] = c; if (k) (x.byNm["#" + k] = x.byNm["#" + k] || []).push(c); });   // 상호 열쇠는 대장 순서 목록(v441 검토 — 번호가 다른 거래처를 건너뛰고 다음 후보로: cliResolve)
+    seeRec = canSee("rec"); seeCon = canSee("con");
+    // 대장 밖 상호 — 열쇠마다 한 줄(원문 표기가 여럿이면 가장 많이 쓴 것 · 같으면 먼저 나온 것을 이름으로), 기성 공급받는자 번호는 사업자번호 꼴(10자리)이 하나뿐일 때만 남김
+    addOut = function(nm, it, isRec){
+      var raw = String(nm == null ? "" : nm).trim(), k = cliNameKey(raw), o, b;
+      if (!k) return;
+      o = outs["#" + k];
+      if (!o){ o = outs["#" + k] = { id: "out:" + k, out: 1, key: k, name: raw, raws: {}, recs: [], recAll: 0, cons: [], bns: {}, biz: "" }; order.push(o); }
+      o.raws["#" + raw] = (o.raws["#" + raw] || 0) + 1;
+      if (isRec){ o.recAll++; if (!it.paid) o.recs.push(it); b = cliDigits(it.client_num); if (b.length === 10) o.bns["#" + b] = 1; }
+      else o.cons.push(it);
+    };
+    liveRec().forEach(function(r){ var c; if (!recVisible(r)) return; c = cliResolve(x, r.client, r.client_num); if (c){ if (!r.paid) (x.rec[c.id] = x.rec[c.id] || []).push(r); } else if (seeRec) addOut(r.client, r, true); });
+    liveContracts().forEach(function(k){ var c = cliResolve(x, k.client, ""); if (c) (x.con[c.id] = x.con[c.id] || []).push(k); else if (seeCon) addOut(k.client, k, false); });
+    order.forEach(function(o){ var best = 0, bs = Object.keys(o.bns); Object.keys(o.raws).forEach(function(r){ if (o.raws[r] > best){ best = o.raws[r]; o.name = r.slice(1); } }); o.biz = bs.length === 1 ? bs[0].slice(1) : ""; x.outBy[o.id] = o; });
+    x.out = order;
+    CLI_LINK = x;
+    try { Promise.resolve().then(function(){ if (CLI_LINK === x) CLI_LINK = null; }); } catch(e){}
+    return x;
+  }
+  // 미수(입금 전·보이는 기성) — 대장 거래처는 묶어 센 잇기에서(사본을 돌려줌 — 옛 상세 창이 정렬함), 대장 밖(지운 거래처 등)은 같은 규칙으로 직접(번호 같음 또는 상호 열쇠 같음 — 겹침 정리 없음)
   function cliUnpaid(cli){
-    var digits = function(s){ return String(s||"").replace(/[^0-9]/g,""); };
-    var bn = digits(cli.biz_no), nm = (cli.name||"").trim();
-    return liveRec().filter(function(r){
-      if (r.paid || !recVisible(r)) return false;
-      if (bn && r.client_num && digits(r.client_num) === bn) return true;
-      return nm !== "" && (r.client||"").trim() === nm;
-    });
+    var x, bn, k;
+    if (!cli) return [];
+    x = cliLinkIdx();
+    if (x.ids[cli.id]) return (x.rec[cli.id] || []).slice();
+    bn = cliDigits(cli.biz_no); k = cliNameKey(cli.name);
+    return liveRec().filter(function(r){ var rb; if (r.paid || !recVisible(r)) return false; rb = cliDigits(r.client_num); if (bn && rb === bn) return true; if (bn.length === 10 && rb.length === 10) return false; return k !== "" && cliNameKey(r.client) === k; });   // 번호가 둘 다 10자리이고 다르면 상호가 같아도 아님(cliResolve와 같은 판정)
   }
   function cliContracts(cli){
-    var nm=(cli.name||"").trim(); if(!nm) return [];
-    return liveContracts().filter(function(c){ return (c.client||"").trim()===nm; });
+    var x, k;
+    if (!cli) return [];
+    x = cliLinkIdx();
+    if (x.ids[cli.id]) return (x.con[cli.id] || []).slice();
+    k = cliNameKey(cli.name); if (!k) return [];
+    return liveContracts().filter(function(c){ return cliNameKey(c.client) === k; });
   }
+  // 삭제 확인 글(표 펼침 [삭제]·수정 창 [삭제] — v441 전엔 수정 창 삭제에 확인이 없었다)
+  function cliDelMsg(c){ return "이 거래처를 대장에서 삭제할까요?\n" + ((c && c.name) || "(상호없음)") + "\n(지운 표시만 남깁니다 — 미수·계약 기록은 그대로이고, 그 이름은 표 아래 '대장에 없는 이름'으로 다시 보일 수 있습니다)"; }
+  // 같은 거래처 의심(추가·수정 창 저장·[대장에 추가]·409 병합 — 사람 확인) — 사업자번호(숫자)가 같거나, 상호 열쇠가 같고 두 사업자번호가 서로 다르지 않은 살아 있는 거래처(list — 없으면 대장 전체)
+  function cliTwinOf(name, biz, exceptId, list){
+    var k = cliNameKey(name), b = cliDigits(biz), i, c, cb, L = list || clients;
+    for (i = 0; i < L.length; i++){
+      c = L[i]; if (!c || c.del === 1 || c.id === exceptId) continue;
+      cb = cliDigits(c.biz_no);
+      if (b && cb && b === cb) return { c: c, by: "biz" };
+      if (k && cliNameKey(c.name) === k && !(b && cb && b !== cb)) return { c: c, by: "name" };
+    }
+    return null;
+  }
+  // 개인 거래처 체크 — 사업자번호 칸을 잠금(저장 때 비움)
+  function cliIndivSync(){ var ind = document.getElementById("cliIndiv"), b = document.getElementById("cliBizNo"); if (!ind || !b) return; b.disabled = !!ind.checked; b.placeholder = ind.checked ? "개인 거래처 — 사업자번호 없음" : "사업자번호 (선택)"; }
   function cliRelatedDocs(cli){
     var nm=(cli.name||"").trim(); if(!nm || typeof documents==="undefined") return [];
     return documents.filter(function(d){ return d && d.del!==1 && (((d.title||"")+" "+(d.category||"")).indexOf(nm)>=0); });
   }
-  // 거래처 통합 뷰: 미수·계약·관련문서 한눈에
+  // 거래처 통합 뷰: 미수·계약·관련문서 한눈에(v441부터 폰 옛 목록의 [상세 ›]만 — PC 표는 펼침 하위 탭)
   function openCliDetail(id){
+    cliLinkReset();   // v441 잇기를 새로(이 창을 여는 사이 기성·계약이 바뀌었을 수 있음)
     var c=findCli(id); if(!c) return;
     document.getElementById("cliDetailTitle").textContent = c.name || "거래처";
     var html="";
     var info=[];
-    if(c.biz_no) info.push("사업자 "+esc(c.biz_no));
+    if(c.indiv) info.push("개인(사업자 없음)"); else if(cliBiz13(c.biz_no)) info.push("사업자번호 13자리(숨김) — 수정에서 지워 주세요"); else if(c.biz_no) info.push("사업자 "+esc(c.biz_no));   // v441 검토: 13자리(주민·법인등록번호 꼴) 원문을 이 창에도 그리지 않음 · 개인 거래처 표시
     if(c.contact) info.push("담당 "+esc(c.contact)+(c.phone?" "+esc(c.phone):""));
     else if(c.phone) info.push(esc(c.phone));
     if(c.address) info.push(esc(c.address));
@@ -20208,7 +20330,8 @@
       } else html+='<div class="crm-empty">미수 없음</div>';
       html+='</div>';
     }
-    // 계약
+    // 계약(v441 검토: 계약 권한이 있을 때만 — PC 표 하위 탭과 같은 규칙, 로그인 창 '전환'은 앞사람이 읽은 계약을 메모리에 남길 수 있음)
+    if(canSee("con")){
     var cons=cliContracts(c);
     html+='<div class="crm-sec"><div class="crm-h">계약 <span>'+cons.length+'건</span></div>';
     if(cons.length){
@@ -20218,8 +20341,9 @@
       }).join("");
     } else html+='<div class="crm-empty">계약 없음</div>';
     html+='</div>';
-    // 관련 문서(상호명 매칭)
-    var docs=cliRelatedDocs(c);
+    }
+    // 관련 문서(상호명 매칭 — v441 검토: 문서함 권한이 있을 때만, PC 표와 같은 규칙)
+    var docs=canSee("doc")?cliRelatedDocs(c):[];
     if(docs.length){
       html+='<div class="crm-sec"><div class="crm-h">관련 문서 <span>'+docs.length+'건</span></div>';
       html+=docs.slice(0,12).map(function(d){ return '<div class="crm-row"><span class="crm-row-t">'+esc(d.title||"-")+'</span><span class="crm-sub">'+esc(d.category||"")+'</span></div>'; }).join("");
@@ -20230,7 +20354,9 @@
     if(eb){ if(canDo("cli")){ eb.style.display=""; eb.onclick=function(){ document.getElementById("cliDetailBackdrop").classList.remove("show"); openCliModal(id); }; } else eb.style.display="none"; }
     document.getElementById("cliDetailBackdrop").classList.add("show");
   }
-  function renderClients(){
+  // v441: 옛 그리기 본문(폰 859px 이하 — 표 정의 phone:"legacy"가 부름). 본문 글자 그대로(uismoke v441 ⑪이 v440 renderClients 본문 해시와 대조 — 고치면 폰 화면이 바뀐다).
+  //   거래처 탭 입구 renderClients는 아래 @cli-sheet 구간의 갈래 함수다(이 함수를 정의의 legacy로 넘김 — 입구를 넘기면 부품 재진입 가드로 폰 화면이 빈다)
+  function renderClientsLegacy(){
     var host = document.getElementById("cliList"); if (!host) return;
     var admin = canDo("cli");
     var addBtn = document.getElementById("cliAddBtn"); if (addBtn) addBtn.style.display = admin ? "block" : "none";
@@ -20282,6 +20408,320 @@
       el.addEventListener("click", function(e){ e.stopPropagation(); openCliModal(el.getAttribute("data-cli-edit")); });
     });
   }
+  // @cli-sheet-start
+  // v441(45-1 넷째 판 — 명세 09_조사_문서/표형탭_시안_자료_20261110/엑셀형탭_명세_20261110.json sections[key=clients] · 단계지시_v441_거래처.json · PM 11/10 15:56 결정 ④):
+  // PC(860px 이상) = 공통 부품(vsSheetRender) 표 한 장 — 자리는 폰 옛 목록과 같은 #cliList(v439 지시처럼 두 갈래가 한 자리를 씀 · 표 위 검색칸 cliSheetQ, 옛 검색칸 #cliSearch는 표 갈래에서 숨김).
+  //   열 10(명세 순서): 상호 · 사업자번호 · 담당자 · 연락처 · 미수 · 계약 · 처리업소 · 메모 · 이메일 · 주소 — 미수 열·'미수 있음' 칩·미수 하위 탭은 기성 권한(canSee rec)만, 계약 열·'계약 진행 중' 칩·
+  //   계약 하위 탭은 계약 권한(canSee con)만, 이메일·주소(열·펼침·검색 글)는 거래처 수행(canDo cli)만, 관련 문서 하위 탭은 문서함 권한(canSee doc)만. 권한이 바뀌면(로그인 창 '전환' — 새로고침 없음)
+  //   정의의 열·칩을 그 사람 것으로 다시 고른다(cliSheetDef — 권한 조합마다 한 벌). 단계별 열 합(관리자) 860 694 / 1280 962 / 1600 1,282(한도 742 / 962 / 1,282 안) — 칸 폭은 운영 백업 실측(맑은 고딕):
+  //   상호 180 → 196(대장 밖 상호 15자 178.1px) · 계약 96 → 104('진행 1 · 완료 2' 84.1px) · 처리업소 72 → 80(머리 + 정렬 화살표 63px), 그만큼 메모 최소 150 → 132 · 주소 180 → 170.
+  // 줄 누르기 = 펼침 — 하위 탭 개요 · 미수 (n) · 계약 (n) · 관련 문서 (n)(종전 [상세 ›] 창 — 폰 옛 목록에는 그대로). 계약 줄을 누르면 계약 탭에서 그 계약을 펼친다(cliSheetGoCon).
+  //   바꾸는 버튼([수정]·[삭제](확인 창)·[대장에 추가])은 .mini-btn + 거래처 수행일 때만 — 누름 길(cliSheetAct)도 권한을 다시 본다. 읽기 토글(칩·하위 탭·[닫기 ▲])은 .vs-chip·.vs-stab.
+  //   배선은 펼침 칸 root 하나(cliSheetBindAct — 자리 #cliList에는 걸지 않음) · 연속 누름 막기(v440 recSheetBindAct와 같은 꼴 — 더블클릭 둘째 누름·처리 뒤 0.5초 CLI_ACT_GAP).
+  // 표 아래 묶음 '대장에 없는 이름'(결정 ④ — 거래처 수행만, 기본 접힘): 계약·기성에는 있는데 대장에 이어지지 않은 상호를 열쇠(cliNameKey)로 묶은 줄 —
+  //   [대장에 추가] = 상호만 채운 새 거래처(자동으로 넣지 않음 · 누를 때 이 기기의 대장·계약·기성으로 다시 맞춰 보고 그새 이어졌으면 만들지 않음 — 다른 기기가 그새 넣은 것은 저장의 409가 알려
+  //   서버 대장을 다시 읽어 합친 뒤 같은 거래처가 둘이면 알림: saveClients). 같은 공급받는자 번호의 다른 대장 밖 이름·상호가 같은 대장 거래처가 있으면 확인 창(사람 확인). 합계 줄·'보이는 n곳 / 전체 m곳'은 묶음 줄을 빼고 센다.
+  //   대장을 아직 못 읽었으면(cliLoaded — 읽는 중·실패) 묶음을 그리지 않고 [대장에 추가]·창 저장을 막는다(계약·기성 상호가 모두 '대장에 없음'으로 보이고, 빈 대장 저장은 서버 대장을 통째로 바꿈 — v441 검토).
+  // 폰(859px 이하) = phone:"legacy" — 옛 그리기 본문 renderClientsLegacy(접는 줄 + 2열 세로표 + [상세 ›] 창 — 본문 글자 그대로)를 부른다. 퀴즈 2번 답(C063) 확인 중이라
+  //   '폰도 새 표'면 phone 한 줄만 "sheet"(폰 열 상호 38 · 연락처 36 · 미수 26 % — 미수 열이 없으면 52 · 48, 폰 합계 '합계 n곳 · 미수' — 미리 넣어 둠).
+  // 그대로 두는 것: 전역 검색 searchId cliSearch(폰 옛 검색칸) · 추가·수정 창(처리업소 체크 — 배출신고서 후보) · del=1 소프트 삭제 · cliUnpaid·cliContracts·cliRelatedDocs 계산 · saveClients 저장 길.
+  var CLI_SHEET_DEF = null, CLI_SHEET_COLS = {}, CLI_SHEET_CHIPS = {}, cliSheetCur = "", cliDetTab = "", cliDetRow = "";
+  var CLI_DASH = '<span style="color:#9AA09C;">-</span>';
+  var CLI_ACT_GAP = 500, cliSheetActAt = 0;
+  // 행 원천 = 대장(지우지 않은 거래처) + 거래처 수행이고 대장을 읽었으면 대장 밖 상호 줄(묶음 'out') — 칩·건수·검색·펼침·그 행 열기가 모두 이것만
+  function cliSheetRows(){ var x = cliLinkIdx(); return (canDo("cli") && cliLoaded) ? x.live.concat(x.out) : x.live.slice(); }
+  // 탭에 올 때(switchTab "cli") — 대장을 아직 못 읽었으면 다시 읽고(못 읽은 동안은 저장을 막아 이 기기에 고친 것이 없음), PC 표 갈래면 다시 그림(미수·계약 열·대장 밖 묶음은 기성·계약에서 끌어오므로).
+  //   폰 옛 목록(legacy)은 다시 그리지 않는다(v441 검토 — v440처럼 펼쳐 둔 줄이 그대로: 옛 목록 펼침은 DOM에만 있음). 아직 한 번도 안 그렸으면 그림
+  function cliSheetOnTab(){ cliReloadIfUnread(); if (cliSheetCur !== "legacy") renderClients(); }
+  function cliSheetUnp(r){ return r.out ? r.recs : cliUnpaid(r); }
+  function cliSheetCons(r){ return r.out ? r.cons : cliContracts(r); }
+  function cliSheetRun(r){ var n = 0; cliSheetCons(r).forEach(function(c){ if (c.status !== "done") n++; }); return n; }   // 진행 = 완료(done)가 아닌 계약(옛 상세 창과 같은 판정)
+  function cliSheetUnpSum(L){ var s = 0; L.forEach(function(x){ s += Number(x.amount) || 0; }); return s; }
+  function cliSheetUnpTxt(L){ var s = cliSheetUnpSum(L); return (s ? recSheetMoney(s) : "0") + "원 · " + L.length + "건"; }   // 부호 살림(v440 recSheetMoney — 수정세금계산서 음수)
+  // 사업자번호 칸 — 개인 거래처 '개인(사업자 없음)'(회색) · 빈 칸 노랑 '미입력' · 13자리 노랑 '13자리(숨김)'(원문은 수정 창에만 — 지우라는 뜻) · 10자리 NNN-NN-NNNNN · 그 밖 적은 그대로
+  function cliBizKind(c){ var raw = String(c.biz_no == null ? "" : c.biz_no).trim(); if (c.indiv) return "indiv"; if (!raw) return "empty"; if (cliBiz13(raw)) return "id13"; return recSheetBizFmt(raw) ? "biz" : "other"; }
+  function cliBizTxt(c){ var k = cliBizKind(c), raw = String(c.biz_no == null ? "" : c.biz_no).trim(); return k === "indiv" ? "개인(사업자 없음)" : (k === "empty" ? "미입력" : (k === "id13" ? "13자리(숨김)" : (k === "biz" ? recSheetBizFmt(raw) : raw))); }
+  function cliBizHtml(c){ var k = cliBizKind(c), t = cliBizTxt(c); if (k === "indiv") return '<span class="rec-st paid">' + t + '</span>'; if (k === "empty" || k === "id13") return '<span class="rec-st wait">' + t + '</span>'; return esc(t); }
+  function cliBizTitle(c){ var k = cliBizKind(c); return k === "empty" ? "사업자번호를 아직 넣지 않았습니다 — [수정]에서" : (k === "id13" ? "사업자번호 칸에 13자리 번호(주민·법인등록번호 꼴)가 있습니다 — 원문은 보이지 않습니다, [수정]에서 지워 주세요" : cliBizTxt(c)); }
+  // 값(거르기·고르기 목록·정렬 기본) — 빈 값은 ""(정렬에서 방향과 상관없이 뒤). 사업자번호 정렬 값은 번호가 있는 줄만(미입력·개인·13자리는 빈 값), 거르기 글은 칸 글(ft — '미입력'으로도 거름)
+  function cliSheetVal(r, k){
+    var L;
+    if (k === "name") return r.name || "";
+    if (k === "unpaid"){ L = cliSheetUnp(r); return L.length ? cliSheetUnpSum(L) : ""; }
+    if (k === "con") return cliSheetCons(r).length ? cliSheetRun(r) : "";
+    if (r.out) return "";
+    if (k === "biz"){ L = cliBizKind(r); return (L === "biz" || L === "other") ? cliBizTxt(r) : ""; }
+    if (k === "contact") return r.contact || "";
+    if (k === "phone") return r.phone || "";
+    if (k === "proc") return r.waste_proc ? "처리업소" : "";
+    if (k === "note") return r.note || "";
+    if (k === "email") return r.email || "";
+    if (k === "addr") return r.address || "";
+    return "";
+  }
+  // 정렬 값만 따로 — 계약은 진행 수 먼저, 같으면 완료 수(진행 × 10000 + 완료)
+  function cliSheetSv(r, k){ var L, n; if (k === "con"){ L = cliSheetCons(r); if (!L.length) return ""; n = cliSheetRun(r); return n * 10000 + (L.length - n); } return cliSheetVal(r, k); }
+  function cliSheetCell(r, c, ctx){
+    var k = c.k, L, t, n;
+    if (k === "name") return { html: esc(r.name || "(상호없음)"), title: r.name || "" };
+    if (k === "unpaid"){ L = cliSheetUnp(r); if (!L.length) return CLI_DASH; t = cliSheetUnpTxt(L); return { html: '<span class="cli-unp">' + esc(t) + '</span>', title: "미수 " + t }; }
+    if (k === "con"){ L = cliSheetCons(r); if (!L.length) return CLI_DASH; n = cliSheetRun(r); t = "진행 " + n + " · 완료 " + (L.length - n); return { html: esc(t), title: "계약 " + t }; }
+    if (r.out) return CLI_DASH;
+    if (k === "biz") return { html: cliBizHtml(r), title: cliBizTitle(r) };
+    if (k === "proc") return r.waste_proc ? { html: "처리업소", title: "폐기물 처리업소 — 배출신고서 처리업체 후보" } : CLI_DASH;
+    t = k === "contact" ? r.contact : (k === "phone" ? r.phone : (k === "note" ? r.note : (k === "email" ? r.email : (k === "addr" ? r.address : ""))));
+    return t ? { html: esc(t), title: String(t) } : CLI_DASH;
+  }
+  // 합계 줄 — 묶음 줄(대장 밖) 빼고(명세): 상호 칸 '합계 n곳' · 사업자번호 칸 '미입력 n' · 미수 합·건수 · 계약 칸 '진행 n' · 처리업소 칸 'n곳'(80px 칸 안 폭 63에 '처리업소 n곳' 굵게 81px가 안 들어가 title로) /
+  //   폰 = '합계 n곳 · 미수'
+  function cliSheetFoot(rows, ctx){
+    var L = rows.filter(function(r){ return !r.out; }), nB = 0, nP = 0, run = 0, U = [], o, t;
+    L.forEach(function(r){ if (cliBizKind(r) === "empty") nB++; if (r.waste_proc) nP++; run += cliSheetRun(r); Array.prototype.push.apply(U, cliUnpaid(r)); });
+    o = { name: "합계 " + L.length + "곳" };
+    // v441 시험 화면(11/11): PC 합계 줄 미수 칸(130px·굵게)은 1억 넘는 합 + 건수가 잘림(1100·1366 실측 3px) — 1280·1600 단계 열 합이 한도라 칸을 못 넓혀 PC는 금액만, 건수는 title(폰 sheet 준비 합계는 그대로)
+    if (U.length){ t = cliSheetUnpTxt(U); o.unpaid = '<span title="미수 ' + esc(t) + '">' + esc(ctx.phone ? t : (cliSheetUnpSum(U) ? recSheetMoney(cliSheetUnpSum(U)) : "0") + "원") + '</span>'; } else o.unpaid = "";
+    if (ctx.phone) return o;
+    o.biz = "미입력 " + nB; o.con = "진행 " + run; o.proc = '<span title="처리업소 ' + nP + '곳">' + nP + '곳</span>';
+    return o;
+  }
+  function cliSheetKv(k, v){ return '<div><div class="k">' + esc(k) + '</div><div class="v">' + v + '</div></div>'; }
+  // 하위 탭 — 대장 줄: 개요 · 미수 (n)(기성 권한) · 계약 (n)(계약 권한) · 관련 문서 (n)(문서함 권한) / 대장 밖 줄: 미수 (n) · 계약 (n)(같은 권한)
+  function cliSheetTabs(r){
+    var a = [];
+    if (!r.out) a.push({ k: "ov", h: "개요" });
+    if (canSee("rec")) a.push({ k: "rec", h: "미수 (" + cliSheetUnp(r).length + ")" });
+    if (canSee("con")) a.push({ k: "con", h: "계약 (" + cliSheetCons(r).length + ")" });
+    if (!r.out && canSee("doc")) a.push({ k: "doc", h: "관련 문서 (" + cliRelatedDocs(r).length + ")", tip: cliSheetDocNote(r) });   // 셈은 cliRelatedDocs 그대로(명세 kept) — 미수·계약(열쇠·번호로 이음)과 찾는 법이 달라 탭에 마우스를 대면 그 안내
+    return a;
+  }
+  // 관련 문서 찾는 법 안내(v441 검토) — 상호 글자 그대로 제목에서 찾음: '(주)'·띄어쓰기가 다른 제목은 빠지고, 상호가 짧으면(열쇠 2자 이하) 이름이 들어간 다른 문서가 섞일 수 있음
+  function cliSheetDocNote(r){ return "문서함 제목에 상호 글자가 그대로 들어간 문서 — '(주)'·띄어쓰기가 다른 제목은 빠집니다" + (cliNameKey(r.name).length <= 2 ? " · 상호가 짧아(2자 이하) 이름이 들어간 다른 문서가 섞였을 수 있습니다" : ""); }
+  // 고른 하위 탭 — 다른 줄을 펼치면 첫 탭(개요)으로 · 권한이 바뀌어 없는 탭이면 첫 탭(메모리만)
+  function cliSheetTabOf(r, tabs){
+    var id = String(r.id), ok = function(k){ return tabs.some(function(t){ return t.k === k; }); };
+    if (cliDetRow !== id){ cliDetRow = id; cliDetTab = ""; }
+    if (!ok(cliDetTab)) cliDetTab = tabs.length ? tabs[0].k : "";
+    return cliDetTab;
+  }
+  // 같은 상호 열쇠·사업자번호의 다른 거래처(대장 안 겹침) — 미수·계약은 대장 순서 첫 거래처에만 붙는다(cliLinkIdx)
+  function cliSheetTwins(r){ var k = cliNameKey(r.name), b = cliDigits(r.biz_no); return cliLinkIdx().live.filter(function(c){ return c !== r && ((k && cliNameKey(c.name) === k) || (b && cliDigits(c.biz_no) === b)); }).length; }
+  function cliSheetOv(r){
+    var cd = canDo("cli"), tw = cliSheetTwins(r), h = '<div class="vs-kv">'
+      + cliSheetKv("사업자번호", cliBizHtml(r) + (cliBizKind(r) === "id13" ? ' <span class="vs-dsub">' + esc(cliBizTitle(r)) + '</span>' : ''))
+      + cliSheetKv("담당자", r.contact ? esc(r.contact) : CLI_DASH)
+      + cliSheetKv("연락처", r.phone ? esc(r.phone) : CLI_DASH)
+      + (cd ? cliSheetKv("이메일", r.email ? esc(r.email) : CLI_DASH) + cliSheetKv("주소", r.address ? esc(r.address) : CLI_DASH) : '')
+      + cliSheetKv("처리업소", r.waste_proc ? "예 — 배출신고서 처리업체 후보" : "아니오")
+      + cliSheetKv("메모", r.note ? esc(r.note) : CLI_DASH)
+      + cliSheetKv("등록일", isDate(r.created) ? esc(r.created) : CLI_DASH)
+      + cliSheetKv("고친 날", isDate(r.updated) ? esc(r.updated) : CLI_DASH)
+      + '</div>';
+    if (tw) h += '<div class="vs-dsub" style="margin-top:6px;">같은 상호(또는 사업자번호)의 거래처가 대장에 ' + tw + '곳 더 있습니다 — 미수·계약은 대장에 먼저 올린 거래처에만 붙습니다</div>';
+    return h;
+  }
+  function cliSheetRecTab(r){
+    var L = cliSheetUnp(r).slice().sort(function(a, b){ var x = a.billed || "", y = b.billed || ""; return x < y ? -1 : (x > y ? 1 : 0); });
+    if (!L.length) return '<div class="vs-empty">미수 없음</div>';
+    return '<table class="vs-hist"><thead><tr><th>청구일</th><th>내역</th><th>경과</th><th class="num">금액(원)</th></tr></thead><tbody>'
+      + L.map(function(x){ var ag = x.billed ? recAging(x.billed) : null; return '<tr><td>' + (isDate(x.billed) ? esc(x.billed) : "-") + '</td><td>' + esc(x.desc || x.client || "청구") + '</td><td>' + (ag ? '<span class="rec-age ' + ag.cls + '">' + ag.days + '일</span>' : "-") + '</td><td class="num">' + (Number(x.amount) ? recSheetMoneyHtml(x.amount) : "-") + '</td></tr>'; }).join("")
+      + '</tbody></table><div class="vs-dsub" style="margin-top:4px;">' + esc(cliSheetUnpTxt(L)) + '</div>';
+  }
+  function cliSheetConTab(r){
+    var L = cliSheetCons(r);
+    if (!L.length) return '<div class="vs-empty">계약 없음</div>';
+    return '<div class="vs-dsub" style="margin:0 0 4px;">줄을 누르면 계약 탭에서 그 계약을 펼칩니다</div><table class="vs-hist"><thead><tr><th>계약</th><th>상태</th><th>시작일</th></tr></thead><tbody>'
+      + L.map(function(c){ return '<tr class="cli-conrow" data-cli-con="' + esc(c.id) + '" title="계약 탭에서 펼침"><td>' + esc(csTitle(c) || c.label || "계약") + '</td><td>' + (c.status === "done" ? '<span class="from-chip">완료</span>' : '<span class="review-chip">진행</span>') + '</td><td>' + (isDate(c.start) ? esc(c.start) : "-") + '</td></tr>'; }).join("")
+      + '</tbody></table>';
+  }
+  function cliSheetDocTab(r){
+    var L = cliRelatedDocs(r), h;
+    if (!L.length) return '<div class="vs-empty">관련 문서 없음 — 상호 글자가 그대로 제목에 들어간 문서함 문서를 모읍니다(\'(주)\'·띄어쓰기가 다른 제목은 빠짐)</div>';
+    h = '<div class="vs-dsub" style="margin:0 0 4px;">' + esc(cliSheetDocNote(r)) + '</div>'   // v441 검토: 늘 — 미수·계약과 찾는 법이 달라 같은 열쇠의 다른 거래처에 문서가 붙을 수 있음
+      + '<table class="vs-hist"><thead><tr><th>문서번호</th><th>제목</th></tr></thead><tbody>'
+      + L.slice(0, 12).map(function(d){ return '<tr><td>' + esc(d.no || "-") + '</td><td>' + esc(d.title || "-") + (d.category ? ' <span class="vs-dsub">' + esc(d.category) + '</span>' : '') + '</td></tr>'; }).join("") + '</tbody></table>';
+    return h + (L.length > 12 ? '<div class="vs-dsub" style="margin-top:4px;">외 ' + (L.length - 12) + '건 — 문서함에서 상호로 찾아보세요</div>' : '');
+  }
+  // 대장 밖 줄의 같은 회사 의심(v441 검토 — 묶음은 상호 열쇠로만 묶음): 같은 공급받는자 번호(10자리)를 가진 다른 대장 밖 줄(그 줄과 겹치는 번호 nums) · 상호 열쇠가 같은 대장 거래처(기성 번호가 달라 잇지 않음 — cliResolve)
+  function cliSheetOutSibs(o, x){ var nums = {}, L; x = x || cliLinkIdx(); L = x.out.filter(function(p){ var hit = false; if (p === o) return false; Object.keys(o.bns).forEach(function(b){ if (p.bns[b]){ hit = true; nums[b] = 1; } }); return hit; }); return { rows: L, nums: Object.keys(nums).map(function(b){ return recSheetBizFmt(b.slice(1)) || b.slice(1); }) }; }
+  function cliSheetOutLedger(o, x){ x = x || cliLinkIdx(); return x.byNm["#" + o.key] || []; }
+  // 대장 밖 줄 안내 — 어디에 몇 건 · 표기가 여럿이면 그 수 · 기성 공급받는자 번호(사업자번호 꼴 하나뿐일 때만, 기성 권한) · 같은 번호의 다른 대장 밖 이름 · 상호가 같은 대장 거래처(번호 다름)
+  function cliSheetOutInfo(o){
+    var a = [], n = Object.keys(o.raws).length, sib = cliSheetOutSibs(o), led = cliSheetOutLedger(o);
+    if (canSee("con")) a.push("계약 " + o.cons.length + "건");
+    if (canSee("rec")) a.push("기성 " + o.recAll + "건(미수 " + o.recs.length + ")");
+    return '<div class="vs-dsub" style="margin:0 0 6px;">' + esc(a.join(" · ")) + '에 이 상호가 있는데 거래처 대장에는 없습니다'
+      + (n > 1 ? ' · 표기 ' + n + '가지(\'(주)\'·띄어쓰기만 다름)' : '') + (o.biz && canSee("rec") ? ' · 기성 공급받는자 번호 ' + esc(recSheetBizFmt(o.biz) || "") : '')
+      + (sib.rows.length && canSee("rec") ? ' · 같은 공급받는자 번호(' + esc(sib.nums.join(", ")) + ')의 다른 대장 밖 이름: ' + esc(sib.rows.map(function(p){ return p.name; }).join(", ")) + '(같은 회사면 하나만 추가하고 [수정]에서 사업자번호를 넣으면 나머지도 이어짐)' : '')
+      + (led.length && canSee("rec") ? ' · 상호가 같은 대장 거래처: ' + esc(led.map(function(c){ return c.name || "(상호없음)"; }).join(", ")) + '(기성 공급받는자 번호가 달라 잇지 않음)' : '')
+      + (canDo("cli") ? ' — [대장에 추가]는 상호만 채운 새 거래처를 만듭니다(사업자번호·담당자 등은 추가한 뒤 [수정])' : '') + '</div>';
+  }
+  function cliSheetBtn(act, id, h, cls, tip){ return '<button type="button" class="mini-btn' + (cls ? " " + cls : "") + '" data-cli-act="' + act + '" data-cli-id="' + esc(id) + '"' + (tip ? ' title="' + esc(tip) + '"' : '') + '>' + h + '</button>'; }
+  // 펼침 버튼 — 거래처 수행만: 대장 줄 [수정] · [삭제](확인 창) / 대장 밖 줄 [대장에 추가]
+  function cliSheetDetBtns(r){
+    if (!canDo("cli")) return "";
+    if (r.out) return cliSheetBtn("addout", r.id, "대장에 추가", "", "상호만 채운 새 거래처를 만듭니다 — 사업자번호·담당자 등은 추가한 뒤 [수정]에서");
+    return cliSheetBtn("edit", r.id, "수정") + cliSheetBtn("del", r.id, "삭제", "danger", "확인 창을 거쳐 대장에서 지웁니다");
+  }
+  // 펼침 — 머리(상호 · 대장에 없음/처리업소 표시 · [닫기 ▲]) → (대장 밖 줄 안내) → 하위 탭 → 고른 탭 내용 → 버튼
+  function cliSheetDetail(r, ctx){
+    var tabs = cliSheetTabs(r), t = cliSheetTabOf(r, tabs), b = cliSheetDetBtns(r), h;
+    h = '<div class="vs-dh"><b>' + esc(r.name || "(상호없음)") + '</b>' + (r.out ? '<span class="rec-st wait">대장에 없음</span>' : (r.waste_proc ? '<span class="rec-st ok">처리업소</span>' : '')) + ctx.close + '</div>';
+    if (r.out) h += cliSheetOutInfo(r);
+    if (tabs.length > 1) h += '<div class="vs-stabs">' + tabs.map(function(x){ return '<button type="button" class="vs-stab' + (x.k === t ? ' on' : '') + '" data-cli-tab="' + x.k + '"' + (x.tip ? ' title="' + esc(x.tip) + '"' : '') + '>' + esc(x.h) + '</button>'; }).join("") + '</div>';   // 탭이 하나뿐(개요 — 기성·계약·문서함 모두 숨김)이면 탭 줄 없이 그 내용만
+    h += t === "ov" ? cliSheetOv(r) : (t === "rec" ? cliSheetRecTab(r) : (t === "con" ? cliSheetConTab(r) : (t === "doc" ? cliSheetDocTab(r) : "")));
+    return h + (b ? '<div class="vs-act">' + b + '</div>' : '');
+  }
+  // 누름 하나 — 그린 버튼과 같은 규칙을 여기서 다시 본다(보기 권한·화면에 없는 거래처는 아무것도 안 함). 실제 일은 기존 수정 창(openCliModal — 권한을 또 봄)·삭제·대장에 추가
+  function cliSheetAct(act, id){
+    var c;
+    if (!canDo("cli")) return;
+    if (act === "edit"){ c = findCli(id); if (c && c.del !== 1) openCliModal(id); }
+    else if (act === "del") cliSheetDelete(id);
+    else if (act === "addout") cliSheetAddOut(id);
+  }
+  // 위임 배선 하나 — 펼침 칸 root 안: 하위 탭(data-cli-tab — 읽기 토글, 칩 건수 그대로 다시 그림) · 계약 줄(data-cli-con — 계약 탭으로) · 버튼(data-cli-act — 연속 누름 막기:
+  //   더블클릭의 둘째 누름(e.detail 2 이상)과 처리 뒤 CLI_ACT_GAP(0.5초) 안의 누름은 버린다 — [대장에 추가]를 두 번 눌러 같은 거래처가 둘 생기지 않게, 시계가 뒤로 가면 막지 않음)
+  function cliSheetBindAct(root){
+    root.addEventListener("click", function(e){
+      var el = e && e.target, a = null, t = null, k = null, now, dt;
+      while (el && el !== root){
+        if (el.getAttribute){ a = el.getAttribute("data-cli-act"); t = el.getAttribute("data-cli-tab"); k = el.getAttribute("data-cli-con"); if (a != null || t != null || k != null) break; }
+        el = el.parentNode;
+      }
+      if (!el || el === root) return;
+      if (e.stopPropagation) e.stopPropagation();
+      if (t != null){ cliDetTab = t; vsSheetRenderKeep(cliSheetDef()); return; }
+      if (k != null){ cliSheetGoCon(k); return; }
+      if ((Number(e.detail) || 0) > 1) return;
+      now = Date.now(); dt = now - cliSheetActAt;
+      if (cliSheetActAt && dt >= 0 && dt < CLI_ACT_GAP) return;
+      cliSheetActAt = now;
+      cliSheetAct(a, el.getAttribute("data-cli-id"));
+    });
+  }
+  // 계약 줄 → 계약 탭에서 그 계약 펼침(계약 권한) — 계약 표의 칩·필터가 그 계약을 거르면 이번만 풀어 그린다(기기 저장 없음 — 안전 › 현황 sfNowGo와 같은 꼴), 그 줄로 굴림
+  function cliSheetGoCon(id){
+    var c = findProc(id), el;
+    if (!c || c.del === 1 || !canSee("con")) return false;
+    if (!csPass(c, conSheet.f, conSheet.chip)){ conSheet.f = {}; conSheet.chip = ""; }
+    conOpenId = id; conDetTab = "ov"; switchTab("con"); renderContracts();
+    try { el = document.querySelector('[data-cs-row="' + vsAttrQ(id) + '"]'); if (el && el.scrollIntoView) el.scrollIntoView({ block: "center" }); } catch(e){}
+    return true;
+  }
+  // [삭제] — 확인 창(cliDelMsg) 뒤 지운 표시(del=1 — 종전 수정 창 삭제와 같은 소프트 삭제), 거래처 수행만
+  function cliSheetDelete(id){
+    var c = findCli(id);
+    if (!canDo("cli") || !c || c.del === 1) return false;
+    if (!confirm(cliDelMsg(c))) return false;
+    c.del = 1; c.updated = todayStr(); cliMarkDirty(c.id);
+    renderClients(); saveClients();
+    return true;
+  }
+  // [대장에 추가](결정 ④) — 누를 때 이 기기의 잇기를 새로 맞춰 봐서 그 상호가 아직 대장 밖일 때만 상호만 채운 새 거래처(나머지 칸은 빈 값 — [수정]으로). 그새 이 기기에서 이어졌으면(같은 이름 추가·번호 입력) 만들지 않는다
+  //   (다른 기기가 그새 넣은 것은 이 기기 대장에 없어 여기서는 모름 — 저장의 409가 알려 서버 대장을 다시 읽어 합치고, 같은 거래처가 둘이 되면 알림: cliSaveConflict).
+  //   대장을 아직 못 읽었으면 막음(CLI_UNREAD_MSG) · 같은 공급받는자 번호의 다른 대장 밖 이름이나 상호가 같은 대장 거래처(번호 다름)가 있으면 확인 창(v441 검토 — 같은 회사를 두 번 넣지 않게, 사람 확인)
+  function cliSheetAddOut(id){
+    var x, o, c, today, sib, led, msg;
+    if (!canDo("cli")) return false;
+    if (!cliLoaded){ alert(CLI_UNREAD_MSG); return false; }
+    CLI_LINK = null; x = cliLinkIdx(); o = x.outBy[String(id)];
+    if (!o){ alert("이미 거래처 대장에 이어진 이름입니다 — 표를 다시 그렸습니다."); renderClients(); return false; }
+    sib = cliSheetOutSibs(o, x); led = cliSheetOutLedger(o, x);
+    if (sib.rows.length || led.length){
+      msg = "'" + o.name + "'을(를) 대장에 추가할까요?";
+      if (sib.rows.length) msg += "\n같은 공급받는자 번호(" + sib.nums.join(", ") + ")의 다른 이름도 대장 밖에 있습니다: " + sib.rows.map(function(p){ return p.name; }).join(", ") + " — 같은 회사면 하나만 추가하고 [수정]에서 사업자번호를 넣으면 나머지도 그 거래처에 이어집니다.";
+      if (led.length) msg += "\n상호가 같은 거래처가 대장에 있습니다: " + led.map(function(c2){ return c2.name || "(상호없음)"; }).join(", ") + " — 이 이름의 기성은 공급받는자 번호가 달라 잇지 않았습니다(다른 회사면 추가하고 [수정]에서 사업자번호를 넣으세요).";
+      if (!confirm(msg)) return false;
+    }
+    today = todayStr();
+    c = { id: genId("cl"), created: today, name: o.name, biz_no: "", contact: "", phone: "", email: "", address: "", note: "", waste_proc: 0, updated: today };
+    clients.push(c); cliMarkDirty(c.id);
+    renderClients(); saveClients();
+    cliSheetShowNew(c.id);
+    return true;
+  }
+  // 새 거래처([+ 거래처 추가]·[대장에 추가]): PC 표에 그 줄이 그려졌으면 그대로(펼치지 않음), 기억된 칩·거르기에 가려 안 보이면 그때만 그 줄을 연다(v440 recSheetShowNew와 같은 꼴 — 기기 기억은 덮지 않음)
+  function cliSheetShowNew(id){
+    var host = document.getElementById("cliList");
+    if (cliSheetCur !== "sheet" || !host || !host.querySelector) return false;
+    if (host.querySelector('[data-vs-row="' + vsAttrQ(id) + '"]')) return true;
+    return vsSheetReveal(cliSheetDef(), id);
+  }
+  // 검색칸 글 — 앞머리는 전역 검색(gsSources 거래처 항목 + gsRun hay = 상호 · 사업자번호 검색 글 cliBizHay · 상세 · 현장)과 같은 꼴이라 전역 검색에서 찾은 글자를 넣으면 그 거래처가 표에도 걸린다.
+  //   그 뒤에 표에서만 보는 글(사업자번호 NNN-NN-NNNNN 꼴 · 개인 거래처 '개인(사업자 없음)' · 담당자 · 연락처 · 메모 · 처리업소 · 거래처 수행이면 이메일·주소). 13자리 번호는 넣지 않는다 · 대장 밖 줄 = 상호 + '대장에 없음'
+  function cliSheetSearchText(r){
+    if (r.out) return [r.name || "", "대장에 없음"].join(" ");
+    return [(r.name || "") + " " + cliBizHay(r) + " " + (r.detail || "") + " " + (r.site || ""), cliBizKind(r) === "biz" ? cliBizTxt(r) : "", r.indiv ? "개인(사업자 없음)" : "", r.contact || "", r.phone || "", r.note || "", r.waste_proc ? "처리업소" : "", canDo("cli") ? (r.email || "") + " " + (r.address || "") : ""].join(" ");
+  }
+  // 전역 검색(🔍)에서 거래처를 누름(gsRun) — 칩·거르기 줄을 이번만 풀고 검색어를 넣은 뒤(vsSheetSeek) 누른 그 행을 연다(vsSheetReveal). 폰 옛 목록이면 false(옛 검색칸 cliSearch 길)
+  function cliSheetFromGs(q, id){ var def = cliSheetDef(); CLI_LINK = null; if (!vsSheetSeek(def, q)) return false; if (id) vsSheetReveal(def, id); return true; }
+  function cliSheetGroupLabel(g, n, open){ return '대장에 없는 이름 <span class="vs-dsub">계약·기성에는 있는데 거래처 대장에 없는 상호 — 줄을 펼쳐 [대장에 추가]</span>'; }
+  // 갈래가 정해질 때마다(부품 onMode) — 표 갈래: 옛 검색칸(#cliSearch)을 숨기고 제목 건수(대장 n곳)·[+ 거래처 추가](거래처 수행)를 정한다. 폰 갈래(legacy): 옛 검색칸을 되살린다(제목 건수·추가 버튼은 옛 본문이 정함)
+  function cliSheetMode(m){
+    var g = function(id){ return document.getElementById(id); }, sheet = m === "sheet", q = g("cliSearch"), head = g("cliHead"), add = g("cliAddBtn"), n = 0;
+    cliSheetCur = sheet ? "sheet" : "legacy";
+    if (q) q.style.display = sheet ? "none" : "";
+    if (!sheet) return;
+    clients.forEach(function(c){ if (c && c.del !== 1) n++; });
+    if (head) head.textContent = n ? n + "곳" : "";
+    if (add) add.style.display = canDo("cli") ? "block" : "none";
+  }
+  // 권한 조합(기성 보기 · 계약 보기 · 거래처 수행) — 열·칩은 조합마다 한 벌(같은 조합이면 같은 배열 — 부품의 칩 건수 다시 쓰기가 배열이 같은지를 봄)
+  function cliSheetSig(){ return (canSee("rec") ? "r" : "") + (canSee("con") ? "c" : "") + (canDo("cli") ? "d" : ""); }
+  function cliSheetCols(sig){
+    var rec = sig.indexOf("r") >= 0, con = sig.indexOf("c") >= 0, cd = sig.indexOf("d") >= 0, a = [];
+    a.push({ k: "name", h: "상호", w: 196, f: "text", pw: rec ? 38 : 52 });   // 명세 180 → 196: 운영 백업 대장 밖 상호 15자(맑은 고딕 굵게 13px 178.1px)가 180의 안 폭에 잘림
+    a.push({ k: "biz", h: "사업자번호", w: 118, f: "text", lv: 2, ft: function(r){ var k; if (r.out) return ""; k = cliBizKind(r); return cliBizTxt(r) + (k === "biz" ? " " + cliDigits(r.biz_no) : ""); } });   // 거르기 글 = 칸 글('미입력'·'개인(사업자 없음)'으로도) + 사업자번호는 줄표 없는 숫자도(13자리 원문은 넣지 않음)
+    a.push({ k: "contact", h: "담당자", w: 84, f: "text", lv: 3 });
+    a.push({ k: "phone", h: "연락처", w: 118, f: "text", pw: rec ? 36 : 48 });
+    if (rec) a.push({ k: "unpaid", h: "미수", w: 130, f: "none", num: 1, pw: 26 });
+    if (con) a.push({ k: "con", h: "계약", w: 104, f: "none", lv: 3 });   // 명세 96 → 104: '진행 1 · 완료 2'(84.1px)가 96의 안 폭에 잘림
+    a.push({ k: "proc", h: "처리업소", w: 80, f: "enum", lv: 3 });   // 명세 72 → 80: 머리 '처리업소' + 정렬 화살표(63px)가 72의 안 폭에 잘림
+    a.push({ k: "note", h: "메모", f: "text", fill: 1, min: 132, lv: 2 });   // 명세 최소 150 → 132: 위 셋을 넓힌 만큼(1280 단계 합 962 한도 안)
+    if (cd){ a.push({ k: "email", h: "이메일", w: 150, f: "text", lv: 4 }); a.push({ k: "addr", h: "주소", w: 170, f: "text", lv: 4 }); }   // 주소 명세 180 → 170(1600 단계 합 1,282 한도 안 — 주소는 말줄임 + title·펼침 전문)
+    return a;
+  }
+  function cliSheetChips(sig){
+    var items = [{ k: "", h: "전체", tip: "대장 거래처 전부" + (sig.indexOf("d") >= 0 ? " + 표 아래 '대장에 없는 이름' 묶음" : "") }];
+    if (sig.indexOf("r") >= 0) items.push({ k: "unpaid", h: "미수 있음", tip: "미수(입금 전 청구)가 있는 거래처", test: function(r){ return cliSheetUnp(r).length > 0; } });
+    if (sig.indexOf("c") >= 0) items.push({ k: "con", h: "계약 진행 중", tip: "완료 전 계약이 있는 거래처", test: function(r){ return cliSheetRun(r) > 0; } });
+    items.push({ k: "proc", h: "처리업소", tip: "폐기물 처리업소(배출신고서 처리업체 후보)", test: function(r){ return !r.out && !!r.waste_proc; } });
+    items.push({ k: "blank", h: "정보 비어 있음", tip: "사업자번호(미입력·13자리)·담당자·연락처 중 빈 칸이 있는 거래처 — 개인 거래처는 빼고", test: function(r){ var k; if (r.out || r.indiv) return false; k = cliBizKind(r); return k === "empty" || k === "id13" || !String(r.contact || "").trim() || !String(r.phone || "").trim(); } });
+    return [{ g: "st", items: items }];
+  }
+  // 정의 하나(만들어 두고 다시 씀 — 함수들이 전역을 그때그때 읽음) · 권한 조합이 바뀌면 열·칩만 그 조합 것으로
+  function cliSheetDef(){
+    var sig = cliSheetSig(), d = CLI_SHEET_DEF;
+    if (!d){
+      d = CLI_SHEET_DEF = {
+        key: "jw_cli_sheet", host: "cliList", unit: "곳",
+        none: "등록된 거래처가 없습니다.", empty: "조건에 맞는 거래처가 없습니다.",
+        rows: cliSheetRows,
+        id: function(r){ return r.id; },
+        val: cliSheetVal, sv: cliSheetSv, cell: cliSheetCell,
+        rowCls: function(r){ return r.out ? "grey" : ""; },
+        sort: { k: "name", d: 1 },
+        foot: cliSheetFoot, detail: cliSheetDetail,
+        bind: function(root){ cliSheetBindAct(root); },
+        search: { id: "cliSheetQ", ph: "거래처 검색 — 상호·사업자번호·담당자·연락처·메모", text: cliSheetSearchText },
+        group: { of: function(r){ return r.out ? "out" : ""; }, label: cliSheetGroupLabel, auto: function(s){ return !!(s.q || Object.keys(s.f || {}).length); } },   // 기본 접힘 — 검색어·거르기 줄이 있으면 저절로 펼침
+        count: function(r){ return !r.out; },   // v441 검토: '보이는 n곳 / 전체 m곳'은 대장 줄만(제목 '거래처 n곳'·합계 줄과 같은 수 — 대장 밖 줄 수는 묶음 머리에)
+        phone: "legacy",   // 퀴즈 2번 답이 '폰도 새 표'면 이 한 줄만 "sheet"
+        legacy: renderClientsLegacy,   // 옛 그리기 본문(입구 renderClients를 넘기면 부품 재진입 가드로 폰 화면이 빈다 — v438)
+        onMode: cliSheetMode
+      };
+    }
+    if (d.sig !== sig){ d.sig = sig; d.cols = CLI_SHEET_COLS[sig] || (CLI_SHEET_COLS[sig] = cliSheetCols(sig)); d.chips = CLI_SHEET_CHIPS[sig] || (CLI_SHEET_CHIPS[sig] = cliSheetChips(sig)); }
+    d.none = cliLoaded ? "등록된 거래처가 없습니다." : "거래처 대장을 불러오는 중입니다 — 계속 비어 있으면 새로고침해 주세요.";   // v441 검토: 못 읽은 대장을 '없음'으로 보이지 않게(대장 밖 묶음·[대장에 추가]도 이때는 없음)
+    return d;
+  }
+  // 거래처 탭 입구 — 갈래 함수 하나(PC = 표, 폰 = 옛 본문). 미수·계약 잇기는 그릴 때마다 새로(cliLinkIdx 한 번)
+  function renderClients(){
+    if (!document.getElementById("cliList")) return;
+    CLI_LINK = null;
+    vsSheetRender(cliSheetDef());
+  }
+  // @cli-sheet-end
   function openCliModal(id){
     if (!canDo("cli")) return;
     editingCliId = id || null;
@@ -20295,19 +20735,29 @@
     document.getElementById("cliAddr").value = c ? (c.address||"") : "";
     document.getElementById("cliNote").value = c ? (c.note||"") : "";
     document.getElementById("cliWasteProc").checked = !!(c && c.waste_proc);
+    document.getElementById("cliIndiv").checked = !!(c && c.indiv); cliIndivSync();   // v441 개인 거래처(사업자 없음)
     document.getElementById("cliDelete").style.display = c ? "block" : "none";
     document.getElementById("cliBackdrop").classList.add("show");
   }
   function closeCliModal(){ document.getElementById("cliBackdrop").classList.remove("show"); editingCliId = null; }
   function saveCliModal(){
     if (!canDo("cli")) return;
+    if (!cliLoaded){ alert(CLI_UNREAD_MSG); return; }   // v441 검토: 대장을 못 읽은 채 넣으면 빈 대장 + 새 거래처가 서버 대장을 통째로 바꿈(창은 열어 둠 — 읽히면 다시 [저장])
     var name = document.getElementById("cliName").value.trim();
     if (!name){ document.getElementById("cliName").focus(); return; }
-    var c = editingCliId ? findCli(editingCliId) : null;
+    // v441 개인 거래처(사업자 없음)면 사업자번호는 비워 저장 · 사업자번호 칸의 13자리(주민·법인등록번호 꼴)는 막는다(명세 — 저장하지 않고 그 칸으로)
+    var indivEl = document.getElementById("cliIndiv"), indiv = !!(indivEl && indivEl.checked);
+    var bizEl = document.getElementById("cliBizNo"), biz = indiv ? "" : bizEl.value.trim();
+    if (cliBiz13(biz)){ alert(CLI_BIZ13_MSG); try { bizEl.focus(); } catch(e){} return; }
+    var c = editingCliId ? findCli(editingCliId) : null, isNew = !c;
+    // v441 같은 거래처 의심(새로 넣거나 상호·사업자번호를 바꿀 때만) — 사람 확인(중복·삭제는 사람 확인 원칙 — 자동으로 막거나 합치지 않음)
+    var tw = (isNew || cliNameKey(c.name) !== cliNameKey(name) || cliDigits(c.biz_no) !== cliDigits(biz)) ? cliTwinOf(name, biz, c ? c.id : null) : null;
+    if (tw && !confirm("대장에 같은 거래처가 있는 것 같습니다 — " + (tw.c.name || "(상호없음)") + (tw.by === "biz" ? " (사업자번호 같음)" : " (상호 같음 — '(주)'·'주식회사'·띄어쓰기 무시)") + "\n그래도 저장할까요?")) return;
     var today = todayStr();
     if (!c){ c = {id: genId("cl"), created: today}; clients.push(c); }
     c.name = name;
-    c.biz_no = document.getElementById("cliBizNo").value.trim();
+    c.biz_no = biz;
+    if (indiv) c.indiv = 1; else if (c.indiv) c.indiv = 0;   // 끈 표시는 0(병합에서 지운 칸이 되살아나지 않게 값으로)
     c.contact = document.getElementById("cliContact").value.trim();
     c.phone = document.getElementById("cliPhone").value.trim();
     c.email = document.getElementById("cliEmail").value.trim();
@@ -20315,11 +20765,15 @@
     c.note = document.getElementById("cliNote").value.trim();
     c.waste_proc = document.getElementById("cliWasteProc").checked ? 1 : 0;
     c.updated = today;
+    cliMarkDirty(c.id);   // v441 검토: 저장이 409로 튕기면 이 거래처는 이 기기 것으로 합침(cliMergeRemote)
     closeCliModal(); renderClients(); saveClients();
+    if (isNew) cliSheetShowNew(c.id);   // v441 PC 표: 기억된 칩·거르기에 가려 안 보이면 그 줄을 연다(폰 옛 목록이면 아무것도 안 함)
   }
   function deleteCliFromModal(){
     if (!canDo("cli") || !editingCliId) return;
-    var c = findCli(editingCliId); if (c){ c.del = 1; c.updated = todayStr(); }
+    var c = findCli(editingCliId);
+    if (c && !confirm(cliDelMsg(c))) return;   // v441 확인 창(종전엔 바로 지웠다 — 폰 옛 목록·PC 수정 창 모두)
+    if (c){ c.del = 1; c.updated = todayStr(); cliMarkDirty(c.id); }
     closeCliModal(); renderClients(); saveClients();
   }
 
