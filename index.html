@@ -1119,7 +1119,7 @@
   /* v438 화면 폭(45-1 #1 — 명세 09_조사_문서/표형탭_시안_자료_20261110/엑셀형탭_명세_20261110.json common.width_plan·css). PC 860px 이상만 — 폰(859px 이하) 틀은 그대로.
      틀(#app)은 탭과 무관하게 같은 폭이라 탭을 옮겨도 사이드바가 안 움직인다. 본문 = 창 − 233(860~1279: 여백 16·사이드바 168·간격 16) · 창 − 269(1280~1599: 여백 22·사이드바 184·간격 24) ·
      1600 이상은 #app 최대 1,680(본문 최대 1,428) — 창 폭은 세로 스크롤바 17px 포함(1024 창 791 · 1366 창 1,097 · 1920 창 1,428 — uismoke v438 ①이 이 CSS를 읽어 계산해 명세 width_plan.table과 대조).
-     넓히는 화면은 id로만(section 태그·class 그대로 — uismoke가 '<section class="view" id=…>' 글자를 찾는다): 이번 판은 계약·차량·권한관리 셋 — 지시·기성·거래처·일용직·입찰은 그 탭을 표로 바꾸는 판(v439~v443)에서 하나씩 더한다(옛 카드 목록이 1,428px로 늘어지지 않게). 나머지 화면은 808 그대로(사이드바 옆 왼쪽 정렬),
+     넓히는 화면은 id로만(section 태그·class 그대로 — uismoke가 '<section class="view" id=…>' 글자를 찾는다): v438은 계약·차량·권한관리 셋, v439에 지시(표로 바꾼 판) — 기성·거래처·일용직·입찰은 그 탭을 표로 바꾸는 판(v440~v443)에서 하나씩 더한다(옛 카드 목록이 1,428px로 늘어지지 않게). 나머지 화면은 808 그대로(사이드바 옆 왼쪽 정렬),
      권한관리는 권한 표(#permRoster)만 넓고 그 밖 카드는 808. 안전(#view-safety)은 56 판(v445)에서 넓히는 목록에 더한다(그때도 현황 #sfPaneNow는 808 — 미리 둠).
      ★퀴즈 1번 대안('메뉴 자리 고정·본문만 오른쪽으로')을 고르시면 860 묶음 #app 줄 끝에 margin:0 0 0 max(0px, calc((100% - 1060px) / 2)); 하나만 더한다 — 1600 묶음 #app{max-width:1680px;}는 남긴다
        (margin-left가 100% 기준이라 상한을 남겨도 메뉴는 고정 · 지우면 2560 창 본문이 약 1,550으로 늘어 명세 why_1680과 어긋나고 계약·차량 펼침도 더 넓어짐)
@@ -1131,7 +1131,7 @@
     .layout{gap:16px;}
     .tabbar{width:168px;}
     .views>.view{max-width:808px;}
-    #view-con,#view-veh,#view-perm{max-width:none;}   /* v439~v443에서 #view-tasks·#view-rec·#view-cli·#view-workers·#view-bid를 탭 판마다 더함 */
+    #view-tasks,#view-con,#view-veh,#view-perm{max-width:none;}   /* v439 지시(#view-tasks)를 더함 — v440~v443에서 #view-rec·#view-cli·#view-workers·#view-bid를 탭 판마다 더함 */
     #sfPaneNow,#view-perm>:not(#permRoster){max-width:808px;}
   }
   @media (min-width:1280px){
@@ -1141,6 +1141,18 @@
   }
   @media (min-width:1600px){
     #app{max-width:1680px;}
+  }
+  /* v439 지시 탭 표(45-1 둘째 판 — 명세 sections[key=tasks].after): 입력 카드는 1280 이상 한 줄(860~1279는 두 줄 그대로 · 폰도 그대로 — 둘째 줄 인라인 padding-top:0을 이 묶음에서만 !important로 덮음)
+     · 펼침 머리의 연결 계약 글(.vs-dsub) · 상세 글 전문(.vs-dtxt — 760px 안에서 줄바꿈, 표 칸에서는 안 보임) */
+  .vs-dsub{font-size:12px;color:var(--sub);font-weight:400;}
+  .vs-dtxt{white-space:pre-wrap;max-width:760px;font-size:12.5px;line-height:1.55;margin:2px 0 6px;overflow-wrap:anywhere;}
+  .vs.vs-fit tr.vs-r td .review-chip,.vs.vs-fit tr.vs-r td .hold-chip{padding:1px 4px;}   /* 표 줄 칸 안 칩만 여백 4px(v439 검토) — 명세 폭(구분 108·담당 76)에서 맑은 고딕으로 '자동' 칩 + '미수 45일'(약 98 → 90px)·'담당 없음' 칩(약 64 → 56px)이 칸 안 폭(91·59)에 들어가게. 펼침 칸 칩은 그대로 */
+  @media (min-width:1280px){
+    #view-tasks>.card.scope-host{display:flex;align-items:center;}
+    #view-tasks>.card.scope-host>.add-row{flex:0 0 auto;padding:10px 14px 10px 0 !important;}
+    #view-tasks>.card.scope-host>.add-row:first-child{flex:1 1 auto;min-width:0;padding:10px 8px 10px 14px !important;}
+    #view-tasks>.card.scope-host #taskWho{flex:0 0 120px;width:120px;}
+    #view-tasks>.card.scope-host .scope-dd{flex:0 0 130px;width:130px;}
   }
 
   /* 모바일: 탭바를 햄버거 드롭다운으로 */
@@ -1267,7 +1279,8 @@
 
   <!-- 지시(업무 전달) -->
   <section class="view" id="view-tasks">
-    <div class="dash-sec" style="margin-bottom:8px;"><h2>지시 <span class="cnt" id="taskHead"></span></h2></div>
+    <!-- v439 PC 표 갈래: 제목 '지시 진행 중 n · 기한 경과 m' + [오늘 승인 일괄 (n)](taskBulkTop) — 폰 갈래(옛 목록)는 제목 글 없이 아래 taskBulkApprove 링크 그대로 -->
+    <div class="dash-sec" style="margin-bottom:8px;"><h2><span>지시 <span class="cnt" id="taskHead"></span></span><button type="button" class="mini-btn" id="taskBulkTop" style="display:none;" title="앱 기준(데이터 신호)으로 승인 대기에 오른 자동 지시만 한 번에 승인 — 사람 완료 요청은 건별">오늘 승인 일괄</button></h2></div>
     <div class="card scope-host">
       <div class="add-row">
         <input type="text" id="taskTitle" placeholder="지시 내용">
@@ -4540,7 +4553,9 @@
       '</div>';
   }
 
-  function renderTasks(){
+  // v439: v438까지의 renderTasks 본문 그대로(이름만 바꿈 — 폰 갈래 def.legacy). 지시 탭의 입구는 아래 @task-sheet 구간의 renderTasks(갈래 함수 vsSheetRender).
+  //   이 본문을 고치면 폰 화면이 바뀐다 — uismoke v439가 v438(43e61b0) renderTasks 본문과 글자째(해시) 대조한다(일부러 바꿀 때는 그 해시도 함께).
+  function renderTasksLegacy(){
     var listHost = document.getElementById("taskList");
     var doneHost = document.getElementById("taskDoneList");
     var toggleBtn = document.getElementById("taskDoneToggle");
@@ -4606,6 +4621,327 @@
     updateTaskBadge();
     renderMyTasks();
   }
+
+  // ---- v439 지시 탭 엑셀형 표(45-1 둘째 판) — PM 11/10 15:56·17:40 결정 ① 자동 지시를 기본 화면('진행 중' 칩)에 같이(구분 열 '자동' 칩 · '자동' 칩·구분 거르기로 따로 볼 수 있음)
+  //      · 결정 ② 행 끝 처리 버튼([완료]/[승인]/[재개] 60px)은 지시 표에만. 명세 09_조사_문서/표형탭_시안_자료_20261110/엑셀형탭_명세_20261110.json sections[key=tasks] · 단계지시_v439_지시.json ----
+  // @task-sheet-start
+  // PC(860px 이상) = 공통 부품(vsSheetRender) 표 한 장에 진행·자동·완료를 담고 칩으로 나눈다(열 10 · 단계별 열 합 860 696 / 1280 944 / 1600 1,174 · 남는 폭 = 지시 내용 최소 220).
+  // 폰(859px 이하) = phone:"legacy" — 옛 그리기 본문 renderTasksLegacy(카드 목록·자동 만기 접이식·완료 보기 20건)를 그대로 부른다. 퀴즈 2번 답 확인 중 — '폰도 새 표'면 아래 정의의 phone 한 줄만 "sheet"로
+  //   (폰 열 지시 내용 52 · 기한 24 · 상태 24 % · 상태 칸 = 처리 버튼 · 폰 합계 '합계 · 경과 · 대기' · 자동·계약 단계·전체 칩은 PC 전용 — 미리 넣어 둠).
+  // 행 원천 = 보이는 지시(taskSheetRows = liveTasks + taskVisible — 관리자 전부, 그 밖 담당·지시자·공개범위) — 칩·건수·합계·검색·전체선택·선택 삭제·삭제된 지시 목록·제목 건수·오늘 승인 일괄이 모두 이것만.
+  // 홈 taskRowHtml·내 업무 myTaskRowHtml·bindTaskHandlers는 그대로 둔다(이 표는 칸 taskSheetCell·펼침 taskSheetDetail을 새로 씀). 처리 열·펼침 버튼은 data-tsk-act 하나 —
+  //   누르면 taskSheetAct가 지금 규칙(canActTask·canApproveTask·canDo("tasks")·canDo("con"))을 다시 보고 기존 함수(toggleTaskDone·approveTask·rejectTask·setTaskStatus·openTaskModal·openStageDoc·taskNotMine)를 부른다.
+  //   배선은 위임 하나 — 처리 열은 bindRows(root = 그릴 때마다 새로 생기는 표 칸), 펼침은 bind(root = 펼침 칸). 자리 host(#taskList)에는 걸지 않는다(v438 규칙 — 그릴 때마다 리스너가 쌓임).
+  // 바꾸는 버튼은 모두 .mini-btn(보기 권한 .view.readonly CSS가 숨김) — 읽기 토글(칩·필터 초기화·[닫기 ▲])만 .vs-chip. 선택 칸은 sel.can = canDo("tasks")일 때만(보기 권한은 선택 칸 없음).
+  var TASK_AUTO_SHORT = { "veh:":"차량 만기", "lic:":"인허가", "cert:":"증명서", "rec:":"미수 45일", "bid:":"적격심사", "site:":"현장 대장", "wk:":"일용직" };   // 구분 칸 짧은 이름 — 배정표 긴 이름(ASSIGN_PREFIX_TXT)은 title
+  var TASK_ST_ORDER = { "진행": 0, "승인 대기": 1, "보류": 2, "완료": 3 };   // 상태 열 정렬 순서
+  var TASK_DASH = '<span style="color:#9AA09C;">-</span>';
+  var TASK_SHEET_DEF = null;
+  function taskSheetRows(){ return liveTasks().filter(taskVisible); }
+  function taskSheetSt(t){ return t.status === "done" ? "완료" : (t.status === "review" ? "승인 대기" : (t.status === "hold" ? "보류" : "진행")); }
+  function taskSheetOver(t){ return t.status === "open" && isDate(t.due) && t.due < todayStr(); }   // 기한 경과 = 진행(open)만 — 탭 배지·홈과 같은 판정(보류·승인 대기·완료는 색 없음)
+  function taskSheetSoon(t){ var n; if (t.status !== "open" || !isDate(t.due)) return false; n = vehDday(t.due).diff; return n >= 0 && n <= 3; }   // 3일 내(용어표 '지시·입찰 3일')
+  function taskSheetPrefix(t){ var k = String(t.auto_key || ""), i = k.indexOf(":"); return i > 0 ? k.slice(0, i + 1) : ""; }
+  // 구분 — 자동(짧은 이름 + '자동' 칩, 배정표 이름은 title) / 계약 단계 / 입금확인 / 반복 · 매월 / 일반. f = 거르기 글(자동은 '자동 · 차량 만기'처럼 '자동'으로 시작 — 고르기 목록에서 자동끼리 모임)
+  function taskSheetKind(t){
+    var p, sh, lg;
+    if (t.auto_key){
+      p = taskSheetPrefix(t); sh = TASK_AUTO_SHORT[p] || "";
+      lg = (typeof ASSIGN_PREFIX_TXT === "object" && ASSIGN_PREFIX_TXT && ASSIGN_PREFIX_TXT[p]) || "";
+      return { auto: true, h: sh, f: sh ? "자동 · " + sh : "자동", tip: lg ? "배정표 이름: " + lg : "자동 지시", long: lg || sh || "자동 지시" };
+    }
+    if (t.proc_id) return { h: "계약 단계", f: "계약 단계" };
+    if (t.rec_id) return { h: "입금확인", f: "입금확인" };
+    if (t.recur && t.recur !== "none") return { h: "반복 · " + (RECUR_LABEL[t.recur] || "반복"), f: "반복" };
+    return { h: "일반", f: "일반" };
+  }
+  function taskSheetNoWho(t){ return !!(t.auto_key && !t.who_id && !t.who); }   // 자동 지시인데 배정표에 담당 없음(v395 — 관리자 폴백 금지)
+  function taskSheetWho(t){ return taskSheetNoWho(t) ? "담당 없음" : (t.who ? dispName(t.who) : "미지정"); }
+  function taskSheetWhoHtml(t){ return taskSheetNoWho(t) ? '<span class="hold-chip" title="배정표(권한관리)에 이 접두어의 담당이 없습니다 — 관리자에게 자동으로 가지 않습니다">담당 없음</span>' : (t.who ? esc(dispName(t.who)) : '<span style="color:#9AA09C;">미지정</span>'); }
+  function taskSheetStageTxt(t){ return t.proc_id ? ((t.stage_i || 0) + 1) + "/" + (t.stage_total || "?") + " · " + (t.stage_name || "") : ""; }
+  function taskSheetStHtml(t){ var s = taskSheetSt(t); return s === "승인 대기" ? '<span class="review-chip">승인 대기</span>' : (s === "보류" ? '<span class="hold-chip">보류</span>' : (s === "완료" ? "✓ 완료" : "진행")); }
+  // 담당 본인(전사 지시는 아님) — 승인자 이름을 보일지 정할 때만
+  function taskSheetMine(t){ var me = myId(); return !!(t && ((t.who_id && t.who_id !== "__all__" && me && t.who_id === me) || (!t.who_id && t.who && t.who === myName()))); }
+  function taskSheetMd(d){ return isDate(d) ? d.slice(5) : ""; }
+  // 완료 요청 글(승인 대기·완료) — 'YYYY-MM-DD · 요청한 사람'
+  function taskSheetReq(t){ if (t.status !== "done" && t.status !== "review") return ""; return (t.done_at || "") + (t.done_by ? (t.done_at ? " · " : "") + dispName(t.done_by) : ""); }
+  // 승인 글 — 승인자 이름은 관리자·담당 본인에게만(지시자 숨김 SHOW_TASK_ISSUER = false와 같은 뜻 — 승인자는 대개 지시자), 그 밖에는 '승인됨 MM-DD'. 승인 기록이 없는 완료(입금 완료 연동 등)는 빈 글
+  function taskSheetAppr(t){
+    if (t.status !== "done" || (!t.approved_by && !t.approved_at)) return "";
+    if (isAdmin() || taskSheetMine(t)) return (t.approved_by ? dispName(t.approved_by) : "승인") + (t.approved_at ? " · " + t.approved_at : "");
+    return "승인됨" + (taskSheetMd(t.approved_at) ? " " + taskSheetMd(t.approved_at) : "");
+  }
+  function taskSheetWhoBy(t){
+    if (t.who_by === "notmine") return "'내 것 아님'으로 빠짐";
+    if (t.who_by === "edit") return "수정 창에서 지정";
+    if (t.auto_key) return taskSheetNoWho(t) ? "배정표에 담당 없음" : "배정표(권한관리)";
+    if (t.proc_id) return "계약 담당";
+    if (t.rec_id) return "기성 담당";
+    return "등록할 때 지정";
+  }
+  // 값(거르기·고르기 목록·정렬 기본) — 빈 값은 ""(정렬에서 방향과 상관없이 뒤)
+  function taskSheetVal(t, k){
+    if (k === "t") return t.title || "";
+    if (k === "kind") return taskSheetKind(t).f;
+    if (k === "stage") return t.proc_id ? ((t.proc_label ? t.proc_label + " " : "") + taskSheetStageTxt(t)) : "";
+    if (k === "who") return taskSheetWho(t);
+    if (k === "due") return isDate(t.due) ? t.due : "";
+    if (k === "st") return taskSheetSt(t);
+    if (k === "reg") return isDate(t.created) ? t.created : "";
+    if (k === "scope") return scopeNames(t.scope) || "";
+    if (k === "done") return isDate(t.done_at) ? t.done_at : "";
+    return "";
+  }
+  // 정렬 값만 따로 — 상태는 진행 → 승인 대기 → 보류 → 완료, 계약 단계는 계약 이름 + 단계 순서, 담당 없음·미지정은 빈 값(뒤)
+  function taskSheetSv(t, k){
+    if (k === "st") return TASK_ST_ORDER[taskSheetSt(t)];
+    if (k === "stage") return t.proc_id ? String(t.proc_label || "") + " " + ("00" + ((t.stage_i || 0) + 1)).slice(-3) : "";
+    if (k === "who") return (taskSheetNoWho(t) || !t.who) ? "" : dispName(t.who);
+    return taskSheetVal(t, k);
+  }
+  function taskSheetBtn(act, id, h, cls, tip){ return '<button type="button" class="mini-btn' + (cls ? " " + cls : "") + '" data-tsk-act="' + act + '" data-tsk-id="' + esc(id) + '"' + (tip ? ' title="' + esc(tip) + '"' : '') + '>' + h + '</button>'; }
+  // 처리 열(행 끝 60px · 폰 sheet면 상태 칸) — 버튼 하나: 승인 대기 = [승인](canApproveTask) · 보류 = [재개](canDo("tasks")) · 진행 = [완료](canActTask) · 완료 = 없음([되돌리기]는 펼침)
+  function taskSheetActBtn(t){
+    if (t.status === "done") return "";
+    if (t.status === "review") return canApproveTask(t) ? taskSheetBtn("approve", t.id, "승인") : "";
+    if (t.status === "hold") return canDo("tasks") ? taskSheetBtn("resume", t.id, "재개") : "";
+    return canActTask(t) ? taskSheetBtn("done", t.id, "완료") : "";
+  }
+  function taskSheetCell(t, c, ctx){
+    var k = c.k, x, s;
+    if (k === "t") return { html: esc(t.title || "(제목 없음)"), title: t.title || "" };
+    if (k === "kind"){ x = taskSheetKind(t); return { html: x.auto ? '<span class="review-chip">자동</span>' + (x.h ? " " + esc(x.h) : "") : esc(x.h), title: x.tip || "" }; }
+    if (k === "stage"){
+      if (!t.proc_id) return TASK_DASH;
+      s = Math.max(0, Math.min(100, Math.round(((t.stage_i || 0) + 1) / (Number(t.stage_total) || 1) * 100)));
+      return { html: '<span class="cs-bar"><i style="width:' + s + '%"></i></span>' + esc(taskSheetStageTxt(t)), title: (t.proc_label ? t.proc_label + " " : "") + taskSheetStageTxt(t) };
+    }
+    if (k === "who") return taskSheetWhoHtml(t);
+    if (k === "due"){
+      if (t.proc_id && !isDate(t.due) && t.status !== "done") return '<span class="need-due">기한 입력</span>';   // 계약 단계 지시인데 기한이 비면(종전 procChipHtml과 같은 표시)
+      x = vsDateCell(t.due, { wide: !ctx.phone, phone: !!ctx.phone, grey: t.status !== "open" });   // 진행(open)만 색 — 경과 빨강·3일 내 노랑(용어표)
+      return { html: x.html, cls: x.cls, title: x.title };
+    }
+    if (k === "st"){ if (ctx.phone && canDo("tasks")){ x = taskSheetActBtn(t); if (x) return x; } return taskSheetStHtml(t); }   // 폰 sheet: 처리할 수 있는 분에게는 상태 칸이 처리 버튼(시안) — 지시 수행 권한만(보기 권한인 담당·지시자는 .view.readonly CSS가 버튼을 숨겨 칸이 비므로 상태 글 — v439 검토)
+    if (k === "reg") return isDate(t.created) ? esc(t.created) : TASK_DASH;
+    if (k === "scope"){ s = scopeNames(t.scope); return s ? { html: esc(s), title: s } : TASK_DASH; }
+    if (k === "done"){
+      s = taskSheetReq(t); if (!s) return TASK_DASH;
+      x = t.status === "done" ? taskSheetAppr(t) : "승인 대기";
+      return { html: esc((t.done_at ? taskSheetMd(t.done_at) : "") + (t.done_by ? (t.done_at ? " · " : "") + dispName(t.done_by) : "")), title: s + (x ? " — " + x : "") };
+    }
+    if (k === "act") return taskSheetActBtn(t);
+    return "";
+  }
+  // 합계 줄 — 거른 행 기준: 자동 n · 계약 n · 보류 n(담당 칸) · 경과 n · 3일 내 n(진행 건) · 대기 n / 폰 '합계 · 경과 · 대기'(첫 칸 '합계 n건'은 부품)
+  //   보류는 담당 칸에 따로(v439 검토 — 상태 칸 88px의 안 폭 71에 '대기 n · 보류 n'(맑은 고딕 굵게 약 85px)이 들어가지 않아 '보류'가 PC 어느 폭에서도 잘렸다. 담당 칸 안 폭 59 · '보류 12' 약 44)
+  function taskSheetFoot(rows, ctx){
+    var au = 0, pr = 0, ov = 0, so = 0, rv = 0, ho = 0;
+    rows.forEach(function(t){ if (t.auto_key) au++; if (t.proc_id) pr++; if (taskSheetOver(t)) ov++; else if (taskSheetSoon(t)) so++; if (t.status === "review") rv++; else if (t.status === "hold") ho++; });
+    if (ctx.phone) return { due: "경과 " + ov, st: "대기 " + rv };
+    return { kind: ctx.stage >= 3 ? "자동 " + au : '<span title="자동 ' + au + '건 · 계약 단계 ' + pr + '건">자동 ' + au + " · 계약 " + pr + '</span>', stage: "계약 " + pr, who: "보류 " + ho, due: "경과 " + ov + " · 3일 내 " + so, st: "대기 " + rv };
+  }
+  function taskSheetKv(k, v){ return '<div><div class="k">' + esc(k) + '</div><div class="v">' + v + '</div></div>'; }
+  // 펼침 버튼 — 지금 규칙 그대로(옛 taskRowHtml과 같은 조건): 완료 = [되돌리기](canDo) · 승인 대기 = [승인]·[반려](승인권자)·[완료취소](canActTask) ·
+  //   진행·보류 = [완료](canActTask)·[📄 서류](계약 단계·계약 수행·변경계약 아님)·[보류]/[재개]·[수정](canDo)·[내 것 아님](자동 지시 담당 본인) · 그리고 [삭제](canDo — 휴지통)
+  function taskSheetDetBtns(t){
+    var b = [], id = t.id;
+    if (t.status === "done"){ if (canDo("tasks")) b.push(taskSheetBtn("reopen", id, "되돌리기")); }
+    else if (t.status === "review"){
+      if (canApproveTask(t)){ b.push(taskSheetBtn("approve", id, "승인", "appr-btn")); b.push(taskSheetBtn("reject", id, "반려")); }
+      if (canActTask(t)) b.push(taskSheetBtn("cancel", id, "완료취소"));
+    } else {
+      if (canActTask(t)) b.push(taskSheetBtn("done", id, "완료", "appr-btn"));
+      if (t.proc_id && canDo("con") && t.pipe !== "chg" && !csTaskChg(t)) b.push(taskSheetBtn("doc", id, "📄 서류"));
+      if (canDo("tasks")) b.push(t.status === "hold" ? taskSheetBtn("resume", id, "재개") : taskSheetBtn("hold", id, "보류"));
+      if (canDo("tasks")) b.push(taskSheetBtn("edit", id, "수정"));
+      if (taskNotMineBtn(t)) b.push(taskSheetBtn("notmine", id, "내 것 아님", "", "이 자동 지시의 담당에서 빠집니다"));   // 조건은 taskNotMineBtn(v413) 그대로
+    }
+    if (canDo("tasks")) b.push(taskSheetBtn("del", id, "삭제", "danger", "삭제된 지시 보기에서 복구할 수 있습니다"));
+    return b.join("");
+  }
+  // 펼침 — 머리(제목·연결 계약·단계 칩·[닫기 ▲]) → 상세 글 전문 → 키·값 12칸 → 버튼. 지시자(from)는 보이지 않는다(SHOW_TASK_ISSUER = false)
+  function taskSheetDetail(t, ctx){
+    var c = t.proc_id ? findProc(t.proc_id) : null, x = taskSheetKind(t), sub = "", con, due, sc, h;
+    if (c) sub = [csSiteText(c) || c.label || "", c.client || ""].filter(function(s){ return !!s; }).join(" · ");
+    h = '<div class="vs-dh"><b>' + esc(t.title || "(제목 없음)") + '</b>' + (sub ? '<span class="vs-dsub">' + esc(sub) + '</span>' : '')
+      + (t.proc_id ? '<span class="proc-chip">' + esc((t.proc_label || "진행") + " " + taskSheetStageTxt(t)) + '</span>' : '') + ctx.close + '</div>';
+    if (t.detail) h += '<div class="vs-dtxt">' + esc(t.detail) + '</div>';
+    due = isDate(t.due) ? esc(t.due) + (t.status === "open" ? " (" + ddayInfo(t.due).text + ")" : "") : (t.proc_id && t.status !== "done" ? '<span class="need-due">기한 입력</span>' : TASK_DASH);
+    con = (c ? esc(csSiteText(c) || c.label || "") : esc(t.proc_label || "")) || TASK_DASH;   // 계약을 못 찾으면(지운 계약) 지시에 남은 이름
+    sc = scopeNames(t.scope);
+    h += '<div class="vs-kv">'
+      + taskSheetKv("담당", taskSheetWhoHtml(t))
+      + taskSheetKv("기한", due)
+      + taskSheetKv("상태", taskSheetStHtml(t))
+      + taskSheetKv("구분", esc(x.auto ? "자동 — " + x.long : x.h))
+      + taskSheetKv("계약", con)
+      + taskSheetKv("단계", t.proc_id ? esc(taskSheetStageTxt(t)) : TASK_DASH)
+      + taskSheetKv("반복", (t.recur && t.recur !== "none") ? esc(RECUR_LABEL[t.recur] || "반복") : TASK_DASH)
+      + taskSheetKv("공개 범위", sc ? esc(sc) : '<span style="color:#9AA09C;">전체공개</span>')
+      + taskSheetKv("등록일", isDate(t.created) ? esc(t.created) : TASK_DASH)
+      + taskSheetKv("완료 요청", taskSheetReq(t) ? esc(taskSheetReq(t)) : TASK_DASH)
+      + taskSheetKv("승인", taskSheetAppr(t) ? esc(taskSheetAppr(t)) : TASK_DASH)
+      + taskSheetKv("담당 지정", esc(taskSheetWhoBy(t)))
+      + '</div>';
+    return h + '<div class="vs-act">' + taskSheetDetBtns(t) + '</div>';
+  }
+  // 누름 하나 — 그린 버튼과 같은 규칙을 여기서 다시 본다(보기 권한·화면에 없는 지시는 아무것도 안 함). 실제 일은 기존 함수(각자 권한을 또 본다)
+  function taskSheetAct(act, id){
+    var t = findTask(id);
+    if (!t || t.del === 1 || !taskVisible(t)) return;
+    if (act === "done"){ if (t.status !== "done" && t.status !== "review" && canActTask(t)) toggleTaskDone(id); }   // 진행·보류 → 승인 대기(승인권자 푸시)
+    else if (act === "approve") approveTask(id);   // 승인 = 완료 + 계약 단계 진행(advanceProc) + 반복 다음 회차(spawnNextRecur) — approveTask가 승인 대기·canApproveTask를 본다
+    else if (act === "reject") rejectTask(id);
+    else if (act === "cancel"){ if (t.status === "review" && canActTask(t)) toggleTaskDone(id); }
+    else if (act === "reopen"){ if (t.status === "done" && canDo("tasks")) toggleTaskDone(id); }
+    else if (act === "hold"){ if (canDo("tasks") && t.status !== "done" && t.status !== "review" && t.status !== "hold") setTaskStatus(id, "hold"); }
+    else if (act === "resume"){ if (canDo("tasks") && t.status === "hold") setTaskStatus(id, "open"); }
+    else if (act === "edit") openTaskModal(id);
+    else if (act === "doc"){ if (t.proc_id && canDo("con") && t.pipe !== "chg" && !csTaskChg(t)) openStageDoc(t.proc_id, t.stage_name || ""); }
+    else if (act === "notmine") taskNotMine(id);
+    else if (act === "del") taskSheetDelete([id], true);
+  }
+  // 위임 배선 하나 — root(표 칸 또는 펼침 칸) 안의 data-tsk-act 버튼. 처리 열 누름은 행 펼침으로 번지지 않는다(부품 vsInteractive가 버튼 누름은 행 토글을 건너뜀)
+  //   연속 누름 막기(v439 검토 med): 누름 하나가 표를 그 자리에서 다시 그려(행 높이 32px 고정) 같은 자리에 같은 지시의 다음 버튼([완료] → [승인]) 또는 빠지거나 옮겨져 올라온 다른 지시의 처리 버튼이 놓인다
+  //   — 더블클릭의 둘째 누름(e.detail 2 이상)과 처리 뒤 TASK_ACT_GAP(0.5초) 안의 누름(터치 연속 탭·키보드 연타)은 버린다. 승인은 계약 단계 진행·반복 다음 회차·푸시를 내고 [되돌리기]로 되감기지 않는다
+  var TASK_ACT_GAP = 500, taskSheetActAt = 0;
+  function taskSheetBindAct(root){
+    root.addEventListener("click", function(e){
+      var el = e && e.target, act = null, now, dt;
+      while (el && el !== root){ act = el.getAttribute ? el.getAttribute("data-tsk-act") : null; if (act != null) break; el = el.parentNode; }
+      if (act == null || !el || el === root) return;
+      if (e.stopPropagation) e.stopPropagation();
+      if ((Number(e.detail) || 0) > 1) return;
+      now = Date.now(); dt = now - taskSheetActAt;
+      if (taskSheetActAt && dt >= 0 && dt < TASK_ACT_GAP) return;   // 시계가 뒤로 가면(dt < 0) 막지 않는다
+      taskSheetActAt = now;
+      taskSheetAct(act, el.getAttribute("data-tsk-id"));
+    });
+  }
+  // 선택 삭제·펼침 [삭제] — 보이는 지시만(행 원천에 없는 id는 버림), 휴지통(del=1 — 삭제된 지시 보기에서 복구)
+  function taskSheetDelete(ids, one){
+    var vis = {}, today = todayStr();
+    if (!canDo("tasks")) return;
+    taskSheetRows().forEach(function(t){ vis[t.id] = 1; });
+    ids = (ids || []).filter(function(id){ return vis[id]; });
+    if (!ids.length) return;
+    if (!confirm((one ? "이 지시를" : ids.length + "건을") + " 삭제할까요? (나중에 복구 가능)")) return;
+    ids.forEach(function(id){ var t = findTask(id); if (!t || t.del === 1) return; t.del = 1; t.updated = today; t.updated_ts = Date.now(); delete selSets.tasks[id]; });
+    saveModule("tasks"); scheduleModuleSave("tasks"); renderModule("tasks");
+  }
+  // 삭제된 지시(표 갈래) — 보이는 지시만(taskVisible) · [영구삭제]는 관리자만(버튼도 누름 길도). 고른 것 중 이 목록에 없는 id는 그릴 때 풀어 복구·영구삭제가 화면에 없는 줄로 번지지 않게.
+  //   폰 갈래는 옛 본문의 renderDeletedList 그대로(지금 동작). 요소(#taskDeletedToggle·#taskDeletedList)·고른 것(delSelSets.tasks)·[보기] 토글(showDeletedTasks)은 두 갈래가 같이 쓴다.
+  function taskSheetDeleted(){
+    var toggle = document.getElementById("taskDeletedToggle"), host = document.getElementById("taskDeletedList"), del, set, vis = {}, n, allOn, bar, rows, da, rb, pb;
+    if (!toggle || !host) return;
+    del = moduleDeleted("tasks").filter(taskVisible);
+    if (!canDo("tasks") || !del.length){ toggle.style.display = "none"; host.style.display = "none"; host.innerHTML = ""; delSelSets.tasks = {}; return; }
+    set = delSelSets.tasks;
+    del.forEach(function(t){ vis[t.id] = 1; });
+    Object.keys(set).forEach(function(id){ if (!vis[id]) delete set[id]; });
+    toggle.style.display = "block";
+    toggle.textContent = showDeletedTasks ? "삭제된 지시 숨기기" : ("삭제된 지시 보기 (" + del.length + ")");
+    host.style.display = showDeletedTasks ? "block" : "none";
+    if (!showDeletedTasks){ host.innerHTML = ""; return; }
+    n = selCount("tasks", true); allOn = del.every(function(t){ return set[t.id]; });
+    bar = '<div class="sel-bar"><input type="checkbox" class="sel-box delall-box"' + (allOn ? " checked" : "") + '>' +
+      '<span class="selall-label">전체선택</span>' +
+      '<button class="mini-btn delrestore-btn"' + (n ? "" : " disabled") + '>선택 복구' + (n ? " (" + n + ")" : "") + '</button>' +
+      (isAdmin() ? '<button class="mini-btn danger delpurge-btn"' + (n ? "" : " disabled") + '>영구삭제' + (n ? " (" + n + ")" : "") + '</button>' : '') + '</div>';
+    rows = del.map(function(t){
+      return '<div class="item" style="opacity:.78;">' + selBoxHtml("tasks", t.id, true) +
+        '<div class="item-body"><div class="item-title" style="font-size:14px;">' + esc((t.title || "제목없음") + (t.who ? " · 담당 " + dispName(t.who) : "") + (t.due ? " · " + t.due : "")) + '</div></div></div>';
+    }).join("");
+    host.innerHTML = bar + rows;
+    bindSelBoxes(host);
+    da = host.querySelector(".delall-box");
+    if (da) da.addEventListener("change", function(){ if (da.checked){ del.forEach(function(t){ set[t.id] = 1; }); } else { delSelSets.tasks = {}; } renderTasks(); });
+    rb = host.querySelector(".delrestore-btn");
+    if (rb) rb.addEventListener("click", function(){ bulkRestore("tasks"); });
+    pb = host.querySelector(".delpurge-btn");
+    if (pb) pb.addEventListener("click", function(){ if (!isAdmin()) return; hardDelete("tasks"); });   // 영구삭제는 관리자만 — 버튼이 없어도 누름 길에서 다시 본다
+  }
+  // 갈래가 정해질 때마다(부품 onMode) — 표 갈래: 옛 목록 요소(선택 막대·자동 만기 접이식·오늘 승인 일괄 링크·완료 보기)를 숨기고 제목 건수·[오늘 승인 일괄]·삭제된 지시를 그린다.
+  //   폰 갈래(legacy): 표 전용 제목 글·일괄 버튼만 걷고, 옛 본문이 표시를 정하지 않는 [완료 보기]만 되살린다(나머지는 옛 본문이 자기 요소의 표시를 정함)
+  function taskSheetMode(m){
+    var g = function(id){ return document.getElementById(id); }, head = g("taskHead"), top = g("taskBulkTop"), rows, n = 0, ov = 0, bulk;
+    if (m !== "sheet"){
+      if (head) head.textContent = "";
+      if (top){ top.style.display = "none"; top.onclick = null; }
+      if (g("taskDoneToggle")) g("taskDoneToggle").style.display = "";
+      return;
+    }
+    ["tasksSelBar", "taskAutoToggle", "taskBulkApprove", "taskAutoList", "taskDoneToggle", "taskDoneList"].forEach(function(id){ var el = g(id); if (el) el.style.display = "none"; });
+    rows = taskSheetRows();
+    rows.forEach(function(t){ if (t.status !== "done") n++; if (taskSheetOver(t)) ov++; });
+    if (head) head.textContent = "진행 중 " + n + " · 기한 경과 " + ov;
+    if (top){   // v397 앱 기준 승인 대기 일괄 승인(승인권자만 — 옛 목록 아래 링크와 같은 조건)
+      bulk = rows.filter(function(t){ return t.auto_key && t.status === "review" && t.done_by === "앱 기준" && canApproveTask(t); });
+      top.style.display = bulk.length ? "inline-block" : "none";
+      top.textContent = "오늘 승인 일괄 (" + bulk.length + ")";
+      top.onclick = function(){ if (!confirm("앱 기준으로 승인 대기에 오른 자동 지시 " + bulk.length + "건을 한 번에 승인합니다. 계속할까요?")) return; bulk.forEach(function(t){ approveTask(t.id); }); apprToastShow("자동 지시 " + bulk.length + "건 승인(앱 기준)"); };
+    }
+    taskSheetDeleted();
+  }
+  // 검색칸 글 — 앞머리는 전역 검색(gsSources 지시 항목 + gsRun)이 보는 글과 같은 꼴(지시 내용 · 담당 원래 이름 + ' · 기한 YYYY-MM-DD' · 상세 · 현장)이라, 전역 검색에서 찾은 글자를 넣으면
+  //   그 지시가 표에도 걸린다(v439 검토 — 종전엔 '나종운'·'11-12'·'기한'으로 찾아 누르면 표가 비었다). 그 뒤에 표에서만 보는 글(담당 표시 이름 '대표님' · 계약 이름 · 단계 이름 · 구분)
+  function taskSheetSearchText(t){ return [t.title || "", (t.who || "") + (t.due ? " · 기한 " + t.due : ""), t.detail || "", t.site || "", taskSheetWho(t), t.proc_label || "", t.stage_name || "", taskSheetKind(t).f].join(" "); }
+  // 전역 검색(🔍)에서 지시를 누름(gsRun) — 칩·거르기 줄을 이번만 풀고 검색어를 넣어 그린다(기기에 기억된 '완료' 칩·거르기에 누른 지시가 숨지 않게 — 전역 검색은 완료 전 지시만 내놓음)
+  //   폰 옛 목록이면 false(검색칸 없음 — 탭만 옮김)
+  function taskSheetFromGs(q){ return vsSheetSeek(taskSheetDef(), q); }
+  // 정의 하나(만들어 두고 다시 씀 — 함수들이 전역을 그때그때 읽음)
+  function taskSheetDef(){
+    if (TASK_SHEET_DEF) return TASK_SHEET_DEF;
+    TASK_SHEET_DEF = {
+      key: "jw_task_sheet", host: "taskList", unit: "건",
+      none: "등록된 지시가 없습니다.", empty: "조건에 맞는 지시가 없습니다.",
+      cols: [
+        { k: "t", h: "지시 내용", f: "text", fill: 1, min: 220, pw: 52 },
+        { k: "kind", h: "구분", w: 108, f: "enum", lv: 2 },
+        { k: "stage", h: "계약 단계", w: 160, f: "text", lv: 3 },
+        { k: "who", h: "담당", w: 76, f: "enum", lv: 2 },
+        { k: "due", h: "기한", w: 160, f: "none", pw: 24 },   // v439 시험 화면: 144면 'YYYY-MM-DD 경과 41일'이 잘림 → 160(단계 합 712/960/1190)
+        { k: "st", h: "상태", w: 88, f: "enum", pw: 24 },
+        { k: "reg", h: "등록일", w: 88, f: "none", lv: 3 },
+        { k: "scope", h: "공개", w: 110, f: "text", lv: 4 },
+        { k: "done", h: "완료", w: 120, f: "none", lv: 4 },
+        { k: "act", h: "처리", w: 60, f: "none", lv: 2, nosort: 1 }
+      ],
+      rows: taskSheetRows,
+      id: function(t){ return t.id; },
+      val: taskSheetVal, sv: taskSheetSv, cell: taskSheetCell,
+      rowCls: function(t){ return (t.status === "hold" || t.status === "done") ? "grey" : ""; },
+      chips: [{ g: "st", items: [
+        { k: "", h: "진행 중", tip: "완료 전 지시 전부 — 자동 지시도 같이(구분 열 '자동')", test: function(t){ return t.status !== "done"; } },
+        { k: "over", h: "기한 경과", warn: 1, test: taskSheetOver },
+        { k: "review", h: "승인 대기", test: function(t){ return t.status === "review"; } },
+        { k: "hold", h: "보류", test: function(t){ return t.status === "hold"; } },
+        { k: "auto", h: "자동", pc: 1, tip: "완료 전 자동 지시(차량 만기·인허가·증명서·미수·적격심사·현장 대장·일용직)", test: function(t){ return !!t.auto_key && t.status !== "done"; } },
+        { k: "proc", h: "계약 단계", pc: 1, tip: "완료 전 계약 단계 지시", test: function(t){ return !!t.proc_id && t.status !== "done"; } },
+        { k: "done", h: "완료", tip: "완료일 최근 먼저 — 자르지 않음", test: function(t){ return t.status === "done"; }, sort: { k: "done", d: -1 } },
+        { k: "all", h: "전체", pc: 1 }
+      ] }],
+      sort: { k: "due", d: 1 },
+      rank: function(t, k){ return k === "due" ? (t.status === "done" ? 2 : (t.status === "hold" ? 1 : 0)) : 0; },   // 기한 정렬(▲▼ 모두)에서 보류는 뒤·완료는 그 뒤(옛 byDue·완료 목록 순서) — 기한 없음은 부품이 뒤로
+      foot: taskSheetFoot, detail: taskSheetDetail,
+      bind: function(root){ taskSheetBindAct(root); },
+      bindRows: function(root){ taskSheetBindAct(root); },
+      search: { id: "taskSearch", ph: "지시 검색 — 지시 내용·상세·담당·기한·계약 단계", text: taskSheetSearchText },
+      sel: { set: function(){ return selSets.tasks; }, can: function(){ return canDo("tasks"); }, acts: [{ h: "선택 삭제", danger: 1, run: function(ids){ taskSheetDelete(ids, false); } }] },
+      page: 1000,   // 완료를 자르지 않아 해마다 늘어남 — 천 건이 넘으면 더 보기(명세 risks)
+      phone: "legacy",   // 퀴즈 2번 답이 '폰도 새 표'면 이 한 줄만 "sheet"
+      legacy: renderTasksLegacy,   // 옛 그리기 본문(입구 renderTasks를 넘기면 부품 재진입 가드로 폰 화면이 빈다 — v438)
+      onMode: taskSheetMode
+    };
+    return TASK_SHEET_DEF;
+  }
+  // 지시 탭 입구 — 갈래 함수 하나(PC = 표, 폰 = 옛 본문). 폰 갈래는 옛 본문이 탭 배지·내 업무를 다시 그리고, 표 갈래는 여기서
+  function renderTasks(){
+    if (!document.getElementById("taskList")) return;
+    if (vsSheetRender(taskSheetDef()) === "sheet"){ updateTaskBadge(); renderMyTasks(); }
+  }
+  // @task-sheet-end
 
   // 업무 탭: 내게 온 지시(담당=본인 OR 지시자=본인, 미완료) 기한순
   function myOpenTasks(){
@@ -6796,7 +7132,7 @@
   function vsSheetSave(def){ var st = vsInst(def).st; try { localStorage.setItem(def.key, JSON.stringify({ k: st.k, d: st.d, f: st.f, chip: st.chip })); } catch(e){} }   // 정렬·거르기·칩만 — 끈 열 폭(colw)·검색어·펼침은 저장하지 않는다
   function vsInst(def){
     var inst = VS_INST[def.key];
-    if (!inst) inst = VS_INST[def.key] = { st: vsSheetLoad(def), colw: {}, open: null, q: "", limit: 0, grp: {}, mode: "", stageR: 0, stale: false, timers: {}, dragAt: 0, prune: false, last: null, keepN: false, chipN: null, chipNk: null, inLegacy: false };
+    if (!inst) inst = VS_INST[def.key] = { st: vsSheetLoad(def), colw: {}, open: null, q: "", limit: 0, grp: {}, mode: "", stageR: 0, stale: false, timers: {}, dragAt: 0, prune: false, last: null, keepN: false, chipN: null, chipNk: null, inLegacy: false, who: null };
     inst.def = def;
     return inst;
   }
@@ -7066,6 +7402,16 @@
   }
   function vsSheetFilter(def, k, v){ var inst = vsInst(def); if (v) inst.st.f[k] = String(v); else delete inst.st.f[k]; inst.limit = 0; inst.prune = true; vsSheetSave(def); return vsSheetRender(def); }
   function vsSheetSetQ(def, q){ var inst = vsInst(def); inst.q = String(q == null ? "" : q); inst.limit = 0; inst.prune = true; return vsSheetRender(def); }   // 검색어는 기기에 저장하지 않는다(전역 검색이 searchId로 넣을 때도 이것)
+  // 찾아가기(전역 검색 등 — 탭 구간의 이어받기 함수가 부름, v439 검토): 칩·거르기 줄을 이번만 풀고(기기 기억은 이 부름에서 저장하지 않음 — 다음 칩·거르기·정렬 누름 때 그때 상태로 저장)
+  //   펼침을 닫고 치던 글 타이머를 지운 뒤 검색어를 넣어 그린다 — 기억된 칩('완료' 등)·거르기에 찾은 행이 숨지 않게. 폰 legacy 갈래(검색칸 없음)면 아무것도 바꾸지 않고 false
+  function vsSheetSeek(def, q){
+    var inst = vsInst(def), t;
+    if (vsStage() <= 1 && def.phone !== "sheet") return false;
+    for (t in inst.timers){ if (Object.prototype.hasOwnProperty.call(inst.timers, t)) clearTimeout(inst.timers[t]); }
+    inst.timers = {}; inst.st.chip = {}; inst.st.f = {}; inst.open = null;
+    vsSheetSetQ(def, q);
+    return true;
+  }
   function vsSheetToggle(def, id){
     var inst = vsInst(def), r, host, d;
     inst.open = (inst.open === id) ? null : id;
@@ -7113,11 +7459,28 @@
     inst.last = M;
     return M;
   }
+  // 보는 사람(로그인 회원 id) — 로그인 창 '전환'·세션 만료 뒤 재로그인은 새로고침 없이 다시 그리므로(afterLogin → render), 그린 사람이 바뀌면 메모리 상태를 비운다
+  //   (v439 검토 — 앞사람이 친 검색어가 다음 사람 검색칸에 남아 그 사람 표를 걸렀다 · '내 상신' 캐시와 같은 꼴). 비우는 것 = 검색어·펼친 행·더보기·묶음 펼침·치던 글 타이머·선택(그 표 sel 지도 —
+  //   폰 legacy와 같이 쓰는 지도면 옛 목록 선택도). 정렬·거르기·칩은 기기 기억(설계)이라 그대로, 끈 열 폭(메모리)도 그대로
+  function vsViewer(){ try { return typeof myId === "function" ? String(myId() || "") : ""; } catch(e){ return ""; } }
+  function vsSheetViewer(def, inst){
+    var who = vsViewer(), t, set;
+    if (inst.who === who) return;
+    if (inst.who != null){
+      for (t in inst.timers){ if (Object.prototype.hasOwnProperty.call(inst.timers, t)) clearTimeout(inst.timers[t]); }
+      inst.timers = {}; inst.q = ""; inst.open = null; inst.limit = 0; inst.grp = {}; inst.prune = true;
+      set = (def.sel && typeof def.sel.set === "function") ? def.sel.set() : null;
+      if (set) Object.keys(set).forEach(function(id){ delete set[id]; });
+    }
+    inst.who = who;
+  }
   // 갈래 함수 하나 — 폰(859px 이하)이고 phone이 "legacy"(기본)면 그 탭의 지금 그리기 함수(def.legacy)를 그대로 부르고(그 자리에 PC 표가 남아 있으면 먼저 비움), 아니면 표를 그린다. 돌려줌 "legacy"|"sheet"
   //   legacy 안에서 이 함수가 다시 불리면(정의에 옛 본문 대신 vsSheetRender를 부르는 새 입구를 잘못 넘김) 그 안쪽 부름은 아무것도 안 하고 돌아간다 — 폰에서 서로 불러 멈추지 않게
+  //   그리기 전에 보는 사람이 바뀌었는지 본다(vsSheetViewer — 폰 legacy 갈래도)
   function vsSheetRender(def){
     var inst = vsInst(def), stage = vsStage(), host = document.getElementById(def.host);
     if (inst.inLegacy) return "legacy";
+    vsSheetViewer(def, inst);
     inst.stageR = stage; inst.stale = false;
     if (host) vsPaneObserve(host, def.key);
     if (stage <= 1 && def.phone !== "sheet"){
@@ -7166,7 +7529,7 @@
     if (host.__vsObs) return;
     try { if (typeof ResizeObserver !== "function") return; if (!vsRo) vsRo = new ResizeObserver(vsRoCb); vsRo.observe(host); host.__vsObs = 1; } catch(e){}
   }
-  // 날짜 칸 규칙 하나(명세 glossary · fixes_with ⓚ) — 지남 = 빨강: 넓은 칸(o.wide — 140px 이상) 'YYYY-MM-DD 경과 n일' · 좁은 칸 '경과 n일'(날짜는 title) · 폰 전용 열(o.phone) 'D+n'
+  // 날짜 칸 규칙 하나(명세 glossary · fixes_with ⓚ) — 지남 = 빨강: 넓은 칸(o.wide — 140px 이상) 'YYYY-MM-DD 경과 n일'(title도 같은 글 — 칸이 좁아 잘려도 일수가 보이게) · 좁은 칸 '경과 n일'(날짜는 title) · 폰 전용 열(o.phone) 'D+n'
   //   임박 = 노랑 'YYYY-MM-DD D-n'(좁은 칸 'D-n') — 기준은 탭마다 o.soon(기본 3 — 지시·입찰 3 · 현장 신고·사람별 의무 30), o.red = 이 일수 안이면 지나지 않아도 빨강(현장 신고 7)
   //   그 밖 = 날짜 + 회색 D-n(좁은 칸은 회색 D-n, 날짜는 title) · 빈 값 '-' · o.grey(보류·완료·회색 상태)는 색 없이. sv = 정렬 값(오늘부터 남은 날 — 빈 값 null)
   function vsDateCell(d, o){
@@ -7177,7 +7540,7 @@
     if (o.grey) return { html: o.phone ? rel : (o.wide ? ds + ' <span style="color:#9AA09C;">' + rel + '</span>' : '<span style="color:#9AA09C;">' + rel + '</span>'), cls: "", title: s, sv: n };
     past = n < 0; red = past || (Number(o.red) > 0 && n <= Number(o.red)); warn = !red && n <= (o.soon == null ? 3 : Number(o.soon));
     if (o.phone) return { html: rel, cls: red ? "vs-dan" : (warn ? "vs-warn" : ""), title: s, sv: n };
-    if (past) return { html: o.wide ? ds + ' 경과 ' + (-n) + '일' : '경과 ' + (-n) + '일', cls: "vs-dan", title: s, sv: n };
+    if (past) return { html: o.wide ? ds + ' 경과 ' + (-n) + '일' : '경과 ' + (-n) + '일', cls: "vs-dan", title: o.wide ? s + ' 경과 ' + (-n) + '일' : s, sv: n };   // 넓은 칸 title에도 경과 일수(v439 검토 — 지시 기한 144px에서 맑은 고딕 굵게 'YYYY-MM-DD 경과 12일'이 칸 안 폭보다 약 2px 넓어 일수가 말줄임에 잘림)
     if (red || warn) return { html: o.wide ? ds + ' ' + rel : rel, cls: red ? "vs-dan" : "vs-warn", title: s, sv: n };
     return { html: o.wide ? ds + ' <span style="color:var(--sub);">' + rel + '</span>' : '<span style="color:var(--sub);">' + rel + '</span>', cls: "", title: s, sv: n };
   }
@@ -19165,7 +19528,7 @@
     var S=[];
     var add=function(tab,label,ok,list,title,sub,searchId){ if(ok) S.push({tab:tab,label:label,list:list,title:title,sub:sub,searchId:searchId||null}); };
     add("con","계약",canSee("con"),function(){return liveContracts();},function(x){return (x.title||x.label||"")+(x.client?" · "+x.client:"");},function(x){return x.site||"";});
-    add("tasks","지시",canSee("tasks"),function(){return tasks.filter(function(t){return t&&t.del!==1&&t.status!=="done";});},function(x){return x.title||"";},function(x){return (x.who||"")+(x.due?" · 기한 "+x.due:"");});
+    add("tasks","지시",canSee("tasks"),function(){return tasks.filter(function(t){return t&&t.del!==1&&t.status!=="done"&&taskVisible(t);});},function(x){return x.title||"";},function(x){return (x.who||"")+(x.due?" · 기한 "+x.due:"");},"taskSearch");   // v439 지시 탭과 같은 행 원천(taskVisible — 비관리자에게 남의 지시 제목이 검색으로 보이지 않게) · 누르면 표 위 검색칸(taskSearch)에 글자(폰 옛 목록은 검색칸이 없어 탭만 옮김)
     add("cli","거래처",canSee("cli"),function(){return clients.filter(function(c){return c&&c.del!==1;});},function(x){return x.name||"";},function(x){return x.biz_no||"";},"cliSearch");
     add("rec","기성·미수",canSee("rec"),function(){return liveRec();},function(x){return (x.client||"")+(x.amount?" · "+fmtAmount(x.amount)+"원":"");},function(x){return (x.desc||"")+(x.paid?" · 수금 "+x.paid:" · 미수");},"recSearch");
     add("quote","견적서",canSee("quote"),function(){return liveQuotes();},function(x){return (x.no||"")+" · "+(x.title||"");},function(x){return x.recv||"";});
@@ -19202,10 +19565,11 @@
     out.innerHTML = html || '<div style="color:#888;padding:8px 2px;">"'+esc(q)+'" 검색 결과 없음</div>';
     Array.prototype.forEach.call(out.querySelectorAll(".gs-hit"), function(el){
       el.addEventListener("click", function(){
-        var tab=el.getAttribute("data-gs-tab"), sid=el.getAttribute("data-gs-sid");
+        var tab=el.getAttribute("data-gs-tab"), sid=el.getAttribute("data-gs-sid"), gq=document.getElementById("gsInput").value.trim();
         document.getElementById("gsBackdrop").classList.remove("show");
         switchTab(tab);
-        if(sid){ var si=document.getElementById(sid); if(si){ si.value=document.getElementById("gsInput").value.trim(); si.dispatchEvent(new Event("input")); } }
+        if(sid==="taskSearch" && taskSheetFromGs(gq)) return;   // v439 지시 표: 칩·거르기 줄을 이번만 풀고 검색어(기억된 '완료' 칩·거르기에 누른 지시가 숨지 않게) — 폰 옛 목록이면 false(검색칸 없음 — 아래 옛 길)
+        if(sid){ var si=document.getElementById(sid); if(si){ si.value=gq; si.dispatchEvent(new Event("input")); } }
       });
     });
   }

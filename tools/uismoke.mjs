@@ -5,6 +5,7 @@
 import { readFileSync, existsSync, readdirSync } from 'fs';
 import { createRequire } from 'module';   // v433 서버 순수 함수(_lib/siteedu.js)를 앱 규칙과 같은 표본에서 실행해 대조
 import { execSync } from 'child_process';
+import { createHash } from 'crypto';   // v439 옛 그리기 본문·홈·내 업무 행 함수를 v438(43e61b0) 원문 해시와 대조
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -4765,7 +4766,7 @@ try {
   const viewW38 = (win, id) => { const b = body38(win), own = decl38(win, '#view-' + id, 'max-width'), base = decl38(win, '.views>.view', 'max-width'), mx = own != null ? own : base; return (!mx || mx === 'none') ? b : Math.min(b, parseFloat(mx)); };
   //   명세 width_plan.table(창 → 본문, 스크롤바 17 포함): 1024 791 · 1100 867 · 1280 1011 · 1366 1097 · 1440 1171 · 1536 1267 · 1600 1331 · 1920·2560 1428
   const WT38 = { 1024: 791, 1100: 867, 1280: 1011, 1366: 1097, 1440: 1171, 1536: 1267, 1600: 1331, 1920: 1428, 2560: 1428 };
-  const WIDE38 = ['con', 'veh', 'perm'];   // 명세 reading_width 9개 중 v438은 계약·차량·권한관리만 — 지시·기성·거래처·일용직·입찰은 각 탭 판(v439~v443), 안전(#view-safety)은 56 판(v445)에서 더한다
+  const WIDE38 = ['tasks', 'con', 'veh', 'perm'];   // 명세 reading_width 9개 중 v438은 계약·차량·권한관리 · v439에 지시(#view-tasks — 표로 바꾼 판) — 기성·거래처·일용직·입찰은 각 탭 판(v440~v443), 안전(#view-safety)은 56 판(v445)에서 더한다
   const views38 = [...html.matchAll(/<(?:section|div) class="view(?: active)?" id="view-([a-z]+)">/g)].map((m) => m[1]);
   const SECS38 = ['tasks', 'veh', 'hwakwan', 'allbaro', 'rec', 'cal', 'lic', 'bid', 'con', 'cli', 'doc', 'hr', 'progress', 'ask', 'safety', 'quote', 'promo', 'workers', 'perm', 'fam', 'leave'];
   const secs38 = [...html.matchAll(/<section class="view" id="view-([a-z]+)">/g)].map((m) => m[1]);
@@ -4773,7 +4774,7 @@ try {
   const vBad38 = [1366, 1920].map((w) => views38.filter((id) => viewW38(w, id) !== (WIDE38.indexOf(id) >= 0 ? body38(w) : 808)).join('/')).join('|') + '|' + views38.filter((id) => viewW38(1024, id) !== body38(1024)).join('/');
   const perm38 = decl38(1366, '#view-perm>:not(#permRoster)', 'max-width') === '808px' && decl38(1920, '#view-perm>:not(#permRoster)', 'max-width') === '808px' && decl38(1920, '#permRoster', 'max-width') == null && decl38(1920, '#sfPaneNow', 'max-width') === '808px';
   const phone38 = decl38(859, '#app', 'max-width') === '560px' && padLR38(decl38(859, '#app', 'padding')).join() === '16,16' && decl38(859, '.views>.view', 'max-width') == null && decl38(375, '.tabbar', 'width') == null && decl38(859, '.layout', 'gap') == null;
-  T('v438 ① 화면 폭(head <style>을 읽어 계산 — 창 폭 − 스크롤바 17): 본문 = 명세 width_plan.table(±2px) 1024 791 · 1100 867 · 1280 1011 · 1366 1097 · 1440 1171 · 1536 1267 · 1600 1331 · 1920·2560 1428 · 넓히는 화면 id 3개(계약·차량·권한관리 — 지시·기성·거래처·일용직·입찰은 각 탭 판 v439~v443, 안전은 v445)만 1366·1920에서 본문 폭, 그 밖 화면(안전 포함)은 808 · 1024 창은 모두 본문 폭(791 < 808) · 권한관리는 권한 표(#permRoster)만 넓고 그 밖 카드·안전 현황(#sfPaneNow) 808 · 859px 이하 틀 그대로(#app 최대 560·여백 16, 간격·사이드바 폭·읽기 폭 규칙 없음) · section 태그 21개 class="view" 그대로(class 더하지 않음)',
+  T('v438 ① 화면 폭(head <style>을 읽어 계산 — 창 폭 − 스크롤바 17): 본문 = 명세 width_plan.table(±2px) 1024 791 · 1100 867 · 1280 1011 · 1366 1097 · 1440 1171 · 1536 1267 · 1600 1331 · 1920·2560 1428 · 넓히는 화면 id 4개(지시·계약·차량·권한관리 — v439에 지시를 더함, 기성·거래처·일용직·입찰은 각 탭 판 v440~v443, 안전은 v445)만 1366·1920에서 본문 폭, 그 밖 화면(안전 포함)은 808 · 1024 창은 모두 본문 폭(791 < 808) · 권한관리는 권한 표(#permRoster)만 넓고 그 밖 카드·안전 현황(#sfPaneNow) 808 · 859px 이하 틀 그대로(#app 최대 560·여백 16, 간격·사이드바 폭·읽기 폭 규칙 없음) · section 태그 21개 class="view" 그대로(class 더하지 않음)',
     wBad38.length === 0 && vBad38 === '||' && views38.length === 23 && perm38 && phone38 && JSON.stringify(secs38) === JSON.stringify(SECS38) && !/<section class="view [^"]*" id=/.test(html),
     JSON.stringify({ body: Object.keys(WT38).map((w) => w + ':' + body38(+w)), viewBad: vBad38, views: views38.length, perm38, phone38, secs: secs38.length }));
 
@@ -5172,7 +5173,7 @@ try {
   // ⑪ 날짜 칸 규칙 하나(명세 glossary — 오늘 2026-11-10) · 정의 검사(vsSheetCheckDef — 다음 판 탭 정의가 지킬 것)
   const DC38 = mk38({}).api, dc38 = [DC38.date('2026-11-05', { wide: 1 }), DC38.date('2026-11-05'), DC38.date('2026-11-05', { phone: 1 }), DC38.date('2026-11-12'), DC38.date('2026-11-12', { wide: 1 }), DC38.date('2026-11-20', { wide: 1 }),
     DC38.date('2026-11-15', { red: 7, soon: 30 }), DC38.date('2026-11-25', { red: 7, soon: 30 }), DC38.date('2026-12-20', { red: 7, soon: 30 }), DC38.date('2026-11-05', { grey: 1, wide: 1 }), DC38.date(''), DC38.date('2026/11/05')];
-  const dOk38 = dc38[0].html === '2026-11-05 경과 5일' && dc38[0].cls === 'vs-dan' && dc38[0].sv === -5 && dc38[1].html === '경과 5일' && dc38[1].title === '2026-11-05' && dc38[2].html === 'D+5' && dc38[2].cls === 'vs-dan'
+  const dOk38 = dc38[0].html === '2026-11-05 경과 5일' && dc38[0].cls === 'vs-dan' && dc38[0].sv === -5 && dc38[0].title === '2026-11-05 경과 5일' && dc38[1].html === '경과 5일' && dc38[1].title === '2026-11-05' && dc38[2].html === 'D+5' && dc38[2].cls === 'vs-dan'
     && dc38[3].html === 'D-2' && dc38[3].cls === 'vs-warn' && dc38[4].html === '2026-11-12 D-2' && dc38[4].cls === 'vs-warn' && dc38[5].cls === '' && dc38[5].html === '2026-11-20 <span style="color:var(--sub);">D-10</span>'
     && dc38[6].html === 'D-5' && dc38[6].cls === 'vs-dan' && dc38[7].html === 'D-15' && dc38[7].cls === 'vs-warn' && dc38[8].cls === '' && dc38[9].cls === '' && dc38[9].html === '2026-11-05 <span style="color:#9AA09C;">D+5</span>'
     && dc38[10].sv === null && dc38[10].html === '<span style="color:#9AA09C;">-</span>' && dc38[11].sv === null;
@@ -5185,14 +5186,22 @@ try {
   const cks2_38 = [ck38({ chips: [{ g: 'st', items: [{ k: '', h: '진행 중', test: (r) => r.st !== '완료' }, { k: 'done', h: '완료', test: (r) => r.st === '완료', sort: { k: 'donee', d: -1 } }] }] }),
     ck38({ cols: C38().map((c) => (c.k === 'reg' ? Object.assign({}, c, { sortAs: 'regi' }) : c)) }), ck38({ sel: { set: {}, can: () => true } }), ck38({ sel: { set: () => ({}) } }), ck38({ group: { of: 'old' } }),
     ck38({ chips: [{ g: 'st', items: [{ k: '', h: '진행 중', test: (r) => r.st !== '완료' }, { k: 'old', h: '지남', pop: 1 }] }] }), ck38({ sel: { set: () => ({}), can: () => true }, group: { of: () => '' } })];
-  T('v438 ⑪ 날짜 칸 규칙(오늘 11-10): 지남 넓은 칸 "2026-11-05 경과 5일"(vs-dan)·좁은 칸 "경과 5일"(날짜는 title)·폰 "D+5" · 임박(기본 3일) 좁은 "D-2"·넓은 "2026-11-12 D-2"(vs-warn)·D-3 노랑·D-4 색 없음 · 그 밖 날짜 + 회색 D-10 · 현장 신고형(red 7·soon 30) D-5 빨강·D-15 노랑·D-40 색 없음 · grey는 색 없이 · 빈 값·다른 꼴 "-"(정렬 값 없음) / 정의 검사: 가짜 지시 정의 통과 · 계약·차량 키 · 기본 정렬이 1280 열 · 폰 % 합 106 · legacy 함수 없음 · 열 합 초과(860 896·1280 1144·1600 1374) · 열 키 겹침 · 거르기 종류 · lv 5 · 폰 전용인데 lv2 · 남는 폭 열 둘 · phone 값 · 칩 정렬 키 오타 · sortAs 없는 열 · sel.set · sel.can · group.of · 모집단 칩 test · 맞는 sel·group 통과',
+  T('v438 ⑪ 날짜 칸 규칙(오늘 11-10): 지남 넓은 칸 "2026-11-05 경과 5일"(vs-dan · title도 같은 글 — v439 검토)·좁은 칸 "경과 5일"(날짜는 title)·폰 "D+5" · 임박(기본 3일) 좁은 "D-2"·넓은 "2026-11-12 D-2"(vs-warn)·D-3 노랑·D-4 색 없음 · 그 밖 날짜 + 회색 D-10 · 현장 신고형(red 7·soon 30) D-5 빨강·D-15 노랑·D-40 색 없음 · grey는 색 없이 · 빈 값·다른 꼴 "-"(정렬 값 없음) / 정의 검사: 가짜 지시 정의 통과 · 계약·차량 키 · 기본 정렬이 1280 열 · 폰 % 합 106 · legacy 함수 없음 · 열 합 초과(860 896·1280 1144·1600 1374) · 열 키 겹침 · 거르기 종류 · lv 5 · 폰 전용인데 lv2 · 남는 폭 열 둘 · phone 값 · 칩 정렬 키 오타 · sortAs 없는 열 · sel.set · sel.can · group.of · 모집단 칩 test · 맞는 sel·group 통과',
     dOk38 && JSON.stringify(cks38) === JSON.stringify(['', 'key', 'sort', 'pw:106', 'legacy', 'sum2:896,sum3:1144,sum4:1374', 'col:t', 'f:y', 'lv:z', 'ph:p', 'fill', 'phone'])
     && dc2_38 === 'vs-warn:D-3,:D-4' && JSON.stringify(cks2_38) === JSON.stringify(['chipsort:st|done', 'sortAs:reg', 'sel', 'sel.can', 'group', 'pop:st|old', '']),
     JSON.stringify({ dc: dc38.map((x) => x.cls + ':' + x.html), cks38, dc2_38, cks2_38 }));
 
-  // ⑫ 정적 — 계약·차량 표는 ResizeObserver 한 줄씩(vsPaneObserve(host) — 그리기마다 불러도 자리에 한 번만 걸림) 말고 무변 · 이번 판은 부품을 쓰는 탭 0(v439부터 이 줄을 고친다) · pointer(마우스 이벤트 없음) · 150ms·조합
+  // ⑫ 정적 — 계약·차량 표는 ResizeObserver 한 줄씩(vsPaneObserve(host) — 그리기마다 불러도 자리에 한 번만 걸림) 말고 무변 · 부품을 쓰는 탭 1개(v439 지시 — 기성 v440부터 탭 판마다 이 줄을 고친다) · pointer(마우스 이벤트 없음) · 150ms·조합
   //   · 저장은 한 곳(def.key에 k,d,f,chip) · ResizeObserver 하나·콜백은 rAF · 경계 matchMedia 3개 · 새 CSS(.vs.vs-fit 폭·폰 --pw·.vs-detcard·td.num·옅은 칩) · 기존 .vs 규칙(min-width 1160·폰 0) 그대로
+  //   v439 '부품을 쓰는 탭 0' → '지시 1개'(같은 강도): 부품을 부르는 곳은 @task-sheet 구간 하나(vsSheetRender 1번·정의 key "jw_task_sheet" 1개·host "taskList")이고 두 구간 밖은 vsSheet*·vsDateCell·VS_INST 0,
+  //     부품 저장 이름 8개 중 @vs-sheet 구간 밖에 나오는 이름은 jw_task_sheet 하나(그 구간 안 1번)
   const outside38 = html.slice(0, html.indexOf('// @vs-sheet-start')) + html.slice(html.indexOf('// @vs-sheet-end'));
+  const tsb38 = (() => { const i = html.indexOf('// @task-sheet-start'), j = html.indexOf('// @task-sheet-end'); return (i < 0 || j < i) ? '' : html.slice(i, j); })();
+  const outside2_38 = tsb38 ? outside38.replace(tsb38, '') : outside38;
+  const keysOut38 = ['jw_task_sheet', 'jw_rec_sheet', 'jw_cli_sheet', 'jw_wk_sheet', 'jw_bid_sheet', 'jw_ob_sheet', 'jw_site_sheet', 'jw_edu_sheet'].filter((k) => outside38.indexOf(k) >= 0);
+  const use38 = tsb38.length > 0 && (outside2_38.match(/\bvsSheet\w*\(|\bvsDateCell\(|\bVS_INST\b/g) || []).length === 0
+    && (tsb38.match(/\bvsSheetRender\(/g) || []).length === 1 && (tsb38.match(/key: "jw_task_sheet"/g) || []).length === 1 && (tsb38.match(/\bhost: "taskList"/g) || []).length === 1
+    && JSON.stringify(keysOut38) === '["jw_task_sheet"]' && (outside38.match(/jw_task_sheet/g) || []).length === 1;
   const rv38 = fn38(html, 'renderVehicles'), rc38 = fn38(html, 'renderContracts');
   const V38 = mk38({ width: 1366 }), vh38 = V38.env.mkHost('vehList'); vh38.innerHTML = '<div class="vs-wrap"><table class="vs"></table></div>';
   V38.api.paneObs(vh38); V38.api.paneObs(vh38); V38.env.roCb([{ target: vh38 }]); V38.env.flushRaf();
@@ -5200,7 +5209,7 @@ try {
   V38.env.cw = 900; V38.env.roCb([{ target: vh38 }]); const ro38b = vh38.querySelector('.vs-wrap').style.getPropertyValue('--vs-panew'); V38.env.flushRaf();   // 창을 줄이면 다시 잼(명세 ⓔ의 뜻 — 첫 값만이 아니라) · 콜백 안에서는 안 바꾸고 다음 그림에
   const ro38 = V38.env.ro.length === 1 && ro38a === '1048px' && ro38b === '1048px' && vh38.querySelector('.vs-wrap').style.getPropertyValue('--vs-panew') === '900px' && vh38.getAttribute('data-vs-host') == null;
   const st38 = (rv38.match(/\bvsPaneObserve\(host\);/g) || []).length === 1 && (rc38.match(/\bvsPaneObserve\(host\);/g) || []).length === 1 && (outside38.match(/\bvsPaneObserve\(/g) || []).length === 2
-    && (outside38.match(/\bvsSheet\w*\(|\bvsDateCell\(|\bVS_INST\b/g) || []).length === 0
+    && use38
     && /addEventListener\("pointerdown"/.test(blk38) && /document\.addEventListener\("pointermove", mv\); document\.addEventListener\("pointerup", up\); document\.addEventListener\("pointercancel", up\);/.test(blk38) && !/mousedown|mousemove|mouseup/.test(blk38)
     && /var VS_TYPE_MS = 150;/.test(blk38) && /"compositionstart"/.test(blk38) && /"compositionend"/.test(blk38) && /e\.isComposing/.test(blk38)
     && (blk38.match(/localStorage\.setItem\(/g) || []).length === 1 && /localStorage\.setItem\(def\.key, JSON\.stringify\(\{ k: st\.k, d: st\.d, f: st\.f, chip: st\.chip \}\)\)/.test(blk38)
@@ -5215,8 +5224,8 @@ try {
     && decl38(1000, '.vs td.num', 'text-align') == null && decl38(1000, '.vs td .sel-box', 'margin-right') == null && decl38(1000, '.vs td .sel-box', 'vertical-align') == null && decl38(1000, '.vs.vs-fit td .sel-box', 'margin-right') === '6px'
     && decl38(375, '.sel-bar.vs-selbar', 'flex-wrap') === 'wrap' && decl38(375, '.sel-bar.vs-selbar', 'padding') === '2px 2px 8px' && decl38(375, '.vs-selbar', 'padding') == null
     && /@media \(pointer:coarse\)\{ \.vs\.vs-fit \.vs-rs\{width:14px;\} \}/.test(css38);
-  T('v438 ⑫ 정적: 계약·차량 그리기에 vsPaneObserve(host) 한 줄씩(파일에서 이 둘뿐 — 여러 번 불러도 자리에 한 번 걸림·--vs-panew = 칸 폭·창을 줄이면 다음 그림에 다시 잼 1048 → 900·data-vs-host 없음) · 이번 판은 부품을 쓰는 탭 0(구간 밖 vsSheet*·vsDateCell·VS_INST 0) · 끌기는 pointer(document pointermove·pointerup·pointercancel — mouse 이벤트 0) · 150ms·compositionstart/end·isComposing · 저장 한 곳(def.key에 k,d,f,chip) · ResizeObserver 하나·콜백은 rAF · 경계 matchMedia 3개 · CSS .vs.vs-fit(860~ 폭 100%·최소 --vs-minw)·폰 col --pw·.vs-detcard(PC 숨김·폰 보임)·.vs.vs-fit td.num 오른쪽·옅은 칩 · 기존 .vs(min-width 1160·폰 0·폰 col 0) 그대로 · 검토 반영: 펼침 폭 상한 max-width 100%(계약·차량 [닫기 ▲] 잘림) · .vs td.num·.vs td .sel-box 규칙 없음(새 표만) · .sel-bar.vs-selbar 줄바꿈·여백 · 터치 손잡이 14px',
-    ro38 && st38 && css2_38 && css3_38, JSON.stringify({ ro38, ro38a, ro38b, st38, css2_38, css3_38 }));
+  T('v438 ⑫ 정적: 계약·차량 그리기에 vsPaneObserve(host) 한 줄씩(파일에서 이 둘뿐 — 여러 번 불러도 자리에 한 번 걸림·--vs-panew = 칸 폭·창을 줄이면 다음 그림에 다시 잼 1048 → 900·data-vs-host 없음) · 부품을 쓰는 탭 1개 — v439 지시(@task-sheet 구간 하나: vsSheetRender 1번·정의 key jw_task_sheet 1개·host taskList · 두 구간 밖 vsSheet*·vsDateCell·VS_INST 0 · 부품 저장 이름은 jw_task_sheet만) · 끌기는 pointer(document pointermove·pointerup·pointercancel — mouse 이벤트 0) · 150ms·compositionstart/end·isComposing · 저장 한 곳(def.key에 k,d,f,chip) · ResizeObserver 하나·콜백은 rAF · 경계 matchMedia 3개 · CSS .vs.vs-fit(860~ 폭 100%·최소 --vs-minw)·폰 col --pw·.vs-detcard(PC 숨김·폰 보임)·.vs.vs-fit td.num 오른쪽·옅은 칩 · 기존 .vs(min-width 1160·폰 0·폰 col 0) 그대로 · 검토 반영: 펼침 폭 상한 max-width 100%(계약·차량 [닫기 ▲] 잘림) · .vs td.num·.vs td .sel-box 규칙 없음(새 표만) · .sel-bar.vs-selbar 줄바꿈·여백 · 터치 손잡이 14px',
+    ro38 && st38 && css2_38 && css3_38, JSON.stringify({ ro38, ro38a, ro38b, st38, use38, keysOut38, css2_38, css3_38 }));
 
   // ⑬ 문서 — FEATURES 기준 v438·v438 절(문장 고정)·자리 글 GATES_V438 0 · TESTLIST v438 체크 칸 = 화면 칸 4개 '[ ] (AI 시험 화면 대상' + 게이트 칸 '[x] (AI)' 5종(PM 몫 0) · MANUAL 1절 화면 폭 한 줄 · CLAUDE.md 폭·부품 줄 · sw v438 이상
   const ft38 = rd38('FEATURES.md'), tl38 = rd38('TESTLIST.md'), man38 = rd38('MANUAL.html'), cl38 = rd38('CLAUDE.md'), sw38 = rd38('sw.js');
@@ -5243,6 +5252,476 @@ try {
     && Number((sw38.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 438,
     JSON.stringify({ ft: FT_PINS38.filter((s) => ftv38.indexOf(s) < 0).map((s) => s.slice(0, 30)), cl: CL_PINS38.filter((s) => cl38.indexOf(s) < 0).map((s) => s.slice(0, 30)), gates: [ftv38.indexOf('GATES_V438'), tlv38.indexOf('GATES_V438')], cb: tcb38.length, scr: cbScr38.length, gate: cbGate38.length, pm: tcb38.filter((l) => l.indexOf('PM') >= 0).map((l) => l.slice(0, 40)), man: man1_38.indexOf('넓은 모니터'), sw: (sw38.match(/jw-shell-v(\d+)/) || [0, 0])[1] }));
 } catch (e) { console.log('  (v438 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ---- v439(11/10 — 45-1 둘째 판: 관리 › 지시 탭을 엑셀형 표로 · PM 11/10 15:56·17:40 결정 ① 자동 지시를 '진행 중'에 같이 · ② 행 끝 처리 버튼은 지시 표에만 —
+//      09_조사_문서/표형탭_시안_자료_20261110/단계지시_v439_지시.json · 엑셀형탭_명세_20261110.json sections[key=tasks]):
+//      시험 틀 = v438 하네스와 같은 작은 DOM(innerHTML을 넣으면 여는 태그마다 요소를 새로 만듦 · 창 폭은 가짜 matchMedia) + index.html의 실제 함수를 그대로 돌린다 —
+//      지시 판정·처리(taskVisible·taskForMe·canActTask·canApproveTask·toggleTaskDone·approveTask·rejectTask·setTaskStatus·spawnNextRecur) · 옛 목록(renderTasksLegacy·taskRowHtml·bindTaskHandlers)
+//      · 선택 삭제·복구(renderSelBar·renderDeletedList·bulkRestore·hardDelete) · @vs-sheet 구간 · @task-sheet 구간. 저장·푸시·계약 진행(advanceProc)·모달·서류·[내 것 아님] 서버 호출은 기록만 남기는 대역. 오늘 = 2026-11-10.
+//      ① 정의 ② 자동 지시 '진행 중'에 같이·'자동' 칩·구분 거르기·칸 글 ③ 처리 버튼 권한별(관리자·지시 수행 직원) ④ 처리·펼침 동작(누름이 행 펼침으로 안 번짐) ⑤ 보기 권한 ⑥ 완료 칩
+//      ⑦ 전체선택·선택 삭제(보이는 행만) ⑧ 폰 legacy(옛 본문 해시·실행·경계) ⑨ 폰 sheet 준비 ⑩ 홈·내 업무 행 함수 무변(해시) ⑪ 제목·합계·오늘 승인 일괄·삭제된 지시 ⑫ 넓힘·CSS·전역 검색·검색칸·정적 ⑬ 문서
+try {
+  const rd39 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const own39 = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+  const fn39 = (src, name) => { const i = src.indexOf('function ' + name + '('); if (i < 0) throw new Error('함수 없음: ' + name); let d = 0, st = false; for (let j = i; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i, j + 1); } } throw new Error('중괄호 짝 안 맞음: ' + name); };
+  const line39 = (src, head) => { const i = src.indexOf(head); if (i < 0) throw new Error('줄 없음: ' + head); return src.slice(i, src.indexOf('\n', i)); };
+  const blkOf39 = (a, b) => { const i = html.indexOf(a), j = html.indexOf(b); if (i < 0 || j < i) throw new Error(a + ' 구간 없음'); return html.slice(i, j); };
+  const body39 = (name) => fn39(html, name).replace(/^function [\w$]+/, '').replace(/\r\n/g, '\n');   // 이름 뒤 '(' 부터 — 줄끝(CRLF)은 LF로 맞춰 셈
+  const sha39 = (s) => createHash('sha256').update(s).digest('hex');
+  const blk39 = blkOf39('// @vs-sheet-start', '// @vs-sheet-end'), tsb39 = blkOf39('// @task-sheet-start', '// @task-sheet-end');
+  const unesc39 = (s) => String(s).replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+  const mq39 = (q, w) => { if (q == null) return true; if (/print/.test(q)) return false; const a = /\(min-width:\s*(\d+)px\)/.exec(q), b = /\(max-width:\s*(\d+)px\)/.exec(q); if (!a && !b) return false; return (!a || w >= +a[1]) && (!b || w <= +b[1]); };
+  // 사람(권한 실측 꼴): 관리자 · 지시 수행 비관리자(직원B — 계약 수행) · 지시 보기(직원C — .view.readonly) · 대표
+  const MEM39 = [{ id: 'm0', name: '나종운', role: '대표', admin: true }, { id: 'm1', name: '관리자A', admin: true }, { id: 'm2', name: '직원B', perms: { tasks: 'do', con: 'do' } }, { id: 'm3', name: '직원C', perms: { tasks: 'view' } }];
+  const U39 = { A: MEM39[1], B: MEM39[2], C: MEM39[3] };
+  const PROC39 = [{ id: 'c1', label: '준설', site: '○○동 하천', title: '○○동 하천 준설공사', client: '포항시' }];
+  // 지시 표본(오늘 11-10) — a 일반 경과 · b 자동(차량) 앱 기준 승인 대기 · c 계약 단계 기한 없음 · d 보류(직원B 지시) · g 자동(적격) 담당 없음 3일 내 · h 반복 매월 승인 대기(직원B 지시)
+  //   · i 공개 관리자A만 · l 입금확인 · n 직원C 담당 · p 자동(인허가) 직원B 담당 · j·k 지운 지시(k는 관리자 전용) · e·f 완료 · z1~z22 완료(관리자 전용 — 완료 24건 > 옛 목록 20건)
+  const FIX39 = () => {
+    const T0 = (o) => Object.assign({ title: '', detail: '', who_id: '', who: '', scope: [], from: '관리자A', from_id: 'm1', by: '관리자A', due: '', status: 'open', done_at: null, done_by: null, created: '2026-11-01', updated: '2026-11-01' }, o);
+    const L = [
+      T0({ id: 'a', title: '가 안전점검 결과 정리', detail: '1행 상세\n2행 상세', who_id: 'm2', who: '직원B', due: '2026-11-05' }),
+      T0({ id: 'b', title: '나 차량 정기검사 예약', who_id: 'm2', who: '직원B', who_by: 'assign', from: '자동', from_id: '', by: '자동', auto_key: 'veh:v1:insp:2026-11-12', due: '2026-11-12', status: 'review', done_at: '2026-11-10', done_by: '앱 기준', created: '2026-10-13' }),
+      T0({ id: 'c', title: '다 준설토 성분분석', who_id: 'm2', who: '직원B', proc_id: 'c1', proc_label: '준설', pipe: 'main', stage_i: 3, stage_total: 9, stage_name: '폐기물 처리', created: '2026-11-03' }),
+      T0({ id: 'd', title: '라 사진대지 양식', who_id: 'm3', who: '직원C', from: '직원B', from_id: 'm2', by: '직원B', due: '2026-11-01', status: 'hold', created: '2026-10-20' }),
+      T0({ id: 'g', title: '사 적격심사 서류 제출', from: '자동', from_id: '', by: '자동', auto_key: 'bid:b9:qual', due: '2026-11-12', created: '2026-11-06' }),
+      T0({ id: 'h', title: '아 소방시설 점검 섭외', who_id: 'm3', who: '직원C', from: '직원B', from_id: 'm2', by: '직원B', recur: 'monthly', recur_root: 'h', due: '2026-11-11', status: 'review', done_at: '2026-11-09', done_by: '직원C', created: '2026-10-26' }),
+      T0({ id: 'i', title: '자 관리자 전용 지시', who_id: 'm1', who: '관리자A', scope: ['m1'], due: '2026-11-20', created: '2026-11-02' }),
+      T0({ id: 'l', title: '차 입금확인: 포항시', who_id: 'm1', who: '관리자A', from: '기성', rec_id: 'r1', due: '2026-11-15', created: '2026-11-04' }),
+      T0({ id: 'n', title: '카 직원C 담당 진행', who_id: 'm3', who: '직원C', due: '2026-11-25', created: '2026-11-07' }),
+      T0({ id: 'p', title: '하 인허가 갱신', who_id: 'm2', who: '직원B', who_by: 'assign', from: '자동', from_id: '', by: '자동', auto_key: 'lic:l1:exp:2026-12-01', due: '2026-12-01', created: '2026-11-08' }),
+      T0({ id: 'j', title: '타 지운 지시', who_id: 'm2', who: '직원B', del: 1 }),
+      T0({ id: 'k', title: '파 지운 관리자 지시', who_id: 'm1', who: '관리자A', scope: ['m1'], del: 1 }),
+      T0({ id: 'e', title: '마 보험 갱신 검토', who_id: 'm2', who: '직원B', due: '2026-10-01', status: 'done', done_at: '2026-11-03', done_by: '직원B', approved_by: '관리자A', approved_at: '2026-11-04' }),
+      T0({ id: 'f', title: '바 증명서 발급', who_id: 'm2', who: '직원B', from: '자동', from_id: '', by: '자동', auto_key: 'cert:c15', due: '2026-09-01', status: 'done', done_at: '2026-11-08', done_by: '직원B', approved_by: '관리자A', approved_at: '2026-11-09' })];
+    for (let q = 1; q <= 22; q++) { const dd = '2026-10-' + String(q).padStart(2, '0'); L.push(T0({ id: 'z' + q, title: '완료 ' + q, who_id: 'm1', who: '관리자A', scope: ['m1'], status: 'done', done_at: dd, done_by: '관리자A', approved_by: '관리자A', approved_at: dd })); }
+    return L;
+  };
+  const REAL39 = ['esc', 'isDate', 'vehDday', 'ddayInfo', 'pad', 'fmtDate', 'liveTasks', 'findTask', 'taskForMe', 'taskVisible', 'canActTask', 'canApproveTask', 'toggleTaskDone', 'approveTask', 'rejectTask', 'setTaskStatus',
+    'advanceRecur', 'spawnNextRecur', 'taskNotMineBtn', 'procChipHtml', 'taskRowHtml', 'bindTaskHandlers', 'selCount', 'selBoxHtml', 'bindSelBoxes', 'renderSelBar', 'hardDelete', 'bulkDelete', 'bulkRestore', 'renderDeletedList',
+    'moduleArr', 'moduleLive', 'moduleDeleted', 'moduleCan', 'moduleFind', 'saveModule', 'scheduleModuleSave', 'renderModuleList', 'renderModule', 'renderTasksLegacy', 'csTitle', 'csSiteText'];
+  const VARS39 = ['  var SHOW_TASK_ISSUER = ', '  var RECUR_LABEL = ', '  var ASSIGN_PREFIX_TXT = '].map((h) => line39(html, h));
+  const PRE39 = [
+    'var tasks = ENV.fixture, contracts = ENV.procs, members = ENV.members, vehicles = [], receivables = [];',
+    'var showTaskDone = false, showTaskAuto = false, showDeletedTasks = false;',
+    'var selSets = { tasks:{}, veh:{}, rec:{} }, delSelSets = { tasks:{}, veh:{}, rec:{} };',
+    'function todayStr(){ return "2026-11-10"; }',
+    'function genId(p){ ENV.gid++; return p + "N" + ENV.gid; }',
+    'function curMember(){ return ENV.user; } function myId(){ return ENV.user ? ENV.user.id : ""; } function myName(){ return ENV.user ? ENV.user.name : ""; } function getUser(){ return myName(); }',
+    'function isAdmin(){ return !!(ENV.user && ENV.user.admin); }',
+    'function permOf(mod){ var u = ENV.user; if (!u) return "hide"; if (u.admin) return "do"; return (u.perms && u.perms[mod]) || "hide"; }',
+    'function canDo(mod){ return permOf(mod) === "do"; } function canSee(mod){ return permOf(mod) !== "hide"; }',
+    'function findMember(id){ for (var i = 0; i < members.length; i++){ if (members[i].id === id) return members[i]; } return null; }',
+    'function memberName(id){ if (!id) return ""; if (id === "__all__") return "전사"; var m = findMember(id); return m ? m.name : ""; }',
+    'function dispName(n){ return n === "나종운" ? "대표님" : (n || ""); }',
+    'function scopeIncludes(scope, m){ if (!scope || !scope.length) return true; if (!m) return false; return scope.indexOf(m.id) >= 0; }',
+    'function scopeNames(tk){ return (tk || []).map(function(id){ var m = findMember(id); return m ? m.name : null; }).filter(Boolean).join(", "); }',
+    'function findProc(id){ for (var i = 0; i < contracts.length; i++){ if (contracts[i].id === id) return contracts[i]; } return null; }',
+    'function csTaskChg(t){ return !!(t && t.chg_stub); }',
+    'function confirm(msg){ ENV.log.push("confirm:" + msg); return ENV.confirmAns !== false; }',
+    'function pushNotify(to, title){ ENV.log.push("push:" + to + ":" + title); }',
+    'function advanceProc(t){ ENV.log.push("advance:" + t.id); }',
+    'function apprToastShow(m){ ENV.log.push("toast:" + m); }',
+    'function saveTasksCache(){ ENV.log.push("saveCache"); } function scheduleTasksSave(){ ENV.log.push("schedSave"); }',
+    'function saveVehiclesCache(){} function saveRecCache(){} function scheduleVehSave(){} function scheduleRecSave(){} function renderVehicles(){} function renderReceivables(){} function fillRecSort(){}',
+    'function renderSummary(){ ENV.log.push("summary"); } function renderDashboard(){ ENV.log.push("dash"); } function renderMyTasks(){ ENV.log.push("mytasks"); } function updateTaskBadge(){ ENV.log.push("badge"); } function bindCalHandlers(){}',
+    'function openTaskModal(id){ if (!canDo("tasks")) return; ENV.log.push("edit:" + id); } function openStageDoc(pid, sn){ ENV.log.push("doc:" + pid + ":" + sn); } function taskNotMine(id){ ENV.log.push("notmine:" + id); }',
+    'function findVeh(){ return null; } function findRec(){ return null; } function removeRecTask(){}'].join('\n');
+  const SRC39 = [PRE39].concat(REAL39.map((n) => fn39(html, n)), VARS39, [blk39, tsb39,
+    'return { render: renderTasks, def: taskSheetDef, vs: vsSheetRender, inst: vsInst, filter: vsSheetFilter, setQ: vsSheetSetQ, check: vsSheetCheckDef, minW: vsSheetMinW, cols: vsSheetCols, legacy: renderTasksLegacy, act: taskSheetAct, del: taskSheetDelete, fromGs: taskSheetFromGs, sText: taskSheetSearchText,'
+    + ' tasks: function(){ return tasks; }, sel: function(){ return selSets; }, delSel: function(){ return delSelSets; }, setShowDel: function(v){ showDeletedTasks = v; }, setShowAuto: function(v){ showTaskAuto = v; } };']).join('\n');
+  const mk39 = (o) => {
+    o = o || {};
+    const env = { width: o.width || 1366, user: o.user || U39.A, fixture: o.fixture || FIX39(), procs: PROC39.map((c) => Object.assign({}, c)), members: MEM39, mql: [], store: {}, timers: [], now: 100000, log: [], raf: [], ro: [], roCb: null, cw: 1048, confirmAns: true, gid: 0 };
+    const doc = { activeElement: null, byId: {} };
+    doc.getElementById = (id) => doc.byId[id] || null;
+    doc.addEventListener = () => {}; doc.removeEventListener = () => {};
+    const mkEl = (tag, attrs) => {
+      const el = { tagName: tag.toUpperCase(), attrs, L: {}, scrollLeft: 0, scrollTop: 0, parentNode: null };
+      Object.defineProperty(el, 'clientWidth', { get: () => env.cw });
+      el.getAttribute = (n) => (own39(attrs, n) ? unesc39(attrs[n]) : null);
+      el.setAttribute = (n, v) => { attrs[n] = String(v); };
+      el.hasAttribute = (n) => own39(attrs, n);
+      el.type = attrs.type || '';
+      el.value = own39(attrs, 'value') ? unesc39(attrs.value) : '';
+      el.checked = own39(attrs, 'checked');
+      const sp = {}; String(attrs.style || '').split(';').forEach((p) => { const k = p.indexOf(':'); if (k > 0) sp[p.slice(0, k).trim()] = p.slice(k + 1).trim(); });
+      el.style = { sp, setProperty: (k, v) => { sp[k] = String(v); }, getPropertyValue: (k) => sp[k] || '' };
+      const cls = new Set(String(attrs.class || '').split(/\s+/).filter(Boolean));
+      el.classList = { toggle: (c, on) => { if (on === undefined ? !cls.has(c) : on) cls.add(c); else cls.delete(c); }, contains: (c) => cls.has(c) };
+      el.addEventListener = (t, f) => { (el.L[t] = el.L[t] || []).push(f); };
+      el.fire = (t, ev) => { const e = Object.assign({ target: el, type: t, stopped: false }, ev || {}); e.stopPropagation = () => { e.stopped = true; }; e.preventDefault = () => {}; (el.L[t] || []).slice().forEach((f) => f(e)); return e; };
+      el.focus = () => { doc.activeElement = el; };
+      el.selectionStart = el.tagName === 'INPUT' ? el.value.length : null;
+      el.setSelectionRange = (a) => { el.selectionStart = a; };
+      el.scrollIntoView = () => {};
+      return el;
+    };
+    env.mkEl = mkEl;
+    const match = (el, sel) => {
+      let m = /^\[([\w-]+)\]$/.exec(sel); if (m) return el.hasAttribute(m[1]);
+      m = /^\[([\w-]+)="((?:[^"\\]|\\.)*)"\]$/.exec(sel); if (m) return el.getAttribute(m[1]) === m[2].replace(/\\(.)/g, '$1');
+      m = /^\.([\w-]+)$/.exec(sel); if (m) return el.classList.contains(m[1]);
+      throw new Error('시험 DOM이 모르는 선택자: ' + sel);
+    };
+    env.mkHost = (id) => {
+      const host = { id, attrs: {}, _h: '', _t: '', els: [], visible: true, onclick: null, style: { display: '' } };
+      host.getAttribute = (n) => (own39(host.attrs, n) ? host.attrs[n] : null);
+      host.setAttribute = (n, v) => { host.attrs[n] = String(v); };
+      host.getClientRects = () => (host.visible ? [{}] : []);
+      host.contains = (el) => host.els.indexOf(el) >= 0;
+      host.querySelectorAll = (sel) => host.els.filter((e) => match(e, sel));
+      host.querySelector = (sel) => host.els.find((e) => match(e, sel)) || null;
+      host.addEventListener = (t) => { env.log.push('host-listener:' + id + ':' + t); };   // 자리(host)에 위임 배선을 걸면 기록(v438 규칙 — 표 칸 root에만)
+      host.classList = { toggle: () => {}, contains: () => false };
+      Object.defineProperty(host, 'innerHTML', { get: () => host._h, set: (v) => {
+        host._h = String(v); host.els = [];
+        for (const t of host._h.matchAll(/<([a-zA-Z][\w-]*)((?:[^<>"]|"[^"]*")*)>/g)) { const attrs = {}; for (const a of t[2].matchAll(/([\w-]+)(?:="([^"]*)")?/g)) attrs[a[1]] = a[2] === undefined ? '' : a[2]; host.els.push(mkEl(t[1], attrs)); }
+      } });
+      Object.defineProperty(host, 'textContent', { get: () => host._t, set: (v) => { host._t = String(v); } });
+      doc.byId[id] = host;
+      return host;
+    };
+    env.host = (id) => doc.byId[id];
+    ['taskList', 'taskHead', 'taskBulkTop', 'taskBulkApprove', 'taskAutoToggle', 'taskAutoList', 'taskDoneToggle', 'taskDoneList', 'tasksSelBar', 'taskDeletedToggle', 'taskDeletedList'].forEach((id) => env.mkHost(id));
+    const win = { get innerWidth() { return env.width; }, matchMedia: (q) => ({ media: q, get matches() { return mq39(q, env.width); }, addEventListener: (t, f) => { env.mql.push(f); } }), requestAnimationFrame: (f) => { env.raf.push(f); } };
+    const ls = { getItem: (k) => (own39(env.store, k) ? env.store[k] : null), setItem: (k, v) => { env.store[k] = String(v); }, removeItem: (k) => { delete env.store[k]; } };
+    const stF = (f, ms) => { const t = { id: env.timers.length + 1, f, at: env.now + ms, done: false }; env.timers.push(t); return t.id; };
+    const ctF = (id) => { env.timers.forEach((t) => { if (t.id === id) t.done = true; }); };
+    function RO(cb) { env.roCb = cb; this.observe = (t) => { env.ro.push(t); }; }
+    class FD extends Date { static now() { return env.now; } }   // 가짜 시계(v439 검토 — 처리 버튼 연속 누름 막기 0.5초를 시험 시계로 본다. press39·pressDet39는 누르기 전에 1초씩 감)
+    const api = new Function('window', 'document', 'localStorage', 'setTimeout', 'clearTimeout', 'ResizeObserver', 'ENV', 'Date', SRC39)(win, doc, ls, stF, ctF, RO, env, FD);
+    env.tick = (ms) => { env.now += ms; let t; while ((t = env.timers.filter((x) => !x.done && x.at <= env.now).sort((a, b) => a.at - b.at)[0])) { t.done = true; t.f(); } };
+    env.breakAll = () => { env.mql.slice().forEach((f) => f({})); };
+    return { api, env, doc, host: env.host('taskList') };
+  };
+  const order39 = (h) => [...h.matchAll(/data-vs-row="([^"]*)"/g)].map((m) => m[1]).join(',');
+  const cnt39 = (h) => (/<span class="vs-count">([^<]*)<\/span>/.exec(h) || ['', ''])[1];
+  const rowSeg39 = (h, id) => (new RegExp('<tr class="vs-r[^"]*" data-vs-row="' + id + '">([\\s\\S]*?)</tr>').exec(h) || ['', ''])[1];
+  const cells39 = (h, id) => [...rowSeg39(h, id).matchAll(/<td([^>]*)>([\s\S]*?)<\/td>/g)].map((m) => [m[1], m[2]]);
+  const acts39 = (h) => [...h.matchAll(/<tr class="vs-r[^"]*" data-vs-row="([^"]*)">([\s\S]*?)<\/tr>/g)].map((m) => m[1] + ':' + (((/data-tsk-act="(\w+)"/.exec(m[2]) || [])[1]) || '-')).join(',');
+  const detActs39 = (h) => { const m = /<div class="vs-act">([\s\S]*?)<\/div>/.exec(h); return m ? [...m[1].matchAll(/data-tsk-act="(\w+)"/g)].map((x) => x[1]).join(',') : '(펼침 없음)'; };
+  const kvKeys39 = (h) => [...h.matchAll(/<div class="k">([^<]*)<\/div>/g)].map((m) => m[1]).join('·');
+  const kvVal39 = (h, k) => (new RegExp('<div class="k">' + k + '</div><div class="v">([\\s\\S]*?)</div></div>').exec(h) || ['', '?'])[1];
+  //   누르기 전에 가짜 시계 1초(연속 누름 막기 0.5초 밖 — 따로 누른 것) · o.fast = 시계 그대로(바로 뒤 누름) · o.detail = 더블클릭 둘째 누름 흉내(e.detail)
+  const ev39 = (X, b, o) => { o = o || {}; if (!o.fast) X.env.now += 1000; return o.detail ? { target: b, detail: o.detail } : { target: b }; };
+  const press39 = (X, act, id, o) => {   // 실제 누름 흉내: 버튼 → 행(행 토글 리스너 — 버튼 누름은 건너뜀) → 표 칸(처리 열 위임 배선)
+    const host = X.host, b = host.els.find((e) => e.getAttribute('data-tsk-act') === act && e.getAttribute('data-tsk-id') === id);
+    if (!b) throw new Error('처리 버튼 없음: ' + act + ':' + id);
+    const row = host.querySelector('[data-vs-row="' + id + '"]'), wrap = host.querySelector('[data-vs-wrap]'), had = host._h.indexOf('data-vs-det=') >= 0, ev = ev39(X, b, o);
+    row.fire('click', ev);
+    if (host.querySelector('[data-vs-row="' + id + '"]') !== row || (host._h.indexOf('data-vs-det=') >= 0) !== had) throw new Error('처리 버튼 누름이 행 펼침으로 번짐: ' + id);
+    wrap.fire('click', ev);
+  };
+  const pressDet39 = (X, act, id, o) => {   // 펼침 안 버튼 → 펼침 칸(위임 배선)
+    const host = X.host, det = host.querySelector('[data-vs-det]') || host.querySelector('[data-vs-detcard]'), L = host.els.filter((e) => e.getAttribute('data-tsk-act') === act && e.getAttribute('data-tsk-id') === id), b = L[L.length - 1];
+    if (!det || !b) throw new Error('펼침 버튼 없음: ' + act + ':' + id);
+    det.fire('click', ev39(X, b, o));
+  };
+  const openRow39 = (X, id) => { const row = X.host.querySelector('[data-vs-row="' + id + '"]'); if (!row) throw new Error('행 없음: ' + id); row.fire('click', { target: row }); };
+  const chip39 = (X, k) => { const el = X.host.querySelector('[data-vs-chip="st|' + k + '"]'); if (!el) throw new Error('칩 없음: ' + k); el.fire('click'); };
+  const tk39 = (X, id) => X.api.tasks().find((t) => t.id === id) || {};
+  const ADMIN_ORDER39 = 'a,h,b,g,l,i,n,p,c,d';
+
+  // ① 정의 — vsSheetCheckDef 통과(폰 legacy·폰 sheet 둘 다) · 열 10(명세 순서·폭·거르기·단계·폰 %, 기한만 160) · 단계별 열 합 712/960/1190 · 칩 8 · 저장 이름·자리·검색칸 id·page 1000 · legacy = 옛 본문 함수
+  const X1 = mk39(), d1 = X1.api.def();
+  const ck1 = X1.api.check(d1), ck1s = X1.api.check(Object.assign({}, d1, { phone: 'sheet' }));
+  const cols1 = d1.cols.map((c) => [c.k, c.h, c.w || 0, c.f, c.lv || 1, c.pw || 0, c.fill ? 'fill' + c.min : '', c.nosort ? 'ns' : ''].join(':')).join('|');
+  const COLS39 = 't:지시 내용:0:text:1:52:fill220:|kind:구분:108:enum:2:0::|stage:계약 단계:160:text:3:0::|who:담당:76:enum:2:0::|due:기한:160:none:1:24::|st:상태:88:enum:1:24::|reg:등록일:88:none:3:0::|scope:공개:110:text:4:0::|done:완료:120:none:4:0::|act:처리:60:none:2:0::ns';
+  const sums1 = [2, 3, 4].map((s) => X1.api.minW({ colw: {} }, X1.api.cols(d1, s))).join('/');
+  const chips1 = d1.chips.length + '|' + d1.chips[0].items.map((it) => it.k + ':' + it.h + (it.warn ? '!' : '') + (it.pc ? '@pc' : '') + (it.sort ? '>' + it.sort.k + it.sort.d : '')).join('|');
+  T('v439 ① 지시 표 정의: vsSheetCheckDef 통과(phone legacy·sheet 둘 다 — 폰 열 %합 100) · 열 10 = 명세 순서(지시 내용 남는 폭 최소 220·폰 52 / 구분 108 lv2 enum / 계약 단계 160 lv3 / 담당 76 lv2 enum / 기한 160·폰 24 / 상태 88·폰 24 enum / 등록일 88 lv3 / 공개 110 lv4 / 완료 120 lv4 / 처리 60 lv2 정렬 없음) · 단계별 열 합 712/960/1190 · 칩 한 묶음 8개(진행 중 기본·기한 경과 빨강·승인 대기·보류·자동·계약 단계·완료(완료일 ↓)·전체 — 자동·계약 단계·전체는 PC 전용) · key jw_task_sheet · host taskList · 검색칸 taskSearch · page 1000 · 기본 정렬 기한 ▲ · phone legacy · legacy = renderTasksLegacy · sel.can 있음',
+    ck1.length === 0 && ck1s.length === 0 && cols1 === COLS39 && sums1 === '712/960/1190' && chips1 === '1|:진행 중|over:기한 경과!|review:승인 대기|hold:보류|auto:자동@pc|proc:계약 단계@pc|done:완료>done-1|all:전체@pc'
+    && d1.key === 'jw_task_sheet' && d1.host === 'taskList' && d1.search && d1.search.id === 'taskSearch' && d1.page === 1000 && d1.sort.k === 'due' && d1.sort.d === 1 && d1.phone === 'legacy' && d1.legacy === X1.api.legacy
+    && typeof d1.onMode === 'function' && d1.sel && typeof d1.sel.can === 'function' && typeof d1.bindRows === 'function' && typeof d1.bind === 'function' && X1.api.def() === d1,
+    JSON.stringify({ ck1, ck1s, cols1: cols1 === COLS39 ? 'ok' : cols1, sums1, chips1 }));
+
+  // ② 자동 지시가 '진행 중'에 같이(결정 ①) · '자동' 칩 · 구분 거르기 · 칸 글(구분 짧은 이름 + '자동' 칩 + 배정표 이름 title · 담당 없음 · 계약 단계 막대 · 기한 입력 · 경과 빨강 · 3일 내 노랑 · 보류 색 없음)
+  const X2 = mk39(); X2.api.render(); const h2 = () => X2.host._h;
+  const o2 = [order39(h2()), cnt39(h2())];
+  const cb2 = cells39(h2(), 'b'), cg2 = cells39(h2(), 'g'), cc2 = cells39(h2(), 'c'), ca2 = cells39(h2(), 'a'), cd2 = cells39(h2(), 'd'), ch2 = cells39(h2(), 'h'), cl2 = cells39(h2(), 'l');
+  const kOpts2 = ((/<select data-vf="kind">([\s\S]*?)<\/select>/.exec(h2()) || ['', ''])[1].match(/<option value="[^"]*"/g) || []).map((s) => s.slice(15, -1)).join('|');
+  const cellOk2 = cb2[1] && cb2[1][0] === ' class="vs-hs" title="배정표 이름: 차량 만기(정기검사·보험)"' && cb2[1][1] === '<span class="review-chip">자동</span> 차량 만기'
+    && cg2[1][1] === '<span class="review-chip">자동</span> 적격심사' && /^<span class="hold-chip" title="배정표\(권한관리\)에 이 접두어의 담당이 없습니다[^"]*">담당 없음<\/span>$/.test(cg2[3][1])
+    && cc2[2][1] === '<span class="cs-bar"><i style="width:44%"></i></span>4/9 · 폐기물 처리' && cc2[4][1] === '<span class="need-due">기한 입력</span>' && cc2[1][1] === '계약 단계'
+    && ca2[4][0] === ' class="vs-dan" title="2026-11-05 경과 5일"' && ca2[4][1] === '2026-11-05 경과 5일' && cg2[4][0] === ' class="vs-warn" title="2026-11-12"' && cg2[4][1] === '2026-11-12 D-2'
+    && cd2[4][0] === ' title="2026-11-01"' && cd2[4][1] === '2026-11-01 <span style="color:#9AA09C;">D+9</span>' && cd2[5][1] === '<span class="hold-chip">보류</span>'
+    && ch2[1][1] === '반복 · 매월' && ch2[5][1] === '<span class="review-chip">승인 대기</span>' && cl2[1][1] === '입금확인' && ca2[1][1] === '일반' && /<input type="checkbox" class="sel-box" data-vs-sel="a">가 안전점검 결과 정리$/.test(ca2[0][1]);
+  chip39(X2, 'auto'); o2.push(order39(h2()), cnt39(h2()));
+  chip39(X2, ''); X2.api.filter(X2.api.def(), 'kind', '자동 · 적격심사'); o2.push(order39(h2()));
+  X2.api.filter(X2.api.def(), 'kind', '계약 단계'); o2.push(order39(h2()));
+  X2.api.filter(X2.api.def(), 'kind', ''); chip39(X2, 'done'); X2.api.filter(X2.api.def(), 'kind', '자동 · 증명서'); o2.push(order39(h2()));
+  T('v439 ② 자동 지시 = 기본 화면(진행 중)에 같이(PM 결정 ①): 진행 중 = 완료 전 전부 "' + ADMIN_ORDER39 + '"(자동 b·g·p 포함 · 기한 ▲ · 기한 없음 c 뒤 · 보류 d 맨 뒤) "보이는 10건 / 전체 34건" · \'자동\' 칩 = b,g,p · 구분 거르기 "자동 · 적격심사" = g · "계약 단계" = c · 완료 AND "자동 · 증명서" = f · 구분 고르기 목록 = 계약 단계|반복|일반|입금확인|자동 · 인허가|자동 · 적격심사|자동 · 증명서|자동 · 차량 만기(자동끼리 모임) · 칸 글: 구분 \'자동\' 칩 + 짧은 이름(차량 만기·적격심사)·title 배정표 이름 / 계약 단계·입금확인·반복 · 매월·일반 · 담당 없음 칩 · 계약 단계 막대 44% "4/9 · 폐기물 처리" · 기한 입력 · 경과 빨강 "2026-11-05 경과 5일"(title도 같은 글 — 칸이 좁아 잘려도 일수, 검토 반영) · 3일 내 노랑 "2026-11-12 D-2" · 보류는 색 없이 회색 D+9 · 상태 칩(승인 대기·보류) · 첫 칸 선택 체크 + 제목',
+    o2[0] === ADMIN_ORDER39 && o2[1] === '보이는 10건 / 전체 34건' && o2[2] === 'b,g,p' && o2[3] === '보이는 3건 / 전체 34건' && o2[4] === 'g' && o2[5] === 'c' && o2[6] === 'f'
+    && kOpts2 === '|계약 단계|반복|일반|입금확인|자동 · 인허가|자동 · 적격심사|자동 · 증명서|자동 · 차량 만기' && cellOk2,
+    JSON.stringify({ o2, kOpts2, cellOk2, b: cb2.slice(1, 2), g: [cg2[1], cg2[3], cg2[4]], c: [cc2[2], cc2[4]], a: [ca2[0], ca2[4]], d: [cd2[4], cd2[5]] }));
+
+  // ③ 처리 버튼 권한별(결정 ②) — 행 끝 처리 열 하나: 승인 대기 = [승인](canApproveTask) · 보류 = [재개](canDo) · 진행 = [완료](canActTask) · 완료 = 없음 / 펼침 버튼 = 지금 규칙
+  //   관리자(전부) · 지시 수행 비관리자 직원B(관리자 전용 i 안 보임 · 자기가 지시한 h만 [승인] · 앱 기준 자동 b는 승인 못 함 · 자기 담당 자동 p에 [내 것 아님])
+  const X3 = mk39(); X3.api.render();
+  const a3 = acts39(X3.host._h);
+  const det3 = {}; ['b', 'c', 'd', 'p'].forEach((id) => { openRow39(X3, id); det3[id] = detActs39(X3.host._h); });
+  const Y3 = mk39({ user: U39.B }); Y3.api.render();
+  const b3 = [order39(Y3.host._h), cnt39(Y3.host._h), acts39(Y3.host._h)];
+  const detB3 = {}; ['b', 'h', 'p', 'c'].forEach((id) => { openRow39(Y3, id); detB3[id] = detActs39(Y3.host._h); });
+  T('v439 ③ 처리 버튼 권한별: 관리자 처리 열 a 완료·h 승인·b 승인·g 완료·l 완료·i 완료·n 완료·p 완료·c 완료·d 재개 · 펼침 b(승인 대기) 승인·반려·완료취소·삭제 / c(계약 단계) 완료·📄 서류·보류·수정·삭제 / d(보류) 완료·재개·수정·삭제 / p(남의 자동) 완료·보류·수정·삭제 · 직원B(지시 수행) 행 = a,h,b,g,l,n,p,c,d(관리자 전용 i 빠짐) "보이는 9건 / 전체 11건" · 처리 열 b 없음(앱 기준 자동은 승인권자 아님)·h 승인(자기가 지시)·d 재개 · 펼침 b 완료취소·삭제 / h 승인·반려·완료취소·삭제 / p(자기 담당 자동) 완료·보류·수정·내 것 아님·삭제 / c 완료·📄 서류(계약 수행)·보류·수정·삭제',
+    a3 === 'a:done,h:approve,b:approve,g:done,l:done,i:done,n:done,p:done,c:done,d:resume'
+    && det3.b === 'approve,reject,cancel,del' && det3.c === 'done,doc,hold,edit,del' && det3.d === 'done,resume,edit,del' && det3.p === 'done,hold,edit,del'
+    && b3[0] === 'a,h,b,g,l,n,p,c,d' && b3[1] === '보이는 9건 / 전체 11건' && b3[2] === 'a:done,h:approve,b:-,g:done,l:done,n:done,p:done,c:done,d:resume'
+    && detB3.b === 'cancel,del' && detB3.h === 'approve,reject,cancel,del' && detB3.p === 'done,hold,edit,notmine,del' && detB3.c === 'done,doc,hold,edit,del',
+    JSON.stringify({ a3, det3, b3, detB3 }));
+
+  // ④ 처리·펼침 버튼 동작(관리자) — 처리 열 누름은 행 펼침으로 번지지 않음(같은 행 요소·펼침 없음) · [완료] = 승인 대기(완료 요청자·승인권자 푸시) · [승인] = 완료 + 반복 다음 회차(한 달 뒤) / 계약 단계 진행(advanceProc)
+  //   · [재개] · 펼침 [📄 서류]·[반려](앱 기준이면 완료 신호 끔)·[보류]·[수정]·[삭제](확인 — 휴지통)·[되돌리기] · 확인 창 취소면 그대로 · 보기 권한 흉내 누름은 무시
+  const X4 = mk39(), L4 = X4.env.log; X4.api.render();
+  press39(X4, 'done', 'a'); const s4a = [tk39(X4, 'a').status, tk39(X4, 'a').done_by, L4.indexOf('push:__admins__:승인요청: 가 안전점검 결과 정리') >= 0, /data-vs-row="a">[\s\S]*?data-tsk-act="approve" data-tsk-id="a"/.test(X4.host._h)];
+  openRow39(X4, 'a'); s4a.push(detActs39(X4.host._h)); pressDet39(X4, 'cancel', 'a'); s4a.push(tk39(X4, 'a').status, tk39(X4, 'a').done_by);   // 펼침 [완료취소] = 다시 진행(완료 요청 지움)
+  press39(X4, 'approve', 'h'); const nx4 = X4.api.tasks().filter((t) => t.recur_root === 'h' && t.id !== 'h');
+  const s4h = [tk39(X4, 'h').status, tk39(X4, 'h').approved_by, L4.indexOf('advance:h') >= 0, L4.indexOf('push:m3:승인됨: 아 소방시설 점검 섭외') >= 0, nx4.length, nx4[0] && nx4[0].due, nx4[0] && nx4[0].status, nx4[0] && nx4[0].recur];
+  openRow39(X4, 'c'); pressDet39(X4, 'doc', 'c'); const s4doc = L4.indexOf('doc:c1:폐기물 처리') >= 0;
+  press39(X4, 'done', 'c'); press39(X4, 'approve', 'c'); const s4c = [tk39(X4, 'c').status, L4.indexOf('advance:c') >= 0];
+  press39(X4, 'resume', 'd'); const s4d = tk39(X4, 'd').status;
+  openRow39(X4, 'b'); const s4b0 = /data-vs-det="b"/.test(X4.host._h); pressDet39(X4, 'reject', 'b'); const s4b = [s4b0, tk39(X4, 'b').status, tk39(X4, 'b').doneif_off, tk39(X4, 'b').done_by];
+  openRow39(X4, 'g'); pressDet39(X4, 'hold', 'g'); const s4g = [tk39(X4, 'g').status, detActs39(X4.host._h)]; pressDet39(X4, 'edit', 'g'); s4g.push(L4.indexOf('edit:g') >= 0);
+  X4.env.confirmAns = false; openRow39(X4, 'n'); pressDet39(X4, 'del', 'n'); const s4n = [tk39(X4, 'n').del, L4.indexOf('confirm:이 지시를 삭제할까요? (나중에 복구 가능)') >= 0]; X4.env.confirmAns = true;
+  openRow39(X4, 'l'); pressDet39(X4, 'del', 'l'); const s4l = [tk39(X4, 'l').del, order39(X4.host._h).split(',').indexOf('l')];
+  chip39(X4, 'done'); openRow39(X4, 'e'); const s4e0 = detActs39(X4.host._h); pressDet39(X4, 'reopen', 'e'); const s4e = [s4e0, tk39(X4, 'e').status, tk39(X4, 'e').approved_by];
+  //   보기 권한 흉내: 직원C로 바꾸고 화면에 없는 버튼을 만들어 누름 → 누름 길의 지금 규칙(canDo)이 막음. 대상은 직원C 담당 지시(n 진행·d 보류·h 완료) — 아래 함수(setTaskStatus·toggleTaskDone)는
+  //   담당 본인이면 canActTask로 통과시키므로, 누름 길의 canDo 검사가 빠지면 여기서 바뀐다(결함 심기 1회차에서 남의 지시를 대상으로 해 놓친 3종 보강) · [삭제]·[📄 서류]·[수정]은 남의 지시 p·c
+  chip39(X4, ''); tk39(X4, 'd').status = 'hold'; X4.env.user = U39.C; X4.api.render();
+  const fake4 = (act, id) => { const b = X4.env.mkEl('button', { type: 'button', class: 'mini-btn', 'data-tsk-act': act, 'data-tsk-id': id }); X4.host.querySelector('[data-vs-wrap]').fire('click', ev39(X4, b)); };
+  fake4('hold', 'n'); fake4('resume', 'd'); fake4('reopen', 'h'); fake4('del', 'p'); fake4('doc', 'c'); fake4('edit', 'p');
+  const s4v = [tk39(X4, 'n').status, tk39(X4, 'd').status, tk39(X4, 'h').status, tk39(X4, 'p').del, L4.filter((l) => l === 'doc:c1:폐기물 처리').length, L4.filter((l) => l === 'edit:p').length];
+  T('v439 ④ 처리·펼침 동작(관리자): 처리 열 [완료] 누름 = 행 펼침으로 안 번짐 → a 승인 대기·완료 요청 관리자A·승인권자 푸시(__admins__)·처리 열이 [승인]으로 → 펼침 승인·반려·완료취소·삭제 → [완료취소] = 다시 진행 · h [승인] = 완료·승인자·푸시(담당)·반복 다음 회차 1건(due 2026-12-11·open·monthly) · c 펼침 [📄 서류] = openStageDoc(c1, 폐기물 처리) · c [완료] → [승인] = 완료 + 계약 단계 진행(advanceProc) · d [재개] = open · b 펼침 [반려] = open·완료 신호 끔(doneif_off 1)·완료 요청 지움 · g [보류] = hold·펼침 버튼 재개로 · [수정] = 수정 창 · [삭제] 확인 취소 = 그대로 / 확인 = del 1·행 빠짐 · 완료 e [되돌리기] = open·승인 지움 · 보기 권한(직원C)으로 바꾼 뒤 누른 [보류](자기 담당 n)·[재개](자기 담당 d)·[되돌리기](자기 담당 h)·[삭제]·[📄 서류]·[수정] = 무시(누름 길이 canDo를 다시 봄)',
+    JSON.stringify(s4a) === '["review","관리자A",true,true,"approve,reject,cancel,del","open",null]' && JSON.stringify(s4h) === '["done","관리자A",true,true,1,"2026-12-11","open","monthly"]' && s4doc
+    && JSON.stringify(s4c) === '["done",true]' && s4d === 'open' && JSON.stringify(s4b) === '[true,"open",1,null]' && JSON.stringify(s4g) === '["hold","done,resume,edit,del",true]'
+    && JSON.stringify(s4n) === '[null,true]' && JSON.stringify(s4l) === '[1,-1]' && JSON.stringify(s4e) === '["reopen,del","open",null]' && JSON.stringify(s4v) === '["open","hold","done",null,1,0]',
+    JSON.stringify({ s4a, s4h, s4doc, s4c, s4d, s4b, s4g, s4n, s4l, s4e, s4v }).replace(/null/g, 'x'));
+
+  // ⑤ 보기 권한(직원C — 지시 'view' → .view.readonly): 선택 칸·선택 막대 없음 · 그린 버튼은 전부 .vs-chip(읽기 토글) 아니면 .mini-btn(보기 권한 CSS가 숨김) · 처리 버튼은 자기 담당 n의 [완료] 하나뿐
+  //   · CSS .view.readonly .mini-btn·.add-row·.link-btn 숨김 · 제목 [오늘 승인 일괄]도 .mini-btn · 삭제된 지시 링크는 수행 권한만
+  const X5 = mk39({ user: U39.C }); X5.api.render(); openRow39(X5, 'n');
+  const h5 = X5.host._h, btn5 = [...h5.matchAll(/<button([^>]*)>/g)].map((m) => (/class="([^"]*)"/.exec(m[1]) || ['', ''])[1]);
+  const css5 = (() => { const i = html.indexOf('<style>'), j = html.indexOf('</style>', i); return html.slice(i + 7, j).replace(/\/\*[\s\S]*?\*\//g, ''); })();
+  const ro5 = /\.view\.readonly \.add-row,\s*\.view\.readonly \.del-x,\s*\.view\.readonly \.mini-btn,\s*\.view\.readonly \.link-btn\{display:none !important;\}/.test(css5);
+  openRow39(X5, 'c'); const c5 = detActs39(X5.host._h);   // 남의 계약 단계 지시 펼침 = 버튼 0(📄 서류는 계약 수행 · 보류·수정·삭제는 지시 수행)
+  T('v439 ⑤ 보기 권한(직원C — .view.readonly): 선택 칸(sel-box)·선택 막대 없음 · 표·펼침의 버튼 ' + btn5.length + '개 전부 vs-chip 또는 mini-btn(보기 권한 CSS가 mini-btn을 숨김 — 칩·필터 초기화·[닫기 ▲]만 보임) · 처리 열 버튼은 자기 담당 n [완료] 하나(mini-btn — 숨김) · 펼침 버튼 n 완료 하나 · 남의 계약 단계 지시 c 펼침 버튼 0 · CSS .view.readonly .add-row·.mini-btn·.link-btn{display:none !important} · 제목 [오늘 승인 일괄](taskBulkTop)도 mini-btn · 삭제된 지시 링크 숨김(수행 권한만)',
+    h5.indexOf('sel-box') < 0 && h5.indexOf('data-vs-selbar') < 0 && btn5.length >= 10 && btn5.every((c) => /(^| )(vs-chip|mini-btn)( |$)/.test(c))
+    && acts39(h5).split(',').filter((x) => !/:-$/.test(x)).join(',') === 'n:done' && detActs39(h5) === 'done' && c5 === '' && ro5
+    && /<button type="button" class="mini-btn" id="taskBulkTop"/.test(html) && X5.env.host('taskDeletedToggle').style.display === 'none',
+    JSON.stringify({ btn: btn5.filter((c) => !/(^| )(vs-chip|mini-btn)( |$)/.test(c)), sel: h5.indexOf('sel-box'), acts: acts39(h5), det: detActs39(h5), c5, ro5, del: X5.env.host('taskDeletedToggle').style.display }));
+
+  // ⑥ 완료 칩 — 자르지 않음(24건 > 옛 목록 20건) · 완료일 최근 먼저(f 11-08 · e 11-03 · z22 10-22 … z1 10-01) · 1920에서는 완료 머리에 ▼
+  const X6 = mk39(); X6.api.render(); chip39(X6, 'done');
+  const o6 = [order39(X6.host._h), cnt39(X6.host._h), acts39(X6.host._h).split(',').every((x) => /:-$/.test(x))];   // 완료 줄 처리 열 = 버튼 없음([완료]를 그리면 누름이 되돌리기가 됨 — [되돌리기]는 펼침에만)
+  const Z6 = 'f,e,' + Array.from({ length: 22 }, (_, i) => 'z' + (22 - i)).join(',');
+  const X6b = mk39({ width: 1920 }); X6b.api.render(); chip39(X6b, 'done');
+  const ar6 = [...X6b.host._h.matchAll(/data-vs-sort="(\w+)"[^>]*>[^<]*<span class="vs-ar">(▲|▼)<\/span>/g)].map((m) => m[1] + m[2]).join(',');
+  T('v439 ⑥ 완료 칩: 자르기 없이 24건(옛 목록은 20건) "보이는 24건 / 전체 34건" · 완료일 최근 먼저 f,e,z22…z1 · 완료 줄 처리 열 버튼 0 · 1920(완료 열 보임)에서 정렬 표시 = 완료 ▼',
+    o6[0] === Z6 && o6[1] === '보이는 24건 / 전체 34건' && o6[2] === true && order39(X6b.host._h) === Z6 && ar6 === 'done▼',
+    JSON.stringify({ o6: o6[0].slice(0, 40), c: o6[1], ar6 }));
+
+  // ⑦ 전체선택 = 그린 행만 · 칩을 바꾸면 숨은 선택 풂 · 선택 삭제 = 보이는 행만(확인 — 휴지통) · 직원B: 보이지 않는 지시(i)를 미리 골라 둬도 셈·삭제에 안 들어감
+  const X7 = mk39(); X7.api.render();
+  const sa7 = X7.host.querySelector('[data-vs-selall]'); sa7.checked = true; sa7.fire('change');
+  const s7a = Object.keys(X7.api.sel().tasks).sort().join(','), bar7 = (/전체선택\(보이는 (\d+)건\)/.exec(X7.host._h) || [0, ''])[1];
+  chip39(X7, 'done'); const s7b = Object.keys(X7.api.sel().tasks).length;
+  chip39(X7, '');
+  ['a', 'i'].forEach((id) => { const cb = X7.host.querySelector('[data-vs-sel="' + id + '"]'); cb.checked = true; cb.fire('change'); });
+  const btn7 = (/data-vs-selact="0"[^>]*>([^<]*)<\/button>/.exec(X7.host._h) || [0, ''])[1];
+  X7.host.querySelector('[data-vs-selact="0"]').fire('click');
+  const s7c = [tk39(X7, 'a').del, tk39(X7, 'i').del, X7.env.log.indexOf('confirm:2건을 삭제할까요? (나중에 복구 가능)') >= 0, Object.keys(X7.api.sel().tasks).length, order39(X7.host._h)];
+  const Y7 = mk39({ user: U39.B }); Y7.api.sel().tasks.i = 1; Y7.api.render();
+  const cbA7 = Y7.host.querySelector('[data-vs-sel="a"]'); cbA7.checked = true; cbA7.fire('change');
+  const yb7 = [(/data-vs-selact="0"[^>]*>([^<]*)<\/button>/.exec(Y7.host._h) || [0, ''])[1], Y7.host._h.indexOf('숨은 선택') < 0];
+  Y7.host.querySelector('[data-vs-selact="0"]').fire('click');
+  const s7d = [tk39(Y7, 'a').del, tk39(Y7, 'i').del, Y7.env.log.indexOf('confirm:1건을 삭제할까요? (나중에 복구 가능)') >= 0];
+  Y7.api.del(['i', 'g'], false); s7d.push(tk39(Y7, 'i').del, tk39(Y7, 'g').del);   // 삭제 함수를 직접 불러도 행 원천(보이는 지시) 밖 id는 버림
+  T('v439 ⑦ 전체선택·선택 삭제: 전체선택 = 그린 행 10건(진행 중 — 완료 24건 빠짐) "전체선택(보이는 10건)" · 완료 칩으로 바꾸면 숨은 선택 풂(0) · a·i 골라 [선택 삭제 (2)] = 확인 "2건을 삭제할까요? (나중에 복구 가능)" → del 1·선택 비움·행 빠짐 · 직원B: 안 보이는 i를 미리 골라 둬도 [선택 삭제 (1)]·숨은 선택 없음 → a만 지움(i 그대로) · 삭제 함수를 i·g로 직접 불러도 g만',
+    s7a === 'a,b,c,d,g,h,i,l,n,p' && bar7 === '10' && s7b === 0 && btn7 === '선택 삭제 (2)' && JSON.stringify(s7c) === '[1,1,true,0,"h,b,g,l,n,p,c,d"]'
+    && JSON.stringify(yb7) === '["선택 삭제 (1)",true]' && JSON.stringify(s7d) === '[1,null,true,null,1]',
+    JSON.stringify({ s7a, bar7, s7b, btn7, s7c, yb7, s7d }).replace(/null/g, 'x'));
+
+  // ⑧ 폰 legacy(859px 이하 — 퀴즈 2번 답 확인 중이라 지금 화면 그대로): 옛 본문 renderTasksLegacy = v438(43e61b0) renderTasks 본문 글자째(해시) · 실행 = 옛 카드 목록(자동 만기 접이식·완료 보기 20건·오늘 승인 일괄 링크·선택 막대)
+  //   · 표 전용 제목 글·일괄 버튼 없음 · 1366으로 넓히면(경계 한 번) 표 + 옛 요소 숨김 + 제목 건수 · 다시 375면 옛 목록·[완료 보기] 되살림
+  const LEG_SHA39 = '182f2805c9b7114bc0545942aee2d4e4dcf501439edf489e1bbca96d4bcd6276';
+  const X8 = mk39({ width: 375 }), E8 = X8.env; const r8 = X8.api.render();
+  const H8 = (id) => E8.host(id);
+  const s8a = [r8 === undefined, (X8.host._h.match(/class="item task-item/g) || []).length, X8.host._h.indexOf('data-vs-') < 0, H8('taskAutoToggle').style.display, H8('taskAutoToggle').textContent, (H8('taskAutoList')._h.match(/class="item task-item/g) || []).length,
+    H8('taskDoneToggle').textContent, H8('taskDoneToggle').style.display, H8('taskBulkApprove').style.display, H8('taskBulkApprove').textContent, H8('tasksSelBar').style.display, H8('taskHead').textContent, H8('taskBulkTop').style.display, E8.log.indexOf('badge') >= 0 && E8.log.indexOf('mytasks') >= 0];
+  E8.width = 1366; E8.breakAll();
+  const s8b = [X8.host._h.indexOf('data-vs-table') > 0, ['taskAutoToggle', 'taskBulkApprove', 'taskAutoList', 'taskDoneToggle', 'taskDoneList', 'tasksSelBar'].map((id) => H8(id).style.display).join(','), H8('taskHead').textContent, H8('taskBulkTop').style.display, H8('taskBulkTop').textContent, order39(X8.host._h)];
+  E8.width = 375; E8.breakAll();
+  const s8c = [(X8.host._h.match(/class="item task-item/g) || []).length, X8.host._h.indexOf('data-vs-') < 0, H8('taskDoneToggle').style.display, H8('taskHead').textContent, H8('taskBulkTop').style.display];
+  const leg8 = sha39(body39('renderTasksLegacy'));
+  T('v439 ⑧ 폰 legacy(375): 옛 본문 renderTasksLegacy = v438 renderTasks 본문 글자째(sha256 ' + LEG_SHA39.slice(0, 12) + '…) · 실행 = 옛 카드 7장(진행 일반·계약·보류·반복·입금확인 — 자동 b·g·p는 접이식) · 표 글 0 · [자동 만기 보기 (3)] 보임·접이식 카드 3장 · [완료 보기 (20)](24건 중 20 — 옛 자르기 그대로) · [오늘 승인 일괄 (1)] 링크 · 선택 막대 flex · 탭 배지·내 업무 다시 그림 · 제목 글 없음·taskBulkTop 숨김 → 1366(경계 한 번) = 표 + 옛 요소 6개 숨김 + 제목 "진행 중 10 · 기한 경과 1" + [오늘 승인 일괄 (1)] → 다시 375 = 옛 카드 7장·[완료 보기] 되살림·제목 글·일괄 버튼 걷음',
+    leg8 === LEG_SHA39 && JSON.stringify(s8a) === '[true,7,true,"block","자동 만기 보기 (3)",3,"완료 보기 (20)","","inline-block","오늘 승인 일괄 (1)","flex","","none",true]'
+    && JSON.stringify(s8b) === '[true,"none,none,none,none,none,none","진행 중 10 · 기한 경과 1","inline-block","오늘 승인 일괄 (1)","' + ADMIN_ORDER39 + '"]'
+    && JSON.stringify(s8c) === '[7,true,"","","none"]',
+    JSON.stringify({ leg: leg8.slice(0, 12), s8a, s8b, s8c }));
+
+  // ⑨ 폰 sheet 준비(퀴즈 2번 답이 '폰도 새 표'면 정의 phone 한 줄만 "sheet"): 폰 열 3(지시 내용 52·기한 24·상태 24 %) · 상태 칸 = 처리 버튼(할 수 있는 분) · 폰 기한 D±n · 폰 합계 '합계 · 경과 · 대기' · 자동·계약 단계·전체 칩 PC 전용 · 행 누름 = 표 아래 상세 카드
+  const X9 = mk39({ width: 375 }), d9 = Object.assign({}, X9.api.def(), { phone: 'sheet' }); X9.api.vs(d9);
+  const h9 = X9.host._h, cg9 = [...h9.matchAll(/<col data-vs-col="(\w+)" style="([^"]*)">/g)].map((m) => m[1] + '=' + m[2]).join(',');
+  const ca9 = cells39(h9, 'a'), cd9 = cells39(h9, 'd'), cb9 = cells39(h9, 'b');
+  const ft9 = ((/<tfoot><tr>([\s\S]*?)<\/tr><\/tfoot>/.exec(h9) || ['', ''])[1].match(/<td[^>]*>([^<]*)<\/td>/g) || []).map((s) => s.replace(/<[^>]+>/g, '')).join('|');
+  const pc9 = ['auto', 'proc', 'all'].every((k) => new RegExp('class="vs-chip vs-pc" data-vs-chip="st\\|' + k + '"').test(h9)) && /class="vs-chip on" data-vs-chip="st\|"/.test(h9);
+  openRow39(X9, 'a'); const dc9 = [/<div class="vs-detcard" data-vs-detcard="a">/.test(X9.host._h), X9.host._h.indexOf('<tr class="vs-det">') < 0, detActs39(X9.host._h)];
+  //   보기 권한(직원C — 자기 담당 n 진행·d 보류·h 승인 대기): 상태 칸 = 상태 글(처리 버튼은 지시 수행 권한만 — 보기 권한 CSS가 버튼을 숨겨 칸이 비지 않게, v439 검토) · 표에 처리 버튼 0
+  const X9c = mk39({ width: 375, user: U39.C }), d9c = Object.assign({}, X9c.api.def(), { phone: 'sheet' }); X9c.api.vs(d9c);
+  const st9c = ['n', 'd', 'h'].map((id) => (cells39(X9c.host._h, id)[2] || ['', '(없음)'])[1]).join('|'), ta9c = (X9c.host._h.match(/data-tsk-act=/g) || []).length;
+  T('v439 ⑨ 폰 sheet 준비(phone 한 줄만 바꾸면 되게): 정의 검사 통과 · 열 3 = t --pw 52%·due 24%·st 24% · a 기한 "D+5"(빨강)·상태 칸 [완료] · d 상태 칸 [재개] · b 상태 칸 [승인] · 합계 "합계 10건|경과 1|대기 2" · 자동·계약 단계·전체 칩 vs-pc(폰 숨김) · 행 누름 = 표 아래 상세 카드(표 안 펼침 없음)·버튼 완료·보류·수정·삭제 · 보기 권한(직원C) 상태 칸 = 상태 글 n 진행·d 보류 칩·h 승인 대기 칩(처리 버튼 0 — 검토 반영)',
+    X9.api.check(d9).length === 0 && cg9 === 't=--pw:52%;,due=--pw:24%;,st=--pw:24%;' && ca9[1][0] === ' class="vs-dan" title="2026-11-05"' && ca9[1][1] === 'D+5' && /data-tsk-act="done" data-tsk-id="a"/.test(ca9[2][1])
+    && /data-tsk-act="resume" data-tsk-id="d"/.test(cd9[2][1]) && /data-tsk-act="approve" data-tsk-id="b"/.test(cb9[2][1]) && ft9 === '합계 10건|경과 1|대기 2' && pc9 && JSON.stringify(dc9) === '[true,true,"done,hold,edit,del"]'
+    && st9c === '진행|<span class="hold-chip">보류</span>|<span class="review-chip">승인 대기</span>' && ta9c === 0,
+    JSON.stringify({ cg9, a: ca9.slice(1, 3), ft9, pc9, dc9, st9c, ta9c }));
+
+  // ⑩ 홈·내 업무 행 함수 무변 — taskRowHtml·myTaskRowHtml·bindTaskHandlers·renderMyTasks·myOpenTasks = v438(43e61b0) 원문 글자째(해시) · 표 구간이 이 함수들을 다시 정의하지 않음
+  const ROWSHA39 = { taskRowHtml: '7551762e4f45f494ca6c5b613d7298e0c7a80e4e8b2521d919e7e90dc870f068', myTaskRowHtml: '6ca787b55b82ea05024badf543c00e1ab70bbf8e08a13ffe5fbe6df22f90347f', bindTaskHandlers: '0b30c25b5b80cb79b12adafdd60d85c24574d1f5088e95ce366d70f9cfca531e',
+    renderMyTasks: 'e97e59dd3ce324be31863f0f572f3b5e1912e8eafabd3e038c3a996f9d61c88f', myOpenTasks: 'fb2988cb6985492ae6103c7c5a7da5e7b739d3224ff0ad19596fac7d786ed8dc' };
+  const rowBad39 = Object.keys(ROWSHA39).filter((n) => sha39(body39(n)) !== ROWSHA39[n] || (html.match(new RegExp('function ' + n + '\\(', 'g')) || []).length !== 1);
+  T('v439 ⑩ 홈·내 업무 행 함수 무변: taskRowHtml·myTaskRowHtml·bindTaskHandlers·renderMyTasks·myOpenTasks = v438(43e61b0) 원문 글자째(sha256) · 파일에 한 번씩만 정의(표 구간은 칸·펼침 함수를 새로 씀)',
+    rowBad39.length === 0 && ['taskRowHtml', 'myTaskRowHtml', 'bindTaskHandlers'].every((n) => tsb39.indexOf('function ' + n + '(') < 0), '바뀜: ' + rowBad39.join(','));
+
+  // ⑪ 제목·합계·오늘 승인 일괄·삭제된 지시 — 제목 '진행 중 n · 기한 경과 m'(보이는 행) · 합계 줄(1366: 자동·계약·경과·3일 내·대기·보류 / 1000: 구분 칸에 '자동 n · 계약 n') · [오늘 승인 일괄 (n)] = 앱 기준 자동 승인 대기(승인권자만)
+  //   · 삭제된 지시 = 보이는 지시만(직원B j만 · 관리자 j·k) · [영구삭제] 관리자만(버튼·누름 길 둘 다) · 고른 것 중 안 보이는 id는 그릴 때 풂
+  const X11 = mk39(); X11.api.render(); const E11 = X11.env;
+  const ft11 = ((/<tfoot><tr>([\s\S]*?)<\/tr><\/tfoot>/.exec(X11.host._h) || ['', ''])[1].match(/<td[^>]*>([\s\S]*?)<\/td>/g) || []).map((s) => s.replace(/^<td[^>]*>|<\/td>$/g, '')).join('|');
+  const X11b = mk39({ width: 1000 }); X11b.api.render();
+  const ft11b = ((/<tfoot><tr>([\s\S]*?)<\/tr><\/tfoot>/.exec(X11b.host._h) || ['', ''])[1].match(/<td[^>]*>([\s\S]*?)<\/td>/g) || []).map((s) => s.replace(/^<td[^>]*>|<\/td>$/g, '')).join('|');
+  const t11 = [E11.host('taskHead').textContent, E11.host('taskBulkTop').style.display, E11.host('taskBulkTop').textContent];
+  E11.host('taskBulkTop').onclick(); const t11b = [tk39(X11, 'b').status, E11.log.indexOf('advance:b') >= 0, E11.log.indexOf('toast:자동 지시 1건 승인(앱 기준)') >= 0, E11.host('taskBulkTop').style.display, E11.host('taskHead').textContent];
+  const Y11 = mk39({ user: U39.B }); Y11.api.delSel().tasks.k = 1; Y11.api.render();
+  const yt11 = [Y11.env.host('taskHead').textContent, Y11.env.host('taskBulkTop').style.display, Y11.env.host('taskDeletedToggle').style.display, Y11.env.host('taskDeletedToggle').textContent, Object.keys(Y11.api.delSel().tasks).join(',')];
+  Y11.api.setShowDel(true); Y11.api.render(); const yl11 = Y11.env.host('taskDeletedList')._h;
+  const yd11 = [Y11.env.host('taskDeletedToggle').textContent, (yl11.match(/data-selid="(\w+)"/g) || []).join(','), yl11.indexOf('delpurge-btn') < 0, yl11.indexOf('delrestore-btn') > 0];
+  const Z11 = mk39(); Z11.api.setShowDel(true); Z11.api.render(); const zl = () => Z11.env.host('taskDeletedList');
+  const zd11 = [Z11.env.host('taskDeletedToggle').textContent, (zl()._h.match(/data-selid="(\w+)"/g) || []).join(','), zl()._h.indexOf('delpurge-btn') > 0];
+  const kb11 = zl().querySelector('[data-selid="k"]'); kb11.checked = true; kb11.fire('change');
+  Z11.env.user = U39.B; zl().querySelector('.delpurge-btn').fire('click'); zd11.push(Z11.api.tasks().some((t) => t.id === 'k'));   // 관리자 화면에 남은 [영구삭제]를 직원B가 누름 = 무시
+  Z11.env.user = U39.A; Z11.api.render(); zl().querySelector('.delpurge-btn').fire('click'); zd11.push(Z11.api.tasks().some((t) => t.id === 'k'), Z11.env.log.indexOf('confirm:선택한 1건을 영구 삭제합니다.\n복구 불가! 계속할까요?') >= 0);
+  T('v439 ⑪ 제목·합계·일괄·삭제된 지시: 제목 "진행 중 10 · 기한 경과 1" · 1366 합계 "합계 10건|자동 3|계약 1|보류 1|경과 1 · 3일 내 1|대기 2|(등록일)|(처리)"(보류는 담당 칸 — 상태 칸 88px에 \'대기 n · 보류 n\'이 안 들어가 잘리던 것, 검토 반영) · 1000 합계 구분 칸 "자동 3 · 계약 1"(title)·담당 칸 "보류 1" · [오늘 승인 일괄 (1)] 보임 → 누름 = 확인 → b 완료·계약 진행 호출·알림 → 버튼 숨김·제목 "진행 중 9" · 직원B: 제목 "진행 중 9 · 기한 경과 1"·일괄 숨김(승인권자 아님) · 삭제된 지시 보기 (1)(j만 — 관리자 전용 k 빠짐)·미리 고른 k 풂·[선택 복구]만([영구삭제] 없음) · 관리자: (2) j·k·[영구삭제] → 직원B로 바뀐 뒤 누름 = 무시(k 남음) → 관리자 누름 = 확인 → k 영구 삭제',
+    JSON.stringify(t11) === '["진행 중 10 · 기한 경과 1","inline-block","오늘 승인 일괄 (1)"]' && ft11 === '합계 10건|자동 3|계약 1|보류 1|경과 1 · 3일 내 1|대기 2||'
+    && ft11b === '합계 10건|<span title="자동 3건 · 계약 단계 1건">자동 3 · 계약 1</span>|보류 1|경과 1 · 3일 내 1|대기 2|' && JSON.stringify(t11b) === '["done",true,true,"none","진행 중 9 · 기한 경과 1"]'
+    && JSON.stringify(yt11) === '["진행 중 9 · 기한 경과 1","none","block","삭제된 지시 보기 (1)",""]' && JSON.stringify(yd11) === '["삭제된 지시 숨기기","data-selid=\\"j\\"",true,true]'
+    && JSON.stringify(zd11) === '["삭제된 지시 숨기기","data-selid=\\"j\\",data-selid=\\"k\\"",true,true,false,true]',
+    JSON.stringify({ t11, ft11, ft11b, t11b, yt11, yd11, zd11 }));
+
+  // ⑫ 넓힘·CSS·전역 검색·검색칸·정적 — #view-tasks 넓힘(1024 791 · 1366 1,097 · 1920 1,428 — 스크롤바 17 포함) · 입력 카드 1280 이상 한 줄(1279·폰 그대로) · 상세 글 760
+  //   · 전역 검색 지시 = taskVisible + searchId taskSearch · 검색칸 taskSearch 150ms · 자리(host)에 위임 배선 0 · 배선은 표 칸·펼침 칸 root 하나(taskSheetBindAct)
+  const rules12 = [];
+  const parse12 = (src, media) => { let i = 0; while (i < src.length) { const ob = src.indexOf('{', i); if (ob < 0) break; const head = src.slice(i, ob).trim(); let d = 1, j = ob + 1; for (; j < src.length && d > 0; j++) { if (src[j] === '{') d++; else if (src[j] === '}') d--; } const body = src.slice(ob + 1, j - 1); if (/^@media/.test(head)) parse12(body, head.slice(6).trim()); else if (!/^@/.test(head)) { const decl = {}; body.split(';').forEach((p) => { const k = p.indexOf(':'); if (k > 0) decl[p.slice(0, k).trim()] = p.slice(k + 1).trim(); }); rules12.push({ media, sels: head.split(',').map((s) => s.trim().replace(/\s*>\s*/g, '>').replace(/\s+/g, ' ')), decl }); } i = j; } };
+  parse12(css5, null);
+  const decl12 = (w, sel, prop) => { let v = null; rules12.forEach((r) => { if (mq39(r.media, w) && r.sels.indexOf(sel) >= 0 && own39(r.decl, prop)) v = r.decl[prop]; }); return v; };
+  const pad12 = (v) => { const p = String(v || '0px').trim().split(/\s+/).map((x) => parseFloat(x) || 0); const r = p.length === 1 ? p[0] : p[1]; return [p.length === 4 ? p[3] : r, r]; };
+  const bodyW12 = (win) => { const W = win - 17, mx = decl12(win, '#app', 'max-width'), appW = (!mx || mx === 'none') ? W : Math.min(W, parseFloat(mx)), lr = pad12(decl12(win, '#app', 'padding')); return appW - lr[0] - lr[1] - (parseFloat(decl12(win, '.tabbar', 'width')) || 0) - (parseFloat(decl12(win, '.layout', 'gap')) || 0); };
+  const viewW12 = (win, id) => { const b = bodyW12(win), own = decl12(win, '#view-' + id, 'max-width'), base = decl12(win, '.views>.view', 'max-width'), mx = own != null ? own : base; return (!mx || mx === 'none') ? b : Math.min(b, parseFloat(mx)); };
+  const w12 = [1024, 1366, 1920].map((w) => Math.round(viewW12(w, 'tasks')));
+  const css12 = decl12(1280, '#view-tasks>.card.scope-host', 'display') === 'flex' && decl12(1279, '#view-tasks>.card.scope-host', 'display') == null && decl12(375, '#view-tasks>.card.scope-host', 'display') == null
+    && decl12(1280, '#view-tasks>.card.scope-host>.add-row', 'padding') === '10px 14px 10px 0 !important' && decl12(1280, '#view-tasks>.card.scope-host #taskWho', 'width') === '120px'
+    && decl12(1366, '.vs-dtxt', 'max-width') === '760px' && decl12(1366, '.vs-dtxt', 'white-space') === 'pre-wrap' && decl12(1366, '#view-tasks', 'max-width') === 'none' && decl12(859, '#view-tasks', 'max-width') == null
+    // 검토 반영: 표 줄 칸 안 칩만 여백 4px(구분 '자동' 칩 + '미수 45일'·담당 '담당 없음'이 명세 폭 108·76에 들어가게) — 칩 기본(8px)·펼침 칸 칩은 그대로
+    && decl12(1366, '.vs.vs-fit tr.vs-r td .review-chip', 'padding') === '1px 4px' && decl12(1366, '.vs.vs-fit tr.vs-r td .hold-chip', 'padding') === '1px 4px' && decl12(1366, '.review-chip', 'padding') === '1px 8px'
+    && decl12(1366, '.vs .review-chip', 'padding') == null && decl12(1366, '.vs-kv .review-chip', 'padding') == null;
+  const gs12 = /add\("tasks","지시",canSee\("tasks"\),function\(\)\{return tasks\.filter\(function\(t\)\{return t&&t\.del!==1&&t\.status!=="done"&&taskVisible\(t\);\}\);\},function\(x\)\{return x\.title\|\|"";\},function\(x\)\{return \(x\.who\|\|""\)\+\(x\.due\?" · 기한 "\+x\.due:""\);\},"taskSearch"\);/.test(html);
+  const X12 = mk39(); X12.api.render(); const q12 = X12.host.querySelector('[data-vs-q]');
+  const qa12 = [q12 && q12.getAttribute('id'), q12 && q12.getAttribute('placeholder')];
+  q12.value = '준설'; q12.fire('input', {}); X12.env.tick(149); qa12.push(order39(X12.host._h)); X12.env.tick(1); qa12.push(order39(X12.host._h), cnt39(X12.host._h));
+  const hostL12 = [X1, X2, X3, X4, X5, X6, X7, X8, X9, X11, X12, Y3, Y7, Y11, Z11].some((X) => X.env.log.some((l) => /^host-listener:/.test(l)));
+  const ael12 = (tsb39.match(/addEventListener\(/g) || []).length, root12 = (tsb39.match(/root\.addEventListener\("click"/g) || []).length;
+  T('v439 ⑫ 넓힘·CSS·전역 검색·검색칸·정적: #view-tasks 본문 폭 1024 ' + w12[0] + ' · 1366 ' + w12[1] + ' · 1920 ' + w12[2] + '(명세 791 · 1,097 · 1,428 ±2 — 860부터 max-width none, 859 이하 규칙 없음) · 입력 카드 1280 이상 한 줄(flex·둘째 줄 여백 !important·담당 120px)·1279·폰 그대로 · 상세 글 .vs-dtxt 760px·pre-wrap · 표 줄 칸 안 칩 여백 4px(검토 반영) · 전역 검색 지시 = taskVisible + searchId taskSearch · 검색칸 id taskSearch·placeholder "지시 검색 — 지시 내용·상세·담당·기한·계약 단계"·149ms 그대로·150ms "준설" = c "보이는 1건 / 전체 34건" · 자리(host)에 리스너 0(모든 시험 틀) · @task-sheet 구간 addEventListener = 표·펼침 칸 root 하나 + 삭제된 지시 3(전체선택·복구·영구삭제)',
+    Math.abs(w12[0] - 791) <= 2 && Math.abs(w12[1] - 1097) <= 2 && Math.abs(w12[2] - 1428) <= 2 && css12 && gs12
+    && JSON.stringify(qa12) === '["taskSearch","지시 검색 — 지시 내용·상세·담당·기한·계약 단계","' + ADMIN_ORDER39 + '","c","보이는 1건 / 전체 34건"]' && !hostL12 && ael12 === 4 && root12 === 1,
+    JSON.stringify({ w12, css12, gs12, qa12, hostL12, ael12, root12 }));
+
+  // ⑬ 문서 — FEATURES 기준 ≥ v439·v439 절(문장 고정)·자리 글 GATES_V439 0 · TESTLIST v439 = 화면 칸 '[ ] (AI 시험 화면 대상'(PM 몫 0) + 게이트 칸 '[x] (AI) `uismoke`'(5종·결함 심기) · TESTLIST v438 칸 4 그대로(종운환경3 몫)
+  //   · MANUAL 4절·32절(PC 표·칩·처리 버튼·넓은 화면·폰 그대로) · CLAUDE.md 지시 표 줄 · sw ≥ 439 (TESTLIST v439 화면 칸·v438 칸 4는 시험 화면으로 닫으면 [x] — 두 상태 모두 받음)
+  const ft13 = rd39('FEATURES.md'), tl13 = rd39('TESTLIST.md'), man13 = rd39('MANUAL.html'), cl13 = rd39('CLAUDE.md'), sw13 = rd39('sw.js');
+  const sec13 = (src, head) => { const i = src.indexOf(head); if (i < 0) return ''; const j = src.indexOf(head.slice(0, head.indexOf(' ') + 1), i + head.length); return src.slice(i, j < 0 ? src.length : j); };
+  const ftv13 = sec13(ft13, '\n### v439 (11/10)'), tlv13 = sec13(tl13, '\n## v439 '), tlv38_13 = sec13(tl13, '\n## v438 ');
+  const FT_PINS39 = ['**자동 지시는 기본 화면(\'진행 중\' 칩)에 같이**', '**처리 열**', '[완료]/[승인]/[재개]', '**완료 칩은 자르지 않는다**', '**행 원천 = 보이는 지시**', '**폰(859px 이하)은 지금 화면 그대로**', '`phone:"legacy"`',
+    '`#view-tasks`', '`renderTasksLegacy`', '**홈 `taskRowHtml`·내 업무 `myTaskRowHtml`은 그대로**', '**삭제된 지시**', '[영구삭제]는 관리자만', '`taskSearch`', '부품을 쓰는 탭 0', '지시 1개',
+    // 검토 반영(11/10) 문장 — 연속 누름·합계 보류·칸 안 칩·날짜 title·검색 글·찾아가기·보는 사람 바뀜·폰 sheet 상태 칸·폰 옛 목록 선택(전체선택이 공개범위 밖까지)
+    '**처리 버튼 연속 누름 막기**', '**더블클릭의 둘째 누름**', '**합계 줄 \'보류 n\'은 담당 칸**', '**표 줄 칸 안 칩은 여백 4px**', '**title도 \'YYYY-MM-DD 경과 n일\'**', '**검색칸 글 앞머리 = 전역 검색이 보는 글**',
+    '`vsSheetSeek`', '**보는 사람이 바뀌면 부품 메모리를 비운다**', '**폰 sheet 준비 갈래의 상태 칸**', '옛 선택 막대의 전체선택이 공개범위 밖 지시까지 골라(moduleLive)'];
+  const CL_PINS39 = ['**지시 탭 표(v439 — 45-1 둘째 판)**', '`renderTasksLegacy`', '`// @task-sheet-start ~ end`', '`#view-tasks`', '`taskSheetAct`', '정의의 phone 한 줄만', '`TASK_ACT_GAP`', '`taskSheetFromGs` → `vsSheetSeek`', '찾아가기 `vsSheetSeek(def, q)`', '`vsSheetViewer`'];
+  const tcb13 = tlv13.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l));
+  const cbScr13 = tcb13.filter((l) => /^- \[[ x]\] \(AI 시험 화면 대상[,) —]/.test(l)), cbGate13 = tcb13.filter((l) => /^- \[x\] \(AI\) `uismoke`\(/.test(l));
+  const man4 = (() => { const i = man13.indexOf('<h2 id="s4">'), j = man13.indexOf('<h2 id="s5">'); return i < 0 || j < i ? '' : man13.slice(i, j); })();
+  const man32 = (() => { const i = man13.indexOf('<h2 id="s32">'), j = man13.indexOf('<h2 id="s33">'); return i < 0 || j < i ? '' : man13.slice(i, j); })();
+  const MAN_PINS39 = ['PC(넓은 화면)에서는 자동 지시도 표의 <b>진행 중</b>에 같이 보이고', '휴대폰 목록에서는'];
+  const MAN32_PINS39 = ['<b>PC(넓은 화면) — 표</b>', '<span class="btn">진행 중</span>', '행 끝 <b>처리</b> 칸', '<span class="btn">완료</span> · <span class="btn">승인</span> · <span class="btn">재개</span>', '<b>휴대폰 — 목록</b>', '영구삭제는 관리자만', '(2026-11 v439)',
+    '빠르게 두 번 누른 두 번째(0.5초 안)는 무시됩니다', '검색칸(지시 내용·상세·담당·기한·계약 단계)', '그때만 처음 상태로 돌아가 찾은 지시가 보입니다', '로그인한 사람이 바뀌면 지워집니다'];   // 뒤 넷은 검토 반영
+  T('v439 ⑬ 문서: FEATURES 기준 ≥ v439·v439 절(자동 지시 같이·처리 열·완료 칩·행 원천·폰 legacy·넓힘·옛 본문·홈·내 업무 그대로·삭제된 지시·전역 검색·v438 ⑫ 고침 + 검토 반영 10문장(연속 누름·더블클릭·합계 보류·칸 안 칩·날짜 title·검색 글·vsSheetSeek·보는 사람 바뀜·폰 sheet 상태 칸·폰 옛 전체선택) — 문장 고정)·자리 글 GATES_V439 0 · TESTLIST v439 = 화면 칸 "[ ] (AI 시험 화면 대상"(≥4 — 1366·1920 표·처리 버튼·폰 375 옛 목록·보기 권한·검토 반영 칸 글 잘림·더블클릭·계정 전환) + 게이트 칸 1개 "[x] (AI) `uismoke`"(consheet_check·proctpl_check·settletest·servertest·결함 심기) · PM 0 · TESTLIST v438 칸 4(공통 부품 실물 — 이 판 시험 화면에서 닫는 칸) 그대로 있음 · MANUAL 4절(PC 표에 자동 지시 같이·휴대폰은 접이식)·32절(PC 표·칩·처리 칸·폰 목록·영구삭제 관리자 + 검토 반영: 두 번째 누름 무시·검색 기한·전역 검색 때 칩 풀림·사람 바뀌면 검색어 지움) · CLAUDE.md 지시 표 줄(+ TASK_ACT_GAP·taskSheetFromGs → vsSheetSeek)·부품 줄(찾아가기·vsSheetViewer) · sw ≥ 439',
+    Number((ft13.match(/기준: v(\d+) /) || [0, 0])[1]) >= 439 && ftv13.length > 0 && FT_PINS39.every((s) => ftv13.indexOf(s) > 0) && ftv13.indexOf('GATES_V439') < 0
+    && tlv13.length > 0 && cbScr13.length >= 4 && cbGate13.length === 1 && tcb13.length === cbScr13.length + 1 && tcb13.every((l) => l.indexOf('PM') < 0) && tlv13.indexOf('GATES_V439') < 0
+    && ['`consheet_check`', '`proctpl_check`', '`settletest`', '`servertest`', '결함 심기'].every((g) => cbGate13[0].indexOf(g) > 0)
+    && cbScr13.some((l) => l.indexOf('1366') > 0 && l.indexOf('1920') > 0) && cbScr13.some((l) => l.indexOf('375') > 0) && cbScr13.some((l) => l.indexOf('보기 권한') > 0)
+    && cbScr13.some((l) => l.indexOf('검토 반영') > 0 && l.indexOf('더블클릭') > 0 && l.indexOf('말줄임') > 0 && l.indexOf('전환') > 0)   // 검토 반영 화면 칸(칸 글 잘림·연속 누름·전역 검색·계정 전환)
+    && (tlv38_13.split(/\r?\n/).filter((l) => /^- \[[ x]\] \(AI 시험 화면 대상 — 시험 화면에 가짜 정의 표를 띄워/.test(l))).length === 1
+    && MAN_PINS39.every((s) => man4.indexOf(s) > 0) && MAN32_PINS39.every((s) => man32.indexOf(s) > 0) && man4.indexOf('받은 지시는 이렇게 끝납니다') > 0
+    && CL_PINS39.every((s) => cl13.indexOf(s) > 0) && Number((sw13.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 439,
+    JSON.stringify({ ft: FT_PINS39.filter((s) => ftv13.indexOf(s) < 0).map((s) => s.slice(0, 30)), cl: CL_PINS39.filter((s) => cl13.indexOf(s) < 0), man4: MAN_PINS39.filter((s) => man4.indexOf(s) < 0), man32: MAN32_PINS39.filter((s) => man32.indexOf(s) < 0), cb: tcb13.length, scr: cbScr13.length, gate: cbGate13.length, pm: tcb13.filter((l) => l.indexOf('PM') >= 0).map((l) => l.slice(0, 40)), sw: (sw13.match(/jw-shell-v(\d+)/) || [0, 0])[1] }));
+  // ⑭ 연속 누름 막기(v439 검토 med) — 누름 하나가 표를 그 자리에서 다시 그려(행 높이 고정) 같은 줄에 다음 버튼이 놓인다(h 승인 → 2번째 줄 b [승인] · a 완료 → 1번째 줄 a [승인] · d 재개 → 맨 끝 줄 c [완료])
+  //   · 처리 뒤 0.5초 안 누름은 버림(가짜 시계 — 0ms·499ms 버림, 500ms 통과) · 더블클릭 둘째 누름(detail 2)은 1초 뒤라도 버림 · 따로 누른 것은 그대로 · 펼침 버튼도 같은 배선 · 시계가 뒤로 가면 막지 않음 · 버린 누름은 계약 진행·알림 0
+  const X14 = mk39(), L14 = X14.env.log, s14 = []; X14.api.render();
+  const at14 = (i) => acts39(X14.host._h).split(',')[i], nA14 = (id) => L14.filter((l) => l === 'advance:' + id).length;
+  //   버튼·행이 없으면 멈추지 않고 표시만(결함이 이 검사를 '검사 생략'으로 끝내 뒤 검사까지 건너뛰지 않게 — ⑭~⑯ 공통)
+  const p14 = (act, id, o) => { try { press39(X14, act, id, o); } catch (e) { s14.push('!' + act + ':' + id); } }, pd14 = (act, id, o) => { try { pressDet39(X14, act, id, o); } catch (e) { s14.push('!펼침 ' + act + ':' + id); } };
+  p14('approve', 'h'); s14.push(tk39(X14, 'h').status, at14(1));
+  p14('approve', 'b', { fast: true }); s14.push(tk39(X14, 'b').status);
+  X14.env.now += 499; p14('approve', 'b', { fast: true }); s14.push(tk39(X14, 'b').status, nA14('b'));
+  X14.env.now += 1; p14('approve', 'b', { fast: true }); s14.push(tk39(X14, 'b').status, nA14('b'));
+  p14('done', 'a'); s14.push(tk39(X14, 'a').status, at14(0));
+  p14('approve', 'a', { detail: 2 }); s14.push(tk39(X14, 'a').status, nA14('a'), L14.filter((l) => /^push:m2:승인됨: 가/.test(l)).length);
+  p14('approve', 'a'); s14.push(tk39(X14, 'a').status, nA14('a'));
+  const i14 = acts39(X14.host._h).split(',').findIndex((x) => /^d:/.test(x));
+  p14('resume', 'd'); const n14 = at14(i14) || '-:-'; s14.push(tk39(X14, 'd').status, n14);
+  p14(n14.split(':')[1], n14.split(':')[0], { fast: true }); s14.push(tk39(X14, n14.split(':')[0]).status);
+  try { openRow39(X14, 'g'); } catch (e) { s14.push('!행 g'); }
+  pd14('done', 'g'); s14.push(tk39(X14, 'g').status, detActs39(X14.host._h));
+  pd14('approve', 'g', { fast: true }); s14.push(tk39(X14, 'g').status);
+  X14.env.now -= 60000; pd14('approve', 'g', { fast: true }); s14.push(tk39(X14, 'g').status);
+  T('v439 ⑭ 연속 누름 막기(검토 반영 — 누름 하나가 표를 다시 그려 같은 자리에 다음 버튼): h [승인] 뒤 2번째 줄 = b [승인] → 바로(0ms)·499ms 누름 버림(b 승인 대기·계약 진행 0) → 500ms 누름 통과 · a [완료] 뒤 1번째 줄 = a [승인] → 1초 뒤라도 더블클릭 둘째 누름(detail 2) 버림(진행·승인 알림 0) → 따로 누른 [승인]은 통과 · d [재개] 뒤 같은 줄 = c [완료] → 바로 누름 버림 · 펼침 [완료] 뒤 바로 누른 펼침 [승인] 버림 · 시계가 뒤로 가면 막지 않음 · 자리(host)에 리스너 0',
+    JSON.stringify(s14) === '["done","b:approve","review","review",0,"done",1,"review","a:approve","review",0,0,"done",1,"open","c:done","open","review","approve,reject,cancel,del","review","done"]' && !L14.some((l) => /^host-listener:/.test(l)),
+    JSON.stringify(s14));
+
+  // ⑮ 전역 검색 → 표(v439 검토): 검색칸 글 앞머리 = 전역 검색(gsSources 지시 항목 · gsRun의 hay)이 보는 글 — 전역 검색 적중은 표에도 걸림(담당 원래 이름 '나종운'(표시는 대표님)·'11-12'·'기한'·'직원B · 기한')
+  //   · 이어받기(taskSheetFromGs → 부품 vsSheetSeek) = 기억된 '완료' 칩·구분 거르기를 이번만 풀고(기기 기억은 이 부름에서 그대로) 펼침 닫고 검색어 · 폰 legacy = false·검색어 안 넣음 · gsRun은 taskSearch면 이어받기(폰이면 옛 길)
+  const FX15 = FIX39().concat([{ id: 'q', title: '거 대표 보고', detail: '', who_id: 'm0', who: '나종운', scope: [], from: '관리자A', from_id: 'm1', by: '관리자A', due: '2026-11-12', status: 'open', done_at: null, done_by: null, created: '2026-11-09', updated: '2026-11-09' }]);
+  const X15 = mk39({ fixture: FX15 }); X15.api.render(); const d15 = X15.api.def();
+  const gsHay15 = (t) => (String(t.title || '') + ' ' + ((t.who || '') + (t.due ? ' · 기한 ' + t.due : '')) + ' ' + (t.detail || '') + ' ' + (t.site || '')).toLowerCase();   // gsRun hay(제목 + sub + 상세 + 현장) — gsSources 지시 줄은 ⑫ gs12가 글자째 고정
+  const gsHits15 = (q) => X15.api.tasks().filter((t) => t.del !== 1 && t.status !== 'done' && gsHay15(t).indexOf(q.toLowerCase()) >= 0).map((t) => t.id).sort().join(',');
+  const r15 = ['나종운', '11-12', '기한', '직원B · 기한', '2026-11-05', '안전점검'].map((q) => { const ok = X15.api.fromGs(q); return q + '=' + ok + ':' + gsHits15(q) + '/' + order39(X15.host._h).split(',').filter(Boolean).sort().join(','); });
+  const o15 = (id, out) => { try { openRow39(X15, id); } catch (e) { out.push('!행 ' + id); } };   // 행이 없으면 멈추지 않고 표시만(⑭와 같은 까닭)
+  X15.api.setQ(d15, ''); chip39(X15, 'done'); X15.api.filter(d15, 'kind', '자동 · 증명서'); const pre15 = []; o15('f', pre15);
+  const mem15 = X15.env.store.jw_task_sheet; pre15.push(order39(X15.host._h), /data-vs-det="f"/.test(X15.host._h));
+  const s15 = [X15.api.fromGs('안전점검'), order39(X15.host._h), /class="vs-chip on" data-vs-chip="st\|"/.test(X15.host._h), ((/<select data-vf="kind">[\s\S]*?<\/select>/.exec(X15.host._h) || [''])[0]).indexOf(' selected') < 0,
+    X15.host.querySelector('[data-vs-q]').value, X15.host._h.indexOf('data-vs-det=') < 0, X15.env.store.jw_task_sheet === mem15];
+  const s15b = []; o15('a', s15b); s15b.push(/data-vs-det="a"/.test(X15.host._h)); X15.api.fromGs('정리'); s15b.push(order39(X15.host._h), X15.host._h.indexOf('data-vs-det=') < 0);   // 펼친 행이 결과에 남아도 닫음
+  const Y15 = mk39({ width: 375, fixture: FX15 }); Y15.api.render();
+  const y15 = [Y15.api.fromGs('안전점검'), Y15.api.inst(Y15.api.def()).q, Y15.host._h.indexOf('data-vs-') < 0, (Y15.host._h.match(/class="item task-item/g) || []).length > 0];
+  const gsRun15 = /if\(sid==="taskSearch" && taskSheetFromGs\(gq\)\) return;/.test(fn39(html, 'gsRun')) && /function taskSheetFromGs\(q\)\{ return vsSheetSeek\(taskSheetDef\(\), q\); \}/.test(tsb39)
+    && /if \(vsStage\(\) <= 1 && def\.phone !== "sheet"\) return false;/.test(fn39(blk39, 'vsSheetSeek')) && fn39(blk39, 'vsSheetSeek').indexOf('vsSheetSave(') < 0;
+  T('v439 ⑮ 전역 검색 → 표(검토 반영): 검색칸 글 앞머리 = 전역 검색이 보는 글 — 전역 검색 적중 = 표에 걸리는 지시(나종운 = q(표시 대표님) · 11-12 = b·g·q · 기한 = 기한 있는 진행 10건 · "직원B · 기한" = a·b·p · 2026-11-05 = a · 안전점검 = a) · 이어받기 = 완료 칩·구분 거르기 "자동 · 증명서"·펼친 f를 풀고 진행 중 칩·검색칸 "안전점검" → a(기기 기억은 그대로) · 펼친 a가 결과("정리" = a)에 남아도 닫음 · 폰 375 legacy = false·검색어 안 넣음·옛 카드 · gsRun은 taskSearch면 taskSheetFromGs(→ vsSheetSeek — 폰 legacy면 false·저장 안 함)',
+    JSON.stringify(r15) === JSON.stringify(['나종운=true:q/q', '11-12=true:b,g,q/b,g,q', '기한=true:a,b,d,g,h,i,l,n,p,q/a,b,d,g,h,i,l,n,p,q', '직원B · 기한=true:a,b,p/a,b,p', '2026-11-05=true:a/a', '안전점검=true:a/a'])
+    && JSON.stringify(pre15) === '["f",true]' && JSON.stringify(s15) === '[true,"a",true,true,"안전점검",true,true]' && JSON.stringify(s15b) === '[true,"a",true]' && JSON.stringify(y15) === '[false,"",true,true]' && gsRun15 && !X15.env.log.some((l) => /^host-listener:/.test(l)),
+    JSON.stringify({ r15, pre15, s15, s15b, y15, gsRun15 }));
+
+  // ⑯ 보는 사람이 바뀌면 부품 메모리를 비움(v439 검토 — 로그인 창 '전환'은 새로고침 없이 afterLogin → render): 검색어·검색칸 글·펼친 행·선택·치던 글 타이머 · 정렬·칩·거르기(기기 기억)는 그대로 · 같은 사람이 다시 그리면 그대로
+  const X16 = mk39(); X16.api.render(); const d16 = X16.api.def();
+  chip39(X16, 'review'); X16.api.setQ(d16, '섭외'); const s16a = [];
+  try { openRow39(X16, 'h'); const cb16 = X16.host.querySelector('[data-vs-sel="h"]'); cb16.checked = true; cb16.fire('change'); } catch (e) { s16a.push('!행 h'); }   // 멈추지 않고 표시만(⑭와 같은 까닭)
+  X16.api.render();
+  s16a.push(X16.api.inst(d16).q, X16.host.querySelector('[data-vs-q]').value, /data-vs-det="h"/.test(X16.host._h), Object.keys(X16.api.sel().tasks).join(','));
+  const q16 = X16.host.querySelector('[data-vs-q]'); q16.value = '소방'; q16.fire('input', {});   // 치던 글(150ms 기다리는 중)에 사람이 바뀜
+  const mem16 = X16.env.store.jw_task_sheet;
+  X16.env.user = U39.B; X16.api.render(); X16.env.tick(200);
+  const s16b = [X16.api.inst(d16).q, X16.host.querySelector('[data-vs-q]').value, X16.host._h.indexOf('data-vs-det=') < 0, Object.keys(X16.api.sel().tasks).length, order39(X16.host._h), /class="vs-chip on" data-vs-chip="st\|review"/.test(X16.host._h), X16.env.store.jw_task_sheet === mem16];
+  T('v439 ⑯ 보는 사람이 바뀌면(로그인 창 \'전환\' — 새로고침 없음) 부품 메모리를 비움(검토 반영): 관리자A가 승인 대기 칩·검색어 "섭외"·h 펼침·h 선택 → 같은 사람이 다시 그리면 그대로 → 직원B로 바뀌어 그리면 검색어·검색칸 글·펼침·선택 비움·치던 글 "소방"(150ms 기다리던 것) 안 들어감 · 승인 대기 칩(기기 기억)은 그대로 = h,b · 기기 저장 안 바뀜',
+    JSON.stringify(s16a) === '["섭외","섭외",true,"h"]' && JSON.stringify(s16b) === '["","",true,0,"h,b",true,true]',
+    JSON.stringify({ s16a, s16b }));
+} catch (e) { console.log('  (v439 검사 생략 — ' + e.message + ')'); fails++; }
 
 try {
   const fdir = join(ROOT, 'netlify', 'functions');
