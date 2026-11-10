@@ -980,6 +980,14 @@
   .asb-bd{padding:2px 4px 12px 42px;border-bottom:1px solid var(--line);}
   .asb-bd .item-sub{margin:3px 0;}
   .asb-bd .asb-names{word-break:keep-all;line-height:1.6;}   /* 전원 보여준다 — 자르지 않는다 */
+  /* v435 안전 › 현장 '지난 자료' 묶음(PM 11/10 56 ⓒ — SITE_OLD_BEFORE 해보다 이른 연도·날짜 없음, 목록 맨 아래 기본 접힘). 머리는 카드와 같은 .asb-hd + bindFold —
+     bindFold가 class를 "asb-hd"/"asb-hd open"으로 통째 바꾸므로 묶음 머리 꾸밈은 data 속성으로 건다. 화살표는 접힘 ▸ · 펼침 ▾(카드의 ▾/▴와 구분).
+     감싸개(.item)는 안쪽 카드를 누를 때 묶음 전체가 깜박이지 않게 :active 바탕을 끈다. 연도 구분 줄은 묶음 안에서 연도가 바뀌는 곳에만 */
+  .site-old:active{background:transparent;}
+  .asb-hd[data-site-old-fold] .asb-t{color:var(--sub);}
+  .asb-hd[data-site-old-fold] .sec-caret{transform:rotate(-90deg);}
+  .asb-hd.open[data-site-old-fold] .sec-caret{transform:none;}
+  .site-yr{padding:7px 14px 5px;font-size:12px;font-weight:800;color:var(--sub);background:var(--bg);border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums;}
   .hr-dept-h{font-size:13px;font-weight:800;color:var(--brand);padding:2px 2px 6px;border-bottom:1px solid var(--line);margin-bottom:4px;}
   .hr-dept-h .cnt{color:var(--sub);font-weight:600;}
   /* v329 퇴사자 그룹(인사 탭 맨 아래 접이식) — 권한관리 구분선·흐림과 같은 언어 */
@@ -13716,9 +13724,20 @@
   var SITE_KIND = { asbestos:"석면", demolition:"철거", dredge:"준설" };
   var SITE_ORDER = ["asbestos","demolition","dredge"];
   var siteFilter = "", siteQ = "";
+  // v435(PM 11/10 '56. ⓒ 현장탭 25년 이전 자료 전체 접을 수 있게'): 종결된 줄 중 연도(siteYear)가 이 해보다 이르거나 날짜 없는 줄은 목록 맨 아래 '지난 자료' 한 묶음으로 기본 접힘(종결 아닌 줄은 연도와 상관없이 위 — 검토 반영).
+  //   펼침은 앱을 켜 있는 동안만 기억한다(siteOldOpen — 저장하지 않음, 앱을 다시 켜면 접힘). 검색어가 있으면 접지 않는다(옛 현장 찾기가 막히지 않게).
+  //   renderSites(안전 › 현장 목록)만 쓴다 — 현황·캘린더·계약 연결의 현장 대장 읽기는 이 묶음과 무관.
+  var SITE_OLD_BEFORE = 2025;
+  var siteOldOpen = false;
   function siteKind(r){ return (r && SITE_KIND[r.kind]) ? r.kind : "asbestos"; }   // 옛 기록은 kind가 없다 = 석면
   function liveSites(){ return asb.filter(function(r){ return r && r.del!==1; }); }
   function siteLabel(r){ return SITE_KIND[siteKind(r)] + (r.seq ? " #"+r.seq : ""); }
+  // 현장 줄의 연도(v435 묶음 판정) — 시작일 앞 네 자리, 없으면 종료일, 둘 다 없으면 0(= 날짜 없음). '2025.03'·숫자 20250301도 2025.
+  //   글자·숫자만 읽는다(객체·배열·null은 날짜 없음 — String()에서 던지거나 '[object Object]'를 읽지 않게).
+  function siteYear(r){
+    function y4(v){ if(typeof v!=="string" && typeof v!=="number") return 0; var m=/^\s*(\d{4})/.exec(String(v)); return m ? Number(m[1]) : 0; }
+    return (r && (y4(r.start) || y4(r.end))) || 0;
+  }
   function renderSiteFilter(){
     var host=document.getElementById("siteFilterBar"); if(!host) return;
     var all=liveSites(), n={};
@@ -13742,15 +13761,22 @@
       if(!q) return true;
       return ((r.title||"")+(r.client||"")+(r.site||"")).toLowerCase().replace(/\s+/g,"").indexOf(q)>=0;
     }).sort(function(a,b){ return String(b.start||b.end||"").localeCompare(String(a.start||a.end||"")); });
+    // v435 지난 자료 묶음 — 검색어가 없을 때만 가른다(종류 거르기만 있으면 거른 뒤 건수로 접힘 유지). 정렬은 위 그대로(최신 먼저) — 묶음 안도 같은 순서(같은 연도끼리 모으기만, 아래).
+    //   종결(done)이 아닌 줄(예정·작업중 — 상태 칸이 없으면 카드도 '예정')은 연도·날짜 없음과 상관없이 위에 둔다(v435 검토): 날짜 칸을 비우고 저장한 새 현장이
+    //   '2024년까지' 묶음에 숨지 않게, 현황 ③ 줄(특별교육 미이수·작업신고 마감 — 종결 아닌 줄)을 눌러 온 현장이 접힘 안에 있지 않게. 운영 11/9 백업 실측: 접히는 135줄·날짜 없는 1줄 모두 종결이라 건수 그대로.
+    var cur=list, old=[];
+    if(!q){ cur=[]; list.forEach(function(r){ var y=siteYear(r); if((y && y>=SITE_OLD_BEFORE) || r.status!=="done") cur.push(r); else old.push(r); }); }
     var head=document.getElementById("siteHead");
-    if(head) head.textContent = list.length ? ("총 "+list.length+"건") : "";
+    function headText(){ return list.length ? ("총 "+list.length+"건"+(old.length && !siteOldOpen ? " (지난 자료 "+old.length+"건 접힘)" : "")) : ""; }
+    if(head) head.textContent = headText();
     if(!list.length){ host.innerHTML='<div class="empty-line">해당하는 현장이 없습니다.</div>'; return; }
     var today=todayStr(), can=canDo("site"), html="";
-    list.forEach(function(r){
+    // 현장 카드 한 장(v435 전 list.forEach 안의 글 그대로 — 묶음 밖·안이 같은 카드)
+    function siteCard(r){
       var k=siteKind(r), names=asbWorkerNames(r), ks=r.ks||{};
       var due=asbNotifyDue(r), hot=(k==="asbestos" && r.status!=="done" && isDate(due) && due>=today && due<=addDays(today,7));
       var chip = hot ? '<span class="from-chip">신고 D-'+Math.max(0,Math.round((new Date(due+"T00:00:00")-new Date(today+"T00:00:00"))/86400000))+'</span>' : "";
-      html+='<div class="item asb-item" style="display:block;padding:0;">'
+      return '<div class="item asb-item" style="display:block;padding:0;">'
         + '<button type="button" class="asb-hd" data-site-fold="'+esc(r.id)+'" aria-expanded="false">'
         +   '<span class="asb-seq">'+esc(siteLabel(r))+'</span>'
         +   '<span class="asb-t">'+esc(r.title||"(공사명 없음)")+(hot?" "+chip:"")+'</span>'
@@ -13780,7 +13806,25 @@
         + '</table></div>'
         + (can ? '<button class="link-btn" data-asb-edit="'+esc(r.id)+'" style="text-align:left;width:auto;padding:2px 0 0;">수정</button>' : "")
         + '</div></div>';
-    });
+    }
+    cur.forEach(function(r){ html+=siteCard(r); });
+    // v435 '지난 자료' 묶음 — 목록 맨 아래 머리 줄 하나(카드와 같은 .asb-hd), 안은 연도가 바뀌는 곳마다 작은 구분 줄 + 같은 카드. 펼침은 siteOldOpen(앱 켜 있는 동안만)
+    if(old.length){
+      // 같은 연도끼리 모은다 — 위 정렬 순서를 지키는 안정 정렬(연도 내림차순, 날짜 없음 맨 끝). YYYY-MM-DD·빈칸뿐인 대장(운영 지금)에서는 순서가 바뀌지 않고,
+      //   시작일이 날짜 꼴이 아닌 글('?'·'미정'·앞 공백)이면 정렬 키(시작일 원문)와 연도(종료일·0)가 달라 같은 연도 구분 줄이 두 번 나오던 자리를 막는다(v435 검토)
+      var yPrev=null, body="";
+      old.map(function(r,i){ return { r:r, y:siteYear(r), i:i }; }).sort(function(a,b){ return (b.y-a.y) || (a.i-b.i); }).forEach(function(o){
+        if(o.y!==yPrev){ body+='<div class="site-yr">'+(o.y ? o.y+"년" : "날짜 없음")+'</div>'; yPrev=o.y; }
+        body+=siteCard(o.r);
+      });
+      html+='<div class="item asb-item site-old" style="display:block;padding:0;">'
+        + '<button type="button" class="asb-hd'+(siteOldOpen?" open":"")+'" data-site-old-fold="past" aria-expanded="'+(siteOldOpen?"true":"false")+'" aria-controls="siteOldBd-past">'
+        +   '<span class="asb-t">지난 자료 · '+(SITE_OLD_BEFORE-1)+'년까지 '+old.length+'건</span>'
+        +   '<span class="sec-caret">▾</span>'
+        + '</button>'
+        + '<div id="siteOldBd-past"'+(siteOldOpen?'':' style="display:none;"')+'>'+body+'</div>'
+        + '</div>';
+    }
     host.innerHTML=html;
     Array.prototype.forEach.call(host.querySelectorAll("[data-asb-edit]"), function(b){
       b.addEventListener("click", function(){ openAsb(b.getAttribute("data-asb-edit")); });
@@ -13789,6 +13833,11 @@
       b.addEventListener("click", function(e){ e.stopPropagation(); openSiteWorkers(b.getAttribute("data-site-wk")); });
     });
     bindFold(host, "data-site-fold", "siteBd-");
+    // v435 묶음 머리 — 접기·펴기는 카드와 같은 bindFold(먼저 붙여 먼저 돈다), 그 뒤 펼침 기억·머리 건수만 고친다(다시 그리지 않음 — 펼쳐 둔 카드가 접히지 않게)
+    bindFold(host, "data-site-old-fold", "siteOldBd-");
+    Array.prototype.forEach.call(host.querySelectorAll("[data-site-old-fold]"), function(b){
+      b.addEventListener("click", function(){ siteOldOpen = b.getAttribute("aria-expanded")==="true"; if(head) head.textContent = headText(); });
+    });
   }
   // 참여 근로자 추가 — 명부에서 고르고, 없으면 그 자리에서 등재한다(인사 탭까지 갔다 오지 않게).
   var swSiteId=null, swQ="";

@@ -976,6 +976,8 @@ try {
     throw new Error('중괄호 짝 안 맞음: ' + name);
   };
   const ASB_STATUS_SRC = 'var ASB_STATUS = ' + (html.match(/var ASB_STATUS = (\{[^}]*\});/) || [])[1] + ';';
+  // v435: renderSites가 '지난 자료' 묶음 선언(상수 SITE_OLD_BEFORE·펼침 기억 siteOldOpen)과 siteYear를 읽는다 — 소스에서 그대로 뽑는다(없으면 ReferenceError로 아래 검사가 ✗)
+  const SITE_OLD_SRC = (html.match(/var SITE_OLD_BEFORE = \d+;/) || ['/* SITE_OLD_BEFORE 없음 */'])[0] + ' ' + (html.match(/var siteOldOpen = false;/) || ['/* siteOldOpen 없음 */'])[0];
   const mkEl = (id) => ({ id, innerHTML: '', textContent: '', querySelectorAll: () => [] });
   const build = (items) => {
     const DOM = { siteList: mkEl('siteList'), siteHead: mkEl('siteHead') };
@@ -990,8 +992,9 @@ try {
       fnSrc('eduLatest'), fnSrc('eduHasValidSpecial'), ASB_STATUS_SRC,
       fnSrc('liveAsb'), fnSrc('normAsbRow'), fnSrc('asbNotifyDue'), fnSrc('asbKeepUntil'),
       'var SITE_KIND = { asbestos:"석면", demolition:"철거", dredge:"준설" }; var siteFilter = "", siteQ = "";',
+      SITE_OLD_SRC,
       'function renderSiteFilter(){} function canDo(){ return false; } function fmtAmount(v){ return String(v); } function openAsb(){} function openSiteWorkers(){}',
-      fnSrc('siteKind'), fnSrc('liveSites'), fnSrc('siteLabel'),
+      fnSrc('siteKind'), fnSrc('liveSites'), fnSrc('siteLabel'), fnSrc('siteYear'),
       // v433: renderSites의 특별교육 줄 = siteEduLine — 안전 권한형(canSee 참)이면 종전처럼 asbNoSpecial로 그린다(이 재현의 강도 그대로). 안전 권한 없는 쪽은 v433 묶음 ②가 본다
       'function canSee(){ return true; } var siteEduGap = null, siteEduGapSig = {};', fnSrc('siteGapSig'), fnSrc('siteEduLine'),
       fnSrc('asbWorkerNames'), fnSrc('asbNoSpecial'), fnSrc('sheetRow'), fnSrc('bindFold'), fnSrc('renderSites'),
@@ -1016,7 +1019,7 @@ try {
     T('v336 재현: 그 상태에서도 목록이 실제로 그려진다(종전엔 innerHTML이 비어 "목록에 안 뜬다"였다)',
       DOM.siteList.innerHTML.indexOf('남성초') >= 0 && DOM.siteList.innerHTML.indexOf('임고면 축사 철거') >= 0,
       'len=' + DOM.siteList.innerHTML.length);
-    T('v336 재현: 총 건수 머리글도 정상', DOM.siteHead.textContent === '총 2건', DOM.siteHead.textContent);
+    T('v336 재현: 총 건수 머리글도 정상(v435: 2013년 줄은 지난 자료 묶음 — 총 건수는 그대로 + "(지난 자료 1건 접힘)")', DOM.siteHead.textContent === '총 2건 (지난 자료 1건 접힘)', DOM.siteHead.textContent);
   }
 
   // ---- ② 적대 데이터: 배열 자리에 들어올 수 있는 모든 모양 + 레코드 자체가 이상한 경우 ----
@@ -1126,6 +1129,8 @@ try {
     throw new Error('중괄호 짝 안 맞음: ' + name);
   };
   const ASB_STATUS_SRC = 'var ASB_STATUS = ' + (html.match(/var ASB_STATUS = (\{[^}]*\});/) || [])[1] + ';';
+  // v435: '지난 자료' 묶음 선언(소스 그대로) — v336 하네스와 같은 방식
+  const SITE_OLD_SRC = (html.match(/var SITE_OLD_BEFORE = \d+;/) || ['/* SITE_OLD_BEFORE 없음 */'])[0] + ' ' + (html.match(/var siteOldOpen = false;/) || ['/* siteOldOpen 없음 */'])[0];
   const mkEl = (id) => ({ id, innerHTML: '', textContent: '', querySelectorAll: () => [] });
   const COMMON = [
     fnSrc('pad'), fnSrc('fmtDate'), fnSrc('todayStr'), fnSrc('esc'), fnSrc('addDays'), fnSrc('isDate'), fnSrc('asList'),
@@ -1147,8 +1152,9 @@ try {
       fnSrc('eduLatest'), fnSrc('eduHasValidSpecial'), ASB_STATUS_SRC,
       fnSrc('liveAsb'), fnSrc('normAsbRow'), fnSrc('asbNotifyDue'), fnSrc('asbKeepUntil'),
       'var SITE_KIND = { asbestos:"석면", demolition:"철거", dredge:"준설" }; var siteFilter = "", siteQ = "";',
+      SITE_OLD_SRC,
       'function renderSiteFilter(){} function canDo(){ return false; } function fmtAmount(v){ return String(v); } function openAsb(){} function openSiteWorkers(){}',
-      fnSrc('siteKind'), fnSrc('liveSites'), fnSrc('siteLabel'),
+      fnSrc('siteKind'), fnSrc('liveSites'), fnSrc('siteLabel'), fnSrc('siteYear'),
       'function canSee(){ return true; } var siteEduGap = null, siteEduGapSig = {};', fnSrc('siteGapSig'), fnSrc('siteEduLine'),   // v433 특별교육 줄(안전 권한형 = 종전 화면)
       fnSrc('asbWorkerNames'), fnSrc('asbNoSpecial'), fnSrc('sheetRow'), fnSrc('bindFold'), fnSrc('renderSites'),
       'return { renderSites: renderSites };',
@@ -1163,8 +1169,8 @@ try {
     try { api.renderSites(); } catch (e) { err = e; }
     T('v337 반례: start가 숫자·객체·null이어도 renderSites가 던지지 않는다(정렬 비교자 String 고정)',
       !err, err && (err.constructor.name + ': ' + err.message));
-    T('v337 반례: 그 상태에서도 5건이 실제로 그려진다(빈 목록으로 죽지 않는다)',
-      DOM.siteHead.textContent === '총 5건' && DOM.siteList.innerHTML.indexOf('숫자 날짜') >= 0 && DOM.siteList.innerHTML.indexOf('뒤쪽 정상') >= 0,
+    T('v337 반례: 그 상태에서도 5건이 실제로 그려진다(빈 목록으로 죽지 않는다 — v435: 객체·null 날짜 2건은 날짜 없음이지만 상태 칸이 없어(카드 "예정") 종결이 아니므로 지난 자료 묶음에 넣지 않는다, 검토 반영 — 머리 "총 5건"·묶음 없음)',
+      DOM.siteHead.textContent === '총 5건' && DOM.siteList.innerHTML.indexOf('숫자 날짜') >= 0 && DOM.siteList.innerHTML.indexOf('뒤쪽 정상') >= 0 && DOM.siteList.innerHTML.indexOf('data-site-old-fold') < 0,
       'head=' + DOM.siteHead.textContent + ' len=' + DOM.siteList.innerHTML.length);
   }
 
@@ -3955,6 +3961,371 @@ try {
     && Number((sw34.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 434,
     JSON.stringify({ m27: m27_34.length, card: m27_34n.indexOf(CARD34) > 0, next: pmNext34, ftv: ftv34.length, ftMiss: ftMiss34.map((s) => s.slice(0, 40)), tl: tlv34.length, cb: cb34.length, notAi: cbNotAi34.map((l) => l.slice(0, 40)), con: tlCon34, op: tlOp34.length, sw: tlSw34.length, cl: clHw34.length, clMiss: clMiss34.map((s) => s.slice(0, 40)) }));
 } catch (e) { console.log('  (v434 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ---- v435(11/10 PM 새 지시 '56. ⓒ 현장탭 25년 이전 자료 전체 접을 수 있게' — 브리핑 밖·앱만, 09_조사_문서/메뉴안전탭_자료_20261109/단계지시_v435_c현장접기.json):
+//      안전 › 현장 목록(renderSites)에서 siteYear(시작일 앞 네 자리 → 없으면 종료일 → 둘 다 없으면 0 = 날짜 없음)가 SITE_OLD_BEFORE(2025 — PM '25년 이전')보다 이르거나 날짜 없음인 줄을
+//      목록 맨 아래 '지난 자료' 한 묶음(기본 접힘)으로. v336·v337·v433 하네스(renderSites를 소스에서 뽑아 실행 — 특별교육 줄은 안전 권한형)를 재사용하되,
+//      펼치기를 실제로 누르려고 innerHTML을 풀어 요소(속성·class·style.display·click 리스너)를 만드는 작은 DOM을 쓴다(다시 그리면 요소가 새로 생긴다 — 실제 innerHTML과 같음).
+//      검토 반영(11/10): 묶음은 종결(done) 줄만 — 종결 아닌 줄(예정·작업중·상태 칸 없음 = 카드 '예정')은 연도·날짜 없음과 상관없이 밖(②-3), 묶음 안은 같은 연도끼리 안정 정렬(②-4),
+//      카드 글은 v434(c1cc9b1)에서 뽑아 고정한 3장과 글자째(②-2 고정 — 종전 ②-2는 같은 소스의 두 화면끼리라 siteCard 글이 바뀌어도 통과했다)
+//      ① siteYear 판정 ② 기본 접힘(밖/안·머리 건수·연도 구분 줄·맨 아래·지금 정렬) ②-2 카드 글 그대로(검색 화면 카드와 글자째)·버튼 ②-2 고정(v434 카드 3장) ②-3 진행 줄은 접지 않음 ②-4 묶음 안 같은 연도끼리
+//      ③ 펼치기(bindFold·펼침 기억·누를 때 다시 그리지 않음·안쪽 카드·다시 접기·새 앱 접힘)
+//      ④ 검색어 = 접힘 없음 ⑤ 종류 거르기 = 거른 뒤 건수 ⑥ 지난 자료만 = 묶음 머리만·빈 목록 그대로 ⑦ 운영 분포 흉내(11/10 백업 실측 — 135건 접힘) ⑧ 상수 2026 사본 = 2025년도 묶음
+//      ⑨ 정적(상수 2025·펼침 기억은 메모리만·renderSites 밖 무변·bindFold 순서·CSS) ⑩ 문서(MANUAL 28절 한 줄·FEATURES v435·§7·TESTLIST v435 AI 몫·CLAUDE.md·sw)
+try {
+  const fn35 = (src, name) => { const i = src.indexOf('function ' + name + '('); if (i < 0) throw new Error('함수 없음: ' + name); let d = 0, st = false; for (let j = i; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i, j + 1); } } throw new Error('중괄호 짝 안 맞음: ' + name); };
+  const rd35 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const own35 = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+  const same35 = (a, b) => JSON.stringify([...a].sort()) === JSON.stringify([...b].sort());
+  // 작은 DOM — host.innerHTML을 넣으면 여는 태그마다 요소(속성 그대로·class·style.display·click 리스너)를 새로 만든다. getElementById = siteList·siteHead·풀린 id.
+  const mkDom35 = () => {
+    const els = [], byId = {};
+    const host = { id: 'siteList', _h: '', querySelectorAll: (sel) => { const m = /^\[([\w-]+)\]$/.exec(sel); if (!m) throw new Error('시험 DOM이 모르는 선택자: ' + sel); return els.filter((e) => own35(e.attrs, m[1])); } };
+    Object.defineProperty(host, 'innerHTML', { get: () => host._h, set: (v) => {
+      host._h = String(v); els.length = 0; Object.keys(byId).forEach((k) => { delete byId[k]; });
+      for (const t of host._h.matchAll(/<([a-zA-Z][\w-]*)([^<>]*)>/g)) {
+        const attrs = {};
+        for (const a of t[2].matchAll(/([\w-]+)(?:="([^"]*)")?/g)) attrs[a[1]] = a[2] === undefined ? '' : a[2];
+        const el = { tag: t[1].toLowerCase(), attrs, className: attrs.class || '', style: { display: /display:\s*none/.test(attrs.style || '') ? 'none' : '' }, on: [] };
+        el.getAttribute = (n) => (own35(el.attrs, n) ? el.attrs[n] : null);
+        el.setAttribute = (n, val) => { el.attrs[n] = String(val); };
+        el.addEventListener = (ty, f) => { if (ty === 'click') el.on.push(f); };
+        el.click = () => { el.on.slice().forEach((f) => f({ stopPropagation() {} })); };
+        els.push(el); if (attrs.id) byId[attrs.id] = el;
+      }
+    } });
+    const head = { id: 'siteHead', textContent: '' };
+    return { host, head, els, byId, doc: { getElementById: (id) => (id === 'siteList' ? host : id === 'siteHead' ? head : (byId[id] || null)) } };
+  };
+  const ASB35 = 'var ASB_STATUS = ' + (html.match(/var ASB_STATUS = (\{[^}]*\});/) || [])[1] + ';';
+  //   지난 자료 선언은 소스 글 그대로 가져온다(값은 아래 검사가 본다 — 선언이 없으면 묶음 전체 '검사 생략' ✗)
+  const decl35 = (src) => { const a = src.match(/\n  var SITE_OLD_BEFORE = ([^;\n]+);\n/), b = src.match(/\n  var siteOldOpen = ([^;\n]+);\n/); if (!a || !b) throw new Error('지난 자료 선언(SITE_OLD_BEFORE·siteOldOpen) 없음'); return 'var SITE_OLD_BEFORE = ' + a[1] + '; var siteOldOpen = ' + b[1] + ';'; };
+  const build35 = (items, opt) => {
+    opt = opt || {}; const src = opt.src || html, D = mkDom35(), log = [];
+    const api = new Function('__items', '__doc', '__can', '__log', '__mem', '__wk', [
+      'var document = __doc;',
+      'var asb = __items; var workers = __wk; var members = __mem; var edu = [];',   // 명부는 opt.members·opt.workers(없으면 빈 명부 — 종전과 같음)
+      fn35(src, 'pad'), fn35(src, 'fmtDate'), fn35(src, 'todayStr'), fn35(src, 'esc'), fn35(src, 'addDays'), fn35(src, 'isDate'), fn35(src, 'asList'),
+      'function findMember(id){ for(var i=0;i<members.length;i++){ if(members[i].id===id) return members[i]; } return null; }',
+      'function memberName(id){ if(!id) return ""; var m=findMember(id); return m?m.name:""; }',
+      'function dispName(n){ return n||""; }',
+      'function liveEdu(){ return edu.filter(function(r){ return r && r.del!==1; }); }',
+      fn35(src, 'eduLatest'), fn35(src, 'eduHasValidSpecial'), ASB35,
+      fn35(src, 'liveAsb'), fn35(src, 'normAsbRow'), fn35(src, 'asbNotifyDue'), fn35(src, 'asbKeepUntil'),
+      'var SITE_KIND = { asbestos:"석면", demolition:"철거", dredge:"준설" }; var siteFilter = "", siteQ = "";', decl35(src),
+      'function renderSiteFilter(){} function canDo(m){ return m === "site" && __can; } function fmtAmount(v){ return String(v); }',
+      'function openAsb(id){ __log.push("edit:" + id); } function openSiteWorkers(id){ __log.push("wk:" + id); }',
+      fn35(src, 'siteKind'), fn35(src, 'liveSites'), fn35(src, 'siteLabel'), fn35(src, 'siteYear'),
+      'function canSee(){ return true; } var siteEduGap = null, siteEduGapSig = {};', fn35(src, 'siteGapSig'), fn35(src, 'siteEduLine'),
+      fn35(src, 'asbWorkerNames'), fn35(src, 'asbNoSpecial'), fn35(src, 'sheetRow'), fn35(src, 'bindFold'), fn35(src, 'renderSites'),
+      'return { render: renderSites, year: siteYear, setQ: function(v){ siteQ = v; }, setF: function(v){ siteFilter = v; }, isOpen: function(){ return siteOldOpen; } };',
+    ].join('\n'))(items, D.doc, !!opt.can, log, opt.members || [], opt.workers || []);
+    return Object.assign({ api, log }, D);
+  };
+  // 표본 — 경계(2024-12-31·2025-01-01)·종료일만·'2025.03'·숫자 날짜·시작일 우선(2024 시작·2025 종료)·'?'·날짜 칸 없음·객체 날짜·지운 줄. 공사명마다 '현장'(검색 한 낱말로 전부 맞게)
+  //   묶음 쪽 7줄은 모두 종결(done) — 종결 아닌 줄은 연도와 상관없이 밖이다(검토 반영, ②-3). 'on'(날짜 칸 없음)도 종결로 둔다(상태 칸까지 없는 줄은 카드 '예정' = 진행이라 ②-3이 본다)
+  const S35 = [
+    { id: 'n26', title: '현장 새 26', kind: 'asbestos', start: '2026-03-01', end: '2026-03-10', status: 'plan', member_ids: [], worker_ids: [] },
+    { id: 'n25', title: '현장 경계 25', kind: 'demolition', start: '2025-01-01', end: '2025-02-01', status: 'done', member_ids: [], worker_ids: [] },
+    { id: 'n25e', title: '현장 종료일만 25', kind: 'dredge', start: '', end: '2025-02-01', status: 'done' },
+    { id: 'n25d', title: '현장 점 꼴 25', start: '2025.03', end: '', status: 'done' },
+    { id: 'n26n', title: '현장 숫자 26', start: 20260101, end: 20260115, status: 'done' },
+    { id: 'o24', title: '현장 경계 24', kind: 'asbestos', start: '2024-12-31', end: '2025-01-10', status: 'done', member_ids: [], worker_ids: [] },
+    { id: 'o24e', title: '현장 시작 없음 24', kind: 'demolition', start: null, end: '2024-06-01', status: 'done' },
+    { id: 'o23', title: '현장 옛 23', kind: 'asbestos', start: '2023-05-05', end: '2023-05-09', status: 'done' },
+    { id: 'o13', title: '현장 아주 옛 13', kind: 'asbestos', start: '2013-10-07', end: '2013-10-15', status: 'done' },
+    { id: 'oq', title: '현장 물음표', start: '?', end: '?', status: 'done' },
+    { id: 'on', title: '현장 날짜 없음', status: 'done' },
+    { id: 'oo', title: '현장 객체 날짜', start: {}, end: [], status: 'done' },
+    { id: 'odel', title: '현장 지운 옛 줄', start: '2020-01-01', del: 1 },
+  ];
+  const YEAR35 = { n26: 2026, n25: 2025, n25e: 2025, n25d: 2025, n26n: 2026, o24: 2024, o24e: 2024, o23: 2023, o13: 2013, oq: 0, on: 0, oo: 0 };
+  const OUT35 = ['n26', 'n25', 'n25e', 'n25d', 'n26n'], IN35 = ['o24', 'o24e', 'o23', 'o13', 'oq', 'on', 'oo'];
+  const cmp35 = (a, b) => String(b.start || b.end || '').localeCompare(String(a.start || a.end || ''));   // 앱 정렬 비교자와 같은 식 — '지금 정렬 그대로' 대조용
+  const live35 = (items) => items.filter((r) => r && r.del !== 1);
+  const cardIds35 = (h) => [...h.matchAll(/data-site-fold="([^"]*)"/g)].map((m) => m[1]);
+  const split35 = (h) => { const g = h.indexOf('data-site-old-fold='); return g < 0 ? { out: cardIds35(h), inn: [], g } : { out: cardIds35(h.slice(0, g)), inn: cardIds35(h.slice(g)), g }; };
+  const toks35 = (h) => { const b = h.indexOf('id="siteOldBd-past"'); if (b < 0) return []; return [...h.slice(b).matchAll(/<div class="site-yr">([^<]*)<\/div>|data-site-fold="([^"]*)"/g)].map((m) => (m[1] !== undefined ? '#' + m[1] : m[2])); };
+  const expToks35 = (items, ids, yr) => { const out = []; let p = null; live35(items).filter((r) => ids.indexOf(r.id) >= 0).sort(cmp35).forEach((r) => { const y = yr[r.id]; if (y !== p) { out.push('#' + (y ? y + '년' : '날짜 없음')); p = y; } out.push(r.id); }); return out; };
+  const GRP35 = /<div class="item asb-item site-old" style="display:block;padding:0;"><button type="button" class="asb-hd(?: open)?" data-site-old-fold="past" aria-expanded="(?:true|false)" aria-controls="siteOldBd-past"><span class="asb-t">지난 자료 · \d{4}년까지 \d+건<\/span><span class="sec-caret">▾<\/span><\/button><div id="siteOldBd-past"(?: style="display:none;")?>/;
+  const strip35 = (h) => h.replace(GRP35, '').replace(/<div class="site-yr">[^<]*<\/div>/g, '').replace(/<\/div><\/div>$/, '');   // 묶음 머리·연도 줄·묶음 닫기를 걷으면 카드만 남는다
+  const CARD0_35 = '<div class="item asb-item" style="display:block;padding:0;"><button type="button" class="asb-hd" data-site-fold="';
+  const grpBtn35 = (X) => X.els.filter((e) => own35(e.attrs, 'data-site-old-fold'));
+
+  // ① siteYear 판정 — 시작일 → 종료일 → 0(날짜 없음), 글자·숫자만(객체·배열·null·함수는 0, 던지지 않음)
+  const Y35 = build35([]);
+  const yv35 = S35.filter((r) => r.del !== 1).map((r) => [r.id, Y35.api.year(r)]);
+  let yThrow35 = null; const yOdd35 = [];
+  try {
+    yOdd35.push(Y35.api.year({ start: '?', end: '2023-01-01' }), Y35.api.year({ start: '25.03.01', end: '' }), Y35.api.year({ start: ' 2019-03-02' }), Y35.api.year({ start: 2025.03 }),
+      Y35.api.year({ start: Object.create(null), end: { toString() { throw new Error('x'); } } }), Y35.api.year({ start: () => 2020 }), Y35.api.year(null), Y35.api.year('2020-01-01'), Y35.api.year({ start: '0000-01-01', end: '2022-02-02' }), Y35.api.year({ start: '2024년 3월' }),
+      Y35.api.year({ start: '03/05/2019', end: '2023-01-01' }), Y35.api.year({ start: '공사 2019-03-02' }));   // 검토 반영: 네 자리가 맨 앞이 아니면 그 칸은 없음(앞 고정 ^\s* — '25.03.01'만으로는 앞 고정을 지워도 0이라 못 잡았다)
+  } catch (e) { yThrow35 = e; }
+  T('v435 ① siteYear 판정(실행): 시작일 앞 네 자리 → 없으면 종료일 → 둘 다 없으면 0(날짜 없음) — 표본 12줄 연도(경계 2024-12-31·2025-01-01·종료일만·"2025.03"·숫자 20260101·시작 2024/종료 2025는 2024·"?"·칸 없음·객체 날짜는 0) · "?"면 종료일 · "25.03.01"은 0 · 앞 공백 허용 · 숫자 2025.03 · 객체·함수·null·글자 레코드는 0(던지지 않음) · "0000"은 다음 칸 · "2024년 3월"은 2024 · 네 자리가 맨 앞이 아니면 그 칸은 없음("03/05/2019" → 종료일 2023, "공사 2019-03-02" → 0)',
+    !yThrow35 && yv35.every(([id, y]) => y === YEAR35[id]) && JSON.stringify(yOdd35) === JSON.stringify([2023, 0, 2019, 2025, 0, 0, 0, 0, 2022, 2024, 2023, 0]),
+    JSON.stringify({ err: yThrow35 && yThrow35.message, yv: yv35, odd: yOdd35 }));
+
+  // ② 기본 접힘 — 밖 = 2025·2026(지금 정렬 그대로), 안 = 2024 이하·날짜 없음(같은 정렬 + 연도 바뀌는 곳마다 구분 줄), 묶음은 맨 아래 하나, 머리 건수
+  const A35 = build35(S35); A35.api.render();
+  const h0_35 = A35.host.innerHTML, sp0_35 = split35(h0_35), g0_35 = grpBtn35(A35), bd0_35 = A35.byId['siteOldBd-past'];
+  const lastOut35 = h0_35.lastIndexOf('data-site-fold="' + sp0_35.out[sp0_35.out.length - 1] + '"');
+  T('v435 ② 기본 접힘(renderSites 실행, 표본 12줄 + 지운 줄): 머리 "총 12건 (지난 자료 7건 접힘)" · 밖 5줄(2025·2026 — 지금 정렬 그대로) · 묶음 안 7줄(2024 이하·"?"·칸 없음·객체 날짜) = 같은 정렬 + 연도가 바뀌는 곳마다 구분 줄(2024년·2023년·2013년·날짜 없음) · 묶음 머리 1개(.asb-hd · aria-expanded false · aria-controls · "지난 자료 · 2024년까지 7건" + ▾ 화살표 칸) · 몸통 처음 숨김 · 묶음은 밖 카드 뒤(맨 아래) · 지운 줄 없음 · 빈 줄 문구 없음',
+    A35.head.textContent === '총 12건 (지난 자료 7건 접힘)' && same35(sp0_35.out, OUT35) && same35(sp0_35.inn, IN35)
+    && JSON.stringify(sp0_35.out) === JSON.stringify(live35(S35).filter((r) => OUT35.indexOf(r.id) >= 0).sort(cmp35).map((r) => r.id))
+    && JSON.stringify(toks35(h0_35)) === JSON.stringify(expToks35(S35, IN35, YEAR35))
+    && g0_35.length === 1 && g0_35[0].tag === 'button' && g0_35[0].className === 'asb-hd' && g0_35[0].getAttribute('aria-expanded') === 'false' && g0_35[0].getAttribute('aria-controls') === 'siteOldBd-past'
+    && h0_35.indexOf('<span class="asb-t">지난 자료 · 2024년까지 7건</span><span class="sec-caret">▾</span></button>') > 0
+    && !!bd0_35 && bd0_35.style.display === 'none' && (h0_35.match(/id="siteOldBd-past"/g) || []).length === 1 && (h0_35.match(/class="item asb-item site-old"/g) || []).length === 1
+    && lastOut35 >= 0 && h0_35.indexOf('<div class="item asb-item site-old"') > lastOut35 && cardIds35(h0_35).indexOf('odel') < 0 && h0_35.indexOf('empty-line') < 0,
+    JSON.stringify({ head: A35.head.textContent, out: sp0_35.out, inn: sp0_35.inn, toks: toks35(h0_35), grp: g0_35.map((e) => [e.className, e.attrs['aria-expanded']]), bd: bd0_35 && bd0_35.style.display }));
+
+  // ②-2 카드 글 그대로 — 묶음 머리·연도 줄·묶음 닫기를 걷으면 검색 화면(접힘 없음)의 카드와 글자째 같다(밖·안 같은 카드) · 수행 권한이면 묶음 안 카드에도 [근로자 추가]·[수정]이 있고 눌림
+  const Q0_35 = build35(S35); Q0_35.api.setQ('현장'); Q0_35.api.render();
+  const hs35 = Q0_35.host.innerHTML, st35 = strip35(h0_35), pS35 = hs35.split(CARD0_35), pF35 = st35.split(CARD0_35);
+  const C35 = build35(S35, { can: true }); C35.api.render();
+  const cEd35 = C35.els.filter((e) => own35(e.attrs, 'data-asb-edit')), cWk35 = C35.els.filter((e) => own35(e.attrs, 'data-site-wk'));
+  const cIn35 = split35(C35.host.innerHTML).inn;
+  (cEd35.filter((e) => e.attrs['data-asb-edit'] === 'o13')[0] || { click() {} }).click(); (cWk35.filter((e) => e.attrs['data-site-wk'] === 'o13')[0] || { click() {} }).click();
+  T('v435 ②-2 카드 글 그대로: 묶음 머리·연도 줄·묶음 닫기를 걷으면 남는 글 = 카드 12장, 검색 화면(접힘 없음) 카드 12장과 글자째 같음(밖·안 같은 카드 — 특별교육 줄·표 칸 그대로) · 현장 수행 권한이면 [수정]·[근로자 추가]가 12줄 모두(묶음 안 7줄 포함)에 있고 묶음 안 카드 버튼이 openAsb·openSiteWorkers를 부름',
+    pS35.length === 13 && pF35.length === 13 && pS35[0] === '' && pF35[0] === '' && JSON.stringify(pS35.slice(1).sort()) === JSON.stringify(pF35.slice(1).sort()) && st35 !== h0_35
+    && cEd35.length === 12 && cWk35.length === 12 && same35(cIn35, IN35) && C35.log.join(',') === 'edit:o13,wk:o13',
+    JSON.stringify({ s: pS35.length, f: pF35.length, f0: pF35[0].slice(0, 80), ed: cEd35.length, wk: cWk35.length, log: C35.log }));
+
+  // ②-2 고정(v435 검토 — 위 ②-2는 같은 소스의 두 화면끼리라 siteCard 글이 바뀌면 양쪽이 함께 바뀌어 통과했다): v434(c1cc9b1) renderSites로 뽑아 고정한 카드 3장과 글자째 대조.
+  //   표본 PIN35 = 카드 칸을 될 수 있는 대로 모두 지나는 3줄(현장 수행 권한 — 버튼 포함): 석면 작업중 2099(작업신고 마감·참여 근로자 직원+일용직·특별교육 줄·농도·인계번호·키스콘·계약액·발주자 승인 취소(warn)·보존 만료·메모 줄바꿈·이스케이프) /
+  //   철거 종결 2024(발주처 —·소재지 미입력·미지정 — 묶음 안) / 준설 상태 칸 없음·날짜 없음((공사명 없음)·기간 미상·? ~ ? — 종결 아님이라 밖). 날짜는 오늘과 무관(2099·2024 — 신고 D-n 칩 없음).
+  //   고정 글 = git show c1cc9b1:index.html의 renderSites를 이 하네스와 같은 대역(명부 홍길동·일용 갑, 교육 기록 0, 안전 권한형)으로 돌린 목록 글(v434는 접힘이 없다). 카드 글을 일부러 바꿀 때만 이 고정 글을 함께 고친다
+  const PIN35 = [
+    { id: 'pA', seq: 7, title: '현장 고정 석면 <b>', kind: 'asbestos', client: '포항시 & 교육청', site: '포항시 남구', start: '2099-05-01', end: '2099-06-30', material: '천장텍스', area: '120.5', status: 'run', conc: '0.002', waste_no: 'W-1', note: '첫 줄\n둘째 줄', member_ids: ['u1'], worker_ids: ['w1'], ks: { no: 'K-9', year: 2099, biz: '석면해체', amount: 12345678, done_amount: 2000000, approve: '승인 취소' } },
+    { id: 'pB', title: '현장 고정 철거', kind: 'demolition', client: '', site: '', start: '2024-03-02', end: '2024-03-09', status: 'done', member_ids: [], worker_ids: [] },
+    { id: 'pC', title: '', kind: 'dredge', site: '현장 준설 구역', start: '', end: '', member_ids: [], worker_ids: [] },
+  ];
+  const PIN_OPT35 = { can: true, members: [{ id: 'u1', name: '홍길동' }], workers: [{ id: 'w1', name: '일용 갑' }] };
+  const PIN_V434_35 = [
+    '<div class="item asb-item" style="display:block;padding:0;"><button type="button" class="asb-hd" data-site-fold="pA" aria-expanded="false"><span class="asb-seq">석면 #7</span><span class="asb-t">현장 고정 석면 &lt;b&gt;</span><span class="asb-end">2099-06-30</span><span class="sec-caret">▾</span></button><div class="asb-bd" id="siteBd-pA" style="display:none;"><div class="jw-sheet-wrap"><table class="jw-sheet"><tr><th>종류·상태</th><td>석면 · 작업중</td></tr><tr><th>발주처</th><td>포항시 &amp; 교육청</td></tr><tr><th>소재지</th><td>포항시 남구</td></tr><tr><th>기간</th><td><span class="num">2099-05-01 ~ 2099-06-30</span></td></tr><tr><th>자재·면적</th><td>천장텍스 · <span class="num">120.5㎡</span></td></tr><tr><th>작업신고 마감</th><td class="warn"><span class="num">2099-04-24</span> (착수 7일 전)</td></tr><tr><th>참여 근로자</th><td><b class="num">2명</b> · 홍길동, 일용 갑 <button class="mini-btn" data-site-wk="pA" style="margin-left:6px;">근로자 추가</button></td></tr><tr><th>특별교육</th><td class="warn"><b>미이수 2명</b> — 홍길동, 일용 갑 (배치 전 이수 필요)</td></tr><tr><th>공기 중 농도</th><td><span class="num">0.002</span> 개/㎤</td></tr><tr><th>폐기물 인계번호</th><td>W-1</td></tr><tr><th>키스콘 신고</th><td><span class="num">K-9</span> · 2099년 · 석면해체</td></tr><tr><th>계약액</th><td><span class="num">12345678원</span> · 기성 <span class="num">2000000원</span></td></tr><tr><th>발주자 승인</th><td class="warn">승인 취소</td></tr><tr><th>기록 보존 만료</th><td><span class="num">2129-06-30</span></td></tr><tr><th>메모</th><td>첫 줄<br>둘째 줄</td></tr></table></div><button class="link-btn" data-asb-edit="pA" style="text-align:left;width:auto;padding:2px 0 0;">수정</button></div></div>',
+    '<div class="item asb-item" style="display:block;padding:0;"><button type="button" class="asb-hd" data-site-fold="pB" aria-expanded="false"><span class="asb-seq">철거</span><span class="asb-t">현장 고정 철거</span><span class="asb-end">2024-03-09</span><span class="sec-caret">▾</span></button><div class="asb-bd" id="siteBd-pB" style="display:none;"><div class="jw-sheet-wrap"><table class="jw-sheet"><tr><th>종류·상태</th><td>철거 · 종결</td></tr><tr><th>발주처</th><td>—</td></tr><tr><th>소재지</th><td class="warn"><b>미입력</b></td></tr><tr><th>기간</th><td><span class="num">2024-03-02 ~ 2024-03-09</span></td></tr><tr><th>참여 근로자</th><td class="warn"><b>미지정</b> <button class="mini-btn" data-site-wk="pB" style="margin-left:6px;">근로자 추가</button></td></tr><tr><th>기록 보존 만료</th><td><span class="num">2054-03-09</span></td></tr></table></div><button class="link-btn" data-asb-edit="pB" style="text-align:left;width:auto;padding:2px 0 0;">수정</button></div></div>',
+    '<div class="item asb-item" style="display:block;padding:0;"><button type="button" class="asb-hd" data-site-fold="pC" aria-expanded="false"><span class="asb-seq">준설</span><span class="asb-t">(공사명 없음)</span><span class="asb-end">기간 미상</span><span class="sec-caret">▾</span></button><div class="asb-bd" id="siteBd-pC" style="display:none;"><div class="jw-sheet-wrap"><table class="jw-sheet"><tr><th>종류·상태</th><td>준설 · 예정</td></tr><tr><th>발주처</th><td>—</td></tr><tr><th>소재지</th><td>현장 준설 구역</td></tr><tr><th>기간</th><td><span class="num">? ~ ?</span></td></tr><tr><th>참여 근로자</th><td class="warn"><b>미지정</b> <button class="mini-btn" data-site-wk="pC" style="margin-left:6px;">근로자 추가</button></td></tr></table></div><button class="link-btn" data-asb-edit="pC" style="text-align:left;width:auto;padding:2px 0 0;">수정</button></div></div>',
+  ];
+  const PS35 = build35(JSON.parse(JSON.stringify(PIN35)), PIN_OPT35); PS35.api.setQ('현장'); PS35.api.render();
+  const PF35 = build35(JSON.parse(JSON.stringify(PIN35)), PIN_OPT35); PF35.api.render();
+  const pfCards35 = strip35(PF35.host.innerHTML).split(CARD0_35).slice(1).map((s) => CARD0_35 + s), pfSp35 = split35(PF35.host.innerHTML);
+  const pinAt35 = (() => { const a = PS35.host.innerHTML, b = PIN_V434_35.join(''); if (a === b) return -1; let i = 0; while (i < a.length && i < b.length && a[i] === b[i]) i++; return i; })();
+  T('v435 ②-2 고정 카드 글 = v434(c1cc9b1 renderSites로 뽑은 카드 3장, 현장 수행 권한 — 검토 반영): 검색 화면(접힘 없음) 목록 글이 고정 글과 글자째 같음·머리 "총 3건" · 접힘 화면에서 묶음 머리·연도 줄을 걷은 카드 3장도 고정 카드와 글자째 같음(종결 2024 철거는 묶음 안, 작업중 2099 석면·상태 칸 없는 날짜 없음 준설은 밖)·머리 "총 3건 (지난 자료 1건 접힘)"',
+    pinAt35 === -1 && PS35.head.textContent === '총 3건'
+    && pfCards35.length === 3 && JSON.stringify(pfCards35.slice().sort()) === JSON.stringify(PIN_V434_35.slice().sort())
+    && JSON.stringify(pfSp35.out) === '["pA","pC"]' && JSON.stringify(pfSp35.inn) === '["pB"]' && PF35.head.textContent === '총 3건 (지난 자료 1건 접힘)',
+    JSON.stringify({ at: pinAt35, got: pinAt35 < 0 ? '' : PS35.host.innerHTML.slice(Math.max(0, pinAt35 - 40), pinAt35 + 60), want: pinAt35 < 0 ? '' : PIN_V434_35.join('').slice(Math.max(0, pinAt35 - 40), pinAt35 + 60), head: PS35.head.textContent, fold: [pfCards35.length, pfSp35.out, pfSp35.inn, PF35.head.textContent] }));
+
+  // ②-3 진행 줄은 접지 않는다(v435 검토 — 저장은 공사명만 필수·상태 기본 '예정'이라 날짜 칸을 비우고 저장한 새 현장이 '2024년까지' 묶음에 숨었고, 2024년 이전 시작·작업중 줄과
+  //   현황 ③(종결 아닌 줄의 특별교육 미이수·작업신고 마감)이 가리키는 현장도 접힘 안에 있었다): 종결(done)이 아닌 줄(예정·작업중·상태 칸 없음 = 카드 '예정')은 연도·날짜 없음과 상관없이 밖(지금 정렬 그대로),
+  //   묶음은 종결 줄만. 종류 거르기에도 같은 규칙 · 진행 줄뿐이면 묶음·빈 줄 문구 없음 · 지운 진행 줄은 어디에도 없음
+  const ACT35 = [
+    { id: 'aN26', title: '진행 표본 26 종결', start: '2026-01-05', end: '', status: 'done' },
+    { id: 'aNP', title: '진행 표본 날짜 없음 예정', kind: 'asbestos', start: '', end: '', status: 'plan', member_ids: [], worker_ids: [] },
+    { id: 'aNR', title: '진행 표본 날짜 없음 작업중', kind: 'dredge', status: 'run' },
+    { id: 'aNS', title: '진행 표본 날짜 없음 상태 없음', kind: 'demolition' },
+    { id: 'aR19', title: '진행 표본 2019 작업중', kind: 'dredge', start: '2019-04-01', end: '', status: 'run' },
+    { id: 'aP24', title: '진행 표본 2024 예정', kind: 'asbestos', start: '2024-12-31', end: '', status: 'plan' },
+    { id: 'aD20', title: '진행 표본 2020 종결', kind: 'asbestos', start: '2020-05-05', end: '2020-05-09', status: 'done' },
+    { id: 'aDN', title: '진행 표본 날짜 없음 종결', kind: 'asbestos', status: 'done' },
+    { id: 'aDel', title: '진행 표본 지운 줄', start: '', status: 'plan', del: 1 },
+  ];
+  const ACT_OUT35 = ['aN26', 'aNP', 'aNR', 'aNS', 'aR19', 'aP24'], ACT_IN35 = ['aD20', 'aDN'];
+  const AC35 = build35(ACT35); AC35.api.render();
+  const ac1_35 = { sp: split35(AC35.host.innerHTML), head: AC35.head.textContent, toks: toks35(AC35.host.innerHTML), txt: AC35.host.innerHTML.indexOf('<span class="asb-t">지난 자료 · 2024년까지 2건</span>') > 0, del: cardIds35(AC35.host.innerHTML).indexOf('aDel') < 0 };
+  AC35.api.setF('dredge'); AC35.api.render(); const ac2_35 = { sp: split35(AC35.host.innerHTML), head: AC35.head.textContent };
+  AC35.api.setF('asbestos'); AC35.api.render(); const ac3_35 = { sp: split35(AC35.host.innerHTML), head: AC35.head.textContent };
+  const AO35 = build35(ACT35.filter((r) => r.status !== 'done' && r.del !== 1)); AO35.api.render(); const ao_35 = { sp: split35(AO35.host.innerHTML), head: AO35.head.textContent, h: AO35.host.innerHTML };
+  T('v435 ②-3 진행 줄은 접지 않음(검토 반영): 종결 아닌 줄(날짜 없는 예정·작업중·상태 칸 없음, 2019 작업중, 2024-12-31 예정)은 밖 — 지금 정렬 그대로 · 묶음은 종결 줄만(2020 종결·날짜 없는 종결) "지난 자료 · 2024년까지 2건"·머리 "총 8건 (지난 자료 2건 접힘)" · 지운 진행 줄 없음 · 준설만 = 진행 2줄 밖·묶음 없음·"총 2건" · 석면(kind 없는 줄 포함) = 밖 3줄·안 2줄 · 진행 줄뿐이면 묶음·빈 줄 문구 없음·"총 5건"',
+    ac1_35.head === '총 8건 (지난 자료 2건 접힘)' && JSON.stringify(ac1_35.sp.out) === JSON.stringify(live35(ACT35).filter((r) => ACT_OUT35.indexOf(r.id) >= 0).sort(cmp35).map((r) => r.id))
+    && JSON.stringify(ac1_35.toks) === '["#2020년","aD20","#날짜 없음","aDN"]' && ac1_35.txt && ac1_35.del
+    && ac2_35.head === '총 2건' && ac2_35.sp.g < 0 && same35(ac2_35.sp.out, ['aNR', 'aR19'])
+    && ac3_35.head === '총 5건 (지난 자료 2건 접힘)' && same35(ac3_35.sp.out, ['aN26', 'aNP', 'aP24']) && same35(ac3_35.sp.inn, ACT_IN35)
+    && ao_35.sp.g < 0 && ao_35.h.indexOf('empty-line') < 0 && same35(ao_35.sp.out, ['aNP', 'aNR', 'aNS', 'aR19', 'aP24']) && ao_35.head === '총 5건',
+    JSON.stringify({ a1: [ac1_35.head, ac1_35.sp.out, ac1_35.toks, ac1_35.txt, ac1_35.del], a2: [ac2_35.head, ac2_35.sp.out], a3: [ac3_35.head, ac3_35.sp.out, ac3_35.sp.inn], ao: [ao_35.head, ao_35.sp.out] }));
+
+  // ②-4 묶음 안 같은 연도끼리(v435 검토 — 정렬 키는 시작일 원문, 연도는 siteYear라 시작일이 날짜 꼴이 아닌 글이면 같은 연도 구분 줄이 두 번 나오고 제 연도 칸 밖에 놓였다):
+  //   '?' + 종료일 2020 · 앞 공백 ' 2020-09-01' · '미정' · 'TBD' + 종료일 2021 → 연도 줄은 연도마다 한 번(내림차순, 날짜 없음 맨 끝), 같은 연도 안은 지금 정렬 순서.
+  //   표본이 실제로 그 자리를 지나는지(지금 정렬 그대로 늘어놓으면 같은 연도 줄이 두 번)도 함께 본다 — 데이터가 YYYY-MM-DD·빈칸뿐이면 순서는 ②·⑦ 그대로
+  const ODD35 = [
+    { id: 'q22', title: '연도 표본 22', start: '2022-02-02', end: '2022-02-03', status: 'done' },
+    { id: 'q20', title: '연도 표본 20', start: '2020-03-03', end: '2020-03-04', status: 'done' },
+    { id: 'q14', title: '연도 표본 14', start: '2014-05-05', status: 'done' },
+    { id: 'qQ20', title: '연도 표본 물음표 20', start: '?', end: '2020-08-01', status: 'done' },
+    { id: 'qS20', title: '연도 표본 앞 공백 20', start: ' 2020-09-01', end: '', status: 'done' },
+    { id: 'qMJ', title: '연도 표본 미정', start: '미정', end: '', status: 'done' },
+    { id: 'qTB', title: '연도 표본 TBD 21', start: 'TBD', end: '2021-06-01', status: 'done' },
+    { id: 'qNO', title: '연도 표본 날짜 없음', status: 'done' },
+    { id: 'q26', title: '연도 표본 26', start: '2026-02-02', status: 'done' },
+  ];
+  const ODD_Y35 = { q22: 2022, q20: 2020, q14: 2014, qQ20: 2020, qS20: 2020, qMJ: 0, qTB: 2021, qNO: 0, q26: 2026 };
+  const oddOld35 = live35(ODD35).sort(cmp35).filter((r) => r.id !== 'q26');   // 지금 정렬 순서(묶음 쪽 8줄)
+  const tokOf35 = (rows) => { const out = []; let p = null; rows.forEach((o) => { if (o.y !== p) { out.push('#' + (o.y ? o.y + '년' : '날짜 없음')); p = o.y; } out.push(o.id); }); return out; };
+  const naive35 = tokOf35(oddOld35.map((r) => ({ id: r.id, y: ODD_Y35[r.id] })));
+  const want35 = tokOf35(oddOld35.map((r, i) => ({ id: r.id, y: ODD_Y35[r.id], i })).sort((a, b) => (b.y - a.y) || (a.i - b.i)));
+  const OD35 = build35(ODD35); OD35.api.render();
+  const od_35 = { toks: toks35(OD35.host.innerHTML), out: split35(OD35.host.innerHTML).out, head: OD35.head.textContent };
+  const odY35 = od_35.toks.filter((t) => t[0] === '#'), nvY35 = naive35.filter((t) => t[0] === '#');
+  T('v435 ②-4 묶음 안 같은 연도끼리(검토 반영 — 시작일이 "?"·앞 공백·"미정"·"TBD" 같은 글): 연도 줄은 연도마다 한 번 · 내림차순(2022 → 2021 → 2020 → 2014 → 날짜 없음 맨 끝) · 같은 연도 안은 지금 정렬 순서 · 밖은 2026 1줄·머리 "총 9건 (지난 자료 8건 접힘)" · (표본 확인: 지금 정렬 그대로 늘어놓으면 같은 연도 줄이 두 번 나오는 표본·연도 판정이 표와 같음)',
+    JSON.stringify(od_35.toks) === JSON.stringify(want35) && new Set(odY35).size === odY35.length && JSON.stringify(odY35) === '["#2022년","#2021년","#2020년","#2014년","#날짜 없음"]'
+    && JSON.stringify(od_35.out) === '["q26"]' && od_35.head === '총 9건 (지난 자료 8건 접힘)'
+    && new Set(nvY35).size < nvY35.length && live35(ODD35).every((r) => OD35.api.year(r) === ODD_Y35[r.id]),
+    JSON.stringify({ toks: od_35.toks, want: want35, naive: naive35, out: od_35.out, head: od_35.head }));
+
+  // ③ 펼치기 — 머리를 누르면 bindFold가 몸통·class·aria를 바꾸고 펼침을 기억(siteOldOpen), 머리 건수에서 '접힘'이 빠짐. 누를 때 다시 그리지 않는다(밖에 펼쳐 둔 카드가 그대로).
+  //    안쪽 카드도 접기·펴기 · 다시 그려도 펼친 채(안쪽 카드는 종전처럼 다시 접힘) · 다시 누르면 접힘 · 새 앱(새로 켬)은 접힘
+  const oc35 = A35.els.filter((e) => e.attrs['data-site-fold'] === 'n26')[0]; oc35.click();
+  const g1_35 = grpBtn35(A35)[0]; g1_35.click();
+  const bd1_35 = A35.byId['siteOldBd-past'];
+  const s1_35 = { cls: g1_35.className, aria: g1_35.getAttribute('aria-expanded'), disp: bd1_35 ? bd1_35.style.display : 'x', open: A35.api.isOpen(), head: A35.head.textContent, outCard: (A35.byId['siteBd-n26'] || { style: {} }).style.display, same: bd1_35 === bd0_35 };
+  const ib35 = A35.els.filter((e) => e.attrs['data-site-fold'] === 'o23')[0], ibd35 = A35.byId['siteBd-o23'];
+  ib35.click(); const s2_35 = { cls: ib35.className, disp: ibd35.style.display };
+  ib35.click(); const s3_35 = { cls: ib35.className, disp: ibd35.style.display };
+  ib35.click();   // 펼쳐 둔 채 다시 그림 → 안쪽 카드는 다시 접힘(종전 bindFold 규칙)
+  A35.api.render();
+  const g4_35 = grpBtn35(A35)[0], s4_35 = { cls: g4_35.className, aria: g4_35.getAttribute('aria-expanded'), disp: A35.byId['siteOldBd-past'].style.display, head: A35.head.textContent, inner: A35.byId['siteBd-o23'].style.display, html: /<div id="siteOldBd-past">/.test(A35.host.innerHTML) };
+  g4_35.click(); const s5_35 = { open: A35.api.isOpen(), disp: A35.byId['siteOldBd-past'].style.display, head: A35.head.textContent, cls: g4_35.className, aria: g4_35.getAttribute('aria-expanded') };
+  const B35 = build35(S35); B35.api.render();
+  const s6_35 = { open: B35.api.isOpen(), disp: B35.byId['siteOldBd-past'].style.display, head: B35.head.textContent, aria: grpBtn35(B35)[0].getAttribute('aria-expanded') };
+  T('v435 ③ 펼치기(실제 bindFold): 묶음 머리를 누르면 class "asb-hd open"·aria true·몸통 보임·siteOldOpen true·머리 "총 12건"(접힘 글 빠짐) · 누를 때 목록을 다시 그리지 않음(같은 몸통 요소·밖에 펼쳐 둔 카드 그대로) · 묶음 안 카드도 접기·펴기(bindFold가 안쪽에도 붙음) · 다시 그려도 묶음은 펼친 채(앱 켜 있는 동안 기억 — 안쪽 카드는 종전처럼 다시 접힘) · 다시 누르면 접힘·"(지난 자료 7건 접힘)" · 새 앱은 접힘',
+    s1_35.cls === 'asb-hd open' && s1_35.aria === 'true' && s1_35.disp === '' && s1_35.open === true && s1_35.head === '총 12건' && s1_35.outCard === '' && s1_35.same === true
+    && s2_35.cls === 'asb-hd open' && s2_35.disp === '' && s3_35.cls === 'asb-hd' && s3_35.disp === 'none'
+    && s4_35.cls === 'asb-hd open' && s4_35.aria === 'true' && s4_35.disp === '' && s4_35.head === '총 12건' && s4_35.inner === 'none' && s4_35.html === true
+    && s5_35.open === false && s5_35.disp === 'none' && s5_35.head === '총 12건 (지난 자료 7건 접힘)' && s5_35.cls === 'asb-hd' && s5_35.aria === 'false'
+    && s6_35.open === false && s6_35.disp === 'none' && s6_35.head === '총 12건 (지난 자료 7건 접힘)' && s6_35.aria === 'false',
+    JSON.stringify({ s1: s1_35, s2: s2_35, s3: s3_35, s4: s4_35, s5: s5_35, s6: s6_35 }));
+
+  // ④ 검색어 — 있으면 접지 않고 맞는 것을 모두 종전처럼(묶음·연도 줄 없음, 머리 '총 n건'), 지우면 묶음이 돌아옴(펼쳐 뒀으면 펼친 채)
+  const Q35 = build35(S35);
+  Q35.api.render(); grpBtn35(Q35)[0].click();
+  Q35.api.setQ('현장'); Q35.api.render(); const q1_35 = { ids: cardIds35(Q35.host.innerHTML), head: Q35.head.textContent, grp: Q35.host.innerHTML.indexOf('data-site-old-fold') < 0 && Q35.host.innerHTML.indexOf('site-yr') < 0 };
+  Q35.api.setQ(' 아주 옛 '); Q35.api.render(); const q2_35 = { ids: cardIds35(Q35.host.innerHTML), head: Q35.head.textContent, grp: Q35.host.innerHTML.indexOf('data-site-old-fold') < 0, disp: (Q35.byId['siteBd-o13'] || { style: {} }).style.display };
+  Q35.api.setQ('옛'); Q35.api.render(); const q3_35 = { ids: cardIds35(Q35.host.innerHTML), head: Q35.head.textContent, grp: Q35.host.innerHTML.indexOf('data-site-old-fold') < 0 };
+  Q35.api.setQ('없는말'); Q35.api.render(); const q4_35 = { h: Q35.host.innerHTML, head: Q35.head.textContent };
+  Q35.api.setQ(''); Q35.api.render(); const q5_35 = { head: Q35.head.textContent, aria: (grpBtn35(Q35)[0] || { getAttribute: () => null }).getAttribute('aria-expanded'), disp: (Q35.byId['siteOldBd-past'] || { style: {} }).style.display };
+  T('v435 ④ 검색어: 있으면 접지 않음 — "현장"(모두 맞음) 12줄 지금 정렬·머리 "총 12건"·묶음·연도 줄 없음 · " 아주 옛 "(2013년 한 줄) 바로 보임·머리 "총 1건" · "옛" 2024 이하 2줄만 · 맞는 것 없음 = 종전 빈 줄 문구·머리 비움 · 검색어를 지우면 묶음이 돌아오고 펼쳐 둔 상태 그대로',
+    JSON.stringify(q1_35.ids) === JSON.stringify(live35(S35).sort(cmp35).map((r) => r.id)) && q1_35.head === '총 12건' && q1_35.grp
+    && JSON.stringify(q2_35.ids) === '["o13"]' && q2_35.head === '총 1건' && q2_35.grp && q2_35.disp === 'none'
+    && same35(q3_35.ids, ['o23', 'o13']) && q3_35.head === '총 2건' && q3_35.grp
+    && q4_35.h === '<div class="empty-line">해당하는 현장이 없습니다.</div>' && q4_35.head === ''
+    && q5_35.head === '총 12건' && q5_35.aria === 'true' && q5_35.disp === '',
+    JSON.stringify({ q1: q1_35, q2: q2_35, q3: q3_35, q4: q4_35, q5: q5_35 }));
+
+  // ⑤ 종류 거르기만 — 접힘 유지, 묶음 머리·머리 건수는 거른 뒤 건수. 거른 뒤 지난 자료가 없으면 묶음 없음. 거르기 + 검색어 = 접힘 없음
+  const F35 = build35(S35);
+  F35.api.setF('demolition'); F35.api.render(); const f1_35 = { sp: split35(F35.host.innerHTML), head: F35.head.textContent, txt: F35.host.innerHTML.indexOf('<span class="asb-t">지난 자료 · 2024년까지 1건</span>') > 0 };
+  F35.api.setF('dredge'); F35.api.render(); const f2_35 = { sp: split35(F35.host.innerHTML), head: F35.head.textContent };
+  F35.api.setF('asbestos'); F35.api.render(); const f3_35 = { sp: split35(F35.host.innerHTML), head: F35.head.textContent };
+  F35.api.setF('demolition'); F35.api.setQ('시작없음'); F35.api.render(); const f4_35 = { sp: split35(F35.host.innerHTML), head: F35.head.textContent };
+  T('v435 ⑤ 종류 거르기만: 철거 = 머리 "총 2건 (지난 자료 1건 접힘)"·밖 2025 1줄·묶음 "지난 자료 · 2024년까지 1건" · 준설(2025 1줄뿐) = 묶음 없음·"총 1건" · 석면(kind 없는 옛 기록 포함) = "총 9건 (지난 자료 6건 접힘)" · 거르기 + 검색어 = 접힘 없음',
+    f1_35.head === '총 2건 (지난 자료 1건 접힘)' && JSON.stringify(f1_35.sp.out) === '["n25"]' && JSON.stringify(f1_35.sp.inn) === '["o24e"]' && f1_35.txt
+    && f2_35.head === '총 1건' && f2_35.sp.g < 0 && JSON.stringify(f2_35.sp.out) === '["n25e"]'
+    && f3_35.head === '총 9건 (지난 자료 6건 접힘)' && same35(f3_35.sp.out, ['n26', 'n25d', 'n26n']) && same35(f3_35.sp.inn, ['o24', 'o23', 'o13', 'oq', 'on', 'oo'])
+    && f4_35.head === '총 1건' && f4_35.sp.g < 0 && JSON.stringify(f4_35.sp.out) === '["o24e"]',
+    JSON.stringify({ f1: [f1_35.head, f1_35.sp.out, f1_35.sp.inn], f2: [f2_35.head, f2_35.sp.out], f3: [f3_35.head, f3_35.sp.out, f3_35.sp.inn], f4: [f4_35.head, f4_35.sp.out] }));
+
+  // ⑥ 지난 자료만 — 빈 줄 문구 대신 묶음 머리만(밖 카드 0, 목록 첫머리가 묶음) · 줄이 하나도 없으면 종전 빈 줄 문구 그대로
+  const O35 = build35(S35.filter((r) => IN35.indexOf(r.id) >= 0)); O35.api.render();
+  const o1_35 = { h: O35.host.innerHTML, head: O35.head.textContent, sp: split35(O35.host.innerHTML) };
+  const E35 = build35([]); E35.api.render(); const E2_35 = build35([{ id: 'x', title: '지운 옛 줄', start: '2013-01-01', del: 1 }]); E2_35.api.render();
+  T('v435 ⑥ 지난 자료만: 빈 줄 문구 없이 묶음 머리만("지난 자료 · 2024년까지 7건", 접힘) · 머리 "총 7건 (지난 자료 7건 접힘)" · 밖 카드 0 · 목록 첫머리가 묶음 · 줄이 하나도 없으면(빈 대장·지운 줄뿐) 종전 "해당하는 현장이 없습니다."·머리 비움',
+    o1_35.h.indexOf('empty-line') < 0 && o1_35.h.indexOf('<div class="item asb-item site-old"') === 0 && o1_35.sp.out.length === 0 && same35(o1_35.sp.inn, IN35)
+    && o1_35.h.indexOf('<span class="asb-t">지난 자료 · 2024년까지 7건</span>') > 0 && o1_35.head === '총 7건 (지난 자료 7건 접힘)' && O35.byId['siteOldBd-past'].style.display === 'none'
+    && E35.host.innerHTML === '<div class="empty-line">해당하는 현장이 없습니다.</div>' && E35.head.textContent === ''
+    && E2_35.host.innerHTML === '<div class="empty-line">해당하는 현장이 없습니다.</div>' && E2_35.head.textContent === '',
+    JSON.stringify({ h: o1_35.h.slice(0, 120), head: o1_35.head, out: o1_35.sp.out, e: E35.host.innerHTML, e2: E2_35.host.innerHTML }));
+
+  // ⑦ 운영 분포 흉내 — 11/10 08:15 운영 백업 실측(읽기만): 살아있는 159줄 = 2013 3·2014 20·2015 10·2016 15·2017 13·2018 18·2019 14·2020 8·2021 13·2022 8·2023 9·2024 3(= 134)·2025 21·2026 3·날짜 없음 1, 지운 줄 20
+  //    (단계지시 파일 단계지시_v435_c현장접기.json도 135(134 + 1) — 구현에 전달된 계산 글만 136(135 + 1)이었고 합이 160이라 살아있는 159와 맞지 않는다, FEATURES v435)
+  //    표본은 모두 종결(done) — 운영 11/9 08:54 백업 실측도 접히는 135줄·날짜 없는 1줄이 모두 종결이라 종결 규칙(②-3)을 더해도 135/24 그대로
+  const DIST35 = { 2013: 3, 2014: 20, 2015: 10, 2016: 15, 2017: 13, 2018: 18, 2019: 14, 2020: 8, 2021: 13, 2022: 8, 2023: 9, 2024: 3, 2025: 21, 2026: 3 };
+  const P35 = [];
+  Object.keys(DIST35).forEach((y) => { for (let i = 0; i < DIST35[y]; i++) P35.push({ id: 'p' + y + '_' + i, title: '운영 흉내 ' + y + '-' + i, kind: ['asbestos', 'demolition', 'dredge'][i % 3], start: y + '-' + String((i % 12) + 1).padStart(2, '0') + '-' + String((i % 27) + 1).padStart(2, '0'), end: '', status: 'done' }); });
+  P35.push({ id: 'pnone', title: '운영 흉내 날짜 없음', status: 'done' });
+  for (let i = 0; i < 20; i++) P35.push({ id: 'pdel' + i, title: '지운 줄', start: '2026-01-0' + ((i % 9) + 1), del: 1 });
+  const W35 = build35(P35); W35.api.render();
+  const w1_35 = { head: W35.head.textContent, sp: split35(W35.host.innerHTML), yr: toks35(W35.host.innerHTML).filter((t) => t[0] === '#') };
+  T('v435 ⑦ 운영 분포 흉내(11/10 백업 실측 — 살아있는 159줄·지운 20줄): 머리 "총 159건 (지난 자료 135건 접힘)" · 묶음 "지난 자료 · 2024년까지 135건" · 보이는 줄 24(2025년 21 + 2026년 3) · 묶음 안 연도 줄 13개(2024년 → 2013년 → 날짜 없음, 같은 연도 두 번 없음)',
+    w1_35.head === '총 159건 (지난 자료 135건 접힘)' && w1_35.sp.out.length === 24 && w1_35.sp.inn.length === 135 && W35.host.innerHTML.indexOf('<span class="asb-t">지난 자료 · 2024년까지 135건</span>') > 0
+    && JSON.stringify(w1_35.yr) === JSON.stringify(['#2024년', '#2023년', '#2022년', '#2021년', '#2020년', '#2019년', '#2018년', '#2017년', '#2016년', '#2015년', '#2014년', '#2013년', '#날짜 없음'])
+    && w1_35.sp.out.every((id) => /^p202[56]_/.test(id)) && w1_35.sp.inn.indexOf('pnone') === 134,
+    JSON.stringify({ head: w1_35.head, out: w1_35.sp.out.length, inn: w1_35.sp.inn.length, yr: w1_35.yr }));
+
+  // ⑧ 상수 하나 — 소스 사본에서 SITE_OLD_BEFORE를 2026으로 바꾸면 2025년 줄도 묶음으로 가고 머리가 '2025년까지'(경계는 이 상수 하나뿐인지)
+  const src26_35 = html.replace(/\n  var SITE_OLD_BEFORE = \d+;\n/, '\n  var SITE_OLD_BEFORE = 2026;\n');
+  const K35 = build35(S35, { src: src26_35 }); K35.api.render();
+  const k1_35 = { head: K35.head.textContent, sp: split35(K35.host.innerHTML), yr: toks35(K35.host.innerHTML).filter((t) => t[0] === '#') };
+  T('v435 ⑧ 상수 하나(소스 사본 SITE_OLD_BEFORE 2026 실행): 2025년 줄(시작일·종료일만·"2025.03")도 묶음 — 머리 "총 12건 (지난 자료 10건 접힘)"·묶음 "지난 자료 · 2025년까지 10건"·밖은 2026년 2줄 · 연도 줄 2025년이 맨 앞 · (사본은 실제로 바뀐 글)',
+    src26_35 !== html && k1_35.head === '총 12건 (지난 자료 10건 접힘)' && same35(k1_35.sp.out, ['n26', 'n26n']) && same35(k1_35.sp.inn, ['n25', 'n25e', 'n25d'].concat(IN35))
+    && K35.host.innerHTML.indexOf('<span class="asb-t">지난 자료 · 2025년까지 10건</span>') > 0 && k1_35.yr[0] === '#2025년' && k1_35.yr.length === 5,
+    JSON.stringify(k1_35));
+
+  // ⑨ 정적 — 상수는 2025(PM '25년 이전') 한 곳 · 펼침 기억은 메모리(선언 false · renderSites 밖에서 안 씀 · 저장소 0) · 세 이름은 renderSites 밖에서 안 씀(현황·캘린더·계약 연결·전역 검색 무변)
+  //    · bindFold 순서(카드 → 묶음 → 펼침 기억·머리 건수) · 검색어가 있으면 가르지 않는 갈래 · CSS(묶음 화살표 ▸/▾·감싸개 :active·연도 줄)
+  //    세는 글은 주석을 걷은 글(v433 htmlNC33과 같은 줄 주석 규칙 + <style> 안 /* */) — 주석 속 이름 언급은 쓰임이 아니다
+  const ncJs35 = (s) => s.split('\n').map((ln) => ln.replace(/(^|[^:"'])\/\/.*$/, '$1')).join('\n');
+  const stEnd35 = html.indexOf('</style>');
+  const htmlNC35 = html.slice(0, stEnd35).replace(/\/\*[\s\S]*?\*\//g, '') + ncJs35(html.slice(stEnd35));
+  const rs35 = fn35(html, 'renderSites'), rsNC35 = ncJs35(rs35), out35 = htmlNC35.split(rsNC35).join('');
+  const cnt35 = (s, re) => (s.match(re) || []).length;
+  const iB1_35 = rs35.indexOf('bindFold(host, "data-site-fold", "siteBd-");'), iB2_35 = rs35.indexOf('bindFold(host, "data-site-old-fold", "siteOldBd-");'), iL_35 = rs35.indexOf('siteOldOpen = b.getAttribute("aria-expanded")==="true";');
+  const CSS35 = ['\n  .site-old:active{background:transparent;}\n', '\n  .asb-hd[data-site-old-fold] .sec-caret{transform:rotate(-90deg);}\n', '\n  .asb-hd.open[data-site-old-fold] .sec-caret{transform:none;}\n', '\n  .site-yr{'];
+  T('v435 ⑨ 정적: var SITE_OLD_BEFORE = 2025 한 곳 · var siteOldOpen = false 한 곳 · SITE_OLD_BEFORE·siteOldOpen은 선언 밖에서 renderSites만, siteYear( 는 정의 밖에서 renderSites만(현황·캘린더·계약 연결 무변) · renderSites에 저장소·저장·서버 호출 0 · 검색어 있으면 가르지 않는 갈래 · bindFold 카드 → 묶음 → 펼침 기억·머리 건수 순 · CSS 4줄(감싸개 :active 끔·접힘 ▸ rotate(-90deg)·펼침 ▾·연도 줄)',
+    cnt35(html, /\n  var SITE_OLD_BEFORE = 2025;\n/g) === 1 && cnt35(html, /\bvar SITE_OLD_BEFORE\b/g) === 1 && cnt35(html, /\n  var siteOldOpen = false;\n/g) === 1 && cnt35(html, /\bvar siteOldOpen\b/g) === 1
+    && htmlNC35.indexOf(rsNC35) > 0 && cnt35(out35, /\bSITE_OLD_BEFORE\b/g) === 1 && cnt35(out35, /\bsiteOldOpen\b/g) === 1 && cnt35(out35, /\bsiteYear\(/g) === 1 && cnt35(rsNC35, /\bsiteYear\(/g) === 2
+    && !/localStorage|sessionStorage|schedule\w*Save|doSave\w*\(|gwCall\(/.test(rsNC35)
+    && /\n    if\(!q\)\{ cur=\[\];/.test(rs35) && cnt35(rsNC35, /\bcur=\[\]/g) === 1
+    && iB1_35 > 0 && iB2_35 > iB1_35 && iL_35 > iB2_35 && rsNC35.indexOf('renderSites(', 10) < 0
+    && CSS35.every((s) => html.indexOf(s) > 0) && html.indexOf('.asb-hd.open .sec-caret{transform:rotate(180deg);}') > 0,
+    JSON.stringify({ decl: cnt35(html, /\bvar SITE_OLD_BEFORE\b/g), outC: cnt35(out35, /\bSITE_OLD_BEFORE\b/g), outO: cnt35(out35, /\bsiteOldOpen\b/g), outY: cnt35(out35, /\bsiteYear\(/g), b: [iB1_35, iB2_35, iL_35], css: CSS35.map((s) => html.indexOf(s) > 0) }));
+
+  // ⑩ 문서 — MANUAL 28절 '자주 하는 일' 1번 한 줄(문장 고정) · FEATURES 기준 ≥ v435·v435 절·§7 안전 줄 · TESTLIST v435(체크 칸 전부 AI 몫 — 화면 칸 '(AI 시험 화면 대상', PM 0, 게이트 칸 [x]) · CLAUDE.md 안전 탭 줄 · sw ≥ 435
+  const man35 = rd35('MANUAL.html'), ft35 = rd35('FEATURES.md'), tl35 = rd35('TESTLIST.md'), cl35 = rd35('CLAUDE.md'), sw35 = rd35('sw.js');
+  const m28_35 = (() => { const i = man35.indexOf('<h2 id="s28">'); return i < 0 ? '' : man35.slice(i, man35.indexOf('<h3 id="s28-1">', i)); })();
+  const MAN35 = '<li>위쪽 <b>전체 / 석면 / 철거 / 준설</b> 버튼과 검색칸(공사명·발주처·소재지)으로 현장을 찾습니다. <b>지난 자료(2024년까지)</b> 묶음은 기본으로 접혀 있습니다 — 종결된 현장 중 시작일(없으면 종료일)이 2024년까지이거나 날짜가 없는 현장은 목록 맨 아래 한 줄로 모이고(예정·작업중 현장은 날짜와 상관없이 위에 그대로), 그 줄을 누르면 펼쳐집니다(앱을 다시 켜면 다시 접힘). 찾을 때는 검색칸에 넣으면 접힘 없이 모두 나옵니다(2026-11 v435).</li>';
+  const ftv35 = (() => { const i = ft35.indexOf('\n### v435 (11/10)'); if (i < 0) return ''; const j = ft35.indexOf('\n### ', i + 5); return ft35.slice(i, j < 0 ? ft35.length : j); })();
+  const ft7_35 = ft35.split('\n').filter((ln) => ln.indexOf('- **안전**(v428') === 0)[0] || '';
+  const tlv35 = (() => { const i = tl35.indexOf('\n## v435'); if (i < 0) return ''; const j = tl35.indexOf('\n## ', i + 5); return tl35.slice(i, j < 0 ? tl35.length : j); })();
+  const cb35 = tlv35.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), cbNotAi35 = cb35.filter((l) => !/^\s*[-*+] \[[ xX]\] \(AI[ 가)]/.test(l)), cbPM35 = cb35.filter((l) => /PM/.test(l));
+  const cbScr35 = cb35.filter((l) => /^- \[[ x]\] \(AI 시험 화면 대상/.test(l));
+  const clSafe35 = cl35.split(/\r?\n/).filter((l) => l.indexOf('- **안전(safety) 탭**') === 0)[0] || '';
+  //   낱말만 보면 다른 문장에 남은 같은 낱말로 통과한다(결함 심기에서 실측 숫자 135 → 136·CLAUDE.md 문장 지움이 낱말 검사를 지났다) — 실측 문장·규칙 문장을 통째 고정
+  //   검토 반영(11/10): FEATURES v435 절은 낱말 9개·실측 문장 1개만 보아 동작을 거꾸로 적어도(기본 펼침·기기에 저장·검색어 있어도 접음·거르기면 접힘 풀림) 통과했고,
+  //   TESTLIST는 화면 칸 '3개 이상'만 보아 칸 하나를 지우거나 순서를 뒤집어도, CLAUDE.md는 '세 이름 밖 0' 규칙 문장을 지워도 통과했다 — 동작 문장·화면 칸 머리·칸 수·규칙 문장을 문장째 고정
+  const FT_PINS35 = [
+    '살아있는 159줄 = 2013~2024 134 + 날짜 없음 1 → **135건 접힘**, 2025년 21 + 2026년 3 = 24줄 보임',
+    "경계는 상수 `SITE_OLD_BEFORE = 2025` 하나 — **종결(done)된 줄** 중 이 해보다 이른 연도와 날짜 없음이 '지난 자료'",
+    "종결이 아닌 줄(예정·작업중 — 상태 칸이 없으면 카드도 '예정')은 연도·날짜 없음과 상관없이 위에 그대로 둔다",
+    '기본 접힘, 누르면 펼쳐 지금과 같은 현장 카드가 나온다',
+    '묶음 안은 지금 정렬(최신 먼저) 그대로 같은 연도끼리 모으고',
+    '펼침은 `siteOldOpen`(메모리만 — 앱을 켜 있는 동안은 다시 그려도 펼친 채, 저장하지 않아 앱을 다시 켜면 접힘)',
+    '묶음 머리를 누를 때는 목록을 다시 그리지 않고 머리 건수만 고친다',
+    '검색어(siteQ)가 있으면 가르지 않고 맞는 것을 모두 종전처럼 보인다',
+    '종류 거르기(siteFilter)만 있으면 접힘 유지·건수는 거른 뒤',
+    "단계지시 파일은 '135건(2013~2024 134 + 날짜 없음 1)'이고, 구현에 전달된 계산 글만 '136건(2013~2024 135 + 날짜 없음 1)'이었다",
+    '②-2 고정이 v434(c1cc9b1) renderSites로 뽑아 고정한 카드 3장',
+  ];
+  const FT7_PIN35 = "v435부터 종결된 줄 중 시작일(없으면 종료일)이 2024년까지이거나 날짜 없는 줄은 목록 맨 아래 '지난 자료' 한 묶음에 기본 접힘(예정·작업중은 위에 그대로), 검색어가 있으면 접지 않음";
+  //   TESTLIST 화면 칸 6개 — 이 순서로 칸마다 머리 하나(김정아는 11/10부터 안전 보기라 정재욱(안전 없음)과 따로 — 검토 반영)
+  const TL_HEADS35 = ['관리자형:', '검색·종류 칩:', '김정아·권민지형(안전 보기/수행 + 현장 수행', '정재욱형(현장 수행·안전 없음):', '진행 현장은 접지 않음:', '다른 곳 그대로: 현황 ③'];
+  const TL_PINS35 = ['2024년 → 2013년 → 날짜 없음 순으로', "'지난 자료 · 2024년까지 135건'", "'총 159건 (지난 자료 135건 접힘)'", '375px', '특별교육 줄은 앱이 교육 기록으로 판정(asbNoSpecial', "날짜 칸을 비운 '예정' 현장을 저장하면"];
+  const CL_PINS35 = ['종결(done)된 줄 중 `siteYear`(시작일 앞 네 자리 → 없으면 종료일 → 둘 다 없으면 0 = 날짜 없음)가 `SITE_OLD_BEFORE`(2025 — 경계는 이 상수 하나)보다 이르거나 0인 줄을 목록 맨 아래 한 묶음',
+    "종결이 아닌 줄(예정·작업중·상태 칸 없음 — 카드 '예정', 특별교육 줄·현황 ③도 같은 판정)은 연도와 상관없이 위에 둔다",
+    '펼침 `siteOldOpen`은 메모리만(저장 금지 — 앱을 다시 켜면 접힘, 머리를 누를 때는 다시 그리지 않음), 검색어가 있으면 가르지 않는다.',
+    '세 이름은 renderSites 밖에서 쓰지 않는다(현황·캘린더·계약 연결 무변 — uismoke v435 ⑨)',
+    '②-2 고정이 v434(c1cc9b1)에서 뽑아 고정한 카드 3장과 글자째 대조'];
+  const tlHeadOk35 = cbScr35.length === TL_HEADS35.length && TL_HEADS35.every((h, i) => cbScr35[i].indexOf(h) > 0 && cbScr35.filter((l) => l.indexOf(h) > 0).length === 1);
+  T('v435 ⑩ 문서: MANUAL 28절 "자주 하는 일" 1번 = 찾기 문장 + 지난 자료(2024년까지) 기본 접힘·종결된 현장만·예정·작업중은 위에 그대로·맨 아래 한 줄·다시 켜면 접힘·찾을 때 검색칸(문장 고정) · FEATURES 기준 ≥ v435·v435 절(낱말 + 문장 11 고정 — 실측 159줄 = 134 + 1 → 135건 접힘·24줄 보임 / 종결 줄만·진행 줄은 위 / 기본 접힘 / 같은 연도끼리 / 펼침 메모리만 / 누를 때 다시 그리지 않음 / 검색어면 가르지 않음 / 거르기는 접힘 유지·거른 뒤 건수 / 건수 메모 135·136 / ②-2 고정)·§7 안전 줄(문장 고정) · TESTLIST v435 체크 칸 전부 AI 몫(화면 칸 정확히 6개 — 관리자형·검색·종류 칩·김정아·권민지형·정재욱형·진행 현장·다른 곳 그대로 순, PM 0, 게이트 칸 [x] uismoke, 연도 순서 문장 고정) · CLAUDE.md 안전 탭 줄(규칙 문장 5 고정 — 종결 줄만 판정·진행 줄은 위·펼침 메모리만·세 이름 renderSites 밖 0·②-2 고정) · sw ≥ 435',
+    m28_35.indexOf(MAN35) > 0
+    && Number((ft35.match(/기준: v(\d+) /) || [0, 0])[1]) >= 435 && ftv35.length > 0
+    && ['`siteYear(r)`', '`SITE_OLD_BEFORE = 2025`', '`siteOldOpen`', "'지난 자료 · 2024년까지 n건'", "' (지난 자료 m건 접힘)'", '검색어', '135건 접힘', 'uismoke v435', '`renderSites`'].every((w) => ftv35.indexOf(w) > 0) && FT_PINS35.every((s) => ftv35.indexOf(s) > 0)
+    && ft7_35.indexOf(FT7_PIN35) > 0
+    && tlv35.length > 0 && cb35.length >= 7 && cbNotAi35.length === 0 && cbPM35.length === 0 && tlv35.indexOf('PM 몫') < 0 && tlHeadOk35 && cb35.some((l) => /^- \[x\] \(AI\) `uismoke`/.test(l))
+    && TL_PINS35.every((w) => tlv35.indexOf(w) > 0)
+    && ['v435', '`SITE_OLD_BEFORE`', '`siteOldOpen`', 'uismoke v435'].every((w) => clSafe35.indexOf(w) > 0) && CL_PINS35.every((s) => clSafe35.indexOf(s) > 0)
+    && Number((sw35.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 435,
+    JSON.stringify({ m28: m28_35.length, man: m28_35.indexOf(MAN35), ftv: ftv35.length, ftMiss: FT_PINS35.filter((s) => ftv35.indexOf(s) < 0).map((s) => s.slice(0, 30)), ft7: ft7_35.indexOf(FT7_PIN35), tl: tlv35.length, cb: cb35.length, notAi: cbNotAi35.map((l) => l.slice(0, 40)), pm: cbPM35.map((l) => l.slice(0, 40)), scr: cbScr35.map((l) => l.slice(0, 50)), tlMiss: TL_PINS35.filter((w) => tlv35.indexOf(w) < 0), clMiss: CL_PINS35.filter((s) => clSafe35.indexOf(s) < 0).map((s) => s.slice(0, 30)) }));
+} catch (e) { console.log('  (v435 검사 생략 — ' + e.message + ')'); fails++; }
 
 try {
   const fdir = join(ROOT, 'netlify', 'functions');
