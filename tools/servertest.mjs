@@ -7155,4 +7155,277 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   } finally { reset87(); }
 }
 
+// 86 체크 29 월말명세서 1단계 판①(gw-stmt.js·_lib/stmt.js — 시안 v2, PM 11/10 18:13 '추천대로 ㄱ' · 11/10 독립 검토 2관점 34건 반영): 권한(관리자 수행 · perms.stmt do/view · 값 없으면 숨김 · 기기 승인 먼저 · 퇴사) /
+//    거래처 목록(시드 12곳·낙관락·지우기·묶음 바꾸기 금지·NO_CHANGE) / 저장 정리(월 밖 날짜·개인정보 꼴·없는 거래처·없는 차량·낡은 base) · 서버 검산 · 확정·전달 막기(NOT_BALANCED) ·
+//    초안 짝(DRAFT_EXISTS·DRAFT_ON_FINAL)·확정 때·확정 뒤 고칠 때 간극 1줄·확정 풀 때 reopen(값 없음·해시 체인·깨진 기록은 안 덮음) · 월 색인(부가세 포함 한 기준)·다시 만들기(접두어) ·
+//    되돌리기(한 판·초안까지) · 차량 별칭(정규화·끝 4자리 감사) · 차량별 이력(확정분만) · 차량 대조(veh 권한) · 잔액형 4칸 · 읽기 실패면 덮지 않음 · 순수 규칙 경계(허용 오차·세 기준·소수 자릿수·객체 오염)
+{
+  const gws86 = require(join(FN, 'gw-stmt.js'));
+  const S86 = require(join(FN, '_lib/stmt.js'));
+  const zlib86 = require('zlib');
+  async function cs86(body, tok, dev, raw) {
+    const r = await gws86.handler(raw || { httpMethod: 'POST', headers: Object.assign({ authorization: tok ? 'Bearer ' + tok : '' }, dev ? { 'x-device-id': dev } : {}), body: JSON.stringify(body) });
+    return { code: r.statusCode, body: JSON.parse(r.body || '{}') };
+  }
+  const keep86 = {}; Object.keys(mem.gw_data).forEach((k) => { if (/^(stmt:|stmtidx:|clog:stmt:)/.test(k)) keep86[k] = mem.gw_data[k]; });
+  const vehKeep86 = mem.gw_data['col:vehicles'];
+  const savedUsers86 = Object.assign({}, mem.gw_users);
+  const audit86 = auditMock.logs.length;
+  try {
+    // 차량 목록 표본(저장·별칭은 목록에 있는 id만 받음) — veh_a·veh_b(시험 줄) + 대조 표본 7대(⑫)
+    mem.gw_data['col:vehicles'] = { schema: 1, items: [
+      { id: 'veh_a', no: '11가0001', own: '자차', state: '운행', type: '덤프', note: '' },
+      { id: 'veh_b', no: '22나0002', own: '지입', state: '운행', type: '트랙터', note: '' },
+      { id: 'v12가1111', no: '12가1111', own: '자차', state: '운행', type: '덤프', driver: '기사갑', insurer: '보험사', note: '' },
+      { id: 'v34나2222', no: '56다3333(구2222)', own: '자차', state: '운행', type: '덤프', driver: '기사을', insurer: '', note: '' },
+      { id: 'v78라7900', no: '91마4444', own: '자차', state: '운행', type: '카고트럭', driver: '', insurer: '', note: '번호 바뀜' },
+      { id: 'v55바5555', no: '55바5555', own: '지입', state: '운행', type: '트랙터', driver: '차주병', insurer: '', note: '구 8419' },
+      { id: 'v66사6666', no: '66사6666', own: '자차', state: '운행', type: '덤프', note: '' },
+      { id: 'v77아6666', no: '77아6666', own: '자차', state: '매각', type: '덤프', note: '' },
+      { id: 'v88자8888', no: '88자8888', own: '자차', state: '운행', type: '덤프', note: '', del: 1 }
+    ] };
+    const V86 = { id: 'uview86', name: '보기86', admin: false, perms: { stmt: 'view' } };
+    const D86 = { id: 'udo86', name: '수행86', admin: false, perms: { stmt: 'do' } };
+    const NV86 = { id: 'unoveh86', name: '차량숨김86', admin: false, perms: { stmt: 'view', veh: 'hide' } };
+    const RT86 = { id: 'uret86', name: '퇴사86', admin: false, perms: { stmt: 'do' }, leave_date: '2020-01-01' };
+    mem.gw_users['member:uview86'] = V86; mem.gw_users['member:udo86'] = D86; mem.gw_users['member:unoveh86'] = NV86; mem.gw_users['member:uret86'] = RT86;
+    const tV86 = issueSession(V86).token, tD86 = issueSession(D86).token, tNV86 = issueSession(NV86).token, tRT86 = issueSession(RT86).token;
+    // ① 권한 — 모르는 동작 400(로그인 전) · 비로그인 401 · 퇴사 401 · 기기 미승인 403(권한보다 먼저 — 숨김 회원도) · stmt 값 없음 = 숨김 · 보기 = 읽기만(쓰기 5종 전부 NO_WRITE) · 수행 200
+    const p86 = [await cs86({ action: 'nope' }, tokA), await cs86({ action: 'stmt_cfg_get' }, null), await cs86({ action: 'stmt_cfg_get' }, tRT86, 'dev1'),
+      await cs86({ action: 'stmt_cfg_get' }, tD86), await cs86({ action: 'stmt_cfg_get' }, tokW), await cs86({ action: 'stmt_cfg_get' }, tokW, 'dev1'),
+      await cs86({ action: 'stmt_cfg_get' }, tV86, 'dev1'), await cs86({ action: 'stmt_cfg_get' }, tD86, 'dev1')];
+    const vw86 = [];
+    for (const a of ['stmt_cfg_set', 'stmt_save', 'stmt_revert', 'stmt_reindex', 'stmt_alias_set']) vw86.push((await cs86({ action: a, ym: '2026-10', vk: 'v05', base: 0 }, tV86, 'dev1')).body.error_code);
+    T('86 ① 월말명세서 권한: 모르는 동작 400 · 비로그인 401 · 퇴사 401 · 기기 미승인 403 DEVICE_NOT_APPROVED(수행·숨김 회원 모두 — 권한보다 먼저) · stmt 값 없는 직원 403 NO_ACCESS(PERM_CLOSED에 기대지 않음) · 보기 = 읽기 200·쓰기 5종 NO_WRITE · 수행 200',
+      p86[0].code === 400 && p86[0].body.error_code === 'UNKNOWN_ACTION' && p86[1].code === 401 && p86[2].code === 401 && p86[3].code === 403 && p86[3].body.error_code === 'DEVICE_NOT_APPROVED'
+      && p86[4].code === 403 && p86[4].body.error_code === 'DEVICE_NOT_APPROVED' && p86[5].code === 403 && p86[5].body.error_code === 'NO_ACCESS' && p86[6].code === 200 && p86[7].code === 200
+      && vw86.every((x) => x === 'NO_WRITE'),
+      p86.map((x) => x.code + '/' + (x.body.error_code || '')).join(' ') + ' · ' + vw86.join(','));
+    // ② 거래처 목록 — 시드 12곳 · 낡은 base 409 · 더하기 200 · 지우기 VENDOR_REMOVED · 묶음 바꾸기 GROUP_LOCKED · 같은 값 NO_CHANGE · 이름 바꾸면 감사 'a→b' · 설정 읽기 실패 = 500(시드로 그리지 않음)
+    const c86 = await cs86({ action: 'stmt_cfg_get' }, tokA);
+    const seed86 = c86.body.vendors || [];
+    const add86 = seed86.concat([{ vk: 'v13', name: '새주유소', group: 'veh', kind: 'fuel', basis: 'total', hint: ['새주유'] }]);
+    const stale86 = await cs86({ action: 'stmt_cfg_set', vendors: add86, base: 5 }, tokA);
+    const set86 = await cs86({ action: 'stmt_cfg_set', vendors: add86, base: 0 }, tokA);
+    const rm86 = await cs86({ action: 'stmt_cfg_set', vendors: seed86, base: set86.body.updated_at }, tokA);
+    const grp86 = await cs86({ action: 'stmt_cfg_set', vendors: set86.body.vendors.map((v) => v.vk === 'v05' ? Object.assign({}, v, { group: 'tool' }) : v), base: set86.body.updated_at }, tokA);
+    const nc86 = await cs86({ action: 'stmt_cfg_set', vendors: set86.body.vendors, base: set86.body.updated_at }, tokA);
+    const ren86 = await cs86({ action: 'stmt_cfg_set', vendors: set86.body.vendors.map((v) => v.vk === 'v13' ? Object.assign({}, v, { name: '새주유소2' }) : v), base: set86.body.updated_at }, tokA);
+    const renAud86 = auditMock.logs.slice(audit86).filter((x) => x.col === 'stmt' && x.ev[0].op === '명세서거래처').map((x) => x.ev[0].t);
+    blobsMock.hooks.failGet = (k) => k === 'stmt:cfg';
+    const cf86 = await cs86({ action: 'stmt_cfg_get' }, tokA);
+    blobsMock.hooks.failGet = null;
+    T('86 ② 거래처 목록: 시드 12곳(veh 9·tool 3 · v05 basis total · v01·v10·v11 잔액형) · 낡은 base 409 · v13 더함 200(prev 없음) · 지우기 VENDOR_REMOVED · 묶음 바꾸기 GROUP_LOCKED · 같은 값 NO_CHANGE · 이름 바꾸기 200·감사 "v13 새주유소→새주유소2" · 읽기 실패 500',
+      c86.code === 200 && c86.body.seeded === true && c86.body.updated_at === 0 && seed86.length === 12 && seed86.filter((v) => v.group === 'veh').length === 9 && seed86.filter((v) => v.group === 'tool').length === 3
+      && seed86[4].vk === 'v05' && seed86[4].basis === 'total' && ['v01', 'v10', 'v11'].every((vk) => seed86.find((v) => v.vk === vk).carry === true)
+      && stale86.code === 409 && set86.code === 200 && set86.body.vendors.length === 13 && rm86.body.error_code === 'VENDOR_REMOVED' && grp86.body.error_code === 'GROUP_LOCKED'
+      && nc86.body.error_code === 'NO_CHANGE' && ren86.code === 200 && renAud86.some((t) => t.indexOf('v13 새주유소→새주유소2') >= 0) && cf86.code === 500,
+      JSON.stringify([c86.code, seed86.length, stale86.code, set86.code, rm86.body.error_code, grp86.body.error_code, nc86.body.error_code, ren86.code, cf86.code]));
+    // ③ 저장 정리 — 월 밖 날짜(at) · 비고 휴대폰 PII · 없는 거래처 · 키 꼴 · 월 꼴 · 낡은 base · 목록에 없는 차량 UNKNOWN_VEH · '__proto__' 차량 BAD_VEH · 숫자만 줄 id BAD_RID · 천 단위 아닌 쉼표 BAD_MONEY — 아무것도 안 씀
+    const row86 = (o) => Object.assign({ date: '2026-10-01', veh: 'veh_a', vraw: '5288', item: '초저유황경유', kind: 'fuel', qty: '100', unit: '1650', amt: 165000, how: 'ocr' }, o);
+    const e86 = [await cs86({ action: 'stmt_save', ym: '2026-10', vk: 'v05', base: 0, rows: [row86({}), row86({ date: '2026-09-30' })] }, tokA),
+      await cs86({ action: 'stmt_save', ym: '2026-10', vk: 'v05', base: 0, rows: [row86({ note: '기사 010-1234-5678' })] }, tokA),
+      await cs86({ action: 'stmt_save', ym: '2026-10', vk: 'v99', base: 0, rows: [] }, tokA),
+      await cs86({ action: 'stmt_save', ym: '2026-10', vk: '대송', base: 0, rows: [] }, tokA),
+      await cs86({ action: 'stmt_save', ym: '2026-13', vk: 'v05', base: 0, rows: [] }, tokA),
+      await cs86({ action: 'stmt_save', ym: '2026-10', vk: 'v05', base: 7, rows: [] }, tokA),
+      await cs86({ action: 'stmt_save', ym: '2026-10', vk: 'v05', base: 0, rows: [row86({ veh: 'veh_zz' })] }, tokA),
+      await cs86({ action: 'stmt_save', ym: '2026-10', vk: 'v05', base: 0, rows: [row86({ veh: '__proto__' })] }, tokA),
+      await cs86({ action: 'stmt_save', ym: '2026-10', vk: 'v05', base: 0, rows: [row86({ r: '01012345678' })] }, tokA),
+      await cs86({ action: 'stmt_save', ym: '2026-10', vk: 'v05', base: 0, rows: [row86({ amt: '1,2,3,4' })] }, tokA)];
+    T('86 ③ 저장 정리: ROW_MONTH(at 1) · PII_1 · UNKNOWN_VENDOR · BAD_VK · BAD_YM · 409 · 목록에 없는 차량 UNKNOWN_VEH · __proto__ BAD_VEH · 숫자 줄 id BAD_RID · "1,2,3,4" BAD_MONEY — 저장 0',
+      e86[0].body.error_code === 'ROW_MONTH' && e86[0].body.at === 1 && e86[1].body.error_code === 'PII_1' && e86[2].body.error_code === 'UNKNOWN_VENDOR' && e86[3].body.error_code === 'BAD_VK'
+      && e86[4].body.error_code === 'BAD_YM' && e86[5].code === 409 && e86[6].body.error_code === 'UNKNOWN_VEH' && e86[7].body.error_code === 'BAD_VEH' && e86[8].body.error_code === 'BAD_RID'
+      && e86[9].body.error_code === 'BAD_MONEY' && !mem.gw_data['stmt:2026-10:v05'] && ({}).fuel === undefined,
+      e86.map((x) => x.code + '/' + x.body.error_code).join(' '));
+    // ④ 초안 짝 + 작성 중 저장 → 서버 검산(셋째 줄 차량 없음) · 색인 한 줄 · 확정·전달 막기 NOT_BALANCED(검산 결과 같이) · 초안 다시 = DRAFT_EXISTS · 확정 요청에 초안 = DRAFT_ON_FINAL
+    const draft86 = [row86({ r: 'd1' }), row86({ r: 'd2', date: '2026-10-02', veh: 'veh_b', vraw: '7900', qty: '50.5', amt: 83325 }), row86({ r: 'd3', date: '2026-10-03', veh: '', vraw: '1234', item: '요소수', kind: 'urea', qty: '2', unit: '10000', amt: 20000 })];
+    const inv86 = { date: '2026-10-31', supply: 243932, vat: 24393, total: 268325 };
+    const s1 = await cs86({ action: 'stmt_save', ym: '2026-10', vk: 'v05', base: 0, rows: draft86, draft_rows: draft86, inv: inv86, stated: '268,325', src: [{ kind: 'scan', name: 'C:\\x\\대송ic주유소-26.10.pdf', pages: 3 }, { kind: 'scan', name: '20261102094123.pdf', pages: 1 }] }, tD86, 'dev1');
+    const at1 = s1.body.doc && s1.body.doc.updated_at;
+    const ix1 = mem.gw_data['stmtidx:2026-10'];
+    const dn1 = await cs86({ action: 'stmt_save', ym: '2026-10', vk: 'v05', base: at1, rows: draft86, inv: inv86, stated: 268325, status: 'done' }, tD86, 'dev1');
+    const sn1 = await cs86({ action: 'stmt_save', ym: '2026-10', vk: 'v05', base: at1, rows: draft86, inv: inv86, stated: 268325, status: 'sent' }, tD86, 'dev1');
+    const dx1 = await cs86({ action: 'stmt_save', ym: '2026-10', vk: 'v05', base: at1, rows: draft86, draft_rows: draft86 }, tD86, 'dev1');
+    const df1 = await cs86({ action: 'stmt_save', ym: '2026-10', vk: 'v05', base: at1, rows: draft86, draft_rows: draft86, redraft: true, status: 'done' }, tD86, 'dev1');
+    T('86 ④ 작성 중 저장 200(초안 3줄·how ocr 3 · 파일 이름 경로 뺌·긴 숫자 … · 명세 합계 "268,325" 받음 · 검산: 셋째 줄 veh 붉음, 합계 = 계산서 = 명세 합계) · 색인 v05 줄 3·붉음 1 · 확정·전달 400 NOT_BALANCED + checks · DRAFT_EXISTS · 확정 요청 초안 DRAFT_ON_FINAL',
+      s1.code === 200 && s1.body.doc.draft.rows.length === 3 && s1.body.doc.draft.how.ocr === 3 && s1.body.doc.src[0].name === '대송ic주유소-26.10.pdf' && s1.body.doc.src[1].name === '….pdf'
+      && s1.body.doc.stated === 268325 && s1.body.doc.status === 'doing' && s1.body.checks.ok === false && s1.body.checks.bad.length === 1 && s1.body.checks.bad[0].r === 'd3' && s1.body.checks.bad[0].why[0] === 'veh'
+      && s1.body.checks.inv_diff === 0 && s1.body.checks.stated_diff === 0 && s1.body.doc.rows[1].qd === 1 && s1.body.idx === true && ix1 && ix1.vendors.v05.rows === 3 && ix1.vendors.v05.bad === 1
+      && dn1.code === 400 && dn1.body.error_code === 'NOT_BALANCED' && dn1.body.checks.bad.length === 1 && sn1.body.error_code === 'NOT_BALANCED'
+      && dx1.body.error_code === 'DRAFT_EXISTS' && df1.body.error_code === 'DRAFT_ON_FINAL' && mem.gw_data['stmt:2026-10:v05'].updated_at === at1,
+      JSON.stringify({ s1: [s1.code, s1.body.error_code, s1.body.checks && s1.body.checks.bad], dn1: dn1.body.error_code, sn1: sn1.body.error_code, dx1: dx1.body.error_code, df1: df1.body.error_code }));
+    // ⑤ 사람이 고침(셋째 줄 차량 고름·둘째 줄 품목 글) → 확정 200 → 간극(문서에서 셈): 읽기 18 중 1(번호 글 vraw 포함) · 차량 2 중 0(초안 빈 칸은 분모 밖) · 종류 3 중 0 · clog 1줄 final(값 없음)
+    const fin86 = draft86.map((x) => Object.assign({}, x)); fin86[2].veh = 'veh_a'; fin86[1].item = '경유';
+    const s2 = await cs86({ action: 'stmt_save', ym: '2026-10', vk: 'v05', base: at1, rows: fin86, inv: inv86, stated: 268325, status: 'done' }, tD86, 'dev1');
+    const cl86 = mem.gw_data['clog:stmt:2026-10'];
+    const g86 = await cs86({ action: 'stmt_gap', ym: '2026-10' }, tV86, 'dev1');
+    const gv = g86.body.vendors && g86.body.vendors.v05;
+    const clogTxt = JSON.stringify(cl86 || {});
+    T('86 ⑤ 확정 200(checks ok · draft 보존) → clog 1줄 op final(값 없음) · 간극 요약(보기 권한, 문서에서 셈): 읽기 18 중 1 · 차량 2 중 0 · 종류 3 중 0 · 줄 3/3 · chain_ok',
+      s2.code === 200 && s2.body.checks.ok === true && s2.body.doc.status === 'done' && s2.body.doc.draft.rows[2].veh === '' && s2.body.gap === true
+      && cl86 && cl86.items.length === 1 && cl86.items[0].op === 'final' && clogTxt.indexOf('165000') < 0 && clogTxt.indexOf('경유') < 0 && cl86.items[0].changed.read === 1
+      && g86.code === 200 && gv && gv.filled.read === 18 && gv.changed.read === 1 && gv.filled.veh === 2 && gv.changed.veh === 0 && gv.filled.kind === 3 && gv.changed.kind === 0
+      && gv.rows.draft === 3 && gv.rows.final === 3 && gv.rows.deleted === 0 && gv.rows.added === 0 && g86.body.chain_ok === true && g86.body.n === 1,
+      JSON.stringify({ s2: [s2.code, s2.body.error_code, s2.body.gap], gv: gv, chain: g86.body.chain_ok }));
+    cl86.items[0].changed.read = 9;
+    const g86b = await cs86({ action: 'stmt_gap', ym: '2026-10' }, tokA);
+    cl86.items[0].changed.read = 1;
+    T('86 ⑤-2 간극 기록을 손으로 고치면 chain_ok false(해시 체인) · 요약 값은 문서에서 세어 그대로(읽기 1)', g86b.code === 200 && g86b.body.chain_ok === false && g86b.body.vendors.v05.changed.read === 1, String(g86b.body.chain_ok));
+    // ⑥ 월 보드·차량별 이력(확정분만 — 작성 중은 pending)·색인 다시 만들기(다른 달 문서는 접두어로 거름)
+    const m86 = await cs86({ action: 'stmt_month', ym: '2026-10' }, tV86, 'dev1');
+    const o06 = await cs86({ action: 'stmt_save', ym: '2026-11', vk: 'v06', base: 0, rows: [row86({ date: '2026-11-02', amt: 165000 })], stated: 165000 }, tokA);
+    const p06 = await cs86({ action: 'stmt_save', ym: '2026-10', vk: 'v06', base: 0, rows: [row86({ date: '2026-10-05', amt: 165000 })], stated: 1 }, tokA);
+    const vh86 = await cs86({ action: 'stmt_veh', veh: 'veh_a', to: '2026-11', n: 3 }, tV86, 'dev1');
+    delete mem.gw_data['stmtidx:2026-10'];
+    const ri86 = await cs86({ action: 'stmt_reindex', ym: '2026-10' }, tD86, 'dev1');
+    const mo86 = vh86.body.months || [];
+    const oct86 = mo86.find((m) => m.ym === '2026-10'), nov86 = mo86.find((m) => m.ym === '2026-11');
+    T('86 ⑥ 월 보드(v05 ok·done·거래처 13곳) · 차량별 이력 veh_a: 10월 = 대송 확정분만(주유 1건 165,000 + 요소수 1건 20,000 = 185,000) · 영남 10월 붉은 작성 중 = pending · 11월 = 영남 작성 중만 pending · 색인 지운 뒤 reindex = 10월 v05·v06만(11월 v06 안 섞임)',
+      m86.code === 200 && m86.body.vendors.v05.ok === true && m86.body.vendors.v05.status === 'done' && m86.body.cfg.length === 13 && o06.code === 200 && p06.code === 200
+      && vh86.code === 200 && oct86 && oct86.kinds.fuel[0] === 1 && oct86.kinds.fuel[1] === 165000 && oct86.kinds.urea[1] === 20000 && oct86.total === 185000 && oct86.vendors.join() === 'v05' && oct86.pending.join() === 'v06'
+      && nov86 && nov86.total === 0 && nov86.pending.join() === 'v06' && ri86.code === 200 && Object.keys(ri86.body.vendors).sort().join() === 'v05,v06' && ri86.body.vendors.v05.rows === 3
+      && mem.gw_data['stmtidx:2026-10'].vendors.v05.veh.veh_a.fuel[1] === 165000,
+      JSON.stringify({ m: m86.code, mo: mo86, ri: ri86.body.vendors && Object.keys(ri86.body.vendors) }));
+    // ⑦ 확정 뒤 고침(done → done, 줄 바뀜) = 간극 1줄 더 · status 빼고 검산 실패 판 = NOT_BALANCED(확정 그대로) · status:'doing' 명시 = 확정 풀기 + reopen 1줄
+    const at5 = mem.gw_data['stmt:2026-10:v05'].updated_at;
+    const fin86b = fin86.map((x) => Object.assign({}, x)); fin86b[0].vraw = '5268';
+    const s3 = await cs86({ action: 'stmt_save', ym: '2026-10', vk: 'v05', base: at5, rows: fin86b, inv: inv86, stated: 268325 }, tD86, 'dev1');
+    const fin86c = fin86b.map((x) => Object.assign({}, x)); fin86c[0].amt = 165001;
+    const s4 = await cs86({ action: 'stmt_save', ym: '2026-10', vk: 'v05', base: s3.body.doc && s3.body.doc.updated_at, rows: fin86c, inv: inv86, stated: 268325 }, tD86, 'dev1');
+    const s5 = await cs86({ action: 'stmt_save', ym: '2026-10', vk: 'v05', base: s3.body.doc && s3.body.doc.updated_at, rows: fin86c, inv: inv86, stated: 268325, status: 'doing' }, tD86, 'dev1');
+    const ops86 = (mem.gw_data['clog:stmt:2026-10'].items || []).map((x) => x.op + (x.op === 'final' ? ':' + x.changed.read : '')).join(',');
+    T('86 ⑦ 확정 뒤 줄 고침(status 빼면 done 유지) = 간극 1줄 더(읽기 2 — 번호 글 포함) · 검산 실패 판을 status 없이 = 400 NOT_BALANCED · status doing 명시 = 200 + reopen · 기록 = final:1,final:2,reopen',
+      s3.code === 200 && s3.body.doc.status === 'done' && s3.body.gap === true && s4.code === 400 && s4.body.error_code === 'NOT_BALANCED' && s5.code === 200 && s5.body.doc.status === 'doing' && s5.body.gap === true
+      && ops86 === 'final:1,final:2,reopen',
+      JSON.stringify({ s3: [s3.code, s3.body.error_code], s4: s4.body.error_code, s5: [s5.code, s5.body.error_code], ops: ops86 }));
+    // ⑧ 되돌리기 — 낡은 base 409 · 직전 판(확정 판)으로: 검산 통과면 done 그대로 · 두 번째 NO_PREV · 재판독(redraft) 뒤 되돌리면 초안도 옛 판으로
+    const at6 = mem.gw_data['stmt:2026-10:v05'].updated_at;
+    const rvS = await cs86({ action: 'stmt_revert', ym: '2026-10', vk: 'v05', base: at6 - 1 }, tD86, 'dev1');
+    const rv1 = await cs86({ action: 'stmt_revert', ym: '2026-10', vk: 'v05', base: at6 }, tD86, 'dev1');
+    const rv2 = await cs86({ action: 'stmt_revert', ym: '2026-10', vk: 'v05', base: rv1.body.doc && rv1.body.doc.updated_at }, tD86, 'dev1');
+    const d07a = [row86({ r: 'a1', date: '2026-10-07' })], d07b = [row86({ r: 'b1', date: '2026-10-07', vraw: '9999' })];
+    const q1 = await cs86({ action: 'stmt_save', ym: '2026-10', vk: 'v07', base: 0, rows: d07a, draft_rows: d07a, stated: 165000 }, tokA);
+    const q2 = await cs86({ action: 'stmt_save', ym: '2026-10', vk: 'v07', base: q1.body.doc.updated_at, rows: d07b, draft_rows: d07b, redraft: true, stated: 165000 }, tokA);
+    const q3 = await cs86({ action: 'stmt_revert', ym: '2026-10', vk: 'v07', base: q2.body.doc.updated_at }, tokA);
+    T('86 ⑧ 되돌리기: 낡은 base 409 · 직전 판(확정·검산 통과) = done · prev 비움 · 두 번째 NO_PREV · 재판독 뒤 되돌리면 초안도 a1 판(간극 짝 유지)',
+      rvS.code === 409 && rv1.code === 200 && rv1.body.doc.status === 'done' && rv1.body.checks.ok === true && rv1.body.doc.prev === null && rv2.body.error_code === 'NO_PREV'
+      && q2.code === 200 && q2.body.doc.draft.rows[0].r === 'b1' && q3.code === 200 && q3.body.doc.draft.rows[0].r === 'a1' && q3.body.doc.rows[0].r === 'a1',
+      JSON.stringify([rvS.code, rv1.code, rv1.body.doc && rv1.body.doc.status, rv2.body.error_code, q3.code, q3.body.doc && q3.body.doc.draft && q3.body.doc.draft.rows[0].r]));
+    // ⑨ 차량 별칭 — 정규화 열쇠 · 목록에 없는 차량 UNKNOWN_VEH · 같은 값 NO_CHANGE · 지우기 · 이상한 raw 400 · 감사는 번호·차량 모두 끝 4자리만
+    const a0 = await cs86({ action: 'stmt_alias_set', raw: '경북 12가-7900', veh: 'veh_zz', base: 0 }, tD86, 'dev1');
+    const a1 = await cs86({ action: 'stmt_alias_set', raw: '경북 12가-7900', veh: 'v78라7900', base: 0 }, tD86, 'dev1');
+    const a2 = await cs86({ action: 'stmt_alias_set', raw: '경북12가7900', veh: 'v78라7900', base: a1.body.updated_at }, tD86, 'dev1');
+    const a3 = await cs86({ action: 'stmt_alias_set', raw: '경북12가 7900', veh: '', base: a1.body.updated_at }, tD86, 'dev1');
+    const a4 = await cs86({ action: 'stmt_alias_set', raw: { toString: 1 }, veh: '', base: 0 }, tD86, 'dev1');
+    const ag = await cs86({ action: 'stmt_alias_get' }, tV86, 'dev1');
+    T('86 ⑨ 차량 별칭: 목록에 없는 차량 UNKNOWN_VEH · 열쇠 = 경북12가7900 · 같은 값 NO_CHANGE · 빈 veh = 지움 · raw가 객체 = 400 BAD_RAW(500 아님) · 보기 권한 읽기',
+      a0.body.error_code === 'UNKNOWN_VEH' && a1.code === 200 && a1.body.map['경북12가7900'] === 'v78라7900' && a2.body.error_code === 'NO_CHANGE' && a3.code === 200 && !('경북12가7900' in a3.body.map)
+      && a4.code === 400 && a4.body.error_code === 'BAD_RAW' && ag.code === 200 && Object.keys(ag.body.map).length === 0,
+      JSON.stringify({ a0: a0.body.error_code, a1: a1.code, a2: a2.body.error_code, a3: a3.code, a4: [a4.code, a4.body.error_code] }));
+    // ⑩ 잔액형(스피드 v01 — 공급가+세액) · 원장 4칸(전기이월 + 당월 − 입금 = 잔액, 당월 = 줄 합 부가세 포함) · 4칸 없이 확정 = no_carry · 잔액 틀림 = carry · 당월 틀림 = carry_month
+    const tr86 = { r: 't1', date: '2026-10-05', veh: 'veh_a', vraw: '0001', item: '타이어 펑크수리', kind: 'tire', qty: '1', unit: '20000', amt: 20000, vat: 2000, how: 'hand', tire: { pos: '운전석 3축 안쪽', act: 'puncture' } };
+    const inv01 = { date: '2026-10-31', supply: 20000, vat: 2000, total: 22000 };
+    const sp0 = await cs86({ action: 'stmt_save', ym: '2026-10', vk: 'v01', base: 0, rows: [tr86], inv: inv01, status: 'done' }, tokA);
+    const sp1 = await cs86({ action: 'stmt_save', ym: '2026-10', vk: 'v01', base: 0, rows: [tr86], inv: inv01, carry: { prev: 50000, month: 22000, paid: 50000, bal: 22000 }, status: 'done' }, tokA);
+    const b1 = sp1.body.doc && sp1.body.doc.updated_at;
+    const sp2 = await cs86({ action: 'stmt_save', ym: '2026-10', vk: 'v01', base: b1, rows: [tr86], inv: inv01, carry: { prev: 50000, month: 22000, paid: 50000, bal: 21000 }, status: 'doing' }, tokA);
+    const sp3 = await cs86({ action: 'stmt_save', ym: '2026-10', vk: 'v01', base: sp2.body.doc && sp2.body.doc.updated_at, rows: [tr86], inv: inv01, carry: { prev: 50000, month: 22002, paid: 50000, bal: 22002 } }, tokA);
+    T('86 ⑩ 잔액형 v01: 원장 4칸 없이 확정 400 NOT_BALANCED(no_carry) · 50,000 + 22,000 − 50,000 = 22,000 → 확정 200(타이어 위치·조치) · 잔액 21,000 = carry · 당월 22,002 = carry_month(공급가+세액 명세는 0원)',
+      sp0.code === 400 && sp0.body.checks.issues.indexOf('no_carry') >= 0 && sp1.code === 200 && sp1.body.checks.ok === true && sp1.body.checks.carry_ok === true && sp1.body.doc.rows[0].tire.act === 'puncture'
+      && sp2.code === 200 && sp2.body.checks.issues.indexOf('carry') >= 0 && sp3.code === 200 && sp3.body.checks.issues.indexOf('carry_month') >= 0 && sp3.body.checks.carry_ok === true,
+      JSON.stringify([sp0.code, sp0.body.checks && sp0.body.checks.issues, sp1.code, sp2.body.checks && sp2.body.checks.issues, sp3.body.checks && sp3.body.checks.issues]));
+    // ⑪ 읽기 실패·깨진 값 — 문서 읽기 실패면 쓰지 않음 · 깨진 색인 = 500 IDX_INVALID(빈 달로 안 그림)·reindex로 복구 · 깨진 간극 기록은 안 덮음(gap false·chain_ok false) · gzip 압축 폭탄 = 400(로그인 전, 6MB 상한)
+    const before86 = JSON.stringify(mem.gw_data['stmt:2026-10:v05']);
+    blobsMock.hooks.failGet = (k) => k === 'stmt:2026-10:v05';
+    const rf86 = await cs86({ action: 'stmt_save', ym: '2026-10', vk: 'v05', base: 0, rows: [] }, tokA);
+    blobsMock.hooks.failGet = null;
+    const rfSame86 = JSON.stringify(mem.gw_data['stmt:2026-10:v05']) === before86;
+    mem.gw_data['stmtidx:2026-10'] = { vendors: 'broken' };
+    const bi86 = await cs86({ action: 'stmt_month', ym: '2026-10' }, tokA);
+    const bi86b = await cs86({ action: 'stmt_reindex', ym: '2026-10' }, tokA);
+    const clKeep = mem.gw_data['clog:stmt:2026-10'];
+    mem.gw_data['clog:stmt:2026-10'] = { items: { x: 1 }, head: 'deadbeef' };
+    const at7 = mem.gw_data['stmt:2026-10:v05'].updated_at;
+    const bc86 = await cs86({ action: 'stmt_save', ym: '2026-10', vk: 'v05', base: at7, rows: fin86, inv: inv86, stated: 268325, status: 'done' }, tokA);
+    const bcg = await cs86({ action: 'stmt_gap', ym: '2026-10' }, tokA);
+    const bcKept = JSON.stringify(mem.gw_data['clog:stmt:2026-10']) === JSON.stringify({ items: { x: 1 }, head: 'deadbeef' });
+    mem.gw_data['clog:stmt:2026-10'] = clKeep;
+    const bomb = zlib86.gzipSync(Buffer.alloc(7 * 1024 * 1024, 32)).toString('base64');
+    const gz86 = await cs86(null, null, null, { httpMethod: 'POST', headers: { 'x-gw-enc': 'gzip' }, isBase64Encoded: true, body: bomb });
+    T('86 ⑪ 문서 읽기 실패 500 DOC_READ_FAILED·저장값 그대로 · 깨진 색인 500 IDX_INVALID → reindex 200 · 깨진 간극 기록 = 확정 200·gap false·기록 그대로·chain_ok false · 7MB로 풀리는 gzip = 400 INVALID_JSON',
+      rf86.code === 500 && rf86.body.error_code === 'DOC_READ_FAILED' && rfSame86
+      && bi86.code === 500 && bi86.body.error_code === 'IDX_INVALID' && bi86b.code === 200 && bc86.code === 200 && bc86.body.gap === false && bcKept && bcg.body.chain_ok === false
+      && gz86.code === 400 && gz86.body.error_code === 'INVALID_JSON',
+      JSON.stringify({ rf: [rf86.code, rf86.body.error_code, rfSame86], bi: [bi86.code, bi86.body.error_code, bi86b.code], bc: [bc86.code, bc86.body.gap, bcKept, bcg.body.chain_ok], gz: [gz86.code, gz86.body.error_code] }));
+    // ⑫ 차량 대조 stmt_match — 별칭 → 현재 번호 → 옛 번호('(구…)'·id·비고) → 끝 4자리 · 겹치면 multi · 지운 차 빠짐 · 고르기 목록에 기사·보험·비고·번호 칸 없음(id = 'v'+전체 번호라 veh 권한 필요) · veh 숨김 = 403
+    const al86 = await cs86({ action: 'stmt_alias_set', raw: '9999', veh: 'v12가1111', base: mem.gw_data['stmt:alias:veh'] ? mem.gw_data['stmt:alias:veh'].updated_at : 0 }, tD86, 'dev1');
+    const mt86 = await cs86({ action: 'stmt_match', raws: ['1111호', '12가 1111', '3333', '2222호', '7900', '78라7900', '8419', '6666', '8888', '9999', '12', ''] }, tV86, 'dev1');
+    const nv86 = await cs86({ action: 'stmt_match', raws: [] }, tNV86, 'dev1');
+    const mh = (mt86.body.matches || []).map((m) => m.how + ':' + (m.veh || m.cand.join('|')));
+    const vl86 = JSON.stringify(mt86.body.vehicles || []);
+    T('86 ⑫ 차량 대조: last4 · plate · 괄호 밖 현재 번호 last4 · (구2222) old4 · id 옛 번호 old4·old · 비고 "구 8419" old4 · 끝4 두 대 multi · 지운 차 none · 별칭 alias · 짧은 글·빈칸 none · 목록 8대(지운 차 빠짐)에 기사·보험·비고·번호 칸 없음 · veh 숨김 403 NO_VEH_ACCESS',
+      al86.code === 200 && mt86.code === 200 && mh.join(',') === ['last4:v12가1111', 'plate:v12가1111', 'last4:v34나2222', 'old4:v34나2222', 'old4:v78라7900', 'old:v78라7900', 'old4:v55바5555', 'multi:v66사6666|v77아6666', 'none:', 'alias:v12가1111', 'none:', 'none:'].join(',')
+      && mt86.body.vehicles.length === 8 && !/기사|보험|차주|번호 바뀜|91마4444/.test(vl86) && mt86.body.vehicles.every((v) => !('no' in v) && !('driver' in v) && !('note' in v) && !('insurer' in v))
+      && mt86.body.vehicles.find((v) => v.id === 'v78라7900').old4[0] === '7900' && mt86.body.vehicles.find((v) => v.id === 'v55바5555').own === '지입' && nv86.code === 403 && nv86.body.error_code === 'NO_VEH_ACCESS',
+      JSON.stringify({ al: al86.code, mt: mt86.code, mh: mh, nv: nv86.body.error_code }));
+    // ⑬ 감사 — col stmt · 글에 금액 숫자 없음(쉼표 꼴 포함) · 별칭 감사의 번호·차량 id 끝 4자리만(전체 번호 없음)
+    const aud86 = auditMock.logs.slice(audit86).filter((x) => x.col === 'stmt');
+    const aliasAud = aud86.filter((x) => x.ev[0].op === '명세서차량별칭').map((x) => x.ev[0].t);
+    T('86 ⑬ 감사: col stmt 줄 · 금액 글 없음(165000·165,000·268325·20000·83325) · 별칭 감사 3줄 모두 "…끝4 → 차량 …끝4"/(지움) 꼴(12가1111·78라7900·경북 없음)',
+      aud86.length >= 15 && aud86.every((x) => !/165,?000|268,?325|20,?000|83,?325/.test(x.ev[0].t)) && aliasAud.length === 3
+      && aliasAud.every((t) => /^…\d{4} → (차량 …\d{4}|\(지움\))$/.test(t)) && !aliasAud.some((t) => /12가1111|78라7900|경북/.test(t)),
+      JSON.stringify({ n: aud86.length, alias: aliasAud }));
+    // ⑭ 순수 규칙 경계(변이 잡기) — 줄 허용 오차(소수 자릿수)·할인 줄 · 세 기준(total·supvat·suponly)의 계산서·명세 합계·세액 허용 · 차량 소계 · 잔액형 · 종류·용도 · 달 이동 · 간극 빠진/더한 줄 · 객체 오염 · 숫자·글 정리 · 개인정보 꼴
+    const R0 = (o) => Object.assign({ r: '', date: '', veh: 'veh_a', vraw: '', item: 'x', kind: 'fuel', use: '', qty: null, qd: 0, unit: null, ud: 0, amt: 0, vat: null, tire: null, how: 'hand', note: '' }, o);
+    const CK = (rows, o, ven) => S86.checkDoc(Object.assign({ basis: 'total', group: 'veh', rows: rows, inv: null, stated: null, carry: null, vsub: null }, o || {}), ven || { group: 'veh' });
+    const q30 = S86.decimal('30.30', 1e7);
+    const t1 = [S86.rowIssues(R0({ qty: 30.3, qd: 2, unit: 1650, amt: 50000 }), 'veh').join(), S86.rowIssues(R0({ qty: 30.3, qd: 2, unit: 1650, amt: 50005 }), 'veh').join(),
+      S86.rowIssues(R0({ qty: 30.3, qd: 2, unit: 1650, amt: 50010 }), 'veh').join(), S86.rowIssues(R0({ qty: 100, unit: 1650, amt: 165001 }), 'veh').join(), S86.rowIssues(R0({ qty: 1, unit: 5000, amt: -5000 }), 'veh').join()];
+    T('86 ⑭-1 줄 검산: "30.30" = 30.3·소수 2자리 · 30.30×1,650: 50,000(차 5) 통과·50,005(차 10) 붉음(허용 9) · 50,010 붉음 · 정수×정수 1원 차 붉음(허용 0) · 할인 줄 −5,000 통과',
+      q30 && q30.n === 30.3 && q30.d === 2 && t1[0] === '' && t1[1] === 'calc' && t1[2] === 'calc' && t1[3] === 'calc' && t1[4] === '', JSON.stringify(t1));
+    const r12 = Array.from({ length: 12 }, () => R0({ kind: 'labor', amt: 20000, vat: 2000 }));
+    const r12bad = r12.map((x, i) => i === 0 ? Object.assign({}, x, { amt: 20009 }) : x);
+    const inv12 = { supply: 240000, vat: 24000, total: 264000 };
+    const c14 = [CK([R0({ amt: 1000 })], { inv: { supply: 909, vat: 91, total: 1000 } }), CK([R0({ amt: 1001 })], { inv: { supply: 909, vat: 91, total: 1000 } }), CK([R0({ amt: 1000 })], { stated: 999 }),
+      CK([R0({ amt: 1000 })], { inv: { supply: 909, vat: 90, total: 1000 } }), CK(r12, { basis: 'supply', inv: inv12, stated: 264000 }), CK(r12bad, { basis: 'supply', inv: inv12 }),
+      CK(r12bad, { basis: 'supply', stated: 264000 }), CK(r12.map((x, i) => i < 12 ? Object.assign({}, x, { vat: 2001 }) : x), { basis: 'supply', inv: inv12 }),
+      CK(r12.map((x) => Object.assign({}, x, { vat: 2001 })).map((x, i) => i === 0 ? Object.assign({}, x, { vat: 2002 }) : x), { basis: 'supply', inv: inv12 }),
+      CK([R0({ kind: 'part', amt: 100000 })], { basis: 'supply', inv: { supply: 100000, vat: 10000, total: 110000 } }), CK([R0({ amt: 1000 })], {}), CK([], { stated: 0 })];
+    T('86 ⑭-2 묶음 검산: total 계산서 0원(1원 차 inv) · 명세 합계 0원(stated) · 계산서 공급가+세액≠합계(inv_sum) · supvat 12줄 통과 · 공급가 9원 오독 = inv(세액 허용으로 덮지 않음)·명세 합계도 stated · 세액 합 +12(줄 수) 통과·+13 inv · suponly 계산서 공급가 대조·부가세 포함 110,000(추정 1줄) · 기준 없음 no_ref · 줄 0개 no_rows',
+      c14[0].ok && c14[1].issues.join() === 'inv' && c14[2].issues.join() === 'stated' && c14[3].issues.indexOf('inv_sum') >= 0 && c14[4].ok && c14[4].mode === 'supvat'
+      && c14[5].issues.join() === 'inv' && c14[5].sup_diff === 9 && c14[6].issues.join() === 'stated' && c14[7].ok && c14[7].vat_diff === 12 && c14[8].issues.join() === 'inv' && c14[8].vat_diff === 13
+      && c14[9].ok && c14[9].mode === 'suponly' && c14[9].sum_gross === 110000 && c14[9].est === 1 && c14[10].issues.join() === 'no_ref' && c14[11].issues.join() === 'no_rows',
+      JSON.stringify(c14.map((c) => [c.ok, c.issues.join('|'), c.mode])));
+    const c15 = [CK([R0({ veh: 'veh_a', amt: 100 }), R0({ veh: 'veh_b', amt: 50 })], { stated: 150, vsub: { veh_a: 100, veh_b: 50 } }), CK([R0({ veh: 'veh_a', amt: 100 }), R0({ veh: 'veh_a', amt: 50 })], { stated: 150, vsub: { veh_a: 100, veh_b: 50 } }),
+      CK([R0({ kind: 'part', amt: 30000 })], { basis: 'supply', stated: 30000, carry: { prev: 0, month: 33000, paid: 0, bal: 33000 } }, { group: 'veh', carry: true }),
+      CK([R0({ kind: 'part', amt: 30000 })], { basis: 'supply', stated: 30000 }, { group: 'veh', carry: true }), CK([R0({ kind: '', amt: 1 })], { stated: 1 }),
+      CK([R0({ veh: '', use: 'vehicle', kind: 'tool', amt: 1 })], { stated: 1, group: 'tool' }), CK([R0({ veh: '', use: 'safety', kind: 'tool', amt: 1 })], { stated: 1, group: 'tool' })];
+    T('86 ⑭-3 차량 소계 맞음·다른 차에 붙은 줄 = vsub · suponly 잔액형 당월 33,000 = 줄 합 30,000의 부가세 포함 추정(±추정 줄 수) 통과 · 잔액형인데 4칸 없음 no_carry · 종류 빈칸 kind · 용구 "차량" 용도 차량 없음 veh · 용구 안전보건 차량 없어도 통과',
+      c15[0].ok && c15[1].issues.join() === 'vsub' && c15[1].vsub_bad.length === 2 && c15[2].ok && c15[2].month_diff === 0 && c15[3].issues.join() === 'no_carry'
+      && c15[4].bad[0].why.join() === 'kind' && c15[5].bad[0].why.join() === 'veh' && c15[6].ok,
+      JSON.stringify(c15.map((c) => [c.ok, c.issues.join('|'), c.bad.map((b) => b.why.join('+')).join()])));
+    const pol = S86.checkDoc({ basis: 'total', group: 'veh', rows: [R0({ veh: '__proto__', amt: 1 }), R0({ veh: 'constructor', amt: 2 }), R0({ veh: 'toString', amt: 3 })], stated: 6 }, { group: 'veh' });
+    const gap14 = S86.gapCount([R0({ r: 'a', amt: 1, item: 'x' }), R0({ r: 'b', amt: 2, item: 'y' })], [R0({ r: 'a', amt: 1, item: 'x' }), R0({ r: 'c', amt: 3 }), R0({ r: 'constructor', amt: 4 })]);
+    const ms = S86.vehMonths([{ ym: '2026-10', doc: { vendors: { v01: { ok: true, status: 'done', veh: { veh_a: { fuel: [1, 10] } } }, v02: { ok: false, status: 'doing', veh: { veh_a: { fuel: [1, 99] } } }, v03: { ok: true, status: 'doing', veh: { veh_a: { fuel: [1, 7] } } } } } }], 'veh_a');
+    T('86 ⑭-4 객체 오염 없음(__proto__·constructor·toString 차량 줄도 각자 합·Object.prototype 그대로) · 간극 빠진 줄 1·더한 줄 2(constructor 줄 id 포함) · 차량 이력 = 확정·통과(v01)만, 작성 중·붉음은 pending · 달 이동 2026-01−1 = 2025-12·−13 = 2024-12 · kstYm 10/31 14:59Z = 10월·15:00Z = 11월',
+      ({}).fuel === undefined && pol.veh_kinds['__proto__'].fuel[1] === 1 && pol.veh_kinds['constructor'].fuel[1] === 2 && pol.veh_kinds['toString'].fuel[1] === 3 && pol.ok
+      && gap14.rows.deleted === 1 && gap14.rows.added === 2 && gap14.filled.read === 4 && gap14.changed.read === 2
+      && ms.length === 1 && ms[0].total === 10 && ms[0].vendors.join() === 'v01' && ms[0].pending.join() === 'v02,v03'
+      && S86.ymShift('2026-01', -1) === '2025-12' && S86.ymShift('2026-01', -13) === '2024-12' && S86.kstYm(Date.UTC(2026, 9, 31, 14, 59, 59)) === '2026-10' && S86.kstYm(Date.UTC(2026, 9, 31, 15, 0, 0)) === '2026-11',
+      JSON.stringify({ gap: gap14, ms: ms }));
+    T('86 ⑭-5 숫자·글 정리: "1,234" = 1234 · "1,2,3,4"·"12,34" 거절 · 공백만 = 빈칸(null) · -0 → 0 · 1e21·"100.12345"·100.12345 거절 · 보이지 않는 글자(U+202E) 거절 · 개인정보 꼴: 붙인 주민번호·점 전화·공백 계좌·10자리 숫자 걸림 · 날짜 "2026.10.31"·"2026-10-31" 안 걸림 · 파일 이름 객체 = BAD_SRC',
+      S86.money('1,234', false) === 1234 && S86.money('1,2,3,4', false) === undefined && S86.money('12,34', false) === undefined && S86.money(' ', true) === null && Object.is(S86.money(-0, false), 0)
+      && S86.decimal(1e21, 1e30) === undefined && S86.decimal('100.12345', 1e7) === undefined && S86.decimal(100.12345, 1e7) === undefined && S86.text('a\u202Eb', 10) === null
+      && S86.piiScan('8505152345678') !== '' && S86.piiScan('010.1234.5678') !== '' && S86.piiScan('1002 123 456789') !== '' && S86.piiScan('번호 1234567890') !== ''
+      && S86.piiScan('2026.10.31') === '' && S86.piiScan('2026-10-31') === '' && S86.cleanSrc([{ kind: 'scan', name: { toString: 1 } }]).code === 'BAD_SRC', '');
+  } finally {
+    blobsMock.hooks.failGet = null;
+    mem.gw_users = savedUsers86;
+    if (vehKeep86 === undefined) delete mem.gw_data['col:vehicles']; else mem.gw_data['col:vehicles'] = vehKeep86;
+    Object.keys(mem.gw_data).forEach((k) => { if (/^(stmt:|stmtidx:|clog:stmt:)/.test(k) && !(k in keep86)) delete mem.gw_data[k]; });
+    Object.keys(keep86).forEach((k) => { mem.gw_data[k] = keep86[k]; });
+  }
+}
+
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);
