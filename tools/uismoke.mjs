@@ -997,9 +997,11 @@ try {
       'function renderSiteFilter(){} function canDo(){ return false; } function fmtAmount(v){ return String(v); } function openAsb(){} function openSiteWorkers(){}',
       fnSrc('siteKind'), fnSrc('liveSites'), fnSrc('siteLabel'), fnSrc('siteYear'),
       // v433: renderSites의 특별교육 줄 = siteEduLine — 안전 권한형(canSee 참)이면 종전처럼 asbNoSpecial로 그린다(이 재현의 강도 그대로). 안전 권한 없는 쪽은 v433 묶음 ②가 본다
+      // v445: 현장 칸 입구 renderSites는 갈래 함수(PC = 엑셀형 표 — 부품 @vs-sheet)가 되고 옛 그리기 본문은 renderSitesLegacy(폰 — v444 renderSites 본문 글자째)로 이름만 바뀌었다.
+      //   이 재현은 옛 본문(폰 화면)을 같은 강도로 그대로 돌리고, 같은 사고 꼴·적대 데이터를 PC 표 갈래에 넣는 재현은 v445 묶음 ⑭가 한다
       'function canSee(){ return true; } var siteEduGap = null, siteEduGapSig = {};', fnSrc('siteGapSig'), fnSrc('siteEduLine'),
-      fnSrc('asbWorkerNames'), fnSrc('asbNoSpecial'), fnSrc('sheetRow'), fnSrc('bindFold'), fnSrc('renderSites'),
-      'return { renderSites: renderSites, normAsbRow: normAsbRow, asList: asList };',
+      fnSrc('asbWorkerNames'), fnSrc('asbNoSpecial'), fnSrc('sheetRow'), fnSrc('bindFold'), fnSrc('renderSitesLegacy'),
+      'return { renderSites: renderSitesLegacy, normAsbRow: normAsbRow, asList: asList };',
     ].join('\n'))(items, DOM);
     return { api, DOM };
   };
@@ -1157,8 +1159,8 @@ try {
       'function renderSiteFilter(){} function canDo(){ return false; } function fmtAmount(v){ return String(v); } function openAsb(){} function openSiteWorkers(){}',
       fnSrc('siteKind'), fnSrc('liveSites'), fnSrc('siteLabel'), fnSrc('siteYear'),
       'function canSee(){ return true; } var siteEduGap = null, siteEduGapSig = {};', fnSrc('siteGapSig'), fnSrc('siteEduLine'),   // v433 특별교육 줄(안전 권한형 = 종전 화면)
-      fnSrc('asbWorkerNames'), fnSrc('asbNoSpecial'), fnSrc('sheetRow'), fnSrc('bindFold'), fnSrc('renderSites'),
-      'return { renderSites: renderSites };',
+      fnSrc('asbWorkerNames'), fnSrc('asbNoSpecial'), fnSrc('sheetRow'), fnSrc('bindFold'), fnSrc('renderSitesLegacy'),   // v445: 옛 본문(폰) — PC 표 갈래의 같은 반례는 v445 묶음 ⑭
+      'return { renderSites: renderSitesLegacy };',
     ].join('\n'))([
       { id: 's1', title: '정상 문자열', start: '2026-05-01', end: '2026-05-10', member_ids: [], worker_ids: [] },
       { id: 's2', title: '숫자 날짜', start: 20260101, end: 20260115, member_ids: '[]', worker_ids: '[]' },
@@ -2087,6 +2089,7 @@ try {
     'function liveAsb(){ return [{ title:"남성초", start:"2026-11-20", end:"2026-11-25", status:"plan", site:"포항" }]; } function asbNotifyDue(){ return "2026-11-13"; }',
     'function liveEdu(){ return [{ ptype:"member", pid:"u1", kind:"regular", date:"2026-06-01", next:"2026-12-01" }, { ptype:"worker", pid:"w1", kind:"spec_med", date:"2026-04-01", next:"2027-04-01" }]; } function eduPersonName(){ return "홍"; } function eduKindLabel(){ return "정기교육(근로자)"; }',
     'function liveLeaves(){ return [{ type:"annual", status:"approved", member_id:"u1", start:"2026-11-26", end:"2026-11-26" }]; } function isPartialLeave(){ return false; } function leaveCalVisible(){ return true; } function leaveTypeLabel(){ return "연차"; }',
+    'var SITE_KIND = { asbestos:"석면", demolition:"철거", dredge:"준설" };', fn28('siteKind'),   // v445 검토: calEvents가 석면 줄만 작업신고 마감·농도측정(siteKind — 옛 기록 kind 없음 = 석면)
     fn28('pad'), fn28('fmtDate'), fn28('eachDate'), cal28, 'return calEvents;'].join('\n'))();
   const ev28 = calApi28();
   const isAsb28 = (e) => /🦺|⚠|🧪/.test(e.label);
@@ -2195,13 +2198,19 @@ try {
   const WK2_28 = runSf28({ site: 'do', safety: 'do', wk: 'do' }, 'safety', 'site'); WK2_28.api.set('edu'); WK2_28.api.cur('dash'); fire28(WK2_28);
   const WK3_28 = runSf28({ site: 'do', safety: 'do', wk: 'do' }, 'safety', 'site'); WK3_28.api.set('edu'); WK3_28.api.set('site'); fire28(WK3_28);
   const WK4_28 = runSf28({ site: 'do', safety: 'do' }, 'safety', 'site'); WK4_28.api.set('edu');
+  //   v445 검토: 현장 칸도 같은 꼴 — 명부가 대장·교육보다 늦게 오면 표의 투입·특별교육 칸(일용직은 명부로 이름을 풀어야 판정)이 '확인 중'·직원만 센 글로 남아,
+  //   명부가 온 뒤 아직 현장 칸이면 한 번 더 그린다(종전 '현장 칸 읽기는 명부 기다리지 않음'을 같은 강도로 뒤집음 — 콜백 1개·그 칸이면 그림 2번·다른 탭이면 1번·일용직 권한 없으면 읽기·콜백 0)
   const WK5_28 = runSf28({ site: 'do', wk: 'do' }, 'safety', 'site'); WK5_28.api.set('site');
-  T('v428 검토 수리 — 명부가 교육 기록보다 늦게 와도 교육·검진 일용직 이름을 다시 그림(setSafetyLayer 실행, 도착 시점을 시험이 고름): 안전 › 교육·검진(일용직)을 열면 그리고 → 명부 읽기 → 명부가 오면 아직 그 칸이라 한 번 더 그림(\'(삭제된 일용직)\' 잔상 없음) · 그 사이 다른 탭이나 현장 칸으로 갔으면 안 그림 · 일용직 권한 없으면 명부를 안 읽음 · 현장 칸 읽기는 옛 현장 탭 그대로(명부 기다리지 않음)',
+  const wk5p28 = WK5_28.pend.length, wk5a28 = nR28(WK5_28, 'renderSites'); fire28(WK5_28); const wk5b28 = nR28(WK5_28, 'renderSites');
+  const WK6_28 = runSf28({ site: 'do', wk: 'do' }, 'safety', 'site'); WK6_28.api.set('site'); WK6_28.api.cur('dash'); fire28(WK6_28);
+  const WK7_28 = runSf28({ site: 'do' }, 'safety', 'site'); WK7_28.api.set('site');
+  T('v428 검토 수리 — 명부가 교육 기록보다 늦게 와도 교육·검진 일용직 이름을 다시 그림(setSafetyLayer 실행, 도착 시점을 시험이 고름): 안전 › 교육·검진(일용직)을 열면 그리고 → 명부 읽기 → 명부가 오면 아직 그 칸이라 한 번 더 그림(\'(삭제된 일용직)\' 잔상 없음) · 그 사이 다른 탭이나 현장 칸으로 갔으면 안 그림 · 일용직 권한 없으면 명부를 안 읽음 · v445 검토: 현장 칸도 명부가 온 뒤 아직 그 칸이면 한 번 더 그림(투입·특별교육 칸 — 콜백 1·그림 1 → 2) · 그 사이 다른 탭이면 안 그림 · 교육 칸에서 현장 칸으로 옮긴 뒤 명부가 오면 현장만 다시 · 일용직 권한 없으면 명부·콜백 0',
     wk1a28 === 1 && wk1p28 === 1 && wk1b28 === 2 && WK1_28.log.indexOf('loadEdu') >= 0
-    && nR28(WK2_28, 'renderEdu:member') === 1 && nR28(WK3_28, 'renderEdu:member') === 1 && WK3_28.api.layer() === 'site'
+    && nR28(WK2_28, 'renderEdu:member') === 1 && nR28(WK3_28, 'renderEdu:member') === 1 && WK3_28.api.layer() === 'site' && nR28(WK3_28, 'renderSites') === 2
     && WK4_28.log.indexOf('loadWorkers') < 0 && WK4_28.pend.length === 0 && nR28(WK4_28, 'renderEdu:member') === 1
-    && WK5_28.log.indexOf('loadWorkers') >= 0 && WK5_28.pend.length === 0 && nR28(WK5_28, 'renderSites') === 1,
-    [wk1a28, wk1p28, wk1b28, nR28(WK2_28, 'renderEdu:member'), nR28(WK3_28, 'renderEdu:member'), WK4_28.log.join(','), WK5_28.pend.length].join(' / '));
+    && WK5_28.log.indexOf('loadWorkers') >= 0 && wk5p28 === 1 && wk5a28 === 1 && wk5b28 === 2 && nR28(WK6_28, 'renderSites') === 1
+    && WK7_28.log.indexOf('loadWorkers') < 0 && WK7_28.pend.length === 0 && nR28(WK7_28, 'renderSites') === 1,
+    [wk1a28, wk1p28, wk1b28, nR28(WK2_28, 'renderEdu:member'), nR28(WK3_28, 'renderEdu:member'), nR28(WK3_28, 'renderSites'), WK4_28.log.join(','), wk5p28, wk5a28, wk5b28, nR28(WK6_28, 'renderSites'), WK7_28.log.join(',')].join(' / '));
 
   // ⑪ 교육·검진 한 목록 — renderEdu를 뽑아 대상 칩별로 돌린다
   const kIdx28 = html.indexOf('var EDU_KINDS'), EDU28 = html.slice(kIdx28, html.indexOf('];', kIdx28) + 2);
@@ -2288,6 +2297,7 @@ try {
     'function liveAsb(){ return [{ title:"남성초", start:"2026-11-20", end:"2026-11-25", status:"plan", site:"포항" }]; } function asbNotifyDue(){ return "2026-11-13"; }',
     'function liveEdu(){ return []; } function eduPersonName(){ return ""; } function eduKindLabel(){ return ""; }',
     'function liveLeaves(){ return []; } function isPartialLeave(){ return false; } function leaveCalVisible(){ return false; } function leaveTypeLabel(){ return ""; }',
+    'var SITE_KIND = { asbestos:"석면", demolition:"철거", dredge:"준설" };', fn29('siteKind'),   // v445 검토: calEvents가 석면 줄만 작업신고 마감·농도측정(siteKind)
     fn29('pad'), fn29('fmtDate'), fn29('eachDate'), cal29, 'return calEvents();'].join('\n'))(perm);
   const isAsb29 = (e) => /🦺|⚠|🧪/.test(e.label);
   const nAsb29 = (ev) => ev.filter(isAsb29).length, nLic29 = (ev) => ev.filter((e) => e.mod === 'lic' && !isAsb29(e)).length;
@@ -2942,8 +2952,9 @@ try {
   //   renderContracts → csDetailHtml → csApprSync(계약당 60초 1회 — 결재 결과 동기화) → 결재가 바뀌었을 때만 scheduleContractSave. cdocLoad 응답도 renderContracts를 부른다.
   //   현황 구간이 내는 직접 저장은 0이고, 이 길은 아래 ②-2가 모양을 못 박고 문서(FEATURES·TESTLIST·CLAUDE.md)가 예외로 적는다 — 길이 늘거나 바뀌면 ②-2가 터진다
   //   v436: isAdmin = ⑤ [고치기] 버튼 글을 관리자에게만 그리는 판정(읽기만 — 누름 배선·창·저장은 구간 밖 @safety-set, v436 묶음 ⑦이 지킴)
+  //   v445: siteSheetGo = ③ 현장 줄 이동의 도착(@site-sheet 구간 이어받기 — 그 현장 줄을 펼치고 굴림, 부품 vsSheetReveal: 칩·거르기·묶음 메모리만, 기기 저장·대장 저장 없음 — v445 묶음 ⑪·⑯이 지킴)
   const ALLOW32 = ['canSee', 'checkItemVisible', 'scopeNames', 'getReview', 'todayStr', 'addDays', 'isDate', 'vehDday', 'esc', 'liveEdu', 'eduPersonName', 'eduKindLabel', 'eduLatest', 'findMember', 'memberRetired', 'liveLic', 'licVisible', 'liveDuties', 'liveSites', 'siteKind', 'siteLabel', 'asbNotifyDue', 'asbKeepUntil', 'asbNoSpecial',
-    'csPkWhen', 'csPkIk', 'csFlow', 'csRowState', 'liveContracts', 'csSiteText', 'csKind', 'csPass', 'findProc', 'switchTab', 'setLicLayer', 'renderContracts', 'renderDocuments', 'loadEdu', 'loadAsb', 'loadWorkers', 'cdocLoad', 'isAdmin', 'String', 'Number', 'setTimeout', 'clearTimeout'];
+    'csPkWhen', 'csPkIk', 'csFlow', 'csRowState', 'liveContracts', 'csSiteText', 'csKind', 'csPass', 'findProc', 'switchTab', 'setLicLayer', 'renderContracts', 'renderDocuments', 'loadEdu', 'loadAsb', 'loadWorkers', 'cdocLoad', 'isAdmin', 'siteSheetGo', 'String', 'Number', 'setTimeout', 'clearTimeout'];
   const calls32 = [...new Set([...code32.matchAll(/(?<![.\w$])([A-Za-z_$][\w$]*)\s*\(/g)].map((m) => m[1]))].filter((n) => !KW32.has(n) && !defs32.has(n) && !locals32.has(n));
   const outside32 = calls32.filter((n) => ALLOW32.indexOf(n) < 0);
   const getOnly32 = (name, act) => { const b = fn32(name); return (b.indexOf('action:"' + act + '"') >= 0 || b.indexOf('action: "' + act + '"') >= 0) && !/action:\s*"(?:save|[a-z_]*(?:put|upsert|del|set|add|purge|restore|cur|mark))"/.test(b) && !/\b(?:schedule\w*Save|doSave\w*)\s*\(/.test(b); };
@@ -3114,7 +3125,8 @@ try {
   const rowIds32 = (s) => [...s.matchAll(/<span class="sfn-id">([^<]*)<\/span>/g)].map((m) => m[1]);
   const pillOf32 = (s, id) => { const m = s.match(new RegExp('<span class="sfn-id">' + id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '<\\/span>[\\s\\S]*?<span class="sfn-pill([^"]*)">([^<]*)<\\/span><\\/div>')); return m ? (m[1].trim() || '-') + ':' + m[2] : ''; };
   const gos32 = (out) => [...out.matchAll(/data-sfn-go="([^"]+)"/g)].map((m) => m[1]);
-  const goOk32 = (g) => /^check:(w1|m1|m3|q1|h[1-7]|y[1-6]|y11|y1[5-8]|su[1356])$/.test(g) || /^(site|duty|doc06|edu:member|edu:worker)$/.test(g) || /^con:c\d$/.test(g);
+  //   v445: 현장 줄은 그 현장 id까지('site:<id>' — 표본 현장 s1~s10 중 실재하는 id만, id 없는 안내 줄은 'site')
+  const goOk32 = (g) => /^check:(w1|m1|m3|q1|h[1-7]|y[1-6]|y11|y1[5-8]|su[1356])$/.test(g) || /^(site|duty|doc06|edu:member|edu:worker)$/.test(g) || /^site:s(?:[1-9]|10)$/.test(g) || /^con:c\d$/.test(g);
   SFNOW32 = { run32, base32, blk32, order32, rowIds32, pillOf32, gos32, goOk32, seedBy32, mem32 };
 
   const A32 = run32(base32());
@@ -3676,8 +3688,11 @@ try {
   const iCm33 = hSrc33.indexOf('currentMember(event)'), iDev33 = hSrc33.indexOf("error_code: 'DEVICE_NOT_APPROVED'"), iAcc33 = hSrc33.indexOf("if (permOf(c.member, 'asbestos') === 'hide') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_ACCESS', request_id: R });"), iWk33 = hSrc33.indexOf("const wkSee = permOf(c.member, 'workers') !== 'hide';"), iRd33 = hSrc33.indexOf('blobGet(');
   const hNC33 = hSrc33.split('\n').map((ln) => ln.replace(/(^|[^:"'])\/\/.*$/, '$1')).join('\n');
   const sfA33 = html.indexOf('// @safety-now-start'), sfB33 = html.indexOf('// @safety-now-end'), sfSec33 = (sfA33 >= 0 && sfB33 > sfA33) ? html.slice(sfA33, sfB33) : '';
-  const rs33 = fn33('renderSites'), la33 = fn33('loadAsb'), ds33 = fn33('doSaveAsb'), sel33 = fn33('siteEduLine'), lg33 = fn33('loadSiteEduGap');
-  T('v433 ⑤ 정적: gw-data 분기 site_edu_gap 1곳 → handleSiteEduGap · 검사 순서 로그인 → 기기 승인(DEVICE_NOT_APPROVED) → permOf(member,"asbestos") 숨김 403 NO_ACCESS → 일용직 권한(permOf workers) → 읽기 · 대장·교육·명부·회원 명부를 함께 읽음(Promise.all 1번 — 차례 읽기 await 0) · 대장·교육·명부 읽기 실패 500 · 회원 명부 미가용 500 MEMBERS_UNAVAILABLE · 핸들러에 쓰기·감사·알림 0 · 판정 = SITEEDU.siteEduGaps 1번(workerNames: wkSee) · _lib/siteedu.js는 저장소·네트워크·환경 변수 0(순수) · 앱 renderSites = siteEduLine(r)(asbNoSpecial 직접 0) · siteEduLine의 asbNoSpecial은 안전 권한 갈래에만 · 투입 인원 = asbWorkerNames(일용직 권한 없으면 worker_ids) · 첫 상태 선언 var siteEduGap;(undefined) · site_edu_gap 글자 = loadSiteEduGap 1곳 · loadSiteEduGap은 화면 대장으로 서명하지 않음(부르는 쪽이 넘김) · loadAsb는 그림 뒤 안전 권한이 아닐 때만 받은 대장 서명으로 · doSaveAsb는 보내기 전 서명 → 200 갈래에서만 그 서명으로 · 현황 구간에 siteEdu 0',
+  //   v445: 옛 그리기 본문 = renderSitesLegacy(폰 — v444 renderSites 본문 글자째) · PC 표(@site-sheet 구간)도 특별교육은 siteEduLine 두 곳(칸 요약 siteEduSum·펼침 세로표 줄)뿐 — asbNoSpecial 직접 0(주석 뺀 글)
+  const rs33 = fn33('renderSitesLegacy'), la33 = fn33('loadAsb'), ds33 = fn33('doSaveAsb'), sel33 = fn33('siteEduLine'), lg33 = fn33('loadSiteEduGap');
+  const ss33 = (() => { const a = html.indexOf('// @site-sheet-start'), b = html.indexOf('// @site-sheet-end'); return (a < 0 || b < a) ? '' : html.slice(a, b).split('\n').map((ln) => ln.replace(/(^|[^:"'])\/\/.*$/, '$1')).join('\n'); })();
+  const ssOk33 = ss33.length > 1000 && (ss33.match(/\bsiteEduLine\(/g) || []).length === 2 && /var line = siteEduLine\(r\)/.test(ss33) && /sh\.push\(siteEduLine\(r\)\);/.test(ss33) && ss33.indexOf('asbNoSpecial(') < 0 && ss33.indexOf('eduHasValidSpecial(') < 0 && !/site_edu_gap|loadSiteEduGap|siteGapSig/.test(ss33);
+  T('v433 ⑤ 정적: gw-data 분기 site_edu_gap 1곳 → handleSiteEduGap · 검사 순서 로그인 → 기기 승인(DEVICE_NOT_APPROVED) → permOf(member,"asbestos") 숨김 403 NO_ACCESS → 일용직 권한(permOf workers) → 읽기 · 대장·교육·명부·회원 명부를 함께 읽음(Promise.all 1번 — 차례 읽기 await 0) · 대장·교육·명부 읽기 실패 500 · 회원 명부 미가용 500 MEMBERS_UNAVAILABLE · 핸들러에 쓰기·감사·알림 0 · 판정 = SITEEDU.siteEduGaps 1번(workerNames: wkSee) · _lib/siteedu.js는 저장소·네트워크·환경 변수 0(순수) · 앱 renderSitesLegacy(폰 옛 본문)·PC 표(v445 @site-sheet — 칸 요약 siteEduSum·펼침 세로표 줄 2곳) = siteEduLine(r)(asbNoSpecial·eduHasValidSpecial 직접 0) · siteEduLine의 asbNoSpecial은 안전 권한 갈래에만 · 투입 인원 = asbWorkerNames(일용직 권한 없으면 worker_ids) · 첫 상태 선언 var siteEduGap;(undefined) · site_edu_gap 글자 = loadSiteEduGap 1곳 · loadSiteEduGap은 화면 대장으로 서명하지 않음(부르는 쪽이 넘김) · loadAsb는 그림 뒤 안전 권한이 아닐 때만 받은 대장 서명으로 · doSaveAsb는 보내기 전 서명 → 200 갈래에서만 그 서명으로 · 현황 구간에 siteEdu 0',
     (gd33.match(/d\.action === 'site_edu_gap'/g) || []).length === 1 && /if \(d && d\.action === 'site_edu_gap'\) return await handleSiteEduGap\(event, d, R\);/.test(gd33)
     && iCm33 > 0 && iDev33 > iCm33 && iAcc33 > iDev33 && iWk33 > iAcc33 && iRd33 > iWk33
     && /if \(bad\) return jr\(500, \{ status: 'ERROR', error_code: bad\.code \|\| 'STORAGE_READ_FAILED', request_id: R \}\);/.test(hSrc33) && /const bad = \[ra, re, rw\]\.filter\(function \(x\) \{ return !x\.ok; \}\)\[0\];/.test(hSrc33)
@@ -3686,7 +3701,7 @@ try {
     && /if \(!Array\.isArray\(ms\) \|\| ms\.unavailable\) return jr\(500, \{ status: 'ERROR', error_code: 'MEMBERS_UNAVAILABLE', request_id: R \}\);/.test(hSrc33)
     && !/blobSet|blobDelete|appendAudit|sendTo|verSnapshot/.test(hSrc33) && (hSrc33.match(/SITEEDU\.siteEduGaps\(/g) || []).length === 1 && /SITEEDU\.siteEduGaps\(items\(ra\), items\(re\), items\(rw\), ms, \{ workerNames: wkSee \}\)/.test(hSrc33) && /const SITEEDU = require\('\.\/_lib\/siteedu'\);/.test(gd33)
     && !/require\('\.\/(?:blobs|push|audit|session|claude)'\)|fetch\(|process\.env|blobGet|blobSet/.test(lib33) && /require\('\.\/tier'\)/.test(lib33)
-    && /\+ siteEduLine\(r\)/.test(rs33) && rs33.indexOf('asbNoSpecial(') < 0 && /if \(canSee\("safety"\)\) names = asbNoSpecial\(r\);/.test(sel33) && (sel33.match(/asbNoSpecial\(/g) || []).length === 1
+    && /\+ siteEduLine\(r\)/.test(rs33) && rs33.indexOf('asbNoSpecial(') < 0 && ssOk33 && /if \(canSee\("safety"\)\) names = asbNoSpecial\(r\);/.test(sel33) && (sel33.match(/asbNoSpecial\(/g) || []).length === 1
     && /if \(!asbWorkerNames\(r\)\.length && !\(!canSee\("wk"\) && asList\(r\.worker_ids\)\.length\)\) return "";/.test(sel33)
     && (html.match(/var siteEduGap\b[^;\n]*;/g) || []).join('|') === 'var siteEduGap;'
     && (htmlNC33.match(/site_edu_gap/g) || []).length === 1 && lg33.indexOf('gwCall("gw-data", { action: "site_edu_gap" })') > 0 && /if \(canSee\("safety"\) \|\| !canSee\("site"\)\) return;/.test(lg33) && !/liveAsb\(|liveSites\(\)\.forEach|asbPending/.test(lg33)
@@ -4030,8 +4045,8 @@ try {
       'function openAsb(id){ __log.push("edit:" + id); } function openSiteWorkers(id){ __log.push("wk:" + id); }',
       fn35(src, 'siteKind'), fn35(src, 'liveSites'), fn35(src, 'siteLabel'), fn35(src, 'siteYear'),
       'function canSee(){ return true; } var siteEduGap = null, siteEduGapSig = {};', fn35(src, 'siteGapSig'), fn35(src, 'siteEduLine'),
-      fn35(src, 'asbWorkerNames'), fn35(src, 'asbNoSpecial'), fn35(src, 'sheetRow'), fn35(src, 'bindFold'), fn35(src, 'renderSites'),
-      'return { render: renderSites, year: siteYear, setQ: function(v){ siteQ = v; }, setF: function(v){ siteFilter = v; }, isOpen: function(){ return siteOldOpen; } };',
+      fn35(src, 'asbWorkerNames'), fn35(src, 'asbNoSpecial'), fn35(src, 'sheetRow'), fn35(src, 'bindFold'), fn35(src, 'renderSitesLegacy'),   // v445: 옛 본문(폰 — v444 renderSites 글자째, 이름만 바뀜) · PC 표의 같은 묶음은 v445 묶음 ④
+      'return { render: renderSitesLegacy, year: siteYear, setQ: function(v){ siteQ = v; }, setF: function(v){ siteFilter = v; }, isOpen: function(){ return siteOldOpen; } };',
     ].join('\n'))(items, D.doc, !!opt.can, log, opt.members || [], opt.workers || []);
     return Object.assign({ api, log }, D);
   };
@@ -4279,13 +4294,18 @@ try {
   const ncJs35 = (s) => s.split('\n').map((ln) => ln.replace(/(^|[^:"'])\/\/.*$/, '$1')).join('\n');
   const stEnd35 = html.indexOf('</style>');
   const htmlNC35 = html.slice(0, stEnd35).replace(/\/\*[\s\S]*?\*\//g, '') + ncJs35(html.slice(stEnd35));
-  const rs35 = fn35(html, 'renderSites'), rsNC35 = ncJs35(rs35), out35 = htmlNC35.split(rsNC35).join('');
+  //   v445: 옛 본문 = renderSitesLegacy(폰) · PC 표의 묶음(@site-sheet 구간 — siteOldOf·묶음 머리 글)도 같은 상수를 읽는다 — 두 곳 밖에서는 선언 1번뿐, 구간 안 SITE_OLD_BEFORE 2번(siteOldOf·머리 글)·siteYear( 1번(siteOldOf)·siteOldOpen 0·숫자 2025 0
+  const rs35 = fn35(html, 'renderSitesLegacy'), rsNC35 = ncJs35(rs35);
+  const ssRaw35 = (() => { const a = html.indexOf('// @site-sheet-start'), b = html.indexOf('// @site-sheet-end'); return (a < 0 || b < a) ? '' : ncJs35(html.slice(a, b)); })();
+  const out35 = htmlNC35.split(rsNC35).join('').split(ssRaw35).join('');
   const cnt35 = (s, re) => (s.match(re) || []).length;
+  const ss35 = ssRaw35.length > 1000 && htmlNC35.indexOf(ssRaw35) > 0 && cnt35(ssRaw35, /\bSITE_OLD_BEFORE\b/g) === 2 && cnt35(ssRaw35, /\bsiteYear\(/g) === 1 && cnt35(ssRaw35, /\bsiteOldOpen\b/g) === 0 && !/\b2025\b/.test(ssRaw35)
+    && /function siteOldOf\(r\)\{ var y = siteYear\(r\); return !!r && r\.status === "done" && !\(y && y >= SITE_OLD_BEFORE\); \}/.test(ssRaw35) && !/localStorage|sessionStorage|schedule\w*Save|doSave\w*\(|gwCall\(/.test(ssRaw35);
   const iB1_35 = rs35.indexOf('bindFold(host, "data-site-fold", "siteBd-");'), iB2_35 = rs35.indexOf('bindFold(host, "data-site-old-fold", "siteOldBd-");'), iL_35 = rs35.indexOf('siteOldOpen = b.getAttribute("aria-expanded")==="true";');
   const CSS35 = ['\n  .site-old:active{background:transparent;}\n', '\n  .asb-hd[data-site-old-fold] .sec-caret{transform:rotate(-90deg);}\n', '\n  .asb-hd.open[data-site-old-fold] .sec-caret{transform:none;}\n', '\n  .site-yr{'];
-  T('v435 ⑨ 정적: var SITE_OLD_BEFORE = 2025 한 곳 · var siteOldOpen = false 한 곳 · SITE_OLD_BEFORE·siteOldOpen은 선언 밖에서 renderSites만, siteYear( 는 정의 밖에서 renderSites만(현황·캘린더·계약 연결 무변) · renderSites에 저장소·저장·서버 호출 0 · 검색어 있으면 가르지 않는 갈래 · bindFold 카드 → 묶음 → 펼침 기억·머리 건수 순 · CSS 4줄(감싸개 :active 끔·접힘 ▸ rotate(-90deg)·펼침 ▾·연도 줄)',
+  T('v435 ⑨ 정적: var SITE_OLD_BEFORE = 2025 한 곳 · var siteOldOpen = false 한 곳 · SITE_OLD_BEFORE·siteOldOpen은 선언 밖에서 현장 칸 그리기만(v445: 폰 옛 본문 renderSitesLegacy + PC 표 @site-sheet 구간 — 구간 안 SITE_OLD_BEFORE 2번(siteOldOf·묶음 머리 글)·siteYear( 1번·siteOldOpen 0·숫자 2025 0·siteOldOf = 옛 본문과 같은 식·저장 0), siteYear( 는 정의 밖에서 그 둘만(현황·캘린더·계약 연결 무변) · renderSitesLegacy에 저장소·저장·서버 호출 0 · 검색어 있으면 가르지 않는 갈래 · bindFold 카드 → 묶음 → 펼침 기억·머리 건수 순 · CSS 4줄(감싸개 :active 끔·접힘 ▸ rotate(-90deg)·펼침 ▾·연도 줄)',
     cnt35(html, /\n  var SITE_OLD_BEFORE = 2025;\n/g) === 1 && cnt35(html, /\bvar SITE_OLD_BEFORE\b/g) === 1 && cnt35(html, /\n  var siteOldOpen = false;\n/g) === 1 && cnt35(html, /\bvar siteOldOpen\b/g) === 1
-    && htmlNC35.indexOf(rsNC35) > 0 && cnt35(out35, /\bSITE_OLD_BEFORE\b/g) === 1 && cnt35(out35, /\bsiteOldOpen\b/g) === 1 && cnt35(out35, /\bsiteYear\(/g) === 1 && cnt35(rsNC35, /\bsiteYear\(/g) === 2
+    && htmlNC35.indexOf(rsNC35) > 0 && cnt35(out35, /\bSITE_OLD_BEFORE\b/g) === 1 && cnt35(out35, /\bsiteOldOpen\b/g) === 1 && cnt35(out35, /\bsiteYear\(/g) === 1 && cnt35(rsNC35, /\bsiteYear\(/g) === 2 && ss35
     && !/localStorage|sessionStorage|schedule\w*Save|doSave\w*\(|gwCall\(/.test(rsNC35)
     && /\n    if\(!q\)\{ cur=\[\];/.test(rs35) && cnt35(rsNC35, /\bcur=\[\]/g) === 1
     && iB1_35 > 0 && iB2_35 > iB1_35 && iL_35 > iB2_35 && rsNC35.indexOf('renderSites(', 10) < 0
@@ -4295,7 +4315,8 @@ try {
   // ⑩ 문서 — MANUAL 28절 '자주 하는 일' 1번 한 줄(문장 고정) · FEATURES 기준 ≥ v435·v435 절·§7 안전 줄 · TESTLIST v435(체크 칸 전부 AI 몫 — 화면 칸 '(AI 시험 화면 대상', PM 0, 게이트 칸 [x]) · CLAUDE.md 안전 탭 줄 · sw ≥ 435
   const man35 = rd35('MANUAL.html'), ft35 = rd35('FEATURES.md'), tl35 = rd35('TESTLIST.md'), cl35 = rd35('CLAUDE.md'), sw35 = rd35('sw.js');
   const m28_35 = (() => { const i = man35.indexOf('<h2 id="s28">'); return i < 0 ? '' : man35.slice(i, man35.indexOf('<h3 id="s28-1">', i)); })();
-  const MAN35 = '<li>위쪽 <b>전체 / 석면 / 철거 / 준설</b> 버튼과 검색칸(공사명·발주처·소재지)으로 현장을 찾습니다. <b>지난 자료(2024년까지)</b> 묶음은 기본으로 접혀 있습니다 — 종결된 현장 중 시작일(없으면 종료일)이 2024년까지이거나 날짜가 없는 현장은 목록 맨 아래 한 줄로 모이고(예정·작업중 현장은 날짜와 상관없이 위에 그대로), 그 줄을 누르면 펼쳐집니다(앱을 다시 켜면 다시 접힘). 찾을 때는 검색칸에 넣으면 접힘 없이 모두 나옵니다(2026-11 v435).</li>';
+  //   v445: 이 문장은 이제 휴대폰(옛 목록) 설명 — 앞머리 '휴대폰(좁은 창)에서는 예전 목록 그대로입니다 — '만 더하고 나머지는 글자째 그대로 고정(PC 표 설명은 바로 앞 li — v445 ⑱이 봄)
+  const MAN35 = '<li>휴대폰(좁은 창)에서는 예전 목록 그대로입니다 — 위쪽 <b>전체 / 석면 / 철거 / 준설</b> 버튼과 검색칸(공사명·발주처·소재지)으로 현장을 찾습니다. <b>지난 자료(2024년까지)</b> 묶음은 기본으로 접혀 있습니다 — 종결된 현장 중 시작일(없으면 종료일)이 2024년까지이거나 날짜가 없는 현장은 목록 맨 아래 한 줄로 모이고(예정·작업중 현장은 날짜와 상관없이 위에 그대로), 그 줄을 누르면 펼쳐집니다(앱을 다시 켜면 다시 접힘). 찾을 때는 검색칸에 넣으면 접힘 없이 모두 나옵니다(2026-11 v435).</li>';
   const ftv35 = (() => { const i = ft35.indexOf('\n### v435 (11/10)'); if (i < 0) return ''; const j = ft35.indexOf('\n### ', i + 5); return ft35.slice(i, j < 0 ? ft35.length : j); })();
   const ft7_35 = ft35.split('\n').filter((ln) => ln.indexOf('- **안전**(v428') === 0)[0] || '';
   const tlv35 = (() => { const i = tl35.indexOf('\n## v435'); if (i < 0) return ''; const j = tl35.indexOf('\n## ', i + 5); return tl35.slice(i, j < 0 ? tl35.length : j); })();
@@ -4325,7 +4346,7 @@ try {
   const CL_PINS35 = ['종결(done)된 줄 중 `siteYear`(시작일 앞 네 자리 → 없으면 종료일 → 둘 다 없으면 0 = 날짜 없음)가 `SITE_OLD_BEFORE`(2025 — 경계는 이 상수 하나)보다 이르거나 0인 줄을 목록 맨 아래 한 묶음',
     "종결이 아닌 줄(예정·작업중·상태 칸 없음 — 카드 '예정', 특별교육 줄·현황 ③도 같은 판정)은 연도와 상관없이 위에 둔다",
     '펼침 `siteOldOpen`은 메모리만(저장 금지 — 앱을 다시 켜면 접힘, 머리를 누를 때는 다시 그리지 않음), 검색어가 있으면 가르지 않는다.',
-    '세 이름은 renderSites 밖에서 쓰지 않는다(현황·캘린더·계약 연결 무변 — uismoke v435 ⑨)',
+    '세 이름은 현장 칸 그리기(폰 옛 본문 `renderSitesLegacy`·PC 표 `// @site-sheet` 구간 — siteOldOpen은 옛 본문만) 밖에서 쓰지 않는다(현황·캘린더·계약 연결 무변 — uismoke v435 ⑨)',   // v445: 이름 쓰는 곳이 옛 본문 + PC 표 구간(⑨와 같은 규칙)
     '②-2 고정이 v434(c1cc9b1)에서 뽑아 고정한 카드 3장과 글자째 대조'];
   const tlHeadOk35 = cbScr35.length === TL_HEADS35.length && TL_HEADS35.every((h, i) => cbScr35[i].indexOf(h) > 0 && cbScr35.filter((l) => l.indexOf(h) > 0).length === 1);
   T('v435 ⑩ 문서: MANUAL 28절 "자주 하는 일" 1번 = 찾기 문장 + 지난 자료(2024년까지) 기본 접힘·종결된 현장만·예정·작업중은 위에 그대로·맨 아래 한 줄·다시 켜면 접힘·찾을 때 검색칸(문장 고정) · FEATURES 기준 ≥ v435·v435 절(낱말 + 문장 11 고정 — 실측 159줄 = 134 + 1 → 135건 접힘·24줄 보임 / 종결 줄만·진행 줄은 위 / 기본 접힘 / 같은 연도끼리 / 펼침 메모리만 / 누를 때 다시 그리지 않음 / 검색어면 가르지 않음 / 거르기는 접힘 유지·거른 뒤 건수 / 건수 메모 135·136 / ②-2 고정)·§7 안전 줄(문장 고정) · TESTLIST v435 체크 칸 전부 AI 몫(화면 칸 정확히 6개 — 관리자형·검색·종류 칩·김정아·권민지형·정재욱형·진행 현장·다른 곳 그대로 순, PM 0, 게이트 칸 [x] uismoke, 연도 순서 문장 고정) · CLAUDE.md 안전 탭 줄(규칙 문장 5 고정 — 종결 줄만 판정·진행 줄은 위·펼침 메모리만·세 이름 renderSites 밖 0·②-2 고정) · sw ≥ 435',
@@ -4560,9 +4581,10 @@ try {
   };
   const swK36 = swRun36({ safety: 'do', lic: 'view' }, 'safety', 'now'), swA36 = swRun36('admin', 'safety', 'now'), swV36 = swRun36({ safety: 'view', site: 'do' }, 'safety', 'now');
   const swE36 = swRun36({ safety: 'do' }, 'safety', 'edu'), swS36 = swRun36('admin', 'safety', 'site'), swD36 = swRun36({ safety: 'do' }, 'dash', 'now'), swJ36 = swRun36({ site: 'do' }, 'safety', 'now'), swN36 = swRun36({ veh: 'view' }, 'safety', 'now');
-  T('v436 ⑥-4 한 기기 사람 전환(실제 applySafetyPerms — 검토 반영): 현황 칸에 있었고 다음 사람이 현황을 볼 수 있으면(권민지형·관리자·김정아형 안전 보기) 현황을 다시 엶(sfNowOpen 1번 · 칸 그대로) · 교육·현장 칸이면 다시 열지 않음 · 홈이면 0 · 현황을 못 보는 사람(현장만) = 현장 칸으로(종전) · 아무 칸도 없음 = 홈(종전)',
+  //   v445: 현장 칸도 다시 연다(현장 표의 특별교육 열·버튼이 앞사람 권한으로 남지 않게 — setSafetyLayer("site") = 그리기 1번 + 읽기) — 종전 '현장 칸이면 다시 열지 않음'(swS36 'at:site@safety')을 같은 강도로 뒤집음
+  T('v436 ⑥-4 한 기기 사람 전환(실제 applySafetyPerms — 검토 반영): 현황 칸에 있었고 다음 사람이 현황을 볼 수 있으면(권민지형·관리자·김정아형 안전 보기) 현황을 다시 엶(sfNowOpen 1번 · 칸 그대로) · 교육 칸이면 다시 열지 않음 · 현장 칸이면 다시 엶(v445 — renderSites 1번·칸 그대로) · 홈이면 0 · 현황을 못 보는 사람(현장만) = 현장 칸으로(종전) · 아무 칸도 없음 = 홈(종전)',
     swK36 === 'sfNowOpen,at:now@safety' && swA36 === 'sfNowOpen,at:now@safety' && swV36 === 'sfNowOpen,at:now@safety'
-    && swE36 === 'at:edu@safety' && swS36 === 'at:site@safety' && swD36 === 'at:now@dash' && swJ36 === 'renderSites,at:site@safety' && swN36 === 'switch:dash,at:now@dash',
+    && swE36 === 'at:edu@safety' && swS36 === 'renderSites,at:site@safety' && swD36 === 'at:now@dash' && swJ36 === 'renderSites,at:site@safety' && swN36 === 'switch:dash,at:now@dash',
     [swK36, swA36, swV36, swE36, swS36, swD36, swJ36, swN36].join(' | '));
 
   // ⑦ 정적 — 앱: 현황 구간은 저장·서버 호출 0 그대로([고치기]는 버튼 글만 — 관리자·읽기 ok일 때) · 누름 배선은 구간 밖 #sfNowHost 위임 1곳 · 서버 액션 글자는 @safety-set 구간에만 · 창·저장 함수 첫 줄 관리자 가드
@@ -4766,15 +4788,16 @@ try {
   const viewW38 = (win, id) => { const b = body38(win), own = decl38(win, '#view-' + id, 'max-width'), base = decl38(win, '.views>.view', 'max-width'), mx = own != null ? own : base; return (!mx || mx === 'none') ? b : Math.min(b, parseFloat(mx)); };
   //   명세 width_plan.table(창 → 본문, 스크롤바 17 포함): 1024 791 · 1100 867 · 1280 1011 · 1366 1097 · 1440 1171 · 1536 1267 · 1600 1331 · 1920·2560 1428
   const WT38 = { 1024: 791, 1100: 867, 1280: 1011, 1366: 1097, 1440: 1171, 1536: 1267, 1600: 1331, 1920: 1428, 2560: 1428 };
-  const WIDE38 = ['tasks', 'rec', 'cli', 'workers', 'bid', 'con', 'veh', 'perm'];   // 명세 reading_width 9개 중 v438은 계약·차량·권한관리 · v439에 지시(#view-tasks) · v440에 기성(#view-rec) · v441에 거래처(#view-cli) · v442에 일용직(#view-workers) · v443에 입찰(#view-bid — 표로 바꾼 판) — 안전(#view-safety)은 56 판(v445)에서 더한다
+  const WIDE38 = ['tasks', 'rec', 'cli', 'workers', 'bid', 'con', 'veh', 'safety', 'perm'];   // 명세 reading_width 9개 중 v438은 계약·차량·권한관리 · v439에 지시(#view-tasks) · v440에 기성(#view-rec) · v441에 거래처(#view-cli) · v442에 일용직(#view-workers) · v443에 입찰(#view-bid — 표로 바꾼 판) · v445에 안전(#view-safety — 56 판, 현장 칸 표) — 9개 다
   const views38 = [...html.matchAll(/<(?:section|div) class="view(?: active)?" id="view-([a-z]+)">/g)].map((m) => m[1]);
   const SECS38 = ['tasks', 'veh', 'hwakwan', 'allbaro', 'rec', 'cal', 'lic', 'bid', 'con', 'cli', 'doc', 'hr', 'progress', 'ask', 'safety', 'quote', 'promo', 'workers', 'perm', 'fam', 'leave'];
   const secs38 = [...html.matchAll(/<section class="view" id="view-([a-z]+)">/g)].map((m) => m[1]);
   const wBad38 = Object.keys(WT38).filter((w) => Math.abs(body38(+w) - WT38[w]) > 2);
   const vBad38 = [1366, 1920].map((w) => views38.filter((id) => viewW38(w, id) !== (WIDE38.indexOf(id) >= 0 ? body38(w) : 808)).join('/')).join('|') + '|' + views38.filter((id) => viewW38(1024, id) !== body38(1024)).join('/');
-  const perm38 = decl38(1366, '#view-perm>:not(#permRoster)', 'max-width') === '808px' && decl38(1920, '#view-perm>:not(#permRoster)', 'max-width') === '808px' && decl38(1920, '#permRoster', 'max-width') == null && decl38(1920, '#sfPaneNow', 'max-width') === '808px';
+  const perm38 = decl38(1366, '#view-perm>:not(#permRoster)', 'max-width') === '808px' && decl38(1920, '#view-perm>:not(#permRoster)', 'max-width') === '808px' && decl38(1920, '#permRoster', 'max-width') == null && decl38(1920, '#sfPaneNow', 'max-width') === '808px'
+    && decl38(1366, '#sfPaneNow', 'max-width') === '808px' && decl38(1920, '#sfPaneEdu', 'max-width') === '808px' && decl38(1920, '#sfPaneSite', 'max-width') == null;   // v445: 안전 탭은 현장 칸(표)만 넓고 현황·교육·검진(옛 목록 — v446 사람별 표 판에서)은 808
   const phone38 = decl38(859, '#app', 'max-width') === '560px' && padLR38(decl38(859, '#app', 'padding')).join() === '16,16' && decl38(859, '.views>.view', 'max-width') == null && decl38(375, '.tabbar', 'width') == null && decl38(859, '.layout', 'gap') == null;
-  T('v438 ① 화면 폭(head <style>을 읽어 계산 — 창 폭 − 스크롤바 17): 본문 = 명세 width_plan.table(±2px) 1024 791 · 1100 867 · 1280 1011 · 1366 1097 · 1440 1171 · 1536 1267 · 1600 1331 · 1920·2560 1428 · 넓히는 화면 id 8개(지시·기성·거래처·일용직·입찰·계약·차량·권한관리 — v439에 지시·v440에 기성·v441에 거래처·v442에 일용직·v443에 입찰을 더함, 안전은 v445)만 1366·1920에서 본문 폭, 그 밖 화면(안전 포함)은 808 · 1024 창은 모두 본문 폭(791 < 808) · 권한관리는 권한 표(#permRoster)만 넓고 그 밖 카드·안전 현황(#sfPaneNow) 808 · 859px 이하 틀 그대로(#app 최대 560·여백 16, 간격·사이드바 폭·읽기 폭 규칙 없음) · section 태그 21개 class="view" 그대로(class 더하지 않음)',
+  T('v438 ① 화면 폭(head <style>을 읽어 계산 — 창 폭 − 스크롤바 17): 본문 = 명세 width_plan.table(±2px) 1024 791 · 1100 867 · 1280 1011 · 1366 1097 · 1440 1171 · 1536 1267 · 1600 1331 · 1920·2560 1428 · 넓히는 화면 id 9개(지시·기성·거래처·일용직·입찰·계약·차량·안전·권한관리 — v439에 지시·v440에 기성·v441에 거래처·v442에 일용직·v443에 입찰·v445에 안전을 더함)만 1366·1920에서 본문 폭, 그 밖 화면은 808 · 1024 창은 모두 본문 폭(791 < 808) · 권한관리는 권한 표(#permRoster)만 넓고 그 밖 카드·안전 현황(#sfPaneNow)·교육·검진(#sfPaneEdu — v446 전까지 옛 목록) 808(현장 칸 #sfPaneSite는 본문 폭) · 859px 이하 틀 그대로(#app 최대 560·여백 16, 간격·사이드바 폭·읽기 폭 규칙 없음) · section 태그 21개 class="view" 그대로(class 더하지 않음)',
     wBad38.length === 0 && vBad38 === '||' && views38.length === 23 && perm38 && phone38 && JSON.stringify(secs38) === JSON.stringify(SECS38) && !/<section class="view [^"]*" id=/.test(html),
     JSON.stringify({ body: Object.keys(WT38).map((w) => w + ':' + body38(+w)), viewBad: vBad38, views: views38.length, perm38, phone38, secs: secs38.length }));
 
@@ -5201,16 +5224,18 @@ try {
   const blkOf38 = (a, b) => { const i = html.indexOf(a), j = html.indexOf(b); return (i < 0 || j < i) ? '' : html.slice(i, j); };
   const tsb38 = blkOf38('// @task-sheet-start', '// @task-sheet-end'), rsb38 = blkOf38('// @rec-sheet-start', '// @rec-sheet-end'), csb38 = blkOf38('// @cli-sheet-start', '// @cli-sheet-end'), wsb38 = blkOf38('// @wk-sheet-start', '// @wk-sheet-end'), bsb38 = blkOf38('// @bid-sheet-start', '// @bid-sheet-end');
   const osb38 = blkOf38('// @ob-sheet-start', '// @ob-sheet-end');   // v444 입찰 부동산
-  const outside2_38 = [tsb38, rsb38, csb38, wsb38, bsb38, osb38].reduce((s, b) => (b ? s.replace(b, '') : s), outside38);
+  const ssb38 = blkOf38('// @site-sheet-start', '// @site-sheet-end');   // v445 안전 현장(56 판)
+  const outside2_38 = [tsb38, rsb38, csb38, wsb38, bsb38, osb38, ssb38].reduce((s, b) => (b ? s.replace(b, '') : s), outside38);
   const keysOut38 = ['jw_task_sheet', 'jw_rec_sheet', 'jw_cli_sheet', 'jw_wk_sheet', 'jw_bid_sheet', 'jw_ob_sheet', 'jw_site_sheet', 'jw_edu_sheet'].filter((k) => outside38.indexOf(k) >= 0);
-  const use38 = tsb38.length > 0 && rsb38.length > 0 && csb38.length > 0 && wsb38.length > 0 && bsb38.length > 0 && osb38.length > 0 && (outside2_38.match(/\bvsSheet\w*\(|\bvsDateCell\(|\bVS_INST\b/g) || []).length === 0
+  const use38 = tsb38.length > 0 && rsb38.length > 0 && csb38.length > 0 && wsb38.length > 0 && bsb38.length > 0 && osb38.length > 0 && ssb38.length > 0 && (outside2_38.match(/\bvsSheet\w*\(|\bvsDateCell\(|\bVS_INST\b/g) || []).length === 0
+    && (ssb38.match(/\bvsSheetRender\(/g) || []).length === 1 && (ssb38.match(/key: "jw_site_sheet"/g) || []).length === 1 && (ssb38.match(/\bhost: "siteList"/g) || []).length === 1 && (outside38.match(/jw_site_sheet/g) || []).length === 1
     && (tsb38.match(/\bvsSheetRender\(/g) || []).length === 1 && (tsb38.match(/key: "jw_task_sheet"/g) || []).length === 1 && (tsb38.match(/\bhost: "taskList"/g) || []).length === 1
     && (rsb38.match(/\bvsSheetRender\(/g) || []).length === 1 && (rsb38.match(/key: "jw_rec_sheet"/g) || []).length === 1 && (rsb38.match(/\bhost: "recSheet"/g) || []).length === 1
     && (csb38.match(/\bvsSheetRender\(/g) || []).length === 1 && (csb38.match(/key: "jw_cli_sheet"/g) || []).length === 1 && (csb38.match(/\bhost: "cliList"/g) || []).length === 1
     && (wsb38.match(/\bvsSheetRender\(/g) || []).length === 1 && (wsb38.match(/key: "jw_wk_sheet"/g) || []).length === 1 && (wsb38.match(/\bhost: "wkList"/g) || []).length === 1
     && (bsb38.match(/\bvsSheetRender\(/g) || []).length === 1 && (bsb38.match(/key: "jw_bid_sheet"/g) || []).length === 1 && (bsb38.match(/\bhost: "bidList"/g) || []).length === 1
     && (osb38.match(/\bvsSheetRender\(/g) || []).length === 1 && (osb38.match(/key: "jw_ob_sheet"/g) || []).length === 1 && (osb38.match(/\bhost: "obList"/g) || []).length === 1
-    && JSON.stringify(keysOut38) === '["jw_task_sheet","jw_rec_sheet","jw_cli_sheet","jw_wk_sheet","jw_bid_sheet","jw_ob_sheet"]' && (outside38.match(/jw_task_sheet/g) || []).length === 1 && (outside38.match(/jw_rec_sheet/g) || []).length === 1 && (outside38.match(/jw_cli_sheet/g) || []).length === 1 && (outside38.match(/jw_wk_sheet/g) || []).length === 1 && (outside38.match(/jw_bid_sheet/g) || []).length === 1 && (outside38.match(/jw_ob_sheet/g) || []).length === 1;
+    && JSON.stringify(keysOut38) === '["jw_task_sheet","jw_rec_sheet","jw_cli_sheet","jw_wk_sheet","jw_bid_sheet","jw_ob_sheet","jw_site_sheet"]' && (outside38.match(/jw_task_sheet/g) || []).length === 1 && (outside38.match(/jw_rec_sheet/g) || []).length === 1 && (outside38.match(/jw_cli_sheet/g) || []).length === 1 && (outside38.match(/jw_wk_sheet/g) || []).length === 1 && (outside38.match(/jw_bid_sheet/g) || []).length === 1 && (outside38.match(/jw_ob_sheet/g) || []).length === 1;
   const rv38 = fn38(html, 'renderVehicles'), rc38 = fn38(html, 'renderContracts');
   const V38 = mk38({ width: 1366 }), vh38 = V38.env.mkHost('vehList'); vh38.innerHTML = '<div class="vs-wrap"><table class="vs"></table></div>';
   V38.api.paneObs(vh38); V38.api.paneObs(vh38); V38.env.roCb([{ target: vh38 }]); V38.env.flushRaf();
@@ -5233,8 +5258,8 @@ try {
     && decl38(1000, '.vs td.num', 'text-align') == null && decl38(1000, '.vs td .sel-box', 'margin-right') == null && decl38(1000, '.vs td .sel-box', 'vertical-align') == null && decl38(1000, '.vs.vs-fit td .sel-box', 'margin-right') === '6px'
     && decl38(375, '.sel-bar.vs-selbar', 'flex-wrap') === 'wrap' && decl38(375, '.sel-bar.vs-selbar', 'padding') === '2px 2px 8px' && decl38(375, '.vs-selbar', 'padding') == null
     && /@media \(pointer:coarse\)\{ \.vs\.vs-fit \.vs-rs\{width:14px;\} \}/.test(css38);
-  T('v438 ⑫ 정적: 계약·차량 그리기에 vsPaneObserve(host) 한 줄씩(파일에서 이 둘뿐 — 여러 번 불러도 자리에 한 번 걸림·--vs-panew = 칸 폭·창을 줄이면 다음 그림에 다시 잼 1048 → 900·data-vs-host 없음) · 부품을 쓰는 탭 6개 — v439 지시·v440 기성·v441 거래처·v442 일용직·v443 입찰 공고·v444 입찰 부동산(@task-sheet·@rec-sheet·@cli-sheet·@wk-sheet·@bid-sheet·@ob-sheet 구간 하나씩: 구간마다 vsSheetRender 1번·정의 key 1개(jw_task_sheet·jw_rec_sheet·jw_cli_sheet·jw_wk_sheet·jw_bid_sheet·jw_ob_sheet)·host 1개(taskList·recSheet·cliList·wkList·bidList·obList) · 일곱 구간 밖 vsSheet*·vsDateCell·VS_INST 0 · 부품 저장 이름은 jw_task_sheet·jw_rec_sheet·jw_cli_sheet·jw_wk_sheet·jw_bid_sheet·jw_ob_sheet만) · 끌기는 pointer(document pointermove·pointerup·pointercancel — mouse 이벤트 0) · 150ms·compositionstart/end·isComposing · 저장 한 곳(def.key에 k,d,f,chip) · ResizeObserver 하나·콜백은 rAF · 경계 matchMedia 3개 · CSS .vs.vs-fit(860~ 폭 100%·최소 --vs-minw)·폰 col --pw·.vs-detcard(PC 숨김·폰 보임)·.vs.vs-fit td.num 오른쪽·옅은 칩 · 기존 .vs(min-width 1160·폰 0·폰 col 0) 그대로 · 검토 반영: 펼침 폭 상한 max-width 100%(계약·차량 [닫기 ▲] 잘림) · .vs td.num·.vs td .sel-box 규칙 없음(새 표만) · .sel-bar.vs-selbar 줄바꿈·여백 · 터치 손잡이 14px',
-    ro38 && st38 && css2_38 && css3_38, JSON.stringify({ ro38, ro38a, ro38b, st38, use38, keysOut38, css2_38, css3_38, cliSeg: csb38.length, wkSeg: wsb38.length, bidSeg: bsb38.length, obSeg: osb38.length }));
+  T('v438 ⑫ 정적: 계약·차량 그리기에 vsPaneObserve(host) 한 줄씩(파일에서 이 둘뿐 — 여러 번 불러도 자리에 한 번 걸림·--vs-panew = 칸 폭·창을 줄이면 다음 그림에 다시 잼 1048 → 900·data-vs-host 없음) · 부품을 쓰는 탭 7개 — v439 지시·v440 기성·v441 거래처·v442 일용직·v443 입찰 공고·v444 입찰 부동산·v445 안전 현장(56 판)(@task-sheet·@rec-sheet·@cli-sheet·@wk-sheet·@bid-sheet·@ob-sheet·@site-sheet 구간 하나씩: 구간마다 vsSheetRender 1번·정의 key 1개(jw_task_sheet·jw_rec_sheet·jw_cli_sheet·jw_wk_sheet·jw_bid_sheet·jw_ob_sheet·jw_site_sheet)·host 1개(taskList·recSheet·cliList·wkList·bidList·obList·siteList) · 여덟 구간 밖 vsSheet*·vsDateCell·VS_INST 0 · 부품 저장 이름은 jw_task_sheet·jw_rec_sheet·jw_cli_sheet·jw_wk_sheet·jw_bid_sheet·jw_ob_sheet·jw_site_sheet만) · 끌기는 pointer(document pointermove·pointerup·pointercancel — mouse 이벤트 0) · 150ms·compositionstart/end·isComposing · 저장 한 곳(def.key에 k,d,f,chip) · ResizeObserver 하나·콜백은 rAF · 경계 matchMedia 3개 · CSS .vs.vs-fit(860~ 폭 100%·최소 --vs-minw)·폰 col --pw·.vs-detcard(PC 숨김·폰 보임)·.vs.vs-fit td.num 오른쪽·옅은 칩 · 기존 .vs(min-width 1160·폰 0·폰 col 0) 그대로 · 검토 반영: 펼침 폭 상한 max-width 100%(계약·차량 [닫기 ▲] 잘림) · .vs td.num·.vs td .sel-box 규칙 없음(새 표만) · .sel-bar.vs-selbar 줄바꿈·여백 · 터치 손잡이 14px',
+    ro38 && st38 && css2_38 && css3_38, JSON.stringify({ ro38, ro38a, ro38b, st38, use38, keysOut38, css2_38, css3_38, cliSeg: csb38.length, wkSeg: wsb38.length, bidSeg: bsb38.length, obSeg: osb38.length, siteSeg: ssb38.length }));
 
   // ⑬ 문서 — FEATURES 기준 v438·v438 절(문장 고정)·자리 글 GATES_V438 0 · TESTLIST v438 체크 칸 = 화면 칸 4개 '[ ] (AI 시험 화면 대상' + 게이트 칸 '[x] (AI)' 5종(PM 몫 0) · MANUAL 1절 화면 폭 한 줄 · CLAUDE.md 폭·부품 줄 · sw v438 이상
   const ft38 = rd38('FEATURES.md'), tl38 = rd38('TESTLIST.md'), man38 = rd38('MANUAL.html'), cl38 = rd38('CLAUDE.md'), sw38 = rd38('sw.js');
@@ -5256,7 +5281,7 @@ try {
     && tlv38.length > 0 && tcb38.length === 5 && cbScr38.length === 4 && cbGate38.length === 1 && tcb38.every((l) => l.indexOf('PM') < 0) && tlv38.indexOf('GATES_V438') < 0
     && ['`consheet_check`', '`proctpl_check`', '`settletest`', '`servertest`', '결함 심기'].every((g) => cbGate38[0].indexOf(g) > 0)
     && cbScr38.some((l) => l.indexOf('[닫기 ▲]') > 0 && l.indexOf('1536') > 0) && cbScr38.some((l) => l.indexOf('두 음절') > 0)
-    && /<p><b>넓은 모니터에서는<\/b> 표로 보는 화면 — 지시 · 기성·수금 · 거래처 · 인사·일용직 · 입찰 · 계약 · 차량 · 권한관리\(권한 표\) — 이 창 폭에 맞춰 넓어져 옆으로 끌 일이 줄어듭니다/.test(man1_38) && man1_38.indexOf('휴대폰 화면은 바뀌지 않습니다(2026-11 v438)') > 0
+    && /<p><b>넓은 모니터에서는<\/b> 표로 보는 화면 — 지시 · 기성·수금 · 거래처 · 인사·일용직 · 입찰 · 계약 · 차량 · 안전 › 현장 · 권한관리\(권한 표\) — 이 창 폭에 맞춰 넓어져 옆으로 끌 일이 줄어듭니다/.test(man1_38) && man1_38.indexOf('휴대폰 화면은 바뀌지 않습니다(2026-11 v438)') > 0   // v445: 안전 › 현장을 목록에 더함 · v445 검토: 이 주석이 조건 사이에 끼어 뒤 조건(폰 화면 문장)이 주석이 됐던 것을 되살림
     && CL_PINS38.every((s) => cl38.indexOf(s) > 0)
     && Number((sw38.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 438,
     JSON.stringify({ ft: FT_PINS38.filter((s) => ftv38.indexOf(s) < 0).map((s) => s.slice(0, 30)), cl: CL_PINS38.filter((s) => cl38.indexOf(s) < 0).map((s) => s.slice(0, 30)), gates: [ftv38.indexOf('GATES_V438'), tlv38.indexOf('GATES_V438')], cb: tcb38.length, scr: cbScr38.length, gate: cbGate38.length, pm: tcb38.filter((l) => l.indexOf('PM') >= 0).map((l) => l.slice(0, 40)), man: man1_38.indexOf('넓은 모니터'), sw: (sw38.match(/jw-shell-v(\d+)/) || [0, 0])[1] }));
@@ -7121,10 +7146,11 @@ try {
   // 교육·검진 기록 — w1 배치전(2025-03-01)·특수(2026-02-01)·특별교육(건강 아님) · w2는 직원(member) 기록뿐 · w7 지운 특수·날짜 아닌 배치전
   const EDU42 = () => [{ id: 'e1', ptype: 'worker', pid: 'w1', kind: 'pre_med', date: '2025-03-01' }, { id: 'e2', ptype: 'worker', pid: 'w1', kind: 'spec_med', date: '2026-02-01' }, { id: 'e3', ptype: 'worker', pid: 'w1', kind: 'special', date: '2026-05-01' },
     { id: 'e4', ptype: 'member', pid: 'w2', kind: 'spec_med', date: '2026-07-01' }, { id: 'e5', ptype: 'worker', pid: 'w7', kind: 'spec_med', date: '2026-03-03', del: 1 }, { id: 'e6', ptype: 'worker', pid: 'w7', kind: 'pre_med', date: '확인 중' }];
-  //   검토 반영(11/11): 고친 줄 표시(wkMarkDirty)·③ 교육 기록 읽기(wkEduEnsure)·현장 창(openSiteWorkers·swEmptyText·renderSwList·swChecked·findAsb + 현장 탭 배선 IIFE — [+ 새 일용직] 실제 처리기)·applyPerms 일용직 줄(apWk)을 함께 싣는다
+  //   검토 반영(11/11): 고친 줄 표시(wkMarkDirty)·③ 교육 기록 읽기(wkEduEnsure)·현장 창(openSiteWorkers·swEmptyText·renderSwList·swPickIds·findAsb + 현장 탭 배선 IIFE — [+ 새 일용직] 실제 처리기)·applyPerms 일용직 줄(apWk)을 함께 싣는다
+  //   (v445 검토: 현장 창 [이 현장에 넣기]는 그려진 상자(옛 swChecked — 없앰)가 아니라 창 안 선택 swSel로 저장(swPickIds) — 그 선택·안내 글 선언 두 줄도 싣는다. 실행 검사는 v445 묶음 ⑳)
   const REAL42 = ['esc', 'isDate', 'asList', 'liveAsb', 'wkBirth6', 'wkMarkDirty', 'mergeWorkers', 'doSaveWorkers', 'liveWorkers', 'sortedWorkers', 'loadWorkers', 'scheduleWorkersSave', 'wkLabel', 'wkKindCounts', 'wkAgoText', 'wkKindChips', 'wkMissing', 'findWk',
-    'renderWorkersLegacy', 'openWkModal', 'sheetRow', 'bindFold', 'liveEdu', 'eduLatest', 'wkExamDate', 'wkExamNote', 'wkExamMissing', 'wkEduEnsure', 'renderXgWorkers', 'xgBuildEdits', 'findAsb', 'openSiteWorkers', 'swEmptyText', 'renderSwList', 'swChecked'];
-  const VARS42 = ['  var workers=[], wkEditId=null', '  var wkLoaded=false, wkPending=false;', '  var WK_UNREAD_MSG=', '  var wkDirty={};', '  var WK_NO_ADD_MSG=', '  var wkEduSt = ', '  var swSiteId=null, swQ="";', '  var WK_KIND_LABEL = ', '  var WK_KIND_ORDER = '].map((h) => line42(html, h));
+    'renderWorkersLegacy', 'openWkModal', 'sheetRow', 'bindFold', 'liveEdu', 'eduLatest', 'wkExamDate', 'wkExamNote', 'wkExamMissing', 'wkEduEnsure', 'renderXgWorkers', 'xgBuildEdits', 'findAsb', 'openSiteWorkers', 'swEmptyText', 'renderSwList', 'swPickIds'];
+  const VARS42 = ['  var workers=[], wkEditId=null', '  var wkLoaded=false, wkPending=false;', '  var WK_UNREAD_MSG=', '  var wkDirty={};', '  var WK_NO_ADD_MSG=', '  var wkEduSt = ', '  var swSiteId=null, swQ="";', '  var swSel=null;', '  var SW_NO_WK_MSG=', '  var WK_KIND_LABEL = ', '  var WK_KIND_ORDER = '].map((h) => line42(html, h));
   const iife42 = (() => { const k = html.indexOf('    if(!$("wkAddBtn")) return;'), s = html.lastIndexOf('  (function(){', k), e = html.indexOf('\n  })();', k); if (k < 0 || s < 0 || e < 0) throw new Error('일용직 창 배선 없음'); return html.slice(s, e + '\n  })();'.length); })();
   const siteIife42 = (() => { const k = html.indexOf('  // 현장 탭 배선(v347)'), s = html.indexOf('  (function(){', k), e = html.indexOf('\n  })();', k); if (k < 0 || s < 0 || e < 0 || html.slice(s, e).indexOf('swNewBtn') < 0) throw new Error('현장 탭 배선 없음'); return html.slice(s, e + '\n  })();'.length); })();
   const apWk42 = line42(fn42(html, 'applyPerms'), '    if (currentTab === "workers")');   // applyPerms의 일용직 줄(로그인 창 '전환' — 검토 반영 ㉑이 그대로 돌림)
@@ -8891,6 +8917,694 @@ try {
   T('v444 ㉔ 검토 문서: FEATURES v444 검토 반영 줄(10건·재공고와 패스 PM 결정 대기 + 실측 1,403/220 + 선택지 가·나·다·머리 총·표시·onPaint·vs-gsep·kstDay·복구 전 자동보존·법정 약칭·servertest 83)·되돌리기 순서 · TESTLIST 운영 칸(재공고 보고·선택지·끈 뒤 ver_list → ver_restore·복구 전 자동보존)·게이트 칸 "검토 반영 뒤" · MANUAL 12절(통합특별시·건수 글 전체·재공고 신규) · CLAUDE.md(onPaint·vs-gsep·재공고 PM 대기·광주특별시·kstDay)',
     doc24.length === 0 && gate24.indexOf('검토 반영 뒤(11/11 — 검토 3관점(데이터 삭제 안전') > 0 && ['`uismoke`(537', '`servertest`(1063', '결함 심기', '대조군'].every((g) => gate24.indexOf(g) > 0), JSON.stringify({ doc24: doc24.map((s) => s.slice(0, 40)), gate: gate24.indexOf('검토 반영 뒤') }));
 } catch (e) { console.log('  (v444 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ---- v445(11/11 — 56 판(그룹웨어 재설계 45-1과 따로 — PM 11/10 15:56 ⓐ 정정, 공통 표 부품만 같이 씀): 안전 › 현장 칸을 엑셀형 표로 + [+ 현장 추가] 창 종류 칸(PM 17:40 ⓓ ①) · AI 결정 보존 만료 석면만 —
+//      09_조사_문서/표형탭_시안_자료_20261110/단계지시_v445_56현장.json · 엑셀형탭_명세_20261110.json sections[key=site]):
+//      시험 틀 = v442와 같은 작은 DOM(innerHTML을 넣으면 여는 태그마다 요소를 새로 만듦 · 창 폭은 가짜 matchMedia · 가짜 시계·타이머) + index.html의 실제 함수 —
+//      현장 대장(liveAsb·findAsb·asbNotifyDue·asbKeepUntil·asbWorkerNames·asbNoSpecial·siteGapSig(s)·siteEduLine·sheetRow·siteKind·liveSites·siteLabel·siteYear·renderSiteFilter·bindFold·옛 본문 renderSitesLegacy) ·
+//      창(asbKindOf·asbKindApply·asbUpdateDerived·openAsb·closeAsb·saveAsb·deleteAsb) · 이동(tabRoute·safetyPanes·setSafetyLayer·applySafetyPerms·calEvents·sfNowGo·sfNowTop) · @vs-sheet · @site-sheet 구간. 오늘 = 2026-11-11.
+//      ① 정의·칸 폭·단계 합 ② 칩·건수 ③ 기간 정렬 = 옛 목록 순서·다른 열 정렬 ④ 지난 자료 묶음(같은 경계·접힘·저절로 펼침·상수 한 곳) ⑤ 신고 마감 색 = 현황 ③(실제 sfNowDue — v432 시험 틀)
+//      ⑥ 특별교육 열 = siteEduLine 요약(두 벌 규칙) ⑦ 펼침 = 옛 카드 세로표 내용(글자째)·버튼 ⑧ 창 종류 칸 ⑨ 못 읽은 대장 ⑩ 새 현장 열기 ⑪ 다른 화면에서 오는 길(현황 ③·캘린더)
+//      ⑫ 폰 legacy(해시·860 경계·검색칸) ⑬ 넓힘·CSS ⑭ 적대 데이터(v336·v337 꼴 — 표 갈래) ⑮ 로그인 창 '전환' ⑯ 정적 ⑰ 폰 sheet 준비 ⑱ 문서
+try {
+  const own45 = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+  const fn45 = (src, name) => { const i = src.indexOf('function ' + name + '('); if (i < 0) throw new Error('함수 없음: ' + name); let d = 0, st = false; for (let j = i; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i, j + 1); } } throw new Error('중괄호 짝 안 맞음: ' + name); };
+  const line45 = (src, head) => { const i = src.indexOf(head); if (i < 0) throw new Error('줄 없음: ' + head); return src.slice(i, src.indexOf('\n', i)); };
+  const blkOf45 = (src, a, b) => { const i = src.indexOf(a), j = src.indexOf(b); if (i < 0 || j < i) throw new Error(a + ' 구간 없음'); return src.slice(i, j); };
+  const sha45 = (s) => createHash('sha256').update(s).digest('hex');
+  const body45 = (name) => fn45(html, name).replace(/^function [\w$]+/, '').replace(/\r\n/g, '\n');
+  const unesc45 = (s) => String(s).replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+  const mq45 = (q, w) => { if (q == null) return true; if (/print/.test(q)) return false; const a = /\(min-width:\s*(\d+)px\)/.exec(q), b = /\(max-width:\s*(\d+)px\)/.exec(q); if (!a && !b) return false; return (!a || w >= +a[1]) && (!b || w <= +b[1]); };
+  const nc45 = (s) => s.split('\n').map((ln) => ln.replace(/(^|[^:"'])\/\/.*$/, '$1')).join('\n');
+  const rd45 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const ssb45 = blkOf45(html, '// @site-sheet-start', '// @site-sheet-end');
+  // 사람 — 관리자A · 안전 수행형 S(권민지형: 현장 수행·일용직 보기) · 안전 보기형 H(김정아형: 일용직 수행) · 안전 숨김형 V(정재욱형) · 일용직·안전 숨김 W(가상) · 현장 보기 R(가상 — 운영 0명)
+  const U45 = { A: { id: 'm1', name: '관리자A', admin: true }, S: { id: 'm2', name: '안전담당', perms: { site: 'do', safety: 'do', wk: 'view' } }, H: { id: 'm3', name: '화관법담당', perms: { site: 'do', safety: 'view', wk: 'do' } },
+    V: { id: 'm4', name: '차량담당', perms: { site: 'do', wk: 'do' } }, W: { id: 'm5', name: '일용직숨김', perms: { site: 'do' } }, R: { id: 'm6', name: '현장보기', perms: { site: 'view', wk: 'view' } } };
+  const MEM45 = () => [{ id: 'u1', name: '홍길동' }, { id: 'u2', name: '김직원' }];
+  const WKS45 = () => [{ id: 'w1', name: '김일용' }, { id: 'w2', name: '박반장' }, { id: 'w3', name: '이신입' }, { id: 'w4', name: '지운일용', del: 1 }];
+  const EDU45 = () => [{ id: 'e1', ptype: 'worker', pid: 'w1', kind: 'special', date: '2026-05-01' }, { id: 'e2', ptype: 'worker', pid: 'w3', kind: 'special', date: '2025-01-01' }];
+  // 현장 대장 — 예정·작업중 4(p1 석면 예정·마감 지남 · p2 종류 없음 작업중 · p3 준설 예정 · p4 철거 예정 날짜 없음) · 2025·2026 종결 3 · 지난 자료 4(o1 시작 2024-12-31 경계 · o2 2013 · o3 준설 2020 · o4 날짜 없음 종결) · 지운 줄 1
+  const S0_45 = (o) => Object.assign({ client: '', site: '', start: '', end: '', material: '', area: '', status: 'done', conc: '', waste_no: '', note: '', member_ids: [], worker_ids: [] }, o);
+  const ASB45 = () => [
+    S0_45({ id: 'p1', seq: 131, kind: 'asbestos', title: '가동 석면 예정', client: '가건설(주)', start: '2026-11-15', status: 'plan', material: '슬레이트', area: '182', member_ids: ['u1'], worker_ids: ['w1', 'w2'] }),
+    S0_45({ id: 'p2', seq: 130, title: '나동 석면 작업중', client: '나주택', site: '포항시 남구', start: '2026-11-01', end: '2026-12-05', status: 'run', worker_ids: ['w1'] }),
+    S0_45({ id: 'p3', seq: 19, kind: 'dredge', title: '다천 준설 예정', client: '포항시', start: '2026-12-01', status: 'plan' }),
+    S0_45({ id: 'p4', seq: 7, kind: 'demolition', title: '라동 철거 날짜 없음', status: 'plan' }),
+    S0_45({ id: 'd1', seq: 18, kind: 'dredge', title: '마천 준설', client: '포항시 북구청', site: '흥해읍', start: '2025-09-15', end: '2025-10-31', worker_ids: ['w3'] }),
+    S0_45({ id: 'd2', seq: 129, kind: 'asbestos', title: '바초 석면', client: '교육청', site: '포항시 북구', start: '2026-03-02', end: '2026-03-06', conc: '0.002', waste_no: 'W-1', worker_ids: ['w1', 'w3'], ks: { no: 'K-9', year: 2026, biz: '석면해체', amount: 12345678 } }),
+    S0_45({ id: 'd3', seq: 6, kind: 'demolition', title: '사동 철거', site: '오천읍', start: '2025-04-07', end: '2025-04-30' }),
+    S0_45({ id: 'o1', seq: 50, kind: 'asbestos', title: '아동 석면 옛', client: '구룡포교회', site: '구룡포', start: '2024-12-31', end: '2025-01-10' }),
+    S0_45({ id: 'o2', seq: 3, title: '자동 석면 아주 옛', site: '연일', start: '2013-10-07', end: '2013-10-15' }),
+    S0_45({ id: 'o3', seq: 2, kind: 'dredge', title: '차천 준설 옛', start: '2020-05-01', end: '2020-05-30' }),
+    S0_45({ id: 'o4', title: '카동 날짜 없음 종결' }),
+    S0_45({ id: 'x1', title: '지운 줄', del: 1, start: '2026-01-01', status: 'plan' }),
+  ];
+  const SITE_DASH45 = '<span style="color:#9AA09C;">-</span>';
+  const MAIN45 = 'p3,p1,p2,d2,d1,d3,p4', OLD45 = 'o1,o3,o2,o4';   // 기간 ▼(옛 목록 정렬 식 String(start || end) 최신 먼저 · 빈 값 뒤 · 같으면 대장 순서) — 묶음 안도 같은 정렬
+  const REAL45 = ['pad', 'fmtDate', 'esc', 'isDate', 'addDays', 'vehDday', 'asList', 'liveAsb', 'findAsb', 'normAsbRow', 'asbNotifyDue', 'asbKeepUntil', 'asbWorkerNames', 'liveEdu', 'eduLatest', 'eduHasValidSpecial', 'asbNoSpecial',
+    'siteGapSig', 'siteGapSigs', 'siteEduLine', 'siteEduLines', 'sheetRow', 'bindFold', 'siteKind', 'liveSites', 'siteLabel', 'siteYear', 'renderSiteFilter', 'renderSitesLegacy',
+    'asbKindOf', 'asbKindApply', 'asbUpdateDerived', 'openAsb', 'closeAsb', 'saveAsb', 'deleteAsb', 'tabRoute', 'safetyPanes', 'setSafetyLayer', 'applySafetyPerms', 'calEvents', 'sfNowGo', 'sfNowTop'];
+  const VARH45 = ['  var ASB_STATUS = ', '  var SITE_KIND = ', '  var SITE_ORDER = ', '  var siteFilter = ', '  var SITE_OLD_BEFORE = ', '  var siteOldOpen = ', '  var siteEduGap;', '  var siteEduGapSig = ', '  var siteEduGapSeq = ',
+    '  var asbSaveBusy = ', '  var ASB_ONLY_IDS = ', '  var ASB_UNREAD_MSG = ', '  var ASB_KIND_OUT_MSG = ', '  var asbOpenSeq = ', '  var TAB_ALIAS = '];   // v445 검토: 종류 바꾸기 확인 글·창 연 차례
+  const PRE45 = [
+    'var asb = ENV.asb, asbBase = 0, asbPending = false, asbSaveTimer = null, asbEditId = null, asbLoaded = ENV.asbLoaded !== false;',
+    'var members = ENV.members, workers = ENV.workers, edu = ENV.edu, wkLoaded = ENV.wkLoaded !== false;',
+    'var vehicles = [], licenses = [], tasks = [], receivables = [], currentTab = ENV.tab || "safety", safetyLayer = "site", eduViewScope = "member";',
+    'function todayStr(){ return "2026-11-11"; }',
+    'function genId(p){ ENV.gid++; return p + "N" + ENV.gid; }',
+    'function curMember(){ return ENV.user; } function myId(){ return ENV.user ? ENV.user.id : ""; }',
+    'function isAdmin(){ return !!(ENV.user && ENV.user.admin); }',
+    'function permOf(mod){ var u = ENV.user; if (!u) return "hide"; if (u.admin) return "do"; return (u.perms && u.perms[mod]) || "hide"; }',
+    'function canDo(mod){ return permOf(mod) === "do"; } function canSee(mod){ return permOf(mod) !== "hide"; }',
+    'function findMember(id){ for (var i = 0; i < members.length; i++){ if (members[i].id === id) return members[i]; } return null; }',
+    'function memberName(id){ if (!id) return ""; var m = findMember(id); return m ? m.name : ""; } function dispName(n){ return n || ""; } function dispNameById(id){ return memberName(id); }',
+    'function fmtAmount(v){ return String(v); }',
+    'function confirm(msg){ ENV.log.push("confirm:" + msg); return ENV.confirmAns !== false; } function alert(msg){ ENV.log.push("alert:" + msg); } function gwToast(msg){ ENV.log.push("toast:" + msg); }',
+    'function loadAsb(){ ENV.log.push("loadAsb"); } function loadEdu(){ ENV.log.push("loadEdu"); } function loadWorkers(){ ENV.log.push("loadWorkers"); return { then: function(f){ ENV.pend.push(f); } }; } function sfNowOpen(){ ENV.log.push("sfNowOpen"); } function renderEdu(){ ENV.log.push("renderEdu"); }',   // v445 검토: 명부 읽기 끝 콜백은 모아 두기만(시험이 도착 시점을 고름 — ⑲·㉑)
+    'function renderCalendar(){ ENV.log.push("renderCalendar"); } function scheduleAsbSave(){ asbPending = true; ENV.log.push("asbSave"); } function openSiteWorkers(id){ ENV.log.push("sw:" + id); }',
+    'function afterSave(){ for (var i = 0; i < arguments.length; i++){ if (typeof arguments[i] === "function") arguments[i](); } }',
+    'function renderMemberPicks(host){ ENV.log.push("picks:" + host); } function getCheckedMembers(){ return (ENV.pickM || []).slice(); } function asbRenderWorkerChecks(){ ENV.log.push("wkchecks"); } function asbGetCheckedWorkers(){ return (ENV.pickW || []).slice(); }',
+    'function switchTab(n){ ENV.log.push("switch:" + n); var rt = tabRoute(n); currentTab = rt.tab; if (rt.tab === "safety") setSafetyLayer(rt.layer); }',
+    'function taskVisible(){ return true; } function recVisible(){ return true; } function licVisible(){ return true; } function liveLeaves(){ return []; } function eduPersonName(){ return "사람"; } function eduKindLabel(){ return "교육"; }'].join('\n');
+  const match45 = (el, sel) => {
+    const re = /(#[\w-]+)|(\.[\w-]+)|(\[[\w-]+(?:="(?:[^"\\]|\\.)*")?\])|([a-zA-Z][\w-]*)/g; let m, at = 0;
+    while ((m = re.exec(sel))) {
+      if (m.index !== at) throw new Error('시험 DOM이 모르는 선택자: ' + sel); at = re.lastIndex;
+      if (m[1]) { if (el.getAttribute('id') !== m[1].slice(1)) return false; }
+      else if (m[2]) { if (!el.classList.contains(m[2].slice(1))) return false; }
+      else if (m[3]) { const a = /^\[([\w-]+)(?:="((?:[^"\\]|\\.)*)")?\]$/.exec(m[3]); if (a[2] === undefined) { if (!el.hasAttribute(a[1])) return false; } else if (el.getAttribute(a[1]) !== a[2].replace(/\\(.)/g, '$1')) return false; }
+      else if (m[4]) { if (!el.tagName || el.tagName !== m[4].toUpperCase()) return false; }
+    }
+    if (!at || at !== sel.length) throw new Error('시험 DOM이 모르는 선택자: ' + sel);
+    return true;
+  };
+  const mkCls45 = (s) => { const c = new Set(String(s || '').split(/\s+/).filter(Boolean)); return { toggle: (k, on) => { if (on === undefined ? !c.has(k) : on) c.add(k); else c.delete(k); return c.has(k); }, contains: (k) => c.has(k), add: (k) => c.add(k), remove: (k) => c.delete(k) }; };
+  const HOSTS45 = ['siteList', 'siteHead', 'siteFilterBar', 'siteSearch', 'siteAddBtn', 'asbBackdrop', 'asbModalTitle', 'asbKind', 'asbTitle', 'asbClient', 'asbSite', 'asbStart', 'asbEnd', 'asbMaterial', 'asbArea', 'asbStatus', 'asbConc', 'asbWaste', 'asbNote',
+    'asbDelete', 'asbDerived', 'asbMembers', 'asbWorkers', 'sfSubBar', 'sfPaneNow', 'sfPaneSite', 'sfPaneEdu', 'tabSafetyBtn', 'sfChipNow', 'asbMovedGo', 'eduMovedHr', 'eduMovedWk', 'wkExamMoved'];
+  //   v445 검토 — 선택 옵션(기본은 위 틀 그대로): o.realWk = 창 일용직 상자 실제 함수(asbRenderWorkerChecks·asbGetCheckedWorkers — 가짜 대신, ⑲) ·
+  //   o.sw = [근로자 추가] 창 실제 함수(openSiteWorkers·renderSwList·swPickIds·swEmptyText + 명부 정렬·배지 함수)와 현장 탭 배선 IIFE 그대로([이 현장에 넣기]·검색칸·목록 change 위임·[+ 새 일용직] — ⑳) ·
+  //   둘 중 하나면 document.querySelectorAll이 자리들의 요소를 찾는다('#자리 선택자' 꼴은 그 자리 안만)
+  const STUB_WK45 = 'function asbRenderWorkerChecks(){ ENV.log.push("wkchecks"); } function asbGetCheckedWorkers(){ return (ENV.pickW || []).slice(); }', STUB_SW45 = 'function openSiteWorkers(id){ ENV.log.push("sw:" + id); }';
+  const SWHOSTS45 = ['swSearch', 'swCancel', 'swNewBtn', 'swSave', 'swNewName', 'swList', 'swSub', 'swBackdrop', 'swNewWrap', 'swNoWkNote'];
+  const SWREAL45 = ['openSiteWorkers', 'swEmptyText', 'renderSwList', 'swPickIds', 'liveWorkers', 'sortedWorkers', 'wkKindCounts', 'wkKindChips', 'wkAgoText', 'wkMissing', 'wkBirth6', 'wkMarkDirty'];
+  const SWVARS45 = ['  var swSiteId=null, swQ="";', '  var swSel=null;', '  var SW_NO_WK_MSG=', '  var WK_UNREAD_MSG=', '  var WK_NO_ADD_MSG=', '  var wkDirty={};', '  var WK_KIND_LABEL = ', '  var WK_KIND_ORDER = '];
+  const siteIife45 = (src) => { const k = src.indexOf('  // 현장 탭 배선(v347)'), s = src.indexOf('  (function(){', k), e = src.indexOf('\n  })();', k); if (k < 0 || s < 0 || e < 0 || src.slice(s, e).indexOf('swSave') < 0) throw new Error('현장 탭 배선 없음'); return src.slice(s, e + '\n  })();'.length); };
+  const mk45 = (o) => {
+    o = o || {};
+    const src = o.src || html;
+    const env = { width: o.width || 1366, user: o.user || U45.A, asb: o.asb || ASB45(), members: o.members || MEM45(), workers: o.workers || WKS45(), edu: o.edu || EDU45(), wkLoaded: o.wkLoaded, asbLoaded: o.asbLoaded, tab: o.tab,
+      mql: [], store: Object.assign({}, o.store || {}), timers: [], now: 100000, log: [], raf: [], ro: [], roCb: null, cw: 1048, confirmAns: true, gid: 0, pickM: [], pickW: [], pend: [] };
+    const doc = { activeElement: null, byId: {} };
+    doc.getElementById = (id) => doc.byId[id] || null;
+    doc.querySelector = (sel) => { env.log.push('qs:' + sel); return null; };
+    doc.querySelectorAll = (sel) => {
+      if (!o.realWk && !o.sw) return [];
+      const m = /^#([\w-]+) (.+)$/.exec(sel);
+      if (m) { const h = doc.byId[m[1]]; return h ? h.els.filter((e) => match45(e, m[2])) : []; }
+      const out = []; Object.keys(doc.byId).forEach((k) => { (doc.byId[k].els || []).forEach((e) => { if (match45(e, sel)) out.push(e); }); }); return out;
+    };
+    doc.addEventListener = () => {}; doc.removeEventListener = () => {};
+    const mkEl = (tag, attrs) => {
+      const el = { tagName: tag.toUpperCase(), attrs, L: {}, scrollLeft: 0, scrollTop: 0, parentNode: null };
+      Object.defineProperty(el, 'clientWidth', { get: () => env.cw });
+      el.getAttribute = (n) => (own45(attrs, n) ? unesc45(attrs[n]) : null);
+      el.setAttribute = (n, v) => { attrs[n] = String(v); };
+      el.hasAttribute = (n) => own45(attrs, n);
+      el.type = attrs.type || ''; el.value = own45(attrs, 'value') ? unesc45(attrs.value) : ''; el.checked = own45(attrs, 'checked'); el.disabled = own45(attrs, 'disabled');
+      const sp = {}; String(attrs.style || '').split(';').forEach((p) => { const k = p.indexOf(':'); if (k > 0) sp[p.slice(0, k).trim()] = p.slice(k + 1).trim(); });
+      el.style = { sp, display: sp.display || '', setProperty: (k, v) => { sp[k] = String(v); }, getPropertyValue: (k) => sp[k] || '' };
+      el.classList = mkCls45(attrs.class);
+      el.addEventListener = (t, f) => { (el.L[t] = el.L[t] || []).push(f); };
+      el.fire = (t, ev) => { const e = Object.assign({ target: el, type: t, stopped: false }, ev || {}); e.stopPropagation = () => { e.stopped = true; }; e.preventDefault = () => {}; (el.L[t] || []).slice().forEach((f) => f(e)); return e; };
+      el.focus = () => { doc.activeElement = el; };
+      el.closest = (sel) => (match45(el, sel) ? el : null);
+      el.selectionStart = el.tagName === 'INPUT' ? el.value.length : null;
+      el.setSelectionRange = (a) => { el.selectionStart = a; };
+      el.scrollIntoView = () => { env.log.push('into:' + (el.getAttribute('data-vs-row') || el.getAttribute('data-vs-detcard') || '')); };
+      return el;
+    };
+    env.mkEl = mkEl;
+    env.mkHost = (id) => {
+      const host = { id, tagName: 'DIV', attrs: { id }, _h: '', _t: '', els: [], visible: true, style: { display: '' }, L: {}, value: '' };
+      host.getAttribute = (n) => (own45(host.attrs, n) ? host.attrs[n] : null);
+      host.setAttribute = (n, v) => { host.attrs[n] = String(v); };
+      host.hasAttribute = (n) => own45(host.attrs, n);
+      host.getClientRects = () => ((host.visible && host.style.display !== 'none') ? [{}] : []);
+      host.contains = (el) => host.els.indexOf(el) >= 0;
+      host.querySelectorAll = (sel) => host.els.filter((e) => match45(e, sel));
+      host.querySelector = (sel) => host.els.find((e) => match45(e, sel)) || null;
+      host.addEventListener = (t, f) => { env.log.push('host-listener:' + id + ':' + t); (host.L[t] = host.L[t] || []).push(f); };
+      host.classList = mkCls45('');
+      host.focus = () => { doc.activeElement = host; };
+      Object.defineProperty(host, 'innerHTML', { get: () => host._h, set: (v) => {
+        host._h = String(v); host.els = [];
+        for (const t of host._h.matchAll(/<([a-zA-Z][\w-]*)((?:[^<>"]|"[^"]*")*)>/g)) { const attrs = {}; for (const a of t[2].matchAll(/([\w-]+)(?:="([^"]*)")?/g)) attrs[a[1]] = a[2] === undefined ? '' : a[2]; host.els.push(mkEl(t[1], attrs)); }
+      } });
+      Object.defineProperty(host, 'textContent', { get: () => host._t, set: (v) => { host._t = String(v); } });
+      doc.byId[id] = host;
+      return host;
+    };
+    env.host = (id) => doc.byId[id];
+    HOSTS45.forEach((id) => env.mkHost(id));
+    if (o.sw) SWHOSTS45.forEach((id) => env.mkHost(id));
+    env.host('siteList').innerHTML = '<div class="loading">불러오는 중…</div>';
+    env.host('siteFilterBar').style.display = 'flex';
+    const win = { get innerWidth() { return env.width; }, matchMedia: (q) => ({ media: q, get matches() { return mq45(q, env.width); }, addEventListener: (t, f) => { env.mql.push(f); } }), requestAnimationFrame: (f) => { env.raf.push(f); }, scrollTo: () => { env.log.push('top'); } };
+    const ls = { getItem: (k) => (own45(env.store, k) ? env.store[k] : null), setItem: (k, v) => { env.log.push('store:' + k); env.store[k] = String(v); }, removeItem: (k) => { delete env.store[k]; } };
+    const stF = (f, ms) => { const t = { id: env.timers.length + 1, f, at: env.now + ms, done: false }; env.timers.push(t); return t.id; };
+    const ctF = (id) => { env.timers.forEach((t) => { if (t.id === id) t.done = true; }); };
+    function RO(cb) { env.roCb = cb; this.observe = (t) => { env.ro.push(t); }; }
+    class FD extends Date { static now() { return env.now; } }
+    const pre45 = PRE45.replace(STUB_WK45, o.realWk ? '' : STUB_WK45).replace(STUB_SW45, o.sw ? 'function renderWorkers(){ ENV.log.push("renderWorkers"); } function scheduleWorkersSave(){ ENV.log.push("wkSave"); }' : STUB_SW45);
+    const extra45 = [].concat(o.realWk ? ['asbRenderWorkerChecks', 'asbGetCheckedWorkers'].map((n) => fn45(src, n)) : [], o.sw ? SWVARS45.map((h) => line45(src, h)).concat(SWREAL45.map((n) => fn45(src, n)), [siteIife45(src)]) : []);
+    const SRC = [pre45].concat(VARH45.map((h) => line45(src, h)), REAL45.map((n) => fn45(src, n)), extra45, [blkOf45(src, '// @vs-sheet-start', '// @vs-sheet-end'), blkOf45(src, '// @site-sheet-start', '// @site-sheet-end'),
+      'return { render: renderSites, legacy: renderSitesLegacy, def: siteSheetDef, inst: vsInst, vs: vsSheetRender, check: vsSheetCheckDef, minW: vsSheetMinW, cols: vsSheetCols, budget: VS_STAGE_BUDGET, reveal: vsSheetReveal,'
+      + ' pairs: siteSheetPairs, eduSum: siteEduSum, eduLine: siteEduLine, dueInfo: siteDueInfo, oldOf: siteOldOf, ppl: siteSheetPpl, sigs: siteGapSigs, sig: siteGapSig, year: siteYear,'
+      + ' openAsb: openAsb, saveAsb: saveAsb, deleteAsb: deleteAsb, kindApply: asbKindApply, showNew: siteSheetShowNew, go: siteSheetGo, nowGo: sfNowGo, cal: calEvents, setLayer: setSafetyLayer, applySafety: applySafetyPerms,'
+      + ' asb: function(){ return asb; }, setAsb: function(a){ asb = a; }, setGap: function(g, s){ siteEduGap = g; siteEduGapSig = s || {}; }, setLoaded: function(v){ asbLoaded = v; }, editId: function(){ return asbEditId; }, setBusy: function(v){ asbSaveBusy = v; },'
+      + ' cur: function(){ return siteSheetCur; }, q: function(){ return siteQ; }, setTab: function(t, l){ currentTab = t; safetyLayer = l; }, layer: function(){ return safetyLayer; }, tab: function(){ return currentTab; }, unread: ASB_UNREAD_MSG,'
+      + ' setWk: function(w){ workers = w; }, setWkLoaded: function(v){ wkLoaded = v; }, setEdu: function(e){ edu = e; }, sw: switchTab,'
+      + ' closeAsb: closeAsb, qOk: vsSheetQOk, gapSeq: function(){ return siteEduGapSeq; }, gap: function(){ return siteEduGap; }, swSelOf: function(){ return typeof swSel === "undefined" ? null : swSel; },'
+      + ' openSw: openSiteWorkers, wks: function(){ return workers; } };']).join('\n');   // v445 검토 묶음(⑲~㉔)이 쓰는 입구
+    const api = new Function('window', 'document', 'localStorage', 'setTimeout', 'clearTimeout', 'ResizeObserver', 'ENV', 'Date', SRC)(win, doc, ls, stF, ctF, RO, env, FD);
+    env.breakAll = () => { env.mql.slice().forEach((f) => f({})); };
+    env.runTimers = () => { env.timers.filter((t) => !t.done).forEach((t) => { t.done = true; t.f(); }); };
+    return { api, env, doc, host: env.host('siteList') };
+  };
+  const order45 = (h) => [...h.matchAll(/data-vs-row="([^"]*)"/g)].map((m) => m[1]).join(',');
+  const cnt45 = (h) => (/<span class="vs-count">([^<]*)<\/span>/.exec(h) || ['', ''])[1];
+  const rowSeg45 = (h, id) => (new RegExp('<tr class="vs-r[^"]*" data-vs-row="' + id + '">([\\s\\S]*?)</tr>').exec(h) || ['', ''])[1];
+  const cells45 = (h, id) => [...rowSeg45(h, id).matchAll(/<td([^>]*)>([\s\S]*?)<\/td>/g)].map((m) => [m[1], m[2]]);
+  const heads45 = (h) => [...h.matchAll(/<th[^>]*data-vs-sort="(\w+)"/g)].map((m) => m[1]);
+  const cellOf45 = (h, id, k) => { const i = heads45(h).indexOf(k); return i < 0 ? null : (cells45(h, id)[i] || null); };
+  const clsOf45 = (c) => ((c && /class="([^"]*)"/.exec(c[0])) || ['', ''])[1];
+  const chips45 = (h) => [...h.matchAll(/data-vs-chip="st\|(\w*)"[^>]*>([^<]*)</g)].map((m) => m[1] + ':' + m[2]).join('|');
+  const foot45 = (h) => ((/<tfoot><tr>([\s\S]*?)<\/tr><\/tfoot>/.exec(h) || ['', ''])[1].match(/<td[^>]*>([\s\S]*?)<\/td>/g) || []).map((s) => s.replace(/^<td[^>]*>|<\/td>$/g, '').replace(/<[^>]+>/g, '')).join('|');
+  const det45 = (h) => (/<div class="vs-det-in" data-vs-det="[^"]*">([\s\S]*?)<\/div><\/td><\/tr>/.exec(h) || ['', ''])[1];
+  const detId45 = (h) => (/data-vs-det="([^"]*)"/.exec(h) || ['', ''])[1];
+  const grp45 = (h) => (/<tr class="vs-grp( open)?" data-vs-grp="old"><td colspan="\d+"><div class="vs-grp-in"><span class="car">(.)<\/span>([\s\S]*?)<span class="n">([^<]*)<\/span><\/div><\/td><\/tr>/.exec(h) || null);
+  const miss45 = [];
+  const noMiss45 = (m0) => miss45.length === m0;
+  const openRow45 = (X, id) => { const row = X.host.querySelector('[data-vs-row="' + id + '"]'); if (!row) { miss45.push('행 없음 ' + id); return false; } row.fire('click', { target: row }); return true; };
+  const chip45 = (X, k) => { const el = X.host.querySelector('[data-vs-chip="st|' + k + '"]'); if (!el) { miss45.push('칩 없음 ' + k); return false; } el.fire('click'); return true; };
+  const grpClick45 = (X) => { const el = X.host.querySelector('[data-vs-grp="old"]'); if (!el) { miss45.push('묶음 없음'); return false; } el.fire('click'); return true; };
+  const sortBy45 = (X, k) => { const th = X.host.querySelector('[data-vs-sort="' + k + '"]'); if (!th) { miss45.push('머리 없음 ' + k); return false; } th.fire('click', { target: th }); return true; };
+  const vf45 = (X, k, v) => { const el = X.host.querySelector('[data-vf="' + k + '"]'); if (!el) { miss45.push('거르기 칸 없음 ' + k); return false; } el.value = v; if (el.tagName === 'SELECT') el.fire('change'); else { el.fire('input'); X.env.runTimers(); } return true; };
+  const typeQ45 = (X, v) => { const s = X.env.host('siteSearch'); s.value = v; (s.L.input || []).slice().forEach((f) => f({})); X.env.runTimers(); };
+  const press45 = (X, attr, val) => { const det = X.host.querySelector('[data-vs-det]'), L = X.host.els.filter((e) => e.getAttribute(attr) === val), b = L[L.length - 1]; if (!det || !b) { miss45.push('펼침 안 요소 없음 ' + attr + '=' + val); return false; } det.fire('click', { target: b }); return true; };
+  const fake45 = (X, attrs) => { const det = X.host.querySelector('[data-vs-det]'); if (!det) { miss45.push('펼침 없음(흉내)'); return false; } const b = X.env.mkEl('button', Object.assign({ type: 'button', class: 'mini-btn' }, attrs)); det.fire('click', { target: b }); return true; };   // 화면에 없는 버튼을 만들어 누름(누름 길의 지금 규칙)
+
+  // ① 정의·칸 폭(운영 백업 11/11 08:15 사본 실측 — 명세에서 일곱 바꿈)·단계 합: vsSheetCheckDef 통과(관리자·안전 수행·안전 보기·안전 숨김·일용직 숨김·현장 보기 × phone legacy·sheet) · 열 11 = 명세 순서 ·
+  //   단계 합 742/960/1,072 ≤ 한도(= CSS 본문 폭 − 49) · key jw_site_sheet · host siteList · 단위 건 · 검색칸 = 탭의 #siteSearch(search.el) · 기본 정렬 기간 ▼ · 묶음(지난 자료)·옅은 칩·칩 수 · phone legacy = renderSitesLegacy · 선택 칸·더보기 없음
+  const X1 = mk45(), d1 = X1.api.def();
+  const ck1 = Object.keys(U45).map((u) => { X1.env.user = U45[u]; const d = X1.api.def(); return [X1.api.check(d).join(','), X1.api.check(Object.assign({}, d, { phone: 'sheet' })).join(',')].join('/'); });
+  X1.env.user = U45.A;
+  const COLS45 = 'title:공사명:0:text:1:52:fill200::|kind:구분:76:enum:1:22:::|client:발주처:132:text:3:0:::|site:소재지:112:text:4:0:::|term:기간:168:none:2:0:::|st:상태:62:enum:2:0:::|n:투입:56:none:2:0::num:|edu:특별교육:94:enum:2:0:::|due:신고 마감:86:none:2:0:::|keep:보존 만료:86:none:3:0:::|sched_ph:일정:0:none:1:26:::ph';
+  const cols1 = d1.cols.map((c) => [c.k, c.h, c.w || 0, c.f, c.lv || 1, c.pw || 0, c.fill ? 'fill' + c.min : '', c.num ? 'num' : '', c.ph ? 'ph' : ''].join(':')).join('|');
+  const sums1 = [2, 3, 4].map((s) => X1.api.minW({ colw: {} }, X1.api.cols(d1, s))), bud1 = [2, 3, 4].map((s) => X1.api.budget[s]);
+  const css45 = (() => { const i = html.indexOf('<style>'), j = html.indexOf('</style>', i); return html.slice(i + 7, j).replace(/\/\*[\s\S]*?\*\//g, ''); })();
+  const rules45 = [];
+  const parse45 = (s, media) => { let i = 0; while (i < s.length) { const ob = s.indexOf('{', i); if (ob < 0) break; const head = s.slice(i, ob).trim(); let d = 1, j = ob + 1; for (; j < s.length && d > 0; j++) { if (s[j] === '{') d++; else if (s[j] === '}') d--; } const bd = s.slice(ob + 1, j - 1); if (/^@media/.test(head)) parse45(bd, head.slice(6).trim()); else if (!/^@/.test(head)) { const decl = {}; bd.split(';').forEach((p) => { const k = p.indexOf(':'); if (k > 0) decl[p.slice(0, k).trim()] = p.slice(k + 1).trim(); }); rules45.push({ media, sels: head.split(',').map((x) => x.trim().replace(/\s*>\s*/g, '>').replace(/\s+/g, ' ')), decl }); } i = j; } };
+  parse45(css45, null);
+  const decl45 = (w, sel, prop) => { let v = null; rules45.forEach((r) => { if (mq45(r.media, w) && r.sels.indexOf(sel) >= 0 && own45(r.decl, prop)) v = r.decl[prop]; }); return v; };
+  const pad45 = (v) => { const p = String(v || '0px').trim().split(/\s+/).map((x) => parseFloat(x) || 0); const r = p.length === 1 ? p[0] : p[1]; return [p.length === 4 ? p[3] : r, r]; };
+  const bodyW45 = (win) => { const W = win - 17, mx = decl45(win, '#app', 'max-width'), appW = (!mx || mx === 'none') ? W : Math.min(W, parseFloat(mx)), lr = pad45(decl45(win, '#app', 'padding')); return appW - lr[0] - lr[1] - (parseFloat(decl45(win, '.tabbar', 'width')) || 0) - (parseFloat(decl45(win, '.layout', 'gap')) || 0); };
+  const body1 = [1024, 1280, 1600].map((w) => Math.round(bodyW45(w)));
+  const fit1 = [0, 1, 2].every((i) => sums1[i] <= bud1[i] && Math.abs(bud1[i] + 49 - body1[i]) <= 2);
+  const chipK1 = d1.chips.length === 1 ? d1.chips[0].items.map((it) => it.k + (it.warn ? '!' : '')).join(',') : '';
+  T('v445 ① 현장 표 정의·칸 폭·단계 합: vsSheetCheckDef 통과(관리자·안전 수행·안전 보기·안전 숨김·일용직 숨김·현장 보기 × phone legacy·sheet — 폰 열 % 합 100) · 열 11 = 공사명 남는 폭 최소 200 text(폰 52) · 구분 76 enum(폰 22) · 발주처 132 lv3 · 소재지 112 lv4 · 기간 168 lv2 · 상태 62 lv2 enum · 투입 56 lv2 숫자 · 특별교육 94 lv2 enum · 신고 마감 86 lv2 · 보존 만료 86 lv3 · 일정(폰 전용 26 — 정렬 별칭 기간) — 명세 폭에서 일곱 바꿈(운영 백업 11/11 08:15 사본 실측: 구분 "석면 #131" 57.6/57 · 기간 148.3/143 · 투입 머리 + 화살표 38/35 · 신고 마감 머리 67.4/59 · 보존 만료 날짜 65.3/63 · 상태 62·특별교육 94는 그만큼 줄임) · 단계 합 742/960/1,072 ≤ 한도 ' + bud1.join('/') + '(= CSS 본문 폭 ' + body1.join('/') + ' − 49) · key jw_site_sheet · host siteList · 단위 건 · 검색칸 = #siteSearch(search.el) · 기본 정렬 기간 ▼ · 칩 한 묶음 7개(신고 7일 안·지남만 빨강)·옅은 선택·칩 수 · 지난 자료 묶음(group) · phone legacy = renderSitesLegacy · 선택 칸·더보기 없음',
+    ck1.every((s) => s === '/') && cols1 === COLS45 && sums1.join('/') === '742/960/1072' && JSON.stringify(bud1) === '[742,962,1282]' && JSON.stringify(body1) === '[791,1011,1331]' && fit1
+    && d1.key === 'jw_site_sheet' && d1.host === 'siteList' && d1.unit === '건' && d1.search && d1.search.el === 'siteSearch' && typeof d1.search.text === 'function' && d1.sort.k === 'term' && d1.sort.d === -1
+    && chipK1 === ',run,asbestos,demolition,dredge,due7!,nosite' && d1.chipStyle === 'light' && d1.chipCount === 1 && d1.group && typeof d1.group.of === 'function' && typeof d1.group.auto === 'function'
+    && d1.phone === 'legacy' && d1.legacy === X1.api.legacy && !d1.sel && !d1.page && typeof d1.onPaint === 'function' && typeof d1.onMode === 'function',
+    JSON.stringify({ ck1, cols1, sums1, bud1, body1, chipK1 }));
+
+  // ② 칩·건수(실행 — 시험이 대장을 따로 세어 대조): 전체 11 · 진행 중 4(종결 아님 — 상태 칸 없는 옛 줄도) · 석면 6(종류 없음 = 석면 3 포함) · 철거 2 · 준설 3 · 신고 7일 안·지남 1(p1 — 예정·마감 지남, 작업중 p2의 지난 마감은 빼고) ·
+  //   소재지 미입력 2(석면만 — p1·o4, 준설 빈 소재지는 빼고) · '보이는 n건 / 전체 m건' · 칩을 누르면 그 줄(진행 중은 묶음 없음 · 석면은 지난 자료 묶음 접힘 그대로 · 소재지 미입력은 묶음 저절로 펼침)
+  const m2 = miss45.length, X2 = mk45(); X2.api.render(); const h2 = X2.host._h;
+  const exp2 = (() => { const L = ASB45().filter((r) => r.del !== 1), kd = (r) => (['asbestos', 'demolition', 'dredge'].indexOf(r.kind) >= 0 ? r.kind : 'asbestos'); return [L.length, L.filter((r) => r.status !== 'done').length, L.filter((r) => kd(r) === 'asbestos').length, L.filter((r) => kd(r) === 'demolition').length, L.filter((r) => kd(r) === 'dredge').length, 1, L.filter((r) => kd(r) === 'asbestos' && !r.site).length]; })();
+  const want2 = ':전체 ' + exp2[0] + '|run:진행 중 ' + exp2[1] + '|asbestos:석면 ' + exp2[2] + '|demolition:철거 ' + exp2[3] + '|dredge:준설 ' + exp2[4] + '|due7:신고 7일 안·지남 ' + exp2[5] + '|nosite:소재지 미입력 ' + exp2[6];
+  const light2 = h2.indexOf('<div class="vs-tools vs-light">') >= 0 && /<button type="button" class="vs-chip warn" data-vs-chip="st\|due7"/.test(h2) && (h2.match(/class="vs-chip warn/g) || []).length === 1;
+  chip45(X2, 'run'); const o2run = order45(X2.host._h), g2run = !!grp45(X2.host._h), c2run = cnt45(X2.host._h);
+  chip45(X2, 'asbestos'); const o2asb = order45(X2.host._h), g2asb = grp45(X2.host._h);
+  chip45(X2, 'due7'); const o2due = order45(X2.host._h);
+  chip45(X2, 'nosite'); const o2ns = order45(X2.host._h), g2ns = grp45(X2.host._h);
+  chip45(X2, 'dredge'); const o2dr = order45(X2.host._h); chip45(X2, '');
+  T('v445 ② 칩·건수(실행 — 시험이 대장을 따로 세어 대조): ' + want2 + ' · 건수 글 "보이는 11건 / 전체 11건" · 옅은 선택(vs-light)·빨강은 신고 7일 안·지남 하나 · 진행 중 = p3,p1,p2,p4(묶음 없음 — "보이는 4건") · 석면 = p1,p2,d2 + 지난 자료 묶음 접힘(o1·o2·o4 — 3건) · 신고 7일 안·지남 = p1 · 소재지 미입력 = p1 + 묶음 저절로 펼침 o4 · 준설 = p3,d1 + 묶음 접힘',
+    chips45(h2) === want2 && want2 === ':전체 11|run:진행 중 4|asbestos:석면 6|demolition:철거 2|dredge:준설 3|due7:신고 7일 안·지남 1|nosite:소재지 미입력 2' && cnt45(h2) === '보이는 11건 / 전체 11건' && light2
+    && o2run === 'p3,p1,p2,p4' && !g2run && c2run === '보이는 4건 / 전체 11건' && o2asb === 'p1,p2,d2' && g2asb && !g2asb[1] && g2asb[4] === '3건' && o2due === 'p1' && o2ns === 'p1,o4' && g2ns && g2ns[1] === ' open' && o2dr === 'p3,d1' && noMiss45(m2),
+    JSON.stringify({ chips: chips45(h2), cnt: cnt45(h2), light2, o2run, g2run, c2run, o2asb, g2asb: g2asb && g2asb.slice(1), o2due, o2ns, o2dr, miss: miss45.slice(m2) }));
+
+  // ③ 기간 정렬 = 옛 목록 순서(옛 본문 renderSitesLegacy를 같은 대장으로 375에서 돌려 카드 순서와 대조 — 묶음 밖·안) · 머리 ▼(기본) · 기간 ▲ = 오래된 먼저·빈 값 뒤 · 구분 ▲ = 석면·철거·준설 → 번호 · 상태 ▲ = 예정·작업중·종결(같으면 대장 순서) · 정렬은 기기 기억(jw_site_sheet)
+  const m3 = miss45.length, L3 = mk45({ width: 375 }); L3.api.render(); const lh3 = L3.host._h;
+  const legCards3 = (() => { const g = lh3.indexOf('data-site-old-fold='), ids = (s) => [...s.matchAll(/data-site-fold="([^"]*)"/g)].map((m) => m[1]); return g < 0 ? [ids(lh3), []] : [ids(lh3.slice(0, g)), ids(lh3.slice(g))]; })();
+  const X3 = mk45(); X3.api.render(); const h3 = X3.host._h, arr3 = /<th class="[^"]*sorted[^"]*" data-vs-sort="term"[^>]*>기간<span class="vs-ar">▼<\/span>/.test(h3);
+  grpClick45(X3); const o3open = order45(X3.host._h);
+  sortBy45(X3, 'term'); const o3up = order45(X3.host._h), arrUp3 = /data-vs-sort="term"[^>]*>기간<span class="vs-ar">▲<\/span>/.test(X3.host._h);
+  sortBy45(X3, 'kind'); const o3kind = order45(X3.host._h); sortBy45(X3, 'st'); const o3st = order45(X3.host._h);
+  const store3 = JSON.parse(X3.env.store.jw_site_sheet || '{}');
+  T('v445 ③ 기간 정렬 = 옛 목록 순서(실행 — 옛 본문 renderSitesLegacy 카드 순서와 대조): 기본 기간 ▼ 묶음 밖 ' + MAIN45 + ' = 옛 카드 순서 · 묶음을 펴면 ' + OLD45 + '가 뒤에 = 옛 묶음 안 카드 순서(연도 내림·같은 정렬) · 기간 ▲ = d3,d1,d2,p2,p1,p3,p4,o2,o3,o1,o4(빈 값 뒤) · 구분 ▲ = 석면·철거·준설 → 번호(묶음 밖 d2,p2,p1,d3,p4,d1,p3 · 묶음 안 o4(번호 없음),o2,o1,o3) · 상태 ▲ = 예정 p1,p3,p4 → 작업중 p2 → 종결 · 정렬은 기기 기억(상태 ▲)',
+    legCards3[0].join(',') === MAIN45 && legCards3[1].join(',') === OLD45 && order45(h3) === MAIN45 && arr3 && o3open === MAIN45 + ',' + OLD45
+    && o3up === 'd3,d1,d2,p2,p1,p3,p4,o2,o3,o1,o4' && arrUp3 && o3kind === 'd2,p2,p1,d3,p4,d1,p3,o4,o2,o1,o3' && o3st === 'p1,p3,p4,p2,d1,d2,d3,o1,o2,o3,o4' && store3.k === 'st' && store3.d === 1 && noMiss45(m3),
+    JSON.stringify({ leg: legCards3.map((x) => x.join(',')), o3: order45(h3), arr3, o3open, o3up, arrUp3, o3kind, o3st, store3, miss: miss45.slice(m3) }));
+
+  // ④ 지난 자료 묶음 = v435와 같은 경계(종결 + 연도 < SITE_OLD_BEFORE 또는 날짜 없음 · 예정·작업중은 연도 무관 밖 — p4 날짜 없음 예정은 밖): 표 묶음 줄 = 옛 본문 묶음 안 줄(같은 집합·건수) · 기본 접힘(머리 "지난 자료 · 2024년까지(날짜 없는 줄 포함)" + 안내 + "4건" ·
+  //   머리 글 "총 11건 (지난 자료 4건 접힘)" = 옛 본문 머리 글) · 누르면 펼침(기기 저장 0 — 메모리만)·다시 누르면 접힘 · 저절로 펼침 = 검색어·공사명·발주처·소재지 글자 거르기·소재지 미입력 칩 / 구분 고르기·석면 칩은 접힘 그대로 ·
+  //   경계 상수 한 곳 — 소스 사본 SITE_OLD_BEFORE 2026이면 표·옛 본문 둘 다 2025년 줄(d1·d3)도 묶음, 머리 "2025년까지"
+  const m4 = miss45.length, X4 = mk45(); X4.api.render(); const h4 = X4.host._h, g4 = grp45(h4), head4 = X4.env.host('siteHead').textContent;
+  const sameSet4 = ASB45().filter((r) => r.del !== 1).every((r) => X4.api.oldOf(r) === (legCards3[1].indexOf(r.id) >= 0));
+  const s4a = X4.env.log.filter((l) => l === 'store:jw_site_sheet').length; grpClick45(X4); const g4o = grp45(X4.host._h), head4o = X4.env.host('siteHead').textContent, s4b = X4.env.log.filter((l) => l === 'store:jw_site_sheet').length; grpClick45(X4); const g4c = grp45(X4.host._h);
+  const auto4 = (fn) => { const X = mk45(); X.api.render(); fn(X); const g = grp45(X.host._h); return g ? (g[1] ? 'open' : 'closed') : 'none'; };
+  const a4 = [auto4((X) => typeQ45(X, '옛')), auto4((X) => vf45(X, 'title', '옛')), auto4((X) => { X.env.width = 1920; X.env.breakAll(); vf45(X, 'site', '연일'); }), auto4((X) => { X.env.width = 1600; X.env.breakAll(); vf45(X, 'client', '교'); }), auto4((X) => chip45(X, 'nosite')), auto4((X) => vf45(X, 'kind', '석면')), auto4((X) => chip45(X, 'asbestos'))];
+  const src26 = html.replace(/\n  var SITE_OLD_BEFORE = \d+;\n/, '\n  var SITE_OLD_BEFORE = 2026;\n');
+  const X4b = mk45({ src: src26 }); X4b.api.render(); const g4b = grp45(X4b.host._h); grpClick45(X4b); const o4b = order45(X4b.host._h);
+  const L4b = mk45({ src: src26, width: 375 }); L4b.api.render(); const l4bOld = (() => { const s = L4b.host._h, g = s.indexOf('data-site-old-fold='); return g < 0 ? '' : [...s.slice(g).matchAll(/data-site-fold="([^"]*)"/g)].map((m) => m[1]).sort().join(','); })();
+  T('v445 ④ 지난 자료 묶음(실행 — v435와 같은 경계, 옛 본문과 대조): 묶음 줄 = 옛 본문 묶음 안(o1 2024-12-31·o2 2013·o3 2020·o4 날짜 없음 종결 — siteOldOf가 대장 모든 줄에서 옛 본문 가르기와 같음 · p4 날짜 없음 예정은 밖) · 기본 접힘 = 머리 "▸ 지난 자료 · 2024년까지(날짜 없는 줄 포함) + 안내 · 4건" · 표 머리 글 "총 11건 (지난 자료 4건 접힘)" = 옛 본문 머리 · 누르면 펼침("총 11건")·기기 저장 0·다시 누르면 접힘 · 저절로 펼침 = 검색어·공사명·소재지(1920)·발주처(1600) 거르기·소재지 미입력 칩 / 구분 고르기·석면 칩 = 접힘 · 상수 사본 2026 = 표 묶음 6건(d1·d3 더함 — 머리 "2025년까지")·옛 본문 묶음도 같은 6줄',
+    g4 && !g4[1] && g4[2] === '▸' && g4[3] === '지난 자료 · 2024년까지(날짜 없는 줄 포함) <span class="vs-dsub">누르면 펼침 · 검색하면 저절로 펼쳐 보임</span>' && g4[4] === '4건' && head4 === '총 11건 (지난 자료 4건 접힘)' && L3.env.host('siteHead').textContent === head4 && sameSet4
+    && g4o && g4o[1] === ' open' && g4o[2] === '▾' && head4o === '총 11건' && s4b === s4a && g4c && !g4c[1]
+    && a4.join(',') === 'open,open,open,open,open,closed,closed'
+    && g4b && g4b[3].indexOf('지난 자료 · 2025년까지') === 0 && g4b[4] === '6건' && o4b === 'p3,p1,p2,d2,p4,d1,d3,o1,o3,o2,o4' && l4bOld === 'd1,d3,o1,o2,o3,o4' && noMiss45(m4),
+    JSON.stringify({ g4: g4 && g4.slice(1), head4, sameSet4, g4o: g4o && g4o[1], head4o, s4: [s4a, s4b], a4, g4b: g4b && g4b.slice(3), o4b, l4bOld, miss: miss45.slice(m4) }));
+
+  // ⑤ 신고 마감 색 = 안전 › 현황 ③(실행 — 같은 표본을 v432 시험 틀(실제 sfNowDue)과 표에 함께 돌림): 현황 알약 bad ↔ 표 칸 빨강(vs-dan) · am ↔ 노랑(vs-warn) · 줄 없음 ↔ 색 없음 —
+  //   표본 = 마감 오늘 기준 −10(예정)·−5(작업중)·0·+7(작업중)·+8·+30(작업중)·+31·종결·준설·종류 없음 +2·상태 칸 없음 −3·시작일 없음·시작일 꼴 아님·−40(예정 — 지난 마감은 30일 경계 없음) · 칸 글(좁은 칸 꼴)·title · 현황 줄 이동 = 'site:<그 현장 id>'
+  const dPlus5 = (n) => { const d = new Date('2026-11-11T00:00:00'); d.setDate(d.getDate() + n + 7); const p = (x) => (x < 10 ? '0' : '') + x; return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); };
+  const D45 = [['q1', 'asbestos', 'plan', -10], ['q2', 'asbestos', 'run', -5], ['q3', 'asbestos', 'plan', 0], ['q4', 'asbestos', 'run', 7], ['q5', 'asbestos', 'plan', 8], ['q6', 'asbestos', 'run', 30], ['q7', 'asbestos', 'plan', 31], ['q8', 'asbestos', 'done', 3], ['q9', 'dredge', 'plan', 3],
+    ['q10', '', 'plan', 2], ['q11', 'asbestos', '', -3], ['q12', 'asbestos', 'plan', null], ['q13', 'asbestos', 'plan', 'x'], ['q14', 'asbestos', 'plan', -40]].map(([id, kind, status, n]) => {
+    const r = { id, title: '마감 표본 ' + id, start: n === null ? '' : (n === 'x' ? '2026.12.01' : dPlus5(n)), end: '', member_ids: [], worker_ids: [] }; if (kind) r.kind = kind; if (status) r.status = status; return r; });
+  const SN5 = SFNOW32 ? SFNOW32.run32(SFNOW32.base32({ asb: JSON.parse(JSON.stringify(D45)) }, '2026-11-11')) : null;
+  const due5 = SN5 ? SFNOW32.blk32(SN5.out, 'due') : '';
+  const now5 = {}; for (const m of due5.matchAll(/data-sfn-go="site:(\w+)" role="button" tabindex="0"><span class="sfn-id">현장<\/span><div class="item-body"><div class="sfn-t">([^<]*)<\/div>[\s\S]*?<span class="sfn-pill([^"]*)">([^<]*)<\/span><\/div>/g)) { if (m[2].indexOf('석면 작업신고 마감') >= 0) now5[m[1]] = m[3].trim() || '-'; }
+  const X5 = mk45({ asb: JSON.parse(JSON.stringify(D45)) }); X5.api.render(); const h5 = X5.host._h;
+  const tab5 = {}; D45.forEach((r) => { const c = cellOf45(h5, r.id, 'due'), cl = clsOf45(c); tab5[r.id] = /\bvs-dan\b/.test(cl) ? 'bad' : (/\bvs-warn\b/.test(cl) ? 'am' : ''); });
+  const pair5 = D45.map((r) => r.id + '=' + (now5[r.id] || '') + '/' + tab5[r.id]);
+  const same5 = D45.every((r) => (now5[r.id] || '') === tab5[r.id]);
+  const txt5 = ['q1', 'q2', 'q3', 'q5', 'q7', 'q8', 'q9', 'q12', 'q13', 'q14'].map((id) => { const c = cellOf45(h5, id, 'due'); return c ? c[1] : '?'; });
+  const tip5 = [cellOf45(h5, 'q1', 'due'), cellOf45(h5, 'q2', 'due'), cellOf45(h5, 'q7', 'due'), cellOf45(h5, 'q11', 'due')].map((c) => unesc45(((c && /title="([^"]*)"/.exec(c[0])) || ['', ''])[1]));
+  const chip5 = (/data-vs-chip="st\|due7"[^>]*>([^<]*)</.exec(h5) || ['', ''])[1];
+  T('v445 ⑤ 신고 마감 색 = 현황 ③(실행 — 같은 표본 14줄을 실제 sfNowDue(v432 시험 틀)와 표에 돌려 대조): ' + pair5.join(' ') + ' · 칸 글 = 경과 10일·회색 D+5·D-0·D-8·회색 D-31·-·-·-·-·경과 40일 · title "YYYY-MM-DD 작업신고 마감(착수 7일 전)"(작업중 지난 마감·30일 밖은 까닭 덧붙임) · 칩 "신고 7일 안·지남" = 빨강 줄 수 5',
+    !!SN5 && Object.keys(now5).length >= 7 && same5 && pair5.join(' ') === 'q1=bad/bad q2=/ q3=bad/bad q4=bad/bad q5=am/am q6=am/am q7=/ q8=/ q9=/ q10=bad/bad q11=/ q12=/ q13=/ q14=bad/bad'
+    && JSON.stringify(txt5) === JSON.stringify(['경과 10일', '<span style="color:#9AA09C;">D+5</span>', 'D-0', 'D-8', '<span style="color:var(--sub);">D-31</span>', SITE_DASH45, SITE_DASH45, SITE_DASH45, SITE_DASH45, '경과 40일'])
+    && tip5[0] === '2026-11-01 작업신고 마감(착수 7일 전)' && tip5[1] === '2026-11-06 작업신고 마감(착수 7일 전) — 작업 중이라 표시만(신고 여부 칸이 없어 현황 ③에도 안 뜸)' && tip5[2] === '2026-12-12 작업신고 마감(착수 7일 전) — 30일 밖' && tip5[3] === "2026-11-08 작업신고 마감(착수 7일 전) — 상태가 '예정'으로 저장되지 않은 줄이라 표시만(현황 ③과 같은 판정)" && chip5 === '신고 7일 안·지남 5',
+    JSON.stringify({ pair5, txt5, tip5, chip5, now: Object.keys(now5).length }));
+  //   현황 ③ 줄 이동 대상 = 그 현장 id(v445 — 'site:<id>', 같은 v432 시험 틀에 이 묶음 표본 대장): 작업신고 마감 p1 줄 = site:p1 · 'site:' 줄은 모두 대장에 있는 id
+  const SN5b = SFNOW32 ? SFNOW32.run32(SFNOW32.base32({ asb: ASB45() }, '2026-11-11')) : null, gos5b = SN5b ? SFNOW32.gos32(SN5b.out).filter((g) => /^site/.test(g)) : [];
+  const ids5b = ASB45().map((r) => r.id);
+  T('v445 ⑤-2 현황 ③ 현장 줄 이동 = 그 현장(실제 sfNowDue — v432 시험 틀): 석면 작업신고 마감 p1 줄 data-sfn-go = "site:p1" · 현장 줄 이동 값은 모두 "site:<대장에 있는 id>"(id 없는 안내 줄만 "site")',
+    !!SN5b && /data-sfn-go="site:p1" role="button" tabindex="0"><span class="sfn-id">현장<\/span><div class="item-body"><div class="sfn-t">석면 #131 · 가동 석면 예정 · 석면 작업신고 마감<\/div>/.test(SN5b.out) && gos5b.length >= 1 && gos5b.every((g) => g === 'site' || ids5b.indexOf(g.slice(5)) >= 0),
+    JSON.stringify({ gos5b }));
+
+  // ⑥ 특별교육 열 = 펼침 '특별교육' 줄(siteEduLine)의 요약 — v433 두 벌 규칙 그대로(판정을 새로 하지 않음):
+  //   안전 수행(관리자)·안전 보기(H) = 앱 판정(asbNoSpecial — p1 '미이수 2명'(직원 u1·일용직 w2 — 노랑) · p2 투입 1명 모두 이수 = '미이수 없음'(펼침 줄은 없음 — 종전) · 투입 0·종결 = '-') /
+  //   안전 숨김(V) = 서버 답(siteEduGap): 첫 답 전 '확인 중'(회색) · 실패 '확인 못 함' · 기록 0건 '기록 없음' · 이름 '미이수 1명'·빈 목록 '미이수 없음' · 투입 인원이 바뀜(서명 다름) '확인 못 함' /
+  //   일용직 숨김(W — 명부 없음) = 서버 wk_n 'p1 미이수 2명'(이름 1 + 일용직 1 — title 전문)·투입 '3'(직원 1 + 일용직 id 2) · 펼침 세로표 특별교육 줄 = siteEduLine(r) 글자째 · 거르기 '미이수 있음' · 합계 '미이수 2명'
+  const m6 = miss45.length;
+  const edu6 = (u, gapFn, wk) => { const X = mk45(Object.assign({ user: u }, wk ? { workers: wk } : {})); if (gapFn) { const gs = gapFn(X); X.api.setGap(gs[0], gs[1]); } X.api.render(); const h = X.host._h;
+    return { X, h, c: ['p1', 'p2', 'p3', 'd2'].map((id) => { const c = cellOf45(h, id, 'edu'); return c ? (clsOf45(c).indexOf('vs-warn') >= 0 ? '!' : '') + c[1].replace(/<[^>]+>/g, '') : '?'; }).join('|') }; };
+  const sigOf6 = (X) => X.api.sigs(X.api.asb());
+  const A6 = edu6(U45.A), H6 = edu6(U45.H), Vw6 = edu6(U45.V), Vf6 = edu6(U45.V, () => [null, {}]);
+  const Vn6 = edu6(U45.V, (X) => [{ has_edu: true, gaps: { p1: ['박반장'], p2: [] }, wk_n: null }, sigOf6(X)]);
+  const Vr6 = edu6(U45.V, (X) => [{ has_edu: false, gaps: {}, wk_n: null }, sigOf6(X)]);
+  const Vs6 = edu6(U45.V, (X) => { const s = sigOf6(X); s.p1 = '[["u9"],[]]'; return [{ has_edu: true, gaps: { p1: ['박반장'], p2: [] }, wk_n: null }, s]; });
+  const W6 = edu6(U45.W, (X) => [{ has_edu: true, gaps: { p1: ['홍길동'], p2: [] }, wk_n: { p1: 1, p2: 0 } }, sigOf6(X)], []);
+  const tipW6 = ((cellOf45(W6.h, 'p1', 'edu') || [''])[0].match(/title="([^"]*)"/) || ['', ''])[1], nW6 = cellOf45(W6.h, 'p1', 'n') || ['', ''];
+  const p1A6 = A6.X.api.asb().filter((r) => r.id === 'p1')[0], p1V6 = Vn6.X.api.asb().filter((r) => r.id === 'p1')[0];
+  openRow45(A6.X, 'p1'); const dA6 = det45(A6.X.host._h); openRow45(Vn6.X, 'p1'); const dV6 = det45(Vn6.X.host._h);
+  const footA6 = foot45(A6.h);
+  vf45(A6.X, 'edu', '미이수 있음'); const fA6 = order45(A6.X.host._h);
+  T('v445 ⑥ 특별교육 열 = siteEduLine 요약(실행 — v433 두 벌 규칙): 관리자·안전 보기 = 앱 판정 p1 "!미이수 2명"·p2 "미이수 없음"(투입 1명 이수 — 줄은 없음)·투입 0·종결 "-" / 안전 숨김 = 첫 답 전 "확인 중"(색 없음)·실패 "!확인 못 함"·이름 "!미이수 1명"/"미이수 없음"·기록 0건 "!기록 없음"·서명 다름 "!확인 못 함" / 일용직 숨김 = "!미이수 2명"(title "미이수 2명 — 홍길동 외 일용직 1명 (배치 전 이수 필요)")·투입 3(직원 1 + 일용직 id 2) · 펼침 세로표 특별교육 줄 = siteEduLine(r) 글자째(관리자·안전 숨김) · 거르기 "미이수 있음" = p1 · 합계 특별교육 칸 "미이수 2명"',
+    A6.c === '!미이수 2명|미이수 없음|-|-' && H6.c === A6.c && Vw6.c === '확인 중|확인 중|-|-' && Vf6.c === '!확인 못 함|!확인 못 함|-|-' && Vn6.c === '!미이수 1명|미이수 없음|-|-' && Vr6.c === '!기록 없음|!기록 없음|-|-' && Vs6.c === '!확인 못 함|미이수 없음|-|-'
+    && W6.c === '!미이수 2명|미이수 없음|-|-' && tipW6 === '미이수 2명 — 홍길동 외 일용직 1명 (배치 전 이수 필요)' && nW6[1] === '3' && /title="직원 1명 · 일용직 2명\(일용직 명부를 볼 권한이 없어 이름 없이 셈\)"/.test(nW6[0])
+    && A6.X.api.eduLine(p1A6).length > 20 && dA6.indexOf(A6.X.api.eduLine(p1A6)) > 0 && dV6.indexOf(Vn6.X.api.eduLine(p1V6)) > 0 && Vn6.X.api.eduLine(p1V6).indexOf('박반장') > 0 && dA6.indexOf(Vn6.X.api.eduLine(p1V6)) < 0
+    && fA6 === 'p1' && footA6.split('|').indexOf('미이수 2명') >= 0 && noMiss45(m6),
+    JSON.stringify({ A: A6.c, H: H6.c, Vw: Vw6.c, Vf: Vf6.c, Vn: Vn6.c, Vr: Vr6.c, Vs: Vs6.c, W: W6.c, tipW6, nW6, fA6, footA6, miss: miss45.slice(m6) }));
+
+  // ⑦ 펼침 = 옛 카드 세로표 내용(글자째 — 옛 본문 renderSitesLegacy(375)와 표 siteSheetPairs를 같은 대장으로 만들어 [항목·노랑·값]을 줄마다 대조): 표본 PIN 5줄(석면 작업중 2099 — 칸을 될 수 있는 대로 모두 · 철거 종결 2024 ·
+  //   준설 상태·날짜 없음 · 준설 종결 2025 · 석면 예정 마감 지남) — 다른 것은 특별교육 줄(펼침 세로표에 siteEduLine 그대로)과 철거·준설의 기록 보존 만료(AI 결정 — 석면만, 폰 옛 카드는 그대로)뿐 ·
+  //   펼침 = 머리(공사명·구분·상태 칩·발주처·[닫기 ▲]) → 키·값(참여 근로자·메모 뺀 줄 — 작업신고 마감 색 = 표 칸, 노랑 줄 = warn) → 세로표(참여 근로자 + [근로자 추가] · 특별교육 · 메모) → [수정] ·
+  //   [수정] = 창 '석면 작업 수정'·값 채움 · [근로자 추가] = openSiteWorkers · 현장 보기(R) = 바꾸는 버튼 0·흉내 누름도 아무것도 안 함 · 일용직 숨김(W) 참여 근로자 = 직원 이름 + '일용직 n명'
+  const PIN45 = () => [
+    { id: 'pA', seq: 7, title: '현장 고정 석면 <b>', kind: 'asbestos', client: '포항시 & 교육청', site: '포항시 남구', start: '2099-05-01', end: '2099-06-30', material: '천장텍스', area: '120.5', status: 'run', conc: '0.002', waste_no: 'W-1', note: '첫 줄\n둘째 줄', member_ids: ['u1'], worker_ids: ['w2'], ks: { no: 'K-9', year: 2099, biz: '석면해체', amount: 12345678, done_amount: 2000000, approve: '승인 취소' } },
+    { id: 'pB', title: '현장 고정 철거', kind: 'demolition', client: '', site: '', start: '2024-03-02', end: '2024-03-09', status: 'done', member_ids: [], worker_ids: [] },
+    { id: 'pC', title: '', kind: 'dredge', site: '현장 준설 구역', start: '', end: '', member_ids: [], worker_ids: [] },
+    { id: 'pD', seq: 4, title: '현장 준설 종결', kind: 'dredge', client: '시청', site: '형산강', start: '2025-06-01', end: '2025-06-30', status: 'done', member_ids: [], worker_ids: ['w1'], note: '메모 <i>' },
+    { id: 'pE', title: '현장 석면 예정 지남', kind: 'asbestos', site: '', start: '2026-11-15', status: 'plan', member_ids: [], worker_ids: ['w1', 'w3'], ks: { approve: '승인' } }];
+  const m7 = miss45.length, L7 = mk45({ width: 375, asb: PIN45() }); L7.api.render(); const lh7 = L7.host._h;
+  const legRows7 = (id) => { const m = new RegExp('id="siteBd-' + id + '" style="display:none;"><div class="jw-sheet-wrap"><table class="jw-sheet">([\\s\\S]*?)</table>').exec(lh7); return m ? [...m[1].matchAll(/<tr><th>([^<]*)<\/th><td(?: class="([^"]*)")?>([\s\S]*?)<\/td><\/tr>/g)].map((x) => [x[1], x[2] || '', x[3]]) : null; };
+  const X7 = mk45({ asb: PIN45() });
+  const cmp7 = PIN45().map((r0) => {
+    const r = X7.api.asb().filter((x) => x.id === r0.id)[0], leg = legRows7(r0.id) || [], kd = ['asbestos', 'demolition', 'dredge'].indexOf(r.kind) >= 0 ? r.kind : 'asbestos';
+    const legEdu = leg.filter((x) => x[0] === '특별교육'), keepN = leg.filter((x) => x[0] === '기록 보존 만료').length;
+    const legCmp = leg.filter((x) => x[0] !== '특별교육' && !(x[0] === '기록 보존 만료' && kd !== 'asbestos')).map((x) => x.join('¦')).join('\n');
+    const pr = X7.api.pairs(r, true).map((x) => [x[0], x[2], x[1]].join('¦')).join('\n');
+    const eduOk = legEdu.length ? ('<tr><th>특별교육</th><td' + (legEdu[0][1] ? ' class="' + legEdu[0][1] + '"' : '') + '>' + legEdu[0][2] + '</td></tr>') === X7.api.eduLine(r) : X7.api.eduLine(r) === '';
+    return r.id + ':' + (leg.length > 3 && legCmp === pr ? 'same' : 'diff') + (eduOk ? '' : '/edu') + (kd === 'asbestos' ? '' : '/keep' + keepN + '→' + (pr.indexOf('기록 보존 만료') >= 0 ? 1 : 0));
+  }).join(' ');
+  X7.api.render(); openRow45(X7, 'pA'); const d7 = det45(X7.host._h);
+  const pA7 = X7.api.asb().filter((x) => x.id === 'pA')[0], prA7 = X7.api.pairs(pA7, true);
+  const kv7 = [...d7.matchAll(/<div><div class="k">([^<]*)<\/div><div class="v([^"]*)">/g)].map((m) => m[1] + (m[2].trim() ? '[' + m[2].trim() + ']' : '')).join('/');
+  const kvWant7 = prA7.filter((p) => p[0] !== '참여 근로자' && p[0] !== '메모').map((p) => p[0] + (p[0] !== '작업신고 마감' && p[2] === 'warn' ? '[warn]' : '')).join('/');
+  const wkV7 = prA7.filter((p) => p[0] === '참여 근로자')[0][1];
+  const tbl7 = '<table class="jw-sheet" style="margin-top:10px;max-width:760px;"><tr><th>참여 근로자</th><td>' + wkV7 + '</td></tr>' + X7.api.eduLine(pA7) + '<tr><th>메모</th><td>첫 줄<br>둘째 줄</td></tr></table>';
+  const head7 = '<div class="vs-dh"><b>현장 고정 석면 &lt;b&gt;</b><span class="scope-chip">석면 #7</span><span class="author-chip">작업중</span><span class="vs-dsub">포항시 &amp; 교육청</span><button type="button" class="vs-chip" data-vs-close="1" style="margin-left:auto;">닫기 ▲</button></div>';
+  const act7 = '<div class="vs-act"><button type="button" class="mini-btn" data-site-act="edit" data-site-id="pA">수정</button></div>';
+  press45(X7, 'data-site-wk', 'pA'); const sw7 = X7.env.log.indexOf('sw:pA') >= 0;
+  press45(X7, 'data-site-act', 'edit'); const ed7 = [X7.env.host('asbBackdrop').classList.contains('show'), X7.env.host('asbModalTitle').textContent, X7.env.host('asbKind').value, X7.env.host('asbMaterial').value, X7.api.editId()];
+  openRow45(X7, 'pE'); const dE7 = det45(X7.host._h);
+  const X7r = mk45({ user: U45.R, asb: PIN45() }); X7r.api.render(); openRow45(X7r, 'pA'); const dR7 = det45(X7r.host._h); fake45(X7r, { 'data-site-act': 'edit', 'data-site-id': 'pA' }); fake45(X7r, { 'data-site-wk': 'pA' });
+  const r7 = [dR7.indexOf('mini-btn') < 0, !X7r.env.host('asbBackdrop').classList.contains('show'), X7r.env.log.filter((l) => /^sw:/.test(l)).length === 0];
+  const X7w = mk45({ user: U45.W, asb: PIN45(), workers: [] }), pAw7 = X7w.api.asb().filter((x) => x.id === 'pA')[0];
+  const wW7 = X7w.api.pairs(pAw7, true).filter((p) => p[0] === '참여 근로자')[0];
+  T('v445 ⑦ 펼침 = 옛 카드 세로표 내용(실행 — 같은 대장으로 옛 본문 카드와 [항목·노랑·값] 글자째 대조): ' + cmp7 + '(특별교육 줄 = siteEduLine · 철거·준설 기록 보존 만료는 옛 카드 1 → 표 0 — AI 결정) · 펼침 머리 = 공사명(이스케이프)·"석면 #7"·작업중 칩·발주처·[닫기 ▲] · 키·값 = 목록에서 참여 근로자·메모를 뺀 줄 차례(발주자 승인 취소 노랑) · 세로표 = 참여 근로자([근로자 추가] 그대로) + 특별교육 줄 + 메모 · [수정] .mini-btn · [근로자 추가] = openSiteWorkers("pA") · [수정] = 창 열림·"석면 작업 수정"·종류 석면·자재 채움·고치는 id pA · 예정 마감 지남 pE = 작업신고 마감 키·값 빨강(v dan)·소재지 노랑(v warn) · 현장 보기 = 바꾸는 버튼 0·흉내 [수정]·[근로자 추가] 아무것도 안 함 · 일용직 숨김 참여 근로자 = "2명 · 홍길동 외 일용직 1명(일용직 명부를 볼 권한이 없어 이름 없이)"',
+    cmp7 === 'pA:same pB:same/keep1→0 pC:same/keep0→0 pD:same/keep1→0 pE:same' && d7.indexOf(head7) === 0 && kv7 === kvWant7 && kvWant7.indexOf('발주자 승인[warn]') > 0 && d7.indexOf('<div class="vs-kv">') > 0 && d7.indexOf(tbl7) > 0 && d7.slice(-act7.length) === act7
+    && wkV7.indexOf('<button class="mini-btn" data-site-wk="pA" style="margin-left:6px;">근로자 추가</button>') > 0 && sw7 && ed7.join('|') === 'true|석면 작업 수정|asbestos|천장텍스|pA'
+    && /<div class="k">작업신고 마감<\/div><div class="v dan">/.test(dE7) && /<div class="k">소재지<\/div><div class="v warn"><b>미입력<\/b>/.test(dE7) && r7.every(Boolean)
+    && wW7 && wW7[1] === '<b class="num">2명</b> · 홍길동 외 일용직 1명(일용직 명부를 볼 권한이 없어 이름 없이) <button class="mini-btn" data-site-wk="pA" style="margin-left:6px;">근로자 추가</button>' && wW7[2] === '' && noMiss45(m7),
+    JSON.stringify({ cmp7, kv7, kvWant7, head: d7.indexOf(head7), tbl: d7.indexOf(tbl7), act: d7.slice(-act7.length) === act7, sw7, ed7, r7, wW7, miss: miss45.slice(m7) }));
+
+  // ⑧ [+ 현장 추가]·[수정] 창 종류 칸(PM 17:40 ⓓ ① — 실제 openAsb·asbKindApply·saveAsb·deleteAsb): 새 창 = 종류 석면·제목 "석면 작업 추가"·석면 칸 4개 보임·안내 글 종전 그대로 · 철거를 고르면 제목 "철거 작업 추가"·석면 칸 4개 숨김·안내 글 철거·준설 ·
+  //   저장 = 새 줄 kind demolition(계약 대장 연결 csLinkSite가 만드는 줄과 같은 칸 모양 — 소스의 두 줄 키 집합 대조) · 옛 기록(kind 없음 = 석면)을 석면 그대로 저장 = kind 안 생김 · 준설로 바꿔 저장 = kind dredge·숨긴 석면 칸 값 그대로 ·
+  //   철거 기록 열기 = "철거 작업 수정"·석면 칸 숨김 · 삭제 확인문 = 저장된 종류대로(석면 = 30년 보존 문구 그대로 — 창에서 준설로 바꿔도 · 철거 = 30년 문구 없음)
+  const m8 = miss45.length, X8 = mk45(); X8.api.render(); const E8 = (id) => X8.env.host(id), ON8 = () => ['asbMaterial', 'asbArea', 'asbConc', 'asbWaste'].map((id) => E8(id).style.display).join(',');
+  X8.api.openAsb(null);
+  const t8a = [E8('asbModalTitle').textContent, E8('asbKind').value, ON8(), E8('asbDerived').textContent, E8('asbBackdrop').classList.contains('show'), E8('asbDelete').style.display].join('|');
+  E8('asbKind').value = 'demolition'; X8.api.kindApply();
+  const t8b = [E8('asbModalTitle').textContent, ON8(), E8('asbDerived').textContent].join('|');
+  E8('asbTitle').value = '새 철거 현장'; E8('asbStart').value = '2026-12-01'; X8.api.saveAsb(); X8.env.runTimers();
+  const nw8 = X8.api.asb().filter((r) => r.title === '새 철거 현장')[0] || {}, keys8 = Object.keys(nw8).sort().join(',');
+  const csl8 = (() => { const s = fn45(html, 'csLinkSite'), i = s.indexOf('hit = { id: genId("asb")'), j = s.indexOf('};', i); return i < 0 ? '' : [...s.slice(i + 6, j).matchAll(/(?:^|[{,]\s*)(\w+):/g)].map((m) => m[1]).sort().join(','); })();
+  const s8 = [nw8.kind, E8('asbBackdrop').classList.contains('show'), X8.env.log.indexOf('asbSave') >= 0, X8.env.log.indexOf('toast:저장했습니다') >= 0].join('|');
+  const p2_8 = () => X8.api.asb().filter((r) => r.id === 'p2')[0];
+  Object.assign(p2_8(), { material: '천장텍스', area: '30', conc: '0.01', waste_no: 'W-9' }); X8.env.pickW = ['w1'];
+  X8.api.openAsb('p2'); const t8c = [E8('asbModalTitle').textContent, E8('asbKind').value, ON8()].join('|'); X8.api.saveAsb(); X8.env.runTimers(); const k8c = own45(p2_8(), 'kind');
+  //   v445 검토: 석면 기록을 철거·준설로 바꿔 저장 = 확인(고른 종류 이름을 넣은 30년 보존 대장 글) — 취소면 저장 안 함(종류·저장 예약 그대로·창 열린 채) · 확인이면 저장(아래 p2 준설) ·
+  //   석면이 아닌 줄끼리 바꾸면(p4 철거 → 준설) 확인 없음
+  const n8a = X8.env.log.filter((l) => l === 'asbSave').length;
+  X8.env.confirmAns = false; X8.api.openAsb('d2'); E8('asbKind').value = 'demolition'; X8.api.kindApply(); X8.api.saveAsb(); X8.env.runTimers();
+  const x8 = [X8.api.asb().filter((r) => r.id === 'd2')[0].kind, X8.env.log.filter((l) => l === 'asbSave').length - n8a, E8('asbBackdrop').classList.contains('show')].join('|');
+  X8.env.confirmAns = true;
+  X8.api.openAsb('p2'); E8('asbKind').value = 'dredge'; X8.api.kindApply(); const t8d = [E8('asbModalTitle').textContent, ON8()].join('|'); X8.api.saveAsb(); X8.env.runTimers();
+  const p2d = p2_8(), k8d = [p2d.kind, p2d.material, p2d.area, p2d.conc, p2d.waste_no].join('|');
+  const nc8 = X8.env.log.filter((l) => /^confirm:/.test(l)).length;
+  X8.api.openAsb('p4'); E8('asbKind').value = 'dredge'; X8.api.kindApply(); X8.api.saveAsb(); X8.env.runTimers();
+  const y8 = [X8.api.asb().filter((r) => r.id === 'p4')[0].kind, X8.env.log.filter((l) => /^confirm:/.test(l)).length - nc8].join('|');
+  X8.api.openAsb('d3'); const t8e = [E8('asbModalTitle').textContent, E8('asbKind').value, ON8()].join('|'); X8.env.confirmAns = false; X8.api.deleteAsb();
+  X8.api.openAsb('o1'); E8('asbKind').value = 'dredge'; X8.api.kindApply(); X8.api.deleteAsb();
+  const conf8 = X8.env.log.filter((l) => /^confirm:/.test(l));
+  const KO8 = 'confirm:이 기록은 석면 작업 기록(30년 보존 대장)입니다.\n종류를 준설로 바꾸면 기록 보존 만료(30년)·작업신고 마감 표시와 석면 칩·안전 › 현황에서 빠집니다(자재·면적·농도·인계번호 값은 지우지 않고 숨깁니다).\n잘못 넣은 종류를 고치는 것이면 [확인], 아니면 [취소]를 눌러 주세요.';
+  T('v445 ⑧ 창 종류 칸(실행): 새 창 = "석면 작업 추가|asbestos|,,,|날짜를 넣으면 …|열림|삭제 숨김" · 철거 고름 = "철거 작업 추가"·석면 칸 4개 none·안내 "철거·준설 현장은 작업신고 마감·기록 보존 만료(30년)를 계산하지 않습니다 …" · 저장 = kind demolition·창 닫힘·저장 예약·"저장했습니다" · 새 줄 칸 = 계약 대장 연결 csLinkSite 새 줄 칸(' + csl8 + ') · 옛 기록 p2(kind 없음) 석면 그대로 저장 = kind 안 생김 · 준설로 바꿔 저장 = kind dredge·자재·면적·농도·인계번호 그대로 · 철거 기록 = "철거 작업 수정"·석면 칸 숨김 · 삭제 확인 = 철거 "이 철거 작업 기록을 삭제할까요?\\n(잘못 만든 것만 지우세요)" · 석면 기록은 창에서 준설로 바꿔도 30년 보존 문구 그대로 · v445 검토: 석면 → 철거·준설 저장은 확인(종류 이름 — 새 줄·석면 그대로·석면 아닌 줄끼리 p4 철거 → 준설은 확인 0) · 취소 = 종류 asbestos 그대로·저장 예약 0·창 열린 채',
+    t8a === '석면 작업 추가|asbestos|,,,|날짜를 넣으면 신고 마감과 보존 만료가 자동으로 계산됩니다.|true|none'
+    && t8b === '철거 작업 추가|none,none,none,none|철거·준설 현장은 작업신고 마감·기록 보존 만료(30년)를 계산하지 않습니다 — 둘 다 석면 해체·제거 현장 규정입니다.'
+    && s8 === 'demolition|false|true|true' && keys8 === csl8 && keys8 === 'area,client,conc,created,end,id,kind,material,member_ids,note,site,start,status,title,updated,waste_no,worker_ids'
+    && t8c === '석면 작업 수정|asbestos|,,,' && k8c === false && t8d === '준설 작업 수정|none,none,none,none' && k8d === 'dredge|천장텍스|30|0.01|W-9'
+    && x8 === 'asbestos|0|true' && y8 === 'dredge|0'
+    && t8e === '철거 작업 수정|demolition|none,none,none,none' && conf8.length === 4 && conf8[0] === KO8.replace('종류를 준설로', '종류를 철거로') && conf8[1] === KO8
+    && conf8[2] === 'confirm:이 철거 작업 기록을 삭제할까요?\n(잘못 만든 것만 지우세요)' && conf8[3] === 'confirm:이 석면 작업 기록을 삭제할까요?\n(기록은 30년 보존 대상입니다 — 잘못 만든 것만 지우세요)' && noMiss45(m8),
+    JSON.stringify({ t8a, t8b, s8, keys8, csl8, t8c, k8c, t8d, k8d, x8, y8, t8e, conf8, miss: miss45.slice(m8) }));
+
+  // ⑨ 못 읽은 대장(asbLoaded — loadAsb 200에서만 켬): [+ 현장 추가] [저장] = 안내 1(ASB_UNREAD_MSG)·다시 읽기(loadAsb)·대장 그대로·저장 예약 0·창 열린 채 → 읽은 뒤 [저장] = 새 줄·저장 예약 ·
+  //   표 빈 글 = 읽기 전 "현장 대장을 불러오는 중입니다 …" / 읽은 빈 대장 "등록된 현장이 없습니다." (서버 낙관락은 base 0 → 409 병합으로 막지만 서버가 직전 문서를 못 읽으면 락이 안 걸림 — v442 wkLoaded와 같은 꼴)
+  const X9 = mk45({ asbLoaded: false }); X9.api.render(); const n9 = X9.api.asb().length; X9.api.openAsb(null); X9.env.host('asbTitle').value = '못 읽은 대장에 새 현장'; X9.api.saveAsb();
+  const r9 = [X9.api.asb().length === n9, X9.env.log.filter((l) => l === 'alert:' + X9.api.unread).length === 1, X9.env.log.indexOf('loadAsb') >= 0, X9.env.log.indexOf('asbSave') < 0, X9.env.host('asbBackdrop').classList.contains('show')];
+  X9.api.setLoaded(true); X9.api.saveAsb(); const r9b = [X9.api.asb().length === n9 + 1, X9.env.log.indexOf('asbSave') >= 0, !X9.env.host('asbBackdrop').classList.contains('show')];
+  const E9a = mk45({ asbLoaded: false, asb: [] }); E9a.api.render(); const E9b = mk45({ asb: [] }); E9b.api.render();
+  T('v445 ⑨ 못 읽은 대장(실행 — 실제 saveAsb): 읽기 전 [저장] = 대장 그대로·안내 1("' + X9.api.unread.slice(0, 20) + '…")·loadAsb·저장 예약 0·창 열린 채 → 읽은 뒤 [저장] = 새 줄 1·저장 예약·창 닫힘 · 표 빈 글 읽기 전 "현장 대장을 불러오는 중입니다" / 읽은 빈 대장 "등록된 현장이 없습니다."',
+    r9.every(Boolean) && r9b.every(Boolean) && E9a.host._h.indexOf('현장 대장을 불러오는 중입니다 — 계속 비어 있으면 새로고침해 주세요.') > 0 && E9b.host._h.indexOf('등록된 현장이 없습니다.') > 0,
+    JSON.stringify({ r9, r9b, e9a: E9a.host._h.slice(0, 80), e9b: E9b.host._h.slice(0, 80) }));
+
+  // ⑩ 새 현장 열기(siteSheetShowNew → vsSheetReveal): 기억된 칩 '준설'(jw_site_sheet)이 새 석면 현장을 가리면 그 줄을 연다(칩 전체로·펼침·굴림 — 기기 기억은 덮지 않음) · 가리지 않으면 그대로(펼치지 않음) · 폰 옛 목록 = 아무것도 안 함
+  const m10 = miss45.length, st10 = { jw_site_sheet: JSON.stringify({ k: '', d: 1, f: {}, chip: { st: 'dredge' } }) };
+  const onChip45 = (h) => (/<button type="button" class="vs-chip[^"]*\bon\b[^"]*" data-vs-chip="st\|(\w*)"/.exec(h) || ['', '?'])[1];
+  const X10 = mk45({ store: st10 }); X10.api.render(); const o10a = order45(X10.host._h), c10a = onChip45(X10.host._h);
+  X10.api.openAsb(null); X10.env.host('asbTitle').value = '새 석면 현장'; X10.env.host('asbStart').value = '2026-12-10'; X10.api.saveAsb();
+  const nid10 = (X10.api.asb().filter((r) => r.title === '새 석면 현장')[0] || {}).id, h10 = X10.host._h;
+  const X10b = mk45(); X10b.api.render(); X10b.api.openAsb(null); X10b.env.host('asbTitle').value = '새 석면 현장 둘'; X10b.env.host('asbStart').value = '2026-12-11'; X10b.api.saveAsb();
+  const nid10b = (X10b.api.asb().filter((r) => r.title === '새 석면 현장 둘')[0] || {}).id;
+  const X10p = mk45({ width: 375 }); X10p.api.render(); X10p.api.openAsb(null); X10p.env.host('asbTitle').value = '폰 새 현장'; X10p.api.saveAsb();
+  T('v445 ⑩ 새 현장 열기(실행 — 실제 saveAsb → afterSave → siteSheetShowNew): 기억된 칩 준설 = 처음 p3,d1 → 석면 새 현장 저장 = 칩 전체로·그 줄 펼침·굴림·기기 기억(jw_site_sheet) 그대로 · 가리지 않으면 줄만 생기고 펼침 없음 · 폰 옛 목록 = 펼침·굴림 0',
+    o10a === 'p3,d1' && c10a === 'dredge' && !!nid10 && detId45(h10) === nid10 && onChip45(h10) === '' && X10.env.log.indexOf('into:' + nid10) >= 0 && X10.env.store.jw_site_sheet === st10.jw_site_sheet
+    && !!nid10b && order45(X10b.host._h).split(',').indexOf(nid10b) === 0 && detId45(X10b.host._h) === '' && X10p.host._h.indexOf('data-vs-det') < 0 && !X10p.env.log.some((l) => /^into:/.test(l)) && noMiss45(m10),
+    JSON.stringify({ o10a, c10a, nid10, det: detId45(h10), chip: onChip45(h10), store: X10.env.store.jw_site_sheet, nid10b, o10b: order45(X10b.host._h), miss: miss45.slice(m10) }));
+
+  // ⑪ 다른 화면에서 오는 길: 현황 ③ 현장 줄(실제 sfNowGo 'site:<id>' → switchTab('safety:site') → setSafetyLayer → siteSheetGo) = 칩·묶음에 가렸으면 이번만 풀고 그 줄 펼침·굴림(맨 위로 굴리지 않음) ·
+  //   묶음 안 줄(o2)은 묶음 펼침 · 없는 id·id 없는 줄·폰 옛 목록 = 맨 위(종전) / 캘린더 현장 일정(실제 calEvents) go = 'safety:site:<id>'(id 없는 줄은 'safety:site') → setSafetyLayer('site:<id>') = 그 줄 펼침 ·
+  //   다른 칸 요청이 현장 칸으로 떨어진 대상('edu:worker')은 현장 id로 쓰지 않음
+  const m11 = miss45.length, X11 = mk45({ store: st10 }); X11.api.setTab('safety', 'site'); X11.api.render();
+  X11.api.nowGo('site:p1'); const a11 = [detId45(X11.host._h), X11.env.log.indexOf('into:p1') >= 0, X11.env.log.indexOf('top') < 0, X11.env.log.indexOf('switch:safety:site') >= 0].join('|');
+  X11.env.log.length = 0; X11.api.nowGo('site:o2'); const b11 = [detId45(X11.host._h), ((grp45(X11.host._h) || [])[1] || '') === ' open'].join('|');
+  X11.env.log.length = 0; X11.api.nowGo('site:zz'); const c11 = X11.env.log.indexOf('top') >= 0;
+  X11.env.log.length = 0; X11.api.nowGo('site'); const d11 = X11.env.log.indexOf('top') >= 0;
+  const X11p = mk45({ width: 375 }); X11p.api.nowGo('site:p1'); const p11 = X11p.env.log.indexOf('top') >= 0 && X11p.host._h.indexOf('data-vs-det') < 0;
+  const X11c = mk45({ store: st10, tab: 'cal' }); const ev11 = X11c.api.cal().filter((e) => /🦺|⚠|🧪/.test(e.label));
+  const evOk11 = ev11.length > 0 && ev11.every((e) => { const r = X11c.api.asb().filter((x) => e.label.indexOf(x.title) >= 0)[0]; return r && e.go === 'safety:site:' + r.id; });
+  const evP1 = ev11.filter((e) => e.label === '⚠ 가동 석면 예정 작업신고 마감')[0] || {};
+  X11c.api.sw(evP1.go || ''); const cal11 = [X11c.api.tab(), X11c.api.layer(), detId45(X11c.host._h)].join('|');
+  const X11n = mk45({ tab: 'cal', asb: [S0_45({ title: 'id 없는 현장', start: '2026-12-01', status: 'plan' })] }); const evN11 = X11n.api.cal().map((e) => e.go);
+  //   (대상 이름과 같은 id 'worker' 줄을 넣어 둠 — 없으면 대상을 현장 id로 써도 찾을 줄이 없어 늘 참)
+  const X11e = mk45({ user: { id: 'm9', name: '현장만', perms: { site: 'do' } }, asb: ASB45().concat([S0_45({ id: 'worker', title: '대상 이름과 같은 id', start: '2026-12-02', status: 'plan' })]) });
+  X11e.api.setLayer('edu:worker'); const e11 = [X11e.api.layer(), X11e.host._h.indexOf('data-vs-det') < 0, order45(X11e.host._h).split(',').indexOf('worker') >= 0].join('|');
+  T('v445 ⑪ 다른 화면에서 오는 길(실행 — 실제 sfNowGo·setSafetyLayer·calEvents): 현황 ③ "site:p1"(기억된 칩 준설이 가림) = 안전 › 현장·그 줄 펼침·굴림·맨 위로 안 굴림 · "site:o2"(지난 자료) = 묶음 펼침·그 줄 펼침 · 없는 id·"site" = 맨 위 · 폰 = 맨 위·펼침 0 / 캘린더 석면 일정 go = "safety:site:<그 현장 id>" 전부 · 신고 마감 일정 누름 = 안전 탭 현장 칸·p1 펼침 · id 없는 줄 go = "safety:site" · 현장만 보는 분의 "edu:worker" = 현장 칸·펼침 0(id "worker" 줄이 그려져 있어도)',
+    a11 === 'p1|true|true|true' && b11 === 'o2|true' && c11 && d11 && p11 && evOk11 && evP1.go === 'safety:site:p1' && cal11 === 'safety|site|p1' && evN11.length >= 1 && evN11.every((g) => g === 'safety:site') && e11 === 'site|true|true' && noMiss45(m11),
+    JSON.stringify({ a11, b11, c11, d11, p11, ev11: ev11.map((e) => e.go), cal11, evN11, e11, miss: miss45.slice(m11) }));
+
+  // ⑫ 폰(859px 이하) = phone:"legacy" — 옛 그리기 본문 renderSitesLegacy = v444(7387ade) renderSites 본문 글자째(sha256) · 그대로 두는 함수 19개 해시(특별교육 두 벌·대장 읽기·저장·현장 창 등) ·
+  //   실행: 375 = 옛 카드 11·표 줄 0·옛 종류 버튼 줄 flex·자리 legacy → 1366(경계 넘음) = 표·버튼 줄 none → 표 검색칸에 '준설' = p3,d1 + 묶음 저절로 펼침 o3 → 375 = 옛 카드·옛 검색어 '준설'(머리 '총 3건')
+  const HASH45 = { renderSitesLegacy: '4446f7906cd66cd300e5833142b2e4f45a9005ff8f3edce4fc0b0b716b3d9b23', siteEduLine: '70f535831e75332b88c5a37c057adc74d1804ef2e78943617d16682a25163b91', asbNoSpecial: '186482f03a1ca9f2894e86233050ac4253732eeaa71de1576da078d684f3c2b8',
+    asbWorkerNames: '1b19314636ac3e991335bc6a1449a643e71b3af4771e52201097e5dd20627c2f', siteYear: '1809126db67bd12286c9fb8b49fbcf0ff3fb0c2b84aa76c48e1e1df6320359a2', sheetRow: 'f77f0201e4dee7c2179eec69c9503a423dd46ce569d4b76061847b29d0b26fc8',
+    bindFold: '2e17be3f057f6b655fa35148f5297d965924e9b512d7fb3eb04b85640cd1c2bc', renderSiteFilter: 'e97f8fe38b3fd5a03059965f57755e56759cc40c7045814b5f34718bef78dd7a', siteLabel: '049362d010ea05ceeffb8696f4991ef0217d477609575e6b06b2c7f2fd0a7f8e',
+    siteKind: '64c88120acef6e84df6790fd6d823260eecfaf65797395716fc915db9c6c0c68', liveSites: 'e00f9252efe93c334c686519f1045752b921aa980071aa9cf0ad9c7bc1ceb206', asbNotifyDue: '69a4a67bc06987e081064888bb7a94bf1dd41cb8010f5aa75cde6ff4f409059f',
+    asbKeepUntil: '18324fa514e86abd8f436ca1cf791a49d6b6b4129862614277fcd475d50c3b55', loadAsb: '82117c350e5ed2fe6c06fe9d34f8c396d60fa8f7ab948964596ea971529f2692', doSaveAsb: '356cbdcb8871cc8cc9e01d2c9d092ee37a32445e1a06639635cf7a4d1cbe5eec',
+    loadSiteEduGap: '190dd72af3bdf21c0197a85a914ca869cdcfc0997110e8507bb4d64700c22e32', openSiteWorkers: '87bac54bab4f204a3e6366c5bff4c8d881fba2a95a1c42d2b792843b6a68fba5', siteGapSig: '2fc2297595a63951b3285ed8b880a5374bd23826c649aa067ee1d02d9c1b8a0a',
+    siteGapSigs: '57394ee9f4c0ce6313ce503e414ef906cbbc35594ff43f56bbf935bb35490724', renderSwList: '769c2fa77f6c4ba96c8697590a809712ef9a93d0599481d3a776a663ba40b635' };
+  //   v445 검토: 현장 창 두 함수(openSiteWorkers·renderSwList)는 창 안 선택 swSel(검색으로 다시 그려도 체크 그대로·그려지지 않은 지정은 빠지지 않음 — 30년 보존 근로자 id)과
+  //   일용직 숨김 이름 막음 때문에 고친 본문으로 다시 고정(v444 해시 39463582…·33d2e7a9… → 위 값 — 고친 동작은 ⑳이 실행으로 지킴) · 옛 본문과 나머지 17개는 v444 그대로
+  const hBad12 = Object.keys(HASH45).filter((n) => sha45(body45(n)) !== HASH45[n]);
+  const m12 = miss45.length, X12 = mk45({ width: 375 }); X12.api.render();
+  const l12a = [X12.host.getAttribute('data-vs-mode'), (X12.host._h.match(/class="item asb-item"/g) || []).length, X12.host._h.indexOf('data-vs-row') < 0, X12.env.host('siteFilterBar').style.display, X12.api.cur(), X12.env.host('siteHead').textContent].join('|');
+  X12.env.width = 1366; X12.env.breakAll(); const l12b = [X12.host.getAttribute('data-vs-mode'), order45(X12.host._h), X12.env.host('siteFilterBar').style.display, X12.api.cur()].join('|');
+  typeQ45(X12, '준설'); const l12q = order45(X12.host._h);
+  X12.env.width = 375; X12.env.breakAll(); const l12c = [X12.host.getAttribute('data-vs-mode'), X12.host._h.indexOf('data-vs-row') < 0, X12.env.host('siteFilterBar').style.display, X12.api.q(), X12.env.host('siteHead').textContent].join('|');
+  const legDef12 = X12.api.def().legacy === X12.api.legacy && X12.api.def().phone === 'legacy';
+  T('v445 ⑫ 폰 legacy(실행 + 해시): 옛 본문 renderSitesLegacy = v444 renderSites 본문 글자째(sha256 4446f7906cd6…) · 함수 19개 해시 고정(특별교육 두 벌 siteEduLine·asbNoSpecial·asbWorkerNames · 대장 loadAsb·doSaveAsb·loadSiteEduGap·siteGapSig(s) · 지난 자료 siteYear · 현장 창 openSiteWorkers·renderSwList(이 둘은 v445 검토로 고친 본문 — 창 안 선택 swSel, ⑳) · sheetRow·bindFold·renderSiteFilter·siteLabel·siteKind·liveSites·asbNotifyDue·asbKeepUntil) · 375 = 옛 카드 11·표 줄 0·버튼 줄 flex·머리 "총 11건 (지난 자료 4건 접힘)" → 1366 = 표 ' + MAIN45 + '·버튼 줄 none → 검색칸 "준설" = p3,d1,o3(묶음 저절로 펼침) → 375 = 옛 카드·옛 검색어 "준설"·머리 "총 3건"',
+    hBad12.length === 0 && legDef12 && l12a === 'legacy|11|true|flex|legacy|총 11건 (지난 자료 4건 접힘)' && l12b === 'sheet|' + MAIN45 + '|none|sheet' && l12q === 'p3,d1,o3' && l12c === 'legacy|true|flex|준설|총 3건' && noMiss45(m12),
+    JSON.stringify({ hBad12, l12a, l12b, l12q, l12c, miss: miss45.slice(m12) }));
+
+  // ⑬ 넓힘·CSS(head <style>을 읽어 계산): #view-safety = 본문 폭(1366 약 1,097 · 1920 약 1,428 — 넓히는 화면 9개 다) · 현황 #sfPaneNow·교육·검진 #sfPaneEdu = 808(교육·검진은 옛 목록 — v446 사람별 표 판에서 넓힘) · 현장 칸 #sfPaneSite 폭 규칙 없음 ·
+  //   859 이하 #view-safety 규칙 없음(폰 틀 그대로) · 상태 칸 '작업중' 칩 여백 4px(#siteList — 62의 안 폭 45) · 펼침 키·값 노랑·빨강 글 · section 태그 그대로
+  const vw13 = (w, id) => { const b = bodyW45(w), own = decl45(w, '#' + id, 'max-width'), base = decl45(w, '.views>.view', 'max-width'), mx = own != null ? own : base; return (!mx || mx === 'none') ? b : Math.min(b, parseFloat(mx)); };
+  const w13 = [vw13(1366, 'view-safety') === bodyW45(1366), vw13(1920, 'view-safety') === bodyW45(1920), Math.round(bodyW45(1366)) === 1097, Math.round(bodyW45(1920)) === 1428, decl45(1366, '#sfPaneNow', 'max-width') === '808px', decl45(1920, '#sfPaneEdu', 'max-width') === '808px',
+    decl45(1920, '#sfPaneSite', 'max-width') == null, decl45(375, '#view-safety', 'max-width') == null, decl45(1366, '#siteList .vs.vs-fit tr.vs-r td .author-chip', 'padding') === '1px 4px', decl45(1366, '.vs-kv .v.warn', 'color') === '#8A5A00', decl45(1366, '.vs-kv .v.dan', 'color') === '#B0332A',
+    /<section class="view" id="view-safety">/.test(html), /<div class="sf-pane" id="sfPaneSite">/.test(html)];
+  T('v445 ⑬ 넓힘·CSS: #view-safety 1366·1920 = 본문 폭(1,097·1,428) · #sfPaneNow·#sfPaneEdu 808 · #sfPaneSite 규칙 없음 · 폰 규칙 없음 · "#siteList .vs.vs-fit tr.vs-r td .author-chip" 여백 1px 4px · .vs-kv .v.warn #8A5A00 · .v.dan #B0332A · section·칸 태그 그대로', w13.every(Boolean), JSON.stringify(w13));
+
+  // ⑭ 적대 데이터(v336·v337 꼴 — 이번엔 표 갈래 1366): 배열 자리 문자열·숫자·객체·null·깨진 JSON·비객체 레코드·숫자·객체 날짜·상속 키 상태('toString')·모르는 종류 — 그리기·펼침·칩·정렬(투입·특별교육·신고 마감·구분)에서 던지지 않음 · 스크립트·속성 글 이스케이프
+  const HOST14 = () => [{ id: 'h1', title: 'JSON 문자열', member_ids: '["u1","u2"]', worker_ids: '["w1"]', start: '2026-01-02', end: '2026-01-03', status: 'run' }, { id: 'h2', title: '쉼표 문자열', member_ids: 'u1, u2', worker_ids: 'w1', status: 'done' },
+    { id: 'h3', title: '숫자·불리언', member_ids: 7, worker_ids: true, start: '2026-02-30', end: '9999-99-99' }, { id: 'h4', title: '객체', member_ids: { a: 1 }, worker_ids: { b: 2 } },
+    { id: 'h5', title: 'null', start: null, end: undefined, status: null, area: null, conc: null, member_ids: null, worker_ids: undefined }, { id: 'h6' }, { id: 'h7', title: '깨진 JSON', member_ids: '[u1,', worker_ids: '[' },
+    { id: 'h8', title: '<script>alert(1)</script>', site: '"><img src=x>', client: '<b>x</b>', member_ids: [], worker_ids: [], status: 'plan', start: '2026-11-12' }, { id: 'h9', title: '숫자 날짜', start: 20260101, end: 20260115 }, { id: 'h10', title: '객체 날짜', start: {}, end: [] },
+    { id: 'h11', title: '상속 키 상태', status: 'toString', kind: 'unknown', seq: '<i>' }, 'not-an-object', null];
+  let err14 = null, h14 = '', d14 = '', o14 = '';
+  try { const X = mk45({ asb: HOST14() }); X.api.render(); h14 = X.host._h; openRow45(X, 'h8'); d14 = det45(X.host._h); chip45(X, 'due7'); chip45(X, 'nosite'); chip45(X, 'run'); chip45(X, ''); sortBy45(X, 'n'); sortBy45(X, 'edu'); sortBy45(X, 'due'); sortBy45(X, 'kind'); sortBy45(X, 'st'); o14 = order45(X.host._h); } catch (e) { err14 = e; }
+  T('v445 ⑭ 적대 데이터 13종(표 갈래 — v336·v337 꼴): 그리기·펼침·칩 4번·정렬 5번에서 던지지 않음 · 줄이 그려짐 · <script>·속성 글 이스케이프(펼침 포함) · 상속 키 상태 = 예정',
+    !err14 && h14.length > 0 && h14.indexOf('<script>') < 0 && h14.indexOf('&lt;script&gt;') > 0 && h14.indexOf('<img src=x>') < 0 && d14.indexOf('<script>') < 0 && d14.indexOf('<b>x</b>') < 0 && o14.split(',').length === 11 && (cellOf45(h14, 'h11', 'st') || ['', ''])[1] === '<span class="review-chip">예정</span>',   // h11 줄의 상태 칸 그 자체(뒤 줄의 '예정'에 걸리지 않게)
+    err14 ? (err14.constructor.name + ': ' + err14.message) : JSON.stringify({ len: h14.length, o14, st11: (cellOf45(h14, 'h11', 'st') || ['', ''])[1] }));
+
+  // ⑮ 로그인 창 '전환'(새로고침 없음 — 실제 applySafetyPerms): 관리자가 현장 칸에서 p1을 펴고 검색칸에 '석면'을 친 채 안전 숨김(V)으로 바뀌면 = 현장 칸을 다시 엶(대장 읽기 loadAsb·명부 읽기 · 교육 읽기 0) ·
+  //   표는 보는 사람이 바뀌어 검색어·펼침을 비움(vsSheetViewer)·검색칸 글도 빈 칸 · 특별교육 칸이 그 사람 규칙으로(서버 답 전 '확인 중' — 앞사람의 앱 판정 '미이수 2명'이 남지 않음)
+  const m15 = miss45.length, X15 = mk45({ tab: 'safety' }); X15.api.setTab('safety', 'site'); X15.api.render(); openRow45(X15, 'p1'); typeQ45(X15, '석면');
+  const a15 = [detId45(X15.host._h), X15.api.inst(X15.api.def()).q, (cellOf45(X15.host._h, 'p1', 'edu') || ['', ''])[1]].join('|');
+  X15.env.user = U45.V; X15.env.log.length = 0; X15.api.applySafety();
+  const b15 = [detId45(X15.host._h), X15.api.inst(X15.api.def()).q, X15.env.host('siteSearch').value, (cellOf45(X15.host._h, 'p1', 'edu') || ['', ''])[1].replace(/<[^>]+>/g, ''), X15.env.log.indexOf('loadAsb') >= 0, X15.env.log.indexOf('loadEdu') < 0, X15.env.log.indexOf('loadWorkers') >= 0, X15.api.layer()].join('|');
+  T('v445 ⑮ 로그인 창 "전환"(실행 — 실제 applySafetyPerms·setSafetyLayer): 관리자 = p1 펼침·검색어 "석면"·특별교육 "미이수 2명" → 안전 숨김형으로 바뀜 = 현장 칸 다시 엶(loadAsb·loadWorkers, loadEdu 0)·펼침 닫힘·검색어·검색칸 빈 칸·p1 특별교육 "확인 중"',
+    a15 === 'p1|석면|미이수 2명' && b15 === '||' + '|확인 중|true|true|true|site' && noMiss45(m15), JSON.stringify({ a15, b15, miss: miss45.slice(m15) }));
+
+  // ⑯ 정적 — 옛 검색 배선은 폰 갈래에서만 그림 · saveAsb 못 읽은 대장 막음(목록에 넣기 전)·종류 규칙(새 줄 kind · 바꿀 때만 · .kind 대입 1곳)·새 줄 열기 · openAsb 종류 칸·옛 제목 글 0 · deleteAsb 저장된 종류·석면 문구 그대로 ·
+  //   sfNowGo 현장 갈래·sfNowDue 현장 줄 4곳 sfNowSiteGo(안내 줄 1곳 'site') · calEvents go 꼴·글자 'safety:site' 0 · setSafetyLayer 현장 id(현장 칸 요청만 — 그린 뒤) · applySafetyPerms 현장 칸 다시 엶 · 창 HTML 종류 칸·change 배선 ·
+  //   @site-sheet 구간 = vsSheetRender 1번·vsSheetReveal 2번(새 줄·다른 화면)·저장·서버·저장소·대장 대입 0 · siteSheetGo는 현장 권한·표 갈래일 때만
+  const iife16 = (() => { const k = html.indexOf('  // 현장 탭 배선(v347)'), s = html.indexOf('  (function(){', k), e = html.indexOf('\n  })();', k); return (k < 0 || s < 0 || e < 0) ? '' : html.slice(s, e); })();
+  const sv16 = fn45(html, 'saveAsb'), oa16 = fn45(html, 'openAsb'), da16 = fn45(html, 'deleteAsb'), ss16 = nc45(ssb45), sg16 = fn45(html, 'sfNowGo'), sd16 = fn45(html, 'sfNowDue'), ce16 = fn45(html, 'calEvents'), sl16 = fn45(html, 'setSafetyLayer'), ap16 = fn45(html, 'applySafetyPerms');
+  const st16 = [
+    /if\(q\) q\.addEventListener\("input", function\(\)\{ siteQ=this\.value; if\(siteSheetCur!=="sheet"\) renderSites\(\); \}\);/.test(iife16),
+    sv16.indexOf('if (!asbLoaded){ alert(ASB_UNREAD_MSG); loadAsb(); return; }') > 0 && sv16.indexOf('if (!asbLoaded)') < sv16.indexOf('asb.push('),
+    /if\(isNew\)\{ r=\{ id:genId\("asb"\), created:todayStr\(\), kind:kind \}; asb\.push\(r\); \}/.test(sv16) && /else if\(siteKind\(r\)!==kind\) r\.kind=kind;/.test(sv16) && (sv16.match(/\.kind\s*=/g) || []).length === 1,
+    /afterSave\(renderSites, renderCalendar, isNew \? function\(\)\{ siteSheetShowNew\(r\.id\); \} : null\);/.test(sv16),
+    /document\.getElementById\("asbKind"\)\.value = r \? siteKind\(r\) : "asbestos";/.test(oa16) && /asbKindApply\(\);/.test(oa16) && html.indexOf('"석면 작업 수정" : "석면 작업 추가"') < 0,
+    /var k=siteKind\(r\);/.test(da16) && da16.indexOf('"이 석면 작업 기록을 삭제할까요?\\n(기록은 30년 보존 대상입니다 — 잘못 만든 것만 지우세요)"') > 0,
+    /if \(k === "site"\)\{ switchTab\("safety:site"\); if \(!\(a && siteSheetGo\(a\)\)\) sfNowTop\(\); return; \}/.test(sg16) && (sd16.match(/sfNowSiteGo\(r\)/g) || []).length === 5 && (sd16.match(/, "site"\)/g) || []).length === 1,
+    /go = "safety:site" \+ \(\(r\.id != null && String\(r\.id\) !== ""\) \? ":" \+ String\(r\.id\) : ""\);/.test(ce16) && (ce16.match(/, go\);/g) || []).length === 4 && ce16.indexOf('"safety:site");') < 0,
+    /if \(name === "site"\) siteId = sub;/.test(sl16) && sl16.indexOf('if (name === "site" && siteId) siteSheetGo(siteId);') > sl16.indexOf('if (name === "site"){ renderSites();'),
+    /else if \(safetyLayer === "site"\) setSafetyLayer\("site"\);/.test(ap16),
+    /<h3 id="asbModalTitle">석면 작업<\/h3>\s*<span class="fld-label">종류<\/span>\s*<select id="asbKind">\s*<option value="asbestos">석면<\/option>\s*<option value="demolition">철거<\/option>\s*<option value="dredge">준설<\/option>\s*<\/select>\s*<input type="text" id="asbTitle"/.test(html) && /document\.getElementById\("asbKind"\)\.addEventListener\("change", asbKindApply\);/.test(html),
+    (ss16.match(/\bvsSheetReveal\(/g) || []).length === 2 && (ss16.match(/\bvsSheetRender\(/g) || []).length === 1 && !/schedule\w*Save|doSave\w*\(|gwCall\(|localStorage|asb\.push|\.del\s*=(?!=)|\basb\s*=(?!=)|\.kind\s*=(?!=)/.test(ss16),
+    /function siteSheetGo\(id\)\{\s*var r;\s*if \(!canSee\("site"\) \|\| siteSheetCur !== "sheet"\) return false;/.test(ssb45),
+  ];
+  T('v445 ⑯ 정적: 옛 검색 배선 = 폰 갈래만 그림 · saveAsb 못 읽은 대장 막음(목록에 넣기 전) · 새 줄 kind·바꿀 때만 r.kind(대입 1곳)·새 줄 열기(afterSave) · openAsb 종류 칸 + asbKindApply·옛 제목 글 0 · deleteAsb 저장된 종류·석면 문구 그대로 · sfNowGo 현장 갈래 siteSheetGo·sfNowDue 현장 줄 5곳 sfNowSiteGo(작업신고 마감·특별교육 둘·농도·보존 만료)·안내 줄 1곳 "site" · calEvents go 꼴·4곳·글자 "safety:site" 0 · setSafetyLayer 현장 id(현장 칸 요청만·그린 뒤) · applySafetyPerms 현장 칸 다시 엶 · 창 종류 칸 HTML(석면·철거·준설)·change 배선 · @site-sheet = vsSheetRender 1·vsSheetReveal 2·저장·서버·저장소·대장·종류 대입 0 · siteSheetGo 현장 권한·표 갈래만',
+    st16.every(Boolean), JSON.stringify(st16));
+
+  // ⑰ 폰 sheet 준비(퀴즈 2번 답이 '폰도 새 표'면 정의의 phone 한 줄만 "sheet" — 미리 돌림): 375 = 열 3(공사명 52 · 구분 22 — "석면"만 · 일정 26 — 정렬 별칭 기간) · 일정 칸 = 신고 마감이 있으면 "신고 D±n"(같은 색 — p1 빨강) ·
+  //   진행 중·시작일 = "시작 D-n" · 그 밖 종료 연월 · 합계 = "합계 11건||7일·지남 1"
+  const X17 = mk45({ width: 375 }), d17 = Object.assign({}, X17.api.def(), { phone: 'sheet' }); X17.api.vs(d17); const h17 = X17.host._h;
+  const sc17 = ['p1', 'p2', 'p3', 'd2', 'p4'].map((id) => { const c = cellOf45(h17, id, 'sched_ph'); return c ? c[1].replace(/<[^>]+>/g, '') + (clsOf45(c).indexOf('vs-dan') >= 0 ? '!' : '') : '?'; }).join('|');
+  T('v445 ⑰ 폰 sheet 준비(실행 — phone:"sheet" 사본): 열 = 공사명·구분·일정(정렬 ▼ 별칭 기간) · 구분 "석면"(번호 없음) · 일정 = 신고 D+3!(빨강)|신고 D+17(작업중 — 색 없음)|시작 D-20|2026-03|- · 합계 "합계 11건||7일·지남 1" · 검사 통과(폰 % 합 100)',
+    heads45(h17).join(',') === 'title,kind,sched_ph' && (cellOf45(h17, 'p1', 'kind') || ['', ''])[1] === '석면' && sc17 === '신고 D+3!|신고 D+17|시작 D-20|2026-03|-' && foot45(h17) === '합계 11건||7일·지남 1' && X17.api.check(d17).length === 0 && /data-vs-sort="sched_ph"[^>]*>일정<span class="vs-ar">▼<\/span>/.test(h17),
+    JSON.stringify({ heads: heads45(h17), sc17, foot: foot45(h17) }));
+  const footD45 = (() => { const X = mk45(); X.api.render(); return foot45(X.host._h); })();
+  T('v445 ⑰-2 합계 줄(1366 — 굵게, 거른 줄 전체): "합계 11건 · 지난 자료 4" · 상태 "진행 4" · 투입 합 7 · 특별교육 "미이수 2명" · 신고 마감 "7일·지남 1"(전문 title) · 그 밖 빈 칸',
+    footD45 === '합계 11건 · 지난 자료 4||||진행 4|7|미이수 2명|7일·지남 1|', footD45);
+
+  // ⑱ 문서 — FEATURES 기준 ≥ v445·v445 절(이름·폭 바꿈·검사 문장 고정)·§7 안전 줄 · TESTLIST v445(체크 칸 전부 AI 몫 — 화면 칸 5개 '(AI 시험 화면 대상', 게이트 칸 '[x] (AI) `uismoke`(' + 게이트 넷·결함 심기, PM 0) ·
+  //   MANUAL 28절(PC 표·종류 칸·신고 마감 색·삭제 확인문·캘린더 문장 고정) · CLAUDE.md '안전 현장 표' 줄 · sw ≥ 445
+  const ft18 = rd45('FEATURES.md'), tl18 = rd45('TESTLIST.md'), man18 = rd45('MANUAL.html'), cl18 = rd45('CLAUDE.md'), sw18 = rd45('sw.js');
+  const ftv18 = (() => { const i = ft18.indexOf('\n### v445 (11/11)'); if (i < 0) return ''; const j = ft18.indexOf('\n### ', i + 5); return ft18.slice(i, j < 0 ? ft18.length : j); })();
+  const ft7_18 = ft18.split('\n').filter((ln) => ln.indexOf('- **안전**(v428') === 0)[0] || '';
+  const tlv18 = (() => { const i = tl18.indexOf('\n## v445 '); if (i < 0) return ''; const j = tl18.indexOf('\n## ', i + 5); return tl18.slice(i, j < 0 ? tl18.length : j); })();
+  const cb18 = tlv18.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), scr18 = cb18.filter((l) => /^- \[[ x]\] \(AI 시험 화면 대상[,) —]/.test(l)), gate18 = cb18.filter((l) => /^- \[x\] \(AI\) `uismoke`\(/.test(l));
+  const m28_18 = (() => { const i = man18.indexOf('<h2 id="s28">'); return i < 0 ? '' : man18.slice(i, man18.indexOf('<h3 id="s28-1">', i)); })();
+  const FT18 = ['`// @site-sheet-start ~ end`', '`siteDueInfo`', '`siteEduSum`', '`siteOldOf`', '`siteSheetPairs`', '`#asbKind`', '`ASB_ONLY_IDS`', '`ASB_UNREAD_MSG`', '`siteSheetGo`', '`sfNowSiteGo`', "'safety:site:<현장 id>'", '`renderSitesLegacy`',
+    '742 / 960 / 1,072', '구분 74 → **76**', '기간 160 → **168**', '상태 64 → **62**', '투입 52 → **56**', '특별교육 96 → **94**', '신고 마감 76 → **86**', '보존 만료 80 → **86**', 'uismoke v445 ⑤', 'uismoke v445 ⑦', 'uismoke v445 ⑫', '옛 기록은 종류를 바꿀 때만 kind 기록'];
+  const MAN18 = ['<li><b>PC(넓은 창)</b>에서는 현장이 <b>엑셀형 표</b>로 나옵니다(2026-11 v445)', '맨 위 <b>종류</b>(석면 · 철거 · 준설 — 기본 석면)를 고르면 창 제목이 그 종류로 바뀌고', 'PC 표의 <b>신고 마감</b> 칸은 안전 › 현황 ③과 같은 색입니다',
+    '철거·준설 기록의 확인 창에는 30년 문구가 없습니다', 'PC 표에서는 그 현장 줄이 펼쳐진 채 열립니다', '<b>특별교육</b> 칸은 펼침의 특별교육 줄을 줄여 보여 줍니다'];
+  const CL18 = ['**안전 현장 표(v445', '`siteSheetPairs`', '`siteDueInfo`', '`siteEduSum`', '`siteOldOf`', '`asbKindApply`', '`ASB_UNREAD_MSG`', '`siteSheetGo`', '`sfNowSiteGo`', "'지시·기성·거래처·일용직·입찰·부동산·현장 7개'", 'v445에 안전 `#view-safety`'];
+  const miss18 = FT18.filter((s) => ftv18.indexOf(s) < 0).concat(MAN18.filter((s) => m28_18.indexOf(s) < 0).map((s) => 'MAN ' + s), CL18.filter((s) => cl18.indexOf(s) < 0).map((s) => 'CL ' + s));
+  T('v445 ⑱ 문서: FEATURES 기준 ≥ v445·v445 절(구간·이름 12·칸 폭 일곱 바꿈·단계 합·검사 문장·kind 규칙 — 문장 고정)·§7 안전 줄 v445 · TESTLIST v445 체크 칸 전부 AI 몫(화면 칸 5 "(AI 시험 화면 대상" — 열린 [ ]·닫힌 [x] 같은 꼴, 게이트 칸 1 "[x] (AI) `uismoke`(" + consheet_check·proctpl_check·settletest·servertest·결함 심기, PM 0) · MANUAL 28절(PC 표·종류 칸·신고 마감 색·삭제 확인문·캘린더·특별교육 칸 — 문장 고정) · CLAUDE.md 안전 현장 표 줄·부품 줄 7개·화면 폭 줄 · sw ≥ 445',
+    Number((ft18.match(/기준: v(\d+) /) || [0, 0])[1]) >= 445 && ftv18.length > 0 && ft7_18.indexOf('v445부터 PC(860px 이상)는 엑셀형 표') > 0 && miss18.length === 0
+    && tlv18.length > 0 && cb18.length === 6 && scr18.length === 5 && gate18.length === 1 && cb18.every((l) => /^\s*[-*+] \[[ xX]\] \(AI[ )]/.test(l) && l.indexOf('PM') < 0) && tlv18.indexOf('PM 몫') < 0
+    && ['`consheet_check`', '`proctpl_check`', '`settletest`', '`servertest`', '결함 심기'].every((g) => (gate18[0] || '').indexOf(g) > 0)
+    && Number((sw18.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 445,
+    JSON.stringify({ miss18: miss18.map((s) => s.slice(0, 40)), ftv: ftv18.length, ft7: ft7_18.indexOf('v445부터'), tl: tlv18.length, cb: cb18.length, scr: scr18.length, gate: gate18.length, sw: (sw18.match(/jw-shell-v(\d+)/) || [0, 0])[1] }));
+
+  // ---- v445 검토 반영(11/11 — 검토 3관점(30년 보존·데이터 · 권한·특별교육 · 회귀) 지적 13건: 고침 11(같은 지적을 묶으면 9곳) · 범위 밖 2) — ⑲~㉕ ----
+  // ⑲ [+ 현장 추가]·[수정] 창 일용직 상자(30년 보존 근로자 id — 실제 asbRenderWorkerChecks·asbGetCheckedWorkers·openAsb·saveAsb, 틀 o.realWk): 표본 줄 worker_ids = w1·w2·w4(명부에서 지움)·wX(명부에 없는 id) —
+  //   일용직 숨김(W — 앞사람이 읽은 명부가 메모리에 남은 '전환' 꼴) = 이름 상자 0·명부 이름 0·'지정된 일용직 4명 — … 권한이 없어' 고정 상자 1·명부 읽기 0 → 종류만 바꿔 저장 = worker_ids 그대로(같은 차례) ·
+  //   명부 읽는 중(H형 — 일용직 수행, 빈 명부) = '읽는 중' 고정 상자·명부 다시 읽기(콜백 1) → 그대로 저장 = 그대로 / 다시 열어 명부가 오면 = 이름 상자로 다시 그림(w1·w2 체크·w3 안 체크·'기존 지정' w4 '지운일용 명부에서 지움'·wX '알 수 없는 일용직 wX' 체크) → 저장 = 그대로 ·
+  //   창을 닫은 뒤 온 명부 = 다시 그리지 않음 · 관리자(명부 읽음) = 그대로 저장 = 같은 집합(명부 차례 → 기존 지정) · 지운 사람 체크를 풀면 그 사람만 빠짐 · 새 현장 = 명부 상자만(체크 0)
+  const m19 = miss45.length, ASB19 = () => [S0_45({ id: 'k1', kind: 'demolition', title: '일용직 보존 표본', status: 'plan', member_ids: ['u1'], worker_ids: ['w1', 'w2', 'w4', 'wX'] })];
+  const ck19 = (h, id) => new RegExp('data-asb-wk="' + id + '" checked>').test(h), bx19 = (h, id) => new RegExp('data-asb-wk="' + id + '"').test(h);
+  const X19w = mk45({ user: U45.W, asb: ASB19(), realWk: true }); X19w.env.pickM = ['u1'];
+  X19w.api.openAsb('k1'); const h19w = X19w.env.host('asbWorkers')._h;
+  X19w.env.host('asbKind').value = 'dredge'; X19w.api.kindApply(); X19w.api.saveAsb(); X19w.env.runTimers();
+  const w19 = [(h19w.match(/data-asb-wk="/g) || []).length, /김일용|박반장|이신입|지운일용/.test(h19w), (h19w.match(/data-asb-wk-keep="/g) || []).length, /checked disabled> 지정된 일용직 4명 — 일용직 명부를 볼 권한이 없어 이름 없이 그대로 둡니다<\/label>/.test(h19w),
+    X19w.api.asb()[0].kind, X19w.api.asb()[0].worker_ids.join(','), X19w.env.log.indexOf('asbSave') >= 0, X19w.env.log.indexOf('loadWorkers') < 0].join('|');
+  const X19h = mk45({ user: U45.H, asb: ASB19(), workers: [], wkLoaded: false, realWk: true }); X19h.env.pickM = ['u1'];
+  X19h.api.openAsb('k1'); const h19h = X19h.env.host('asbWorkers')._h, p19h = X19h.env.pend.length; X19h.api.saveAsb(); X19h.env.runTimers(); const k19h = X19h.api.asb()[0].worker_ids.join(',');
+  X19h.env.pend.length = 0; X19h.api.openAsb('k1'); X19h.api.setWk(WKS45()); X19h.api.setWkLoaded(true); X19h.env.pend.splice(0).forEach((f) => f());
+  const h19r = X19h.env.host('asbWorkers')._h; X19h.api.saveAsb(); X19h.env.runTimers(); const k19r = X19h.api.asb()[0].worker_ids.join(',');
+  const lv19 = (h) => [ck19(h, 'w1'), ck19(h, 'w2'), bx19(h, 'w3') && !ck19(h, 'w3'), /<div class="scope-hint">기존 지정 — 지금 명부에 없는 일용직\(체크를 풀면 이 현장 투입 인원에서 빠집니다\)<\/div>/.test(h), /data-asb-wk="w4" checked> 지운일용 <span class="scope-chip">명부에서 지움<\/span>/.test(h), /data-asb-wk="wX" checked> 알 수 없는 일용직 wX<\/label>/.test(h), h.indexOf('data-asb-wk-keep') < 0].every(Boolean);
+  const X19c = mk45({ user: U45.H, asb: ASB19(), workers: [], wkLoaded: false, realWk: true }); X19c.api.openAsb('k1'); X19c.api.closeAsb(); X19c.api.setWk(WKS45()); X19c.api.setWkLoaded(true); X19c.env.pend.splice(0).forEach((f) => f());
+  const c19 = X19c.env.host('asbWorkers')._h.indexOf('data-asb-wk-keep=') > 0 && !bx19(X19c.env.host('asbWorkers')._h, 'w1');
+  const X19a = mk45({ asb: ASB19(), realWk: true }); X19a.env.pickM = ['u1'];
+  X19a.api.openAsb('k1'); const h19a = X19a.env.host('asbWorkers')._h; X19a.api.saveAsb(); X19a.env.runTimers(); const k19a = X19a.api.asb()[0].worker_ids.join(',');
+  X19a.api.openAsb('k1'); const b19 = X19a.env.host('asbWorkers').els.find((e) => e.getAttribute('data-asb-wk') === 'w4'); if (b19) b19.checked = false; else miss45.push('w4 상자 없음'); X19a.api.saveAsb(); X19a.env.runTimers(); const k19a2 = X19a.api.asb()[0].worker_ids.join(',');
+  X19a.api.openAsb(null); const h19n = X19a.env.host('asbWorkers')._h;
+  T('v445 ⑲ 검토 — 창 일용직 상자가 30년 보존 근로자 id를 지움(실행 — 실제 asbRenderWorkerChecks·asbGetCheckedWorkers·openAsb·saveAsb): 일용직 숨김(앞사람 명부가 메모리에 남음) = 이름 상자 0·이름 글 0·고정 상자 "지정된 일용직 4명 — 권한이 없어" 1·명부 읽기 0 → 종류만 바꿔 저장 = w1,w2,w4,wX 그대로 · 명부 읽는 중 = 고정 상자 "읽는 중"·다시 읽기 콜백 1 → 저장 = 그대로 → 다시 열고 명부가 오면 이름 상자(w1·w2 체크·w3 안 체크·기존 지정 w4 지운일용·wX 알 수 없는 일용직 체크) → 저장 = 그대로 · 창을 닫은 뒤 온 명부 = 다시 그리지 않음 · 관리자 = 같은 화면·그대로 저장 · w4 체크를 풀면 w1,w2,wX · 새 현장 = 명부 상자 3·체크 0',
+    w19 === '0|false|1|true|dredge|w1,w2,w4,wX|true|true'
+    && /checked disabled> 지정된 일용직 4명 — 명부를 읽는 중이라 이름 없이 그대로 둡니다\(명부가 오면 이름이 보입니다\)<\/label>/.test(h19h) && p19h === 1 && k19h === 'w1,w2,w4,wX'
+    && lv19(h19r) && k19r === 'w1,w2,w4,wX' && c19 && lv19(h19a) && k19a === 'w1,w2,w4,wX' && k19a2 === 'w1,w2,wX'
+    && (h19n.match(/data-asb-wk="/g) || []).length === 3 && h19n.indexOf(' checked') < 0 && h19n.indexOf('기존 지정') < 0 && noMiss45(m19),
+    JSON.stringify({ w19, h19h: h19h.slice(0, 160), p19h, k19h, r: lv19(h19r), k19r, c19, a: lv19(h19a), k19a, k19a2, h19n: h19n.slice(0, 120), miss: miss45.slice(m19) }));
+
+  // ⑳ [근로자 추가] 창 [이 현장에 넣기](실제 openSiteWorkers·renderSwList·swPickIds·현장 탭 배선 IIFE — 틀 o.sw): 표본 줄 worker_ids = w1·w2·w4(지움)·wX —
+  //   관리자 = 목록 w1·w2 체크·w3 → 이름 검색 '이신'으로 w3만 그려 체크 → 넣기 = w1,w2,w3 + 그려지지 않은 지정 w4,wX(종전 = w3만) · 창 닫힘·저장 예약·토스트 ·
+  //   체크를 푼 뒤 검색해도 그 선택이 남음(w1 풂 → '박' → 빈 검색 = w1 안 체크) → 넣기 = w2,w4,wX · 일용직 숨김(앞사람 명부가 메모리에) = 목록에 이름 0·'권한이 없습니다' → 넣기 = 안내 1·그대로·저장 예약 0 ·
+  //   명부 읽는 중 = '불러오는 중' → 넣기 = 못 읽은 명부 안내 1·다시 읽기 1·그대로·저장 예약 0 · [+ 새 일용직] 등재한 사람 = 선택에 들어가 넣기에 포함 · 정적: swChecked 없음·넣기는 swPickIds
+  const m20 = miss45.length, ASB20 = () => [S0_45({ id: 'k2', kind: 'asbestos', title: '근로자 창 표본', status: 'plan', member_ids: ['u1'], worker_ids: ['w1', 'w2', 'w4', 'wX'] })];
+  const swClick45 = (X, id) => (X.env.host(id).L.click || []).slice().forEach((f) => f({ target: X.env.host(id) }));
+  const swType45 = (X, v) => { const s = X.env.host('swSearch'); s.value = v; (s.L.input || []).slice().forEach((f) => f.call(s, {})); };
+  const swTick45 = (X, id, on) => { const el = X.env.host('swList').els.find((e) => e.getAttribute('data-sw') === id); if (!el) { miss45.push('창 상자 없음 ' + id); return false; } el.checked = on; (X.env.host('swList').L.change || []).slice().forEach((f) => f({ target: el })); return true; };
+  const swIds45 = (X) => X.env.host('swList').els.filter((e) => e.hasAttribute('data-sw')).map((e) => e.getAttribute('data-sw') + (e.checked ? '+' : '')).join(',');
+  const SW_NO45 = '일용직 명부를 볼 권한이 없어 이 창에서는 투입 일용직을 바꿀 수 없습니다 — 지금 투입 인원은 그대로 둡니다(일용직 지정은 일용직 권한이 있는 분이 합니다).';
+  const X20 = mk45({ asb: ASB20(), sw: true }); X20.api.openSw('k2'); const l20a = swIds45(X20); swType45(X20, '이신'); const l20b = swIds45(X20); swTick45(X20, 'w3', true); swClick45(X20, 'swSave');
+  const r20a = X20.api.asb()[0].worker_ids.join(','), s20a = [X20.env.host('swBackdrop').classList.contains('show'), X20.env.log.indexOf('asbSave') >= 0, X20.env.log.indexOf('toast:저장했습니다') >= 0].join('|');
+  const X20b = mk45({ asb: ASB20(), sw: true }); X20b.api.openSw('k2'); swTick45(X20b, 'w1', false); swType45(X20b, '박'); const l20c = swIds45(X20b); swType45(X20b, ''); const l20d = swIds45(X20b); swClick45(X20b, 'swSave');
+  const r20b = X20b.api.asb()[0].worker_ids.join(',');
+  const X20w = mk45({ user: U45.W, asb: ASB20(), sw: true }); X20w.api.openSw('k2'); const l20w = X20w.env.host('swList')._h; swClick45(X20w, 'swSave');
+  const r20w = [/김일용|박반장|이신입/.test(l20w), l20w.indexOf('일용직 명부를 볼 권한이 없습니다') > 0, X20w.env.log.filter((l) => l === 'alert:' + SW_NO45).length, X20w.api.asb()[0].worker_ids.join(','), X20w.env.log.indexOf('asbSave') < 0].join('|');
+  const X20h = mk45({ user: U45.H, asb: ASB20(), workers: [], wkLoaded: false, sw: true }); X20h.api.openSw('k2'); const l20h = X20h.env.host('swList')._h, n20h = X20h.env.log.filter((l) => l === 'loadWorkers').length; swClick45(X20h, 'swSave');
+  const r20h = [l20h.indexOf('일용직 명부를 불러오는 중입니다') > 0, n20h, X20h.env.log.filter((l) => /^alert:일용직 명부를 아직 읽지 못했습니다/.test(l)).length, X20h.env.log.filter((l) => l === 'loadWorkers').length - n20h, X20h.api.asb()[0].worker_ids.join(','), X20h.env.log.indexOf('asbSave') < 0].join('|');
+  const X20n = mk45({ user: U45.V, asb: ASB20(), sw: true }); X20n.api.openSw('k2'); X20n.env.host('swNewName').value = '새일용'; swClick45(X20n, 'swNewBtn');
+  const nw20 = (X20n.api.wks().filter((w) => w.name === '새일용')[0] || {}).id, l20n = swIds45(X20n); swClick45(X20n, 'swSave'); const r20n = X20n.api.asb()[0].worker_ids.join(',');
+  const iife20 = siteIife45(html), sv20 = iife20.slice(Math.max(0, iife20.indexOf('if(sv) sv.addEventListener("click"'))), st20 = [html.indexOf('function swChecked(') < 0, iife20.indexOf('if(sv) sv.addEventListener("click"') > 0, /r\.worker_ids=swPickIds\(r\);/.test(sv20), iife20.indexOf('swChecked') < 0,
+    /if\(!canSee\("wk"\)\)\{ alert\(SW_NO_WK_MSG\); return; \}/.test(sv20), /if\(!wkLoaded\)\{ alert\(WK_UNREAD_MSG\);/.test(sv20), sv20.indexOf('if(!canSee("wk"))') < sv20.indexOf('r.worker_ids=swPickIds(r);')].every(Boolean);   // 넣기 처리기 구간만(등재 처리기의 같은 막음과 섞이지 않게)
+  T('v445 ⑳ 검토 — [근로자 추가] [이 현장에 넣기]가 그려진 상자만으로 30년 보존 근로자 id를 바꿈(실행 — 실제 openSiteWorkers·renderSwList·swPickIds·현장 탭 배선): 관리자 = 목록 w1+,w2+,w3 → 검색 "이신" = w3만 → 체크·넣기 = w1,w2,w3,w4,wX(종전 w3만)·창 닫힘·저장 예약·토스트 · w1 풂 → 검색 "박" = w2+ → 빈 검색 = w1,w2+,w3 → 넣기 = w2,w4,wX · 일용직 숨김 = 이름 0·"권한이 없습니다" → 넣기 = 안내 1·그대로·저장 0 · 명부 읽는 중 = "불러오는 중"·창 열 때 다시 읽기 1 → 넣기 = 못 읽은 명부 안내 1·다시 읽기 1·그대로·저장 0 · [+ 새 일용직] = 선택에 들어감(w1+,w2+,새+,w3) → 넣기 = w1,w2,새,w4,wX · 정적: swChecked 없음·넣기 = swPickIds·두 막음',
+    l20a === 'w1+,w2+,w3' && l20b === 'w3' && r20a === 'w1,w2,w3,w4,wX' && s20a === 'false|true|true' && l20c === 'w2+' && l20d === 'w1,w2+,w3' && r20b === 'w2,w4,wX'
+    && r20w === 'false|true|1|w1,w2,w4,wX|true' && r20h === 'true|1|1|1|w1,w2,w4,wX|true' && !!nw20 && l20n === 'w1+,w2+,' + nw20 + '+,w3' && r20n === 'w1,w2,' + nw20 + ',w4,wX' && st20 && noMiss45(m20),
+    JSON.stringify({ l20a, l20b, r20a, s20a, l20c, l20d, r20b, r20w, r20h, nw20, l20n, r20n, st20, miss: miss45.slice(m20) }));
+
+  // ㉑ 특별교육 칸 '미이수 없음' = 투입 인원을 모두 풀 수 있을 때만(실제 siteEduSum·siteEduLine·setSafetyLayer — 안전 권한 앱 판정): 표본 e1 = 직원 u1(이수) + 일용직 w2(기록 없음) · e2 = 직원 u1만 · e3 = u1 + w1(이수) —
+  //   권민지형(안전 수행·일용직 보기) 명부 읽기 전(빈 명부) = e1 "확인 중"(색 없음 — 종전 "미이수 없음")·e2 "미이수 없음"·e3 "확인 중" · 현장 칸을 열면 명부 읽기 콜백 1 → 명부가 오면 다시 그림 = e1 "!미이수 1명"·e3 "미이수 없음" ·
+  //   그 사이 다른 탭이면 안 그림 · 안전 보기·일용직 숨김(가상) = e1·e3 "-"(일용직을 판정할 수 없음)·e2 "미이수 없음" · 확인 중 title = 명부를 읽는 중
+  const EDU21 = () => [{ id: 'm1e', ptype: 'member', pid: 'u1', kind: 'special', date: '2026-05-01' }, { id: 'w1e', ptype: 'worker', pid: 'w1', kind: 'special', date: '2026-05-01' }];
+  const ASB21 = () => [S0_45({ id: 'e1', kind: 'asbestos', title: '교육 표본 일용직', status: 'plan', start: '2026-12-01', member_ids: ['u1'], worker_ids: ['w2'] }), S0_45({ id: 'e2', kind: 'asbestos', title: '교육 표본 직원만', status: 'plan', start: '2026-12-02', member_ids: ['u1'] }),
+    S0_45({ id: 'e3', kind: 'asbestos', title: '교육 표본 이수 일용직', status: 'plan', start: '2026-12-03', member_ids: ['u1'], worker_ids: ['w1'] })];
+  const ed21 = (X) => ['e1', 'e2', 'e3'].map((id) => { const c = cellOf45(X.host._h, id, 'edu'); return c ? (clsOf45(c).indexOf('vs-warn') >= 0 ? '!' : '') + c[1].replace(/<[^>]+>/g, '') : '?'; }).join('|');
+  const X21 = mk45({ user: U45.S, asb: ASB21(), edu: EDU21(), workers: [], wkLoaded: false }); X21.api.setTab('safety', 'site'); X21.api.setLayer('site');
+  const a21 = ed21(X21), p21 = X21.env.pend.length, t21 = unesc45(((cellOf45(X21.host._h, 'e1', 'edu') || [''])[0].match(/title="([^"]*)"/) || ['', ''])[1]);
+  X21.api.setWk(WKS45()); X21.api.setWkLoaded(true); X21.env.pend.splice(0).forEach((f) => f()); const b21 = ed21(X21);
+  const X21d = mk45({ user: U45.S, asb: ASB21(), edu: EDU21(), workers: [], wkLoaded: false }); X21d.api.setTab('safety', 'site'); X21d.api.setLayer('site'); X21d.api.setTab('dash', 'site'); X21d.api.setWk(WKS45()); X21d.api.setWkLoaded(true); X21d.env.pend.splice(0).forEach((f) => f());
+  const d21 = ed21(X21d);
+  const X21h = mk45({ user: { id: 'm7', name: '안전보기', perms: { site: 'do', safety: 'view' } }, asb: ASB21(), edu: EDU21(), workers: [], wkLoaded: false }); X21h.api.render(); const h21 = ed21(X21h);
+  T('v445 ㉑ 검토 — 특별교육 칸 "미이수 없음"은 투입 인원을 모두 풀 수 있을 때만(실행 — 실제 siteEduSum·siteEduLine·setSafetyLayer): 권민지형 명부 읽기 전 = e1 확인 중(색 없음·title 명부를 읽는 중)|e2 미이수 없음|e3 확인 중 · 명부 콜백 1 → 명부가 오면 다시 그림 = e1 !미이수 1명|e2 미이수 없음|e3 미이수 없음 · 그 사이 다른 탭 = 다시 안 그림(확인 중 그대로) · 안전 보기·일용직 숨김 = e1 -|e2 미이수 없음|e3 -',
+    a21 === '확인 중|미이수 없음|확인 중' && p21 === 1 && t21 === '일용직 명부를 읽는 중 — 읽은 뒤 일용직까지 판정합니다' && b21 === '!미이수 1명|미이수 없음|미이수 없음' && d21 === a21 && h21 === '-|미이수 없음|-',
+    JSON.stringify({ a21, p21, t21, b21, d21, h21 }));
+
+  // ㉒ 로그인 창 '전환' — 앞사람 서버 특별교육 답을 비움(실제 applySafetyPerms·setSafetyLayer·renderSites → siteGapViewer): 정재욱형(V — 안전 숨김·일용직 수행)이 받은 답(일용직 이름 '박반장') = 칸 "미이수 1명"·title에 이름 ·
+  //   같은 사람이 다시 그려도 답 그대로(순번 0) → 일용직 숨김형(W)으로 바뀌면 = 다시 엶·답 비움(첫 답 전 — "확인 중")·순번 1(앞사람 물음의 늦은 답은 loadSiteEduGap이 버림)·화면 어디에도 '박반장' 0 · 그 사람이 받은 답은 그대로 그림
+  const ASB22 = () => [S0_45({ id: 'g1', kind: 'asbestos', title: '전환 표본', status: 'plan', start: '2026-12-01', member_ids: ['u1'], worker_ids: ['w2'] })];
+  const X22 = mk45({ user: U45.V, asb: ASB22() }); X22.api.setTab('safety', 'site'); X22.api.render();
+  X22.api.setGap({ has_edu: true, gaps: { g1: ['박반장'] }, wk_n: null }, X22.api.sigs(X22.api.asb())); X22.api.render(); X22.api.render();
+  const a22 = [((cellOf45(X22.host._h, 'g1', 'edu') || ['', ''])[1]).replace(/<[^>]+>/g, ''), X22.host._h.indexOf('박반장') > 0, X22.api.gapSeq()].join('|');
+  X22.env.user = U45.W; X22.env.log.length = 0; X22.api.applySafety();
+  const b22 = [((cellOf45(X22.host._h, 'g1', 'edu') || ['', ''])[1]).replace(/<[^>]+>/g, ''), X22.host._h.indexOf('박반장') < 0, X22.api.gapSeq(), X22.api.gap() === undefined, X22.env.log.indexOf('loadAsb') >= 0].join('|');
+  X22.api.setGap({ has_edu: true, gaps: { g1: [] }, wk_n: { g1: 1 } }, X22.api.sigs(X22.api.asb())); X22.api.render();
+  const c22 = [((cellOf45(X22.host._h, 'g1', 'edu') || ['', ''])[1]).replace(/<[^>]+>/g, ''), X22.api.gapSeq()].join('|');
+  T('v445 ㉒ 검토 — 로그인 창 "전환" 뒤 앞사람 서버 특별교육 답(실행 — 실제 applySafetyPerms·setSafetyLayer·renderSites): 정재욱형 답 = 칸 "미이수 1명"·이름 보임·같은 사람이 다시 그려도 순번 0 → 일용직 숨김형으로 바뀜 = 현장 칸 다시 엶(대장 읽기)·답 비움(undefined)·칸 "확인 중"·화면에 앞사람 답의 이름 0·순번 1 → 그 사람 답(일용직 1명) = "미이수 1명"·순번 그대로',
+    a22 === '미이수 1명|true|0' && b22 === '확인 중|true|1|true|true' && c22 === '미이수 1명|1', JSON.stringify({ a22, b22, c22 }));
+
+  // ㉓ 검색칸 = 옛 검색 식(실행 — 같은 대장·같은 검색어로 폰 옛 본문 renderSitesLegacy(375)와 PC 표 줄을 대조): 띄어쓰기 차이('철거 공사' ↔ '철거공사'·'석면 해체' ↔ '석면해체'·'포항 제철' ↔ 발주처 '포항 제철'·소재지 '포항제철소'·앞뒤·여러 칸 띄어쓰기) ·
+  //   구분·상태 글은 걸지 않음('석면' = 공사명에 석면이 든 줄만 — 학교 지붕 석면 줄 빠짐 · '종결'·'#131' = 0) — 검색어 11개 모두 두 쪽이 같은 줄 · 몇 개는 줄도 고정 · 부품: search.squash가 없는 정의(다른 탭)는 종전 그대로(띄어쓰기 그대로 비교)
+  const ASB23 = () => [S0_45({ id: 's1', kind: 'demolition', title: 'A동 철거공사', client: '포항시', status: 'plan', start: '2026-12-01' }), S0_45({ id: 's2', kind: 'demolition', title: 'B동 철거 공사', status: 'run', start: '2026-11-01' }),
+    S0_45({ id: 's3', kind: 'asbestos', seq: 131, title: '석면해체 작업', client: '포항 제철', start: '2026-10-01' }), S0_45({ id: 's4', kind: 'asbestos', title: '석면 해체작업', site: '포항제철소', start: '2020-05-01' }),
+    S0_45({ id: 's5', kind: 'dredge', title: '준설 공사', client: '시청', start: '2026-09-01' }), S0_45({ id: 's6', kind: 'asbestos', title: '학교 지붕', client: '교육청', start: '2026-08-01' })];
+  const Q23 = ['철거 공사', '철거공사', '석면 해체', '석면해체', '포항 제철', '  철거   공사 ', '석면', '종결', '#131', '준설공 사', '포항'];
+  const leg23 = (q) => { const L = mk45({ width: 375, asb: ASB23() }); L.env.host('siteSearch').value = q; L.api.render(); return [...L.host._h.matchAll(/data-site-fold="([^"]*)"/g)].map((m) => m[1]).sort().join(','); };
+  const sh23 = (q) => { const X = mk45({ asb: ASB23() }); X.api.render(); typeQ45(X, q); return order45(X.host._h).split(',').filter(Boolean).sort().join(','); };
+  const cmp23 = Q23.map((q) => [q, leg23(q), sh23(q)]), X23 = mk45();
+  const qk23 = [X23.api.qOk({ search: { text: () => 'A동 철거공사' } }, { q: '철거 공사' }, {}), X23.api.qOk({ search: { text: () => 'A동 철거공사' } }, { q: '철거공' }, {}), X23.api.qOk({ search: { text: () => 'A동 철거공사', squash: true } }, { q: '철거 공사' }, {}),
+    X23.api.qOk({ search: { text: () => 'B동 철거 공사', squash: true } }, { q: ' 철거공사 ' }, {}), X23.api.qOk({ search: { text: () => 'B동 철거 공사' } }, { q: '철거공사' }, {})];
+  const pin23 = { '철거 공사': 's1,s2', '석면 해체': 's3,s4', '포항 제철': 's3,s4', '석면': 's3,s4', '종결': '', '#131': '', '포항': 's1,s3,s4' };
+  T('v445 ㉓ 검토 — 검색칸 띄어쓰기 = 옛 검색 식(실행 — 같은 대장·검색어 11개로 폰 옛 본문 카드와 PC 표 줄 대조): 모두 같은 줄 · "철거 공사" = s1(철거공사),s2 · "석면 해체" = s3,s4 · "포항 제철" = 발주처·소재지 s3,s4 · "석면" = 공사명 줄만 s3,s4(구분 글 안 걸림) · "종결"·"#131" = 0 · 정의 search.squash · 부품: squash 없는 정의는 띄어쓰기 그대로(false,true / squash true,true / 없음 false)',
+    cmp23.every((c) => c[1] === c[2]) && Object.keys(pin23).every((q) => (cmp23.filter((c) => c[0] === q)[0] || [])[2] === pin23[q]) && JSON.stringify(qk23) === '[false,true,true,true,false]' && X23.api.def().search.squash === true,
+    JSON.stringify({ cmp23: cmp23.filter((c) => c[1] !== c[2] || pin23[c[0]] !== undefined), qk23 }));
+
+  // ㉔ 캘린더 — 작업신고 마감·농도측정은 석면 줄만(실행 — 실제 calEvents): 석면(kind)·종류 없는 옛 줄 = 착수·종료·신고 마감·농도측정 4 · 철거·준설 = 착수·종료 2(종전 4) · 공사명 없는 철거 줄 = '🦺 철거 작업 착수'(종전 '석면 작업') ·
+  //   공사명 없는 석면 줄 = '🦺 석면 작업 착수' · go = 그 현장 · 정적: 두 줄 모두 k === "asbestos" 조건
+  const ASB24 = () => [S0_45({ id: 'c1', kind: 'asbestos', title: '달력 석면', start: '2026-12-10', end: '2026-12-20', status: 'plan' }), S0_45({ id: 'c2', kind: 'demolition', title: '달력 철거', start: '2026-12-10', end: '2026-12-20', status: 'plan' }),
+    S0_45({ id: 'c3', kind: 'dredge', title: '달력 준설', start: '2026-12-10', end: '2026-12-20', status: 'run' }), S0_45({ id: 'c4', title: '달력 종류 없음', start: '2026-12-10', end: '2026-12-20', status: 'plan' }),
+    S0_45({ id: 'c5', kind: 'demolition', title: '', start: '2026-12-11', status: 'plan' }), S0_45({ id: 'c6', kind: 'asbestos', title: '', start: '2026-12-12', status: 'plan' })];
+  const X24 = mk45({ asb: ASB24(), tab: 'cal' }), ev24 = X24.api.cal().filter((e) => /🦺|⚠|🧪/.test(e.label));
+  const kinds24 = (id) => ev24.filter((e) => e.go === 'safety:site:' + id).map((e) => (/ 착수$/.test(e.label) ? 'start' : / 종료$/.test(e.label) ? 'end' : / 작업신고 마감$/.test(e.label) ? 'due' : / 농도측정$/.test(e.label) ? 'conc' : '?')).sort().join('+');
+  const k24 = ['c1', 'c2', 'c3', 'c4', 'c5', 'c6'].map(kinds24).join(' '), ce24 = fn45(html, 'calEvents');
+  T('v445 ㉔ 검토 — 캘린더 작업신고 마감·농도측정은 석면 줄만(실행 — 실제 calEvents): 석면·종류 없음 = 착수·종료·신고 마감·농도측정 · 철거·준설 = 착수·종료 · 공사명 없는 철거 = "🦺 철거 작업 착수" · 공사명 없는 석면 = "🦺 석면 작업 착수"·신고 마감 · 정적: 신고 마감·농도측정 줄에 k === "asbestos"',
+    k24 === 'conc+due+end+start end+start end+start conc+due+end+start start due+start' && ev24.some((e) => e.label === '🦺 철거 작업 착수') && ev24.some((e) => e.label === '🦺 석면 작업 착수') && !ev24.some((e) => /석면 작업/.test(e.label) && e.go === 'safety:site:c5')
+    && /if \(k === "asbestos" && r\.status !== "done"\) add\(asbNotifyDue\(r\), "lic", "⚠ "\+nm\+" 작업신고 마감"/.test(ce24) && /if \(k === "asbestos" && isDate\(r\.end\) && !r\.conc\) add\(r\.end, "lic", "🧪 "\+nm\+" 농도측정"/.test(ce24),
+    JSON.stringify({ k24, labels: ev24.filter((e) => /c5|c6/.test(e.go)).map((e) => e.label) }));
+
+  // ㉕ 검토 문서 — FEATURES v445 '검토 반영' 항목(①~⑨·범위 밖·게이트 — 문장 고정) · MANUAL 28절(검색 띄어쓰기·근로자 추가 넣기·기존 지정·안전 권한 PC 칸 글·종류 바꾸기 확인·캘린더 석면만 — 옛 '철거·준설 줄도 같이 뜹니다' 0) ·
+  //   CLAUDE.md 안전 현장 표 줄 검토 반영·부품 줄 search.squash · TESTLIST v445(옛 '그대로 저장 = kind' 문장 0 · kind 칸 없이 만든 시험 줄·worker_ids·member_ids 개수 · 게이트 칸 '검토 반영 뒤')
+  const ftv25 = ftv18, tlv25 = tlv18, m28_25 = m28_18, cl25 = cl18;
+  const FT25 = ['- **검토 반영(11/11)** — 검토 3관점(30년 보존·데이터 · 권한·특별교육 · 회귀) 지적 13건: 고침 11(같은 지적을 묶으면 9곳) · 범위 밖 2', '`asbRenderWorkerChecks`', '`data-asb-wk-keep`', '`swPickIds`', '`SW_NO_WK_MSG`', '`ASB_KIND_OUT_MSG`',
+    '`siteEduNone`', '`siteGapViewer`', '`search.squash`', "'철거 공사' 49 → 1", '운영 대장에는 kind 없는 줄이 0줄', 'uismoke v445 ⑲', 'uismoke v445 ⑳', 'uismoke v445 ㉑', 'uismoke v445 ㉒', 'uismoke v445 ㉓', 'uismoke v445 ㉔', '범위 밖(받아들임 — 남은 걱정)', '`_lib/ask.js` asbestos 도구', '- 검사·게이트(검토 반영 뒤): uismoke 564'];
+  const MAN25 = ["띄어쓰기는 상관없습니다('철거 공사'로 '철거공사'도 찾음", '이미 넣어 둔 다른 사람은 그대로 남고(체크를 푼 사람만 빠짐)', '<b>기존 지정</b>으로 체크된 채 남고(체크를 풀어야 빠짐)', "PC 표의 특별교육 칸은 줄이 없는 현장도 투입 인원이 모두 이수했으면 '미이수 없음'",
+    '30년 보존 대장이라는 확인 창이 뜹니다', '(철거·준설 줄은 착수·종료만 — 작업신고 마감·농도측정은 석면 해체·제거 현장 규정이라 석면 줄만, 2026-11 v445)'];
+  const CL25 = ['**검토 반영(11/11 — 30년 보존 근로자 id)**', '`data-asb-wk-keep`', '`swPickIds`', '`siteGapViewer`', '`siteEduNone`', '정의 옵션 `search.squash` 하나', '현장 대장 worker_ids를 쓰는 새 길을 만들면 그려지지 않은 지정을 남기는 같은 규칙을 함께'];
+  const cb25 = tlv25.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), g25 = cb25.filter((l) => /^- \[x\] \(AI\) `uismoke`\(/.test(l))[0] || '';
+  const miss25 = FT25.filter((s) => ftv25.indexOf(s) < 0).map((s) => 'FT ' + s).concat(MAN25.filter((s) => m28_25.indexOf(s) < 0).map((s) => 'MAN ' + s), CL25.filter((s) => cl25.indexOf(s) < 0).map((s) => 'CL ' + s));
+  T('v445 ㉕ 검토 문서: FEATURES v445 검토 반영(①~⑨ 이름·검사 번호·운영 사본 숫자·범위 밖 둘·게이트 564 — 문장 고정) · MANUAL 28절 여섯 문장(옛 "철거·준설 줄도 같이 뜹니다" 0) · CLAUDE.md 검토 반영·search.squash·새 길 규칙 · TESTLIST v445 옛 "그대로 저장 = kind" 문장 0·kind 칸 없이 만든 시험 줄·worker_ids·member_ids 개수·게이트 칸 "검토 반영 뒤"(+ 게이트 넷·결함 심기)',
+    miss25.length === 0 && m28_25.indexOf('(철거·준설 줄도 같이 뜹니다)') < 0 && tlv25.indexOf('옛 석면 줄을 그대로 저장하면 저장 기록에 kind가 생기지 않음(시험 서버 대장 확인)') < 0
+    && cb25.some((l) => l.indexOf('kind 칸 없이') > 0 && l.indexOf('worker_ids·member_ids 개수 그대로') > 0) && g25.indexOf('검토 반영 뒤') > 0 && ['`consheet_check`', '`proctpl_check`', '`settletest`', '`servertest`', '결함 심기'].every((g) => g25.lastIndexOf(g) > g25.indexOf('검토 반영 뒤')),
+    JSON.stringify({ miss25: miss25.map((s) => s.slice(0, 50)), gate: g25.indexOf('검토 반영 뒤') }));
+} catch (e) { console.log('  (v445 검사 생략 — ' + e.message + ')'); fails++; }
 
 try {
   const fdir = join(ROOT, 'netlify', 'functions');
