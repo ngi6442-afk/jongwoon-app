@@ -5507,4 +5507,198 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   }
 }
 
+// 82 v444 부동산(온비드 col:onbid) 마감 14일 정리 — PM 11/10 15:56 결정 ⑥ '마감 지난 부동산 물건도 공고와 같은 규칙'(48 v380 공고 정리와 같은 판정 bidPurgeable·bidsCutDate) · ★기본 꺼짐(settings:onbid purge):
+//    ① 꺼져 있으면 아무것도 안 지움(수집·저장) ② 세기 onbid_purge dry = 건수만·쓰기 0(관리자 — 비관리자 403·비로그인 401·dry 아니면 400 DRY_ONLY) ③ 켜기 onbid_purge_set(관리자·값 검사·낙관락·같은 값·prev·감사)
+//    ④ 켜면 수집이 마감 + 14일 지난 신규·패스(상태 없음 = 신규)만 지우고 검토·참여·사람이 바꾼 상태·마감 없음·마감 꼴 아님·14일째는 보존 + 되살림 방지 + 정리 전 스냅샷 1벌 ⑤ 저장이 되살린 만료 줄을 거름(되살림만이면 스냅샷·감사 없음, 서버 줄을 지우면 스냅샷·감사 '정리')
+//    ⑥ 공고 정리와 같은 날짜 경계(같은 표본 — bids_purge dry와 같은 수 · 공고 수집과 같은 남은 줄) ⑦ 저장 충돌(409) 중 정리가 끼어들어도 사람이 바꾼 상태는 남음 ⑧ 다시 끄면 정리 안 함
+{
+  const day = (n) => new Date(Date.now() + 9 * 3600000 - n * 86400000).toISOString().slice(0, 10);
+  const keep82 = {}; ['col:onbid', 'col:bids', 'settings:onbid', 'veridx:onbid', 'veridx:bids'].forEach((k) => { keep82[k] = mem.gw_data[k]; });
+  const clrVer82 = () => Object.keys(mem.gw_data).forEach((k) => { if (k === 'veridx:onbid' || k.indexOf('ver:onbid:') === 0 || k === 'veridx:bids' || k.indexOf('ver:bids:') === 0) delete mem.gw_data[k]; });
+  const SEED82 = () => [
+    { id: 'p1', title: '만료 신규', due: day(20), status: 'new' },
+    { id: 'p2', title: '만료 패스', due: day(15), status: '패스' },
+    { id: 'p3', title: '경계+1 신규(15일)', due: day(15), status: 'new' },
+    { id: 'p4', title: '만료 신규 url 없음', due: day(30), status: 'new', url: '' },
+    { id: 'p5', title: '상태 없음 만료', due: day(20) },
+    { id: 'h1', title: '만료 검토', due: day(40), status: '검토' },
+    { id: 'h2', title: '만료 참여', due: day(30), status: '참여' },
+    { id: 'h3', title: '만료 사람 상태', due: day(30), status: '보류' },
+    { id: 'k1', title: '유효 신규(13일)', due: day(13), status: 'new' },
+    { id: 'k2', title: '경계(14일째)', due: day(14), status: 'new' },
+    { id: 'k3', title: '마감 없음', due: '', status: 'new' },
+    { id: 'k4', title: '마감 꼴 아님', due: '2026/01/01', status: 'new' },
+    { id: 'k5', title: '패스(14일째)', due: day(14), status: '패스' }].map((x) => Object.assign({ url: 'https://onbid.example/' + x.id }, x));
+  const ids82 = (k) => ((mem.gw_data[k] && mem.gw_data[k].items) || []).map((x) => x.id).sort().join(',');
+  const SURV82 = 'h1,h2,h3,k1,k2,k3,k4,k5';
+  try {
+    delete mem.gw_data['settings:onbid']; clrVer82();
+    mem.gw_data['col:onbid'] = { schema: 1, items: SEED82(), updated_at: 5000 };
+    // ② 세기(꺼진 채) — 쓰기 0
+    const snap82 = JSON.stringify(mem.gw_data), aud82 = auditMock.logs.length;
+    const dry82 = await call({ action: 'onbid_purge', dry: true }, tokA);
+    const b82 = dry82.body || {};
+    T('82 v444 부동산 정리 세기(꺼진 채): 관리자 dry = 200·on false·지울 5(신규 4·패스 1 — 마감 15일↑ 신규·패스·상태 없음)·남는 마감 지난 사람 상태 3(검토·참여·보류)·마감 없음/꼴 아님 2·지울 것 중 url 없음 1·총 13·기준일 = 오늘 − 14일(KST)·보관 14일 · 쓰기 0(저장소 글자째 그대로·감사 0·스냅샷 0)',
+      dry82.code === 200 && b82.dry === true && b82.on === false && b82.would_remove === 5 && b82.by_status && b82.by_status['new'] === 4 && b82.by_status['패스'] === 1 && b82.kept_expired === 3 && b82.no_due === 2 && b82.no_url === 1 && b82.total === 13
+      && b82.cut === day(14) && b82.keep_days === 14 && JSON.stringify(mem.gw_data) === snap82 && auditMock.logs.length === aud82 && !mem.gw_data['veridx:onbid'], JSON.stringify(b82));
+    const dryS82 = await call({ action: 'onbid_purge', dry: 'true' }, tokA), dryN82 = await call({ action: 'onbid_purge', dry: 1 }, tokA), noDry82 = await call({ action: 'onbid_purge' }, tokA), falseDry82 = await call({ action: 'onbid_purge', dry: false }, tokA);
+    const wDry82 = await call({ action: 'onbid_purge', dry: true }, tokW, 'dev1'), anonDry82 = await call({ action: 'onbid_purge', dry: true }, null), botDry82 = await call({ action: 'onbid_purge', dry: true, key: 'test-ingest-key' }, null);
+    T('82 v444 세기 관용·막음: dry "true"·1도 세기만(5) · dry 없음·false = 400 DRY_ONLY(지우지 않음) · 비관리자(기기 승인) 403 ADMIN_ONLY · 비로그인 401 · 봇 키만으로는 401(관리자 세션만) · 그사이 저장소 글자째 그대로·감사 0',
+      dryS82.code === 200 && dryS82.body.would_remove === 5 && dryN82.code === 200 && dryN82.body.would_remove === 5 && noDry82.code === 400 && noDry82.body.error_code === 'DRY_ONLY' && falseDry82.code === 400 && falseDry82.body.error_code === 'DRY_ONLY'
+      && wDry82.code === 403 && wDry82.body.error_code === 'ADMIN_ONLY' && anonDry82.code === 401 && botDry82.code === 401 && JSON.stringify(mem.gw_data) === snap82 && auditMock.logs.length === aud82,
+      [dryS82.code, dryN82.code, noDry82.code + '/' + noDry82.body.error_code, falseDry82.code, wDry82.code + '/' + wDry82.body.error_code, anonDry82.code, botDry82.code].join(' '));
+    // ① 꺼진 채 수집·저장 = 아무것도 안 지움(되살림 방지도 꺼짐)
+    let r82 = await call({ action: 'bids_ingest', key: 'test-ingest-key', col: 'onbid', items: [{ id: 'p1', title: '만료 신규', due: day(20) }, { id: 'n1', title: '새 만료', due: day(16) }, { id: 'n2', title: '새 유효', due: day(2) }] });
+    T('82 v444 꺼진 채 수집(ingest col onbid): 정리 0·건너뜀 0·새 2(만료 n1도 받음)·15건 그대로(만료 신규·패스 보존)·스냅샷 0(VER_SKIP)',
+      r82.code === 200 && r82.body.purged === 0 && r82.body.skipped === 0 && r82.body.added === 2 && r82.body.total === 15 && ids82('col:onbid') === 'h1,h2,h3,k1,k2,k3,k4,k5,n1,n2,p1,p2,p3,p4,p5' && !mem.gw_data['veridx:onbid'], JSON.stringify(r82.body));
+    const ua82 = mem.gw_data['col:onbid'].updated_at;
+    r82 = await call({ action: 'save', collection: 'onbid', base: ua82, doc: { schema: 1, items: mem.gw_data['col:onbid'].items.concat([{ id: 'z1', title: '되살림 시도(만료 신규)', due: day(30), status: 'new' }]) } }, tokA);
+    T('82 v444 꺼진 채 저장(save col onbid): 만료 신규 z1까지 그대로 16건(거르지 않음)·스냅샷 0·감사에 정리 줄 0',
+      r82.code === 200 && mem.gw_data['col:onbid'].items.length === 16 && ids82('col:onbid').indexOf('z1') >= 0 && !mem.gw_data['veridx:onbid'] && !auditMock.logs.slice(aud82).some((l) => (l.ev || []).some((e) => e.op === '정리')), r82.code + ' ' + ids82('col:onbid'));
+    // ③ 켜기 — 관리자만·값 검사·낙관락·같은 값
+    const w82 = await call({ action: 'onbid_purge_set', on: true }, tokW, 'dev1'), an82 = await call({ action: 'onbid_purge_set', on: true }, null), bad82 = await call({ action: 'onbid_purge_set', on: 'yes' }, tokA);
+    const same82 = await call({ action: 'onbid_purge_set', on: false }, tokA), stale82 = await call({ action: 'onbid_purge_set', on: true, base: 123 }, tokA);
+    T('82 v444 켜기 막음: 비관리자 403 ADMIN_ONLY · 비로그인 401 · 값 "yes" 400 BAD_VALUE · 꺼진 채 끄기 400 NO_CHANGE · 낡은 base 409 ONBID_STALE · 설정 키 생기지 않음',
+      w82.code === 403 && w82.body.error_code === 'ADMIN_ONLY' && an82.code === 401 && bad82.code === 400 && bad82.body.error_code === 'BAD_VALUE' && same82.code === 400 && same82.body.error_code === 'NO_CHANGE' && stale82.code === 409 && stale82.body.error_code === 'ONBID_STALE' && !mem.gw_data['settings:onbid'],
+      [w82.code, an82.code, bad82.code, same82.code + '/' + same82.body.error_code, stale82.code].join(' '));
+    const aud82b = auditMock.logs.length;
+    const on82 = await call({ action: 'onbid_purge_set', on: true, base: 0 }, tokA), set82 = mem.gw_data['settings:onbid'] || {};
+    const again82 = await call({ action: 'onbid_purge_set', on: true }, tokA), dryOn82 = await call({ action: 'onbid_purge', dry: true }, tokA);
+    T('82 v444 켜기(관리자, base 0 = 설정 없음): 200·on true·설정 purge true·keep_days 14·prev {purge false, updated_at 0}·updated_by 관리자 · 감사 1줄(col onbid 정리설정 "끔→켬") · 다시 켜기 400 NO_CHANGE · 세기 on true',
+      on82.code === 200 && on82.body.on === true && set82.purge === true && set82.keep_days === 14 && set82.prev && set82.prev.purge === false && set82.prev.updated_at === 0 && set82.updated_by === 'uadmin' && on82.body.updated_at === set82.updated_at
+      && auditMock.logs.length === aud82b + 1 && auditMock.logs[aud82b].col === 'onbid' && auditMock.logs[aud82b].ev[0].op === '정리설정' && /끔→켬/.test(auditMock.logs[aud82b].ev[0].t)
+      && again82.code === 400 && again82.body.error_code === 'NO_CHANGE' && dryOn82.body.on === true, JSON.stringify({ on82: on82.body, set82, again: again82.code }));
+    // ④ 켜진 채 수집: 마감 + 14일 지난 신규·패스만 정리·사람 상태·14일째·마감 없음·꼴 아님 보존·되살림 방지·정리 전 스냅샷 1벌
+    clrVer82(); mem.gw_data['col:onbid'] = { schema: 1, items: SEED82(), updated_at: 6000 };
+    r82 = await call({ action: 'bids_ingest', key: 'test-ingest-key', col: 'onbid', items: [{ id: 'p1', title: '만료 신규', due: day(20) }, { id: 'n1', title: '새 만료', due: day(16) }, { id: 'n2', title: '새 유효', due: day(2) }, { id: 'h1', title: '만료 검토', due: day(40) }] });
+    const vi82 = mem.gw_data['veridx:onbid'], h1b82 = (mem.gw_data['col:onbid'].items || []).find((x) => x.id === 'h1') || {};
+    T('82 v444 켜진 채 수집: 정리 5(p1~p5 — 신규·패스·상태 없음·url 없음 포함)·건너뜀 1(원장에 없는 만료 n1)·새 1(n2) · 남은 줄 = 검토·참여·보류·13일·14일째(신규·패스)·마감 없음·꼴 아님 + n2 · 검토 상태 그대로 · VER_SKIP을 넘어 정리 전 스냅샷 1벌(13건·수집봇) · 감사 "정리 5건(마감 14일 경과)"',
+      r82.code === 200 && r82.body.purged === 5 && r82.body.skipped === 1 && r82.body.added === 1 && ids82('col:onbid') === SURV82 + ',n2' && h1b82.status === '검토'
+      && vi82 && vi82.items.length === 1 && vi82.items[0].tot === 13 && vi82.items[0].by === '수집봇' && auditMock.logs.some((l) => l.col === 'onbid' && (l.ev || []).some((e) => /정리 5건\(마감 14일 경과\)/.test(e.t || ''))), JSON.stringify(r82.body) + ' ' + ids82('col:onbid'));
+    // ⑤ 켜진 채 저장: 되살린 만료 신규 z1은 거름·만료 검토 z2·유효 z3 통과 — 되살림만이면 스냅샷·감사 정리 줄 없음 / 서버 줄(p1)을 지우게 되면 스냅샷 1벌 + 감사 '정리 1건'
+    const ub82 = mem.gw_data['col:onbid'].updated_at, aud82c = auditMock.logs.length;
+    r82 = await call({ action: 'save', collection: 'onbid', base: ub82, doc: { schema: 1, items: mem.gw_data['col:onbid'].items.concat([{ id: 'z1', title: '되살림(만료 신규)', due: day(30), status: 'new' }, { id: 'z2', title: '만료 검토', due: day(30), status: '검토' }, { id: 'z3', title: '유효', due: day(1), status: 'new' }]) } }, tokA);
+    T('82 v444 켜진 채 저장 — 되살림 방지: 만료 신규 z1 거름·만료 검토 z2·유효 z3 통과 · 서버에 없던 줄만 걸렀으니 스냅샷 그대로 1벌·감사 정리 줄 0',
+      r82.code === 200 && ids82('col:onbid') === SURV82 + ',n2,z2,z3' && (mem.gw_data['veridx:onbid'] || { items: [] }).items.length === 1 && !auditMock.logs.slice(aud82c).some((l) => (l.ev || []).some((e) => e.op === '정리')), r82.code + ' ' + ids82('col:onbid'));
+    mem.gw_data['col:onbid'] = { schema: 1, items: SEED82(), updated_at: 7000 };   // 켠 날 수집보다 저장이 먼저 온 경우(서버 원장에 만료 줄이 아직 있음)
+    const aud82d = auditMock.logs.length;
+    r82 = await call({ action: 'save', collection: 'onbid', base: 7000, doc: { schema: 1, items: SEED82().map((x) => (x.id === 'k1' ? Object.assign({}, x, { status: '검토' }) : x)) } }, tokA);
+    const ev82 = auditMock.logs.slice(aud82d).reduce((a, l) => a.concat(l.ev || []), []), vi82b = mem.gw_data['veridx:onbid'] || { items: [] };
+    T('82 v444 켜진 채 저장 — 서버 줄을 지우는 저장: p1~p5 정리·사람이 바꾼 k1 검토 남음 · VER_SKIP을 넘어 저장 전 스냅샷(13건 — 2벌째) · 감사 "부동산 정리 5건(마감 14일 경과 신규·패스 — 저장 때)"',
+      r82.code === 200 && ids82('col:onbid') === SURV82 && ((mem.gw_data['col:onbid'].items || []).find((x) => x.id === 'k1') || {}).status === '검토' && vi82b.items.length === 2 && (vi82b.items[0] || {}).tot === 13
+      && ev82.some((e) => e.op === '정리' && e.t === '부동산 정리 5건(마감 14일 경과 신규·패스 — 저장 때)'), JSON.stringify({ code: r82.code, ids: ids82('col:onbid'), ver: vi82b.items.length, ev: ev82.map((e) => e.op) }));
+    // ⑥ 공고 정리와 같은 날짜 경계 — 같은 표본을 공고 원장에도 두고 세기·수집을 비교
+    clrVer82(); mem.gw_data['col:bids'] = { schema: 1, items: SEED82() }; mem.gw_data['col:onbid'] = { schema: 1, items: SEED82() };
+    const bd82 = await call({ action: 'bids_purge', mode: 'expired', dry: true }, tokA), od82 = await call({ action: 'onbid_purge', dry: true }, tokA);
+    const bi82 = await call({ action: 'bids_ingest', key: 'test-ingest-key', items: [] }), oi82 = await call({ action: 'bids_ingest', key: 'test-ingest-key', col: 'onbid', items: [] });
+    T('82 v444 공고 정리와 같은 날짜 경계: 같은 표본에서 bids_purge dry 5 = onbid_purge dry 5·기준일 같음 · 빈 수집 뒤 남은 줄 공고 = 부동산(검토·참여·보류·13일·14일째·마감 없음·꼴 아님)',
+      bd82.body.would_remove === 5 && od82.body.would_remove === 5 && bd82.body.cut === od82.body.cut && bi82.body.purged === 5 && oi82.body.purged === 5 && ids82('col:bids') === SURV82 && ids82('col:onbid') === SURV82,
+      JSON.stringify({ bd: bd82.body.would_remove, od: od82.body.would_remove, cut: [bd82.body.cut, od82.body.cut], b: ids82('col:bids'), o: ids82('col:onbid') }));
+    // ⑦ 저장 충돌(409) 중 정리가 끼어들어도 사람이 바꾼 상태는 남음: 관리자 화면이 p1을 검토로 바꾸는 사이 수집이 p1(신규)을 정리 → 낡은 base 저장 409 → 다시 읽어 합친 원장(로컬 우선 — p1 검토)으로 저장 = p1 검토로 남음
+    mem.gw_data['col:onbid'] = { schema: 1, items: SEED82(), updated_at: 8000 };
+    await call({ action: 'bids_ingest', key: 'test-ingest-key', col: 'onbid', items: [] });
+    const uc82 = mem.gw_data['col:onbid'].updated_at;
+    const st82 = await call({ action: 'save', collection: 'onbid', base: 8000, doc: { schema: 1, items: SEED82().map((x) => (x.id === 'p1' ? Object.assign({}, x, { status: '검토' }) : x)) } }, tokA);
+    const merged82 = mem.gw_data['col:onbid'].items.concat([Object.assign({}, SEED82()[0], { status: '검토' })]);
+    const re82 = await call({ action: 'save', collection: 'onbid', base: uc82, doc: { schema: 1, items: merged82 } }, tokA), p1b82 = (mem.gw_data['col:onbid'].items || []).find((x) => x.id === 'p1') || {};
+    T('82 v444 409 중 정리: 수집이 p1(신규)을 정리한 뒤 낡은 base 저장 = 409 STALE_BASE(원장 그대로 8줄) → 합친 원장으로 다시 저장 = p1 검토로 남음(사람이 바꾼 상태는 정리 대상 아님)',
+      st82.code === 409 && st82.body.error_code === 'STALE_BASE' && re82.code === 200 && p1b82.status === '검토' && ids82('col:onbid') === 'h1,h2,h3,k1,k2,k3,k4,k5,p1', st82.code + ' ' + re82.code + ' ' + ids82('col:onbid'));
+    // ⑧ 다시 끄면(관리자·base) 수집이 정리 안 함
+    const off82 = await call({ action: 'onbid_purge_set', on: false, base: (mem.gw_data['settings:onbid'] || {}).updated_at }, tokA), set82b = mem.gw_data['settings:onbid'] || {};
+    mem.gw_data['col:onbid'] = { schema: 1, items: SEED82() };
+    const oi82b = await call({ action: 'bids_ingest', key: 'test-ingest-key', col: 'onbid', items: [{ id: 'n1', title: '새 만료', due: day(16) }] });
+    T('82 v444 다시 끄기: 200·설정 purge false·prev purge true · 그 뒤 수집 정리 0·만료 n1도 받음(14건)',
+      off82.code === 200 && set82b.purge === false && (set82b.prev || {}).purge === true && oi82b.body.purged === 0 && oi82b.body.skipped === 0 && mem.gw_data['col:onbid'].items.length === 14,
+      JSON.stringify({ off: off82.code, ing: oi82b.body }));
+  } finally {
+    clrVer82();
+    Object.keys(keep82).forEach((k) => { if (keep82[k] === undefined) delete mem.gw_data[k]; else mem.gw_data[k] = keep82[k]; });
+  }
+}
+
+// 83 v444 검토 반영(데이터 삭제 안전 — 서버, 공고·부동산 공통): ① 수집이 원장을 못 읽으면(읽기 실패 — 처음 읽기·쓰기 직전 다시 읽기) 500·쓰기 0(빈 원장에 받은 줄만 다시 쓰지 않음 · 키 없음은 빈 원장으로 시작 그대로)
+//    ② 수집이 읽은 뒤 쓰기 전에 관리자 저장이 끼면(정리 전 스냅샷을 쓰는 사이) 쓰기 직전 다시 읽어 새 원장으로 처음부터 — 그사이 신규 → 검토로 바꾼 만료 줄이 지워지지 않음 · 계속 바뀌어도 셋째 번은 씀(끝없이 돌지 않음)
+//    ③ 시점 복구(ver_restore)의 복구 전 자동보존이 스냅샷 제외(VER_SKIP) 부동산·공고에도 남음(종전엔 말없이 건너뜀) ④ 새로 받은 줄 created = KST 날짜(UTC 전날 22시대 수집 = KST 다음 날) · updated는 종전 UTC 날짜
+{
+  const day = (n) => new Date(Date.now() + 9 * 3600000 - n * 86400000).toISOString().slice(0, 10);
+  const keep83 = {}; ['col:onbid', 'col:bids', 'settings:onbid', 'veridx:onbid', 'veridx:bids'].forEach((k) => { keep83[k] = mem.gw_data[k]; });
+  const clrVer83 = () => Object.keys(mem.gw_data).forEach((k) => { if (k === 'veridx:onbid' || k.indexOf('ver:onbid:') === 0 || k === 'veridx:bids' || k.indexOf('ver:bids:') === 0) delete mem.gw_data[k]; });
+  const fg83 = blobsMock.hooks.failGet, bs83 = blobsMock.hooks.beforeSet, bg83 = blobsMock.hooks.beforeGet, realNow83 = Date.now;
+  const SEED83 = () => [
+    { id: 'p1', title: '만료 신규', due: day(20), status: 'new' },
+    { id: 'p2', title: '만료 패스', due: day(16), status: '패스' },
+    { id: 'h1', title: '만료 검토', due: day(30), status: '검토' },
+    { id: 'k1', title: '유효 신규', due: day(3), status: 'new' }].map((x) => Object.assign({ url: 'https://onbid.example/' + x.id }, x));
+  const ids83 = (k) => ((mem.gw_data[k] && mem.gw_data[k].items) || []).map((x) => x.id + ':' + (x.status || '')).sort().join(',');
+  try {
+    // ① 읽기 실패 — 처음 읽기(부동산·공고) · 쓰기 직전 다시 읽기 · 키 없음
+    clrVer83(); delete mem.gw_data['settings:onbid'];
+    mem.gw_data['col:onbid'] = { schema: 1, items: SEED83(), updated_at: 9000 }; mem.gw_data['col:bids'] = { schema: 1, items: SEED83(), updated_at: 9100 };
+    const snap83 = JSON.stringify(mem.gw_data), aud83 = auditMock.logs.length;
+    blobsMock.hooks.failGet = (k) => k === 'col:onbid' || k === 'col:bids';
+    const fo83 = await call({ action: 'bids_ingest', key: 'test-ingest-key', col: 'onbid', items: [{ id: 'n1', title: '새 물건', due: day(-5) }] });
+    const fb83 = await call({ action: 'bids_ingest', key: 'test-ingest-key', items: [{ id: 'n1', title: '새 공고', due: day(-5) }] });
+    let nr83 = 0; blobsMock.hooks.failGet = (k) => k === 'col:onbid' && ++nr83 === 2;   // 처음 읽기는 되고 쓰기 직전 다시 읽기만 실패
+    const fr83 = await call({ action: 'bids_ingest', key: 'test-ingest-key', col: 'onbid', items: [{ id: 'n1', title: '새 물건', due: day(-5) }] });
+    blobsMock.hooks.failGet = fg83;
+    const same83 = JSON.stringify(mem.gw_data) === snap83 && auditMock.logs.length === aud83;
+    // 셋째 회차(다시 읽지 않고 쓰는 회차)의 처음 읽기가 실패해도 500 — 앞 두 회차는 원장이 바뀌어(updated_at) 다시 했고, 셋째 처음 읽기에서 실패 = 빈 원장에 받은 줄만 쓰지 않음
+    mem.gw_data['col:onbid'] = { schema: 1, items: SEED83(), updated_at: 9050 };
+    let nz83 = 0;
+    blobsMock.hooks.beforeGet = async (k) => { if (k === 'col:onbid') { nz83++; mem.gw_data['col:onbid'].updated_at = 9050 + nz83; } if (bg83) await bg83(k); };
+    blobsMock.hooks.failGet = (k) => k === 'col:onbid' && nz83 >= 4;   // 읽기 5번째(셋째 회차 처음)부터 실패(실패 판정이 beforeGet보다 먼저 — 넷째까지는 읽힘)
+    const fz83 = await call({ action: 'bids_ingest', key: 'test-ingest-key', col: 'onbid', items: [{ id: 'n1', title: '새 물건', due: day(-5) }] });
+    blobsMock.hooks.failGet = fg83; blobsMock.hooks.beforeGet = bg83;
+    const z83 = fz83.code === 500 && fz83.body.error_code === 'STORAGE_READ_FAILED' && nz83 === 4 && ids83('col:onbid') === 'h1:검토,k1:new,p1:new,p2:패스' && mem.gw_data['col:onbid'].updated_by !== '수집봇' && auditMock.logs.length === aud83;
+    delete mem.gw_data['col:onbid'];
+    const fn83 = await call({ action: 'bids_ingest', key: 'test-ingest-key', col: 'onbid', items: [{ id: 'n1', title: '새 물건', due: day(-5) }] });
+    T('83 v444 검토 ① 수집이 원장을 못 읽으면 500·쓰기 0: 부동산·공고 처음 읽기 실패 = 500 STORAGE_READ_FAILED · 쓰기 직전 다시 읽기 실패 = 500(두 번 읽음) · 그사이 원장·스냅샷·감사 글자째 그대로(받은 줄만으로 덮지 않음) · 셋째 회차(다시 읽지 않고 쓰는 회차) 처음 읽기 실패 = 500·원장 줄·상태 그대로(넷째 읽기까지 되고 다섯째에서 실패) · 키 없음 = 빈 원장으로 시작(200·새 1)',
+      fo83.code === 500 && fo83.body.error_code === 'STORAGE_READ_FAILED' && fb83.code === 500 && fb83.body.error_code === 'STORAGE_READ_FAILED' && fr83.code === 500 && nr83 === 2 && same83 && z83
+      && fn83.code === 200 && fn83.body.added === 1 && ids83('col:onbid') === 'n1:new', JSON.stringify({ fo: fo83.code + '/' + fo83.body.error_code, fb: fb83.code, fr: fr83.code + '/' + nr83, same83, z: [fz83.code, nz83, z83], fn: fn83.body }));
+    // ② 수집 도중 관리자 저장(정리 켜짐) — 정리 전 스냅샷을 쓰는 사이 p1 신규 → 검토(updated_at 바뀜)
+    mem.gw_data['settings:onbid'] = { schema: 1, purge: true, keep_days: 14, updated_at: 1 };
+    clrVer83(); mem.gw_data['col:onbid'] = { schema: 1, items: SEED83(), updated_at: 9200 };
+    let fired83 = 0;
+    blobsMock.hooks.beforeSet = (k) => { if (!fired83 && String(k).indexOf('ver:onbid:') === 0) { fired83++; const c = mem.gw_data['col:onbid']; c.items = c.items.map((x) => (x.id === 'p1' ? Object.assign({}, x, { status: '검토' }) : x)); c.updated_at = 9300; } };
+    const aud83b = auditMock.logs.length;
+    const rc83 = await call({ action: 'bids_ingest', key: 'test-ingest-key', col: 'onbid', items: [{ id: 'n2', title: '새 유효', due: day(-3) }] });
+    blobsMock.hooks.beforeSet = bs83;
+    const vi83 = (mem.gw_data['veridx:onbid'] || { items: [] }).items, ev83 = auditMock.logs.slice(aud83b).reduce((a, l) => a.concat(l.ev || []), []);
+    T('83 v444 검토 ② 수집 도중 관리자 저장(정리 켜짐): 정리 전 스냅샷을 쓰는 사이 p1 신규 → 검토 → 쓰기 직전 다시 읽어 새 원장으로 다시 = p1 검토로 남음(종전엔 낡은 원장으로 정리해 p1이 줄째 지워짐) · 정리 1(만료 패스 p2)·새 1 · 감사 "정리 1건" 한 줄 · 정리 전 스냅샷 1벌(처음 읽은 원장 4건 — 다시 할 때는 같은 날이라 건너뜀)',
+      rc83.code === 200 && fired83 === 1 && ids83('col:onbid') === 'h1:검토,k1:new,n2:new,p1:검토' && rc83.body.purged === 1 && rc83.body.added === 1 && mem.gw_data['col:onbid'].updated_by === '수집봇'
+      && vi83.length === 1 && vi83[0].tot === 4 && ev83.filter((e) => e.op === '수집').length === 1 && ev83.some((e) => /정리 1건\(마감 14일 경과\)/.test(e.t || '')), JSON.stringify({ code: rc83.code, body: rc83.body, ids: ids83('col:onbid'), ver: vi83.length, ev: ev83.map((e) => e.t) }));
+    // ② 계속 바뀌면(읽을 때마다 updated_at이 다름) 셋째 번은 다시 읽지 않고 씀 — 원장 읽기 5번(처음·다시 × 2 + 셋째 처음)
+    delete mem.gw_data['settings:onbid']; clrVer83(); mem.gw_data['col:onbid'] = { schema: 1, items: SEED83(), updated_at: 9400 };
+    let reads83 = 0; blobsMock.hooks.beforeGet = async (k) => { if (k === 'col:onbid') { reads83++; mem.gw_data['col:onbid'].updated_at = 10000 + reads83; } if (bg83) await bg83(k); };
+    const rl83 = await call({ action: 'bids_ingest', key: 'test-ingest-key', col: 'onbid', items: [{ id: 'n3', title: '새 유효', due: day(-3) }] });
+    blobsMock.hooks.beforeGet = bg83;
+    T('83 v444 검토 ② 계속 바뀌는 원장: 셋째 번은 다시 읽지 않고 씀(끝없이 돌지 않음) — 200·새 1·원장 읽기 5번·쓴 사람 수집봇',
+      rl83.code === 200 && rl83.body.added === 1 && reads83 === 5 && mem.gw_data['col:onbid'].updated_by === '수집봇' && ids83('col:onbid').indexOf('n3:new') >= 0, JSON.stringify({ code: rl83.code, reads83, body: rl83.body }));
+    // ③ 시점 복구 — 복구 전 자동보존(VER_SKIP 부동산·공고)
+    const TS83 = 1700000000000, vr83 = {};
+    for (const col of ['onbid', 'bids']) {
+      clrVer83(); mem.gw_data['col:' + col] = { schema: 1, items: SEED83(), updated_at: 9600 };
+      mem.gw_data['ver:' + col + ':' + TS83] = { ts: TS83, by: '수집봇', doc: { schema: 1, items: SEED83().slice(0, 2) } };
+      mem.gw_data['veridx:' + col] = { items: [{ ts: TS83, by: '수집봇', day: '2023-11-15', tot: 2, live: 2 }] };
+      const rr = await call({ action: 'ver_restore', collection: col, ts: TS83 }, tokA);
+      const vx = (mem.gw_data['veridx:' + col] || { items: [] }).items, pre = vx.find((e) => e.by === '관리자(복구 전 자동보존)') || null;
+      vr83[col] = { code: rr.code, n: mem.gw_data['col:' + col].items.length, idx: vx.length, pre: pre ? pre.tot : null, blob: pre ? ((mem.gw_data['ver:' + col + ':' + pre.ts] || {}).doc || { items: [] }).items.length : null };
+    }
+    T('83 v444 검토 ③ 시점 복구(스냅샷 제외 VER_SKIP 부동산·공고): 복구 = 200·원장 2건(스냅샷 그대로) · 복구 직전 원장(4건)이 버전 링에 "관리자(복구 전 자동보존)"로 남음(복구를 되돌릴 수 있음 — 종전엔 말없이 건너뜀)',
+      ['onbid', 'bids'].every((c) => vr83[c].code === 200 && vr83[c].n === 2 && vr83[c].idx === 2 && vr83[c].pre === 4 && vr83[c].blob === 4), JSON.stringify(vr83));
+    // ④ 새 줄 수집일 created = KST 날짜 — UTC 2027-03-01 22:30(KST 03-02 07:30) 수집(Date.now만 흉내 — updated의 new Date()는 실제 시계)
+    clrVer83(); mem.gw_data['col:onbid'] = { schema: 1, items: [], updated_at: 9700 };
+    Date.now = () => Date.parse('2027-03-01T22:30:00Z');
+    let rk83;
+    try { rk83 = await call({ action: 'bids_ingest', key: 'test-ingest-key', col: 'onbid', items: [{ id: 'c1', title: '새 물건', due: '2027-04-01' }] }); } finally { Date.now = realNow83; }
+    const c83 = (mem.gw_data['col:onbid'].items || []).find((x) => x.id === 'c1') || {};
+    T('83 v444 검토 ④ 새 줄 수집일(created) = KST 날짜: UTC 03-01 22:30(KST 03-02 07:30) 수집 = created 2027-03-02 · updated는 종전 UTC 날짜 그대로(앱 mergeBidsLocal 날짜 단위 병합 축 — new Date())',
+      rk83.code === 200 && c83.created === '2027-03-02' && c83.updated === new Date().toISOString().slice(0, 10), JSON.stringify(c83));
+  } finally {
+    blobsMock.hooks.failGet = fg83; blobsMock.hooks.beforeSet = bs83; blobsMock.hooks.beforeGet = bg83; Date.now = realNow83;
+    clrVer83();
+    Object.keys(keep83).forEach((k) => { if (keep83[k] === undefined) delete mem.gw_data[k]; else mem.gw_data[k] = keep83[k]; });
+  }
+}
+
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

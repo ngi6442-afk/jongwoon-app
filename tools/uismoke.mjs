@@ -5191,23 +5191,26 @@ try {
     && dc2_38 === 'vs-warn:D-3,:D-4' && JSON.stringify(cks2_38) === JSON.stringify(['chipsort:st|done', 'sortAs:reg', 'sel', 'sel.can', 'group', 'pop:st|old', '']),
     JSON.stringify({ dc: dc38.map((x) => x.cls + ':' + x.html), cks38, dc2_38, cks2_38 }));
 
-  // ⑫ 정적 — 계약·차량 표는 ResizeObserver 한 줄씩(vsPaneObserve(host) — 그리기마다 불러도 자리에 한 번만 걸림) 말고 무변 · 부품을 쓰는 탭 5개(v439 지시·v440 기성·v441 거래처·v442 일용직·v443 입찰 공고 — 탭 판마다 이 줄을 고친다) · pointer(마우스 이벤트 없음) · 150ms·조합
+  // ⑫ 정적 — 계약·차량 표는 ResizeObserver 한 줄씩(vsPaneObserve(host) — 그리기마다 불러도 자리에 한 번만 걸림) 말고 무변 · 부품을 쓰는 탭 6개(v439 지시·v440 기성·v441 거래처·v442 일용직·v443 입찰 공고·v444 입찰 부동산 — 탭 판마다 이 줄을 고친다) · pointer(마우스 이벤트 없음) · 150ms·조합
   //   · 저장은 한 곳(def.key에 k,d,f,chip) · ResizeObserver 하나·콜백은 rAF · 경계 matchMedia 3개 · 새 CSS(.vs.vs-fit 폭·폰 --pw·.vs-detcard·td.num·옅은 칩) · 기존 .vs 규칙(min-width 1160·폰 0) 그대로
-  //   v439 '부품을 쓰는 탭 0' → '지시 1개' → v440 '지시·기성 2개' → v441 '지시·기성·거래처 3개' → v442 '지시·기성·거래처·일용직 4개' → v443 '지시·기성·거래처·일용직·입찰 5개'(같은 강도): 부품을 부르는 곳은 @task-sheet·@rec-sheet·@cli-sheet·@wk-sheet·@bid-sheet 구간 하나씩
-  //     (구간마다 vsSheetRender 1번·정의 key 1개 — "jw_task_sheet"·"jw_rec_sheet"·"jw_cli_sheet"·"jw_wk_sheet"·"jw_bid_sheet" · host 1개 — "taskList"·"recSheet"·"cliList"·"wkList"·"bidList")이고 여섯 구간 밖은 vsSheet*·vsDateCell·VS_INST 0,
-  //     부품 저장 이름 8개 중 @vs-sheet 구간 밖에 나오는 이름은 그 다섯(각 1번)
+  //   v439 '부품을 쓰는 탭 0' → '지시 1개' → v440 '지시·기성 2개' → v441 '지시·기성·거래처 3개' → v442 '지시·기성·거래처·일용직 4개' → v443 '지시·기성·거래처·일용직·입찰 5개' → v444 '지시·기성·거래처·일용직·입찰·부동산 6개'(같은 강도):
+  //     부품을 부르는 곳은 @task-sheet·@rec-sheet·@cli-sheet·@wk-sheet·@bid-sheet·@ob-sheet 구간 하나씩
+  //     (구간마다 vsSheetRender 1번·정의 key 1개 — "jw_task_sheet"·"jw_rec_sheet"·"jw_cli_sheet"·"jw_wk_sheet"·"jw_bid_sheet"·"jw_ob_sheet" · host 1개 — "taskList"·"recSheet"·"cliList"·"wkList"·"bidList"·"obList")이고 일곱 구간 밖은 vsSheet*·vsDateCell·VS_INST 0,
+  //     부품 저장 이름 8개 중 @vs-sheet 구간 밖에 나오는 이름은 그 여섯(각 1번)
   const outside38 = html.slice(0, html.indexOf('// @vs-sheet-start')) + html.slice(html.indexOf('// @vs-sheet-end'));
   const blkOf38 = (a, b) => { const i = html.indexOf(a), j = html.indexOf(b); return (i < 0 || j < i) ? '' : html.slice(i, j); };
   const tsb38 = blkOf38('// @task-sheet-start', '// @task-sheet-end'), rsb38 = blkOf38('// @rec-sheet-start', '// @rec-sheet-end'), csb38 = blkOf38('// @cli-sheet-start', '// @cli-sheet-end'), wsb38 = blkOf38('// @wk-sheet-start', '// @wk-sheet-end'), bsb38 = blkOf38('// @bid-sheet-start', '// @bid-sheet-end');
-  const outside2_38 = [tsb38, rsb38, csb38, wsb38, bsb38].reduce((s, b) => (b ? s.replace(b, '') : s), outside38);
+  const osb38 = blkOf38('// @ob-sheet-start', '// @ob-sheet-end');   // v444 입찰 부동산
+  const outside2_38 = [tsb38, rsb38, csb38, wsb38, bsb38, osb38].reduce((s, b) => (b ? s.replace(b, '') : s), outside38);
   const keysOut38 = ['jw_task_sheet', 'jw_rec_sheet', 'jw_cli_sheet', 'jw_wk_sheet', 'jw_bid_sheet', 'jw_ob_sheet', 'jw_site_sheet', 'jw_edu_sheet'].filter((k) => outside38.indexOf(k) >= 0);
-  const use38 = tsb38.length > 0 && rsb38.length > 0 && csb38.length > 0 && wsb38.length > 0 && bsb38.length > 0 && (outside2_38.match(/\bvsSheet\w*\(|\bvsDateCell\(|\bVS_INST\b/g) || []).length === 0
+  const use38 = tsb38.length > 0 && rsb38.length > 0 && csb38.length > 0 && wsb38.length > 0 && bsb38.length > 0 && osb38.length > 0 && (outside2_38.match(/\bvsSheet\w*\(|\bvsDateCell\(|\bVS_INST\b/g) || []).length === 0
     && (tsb38.match(/\bvsSheetRender\(/g) || []).length === 1 && (tsb38.match(/key: "jw_task_sheet"/g) || []).length === 1 && (tsb38.match(/\bhost: "taskList"/g) || []).length === 1
     && (rsb38.match(/\bvsSheetRender\(/g) || []).length === 1 && (rsb38.match(/key: "jw_rec_sheet"/g) || []).length === 1 && (rsb38.match(/\bhost: "recSheet"/g) || []).length === 1
     && (csb38.match(/\bvsSheetRender\(/g) || []).length === 1 && (csb38.match(/key: "jw_cli_sheet"/g) || []).length === 1 && (csb38.match(/\bhost: "cliList"/g) || []).length === 1
     && (wsb38.match(/\bvsSheetRender\(/g) || []).length === 1 && (wsb38.match(/key: "jw_wk_sheet"/g) || []).length === 1 && (wsb38.match(/\bhost: "wkList"/g) || []).length === 1
     && (bsb38.match(/\bvsSheetRender\(/g) || []).length === 1 && (bsb38.match(/key: "jw_bid_sheet"/g) || []).length === 1 && (bsb38.match(/\bhost: "bidList"/g) || []).length === 1
-    && JSON.stringify(keysOut38) === '["jw_task_sheet","jw_rec_sheet","jw_cli_sheet","jw_wk_sheet","jw_bid_sheet"]' && (outside38.match(/jw_task_sheet/g) || []).length === 1 && (outside38.match(/jw_rec_sheet/g) || []).length === 1 && (outside38.match(/jw_cli_sheet/g) || []).length === 1 && (outside38.match(/jw_wk_sheet/g) || []).length === 1 && (outside38.match(/jw_bid_sheet/g) || []).length === 1;
+    && (osb38.match(/\bvsSheetRender\(/g) || []).length === 1 && (osb38.match(/key: "jw_ob_sheet"/g) || []).length === 1 && (osb38.match(/\bhost: "obList"/g) || []).length === 1
+    && JSON.stringify(keysOut38) === '["jw_task_sheet","jw_rec_sheet","jw_cli_sheet","jw_wk_sheet","jw_bid_sheet","jw_ob_sheet"]' && (outside38.match(/jw_task_sheet/g) || []).length === 1 && (outside38.match(/jw_rec_sheet/g) || []).length === 1 && (outside38.match(/jw_cli_sheet/g) || []).length === 1 && (outside38.match(/jw_wk_sheet/g) || []).length === 1 && (outside38.match(/jw_bid_sheet/g) || []).length === 1 && (outside38.match(/jw_ob_sheet/g) || []).length === 1;
   const rv38 = fn38(html, 'renderVehicles'), rc38 = fn38(html, 'renderContracts');
   const V38 = mk38({ width: 1366 }), vh38 = V38.env.mkHost('vehList'); vh38.innerHTML = '<div class="vs-wrap"><table class="vs"></table></div>';
   V38.api.paneObs(vh38); V38.api.paneObs(vh38); V38.env.roCb([{ target: vh38 }]); V38.env.flushRaf();
@@ -5230,8 +5233,8 @@ try {
     && decl38(1000, '.vs td.num', 'text-align') == null && decl38(1000, '.vs td .sel-box', 'margin-right') == null && decl38(1000, '.vs td .sel-box', 'vertical-align') == null && decl38(1000, '.vs.vs-fit td .sel-box', 'margin-right') === '6px'
     && decl38(375, '.sel-bar.vs-selbar', 'flex-wrap') === 'wrap' && decl38(375, '.sel-bar.vs-selbar', 'padding') === '2px 2px 8px' && decl38(375, '.vs-selbar', 'padding') == null
     && /@media \(pointer:coarse\)\{ \.vs\.vs-fit \.vs-rs\{width:14px;\} \}/.test(css38);
-  T('v438 ⑫ 정적: 계약·차량 그리기에 vsPaneObserve(host) 한 줄씩(파일에서 이 둘뿐 — 여러 번 불러도 자리에 한 번 걸림·--vs-panew = 칸 폭·창을 줄이면 다음 그림에 다시 잼 1048 → 900·data-vs-host 없음) · 부품을 쓰는 탭 5개 — v439 지시·v440 기성·v441 거래처·v442 일용직·v443 입찰 공고(@task-sheet·@rec-sheet·@cli-sheet·@wk-sheet·@bid-sheet 구간 하나씩: 구간마다 vsSheetRender 1번·정의 key 1개(jw_task_sheet·jw_rec_sheet·jw_cli_sheet·jw_wk_sheet·jw_bid_sheet)·host 1개(taskList·recSheet·cliList·wkList·bidList) · 여섯 구간 밖 vsSheet*·vsDateCell·VS_INST 0 · 부품 저장 이름은 jw_task_sheet·jw_rec_sheet·jw_cli_sheet·jw_wk_sheet·jw_bid_sheet만) · 끌기는 pointer(document pointermove·pointerup·pointercancel — mouse 이벤트 0) · 150ms·compositionstart/end·isComposing · 저장 한 곳(def.key에 k,d,f,chip) · ResizeObserver 하나·콜백은 rAF · 경계 matchMedia 3개 · CSS .vs.vs-fit(860~ 폭 100%·최소 --vs-minw)·폰 col --pw·.vs-detcard(PC 숨김·폰 보임)·.vs.vs-fit td.num 오른쪽·옅은 칩 · 기존 .vs(min-width 1160·폰 0·폰 col 0) 그대로 · 검토 반영: 펼침 폭 상한 max-width 100%(계약·차량 [닫기 ▲] 잘림) · .vs td.num·.vs td .sel-box 규칙 없음(새 표만) · .sel-bar.vs-selbar 줄바꿈·여백 · 터치 손잡이 14px',
-    ro38 && st38 && css2_38 && css3_38, JSON.stringify({ ro38, ro38a, ro38b, st38, use38, keysOut38, css2_38, css3_38, cliSeg: csb38.length, wkSeg: wsb38.length, bidSeg: bsb38.length }));
+  T('v438 ⑫ 정적: 계약·차량 그리기에 vsPaneObserve(host) 한 줄씩(파일에서 이 둘뿐 — 여러 번 불러도 자리에 한 번 걸림·--vs-panew = 칸 폭·창을 줄이면 다음 그림에 다시 잼 1048 → 900·data-vs-host 없음) · 부품을 쓰는 탭 6개 — v439 지시·v440 기성·v441 거래처·v442 일용직·v443 입찰 공고·v444 입찰 부동산(@task-sheet·@rec-sheet·@cli-sheet·@wk-sheet·@bid-sheet·@ob-sheet 구간 하나씩: 구간마다 vsSheetRender 1번·정의 key 1개(jw_task_sheet·jw_rec_sheet·jw_cli_sheet·jw_wk_sheet·jw_bid_sheet·jw_ob_sheet)·host 1개(taskList·recSheet·cliList·wkList·bidList·obList) · 일곱 구간 밖 vsSheet*·vsDateCell·VS_INST 0 · 부품 저장 이름은 jw_task_sheet·jw_rec_sheet·jw_cli_sheet·jw_wk_sheet·jw_bid_sheet·jw_ob_sheet만) · 끌기는 pointer(document pointermove·pointerup·pointercancel — mouse 이벤트 0) · 150ms·compositionstart/end·isComposing · 저장 한 곳(def.key에 k,d,f,chip) · ResizeObserver 하나·콜백은 rAF · 경계 matchMedia 3개 · CSS .vs.vs-fit(860~ 폭 100%·최소 --vs-minw)·폰 col --pw·.vs-detcard(PC 숨김·폰 보임)·.vs.vs-fit td.num 오른쪽·옅은 칩 · 기존 .vs(min-width 1160·폰 0·폰 col 0) 그대로 · 검토 반영: 펼침 폭 상한 max-width 100%(계약·차량 [닫기 ▲] 잘림) · .vs td.num·.vs td .sel-box 규칙 없음(새 표만) · .sel-bar.vs-selbar 줄바꿈·여백 · 터치 손잡이 14px',
+    ro38 && st38 && css2_38 && css3_38, JSON.stringify({ ro38, ro38a, ro38b, st38, use38, keysOut38, css2_38, css3_38, cliSeg: csb38.length, wkSeg: wsb38.length, bidSeg: bsb38.length, obSeg: osb38.length }));
 
   // ⑬ 문서 — FEATURES 기준 v438·v438 절(문장 고정)·자리 글 GATES_V438 0 · TESTLIST v438 체크 칸 = 화면 칸 4개 '[ ] (AI 시험 화면 대상' + 게이트 칸 '[x] (AI)' 5종(PM 몫 0) · MANUAL 1절 화면 폭 한 줄 · CLAUDE.md 폭·부품 줄 · sw v438 이상
   const ft38 = rd38('FEATURES.md'), tl38 = rd38('TESTLIST.md'), man38 = rd38('MANUAL.html'), cl38 = rd38('CLAUDE.md'), sw38 = rd38('sw.js');
@@ -8315,6 +8318,579 @@ try {
   T('v443 ㉓ 검토 문서: FEATURES v443 "검토 반영(11/11)" 줄(지적 9건·건수 글 917/969 → 917/917·지남 1,489·BID_ALL_T 359줄·neg 3건 중 2건·onlyHidden 한도 1,050·909줄·펼친 줄 909번째·display:flex·bidsLoading·범위 밖 통계 카드 reading_width) · MANUAL 11절(건수 글 전체 = 전체 버튼·지남·상태로 정렬한 줄 따라가기·150줄 밖 알림) · CLAUDE.md 부품 줄·입찰 공고 표 줄 · TESTLIST 검토 반영 화면 칸 1(건수 글·neg title·새 등록·따라가기·폰 칩 줄·통계 폭) · 게이트 칸 "검토 반영 뒤(11/11" 뒤에 게이트 4종·결함 심기',
     ft23.length > 0 && doc23.length === 0 && gate23, JSON.stringify({ doc23: doc23.map((s) => s.slice(0, 50)), ft: ft23.length, rv: rv23.length, gate23 }));
 } catch (e) { console.log('  (v443 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ---- v444(11/11 — 45-1 일곱째 판: 수주 › 입찰 › 부동산 목록을 엑셀형 표로 + 마감 14일 정리(서버 — 기본 꺼짐, servertest 82) · PM 11/10 15:56 결정 ⑥ · 입찰은 관리자만(서버 ADMIN_ONLY) —
+//      09_조사_문서/표형탭_시안_자료_20261110/단계지시_v444_부동산.json · 엑셀형탭_명세_20261110.json sections[key=onbid]):
+//      시험 틀 = v443과 같은 작은 DOM(가짜 matchMedia·시계·타이머) + index.html의 실제 함수 — 부동산 읽기·저장·상태 바꾸기(loadOnbid·doSaveOnbid·scheduleOnbidSave·setObStatus)·옛 본문 renderOnbidLegacy ·
+//      공고 판정·옛 본문(칸 전환 섞임 시험용 — v443 틀과 같은 목록) · setBidLayer · @vs-sheet·@bid-sheet·@ob-sheet 구간. 서버(fetch)는 큐에서 답을 꺼내는 대역. 오늘 = 2026-11-11.
+//      ① 정의·칸 폭·단계 합 ② 떼기·줄임말·비율(유찰·재산구분·시도 대응표 밖 원래 값·최저/감정 % — 원장 그대로) ③ 칩 두 묶음 AND = 옛 칩 줄(24조합)·칩 수 ④ 칸 표시·합계 줄 ⑤ 150줄 + 더보기
+//      ⑥ 정렬·거르기 ⑦ 펼침(주소 전문 머리·버튼·키·값 11칸) ⑧ 상태 버튼(관리자만·누름 길·연속 누름) ⑨ 폰 legacy(옛 본문 해시·그대로 두는 함수·경계) ⑩ 검색칸 #obSearch(search.el) ⑪ 머리·빈 화면 글
+//      ⑫ 못 읽은 부동산 — 저장이 서버 문서를 덮지 않음(이미 막혀 있음 — 확인만) ⑬ 공고 칸 ↔ 부동산 칸 — 두 표의 칩·검색어·펼침이 섞이지 않음 ⑭ 넓힘·CSS·정적 ⑮ 폰 sheet 준비 ⑯ 서버 정리 정적(한 벌 판정·기본 꺼짐) ⑰ 문서
+try {
+  const rd44 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const own44 = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+  const fn44 = (src, name) => { const i = src.indexOf('function ' + name + '('); if (i < 0) throw new Error('함수 없음: ' + name); let d = 0, st = false; for (let j = i; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i, j + 1); } } throw new Error('중괄호 짝 안 맞음: ' + name); };
+  const line44 = (src, head) => { const i = src.indexOf(head); if (i < 0) throw new Error('줄 없음: ' + head); return src.slice(i, src.indexOf('\n', i)); };
+  const blkOf44 = (a, b) => { const i = html.indexOf(a), j = html.indexOf(b); if (i < 0 || j < i) throw new Error(a + ' 구간 없음'); return html.slice(i, j); };
+  const sha44 = (s) => createHash('sha256').update(s).digest('hex');
+  const body44 = (name) => fn44(html, name).replace(/^function [\w$]+/, '').replace(/\r\n/g, '\n');
+  const blk44 = blkOf44('// @vs-sheet-start', '// @vs-sheet-end'), bsb44 = blkOf44('// @bid-sheet-start', '// @bid-sheet-end'), osb44 = blkOf44('// @ob-sheet-start', '// @ob-sheet-end');
+  const unesc44 = (s) => String(s).replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+  const inlDisp44 = (id) => ((((new RegExp('<div style="([^"]*)" id="' + id + '">').exec(html) || ['', ''])[1]).split(';').map((p) => p.split(':')).find((p) => p[0].trim() === 'display') || ['', ''])[1] || '').trim();
+  const FB44 = inlDisp44('obFilterBar'), FBB44 = inlDisp44('bidFilterBar');   // 옛 칩 줄 HTML 인라인 display(지금 flex — v443 검토)
+  const QL44 = (/<input type="search" id="obSearch" placeholder="([^"]*)"/.exec(html) || ['', ''])[1];   // 검색칸 옛 안내 글(HTML)
+  const mq44 = (q, w) => { if (q == null) return true; if (/print/.test(q)) return false; const a = /\(min-width:\s*(\d+)px\)/.exec(q), b = /\(max-width:\s*(\d+)px\)/.exec(q); if (!a && !b) return false; return (!a || w >= +a[1]) && (!b || w <= +b[1]); };
+  const U44 = { A: { id: 'm1', name: '관리자A', admin: true }, B: { id: 'm2', name: '관리자B', admin: true }, N: { id: 'm3', name: '직원', perms: { tasks: 'do', bid: 'do' } } };   // N은 perms.bid 'do'를 일부러 줌 — 화면 permOf가 '수행'이어도 부동산은 관리자 검사(setObStatus isAdmin)·서버 ADMIN_ONLY가 막는다
+  // 물건 — 오늘 11-11 · o1 신규 경북(경상북도 → 경북)·유찰 3회·34.3%·D-1 · o2 신규 서울·압류(유찰 없음)·100% · o3 검토 충남·국유 유찰 1회·90%·D-0 · o4 참여 대응표 밖(오타 '세종틍별자치시')·공유 유찰 12회·49.995%('50%' — 50% 미만 아님)·마감 지남(회색)·url 없음 ·
+  //   o5 패스 대응표 밖 '아산'·수탁·49.9% · o6 신규 마감 지남(지남)·유찰 108회·최저가 0 · o7 검토 마감 지남(지남)·org 없음·감정가 0 · o8 신규 '제주시'(대응표 밖)·마감 없음·70% · o9 신규 '경기도' + 띄어쓰기 없는 주소(줄임말 안 붙임)·40%·D-3 · o10 지운 물건
+  const O044 = (o) => Object.assign({ source: '온비드', kind: '토지', title: '', org: '', region: '', due: '', budget: 0, appr: 0, url: '', matched: [], method: '일반경쟁·최고가방식', rgn_ref: false, status: 'new', auto_pass: false, created: '2026-11-01', updated: '2026-11-01' }, o);
+  const OBS44 = () => [
+    O044({ id: 'onbid-o1', kind: '토지', region: '경상북도', title: '경상북도 포항시 남구 가동 1-1', org: '기타일반재산 · 유찰3회', appr: 1000000000, budget: 343000000, due: '2026-11-12', url: 'https://onbid.example/1', created: '2026-11-03' }),
+    O044({ id: 'onbid-o2', kind: '상가·업무', region: '서울특별시', title: '서울특별시 강남구 나동 2', org: '압류재산', appr: 600000000, budget: 600000000, due: '2026-11-20', url: 'https://onbid.example/2' }),
+    O044({ id: 'onbid-o3', kind: '공장·산업', region: '충청남도', title: '충청남도 아산시 다동 3', org: '국유재산 · 유찰1회', appr: 800000000, budget: 720000000, due: '2026-11-11', url: 'https://onbid.example/3', status: '검토', method: '제한경쟁·최고가방식' }),
+    O044({ id: 'onbid-o4', kind: '토지', region: '세종틍별자치시', title: '세종틍별자치시 라동 4', org: '공유재산 · 유찰12회', appr: 2000000000, budget: 999900000, due: '2026-11-09', url: '', status: '참여' }),
+    O044({ id: 'onbid-o5', kind: '상가·업무', region: '아산', title: '아산 마동 5', org: '수탁재산', appr: 1500000000, budget: 748500000, due: '2026-11-25', url: 'https://onbid.example/5', status: '패스' }),
+    O044({ id: 'onbid-o6', kind: '토지', region: '강원도', title: '강원도 춘천시 바동 6', org: '기타일반재산 · 유찰108회', appr: 3000000000, budget: 0, due: '2026-11-05', url: 'https://onbid.example/6' }),
+    O044({ id: 'onbid-o7', kind: '상가·업무', region: '전북특별자치도', title: '전북특별자치도 전주시 사동 7', org: '', appr: 0, budget: 300000000, due: '2026-11-01', url: 'https://onbid.example/7', status: '검토' }),
+    O044({ id: 'onbid-o8', kind: '공장·산업', region: '제주시', title: '제주시 아동 8', org: '압류재산 · 유찰2회', appr: 900000000, budget: 630000000, due: '', url: 'https://onbid.example/8' }),
+    O044({ id: 'onbid-o9', kind: '토지', region: '경기도', title: '경기도화성시 자동 9', org: '기타일반재산 · 유찰5회', appr: 700000000, budget: 280000000, due: '2026-11-14', url: 'https://onbid.example/9' }),
+    O044({ id: 'onbid-o10', kind: '토지', region: '경상남도', title: '경상남도 지운 물건 10', org: '압류재산', appr: 500000000, budget: 400000000, due: '2026-11-30', del: 1 })];
+  const B044 = (o) => Object.assign({ source: '나라장터', kind: '용역', title: '', org: '', region: '', due: '', budget: 0, url: '', matched: [], method: '적격심사제', rgn_ref: false, status: 'new', created: '2026-11-01', updated: '2026-11-01', no: '', posted: '2026-11-01', ext: {} }, o);
+  const BIDS44 = () => [B044({ id: 'b1', title: '가 석면 해체', org: '가나시', due: '2026-11-12', url: 'https://g2b.example/b1' }), B044({ id: 'b2', title: '나 슬러지 운반', org: '나다시', due: '2026-11-20', status: '검토', url: 'https://g2b.example/b2' }), B044({ id: 'b3', title: '다 포항 준설', org: '다라군', due: '2026-11-15', url: 'https://g2b.example/b3' })];   // b3 제목의 '포항' — 부동산 검색어가 공고 표에 새면 b3만 남는다
+  const REAL44 = ['esc', 'isDate', 'vehDday', 'ddayInfo', 'fmtAmount', 'mTime', 'mergeDel', 'bidSt', 'bidHasDeepLink', 'bidNoOf', 'findBid', 'liveBids', 'bidExpired', 'bidNewCount', 'loadBids', 'scheduleBidsSave', 'mergeBidsLocal', 'doSaveBids',
+    'methodKindOf', 'bidMethodEff', 'bidDecideState', 'bidLwltState', 'bidFloorRange', 'bcBand', 'lwltRefMode', 'orgStatChip', 'undoBidStatus', 'setBidStatus', 'conAmtFromBid', 'renderBidsLegacy', 'bidToContract', 'openBidAdd', 'saveBidAdd',
+    'findOb', 'liveObs', 'obExpired', 'loadOnbid', 'scheduleOnbidSave', 'doSaveOnbid', 'setObStatus', 'renderOnbidLegacy', 'setBidLayer'];
+  const VARS44 = ['  var bids = [];', '  var bidsSha = null, bidsSaveTimer', '  var bidExpanded = {};', '  var bidsHealth = null;', '  var bidsAwards = null;', '  var BID_STATUSES = ', '  var BID_NEXT = ', '  var BID_NO_DEEPLINK = ',
+    '  var bidsLoadErr = null;', '  var bidsLoaded = false, bidsSaveHeld = false;', '  var bidsLoading = ', '  var BID_UNREAD_MSG = ', '  var DECIDE_TO_METHOD=', '  var BID_PREV=', '  var BID_LABEL=',
+    '  var onbids = [];', '  var onbidSha = null, onbidSaveTimer', '  var bidLayer = '].map((h) => line44(html, h));
+  const PRE44 = [
+    'var BIDS_API = "https://api.github.com/repos/x/appdata/contents/data/bids.json", ONBID_API = "https://api.github.com/repos/x/appdata/contents/data/onbid.json", contracts = [], lastBidForCon = null, autoGenReady = {}, currentTab = "bid";',
+    'function todayStr(){ return "2026-11-11"; }',
+    'function genId(p){ ENV.gid++; return p + "N" + ENV.gid; }',
+    'function curMember(){ return ENV.user; } function myId(){ return ENV.user ? ENV.user.id : ""; }',
+    'function isAdmin(){ return !!(ENV.user && ENV.user.admin); }',
+    'function permOf(mod){ var u = ENV.user; if (!u) return "hide"; if (u.admin) return "do"; return (u.perms && u.perms[mod]) || "view"; }',
+    'function canDo(mod){ return permOf(mod) === "do"; } function canSee(mod){ return permOf(mod) !== "hide"; }',
+    'function confirm(msg){ ENV.log.push("confirm:" + msg); return ENV.confirmAns !== false; }',
+    'function alert(msg){ ENV.log.push("alert:" + msg); }',
+    'function gwToast(msg){ ENV.log.push("toast:" + msg); }',
+    'function getToken(){ return ENV.noTok ? "" : "tok"; } function ghHeaders(){ return {}; }',   // ⑫ 로그아웃(토큰 없음) 흉내
+    'function b64EncodeUnicode(s){ return ENV.b64e(s); } function b64DecodeUnicode(s){ return ENV.b64d(s); }',
+    'function fetch(url, opts){ var m = (opts && opts.method) || "GET", r; ENV.fetchLog.push(m + (url.indexOf("onbid") >= 0 ? "@ob" : "@bid") + (m === "PUT" ? ":" + JSON.parse(ENV.b64d(JSON.parse(opts.body).content)).items.length : "")); r = ENV.fetchQ.shift() || { status: 599 }; if (r.err) return Promise.reject(new Error(r.err)); return Promise.resolve({ status: r.status, ok: r.status >= 200 && r.status < 300, json: function(){ return Promise.resolve(r.body || {}); } }); }',
+    'function renderDashboard(){ ENV.log.push("dash"); } function runBidQualGen(){} function runAwardAutoCon(){}',
+    'function switchTab(n){ ENV.log.push("switch:" + n); currentTab = n; }',
+    'function openConStart(){ ENV.log.push("conStart"); } function suggestConElems(){ return {}; } function renderConScen(){}',
+    'function openBidCalc(pre){ ENV.log.push("calc:" + JSON.stringify(pre)); }',
+    'function liveContracts(){ return contracts.filter(function(c){ return c && c.del !== 1; }); }',
+    'var navigator = { clipboard: { writeText: function(t){ ENV.log.push("copy:" + t); return Promise.resolve(); } } };'].join('\n');
+  const SRC44 = [PRE44].concat(VARS44, ['bids = ENV.bids; bidsAwards = null; bidsHealth = null; bidsLoaded = true; bidsLoadErr = null; onbids = ENV.obs; onbidSha = ENV.sha;'], REAL44.map((n) => fn44(html, n)), [blk44, bsb44, osb44,
+    'return { render: renderOnbid, legacy: renderOnbidLegacy, def: obSheetDef, inst: vsInst, vs: vsSheetRender, check: vsSheetCheckDef, minW: vsSheetMinW, cols: vsSheetCols, budget: VS_STAGE_BUDGET,'
+    + ' obs: function(){ return onbids; }, setObs: function(o){ onbids = o; }, setSha: function(s){ onbidSha = s; }, setFilter: function(st, kd){ obStatusFilter = st; obKindFilter = kd; }, setShow: function(n){ obShow = n; }, term: function(){ return obSearchTerm; },'
+    + ' info: obInfo, sido: obSidoOf, pct: obPct, eok: obEok, act: obSheetAct, cur: function(){ return obSheetCur; }, load: loadOnbid, save: doSaveOnbid, sched: scheduleOnbidSave, timer: function(){ return onbidSaveTimer; }, pending: function(){ return onbidPending; },'
+    + ' setStatus: setObStatus, paint: obSheetPaint, sText: obSheetSearchText, layer: setBidLayer, bidDef: bidSheetDef, bids: function(){ return bids; }, allTip: OB_ALL_T, qLeg: OB_Q_LEG, qSheet: OB_Q_SHEET, sidoMap: OB_SIDO };']).join('\n');
+  const match44 = (el, sel) => {
+    const re = /(#[\w-]+)|(\.[\w-]+)|(\[[\w-]+(?:="(?:[^"\\]|\\.)*")?\])|([a-zA-Z][\w-]*)/g; let m, at = 0;
+    while ((m = re.exec(sel))) {
+      if (m.index !== at) throw new Error('시험 DOM이 모르는 선택자: ' + sel); at = re.lastIndex;
+      if (m[1]) { if (el.getAttribute('id') !== m[1].slice(1)) return false; }
+      else if (m[2]) { if (!el.classList.contains(m[2].slice(1))) return false; }
+      else if (m[3]) { const a = /^\[([\w-]+)(?:="((?:[^"\\]|\\.)*)")?\]$/.exec(m[3]); if (a[2] === undefined) { if (!el.hasAttribute(a[1])) return false; } else if (el.getAttribute(a[1]) !== a[2].replace(/\\(.)/g, '$1')) return false; }
+      else if (m[4]) { if (!el.tagName || el.tagName !== m[4].toUpperCase()) return false; }
+    }
+    if (!at || at !== sel.length) throw new Error('시험 DOM이 모르는 선택자: ' + sel);
+    return true;
+  };
+  const mkCls44 = (s) => { const c = new Set(String(s || '').split(/\s+/).filter(Boolean)); return { toggle: (k, on) => { if (on === undefined ? !c.has(k) : on) c.add(k); else c.delete(k); }, contains: (k) => c.has(k), add: (k) => c.add(k), remove: (k) => c.delete(k) }; };
+  const b64e44 = (s) => Buffer.from(String(s), 'utf8').toString('base64'), b64d44 = (s) => Buffer.from(String(s), 'base64').toString('utf8');
+  const mk44 = (o) => {
+    o = o || {};
+    const env = { width: o.width || 1366, user: o.user || U44.A, obs: o.obs || OBS44(), sha: o.sha === undefined ? 'gw' : o.sha, bids: o.bids || [], noTok: false,
+      fetchLog: [], fetchQ: (o.fetchQ || []).slice(), b64e: b64e44, b64d: b64d44, mql: [], store: Object.assign({}, o.store || {}), timers: [], now: o.now || 1794000000000, log: [], raf: [], ro: [], cw: 1048, confirmAns: true, gid: 0 };
+    const doc = { activeElement: null, byId: {} };
+    doc.getElementById = (id) => doc.byId[id] || null;
+    doc.querySelector = (sel) => { env.log.push('qs:' + sel); return null; };
+    doc.addEventListener = () => {}; doc.removeEventListener = () => {};
+    const mkEl = (tag, attrs) => {
+      const el = { tagName: tag.toUpperCase(), attrs, L: {}, scrollLeft: 0, scrollTop: 0, parentNode: null };
+      Object.defineProperty(el, 'clientWidth', { get: () => env.cw });
+      el.getAttribute = (n) => (own44(attrs, n) ? unesc44(attrs[n]) : null);
+      el.setAttribute = (n, v) => { attrs[n] = String(v); };
+      el.hasAttribute = (n) => own44(attrs, n);
+      el.type = attrs.type || ''; el.value = own44(attrs, 'value') ? unesc44(attrs.value) : ''; el.checked = own44(attrs, 'checked'); el.disabled = own44(attrs, 'disabled');
+      const sp = {}; String(attrs.style || '').split(';').forEach((p) => { const k = p.indexOf(':'); if (k > 0) sp[p.slice(0, k).trim()] = p.slice(k + 1).trim(); });
+      el.style = { sp, setProperty: (k, v) => { sp[k] = String(v); }, getPropertyValue: (k) => sp[k] || '' };
+      el.classList = mkCls44(attrs.class);
+      el.addEventListener = (t, f) => { (el.L[t] = el.L[t] || []).push(f); };
+      el.fire = (t, ev) => { const e = Object.assign({ target: el, type: t, stopped: false }, ev || {}); e.stopPropagation = () => { e.stopped = true; }; e.preventDefault = () => {}; (el.L[t] || []).slice().forEach((f) => f(e)); return e; };
+      el.focus = () => { doc.activeElement = el; };
+      el.closest = (sel) => (match44(el, sel) ? el : null);
+      el.selectionStart = el.tagName === 'INPUT' ? el.value.length : null;
+      el.setSelectionRange = (a) => { el.selectionStart = a; };
+      el.scrollIntoView = () => { env.log.push('into:' + (el.getAttribute('data-vs-row') || el.getAttribute('data-vs-detcard') || '')); };
+      return el;
+    };
+    env.mkEl = mkEl;
+    env.mkHost = (id) => {
+      const host = { id, tagName: 'DIV', attrs: { id }, _h: '', _t: '', els: [], visible: true, style: { display: '' }, L: {}, value: '', placeholder: '' };
+      host.getAttribute = (n) => (own44(host.attrs, n) ? host.attrs[n] : null);
+      host.setAttribute = (n, v) => { host.attrs[n] = String(v); };
+      host.hasAttribute = (n) => own44(host.attrs, n);
+      host.getClientRects = () => ((host.visible && host.style.display !== 'none') ? [{}] : []);
+      host.contains = (el) => host.els.indexOf(el) >= 0;
+      host.querySelectorAll = (sel) => host.els.filter((e) => match44(e, sel));
+      host.querySelector = (sel) => host.els.find((e) => match44(e, sel)) || null;
+      host.addEventListener = (t, f) => { env.log.push('host-listener:' + id + ':' + t); (host.L[t] = host.L[t] || []).push(f); };   // 자리(host)에 건 배선은 기록(표 자리 obList·bidList에는 0이어야 — v438 규칙)
+      host.classList = mkCls44('');
+      host.focus = () => { doc.activeElement = host; };
+      Object.defineProperty(host, 'innerHTML', { get: () => host._h, set: (v) => {
+        host._h = String(v); host.els = []; host._n = (host._n || 0) + 1;
+        for (const t of host._h.matchAll(/<([a-zA-Z][\w-]*)((?:[^<>"]|"[^"]*")*)>/g)) { const attrs = {}; for (const a of t[2].matchAll(/([\w-]+)(?:="([^"]*)")?/g)) attrs[a[1]] = a[2] === undefined ? '' : a[2]; host.els.push(mkEl(t[1], attrs)); }
+      } });
+      Object.defineProperty(host, 'textContent', { get: () => host._t, set: (v) => { host._t = String(v); } });
+      doc.byId[id] = host;
+      return host;
+    };
+    env.host = (id) => doc.byId[id];
+    ['obList', 'obHead', 'obFilterBar', 'obSearch', 'obMoreBtn', 'onbidSection', 'view-bid', 'bidSubBar', 'bidLayerList', 'bidLayerOnbid',
+      'bidList', 'bidHead', 'bidFilterBar', 'bidBanner', 'bidGuideCard', 'bidGuideSheet', 'bidSearch', 'bidTabBadge', 'bidAddBackdrop', 'baTitle', 'baOrg', 'baDue', 'baUrl', 'conClient', 'conSite', 'conType', 'conCombo', 'conAmount', 'conStartBackdrop'].forEach((id) => env.mkHost(id));
+    env.host('obList').innerHTML = '<div class="loading">불러오는 중…</div>'; env.host('bidList').innerHTML = '<div class="loading">불러오는 중…</div>';
+    env.host('obFilterBar').style.display = FB44; env.host('bidFilterBar').style.display = FBB44; env.host('obMoreBtn').style.display = 'none'; env.host('obSearch').placeholder = QL44;
+    env.host('bidBanner').style.display = 'none'; env.host('bidGuideSheet').style.display = 'none'; env.host('bidLayerOnbid').style.display = 'none';
+    env.host('bidSubBar').innerHTML = '<button class="lsub-btn active" data-lsub="list" id="bidChipList">공고</button><button class="lsub-btn" data-lsub="onbid" id="bidChipOnbid">부동산</button>';
+    const win = { get innerWidth() { return env.width; }, matchMedia: (q) => ({ media: q, get matches() { return mq44(q, env.width); }, addEventListener: (t, f) => { env.mql.push(f); } }), requestAnimationFrame: (f) => { env.raf.push(f); }, prompt: (m, v) => { env.log.push('prompt:' + v); } };
+    const ls = { getItem: (k) => (own44(env.store, k) ? env.store[k] : null), setItem: (k, v) => { env.log.push('store:' + k); env.store[k] = String(v); }, removeItem: (k) => { delete env.store[k]; } };
+    const stF = (f, ms) => { const t = { id: env.timers.length + 1, f, at: env.now + (ms || 0), done: false }; env.timers.push(t); return t.id; };
+    const ctF = (id) => { env.timers.forEach((t) => { if (t.id === id) t.done = true; }); };
+    function RO(cb) { this.observe = (t) => { env.ro.push(t); }; }
+    class FD extends Date { static now() { return env.now; } }
+    const api = new Function('window', 'document', 'localStorage', 'setTimeout', 'clearTimeout', 'ResizeObserver', 'ENV', 'Date', SRC44)(win, doc, ls, stF, ctF, RO, env, FD);
+    env.breakAll = () => { env.mql.slice().forEach((f) => f({})); };
+    env.tick = (ms) => { env.now += ms; let t; while ((t = env.timers.filter((x) => !x.done && x.at <= env.now).sort((a, b) => a.at - b.at)[0])) { t.done = true; t.f(); } };
+    env.type = (v, comp, id) => { const q = env.host(id || 'obSearch'); q.value = v; (q.L.input || []).slice().forEach((f) => f({ target: q, isComposing: !!comp })); };
+    env.comp = (t, id) => { const q = env.host(id || 'obSearch'); (q.L[t] || []).slice().forEach((f) => f({ target: q })); };
+    return { api, env, doc, host: env.host('obList') };
+  };
+  const flush44 = () => new Promise((r) => setTimeout(r, 0));
+  const ids44 = (h, re) => [...h.matchAll(re || /data-vs-row="([^"]*)"/g)].map((m) => m[1].replace(/^onbid-/, ''));
+  const order44 = (h) => ids44(h).join(',');
+  const cnt44 = (h) => (/<span class="vs-count">([^<]*)<\/span>/.exec(h) || ['', ''])[1];
+  const rowSeg44 = (h, id) => (new RegExp('<tr class="vs-r[^"]*" data-vs-row="onbid-' + id + '">([\\s\\S]*?)</tr>').exec(h) || ['', ''])[1];
+  const cells44 = (h, id) => [...rowSeg44(h, id).matchAll(/<td([^>]*)>([\s\S]*?)<\/td>/g)].map((m) => [m[1], m[2]]);
+  const ctxt44 = (h, id) => cells44(h, id).map((c) => c[1].replace(/<[^>]+>/g, '')).join('|');
+  const heads44 = (h) => [...h.matchAll(/<th[^>]*data-vs-sort="(\w+)"/g)].map((m) => m[1]).join(',');
+  const chipN44 = (h, g, k) => Number(((new RegExp('data-vs-chip="' + g + '\\|' + k + '"[^>]*>[^<]* ([\\d,]+)</button>').exec(h) || [0, '-1'])[1]).replace(/,/g, ''));
+  const chipOn44 = (h, g) => ((new RegExp('class="vs-chip(?: warn)? on" data-vs-chip="' + g + '\\|([^"]*)"').exec(h)) || ['', null])[1];
+  const foot44 = (h) => ((/<tfoot><tr>([\s\S]*?)<\/tr><\/tfoot>/.exec(h) || ['', ''])[1].match(/<td[^>]*>([\s\S]*?)<\/td>/g) || []).map((s) => s.replace(/^<td[^>]*>|<\/td>$/g, '')).join('|');
+  const det44 = (h) => (/<div class="vs-det-in" data-vs-det="[^"]*">([\s\S]*?)<\/div><\/td><\/tr>/.exec(h) || ['', ''])[1];
+  const acts44 = (h) => { const m = /<div class="vs-act"[^>]*>([\s\S]*?)<\/div>/.exec(h); return m ? [...m[1].matchAll(/<(?:button|a) [^>]*?class="([^"]*)"[^>]*>([^<]*)<\/(?:button|a)>/g)].map((x) => x[1] + ':' + x[2]).join(',') : ''; };
+  const kv44 = (h) => [...h.matchAll(/<div><div class="k">([^<]*)<\/div><div class="v">([\s\S]*?)<\/div><\/div>/g)].map((m) => m[1] + '=' + m[2]);
+  const miss44 = [];
+  const openRow44 = (X, id) => { const row = X.host.querySelector('[data-vs-row="onbid-' + id + '"]'); if (!row) { miss44.push('행 없음 ' + id); return false; } row.fire('click', { target: row }); return true; };
+  const chip44 = (X, g, k) => { const el = X.host.querySelector('[data-vs-chip="' + g + '|' + k + '"]'); if (!el) { miss44.push('칩 없음 ' + g + '|' + k); return false; } el.fire('click'); return true; };
+  const press44 = (X, attr, val, ev) => { const det = X.host.querySelector('[data-vs-det]') || X.host.querySelector('[data-vs-detcard]'), L = X.host.els.filter((e) => e.getAttribute(attr) === val), b = L[L.length - 1]; if (!det || !b) { miss44.push('펼침 안 요소 없음 ' + attr + '=' + val); return false; } det.fire('click', Object.assign({ target: b }, ev || {})); return true; };
+  const fake44 = (X, id, v) => { const det = X.host.querySelector('[data-vs-det]'); if (!det) { miss44.push('펼침 없음(흉내 ' + v + ')'); return false; } const b = X.env.mkEl('button', { type: 'button', class: 'mini-btn', 'data-ob-act': 'st', 'data-ob-id': 'onbid-' + id, 'data-ob-v': v }); det.fire('click', { target: b }); return true; };   // 화면에 없는 버튼(누름 길의 지금 규칙을 봄)
+  const noMiss44 = (m0) => miss44.length === m0;
+  const sortBy44 = (X, k) => { const th = X.host.querySelector('[data-vs-sort="' + k + '"]'); if (!th) { miss44.push('머리 없음 ' + k); return false; } th.fire('click', { target: th }); return true; };
+  const more44 = (X) => { const b = X.host.querySelector('[data-vs-more]'); if (!b) { miss44.push('더 보기 없음'); return false; } b.fire('click'); return true; };
+  const stOf44 = (X, id) => (X.api.obs().find((b) => b.id === 'onbid-' + id) || {}).status;
+
+  // ① 정의·칸 폭(운영 백업 실측으로 명세 폭에서 바꾼 다섯)·단계 합: vsSheetCheckDef 통과(phone legacy·sheet — 폰 열 물건 50·최저가 24·마감 26 % 합 100) · 열 13 = 명세 순서 11 + 폰 전용 2
+  //   (물건(소재지) 남는 폭 최소 280 text 폰 50 첫 열 굵게 끔·ft / 용도 76 lv3 / 시도 64 lv3 enum / 재산구분 96 lv3 enum / 유찰 56 lv2 숫자 / 감정가 108 lv4 숫자 / 최저가 108 lv2 숫자 / 최저/감정 88 lv2 숫자 / 마감 92 lv2 / 상태 56 lv2 / ↗ 34 lv2 정렬 없음 /
+  //   최저가(폰) 24 별칭 최저가 / 마감(폰) 26 별칭 마감) · 단계 합 714/950/1058 ≤ 한도(= CSS 본문 폭 − 49) · 칩 두 묶음(상태 6 — 지남 빨강 모집단 · 용도 4) · key jw_ob_sheet · host obList · 단위 건 · 검색 = 탭의 #obSearch(search.el) · 150줄 ·
+  //   칩 수·옅은 선택 · '전체' 규칙 total · 기본 정렬 마감 ▲ · phone legacy · legacy = renderOnbidLegacy · 선택 칸·묶음 없음
+  const X1 = mk44(), d1 = X1.api.def();
+  const ck1 = [X1.api.check(d1).join(','), X1.api.check(Object.assign({}, d1, { phone: 'sheet' })).join(',')].join('/');
+  const COLS44 = 'title:물건(소재지):0:text:1:50:fill280:ft:b0|kind:용도:76:none:3:0:::|sido:시도:64:enum:3:0:::|prop:재산구분:96:enum:3:0:::|fail:유찰:56:none:2:0::num:|appr:감정가:108:none:4:0::num:|budget:최저가:108:none:2:0::num:|ratio:최저/감정:88:none:2:0::num:'
+    + '|due:마감:92:none:2:0:::|st:상태:56:none:2:0:::|link:↗:34:none:2:0::nosort:|budget_ph:최저가:0:none:1:24::num+ph>budget:|due_ph:마감:0:none:1:26::ph>due:';
+  const cols1 = d1.cols.map((c) => [c.k, c.h, c.w || 0, c.f, c.lv || 1, c.pw || 0, c.fill ? 'fill' + c.min : '', [c.ft ? 'ft' : '', c.num ? 'num' : '', c.nosort ? 'nosort' : '', c.ph ? 'ph>' + c.sortAs : ''].filter(Boolean).join('+'), c.b === 0 ? 'b0' : ''].join(':')).join('|');
+  const sums1 = [2, 3, 4].map((s) => X1.api.minW({ colw: {} }, X1.api.cols(d1, s))).join('/');
+  const css44 = (() => { const i = html.indexOf('<style>'), j = html.indexOf('</style>', i); return html.slice(i + 7, j).replace(/\/\*[\s\S]*?\*\//g, ''); })();
+  const rules44 = [];
+  const parse44 = (src, media) => { let i = 0; while (i < src.length) { const ob = src.indexOf('{', i); if (ob < 0) break; const head = src.slice(i, ob).trim(); let d = 1, j = ob + 1; for (; j < src.length && d > 0; j++) { if (src[j] === '{') d++; else if (src[j] === '}') d--; } const bd = src.slice(ob + 1, j - 1); if (/^@media/.test(head)) parse44(bd, head.slice(6).trim()); else if (!/^@/.test(head)) { const decl = {}; bd.split(';').forEach((p) => { const k = p.indexOf(':'); if (k > 0) decl[p.slice(0, k).trim()] = p.slice(k + 1).trim(); }); rules44.push({ media, sels: head.split(',').map((s) => s.trim().replace(/\s*>\s*/g, '>').replace(/\s+/g, ' ')), decl }); } i = j; } };
+  parse44(css44, null);
+  const decl44 = (w, sel, prop) => { let v = null; rules44.forEach((r) => { if (mq44(r.media, w) && r.sels.indexOf(sel) >= 0 && own44(r.decl, prop)) v = r.decl[prop]; }); return v; };
+  const pad44 = (v) => { const p = String(v || '0px').trim().split(/\s+/).map((x) => parseFloat(x) || 0); const r = p.length === 1 ? p[0] : p[1]; return [p.length === 4 ? p[3] : r, r]; };
+  const bodyW44 = (win) => { const W = win - 17, mx = decl44(win, '#app', 'max-width'), appW = (!mx || mx === 'none') ? W : Math.min(W, parseFloat(mx)), lr = pad44(decl44(win, '#app', 'padding')); return appW - lr[0] - lr[1] - (parseFloat(decl44(win, '.tabbar', 'width')) || 0) - (parseFloat(decl44(win, '.layout', 'gap')) || 0); };
+  const viewW44 = (win) => { const b = bodyW44(win), own = decl44(win, '#view-bid', 'max-width'), base = decl44(win, '.views>.view', 'max-width'), mx = own != null ? own : base; return (!mx || mx === 'none') ? b : Math.min(b, parseFloat(mx)); };
+  const body1 = [1024, 1280, 1600].map((w) => Math.round(bodyW44(w))), bud1 = [2, 3, 4].map((s) => X1.api.budget[s]);
+  const sumN1 = sums1.split('/').map(Number), fit1 = [0, 1, 2].every((i) => sumN1[i] <= bud1[i] && Math.abs(bud1[i] + 49 - body1[i]) <= 2);
+  const ch1 = d1.chips.map((g) => g.g + ':' + g.items.map((it) => it.k + '|' + it.h + (it.warn ? ':warn' : '') + (it.pop ? ':pop' : '') + (typeof it.test === 'function' ? '' : ':all')).join(',')).join(' / ');
+  T('v444 ① 입찰 부동산 표 정의·칸 폭·단계 합: vsSheetCheckDef 통과(phone legacy·sheet — 폰 열 물건 50·최저가 24·마감 26 % 합 100) · 열 13 = 명세 순서 11(물건(소재지) 남는 폭 최소 280 text·ft 폰 50 첫 열 굵게 끔(신규만 굵게) · 용도 76 lv3 · 시도 64 lv3 enum · 재산구분 96 lv3 enum · 유찰 56 lv2 숫자 · 감정가 108 lv4 숫자 · 최저가 108 lv2 숫자 · 최저/감정 88 lv2 숫자 · 마감 92 lv2 · 상태 56 lv2 · ↗ 34 lv2 정렬 없음 — 명세 76·72·52·64·112에서 운영 백업 실측으로 다섯 바꿈) + 폰 전용 2(최저가 24 별칭 최저가 · 마감 26 별칭 마감) · 단계 합 714/950/1058 ≤ 한도 ' + bud1.join('/') + '(= CSS 본문 폭 ' + body1.join('/') + ' − 49) · 칩 두 묶음(상태 = 전체·신규·검토·참여·패스·지남 빨강 모집단 / 용도 = 용도전체(판정 없음)·토지·공장·산업·상가·업무) · key jw_ob_sheet · host obList · 단위 건 · 검색 = 탭의 #obSearch(search.el — 표 위 검색칸 없음) · 150줄 · 칩 수·옅은 선택 · 건수 글 total · 기본 정렬 마감 ▲ · phone legacy · legacy = renderOnbidLegacy · 선택 칸·묶음 없음',
+    ck1 === '/' && cols1 === COLS44 && sums1 === '714/950/1058' && JSON.stringify(bud1) === '[742,962,1282]' && JSON.stringify(body1) === '[791,1011,1331]' && fit1
+    && ch1 === 'st:|전체,new|신규,검토|검토,참여|참여,패스|패스,expired|지남:warn:pop / kd:|용도전체:all,토지|토지,공장·산업|공장·산업,상가·업무|상가·업무'
+    && d1.key === 'jw_ob_sheet' && d1.host === 'obList' && d1.unit === '건' && d1.search && d1.search.el === 'obSearch' && !d1.search.id && typeof d1.search.text === 'function' && d1.page === 150 && d1.chipCount === 1 && d1.chipStyle === 'light'
+    && typeof d1.total === 'function' && d1.sort.k === 'due' && d1.sort.d === 1 && d1.phone === 'legacy' && d1.legacy === X1.api.legacy && !d1.sel && !d1.group,
+    JSON.stringify({ ck1, cols1, sums1, bud1, body1, ch1 }));
+
+  // ② 떼기·줄임말·비율(화면 계산 — 원장 그대로): 시도 대응표 = 행정구역 표준 이름·옛 이름·'○○시' 꼴 → 두 글자(전국 17 + 변형) · 대응표 밖 값(오타 '세종틍별자치시'·'아산'·'제주시'·경기 광주와 겹치는 '광주시'·'constructor'·빈 값)은 원래 값 ·
+  //   물건 칸 = 시도 줄임말 + 나머지 주소(주소 첫 토막이 시도이고 뒤가 띄어쓰기일 때만 — '경기도화성시 …'는 그대로)·title = 주소 전문 · 재산구분·유찰 = org '재산구분 · 유찰N회'에서 뗌('유찰 없음'은 '-'·title, org 없음 '-') ·
+  //   최저/감정 = 최저가 ÷ 감정가 소수 한 자리(34.3% · 100% · 49.995% → '50%' · 49.9% · 최저가 0·감정가 0 '-') · 시도 거르기 고르기 목록 = 줄임말 + 대응표 밖 원래 값 · 그린 뒤 원장(onbids) 글자째 그대로 · 옛 본문은 org 원문 그대로
+  const m2 = miss44.length, X2 = mk44(), before2 = JSON.stringify(X2.api.obs());
+  const SIDO2 = { '서울특별시': '서울', '서울시': '서울', '부산광역시': '부산', '대구광역시': '대구', '대구': '대구', '인천광역시': '인천', '인천시': '인천', '광주광역시': '광주', '대전광역시': '대전', '울산광역시': '울산', '세종특별자치시': '세종', '세종시': '세종',
+    '경기도': '경기', '강원특별자치도': '강원', '강원도': '강원', '충청북도': '충북', '충청남도': '충남', '충남': '충남', '전북특별자치도': '전북', '전라북도': '전북', '전라남도': '전남', '경상북도': '경북', '경상남도': '경남', '경남': '경남', '제주특별자치도': '제주', '제주도': '제주',
+    '세종틍별자치시': '세종틍별자치시', '아산': '아산', '제주시': '제주시', '광주시': '광주시', 'constructor': 'constructor', '': '',
+    '전남광주통합특별시': '전남광주통합특별시', '광주특별시': '광주특별시' };   // v444 검토: 7/1 출범 통합특별시 이름·법정 약칭도 대응표 밖(두 글자 줄임말 없음 — 옛 광주·전남과 묶을지는 PM 확인)
+  const sidoBad2 = Object.keys(SIDO2).filter((k) => X2.api.sido(k) !== SIDO2[k]);
+  const std2 = ['서울', '부산', '대구', '인천', '광주', '대전', '울산', '세종', '경기', '강원', '충북', '충남', '전북', '전남', '경북', '경남', '제주'].every((s) => Object.values(X2.api.sidoMap).indexOf(s) >= 0) && new Set(Object.values(X2.api.sidoMap)).size === 17;
+  X2.api.render(); const h2 = X2.host._h;
+  const s2 = [cells44(h2, 'o1')[0], cells44(h2, 'o9')[0][1], cells44(h2, 'o4')[0][1], cells44(h2, 'o8')[0][1], cells44(h2, 'o1')[2], cells44(h2, 'o4')[2], cells44(h2, 'o1')[3][1], cells44(h2, 'o1')[4], cells44(h2, 'o2')[4], cells44(h2, 'o2')[3][1],
+    cells44(h2, 'o1')[6][1], cells44(h2, 'o2')[6][1], cells44(h2, 'o3')[6][1], cells44(h2, 'o4')[6][1], cells44(h2, 'o9')[6][1]];
+  chip44(X2, 'st', 'expired'); s2.push(cells44(X2.host._h, 'o6')[4][1], cells44(X2.host._h, 'o6')[6], cells44(X2.host._h, 'o7')[3][1], cells44(X2.host._h, 'o7')[6][1]); chip44(X2, 'st', '패스'); s2.push(cells44(X2.host._h, 'o5')[6][1], cells44(X2.host._h, 'o5')[2][1]); chip44(X2, 'st', '');
+  const opt2 = (/<select data-vf="sido">([\s\S]*?)<\/select>/.exec(X2.host._h) || ['', ''])[1].replace(/<option value="([^"]*)"[^>]*>[^<]*<\/option>/g, '$1;'), optP2 = (/<select data-vf="prop">([\s\S]*?)<\/select>/.exec(X2.host._h) || ['', ''])[1].replace(/<option value="([^"]*)"[^>]*>[^<]*<\/option>/g, '$1;');
+  X2.api.setFilter('all', 'all'); X2.api.setShow(1000); X2.api.legacy(); const leg2 = X2.host._h.indexOf('<span>기타일반재산 · 유찰3회</span>') > 0 && X2.host._h.indexOf('경상북도 포항시 남구 가동 1-1') > 0;
+  const pctB2 = [X2.api.pct(34.3), X2.api.pct(100), X2.api.pct(0.7), X2.api.pct(null)].join(',');
+  T('v444 ② 떼기·줄임말·비율(실행 1366 — 화면 계산, 원장 그대로): 시도 대응표 = 표준 이름·옛 이름·○○시 꼴 → 두 글자(17개 — 서울·부산·대구·인천·광주·대전·울산·세종·경기·강원·충북·충남·전북·전남·경북·경남·제주) · 대응표 밖(오타 세종틍별자치시·아산·제주시·광주시(경기 광주와 겹침)·constructor·빈 값) = 원래 값 · 물건 칸 "경북 포항시 남구 가동 1-1"(신규 굵게·title 주소 전문) · 띄어쓰기 없는 주소·대응표 밖 시도는 그대로 · 시도 칸 경북(title 경상북도)·대응표 밖 원래 값 · 재산구분 기타일반재산·유찰 3회 · 압류재산(유찰 없음 "-"·title) · 유찰 108회 · org 없음 "-" · 최저/감정 34.3%·100%·90%·49.995% → 50%·40% · 최저가 0 = "-"(o6) · 감정가 0 = "-"(o7) · 패스 49.9%·아산 · 시도 고르기 목록 = 줄임말 + 대응표 밖 원래 값(지남 칩이 꺼져 있으면 지남 줄 값은 목록에 없음) · 재산구분 고르기 목록 · 그린 뒤 원장 글자째 그대로 · 옛 본문은 org 원문 그대로',
+    sidoBad2.length === 0 && std2 && JSON.stringify(s2) === JSON.stringify([[' class="vs-b" title="경상북도 포항시 남구 가동 1-1"', '경북 포항시 남구 가동 1-1'], '경기도화성시 자동 9', '세종틍별자치시 라동 4', '제주시 아동 8',
+      [' class="vs-hs vs-l3" title="경상북도"', '경북'], [' class="vs-hs vs-l3" title="세종틍별자치시"', '세종틍별자치시'], '기타일반재산', [' class="vs-hs num" title="유찰 3회"', '3회'], [' class="vs-hs num" title="유찰 없음"', '<span style="color:#9AA09C;">-</span>'], '압류재산',
+      '34.3%', '100%', '90%', '50%', '40%',
+      '108회', [' class="vs-hs num"', '<span style="color:#9AA09C;">-</span>'], '<span style="color:#9AA09C;">-</span>', '<span style="color:#9AA09C;">-</span>', '49.9%', '아산'])
+    && opt2 === ';경기;경북;서울;세종틍별자치시;아산;제주시;충남;' && optP2 ===';공유재산;국유재산;기타일반재산;수탁재산;압류재산;' && JSON.stringify(X2.api.obs()) === before2 && leg2 && pctB2 === '34.3%,100%,0.7%,' && noMiss44(m2),
+    JSON.stringify({ sidoBad2, std2, s2, opt2, optP2, same: JSON.stringify(X2.api.obs()) === before2, leg2, pctB2, miss: miss44.slice(m2) }));
+
+  // ③ 칩 두 묶음 AND = 옛 칩 줄(옛 본문 renderOnbidLegacy의 obStatusFilter × obKindFilter 거르기 그대로 — 명세 '칩 두 묶음(상태·용도)은 AND로 그대로'): 상태 6 × 용도 4 = 24조합마다 새 표가 그리는 줄 집합 = 옛 본문이 그리는 카드 집합 ·
+  //   칩 수(그 칩을 누르면 보일 줄 수 — 다른 묶음은 지금 켜진 칩 그대로) · 지남(모집단)은 다른 칩 어디에도 없음 · '보이는 n건 / 전체 m건'(total — 전체 = '전체' 칩 수, 지남 칩이면 '/ 지남 m건')
+  const m3 = miss44.length, X3 = mk44(), ST3 = [['all', ''], ['new', 'new'], ['검토', '검토'], ['참여', '참여'], ['패스', '패스'], ['expired', 'expired']], KD3 = [['all', ''], ['토지', '토지'], ['공장·산업', '공장·산업'], ['상가·업무', '상가·업무']];
+  const bad3 = [], combos3 = [];
+  ST3.forEach((s) => KD3.forEach((k) => {
+    X3.api.setFilter(s[0], k[0]); X3.api.setShow(1000); X3.api.legacy();
+    const leg = [...new Set(ids44(X3.host._h, /data-ob-id="([^"]*)"/g))].sort().join(',');
+    X3.api.render(); chip44(X3, 'st', s[1]); chip44(X3, 'kd', k[1]);
+    const tab = ids44(X3.host._h).sort().join(',');
+    combos3.push(s[1] + '/' + k[1] + '=' + tab);
+    if (leg !== tab) bad3.push(s[0] + '×' + k[0] + ' 옛 ' + leg + ' ≠ 표 ' + tab);
+  }));
+  chip44(X3, 'st', ''); chip44(X3, 'kd', ''); const h3 = X3.host._h;
+  const nums3 = [['st', ''], ['st', 'new'], ['st', '검토'], ['st', '참여'], ['st', '패스'], ['st', 'expired'], ['kd', ''], ['kd', '토지'], ['kd', '공장·산업'], ['kd', '상가·업무']].map((p) => chipN44(h3, p[0], p[1]));
+  const eq3 = [['st', ''], ['st', 'new'], ['st', '검토'], ['st', '참여'], ['st', '패스'], ['st', 'expired'], ['kd', '토지'], ['kd', '공장·산업'], ['kd', '상가·업무']].filter((p) => { const n = chipN44(X3.host._h, p[0], p[1]); chip44(X3, p[0], p[1]); const v = ids44(X3.host._h).length; chip44(X3, p[0], ''); return n !== v; });
+  chip44(X3, 'kd', '토지'); const nums3b = [['st', ''], ['st', 'new'], ['st', '참여'], ['st', 'expired']].map((p) => chipN44(X3.host._h, p[0], p[1])); const cnt3b = cnt44(X3.host._h); chip44(X3, 'kd', '');
+  chip44(X3, 'st', 'expired'); const exp3 = order44(X3.host._h), cnt3e = cnt44(X3.host._h); chip44(X3, 'st', '');
+  const popLeak3 = ['', 'new', '검토', '참여', '패스'].some((k) => { chip44(X3, 'st', k); const o = order44(X3.host._h); chip44(X3, 'st', ''); return /\bo[67]\b/.test(o); });
+  T('v444 ③ 칩 두 묶음 AND = 옛 칩 줄(실행 — 상태 6 × 용도 4 = 24조합마다 옛 본문 카드 집합 ↔ 새 표 줄 집합 대조) · 칩 수 전체 6·신규 4·검토 1·참여 1·패스 1·지남 2 / 용도전체 6·토지 3·공장·산업 2·상가·업무 1 = 그 칩을 눌렀을 때 줄 수 · 용도 토지를 켜면 상태 칩 수가 그 안에서(전체 3·신규 2·참여 1·지남 1 — 묶음끼리 AND) · "보이는 3건 / 전체 3건"(v444 검토 — 건수 글 전체 = 전체 칩 3, 종전 "/ 전체 6건") · 지남 = o7·o6만(다른 칩에 0)·"보이는 2건 / 지남 2건" · 기본 "보이는 6건 / 전체 6건"',
+    bad3.length === 0 && combos3.length === 24 && JSON.stringify(nums3) === '[6,4,1,1,1,2,6,3,2,1]' && eq3.length === 0 && JSON.stringify(nums3b) === '[3,2,1,1]' && cnt3b === '보이는 3건 / 전체 3건' && exp3 === 'o7,o6' && cnt3e === '보이는 2건 / 지남 2건' && !popLeak3
+    && cnt44(h3) === '보이는 6건 / 전체 6건' && chipOn44(h3, 'st') === '' && chipOn44(h3, 'kd') === '' && noMiss44(m3),
+    JSON.stringify({ bad3: bad3.slice(0, 6), nums3, eq3, nums3b, cnt3b, exp3, cnt3e, popLeak3, cnt: cnt44(h3), combos: combos3.slice(0, 3), miss: miss44.slice(m3) }));
+
+  // ④ 칸 표시(1366 = 1280~1599 단계 · 1920 = 1600~ · 1100 = 860~1279): 머리 열 1366 = 물건·용도·시도·재산구분·유찰·최저가·최저/감정·마감·상태(+↗ 정렬 없음) · 1920 = + 감정가 · 1100 = 물건·유찰·최저가·최저/감정·마감·상태 ·
+  //   상태 칩 색(신규 review·검토 scope·참여 from·패스 hold) · 마감: D-1·D-0·D-3 노랑(vs-warn — 날짜 title) · D-9 회색 글 · 참여 마감 지남 = 회색 D+2(빨강 아님) · 패스 = 회색 · 마감 없음 '-' · 지남 칩 = 빨강 '경과 6일'·'경과 10일' ·
+  //   ↗ = 새 창 링크(title)·url 없으면 빈칸 · 금액(감정가 1920)·title 원 · 합계 줄 = 물건 칸 '합계 6건 · 50% 미만 2'·마감 칸 '3일 내 3'(1366·1920·1100 같은 글)
+  const m4 = miss44.length, X4 = mk44(); X4.api.render(); const h4 = X4.host._h;
+  //   1366 칸 차례 = 물건 0 · 용도 1 · 시도 2 · 재산구분 3 · 유찰 4 · 최저가 5 · 최저/감정 6 · 마감 7 · 상태 8 · ↗ 9(감정가는 lv4 — 1920에서 유찰 다음 5)
+  const s4 = [heads44(h4), cells44(h4, 'o1')[7], cells44(h4, 'o3')[7][1], cells44(h4, 'o9')[7][1], cells44(h4, 'o2')[7], cells44(h4, 'o4')[7], cells44(h4, 'o8')[7][1], cells44(h4, 'o1')[8][1], cells44(h4, 'o3')[8][1], cells44(h4, 'o4')[8][1],
+    cells44(h4, 'o1')[9], cells44(h4, 'o4')[9][1], cells44(h4, 'o1')[5], foot44(h4)];
+  chip44(X4, 'st', 'expired'); s4.push(cells44(X4.host._h, 'o6')[7], cells44(X4.host._h, 'o7')[7][1], cells44(X4.host._h, 'o6')[8][1]); chip44(X4, 'st', '패스'); s4.push(cells44(X4.host._h, 'o5')[7], cells44(X4.host._h, 'o5')[8][1]); chip44(X4, 'st', '');
+  const X4w = mk44({ width: 1920 }); X4w.api.render(); const h4w = X4w.host._h; s4.push(heads44(h4w), cells44(h4w, 'o1')[5], foot44(h4w));
+  const X4n = mk44({ width: 1100 }); X4n.api.render(); const h4n = X4n.host._h; s4.push(heads44(h4n), ctxt44(h4n, 'o1'), foot44(h4n));
+  const EXP4 = ['title,kind,sido,prop,fail,budget,ratio,due,st', [' class="vs-hs vs-warn" title="2026-11-12"', 'D-1'], 'D-0', 'D-3', [' class="vs-hs" title="2026-11-20"', '<span style="color:var(--sub);">D-9</span>'], [' class="vs-hs" title="2026-11-09"', '<span style="color:#9AA09C;">D+2</span>'], '<span style="color:#9AA09C;">-</span>',
+    '<span class="review-chip">신규</span>', '<span class="scope-chip">검토</span>', '<span class="from-chip">참여</span>',
+    [' class="vs-hs bid-go"', '<a href="https://onbid.example/1" target="_blank" rel="noopener" title="온비드 원문 열기(새 창)">↗</a>'], '', [' class="vs-hs num" title="최저입찰가 343,000,000원"', '343,000,000'], '합계 6건 · 50% 미만 2|||||||3일 내 3||',
+    [' class="vs-hs vs-dan" title="2026-11-05"', '경과 6일'], '경과 10일', '<span class="review-chip">신규</span>', [' class="vs-hs" title="2026-11-25"', '<span style="color:#9AA09C;">D-14</span>'], '<span class="hold-chip">패스</span>',
+    'title,kind,sido,prop,fail,appr,budget,ratio,due,st', [' class="vs-hs vs-l4 num" title="감정가 1,000,000,000원"', '1,000,000,000'], '합계 6건 · 50% 미만 2||||||||3일 내 3||',
+    'title,fail,budget,ratio,due,st', '경북 포항시 남구 가동 1-1|3회|343,000,000|34.3%|D-1|신규|↗', '합계 6건 · 50% 미만 2||||3일 내 3||'];
+  const bad4 = EXP4.map((v, i) => (JSON.stringify(v) === JSON.stringify(s4[i]) ? '' : i + ':' + JSON.stringify(s4[i]).slice(0, 160))).filter(Boolean);
+  T('v444 ④ 칸 표시(실행 1366·1920·1100): 머리 1366 열 9(+↗)·1920 + 감정가·1100 열 6 · 마감 D-1·D-0·D-3 노랑(날짜 title)·D-9 회색 글·참여 마감 지남 회색 D+2·패스 회색 D-14·마감 없음 "-"·지남 칩 빨강 "경과 6일"·"경과 10일" · 상태 칩 신규 review·검토 scope·참여 from·패스 hold · ↗ 새 창(title)·url 없으면 빈칸 · 최저가 숫자(title 원)·1920 감정가 · 합계 줄 물건 칸 "합계 6건 · 50% 미만 2"(49.995% = 50%는 안 셈·패스·지남 밖)·마감 칸 "3일 내 3"(회색 참여 안 셈) — 세 단계 같은 글',
+    bad4.length === 0 && noMiss44(m4), JSON.stringify({ bad4: bad4.slice(0, 6), miss: miss44.slice(m4) }));
+
+  // ⑤ 150줄 + [150건 더 보기]: 물건 320건(신규 — 마감 11-12 ~ · 8건마다 하루 · 3건에 1건 비율 40%) = 처음 150줄·'150건 더 보기 · 남은 170건' · 칩 수·'보이는 320건 / 전체 320건'·합계 줄('합계 320건 · 50% 미만 107'·3일 내 24)은 전체 기준 ·
+  //   더 보기 → 300줄·남은 20건 → 320줄·더 보기 없음(합계·칩 수 그대로) · 칩을 바꾸면 그 칩 줄부터(토지 107)·전체로 돌아오면 다시 150줄
+  const m5 = miss44.length, OB5 = [], KINDS5 = ['토지', '상가·업무', '공장·산업'];
+  for (let i = 0; i < 320; i++) { const d = new Date(Date.UTC(2026, 10, 12 + Math.floor(i / 8))); OB5.push(O044({ id: 'onbid-p' + i, kind: KINDS5[i % 3], region: '경상북도', title: '경상북도 물건 ' + i, org: '압류재산 · 유찰' + (i % 4) + '회', appr: 1000000000, budget: i % 3 === 0 ? 400000000 : 700000000, due: d.toISOString().slice(0, 10), url: 'https://onbid.example/p' + i })); }
+  const X5 = mk44({ obs: OB5 }); X5.api.render(); const s5 = [];
+  const drawn5 = (h) => (h.match(/data-vs-row="/g) || []).length, moreT5 = (h) => ((/<tr class="vs-more">[\s\S]*?<\/tr>/.exec(h) || [''])[0]).replace(/<[^>]+>/g, '');
+  s5.push(drawn5(X5.host._h), moreT5(X5.host._h), cnt44(X5.host._h), chipN44(X5.host._h, 'st', ''), chipN44(X5.host._h, 'kd', '토지'), foot44(X5.host._h));
+  more44(X5); s5.push(drawn5(X5.host._h), moreT5(X5.host._h), foot44(X5.host._h), chipN44(X5.host._h, 'st', ''));
+  more44(X5); s5.push(drawn5(X5.host._h), X5.host._h.indexOf('data-vs-more') < 0, foot44(X5.host._h));
+  chip44(X5, 'kd', '토지'); s5.push(drawn5(X5.host._h)); chip44(X5, 'kd', ''); s5.push(drawn5(X5.host._h));
+  //   옛 [더보기](#obMoreBtn): 폰 옛 목록이 150건을 넘으면 보임 → 넓혀 표 갈래 = 숨김(부품 더 보기 줄이 대신)·150줄 → 다시 폰 = 옛 본문이 다시 보임
+  const X5b = mk44({ obs: OB5, width: 375 }); X5b.api.render(); s5.push(X5b.env.host('obMoreBtn').style.display); X5b.env.width = 1366; X5b.env.breakAll(); s5.push(X5b.env.host('obMoreBtn').style.display, drawn5(X5b.host._h)); X5b.env.width = 375; X5b.env.breakAll(); s5.push(X5b.env.host('obMoreBtn').style.display);
+  T('v444 ⑤ 150줄 + 더 보기(실행 — 320건): 처음 150줄·"150건 더 보기 · 남은 170건" · "보이는 320건 / 전체 320건"·전체 칩 320·토지 칩 107 · 합계 줄 "합계 320건 · 50% 미만 107|…|3일 내 24" = 전체 기준 → 더 보기 300줄·남은 20건·합계·칩 수 그대로 → 320줄·더 보기 없음 · 칩을 바꾸면 그 칩 줄부터(토지 107)·전체로 돌아오면 다시 150줄 · 옛 [더보기] = 폰 옛 목록(320건)에서 보임 → 표 갈래 숨김·150줄 → 다시 폰 보임',
+    JSON.stringify(s5) === JSON.stringify([150, '150건 더 보기남은 170건', '보이는 320건 / 전체 320건', 320, 107, '합계 320건 · 50% 미만 107|||||||3일 내 24||', 300, '150건 더 보기남은 20건', '합계 320건 · 50% 미만 107|||||||3일 내 24||', 320, 320, true, '합계 320건 · 50% 미만 107|||||||3일 내 24||', 107, 150, '', 'none', 150, '']) && noMiss44(m5),
+    JSON.stringify({ s5, miss: miss44.slice(m5) }));
+
+  // ⑥ 정렬·거르기: 기본 마감 ▲(마감 없는 o8은 방향과 상관없이 뒤) · 마감 ▼ · 유찰 ▲(유찰 없음 0이 숫자로 맨 앞) · 최저/감정 ▲(비율 없음 뒤) · 시도 ▲(가나다) · 상태 ▲(신규 → 검토 → 참여) ·
+  //   시도 고르기 '경북' = o1 · 재산구분 고르기 '압류재산' = o2·o8 · 물건 칸 글자 거르기 '경상북도'(원장 시도로도)·'경북 포항'(표시 글) = o1
+  const m6 = miss44.length, X6 = mk44(); X6.api.render(); const s6 = [order44(X6.host._h), /data-vs-sort="due"[^>]*>마감<span class="vs-ar">▲<\/span>/.test(X6.host._h)];
+  sortBy44(X6, 'due'); s6.push(order44(X6.host._h)); sortBy44(X6, 'fail'); s6.push(order44(X6.host._h)); sortBy44(X6, 'ratio'); s6.push(order44(X6.host._h)); sortBy44(X6, 'sido'); s6.push(order44(X6.host._h)); sortBy44(X6, 'st'); s6.push(order44(X6.host._h));
+  sortBy44(X6, 'due'); if (/data-vs-sort="due"[^>]*>마감<span class="vs-ar">▲/.test(X6.host._h) === false) sortBy44(X6, 'due');   // 마감 ▲로 돌려 둠
+  const sel6 = (k, v) => { const f = X6.host.querySelector('[data-vf="' + k + '"]'); if (!f) { miss44.push('거르기 없음 ' + k); return; } f.value = v; f.fire('change'); };
+  sel6('sido', '경북'); s6.push(order44(X6.host._h)); sel6('sido', ''); sel6('prop', '압류재산'); s6.push(order44(X6.host._h)); sel6('prop', '');
+  const tf6 = (v) => { const f = X6.host.querySelector('[data-vf="title"]'); if (!f) { miss44.push('글자 거르기 없음'); return; } f.value = v; (f.L.input || []).slice().forEach((g) => g({ target: f, isComposing: false })); X6.env.tick(150); };
+  tf6('경상북도'); s6.push(order44(X6.host._h)); tf6('경북 포항'); s6.push(order44(X6.host._h)); tf6('');
+  T('v444 ⑥ 정렬·거르기(실행): 기본 마감 ▲ = o4(11-09)·o3·o1·o9·o2·o8(마감 없음 뒤) · 마감 ▼ = o2·o9·o1·o3·o4·o8(마감 없음은 ▼에서도 뒤) · 유찰 ▲ = o2(0 — 유찰 없음도 숫자)·o3(1)·o8(2)·o1(3)·o9(5)·o4(12) · 최저/감정 ▲ = o1(34.3)·o9(40)·o4(50)·o8(70)·o3(90)·o2(100) · 시도 ▲ 가나다(경기·경북·서울·세종틍별자치시·제주시·충남) · 상태 ▲ 신규(원래 순서 o1·o2·o8·o9) → 검토 → 참여 · 시도 고르기 경북 = o1 · 재산구분 압류재산 = o2·o8 · 물건 글자 거르기 "경상북도"(원장 시도)·"경북 포항"(표시 글) = o1',
+    JSON.stringify(s6) === JSON.stringify(['o4,o3,o1,o9,o2,o8', true, 'o2,o9,o1,o3,o4,o8', 'o2,o3,o8,o1,o9,o4', 'o1,o9,o4,o8,o3,o2', 'o9,o1,o2,o4,o8,o3', 'o1,o2,o8,o9,o3,o4', 'o1', 'o2,o8', 'o1', 'o1']) && noMiss44(m6),
+    JSON.stringify({ s6, miss: miss44.slice(m6) }));
+
+  // ⑦ 펼침(명세 '주소 전문 머리 → [검토]·[참여]·[패스]·[원문↗] → 키·값 11칸(하위 탭 없음)'): 머리 = 주소 전문(굵게)·상태 칩·용도·D-day·'재산구분 · 유찰 n회 · 마감 날짜'·[닫기 ▲] ·
+  //   버튼 = 지금 상태 빼고 [검토][참여](초록)[패스] + [원문↗](url 있을 때) · 키·값 11칸 차례(용도·시도(원장 + 줄임말)·재산구분·유찰·감정가·최저입찰가·최저/감정·입찰방식·입찰 마감·물건관리번호·수집일 — 빈 값 '-') · 하위 탭 없음 ·
+  //   검토 = [참여][패스][원문↗] · 참여·url 없음 = [검토][패스]만 · 화면 permOf 'bid'가 수행이어도 비관리자 그리기(부품 직접)는 상태 버튼 없음·[원문↗]만 · 비관리자 입구(renderOnbid) = 칸 숨김·표 그리지 않음
+  const m7 = miss44.length, X7 = mk44(); X7.api.render(); const s7 = [];
+  openRow44(X7, 'o1'); const d7 = det44(X7.host._h);
+  s7.push(/^<div class="vs-dh"><b>경상북도 포항시 남구 가동 1-1<\/b><span class="review-chip">신규<\/span><span class="own-badge lease">토지<\/span><span class="dday amber">D-1<\/span><span class="vs-dsub">기타일반재산 · 유찰 3회 · 마감 2026-11-12<\/span><button type="button" class="vs-chip" data-vs-close="1"/.test(d7), acts44(d7), kv44(d7).join('|'), d7.indexOf('vs-stab') < 0);
+  openRow44(X7, 'o3'); s7.push(acts44(det44(X7.host._h)), kv44(det44(X7.host._h)).length);
+  openRow44(X7, 'o4'); s7.push(acts44(det44(X7.host._h)), kv44(det44(X7.host._h)).slice(4, 7).join('|'));
+  chip44(X7, 'st', 'expired'); openRow44(X7, 'o7'); s7.push(kv44(det44(X7.host._h)).filter((x) => /^(재산구분|유찰|감정가|최저\/감정)=/.test(x)).join('|')); chip44(X7, 'st', '');
+  const X7n = mk44({ user: U44.N }); X7n.api.vs(X7n.api.def()); openRow44(X7n, 'o1'); s7.push(acts44(det44(X7n.host._h)));
+  const X7r = mk44({ user: U44.N }); X7r.api.render(); s7.push(X7r.env.host('onbidSection').style.display, X7r.host._h.indexOf('data-vs-row') < 0, X7r.host.getAttribute('data-vs-mode'));
+  T('v444 ⑦ 펼침(실행): 머리 = 주소 전문·신규 칩·용도 토지·D-1·"기타일반재산 · 유찰 3회 · 마감 2026-11-12"·[닫기 ▲] · 버튼 신규 = [검토][참여](초록)[패스][원문↗] · 키·값 11칸 = 용도·시도(경상북도 (경북))·재산구분·유찰·감정가·최저입찰가·최저/감정·입찰방식·입찰 마감·물건관리번호·수집일 · 하위 탭 없음 · 검토 = [참여](초록)[패스][원문↗]·11칸 · 참여·url 없음 = [검토][패스]만·감정가·최저입찰가·최저/감정 · 지남 검토(org·감정가 없음) = "-"·유찰 없음 · 비관리자(화면 permOf bid 수행) 그리기 = 상태 버튼 없음·[원문↗]만 · 비관리자 입구 = 칸 숨김·표 없음',
+    JSON.stringify(s7) === JSON.stringify([true, 'mini-btn:검토,mini-btn appr-btn:참여,mini-btn:패스,mini-btn:원문↗',
+      '용도=토지|시도=경상북도 <span style="color:#888;">(경북)</span>|재산구분=기타일반재산|유찰=3회|감정가=1,000,000,000원|최저입찰가=343,000,000원|최저/감정=34.3%|입찰방식=일반경쟁·최고가방식|입찰 마감=2026-11-12|물건관리번호=o1|수집일=2026-11-03', true,
+      'mini-btn appr-btn:참여,mini-btn:패스,mini-btn:원문↗', 11, 'mini-btn:검토,mini-btn:패스', '감정가=2,000,000,000원|최저입찰가=999,900,000원|최저/감정=50%',
+      '재산구분=<span style="color:#9AA09C;">-</span>|유찰=없음|감정가=<span style="color:#9AA09C;">-</span>|최저/감정=<span style="color:#9AA09C;">-</span>', 'mini-btn:원문↗', 'none', true, null]) && noMiss44(m7),
+    JSON.stringify({ s7, miss: miss44.slice(m7) }));
+
+  // ⑧ 상태 버튼(펼침 맨 위·관리자만) 누름 길 — 실제 setObStatus(관리자 검사·저장 예약·다시 그림): o2 [검토] = 검토·저장 예약(1.2초 뒤 PUT 1 — 9건 그대로)·같은 줄 펼친 채·버튼 [참여][패스][원문↗] ·
+  //   바로(0ms)·499ms 뒤 같은 자리 [참여] = 버림 · 더블클릭 둘째 누름 버림 · 0.6초 뒤 = 참여 · 흉내: 지금 상태 그대로('참여') = 아무것도 안 함 · 바꿀 수 없는 값('낙찰') = 그대로 · 지운 물건 = 그대로 · 없는 물건 = 그대로 ·
+  //   비관리자(화면 permOf bid 수행)의 흉내 = 그대로·저장 0(누름 길 canDo는 지나도 setObStatus 관리자 검사가 막음 — 둘 다 있어야 함은 ⑭ 정적) · 상태 머리로 정렬한 채 바꾸면 자리를 옮긴 줄로 굴림 · 기본 마감 정렬은 굴리지 않음
+  const m8 = miss44.length, X8 = mk44({ fetchQ: [{ status: 200, body: { content: { sha: 'gw' } } }] }); X8.api.render(); const s8 = [];
+  openRow44(X8, 'o2'); const L8 = X8.env.log.length; press44(X8, 'data-ob-v', '검토');
+  s8.push(stOf44(X8, 'o2'), !!X8.api.timer(), X8.api.pending(), X8.host._h.indexOf('data-vs-det="onbid-o2"') > 0, acts44(det44(X8.host._h)), X8.env.log.slice(L8).filter((l) => /^into:/.test(l)).length);
+  press44(X8, 'data-ob-v', '참여'); s8.push(stOf44(X8, 'o2')); X8.env.now += 499; press44(X8, 'data-ob-v', '참여'); s8.push(stOf44(X8, 'o2'));
+  X8.env.now += 101; press44(X8, 'data-ob-v', '참여', { detail: 2 }); s8.push(stOf44(X8, 'o2'));
+  X8.env.now += 600; press44(X8, 'data-ob-v', '참여'); s8.push(stOf44(X8, 'o2'));
+  const n8 = X8.host._n, tm8 = X8.api.timer(); X8.env.now += 600; fake44(X8, 'o2', '참여'); s8.push(X8.host._n === n8 && X8.api.timer() === tm8);   // 지금 상태 그대로 = setObStatus를 부르지 않음(다시 그림·저장 예약 그대로)
+  X8.env.now += 600; fake44(X8, 'o2', '낙찰'); s8.push(stOf44(X8, 'o2'));
+  X8.env.now += 600; fake44(X8, 'o10', '검토'); s8.push(stOf44(X8, 'o10')); X8.env.now += 600; fake44(X8, 'o99', '검토'); s8.push(X8.api.obs().length);
+  X8.env.tick(1200); await flush44(); s8.push(X8.env.fetchLog.join(','));
+  const X8n = mk44({ user: U44.N }); X8n.api.vs(X8n.api.def()); openRow44(X8n, 'o1'); fake44(X8n, 'o1', '검토'); X8n.env.tick(1300); s8.push(stOf44(X8n, 'o1'), !!X8n.api.timer(), X8n.env.fetchLog.length);
+  const X8s = mk44(); X8s.api.render(); sortBy44(X8s, 'st'); openRow44(X8s, 'o1'); const L8s = X8s.env.log.length; press44(X8s, 'data-ob-v', '참여'); s8.push(stOf44(X8s, 'o1'), X8s.env.log.slice(L8s).filter((l) => /^into:/.test(l)).join(','), X8s.host._h.indexOf('data-vs-det="onbid-o1"') > 0);
+  T('v444 ⑧ 상태 버튼(실행 — 실제 setObStatus): o2 [검토] = 검토·저장 예약·펼친 채·[참여][패스][원문↗]·굴림 0(기본 마감 정렬) · 같은 자리 [참여] 바로·499ms·더블클릭 둘째 = 버림 · 0.6초 뒤 = 참여 · 흉내 지금 상태 그대로 = 다시 그림·저장 예약 그대로 · "낙찰" = 그대로 · 지운 물건(신규 그대로)·없는 물건 = 그대로 · 1.2초 뒤 PUT 1(9건 + 지운 1 = 10건 그대로) · 비관리자(화면 permOf bid 수행) 흉내 = 그대로·저장 0 · 상태 머리 정렬 중 [참여] = 자리를 옮긴 줄로 굴림·펼친 채',
+    JSON.stringify(s8) === JSON.stringify(['검토', true, true, true, 'mini-btn appr-btn:참여,mini-btn:패스,mini-btn:원문↗', 0, '검토', '검토', '검토', '참여', true, '참여', 'new', 10, 'PUT@ob:10', 'new', false, 0, '참여', 'into:onbid-o1', true]) && noMiss44(m8),
+    JSON.stringify({ s8, miss: miss44.slice(m8) }));
+
+  // ⑨ 폰 legacy(859px 이하 — PM 11/10 '폰은 지금 디자인 그대로'): 옛 본문 renderOnbidLegacy = v443 renderOnbid 본문 글자째(sha256) · 그대로 두는 함수 9개(setObStatus·loadOnbid·scheduleOnbidSave·doSaveOnbid·obExpired·liveObs·findOb·setBidLayer·mergeBidsLocal) 무변(해시) ·
+  //   375 실행 = 옛 카드 6장·표 글 0·옛 칩 줄 보임(HTML 인라인 display 그대로)·머리 '총 9 · 표시 6/6'(옛 셈)·검색칸 안내 옛 글·자리 legacy → 1366(경계 넘김) = 표·옛 칩 줄 숨김·[더보기] 숨김·검색칸 안내 표 글·머리 '총 9 · 표시 6/6'(v444 검토 — 옛 본문과 같은 식, 그린 뒤 onPaint) →
+  //   검색칸에 '포항'이 있는 채 다시 375 = 옛 검색어(obSearchTerm)를 칸 글로 맞춰 그 카드만(o1) · 옛 칩 줄 다시 flex
+  const LEG_SHA44 = 'd45120dd7f6a70e20d795dc6f1c1b6beab7d5a83a13b0e24c10109156d47788a';
+  const KEEP44 = { setObStatus: '79168b6660b9598b', loadOnbid: '16871a60c10cbe26', scheduleOnbidSave: '66cca6b7fa0614de', doSaveOnbid: '167747227433dac3', obExpired: '5bebe392d73fa422', liveObs: '283968a60a2a2fdc', findOb: 'ba94045a8e6b99ef', setBidLayer: '2866e6652936072a', mergeBidsLocal: 'b381a770ab833b3e' };
+  const keepBad9 = Object.keys(KEEP44).filter((n) => sha44(body44(n)).slice(0, 16) !== KEEP44[n]);
+  const X9 = mk44({ width: 375 }); X9.api.render(); const g9 = (id) => X9.env.host(id);
+  const p9 = [(X9.host._h.match(/<div class="item"/g) || []).length, X9.host._h.indexOf('data-vs-row') < 0, g9('obFilterBar').style.display, /data-ob-st-f="all">전체 6<\/button>/.test(g9('obFilterBar').innerHTML), g9('obHead').textContent, g9('obSearch').placeholder, X9.host.getAttribute('data-vs-mode')];
+  X9.env.width = 1366; X9.env.breakAll(); p9.push(order44(X9.host._h), X9.host._h.indexOf('<div class="item"') < 0, g9('obFilterBar').style.display, g9('obMoreBtn').style.display, g9('obSearch').placeholder === X9.api.qSheet, g9('obHead').textContent);
+  g9('obSearch').value = '포항'; X9.env.width = 375; X9.env.breakAll(); p9.push(X9.api.term(), (X9.host._h.match(/<div class="item"/g) || []).length, X9.host._h.indexOf('경상북도 포항시') > 0, X9.host._h.indexOf('data-vs-row') < 0, g9('obFilterBar').style.display, g9('obSearch').placeholder);
+  T('v444 ⑨ 폰 legacy(375): 옛 본문 renderOnbidLegacy = v443 renderOnbid 본문 글자째(sha256 ' + LEG_SHA44.slice(0, 12) + '…) · 그대로 두는 함수 9개 무변(해시 — 상태 바꾸기·읽기·저장 예약·저장(409 병합)·지남 규칙·행 원천·찾기·칸 전환·병합) · 실행 = 옛 카드 6장·표 글 0·옛 칩 줄 보임(HTML 인라인 display ' + FB44 + ' — 빈 값이면 칩이 붙음)·옛 셈 "전체 6"·머리 "총 9 · 표시 6/6"·검색칸 안내 옛 글·자리 legacy → 1366 = 표(마감 ▲)·카드 0·옛 칩 줄·[더보기] 숨김·검색칸 안내 표 글·머리 "총 9 · 표시 6/6"(v444 검토 — 옛 본문과 같은 식) → 칸에 "포항"이 있는 채 375 = 옛 검색어 맞춤·카드 o1 하나·표 글 0·옛 칩 줄 다시 ' + FB44 + '·안내 옛 글',
+    keepBad9.length === 0 && sha44(body44('renderOnbidLegacy')) === LEG_SHA44 && FB44 === 'flex' && QL44 === X9.api.qLeg
+    && JSON.stringify(p9) === JSON.stringify([6, true, FB44, true, '총 9 · 표시 6/6', QL44, 'legacy', 'o4,o3,o1,o9,o2,o8', true, 'none', 'none', true, '총 9 · 표시 6/6', '포항', 1, true, true, FB44, QL44]),
+    JSON.stringify({ keepBad9, leg: sha44(body44('renderOnbidLegacy')).slice(0, 12), FB44, p9 }));
+
+  // ⑩ 검색칸 = 탭의 #obSearch(부품 옵션 search.el — 명세 kept '#obSearch'): 표 위에 검색칸을 새로 그리지 않음 · 그 칸에 부품 배선 한 번(입력·조합 시작·끝 — 다시 그려도 1) · 글을 치면 150ms 뒤 거름(149ms엔 그대로) ·
+  //   검색 글 = 표시 글(시도 줄임말 + 주소)·주소 전문·원장 시도·재산구분·용도·물건관리번호: '경북' = o1(원장 경상북도) · '경상북도' = o1 · '경북 포항' = o1 · '압류' = o2·o8 · '공장·산업' = o3·o8 · 물건관리번호 'o9' = o9 ·
+  //   한글 조합 중 입력은 조합이 끝난 뒤 150ms · [필터 초기화] = 칸 글도 지움 · 보는 사람이 바뀌면 칸 글 지움 · 폰 갈래에서 친 글은 넓혀 표를 처음 그릴 때 검색어로 받음 · 폰 갈래 입력은 표를 그리지 않음(검색어만) · 기기 저장 없음
+  const m10 = miss44.length, X10 = mk44(); X10.api.render(); const q10 = X10.env.host('obSearch'), s10 = [X10.host._h.indexOf('data-vs-q') < 0 && X10.host._h.indexOf('class="vs-q"') < 0, (q10.L.input || []).length, (q10.L.compositionstart || []).length, (q10.L.compositionend || []).length];
+  X10.api.render(); s10.push((q10.L.input || []).length);
+  X10.env.type('경북'); X10.env.tick(149); s10.push(order44(X10.host._h)); X10.env.tick(1); s10.push(order44(X10.host._h));
+  [['경상북도'], ['경북 포항'], ['압류'], ['공장·산업'], ['o9']].forEach((v) => { X10.env.type(v[0]); X10.env.tick(150); s10.push(order44(X10.host._h)); });
+  X10.env.type('가'); X10.env.comp('compositionstart'); X10.env.type('서', true); X10.env.tick(300); s10.push(order44(X10.host._h)); X10.env.type('서울', true); X10.env.comp('compositionend'); X10.env.tick(150); s10.push(order44(X10.host._h));
+  const rs10 = X10.host.querySelector('[data-vs-reset]'); if (rs10) rs10.fire('click'); s10.push(q10.value, order44(X10.host._h));
+  X10.env.type('아산'); X10.env.tick(150); s10.push(order44(X10.host._h)); X10.env.user = U44.B; X10.api.render(); s10.push(q10.value, order44(X10.host._h), JSON.parse(X10.env.store.jw_ob_sheet || '{}').q === undefined);
+  const X10p = mk44({ width: 375 }); X10p.api.render(); X10p.env.host('obSearch').value = '서울'; X10p.env.width = 1366; X10p.env.breakAll(); s10.push(X10p.env.host('obSearch').value, order44(X10p.host._h));
+  X10p.env.width = 375; X10p.env.breakAll(); const n10p = X10p.host._n; X10p.env.type('포항'); X10p.env.tick(150); s10.push(X10p.host._h.indexOf('data-vs-row') < 0 && X10p.host._n === n10p, X10p.api.inst(X10p.api.def()).q);
+  T('v444 ⑩ 검색칸 #obSearch(실행 — 부품 search.el): 표 위 검색칸 0 · 그 칸에 배선 한 번(입력 1·조합 시작 1·끝 1 — 다시 그려도 1) · "경북" 149ms = 그대로 → 150ms = o1(원장 경상북도) · "경상북도" = o1 · "경북 포항" = o1(표시 글) · "압류" = o2·o8(재산구분) · "공장·산업" = o3·o8(용도) · "o9" = o9(물건관리번호) · "가"를 치고 바로 조합 시작 → 조합 중 300ms = 그대로(o9 — 조합 시작이 "가"의 150ms를 지움) → 조합 끝 "서울" 150ms = o2 · [필터 초기화] = 칸 글 빔·6줄 · "아산" = o3(주소 전문 충청남도 아산시 — 아산 o5는 패스라 전체 밖) · 보는 사람이 바뀌면 칸 글 빔·6줄 · 검색어 기기 저장 없음 · 폰 갈래에서 친 "서울"은 넓힌 첫 표에서 검색어(o2) · 폰 갈래 입력 = 자리를 다시 그리지 않음·검색어만 받아 둠',
+    JSON.stringify(s10) === JSON.stringify([true, 1, 1, 1, 1, 'o4,o3,o1,o9,o2,o8', 'o1', 'o1', 'o1', 'o2,o8', 'o3,o8', 'o9', 'o9', 'o2', '', 'o4,o3,o1,o9,o2,o8', 'o3', '', 'o4,o3,o1,o9,o2,o8', true, '서울', 'o2', true, '포항']) && noMiss44(m10),
+    JSON.stringify({ s10, miss: miss44.slice(m10) }));
+
+  // ⑪ 머리·빈 화면 글: 표 갈래 머리 = '총 9 · 표시 6/6'(v444 검토 — 명세 kept '#obHead'·PM 시안 '총 3113 · 표시 150/1092' = 옛 본문과 같은 식, 같은 거르기의 옛 본문 머리와 글자째 같음 · 종전 '총 · 신규 · 지남') ·
+  //   지남 없는 원장 '총 7 · 표시 6/6' · 물건 0이면 빈 글 · 읽기 전(onbidSha 없음) 빈 원장 = '물건을 불러오는 중입니다 — 계속 비어 있으면 새로고침해 주세요.'(없음 글 아님) ·
+  //   읽은 빈 원장 = '수집된 물건이 없습니다. (아침 자동 수집)' · 폰 옛 본문 빈 글은 옛 글 그대로 · '전체' 칩 title = 규칙 그대로(OB_ALL_T) · 지남 칩 title
+  const s11 = [];
+  const X11 = mk44(); X11.api.render(); const X11L = mk44(); X11L.api.setFilter('all', 'all'); X11L.api.setShow(150); X11L.api.legacy(); s11.push(X11.env.host('obHead').textContent, X11L.env.host('obHead').textContent);
+  const X11b = mk44({ obs: OBS44().filter((b) => !/o[67]$/.test(b.id)) }); X11b.api.render(); s11.push(X11b.env.host('obHead').textContent);
+  const X11u = mk44({ obs: [], sha: null }); X11u.api.render(); s11.push(X11u.host._h.indexOf('<div class="empty-line">물건을 불러오는 중입니다 — 계속 비어 있으면 새로고침해 주세요.</div>') >= 0, X11u.host._h.indexOf('수집된 물건이 없습니다') < 0, X11u.env.host('obHead').textContent);
+  const X11e = mk44({ obs: [], sha: 'gw' }); X11e.api.render(); s11.push(X11e.host._h.indexOf('<div class="empty-line">수집된 물건이 없습니다. (아침 자동 수집)</div>') >= 0);
+  const X11p = mk44({ obs: [], sha: null, width: 375 }); X11p.api.render(); s11.push(X11p.host._h.indexOf('<div class="empty-line">수집된 물건이 없습니다. (아침 자동 수집)</div>') >= 0);
+  const tip11 = (k) => unesc44((new RegExp('data-vs-chip="st\\|' + k + '"[^>]*title="([^"]*)"').exec(X11.host._h) || ['', ''])[1]);
+  s11.push(tip11('') === X11.api.allTip && /^지남\(마감 지난 신규·검토\)·패스를 뺀 물건/.test(tip11('')), tip11('expired'));
+  T('v444 ⑪ 머리·빈 화면 글(실행): 표 갈래 머리 "총 9 · 표시 6/6"(v444 검토 — 옛 본문과 같은 식·같은 거르기의 옛 본문 머리와 글자째 같음 — 명세 kept·PM 시안) · 지남 없는 원장 "총 7 · 표시 6/6" · 읽기 전 빈 원장 = "물건을 불러오는 중입니다 — 계속 비어 있으면 새로고침해 주세요."(없음 글 0·머리 빈 글) · 읽은 빈 원장 = "수집된 물건이 없습니다. (아침 자동 수집)" · 폰 옛 본문은 옛 빈 글 그대로 · "전체" 칩 title = 규칙(지남·패스를 뺀 물건 — 마감 없는 물건·결과 기다리는 참여는 들어감) · 지남 칩 title',
+    JSON.stringify(s11) === JSON.stringify(['총 9 · 표시 6/6', '총 9 · 표시 6/6', '총 7 · 표시 6/6', true, true, '', true, true, true, '마감이 지났는데 아직 판단 전(신규·검토)인 물건 — 다른 칩에서는 모두 빠집니다']),
+    JSON.stringify({ s11 }));
+
+  // ⑫ 못 읽은 부동산(앱을 켠 직후 읽는 중·읽기 실패 — 빈 배열) — 저장이 서버 부동산 문서를 덮지 않는다(이미 막혀 있음 — 확인만, v443 bidsLoaded 같은 막음은 더하지 않음):
+  //   저장 예약은 setObStatus 한 곳뿐이고 setObStatus는 원장에서 찾은 물건만 바꾼다 → 빈 원장에서 상태 누름(흉내·직접) = 저장 예약 0·요청 0 · 읽은 뒤 바꾸고 1.2초 안에 로그아웃(토큰 없음·원장 비움) = PUT 0 ·
+  //   409(남이 먼저 저장)면 다시 읽어 합친(mergeBidsLocal — 로컬 우선 합집합) 원장을 다시 보냄(사람이 바꾼 상태가 남음) · 정적: scheduleOnbidSave 부르는 곳 = setObStatus 하나 · doSaveOnbid 부르는 곳 = 예약 타이머·409 다시 보내기 둘 · 로그아웃 clearSessionData가 onbids를 비움
+  const X12 = mk44({ obs: [], sha: null }); X12.api.render(); X12.api.setStatus('onbid-o1', '검토'); X12.api.act('st', 'onbid-o1', '검토'); X12.env.tick(1300); await flush44();
+  const s12 = [X12.api.obs().length, !!X12.api.timer(), X12.api.pending(), X12.env.fetchLog.length];
+  const X12b = mk44(); X12b.api.render(); X12b.api.setStatus('onbid-o2', '검토'); X12b.env.noTok = true; X12b.api.setObs([]); X12b.env.tick(1300); await flush44(); s12.push(X12b.env.fetchLog.join(',') === '', X12b.api.pending());
+  const remote12 = OBS44().map((b) => (b.id === 'onbid-o9' ? Object.assign({}, b, { status: '패스', updated: '2026-11-10' }) : b)).concat([O044({ id: 'onbid-o11', title: '서울특별시 새 물건', region: '서울특별시', due: '2026-11-28' })]);
+  const X12c = mk44({ fetchQ: [{ status: 409 }, { status: 200, body: { sha: 'gw', content: b64e44(JSON.stringify({ schema: 1, items: remote12 })) } }, { status: 200, body: { content: { sha: 'gw' } } }] }); X12c.api.render();
+  X12c.api.setStatus('onbid-o2', '참여'); X12c.env.tick(1300); await flush44(); await flush44(); await flush44(); await flush44();
+  s12.push(X12c.env.fetchLog.join(','), stOf44(X12c, 'o2'), stOf44(X12c, 'o9'), X12c.api.obs().length);
+  const st12 = (html.match(/scheduleOnbidSave\(/g) || []).length === 2 && /scheduleOnbidSave\(\); renderOnbid\(\);/.test(fn44(html, 'setObStatus')) && /var b=findOb\(id\); if\(!b\) return;/.test(fn44(html, 'setObStatus')) && /if\(!isAdmin\(\)\) return;/.test(fn44(html, 'setObStatus'))
+    && (html.match(/\bdoSaveOnbid\b/g) || []).length === 3 && /setTimeout\(doSaveOnbid,1200\)/.test(fn44(html, 'scheduleOnbidSave')) && /onbidSha=j\.sha;\} return doSaveOnbid\(\);/.test(fn44(html, 'doSaveOnbid'))
+    && /bids = \[\]; onbids = \[\];/.test(fn44(html, 'clearSessionData')) && /var token=getToken\(\); if\(!token\) return;/.test(fn44(html, 'doSaveOnbid'));
+  T('v444 ⑫ 못 읽은 부동산 — 저장이 서버 문서를 덮지 않음(실행 — 실제 setObStatus·scheduleOnbidSave·doSaveOnbid · 이미 막혀 있어 막음은 더하지 않음): 빈 원장에서 상태 누름(직접·누름 길) = 원장 0·저장 예약 0·요청 0 · 읽은 뒤 바꾸고 1.2초 안에 로그아웃(토큰 없음·원장 비움) = PUT 0 · 409 = 다시 읽기 → 합친 원장(내가 바꾼 참여 + 남이 바꾼 패스 + 새 물건 = 11건) 다시 보냄 · 정적: 저장 예약 = setObStatus 한 곳(찾은 물건만·관리자 검사) · doSaveOnbid = 예약 타이머·409 다시 보내기 · 토큰 없으면 안 보냄 · 로그아웃이 원장 비움',
+    JSON.stringify(s12) === JSON.stringify([0, false, false, 0, true, true, 'PUT@ob:10,GET@ob,PUT@ob:11', '참여', '패스', 11]) && st12,
+    JSON.stringify({ s12, st12 }));
+
+  // ⑬ 공고 칸 ↔ 부동산 칸(칸 칩 전환 — setBidLayer 실제 함수): 두 표의 칩·검색어·펼침이 섞이지 않음 — 공고 칸에서 '신규' 칩·검색 '석면'·b1 펼침 → 부동산 칸 = 기본 칩(전체·용도전체)·검색칸 빈 글·펼침 없음·6줄 →
+  //   부동산 칸에서 용도 '토지'·검색 '포항'·o1 펼침 → 공고 칸 = '신규' 칩·검색칸 '석면'·b1 펼침·b1만(부동산 검색어 '포항'이 새면 b3만) → 다시 부동산 칸 = 토지·'포항'·o1 펼침 · 기기 기억 jw_bid_sheet(칩 신규)·jw_ob_sheet(용도 토지)가 따로 ·
+  //   두 표 검색어 메모리 따로(공고 '석면' · 부동산 '포항') · 자리(bidList·obList)에 건 리스너 0
+  const m13 = miss44.length, X13 = mk44({ bids: BIDS44() }); const bl13 = X13.env.host('bidList'), s13 = [];
+  const bchip13 = (k) => { const el = bl13.querySelector('[data-vs-chip="st|' + k + '"]'); if (!el) { miss44.push('공고 칩 없음 ' + k); return; } el.fire('click'); };
+  X13.api.layer('list'); bchip13('new'); X13.env.type('석면', false, 'bidSearch'); X13.env.tick(150); const brow13 = bl13.querySelector('[data-vs-row="b1"]'); if (brow13) brow13.fire('click', { target: brow13 }); else miss44.push('공고 행 없음 b1');
+  s13.push(order44(bl13._h), bl13._h.indexOf('data-vs-det="b1"') > 0);
+  X13.api.layer('onbid'); s13.push(X13.env.host('bidLayerOnbid').style.display, X13.env.host('bidLayerList').style.display, chipOn44(X13.host._h, 'st'), chipOn44(X13.host._h, 'kd'), X13.env.host('obSearch').value, X13.host._h.indexOf('data-vs-det=') < 0, order44(X13.host._h));
+  chip44(X13, 'kd', '토지'); X13.env.type('포항'); X13.env.tick(150); openRow44(X13, 'o1'); s13.push(order44(X13.host._h), X13.host._h.indexOf('data-vs-det="onbid-o1"') > 0);
+  X13.api.layer('list'); s13.push(chipOn44(bl13._h, 'st'), X13.env.host('bidSearch').value, bl13._h.indexOf('data-vs-det="b1"') > 0, order44(bl13._h));
+  X13.api.layer('onbid'); s13.push(chipOn44(X13.host._h, 'kd'), X13.env.host('obSearch').value, X13.host._h.indexOf('data-vs-det="onbid-o1"') > 0, order44(X13.host._h));
+  s13.push(JSON.parse(X13.env.store.jw_bid_sheet || '{}').chip.st, JSON.stringify(JSON.parse(X13.env.store.jw_ob_sheet || '{}').chip), X13.api.inst(X13.api.bidDef()).q, X13.api.inst(X13.api.def()).q);
+  const hostL13 = X13.env.log.some((l) => /^host-listener:(bidList|obList):/.test(l));
+  T('v444 ⑬ 공고 칸 ↔ 부동산 칸(실행 — setBidLayer): 공고 신규 칩·"석면"·b1 펼침 → 부동산 칸 보임·공고 칸 숨김 = 기본 칩 둘(전체·용도전체)·검색칸 빈 글·펼침 없음·6줄 → 부동산 토지·"포항"·o1 펼침 = o1 → 공고 칸 = 신규 칩·검색칸 "석면"·b1 펼침·b1만(부동산 검색어가 새지 않음 — 새면 b3) → 부동산 칸 = 토지·"포항"·o1 펼침 · 기기 기억 jw_bid_sheet {st:신규}·jw_ob_sheet {kd:토지} 따로 · 검색어 메모리 따로 · 자리 리스너 0',
+    JSON.stringify(s13) === JSON.stringify(['b1', true, '', 'none', '', '', '', true, 'o4,o3,o1,o9,o2,o8', 'o1', true, 'new', '석면', true, 'b1', '토지', '포항', true, 'o1', 'new', '{"kd":"토지"}', '석면', '포항']) && !hostL13 && noMiss44(m13),
+    JSON.stringify({ s13, hostL13, miss: miss44.slice(m13) }));
+
+  // ⑭ 넓힘·CSS·정적: #view-bid 본문 폭 그대로(1024 791 · 1366 1,097 · 1920 1,428 ±2 — v443) · 상태 칸 칩 scope·from 여백 4px(#obList 표만 — 공고 표 규칙·공용 규칙 무변) · ↗ 칸은 공고 표 .bid-go 그대로(여백 0) ·
+  //   @ob-sheet 배선 = 펼침 칸 root 하나(자리에 걸지 않음) · 부품 부름 = 그리기 1(입구 renderOnbid) · 다시 그리기·찾아가기·그 행 열기 0(다른 화면에서 오는 길 없음) · 구간 안 localStorage 0 · 입구 renderOnbid 한 곳(구간 안)·옛 본문은 구간 밖 ·
+  //   누름 길 = canDo("bid") + setObStatus(isAdmin) 둘 다 · 탭 옛 검색 배선은 폰 갈래에서만 바로 그림·[더보기] 배선 그대로 · HTML 부동산 칸(머리·안내·칩 줄·검색칸·자리·더보기) 그대로 · 모든 시험 틀에서 자리(obList)에 건 리스너 0
+  const w14 = [1024, 1366, 1920].map((w) => Math.round(viewW44(w)));
+  const css14 = decl44(1366, '#obList .vs.vs-fit tr.vs-r td .scope-chip', 'padding') === '1px 4px' && decl44(1366, '#obList .vs.vs-fit tr.vs-r td .from-chip', 'padding') === '1px 4px' && decl44(1366, '#bidList .vs.vs-fit tr.vs-r td .scope-chip', 'padding') === '1px 4px'
+    && decl44(1366, '.vs.vs-fit tr.vs-r td .scope-chip', 'padding') == null && decl44(1366, '.vs.vs-fit td.bid-go', 'padding') === '0' && decl44(1366, '#view-bid', 'max-width') === 'none';
+  const st14 = (osb44.match(/addEventListener\(/g) || []).length === 1 && (osb44.match(/root\.addEventListener\("click"/g) || []).length === 1
+    && (osb44.match(/\bvsSheetRender\(/g) || []).length === 1 && (osb44.match(/\bvsSheetRenderKeep\(|\bvsSheetSeek\(|\bvsSheetReveal\(/g) || []).length === 0 && !/localStorage/.test(osb44)
+    && (html.match(/function renderOnbid\(/g) || []).length === 1 && osb44.indexOf('function renderOnbid(') > 0 && osb44.indexOf('function renderOnbidLegacy(') < 0 && (html.match(/function renderOnbidLegacy\(/g) || []).length === 1
+    && /if \(!b \|\| b\.del === 1 \|\| !isAdmin\(\)\) return;/.test(fn44(osb44, 'obSheetAct')) && /setObStatus\(id, v\)/.test(fn44(osb44, 'obSheetAct')) && /if \(isAdmin\(\)\) OB_ST_BTNS\.forEach\(/.test(fn44(osb44, 'obSheetDetail')) && !/canDo\("bid"\)/.test(osb44.replace(/\/\/[^\n]*/g, ''))
+    && /document\.getElementById\("obSearch"\)\.addEventListener\("input", function\(\)\{ obSearchTerm=this\.value\.toLowerCase\(\)\.trim\(\); obShow=150; if\(obSheetCur!=="sheet"\) renderOnbid\(\); \}\);/.test(html)
+    && /document\.getElementById\("obMoreBtn"\)\.addEventListener\("click", function\(\)\{ obShow\+=150; renderOnbid\(\); \}\);/.test(html)
+    && /<div class="dash-sec" style="margin-bottom:8px;"><h2>부동산 \(온비드 공매\) <span class="cnt" id="obHead"><\/span><\/h2><\/div>\s*\n\s*<div style="font-size:12px;color:var\(--sub\);margin:-4px 0 8px;">전국 · 매각 · 감정가 5억~50억 · 토지\/공장·산업\/상가·업무\. 마감 임박순, 150건씩 표시\.<\/div>\s*\n\s*<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;" id="obFilterBar"><\/div>\s*\n\s*<input type="search" id="obSearch"[^>]*>\s*\n\s*<div class="card" id="obList"><div class="loading">불러오는 중…<\/div><\/div>\s*\n\s*<button class="link-btn" id="obMoreBtn" style="display:none;">더보기<\/button>/.test(html);
+  const hostL14 = [X1, X2, X3, X4, X4w, X4n, X5, X5b, X6, X7, X7n, X7r, X8, X8n, X8s, X9, X10, X10p, X11, X11b, X11u, X11e, X11p, X12, X12b, X12c, X13].some((X) => X.env.log.some((l) => /^host-listener:obList:/.test(l)));
+  T('v444 ⑭ 넓힘·CSS·정적: #view-bid 본문 폭 1024 ' + w14[0] + ' · 1366 ' + w14[1] + ' · 1920 ' + w14[2] + '(v443 그대로 ±2) · 상태 칩 scope·from 여백 4px(#obList — 공고 표 규칙·공용 규칙 무변) · ↗ .bid-go 여백 0 · @ob-sheet 배선 = 펼침 칸 root 하나 · 부품 부름 = 그리기 1·다시 그리기·찾아가기·그 행 열기 0 · 구간 안 localStorage 0 · 입구 renderOnbid 한 곳(구간 안)·옛 본문 구간 밖 · 상태 버튼 그리기·누름 길 = isAdmin(setObStatus와 같은 관리자 검사 — 화면 permOf canDo("bid") 0) 뒤 setObStatus · 탭 옛 검색 배선 = 폰 갈래에서만 바로 그림·[더보기] 배선 그대로 · HTML 부동산 칸(머리·안내·칩 줄·검색칸·자리·더보기) 그대로 · 자리(obList)에 건 리스너 0(모든 시험 틀)',
+    Math.abs(w14[0] - 791) <= 2 && Math.abs(w14[1] - 1097) <= 2 && Math.abs(w14[2] - 1428) <= 2 && css14 && st14 && !hostL14,
+    JSON.stringify({ w14, css14, st14, hostL14 }));
+
+  // ⑮ 폰 sheet 준비(phone 한 줄만 바꾸면 되게 — 퀴즈 2번 답 C063): 정의 검사 통과(①) · 열 3 = 물건 --pw 50%·최저가(폰) 24%('3.43억' — 억 소수 둘째 자리·1억 미만은 '만')·마감(폰) 26%('D-1' 노랑) · 합계 '합계 6건||3일 내 3' · 줄 누름 = 표 아래 상세 카드(표 안 펼침 없음)·상태 버튼
+  const m15 = miss44.length, X15 = mk44({ width: 375 }), d15 = Object.assign({}, X15.api.def(), { phone: 'sheet' }); X15.api.vs(d15);
+  const h15 = X15.host._h, cg15 = [...h15.matchAll(/<col data-vs-col="(\w+)" style="([^"]*)">/g)].map((m) => m[1] + '=' + m[2]).join(',');
+  const s15 = [cg15, ctxt44(h15, 'o1'), ctxt44(h15, 'o2'), cells44(h15, 'o1')[2][0], foot44(h15), [X15.api.eok(899000000), X15.api.eok(1234567890), X15.api.eok(50000000), X15.api.eok(0)].join(',')];
+  openRow44(X15, 'o3'); s15.push(X15.host._h.indexOf('data-vs-detcard="onbid-o3"') > 0, X15.host._h.indexOf('class="vs-det"') < 0, /data-ob-act="st"/.test(X15.host._h));
+  T('v444 ⑮ 폰 sheet 준비(실행 — phone:"sheet" 한 줄): 열 3 = 물건 --pw 50%·최저가(폰) 24%·마감(폰) 26% · o1 칸 "경북 포항시 남구 가동 1-1|3.43억|D-1" · o2 "6억" · 마감 칸 노랑 · 합계 "합계 6건||3일 내 3" · 억 글 8.99억·12.35억·5,000만·빈 글 · 줄 누름 = 표 아래 상세 카드(표 안 펼침 0)·상태 버튼',
+    JSON.stringify(s15) === JSON.stringify(['title=--pw:50%;,budget_ph=--pw:24%;,due_ph=--pw:26%;', '경북 포항시 남구 가동 1-1|3.43억|D-1', '서울 강남구 나동 2|6억|D-9', ' class="vs-ph vs-warn" title="2026-11-12"', '합계 6건||3일 내 3', '8.99억,12.35억,5,000만,', true, true, true]) && noMiss44(m15),
+    JSON.stringify({ s15, miss: miss44.slice(m15) }));
+
+  // ⑯ 서버 정리 정적(gw-data — 실행 검사는 servertest 82): 판정은 공고와 한 벌(bidsCutDate·bidPurgeable·purgeExpiredBids — 부동산용 판정 함수 0) · 기본 꺼짐(settings:onbid의 purge === true일 때만 — 읽기 실패·없음 = 끔) ·
+  //   정리 자리 셋(수집 ingest·저장 save·되살림 방지)이 같은 스위치 · 세기(onbid_purge — dry만·관리자) · 켜기·끄기(onbid_purge_set — 관리자) · 보관 일수 BIDS_KEEP_DAYS 14 한 곳
+  const gd16 = rd44('netlify/functions/gw-data.js');
+  const st16 = /const ONBID_SET_KEY = 'settings:onbid';/.test(gd16) && /return !!\(r\.ok && r\.data && r\.data\.purge === true\);/.test(fn44(gd16, 'onbidPurgeOn'))
+    && /const purgeOn = target === 'bids' \|\| \(target === 'onbid' && await onbidPurgeOn\(st\)\);/.test(fn44(gd16, 'handleBidsIngest')) && /const willPurge = purgeOn && /.test(fn44(gd16, 'handleBidsIngest')) && /if \(purgeOn\) \{/.test(fn44(gd16, 'handleBidsIngest')) && /const purged = purgeOn \? purgeExpiredBids\(doc, cut\) : 0;/.test(fn44(gd16, 'handleBidsIngest'))
+    && /if \(col === 'onbid' && Array\.isArray\(doc\.items\) && await onbidPurgeOn\(store\(DATA\)\)\) \{/.test(fn44(gd16, 'handleSave')) && /purgeExpiredBids\(doc, cutO\);/.test(fn44(gd16, 'handleSave'))
+    && /if \(!dryRun\) return jr\(400, \{ status: 'REJECTED', error_code: 'DRY_ONLY'/.test(fn44(gd16, 'handleOnbidPurge')) && !/blobSet|verSnapshot|appendAudit/.test(fn44(gd16, 'handleOnbidPurge'))
+    && /if \(!c\.member\.admin\) return jr\(403, \{ status: 'FORBIDDEN', error_code: 'ADMIN_ONLY'/.test(fn44(gd16, 'handleOnbidPurge')) && /if \(!c\.member\.admin\) return jr\(403, \{ status: 'FORBIDDEN', error_code: 'ADMIN_ONLY'/.test(fn44(gd16, 'handleOnbidPurgeSet'))
+    && /if \(d && d\.action === 'onbid_purge'\) return await handleOnbidPurge\(event, d, R\);/.test(gd16) && /if \(d && d\.action === 'onbid_purge_set'\) return await handleOnbidPurgeSet\(event, d, R\);/.test(gd16)
+    && (gd16.match(/const BIDS_KEEP_DAYS = 14;/g) || []).length === 1 && !/function \w*(?:[Oo]nbid|[Oo]b)Purgeable\(|function \w*[Oo]nbidCut\w*\(/.test(gd16) && /const BIDS_PURGEABLE = \{ 'new': 1, '패스': 1 \};/.test(gd16);
+  T('v444 ⑯ 서버 정리 정적(gw-data — 실행은 servertest 82): 설정 키 settings:onbid·purge === true일 때만 켜짐 · 수집 ingest 세 자리(스냅샷·되살림 방지·정리)가 같은 스위치(공고는 늘) · 저장 save는 스위치가 켜졌을 때만 purgeExpiredBids · 세기 = dry만(400 DRY_ONLY)·쓰기 0(blobSet·스냅샷·감사 없음)·관리자 · 켜기·끄기 관리자 · 액션 둘 배선 · 보관 일수 BIDS_KEEP_DAYS 14 한 곳·대상 new·패스 · 부동산용 판정 함수 0(공고와 한 벌)',
+    st16, JSON.stringify({ st16 }));
+
+  // ⑰ 문서: FEATURES 기준 ≥ v444·v444 절(문장 고정 — 구간·시도 줄임말·대응표 밖 원래 값·org 떼기·부품 안 넓힘·하위 탭 없음·누름 길·search.el·못 읽은 부동산 확인만·옛 본문·서버 정리 기본 꺼짐·액션 둘·실측 칩 수·정리 건수·칸 폭 다섯·단계 합·속도)·§6 보관 기간 줄 · 자리 글 GATES_V444 0 ·
+  //   TESTLIST v444 체크 칸 = 화면 칸 4개 '[ ] (AI 시험 화면 대상'(PM 0) + 정리 켜기 운영 칸 1개 '[ ] (종운환경3 운영'(onbid_purge dry → PM께 보고 → onbid_purge_set) + 게이트 칸 1개 '[x] (AI) `uismoke`'(consheet_check·proctpl_check·settletest·servertest·결함 심기) · PM 몫 칸 0 ·
+  //   MANUAL 12절 PC 표 단락·휴대폰 카드·정리 규칙 · CLAUDE.md 입찰 부동산 표 줄·M7 줄·부품 줄(탭 6개) · sw ≥ 444
+  const ft17 = rd44('FEATURES.md'), tl17 = rd44('TESTLIST.md'), man17 = rd44('MANUAL.html'), cl17 = rd44('CLAUDE.md'), sw17 = rd44('sw.js');
+  const sec17 = (src, head) => { const i = src.indexOf(head); if (i < 0) return ''; const j = src.indexOf(head.slice(0, head.indexOf(' ') + 1), i + head.length); return src.slice(i, j < 0 ? src.length : j); };
+  const ftv17 = sec17(ft17, '\n### v444 (11/11)'), tlv17 = sec17(tl17, '\n## v444 ');
+  const FT_PINS44 = ['`// @ob-sheet-start ~ end`', '**시도 줄임말 + 나머지 주소**', '**표준 줄임말** `OB_SIDO`', "'광주시'는 넣지 않음", '**원래 값**', '**유찰·재산구분은 org 글자(', '`OB_ORG_RE`', '**부품은 넓히지 않았다**', "명세 '하위 탭 없음'", '`OB_ACT_GAP`', '`obSheetFollow`', '`search.el`',
+    '**못 읽은 부동산 — 저장이 서버 문서를 덮지 않음(확인 결과 이미 막혀 있음 — 막음을 더하지 않음)**', '`renderOnbidLegacy`', '**서버 정리(결정 ⑥) — ★기본 꺼짐**', '`settings:onbid`', '**`onbid_purge`(dry만', '**`onbid_purge_set`(on true/false', '같은 판정 한 벌',
+    '전체 1,161 · 신규 1,161 · 검토 0 · 참여 0 · 패스 2 · 지남 2,001', '1,802(신규 1,800 · 패스 2 · 그중 url 없음 570)', '시도 76 → **64**', '재산구분 72 → **96**', '유찰 52 → **56**', '최저/감정 64 → **88**', '마감 112 → **92**', '**714 / 950 / 1,058**', '35.8ms', "'지시·기성·거래처·일용직·입찰·부동산 6개'"];
+  const CL_PINS44 = ['**입찰 부동산 표(v444 — 45-1 일곱째 판, 45-1 끝)**', '`// @ob-sheet-start ~ end`', '`renderOnbidLegacy`', '`OB_SIDO`', '`OB_ORG_RE`', '`obSheetAct`', '`OB_ACT_GAP`', '`settings:onbid`', '`onbid_purge`', '`onbid_purge_set`', "'지시·기성·거래처·일용직·입찰·부동산 6개'", 'v444부터 PC 부동산 칸도 엑셀형 표', '부동산용 판정 함수를 따로 만들지 말 것', 'v443에 입찰 `#view-bid`'];
+  const man12_17 = (() => { const i = man17.indexOf('<h2 id="s12">'), j = man17.indexOf('<h2 id="s13">'); return i < 0 || j < i ? '' : man17.slice(i, j); })();
+  const MAN_PINS44 = ['<p><b>PC(넓은 화면) — 표</b> (2026-11 v444)', "'경북'·'서울'처럼 두 글자로 줄여", '저장된 원문은 바뀌지 않습니다', '<b>최저/감정</b>은 최저가를 감정가로 나눈 비율(%)', '함께 걸립니다(예: 신규 + 토지 = 신규인 토지만)', '<span class="btn">150건 더 보기</span>',
+    "<b>'경북' 같은 줄임말·재산구분·용도·물건관리번호</b>", '공고 칸과 부동산 칸의 버튼·검색어·펼친 줄은 따로 기억됩니다', '<p><b>휴대폰 — 카드</b> (예전 모양 그대로)', '<p><b>정리 규칙</b> (2026-11 v444)', '마감이 14일 넘게 지난 <b>신규·패스</b> 물건은 서버가 매일 정리합니다', '<b>검토·참여</b>로 표시한 물건은 남습니다', '이 정리는 지울 건수를 먼저 세어 보고한 뒤 켭니다'];
+  const tcb17 = tlv17.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l));
+  const cbScr17 = tcb17.filter((l) => /^- \[[ x]\] \(AI 시험 화면 대상[,) —]/.test(l)), cbOps17 = tcb17.filter((l) => /^- \[[ x]\] \(종운환경3 운영[ —]/.test(l)), cbGate17 = tcb17.filter((l) => /^- \[x\] \(AI\) `uismoke`\(/.test(l));
+  const doc17 = FT_PINS44.filter((s) => ftv17.indexOf(s) < 0).concat(CL_PINS44.filter((s) => cl17.indexOf(s) < 0).map((s) => 'CL ' + s), MAN_PINS44.filter((s) => man12_17.indexOf(s) < 0).map((s) => 'MAN ' + s));
+  T('v444 ⑰ 문서: FEATURES 기준 ≥ v444·v444 절(구간·시도 줄임말·OB_SIDO·광주시 뺌·대응표 밖 원래 값·org 떼기 OB_ORG_RE·부품 안 넓힘·하위 탭 없음·OB_ACT_GAP·obSheetFollow·search.el·못 읽은 부동산 확인만·renderOnbidLegacy·서버 정리 기본 꺼짐·settings:onbid·onbid_purge(dry만)·onbid_purge_set·같은 판정 한 벌·실측 칩 수 1,161/2,001·정리 건수 1,802·칸 폭 다섯(64·96·56·88·92)·단계 합 714 / 950 / 1,058·속도 35.8ms·탭 6개 — 문장 고정)·§6 보관 기간 줄·자리 글 GATES_V444·DEFECTS_V444 0 · TESTLIST v444 체크 칸 = 화면 칸 4개 "[ ] (AI 시험 화면 대상"(PM 0) + 운영 칸 1개 "[ ] (종운환경3 운영"(onbid_purge dry → PM께 보고 → onbid_purge_set on true) + 게이트 칸 1개 "[x] (AI) `uismoke`"(consheet_check·proctpl_check·settletest·servertest·결함 심기) · PM 몫 칸 0 · MANUAL 12절 PC 표 단락(줄임말·원문 그대로·최저/감정·AND·150건 더 보기·검색 글·칸 따로)·휴대폰 카드·정리 규칙 · CLAUDE.md 입찰 부동산 표 줄·M7 줄·부품 줄 탭 6개 · sw ≥ 444',
+    Number((ft17.match(/기준: v(\d+) /) || [0, 0])[1]) >= 444 && ftv17.length > 0 && doc17.length === 0 && ftv17.indexOf('GATES_V444') < 0 && ft17.indexOf('부동산(온비드)도 같은 규칙이지만 서버 설정 `settings:onbid`로 켜야 돈다(v444 — 기본 꺼짐') > 0
+    && tlv17.length > 0 && tcb17.length === 6 && cbScr17.length === 4 && cbOps17.length === 1 && cbGate17.length === 1 && cbScr17.every((l) => l.indexOf('PM') < 0) && !tcb17.some((l) => /^- \[[ xX]\] \(PM/.test(l)) && tlv17.indexOf('GATES_V444') < 0 && tlv17.indexOf('DEFECTS_V444') < 0
+    && /`\{action:"onbid_purge",dry:true\}`/.test(cbOps17[0] || '') && /`\{action:"onbid_purge_set",on:true,base:0\}`/.test(cbOps17[0] || '') && (cbOps17[0] || '').indexOf('PM께 보고') > 0 && (cbOps17[0] || '').indexOf('jw_gw_token') > 0
+    && ['`consheet_check`', '`proctpl_check`', '`settletest`', '`servertest`', '결함 심기'].every((g) => (cbGate17[0] || '').indexOf(g) > 0)
+    && Number((sw17.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 444,
+    JSON.stringify({ doc17: doc17.map((s) => s.slice(0, 40)), gates: [ftv17.indexOf('GATES_V444'), tlv17.indexOf('GATES_V444'), tlv17.indexOf('DEFECTS_V444')], cb: tcb17.length, scr: cbScr17.length, ops: cbOps17.length, gate: cbGate17.length, pm: cbScr17.filter((l) => l.indexOf('PM') >= 0).map((l) => l.slice(0, 40)), sw: (sw17.match(/jw-shell-v(\d+)/) || [0, 0])[1] }));
+
+  // ---- v444 검토 반영(11/11 — 검토 3관점(데이터 삭제 안전 · 표·파싱 정확성 · 회귀) 지적 10건) — 묶음 ⑱~㉔(서버 실행은 servertest 83)
+  // ⑱ 건수 글 '전체 m' = '전체' 칩(칩 묶음이 둘 — 부품 vsSheetCountTxt가 '전체'·모집단 칩이 든 묶음 밖의 켜진 칩도 건다): 용도 칩 넷 × 상태(전체·신규·지남)마다 건수 글의 m = 그 줄의 '전체' 칩 수(지남이면 '지남' 칩 수) ·
+  //   토지 = '보이는 3건 / 전체 3건'(종전 '/ 전체 6건') · 토지 + 지남 = '보이는 1건 / 지남 1건'(종전 '/ 지남 2건') · 토지 + 신규 = '보이는 2건 / 전체 3건' · 칩 묶음 하나인 v443 공고 표는 같은 결과
+  const m18 = miss44.length, X18 = mk44({ bids: BIDS44() }); X18.api.render(); const bad18 = [], s18 = [];
+  const mOf18 = (h) => { const m = /\/ (전체|지남) ([\d,]+)건$/.exec(cnt44(h)); return m ? [m[1], Number(m[2].replace(/,/g, ''))] : ['?', -1]; };
+  ['', '토지', '공장·산업', '상가·업무'].forEach((kd) => {
+    chip44(X18, 'kd', kd);
+    [['', '전체', ''], ['new', '전체', ''], ['expired', '지남', 'expired']].forEach((p) => {
+      chip44(X18, 'st', p[0]); const h = X18.host._h, mm = mOf18(h), want = chipN44(h, 'st', p[2]);
+      if (mm[0] !== p[1] || mm[1] !== want) bad18.push((kd || '용도전체') + '/' + (p[0] || '전체') + ': ' + cnt44(h) + ' ≠ 칩 ' + want);
+    });
+    chip44(X18, 'st', '');
+  });
+  chip44(X18, 'kd', '토지'); s18.push(cnt44(X18.host._h)); chip44(X18, 'st', 'expired'); s18.push(cnt44(X18.host._h)); chip44(X18, 'st', 'new'); s18.push(cnt44(X18.host._h)); chip44(X18, 'st', ''); chip44(X18, 'kd', ''); s18.push(cnt44(X18.host._h));
+  X18.api.layer('list'); const bl18 = X18.env.host('bidList'); s18.push(cnt44(bl18._h)); const bn18 = bl18.querySelector('[data-vs-chip="st|new"]'); if (bn18) bn18.fire('click'); else miss44.push('공고 칩 없음 new(⑱)'); s18.push(cnt44(bl18._h));
+  T('v444 ⑱ 검토 — 건수 글 "전체 m" = "전체" 칩(칩 묶음 둘 — 부품 vsSheetCountTxt가 상태 묶음 밖의 켜진 용도 칩도 건다): 용도 4 × 상태(전체·신규·지남) 12조합마다 m = 그 줄 "전체"(지남이면 "지남") 칩 수 · 토지 "보이는 3건 / 전체 3건"(종전 "/ 전체 6건") · 토지 + 지남 "보이는 1건 / 지남 1건"(종전 "/ 지남 2건") · 토지 + 신규 "보이는 2건 / 전체 3건" · 기본 "보이는 6건 / 전체 6건" · 칩 묶음 하나인 공고 표 그대로("보이는 3건 / 전체 3건" · 신규 "보이는 2건 / 전체 3건")',
+    bad18.length === 0 && JSON.stringify(s18) === JSON.stringify(['보이는 3건 / 전체 3건', '보이는 1건 / 지남 1건', '보이는 2건 / 전체 3건', '보이는 6건 / 전체 6건', '보이는 3건 / 전체 3건', '보이는 2건 / 전체 3건']) && noMiss44(m18),
+    JSON.stringify({ bad18: bad18.slice(0, 6), s18, miss: miss44.slice(m18) }));
+
+  // ⑲ 칩 묶음 사이 칸(옛 부동산 칩 줄·PM 시안의 8px — 부품 vsSheetHtml이 둘째 묶음 앞에 .vs-gsep): 부동산 표 = 지남 칩 바로 뒤 칸 하나·그 뒤 용도전체 칩(켜짐) · 칸 1개 · 간격 .vs-tools 6px + 8 + 6 = 옛 칩 줄(gap 6px + 8px 칸) ·
+  //   칩 묶음 하나인 v443 공고 표 = 칸 0 · 부품 정적(둘째 묶음부터만)
+  const X19 = mk44({ bids: BIDS44() }); X19.api.render(); const h19 = X19.host._h;
+  const s19 = [(h19.match(/class="vs-gsep"/g) || []).length, /data-vs-chip="st\|expired"[^>]*>[^<]*<\/button><span class="vs-gsep" aria-hidden="true" style="width:8px;flex:none;"><\/span><button type="button" class="vs-chip on" data-vs-chip="kd\|">/.test(h19)];
+  X19.api.layer('list'); s19.push((X19.env.host('bidList')._h.match(/vs-gsep/g) || []).length);
+  s19.push(decl44(1366, '.vs-tools', 'gap'), /'<span style="width:8px"><\/span>'/.test(fn44(html, 'renderOnbidLegacy')), /<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;" id="obFilterBar">/.test(html),
+    /if \(gi > 0\) h \+= '<span class="vs-gsep" aria-hidden="true" style="width:8px;flex:none;"><\/span>';/.test(fn44(blk44, 'vsSheetHtml')));
+  T('v444 ⑲ 검토 — 칩 묶음 사이 칸: 부동산 표 = 지남 칩 바로 뒤 .vs-gsep 하나(8px·줄지 않음) → 용도전체 칩(켜짐) · 칸 1개 · 간격 6 + 8 + 6 = 옛 칩 줄(gap 6px + 8px 칸 — 옛 본문 그대로) · 칩 묶음 하나인 공고 표 칸 0 · 부품 = 둘째 묶음부터만(gi > 0)',
+    JSON.stringify(s19) === JSON.stringify([1, true, 0, '6px', true, true, true]), JSON.stringify({ s19 }));
+
+  // ⑳ 머리 '총 n · 표시 a/b' = 옛 본문과 같은 식(명세 kept '#obHead'·PM 시안 '총 3113 · 표시 150/1092' — 부품 정의 옵션 onPaint로 표를 그린 뒤마다): 기본 '총 9 · 표시 6/6' · 지남 '2/2' · 토지 '3/3' = 같은 거르기의 옛 본문 머리(글자째) ·
+  //   검색 '경북' '1/1'·지우면 '6/6' · 320건 '총 320 · 표시 150/320' → 더 보기 '300/320' → '320/320' → 토지 '107/107' · 옛 본문 150건 머리 · 빈 원장 빈 글 · 정적: vsSheetPaint가 그린 뒤 onPaint · 정의 onPaint = obSheetPaint · onMode는 머리를 건드리지 않음 · 구간에서 #obHead를 쓰는 곳 하나
+  const m20 = miss44.length, X20 = mk44(); X20.api.render(); const hd20 = () => X20.env.host('obHead').textContent, s20 = [hd20()];
+  chip44(X20, 'st', 'expired'); s20.push(hd20()); chip44(X20, 'st', ''); chip44(X20, 'kd', '토지'); s20.push(hd20()); chip44(X20, 'kd', '');
+  X20.env.type('경북'); X20.env.tick(150); s20.push(hd20()); X20.env.type(''); X20.env.tick(150); s20.push(hd20());
+  const leg20 = [['all', 'all'], ['expired', 'all'], ['all', '토지']].map((p) => { const L = mk44(); L.api.setFilter(p[0], p[1]); L.api.setShow(150); L.api.legacy(); return L.env.host('obHead').textContent; });
+  const X20m = mk44({ obs: OB5 }); X20m.api.render(); const hm20 = () => X20m.env.host('obHead').textContent; s20.push(hm20()); more44(X20m); s20.push(hm20()); more44(X20m); s20.push(hm20()); chip44(X20m, 'kd', '토지'); s20.push(hm20());
+  const L20m = mk44({ obs: OB5 }); L20m.api.setFilter('all', 'all'); L20m.api.setShow(150); L20m.api.legacy(); s20.push(L20m.env.host('obHead').textContent);
+  const X20e = mk44({ obs: [], sha: 'gw' }); X20e.env.host('obHead').textContent = '이전 글'; X20e.api.render(); s20.push(X20e.env.host('obHead').textContent);
+  const st20 = /inst\.last = M;\r?\n\s*if \(typeof def\.onPaint === "function"\) def\.onPaint\(M\);/.test(fn44(blk44, 'vsSheetPaint')) && /onPaint: obSheetPaint/.test(osb44) && !/obHead/.test(fn44(osb44, 'obSheetMode')) && (osb44.match(/getElementById\("obHead"\)/g) || []).length === 1;
+  T('v444 ⑳ 검토 — 머리 "총 n · 표시 a/b" = 옛 본문과 같은 식(그린 뒤마다 — 부품 정의 옵션 onPaint): 기본 "총 9 · 표시 6/6"·지남 "2/2"·토지 "3/3" = 같은 거르기의 옛 본문 머리(글자째) · 검색 "경북" "1/1"·지우면 "6/6" · 320건 "150/320" → 더 보기 "300/320" → "320/320" → 토지 "107/107" · 옛 본문 150건 머리 "총 320 · 표시 150/320" · 빈 원장 빈 글 · 정적(vsSheetPaint 끝에서 onPaint · 정의 onPaint = obSheetPaint · onMode는 머리 안 건드림 · 구간의 #obHead 쓰기 한 곳)',
+    JSON.stringify(s20) === JSON.stringify(['총 9 · 표시 6/6', '총 9 · 표시 2/2', '총 9 · 표시 3/3', '총 9 · 표시 1/1', '총 9 · 표시 6/6', '총 320 · 표시 150/320', '총 320 · 표시 300/320', '총 320 · 표시 320/320', '총 320 · 표시 107/107', '총 320 · 표시 150/320', ''])
+    && JSON.stringify(leg20) === JSON.stringify(s20.slice(0, 3)) && st20 && noMiss44(m20), JSON.stringify({ s20, leg20, st20, miss: miss44.slice(m20) }));
+
+  // ㉑ 물건 칸 글자 거르기 = 표시 글 + 주소 전문(명세 'text(주소 전문)' — 검색칸 #obSearch와 같은 답): '경상북도 포항'(주소 전문 꼴 — 종전 0줄) · '경북 포항'(표시 글) · '경상북도' · '포항시 남구' · '충청남도 아산'(종전 0줄) — 거르기 줄 결과 = 검색칸 결과
+  const m21 = miss44.length, X21 = mk44(); X21.api.render(); const s21 = [];
+  const tf21 = (v) => { const f = X21.host.querySelector('[data-vf="title"]'); if (!f) { miss44.push('글자 거르기 없음(㉑)'); return '?'; } f.value = v; (f.L.input || []).slice().forEach((g) => g({ target: f, isComposing: false })); X21.env.tick(150); return order44(X21.host._h); };
+  const sq21 = (v) => { X21.env.type(v); X21.env.tick(150); const o = order44(X21.host._h); X21.env.type(''); X21.env.tick(150); return o; };
+  ['경상북도 포항', '경북 포항', '경상북도', '포항시 남구', '충청남도 아산'].forEach((q) => { const a = tf21(q); tf21(''); s21.push(q + '=' + a + '|' + sq21(q)); });
+  T('v444 ㉑ 검토 — 물건 칸 글자 거르기 = 표시 글 + 주소 전문(검색칸과 같은 답): "경상북도 포항" o1|o1(종전 거르기 0줄) · "경북 포항" o1|o1 · "경상북도" o1|o1 · "포항시 남구" o1|o1 · "충청남도 아산" o3|o3(종전 0줄 — 아산 o5는 패스라 전체 밖)',
+    JSON.stringify(s21) === JSON.stringify(['경상북도 포항=o1|o1', '경북 포항=o1|o1', '경상북도=o1|o1', '포항시 남구=o1|o1', '충청남도 아산=o3|o3']) && noMiss44(m21), JSON.stringify({ s21, miss: miss44.slice(m21) }));
+
+  // ㉒ 시도 대응표 밖 — 2026-07-01 출범 '전남광주통합특별시'(법정 약칭 '광주특별시' — 두 글자 줄임말 없음, 지어내지 않음): 물건 칸 = 주소 그대로(줄임말 안 붙음) · 시도 칸 = 원래 값(title 같음 — 칸이 좁으면 말줄임) · 옛 '광주광역시' 줄은 '광주' ·
+  //   시도 고르기 목록에 '광주'와 따로 한 줄 · '광주' = 옛 이름 줄만 · '전남광주통합특별시' = 그 줄만 · '전남' = 0줄(옛 광주·전남과 묶을지는 PM 확인 — 묶지 않음) · 대응표 키에 '통합'·'광주특별시' 없음 · 이 묶음 시험 틀 자리 리스너 0
+  const OBS22 = OBS44().concat([O044({ id: 'onbid-o11', kind: '토지', region: '전남광주통합특별시', title: '전남광주통합특별시 북구 차동 11', org: '압류재산', appr: 900000000, budget: 450000000, due: '2026-11-20', url: 'https://onbid.example/11' }),
+    O044({ id: 'onbid-o12', kind: '토지', region: '광주광역시', title: '광주광역시 북구 카동 12', org: '압류재산', appr: 900000000, budget: 450000000, due: '2026-11-21', url: 'https://onbid.example/12' })]);
+  const m22 = miss44.length, X22 = mk44({ obs: OBS22 }); X22.api.render(); const h22 = X22.host._h;
+  const s22 = [cells44(h22, 'o11')[0][1], cells44(h22, 'o11')[2], cells44(h22, 'o12')[0][1], cells44(h22, 'o12')[2][1]];
+  s22.push((/<select data-vf="sido">([\s\S]*?)<\/select>/.exec(h22) || ['', ''])[1].replace(/<option value="([^"]*)"[^>]*>[^<]*<\/option>/g, '$1;'));
+  const selS22 = (v) => { const f = X22.host.querySelector('[data-vf="sido"]'); if (!f) { miss44.push('시도 고르기 없음(㉒)'); return '?'; } f.value = v; f.fire('change'); return order44(X22.host._h); };
+  s22.push(selS22('광주'), selS22('전남광주통합특별시'), selS22('전남')); selS22('');
+  const map22 = Object.keys(X22.api.sidoMap).every((k) => k.indexOf('통합') < 0 && k !== '광주특별시') && X22.api.sido('전남광주통합특별시') === '전남광주통합특별시' && X22.api.sido('광주특별시') === '광주특별시';
+  const hostL22 = [X18, X19, X20, X20m, X20e, X21, X22].some((X) => X.env.log.some((l) => /^host-listener:(obList|bidList):/.test(l)));
+  T('v444 ㉒ 검토 — 시도 대응표 밖 "전남광주통합특별시"(2026-07-01 출범·법정 약칭 광주특별시 — 두 글자 줄임말 없음, 지어내지 않음): 물건 칸 주소 그대로 · 시도 칸 원래 값(title 같음) · 옛 광주광역시 줄은 "광주" · 시도 고르기 목록에 따로 한 줄 · "광주" = 옛 이름 줄만 · "전남광주통합특별시" = 그 줄만 · "전남" = 0줄(묶지 않음 — PM 확인 전) · 대응표 키에 통합·광주특별시 없음 · 검토 묶음 시험 틀 자리 리스너 0',
+    JSON.stringify(s22) === JSON.stringify(['전남광주통합특별시 북구 차동 11', [' class="vs-hs vs-l3" title="전남광주통합특별시"', '전남광주통합특별시'], '광주 북구 카동 12', '광주', ';경기;경북;광주;서울;세종틍별자치시;아산;전남광주통합특별시;제주시;충남;', 'o12', 'o11', ''])
+    && map22 && !hostL22 && noMiss44(m22), JSON.stringify({ s22, map22, hostL22, miss: miss44.slice(m22) }));
+
+  // ㉓ 서버 정적(gw-data — 실행은 servertest 83): 수집 handleBidsIngest — 원장 읽기 실패 500(키 없음 NOT_FOUND만 빈 원장) · 쓰기 직전 다시 읽어 updated_at 비교 · 다르면 받은 줄 그대로 attempt + 1(3번까지 — 바깥 부름은 router 한 곳, attempt 없이) ·
+  //   mergeBidItems 새 줄 created = kstDay(KST) · updated = today(UTC 그대로 — 앱 mergeBidsLocal 날짜 단위 병합 축) · ver_restore 복구 전 자동보존 = force(VER_SKIP 입찰·부동산도)
+  const gd23 = rd44('netlify/functions/gw-data.js'), ing23 = fn44(gd23, 'handleBidsIngest'), mrg23 = fn44(gd23, 'mergeBidItems'), vrs23 = fn44(gd23, 'handleVerRestore');
+  const st23 = /^function handleBidsIngest\(event, d, R, attempt\) \{\r?\n\s*attempt = attempt \|\| 1;/.test(ing23)
+    && /const r = await blobGet\(st, colKey\(target\)\);\r?\n\s*if \(!r\.ok && r\.code !== 'NOT_FOUND'\) return jr\(500, \{ status: 'ERROR', error_code: r\.code \|\| 'STORAGE_READ_FAILED'/.test(ing23)
+    && /const at0 = \(r\.ok && r\.data\) \? r\.data\.updated_at : undefined, inItems = d\.items;/.test(ing23)
+    && /if \(attempt < 3\) \{/.test(ing23) && /const r2 = await blobGet\(st, colKey\(target\)\);/.test(ing23) && /!== at0\) \{ d\.items = inItems; return handleBidsIngest\(event, d, R, attempt \+ 1\); \}/.test(ing23)
+    && (gd23.match(/handleBidsIngest\(event, d, R\)/g) || []).length === 1
+    && /const kstDay = new Date\(Date\.now\(\) \+ 9 \* 3600000\)\.toISOString\(\)\.slice\(0, 10\);/.test(mrg23) && /created: kstDay, updated: today \}/.test(mrg23) && /const today = new Date\(\)\.toISOString\(\)\.slice\(0, 10\);/.test(mrg23)
+    && /await verSnapshot\(col, cur\.data, g\.c\.member\.name \+ '\(복구 전 자동보존\)', false, true\);/.test(vrs23);
+  T('v444 ㉓ 검토 — 서버 정적(gw-data, 실행은 servertest 83): 수집 원장 읽기 실패 500(키 없음만 빈 원장) · 쓰기 직전 다시 읽어 updated_at 비교 · 다르면 받은 줄 그대로 attempt + 1(3번까지 · 바깥 부름은 router 한 곳) · 새 줄 created = KST(kstDay)·updated = UTC 그대로 · ver_restore 복구 전 자동보존 force',
+    st23, JSON.stringify({ st23 }));
+
+  // ㉔ 검토 문서: FEATURES v444 검토 반영 줄(10건·재공고와 패스 PM 결정 대기 + 실측 1,403/220 + 선택지 가·나·다 · 머리 총·표시 · onPaint · vs-gsep · kstDay · 복구 전 자동보존 · 법정 약칭 · servertest 83)·되돌리기 순서 ·
+  //   TESTLIST 운영 칸(재공고 보고·선택지·끈 뒤 ver_list → ver_restore·복구 전 자동보존)·게이트 칸 '검토 반영 뒤' · MANUAL 12절(통합특별시·건수 글 전체·재공고 신규) · CLAUDE.md(onPaint·vs-gsep·재공고 PM 대기·광주특별시·kstDay) — 문장 고정
+  const FT24 = ['**검토 반영(11/11 — 검토 3관점(데이터 삭제 안전 · 표·파싱 정확성 · 회귀) 지적 10건 모두 반영, 하나는 PM 결정 대기)**', '**재공고와 패스(PM 결정 대기 — 켜기 전 보고에 넣음, TESTLIST v444 운영 칸)**',
+    '정리 대상 1,403건 중 220건', '(가) 지운 패스 id를', '(나) 부동산은 신규만 정리', '(다) 그대로', "머리 글은 옛 본문과 같은 식 '총 n · 표시 a/b'", '`onPaint(M)`', '`vs-gsep`', '`kstDay`', "'(복구 전 자동보존)'", "법정 약칭 '광주특별시'", 'servertest 절 83', '켠 뒤 되돌리기(검토 반영 — 순서)'];
+  const ops24 = cbOps17[0] || '', gate24 = cbGate17[0] || '';
+  const TL24 = ['**재공고와 패스**', '(가) 지운 패스 id를 기억해', '(나) 부동산은 신규만 정리', '(다) 그대로', '`{action:"onbid_purge_set",on:false,', '`{action:"ver_list",collection:"onbid"}`', '`{action:"ver_restore",collection:"onbid",ts:…}`', "'(복구 전 자동보존)'"];
+  const MAN24 = ['<b>전남광주통합특별시</b>도 두 글자 줄임말이 없어 그대로 두며', '전체는 <span class="btn">전체</span> 버튼 숫자와 같습니다(용도 버튼을 켜면 그 용도 안에서)', '정리된 뒤에는 <b>신규</b>로 다시 들어옵니다'];
+  const CL24 = ['정의 옵션 `onPaint(M)`', '`vs-gsep`', '**재공고와 패스는 PM 결정 대기**', "'광주특별시'", '`kstDay`'];
+  const doc24 = FT24.filter((s) => ftv17.indexOf(s) < 0).concat(TL24.filter((s) => ops24.indexOf(s) < 0).map((s) => 'TL ' + s), MAN24.filter((s) => man12_17.indexOf(s) < 0).map((s) => 'MAN ' + s), CL24.filter((s) => cl17.indexOf(s) < 0).map((s) => 'CL ' + s));
+  T('v444 ㉔ 검토 문서: FEATURES v444 검토 반영 줄(10건·재공고와 패스 PM 결정 대기 + 실측 1,403/220 + 선택지 가·나·다·머리 총·표시·onPaint·vs-gsep·kstDay·복구 전 자동보존·법정 약칭·servertest 83)·되돌리기 순서 · TESTLIST 운영 칸(재공고 보고·선택지·끈 뒤 ver_list → ver_restore·복구 전 자동보존)·게이트 칸 "검토 반영 뒤" · MANUAL 12절(통합특별시·건수 글 전체·재공고 신규) · CLAUDE.md(onPaint·vs-gsep·재공고 PM 대기·광주특별시·kstDay)',
+    doc24.length === 0 && gate24.indexOf('검토 반영 뒤(11/11 — 검토 3관점(데이터 삭제 안전') > 0 && ['`uismoke`(537', '`servertest`(1063', '결함 심기', '대조군'].every((g) => gate24.indexOf(g) > 0), JSON.stringify({ doc24: doc24.map((s) => s.slice(0, 40)), gate: gate24.indexOf('검토 반영 뒤') }));
+} catch (e) { console.log('  (v444 검사 생략 — ' + e.message + ')'); fails++; }
 
 try {
   const fdir = join(ROOT, 'netlify', 'functions');

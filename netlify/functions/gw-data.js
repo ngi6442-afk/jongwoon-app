@@ -311,6 +311,15 @@ async function handleSave(event, d, R) {
   if (col !== 'checklist' && !Array.isArray(doc.items)) doc.items = [];
   // v380(검토 발견): 정리 전에 열려 있던 관리자 탭이 상태 하나만 바꿔 저장해도(409 병합 = 로컬 우선 합집합) 정리된 공고가 되살아나지 않게 서버가 다시 거른다
   if (col === 'bids' && Array.isArray(doc.items)) purgeExpiredBids(doc, bidsCutDate());
+  // v444 부동산 — 설정 settings:onbid가 켜졌을 때만 같은 줄(기본 꺼짐 — 꺼져 있으면 아무것도 거르지 않음). 서버 문서에 있던 줄을 지우게 되면(켠 날 수집보다 저장이 먼저 오는 경우 등)
+  //   저장 전 문서를 스냅샷으로 남기고(VER_SKIP을 넘어 — 아래 verSnapshot) 감사에 '정리' 1줄. 되살린 줄(서버에 이미 없는 줄)만 걸렀으면 스냅샷·감사 없음
+  let obPurged = 0;
+  if (col === 'onbid' && Array.isArray(doc.items) && await onbidPurgeOn(store(DATA))) {
+    const cutO = bidsCutDate(), had = {};
+    oldItems.forEach(function (o) { if (o && o.id) had[o.id] = 1; });
+    obPurged = doc.items.filter(function (it) { return it && it.id && had[it.id] && bidPurgeable(it, cutO); }).length;
+    purgeExpiredBids(doc, cutO);
+  }
   // v395 배정표(기반 1·9): 자동 지시의 서버 배정 who_id(who_by 'assign')는 클라 사본이 공란으로 올려도 이월 + 남은 공란은 배정표로 채움
   if (col === 'tasks' && Array.isArray(doc.items)) {
     const oldByA = {}; oldItems.forEach(function (o) { if (o && o.id) oldByA[o.id] = o; });
@@ -501,7 +510,7 @@ async function handleSave(event, d, R) {
       return s;
     });
   }
-  await verSnapshot(col, prevDoc, c.member.name, false);   // 사람 저장은 매번 직전 상태 보존(시점 복구용)
+  await verSnapshot(col, prevDoc, c.member.name, false, obPurged > 0);   // 사람 저장은 매번 직전 상태 보존(시점 복구용) · v444 부동산 정리가 서버 줄을 지우는 저장은 VER_SKIP이어도 보존
   const w = await blobSet(store(DATA), colKey(col), doc);
   if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
   // 감사 로그: 누가·언제·무엇을(이전값→새값). 서버측 기록이라 클라이언트 위변조 불가.
@@ -520,6 +529,7 @@ async function handleSave(event, d, R) {
     } else {
       ev = diffItems(oldItems, Array.isArray(doc.items) ? doc.items : []);
     }
+    if (obPurged) ev.push({ op: '정리', id: '', t: '부동산 정리 ' + obPurged + '건(마감 ' + BIDS_KEEP_DAYS + '일 경과 신규·패스 — 저장 때)' });   // v444
     if (ev.length) await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: col, ev: ev });
   } catch (e) {}
   // 문서함 등재 결재 훅(v314): 비관리자의 '대기' 문서마다 결재함에 '문서함 등재' 카드를 서버가 대신 기안(by=등재한 직원, ref 'doc:'+id, cid 멱등).
@@ -569,10 +579,23 @@ function purgeExpiredBids(doc, cut) {
   doc.items = doc.items.filter(function (it) { return !bidPurgeable(it, cut); });
   return before - doc.items.length;
 }
+// v444(45-1 일곱째 판 — PM 11/10 15:56 결정 ⑥ '마감 지난 부동산 물건도 공고와 같은 규칙'): 부동산(온비드 col:onbid)도 마감 + BIDS_KEEP_DAYS(14일) 지난 'new'·'패스'만 정리하고
+//   검토·참여·그 밖 사람이 정한 상태는 보존한다. 날짜 경계·대상 판정은 공고와 한 벌(bidsCutDate·bidPurgeable·purgeExpiredBids — 부동산용을 따로 만들지 않는다).
+//   ★기본 꺼짐: 설정 settings:onbid의 purge가 true일 때만 정리한다(키 없음·읽기 실패·true가 아닌 값 = 끔 — 모르면 지우지 않는다).
+//   켜기 전에 지워질 건수를 세어 PM께 보고(onbid_purge dry — 관리자, 쓰기 0) → 켜기·끄기 onbid_purge_set(관리자 — 감사 1줄·prev 1판).
+//   켜져 있으면 정리 자리는 공고와 같다: ① 수집 ingest(평일 아침 — 정리가 있는 날은 VER_SKIP을 넘어 하루 1벌 스냅샷) ② 앱 저장 save(409 병합이 되살린 만료 줄을 다시 거름 —
+//   서버 문서에 있던 줄을 지우게 되면(켠 뒤 첫 정리가 수집보다 먼저 오는 날 등) 저장 전 문서를 스냅샷으로 남기고 감사에 '정리' 1줄) ③ 되살림 방지(ingest가 원장에 없는 만료 new·패스를 받지 않음).
+const ONBID_SET_KEY = 'settings:onbid';
+async function onbidPurgeOn(st) {
+  try { const r = await blobGet(st, ONBID_SET_KEY); return !!(r.ok && r.data && r.data.purge === true); } catch (e) { return false; }
+}
 function mergeBidItems(doc, items) {
   const byId = {};
   doc.items.forEach(function (it) { if (it && it.id) byId[it.id] = it; });
   const today = new Date().toISOString().slice(0, 10);
+  // v444 검토: 새 줄의 created(부동산 펼침 '수집일')는 KST 날짜 — 평일 아침 수집(KST 07:23 = UTC 전날 22:23)이 하루 앞 날짜(일요일 등)로 찍히던 것.
+  //   updated는 종전 그대로(UTC 날짜 — 앱 mergeBidsLocal이 날짜 단위로 견주는 축이라 바꾸지 않는다). 이미 저장된 줄의 created는 그대로(옛 UTC 날짜)
+  const kstDay = new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);
   let added = 0, updated = 0;
   for (const n of (items || [])) {
     if (!n || !n.id) continue;
@@ -582,7 +605,7 @@ function mergeBidItems(doc, items) {
         region: n.region || '', due: n.due || '', budget: n.budget || 0, url: n.url || '',
         matched: Array.isArray(n.matched) ? n.matched : [], method: n.method || '', rgn_ref: !!n.rgn_ref, appr: n.appr || 0,
         no: n.no || '', posted: n.posted || '', docs: Array.isArray(n.docs) ? n.docs : [], ext: (n.ext && typeof n.ext === 'object') ? n.ext : {},
-        status: (n.status === '패스' ? '패스' : 'new'), auto_pass: !!n.auto_pass, created: today, updated: today });
+        status: (n.status === '패스' ? '패스' : 'new'), auto_pass: !!n.auto_pass, created: kstDay, updated: today });
       byId[n.id] = doc.items[doc.items.length - 1];
       added++;
     } else {
@@ -608,25 +631,34 @@ async function saveBidsDoc(st, doc, by, added, updated, R) {
 }
 
 // 일감 수집 ingest(수집봇 전용) — 공유 시크릿(BIDS_INGEST_KEY) 인증, 세션 불필요.
-async function handleBidsIngest(event, d, R) {
+// v444 검토(데이터 삭제 안전 — 공고·부동산 공통): ① 원장을 못 읽으면(읽기·파싱 실패) 빈 원장에 받은 줄만 다시 쓰지 않고 500 — 사람 상태(검토·참여·패스)가 모두 사라지고
+//   정리가 켜져 있으면 마감 지난 검토·참여 줄까지 줄째 빠지던 길(키 없음 = 빈 원장으로 시작은 그대로 · 수집기 ingest_push는 3번 다시 보내고 그래도 실패면 잡 실패 → watch 경보)
+//   ② 읽은 뒤 쓰기 전까지(정리하는 날은 정리 전 스냅샷 쓰기까지 몇 초) 관리자 저장이 끼면 그 저장을 409 없이 덮었다(정리가 켜져 있으면 그사이 신규 → 검토로 바꾼 만료 줄이 줄째 지워짐) —
+//   쓰기 직전에 원장을 다시 읽어 updated_at이 처음 읽은 값과 다르면 받은 줄 그대로 처음부터 다시(attempt — 모두 3번까지, 셋째 번은 다시 읽지 않고 씀 ·
+//   조건부 쓰기가 없는 @netlify/blobs 8.2.0이라 다시 읽어 견줌 — 다시 읽은 뒤 쓰기까지의 짧은 틈은 남음)
+async function handleBidsIngest(event, d, R, attempt) {
+  attempt = attempt || 1;
   const secret = (process.env.BIDS_INGEST_KEY || '').trim();
   if (!secret || String(d.key || '').trim() !== secret) return jr(403, { status: 'FORBIDDEN', error_code: 'BAD_INGEST_KEY', request_id: R });
   if (!Array.isArray(d.items)) return jr(400, { status: 'REJECTED', error_code: 'INVALID_ITEMS', request_id: R });
   const target = (d.col === 'onbid') ? 'onbid' : 'bids';
   const st = store(DATA);
   const r = await blobGet(st, colKey(target));
+  if (!r.ok && r.code !== 'NOT_FOUND') return jr(500, { status: 'ERROR', error_code: r.code || 'STORAGE_READ_FAILED', request_id: R });   // v444 검토 ①
   const doc = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data : { schema: 1, items: [] };
+  const at0 = (r.ok && r.data) ? r.data.updated_at : undefined, inItems = d.items;   // v444 검토 ② 처음 읽은 원장 시각 · 받은 줄(되살림 방지가 d.items를 거른 사본으로 바꾸므로 다시 할 때 되돌림)
   const cut = bidsCutDate();
-  // v380(검토 발견): 정리가 있는 날은 VER_SKIP(bids)을 넘어 강제 보존 — 매일 정리는 재수집으로 못 되돌리는 삭제라 하루 1벌은 남긴다
-  const willPurge = target === 'bids' && doc.items.some(function (it) { return bidPurgeable(it, cut); });
+  const purgeOn = target === 'bids' || (target === 'onbid' && await onbidPurgeOn(st));   // v444 부동산은 설정 settings:onbid가 켜졌을 때만(기본 꺼짐) — 공고는 종전대로 늘
+  // v380(검토 발견): 정리가 있는 날은 VER_SKIP(bids)을 넘어 강제 보존 — 매일 정리는 재수집으로 못 되돌리는 삭제라 하루 1벌은 남긴다(v444 부동산도 같음)
+  const willPurge = purgeOn && doc.items.some(function (it) { return bidPurgeable(it, cut); });
   await verSnapshot(target, doc, '수집봇', true, willPurge);   // 병합이 doc를 제자리 변형하므로 반드시 병합 전에(봇은 일 1개)
   let skipped = 0;
-  if (target === 'bids') {   // v380 되살림 방지 — 원장이 더 오래 들고 있는 만료 공고(new·패스)는 앱에 없으면 받지 않는다
+  if (purgeOn) {   // v380 되살림 방지 — 원장이 더 오래 들고 있는 만료 공고(new·패스)는 앱에 없으면 받지 않는다(v444 부동산도 켜졌으면 같음)
     const have = {}; doc.items.forEach(function (it) { if (it && it.id) have[it.id] = 1; });
     d.items = d.items.filter(function (n) { const drop = n && n.id && !have[n.id] && bidPurgeable(n, cut); if (drop) skipped++; return !drop; });
   }
   const m = mergeBidItems(doc, d.items);
-  const purged = (target === 'bids') ? purgeExpiredBids(doc, cut) : 0;   // v380 기존 만료 new·패스 정리(사람이 정한 상태는 보존)
+  const purged = purgeOn ? purgeExpiredBids(doc, cut) : 0;   // v380 기존 만료 new·패스 정리(사람이 정한 상태는 보존)
   // 수집 헬스(실패 어댑터·마지막 실행시각) — 변경 없어도 항상 갱신해 앱 배너가 최신을 보게
   let hasHealth = false;
   if (target === 'bids' && d.health && typeof d.health === 'object' && Array.isArray(d.health.adapters)) {
@@ -690,6 +722,11 @@ async function handleBidsIngest(event, d, R) {
     doc.awards = aw; hasAwards = true;
   }
   if (m.added || m.updated || hasHealth || hasAwards || purged) {
+    if (attempt < 3) {   // v444 검토 ② 쓰기 직전 다시 읽기 — 그사이 누가 썼으면(updated_at이 다름) 받은 줄 그대로 새 원장으로 처음부터
+      const r2 = await blobGet(st, colKey(target));
+      if (!r2.ok && r2.code !== 'NOT_FOUND') return jr(500, { status: 'ERROR', error_code: r2.code || 'STORAGE_READ_FAILED', request_id: R });
+      if (((r2.ok && r2.data) ? r2.data.updated_at : undefined) !== at0) { d.items = inItems; return handleBidsIngest(event, d, R, attempt + 1); }
+    }
     doc.updated_by = '수집봇'; doc.updated_at = Date.now();
     const w = await blobSet(st, colKey(target), doc);
     if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
@@ -997,6 +1034,53 @@ async function handleBidsPurge(event, d, R) {
   try { await blobSet(st, 'bids:lastfetch', { ts: 0 }); } catch (e) {}
   try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'bids', ev: [{ op: '비우기', id: '', t: (d.mode === 'all' ? '전체' : d.mode === 'expired' ? '마감 ' + BIDS_KEEP_DAYS + '일 경과' : '미검토') + ' ' + removed + '건 제거' }] }); } catch (e) {}
   return jr(200, { status: 'OK', removed: removed, total: doc.items.length, request_id: R });
+}
+
+// v444 부동산 정리 세기(dry-run — PM 11/10 결정 ⑥ '적용 전 지워질 건수를 먼저 세어 보고'): 관리자 세션만(비관리자 403 ADMIN_ONLY · 봇 키 없음). 쓰기 0(스냅샷·저장·감사 없음).
+//   설정이 꺼져 있어도 센다(켜기 전 보고용). dry가 참이 아니면 400 DRY_ONLY — 이 액션으로는 지우지 않는다(실제 정리는 설정을 켠 뒤 수집·저장에서만).
+//   would_remove = 공고 정리와 같은 판정(bidPurgeable — 마감 < bidsCutDate() · new·패스) · by_status = 그중 신규·패스 · kept_expired = 마감 14일이 지났지만 사람이 정한 상태라 남는 줄 ·
+//   no_due = 마감이 YYYY-MM-DD가 아니라 지우지 않는 줄 · no_url = 지울 줄 중 원문 링크 없는 줄(같은 규칙으로 지움) · on = 지금 설정
+async function handleOnbidPurge(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (!c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
+  const dryRun = d.dry === true || d.dry === 'true' || d.dry === 1;   // bids_purge와 같은 관용
+  if (!dryRun) return jr(400, { status: 'REJECTED', error_code: 'DRY_ONLY', request_id: R });
+  const st = store(DATA);
+  const r = await blobGet(st, colKey('onbid'));
+  if (!r.ok && r.code !== 'NOT_FOUND') return jr(500, { status: 'ERROR', error_code: r.code || 'STORAGE_READ_FAILED', request_id: R });   // 못 읽은 원장을 '0건'으로 보고하지 않게
+  const items = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data.items : [];
+  const cut = bidsCutDate();
+  let would = 0, byNew = 0, byPass = 0, keptExp = 0, noDue = 0, noUrl = 0;
+  items.forEach(function (it) {
+    if (!it) return;
+    if (bidPurgeable(it, cut)) { would++; if ((it.status || 'new') === '패스') byPass++; else byNew++; if (!it.url) noUrl++; return; }
+    if (bidExpired(it, cut)) keptExp++;
+    else if (!/^\d{4}-\d{2}-\d{2}$/.test(String(it.due || '').slice(0, 10))) noDue++;
+  });
+  return jr(200, { status: 'OK', dry: true, on: await onbidPurgeOn(st), would_remove: would, by_status: { 'new': byNew, '패스': byPass }, kept_expired: keptExp, no_due: noDue, no_url: noUrl,
+    total: items.length, cut: cut, keep_days: BIDS_KEEP_DAYS, request_id: R });
+}
+// v444 부동산 정리 켜기·끄기(settings:onbid — 기본 꺼짐): 관리자 세션만(403 ADMIN_ONLY) · on은 참·거짓만(400 BAD_VALUE) · base가 오면 지금 updated_at과 같아야(409 ONBID_STALE — 없는 설정은 0) ·
+//   같은 값 400 NO_CHANGE · 설정을 못 읽으면 500(덮어쓰지 않음) · prev 1판 · 감사 1줄(col onbid '정리설정'). 켠 다음 정리는 다음 수집(평일 아침)이나 관리자의 부동산 저장 때 일어난다.
+//   알려진 한계(settings:safety 등 기존 설정 핸들러와 같은 꼴): 읽기 → base 검사 → 쓰기가 원자적이지 않다(동시 저장은 마지막 쓰기가 이김)
+async function handleOnbidPurgeSet(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (!c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
+  if (typeof d.on !== 'boolean') return jr(400, { status: 'REJECTED', error_code: 'BAD_VALUE', request_id: R });
+  const st = store(DATA);
+  const r = await blobGet(st, ONBID_SET_KEY);
+  if (!r.ok && r.code !== 'NOT_FOUND') return jr(500, { status: 'ERROR', error_code: r.code || 'STORAGE_READ_FAILED', request_id: R });
+  const cur = (r.ok && r.data && typeof r.data === 'object') ? r.data : {};
+  const curOn = cur.purge === true, curAt = Number(cur.updated_at) || 0;
+  if (d.base !== undefined && Number(d.base) !== curAt) return jr(409, { status: 'CONFLICT', error_code: 'ONBID_STALE', request_id: R });
+  if (curOn === d.on) return jr(400, { status: 'REJECTED', error_code: 'NO_CHANGE', request_id: R });
+  const doc = { schema: 1, purge: d.on, keep_days: BIDS_KEEP_DAYS, prev: { purge: curOn, updated_at: curAt, updated_by: String(cur.updated_by || '') }, updated_by: c.member.id, updated_at: Date.now() };
+  const w = await blobSet(st, ONBID_SET_KEY, doc);
+  if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
+  try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'onbid', ev: [{ op: '정리설정', id: '', t: '부동산 마감 ' + BIDS_KEEP_DAYS + '일 정리 ' + (curOn ? '켬' : '끔') + '→' + (d.on ? '켬' : '끔') }] }); } catch (e) {}
+  return jr(200, { status: 'OK', on: d.on, updated_at: doc.updated_at, request_id: R });
 }
 
 // 일감 이력 export(수집봇) — 학습 필터용(패스 패턴). 경량 필드만 반환.
@@ -4302,9 +4386,10 @@ async function handleVerRestore(event, d, R) {
   const col = d.collection, ts = Number(d.ts) || 0;
   const vr = await blobGet(store(DATA), `ver:${col}:${ts}`);
   if (!vr.ok || !vr.data || !vr.data.doc) return jr(404, { status: 'NOT_FOUND', error_code: 'NO_VERSION', request_id: R });
-  // 복구 직전 현재 상태도 보존 — 복구 자체를 되돌릴 수 있게
+  // 복구 직전 현재 상태도 보존 — 복구 자체를 되돌릴 수 있게(v444 검토: force — 스냅샷 제외 VER_SKIP 컬렉션(입찰·부동산)도. 종전엔 이 보존이 말없이 건너뛰어져
+  //   부동산 정리를 되돌리는 복구가 정리 뒤 바뀐 상태·새 물건을 스냅샷 없이 덮었다)
   const cur = await blobGet(store(DATA), colKey(col));
-  if (cur.ok && cur.data) await verSnapshot(col, cur.data, g.c.member.name + '(복구 전 자동보존)', false);
+  if (cur.ok && cur.data) await verSnapshot(col, cur.data, g.c.member.name + '(복구 전 자동보존)', false, true);
   const doc = Object.assign({}, vr.data.doc, { updated_by: g.c.member.id, updated_at: Date.now() });
   const w = await blobSet(store(DATA), colKey(col), doc);
   if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
@@ -4382,6 +4467,8 @@ async function handlerInner(event) {
     if (d && d.action === 'inquiry_notify') return await handleInquiryNotify(event, d, R);
     if (d && d.action === 'bids_refresh') return await handleBidsRefresh(event, d, R);
     if (d && d.action === 'bids_purge') return await handleBidsPurge(event, d, R);
+    if (d && d.action === 'onbid_purge') return await handleOnbidPurge(event, d, R);   // v444 부동산 정리 세기(dry만 — 관리자)
+    if (d && d.action === 'onbid_purge_set') return await handleOnbidPurgeSet(event, d, R);   // v444 부동산 정리 켜기·끄기(관리자 — 기본 꺼짐)
     if (d && d.action === 'bids_export') return await handleBidsExport(event, d, R);
     if (d && d.action === 'bids_results') return await handleBidsResults(event, d, R);
     if (d && d.action === 'bldg_lookup') return await handleBldgLookup(event, d, R);
