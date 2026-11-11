@@ -8,9 +8,9 @@
 //   stmt:alias:veh       차량 별칭 사전 — 거래처가 쓰는 옛 번호·처음 보는 번호 → 차량 목록 item.id(사람이 한 번 고른 것, v2 §3-2 「덧대기」)
 //   clog:stmt:<YYYY-MM>  간극 기록(이력) — 확정 때·확정 뒤 고칠 때 초안↔확정 칸 변경 수, 확정 풀 때 reopen(값 없음), 해시 체인(clog:<영역>:<월> 규약 — _lib/doneif clogAppend).
 //                        월 요약(stmt_gap)은 이 기록이 아니라 문서(draft↔rows)에서 다시 센다 — 기록 한 줄이 빠져도 요약은 맞게(11/10 검토 L2·8)
-// 권한(키 stmt): 관리자 수행 · 회원 perms.stmt(do 수행 / view 보기) · 값 없으면 숨김. 권한관리 표(레지스트리 13곳)에는 29 판②에서 탭과 함께 올린다 —
-//   그 전엔 gw-auth cleanPerms가 stmt 값을 버리므로 관리자만 쓴다. 기본 숨김을 PERM_CLOSED가 아니라 여기서 정한다(등록 전에도 '보기'로 새지 않게).
-//   차량 대조(stmt_match)는 차량 목록 id(= 'v'+등록 때 번호)를 돌려주므로 차량(veh) 권한도 본다 — gw-data permOf와 같은 규칙(관리자 do · perms.veh · 값 없으면 보기), 숨김이면 403.
+// 권한(키 stmt): 관리자 수행 · 회원 perms.stmt(do 수행 / view 보기) · 값 없으면 숨김. 29 판②에서 권한관리 레지스트리(앱 7곳·서버 기본 숨김 3곳·gw-auth MODULES·ROLE_OPEN_PERMS)에 올렸다 —
+//   gw-data 컬렉션이 없는 키라(화관법 hw와 같은 꼴) 강제는 이 함수뿐이다. 기본 숨김을 PERM_CLOSED에 기대지 않고 여기서도 정한다(값 없음·이상한 값 = 숨김).
+//   모든 동작이 차량(veh) 권한도 본다(29 판② — 줄·색인·별칭이 차량 목록 id = 'v'+등록 때 전체 번호를 담음) — gw-data permOf와 같은 규칙(관리자 do · perms.veh · 값 없으면 보기), 숨김이면 403 NO_VEH_ACCESS.
 // 받지 않는 것: 스캔·원본 파일 자체(이름·쪽 수·sha만 — 원본은 권민지 PC·종이, v2 §4), 사업자번호·계좌·전화·주민번호(piiScan 거절), 대표자·기사·작업자 이름(줄에 이름 칸 없음),
 //   차량 목록에 없는 차량 id(줄·차량 소계·별칭 모두 목록으로 확인 — 지운 차 id는 받음).
 // 비전 판독(D1)은 이 함수에 없다 — 켜는 판은 노무사 회신(원장 T464) 뒤 따로.
@@ -447,6 +447,9 @@ async function handler(event) {
   const p = stmtPerm(c.member);
   if (p === 'hide') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_ACCESS', request_id: R });
   if (isWrite && p !== 'do') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_WRITE', request_id: R });
+  // 차량(veh) 숨김이면 명세서 동작 전부 거절 — 줄·초안·이전 판·차량 소계·월 색인·별칭 사전이 차량 목록 id('v'+등록 때 전체 번호)를 담는다.
+  //   29 판② 검토(low): stmt_match만 veh를 봐서, '명세서 보기 + 차량 숨김' 회원이 stmt_get·stmt_month·stmt_alias_get 응답 JSON으로 전체 번호를 받았다(화면은 끝 4자리만 그림)
+  if (vehPerm(c.member) === 'hide') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_VEH_ACCESS', request_id: R });
   try {
     return await (isRead ? READ[act] : WRITE[act])(store(DATA), c, d, R);
   } catch (e) {

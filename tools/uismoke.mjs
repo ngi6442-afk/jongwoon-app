@@ -56,8 +56,14 @@ const hwEnf4 = /function hwPerm\(member\) \{\s*if \(member && member\.admin\) re
   && /\n  const hp = hwPerm\(c\.member\);/.test(hwk4)
   && /case 'hw_waste_submit': if \(hp !== 'do'\) return jr\(403, \{ ok: false, code: 'NO_WRITE', error: HW_ERR_NO_WRITE, request_id: R \}\); return await handleWasteSubmit\(st, c, d, R\);/.test(hwk4)   // v434 검토: 몸체에 사람 말 error(옛 앱 안내용 — code 그대로)
   && /\nconst HW_ERR_NO_WRITE = '화관법 수행 권한이 없어 제출하지 않았습니다 — [^'\n]*이 요청은 정부에 제출되지 않았습니다\.';\n/.test(hwk4);
-const dm = [...colVals].filter((v) => !mods.has(v)), dx = [...mods].filter((v) => !colVals.has(v) && v !== NO_COL_KEY);
-T('권한 레지스트리 auth↔data 일치(예외 hw = 저장 데이터 없는 키 — gw-auth MODULES에 있고 gw-data COL 값에는 없음 · 강제는 gw-hwakwan.js: hwPerm이 perms.hw를 읽고 폐기물 제출 앞 수행 검사 NO_WRITE, v434)', !dm.length && !dx.length && mods.has(NO_COL_KEY) && !colVals.has(NO_COL_KEY) && hwEnf4, 'auth 누락: ' + dm + ' / auth 잉여: ' + dx + ' / hw MODULES ' + mods.has(NO_COL_KEY) + '·COL ' + colVals.has(NO_COL_KEY) + ' / gw-hwakwan hw 강제 ' + hwEnf4);
+//    29 판②: stmt(월말명세서)도 같은 꼴의 '저장 데이터 없는 키'(자료는 gw-stmt가 stmt:<월>:<거래처>·stmtidx·stmt:cfg·stmt:alias:veh로 직접 다룸 — gw-data 컬렉션 아님).
+//    예외를 키 둘로 늘리되, stmt도 실제로 강제하는 쪽(gw-stmt.js stmtPerm — 관리자 do · perms.stmt do/view · 그 밖 값·값 없음 hide, 로그인·기기 승인 뒤 숨김 403 NO_ACCESS · 쓰기 수행만 NO_WRITE)을 함께 대조한다.
+const NO_COL_KEY2 = 'stmt';
+const stk4 = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-stmt.js'), 'utf8');
+const stmtEnf4 = /function stmtPerm\(member\) \{\s*if \(member && member\.admin\) return 'do';\s*const v = member && member\.perms && member\.perms\.stmt;\s*return \(v === 'do' \|\| v === 'view'\) \? v : 'hide';\s*\}/.test(stk4)
+  && /\n  if \(!\(await deviceApproved\(event, c\.member\)\)\) return jr\(403, \{ status: 'FORBIDDEN', error_code: 'DEVICE_NOT_APPROVED', request_id: R \}\);\n  const p = stmtPerm\(c\.member\);\n  if \(p === 'hide'\) return jr\(403, \{ status: 'FORBIDDEN', error_code: 'NO_ACCESS', request_id: R \}\);\n  if \(isWrite && p !== 'do'\) return jr\(403, \{ status: 'FORBIDDEN', error_code: 'NO_WRITE', request_id: R \}\);/.test(stk4);
+const dm = [...colVals].filter((v) => !mods.has(v)), dx = [...mods].filter((v) => !colVals.has(v) && v !== NO_COL_KEY && v !== NO_COL_KEY2);
+T('권한 레지스트리 auth↔data 일치(예외 hw = 저장 데이터 없는 키 — gw-auth MODULES에 있고 gw-data COL 값에는 없음 · 강제는 gw-hwakwan.js: hwPerm이 perms.hw를 읽고 폐기물 제출 앞 수행 검사 NO_WRITE, v434 · 29 판② stmt도 같은 꼴 — 강제는 gw-stmt.js stmtPerm: 기기 승인 뒤 숨김 NO_ACCESS·쓰기 수행만 NO_WRITE)', !dm.length && !dx.length && mods.has(NO_COL_KEY) && !colVals.has(NO_COL_KEY) && hwEnf4 && mods.has(NO_COL_KEY2) && !colVals.has(NO_COL_KEY2) && stmtEnf4, 'auth 누락: ' + dm + ' / auth 잉여: ' + dx + ' / hw MODULES ' + mods.has(NO_COL_KEY) + '·COL ' + colVals.has(NO_COL_KEY) + ' / gw-hwakwan hw 강제 ' + hwEnf4 + ' / stmt MODULES ' + mods.has(NO_COL_KEY2) + '·COL ' + colVals.has(NO_COL_KEY2) + ' / gw-stmt stmt 강제 ' + stmtEnf4);
 
 // 4a) 권한관리 화면 열 목록(PERM_ORDER)도 앱 MODULES와 일치해야 한다 —
 //     wk(일용직)·promo(홍보) 누락으로 매트릭스에 열이 안 떠 권한 부여가 불가능했던 실사고 2회의 재발 방지
@@ -1302,8 +1308,8 @@ try {
   const svrC = keys(gwd, /const PERM_CLOSED = \{([^}]+)\}/);
   const askS = readFileSync(join(ROOT, 'netlify/functions/_lib/ask.js'), 'utf8');
   T('v424 검토 물어보기 권한: 기본 숨김 집합 = 서버와 같음 · 석면 도구 = 현장 권한(gw-data COL과 같음)', keys(askS, /const PERM_CLOSED = \{([^}]+)\}/).join() === svrC.join() && /asbestos: 'site'/.test(askS) && /asbestos: *'site'/.test(gwd), '');
-  T('기본 숨김 집합(PERM_CLOSED) 앱↔서버 일치 + lic·site·safety·hw 포함(인허가=면허 · site=현장 대장, 둘 다 관리부·운영부만 · safety=안전 › 교육·검진, v430 명시 부여만 · hw=화관법, v431 관리+운영만) — 7개',
-    appC.length === 7 && same(appC, svrC) && appC.indexOf('lic') >= 0 && appC.indexOf('site') >= 0 && appC.indexOf('safety') >= 0 && appC.indexOf('hw') >= 0,
+  T('기본 숨김 집합(PERM_CLOSED) 앱↔서버 일치 + lic·site·safety·hw·stmt 포함(인허가=면허 · site=현장 대장, 둘 다 관리부·운영부만 · safety=안전 › 교육·검진, v430 명시 부여만 · hw=화관법, v431 관리+운영만 · stmt=월말명세서, 29 판② 권민지 수행·나수진 보기만) — 8개',
+    appC.length === 8 && same(appC, svrC) && appC.indexOf('lic') >= 0 && appC.indexOf('site') >= 0 && appC.indexOf('safety') >= 0 && appC.indexOf('hw') >= 0 && appC.indexOf('stmt') >= 0,
     '앱 [' + appC.join(',') + '] / 서버 [' + svrC.join(',') + ']');
   T('앱 permOf·pmVal 둘 다 PERM_CLOSED를 쓴다(집합이 함수마다 따로 놀지 않게)',
     /return \(m\.perms && m\.perms\[mod\]\) \|\| \(PERM_CLOSED\[mod\] \? "hide" : "view"\);/.test(html)
@@ -2078,10 +2084,10 @@ try {
   // ② 사이드바 순서·칸 수
   const nav28 = html.slice(html.indexOf('<nav class="tabbar" id="tabbar">'), html.indexOf('</nav>'));
   const tabs28 = [...nav28.matchAll(/data-tab="([\w-]+)"/g)].map((m) => m[1]);
-  const WANT28 = 'dash,tasks,rec,cli,hr,workers,progress,bid,con,quote,promo,cal,veh,hwakwan,allbaro,safety,lic,doc,ask,check,leave';
+  const WANT28 = 'dash,tasks,rec,stmt,cli,hr,workers,progress,bid,con,quote,promo,cal,veh,hwakwan,allbaro,safety,lic,doc,ask,check,leave';   // 29 판②: 관리 › 기성·수금 다음 월말명세서(stmt)
   const ia28 = tabs28.indexOf('allbaro');
-  T('v428 사이드바 21칸(관리자 22 → 21, 부동산 빠짐) 순서 그대로 · 업무 묶음 운반일지 → 안전 → 인허가(옛 현장 자리) · 안전 버튼 tabSafetyBtn = 처음엔 숨김(perm-hidden)·글자 "안전"',
-    tabs28.join(',') === WANT28 && tabs28.length === 21 && ia28 > 0 && tabs28[ia28 + 1] === 'safety' && tabs28[ia28 + 2] === 'lic'
+  T('v428 사이드바 21칸(관리자 22 → 21, 부동산 빠짐 — 29 판②에 관리 › 기성·수금 다음 월말명세서를 더해 22칸) 순서 그대로 · 업무 묶음 운반일지 → 안전 → 인허가(옛 현장 자리) · 안전 버튼 tabSafetyBtn = 처음엔 숨김(perm-hidden)·글자 "안전"',
+    tabs28.join(',') === WANT28 && tabs28.length === 22 && ia28 > 0 && tabs28[ia28 + 1] === 'safety' && tabs28[ia28 + 2] === 'lic'
     && /<button class="tab-btn perm-hidden" data-tab="safety" id="tabSafetyBtn">안전<\/button>/.test(nav28), tabs28.join(','));
 
   // ③ 칸 구조 — 현장 id 5개가 view-safety의 현장 칸 안 · 교육 칸 · 입찰 칸
@@ -2317,8 +2323,8 @@ try {
   const helpBad28 = G4_28.filter((g) => !grp28[g] || helpLn28(g) !== grp28[g].join(' / ')), manBad28 = G4_28.filter((g) => !grp28[g] || manLn28(g) !== grp28[g].join(' / '));
   const OLDMAN28 = ['온비드 물건은 부동산 탭에 따로 모입니다', '현장 탭에 <b>미이수</b>', '인사·직원 탭(직원 대상)과 인사·일용직 탭(일용직 대상) 아래에 있습니다', '<h2 id="s12">12. 부동산', '<h2 id="s28">28. 현장', '홍보 / 부동산', '운반일지 / 현장 /', '>부동산 (온비드)</a>', '>현장 — 석면·철거·준설 대장</a>'];
   const oldMan28 = OLDMAN28.filter((s) => man28.indexOf(s) >= 0);
-  T('v428 도움말·MANUAL 1절 4묶음 = 사이드바 라벨 그대로(관리 6 · 수주 4 · 업무 7 · 개인 3 — 수주 입찰/계약/견적서/홍보 · 업무 …/운반일지/안전/인허가/문서함 · 개인 물어보기/내 업무/휴가) · 탭 안 칸 안내(입찰 = 공고/부동산, 안전 = 현장/교육·검진) · MANUAL 12·28·21-9절 새 자리 · 옛 위치 문장 0 · sw ≥ 428',
-    G4_28.map((g) => (grp28[g] || []).length).join(',') === '6,4,7,3' && grp28['수주'].join('/') === '입찰/계약/견적서/홍보' && grp28['업무'].join('/') === '캘린더/차량/화관법/운반일지/안전/인허가/문서함' && grp28['개인'].join('/') === '물어보기/내 업무/휴가'
+  T('v428 도움말·MANUAL 1절 4묶음 = 사이드바 라벨 그대로(관리 7(29 판② 월말명세서 더함 — 지시/기성·수금/월말명세서/…) · 수주 4 · 업무 7 · 개인 3 — 수주 입찰/계약/견적서/홍보 · 업무 …/운반일지/안전/인허가/문서함 · 개인 물어보기/내 업무/휴가) · 탭 안 칸 안내(입찰 = 공고/부동산, 안전 = 현장/교육·검진) · MANUAL 12·28·21-9절 새 자리 · 옛 위치 문장 0 · sw ≥ 428',
+    G4_28.map((g) => (grp28[g] || []).length).join(',') === '7,4,7,3' && grp28['관리'].slice(0, 3).join('/') === '지시/기성·수금/월말명세서' && grp28['수주'].join('/') === '입찰/계약/견적서/홍보' && grp28['업무'].join('/') === '캘린더/차량/화관법/운반일지/안전/인허가/문서함' && grp28['개인'].join('/') === '물어보기/내 업무/휴가'
     && helpBad28.length === 0 && manBad28.length === 0 && help28.indexOf('<b>입찰</b> = 공고 / 부동산, <b>안전</b> = 현황 / 현장 / 체크') > 0 && man1_28.indexOf('<b>입찰</b> = 공고 / 부동산, <b>안전</b> = 현황 / 현장 / 체크') > 0   // v432 안전 칸에 현황(맨 앞) · v447 칸 이름 교육·검진 → 체크
     && help28.indexOf('홍보 / 부동산') < 0 && help28.indexOf('운반일지 / 현장 /') < 0 && oldMan28.length === 0
     && man28.indexOf('<h2 id="s12">12. 입찰 › 부동산 (온비드)') > 0 && man28.indexOf('<h2 id="s28">28. 안전 › 현장 — 석면·철거·준설 대장') > 0 && man28.indexOf('<h3>21-9. 교육·건강진단 이력 (안전 › 체크)</h3>') > 0
@@ -2447,7 +2453,7 @@ try {
   T('v429 권한 열 순서 한 벌 = 사이드바 순서(' + PO29.join('·') + '): 모듈마다 사이드바 탭으로 풀리고(site = 안전 탭 안 현장 칩) 사이드바 자리가 엄격히 증가(같은 탭 짝은 3단계 safety>site만 — 지금 ' + (same29.join('·') || '0') + ') · PERM_ORDER를 쓰는 코드는 permModList 하나(권한관리 표·인사 카드) · 인사 카드 숨김 블록(openMemberEdit 실행) = 같은 순서 + 관리 묶음(' + mgMods29.join('·') + ') 뒤 구분선 1개 · MANUAL 21-2 열 목록 = 같은 순서',
     PO29.length >= 12 && mono29 && same29.every((s) => SAME29[s] === 1) && new Set(pos29).size === PO29.length - same29.length && (codeOnly29.match(/\bPERM_ORDER\b/g) || []).length === 2 && /function permModList\(\)\{ return PERM_ORDER\.filter\(/.test(html)
     && /var mods = permModList\(\);/.test(fn29('renderPermMgmt')) && /getElementById\("mePerms"\)\.innerHTML = permModList\(\)\.map\(/.test(ome29)
-    && meRows29.join(',') === wantRows29.join(',') && mgMods29.join(',') === 'tasks,rec,cli,wk' && man29.indexOf('표의 열은 사이드바 순서와 같습니다 — ' + manCols29 + '.') > 0,
+    && meRows29.join(',') === wantRows29.join(',') && mgMods29.join(',') === 'tasks,rec,stmt,cli,wk' && man29.indexOf('표의 열은 사이드바 순서와 같습니다 — ' + manCols29 + '.') > 0,   // 29 판②: 관리 묶음에 월말명세서(stmt)
     'PERM_ORDER ' + PO29.join(',') + ' → 사이드바 자리 ' + pos29.join(',') + ' (같은 탭 짝 ' + (same29.join(',') || '없음') + ') / 인사 카드 ' + meRows29.join(',') + ' (기대 ' + wantRows29.join(',') + ') / MANUAL 열 ' + manCols29);
 
   T('v429 쓰지 않는 상수·두 번째 순서 0곳: TAB_LABELS(부동산 onbid 잔재 포함) · permOrder 없음',
@@ -2496,8 +2502,8 @@ try {
   const am30 = list30(html, /var MODULES = \[([^\]]+)\]/, '"'), gm30 = list30(auth, /const MODULES = \[([^\]]+)\]/, "'");
   const ML30 = {}; [...((html.match(/var MOD_LABEL = \{([^}]+)\}/) || ['', ''])[1]).matchAll(/(\w+):"([^"]+)"/g)].forEach((m) => { ML30[m[1]] = m[2]; });
   const PO30 = list30(html, /var PERM_ORDER = \[([^\]]+)\]/, '"');
-  T('v430 앱 MODULES = gw-auth MODULES(순서까지 — cleanPerms가 저장하는 키) · safety 다음 hw(v431)가 둘 다 끝 · MOD_LABEL safety "안전"·hw "화관법"(키마다 라벨) · PERM_ORDER에서 safety 바로 뒤 site(같은 안전 탭 칩 짝)·veh 바로 뒤 hw(사이드바 차량 다음 화관법)',
-    am30.length >= 14 && am30.join(',') === gm30.join(',') && am30.slice(-2).join(',') === 'safety,hw' && ML30.safety === '안전' && ML30.hw === '화관법' && am30.every((k) => !!ML30[k])
+  T('v430 앱 MODULES = gw-auth MODULES(순서까지 — cleanPerms가 저장하는 키) · safety 다음 hw(v431)가 끝(29 판②부터 그 뒤 맨 끝 stmt) · MOD_LABEL safety "안전"·hw "화관법"·stmt "월말명세서"(키마다 라벨) · PERM_ORDER에서 safety 바로 뒤 site(같은 안전 탭 칩 짝)·veh 바로 뒤 hw(사이드바 차량 다음 화관법)',
+    am30.length >= 15 && am30.join(',') === gm30.join(',') && am30.slice(-3).join(',') === 'safety,hw,stmt' && ML30.safety === '안전' && ML30.hw === '화관법' && ML30.stmt === '월말명세서' && am30.every((k) => !!ML30[k])
     && PO30.indexOf('safety') >= 0 && PO30[PO30.indexOf('safety') + 1] === 'site' && PO30.indexOf('veh') >= 0 && PO30[PO30.indexOf('veh') + 1] === 'hw',
     '앱 ' + am30.join(',') + ' / auth ' + gm30.join(',') + ' / PERM_ORDER ' + PO30.join(','));
 
@@ -2508,10 +2514,10 @@ try {
   const R6_30 = ['개발자', '대표', '관리자', '팀장', '직원', '현장직'], R3_30 = ['팀장', '직원', '현장직'];
   const preKeys30 = R6_30.every((r) => pre30[r] && Object.keys(pre30[r]).sort().join(',') === am30.slice().sort().join(','));
   const openEq30 = R3_30.every((r) => open30[r] && kv30(pre30[r]) === kv30(open30[r]));
-  T('v430 직책 프리셋: 앱 ROLE_PRESET 6직책 키 = MODULES · 일반 3직책(팀장·직원·현장직) = 서버 gw-auth ROLE_OPEN_PERMS 키·값(관리자 등록분 권한이 화면과 같게) · safety·hw(v431) = 관리 3직책 수행 / 일반 3직책 숨김(PM ②·③ — 팀장도 숨김) · 직원 줄 맨 끝 safety·hw(servertest가 직원 줄 글자를 서버 표와 대조)',
+  T('v430 직책 프리셋: 앱 ROLE_PRESET 6직책 키 = MODULES · 일반 3직책(팀장·직원·현장직) = 서버 gw-auth ROLE_OPEN_PERMS 키·값(관리자 등록분 권한이 화면과 같게) · safety·hw(v431)·stmt(29 판②) = 관리 3직책 수행 / 일반 3직책 숨김(PM ②·③·11/10 D2 — 팀장도 숨김) · 직원 줄 맨 끝 safety·hw·stmt(servertest가 직원 줄 글자를 서버 표와 대조)',
     Object.keys(pre30).length === 6 && Object.keys(open30).length === 3 && preKeys30 && openEq30
-    && ['개발자', '대표', '관리자'].every((r) => pre30[r].safety === 'do' && pre30[r].hw === 'do') && R3_30.every((r) => pre30[r].safety === 'hide' && open30[r].safety === 'hide' && pre30[r].hw === 'hide' && open30[r].hw === 'hide')
-    && Object.keys(pre30['직원']).slice(-2).join(',') === 'safety,hw' && Object.keys(open30['직원']).slice(-2).join(',') === 'safety,hw',
+    && ['개발자', '대표', '관리자'].every((r) => pre30[r].safety === 'do' && pre30[r].hw === 'do' && pre30[r].stmt === 'do') && R3_30.every((r) => pre30[r].safety === 'hide' && open30[r].safety === 'hide' && pre30[r].hw === 'hide' && open30[r].hw === 'hide' && pre30[r].stmt === 'hide' && open30[r].stmt === 'hide')
+    && Object.keys(pre30['직원']).slice(-3).join(',') === 'safety,hw,stmt' && Object.keys(open30['직원']).slice(-3).join(',') === 'safety,hw,stmt',
     JSON.stringify({ app: R6_30.map((r) => r + ':' + (pre30[r] ? pre30[r].safety + '/' + pre30[r].hw : '-')), srv: R3_30.map((r) => r + ':' + (open30[r] ? open30[r].safety + '/' + open30[r].hw : '-')), keys: preKeys30, same: openEq30 }));
 
   // ④ 서버 COL edu = safety · hr은 COL 값에 없음 · gw-auth cleanPerms를 뽑아 실제로 돌린다(safety 없는 perms → hide)
@@ -2734,8 +2740,8 @@ try {
   // ① 등록 자리 — hw는 MODULES 끝·라벨 '화관법'·기본 숨김 · v434(4-2) MODULE_TAB.hw = 사이드바 화관법 탭 버튼(nav 안 data-tab "hwakwan" 버튼 — 다른 키 값에는 없음) ·
   //    MODULE_VIEW.hw = 화관법 화면 section(view-hwakwan) · 저장 데이터 없는 키(gw-data·물어보기 COL 값에 hw·hwakwan 없음 — 앞 묶음 4번 예외의 근거)
   const nav31 = html.slice(html.indexOf('<nav class="tabbar" id="tabbar">'), html.indexOf('</nav>'));
-  T('v431 등록 자리(v434 4-2 연결): 앱 MODULES 끝 hw · MOD_LABEL.hw "화관법" · 앱 PERM_CLOSED에 hw · MODULE_TAB.hw = tabHwakwanBtn(사이드바 업무 묶음 화관법 탭 버튼, data-tab "hwakwan") · MODULE_VIEW.hw = view-hwakwan(화관법 화면 section) · 두 id는 hw 키에만 · gw-data·물어보기 COL 값에 hw·hwakwan 없음(저장 데이터 없는 키)',
-    am31[am31.length - 1] === 'hw' && ML31.hw === '화관법' && pc31.indexOf('hw') >= 0
+  T('v431 등록 자리(v434 4-2 연결): 앱 MODULES 끝 hw(29 판②부터 hw 다음 맨 끝 stmt) · MOD_LABEL.hw "화관법" · 앱 PERM_CLOSED에 hw · MODULE_TAB.hw = tabHwakwanBtn(사이드바 업무 묶음 화관법 탭 버튼, data-tab "hwakwan") · MODULE_VIEW.hw = view-hwakwan(화관법 화면 section) · 두 id는 hw 키에만 · gw-data·물어보기 COL 값에 hw·hwakwan 없음(저장 데이터 없는 키)',
+    am31.slice(-2).join(',') === 'hw,stmt' && ML31.hw === '화관법' && pc31.indexOf('hw') >= 0
     && MT31.hw === 'tabHwakwanBtn' && MV31.hw === 'view-hwakwan'
     && Object.keys(MT31).filter((k) => MT31[k] === 'tabHwakwanBtn').join(',') === 'hw' && Object.keys(MV31).filter((k) => MV31[k] === 'view-hwakwan').join(',') === 'hw'
     && nav31.indexOf('<button class="tab-btn" data-tab="hwakwan" id="tabHwakwanBtn">화관법</button>') > nav31.indexOf('<div class="nav-group">업무</div>') && nav31.indexOf('<div class="nav-group">업무</div>') > 0
@@ -3888,15 +3894,16 @@ try {
     fld: { id: 'k5', perms: { tasks: 'hide', veh: 'view', rec: 'hide', lic: 'hide', site: 'hide', check: 'do', con: 'hide', cli: 'hide', doc: 'view', wk: 'hide', quote: 'hide', promo: 'hide' } },   // 현장 8명(값 없음 = 기본 숨김)
     dmy: { id: 'k6', perms: { tasks: 'do', veh: 'do', rec: 'view', lic: 'view', site: 'do', check: 'do', con: 'hide', cli: 'view', doc: 'view', wk: 'do', quote: 'hide', promo: 'hide' } },   // 더미(값 없음)
   };
-  const WANT34 = { admin: [21, 21], kja: [15, 15], kmj: [14, 14], kmjS: [15, 15], jjw: [14, 14], kht: [12, 11], fld: [9, 8], dmy: [15, 14] };   // [4-1 흉내(v433), v434]
+  const WANT34 = { admin: [22, 22], kja: [15, 15], kmj: [14, 14], kmjS: [15, 15], jjw: [14, 14], kht: [12, 11], fld: [9, 8], dmy: [15, 14] };   // [4-1 흉내(v433), v434] — 29 판②: 관리자는 월말명세서까지 22(두 판 모두 — 흉내는 hw만 걷음), 그 밖 사람은 stmt 값이 없어 기본 숨김(칸 수 그대로)
   const R34 = {}; Object.keys(P34).forEach((k) => { R34[k] = { a: runNav34(P34[k], REG41_34, AP41_34), b: runNav34(P34[k], REG42_34, AP42_34) }; });
   const diff34 = (r) => r.a.vis.filter((id) => r.b.vis.indexOf(id) < 0).concat(r.b.vis.filter((id) => r.a.vis.indexOf(id) < 0).map((id) => '+' + id));
   const okN34 = Object.keys(WANT34).every((k) => R34[k].a.vis.length === WANT34[k][0] && R34[k].b.vis.length === WANT34[k][1]);
   const okD34 = Object.keys(WANT34).every((k) => { const d = diff34(R34[k]); return WANT34[k][0] === WANT34[k][1] ? d.length === 0 : (d.length === 1 && d[0] === 'tabHwakwanBtn'); });
   const hwVis34 = Object.keys(P34).filter((k) => R34[k].b.vis.indexOf('tabHwakwanBtn') >= 0).join(',');
-  T('v434 ⓑ 사람별 사이드바 칸 수(실제 nav 21칸·permOf·applyPerms·applySafetyPerms 실행 — 11/9 명부 권한 + 11/10 hw 저장값): 관리자 21 · 김정아(수행) 15 · 권민지(보기) 14(안전 부여 뒤 15) · 정재욱(보기) 14 · 김호태(숨김) 12 → 11 · 현장 8명형(값 없음) 9 → 8 · 더미(값 없음) 15 → 14 — 4-1 흉내(두 표에 hw 없음·전용 줄 없음)와 비교해 바뀐 칸은 화관법 하나뿐(안전 탭 등 그대로) · 화관법이 보이는 사람 = 관리자·김정아·권민지·정재욱 · 4-1 흉내에서도 getElementById(undefined) 0(applyPerms "MODULE_TAB 없는 키 건너뜀" 안전장치가 남아 있음) · 흉내가 실제로 전용 줄·두 표 hw를 지웠는지 · 홈에서 돌린 applyPerms는 홈 이동·화관법 다시 그림 0',
-    navEls34.filter((e) => e.cls.indexOf('tab-btn') >= 0).length === 21 && AP41_34 !== AP42_34 && REG41_34[1] !== REG42_34[1] && REG41_34[2] !== REG42_34[2]
-    && okN34 && okD34 && hwVis34 === 'admin,kja,kmj,kmjS,jjw' && Object.keys(R34).every((k) => R34[k].b.log.length === 0 && R34[k].a.undef === 0 && R34[k].b.undef === 0),
+  const stVis34 = Object.keys(P34).filter((k) => R34[k].b.vis.indexOf('tabStmtBtn') >= 0).join(',');   // 29 판② 월말명세서 — 명부 저장값에 stmt가 없어(배포 직후 전원) 관리자만
+  T('v434 ⓑ 사람별 사이드바 칸 수(실제 nav 22칸(29 판② 월말명세서 더함)·permOf·applyPerms·applySafetyPerms 실행 — 11/9 명부 권한 + 11/10 hw 저장값): 관리자 22 · 김정아(수행) 15 · 권민지(보기) 14(안전 부여 뒤 15) · 정재욱(보기) 14 · 김호태(숨김) 12 → 11 · 현장 8명형(값 없음) 9 → 8 · 더미(값 없음) 15 → 14 — 4-1 흉내(두 표에 hw 없음·전용 줄 없음)와 비교해 바뀐 칸은 화관법 하나뿐(안전 탭 등 그대로) · 화관법이 보이는 사람 = 관리자·김정아·권민지·정재욱 · 월말명세서가 보이는 사람 = 관리자만(stmt 값 없음 = 기본 숨김) · 4-1 흉내에서도 getElementById(undefined) 0(applyPerms "MODULE_TAB 없는 키 건너뜀" 안전장치가 남아 있음) · 흉내가 실제로 전용 줄·두 표 hw를 지웠는지 · 홈에서 돌린 applyPerms는 홈 이동·화관법 다시 그림 0',
+    navEls34.filter((e) => e.cls.indexOf('tab-btn') >= 0).length === 22 && AP41_34 !== AP42_34 && REG41_34[1] !== REG42_34[1] && REG41_34[2] !== REG42_34[2]
+    && okN34 && okD34 && hwVis34 === 'admin,kja,kmj,kmjS,jjw' && stVis34 === 'admin' && Object.keys(R34).every((k) => R34[k].b.log.length === 0 && R34[k].a.undef === 0 && R34[k].b.undef === 0),
     Object.keys(P34).map((k) => k + ' ' + R34[k].a.vis.length + '→' + R34[k].b.vis.length + (diff34(R34[k]).length ? '(' + diff34(R34[k]).join('·') + ')' : '')).join(' · '));
 
   // ⓒ renderHwWaste 실행 — 보기·숨김 = 폐기물 칸 대신 안내 한 줄(#hwViewOnly) · 수행·관리자 = 종전 제출 칸
@@ -4877,17 +4884,17 @@ try {
   const viewW38 = (win, id) => { const b = body38(win), own = decl38(win, '#view-' + id, 'max-width'), base = decl38(win, '.views>.view', 'max-width'), mx = own != null ? own : base; return (!mx || mx === 'none') ? b : Math.min(b, parseFloat(mx)); };
   //   명세 width_plan.table(창 → 본문, 스크롤바 17 포함): 1024 791 · 1100 867 · 1280 1011 · 1366 1097 · 1440 1171 · 1536 1267 · 1600 1331 · 1920·2560 1428
   const WT38 = { 1024: 791, 1100: 867, 1280: 1011, 1366: 1097, 1440: 1171, 1536: 1267, 1600: 1331, 1920: 1428, 2560: 1428 };
-  const WIDE38 = ['tasks', 'rec', 'cli', 'workers', 'bid', 'con', 'veh', 'safety', 'perm'];   // 명세 reading_width 9개 중 v438은 계약·차량·권한관리 · v439에 지시(#view-tasks) · v440에 기성(#view-rec) · v441에 거래처(#view-cli) · v442에 일용직(#view-workers) · v443에 입찰(#view-bid — 표로 바꾼 판) · v445에 안전(#view-safety — 56 판, 현장 칸 표) — 9개 다
+  const WIDE38 = ['tasks', 'rec', 'cli', 'workers', 'bid', 'con', 'veh', 'safety', 'perm', 'stmt'];   // 명세 reading_width 9개 중 v438은 계약·차량·권한관리 · v439에 지시(#view-tasks) · v440에 기성(#view-rec) · v441에 거래처(#view-cli) · v442에 일용직(#view-workers) · v443에 입찰(#view-bid — 표로 바꾼 판) · v445에 안전(#view-safety — 56 판, 현장 칸 표) — 9개 다 · 29 판② 월말명세서(#view-stmt — 처음부터 표, 명세 9개 밖)
   const views38 = [...html.matchAll(/<(?:section|div) class="view(?: active)?" id="view-([a-z]+)">/g)].map((m) => m[1]);
-  const SECS38 = ['tasks', 'veh', 'hwakwan', 'allbaro', 'rec', 'cal', 'lic', 'bid', 'con', 'cli', 'doc', 'hr', 'progress', 'ask', 'safety', 'quote', 'promo', 'workers', 'perm', 'fam', 'leave'];
+  const SECS38 = ['tasks', 'veh', 'hwakwan', 'allbaro', 'rec', 'stmt', 'cal', 'lic', 'bid', 'con', 'cli', 'doc', 'hr', 'progress', 'ask', 'safety', 'quote', 'promo', 'workers', 'perm', 'fam', 'leave'];   // 29 판②: 기성 화면 뒤 월말명세서 section
   const secs38 = [...html.matchAll(/<section class="view" id="view-([a-z]+)">/g)].map((m) => m[1]);
   const wBad38 = Object.keys(WT38).filter((w) => Math.abs(body38(+w) - WT38[w]) > 2);
   const vBad38 = [1366, 1920].map((w) => views38.filter((id) => viewW38(w, id) !== (WIDE38.indexOf(id) >= 0 ? body38(w) : 808)).join('/')).join('|') + '|' + views38.filter((id) => viewW38(1024, id) !== body38(1024)).join('/');
   const perm38 = decl38(1366, '#view-perm>:not(#permRoster)', 'max-width') === '808px' && decl38(1920, '#view-perm>:not(#permRoster)', 'max-width') === '808px' && decl38(1920, '#permRoster', 'max-width') == null && decl38(1920, '#sfPaneNow', 'max-width') === '808px'
     && decl38(1366, '#sfPaneNow', 'max-width') === '808px' && decl38(1920, '#sfPaneEdu', 'max-width') == null && decl38(1920, '#eduLead', 'max-width') === '808px' && decl38(1920, '#eduScopeLine', 'max-width') === '808px' && decl38(1920, '#sfPaneSite', 'max-width') == null;   // v447: 체크 칸(#sfPaneEdu)도 사람별 표라 넓힘 — 칸 머리 두 줄만 808   // v445: 안전 탭은 현장 칸(표)만 넓고 현황·교육·검진(옛 목록 — v446 사람별 표 판에서)은 808
   const phone38 = decl38(859, '#app', 'max-width') === '560px' && padLR38(decl38(859, '#app', 'padding')).join() === '16,16' && decl38(859, '.views>.view', 'max-width') == null && decl38(375, '.tabbar', 'width') == null && decl38(859, '.layout', 'gap') == null;
-  T('v438 ① 화면 폭(head <style>을 읽어 계산 — 창 폭 − 스크롤바 17): 본문 = 명세 width_plan.table(±2px) 1024 791 · 1100 867 · 1280 1011 · 1366 1097 · 1440 1171 · 1536 1267 · 1600 1331 · 1920·2560 1428 · 넓히는 화면 id 9개(지시·기성·거래처·일용직·입찰·계약·차량·안전·권한관리 — v439에 지시·v440에 기성·v441에 거래처·v442에 일용직·v443에 입찰·v445에 안전을 더함)만 1366·1920에서 본문 폭, 그 밖 화면은 808 · 1024 창은 모두 본문 폭(791 < 808) · 권한관리는 권한 표(#permRoster)만 넓고 그 밖 카드·안전 현황(#sfPaneNow)·교육·검진(#sfPaneEdu — v446 전까지 옛 목록) 808(현장 칸 #sfPaneSite는 본문 폭) · 859px 이하 틀 그대로(#app 최대 560·여백 16, 간격·사이드바 폭·읽기 폭 규칙 없음) · section 태그 21개 class="view" 그대로(class 더하지 않음)',
-    wBad38.length === 0 && vBad38 === '||' && views38.length === 23 && perm38 && phone38 && JSON.stringify(secs38) === JSON.stringify(SECS38) && !/<section class="view [^"]*" id=/.test(html),
+  T('v438 ① 화면 폭(head <style>을 읽어 계산 — 창 폭 − 스크롤바 17): 본문 = 명세 width_plan.table(±2px) 1024 791 · 1100 867 · 1280 1011 · 1366 1097 · 1440 1171 · 1536 1267 · 1600 1331 · 1920·2560 1428 · 넓히는 화면 id 10개(지시·기성·거래처·일용직·입찰·계약·차량·안전·권한관리·월말명세서 — v439에 지시·v440에 기성·v441에 거래처·v442에 일용직·v443에 입찰·v445에 안전·29 판②에 월말명세서를 더함)만 1366·1920에서 본문 폭, 그 밖 화면은 808 · 1024 창은 모두 본문 폭(791 < 808) · 권한관리는 권한 표(#permRoster)만 넓고 그 밖 카드·안전 현황(#sfPaneNow)·교육·검진(#sfPaneEdu — v446 전까지 옛 목록) 808(현장 칸 #sfPaneSite는 본문 폭) · 859px 이하 틀 그대로(#app 최대 560·여백 16, 간격·사이드바 폭·읽기 폭 규칙 없음) · section 태그 22개(29 판② 월말명세서 더함) class="view" 그대로(class 더하지 않음)',
+    wBad38.length === 0 && vBad38 === '||' && views38.length === 24 && perm38 && phone38 && JSON.stringify(secs38) === JSON.stringify(SECS38) && !/<section class="view [^"]*" id=/.test(html),   // 29 판②: 화면 24(월말명세서 더함)·넓히는 화면 10
     JSON.stringify({ body: Object.keys(WT38).map((w) => w + ':' + body38(+w)), viewBad: vBad38, views: views38.length, perm38, phone38, secs: secs38.length }));
 
   // ② 이후 — 부품 하네스
@@ -5142,8 +5149,8 @@ try {
   //   저장소가 던지면(개인 창·사이트 데이터 차단 — getItem·setItem 모두) 그리기·칩 누름·거르기가 오류 없이 되고 상태는 메모리에 남음(v438 검토)
   let thr38 = '';
   try { const K3_38 = mk38({ width: 1366, throwStore: 1 }), hK3_38 = K3_38.env.mkHost('vsT'), dK3_38 = def38(); thr38 = K3_38.api.render(dK3_38); click38(hK3_38, '[data-vs-chip="kd|auto"]'); K3_38.api.filter(dK3_38, 'who', '이'); thr38 += ':' + order38(hK3_38._h) + ':' + JSON.stringify(K3_38.api.inst(dK3_38).st.chip) + JSON.stringify(K3_38.api.inst(dK3_38).st.f); } catch (e) { thr38 = '던짐 ' + e.message; }
-  T('v438 ⑦ 기기 기억: 저장 이름 = 명세 8개(jw_task_sheet·jw_rec_sheet·jw_cli_sheet·jw_wk_sheet·jw_bid_sheet·jw_ob_sheet·jw_site_sheet·jw_edu_sheet — 계약·차량 키 아님) · 옛 기억 읽기 = 정렬 담당 ▼·거르기는 정의에 있는 글자/고르기 열만(모르는 열·거르기 없음 열 버림)·칩은 있는 값만·끈 폭은 안 읽음 → 기한 경과 AND "준설" = a · 칩을 누르면 jw_task_sheet 한 곳에만 저장·키는 k,d,f,chip 넷뿐 · 깨진 기억은 빈 상태로 그림 · 저장소가 던져도(읽기·쓰기) 그리기·칩·거르기 오류 없음(자동 AND 담당 이 = b, 상태는 메모리)',
-    JSON.stringify(K38.api.KEYS) === JSON.stringify(['jw_task_sheet', 'jw_rec_sheet', 'jw_cli_sheet', 'jw_wk_sheet', 'jw_bid_sheet', 'jw_ob_sheet', 'jw_site_sheet', 'jw_edu_sheet'])
+  T('v438 ⑦ 기기 기억: 저장 이름 = 명세 8개(jw_task_sheet·jw_rec_sheet·jw_cli_sheet·jw_wk_sheet·jw_bid_sheet·jw_ob_sheet·jw_site_sheet·jw_edu_sheet — 계약·차량 키 아님) + 29 판② jw_stmt_sheet(월말명세서) · 옛 기억 읽기 = 정렬 담당 ▼·거르기는 정의에 있는 글자/고르기 열만(모르는 열·거르기 없음 열 버림)·칩은 있는 값만·끈 폭은 안 읽음 → 기한 경과 AND "준설" = a · 칩을 누르면 jw_task_sheet 한 곳에만 저장·키는 k,d,f,chip 넷뿐 · 깨진 기억은 빈 상태로 그림 · 저장소가 던져도(읽기·쓰기) 그리기·칩·거르기 오류 없음(자동 AND 담당 이 = b, 상태는 메모리)',
+    JSON.stringify(K38.api.KEYS) === JSON.stringify(['jw_task_sheet', 'jw_rec_sheet', 'jw_cli_sheet', 'jw_wk_sheet', 'jw_bid_sheet', 'jw_ob_sheet', 'jw_site_sheet', 'jw_edu_sheet', 'jw_stmt_sheet'])
     && JSON.stringify(kld38) === JSON.stringify(['who', -1, '{"t":"준설"}', '{"st":"over"}', 0, 'a', 'who▼'])
     && K38.env.sets.length >= 1 && K38.env.sets.every((k) => k === 'jw_task_sheet') && Object.keys(ksv38).join() === 'k,d,f,chip' && ksv38.chip.kd === 'auto' && ksv38.chip.st === 'over' && ksv38.f.t === '준설'
     && kr2_38 === 'sheet' && kb2_38 === '{"k":"","d":1,"f":{},"chip":{}}' && thr38 === 'sheet:b:{"kd":"auto"}{"who":"이"}',
@@ -5309,24 +5316,27 @@ try {
   //     부품을 부르는 곳은 @task-sheet·@rec-sheet·@cli-sheet·@wk-sheet·@bid-sheet·@ob-sheet 구간 하나씩
   //     (구간마다 vsSheetRender 1번·정의 key 1개 — "jw_task_sheet"·"jw_rec_sheet"·"jw_cli_sheet"·"jw_wk_sheet"·"jw_bid_sheet"·"jw_ob_sheet" · host 1개 — "taskList"·"recSheet"·"cliList"·"wkList"·"bidList"·"obList")이고 일곱 구간 밖은 vsSheet*·vsDateCell·VS_INST 0,
   //     부품 저장 이름 8개 중 @vs-sheet 구간 밖에 나오는 이름은 그 여섯(각 1번)
+  //   29 판② 월말명세서 — 부품을 쓰는 탭 8개(같은 강도): @stmt-sheet 구간도 vsSheetRender 1번·정의 key "jw_stmt_sheet" 1개·host "stmtBoard" 1개 · 아홉 구간 밖 0 · 부품 저장 이름 9개 중 @vs-sheet 구간 밖은 jw_stmt_sheet까지 여덟(각 1번)
   const outside38 = html.slice(0, html.indexOf('// @vs-sheet-start')) + html.slice(html.indexOf('// @vs-sheet-end'));
   const blkOf38 = (a, b) => { const i = html.indexOf(a), j = html.indexOf(b); return (i < 0 || j < i) ? '' : html.slice(i, j); };
   const tsb38 = blkOf38('// @task-sheet-start', '// @task-sheet-end'), rsb38 = blkOf38('// @rec-sheet-start', '// @rec-sheet-end'), csb38 = blkOf38('// @cli-sheet-start', '// @cli-sheet-end'), wsb38 = blkOf38('// @wk-sheet-start', '// @wk-sheet-end'), bsb38 = blkOf38('// @bid-sheet-start', '// @bid-sheet-end');
   const osb38 = blkOf38('// @ob-sheet-start', '// @ob-sheet-end');   // v444 입찰 부동산
   const ssb38 = blkOf38('// @site-sheet-start', '// @site-sheet-end');   // v445 안전 현장(56 판)
   const esb38 = blkOf38('// @edu-sheet-start', '// @edu-sheet-end');   // v447 안전 체크 칸 사람별 표(56 판 1차)
-  const outside2_38 = [tsb38, rsb38, csb38, wsb38, bsb38, osb38, ssb38, esb38].reduce((s, b) => (b ? s.replace(b, '') : s), outside38);
-  const keysOut38 = ['jw_task_sheet', 'jw_rec_sheet', 'jw_cli_sheet', 'jw_wk_sheet', 'jw_bid_sheet', 'jw_ob_sheet', 'jw_site_sheet', 'jw_edu_sheet'].filter((k) => outside38.indexOf(k) >= 0);
-  const use38 = tsb38.length > 0 && rsb38.length > 0 && csb38.length > 0 && wsb38.length > 0 && bsb38.length > 0 && osb38.length > 0 && ssb38.length > 0 && esb38.length > 0 && (outside2_38.match(/\bvsSheet\w*\(|\bvsDateCell\(|\bVS_INST\b/g) || []).length === 0
+  const stb38 = blkOf38('// @stmt-sheet-start', '// @stmt-sheet-end');   // 29 판② 월말명세서
+  const outside2_38 = [tsb38, rsb38, csb38, wsb38, bsb38, osb38, ssb38, esb38, stb38].reduce((s, b) => (b ? s.replace(b, '') : s), outside38);
+  const keysOut38 = ['jw_task_sheet', 'jw_rec_sheet', 'jw_cli_sheet', 'jw_wk_sheet', 'jw_bid_sheet', 'jw_ob_sheet', 'jw_site_sheet', 'jw_edu_sheet', 'jw_stmt_sheet'].filter((k) => outside38.indexOf(k) >= 0);
+  const use38 = tsb38.length > 0 && rsb38.length > 0 && csb38.length > 0 && wsb38.length > 0 && bsb38.length > 0 && osb38.length > 0 && ssb38.length > 0 && esb38.length > 0 && stb38.length > 0 && (outside2_38.match(/\bvsSheet\w*\(|\bvsDateCell\(|\bVS_INST\b/g) || []).length === 0
     && (esb38.match(/\bvsSheetRender\(/g) || []).length === 1 && (esb38.match(/key: "jw_edu_sheet"/g) || []).length === 1 && (esb38.match(/\bhost: "eduList"/g) || []).length === 1 && (outside38.match(/jw_edu_sheet/g) || []).length === 1
     && (ssb38.match(/\bvsSheetRender\(/g) || []).length === 1 && (ssb38.match(/key: "jw_site_sheet"/g) || []).length === 1 && (ssb38.match(/\bhost: "siteList"/g) || []).length === 1 && (outside38.match(/jw_site_sheet/g) || []).length === 1
+    && (stb38.match(/\bvsSheetRender\(/g) || []).length === 1 && (stb38.match(/key: "jw_stmt_sheet"/g) || []).length === 1 && (stb38.match(/\bhost: "stmtBoard"/g) || []).length === 1 && (outside38.match(/jw_stmt_sheet/g) || []).length === 1
     && (tsb38.match(/\bvsSheetRender\(/g) || []).length === 1 && (tsb38.match(/key: "jw_task_sheet"/g) || []).length === 1 && (tsb38.match(/\bhost: "taskList"/g) || []).length === 1
     && (rsb38.match(/\bvsSheetRender\(/g) || []).length === 1 && (rsb38.match(/key: "jw_rec_sheet"/g) || []).length === 1 && (rsb38.match(/\bhost: "recSheet"/g) || []).length === 1
     && (csb38.match(/\bvsSheetRender\(/g) || []).length === 1 && (csb38.match(/key: "jw_cli_sheet"/g) || []).length === 1 && (csb38.match(/\bhost: "cliList"/g) || []).length === 1
     && (wsb38.match(/\bvsSheetRender\(/g) || []).length === 1 && (wsb38.match(/key: "jw_wk_sheet"/g) || []).length === 1 && (wsb38.match(/\bhost: "wkList"/g) || []).length === 1
     && (bsb38.match(/\bvsSheetRender\(/g) || []).length === 1 && (bsb38.match(/key: "jw_bid_sheet"/g) || []).length === 1 && (bsb38.match(/\bhost: "bidList"/g) || []).length === 1
     && (osb38.match(/\bvsSheetRender\(/g) || []).length === 1 && (osb38.match(/key: "jw_ob_sheet"/g) || []).length === 1 && (osb38.match(/\bhost: "obList"/g) || []).length === 1
-    && JSON.stringify(keysOut38) === '["jw_task_sheet","jw_rec_sheet","jw_cli_sheet","jw_wk_sheet","jw_bid_sheet","jw_ob_sheet","jw_site_sheet","jw_edu_sheet"]' && (outside38.match(/jw_task_sheet/g) || []).length === 1 && (outside38.match(/jw_rec_sheet/g) || []).length === 1 && (outside38.match(/jw_cli_sheet/g) || []).length === 1 && (outside38.match(/jw_wk_sheet/g) || []).length === 1 && (outside38.match(/jw_bid_sheet/g) || []).length === 1 && (outside38.match(/jw_ob_sheet/g) || []).length === 1;
+    && JSON.stringify(keysOut38) === '["jw_task_sheet","jw_rec_sheet","jw_cli_sheet","jw_wk_sheet","jw_bid_sheet","jw_ob_sheet","jw_site_sheet","jw_edu_sheet","jw_stmt_sheet"]' && (outside38.match(/jw_task_sheet/g) || []).length === 1 && (outside38.match(/jw_rec_sheet/g) || []).length === 1 && (outside38.match(/jw_cli_sheet/g) || []).length === 1 && (outside38.match(/jw_wk_sheet/g) || []).length === 1 && (outside38.match(/jw_bid_sheet/g) || []).length === 1 && (outside38.match(/jw_ob_sheet/g) || []).length === 1;
   const rv38 = fn38(html, 'renderVehicles'), rc38 = fn38(html, 'renderContracts');
   const V38 = mk38({ width: 1366 }), vh38 = V38.env.mkHost('vehList'); vh38.innerHTML = '<div class="vs-wrap"><table class="vs"></table></div>';
   V38.api.paneObs(vh38); V38.api.paneObs(vh38); V38.env.roCb([{ target: vh38 }]); V38.env.flushRaf();
@@ -5349,8 +5359,8 @@ try {
     && decl38(1000, '.vs td.num', 'text-align') == null && decl38(1000, '.vs td .sel-box', 'margin-right') == null && decl38(1000, '.vs td .sel-box', 'vertical-align') == null && decl38(1000, '.vs.vs-fit td .sel-box', 'margin-right') === '6px'
     && decl38(375, '.sel-bar.vs-selbar', 'flex-wrap') === 'wrap' && decl38(375, '.sel-bar.vs-selbar', 'padding') === '2px 2px 8px' && decl38(375, '.vs-selbar', 'padding') == null
     && /@media \(pointer:coarse\)\{ \.vs\.vs-fit \.vs-rs\{width:14px;\} \}/.test(css38);
-  T('v438 ⑫ 정적: 계약·차량 그리기에 vsPaneObserve(host) 한 줄씩(파일에서 이 둘뿐 — 여러 번 불러도 자리에 한 번 걸림·--vs-panew = 칸 폭·창을 줄이면 다음 그림에 다시 잼 1048 → 900·data-vs-host 없음) · 부품을 쓰는 탭 8개 — v439 지시·v440 기성·v441 거래처·v442 일용직·v443 입찰 공고·v444 입찰 부동산·v445 안전 현장(56 판)·v447 안전 체크(56 판)(@task-sheet·@rec-sheet·@cli-sheet·@wk-sheet·@bid-sheet·@ob-sheet·@site-sheet·@edu-sheet 구간 하나씩: 구간마다 vsSheetRender 1번·정의 key 1개(jw_task_sheet·jw_rec_sheet·jw_cli_sheet·jw_wk_sheet·jw_bid_sheet·jw_ob_sheet·jw_site_sheet·jw_edu_sheet)·host 1개(taskList·recSheet·cliList·wkList·bidList·obList·siteList·eduList) · 아홉 구간 밖 vsSheet*·vsDateCell·VS_INST 0 · 부품 저장 이름 8개 모두 구간 밖에 1번씩) · 끌기는 pointer(document pointermove·pointerup·pointercancel — mouse 이벤트 0) · 150ms·compositionstart/end·isComposing · 저장 한 곳(def.key에 k,d,f,chip) · ResizeObserver 하나·콜백은 rAF · 경계 matchMedia 3개 · CSS .vs.vs-fit(860~ 폭 100%·최소 --vs-minw)·폰 col --pw·.vs-detcard(PC 숨김·폰 보임)·.vs.vs-fit td.num 오른쪽·옅은 칩 · 기존 .vs(min-width 1160·폰 0·폰 col 0) 그대로 · 검토 반영: 펼침 폭 상한 max-width 100%(계약·차량 [닫기 ▲] 잘림) · .vs td.num·.vs td .sel-box 규칙 없음(새 표만) · .sel-bar.vs-selbar 줄바꿈·여백 · 터치 손잡이 14px',
-    ro38 && st38 && css2_38 && css3_38, JSON.stringify({ ro38, ro38a, ro38b, st38, use38, keysOut38, css2_38, css3_38, cliSeg: csb38.length, wkSeg: wsb38.length, bidSeg: bsb38.length, obSeg: osb38.length, siteSeg: ssb38.length }));
+  T('v438 ⑫ 정적: 계약·차량 그리기에 vsPaneObserve(host) 한 줄씩(파일에서 이 둘뿐 — 여러 번 불러도 자리에 한 번 걸림·--vs-panew = 칸 폭·창을 줄이면 다음 그림에 다시 잼 1048 → 900·data-vs-host 없음) · 부품을 쓰는 탭 8개 — v439 지시·v440 기성·v441 거래처·v442 일용직·v443 입찰 공고·v444 입찰 부동산·v445 안전 현장(56 판)·v447 안전 체크(56 판)·29 판② 월말명세서(@task-sheet·@rec-sheet·@cli-sheet·@wk-sheet·@bid-sheet·@ob-sheet·@site-sheet·@edu-sheet·@stmt-sheet 구간 하나씩: 구간마다 vsSheetRender 1번·정의 key 1개(jw_task_sheet·jw_rec_sheet·jw_cli_sheet·jw_wk_sheet·jw_bid_sheet·jw_ob_sheet·jw_site_sheet·jw_edu_sheet·jw_stmt_sheet)·host 1개(taskList·recSheet·cliList·wkList·bidList·obList·siteList·eduList·stmtBoard) · 열 구간 밖 vsSheet*·vsDateCell·VS_INST 0 · 부품 저장 이름 9개 모두 구간 밖에 1번씩) · 끌기는 pointer(document pointermove·pointerup·pointercancel — mouse 이벤트 0) · 150ms·compositionstart/end·isComposing · 저장 한 곳(def.key에 k,d,f,chip) · ResizeObserver 하나·콜백은 rAF · 경계 matchMedia 3개 · CSS .vs.vs-fit(860~ 폭 100%·최소 --vs-minw)·폰 col --pw·.vs-detcard(PC 숨김·폰 보임)·.vs.vs-fit td.num 오른쪽·옅은 칩 · 기존 .vs(min-width 1160·폰 0·폰 col 0) 그대로 · 검토 반영: 펼침 폭 상한 max-width 100%(계약·차량 [닫기 ▲] 잘림) · .vs td.num·.vs td .sel-box 규칙 없음(새 표만) · .sel-bar.vs-selbar 줄바꿈·여백 · 터치 손잡이 14px',
+    ro38 && st38 && css2_38 && css3_38, JSON.stringify({ ro38, ro38a, ro38b, st38, use38, keysOut38, css2_38, css3_38, cliSeg: csb38.length, wkSeg: wsb38.length, bidSeg: bsb38.length, obSeg: osb38.length, siteSeg: ssb38.length, stmtSeg: stb38.length }));
 
   // ⑬ 문서 — FEATURES 기준 v438·v438 절(문장 고정)·자리 글 GATES_V438 0 · TESTLIST v438 체크 칸 = 화면 칸 4개 '[ ] (AI 시험 화면 대상' + 게이트 칸 '[x] (AI)' 5종(PM 몫 0) · MANUAL 1절 화면 폭 한 줄 · CLAUDE.md 폭·부품 줄 · sw v438 이상
   const ft38 = rd38('FEATURES.md'), tl38 = rd38('TESTLIST.md'), man38 = rd38('MANUAL.html'), cl38 = rd38('CLAUDE.md'), sw38 = rd38('sw.js');
@@ -11908,6 +11918,159 @@ try {
   const seed421 = [re421.test('&& /jw-shell-' + 'v(39[4-9]|4\\d\\d)/.test(swv)'), re421.test('Number((swv.match(/jw-shell-' + 'v(\\d+)/) || [0, 0])[1]) >= 394')];
   T('T421 판 번호 검사 = 숫자 비교(옛 블록의 판 번호 정규식 갈래 꼴 0 — v500에서 한꺼번에 깨지지 않게 · 숫자 꺼내기 꼴만) · 결함 심기: 옛 꼴 표본 잡힘·숫자 꼴 안 잡힘', old421.length === 0 && seed421[0] === true && seed421[1] === false, JSON.stringify({ old: old421.map((l) => l.trim().slice(0, 80)), seed421 }));
 } catch (e) { console.log('  (T421 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ---- 29 판②(체크 29 월말명세서 화면 — 권한 키 stmt · 월 보드 = 공통 부품 정의 · 거래처 상세 줄 입력 = 검산 거울): index.html @stmt-sheet 구간을 그대로 돌린다
+//      ① 검산 거울 = 서버 _lib/stmt.js(실행 대조 — 표본 문서 6벌·간극·돈/수량 꼴·개인정보 꼴·라벨) ② 앱 저장 몸체 = 서버 정리 통과·같은 검산(왕복) ③ 입력 형식 오류·빈 줄·일자 꼴
+//      ④ 월 보드 정의(vsSheetCheckDef)·모델·그림(거래처 순서·두 묶음·칩 건수·칸 글·합계 줄·[열기])·폰 카드 ⑤ 상세 줄 그림(수행·보기)·보는 사람 바뀜 ⑥ 정적(등록 자리·탭 전환·권한 적용·로그아웃·배선·버튼 class·서버 동작 이름)
+try {
+  const req29s = createRequire(import.meta.url);
+  const SV = req29s(join(ROOT, 'netlify', 'functions', '_lib', 'stmt.js'));
+  const blkOf29s = (a, b) => { const i = html.indexOf(a), j = html.indexOf(b); if (i < 0 || j < i) throw new Error('구간 없음: ' + a); return html.slice(i, j); };
+  const fnOf29s = (name) => { const i = html.indexOf('function ' + name + '('); if (i < 0) throw new Error('함수 없음: ' + name); let d = 0, st = false; for (let j = i; j < html.length; j++) { const ch = html[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return html.slice(i, j + 1); } } throw new Error('중괄호 짝 안 맞음: ' + name); };
+  const ssb29 = blkOf29s('// @stmt-sheet-start', '// @stmt-sheet-end'), vsb29 = blkOf29s('// @vs-sheet-start', '// @vs-sheet-end');
+  const VEH29 = [{ id: 'veh_a', no: '11가0001', own: '자차', type: '덤프', state: '운행' }, { id: 'veh_b', no: '22나0002(구7900)', own: '지입', type: '트랙터', state: '운행' }, { id: 'veh_old', no: '33다0003', own: '자차', type: '카고', state: '매각', del: 1 }];
+  const mk29s = (o) => {
+    o = o || {};
+    const env = { who: o.who || 'u1', perm: o.perm || 'do', host: { innerHTML: '', _q: [], querySelectorAll() { return []; }, getAttribute() { return null; }, setAttribute() {}, removeAttribute() {} } };
+    const api = new Function('__env', '__veh', [
+      'var window = {}, localStorage = { getItem: function(){ return null; }, setItem: function(){} }, ResizeObserver = undefined, currentTab = "stmt";',
+      'var document = { getElementById: function(id){ return id === "stmtBoard" ? __env.host : null; }, querySelector: function(){ return null; }, activeElement: null };',
+      fnOf29s('esc'), fnOf29s('pad'), fnOf29s('isDate'),
+      'function myId(){ return __env.who; } function canDo(m){ return m === "stmt" && __env.perm === "do"; } function canSee(m){ return m !== "stmt" || __env.perm !== "hide"; }',
+      'function findVeh(id){ for (var i = 0; i < __veh.length; i++){ if (__veh[i].id === id) return __veh[i]; } return null; } function liveVehicles(){ return __veh.filter(function(v){ return v.del !== 1; }); }',
+      'function findMember(id){ return id === "u1" ? { id: "u1", name: "권민지" } : null; } function dispName(n){ return n; } function gwToast(){} function onSessionInvalid(){} function gwCall(){ return { then: function(){ return { catch: function(){} }; } }; }',
+      vsb29, ssb29,
+      'return { STMT: STMT, KIND: STMT_KIND, USE: STMT_USE, GAP: STMT_GAP_CLASSES, check: stmtCheck, gap: stmtGap, money: stmtMoney, dec: stmtDecimal, pii: stmtPii, dateIn: stmtDateIn, vraw: stmtVraw,',
+      '  collect: stmtEdCollect, edLoad: stmtEdLoad, edRow: stmtEdRow, newRow: stmtNewRow, edW: stmtEdW, rowHtml: stmtEdRowHtml, ckHtml: stmtCkHtml, footHtml: stmtFootHtml, vehHtml: stmtVehHtml,',
+      '  def: stmtSheetDef, rows: stmtBoardRows, rowSt: stmtRowSt, cards: stmtBoardCards, viewer: stmtViewer, reset: stmtReset,',
+      '  checkDef: vsSheetCheckDef, inst: vsInst, model: vsSheetModel, html: vsSheetHtml, chipN: vsSheetChipCounts };'].join('\n'))(env, VEH29);
+    return { env, api };
+  };
+  const X = mk29s();
+  const J = (x) => JSON.stringify(x);
+  // ① 검산 거울 = 서버 — 표본 줄은 서버 cleanRow로 만든 꼴(앱도 같은 꼴을 검산함)
+  const CR = (o, ym) => { const c = SV.cleanRow(Object.assign({ date: '', veh: 'veh_a', vraw: '0001', item: '경유', kind: 'fuel', how: 'hand' }, o), ym || '2026-10'); if (!c.row) throw new Error('표본 줄 거절 ' + c.code + ' ' + J(o)); return c.row; };
+  const RW = [CR({ r: 'a1', date: '2026-10-01', qty: '129.000', unit: '1,858', amt: 239682 }), CR({ r: 'a2', qty: '30.30', unit: '1650', amt: 49995 }), CR({ r: 'a3', qty: '10', unit: '1000', amt: 10001 }),
+    CR({ r: 'a4', qty: '5', amt: null }), CR({ r: 'a5', kind: '', amt: 3000 }), CR({ r: 'a6', veh: '', amt: 4000 }), CR({ r: 'a7', qty: '-1', unit: '5000', amt: -5000 }), CR({ r: 'a8', veh: 'toString', amt: 1 }), CR({ r: 'a9', veh: 'veh_b', amt: 70000 })];   // '__proto__'·'constructor'는 서버가 줄에서 거절(BAD_VEH) — 원형 이름 'toString'으로 지도 오염을 봄
+  const sumAmt = RW.reduce((s, x) => s + (typeof x.amt === 'number' ? x.amt : 0), 0);
+  const D29 = [
+    { n: 'total·계산서·명세·차량 소계·잔액', v: { group: 'veh', carry: true }, d: { basis: 'total', group: 'veh', rows: RW, inv: { date: '', supply: 100, vat: 10, total: sumAmt + 1 }, stated: sumAmt, vsub: { veh_a: 1, veh_b: 70000 }, carry: { prev: 100, month: sumAmt, paid: 50, bal: 50 + sumAmt } } },
+    { n: 'supvat 세액 허용', v: { group: 'veh' }, d: { basis: 'supply', group: 'veh', rows: [CR({ r: 'b1', amt: 1000, vat: 100 }), CR({ r: 'b2', amt: 2000, vat: 201 }), CR({ r: 'b3', amt: 3000 })], inv: { date: '2026-10-31', supply: 6000, vat: 302, total: 6302 }, stated: null } },
+    { n: 'suponly 추정', v: { group: 'veh', carry: true }, d: { basis: 'supply', group: 'veh', rows: [CR({ r: 'c1', amt: 10000 }), CR({ r: 'c2', amt: 20000 })], inv: { date: '', supply: 30000, vat: 3000, total: 33000 }, stated: 30000, carry: { prev: 0, month: 33001, paid: 0, bal: 33001 } } },
+    { n: '용구 용도', v: { group: 'tool' }, d: { basis: 'supply', group: 'tool', rows: [CR({ r: 't1', veh: '', kind: 'tool', use: '', amt: 100 }), CR({ r: 't2', veh: '', kind: 'tool', use: 'vehicle', amt: 200 }), CR({ r: 't3', veh: '', kind: 'tool', use: 'safety', amt: 300 }), CR({ r: 't4', kind: 'tool', use: 'vehicle', amt: 400 })], inv: null, stated: 1000 } },
+    { n: '빈 문서·기준 없음·잔액형 4칸 없음', v: { group: 'veh', carry: true }, d: { basis: 'supply', group: 'veh', rows: [], inv: null, stated: null } },
+    { n: '묶음 = 문서 값 먼저', v: { group: 'tool' }, d: { basis: 'total', group: 'veh', rows: [CR({ r: 'g1', amt: 500, veh: '' })], inv: { date: '', supply: 455, vat: 45, total: 500 }, stated: null } }
+  ];
+  const cmp1 = D29.map((x) => ({ n: x.n, a: J(X.api.check(x.d, x.v)), s: J(SV.checkDoc(x.d, x.v)) }));
+  const g1 = [[RW.slice(0, 4), RW.slice(1, 5).concat([CR({ r: 'zz', amt: 9 })])], [[], RW], [RW, []], [[CR({ r: 'constructor', amt: 1, item: 'x' })], [CR({ r: 'constructor', amt: 1, item: 'y' })]]].map((p) => J(X.api.gap(p[0], p[1])) === J(SV.gapCount(p[0], p[1])));
+  const NUM29 = ['1,234', '1,2,3,4', '12,34', ' ', '', '-0', -0, '1e21', 1e21, '100.12345', 100.12345, '30.30', '1 234', '-5,000', 12.5, '1,234원', '５', null, undefined, '0.0001', '12,345.6789'];
+  const enc = (v) => v === undefined ? 'U' : J(v);
+  const numBad = NUM29.filter((v) => enc(X.api.money(v, true)) !== enc(SV.money(v, true)) || enc(X.api.money(v, false)) !== enc(SV.money(v, false)) || enc(X.api.dec(v, 1e7)) !== enc(SV.decimal(v, 1e7)));
+  const PII29 = ['8505152345678', '850515-2345678', '010.1234.5678', '010-1234-5678', '01012345678', '1002 123 456789', '110-123-456789', '번호 1234567890', '2026.10.31', '2026-10-31', '12가3456', '경북98사5749', '경유 129.000L', '02-123-4567', '1,858'];
+  const piiBad = PII29.filter((s) => X.api.pii(s) !== (SV.piiScan(s) !== ''));
+  T('29 판② ① 검산 거울 = 서버 _lib/stmt.js(실행 대조): 표본 문서 6벌(total 계산서·명세 합계·차량 소계·잔액형 · supvat 세액 허용 · suponly 추정 · 용구 용도 · 빈 문서 · 묶음은 문서 값 먼저) checkDoc 결과 JSON 같음(금액 빈칸 amt·수량×단가 calc·종류·차량·용도·"toString" 차량 줄 포함) · 간극 4벌 같음 · 돈/수량 꼴 ' + NUM29.length + '개 같음 · 개인정보 꼴 ' + PII29.length + '개 같음 · 종류·용도 라벨·간극 칸 묶음 = 서버 표',
+    cmp1.every((c) => c.a === c.s) && g1.every(Boolean) && numBad.length === 0 && piiBad.length === 0
+    && J(X.api.KIND) === J(SV.KIND_LABEL) && J(X.api.USE) === J(SV.USE_LABEL) && J(X.api.GAP) === J(SV.GAP_CLASSES)
+    && J(SV.checkDoc(D29[0].d, D29[0].v).bad.map((b) => b.r + ':' + b.why.join('+'))) === '["a3:calc","a4:amt","a5:kind","a6:veh"]',
+    J({ diff: cmp1.filter((c) => c.a !== c.s).map((c) => c.n), gap: g1, numBad: numBad.map(enc), piiBad }));
+
+  // ② 왕복 — 사람이 친 글(편집 줄) → 앱 stmtEdCollect 몸체 → 서버 cleanRows·cleanInv·cleanCarry·cleanVsub 통과 · 서버 checkDoc(정리한 줄) = 앱 검산 · 소수 자릿수(qd·ud) 그대로
+  const V05 = { vk: 'v05', name: '대송IC주유소', group: 'veh', kind: 'fuel', basis: 'total', carry: false };
+  const V01 = { vk: 'v01', name: '스피드타이어', group: 'veh', kind: 'tire', basis: 'supply', carry: true };
+  const V10 = { vk: 'v10', name: '철탑종합공구상사', group: 'tool', kind: 'tool', basis: 'supply', carry: true };
+  const ED = (vendor, rows, o) => { X.api.STMT.ed = { ym: '2026-10', vk: vendor.vk, loading: true, err: '', msg: '', vendor: vendor, rows: [] }; X.api.edLoad({ vendor: vendor, doc: null }); const ed = X.api.STMT.ed; ed.rows = rows.map((r) => Object.assign(X.api.newRow(ed), r)); Object.assign(ed, o || {}); return ed; };
+  const e1 = ED(V05, [{ date: '1', vin: '11가0001', veh: 'veh_a', item: '경유', qty: '129.000', unit: '1,858', amt: '239,682' }, { date: '10/2', vin: '0002', veh: 'veh_b', item: '경유', qty: '30.30', unit: '1650', amt: '49,995' }, { date: '', vin: '', item: '', qty: '', unit: '', amt: '' }],
+    { inv: { date: '2026-10-31', supply: '263,343', vat: '26,334', total: '289,677' }, stated: '289,677' });
+  const p1 = X.api.collect(e1);
+  const sr1 = SV.cleanRows(p1.rows, '2026-10', false), si1 = SV.cleanInv(p1.inv);
+  const sd1 = sr1.rows ? SV.checkDoc({ basis: e1.basis, group: e1.group, rows: sr1.rows, inv: si1.v, stated: p1.stated, carry: null, vsub: null }, V05) : null;
+  const e2 = ED(V01, [{ date: '2026-10-05', vin: '22나0002', veh: 'veh_b', item: '타이어 11R22.5', qty: '2', unit: '250,000', amt: '500,000', vat: '50,000' }, { date: '10-06', veh: 'veh_a', vin: '0001', item: '펑크', qty: '1', unit: '20000', amt: '' }],
+    { inv: { date: '', supply: '520,000', vat: '50,000', total: '570,000' }, stated: '', carry: { prev: '100,000', month: '550,000', paid: '100,000', bal: '550,000' }, vsub: Object.assign(Object.create(null), { veh_b: '550,000' }) });
+  const p2 = X.api.collect(e2);
+  const sr2 = SV.cleanRows(p2.rows, '2026-10', false);
+  const sd2 = sr2.rows ? SV.checkDoc({ basis: 'supply', group: 'veh', rows: sr2.rows, inv: SV.cleanInv(p2.inv).v, stated: p2.stated, carry: SV.cleanCarry(p2.carry).v, vsub: SV.cleanVsub(p2.vsub).v }, V01) : null;
+  T('29 판② ② 왕복(앱 저장 몸체 → 서버 정리): 대송형(total) 빈 줄 1 빼고 2줄 · "1"·"10/2" = 2026-10-01·02 · "129.000"(소수 3자리)·"30.30"(2자리) 그대로 · 천 단위 쉼표 금액 → 숫자 · 서버 cleanRows·cleanInv 통과 · 서버 검산 = 앱 검산(확정 가능) / 스피드형(supply·잔액형) 금액 빈 줄 = null로 보냄·서버 통과 · 서버 검산 = 앱 검산(붉음 amt) · 잔액 4칸·차량 소계 서버 정리 통과',
+    p1.errs.length === 0 && p1.rows.length === 2 && p1.rows[0].date === '2026-10-01' && p1.rows[1].date === '2026-10-02' && p1.rows[0].qty === '129.000' && p1.rows[1].qty === '30.30' && p1.rows[0].amt === 239682
+    && !!sr1.rows && sr1.rows[0].qd === 3 && sr1.rows[1].qd === 2 && sr1.rows[0].ud === 0 && !si1.code && J(sd1) === J(p1.chk) && p1.chk.ok === true
+    && p2.errs.length === 0 && p2.rows[1].amt === null && !!sr2.rows && J(sd2) === J(p2.chk) && p2.chk.ok === false && p2.chk.bad.length === 1 && p2.chk.bad[0].why.join() === 'amt'
+    && !SV.cleanCarry(p2.carry).code && !SV.cleanVsub(p2.vsub).code && p2.vsub.veh_b === 550000,
+    J({ e1: [p1.errs, sr1.code, si1.code, p1.chk.issues, sd1 && sd1.issues], e2: [p2.errs, sr2.code, p2.chk.issues, p2.chk.bad] }));
+
+  // ③ 입력 형식 오류 — 칸마다 붉고 저장 막음(서버도 거절할 꼴): 일자 그 달 밖·없는 날 · 수량 소수 5자리 · 금액 "12,34" · 품목 개인정보 꼴 · 비고 보이지 않는 글자 · 계산서 세 칸 중 일부 · 잔액 4칸 중 일부 · 명세 합계 글
+  const e3 = ED(V10, [{ date: '9/30', item: '장갑', use: 'safety', qty: '1.12345', unit: '100', amt: '12,34' }, { date: '32', item: '연락 010-1234-5678', use: 'etc', amt: '100' }, { date: '10/31', item: '공구', use: 'posco_cip', note: 'a\u202Eb', amt: '200' }, { item: '', note: '', amt: '' }],
+    { inv: { date: '', supply: '300', vat: '', total: '' }, carry: { prev: '1', month: '', paid: '', bal: '' }, stated: '삼백' });
+  const p3 = X.api.collect(e3);
+  const din = [['1', '2026-10-01'], ['31', '2026-10-31'], ['10/31', '2026-10-31'], ['10-5', '2026-10-05'], ['2026.10.07', '2026-10-07'], ['2026-10-07', '2026-10-07'], ['', ''], ['32', 'U'], ['0', 'U'], ['9/30', 'U'], ['2025-10-01', 'U'], ['10월 1일', 'U']].map((x) => enc(X.api.dateIn(x[0], '2026-10')) === (x[1] === 'U' ? 'U' : J(x[1])));
+  const dinFeb = [X.api.dateIn('29', '2026-02'), X.api.dateIn('28', '2026-02'), X.api.dateIn('29', '2028-02')];
+  T('29 판② ③ 입력 형식: 1번 줄 일자(9/30 — 그 달 밖)·수량(소수 5자리)·금액("12,34") · 2번 줄 일자(32)·품목(전화 꼴) · 3번 줄 비고(보이지 않는 글자) · 4번 빈 줄은 빼고 셈 안 함 · 계산서 일부만 · 잔액 일부만 · 명세 합계 글 → 오류 6곳·저장 막음 · 일자 꼴 12개(DD·M/D·M-D·YYYY.MM.DD·빈칸 / 32·0·다른 달·다른 해·글) · 2월 29일(2026 없음·2028 있음) · 번호 글 정리(… 빼고 24자)',
+    p3.errs.length === 6 && J(Object.keys(p3.badf[0]).sort()) === '["amt","date","qty"]' && J(Object.keys(p3.badf[1]).sort()) === '["date","item"]' && J(Object.keys(p3.badf[2])) === '["note"]' && !p3.badf[3]
+    && p3.parsed.length === 3 && p3.docErr.inv === 1 && p3.docErr.carry === 1 && p3.docErr.stated === 1 && din.every(Boolean)
+    && dinFeb[0] === undefined && dinFeb[1] === '2026-02-28' && dinFeb[2] === '2028-02-29' && X.api.vraw('…6441 호') === '6441 호' && X.api.vraw('경북98사5749(구1234)·덤프') === '경북98사5749(구1234)덤프'.slice(0, 24),
+    J({ errs: p3.errs, badf: p3.badf, docErr: p3.docErr, din, dinFeb }));
+
+  // ④ 월 보드 — 정의 검사 통과 · 행 = 거래처 목록(켜진 곳 + 꺼졌어도 이 달 문서가 있는 곳) · 두 묶음(차량 → 사장님 · 용구 → 나주임) · 거래처 순서 = 목록 순서(v01~) · 칩 건수 · 칸 글 · 합계 줄 · [열기] = 읽기 칩(vs-chip)
+  const seed = SV.seedVendors();
+  const cfg = seed.concat([{ vk: 'v13', name: '꺼진곳', group: 'veh', kind: '', basis: 'supply', carry: false, active: false, hint: [] }, { vk: 'v14', name: '꺼진문서', group: 'tool', kind: 'tool', basis: 'supply', carry: false, active: false, hint: [] }]);
+  const sumOf = (vk, doc) => { const v = cfg.find((x) => x.vk === vk); return SV.vendorSummary(Object.assign({ updated_at: 1793000000000, updated_by: 'u1' }, doc), SV.checkDoc(doc, v)); };
+  const MON = { status: 'OK', ym: '2026-10', cfg: cfg, cfg_at: 0, idx_at: 1, vendors: {
+    v05: sumOf('v05', { group: 'veh', basis: 'total', status: 'done', rows: [CR({ r: 'x1', amt: 1000 })], inv: { date: '', supply: 909, vat: 91, total: 1000 }, stated: null }),
+    v06: sumOf('v06', { group: 'veh', basis: 'total', status: 'doing', rows: [CR({ r: 'y1', amt: 1000 }), CR({ r: 'y2', amt: null })], inv: null, stated: 1000 }),
+    v02: sumOf('v02', { group: 'veh', basis: 'supply', status: 'sent', rows: [CR({ r: 'z1', kind: 'cover', amt: 2000 })], inv: { date: '', supply: 2000, vat: 200, total: 2200 }, stated: null }),
+    v10: sumOf('v10', { group: 'tool', basis: 'supply', status: 'doing', rows: [CR({ r: 'w1', veh: '', kind: 'tool', use: 'safety', amt: 3000 })], inv: null, stated: 3000, carry: { prev: 0, month: 3300, paid: 0, bal: 3300 } }),
+    v14: sumOf('v14', { group: 'tool', basis: 'supply', status: 'doing', rows: [CR({ r: 'k1', veh: '', kind: 'tool', use: 'etc', amt: 10 })], inv: null, stated: 10 })
+  } };
+  const X4 = mk29s(); X4.api.STMT.month = MON;
+  const def4 = X4.api.def(), ck4 = X4.api.checkDef(def4), inst4 = X4.api.inst(def4), M4 = X4.api.model(def4, inst4, 3), H4 = X4.api.html(def4, inst4, M4), cn4 = X4.api.chipN(def4, inst4, M4);
+  const flat4 = M4.flat.map((e) => e.r ? e.r.vk : '#' + e.g).join(',');
+  const st4 = X4.api.rows().map((r) => r.vk + ':' + X4.api.rowSt(r)).filter((s) => !/:wait$/.test(s)).join(',');
+  X4.api.cards(); const cardsH = X4.env.host.innerHTML;
+  T('29 판② ④ 월 보드: vsSheetCheckDef 통과(key jw_stmt_sheet·단계별 열 합 한도 안·폰 legacy = 카드) · 행 13 = 시드 12 + 꺼졌어도 문서 있는 v14(꺼졌고 문서 없는 v13 빠짐 · v14는 grey) · 두 묶음 차량 9 → 용구 4, 거래처 목록 순서 · 상태 v02 전달·v05 확정·v06 붉은 칸(금액 빈칸)·v10 확정 전(검산 맞음)·v14 확정 전 · 칩 건수 전체 13·입력 대기 8·붉은 1·확정 전 2·확정 1·전달 1 · 칸 글 ✓ 검산 통과·붉은 n·입력 대기·잔액형 · [열기] 13개 모두 vs-chip(보기 권한도 엶) · 합계 줄 "합계 13곳 · 입력 5" · 폰 카드 = 두 묶음 머리·카드 13',
+    J(ck4) === '[]' && def4.key === 'jw_stmt_sheet' && def4.host === 'stmtBoard' && def4.phone === 'legacy' && typeof def4.legacy === 'function'
+    && flat4 === '#veh,v01,v02,v03,v04,v05,v06,v07,v08,v09,#tool,v10,v11,v12,v14' && st4 === 'v02:sent,v05:done,v06:red,v10:ready,v14:ready'
+    && J(cn4) === '[[13,8,1,2,1,1]]' && (H4.match(/data-st-open="v\d+"/g) || []).length === 13 && (H4.match(/<button type="button" class="vs-chip" data-st-open=/g) || []).length === 13
+    && H4.indexOf('✓ 검산 통과') > 0 && /<span class="need-due"[^>]*>붉은 1<\/span>/.test(H4) && H4.indexOf('잔액형') > 0 && /class="vs-r grey[^"]*" data-vs-row="v14"/.test(H4) && H4.indexOf('합계 13곳 · 입력 5') > 0
+    && (cardsH.match(/class="st-pgrp"/g) || []).length === 2 && (cardsH.match(/class="st-pc"/g) || []).length === 13,
+    J({ ck4, flat4, st4, cn4 }));
+
+  // ⑤ 상세 줄 그림 — 수행(입력칸·지우기 mini-btn) · 보기(글만, 버튼·입력칸 없음) · 확정 문서는 수행이어도 잠김([고치기] 뒤 입력) · 차량 표시(…끝4 차종 지입·지운 차·목록 밖) · 보는 사람이 바뀌면 상세·달 비움
+  const X5 = mk29s({ perm: 'do' }), X5v = mk29s({ perm: 'view' });
+  const ed5 = (X, st) => { X.api.STMT.ed = { ym: '2026-10', vk: 'v05', loading: true, err: '', msg: '', vendor: V05, rows: [] }; X.api.edLoad({ vendor: V05, doc: { rows: [CR({ r: 'q1', date: '2026-10-03', veh: 'veh_b', vraw: '7900', qty: '129.000', unit: '1858', amt: 239682 })], status: st || 'done', basis: 'total', group: 'veh', updated_at: 5, inv: null, stated: 239682, prev: { rows: [] } } }); return X.api.STMT.ed; };
+  const d5 = ed5(X5), d5v = ed5(X5v);
+  const w5 = [X5.api.edW(d5), (d5.reopen = true, X5.api.edW(d5)), X5v.api.edW(d5v)];
+  //   (검토 반영) 보기 권한은 작성 중 문서·확정 풀기에서도 잠김 — 확정 문서로만 보면 stmtEdW의 canDo 검사를 지워도 통과했다
+  const X5d = mk29s({ perm: 'do' }), X5vd = mk29s({ perm: 'view' });
+  const d5d = ed5(X5d, 'doing'), d5vd = ed5(X5vd, 'doing');
+  const w5b = [X5d.api.edW(d5d), X5vd.api.edW(d5vd), (d5vd.reopen = true, X5vd.api.edW(d5vd))];
+  const rh5vd = X5vd.api.rowHtml(d5vd, d5vd.rows[0], 0, X5vd.api.edW(d5vd), false, false);
+  const rh5 = X5.api.rowHtml(d5, d5.rows[0], 0, true, false, false), rh5v = X5v.api.rowHtml(d5v, d5v.rows[0], 0, false, false, false);
+  const vh5 = [X5.api.vehHtml('veh_b'), X5.api.vehHtml('veh_old'), X5.api.vehHtml('v99가9999'), X5.api.vehHtml('_common')];
+  X5.api.viewer(); X5.api.STMT.month = MON; const pre5 = !!X5.api.STMT.ed && !!X5.api.STMT.month; X5.env.who = 'u2'; X5.api.viewer();
+  T('29 판② ⑤ 상세 줄: 확정 문서는 수행이어도 잠김 → [고치기] 뒤 입력 · 보기는 늘 잠김(확정·작성 중·확정 풀기 모두 — 보기 권한 작성 중 줄 그림에 입력·버튼 0) · 수행 + 작성 중 = 입력 · 수행 줄 = 입력칸(일자·차량 목록·품목·종류·수량·단가·금액)·지우기 mini-btn · 보기 줄 = 글만(입력·버튼 0, 일자 "10/03"·수량 "129.000"·금액 "239,682") · 차량 표시 "…0002 트랙터 지입"(괄호 안 옛 번호 아님)·지운 차·목록 밖·공용 · 보는 사람이 바뀌면 상세·달 비움',
+    J(w5) === '[false,true,false]' && J(w5b) === '[true,false,false]' && !/<input|<select|<button/.test(rh5vd) && /data-f="date"/.test(rh5) && /data-f="vin"[^>]*list="stmtVehDl"/.test(rh5) && /<select data-f="kind"/.test(rh5) && /data-f="amt"/.test(rh5) && !/data-f="vat"/.test(rh5) && /class="mini-btn" data-st-act="del"/.test(rh5)
+    && !/<input|<select|<button/.test(rh5v) && rh5v.indexOf('10/03') > 0 && rh5v.indexOf('129.000') > 0 && rh5v.indexOf('239,682') > 0
+    && /…0002<\/b>.*트랙터.*지입/.test(vh5[0]) && vh5[1].indexOf('(지운 차)') > 0 && vh5[2].indexOf('(목록 밖)') > 0 && vh5[2].indexOf('…9999') > 0 && vh5[3].indexOf('공용') > 0
+    && pre5 && X5.api.STMT.ed === null && X5.api.STMT.month === null && X5.api.STMT.who === 'u2',
+    J({ w5, vh5 }));
+
+  // ⑥ 정적 — 등록 자리·탭 전환·권한 적용·로그아웃 비우기·배선 한 번·버튼 class(바꾸는 버튼 mini-btn · 읽기 토글 vs-chip)·서버 동작 이름 = gw-stmt READ/WRITE · 비전(vision) 줄을 앱이 만들지 않음
+  const gst = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-stmt.js'), 'utf8');
+  const acts6 = [...new Set([...ssb29.matchAll(/action: "(stmt_\w+)"/g)].map((m) => m[1]))].sort();
+  const srvActs6 = [...((gst.match(/const READ = \{([^}]+)\}/) || ['', ''])[1] + ',' + (gst.match(/const WRITE = \{([^}]+)\}/) || ['', ''])[1]).matchAll(/(stmt_\w+):/g)].map((m) => m[1]);
+  const sw6 = fnOf29s('switchTab'), ap6 = fnOf29s('applyPerms'), cs6 = fnOf29s('clearSessionData');
+  const nav6 = html.slice(html.indexOf('<nav class="tabbar" id="tabbar">'), html.indexOf('</nav>'));
+  const btnCls6 = [...ssb29.matchAll(/<button type="button" class="([^"]+)" data-st-(act|open)=["\\]*"?([\w-]*)/g)].map((m) => m[1] + '|' + m[2] + '|' + m[3]);
+  const writeActs6 = ['add', 'save', 'done', 'sent', 'reopen', 'revert', 'del'], readActs6 = ['back', 'reload'];
+  const clsOk6 = btnCls6.length >= 10 && btnCls6.every((s) => { const p = s.split('|'); if (p[1] === 'open') return p[0] === 'vs-chip'; if (writeActs6.indexOf(p[2]) >= 0) return /\bmini-btn\b/.test(p[0]); if (readActs6.indexOf(p[2]) >= 0) return p[0] === 'vs-chip'; return true; });
+  T('29 판② ⑥ 정적: 사이드바 관리 › 기성·수금 바로 다음 월말명세서 버튼(처음 숨김) · 화면 section 1개(보드·상세·달 ◀▶ 자리) · switchTab 숨김이면 홈(currentTab 정하기 전)·화면 토글·stmtEnter · applyPerms 볼 수 있으면 다시 그림(보는 사람 바뀜) · 로그아웃 clearSessionData → stmtReset · 상세 배선은 한 번(STMT.bound) · 바꾸는 버튼 mini-btn·읽기 토글([열기]·[‹ 월 보드]·[다시 불러오기]) vs-chip · 앱이 부르는 동작 ' + acts6.join('·') + ' 모두 gw-stmt에 있음 · 앱은 줄을 "vision"으로 만들지 않음(D1 꺼짐)',
+    /<button class="tab-btn" data-tab="rec" id="tabRecBtn">기성·수금<\/button>\n\s*<button class="tab-btn perm-hidden" data-tab="stmt" id="tabStmtBtn">월말명세서<\/button>/.test(nav6)
+    && (html.match(/<section class="view" id="view-stmt">/g) || []).length === 1 && ['stmtBoard', 'stmtEditor', 'stmtPrev', 'stmtNext', 'stmtStats', 'stmtBoardMsg', 'stmtMonBar', 'stmtYm'].every((id) => (html.match(new RegExp('id="' + id + '"', 'g')) || []).length === 1)
+    && /if \(name === "stmt" && !canSee\("stmt"\)\) name = "dash";/.test(sw6) && /getElementById\("view-stmt"\)\.classList\.toggle\("active", name === "stmt"\);/.test(sw6) && /if \(name === "stmt"\) stmtEnter\(\);/.test(sw6)
+    && sw6.indexOf('if (name === "stmt" && !canSee("stmt")) name = "dash";') < sw6.indexOf('currentTab = name;')   // (검토 반영) 막는 줄은 currentTab·화면 토글보다 앞(뒤로 가면 숨김 사람이 빈 화면에 남음)
+    && /if \(currentTab === "stmt" && canSee\("stmt"\)\) renderStmt\(\);/.test(ap6) && /\bstmtReset\(\);/.test(cs6)
+    && /if \(STMT\.bound \|\| !host\) return;\n\s*STMT\.bound = true;/.test(fnOf29s('stmtBindOnce')) && (ssb29.match(/addEventListener\("input"/g) || []).length === 1
+    && clsOk6 && acts6.length === 6 && acts6.every((a) => srvActs6.indexOf(a) >= 0) && !/how: "vision"|"vision"/.test(ssb29.replace(/\/\/[^\n]*/g, '')),
+    J({ acts6, btnCls6 }));
+} catch (e) { console.log('  (29 판② 검사 생략 — ' + e.message + ')'); fails++; }
 
 try {
   // ---- v459(11/13 — P1 판1·2·4 · 판 번호 임시): 문서·판 번호 정확 검사. 다음 판은 이 검사를 숫자 비교(>= 456)로 풀고 새 판 정확 검사를 더할 것.

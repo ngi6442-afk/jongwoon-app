@@ -16,7 +16,7 @@ const CLIBIZ = require('./clibiz');   // v456 거래처 사업자번호 칸 13�
 
 const DATA = 'gw_data';
 
-const PERM_CLOSED = { quote: 1, promo: 1, hr: 1, lic: 1, site: 1, safety: 1, hw: 1 };   // gw-data와 같은 집합(uismoke 대조 — v430 safety 추가, 물어보기 도구는 교육 기록 col:edu를 싣지 않는다 · v431 hw 화관법 추가, 물어보기 도구에 화관법 자료 없음)
+const PERM_CLOSED = { quote: 1, promo: 1, hr: 1, lic: 1, site: 1, safety: 1, hw: 1, stmt: 1 };   // gw-data와 같은 집합(uismoke 대조 — v430 safety 추가, 물어보기 도구는 교육 기록 col:edu를 싣지 않는다 · v431 hw 화관법 추가, 물어보기 도구에 화관법 자료 없음 · 29 stmt 월말명세서 추가, 물어보기 도구에 명세서 자료 없음)
 const COL = { vehicles: 'veh', licenses: 'lic', asbestos: 'site', contracts: 'con',
   clients: 'cli', documents: 'doc', bids: 'bid', tasks: 'tasks', workers: 'wk' };
 

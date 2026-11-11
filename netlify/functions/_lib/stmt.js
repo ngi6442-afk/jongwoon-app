@@ -170,7 +170,8 @@ function cleanRow(x, ym) {
   if (use !== '' && USES.indexOf(use) < 0) return { code: 'BAD_USE' };
   const qty = decimal(x.qty, LIMIT.qty), unit = decimal(x.unit, LIMIT.money);
   if (qty === undefined || unit === undefined) return { code: 'BAD_NUMBER' };
-  const amt = money(x.amt, false), vat = money(x.vat, true);
+  // 금액 빈칸(null)은 받는다(29 판② — 작성 중 저장은 언제든: 종이를 보며 넣다 멈춘 줄) — 검산이 'amt'로 붉게 해 확정(done·sent)을 막는다
+  const amt = money(x.amt, true), vat = money(x.vat, true);
   if (amt === undefined || vat === undefined) return { code: 'BAD_MONEY' };
   const how = (x.how === undefined || x.how === null) ? 'hand' : x.how;
   if (HOWS.indexOf(how) < 0) return { code: 'BAD_HOW' };
@@ -268,9 +269,11 @@ function calcTol(x) {
   if (x.ud) t += Math.ceil(Math.abs(x.qty) * 0.5 * Math.pow(10, -x.ud));
   return t;
 }
+function amtOf(x) { return typeof x.amt === 'number' ? x.amt : 0; }   // 금액 빈칸 = 0으로 더함(그 줄은 'amt'로 붉음 — 확정 불가)
 function rowIssues(x, group) {
   const out = [];
-  if (typeof x.qty === 'number' && typeof x.unit === 'number' && Math.abs(Math.round(Math.abs(x.qty * x.unit)) - Math.abs(x.amt)) > calcTol(x)) out.push('calc');
+  if (typeof x.amt !== 'number') out.push('amt');
+  else if (typeof x.qty === 'number' && typeof x.unit === 'number' && Math.abs(Math.round(Math.abs(x.qty * x.unit)) - Math.abs(x.amt)) > calcTol(x)) out.push('calc');
   if (!x.kind) out.push('kind');
   if (group === 'veh' && !x.veh) out.push('veh');
   if (group === 'tool' && !x.use) out.push('use');
@@ -281,12 +284,12 @@ function docMode(doc) {
   if (doc.basis === 'total') return 'total';
   return (doc.rows || []).some(function (x) { return x.vat !== null && x.vat !== undefined; }) ? 'supvat' : 'suponly';
 }
-function rowOwn(x, mode) { return mode === 'supvat' ? x.amt + (x.vat || 0) : x.amt; }
+function rowOwn(x, mode) { return mode === 'supvat' ? amtOf(x) + (x.vat || 0) : amtOf(x); }
 function rowGross(x, doc, mode) {
-  if (mode === 'total') return { v: x.amt, est: false };
-  if (mode === 'supvat') return { v: x.amt + (x.vat || 0), est: false };
-  if (doc.inv && doc.inv.supply) return { v: Math.round(x.amt * doc.inv.total / doc.inv.supply), est: true };
-  return { v: Math.round(x.amt * 1.1), est: true };
+  if (mode === 'total') return { v: amtOf(x), est: false };
+  if (mode === 'supvat') return { v: amtOf(x) + (x.vat || 0), est: false };
+  if (doc.inv && doc.inv.supply) return { v: Math.round(amtOf(x) * doc.inv.total / doc.inv.supply), est: true };
+  return { v: Math.round(amtOf(x) * 1.1), est: true };
 }
 // vendor = 거래처 설정(잔액형 여부·묶음) — 묶음은 저장된 문서 값(doc.group)이 먼저(설정을 나중에 바꿔도 지난 문서 판정이 안 바뀌게)
 function checkDoc(doc, vendor) {
@@ -298,7 +301,7 @@ function checkDoc(doc, vendor) {
   rows.forEach(function (x, i) {
     const is = rowIssues(x, group);
     if (is.length) bad.push({ i: i, r: x.r || '', why: is });
-    sumAmt += x.amt;
+    sumAmt += amtOf(x);
     if (x.vat !== null && x.vat !== undefined) { sumVat += x.vat; nVat++; }
     const o = rowOwn(x, mode), g = rowGross(x, doc, mode);
     sumOwn += o; sumGross += g.v; if (g.est) est++;

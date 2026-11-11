@@ -51,7 +51,8 @@ async function currentMember(event) {
 //          기본이 view라 명시적으로 닫지 않은 현장 직원 4명에게 근로자 인적사항(30년 보존 대장)이 열려 있었다.
 //   hw     화관법 = v431(메뉴 56 4-1, PM 11/9 ③ "관리+운영만") 등록. gw-data에는 화관법 컬렉션이 없어 COL 값에 없다(아래 permOf가 hw를 볼 일 없음) —
 //          권한 강제는 v434(4-2)부터 gw-hwakwan(hwPerm — 폐기물 제출 수행·조회 숨김 거절)이 hw로 한다. 기본 숨김 4곳을 같은 집합으로 두려고 여기에도 둔다(uismoke v430 4곳 대조).
-const PERM_CLOSED = { quote: 1, promo: 1, hr: 1, lic: 1, site: 1, safety: 1, hw: 1 };
+//   stmt   월말명세서 = 29 판②(PM 11/10 D2 권민지 수행·나수진 보기). hw와 같은 꼴 — gw-data 컬렉션 없음, 강제는 gw-stmt(stmtPerm — 값 없음 = 숨김). 4곳 같은 집합이라 여기에도.
+const PERM_CLOSED = { quote: 1, promo: 1, hr: 1, lic: 1, site: 1, safety: 1, hw: 1, stmt: 1 };
 function permOf(member, col) {
   if (member.admin) return 'do';
   const key = COL[col];

@@ -1758,7 +1758,7 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   };
   const tokSoo = issueSession(mem.gw_users['member:usoo']).token;   // 관리자(비개발자) = 나수진 자리
   const tokDev = issueSession(mem.gw_users['member:udev']).token;
-  const PRESET_WORKER = { tasks: 'do', veh: 'view', rec: 'view', lic: 'view', site: 'hide', check: 'do', con: 'view', cli: 'view', doc: 'view', wk: 'view', quote: 'hide', promo: 'hide', safety: 'hide', hw: 'hide' };   // v430 safety(안전 › 교육·검진)·v431 hw(화관법) 끝에 — cleanPerms 순서 = gw-auth MODULES
+  const PRESET_WORKER = { tasks: 'do', veh: 'view', rec: 'view', lic: 'view', site: 'hide', check: 'do', con: 'view', cli: 'view', doc: 'view', wk: 'view', quote: 'hide', promo: 'hide', safety: 'hide', hw: 'hide', stmt: 'hide' };   // v430 safety(안전 › 교육·검진)·v431 hw(화관법)·29 판② stmt(월말명세서) 끝에 — cleanPerms 순서 = gw-auth MODULES
   let r34 = await callA34({ action: 'member_upsert', name: '새직원', role: '직원', rank: '사원', dept: '폐기물팀', pin: '1234', hire_date: '2026-09-08', emp_type: '계약직' }, tokSoo);
   const made = Object.values(mem.gw_users).find((x) => x && x.name === '새직원');
   T('관리자(비개발자)가 직원 등록 → 200 · admin false · dev 없음 · 계약직 저장', r34.code === 200 && !!made && made.admin === false && made.dev === undefined && made.role === '직원' && made.emp_type === '계약직', r34.code + '/' + r34.body.error_code);
@@ -4982,21 +4982,21 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   const a4_76 = await callA76({ action: 'member_upsert', id: 'upm76', perms: Object.assign({}, p3_76, { safety: 'admin' }) }, tDev76);
   const p4_76 = Object.assign({}, (mem.gw_users['member:upm76'] || {}).perms), f4_76 = aud76(L4_76, 'upm76');
   // 키 순서만 MODULES와 다른 저장값(김정아형 — site가 끝)에 인사 정보만 저장 → cleanPerms가 순서만 바꿈 → 감사에 권한 항목 없음(직급만)
-  //   v431: hw(화관법)도 MODULES에 늘어 저장값에 hw가 있어야 '순서만 다른' 경우가 된다 — 앞쪽에 둔다(순서는 여전히 MODULES와 다름)
-  const PK_76 = { safety: 'hide', hw: 'hide', tasks: 'hide', veh: 'do', rec: 'hide', lic: 'do', check: 'do', con: 'do', cli: 'hide', doc: 'view', wk: 'do', quote: 'hide', promo: 'hide', site: 'do' };
+  //   v431: hw(화관법)도 MODULES에 늘어 저장값에 hw가 있어야 '순서만 다른' 경우가 된다 — 앞쪽에 둔다(순서는 여전히 MODULES와 다름) · 29 판② stmt(월말명세서)도 같은 까닭으로 앞쪽에
+  const PK_76 = { stmt: 'hide', safety: 'hide', hw: 'hide', tasks: 'hide', veh: 'do', rec: 'hide', lic: 'do', check: 'do', con: 'do', cli: 'hide', doc: 'view', wk: 'do', quote: 'hide', promo: 'hide', site: 'do' };
   mem.gw_users['member:ukja76'] = { id: 'ukja76', name: '김정아형76', role: '직원', admin: false, perms: JSON.parse(JSON.stringify(PK_76)) };
   const L5_76 = auditMock.logs.length;
   const a5_76 = await callA76({ action: 'member_upsert', id: 'ukja76', rank: '대리' }, tDev76);
   const f5_76 = aud76(L5_76, 'ukja76'), p5_76 = (mem.gw_users['member:ukja76'] || {}).perms || {};
-  T('76 v430 검토 감사 로그 권한 = 바뀐 칸만: safety 없이 저장(숨김으로 굳음 — v431 hw도 같은 저장에서 함께 굳어 "safety:-,hw:-" → "safety:hide,hw:hide") · 칸 1번 → "safety:hide" → "safety:do" · 이상한 값 → "safety:do" → "safety:hide" · 인사 정보만 저장 → 권한 항목 없음(직급만) · 키 순서만 바뀐 저장(김정아형) → 권한 항목 없음',
-    !!f1_76 && JSON.stringify(f1_76.perms) === JSON.stringify(['safety:-,hw:-', 'safety:hide,hw:hide']) && !!f2_76 && JSON.stringify(f2_76.perms) === JSON.stringify(['safety:hide', 'safety:do'])
+  T('76 v430 검토 감사 로그 권한 = 바뀐 칸만: safety 없이 저장(숨김으로 굳음 — v431 hw·29 판② stmt도 같은 저장에서 함께 굳어 "safety:-,hw:-,stmt:-" → "safety:hide,hw:hide,stmt:hide") · 칸 1번 → "safety:hide" → "safety:do" · 이상한 값 → "safety:do" → "safety:hide" · 인사 정보만 저장 → 권한 항목 없음(직급만) · 키 순서만 바뀐 저장(김정아형) → 권한 항목 없음',
+    !!f1_76 && JSON.stringify(f1_76.perms) === JSON.stringify(['safety:-,hw:-,stmt:-', 'safety:hide,hw:hide,stmt:hide']) && !!f2_76 && JSON.stringify(f2_76.perms) === JSON.stringify(['safety:hide', 'safety:do'])
     && !!f3_76 && !!f3_76.rank && f3_76.perms === undefined && !!f4_76 && JSON.stringify(f4_76.perms) === JSON.stringify(['safety:do', 'safety:hide'])
     && a5_76.code === 200 && !!f5_76 && !!f5_76.rank && f5_76.perms === undefined && JSON.stringify(Object.keys(p5_76)) !== JSON.stringify(Object.keys(PK_76)) && Object.keys(PK_76).every((k) => p5_76[k] === PK_76[k]),
     JSON.stringify({ f1: f1_76 && f1_76.perms, f2: f2_76 && f2_76.perms, f3: f3_76 && Object.keys(f3_76), f4: f4_76 && f4_76.perms, f5: f5_76 && Object.keys(f5_76) }));
-  T('76 v430 회원 저장 cleanPerms: safety 없이 저장 → "hide"로 굳음(보기로 열리지 않음) · 칸 1번(숨김→수행) 저장 → "do" · perms 없는 인사 정보 저장 → "do" 유지 · 이상한 값 → "hide" · 다른 키는 그대로 · 키 순서 = gw-auth MODULES(끝 safety·hw — v431)',
-    a1_76.code === 200 && p1_76.safety === 'hide' && p1_76.veh === 'do' && p1_76.lic === 'view' && p1_76.site === 'hide'
+  T('76 v430 회원 저장 cleanPerms: safety 없이 저장 → "hide"로 굳음(보기로 열리지 않음) · 칸 1번(숨김→수행) 저장 → "do" · perms 없는 인사 정보 저장 → "do" 유지 · 이상한 값 → "hide" · 다른 키는 그대로 · 키 순서 = gw-auth MODULES(끝 safety·hw·stmt — v431·29 판②)',
+    a1_76.code === 200 && p1_76.safety === 'hide' && p1_76.veh === 'do' && p1_76.lic === 'view' && p1_76.site === 'hide' && p1_76.stmt === 'hide'
     && a2_76.code === 200 && p2_76.safety === 'do' && a3_76.code === 200 && p3_76.safety === 'do' && a4_76.code === 200 && p4_76.safety === 'hide' && p4_76.promo === 'do'
-    && Object.keys(p2_76).slice(-2).join(',') === 'safety,hw' && Object.keys(p2_76).length === 14,
+    && Object.keys(p2_76).slice(-3).join(',') === 'safety,hw,stmt' && Object.keys(p2_76).length === 15,
     JSON.stringify([a1_76.code, p1_76.safety, a2_76.code, p2_76.safety, a3_76.code, p3_76.safety, a4_76.code, p4_76.safety, Object.keys(p2_76).length]));
   // ⑤ 새 회원 등록의 safety — 관리자(비개발자)의 직원 등록은 서버 표(ROLE_OPEN_PERMS)로 '숨김'(클라가 safety:'do'를 실어 보내도 무시) ·
   //    개발자 등록은 앱이 보내는 직책 프리셋(index.html ROLE_PRESET을 뽑아 그대로 보냄)이 저장돼 팀장·현장직도 '숨김'(PM ② — 팀장도 숨김)
@@ -5013,7 +5013,7 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
     const pre = appPre76(rl);
     const x = await callA76({ action: 'member_upsert', name: '새' + rl + '76', role: rl, pin: '1234', admin: false, perms: pre }, tDev76);
     const m = find76('새' + rl + '76');
-    madeDev76.push(x.code + ':' + (m && m.perms ? m.perms.safety : '-') + ':' + (m && m.perms && Object.keys(pre).length === 14 && Object.keys(pre).every((k) => m.perms[k] === pre[k]) ? 'same' : 'diff'));   // v431 hw로 프리셋 키 14
+    madeDev76.push(x.code + ':' + (m && m.perms ? m.perms.safety : '-') + ':' + (m && m.perms && Object.keys(pre).length === 15 && Object.keys(pre).every((k) => m.perms[k] === pre[k]) ? 'same' : 'diff'));   // v431 hw·29 판② stmt로 프리셋 키 15
   }
   T('76 v430 새 회원 safety: 관리자(비개발자) 직원 등록 → 서버 프리셋 "hide"(클라가 do를 실어 보내도 무시)·admin false · 개발자가 앱 직책 프리셋으로 팀장·현장직 등록 → 프리셋 그대로 저장, safety "hide"(팀장도)',
     xw76.code === 200 && mw76 && mw76.perms.safety === 'hide' && mw76.perms.tasks === 'do' && mw76.admin === false && madeDev76.join(',') === '200:hide:same,200:hide:same',
@@ -5048,12 +5048,13 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
 
   // ① 김정아 1번(숨김 → 수행) · 권민지 2번 연달아(1초 안 — 표가 '보기' 한 번만 저장) · 정재욱 2번을 띄워서(수행 저장 뒤 보기 저장)
   const k1 = await cell77('ukja77', 'do'), m1 = await cell77('ukmj77', 'view'), j1 = await cell77('ujjw77', 'do'), j2 = await cell77('ujjw77', 'view');
-  T('77 v431 권한관리 \'화관법\' 칸 저장(perms만 부분 전송 — PM 순서): 김정아형 1번 → hw "do" · 권민지형 2번 연달아 → "view" · 정재욱형 2번 띄워서 → "do" 뒤 "view" — 200 OK·이유 코드 없음·응답 회원 값 = 저장값 · 감사 로그 = 바뀐 칸만("hw:-" → "hw:do" · "hw:-" → "hw:view" · "hw:-" → "hw:do" · "hw:do" → "hw:view") · 다른 13키 값 그대로 · 키 14개·끝 safety·hw',
+  //   29 판②: 저장값(v430 모양)에 stmt도 없어 첫 저장에서 stmt가 '숨김'으로 함께 굳는다(감사 "…,stmt:-" → "…,stmt:hide") — 둘째 저장부터는 hw 칸만
+  T('77 v431 권한관리 \'화관법\' 칸 저장(perms만 부분 전송 — PM 순서): 김정아형 1번 → hw "do" · 권민지형 2번 연달아 → "view" · 정재욱형 2번 띄워서 → "do" 뒤 "view" — 200 OK·이유 코드 없음·응답 회원 값 = 저장값 · 감사 로그 = 바뀐 칸만("hw:-,stmt:-" → "hw:do,stmt:hide" · "hw:-,stmt:-" → "hw:view,stmt:hide" · "hw:-,stmt:-" → "hw:do,stmt:hide" · "hw:do" → "hw:view" — 29 판② stmt는 첫 저장에서 숨김으로 굳음) · 다른 13키 값 그대로 · 키 15개·끝 safety·hw·stmt',
     [k1, m1, j1, j2].every(ok77) && k1.p.hw === 'do' && m1.p.hw === 'view' && j1.p.hw === 'do' && j2.p.hw === 'view'
-    && JSON.stringify(k1.f && k1.f.perms) === '["hw:-","hw:do"]' && JSON.stringify(m1.f && m1.f.perms) === '["hw:-","hw:view"]'
-    && JSON.stringify(j1.f && j1.f.perms) === '["hw:-","hw:do"]' && JSON.stringify(j2.f && j2.f.perms) === '["hw:do","hw:view"]'
-    && Object.keys(KJA77).every((k) => k1.p[k] === KJA77[k]) && m1.p.safety === 'do'
-    && [k1, m1, j2].every((x) => Object.keys(x.p).length === 14 && Object.keys(x.p).slice(-2).join(',') === 'safety,hw'),
+    && JSON.stringify(k1.f && k1.f.perms) === '["hw:-,stmt:-","hw:do,stmt:hide"]' && JSON.stringify(m1.f && m1.f.perms) === '["hw:-,stmt:-","hw:view,stmt:hide"]'
+    && JSON.stringify(j1.f && j1.f.perms) === '["hw:-,stmt:-","hw:do,stmt:hide"]' && JSON.stringify(j2.f && j2.f.perms) === '["hw:do","hw:view"]'
+    && Object.keys(KJA77).every((k) => k1.p[k] === KJA77[k]) && m1.p.safety === 'do' && [k1, m1, j2].every((x) => x.p.stmt === 'hide')
+    && [k1, m1, j2].every((x) => Object.keys(x.p).length === 15 && Object.keys(x.p).slice(-3).join(',') === 'safety,hw,stmt'),
     JSON.stringify({ k: [k1.r.code, k1.r.body.error_code, k1.p.hw, k1.f && k1.f.perms], m: [m1.r.code, m1.p.hw, m1.f && m1.f.perms], j: [j1.f && j1.f.perms, j2.f && j2.f.perms, j2.p.hw] }));
 
   // ② 그 뒤 권한과 무관한 저장(인사 카드 — perms 미전송)과 같은 사람의 다른 칸 저장에도 hw 값이 남는다
@@ -5852,7 +5853,7 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
     const f84 = (ev84[0] && ev84[0].f) || {};
     T('84 v447 ① 회원 칸 4개 저장(관리자): 200 · office·supervisor·test_acct true·corp con · 보내지 않은 칸(perms·rank·dept·hire_date·birth) 그대로 · 감사 1줄 f에 네 칸(없음 → 값)',
       r84.code === 200 && u84().office === true && u84().supervisor === true && u84().corp === 'con' && u84().test_acct === true
-      && JSON.stringify(u84().perms) === JSON.stringify({ tasks: 'do', veh: 'view', rec: 'view', lic: 'hide', site: 'hide', check: 'view', con: 'view', cli: 'view', doc: 'view', wk: 'view', quote: 'hide', promo: 'hide', safety: 'do', hw: 'hide' })
+      && JSON.stringify(u84().perms) === JSON.stringify({ tasks: 'do', veh: 'view', rec: 'view', lic: 'hide', site: 'hide', check: 'view', con: 'view', cli: 'view', doc: 'view', wk: 'view', quote: 'hide', promo: 'hide', safety: 'do', hw: 'hide', stmt: 'hide' })
       && u84().rank === '사원' && u84().dept === '운영부' && u84().hire_date === '2024-02-01' && u84().birth === '1990-01-01'
       && ev84.length === 1 && ['office', 'supervisor', 'corp', 'test_acct'].every((k) => Array.isArray(f84[k])) && f84.corp[1] === 'con',
       JSON.stringify({ code: r84.code, m: u84(), f: f84 }));
@@ -7362,12 +7363,14 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
     const al86 = await cs86({ action: 'stmt_alias_set', raw: '9999', veh: 'v12가1111', base: mem.gw_data['stmt:alias:veh'] ? mem.gw_data['stmt:alias:veh'].updated_at : 0 }, tD86, 'dev1');
     const mt86 = await cs86({ action: 'stmt_match', raws: ['1111호', '12가 1111', '3333', '2222호', '7900', '78라7900', '8419', '6666', '8888', '9999', '12', ''] }, tV86, 'dev1');
     const nv86 = await cs86({ action: 'stmt_match', raws: [] }, tNV86, 'dev1');
+    const nv86b = [await cs86({ action: 'stmt_month', ym: '2026-10' }, tNV86, 'dev1'), await cs86({ action: 'stmt_get', ym: '2026-10', vk: 'v05' }, tNV86, 'dev1'), await cs86({ action: 'stmt_alias_get' }, tNV86, 'dev1'), await cs86({ action: 'stmt_veh', veh: 'veh_a' }, tNV86, 'dev1')];   // 29 판② 검토: 차량 숨김이면 명세서 읽기 전부 403(응답에 전체 번호 id가 실림)
     const mh = (mt86.body.matches || []).map((m) => m.how + ':' + (m.veh || m.cand.join('|')));
     const vl86 = JSON.stringify(mt86.body.vehicles || []);
-    T('86 ⑫ 차량 대조: last4 · plate · 괄호 밖 현재 번호 last4 · (구2222) old4 · id 옛 번호 old4·old · 비고 "구 8419" old4 · 끝4 두 대 multi · 지운 차 none · 별칭 alias · 짧은 글·빈칸 none · 목록 8대(지운 차 빠짐)에 기사·보험·비고·번호 칸 없음 · veh 숨김 403 NO_VEH_ACCESS',
+    T('86 ⑫ 차량 대조: last4 · plate · 괄호 밖 현재 번호 last4 · (구2222) old4 · id 옛 번호 old4·old · 비고 "구 8419" old4 · 끝4 두 대 multi · 지운 차 none · 별칭 alias · 짧은 글·빈칸 none · 목록 8대(지운 차 빠짐)에 기사·보험·비고·번호 칸 없음 · veh 숨김 403 NO_VEH_ACCESS(29 판② — stmt_month·stmt_get·stmt_alias_get·stmt_veh 읽기도)',
       al86.code === 200 && mt86.code === 200 && mh.join(',') === ['last4:v12가1111', 'plate:v12가1111', 'last4:v34나2222', 'old4:v34나2222', 'old4:v78라7900', 'old:v78라7900', 'old4:v55바5555', 'multi:v66사6666|v77아6666', 'none:', 'alias:v12가1111', 'none:', 'none:'].join(',')
       && mt86.body.vehicles.length === 8 && !/기사|보험|차주|번호 바뀜|91마4444/.test(vl86) && mt86.body.vehicles.every((v) => !('no' in v) && !('driver' in v) && !('note' in v) && !('insurer' in v))
-      && mt86.body.vehicles.find((v) => v.id === 'v78라7900').old4[0] === '7900' && mt86.body.vehicles.find((v) => v.id === 'v55바5555').own === '지입' && nv86.code === 403 && nv86.body.error_code === 'NO_VEH_ACCESS',
+      && mt86.body.vehicles.find((v) => v.id === 'v78라7900').old4[0] === '7900' && mt86.body.vehicles.find((v) => v.id === 'v55바5555').own === '지입' && nv86.code === 403 && nv86.body.error_code === 'NO_VEH_ACCESS'
+      && nv86b.every((x) => x.code === 403 && x.body.error_code === 'NO_VEH_ACCESS'),   // 29 판②: stmt_month·stmt_get·stmt_alias_get·stmt_veh도
       JSON.stringify({ al: al86.code, mt: mt86.code, mh: mh, nv: nv86.body.error_code }));
     // ⑬ 감사 — col stmt · 글에 금액 숫자 없음(쉼표 꼴 포함) · 별칭 감사의 번호·차량 id 끝 4자리만(전체 번호 없음)
     const aud86 = auditMock.logs.slice(audit86).filter((x) => x.col === 'stmt');
@@ -7419,6 +7422,38 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
       && S86.decimal(1e21, 1e30) === undefined && S86.decimal('100.12345', 1e7) === undefined && S86.decimal(100.12345, 1e7) === undefined && S86.text('a\u202Eb', 10) === null
       && S86.piiScan('8505152345678') !== '' && S86.piiScan('010.1234.5678') !== '' && S86.piiScan('1002 123 456789') !== '' && S86.piiScan('번호 1234567890') !== ''
       && S86.piiScan('2026.10.31') === '' && S86.piiScan('2026-10-31') === '' && S86.cleanSrc([{ kind: 'scan', name: { toString: 1 } }]).code === 'BAD_SRC', '');
+
+    // ⑮ 29 판② — 금액 빈칸 줄(종이를 보며 넣다 멈춘 줄): 작성 중 저장은 받고 검산 'amt'로 붉음(합에는 0) · 확정은 NOT_BALANCED ·
+    //    권한관리 레지스트리 등록 뒤 gw-auth cleanPerms가 stmt 값을 지킴(수행 → gw-stmt 200) · 값 없는 직원 저장 → '숨김'으로 굳음(→ 403 NO_ACCESS) · 보기 → 쓰기 403 NO_WRITE
+    const R15 = (o) => Object.assign({ r: 'h1', date: '2026-11-03', veh: 'veh_a', vraw: '0001', item: '요소수', kind: 'urea', qty: '10', unit: '1000', amt: 10000, how: 'hand' }, o);
+    const rows15 = [R15({}), R15({ r: 'h2', qty: '5', unit: null, amt: null })];
+    const a15 = await cs86({ action: 'stmt_save', ym: '2026-11', vk: 'v07', base: 0, rows: rows15, stated: 10000 }, tokA);
+    const a15d = await cs86({ action: 'stmt_save', ym: '2026-11', vk: 'v07', base: a15.body.doc ? a15.body.doc.updated_at : 0, status: 'done', rows: rows15, stated: 10000 }, tokA);
+    const a15e = await cs86({ action: 'stmt_save', ym: '2026-11', vk: 'v07', base: a15.body.doc ? a15.body.doc.updated_at : 0, rows: [R15({ amt: '' })], stated: 10000 }, tokA);
+    const a15c = S86.checkDoc({ basis: 'supply', group: 'veh', rows: [S86.cleanRow(R15({}), '2026-11').row, S86.cleanRow(R15({ r: 'h2', amt: '  ' }), '2026-11').row], stated: 10000 }, { group: 'veh' });
+    const gwa15 = require(join(FN, 'gw-auth.js'));
+    const callA15 = async (body, tok) => { const x = await gwa15.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + tok }, body: JSON.stringify(body) }); return { code: x.statusCode, body: JSON.parse(x.body || '{}') }; };
+    mem.gw_users['member:udev15'] = { id: 'udev15', name: '개발자15', role: '개발자', admin: true, dev: true, perms: {}, tier: 'pm' };
+    mem.gw_users['member:ukmj15'] = { id: 'ukmj15', name: '권민지형15', role: '직원', admin: false, perms: { tasks: 'do', veh: 'view' } };
+    mem.gw_users['member:unop15'] = { id: 'unop15', name: '무권한15', role: '직원', admin: false, perms: { tasks: 'do', veh: 'view' } };
+    const tDev15 = issueSession(mem.gw_users['member:udev15']).token;
+    const g15a = await callA15({ action: 'member_upsert', id: 'ukmj15', perms: Object.assign({}, mem.gw_users['member:ukmj15'].perms, { stmt: 'do' }) }, tDev15);
+    const pg15a = Object.assign({}, (mem.gw_users['member:ukmj15'] || {}).perms);
+    const s15a = await cs86({ action: 'stmt_cfg_get' }, issueSession(mem.gw_users['member:ukmj15']).token, 'dev1');
+    const g15b = await callA15({ action: 'member_upsert', id: 'unop15', rank: '사원' }, tDev15);
+    const pg15b = Object.assign({}, (mem.gw_users['member:unop15'] || {}).perms);
+    const s15b = await cs86({ action: 'stmt_cfg_get' }, issueSession(mem.gw_users['member:unop15']).token, 'dev1');
+    const g15c = await callA15({ action: 'member_upsert', id: 'unop15', perms: Object.assign({}, pg15b, { stmt: 'view' }) }, tDev15);
+    const tN15 = issueSession(mem.gw_users['member:unop15']).token;
+    const s15r = await cs86({ action: 'stmt_month', ym: '2026-11' }, tN15, 'dev1'), s15w = await cs86({ action: 'stmt_save', ym: '2026-11', vk: 'v07', base: 0, rows: [] }, tN15, 'dev1');
+    T('86 ⑮ 29 판② 금액 빈칸 줄: 작성 중 저장 200(빈칸 = null 저장·검산 붉음 2번 줄 "amt"·합에는 0 — 명세 합계 10,000 맞음) · 확정 400 NOT_BALANCED · 금액 "" 줄도 작성 중 200 · 순수 규칙: 빈칸 금액 = amt(calc 아님) · 권한관리 등록 뒤 회원 저장: stmt "do" 지킴 → gw-stmt 200 · stmt 없는 직원 인사 저장 → "hide"로 굳음 → 403 NO_ACCESS · "view" 저장 → 읽기 200·쓰기 403 NO_WRITE',
+      a15.code === 200 && a15.body.doc.rows[1].amt === null && a15.body.checks.ok === false && a15.body.checks.bad.length === 1 && a15.body.checks.bad[0].i === 1 && a15.body.checks.bad[0].why.join() === 'amt'
+      && a15.body.checks.sum_amt === 10000 && a15.body.checks.issues.length === 0
+      && a15d.code === 400 && a15d.body.error_code === 'NOT_BALANCED' && a15e.code === 200 && a15e.body.doc.rows[0].amt === null
+      && a15c.bad.length === 1 && a15c.bad[0].why.join() === 'amt' && a15c.sum_amt === 10000 && a15c.sum_gross === 11000 && a15c.est === 2
+      && g15a.code === 200 && pg15a.stmt === 'do' && s15a.code === 200 && g15b.code === 200 && pg15b.stmt === 'hide' && s15b.code === 403 && s15b.body.error_code === 'NO_ACCESS'
+      && g15c.code === 200 && s15r.code === 200 && s15w.code === 403 && s15w.body.error_code === 'NO_WRITE',
+      JSON.stringify({ a15: [a15.code, a15.body.checks && a15.body.checks.bad, a15.body.checks && a15.body.checks.issues], a15d: [a15d.code, a15d.body.error_code], a15e: a15e.code, a15c: [a15c.bad, a15c.sum_gross, a15c.est], g: [g15a.code, pg15a.stmt, s15a.code, g15b.code, pg15b.stmt, s15b.code, g15c.code, s15r.code, s15w.code] }));
   } finally {
     blobsMock.hooks.failGet = null;
     mem.gw_users = savedUsers86;
