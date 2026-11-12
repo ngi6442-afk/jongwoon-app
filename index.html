@@ -1802,7 +1802,7 @@
       <button type="button" class="sec-hd-add" id="eduAddWkBtn" style="display:none;">+ 일용직</button>
     </div>
     <div class="edu-lead" id="eduLead">회사가 사람마다 챙길 법정 교육·검진·위험성평가 공유·참여</div>
-    <div class="edu-scope-line" id="eduScopeLine">범위: 산안법 교육·검진·위험성평가 공유·참여 — 화관법 교육은 화관법 탭</div>
+    <div class="edu-scope-line" id="eduScopeLine">범위: 산안법 교육·검진·위험성평가 공유·참여 — 석면 작업 교육은 현장 칸 · 화관법 교육은 화관법 탭</div>
     <div class="vs-tools" id="eduScopeBar">
       <button type="button" class="vs-chip on" data-edu-scope="member">직원</button>
       <button type="button" class="vs-chip" data-edu-scope="worker">일용직</button>
@@ -16734,7 +16734,11 @@
   //   칸 상태 일곱: '✓ 연-월'(또는 정기교육 '✓ a/b시간') · 반기 진도 'a/b시간' · 'D-n' · '경과 n일' · '기록 없음' · '근거 확인 중'(회색 — ✓·빨강 안 냄, 빠진 항목에 안 셈) · '—'(대상 아님)
   //   + 현장 대장을 볼 권한이 없으면 배치 전 칸(채용 시·특별교육·건설 기초·석면 건진) '판정 불가(현장 권한 없음)'(회색) · 대장을 읽는 중이면 '확인 중'(회색).
   //   배치 전 의무 기한 = 그 사람이 든 예정·작업중 현장(종결이 아닌 줄 — 현장 표·서버 판정과 같은 r.status !== "done")의 가장 이른 시작일(시작일이 없으면 '기록 없음').
-  //   특별교육 칸 = 현장 표 특별교육 칸·서버 site_edu_gap·현황 ③과 같은 함수·같은 범위(eduHasValidSpecial — 종류 무관 진행 현장 투입자, special 기록) — 석면만으로 좁힐지는 별표5 원문 확인 뒤 따로.
+  //   v450(PM 11/13 02:14 '석면은 교육 제외'): 석면은 이 칸의 교육 판정 밖 — 석면 현장에만 든 일용직(진행 중 석면 현장 없음)은 행에 넣지 않고(asbOut), 교육 칸(채용 시·특별교육·건설 기초·작업내용 변경 시)은
+  //   석면 밖 현장(철거·준설)만 본다. 특별교육 열 = 석면 밖 특별교육(special_demo — 별표5 해체·밀폐 등). 석면 특별교육은 현장 칸 특별교육 줄(현장 표 asbNoSpecial·서버 site_edu_gap·현황 ③ —
+  //   eduHasValidSpecial 한 판정)이 그대로 맡는다(원장 C086). 석면 건진(검진)·석면 투입자 칩·위험성평가는 종전대로 석면 현장도 본다.
+  //   v450 검토: 진행 중 투입이 석면 현장뿐인 일용직의 교육 칸 = '—'(기록이 있으면 '✓ 연-월') · 고르기 '석면 — 판정 밖'(대상 아님이라 단정하지 않음 — 채용 시·건설 기초는 석면 교육이 아니어서 이 칸이 판정하지 않을 뿐).
+  //   석면 현장에만 든 일용직(진행 중 없음)의 기록은 PC 표에 나오지 않는다 — 보기·수정은 폰 목록(860px 아래)에서.
   //   위험성평가 칸 = 결과 공유만 판정(직원 — 그 사람에게 걸리는 올해 정기·최초 회차(eduRaOnFor — 전사·그 부서)가 있으면 그 뒤 ra_share가 없을 때, 회차가 없으면 올해 ra_share가 없을 때 노랑 '기록 없음' — 빨강은 공유 기한 근거 확인 뒤, v447 검토 2)
   //   · 참여(ra_join)는 '· 참여' 표시만 · 올해 투입 일용직의 공유는 '신규·작업 변경자 작업 전 공유'라
   //   고용노동부 11/4 고시 전부개정이 법제처에 오르기 전까지 '근거 확인 중'(회색).
@@ -16748,7 +16752,9 @@
   //   그 글이 나오는 정기교육 90·채용 시 89·건설 기초 89(명세 86) · '경과 999일' 굵게 63.6 → 특별교육·일반건진 82 · 석면 건진 84(머리 '석면 건진' + 화살표 67.4) · 위험성평가 '✓ 2026-11 · 참여' 95.5·
   //   '근거 확인 중 · 참여' 약 104 → 124 · 빠진 항목 72(머리 굵게 54.4 — 64의 안 폭 47이면 머리가 잘림) · 구분 56 · 다음 할 일 남는 폭 최소 128('위험성평가 기록 없음 외 6' 149.4 — 말줄임 + title).
   //   '판정 불가(현장 권한 없음)' 145.6은 어느 칸에도 안 들어가 말줄임 + title(지금 안전을 볼 수 있는 분은 모두 현장 수행이라 나올 일 0).
-  //   단계별 열 합 742 / 948 / 1,172(명세 722 / 956 / 1,042) ≤ 742 / 962 / 1,282.
+  //   단계별 열 합 742 / 956 / 1,180(명세 722 / 956 / 1,042 — 일반건진 82 → 90 뒤) ≤ 742 / 962 / 1,282.
+  //   v450: 특별교육 열에 '근거 확인 중'(석면 밖 특별교육 — 철거·준설 진행 현장 투입)이 나와 82 → 89(글 71.3 + 칸 여백 17 — 11/13 시험 화면 실측: 88이면 안 폭 71이라 말줄임) · 단계 2 합을 742에 두려고 다음 할 일 남는 폭 최소 128 → 121(말줄임 + title) —
+  //   단계별 열 합 742 / 956 / 1,180 그대로.
   // 칩 두 묶음(옅은 선택): 대상 전체·직원·일용직(옛 #eduScopeBar 이어받음 — 'safety:edu:worker'·'safety:edu:member' 이동이 이번만 켬) · 상태 전체·빠진 항목 있음·30일 안·지남·기한 경과(.warn)·석면 투입자 + 건수.
   // 줄 누르기 = 펼침(항목별 상태 표 — 항목·대상 근거·마지막 실시·다음 기한·상태·[+ 기록] · 대상 아님은 한 줄 → 이력 표 [수정] → [+ 이력 추가]). 바꾸는 버튼은 .mini-btn + canDo("safety") —
   //   누름 길 eduSheetAct가 다시 봄 · 선택 체크(sel.can = 안전 수행)로 여럿에게 같은 기록(eduBulkOpen — 퇴사자·지운 일용직·이름 모르는 일용직은 뺌).
@@ -16759,6 +16765,7 @@
   var EDU_SOON = 30;                                   // 임박 노랑(사람별 의무 30일 — 명세 glossary)
   var EDU_HIRE_GAP = 7;                                // v447: 채용 시 교육 기록이 이번 투입 시작일보다 이만큼(일) 넘게 앞이면 옛 투입 것으로 보고 ✓ 대신 회색 — 산안법 시행규칙 별표4 비고 2(일용근로자가 채용 시 교육을 받은 날부터 1주일 안에 같은 사업장 같은 업무로 다시 종사할 때만 면제 — 현행 2026-08-01 원문 11/12 확인, 09_조사_문서/특별교육범위_자료_20261112). 검토 2의 90일 대리값을 법정 값으로 바꿈
   var EDU_CHK = "근거 확인 중", EDU_NOSITE = "판정 불가(현장 권한 없음)";
+  var EDU_ASB_CAT = "석면 — 판정 밖";   // v450 검토: 진행 중 투입이 석면 현장뿐인 일용직의 교육 칸 고르기 글(대상 아님과 따로 — 펼침에서 '대상 아님' 줄로 접지 않음)
   var EDU_ITEM_COLS = ["reg", "hire", "spec", "basic", "gmed", "amed", "ra"];
   var EDU_ITEM_H = { reg: "정기교육", hire: "채용 시", spec: "특별교육", basic: "건설 기초", gmed: "일반건진", amed: "석면 건진", ra: "위험성평가" };
   var EDU_GREY = "color:#9AA09C;";
@@ -16843,14 +16850,21 @@
   // 한 사람의 칸 상태 전부 — p = 행(eduSheetRows), cx = eduSheetCx(), si·ri = 현장·기록 색인. 돌려줌 { c: {열 키: 상태}, x: {펼침에만 있는 항목}, miss, over, soon, asb, cand }
   function eduPersonStat(p, cx, si, ri){
     var recs = ri[p.id] || [], sites = si[p.id] || [], act = sites.filter(function(e){ return e.act; }), mem = p.ptype === "member", gone = p.grp === "gone", m = p.m || null, c = {}, x = {};
-    var asbAct = act.filter(function(e){ return e.k === "asbestos"; }), conAct = act.filter(function(e){ return e.k === "asbestos" || e.k === "demolition"; }), drAct = act.filter(function(e){ return e.k === "dredge"; });
-    var last = function(kinds, from){ return eduLastOf(recs, kinds, from); }, actTxt = act.length ? "진행 중 현장 " + eduSitesTxt(act) : "", sup = !!(m && m.supervisor === true), off = !!(m && m.office === true);
+    var asbAct = act.filter(function(e){ return e.k === "asbestos"; });
+    // v450(PM 11/13 02:14 '석면은 교육 제외'): 교육 판정(채용 시·특별교육·건설 기초·작업내용 변경 시)은 석면 밖 현장만 본다(eSites·eAct) — 석면 교육은 현장 칸 특별교육 줄(eduHasValidSpecial).
+    //   석면 건진(검진)·석면 투입자 칩·위험성평가는 종전대로 모든 현장(sites·act·asbAct) · 진행 중 투입이 석면 현장뿐인 일용직(aOnly — 석면 밖 현장은 없거나 종결)은 교육 칸 '—'(ASB_T)
+    //   v450 검토: 이 칸들은 '대상 아님'이 아니라 '석면 — 판정 밖'(EDU_ASB_CAT — 거르기·펼침에서 대상 아님 줄로 접지 않고 근거 글과 함께 보임 · 채용 시·건설 기초는 석면 교육이 아니라 법정 대상 여부를 단정하지 않음)
+    var eSites = sites.filter(function(e){ return e.k !== "asbestos"; }), eAct = act.filter(function(e){ return e.k !== "asbestos"; });
+    var aOnly = !mem && !gone && act.length > 0 && !eAct.length, ASB_T = "석면 현장 투입 — 체크 칸 교육 판정에서 뺌(석면 특별교육은 현장 칸 특별교육 줄)";
+    var asbNone = function(kind, rec, basis){ return eduIt({ t: rec ? "✓ " + eduYm(rec.date) : "—", cat: EDU_ASB_CAT, last: rec || null, kind: kind, basis: basis || ASB_T }); };
+    var conAct = eAct.filter(function(e){ return e.k === "demolition"; }), drAct = eAct.filter(function(e){ return e.k === "dredge"; });
+    var last = function(kinds, from){ return eduLastOf(recs, kinds, from); }, actTxt = eAct.length ? "진행 중 현장 " + eduSitesTxt(eAct) : "", sup = !!(m && m.supervisor === true), off = !!(m && m.office === true);
     var noSite = function(kind, rec){ return eduGreyIt(kind, EDU_NOSITE, "판정 불가", "현장 대장을 볼 권한이 없어 배치 전 기한을 셀 수 없음", rec); };
     var wait = function(kind, rec){ return eduGreyIt(kind, "확인 중", "확인 중", "현장 대장을 읽는 중 — 읽은 뒤 다시 그립니다", rec); };
     var siteGate = function(kind, rec){ return !cx.site ? noSite(kind, rec) : (!cx.asb ? wait(kind, rec) : null); };
-    var sp, valid, b, h, g, am, sh, jn, raT, from, to, need, kind, a, n, tip, pf, pt, pa, pn, pl;
+    var sp, b, h, g, am, sh, jn, raT, from, to, need, kind, a, n, tip, pf, pt, pa, pn, pl;
     // v447 검토 2: 대표(사업주 — isBossMember)는 근로자 의무 칸(정기교육·채용 시·일반건진·위험성평가 공유)을 '근거 확인 중'(회색 — 빠진 항목·합계 분모 밖)으로.
-    //   특별교육·석면 건진은 현장 투입 판정이라 현장 표와 같게 그대로. 등기임원(PM 등) 근로자성은 사람마다 달라 판정하지 않음
+    //   특별교육(v450부터 석면 밖)·석면 건진은 현장 투입 판정이라 그대로. 등기임원(PM 등) 근로자성은 사람마다 달라 판정하지 않음
     var boss = !!(mem && m && !gone && isBossMember(m)), BOSS_B = "사업주(대표) — 근로자 의무 대상 여부 근거 확인 중(근로자 대상 의무라 빠진 항목으로 세지 않음)";
     // 정기교육 — 직원: 관리감독자 지정이면 올해 super 시간 / 16, 아니면 이번 반기 regular 시간 / (사무직 6 · 그 밖 12) · 일용직: 근거 확인 중
     if (gone) c.reg = eduNone(sup ? "super" : "regular", "기록만 남은 사람 — 판정 안 함", last(["regular", "super"]));
@@ -16877,32 +16891,40 @@
     h = last(["hire"]); b = last(["basic_con"]);
     if (gone) c.hire = eduNone("hire", "기록만 남은 사람 — 판정 안 함", h);
     else if (mem) c.hire = eduGreyIt("hire", EDU_CHK, EDU_CHK, "직원 — 채용 시 교육 대상·기한 근거 확인 중(입사일 기준 판정은 원문 확인 뒤)", h);
+    else if (aOnly) c.hire = siteGate("hire", h) || asbNone("hire", h);   // v450
     else {
       // v447 검토: 채용 시 교육은 채용(투입)마다 생기는 의무 — 기록이 이번 투입(가장 이른 진행 현장 시작일) 전 다른 투입 때 것일 수 있으면(아래 hOld)
-      //   ✓로 보지 않고 '근거 확인 중'(일용직을 다시 채용할 때마다 다시 받는지 원문 확인 전) · 건설 기초 이수 '면제'는 석면·철거 현장 투입일 때만(준설 등만이면 근거 확인 중)
+      //   ✓로 보지 않고 '근거 확인 중'(일용직을 다시 채용할 때마다 다시 받는지 원문 확인 전) · 건설 기초 이수 '면제'는 철거 현장 투입일 때만(준설 등만이면 근거 확인 중 — v450: 석면 현장은 보지 않음)
       //   v447 검토 2: 연도 비교(해를 넘는 같은 투입 — 12-30 교육·01-05 시작 — 도 회색이 되던 것)를 빼고 ① 기록일과 이번 시작일 사이에 시작했거나 끝난 다른 현장이 있음 ·
       //   ② 기록일이 이번 시작일보다 EDU_HIRE_GAP(7)일 넘게 앞(별표4 비고 2 — 1주일 안 재종사만 면제, 넘으면 ✓ 대신 회색: 다시 채용 때 다시 받는지는 '같은 사업장·같은 업무' 판정이 앱에 없어 근거 확인 중)
-      var hRef = eduMinStart(act) || cx.today, hOld = !!(h && isDate(h.date) && act.length && (vehDday(h.date).diff - vehDday(hRef).diff < -EDU_HIRE_GAP
+      //   v450 검토: 기준일(hRef)은 석면 밖 진행 현장 · 사이 현장은 석면도 본다(석면 투입도 다른 채용(투입) — ✓를 회색으로 낮추는 쪽으로만)
+      var hRef = eduMinStart(eAct) || cx.today, hOld = !!(h && isDate(h.date) && eAct.length && (vehDday(h.date).diff - vehDday(hRef).diff < -EDU_HIRE_GAP
         || sites.some(function(e){ return (e.start && e.start > h.date && e.start < hRef) || (e.end && e.end > h.date && e.end < hRef); })));
-      c.hire = siteGate("hire", h || b) || (b ? (conAct.length ? eduIt({ t: "면제", tgt: true, cat: "면제", last: b, kind: "hire", basis: "건설업 기초안전보건교육 이수(" + b.date + ") — 석면·철거 현장 투입이라 채용 시 교육 면제" })
-          : (act.length ? eduGreyIt("hire", EDU_CHK, EDU_CHK, "건설업 기초안전보건교육 이수(" + b.date + ") — 석면·철거 밖 현장(" + eduSitesTxt(act) + ") 투입이라 면제 여부 근거 확인 중", b)
+      c.hire = siteGate("hire", h || b) || (b ? (conAct.length ? eduIt({ t: "면제", tgt: true, cat: "면제", last: b, kind: "hire", basis: "건설업 기초안전보건교육 이수(" + b.date + ") — 철거 현장 투입이라 채용 시 교육 면제" })
+          : (eAct.length ? eduGreyIt("hire", EDU_CHK, EDU_CHK, "건설업 기초안전보건교육 이수(" + b.date + ") — 철거 밖 현장(" + eduSitesTxt(eAct) + ") 투입이라 면제 여부 근거 확인 중", b)
             : eduIt({ t: "면제", cat: "면제", last: b, kind: "hire", basis: "건설업 기초안전보건교육 이수(" + b.date + ") — 진행 중 현장 투입 없음" })))
-        : (h ? (!act.length ? eduNone("hire", "진행 중 현장 투입 없음", h) : (hOld ? eduGreyIt("hire", EDU_CHK, EDU_CHK, "채용 시 교육 기록(" + h.date + ")이 이번 투입(" + hRef + ") 전 다른 투입 때 것일 수 있음 — 1주일 안 같은 사업장·같은 업무 재종사만 면제(산안법 시행규칙 별표4 비고 2), 이번 투입이 해당하는지 근거 확인 중", h) : eduOk("hire", h, actTxt)))
-          : (act.length ? eduDue("hire", eduMinStart(act), actTxt + " — 배치 전 1회, 기한 = 현장 시작일") : eduNone("hire", "진행 중 현장 투입 없음"))));
+        : (h ? (!eAct.length ? eduNone("hire", "진행 중 현장 투입 없음", h) : (hOld ? eduGreyIt("hire", EDU_CHK, EDU_CHK, "채용 시 교육 기록(" + h.date + ")이 이번 투입(" + hRef + ") 전 다른 투입 때 것일 수 있음 — 1주일 안 같은 사업장·같은 업무 재종사만 면제(산안법 시행규칙 별표4 비고 2), 이번 투입이 해당하는지 근거 확인 중", h) : eduOk("hire", h, actTxt)))
+          : (eAct.length ? eduDue("hire", eduMinStart(eAct), actTxt + " — 배치 전 1회, 기한 = 현장 시작일") : eduNone("hire", "진행 중 현장 투입 없음"))));
     }
-    // 특별교육 — 현장 표·서버와 같은 판정: 진행 현장에 든 사람이 유효한 특별교육 기록(eduHasValidSpecial)이 없으면 빠짐(기록만 남은 사람도 진행 현장에 들어 있으면 — 현장 표와 같은 사람)
-    //   v447 검토: 같은 사람 = 현장 표(asbNoSpecial)·서버(siteEduGaps)가 이름을 내는 사람 — 회원 목록에 있는 회원(퇴사자 포함)·명부의 지우지 않은 일용직뿐.
-    //   지운 회원·지운 일용직·명부에 없는 id는 판정 안 함 · 명부를 볼 수 없는 '일용직 n'은 지운 사람을 가를 수 없어 판정 불가(서버 wk_n·현장 표가 세지 않는 사람을 세지 않게)
-    sp = eduLatest(p.ptype, p.pid, "special"); valid = eduHasValidSpecial(p.ptype, p.pid);
-    if (p.anon) c.spec = eduGreyIt("special", "판정 불가", "판정 불가", "일용직 명부를 볼 수 없어 지운 일용직인지 가를 수 없음 — 현장 표·서버와 같은 사람만 세려고 판정 안 함", sp);
-    else if (mem ? !p.m : (!p.w || p.w.del === 1)) c.spec = eduNone("special", (mem ? "지운 회원" : "지운 일용직") + " — 현장 표·서버 특별교육 판정 밖(판정 안 함)", sp);
-    else c.spec = siteGate("special", sp) || ((act.length && !valid) ? eduDue("special", eduMinStart(act), actTxt + " — 현장 표 특별교육 칸과 같은 판정(배치 전 이수), 기한 = 현장 시작일")
-      : (valid ? (act.length ? eduOk("special", sp, actTxt) : eduNone("special", "진행 중 현장 투입 없음", sp)) : eduNone("special", "진행 중 현장 투입 없음")));
-    // 건설 기초 — 석면·철거 진행 현장 투입 일용직(1회 — 기록 있으면 ✓) · 준설만이면 근거 확인 중(기록이 있어도 — 검토: 근거를 확인하지 못한 항목은 ✓·합계 분모에 넣지 않음) · 직원 대상 아님
+    // 특별교육 — v450: 석면 밖 특별교육(special_demo — 산안법 시행규칙 별표5 해체·밀폐 등 · 종전 펼침 '특별교육(해체·밀폐 등)' 판정을 열로 옮김):
+    //   기록 있음 + 진행 중 석면 밖 현장(철거·준설) 투입 = '✓ 연-월'(고르기 '✓ 기록' — v450 검토: 대상 확정은 C086 뒤라 합계 분모 밖) · 기록만 = '✓ 기록(대상 아님)' · 기록 없음 + 진행 중 철거·준설 투입 = 회색 '근거 확인 중'(별표5 어느 호인지 원문 확인 뒤 — 원장 C086) · 그 밖 '—'.
+    //   석면 특별교육(eduHasValidSpecial — 현장 표 asbNoSpecial·서버 siteEduGaps·현황 ③의 한 판정)은 이 열에서 보지 않는다(현장 칸 특별교육 줄이 그대로 맡음 — 따로 만들지 말 것)
+    //   지운 사람·기록만 남은 사람 = 판정 안 함 · 명부를 볼 수 없는 '일용직 n'은 지운 사람을 가를 수 없어 판정 불가
+    sp = last(["special_demo"]);
+    if (p.anon) c.spec = eduGreyIt("special_demo", "판정 불가", "판정 불가", "일용직 명부를 볼 수 없어 지운 일용직인지 가를 수 없음 — 판정 안 함", sp);
+    else if (gone || (mem ? !p.m : (!p.w || p.w.del === 1))) c.spec = eduNone("special_demo", "기록만 남은 사람 — 판정 안 함", sp);
+    else if (aOnly) c.spec = siteGate("special_demo", sp) || asbNone("special_demo", sp, ASB_T + " · 석면 특별교육 기록은 [+ 이력 추가]에서 종류 「석면 특별교육」으로(이 줄 [+ 기록]은 석면 밖 특별교육)");
+    //   v450 검토: 기록 + 진행 중 철거·준설 투입도 대상 확정 전(C086 — 기록이 없으면 '근거 확인 중'인 사람)이라 '✓ 연-월'만 내고 대상(합계 분모)에 넣지 않음(건설 기초 준설만과 같은 원칙)
+    else c.spec = siteGate("special_demo", sp) || (sp ? (eAct.length ? eduIt({ t: "✓ " + eduYm(sp.date), cat: "✓ 기록", last: sp, kind: "special_demo", basis: "석면 밖 특별교육(별표5) 기록 — 대상 작업 여부는 별표5 원문 확인 뒤(C086) · " + actTxt }) : eduNone("special_demo", "석면 밖 특별교육(별표5) 기록 — 진행 중 철거·준설 현장 투입 없음", sp))
+      : (eAct.length ? eduGreyIt("special_demo", EDU_CHK, EDU_CHK, "철거·준설 진행 현장(" + eduSitesTxt(eAct) + ") — 별표5 대상 작업인지 원문 확인 뒤 판정(석면 특별교육은 현장 칸)") : eduNone("special_demo", "철거·준설 진행 현장 투입 없음")));
+    // 건설 기초 — 철거 진행 현장 투입 일용직(1회 — 기록 있으면 ✓ · v450: 석면 현장은 보지 않음) · 준설만이면 근거 확인 중(기록이 있어도 — 검토: 근거를 확인하지 못한 항목은 ✓·합계 분모에 넣지 않음) · 직원 대상 아님
+    //   v450 검토 2: 진행 중 석면 현장에도 든 사람은 '준설 현장만'이 사실과 달라 '준설 현장 투입(…) … · 석면 현장(…)은 체크 칸 교육 판정 밖'(회색 판정은 그대로)
+    var drB = drAct.length ? "준설 현장" + (asbAct.length ? "" : "만") + " 투입(" + eduSitesTxt(drAct) + ") — 건설공사 해당 여부 근거 확인 중" + (asbAct.length ? " · 석면 현장(" + eduSitesTxt(asbAct) + ")은 체크 칸 교육 판정 밖" : "") : "";
     if (gone || mem) c.basic = eduNone("basic_con", mem ? "직원 — 건설 일용근로자 교육이라 대상 아님" : "기록만 남은 사람 — 판정 안 함", b);
-    else c.basic = siteGate("basic_con", b) || (b ? (conAct.length ? eduOk("basic_con", b, "1회 이수(다시 받지 않음)") : (drAct.length ? eduGreyIt("basic_con", EDU_CHK, EDU_CHK, "준설 현장만 투입(" + eduSitesTxt(drAct) + ") — 건설공사 해당 여부 근거 확인 중 · 1회 이수 기록 있음", b) : eduNone("basic_con", "1회 이수(다시 받지 않음)", b)))
-      : (conAct.length ? eduDue("basic_con", eduMinStart(conAct), "석면·철거 현장 투입 일용직(" + eduSitesTxt(conAct) + ") — 첫 투입 전 1회, 기한 = 현장 시작일")
-        : (drAct.length ? eduGreyIt("basic_con", EDU_CHK, EDU_CHK, "준설 현장만 투입(" + eduSitesTxt(drAct) + ") — 건설공사 해당 여부 근거 확인 중") : eduNone("basic_con", "석면·철거 진행 현장 투입 없음"))));
+    else if (aOnly) c.basic = siteGate("basic_con", b) || asbNone("basic_con", b);   // v450
+    else c.basic = siteGate("basic_con", b) || (b ? (conAct.length ? eduOk("basic_con", b, "1회 이수(다시 받지 않음)") : (drAct.length ? eduGreyIt("basic_con", EDU_CHK, EDU_CHK, drB + " · 1회 이수 기록 있음", b) : eduNone("basic_con", "1회 이수(다시 받지 않음)", b)))
+      : (conAct.length ? eduDue("basic_con", eduMinStart(conAct), "철거 현장 투입 일용직(" + eduSitesTxt(conAct) + ") — 첫 투입 전 1회, 기한 = 현장 시작일")
+        : (drAct.length ? eduGreyIt("basic_con", EDU_CHK, EDU_CHK, drB) : eduNone("basic_con", "철거 진행 현장 투입 없음"))));
     // 일반건진 — 직원(사무직 2년·그 밖 1년, 표시 없으면 1년) · 일용직 대상 아님
     g = last(["gen_med"]);
     if (gone || !mem) c.gmed = eduNone("gen_med", mem ? "기록만 남은 사람 — 판정 안 함" : "일용직 — 상시 근로자 검진이라 대상 아님", g);
@@ -16930,15 +16952,12 @@
     else if (raOn) c.ra = shR ? eduOk("ra_share", shR, "직원 — " + cx.y + "년 회차(평가 " + raOn + ") 결과 공유 · " + RA_SRC) : eduIt({ t: "기록 없음", cls: "vs-warn", tgt: true, miss: true, cat: "기록 없음", kind: "ra_share", basis: "직원 — " + cx.y + "년 회차(평가 " + raOn + ") 뒤 결과 공유 기록 없음(공유 기한은 지침 원문 확인 뒤 — 빨강 안 냄) · " + RA_SRC });
     else c.ra = sh ? eduOk("ra_share", sh, "직원 — " + cx.y + "년 결과 공유(올해 정기·최초 회차 표식 없음) · " + RA_SRC) : eduIt({ t: "기록 없음", cls: "vs-warn", tgt: true, miss: true, cat: "기록 없음", kind: "ra_share", basis: "직원 — " + cx.y + "년 위험성평가 회차·결과 공유 기록 없음(회차 = 위험성평가 줄의 회차 표식 정기·최초) · " + RA_SRC });
     c.ra.join = raT ? jn : null;
-    // 펼침에만 있는 항목(열에 없음) — 작업내용 변경 시 · 특별교육(해체·밀폐 등) · 석면해체·제거관리자교육 · 위험성평가 참여(표시만) · 신규·작업 변경자 작업 전 공유(근거 확인 중)
+    // 펼침에만 있는 항목(열에 없음) — 작업내용 변경 시 · 위험성평가 참여(표시만) · 신규·작업 변경자 작업 전 공유(근거 확인 중)
+    //   v450: 특별교육(해체·밀폐 등)은 특별교육 열로 옮김 · 석면해체·제거관리자교육은 석면 교육이라 이 칸 펼침에서 뺌(현황 ⑤ 관리자교육 셈·기록 저장은 그대로) · 작업내용 변경 시는 석면 밖 현장만
+    //   v450 검토 2: 진행 중 투입이 석면 현장뿐인 직원도 작업내용 변경 시는 '석면 — 판정 밖'(석면 교육이 아닌 의무라 '대상 아님'으로 단정하지 않음 — 일용직 aOnly와 같은 표시)
     h = last(["change"]);
     x.change = h ? eduIt({ t: "✓ " + eduYm(h.date), cat: "✓ 기록", last: h, kind: "change", basis: "작업내용을 바꾼 때 1회 — 변경 시점 자료가 앱에 없어 기록만 보여 줌" })
-      : ((!gone && act.length) ? eduGreyIt("change", EDU_CHK, EDU_CHK, "작업내용 변경 시점 자료가 앱에 없음 — 근거 확인 중") : eduNone("change", "작업내용 변경 기록 없음"));
-    h = last(["special_demo"]); a = act.filter(function(e){ return e.k !== "asbestos"; });
-    x.sdemo = h ? eduIt({ t: "✓ " + eduYm(h.date), cat: "✓ 기록", last: h, kind: "special_demo", basis: "석면 밖 특별교육(별표5) — 기록만" })
-      : ((!gone && a.length) ? eduGreyIt("special_demo", EDU_CHK, EDU_CHK, "철거·준설 진행 현장(" + eduSitesTxt(a) + ") — 별표5 대상 작업인지 원문 확인 뒤 판정") : eduNone("special_demo", "철거·준설 진행 현장 투입 없음"));
-    h = last(["manager"]);
-    x.mgr = h ? eduIt({ t: "✓ " + eduYm(h.date), cat: "✓ 기록", last: h, kind: "manager", basis: "석면해체·제거관리자교육(보수교육 조항 없음 — 인력 교체 시 후임자만)" }) : eduNone("manager", mem ? "지정 자료가 없어 기록만 보여 줌" : "직원 교육");
+      : ((aOnly || (mem && !gone && act.length && !eAct.length)) ? asbNone("change", null) : ((!gone && eAct.length) ? eduGreyIt("change", EDU_CHK, EDU_CHK, "작업내용 변경 시점 자료가 앱에 없음 — 근거 확인 중") : eduNone("change", "작업내용 변경 기록 없음")));
     x.join = raT ? (jn ? eduIt({ t: "참여 " + eduYm(jn.date), cat: "참여", last: jn, kind: "ra_join", basis: cx.y + "년 참여 — 표시만(판정 안 함)" }) : eduGreyIt("ra_join", "기록 없음", "표시만", cx.y + "년 참여 기록 없음 — 표시만(판정 안 함)"))
       : eduNone("ra_join", "올해 투입 없음", jn);
     x.ranew = raT ? eduGreyIt("ra_share", EDU_CHK, EDU_CHK, "신규·작업 변경자 작업 전 공유 — 고용노동부 고시 전부개정(11/4 시행)이 법제처에 오르기 전까지 근거 확인 중") : eduNone("ra_share", "올해 투입 없음");
@@ -16968,6 +16987,10 @@
     //   v449(PM 11/12 23:40 '일용직 명단은 있지 않나?'): 현장 대장 투입도, 날짜 있는 교육 기록도 없는 일용직 = 명부에 올라 있는 지금 일용직으로 보고 편다 — 접힘은 경계 해 전 흔적(현장 투입·날짜 있는 기록)만 있는 사람.
     //   종전(v448)은 흔적이 없어도 접어, 현장 연결 없이 명부에 올린 2025년 준설 인원(운영 24명)이 '그 밖 일용직'에 숨었다(새로 넣은 일용직도 접힘에 들어가 eduSheetShowNew가 열어야 보였다) · 날짜 아닌 기록은 펴짐·접힘 어느 쪽 근거도 아님
     var wkGrp = function(k){ var s = si[k] || []; if (!cx.site) return ri[k] ? "" : "old"; if (!s.length && !(ri[k] || []).some(function(r){ return isDate(r.date); })) return ""; return (s.some(function(e){ return e.act || newY(e.y) || newY(Number(String(e.end || "").slice(0, 4))); }) ||(ri[k] || []).some(function(r){ return isDate(r.date) && newY(Number(r.date.slice(0, 4))); })) ? "" : "old"; };
+    //   v450(PM 11/13 02:14 '석면은 교육 제외'): 석면 현장에만 든 일용직(현장 대장 — 지운 줄 빼고 — 에 든 현장이 하나 이상 · 모두 석면 · 진행 중 현장 없음)은 이 표에 넣지 않는다 —
+    //   펴진 줄·'그 밖 일용직'·'기록만 남은 사람' 어디에도(기록이 있어도·지운 일용직도·'일용직 n' 갈래도 — seen은 먼저 켜 '(지운 일용직)' 줄로 새지 않게). 석면 교육은 현장 칸 특별교육 줄이 맡는다.
+    //   진행 중 석면 현장에 든 사람은 석면 건진(검진) 때문에 남는다(교육 칸은 eduPersonStat이 석면 밖 현장으로만) · 현장 권한이 없으면(현장을 못 봄) 종전 그대로 · 직원(회원) 줄은 빼지 않음
+    var asbOut = function(k){ var s = si[k] || []; return cx.site && s.length > 0 && s.every(function(e){ return e.k === "asbestos" && !e.act; }); };
     liveMembers().forEach(function(m){
       if (!m || m.id == null) return;
       var k = "member:" + m.id, ret = memberRetired(m);
@@ -16982,11 +17005,12 @@
         var k = "worker:" + w.id;
         if (seen[k]) return;
         seen[k] = 1;
+        if (asbOut(k)) return;   // v450
         if (w.del === 1){ if (ri[k]) out.push({ id: k, ptype: "worker", pid: w.id, w: w, name: (w.name || "(이름 없음)") + " (지움)", grp: "gone", del: 1 }); return; }
         out.push({ id: k, ptype: "worker", pid: w.id, w: w, name: w.name || "(이름 없음)", grp: wkGrp(k) });
       });
     } else {
-      Object.keys(si).concat(Object.keys(ri)).forEach(function(k){ if (k.indexOf("worker:") === 0 && !wseen[k]){ wseen[k] = 1; wids.push(k); } });
+      Object.keys(si).concat(Object.keys(ri)).forEach(function(k){ if (k.indexOf("worker:") === 0 && !wseen[k]){ wseen[k] = 1; if (asbOut(k)){ seen[k] = 1; return; } wids.push(k); } });   // v450: 석면만 든 사람은 번호도 매기지 않음
       wids.sort();
       wids.forEach(function(k){ n++; seen[k] = 1; out.push({ id: k, ptype: "worker", pid: k.slice(7), w: null, name: "일용직 " + n, grp: wkGrp(k), anon: true }); });
     }
@@ -16994,7 +17018,7 @@
     Object.keys(ri).forEach(function(k){
       if (seen[k]) return;
       if (k.indexOf("member:") === 0 && members.length) out.push({ id: k, ptype: "member", pid: k.slice(7), m: null, name: "(지운 회원)", grp: "gone" });
-      else if (k.indexOf("worker:") === 0 && cx.wk) out.push({ id: k, ptype: "worker", pid: k.slice(7), w: null, name: "(지운 일용직)", grp: "gone", del: 1 });
+      else if (k.indexOf("worker:") === 0 && cx.wk && !asbOut(k)) out.push({ id: k, ptype: "worker", pid: k.slice(7), w: null, name: "(지운 일용직)", grp: "gone", del: 1 });
     });
     out.forEach(function(p){ var s = si[p.id] || []; p.st = eduPersonStat(p, cx, si, ri); p.org = [p.m && p.m.dept ? String(p.m.dept) : "", eduRecentSite(s)].filter(Boolean).join(" · "); });
     return out;
@@ -17017,7 +17041,7 @@
     return "";
   }
   // 정렬 값 — 다음 할 일 = 남은 날(지남 음수 · 기록 없음 0 · 없으면 뒤) · 항목 칸 = 기한 남은 날, 기한 없으면 상태 순(기록 없음 → 진행 → 확인 중 → ✓ → 대상 아님)
-  var EDU_CAT_RANK = { "기한 경과": 0, "기록 없음": 1, "기한 전": 2, "진행 중": 3, "판정 불가": 4, "확인 중": 5, "근거 확인 중": 6, "면제": 7, "✓ 이수": 8, "✓ 기록(대상 아님)": 9, "대상 아님": 10 };
+  var EDU_CAT_RANK = { "기한 경과": 0, "기록 없음": 1, "기한 전": 2, "진행 중": 3, "판정 불가": 4, "확인 중": 5, "근거 확인 중": 6, "면제": 7, "✓ 이수": 8, "✓ 기록": 8.5, "✓ 기록(대상 아님)": 9, "석면 — 판정 밖": 9.5, "대상 아님": 10 };   // v450 검토: 석면 — 판정 밖(EDU_ASB_CAT) · 검토 2: ✓ 기록(특별교육 열 — 기록 + 진행 중 철거·준설, 대상 확정 전)
   function eduSheetSv(r, k){
     var nx, it;
     if (k === "next"){ nx = eduNextOf(r); return nx ? nx.o : ""; }
@@ -17043,7 +17067,7 @@
     if (!it) return "";
     return { html: eduItHtml(it), cls: it.cls, title: eduItTip(it, EDU_ITEM_H[k] + " " + it.t) };
   }
-  // 합계 줄(거른 줄 전체 — 접힌 묶음 안 줄 포함): 이름 칸 '합계 n명 · 접힘 m' · 다음 할 일 칸 '경과 a · 30일 안 b'(칩과 같은 셈) · 빠진 항목 칸 합 · 항목 칸 '✓ 이수/대상'
+  // 합계 줄(거른 줄 전체 — 접힌 묶음 안 줄 포함): 이름 칸 '합계 n명 · 접힘 m' · 다음 할 일 칸 '경과 a · 30일 안 b'(칩과 같은 셈) · 빠진 항목 칸 합 · 항목 칸 '✓ 이수/대상'(특별교육 칸은 v450 검토 2부터 '기록 n')
   function eduSheetFoot(rows, ctx){
     var fold = 0, over = 0, soon = 0, miss = 0, o = {};
     rows.forEach(function(r){ if (r.grp) fold++; if (r.st.over) over++; else if (r.st.soon) soon++; miss += r.st.miss; });
@@ -17051,7 +17075,13 @@
     o.next = '<span title="기한 경과 — 지난 항목이 있는 사람 · 30일 안 — 기한이 30일 안에 오는 사람(칩과 같은 셈)">경과 ' + vsN(over) + ' · 30일 안 ' + vsN(soon) + '</span>';
     o.miss = vsN(miss);
     EDU_ITEM_COLS.forEach(function(k){
-      var ok = 0, tg = 0;
+      var ok = 0, tg = 0, rc = 0;
+      // v450 검토 2: 특별교육 열(석면 밖 특별교육)은 대상 확정 전(별표5 원문 확인 뒤 — C086)이라 어느 칸도 대상이 아님 — '✓ 0/0' 대신 기록 있는 사람 수 '기록 n'
+      if (k === "spec"){
+        rows.forEach(function(r){ var it = r.st.c[k]; if (it && it.last && it.last.kind === "special_demo") rc++; });
+        o[k] = '<span title="' + esc(EDU_ITEM_H[k]) + '(석면 밖) — 기록 있는 사람 ' + rc + '명 · 대상은 별표5 원문 확인 뒤(C086)라 이수/대상을 세지 않음">기록 ' + vsN(rc) + '</span>';
+        return;
+      }
       rows.forEach(function(r){ var it = r.st.c[k]; if (!it || !it.tgt) return; tg++; if (!it.miss && (it.cat === "✓ 이수" || it.cat === "면제" || it.cat === "기한 전")) ok++; });
       o[k] = '<span title="' + esc(EDU_ITEM_H[k]) + ' — 유효 기록 있음 / 대상(근거 확인 중·대상 아님은 빼고)">✓ ' + vsN(ok) + '/' + vsN(tg) + '</span>';
     });
@@ -17061,8 +17091,8 @@
   function eduDetRows(r){
     var c = r.st.c, x = r.st.x, sup = !!(r.m && r.m.supervisor === true);
     return [
-      [sup ? "정기교육(관리감독자)" : "정기교육(근로자)", c.reg], ["채용 시 교육", c.hire], ["작업내용 변경 시 교육", x.change], ["특별교육(석면)", c.spec], ["특별교육(해체·밀폐 등)", x.sdemo],
-      ["건설업 기초안전보건교육", c.basic], ["석면해체·제거관리자교육", x.mgr], ["일반건강진단", c.gmed], ["석면 건강진단(배치전·특수)", c.amed],
+      [sup ? "정기교육(관리감독자)" : "정기교육(근로자)", c.reg], ["채용 시 교육", c.hire], ["작업내용 변경 시 교육", x.change], ["특별교육(해체·밀폐 등 — 석면 밖)", c.spec],
+      ["건설업 기초안전보건교육", c.basic], ["일반건강진단", c.gmed], ["석면 건강진단(배치전·특수)", c.amed],
       ["위험성평가 결과 공유", c.ra], ["위험성평가 참여(표시만)", x.join], ["신규·작업 변경자 작업 전 공유", x.ranew]
     ];
   }
@@ -17073,7 +17103,7 @@
     rows.forEach(function(x){
       var it = x[1];
       if (!it) return;
-      if (it.t === "—" && !it.last){ na.push(x[0]); return; }
+      if (it.t === "—" && !it.last && it.cat === "대상 아님"){ na.push(x[0]); return; }   // v450 검토: '석면 — 판정 밖'(EDU_ASB_CAT)은 접지 않고 근거 글과 함께
       body += '<tr><td><b>' + esc(x[0]) + '</b></td><td class="edu-basis">' + esc(it.basis || "-") + '</td><td>' + (it.last ? esc(it.last.date) : '<span style="' + EDU_GREY + '">-</span>') + '</td>'
         + '<td>' + (it.due ? esc(it.due) : '<span style="' + EDU_GREY + '">-</span>') + '</td><td class="' + (it.cls || "") + '">' + eduItHtml(it) + '</td>'
         + '<td>' + (can && it.kind ? '<button type="button" class="mini-btn" data-edu-act="add" data-edu-row="' + esc(r.id) + '" data-edu-kind="' + esc(it.kind) + '">+ 기록</button>' : '') + '</td></tr>';
@@ -17171,11 +17201,11 @@
           { k: "name", h: "이름", w: 108, f: "text" },   // 명세 96 → 108(실측 — 선택 체크 상자 24 + '일용직 155')
           { k: "type", h: "구분", w: 56, f: "enum", lv: 4 },   // 명세 lv3 → lv4(위험성평가 열 단계 올림 — 단계 합)
           { k: "org", h: "소속·최근", w: 168, f: "text", lv: 4 },   // 명세 92·lv3 → 168·lv4
-          { k: "next", h: "다음 할 일", f: "none", fill: 1, min: 128 },
+          { k: "next", h: "다음 할 일", f: "none", fill: 1, min: 121 },   // v450: 128 → 121(특별교육 열 89 — 단계 2 합 742)
           { k: "miss", h: "빠진 항목", w: 72, f: "none", num: 1 },   // 명세 64 → 72
           { k: "reg", h: "정기교육", w: 90, f: "enum", lv: 2, ft: cat("reg") },
           { k: "hire", h: "채용 시", w: 89, f: "enum", lv: 2, ft: cat("hire") },   // 명세 86 → 89('근거 확인 중')
-          { k: "spec", h: "특별교육", w: 82, f: "enum", lv: 2, ft: cat("spec") },   // 명세 86 → 82
+          { k: "spec", h: "특별교육", w: 89, f: "enum", lv: 2, ft: cat("spec") },   // 명세 86 → 82 → 89(v450 — 석면 밖 특별교육 '근거 확인 중' · 11/13 실측 88은 잘림)
           { k: "basic", h: "건설 기초", w: 89, f: "enum", lv: 2, ft: cat("basic") },   // 명세 86 → 89
           { k: "gmed", h: "일반건진", w: 90, f: "enum", lv: 3, ft: cat("gmed") },   // 명세 86 → 82 → 90(11/12 시험 화면 실측 — 대표 줄 '근거 확인 중' 글 71.3px + 칸 여백 16 · '경과 1,000일' 72.2px)
           { k: "amed", h: "석면 건진", w: 84, f: "enum", lv: 2, ft: cat("amed") },   // 명세 86 → 84

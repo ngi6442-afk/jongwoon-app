@@ -9790,7 +9790,7 @@ try {
       + ' bulk: eduBulkOpen, act: eduSheetAct, open: openEdu, save: saveEdu, del: deleteEdu, doSave: doSaveEdu, close: closeEdu, miss: eduSheetMissSum, addScope: eduAddScope, scopeAsk: function(s){ eduScopeAsk = s; },'
       + ' edu: function(){ return edu; }, sel: function(){ return eduSel; }, cur: function(){ return eduSheetCur; }, bulkIds: function(){ return eduBulkIds; }, setLoaded: function(v){ eduLoaded = v; }, hoursNum: eduHoursNum, halfEnd: eduHalfEnd, anySpecial: eduAnySpecial,'
       + ' noSpecial: asbNoSpecial, live: liveSites, pending: function(){ return eduPending; },'
-      + ' nextFor: eduNextFor, autoNext: eduAutoNext, merge: mergeEdu, setEdu: function(v){ edu = v; } };']).join('\n');   // v447 검토
+      + ' nextFor: eduNextFor, autoNext: eduAutoNext, merge: mergeEdu, setEdu: function(v){ edu = v; }, sv: eduSheetSv, foot: eduSheetFoot };']).join('\n');   // v447 검토 · v450 검토 2: 정렬 값·합계 줄
     const api = new Function('window', 'document', 'localStorage', 'setTimeout', 'clearTimeout', 'ResizeObserver', 'ENV', 'Date', SRC)(win, doc, ls, stF, ctF, RO, env, FD);
     return { api, env, doc, host: doc.byId.eduList, el: (id) => doc.byId[id] };
   };
@@ -9802,15 +9802,16 @@ try {
   const grpOf47 = (h) => [...h.matchAll(/<tr class="vs-grp( open)?" data-vs-grp="(\w+)">[\s\S]*?<span class="n">([^<]*)<\/span>/g)].map((m) => m[2] + (m[1] ? '+' : '-') + m[3]).join(',');
 
   // ① 정의·폭·단계 합 — 정의 검사 통과 · 열 12개(명세 순서) · 위험성평가 lv3(1366 창 = 단계 3에 보임) · 구분·소속·최근 lv4 · 단계별 열 합 742 / 956 / 1,180(≤ 742 / 962 / 1,282) · 폰 legacy = renderEduLegacy
-  //   (11/12 시험 화면 실측) '근거 확인 중'이 나올 수 있는 열(정기교육·채용 시·건설 기초·일반건진·위험성평가)은 폭 ≥ 88 — 글 71.3px(칸 글꼴) + 칸 여백 16. 일반건진 82에서 대표 줄 글이 잘려 90으로
+  //   (11/12 시험 화면 실측) '근거 확인 중'이 나올 수 있는 열(정기교육·채용 시·특별교육·건설 기초·일반건진·위험성평가)은 폭 ≥ 89 — 글 71.3px(칸 글꼴) + 칸 여백 17(안 폭 = 폭 − 17). 일반건진 82에서 대표 줄 글이 잘려 90으로
+  //   (11/13 시험 화면 실측) v450 특별교육 88은 안 폭 71 < 글 71.3이라 말줄임 → 89(다음 할 일 최소 121 — 단계 2 합 742)
   const X1 = mk47();
   const d1 = X1.api.def(), cols1 = d1.cols, ck1 = X1.api.check(d1);
   const sums1 = [2, 3, 4].map((s) => X1.api.minW({ colw: {} }, X1.api.cols(d1, s)));
   const lv1 = cols1.map((c) => c.k + ':' + (c.lv || 1) + ':' + (c.fill ? 'f' + c.min : c.w)).join(',');
   T('v447 ① 정의(실행 — 실제 eduSheetDef·vsSheetCheckDef): 문제 0 · 저장 이름 jw_edu_sheet·자리 eduList·단위 명 · 열 12개 이름·구분·소속·최근·다음 할 일·빠진 항목·정기교육·채용 시·특별교육·건설 기초·일반건진·석면 건진·위험성평가 · ★위험성평가 lv3(1366 창에 보임 — 명세 lv4)·124px · 구분·소속·최근 lv4 · 단계별 열 합 742 / 956 / 1,180 ≤ 742 / 962 / 1,282 · 근거 확인 중 열 폭 ≥ 88 · 기본 정렬 다음 할 일 ▲ · 폰 legacy = renderEduLegacy · 선택(sel.can = 안전 수행) · 묶음 old·gone',
     ck1.length === 0 && d1.key === 'jw_edu_sheet' && d1.host === 'eduList' && d1.unit === '명' && cols1.map((c) => c.h).join(',') === '이름,구분,소속·최근,다음 할 일,빠진 항목,정기교육,채용 시,특별교육,건설 기초,일반건진,석면 건진,위험성평가'
-    && lv1 === 'name:1:108,type:4:56,org:4:168,next:1:f128,miss:1:72,reg:2:90,hire:2:89,spec:2:82,basic:2:89,gmed:3:90,amed:2:84,ra:3:124'
-    && ['reg', 'hire', 'basic', 'gmed', 'ra'].every((k) => (cols1.find((c) => c.k === k) || {}).w >= 88)
+    && lv1 === 'name:1:108,type:4:56,org:4:168,next:1:f121,miss:1:72,reg:2:90,hire:2:89,spec:2:89,basic:2:89,gmed:3:90,amed:2:84,ra:3:124'   // v450: 특별교육 82 → 89('근거 확인 중' — 석면 밖 특별교육, 11/13 실측 88은 잘림)·다음 할 일 최소 128 → 121(단계 2 합 742)
+    && ['reg', 'hire', 'spec', 'basic', 'gmed', 'ra'].every((k) => (cols1.find((c) => c.k === k) || {}).w >= 89)
     && JSON.stringify(sums1) === '[742,956,1180]' && sums1.every((w, i) => w <= X1.api.budget[i + 2]) && X1.api.cols(d1, 3).some((c) => c.k === 'ra') && !X1.api.cols(d1, 2).some((c) => c.k === 'ra')
     && d1.sort.k === 'next' && d1.sort.d === 1 && d1.phone === 'legacy' && d1.legacy === X1.api.legacy && typeof d1.sel.can === 'function' && JSON.stringify(d1.group.order) === '["old","gone"]',
     JSON.stringify({ ck1, lv1, sums1 }));
@@ -9822,7 +9823,7 @@ try {
     .filter((f) => nc47(readFileSync(join(ROOT, 'netlify', 'functions', f), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')).indexOf('교육·검진') >= 0);
   const oldVis2 = []; { let i = -1; while ((i = v2.indexOf('교육·검진', i + 1)) >= 0) { if (v2.slice(i, i + '교육·검진·위험성평가'.length) !== '교육·검진·위험성평가') oldVis2.push(v2.slice(Math.max(0, i - 30), i + 20)); } }
   const SENT2 = ['<button class="lsub-btn" data-lsub="edu" id="sfChipEdu">체크</button>', '<span>체크</span> <span class="cnt" id="eduHead"></span>',
-    '<div class="edu-lead" id="eduLead">회사가 사람마다 챙길 법정 교육·검진·위험성평가 공유·참여</div>', '<div class="edu-scope-line" id="eduScopeLine">범위: 산안법 교육·검진·위험성평가 공유·참여 — 화관법 교육은 화관법 탭</div>',
+    '<div class="edu-lead" id="eduLead">회사가 사람마다 챙길 법정 교육·검진·위험성평가 공유·참여</div>', '<div class="edu-scope-line" id="eduScopeLine">범위: 산안법 교육·검진·위험성평가 공유·참여 — 석면 작업 교육은 현장 칸 · 화관법 교육은 화관법 탭</div>',   // v450: 석면 작업 교육 구절
     '교육·건강진단 이력은 <b>안전 › 체크</b> 칸으로 옮겼습니다', '일용직 교육·건강진단 이력은 <b>안전 › 체크</b> 칸(일용직)으로 옮겼습니다', '건강진단(배치전·특수) 날짜는 <b>안전 › 체크</b> 칸(일용직)에 적습니다',
     'var EDU_NO_WRITE = "안전 › 체크 칸 기록을 추가·수정·삭제할 권한이 없습니다', '<b>안전</b> = 현황 / 현장 / 체크(옛 현장 탭은', '"③ 건강진단 기록이 없는 사람 "+n+"명 — 빈칸(안전 › 체크에서 확인)"',
     'var EDU_HEAD_LINE = "회사가 사람마다 챙길 법정 교육·검진·위험성평가 공유·참여";'];
@@ -9838,20 +9839,25 @@ try {
   //   둘째 묶음 'gone' = 기록 있는 퇴사자 u4·지운 일용직 w5·지운 회원 ux(지운 일용직 w6·기록 없는 퇴사자 u5는 없음) · 시험 계정 u3은 어디에도 없음(기록 있어도)
   X1.api.render();
   const h3 = X1.host.innerHTML, all3 = X1.api.rows(), byG3 = {}; all3.forEach((r) => { (byG3[r.grp || 'main'] = byG3[r.grp || 'main'] || []).push(r.id); });
-  T('v447 ③ 행 구성(실행 — v449 기대값): 펴고 = member:m0·u1·u2·u6 + worker:w1·w2·w4(명부만)·w7 · 접힘 old = worker:w3 · 기록만 남은 사람 gone = member:u4(퇴사)·worker:w5(지운)·member:ux(지운 회원) · 시험 계정 u3·기록 없는 퇴사자 u5·기록 없는 지운 일용직 w6 없음 · 표에 그린 줄 = 펴고 8줄(묶음 둘 접힘 — 머리 "그 밖 일용직 1"·"기록만 남은 사람 3") · 머리 "총 12명 (접힘 4명)"',
+  //   v450: w3(2024 석면 종결 현장만) = 줄 없음(석면은 교육 제외) — 'old' 묶음은 같은 현장을 철거로 바꾼 표본(X3o)에서 그대로 지킴(w3 접힘·머리 "그 밖 일용직 1")
+  const X3o = mk47({ asb: ASB47().map((r) => r.id === 'o1' ? Object.assign({}, r, { kind: 'demolition', title: '마동 옛 철거' }) : r) }); X3o.api.render();
+  const h3o = X3o.host.innerHTML, byG3o = {}; X3o.api.rows().forEach((r) => { (byG3o[r.grp || 'main'] = byG3o[r.grp || 'main'] || []).push(r.id); });
+  T('v447 ③ 행 구성(실행 — v450 기대값): 펴고 = member:m0·u1·u2·u6 + worker:w1·w2·w4(명부만)·w7 · w3(2024 석면 종결만) 줄 없음(v450) · 기록만 남은 사람 gone = member:u4(퇴사)·worker:w5(지운)·member:ux(지운 회원) · 시험 계정 u3·기록 없는 퇴사자 u5·기록 없는 지운 일용직 w6 없음 · 표에 그린 줄 = 펴고 8줄(묶음 gone 접힘 — "기록만 남은 사람 3") · 머리 "총 11명 (접힘 3명)" · 같은 현장이 철거면 접힘 old = worker:w3(묶음 "그 밖 일용직 1"·머리 "총 12명 (접힘 4명)")',
     JSON.stringify((byG3.main || []).slice().sort()) === JSON.stringify(['member:m0', 'member:u1', 'member:u2', 'member:u6', 'worker:w1', 'worker:w2', 'worker:w4', 'worker:w7'])
-    && JSON.stringify((byG3.old || []).slice().sort()) === JSON.stringify(['worker:w3']) && JSON.stringify((byG3.gone || []).slice().sort()) === JSON.stringify(['member:u4', 'member:ux', 'worker:w5'])
-    && !all3.some((r) => /u3|u5|w6/.test(r.id)) && rowsH47(h3).length === 8 && grpOf47(h3) === 'old-1명,gone-3명' && X1.el('eduHead').textContent === '총 12명 (접힘 4명)',
-    JSON.stringify({ byG3, rows: rowsH47(h3), grp: grpOf47(h3), head: X1.el('eduHead').textContent }));
+    && !byG3.old && JSON.stringify((byG3.gone || []).slice().sort()) === JSON.stringify(['member:u4', 'member:ux', 'worker:w5'])
+    && !all3.some((r) => /u3|u5|w6|w3/.test(r.id)) && rowsH47(h3).length === 8 && grpOf47(h3) === 'gone-3명' && X1.el('eduHead').textContent === '총 11명 (접힘 3명)'
+    && JSON.stringify((byG3o.main || []).slice().sort()) === JSON.stringify((byG3.main || []).slice().sort()) && JSON.stringify(byG3o.old || []) === JSON.stringify(['worker:w3']) && JSON.stringify((byG3o.gone || []).slice().sort()) === JSON.stringify(['member:u4', 'member:ux', 'worker:w5'])
+    && rowsH47(h3o).length === 8 && grpOf47(h3o) === 'old-1명,gone-3명' && X3o.el('eduHead').textContent === '총 12명 (접힘 4명)',
+    JSON.stringify({ byG3, byG3o, rows: rowsH47(h3), grp: [grpOf47(h3), grpOf47(h3o)], head: [X1.el('eduHead').textContent, X3o.el('eduHead').textContent] }));
 
   // ④ 칸 상태 일곱(실행 — 1600 창 모든 열): '✓ 연-월'(u1 일반건진 2025-01 — 사무직 2년) · 반기 진도 'a/b시간'(u6 4/12 — '4시간' 글자는 숫자만 · 상반기 12시간은 셈 밖) · 'D-n'(u2 일반건진 2026-11-20 D-8 노랑) ·
   //   '경과 n일'(u6 일반건진 2025-06-01 + 1년 = 2026-06-01 경과 164일 빨강) · '기록 없음'(m0 일반건진 노랑) · '근거 확인 중'(u1 채용 시 — 회색, ✓·빨강 아님) · '—'(u1 건설 기초 — 직원 대상 아님)
   const X4 = mk47({ width: 1700 }); X4.api.render(); const h4 = X4.host.innerHTML;
   const c4 = (id, k) => cell47(h4, id, k) || { cls: '?', t: '?' };
   const st4 = [c4('member:u1', 'gmed'), c4('member:u6', 'reg'), c4('member:u2', 'gmed'), c4('member:u6', 'gmed'), c4('member:m0', 'gmed'), c4('member:u1', 'hire'), c4('member:u1', 'basic')];
-  T('v447 ④ 칸 상태 일곱(실행): ✓ 2025-01(사무직 2년 — 색 없음) · 4/12시간(진도 — 반기 말일 12-31까지 49일이라 색 없음) · D-8(노랑) · 경과 164일(빨강) · 기록 없음(노랑) · 근거 확인 중(회색 글 — vs-dan·vs-warn·✓ 없음) · —(대상 아님) · 빠진 항목 u6 = 5(정기교육·특별교육·일반건진·석면 건진·위험성평가 공유 — 채용 시 근거 확인 중은 안 셈) · u1 = 0',
+  T('v447 ④ 칸 상태 일곱(실행): ✓ 2025-01(사무직 2년 — 색 없음) · 4/12시간(진도 — 반기 말일 12-31까지 49일이라 색 없음) · D-8(노랑) · 경과 164일(빨강) · 기록 없음(노랑) · 근거 확인 중(회색 글 — vs-dan·vs-warn·✓ 없음) · —(대상 아님) · 빠진 항목 u6 = 4(정기교육·일반건진·석면 건진·위험성평가 공유 — 채용 시 근거 확인 중은 안 셈 · v450: 특별교육은 석면 밖 특별교육이라 석면 예정 현장만 든 u6는 대상 아님 "—") · u1 = 0',
     st4.map((c) => c.cls.replace(/\s*vs-(?:hs|l3|l4)\s*/g, ' ').trim() + ':' + c.t).join('|') === ':✓ 2025-01|:4/12시간|vs-warn:D-8|vs-dan:경과 164일|vs-warn:기록 없음|:근거 확인 중|:—'
-    && /color:#9AA09C;">근거 확인 중</.test(c4('member:u6', 'hire').raw) && c4('member:u6', 'miss').t === '5' && c4('member:u1', 'miss').t === '0',
+    && /color:#9AA09C;">근거 확인 중</.test(c4('member:u6', 'hire').raw) && c4('member:u6', 'miss').t === '4' && c4('member:u6', 'spec').t === '—' && c4('member:u1', 'miss').t === '0',
     JSON.stringify(st4.map((c) => c.cls + ':' + c.t)) + ' miss ' + c4('member:u6', 'miss').t);
 
   // ⑤ 위험성평가 열(1366 창에 보임): 공유 판정만 — u1 공유 2026-04 + 참여 = "✓ 2026-04 · 참여" · u2 참여만 = "기록 없음 · 참여" 빨강(참여는 표시만 — 판정을 바꾸지 않음) · m0 작년 공유 = 올해 기록 없음 빨강 ·
@@ -9864,7 +9870,14 @@ try {
   //   올해 투입 일용직은 공유 기록이 있어도 '근거 확인 중'(✓·대상 분모 아님)
   const X5b = mk47({ edu: EDU47().map((r) => { const o = Object.assign({}, r); delete o.ra; return o; }).concat([{ id: 'e19', ptype: 'worker', pid: 'w1', kind: 'ra_share', date: '2026-10-01' }]) }); X5b.api.render();
   const r5b = (id) => X5b.api.find(id).st.c.ra;
-  T('v447 ⑤ 위험성평가 열(실행 — 1366 창): 머리에 위험성평가 · u1 "✓ 2026-04 · 참여"(색 없음 — 관리부 회차 2026-04-01 뒤 공유) · 회차가 없는 운영부 u2 참여만 = "기록 없음 · 참여" 노랑(기한·dd 없음 — 빨강 0) · m0 작년 공유 = "기록 없음" 노랑(기한 경과 아님) · 회차 표식이 없는 해 = u2·m0 노랑 "기록 없음"(빠짐) · u1 올해 공유 ✓ · 근거 글 위험성평가 지침(고시)·제36조 0 · w1 = 근거 확인 중 회색(빠짐 아님 — 공유 기록이 있어도 회색·대상 아님) · w2(올해 종결 준설) = 근거 확인 중 · w3 = —(대상 아님) · 참여 기록만으로 ✓ 안 됨',
+  //   v450 검토 2: '지난해 현장이 있어도 올해 투입 아님'(w3 2024 현장만)은 같은 현장을 철거로 바꾼 표본(X5o — v447 ③ X3o와 같은 식)에서 계속 지킴(석면이면 w3 줄 없음)
+  const X5o = mk47({ width: 1366, asb: ASB47().map((r) => r.id === 'o1' ? Object.assign({}, r, { kind: 'demolition', title: '마동 옛 철거' }) : r) }); X5o.api.render();
+  const w3o5 = X5o.api.find('worker:w3');
+  //   결함 사본(올해 투입 판정에서 연도 조건을 걷음) = w3 위험성평가가 '—'이 아님(이 확인이 항상 참이 아님)
+  const RAT5 = 'return e.act || String(e.y) === cx.y; }));', w3m5 = cnt47(html, RAT5) === 1 ? mk47({ width: 1366, src: html.replace(RAT5, () => 'return true; }));'), asb: ASB47().map((r) => r.id === 'o1' ? Object.assign({}, r, { kind: 'demolition', title: '마동 옛 철거' }) : r) }) : null;
+  if (w3m5) w3m5.api.render();
+  const w3m5ra = w3m5 && w3m5.api.find('worker:w3') ? w3m5.api.find('worker:w3').st.c.ra.t : '(없음)';
+  T('v447 ⑤ 위험성평가 열(실행 — 1366 창): 머리에 위험성평가 · u1 "✓ 2026-04 · 참여"(색 없음 — 관리부 회차 2026-04-01 뒤 공유) · 회차가 없는 운영부 u2 참여만 = "기록 없음 · 참여" 노랑(기한·dd 없음 — 빨강 0) · m0 작년 공유 = "기록 없음" 노랑(기한 경과 아님) · 회차 표식이 없는 해 = u2·m0 노랑 "기록 없음"(빠짐) · u1 올해 공유 ✓ · 근거 글 위험성평가 지침(고시)·제36조 0 · w1 = 근거 확인 중 회색(빠짐 아님 — 공유 기록이 있어도 회색·대상 아님) · w2(올해 종결 준설) = 근거 확인 중 · 올해 투입 없는 w4(명부만) = —(대상 아님 — v450: 석면 종결만 w3은 줄 없음) · 2024 현장만 w3(같은 현장을 철거로 바꾼 표본) = —(대상 아님 — 지난해 현장은 올해 투입 아님 · 연도 조건을 걷은 결함 사본이면 "—" 아님) · 참여 기록만으로 ✓ 안 됨',
     heads47(h5).indexOf('ra') > 0 && cell47(h5, 'member:u1', 'ra').t === '✓ 2026-04 · 참여' && !/vs-dan|vs-warn/.test(cell47(h5, 'member:u1', 'ra').cls)
       && cell47(h5, 'member:u2', 'ra').t === '기록 없음 · 참여' && /vs-warn/.test(cell47(h5, 'member:u2', 'ra').cls) && /vs-warn/.test(cell47(h5, 'member:m0', 'ra').cls) && cell47(h5, 'member:m0', 'ra').t === '기록 없음'
       && r5('member:u2').due === '' && r5('member:u2').dd === null && r5('member:u2').miss && r5('member:m0').cat === '기록 없음' && r5('member:m0').dd === null && !/vs-dan/.test(cell47(h5, 'member:u2', 'ra').cls + cell47(h5, 'member:m0', 'ra').cls)
@@ -9872,8 +9885,8 @@ try {
       && ['member:u1', 'member:u2', 'member:m0'].every((id) => /위험성평가 지침\(고시\)/.test(r5(id).basis) && !/제36조/.test(r5(id).basis))
       && r5b('member:u2').t === '기록 없음' && r5b('member:u2').cls === 'vs-warn' && r5b('member:u2').miss && r5b('member:u2').dd === null && r5b('member:m0').cls === 'vs-warn' && r5b('member:u1').t === '✓ 2026-04' && !r5b('member:u1').miss
       && r5b('worker:w1').t === '근거 확인 중' && r5b('worker:w1').grey && !r5b('worker:w1').tgt && !r5b('worker:w1').miss && r5b('worker:w1').last && r5b('worker:w1').last.id === 'e19'
-      && cell47(h5, 'worker:w1', 'ra').t === '근거 확인 중' && r5('worker:w1').grey && !r5('worker:w1').miss && r5('worker:w2').t === '근거 확인 중' && r5('worker:w3').t === '—' && r5('member:u2').miss && r5('member:u1').tgt && !r5('member:u1').miss,
-    JSON.stringify({ heads: heads47(h5), u1: cell47(h5, 'member:u1', 'ra'), u2: cell47(h5, 'member:u2', 'ra'), m0: r5('member:m0').t, b: ['member:u2', 'member:m0', 'member:u1', 'worker:w1'].map((id) => r5b(id).t + '/' + r5b(id).cls), w1: r5('worker:w1').t }));
+      && cell47(h5, 'worker:w1', 'ra').t === '근거 확인 중' && r5('worker:w1').grey && !r5('worker:w1').miss && r5('worker:w2').t === '근거 확인 중' && r5('worker:w4').t === '—' && X5.api.find('worker:w3') === null && !!w3o5 && w3o5.grp === 'old' && w3o5.st.c.ra.t === '—' && w3o5.st.c.ra.cat === '대상 아님' && !w3o5.st.c.ra.tgt && /올해 투입 없음/.test(w3o5.st.c.ra.basis) && !!w3m5 && w3m5ra !== '—' && r5('member:u2').miss && r5('member:u1').tgt && !r5('member:u1').miss,
+    JSON.stringify({ heads: heads47(h5), u1: cell47(h5, 'member:u1', 'ra'), u2: cell47(h5, 'member:u2', 'ra'), m0: r5('member:m0').t, b: ['member:u2', 'member:m0', 'member:u1', 'worker:w1'].map((id) => r5b(id).t + '/' + r5b(id).cls), w1: r5('worker:w1').t, w3o: w3o5 ? [w3o5.grp, w3o5.st.c.ra.t] : null, w3m: w3m5ra }));
 
   // ⑥ 정기교육(감면 없음 기준): 사무직 u1 하반기 6/6 = "✓ 6/6시간" · 표식 없음 u6 = 4/12(기준 12 — 상반기 12시간은 셈 밖) · 관리감독자 u2 = 올해 super 10/16(연 단위 — 반기 아님) · 관리자 m0(표식 없음) = 0/12 · 일용직 = 근거 확인 중 · title에 기준·감면 없음
   const r6 = (id) => X5.api.find(id).st.c.reg;
@@ -9885,11 +9898,19 @@ try {
   // ⑦ 배치 전 기한 = 예정·작업중 현장의 가장 이른 시작일: w1(예정 11-20 · 작업중 11-01) 채용 시·특별교육·건설 기초·석면 건진 = 경과 11일(11-01) 빨강 · u6(예정 11-20만) 특별교육·석면 건진 = D-8 노랑 ·
   //   w7(진행 준설 12-15만) 특별교육 이수 ✓ · 건설 기초 = 근거 확인 중(준설만) · 채용 시 D-33(30일 밖 — 회색 글) · w2(종결 준설만) 채용 시 기록 ✓ 2026-03(대상 아님 표시)
   const r7 = (id, k) => X5.api.find(id).st.c[k];
-  T('v447 ⑦ 배치 전 기한 = 현장 시작일(실행): w1 채용 시·특별교육·건설 기초·석면 건진 = 경과 11일 빨강(가장 이른 11-01) · u6 특별교육·석면 건진 D-8 노랑 · w7 특별교육 ✓ 2026-10·건설 기초 근거 확인 중·채용 시 D-33 회색 · w2 채용 시 ✓ 2026-03(대상 아님) · 기한 글 = 그 시작일',
-    ['hire', 'spec', 'basic', 'amed'].every((k) => r7('worker:w1', k).t === '경과 11일' && r7('worker:w1', k).cls === 'vs-dan' && r7('worker:w1', k).due === '2026-11-01')
-    && ['spec', 'amed'].every((k) => r7('member:u6', k).t === 'D-8' && r7('member:u6', k).cls === 'vs-warn' && r7('member:u6', k).due === '2026-11-20')
-    && r7('worker:w7', 'spec').t === '✓ 2026-10' && r7('worker:w7', 'basic').t === '근거 확인 중' && r7('worker:w7', 'hire').t === 'D-33' && r7('worker:w7', 'hire').grey && r7('worker:w2', 'hire').t === '✓ 2026-03' && !r7('worker:w2', 'hire').tgt,
-    JSON.stringify({ w1: ['hire', 'spec', 'basic', 'amed'].map((k) => r7('worker:w1', k).t), u6: [r7('member:u6', 'spec').t, r7('member:u6', 'amed').t], w7: [r7('worker:w7', 'spec').t, r7('worker:w7', 'basic').t, r7('worker:w7', 'hire').t] }));
+  //   v450(석면은 교육 제외): 같은 기한 상태를 철거 현장으로 — p2(작업중 11-01)를 철거로 바꾼 표본(X7d)에서 w1 채용 시·건설 기초 = 경과 11일(11-01) · 석면 건진은 석면 예정 p1(11-20) = D-8 ·
+  //   원 표본(석면만 p1·p2)의 w1 = 석면 건진 경과 11일 그대로·교육 칸 셋(채용 시·특별교육·건설 기초) '—'(근거 글 '석면 현장 투입 — 체크 칸 교육 판정에서 뺌') · u6(석면 예정만) 석면 건진 D-8·특별교육 '—' ·
+  //   특별교육 열 = 석면 밖 특별교육: w7(진행 준설 — special 기록뿐, special_demo 없음) = 근거 확인 중 회색 · X7d w1(진행 철거·기록 없음) = 근거 확인 중 — 빨강·기한 없음
+  const X7d = mk47({ asb: ASB47().map((r) => r.id === 'p2' ? Object.assign({}, r, { kind: 'demolition', title: '나동 철거 작업중' }) : r) }); X7d.api.render();
+  const d7 = (id, k) => X7d.api.find(id).st.c[k];
+  T('v447 ⑦ 배치 전 기한 = 현장 시작일(실행 — v450 기대값): 철거 작업중 11-01 표본 w1 채용 시·건설 기초 = 경과 11일 빨강·기한 2026-11-01 · 석면 건진 = 석면 예정 11-20 D-8 · 특별교육 근거 확인 중(회색·빠짐 아님) · 원 표본 w1 석면 건진 경과 11일(석면 작업중 11-01)·채용 시·특별교육·건설 기초 "—"(석면 현장 투입 — 교육 판정에서 뺌) · u6 석면 건진 D-8 노랑·특별교육 "—" · w7 특별교육 근거 확인 중·건설 기초 근거 확인 중·채용 시 D-33 회색 · w2 채용 시 ✓ 2026-03(대상 아님) · 기한 글 = 그 시작일',
+    ['hire', 'basic'].every((k) => d7('worker:w1', k).t === '경과 11일' && d7('worker:w1', k).cls === 'vs-dan' && d7('worker:w1', k).due === '2026-11-01')
+    && d7('worker:w1', 'amed').t === 'D-8' && d7('worker:w1', 'amed').due === '2026-11-20' && d7('worker:w1', 'spec').t === '근거 확인 중' && d7('worker:w1', 'spec').grey && !d7('worker:w1', 'spec').miss && !d7('worker:w1', 'spec').due
+    && r7('worker:w1', 'amed').t === '경과 11일' && r7('worker:w1', 'amed').cls === 'vs-dan' && r7('worker:w1', 'amed').due === '2026-11-01'
+    && ['hire', 'spec', 'basic'].every((k) => r7('worker:w1', k).t === '—' && !r7('worker:w1', k).tgt && !r7('worker:w1', k).miss && /석면 현장 투입 — 체크 칸 교육 판정에서 뺌/.test(r7('worker:w1', k).basis))
+    && r7('member:u6', 'amed').t === 'D-8' && r7('member:u6', 'amed').cls === 'vs-warn' && r7('member:u6', 'amed').due === '2026-11-20' && r7('member:u6', 'spec').t === '—' && !r7('member:u6', 'spec').miss
+    && r7('worker:w7', 'spec').t === '근거 확인 중' && r7('worker:w7', 'spec').grey && !r7('worker:w7', 'spec').tgt && r7('worker:w7', 'basic').t === '근거 확인 중' && r7('worker:w7', 'hire').t === 'D-33' && r7('worker:w7', 'hire').grey && r7('worker:w2', 'hire').t === '✓ 2026-03' && !r7('worker:w2', 'hire').tgt,
+    JSON.stringify({ w1: ['hire', 'spec', 'basic', 'amed'].map((k) => r7('worker:w1', k).t), w1d: ['hire', 'spec', 'basic', 'amed'].map((k) => d7('worker:w1', k).t), u6: [r7('member:u6', 'spec').t, r7('member:u6', 'amed').t], w7: [r7('worker:w7', 'spec').t, r7('worker:w7', 'basic').t, r7('worker:w7', 'hire').t] }));
 
   // ⑧ 특별교육 = 현장 표·서버·현황 ③과 같은 판정 — 진행 현장마다 asbNoSpecial이 낸 이름 집합 = 표에서 특별교육이 빠짐인 사람 이름 집합(지운 기록 e18은 이수 아님 · w7 이수 · 종류 무관 진행 현장 = 준설 p3 포함) ·
   //   서버 _lib/siteedu.js siteEduGaps도 같은 표본에서 같은 사람
@@ -9898,8 +9919,10 @@ try {
   const tb8 = new Set(X8.api.rows().filter((r) => r.st.c.spec.miss).map((r) => r.name));
   const SE8 = createRequire(import.meta.url)(join(ROOT, 'netlify', 'functions', '_lib', 'siteedu.js'));
   const sv8 = SE8.siteEduGaps(ASB47(), EDU47(), WK47(), MEM47().map((m) => Object.assign({}, m, { admin: !!m.admin }))), svN8 = new Set(); Object.values(sv8.gaps).forEach((a) => a.forEach((n) => svN8.add(n)));
-  T('v447 ⑧ 특별교육 = 현장 표·서버와 같은 사람(실행 — 실제 asbNoSpecial·eduHasValidSpecial · _lib/siteedu.js): 표 빠짐 = asbNoSpecial 진행 현장 이름 = 서버 gaps 이름 = {김일용, 현장직}(w7 이수·지운 기록 e18 이수 아님·준설 p3 포함·지운 현장 x1 빼고)',
-    JSON.stringify([...tb8].sort()) === JSON.stringify([...ns8].sort()) && JSON.stringify([...svN8].sort()) === JSON.stringify([...ns8].sort()) && JSON.stringify([...ns8].sort()) === JSON.stringify(['김일용', '현장직']),
+  //   v450(석면은 교육 제외): 체크 칸 특별교육 열은 석면 밖 특별교육(special_demo)이라 표 빠짐 = 0명(근거 확인 중은 빠짐 아님) — 현장 표(asbNoSpecial)·서버 gaps는 석면 특별교육 그대로 {김일용, 현장직}
+  const es8 = nc47(blk47(html, '// @edu-sheet-start', '// @edu-sheet-end'));
+  T('v447 ⑧ 특별교육 — 현장 표·서버는 석면 특별교육 그대로(실행 — 실제 asbNoSpecial·eduHasValidSpecial · _lib/siteedu.js · v450 기대값): asbNoSpecial 진행 현장 이름 = 서버 gaps 이름 = {김일용, 현장직}(w7 이수·지운 기록 e18 이수 아님·준설 p3 포함·지운 현장 x1 빼고) · 체크 칸 표 특별교육 빠짐 0명(석면 밖 특별교육 열) · @edu-sheet 구간(주석 걷음) eduHasValidSpecial( 0',
+    tb8.size === 0 && JSON.stringify([...svN8].sort()) === JSON.stringify([...ns8].sort()) && JSON.stringify([...ns8].sort()) === JSON.stringify(['김일용', '현장직']) && es8.indexOf('eduHasValidSpecial(') < 0,
     JSON.stringify({ tb8: [...tb8], ns8: [...ns8], svN8: [...svN8] }));
 
   // ⑨ 여럿에게 넣기(안전 수행만): 관리자·안전 수행 = 선택 칸·[같은 기록 넣기] · 안전 보기(H) = 선택 칸 0·[+ 기록]·[+ 이력 추가]·[수정] 0 · eduBulkOpen = 넣을 수 있는 사람만(퇴사·지운·이름 모르는 일용직 뺌) →
@@ -10062,8 +10085,8 @@ try {
   const tb19 = new Set(X19d.api.rows().filter((r) => r.st.c.spec.miss).map((r) => r.name));
   const sv19d = SE8.siteEduGaps(A19(), EDU47(), WK47(), MEM47().map((m) => Object.assign({}, m, { admin: !!m.admin }))), svN19 = new Set(); Object.values(sv19d.gaps).forEach((a) => a.forEach((n) => svN19.add(n)));
   const X19e = mk47({ user: U47.K, workers: [], asb: A19() }); X19e.api.render(); const an19 = X19e.api.rows().filter((r) => r.anon);
-  T('v447 ⑲-4 검토 — 특별교육 같은 사람(실행): 진행 현장에 지운 일용직 w5·지운 회원 ux·명부에 없는 wZ가 있어도 표 빠짐 이름 = asbNoSpecial = 서버 gaps = {김일용, 현장직} · w5·ux 특별교육 빠짐 아님 · 일용직 권한 없음 = "일용직 n" 줄 특별교육 "판정 불가"·빠짐 0',
-    JSON.stringify([...tb19].sort()) === JSON.stringify([...ns19].sort()) && JSON.stringify([...svN19].sort()) === JSON.stringify([...ns19].sort()) && JSON.stringify([...ns19].sort()) === JSON.stringify(['김일용', '현장직'])
+  T('v447 ⑲-4 검토 — 특별교육 같은 사람(실행 — v450 기대값): 진행 현장에 지운 일용직 w5·지운 회원 ux·명부에 없는 wZ가 있어도 asbNoSpecial = 서버 gaps = {김일용, 현장직} · 체크 칸 표 특별교육 빠짐 0(석면 밖 특별교육 열) · w5·ux 특별교육 빠짐 아님 · 일용직 권한 없음 = "일용직 n" 줄 특별교육 "판정 불가"·빠짐 0',
+    tb19.size === 0 && JSON.stringify([...svN19].sort()) === JSON.stringify([...ns19].sort()) && JSON.stringify([...ns19].sort()) === JSON.stringify(['김일용', '현장직'])   // v450: 표 특별교육 열은 석면 밖 — 빠짐 0(현장 표·서버는 그대로 둘)
     && !X19d.api.find('worker:w5').st.c.spec.miss && !X19d.api.find('member:ux').st.c.spec.miss && an19.length > 0 && an19.every((r) => r.st.c.spec.t === '판정 불가' && !r.st.c.spec.miss),
     JSON.stringify({ tb19: [...tb19], ns19: [...ns19], svN19: [...svN19], an: an19.map((r) => r.st.c.spec.t) }));
 
@@ -10071,11 +10094,13 @@ try {
   //        채용 시 교육 옛 투입 기록: w1 2025-05 기록 = '근거 확인 중'(연도 다름) · w7 2026-02 기록 + 그 사이(03-01) 다른 현장 = '근거 확인 중' · w7 2026-12-10 기록(사이 현장 없음·이번 시작 12-15보다 5일 앞 — 별표4 비고 2 1주일 안) = ✓
   //        (11/12 법 원문 대조: 종전 2026-11-01 기록(44일 앞)은 EDU_HIRE_GAP 7에서 근거 확인 중이 맞아 12-10으로 바꿈 — 44일 앞 = 근거 확인 중은 ⑳-5가 봄)
   const E19f = EDU47().concat([{ id: 'b1', ptype: 'worker', pid: 'w7', kind: 'basic_con', date: '2026-10-05' }, { id: 'b2', ptype: 'worker', pid: 'w1', kind: 'basic_con', date: '2026-10-20' }]);
-  const X19f = mk47({ edu: E19f }); X19f.api.render(); const f19 = (id, k) => X19f.api.find(id).st.c[k];
-  const X19g = mk47({ edu: EDU47().concat([{ id: 'h1', ptype: 'worker', pid: 'w1', kind: 'hire', date: '2025-05-01' }, { id: 'h2', ptype: 'worker', pid: 'w7', kind: 'hire', date: '2026-02-01' }]), asb: ASB47().map((r) => r.id === 'd1' ? Object.assign({}, r, { worker_ids: ['w2', 'w7'] }) : r) }); X19g.api.render();
+  //   v450(석면은 교육 제외): w1의 '면제'·'✓'·옛 투입 상태는 작업중 p2를 철거로 바꾼 표본(D19)에서 지킴(석면 현장은 교육 판정 밖)
+  const D19 = (rs) => rs.map((r) => r.id === 'p2' ? Object.assign({}, r, { kind: 'demolition', title: '나동 철거 작업중' }) : r);
+  const X19f = mk47({ edu: E19f, asb: D19(ASB47()) }); X19f.api.render(); const f19 = (id, k) => X19f.api.find(id).st.c[k];
+  const X19g = mk47({ edu: EDU47().concat([{ id: 'h1', ptype: 'worker', pid: 'w1', kind: 'hire', date: '2025-05-01' }, { id: 'h2', ptype: 'worker', pid: 'w7', kind: 'hire', date: '2026-02-01' }]), asb: D19(ASB47().map((r) => r.id === 'd1' ? Object.assign({}, r, { worker_ids: ['w2', 'w7'] }) : r)) }); X19g.api.render();
   const X19h = mk47({ edu: EDU47().concat([{ id: 'h3', ptype: 'worker', pid: 'w7', kind: 'hire', date: '2026-12-10' }]) }); X19h.api.render();
   const foot19 = (X, k) => { const hh = X.host.innerHTML; const i = heads47(hh).indexOf(k); return i < 0 ? '' : (((/<tfoot><tr>([\s\S]*?)<\/tr><\/tfoot>/.exec(hh) || ['', ''])[1].match(/<td[^>]*>([\s\S]*?)<\/td>/g) || [])[i] || '').replace(/<[^>]+>/g, ''); };
-  T('v447 ⑲-5 검토 — 근거 확인 중은 기록이 있어도 회색(실행): w7(준설만) 건설 기초 기록 = "근거 확인 중" 회색·대상 아님 · 채용 시 = "근거 확인 중"(면제 근거) · w1(석면) 건설 기초 ✓·채용 시 "면제"(대상) · 채용 시 옛 투입 기록 = w1 2025-05 "근거 확인 중"·w7 2026-02 + 사이 현장 "근거 확인 중" · w7 2026-12-10(이번 시작 5일 앞) = ✓ 2026-12 · 합계 줄 건설 기초 "✓ 1/1"(w7 회색은 분모 밖 — 종전 ✓ 2/2)',
+  T('v447 ⑲-5 검토 — 근거 확인 중은 기록이 있어도 회색(실행): w7(준설만) 건설 기초 기록 = "근거 확인 중" 회색·대상 아님 · 채용 시 = "근거 확인 중"(면제 근거) · w1(철거 작업중 — v450: 석면 현장은 교육 판정 밖이라 철거 표본) 건설 기초 ✓·채용 시 "면제"(대상) · 채용 시 옛 투입 기록 = w1 2025-05 "근거 확인 중"·w7 2026-02 + 사이 현장 "근거 확인 중" · w7 2026-12-10(이번 시작 5일 앞) = ✓ 2026-12 · 합계 줄 건설 기초 "✓ 1/1"(w7 회색은 분모 밖 — 종전 ✓ 2/2)',
     f19('worker:w7', 'basic').t === '근거 확인 중' && f19('worker:w7', 'basic').grey && !f19('worker:w7', 'basic').tgt && f19('worker:w7', 'basic').last && f19('worker:w7', 'basic').last.id === 'b1'
     && f19('worker:w7', 'hire').t === '근거 확인 중' && !f19('worker:w7', 'hire').tgt && f19('worker:w1', 'basic').t === '✓ 2026-10' && f19('worker:w1', 'basic').tgt && f19('worker:w1', 'hire').t === '면제' && f19('worker:w1', 'hire').tgt
     && X19g.api.find('worker:w1').st.c.hire.t === '근거 확인 중' && X19g.api.find('worker:w7').st.c.hire.t === '근거 확인 중' && X19h.api.find('worker:w7').st.c.hire.t === '✓ 2026-12' && X19h.api.find('worker:w7').st.c.hire.tgt
@@ -10157,7 +10182,7 @@ try {
     JSON.stringify(f20 ? ['reg', 'gmed', 'ra'].map((k) => f20.st.c[k].t) : null));
 
   //   ⑳-5 채용 시 옛 투입 판정: 해를 넘는 같은 투입(2025-12-30 교육 · 2026-01-05 시작 작업중 현장) = ✓ · 기록일 뒤에 끝난 다른 현장(09-20 시작·10-20 종결 — 시작은 기록 앞)이 이번 시작(12-15) 전에 있으면 근거 확인 중 · 그 현장이 없으면(75일 앞) ✓
-  const X20g = mk47({ asb: ASB47().concat([S0_47({ id: 'q1', seq: 30, kind: 'asbestos', title: '사동 석면 작업중', start: '2026-01-05', end: '2026-12-31', status: 'run', worker_ids: ['w4'] })]), edu: EDU47().concat([{ id: 'hh1', ptype: 'worker', pid: 'w4', kind: 'hire', date: '2025-12-30' }]) }); X20g.api.render();
+  const X20g = mk47({ asb: ASB47().concat([S0_47({ id: 'q1', seq: 30, kind: 'demolition', title: '사동 철거 작업중', start: '2026-01-05', end: '2026-12-31', status: 'run', worker_ids: ['w4'] })]), edu: EDU47().concat([{ id: 'hh1', ptype: 'worker', pid: 'w4', kind: 'hire', date: '2025-12-30' }]) }); X20g.api.render();   // v450: 석면 → 철거(석면 현장은 교육 판정 밖 — 같은 상태를 철거로)
   const H20 = [{ id: 'hh2', ptype: 'worker', pid: 'w7', kind: 'hire', date: '2026-10-01' }];
   const X20h = mk47({ asb: ASB47().concat([S0_47({ id: 'q2', seq: 31, kind: 'dredge', title: '아천 준설 종결', start: '2026-09-20', end: '2026-10-20', worker_ids: ['w7'] })]), edu: EDU47().concat(H20) }); X20h.api.render();
   const X20i = mk47({ edu: EDU47().concat(H20) }); X20i.api.render();
@@ -10299,8 +10324,8 @@ try {
   const r3 = XA3.api.find('member:u10'), h3 = XA3.host.innerHTML;
   XA3.env.x.saved('member', 'u10'); const again3 = XA3.env.log.filter((l) => l === 'gwCall:member_list').length;
   const XF3 = X48({ user: U48.A }); XF3.api.render(); XF3.env.x.add('member'); XF3.env.x.saved('member', 'u11'); res48(XF3)({ status: 500, body: {} }); await flush48(); await flush48();
-  T('v448 ③ 직원 저장 뒤(실행 — v449 기대값: 명부만 있는 w4 펴짐): member_list 1번 · 받기 전 새 회원 줄 0 · 받은 뒤 member:u10(현장직·라임팀) 펴진 줄·표에 그려짐·소속 "라임팀"·머리 "총 13명 (접힘 4명)" · 표시 한 번만(다시 불러도 member_list 그대로) · 받기 실패 500 = 회원 목록 그대로·표 그대로 그림(8줄)',
-    pre3.gw === 1 && !pre3.row && pre3.from === '' && !!r3 && r3.grp === '' && V.rowsH47(h3).indexOf('member:u10') >= 0 && r3.org === '라임팀' && XA3.el('eduHead').textContent === '총 13명 (접힘 4명)'
+  T('v448 ③ 직원 저장 뒤(실행 — v449 기대값: 명부만 있는 w4 펴짐): member_list 1번 · 받기 전 새 회원 줄 0 · 받은 뒤 member:u10(현장직·라임팀) 펴진 줄·표에 그려짐·소속 "라임팀"·머리 "총 12명 (접힘 3명)"(v450 — 석면 종결만 w3 줄 없음) · 표시 한 번만(다시 불러도 member_list 그대로) · 받기 실패 500 = 회원 목록 그대로·표 그대로 그림(8줄)',
+    pre3.gw === 1 && !pre3.row && pre3.from === '' && !!r3 && r3.grp === '' && V.rowsH47(h3).indexOf('member:u10') >= 0 && r3.org === '라임팀' && XA3.el('eduHead').textContent === '총 12명 (접힘 3명)'
     && again3 === 1 && XF3.env.log.filter((l) => l === 'gwCall:member_list').length === 1 && XF3.env.x.members().length === V.MEM47().length && XF3.host.getAttribute('data-vs-mode') === 'sheet' && V.rowsH47(XF3.host.innerHTML).length === 8,
     JSON.stringify({ pre3, r3: r3 ? { grp: r3.grp, org: r3.org } : null, head: XA3.el('eduHead').textContent, again3 }));
 
@@ -10328,20 +10353,22 @@ try {
   const g6 = (rec, o) => { const X = V.mk47(Object.assign({ edu: V.EDU47().concat(rec) }, o || {})); X.api.render(); return X; };
   const G6a = g6([{ id: 'g1', ptype: 'worker', pid: 'w4', kind: 'hire', date: '2025-01-01' }]);
   const G6b = g6([{ id: 'g2', ptype: 'worker', pid: 'w4', kind: 'hire', date: '2024-12-31' }]);
-  const G6c = g6([{ id: 'g3', ptype: 'worker', pid: 'w3', kind: 'special', date: '2026-05-01' }]);
+  //   v450: 2024 현장 w3 + 2026 기록 = 펴짐은 그 현장을 철거로 바꾼 표본에서(석면 종결 현장만이면 기록이 있어도 줄 없음 — G6c0)
+  const G6c = g6([{ id: 'g3', ptype: 'worker', pid: 'w3', kind: 'special', date: '2026-05-01' }], { asb: V.ASB47().map((r) => r.id === 'o1' ? Object.assign({}, r, { kind: 'demolition' }) : r) });
+  const G6c0 = g6([{ id: 'g3', ptype: 'worker', pid: 'w3', kind: 'special', date: '2026-05-01' }]);
   const G6d = g6([{ id: 'g4', ptype: 'worker', pid: 'w4', kind: 'hire', date: '2026-05-01', del: 1 }]);
   const G6e = g6([{ id: 'g5', ptype: 'member', pid: 'w4', kind: 'hire', date: '2026-05-01' }]);
   const G6f = g6([{ id: 'g6', ptype: 'worker', pid: 'w4', kind: 'hire', date: '확인 중' }]);
   const G6n = g6([{ id: 'g7', ptype: 'worker', pid: 'w4', kind: 'hire', date: '2024-03-01' }], { user: V.U47.N, asb: [] });
   //   v448 검토: 해를 걸친 종결 현장(2024-12-01 시작·2025-01-10 종료)에 든 w4 = 펴짐(종료일의 해도 봄) · 같은 현장이 2024-12-31에 끝났으면 = 접힘(경계 하루 차이) · 현장 권한 없음(N) 묶음 이름 = '교육 기록 없음' 갈래
-  const SY6 = (end) => V.ASB47().concat([{ id: 'y1', seq: 20, kind: 'asbestos', title: '해 걸친 현장', client: '', site: '', start: '2024-12-01', end, status: 'done', member_ids: [], worker_ids: ['w4'] }]);
+  const SY6 = (end) => V.ASB47().concat([{ id: 'y1', seq: 20, kind: 'demolition', title: '해 걸친 현장', client: '', site: '', start: '2024-12-01', end, status: 'done', member_ids: [], worker_ids: ['w4'] }]);
   const G6y = g6([], { asb: SY6('2025-01-10') }), G6z = g6([], { asb: SY6('2024-12-31') });
   const gy6 = [G6y.api.find('worker:w4').grp, G6z.api.find('worker:w4').grp];
   const gl6 = G6n.host.innerHTML.indexOf('그 밖 일용직 · 교육 기록 없음(현장 투입은 현장 권한이 있어야 셈)') >= 0 && G6n.host.innerHTML.indexOf('년까지 현장·교육 기록만') < 0;
   const gr6 = [G6a.api.find('worker:w4').grp, G6b.api.find('worker:w4').grp, G6c.api.find('worker:w3').grp, G6d.api.find('worker:w4').grp, G6e.api.find('worker:w4').grp, G6f.api.find('worker:w4').grp, G6n.api.find('worker:w4').grp];
   const ms6 = G6a.api.miss(), sum6 = G6a.api.rows().reduce((s, r) => s + r.st.miss, 0);
-  T('v448 ⑥ 일용직 펴짐 기준(실행 — v449 기대값): 대장 투입 없음 + 2025-01-01 기록 = 펴짐 · 2024-12-31 = 접힘 · 2024 현장 + 2026 기록 = 펴짐 · 지운 기록만·남의(직원 줄) 기록만·날짜 아닌 기록만 = 펴짐(명부 일용직 — v448은 접힘) · 현장 권한 없음 = 종전(기록 있으면 펴짐) · 머리 "총 12명 (접힘 4명)" · 묶음 이름 "그 밖 일용직 · 2024년까지 현장·교육 기록만"("(또는 기록 없음)" 없음) · 빠진 항목 셈 = 행 원천 · 검토: 2024-12 시작·2025-01-10 종료 현장 = 펴짐·2024-12-31 종료 = 접힘 · 현장 권한 없음 묶음 이름 "교육 기록 없음(현장 투입은 현장 권한이 있어야 셈)"',
-    JSON.stringify(gr6) === JSON.stringify(['', 'old', '', '', '', '', '']) && G6a.el('eduHead').textContent === '총 12명 (접힘 4명)' && G6b.el('eduHead').textContent === '총 12명 (접힘 5명)'
+  T('v448 ⑥ 일용직 펴짐 기준(실행 — v449 기대값): 대장 투입 없음 + 2025-01-01 기록 = 펴짐 · 2024-12-31 = 접힘 · 2024 현장 + 2026 기록 = 펴짐 · 지운 기록만·남의(직원 줄) 기록만·날짜 아닌 기록만 = 펴짐(명부 일용직 — v448은 접힘) · 현장 권한 없음 = 종전(기록 있으면 펴짐) · 머리 "총 11명 (접힘 3명)"(v450 — 석면 종결만 w3 줄 없음 · 2024 현장 + 2026 기록 표본은 그 현장을 철거로) · 묶음 이름 "그 밖 일용직 · 2024년까지 현장·교육 기록만"("(또는 기록 없음)" 없음) · 빠진 항목 셈 = 행 원천 · 검토: 2024-12 시작·2025-01-10 종료 현장 = 펴짐·2024-12-31 종료 = 접힘 · 현장 권한 없음 묶음 이름 "교육 기록 없음(현장 투입은 현장 권한이 있어야 셈)"',
+    JSON.stringify(gr6) === JSON.stringify(['', 'old', '', '', '', '', '']) && G6a.el('eduHead').textContent === '총 11명 (접힘 3명)' && G6b.el('eduHead').textContent === '총 11명 (접힘 4명)' && G6c0.api.find('worker:w3') === null
     && G6b.host.innerHTML.indexOf('그 밖 일용직 · 2024년까지 현장·교육 기록만') >= 0 && G6b.host.innerHTML.indexOf('(또는 기록 없음)') < 0 && G6b.host.innerHTML.indexOf('현장만(또는 현장 참여 없음)') < 0 && ms6.items === sum6
     && JSON.stringify(gy6) === JSON.stringify(['', 'old']) && gl6,   // v448 검토: 해 걸친 현장 · 현장 권한 없음 묶음 이름
     JSON.stringify({ gr6, gy6, gl6, heads: [G6a.el('eduHead').textContent, G6b.el('eduHead').textContent] }));
@@ -10468,8 +10495,8 @@ try {
   const mk49 = (o) => { const X = V.mk47(Object.assign({ workers: WK49(), asb: ASB49(), edu: [], members: MEM49() }, o || {})); X.api.render(); return X; };
   const grpIds49 = (X, ids) => ids.map((id) => { const r = X.api.find('worker:' + id); return r ? (r.grp || 'main') : 'none'; }).join(',');
   const X1 = mk49(), g1 = grpIds49(X1, ['r1', 'r2', 'r3', 'j1', 'j2', 'j3', 'j4']);
-  T('v449 ① 운영 모양 흉내(실행 — 실제 eduSheetRows): 옛 석면 현장만 든 소급 인부 r1·r2 = 접힘 · 2026 석면 r3·2025 준설 연결 j1 = 펴짐 · 현장 연결·기록 없는 명부 인원 j2·j3 = 펴짐(v448은 접힘) · 지운 명부 j4(기록 없음) = 줄 없음 · 머리 "총 7명 (접힘 2명)" · 그린 줄 5',
-    g1 === 'old,old,main,main,main,main,none' && X1.el('eduHead').textContent === '총 7명 (접힘 2명)' && V.rowsH47(X1.host.innerHTML).length === 5 && V.grpOf47(X1.host.innerHTML) === 'old-2명',
+  T('v449 ① 운영 모양 흉내(실행 — 실제 eduSheetRows · v450 기대값): 옛 석면 현장만 든 소급 인부 r1·r2·2026 석면 종결만 r3 = 줄 없음(v450 석면은 교육 제외 — v449는 r1·r2 접힘·r3 펴짐) · 2025 준설 연결 j1 = 펴짐 · 현장 연결·기록 없는 명부 인원 j2·j3 = 펴짐(v448은 접힘) · 지운 명부 j4(기록 없음) = 줄 없음 · 머리 "총 4명" · 그린 줄 4 · 묶음 없음',
+    g1 === 'none,none,none,main,main,main,none' && X1.el('eduHead').textContent === '총 4명' && V.rowsH47(X1.host.innerHTML).length === 4 && V.grpOf47(X1.host.innerHTML) === '',
     JSON.stringify({ g1, head: X1.el('eduHead').textContent, rows: V.rowsH47(X1.host.innerHTML), grp: V.grpOf47(X1.host.innerHTML) }));
 
   // ② 경계 — k1 옛 기록만(2024-06-01) = 접힘 · k2 지운 현장(2013)에만 = 펴짐(지운 줄은 현장 아님) · k3 날짜 없는 종결 현장만 = 접힘(현장 칸 '지난 자료'와 같은 판정 — siteYear 0) ·
@@ -10493,8 +10520,8 @@ try {
   const COND49 = ' if (!s.length && !(ri[k] || []).some(function(r){ return isDate(r.date); })) return "";';
   const src48 = html.replace(COND49, ''), X4 = mk49({ src: src48 }), g4 = grpIds49(X4, ['j2', 'j3']);
   const m4a = X1.api.miss(), m4b = X4.api.miss(), sum4 = (X) => X.api.rows().reduce((s, r) => s + r.st.miss, 0);
-  T('v449 ④ v448 사본과 대조(실행): 조건 한 줄을 걷은 사본 = j2·j3 접힘(고친 곳이 이 조건 하나) · 두 판 사람 수 7·빠진 항목 셈·합계 같음 · 사본 머리 "총 7명 (접힘 4명)"',
-    src48 !== html && V.cnt47(html, COND49) === 1 && g4 === 'old,old' && X4.api.rows().length === X1.api.rows().length && JSON.stringify(m4a) === JSON.stringify(m4b) && sum4(X1) === sum4(X4) && X4.el('eduHead').textContent === '총 7명 (접힘 4명)',
+  T('v449 ④ v448 사본과 대조(실행 — v450 기대값): 조건 한 줄을 걷은 사본 = j2·j3 접힘(고친 곳이 이 조건 하나) · 두 판 사람 수 4(v450 — 석면만 r1·r2·r3 빠짐)·빠진 항목 셈·합계 같음 · 사본 머리 "총 4명 (접힘 2명)"',
+    src48 !== html && V.cnt47(html, COND49) === 1 && g4 === 'old,old' && X4.api.rows().length === X1.api.rows().length && JSON.stringify(m4a) === JSON.stringify(m4b) && sum4(X1) === sum4(X4) && X4.el('eduHead').textContent === '총 4명 (접힘 2명)',
     JSON.stringify({ g4, m4a, m4b, head: X4.el('eduHead').textContent }));
 
   // ⑤ 정적: @edu-sheet 구간(주석 걷음) wkGrp 한 줄 = 현장 권한 갈래 → 명부만 갈래(날짜 있는 기록 isDate) → 경계 판정 순서 · 묶음 이름에 '(또는 기록 없음)' 0(보이는 글 — 주석 걷음) · newY 3번 그대로 · 숫자 2025 0
@@ -10515,11 +10542,198 @@ try {
   const GATE6 = ['uismoke', 'consheet_check', 'proctpl_check', 'settletest', 'servertest', 'rectest', 'promoqual_check', 'promogen_check'];
   const mF6 = FT6.filter((s) => ftv6.indexOf(s) < 0), mM6 = MAN6.filter((s) => m219_6.indexOf(s) < 0);
   T('v449 ⑥ 문서: FEATURES 기준 v449·v449 절 · TESTLIST v449 화면 칸 "[ ] (AI 시험 화면 대상" ≥ 1("PM" 낱말 0)·게이트 칸 [x] 8종 · MANUAL 21-9 펴짐 기준(명부에만 있는 일용직·2024년까지 흔적만 접힘 — "(또는 기록 없음)"·"기록이 없는 사람" 묶음 설명 0) · CLAUDE.md v449 · sw jw-shell-v449',
-    /기준: v449 \(2026-11-12\)\./.test(ft6) && ftv6.length > 0 && mF6.length === 0 && tlv6.length > 0 && scr6.length >= 1 && !scr6.some((l) => /PM/.test(l)) && GATE6.every((g) => gate6.some((l) => l.indexOf('`' + g + '`') > 0))
+    Number((ft6.match(/기준: v(\d+) /) || [0, 0])[1]) >= 449 && ftv6.length > 0 && mF6.length === 0 && tlv6.length > 0 && scr6.length >= 1 && !scr6.some((l) => /PM/.test(l)) && GATE6.every((g) => gate6.some((l) => l.indexOf('`' + g + '`') > 0))   /* v450: 기준 줄·sw는 이 판 이상(이 판 값은 v450 ⑦) — v450 검토: 줄 가운데 // 주석이 뒤 조건을 지웠던 것 */
     && mM6.length === 0 && m219_6.indexOf('기록이 없는 사람 — 현장 권한') < 0 && m219_6.indexOf('현장·교육 기록만 있거나 기록이 없는 사람') < 0 && m219_6.indexOf('아직 없는 일용직은 \'그 밖 일용직\' 묶음 안') < 0
-    && cl6.indexOf('v449') > 0 && /SHELL_CACHE = 'jw-shell-v449'/.test(sw6),
+    && cl6.indexOf('v449') > 0 && Number((sw6.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 449,
     JSON.stringify({ mF6, mM6, scr: scr6.length, gate: gate6.length }));
 } catch (e) { console.log('  (v449 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ---- v450(11/13 — PM 11/13 02:14 '석면은 교육 제외'): 안전 › 체크 칸에서 석면을 교육 판정 밖으로 — 석면 현장에만 든 일용직(진행 중 석면 현장 없음)은 표에 넣지 않고(asbOut),
+//      교육 칸(채용 시·특별교육·건설 기초·작업내용 변경 시)은 석면 밖 현장만 본다 · 특별교육 열 = 석면 밖 특별교육(special_demo). 석면 건진·석면 투입자 칩·위험성평가·
+//      현장 칸 특별교육(asbNoSpecial·eduHasValidSpecial·서버 site_edu_gap·현황 ③)은 그대로. 운영 11/12 17:17 백업 사본 실측: 일용직 명부 155 = 석면 현장만 120 · 석면+준설 2 · 준설만 9 · 현장 없음 24.
+//      시험 틀 = v447 mk47(V48). ① 행 ② 교육 판정에서 석면 제외 ③ 특별교육 열 ④ 폭 ⑤ 범위 줄 ⑥ 운영 모양 흉내 ⑦ 문서 —
+//      새 검사는 판정 함수(chk)를 저장소 원문과 결함을 심은 사본(원문 한 곳을 바꾼 것) 양쪽에 돌려 원문 ✓·사본 ✗를 함께 본다(항상 참인 검사 막기)
+try {
+  if (!V48) throw new Error('v447 시험 틀 없음');
+  const V = V48;
+  const S50 = (o) => Object.assign({ client: '', site: '', start: '', end: '', status: 'done', member_ids: [], worker_ids: [] }, o);
+  const mut50 = (a, b) => { if (V.cnt47(html, a) !== 1) throw new Error('결함 심을 자리 없음: ' + a.slice(0, 50)); return html.replace(a, () => b); };
+  const ASB_T50 = '석면 현장 투입 — 체크 칸 교육 판정에서 뺌(석면 특별교육은 현장 칸 특별교육 줄)';
+
+  // ① 행 — a1 옛 석면 종결만(2026 기록 있음 — 기록이 있어도 줄 없음) · a2 지운 일용직(석면 종결만·기록 있음) · a9 명부에 없는 id(석면 종결만·기록 있음 — '(지운 일용직)' 줄로 새지 않음) ·
+  //   a6 석면 종결 두 곳(기록 없음) · a3 진행 석면만(줄 있음·교육 칸 '—'·석면 건진 기한·위험성평가 그대로) · a4 진행 석면 + 진행 준설(교육은 준설로) · a5 준설만 · m1 석면 종결만 직원(직원 줄은 빼지 않음)
+  //   · 일용직 권한 없음(K) '일용직 n' 갈래도 같은 기준 · 현장 권한 없음(N) = 종전 · [+ 이력 추가] 대상 고르기(eduFillPersons)는 명부 전체 그대로(석면 전용 일용직도)
+  const WK50a = () => [{ id: 'a1', name: '석면옛' }, { id: 'a2', name: '석면지움', del: 1 }, { id: 'a3', name: '석면진행' }, { id: 'a4', name: '석면준설' }, { id: 'a5', name: '준설만' }, { id: 'a6', name: '석면두곳' }];
+  const MEM50a = () => [{ id: 'm0', name: '관리자', admin: true }, { id: 'm1', name: '석면직원', dept: '운영부' }];
+  const ASB50a = () => [S50({ id: 's1', seq: 1, kind: 'asbestos', title: '옛 석면 2024', start: '2024-05-01', end: '2024-05-20', worker_ids: ['a1', 'a2', 'a9', 'a6'], member_ids: ['m1'] }),
+    S50({ id: 's2', seq: 2, kind: 'asbestos', title: '석면 예정', start: '2026-11-20', status: 'plan', worker_ids: ['a3', 'a4'] }),
+    S50({ id: 's3', seq: 3, kind: 'dredge', title: '준설 예정', start: '2026-12-15', status: 'plan', worker_ids: ['a4', 'a5'] }),
+    S50({ id: 's4', seq: 4, kind: 'asbestos', title: '석면 2026 종결', start: '2026-01-09', end: '2026-02-27', worker_ids: ['a6'] })];
+  const EDU50a = () => [{ id: 'q1', ptype: 'worker', pid: 'a1', kind: 'hire', date: '2026-01-10' }, { id: 'q2', ptype: 'worker', pid: 'a2', kind: 'hire', date: '2026-02-01' }, { id: 'q3', ptype: 'worker', pid: 'a9', kind: 'special', date: '2026-03-01' }];
+  const mkA50 = (o) => { const X = V.mk47(Object.assign({ workers: WK50a(), asb: ASB50a(), edu: EDU50a(), members: MEM50a() }, o || {})); X.api.render(); return X; };
+  const chk1_50 = (src) => {
+    const XA = mkA50({ src }), XK = mkA50({ src, user: V.U47.K, workers: [] }), XN = mkA50({ src, user: V.U47.N });
+    const ids = XA.api.rows().map((r) => r.id).sort(), a3 = XA.api.find('worker:a3'), a4 = XA.api.find('worker:a4'), m1 = XA.api.find('member:m1');
+    XA.api.inst(XA.api.def()).open = 'worker:a3'; XA.api.render(); const det3 = XA.host.innerHTML;   // v450 검토: 펼침 — 석면 판정 밖 칸은 '대상 아님' 줄로 접지 않고 근거 글과 함께
+    const an = XK.api.rows().filter((r) => r.anon).map((r) => r.pid).sort(), nIds = XN.api.rows().map((r) => r.id + ':' + (r.grp || 'main')).sort();
+    const ok = JSON.stringify(ids) === JSON.stringify(['member:m0', 'member:m1', 'worker:a3', 'worker:a4', 'worker:a5']) && XA.el('eduHead').textContent === '총 5명' && V.grpOf47(XA.host.innerHTML) === ''
+      && !XA.api.rows().some((r) => /지운 일용직/.test(r.name)) && !!a3 && a3.grp === '' && !!m1 && m1.grp === ''
+      && ['hire', 'spec', 'basic'].every((k) => a3.st.c[k].t === '—' && !a3.st.c[k].tgt && !a3.st.c[k].miss && a3.st.c[k].basis.indexOf(ASB_T50) === 0 && a3.st.c[k].cat === '석면 — 판정 밖') && a3.st.x.change.t === '—' && a3.st.x.change.basis === ASB_T50
+      && a3.st.c.hire.basis === ASB_T50 && a3.st.c.basic.basis === ASB_T50 && a3.st.x.change.cat === '석면 — 판정 밖' && a3.st.c.spec.basis.indexOf('종류 「석면 특별교육」') > 0
+      && det3.indexOf('<b>채용 시 교육</b></td><td class="edu-basis">' + ASB_T50 + '</td>') > 0 && det3.indexOf('<b>건설업 기초안전보건교육</b></td><td class="edu-basis">' + ASB_T50 + '</td>') > 0
+      && det3.indexOf('<b>작업내용 변경 시 교육</b></td><td class="edu-basis">' + ASB_T50 + '</td>') > 0 && !/대상 아님 — [^<]*(채용 시 교육|건설업 기초|특별교육|작업내용 변경)/.test(det3) && /대상 아님 — [^<]*일반건강진단/.test(det3)
+      && a3.st.c.amed.t === 'D-8' && a3.st.c.amed.due === '2026-11-20' && a3.st.c.amed.miss && a3.st.asb === true && a3.st.c.ra.t === '근거 확인 중' && a3.st.x.join.t === '기록 없음'
+      && !!a4 && a4.st.c.hire.t === 'D-33' && a4.st.c.hire.due === '2026-12-15' && a4.st.c.basic.t === '근거 확인 중' && a4.st.c.basic.grey && !a4.st.c.basic.tgt   // v450 검토 2: 진행 석면 + 진행 준설 = '준설 현장 투입 … · 석면 현장(…)은 체크 칸 교육 판정 밖'('만' 0) · 준설만 a5 = '준설 현장만 투입'
+      && /^준설 현장 투입\(/.test(a4.st.c.basic.basis) && !/준설 현장만/.test(a4.st.c.basic.basis) && /석면 현장\([^)]+\)은 체크 칸 교육 판정 밖/.test(a4.st.c.basic.basis)
+      && !!XA.api.find('worker:a5') && /^준설 현장만 투입\(/.test(XA.api.find('worker:a5').st.c.basic.basis) && !/석면 현장/.test(XA.api.find('worker:a5').st.c.basic.basis) && a4.st.c.spec.t === '근거 확인 중' && a4.st.c.amed.t === 'D-8' && a4.st.asb === true
+      && JSON.stringify(an) === JSON.stringify(['a3', 'a4', 'a5']) && XK.api.rows().filter((r) => r.anon).every((r) => /^일용직 [123]$/.test(r.name))
+      && JSON.stringify(nIds) === JSON.stringify(['member:m0:main', 'member:m1:main', 'worker:a1:main', 'worker:a2:gone', 'worker:a3:old', 'worker:a4:old', 'worker:a5:old', 'worker:a6:old', 'worker:a9:gone']);
+    return { ok, info: { ids, head: XA.el('eduHead').textContent, an, nIds, a3: a3 ? ['hire', 'spec', 'basic', 'amed', 'ra'].map((k) => a3.st.c[k].t) : null, a4: a4 ? ['hire', 'spec', 'basic', 'amed'].map((k) => a4.st.c[k].t) : null } };
+  };
+  const r1_50 = chk1_50(html);
+  const m1_50 = [mut50('        if (asbOut(k)) return;   // v450\n', ''), mut50('if (asbOut(k)){ seen[k] = 1; return; } ', ''), mut50('cx.wk && !asbOut(k)', 'cx.wk'),
+    mut50('return cx.site && s.length > 0 && s.every(', 'return s.length > 0 && s.every('), mut50('else if (aOnly) c.hire = siteGate("hire", h) || asbNone("hire", h);', ''),
+    // v450 검토: 펼침 접기 조건에서 고르기 글 검사를 걷음 · 석면 판정 밖 고르기 글을 '대상 아님'으로
+    mut50('if (it.t === "—" && !it.last && it.cat === "대상 아님"){', 'if (it.t === "—" && !it.last){'), mut50('var EDU_ASB_CAT = "석면 — 판정 밖";', 'var EDU_ASB_CAT = "대상 아님";'),
+    // v450 검토 2: 건설 기초 준설 글을 늘 '준설 현장만'으로 · 석면 현장 덧붙임을 걷음
+    mut50('"준설 현장" + (asbAct.length ? "" : "만") + " 투입("', '"준설 현장만 투입("'), mut50(' + (asbAct.length ? " · 석면 현장(" + eduSitesTxt(asbAct) + ")은 체크 칸 교육 판정 밖" : "")', '')].map((s) => chk1_50(s).ok);
+  const XF50 = mkA50(); XF50.api.open(null, 'worker'); const fp50 = XF50.el('eduPerson').innerHTML;
+  T('v450 ① 행(실행 — 실제 eduSheetRows·eduPersonStat): 옛 석면 종결만(2026 기록 있어도)·지운 일용직·명부에 없는 id·석면 종결 두 곳 = 줄 없음("(지운 일용직)" 0) · 진행 석면만 = 줄 있음·채용 시·특별교육·건설 기초·작업내용 변경 "—"(근거 "석면 현장 투입 — 체크 칸 교육 판정에서 뺌")·석면 건진 D-8(기한 11-20)·석면 투입자·위험성평가 근거 확인 중(그대로) · 석면+준설 = 채용 시 D-33(준설 12-15)·건설 기초 근거 확인 중(글 "준설 현장 투입 … · 석면 현장(…)은 체크 칸 교육 판정 밖" — 검토 2: "준설 현장만"은 준설만 든 사람에게만) · 석면 종결만 직원 = 줄 있음 · 머리 "총 5명"·묶음 없음 · "일용직 n" 갈래 = 3명(a3·a4·a5) · 현장 권한 없음 = 종전(기록 있으면 펴짐·지운·명부 밖은 기록만 남은 사람) · 고르기 "석면 — 판정 밖"·펼침에서 채용 시·건설 기초·작업내용 변경 줄이 근거 글과 함께(대상 아님 줄로 접히지 않음 — 일반건진은 접힘)·특별교육 근거에 "종류 「석면 특별교육」" 안내 · 결함 사본 9개(줄 빼기 3곳·현장 권한 조건·교육 칸 석면 갈래를 걷음·펼침 접기 조건·고르기 글 대상 아님·건설 기초 글 늘 "준설 현장만"·석면 현장 덧붙임 걷음) = 모두 ✗ · [+ 이력 추가] 대상 = 명부 전체(석면옛·석면두곳 있음·지운 사람 없음)',
+    r1_50.ok && m1_50.every((v) => v === false) && fp50.indexOf('value="worker:a1"') >= 0 && fp50.indexOf('value="worker:a6"') >= 0 && fp50.indexOf('value="worker:a3"') >= 0 && fp50.indexOf('value="worker:a2"') < 0,
+    JSON.stringify({ r: r1_50.info, mut: m1_50 }));
+
+  // ② 교육 판정에서 석면 제외 — b1 석면 작업중(11-01) + 철거 예정(12-01) = 채용 시·건설 기초 기한 12-01(D-19 — 석면 시작일 11-01로 기한을 내지 않음)·근거 글 '철거 현장 투입'('석면·철거' 0)·석면 건진은 석면 11-01 경과 11일 ·
+  //   b2 석면 작업중 + 준설 종결 = 채용 시 '—'(진행 중 석면 밖 현장 없음)·건설 기초 '—'·작업내용 변경 '—'·석면 건진 경과 11일 · b3 2026-11-05 채용 시 기록 + 그 뒤 끝난 석면 현장(11-08 종결) + 철거 예정 11-10 = ✓(석면 현장은 옛 투입 판정에도 안 봄 — 사이 현장 없음)
+  //   v450 검토: b2 근거 글 = 석면 판정 밖(ASB_T — '진행 중 현장 투입 없음'은 사실과 다름) · b3 = 사이 석면 현장도 다른 투입이라 '근거 확인 중'(회색 — 기준일은 석면 밖 현장, 사이 현장은 석면도 봄)
+  const WK50b = () => [{ id: 'b1', name: '석면철거' }, { id: 'b2', name: '석면준설종결' }, { id: 'b3', name: '석면사이' }];
+  //   v450 검토 2: m2 = 진행 중 석면 현장(t1)에만 든 직원 — 작업내용 변경 시 '석면 — 판정 밖'(대상 아님 아님 — 일용직과 같은 표시) · 결함 사본(일용직 aOnly만) = ✗
+  const ASB50b = () => [S50({ id: 't1', seq: 1, kind: 'asbestos', title: '석면 작업중', start: '2026-11-01', end: '2026-12-31', status: 'run', worker_ids: ['b1', 'b2'], member_ids: ['m2'] }),
+    S50({ id: 't2', seq: 2, kind: 'demolition', title: '철거 예정', start: '2026-12-01', status: 'plan', worker_ids: ['b1'] }),
+    S50({ id: 't3', seq: 3, kind: 'dredge', title: '준설 종결', start: '2025-07-24', end: '2025-08-21', worker_ids: ['b2'] }),
+    S50({ id: 't4', seq: 4, kind: 'asbestos', title: '석면 종결 사이', start: '2026-10-01', end: '2026-11-08', worker_ids: ['b3'] }),
+    S50({ id: 't5', seq: 5, kind: 'demolition', title: '철거 예정 2', start: '2026-11-10', status: 'plan', worker_ids: ['b3'] })];
+  const chk2_50 = (src) => {
+    const X = V.mk47({ src, workers: WK50b(), asb: ASB50b(), edu: [{ id: 'r1', ptype: 'worker', pid: 'b3', kind: 'hire', date: '2026-11-05' }], members: [{ id: 'm0', name: '관리자', admin: true }, { id: 'm2', name: '석면직원진행', dept: '운영부' }] }); X.api.render();
+    const b = (id) => X.api.find('worker:' + id), b1 = b('b1'), b2 = b('b2'), b3 = b('b3'), m2 = X.api.find('member:m2');
+    X.api.inst(X.api.def()).open = 'member:m2'; X.api.render(); const detM2 = X.host.innerHTML;
+    const ok = !!b1 && !!b2 && !!b3 && ['hire', 'basic'].every((k) => b1.st.c[k].t === 'D-19' && b1.st.c[k].due === '2026-12-01' && b1.st.c[k].cls === 'vs-warn')
+      && /철거 현장 투입 일용직/.test(b1.st.c.basic.basis) && !/석면·철거/.test(b1.st.c.basic.basis + b1.st.c.hire.basis) && b1.st.c.amed.t === '경과 11일' && b1.st.c.amed.due === '2026-11-01' && b1.st.x.change.t === '근거 확인 중'
+      && ['hire', 'basic', 'spec'].every((k) => b2.st.c[k].t === '—' && !b2.st.c[k].due && !b2.st.c[k].miss) && b2.st.x.change.t === '—' && b2.st.c.amed.t === '경과 11일' && b2.st.c.ra.t === '근거 확인 중'
+      && ['hire', 'basic'].every((k) => b2.st.c[k].basis === ASB_T50 && b2.st.c[k].cat === '석면 — 판정 밖') && b2.st.x.change.basis === ASB_T50 && !/진행 중 현장 투입 없음/.test(b2.st.c.hire.basis)   // v450 검토: 진행 중 투입이 석면뿐(준설 종결)
+      && b3.st.c.hire.t === '근거 확인 중' && b3.st.c.hire.grey && !b3.st.c.hire.tgt && /2026-11-05/.test(b3.st.c.hire.basis) && b3.st.c.basic.t === '경과 2일' && b3.st.c.basic.due === '2026-11-10'   // v450 검토: 사이 석면 현장 = 다른 투입(회색)
+      && !!m2 && m2.st.x.change.t === '—' && m2.st.x.change.cat === '석면 — 판정 밖' && m2.st.x.change.basis === ASB_T50 && !m2.st.x.change.tgt   // v450 검토 2: 진행 중 석면만 직원
+      && detM2.indexOf('<b>작업내용 변경 시 교육</b></td><td class="edu-basis">' + ASB_T50 + '</td>') > 0 && !/대상 아님 — [^<]*작업내용 변경/.test(detM2);
+    return { ok, info: { b1: b1 ? ['hire', 'basic', 'amed'].map((k) => b1.st.c[k].t + '/' + b1.st.c[k].due) : null, b2: b2 ? ['hire', 'basic', 'spec', 'amed'].map((k) => b2.st.c[k].t) : null, b3: b3 ? [b3.st.c.hire.t, b3.st.c.basic.t] : null, m2: m2 ? [m2.st.x.change.t, m2.st.x.change.cat] : null } };
+  };
+  const r2_50 = chk2_50(html);
+  const m2_50 = [mut50('var eSites = sites.filter(function(e){ return e.k !== "asbestos"; }), eAct = act.filter(function(e){ return e.k !== "asbestos"; });', 'var eSites = sites, eAct = act;'),
+    mut50('var conAct = eAct.filter(function(e){ return e.k === "demolition"; })', 'var conAct = act.filter(function(e){ return e.k === "asbestos" || e.k === "demolition"; })'),
+    mut50('|| sites.some(function(e){ return (e.start && e.start > h.date', '|| eSites.some(function(e){ return (e.start && e.start > h.date'),
+    mut50('var aOnly = !mem && !gone && act.length > 0 && !eAct.length,', 'var aOnly = !mem && !gone && sites.length > 0 && !eSites.length,'),
+    mut50('((aOnly || (mem && !gone && act.length && !eAct.length)) ? asbNone("change", null)', '(aOnly ? asbNone("change", null)')].map((s) => chk2_50(s).ok);   // v450 검토 2: 직원 석면만 진행 = 대상 아님으로 되돌림
+  T('v450 ② 교육 판정에서 석면 제외(실행): 석면 작업중 11-01 + 철거 예정 12-01 = 채용 시·건설 기초 D-19(기한 12-01 — 석면 시작일 아님)·근거 "철거 현장 투입 일용직"("석면·철거" 0)·작업내용 변경 근거 확인 중·석면 건진 경과 11일(석면 11-01) · 석면 작업중 + 준설 종결 = 채용 시·건설 기초·특별교육·작업내용 변경 "—"·석면 건진 경과 11일·위험성평가 근거 확인 중·근거 글 석면 판정 밖(검토) · 채용 시 기록과 이번 철거 시작 사이에 끝난 석면 현장 = 다른 투입이라 근거 확인 중(회색 — 검토) · 진행 중 석면 현장에만 든 직원 = 작업내용 변경 시 "—"·고르기 석면 — 판정 밖·펼침에서 근거 글과 함께(대상 아님 줄 아님 — 검토 2) · 결함 사본 5개(석면 거름 걷음·건설 기초에 석면 되살림·옛 투입 사이 현장에서 석면 뺌·석면뿐 조건을 옛 "석면 현장에만"으로·직원 작업내용 변경을 일용직만으로) = 모두 ✗',
+    r2_50.ok && m2_50.every((v) => v === false), JSON.stringify({ r: r2_50.info, mut: m2_50 }));
+
+  // ③ 특별교육 열 = 석면 밖 특별교육(special_demo): c1 기록 + 철거 작업중 = ✓ 2026-09(대상 확정 전 — ✓ 기록·분모 밖, v450 검토) · c2 기록 + 준설 종결만 = ✓ 기록(대상 아님) · c3 기록 없음 + 준설 예정 = 근거 확인 중(회색·빠짐 아님) ·
+  //   c4 석면 작업중(special 없음)·c5 석면 작업중(special 있음) = "—" · c6 지운 일용직(special_demo 기록) = 기록만 남은 사람 '✓ 기록(대상 아님)' · 현장 권한 없음 = 판정 불가 · 대장 읽는 중 = 확인 중 ·
+  //   같은 표본에서 현장 표 asbNoSpecial·eduHasValidSpecial·서버 siteEduGaps = 석면 특별교육 그대로(c4 미이수·c5 이수) · 펼침 = '특별교육(해체·밀폐 등 — 석면 밖)' 줄([+ 기록] 종류 special_demo)·석면해체·제거관리자교육 줄 없음 · 현황 ⑤ 관리자교육 셈 그대로
+  const WK50c = () => [{ id: 'c1', name: '특교철거' }, { id: 'c2', name: '특교기록만' }, { id: 'c3', name: '준설예정' }, { id: 'c4', name: '석면미이수' }, { id: 'c5', name: '석면이수' }, { id: 'c6', name: '지운특교', del: 1 }];
+  const ASB50c = () => [S50({ id: 'v1', seq: 1, kind: 'demolition', title: '철거 작업중', start: '2026-11-01', end: '2026-12-31', status: 'run', worker_ids: ['c1', 'c6'] }),
+    S50({ id: 'v2', seq: 2, kind: 'dredge', title: '준설 종결', start: '2026-03-01', end: '2026-03-30', worker_ids: ['c2'] }),
+    S50({ id: 'v3', seq: 3, kind: 'dredge', title: '준설 예정', start: '2026-12-15', status: 'plan', worker_ids: ['c3'] }),
+    S50({ id: 'v4', seq: 4, kind: 'asbestos', title: '석면 작업중', start: '2026-11-01', end: '2026-12-31', status: 'run', worker_ids: ['c4', 'c5'] })];
+  const EDU50c = () => [{ id: 'd1', ptype: 'worker', pid: 'c1', kind: 'special_demo', date: '2026-09-01' }, { id: 'd2', ptype: 'worker', pid: 'c2', kind: 'special_demo', date: '2026-03-01' },
+    { id: 'd3', ptype: 'worker', pid: 'c5', kind: 'special', date: '2026-10-20' }, { id: 'd4', ptype: 'worker', pid: 'c6', kind: 'special_demo', date: '2026-10-01' }, { id: 'd5', ptype: 'worker', pid: 'c1', kind: 'manager', date: '2026-08-01' }];
+  const MEM50c = () => [{ id: 'm0', name: '관리자', admin: true }];
+  const SE50 = createRequire(import.meta.url)(join(ROOT, 'netlify', 'functions', '_lib', 'siteedu.js'));
+  const chk3_50 = (src) => {
+    const X = V.mk47({ src, workers: WK50c(), asb: ASB50c(), edu: EDU50c(), members: MEM50c() }); X.api.render();
+    const s = (id) => { const r = X.api.find('worker:' + id); return r ? r.st.c.spec : { t: '?', basis: '' }; };
+    const XN = V.mk47({ src, user: V.U47.N, workers: WK50c(), asb: ASB50c(), edu: EDU50c(), members: MEM50c() }), XW = V.mk47({ src, asbLoaded: false, workers: WK50c(), asb: ASB50c(), edu: EDU50c(), members: MEM50c() });
+    const ns = new Set(); X.api.live().forEach((r) => { if (r.status !== 'done') X.api.noSpecial(r).forEach((n) => ns.add(n)); });
+    const sv = SE50.siteEduGaps(ASB50c(), EDU50c(), WK50c(), MEM50c().map((m) => Object.assign({}, m, { admin: !!m.admin }))), svN = new Set(); Object.values(sv.gaps).forEach((a) => a.forEach((n) => svN.add(n)));
+    X.api.inst(X.api.def()).open = 'worker:c1'; X.api.render(); const det = X.host.innerHTML;
+    const c6 = X.api.find('worker:c6');
+    //   v450 검토 2: 정렬 값 — 근거 확인 중(c3) < ✓ 기록(c1) < ✓ 기록(대상 아님)(c2) < 석면 — 판정 밖(c4) < 대상 아님(m0) · 합계 줄 특별교육 칸 = '기록 3'(c1·c2·지운 c6 — 대상 확정 전이라 ✓ 0/0 아님)
+    const rk = (id) => X.api.sv(X.api.find(id), 'spec'), ft = X.api.foot(X.api.rows(), {}).spec || '';
+    const svOk = rk('worker:c3') < rk('worker:c1') && rk('worker:c1') < rk('worker:c2') && rk('worker:c2') < rk('worker:c4') && rk('worker:c4') < rk('member:m0') && X.api.find('member:m0').st.c.spec.cat === '대상 아님';
+    const ftOk = />기록 3<\/span>$/.test(ft) && /C086/.test(ft) && ft.indexOf('✓ ') < 0 && X.host.innerHTML.indexOf(ft) > 0;
+    const ok = svOk && ftOk && s('c1').t === '✓ 2026-09' && !s('c1').tgt && s('c1').cat === '✓ 기록' && /C086/.test(s('c1').basis) && s('c1').kind === 'special_demo' && s('c2').t === '✓ 2026-03' && !s('c2').tgt && s('c2').cat === '✓ 기록(대상 아님)'   // v450 검토: 대상 확정 전(C086)이라 분모 밖
+      && s('c3').t === '근거 확인 중' && s('c3').grey && !s('c3').tgt && !s('c3').miss && !s('c3').due && ['c4', 'c5'].every((id) => s(id).t === '—' && s(id).basis.indexOf(ASB_T50) === 0 && s(id).basis.indexOf('종류 「석면 특별교육」') > 0 && s(id).cat === '석면 — 판정 밖')
+      && !!c6 && c6.grp === 'gone' && c6.st.c.spec.t === '✓ 2026-10' && !c6.st.c.spec.tgt && c6.st.c.spec.cat === '✓ 기록(대상 아님)' && /기록만 남은 사람 — 판정 안 함/.test(c6.st.c.spec.basis) && X.api.rows().every((r) => !r.st.c.spec.miss)
+      && XN.api.rows().filter((r) => r.ptype === 'worker' && r.grp !== 'gone').every((r) => r.st.c.spec.t === '판정 불가(현장 권한 없음)') && XW.api.rows().filter((r) => r.ptype === 'worker' && r.grp !== 'gone').every((r) => r.st.c.spec.t === '확인 중')
+      && JSON.stringify([...ns].sort()) === JSON.stringify([...svN].sort()) && ns.has('석면미이수') && !ns.has('석면이수') && X.api.find('worker:c5') && X.api.noSpecial(ASB50c()[3]).join(',') === '석면미이수'
+      && det.indexOf('<b>특별교육(해체·밀폐 등 — 석면 밖)</b>') > 0 && det.indexOf('<b>석면해체·제거관리자교육</b>') < 0 && det.indexOf('<td>석면해체·제거관리자교육</td>') > 0 && det.indexOf('특별교육(석면)') < 0 && /data-edu-kind="special_demo"/.test(det)
+      && !Object.prototype.hasOwnProperty.call(X.api.find('worker:c1').st.x, 'sdemo') && !Object.prototype.hasOwnProperty.call(X.api.find('worker:c1').st.x, 'mgr');
+    return { ok, info: { svOk, ftOk, ft, rk: ['worker:c3', 'worker:c1', 'worker:c2', 'worker:c4', 'member:m0'].map(rk), spec: ['c1', 'c2', 'c3', 'c4', 'c5'].map((id) => s(id).t), c1: [s('c1').cat, s('c1').tgt], c6: c6 ? c6.st.c.spec.t : null, ns: [...ns], svN: [...svN] } };
+  };
+  const r3_50 = chk3_50(html);
+  const m3_50 = [mut50('    sp = last(["special_demo"]);\n', '    sp = last(["special"]);\n'), mut50('else if (aOnly) c.spec = siteGate("special_demo", sp) || asbNone("special_demo", sp, ASB_T', 'else if (false) c.spec = siteGate("special_demo", sp) || asbNone("special_demo", sp, ASB_T'),
+    mut50('eduIt({ t: "✓ " + eduYm(sp.date), cat: "✓ 기록", last: sp, kind: "special_demo", basis: "석면 밖 특별교육(별표5) 기록 — 대상 작업 여부는 별표5 원문 확인 뒤(C086) · " + actTxt })', 'eduOk("special_demo", sp, "석면 밖 특별교육(별표5) — " + actTxt)'),   // v450 검토: 기록을 대상 ✓로
+    mut50('else if (gone || (mem ? !p.m : (!p.w || p.w.del === 1))) c.spec', 'else if (mem ? !p.m : (!p.w)) c.spec'),
+    // v450 검토 2: 정렬 순위에서 '✓ 기록'을 걷음 · 합계 줄 특별교육 칸 갈래를 걷음(✓ 0/0으로)
+    mut50('"✓ 이수": 8, "✓ 기록": 8.5, ', '"✓ 이수": 8, '), mut50('      if (k === "spec"){\n', '      if (false){\n')].map((s) => chk3_50(s).ok);
+  T('v450 ③ 특별교육 열 = 석면 밖 특별교육(실행): special_demo 기록 + 철거 작업중 = ✓ 2026-09(고르기 ✓ 기록 — 대상 확정은 C086 뒤라 분모 밖 · 검토) · 기록 + 준설 종결만 = ✓ 기록(대상 아님) · 기록 없음 + 준설 예정 = 근거 확인 중(회색·빠짐·기한 없음) · 석면 작업중(special 있음·없음) = "—"(석면 현장 투입 근거) · 지운 일용직 = 판정 안 함 · 표 빠짐 0 · 현장 권한 없음 = 판정 불가 · 대장 읽는 중 = 확인 중 · 같은 표본 현장 표 asbNoSpecial = 서버 gaps(석면미이수 있음·석면이수 없음 — 석면 특별교육 그대로) · 펼침 "특별교육(해체·밀폐 등 — 석면 밖)"·[+ 기록] special_demo·관리자교육 항목 줄 0(이력 표의 관리자교육 기록은 그대로) · 현황 ⑤ 관리자교육 셈 그대로 · 석면 작업중 고르기 석면 — 판정 밖·근거에 "종류 「석면 특별교육」" 안내 · 검토 2: 열 정렬 근거 확인 중 < ✓ 기록 < ✓ 기록(대상 아님) < 석면 — 판정 밖 < 대상 아님 · 합계 줄 특별교육 칸 "기록 3"(title C086 — ✓ 0/0 아님) · 결함 사본 6개(종류 special로·석면 갈래 걷음·지운 사람 판정·기록을 대상 ✓로·정렬 순위 ✓ 기록 걷음·합계 줄 갈래 걷음) = 모두 ✗',
+    r3_50.ok && m3_50.every((v) => v === false) && V.cnt47(html, 'liveEdu().forEach(function(r){ if (r.kind !== "manager" || !sfNowEduLive(r)) return;') === 1,
+    JSON.stringify({ r: r3_50.info, mut: m3_50 }));
+
+  // ④ 폭 — 특별교육 열에 '근거 확인 중'이 나오므로 폭 ≥ 89(글 71.3 + 칸 여백 17 — 11/13 시험 화면 실측: 88이면 안 폭 71이라 말줄임) · 단계별 열 합 ≤ 742 / 962 / 1,282(다음 할 일 남는 폭 최소를 줄여 맞춤) ·
+  //   결함 사본(폭 82 · 폭 88(실측으로 잡은 잘림) · 폭 94인데 최소 그대로) = ✗
+  const chk4_50 = (src) => { const X = V.mk47({ src }); const d = X.api.def(), sp = d.cols.find((c) => c.k === 'spec') || {}, nx = d.cols.find((c) => c.k === 'next') || {}; const sums = [2, 3, 4].map((st) => X.api.minW({ colw: {} }, X.api.cols(d, st)));
+    return { ok: X.api.check(d).length === 0 && sp.w >= 89 && sums.every((w, i) => w <= X.api.budget[i + 2]), sp: sp.w, nx: nx.min, sums }; };
+  const r4_50 = chk4_50(html), SPW50 = '{ k: "spec", h: "특별교육", w: 89,';
+  const m4_50 = [mut50(SPW50, '{ k: "spec", h: "특별교육", w: 82,'), mut50(SPW50, '{ k: "spec", h: "특별교육", w: 88,'), mut50(SPW50, '{ k: "spec", h: "특별교육", w: 94,')].map((s) => chk4_50(s).ok);
+  T('v450 ④ 폭(실행 — 실제 eduSheetDef·vsSheetMinW): 특별교육 89(≥ 89 — "근거 확인 중" 71.3 + 여백 17) · 다음 할 일 남는 폭 최소 121 · 단계별 열 합 742 / 956 / 1,180 ≤ 742 / 962 / 1,282 · 정의 검사 0 · 결함 사본(82 · 88 · 94 + 최소 그대로) = ✗',
+    r4_50.ok && r4_50.sp === 89 && r4_50.nx === 121 && JSON.stringify(r4_50.sums) === '[742,956,1180]' && m4_50.every((v) => v === false), JSON.stringify({ r4_50, m4_50 }));
+
+  // ⑤ 범위 줄(#eduScopeLine) — 한 구절만 더함(새 줄·새 영역 0): '… — 석면 작업 교육은 현장 칸 · 화관법 교육은 화관법 탭' · 칸 머리 줄 두 개(#eduLead·#eduScopeLine) 그대로
+  const pe5_50 = (() => { const i = html.indexOf('<div class="sf-pane" id="sfPaneEdu"'), j = html.indexOf('<div class="card" id="eduList">', i); return i > 0 && j > i ? html.slice(i, j) : ''; })();
+  T('v450 ⑤ 범위 줄 글: "범위: 산안법 교육·검진·위험성평가 공유·참여 — 석면 작업 교육은 현장 칸 · 화관법 교육은 화관법 탭" 1곳 · class edu-scope-line 1·edu-lead 1(새 줄 0) · 옛 글("공유·참여 — 화관법") 0',
+    V.cnt47(html, '<div class="edu-scope-line" id="eduScopeLine">범위: 산안법 교육·검진·위험성평가 공유·참여 — 석면 작업 교육은 현장 칸 · 화관법 교육은 화관법 탭</div>') === 1
+    && V.cnt47(pe5_50, 'class="edu-scope-line"') === 1 && V.cnt47(pe5_50, 'class="edu-lead"') === 1 && V.cnt47(html, '공유·참여 — 화관법 교육은 화관법 탭') === 0, String(pe5_50.length));
+
+  // ⑥ 운영 모양 흉내(숫자만 — 이름 없음): 일용직 155 = 석면 현장만 120(옛 석면 종결 — 그중 10명은 2026 기록 있음) · 석면+준설 2 · 준설만 9(2025 준설) · 현장 없음 24 + 직원 4 →
+  //   일용직 줄 35 · 머리 '총 39명' · '그 밖 일용직' 묶음 없음 · 결함 사본(석면 거름을 끈 것) = 일용직 줄 155
+  const WK50f = [], A50f = [], E50f = []; let wi50 = 0;
+  const addW50 = (n) => { const ids = []; for (let i = 0; i < n; i++) { wi50++; WK50f.push({ id: 'z' + wi50, name: '일용' + wi50 }); ids.push('z' + wi50); } return ids; };
+  const asbOnly50 = addW50(120), both50 = addW50(2), drOnly50 = addW50(9); addW50(24);
+  [2013, 2016, 2019, 2022, 2024, 2026].forEach((y, k) => A50f.push(S50({ id: 'f' + k, seq: k + 1, kind: 'asbestos', title: '석면 ' + y, start: y + '-03-01', end: y + '-03-20', worker_ids: asbOnly50.filter((_, i) => i % 6 === k).concat(k === 2 ? both50 : []) })));
+  A50f.push(S50({ id: 'fd', seq: 9, kind: 'dredge', title: '준설 2025', start: '2025-07-24', end: '2025-08-21', worker_ids: drOnly50.concat(both50) }));
+  asbOnly50.slice(0, 10).forEach((id, i) => E50f.push({ id: 'fe' + i, ptype: 'worker', pid: id, kind: 'hire', date: '2026-01-10' }));
+  const MEM50f = () => [{ id: 'm0', name: '관리자', admin: true }, { id: 'm1', name: '직원하나', dept: '관리부' }, { id: 'm2', name: '직원둘', dept: '운영부' }, { id: 'm3', name: '직원셋', dept: '운영부' }];
+  const chk6_50 = (src) => { const X = V.mk47({ src, workers: WK50f, asb: A50f, edu: E50f, members: MEM50f() }); X.api.render(); const rs = X.api.rows(), wk = rs.filter((r) => r.ptype === 'worker');
+    return { ok: WK50f.length === 155 && wk.length === 35 && wk.every((r) => r.grp === '') && X.el('eduHead').textContent === '총 39명' && V.grpOf47(X.host.innerHTML) === '' && X.host.innerHTML.indexOf('그 밖 일용직') < 0
+      && both50.every((id) => !!X.api.find('worker:' + id)) && asbOnly50.every((id) => !X.api.find('worker:' + id)), wk: wk.length, head: X.el('eduHead').textContent }; };
+  const r6_50 = chk6_50(html), m6_50 = chk6_50(mut50('var asbOut = function(k){ var s = si[k] || []; return cx.site &&', 'var asbOut = function(k){ var s = si[k] || []; return false && cx.site &&'));
+  T('v450 ⑥ 운영 모양 흉내(실행): 일용직 155(석면만 120·석면+준설 2·준설만 9·현장 없음 24) + 직원 4 = 일용직 줄 35(모두 펴짐) · 머리 "총 39명" · "그 밖 일용직" 묶음 없음 · 석면+준설 2 남음·석면만 120(기록 있는 10 포함) 없음 · 결함 사본(석면 거름 끔) = 일용직 줄 155',
+    r6_50.ok && !m6_50.ok && m6_50.wk === 155, JSON.stringify({ r6_50, m6: { wk: m6_50.wk, head: m6_50.head } }));
+
+  // ⑦ 문서 — FEATURES 기준 v450 (2026-11-13)·v450 절 · TESTLIST v450(화면 칸 '[ ] (AI 시험 화면 대상' ≥ 1 — 'PM' 0 · 게이트 칸 [x] 8종) · MANUAL 21-9(석면 교육은 현장 칸·석면 밖 특별교육) ·
+  //   CLAUDE.md 안전 줄(체크 칸 특별교육 열 = special_demo · 현장 표·서버·현황 ③ = eduHasValidSpecial 한 판정 · 옛 문장 0) · sw jw-shell-v450
+  const ft7 = V.rd47('FEATURES.md'), tl7 = V.rd47('TESTLIST.md'), cl7 = V.rd47('CLAUDE.md'), sw7 = V.rd47('sw.js'), man7 = V.rd47('MANUAL.html');
+  const ftv7 = (() => { const i = ft7.indexOf('\n### v450 (11/13)'); if (i < 0) return ''; const j = ft7.indexOf('\n### ', i + 5); return ft7.slice(i, j < 0 ? ft7.length : j); })();
+  const tlv7 = (() => { const i = tl7.indexOf('\n## v450 '); if (i < 0) return ''; const j = tl7.indexOf('\n## ', i + 5); return tl7.slice(i, j < 0 ? tl7.length : j); })();
+  const m219_7 = (() => { const i = man7.indexOf('<h3>21-9.'); return i < 0 ? '' : man7.slice(i, man7.indexOf('<h3>21-10.', i)); })();
+  const cb7 = tlv7.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), scr7 = cb7.filter((l) => /^- \[[ x]\] \(AI 시험 화면 대상/.test(l)), gate7 = cb7.filter((l) => /^- \[x\] \(AI\) `/.test(l));
+  const FT7 = ["PM 11/13 02:14 '석면은 교육 제외'", '`asbOut`', '`eduPersonStat`', 'special_demo', 'eduHasValidSpecial', '120', '석면+준설 2', '준설만 9', '현장 없음 24', '35', '총 64명', 'C086', '서버 변경 없음', 'uismoke v450', '석면 작업 교육은 현장 칸',
+    '캘린더 교육 예정', '`EDU_CAT_RANK`', "'기록 n'", '석면 현장(…)은 체크 칸 교육 판정 밖'];   // v450 검토 2: 알려진 차이에 캘린더 · 정렬 순위 · 합계 줄 · 건설 기초 글
+  const MAN7 = ['석면 현장에만 든 일용직', '석면 밖 특별교육', '현장 칸', '캘린더 교육 예정', '<b>기록 n</b>', '석면 현장뿐인 직원도 작업내용 변경 시 교육은 <b>석면 — 판정 밖</b>'];
+  const GATE7 = ['uismoke', 'consheet_check', 'proctpl_check', 'settletest', 'servertest', 'rectest', 'promoqual_check', 'promogen_check'];
+  const mF7 = FT7.filter((s) => ftv7.indexOf(s) < 0), mM7 = MAN7.filter((s) => m219_7.indexOf(s) < 0);
+  // v450 검토: 검사 조건 줄 가운데 `//` 줄 주석이 뒤 조건을 지우는 것(v449 ⑥에서 FEATURES 문구·TESTLIST 절·화면 칸·게이트 칸이 소리 없이 빠졌던 것)을 이 파일 전체에서 막음 —
+  //   주석으로 시작하지 않는 줄에서 ' // ' 뒤에 '&& 식 비교·.length·.every(·.some(' 이 오면 걸림 · 결함 사본(v449 ⑥ 조건 줄 가운데 주석) = 걸림 1
+  const MIDC50 = /^\s*(?!\/\/)\S.*\s\/\/ .*?\s&& [\w!.(\[]+.*?(===|!==|>=|<=|\.length|\.every\(|\.some\()/;
+  const midC50 = (txt) => txt.split('\n').filter((l) => MIDC50.test(l)).length;
+  const us7 = V.rd47('tools/uismoke.mjs'), V496 = '>= 449 && ftv6.length > 0' + ' && mF6.length === 0';   // 이어 쓰지 않음(이 줄이 자리로 잡히지 않게)
+  const midOk50 = midC50(us7) === 0 && V.cnt47(us7, V496) === 1 && midC50(us7.replace(V496, () => '>= 449 && ftv6.length > 0   /' + '/ x && mF6.length === 0')) === 1;
+  T('v450 ⑦ 문서: FEATURES 기준 v450 (2026-11-13)·v450 절(이름·운영 수 고정) · TESTLIST v450 화면 칸 "[ ] (AI 시험 화면 대상" ≥ 1("PM" 낱말 0)·게이트 칸 [x] 8종 · MANUAL 21-9 석면 교육 빠짐 · CLAUDE.md 체크 칸 특별교육 열 v450 문장(옛 "특별교육 칸은 eduHasValidSpecial" 0) · sw jw-shell-v450 · 검토: EDU_ASB_CAT(CLAUDE.md·FEATURES)·MANUAL "석면 — 판정 밖"·판정 불가 문장에 특별교육·폰 목록 수정 길 · 검토 2: 알려진 차이에 캘린더 교육 예정(FEATURES·MANUAL·TESTLIST)·합계 줄 "기록 n"·EDU_CAT_RANK·건설 기초 석면 덧붙임 글·직원 작업내용 변경 · 이 파일 검사 조건 줄 가운데 // 주석 0(결함 사본 = 1)',
+    /기준: v450 \(2026-11-13\)\./.test(ft7) && ftv7.length > 0 && mF7.length === 0 && tlv7.length > 0 && scr7.length >= 1 && !scr7.some((l) => /PM/.test(l)) && GATE7.every((g) => gate7.some((l) => l.indexOf('`' + g + '`') > 0))
+    && mM7.length === 0 && cl7.indexOf('체크 칸 특별교육 열은 v450부터 석면 밖 특별교육(special_demo) — 현장 표·서버·현황 ③의 석면 특별교육은 `eduHasValidSpecial` 한 판정(따로 만들지 말 것)') > 0
+    && cl7.indexOf('특별교육 칸은 `eduHasValidSpecial`(현장 표·서버·현황 ③과 한 판정') < 0 && /SHELL_CACHE = 'jw-shell-v450'/.test(sw7) && midOk50
+    && cl7.indexOf('`EDU_ASB_CAT`') > 0 && ftv7.indexOf('`EDU_ASB_CAT`') > 0 && m219_7.indexOf('석면 — 판정 밖') > 0 && m219_7.indexOf('이 칸들과 특별교육 칸이 <b>판정 불가') > 0 && m219_7.indexOf('폰 화면(창 860px 아래)의 목록') > 0
+    && tlv7.indexOf('캘린더 교육 예정') > 0 && tlv7.indexOf("합계 줄 특별교육 칸 '기록 n'") > 0,   // v450 검토 2: TESTLIST 화면 칸에 캘린더 이동 끝·합계 줄
+    JSON.stringify({ mF7, mM7, scr: scr7.length, gate: gate7.length, midOk50, midN: midC50(us7) }));
+} catch (e) { console.log('  (v450 검사 생략 — ' + e.message + ')'); fails++; }
 
 try {
   const fdir = join(ROOT, 'netlify', 'functions');
