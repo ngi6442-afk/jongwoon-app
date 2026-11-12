@@ -5929,13 +5929,14 @@ try {
   };
   const TASKS40 = () => [{ id: 't5', title: '입금확인: 사아공단 준설토 운반 22,000,000원', detail: '금액 불일치 — 확인 필요', who_id: '', who: '', scope: ['m1'], from: '기성', from_id: 'm1', due: '2026-08-01', status: 'open', done_at: null, done_by: null, rec_id: 'r5', created: '2026-08-01', updated: '2026-08-01' }];
   const REAL40 = ['esc', 'isDate', 'vehDday', 'liveRec', 'findRec', 'fmtAmount', 'recVisible', 'liveTasks', 'findTask', 'taskForMe', 'taskVisible', 'findRecTask', 'findOpenRecTask', 'createRecTask', 'completeRecTask', 'reopenRecTask', 'removeRecTask',
-    'recTaxExport', 'addReceivable', 'toggleRecReview', 'toggleRecPaid', 'toggleRecInvoice', 'toggleRecMismatch', 'toggleRecHl', 'saveRecModal', 'closeRecModal', 'recAging', 'recRowHtml', 'renderRecAging', 'recMatchesSearch', 'unpaidReceivables',
+    'recTaxExport', 'addReceivable', 'toggleRecReview', 'toggleRecPaid', 'toggleRecInvoice', 'toggleRecMismatch', 'toggleRecHl', 'saveRecModal', 'closeRecModal', 'recAging', 'recRowHtml', 'renderRecAging', 'recAgingKey', 'cliLinkReset', 'cliNameKey', 'cliDigits', 'cliResolve', 'cliLinkIdx', 'liveContracts', 'recMatchesSearch', 'unpaidReceivables',
     'renderReceivablesLegacy', 'bindRecHandlers', 'recSortCmp', 'fillRecSort', 'selCount', 'selBoxHtml', 'bindSelBoxes', 'renderSelBar', 'hardDelete', 'bulkDelete', 'bulkRestore', 'renderDeletedList',
     'moduleArr', 'moduleLive', 'moduleDeleted', 'moduleCan', 'moduleFind', 'saveModule', 'scheduleModuleSave', 'renderModuleList', 'renderModule', 'csTitle', 'csSiteText',
     'impEsc', 'xlsxUnescape', 'xlsxCol', 'xlsxZip', 'xlsxEntry', 'xlsxSS', 'xlsxSheet', 'xlsxRows', 'recImportMap', 'recImportPlan', 'recNewRec', 'recImportApply', 'handleRecImportFile', 'showRecImportPreview', 'confirmRecImport'];
   const VARS40 = ['  var showRecAging = ', '  var recSearchTerm = ', '  var recSort = ', '  var REC_SORTS = ', '  var pendingImport = ', '  var editingRecId = '].map((h) => line40(html, h));
   const PRE40 = [
     'var receivables = ENV.recs, tasks = ENV.tasks, contracts = ENV.procs, members = ENV.members, vehicles = [];',
+    'var clients = ENV.clients, CLI_LINK = null;',   // v451 C081 ②: 거래처별 미수 집계가 거래처 탭 잇기(cliLinkIdx)를 씀
     'var showDeletedRec = false, showRecPaid = false;',
     'var selSets = { tasks:{}, veh:{}, rec:{} }, delSelSets = { tasks:{}, veh:{}, rec:{} };',
     'function todayStr(){ return "2026-11-10"; }',
@@ -5984,7 +5985,7 @@ try {
   const mkCls40 = (s) => { const c = new Set(String(s || '').split(/\s+/).filter(Boolean)); return { toggle: (k, on) => { if (on === undefined ? !c.has(k) : on) c.add(k); else c.delete(k); }, contains: (k) => c.has(k), add: (k) => c.add(k), remove: (k) => c.delete(k), list: () => [...c].join(' ') }; };
   const mk40 = (o) => {
     o = o || {};
-    const env = { width: o.width || 1366, user: o.user || U40.A, recs: o.recs || FIX40(), tasks: o.tasks || TASKS40(), procs: PROC40.map((c) => Object.assign({}, c)), members: MEM40, mql: [], store: Object.assign({}, o.store || {}), timers: [], now: 100000, log: [], raf: [], ro: [], roCb: null, cw: 1048, confirmAns: true, gid: 0, checked: [] };
+    const env = { width: o.width || 1366, user: o.user || U40.A, recs: o.recs || FIX40(), tasks: o.tasks || TASKS40(), procs: PROC40.map((c) => Object.assign({}, c)), members: MEM40, clients: (o.clients || []).map((c) => Object.assign({}, c)), mql: [], store: Object.assign({}, o.store || {}), timers: [], now: 100000, log: [], raf: [], ro: [], roCb: null, cw: 1048, confirmAns: true, gid: 0, checked: [] };
     const doc = { activeElement: null, byId: {} };
     doc.getElementById = (id) => doc.byId[id] || null;
     doc.addEventListener = () => {}; doc.removeEventListener = () => {};
@@ -6602,6 +6603,22 @@ try {
     FT_REV40.every((s) => ftv23.indexOf(s) > 0) && MAN_REV40.every((s) => man9.indexOf(s) > 0) && CL_REV40.every((s) => cl23.indexOf(s) > 0)
     && rv32.length === 1 && ['기성 숨김', '옮깁니다', '마이너스', '입금된 줄', '[삭제] 없음', '[+ 청구 등록]', '1366으로 넓히면', "'불일치'"].every((s) => rv32[0].indexOf(s) > 0) && cbGate23.length === 1 && cbGate23[0].indexOf('검토 반영') > 0,
     JSON.stringify({ ft: FT_REV40.filter((s) => ftv23.indexOf(s) < 0), man: MAN_REV40.filter((s) => man9.indexOf(s) < 0), cl: CL_REV40.filter((s) => cl23.indexOf(s) < 0), rv: rv32.length, gate: cbGate23.length && cbGate23[0].indexOf('검토 반영') }));
+  // ---- v451(11/13 — C081 ② R1, 11/11 예고): PC 표 갈래의 거래처별 미수 집계 = 거래처 탭과 같은 잇기(cliResolve — 공급받는자 번호 먼저, 없으면 상호 열쇠 · 두 10자리 번호가 다르면 안 붙임)
+  //   대장 c1 (주)가나건설 123-45-67890 · c2 가나건설(같은 열쇠 — 대장 순서 첫 c1에만) · 미수: '가나건설'·'가나 건설'·이름 '사아'인데 번호 1234567890(번호 먼저 → c1) · '가나건설' 번호 999-99-99999(10자리 다름 → 안 붙임, 대장 밖)
+  //   · '(주)신규상사'·'신규상사'·'신규 상사'(대장 밖 열쇠 한 묶음 — 이름 = 많이 쓴 표기) · 거래처 빈 칸('-') · 입금된 줄·지운 줄 빼고
+  //   → 1366(표): "(주)가나건설" 3건 · "가나건설"(대장 밖 — 번호 다름) 1건 · "신규상사" 3건 · "-" 1건 = 4곳 · 375(폰 옛 목록) = 종전 글자째 묶음('가나건설'·'가나 건설'·'사아'·'(주)신규상사'·'신규상사'·'신규 상사'·'-' — 번호 다른 '가나건설'은 같은 글자에 합쳐짐) 7곳
+  const CL51 = [{ id: 'c1', name: '(주)가나건설', biz_no: '123-45-67890' }, { id: 'c2', name: '가나건설' }, { id: 'c9', name: '지운', del: 1 }];
+  const RC51 = () => [R040({ id: 'a1', client: '가나건설', amount: 1000, billed: '2026-10-20' }), R040({ id: 'a2', client: '가나 건설', amount: 2000, billed: '2026-09-01' }),
+    R040({ id: 'a3', client: '사아', amount: 4000, billed: '2026-08-01', client_num: '1234567890' }), R040({ id: 'a4', client: '가나건설', amount: 8000, billed: '2026-10-01', client_num: '999-99-99999' }),
+    R040({ id: 'a5', client: '(주)신규상사', amount: 100, billed: '2026-10-25' }), R040({ id: 'a6', client: '신규상사', amount: 200, billed: '2026-10-26' }), R040({ id: 'a7', client: '신규 상사', amount: 300, billed: '2026-10-27' }), R040({ id: 'a10', client: '신규상사', amount: 50, billed: '2026-10-28' }),
+    R040({ id: 'a8', client: '', amount: 10, billed: '2026-10-28' }), R040({ id: 'a9', client: '가나건설', amount: 99999, billed: '2026-10-02', paid: '2026-11-01' }), R040({ id: 'a11', client: '가나건설', amount: 77777, billed: '2026-10-02', del: 1 })];
+  const agg51 = (w) => { const X = mk40({ width: w, recs: RC51(), clients: CL51 }); X.api.render(); const h = X.env.host('recAgingSummary')._h;
+    return [(/rec-agg-cap">([^<]*)</.exec(h) || ['', ''])[1], [...h.matchAll(/<b>([^<]*)<\/b>[\s\S]*?class="cnt2">(\d+)건<\/span><\/div><div class="amt">([^<]*)<\/div>/g)].map((m) => m[1] + ':' + m[2] + ':' + m[3]).join('|'), X.env.host('recAgingToggle').textContent]; };
+  const a51 = agg51(1366), b51 = agg51(375);
+  T('v451 C081 ② 거래처별 미수 집계 = 거래처 탭 잇기(PC 표): ' + JSON.stringify(a51) + ' · 폰 옛 목록 = 글자째 그대로 ' + JSON.stringify(b51),
+    JSON.stringify(a51) === JSON.stringify(['거래처 4곳 · 합계 15,660원 (금액 큰 순)', '가나건설:1:8,000원|(주)가나건설:3:7,000원|신규상사:4:650원|-:1:10원', '거래처별 미수 집계 (4곳)'])
+    && b51[1].split('|').length === 7 && b51[2] === '거래처별 미수 집계 (7곳)' && /가나건설:2:9,000원/.test(b51[1]) && /가나 건설:1:2,000원/.test(b51[1]) && /사아:1:4,000원/.test(b51[1]),
+    JSON.stringify({ a51, b51 }));
 } catch (e) { console.log('  (v440 검사 생략 — ' + e.message + ')'); fails++; }
 
 // ---- v441(11/11 — 45-1 넷째 판: 관리 › 거래처 탭을 엑셀형 표로 · PM 11/10 15:56 결정 ④ 계약·기성에는 있는데 대장에 없는 이름을 표 아래 묶음으로 모아 [대장에 추가](상호만 채운 새 거래처) —
@@ -6814,9 +6831,9 @@ try {
   const view2 = (u) => { const X = mk41({ width: 1920, user: u }); X.api.render(); const h0 = X.host._h; openRow41(X, 'c1'); const h = X.host._h; return { heads: heads41(h0), chips: chips41(h0), tabs: tabs41(h), acts: acts41(h), grp: /data-vs-grp="out"/.test(h0), n: cnt41(h0), kv: kvKeys41(h) }; };
   const v2 = { A: view2(U41.A), C: view2(U41.C), D: view2(U41.D), E: view2(U41.E) };
   const KV41 = '사업자번호·담당자·연락처·이메일·주소·처리업소·메모·등록일·고친 날', KVv41 = '사업자번호·담당자·연락처·처리업소·메모·등록일·고친 날';
-  T('v441 ② 권한별 열·칩·하위 탭: 관리자 열 name…addr 10 · 칩 전체·미수 있음·계약 진행 중·처리업소·정보 비어 있음 · c1 하위 탭 개요*·미수 (3)·계약 (2)·관련 문서 (0) · 버튼 수정·삭제 · 묶음 있음 "보이는 6곳 / 전체 6곳"(검토 — 대장 줄만, 묶음 4곳은 머리에) / 직원C(기성 보기·계약 숨김) = 열 7(계약·이메일·주소 없음)·칩 4(계약 진행 중 없음)·탭 개요·미수·관련 문서·버튼 0·묶음 없음 "6곳"·개요에 이메일·주소 없음 / 직원D(기성·계약 숨김·거래처 수행) = 열 8(미수·계약 없음, 이메일·주소 있음)·칩 3·탭 줄 없음·버튼 수정·삭제·묶음 없음 / 직원E(기성 숨김·계약 보기) = 열 7(미수·이메일·주소 없음)·칩 전체·계약 진행 중·처리업소·정보 비어 있음·탭 개요·계약 (2)',
-    v2.A.heads === 'name,biz,contact,phone,unpaid,con,proc,note,email,addr' && v2.A.chips === ':전체|unpaid:미수 있음|con:계약 진행 중|proc:처리업소|blank:정보 비어 있음' && v2.A.tabs === '개요*|미수 (3)|계약 (2)|관련 문서 (0)' && v2.A.acts === 'edit,del' && v2.A.grp && v2.A.n === '보이는 6곳 / 전체 6곳' && v2.A.kv === KV41
-    && v2.C.heads === 'name,biz,contact,phone,unpaid,proc,note' && v2.C.chips === ':전체|unpaid:미수 있음|proc:처리업소|blank:정보 비어 있음' && v2.C.tabs === '개요*|미수 (3)|관련 문서 (0)' && v2.C.acts === '' && !v2.C.grp && v2.C.n === '보이는 6곳 / 전체 6곳' && v2.C.kv === KVv41
+  T('v441 ② 권한별 열·칩·하위 탭: 관리자 열 name…addr 10 · 칩 전체·미수 있음·계약 진행 중·처리업소·정보 비어 있음 · c1 하위 탭 개요*·미수 (3)·계약 (2)·관련 문서 (1)(v451 열쇠) · 버튼 수정·삭제 · 묶음 있음 "보이는 6곳 / 전체 6곳"(검토 — 대장 줄만, 묶음 4곳은 머리에) / 직원C(기성 보기·계약 숨김) = 열 7(계약·이메일·주소 없음)·칩 4(계약 진행 중 없음)·탭 개요·미수·관련 문서·버튼 0·묶음 없음 "6곳"·개요에 이메일·주소 없음 / 직원D(기성·계약 숨김·거래처 수행) = 열 8(미수·계약 없음, 이메일·주소 있음)·칩 3·탭 줄 없음·버튼 수정·삭제·묶음 없음 / 직원E(기성 숨김·계약 보기) = 열 7(미수·이메일·주소 없음)·칩 전체·계약 진행 중·처리업소·정보 비어 있음·탭 개요·계약 (2)',
+    v2.A.heads === 'name,biz,contact,phone,unpaid,con,proc,note,email,addr' && v2.A.chips === ':전체|unpaid:미수 있음|con:계약 진행 중|proc:처리업소|blank:정보 비어 있음' && v2.A.tabs === '개요*|미수 (3)|계약 (2)|관련 문서 (1)' && v2.A.acts === 'edit,del' && v2.A.grp && v2.A.n === '보이는 6곳 / 전체 6곳' && v2.A.kv === KV41
+    && v2.C.heads === 'name,biz,contact,phone,unpaid,proc,note' && v2.C.chips === ':전체|unpaid:미수 있음|proc:처리업소|blank:정보 비어 있음' && v2.C.tabs === '개요*|미수 (3)|관련 문서 (1)' && v2.C.acts === '' && !v2.C.grp && v2.C.n === '보이는 6곳 / 전체 6곳' && v2.C.kv === KVv41
     && v2.D.heads === 'name,biz,contact,phone,proc,note,email,addr' && v2.D.chips === ':전체|proc:처리업소|blank:정보 비어 있음' && v2.D.tabs === '' && v2.D.acts === 'edit,del' && !v2.D.grp && v2.D.kv === KV41
     && v2.E.heads === 'name,biz,contact,phone,con,proc,note' && v2.E.chips === ':전체|con:계약 진행 중|proc:처리업소|blank:정보 비어 있음' && v2.E.tabs === '개요*|계약 (2)' && v2.E.acts === '' && !v2.E.grp && v2.E.kv === KVv41 && noMiss41(m2),
     JSON.stringify({ v2, miss: miss41.slice(m2) }));
@@ -6940,7 +6957,7 @@ try {
     JSON.stringify(s8) === JSON.stringify([0, 1, 1, '2026-11-10', 1, -1, 0, 1, true, 0, 1]) && dm8 && noMiss41(m8), JSON.stringify({ s8, dm8, miss: miss41.slice(m8) }));
 
   // ⑨ 펼침 하위 탭·계약 줄: c1 개요(키·값·같은 상호 1곳 더 안내) → 미수 (3) 탭 = 청구일 순 r3,r2,r1(경과 칩)·합 '8,500,000원 · 3건' → 계약 (2) 탭 = k1(진행)·k2(완료) 줄(누를 수 있음) → k1 누름 = 계약 탭 이동·
-  //   그 계약 펼침(개요)·계약 표 '완료' 칩·거래처 거르기가 k1을 거르면 이번만 풂 · 다른 줄(c5)을 펼치면 개요부터 · c5 관련 문서 (2)(사아공단 협약·사아 견적 — 짧은 상호 안내) · 직원D(계약 숨김) 계약 이동 = false
+  //   그 계약 펼침(개요)·계약 표 '완료' 칩·거래처 거르기가 k1을 거르면 이번만 풂 · 다른 줄(c5)을 펼치면 개요부터 · c5 관련 문서 (0)(v451 C081 ①: 2자 상호는 찾지 않음 — 빈 안내에 그 말) · 직원D(계약 숨김) 계약 이동 = false
   const m9 = miss41.length;
   const X9 = mk41({ conChip: 'done' }); X9.api.render(); openRow41(X9, 'c1'); const h9a = X9.host._h;
   const s9 = [tabs41(h9a), /같은 상호\(또는 사업자번호\)의 거래처가 대장에 1곳 더 있습니다/.test(h9a), kvVal41(h9a, '사업자번호'), kvVal41(h9a, '처리업소')];
@@ -6950,13 +6967,13 @@ try {
   s9.push(tabs41(h9c), [...h9c.matchAll(/<tr class="cli-conrow" data-cli-con="(\w+)" title="계약 탭에서 펼침"><td>([^<]*)<\/td><td><span class="(\w+)-chip">([^<]*)<\/span><\/td><td>([^<]*)<\/td><\/tr>/g)].map((m) => m.slice(1).join(':')).join('|'));
   press41(X9, 'data-cli-con', 'k1'); s9.push(X9.api.con(), X9.env.log.filter((l) => /^tab:|^renderContracts:/.test(l)).join(','), X9.env.log.indexOf('qs:[data-cs-row="k1"]') >= 0);
   openRow41(X9, 'c5'); const h9d = X9.host._h; s9.push(tabs41(h9d)); press41(X9, 'data-cli-tab', 'doc'); const h9e = X9.host._h;
-  s9.push(tabs41(h9e), [...h9e.matchAll(/<tr><td>(JW-[\d-]+)<\/td><td>([^<]*)<\/td><\/tr>/g)].map((m) => m[1] + ' ' + m[2]).join('|'), /상호가 짧아\(2자 이하\) 이름이 들어간 다른 문서가 섞였을 수 있습니다/.test(h9e));
+  s9.push(tabs41(h9e), [...h9e.matchAll(/<tr><td>(JW-[\d-]+)<\/td><td>([^<]*)<\/td><\/tr>/g)].map((m) => m[1] + ' ' + m[2]).join('|'), /관련 문서 없음 — 상호가 짧아\(2자 이하\) 관련 문서를 찾지 않습니다 — 문서함에서 직접 찾아보세요/.test(h9e));
   const Z9 = mk41({ user: U41.D }); s9.push(Z9.api.goCon('k1'), Z9.env.log.some((l) => /^tab:/.test(l)));
-  T('v441 ⑨ 펼침 하위 탭·계약 줄: c1 개요* · 같은 상호 1곳 더 안내 · 사업자번호 123-45-67890 · 처리업소 아니오 → 미수 (3)* = r3 08-01 경과 101일 age90 · r2 09-01 70일 age60 · r1 10-20 21일 age0 · 금액 2,000,000·1,000,000·5,500,000 · 합 8,500,000원 · 3건 → 계약 (2)* = k1 ○○동 철거 진행 2026-09-01 · k2 석면철거 완료 2026-03-02 → k1 누름 = 계약 탭·conOpenId k1·개요·완료 칩 풂·그 줄로 굴림 · c5 펼침 = 개요부터 → 관련 문서 (2) = 사아공단 협약·사아 견적 + 짧은 상호 안내 · 직원D(계약 숨김) 이동 = false·탭 이동 0',
-    JSON.stringify(s9) === JSON.stringify(['개요*|미수 (3)|계약 (2)|관련 문서 (0)', true, '123-45-67890', '아니오',
-      '개요|미수 (3)*|계약 (2)|관련 문서 (0)', '2026-08-01:번호로 이어짐:age90:101:2,000,000|2026-09-01:9월 철거:age60:70:1,000,000|2026-10-20:10월 철거:age0:21:5,500,000', true,
-      '개요|미수 (3)|계약 (2)*|관련 문서 (0)', 'k1:○○동 철거:review:진행:2026-09-01|k2:석면철거:from:완료:2026-03-02',
-      'k1|ov||{}', 'tab:con,renderContracts:k1:ov::{}', true, '개요*|미수 (1)|계약 (1)|관련 문서 (2)', '개요|미수 (1)|계약 (1)|관련 문서 (2)*', 'JW-04-01-002 사아공단 협약|JW-04-01-003 사아 견적', true, false, false]) && noMiss41(m9),
+  T('v441 ⑨ 펼침 하위 탭·계약 줄: c1 개요* · 같은 상호 1곳 더 안내 · 사업자번호 123-45-67890 · 처리업소 아니오 → 미수 (3)* = r3 08-01 경과 101일 age90 · r2 09-01 70일 age60 · r1 10-20 21일 age0 · 금액 2,000,000·1,000,000·5,500,000 · 합 8,500,000원 · 3건 → 계약 (2)* = k1 ○○동 철거 진행 2026-09-01 · k2 석면철거 완료 2026-03-02 → k1 누름 = 계약 탭·conOpenId k1·개요·완료 칩 풂·그 줄로 굴림 · c5 펼침 = 개요부터 → 관련 문서 (0) = 2자 상호는 찾지 않음 안내(v451 C081 ①) · 직원D(계약 숨김) 이동 = false·탭 이동 0',
+    JSON.stringify(s9) === JSON.stringify(['개요*|미수 (3)|계약 (2)|관련 문서 (1)', true, '123-45-67890', '아니오',
+      '개요|미수 (3)*|계약 (2)|관련 문서 (1)', '2026-08-01:번호로 이어짐:age90:101:2,000,000|2026-09-01:9월 철거:age60:70:1,000,000|2026-10-20:10월 철거:age0:21:5,500,000', true,
+      '개요|미수 (3)|계약 (2)*|관련 문서 (1)', 'k1:○○동 철거:review:진행:2026-09-01|k2:석면철거:from:완료:2026-03-02',
+      'k1|ov||{}', 'tab:con,renderContracts:k1:ov::{}', true, '개요*|미수 (1)|계약 (1)|관련 문서 (0)', '개요|미수 (1)|계약 (1)|관련 문서 (0)*', '', true, false, false]) && noMiss41(m9),
     JSON.stringify({ s9, miss: miss41.slice(m9) }));
 
   // ⑩ 이메일·주소(거래처 수행만 — 명세 열·누가 보나): 1920 관리자·직원B·D = 열·펼침 개요·검색 글에 있음 / 직원C·E(보기) = 표·펼침 화면 글 어디에도 없음·검색 글에도 없음(이메일로 찾으면 0)
@@ -7039,7 +7056,7 @@ try {
   press41(X15, 'data-cli-act', 'addout'); s15.push(X15.api.clis().length - n15);
   openRow41(X15, 'c1'); press41(X15, 'data-cli-tab', 'rec', { fast: true }); s15.push(tabs41(X15.host._h));
   T('v441 ⑮ 연속 누름 막기: 대장에 추가 = 1 → 0.5초 안 다른 줄 누름 버림(1) → 더블클릭 둘째 누름 버림(1) → 1초 뒤 = 2 · 하위 탭 누름은 막지 않음(미수 (3)*)',
-    JSON.stringify(s15) === JSON.stringify([1, 1, 1, 2, '개요|미수 (3)*|계약 (2)|관련 문서 (0)']) && noMiss41(m15), JSON.stringify({ s15, miss: miss41.slice(m15) }));
+    JSON.stringify(s15) === JSON.stringify([1, 1, 1, 2, '개요|미수 (3)*|계약 (2)|관련 문서 (1)']) && noMiss41(m15), JSON.stringify({ s15, miss: miss41.slice(m15) }));
 
   // ⑯ 폰 sheet 준비(phone 한 줄만 바꾸면 되게): 정의 검사 통과 · 열 3 = 상호 --pw 38%·연락처 36%·미수 26%(직원D = 미수 없이 52·48) · 합계 '합계 6곳||미수' · 줄 누름 = 표 아래 상세 카드(하위 탭·개요)
   const m16 = miss41.length;
@@ -7048,9 +7065,9 @@ try {
   const h16 = X16.host._h, c16 = cg16(h16), f16 = foot41(h16);
   openRow41(X16, 'c1'); const dc16 = [/<div class="vs-detcard" data-vs-detcard="c1">/.test(X16.host._h), X16.host._h.indexOf('<tr class="vs-det">') < 0, tabs41(X16.host._h)];
   const X16d = mk41({ width: 375, user: U41.D }), d16d = Object.assign({}, X16d.api.def(), { phone: 'sheet' }); X16d.api.vs(d16d); const c16d = cg16(X16d.host._h);
-  T('v441 ⑯ 폰 sheet 준비: 정의 검사 통과 · 열 3 = name --pw 38%·phone 36%·unpaid 26% · 직원D(미수 없음) = 52%·48% · 합계 "합계 6곳||9,200,000원 · 4건" · 줄 누름 = 표 아래 상세 카드(표 안 펼침 없음)·하위 탭 개요*·미수 (3)·계약 (2)·관련 문서 (0)',
+  T('v441 ⑯ 폰 sheet 준비: 정의 검사 통과 · 열 3 = name --pw 38%·phone 36%·unpaid 26% · 직원D(미수 없음) = 52%·48% · 합계 "합계 6곳||9,200,000원 · 4건" · 줄 누름 = 표 아래 상세 카드(표 안 펼침 없음)·하위 탭 개요*·미수 (3)·계약 (2)·관련 문서 (1)(v451 열쇠)',
     X16.api.check(d16).length === 0 && c16 === 'name=--pw:38%;,phone=--pw:36%;,unpaid=--pw:26%;' && c16d === 'name=--pw:52%;,phone=--pw:48%;' && f16 === '합계 6곳||<span title="미수 9,200,000원 · 4건">9,200,000원 · 4건</span>'   // 폰 sheet 준비 합계는 건수까지(11/11 PC만 금액만으로 바꿈)
-    && JSON.stringify(dc16) === JSON.stringify([true, true, '개요*|미수 (3)|계약 (2)|관련 문서 (0)']) && noMiss41(m16),
+    && JSON.stringify(dc16) === JSON.stringify([true, true, '개요*|미수 (3)|계약 (2)|관련 문서 (1)']) && noMiss41(m16),
     JSON.stringify({ c16, c16d, f16, dc16, miss: miss41.slice(m16) }));
 
   // ⑰ 문서 — FEATURES 기준 ≥ v441·v441 절(문장 고정)·자리 글 GATES_V441 0 · TESTLIST v441 = 화면 칸 '[ ]/[x] (AI 시험 화면 대상'(≥5 — PM 몫 0) + 게이트 칸 '[x] (AI) `uismoke`'(5종·결함 심기) ·
@@ -7197,8 +7214,8 @@ try {
   const X21 = mk41(); X21.api.render(); openRow41(X21, 'c1'); press41(X21, 'data-cli-tab', 'doc'); const h21a = X21.host._h;
   openRow41(X21, 'c5'); press41(X21, 'data-cli-tab', 'doc'); const h21b = X21.host._h;
   const tip21 = (h) => (/data-cli-tab="doc" title="([^"]*)"/.exec(h) || ['', ''])[1];
-  const s21 = [tip21(h21a), /<div class="vs-empty">관련 문서 없음 — 상호 글자가 그대로 제목에 들어간 문서함 문서를 모읍니다\('\(주\)'·띄어쓰기가 다른 제목은 빠짐\)<\/div>/.test(h21a), tip21(h21b),
-    /<div class="vs-dsub" style="margin:0 0 4px;">문서함 제목에 상호 글자가 그대로 들어간 문서 — &#39;\(주\)&#39;·띄어쓰기가 다른 제목은 빠집니다 · 상호가 짧아\(2자 이하\) 이름이 들어간 다른 문서가 섞였을 수 있습니다<\/div>/.test(h21b)];
+  const s21 = [tip21(h21a), /<div class="vs-empty">관련 문서 없음 — 상호가 짧아\(2자 이하\) 관련 문서를 찾지 않습니다 — 문서함에서 직접 찾아보세요<\/div>/.test(h21b), tip21(h21b),
+    /<div class="vs-dsub" style="margin:0 0 4px;">문서함 제목·분류에 상호가 들어간 문서 — &#39;\(주\)&#39;·&#39;㈜&#39;·&#39;주식회사&#39;·띄어쓰기는 무시합니다<\/div><table class="vs-hist">.*JW-04-01-001/.test(h21a)];   // v451 C081 ①: c1 = 열쇠 '가나건설' 1건(표 첫 줄 안내) · c5 사아 = 2자라 찾지 않음(빈 안내)
   const P21 = mk41({ width: 375 }), HP21 = (id) => P21.env.host(id); P21.api.render(); P21.api.detail('c4'); const b21a = HP21('cliDetailBody')._h; P21.api.detail('c3'); const b21b = HP21('cliDetailBody')._h; P21.api.detail('c5'); const b21c = HP21('cliDetailBody')._h;
   const Q21 = mk41({ width: 375, user: U41.D }); Q21.api.render(); Q21.api.detail('c5'); const b21d = Q21.env.host('cliDetailBody')._h;   // c5 사아 = 계약 k5·관련 문서 2건이 메모리에 있는 거래처
   s21.push(b21a.indexOf('9001011234567') < 0 && /13자리\(숨김\)/.test(b21a), /<div class="crm-info">개인\(사업자 없음\)<\/div>/.test(b21b), /계약 <span>1건<\/span>/.test(b21c) && /관련 문서 <span>2건<\/span>/.test(b21c), /crm-h">계약 /.test(b21d) || /관련 문서/.test(b21d));
@@ -7208,18 +7225,33 @@ try {
   s21.push([hy21('c1'), hy21('c3'), hy21('c4'), hy21('c5')].join('|'), H21.api.sText(cl41(H21, 'c3')).indexOf('개인(사업자 없음)') > 0 && H21.api.sText(cl41(H21, 'c3')).indexOf('개인고객 ' + hy21('c3') + ' ') === 0);
   const tsb21 = blkOf41('// @task-sheet-start', '// @task-sheet-end'), rsb21 = blkOf41('// @rec-sheet-start', '// @rec-sheet-end');
   s21.push(!/\bcount\s*:/.test(tsb21) && !/\bcount\s*:/.test(rsb21) && /\bcount: function\(r\)\{ return !r\.out; \},/.test(csb41), X1.api.check(Object.assign({}, d1, { count: 1 })).indexOf('count') >= 0 && X1.api.check(d1).indexOf('count') < 0);
-  T('v441 ㉑ 검토 — 관련 문서 찾는 법·옛 상세 창·탭 이동·검색 글·건수: 관련 문서 탭 title·첫 줄 안내("상호 글자가 그대로 … (주)·띄어쓰기가 다른 제목은 빠짐" + 2자 이하면 섞임 안내)·0건 빈 안내 · 옛 [상세 ›] = 13자리 원문 0("13자리(숨김)")·개인 "개인(사업자 없음)"·관리자 c5 계약 1·관련 문서 2·계약 숨김 직원D = 계약·관련 문서 절 0 · 탭에 다시 옴: 폰 = 그대로·PC = 표·처음 = 옛 목록 · hay c1 원문·c3 개인 빈 글·c4 13자리 빈 글·c5 원문 · 표 검색 글 뒤쪽 "개인(사업자 없음)" · count는 거래처 정의만(정의 검사)',
-    JSON.stringify(s21) === JSON.stringify(["문서함 제목에 상호 글자가 그대로 들어간 문서 — &#39;(주)&#39;·띄어쓰기가 다른 제목은 빠집니다", true,
-      "문서함 제목에 상호 글자가 그대로 들어간 문서 — &#39;(주)&#39;·띄어쓰기가 다른 제목은 빠집니다 · 상호가 짧아(2자 이하) 이름이 들어간 다른 문서가 섞였을 수 있습니다", true,
+  T('v441 ㉑ 검토 — 관련 문서 찾는 법·옛 상세 창·탭 이동·검색 글·건수: 관련 문서 탭 title·첫 줄 안내(v451 C081 ①: c1 "제목·분류에 상호 … 무시" · c5 2자 "찾지 않습니다" 빈 안내) · 옛 [상세 ›] = 13자리 원문 0("13자리(숨김)")·개인 "개인(사업자 없음)"·관리자 c5 계약 1·관련 문서 2·계약 숨김 직원D = 계약·관련 문서 절 0 · 탭에 다시 옴: 폰 = 그대로·PC = 표·처음 = 옛 목록 · hay c1 원문·c3 개인 빈 글·c4 13자리 빈 글·c5 원문 · 표 검색 글 뒤쪽 "개인(사업자 없음)" · count는 거래처 정의만(정의 검사)',
+    JSON.stringify(s21) === JSON.stringify(["문서함 제목·분류에 상호가 들어간 문서 — &#39;(주)&#39;·&#39;㈜&#39;·&#39;주식회사&#39;·띄어쓰기는 무시합니다", true,
+      "상호가 짧아(2자 이하) 관련 문서를 찾지 않습니다 — 문서함에서 직접 찾아보세요", true,
       true, true, true, false, 'kept', 'sheet', 'legacy', '123-45-67890|||2223344444', true, true, true]) && noMiss41(m21),
     JSON.stringify({ s21, miss: miss41.slice(m21) }));
+
+  // v451(11/13 — C081 ① R1, 11/11 예고): PC 표 펼침 '관련 문서' = 상호 열쇠(cliNameKey) 3자 이상이 제목 열쇠 또는 분류 열쇠 안에 있는 문서(지운 문서 빼고)
+  //   c1 (주)가나건설(열쇠 '가나건설') = '가나 건설(주) 견적'·'주식회사 가나건설 계약'·분류 '가나건설' 3건 · 제목 '가나' 0 · 제목 끝+분류 앞 경계('…가나' + '건설…')로는 안 잡힘 · 지운 문서 0
+  //   c5 사아(2자) = 0 · 탭 title = 짧은 상호 안내 · 폰 옛 [상세 ›] 창(cliRelatedDocs)은 종전 글자째 그대로('사아' 부분 일치 3건)
+  const m51 = miss41.length;
+  const DOCS51 = [{ id: 'e1', title: '가나 건설(주) 견적', no: 'JW-1' }, { id: 'e2', title: '주식회사 가나건설 계약', no: 'JW-2' }, { id: 'e3', title: '협약', category: '가나건설', no: 'JW-3' },
+    { id: 'e4', title: '가나 소식', no: 'JW-4' }, { id: 'e5', title: '대구 가나', category: '건설 일반', no: 'JW-5' }, { id: 'e6', title: '가나건설 지운', no: 'JW-6', del: 1 },
+    { id: 'e7', title: '사아공단 협약', no: 'JW-7' }, { id: 'e8', title: '사아 견적', no: 'JW-8' }, { id: 'e9', title: '박사아 메모', no: 'JW-9' }];
+  const X51 = mk41({ docs: DOCS51.map((d) => Object.assign({}, d)) }); X51.api.render(); openRow41(X51, 'c1'); press41(X51, 'data-cli-tab', 'doc'); const h51a = X51.host._h;
+  openRow41(X51, 'c5'); const h51b = X51.host._h;
+  const P51 = mk41({ width: 375, docs: DOCS51.map((d) => Object.assign({}, d)) }); P51.api.render(); P51.api.detail('c5'); const b51 = P51.env.host('cliDetailBody')._h;
+  const s51 = [tabs41(h51a), [...h51a.matchAll(/<tr><td>(JW-\d)<\/td>/g)].map((m) => m[1]).join(','), tabs41(h51b), (/data-cli-tab="doc" title="([^"]*)"/.exec(h51b) || ['', ''])[1], (/관련 문서 <span>(\d+)건/.exec(b51) || ['', ''])[1]];
+  T('v451 C081 ① 관련 문서 = 상호 열쇠 3자 이상(PC 표 펼침): ' + JSON.stringify(s51),
+    JSON.stringify(s51) === JSON.stringify(['개요|미수 (3)|계약 (2)|관련 문서 (3)*', 'JW-1,JW-2,JW-3', '개요*|미수 (1)|계약 (1)|관련 문서 (0)', '상호가 짧아(2자 이하) 관련 문서를 찾지 않습니다 — 문서함에서 직접 찾아보세요', '3']) && noMiss41(m51),
+    JSON.stringify({ s51, miss: miss41.slice(m51) }));
 
   // ㉒ 검토 반영 문서: FEATURES v441 '검토 반영(11/11' 줄(못 읽은 대장·409 병합·13자리 판정·번호가 다르면 다른 회사·count·관련 문서 안내·탭 이동·운영 사본 다시 잼)과 실제와 달랐던 옛 서술 0
   //   ('같은 거래처를 두 번 만들 길 없음'·switchTab이 renderClients를 부른다) · CLAUDE.md 거래처 표 줄(옛 '어디에도 원문을 그리지 않는다' 0)·부품 줄 count · MANUAL 10절·35절 · TESTLIST v441 검토 반영 화면 칸·게이트 칸 '검토 반영 뒤'
   const FT_PINS22 = ['**검토 반영(11/11', '`cliLoaded`', '`CLI_UNREAD_MSG`', '`cliSaveConflict`', '`cliDirty`', '`cliMarkDirty`', '`cliMergeRemote`', '`cliBiz13`', '`cliBizHay`', '`count(r)`', '`cliSheetDocNote`', '`cliSheetOnTab()`',
     '번호가 달라 안 붙인 기성 0', "'보이는 2곳 / 전체 2곳' + 묶음 5곳", '물어보기 서버 clients 도구(`_lib/ask.js`)', '기성 탭 \'거래처별 미수 집계\''];
   const CL_PINS22 = ['`cliLoaded`', '`CLI_UNREAD_MSG`', '`cliSaveConflict`', '`cliMarkDirty`', '`cliMergeRemote`', '`cliBizHay`', '`cliSheetOnTab`', '`cliSheetDocNote`', '정의 옵션 `count(r)`', '`cliSheetOutSibs`'];
-  const MAN_PINS22 = ['전각 숫자로 적거나 다른 번호와 함께 적어도 같습니다', '쉼표로 나눠 주세요', '거래처 목록을 아직 불러오지 못했을 때', '대장 거래처만 셉니다', "'(주)'·띄어쓰기가 다른 제목은 빠지고", '누를 때 한 번 더 묻습니다', '상호가 같아도 다른 회사로 보고 묶지 않습니다'];
+  const MAN_PINS22 = ['전각 숫자로 적거나 다른 번호와 함께 적어도 같습니다', '쉼표로 나눠 주세요', '거래처 목록을 아직 불러오지 못했을 때', '대장 거래처만 셉니다', '상호가 두 글자 이하면 엉뚱한 문서가 섞이지 않게 찾지 않으니', '누를 때 한 번 더 묻습니다', '상호가 같아도 다른 회사로 보고 묶지 않습니다'];
   const OLD22 = [ftv17.indexOf('같은 거래처를 두 번 만들 길 없음'), ftv17.indexOf('`switchTab("cli")`가 `renderClients()`를 부른다'), cl17.indexOf('옛 13자리 값은 표·펼침·검색 글 어디에도 원문을 그리지 않는다'), cl17.indexOf('switchTab("cli")는 다시 그림')];
   const rv22 = cbScr17.filter((l) => l.indexOf('검토 반영(11/11)') > 0);
   T('v441 ㉒ 검토 반영 문서: FEATURES v441 검토 반영 줄(못 읽은 대장·409 병합·13자리 판정·번호 다르면 다른 회사·count·관련 문서 안내·탭 이동·남긴 것·운영 사본 다시 잼) · 옛 서술 0(두 번 만들 길 없음·switchTab renderClients·어디에도 원문·switchTab 다시 그림) · CLAUDE.md 거래처 표·부품 줄 · MANUAL 10절(13자리 꼴·못 읽은 때·건수·관련 문서·확인 창·번호 다르면 다른 회사)·35절(계약·문서함 권한) · TESTLIST 검토 반영 화면 칸 1(못 읽은 대장·두 창·13자리·확인 창·375) · 게이트 칸 "검토 반영 뒤"',

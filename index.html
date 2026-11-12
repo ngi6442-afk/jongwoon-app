@@ -25602,11 +25602,20 @@
     if (!r.out) a.push({ k: "ov", h: "개요" });
     if (canSee("rec")) a.push({ k: "rec", h: "미수 (" + cliSheetUnp(r).length + ")" });
     if (canSee("con")) a.push({ k: "con", h: "계약 (" + cliSheetCons(r).length + ")" });
-    if (!r.out && canSee("doc")) a.push({ k: "doc", h: "관련 문서 (" + cliRelatedDocs(r).length + ")", tip: cliSheetDocNote(r) });   // 셈은 cliRelatedDocs 그대로(명세 kept) — 미수·계약(열쇠·번호로 이음)과 찾는 법이 달라 탭에 마우스를 대면 그 안내
+    if (!r.out && canSee("doc")) a.push({ k: "doc", h: "관련 문서 (" + cliSheetDocs(r).length + ")", tip: cliSheetDocNote(r) });   // v451(C081 ①): 셈 = 상호 열쇠 3자 이상(cliSheetDocs) — 폰 옛 [상세 ›] 창은 cliRelatedDocs 그대로
     return a;
   }
-  // 관련 문서 찾는 법 안내(v441 검토) — 상호 글자 그대로 제목에서 찾음: '(주)'·띄어쓰기가 다른 제목은 빠지고, 상호가 짧으면(열쇠 2자 이하) 이름이 들어간 다른 문서가 섞일 수 있음
-  function cliSheetDocNote(r){ return "문서함 제목에 상호 글자가 그대로 들어간 문서 — '(주)'·띄어쓰기가 다른 제목은 빠집니다" + (cliNameKey(r.name).length <= 2 ? " · 상호가 짧아(2자 이하) 이름이 들어간 다른 문서가 섞였을 수 있습니다" : ""); }
+  // 관련 문서(PC 표 펼침 — v451 C081 ①): 상호 열쇠(cliNameKey — '(주)'·'㈜'·'주식회사'·띄어쓰기·영문 대소문자 무시)가 문서 제목 열쇠 또는 분류 열쇠 안에 들어 있는 문서함 문서(지운 문서 빼고).
+  //   열쇠가 3자 미만(1·2자 상호)이면 찾지 않는다(종전 글자째 부분 일치는 1자 상호가 이름이 들어간 다른 문서를 2·3건 잡았다). 제목·분류는 따로 맞춤(둘을 이어 붙인 경계에서 생기는 엉뚱한 일치 없게).
+  //   폰 옛 [상세 ›] 창(openCliDetail)은 cliRelatedDocs 그대로(옛 목록 글자째 유지)
+  var CLI_DOC_MINKEY = 3;
+  function cliSheetDocs(r){
+    var k = cliNameKey(r && r.name);
+    if (k.length < CLI_DOC_MINKEY || typeof documents === "undefined" || !documents) return [];
+    return documents.filter(function(d){ return d && d.del !== 1 && (cliNameKey(d.title).indexOf(k) >= 0 || cliNameKey(d.category).indexOf(k) >= 0); });
+  }
+  // 관련 문서 찾는 법 안내(탭 title·탭 안 첫 줄·빈 안내 — v451 C081 ①)
+  function cliSheetDocNote(r){ return cliNameKey(r && r.name).length < CLI_DOC_MINKEY ? "상호가 짧아(2자 이하) 관련 문서를 찾지 않습니다 — 문서함에서 직접 찾아보세요" : "문서함 제목·분류에 상호가 들어간 문서 — '(주)'·'㈜'·'주식회사'·띄어쓰기는 무시합니다"; }
   // 고른 하위 탭 — 다른 줄을 펼치면 첫 탭(개요)으로 · 권한이 바뀌어 없는 탭이면 첫 탭(메모리만)
   function cliSheetTabOf(r, tabs){
     var id = String(r.id), ok = function(k){ return tabs.some(function(t){ return t.k === k; }); };
@@ -25645,8 +25654,8 @@
       + '</tbody></table>';
   }
   function cliSheetDocTab(r){
-    var L = cliRelatedDocs(r), h;
-    if (!L.length) return '<div class="vs-empty">관련 문서 없음 — 상호 글자가 그대로 제목에 들어간 문서함 문서를 모읍니다(\'(주)\'·띄어쓰기가 다른 제목은 빠짐)</div>';
+    var L = cliSheetDocs(r), h;
+    if (!L.length) return '<div class="vs-empty">관련 문서 없음 — ' + esc(cliSheetDocNote(r)) + '</div>';
     h = '<div class="vs-dsub" style="margin:0 0 4px;">' + esc(cliSheetDocNote(r)) + '</div>'   // v441 검토: 늘 — 미수·계약과 찾는 법이 달라 같은 열쇠의 다른 거래처에 문서가 붙을 수 있음
       + '<table class="vs-hist"><thead><tr><th>문서번호</th><th>제목</th></tr></thead><tbody>'
       + L.slice(0, 12).map(function(d){ return '<tr><td>' + esc(d.no || "-") + '</td><td>' + esc(d.title || "-") + (d.category ? ' <span class="vs-dsub">' + esc(d.category) + '</span>' : '') + '</td></tr>'; }).join("") + '</tbody></table>';
@@ -26560,15 +26569,25 @@
   }
 
   // 거래처별 미수 집계(금액 큰 순, 경과 최대일)
-  function renderRecAging(unpaid){
+  //   v451(C081 ②) PC 표 갈래(linked): 거래처 탭과 같은 잇기 — cliResolve(공급받는자 번호 먼저, 없으면 상호 열쇠 · 두 10자리 번호가 다르면 안 붙임)로 대장 거래처에 묶고(이름 = 대장 상호),
+  //   대장에 안 이어진 줄은 상호 열쇠마다 한 묶음(이름 = 거래처 탭 '대장에 없는 이름' 줄과 같은 표기 — cliLinkIdx out). 같은 거래처의 건수·합이 거래처 탭 미수와 같아진다.
+  //   폰 옛 목록(legacy)은 종전 글자째 묶음 그대로
+  function recAgingKey(r, x){
+    var c = cliResolve(x, r.client, r.client_num), k, o;
+    if (c) return { k: "c:" + c.id, n: (c.name || "").trim() || "-" };
+    k = cliNameKey(r.client); if (!k) return { k: "-", n: "-" };
+    o = x.outBy["out:" + k];
+    return { k: "o:" + k, n: o ? o.name : String(r.client).trim() };
+  }
+  function renderRecAging(unpaid, linked){
     var host = document.getElementById("recAgingSummary");
     var tog = document.getElementById("recAgingToggle");
     if (!host || !tog) return;
     if (!unpaid.length){ tog.style.display = "none"; host.style.display = "none"; return; }
-    var by = {};
+    var by = {}, lx = linked ? (cliLinkReset(), cliLinkIdx()) : null;
     unpaid.forEach(function(r){
-      var k = (r.client || "-").trim();
-      if (!by[k]) by[k] = { client:k, sum:0, cnt:0, maxDays:0 };
+      var g = lx ? recAgingKey(r, lx) : null, k = g ? g.k : (r.client || "-").trim();
+      if (!by[k]) by[k] = { client: g ? g.n : k, sum:0, cnt:0, maxDays:0 };
       by[k].sum += (r.amount || 0); by[k].cnt++;
       var ag = recAging(r.billed); if (ag && ag.days > by[k].maxDays) by[k].maxDays = ag.days;
     });
@@ -26968,7 +26987,7 @@
     un = recSheetRows().filter(function(r){ return !r.paid; });
     un.forEach(function(r){ sum += Number(r.amount) || 0; });
     if (head) head.textContent = "미수 " + un.length + "건" + (sum ? " · " + recSheetMoney(sum) + "원" : "");
-    renderRecAging(un);   // 거래처별 미수 집계 — 보이는 미수 전부(표의 칩·검색과 무관 — 옛 목록은 검색어로 걸렀음)
+    renderRecAging(un, true);   // 거래처별 미수 집계 — 보이는 미수 전부, 거래처 탭과 같은 잇기(v451 C081 ②)(표의 칩·검색과 무관 — 옛 목록은 검색어로 걸렀음)
     recSheetDeleted();
   }
   // 검색칸 글 — 앞머리는 전역 검색(gsSources 기성 항목 + gsRun hay)이 보는 글과 같은 꼴(거래처 · 금액원 · 내역 · 수금 날짜/미수 · 상세 · 현장)이라 전역 검색에서 찾은 글자를 넣으면 그 기성이 표에도 걸린다.
