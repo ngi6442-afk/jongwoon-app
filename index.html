@@ -711,6 +711,23 @@
   .vs.vs-fit td.num{text-align:right;}
   .vs thead th.vs-ns{cursor:default;}
   .vs td.vs-none{position:static;text-align:center;color:var(--sub);}
+  /* v447 안전 › 체크 칸 — 칸 머리 두 줄 · 위험성평가 칸 '· 참여'(표시만) · 펼침 항목·이력 표 */
+  .edu-lead{font-size:13px;font-weight:700;color:var(--ink,#1F2A24);margin:-2px 0 2px;}
+  .edu-scope-line{font-size:12px;color:var(--sub);margin:0 0 8px;}
+  @media (max-width:859px){ #eduLead,#eduScopeLine{display:none;} }   /* v447 검토: 폰(phone legacy)은 지금 디자인 그대로 — 칸 이름만 새 이름(C063), 칸 머리 두 줄은 PC 표에만 */
+  .edu-join{font-size:11px;font-weight:400;color:var(--sub);}
+  .edu-dt{border-collapse:collapse;width:100%;max-width:1000px;font-size:12.5px;margin-top:8px;}
+  .edu-dt th,.edu-dt td{border-bottom:1px solid var(--line);padding:5px 8px;text-align:left;vertical-align:middle;}
+  .edu-dt th{background:#EFF5F2;color:var(--sub);font-weight:700;white-space:nowrap;}
+  .edu-dt td.vs-dan{background:#FBEAE8;color:#B0332A;font-weight:700;}
+  .edu-dt td.vs-warn{background:#FFF6E0;color:#8A5A00;font-weight:700;}
+  .edu-dt td.edu-basis{color:var(--sub);font-size:12px;}
+  /* 펼침 안 표는 바깥 .vs 표의 칸 규칙(.vs th·.vs td — 높이 32·한 줄·말줄임 · .vs thead th 머리 고정)을 물려받지 않게 되돌림 */
+  .vs .edu-dt th,.vs .edu-dt td{position:static;height:auto;white-space:normal;overflow:visible;text-overflow:clip;border-right:0;padding:5px 8px;cursor:default;}
+  .vs .edu-dt th{white-space:nowrap;background:#EFF5F2;}
+  .vs .edu-dt td{background:transparent;}
+  .vs .edu-dt td.vs-dan{background:#FBEAE8;}
+  .vs .edu-dt td.vs-warn{background:#FFF6E0;}
   .vs.vs-fit td .sel-box{display:inline-block;vertical-align:-4px;margin-right:6px;}   /* 숫자 칸·체크 상자는 새 표(.vs-fit)만 — 차량 표 번호 칸 체크(selBoxHtml)·계약 펼침 안 표는 v437 모양 그대로(v438 검토) */
   .vs tr.vs-det>td>.vs-det-in{max-width:100%;}   /* 펼침 폭 = 표 칸 폭(--vs-panew)과 표 폭 중 작은 쪽 — 계약(1,160)·차량(1,344) 표는 열 합에 묶여 넓은 창에서 표 칸보다 좁아, 펼침이 칸 overflow:hidden에 잘려 [닫기 ▲]·오른쪽 칸이 안 보였다(v438 검토) */
   .vs tr.vs-grp>td,.vs tr.vs-more>td{position:static;height:auto;padding:0;background:#F3F6F4;border-right:0;}
@@ -1120,7 +1137,7 @@
      틀(#app)은 탭과 무관하게 같은 폭이라 탭을 옮겨도 사이드바가 안 움직인다. 본문 = 창 − 233(860~1279: 여백 16·사이드바 168·간격 16) · 창 − 269(1280~1599: 여백 22·사이드바 184·간격 24) ·
      1600 이상은 #app 최대 1,680(본문 최대 1,428) — 창 폭은 세로 스크롤바 17px 포함(1024 창 791 · 1366 창 1,097 · 1920 창 1,428 — uismoke v438 ①이 이 CSS를 읽어 계산해 명세 width_plan.table과 대조).
      넓히는 화면은 id로만(section 태그·class 그대로 — uismoke가 '<section class="view" id=…>' 글자를 찾는다): v438은 계약·차량·권한관리 셋, v439에 지시·v440에 기성·v441에 거래처·v442에 일용직(표로 바꾼 판) — 입찰은 그 탭을 표로 바꾸는 판(v443)에서 더한다(옛 카드 목록이 1,428px로 늘어지지 않게). 나머지 화면은 808 그대로(사이드바 옆 왼쪽 정렬),
-     권한관리는 권한 표(#permRoster)만 넓고 그 밖 카드는 808. 안전(#view-safety)은 56 판(v445 — 현장 칸을 표로 바꾼 판)에서 넓히는 목록에 더했다 — 현황 #sfPaneNow는 808 그대로, 교육·검진 #sfPaneEdu도 옛 목록인 동안 808(v446 사람별 표 판에서 넓힘).
+     권한관리는 권한 표(#permRoster)만 넓고 그 밖 카드는 808. 안전(#view-safety)은 56 판(v445 — 현장 칸을 표로 바꾼 판)에서 넓히는 목록에 더했다 — 현황 #sfPaneNow는 808 그대로, 체크 칸 #sfPaneEdu는 사람별 표 판(v447)에서 넓힘.
      ★퀴즈 1번 대안('메뉴 자리 고정·본문만 오른쪽으로')을 고르시면 860 묶음 #app 줄 끝에 margin:0 0 0 max(0px, calc((100% - 1060px) / 2)); 하나만 더한다 — 1600 묶음 #app{max-width:1680px;}는 남긴다
        (margin-left가 100% 기준이라 상한을 남겨도 메뉴는 고정 · 지우면 2560 창 본문이 약 1,550으로 늘어 명세 why_1680과 어긋나고 계약·차량 펼침도 더 넓어짐)
        → 메뉴 왼쪽 끝이 1280 이상 창에서 지금(v437) 자리 그대로(1920 창 약 444px — 계획대로면 약 134px), 860~1279 창은 6px 왼쪽 · #app 오른쪽 끝이 창 약 2,317까지는 창 오른쪽(스크롤바 앞)이라 머리 줄 오른쪽 버튼(🔍·🔔·이름·⚙)도 그리로(1920 창 #app 오른쪽 끝 1,903 — 지금 1,482 · 계획 1,792 · 2560 창은 1,680 상한으로 2,422)
@@ -1132,7 +1149,8 @@
     .tabbar{width:168px;}
     .views>.view{max-width:808px;}
     #view-tasks,#view-rec,#view-cli,#view-workers,#view-bid,#view-con,#view-veh,#view-safety,#view-perm{max-width:none;}   /* v439 지시(#view-tasks) · v440 기성(#view-rec) · v441 거래처(#view-cli) · v442 일용직(#view-workers) · v443 입찰(#view-bid — 부동산 칸은 v444까지 옛 카드) · v445 안전(#view-safety — 현장 칸 표, 56 판)을 더함 */
-    #sfPaneNow,#sfPaneEdu,#view-perm>:not(#permRoster){max-width:808px;}   /* v445: 안전 탭은 현장 칸(표)만 넓고 현황·교육·검진(옛 목록 — v446 사람별 표 판에서 넓힘)은 808 */
+    #sfPaneNow,#view-perm>:not(#permRoster){max-width:808px;}   /* v445: 안전 탭은 현장 칸(표)만 넓고 현황은 808 · v447 체크 칸(#sfPaneEdu — 사람별 표)도 넓힘(칸 머리 두 줄·옛 대상 칩 줄은 아래 808) */
+    #eduLead,#eduScopeLine{max-width:808px;}
     #recAddCard,#recImportCard,#recAbCard,#recAgingSummary{max-width:808px;}   /* v440 기성: 표만 넓고, 머리 버튼으로 펼치는 카드 셋(청구 등록·홈택스 불러오기·운반 실적)·거래처별 미수 집계는 지금 읽기 폭 808 그대로 */
   }
   @media (min-width:1280px){
@@ -1705,8 +1723,8 @@
     <button class="link-btn" id="hrAddBtn">+ 직원 추가</button>
 
     <!-- v428: 교육·건강진단 이력(직원)은 안전 › 교육·검진 한 목록으로 옮겼다. 안내 줄은 교육·검진 칸을 볼 수 있는 사람에게만(applySafetyPerms). -->
-    <div class="hw-note" id="eduMovedHr" style="margin:22px 0 4px;display:none;">교육·건강진단 이력은 <b>안전 › 교육·검진</b>으로 옮겼습니다 — 직원·일용직을 한 목록에서 봅니다.
-      <button class="mini-btn" id="eduMovedHrBtn" data-go-tab="safety:edu:member" style="margin-left:6px;">안전 › 교육·검진 열기</button></div>
+    <div class="hw-note" id="eduMovedHr" style="margin:22px 0 4px;display:none;">교육·건강진단 이력은 <b>안전 › 체크</b> 칸으로 옮겼습니다 — 직원·일용직을 한 목록에서 봅니다.
+      <button class="mini-btn" id="eduMovedHrBtn" data-go-tab="safety:edu:member" style="margin-left:6px;">안전 › 체크 열기</button></div>
 
     <button class="link-btn" id="permMgmtBtn">🔑 권한관리</button>
     <button class="link-btn" id="famBtn">👪 가족친화 실적</button>
@@ -1751,7 +1769,7 @@
     <div class="lsub-bar" id="sfSubBar">
       <button class="lsub-btn" data-lsub="now" id="sfChipNow">현황</button>
       <button class="lsub-btn active" data-lsub="site" id="sfChipSite">현장</button>
-      <button class="lsub-btn" data-lsub="edu" id="sfChipEdu">교육·검진</button>
+      <button class="lsub-btn" data-lsub="edu" id="sfChipEdu">체크</button>
     </div>
     <!-- 현황(v432, 메뉴 56 5단계 — PM 11/9 "56. ㄱ" 브리핑 steps[4]): 안전 체크 26개 · 중처법 반기 점검 · 30일 기한 · 계약 안전 서류 · 인정·평가(v436 7단계 — 안전 설정 settings:safety, 관리자만 [고치기]) · 확인 필요를 한 화면에(v436 회사 구분은 회사별 인원 두 칸을 넣은 뒤 맨 위).
          읽기 전용 — 완료·입력 버튼은 없고 줄을 누르면 원래 자리(내 업무 · 안전 › 현장·교육·검진 · 인허가 의무 대장 · 계약 단계·서류 · 문서함 06)로 간다. 그리기는 renderSafetyNow(// @safety-now 구간) -->
@@ -1759,7 +1777,7 @@
     <div class="sec-hd">
       <button type="button" class="sec-hd-t" style="cursor:default;"><span>현황</span> <span class="cnt" id="sfNowHead"></span></button>
     </div>
-    <div class="sfn-note">읽기 전용입니다 — 완료·입력은 원래 자리(내 업무 · 안전 › 현장·교육·검진 · 인허가 · 계약 단계·서류)에서 합니다. 줄을 누르면 그 자리로 갑니다. 원래 자리가 따로 없는 안전 설정(KOSHA 인정 상태·회사별 인원)만 관리자가 ⑤의 [고치기]로 넣습니다.</div>
+    <div class="sfn-note">읽기 전용입니다 — 완료·입력은 원래 자리(내 업무 · 안전 › 현장 · 안전 › 체크 · 인허가 · 계약 단계·서류)에서 합니다. 줄을 누르면 그 자리로 갑니다. 원래 자리가 따로 없는 안전 설정(KOSHA 인정 상태·회사별 인원)만 관리자가 ⑤의 [고치기]로 넣습니다.</div>
     <div id="sfNowHost"><div class="loading">불러오는 중…</div></div>
     </div>
     <!-- 현장(석면·철거·준설) — 2026-09-10 인허가 탭에서 분리, v428 안전 탭 칸으로. 한 대장을 종류로 갈라 본다.
@@ -1773,12 +1791,15 @@
     <input type="search" id="siteSearch" placeholder="공사명·발주처·소재지 검색" autocomplete="off" style="width:100%;padding:9px 12px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;font-size:14px;box-sizing:border-box;">
     <div class="card" id="siteList"><div class="loading">불러오는 중…</div></div>
     </div>
-    <!-- 교육·검진 — 옛 인사·직원(직원)·인사·일용직(일용직) 두 목록을 대상 칩 하나로. 저장은 그대로 col:edu. -->
+    <!-- 체크(v447 — 옛 이름 '교육·검진', PM 11/12 '체크로'. 사이드바 '주기 체크' 탭과 다른 곳) — 옛 인사·직원(직원)·인사·일용직(일용직) 두 목록을 대상 칩 하나로(v428). 저장은 그대로 col:edu.
+         v447: PC(860px 이상)는 사람별 엑셀형 표(@edu-sheet 구간 — 자리 #eduList 그대로), 폰은 지금 이력 카드 목록(대상 칩 #eduScopeBar + renderEduInto). id·저장 키·이동 키('safety:edu:worker' 등)는 그대로 -->
     <div class="sf-pane" id="sfPaneEdu" style="display:none;">
     <div class="sec-hd">
-      <button type="button" class="sec-hd-t" style="cursor:default;"><span>교육·건강진단 이력</span> <span class="cnt" id="eduHead"></span></button>
+      <button type="button" class="sec-hd-t" style="cursor:default;"><span>체크</span> <span class="cnt" id="eduHead"></span></button>
       <button type="button" class="sec-hd-add" id="eduAddBtn">+ 이력 추가</button>
     </div>
+    <div class="edu-lead" id="eduLead">회사가 사람마다 챙길 법정 교육·검진·위험성평가 공유·참여</div>
+    <div class="edu-scope-line" id="eduScopeLine">범위: 산안법 교육·검진·위험성평가 공유·참여 — 화관법 교육은 화관법 탭</div>
     <div class="vs-tools" id="eduScopeBar">
       <button type="button" class="vs-chip on" data-edu-scope="member">직원</button>
       <button type="button" class="vs-chip" data-edu-scope="worker">일용직</button>
@@ -1818,8 +1839,8 @@
 
     <!-- v428: 교육·건강진단 이력(일용직)은 안전 › 교육·검진 한 목록으로 옮겼다. 비관리자에게 보이던 빈 이력 칸(저장도 서버가 막던 자리)은 없앴고,
          안내 줄은 교육·검진 칸을 볼 수 있는 사람에게만(applySafetyPerms). -->
-    <div class="hw-note" id="eduMovedWk" style="margin:22px 0 4px;display:none;">일용직 교육·건강진단 이력은 <b>안전 › 교육·검진</b>(일용직)으로 옮겼습니다.
-      <button class="mini-btn" id="eduMovedWkBtn" data-go-tab="safety:edu:worker" style="margin-left:6px;">안전 › 교육·검진 열기</button></div>
+    <div class="hw-note" id="eduMovedWk" style="margin:22px 0 4px;display:none;">일용직 교육·건강진단 이력은 <b>안전 › 체크</b> 칸(일용직)으로 옮겼습니다.
+      <button class="mini-btn" id="eduMovedWkBtn" data-go-tab="safety:edu:worker" style="margin-left:6px;">안전 › 체크 열기</button></div>
   </section>
 
   <!-- 권한관리 (인사 하위 · 관리자 전용) — 매트릭스: 셀 클릭마다 수행→보기→숨김 순환, 사람 단위 자동 저장 -->
@@ -2041,7 +2062,7 @@
     <select id="wkRole"><option value="반장">반장</option><option value="인부" selected>인부</option></select>
     <input type="text" id="wkPhone" placeholder="연락처" autocomplete="off">
     <!-- v442: 건강진단일 칸은 뺐다(운영 입력 0건 — 건강정보는 안전 권한 안에서만). 배치전·특수건강진단은 안전 › 교육·검진(일용직)에 적고, 해체계획서 ③ 건강진단은 그 기록에서 채운다(안전 권한) -->
-    <div class="hw-note" id="wkExamMoved" style="font-size:12px;display:none;">건강진단(배치전·특수) 날짜는 <b>안전 › 교육·검진</b>(일용직)에 적습니다 — 석면해체계획서 ③ 건강진단은 그 기록에서 채웁니다(안전 권한).</div>
+    <div class="hw-note" id="wkExamMoved" style="font-size:12px;display:none;">건강진단(배치전·특수) 날짜는 <b>안전 › 체크</b> 칸(일용직)에 적습니다 — 석면해체계획서 ③ 건강진단은 그 기록에서 채웁니다(안전 권한).</div>
     <input type="text" id="wkNote" placeholder="비고 (선택 — 교육이수 등)" autocomplete="off">
     <button class="primary" id="wkSave">저장</button>
     <button class="danger" id="wkDelete" style="display:none;">삭제</button>
@@ -2598,7 +2619,8 @@
 <div class="modal-backdrop" id="eduBackdrop">
   <div class="modal">
     <h3 id="eduModalTitle">교육·건강진단 이력</h3>
-    <span class="fld-label">대상</span>
+    <div id="eduBulkNote" class="hw-note" style="display:none;margin:0 0 8px;"></div><!-- v447 체크 칸 표 '같은 기록 넣기'(여럿) — 고른 사람 이름 -->
+    <span class="fld-label" id="eduPersonLabel">대상</span>
     <select id="eduPerson"></select>
     <span class="fld-label">종류</span>
     <select id="eduKind"></select>
@@ -2609,6 +2631,13 @@
     <span class="fld-label">다음 예정일</span>
     <input type="date" id="eduNext">
     <div id="eduNextNote" class="empty-line" style="margin:-2px 2px 8px;"></div>
+    <!-- v447 위험성평가 두 종류(참여·결과 공유)만 — 회차 표식(평가일·정기/수시/최초·부서/현장). 2차 '평가' 칸이 같은 줄을 회차로 묶어 읽는다(저장은 col:edu 한 곳) -->
+    <div id="eduRaBox" style="display:none;">
+      <span class="fld-label">평가 회차 — 평가일(비우면 위 날짜) · 구분(고르지 않으면 회차로 세지 않음) · 부서/현장(비우면 전사)</span>
+      <input type="date" id="eduRaOn">
+      <select id="eduRaType"><option value="">구분 고르기</option><option value="regular">정기</option><option value="adhoc">수시</option><option value="initial">최초</option></select>
+      <input type="text" id="eduRaUnit" placeholder="부서 또는 현장 — 비우면 전사 (예: 운영부 · 석면 #131)" maxlength="60" autocomplete="off">
+    </div>
     <input type="text" id="eduNote" placeholder="기관·비고 (선택)" autocomplete="off">
     <button class="primary" id="eduSave">저장</button>
     <button class="danger" id="eduDelete">삭제</button>
@@ -3024,7 +3053,7 @@
       · <b>수주</b>: 입찰 / 계약 / 견적서 / 홍보<br>
       · <b>업무</b>: 캘린더 / 차량 / 화관법 / 운반일지 / 안전 / 인허가 / 문서함<br>
       · <b>개인</b>: 물어보기 / 내 업무(내게 온 지시·내 할 일·주기 체크) / 휴가<br>
-      · 탭 안 칸: <b>입찰</b> = 공고 / 부동산, <b>안전</b> = 현황 / 현장 / 교육·검진(옛 현장 탭은 안전 › 현장, 옛 부동산 탭은 입찰 › 부동산 · 현황은 읽기 전용 — 완료는 원래 자리에서). 볼 수 있는 칸이 하나뿐이면 칸 줄 없이 바로 열립니다.<br><br>
+      · 탭 안 칸: <b>입찰</b> = 공고 / 부동산, <b>안전</b> = 현황 / 현장 / 체크(옛 현장 탭은 안전 › 현장, 옛 부동산 탭은 입찰 › 부동산 · 현황은 읽기 전용 — 완료는 원래 자리에서). 볼 수 있는 칸이 하나뿐이면 칸 줄 없이 바로 열립니다.<br><br>
       · 로그인: ⚙ → <b>아이디 + PIN</b>. 아이디를 아직 안 만들었으면 이름을 그대로 넣고, 로그인 뒤 ⚙ › <b>내 아이디 설정</b>. 회원 추가·수정과 기기 승인은 관리자가 <b>인사·직원</b> 탭의 직원 카드에서 합니다.<br>
       · 알림: 쓰는 기기마다 한 번 ⚙ → <b>🔔 이 기기 알림 켜기</b>. 안 켠 기기에는 아무 알림도 오지 않습니다.<br>
       · 휴가: 개인 › 휴가 › <b>+ 휴가 신청</b>(유형·기간·사유 필수) → 관리자 승인 → 연차·반차·반반차는 캘린더에 표시. 승인된 휴가는 <b>[취소 요청]</b>(끝난 휴가는 종료 뒤 3일까지)만 되고 관리자가 승인합니다. 📖 사용 안내 20절<br>
@@ -3075,6 +3104,13 @@
     <input type="date" id="meHire">
     <span class="fld-label">고용형태</span>
     <select id="meEmp"><option value="정규직">정규직</option><option value="계약직">계약직</option><option value="일용직">일용직</option><option value="아르바이트">아르바이트</option><option value="기타">기타</option></select>
+    <!-- v447 안전 › 체크 칸(사람별 표)이 쓰는 회원 칸 4개 — 서버 gw-auth 회원 저장(필드별 복사·감사 기록). 시험 계정 표식은 관리자만(인사 카드 자체가 관리자 전용 — 서버도 칸 앞에서 다시 봄) -->
+    <span class="fld-label">안전 › 체크 칸 기준</span>
+    <label class="dg-check"><input type="checkbox" id="meOffice"> 사무직 (정기교육 반기 6시간·일반건강진단 2년 — 표시가 없으면 그 밖 근로자: 반기 12시간·1년)</label>
+    <label class="dg-check"><input type="checkbox" id="meSupervisor"> 관리감독자 지정 (정기교육 연 16시간)</label>
+    <span class="fld-label">소속 회사</span>
+    <select id="meCorp"><option value="">(지정 안 함)</option><option value="env">종운환경</option><option value="con">종운건설</option></select>
+    <label class="dg-check" id="meTestWrap"><input type="checkbox" id="meTestAcct"> 시험 계정 (안전 › 체크 칸 표·빠진 항목·합계에서 뺌 — 다른 화면은 그대로)</label>
     <span class="fld-label">연차 부여 기준</span>
     <select id="meBasis"><option value="hire">입사일 기준</option><option value="fiscal">회계연도(1/1) 기준</option></select>
     <span class="fld-label">휴직 누적일수 (근속에서 제외)</span>
@@ -3440,6 +3476,7 @@
     cliLoaded = false; cliDirty = {};   // v441 검토: 비운 거래처 대장은 '아직 못 읽음'(빈 목록을 저장하지 않게 — loadClients가 200에서 다시 켬)
     wkLoaded = false;   // v442: 일용직 명부도 '아직 못 읽음'으로(loadWorkers가 200에서 다시 켬 — 빈 명부 저장 막음)
     wkPending = false; wkDirty = {}; wkEduSt = "";   // v442 검토: 저장 대기·이 기기에서 고친 줄 표시·③ 건강진단용 교육 기록 읽기 상태도 비움(다음 사람이 앞사람 표시로 합치거나 '읽음'으로 보지 않게)
+    eduLoaded = false; eduPending = false; eduSel = {};   // v447: 비운 체크 칸 기록은 '아직 못 읽음'(loadEdu가 200에서 다시 켬 — 빈 기록 + 새 1건이 서버 col:edu를 덮지 않게) · 저장 대기·표 선택도 비움
     bidsLoaded = false; bidsSaveHeld = false;   // v443: 비운 공고 목록은 '아직 못 읽음'(loadBids가 200에서 다시 켬 — 빈 목록 + 수동 등록 1건 저장이 서버 일감 문서를 덮지 않게)
     records = {};
     abStatus = null; abDay = { day: "", data: null, loading: false, error: "" }; abPresets = { items: null, loading: false, saving: false, error: "" };
@@ -6808,12 +6845,14 @@
   document.getElementById("asbStart").addEventListener("change", asbUpdateDerived);
   document.getElementById("asbEnd").addEventListener("change", asbUpdateDerived);
   document.getElementById("asbKind").addEventListener("change", asbKindApply);   // v445 종류 칸 — 창 제목·석면 칸 4개·안내 글을 그 자리에서 바꿈(저장은 [저장] 때)
-  document.getElementById("eduAddBtn").addEventListener("click", function(){ openEdu(null, eduViewScope); });   // v428 두 버튼(직원·일용직) → 안전 › 교육·검진 한 버튼(고른 대상 칩)
+  document.getElementById("eduAddBtn").addEventListener("click", function(){ openEdu(null, eduAddScope()); });   // v428 두 버튼(직원·일용직) → 안전 › 체크 칸 한 버튼(고른 대상 칩) · v447 PC 표면 표의 대상 칩(일용직이면 일용직, 그 밖 직원 — eduAddScope)
   document.getElementById("eduSave").addEventListener("click", saveEdu);
   document.getElementById("eduDelete").addEventListener("click", deleteEdu);
   document.getElementById("eduCancel").addEventListener("click", closeEdu);
   document.getElementById("eduKind").addEventListener("change", function(){ eduUpdateNotes(); eduAutoNext(); });
   document.getElementById("eduDate").addEventListener("change", eduAutoNext);
+  document.getElementById("eduPerson").addEventListener("change", function(){ if (/^(gen_med|regular|super)$/.test(document.getElementById("eduKind").value)) eduAutoNext(); });   // v447 일반건강진단 다음 예정 = 대상의 사무직 표식(24·12개월) · 검토: 정기교육은 그 사람의 반기(연) 누적 시간
+  document.getElementById("eduHours").addEventListener("change", function(){ if (/^(regular|super)$/.test(document.getElementById("eduKind").value)) eduAutoNext(); });   // v447 검토 — 시간을 날짜 뒤에 넣어도 정기교육 다음 예정이 누적 시간으로
   // v436 현황 ⑤ [고치기](관리자에게만 그려짐 — 버튼 글은 @safety-now 구간 sfNowEval) — 칸을 다시 그려도 그대로 듣게 #sfNowHost에 한 번 위임. 창·저장은 @safety-set 구간
   document.getElementById("sfNowHost").addEventListener("click", function(e){
     var t = e.target;
@@ -8490,7 +8529,7 @@
         '</div>' };
       }).concat(eduHome.map(function(x){ return { d: x.dd.diff, h: sfNowHomeEduRow(x) }; }));
       dueMix.sort(function(a, b){ return a.d - b.d; });
-      html += '<div class="dash-sec"><h2>인허가·보수교육 만기' + (eduHome.length ? ' · 교육·검진' : '') + ' <span class="cnt">' + dueMix.length + '</span></h2><div class="card">';
+      html += '<div class="dash-sec"><h2>인허가·보수교육 만기' + (eduHome.length ? ' · 안전 › 체크' : '') + ' <span class="cnt">' + dueMix.length + '</span></h2><div class="card">';
       html += dueMix.map(function(x){ return x.h; }).join("");
       html += '</div></div>';
     }
@@ -10284,17 +10323,17 @@
     [eduLatest("worker", w.id, "pre_med"), eduLatest("worker", w.id, "spec_med")].forEach(function(r){ if(r && isDate(r.date) && r.date>d) d=r.date; });
     return d;
   }
-  function wkExamNote(){ return canSee("safety") ? "③ 건강진단(유무·검진일)은 안전 › 교육·검진 기록(배치전·특수건강진단 가장 최근 날짜)으로 채웁니다 — 기록이 없는 사람은 빈칸" : "③ 건강진단(유무·검진일)은 빈칸으로 둡니다 — 안전 담당 확인(건강진단 기록은 안전 권한)"; }
+  function wkExamNote(){ return canSee("safety") ? "③ 건강진단(유무·검진일)은 안전 › 체크 칸 기록(배치전·특수건강진단 가장 최근 날짜)으로 채웁니다 — 기록이 없는 사람은 빈칸" : "③ 건강진단(유무·검진일)은 빈칸으로 둡니다 — 안전 담당 확인(건강진단 기록은 안전 권한)"; }
   // [생성] 확인요망 한 줄 — 고른 투입 인력이 있을 때만: 안전 권한이 없으면 '빈칸 — 안전 담당 확인', 교육·검진 기록을 아직 못 읽었으면 '아직 못 읽어 빈칸'(검토 반영 — 종전엔 기록이 있어도 '기록이 없는 사람 n명'),
   //   있으면 ③ 칸에 들어가는 사람(xgBuildEdits와 같은 순서 — 반장 먼저·이름 — 앞 12명, 13명째부터는 양식에 안 들어감) 중 기록이 없는 사람 수(없으면 빈 글)
   function wkExamMissing(ws){
     var n=0, L;
     if(!ws || !ws.length) return "";
     if(!canSee("safety")) return "③ 건강진단(유무·검진일) — 빈칸, 안전 담당 확인(건강진단 기록은 안전 권한)";
-    if(wkEduSt!=="ok") return "③ 건강진단(유무·검진일) — 교육·검진 기록을 아직 읽지 못해 빈칸입니다(잠시 뒤 다시 [생성]하면 기록으로 채웁니다)";
+    if(wkEduSt!=="ok") return "③ 건강진단(유무·검진일) — 안전 › 체크 칸 기록을 아직 읽지 못해 빈칸입니다(잠시 뒤 다시 [생성]하면 기록으로 채웁니다)";
     L=ws.slice().sort(function(a,b){ return ((a.role==="반장"?0:1)-(b.role==="반장"?0:1)) || (a.name||"").localeCompare(b.name||""); }).slice(0,12);
     L.forEach(function(w){ if(!wkExamDate(w)) n++; });
-    return n ? "③ 건강진단 기록이 없는 사람 "+n+"명 — 빈칸(안전 › 교육·검진에서 확인)" : "";
+    return n ? "③ 건강진단 기록이 없는 사람 "+n+"명 — 빈칸(안전 › 체크에서 확인)" : "";
   }
   // v442 검토: ③ 건강진단에 쓰는 교육·검진 기록 읽기 — 석면해체계획서를 고를 때만(xgToggle)·[생성] 때 못 읽었으면 다시, 이 세션에서 한 번(종전 v442 초안은 xgPrefill이 서류 종류와 상관없이
   //   생성 창을 열 때마다·계약 패킷 서류마다 다시 읽었다 — 운영은 교육 기록 키가 없어 늘 비어 있으므로 매번 읽고 안전 탭·캘린더·현장·홈까지 다시 그렸다).
@@ -14944,7 +14983,7 @@
     return Object.keys(byId).map(function(k){ return byId[k]; });
   }
   // v432: 읽기 결과를 돌려준다(성공 true · 실패 false — 안전 › 현황이 '불러오지 못함'을 그 블록에만 쓰려고). 부르는 쪽이 안 받으면 종전과 같다.
-  //   opt.noHooks = 현황이 부를 때 — 보류된 계약 연결·종결(csSiteHooksRetry → csSiteDone, 대장·계약 저장이 날 수 있음)을 돌리지 않는다(현황은 읽기만). 현장 칸·계약 쪽 읽기는 종전대로 돌린다
+  //   opt.noHooks = 현황·체크 칸(v447 검토)이 부를 때 — 보류된 계약 연결·종결(csSiteHooksRetry → csSiteDone, 대장·계약 저장이 날 수 있음)을 돌리지 않는다(현황은 읽기만). 현장 칸·계약 쪽 읽기는 종전대로 돌린다
   function loadAsb(opt){
     if(!canSee("site")) return;   // v429: 현장 대장 = 현장 권한(서버 col:asbestos도 site — 인허가 lic만 있으면 403). 종전 lic 판정이라 현장 권한만 있는 사람은 목록이 비었다
     return gwCall("gw-data",{action:"get",collection:"asbestos"}).then(function(res){
@@ -15017,7 +15056,7 @@
   // 줄 넷(종결 현장·투입 인원이 없는 현장은 줄 없음 — 종전과 같음). 투입 인원 = '참여 근로자' 줄과 같은 풀이(asbWorkerNames — 지운 회원·지운 일용직·토큰은 사람 아님, v433 검토);
   //   일용직 권한이 없는 분은 명부를 안 읽어 일용직을 못 푸니 worker_ids가 있으면 있는 것으로 본다(서버가 일용직은 수만 준다).
   //   ① 안전 권한 = 종전처럼 앱이 교육 기록으로 계산한 이름(asbNoSpecial — 없으면 줄 없음 · 교육 기록이 0건이면 투입 인원 전원)
-  //   ② 교육 기록 0건(서버 has_edu false) = '교육 기록 없음 — 이수 여부 미확인'
+  //   ② 특별교육 기록 0건(서버 has_edu false — v447부터 special 종류만) = '특별교육 기록 없음 — 이수 여부 미확인'
   //   ③ 답을 못 씀 = 이 세션 첫 답 전 '확인 중'(경고 아님) · 물음 실패 '확인 못 함 — 현장 칸을 다시 열면 다시 확인합니다' ·
   //      답이 판정한 대장과 화면 줄의 투입 인원이 다름(저장 전 변경·저장 실패) '확인 못 함 — 바뀐 투입 인원은 저장된 뒤 다시 확인합니다' — 어느 쪽도 전원을 미이수로 그리지 않는다
   //   ④ 그 밖 = 서버가 준 이름(일용직 권한이 없으면 일용직은 이름 없이 '일용직 n명' — 서버 wk_n), 없으면 '미이수 없음'
@@ -15030,7 +15069,7 @@
       var g = siteEduGap, id = String(r.id);
       if (g === undefined) return sheetRow("특별교육", "확인 중");
       if (!g) return sheetRow("특별교육", "확인 못 함 — 현장 칸을 다시 열면 다시 확인합니다", "warn");
-      if (!g.has_edu) return sheetRow("특별교육", "교육 기록 없음 — 이수 여부 미확인", "warn");
+      if (!g.has_edu) return sheetRow("특별교육", "특별교육 기록 없음 — 이수 여부 미확인", "warn");   // v447 검토 2: has_edu = 특별교육(special) 기록 유무(v447) — 다른 종류 기록이 있어도 '교육 기록 없음'이라 하지 않게
       if (!Object.prototype.hasOwnProperty.call(siteEduGapSig, id) || siteEduGapSig[id] !== siteGapSig(r)) return sheetRow("특별교육", "확인 못 함 — 바뀐 투입 인원은 저장된 뒤 다시 확인합니다", "warn");
       var n = (g.gaps && Object.prototype.hasOwnProperty.call(g.gaps, id)) ? g.gaps[id] : null;
       if (!Array.isArray(n)) return sheetRow("특별교육", "확인 못 함 — 현장 칸을 다시 열면 다시 확인합니다", "warn");
@@ -15346,7 +15385,7 @@
   function siteEduNone(r){
     if (!r || r.status === "done" || !canSee("safety")) return null;
     if (asList(r.worker_ids).length && !(canSee("wk") && wkLoaded)) return canSee("wk") ? { k: "wait", n: 0, t: "확인 중", cls: "", tip: "일용직 명부를 읽는 중 — 읽은 뒤 일용직까지 판정합니다" } : null;
-    return asbWorkerNames(r).length ? { k: "ok", n: 0, t: "미이수 없음", cls: "", tip: "투입 인원 모두 유효한 특별교육 기록이 있습니다(안전 › 교육·검진 기준)" } : null;
+    return asbWorkerNames(r).length ? { k: "ok", n: 0, t: "미이수 없음", cls: "", tip: "투입 인원 모두 유효한 특별교육 기록이 있습니다(안전 › 체크 칸 기록 기준)" } : null;
   }
   function siteEduSum(r){
     var line = siteEduLine(r), m, t, n;
@@ -15357,7 +15396,7 @@
     if (n) return { k: "miss", n: Number(n[1]), t: "미이수 " + n[1] + "명", cls: "vs-warn", tip: t };
     if (t === "미이수 없음") return { k: "ok", n: 0, t: t, cls: "", tip: "투입 인원 모두 유효한 특별교육 기록이 있습니다" };
     if (t.indexOf("확인 중") === 0) return { k: "wait", n: 0, t: "확인 중", cls: "", tip: "서버 답을 기다리는 중 — 곧 바뀝니다" };
-    if (t.indexOf("교육 기록 없음") === 0) return { k: "norec", n: 0, t: "기록 없음", cls: "vs-warn", tip: t };
+    if (t.indexOf("특별교육 기록 없음") === 0) return { k: "norec", n: 0, t: "기록 없음", cls: "vs-warn", tip: t };
     if (t.indexOf("확인 못 함") === 0) return { k: "fail", n: 0, t: "확인 못 함", cls: "vs-warn", tip: t };
     return { k: "etc", n: 0, t: t || "-", cls: "", tip: t };
   }
@@ -15855,7 +15894,7 @@
   // ① 이번 주기 안전 점검 — 26개 중 이 사람에게 공개된 항목(내 업무와 같은 checkItemVisible)
   function sfNowChecks(){
     var T = "① 이번 주기 안전 점검", st = sfNowColSt("checklist", Object.keys(records || {}).length > 0);
-    if (st !== "ok") return { h: sfNowBlock("check", T, "", "내 업무 안전 항목", sfNowWaitRow("체크", "주기 체크 기록", st, true), ""), pend: st === "wait" };
+    if (st !== "ok") return { h: sfNowBlock("check", T, "", "내 업무 안전 항목", sfNowWaitRow("주기", "주기 체크 기록", st, true), ""), pend: st === "wait" };   // v447 검토: 줄 표식 '주기'(칩 '체크' = 안전 › 체크 칸과 섞이지 않게)
     var rows = [], n = { ok: 0, am: 0, bad: 0, plan: 0, su: 0 };
     SF_NOW_CHECK.forEach(function(id, ord){
       var f = sfNowItem(id);
@@ -15876,15 +15915,25 @@
   function sfNowJcb(){
     var T = "② 중처법 반기 점검", st = sfNowColSt("checklist", Object.keys(records || {}).length > 0), hk = String(CURRENT_KEYS.half);
     var per = hk.slice(0, 4) + (hk.slice(-1) === "1" ? " 상반기" : " 하반기"), src = "중대재해처벌법 시행령 제4조 · 제5조②";
-    if (st !== "ok") return { h: sfNowBlock("jcb", T, per, src, sfNowWaitRow("체크", "주기 체크 기록", st, true), ""), pend: st === "wait" };
-    var rows = [];
+    if (st !== "ok") return { h: sfNowBlock("jcb", T, per, src, sfNowWaitRow("주기", "주기 체크 기록", st, true), ""), pend: st === "wait" };   // v447 검토: 줄 표식 '주기'
+    var rows = [], eRow = "", eAt = -1;
+    // v447 5조②1·2(법령 의무이행 점검)·3·4(교육 실시 점검) 줄에 잇는 한 줄 — 안전 › 체크 칸 표의 빠진 항목 수(같은 셈 eduSheetMissSum · 읽기만). 누르면 체크 칸(대상 전체·빠진 항목 있음 — 'edu:miss')
+    //   v447 검토: 현장 권한이면 현장 대장도 받은 뒤에만 센다(받기 전·실패면 표의 배치 전 칸이 회색 '확인 중'이라 빠짐으로 안 세져 '없음'으로 보고되던 것) · 판정 불가·확인 중 칸 수도 함께
+    //   v447 검토 2: 자리 = 5조②1·2 줄 바로 뒤(없으면 5조②3·4 뒤, 둘 다 없으면 맨 끝 — 2·6호 아래에 붙어 그 줄에 딸린 것처럼 읽히지 않게)
+    if (canSee("safety")){
+      var es2 = sfNowLd(sfNowSt.edu), ms2, as2 = canSee("site") ? sfNowLd(sfNowSt.asb) : "ok", nd2;
+      if (es2 === "ok" && as2 === "ok"){ ms2 = eduSheetMissSum(); nd2 = ms2.nd || 0; eRow = sfNowRow("5조②", "사람별 교육·검진·위험성평가 공유 — 안전 › 체크 빠진 항목", (ms2.items ? "빠진 항목 " + ms2.items + "개 · " + ms2.people + "명 — 체크 칸 표와 같은 셈('근거 확인 중'은 세지 않음) · 5조②1·2·3·4 점검 때 함께 보기" : "체크 칸 표에 빠진 항목이 없습니다('근거 확인 중'은 세지 않음)") + (nd2 ? " · 판정 불가·확인 중 " + nd2 + "칸(세지 않음)" : ""), ms2.items ? "빠짐 " + ms2.items : (nd2 ? "판정 불가 " + nd2 : "없음"), (ms2.items || nd2) ? "am" : "ok", "edu:miss"); }
+      else eRow = sfNowWaitRow("5조②", es2 === "ok" ? "안전 › 체크 빠진 항목 — 현장 대장을 받은 뒤 셈(배치 전 항목)" : "안전 › 체크 빠진 항목", es2 === "ok" ? as2 : es2);
+    }
     SF_NOW_JCB.forEach(function(x){
-      if (!x.id){ rows.push(sfNowRow(x.no, x.t, x.m, x.p, x.pc, "")); return; }
+      if (!x.id){ rows.push(sfNowRow(x.no, x.t, x.m, x.p, x.pc, "")); if (x.no === "5조②1·2" || (x.no === "5조②3·4" && eAt < 0)) eAt = rows.length; return; }
       var f = sfNowItem(x.id);
       if (!f || !checkItemVisible(x.id)) return;
       var s = sfNowState(f.type, x.id, f.it.title);
       rows.push(sfNowRow(x.no, x.t, x.id + " " + f.it.title + (x.m ? " · " + x.m : ""), s.t, s.c, "check:" + x.id));
+      if (x.no === "5조②1·2" || (x.no === "5조②3·4" && eAt < 0)) eAt = rows.length;
     });
+    if (eRow) rows.splice(eAt < 0 ? rows.length : eAt, 0, eRow);
     return { h: sfNowBlock("jcb", T, per, src, rows.join(""), "진행 표시입니다. 완료 기록에 날짜만 남아 시행령 제13조 이행 서면(5년 보관)으로 쓰기에는 약하므로 3차 시안에서 보강합니다."), pend: false };
   }
   // ③ — 교육·검진 다음 예정이 오늘+days 안(지난 것 포함). 현황 ③·관리자 홈 만기 목록이 같이 쓴다(읽기만).
@@ -15925,7 +15974,7 @@
     return '<div class="item veh-item" data-inbox-go="' + go + '" style="cursor:pointer;">' +
       '<div class="item-body">' +
         '<div class="item-title">' + esc(sfNowEduName(r)) + ' · ' + esc(eduKindLabel(r.kind)) + '</div>' +
-        '<div class="item-meta"><span>다음 예정 ' + esc(r.next) + '</span><span class="own-badge self">' + (r.ptype === "worker" ? "일용직" : "직원") + ' · 교육·검진</span></div>' +
+        '<div class="item-meta"><span>다음 예정 ' + esc(r.next) + '</span><span class="own-badge self">' + (r.ptype === "worker" ? "일용직" : "직원") + ' · 안전 › 체크</span></div>' +
       '</div>' +
       '<div class="task-ctrl"><span class="dday' + (x.dd.cls ? ' ' + x.dd.cls : '') + '">' + x.dd.text + '</span></div>' +
     '</div>';
@@ -15972,10 +16021,10 @@
             if (isDate(due) && due <= lim && (due >= today || r.status === "plan")){ dd = vehDday(due); dated.push({ d: dd.diff, h: sfNowRow("현장", nm + " · 석면 작업신고 마감", "착수 " + r.start + " 7일 전 신고 · 마감 " + due, dd.diff < 0 ? "지남" : dd.text, dd.diff <= 7 ? "bad" : "am", sfNowSiteGo(r)) }); }
           }
           if (r.status !== "done" && es === "ok"){
-            ns = asbNoSpecial(r);   // 현장 칸과 같은 판정(교육·검진 기록 기준)
-            if (ns.length) other.push(liveEdu().length
+            ns = asbNoSpecial(r);   // 현장 칸과 같은 판정(안전 › 체크 칸 기록 기준)
+            if (ns.length) other.push(eduAnySpecial()   // v447: 특별교육 기록이 1건이라도 있나(서버 has_edu와 같은 규칙 — 새 종류 기록만 있으면 '기록 없음' 그대로)
               ? sfNowRow("현장", nm + " · 특별교육 미이수", ns.slice(0, 5).join(", ") + (ns.length > 5 ? " 외 " + (ns.length - 5) + "명" : "") + " — 배치 전 이수 필요", ns.length + "명", "am", sfNowSiteGo(r))
-              : sfNowRow("현장", nm + " · 특별교육", "교육·검진 기록이 0건이라 투입 " + ns.length + "명 모두 이수 여부 미확인", "기록 없음", "", sfNowSiteGo(r)));
+              : sfNowRow("현장", nm + " · 특별교육", "특별교육 기록이 0건이라 투입 " + ns.length + "명 모두 이수 여부 미확인", "기록 없음", "", sfNowSiteGo(r)));
           }
           if (k === "asbestos" && isDate(r.end) && r.end <= today && r.end >= past && !String(r.conc || "").trim()) other.push(sfNowRow("현장", nm + " · 완료 후 석면농도 미입력", "작업 종료 " + r.end + " · 1㎤당 0.01개 이하 확인·보고", "미입력", "am", sfNowSiteGo(r)));
           keep = k === "asbestos" ? asbKeepUntil(r) : "";
@@ -15984,11 +16033,11 @@
         if (bad) notes.push(sfNowRow("현장", "현장 대장 기록 " + bad + "건을 읽지 못했습니다", "안전 › 현장에서 그 기록을 확인하세요", "확인 필요", "bad", "site"));
       } else { notes.push(sfNowWaitRow("현장", "현장 대장", as)); if (as === "wait") pend = true; }
     }
-    src.push("교육·검진");
+    src.push("안전 › 체크");
     if (es === "ok"){
-      if (!liveEdu().length) notes.push(sfNowRow("교육", "교육·검진 다음 예정", "첫 입력 전에는 계산할 날짜가 없습니다", "기록 없음", "", "edu:member"));
+      if (!liveEdu().length) notes.push(sfNowRow("교육", "체크 칸 다음 예정", "첫 입력 전에는 계산할 날짜가 없습니다", "기록 없음", "", "edu:member"));
       else sfNowEduDue(30).forEach(function(x){ var r = x.r, w = r.ptype === "worker"; dated.push({ d: x.dd.diff, h: sfNowRow("교육", sfNowEduName(r) + " · " + eduKindLabel(r.kind), "다음 예정 " + r.next + " · " + (w ? "일용직" : "직원"), x.dd.diff < 0 ? "기한 경과" : x.dd.text, x.dd.diff < 0 ? "bad" : (x.dd.diff <= 7 ? "am" : ""), w ? "edu:worker" : "edu:member") }); });
-    } else { notes.push(sfNowWaitRow("교육", "교육·검진 기록", es)); if (es === "wait") pend = true; }
+    } else { notes.push(sfNowWaitRow("교육", "체크 칸 기록", es)); if (es === "wait") pend = true; }
     var duty = { h: "", pend: false };
     if (see.lic){ src.push("인허가 의무 대장"); duty = sfNowDutyPart(); if (duty.pend) pend = true; }
     dated.sort(function(a, b){ return a.d - b.d; });
@@ -16119,9 +16168,9 @@
       [(q ? "앱 적격 계산 등급은 아직 " + q : ""), dq[16] ? "통보서를 반영할 때 입찰 카드·의무 대장 16행까지 한 번에 고칩니다" : "통보서를 반영할 때 함께 고칩니다", dq[16] ? "다음 평가 시기(의무 대장 16행): " + (dq[16].cycle || "") : ""].filter(Boolean).join(" · "),
       [sfNowPill(SF_NOW_ASB_EVAL.t + " · 앱 반영 대기", "am")], dq[16] ? "duty" : ""));
     if (es === "ok"){
-      if (!liveEdu().length){ mp = sfNowPill("기록 없음", ""); mm = "교육·검진 기록을 넣기 전에는 이수자를 셀 수 없습니다"; }
-      else { mg = sfNowEduMgr(); mp = sfNowPill("관리자교육 " + mg.n + "/2명", mg.n >= 2 ? "ok" : "am"); mm = "교육·검진의 석면해체·제거관리자교육 이수 직원(사람 수 — 자격 요건은 따로 확인)" + (mg.w ? " · 일용직 이수자 " + mg.w + "명은 세지 않음(전담 인력에 넣을지는 따로 확인)" : ""); }
-    } else { mp = sfNowPill(es === "wait" ? "확인 중" : "불러오지 못함", es === "wait" ? "" : "bad"); mm = es === "wait" ? "교육·검진 기록을 읽는 중" : "교육·검진 기록 — 현황 칸을 다시 열면 새로 읽습니다"; if (es === "wait") pend = true; }
+      if (!liveEdu().length){ mp = sfNowPill("기록 없음", ""); mm = "안전 › 체크 칸 기록을 넣기 전에는 이수자를 셀 수 없습니다"; }
+      else { mg = sfNowEduMgr(); mp = sfNowPill("관리자교육 " + mg.n + "/2명", mg.n >= 2 ? "ok" : "am"); mm = "안전 › 체크 칸의 석면해체·제거관리자교육 이수 직원(사람 수 — 자격 요건은 따로 확인)" + (mg.w ? " · 일용직 이수자 " + mg.w + "명은 세지 않음(전담 인력에 넣을지는 따로 확인)" : ""); }
+    } else { mp = sfNowPill(es === "wait" ? "확인 중" : "불러오지 못함", es === "wait" ? "" : "bad"); mm = es === "wait" ? "안전 › 체크 칸 기록을 읽는 중" : "안전 › 체크 칸 기록 — 현황 칸을 다시 열면 새로 읽습니다"; if (es === "wait") pend = true; }
     rows.push(sfNowRowP("등록", esc("석면해체·제거업 등록기준 — 전담 인력 2명 · 장비 6종"), mm + " · 장비 6종: " + SF_NOW_EQUIP + " — 인력이 바뀌면 다시 확인", [mp], ""));
     [17, 18].forEach(function(no){ var d = dq[no]; if (d) rows.push(sfNowRow(no + "행", d.duty || "", [d.lic, d.cycle].filter(Boolean).join(" · "), "주기 문구", "", "duty")); });
     bm = sfSetBy ? findMember(sfSetBy) : null;
@@ -16164,7 +16213,7 @@
     var s = String(v || ""), i = s.indexOf(":"), k = i < 0 ? s : s.slice(0, i), a = i < 0 ? "" : s.slice(i + 1);
     if (k === "check"){ switchTab("check"); if (!sfNowScrollTo("#listHost .item", "data-id", a) && !(/^su\d/.test(a) && sfNowScrollSudsi(a))) sfNowTop(); return; }   // 수시 항목은 내 업무 '수시' 칸(#sudsiHost)에 있다
     if (k === "site"){ switchTab("safety:site"); if (!(a && siteSheetGo(a))) sfNowTop(); return; }   // v445: 'site:<현장 id>' = PC 표면 그 줄을 펼치고 굴림(@site-sheet 구간의 이어받기 siteSheetGo — 가린 칩·거르기·묶음만 이번에 풂, 기기 저장 없음) · 폰 옛 목록·못 찾으면 맨 위(종전)
-    if (k === "edu"){ if (a === "worker") switchTab("safety:edu:worker"); else switchTab("safety:edu:member"); sfNowTop(); return; }
+    if (k === "edu"){ if (a === "worker" || a === "miss") switchTab("safety:edu:" + a); else switchTab("safety:edu:member"); sfNowTop(); return; }   // v447 검토 2 'edu:miss' = ② 5조② 줄(체크 칸 대상 전체 · 빠진 항목 있음)
     if (k === "duty"){ switchTab("lic"); setLicLayer("duty"); sfNowTop(); return; }
     if (k === "con"){
       var c = findProc(a);
@@ -16343,15 +16392,34 @@
   // 다음 예정일을 만들면 있지도 않은 만기를 만드는 셈이 된다.
   var EDU_KINDS = [
     { k:"special",   n:"석면 특별교육",         months:0,  hint:"배치 전 1회. 상용직 16시간(최초 4h+12h는 3개월 내 분할), 단기간·간헐적 작업이나 일용직은 2시간" },
-    { k:"regular",   n:"정기교육(근로자)",       months:6,  hint:"매반기 12시간 이상(비사무직)" },
-    { k:"super",     n:"정기교육(관리감독자)",   months:12, hint:"연간 16시간 이상 — 근로자와 달리 연 단위" },
+    { k:"regular",   n:"정기교육(근로자)",       months:6,  hint:"매반기 — 사무직 6시간·그 밖 12시간 이상(감면 없음 기준 — 체크 칸 표의 반기 진도와 같은 기준). 다음 예정은 그 반기 누적 시간이 기준에 못 미치면 그 반기 말일, 채우면 다음 반기 말일" },
+    { k:"super",     n:"정기교육(관리감독자)",   months:12, hint:"연간 16시간 이상(감면 없음 기준 — 체크 칸 표의 관리감독자 올해 진도) — 근로자와 달리 연 단위. 다음 예정은 그해 누적이 16시간에 못 미치면 그해 12-31, 채우면 다음 해 12-31" },
     { k:"manager",   n:"석면해체·제거관리자교육", months:0,  hint:"신규 18시간(이론10·실습8). 현행 고시에 보수교육 조항 없음 — 인력 교체 시 후임자만 이수" },
     { k:"pre_med",   n:"배치전건강진단",         months:0,  hint:"배치 전 실시. 다른 사업장에서 12개월 내 받았고 개인표를 내면 면제" },
-    { k:"spec_med",  n:"특수건강진단",           months:12, hint:"배치 후 12개월 이내 최초, 이후 12개월마다. 노출기준 초과 등에 해당하면 다음 회에 한해 6개월" }
+    { k:"spec_med",  n:"특수건강진단",           months:12, hint:"배치 후 12개월 이내 최초, 이후 12개월마다. 노출기준 초과 등에 해당하면 다음 회에 한해 6개월" },
+    // v447(56 판 — 안전 › 체크 칸 사람별 표): 새 종류 7개. 행 모양은 그대로(ptype·pid·kind·date·hours·next·note) — 위험성평가 두 줄(ra_join·ra_share)만 회차 표식 ra{on 평가일·type 정기|수시|최초·unit 부서/현장}을 더 적는다.
+    //   주기 없는 종류(months 0)는 다음 예정을 만들지 않는다. 일반건강진단은 사무직 24개월(eduAutoNext가 대상의 사무직 표식으로).
+    { k:"hire",      n:"채용 시 교육",           months:0,  hint:"채용·투입 전 1회(일용근로자 1시간 이상 — 산안법 시행규칙 별표4). 건설업 기초안전보건교육 이수자는 체크 칸 표에서 '면제'로 봅니다. 직원은 근거 확인 중" },
+    { k:"change",    n:"작업내용 변경 시 교육",  months:0,  hint:"작업내용을 바꿀 때 1회(일용근로자 1시간·그 밖 2시간 이상 — 별표4). 변경 시점은 앱에 자료가 없어 표에서는 기록만 보여 줍니다" },
+    { k:"basic_con", n:"건설업 기초안전보건교육", months:0, hint:"건설 일용근로자 — 건설 현장 첫 투입 전 1회(4시간 — 별표4). 한 번 이수하면 다시 받지 않고, 이수자는 채용 시 교육 면제" },
+    { k:"gen_med",   n:"일반건강진단",           months:12, hint:"사무직 2년마다·그 밖 1년마다(체크 칸 표는 회원 '사무직' 표식으로 — 표식이 없으면 1년). 날짜·실시 여부만 적고 결과는 넣지 않습니다" },
+    { k:"ra_join",   n:"위험성평가 참여",         months:0,  hint:"위험성평가에 참여한 날 — 표에서는 표시만(판정 안 함). 아래 회차 표식(평가일·정기/수시/최초·부서/현장)을 함께 적습니다" },
+    { k:"ra_share",  n:"위험성평가 결과 공유",    months:0,  hint:"위험성평가 결과·조치를 알린 날 — 표는 올해 정기·최초 회차(평가일 — 전사 또는 그 사람 부서) 뒤 기록이 있으면 ✓(회차가 없으면 올해 기록), 없으면 노랑 '기록 없음'(공유 기한은 지침 원문 확인 뒤). 아래 회차 표식을 함께 적습니다(신규·작업 변경자 작업 전 공유는 근거 확인 중)" },
+    { k:"special_demo", n:"특별교육(해체·밀폐 등)", months:0, hint:"석면 밖 특별교육 대상 작업(별표5 — 해체·밀폐공간 등). 현장 특별교육 판정은 '석면 특별교육' 기록만 봅니다" }
   ];
+  var EDU_RA_TYPE = { regular: "정기", adhoc: "수시", initial: "최초" };   // v447 위험성평가 회차 표식 구분(ra.type)
+  function eduIsRa(k){ return k === "ra_join" || k === "ra_share"; }
+  // v447 이력 시간 — 숫자로 저장(옛 값 '16'·'2시간'·'4h'는 앞 숫자만 뽑아 읽음, 기록은 고칠 때만 숫자로 바뀜). 없거나 0 이하·숫자가 아니면 0
+  function eduHoursNum(v){ if (typeof v === "number") return (isFinite(v) && v > 0) ? v : 0; var m = /(\d+(?:\.\d+)?)/.exec(String(v == null ? "" : v)); return m ? Number(m[1]) : 0; }
+  // v447 특별교육(kind special) 기록이 1건이라도 있나 — 서버 site_edu_gap has_edu(_lib/siteedu.js)와 같은 규칙(새 종류 기록만 있으면 '기록 없음' 그대로)
+  function eduAnySpecial(){ return liveEdu().some(function(r){ return r.kind === "special"; }); }
   function eduKindDef(k){ for(var i=0;i<EDU_KINDS.length;i++){ if(EDU_KINDS[i].k===k) return EDU_KINDS[i]; } return null; }
   function eduKindLabel(k){ var d=eduKindDef(k); return d?d.n:(k||""); }
-  var edu = [], eduBase = 0, eduPending = false, eduSaveTimer = null, eduEditId = null, eduScope = "member", eduViewScope = "member";   // v428 eduViewScope = 안전 › 교육·검진 목록의 대상 칩(member 직원 | worker 일용직), eduScope = 이력 창의 대상
+  var edu = [], eduBase = 0, eduPending = false, eduSaveTimer = null, eduEditId = null, eduScope = "member", eduViewScope = "member";   // v428 eduViewScope = 안전 › 체크 칸 목록의 대상 칩(member 직원 | worker 일용직), eduScope = 이력 창의 대상
+  // v447 읽기 전 저장 막기(v441~v445 cliLoaded·wkLoaded·asbLoaded와 같은 꼴): 서버 기록을 한 번이라도 받기 전(읽는 중·읽기 실패·로그아웃·전환 직후 clearSessionData)에는
+  //   창 열기·저장·지우기·여럿에게 넣기가 막히고(EDU_UNREAD_MSG) doSaveEdu도 보내지 않는다 — 받지 못한 원장(빈 edu) + 새 기록 1건이 서버 col:edu를 통째로 바꾸지 않게
+  var eduLoaded = false;
+  var EDU_UNREAD_MSG = "체크 칸 기록을 아직 읽지 못했습니다 — 다시 읽는 중입니다. 잠시 뒤 다시 눌러 주세요.";
   function liveEdu(){ return edu.filter(function(r){ return r && r.del!==1; }); }
   function findEdu(id){ for(var i=0;i<edu.length;i++){ if(edu[i].id===id) return edu[i]; } return null; }
   function mergeEdu(local, remote){
@@ -16373,7 +16441,7 @@
       var doc=(res.body&&res.body.doc)||{};
       var ri=Array.isArray(doc.items)?doc.items:[];
       edu = eduPending ? mergeEdu(edu, ri) : ri;
-      eduBase = doc.updated_at||0;
+      eduBase = doc.updated_at||0; eduLoaded = true;   // v447 읽기 전 저장 막기 해제(위 eduLoaded)
       renderEdu(); renderCalendar(); renderSites();
       if (isAdmin() && currentTab === "dash") renderDashboard();   // v432 관리자 홈 만기 목록의 교육·검진 다음 예정 줄 — 홈이 보일 때만(다른 화면이면 홈으로 돌아올 때 switchTab이 다시 그린다)
       return true;
@@ -16381,6 +16449,7 @@
   }
   function scheduleEduSave(){ eduPending=true; if(eduSaveTimer) clearTimeout(eduSaveTimer); eduSaveTimer=setTimeout(doSaveEdu,1200); }
   function doSaveEdu(){
+    if(!eduLoaded) return Promise.resolve();   // v447: 못 읽은 기록은 보내지 않는다(위 eduLoaded — 고치는 길이 먼저 막고 알린다)
     return gwCall("gw-data",{action:"save",collection:"edu",doc:{schema:1,items:edu},base:eduBase}).then(function(res){
       if(res.status===409){
         return gwCall("gw-data",{action:"get",collection:"edu"}).then(function(r2){
@@ -16394,13 +16463,13 @@
       //   v430(검토): 기기 승인 취소(403 DEVICE_NOT_APPROVED — 서버 handleSave가 권한보다 먼저 본다)는 권한 문제가 아니다 — 기기 안내를 띄우고
       //   보류는 유지한다(로컬 변경을 버리지 않음 — 기기를 다시 승인받은 뒤 다음 저장 때 함께 올라간다. 그 밖의 오류와 같은 처리)
       if(res.status===403){
-        if((res.body&&res.body.error_code)==="DEVICE_NOT_APPROVED") gwToast("승인되지 않은 기기입니다 — 관리자에게 기기 승인을 요청하세요.\n교육·검진 기록 변경은 아직 서버에 저장되지 않았습니다.", true);
-        else { eduPending=false; gwToast("교육·검진 기록 저장 권한이 없어 서버가 이 변경을 받지 않았습니다.\n화면 값은 새로고침하면 서버 값으로 돌아갑니다.", true); }
+        if((res.body&&res.body.error_code)==="DEVICE_NOT_APPROVED") gwToast("승인되지 않은 기기입니다 — 관리자에게 기기 승인을 요청하세요.\n안전 › 체크 칸 기록 변경은 아직 서버에 저장되지 않았습니다.", true);
+        else { eduPending=false; gwToast("안전 › 체크 칸 기록 저장 권한이 없어 서버가 이 변경을 받지 않았습니다.\n화면 값은 새로고침하면 서버 값으로 돌아갑니다.", true); }
       }
     }).catch(function(){});
   }
   // v430 교육·검진 쓰기 가드(openEdu·saveEdu·deleteEdu 첫 줄) — 안전 '수행'만. 보기 권한 칸은 [+ 이력 추가]·[수정]이 숨지만(.sf-pane.readonly) 창이 열린 사이 권한이 바뀌어도 알린다
-  var EDU_NO_WRITE = "교육·검진 기록을 추가·수정·삭제할 권한이 없습니다 — 권한관리 [안전] 열이 '수행'이어야 합니다.";
+  var EDU_NO_WRITE = "안전 › 체크 칸 기록을 추가·수정·삭제할 권한이 없습니다 — 권한관리 [안전] 열이 '수행'이어야 합니다.";
   function eduPersonName(r){
     if(r.ptype==="worker"){ for(var i=0;i<workers.length;i++){ if(workers[i].id===r.pid) return workers[i].name||"(일용직)"; } return "(삭제된 일용직)"; }
     return dispName(memberName(r.pid)) || "(퇴사자)";
@@ -16443,7 +16512,8 @@
     });
   }
   // v428: 옛 두 목록(인사·직원 화면의 직원 이력 · 인사·일용직 화면의 일용직 이력)을 안전 › 교육·검진 한 목록으로 — 대상은 칩(eduScopeBar)으로 고른다
-  function renderEdu(){
+  // v447: 옛 그리기 본문(폰 859px 이하 — v446 renderEdu 본문 글자째, 이름만 바꿈 · uismoke v447이 renderEduInto와 함께 해시로 대조). 입구 renderEdu는 아래 @edu-sheet 구간의 갈래 함수(PC = 사람별 표)
+  function renderEduLegacy(){
     var bar=document.getElementById("eduScopeBar");
     if(bar) Array.prototype.forEach.call(bar.querySelectorAll("[data-edu-scope]"), function(b){ b.classList.toggle("on", b.getAttribute("data-edu-scope")===eduViewScope); });
     renderEduInto("eduList","eduHead",eduViewScope);
@@ -16461,57 +16531,174 @@
         opts+='<option value="member:'+esc(m.id)+'"'+((sel==="member:"+m.id)?" selected":"")+'>'+esc((dispName(m.name)||m.name||"")+(memberRetired(m)?" (퇴사)":""))+'</option>';
       });
     }
+    // v447 검토: 고치는 기록의 대상이 목록 밖(지운 회원·지운 일용직·명부를 볼 수 없는 일용직)이어도 그 사람을 고른 채로 둔다 —
+    //   빠지면 고르기 칸이 첫 사람으로 잡혀 [저장]이 그 기록(교육·건강진단)을 다른 사람에게 옮겼다
+    if(sel && String(sel).indexOf(":")>0 && opts.indexOf('value="'+esc(sel)+'"')<0){
+      var sp=String(sel).split(":"), st=sp[0], sid=sp.slice(1).join(":"), lab;
+      if(st==="worker") lab = (canSee("wk") && wkLoaded) ? "(삭제된 일용직)" : "(이름을 볼 수 없는 일용직)";
+      else { var dm=findMember(sid); lab = dm ? ((dispName(dm.name)||dm.name||"")+" (지운 회원)") : "(지운 회원)"; }
+      if(st==="worker"||st==="member") opts='<option value="'+esc(sel)+'" selected>'+esc(lab)+'</option>'+opts;
+    }
     s.innerHTML = opts || '<option value="">(대상 없음)</option>';
+  }
+  // v447 다음 예정 — eduHalfEnd = 그 날짜가 든 반기의 다음 반기 말일(상반기 → 그해 12-31 · 하반기 → 다음 해 06-30 — 정기교육 기준을 채운 경우 eduNextFor가 씀),
+  //   일반건강진단은 대상이 사무직이면 24개월(여럿에게 넣기·대상 없음은 12개월), 그 밖은 종류의 months(종전 그대로)
+  function eduHalfEnd(d){ var y = Number(String(d).slice(0, 4)), m = Number(String(d).slice(5, 7)); return m <= 6 ? y + "-12-31" : (y + 1) + "-06-30"; }
+  function eduMonthsFor(k, pv){
+    var d = eduKindDef(k), m = d ? d.months : 0, p = String(pv || ""), mm;
+    if (k === "gen_med" && p.indexOf("member:") === 0){ mm = findMember(p.slice(7)); if (mm && mm.office === true) m = 24; }
+    return m;
+  }
+  // v447 검토: 사람마다 다음 예정 — 정기교육(근로자)은 그 사람의 그 반기 누적 시간(이 기록 포함 · 고치는 기록은 옛 값 빼고)이 기준(사무직 6·그 밖 12 — 체크 칸 표와 같은 감면 없음 기준)에
+  //   못 미치면 그 반기 말일, 채우면 다음 반기 말일 · 관리감독자는 연 단위(16시간 — 못 미치면 그해 12-31, 채우면 다음 해 12-31) · 일반건강진단은 사무직 24·그 밖 12개월 · 그 밖은 종류의 months.
+  //   pv = "member:<id>"|"worker:<id>"|"" · 표·캘린더·홈·현황이 읽는 next가 표의 반기·연 기준과 맞게(종전엔 정기교육은 시간과 상관없이 다음 반기 말일, 관리감독자는 +12개월)
+  function eduNextFor(k, pv, date, hours, exceptId){
+    var d = eduKindDef(k), p = String(pv || ""), ptype = p.split(":")[0], pid = p.split(":").slice(1).join(":"), mm, y, m, sum, need, from, to, dt;
+    if (!d || !d.months || !isDate(date)) return "";
+    y = Number(date.slice(0, 4)); m = Number(date.slice(5, 7));
+    if (k === "regular" || k === "super"){
+      mm = ptype === "member" ? findMember(pid) : null;
+      need = k === "super" ? 16 : ((mm && mm.office === true) ? 6 : 12);
+      from = k === "super" ? y + "-01-01" : y + (m <= 6 ? "-01-01" : "-07-01"); to = k === "super" ? y + "-12-31" : y + (m <= 6 ? "-06-30" : "-12-31");
+      sum = eduHoursNum(hours);
+      liveEdu().forEach(function(r){ if (r.id !== exceptId && r.kind === k && r.ptype === ptype && String(r.pid) === pid && isDate(r.date) && r.date >= from && r.date <= to) sum += eduHoursNum(r.hours); });
+      if (sum < need) return to;
+      return k === "super" ? (y + 1) + "-12-31" : eduHalfEnd(date);
+    }
+    dt = new Date(date + "T00:00:00"); dt.setMonth(dt.getMonth() + eduMonthsFor(k, p));
+    return fmtDate(dt);
   }
   function eduUpdateNotes(){
     var k=document.getElementById("eduKind").value, d=eduKindDef(k);
     var note=document.getElementById("eduKindNote");
     if(note) note.textContent = d ? d.hint : "";
     var nn=document.getElementById("eduNextNote");
-    if(nn) nn.textContent = d ? (d.months ? ("이수일을 넣으면 "+d.months+"개월 뒤로 자동 계산됩니다. 필요하면 직접 고치세요.") : "이 교육은 법정 재이수 주기가 없습니다 — 다음 예정일을 비워 두세요.") : "";
+    if(nn) nn.textContent = d ? (k==="regular" ? "이수일·시간을 넣으면 그 반기 누적 시간으로 자동 계산됩니다(못 미치면 그 반기 말일, 채우면 다음 반기 말일). 필요하면 직접 고치세요." : k==="super" ? "이수일·시간을 넣으면 그해 누적 시간으로 자동 계산됩니다(16시간에 못 미치면 그해 12-31, 채우면 다음 해 12-31). 필요하면 직접 고치세요." : (d.months ? ("이수일을 넣으면 "+(k==="gen_med" ? "12개월(사무직 24개월)" : d.months+"개월")+" 뒤로 자동 계산됩니다. 필요하면 직접 고치세요.") : "이 교육은 법정 재이수 주기가 없습니다 — 다음 예정일을 비워 두세요.")) : "";
+    var rb=document.getElementById("eduRaBox"); if(rb) rb.style.display = eduIsRa(k) ? "" : "none";   // v447 위험성평가 두 종류만 회차 표식
   }
+  // v447 검토: 자동으로 넣은 다음 예정(eduNextAuto) — [저장] 때 다음 예정 칸이 이 값 그대로면 사람마다 다시 계산(시간을 날짜 뒤에 넣은 경우·여럿에게 넣기의 사무직·반기 누적)
+  var eduNextAuto = null;
   function eduAutoNext(){
     var k=document.getElementById("eduKind").value, d=eduKindDef(k);
     var base=document.getElementById("eduDate").value;
     if(!d||!d.months||!isDate(base)) return;
-    var dt=new Date(base+"T00:00:00"); dt.setMonth(dt.getMonth()+d.months);
-    document.getElementById("eduNext").value=fmtDate(dt);
+    eduNextAuto = eduNextFor(k, eduBulkIds ? "" : document.getElementById("eduPerson").value, base, eduHoursIn() || 0, eduEditId);   // v447 검토 — 사람마다(eduNextFor)
+    document.getElementById("eduNext").value=eduNextAuto;
   }
-  function openEdu(id, scope){
+  // v447 여럿에게 넣기(체크 칸 표의 선택 → eduBulkOpen): 고른 사람 id 목록(표 줄 id "member:<회원 id>"·"worker:<일용직 id>") — 창 하나로 같은 기록을 사람마다 한 줄씩
+  var eduBulkIds = null;
+  function eduRaTypeOk(t){ return typeof t === "string" && Object.prototype.hasOwnProperty.call(EDU_RA_TYPE, t); }
+  // 창의 대상 줄 — 여럿에게 넣기면 고르기 칸 대신 고른 사람 이름(앞 8명 + 외 n명)·뺀 사람 수
+  function eduBulkShow(opt){
+    var sel = document.getElementById("eduPerson"), lab = document.getElementById("eduPersonLabel"), bn = document.getElementById("eduBulkNote"), names;
+    if (sel) sel.style.display = eduBulkIds ? "none" : "";
+    if (lab) lab.style.display = eduBulkIds ? "none" : "";
+    if (!bn) return;
+    if (!eduBulkIds){ bn.style.display = "none"; bn.textContent = ""; return; }
+    var byId = eduSheetMap();
+    names = eduBulkIds.map(function(id){ var p = Object.prototype.hasOwnProperty.call(byId, id) ? byId[id] : null; return p ? p.name : ""; }).filter(Boolean);
+    bn.style.display = "";
+    bn.textContent = "대상 " + eduBulkIds.length + "명 — " + names.slice(0, 8).join(", ") + (names.length > 8 ? " 외 " + (names.length - 8) + "명" : "") + " · 사람마다 같은 기록이 한 줄씩 들어갑니다" + ((opt && opt.skip) ? " (퇴사자·지운 일용직·이름을 볼 수 없는 일용직 " + opt.skip + "명은 뺐습니다)" : "");
+  }
+  // opt(v447 — 체크 칸 표): { ids: 여럿에게 넣기 줄 id 목록, skip: 뺀 수 } | { ptype, pid, kind: 펼침 [+ 기록]·[+ 이력 추가]가 대상·종류를 미리 고름 }
+  function openEdu(id, scope, opt){
     if(!canDo("safety")){ alert(EDU_NO_WRITE); return; }   // v430 쓰기 가드
+    if(!eduLoaded){ alert(EDU_UNREAD_MSG); loadEdu(); return; }   // v447 읽기 전 저장 막기(eduLoaded) — 창을 열지 않음
+    opt = opt || {};
     eduEditId=id||null;
-    var r=id?findEdu(id):null;
-    eduScope = r ? r.ptype : (scope||"member");
-    document.getElementById("eduModalTitle").textContent = r ? "이력 수정" : "이력 추가";
+    var r=id?findEdu(id):null, ra, kSel;
+    eduBulkIds = (!r && Array.isArray(opt.ids) && opt.ids.length) ? opt.ids.slice() : null;
+    eduScope = r ? r.ptype : (opt.ptype==="worker"||opt.ptype==="member" ? opt.ptype : (scope||"member"));
+    document.getElementById("eduModalTitle").textContent = r ? "이력 수정" : (eduBulkIds ? "같은 기록 넣기 — " + eduBulkIds.length + "명" : "이력 추가");
+    kSel = r ? r.kind : (opt.kind || "");
     document.getElementById("eduKind").innerHTML = EDU_KINDS.map(function(d){
-      return '<option value="'+d.k+'"'+((r&&r.kind===d.k)?" selected":"")+'>'+esc(d.n)+'</option>';
+      return '<option value="'+d.k+'"'+((kSel===d.k)?" selected":"")+'>'+esc(d.n)+'</option>';
     }).join("");
-    eduFillPersons(eduScope, r ? (r.ptype+":"+r.pid) : null);
+    eduFillPersons(eduScope, r ? (r.ptype+":"+r.pid) : (opt.pid ? eduScope+":"+opt.pid : null));
+    eduBulkShow(opt);
     document.getElementById("eduDate").value = r ? (r.date||"") : "";
     document.getElementById("eduHours").value = r ? (r.hours||"") : "";
+    eduHoursOrig = r ? r.hours : undefined; eduNextAuto = null;   // v447 검토 — 시간 칸을 안 고치면 옛 값 그대로(eduHoursIn) · 자동 다음 예정 없음
     document.getElementById("eduNext").value = r ? (r.next||"") : "";
     document.getElementById("eduNote").value = r ? (r.note||"") : "";
+    ra = (r && eduIsRa(r.kind) && r.ra && typeof r.ra === "object") ? r.ra : {};
+    document.getElementById("eduRaOn").value = isDate(ra.on) ? ra.on : "";
+    document.getElementById("eduRaType").value = eduRaTypeOk(ra.type) ? ra.type : "";   // v447 검토 2: 기본값 없음(고르지 않으면 회차로 세지 않음 — 일용직 참여 한 줄이 전사 정기 회차가 되던 길)
+    document.getElementById("eduRaUnit").value = typeof ra.unit === "string" ? ra.unit : "";
     eduUpdateNotes();
     document.getElementById("eduDelete").style.display = r ? "" : "none";
     document.getElementById("eduBackdrop").classList.add("show");
   }
-  function closeEdu(){ document.getElementById("eduBackdrop").classList.remove("show"); eduEditId=null; }
+  function closeEdu(){ document.getElementById("eduBackdrop").classList.remove("show"); eduEditId=null; eduBulkIds=null; eduNextAuto=null; eduHoursOrig=undefined; }
+  // v447 창 값 — 시간은 숫자(빈칸은 ""), 숫자가 아니면 null(저장 막음) · 위험성평가 회차 표식(평가일 비면 실시일 · 구분 정기/수시/최초 · 부서/현장 60자)
+  //   v447 검토: 고치는 기록의 옛 시간 글('4h+12h'·'2시간 30분' 등 숫자로 못 바꾸는 글)은 칸을 안 고쳤으면 그대로 둔다(종전엔 저장이 막히고, 칸을 비우면 원래 글이 사라졌다)
+  //   v447 검토 2: 숫자로 바꿀 수 있으면 먼저 숫자(옛 글자 '16'도 16 — 고쳐 저장하면 숫자), 못 바꿀 때만 옛 글 그대로
+  var eduHoursOrig;
+  function eduHoursIn(){ var raw = String(document.getElementById("eduHours").value || "").trim(); if (!raw) return ""; var n = Number(raw.replace(/시간|h/gi, "").trim()); if (isFinite(n) && n > 0) return n; if (eduHoursOrig !== undefined && eduHoursOrig !== null && typeof eduHoursOrig !== "number" && raw === String(eduHoursOrig).trim()) return eduHoursOrig; return null; }
+  function eduRaIn(kind, date){
+    if (!eduIsRa(kind)) return null;
+    var on = document.getElementById("eduRaOn").value, t = document.getElementById("eduRaType").value;
+    return { on: isDate(on) ? on : date, type: eduRaTypeOk(t) ? t : "", unit: String(document.getElementById("eduRaUnit").value || "").trim().slice(0, 60) };   // v447 검토 2: 구분은 고른 것만(빈 글 = 회차 아님)
+  }
+  // v447 검토 2: 정기교육·관리감독자 다음 예정 다시 셈 — 같은 사람·같은 종류 줄의 자동 다음 예정(그 줄 날짜의 두 후보: 그 반기(해) 말일 · 다음 반기(해) 말일)을
+  //   지금 누적으로 다시 계산(skipId = 방금 [저장]한 줄 — 그 줄은 saveEdu 규칙 그대로). 손으로 고친 다음 예정(두 후보 밖 날짜)·빈 칸은 건드리지 않는다.
+  //   종전엔 저장한 한 줄의 next만 정해, 늦은 날짜 줄을 먼저 넣고 이른 날짜 줄을 나중에 넣거나 반기를 채운 줄을 지우면 현황 ③·캘린더·홈(eduLatest의 next)이 표와 어긋났다
+  function eduRenext(ptype, pid, kind, skipId){
+    var ch = 0, t = todayStr();
+    if ((kind !== "regular" && kind !== "super") || (ptype !== "member" && ptype !== "worker") || pid == null) return 0;
+    liveEdu().forEach(function(r){
+      var y, m, a, b, nn;
+      if (r.id === skipId || r.kind !== kind || r.ptype !== ptype || String(r.pid) !== String(pid) || !isDate(r.date) || !isDate(r.next)) return;
+      y = Number(r.date.slice(0, 4)); m = Number(r.date.slice(5, 7));
+      a = kind === "super" ? y + "-12-31" : y + (m <= 6 ? "-06-30" : "-12-31"); b = kind === "super" ? (y + 1) + "-12-31" : eduHalfEnd(r.date);
+      if (r.next !== a && r.next !== b) return;
+      nn = eduNextFor(kind, ptype + ":" + r.pid, r.date, r.hours, r.id);
+      if (nn && nn !== r.next){ r.next = nn; r.updated = t; ch++; }
+    });
+    return ch;
+  }
   function saveEdu(){
     if(!canDo("safety")){ alert(EDU_NO_WRITE); return; }   // v430 쓰기 가드 — 서버가 NO_WRITE로 거절할 저장을 '저장했습니다'로 보이지 않게
+    if(!eduLoaded){ alert(EDU_UNREAD_MSG); loadEdu(); return; }   // v447 읽기 전 저장 막기(창은 그대로 — 읽히면 다시 [저장])
     var pv=document.getElementById("eduPerson").value||"";
-    if(!pv){ alert("대상을 선택하세요."); return; }
+    if(!eduBulkIds && !pv){ alert("대상을 선택하세요."); return; }
     var date=document.getElementById("eduDate").value;
     if(!isDate(date)){ alert("이수·실시일을 입력하세요."); return; }
+    var hours=eduHoursIn();
+    if(hours===null){ alert("시간은 숫자로 넣어 주세요(예: 16 · 1.5) — 모르면 비워 두세요."); return; }
+    var kind=document.getElementById("eduKind").value, next=document.getElementById("eduNext").value||"", note=document.getElementById("eduNote").value.trim(), ra=eduRaIn(kind, date);
+    var autoNx = !!next && next===eduNextAuto && /^(regular|super|gen_med)$/.test(kind);   // v447 검토: 자동 다음 예정 그대로면 사람마다 다시(eduNextFor) — 손으로 고친 값은 그대로
+    if(eduBulkIds){   // v447 여럿에게 넣기 — 저장 때 한 번 더 고른다(창을 연 사이 퇴사·지움·권한이 바뀐 사람은 넣지 않음)
+      var made=0, today=todayStr(), byId=eduSheetMap();
+      eduBulkIds.forEach(function(rid){
+        var p=Object.prototype.hasOwnProperty.call(byId, rid) ? byId[rid] : null; if(!eduCanAdd(p)) return;
+        var nr={ id:genId("edu"), created:today, ptype:p.ptype, pid:p.pid, kind:kind, date:date, hours:hours, next:(autoNx ? (eduNextFor(kind, p.ptype+":"+p.pid, date, hours, null)||next) : next), note:note, updated:today };
+        if(ra) nr.ra={ on:ra.on, type:ra.type, unit:ra.unit };
+        edu.push(nr); made++;
+        eduRenext(nr.ptype, nr.pid, kind, nr.id);   // v447 검토 2: 같은 반기(해) 다른 줄의 자동 다음 예정도
+      });
+      if(!made){ alert("넣을 수 있는 사람이 없습니다 — 퇴사자·지운 일용직·이름을 볼 수 없는 일용직에게는 새 기록을 넣지 않습니다."); return; }
+      Object.keys(eduSel).forEach(function(k){ delete eduSel[k]; });
+      scheduleEduSave();
+      closeEdu();
+      gwToast(made+"명에게 같은 기록을 넣었습니다");
+      afterSave(renderEdu, renderCalendar, renderSites);
+      return;
+    }
     var parts=pv.split(":");
     var r=eduEditId?findEdu(eduEditId):null, isNew=!r;
+    if(autoNx) next = eduNextFor(kind, pv, date, hours, r ? r.id : null) || next;   // v447 검토
+    var was = r ? { ptype: r.ptype, pid: r.pid, kind: r.kind } : null;   // v447 검토 2: 고치기 전 사람·종류(옮기면 옛 쪽 다음 예정도 다시)
     if(isNew){ r={ id:genId("edu"), created:todayStr() }; edu.push(r); }
     r.ptype=parts[0]; r.pid=parts.slice(1).join(":");
-    r.kind=document.getElementById("eduKind").value;
+    r.kind=kind;
     r.date=date;
-    r.hours=document.getElementById("eduHours").value.trim();
-    r.next=document.getElementById("eduNext").value||"";
-    r.note=document.getElementById("eduNote").value.trim();
+    r.hours=hours;   // v447 숫자(빈칸 "")
+    r.next=next;
+    r.note=note;
+    if(ra) r.ra=ra; else if(!isNew && r.ra!=null) r.ra=null;   // v447 위험성평가 두 종류만 회차 표식(다른 종류로 바꾸면 지움) · 검토: delete가 아니라 null — 409 병합(mergeEdu Object.assign)이 서버 옛 줄의 ra를 되살리지 않게
     r.updated=todayStr();
+    eduRenext(r.ptype, r.pid, r.kind, r.id); if(was && (was.ptype!==r.ptype || String(was.pid)!==String(r.pid) || was.kind!==r.kind)) eduRenext(was.ptype, was.pid, was.kind, r.id);   // v447 검토 2
     scheduleEduSave();
     closeEdu();                       // v336: 석면과 같은 순서 — 닫기·토스트 먼저, 렌더는 다음 프레임
     gwToast("저장했습니다");
@@ -16519,13 +16706,509 @@
   }
   function deleteEdu(){
     if(!canDo("safety")){ alert(EDU_NO_WRITE); return; }   // v430 쓰기 가드
+    if(!eduLoaded){ alert(EDU_UNREAD_MSG); loadEdu(); return; }   // v447
     var r=eduEditId?findEdu(eduEditId):null; if(!r) return;
     if(!confirm("이 이력을 삭제할까요?")) return;
     r.del=1; r.updated=todayStr();
+    eduRenext(r.ptype, r.pid, r.kind, r.id);   // v447 검토 2: 남은 줄의 자동 다음 예정(반기를 채운 줄을 지우면 그 반기 말일로)
     scheduleEduSave();
     closeEdu();
     afterSave(renderEdu, renderCalendar, renderSites);
   }
+
+  // @edu-sheet-start
+  // v447(56 판 1차 — 그룹웨어 재설계(45-1)와 따로, 공통 표 부품만 같이 씀 · 명세 09_조사_문서/표형탭_시안_자료_20261110/엑셀형탭_명세_20261110.json sections[key=edu] · 단계지시_v447_56사람별.json ·
+  //   PM 11/12 17:59 '체크로' = 칸 이름 '체크'(사이드바 '주기 체크' 탭과 다른 곳 — 안내 글은 '안전 › 체크'·'체크 칸')):
+  // PC(860px 이상) = 공통 부품(vsSheetRender) 표 한 장 — 자리는 폰 옛 목록과 같은 #eduList. 행 = 사람, 칸 = 그 항목 상태 하나.
+  //   행: 직원 = 재직 회원(시험 계정 표식 test_acct 빼고) · 일용직 = 명부(지운 사람 빼고) — 2025년 이후 현장(현장 칸 '지난 자료'와 같은 경계 상수 SITE_OLD_BEFORE·연도 siteYear) 또는 진행 중 현장에 든 사람은
+  //   펴고, 나머지 일용직은 묶음 '그 밖 일용직'(기본 접힘) · 기록이 남은 퇴사자·지운 회원·지운 일용직은 둘째 묶음 '기록만 남은 사람'(새 기록은 넣지 않음). 일용직 권한이 없거나 명부를 아직 못 읽었으면
+  //   일용직은 이름 대신 '일용직 n'(현장 대장 worker_ids·교육 기록의 id로만 셈 — 이름은 받지 않는다).
+  //   칸 상태 일곱: '✓ 연-월'(또는 정기교육 '✓ a/b시간') · 반기 진도 'a/b시간' · 'D-n' · '경과 n일' · '기록 없음' · '근거 확인 중'(회색 — ✓·빨강 안 냄, 빠진 항목에 안 셈) · '—'(대상 아님)
+  //   + 현장 대장을 볼 권한이 없으면 배치 전 칸(채용 시·특별교육·건설 기초·석면 건진) '판정 불가(현장 권한 없음)'(회색) · 대장을 읽는 중이면 '확인 중'(회색).
+  //   배치 전 의무 기한 = 그 사람이 든 예정·작업중 현장(종결이 아닌 줄 — 현장 표·서버 판정과 같은 r.status !== "done")의 가장 이른 시작일(시작일이 없으면 '기록 없음').
+  //   특별교육 칸 = 현장 표 특별교육 칸·서버 site_edu_gap·현황 ③과 같은 함수·같은 범위(eduHasValidSpecial — 종류 무관 진행 현장 투입자, special 기록) — 석면만으로 좁힐지는 별표5 원문 확인 뒤 따로.
+  //   위험성평가 칸 = 결과 공유만 판정(직원 — 그 사람에게 걸리는 올해 정기·최초 회차(eduRaOnFor — 전사·그 부서)가 있으면 그 뒤 ra_share가 없을 때, 회차가 없으면 올해 ra_share가 없을 때 노랑 '기록 없음' — 빨강은 공유 기한 근거 확인 뒤, v447 검토 2)
+  //   · 참여(ra_join)는 '· 참여' 표시만 · 올해 투입 일용직의 공유는 '신규·작업 변경자 작업 전 공유'라
+  //   고용노동부 11/4 고시 전부개정이 법제처에 오르기 전까지 '근거 확인 중'(회색).
+  //   정기교육 = 감면 없음 기준(사무직 반기 6 · 그 밖 12 · 관리감독자 연 16시간 — 회원 '사무직'·'관리감독자 지정' 표식, 표식이 없으면 12). 회사 단위 감면(상시근로자 수·감면 적용 연도·전년 무재해)은
+  //   안전 설정(settings:safety — v436 저장 형식 kosha·headcount)에 칸이 아직 없어 늘 '감면 없음'(eduReduce — 칸이 생기면 이 한 곳에서 읽는다).
+  // 열 12(명세 순서): 이름(굵게 · 선택 체크) · 구분 · 소속·최근 · 다음 할 일(기본 ▲ · 남는 폭) · 빠진 항목 · 정기교육 · 채용 시 · 특별교육 · 건설 기초 · 일반건진 · 석면 건진 · 위험성평가.
+  //   ★위험성평가 열은 1366 창(1280~1599 단계)에서도 보이게 lv3(명세 lv4 → PM 11/10 19:10 '층 나눔' 구현 메모) — 단계 합 규칙(860 ≤ 742 · 1280 ≤ 962 · 1600 ≤ 1,282)을 지키려고
+  //   구분·소속·최근을 lv4로 내림(명세 lv3 — 구분은 칩·펼침 머리로도 보임).
+  // 칸 폭 — 운영 백업 11/12 17:17 사본 실측(맑은 고딕 advance · 표 12.5px·첫 열 굵게 13px · 칸 안 폭 = 폭 − 17 · 값은 옮기지 않고 길이만): 이름 굵게 최대 39.0(회원 16·일용직 155 같음) + 체크 상자 24 →
+  //   108(명세 96 — '일용직 155' 굵게 약 66 + 24 = 90이 96의 안 폭 79에 잘림) · 소속·최근 '부서 · 석면 2026-11' 최대 149.8 → 168(명세 92 — 말줄임 + title) · 상태 글 최대 '근거 확인 중' 71.2 →
+  //   그 글이 나오는 정기교육 90·채용 시 89·건설 기초 89(명세 86) · '경과 999일' 굵게 63.6 → 특별교육·일반건진 82 · 석면 건진 84(머리 '석면 건진' + 화살표 67.4) · 위험성평가 '✓ 2026-11 · 참여' 95.5·
+  //   '근거 확인 중 · 참여' 약 104 → 124 · 빠진 항목 72(머리 굵게 54.4 — 64의 안 폭 47이면 머리가 잘림) · 구분 56 · 다음 할 일 남는 폭 최소 128('위험성평가 기록 없음 외 6' 149.4 — 말줄임 + title).
+  //   '판정 불가(현장 권한 없음)' 145.6은 어느 칸에도 안 들어가 말줄임 + title(지금 안전을 볼 수 있는 분은 모두 현장 수행이라 나올 일 0).
+  //   단계별 열 합 742 / 948 / 1,172(명세 722 / 956 / 1,042) ≤ 742 / 962 / 1,282.
+  // 칩 두 묶음(옅은 선택): 대상 전체·직원·일용직(옛 #eduScopeBar 이어받음 — 'safety:edu:worker'·'safety:edu:member' 이동이 이번만 켬) · 상태 전체·빠진 항목 있음·30일 안·지남·기한 경과(.warn)·석면 투입자 + 건수.
+  // 줄 누르기 = 펼침(항목별 상태 표 — 항목·대상 근거·마지막 실시·다음 기한·상태·[+ 기록] · 대상 아님은 한 줄 → 이력 표 [수정] → [+ 이력 추가]). 바꾸는 버튼은 .mini-btn + canDo("safety") —
+  //   누름 길 eduSheetAct가 다시 봄 · 선택 체크(sel.can = 안전 수행)로 여럿에게 같은 기록(eduBulkOpen — 퇴사자·지운 일용직·이름 모르는 일용직은 뺌).
+  // 폰(859px 이하) = phone:"legacy" — 옛 그리기 본문 renderEduLegacy(v446 renderEdu 본문 그대로 — 대상 칩 #eduScopeBar + renderEduInto 이력 카드, uismoke v447이 해시로 대조).
+  var EDU_SHEET_DEF = null, eduSheetCur = "", eduSel = {}, eduScopeAsk = "";   // eduScopeAsk = 'safety:edu:member|worker|miss' 이동이 남긴 대상(다음 renderEdu가 표 칩에 한 번 켬)
+  var EDU_HEAD_LINE = "회사가 사람마다 챙길 법정 교육·검진·위험성평가 공유·참여";   // 칸 머리 한 줄(v448 자격·담당 교육 때 '·자격 교육' 덧붙임) — HTML #eduLead와 같은 글(uismoke v447)
+  var EDU_STD = { office: 6, other: 12, super: 16 };   // 감면 없음 기준 시간(사무직 반기 · 그 밖 반기 · 관리감독자 연)
+  var EDU_SOON = 30;                                   // 임박 노랑(사람별 의무 30일 — 명세 glossary)
+  var EDU_HIRE_GAP = 7;                                // v447: 채용 시 교육 기록이 이번 투입 시작일보다 이만큼(일) 넘게 앞이면 옛 투입 것으로 보고 ✓ 대신 회색 — 산안법 시행규칙 별표4 비고 2(일용근로자가 채용 시 교육을 받은 날부터 1주일 안에 같은 사업장 같은 업무로 다시 종사할 때만 면제 — 현행 2026-08-01 원문 11/12 확인, 09_조사_문서/특별교육범위_자료_20261112). 검토 2의 90일 대리값을 법정 값으로 바꿈
+  var EDU_CHK = "근거 확인 중", EDU_NOSITE = "판정 불가(현장 권한 없음)";
+  var EDU_ITEM_COLS = ["reg", "hire", "spec", "basic", "gmed", "amed", "ra"];
+  var EDU_ITEM_H = { reg: "정기교육", hire: "채용 시", spec: "특별교육", basic: "건설 기초", gmed: "일반건진", amed: "석면 건진", ra: "위험성평가" };
+  var EDU_GREY = "color:#9AA09C;";
+  // 회사 단위 감면 — 안전 설정에 감면 칸이 아직 없어 늘 없음(위 설명). 감면 시간은 원문(산안법 시행규칙 별표4 비고) 확인 뒤 이 함수에서만
+  function eduReduce(){ return null; }
+  function eduYm(d){ return isDate(d) ? d.slice(0, 7) : ""; }
+  function eduAddMonths(d, n){ var dt = new Date(d + "T00:00:00"); dt.setMonth(dt.getMonth() + n); return fmtDate(dt); }
+  function eduSiteStart(r){ var s = siteTermPart(r && r.start); return isDate(s) ? s : ""; }
+  // v447 검토 2: 올해 위험성평가 회차(직원 결과 공유 판정이 거는 평가일) — 위험성평가 두 종류 줄의 회차 표식 중
+  //   ① 직원(회원) 줄만: 일용직 줄·시험 계정(test_acct)·지운 회원·회원 목록에 없는 id의 줄은 빼고(행에서 뺀 사람의 기록이 다른 사람 판정에 들지 않게 — 종전엔 시험 계정·일용직 한 줄이 전원 기한을 정함)
+  //   ② 구분 정기·최초만(구분을 고르지 않은 줄은 회차 아님 — 창의 기본값이 회차가 되던 길) · 평가일이 올해·오늘까지
+  //   ③ 단위: 비었거나 '전사' = 전사 회차(all) · 그 밖 글 = 그 글과 같은 부서(회원 dept) 회차(dept) — 현장 단위 회차는 2차 '평가' 칸 몫(사람에게 걸지 않음)
+  var EDU_RA_ALL = { "": 1, "전사": 1 };
+  function eduRaRounds(y, t){
+    var o = { all: "", dept: {} };
+    liveEdu().forEach(function(r){
+      var a = (r && eduIsRa(r.kind) && r.ptype === "member" && r.ra && typeof r.ra === "object") ? r.ra : null, mm, u;
+      if (!a || !isDate(a.on) || a.on.slice(0, 4) !== y || a.on > t || (a.type !== "regular" && a.type !== "initial")) return;
+      mm = findMember(r.pid);
+      if (!mm || mm.del === 1 || mm.test_acct === true) return;
+      u = typeof a.unit === "string" ? a.unit.trim() : "";
+      if (Object.prototype.hasOwnProperty.call(EDU_RA_ALL, u)){ if (a.on > o.all) o.all = a.on; }
+      else if (!Object.prototype.hasOwnProperty.call(o.dept, u) || a.on > o.dept[u]) o.dept[u] = a.on;
+    });
+    return o;
+  }
+  // 그 직원에게 걸리는 회차 평가일 — 전사 회차와 그 사람 부서 회차 중 늦은 것("" = 회차 없음)
+  function eduRaOnFor(cx, m){ var d = (m && typeof m.dept === "string") ? m.dept.trim() : "", b = (d && Object.prototype.hasOwnProperty.call(cx.ra.dept, d)) ? cx.ra.dept[d] : ""; return cx.ra.all > b ? cx.ra.all : b; }
+  function eduSheetCx(){
+    var t = todayStr(), y = t.slice(0, 4), h1 = Number(t.slice(5, 7)) <= 6;
+    return { today: t, y: y, half: { start: y + (h1 ? "-01-01" : "-07-01"), end: y + (h1 ? "-06-30" : "-12-31"), label: y + (h1 ? " 상반기" : " 하반기") },
+      prev: h1 ? { start: (Number(y) - 1) + "-07-01", end: (Number(y) - 1) + "-12-31", label: (Number(y) - 1) + " 하반기" } : { start: y + "-01-01", end: y + "-06-30", label: y + " 상반기" },
+      site: canSee("site"), asb: canSee("site") && asbLoaded, wk: canSee("wk") && wkLoaded, ra: eduRaRounds(y, t) };
+  }
+  // 사람 → 든 현장(지운 줄 빼고 · 같은 현장 두 번은 한 번) — 키 "member:<회원 id>"·"worker:<일용직 id>" · act = 종결이 아닌 줄(예정·작업중·상태 칸 없음)
+  function eduSiteIdx(){
+    var idx = {};
+    liveSites().forEach(function(r){
+      var e = { r: r, act: r.status !== "done", y: siteYear(r), k: siteKind(r), start: eduSiteStart(r), end: (function(){ var s = siteTermPart(r.end); return isDate(s) ? s : ""; })() }, seen = {};   // v447 검토 2: end(채용 시 옛 투입 판정)
+      function add(k){ if (seen[k]) return; seen[k] = 1; if (!Object.prototype.hasOwnProperty.call(idx, k)) idx[k] = []; idx[k].push(e); }
+      asList(r.member_ids).forEach(function(id){ if (id != null && String(id) !== "") add("member:" + id); });
+      asList(r.worker_ids).forEach(function(id){ if (id != null && String(id) !== "") add("worker:" + id); });
+    });
+    return idx;
+  }
+  // 사람 → 지우지 않은 기록(날짜 최근 먼저)
+  function eduRecIdx(){
+    var idx = {};
+    liveEdu().forEach(function(r){
+      if (!r || (r.ptype !== "member" && r.ptype !== "worker") || r.pid == null) return;
+      var k = r.ptype + ":" + r.pid;
+      if (!Object.prototype.hasOwnProperty.call(idx, k)) idx[k] = [];
+      idx[k].push(r);
+    });
+    Object.keys(idx).forEach(function(k){ idx[k].sort(function(a, b){ return String(b.date || "").localeCompare(String(a.date || "")); }); });
+    return idx;
+  }
+  function eduLastOf(recs, kinds, from){ var i, r; for (i = 0; i < recs.length; i++){ r = recs[i]; if (kinds.indexOf(r.kind) >= 0 && isDate(r.date) && (!from || r.date >= from)) return r; } return null; }
+  function eduHoursSum(recs, kind, from, to){ var s = 0; recs.forEach(function(r){ if (r.kind === kind && isDate(r.date) && r.date >= from && r.date <= to) s += eduHoursNum(r.hours); }); return Math.round(s * 10) / 10; }
+  function eduMinStart(list){ var s = ""; list.forEach(function(e){ if (e.start && (!s || e.start < s)) s = e.start; }); return s; }
+  function eduSitesTxt(list){ var a = list.slice(0, 3).map(function(e){ return siteLabel(e.r); }); return a.join(", ") + (list.length > 3 ? " 외 " + (list.length - 3) : ""); }
+  // 칸 상태 하나 — t 글 · cls(vs-dan 빨강·vs-warn 노랑) · grey 회색 글 · tgt 대상 · miss 빠짐(대상인데 유효 기록 없음) · dd 기한까지 남은 날(지남 음수) · due 기한 · last 마지막 기록 · basis 대상 근거 · cat 고르기(거르기) 글
+  function eduIt(o){ return { t: o.t || "—", cls: o.cls || "", grey: !!o.grey, tgt: !!o.tgt, miss: !!o.miss, dd: (typeof o.dd === "number" && isFinite(o.dd)) ? o.dd : null, due: o.due || "", last: o.last || null, basis: o.basis || "", tip: o.tip || "", cat: o.cat || "대상 아님", kind: o.kind || "", join: o.join || null }; }
+  function eduNone(kind, basis, rec){ return rec ? eduIt({ t: "✓ " + eduYm(rec.date), cat: "✓ 기록(대상 아님)", last: rec, kind: kind, basis: basis }) : eduIt({ t: "—", kind: kind, basis: basis }); }
+  function eduOk(kind, rec, basis, o){ return eduIt({ t: isDate(rec && rec.date) ? "✓ " + eduYm(rec.date) : "✓", tgt: true, cat: "✓ 이수", last: rec, kind: kind, basis: basis, dd: o && o.dd, due: o && o.due }); }
+  function eduGreyIt(kind, t, cat, basis, rec){ return eduIt({ t: t, grey: true, cat: cat, kind: kind, basis: basis, last: rec || null }); }
+  // 대상인데 유효 기록 없음 — 기한이 있으면 지남 빨강 '경과 n일' · 30일 안 노랑 'D-n' · 그 밖 회색 'D-n' / 기한을 모르면 노랑 '기록 없음'
+  function eduDue(kind, due, basis){
+    var n;
+    if (!isDate(due)) return eduIt({ t: "기록 없음", cls: "vs-warn", tgt: true, miss: true, cat: "기록 없음", kind: kind, basis: basis });
+    n = vehDday(due).diff;
+    return eduIt({ t: n < 0 ? "경과 " + (-n) + "일" : "D-" + n, cls: n < 0 ? "vs-dan" : (n <= EDU_SOON ? "vs-warn" : ""), grey: n > EDU_SOON, tgt: true, miss: true, dd: n, due: due, cat: n < 0 ? "기한 경과" : "기한 전", kind: kind, basis: basis });
+  }
+  // 주기 검진(일반·석면 특수) — 마지막 실시 + months: 지남 빨강(빠짐) · 30일 안 노랑(아직 유효 — 빠짐 아님) · 그 밖 ✓
+  //   v447 검토: dueAt = 기한을 따로 셀 때(석면 첫 특수건진 = 배치일 + 12개월 — 배치전 건진일이 아니라)
+  function eduCycle(kind, rec, months, basis, dueAt){
+    var nx = isDate(dueAt) ? dueAt : eduAddMonths(rec.date, months), n = vehDday(nx).diff;
+    if (n < 0) return eduIt({ t: "경과 " + (-n) + "일", cls: "vs-dan", tgt: true, miss: true, dd: n, due: nx, cat: "기한 경과", last: rec, kind: kind, basis: basis });
+    if (n <= EDU_SOON) return eduIt({ t: "D-" + n, cls: "vs-warn", tgt: true, dd: n, due: nx, cat: "기한 전", last: rec, kind: kind, basis: basis });
+    return eduOk(kind, rec, basis, { dd: n, due: nx });
+  }
+  // 한 사람의 칸 상태 전부 — p = 행(eduSheetRows), cx = eduSheetCx(), si·ri = 현장·기록 색인. 돌려줌 { c: {열 키: 상태}, x: {펼침에만 있는 항목}, miss, over, soon, asb, cand }
+  function eduPersonStat(p, cx, si, ri){
+    var recs = ri[p.id] || [], sites = si[p.id] || [], act = sites.filter(function(e){ return e.act; }), mem = p.ptype === "member", gone = p.grp === "gone", m = p.m || null, c = {}, x = {};
+    var asbAct = act.filter(function(e){ return e.k === "asbestos"; }), conAct = act.filter(function(e){ return e.k === "asbestos" || e.k === "demolition"; }), drAct = act.filter(function(e){ return e.k === "dredge"; });
+    var last = function(kinds, from){ return eduLastOf(recs, kinds, from); }, actTxt = act.length ? "진행 중 현장 " + eduSitesTxt(act) : "", sup = !!(m && m.supervisor === true), off = !!(m && m.office === true);
+    var noSite = function(kind, rec){ return eduGreyIt(kind, EDU_NOSITE, "판정 불가", "현장 대장을 볼 권한이 없어 배치 전 기한을 셀 수 없음", rec); };
+    var wait = function(kind, rec){ return eduGreyIt(kind, "확인 중", "확인 중", "현장 대장을 읽는 중 — 읽은 뒤 다시 그립니다", rec); };
+    var siteGate = function(kind, rec){ return !cx.site ? noSite(kind, rec) : (!cx.asb ? wait(kind, rec) : null); };
+    var sp, valid, b, h, g, am, sh, jn, raT, from, to, need, kind, a, n, tip, pf, pt, pa, pn, pl;
+    // v447 검토 2: 대표(사업주 — isBossMember)는 근로자 의무 칸(정기교육·채용 시·일반건진·위험성평가 공유)을 '근거 확인 중'(회색 — 빠진 항목·합계 분모 밖)으로.
+    //   특별교육·석면 건진은 현장 투입 판정이라 현장 표와 같게 그대로. 등기임원(PM 등) 근로자성은 사람마다 달라 판정하지 않음
+    var boss = !!(mem && m && !gone && isBossMember(m)), BOSS_B = "사업주(대표) — 근로자 의무 대상 여부 근거 확인 중(근로자 대상 의무라 빠진 항목으로 세지 않음)";
+    // 정기교육 — 직원: 관리감독자 지정이면 올해 super 시간 / 16, 아니면 이번 반기 regular 시간 / (사무직 6 · 그 밖 12) · 일용직: 근거 확인 중
+    if (gone) c.reg = eduNone(sup ? "super" : "regular", "기록만 남은 사람 — 판정 안 함", last(["regular", "super"]));
+    else if (!mem) c.reg = eduGreyIt("regular", EDU_CHK, EDU_CHK, "일용직 — 정기교육 대상 여부 근거 확인 중(현장 투입 때 채용 시·특별교육·건설 기초로 봄)", last(["regular"]));
+    else if (boss) c.reg = eduGreyIt(sup ? "super" : "regular", EDU_CHK, EDU_CHK, BOSS_B, last(["regular", "super"]));
+    else {
+      kind = sup ? "super" : "regular"; from = sup ? cx.y + "-01-01" : cx.half.start; to = sup ? cx.y + "-12-31" : cx.half.end; need = sup ? EDU_STD.super : (off ? EDU_STD.office : EDU_STD.other);
+      a = eduHoursSum(recs, kind, from, to); n = vehDday(to).diff;
+      tip = (sup ? "관리감독자 정기교육 " + cx.y + "년" : "정기교육 " + cx.half.label) + " " + a + "시간 / 기준 " + need + "시간(" + (sup ? "관리감독자 연 16" : (off ? "사무직 반기 6" : "그 밖 근로자 반기 12 — 사무직 표시가 없으면 12")) + " · 감면 없음 기준) · 기한 " + to;
+      // v447 검토 2: 직전 반기(관리감독자는 작년)에 그 종류 기록이 1건 이상 있는데(그때 재직이 확실) 합이 기준 미만이면 빨강 '경과 n일'(기한 = 그 반기(해) 말일) — 현황 ③·캘린더(저장된 next)와 같은 사람을 경과로.
+      //   직전 반기 기록 0건은 입사일 없이 가를 수 없어 판정 안 함(입사일 기준은 따로 정할 몫)
+      pf = sup ? (Number(cx.y) - 1) + "-01-01" : cx.prev.start; pt = sup ? (Number(cx.y) - 1) + "-12-31" : cx.prev.end; pl = sup ? (Number(cx.y) - 1) + "년" : cx.prev.label;
+      pn = recs.filter(function(r){ return r.kind === kind && isDate(r.date) && r.date >= pf && r.date <= pt; }).length; pa = eduHoursSum(recs, kind, pf, pt);
+      if (pn && pa < need) c.reg = eduIt({ t: "경과 " + (-vehDday(pt).diff) + "일", cls: "vs-dan", tgt: true, miss: true, dd: vehDday(pt).diff, due: pt, cat: "기한 경과", kind: kind, last: last([kind], pf),
+          basis: "지난 " + pl + " " + pa + "/" + need + "시간 — 기준 미달(그 기간 기록 " + pn + "건 · 기한 " + pt + " 경과) · 이번 " + tip });
+      else c.reg = a >= need ? eduIt({ t: "✓ " + a + "/" + need + "시간", tgt: true, cat: "✓ 이수", kind: kind, basis: tip, last: last([kind], from) })
+        : eduIt({ t: a + "/" + need + "시간", cls: n <= EDU_SOON ? "vs-warn" : "", tgt: true, miss: true, dd: n, due: to, cat: "진행 중", kind: kind, basis: tip, last: last([kind], from) });
+    }
+    // 채용 시 — 직원: 근거 확인 중 · 일용직: 건설 기초 이수자 면제 · 기록 있으면 ✓ · 진행 현장 투입이면 기한 = 가장 이른 시작일
+    h = last(["hire"]); b = last(["basic_con"]);
+    if (gone) c.hire = eduNone("hire", "기록만 남은 사람 — 판정 안 함", h);
+    else if (mem) c.hire = eduGreyIt("hire", EDU_CHK, EDU_CHK, "직원 — 채용 시 교육 대상·기한 근거 확인 중(입사일 기준 판정은 원문 확인 뒤)", h);
+    else {
+      // v447 검토: 채용 시 교육은 채용(투입)마다 생기는 의무 — 기록이 이번 투입(가장 이른 진행 현장 시작일) 전 다른 투입 때 것일 수 있으면(아래 hOld)
+      //   ✓로 보지 않고 '근거 확인 중'(일용직을 다시 채용할 때마다 다시 받는지 원문 확인 전) · 건설 기초 이수 '면제'는 석면·철거 현장 투입일 때만(준설 등만이면 근거 확인 중)
+      //   v447 검토 2: 연도 비교(해를 넘는 같은 투입 — 12-30 교육·01-05 시작 — 도 회색이 되던 것)를 빼고 ① 기록일과 이번 시작일 사이에 시작했거나 끝난 다른 현장이 있음 ·
+      //   ② 기록일이 이번 시작일보다 EDU_HIRE_GAP(7)일 넘게 앞(별표4 비고 2 — 1주일 안 재종사만 면제, 넘으면 ✓ 대신 회색: 다시 채용 때 다시 받는지는 '같은 사업장·같은 업무' 판정이 앱에 없어 근거 확인 중)
+      var hRef = eduMinStart(act) || cx.today, hOld = !!(h && isDate(h.date) && act.length && (vehDday(h.date).diff - vehDday(hRef).diff < -EDU_HIRE_GAP
+        || sites.some(function(e){ return (e.start && e.start > h.date && e.start < hRef) || (e.end && e.end > h.date && e.end < hRef); })));
+      c.hire = siteGate("hire", h || b) || (b ? (conAct.length ? eduIt({ t: "면제", tgt: true, cat: "면제", last: b, kind: "hire", basis: "건설업 기초안전보건교육 이수(" + b.date + ") — 석면·철거 현장 투입이라 채용 시 교육 면제" })
+          : (act.length ? eduGreyIt("hire", EDU_CHK, EDU_CHK, "건설업 기초안전보건교육 이수(" + b.date + ") — 석면·철거 밖 현장(" + eduSitesTxt(act) + ") 투입이라 면제 여부 근거 확인 중", b)
+            : eduIt({ t: "면제", cat: "면제", last: b, kind: "hire", basis: "건설업 기초안전보건교육 이수(" + b.date + ") — 진행 중 현장 투입 없음" })))
+        : (h ? (!act.length ? eduNone("hire", "진행 중 현장 투입 없음", h) : (hOld ? eduGreyIt("hire", EDU_CHK, EDU_CHK, "채용 시 교육 기록(" + h.date + ")이 이번 투입(" + hRef + ") 전 다른 투입 때 것일 수 있음 — 1주일 안 같은 사업장·같은 업무 재종사만 면제(산안법 시행규칙 별표4 비고 2), 이번 투입이 해당하는지 근거 확인 중", h) : eduOk("hire", h, actTxt)))
+          : (act.length ? eduDue("hire", eduMinStart(act), actTxt + " — 배치 전 1회, 기한 = 현장 시작일") : eduNone("hire", "진행 중 현장 투입 없음"))));
+    }
+    // 특별교육 — 현장 표·서버와 같은 판정: 진행 현장에 든 사람이 유효한 특별교육 기록(eduHasValidSpecial)이 없으면 빠짐(기록만 남은 사람도 진행 현장에 들어 있으면 — 현장 표와 같은 사람)
+    //   v447 검토: 같은 사람 = 현장 표(asbNoSpecial)·서버(siteEduGaps)가 이름을 내는 사람 — 회원 목록에 있는 회원(퇴사자 포함)·명부의 지우지 않은 일용직뿐.
+    //   지운 회원·지운 일용직·명부에 없는 id는 판정 안 함 · 명부를 볼 수 없는 '일용직 n'은 지운 사람을 가를 수 없어 판정 불가(서버 wk_n·현장 표가 세지 않는 사람을 세지 않게)
+    sp = eduLatest(p.ptype, p.pid, "special"); valid = eduHasValidSpecial(p.ptype, p.pid);
+    if (p.anon) c.spec = eduGreyIt("special", "판정 불가", "판정 불가", "일용직 명부를 볼 수 없어 지운 일용직인지 가를 수 없음 — 현장 표·서버와 같은 사람만 세려고 판정 안 함", sp);
+    else if (mem ? !p.m : (!p.w || p.w.del === 1)) c.spec = eduNone("special", (mem ? "지운 회원" : "지운 일용직") + " — 현장 표·서버 특별교육 판정 밖(판정 안 함)", sp);
+    else c.spec = siteGate("special", sp) || ((act.length && !valid) ? eduDue("special", eduMinStart(act), actTxt + " — 현장 표 특별교육 칸과 같은 판정(배치 전 이수), 기한 = 현장 시작일")
+      : (valid ? (act.length ? eduOk("special", sp, actTxt) : eduNone("special", "진행 중 현장 투입 없음", sp)) : eduNone("special", "진행 중 현장 투입 없음")));
+    // 건설 기초 — 석면·철거 진행 현장 투입 일용직(1회 — 기록 있으면 ✓) · 준설만이면 근거 확인 중(기록이 있어도 — 검토: 근거를 확인하지 못한 항목은 ✓·합계 분모에 넣지 않음) · 직원 대상 아님
+    if (gone || mem) c.basic = eduNone("basic_con", mem ? "직원 — 건설 일용근로자 교육이라 대상 아님" : "기록만 남은 사람 — 판정 안 함", b);
+    else c.basic = siteGate("basic_con", b) || (b ? (conAct.length ? eduOk("basic_con", b, "1회 이수(다시 받지 않음)") : (drAct.length ? eduGreyIt("basic_con", EDU_CHK, EDU_CHK, "준설 현장만 투입(" + eduSitesTxt(drAct) + ") — 건설공사 해당 여부 근거 확인 중 · 1회 이수 기록 있음", b) : eduNone("basic_con", "1회 이수(다시 받지 않음)", b)))
+      : (conAct.length ? eduDue("basic_con", eduMinStart(conAct), "석면·철거 현장 투입 일용직(" + eduSitesTxt(conAct) + ") — 첫 투입 전 1회, 기한 = 현장 시작일")
+        : (drAct.length ? eduGreyIt("basic_con", EDU_CHK, EDU_CHK, "준설 현장만 투입(" + eduSitesTxt(drAct) + ") — 건설공사 해당 여부 근거 확인 중") : eduNone("basic_con", "석면·철거 진행 현장 투입 없음"))));
+    // 일반건진 — 직원(사무직 2년·그 밖 1년, 표시 없으면 1년) · 일용직 대상 아님
+    g = last(["gen_med"]);
+    if (gone || !mem) c.gmed = eduNone("gen_med", mem ? "기록만 남은 사람 — 판정 안 함" : "일용직 — 상시 근로자 검진이라 대상 아님", g);
+    else if (boss) c.gmed = eduGreyIt("gen_med", EDU_CHK, EDU_CHK, BOSS_B, g);   // v447 검토 2
+    else c.gmed = g ? eduCycle("gen_med", g, off ? 24 : 12, (off ? "사무직 2년" : "그 밖 1년(사무직 표시가 없으면 1년)") + "마다 — 근사: 마지막 실시 + " + (off ? 24 : 12) + "개월(시행규칙 제197조 '1년(사무직 2년)에 1회 이상'의 연 단위 해석은 원문 확인 중)")
+      : eduIt({ t: "기록 없음", cls: "vs-warn", tgt: true, miss: true, cat: "기록 없음", kind: "gen_med", basis: (off ? "사무직 2년" : "그 밖 1년(사무직 표시가 없으면 1년)") + "마다 — 기록 없음" });
+    // 석면 건진 — 진행 중 석면 현장 투입자: 배치전·특수 기록이 없으면 기한 = 석면 현장 시작일 · 있으면 마지막 + 12개월(배치 뒤 12개월 첫 회·이후 12개월)
+    am = last(["pre_med", "spec_med"]);
+    // v447 검토: 마지막이 배치전 건진이면 첫 특수건진 기한 = 배치일(그 뒤 처음 든 석면 현장 시작일 — 없으면 진행 중 석면 현장의 가장 이른 시작일) + 12개월(종전엔 배치전 건진일 + 12개월)
+    var amPlace = "";
+    if (am && am.kind === "pre_med"){ sites.forEach(function(e){ if (e.k === "asbestos" && e.start && e.start >= am.date && (!amPlace || e.start < amPlace)) amPlace = e.start; }); if (!amPlace) amPlace = eduMinStart(asbAct); }
+    if (gone) c.amed = eduNone("pre_med", "기록만 남은 사람 — 판정 안 함", am);
+    else c.amed = siteGate(am ? "spec_med" : "pre_med", am) || (asbAct.length ? (am ? eduCycle("spec_med", am, 12, "석면 현장 투입(" + eduSitesTxt(asbAct) + ") — 배치 뒤 12개월 첫 회·이후 12개월" + (amPlace ? "(배치 " + amPlace + " 기준)" : ""), amPlace ? eduAddMonths(amPlace, 12) : "")
+      : eduDue("pre_med", eduMinStart(asbAct), "석면 현장 투입(" + eduSitesTxt(asbAct) + ") — 배치전 건강진단, 기한 = 현장 시작일")) : eduNone(am ? "spec_med" : "pre_med", "진행 중 석면 현장 투입 없음", am));
+    // 위험성평가 — 대상 = 직원 + 올해 투입(진행 중이거나 올해 현장) 일용직 · 결과 공유만 판정(직원) · 참여는 표시만
+    sh = last(["ra_share"], cx.y + "-01-01"); jn = last(["ra_join"], cx.y + "-01-01");
+    raT = !gone && (mem || sites.some(function(e){ return e.act || String(e.y) === cx.y; }));
+    //   v447 검토 2: 직원 판정은 그 사람에게 걸리는 올해 회차(eduRaOnFor — 전사 회차·그 사람 부서 회차 중 늦은 평가일)에 건다 — 회차가 있는데 그 뒤 공유 기록이 없거나,
+    //   회차가 아직 없는데 올해 공유 기록이 없으면 노랑 '기록 없음'(기한 없음 — 공유 기한은 지침 원문을 확인한 뒤에야 빨강을 낸다. 종전 '기한 = 평가일' 빨강은 지침에 없는 날짜였다)
+    //   · 근거 = 위험성평가 지침(고시 — 산안법 제36조 ④ 위임, 결과 알림은 법 제36조 본문이 아님) · 올해 투입 일용직은 기록이 있어도 '근거 확인 중'(✓·합계 분모에 넣지 않음)
+    var RA_SRC = "위험성평가 지침(고시) — 11/4 전부개정 원문 확인 중", raOn = mem ? eduRaOnFor(cx, m) : "", shR = raOn ? recs.filter(function(r){ return r.kind === "ra_share" && ((r.ra && typeof r.ra === "object" && isDate(r.ra.on) && r.ra.on >= raOn) || (isDate(r.date) && r.date >= raOn)); })[0] || null : null;
+    if (!raT) c.ra = eduNone("ra_share", gone ? "기록만 남은 사람 — 판정 안 함" : "올해 투입 없음(일용직)", sh);
+    else if (!mem) c.ra = eduGreyIt("ra_share", EDU_CHK, EDU_CHK, "올해 투입 일용직 — 신규·작업 변경자 작업 전 공유는 고용노동부 고시 전부개정(11/4)이 법제처에 오르기 전까지 근거 확인 중", sh);
+    else if (boss) c.ra = eduGreyIt("ra_share", EDU_CHK, EDU_CHK, BOSS_B, sh);
+    else if (raOn) c.ra = shR ? eduOk("ra_share", shR, "직원 — " + cx.y + "년 회차(평가 " + raOn + ") 결과 공유 · " + RA_SRC) : eduIt({ t: "기록 없음", cls: "vs-warn", tgt: true, miss: true, cat: "기록 없음", kind: "ra_share", basis: "직원 — " + cx.y + "년 회차(평가 " + raOn + ") 뒤 결과 공유 기록 없음(공유 기한은 지침 원문 확인 뒤 — 빨강 안 냄) · " + RA_SRC });
+    else c.ra = sh ? eduOk("ra_share", sh, "직원 — " + cx.y + "년 결과 공유(올해 정기·최초 회차 표식 없음) · " + RA_SRC) : eduIt({ t: "기록 없음", cls: "vs-warn", tgt: true, miss: true, cat: "기록 없음", kind: "ra_share", basis: "직원 — " + cx.y + "년 위험성평가 회차·결과 공유 기록 없음(회차 = 위험성평가 줄의 회차 표식 정기·최초) · " + RA_SRC });
+    c.ra.join = raT ? jn : null;
+    // 펼침에만 있는 항목(열에 없음) — 작업내용 변경 시 · 특별교육(해체·밀폐 등) · 석면해체·제거관리자교육 · 위험성평가 참여(표시만) · 신규·작업 변경자 작업 전 공유(근거 확인 중)
+    h = last(["change"]);
+    x.change = h ? eduIt({ t: "✓ " + eduYm(h.date), cat: "✓ 기록", last: h, kind: "change", basis: "작업내용을 바꾼 때 1회 — 변경 시점 자료가 앱에 없어 기록만 보여 줌" })
+      : ((!gone && act.length) ? eduGreyIt("change", EDU_CHK, EDU_CHK, "작업내용 변경 시점 자료가 앱에 없음 — 근거 확인 중") : eduNone("change", "작업내용 변경 기록 없음"));
+    h = last(["special_demo"]); a = act.filter(function(e){ return e.k !== "asbestos"; });
+    x.sdemo = h ? eduIt({ t: "✓ " + eduYm(h.date), cat: "✓ 기록", last: h, kind: "special_demo", basis: "석면 밖 특별교육(별표5) — 기록만" })
+      : ((!gone && a.length) ? eduGreyIt("special_demo", EDU_CHK, EDU_CHK, "철거·준설 진행 현장(" + eduSitesTxt(a) + ") — 별표5 대상 작업인지 원문 확인 뒤 판정") : eduNone("special_demo", "철거·준설 진행 현장 투입 없음"));
+    h = last(["manager"]);
+    x.mgr = h ? eduIt({ t: "✓ " + eduYm(h.date), cat: "✓ 기록", last: h, kind: "manager", basis: "석면해체·제거관리자교육(보수교육 조항 없음 — 인력 교체 시 후임자만)" }) : eduNone("manager", mem ? "지정 자료가 없어 기록만 보여 줌" : "직원 교육");
+    x.join = raT ? (jn ? eduIt({ t: "참여 " + eduYm(jn.date), cat: "참여", last: jn, kind: "ra_join", basis: cx.y + "년 참여 — 표시만(판정 안 함)" }) : eduGreyIt("ra_join", "기록 없음", "표시만", cx.y + "년 참여 기록 없음 — 표시만(판정 안 함)"))
+      : eduNone("ra_join", "올해 투입 없음", jn);
+    x.ranew = raT ? eduGreyIt("ra_share", EDU_CHK, EDU_CHK, "신규·작업 변경자 작업 전 공유 — 고용노동부 고시 전부개정(11/4 시행)이 법제처에 오르기 전까지 근거 확인 중") : eduNone("ra_share", "올해 투입 없음");
+    // 빠진 항목 · 다음 할 일 후보(빠짐 또는 30일 안) — 지남(음수)이 맨 앞, '기록 없음'(기한 모름)은 0일로, 열 순서로 동률 가름
+    var out = { c: c, x: x, miss: 0, over: false, soon: false, asb: asbAct.length > 0, cand: [] };
+    EDU_ITEM_COLS.forEach(function(k, i){
+      var it = c[k];
+      if (!it) return;
+      if (it.miss) out.miss++;
+      if (it.dd != null && it.dd < 0 && it.miss) out.over = true;
+      else if (it.dd != null && it.dd <= EDU_SOON && it.tgt) out.soon = true;
+      if (it.miss || (it.tgt && it.dd != null && it.dd <= EDU_SOON)) out.cand.push({ k: k, it: it, o: it.dd != null ? it.dd : 0, i: i });
+    });
+    out.cand.sort(function(a1, b1){ return (a1.o - b1.o) || (a1.i - b1.i); });
+    return out;
+  }
+  // 최근 현장 '종류 연-월'(시작일 → 없으면 종료일 — 옛 목록 정렬과 같은 식)
+  function eduRecentSite(list){ var best = null; (list || []).forEach(function(e){ var s = String(e.r.start || e.r.end || ""); if (!best || s > best.s) best = { s: s, e: e }; }); return best ? SITE_KIND[best.e.k] + (best.s ? " " + best.s.slice(0, 7) : "") : ""; }
+  // 행 원천 = 볼 수 있는 사람(위 설명). 기록을 받기 전(eduLoaded)이면 빈 배열(정의 none 글이 '불러오는 중')
+  function eduSheetRows(){
+    if (!eduLoaded) return [];
+    var cx = eduSheetCx(), si = eduSiteIdx(), ri = eduRecIdx(), out = [], seen = {}, wids = [], wseen = {}, n = 0;
+    var wkGrp = function(k){ var s = si[k] || []; if (!cx.site) return ri[k] ? "" : "old"; return s.some(function(e){ return e.act || (e.y && e.y >= SITE_OLD_BEFORE); }) ? "" : "old"; };
+    liveMembers().forEach(function(m){
+      if (!m || m.id == null) return;
+      var k = "member:" + m.id, ret = memberRetired(m);
+      seen[k] = 1;
+      if (m.test_acct === true) return;   // 시험 계정 — 이 표·빠진 항목·합계에서 뺌(기록도 둘째 묶음에 안 나옴)
+      if (ret && !ri[k] && !(si[k] || []).some(function(e){ return e.act; })) return;
+      out.push({ id: k, ptype: "member", pid: m.id, m: m, name: (dispName(m.name) || m.name || "(이름 없음)") + (ret ? " (퇴사)" : ""), grp: ret ? "gone" : "" });
+    });
+    if (cx.wk){
+      workers.forEach(function(w){
+        if (!w || w.id == null) return;
+        var k = "worker:" + w.id;
+        if (seen[k]) return;
+        seen[k] = 1;
+        if (w.del === 1){ if (ri[k]) out.push({ id: k, ptype: "worker", pid: w.id, w: w, name: (w.name || "(이름 없음)") + " (지움)", grp: "gone", del: 1 }); return; }
+        out.push({ id: k, ptype: "worker", pid: w.id, w: w, name: w.name || "(이름 없음)", grp: wkGrp(k) });
+      });
+    } else {
+      Object.keys(si).concat(Object.keys(ri)).forEach(function(k){ if (k.indexOf("worker:") === 0 && !wseen[k]){ wseen[k] = 1; wids.push(k); } });
+      wids.sort();
+      wids.forEach(function(k){ n++; seen[k] = 1; out.push({ id: k, ptype: "worker", pid: k.slice(7), w: null, name: "일용직 " + n, grp: wkGrp(k), anon: true }); });
+    }
+    // 기록만 남은 사람 — 회원 목록·명부에 없는 id(지운 회원·지운 일용직). 목록을 아직 못 받았으면 가릴 수 없으니 빼 둔다
+    Object.keys(ri).forEach(function(k){
+      if (seen[k]) return;
+      if (k.indexOf("member:") === 0 && members.length) out.push({ id: k, ptype: "member", pid: k.slice(7), m: null, name: "(지운 회원)", grp: "gone" });
+      else if (k.indexOf("worker:") === 0 && cx.wk) out.push({ id: k, ptype: "worker", pid: k.slice(7), w: null, name: "(지운 일용직)", grp: "gone", del: 1 });
+    });
+    out.forEach(function(p){ var s = si[p.id] || []; p.st = eduPersonStat(p, cx, si, ri); p.org = [p.m && p.m.dept ? String(p.m.dept) : "", eduRecentSite(s)].filter(Boolean).join(" · "); });
+    return out;
+  }
+  function eduSheetFind(id){ var rs = eduSheetRows(), i; for (i = 0; i < rs.length; i++){ if (rs[i].id === id) return rs[i]; } return null; }
+  // 줄 id → 행(여럿에게 넣기처럼 여러 사람을 한 번에 찾을 때 — 행 원천을 한 번만 만든다)
+  function eduSheetMap(){ var o = {}; eduSheetRows().forEach(function(r){ o[r.id] = r; }); return o; }
+  // 새 기록을 넣을 수 있는 사람 — 재직 회원(시험 계정 빼고) · 명부에 있는 지우지 않은 일용직(이름을 볼 수 있을 때만 — 옛 창의 대상 고르기와 같은 범위)
+  function eduCanAdd(p){ return !!p && p.grp !== "gone" && (p.ptype === "member" ? (!!p.m && !memberRetired(p.m) && p.m.test_acct !== true) : (!!p.w && p.w.del !== 1)); }
+  // 다음 할 일 — 가장 급한 항목 + '외 n'
+  function eduNextOf(p){ var c = p.st.cand; if (!c.length) return null; return { k: c[0].k, it: c[0].it, t: EDU_ITEM_H[c[0].k] + " " + c[0].it.t + (c.length > 1 ? " 외 " + (c.length - 1) : ""), o: c[0].o }; }
+  function eduSheetVal(r, k){
+    var nx;
+    if (k === "name") return r.name;
+    if (k === "type") return r.ptype === "member" ? "직원" : "일용직";
+    if (k === "org") return r.org || "";
+    if (k === "next"){ nx = eduNextOf(r); return nx ? nx.t : ""; }
+    if (k === "miss") return r.st.miss;
+    if (r.st.c[k]) return r.st.c[k].t;
+    return "";
+  }
+  // 정렬 값 — 다음 할 일 = 남은 날(지남 음수 · 기록 없음 0 · 없으면 뒤) · 항목 칸 = 기한 남은 날, 기한 없으면 상태 순(기록 없음 → 진행 → 확인 중 → ✓ → 대상 아님)
+  var EDU_CAT_RANK = { "기한 경과": 0, "기록 없음": 1, "기한 전": 2, "진행 중": 3, "판정 불가": 4, "확인 중": 5, "근거 확인 중": 6, "면제": 7, "✓ 이수": 8, "✓ 기록(대상 아님)": 9, "대상 아님": 10 };
+  function eduSheetSv(r, k){
+    var nx, it;
+    if (k === "next"){ nx = eduNextOf(r); return nx ? nx.o : ""; }
+    if (k === "miss") return r.st.miss;
+    it = r.st.c[k];
+    if (it) return it.dd != null && it.tgt ? -100000 + it.dd : (Object.prototype.hasOwnProperty.call(EDU_CAT_RANK, it.cat) ? EDU_CAT_RANK[it.cat] : 11);
+    return eduSheetVal(r, k);
+  }
+  function eduItHtml(it){
+    var h = it.grey && !it.cls ? '<span style="' + EDU_GREY + '">' + esc(it.t) + '</span>' : esc(it.t);
+    if (it.join) h += '<span class="edu-join" title="' + esc("참여 " + it.join.date) + '"> · 참여</span>';
+    return h;
+  }
+  function eduItTip(it, head){ return [head, it.basis, it.last ? "마지막 " + it.last.date + " " + eduKindLabel(it.last.kind) : "", it.due ? "기한 " + it.due : "", it.join ? "참여 " + it.join.date : ""].filter(Boolean).join(" · "); }
+  function eduSheetCell(r, c, ctx){
+    var k = c.k, it, nx;
+    if (k === "name") return { html: esc(r.name), title: r.name + " — " + (r.ptype === "member" ? "직원" : "일용직") + (r.anon ? "(일용직 명부를 볼 권한이 없거나 읽는 중이라 이름 없이)" : "") };
+    if (k === "type") return r.ptype === "member" ? "직원" : "일용직";
+    if (k === "org") return r.org ? { html: esc(r.org), title: r.org } : '<span style="' + EDU_GREY + '">-</span>';
+    if (k === "next"){ nx = eduNextOf(r); return nx ? { html: esc(nx.t), cls: nx.it.cls, title: nx.t + " · " + eduItTip(nx.it, "") } : '<span style="' + EDU_GREY + '">없음</span>'; }
+    if (k === "miss") return r.st.miss ? { html: String(r.st.miss), title: "대상인데 유효 기록이 없는 항목 수('근거 확인 중'·'판정 불가'는 세지 않음)" } : '<span style="' + EDU_GREY + '">0</span>';
+    it = r.st.c[k];
+    if (!it) return "";
+    return { html: eduItHtml(it), cls: it.cls, title: eduItTip(it, EDU_ITEM_H[k] + " " + it.t) };
+  }
+  // 합계 줄(거른 줄 전체 — 접힌 묶음 안 줄 포함): 이름 칸 '합계 n명 · 접힘 m' · 다음 할 일 칸 '경과 a · 30일 안 b'(칩과 같은 셈) · 빠진 항목 칸 합 · 항목 칸 '✓ 이수/대상'
+  function eduSheetFoot(rows, ctx){
+    var fold = 0, over = 0, soon = 0, miss = 0, o = {};
+    rows.forEach(function(r){ if (r.grp) fold++; if (r.st.over) over++; else if (r.st.soon) soon++; miss += r.st.miss; });
+    o.name = "합계 " + vsN(rows.length) + "명" + (fold ? " · 접힘 " + vsN(fold) : "");
+    o.next = '<span title="기한 경과 — 지난 항목이 있는 사람 · 30일 안 — 기한이 30일 안에 오는 사람(칩과 같은 셈)">경과 ' + vsN(over) + ' · 30일 안 ' + vsN(soon) + '</span>';
+    o.miss = vsN(miss);
+    EDU_ITEM_COLS.forEach(function(k){
+      var ok = 0, tg = 0;
+      rows.forEach(function(r){ var it = r.st.c[k]; if (!it || !it.tgt) return; tg++; if (!it.miss && (it.cat === "✓ 이수" || it.cat === "면제" || it.cat === "기한 전")) ok++; });
+      o[k] = '<span title="' + esc(EDU_ITEM_H[k]) + ' — 유효 기록 있음 / 대상(근거 확인 중·대상 아님은 빼고)">✓ ' + vsN(ok) + '/' + vsN(tg) + '</span>';
+    });
+    return o;
+  }
+  // 펼침 항목 줄(항목·대상 근거·마지막 실시·다음 기한·상태·[+ 기록]) — 대상 아님(—)은 맨 아래 한 줄로
+  function eduDetRows(r){
+    var c = r.st.c, x = r.st.x, sup = !!(r.m && r.m.supervisor === true);
+    return [
+      [sup ? "정기교육(관리감독자)" : "정기교육(근로자)", c.reg], ["채용 시 교육", c.hire], ["작업내용 변경 시 교육", x.change], ["특별교육(석면)", c.spec], ["특별교육(해체·밀폐 등)", x.sdemo],
+      ["건설업 기초안전보건교육", c.basic], ["석면해체·제거관리자교육", x.mgr], ["일반건강진단", c.gmed], ["석면 건강진단(배치전·특수)", c.amed],
+      ["위험성평가 결과 공유", c.ra], ["위험성평가 참여(표시만)", x.join], ["신규·작업 변경자 작업 전 공유", x.ranew]
+    ];
+  }
+  function eduSheetDetail(r, ctx){
+    var can = canDo("safety") && eduCanAdd(r), rows = eduDetRows(r), na = [], body = "", hist, h;
+    h = '<div class="vs-dh"><b>' + esc(r.name) + '</b><span class="scope-chip">' + (r.ptype === "member" ? "직원" : "일용직") + '</span>'
+      + (r.org ? '<span class="vs-dsub">' + esc(r.org) + '</span>' : '') + (r.grp === "gone" ? '<span class="vs-dsub">기록만 남은 사람 — 새 기록은 넣지 않음</span>' : '') + ctx.close + '</div>';
+    rows.forEach(function(x){
+      var it = x[1];
+      if (!it) return;
+      if (it.t === "—" && !it.last){ na.push(x[0]); return; }
+      body += '<tr><td><b>' + esc(x[0]) + '</b></td><td class="edu-basis">' + esc(it.basis || "-") + '</td><td>' + (it.last ? esc(it.last.date) : '<span style="' + EDU_GREY + '">-</span>') + '</td>'
+        + '<td>' + (it.due ? esc(it.due) : '<span style="' + EDU_GREY + '">-</span>') + '</td><td class="' + (it.cls || "") + '">' + eduItHtml(it) + '</td>'
+        + '<td>' + (can && it.kind ? '<button type="button" class="mini-btn" data-edu-act="add" data-edu-row="' + esc(r.id) + '" data-edu-kind="' + esc(it.kind) + '">+ 기록</button>' : '') + '</td></tr>';
+    });
+    h += '<table class="edu-dt"><thead><tr><th>항목</th><th>대상 근거</th><th>마지막 실시</th><th>다음 기한</th><th>상태</th><th></th></tr></thead><tbody>' + body + '</tbody></table>';
+    if (na.length) h += '<div class="vs-dsub" style="margin:6px 0 0;">대상 아님 — ' + esc(na.join(" · ")) + '</div>';
+    hist = liveEdu().filter(function(e){ return e.ptype === r.ptype && String(e.pid) === String(r.pid); }).sort(function(a, b){ return String(b.date || "").localeCompare(String(a.date || "")); });
+    h += '<div class="vs-dsub" style="margin:10px 0 4px;font-weight:700;">이력 ' + hist.length + '건</div>';
+    if (hist.length){
+      h += '<table class="edu-dt"><thead><tr><th>날짜</th><th>종류</th><th>시간</th><th>다음 예정</th><th>메모</th><th></th></tr></thead><tbody>';
+      hist.forEach(function(e){
+        var ra = (eduIsRa(e.kind) && e.ra && typeof e.ra === "object") ? [isDate(e.ra.on) ? "평가 " + e.ra.on : "", eduRaTypeOk(e.ra.type) ? EDU_RA_TYPE[e.ra.type] : "", typeof e.ra.unit === "string" ? e.ra.unit : ""].filter(Boolean).join(" · ") : "";
+        h += '<tr><td>' + esc(e.date || "-") + '</td><td>' + esc(eduKindLabel(e.kind)) + '</td><td>' + (eduHoursNum(e.hours) ? esc(String(eduHoursNum(e.hours))) + '시간' : '-') + '</td><td>' + esc(isDate(e.next) ? e.next : "-") + '</td>'
+          + '<td class="edu-basis">' + esc([ra, e.note || ""].filter(Boolean).join(" · ") || "-") + '</td><td>' + (canDo("safety") ? '<button type="button" class="mini-btn" data-edu-act="edit" data-edu-id="' + esc(e.id) + '" data-edu-row="' + esc(r.id) + '">수정</button>' : '') + '</td></tr>';
+      });
+      h += '</tbody></table>';
+    } else h += '<div class="empty-line">아직 기록이 없습니다.</div>';
+    if (can) h += '<div class="vs-act"><button type="button" class="mini-btn" data-edu-act="add" data-edu-row="' + esc(r.id) + '">+ 이력 추가</button></div>';
+    return h;
+  }
+  // 누름 — 지금 규칙을 다시 본다(화면에 남은 옛 버튼·흉내 누름도): 안전 수행 · 기록을 받은 뒤 · [수정]은 그 사람의 지우지 않은 기록만 · [+ 기록]·[+ 이력 추가]는 새 기록을 넣을 수 있는 사람만
+  function eduSheetAct(act, rowId, recId, kind){
+    var p, r;
+    if (!canDo("safety")){ alert(EDU_NO_WRITE); return; }
+    if (!eduLoaded){ alert(EDU_UNREAD_MSG); return; }
+    p = eduSheetFind(String(rowId == null ? "" : rowId));
+    if (act === "edit"){
+      r = findEdu(String(recId == null ? "" : recId));
+      if (!p || !r || r.del === 1 || r.ptype !== p.ptype || String(r.pid) !== String(p.pid)) return;
+      openEdu(r.id);
+      return;
+    }
+    if (act !== "add") return;
+    if (!eduCanAdd(p)){ alert("이 사람에게는 새 기록을 넣지 않습니다 — 퇴사자·지운 일용직·이름을 볼 수 없는 일용직."); return; }
+    openEdu(null, p.ptype, { ptype: p.ptype, pid: p.pid, kind: (kind && eduKindDef(kind)) ? kind : "" });
+  }
+  function eduSheetBindAct(root){
+    root.addEventListener("click", function(e){
+      var el = e && e.target, a = null;
+      while (el && el !== root){ if (el.getAttribute){ a = el.getAttribute("data-edu-act"); if (a != null) break; } el = el.parentNode; }
+      if (!el || el === root || a == null) return;
+      if (e.stopPropagation) e.stopPropagation();
+      eduSheetAct(a, el.getAttribute("data-edu-row"), el.getAttribute("data-edu-id"), el.getAttribute("data-edu-kind"));
+    });
+  }
+  // 여럿에게 같은 기록(선택 막대) — 행 원천에 있는 줄 중 새 기록을 넣을 수 있는 사람만(그린 줄만 전체선택 · 칩·거르기를 바꾸면 숨은 선택은 풀림 — 부품 규칙)
+  function eduBulkOpen(ids){
+    var ok = [], skip = 0;
+    if (!canDo("safety")){ alert(EDU_NO_WRITE); return; }
+    if (!eduLoaded){ alert(EDU_UNREAD_MSG); return; }
+    var byId = eduSheetMap();
+    (ids || []).forEach(function(id){ var p = Object.prototype.hasOwnProperty.call(byId, id) ? byId[id] : null; if (eduCanAdd(p)) ok.push(p.id); else skip++; });
+    if (!ok.length){ alert("선택한 사람 중 새 기록을 넣을 수 있는 사람이 없습니다 — 퇴사자·지운 일용직·이름을 볼 수 없는 일용직에게는 넣지 않습니다."); return; }
+    openEdu(null, null, { ids: ok, skip: skip });
+  }
+  // 갈래가 정해질 때마다(부품 onMode) — 표 갈래: 옛 대상 칩 줄(#eduScopeBar) 숨김(부품 칩 줄이 대신) · 폰 갈래: 되살림(머리 글은 옛 본문이 그림)
+  function eduSheetMode(m){
+    var bar = document.getElementById("eduScopeBar"), sheet = m === "sheet";
+    eduSheetCur = sheet ? "sheet" : "legacy";
+    if (bar) bar.style.display = sheet ? "none" : "";
+  }
+  // 머리 글(표 갈래) — '총 n명 (접힘 m명)': n = 칩·거르기를 지난 줄 · m = 접힌 묶음 줄
+  function eduSheetPaint(M){
+    var head = document.getElementById("eduHead"), fold = 0;
+    M.flat.forEach(function(e){ if (!e.r && !e.open) fold += e.n; });
+    if (head) head.textContent = M.rows.length ? ("총 " + M.rows.length + "명" + (fold ? " (접힘 " + fold + "명)" : "")) : "";
+  }
+  function eduSheetGrpLabel(g, n, open){
+    var t = g === "old" ? "그 밖 일용직 · " + (SITE_OLD_BEFORE - 1) + "년까지 현장만(또는 현장 참여 없음)" : "기록만 남은 사람 · 퇴사자·지운 회원·지운 일용직(새 기록은 넣지 않음)";
+    return esc(t) + (open ? "" : ' <span class="vs-dsub">누르면 펼침 · 이름을 거르면 저절로 펼쳐 보임</span>');
+  }
+  function eduSheetGrpAuto(o){ var f = (o && o.f) || {}; return !!(f.name || f.org); }
+  function eduChipT(fn){ return function(r){ return !!fn(r); }; }
+  function eduSheetDef(){
+    var d = EDU_SHEET_DEF, cat = function(k){ return function(r){ var it = r.st.c[k]; return it ? it.cat : ""; }; };
+    if (!d){
+      d = EDU_SHEET_DEF = {
+        key: "jw_edu_sheet", host: "eduList", unit: "명",
+        empty: "조건에 맞는 사람이 없습니다.",
+        cols: [
+          { k: "name", h: "이름", w: 108, f: "text" },   // 명세 96 → 108(실측 — 선택 체크 상자 24 + '일용직 155')
+          { k: "type", h: "구분", w: 56, f: "enum", lv: 4 },   // 명세 lv3 → lv4(위험성평가 열 단계 올림 — 단계 합)
+          { k: "org", h: "소속·최근", w: 168, f: "text", lv: 4 },   // 명세 92·lv3 → 168·lv4
+          { k: "next", h: "다음 할 일", f: "none", fill: 1, min: 128 },
+          { k: "miss", h: "빠진 항목", w: 72, f: "none", num: 1 },   // 명세 64 → 72
+          { k: "reg", h: "정기교육", w: 90, f: "enum", lv: 2, ft: cat("reg") },
+          { k: "hire", h: "채용 시", w: 89, f: "enum", lv: 2, ft: cat("hire") },   // 명세 86 → 89('근거 확인 중')
+          { k: "spec", h: "특별교육", w: 82, f: "enum", lv: 2, ft: cat("spec") },   // 명세 86 → 82
+          { k: "basic", h: "건설 기초", w: 89, f: "enum", lv: 2, ft: cat("basic") },   // 명세 86 → 89
+          { k: "gmed", h: "일반건진", w: 90, f: "enum", lv: 3, ft: cat("gmed") },   // 명세 86 → 82 → 90(11/12 시험 화면 실측 — 대표 줄 '근거 확인 중' 글 71.3px + 칸 여백 16 · '경과 1,000일' 72.2px)
+          { k: "amed", h: "석면 건진", w: 84, f: "enum", lv: 2, ft: cat("amed") },   // 명세 86 → 84
+          { k: "ra", h: "위험성평가", w: 124, f: "enum", lv: 3, ft: cat("ra") }   // ★명세 86·lv4 → 124·lv3(1366 창에서 보이게 · '✓ 2026-11 · 참여')
+        ],
+        rows: eduSheetRows,
+        id: function(r){ return r.id; },
+        val: eduSheetVal, sv: eduSheetSv, cell: eduSheetCell,
+        chips: [
+          { g: "who", items: [
+            { k: "", h: "전체", tip: "직원·일용직 모두(시험 계정 빼고)" },
+            { k: "member", h: "직원", test: eduChipT(function(r){ return r.ptype === "member"; }) },
+            { k: "worker", h: "일용직", test: eduChipT(function(r){ return r.ptype === "worker"; }) }
+          ] },
+          { g: "st", items: [
+            { k: "", h: "상태 전체" },
+            { k: "miss", h: "빠진 항목 있음", tip: "대상인데 유효 기록이 없는 항목이 있는 사람('근거 확인 중'·'판정 불가'는 세지 않음)", test: eduChipT(function(r){ return r.st.miss > 0; }) },
+            { k: "due30", h: "30일 안·지남", tip: "기한이 30일 안이거나 지난 항목이 있는 사람", test: eduChipT(function(r){ return r.st.over || r.st.soon; }) },
+            { k: "over", h: "기한 경과", warn: 1, tip: "기한이 지난 항목이 있는 사람", test: eduChipT(function(r){ return r.st.over; }) },
+            { k: "asb", h: "석면 투입자", tip: "진행 중(예정·작업중) 석면 현장에 든 사람", test: eduChipT(function(r){ return r.st.asb; }) }
+          ] }
+        ],
+        chipCount: 1, chipStyle: "light",
+        sort: { k: "next", d: 1 },
+        group: { of: function(r){ return r.grp || ""; }, label: eduSheetGrpLabel, order: ["old", "gone"], auto: eduSheetGrpAuto },
+        foot: eduSheetFoot, detail: eduSheetDetail,
+        bind: function(root){ eduSheetBindAct(root); },
+        sel: { set: function(){ return eduSel; }, can: function(){ return canDo("safety"); }, acts: [{ h: "같은 기록 넣기", run: eduBulkOpen }] },
+        phone: "legacy",   // 폰 = 지금 이력 카드 목록 그대로(C063 PM 11/12 16:14 '계획대로(나·나)')
+        legacy: renderEduLegacy,   // 옛 그리기 본문(입구 renderEdu를 넘기면 부품 재진입 가드로 폰 화면이 빈다 — v438)
+        onMode: eduSheetMode,
+        onPaint: eduSheetPaint
+      };
+    }
+    d.none = eduLoaded ? "대상인 사람이 없습니다." : "체크 칸 기록을 불러오는 중입니다 — 계속 비어 있으면 새로고침해 주세요.";
+    return d;
+  }
+  // 안전 › 체크 칸 입구 — 갈래 함수 하나(PC = 표, 폰 = 옛 본문)
+  function renderEdu(){
+    if (!document.getElementById("eduList")) return;
+    if (eduScopeAsk){ eduSheetScope(eduScopeAsk); eduScopeAsk = ""; }   // 다른 화면에서 대상 칩으로 온 길(setSafetyLayer가 남김) — 이번 그림에 한 번
+    vsSheetRender(eduSheetDef());
+  }
+  // [+ 이력 추가](칸 머리) 대상 — PC 표면 대상 칩이 '일용직'일 때 일용직, 그 밖 직원 · 폰 옛 목록은 대상 칩(eduViewScope — 종전)
+  function eduAddScope(){
+    var d, g, on;
+    if (eduSheetCur !== "sheet") return eduViewScope;
+    d = eduSheetDef(); g = vsChipGroup(d, "who"); on = g ? vsChipOn(vsInst(d), g) : null;
+    return (on && on.k === "worker") ? "worker" : "member";
+  }
+  // 다른 화면에서 대상 칩으로 오는 길('safety:edu:worker'·'safety:edu:member' — 캘린더·관리자 홈·인사 두 화면 안내·현황): 표의 대상 칩을 이번만 켬(기기 기억은 저장하지 않음 — 다음 칩 누름 때 그때 상태로)
+  //   v447 검토 2: 대상 칩만 켜면 이 기기에 저장된 상태 칩·칸 거르기·검색어가 남아 누른 줄의 사람이 표에 없을 수 있었다 — 이번만 상태 칩·거르기·검색어도 풂(현장 표 siteSheetGo·현황 ④ 계약과 같은 꼴, 기기 저장 없음 — 다음 칩 누름 때 그때 상태로).
+  //   'miss'(현황 ② 5조② 줄) = 대상 전체 + 상태 '빠진 항목 있음'(줄이 말하는 사람들 — 직원·일용직 모두)
+  function eduSheetScope(sub){
+    var d, inst, t;
+    if (sub !== "member" && sub !== "worker" && sub !== "miss") return;
+    d = eduSheetDef(); inst = vsInst(d);
+    for (t in inst.timers){ if (Object.prototype.hasOwnProperty.call(inst.timers, t)) clearTimeout(inst.timers[t]); }
+    inst.timers = {};
+    inst.st.chip.who = sub === "miss" ? "" : sub; inst.st.chip.st = sub === "miss" ? "miss" : ""; inst.st.f = {}; inst.q = ""; inst.open = null; inst.prune = true;
+  }
+  // 현황 ② 중처법 5조② 줄이 잇는 빠진 항목 수(읽기만 — 이 표와 같은 셈: 행 원천 전부, 접힌 묶음 포함)
+  //   v447 검토: nd = 판정 불가·확인 중 칸 수(현장 권한 없음·대장 읽는 중·명부를 볼 수 없는 일용직 — 빠짐으로 세지 않는 칸을 '없음'으로 보이지 않게 현황이 함께 적음)
+  function eduSheetMissSum(){ var p = 0, n = 0, nd = 0; eduSheetRows().forEach(function(r){ if (r.st.miss){ p++; n += r.st.miss; } EDU_ITEM_COLS.forEach(function(k){ var it = r.st.c[k]; if (it && (it.cat === "판정 불가" || it.cat === "확인 중")) nd++; }); }); return { people: p, items: n, nd: nd }; }
+  // @edu-sheet-end
 
   function famQRange(){
     famQInit();
@@ -23721,7 +24404,8 @@
     if (ci >= 0){ sub = String(name).slice(ci + 1); name = String(name).slice(0, ci); }   // "edu:worker" = 교육·검진 칸 + 대상 칩(캘린더·인사 두 화면 안내가 넘긴다)
     if (name === "site") siteId = sub;   // v445 "site:<현장 id>"(캘린더 현장 일정) — 현장 칸으로 온 요청만(다른 칸 요청이 현장 칸으로 떨어진 'edu:worker'의 대상은 현장 id가 아님)
     if (panes.indexOf(name) < 0) name = panes.length ? panes[0] : "site";   // 칸을 안 고르면(사이드바) 볼 수 있는 첫 칸
-    if (name === "edu" && (sub === "member" || sub === "worker")) eduViewScope = sub;
+    if (name === "edu" && (sub === "member" || sub === "worker")){ eduViewScope = sub; eduScopeAsk = sub; }   // v447 PC 표의 대상 칩도 이번만 — 아래 renderEdu가 받아 켬(eduScopeAsk · 기기 기억 저장 없음 — @edu-sheet 구간)
+    else if (name === "edu" && sub === "miss") eduScopeAsk = sub;   // v447 검토 2 현황 ② 5조② 줄 — PC 표 대상 전체·상태 '빠진 항목 있음'을 이번만(폰 옛 목록 대상 칩은 그대로)
     safetyLayer = name;
     var bar = document.getElementById("sfSubBar");
     if (bar) Array.prototype.forEach.call(bar.querySelectorAll(".lsub-btn"), function(b){
@@ -23738,6 +24422,10 @@
       // 일용직 이름은 명부에서 — 명부가 교육 기록보다 늦게 오면 일용직 줄이 '(삭제된 일용직)'으로 남는다(loadWorkers는 renderEdu를 부르지 않음).
       //   명부가 온 뒤 아직 이 칸이면 한 번 더 그린다(v428 검토: 캘린더 교육 예정 → 일용직 목록 길에서 바로 드러나던 경합. 공용 loadWorkers는 그대로)
       if (canSee("wk")){ var wkp = loadWorkers(); if (wkp && typeof wkp.then === "function") wkp.then(function(){ if (currentTab === "safety" && safetyLayer === "edu") renderEdu(); }); }
+      // v447 사람별 표의 배치 전 칸(채용 시·특별교육·건설 기초·석면 건진)·일용직 묶음은 현장 대장으로 판정 — 현장 권한이면 대장도 읽고, 받은 뒤 아직 이 칸이면 한 번 더 그린다
+      //   (loadAsb는 현장 칸만 다시 그림 · 현장 권한이 없으면 그 칸들은 '판정 불가(현장 권한 없음)')
+      //   v447 검토: 체크 칸은 대장을 읽기만 — noHooks(보류된 계약 연결·종결 훅 csSiteHooksRetry는 현장 칸·계약 쪽 읽기에서만 — 현황과 같은 꼴, 파일 전체에서 이 두 곳)
+      if (canSee("site")){ var eap = loadAsb({ noHooks: true }); if (eap && typeof eap.then === "function") eap.then(function(){ if (currentTab === "safety" && safetyLayer === "edu") renderEdu(); }); }
     }
   }
   function setBidLayer(name){
@@ -27076,6 +27764,11 @@
     document.getElementById("meBirth").value = m ? (m.birth||"") : "";
     document.getElementById("meHire").value = m ? (m.hire_date||"") : "";
     document.getElementById("meEmp").value = m ? (m.emp_type||"정규직") : "정규직";
+    document.getElementById("meOffice").checked = !!(m && m.office === true);   // v447 회원 칸 4개(안전 › 체크 칸 기준)
+    document.getElementById("meSupervisor").checked = !!(m && m.supervisor === true);
+    document.getElementById("meCorp").value = (m && (m.corp === "env" || m.corp === "con")) ? m.corp : "";
+    document.getElementById("meTestAcct").checked = !!(m && m.test_acct === true);
+    document.getElementById("meTestWrap").style.display = isAdmin() ? "" : "none";   // 시험 계정 표식은 관리자만
     document.getElementById("meBasis").value = m ? (m.annual_basis||"hire") : "hire";
     document.getElementById("meLoa").value = (m && m.loa_days) ? m.loa_days : "";
     document.getElementById("meLeave").value = m ? (m.leave_date||"") : "";
@@ -27168,7 +27861,10 @@
       annual_basis: document.getElementById("meBasis").value,
       loa_days: loaRaw === "" ? 0 : Number(loaRaw),
       leave_date: document.getElementById("meLeave").value || "",
-      annual_paid: document.getElementById("mePaidAnnual").checked };
+      annual_paid: document.getElementById("mePaidAnnual").checked,
+      office: document.getElementById("meOffice").checked, supervisor: document.getElementById("meSupervisor").checked,   // v447 회원 칸(서버는 켜짐만 저장 — 꺼짐은 칸째 지움)
+      corp: document.getElementById("meCorp").value || "" };
+    if (isAdmin()) payload.test_acct = document.getElementById("meTestAcct").checked;   // v447 시험 계정 표식은 관리자만 보냄(서버도 관리자만 받음)
     // 관리자·개발자 지정과 아이디는 개발자만 보낸다(서버 DEV_ONLY). v328: 관리자가 만든 일반 직책 회원은
     // 이 필드들을 아예 싣지 않아 통과하고, 권한은 서버 프리셋이 붙는다.
     if (isDev()){

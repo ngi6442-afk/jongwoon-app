@@ -15,7 +15,9 @@
 //   - 일용직 이름 = 명부(col:workers)에서 지우지 않은 같은 id의 첫 줄 이름(지운 일용직·없는 id·빈 이름은 뺀다)
 //   - 순서 = 그 현장의 member_ids 순(직원) 다음 worker_ids 순(일용직) — 앱과 같음
 //   - 같은 대장 id가 두 줄이면 앞 줄(지운·종결 줄을 뺀 뒤 첫 줄)만 — 앱 siteGapSigs(서명)도 같은 줄을 고른다
-// has_edu = 지우지 않은 교육 기록이 1건이라도 있나(종류 무관). 앱은 0건이면 '교육 기록 없음 — 이수 여부 미확인'을 그리고 이름을 쓰지 않는다.
+// has_edu = 지우지 않은 특별교육(kind special) 기록이 1건이라도 있나. 앱은 없으면 '특별교육 기록 없음 — 이수 여부 미확인'을 그리고 이름을 쓰지 않는다.
+//   v447: 종전엔 종류 무관(아무 기록 1건)이라, 안전 › 체크 칸에 새 종류(채용 시·위험성평가 공유 등)만 먼저 넣으면 투입 인원 전원이 '미이수'로 바뀌었다 —
+//   특별교육 판정과 같은 종류(special)만 본다(앱 eduAnySpecial과 같은 규칙 — uismoke v447 대조).
 // opts.workerNames === false(v433 검토 — 일용직 권한 wk가 숨김인 사람): 일용직은 이름 대신 현장별 수만 wk_n에 — 그 사람은 일용직 명부(col:workers)를 못 읽고
 //   v433 전 화면에도 일용직 이름이 없었다(앱은 명부를 일용직 권한일 때만 읽음). 수는 이름을 냈을 사람 수와 같다(지운 일용직·없는 id·빈 이름은 세지 않음).
 const tier = require('./tier');
@@ -83,7 +85,7 @@ function siteEduGaps(sites, eduItems, workers, members, opts) {
     gaps[key] = out;
     if (!wkNames) wkN[key] = k;
   });
-  const has = edu.some(function (r) { return typeof r === 'object'; });
+  const has = edu.some(function (r) { return typeof r === 'object' && r.kind === 'special'; });   // v447 특별교육 기록만(위 has_edu 설명)
   return wkNames ? { has_edu: has, gaps: gaps } : { has_edu: has, gaps: gaps, wk_n: wkN };
 }
 

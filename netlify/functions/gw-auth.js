@@ -91,6 +91,8 @@ function safeMember(m) { if (!m) return null; const { pin_salt, pin_hash, ...s }
 // 일반 직책(v328, PM 9/8 "대표/관리자/개발자 제외한 다른 직책 등록 가능하게") — 권한 상승이 없는 직책만.
 // 이 직책의 회원 등록·직책 변경은 관리자(비개발자)도 할 수 있다. 관리자·대표·개발자 지정은 종전대로 개발자만.
 const ROLE_OPEN = { '팀장': 1, '직원': 1, '현장직': 1 };
+// v447 회원 소속 회사(corp) — 안전 설정(gw-data 안전 설정 키) 회사별 상시근로자 수 두 키와 같은 값(env 종운환경 · con 종운건설). 그 밖 값은 400 BAD_CORP
+const MEMBER_CORP = { env: 1, con: 1 };
 function roleOpen(r) { return Object.prototype.hasOwnProperty.call(ROLE_OPEN, String(r || '')); }
 // 일반 직책 기본 권한 — 앱 ROLE_PRESET과 같은 값(uismoke v430이 3직책 전부 대조, servertest가 직원 줄 대조). 관리자가 만든 회원의 perms는 클라 값이 아니라 이 표에서 온다(권한 상승 차단).
 //   v430 safety: 3직책 모두 숨김(PM 11/9 ② "권민지 1명" — 팀장도 숨김, 부여는 권한관리 표에서 한 분씩)
@@ -227,9 +229,14 @@ async function handleMemberList(st, event, R) {
   if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: 'NO_SESSION', request_id: R });
   // 회원 목록은 담당 배정 드롭다운용 — 비관리자에겐 표시용 필드만(입사일·연차·휴직 등 인사정보는 관리자와 본인 것만.
   // 종전엔 safeMember 전체가 나가 현장직 계정으로 전사 입사일·연차 조회가 가능했다)
+  // v447 검토: 회원 칸 4개(직무 구분 표식)는 안전 › 체크 칸 표만 쓴다 — 요청자의 안전 권한이 숨김이 아닐 때만 싣는다(gw-data permKey와 같은 판정: 값이 없으면 기본 숨김 CLOSED_DEFAULT)
+  const pSafety = c.member.perms && c.member.perms.safety;
+  const seeSafety = !!pSafety && pSafety !== 'hide';
   const members = (await listMembers(st)).map(function (m) {
     if (c.member.admin || m.id === c.member.id) return safeMember(m);
-    return { id: m.id, name: m.name, role: m.role, rank: m.rank, dept: m.dept, seq: m.seq, admin: m.admin, dev: m.dev, tier: m.tier, on_loa: m.on_loa, del: m.del, retired: retired(m) };   // tier·dev(v321)는 클라 tierOfMember 파생·표시용(인사정보 아님). retired(v329)는 퇴사 여부 파생 불리언 — 날짜(leave_date)는 여전히 숨기고, 비관리자 화면도 담당·공개범위에서 퇴사자를 걸러낼 수 있게 한다
+    const o = { id: m.id, name: m.name, role: m.role, rank: m.rank, dept: m.dept, seq: m.seq, admin: m.admin, dev: m.dev, tier: m.tier, on_loa: m.on_loa, del: m.del, retired: retired(m) };
+    if (seeSafety) { o.office = m.office; o.supervisor = m.supervisor; o.corp = m.corp; o.test_acct = m.test_acct; }
+    return o;   // v447 회원 칸 4개(사무직·관리감독자 지정·소속 회사·시험 계정) — 안전 › 체크 칸 표를 안전 담당(비관리자)이 그리는 데 쓰는 직무 구분 표식(인사정보·날짜 아님)   // tier·dev(v321)는 클라 tierOfMember 파생·표시용(인사정보 아님). retired(v329)는 퇴사 여부 파생 불리언 — 날짜(leave_date)는 여전히 숨기고, 비관리자 화면도 담당·공개범위에서 퇴사자를 걸러낼 수 있게 한다
   });
   return jr(200, { status: 'OK', members, request_id: R });
 }
@@ -279,6 +286,10 @@ async function handleMemberUpsert(st, event, d, R) {
   const uidSys = d.uid_clear === true || (d.uid !== undefined && normUid(d.uid) !== '');
   const touchesSystem = (isNew && !openCreate) || adminSys || permsSys || uidSys || (nameChange && !isNew) || (roleChange && !openRole);
   if (touchesSystem && !canDev) return jr(403, { status: 'FORBIDDEN', error_code: 'DEV_ONLY', request_id: R });
+  // v447 회원 칸 검사는 어떤 칸도 바꾸기 전에(아래 이름 색인 지우기보다 앞 — 거절하면 저장 0): 소속 회사는 env·con·빈 값만 · 시험 계정 표식은 관리자만
+  //   (회원 저장 자체가 위 ADMIN_ONLY지만, 저장 문이 넓어져도 이 칸은 닫혀 있게 칸 앞에서 한 번 더)
+  if (d.corp !== undefined && String(d.corp || '') !== '' && !Object.prototype.hasOwnProperty.call(MEMBER_CORP, String(d.corp))) return jr(400, { status: 'REJECTED', error_code: 'BAD_CORP', request_id: R });
+  if (d.test_acct !== undefined && !c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
   // 자기 계정의 role·name·dev·admin·tier 변경 금지(S1(b) — 개발자 예외 없음: 다른 개발자·대표가 바꾼다). 자기 등급 상승·이름 색인 탈취의 뿌리를 닫는다
   if (self) {
     const selfChange = nameChange || roleChange
@@ -360,6 +371,13 @@ async function handleMemberUpsert(st, event, d, R) {
   if (d.on_loa !== undefined) m.on_loa = !!d.on_loa;
   if (d.loa_start !== undefined) m.loa_start = String(d.loa_start || '');
   if (d.loa_end !== undefined) m.loa_end = String(d.loa_end || '');
+  // v447 안전 › 체크 칸(사람별 표)이 쓰는 회원 칸 4개 — 필드별 복사(보내지 않은 칸은 그대로). 켜짐만 저장하고 꺼짐·빈 값은 칸째 지운다
+  //   (인사 카드는 네 칸을 늘 함께 보내므로 '없음 → false'를 남기면 저장마다 감사 줄이 생긴다). 사무직(office) = 정기교육 반기 6시간·일반건강진단 2년 ·
+  //   관리감독자 지정(supervisor) = 정기교육 연 16시간 · 소속 회사(corp) = env 종운환경·con 종운건설 · 시험 계정(test_acct) = 체크 칸 표·빠진 항목·합계에서 뺌(다른 화면은 그대로)
+  if (d.office !== undefined) { if (d.office === true) m.office = true; else delete m.office; }
+  if (d.supervisor !== undefined) { if (d.supervisor === true) m.supervisor = true; else delete m.supervisor; }
+  if (d.corp !== undefined) { const cp = String(d.corp || ''); if (cp) m.corp = cp; else delete m.corp; }   // 값 검사(400 BAD_CORP)는 위 — 어떤 칸도 바꾸기 전
+  if (d.test_acct !== undefined) { if (d.test_acct === true) m.test_acct = true; else delete m.test_acct; }   // 관리자 검사도 위(어떤 칸도 바꾸기 전)
   m.perms = cleanPerms(forcedPerms || d.perms || m.perms);   // v328: 관리자 등록분은 서버 표 프리셋(클라 값 무시)
   m.updated = Date.now();
   if (d.pin) {
@@ -377,7 +395,7 @@ async function handleMemberUpsert(st, event, d, R) {
   // 감사 로그: 회원 필드 변경(이전값→새값). PIN은 값 미기록('변경'만), 해시·비밀값 제외.
   try {
     const f = {};
-    const AUD_FIELDS = ['name','uid','role','admin','dev','tier','rank','dept','annual_days','birth','hire_date','emp_type','annual_basis','loa_days','leave_date','annual_paid','annual_base','annual_base_date','seq','on_loa','loa_start','loa_end'];
+    const AUD_FIELDS = ['name','uid','role','admin','dev','tier','rank','dept','annual_days','birth','hire_date','emp_type','annual_basis','loa_days','leave_date','annual_paid','annual_base','annual_base_date','seq','on_loa','loa_start','loa_end','office','supervisor','corp','test_acct'];   // v447 회원 칸 4개(사무직·관리감독자 지정·소속 회사·시험 계정)
     const b = before || {};
     for (const k of AUD_FIELDS) {
       const a = b[k], v = m[k];

@@ -5701,4 +5701,116 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   }
 }
 
+// 84 v447(56 판 1차 — 안전 › 체크 칸 사람별 표): ① gw-auth 회원 칸 4개(사무직 office·관리감독자 지정 supervisor·소속 회사 corp·시험 계정 test_acct) — 필드별 복사(보내지 않은 칸 그대로)·켜짐만 저장(꺼짐은 칸째 지움)·
+//   감사 기록(AUD_FIELDS)·소속 회사 값 검사(400 BAD_CORP — 어떤 칸도 바꾸기 전: 이름 색인·다른 칸 그대로)·시험 계정 표식은 관리자만(비관리자 회원 저장은 종전대로 403 ADMIN_ONLY)·비관리자 회원 목록에 네 칸(날짜·인사정보는 여전히 없음)
+//   ② col:edu 새 종류 7개·위험성평가 회차 표식(ra{on,type,unit})·숫자 시간 — 행 모양 그대로 저장·낡은 base 409·base 맞으면 200(덮어쓰기 없이 그대로)
+//   ③ site_edu_gap이 새 종류 기록에 흔들리지 않음 — 특별교육 판정은 special 종류만: 새 종류만 있으면 has_edu false·이름 0(종전엔 아무 기록 1건이면 전원 미이수 이름) · special + 새 종류 = special만 있을 때와 같은 답 · special_demo는 특별교육 이수 아님
+{
+  const gwa84 = require(join(FN, 'gw-auth.js'));
+  const callA84 = async (body, tok) => { const x = await gwa84.handler({ httpMethod: 'POST', headers: { authorization: tok ? 'Bearer ' + tok : '' }, body: JSON.stringify(body) }); return { code: x.statusCode, body: JSON.parse(x.body || '{}') }; };
+  const savedUsers84 = JSON.parse(JSON.stringify(mem.gw_users));
+  const had84 = {}; ['col:edu', 'col:asbestos', 'col:workers'].forEach((k) => { had84[k] = Object.prototype.hasOwnProperty.call(mem.gw_data, k) ? JSON.parse(JSON.stringify(mem.gw_data[k])) : undefined; });
+  const aud84 = auditMock.logs.length;
+  try {
+    mem.gw_users = {
+      'member:udev84': { id: 'udev84', name: '개발자84', role: '개발자', admin: true, dev: true, perms: {}, tier: 'pm' },
+      'member:uadm84': { id: 'uadm84', name: '관리자84', role: '관리자', admin: true, perms: {}, tier: 'admin' },
+      'member:uw84': { id: 'uw84', name: '직원84', role: '직원', admin: false, perms: { tasks: 'do', safety: 'do' }, rank: '사원', dept: '운영부', hire_date: '2024-02-01', birth: '1990-01-01' },
+      'member:uo84': { id: 'uo84', name: '사무84', role: '직원', admin: false, perms: { tasks: 'do' }, office: true, corp: 'env' },
+      'name:직원84': 'uw84', 'name:사무84': 'uo84',
+      'device:dev1': { status: 'approved' },
+    };
+    const tokAdm84 = issueSession(mem.gw_users['member:uadm84']).token, tokW84 = issueSession(mem.gw_users['member:uw84']).token;
+    const u84 = () => mem.gw_users['member:uw84'];
+    // ① 관리자 저장 — 네 칸 켬(다른 칸은 보내지 않음) → 켜짐 저장·다른 칸(권한·직급·부서·입사일·생년) 그대로·감사 1줄에 네 칸
+    let r84 = await callA84({ action: 'member_upsert', id: 'uw84', office: true, supervisor: true, corp: 'con', test_acct: true }, tokAdm84);
+    const ev84 = auditMock.logs.slice(aud84).reduce((a, l) => a.concat(l.ev || []), []).filter((e) => e.id === 'uw84');
+    const f84 = (ev84[0] && ev84[0].f) || {};
+    T('84 v447 ① 회원 칸 4개 저장(관리자): 200 · office·supervisor·test_acct true·corp con · 보내지 않은 칸(perms·rank·dept·hire_date·birth) 그대로 · 감사 1줄 f에 네 칸(없음 → 값)',
+      r84.code === 200 && u84().office === true && u84().supervisor === true && u84().corp === 'con' && u84().test_acct === true
+      && JSON.stringify(u84().perms) === JSON.stringify({ tasks: 'do', veh: 'view', rec: 'view', lic: 'hide', site: 'hide', check: 'view', con: 'view', cli: 'view', doc: 'view', wk: 'view', quote: 'hide', promo: 'hide', safety: 'do', hw: 'hide' })
+      && u84().rank === '사원' && u84().dept === '운영부' && u84().hire_date === '2024-02-01' && u84().birth === '1990-01-01'
+      && ev84.length === 1 && ['office', 'supervisor', 'corp', 'test_acct'].every((k) => Array.isArray(f84[k])) && f84.corp[1] === 'con',
+      JSON.stringify({ code: r84.code, m: u84(), f: f84 }));
+    // ①-2 필드별 복사 — 다른 칸만 보낸 저장(인사 정보)은 네 칸 그대로 · 꺼짐(false·빈 값)은 칸째 지움(false로 남기지 않음 — 감사 소음 0)
+    r84 = await callA84({ action: 'member_upsert', id: 'uw84', rank: '주임' }, tokAdm84);
+    const keep84 = r84.code === 200 && u84().rank === '주임' && u84().office === true && u84().supervisor === true && u84().corp === 'con' && u84().test_acct === true;
+    const aud84b = auditMock.logs.length;
+    r84 = await callA84({ action: 'member_upsert', id: 'uw84', office: false, supervisor: false, corp: '', test_acct: false }, tokAdm84);
+    const off84 = r84.code === 200 && !('office' in u84()) && !('supervisor' in u84()) && !('corp' in u84()) && !('test_acct' in u84());
+    r84 = await callA84({ action: 'member_upsert', id: 'uw84', office: false, supervisor: false, corp: '', test_acct: false }, tokAdm84);   // 같은 꺼짐을 다시 — 감사 줄 0(없음 → 없음)
+    const quiet84 = r84.code === 200 && auditMock.logs.slice(aud84b).reduce((a, l) => a.concat(l.ev || []), []).filter((e) => e.id === 'uw84').length === 1;
+    T('84 v447 ①-2 필드별 복사·꺼짐: 다른 칸만 보낸 저장 = 네 칸 그대로 · false·빈 값 = 칸째 지움(false·"" 남지 않음) · 같은 꺼짐 다시 저장 = 감사 줄 0',
+      keep84 && off84 && quiet84, JSON.stringify({ keep84, off84, quiet84, m: u84() }));
+    // ①-3 소속 회사 값 검사 — 표 밖 값·객체 = 400 BAD_CORP · 같은 요청의 다른 칸(이름 바꾸기 아님 — 직급·사무직)도 안 바뀜 · 이름 색인 그대로
+    const before84 = JSON.stringify(u84());
+    const bc1 = await callA84({ action: 'member_upsert', id: 'uw84', corp: 'abc', office: true, rank: '대리' }, tokAdm84);
+    const bc2 = await callA84({ action: 'member_upsert', id: 'uw84', corp: { env: 1 }, office: true }, tokAdm84);
+    const bc3 = await callA84({ action: 'member_upsert', id: 'uw84', corp: 'toString' }, tokAdm84);
+    T('84 v447 ①-3 소속 회사 값 검사: "abc"·객체·상속 키 "toString" = 400 BAD_CORP · 회원 레코드 글자째 그대로(직급·사무직 안 바뀜) · 이름 색인 그대로 · env·con만 받음',
+      [bc1, bc2, bc3].every((x) => x.code === 400 && x.body.error_code === 'BAD_CORP') && JSON.stringify(u84()) === before84 && mem.gw_users['name:직원84'] === 'uw84',
+      [bc1, bc2, bc3].map((x) => x.code + '/' + x.body.error_code).join(' | '));
+    // ①-4 시험 계정 표식은 관리자만 — 비관리자(안전 수행이어도)의 회원 저장은 종전대로 403 ADMIN_ONLY·표식 그대로 · 서버 코드는 칸 앞(이름 색인 지우기보다 먼저)에서 관리자 검사
+    const t84 = await callA84({ action: 'member_upsert', id: 'uw84', test_acct: true }, tokW84);
+    const src84 = require('fs').readFileSync(join(FN, 'gw-auth.js'), 'utf8');
+    const iChk84 = src84.indexOf("if (d.test_acct !== undefined && !c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });"), iCorp84 = src84.indexOf("error_code: 'BAD_CORP'"), iName84 = src84.indexOf('if (nameChange) { await blobSet(st, nameKey(m.name), null); m.name = name; }');
+    T('84 v447 ①-4 시험 계정 표식은 관리자만: 비관리자(안전 수행) 저장 = 403 ADMIN_ONLY·표식 없음 그대로 · 서버 검사(관리자·BAD_CORP)는 이름 색인 지우기보다 앞 · AUD_FIELDS에 네 칸',
+      t84.code === 403 && t84.body.error_code === 'ADMIN_ONLY' && !('test_acct' in u84()) && iChk84 > 0 && iCorp84 > 0 && iName84 > 0 && iChk84 < iName84 && iCorp84 < iName84
+      && /const AUD_FIELDS = \[[^\]]*'office','supervisor','corp','test_acct'\]/.test(src84), JSON.stringify({ code: t84.code, ec: t84.body.error_code, iChk84, iCorp84, iName84 }));
+    // ①-5 회원 목록 — 비관리자 투영에 네 칸은 요청자의 안전 권한이 숨김이 아닐 때만(안전 담당이 표를 그림 — v447 검토: 직무 구분도 최소 범위로), 날짜·인사정보(hire_date·birth·leave_date)는 여전히 없음
+    //   안전 보기(ukv84) = 다른 회원 네 칸 · 안전 숨김(uo84 — 값 없음 = 기본 숨김)·안전 'hide' 명시(ukh84) = 다른 회원 네 칸 없음 · 본인은 종전대로 전체(uo84 office·corp)
+    await callA84({ action: 'member_upsert', id: 'uw84', supervisor: true, test_acct: true }, tokAdm84);
+    mem.gw_users['member:ukv84'] = { id: 'ukv84', name: '안전보기84', role: '직원', admin: false, perms: { safety: 'view' } };
+    mem.gw_users['member:ukh84'] = { id: 'ukh84', name: '안전숨김84', role: '직원', admin: false, perms: { safety: 'hide', site: 'do' } };
+    const ml84 = await callA84({ action: 'member_list' }, issueSession(mem.gw_users['member:ukv84']).token);
+    const mlo84 = await callA84({ action: 'member_list' }, issueSession(mem.gw_users['member:uo84']).token);
+    const mlh84 = await callA84({ action: 'member_list' }, issueSession(mem.gw_users['member:ukh84']).token);
+    const w84 = (ml84.body.members || []).find((m) => m.id === 'uw84') || {}, wo84 = (mlo84.body.members || []).find((m) => m.id === 'uw84') || {}, wh84 = (mlh84.body.members || []).find((m) => m.id === 'uw84') || {};
+    const o84 = (mlo84.body.members || []).find((m) => m.id === 'uo84') || {}, ov84 = (ml84.body.members || []).find((m) => m.id === 'uo84') || {};
+    const four84 = (x) => ['office', 'supervisor', 'corp', 'test_acct'].filter((k) => k in x);
+    T('84 v447 ①-5 회원 목록(비관리자): 안전 보기 = 다른 회원 office·supervisor·corp·test_acct 네 칸(값 그대로·없으면 없음) · 안전 숨김(값 없음·hide 명시) = 다른 회원 네 칸 키째 없음 · hire_date·birth·leave_date 없음 · 본인은 종전대로 전체',
+      ml84.code === 200 && mlo84.code === 200 && mlh84.code === 200 && w84.supervisor === true && w84.test_acct === true && w84.office === undefined && w84.corp === undefined && ov84.office === true && ov84.corp === 'env'
+      && !('hire_date' in w84) && !('birth' in w84) && !('leave_date' in w84) && four84(wo84).length === 0 && four84(wh84).length === 0 && wo84.name === '직원84' && wh84.retired === false
+      && o84.office === true && o84.corp === 'env', JSON.stringify({ w84, wo84, wh84, o84 }));
+
+    // ② col:edu 새 종류·회차 표식·숫자 시간 — 저장 그대로 · 409 · 병합은 앱 몫(서버는 base 낙관락)
+    mem.gw_users['member:uw84'].perms = { safety: 'do' };
+    const tokS84 = issueSession(mem.gw_users['member:uw84']).token;
+    const NEW84 = ['hire', 'change', 'basic_con', 'gen_med', 'ra_join', 'ra_share', 'special_demo'].map((k, i) => ({ id: 'n84' + i, ptype: i % 2 ? 'worker' : 'member', pid: i % 2 ? 'w84a' : 'uw84', kind: k, date: '2026-11-0' + (i + 1), hours: i + 0.5, next: k === 'gen_med' ? '2027-11-03' : '', note: '메모' + i, created: '2026-11-12', updated: '2026-11-12' }));
+    NEW84[4].ra = { on: '2026-10-30', type: 'regular', unit: '운영부' }; NEW84[5].ra = { on: '2026-10-31', type: 'adhoc', unit: '석면 #131' };
+    mem.gw_data['col:edu'] = { schema: 1, items: [{ id: 'old84', ptype: 'member', pid: 'uw84', kind: 'regular', date: '2026-07-01', hours: '4시간', next: '', updated: '2026-07-01' }], updated_at: 8400 };
+    const s84a = await call({ action: 'save', collection: 'edu', base: 8400, doc: { schema: 1, items: [mem.gw_data['col:edu'].items[0]].concat(NEW84) } }, tokS84, 'dev1');
+    const got84 = (mem.gw_data['col:edu'].items || []);
+    const ok84 = s84a.code === 200 && got84.length === 8 && NEW84.every((n) => { const g = got84.find((x) => x.id === n.id); return g && g.kind === n.kind && g.hours === n.hours && typeof g.hours === 'number' && JSON.stringify(g.ra || null) === JSON.stringify(n.ra || null); }) && got84[0].hours === '4시간';
+    const s84b = await call({ action: 'save', collection: 'edu', base: 8400, doc: { schema: 1, items: [] } }, tokS84, 'dev1');
+    T('84 v447 ② col:edu 새 종류 7개(hire·change·basic_con·gen_med·ra_join·ra_share·special_demo)·회차 표식 ra{on,type,unit}·숫자 시간 = 행 모양 그대로 200 저장(옛 줄 "4시간" 그대로) · 낡은 base로 빈 목록 저장 = 409 STALE_BASE·8줄 그대로',
+      ok84 && s84b.code === 409 && s84b.body.error_code === 'STALE_BASE' && (mem.gw_data['col:edu'].items || []).length === 8, JSON.stringify({ a: s84a.code, b: s84b.code + '/' + s84b.body.error_code, n: got84.length }));
+
+    // ③ site_edu_gap — 새 종류만 있는 기록·special + 새 종류·special_demo
+    mem.gw_users['member:ukja84'] = { id: 'ukja84', name: '현장84', role: '직원', admin: false, perms: { site: 'do', wk: 'do' } };
+    const tokK84 = issueSession(mem.gw_users['member:ukja84']).token;
+    mem.gw_data['col:asbestos'] = { schema: 1, items: [{ id: 'a84', kind: 'asbestos', status: 'run', member_ids: ['uw84', 'uo84'], worker_ids: ['w84a', 'w84b'] }], updated_at: 8401 };
+    mem.gw_data['col:workers'] = { schema: 1, items: [{ id: 'w84a', name: '일용갑84' }, { id: 'w84b', name: '일용을84' }], updated_at: 8402 };
+    const gap84 = async () => call({ action: 'site_edu_gap' }, tokK84, 'dev1');
+    mem.gw_data['col:edu'] = { schema: 1, items: JSON.parse(JSON.stringify(NEW84)), updated_at: 8403 };
+    const g0 = await gap84();
+    const SP84 = [{ id: 'sp84', ptype: 'worker', pid: 'w84b', kind: 'special', date: '2026-10-01' }];
+    mem.gw_data['col:edu'] = { schema: 1, items: JSON.parse(JSON.stringify(SP84)), updated_at: 8404 };
+    const g1 = await gap84();
+    mem.gw_data['col:edu'] = { schema: 1, items: JSON.parse(JSON.stringify(SP84.concat(NEW84))), updated_at: 8405 };
+    const g2 = await gap84();
+    mem.gw_data['col:edu'] = { schema: 1, items: [{ id: 'sd84', ptype: 'member', pid: 'uw84', kind: 'special_demo', date: '2026-10-02' }].concat(JSON.parse(JSON.stringify(SP84))), updated_at: 8406 };
+    const g3 = await gap84();
+    T('84 v447 ③ site_edu_gap이 새 종류 기록에 흔들리지 않음: 새 종류 7개만 = 200·has_edu false·이름 0(종전 has_edu는 종류 무관이라 투입 4명 전원 미이수) · special 1건 = 미이수 [직원84, 사무84, 일용갑84] · special + 새 종류 = 같은 답 · special_demo는 이수 아님(직원84 그대로 미이수)',
+      g0.code === 200 && g0.body.has_edu === false && JSON.stringify(g0.body.gaps) === '{}'
+      && g1.code === 200 && g1.body.has_edu === true && JSON.stringify(g1.body.gaps) === JSON.stringify({ a84: ['직원84', '사무84', '일용갑84'] })
+      && g2.code === 200 && JSON.stringify(g2.body) .replace(/"request_id":"[^"]*"/, '') === JSON.stringify(g1.body).replace(/"request_id":"[^"]*"/, '')
+      && g3.code === 200 && JSON.stringify(g3.body.gaps) === JSON.stringify({ a84: ['직원84', '사무84', '일용갑84'] }),
+      JSON.stringify({ g0: g0.body, g1: g1.body.gaps, g2: g2.body.gaps, g3: g3.body.gaps }));
+  } finally {
+    mem.gw_users = savedUsers84;
+    Object.keys(had84).forEach((k) => { if (had84[k] === undefined) delete mem.gw_data[k]; else mem.gw_data[k] = had84[k]; });
+  }
+}
+
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);
