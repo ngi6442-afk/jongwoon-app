@@ -18774,7 +18774,15 @@
   // 카드에 표시할 생성 조합 라벨 — 신규(gen)·구버전(fi/bi) 겸용
   // v360(PM 9/16 "미생성은 또 뭔말인데"): 카드에 자동 생성 상태를 말로. 상태(ai_st)는 서버 워커·크론이 기록에 쓴다 —
   //   브라우저가 닫혀도 서버(gw-promo-ai-cron, 10분)가 끝까지 책임지고, 실패는 이유·횟수와 함께 보인다.
-  function paFailShort(code){ var m={NETWORK:"네트워크 끊김",TIMEOUT:"시간 초과",BUDGET_CAP:"월 상한 도달",NO_PHOTOS:"사진 없음",REFUSAL:"모델 거부",KICKOFF_FAILED:"기동 실패",ENV_MISSING:"설정 누락",WORKER_THREW:"서버 오류",GENERATE_THREW:"생성 오류"}; return m[code]||(code||"원인 미상"); }
+  function paFailShort(code){ var m={NETWORK:"네트워크 끊김",TIMEOUT:"시간 초과",BUDGET_CAP:"월 상한 도달",NO_PHOTOS:"사진 없음",REFUSAL:"모델 거부",KICKOFF_FAILED:"기동 실패",ENV_MISSING:"설정 누락",WORKER_THREW:"서버 오류",GENERATE_THREW:"생성 오류",CREDIT_LOW:"API 잔액 부족",BAD_REQUEST:"요청 거부"}; return m[code]||(code||"원인 미상"); }
+  // 체크 10 2단계 E(C061, PM 11/10 '2단계 ㄱ'): 사진이 있는데 사진AI 초안이 한 번도 안 생긴 기록의 본문은 자동 예비 글(템플릿)이다 — 승인·완성본을 막는다.
+  //   10/23 API 잔액 부족으로 사진AI가 멈춘 사이 예비 글이 승인돼 10/30·11/2에 그대로 게시됐다(마크다운 ** 노출·11월 글 '봄비'). 게시 완료 기록은 손대지 않는다.
+  function promoNoAiDraft(p){ return !!p && !p.ai && (p.photos||[]).length>0; }
+  function promoNoAiText(p){
+    var s=(p&&p.ai_st)||{};
+    return "사진AI 초안이 아직 없습니다"+(s.st==="fail"? " — "+paFailShort(s.code)+(s.code==="CREDIT_LOW"? "(충전되면 서버가 자동으로 다시 만듭니다)" : "") : "")
+      +". 지금 본문은 자동 예비 글(템플릿)이라 승인·게시하지 않습니다. 서버 재시도를 기다리거나 [사진으로 다시 쓰기]를 눌러 주세요.";
+  }
   function promoAiLine(p){
     if(p.ai) return ' · 태그 '+((p.tags||[]).length)+'개'+(p.ai.tags_only?' <span style="color:#888;">(게시 뒤 태그만 생성 — 네이버 글 편집으로 추가)</span>':'');
     if(!(p.photos||[]).length) return '';
@@ -18782,7 +18790,8 @@
     var s=p.ai_st||{};
     var hm=function(ts){ var d=ts?new Date(ts):null; return (d&&!isNaN(d))?(pad(d.getHours())+':'+pad(d.getMinutes())):''; };
     if(s.st==="running") return ' · <span style="color:#1B4F8A;">블로그 초안·태그 자동 생성 중('+hm(s.ts)+'~, 5~10분)</span>';
-    if(s.st==="fail"){ var n=s.tries||1; return ' · <span style="color:#a5382c;">자동 생성 실패 '+n+'회('+esc(paFailShort(s.code))+' '+hm(s.ts)+')'+(n>=4?' — 자동 재시도 끝, 카드 열어 [사진으로 다시 쓰기]':' — 서버가 잠시 뒤 다시 시도')+'</span>'; }
+    if(s.st==="fail" && s.code==="CREDIT_LOW") return ' · <span style="color:#a5382c;">자동 생성 대기 — API 잔액 부족('+hm(s.ts)+') · 충전되면 서버가 자동으로 다시 만듭니다(한 시간에 한 건씩 확인) · 그때까지 승인·게시 안 함</span>';
+    if(s.st==="fail"){ var n=s.tries||1; return ' · <span style="color:#a5382c;">자동 생성 실패 '+n+'회('+esc(paFailShort(s.code))+' '+hm(s.ts)+')'+(n>=4?' — 자동 재시도 끝, 카드 열어 [사진으로 다시 쓰기]':' — 서버가 잠시 뒤 다시 시도')+' · 초안이 생길 때까지 승인·게시 안 함</span>'; }
     return ' · <span style="color:#B7791F;">블로그 초안·태그 자동 생성 대기(서버가 10분 안에 시작)</span>';
   }
   function promoGenLabel(p){
@@ -18994,7 +19003,10 @@
     if(vs){
       var lg=promoLastGen(promoLast());
       var ng=promoNextGen(lg, livePromo().length, "", "");
-      vs.innerHTML="회전 상태 — 직전: "+(lg? esc((PROMO_SCEN_NAMES[lg.sc]||"")+" · "+(PROMO_TITLE_NAMES[lg.ti]||"")) : "없음")
+      // C061: API 잔액 부족으로 멈춘 기록이 있으면 탭 맨 위에 한 줄(카드마다 작은 글씨로만 보여 10/23~11/2 2주 동안 아무도 몰랐다)
+      var credN=livePromo().filter(function(p){ var s=p.ai_st||{}; return !p.ai && p.status!=="posted" && s.st==="fail" && s.code==="CREDIT_LOW"; }).length;
+      vs.innerHTML=(credN? '<div style="color:#a5382c;font-weight:600;margin-bottom:4px;">⚠ 사진AI 글 생성이 멈췄습니다 — API 잔액 부족('+credN+'건 대기). 충전되면 서버가 자동으로 다시 만들고, 그때까지 예비 글은 승인·게시하지 않습니다.</div>' : "")
+        +"회전 상태 — 직전: "+(lg? esc((PROMO_SCEN_NAMES[lg.sc]||"")+" · "+(PROMO_TITLE_NAMES[lg.ti]||"")) : "없음")
         +" / 다음 기록: <b>"+esc((PROMO_SCEN_NAMES[ng.sc]||"")+" · "+(PROMO_TITLE_NAMES[ng.ti]||""))+"</b> (시설유형은 입력에서 자동 판정 · 발행 시각 분산은 붙여넣는 사람이 지킬 것)";
     }
   }
@@ -19004,6 +19016,44 @@
   var promoLearnBusy = false;
   function plFmtTs(ts){ var t = new Date(Number(ts)||0); return isNaN(t.getTime())||!ts ? "" : (String(t.getMonth()+1).padStart(2,"0")+"/"+String(t.getDate()).padStart(2,"0")+" "+String(t.getHours()).padStart(2,"0")+":"+String(t.getMinutes()).padStart(2,"0")); }
   function plPct(x){ return (x===null||x===undefined||isNaN(Number(x))) ? "—" : (Math.round(Number(x)*1000)/10)+"%"; }
+  // ---- 체크 10 품질 고리 1단계(측정만, PM 11/10 '10. ㄱ') — 크론 ⑤가 잰 점수(promoai:quality → pl_get quality)를 보여 주기만 한다. 글·생성·복사는 그대로, 버튼 없음 ----
+  var PQ_ITEM_TXT = { C1:"사진 사이 글", C2:"사진당 글", C3:"결함", C4:"제목", C5:"시각 리듬", C6:"마무리", D1:"현장 문장", D2:"장비·도구", D3:"공정 동사", D4:"장소·지형", D5:"현장 수량", X1:"연결어미", X2:"긴 문장", X3:"전문 용어", X4:"분량", X5:"겹침" };
+  var PQ_KIND_TXT = { ai:"사진AI", tpl:"템플릿", tpl_tags:"템플릿(사진AI는 태그만)", tpl_fail:"템플릿(사진AI 실패)" };
+  var PQ_ST_TXT = { review:"검수 전", approved:"승인", posted:"게시", rejected:"반려" };
+  function pqNum(v){ return (v===null||v===undefined||isNaN(Number(v))) ? "—" : String(Math.round(Number(v)*10)/10); }
+  function pqVal(code, v){
+    if (v===null||v===undefined||isNaN(Number(v))) return "—";
+    if (code==="D1"||code==="X2") return Math.round(Number(v)*100)+"%";
+    if (code==="X4") return Number(v).toLocaleString()+"자";
+    if (code==="C2") return v+"자";
+    if (code==="C1") return v+"장";
+    return String(v);
+  }
+  function promoQualHtml(q){
+    var h = '<div style="font-weight:600;margin:10px 0 4px;">품질 점수 — 본보기 대비 <span style="font-weight:400;color:var(--sub);">(1단계 측정만 — 글·생성·복사는 그대로 · 코드로 재는 16항목을 10점으로, 기준값은 시안)</span></div>';
+    if (!q || !q.rows || !q.rows.length) return h + '<div class="empty-line">아직 잰 글이 없습니다 — 서버가 10분 안에 첫 점수를 매깁니다.</div>';
+    var top = q.top || {}, dr = q.dredge || {}, r4 = q.recent4 || {}, ai = q.ai || {};
+    h += '<div style="display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12.5px;margin-bottom:4px;">'
+      + '<span>본보기 <b>' + esc(top.label||"") + ' ' + pqNum(top.score10) + '</b></span>'
+      + '<span>' + esc(dr.label||"") + ' 중앙 <b>' + pqNum(dr.score10) + '</b></span>'
+      + '<span>최근 게시 ' + (r4.n||0) + '편 평균 <b>' + pqNum(r4.avg) + '</b></span>'
+      + '<span>사진AI ' + (ai.n||0) + '편 중앙 <b>' + pqNum(ai.med) + '</b></span></div>';
+    h += '<div style="overflow:auto;"><table style="font-size:12px;border-collapse:collapse;width:100%;"><tr><th style="text-align:left;padding:2px 6px;">날짜</th><th style="text-align:left;padding:2px 6px;">글</th><th style="text-align:left;padding:2px 6px;">점수</th><th style="text-align:left;padding:2px 6px;" title="완성도 12 · 디테일 10 · 복잡성 10점 만점">완성도·디테일·복잡성</th><th style="text-align:left;padding:2px 6px;">부족 항목 (이 글 / 본보기)</th></tr>'
+      + q.rows.slice(0, 15).map(function(r){
+          var ax = r.axis || {};
+          var chips = (r.weak||[]).map(function(w){
+            var num = (/^(C[12]|D|X)/.test(w.code)) ? ' ' + pqVal(w.code, w.v) + ' / ' + pqVal(w.code, w.ex) : '';
+            return '<span class="scope-chip" style="margin:1px 3px 1px 0;' + (w.s===0 ? 'background:#FAF0E4;color:#a8651f;' : '') + '">' + esc(w.code + ' ' + (PQ_ITEM_TXT[w.code]||"") + num) + '</span>';
+          }).join("");
+          return '<tr><td style="padding:2px 6px;white-space:nowrap;">' + esc(String(r.date||"").slice(5).replace("-","/")) + '</td>'
+            + '<td style="padding:2px 6px;">' + esc(String(r.title||"").slice(0,34)) + '<div style="color:var(--sub);font-size:11px;">' + esc((PQ_ST_TXT[r.status]||r.status||"") + ' · ' + (PQ_KIND_TXT[r.kind]||r.kind||"") + ' · 사진 ' + (r.n_img||0) + '장') + '</div></td>'
+            + '<td style="padding:2px 6px;white-space:nowrap;"><b>' + pqNum(r.score10) + '</b>' + (r.draft10!==null && r.draft10!==undefined && r.draft10!==r.score10 ? ' <span style="color:var(--sub);" title="모델이 처음 쓴 초안(보존본) 점수">(초안 ' + pqNum(r.draft10) + ')</span>' : '') + (r.draft_pv ? ' <span class="scope-chip" title="이 초안을 만든 생성 프롬프트 판">' + esc(String(r.draft_pv).split("-")[0]) + '</span>' : '') + '</td>'
+            + '<td style="padding:2px 6px;white-space:nowrap;">' + (ax.C===undefined ? "—" : ax.C + ' · ' + ax.D + ' · ' + ax.X) + '</td>'
+            + '<td style="padding:2px 6px;">' + (chips || '<span style="color:var(--sub);">없음</span>') + '</td></tr>';
+        }).join("") + '</table></div>';
+    h += '<div class="empty-line" style="margin-top:4px;">점수 = 기록 본문을 지금 복사 창이 만드는 모양으로 잰 값(지도는 게시 때 붙는 것으로 봄) · 본보기 = ' + esc(q.basis||"") + ' · 모델 판정 3항목(소제목-답 정합·사진 판독 반영·인과 사슬)과 보강은 3단계 · 잰 시각 ' + (plFmtTs(q.sweep && q.sweep.ts) || "—") + '</div>';
+    return h;
+  }
   function renderPromoLearn(){
     var host = document.getElementById("promoLearnCard"); if (!host) return;
     if (!isAdmin()){ host.style.display = "none"; return; }
@@ -19051,6 +19101,7 @@
       if (lay.posts && lay.posts.length) h += '<div style="overflow:auto;margin-top:4px;"><table style="font-size:11.5px;border-collapse:collapse;"><tr><th style="text-align:left;padding:1px 6px;">게시</th><th style="padding:1px 6px;">문단</th><th style="padding:1px 6px;">가운데</th><th style="padding:1px 6px;">줄(중앙/90%)</th><th style="padding:1px 6px;">빈 줄</th><th style="padding:1px 6px;">구분선</th><th style="padding:1px 6px;">굵게</th></tr>'
         + lay.posts.map(function(p){ return '<tr><td style="padding:1px 6px;">' + esc(p.date||"") + '</td><td style="text-align:right;padding:1px 6px;">' + (p.paras||0) + '</td><td style="text-align:right;padding:1px 6px;">' + Math.round((p.center||0)*100) + '%</td><td style="text-align:right;padding:1px 6px;">' + (p.len_med||0) + '/' + (p.len_p90||0) + '</td><td style="text-align:right;padding:1px 6px;">' + (p.blank||0) + '</td><td style="text-align:right;padding:1px 6px;">' + (p.hr||0) + '</td><td style="text-align:right;padding:1px 6px;">' + Math.round((p.bold||0)*100) + '%</td></tr>'; }).join("") + '</table></div>';
     } else h += '<div class="empty-line">아직 측정된 게시글이 없습니다 (수집기 09:05·16:05).</div>';
+    h += promoQualHtml(res.body.quality);   // 체크 10 품질 고리 1단계 — 표시만
     h += '<div style="font-weight:600;margin:8px 0 4px;">비교 짝 ' + pairs.length + '건 <span style="font-weight:400;color:var(--sub);">(네이버 게시글 자동 + 폴더 수정본. "짝 없음"은 아래에서 기록을 골라 지정)</span></div>';
     var live = livePromo().slice().sort(function(a,b){ return (b.ts||0)-(a.ts||0); });
     h += pairs.length ? '<div style="overflow:auto;"><table style="font-size:12px;border-collapse:collapse;width:100%;"><tr><th style="text-align:left;padding:2px 6px;">파일·제목</th><th style="text-align:left;padding:2px 6px;">짝 기록</th><th style="text-align:left;padding:2px 6px;">상태</th><th style="text-align:left;padding:2px 6px;">간극</th><th></th></tr>'
@@ -19083,7 +19134,7 @@
     document.getElementById("promoDetBody").value=p.body||"";
     document.getElementById("promoDetStat").textContent="";
     var st=p.status||"review";
-    document.getElementById("promoApproveBtn").style.display=(isAdmin()&&st==="review")?"":"none";
+    document.getElementById("promoApproveBtn").style.display=(isAdmin()&&st==="review"&&!promoNoAiDraft(p))?"":"none";   // C061: 사진AI 초안 없는 예비 글은 승인 버튼 없음
     document.getElementById("promoRejectBtn").style.display=(isAdmin()&&st==="review")?"":"none";
     document.getElementById("promoPostedBtn").style.display=(canDo("promo")&&st==="approved")?"":"none";
     document.getElementById("promoGalleryBtn").style.display=(canDo("promo")&&st==="posted")?"":"none";   // 혁신⑥ — 전송·재시도 겸용(서버가 중복 차단)
@@ -19093,6 +19144,7 @@
     if(paResults[id]) paResults[id].applied=false;
     if(paUndo && paUndo.promo!==id) paUndo=null;
     paRenderBtns();
+    if(promoNoAiDraft(p) && st!=="posted") paStat(promoNoAiText(p), true);   // C061: 왜 승인 버튼이 없는지 말로
     promoRenderDetPhotos(p);
     document.getElementById("promoDetailBackdrop").classList.add("show");
   }
@@ -19564,6 +19616,7 @@
   }
   function promoOpenPost(){
     var p=promoDetId? promoFind(promoDetId) : null; if(!p) return;
+    if(promoNoAiDraft(p) && p.status!=="posted"){ alert(promoNoAiText(p)); return; }   // C061: 예비 글로 게시용 완성본을 만들지 않는다(게시 완료 기록은 그대로 열림)
     // v354 모자이크: 가리기 확인이 안 끝난 사진이 있으면 먼저 알린다(원본 얼굴·번호판이 그대로 나갈 수 있다)
     var ms=maskState[p.id];
     if(ms && (ms.items||[]).length){
@@ -19688,6 +19741,7 @@
   });
   document.getElementById("promoApproveBtn").addEventListener("click",function(){
     var p=promoFind(promoDetId); if(!p||!isAdmin()) return;
+    if(promoNoAiDraft(p)){ alert(promoNoAiText(p)); return; }   // C061: 버튼을 숨겨도 남아 있던 창에서 눌리는 길까지 막는다
     promoDetApplyEdits(p); p.status="approved"; p.note=""; promoStamp(p);
     schedulePromoSave(); renderPromo();
     document.getElementById("promoDetailBackdrop").classList.remove("show");

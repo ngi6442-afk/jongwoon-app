@@ -21,6 +21,12 @@ const RETRY_MIN = [0, 10, 30, 120];        // n번째 실패 뒤 다시 시도�
 const MAX_TRIES = 4;                       // 그 뒤로는 사람이 카드에서 버튼으로(카드에 이유가 적혀 있다)
 const RUNNING_STALE_MS = 15 * 60 * 1000;   // 'running'이 15분 넘게 그대로면 워커가 죽은 것으로 보고 다시 시도(워커 생성 상한 10분 + 여유)
 const AUTO_STATUSES = { review: 1, rejected: 1, approved: 1 };   // 게시 완료(posted)는 손대지 않는다
+// 체크 10 2단계 E(C061, PM 11/10 '2단계 ㄱ'): API 잔액 부족은 일시 오류 — 시도 횟수를 쓰지 않고, 충전될 때까지 한 시간에 한 건씩만 다시 본다.
+//   10/23 잔액 부족이 HTTP 400(BAD_REQUEST)로 와서 재시도 4회를 다 쓰고 멈췄고, 그사이 템플릿 예비 글이 10/30·11/2에 그대로 게시됐다.
+//   판정은 이 파일 setAiState 한 곳(워커 finish·크론 공용) — 옛 기록(이미 게시된 BAD_REQUEST 2건)의 상태값은 다시 해석하지 않는다(PM 11/10 '기존글은 그대로').
+const CREDIT_RE = /credit balance is too low|purchase credits/i;
+const CREDIT_WAIT_MIN = 60;                // 잔액 부족 뒤 다시 보는 간격(분) — 전체에서 한 건씩(사진 수십 장 요청을 헛되이 되풀이하지 않게)
+function failCode(code, detail) { return (String(code || '') === 'BAD_REQUEST' && CREDIT_RE.test(String(detail || ''))) ? 'CREDIT_LOW' : String(code || ''); }
 
 function jobKey(id) { return `promoai:job:${id}`; }
 function lockKey(promoId) { return `promoai:lock:${promoId}`; }
@@ -53,8 +59,10 @@ function setAiState(rec, st, extra, now) {
   const tries = Number(prev.tries) || 0;
   const o = { st: st, ts: now || Date.now(), tries: st === 'running' ? tries + 1 : tries };
   if (extra && extra.job) o.job = String(extra.job);
-  if (extra && extra.code) o.code = String(extra.code).slice(0, 40);
+  if (extra && extra.code) o.code = failCode(extra.code, extra.detail).slice(0, 40);
   if (extra && extra.detail) o.detail = String(extra.detail).slice(0, 120);
+  // 잔액 부족은 시도 횟수를 쓰지 않는다 — running 때 올린 1을 되돌린다(충전되면 크론이 이어서 만든다)
+  if (st === 'fail' && o.code === 'CREDIT_LOW') o.tries = Math.max(0, tries - 1);
   rec.ai_st = o;
   return o;
 }
@@ -70,6 +78,7 @@ function applyResult(doc, promoId, res, now) {
   now = now || Date.now();
   const tk = res.tokens;
   const aiRec = { model: String((res && res.model) || ''), tokens: (tk && typeof tk === 'object') ? (Number(tk.total) || 0) : (Number(tk) || 0), ts: now, tt: String((res && res.tt) || ''), by: 'server' };
+  if (res && res.pv) aiRec.pv = String(res.pv).slice(0, 20);   // 체크 10 2단계 — 프롬프트 판(품질 점수를 판별로 비교)
   // 게시 완료 기록은 글을 바꾸지 않는다 — 네이버에 이미 올라간 글이다. 태그만 채운다(PM 9/16: 9/7 용흥동 글이 태그 없이 게시됨 — 태그는 게시글 편집으로 넣을 수 있다).
   if (String(rec.status || '') === 'posted') {
     if (!tags.length) return { changed: false, why: 'EMPTY', rec: rec };
@@ -98,7 +107,17 @@ function pickCandidates(items, now, locks) {
   now = now || Date.now();
   locks = locks || {};
   const out = [];
-  for (const rec of (items || [])) {
+  // 잔액 부족(CREDIT_LOW) 기록은 전체에서 마지막 실패로부터 CREDIT_WAIT_MIN이 지나고 지금 도는 생성이 없을 때, 가장 오래된 한 건만 다시 시도한다
+  //   (도는 생성이 있으면 기다린다 — 그 한 건이 다시 잔액 부족이면 한 시간 뒤, 성공하면 다음 회차에 다음 건)
+  let lastCredit = 0, creditRunning = false, creditPicked = false;
+  for (const r of (items || [])) {
+    const s0 = r && r.ai_st;
+    if (!r || r.del === 1 || !s0) continue;
+    if (!r.ai && s0.st === 'fail' && s0.code === 'CREDIT_LOW') lastCredit = Math.max(lastCredit, Number(s0.ts) || 0);
+    if (s0.st === 'running' && (now - (Number(s0.ts) || 0)) < RUNNING_STALE_MS) creditRunning = true;
+  }
+  const creditOpen = (now - lastCredit) >= CREDIT_WAIT_MIN * 60000 && !creditRunning;
+  for (const rec of (items || []).slice().sort(function (a, b) { return (Number(a && a.ts) || 0) - (Number(b && b.ts) || 0); })) {
     if (!rec || rec.del === 1 || rec.ai) continue;
     const posted = String(rec.status || '') === 'posted';
     // 게시 완료라도 태그가 비어 있으면 대상(태그만 생성·적용 — applyResult가 글은 안 바꾼다). 태그가 있으면 손대지 않는다.
@@ -114,6 +133,10 @@ function pickCandidates(items, now, locks) {
       if (s.st === 'running') {
         if ((now - (Number(s.ts) || 0)) < RUNNING_STALE_MS) continue;   // 워커 진행 중
         why = 'stale_running';
+      } else if (s.st === 'fail' && s.code === 'CREDIT_LOW') {
+        if (!creditOpen || creditPicked) continue;                        // 잔액 부족 — 한 시간에 한 건만(충전되면 그 한 건이 성공하고 다음 회차에 다음 건)
+        creditPicked = true;
+        why = 'credit_retry';
       } else if (s.st === 'fail') {
         if (tries >= MAX_TRIES) continue;                                 // 자동 재시도 끝 — 카드에 이유가 적혀 있다
         const waitMin = RETRY_MIN[Math.min(tries, RETRY_MIN.length - 1)];
@@ -214,19 +237,23 @@ async function startJob(st, opts) {
 // v389 자동 학습 — 생성 성공 때 초안을 보존한다(applyResult가 기록 본문을 덮고 검수에서 고치면 초안이 사라지므로). 기록당 최근 DRAFT_KEEP건.
 const DRAFT_KEEP = 3;
 function draftKey(promoId) { return `promoai:draft:${promoId}`; }
-async function saveDraft(st, promoId, job, title, body, now) {
+// extra(체크 10 2단계, 없어도 됨) = {scenes, pv} — 사진 판독표·프롬프트 판을 초안 곁에 남긴다(3단계 판정 재료·판별 점수 비교)
+async function saveDraft(st, promoId, job, title, body, now, extra) {
   try {
     if (!RE_REC_ID.test(String(promoId || '')) || !body) return { ok: false, code: 'BAD_INPUT' };
     const r = await blobGet(st, draftKey(promoId));
     const items = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data.items : [];
     if (items.some(function (x) { return x && job && x.job === job; })) return { ok: true, dup: true };
-    items.push({ job: String(job || ''), title: String(title || '').slice(0, 200), body: String(body || '').slice(0, 12000), ts: now || Date.now() });
+    const it = { job: String(job || ''), title: String(title || '').slice(0, 200), body: String(body || '').slice(0, 12000), ts: now || Date.now() };
+    if (extra && Array.isArray(extra.scenes) && extra.scenes.length) it.scenes = extra.scenes.slice(0, 40);
+    if (extra && extra.pv) it.pv = String(extra.pv).slice(0, 20);
+    items.push(it);
     const w = await blobSet(st, draftKey(promoId), { schema: 1, items: items.slice(-DRAFT_KEEP), updated_at: now || Date.now() });
     return { ok: !!w.ok, code: w.code };
   } catch (e) { return { ok: false, code: 'DRAFT_THREW' }; }
 }
 
 module.exports = {
-  USAGE_KEY, MAX_PHOTOS, LOCK_TTL_MS, MONTH_CALL_CAP, RE_REC_ID, RE_ATT, RETRY_MIN, MAX_TRIES, RUNNING_STALE_MS, DRAFT_KEEP,
-  jobKey, lockKey, draftKey, kstDate, kstMonth, newJobId, monthUsage, pickPhotoIds, setAiState, applyResult, pickCandidates, updatePromo, kickBackground, startJob, saveDraft,
+  USAGE_KEY, MAX_PHOTOS, LOCK_TTL_MS, MONTH_CALL_CAP, RE_REC_ID, RE_ATT, RETRY_MIN, MAX_TRIES, RUNNING_STALE_MS, DRAFT_KEEP, CREDIT_RE, CREDIT_WAIT_MIN,
+  jobKey, lockKey, draftKey, kstDate, kstMonth, newJobId, monthUsage, pickPhotoIds, failCode, setAiState, applyResult, pickCandidates, updatePromo, kickBackground, startJob, saveDraft,
 };

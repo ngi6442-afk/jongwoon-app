@@ -32,8 +32,8 @@ async function applyDoneJobs(st, doc, now) {
     if (!need[pid] || seen[pid]) continue;
     if (j.status !== 'done' || !j.title || !j.body) continue;
     seen[pid] = 1;
-    const a = PJ.applyResult(doc, pid, { title: j.title, body: j.body, tags: j.tags, model: j.model, tokens: j.used_tokens, tt: j.title_type, job: k.slice('promoai:job:'.length) }, now);
-    if (a.changed) { applied++; try { await PJ.saveDraft(st, pid, k.slice('promoai:job:'.length), j.title, j.body, now); } catch (e) {} }   // v389 초안 보존(옛 워커 결과도)
+    const a = PJ.applyResult(doc, pid, { title: j.title, body: j.body, tags: j.tags, model: j.model, tokens: j.used_tokens, tt: j.title_type, job: k.slice('promoai:job:'.length), pv: j.prompt_ver }, now);
+    if (a.changed) { applied++; try { await PJ.saveDraft(st, pid, k.slice('promoai:job:'.length), j.title, j.body, now, { scenes: j.scenes, pv: j.prompt_ver }); } catch (e) {} }   // v389 초안 보존(옛 워커 결과도) · 체크 10 2단계 판독표·프롬프트 판
   }
   return { applied: applied, scanned: scanned };
 }
@@ -142,7 +142,11 @@ exports.handler = async function (event) {
   try { learn = await kickLearn(st, now); } catch (e) { learn = { error: (e && e.message) || 'ERR' }; }
   // v411 계약 D4 — 블로그 짝을 기동하지 않은 회차에만 계약 서류 짝을 교대로 1건(10분 크론 신설 금지 규칙, netlify.toml). 잠금·재시도 규칙은 블로그와 같다.
   if (!learn || !learn.started) { try { learn = Object.assign({}, learn || {}, { contract: await kickLearnContract(st, now) }); } catch (e) { learn = Object.assign({}, learn || {}, { contract: { error: (e && e.message) || 'ERR' } }); } }
-  const out = { ok: true, at: new Date(now).toISOString(), applied: ap.applied, scanned: ap.scanned, candidates: cand0.length, started: started, failed: failed, remask: remask, learn: learn };
+  // ⑤ 체크 10 품질 고리 1단계(측정만, PM 11/10 '10. ㄱ') — 기록이 바뀌었거나 날·채점 판이 바뀌면 앱 출력(복사 창 모양)·모델 초안을 16항목으로 재서 promoai:quality에 둔다.
+  //    생성·복사·게시는 그대로(이 단계는 읽고 새 키 하나만 쓴다). 모듈은 여기서만 늦게 부른다 — 읽기·채점이 실패해도 ①~④ 결과는 그대로.
+  let quality = null;
+  try { quality = await require('./_lib/promoqual').sweep(st, doc, now); } catch (e) { quality = { error: (e && e.message) || 'ERR' }; }
+  const out = { ok: true, at: new Date(now).toISOString(), applied: ap.applied, scanned: ap.scanned, candidates: cand0.length, started: started, failed: failed, remask: remask, learn: learn, quality: quality };
   console.log('[사진AI 크론] ' + JSON.stringify(out));
   return { statusCode: 200, body: JSON.stringify(out) };
 };

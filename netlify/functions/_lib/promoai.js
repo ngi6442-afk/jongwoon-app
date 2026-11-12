@@ -32,6 +32,9 @@ const API_VERSION = CL.API_VERSION;
 const ApiError = CL.ApiError, callApi = CL.callApi, responseText = CL.responseText, scrubPayload = CL.scrubPayload;
 // 모델은 계약서 지정값. 이미지 입력 지원 + 비용·품질 균형.
 const MODEL = 'claude-sonnet-5';
+// 프롬프트 판 — 잡·초안·기록(ai.pv)에 남겨 품질 점수(promoai:quality)를 판별로 비교한다. 되돌리기 = 이 판을 만든 커밋을 되돌린다.
+//   p2-20261110: 체크 10 2단계(PM 11/10 '2단계 ㄱ') — 현장 사례형 틀·현장 근거·장비 이름·문장 길이 섞기·게시 시점 계절·사진 판독표(scenes)·자동 현장 사실·최근 소제목 회피·회사 절차 블록
+const PROMPT_VER = 'p2-20261110';
 const MAX_PHOTOS = 30;          // 첨부분은 전부 모델이 보고 제자리에 배치해야 한다(2026-08-15 PM)
 const MAX_TOKENS = 40000;       // 본문이 사진 장수에 비례(30장≈9천 자≈1만 토큰)에 high effort 사고(thinking)까지
                                 // 이 상한을 같이 쓴다. 24000으로는 사고+본문이 잘렸다(2026-08-18 실사고
@@ -235,6 +238,65 @@ function shotInfo(shotAt) {
   if (mo < 1 || mo > 12 || d < 1 || d > 31) return null;
   const pad = function (n) { return String(n).padStart(2, '0'); };
   return { date: y + '-' + pad(mo) + '-' + pad(d), month: mo, season: SEASONS[mo - 1] };
+}
+// 체크 10 2단계 C(PM 11/10 '2단계 ㄱ'): 계절은 게시 시점 기준 — 촬영월과 게시월이 두 달 이상 떨어지면 계절 언급 금지.
+//   촬영월만 보던 때 8월 글 '겨울철'(1월 촬영)·10월 글 '벚꽃'(3월 촬영)·11월 템플릿 글 '봄비'가 나갔다(10번 자료: 촬영→게시 중앙 204일).
+//   postDate = 워커가 넘기는 게시 시점(생성하는 날 KST). 없으면 오늘(KST).
+function kstDay(ts) { return new Date((ts || Date.now()) + 9 * 3600000).toISOString().slice(0, 10); }
+function monthGap(a, b) { return Math.abs((Number(a.date.slice(0, 4)) * 12 + a.month) - (Number(b.date.slice(0, 4)) * 12 + b.month)); }
+function seasonPlan(shotAt, postDate) {
+  const shot = shotInfo(shotAt), post = shotInfo(postDate) || shotInfo(kstDay());
+  if (!shot) return { ok: false, why: 'none', shot: null, post: post, gap: null };
+  const gap = post ? monthGap(shot, post) : 0;
+  return { ok: gap < 2, why: gap < 2 ? '' : 'far', shot: shot, post: post, gap: gap };
+}
+
+// ---------- 3.4) 체크 10 2단계 A·B⑤ — 현장 사실 자동 채움·최근 소제목 (PM 11/10 '2단계 ㄱ', 순수 함수) ----------
+// A(C059 무응답 기본값 = 입력 칸 추가 없이 자동 채움만): 사진 기록(모델에 보낸 순서의 {name, shot})에서 촬영 시각 범위와 파일 이름의 단계 낱말만 뽑는다.
+//   반환 {span, stages:[{label, nums}]} | null. 숫자는 한글 수사(계약금액 차단 충돌 방지), 파일 이름 글자(주소·번지)는 프롬프트로 나가지 않는다 — 단계 낱말 세 가지만.
+function autoFacts(list) {
+  const L = Array.isArray(list) ? list : [];
+  const times = [];
+  L.forEach(function (x) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/.exec(String((x && x.shot) || ''));
+    if (m) times.push({ day: m[1] + m[2] + m[3], min: (+m[4]) * 60 + (+m[5]) });
+  });
+  let span = '';
+  if (times.length >= 2) {
+    const days = {}; times.forEach(function (t) { days[t.day] = 1; });
+    const nd = Object.keys(days).length;
+    if (nd === 1) {
+      const mins = times.map(function (t) { return t.min; }).sort(function (a, b) { return a - b; });
+      const a = mins[0], b = mins[mins.length - 1], dur = b - a;
+      const half = function (m) { return Math.floor(m / 60) < 12 ? '오전' : '오후'; };
+      const hour = function (m) { const h = Math.floor(m / 60) % 12; return koCount(h === 0 ? 12 : h) + ' 시대'; };
+      const from = half(a) + ' ' + hour(a), to = (half(a) === half(b) ? '' : half(b) + ' ') + hour(b);   // 오전·오후가 같으면 뒤쪽은 시만
+      span = (Math.floor(a / 60) === Math.floor(b / 60) ? from : from + '부터 ' + to + '까지') + '(첫 장과 마지막 장 사이 ' + (dur < 60 ? '한 시간 안' : '약 ' + koCount(Math.round(dur / 60)) + ' 시간') + ')';
+    } else {
+      const NAMES = ['', '하루', '이틀', '사흘', '나흘', '닷새'];
+      span = (NAMES[nd] || (koCount(nd) + ' 날')) + '에 걸쳐 촬영';
+    }
+  }
+  const RES = [['작업 전', /(작업|공사|준설|세척|청소|시공)\s*전|before/i], ['작업 중', /(작업|공사|준설|세척|청소|시공)\s*중|진행/i], ['작업 후', /(작업|공사|준설|세척|청소|시공)\s*후|완료|after/i]];
+  const stages = RES.map(function (r) {
+    const nums = []; L.forEach(function (x, i) { if (r[1].test(String((x && x.name) || ''))) nums.push(i + 1); });
+    return { label: r[0], nums: nums };
+  }).filter(function (s) { return s.nums.length; });
+  if (!span && !stages.length) return null;
+  return { span: span, stages: stages };
+}
+// B⑤: 최근 글 본문에서 질문 소제목만(앱 복사 창 소제목 판정과 같은 꼴 — 45자 이하·물음표로 끝남·'. ' 없음), 글당 여섯·전체 열여덟까지, 같은 줄은 한 번.
+function recentHeads(bodies) {
+  const out = [], seen = Object.create(null);
+  (Array.isArray(bodies) ? bodies : []).forEach(function (b) {
+    let k = 0;
+    String(b || '').split(/\r?\n/).forEach(function (ln) {
+      const t = ln.trim();
+      if (k >= 6 || !t || t.length > 45 || !/[?？]$/.test(t) || t.indexOf('. ') >= 0 || /^\[?\s*사진\s*[0-9]/.test(t) || seen[t]) return;
+      seen[t] = 1; out.push(t); k++;
+    });
+  });
+  return out.slice(0, 18);
 }
 
 // ---------- 3.5) 블로그 제목 원형 다양화 (v320, 2026-09-06 — 설계: 09_조사_문서/블로그제목_다양화_20260904.md) ----------
@@ -697,7 +759,7 @@ function titleWarnings(title, ctx) {
   // 구두점 상한(제목 규칙 '쉼표 하나 또는 대시 하나까지')·계절어(촬영일 없음)·완화 발생 — 검출 층이 없던 결함(9/6 검증 반영 ⑥·⑦·⑧)
   var pc = (t.match(/[,，]/g) || []).length + (t.match(/[—–\-]/g) || []).length;
   if (pc > 1) w.push('제목 구두점이 ' + pc + '개입니다 — 쉼표 하나 또는 대시 하나까지만');
-  if (!String(c.shot_at || '').trim() && /봄|여름|가을|겨울|장마|한파|폭염|낙엽|해빙|[0-9]{1,2}월/.test(t)) w.push('제목에 계절·시기 표현이 있습니다(촬영일 없음)');
+  if (!String(c.shot_at || '').trim() && /봄|여름|가을|겨울|장마|한파|폭염|낙엽|해빙|[0-9]{1,2}월/.test(t)) w.push('제목에 계절·시기 표현이 있습니다(' + (c.season === 'far' ? '촬영과 게시 시점이 두 달 넘게 떨어짐' : '촬영일 없음') + ')');
   if (c.plan && c.plan.relaxed) w.push('제목 원형 후보가 모자라 제외를 완화했습니다(단계 ' + c.plan.relaxed + ') — 최근 글·이전 제목과 같은 원형일 수 있습니다');
   var recent = Array.isArray(c.recent) ? c.recent : [];
   var rr = function (x) { return (x && x.region) || c.region; };   // 최근 제목은 그 기록의 지역으로 어절·선두를 판정
@@ -751,6 +813,7 @@ const SYSTEM_PROMPT = [
   "- 사진은 답을 뒷받침하는 근거로 인용합니다. 사진 설명을 이어 붙인 사진첩 글을 쓰지 않습니다.",
   "- 판정 기준: 사진 마커를 전부 지워도 글이 혼자 서서 질문에 답해야 합니다. 문장이 끊기면 잘못 쓴 것이므로 다시 씁니다.",
   "- 검색엔진이 읽는 것은 글자뿐입니다. 사진이 대신 말해 줄 것이라고 가정하지 않습니다.",
+  "- 독자가 가장 믿는 근거는 이 현장에서 실제로 한 일입니다. 질문에 답할 때마다 이 현장에서 무엇을 무엇으로 어떻게 했는지(장비·도구·방법·순서)를 근거로 붙입니다. 지식만 있고 현장이 안 보이는 글은 사례가 아니라 설명서입니다.",
   "",
   "## 회사 (하나만 고릅니다)",
   "- 준설(우수받이·빗물받이·맨홀·관로·집수정·배수로)과 폐기물 수집운반 → (주)종운환경. 포항 소재.",
@@ -766,6 +829,10 @@ const SYSTEM_PROMPT = [
   "- 사진에서 실제로 보이는 것만 씁니다. 있었을 법한 일을 지어내지 않습니다.",
   "- 사진에서 확신이 서지 않으면 그 대목을 통째로 뺍니다. 애매하게 얼버무리지 않습니다.",
   "- 담당자가 입력한 지역·시설·증상·수치는 사실로 씁니다. 담당자가 적지 않은 수치는 만들지 않습니다.",
+  "- 사진에 보이는 장비·도구·보호구·안전시설은 정확한 이름으로 부릅니다. \"장비\"·\"도구\"로 뭉뚱그리지 않고 준설차·흡입호스·고압세척 노즐·라바콘·안전모·방수 작업복처럼 씁니다(보이는 것만).",
+  "- 사진에서 셀 수 있는 대수·인원·지점 수는 세어서 한글 수사로 적습니다(차량 두 대, 작업자 세 명, 맨홀 네 곳). 셀 수 없으면 쓰지 않습니다.",
+  "- 현장 사실의 근거는 출력 맨 앞에 적는 사진 판독표(scenes)입니다. 판독표에 없는 장비·대수·인원은 본문에 쓰지 않고, 판독 확신이 '낮음'인 장면은 현장 사실로 쓰지 않습니다.",
+  "- 요청의 [현장 정보]에 '자동으로 채운 현장 사실'(촬영 시각 범위·사진 단계 표시)이 오면 그것도 현장 사실로 씁니다.",
   "",
   "(B) 일반 지식 문장 — 그 시설이 원래 어떤 것인지 말하는 문장.",
   "시설의 구조와 목적, 문제가 생기는 원리, 방치했을 때 따라오는 결과, 그 공정을 그 순서로 하는 이유, 점검·의뢰 판단 기준, 권장 주기, 관리 주체와 정해진 절차, 자주 하는 오해가 여기에 해당합니다.",
@@ -799,6 +866,7 @@ const SYSTEM_PROMPT = [
   "- 각 문단은 ① 왜 그렇게 되는가(원리·기준) → ② 그래서 이 현장에서 무엇을 확인했는가(사진 근거) 순서입니다.",
   "- 문단의 첫 문장은 사진 묘사가 아닙니다. \"사진에 보이는\", \"사진에서는\", \"사진 속\", \"위 사진처럼\"으로 문단을 시작하지 않습니다.",
   "- \"무엇을 했습니다\"로 끝나는 문단을 만들지 않습니다. 행위를 적었으면 반드시 이유를 붙입니다(\"…하기 때문입니다\", \"…을 막기 위한 조치입니다\", \"이 단계를 건너뛰면 …가 됩니다\").",
+  "- 작업을 적을 때는 무엇을·무엇으로·어떻게 했는지와 그 이유를 이어서 씁니다. 예: 굳은 퇴적물을 먼저 고압수로 풀어 준 뒤 흡입호스로 빨아올렸는데, 그대로 흡입하면 호스가 막히고 바닥에 단단한 층이 남기 때문입니다.",
   "- 작업 순서만 나열한 대목은 시공일지입니다. 그 자리에는 그 공정이 없으면 무슨 일이 생기는지를 함께 적습니다.",
   "- 사진을 가리키는 말(\"사진에서\", \"사진을 보시면\")은 글 전체에서 두 번을 넘기지 않습니다(사진 마커 줄은 여기에 세지 않습니다).",
   "",
@@ -812,6 +880,7 @@ const SYSTEM_PROMPT = [
   "- 본문에 질문형 소제목을 세 개에서 다섯 개 둡니다. 독자가 검색창에 그대로 칠 법한 문장으로 씁니다.",
   "  (예: 왜 이 자리에만 물이 고일까요? / 그냥 두면 어떻게 될까요? / 언제 부르는 것이 맞을까요? / 직접 치우면 안 될까요? / 이건 누가 관리하는 걸까요?)",
   "- 질문은 이 현장의 증상·시설에서 뽑습니다. 매 글 같은 질문 묶음을 돌려쓰지 않습니다.",
+  "- 요청에 [최근 글 소제목]이 오면 그 질문 꼴(예: 두면 어떻게 될까요 · 누가 관리하는 걸까요 · 언제 불러야 할까요)을 이번 글에서 되풀이하지 않습니다. 같은 지식을 다루더라도 이 현장의 장면에서 새 질문을 뽑습니다.",
   "- 소제목 바로 아래에 답을 놓습니다. 답하지 않는 질문은 걸지 않습니다.",
   "- 제목에 쓴 질문과 소제목의 질문이 같은 말이 되지 않게 합니다.",
   "- 소제목은 기호 없이 한 줄로 두고 앞뒤에 빈 줄을 둡니다. 질문형이므로 반드시 물음표(?)로 끝냅니다 — 물음표가 빠진 소제목은 게시 담당자가 매번 손으로 붙이고 있었습니다.",
@@ -825,7 +894,7 @@ const SYSTEM_PROMPT = [
   "## 문체",
   "- 합쇼체(~습니다 / ~합니다 / ~입니다) 하나로 통일합니다. 해요체를 섞지 않습니다.",
   "- 개조식·명사형 종결(…확인. …완료. …필요.)을 쓰지 않고 반드시 서술어로 닫습니다. 예외는 질문형 소제목(~일까요?)과 독자의 말을 옮긴 큰따옴표뿐입니다.",
-  "- 문장은 짧게 끊습니다. 한 문장에 절을 셋 이상 넣지 않고, 한 문단은 세 줄에서 여섯 줄입니다.",
+  "- 문장 길이를 섞습니다. 짧은 문장 사이사이에, 상태·위치·원인·결과를 '-고, -며, -어서, -기 때문에, -도록'으로 이어 육십 자 안팎으로 쓰는 설명 문장을 다섯 문장에 한 번꼴로 둡니다. 다만 한 문장에 절을 넷 이상 넣지 않습니다(모바일에서 읽기 어렵습니다). 한 문단은 세 줄에서 여섯 줄입니다.",
   "- 과장·감탄·홍보 상투구·느낌표·이모지를 쓰지 않습니다. \"최고\", \"완벽\", \"확실히 책임\" 같은 표현을 쓰지 않습니다.",
   "- 마크다운 기호(#, **, - )를 쓰지 않습니다. 그대로 붙여넣어 게시하는 글입니다.",
   "- 목록이 필요하면 ✔(확인할 것) · ●(종류 나열) · 1) 2) 3)(순서) 세 가지만 씁니다. 줄글이 여섯 줄을 넘기기 전에 소제목이나 목록으로 호흡을 끊습니다.",
@@ -841,10 +910,11 @@ const SYSTEM_PROMPT = [
   "- 위험은 단정하지 않고 가능형으로 씁니다(\"…될 수 있습니다\", \"…으로 이어질 수 있습니다\"). 공포를 팔지 않습니다.",
   "- 방치 결과는 겁주기가 아니라 독자의 손해로 적습니다. 금액은 쓰지 않고 \"작업 범위가 커집니다\", \"일정이 밀릴 수 있습니다\", \"같은 자리가 다시 막힙니다\"처럼 씁니다.",
   "",
-  "## 계절",
-  "- 촬영일이 주어지면 그 날짜의 달을 기준으로만 계절을 말합니다.",
-  "- 촬영일이 주어지지 않으면 계절·날씨·시기를 한 글자도 언급하지 않습니다(장마·한파·낙엽·해빙 등 포함).",
-  "- 촬영일이 없을 때 지식 종류 6)을 쓰려면 월·계절어 없이 주기와 상태 기준으로만 씁니다(\"한 번 비워도 다시 찹니다\", \"이 상태가 보이면 점검할 때입니다\"). 그렇게 쓸 수 없으면 다른 종류로 바꿉니다.",
+  "## 계절 — 게시 시점 기준",
+  "- 글은 촬영하고 여러 달 뒤에 올라가기도 합니다. 계절은 독자가 글을 읽는 때(게시 시점)에 맞아야 합니다.",
+  "- 요청의 [현장 정보]가 '계절 언급: 가능'을 주면 촬영일의 달을 기준으로만 계절을 말합니다.",
+  "- '계절 언급: 하지 않음'이면(촬영일이 없거나 촬영과 게시 시점이 두 달 이상 떨어진 경우) 제목·본문·태그 어디에도 계절·날씨·시기를 쓰지 않습니다(장마·한파·낙엽·해빙·벚꽃·봄비 등 포함). 사진 속 꽃·눈·낙엽도 계절어로 옮기지 않습니다.",
+  "- 계절을 말하지 않을 때 지식 종류 6)을 쓰려면 월·계절어 없이 주기와 상태 기준으로만 씁니다(\"한 번 비워도 다시 찹니다\", \"이 상태가 보이면 점검할 때입니다\"). 그렇게 쓸 수 없으면 다른 종류로 바꿉니다.",
   "",
   "## 쓰지 않는 것",
   "- 금액·계약금액·견적가·발주처 이름·계약 조건·공사기간·입찰과 낙찰 관련 내용은 어떤 형태로도 쓰지 않습니다. 애초에 입력으로 주어지지 않으므로 짐작해서 채워 넣지 마십시오.",
@@ -878,13 +948,16 @@ const SYSTEM_PROMPT = [
   "## 본문 구성",
   "- 본문 길이는 사진 장수가 정합니다. 사진 한 장마다 이백오십에서 삼백오십 자를 배정합니다 — 사진 열 장이면 삼천 자 안팎, 스무 장이면 육천 자 안팎, 서른 장이면 구천 자 안팎이 됩니다. 사진이 일곱 장 이하면 공백 포함 2천자에서 2천6백자 사이로 씁니다(어느 쪽이든 사진 마커 줄은 빼고 셉니다).",
   "- 글이 길어져도 채우기 문장으로 늘리지 않습니다. 사진마다 [무엇을 한다]+[왜 그렇게 한다]를 배정하고, 남는 분량은 지식 덩어리로 채웁니다.",
-  "- 아래 네 가지 틀 중 하나를 고릅니다. 어느 틀을 골라도 지식 덩어리 규칙과 문단 쓰는 순서는 그대로 지킵니다. 직전 글과 같은 틀은 쓰지 않습니다.",
+  "- 아래 다섯 가지 틀 중 하나를 고릅니다. 어느 틀을 골라도 지식 덩어리 규칙과 문단 쓰는 순서는 그대로 지킵니다. 직전 글과 같은 틀은 쓰지 않습니다.",
   "  1) 질문 사슬형 — 질문 소제목 네다섯 개로 뼈대를 세우고 각 답의 근거로 사진을 붙입니다.",
   "  2) 증상 진단형 — 증상 → 왜 생기는가 → 두면 어떻게 되는가 → 그래서 이렇게 처치했다 → 재발을 막는 법.",
   "  3) 점검 기준형 — 부를 때가 됐다는 신호 네 가지를 앞세우고, 각 신호가 왜 신호인지 풀고, 이번 현장에서 그 신호가 어떻게 나타났는지 확인합니다.",
   "  4) 기록·비교형 — 작업 전 상태와 작업 후 상태를 대비시키고, 그 차이가 왜 생기는지를 지식으로 설명합니다.",
+  "  5) 현장 사례형 — 이 현장의 작업 순서가 글의 순서입니다: 현장과 증상 → 단계별 작업(사진 한 장마다 무엇을·무엇으로·어떻게·왜를 한 쌍으로) → 결과 확인 → 회사가 지킨 절차. 단계마다 질문형 소제목을 달고(예: 작업 전에 무엇부터 막았을까요?), 단계 사이사이에 지식 덩어리를 둡니다.",
+  "- 작업 과정 사진이 여러 장이면 5) 현장 사례형이 독자에게 가장 잘 읽힙니다. 다른 틀을 골라도 사진이 나오는 자리마다 이 현장에서 한 일을 무엇을·무엇으로·어떻게·왜로 씁니다.",
   "- 첫 문단은 시설과 증상에서 시작합니다. 회사 소개로 시작하지 않습니다.",
   "- 회사 이야기(무엇을 하는 회사인지, 왜 맡겨야 하는지)는 마지막 두 문단에만 둡니다. 앞쪽에는 넣지 않습니다.",
+  "- 마지막 두 문단의 회사 이야기에는 이 공종에서 회사가 지키는 절차나 갖춘 장비를 한두 가지 구체적으로 적습니다 — 준설은 사진에서 확인되는 장비와, 수거한 퇴적물을 정해진 절차에 따라 운반·처리한다는 것 / 석면·철거는 해체 전 신고·작업 중 비산 관리·지정폐기물 처리처럼 법으로 정해진 절차. 회사가 받은 등록·허가의 이름과 번호, 실적 건수는 입력으로 주어지지 않으므로 쓰지 않습니다.",
   "- 마지막에 회사 한 줄 소개를 붙이고, 마지막 문장은 독자가 다음에 무엇을 확인하면 되는지로 끝냅니다. 매 글 다른 문장으로 씁니다.",
   "",
   "## 사진 마커",
@@ -900,13 +973,19 @@ const SYSTEM_PROMPT = [
   "- 쓸 자리가 마땅치 않은 사진도 버리지 말고, 가장 가까운 장면의 마커에 함께 묶습니다. 배치되지 않은 사진은 글 끝에 무더기로 붙어 글을 망칩니다.",
   "- 본문을 다 쓴 뒤 마커에 적은 번호를 모두 모아, 1번부터 마지막 번호까지 빠진 것이 없는지 세어 확인합니다. 빠진 번호가 있으면 그 번호를 알맞은 마커에 넣어 고칩니다.",
   "- 마커 설명은 게시글에서 사진 밑 캡션으로 그대로 실립니다. '준설차 흡입호스로 맨홀 내부 토사를 제거하는 모습'처럼 스무 자 안팎의 서술형 문장으로 쓰고, 본문 문장이나 다른 마커의 설명을 그대로 되풀이하지 않습니다.",
-  "- 마커 다음 문장으로 사진을 묘사하지 않습니다. 그 자리에는 그것이 무슨 작업이고 왜 그렇게 하는지를 씁니다. [무엇을 한다] 한 문장 + [왜 그렇게 한다] 한 문장이 기본 꼴입니다.",
+  "- 마커 다음 문장으로 사진을 묘사하지 않습니다(\"사진에 보이는 …\"). 그 자리에는 그 장면에서 한 일을 씁니다. [누가·무엇으로·무엇을 어떻게 했다] + [왜 그렇게 한다]가 기본 꼴이고, 장비·도구는 판독표에 적은 이름으로 부릅니다.",
   "- 마커와 마커 사이에는 사진과 무관한 지식 덩어리를 최소 하나 둡니다.",
   "- 도입부와 마무리(시기·신호·관리 주체)에는 마커를 넣지 않습니다.",
   "- 사진 배치 순서는 번호 순서가 아니라 독자가 현장을 따라가는 순서입니다. 장면 그룹을 이 차례로 배열합니다: 의뢰·문제 확인(막힘·퇴적 등 상태 사진) → 원인 설명 → 안전조치·장비 준비 → 본작업(단계별) → 결과 확인·전후 비교 → 마무리. 안전조치 사진이 본작업 사진보다 뒤에 오면 잘못 배치한 것입니다.",
   "- 작업 전과 후를 비교할 수 있는 사진이 있으면 결과 대목에서 나란히 배치합니다. 전후 대비는 이 글 유형에서 독자가 가장 찾는 장면입니다.",
   "- 한 마커에는 한 장면만 담습니다. 차량 정차와 흡입 작업처럼 서로 다른 장면을 한 마커에 섞지 않습니다.",
   "- 글 틀(질문 순서)은 그대로 두되, 작업 과정을 다루는 소제목들의 순서만큼은 실제 작업 순서와 어긋나지 않게 잡습니다.",
+  "",
+  "## 사진 판독표(scenes) — 본문보다 먼저 씁니다",
+  "- 출력의 scenes에 사진마다 한 항목씩, 사진 번호 순서대로 적습니다: n(사진 번호) · scene(무슨 장면인지 한 줄) · equip(보이는 장비·도구·보호구·안전시설의 정확한 이름, 안 보이면 빈칸) · act(누가 무엇을 어떻게 하는지, 사람이 없으면 빈칸) · state(퇴적물·관·시설의 상태) · count(셀 수 있는 대수·인원을 한글 수사로, 없으면 빈칸) · conf(판독 확신 — 높음·보통·낮음).",
+  "- 판독표에는 사진에서 보이는 것만 적습니다. 짐작은 적지 않고, 애매하면 conf를 낮춥니다.",
+  "- 본문의 현장 사실 문장은 판독표에서 나옵니다. 판독표의 장비·행위·상태를 무엇을·무엇으로·어떻게·왜로 풀어 쓰고, 판독표에 없는 장비·수량은 쓰지 않습니다.",
+  "- 사람 이름·차량 번호판·전화번호·간판 상호는 판독표에도 적지 않습니다.",
   "",
   "## 입력이 부족할 때",
   "- 담당자가 주는 것은 보통 지역·시설·증상 세 값과 사진뿐입니다. 그것만으로 글이 성립하도록 (B)로 뼈대를 세웁니다.",
@@ -926,13 +1005,15 @@ const SYSTEM_PROMPT = [
   "4. 사진에서 확인되지 않은 현장 사실(장비·색·대수·인원·지형·퇴적물 상태·날씨)을 쓴 곳이 있는가. 있으면 지웁니다.",
   "5. 질문형 소제목이 세 개 이상이고 서로 다른 것을 묻는가.",
   "6. 금액·발주처·계약·입찰, 조문 번호·과태료 금액·기준 수치가 없는가. 마크다운 기호가 없는가.",
-  "7. 촬영일이 없는데 계절·날씨·시기를 말하지 않았는가.",
+  "7. 계절 언급이 '하지 않음'인데 계절·날씨·시기를 말하지 않았는가(제목·본문·태그 모두).",
   "8. 제목이 50자 이내이고 상호명이 없으며 핵심 키워드가 한 번이고, 지정된 원형(주 또는 보조)으로 썼는가. title_type에 실제로 쓴 원형 코드를 적었는가.",
   "9. 사진 마커에 적은 번호를 1번부터 세어, 받은 사진 전부가 빠짐없이 들어갔는가. 빠진 번호가 하나라도 있으면 그 번호를 알맞은 마커에 넣어 고친 뒤 출력한다.",
   "10. 마커 하나에 사진이 세 장 이상 묶인 곳이 없는가. 있으면 장면을 나눠 마커를 쪼갠 뒤 출력한다.",
+  "11. 사진이 나오는 자리마다 이 현장에서 한 일이 무엇을·무엇으로·어떻게·왜로 적혔고, 장비·도구를 정확한 이름으로 불렀는가. 판독표에 없는 장비·대수·인원을 쓰지 않았는가.",
+  "12. 다섯 문장에 한 번꼴로 상태·원인·결과를 잇는 설명 문장이 있고, 절이 넷 이상인 문장은 없는가.",
   "",
   "## 출력",
-  "- title(제목)·body(본문)·tags(해시태그)·title_type(실제로 쓴 제목 원형 코드 한 글자) 네 값만 출력합니다. 다른 설명이나 점검 결과를 덧붙이지 않습니다.",
+  "- scenes(사진 판독표)·title(제목)·body(본문)·tags(해시태그)·title_type(실제로 쓴 제목 원형 코드 한 글자) 다섯 값만 출력합니다. scenes를 먼저 채우고 그것을 근거로 본문을 씁니다. 다른 설명이나 점검 결과를 덧붙이지 않습니다.",
   "- 본문에 (A)·(B) 같은 분류 표시, 지식 종류 번호, 틀 이름을 남기지 않습니다.",
 ].join('\n');
 
@@ -944,6 +1025,8 @@ function buildPrompt(input) {
   const inp = input || {};
   const pub = contractPublicView(inp.contract);      // 계약에서 나가는 값은 이 4필드가 전부
   const shot = shotInfo(inp.shot_at);
+  const sp = seasonPlan(inp.shot_at, inp.post_date);   // 2단계 C — 게시 시점 기준 계절
+  const shotForTitle = sp.ok ? safeText(inp.shot_at, 40) : '';   // 계절 언급을 안 하면 제목 원형 S(계절·시기형)도 고르지 않고, 제목 계절어는 경고로 잡힌다
   const n = Math.max(0, Math.min(MAX_PHOTOS, parseInt(inp.photoCount, 10) || 0));
 
   const lines = [];
@@ -964,11 +1047,31 @@ function buildPrompt(input) {
     if (pub.region_wide) lines.push('- 지역 참고: ' + pub.region_wide);
   }
   lines.push('- 사진: ' + n + '장 (위에 사진 1부터 순서대로 붙였습니다)');
-  if (shot) {
-    lines.push('- 촬영일: ' + shot.date + ' (' + shot.month + '월 · ' + shot.season + ')');
-    lines.push('  → 계절은 이 달을 기준으로만 씁니다.');
+  if (shot && sp.ok) {
+    lines.push('- 촬영일: ' + shot.date + ' (' + shot.month + '월 · ' + shot.season + ') · 게시 시점: ' + sp.post.month + '월');
+    lines.push('  → 계절 언급: 가능 — 계절은 촬영한 달을 기준으로만 씁니다.');
+  } else if (shot) {
+    lines.push('- 촬영일: ' + shot.date + ' (' + shot.month + '월) · 게시 시점: ' + sp.post.month + '월 — 촬영과 ' + koCount(sp.gap) + ' 달 차이');
+    lines.push('  → 계절 언급: 하지 않음 — 제목·본문·태그에 계절·날씨·시기를 한 글자도 쓰지 마십시오(사진 속 꽃·눈·낙엽도 계절어로 옮기지 않습니다).');
   } else {
-    lines.push('- 촬영일: 확인 불가 → 계절·시기·날씨를 한 글자도 언급하지 마십시오.');
+    lines.push('- 촬영일: 확인 불가 → 계절 언급: 하지 않음 — 계절·시기·날씨를 한 글자도 언급하지 마십시오.');
+  }
+  // 2단계 A(현장 사실 자동 채움 — C059 무응답 기본값 '자동 채움만', 입력 칸 추가 없음): 사진 기록에서 워커가 뽑은 값(촬영 시각 범위·파일 이름의 단계 낱말). 사람·주소·번호는 없다.
+  const af = (inp.auto_facts && typeof inp.auto_facts === 'object') ? inp.auto_facts : null;
+  if (af) {
+    const fl = [];
+    if (safeText(af.span, 80)) fl.push('촬영 시각(사진 기록 기준): ' + safeText(af.span, 80));
+    if (Array.isArray(af.stages)) {
+      const st = af.stages.slice(0, 4).map(function (s) {
+        const nums = (Array.isArray(s && s.nums) ? s.nums : []).map(function (k) { return parseInt(k, 10); }).filter(function (k) { return k > 0 && k <= MAX_PHOTOS; }).slice(0, MAX_PHOTOS);
+        return (s && safeText(s.label, 10) && nums.length) ? safeText(s.label, 10) + ' = 사진 ' + nums.join('·') : '';
+      }).filter(Boolean);
+      if (st.length) fl.push('사진 파일 이름의 단계 표시: ' + st.join(' / '));
+    }
+    if (fl.length) {
+      lines.push('- 자동으로 채운 현장 사실(사진 기록에서 뽑은 값 — 현장 사실로 써도 됩니다):');
+      fl.forEach(function (l) { lines.push('  · ' + l); });
+    }
   }
 
   // 제목 원형(v320) — 최근 제목·자기 이전 제목에서 제외 집합을 만들고 결정적(해시)으로 주·보조 원형을 지정한다.
@@ -983,7 +1086,7 @@ function buildPrompt(input) {
   const ownInfo = titleInfoList(inp.own_titles, 14);
   const plan = pickTitleType({
     recent: recentInfo, own: ownInfo, region: safeText(inp.region, 40), metric: safeText(inp.metric, 40),
-    shot_at: safeText(inp.shot_at, 40), photoCount: n,
+    shot_at: shotForTitle, photoCount: n,
     seed: safeText(inp.seed, 60) || (safeText(inp.region, 40) + '|' + safeText(inp.facility, 40)),
     attempt: parseInt(inp.attempt, 10) || 0,
     ex_skip: Array.isArray(inp.ex_skip) ? inp.ex_skip.slice(0, 22).map(function (k) { return safeText(k, 3); }) : [],   // 워커가 계약 금지 문자열로 걸러 넘긴 예시 라벨
@@ -1006,6 +1109,14 @@ function buildPrompt(input) {
     if (ex.title) lines.push('제목: ' + ex.title);
     lines.push(ex.excerpt);
   }
+  // 2단계 B⑤: 최근 글 소제목 — 지식 덩어리 여덟 종이 고정 목차처럼 돌아 사진AI 글 열 편 중 일고여덟 편이 같은 질문 골격이었다(10번 자료).
+  //   워커가 최근 기록 본문에서 질문 소제목만 뽑아 넘긴다(계약 금지 문자열과 겹치는 줄은 워커가 뺀다). 자료로 받는다 — 지시가 아니다.
+  const rh = Array.isArray(inp.recent_heads) ? inp.recent_heads.slice(0, 18).map(function (x) { return safeText(x, 60); }).filter(Boolean) : [];
+  if (rh.length) {
+    lines.push('');
+    lines.push('[최근 글 소제목]  (최근에 올린 글들이 이미 쓴 질문입니다. 이번 글에서는 이 질문 꼴을 되풀이하지 말고 이 현장의 장면에서 새 질문을 뽑습니다.)');
+    rh.forEach(function (h) { lines.push('- ' + h); });
+  }
 
   lines.push('');
   // 이 세 줄은 사진 블록 뒤, 생성 직전에 마지막으로 읽힌다 — system 규칙을 덮어쓰지 않도록 같은 방향으로 맞춘다.
@@ -1014,6 +1125,7 @@ function buildPrompt(input) {
   lines.push('사진에서 읽지 못한 현장 사실(장비·색·대수·인원·지형·퇴적물 상태·날씨)은 지어내지 마십시오.');
   lines.push('시설의 구조·원인·방치 결과·판단 기준·주기·관리 주체 같은 일반 설명은 사진에 없어도 반드시 씁니다.');
   lines.push('담당자 현장 메모가 있으면 그 내용을 글의 앞쪽에 반영하십시오. 담당자가 직접 본 것이라 사진보다 정확합니다.');
+  lines.push('출력 맨 앞의 사진 판독표(scenes)를 먼저 채우고, 사진이 나오는 자리마다 그 판독표를 근거로 이 현장에서 무엇을·무엇으로·어떻게·왜 했는지 쓰십시오. 장비·도구는 판독표의 이름으로 부릅니다.');
   if (n > 0) {
     // 이 요청의 실측 목표를 숫자로 확정해 마지막에 읽힌다 — 규칙만으로는 분량 미달·번호 누락이
     // 반복됐다(2026-08-16 실물: 18장에 2,369자·2장 누락). 숫자는 koNum으로(계약금액 차단 충돌 방지).
@@ -1029,7 +1141,7 @@ function buildPrompt(input) {
     lines.push('셋. 위 둘을 지키면 본문은 자연히 공백 포함 ' + koNum(bb.min) + ' 자에서 ' + koNum(bb.max) + ' 자 사이가 됩니다(마커 줄 제외). 이보다 짧으면 지식 덩어리가 모자란 것이니 더 넣으십시오.');
   }
 
-  return { system: SYSTEM_PROMPT, user: lines.join('\n'), title_plan: plan, title_ctx: { recent: recentInfo, own: ownInfo, region: safeText(inp.region, 40), shot_at: safeText(inp.shot_at, 40) } };
+  return { system: SYSTEM_PROMPT, user: lines.join('\n'), title_plan: plan, title_ctx: { recent: recentInfo, own: ownInfo, region: safeText(inp.region, 40), shot_at: shotForTitle, season: sp.ok ? 'ok' : sp.why } };
 }
 
 // ---------- 5) 사진 정규화 ----------
@@ -1101,13 +1213,32 @@ function buildRequest(photos, input) {
         schema: {
           type: 'object',
           properties: {
+            // 2단계 D(PM 11/10 '2단계 ㄱ'): 사진 판독표를 본문보다 먼저 — 같은 호출 안에서 디테일의 근거를 먼저 적게 한다(추가 호출 없음). 워커가 잡·초안에 남긴다.
+            scenes: {
+              type: 'array',
+              description: '사진 판독표 — 사진마다 한 항목, 사진 번호 순서. 본문보다 먼저 채우고 본문의 현장 사실은 여기서만 나온다.',
+              items: {
+                type: 'object',
+                properties: {
+                  n: { type: 'integer', description: '사진 번호' },
+                  scene: { type: 'string', description: '무슨 장면인지 한 줄' },
+                  equip: { type: 'string', description: '보이는 장비·도구·보호구·안전시설의 정확한 이름(안 보이면 빈칸)' },
+                  act: { type: 'string', description: '누가 무엇을 어떻게 하는지(사람이 없으면 빈칸)' },
+                  state: { type: 'string', description: '퇴적물·관·시설의 상태' },
+                  count: { type: 'string', description: '셀 수 있는 대수·인원(한글 수사, 없으면 빈칸)' },
+                  conf: { type: 'string', enum: SCENE_CONF, description: '판독 확신' },
+                },
+                required: ['n', 'scene', 'equip', 'act', 'state', 'count', 'conf'],
+                additionalProperties: false,
+              },
+            },
             title: { type: 'string', description: '50자 이내 제목' },
             body: { type: 'string', description: bodyDesc },
             tags: { type: 'array', items: { type: 'string' }, description: '해시태그 15~20개. # 없이 낱말만. 지역·시설·증상·공종을 섞어 이 글에서만 나오는 조합으로.' },
             // 제목 원형 보고(v320) — 모델이 실제로 쓴 원형. 워커가 잡·이력 blob에 라벨로 남겨 다음 생성의 제외 집합이 된다.
             title_type: { type: 'string', enum: TITLE_CODES, description: '제목에 실제로 쓴 원형 코드 한 글자' },
           },
-          required: ['title', 'body', 'tags', 'title_type'],
+          required: ['scenes', 'title', 'body', 'tags', 'title_type'],
           additionalProperties: false,
         },
       },
@@ -1154,6 +1285,15 @@ function wireBody(req) {
 
 // (v410) responseText 본체는 _lib/claude.js.
 
+// 사진 판독표 한 항목 정리(2단계 D) — 글자 수 상한·확신 값 화이트리스트. 사람 이름·번호판은 프롬프트가 막고, 여기서는 모양만 본다.
+const SCENE_CONF = ['높음', '보통', '낮음'];
+function normScene(x) {
+  if (!x || typeof x !== 'object') return null;
+  const n = parseInt(x.n, 10);
+  const t = function (v, k) { return String(v == null ? '' : v).replace(/[\u0000-\u001F]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, k); };
+  const o = { n: (n > 0 && n <= 999) ? n : 0, scene: t(x.scene, 80), equip: t(x.equip, 80), act: t(x.act, 100), state: t(x.state, 80), count: t(x.count, 30), conf: SCENE_CONF.indexOf(String(x.conf || '').trim()) >= 0 ? String(x.conf).trim() : '' };
+  return (o.n || o.scene) ? o : null;
+}
 // 구조화 출력(JSON)이 정상이면 그대로, 아니면 '제목:' 형태를 받아준다.
 function parseDraft(text) {
   const s = String(text || '').trim();
@@ -1164,11 +1304,13 @@ function parseDraft(text) {
       // tags를 여기서 흘리면 스키마가 강제한 값이 그대로 증발한다 — "태그가 없습니다" 실사고(2026-08-15)
       const tags = Array.isArray(j.tags) ? j.tags.filter(function (t) { return typeof t === 'string' && t.trim(); }) : [];
       const tt = (typeof j.title_type === 'string' && TITLE_CODES.indexOf(j.title_type.trim()) >= 0) ? j.title_type.trim() : '';
-      return { title: j.title.trim(), body: j.body.trim(), tags: tags, title_type: tt };
+      // scenes도 같은 이유로 여기서 흘리지 않는다(2단계 D) — 없으면 빈 배열(옛 응답 모양도 그대로 받는다)
+      const scenes = Array.isArray(j.scenes) ? j.scenes.slice(0, 40).map(normScene).filter(Boolean) : [];
+      return { title: j.title.trim(), body: j.body.trim(), tags: tags, title_type: tt, scenes: scenes };
     }
   } catch (e) { /* 아래 폴백 */ }
   const m = /^\s*(?:제목|title)\s*[:：]\s*(.+?)\s*\n([\s\S]+)$/i.exec(s);
-  if (m) return { title: m[1].trim(), body: m[2].trim(), tags: [], title_type: '' };
+  if (m) return { title: m[1].trim(), body: m[2].trim(), tags: [], title_type: '', scenes: [] };
   return null;
 }
 
@@ -1274,6 +1416,15 @@ function draftWarnings(draft, photoCount, tctx) {
     if (isWork && !isPrep) { workSeen = true; return; }
     if (isPrep && !isWork && workSeen) w.push('안전조치·준비 사진(' + mk.nums.join(',') + ')이 본작업 사진 뒤에 있습니다 — 작업 순서 역행');
   });
+  // 2단계 C·D 경고(사람 판단용 — 차단 아님): 계절 언급을 안 하기로 한 글의 본문·태그 계절어 · 사진 판독표가 사진 수보다 적음
+  const tc = tctx || {};
+  if (tc.season === 'far' || tc.season === 'none') {
+    const SEASON_WORDS = ['봄', '여름', '가을', '겨울', '벚꽃', '꽃잎', '해빙', '장마', '폭염', '무더위', '단풍', '한파', '결빙', '동파', '낙엽'];
+    const txt = String(draft.body || '') + ' ' + (Array.isArray(draft.tags) ? draft.tags.join(' ') : '');
+    const hit = SEASON_WORDS.filter(function (s) { return txt.indexOf(s) >= 0; });
+    if (hit.length) w.push('본문·태그에 계절·시기 말(' + hit.slice(0, 4).join('·') + ')이 있습니다 — ' + (tc.season === 'far' ? '촬영과 게시 시점이 두 달 넘게 떨어져' : '촬영일이 없어') + ' 쓰지 않기로 한 말입니다');
+  }
+  if (Array.isArray(draft.scenes) && photoCount > 0 && draft.scenes.length < photoCount) w.push('사진 판독표 ' + draft.scenes.length + '장 — 사진 ' + photoCount + '장 중 빠진 장면은 현장 사실 근거가 없습니다');
   // 제목 경고(50자·상호 포함, titleWarnings v320) — 마커·장면 경고 뒤에 둔다(워커가 갈래별 상한을 따로 둔다).
   titleWarnings(draft.title, Object.assign({}, tctx || {}, { title_type: draft.title_type })).forEach(function (x) { w.push(x); });
   return w;
@@ -1359,6 +1510,8 @@ async function generateDraft(apiKey, photos, input, opts) {
       title: draft.title,
       body: draft.body,
       tags: draft.tags || [],
+      scenes: draft.scenes || [],          // 2단계 D 사진 판독표 — 워커가 잡·초안 보존본에 남긴다(3단계 판정 재료)
+      prompt_ver: PROMPT_VER,
       // 제목 원형(v320) — 실제 사용 코드와 지정 계획. 워커가 잡·이력 blob에 기록한다.
       title_type: draft.title_type || '',
       title_plan: req._title_plan ? { primary: req._title_plan.primary && req._title_plan.primary.code, backup: req._title_plan.backup && req._title_plan.backup.code, exclude: req._title_plan.exclude, lead_ok: req._title_plan.lead_ok, relaxed: req._title_plan.relaxed, labels: req._title_plan.labels } : null,
@@ -1379,7 +1532,9 @@ async function generateDraft(apiKey, photos, input, opts) {
 
 module.exports = {
   // 상수
-  MODEL, MAX_PHOTOS, MAX_TOKENS, BODY_MIN, BODY_MAX, bodyBounds, koNum, koCount, ALLOWED_MIME, SYSTEM_PROMPT,
+  MODEL, MAX_PHOTOS, MAX_TOKENS, BODY_MIN, BODY_MAX, bodyBounds, koNum, koCount, ALLOWED_MIME, SYSTEM_PROMPT, PROMPT_VER,
+  // 2단계(체크 10): 게시 시점 계절·사진 판독표·현장 사실 자동 채움·최근 소제목
+  seasonPlan, monthGap, SCENE_CONF, normScene, autoFacts, recentHeads,
   // 계약 차단(순수 함수 — 테스트 대상)
   contractPublicView, contractForbidden, scrubPayload,
   // 프롬프트·요청 조립(순수 함수 — 테스트 대상)

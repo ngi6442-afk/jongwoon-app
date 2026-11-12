@@ -149,7 +149,8 @@ try {
   const libCodes = [...((lib.match(/var TITLE_TYPES = \[([\s\S]*?)\n\];/) || ['', ''])[1]).matchAll(/\{ code: '([A-Z])'/g)].map((m) => m[1]);
   const uiCodes = [...((idx.match(/var PA_TITLE_TYPE_NAMES=\{([^}]+)\}/) || ['', ''])[1]).matchAll(/([A-Z]):"/g)].map((m) => m[1]);
   T('제목 원형 코드 11종 라이브러리 = 화면 이름표(' + libCodes.join('') + ')', libCodes.length === 11 && libCodes.join('') === uiCodes.join(''), '라이브러리 ' + libCodes.join('') + ' / 화면 ' + uiCodes.join(''));
-  T('출력 스키마 title_type enum·required + 제목 규칙 절 4자리 숫자 없음', /title_type: \{ type: 'string', enum: TITLE_CODES/.test(lib) && /required: \['title', 'body', 'tags', 'title_type'\]/.test(lib) && !/\d{4,}/.test(((lib.match(/var TITLE_TYPES = \[([\s\S]*?)\n\];/) || ['', ''])[1]).replace(/[,\s]/g, '')), '');
+  // 체크 10 2단계 D(PM 11/10 '2단계 ㄱ'): 사진 판독표 scenes가 맨 앞 필수 칸으로 들어옴 — title_type 필수·원형 목록은 그대로(판독표 실행 검사는 tools/promogen_check.mjs)
+  T('출력 스키마 title_type enum·required(scenes 맨 앞) + 제목 규칙 절 4자리 숫자 없음', /title_type: \{ type: 'string', enum: TITLE_CODES/.test(lib) && /required: \['scenes', 'title', 'body', 'tags', 'title_type'\]/.test(lib) && !/\d{4,}/.test(((lib.match(/var TITLE_TYPES = \[([\s\S]*?)\n\];/) || ['', ''])[1]).replace(/[,\s]/g, '')), '');
   // v352(PM 9/11 #31ⓒ "태그 생성이 빠졌다"): 실사고는 태그 코드 상실이 아니라 자동 생성 누락(다른 기록 생성 중 등록 → 버려짐)이었다.
   //   그래도 태그 사슬 8고리(v267 신설·v271 parseDraft 증발 수리 — 두 번 깨진 사슬)는 검사가 없었다 — 어느 고리가 빠져도 push 전에 잡는다.
   T('태그 사슬(v267·v271): 프롬프트 절·스키마 tags·parseDraft 통과·generateDraft 반환·워커 rec.tags·화면 paFinish/paApply 3곳(v361 posted 갈래 포함)/태그 상자',
@@ -1552,6 +1553,35 @@ try {
     && /case 'pl_layout'/.test(papi) && /case 'copy_save'/.test(papi) && /COPY_MAX_LINES = 600/.test(papi) && /replace\(\/\[\^cbih\]\/g, ''\)/.test(papi) && /code: 'NO_PERMISSION'/.test(papi)
     && /function layoutGap\(copyLines, finalLines\)/.test(plsrc) && /COPY_PREFIX = 'promoai:copy:'/.test(plsrc) && /PL\.layoutGap\(cp\.data\.lines, pair\.final_layout\)/.test(lw) && /jw-shell-v(39[4-9]|4\d\d)/.test(swv));
 } catch (e) { console.log('  (v394 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ---- v446 체크 10 품질 고리 1단계(측정만, PM 11/10 17:40 '10. ㄱ' = 원장 C058): 채점·포장 재현 대조·저장·카드 실행 검사는 tools/promoqual_check.mjs. 여기서는 출력 무변·배선만 ----
+try {
+  const pq = readFileSync(join(ROOT, 'netlify', 'functions', '_lib', 'promoqual.js'), 'utf8');
+  const cron = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-promo-ai-cron.js'), 'utf8');
+  const papi = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-promo-ai.js'), 'utf8');
+  const gen = ['_lib/promoai.js', 'gw-promo-ai-run-background.js', 'gw-promo-learn-background.js', '_lib/promoai_job.js'].map((p) => readFileSync(join(ROOT, 'netlify', 'functions', p), 'utf8')).join('\n');
+  const post = (html.match(/\/\/ @promo-post-start([\s\S]*?)\/\/ @promo-post-end/) || ['', ''])[1];
+  T('체크 10 품질 고리 1단계(측정만): _lib/promoqual.js(promoai:quality · sweep · summary · planFromBody) + promoqual_ex.json · 크론 ⑤ try 안 늦은 require · pl_get quality(try — 실패 null) · 카드 promoQualHtml(표시만) · 출력 무변(생성 라이브러리·생성 워커·학습 워커·작업 층·복사 구간에 promoqual 0) · 게이트 tools/promoqual_check.mjs',
+    /QUAL_KEY = 'promoai:quality'/.test(pq) && /async function sweep\(st, doc, now\)/.test(pq) && /function summary\(raw\)/.test(pq) && /function planFromBody\(body, nImg, prof, tags\)/.test(pq) && existsSync(join(ROOT, 'netlify', 'functions', '_lib', 'promoqual_ex.json'))
+    && /try \{ quality = await require\('\.\/_lib\/promoqual'\)\.sweep\(st, doc, now\); \}/.test(cron) && /quality: quality, layout: layout, request_id: R/.test(papi)
+    && /function promoQualHtml\(q\)\{/.test(html) && /h \+= promoQualHtml\(res\.body\.quality\);/.test(html)
+    && !/promoqual/.test(gen) && !/promoqual|promoQual|quality/.test(post) && existsSync(join(ROOT, 'tools', 'promoqual_check.mjs')),
+    '어느 고리가 빠졌는지 node tools/promoqual_check.mjs ⑥으로 확인');
+} catch (e) { console.log('  (체크 10 품질 고리 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ---- v446 체크 10 품질 고리 2단계(생성 개선, PM 11/10 18:26 '2단계 ㄱ' — 기존 글은 그대로): 실행 검사는 tools/promogen_check.mjs. 여기서는 배선·판 표시만 ----
+try {
+  const pai = readFileSync(join(ROOT, 'netlify', 'functions', '_lib', 'promoai.js'), 'utf8');
+  const pj = readFileSync(join(ROOT, 'netlify', 'functions', '_lib', 'promoai_job.js'), 'utf8');
+  const wk = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-promo-ai-run-background.js'), 'latin1');   // NUL 바이트 파일 — 글자 비교만
+  T('체크 10 2단계: 프롬프트 판 PROMPT_VER p2 · 게시 시점 계절 seasonPlan · 판독표 scenes(스키마·parseDraft) · autoFacts·recentHeads · 잔액 부족 CREDIT_LOW(setAiState 한 곳·한 시간에 한 건) · 앱 예비 글 승인·완성본 막기 · 게이트 tools/promogen_check.mjs',
+    /const PROMPT_VER = 'p2-/.test(pai) && /function seasonPlan\(shotAt, postDate\)/.test(pai) && /scenes: \{\s*\n\s*type: 'array'/.test(pai) && /function normScene\(x\)/.test(pai) && /function autoFacts\(list\)/.test(pai) && /function recentHeads\(bodies\)/.test(pai)
+    && /function failCode\(code, detail\)/.test(pj) && /CREDIT_WAIT_MIN = 60/.test(pj) && /o\.code === 'CREDIT_LOW'\) o\.tries = Math\.max\(0, tries - 1\)/.test(pj)
+    && /post_date: new Date\(Date\.now\(\) \+ 9 \* 3600000\)/.test(wk) && /rec\.prompt_ver = cleanStr\(/.test(wk)
+    && /function promoNoAiDraft\(p\)\{/.test(html) && /promoApproveBtn"\)\.style\.display=\(isAdmin\(\)&&st==="review"&&!promoNoAiDraft\(p\)\)/.test(html)
+    && existsSync(join(ROOT, 'tools', 'promogen_check.mjs')),
+    '어느 고리가 빠졌는지 node tools/promogen_check.mjs로 확인');
+} catch (e) { console.log('  (체크 10 2단계 검사 생략 — ' + e.message + ')'); fails++; }
 
 
 // ---- v395(10/27 착수 브리핑 A2 · 공통 기반 1 첫 시범): 자동 지시 배정표 settings:assign — 접두어 앱↔서버 동률 · 카드·호출·배지·액션 배선 · sw ----

@@ -119,8 +119,11 @@ async function handleLearnGet(st, c, d, R) {
   const pairs = await learnPairs(st);
   const lay = await blobGet(st, PL.LAYOUT_KEY);   // v392 포장 측정 프로필(없으면 null — 수집기가 아직 안 올린 것)
   const layout = (lay.ok && lay.data && typeof lay.data === 'object' && lay.data.profile) ? { ts: Number(lay.data.ts) || 0, profile: lay.data.profile, posts: (Array.isArray(lay.data.posts) ? lay.data.posts : []).slice(0, 12) } : null;
+  // 체크 10 품질 고리 1단계 — 크론 ⑤가 잰 점수(promoai:quality) 요약. 읽기만 하고, 모듈·읽기 실패는 카드의 이 칸만 비운다(null)
+  let quality = null;
+  try { const PQ = require('./_lib/promoqual'); const qr = await blobGet(st, PQ.QUAL_KEY); quality = PQ.summary(qr.ok ? qr.data : null); } catch (e) { quality = null; }
   return jr(200, { ok: true, lessons: { off: L.off, rules: L.rules, exemplars: Object.keys(L.exemplars).map(function (k) { const e = L.exemplars[k]; return { key: k, promo_id: String(e.promo_id || ''), title: String(e.title || ''), ts: Number(e.ts) || 0, chars: String(e.excerpt || '').length }; }), gaps: L.gaps.slice(-20), stats: L.stats, updated_at: L.updated_at, summary: PL.gapSummary(L) },
-    pairs: pairs.pairs, pairs_error: pairs.ok ? '' : pairs.code, layout: layout, request_id: R });
+    pairs: pairs.pairs, pairs_error: pairs.ok ? '' : pairs.code, quality: quality, layout: layout, request_id: R });
 }
 // v394 — 복사 출력이 읽는 포장 프로필(홍보 권한이면 누구나). 사람 승인 없음: 수집기가 올린 그대로.
 async function handleLayoutGet(st, c, d, R) {
