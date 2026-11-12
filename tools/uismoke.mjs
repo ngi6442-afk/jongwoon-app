@@ -1504,7 +1504,7 @@ try {
     && /function docViewFile\(d\)/.test(html) && html.indexOf('>보기·인쇄</button>') > 0 && html.indexOf('"원본" : "열기"') > 0 && html.indexOf('원본은 관리부·관리자') > 0 && html.indexOf('열람용 PDF 준비 중') > 0
     && html.indexOf('id="docOrigDl"') > 0 && /odw\.style\.display = isAdmin\(\) \? "block" : "none"/.test(html) && /action: "doc_log_get"/.test(html) && html.indexOf('id="docLogCard"') > 0 && /function docLogRender\(month\)/.test(html)
     && /error_code: 'ORIG_FORBIDDEN'/.test(gwd) && /'doclog:' \+ month/.test(gwd) && /d\.action === 'doc_log_get'/.test(gwd) && /if \(s\.orig_dl !== 'all'\) delete s\.orig_dl;/.test(gwd) && /'scope', 'orig_dl'\]/.test(gwd)
-    && /jw-shell-v(3(8[89]|9\d)|4\d\d)/.test(swv));   // v388 이후 판도 통과(sw 버전은 최신 블록이 정확히 본다)
+    && Number((swv.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 388);   // v388 이후 판도 통과(sw 버전은 최신 블록이 정확히 본다)
 } catch (e) { console.log('  (v388 검사 생략 — ' + e.message + ')'); fails++; }
 
 // ---- v389(PM 10/19 "니가 아니라 모델이 학습 — 초안↔직원 수정본 차이를 학습"): 블로그 자동 학습 루프 — 초안 보존·짝 블롭·학습 워커·규칙 창고 주입·관리자 카드. 모자이크 코드 불변 ----
@@ -1523,7 +1523,7 @@ try {
     && html.indexOf('id="promoLearnCard"') > 0 && /function renderPromoLearn\(\)/.test(html) && /action: "pl_get"/.test(html) && /action: "pl_set"/.test(html) && /data-pl-off/.test(html) && /data-pl-del/.test(html) && /data-pl-assign/.test(html) && /data-pl-retry/.test(html)
     && /if \(name === "promo"\)\{ renderPromo\(\); loadPromo\(\); renderPromoLearn\(\); promoLoadLayoutProf\(\); \}/.test(html)
     && /detectFaces|facedet/.test(mask) && /detectPlates|platedet/.test(mask)
-    && /jw-shell-v(39[4-9]|4\d\d)/.test(swv));
+    && Number((swv.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 394);
 } catch (e) { console.log('  (v389 검사 생략 — ' + e.message + ')'); fails++; }
 
 // ---- v392(PM 10/20 "자동으로 학습해서 반영되게 · 줄간격·정렬도 포함"): D1 포장 측정 프로필 — 수집기 promoai:layout → pl_get layout → 카드 "포장 측정"(승인 버튼 없음) ----
@@ -1534,14 +1534,14 @@ try {
   T('v392 포장 측정 프로필: LAYOUT_KEY promoai:layout · pl_get layout(profile·posts 12, 없으면 null) · 카드 "포장 측정 — 실제 게시글" 가운데/한 줄/간격/구분선/굵게/해시태그 + 편별 표 · 승인 버튼 없음 · sw v392',
     /LAYOUT_KEY = 'promoai:layout'/.test(plsrc) && /LAYOUT_KEY,/.test(plsrc) && /blobGet\(st, PL\.LAYOUT_KEY\)/.test(papi) && /layout: layout, request_id: R/.test(papi) && /\.slice\(0, 12\)/.test(papi)
     && html.indexOf('포장 측정 — 실제 게시글') > 0 && /pf\.center_ratio/.test(html) && /pf\.len_med/.test(html) && /pf\.gap_default/.test(html) && /pf\.hr_per_post/.test(html) && /pf\.bold_ratio/.test(html) && /pf\.tags_med/.test(html) && /lay\.posts\.map/.test(html)
-    && html.indexOf('data-pl-approve') < 0 && /jw-shell-v(39[4-9]|4\d\d)/.test(swv));
+    && html.indexOf('data-pl-approve') < 0 && Number((swv.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 394);
 } catch (e) { console.log('  (v392 검사 생략 — ' + e.message + ')'); fails++; }
 
 // ---- v393: 포장 프로필 2판 — 모듈 순서(사진 i·구분선 h)·서명 유지·인사말 줄별 굵게·소제목 굵게/앞 구분선/앞 빈 줄·자주 쓰는 해시태그 → 카드 표시 ----
 try {
   const swv = readFileSync(join(ROOT, 'sw.js'), 'utf8');
   T('v393 포장 프로필 2판 카드: 서명 유지·인사말 굵게·소제목 굵게/앞 구분선/앞 빈 줄·사진 뒤 구분선·자주 쓰는 해시태그 · sw v393',
-    /pf\.sig_kept_ratio/.test(html) && /pf\.greet_bold/.test(html) && /pf\.head_bold_ratio/.test(html) && /pf\.head_hr_ratio/.test(html) && /pf\.head_blank_ratio/.test(html) && /pf\.hr_after_img_ratio/.test(html) && /pf\.tags_top/.test(html) && /jw-shell-v(39[4-9]|4\d\d)/.test(swv));
+    /pf\.sig_kept_ratio/.test(html) && /pf\.greet_bold/.test(html) && /pf\.head_bold_ratio/.test(html) && /pf\.head_hr_ratio/.test(html) && /pf\.head_blank_ratio/.test(html) && /pf\.hr_after_img_ratio/.test(html) && /pf\.tags_top/.test(html) && Number((swv.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 394);
 } catch (e) { console.log('  (v393 검사 생략 — ' + e.message + ')'); fails++; }
 
 // ---- v394(D3): 복사 출력에 포장 프로필 자동 적용(서명 삭제·인사말/소제목 굵게·소제목 앞 구분선·문단 경계 빈 줄) · pl_layout(홍보 권한) · copy_save → 워커 포장 간극 → 카드 ----
@@ -1555,7 +1555,7 @@ try {
     && /P\.sig_kept_ratio\|\|0\)<0\.3/.test(html) && /gbold\[l\]\|\|0\)>=0\.5/.test(html) && /P\.head_bold_ratio\|\|0\)>=0\.5/.test(html) && /P\.head_hr_ratio\|\|0\)>=0\.5/.test(html) && /P\.blank_per_para\|\|0\)>=0\.15/.test(html)
     && /function pushHr\(\)/.test(html) && /function promoPlanOfHtml\(html\)/.test(html) && /action:"pl_layout"/.test(html) && /action:"copy_save"/.test(html) && /promoLoadLayoutProf\(\); \}/.test(html) && /p\.gap\.layout\.line_match/.test(html)
     && /case 'pl_layout'/.test(papi) && /case 'copy_save'/.test(papi) && /COPY_MAX_LINES = 600/.test(papi) && /replace\(\/\[\^cbih\]\/g, ''\)/.test(papi) && /code: 'NO_PERMISSION'/.test(papi)
-    && /function layoutGap\(copyLines, finalLines\)/.test(plsrc) && /COPY_PREFIX = 'promoai:copy:'/.test(plsrc) && /PL\.layoutGap\(cp\.data\.lines, pair\.final_layout\)/.test(lw) && /jw-shell-v(39[4-9]|4\d\d)/.test(swv));
+    && /function layoutGap\(copyLines, finalLines\)/.test(plsrc) && /COPY_PREFIX = 'promoai:copy:'/.test(plsrc) && /PL\.layoutGap\(cp\.data\.lines, pair\.final_layout\)/.test(lw) && Number((swv.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 394);
 } catch (e) { console.log('  (v394 검사 생략 — ' + e.message + ')'); fails++; }
 
 // ---- v446 체크 10 품질 고리 1단계(측정만, PM 11/10 17:40 '10. ㄱ' = 원장 C058): 채점·포장 재현 대조·저장·카드 실행 검사는 tools/promoqual_check.mjs. 여기서는 출력 무변·배선만 ----
@@ -1605,7 +1605,7 @@ try {
     && /action === 'assign_get'/.test(gwd) && /action === 'assign_set'/.test(gwd) && /action === 'assign_revert'/.test(gwd)
     && /function assignFill\(items, rules, names\)/.test(gwd) && (gwd.match(/assignFill\(doc\.items/g) || []).length === 2 && /who_by === 'assign'/.test(gwd)
     && /'MEMBERS_UNAVAILABLE'/.test(gwd) && /'BAD_PREFIX'/.test(gwd) && /'BAD_MEMBER'/.test(gwd) && /'ASSIGN_STALE'/.test(gwd) && /'NO_PREV'/.test(gwd)
-    && /jw-shell-v(39[5-9]|4\d\d)/.test(swv));
+    && Number((swv.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 395);
 } catch (e) { console.log('  (v395 검사 생략 — ' + e.message + ')'); fails++; }
 
 
@@ -1626,7 +1626,7 @@ try {
     && /action === 'notify_get'/.test(gwd) && /action === 'notify_set'/.test(gwd) && /action === 'notify_revert'/.test(gwd)
     && /suppressed: 'task_auto_create'/.test(gwd) && /task_review === 'issuer_approver'/.test(gwd) && (gwd.match(/await notifyAutoCreated\(/g) || []).length === 2
     && /due_digest === 'summary'/.test(todo) && /task-digest-/.test(todo)
-    && /jw-shell-v(39[6-9]|4\d\d)/.test(swv));
+    && Number((swv.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 396);
 } catch (e) { console.log('  (v396 검사 생략 — ' + e.message + ')'); fails++; }
 
 
@@ -1655,7 +1655,7 @@ try {
     && /\[functions\."gw-doneif-cron"\]\s*\r?\n\s*schedule = "\*\/10 \* \* \* \*"/.test(toml)
     && /action === 'doneif_get'/.test(gwd) && /action === 'doneif_set'/.test(gwd) && /o\.done_by === '앱 기준' && t\.status === 'open' && !t\.doneif_off/.test(gwd)
     && html.indexOf('id="taskBulkApprove"') > 0 && /t\.done_by === "앱 기준" && canApproveTask\(t\)/.test(html) && /if \(t\.done_by === "앱 기준"\) t\.doneif_off = 1;/.test(html) && /function renderDoneifRow\(\)/.test(html) && /action: "doneif_get"/.test(html) && /action: "doneif_set"/.test(html)
-    && /jw-shell-v(39[7-9]|4\d\d)/.test(swv));
+    && Number((swv.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 397);
 } catch (e) { console.log('  (v397 검사 생략 — ' + e.message + ')'); fails++; }
 
 
@@ -1671,7 +1671,7 @@ try {
   const cmPath = join(ROOT, '..', 'jongwoon-appdata', 'data', 'cron_map.json');
   if (existsSync(cmPath)) { const cm = JSON.parse(readFileSync(cmPath, 'utf8')); okMap = fns.every((f) => (cm.crons || []).some((c) => c.id === f && c.evidence && c.evidence.type === 'stamp' && c.evidence.key === 'it:cron:' + f + ':last' && c.watch === true)); }
   T('v398 크론 흔적: cronstamp.js(it:cron:<fn>:last, 저장 실패 삼킴) · 4 함수 시작 스탬프 · 3 함수 끝 스탬프 · cron_map stamp 편입 · sw',
-    /it:cron:/.test(lib) && /catch \(e\) \{ \/\* no-op \*\/ \}/.test(lib) && okStart && okEnd && okMap && /jw-shell-v(39[8-9]|4\d\d)/.test(swv), 'start ' + okStart + ' end ' + okEnd + ' map ' + okMap);
+    /it:cron:/.test(lib) && /catch \(e\) \{ \/\* no-op \*\/ \}/.test(lib) && okStart && okEnd && okMap && Number((swv.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 398, 'start ' + okStart + ' end ' + okEnd + ' map ' + okMap);
 } catch (e) { console.log('  (v398 검사 생략 — ' + e.message + ')'); fails++; }
 
 
@@ -1685,7 +1685,7 @@ try {
   T('v399 경보 라벨: 카드 id·렌더·호출·alerts_get/set·서버 핸들러(level warn|alert|mute, mute until 7일, 감사 경보라벨)·감시 id 목록 = cron_map watch · sw',
     html.indexOf('id="alertsCard"') > 0 && /function renderAlertsCard\(\)/.test(html) && /renderNotifyCard\(\);[^\n]*\n\s*renderAlertsCard\(\);/.test(html) && /action: "alerts_get"/.test(html) && /action: "alerts_set"/.test(html)
     && /async function handleAlertsGet/.test(gwd) && /async function handleAlertsSet/.test(gwd) && /action === 'alerts_get'/.test(gwd) && /action === 'alerts_set'/.test(gwd) && /const ALERT_LEVELS = \{ warn: 1, alert: 1, mute: 1 \}/.test(gwd) && /op: '경보라벨'/.test(gwd)
-    && appIds.size >= 6 && okMap && /jw-shell-v(399|4\d\d)/.test(swv), mapTxt);
+    && appIds.size >= 6 && okMap && Number((swv.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 399, mapTxt);
 } catch (e) { console.log('  (v399 검사 생략 — ' + e.message + ')'); fails++; }
 
 // ---- v400(10/28 계약 D1 2일차): 계약 골조·목록 거울 — 로더(제자리 덮어쓰기·검증·폴백)·afterLogin 호출·관리자 카드·서버 액션 2종·dredge 접두형·appdata 거울 파일 2층·신설 제안 전부 비활성 · sw ----
@@ -1702,7 +1702,7 @@ try {
     && html.indexOf('id="conProcCard"') > 0 && /function renderConProcCard\(\)/.test(html) && /renderAlertsCard\(\);[^\n]*\n\s*renderConProcCard\(\);/.test(html) && /action: "con_proc_get"/.test(html) && /action: "con_proc_flag_set"/.test(html)
     && /dredge:"주식회사 종운환경"/.test(html) && html.indexOf('종운환경 주식회사') < 0 && /var elems=conModalElems\(type, false\);/.test(html) && html.indexOf('{asb:1,labor:1,wst:1}:{dredge:1}') < 0
     && /async function handleConProcGet/.test(gwd) && /async function handleConProcFlagSet/.test(gwd) && /action === 'con_proc_get'/.test(gwd) && /action === 'con_proc_flag_set'/.test(gwd) && /const CON_PROC_KEYS = \{ proc: 'proc:contract:v1', list: 'list:contract', flag: 'settings:contract'/.test(gwd) && /MIRROR_MISSING/.test(gwd) && /CON_PROC_STALE/.test(gwd) && /op: '계약골조'/.test(gwd)
-    && okAdd && okBlob && /jw-shell-v(400|4\d\d)/.test(swv), addTxt);
+    && okAdd && okBlob && Number((swv.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 400, addTxt);
 } catch (e) { console.log('  (v400 검사 생략 — ' + e.message + ')'); fails++; }
 
 // ---- v401(10/29 계약 D1 3일차): 골조·목록 편집 clog:contract(관리자 카드 편집 4절·서버 con_proc_edit op 6종·재생 유효 층) · 건별 서류 체크리스트 stage.docs[](☑·해당없음·추가, con_clog_add 월 키) · STAGE_DOCS 2줄 표기 정정(·→/) · sw ----
@@ -10734,6 +10734,16 @@ try {
     && tlv7.indexOf('캘린더 교육 예정') > 0 && tlv7.indexOf("합계 줄 특별교육 칸 '기록 n'") > 0,   // v450 검토 2: TESTLIST 화면 칸에 캘린더 이동 끝·합계 줄
     JSON.stringify({ mF7, mM7, scr: scr7.length, gate: gate7.length, midOk50, midN: midC50(us7) }));
 } catch (e) { console.log('  (v450 검사 생략 — ' + e.message + ')'); fails++; }
+
+try {
+  // 원장 T421(11/13): 옛 블록의 sw 판 번호 검사는 숫자 비교(>= 그 판) — '…|4\\d\\d)' 꼴 정규식은 v500에서 한꺼번에 실패하므로 다시 쓰지 않는다(판마다 옛 블록을 손보던 구조 해소)
+  const self421 = readFileSync(join(ROOT, 'tools', 'uismoke.mjs'), 'utf8');
+  const re421 = /jw-shell-v\((?!\\d\+\))/;   // 판 번호 뒤 여는 괄호 = 정규식 갈래 꼴 — 숫자 꺼내기 꼴(\d+)만 허용
+  const old421 = self421.split('\n').filter((l) => re421.test(l));
+  //   결함 심기: 옛 꼴 표본(이 줄에 그 글자가 생기지 않게 이어 붙임)은 잡고, 숫자 꺼내기 꼴은 안 잡아야 한다
+  const seed421 = [re421.test('&& /jw-shell-' + 'v(39[4-9]|4\\d\\d)/.test(swv)'), re421.test('Number((swv.match(/jw-shell-' + 'v(\\d+)/) || [0, 0])[1]) >= 394')];
+  T('T421 판 번호 검사 = 숫자 비교(옛 블록의 판 번호 정규식 갈래 꼴 0 — v500에서 한꺼번에 깨지지 않게 · 숫자 꺼내기 꼴만) · 결함 심기: 옛 꼴 표본 잡힘·숫자 꼴 안 잡힘', old421.length === 0 && seed421[0] === true && seed421[1] === false, JSON.stringify({ old: old421.map((l) => l.trim().slice(0, 80)), seed421 }));
+} catch (e) { console.log('  (T421 검사 생략 — ' + e.message + ')'); fails++; }
 
 try {
   const fdir = join(ROOT, 'netlify', 'functions');
