@@ -4631,9 +4631,10 @@ try {
   const swK36 = swRun36({ safety: 'do', lic: 'view' }, 'safety', 'now'), swA36 = swRun36('admin', 'safety', 'now'), swV36 = swRun36({ safety: 'view', site: 'do' }, 'safety', 'now');
   const swE36 = swRun36({ safety: 'do' }, 'safety', 'edu'), swS36 = swRun36('admin', 'safety', 'site'), swD36 = swRun36({ safety: 'do' }, 'dash', 'now'), swJ36 = swRun36({ site: 'do' }, 'safety', 'now'), swN36 = swRun36({ veh: 'view' }, 'safety', 'now');
   //   v445: 현장 칸도 다시 연다(현장 표의 특별교육 열·버튼이 앞사람 권한으로 남지 않게 — setSafetyLayer("site") = 그리기 1번 + 읽기) — 종전 '현장 칸이면 다시 열지 않음'(swS36 'at:site@safety')을 같은 강도로 뒤집음
-  T('v436 ⑥-4 한 기기 사람 전환(실제 applySafetyPerms — 검토 반영): 현황 칸에 있었고 다음 사람이 현황을 볼 수 있으면(권민지형·관리자·김정아형 안전 보기) 현황을 다시 엶(sfNowOpen 1번 · 칸 그대로) · 교육 칸이면 다시 열지 않음 · 현장 칸이면 다시 엶(v445 — renderSites 1번·칸 그대로) · 홈이면 0 · 현황을 못 보는 사람(현장만) = 현장 칸으로(종전) · 아무 칸도 없음 = 홈(종전)',
+  //   v448 검토: 체크 칸도 다시 연다([+ 직원]·[+ 일용직] 보임이 앞사람 권한으로 남지 않게 — setSafetyLayer("edu") = renderEdu 1번 + 읽기) — 종전 '교육 칸이면 다시 열지 않음'(swE36 'at:edu@safety')을 같은 강도로 뒤집음(실행은 v448 ⑫)
+  T('v436 ⑥-4 한 기기 사람 전환(실제 applySafetyPerms — 검토 반영): 현황 칸에 있었고 다음 사람이 현황을 볼 수 있으면(권민지형·관리자·김정아형 안전 보기) 현황을 다시 엶(sfNowOpen 1번 · 칸 그대로) · 체크 칸도 다시 엶(v448 — renderEdu 1번·칸 그대로) · 현장 칸이면 다시 엶(v445 — renderSites 1번·칸 그대로) · 홈이면 0 · 현황을 못 보는 사람(현장만) = 현장 칸으로(종전) · 아무 칸도 없음 = 홈(종전)',
     swK36 === 'sfNowOpen,at:now@safety' && swA36 === 'sfNowOpen,at:now@safety' && swV36 === 'sfNowOpen,at:now@safety'
-    && swE36 === 'at:edu@safety' && swS36 === 'renderSites,at:site@safety' && swD36 === 'at:now@dash' && swJ36 === 'renderSites,at:site@safety' && swN36 === 'switch:dash,at:now@dash',
+    && swE36 === 'renderEdu,at:edu@safety' && swS36 === 'renderSites,at:site@safety' && swD36 === 'at:now@dash' && swJ36 === 'renderSites,at:site@safety' && swN36 === 'switch:dash,at:now@dash',
     [swK36, swA36, swV36, swE36, swS36, swD36, swJ36, swN36].join(' | '));
 
   // ⑦ 정적 — 앱: 현황 구간은 저장·서버 호출 0 그대로([고치기]는 버튼 글만 — 관리자·읽기 ok일 때) · 누름 배선은 구간 밖 #sfNowHost 위임 1곳 · 서버 액션 글자는 @safety-set 구간에만 · 창·저장 함수 첫 줄 관리자 가드
@@ -7220,6 +7221,7 @@ try {
     'function alert(msg){ ENV.log.push("alert:" + msg); }',
     'function gwToast(msg){ ENV.log.push("toast:" + msg); }',
     'function xgToggle(){ ENV.log.push("xgToggle"); } function findProc(){ return null; } function xgAgentAuto(){}',
+    'var eduPersonFrom = ""; function eduPersonSaved(k, id){ ENV.edp = (ENV.edp || []).concat([k + ":" + id + ":" + eduPersonFrom]); }',   // v448: 일용직 창 [저장]이 부르는 체크 칸 훅(창 처리기는 그대로 돌림 — 실행 검사는 v448 묶음)
     'function gwCall(fn, body){ ENV.gw.push(body.action + ":" + body.collection + (body.base !== undefined ? ":base=" + body.base : "") + (body.doc ? ":" + body.doc.items.map(function(w){ return w.id + (w.note ? "=" + w.note : "") + (w.del === 1 ? "(del)" : ""); }).join(",") : "")); var r = ENV.gwQ.shift() || { status: 599 }; return Promise.resolve({ status: r.status, body: r.body || {} }); }'].join('\n');
   const SRC42 = [PRE42].concat(VARS42, ['workers = ENV.workers; wkLoaded = ENV.loaded !== false; wkEduSt = ENV.eduSt == null ? "ok" : ENV.eduSt;'], REAL42.map((n) => fn42(html, n)), [blk42, wsb42, iife42, siteIife42,
     'function apWk(){', apWk42, '}',
@@ -9668,6 +9670,7 @@ try {
 //      오늘 = 2026-11-12(하반기). ① 정의·폭·단계 합(위험성평가 lv3) ② 이름 바꾸기 전체(보이는 글·MANUAL·서버 문구·id·키 그대로·'주기 체크' 그대로) ③ 행 구성 ④ 칸 상태 일곱 ⑤ 위험성평가 열
 //      ⑥ 정기교육 반기 진도 ⑦ 배치 전 기한 = 현장 시작일 ⑧ 특별교육 = 현장 표·서버와 같은 판정 ⑨ 여럿에게 넣기(안전 수행만) ⑩ 현장 권한 없음 ⑪ 폰 legacy(해시) ⑫ 375px 칩 줄
 //      ⑬ 읽기 전 저장 막기 ⑭ 읽기 순서(setSafetyLayer) ⑮ has_edu 앱·서버 ⑯ 현황 ② 줄·읽기 전용 ⑰ 시간 숫자·반기 말일·창 ⑱ 문서
+let V48 = null;   // v448: 이 묶음의 시험 틀(mk47)·표본을 v448 묶음이 다시 쓴다(없으면 v448 묶음은 '검사 생략' = 실패)
 try {
   const own47 = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
   const fn47 = (src, name) => { const i = src.indexOf('function ' + name + '('); if (i < 0) throw new Error('함수 없음: ' + name); let d = 0, st = false; for (let j = i; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i, j + 1); } } throw new Error('중괄호 짝 안 맞음: ' + name); };
@@ -9775,14 +9778,14 @@ try {
       Object.defineProperty(host, 'textContent', { get: () => host._t, set: (v) => { host._t = String(v); } });
       doc.byId[id] = host; return host;
     };
-    HOSTS47.forEach(mkHost);
+    HOSTS47.concat(o.hosts || []).forEach(mkHost);   // v448: o.hosts = 더 만들 자리(사람 추가 버튼·두 등록 창 칸)
     doc.byId.eduScopeBar.innerHTML = '<button type="button" class="vs-chip on" data-edu-scope="member">직원</button><button type="button" class="vs-chip" data-edu-scope="worker">일용직</button>';
     const win = { get innerWidth() { return env.width; }, matchMedia: (q) => ({ media: q, get matches() { return mq47(q, env.width); }, addEventListener: (t, f) => { env.mql.push(f); } }), requestAnimationFrame: (f) => { env.raf.push(f); } };
     const ls = { getItem: (k) => (own47(env.store, k) ? env.store[k] : null), setItem: (k, v) => { env.store[k] = String(v); }, removeItem: (k) => { delete env.store[k]; } };
     const stF = (f, ms) => { const t = { id: env.timers.length + 1, f, done: false }; env.timers.push(t); return t.id; }, ctF = (id) => { env.timers.forEach((t) => { if (t.id === id) t.done = true; }); };
     function RO(cb) { this.observe = (t) => { env.ro.push(t); }; }
     class FD extends Date { static now() { return env.now; } }
-    const SRC = [PRE47, kinds47].concat(VARH47.map((h) => line47(src, h)), REAL47.map((n) => fn47(src, n)), [blk47(src, '// @vs-sheet-start', '// @vs-sheet-end'), blk47(src, '// @edu-sheet-start', '// @edu-sheet-end'),
+    const SRC = [PRE47, kinds47].concat(VARH47.map((h) => line47(src, h)), REAL47.map((n) => fn47(src, n)), o.extra || [], [blk47(src, '// @vs-sheet-start', '// @vs-sheet-end'), blk47(src, '// @edu-sheet-start', '// @edu-sheet-end'),   // v448: o.extra = 이 판 시험이 더 싣는 실제 함수·대역(체크 칸 사람 추가)
       'return { render: renderEdu, legacy: renderEduLegacy, def: eduSheetDef, rows: eduSheetRows, find: eduSheetFind, inst: vsInst, check: vsSheetCheckDef, minW: vsSheetMinW, cols: vsSheetCols, budget: VS_STAGE_BUDGET,'
       + ' bulk: eduBulkOpen, act: eduSheetAct, open: openEdu, save: saveEdu, del: deleteEdu, doSave: doSaveEdu, close: closeEdu, miss: eduSheetMissSum, addScope: eduAddScope, scopeAsk: function(s){ eduScopeAsk = s; },'
       + ' edu: function(){ return edu; }, sel: function(){ return eduSel; }, cur: function(){ return eduSheetCur; }, bulkIds: function(){ return eduBulkIds; }, setLoaded: function(v){ eduLoaded = v; }, hoursNum: eduHoursNum, halfEnd: eduHalfEnd, anySpecial: eduAnySpecial,'
@@ -10135,6 +10138,16 @@ try {
     e20('member:m0').t === '경과 135일' && e20('member:m0').cls === 'vs-dan' && e20('member:m0').due === '2026-06-30' && e20('member:m0').miss && e20('member:m0').cat === '기한 경과' && X20e.api.find('member:m0').st.over && /지난 2026 상반기 6\/12시간/.test(e20('member:m0').basis)
     && e20('member:u2').t === '경과 316일' && e20('member:u2').due === '2025-12-31' && e20('member:u6').t === '4/12시간' && e20('member:u1').t === '✓ 6/6시간',
     JSON.stringify(['member:m0', 'member:u2', 'member:u6', 'member:u1'].map((id) => e20(id).t + '/' + e20(id).due)));
+  //   (v448 11/12 — 운영 기록 옮긴 뒤 시험 화면) 그 반기(관리감독자는 그해) 중간 입사 = 지난 기간 미달을 빨강으로 내지 않음(근거 글에만): 같은 기록에 m0 입사 2026-03-16·u2 입사 2025-06-01이면
+  //        m0 = 이번 반기 '0/12시간'(빨강 아님)·근거 '입사(2026-03-16) 뒤 일부 기간이라 미달 판정 안 함' · u2 = 올해 '10/16시간' · 입사가 그 기간 시작보다 앞(2025-12-01·2024-12-31)이면 종전대로 빨강
+  const MEMH48 = (a, b) => MEM47().map((m) => m.id === 'm0' ? Object.assign({}, m, { hire_date: a }) : (m.id === 'u2' ? Object.assign({}, m, { hire_date: b }) : m));
+  const EDUH48 = () => EDU47().concat([{ id: 'pa', ptype: 'member', pid: 'm0', kind: 'regular', date: '2026-03-01', hours: 6 }, { id: 'pb', ptype: 'member', pid: 'u2', kind: 'super', date: '2025-05-01', hours: 4 }]);
+  const XH48 = mk47({ members: MEMH48('2026-03-16', '2025-06-01'), edu: EDUH48() }); XH48.api.render(); const h48 = (id) => XH48.api.find(id).st.c.reg;
+  const XH48b = mk47({ members: MEMH48('2025-12-01', '2024-12-31'), edu: EDUH48() }); XH48b.api.render(); const h48b = (id) => XH48b.api.find(id).st.c.reg;
+  T('v448 ⑮ 반기 중간 입사(실행): m0 입사 2026-03-16 + 상반기 6/12 = "0/12시간"(빨강 아님·근거 "입사(2026-03-16) 뒤 일부 기간이라 미달 판정 안 함") · u2 관리감독자 입사 2025-06-01 + 2025년 4/16 = "10/16시간" · 입사가 그 기간 앞(2025-12-01·2024-12-31) = 종전 빨강 "경과 135일"·"경과 316일"',
+    h48('member:m0').t === '0/12시간' && h48('member:m0').cls !== 'vs-dan' && /입사\(2026-03-16\) 뒤 일부 기간이라 미달 판정 안 함/.test(h48('member:m0').basis) && h48('member:u2').t === '10/16시간' && h48('member:u2').cls !== 'vs-dan'
+    && h48b('member:m0').t === '경과 135일' && h48b('member:m0').cls === 'vs-dan' && h48b('member:u2').t === '경과 316일',
+    JSON.stringify([h48('member:m0').t, h48('member:u2').t, h48b('member:m0').t, h48b('member:u2').t]));
 
   //   ⑳-4 대표(사업주 — isBossMember: 등급 미지정 부트스트랩 role 대표) = 정기교육·일반건진·위험성평가 '근거 확인 중'(빠진 항목 0) · 관리자(대표 아님) m0는 종전 판정
   const X20f = mk47({ members: MEM47().concat([{ id: 'b0', name: '나종운', admin: true, role: '대표', dept: '관리부' }]) }); X20f.api.render(); const f20 = X20f.api.find('member:b0');
@@ -10194,10 +10207,248 @@ try {
   const mF18 = FT18.filter((s) => ftv18.indexOf(s) < 0), mM18 = MAN18.filter((s) => m219_18.indexOf(s) < 0), mC18 = CL18.filter((s) => cl18.indexOf(s) < 0);
   const GATE18 = ['uismoke', 'consheet_check', 'proctpl_check', 'settletest', 'servertest', 'rectest', 'promoqual_check', 'promogen_check'];
   T('v447 ⑱ 문서: FEATURES 기준 v447·v447 절(문장·이름 고정) · TESTLIST v447 화면 칸 "[ ] (AI 시험 화면 대상" ≥ 5개("PM" 낱말 0)·게이트 칸 [x] 8종(uismoke·consheet·proctpl·settle·servertest·rectest·promoqual·promogen) · MANUAL 21-9 새 이름·사람별 표·같은 기록 넣기·근거 확인 중·판정 불가·휴대폰·시험 계정·위험성평가 · CLAUDE.md 안전 줄 · sw jw-shell-v447',
-    /기준: v447 \(2026-11-12\)\./.test(ft18) && ftv18.length > 0 && mF18.length === 0 && tlv18.length > 0 && scr18.length >= 5 && !scr18.some((l) => /PM/.test(l)) && GATE18.every((g) => gate18.some((l) => l.indexOf('`' + g + '`') > 0))
-    && mM18.length === 0 && m219_18.indexOf('<h3>21-9. 교육·건강진단 이력 (안전 › 체크)</h3>') === 0 && mC18.length === 0 && /jw-shell-v447/.test(sw18),
+    Number((ft18.match(/기준: v(\d+) /) || [0, 0])[1]) >= 447 && ftv18.length > 0 && mF18.length === 0 && tlv18.length > 0 && scr18.length >= 5 && !scr18.some((l) => /PM/.test(l)) && GATE18.every((g) => gate18.some((l) => l.indexOf('`' + g + '`') > 0))
+    && mM18.length === 0 && m219_18.indexOf('<h3>21-9. 교육·건강진단 이력 (안전 › 체크)</h3>') === 0 && mC18.length === 0 && Number((sw18.match(/jw-shell-v(\d+)'/) || [0, 0])[1]) >= 447,   // v448: sw도 이 판 이상(이 판 값은 v448 ⑪)
     JSON.stringify({ mF18, mM18, mC18, scr: scr18.length, gate: gate18.length }));
+  V48 = { mk47, U47, MEM47, WK47, ASB47, EDU47, fn47, line47, blk47, nc47, sha47, body47, rd47, rowsH47, grpOf47, cnt47, own47 };   // v448 묶음이 이 시험 틀을 이어 씀
 } catch (e) { console.log('  (v447 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ---- v448(11/12 — PM 11/12 21:51 '인사(직원, 일용직) 정보 다 받았으면 차트를 자동으로 연결 … 추가 가능하게' · 21:52 '내가 언제 디자인 넣으라디?' = 새 화면·새 보기·새 디자인 없이):
+//      09_조사_문서/표형탭_시안_자료_20261110/단계지시_v448_체크사람추가.json. 시험 틀 = v447 mk47(V48) + 이 판 함수(eduAddPerson·eduPersonSaved·loadMembers·openWkModal·일용직 창 배선 IIFE — 실제 원문).
+//      ① 두 버튼 보임 조건(관리자·일용직 수행·둘 다 아님·안전 보기만·폰) ② 누르면 부르는 창·직책 기본값 현장직·권한 밖 알림 ③ 직원 저장 뒤 = 회원 목록 새로 받기 → 체크 칸 다시 그림(새 현장직·라임팀 회원 줄)
+//      ④ 일용직 저장 뒤 = 체크 칸 다시 그림·가려진 새 줄 열기 ⑤ 다른 길로 연 창은 체크 칸을 안 건드림 ⑥ 일용직 펴짐 기준(교육 기록 — 경계 날짜·지운 기록·남의 기록·현장 권한 없음)
+//      ⑦ 경계 상수 한 곳(상수를 바꾸면 현장·교육 경계가 같이) ⑧ 직원 줄 = 부서·직책으로 거르지 않음 ⑨ 새 디자인 없음(같은 줄·같은 클래스·CSS 0)·폰 legacy 해시 ⑩ 배선 순서(정적) ⑪ 문서
+try {
+  if (!V48) throw new Error('v447 시험 틀 없음');
+  const V = V48;
+  const flush48 = () => new Promise((r) => setImmediate(r));
+  const HOSTS48 = ['eduAddMemBtn', 'eduAddWkBtn', 'meRole', 'mePin', 'wkAddBtn', 'wkCancel', 'wkSave', 'wkDelete', 'wkBackdrop', 'wkModalTitle', 'wkName', 'wkBirth', 'wkRole', 'wkPhone', 'wkNote', 'wkNeedNote'];
+  const SW48 = ['tabSafetyBtn', 'sfSubBar', 'sfChipNow', 'sfPaneNow', 'sfPaneSite', 'sfPaneEdu', 'asbMovedGo', 'eduMovedHr', 'eduMovedWk', 'wkExamMoved'];   // v448 검토: 안전 탭 자리(applySafetyPerms·setSafetyLayer가 읽음)
+  //   사람 — 관리자 A · 안전 수행 S(권민지형 — 일용직 보기) · 안전 보기 H(김정아형 — 일용직 수행) · 안전 수행·일용직 수행 W(가상 — 일용직 담당이 안전도 수행)
+  const U48 = Object.assign({}, V.U47, { W: { id: 'u7', name: '일용직담당', perms: { safety: 'do', site: 'do', wk: 'do' } } });
+  const X48 = (o) => {
+    o = o || {};
+    const src = o.src || html;
+    const iife = (() => { const k = src.indexOf('    if(!$("wkAddBtn")) return;'), s = src.lastIndexOf('  (function(){', k), e = src.indexOf('\n  })();', k); if (k < 0 || s < 0 || e < 0) throw new Error('일용직 창 배선 없음'); return src.slice(s, e + '\n  })();'.length); })();
+    const extra = [V.line47(src, '  var eduPersonFrom = '), V.line47(src, '  var EDU_ADD_MEM_NO = '), V.line47(src, '  var EDU_ADD_WK_NO = '), V.line47(src, '  var EDU_ADD_HR_OPEN = '), V.line47(src, '  var EDU_ADD_PIN_HINT = '), V.line47(src, '  var WK_UNREAD_MSG='),
+      V.line47(src, '  var hrOpenId = '), V.line47(src, '  var hrNewOpen = '),   // v448 검토: 인사 탭 카드·새 직원 패널 상태(실제 선언 줄 — eduAddPerson이 [+ 직원] 전에 물음)
+      'function confirm(m){ ENV.log.push("confirm:" + m); return ENV.cf !== false; }',   // v448 검토: 확인 창 답(ENV.cf = false면 취소) — 이 틀만(PRE47 confirm을 덮음)
+      V.fn47(src, 'eduAddPerson'), V.fn47(src, 'eduPersonSaved'), V.fn47(src, 'loadMembers'), V.fn47(src, 'openWkModal'), V.fn47(src, 'wkBirth6'), V.fn47(src, 'wkMissing'), V.fn47(src, 'findWk'), V.fn47(src, 'liveWorkers'),
+      'var wkEditId = null;',
+      'function wkMarkDirty(id){ ENV.log.push("wkDirty:" + id); } function scheduleWorkersSave(){ ENV.log.push("wkSched"); } function renderWorkers(){ ENV.log.push("renderWorkers"); } function renderXgWorkers(){} function wkSheetShowNew(id){ ENV.log.push("wkShowNew:" + id); } function loadWorkers(){ ENV.log.push("loadWorkers"); }',
+      // 인사 회원 창(openMemberEdit)은 칸이 많아 대역 — 실제 원문 첫 줄(eduPersonFrom 지움)·인라인 폼 되돌림은 ⑩이 정적으로 봄. 대역은 창이 직책을 '직원'으로 채우는 것까지 흉내
+      'function openMemberEdit(id, inline){ eduPersonFrom = ""; ENV.log.push("openMemberEdit:" + id + ":" + !!inline); document.getElementById("meRole").value = "직원"; }',
+      'function applyRolePreset(){ ENV.log.push("applyRolePreset:" + document.getElementById("meRole").value); }',
+      'function saveUsersCache(){} function populateMemberNames(){} function render(){ ENV.log.push("render"); }',
+      'function gwCall(fn, b){ ENV.log.push("gwCall:" + b.action); return new Promise(function(res){ ENV.pend.push(res); }); }',
+      iife,
+      'ENV.x = { add: eduAddPerson, saved: eduPersonSaved, from: function(){ return eduPersonFrom; }, setFrom: function(v){ eduPersonFrom = v; }, openWk: openWkModal, members: function(){ return members; }, workers: function(){ return workers; },'
+      + ' hr: function(id, nw){ hrOpenId = id; hrNewOpen = !!nw; } };'];
+    //   v448 검토 o.sw: 로그인 창 '전환' 시험 — 실제 safetyPanes·setSafetyLayer·applySafetyPerms + 안전 탭 자리·대역(switchTab·sfNowOpen·siteSheetGo)
+    if (o.sw) extra.push(V.fn47(src, 'safetyPanes'), V.fn47(src, 'setSafetyLayer'), V.fn47(src, 'applySafetyPerms'),
+      'function switchTab(n){ ENV.log.push("switch:" + n); currentTab = n; } function sfNowOpen(){ ENV.log.push("sfNowOpen"); } function siteSheetGo(){}',
+      'ENV.sw = { apply: applySafetyPerms, layer: function(){ return safetyLayer + "@" + currentTab; } };');
+    const X = V.mk47(Object.assign({}, o, { hosts: HOSTS48.concat(o.sw ? SW48 : []), extra }));
+    X.env.pend = [];
+    return X;
+  };
+  const disp48 = (X) => [X.el('eduAddMemBtn').style.display, X.el('eduAddWkBtn').style.display].join('|');
+
+  // ① 두 버튼 보임 조건(실행 — 실제 eduSheetMode): 관리자 = 둘 다 · 일용직 수행 + 안전 수행(W) = [+ 일용직]만 · 권민지형 S(일용직 보기) = 둘 다 숨김 · 안전 보기 H(일용직 수행이어도 — 보기 칸은 .sf-pane.readonly가 같은 줄 버튼을 숨김) = 둘 다 숨김 ·
+  //   폰 375(관리자) = 둘 다 숨김(옛 목록 그대로) · 관리자가 폰 → PC로 넓히면 다시 보임
+  const XA1 = X48({ user: U48.A }); XA1.api.render();
+  const XW1 = X48({ user: U48.W }); XW1.api.render();
+  const XS1 = X48({ user: U48.S }); XS1.api.render();
+  const XH1 = X48({ user: U48.H }); XH1.api.render();
+  const XP1 = X48({ user: U48.A, width: 375 }); XP1.api.render(); const p1a = disp48(XP1); XP1.env.width = 1366; XP1.api.render(); const p1b = disp48(XP1);
+  const vis1 = [disp48(XA1), disp48(XW1), disp48(XS1), disp48(XH1), p1a, p1b];
+  T('v448 ① 사람 추가 두 버튼 보임(실행 — 실제 eduSheetMode): 관리자 = [+ 직원]·[+ 일용직] · 일용직 수행·안전 수행 = [+ 일용직]만 · 권민지형(일용직 보기) = 없음 · 안전 보기(일용직 수행이어도) = 없음 · 폰 375 = 없음 → 1366 = 다시 보임',
+    JSON.stringify(vis1) === JSON.stringify(['|', 'none|', 'none|none', 'none|none', 'none|none', '|']) && XA1.host.getAttribute('data-vs-mode') === 'sheet' && XP1.host.getAttribute('data-vs-mode') === 'sheet',
+    JSON.stringify(vis1));
+
+  // ② 누르면(실행 — 실제 eduAddPerson·openWkModal): [+ 직원] = openMemberEdit(null)(창 — 인라인 아님) → 직책 '현장직'(applyRolePreset — 고른 것과 같게)·이 칸에서 연 창 표시 member ·
+  //   [+ 일용직] = 실제 openWkModal(null) — 창 열림·제목 '일용직 추가'·이름 빈 칸·역할 인부·표시 worker · 권한 밖(권민지형 S) = 알림 두 글·창 안 열림·표시 없음
+  const XA2 = X48({ user: U48.A }); XA2.api.render(); XA2.env.x.add('member');
+  const m2 = { log: XA2.env.log.slice(), role: XA2.el('meRole').value, from: XA2.env.x.from(), pin: XA2.el('mePin').placeholder };
+  XA2.env.x.add('worker');
+  const w2 = { show: XA2.el('wkBackdrop').classList.contains('show'), title: XA2.el('wkModalTitle').textContent, name: XA2.el('wkName').value, role: XA2.el('wkRole').value, from: XA2.env.x.from() };
+  const XS2 = X48({ user: U48.S }); XS2.api.render(); XS2.env.x.add('member'); XS2.env.x.add('worker');
+  const s2 = { log: XS2.env.log.slice(), show: XS2.el('wkBackdrop').classList.contains('show'), from: XS2.env.x.from() };
+  T('v448 ② 누르면(실행): [+ 직원] = openMemberEdit(null)(창)·직책 현장직(applyRolePreset)·표시 member · [+ 일용직] = 실제 openWkModal(null) 창(제목 "일용직 추가"·이름 빈 칸·역할 인부)·표시 worker · 권한 밖 = 알림 "직원 등록은 관리자만"·"일용직 등록은 일용직 수행 권한"·창 0·표시 없음',
+    JSON.stringify(m2.log) === JSON.stringify(['openMemberEdit:null:false', 'applyRolePreset:현장직']) && m2.role === '현장직' && m2.from === 'member'
+    && w2.show && w2.title === '일용직 추가' && w2.name === '' && w2.role === '인부' && w2.from === 'worker'
+    && JSON.stringify(s2.log) === JSON.stringify(['alert:직원 등록은 관리자만 할 수 있습니다(인사 회원 등록).', 'alert:일용직 등록은 일용직 수행 권한이 있어야 합니다 — 인사·일용직 담당에게 부탁해 주세요.']) && !s2.show && s2.from === '',
+    JSON.stringify({ m2, w2, s2 }));
+  //   ⑯ (11/12 시험 화면) 로그인 안 하는 현장 인원 — 회원 창은 새 회원에게 PIN을 요구해 체크 칸 [+ 직원]으로 현장 인원을 넣지 못했다: 이 길만 PIN 빈칸 허용(서버는 PIN 없는 회원을 받고 그 회원은 로그인 못 함)
+  //        실행: [+ 직원] 뒤 PIN 칸 안내 글 = EDU_ADD_PIN_HINT · 정적: saveMemberEdit 허용 조건(새 회원·PIN 빈칸·이 칸에서 연 창·관리자/개발자 직책 아님)·openMemberEdit 첫 줄이 안내 글을 되돌림·PIN 보낼 때는 그대로(pin && pinOk)
+  const sme16 = V.fn47(html, 'saveMemberEdit'), ome16 = V.fn47(html, 'openMemberEdit');
+  T('v448 ⑯ 체크 칸 [+ 직원] PIN 빈칸 허용(로그인 안 하는 현장 인원): 실행 — 누르면 PIN 칸 안내 "앱에 로그인하지 않는 현장 인원은 비워 두면 됩니다" · 정적 — saveMemberEdit noLoginOk = 새 회원·PIN 빈칸·eduPersonFrom "member"·관리자/개발자 직책 아님 · 검사 (isNew && !pinOk && !noLoginOk) · PIN 보낼 때 (pin && pinOk) 그대로 · openMemberEdit 셋째 줄(표시 지움·인라인 폼 되돌림 다음 — ⑩ 순서 그대로)이 "PIN 4자리 숫자"로 되돌림(인사 탭 길은 종전대로 PIN 필수)',
+    m2.pin === 'PIN 4자리 숫자 — 앱에 로그인하지 않는 현장 인원은 비워 두면 됩니다'
+    && sme16.indexOf('var noLoginOk = isNew && !pin && eduPersonFrom === "member" && !admin && !devRole;') > 0 && sme16.indexOf('if (!name || (isNew && !pinOk && !noLoginOk) || (pin && !pinOk)){') > 0 && sme16.indexOf('if (pin && pinOk) payload.pin = pin;') > 0
+    && /^\s*function openMemberEdit\(id, inline\)\{\n\s*eduPersonFrom = "";[^\n]*\n\s*if \(!inline\)\{[^\n]*\n\s*document\.getElementById\("mePin"\)\.placeholder = "PIN 4자리 숫자";/.test(ome16),
+    JSON.stringify({ pin: m2.pin, s: sme16.length, o: ome16.slice(0, 120) }));
+
+  // ③ 직원 저장 뒤(실행 — 실제 eduPersonSaved·loadMembers): 이 칸에서 연 창이면 저장 응답 회원 id로 → 회원 목록 다시 받기(member_list) → 받은 뒤 체크 칸 다시 그림 —
+  //   서버에만 있는 새 회원(현장직·부서 '라임팀')이 받기 전 0줄 → 받은 뒤 펴진 줄(소속 칸 라임팀)·머리 '총 13명' · 표시는 한 번 쓰고 지움(다시 불러도 member_list 0) · 받기 실패(500)도 다시 그림(앞의 목록으로)
+  const XA3 = X48({ user: U48.A }); XA3.api.render(); XA3.env.x.add('member');
+  XA3.env.x.saved('member', 'u10');
+  const pre3 = { gw: XA3.env.log.filter((l) => l === 'gwCall:member_list').length, row: V.rowsH47(XA3.host.innerHTML).indexOf('member:u10') >= 0, from: XA3.env.x.from() };
+  const res48 = (X) => X.env.pend.shift() || (() => {});   // 회원 목록 요청이 없으면(결함) 던지지 않고 아래 판정이 ✗
+  res48(XA3)({ status: 200, body: { members: V.MEM47().concat([{ id: 'u10', name: '새현장직', role: '현장직', dept: '라임팀' }]) } });
+  await flush48(); await flush48();
+  const r3 = XA3.api.find('member:u10'), h3 = XA3.host.innerHTML;
+  XA3.env.x.saved('member', 'u10'); const again3 = XA3.env.log.filter((l) => l === 'gwCall:member_list').length;
+  const XF3 = X48({ user: U48.A }); XF3.api.render(); XF3.env.x.add('member'); XF3.env.x.saved('member', 'u11'); res48(XF3)({ status: 500, body: {} }); await flush48(); await flush48();
+  T('v448 ③ 직원 저장 뒤(실행): member_list 1번 · 받기 전 새 회원 줄 0 · 받은 뒤 member:u10(현장직·라임팀) 펴진 줄·표에 그려짐·소속 "라임팀"·머리 "총 13명 (접힘 5명)" · 표시 한 번만(다시 불러도 member_list 그대로) · 받기 실패 500 = 회원 목록 그대로·표 그대로 그림',
+    pre3.gw === 1 && !pre3.row && pre3.from === '' && !!r3 && r3.grp === '' && V.rowsH47(h3).indexOf('member:u10') >= 0 && r3.org === '라임팀' && XA3.el('eduHead').textContent === '총 13명 (접힘 5명)'
+    && again3 === 1 && XF3.env.log.filter((l) => l === 'gwCall:member_list').length === 1 && XF3.env.x.members().length === V.MEM47().length && XF3.host.getAttribute('data-vs-mode') === 'sheet' && V.rowsH47(XF3.host.innerHTML).length === 7,
+    JSON.stringify({ pre3, r3: r3 ? { grp: r3.grp, org: r3.org } : null, head: XA3.el('eduHead').textContent, again3 }));
+
+  // ④ 일용직 저장 뒤(실행 — 실제 openWkModal → 일용직 창 [저장] 처리기 → eduPersonSaved): 명부에 새 줄·저장 예약 → 체크 칸 다시 그림 — 새 일용직은 현장·교육 기록이 없어 '그 밖 일용직'(접힘)이지만
+  //   그 줄만 열어 보임(묶음 펼침·그 줄 펼침 — v442 새 줄 열기와 같은 꼴, 기기 저장 0) · 표시 지움
+  const XA4 = X48({ user: U48.A }); XA4.api.render(); XA4.env.x.add('worker'); XA4.el('wkName').value = '새일용'; XA4.el('wkSave').L.click[0]({});
+  const nw4 = XA4.env.x.workers().filter((w) => w.name === '새일용')[0] || {}, id4 = 'worker:' + nw4.id, r4 = XA4.api.find(id4), i4 = XA4.api.inst(XA4.api.def());
+  T('v448 ④ 일용직 저장 뒤(실행 — 실제 창 [저장]): 명부 새 줄 "새일용"·저장 예약 · 체크 칸 다시 그림 = 새 줄(접힘 묶음 old)이 열려 그려짐(묶음 펼침·그 줄 펼침)·기기 저장 0 · 창 닫힘·표시 지움',
+    !!nw4.id && XA4.env.log.indexOf('wkSched') >= 0 && !!r4 && r4.grp === 'old' && V.rowsH47(XA4.host.innerHTML).indexOf(id4) >= 0 && i4.grp.old === true && i4.open === id4
+    && !Object.keys(XA4.env.store).some((k) => /jw_edu_sheet/.test(k)) && !XA4.el('wkBackdrop').classList.contains('show') && XA4.env.x.from() === '',
+    JSON.stringify({ id4, grp: r4 && r4.grp, open: i4.open, log: XA4.env.log }));
+
+  // ⑤ 다른 길로 연 창(인사 탭 카드·일용직 탭·표 [수정])은 체크 칸을 안 건드림(실행): 표시 없이 저장 = member_list 0·다시 그림 0 · 체크 칸에서 [+ 직원]을 눌러 놓고 다른 길로 일용직 창(openWkModal)을 열면 표시 지움 ·
+  //   종류가 다른 저장(직원 표시인데 일용직 저장)은 아무것도 안 함
+  const XA5 = X48({ user: U48.A }); XA5.api.render(); const h5a = XA5.host.innerHTML;
+  XA5.env.x.saved('member', 'u12'); XA5.env.x.saved('worker', 'w1');
+  XA5.env.x.add('member'); XA5.env.x.saved('worker', 'w1'); const f5a = XA5.env.x.from(); XA5.env.x.openWk(null); const f5b = XA5.env.x.from();
+  T('v448 ⑤ 다른 길로 연 창(실행): 표시 없음 = member_list 0·표 그대로 · 직원 표시 + 일용직 저장 = 아무것도 안 함(표시 그대로) · 다른 길 openWkModal = 표시 지움',
+    XA5.env.log.filter((l) => l === 'gwCall:member_list').length === 0 && XA5.host.innerHTML === h5a && f5a === 'member' && f5b === '',
+    JSON.stringify({ f5a, f5b, log: XA5.env.log }));
+
+  // ⑥ 일용직 펴짐 기준(실행 — 실제 eduSheetRows): 현장 대장 투입이 없는 w4 — 2025-01-01 교육 기록(일용직 줄) = 펴짐(머리 "총 12명 (접힘 4명)") · 2024-12-31 = 접힘(경계 하루 차이) ·
+  //   2024 현장만 w3 + 2026 기록 = 펴짐 · 지운 기록(del)만 = 접힘 · 남의 기록(같은 id의 직원 줄 member:w4) = 접힘 · 날짜 아닌 기록 = 접힘 · 현장 권한 없음(N) = 종전처럼 기록이 하나라도 있으면 펴짐(2024 기록도) ·
+  //   묶음 이름 '그 밖 일용직 · 2024년까지 현장·교육 기록만(또는 기록 없음)' · 빠진 항목 셈(현황 ② 줄)은 행 원천 그대로
+  const g6 = (rec, o) => { const X = V.mk47(Object.assign({ edu: V.EDU47().concat(rec) }, o || {})); X.api.render(); return X; };
+  const G6a = g6([{ id: 'g1', ptype: 'worker', pid: 'w4', kind: 'hire', date: '2025-01-01' }]);
+  const G6b = g6([{ id: 'g2', ptype: 'worker', pid: 'w4', kind: 'hire', date: '2024-12-31' }]);
+  const G6c = g6([{ id: 'g3', ptype: 'worker', pid: 'w3', kind: 'special', date: '2026-05-01' }]);
+  const G6d = g6([{ id: 'g4', ptype: 'worker', pid: 'w4', kind: 'hire', date: '2026-05-01', del: 1 }]);
+  const G6e = g6([{ id: 'g5', ptype: 'member', pid: 'w4', kind: 'hire', date: '2026-05-01' }]);
+  const G6f = g6([{ id: 'g6', ptype: 'worker', pid: 'w4', kind: 'hire', date: '확인 중' }]);
+  const G6n = g6([{ id: 'g7', ptype: 'worker', pid: 'w4', kind: 'hire', date: '2024-03-01' }], { user: V.U47.N, asb: [] });
+  //   v448 검토: 해를 걸친 종결 현장(2024-12-01 시작·2025-01-10 종료)에 든 w4 = 펴짐(종료일의 해도 봄) · 같은 현장이 2024-12-31에 끝났으면 = 접힘(경계 하루 차이) · 현장 권한 없음(N) 묶음 이름 = '교육 기록 없음' 갈래
+  const SY6 = (end) => V.ASB47().concat([{ id: 'y1', seq: 20, kind: 'asbestos', title: '해 걸친 현장', client: '', site: '', start: '2024-12-01', end, status: 'done', member_ids: [], worker_ids: ['w4'] }]);
+  const G6y = g6([], { asb: SY6('2025-01-10') }), G6z = g6([], { asb: SY6('2024-12-31') });
+  const gy6 = [G6y.api.find('worker:w4').grp, G6z.api.find('worker:w4').grp];
+  const gl6 = G6n.host.innerHTML.indexOf('그 밖 일용직 · 교육 기록 없음(현장 투입은 현장 권한이 있어야 셈)') >= 0 && G6n.host.innerHTML.indexOf('년까지 현장·교육 기록만') < 0;
+  const gr6 = [G6a.api.find('worker:w4').grp, G6b.api.find('worker:w4').grp, G6c.api.find('worker:w3').grp, G6d.api.find('worker:w4').grp, G6e.api.find('worker:w4').grp, G6f.api.find('worker:w4').grp, G6n.api.find('worker:w4').grp];
+  const ms6 = G6a.api.miss(), sum6 = G6a.api.rows().reduce((s, r) => s + r.st.miss, 0);
+  T('v448 ⑥ 일용직 펴짐 기준(실행): 대장 투입 없음 + 2025-01-01 기록 = 펴짐 · 2024-12-31 = 접힘 · 2024 현장 + 2026 기록 = 펴짐 · 지운 기록·남의(직원 줄) 기록·날짜 아닌 기록 = 접힘 · 현장 권한 없음 = 종전(기록 있으면 펴짐) · 머리 "총 12명 (접힘 4명)" · 묶음 이름 새 글 · 빠진 항목 셈 = 행 원천 · 검토: 2024-12 시작·2025-01-10 종료 현장 = 펴짐·2024-12-31 종료 = 접힘 · 현장 권한 없음 묶음 이름 "교육 기록 없음(현장 투입은 현장 권한이 있어야 셈)"',
+    JSON.stringify(gr6) === JSON.stringify(['', 'old', '', 'old', 'old', 'old', '']) && G6a.el('eduHead').textContent === '총 12명 (접힘 4명)' && G6b.el('eduHead').textContent === '총 12명 (접힘 5명)'
+    && G6b.host.innerHTML.indexOf('그 밖 일용직 · 2024년까지 현장·교육 기록만(또는 기록 없음)') >= 0 && G6b.host.innerHTML.indexOf('현장만(또는 현장 참여 없음)') < 0 && ms6.items === sum6
+    && JSON.stringify(gy6) === JSON.stringify(['', 'old']) && gl6,   // v448 검토: 해 걸친 현장 · 현장 권한 없음 묶음 이름
+    JSON.stringify({ gr6, gy6, gl6, heads: [G6a.el('eduHead').textContent, G6b.el('eduHead').textContent] }));
+
+  // ⑦ 경계 상수 한 곳(실행 + 정적): 저장소 사본에서 SITE_OLD_BEFORE만 2026으로 바꾸면 2025-06-01 교육 기록 w4 = 접힘·2026-01-01 = 펴짐(교육 경계도 같은 상수) · 2026 종결 준설 w2 = 펴짐 그대로 ·
+  //   @edu-sheet 구간(주석 걷음)에 SITE_OLD_BEFORE 2번(newY 하나·묶음 이름) · 숫자 2025 0 · wkGrp가 newY를 현장·교육 두 번 씀
+  const src7 = html.replace('\n  var SITE_OLD_BEFORE = 2025;', '\n  var SITE_OLD_BEFORE = 2026;');
+  const G7a = g6([{ id: 'g8', ptype: 'worker', pid: 'w4', kind: 'hire', date: '2025-06-01' }], { src: src7 }), G7b = g6([{ id: 'g9', ptype: 'worker', pid: 'w4', kind: 'hire', date: '2026-01-01' }], { src: src7 });
+  const es7 = V.nc47(V.blk47(html, '// @edu-sheet-start', '// @edu-sheet-end')), wg7 = (es7.match(/var wkGrp = function\(k\)\{[^\n]*\n/) || [''])[0];
+  T('v448 ⑦ 경계 상수 한 곳(실행 + 정적): 상수 2026 사본 = 2025-06-01 기록 접힘·2026-01-01 기록 펴짐·w2(2026 종결 준설) 펴짐 · 구간 SITE_OLD_BEFORE 2번·newY 정의 1번·wkGrp 안 newY( 3번(검토 — 현장 종료 해)·숫자 2025 0',
+    src7 !== html && G7a.api.find('worker:w4').grp === 'old' && G7b.api.find('worker:w4').grp === '' && G7a.api.find('worker:w2').grp === ''
+    && (es7.match(/\bSITE_OLD_BEFORE\b/g) || []).length === 2 && V.cnt47(es7, 'var newY = function(y){ return !!y && y >= SITE_OLD_BEFORE; };') === 1 && (wg7.match(/\bnewY\(/g) || []).length === 3 && !/\b2025\b/.test(es7),   // v448 검토: newY( 현장 시작 해·현장 종료 해·교육 기록 = 3
+    JSON.stringify({ a: G7a.api.find('worker:w4').grp, b: G7b.api.find('worker:w4').grp, wg7: wg7.slice(0, 80) }));
+
+  // ⑧ 직원 줄 = 부서·직책으로 거르지 않음(실행 + 정적): 새 부서 '라임팀' 현장직 · 직책 없음·부서 없음 회원 · 사무직 표식 새 부서 회원 = 모두 펴진 직원 줄(판정 기준 사무직 6 · 그 밖 12) · eduSheetRows 회원 줄 고르기에 .role·.dept 0
+  const M8 = V.MEM47().concat([{ id: 'n1', name: '라임현장', role: '현장직', dept: '라임팀' }, { id: 'n2', name: '빈칸회원' }, { id: 'n3', name: '새사무', office: true, dept: '신규부서', role: '직원' }]);
+  const G8 = V.mk47({ members: M8 }); G8.api.render();
+  const r8 = ['n1', 'n2', 'n3'].map((id) => G8.api.find('member:' + id));
+  const ml8 = (() => { const f = V.fn47(html, 'eduSheetRows'), i = f.indexOf('liveMembers().forEach'), j = f.indexOf('if (cx.wk)'); return i > 0 && j > i ? V.nc47(f.slice(i, j)) : ''; })();
+  T('v448 ⑧ 직원 줄(실행 + 정적): 라임팀 현장직·직책·부서 빈 회원·새 부서 사무직 = 펴진 직원 줄 3 · 정기교육 기준 그 밖 12·사무직 6 · 회원 줄 고르기 .role·.dept 0(퇴사·시험 계정만)',
+    r8.every((r) => r && r.grp === '' && r.ptype === 'member') && /\/12시간/.test(r8[0].st.c.reg.t) && /\/12시간/.test(r8[1].st.c.reg.t) && /\/6시간/.test(r8[2].st.c.reg.t)
+    && ml8.length > 50 && !/\.role\b|\.dept\b/.test(ml8.replace(/p\.org[^;]*;/g, '')) && /m\.test_acct === true/.test(ml8),
+    JSON.stringify(r8.map((r) => r ? r.id + ':' + r.grp + ':' + r.st.c.reg.t : null)));
+
+  // ⑨ 새 디자인 없음(정적) + 폰 legacy 그대로(해시): 체크 칸 머리 줄(.sec-hd) 하나에 버튼 셋(+ 이력 추가·+ 직원·+ 일용직 — 같은 클래스 sec-hd-add, 새 클래스 0) · 칸 안 .sec-hd 1개(새 줄·새 영역 0) ·
+  //   CSS에 두 id 0 · 보기 칸 숨김 CSS(.sf-pane.readonly .sec-hd-add) 그대로 · 폰 옛 본문 renderEduLegacy·renderEduInto = v446 원문 해시 그대로
+  const pe9 = (() => { const i = html.indexOf('<div class="sf-pane" id="sfPaneEdu"'), j = html.indexOf('<div class="card" id="eduList">', i); return i > 0 && j > i ? html.slice(i, j) : ''; })();
+  const hd9 = (/<div class="sec-hd">([\s\S]*?)\n    <\/div>/.exec(pe9) || ['', ''])[1], btn9 = [...hd9.matchAll(/<button type="button" class="([^"]*)" id="(\w+)"[^>]*>([^<]*)<\/button>/g)].map((m) => m[1] + '#' + m[2] + '=' + m[3]);
+  const css9 = html.slice(0, html.indexOf('</style>'));
+  T('v448 ⑨ 새 디자인 없음(정적) + 폰 legacy 해시: 칸 머리 한 줄 = sec-hd-t 제목(그대로) + sec-hd-add 버튼 셋(+ 이력 추가·+ 직원·+ 일용직) · 칸 안 sec-hd 1개 · CSS에 eduAddMemBtn·eduAddWkBtn 0 · .sf-pane.readonly .sec-hd-add 숨김 그대로 · renderEduLegacy f4bff7cd…·renderEduInto b9b2b6dd… 그대로',
+    JSON.stringify(btn9) === JSON.stringify(['sec-hd-add#eduAddBtn=+ 이력 추가', 'sec-hd-add#eduAddMemBtn=+ 직원', 'sec-hd-add#eduAddWkBtn=+ 일용직']) && /<button type="button" class="sec-hd-t" style="cursor:default;"><span>체크<\/span> <span class="cnt" id="eduHead"><\/span><\/button>/.test(hd9)
+    && V.cnt47(pe9, '<div class="sec-hd">') === 1 && css9.indexOf('eduAddMemBtn') < 0 && css9.indexOf('eduAddWkBtn') < 0 && css9.indexOf('.sf-pane.readonly .sec-hd-add{display:none !important;}') > 0
+    && V.sha47(V.body47(html, 'renderEduLegacy')) === 'f4bff7cdff2f8c5c42fd0d502d25980e4437ec720cc5315665dd80ad88ff0c5d' && V.sha47(V.body47(html, 'renderEduInto')) === 'b9b2b6dd512211590b4267382839c29463806523d39ff90a35e043e2f6413c8a',
+    JSON.stringify(btn9));
+
+  // ⑩ 배선 순서(정적): openMemberEdit 첫 줄 = 표시 지움 → 인라인 폼이면 창으로 되돌림(hrCollapse·hrCloseNew) · openWkModal 첫 줄 = 표시 지움 · saveMemberEdit 200 = closeMemberEdit → drawHrRoster(keep) → render → eduPersonSaved("member", 응답 회원 id) ·
+  //   일용직 창 [저장] = wkSheetShowNew 다음 eduPersonSaved("worker", w.id) · loadMembers가 약속을 돌려줌 · 두 버튼 배선 각 1번 · eduAddPerson·eduPersonSaved는 @edu-sheet 구간 밖(구간은 읽기만 — v447 ⑯), eduSheetShowNew는 구간 안(vsSheetReveal)
+  const esb10 = V.blk47(html, '// @edu-sheet-start', '// @edu-sheet-end');
+  const ok10 = [
+    /function openMemberEdit\(id, inline\)\{\n    eduPersonFrom = "";[^\n]*\n    if \(!inline\)\{ if \(hrOpenId != null\) hrCollapse\(\); hrCloseNew\(\); \}/.test(html),
+    /function openWkModal\(id\)\{\n    eduPersonFrom="";/.test(html),
+    /      closeMemberEdit\(\);\n      drawHrRoster\(keep\);\n      render\(\);\n      eduPersonSaved\("member", res\.body && res\.body\.member \? res\.body\.member\.id : null\);/.test(html),
+    /if\(isNew\) wkSheetShowNew\(w\.id\);[^\n]*\n      eduPersonSaved\("worker", w\.id\);/.test(html),
+    /function loadMembers\(\)\{\n    return gwCall\("gw-auth", \{ action: "member_list" \}\)\.then\(/.test(html),
+    V.cnt47(html, 'getElementById("eduAddMemBtn").addEventListener("click", function(){ eduAddPerson("member"); });') === 1 && V.cnt47(html, 'getElementById("eduAddWkBtn").addEventListener("click", function(){ eduAddPerson("worker"); });') === 1,
+    esb10.indexOf('function eduAddPerson(') < 0 && esb10.indexOf('function eduPersonSaved(') < 0 && esb10.indexOf('function eduSheetShowNew(') > 0 && V.cnt47(html, 'function eduAddPerson(') === 1 && V.cnt47(html, 'function eduPersonSaved(') === 1,
+    (html.match(/eduPersonSaved\(/g) || []).length === 3 && (html.match(/\beduPersonFrom\s*=(?!=)/g) || []).length === 6];
+  T('v448 ⑩ 배선 순서(정적): openMemberEdit·openWkModal 첫 줄 표시 지움(인라인 폼 되돌림 그대로) · 회원 저장 200 끝·일용직 창 저장 끝에 eduPersonSaved · loadMembers 약속 · 버튼 배선 각 1번 · 사람 추가 함수는 구간 밖·새 줄 열기는 구간 안 · eduPersonSaved 부름 2곳(정의 1)·표시 쓰기 6곳',
+    ok10.every(Boolean), JSON.stringify(ok10));
+
+  // ⑫ (검토 반영) 로그인 창 '전환'(새로고침 없음 — 실제 applySafetyPerms·setSafetyLayer·renderEdu): 관리자가 체크 칸 표를 그린 채(두 버튼 보임) 사람이 바뀌면 체크 칸을 다시 열어 버튼이 그 사람 권한대로 —
+  //   권민지형 S = 둘 다 숨김 · 일용직 수행·안전 수행 W = [+ 일용직]만 · 안전 보기 H = 둘 다 숨김 · 다시 관리자 = 둘 다 · 칸은 체크 그대로·기록 다시 읽기(loadEdu)
+  const XS12 = X48({ user: U48.A, sw: 1 }); XS12.api.render();
+  const sw12 = (u) => { XS12.env.user = u; XS12.env.log.length = 0; XS12.env.sw.apply(); return disp48(XS12) + '#' + XS12.env.sw.layer() + '#' + (XS12.env.log.indexOf('loadEdu') >= 0 ? 'L' : '-'); };
+  const s12 = [disp48(XS12), sw12(U48.S), sw12(U48.W), sw12(U48.H), sw12(U48.A)];
+  T('v448 ⑫ 검토 — 로그인 창 "전환"(실행 — 실제 applySafetyPerms·setSafetyLayer): 관리자 = 두 버튼 → 권민지형 = 둘 다 숨김 → 일용직 수행·안전 수행 = [+ 일용직]만 → 안전 보기 = 둘 다 숨김 → 관리자 = 둘 다 · 칸은 체크 그대로·기록 다시 읽기',
+    JSON.stringify(s12) === JSON.stringify(['|', 'none|none#edu@safety#L', 'none|#edu@safety#L', 'none|none#edu@safety#L', '|#edu@safety#L']),
+    JSON.stringify(s12));
+
+  // ⑬ (검토 반영) [+ 직원] 전 확인(실행 — 실제 eduAddPerson): 인사 탭에 펼친 직원 카드(hrOpenId)·새 직원 패널(hrNewOpen)이 있으면 확인 창 EDU_ADD_HR_OPEN을 먼저 — 취소 = 창 안 열림·표시 그대로 ·
+  //   확인 = 회원 추가 창·현장직·표시 member · 둘 다 없으면 묻지 않음(②와 같음) · [+ 일용직]은 회원 폼과 무관해 묻지 않음
+  const XC13 = X48({ user: U48.A }); XC13.api.render();
+  const MSG13 = '인사 탭에서 열어 둔 직원 카드(또는 새 직원 등록)가 닫히고, 저장하지 않은 내용은 사라집니다. 계속할까요?';
+  const c13 = (id, nw, cf, kind) => { XC13.env.x.hr(id, nw); XC13.env.x.setFrom(''); XC13.env.cf = cf; XC13.env.log.length = 0; XC13.env.x.add(kind || 'member'); return XC13.env.log.filter((l) => !/^(renderWorkers|loadWorkers)/.test(l)).join(',') + '#' + XC13.env.x.from(); };
+  const r13 = [c13('u6', false, false), c13('u6', false, true), c13(null, true, false), c13(null, true, true), c13(null, false, false), c13('u6', false, false, 'worker')];
+  T('v448 ⑬ 검토 — [+ 직원] 전 확인(실행): 펼친 카드·새 직원 패널이 있으면 확인 창(저장하지 않은 내용은 사라집니다) — 취소 = 창 0·표시 없음 · 확인 = openMemberEdit(null)·현장직·표시 member · 둘 다 없으면 묻지 않음 · [+ 일용직]은 묻지 않음',
+    JSON.stringify(r13) === JSON.stringify(['confirm:' + MSG13 + '#', 'confirm:' + MSG13 + ',openMemberEdit:null:false,applyRolePreset:현장직#member', 'confirm:' + MSG13 + '#', 'confirm:' + MSG13 + ',openMemberEdit:null:false,applyRolePreset:현장직#member',
+      'openMemberEdit:null:false,applyRolePreset:현장직#member', '#worker']),
+    JSON.stringify(r13));
+
+  // ⑭ (검토 반영) 부서 칸(실행 — 실제 meDeptFill + 실제 DOM처럼 선택지에 없는 값은 빈 값이 되는 선택 칸): 라임팀 = 정식 선택지(목록 한 곳 DEPT_LIST) · 목록에 없는 부서 회원을 열면 그 값을 선택지로 더해 지킴(저장 payload.dept가 그 값) ·
+  //   빈 값 = '- 선택 -' · 정적: HTML #meDept 선택지 = ['', ...DEPT_LIST] · openMemberEdit은 meDeptFill로 채움(직접 .value 대입 0) · saveMemberEdit은 칸 값 그대로 보냄
+  const dl14 = JSON.parse((/\n  var DEPT_LIST = (\[[^\]]*\]);/.exec(html) || ['', '[]'])[1]);
+  const dep14 = (cur) => {
+    const sel = { _h: '', _v: '' };
+    Object.defineProperty(sel, 'innerHTML', { get() { return this._h; }, set(v) { this._h = String(v); this._v = ''; } });
+    Object.defineProperty(sel, 'value', { get() { return this._v; }, set(v) { const op = [...this._h.matchAll(/<option value="([^"]*)"/g)].map((m) => m[1]); this._v = op.indexOf(String(v)) >= 0 ? String(v) : ''; } });
+    new Function('__sel', [V.line47(html, '  var DEPT_LIST = '), V.fn47(html, 'esc'), 'var document = { getElementById: function(){ return __sel; } };', V.fn47(html, 'meDeptFill'), 'meDeptFill(' + JSON.stringify(cur) + ');'].join('\n'))(sel);
+    return sel.value + '|' + [...sel._h.matchAll(/<option value="([^"]*)"/g)].map((m) => m[1]).length;
+  };
+  const d14 = [dep14('라임팀'), dep14('운영부'), dep14('신규부서'), dep14('')];
+  const ho14 = [...((/<select id="meDept">([\s\S]*?)<\/select>/.exec(html) || ['', ''])[1]).matchAll(/<option value="([^"]*)">/g)].map((m) => m[1]);
+  const om14 = V.fn47(html, 'openMemberEdit'), sm14 = V.fn47(html, 'saveMemberEdit');
+  T('v448 ⑭ 검토 — 부서 칸(실행 — 실제 meDeptFill·DOM 같은 선택 칸): 라임팀 = 정식 선택지(DEPT_LIST 여섯째 — 선택지 7) · 운영부 그대로 · 목록에 없는 "신규부서" = 선택지로 더해 지킴(8) · 빈 값 = "- 선택 -" · HTML 선택지 = DEPT_LIST · openMemberEdit = meDeptFill(직접 대입 0) · saveMemberEdit dept = 칸 값',
+    dl14.indexOf('라임팀') === 5 && JSON.stringify(d14) === JSON.stringify(['라임팀|7', '운영부|7', '신규부서|8', '|7']) && JSON.stringify(ho14) === JSON.stringify([''].concat(dl14))
+    && V.cnt47(om14, 'meDeptFill(m ? (m.dept||"") : "");') === 1 && om14.indexOf('getElementById("meDept").value =') < 0 && sm14.indexOf('dept: document.getElementById("meDept").value') > 0,
+    JSON.stringify({ d14, dl14, ho14 }));
+
+  // ⑪ 문서 — FEATURES 기준 v448·v448 절 · TESTLIST v448(화면 칸 '[ ] (AI 시험 화면 대상' ≥ 3 — 'PM' 0 · 게이트 칸 [x] 8종) · MANUAL 21-9 사람 추가·누가 보이나·저장하면 표에 바로·일용직 펴짐 기준 · CLAUDE.md 안전 줄 · sw v448
+  const ft11 = V.rd47('FEATURES.md'), tl11 = V.rd47('TESTLIST.md'), cl11 = V.rd47('CLAUDE.md'), sw11 = V.rd47('sw.js'), man11 = V.rd47('MANUAL.html');
+  const ftv11 = (() => { const i = ft11.indexOf('\n### v448 (11/12)'); if (i < 0) return ''; const j = ft11.indexOf('\n### ', i + 5); return ft11.slice(i, j < 0 ? ft11.length : j); })();
+  const tlv11 = (() => { const i = tl11.indexOf('\n## v448 '); if (i < 0) return ''; const j = tl11.indexOf('\n## ', i + 5); return tl11.slice(i, j < 0 ? tl11.length : j); })();
+  const m219_11 = (() => { const i = man11.indexOf('<h3>21-9.'); return i < 0 ? '' : man11.slice(i, man11.indexOf('<h3>21-10.', i)); })();
+  const cb11 = tlv11.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), scr11 = cb11.filter((l) => /^- \[[ x]\] \(AI 시험 화면 대상/.test(l)), gate11 = cb11.filter((l) => /^- \[x\] \(AI\) `/.test(l));
+  const FT11 = ['[+ 직원]', '[+ 일용직]', '`eduAddPerson`', '`eduPersonSaved`', '`eduSheetShowNew`', 'openMemberEdit(null)', 'openWkModal(null)', '현장직', 'member_list', 'SITE_OLD_BEFORE', '교육 기록', '서버 변경 없음', 'uismoke v448',
+    '검토 반영(11/12)', 'setSafetyLayer("edu")', '`EDU_ADD_HR_OPEN`', '`meDeptFill`', '라임팀', '종료일의 해', '교육 기록 없음(현장 투입은 현장 권한이 있어야 셈)', '접힘 수는'];   // v448 검토 반영
+  const MAN11 = ['<span class="btn">+ 직원</span>', '<span class="btn">+ 일용직</span>', '관리자에게만', '일용직 수행', '표에 바로', '2025년 이후', '교육 기록', '휴대폰',
+    '저장하지 않은 내용은 사라집니다', '끝난 현장', '로그인 창'];   // v448 검토 반영
+  const CL11 = ['v448', '`eduAddPerson`', '`eduPersonSaved`', '`eduPersonFrom`', 'newY', 'setSafetyLayer("edu")', '`EDU_ADD_HR_OPEN`', '`meDeptFill`'];
+  const GATE11 = ['uismoke', 'consheet_check', 'proctpl_check', 'settletest', 'servertest', 'rectest', 'promoqual_check', 'promogen_check'];
+  const mF11 = FT11.filter((s) => ftv11.indexOf(s) < 0), mM11 = MAN11.filter((s) => m219_11.indexOf(s) < 0), mC11 = CL11.filter((s) => cl11.indexOf(s) < 0);
+  T('v448 ⑪ 문서: FEATURES 기준 v448·v448 절(이름 고정) · TESTLIST v448 화면 칸 "[ ] (AI 시험 화면 대상" ≥ 3개("PM" 낱말 0)·게이트 칸 [x] 8종 · MANUAL 21-9 사람 추가·누가 보이나·저장하면 표에 바로·일용직 펴짐 기준 · CLAUDE.md 안전 줄 · sw jw-shell-v448',
+    /기준: v448 \(2026-11-12\)\./.test(ft11) && ftv11.length > 0 && mF11.length === 0 && tlv11.length > 0 && scr11.length >= 3 && !scr11.some((l) => /PM/.test(l)) && GATE11.every((g) => gate11.some((l) => l.indexOf('`' + g + '`') > 0))
+    && mM11.length === 0 && mC11.length === 0 && /SHELL_CACHE = 'jw-shell-v448'/.test(sw11)
+    && tlv11.indexOf('줄 수가 같은 셈') < 0 && tlv11.indexOf('접힘 수는') > 0 && tlv11.indexOf('저장하지 않은 내용은 사라집니다') > 0,   // v448 검토: 머리·합계 접힘 수는 셈이 달라 '같은 셈' 확인 칸에서 뺌 · 인사 카드 확인 창
+    JSON.stringify({ mF11, mM11, mC11, scr: scr11.length, gate: gate11.length }));
+} catch (e) { console.log('  (v448 검사 생략 — ' + e.message + ')'); fails++; }
 
 try {
   const fdir = join(ROOT, 'netlify', 'functions');
