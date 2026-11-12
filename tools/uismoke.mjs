@@ -12060,7 +12060,7 @@ try {
   const sw6 = fnOf29s('switchTab'), ap6 = fnOf29s('applyPerms'), cs6 = fnOf29s('clearSessionData');
   const nav6 = html.slice(html.indexOf('<nav class="tabbar" id="tabbar">'), html.indexOf('</nav>'));
   const btnCls6 = [...ssb29.matchAll(/<button type="button" class="([^"]+)" data-st-(act|open)=["\\]*"?([\w-]*)/g)].map((m) => m[1] + '|' + m[2] + '|' + m[3]);
-  const writeActs6 = ['add', 'save', 'done', 'sent', 'reopen', 'revert', 'del'], readActs6 = ['back', 'reload'];
+  const writeActs6 = ['add', 'save', 'done', 'sent', 'reopen', 'revert', 'del', 'pick', 'repick'], readActs6 = ['back', 'reload', 'pickx'];   // 29 판③: [고르기 ▾](별칭 저장 — 바꾸는 단추)·고르기 칸 [닫기](읽기 토글)
   const clsOk6 = btnCls6.length >= 10 && btnCls6.every((s) => { const p = s.split('|'); if (p[1] === 'open') return p[0] === 'vs-chip'; if (writeActs6.indexOf(p[2]) >= 0) return /\bmini-btn\b/.test(p[0]); if (readActs6.indexOf(p[2]) >= 0) return p[0] === 'vs-chip'; return true; });
   T('29 판② ⑥ 정적: 사이드바 관리 › 기성·수금 바로 다음 월말명세서 버튼(처음 숨김) · 화면 section 1개(보드·상세·달 ◀▶ 자리) · switchTab 숨김이면 홈(currentTab 정하기 전)·화면 토글·stmtEnter · applyPerms 볼 수 있으면 다시 그림(보는 사람 바뀜) · 로그아웃 clearSessionData → stmtReset · 상세 배선은 한 번(STMT.bound) · 바꾸는 버튼 mini-btn·읽기 토글([열기]·[‹ 월 보드]·[다시 불러오기]) vs-chip · 앱이 부르는 동작 ' + acts6.join('·') + ' 모두 gw-stmt에 있음 · 앱은 줄을 "vision"으로 만들지 않음(D1 꺼짐)',
     /<button class="tab-btn" data-tab="rec" id="tabRecBtn">기성·수금<\/button>\n\s*<button class="tab-btn perm-hidden" data-tab="stmt" id="tabStmtBtn">월말명세서<\/button>/.test(nav6)
@@ -12068,8 +12068,9 @@ try {
     && /if \(name === "stmt" && !canSee\("stmt"\)\) name = "dash";/.test(sw6) && /getElementById\("view-stmt"\)\.classList\.toggle\("active", name === "stmt"\);/.test(sw6) && /if \(name === "stmt"\) stmtEnter\(\);/.test(sw6)
     && sw6.indexOf('if (name === "stmt" && !canSee("stmt")) name = "dash";') < sw6.indexOf('currentTab = name;')   // (검토 반영) 막는 줄은 currentTab·화면 토글보다 앞(뒤로 가면 숨김 사람이 빈 화면에 남음)
     && /if \(currentTab === "stmt" && canSee\("stmt"\)\) renderStmt\(\);/.test(ap6) && /\bstmtReset\(\);/.test(cs6)
-    && /if \(STMT\.bound \|\| !host\) return;\n\s*STMT\.bound = true;/.test(fnOf29s('stmtBindOnce')) && (ssb29.match(/addEventListener\("input"/g) || []).length === 1
-    && clsOk6 && acts6.length === 6 && acts6.every((a) => srvActs6.indexOf(a) >= 0) && !/how: "vision"|"vision"/.test(ssb29.replace(/\/\/[^\n]*/g, '')),
+    && /if \(STMT\.bound \|\| !host\) return;\n\s*STMT\.bound = true;/.test(fnOf29s('stmtBindOnce')) && (ssb29.match(/addEventListener\("input"/g) || []).length === 2   // 29 판③: 상세 + 거래처 목록 고치기(둘 다 stmtBindOnce 안 — 한 번)
+    && (fnOf29s('stmtBindOnce').match(/addEventListener\("input"/g) || []).length === 2
+    && clsOk6 && acts6.length === 10 && acts6.every((a) => srvActs6.indexOf(a) >= 0) && !/how: "vision"|"vision"/.test(ssb29.replace(/\/\/[^\n]*/g, '')),   // 29 판③: 동작 6 → 10(stmt_match·stmt_alias_set·stmt_alias_get·stmt_cfg_get·stmt_cfg_set 더함 — 서버에 다 있음)
     J({ acts6, btnCls6 }));
 
   // ⑦ 화면 결함 검토 반영(11/10 — 재현된 7건): 차량 칸 글을 쳤다 되돌리면 대조된 차량이 되살아남(change가 안 와도) · 저장 응답이 줄 객체를 갈아 끼워도 같은 줄 id로 찾음 ·
@@ -12096,7 +12097,7 @@ try {
     J(v7) === '["","veh_b","veh_b",""]' && rowOf7
     && !!p7.badf[0] && p7.badf[0].vin === 1 && p7.badf[0].item === 1
     && /세액 합 100 = 500 <span class="st-no">▲<\/span>/.test(ck7) && stay7
-    && /if \(STMT\.ed\) stmtRenderStats\(\); else renderStmt\(\);/.test(md7) && (lm7.match(/stmtMonthDone\(\);/g) || []).length === 3 && /if \(!STMT\.ed\) STMT\.month = null;/.test(lm7)
+    && /if \(STMT\.ed \|\| STMT\.cfg\) stmtRenderStats\(\); else renderStmt\(\);/.test(md7) && (lm7.match(/stmtMonthDone\(\);/g) || []).length === 3 && /if \(!STMT\.ed\) STMT\.month = null;/.test(lm7)   // 29 판③: 거래처 목록 고치기를 연 채도 요약만
     && /stmtOpen\(ed\.vk, true\)/.test(oc7) && /if \(again && typeof vk === "string" && \/\^v\\d\{2,3\}\$\/\.test\(vk\)\) ok = true;/.test(op7)
     && /\[data-st-act="back"\],\[data-st-act="reload"\]/.test(rf7) && /b\.disabled = !!ed\.saving;/.test(rf7)
     && /로그인이 풀려 처리하지 않았습니다/.test(dn7) && /로그인이 풀려 대조하지 못했습니다/.test(vm7) && /로그인이 풀렸습니다 — 다시 로그인한 뒤 열어 주세요/.test(op7) && /로그인이 풀렸습니다 — 다시 로그인해 주세요/.test(lm7)
@@ -12105,6 +12106,364 @@ try {
     && /if \(currentTab === "stmt" && !canSee\("veh"\)\) switchTab\("dash"\);/.test(ap7) && /var sb = document\.getElementById\("tabStmtBtn"\); if \(sb && !canSee\("veh"\)\) sb\.classList\.add\("perm-hidden"\);/.test(ap7),
     J({ v7, rowOf7, badf: p7.badf, stay7 }));
 } catch (e) { console.log('  (29 판② 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ---- 29 판③(체크 29 월말명세서 화면 2 — 처음 보는 번호 고르기·용구 용도 칩·타이어 위치·조치·거래처 목록 고치기): index.html @stmt-sheet 구간을 가짜 서버(gwCall 약속)로 돌린다
+//      ① 고르기(후보·찾기·같은 번호 줄 같이·별칭 저장 409 → 사전 판 다시 읽고 한 번 더·지워진 차·별칭 실패·이제 찾힘·여러 대 후보 먼저·치면 칸 닫힘)
+//      ② 용도 칩(지난달 같은 품목 기본값 = 가장 많이 쓴 용도·사람 값 안 덮음·점선 확정·다시 누르면 비움·'차량' → 번호 칸 검산·지난달 못 읽음·차량 거래처·보기 권한은 안 읽음)
+//      ③ 타이어(위치·조치 → 서버 cleanRows 통과·둘 다 빈칸 null·다른 종류 null·개인정보·30자·빈 줄 판정·줄 그림·라벨 = 서버) ④ 거래처 목록 고치기(다음 번호·서버 cleanVendors와 같은 판정·묶음 고정·저장 몸체·409·개인정보·성공 뒤 보드 다시 읽기·막는 자리) ⑤ 정적
+try {
+  const req29t = createRequire(import.meta.url);
+  const SVt = req29t(join(ROOT, 'netlify', 'functions', '_lib', 'stmt.js'));
+  const blkOf29t = (a, b) => { const i = html.indexOf(a), j = html.indexOf(b); if (i < 0 || j < i) throw new Error('구간 없음: ' + a); return html.slice(i, j); };
+  const fnOf29t = (name) => { const i = html.indexOf('function ' + name + '('); if (i < 0) throw new Error('함수 없음: ' + name); let d = 0, st = false; for (let j = i; j < html.length; j++) { const ch = html[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return html.slice(i, j + 1); } } throw new Error('중괄호 짝 안 맞음: ' + name); };
+  const ssb29t = blkOf29t('// @stmt-sheet-start', '// @stmt-sheet-end'), vsb29t = blkOf29t('// @vs-sheet-start', '// @vs-sheet-end');
+  // 서버 stmt_match가 내보내는 차량 목록 꼴(id·끝 4자리·옛 끝 4자리·차종·자차/지입·상태) · 앱 차량 탭 목록(findVeh — 차량 표시용)
+  const VL29 = [{ id: 'v12가1111', l4: '1111', old4: [], type: '덤프', own: '자차', state: '운행' }, { id: 'v34나2025', l4: '2025', old4: ['7900'], type: '덤프', own: '자차', state: '운행' },
+    { id: 'v56다5772', l4: '5772', old4: [], type: '덤프', own: '지입', state: '정비' }, { id: 'v78라6666', l4: '6666', old4: [], type: '트랙터', own: '지입', state: '운행' }, { id: 'v90마6666', l4: '6666', old4: [], type: '카고', own: '자차', state: '운행' }];
+  const VEH29t = VL29.map((v) => ({ id: v.id, no: v.id.slice(1), own: v.own, type: v.type, state: v.state }));
+  const mk29t = (o) => {
+    o = o || {};
+    const env = { who: 'u1', perm: o.perm || 'do', log: [], resp: o.resp || {}, toasts: [], inval: 0 };
+    const api = new Function('__env', '__veh', [
+      'var window = {}, localStorage = { getItem: function(){ return null; }, setItem: function(){} }, ResizeObserver = undefined, currentTab = "stmt";',
+      'var document = { getElementById: function(){ return null; }, querySelector: function(){ return null; }, activeElement: null };',
+      'function confirm(){ return true; }',
+      fnOf29t('esc'), fnOf29t('pad'), fnOf29t('isDate'),
+      'function myId(){ return __env.who; } function canDo(m){ return m === "stmt" && __env.perm === "do"; } function canSee(m){ return m !== "stmt" || __env.perm !== "hide"; }',
+      'function findVeh(id){ for (var i = 0; i < __veh.length; i++){ if (__veh[i].id === id) return __veh[i]; } return null; } function liveVehicles(){ return __veh.filter(function(v){ return v.del !== 1; }); }',
+      'function findMember(){ return null; } function dispName(n){ return n; } function gwToast(t){ __env.toasts.push(t); } function onSessionInvalid(){ __env.inval++; }',
+      'function gwCall(fn, body){ __env.log.push(JSON.parse(JSON.stringify(body))); var r = __env.resp[body.action]; if (typeof r === "function") r = r(body); if (r instanceof Error) return Promise.reject(r); return Promise.resolve(r || { status: 500, body: {} }); }',
+      vsb29t, ssb29t,
+      'return { STMT: STMT, TIRE: STMT_TIRE_ACT, USE: STMT_USE, USE_SHORT: STMT_USE_SHORT, KIND: STMT_KIND, KIND_OPT: STMT_KIND_OPT, TIRE_POS: STMT_TIRE_POS,',
+      '  edLoad: stmtEdLoad, edRow: stmtEdRow, newRow: stmtNewRow, edEmpty: stmtEdEmpty, collect: stmtEdCollect, rowHtml: stmtEdRowHtml, vcHtml: stmtVcHtml,',
+      '  pickOpen: stmtPickOpen, pickChoose: stmtPickChoose, pickList: stmtPickListHtml, pickHtml: stmtPickHtml, onInput: stmtOnInput, onChange: stmtOnChange,',
+      '  vehMatch: stmtVehMatch, aliasKind: stmtAliasKind, aq: function(){ return STMT_AQ; }, chipCls: stmtChipCls, uvShow: stmtUvShow, subShow: stmtSubShow,',
+      '  useSet: stmtUseSet, useDefault: stmtUseDefault, useSug: stmtUseSug, useNote: stmtUseNoteHtml, itemKey: stmtItemKey,',
+      '  cfgNextVk: stmtCfgNextVk, cfgVendors: stmtCfgVendors, cfgRowHtml: stmtCfgRowHtml, cfgOpen: stmtCfgOpen, cfgSave: stmtCfgSave, cfgClose: stmtCfgClose,',
+      '  month: stmtMonth, open: stmtOpen, reset: stmtReset };'].join('\n'))(env, VEH29t);
+    return { env, api };
+  };
+  const fl29 = async () => { for (let k = 0; k < 8; k++) await new Promise((r) => setTimeout(r, 0)); };
+  const J = (x) => JSON.stringify(x);
+  const edT = (X, vendor, rows) => { X.api.STMT.ym = '2026-10'; X.api.STMT.ed = { ym: '2026-10', vk: vendor.vk, loading: true, err: '', msg: '', vendor: vendor, rows: [] }; X.api.edLoad({ vendor: vendor, doc: null }); const ed = X.api.STMT.ed; ed.rows = rows.map((r) => Object.assign(X.api.newRow(ed), r)); return ed; };
+  const V05t = { vk: 'v05', name: '대송IC주유소', group: 'veh', kind: 'fuel', basis: 'total', carry: false };
+  const MATCH_NONE = (b) => ({ status: 200, body: { status: 'OK', matches: b.raws.map((r) => ({ raw: r, how: 'none', veh: '', cand: [] })), vehicles: VL29, alias_at: 7 } });
+  const nPv = (s) => (s.match(/data-st-pickv=/g) || []).length;
+
+  // ① 고르기
+  let aliasN = 0;
+  const A = mk29t({ resp: { stmt_match: MATCH_NONE, stmt_alias_get: () => ({ status: 200, body: { status: 'OK', map: {}, updated_at: 11 } }),
+    stmt_alias_set: () => (++aliasN === 1 ? { status: 409, body: { status: 'CONFLICT', error_code: 'STMT_STALE' } } : { status: 200, body: { status: 'OK', map: {}, updated_at: 12 } }) } });
+  const a1 = edT(A, V05t, [{ date: '3', vin: '9999호', item: '경유', amt: '10,000', vtried: true }, { date: '4', vin: '9999 호', item: '경유', amt: '20,000', vtried: true }, { date: '5', vin: '8888', item: '경유', amt: '5,000', vtried: true }, { date: '6', vin: '12가1111', veh: 'v12가1111', item: '경유', amt: '1,000' }]);
+  const vcA = [A.api.vcHtml(a1, a1.rows[0], 0, true), A.api.vcHtml(a1, a1.rows[0], 0, false), A.api.vcHtml(a1, a1.rows[3], 3, true), A.api.vcHtml(a1, Object.assign({}, a1.rows[0], { vtried: false, r: 'zz' }), 0, true)];
+  A.api.pickOpen(0);
+  const pkLoad = !!a1.pick && a1.pick.loading === true && a1.pick.same === 2 && a1.pick.t === '9999호';
+  await fl29();
+  const pk = a1.pick, listAll = A.api.pickList(pk);
+  pk.q = '25'; const n25 = A.api.pickList(pk); pk.q = '트랙터'; const nType = A.api.pickList(pk); pk.q = '7900'; const nOld = A.api.pickList(pk); pk.q = '덤프 57'; const nTwo = A.api.pickList(pk); pk.q = '1234'; const nNone = A.api.pickList(pk); pk.q = '';
+  const pkHtml = A.api.pickHtml(a1);
+  const pkOk = !pk.loading && pk.list.length === 5 && A.api.STMT.aliasAt === 7 && /처음 보는 번호/.test(pk.why) && nPv(listAll) === 5 && nPv(n25) === 1 && n25.indexOf('v34나2025') > 0 && nPv(nType) === 1 && nType.indexOf('v78라6666') > 0
+    && nPv(nOld) === 1 && nOld.indexOf('옛 …7900') > 0 && nPv(nTwo) === 1 && nTwo.indexOf('v56다5772') > 0 && /맞는 차량이 없습니다/.test(nNone) && listAll.indexOf('정비') > 0 && /class="st-chip jiip">지입/.test(listAll)
+    && /같은 번호 줄 2개에 같이 붙습니다/.test(pkHtml) && /id="stmtPickQ" data-st-pq="1"/.test(pkHtml) && /class="vs-chip" data-st-act="pickx"/.test(pkHtml) && pkHtml.indexOf('9999호') > 0;
+  A.api.pickChoose('v00없는차');   // 목록에 없는 id — 아무것도 안 함
+  const noop1 = a1.pick === pk && a1.rows[0].veh === '';
+  A.api.pickChoose('v56다5772');
+  const after1 = [a1.rows.map((x) => x.veh).join(','), a1.pick === null, a1.rows[0].vm.veh, a1.rows[1].vm.t, a1.dirty === true];
+  await fl29();
+  const calls1 = A.env.log.filter((b) => /^stmt_alias/.test(b.action)).map((b) => [b.action, b.base, b.raw, b.veh].filter((x) => x !== undefined).join(':'));
+  const hint1 = [a1.rows[0].vhint, a1.rows[1].vhint === a1.rows[0].vhint, !!a1.rows[0].vbad, A.api.STMT.aliasAt, a1.rows[2].vhint];
+  const p1 = A.api.collect(a1), s1 = SVt.cleanRows(p1.rows, '2026-10', false);
+  //   지워진 차(UNKNOWN_VEH) → 붙인 차를 뗌 · 별칭만 실패(읽기 실패) → 줄에는 붙어 있고 붉은 안내 · 이제 한 대로 찾힘(별칭 생김) → 바로 붙이고 별칭 저장 안 함 · 여러 대 = 후보 먼저 · 차량 칸을 고치면 고르기 칸 닫힘 · 보기 권한·차량 있는 줄은 안 열림
+  const B = mk29t({ resp: { stmt_match: MATCH_NONE, stmt_alias_set: () => ({ status: 400, body: { status: 'REJECTED', error_code: 'UNKNOWN_VEH' } }) } });
+  const b1 = edT(B, V05t, [{ date: '3', vin: '4321', item: '경유', amt: '1', vtried: true }]);
+  B.api.pickOpen(0); await fl29(); B.api.pickChoose('v90마6666'); const bMid = b1.rows[0].veh; await fl29();
+  const bRes = [bMid, b1.rows[0].veh, b1.rows[0].vtried, !!b1.rows[0].vbad, /지워진 차/.test(b1.rows[0].vhint) && /그 사이 지워짐/.test(b1.rows[0].vhintT), b1.rows[0].vm === null];
+  const C = mk29t({ resp: { stmt_match: MATCH_NONE, stmt_alias_set: () => ({ status: 500, body: { status: 'ERROR', error_code: 'ALIAS_READ_FAILED' } }) } });
+  const c1 = edT(C, V05t, [{ date: '3', vin: '4321', item: '경유', amt: '1', vtried: true }]);
+  C.api.pickOpen(0); await fl29(); C.api.pickChoose('v90마6666'); await fl29();
+  const cRes = [c1.rows[0].veh, !!c1.rows[0].vbad, c1.rows[0].vhint === '별칭 저장 못 함' && /줄에만 붙였습니다/.test(c1.rows[0].vhintT) && /별칭 사전을 읽지 못했습니다/.test(c1.rows[0].vhintT)];
+  const vcC = C.api.vcHtml(c1, c1.rows[0], 0, true);   // 짧은 안내 + 긴 까닭은 title
+  const D = mk29t({ resp: { stmt_match: (b) => ({ status: 200, body: { status: 'OK', matches: [{ raw: b.raws[0], how: 'alias', veh: 'v12가1111', cand: [] }], vehicles: VL29, alias_at: 3 } }) } });
+  const d1 = edT(D, V05t, [{ date: '3', vin: '1111호', item: '경유', amt: '1', vtried: true }, { date: '4', vin: '1111 호', item: '경유', amt: '2', vtried: true }]);
+  D.api.pickOpen(0); await fl29();
+  const dRes = [d1.rows.map((x) => x.veh).join(','), d1.pick === null, d1.rows[0].vhint, D.env.log.some((b) => b.action === 'stmt_alias_set')];
+  const E = mk29t({ resp: { stmt_match: (b) => ({ status: 200, body: { status: 'OK', matches: [{ raw: b.raws[0], how: 'multi', veh: '', cand: ['v90마6666', 'v78라6666'] }], vehicles: VL29, alias_at: 3 } }) } });
+  const e1 = edT(E, V05t, [{ date: '3', vin: '6666', item: '경유', amt: '1', vtried: true }]);
+  E.api.pickOpen(0); await fl29();
+  const eList = E.api.pickList(e1.pick), eIds = [...eList.matchAll(/class="st-pv( cand)?" data-st-pickv="([^"]+)"/g)].map((m) => (m[1] ? '*' : '') + m[2]);
+  const eWhy = e1.pick.why;
+  E.api.onInput({ target: { getAttribute: (n) => (n === 'data-f' ? 'vin' : (n === 'data-i' ? '0' : null)), value: '66667' } });
+  const eDrop = [e1.pick === null, e1.rows[0].vtried, e1.rows[0].vhint];
+  const Fv = mk29t({ perm: 'view', resp: { stmt_match: MATCH_NONE } });
+  const f1 = edT(Fv, V05t, [{ date: '3', vin: '4321', item: '경유', amt: '1', vtried: true }]); Fv.api.pickOpen(0);
+  const f2 = edT(A, V05t, [{ date: '3', vin: '4321', veh: 'v12가1111', item: '경유', amt: '1', vtried: true }]); const logN = A.env.log.length; A.api.pickOpen(0);
+  const guard1 = f1.pick == null && Fv.env.log.length === 0 && f2.pick == null && A.env.log.length === logN;
+  const lr = [A.api.edRow({ r: 'q1', vraw: '1234', veh: '' }).vtried, A.api.edRow({ r: 'q2', vraw: '1234', veh: 'v12가1111' }).vtried, A.api.edRow({ r: 'q3', vraw: '', veh: '' }).vtried];
+  T('29 판③ ① 처음 보는 번호 고르기: [고르기 ▾]는 수행 + 대조를 마치고도 차량이 빈 줄에만(보기·차량 있는 줄·치는 중 없음 — 불러온 줄은 번호 글만 있으면 바로) · 열면 stmt_match로 차량 목록 5대·사전 판 7 · 찾기 "25"·"트랙터"·옛 "7900"·"덤프 57"(낱말 둘 다)·없는 글 · 정비 상태·지입 칩 · 같은 번호 줄 2개 안내 · 목록 밖 id 무시 · 고르면 "9999호"·"9999 호" 두 줄에 같이(다른 번호 "8888" 그대로) · 별칭 저장 base 7 → 409 → 사전 판 다시 읽기(11) → 한 번 더 → 12 · 안내 "별칭 저장 ✓"(긴 뜻은 title) · 서버 cleanRows 통과 / 지워진 차 = 뗌·붉음 · 별칭만 실패 = 줄에는 붙고 붉은 안내 · 이제 별칭으로 찾힘 = 두 줄 바로·별칭 저장 안 함 · 여러 대 = 후보 둘 먼저 · 차량 칸을 고치면 고르기 칸 닫힘 · 보기 권한·차량 있는 줄은 안 열림',
+    /data-st-act="pick"/.test(vcA[0]) && /class="mini-btn st-pickb"/.test(vcA[0]) && !/data-st-act/.test(vcA[1]) && !/data-st-act/.test(vcA[2]) && !/data-st-act/.test(vcA[3])
+    && pkLoad && pkOk && noop1 && J(after1) === J(['v56다5772,v56다5772,,v12가1111', true, 'v56다5772', '9999 호', true])
+    && J(calls1) === J(['stmt_alias_set:7:9999호:v56다5772', 'stmt_alias_get', 'stmt_alias_set:11:9999호:v56다5772'])
+    && J(hint1) === J(['별칭 저장 ✓', true, false, 12, '']) && /다음 달부터 자동으로 이 차를 찾습니다/.test(a1.rows[0].vhintT) && /<span class="st-vh st-no" title="이 명세의 줄에만 붙였습니다[^"]*">별칭 저장 못 함<\/span>/.test(vcC) && !!s1.rows && s1.rows[0].veh === 'v56다5772' && s1.rows[1].veh === 'v56다5772' && s1.rows[0].vraw === '9999호'
+    && J(bRes) === J(['v90마6666', '', true, true, true, true]) && J(cRes) === J(['v90마6666', true, true])
+    && J(dRes) === J(['v12가1111,v12가1111', true, '별칭으로 찾음', false]) && J(eIds.slice(0, 2)) === J(['*v90마6666', '*v78라6666']) && eIds.length === 5 && /여러 대/.test(eWhy)
+    && J(eDrop) === J([true, false, '']) && guard1 && J(lr) === J([true, false, false]),
+    J({ vcA: vcA.map((s) => s.slice(0, 60)), after1, calls1, hint1, bRes, cRes, dRes, eIds, eDrop, lr, s1: s1.code }));
+
+  // ①-2 검토 반영(11/12 — 두 관점 12건 중 별칭 쪽): 여러 대·짧은 번호는 별칭 저장 안 함(줄에만) · [다시 고르기](고른 줄·별칭 줄) · 409 뒤 사전 값이 내가 본 값과 다르면 안 덮음 · 409 되풀이 상한 ·
+  //   사전 읽기 실패 · NO_CHANGE = 성공 · 별칭이 지운 차 → 안 붙임·고르면 갈아 끼움 · 별칭인데 끝 4자리 같은 차 또 있음 = 붉음 · 열고 나서 보기 권한 = 저장 0 · 목록 글에 전체 번호 없음 · 줄 세우기(하나씩·닫아도 끝까지·사람 바뀌면 버림)
+  const MATCH_MULTI = (b) => ({ status: 200, body: { status: 'OK', matches: [{ raw: b.raws[0], how: 'multi', veh: '', cand: ['v90마6666', 'v78라6666'] }], vehicles: VL29, alias_at: 3 } });
+  const MATCH_ALIAS = (veh, list) => (b) => ({ status: 200, body: { status: 'OK', matches: [{ raw: b.raws[0], how: 'alias', veh: veh, cand: [] }], vehicles: list || VL29, alias_at: 5 } });
+  const OK_SET = (at) => () => ({ status: 200, body: { status: 'OK', map: {}, updated_at: at } });
+  const CONFLICT = () => ({ status: 409, body: { status: 'CONFLICT', error_code: 'STMT_STALE' } });
+  const aSet = (X) => X.env.log.filter((b) => b.action === 'stmt_alias_set').map((b) => b.veh + '@' + b.base);
+  const R1 = (o) => Object.assign({ date: '3', item: '경유', amt: '1' }, o);
+  const kinds = [['12가3456', 'ok'], ['6666', 'multi'], ['6666호', 'multi'], ['12', 'short'], ['9999호', 'ok'], ['7900', 'ok'], ['4321', 'ok']].map((x) => A.api.aliasKind(x[0], VL29) === x[1]);
+  const G1 = mk29t({ resp: { stmt_match: MATCH_MULTI, stmt_alias_set: OK_SET(9) } });
+  const g11 = edT(G1, V05t, [R1({ vin: '6666', vtried: true }), R1({ vin: '6666', date: '4', vtried: true })]);
+  G1.api.pickOpen(0); await fl29(); const gk1 = g11.pick.kind, gFoot = G1.api.pickHtml(g11); G1.api.pickChoose('v78라6666'); await fl29();
+  const gRes = [gk1, /여러 대라 별칭으로 저장하지 않고/.test(gFoot), aSet(G1).length, g11.rows.map((x) => x.veh + '/' + x.vhow).join(','), g11.rows[0].vhint, /data-st-act="repick"/.test(G1.api.vcHtml(g11, g11.rows[0], 0, true))];
+  const G2 = mk29t({ resp: { stmt_match: MATCH_NONE, stmt_alias_set: OK_SET(9) } });
+  const g21 = edT(G2, V05t, [R1({ vin: '12', vtried: true })]);
+  G2.api.pickOpen(0); await fl29(); G2.api.pickChoose('v12가1111'); await fl29();
+  const g2Res = [g21.pick === null, aSet(G2).length, g21.rows[0].veh, g21.rows[0].vhint];
+  let n3 = 0;
+  const G3 = mk29t({ resp: { stmt_match: MATCH_NONE, stmt_alias_set: () => (++n3, CONFLICT()), stmt_alias_get: () => ({ status: 200, body: { status: 'OK', map: { '4321': 'v78라6666' }, updated_at: 20 } }) } });
+  const g31 = edT(G3, V05t, [R1({ vin: '4321', vtried: true })]);
+  G3.api.pickOpen(0); await fl29(); G3.api.pickChoose('v12가1111'); await fl29();
+  const g3Res = [n3, g31.rows[0].veh, g31.rows[0].vhint, !!g31.rows[0].vbad, g31.rows[0].valias, /…6666/.test(g31.rows[0].vhintT)];
+  const G4 = mk29t({ resp: { stmt_match: MATCH_NONE, stmt_alias_set: CONFLICT, stmt_alias_get: () => ({ status: 200, body: { status: 'OK', map: {}, updated_at: 21 } }) } });
+  const g41 = edT(G4, V05t, [R1({ vin: '4321', vtried: true })]);
+  G4.api.pickOpen(0); await fl29(); G4.api.pickChoose('v12가1111'); await fl29();
+  const g4Res = [aSet(G4).join(','), G4.env.log.filter((b) => b.action === 'stmt_alias_get').length, g41.rows[0].vhint, /다른 곳에서 사전을 고치는 중/.test(g41.rows[0].vhintT)];
+  const G5 = mk29t({ resp: { stmt_match: MATCH_NONE, stmt_alias_set: CONFLICT, stmt_alias_get: () => ({ status: 500, body: { status: 'ERROR', error_code: 'ALIAS_READ_FAILED' } }) } });
+  const g51 = edT(G5, V05t, [R1({ vin: '4321', vtried: true })]);
+  G5.api.pickOpen(0); await fl29(); G5.api.pickChoose('v12가1111'); await fl29();
+  const g5Res = [g51.rows[0].veh, g51.rows[0].vhint, /별칭 사전을 읽지 못했습니다/.test(g51.rows[0].vhintT)];
+  const G6 = mk29t({ resp: { stmt_match: MATCH_NONE, stmt_alias_set: () => ({ status: 400, body: { status: 'REJECTED', error_code: 'NO_CHANGE' } }) } });
+  const g61 = edT(G6, V05t, [R1({ vin: '4321', vtried: true })]);
+  G6.api.pickOpen(0); await fl29(); G6.api.pickChoose('v12가1111'); await fl29();
+  const g6Res = [g61.rows[0].vhint, g61.rows[0].valias];
+  // 다시 고르기 — 별칭으로 찾은 두 줄(번호 글 같음)만 바뀌고 사람이 목록 번호로 붙인 줄(vhow plate)은 그대로 · 별칭 덮어씀(base = 대조 판 5)
+  const G7 = mk29t({ resp: { stmt_match: MATCH_ALIAS('v12가1111'), stmt_alias_set: OK_SET(8) } });
+  const g71 = edT(G7, V05t, [R1({ vin: '4321호' }), R1({ vin: '4321 호', date: '4' }), R1({ vin: '4321호', date: '5', veh: 'v12가1111', vhow: 'plate' })]);
+  G7.api.vehMatch(0); G7.api.vehMatch(1); await fl29();
+  const g7a = [g71.rows[0].veh, g71.rows[0].vhow, g71.rows[0].valias, g71.rows[0].vhint, /data-st-act="repick"/.test(G7.api.vcHtml(g71, g71.rows[0], 0, true)), /data-st-act="repick"/.test(G7.api.vcHtml(g71, g71.rows[2], 2, true))];
+  G7.api.pickOpen(0, true); await fl29();
+  const pk7 = g71.pick, g7b = [!!pk7 && pk7.re, pk7 && pk7.prev, pk7 && pk7.kind, pk7 && pk7.same, pk7 && pk7.loading === false];
+  G7.api.pickChoose('v56다5772'); await fl29();
+  const g7c = [g71.rows.map((x) => x.veh).join(','), aSet(G7).join(','), g71.rows[0].vhint, g71.rows[0].valias, g71.rows[2].vhow];
+  // 다시 고르기인데 지금은 끝 4자리 같은 차가 둘 — 줄에만 붙이고 있던 별칭은 지움(veh '') · 대조 때 '끝 4자리 같은 차 또 있음' 붉음
+  const VL29b = VL29.concat([{ id: 'v11가4321', l4: '4321', old4: [], type: '덤프', own: '자차', state: '운행' }, { id: 'v22나4321', l4: '4321', old4: [], type: '카고', own: '지입', state: '운행' }]);
+  const G8 = mk29t({ resp: { stmt_match: MATCH_ALIAS('v12가1111', VL29b), stmt_alias_set: OK_SET(8) } });
+  const g81 = edT(G8, V05t, [R1({ vin: '4321' })]);
+  G8.api.vehMatch(0); await fl29();
+  const g8a = [g81.rows[0].veh, !!g81.rows[0].vbad, g81.rows[0].vhint];
+  G8.api.pickOpen(0, true); await fl29(); const k8 = g81.pick.kind, c8 = g81.pick.cand.join(',');
+  G8.api.pickChoose('v11가4321'); await fl29();
+  const g8b = [k8, c8, g81.rows[0].veh, g81.rows[0].vhow, aSet(G8).join(','), g81.rows[0].vhint, g81.rows[0].valias];
+  // 별칭이 지운 차(목록에 없음) — 대조도 고르기 칸도 붙이지 않음 · 고르면 별칭 갈아 끼움
+  const G9 = mk29t({ resp: { stmt_match: MATCH_ALIAS('v99가0000'), stmt_alias_set: OK_SET(8) } });
+  const g91 = edT(G9, V05t, [R1({ vin: '0000호' })]);
+  G9.api.vehMatch(0); await fl29();
+  const g9a = [g91.rows[0].veh, !!g91.rows[0].vbad, g91.rows[0].vtried, g91.rows[0].valias];
+  G9.api.pickOpen(0); await fl29(); const g9p = [g91.pick && g91.pick.prev, g91.pick && g91.pick.list.length];
+  G9.api.pickChoose('v12가1111'); await fl29();
+  const g9b = [g91.rows[0].veh, aSet(G9).join(',')];
+  // 열고 나서 보기 권한 → 고르기 0 · 목록 글(태그 뺌)에 전체 번호 없음(속성 data-st-pickv에만)
+  const G10 = mk29t({ resp: { stmt_match: MATCH_NONE, stmt_alias_set: OK_SET(9) } });
+  const g101 = edT(G10, V05t, [R1({ vin: '4321', vtried: true })]);
+  G10.api.pickOpen(0); await fl29(); G10.env.perm = 'view'; G10.api.pickChoose('v12가1111'); await fl29();
+  const g10 = [g101.rows[0].veh, aSet(G10).length];
+  const noFull = !/\d{2,3}[가-힣]\d{4}/.test(listAll.replace(/<[^>]*>/g, ' ')) && /\d{2,3}[가-힣]\d{4}/.test(listAll);
+  // 줄 세우기 — 둘째 저장은 첫 응답(판 30) 뒤에 · 상세를 닫아도 끝까지 · 보는 사람이 바뀌면 아직 안 보낸 것은 버림
+  const mkQ = (at) => { const box = { res: null }; const X = mk29t({ resp: { stmt_match: MATCH_NONE, stmt_alias_set: (b) => (b.raw === '4321' ? new Promise((r) => { box.res = () => r({ status: 200, body: { status: 'OK', map: {}, updated_at: at } }); }) : { status: 200, body: { status: 'OK', map: {}, updated_at: at + 1 } }) } }); return { X, box }; };
+  const QA = mkQ(30), qa1 = edT(QA.X, V05t, [R1({ vin: '4321', vtried: true }), R1({ vin: '9876', date: '4', vtried: true })]);
+  QA.X.api.pickOpen(0); await fl29(); QA.X.api.pickChoose('v12가1111'); await fl29(); QA.X.api.pickOpen(1); await fl29(); QA.X.api.pickChoose('v34나2025'); await fl29();
+  const qMid = aSet(QA.X).join(','); QA.X.api.STMT.ed = null; QA.box.res(); await fl29();
+  const qEnd = [qMid, aSet(QA.X).join(','), QA.X.api.aq().length];
+  const QB = mkQ(40); QB.X.api.STMT.who = 'u1'; edT(QB.X, V05t, [R1({ vin: '4321', vtried: true }), R1({ vin: '9876', date: '4', vtried: true })]);
+  QB.X.api.pickOpen(0); await fl29(); QB.X.api.pickChoose('v12가1111'); await fl29(); QB.X.api.pickOpen(1); await fl29(); QB.X.api.pickChoose('v34나2025'); await fl29();
+  QB.X.api.reset(); QB.X.api.STMT.who = 'u2'; QB.box.res(); await fl29();
+  const qbEnd = [aSet(QB.X).join(','), QB.X.api.aq().length];
+  T('29 판③ ①-2 별칭 검토 반영: 판정(전체 번호 ok·"6666"/"6666호" 여러 대·"12" 짧음·"9999호"·옛 "7900"·"4321" ok) · 여러 대 = 두 줄 줄에만·별칭 저장 0·[다시 고르기] · 짧은 번호 = 줄에만 · 409 뒤 사전 값이 다른 차면 안 덮음(붉음·그 값 기억) · 409 되풀이 = 저장 2·읽기 1 뒤 "별칭 저장 못 함" · 사전 읽기 500 = 줄에는 붙음 · NO_CHANGE = 성공 · 다시 고르기 = 별칭 두 줄만 바꿈(목록 번호 줄 그대로)·덮어씀 · 다시 고르기 + 이제 여러 대 = 줄에만·별칭 지움 · 별칭 + 끝 4자리 같은 차 또 있음 = 붉음 · 별칭이 지운 차 = 안 붙임 → 고르면 갈아 끼움 · 연 뒤 보기 권한 = 0 · 목록 글에 전체 번호 없음 · 줄 세우기(둘째는 첫 응답 판 30으로·상세를 닫아도 보냄·사람 바뀌면 둘째 버림)',
+    kinds.every(Boolean) && J(gRes) === J(['multi', true, 0, 'v78라6666/rowonly,v78라6666/rowonly', '이 줄에만(여러 대)', true]) && J(g2Res) === J([true, 0, 'v12가1111', '이 줄에만(번호가 짧음)'])
+    && J(g3Res) === J([1, 'v12가1111', '다른 곳에서 바뀜 — 확인', true, 'v78라6666', true]) && J(g4Res) === J(['v12가1111@7,v12가1111@21', 1, '별칭 저장 못 함', true]) && J(g5Res) === J(['v12가1111', '별칭 저장 못 함', true])
+    && J(g6Res) === J(['별칭 저장 ✓', 'v12가1111'])
+    && J(g7a) === J(['v12가1111', 'alias', 'v12가1111', '별칭으로 찾음', true, false]) && J(g7b) === J([true, 'v12가1111', 'ok', 2, true])
+    && J(g7c) === J(['v56다5772,v56다5772,v12가1111', 'v56다5772@5', '별칭 저장 ✓', 'v56다5772', 'plate'])
+    && J(g8a) === J(['v12가1111', true, '별칭 — 끝 4자리 같은 차 또 있음']) && J(g8b) === J(['multi', 'v11가4321,v22나4321', 'v11가4321', 'rowonly', '@5', '이 줄에만 · 별칭 지움', ''])
+    && J(g9a) === J(['', true, true, 'v99가0000']) && J(g9p) === J(['v99가0000', 5]) && J(g9b) === J(['v12가1111', 'v12가1111@5'])
+    && J(g10) === J(['', 0]) && noFull && J(qEnd) === J(['v12가1111@7', 'v12가1111@7,v34나2025@30', 0]) && J(qbEnd) === J(['v12가1111@7', 0]),
+    J({ kinds, gRes, g2Res, g3Res, g4Res, g5Res, g6Res, g7a, g7b, g7c, g8a, g8b, g9a, g9p, g9b, g10, noFull, qEnd, qbEnd }));
+
+  // ② 용도 칩
+  const V10t = { vk: 'v10', name: '철탑종합공구상사', group: 'tool', kind: 'tool', basis: 'supply', carry: true };
+  const PREV29 = { status: 200, body: { status: 'OK', vendor: V10t, doc: { rows: [{ item: '장갑', use: 'safety' }, { item: '장 갑', use: 'safety' }, { item: '장갑', use: 'etc' }, { item: '그라인더날', use: 'dredge' }, { item: '', use: 'etc' }, { item: '케이블타이', use: 'toString' }, { item: '마스크', use: '' }] } } };
+  const G = mk29t({ resp: { stmt_get: (b) => (b.ym === '2026-09' && b.vk === 'v10' ? PREV29 : { status: 500, body: {} }) } });
+  const g1 = edT(G, V10t, [{ date: '1', item: '장갑', amt: '1,000' }, { date: '2', item: '그라인더날', use: 'etc', amt: '2,000' }, { date: '3', item: '드릴', amt: '3,000' }, { date: '4', item: '마스크', amt: '500' }]);
+  const gLoad = g1.prevUse && g1.prevUse.st;
+  await fl29();
+  const gMap = J(g1.prevUse.map), gSt = g1.prevUse.st, gNote = G.api.useNote(g1);
+  const gSug = [G.api.useSug(g1, { item: '장 갑', use: '' }), G.api.useSug(g1, { item: '장갑', use: 'etc' }), G.api.useSug(g1, { item: '드릴', use: '' }), G.api.useSug(g1, { item: '', use: '' })];   // 이미 있던 빈 줄 = 지난달 값 칩만 점선(줄은 안 바꿈)
+  const chg = (X, ed, i) => X.api.onChange({ target: { getAttribute: (n) => (n === 'data-f' ? 'item' : (n === 'data-i' ? String(i) : null)), value: ed.rows[i].item } });
+  [0, 1, 2, 3].forEach((i) => chg(G, g1, i));
+  const gUse = g1.rows.map((x) => x.use + '/' + x.useHow).join(',');
+  G.api.useSet(0, 'safety'); const gConfirm = g1.rows[0].use + '/' + g1.rows[0].useHow;
+  G.api.useSet(0, 'safety'); const gClear = g1.rows[0].use;
+  G.api.useSet(0, 'posco_ep'); G.api.useSet(2, 'vehicle'); G.api.useSet(3, 'toString'); const g3 = g1.rows[3].use;
+  const p2 = G.api.collect(g1), bad2 = p2.chk.bad.map((b) => b.i + ':' + b.why.join('+')).join(',');
+  g1.rows[2].vin = '1111'; g1.rows[2].veh = 'v12가1111'; g1.rows[3].use = 'safety';
+  const p2b = G.api.collect(g1), s2 = SVt.cleanRows(p2b.rows, '2026-10', false), sd2 = s2.rows ? SVt.checkDoc({ basis: 'supply', group: 'tool', rows: s2.rows, inv: null, stated: 6500, carry: null, vsub: null }, V10t) : null;
+  const rhW = G.api.rowHtml(g1, g1.rows[2], 2, true, true, true, 11), rhR = G.api.rowHtml(g1, g1.rows[2], 2, false, true, true, 10);
+  const H = mk29t({ resp: { stmt_get: () => ({ status: 500, body: { status: 'ERROR', error_code: 'DOC_READ_FAILED' } }) } });
+  const h1 = edT(H, V10t, [{ date: '1', item: '장갑', amt: '1,000' }]); await fl29(); chg(H, h1, 0);
+  const hRes = [h1.prevUse.st, h1.rows[0].use, /읽지 못함/.test(H.api.useNote(h1))];
+  const Kv = mk29t({ resp: { stmt_get: () => PREV29 } }); edT(Kv, V05t, [{ item: '경유' }]); const Kvw = mk29t({ perm: 'view', resp: { stmt_get: () => PREV29 } }); edT(Kvw, V10t, [{ item: '장갑' }]);
+  const noFetch = !Kv.env.log.some((b) => b.action === 'stmt_get') && !Kvw.env.log.some((b) => b.action === 'stmt_get');
+  T('29 판③ ② 용구 용도 칩: 상세를 열면 지난달(9월) 같은 거래처 문서를 한 번 읽어 품목 지도(띄어쓰기 빼고 — "장갑" 3번 중 안전보건 2 > 기타 1, 빈 품목·없는 용도·빈 용도 뺌) · 품목 칸을 떠나면 빈 용도에만 점선 기본값(사람이 고른 "기타"는 그대로, 지난달에 없는 "드릴" 빈칸) · 점선 칩을 누르면 확정 · 고른 칩을 다시 누르면 비움 · 없는 칩 키 무시 · "차량"인데 번호 없음 = 붉음(veh) · 번호를 넣으면 서버 cleanRows·checkDoc 통과 · 줄 그림 = 차량 칸 없이 용도 칸 칩 6(title 원래 이름)·번호 칸 · 보기 = 글 · 지난달을 못 읽으면 기본값 없음·안내 · 차량 거래처·보기 권한은 지난달을 안 읽음',
+    gLoad === 'loading' && gMap === J({ '장갑': 'safety', '그라인더날': 'dredge' }) && gSt === 'ok' && /지난달\(9월\)/.test(gNote) && /지난달 품목 2가지/.test(gNote) && J(gSug) === J(['safety', '', '', ''])
+    && gUse === 'safety/prev,etc/,/,/' && gConfirm === 'safety/' && gClear === '' && g3 === '' && bad2 === '2:veh,3:use'
+    && !!s2.rows && !!sd2 && sd2.bad.length === 0 && s2.rows[0].use === 'posco_ep' && s2.rows[2].use === 'vehicle' && s2.rows[2].veh === 'v12가1111'
+    && !/class="c-veh"/.test(rhW) && (rhW.match(/data-st-use="/g) || []).length === 6 && /<button type="button" class="st-uc" data-st-use="posco_cip" data-i="2" title="포스코 CIP">CIP<\/button>/.test(rhW) && /data-uv="2"><input data-f="vin" data-i="2"/.test(rhW)
+    && !/<input|<button|<select/.test(rhR) && /class="c-use">차량<span class="st-vc"><b>…1111<\/b>/.test(rhR)
+    && J(hRes) === J(['err', '', true]) && noFetch,
+    J({ gLoad, gMap, gUse, gConfirm, gClear, bad2, s2: s2.code, sd2: sd2 && sd2.bad, hRes, noFetch }));
+  // ②-2 검토 반영: 1월 → 지난해 12월 · 저장 응답으로 다시 채워도 한 번만 읽음 · 닫고 다시 연 상세에 옛 응답이 안 붙음 · 403도 err · 품목을 고치면 지난달 값 다시 셈(사람 값은 그대로) · 표시 규칙(칩·번호 칸·타이어 줄) 순수 함수
+  const Gj = mk29t({ resp: { stmt_get: () => PREV29 } });
+  Gj.api.STMT.ym = '2026-01'; Gj.api.STMT.ed = { ym: '2026-01', vk: 'v10', loading: true, err: '', msg: '', vendor: V10t, rows: [] }; Gj.api.edLoad({ vendor: V10t, doc: null });
+  const gjEd = Gj.api.STMT.ed; Gj.api.edLoad({ vendor: V10t, doc: null }); await fl29();
+  const gjRes = [Gj.env.log.filter((b) => b.action === 'stmt_get').map((b) => b.ym + ':' + b.vk).join(','), gjEd.prevUse.st];
+  const rsK = [];
+  const Uk = mk29t({ resp: { stmt_get: () => new Promise((r) => { rsK.push(r); }) } });
+  const uk1 = edT(Uk, V10t, [{ item: '장갑' }]), uk2 = edT(Uk, V10t, [{ item: '장갑' }]);
+  rsK[0]({ status: 200, body: { status: 'OK', doc: { rows: [{ item: '장갑', use: 'etc' }] } } }); await fl29();
+  const gkMid = [uk1.prevUse.st, uk2.prevUse.st];
+  rsK[1](PREV29); await fl29();
+  const gkRes = [gkMid, uk2.prevUse.st, J(uk2.prevUse.map)];
+  const Gl = mk29t({ resp: { stmt_get: () => ({ status: 403, body: { status: 'FORBIDDEN', error_code: 'NO_VEH_ACCESS' } }) } });
+  const gl1 = edT(Gl, V10t, [{ item: '장갑' }]); await fl29();
+  const Gm = mk29t({ resp: { stmt_get: () => PREV29 } }), gm1 = edT(Gm, V10t, [{ item: '장갑' }]); await fl29();
+  const um = (it) => { gm1.rows[0].item = it; chg(Gm, gm1, 0); return gm1.rows[0].use + '/' + gm1.rows[0].useHow; };
+  const gmRes = [um('장갑'), um('그라인더날'), um('드릴')];
+  Gm.api.useSet(0, 'etc'); gmRes.push(um('장갑'));
+  const disp = [J(Gm.api.chipCls({ use: 'safety', useHow: 'prev' }, 'safety', '')), J(Gm.api.chipCls({ use: '' }, 'safety', 'safety')), J(Gm.api.chipCls({ use: 'etc', useHow: '' }, 'safety', '')),
+    Gm.api.uvShow({ use: 'vehicle' }), Gm.api.uvShow({ use: 'etc', vin: ' ' }), Gm.api.uvShow({ use: 'etc', veh: 'v12가1111' }), Gm.api.uvShow({ vin: '12' }), Gm.api.subShow({ kind: 'tire' }), Gm.api.subShow({ kind: 'part' })];
+  const rf2 = fnOf29t('stmtEdRefresh');
+  T('29 판③ ②-2 용도 검토 반영: 1월 상세 = 지난해 12월 같은 거래처 읽기 한 번(저장 뒤 다시 채워도 안 읽음) · 닫고 다시 연 상세에 옛 상세의 늦은 응답이 안 붙음(새 상세는 제 응답으로) · 지난달 403(차량 숨김) = 기본값 없음 · 품목을 고치면 지난달 값 다시 셈(장갑 → 그라인더날 = 준설 → 드릴 = 빈칸) · 사람이 고른 용도는 품목을 고쳐도 그대로 · 표시 규칙 함수(고른 칩·점선·제안 / 번호 칸 / 타이어 줄)를 stmtEdRefresh가 씀',
+    J(gjRes) === J(['2025-12:v10', 'ok']) && J(gkRes) === J([['loading', 'loading'], 'ok', J({ '장갑': 'safety', '그라인더날': 'dredge' })]) && gl1.prevUse.st === 'err'
+    && J(gmRes) === J(['safety/prev', 'dredge/prev', '/', 'etc/'])
+    && J(disp) === J([J({ on: true, prev: true, sug: false }), J({ on: false, prev: false, sug: true }), J({ on: false, prev: false, sug: false }), true, false, true, true, true, false])
+    && /stmtChipCls\(e, b\.getAttribute\("data-st-use"\), sg\)/.test(rf2) && /uv\.style\.display = stmtUvShow\(e\)/.test(rf2) && /tr\.style\.display = stmtSubShow\(e\)/.test(rf2) && /stmtSubShow\(e\) \? '' : ' style="display:none;"'/.test(fnOf29t('stmtEdRowHtml')),
+    J({ gjRes, gkRes, gl: gl1.prevUse.st, gmRes, disp }));
+
+  // ③ 타이어 위치·조치
+  const V01t = { vk: 'v01', name: '스피드타이어', group: 'veh', kind: 'tire', basis: 'supply', carry: true };
+  const T3 = mk29t({});
+  const VH = { vin: '12가1111', veh: 'v12가1111' };
+  const t1 = edT(T3, V01t, [Object.assign({ date: '1', item: '타이어', kind: 'tire', tire: { pos: '운전석  2축   바깥', act: 'new' }, qty: '1', unit: '300,000', amt: '300,000', vat: '30,000' }, VH),
+    Object.assign({ date: '2', item: '펑크', kind: 'tire', tire: { pos: '', act: '' }, amt: '10,000', vat: '1,000' }, VH), Object.assign({ date: '3', item: '휠', kind: 'part', tire: { pos: '운전석', act: 'used' }, amt: '5,000', vat: '500' }, VH),
+    Object.assign({ date: '4', item: '타이어', kind: 'tire', tire: { pos: '연락 010-1234-5678', act: 'puncture' }, amt: '1,000', vat: '100' }, VH), Object.assign({ date: '5', item: '타이어', kind: 'tire', tire: { pos: 'ㄱ'.repeat(31), act: '' }, amt: '1,000', vat: '100' }, VH)]);
+  const p3 = T3.api.collect(t1);
+  T3.api.onInput({ target: { getAttribute: (n) => (n === 'data-t' ? 'act' : (n === 'data-i' ? '1' : null)), value: 'puncture' } });
+  t1.rows.splice(3, 2);
+  const p3b = T3.api.collect(t1), s3 = SVt.cleanRows(p3b.rows, '2026-10', false);
+  const em3 = [T3.api.edEmpty({ kind: 'tire', tire: { pos: '운전석 1축', act: '' } }), T3.api.edEmpty({ kind: 'tire', tire: { pos: ' ', act: 'new' } }), T3.api.edEmpty({ kind: 'part', tire: { pos: '운전석', act: '' } })];
+  const rh3 = T3.api.rowHtml(t1, t1.rows[0], 0, true, false, true, 11), rh3p = T3.api.rowHtml(t1, t1.rows[2], 2, true, false, true, 11), rh3r = T3.api.rowHtml(t1, t1.rows[0], 0, false, false, true, 10), rh3rp = T3.api.rowHtml(t1, t1.rows[2], 2, false, false, true, 10);
+  const tireLbl = Object.fromEntries(Object.entries(SVt.TIRE_ACT_LABEL).filter(([k]) => k !== ''));
+  T('29 판③ ③ 타이어 위치·조치: 타이어 줄 위치(띄어쓰기 접음)·조치 → 서버 cleanRows 통과·같은 값 · 둘 다 빈칸 = null · 다른 종류(부품) 줄은 null · 위치 개인정보 꼴·31자 = 붉음("타이어 위치")·저장 막음 · 조치 칸 입력 = 그 줄 tire.act · 위치만 넣은 타이어 줄은 빈 줄 아님 · 줄 그림: 타이어 줄 아래 위치(보기 목록 stmtTirePos)·조치(펑크 수리·중고 교체·신품 교체) 줄 보임 / 다른 종류는 숨김 · 보기 = 글(위치·조치), 다른 종류·빈 타이어 칸은 줄 없음 · 조치 라벨 = 서버 TIRE_ACT_LABEL(빈칸 뺌) · 위치 보기 18개',
+    J(p3.rows[0].tire) === J({ pos: '운전석 2축 바깥', act: 'new' }) && p3.rows[1].tire === null && p3.rows[2].tire === null && !!p3.badf[3] && p3.badf[3].tpos === 1 && !!p3.badf[4] && p3.badf[4].tpos === 1
+    && p3.errs.length === 2 && p3.errs.every((s) => /타이어 위치/.test(s))
+    && p3b.errs.length === 0 && !!s3.rows && J(s3.rows[0].tire) === J({ pos: '운전석 2축 바깥', act: 'new' }) && J(s3.rows[1].tire) === J({ pos: '', act: 'puncture' }) && s3.rows[2].tire === null
+    && J(em3) === J([false, true, true])
+    && /<tr class="st-sub" data-sub="0"><td class="c-n"><\/td><td colspan="10">/.test(rh3) && /data-t="pos" data-i="0" value="운전석  2축   바깥"[^>]*list="stmtTirePos"/.test(rh3) && /<option value="new" selected>신품 교체<\/option>/.test(rh3)
+    && /<tr class="st-sub" data-sub="2" style="display:none;">/.test(rh3p)
+    && /class="st-sub"><td class="c-n"><\/td><td colspan="9"><div class="st-tire"><span class="st-tl">타이어<\/span><span>위치 <b>운전석  2축   바깥<\/b><\/span><span>조치 <b>신품 교체<\/b><\/span>/.test(rh3r) && !/st-sub/.test(rh3rp) && !/<input|<select|<button/.test(rh3r)
+    && J(T3.api.TIRE) === J(tireLbl) && T3.api.TIRE_POS.length === 18 && T3.api.TIRE_POS.indexOf('조수석 3축 안쪽') >= 0,
+    J({ p3: [p3.rows.map((r) => r.tire), Object.keys(p3.badf), p3.errs], s3: s3.code, em3 }));
+  // ③-2 검토 반영: 종류 타이어 → 부품 → 타이어 = 칸 값은 남고 부품일 때 보내는 값은 null · 조치 칸에 목록 밖 값('toString')이면 빈칸으로 보냄
+  const t2 = edT(T3, V01t, [Object.assign({ date: '1', item: '타이어', kind: 'tire', tire: { pos: '운전석 1축', act: 'used' }, amt: '1,000', vat: '100' }, VH)]);
+  const kindIn = (i, v) => T3.api.onInput({ target: { getAttribute: (n) => (n === 'data-f' ? 'kind' : (n === 'data-i' ? String(i) : null)), value: v } });
+  kindIn(0, 'part'); const tp1 = T3.api.collect(t2).rows[0].tire; kindIn(0, 'tire'); const tp2 = T3.api.collect(t2).rows[0].tire;
+  t2.rows[0].tire.act = 'toString'; const tp3 = T3.api.collect(t2).rows[0].tire;
+  T('29 판③ ③-2 타이어 검토 반영: 타이어 → 부품 = 보내는 tire null(칸 값은 남음) → 다시 타이어 = {운전석 1축, used} · 조치 목록 밖 값 = 빈칸',
+    tp1 === null && J(tp2) === J({ pos: '운전석 1축', act: 'used' }) && J(tp3) === J({ pos: '운전석 1축', act: '' }), J({ tp1, tp2, tp3 }));
+
+  // ④ 거래처 목록 고치기
+  const seedT = SVt.seedVendors();
+  const CF = mk29t({ resp: { stmt_cfg_get: () => ({ status: 200, body: { status: 'OK', vendors: seedT, updated_at: 0, updated_by: '', seeded: true } }) } });
+  CF.api.STMT.ym = '2026-10'; CF.api.STMT.month = { cfg: seedT, vendors: {} };
+  CF.api.cfgOpen(); const cfLoading = !!CF.api.STMT.cfg && CF.api.STMT.cfg.loading === true;
+  await fl29();
+  const cf = CF.api.STMT.cfg;
+  const cfRows = cf.rows.length === 12 && cf.rows.every((r) => r.old) && cf.rows[4].hint === '대송, 칼텍스' && cf.base === 0 && cf.seeded === true;
+  const v0 = CF.api.cfgVendors(cf.rows), sv0 = SVt.cleanVendors(v0.v);
+  const nv = [CF.api.cfgNextVk(cf.rows), CF.api.cfgNextVk([{ vk: 'v99' }]), CF.api.cfgNextVk([{ vk: 'v999' }]), CF.api.cfgNextVk([{ vk: 'v05' }, { vk: 'v07' }]), CF.api.cfgNextVk([])];
+  cf.rows.push({ vk: 'v13', name: ' 새 주유소 ', group: 'veh', kind: 'fuel', basis: 'total', carry: false, active: true, hint: '새주유, 새 주유소 ,', old: false });
+  cf.rows[11].active = false; cf.rows[0].name = '스피드타이어(본점)';
+  const v1 = CF.api.cfgVendors(cf.rows), sv1 = SVt.cleanVendors(v1.v);
+  const badCase = (patch) => { const rows = cf.rows.map((r) => Object.assign({}, r)); patch(rows); const c = CF.api.cfgVendors(rows), s = SVt.cleanVendors(c.v); return [Object.keys(c.bad).sort().join('+') + ':' + Object.keys(c.bad[12] || {}).join('+'), s.code || 'ok']; };
+  const bc = [badCase((r) => { r[12].name = ''; }), badCase((r) => { r[12].name = '연락 010-1234-5678'; }), badCase((r) => { r[12].hint = 'a,b,c,d,e,f,g'; }), badCase((r) => { r[12].hint = 'ㄱ'.repeat(21); }),
+    badCase((r) => { r[12].vk = 'v12'; }), badCase((r) => { r[12].name = 'ㄴ'.repeat(31); }), badCase((r) => { r[12].hint = '계좌 110-123-456789'; })];
+  const rhOld = CF.api.cfgRowHtml(cf.rows[0], 0), rhNew = CF.api.cfgRowHtml(cf.rows[12], 12);
+  let cfgSetN = 0;
+  CF.env.resp.stmt_cfg_set = (b) => (++cfgSetN === 1 ? { status: 409, body: { status: 'CONFLICT', error_code: 'STMT_STALE' } } : (cfgSetN === 2 ? { status: 400, body: { status: 'REJECTED', error_code: 'PII_2' } }
+    : (cfgSetN === 3 ? { status: 400, body: { status: 'REJECTED', error_code: 'GROUP_LOCKED' } } : { status: 200, body: { status: 'OK', vendors: b.vendors, updated_at: 99 } })));
+  CF.api.cfgSave(); const body4 = CF.env.log.filter((b) => b.action === 'stmt_cfg_set').slice(-1)[0];
+  const midSaving = cf.saving === true;
+  await fl29(); const st1 = [cf.stale, /먼저 거래처 목록을 고쳐/.test(cf.msg), cf.saving];
+  CF.api.cfgSave(); await fl29(); const st2 = /전화·계좌·주민번호/.test(cf.msg) && !cf.stale;
+  CF.api.cfgSave(); await fl29(); const st3 = /묶음\(차량·작업용구\)은 바꿀 수 없습니다/.test(cf.msg);
+  CF.api.cfgSave(); await fl29(); const st4 = [CF.api.STMT.cfg === null, CF.api.STMT.month === null, CF.env.toasts.slice(-1)[0]];
+  cf.rows[12].name = ''; const noSendN = CF.env.log.length; CF.api.STMT.cfg = cf; cf.saving = false; CF.api.cfgSave(); const st5 = CF.env.log.length === noSendN && /고칠 칸/.test(cf.msg); CF.api.STMT.cfg = null;
+  const CFv = mk29t({ perm: 'view', resp: CF.env.resp }); CFv.api.cfgOpen(); const gv = CFv.api.STMT.cfg === null && CFv.env.log.length === 0;
+  const CFe = mk29t({ resp: CF.env.resp }); CFe.api.STMT.ed = { ym: '2026-10', vk: 'v01' }; CFe.api.cfgOpen(); const ge = CFe.api.STMT.cfg === null;
+  const CF2 = mk29t({ resp: CF.env.resp }); CF2.api.STMT.ym = '2026-10'; CF2.api.cfgOpen(); await fl29(); CF2.api.month(-1); const gm = CF2.api.STMT.ym === '2026-10';
+  CF2.api.STMT.month = { cfg: seedT, vendors: {} }; CF2.api.open('v01'); const go = CF2.api.STMT.ed === null;
+  CF2.api.cfgClose(); const gc = CF2.api.STMT.cfg === null; CF2.api.cfgOpen(); CF2.api.reset(); const gr = CF2.api.STMT.cfg === null;
+  T('29 판③ ④ 거래처 목록 고치기: 열면 stmt_cfg_get(시드 12곳·저장 전 at 0) · 편집 줄 → 서버 꼴이 시드와 같음(cleanVendors 통과) · 다음 번호 v13·v100·없음(999)·v08·v01 · 새 거래처(이름 띄어쓰기 정리·낱말 쉼표로 둘)·끄기·이름 고침 → 서버 cleanVendors 통과·같은 값 · 막는 꼴 7(빈 이름·이름 전화 꼴·낱말 7개·낱말 21자·번호 겹침·이름 31자·낱말 계좌 꼴 — 서버도 거절하거나 앱이 더 엄격) · 있던 거래처 묶음 = 글 "(고정)"·빼기 없음 / 새 거래처 = 묶음 고르기·빼기 mini-btn·"새" · 저장 몸체 {vendors 13, base 0} · 409 = 다시 불러오기 안내 · 개인정보·묶음 고정 오류 문구 · 성공 = 닫고 그 달을 새 목록으로 다시 읽음·알림 · 고칠 칸이 있으면 보내지 않음 · 보기 권한·상세를 연 채는 안 열림 · 연 채로 달 넘기기·상세 열기 막음 · 닫기·보는 사람 바뀜에 비움',
+    cfLoading && cfRows && !sv0.code && J(sv0.v) === J(seedT) && Object.keys(v0.bad).length === 0 && J(nv) === J(['v13', 'v100', '', 'v08', 'v01'])
+    && Object.keys(v1.bad).length === 0 && !sv1.code && J(sv1.v) === J(v1.v) && J(v1.v[12]) === J({ vk: 'v13', name: '새 주유소', group: 'veh', kind: 'fuel', basis: 'total', carry: false, active: true, hint: ['새주유', '새 주유소'] }) && v1.v[11].active === false && v1.v[0].name === '스피드타이어(본점)'
+    && bc.every((x) => /^12:/.test(x[0])) && J(bc.map((x) => x[0])) === J(['12:name', '12:name', '12:hint', '12:hint', '12:vk', '12:name', '12:hint']) && J(bc.map((x) => x[1])) === J(['BAD_NAME', bc[1][1], 'BAD_HINT', 'ok', 'DUP_VK', 'BAD_NAME', 'ok']) && /^PII_\d+$/.test(bc[1][1])   // 'ok' 둘 = 앱이 그 낱말을 빼고 막음(서버보다 엄격 — 저장 단추가 꺼짐)
+    && /차량 <span class="st-mute">\(고정\)<\/span>/.test(rhOld) && !/data-cf="group"/.test(rhOld) && !/data-st-cfg="del"/.test(rhOld) && /<select data-cf="group" data-i="12">/.test(rhNew) && /<button type="button" class="mini-btn" data-st-cfg="del" data-i="12"/.test(rhNew) && /<span class="st-chip">새<\/span>/.test(rhNew)
+    && !!body4 && body4.base === 0 && body4.vendors.length === 13 && J(body4.vendors[12]) === J(v1.v[12]) && midSaving && J(st1) === J([true, true, false]) && st2 && st3
+    && J(st4) === J([true, true, '거래처 목록을 저장했습니다(13곳)']) && st5 && gv && ge && gm && go && gc && gr,
+    J({ nv, bc, st1, st2, st3, st4, st5, g: [gv, ge, gm, go, gc, gr] }));
+  // ④-2 검토 반영: 저장된 목록(판 1234)이면 base 1234 · 고친 줄 밖은 그대로(시드와 같음) · 쉼표가 든 저장 낱말은 잠가 그대로(쪼개지 않음·칸 잠김·바뀜 아님) · NO_CHANGE·CFG_READ_FAILED 문구 ·
+  //   앱이 걸러 막는 낱말(21자·계좌 꼴)은 서버에 원문 그대로 넣으면 서버도 거절(앱이 더 엄격할 뿐 — 대조 강도)
+  const saved4 = seedT.map((v) => Object.assign({}, v));
+  const CF3 = mk29t({ resp: { stmt_cfg_get: () => ({ status: 200, body: { status: 'OK', vendors: saved4, updated_at: 1234, seeded: false } }), stmt_cfg_set: (b) => ({ status: 200, body: { status: 'OK', vendors: b.vendors, updated_at: 1300 } }) } });
+  CF3.api.STMT.ym = '2026-10'; CF3.api.cfgOpen(); await fl29();
+  const cf3 = CF3.api.STMT.cfg; cf3.rows[2].name = '신일상사(본점)'; CF3.api.cfgSave();
+  const b3 = CF3.env.log.filter((b) => b.action === 'stmt_cfg_set').slice(-1)[0];
+  const cf3Res = [b3.base, b3.vendors.every((v, i) => i === 2 || J(v) === J(saved4[i])), b3.vendors[2].name, cf3.seeded];
+  const keepSame = v1.v.slice(1, 11).every((v, i) => J(v) === J(seedT[i + 1]));
+  const lockV = seedT.map((v) => Object.assign({}, v)); lockV[4] = Object.assign({}, lockV[4], { hint: ['대송,칼텍스', '대송'] });
+  const CF4 = mk29t({ resp: { stmt_cfg_get: () => ({ status: 200, body: { status: 'OK', vendors: lockV, updated_at: 5, seeded: false } }) } });
+  CF4.api.STMT.ym = '2026-10'; CF4.api.cfgOpen(); await fl29();
+  const cf4 = CF4.api.STMT.cfg, v4 = CF4.api.cfgVendors(cf4.rows), rh4 = CF4.api.cfgRowHtml(cf4.rows[4], 4), rh4b = CF4.api.cfgRowHtml(cf4.rows[3], 3);
+  const lockRes = [cf4.rows[4].hintLock, J(v4.v[4].hint), Object.keys(v4.bad).length, /data-cf="hint"[^>]*disabled/.test(rh4), /data-cf="hint"[^>]*disabled/.test(rh4b), cf4.orig === J(v4.v), !SVt.cleanVendors(v4.v).code];
+  CF4.env.resp.stmt_cfg_set = () => ({ status: 400, body: { status: 'REJECTED', error_code: 'NO_CHANGE' } }); CF4.api.cfgSave(); await fl29(); const m5 = cf4.msg;
+  CF4.env.resp.stmt_cfg_set = () => ({ status: 500, body: { status: 'ERROR', error_code: 'CFG_READ_FAILED' } }); CF4.api.cfgSave(); await fl29(); const m6 = cf4.msg;
+  const rawHint = (h) => SVt.cleanVendors(seedT.concat([Object.assign({}, v1.v[12], { hint: h.split(/[,，]/).map((s) => s.trim()).filter(Boolean) })])).code || 'ok';
+  const srvH = [rawHint('ㄱ'.repeat(21)), rawHint('계좌 110-123-456789')];
+  T('29 판③ ④-2 거래처 목록 검토 반영: 저장된 목록 = base 1234(시드 0만 보던 공백)·고친 줄 밖 그대로 · 처음 목록에서 고친 3줄 밖 10줄 = 시드와 같음 · 쉼표 든 저장 낱말 = 잠가 그대로 ["대송,칼텍스","대송"](칸 잠김·다른 줄은 안 잠김·바뀜 아님·서버 통과) · NO_CHANGE "바뀐 것이 없습니다" · CFG_READ_FAILED 문구 · 앱이 막는 낱말 원문은 서버도 거절(21자 BAD_HINT·계좌 꼴 PII)',
+    J(cf3Res) === J([1234, true, '신일상사(본점)', false]) && keepSame && J(lockRes) === J([true, J(['대송,칼텍스', '대송']), 0, true, false, true, true])
+    && m5 === '바뀐 것이 없습니다.' && /거래처 목록을 읽지 못해 저장하지 않았습니다/.test(m6) && srvH[0] === 'BAD_HINT' && /^PII_\d+$/.test(srvH[1]),
+    J({ cf3Res, keepSame, lockRes, m5, m6, srvH }));
+
+  // ⑤ 정적 — 단추 class(바꾸는 단추 mini-btn · 읽기 토글 vs-chip) · 화면 자리 · CSS(용구 거래처 = 차량 칸 대신 용도 칸, 같은 폭) · 보드/상세/목록 고치기 갈래 · 비우기 · 칩 글·종류 보기 = 서버 키
+  const cfgBtn5 = [...ssb29t.matchAll(/<button type="button" class="([^"]+)" data-st-cfg="(\w+)"/g)].map((m) => m[1] + '|' + m[2]);
+  const cfgOk5 = cfgBtn5.length >= 6 && ['open', 'add', 'save', 'del', 'back', 'reload'].every((a) => cfgBtn5.some((s) => s.split('|')[1] === a)) && cfgBtn5.every((s) => { const p = s.split('|'); return (p[1] === 'back' || p[1] === 'reload') ? p[0] === 'vs-chip' : /\bmini-btn\b/.test(p[0]); });
+  const rs5 = fnOf29t('renderStmt'), er5 = fnOf29t('stmtEdRender');
+  T('29 판③ ⑤ 정적: 거래처 목록 고치기 단추 ' + cfgBtn5.length + '개(열기·더하기·저장·빼기 = mini-btn · 월 보드로·다시 불러오기 = vs-chip) · 용도 칩 st-uc·고르기 목록 st-pv · 화면 자리 #stmtCfgBar·#stmtCfg 하나씩 · CSS 용구 거래처 최소 폭 규칙 없음(차량 칸과 같은 폭 140·170) · 머리 = 용구는 차량 칸 없이 용도 · 갈래(상세 → 목록 고치기 → 보드)·두 자리 숨김 · 수행 아니면 목록 고치기 닫음 · 칩 키 = 용도 키 · 기본 종류 보기 = 빈칸(줄마다) + 종류 10',
+    cfgOk5 && /<button type="button" class="st-uc" data-st-use="/.test(ssb29t) && /<button type="button" class="st-pv cand" data-st-pickv="/.test(ssb29t) && /<button type="button" class="st-pv" data-st-pickv="/.test(ssb29t)
+    && ['stmtCfgBar', 'stmtCfg'].every((id) => (html.match(new RegExp('id="' + id + '"', 'g')) || []).length === 1)
+    && !/table\.st-ed\.st-u\{min-width/.test(html) && /table\.st-ed td\.c-veh,table\.st-ed td\.c-use\{width:140px;\}/.test(html) && /table\.st-ed td\.c-veh,table\.st-ed td\.c-use\{width:170px;\}/.test(html)
+    && /\(tool \? '' : '<th>차량<\/th>'\)/.test(er5) && /nc = 9 \+ \(vat \? 1 : 0\) \+ \(w \? 1 : 0\);/.test(er5)
+    && /\["stmtMonBar", "stmtStats", "stmtBoardMsg", "stmtBoard", "stmtCfgBar"\]/.test(rs5) && rs5.indexOf('if (ed){ stmtEdRender(); return; }') < rs5.indexOf('if (cf){ stmtCfgRender(); return; }') && /if \(STMT\.cfg && !canDo\("stmt"\)\)/.test(rs5)
+    && J(Object.keys(CF.api.USE_SHORT)) === J(Object.keys(CF.api.USE)) && J(Object.keys(CF.api.KIND_OPT)) === J([''].concat(Object.keys(CF.api.KIND))) && J(Object.keys(CF.api.KIND)) === J(SVt.KINDS),
+    J({ cfgBtn5 }));
+} catch (e) { console.log('  (29 판③ 검사 생략 — ' + e.message + ')'); fails++; }
 
 try {
   // ---- v459(11/13 — P1 판1·2·4 · 판 번호 임시): 문서·판 번호 정확 검사. 다음 판은 이 검사를 숫자 비교(>= 456)로 풀고 새 판 정확 검사를 더할 것.

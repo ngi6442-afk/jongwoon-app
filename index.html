@@ -1238,7 +1238,8 @@
   table.st-ed input.bad,table.st-ed select.bad,.st-fields input.bad{border-color:#D9534F;background:#FDF0EE;}
   table.st-ed tr.red>td{background:#FFF7F6;}
   table.st-ed tfoot td{font-weight:700;border-bottom:0;padding-top:8px;font-size:12.5px;}
-  table.st-ed .st-vc{display:block;font-size:11px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px;}
+  table.st-ed .st-vc{display:block;font-size:11px;margin-top:2px;line-height:1.6;}   /* 29 판③: 차량 표시·[고르기]·[다시 고르기]는 줄바꿈(칸 140 — 한 줄로 자르면 단추가 잘림), 안내 글(.st-vh)만 한 줄 말줄임 + title */
+  table.st-ed .st-vh{display:inline-block;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom;}
   table.st-ed td.c-x .mini-btn{padding:2px 8px;}
   .st-savebar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0 4px;}
   .st-savebar .st-gap{margin-left:auto;font-size:12px;color:var(--sub);}
@@ -1249,19 +1250,62 @@
   .st-pc-h .am{font-size:12.5px;white-space:nowrap;}
   .st-pc-b{padding:0 12px 10px;}
   #stmtBoard .st-pc:last-child{margin-bottom:0;}
-  /* 줄 입력 표 칸 폭 — 860~1279는 좁게, 1280 이상은 넓게. 품목은 남는 폭(입력칸 최소 110). 표 최소 폭 = 그 열 구성의 칸 합(.st-v 세액 칸 · .st-u 용도 칸) —
-     칸 합보다 좁은 창에서는 칸을 누르지 않고 표 칸 안에서 가로 스크롤(1100 창 하네스 실측: 최소 폭이 칸 합보다 작으면 일자 '10/15'·종류 '작업용구'가 잘림) */
+  /* 줄 입력 표 칸 폭 — 860~1279는 좁게, 1280 이상은 넓게. 품목은 남는 폭(입력칸 최소 110). 표 최소 폭 = 그 열 구성의 칸 합(.st-v 세액 칸) —
+     칸 합보다 좁은 창에서는 칸을 누르지 않고 표 칸 안에서 가로 스크롤(1100 창 하네스 실측: 최소 폭이 칸 합보다 작으면 일자 '10/15'·종류 '작업용구'가 잘림)
+     · 29 판③: 용구 거래처(.st-u)는 차량 칸 대신 용도 칸(칩 6 — 두 줄, '차량'을 고르면 아래 번호 칸)이라 차량 칸과 같은 폭·같은 최소 폭 */
   @media (min-width:860px){
-    table.st-ed{min-width:782px;} table.st-ed.st-v{min-width:862px;} table.st-ed.st-u{min-width:874px;} table.st-ed.st-v.st-u{min-width:954px;}
+    table.st-ed{min-width:782px;} table.st-ed.st-v{min-width:862px;}
     table.st-ed input,table.st-ed select{padding:4px;}
-    table.st-ed td.c-n{width:22px;} table.st-ed td.c-date{width:60px;} table.st-ed td.c-veh{width:140px;} table.st-ed td.c-item input{min-width:110px;}
-    table.st-ed td.c-kind{width:84px;} table.st-ed td.c-use{width:92px;} table.st-ed td.c-qty{width:70px;} table.st-ed td.c-unit{width:74px;}
+    table.st-ed td.c-n{width:22px;} table.st-ed td.c-date{width:60px;} table.st-ed td.c-veh,table.st-ed td.c-use{width:140px;} table.st-ed td.c-item input{min-width:110px;}
+    table.st-ed td.c-kind{width:84px;} table.st-ed td.c-qty{width:70px;} table.st-ed td.c-unit{width:74px;}
     table.st-ed td.c-amt{width:92px;} table.st-ed td.c-vat{width:80px;} table.st-ed td.c-st{width:96px;font-size:12px;} table.st-ed td.c-x{width:34px;}
+    table.st-ed .st-uc{padding:1px 4px;}   /* 용도 칩 두 줄(1100 창 실측 맑은 고딕 11.5 — 여백 7이면 세 줄로 꺾임: 칸 안 폭 131에 'CIP·EP더스트·준설' 141 / 여백 4면 123·'차량·안전보건·기타' 128) */
   }
   @media (min-width:1280px){
-    table.st-ed{min-width:898px;} table.st-ed.st-v{min-width:1002px;} table.st-ed.st-u{min-width:994px;} table.st-ed.st-v.st-u{min-width:1098px;}
-    table.st-ed td.c-date{width:64px;} table.st-ed td.c-veh{width:170px;} table.st-ed td.c-kind,table.st-ed td.c-use{width:96px;}
+    table.st-ed .st-uc{padding:1px 7px;}
+    table.st-ed{min-width:898px;} table.st-ed.st-v{min-width:1002px;}
+    table.st-ed td.c-date{width:64px;} table.st-ed td.c-veh,table.st-ed td.c-use{width:170px;} table.st-ed td.c-kind{width:96px;}
     table.st-ed td.c-qty,table.st-ed td.c-unit{width:84px;} table.st-ed td.c-amt,table.st-ed td.c-vat{width:104px;} table.st-ed td.c-st{width:130px;}
+  }
+  /* 29 판③: 용도 칩(용구 거래처 — 고른 칩 진하게 · 지난달 기본값은 점선) · 타이어 위치·조치 줄(타이어 줄 바로 아래) · 차량 고르기 칸(그 줄 바로 아래) · 거래처 목록 고치기 표(st-cfg) */
+  .st-ucs{display:flex;flex-wrap:wrap;gap:3px;}
+  .st-uc{font-size:11.5px;line-height:1.5;padding:1px 7px;border:1px solid var(--line);border-radius:999px;background:#fff;color:var(--sub);cursor:pointer;white-space:nowrap;font-family:inherit;}
+  .st-uc.on{background:#EAF3EF;border-color:var(--brand);color:var(--brand-dark,#1F5A3C);font-weight:700;}
+  .st-uc.prev{border-style:dashed;}
+  .st-uc.sug{border-style:dashed;border-color:var(--brand);color:var(--brand-dark,#1F5A3C);}   /* 용도가 빈 줄에 지난달 값 — 고르지는 않음(누르면 고름) */
+  .st-ucs.bad .st-uc{border-color:#D9534F;}
+  .st-uv{margin-top:4px;}
+  .st-note{font-size:12px;color:var(--sub);margin:0 0 6px;line-height:1.5;}
+  .st-note:empty{display:none;}
+  table.st-ed .st-pickb{padding:1px 6px;font-size:11px;margin-right:2px;}
+  table.st-ed tr.st-sub>td{padding-top:0;}
+  .st-tire{display:flex;gap:4px 12px;flex-wrap:wrap;align-items:center;font-size:12px;color:var(--sub);padding:2px 0 4px;}
+  .st-tire label{display:flex;align-items:center;gap:4px;}
+  table.st-ed .st-tire input{width:190px;} table.st-ed .st-tire select{width:auto;}
+  .st-tl{font-weight:700;color:#1F2B27;}
+  .st-tire b{color:#1F2B27;}
+  table.st-ed tr.st-pick>td{background:#F7FAF8;padding:6px 4px 8px;}
+  .st-pickbox{border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:#fff;}
+  .st-pick-h{display:flex;gap:6px 10px;flex-wrap:wrap;align-items:center;font-size:12.5px;}
+  table.st-ed .st-pick-h input{width:190px;}
+  .st-pick-list{display:flex;flex-wrap:wrap;gap:4px;margin:8px 0 6px;}
+  .st-pv{font-size:12px;padding:3px 8px;border:1px solid var(--line);border-radius:6px;background:#fff;cursor:pointer;text-align:left;font-family:inherit;color:#1F2B27;}
+  .st-pv:hover{border-color:var(--brand);background:#F3F8F5;}
+  .st-pv.cand{border-color:var(--brand);background:#F3F8F5;}
+  .st-pick-f{font-size:11.5px;}
+  .st-cfgbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:8px 0 0;font-size:12px;}
+  .st-cfgbar:empty{display:none;}
+  table.st-cfg{border-collapse:collapse;width:100%;font-size:13px;}
+  table.st-cfg th{font-size:11.5px;color:var(--sub);font-weight:700;text-align:left;padding:6px 4px;border-bottom:1px solid var(--line);white-space:nowrap;}
+  table.st-cfg td{padding:3px 4px;border-bottom:1px solid var(--line);vertical-align:middle;}
+  table.st-cfg input[data-cf="name"],table.st-cfg input[data-cf="hint"],table.st-cfg select{width:100%;box-sizing:border-box;padding:4px 6px;border:1px solid var(--line);border-radius:6px;font-size:13px;background:#fff;}
+  table.st-cfg input.bad{border-color:#D9534F;background:#FDF0EE;}
+  .st-cb{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--sub);}
+  @media (min-width:860px){
+    table.st-cfg{min-width:864px;}
+    table.st-cfg td.c-vk{width:56px;white-space:nowrap;} table.st-cfg td.c-nm{width:170px;} table.st-cfg td.c-gr{width:140px;} table.st-cfg td.c-kd{width:96px;}
+    table.st-cfg td.c-bs{width:124px;} table.st-cfg td.c-cr,table.st-cfg td.c-ac{width:52px;text-align:center;} table.st-cfg td.c-x{width:34px;}
+    .st-cbt{display:none;}
   }
   /* 폰: 줄마다 카드 — 칸이 flex로 흘러 '번호·일자·차량 / 품목·종류(·용도) / 수량·단가·금액(·세액) / 검산·×' 순(375 하네스 실측: grid 4칸은 번호 칸이 한 칸을 통째로 쓰고 ×가 혼자 한 줄) */
   @media (max-width:859px){
@@ -1270,9 +1314,18 @@
     table.st-ed tbody td{border:0;padding:0;}
     table.st-ed td.c-n{flex:0 0 18px;font-size:12px;}
     table.st-ed td.c-date{flex:0 0 64px;}
-    table.st-ed td.c-veh{flex:1 1 150px;min-width:0;}
+    table.st-ed td.c-veh,table.st-ed td.c-use{flex:1 1 150px;min-width:0;}
     table.st-ed td.c-item{flex:1 1 140px;min-width:0;}
-    table.st-ed td.c-kind,table.st-ed td.c-use{flex:0 0 92px;}
+    table.st-ed td.c-kind{flex:0 0 92px;}
+    table.st-ed tbody tr.st-sub,table.st-ed tbody tr.st-pick{padding-top:0;}
+    table.st-ed tr.st-sub>td.c-n{display:none;}
+    table.st-ed tr.st-sub>td,table.st-ed tr.st-pick>td{flex:1 1 100%;min-width:0;}
+    table.st-ed .st-tire input{width:170px;}
+    table.st-cfg thead{display:none;}
+    table.st-cfg tbody tr{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;padding:8px 0;border-bottom:1px solid var(--line);}
+    table.st-cfg tbody td{border:0;padding:0;}
+    table.st-cfg td.c-vk{flex:0 0 44px;} table.st-cfg td.c-nm{flex:1 1 160px;min-width:0;}
+    table.st-cfg td.c-gr,table.st-cfg td.c-kd,table.st-cfg td.c-bs{flex:1 1 110px;min-width:0;} table.st-cfg td.c-hn{flex:1 1 100%;}
     table.st-ed td.c-qty,table.st-ed td.c-unit,table.st-ed td.c-amt,table.st-ed td.c-vat{flex:1 1 64px;min-width:0;}
     table.st-ed td.c-st{flex:1 1 120px;font-size:12px;}
     table.st-ed td.c-x{flex:0 0 34px;text-align:right;}
@@ -1666,6 +1719,8 @@
     <div class="st-stats" id="stmtStats"></div>
     <div id="stmtBoardMsg"></div>
     <div class="card" id="stmtBoard"><div class="loading">불러오는 중…</div></div>
+    <div class="st-cfgbar" id="stmtCfgBar"></div>
+    <div id="stmtCfg" style="display:none;"></div>
     <div id="stmtEditor" style="display:none;"></div>
   </section>
 
@@ -8090,9 +8145,16 @@
   //   검산 거울(stmtCheck·stmtRowIssues·stmtGap·stmtMoney·stmtDecimal) = 서버 _lib/stmt.js와 같은 규칙 — 붉은 칸을 바로 보여 주는 데만 쓰고 확정은 서버가 다시 셈(uismoke 29 판②가 같은 표본으로 대조).
   //   권한(키 stmt — PM 11/10 D2): 보기(나수진) = 보드·상세 읽기만(입력칸 대신 글 · 바꾸는 버튼은 .mini-btn이라 보기 CSS가 숨김 · 서버 NO_WRITE) · 수행(권민지) = 입력·작성 중 저장·확정 저장·되돌리기·전달 표시.
   //   읽기 토글(달 ◀▶·[열기]·[‹ 월 보드]·[닫기 ▲]·칩)은 .vs-chip. 받지 않는 것: 스캔 원본·사업자번호·계좌·전화·주민번호(서버 piiScan과 같은 꼴을 앱이 먼저 막음 — 걸리면 저장 안 함).
-  //   파일 읽기(PDF 글자층·htm·홈택스 매입)·비전 스위치(D1 꺼짐)는 판④, 처음 보는 번호 고르기·용도 칩·타이어 칸·거래처 고치기는 판③, 사장님 보고·결제 목록·차량 탭 이력은 판⑤.
+  //   29 판③(이 구간에 더함): 처음 보는 번호 고르기(그 줄 아래 고르기 칸 → 같은 번호 줄에 같이 붙이고 별칭 사전 stmt_alias_set — 다음 달부터 자동) ·
+  //     용구 거래처 용도 칩(차량 칸 대신 — '차량'을 고르면 번호 칸, 품목을 넣으면 지난달 같은 품목의 용도가 점선 칩으로 먼저 골라짐 = R1 바꿀 수 있는 기본값) ·
+  //     타이어 줄 아래 위치·조치 칸 · 월 보드 아래 [거래처 목록 고치기](수행만 — stmt_cfg_set, 있던 거래처는 끄기만·묶음 고정).
+  //   파일 읽기(PDF 글자층·htm·홈택스 매입)·비전 스위치(D1 꺼짐)는 판④, 사장님 보고·결제 목록·차량 탭 이력은 판⑤.
   var STMT_KIND = { fuel: "주유", urea: "요소수", tire: "타이어", oil: "오일", part: "부품", labor: "정비 공임", wash: "세차", cover: "덮개", tool: "작업용구", etc: "기타" };   // 서버 KIND_LABEL과 같은 키·값·순서(uismoke 대조)
-  var STMT_USE = { posco_cip: "포스코 CIP", posco_ep: "포스코 EP더스트", dredge: "준설", vehicle: "차량", safety: "안전보건", etc: "기타" };   // 서버 USE_LABEL과 같음(작업용구 용도 — 판③에서 칩)
+  var STMT_USE = { posco_cip: "포스코 CIP", posco_ep: "포스코 EP더스트", dredge: "준설", vehicle: "차량", safety: "안전보건", etc: "기타" };   // 서버 USE_LABEL과 같음(작업용구 용도 — 판③ 칩)
+  var STMT_USE_SHORT = { posco_cip: "CIP", posco_ep: "EP더스트", dredge: "준설", vehicle: "차량", safety: "안전보건", etc: "기타" };   // 29 판③ 용도 칩 글(칸이 좁아 짧게 — 칩 title = STMT_USE)
+  var STMT_TIRE_ACT = { puncture: "펑크 수리", used: "중고 교체", "new": "신품 교체" };   // 서버 TIRE_ACT_LABEL에서 빈칸('')만 뺀 셋 — 같은 키·값·순서(uismoke 29 판③ 대조)
+  var STMT_TIRE_POS = (function(){ var a = []; ["운전석", "조수석"].forEach(function(s){ ["1축", "2축", "3축"].forEach(function(x){ a.push(s + " " + x, s + " " + x + " 안쪽", s + " " + x + " 바깥"); }); }); return a; })();   // 위치 칸 보기 목록(시안 v2 §3-3 운전석/조수석·1~3축·안쪽/바깥 — 글은 자유, 30자)
+  var STMT_KIND_OPT = (function(){ var o = { "": "줄마다" }; Object.keys(STMT_KIND).forEach(function(k){ o[k] = STMT_KIND[k]; }); return o; })();   // 거래처 기본 종류(빈칸 = 줄마다 고름 — 서버 cleanVendor kind '')
   var STMT_ST = { doing: "작성 중", done: "확정", sent: "전달함" };
   var STMT_GRP = { veh: "차량 거래처 → 사장님 보고", tool: "작업용구 거래처 → 나주임 결제" };
   var STMT_ROWST = { wait: "입력 대기", red: "붉은 칸", ready: "확정 전", done: "확정", sent: "전달함" };
@@ -8107,13 +8169,18 @@
     NO_PREV: "되돌릴 직전 판이 없습니다.", NO_VEH_ACCESS: "차량 보기 권한이 없어 열 수 없습니다 — 명세서 줄에 차량 번호가 들어 있어 권한관리 '차량' 열이 보기 이상이어야 합니다.", VEH_READ_FAILED: "차량 목록을 읽지 못해 저장하지 않았습니다 — 잠시 뒤 다시 해 주세요.",
     DOC_READ_FAILED: "저장된 명세를 읽지 못해 저장하지 않았습니다(덮어쓰지 않음) — 잠시 뒤 다시 해 주세요.", HANDLER_FAILED: "서버 처리 중 오류가 났습니다 — 잠시 뒤 다시 해 주세요.",
     BAD_DATE: "일자가 날짜 꼴이 아닙니다.", ROW_MONTH: "일자가 이 달이 아닙니다.", BAD_MONEY: "금액·세액이 숫자 꼴이 아닙니다.", BAD_NUMBER: "수량·단가가 숫자 꼴이 아닙니다.",
-    BAD_TEXT: "품목·비고 글이 너무 길거나 보이지 않는 글자가 있습니다.", BAD_INV: "계산서 칸이 숫자 꼴이 아닙니다.", BAD_CARRY: "잔액 칸이 숫자 꼴이 아닙니다.", BAD_VSUB: "차량 소계 칸이 숫자 꼴이 아닙니다."
+    BAD_TEXT: "품목·비고 글이 너무 길거나 보이지 않는 글자가 있습니다.", BAD_INV: "계산서 칸이 숫자 꼴이 아닙니다.", BAD_CARRY: "잔액 칸이 숫자 꼴이 아닙니다.", BAD_VSUB: "차량 소계 칸이 숫자 꼴이 아닙니다.",
+    BAD_TIRE: "타이어 위치·조치 칸 꼴이 맞지 않습니다.", BAD_RAW: "번호 글 꼴이 맞지 않습니다.", ALIAS_FULL: "별칭 사전이 가득 찼습니다(500개) — 관리자 확인이 필요합니다.",
+    ALIAS_READ_FAILED: "별칭 사전을 읽지 못했습니다 — 잠시 뒤 다시 해 주세요.", ALIAS_INVALID: "별칭 사전 저장값이 깨져 있습니다 — 관리자 확인이 필요합니다.", NO_CHANGE: "바뀐 것이 없습니다.",
+    VENDOR_REMOVED: "있던 거래처는 지울 수 없습니다 — '켬'을 끄면 보드에서 빠집니다.", GROUP_LOCKED: "있던 거래처의 묶음(차량·작업용구)은 바꿀 수 없습니다 — 새 거래처로 더해 주세요.", DUP_VK: "거래처 번호가 겹칩니다.",
+    BAD_NAME: "거래처 이름이 비었거나 30자를 넘습니다.", BAD_HINT: "알아보는 낱말은 6개까지, 낱말마다 20자까지입니다.", BAD_VENDORS: "거래처는 1~40곳이어야 합니다.",
+    CFG_READ_FAILED: "거래처 목록을 읽지 못해 저장하지 않았습니다(덮어쓰지 않음) — 잠시 뒤 다시 해 주세요."
   };
   var STMT_RFIELDS = ["date", "vin", "item", "kind", "use", "qty", "unit", "amt", "vat", "note"];   // 줄 입력칸(data-f) — 이 밖의 이름은 무시
   var STMT_DPATHS = ["basis", "stated", "inv.date", "inv.supply", "inv.vat", "inv.total", "carry.prev", "carry.month", "carry.paid", "carry.bal"];   // 문서 입력칸(data-d)
   var STMT_DASH = '<span style="color:#9AA09C;">-</span>';
   var STMT_SHEET_DEF = null;
-  var STMT = { who: null, ym: "", month: null, loading: false, err: "", errCode: "", mseq: 0, eseq: 0, ed: null, open: {}, bound: false };
+  var STMT = { who: null, ym: "", month: null, loading: false, err: "", errCode: "", mseq: 0, eseq: 0, ed: null, cfg: null, cseq: 0, aliasAt: 0, open: {}, bound: false };   // cfg = 거래처 목록 고치기(29 판③ — 열려 있으면 보드 대신) · aliasAt = 별칭 사전 판(낙관락 base)
 
   // ---- 검산 거울(서버 _lib/stmt.js와 같은 규칙 — uismoke 29 판②가 같은 표본으로 대조. 고치면 두 곳 다) ----
   function stmtDict(){ return Object.create(null); }   // 사람이 보낸 글(차량 id)을 열쇠로 쓰는 지도 — 원형 없는 객체('__proto__' 오염 막기, 서버 dict와 같음)
@@ -8255,6 +8322,7 @@
 
   // ---- 차량 표시(차량 탭 목록 — 읽기만, 고치지 않음) ----
   function stmtLast4(s){ var d = String(s || "").replace(/\D/g, ""); return d.length >= 4 ? d.slice(-4) : ""; }
+  function stmtNormPlate(s){ return String(s == null ? "" : s).replace(/[^가-힣A-Za-z0-9]/g, "").slice(0, 24); }   // 서버 normPlate와 같은 꼴(별칭 사전 열쇠 — 같은 번호 줄 찾기)
   // '…끝4 차종 자차/지입' — 번호 칸 괄호 밖(현재 번호) 끝 4자리 · 목록에 없는 id는 id의 끝 4자리 · '_common' = 공용. D3(PM 11/10): 지입은 표시만
   function stmtVehHtml(id){
     var v, no, l4;
@@ -8274,29 +8342,210 @@
   // 그 줄의 지금 객체 — 저장 응답이 줄 객체를 갈아 끼웠으면(stmtEdLoad) 같은 줄 id로 찾음(검토: 대조 응답이 화면에 없는 옛 객체에 붙어 사라짐)
   function stmtRowOf(ed, e){ var i; if (ed.rows.indexOf(e) >= 0) return e; if (!e.r) return null; for (i = 0; i < ed.rows.length; i++){ if (ed.rows[i].r === e.r) return ed.rows[i]; } return null; }
   // 차량 칸을 떠날 때(목록에서 고르면 input에서 바로) — 번호 칸과 똑같거나 마지막 대조 글과 같으면 바로, 아니면 서버 stmt_match(별칭 → 현재 번호 → 옛 번호 → 끝 4자리 — 판① 규칙 한 곳).
-  //   여러 대·처음 보는 번호는 비워 둔다(붉음 — 고르기는 판③) · 같은 글을 이미 묻는 중이면 또 묻지 않음(change·focusout 둘 다 옴)
+  //   여러 대·처음 보는 번호는 비워 두고(붉음) [고르기 ▾](판③ — vtried: 대조를 한 번 마친 줄에만 · 치는 중에는 안 보임) · 같은 글을 이미 묻는 중이면 또 묻지 않음(change·focusout 둘 다 옴)
   function stmtVehMatch(i){
     var ed = STMT.ed, e = ed && ed.rows[i], t, id, tok;
     if (!e) return;
     t = String(e.vin || "").trim();
     id = stmtVehOfText(e, t);
-    if (!t || id){ e.veh = id; e.vhint = ""; e.vreq = ""; stmtEdRefresh(); return; }
+    if (!t || id){ e.veh = id; if (!id){ e.vhow = ""; e.valias = ""; } e.vhint = ""; e.vhintT = ""; e.vbad = false; e.vtried = false; e.vreq = ""; stmtEdRefresh(); return; }   // 찾은 길(vhow)·별칭 값은 글을 칠 때(stmtOnInput) 정함
     if (e.vreq === t) return;
-    e.veh = ""; e.vhint = "찾는 중…"; e.vreq = t; tok = e.vtok = (e.vtok || 0) + 1; stmtEdRefresh();
+    e.veh = ""; e.vhow = ""; e.vhint = "찾는 중…"; e.vhintT = ""; e.vbad = false; e.vtried = false; e.vreq = t; tok = e.vtok = (e.vtok || 0) + 1; stmtEdRefresh();
     gwCall("gw-stmt", { action: "stmt_match", raws: [t.slice(0, 40)] }).then(function(res){
-      var m, cur;
+      var m, cur, vl, oth;
       if (STMT.ed !== ed || e.vtok !== tok) return;
       e.vreq = "";
       cur = stmtRowOf(ed, e);
       if (!cur || stmtVraw(cur.vin) !== stmtVraw(t)) return;   // 그 사이 글이 바뀌었으면 버림
+      cur.vhintT = "";
       if (res.status === 401){ cur.vhint = "로그인이 풀려 대조하지 못했습니다"; stmtEdRefresh(); onSessionInvalid(); return; }
       m = (res.status === 200 && res.body && Array.isArray(res.body.matches)) ? res.body.matches[0] : null;
-      if (m && m.veh){ cur.veh = m.veh; cur.vm = { t: t, veh: m.veh }; cur.vhint = (m.how === "old" || m.how === "old4") ? "옛 번호로 찾음" : (m.how === "alias" ? "별칭으로 찾음" : ""); ed.dirty = true; ed.editN = (ed.editN || 0) + 1; }   // 저장이 오가는 중이면 응답이 이 차량을 지우지 않게(stmtEdDone)
-      else if (m && m.how === "multi") cur.vhint = "여러 대 — 번호를 더 넣거나 목록에서 골라 주세요";
-      else if (m) cur.vhint = "처음 보는 번호 — 목록에서 골라 주세요";
-      else cur.vhint = STMT_ERR[(res.body || {}).error_code] || "번호를 대조하지 못했습니다";
+      vl = (res.body && Array.isArray(res.body.vehicles)) ? res.body.vehicles : [];
+      if (res.status === 200 && res.body && res.body.alias_at !== undefined) STMT.aliasAt = Number(res.body.alias_at) || 0;
+      if (m && m.veh && !stmtVehIn(vl, m.veh)){   // 별칭이 지운 차를 가리킴(서버 색인은 지운 차 id도 담음) — 붙이지 않고 고르게(고르면 별칭도 갈아 끼움 — 29 판③ 검토)
+        cur.vhint = "별칭이 목록에 없는 차 — 골라 주세요"; cur.vhintT = "별칭 사전이 차량 목록에 없는 차(…" + stmtLast4(m.veh) + ")를 가리킵니다 — [고르기]로 고르면 별칭도 바뀝니다"; cur.vbad = true; cur.vtried = true; cur.valias = m.veh;
+      } else if (m && m.veh){
+        cur.veh = m.veh; cur.vhow = m.how || ""; cur.valias = m.how === "alias" ? m.veh : ""; cur.vm = { t: t, veh: m.veh, how: cur.vhow, alias: cur.valias };
+        oth = m.how === "alias" ? stmtPlateL4Hits(vl, stmtLast4(t)).filter(function(v){ return v.id !== m.veh; }) : [];
+        if (oth.length){ cur.vhint = "별칭 — 끝 4자리 같은 차 또 있음"; cur.vhintT = "별칭으로 …" + stmtLast4(m.veh) + "에 붙였지만 끝 4자리가 같은 다른 차가 목록에 있습니다 — 맞는지 보고, 틀리면 [다시 고르기]"; cur.vbad = true; }
+        else cur.vhint = (m.how === "old" || m.how === "old4") ? "옛 번호로 찾음" : (m.how === "alias" ? "별칭으로 찾음" : "");
+        ed.dirty = true; ed.editN = (ed.editN || 0) + 1;   // 저장이 오가는 중이면 응답이 이 차량을 지우지 않게(stmtEdDone)
+      }
+      else if (m && m.how === "multi"){ cur.vhint = "여러 대 — 골라 주세요"; cur.vtried = true; cur.valias = ""; }
+      else if (m){ cur.vhint = "처음 보는 번호 — 골라 주세요"; cur.vtried = true; cur.valias = ""; }
+      else { cur.vhint = STMT_ERR[(res.body || {}).error_code] || "번호를 대조하지 못했습니다"; cur.vtried = true; }
       stmtEdRefresh();
-    }).catch(function(){ var cur; if (STMT.ed !== ed || e.vtok !== tok) return; e.vreq = ""; cur = stmtRowOf(ed, e); if (cur){ cur.vhint = "번호를 대조하지 못했습니다(네트워크)"; stmtEdRefresh(); } });
+    }).catch(function(){ var cur; if (STMT.ed !== ed || e.vtok !== tok) return; e.vreq = ""; cur = stmtRowOf(ed, e); if (cur){ cur.vhint = "번호를 대조하지 못했습니다(네트워크)"; cur.vtried = true; stmtEdRefresh(); } });
+  }
+  // 차량 칸 아래 글 — [고르기 ▾](수행 · 대조를 마치고도 차량이 빈 줄) · 차량 표시 · [다시 고르기](고른 줄·별칭으로 찾은 줄 — 틀린 차·틀린 별칭을 바로잡는 길, 29 판③ 검토) · 대조·별칭 안내(붉음 = vbad)
+  //   안내 글은 짧게(칸 폭 170 — 말줄임, 차량 표시가 먼저 보이게 단추·안내는 뒤) · 긴 까닭은 vhintT를 title로 · 그 줄 고르기 칸이 열려 있거나 번호 글이 개인정보 꼴이면 단추 없음
+  function stmtVcHtml(ed, e, i, w){
+    var vin = String(e.vin || "").trim(), can = w && !!vin && !e.vreq && !stmtPickIs(ed, e) && !stmtPii(stmtVraw(vin)),
+      pk = can && !e.veh && e.vtried, re = can && !!e.veh && e.veh !== "_common" && (e.vhow === "alias" || e.vhow === "pick" || e.vhow === "rowonly");
+    return (pk ? '<button type="button" class="mini-btn st-pickb" data-st-act="pick" data-i="' + i + '">고르기 ▾</button>' : '') + stmtVehHtml(e.veh)
+      + (re ? ' <button type="button" class="mini-btn st-pickb" data-st-act="repick" data-i="' + i + '" title="고른 차·별칭으로 찾은 차가 틀렸으면 다시 고릅니다(별칭도 함께 바뀜)">다시 고르기</button>' : '')
+      + (e.vhint ? ' <span class="st-vh ' + (e.vbad || !e.veh ? "st-no" : "st-mute") + '" title="' + esc(e.vhintT || e.vhint) + '">' + esc(e.vhint) + '</span>' : '');
+  }
+
+  // ---- 처음 보는 번호·여러 대 고르기(29 판③) — 그 줄 아래 칸 · stmt_match로 후보(끝 4자리가 같은 차)·차량 목록(끝 4자리·차종·자차/지입·상태·옛 끝 4자리 — 서버가 내보내는 칸만)·별칭 사전 판(alias_at)을 받음 ·
+  //   고르면 같은 번호 글(서버 normPlate 꼴)의 줄에 같이 붙이고, 별칭으로 저장해도 되는 글이면 stmt_alias_set(줄 세워 하나씩 — stmtAliasQueue) → 다음 달부터 자동. '공용'은 별칭으로 안 씀(줄에서 목록의 '공용')
+  //   [다시 고르기](re) = 고른 줄·별칭으로 찾은 줄 — 같은 글로 그 차가 붙은 줄을 함께 바꾸고 별칭을 덮어씀(서버가 지금 별칭이 내가 본 값일 때만 — 409 뒤 견줌)
+  function stmtPickIs(ed, e){ var pk = ed && ed.pick; return !!(pk && e && (pk.e === e || (pk.r && e.r === pk.r))); }
+  // 같은 번호 글의 줄 — 차량이 빈 줄 + (다시 고르기면) 그 차가 고르기·별칭으로 붙은 줄(사람이 목록 번호로 붙인 줄은 안 건드림)
+  function stmtPickRowsOf(ed, t, old){ var k = stmtNormPlate(t); return k ? ed.rows.filter(function(x){ return stmtNormPlate(x.vin) === k && (!x.veh || (!!old && x.veh === old && (x.vhow === "alias" || x.vhow === "pick" || x.vhow === "rowonly"))); }) : []; }
+  function stmtVehIn(list, id){ return !!id && (list || []).some(function(v){ return v && v.id === id; }); }
+  function stmtPlateL4Hits(list, d4){ return d4 ? (list || []).filter(function(v){ return v && (String(v.l4 || "") === d4 || (Array.isArray(v.old4) && v.old4.indexOf(d4) >= 0)); }) : []; }
+  // 별칭으로 저장할 번호 글인가(29 판③ 검토 반영 high) — 별칭 사전은 거래처 구분 없이 하나라, 여러 대가 맞는 글('6666' — 지금 목록에서 끝 4자리·옛 끝 4자리가 같은 차 2대 이상, 서버 multi와 같은 셈)이나
+  //   숫자가 4자리 미만인 글('12')을 한 차로 저장하면 다음 달 모든 거래처의 그 글이 그 차로 말없이 붙는다 → 그 명세 줄에만 붙임("rowonly"). 전체 번호 꼴('12가3456')은 한 차를 가리켜 저장
+  function stmtAliasKind(t, list){
+    var key = stmtNormPlate(t), d = key.replace(/\D/g, "");
+    if (/\d{2,3}[가-힣]\d{4}/.test(key)) return "ok";
+    if (d.length < 4) return "short";
+    return stmtPlateL4Hits(list, d.slice(-4)).length >= 2 ? "multi" : "ok";
+  }
+  function stmtPickVeh(v){
+    var old = Array.isArray(v.old4) ? v.old4 : [];
+    return '<b>…' + esc(v.l4 || "?") + '</b>' + (v.type ? ' ' + esc(v.type) : '') + (v.own === "지입" ? ' <span class="st-chip jiip">지입</span>' : (v.own ? ' <span class="st-mute">' + esc(v.own) + '</span>' : ''))
+      + (old.length ? ' <span class="st-mute">옛 …' + old.map(function(o){ return esc(o); }).join("·…") + '</span>' : '') + (v.state && v.state !== "운행" ? ' <span class="st-mute">' + esc(v.state) + '</span>' : '');
+  }
+  // 찾는 글 — 띄어쓰기로 나눈 낱말이 다 맞아야 함(숫자 = 끝 4자리·옛 끝 4자리에 들어 있음 · 글 = 차종·자차/지입·상태)
+  function stmtPickHit(v, toks){
+    return toks.every(function(t){ var d = t.replace(/\D/g, ""); if (d && d === t) return String(v.l4 || "").indexOf(d) >= 0 || (Array.isArray(v.old4) ? v.old4 : []).some(function(o){ return String(o).indexOf(d) >= 0; }); return String(v.type || "").indexOf(t) >= 0 || String(v.own || "") === t || String(v.state || "").indexOf(t) >= 0; });
+  }
+  function stmtPickListHtml(pk){
+    var toks, byId = stmtDict(), cand = [], rest, more = 0, cs;
+    if (!pk) return "";
+    if (pk.loading) return '<span class="st-mute">차량 목록을 불러오는 중…</span>';
+    if (pk.err) return '<span class="st-no">' + esc(pk.err) + '</span>';
+    toks = String(pk.q || "").trim().split(/\s+/).filter(function(s){ return !!s; });
+    cs = Array.isArray(pk.cand) ? pk.cand : [];
+    pk.list.forEach(function(v){ if (v && typeof v.id === "string") byId[v.id] = v; });
+    cs.forEach(function(id){ if (byId[id] && stmtPickHit(byId[id], toks)) cand.push(byId[id]); });
+    rest = pk.list.filter(function(v){ return v && byId[v.id] === v && cs.indexOf(v.id) < 0 && stmtPickHit(v, toks); }).sort(function(a, b){ return String(a.l4 || "").localeCompare(String(b.l4 || "")); });
+    if (rest.length > 60){ more = rest.length - 60; rest = rest.slice(0, 60); }
+    if (!cand.length && !rest.length) return '<span class="st-mute">맞는 차량이 없습니다' + (toks.length ? ' — 찾는 글을 줄여 주세요' : '') + '.</span>';
+    return cand.map(function(v){ return '<button type="button" class="st-pv cand" data-st-pickv="' + esc(v.id) + '" title="번호가 맞는 후보">' + stmtPickVeh(v) + '</button>'; }).join("")
+      + rest.map(function(v){ return '<button type="button" class="st-pv" data-st-pickv="' + esc(v.id) + '">' + stmtPickVeh(v) + '</button>'; }).join("")
+      + (more ? '<span class="st-mute">그 밖 ' + more + '대 — 끝 4자리로 좁혀 주세요</span>' : '');
+  }
+  function stmtPickFoot(pk){
+    var k = pk.kind;
+    if (pk.loading || pk.err || !k) return '';
+    if (k !== "ok") return (k === "multi" ? "끝 4자리가 같은 차가 여러 대라" : "번호가 4자리보다 짧아") + " 별칭으로 저장하지 않고 이 명세 줄에만 붙입니다(다음 달에도 고름)" + (pk.prev ? " · 있던 별칭은 지웁니다" : "") + (pk.same > 1 ? " · 같은 번호 줄 " + pk.same + "개에 같이" : "") + ".";
+    return "고르면 이 번호 글을 별칭 사전에 저장합니다 — 다음 달부터 자동으로 찾습니다" + (pk.same > 1 ? " · 같은 번호 줄 " + pk.same + "개에 같이 붙습니다" : "") + ". 차량 목록은 고치지 않습니다.";
+  }
+  function stmtPickHtml(ed){
+    var pk = ed.pick;
+    return '<div class="st-pickbox"><div class="st-pick-h"><b>차량 ' + (pk.re ? "다시 " : "") + '고르기</b><span><span class="st-mute">명세서 번호</span> <b>' + esc(pk.t) + '</b></span><span class="st-no" id="stmtPickWhy">' + esc(pk.why || "") + '</span>'
+      + '<input id="stmtPickQ" data-st-pq="1" value="' + esc(pk.q || "") + '" placeholder="끝 4자리·차종으로 찾기" autocomplete="off"><button type="button" class="vs-chip" data-st-act="pickx">닫기</button></div>'
+      + '<div class="st-pick-list" id="stmtPickList">' + stmtPickListHtml(pk) + '</div>'
+      + '<div class="st-mute st-pick-f" id="stmtPickF">' + esc(stmtPickFoot(pk)) + '</div></div>';
+  }
+  function stmtPickRefresh(ed){ if (STMT.ed !== ed || !ed.pick) return; stmtSetHtml("stmtPickList", stmtPickListHtml(ed.pick)); stmtSetHtml("stmtPickWhy", esc(ed.pick.why || "")); stmtSetHtml("stmtPickF", esc(stmtPickFoot(ed.pick))); }
+  // 고르기 칸만 떼어 냄(차량 칸 글을 고치는 중·고른 뒤 — 표를 다시 그리면 치던 칸의 포커스·한글 조합이 끊김)
+  function stmtPickDrop(ed){ var host = document.getElementById("stmtEditor"), tr = host && host.querySelector ? host.querySelector("tr[data-pick]") : null; ed.pick = null; if (tr && tr.parentNode) tr.parentNode.removeChild(tr); }
+  // re = [다시 고르기](차가 붙은 줄 — 고른 줄·별칭으로 찾은 줄). 번호 글이 개인정보 꼴이면 열지 않음(별칭으로 보낼 글 — 서버 BAD_RAW, 그 칸은 이미 붉음)
+  function stmtPickOpen(i, re){
+    var ed = STMT.ed, e = ed && ed.rows[i], t, seq, qi;
+    if (!e || !stmtEdW(ed) || ed.saving) return;
+    t = String(e.vin || "").trim();
+    if (!t || stmtPii(stmtVraw(t))) return;
+    if (re ? (!e.veh || e.veh === "_common") : !!e.veh) return;
+    seq = ed.pseq = (ed.pseq || 0) + 1;
+    ed.pick = { e: e, r: e.r, t: t, q: "", loading: true, err: "", why: "", kind: "", cand: [], list: [], re: !!re, old: re ? e.veh : "", prev: e.valias || "", same: stmtPickRowsOf(ed, t, re ? e.veh : "").length, seq: seq };
+    stmtEdRender();
+    qi = document.getElementById("stmtPickQ"); if (qi && qi.focus) qi.focus();
+    gwCall("gw-stmt", { action: "stmt_match", raws: [t.slice(0, 40)] }).then(function(res){
+      var pk = ed.pick, b = (res && res.body) || {}, m, known;
+      if (STMT.ed !== ed || !pk || pk.seq !== seq) return;
+      pk.loading = false;
+      if (res.status === 401){ pk.err = "로그인이 풀려 불러오지 못했습니다 — 다시 로그인해 주세요."; stmtPickRefresh(ed); onSessionInvalid(); return; }
+      if (res.status !== 200 || b.status !== "OK" || !Array.isArray(b.matches) || !Array.isArray(b.vehicles)){ pk.err = stmtErrText(res); stmtPickRefresh(ed); return; }
+      m = b.matches[0] || {};
+      STMT.aliasAt = Number(b.alias_at) || 0;
+      known = stmtVehIn(b.vehicles, m.veh);
+      if (m.how === "alias" && m.veh) pk.prev = m.veh;   // 지금 사전 값(다시 고르기·지운 차) — 409 뒤 '내가 본 값'과 견줌
+      if (known && !pk.re){ stmtPickApply(ed, pk, m.veh, m.how || "", m.how === "alias" ? "별칭으로 찾음" : ((m.how === "old" || m.how === "old4") ? "옛 번호로 찾음" : "")); return; }   // 그 사이 별칭·차량 목록이 바뀌어 이제는 한 대로 찾힘(목록에 있는 차만)
+      pk.list = b.vehicles;
+      pk.cand = (Array.isArray(m.cand) && m.cand.length) ? m.cand : stmtPlateL4Hits(b.vehicles, stmtLast4(t)).map(function(v){ return v.id; });   // 다시 고르기·별칭이면 서버 후보가 비어 끝 4자리로
+      pk.kind = stmtAliasKind(t, b.vehicles);
+      pk.why = pk.re ? "고른 차를 바꿉니다" : (m.veh && !known ? "별칭이 목록에 없는 차를 가리킴 — 다시 골라 주세요" : (m.how === "multi" ? "여러 대 — 골라 주세요" : "처음 보는 번호 — 현재·옛 번호 모두 없음"));
+      stmtPickRefresh(ed);
+    }).catch(function(){ var pk = ed.pick; if (STMT.ed !== ed || !pk || pk.seq !== seq) return; pk.loading = false; pk.err = "차량 목록을 불러오지 못했습니다(네트워크)."; stmtPickRefresh(ed); });
+  }
+  // 같은 번호 글의 줄(연 줄 포함 — 다시 고르기면 그 차가 고르기·별칭으로 붙은 줄도)에 그 차를 붙이고 고르기 칸을 떼어 냄 → 붙인 줄 목록.
+  //   표를 다시 그리지 않음(다른 칸을 치던 포커스·한글 조합 보존 — 검토) · 고른 직후 0.4초는 표 누름을 버림(두 번 누르면 둘째 누름이 올라온 아래 줄 단추에 떨어짐 — 검토)
+  function stmtPickApply(ed, pk, id, how, hint){
+    var rows = stmtPickRowsOf(ed, pk.t, pk.old), cur = stmtRowOf(ed, pk.e);
+    if (cur && rows.indexOf(cur) < 0 && (!cur.veh || cur.veh === pk.old)) rows.push(cur);
+    rows.forEach(function(x){ x.veh = id; x.vhow = how; x.valias = how === "alias" ? id : (x.valias || ""); x.vm = { t: String(x.vin || "").trim(), veh: id, how: how, alias: x.valias }; x.vhint = hint; x.vhintT = ""; x.vbad = false; x.vreq = ""; x.vtok = (x.vtok || 0) + 1; x.vtried = false; });
+    stmtPickDrop(ed);
+    ed.dirty = true; ed.editN = (ed.editN || 0) + 1; ed.msg = ""; ed.stale = false; ed.clickAt = Date.now();
+    stmtEdRefresh();
+    return rows;
+  }
+  function stmtPickChoose(id){
+    var ed = STMT.ed, pk = ed && ed.pick, rows, kind;
+    if (!pk || pk.loading || pk.err || !stmtEdW(ed) || !stmtVehIn(pk.list, id)) return;
+    kind = pk.kind || stmtAliasKind(pk.t, pk.list);
+    if (kind !== "ok"){   // 여러 대·짧은 번호 — 이 명세 줄에만(있던 별칭은 지움 — 다음 달부터 다시 여러 대로 물음)
+      rows = stmtPickApply(ed, pk, id, "rowonly", kind === "multi" ? "이 줄에만(여러 대)" : "이 줄에만(번호가 짧음)");
+      rows.forEach(function(x){ x.vhintT = (kind === "multi" ? "끝 4자리가 같은 차가 여러 대라" : "번호가 4자리보다 짧아") + " 별칭으로 저장하지 않았습니다 — 이 명세 줄에만 붙였고, 다음 달에도 고릅니다"; });
+      if (pk.prev) stmtAliasQueue({ ed: ed, t: pk.t, veh: "", prev: pk.prev, rows: rows, rowVeh: id, okTxt: "이 줄에만 · 별칭 지움", okTitle: "있던 별칭(…" + stmtLast4(pk.prev) + ")을 지웠습니다 — 이 번호 글은 다음 달부터 다시 고릅니다" });
+      stmtEdRefresh();
+      return;
+    }
+    rows = stmtPickApply(ed, pk, id, "pick", pk.prev === id ? "별칭 그대로" : "별칭 저장 중…");
+    if (pk.prev === id) return;   // 다시 골라도 같은 차 — 사전은 그대로
+    stmtAliasQueue({ ed: ed, t: pk.t, veh: id, prev: pk.prev, rows: rows, rowVeh: id, okTxt: "별칭 저장 ✓", okTitle: "고른 차 — 이 번호 글은 다음 달부터 자동으로 이 차를 찾습니다(별칭 사전)" });
+  }
+  // ---- 별칭 저장 줄(29 판③ 검토 반영) — 한 번에 하나씩(연달아 고르면 앞 저장의 새 판으로 다음을 보냄 — 409 줄임) · 상세를 닫거나 다시 불러와도 끝까지 보냄(안내는 같은 문서 상세가 열려 있을 때만) ·
+  //   보는 사람이 바뀌면(STMT.who) 아직 안 보낸 저장·다시 시도는 버림(다른 사람 이름으로 저장되지 않게) · 판(base)은 STMT.aliasAt 하나(대조·고르기·저장 응답이 고침)
+  var STMT_AQ = [];
+  function stmtAliasQueue(op){ op.who = STMT.who; op.n = 0; STMT_AQ.push(op); stmtAliasNext(); }
+  function stmtAliasNext(){ var op = STMT_AQ[0]; if (!op || op.busy) return; if (op.who !== STMT.who){ STMT_AQ.shift(); stmtAliasNext(); return; } op.busy = true; stmtAliasSend(op); }
+  function stmtAliasDone(op){ var k = STMT_AQ.indexOf(op); if (k >= 0) STMT_AQ.splice(k, 1); stmtAliasNext(); }
+  function stmtAliasEd(op){ var ed = STMT.ed; return (op.who === STMT.who && ed && (ed === op.ed || (ed.vk === op.ed.vk && ed.ym === op.ed.ym))) ? ed : null; }   // 안내를 붙일 상세(같은 문서면 다시 불러온 상세도)
+  // 별칭 저장 결과를 붙인 줄에 — 줄 객체가 갈렸으면 같은 줄 id로(stmtRowOf) · 그 사이 다른 차로 바꾼 줄은 안 건드림 · clear = 붙인 차를 뗌(차량 목록에 없는 차) · av = 지금 사전 값(모르면 성공 때 op.veh)
+  function stmtAliasHint(op, txt, bad, clear, title, av){
+    var ed = stmtAliasEd(op);
+    if (!ed) return;
+    op.rows.forEach(function(x){
+      var cur = stmtRowOf(ed, x);
+      if (!cur || cur.veh !== op.rowVeh) return;
+      cur.vhint = txt; cur.vhintT = title || ""; cur.vbad = !!bad;
+      if (av !== undefined) cur.valias = av; else if (!bad && !clear) cur.valias = op.veh;
+      if (cur.vm && cur.vm.veh === cur.veh) cur.vm.alias = cur.valias || "";
+      if (clear){ cur.veh = ""; cur.vhow = ""; cur.vm = null; cur.valias = ""; cur.vtried = true; }
+    });
+    if (clear){ ed.dirty = true; ed.editN = (ed.editN || 0) + 1; }
+    stmtEdRefresh();
+  }
+  function stmtAliasSend(op){
+    var key = stmtNormPlate(op.t), done = function(){ stmtAliasDone(op); },
+      fail = function(why){ stmtAliasHint(op, "별칭 저장 못 함", true, false, "이 명세의 줄에만 붙였습니다 — 별칭은 " + (op.veh ? "저장" : "지우지") + " 못 했습니다(" + why + ") · [다시 고르기]로 다시 할 수 있습니다"); done(); };
+    if (op.who !== STMT.who){ done(); return; }
+    gwCall("gw-stmt", { action: "stmt_alias_set", raw: op.t.slice(0, 40), veh: op.veh, base: STMT.aliasAt || 0 }).then(function(res){
+      var b = (res && res.body) || {}, code = b.error_code || "";
+      if (res.status === 409 && op.n < 1 && op.who === STMT.who){   // 그 사이 사전이 바뀜 — 판만 다시 읽고, 이 글의 값이 내가 본 값 그대로일 때만 한 번 더(다른 사람이 이 글에 넣은 값은 덮지 않음 — 검토)
+        op.n++;
+        gwCall("gw-stmt", { action: "stmt_alias_get" }).then(function(r2){
+          var mp, cur;
+          if (op.who !== STMT.who){ done(); return; }
+          if (!(r2.status === 200 && r2.body && r2.body.status === "OK" && r2.body.map && typeof r2.body.map === "object")){ fail(stmtErrText(r2)); return; }
+          STMT.aliasAt = Number(r2.body.updated_at) || 0; mp = r2.body.map;
+          cur = Object.prototype.hasOwnProperty.call(mp, key) ? String(mp[key] || "") : "";
+          if (cur === op.veh){ stmtAliasHint(op, op.okTxt, false, false, op.okTitle); done(); return; }
+          if (cur !== (op.prev || "")){ stmtAliasHint(op, "다른 곳에서 바뀜 — 확인", true, false, "그 사이 다른 곳에서 이 번호 글의 별칭을 " + (cur ? "다른 차(…" + stmtLast4(cur) + ")로" : "지워") + " 바꿔 덮어쓰지 않았습니다 — 이 명세 줄에만 붙였습니다", cur); done(); return; }
+          stmtAliasSend(op);
+        }).catch(function(){ fail("네트워크"); });
+        return;
+      }
+      if (res.status === 401){ fail("로그인이 풀림"); onSessionInvalid(); return; }
+      if ((res.status === 200 && b.status === "OK") || code === "NO_CHANGE"){ if (b.updated_at) STMT.aliasAt = Number(b.updated_at) || STMT.aliasAt; stmtAliasHint(op, op.okTxt, false, false, op.okTitle); done(); return; }
+      if (code === "UNKNOWN_VEH"){ stmtAliasHint(op, "지워진 차 — 다시 골라 주세요", true, true, "차량 목록에 없는 차량입니다(그 사이 지워짐) — 다시 골라 주세요"); done(); return; }
+      fail(code === "STMT_STALE" ? "다른 곳에서 사전을 고치는 중" : stmtErrText(res));
+    }).catch(function(){ fail("네트워크"); });
   }
 
   // ---- 월 보드(장 1) ----
@@ -8489,8 +8738,8 @@
       stmtMonthDone();
     });
   }
-  // 달 응답 뒤 — 상세를 연 채면 요약 숫자만(편집 표를 다시 그리면 치던 칸의 포커스·한글 조합이 끊김 — 검토 반영), 아니면 보드째
-  function stmtMonthDone(){ if (currentTab !== "stmt") return; if (STMT.ed) stmtRenderStats(); else renderStmt(); }
+  // 달 응답 뒤 — 상세·거래처 목록 고치기를 연 채면 요약 숫자만(편집 표를 다시 그리면 치던 칸의 포커스·한글 조합이 끊김 — 검토 반영), 아니면 보드째
+  function stmtMonthDone(){ if (currentTab !== "stmt") return; if (STMT.ed || STMT.cfg) stmtRenderStats(); else renderStmt(); }
   function stmtReindex(ym, then){
     if (!canDo("stmt")) return;
     gwCall("gw-stmt", { action: "stmt_reindex", ym: ym }).then(function(res){
@@ -8500,7 +8749,7 @@
   }
   function stmtMonth(n){
     var ym;
-    if (STMT.ed) return;
+    if (STMT.ed || STMT.cfg) return;
     ym = stmtYmShift(STMT.ym || stmtYmShift(stmtKstYm(), -1), n);
     if (ym > stmtKstYm()) return;   // 이번 달 다음은 없음(명세는 지난 달 것)
     STMT.ym = ym; STMT.month = null; STMT.err = ""; STMT.errCode = ""; STMT.open = {}; STMT.mseq++; STMT.loading = false;
@@ -8512,13 +8761,15 @@
   function stmtEdW(ed){ return !!(ed && canDo("stmt") && !ed.loading && !ed.err && (!stmtFinal(ed.status) || ed.reopen)); }   // 입력칸을 그리나 — 수행 권한 + 작성 중(확정은 [고치기]로 푼 뒤)
   // 사람이 더한 줄 id(영문 시작 — 서버 RE_RID) — 마지막으로 낸 번호(ed.ridN)를 기억해, 줄을 넣기 전에 연달아 만들어도 겹치지 않는다(겹치면 서버가 DUP_RID로 저장 전체를 거절 — uismoke 29 판② ②가 잡음)
   function stmtNewRid(ed){ var used = {}, k; ed.rows.forEach(function(e){ if (e.r) used[e.r] = 1; }); k = Math.max(Number(ed.ridN) || 0, ed.rows.length) + 1; while (used["h" + k.toString(36)]) k++; ed.ridN = k; return "h" + k.toString(36); }
-  function stmtNewRow(ed){ return { r: stmtNewRid(ed), date: "", veh: "", vin: "", item: "", kind: (ed.vendor && ed.vendor.kind) || "", use: "", qty: "", unit: "", amt: "", vat: "", tire: null, how: "hand", note: "", vhint: "" }; }
-  function stmtEdRow(x){   // 서버 줄 → 편집 줄(글)
-    return { r: x.r || "", date: stmtDateOut(x.date), veh: x.veh || "", vin: x.vraw || "", vm: { t: x.vraw || "", veh: x.veh || "" }, item: x.item || "", kind: x.kind || "", use: x.use || "",
+  function stmtNewRow(ed){ return { r: stmtNewRid(ed), date: "", veh: "", vin: "", item: "", kind: (ed.vendor && ed.vendor.kind) || "", use: "", useHow: "", qty: "", unit: "", amt: "", vat: "", tire: null, how: "hand", note: "", vhint: "" }; }
+  // 서버 줄 → 편집 줄(글) · vtried = 번호 글은 있는데 차량이 빈 채 저장된 줄(바로 [고르기]) · vhow = 차를 찾은 길(plate·old·old4·last4·alias·pick·rowonly — 저장된 줄은 모름 '') · valias = 그 글의 별칭 값(아는 만큼)
+  function stmtEdRow(x){
+    return { r: x.r || "", date: stmtDateOut(x.date), veh: x.veh || "", vin: x.vraw || "", vm: { t: x.vraw || "", veh: x.veh || "", how: "", alias: "" }, vhow: "", valias: "", vtried: !!(x.vraw && !x.veh), item: x.item || "", kind: x.kind || "", use: x.use || "", useHow: "",
       qty: x.qty == null ? "" : stmtDecStr(x.qty, x.qd), unit: x.unit == null ? "" : stmtDecStr(x.unit, x.ud), amt: x.amt == null ? "" : stmtNum(x.amt), vat: x.vat == null ? "" : stmtNum(x.vat),
-      tire: x.tire || null, how: x.how || "hand", note: x.note || "", vhint: "" };
+      tire: x.tire ? { pos: x.tire.pos || "", act: x.tire.act || "" } : null, how: x.how || "hand", note: x.note || "", vhint: "" };
   }
-  function stmtEdEmpty(e){ return !["date", "vin", "item", "qty", "unit", "amt", "vat", "note"].some(function(f){ return String(e[f] == null ? "" : e[f]).trim() !== ""; }); }   // 빈 줄 = 저장·검산에서 뺌(종류·용도 기본값만 있는 줄 포함)
+  // 빈 줄 = 저장·검산에서 뺌(종류·용도 기본값만 있는 줄 포함 — 타이어 위치를 넣은 타이어 줄은 빈 줄 아님)
+  function stmtEdEmpty(e){ return !["date", "vin", "item", "qty", "unit", "amt", "vat", "note"].some(function(f){ return String(e[f] == null ? "" : e[f]).trim() !== ""; }) && !(e.kind === "tire" && e.tire && String(e.tire.pos || "").trim() !== ""); }
   function stmtEdLoad(b){
     var ed = STMT.ed, d = b.doc, v = b.vendor;
     ed.loading = false; ed.err = ""; ed.vendor = v; ed.doc = d;
@@ -8534,10 +8785,12 @@
     ed.src = d && Array.isArray(d.src) ? d.src : [];   // 넣은 파일 표시(판④) — 저장 때 그대로 돌려보냄(빼면 서버가 빈 목록으로 덮음)
     ed.draft = d ? (d.draft || null) : null;
     ed.hasPrev = !!(d && d.prev);
-    ed.dirty = false; ed.saving = false; ed.stale = false; ed.vsubSig = null; ed.editN = 0; ed.saveN = 0;
+    ed.dirty = false; ed.saving = false; ed.stale = false; ed.vsubSig = null; ed.editN = 0; ed.saveN = 0; ed.pick = null;
+    if (ed.prevUse === undefined && ed.group === "tool" && canDo("stmt")) stmtPrevUseLoad(ed);   // 29 판③ 용도 기본값 — 상세를 연 뒤 한 번(저장 뒤 다시 채울 때는 안 읽음)
   }
   function stmtOpen(vk, again){   // again = 상세의 [다시 불러오기] — 보드 행 확인 없이(달 읽기가 실패해 보드가 비어도 열림 — 거래처는 서버가 확인)
     var seq, ok = false;
+    if (STMT.cfg) return;   // 거래처 목록 고치기를 연 채로는 열지 않음(보드가 가려져 있음)
     stmtBoardRows().forEach(function(r){ if (r.vk === vk) ok = true; });
     if (again && typeof vk === "string" && /^v\d{2,3}$/.test(vk)) ok = true;
     if (!ok || !canSee("stmt")) return;
@@ -8578,17 +8831,19 @@
   function stmtVsubIn(map, bad){ var out = stmtDict(), n = 0; Object.keys(map || {}).forEach(function(k){ var t = String(map[k] == null ? "" : map[k]).trim(), m; if (!t) return; m = stmtMoney(t, false); if (m === undefined){ bad[k] = 1; return; } out[k] = m; n++; }); return n ? out : null; }
   // 편집 판 전체 → { rows(보낼 꼴) · parsed(서버 cleanRow 꼴 — 검산 거울용) · idx(parsed i → 편집 줄 번호) · badf(줄별 형식 오류 칸) · docErr · vsubBad · errs(사람 말) · doc · chk }
   function stmtEdCollect(ed){
-    var out = { rows: [], parsed: [], idx: [], badf: {}, docErr: {}, vsubBad: {}, errs: [] }, inv, carry, stated, vsub, lb = { date: "일자", vin: "차량(개인정보 꼴)", item: "품목", note: "비고", qty: "수량", unit: "단가", amt: "금액", vat: "세액" };
+    var out = { rows: [], parsed: [], idx: [], badf: {}, docErr: {}, vsubBad: {}, errs: [] }, inv, carry, stated, vsub, lb = { date: "일자", vin: "차량(개인정보 꼴)", item: "품목", note: "비고", qty: "수량", unit: "단가", amt: "금액", vat: "세액", tpos: "타이어 위치" };
     ed.rows.forEach(function(e, i){
-      var qty, unit, amt, vat, date, item, note, bf = {}, row;
+      var qty, unit, amt, vat, date, item, note, bf = {}, row, tp = "", ta = "";
       if (stmtEdEmpty(e)) return;
       qty = stmtDecimal(e.qty, 1e7); unit = stmtDecimal(e.unit, 1e10); amt = stmtMoney(e.amt, true); vat = ed.basis === "total" ? null : stmtMoney(e.vat, true);
       date = stmtDateIn(e.date, ed.ym); item = stmtText(e.item, 40); note = stmtText(e.note, 60);
       if (qty === undefined) bf.qty = 1; if (unit === undefined) bf.unit = 1; if (amt === undefined) bf.amt = 1; if (vat === undefined) bf.vat = 1; if (date === undefined) bf.date = 1;
       // 개인정보 꼴은 보낼 값(정리한 글)으로 — 서버도 그 값을 봄(검토: 차량 칸 '010/1234/5678'은 글자를 걸러 '01012345678'이 되고, 품목 공백 두 칸은 한 칸으로 접혀 서버만 걸렸음)
       if (item === null || stmtPii(item)) bf.item = 1; if (note === null || stmtPii(note)) bf.note = 1; if (stmtPii(stmtVraw(e.vin))) bf.vin = 1;
+      // 타이어 위치·조치(29 판③ — 종류가 타이어인 줄만 보냄, 둘 다 비면 null · 위치는 서버 text 30자·개인정보 꼴과 같은 거절)
+      if (e.kind === "tire" && e.tire){ tp = stmtText(e.tire.pos, 30); ta = Object.prototype.hasOwnProperty.call(STMT_TIRE_ACT, e.tire.act) ? e.tire.act : ""; if (tp === null || stmtPii(tp)) bf.tpos = 1; }
       row = { r: e.r || "", date: date || "", veh: e.veh || "", vraw: stmtVraw(e.vin), item: item || "", kind: e.kind || "", use: e.use || "", qty: qty ? qty.n : null, qd: qty ? qty.d : 0, unit: unit ? unit.n : null, ud: unit ? unit.d : 0,
-        amt: (amt === undefined ? null : amt), vat: (vat === undefined ? null : vat), tire: e.kind === "tire" ? (e.tire || null) : null, how: e.how || "hand", note: note || "" };
+        amt: (amt === undefined ? null : amt), vat: (vat === undefined ? null : vat), tire: (e.kind === "tire" && (tp || ta)) ? { pos: tp || "", act: ta } : null, how: e.how || "hand", note: note || "" };
       out.parsed.push(row); out.idx.push(i);
       if (Object.keys(bf).length){ out.badf[i] = bf; out.errs.push((i + 1) + "번 줄 " + Object.keys(bf).map(function(f){ return lb[f] || f; }).join("·")); }
       out.rows.push({ r: row.r, date: row.date, veh: row.veh, vraw: row.vraw, item: row.item, kind: row.kind, use: row.use, qty: stmtNumStr(e.qty), unit: stmtNumStr(e.unit), amt: row.amt, vat: row.vat, tire: row.tire, how: row.how, note: row.note });
@@ -8606,26 +8861,37 @@
     return out;
   }
   function stmtOpts(map, cur, ph){ return '<option value="">' + esc(ph) + '</option>' + Object.keys(map).map(function(k){ return '<option value="' + k + '"' + (k === cur ? " selected" : "") + '>' + esc(map[k]) + '</option>'; }).join(""); }
-  function stmtEdRowHtml(ed, e, i, w, tool, vat){
-    var h = '<tr data-i="' + i + '"><td class="c-n st-mute">' + (i + 1) + '</td>', inp = function(f, ph, cls, extra){ return '<input data-f="' + f + '" data-i="' + i + '" value="' + esc(e[f]) + '" placeholder="' + esc(ph) + '" autocomplete="off"' + (cls ? ' class="' + cls + '"' : '') + (extra || "") + '>'; };
+  // 줄 하나(+ 타이어 위치·조치 줄 · 그 줄 고르기 칸) — 용구 거래처(tool)는 차량 칸 대신 용도 칸(칩 6 + '차량'일 때 번호 칸 — 시안 '차량 칸 없음 · 용도 칩', 29 판③)
+  function stmtEdRowHtml(ed, e, i, w, tool, vat, nc){
+    var h = '<tr data-i="' + i + '"><td class="c-n st-mute">' + (i + 1) + '</td>', inp = function(f, ph, cls, extra){ return '<input data-f="' + f + '" data-i="' + i + '" value="' + esc(e[f]) + '" placeholder="' + esc(ph) + '" autocomplete="off"' + (cls ? ' class="' + cls + '"' : '') + (extra || "") + '>'; },
+      vin = String(e.vin || "").trim(), tr = e.tire || {};
+    nc = nc || (9 + (vat ? 1 : 0) + (w ? 1 : 0));
     if (!w){
-      h += '<td class="c-date">' + esc(e.date || "-") + '</td><td class="c-veh">' + (e.veh ? stmtVehHtml(e.veh) : '<span class="st-mute">' + esc(e.vin || "-") + '</span>') + '</td><td class="c-item">' + esc(e.item || "-") + '</td><td class="c-kind">' + esc(STMT_KIND[e.kind] || "-") + '</td>'
-        + (tool ? '<td class="c-use">' + esc(STMT_USE[e.use] || "-") + '</td>' : '')
+      h += '<td class="c-date">' + esc(e.date || "-") + '</td>' + (tool ? '' : '<td class="c-veh">' + (e.veh ? stmtVehHtml(e.veh) : '<span class="st-mute">' + esc(e.vin || "-") + '</span>') + '</td>')
+        + '<td class="c-item">' + esc(e.item || "-") + '</td><td class="c-kind">' + esc(STMT_KIND[e.kind] || "-") + '</td>'
+        + (tool ? '<td class="c-use">' + esc(STMT_USE[e.use] || "-") + (e.veh || vin ? '<span class="st-vc">' + (e.veh ? stmtVehHtml(e.veh) : '<span class="st-mute">' + esc(vin) + '</span>') + '</span>' : '') + '</td>' : '')
         + '<td class="c-qty num">' + esc(e.qty || "") + '</td><td class="c-unit num">' + esc(e.unit || "") + '</td><td class="c-amt num">' + esc(e.amt || "-") + '</td>' + (vat ? '<td class="c-vat num">' + esc(e.vat || "") + '</td>' : '')
         + '<td class="c-st" data-st="' + i + '"></td></tr>';
+      if (e.kind === "tire" && (tr.pos || tr.act)) h += '<tr class="st-sub"><td class="c-n"></td><td colspan="' + (nc - 1) + '"><div class="st-tire"><span class="st-tl">타이어</span><span>위치 <b>' + esc(tr.pos || "-") + '</b></span><span>조치 <b>' + esc(STMT_TIRE_ACT[tr.act] || "-") + '</b></span></div></td></tr>';
       return h;
     }
     h += '<td class="c-date">' + inp("date", "일(DD)", "", ' inputmode="numeric"') + '</td>'
-      + '<td class="c-veh">' + inp("vin", "번호 끝 4자리", "", ' list="stmtVehDl"') + '<span class="st-vc" data-vc="' + i + '"></span></td>'
+      + (tool ? '' : '<td class="c-veh">' + inp("vin", "번호 끝 4자리", "", ' list="stmtVehDl"') + '<span class="st-vc" data-vc="' + i + '"></span></td>')
       + '<td class="c-item">' + inp("item", "품목", "", ' maxlength="40"') + '</td>'
       + '<td class="c-kind"><select data-f="kind" data-i="' + i + '">' + stmtOpts(STMT_KIND, e.kind, "종류") + '</select></td>'
-      + (tool ? '<td class="c-use"><select data-f="use" data-i="' + i + '">' + stmtOpts(STMT_USE, e.use, "용도") + '</select></td>' : '')
+      + (tool ? '<td class="c-use"><span class="st-ucs" data-uc="' + i + '">' + Object.keys(STMT_USE_SHORT).map(function(k){ return '<button type="button" class="st-uc" data-st-use="' + k + '" data-i="' + i + '" title="' + esc(STMT_USE[k]) + '">' + esc(STMT_USE_SHORT[k]) + '</button>'; }).join("") + '</span>'
+        + '<div class="st-uv" data-uv="' + i + '">' + inp("vin", "차량 번호 끝 4자리", "", ' list="stmtVehDl"') + '<span class="st-vc" data-vc="' + i + '"></span></div></td>' : '')
       + '<td class="c-qty num">' + inp("qty", "수량", "", ' inputmode="decimal"') + '</td>'
       + '<td class="c-unit num">' + inp("unit", "단가", "", ' inputmode="decimal"') + '</td>'
       + '<td class="c-amt num">' + inp("amt", vat ? "공급가" : "금액", "", ' inputmode="numeric"') + '</td>'
       + (vat ? '<td class="c-vat num">' + inp("vat", "세액", "", ' inputmode="numeric"') + '</td>' : '')
       + '<td class="c-st" data-st="' + i + '"></td>'
       + '<td class="c-x"><button type="button" class="mini-btn" data-st-act="del" data-i="' + i + '" title="이 줄 지우기">×</button></td></tr>';
+    // 타이어 위치·조치 — 줄마다 그려 두고 종류가 타이어일 때만 보임(종류를 바꿀 때 표를 다시 그리지 않게 — stmtEdRefresh가 보이기만 바꿈)
+    h += '<tr class="st-sub" data-sub="' + i + '"' + (stmtSubShow(e) ? '' : ' style="display:none;"') + '><td class="c-n"></td><td colspan="' + (nc - 1) + '"><div class="st-tire"><span class="st-tl">타이어</span>'
+      + '<label>위치<input data-t="pos" data-i="' + i + '" value="' + esc(tr.pos || "") + '" placeholder="예: 운전석 2축 바깥" maxlength="30" list="stmtTirePos" autocomplete="off"></label>'
+      + '<label>조치<select data-t="act" data-i="' + i + '">' + stmtOpts(STMT_TIRE_ACT, tr.act || "", "조치") + '</select></label></div></td></tr>';
+    if (ed.pick && stmtPickIs(ed, e)) h += '<tr class="st-pick" data-pick="' + i + '"><td colspan="' + nc + '">' + stmtPickHtml(ed) + '</td></tr>';
     return h;
   }
   function stmtPathGet(ed, path){ var p = path.split("."); return p.length === 1 ? (ed[p[0]] == null ? "" : ed[p[0]]) : ((ed[p[0]] || {})[p[1]] == null ? "" : ed[p[0]][p[1]]); }
@@ -8657,17 +8923,18 @@
       + (carry ? '<div class="grp">' + stmtFld(ed, w, "carry.prev", "전기이월") + stmtFld(ed, w, "carry.month", "당월(원장)") + stmtFld(ed, w, "carry.paid", "입금") + stmtFld(ed, w, "carry.bal", "잔액") + '</div>' : '')
       + '</div>';
     h += '<details class="card st-vsub"' + (stmtAllEmpty(ed.vsub, Object.keys(ed.vsub || {})) ? '' : ' open') + '><summary>차량 소계 — 명세서에 차량별 소계가 있으면 넣어 주세요(줄을 다른 차에 붙인 판독을 잡습니다)</summary><div class="st-fields" id="stmtVsubBody"></div></details>';
-    nc = 9 + (tool ? 1 : 0) + (vat ? 1 : 0) + (w ? 1 : 0);
-    h += '<div class="card st-ed-wrap"><table class="st-ed' + (vat ? ' st-v' : '') + (tool ? ' st-u' : '') + '"><thead><tr><th>#</th><th>일자</th><th>차량</th><th>품목</th><th>종류</th>' + (tool ? '<th>용도</th>' : '') + '<th class="num">수량</th><th class="num">단가</th><th class="num">' + (vat ? "공급가" : "금액(부가세 포함)") + '</th>'
+    nc = 9 + (vat ? 1 : 0) + (w ? 1 : 0);   // 용구 거래처는 차량 칸 대신 용도 칸(29 판③) — 열 수 같음
+    if (tool && w) h += '<div class="st-note" id="stmtUseNote"></div>';
+    h += '<div class="card st-ed-wrap"><table class="st-ed' + (vat ? ' st-v' : '') + (tool ? ' st-u' : '') + '"><thead><tr><th>#</th><th>일자</th>' + (tool ? '' : '<th>차량</th>') + '<th>품목</th><th>종류</th>' + (tool ? '<th>용도</th>' : '') + '<th class="num">수량</th><th class="num">단가</th><th class="num">' + (vat ? "공급가" : "금액(부가세 포함)") + '</th>'
       + (vat ? '<th class="num">세액</th>' : '') + '<th>검산</th>' + (w ? '<th></th>' : '') + '</tr></thead><tbody>';
-    ed.rows.forEach(function(e, i){ h += stmtEdRowHtml(ed, e, i, w, tool, vat); });
+    ed.rows.forEach(function(e, i){ h += stmtEdRowHtml(ed, e, i, w, tool, vat, nc); });
     if (!ed.rows.length) h += '<tr><td colspan="' + nc + '" class="st-mute">줄이 없습니다' + (w ? ' — [+ 줄 추가]' : '') + '</td></tr>';
     h += '</tbody><tfoot><tr><td colspan="' + nc + '" id="stmtFoot"></td></tr></tfoot></table></div>';
     h += '<div class="st-savebar" id="stmtBar"><button type="button" class="mini-btn" data-st-act="add">+ 줄 추가</button><button type="button" class="mini-btn" data-st-act="save">저장(작성 중)</button>'
       + '<button type="button" class="mini-btn appr-btn" data-st-act="done">확정 저장</button><button type="button" class="mini-btn" data-st-act="sent" title="사장님·나주임께 전달했으면 표시">전달함 표시</button>'
       + '<button type="button" class="mini-btn" data-st-act="reopen" title="확정을 풀고 고칩니다">고치기(확정 풀기)</button><button type="button" class="mini-btn" data-st-act="revert" title="직전 저장 판으로">되돌리기</button>'
       + '<span class="st-gap" id="stmtGapTxt"></span></div>';
-    if (w) h += stmtVehDl();
+    if (w) h += stmtVehDl() + '<datalist id="stmtTirePos">' + STMT_TIRE_POS.map(function(s){ return '<option value="' + esc(s) + '"></option>'; }).join("") + '</datalist>';
     host.innerHTML = h;
     ed.vsubSig = null;
     stmtEdRefresh();
@@ -8718,12 +8985,17 @@
     w = stmtEdW(ed); p = stmtEdCollect(ed); ed.last = p; fin = stmtFinal(ed.status);
     p.chk.bad.forEach(function(b){ why[p.idx[b.i]] = b.why; });
     Array.prototype.forEach.call(host.querySelectorAll("tr[data-i]"), function(tr){
-      var i = Number(tr.getAttribute("data-i")), e = ed.rows[i], bf = p.badf[i] || {}, wy = why[i] || [], st = tr.querySelector("[data-st]"), vc = tr.querySelector("[data-vc]"), empty = !e || stmtEdEmpty(e), nb = Object.keys(bf).length;
+      var i = Number(tr.getAttribute("data-i")), e = ed.rows[i], bf = p.badf[i] || {}, wy = why[i] || [], st = tr.querySelector("[data-st]"), vc = tr.querySelector("[data-vc]"), uc = tr.querySelector("[data-uc]"), uv = tr.querySelector("[data-uv]"), empty = !e || stmtEdEmpty(e), nb = Object.keys(bf).length, vh, sg;
       tr.classList.toggle("red", !empty && (wy.length > 0 || nb > 0));
       Array.prototype.forEach.call(tr.querySelectorAll("[data-f]"), function(el){ var f = el.getAttribute("data-f"); el.classList.toggle("bad", !empty && (!!bf[f] || stmtWhyHits(wy, f))); });
       if (st) st.innerHTML = empty ? '<span class="st-mute">빈 줄(저장 안 함)</span>' : (nb ? '<span class="st-no">형식</span>' : (wy.length ? '<span class="st-no">' + esc(wy.map(function(k){ return STMT_WHY[k] || k; }).join(" · ")) + '</span>' : '<span class="st-ok">✓</span>'));
-      if (vc) vc.innerHTML = e ? stmtVehHtml(e.veh) + (e.vhint ? ' <span class="' + (e.veh ? "st-mute" : "st-no") + '">' + esc(e.vhint) + '</span>' : '') : '';
+      if (vc){ vh = e ? stmtVcHtml(ed, e, i, w) : ""; if (vc.__h !== vh){ vc.innerHTML = vh; vc.__h = vh; } }   // 같은 글이면 안 건드림(누르려는 [고르기] 단추를 갈아 끼우지 않게)
+      // 용도 칩 — 단추는 그대로 두고 표시만(칩을 누르는 사이 품목 칸을 떠나 기본값이 들어가도 누른 단추가 살아 있게) · '차량'이거나 번호·차량이 있으면 번호 칸
+      if (uc){ sg = stmtUseSug(ed, e); Array.prototype.forEach.call(uc.querySelectorAll("[data-st-use]"), function(b){ var c = stmtChipCls(e, b.getAttribute("data-st-use"), sg); b.classList.toggle("on", c.on); b.classList.toggle("prev", c.prev); b.classList.toggle("sug", c.sug); }); uc.classList.toggle("bad", !empty && stmtWhyHits(wy, "use")); }
+      if (uv) uv.style.display = stmtUvShow(e) ? "" : "none";
     });
+    Array.prototype.forEach.call(host.querySelectorAll("tr[data-sub]"), function(tr){ var i = Number(tr.getAttribute("data-sub")), e = ed.rows[i], pos = tr.querySelector('[data-t="pos"]'); tr.style.display = stmtSubShow(e) ? "" : "none"; if (pos) pos.classList.toggle("bad", !!(p.badf[i] || {}).tpos); });
+    if (ed.group === "tool" && w) stmtSetHtml("stmtUseNote", stmtUseNoteHtml(ed));
     Array.prototype.forEach.call(host.querySelectorAll("[data-d]"), function(el){ el.classList.toggle("bad", !!p.docErr[el.getAttribute("data-d").split(".")[0]]); });
     vs = stmtVsubHtml(ed, w);
     if (vs.sig !== ed.vsubSig){ vb = document.getElementById("stmtVsubBody"); if (vb) vb.innerHTML = vs.html; ed.vsubSig = vs.sig; }
@@ -8793,15 +9065,82 @@
     e.amt = stmtNum(a); el = document.querySelector('#stmtEditor [data-f="amt"][data-i="' + i + '"]'); if (el) el.value = e.amt;
     ed.dirty = true; ed.editN = (ed.editN || 0) + 1;
   }
+  // ---- 용구 용도 칩(29 판③ — 시안 v2 §3-3 '지난달 같은 품목 기본값 칩', R1 바꿀 수 있는 기본값) ----
+  //   상세를 열 때 지난달 같은 거래처 문서를 한 번 읽어 품목(띄어쓰기 빼고 소문자) → 가장 많이 쓴 용도 지도를 만들고, 품목 칸을 떠날 때 용도가 비었으면 그 값을 점선 칩으로 넣음(사람이 고른 용도는 안 덮음).
+  //   점선 칩을 누르면 확정 · 고른 칩을 다시 누르면 비움. 지난달을 못 읽으면 기본값 없이(칩은 그대로 고름)
+  function stmtItemKey(s){ return String(s == null ? "" : s).replace(/\s+/g, "").toLowerCase(); }
+  function stmtPrevUseLoad(ed){
+    var ym = stmtYmShift(ed.ym, -1);
+    ed.prevUse = { ym: ym, map: null, st: "loading" };
+    gwCall("gw-stmt", { action: "stmt_get", ym: ym, vk: ed.vk }).then(function(res){
+      var b = (res && res.body) || {}, cnt = stmtDict(), map = stmtDict();
+      if (STMT.ed !== ed) return;
+      if (res.status !== 200 || b.status !== "OK"){ ed.prevUse.st = "err"; stmtEdRefresh(); return; }
+      ((b.doc && Array.isArray(b.doc.rows)) ? b.doc.rows : []).forEach(function(x){
+        var k = stmtItemKey(x && x.item), c;
+        if (!k || !x.use || !Object.prototype.hasOwnProperty.call(STMT_USE, x.use)) return;
+        c = cnt[k] = cnt[k] || stmtDict(); c[x.use] = (c[x.use] || 0) + 1;
+      });
+      Object.keys(cnt).forEach(function(k){ var best = "", n = 0; Object.keys(cnt[k]).forEach(function(u){ if (cnt[k][u] > n){ best = u; n = cnt[k][u]; } }); map[k] = best; });
+      ed.prevUse.map = map; ed.prevUse.st = Object.keys(map).length ? "ok" : "none";
+      stmtEdRefresh();
+    }).catch(function(){ if (STMT.ed === ed){ ed.prevUse.st = "err"; stmtEdRefresh(); } });
+  }
+  function stmtUseDefault(i){   // → 바꿨으면 true · 사람이 고른 용도는 안 덮음 · 지난달 값(prev)이 들어간 줄은 품목을 고치면 다시 셈(지난달에 없으면 비움 — 검토: 오타를 고쳐도 옛 기본값이 남아 그대로 저장됨)
+    var ed = STMT.ed, e = ed && ed.rows[i], u;
+    if (!e || ed.group !== "tool" || !ed.prevUse || !ed.prevUse.map) return false;
+    if (e.use && e.useHow !== "prev") return false;
+    u = ed.prevUse.map[stmtItemKey(e.item)] || "";
+    if (u === e.use) return false;
+    e.use = u; e.useHow = u ? "prev" : ""; ed.dirty = true; ed.editN = (ed.editN || 0) + 1;
+    return true;
+  }
+  function stmtUseSug(ed, e){ var m = ed && ed.prevUse && ed.prevUse.map; return (m && e && !e.use && e.item) ? (m[stmtItemKey(e.item)] || "") : ""; }   // 용도가 빈 줄의 지난달 값(표시만)
+  // 줄 표시 규칙(stmtEdRefresh가 그 자리에서 고치는 것 — 순수 함수로 빼 uismoke가 돌림, 검토: 시험이 DOM 고침 길을 안 돌렸음)
+  //   칩: on = 고른 용도 · prev = 고른 것이 지난달 기본값(점선) · sug = 빈 용도에 지난달 값(테두리만) / 번호 칸: '차량'이거나 번호·차량이 있으면 / 타이어 줄: 종류 = 타이어
+  function stmtChipCls(e, k, sg){ var on = !!e && e.use === k; return { on: on, prev: on && e.useHow === "prev", sug: !on && !!sg && sg === k }; }
+  function stmtUvShow(e){ return !!(e && (e.use === "vehicle" || e.veh || String(e.vin || "").trim())); }
+  function stmtSubShow(e){ return !!(e && e.kind === "tire"); }
+  function stmtUseSet(i, k){
+    var ed = STMT.ed, e = ed && ed.rows[i], vi;
+    if (!e || !Object.prototype.hasOwnProperty.call(STMT_USE, k)) return;
+    e.use = (e.use === k && e.useHow !== "prev") ? "" : k;   // 고른 칩을 다시 누르면 비움 · 점선(지난달 값) 칩은 눌러 확정
+    e.useHow = "";
+    ed.dirty = true; ed.editN = (ed.editN || 0) + 1; ed.msg = ""; ed.stale = false;
+    stmtEdRefresh();
+    if (e.use === "vehicle" && !String(e.vin || "").trim()){ vi = document.querySelector('#stmtEditor [data-f="vin"][data-i="' + i + '"]'); if (vi && vi.focus) vi.focus(); }
+  }
+  function stmtUseNoteHtml(ed){
+    var pu = ed.prevUse, mo = Number(String(pu ? pu.ym : stmtYmShift(ed.ym, -1)).slice(5, 7)), s;
+    s = '용도 칩 — 품목을 넣고 칸을 떠나면 지난달(' + mo + '월) 같은 품목의 용도를 먼저 골라 둡니다(점선 칩 = 지난달 값 · 누르면 확정, 다른 칩으로 바꿀 수 있음 · 이미 있던 빈 줄은 점선 테두리만) · \'차량\'을 고르면 번호 칸이 나옵니다.';
+    if (!pu || pu.st === "loading") s += ' <span class="st-mute">지난달 용도 읽는 중…</span>';
+    else if (pu.st === "none") s += ' <span class="st-mute">지난달 기록 없음 — 칩을 골라 주세요</span>';
+    else if (pu.st === "err") s += ' <span class="st-no">지난달 용도를 읽지 못함 — 칩을 골라 주세요</span>';
+    else s += ' <span class="st-mute">지난달 품목 ' + Object.keys(pu.map).length + '가지</span>';
+    return s;
+  }
   function stmtOnInput(e){
-    var ed = STMT.ed, t = e && e.target, f, d, sv, i, x;
+    var ed = STMT.ed, t = e && e.target, f, d, sv, tt, i, x, tv, ex;
     if (!ed || !t || !t.getAttribute || !stmtEdW(ed)) return;
-    f = t.getAttribute("data-f"); d = t.getAttribute("data-d"); sv = t.getAttribute("data-sv");
+    if (t.getAttribute("data-st-pq") != null){ if (ed.pick){ ed.pick.q = t.value; stmtSetHtml("stmtPickList", stmtPickListHtml(ed.pick)); } return; }   // 고르기 칸 찾기 글 — 목록만 다시(고친 내용 아님)
+    f = t.getAttribute("data-f"); d = t.getAttribute("data-d"); sv = t.getAttribute("data-sv"); tt = t.getAttribute("data-t");
     if (f != null){
       i = Number(t.getAttribute("data-i")); x = ed.rows[i];
       if (!x || STMT_RFIELDS.indexOf(f) < 0) return;
       x[f] = t.value;
-      if (f === "vin"){ x.vtok = (x.vtok || 0) + 1; x.vhint = ""; x.vreq = ""; x.veh = stmtVehOfText(x, t.value); }   // 목록에서 고르거나 마지막 대조 글로 되돌리면 그 자리에서 · 치는 중이면 칸을 떠날 때(change·focusout) 서버 대조
+      if (f === "vin"){   // 목록 번호면 그 차(그것을 마지막 대조로 기억 — 검토: 옛 대조 글로 되돌리면 틀린 차가 되살아남) · 마지막 대조 글로 되돌리면 그때 차·찾은 길 · 치는 중이면 칸을 떠날 때(change·focusout) 서버 대조 · 고르기 칸은 닫음(글이 바뀜)
+        x.vtok = (x.vtok || 0) + 1; x.vhint = ""; x.vhintT = ""; x.vbad = false; x.vtried = false; x.vreq = "";
+        tv = String(t.value || "").trim(); ex = stmtVehExact(tv);
+        if (ex){ x.veh = ex; x.vhow = "plate"; x.valias = ""; x.vm = { t: tv, veh: ex, how: "plate", alias: "" }; }
+        else if (x.vm && x.vm.t === tv){ x.veh = x.vm.veh || ""; x.vhow = x.vm.how || ""; x.valias = x.vm.alias || ""; }
+        else { x.veh = ""; x.vhow = ""; x.valias = ""; }
+        if (stmtPickIs(ed, x)) stmtPickDrop(ed);
+      }
+    } else if (tt != null){   // 타이어 위치·조치(29 판③)
+      i = Number(t.getAttribute("data-i")); x = ed.rows[i];
+      if (!x || (tt !== "pos" && tt !== "act")) return;
+      if (!x.tire || typeof x.tire !== "object") x.tire = { pos: "", act: "" };
+      x.tire[tt] = t.value;
     } else if (d != null){
       if (STMT_DPATHS.indexOf(d) < 0 || d === "basis") return;   // 기준은 change에서(열이 바뀜)
       stmtPathSet(ed, d, t.value);
@@ -8819,6 +9158,7 @@
     if (d === "basis"){ ed.basis = t.value === "total" ? "total" : "supply"; ed.dirty = true; ed.editN = (ed.editN || 0) + 1; stmtEdRender(); return; }
     if (f === "vin"){ if (ed.rows[i] && !ed.rows[i].veh) stmtVehMatch(i); return; }
     if ((f === "qty" || f === "unit") && ed.rows[i]) stmtAutoAmt(i);
+    if (f === "item" && ed.rows[i]) stmtUseDefault(i);   // 용구 거래처 — 용도가 비었으면 지난달 같은 품목 값(점선 칩)
     if (f === "amt" || f === "vat" || (d && d !== "inv.date") || t.getAttribute("data-sv") != null){   // 돈 칸은 떠날 때 천 단위 쉼표로
       m = stmtMoney(t.value, true);
       if (typeof m === "number" && t.value !== stmtNum(m)){ t.value = stmtNum(m); if (f && ed.rows[i]) ed.rows[i][f] = t.value; else if (d) stmtPathSet(ed, d, t.value); else ed.vsub[t.getAttribute("data-sv")] = t.value; }
@@ -8833,20 +9173,27 @@
     if (x && !x.veh && String(x.vin || "").trim()) stmtVehMatch(i);
   }
   function stmtOnClick(e){
-    var host = document.getElementById("stmtEditor"), el = e && e.target, act, ed = STMT.ed, i, x;
-    while (el && el !== host && !(el.getAttribute && el.getAttribute("data-st-act") != null)) el = el.parentNode;
+    var host = document.getElementById("stmtEditor"), el = e && e.target, act, ed = STMT.ed, i, x, u;
+    while (el && el !== host && !(el.getAttribute && (el.getAttribute("data-st-act") != null || el.getAttribute("data-st-use") != null || el.getAttribute("data-st-pickv") != null))) el = el.parentNode;
     if (!el || el === host || el.disabled) return;
+    if (ed && ed.clickAt && Date.now() - ed.clickAt < 400) return;   // 고른 직후 둘째 누름(고르기 칸이 빠져 올라온 아래 줄 단추에 떨어짐) 버림
+    u = el.getAttribute("data-st-use");
+    if (u != null){ if (ed && stmtEdW(ed)) stmtUseSet(Number(el.getAttribute("data-i")), u); return; }   // 용도 칩 — 글 칸처럼 저장 중에도 고침(editN이 저장 응답에서 지킴)
+    if (el.getAttribute("data-st-pickv") != null){ if (ed && stmtEdW(ed)) stmtPickChoose(el.getAttribute("data-st-pickv")); return; }
     act = el.getAttribute("data-st-act");
     if (act === "back"){ stmtCloseEd(); return; }
     if (!ed) return;
     if (act === "reload"){ if (!ed.saving && (!ed.dirty || confirm("최신 판을 다시 불러올까요?\n(지금 화면의 고친 내용은 사라집니다)"))) stmtOpen(ed.vk, true); return; }
+    if (act === "pickx"){ ed.pick = null; stmtEdRender(); return; }
     if (!canDo("stmt") || ed.saving) return;
+    if ((act === "pick" || act === "repick") && stmtEdW(ed)){ stmtPickOpen(Number(el.getAttribute("data-i")), act === "repick"); return; }
     if (act === "add" && stmtEdW(ed)){
       ed.rows.push(stmtNewRow(ed)); ed.dirty = true; ed.editN = (ed.editN || 0) + 1; stmtEdRender();
       x = document.querySelector('#stmtEditor [data-f="date"][data-i="' + (ed.rows.length - 1) + '"]'); if (x && x.focus) x.focus();
     } else if (act === "del" && stmtEdW(ed)){
       i = Number(el.getAttribute("data-i")); x = ed.rows[i];
       if (!x || (!stmtEdEmpty(x) && !confirm((i + 1) + "번 줄을 지울까요?"))) return;
+      if (stmtPickIs(ed, x)) ed.pick = null;
       ed.rows.splice(i, 1); ed.dirty = true; ed.editN = (ed.editN || 0) + 1; stmtEdRender();
     } else if (act === "save") stmtEdSave("doing");
     else if (act === "done") stmtEdSave("done");
@@ -8854,35 +9201,202 @@
     else if (act === "reopen"){ if (stmtFinal(ed.status) && confirm("확정을 풀고 고칩니다.\n[저장(작성 중)]을 누르면 확정이 풀리고, [확정 저장]을 누르면 고친 판으로 다시 확정됩니다.")){ ed.reopen = true; stmtEdRender(); } }
     else if (act === "revert") stmtEdRevert();
   }
-  function stmtBindOnce(){   // 자리(#stmtEditor·달 버튼)는 다시 그려도 그대로인 요소라 한 번만 건다
-    var host = document.getElementById("stmtEditor"), pv = document.getElementById("stmtPrev"), nx = document.getElementById("stmtNext");
+  // ---- 거래처 목록 고치기(29 판③ — 수행만, 월 보드 아래 단추) — 서버 stmt_cfg_get·stmt_cfg_set(낙관락 base = 목록 저장 시각 · 있던 거래처 지우기 금지 VENDOR_REMOVED ·
+  //   묶음 바꾸기 금지 GROUP_LOCKED · 같은 판 NO_CHANGE · 이름·낱말 개인정보 꼴 거절). 새 거래처 = 지금 번호 중 가장 큰 것 + 1(있던 거래처는 지울 수 없어 늘 새 번호 — 지난 달 문서 키가 가리키는 번호를 다시 쓰지 않음)
+  function stmtCfgNextVk(rows){ var n = 0; rows.forEach(function(r){ var m = /^v(\d{2,3})$/.exec(r.vk); if (m) n = Math.max(n, Number(m[1])); }); n++; return n > 999 ? "" : "v" + (n < 10 ? "0" + n : String(n)); }
+  // 편집 줄 → 서버 꼴(cleanVendor와 같은 칸) + 줄별 고칠 칸(name·hint·vk·group) · 낱말은 쉼표로 나눔(빈 낱말 뺌)
+  function stmtCfgVendors(rows){
+    var out = [], bad = {}, seen = stmtDict();
+    rows.forEach(function(r, i){
+      var b = {}, name = stmtText(r.name, 30), hint = [],
+        hs = r.hintLock ? (r.hintRaw || []).slice() : String(r.hint == null ? "" : r.hint).split(/[,，]/).map(function(s){ return s.replace(/\s+/g, " ").trim(); }).filter(function(s){ return !!s; });   // 쉼표가 든 저장 낱말은 잠가 그대로(쪼개지 않음 — 검토)
+      if (!name || stmtPii(name)) b.name = 1;
+      if (hs.length > 6) b.hint = 1;
+      hs.forEach(function(h){ var t = stmtText(h, 20); if (!t || stmtPii(t)) b.hint = 1; else hint.push(t); });
+      if (!/^v\d{2,3}$/.test(String(r.vk)) || seen[r.vk]) b.vk = 1;
+      seen[r.vk] = 1;
+      if (r.group !== "veh" && r.group !== "tool") b.group = 1;
+      if (Object.keys(b).length) bad[i] = b;
+      out.push({ vk: r.vk, name: name || "", group: r.group, kind: Object.prototype.hasOwnProperty.call(STMT_KIND_OPT, r.kind) ? r.kind : "", basis: r.basis === "total" ? "total" : "supply", carry: !!r.carry, active: !!r.active, hint: hint });
+    });
+    if (!out.length || out.length > 40) bad.all = 1;
+    if (!Object.keys(bad).length && stmtPii(JSON.stringify(out.map(function(v){ return [v.name, v.hint]; })))) bad.pii = 1;   // 서버 piiScan은 이름·낱말 전체를 한 JSON으로 — 칸 사이에서만 걸리는 꼴
+    return { v: out, bad: bad };
+  }
+  function stmtCfgLoad(cf, b){
+    cf.base = Number(b.updated_at) || 0; cf.seeded = !!b.seeded;
+    cf.rows = b.vendors.map(function(v){ var hs = Array.isArray(v.hint) ? v.hint.map(function(h){ return String(h); }) : []; return { vk: v.vk, name: v.name || "", group: v.group === "tool" ? "tool" : "veh", kind: v.kind || "", basis: v.basis === "total" ? "total" : "supply", carry: !!v.carry, active: v.active !== false,
+      hint: hs.join(", "), hintRaw: hs, hintLock: hs.some(function(h){ return /[,，]/.test(h); }), old: true }; });   // hintLock = 낱말 안에 쉼표(이 화면은 쉼표로 나눠 받으므로 고치면 쪼개짐 — 그 칸은 잠가 그대로 저장)
+    cf.orig = JSON.stringify(stmtCfgVendors(cf.rows).v); cf.dirty = false; cf.stale = false; cf.msg = ""; cf.msgBad = false;
+  }
+  function stmtCfgOpen(){
+    var seq;
+    if (!canDo("stmt") || STMT.ed || STMT.cfg) return;
+    seq = ++STMT.cseq;
+    STMT.cfg = { loading: true, err: "", msg: "", msgBad: false, rows: [], base: 0, dirty: false, saving: false, stale: false, seq: seq };
+    renderStmt();
+    gwCall("gw-stmt", { action: "stmt_cfg_get" }).then(function(res){
+      var cf = STMT.cfg, b = (res && res.body) || {};
+      if (!cf || cf.seq !== seq) return;
+      cf.loading = false;
+      if (res.status === 401){ cf.err = "로그인이 풀렸습니다 — 다시 로그인해 주세요."; if (currentTab === "stmt") renderStmt(); onSessionInvalid(); return; }
+      if (res.status === 200 && b.status === "OK" && Array.isArray(b.vendors)) stmtCfgLoad(cf, b);
+      else cf.err = stmtErrText(res);
+      if (currentTab === "stmt") renderStmt();
+    }).catch(function(){ var cf = STMT.cfg; if (!cf || cf.seq !== seq) return; cf.loading = false; cf.err = "네트워크 오류 — 연결 상태를 확인해 주세요."; if (currentTab === "stmt") renderStmt(); });
+  }
+  function stmtCfgClose(){
+    var cf = STMT.cfg;
+    if (cf && cf.saving) return;
+    if (cf && cf.dirty && !confirm("저장하지 않은 거래처 목록 고침이 있습니다. 월 보드로 나갈까요?\n(나가면 고친 내용이 사라집니다)")) return;
+    STMT.cfg = null; STMT.cseq++;
+    renderStmt();
+  }
+  function stmtCfgSel(f, i, map, cur){ return '<select data-cf="' + f + '" data-i="' + i + '">' + Object.keys(map).map(function(k){ return '<option value="' + k + '"' + (k === cur ? " selected" : "") + '>' + esc(map[k]) + '</option>'; }).join("") + '</select>'; }
+  function stmtCfgRowHtml(r, i){
+    return '<tr data-ci="' + i + '"><td class="c-vk st-mute">' + esc(r.vk) + (r.old ? '' : ' <span class="st-chip">새</span>') + '</td>'
+      + '<td class="c-nm"><input data-cf="name" data-i="' + i + '" value="' + esc(r.name) + '" placeholder="거래처 이름" maxlength="30" autocomplete="off"></td>'
+      + '<td class="c-gr">' + (r.old ? '<span title="있던 거래처는 묶음을 바꿀 수 없습니다 — 지난 달 명세의 판정·전달처가 바뀝니다(새 거래처로 더해 주세요)">' + (r.group === "tool" ? "작업용구" : "차량") + ' <span class="st-mute">(고정)</span></span>'
+        : stmtCfgSel("group", i, { veh: "차량 → 사장님", tool: "작업용구 → 나주임" }, r.group)) + '</td>'
+      + '<td class="c-kd">' + stmtCfgSel("kind", i, STMT_KIND_OPT, r.kind) + '</td>'
+      + '<td class="c-bs">' + stmtCfgSel("basis", i, { supply: "공급가 + 세액", total: "부가세 포함" }, r.basis) + '</td>'
+      + '<td class="c-cr"><label class="st-cb"><input type="checkbox" data-cf="carry" data-i="' + i + '"' + (r.carry ? " checked" : "") + '><span class="st-cbt">잔액형</span></label></td>'
+      + '<td class="c-ac"><label class="st-cb"><input type="checkbox" data-cf="active" data-i="' + i + '"' + (r.active ? " checked" : "") + '><span class="st-cbt">켬</span></label></td>'
+      + '<td class="c-hn"><input data-cf="hint" data-i="' + i + '" value="' + esc(r.hint) + '" placeholder="예: 대송, 칼텍스" autocomplete="off"' + (r.hintLock ? ' disabled title="낱말 안에 쉼표가 있어 이 화면에서는 고칠 수 없습니다(저장할 때 그대로 둠)"' : '') + '></td>'
+      + '<td class="c-x">' + (r.old ? '' : '<button type="button" class="mini-btn" data-st-cfg="del" data-i="' + i + '" title="더한 줄 빼기(저장 전)">×</button>') + '</td></tr>';
+  }
+  function stmtCfgRender(){
+    var host = document.getElementById("stmtCfg"), cf = STMT.cfg, h;
+    if (!host || !cf) return;
+    h = '<div class="dash-sec" style="margin-bottom:8px;"><h2 style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-start;"><button type="button" class="vs-chip" data-st-cfg="back">‹ 월 보드</button><span>거래처 목록 고치기'
+      + (cf.loading || cf.err ? '' : ' <span class="cnt">' + cf.rows.length + '곳' + (cf.seeded ? ' · 처음 목록(아직 저장 전)' : '') + '</span>') + '</span></h2></div>';
+    if (cf.loading){ host.innerHTML = h + '<div class="card"><div class="loading">불러오는 중…</div></div>'; return; }
+    if (cf.err){ host.innerHTML = h + '<div class="card" style="padding:10px 12px;"><span class="st-no">' + esc(cf.err) + '</span></div>'; return; }
+    h += '<div class="st-msg" id="stmtCfgMsg"></div>'
+      + '<div class="card st-ed-wrap"><table class="st-cfg"><thead><tr><th>번호</th><th>거래처 이름</th><th>묶음</th><th>기본 종류</th><th>줄 금액 기준</th><th>잔액형</th><th>켬</th><th>알아보는 낱말(쉼표로)</th><th></th></tr></thead><tbody>'
+      + cf.rows.map(function(r, i){ return stmtCfgRowHtml(r, i); }).join("") + '</tbody></table></div>'
+      + '<div class="st-savebar"><button type="button" class="mini-btn" data-st-cfg="add">+ 거래처</button><button type="button" class="mini-btn appr-btn" data-st-cfg="save">저장</button>'
+      + '<span class="st-gap">있던 거래처는 지울 수 없습니다(지난 달 명세가 가리킴) — \'켬\'을 끄면 보드에서 빠집니다 · 묶음은 새 거래처만 고릅니다</span></div>';
+    host.innerHTML = h;
+    stmtCfgRefresh();
+  }
+  function stmtCfgRefresh(){
+    var cf = STMT.cfg, host = document.getElementById("stmtCfg"), c, msg = "", errs = [], lb = { name: "이름", hint: "낱말", vk: "번호", group: "묶음" }, b;
+    if (!cf || !host || cf.loading || cf.err) return;
+    c = stmtCfgVendors(cf.rows);
+    cf.dirty = JSON.stringify(c.v) !== cf.orig;
+    Array.prototype.forEach.call(host.querySelectorAll("[data-cf]"), function(el){ el.classList.toggle("bad", !!(c.bad[Number(el.getAttribute("data-i"))] || {})[el.getAttribute("data-cf")]); });
+    Object.keys(c.bad).forEach(function(k){ if (k === "all") errs.push("거래처는 1~40곳"); else if (k === "pii") errs.push("이름·낱말에 전화·계좌·주민번호 꼴"); else if (cf.rows[k]) errs.push(cf.rows[k].vk + " " + Object.keys(c.bad[k]).map(function(f){ return lb[f] || f; }).join("·")); });
+    if (cf.msg) msg += '<span class="' + (cf.msgBad ? "st-no" : "st-ok") + '">' + esc(cf.msg) + '</span> ';
+    if (cf.stale) msg += '<button type="button" class="vs-chip" data-st-cfg="reload">다시 불러오기</button> ';
+    if (errs.length) msg += '<span class="st-no">고칠 칸: ' + esc(errs.join(" · ")) + '</span>';
+    stmtSetHtml("stmtCfgMsg", msg);
+    b = host.querySelector('[data-st-cfg="save"]'); if (b) b.disabled = !!cf.saving || !cf.dirty || errs.length > 0;
+    b = host.querySelector('[data-st-cfg="add"]'); if (b) b.disabled = !!cf.saving || cf.rows.length >= 40 || !stmtCfgNextVk(cf.rows);
+    Array.prototype.forEach.call(host.querySelectorAll('[data-st-cfg="back"],[data-st-cfg="reload"]'), function(x){ x.disabled = !!cf.saving; });
+  }
+  function stmtCfgSave(){
+    var cf = STMT.cfg, c;
+    if (!cf || cf.saving || cf.loading || cf.err || !canDo("stmt")) return;
+    c = stmtCfgVendors(cf.rows);
+    if (Object.keys(c.bad).length){ cf.msg = "고칠 칸이 있어 저장하지 않았습니다."; cf.msgBad = true; stmtCfgRefresh(); return; }
+    cf.saving = true; cf.msg = "저장 중…"; cf.msgBad = false; stmtCfgRefresh();
+    gwCall("gw-stmt", { action: "stmt_cfg_set", vendors: c.v, base: cf.base }).then(function(res){
+      var b = (res && res.body) || {}, code = b.error_code || "";
+      if (STMT.cfg !== cf) return;
+      cf.saving = false;
+      if (res.status === 401){ cf.msg = "로그인이 풀려 저장하지 않았습니다 — 다시 로그인한 뒤 다시 눌러 주세요(고친 내용은 화면에 남아 있습니다)."; cf.msgBad = true; stmtCfgRefresh(); onSessionInvalid(); return; }
+      if (res.status === 200 && b.status === "OK" && Array.isArray(b.vendors)){
+        STMT.cfg = null; STMT.cseq++; STMT.month = null; STMT.err = ""; STMT.errCode = ""; STMT.mseq++; STMT.loading = false;   // 보드는 새 목록으로 그 달을 다시 읽음
+        gwToast("거래처 목록을 저장했습니다(" + b.vendors.length + "곳)");
+        if (currentTab === "stmt") renderStmt();
+        return;
+      }
+      cf.stale = code === "STMT_STALE";
+      cf.msg = cf.stale ? "다른 곳에서 먼저 거래처 목록을 고쳐 이번 저장은 하지 않았습니다 — [다시 불러오기] 뒤 고쳐 주세요(지금 화면의 고친 내용은 사라집니다)."
+        : (/^PII_\d+$/.test(code) ? "거래처 이름·낱말에 전화·계좌·주민번호 꼴 글이 있어 저장하지 않았습니다." : stmtErrText(res));
+      cf.msgBad = true; stmtCfgRefresh();
+    }).catch(function(){ if (STMT.cfg !== cf) return; cf.saving = false; cf.msg = "네트워크 오류 — 저장되지 않았습니다."; cf.msgBad = true; stmtCfgRefresh(); });
+  }
+  function stmtCfgOnInput(e){
+    var cf = STMT.cfg, t = e && e.target, f, r;
+    if (!cf || !t || !t.getAttribute || !canDo("stmt") || cf.loading || cf.err) return;
+    f = t.getAttribute("data-cf"); r = cf.rows[Number(t.getAttribute("data-i"))];
+    if (!r || (f !== "name" && f !== "hint")) return;
+    r[f] = t.value; cf.msg = ""; cf.stale = false;
+    stmtCfgRefresh();
+  }
+  function stmtCfgOnChange(e){
+    var cf = STMT.cfg, t = e && e.target, f, r;
+    if (!cf || !t || !t.getAttribute || !canDo("stmt") || cf.loading || cf.err) return;
+    f = t.getAttribute("data-cf"); r = cf.rows[Number(t.getAttribute("data-i"))];
+    if (!r) return;
+    if (f === "carry" || f === "active") r[f] = !!t.checked;
+    else if (f === "kind"){ if (Object.prototype.hasOwnProperty.call(STMT_KIND_OPT, t.value)) r.kind = t.value; }
+    else if (f === "basis") r.basis = t.value === "total" ? "total" : "supply";
+    else if (f === "group"){ if (!r.old) r.group = t.value === "tool" ? "tool" : "veh"; }
+    else return;
+    cf.msg = ""; cf.stale = false;
+    stmtCfgRefresh();
+  }
+  function stmtCfgOnClick(e){
+    var host = document.getElementById("stmtCfg"), el = e && e.target, act, cf = STMT.cfg, i, vk, x;
+    while (el && el !== host && !(el.getAttribute && el.getAttribute("data-st-cfg") != null)) el = el.parentNode;
+    if (!el || el === host || el.disabled) return;
+    act = el.getAttribute("data-st-cfg");
+    if (act === "back"){ stmtCfgClose(); return; }
+    if (!cf || !canDo("stmt") || cf.saving) return;
+    if (act === "reload"){ if (!cf.dirty || confirm("거래처 목록을 다시 불러올까요?\n(지금 화면의 고친 내용은 사라집니다)")){ STMT.cfg = null; stmtCfgOpen(); } return; }
+    if (cf.loading || cf.err) return;
+    if (act === "add"){
+      vk = stmtCfgNextVk(cf.rows);
+      if (!vk || cf.rows.length >= 40) return;
+      cf.rows.push({ vk: vk, name: "", group: "veh", kind: "", basis: "supply", carry: false, active: true, hint: "", old: false });
+      stmtCfgRender();
+      x = document.querySelector('#stmtCfg [data-cf="name"][data-i="' + (cf.rows.length - 1) + '"]'); if (x && x.focus) x.focus();
+    } else if (act === "del"){
+      i = Number(el.getAttribute("data-i"));
+      if (cf.rows[i] && !cf.rows[i].old){ cf.rows.splice(i, 1); stmtCfgRender(); }
+    } else if (act === "save") stmtCfgSave();
+  }
+  function stmtCfgBarRender(){
+    var el = document.getElementById("stmtCfgBar"), h = (canDo("stmt") && STMT.month) ? '<button type="button" class="mini-btn" data-st-cfg="open">거래처 목록 고치기</button><span class="st-mute">새 거래처 더하기 · 끄기 · 이름 · 기본 종류 · 잔액형</span>' : "";
+    if (el && el.__h !== h){ el.innerHTML = h; el.__h = h; }
+  }
+  function stmtBindOnce(){   // 자리(#stmtEditor·#stmtCfg·#stmtCfgBar·달 버튼)는 다시 그려도 그대로인 요소라 한 번만 건다
+    var host = document.getElementById("stmtEditor"), cfh = document.getElementById("stmtCfg"), cfb = document.getElementById("stmtCfgBar"), pv = document.getElementById("stmtPrev"), nx = document.getElementById("stmtNext");
     if (STMT.bound || !host) return;
     STMT.bound = true;
     host.addEventListener("input", stmtOnInput);
     host.addEventListener("change", stmtOnChange);
     host.addEventListener("click", stmtOnClick);
     host.addEventListener("focusout", stmtOnBlur);
+    if (cfh){ cfh.addEventListener("input", stmtCfgOnInput); cfh.addEventListener("change", stmtCfgOnChange); cfh.addEventListener("click", stmtCfgOnClick); }
+    if (cfb) cfb.addEventListener("click", function(e){ var el = e && e.target; while (el && el !== cfb && !(el.getAttribute && el.getAttribute("data-st-cfg") != null)) el = el.parentNode; if (el && el !== cfb && !el.disabled) stmtCfgOpen(); });
     if (pv) pv.addEventListener("click", function(){ stmtMonth(-1); });
     if (nx) nx.addEventListener("click", function(){ stmtMonth(1); });
   }
-  // 보는 사람이 바뀌면(로그인 창 '전환' — 새로고침 없음) 앞사람이 연 달·상세·고치던 줄을 비운다(vsSheetViewer와 같은 까닭) · 로그아웃(clearSessionData)도 같은 비우기
-  function stmtReset(){ STMT.mseq++; STMT.eseq++; STMT.ym = ""; STMT.month = null; STMT.loading = false; STMT.err = ""; STMT.errCode = ""; STMT.ed = null; STMT.open = {}; STMT.who = null; }
+  // 보는 사람이 바뀌면(로그인 창 '전환' — 새로고침 없음) 앞사람이 연 달·상세·고치던 줄·거래처 목록 고침을 비운다(vsSheetViewer와 같은 까닭) · 로그아웃(clearSessionData)도 같은 비우기
+  function stmtReset(){ STMT.mseq++; STMT.eseq++; STMT.cseq++; STMT.ym = ""; STMT.month = null; STMT.loading = false; STMT.err = ""; STMT.errCode = ""; STMT.ed = null; STMT.cfg = null; STMT.aliasAt = 0; STMT.open = {}; STMT.who = null; STMT_AQ = STMT_AQ.filter(function(o){ return o.busy; }); }   // 아직 안 보낸 별칭 저장은 버림(보내는 중인 것은 STMT.who로 다시 시도를 막음)
   function stmtViewer(){ var who = (typeof myId === "function") ? String(myId() || "") : ""; if (STMT.who === who) return; if (STMT.who !== null) stmtReset(); STMT.who = who; }
   // 탭 입구 — 월 보드(부품 갈래 함수) 또는 거래처 상세. 처음·사람이 바뀐 뒤엔 그 달을 읽는다(읽기 실패는 '다시 읽기'로만 — 저절로 되풀이하지 않음)
   function renderStmt(){
-    var board = document.getElementById("stmtBoard"), edHost = document.getElementById("stmtEditor"), ed, ymEl = document.getElementById("stmtYm");
+    var board = document.getElementById("stmtBoard"), edHost = document.getElementById("stmtEditor"), cfHost = document.getElementById("stmtCfg"), ed, cf, ymEl = document.getElementById("stmtYm");
     if (!board || !edHost) return;
     stmtViewer(); stmtBindOnce();
-    if (!canSee("stmt")){ board.innerHTML = ""; edHost.innerHTML = ""; return; }
+    if (!canSee("stmt")){ board.innerHTML = ""; edHost.innerHTML = ""; if (cfHost) cfHost.innerHTML = ""; return; }
     if (!STMT.ym) STMT.ym = stmtYmShift(stmtKstYm(), -1);   // 기본 = 지난 달(매월 1~5일에 지난 달 명세를 정리)
     if (ymEl) ymEl.textContent = STMT.ym;
-    ed = STMT.ed;
-    ["stmtMonBar", "stmtStats", "stmtBoardMsg", "stmtBoard"].forEach(function(id){ var el = document.getElementById(id); if (el) el.style.display = ed ? "none" : ""; });
+    if (STMT.cfg && !canDo("stmt")){ STMT.cfg = null; STMT.cseq++; }   // 거래처 목록 고치기는 수행만
+    ed = STMT.ed; cf = !ed && STMT.cfg;
+    ["stmtMonBar", "stmtStats", "stmtBoardMsg", "stmtBoard", "stmtCfgBar"].forEach(function(id){ var el = document.getElementById(id); if (el) el.style.display = (ed || cf) ? "none" : ""; });
     edHost.style.display = ed ? "" : "none";
+    if (cfHost){ cfHost.style.display = cf ? "" : "none"; if (!cf) cfHost.innerHTML = ""; }
     if (ed){ stmtEdRender(); return; }
     edHost.innerHTML = "";
+    if (cf){ stmtCfgRender(); return; }
     if (!STMT.month && !STMT.loading && !STMT.err) stmtLoadMonth();
-    stmtRenderStats(); stmtRenderMsg();
+    stmtRenderStats(); stmtRenderMsg(); stmtCfgBarRender();
     if (STMT.month) vsSheetRender(stmtSheetDef());
     else { board.removeAttribute("data-vs-mode"); board.innerHTML = STMT.err ? "" : '<div class="loading">불러오는 중…</div>'; }
   }
