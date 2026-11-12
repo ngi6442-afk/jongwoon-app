@@ -9704,7 +9704,7 @@ try {
   // 회원 — m0 관리자(사무직 아님) · u1 사무직 · u2 관리감독자 · u3 시험 계정 · u4 퇴사(기록 있음) · u5 퇴사(기록 없음) · u6 그 밖(표식 없음)
   const MEM47 = () => [{ id: 'm0', name: '관리자', admin: true }, { id: 'u1', name: '안전담당', office: true, dept: '관리부' }, { id: 'u2', name: '감독자', supervisor: true, dept: '운영부' },
     { id: 'u3', name: '시험계정', test_acct: true }, { id: 'u4', name: '퇴사자', leave_date: '2026-01-31' }, { id: 'u5', name: '옛직원', leave_date: '2025-05-01' }, { id: 'u6', name: '현장직', dept: '운영부' }];
-  // 일용직 — w1 진행 석면(예정 11-20)·작업중(11-01) 투입 · w2 2026 종결 준설만 · w3 2024 종결만(접힘) · w4 현장 없음(접힘) · w5 지운(기록 있음 — 둘째 묶음) · w6 지운(기록 없음 — 없음) · w7 진행 준설만
+  // 일용직 — w1 진행 석면(예정 11-20)·작업중(11-01) 투입 · w2 2026 종결 준설만 · w3 2024 종결만(접힘) · w4 현장·기록 없음(지운 현장 x1에만 — v449부터 명부에만 있는 일용직이라 펴짐, v447·v448은 접힘) · w5 지운(기록 있음 — 둘째 묶음) · w6 지운(기록 없음 — 없음) · w7 진행 준설만
   const WK47 = () => [{ id: 'w1', name: '김일용' }, { id: 'w2', name: '박준설' }, { id: 'w3', name: '이옛날' }, { id: 'w4', name: '최명부' }, { id: 'w5', name: '지운사람', del: 1 }, { id: 'w6', name: '지운없음', del: 1 }, { id: 'w7', name: '한준설' }];
   const S0_47 = (o) => Object.assign({ client: '', site: '', start: '', end: '', status: 'done', member_ids: [], worker_ids: [] }, o);
   const ASB47 = () => [
@@ -9834,14 +9834,14 @@ try {
     && cnt47(v2, '주기 체크') === 6 && cnt47(v2, '>체크<') === 2,
     JSON.stringify({ oldVis2, miss2: miss2.map((s) => s.slice(0, 40)), srv2, ids2, chk: cnt47(v2, '주기 체크') }));
 
-  // ③ 행 구성(관리자 1366): 펴고 = 재직 회원(시험 계정 u3 빼고 — 퇴사 u4·u5 빼고) + 2025 이후·진행 현장 일용직(w1·w2·w7) · 접힘 'old' = 그 밖 일용직(w3 2024만·w4 현장 없음 — 지운 현장 x1은 현장 아님) ·
+  // ③ 행 구성(관리자 1366): 펴고 = 재직 회원(시험 계정 u3 빼고 — 퇴사 u4·u5 빼고) + 2025 이후·진행 현장 일용직(w1·w2·w7) + v449 현장·기록 없는 명부 일용직(w4 — 지운 현장 x1은 현장 아님) · 접힘 'old' = 그 밖 일용직(w3 2024만) ·
   //   둘째 묶음 'gone' = 기록 있는 퇴사자 u4·지운 일용직 w5·지운 회원 ux(지운 일용직 w6·기록 없는 퇴사자 u5는 없음) · 시험 계정 u3은 어디에도 없음(기록 있어도)
   X1.api.render();
   const h3 = X1.host.innerHTML, all3 = X1.api.rows(), byG3 = {}; all3.forEach((r) => { (byG3[r.grp || 'main'] = byG3[r.grp || 'main'] || []).push(r.id); });
-  T('v447 ③ 행 구성(실행): 펴고 = member:m0·u1·u2·u6 + worker:w1·w2·w7 · 접힘 old = worker:w3·w4 · 기록만 남은 사람 gone = member:u4(퇴사)·worker:w5(지운)·member:ux(지운 회원) · 시험 계정 u3·기록 없는 퇴사자 u5·기록 없는 지운 일용직 w6 없음 · 표에 그린 줄 = 펴고 7줄(묶음 둘 접힘 — 머리 "그 밖 일용직 2"·"기록만 남은 사람 3") · 머리 "총 12명 (접힘 5명)"',
-    JSON.stringify((byG3.main || []).slice().sort()) === JSON.stringify(['member:m0', 'member:u1', 'member:u2', 'member:u6', 'worker:w1', 'worker:w2', 'worker:w7'])
-    && JSON.stringify((byG3.old || []).slice().sort()) === JSON.stringify(['worker:w3', 'worker:w4']) && JSON.stringify((byG3.gone || []).slice().sort()) === JSON.stringify(['member:u4', 'member:ux', 'worker:w5'])
-    && !all3.some((r) => /u3|u5|w6/.test(r.id)) && rowsH47(h3).length === 7 && grpOf47(h3) === 'old-2명,gone-3명' && X1.el('eduHead').textContent === '총 12명 (접힘 5명)',
+  T('v447 ③ 행 구성(실행 — v449 기대값): 펴고 = member:m0·u1·u2·u6 + worker:w1·w2·w4(명부만)·w7 · 접힘 old = worker:w3 · 기록만 남은 사람 gone = member:u4(퇴사)·worker:w5(지운)·member:ux(지운 회원) · 시험 계정 u3·기록 없는 퇴사자 u5·기록 없는 지운 일용직 w6 없음 · 표에 그린 줄 = 펴고 8줄(묶음 둘 접힘 — 머리 "그 밖 일용직 1"·"기록만 남은 사람 3") · 머리 "총 12명 (접힘 4명)"',
+    JSON.stringify((byG3.main || []).slice().sort()) === JSON.stringify(['member:m0', 'member:u1', 'member:u2', 'member:u6', 'worker:w1', 'worker:w2', 'worker:w4', 'worker:w7'])
+    && JSON.stringify((byG3.old || []).slice().sort()) === JSON.stringify(['worker:w3']) && JSON.stringify((byG3.gone || []).slice().sort()) === JSON.stringify(['member:u4', 'member:ux', 'worker:w5'])
+    && !all3.some((r) => /u3|u5|w6/.test(r.id)) && rowsH47(h3).length === 8 && grpOf47(h3) === 'old-1명,gone-3명' && X1.el('eduHead').textContent === '총 12명 (접힘 4명)',
     JSON.stringify({ byG3, rows: rowsH47(h3), grp: grpOf47(h3), head: X1.el('eduHead').textContent }));
 
   // ④ 칸 상태 일곱(실행 — 1600 창 모든 열): '✓ 연-월'(u1 일반건진 2025-01 — 사무직 2년) · 반기 진도 'a/b시간'(u6 4/12 — '4시간' 글자는 숫자만 · 상반기 12시간은 셈 밖) · 'D-n'(u2 일반건진 2026-11-20 D-8 노랑) ·
@@ -10299,17 +10299,17 @@ try {
   const r3 = XA3.api.find('member:u10'), h3 = XA3.host.innerHTML;
   XA3.env.x.saved('member', 'u10'); const again3 = XA3.env.log.filter((l) => l === 'gwCall:member_list').length;
   const XF3 = X48({ user: U48.A }); XF3.api.render(); XF3.env.x.add('member'); XF3.env.x.saved('member', 'u11'); res48(XF3)({ status: 500, body: {} }); await flush48(); await flush48();
-  T('v448 ③ 직원 저장 뒤(실행): member_list 1번 · 받기 전 새 회원 줄 0 · 받은 뒤 member:u10(현장직·라임팀) 펴진 줄·표에 그려짐·소속 "라임팀"·머리 "총 13명 (접힘 5명)" · 표시 한 번만(다시 불러도 member_list 그대로) · 받기 실패 500 = 회원 목록 그대로·표 그대로 그림',
-    pre3.gw === 1 && !pre3.row && pre3.from === '' && !!r3 && r3.grp === '' && V.rowsH47(h3).indexOf('member:u10') >= 0 && r3.org === '라임팀' && XA3.el('eduHead').textContent === '총 13명 (접힘 5명)'
-    && again3 === 1 && XF3.env.log.filter((l) => l === 'gwCall:member_list').length === 1 && XF3.env.x.members().length === V.MEM47().length && XF3.host.getAttribute('data-vs-mode') === 'sheet' && V.rowsH47(XF3.host.innerHTML).length === 7,
+  T('v448 ③ 직원 저장 뒤(실행 — v449 기대값: 명부만 있는 w4 펴짐): member_list 1번 · 받기 전 새 회원 줄 0 · 받은 뒤 member:u10(현장직·라임팀) 펴진 줄·표에 그려짐·소속 "라임팀"·머리 "총 13명 (접힘 4명)" · 표시 한 번만(다시 불러도 member_list 그대로) · 받기 실패 500 = 회원 목록 그대로·표 그대로 그림(8줄)',
+    pre3.gw === 1 && !pre3.row && pre3.from === '' && !!r3 && r3.grp === '' && V.rowsH47(h3).indexOf('member:u10') >= 0 && r3.org === '라임팀' && XA3.el('eduHead').textContent === '총 13명 (접힘 4명)'
+    && again3 === 1 && XF3.env.log.filter((l) => l === 'gwCall:member_list').length === 1 && XF3.env.x.members().length === V.MEM47().length && XF3.host.getAttribute('data-vs-mode') === 'sheet' && V.rowsH47(XF3.host.innerHTML).length === 8,
     JSON.stringify({ pre3, r3: r3 ? { grp: r3.grp, org: r3.org } : null, head: XA3.el('eduHead').textContent, again3 }));
 
-  // ④ 일용직 저장 뒤(실행 — 실제 openWkModal → 일용직 창 [저장] 처리기 → eduPersonSaved): 명부에 새 줄·저장 예약 → 체크 칸 다시 그림 — 새 일용직은 현장·교육 기록이 없어 '그 밖 일용직'(접힘)이지만
-  //   그 줄만 열어 보임(묶음 펼침·그 줄 펼침 — v442 새 줄 열기와 같은 꼴, 기기 저장 0) · 표시 지움
+  // ④ 일용직 저장 뒤(실행 — 실제 openWkModal → 일용직 창 [저장] 처리기 → eduPersonSaved): 명부에 새 줄·저장 예약 → 체크 칸 다시 그림 — v449: 새 일용직은 현장·교육 기록이 없어도 펴진 줄(명부에만 있는 일용직)이라
+  //   묶음을 열지 않고 바로 그려짐(종전 v448은 '그 밖 일용직' 접힘이라 eduSheetShowNew가 묶음·그 줄을 열었다 — 보이는 줄은 열지 않는 것은 그 함수 그대로, 기기 저장 0) · 표시 지움
   const XA4 = X48({ user: U48.A }); XA4.api.render(); XA4.env.x.add('worker'); XA4.el('wkName').value = '새일용'; XA4.el('wkSave').L.click[0]({});
   const nw4 = XA4.env.x.workers().filter((w) => w.name === '새일용')[0] || {}, id4 = 'worker:' + nw4.id, r4 = XA4.api.find(id4), i4 = XA4.api.inst(XA4.api.def());
-  T('v448 ④ 일용직 저장 뒤(실행 — 실제 창 [저장]): 명부 새 줄 "새일용"·저장 예약 · 체크 칸 다시 그림 = 새 줄(접힘 묶음 old)이 열려 그려짐(묶음 펼침·그 줄 펼침)·기기 저장 0 · 창 닫힘·표시 지움',
-    !!nw4.id && XA4.env.log.indexOf('wkSched') >= 0 && !!r4 && r4.grp === 'old' && V.rowsH47(XA4.host.innerHTML).indexOf(id4) >= 0 && i4.grp.old === true && i4.open === id4
+  T('v448 ④ 일용직 저장 뒤(실행 — 실제 창 [저장] · v449 기대값): 명부 새 줄 "새일용"·저장 예약 · 체크 칸 다시 그림 = 새 줄이 펴진 줄로 바로 그려짐(묶음 old 안 엶·그 줄 펼침 없음)·기기 저장 0 · 창 닫힘·표시 지움',
+    !!nw4.id && XA4.env.log.indexOf('wkSched') >= 0 && !!r4 && r4.grp === '' && V.rowsH47(XA4.host.innerHTML).indexOf(id4) >= 0 && !(i4.grp && i4.grp.old) && i4.open == null
     && !Object.keys(XA4.env.store).some((k) => /jw_edu_sheet/.test(k)) && !XA4.el('wkBackdrop').classList.contains('show') && XA4.env.x.from() === '',
     JSON.stringify({ id4, grp: r4 && r4.grp, open: i4.open, log: XA4.env.log }));
 
@@ -10323,8 +10323,8 @@ try {
     JSON.stringify({ f5a, f5b, log: XA5.env.log }));
 
   // ⑥ 일용직 펴짐 기준(실행 — 실제 eduSheetRows): 현장 대장 투입이 없는 w4 — 2025-01-01 교육 기록(일용직 줄) = 펴짐(머리 "총 12명 (접힘 4명)") · 2024-12-31 = 접힘(경계 하루 차이) ·
-  //   2024 현장만 w3 + 2026 기록 = 펴짐 · 지운 기록(del)만 = 접힘 · 남의 기록(같은 id의 직원 줄 member:w4) = 접힘 · 날짜 아닌 기록 = 접힘 · 현장 권한 없음(N) = 종전처럼 기록이 하나라도 있으면 펴짐(2024 기록도) ·
-  //   묶음 이름 '그 밖 일용직 · 2024년까지 현장·교육 기록만(또는 기록 없음)' · 빠진 항목 셈(현황 ② 줄)은 행 원천 그대로
+  //   2024 현장만 w3 + 2026 기록 = 펴짐 · v449: 지운 기록(del)만·남의 기록(같은 id의 직원 줄 member:w4)만·날짜 아닌 기록만 = 날짜 있는 흔적이 없어 명부 일용직으로 펴짐(v448은 접힘) · 현장 권한 없음(N) = 종전처럼 기록이 하나라도 있으면 펴짐(2024 기록도) ·
+  //   묶음 이름 '그 밖 일용직 · 2024년까지 현장·교육 기록만'(v449 — '(또는 기록 없음)' 뺌) · 빠진 항목 셈(현황 ② 줄)은 행 원천 그대로
   const g6 = (rec, o) => { const X = V.mk47(Object.assign({ edu: V.EDU47().concat(rec) }, o || {})); X.api.render(); return X; };
   const G6a = g6([{ id: 'g1', ptype: 'worker', pid: 'w4', kind: 'hire', date: '2025-01-01' }]);
   const G6b = g6([{ id: 'g2', ptype: 'worker', pid: 'w4', kind: 'hire', date: '2024-12-31' }]);
@@ -10340,9 +10340,9 @@ try {
   const gl6 = G6n.host.innerHTML.indexOf('그 밖 일용직 · 교육 기록 없음(현장 투입은 현장 권한이 있어야 셈)') >= 0 && G6n.host.innerHTML.indexOf('년까지 현장·교육 기록만') < 0;
   const gr6 = [G6a.api.find('worker:w4').grp, G6b.api.find('worker:w4').grp, G6c.api.find('worker:w3').grp, G6d.api.find('worker:w4').grp, G6e.api.find('worker:w4').grp, G6f.api.find('worker:w4').grp, G6n.api.find('worker:w4').grp];
   const ms6 = G6a.api.miss(), sum6 = G6a.api.rows().reduce((s, r) => s + r.st.miss, 0);
-  T('v448 ⑥ 일용직 펴짐 기준(실행): 대장 투입 없음 + 2025-01-01 기록 = 펴짐 · 2024-12-31 = 접힘 · 2024 현장 + 2026 기록 = 펴짐 · 지운 기록·남의(직원 줄) 기록·날짜 아닌 기록 = 접힘 · 현장 권한 없음 = 종전(기록 있으면 펴짐) · 머리 "총 12명 (접힘 4명)" · 묶음 이름 새 글 · 빠진 항목 셈 = 행 원천 · 검토: 2024-12 시작·2025-01-10 종료 현장 = 펴짐·2024-12-31 종료 = 접힘 · 현장 권한 없음 묶음 이름 "교육 기록 없음(현장 투입은 현장 권한이 있어야 셈)"',
-    JSON.stringify(gr6) === JSON.stringify(['', 'old', '', 'old', 'old', 'old', '']) && G6a.el('eduHead').textContent === '총 12명 (접힘 4명)' && G6b.el('eduHead').textContent === '총 12명 (접힘 5명)'
-    && G6b.host.innerHTML.indexOf('그 밖 일용직 · 2024년까지 현장·교육 기록만(또는 기록 없음)') >= 0 && G6b.host.innerHTML.indexOf('현장만(또는 현장 참여 없음)') < 0 && ms6.items === sum6
+  T('v448 ⑥ 일용직 펴짐 기준(실행 — v449 기대값): 대장 투입 없음 + 2025-01-01 기록 = 펴짐 · 2024-12-31 = 접힘 · 2024 현장 + 2026 기록 = 펴짐 · 지운 기록만·남의(직원 줄) 기록만·날짜 아닌 기록만 = 펴짐(명부 일용직 — v448은 접힘) · 현장 권한 없음 = 종전(기록 있으면 펴짐) · 머리 "총 12명 (접힘 4명)" · 묶음 이름 "그 밖 일용직 · 2024년까지 현장·교육 기록만"("(또는 기록 없음)" 없음) · 빠진 항목 셈 = 행 원천 · 검토: 2024-12 시작·2025-01-10 종료 현장 = 펴짐·2024-12-31 종료 = 접힘 · 현장 권한 없음 묶음 이름 "교육 기록 없음(현장 투입은 현장 권한이 있어야 셈)"',
+    JSON.stringify(gr6) === JSON.stringify(['', 'old', '', '', '', '', '']) && G6a.el('eduHead').textContent === '총 12명 (접힘 4명)' && G6b.el('eduHead').textContent === '총 12명 (접힘 5명)'
+    && G6b.host.innerHTML.indexOf('그 밖 일용직 · 2024년까지 현장·교육 기록만') >= 0 && G6b.host.innerHTML.indexOf('(또는 기록 없음)') < 0 && G6b.host.innerHTML.indexOf('현장만(또는 현장 참여 없음)') < 0 && ms6.items === sum6
     && JSON.stringify(gy6) === JSON.stringify(['', 'old']) && gl6,   // v448 검토: 해 걸친 현장 · 현장 권한 없음 묶음 이름
     JSON.stringify({ gr6, gy6, gl6, heads: [G6a.el('eduHead').textContent, G6b.el('eduHead').textContent] }));
 
@@ -10443,12 +10443,83 @@ try {
   const CL11 = ['v448', '`eduAddPerson`', '`eduPersonSaved`', '`eduPersonFrom`', 'newY', 'setSafetyLayer("edu")', '`EDU_ADD_HR_OPEN`', '`meDeptFill`'];
   const GATE11 = ['uismoke', 'consheet_check', 'proctpl_check', 'settletest', 'servertest', 'rectest', 'promoqual_check', 'promogen_check'];
   const mF11 = FT11.filter((s) => ftv11.indexOf(s) < 0), mM11 = MAN11.filter((s) => m219_11.indexOf(s) < 0), mC11 = CL11.filter((s) => cl11.indexOf(s) < 0);
-  T('v448 ⑪ 문서: FEATURES 기준 v448·v448 절(이름 고정) · TESTLIST v448 화면 칸 "[ ] (AI 시험 화면 대상" ≥ 3개("PM" 낱말 0)·게이트 칸 [x] 8종 · MANUAL 21-9 사람 추가·누가 보이나·저장하면 표에 바로·일용직 펴짐 기준 · CLAUDE.md 안전 줄 · sw jw-shell-v448',
-    /기준: v448 \(2026-11-12\)\./.test(ft11) && ftv11.length > 0 && mF11.length === 0 && tlv11.length > 0 && scr11.length >= 3 && !scr11.some((l) => /PM/.test(l)) && GATE11.every((g) => gate11.some((l) => l.indexOf('`' + g + '`') > 0))
-    && mM11.length === 0 && mC11.length === 0 && /SHELL_CACHE = 'jw-shell-v448'/.test(sw11)
+  T('v448 ⑪ 문서: FEATURES 기준 v448 이상·v448 절(이름 고정) · TESTLIST v448 화면 칸 "[ ] (AI 시험 화면 대상" ≥ 3개("PM" 낱말 0)·게이트 칸 [x] 8종 · MANUAL 21-9 사람 추가·누가 보이나·저장하면 표에 바로·일용직 펴짐 기준 · CLAUDE.md 안전 줄 · sw jw-shell-v448 이상',
+    Number((ft11.match(/기준: v(\d+) /) || [0, 0])[1]) >= 448 && ftv11.length > 0 && mF11.length === 0 && tlv11.length > 0 && scr11.length >= 3 && !scr11.some((l) => /PM/.test(l)) && GATE11.every((g) => gate11.some((l) => l.indexOf('`' + g + '`') > 0))
+    && mM11.length === 0 && mC11.length === 0 && Number((sw11.match(/jw-shell-v(\d+)'/) || [0, 0])[1]) >= 448   // v449: 기준 줄·sw는 이 판 이상(이 판 값은 v449 ⑥)
     && tlv11.indexOf('줄 수가 같은 셈') < 0 && tlv11.indexOf('접힘 수는') > 0 && tlv11.indexOf('저장하지 않은 내용은 사라집니다') > 0,   // v448 검토: 머리·합계 접힘 수는 셈이 달라 '같은 셈' 확인 칸에서 뺌 · 인사 카드 확인 창
     JSON.stringify({ mF11, mM11, mC11, scr: scr11.length, gate: gate11.length }));
 } catch (e) { console.log('  (v448 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ---- v449(11/12 — PM 11/12 23:40 '니한테 노무비 지급 명단을 왜주지? 일용직 명단은 있지 않나?'): 체크 칸 일용직 펴짐 = 명부에만 있는 일용직(현장 대장 투입·날짜 있는 교육 기록 없음)도 펼침.
+//      운영 11/12 17:17 백업 사본 실측: 명부 155명 = 석면 대장 소급 등재 122명(9/10 — 전원 현장 대장 연결, 2025년 이후 투입 21명) + 9/22 담당자 등록 33명(2025년 준설 인원 — 현장 연결 9명·연결 없음 24명).
+//      v448은 연결 없는 24명을 '그 밖 일용직'에 접었다. 시험 틀 = v447 mk47(V48).
+//      ① 운영 모양 흉내 ② 경계(옛 기록만·지운 현장만·날짜 없는 종결 현장만·날짜 아닌 기록만·날짜 없는 예정 현장) ③ 현장 권한 없음 = 종전 ④ v448 사본과 대조(펴짐만 바뀜 — 사람 수·빠진 항목 셈 같음) ⑤ 정적 ⑥ 문서
+try {
+  if (!V48) throw new Error('v447 시험 틀 없음');
+  const V = V48;
+  // ① 운영 모양 흉내 — 소급 인부 r1·r2(2013·2019 석면 종결 현장만) · 남성초형 r3(2026 석면 종결) · 2025 준설 현장 연결 j1 · 연결 없는 명부 인원 j2·j3 · 지운 명부 j4(기록 없음 — 줄 없음)
+  const WK49 = () => [{ id: 'r1', name: '소급하나' }, { id: 'r2', name: '소급둘' }, { id: 'r3', name: '석면이천' }, { id: 'j1', name: '준설연결' }, { id: 'j2', name: '준설명부' }, { id: 'j3', name: '명부만' }, { id: 'j4', name: '지운명부', del: 1 }];
+  const S49 = (o) => Object.assign({ client: '', site: '', start: '', end: '', status: 'done', member_ids: [], worker_ids: [] }, o);
+  const ASB49 = () => [S49({ id: 'a1', seq: 1, kind: 'asbestos', title: '옛 석면 2013', start: '2013-05-01', end: '2013-05-10', worker_ids: ['r1', 'r2'] }),
+    S49({ id: 'a2', seq: 2, kind: 'asbestos', title: '옛 석면 2019', start: '2019-07-01', end: '2019-07-05', worker_ids: ['r2'] }),
+    S49({ id: 'a3', seq: 3, kind: 'asbestos', title: '석면 2026', start: '2026-01-09', end: '2026-02-27', worker_ids: ['r3'] }),
+    S49({ id: 'a4', seq: 4, kind: 'dredge', title: '준설 2025', start: '2025-07-24', end: '2025-08-21', worker_ids: ['j1'] })];
+  const MEM49 = () => [{ id: 'm0', name: '관리자', admin: true }];
+  const mk49 = (o) => { const X = V.mk47(Object.assign({ workers: WK49(), asb: ASB49(), edu: [], members: MEM49() }, o || {})); X.api.render(); return X; };
+  const grpIds49 = (X, ids) => ids.map((id) => { const r = X.api.find('worker:' + id); return r ? (r.grp || 'main') : 'none'; }).join(',');
+  const X1 = mk49(), g1 = grpIds49(X1, ['r1', 'r2', 'r3', 'j1', 'j2', 'j3', 'j4']);
+  T('v449 ① 운영 모양 흉내(실행 — 실제 eduSheetRows): 옛 석면 현장만 든 소급 인부 r1·r2 = 접힘 · 2026 석면 r3·2025 준설 연결 j1 = 펴짐 · 현장 연결·기록 없는 명부 인원 j2·j3 = 펴짐(v448은 접힘) · 지운 명부 j4(기록 없음) = 줄 없음 · 머리 "총 7명 (접힘 2명)" · 그린 줄 5',
+    g1 === 'old,old,main,main,main,main,none' && X1.el('eduHead').textContent === '총 7명 (접힘 2명)' && V.rowsH47(X1.host.innerHTML).length === 5 && V.grpOf47(X1.host.innerHTML) === 'old-2명',
+    JSON.stringify({ g1, head: X1.el('eduHead').textContent, rows: V.rowsH47(X1.host.innerHTML), grp: V.grpOf47(X1.host.innerHTML) }));
+
+  // ② 경계 — k1 옛 기록만(2024-06-01) = 접힘 · k2 지운 현장(2013)에만 = 펴짐(지운 줄은 현장 아님) · k3 날짜 없는 종결 현장만 = 접힘(현장 칸 '지난 자료'와 같은 판정 — siteYear 0) ·
+  //   k4 날짜 아닌 기록만('확인 중') = 펴짐(날짜 없는 기록은 어느 쪽 근거도 아님) · k5 날짜 없는 예정 현장 = 펴짐(진행) · k6 옛 기록 + 날짜 아닌 기록 = 접힘(날짜 있는 옛 흔적) · k7 2025-01-01 기록만 = 펴짐(경계)
+  const WK49b = WK49().concat(['k1', 'k2', 'k3', 'k4', 'k5', 'k6', 'k7'].map((id) => ({ id, name: '경계' + id })));
+  const ASB49b = ASB49().concat([S49({ id: 'b1', seq: 5, kind: 'asbestos', title: '지운 옛 현장', start: '2013-01-01', end: '2013-01-02', worker_ids: ['k2'], del: 1 }),
+    S49({ id: 'b2', seq: 6, kind: 'demolition', title: '날짜 없는 종결', worker_ids: ['k3'] }), S49({ id: 'b3', seq: 7, kind: 'dredge', title: '날짜 없는 예정', status: 'plan', worker_ids: ['k5'] })]);
+  const EDU49b = [{ id: 'q1', ptype: 'worker', pid: 'k1', kind: 'hire', date: '2024-06-01' }, { id: 'q2', ptype: 'worker', pid: 'k4', kind: 'hire', date: '확인 중' },
+    { id: 'q3', ptype: 'worker', pid: 'k6', kind: 'hire', date: '2023-02-01' }, { id: 'q4', ptype: 'worker', pid: 'k6', kind: 'basic_con', date: '' }, { id: 'q5', ptype: 'worker', pid: 'k7', kind: 'hire', date: '2025-01-01' }];
+  const X2 = mk49({ workers: WK49b, asb: ASB49b, edu: EDU49b }), g2 = grpIds49(X2, ['k1', 'k2', 'k3', 'k4', 'k5', 'k6', 'k7']);
+  T('v449 ② 경계(실행): 옛 기록만 = 접힘 · 지운 현장에만 = 펴짐 · 날짜 없는 종결 현장만 = 접힘(현장 칸 지난 자료와 같음) · 날짜 아닌 기록만 = 펴짐 · 날짜 없는 예정 현장 = 펴짐 · 옛 기록 + 날짜 아닌 기록 = 접힘 · 2025-01-01 기록만 = 펴짐',
+    g2 === 'old,main,old,main,main,old,main', g2);
+
+  // ③ 현장 권한 없음(N — 안전 수행·현장 숨김·일용직 보기) = 종전: 기록이 하나도 없으면 접힘(현장 투입을 볼 수 없어 명부 인원과 옛 인부를 못 가름) · 기록이 있으면 펴짐 · 묶음 이름 '교육 기록 없음' 갈래
+  const X3 = mk49({ user: V.U47.N, edu: [{ id: 'n1', ptype: 'worker', pid: 'r1', kind: 'hire', date: '2013-05-01' }] }), g3 = grpIds49(X3, ['r1', 'r2', 'j2', 'j3']);
+  T('v449 ③ 현장 권한 없음 = 종전(실행): 기록 있는 r1 = 펴짐 · 기록 없는 r2·j2·j3 = 접힘 · 묶음 이름 "그 밖 일용직 · 교육 기록 없음(현장 투입은 현장 권한이 있어야 셈)"',
+    g3 === 'main,old,old,old' && X3.host.innerHTML.indexOf('그 밖 일용직 · 교육 기록 없음(현장 투입은 현장 권한이 있어야 셈)') >= 0 && X3.host.innerHTML.indexOf('년까지 현장·교육 기록만') < 0,
+    JSON.stringify({ g3 }));
+
+  // ④ v448 사본과 대조 — 저장소 사본에서 v449 한 조건만 걷으면(= v448) j2·j3 = 접힘 · 두 판의 사람 수·빠진 항목 수·합계 셈은 같음(펴짐만 바뀜)
+  const COND49 = ' if (!s.length && !(ri[k] || []).some(function(r){ return isDate(r.date); })) return "";';
+  const src48 = html.replace(COND49, ''), X4 = mk49({ src: src48 }), g4 = grpIds49(X4, ['j2', 'j3']);
+  const m4a = X1.api.miss(), m4b = X4.api.miss(), sum4 = (X) => X.api.rows().reduce((s, r) => s + r.st.miss, 0);
+  T('v449 ④ v448 사본과 대조(실행): 조건 한 줄을 걷은 사본 = j2·j3 접힘(고친 곳이 이 조건 하나) · 두 판 사람 수 7·빠진 항목 셈·합계 같음 · 사본 머리 "총 7명 (접힘 4명)"',
+    src48 !== html && V.cnt47(html, COND49) === 1 && g4 === 'old,old' && X4.api.rows().length === X1.api.rows().length && JSON.stringify(m4a) === JSON.stringify(m4b) && sum4(X1) === sum4(X4) && X4.el('eduHead').textContent === '총 7명 (접힘 4명)',
+    JSON.stringify({ g4, m4a, m4b, head: X4.el('eduHead').textContent }));
+
+  // ⑤ 정적: @edu-sheet 구간(주석 걷음) wkGrp 한 줄 = 현장 권한 갈래 → 명부만 갈래(날짜 있는 기록 isDate) → 경계 판정 순서 · 묶음 이름에 '(또는 기록 없음)' 0(보이는 글 — 주석 걷음) · newY 3번 그대로 · 숫자 2025 0
+  const es5 = V.nc47(V.blk47(html, '// @edu-sheet-start', '// @edu-sheet-end')), wg5 = (es5.match(/var wkGrp = function\(k\)\{[^\n]*\n/) || [''])[0];
+  const o5 = [wg5.indexOf('if (!cx.site) return ri[k] ? "" : "old";'), wg5.indexOf(COND49.trim()), wg5.indexOf('return (s.some(')];
+  T('v449 ⑤ 정적: wkGrp 한 줄 순서 = 현장 권한 갈래 → 명부만 갈래(날짜 있는 기록 isDate) → 경계 판정 · 구간(주석 걷음) "(또는 기록 없음)" 0 · 묶음 이름 "년까지 현장·교육 기록만" 1 · newY( 3번 · 숫자 2025 0',
+    o5[0] > 0 && o5[1] > o5[0] && o5[2] > o5[1] && es5.indexOf('(또는 기록 없음)') < 0 && V.cnt47(es5, '"년까지 현장·교육 기록만"') === 1 && (wg5.match(/\bnewY\(/g) || []).length === 3 && !/\b2025\b/.test(es5),
+    JSON.stringify({ o5 }));
+
+  // ⑥ 문서 — FEATURES 기준 v449·v449 절 · TESTLIST v449(화면 칸 '[ ] (AI 시험 화면 대상' ≥ 1 — 'PM' 0 · 게이트 칸 [x] 8종) · MANUAL 21-9 펴짐 기준(명부에만 있는 일용직·2024년까지 흔적만 접힘) · CLAUDE.md 안전 줄 v449 · sw v449
+  const ft6 = V.rd47('FEATURES.md'), tl6 = V.rd47('TESTLIST.md'), cl6 = V.rd47('CLAUDE.md'), sw6 = V.rd47('sw.js'), man6 = V.rd47('MANUAL.html');
+  const ftv6 = (() => { const i = ft6.indexOf('\n### v449 (11/12)'); if (i < 0) return ''; const j = ft6.indexOf('\n### ', i + 5); return ft6.slice(i, j < 0 ? ft6.length : j); })();
+  const tlv6 = (() => { const i = tl6.indexOf('\n## v449 '); if (i < 0) return ''; const j = tl6.indexOf('\n## ', i + 5); return tl6.slice(i, j < 0 ? tl6.length : j); })();
+  const m219_6 = (() => { const i = man6.indexOf('<h3>21-9.'); return i < 0 ? '' : man6.slice(i, man6.indexOf('<h3>21-10.', i)); })();
+  const cb6 = tlv6.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), scr6 = cb6.filter((l) => /^- \[[ x]\] \(AI 시험 화면 대상/.test(l)), gate6 = cb6.filter((l) => /^- \[x\] \(AI\) `/.test(l));
+  const FT6 = ['명부에만 있는', '날짜 있는 교육 기록', '그 밖 일용직 · 2024년까지 현장·교육 기록만', '155명', '24명', 'uismoke v449', '서버 변경 없음', '노무비'];
+  const MAN6 = ['명부에만 있는 일용직', '2024년까지의 현장·교육 기록만 있는 사람'];
+  const GATE6 = ['uismoke', 'consheet_check', 'proctpl_check', 'settletest', 'servertest', 'rectest', 'promoqual_check', 'promogen_check'];
+  const mF6 = FT6.filter((s) => ftv6.indexOf(s) < 0), mM6 = MAN6.filter((s) => m219_6.indexOf(s) < 0);
+  T('v449 ⑥ 문서: FEATURES 기준 v449·v449 절 · TESTLIST v449 화면 칸 "[ ] (AI 시험 화면 대상" ≥ 1("PM" 낱말 0)·게이트 칸 [x] 8종 · MANUAL 21-9 펴짐 기준(명부에만 있는 일용직·2024년까지 흔적만 접힘 — "(또는 기록 없음)"·"기록이 없는 사람" 묶음 설명 0) · CLAUDE.md v449 · sw jw-shell-v449',
+    /기준: v449 \(2026-11-12\)\./.test(ft6) && ftv6.length > 0 && mF6.length === 0 && tlv6.length > 0 && scr6.length >= 1 && !scr6.some((l) => /PM/.test(l)) && GATE6.every((g) => gate6.some((l) => l.indexOf('`' + g + '`') > 0))
+    && mM6.length === 0 && m219_6.indexOf('기록이 없는 사람 — 현장 권한') < 0 && m219_6.indexOf('현장·교육 기록만 있거나 기록이 없는 사람') < 0 && m219_6.indexOf('아직 없는 일용직은 \'그 밖 일용직\' 묶음 안') < 0
+    && cl6.indexOf('v449') > 0 && /SHELL_CACHE = 'jw-shell-v449'/.test(sw6),
+    JSON.stringify({ mF6, mM6, scr: scr6.length, gate: gate6.length }));
+} catch (e) { console.log('  (v449 검사 생략 — ' + e.message + ')'); fails++; }
 
 try {
   const fdir = join(ROOT, 'netlify', 'functions');
