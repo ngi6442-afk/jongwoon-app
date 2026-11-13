@@ -609,7 +609,7 @@ try {
   T('서버 gw-auth: member_list 비관리자 투영에 파생 불리언 retired 추가 · 날짜(leave_date)는 여전히 안 나간다(S7 유지) · 목록에서 퇴사자를 빼지 않는다(인사 화면이 그린다)',
     /const o = \{ id: m\.id[^;]*, retired: retired\(m\) \};/.test(auth)   // v447 검토: 투영 객체(o) 끝 = retired · 회원 칸 4개는 요청자 안전 권한이 숨김이 아닐 때만 덧붙임(아래 줄 — 날짜·인사정보 아님)
     && /const pSafety = c\.member\.perms && c\.member\.perms\.safety;\s*const seeSafety = !!pSafety && pSafety !== 'hide';/.test(auth)
-    && /if \(seeSafety\) \{ o\.office = m\.office; o\.supervisor = m\.supervisor; o\.corp = m\.corp; o\.test_acct = m\.test_acct; \}\s*return o;/.test(auth)
+    && /if \(seeSafety\) \{ o\.office = m\.office; o\.supervisor = m\.supervisor; o\.corp = m\.corp; o\.test_acct = m\.test_acct; o\.quals = m\.quals; \}[^\n]*\n\s*return o;/.test(auth)
     && ((auth.match(/const o = \{ id: m\.id[^;]*\};/) || ['leave_date'])[0].indexOf('leave_date') < 0)
     && /const members = \(await listMembers\(st\)\)\.map\(function \(m\) \{/.test(auth)
     && /const ms = \(await listMembers\(st\)\)\.filter\(function \(m\) \{ return !retired\(m\); \}\);/.test(auth), '');   // 로그인 이름목록은 종전대로 퇴사자 제외(S2-A) — 바뀐 건 member_list 투영뿐
@@ -11921,13 +11921,13 @@ try {
     const who = cb.filter((l) => /^- \[ \] (나수진|정재욱|PM): /.test(l));
     const FT = ['settings:corp_reg', 'GATE_CORP_REG', 'corpRegLockOf', 'corpRegLock', 'veh_due_set', 'VEH_DUE_STALE', '날짜 그대로', 'vehRedo', ':re:<YYYY-MM>', '`due_set{칸: {prev, at}}`', 'R2-1', 'bg_fp', 'bg_auto', 'con_proc_get', '판 번호 v459은 임시'];
     const GATE = ['uismoke', 'consheet_check', 'proctpl_check', 'settletest', 'servertest', 'rectest', 'promoqual_check', 'promogen_check'];
-    return [/기준: v459 \(2026-11-13\)\./.test(ft), /SHELL_CACHE = 'jw-shell-v459'/.test(sw), ftv.length > 0 && FT.every((s) => ftv.indexOf(s) >= 0),
+    return [Number((ft.match(/기준: v(\d+) /) || [0, 0])[1]) >= 459, Number((sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 459, ftv.length > 0 && FT.every((s) => ftv.indexOf(s) >= 0),
       tlv.length > 0 && GATE.every((g) => gate.some((l) => l.indexOf('`' + g + '`') > 0)) && who.length >= 3, cl.indexOf('**P1 판1·2·4(v459') >= 0 && cl.indexOf('`vehDueMergeKeep`') >= 0];
   };
   const ft56 = rd56('FEATURES.md'), tl56 = rd56('TESTLIST.md'), cl56 = rd56('CLAUDE.md'), sw56 = rd56('sw.js');
   const real56 = chk56(ft56, tl56, cl56, sw56);
-  const MUT56 = [['기준 줄 v455', () => chk56(ft56.replace('기준: v459 (2026-11-13).', '기준: v455 (2026-11-13).'), tl56, cl56, sw56)],
-    ['sw v455', () => chk56(ft56, tl56, cl56, sw56.replace("'jw-shell-v459'", "'jw-shell-v455'"))],
+  const MUT56 = [['기준 줄 v455', () => chk56(ft56.replace(/기준: v\d+ \(2026-11-13\)\./, '기준: v455 (2026-11-13).'), tl56, cl56, sw56)],
+    ['sw v455', () => chk56(ft56, tl56, cl56, sw56.replace(/'jw-shell-v\d+'/, "'jw-shell-v455'"))],
     ['TESTLIST 절 없음', () => chk56(ft56, tl56.replace('\n## v459 — P1 판1·2·4', '\n## v4xx — 다른 것'), cl56, sw56)],
     ['CLAUDE 줄 없음', () => chk56(ft56, tl56, cl56.replace('**P1 판1·2·4(v459', '**P1(v4xx'), sw56)],
     ['FEATURES R2-1 걷음', () => chk56(ft56.split('R2-1').join('R2-x'), tl56, cl56, sw56)]];
@@ -11935,6 +11935,72 @@ try {
   T('v459 문서·판 번호(P1 판1·2·4 — 정확 검사): FEATURES 기준 v459 (2026-11-13) · sw jw-shell-v459 · FEATURES v459 절(corp_reg·GATE_CORP_REG·두 벌 판정·veh_due_set·날짜 그대로·다시 지시 :re:·due_set 표식·R2-1·bg_fp·bg_auto·임시 판 번호) · TESTLIST v459 절(사람 확인 칸 "누가: 무엇" ≥ 3 · 게이트 칸 [x] 8종) · CLAUDE.md P1 줄 · 결함 사본 ' + MUT56.length + '개 전부 깨짐',
     real56.every(Boolean) && kill56.length === 0, JSON.stringify({ real56, kill56 }));
 } catch (e) { console.log('  (v459 문서 검사 생략 — ' + e.message + ')'); fails++; }
+// ── v460(원장 C085 — PM 11/13 11:13 '추천대로' · 14:42 'ㄱ 만들기'): 체크 칸 2차 — 자격·담당 교육 6종 + 자격유지검사·정기적성검사 ──
+//   회원 칸 quals(대상 표시 — 인사·직원 수정 창 6칸 · 서버 gw-auth 허용 키만) → 켠 직원만 체크 칸 그 사람 줄 펼침에 줄 + 빠진 항목·다음 할 일 셈(열은 늘리지 않음)
+try {
+  if (!V48 || !V51) throw new Error('v447·v451 시험 틀 없음');
+  const V = V48, W = V51;
+  const mut60 = (a, b) => { if (V.cnt47(html, a) !== 1) throw new Error('결함 심을 자리 없음: ' + a.slice(0, 50)); return html.replace(a, () => b); };
+  // 오늘 2026-11-12 · q1 만 68세(1958-05-01) 운수종사자·건설기계조종사 · q2 만 50세 운수종사자·건설기계조종사 · q3 생년월일 없음 운수종사자 · q4 환경기술인·기술요원·폐기물·전기 · q5 표시 없음 · q6 퇴사자(표시 있음) · q7 만 71세 운수종사자
+  const MEM60 = () => [{ id: 'm0', name: '관리자', admin: true }, { id: 'q1', name: '육팔', dept: '운영부', birth: '1958-05-01', quals: ['drv', 'cm'] }, { id: 'q2', name: '오십', dept: '운영부', birth: '1976-03-03', quals: ['drv', 'cm'] },
+    { id: 'q3', name: '생일없음', dept: '운영부', quals: ['drv'] }, { id: 'q4', name: '담당넷', dept: '관리부', office: true, quals: ['wst', 'env', 'tech', 'elec'] }, { id: 'q5', name: '표시없음', dept: '관리부' },
+    { id: 'q6', name: '퇴사표시', dept: '운영부', retired: true, quals: ['drv'] }, { id: 'q7', name: '칠일', dept: '운영부', birth: '1955-01-01', quals: ['drv'] }];
+  const E60 = (id, pid, kind, date) => ({ id, ptype: 'member', pid, kind, date, hours: '', next: '', note: '' });
+  const EDU60 = () => [E60('a', 'q1', 'drv_fit', '2024-01-10'), E60('b', 'q1', 'cm_edu', '2023-10-01'), E60('c', 'q1', 'cm_fit', '2020-01-01'), E60('d', 'q2', 'cm_fit', '2020-01-01'), E60('e', 'q2', 'drv_edu', '2025-11-20'),
+    E60('f', 'q4', 'env_edu', '2023-12-01'), E60('g', 'q4', 'wst_edu', '2025-06-01'), E60('h', 'q6', 'drv_edu', '2020-01-01'), E60('i', 'q7', 'drv_fit', '2025-10-01'), E60('j', 'q7', 'drv_edu', '2026-03-01')];
+  const chk1_60 = (src) => {
+    const X = V.mk47({ src, members: MEM60(), workers: [{ id: 'w1', name: '일용', quals: ['drv'] }], asb: [], edu: EDU60() }); X.api.render();
+    const q = (id) => { const p = X.api.find(id); return p ? p.st.x.q.map((e) => e.k + ':' + e.it.t + (e.it.cls ? '[' + e.it.cls + ']' : '') + (e.it.miss ? '!' : '') + (e.it.due ? '@' + e.it.due : '')) : null; };
+    const p1 = X.api.find('member:q1'), p4 = X.api.find('member:q4'), p5 = X.api.find('member:q5'), p6 = X.api.find('member:q6');
+    X.api.inst(X.api.def()).open = 'member:q1'; X.api.render(); const det = X.host.innerHTML;
+    const nx = (id) => { const h = X.host.innerHTML, m = new RegExp('<tr class="vs-r[^"]*" data-vs-row="' + id + '">([\\s\\S]*?)</tr>').exec(h); return m ? m[1].replace(/<[^>]+>/g, '|') : ''; };
+    const info = { q1: q('member:q1'), q2: q('member:q2'), q3: q('member:q3'), q4: q('member:q4'), q5: q('member:q5'), q6: q('member:q6'), q7: q('member:q7'), w1: q('worker:w1'), miss: [p1.st.miss, p4.st.miss, p5.st.miss], over: [p1.st.over, p4.st.over], cand: p1.st.cand.map((c) => c.k + '/' + (c.lab || '')), row1: nx('member:q1').slice(0, 200) };
+    const base5 = p5.st.miss;   // 표시 없는 직원의 빠진 항목(열 항목만) — 같은 처지 q1은 여기에 자격 줄 빠짐이 더해짐
+    const ok = JSON.stringify(info.q1) === JSON.stringify(['drv_edu:기록 없음[vs-warn]!', 'drv_fit:✓ 2024-01@2027-01-10', 'cm_edu:경과 42일[vs-dan]!@2026-10-01', 'cm_fit:경과 680일[vs-dan]!@2025-01-01'])
+      && JSON.stringify(info.q2) === JSON.stringify(['drv_edu:D-8[vs-warn]@2026-11-20', 'drv_fit:—', 'cm_edu:기록 없음[vs-warn]!', 'cm_fit:✓ 2020-01@2030-01-01'])
+      && JSON.stringify(info.q3) === JSON.stringify(['drv_edu:기록 없음[vs-warn]!', 'drv_fit:근거 확인 중'])
+      && JSON.stringify(info.q4) === JSON.stringify(['wst_edu:✓ 2025-06@2028-06-01', 'env_edu:D-19[vs-warn]@2026-12-01', 'tech_edu:기록 없음[vs-warn]!', 'elec_edu:기록 없음[vs-warn]!'])
+      && JSON.stringify(info.q5) === '[]' && JSON.stringify(info.q6) === '[]' && JSON.stringify(info.w1) === '[]'
+      && JSON.stringify(info.q7) === JSON.stringify(['drv_edu:✓ 2026-03@2027-03-01', 'drv_fit:경과 42일[vs-dan]!@2026-10-01'])
+      && p1.st.miss === base5 + 3 && p4.st.miss >= 2 && p1.st.over === true && p1.st.cand[0].k === 'q:cm_fit' && p1.st.cand[0].lab === '건설기계조종사 정기적성검사'
+      && /건설기계조종사 정기적성검사 경과 680일 외 \d+/.test(nx('member:q1'))
+      && det.indexOf('<b>운수종사자 정기교육</b></td><td class="edu-basis">운수종사자 표시 — 매년 1회 이상(인허가 의무 대장 4행) — 기록 없음</td>') > 0 && det.indexOf('만 68세 = 3년마다') > 0 && det.indexOf('만 68세 = 5년마다') > 0
+      && /data-edu-kind="cm_fit"/.test(det) && /65세 미만이라 대상 아님/.test(X.api.find('member:q2').st.x.q[1].it.basis) && /생년월일이 없거나 볼 수 없어/.test(X.api.find('member:q3').st.x.q[1].it.basis) && /만 71세 = 1년마다/.test(X.api.find('member:q7').st.x.q[1].it.basis)
+      && X.api.nextFor('cm_edu', 'member:q1', '2026-01-10', 0, null) === '2029-01-10' && X.api.nextFor('drv_edu', 'member:q1', '2026-01-10', 0, null) === '2027-01-10' && X.api.nextFor('drv_fit', 'member:q1', '2026-01-10', 0, null) === '';
+    return { ok, info };
+  };
+  const r1_60 = chk1_60(html);
+  const m1_60 = [mut60('if (p.ptype !== "member" || p.grp === "gone" || !m || !qs.length) return out;', 'if (!m || !qs.length) return out;'), mut60('if (x.min && age < x.min){', 'if (false){'),
+    mut60('for (i = 0; i < x.age.length; i++){ if (age >= x.age[i][0]){ mon = x.age[i][1]; break; } }', ''), mut60('{ k: "drv_fit", age: [[70, 12], [65, 36]], min: 65,', '{ k: "drv_fit", age: [[65, 36], [70, 12]], min: 65,'),
+    mut60('      if (it.miss) out.miss++;\n      if (it.dd != null && it.dd < 0 && it.miss) out.over = true;\n      else if (it.dd != null && it.dd <= EDU_SOON && it.tgt) out.soon = true;\n      if (it.miss || (it.tgt && it.dd != null && it.dd <= EDU_SOON)) out.cand.push({ k: "q:" + e.k,', '      if (it.miss || (it.tgt && it.dd != null && it.dd <= EDU_SOON)) out.cand.push({ k: "q:" + e.k,'),
+    mut60('].concat((x.q || []).map(function(e){ return [e.lab, e.it]; }));', '];'), mut60('t: (c[0].lab || EDU_ITEM_H[c[0].k]) + " " + c[0].it.t +', 't: EDU_ITEM_H[c[0].k] + " " + c[0].it.t +')].map((s) => W.safe51(() => chk1_60(s)).ok);
+  T('v460 ① 자격·담당 교육·검사 줄(실행 — 실제 eduPersonStat·eduQualItems): 대상 표시가 켜진 재직 직원만(표시 없음·퇴사자·일용직 = 줄 0) · 만 68세 운수종사자 = 정기교육 기록 없음(노랑·빠짐)·자격유지검사 3년마다 ✓(기한 2027-01-10) · 건설기계조종사 = 안전교육 3년 경과 42일 빨강·정기적성검사 65세부터 5년 → 경과 680일 · 만 50세 = 자격유지검사 "—"(65세 미만 대상 아님)·정기적성검사 10년 ✓ · 만 71세 = 자격유지검사 1년마다 경과 · 생년월일 없음 = 근거 확인 중(회색) · 환경기술인 3년 D-19 노랑·폐기물 ✓·기술요원·전기 기록 없음 · 빠진 항목 = 열 항목 + 자격 줄 · 다음 할 일 글 = 그 줄 이름("건설기계조종사 정기적성검사 경과 680일 외 n") · 펼침에 줄·근거 글(의무 대장 행)·[+ 기록] 종류 · 다음 예정 자동 = 정기교육 12·안전교육 36개월·검사는 없음 · 결함 사본 7개(일용직·퇴사자도 줄·나이 하한 걷음·나이 주기 안 봄·나이 차례 뒤집음·빠진 항목 안 셈·펼침 줄 빠짐·다음 할 일 이름) = 모두 ✗',
+    r1_60.ok && m1_60.every((v) => v === false), JSON.stringify({ r: r1_60.info, mut: m1_60 }));
+
+  // ② 정적 — 인사·직원 수정 창 6칸(채움·저장) · EDU_KINDS 8종 · 서버 gw-auth(허용 키만·비면 칸째 지움·감사 칸·안전 권한자 투영) — 서버 실행은 servertest 84
+  const au60 = V.rd47('netlify/functions/gw-auth.js'), ids60 = ['drv', 'cm', 'wst', 'env', 'tech', 'elec'], kinds60 = ['drv_edu', 'drv_fit', 'cm_edu', 'cm_fit', 'wst_edu', 'env_edu', 'tech_edu', 'elec_edu'];
+  T('v460 ② 정적: 인사·직원 수정 창 대상 표시 6칸(id meQ_… 각 1번)·창 열 때 회원 quals로 채움·저장 때 켠 키만 quals로 · EDU_KINDS 8종(종류 고르기에 나옴) · EDU_QUAL 키 = 서버 QUAL_KEYS(같은 순서) · 서버 = 허용 키만 정해진 순서로·하나도 없으면 칸째 지움·AUD_FIELDS에 quals·회원 목록 투영은 안전 권한이 숨김이 아닐 때만 quals',
+    ids60.every((k) => V.cnt47(html, 'id="meQ_' + k + '"') === 1) && /EDU_QUAL\.forEach\(function\(q\)\{ var el = document\.getElementById\("meQ_" \+ q\.q\); if \(el\) el\.checked = !!\(m && Array\.isArray\(m\.quals\) && m\.quals\.indexOf\(q\.q\) >= 0\); \}\);/.test(html)
+    && /quals: EDU_QUAL\.filter\(function\(q\)\{ var el = document\.getElementById\("meQ_" \+ q\.q\); return !!\(el && el\.checked\); \}\)\.map\(function\(q\)\{ return q\.q; \}\),/.test(html)
+    && kinds60.every((k) => V.cnt47(html, '{ k:"' + k + '",') === 1) && ids60.every((k, i) => html.indexOf('{ q: "' + k + '",') > (i ? html.indexOf('{ q: "' + ids60[i - 1] + '",') : 0))
+    && /const QUAL_KEYS = \['drv', 'cm', 'wst', 'env', 'tech', 'elec'\];/.test(au60)
+    && /if \(d\.quals !== undefined\) \{ const q = Array\.isArray\(d\.quals\) \? QUAL_KEYS\.filter\(function \(k\) \{ return d\.quals\.indexOf\(k\) >= 0; \}\) : \[\]; if \(q\.length\) m\.quals = q; else delete m\.quals; \}/.test(au60)
+    && /const AUD_FIELDS = \[[^\]]*'test_acct','quals'\]/.test(au60) && /if \(seeSafety\) \{ o\.office = m\.office; o\.supervisor = m\.supervisor; o\.corp = m\.corp; o\.test_acct = m\.test_acct; o\.quals = m\.quals; \}/.test(au60), '');
+
+  // ③ 문서
+  const ft3 = V.rd47('FEATURES.md'), tl3 = V.rd47('TESTLIST.md'), cl3 = V.rd47('CLAUDE.md'), sw3 = V.rd47('sw.js'), man3 = V.rd47('MANUAL.html');
+  const ftv3 = (() => { const i = ft3.indexOf('\n### v460 (11/13)'); if (i < 0) return ''; const j = ft3.indexOf('\n### ', i + 5); return ft3.slice(i, j < 0 ? ft3.length : j); })();
+  const tlv3 = (() => { const i = tl3.indexOf('\n## v460 '); if (i < 0) return ''; const j = tl3.indexOf('\n## ', i + 5); return tl3.slice(i, j < 0 ? tl3.length : j); })();
+  const m219_3 = (() => { const i = man3.indexOf('<h3>21-9.'); return i < 0 ? '' : man3.slice(i, man3.indexOf('<h3>21-10.', i)); })();
+  const cb3 = tlv3.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), scr3 = cb3.filter((l) => /^- \[[ x]\] \(AI 시험 화면 대상/.test(l)), gate3 = cb3.filter((l) => /^- \[x\] \(AI\) `/.test(l));
+  const FT3 = ['C085', '`EDU_QUAL`', '`eduQualItems`', '`quals`', '`QUAL_KEYS`', '자격유지검사', '정기적성검사', '의무 대장', '4대 법정의무교육', 'uismoke v460', 'servertest'];
+  const GATE3 = ['uismoke', 'consheet_check', 'proctpl_check', 'settletest', 'servertest', 'rectest', 'promoqual_check', 'promogen_check', 'promoqlearn_check', 'promo_wrap_check', 'promo_post_check'];
+  const mF3 = FT3.filter((s) => ftv3.indexOf(s) < 0);
+  T('v460 ③ 문서: FEATURES 기준 v460 (2026-11-13)·v460 절 · TESTLIST v460 화면 칸 "[ ] (AI 시험 화면 대상" ≥ 1("PM" 낱말 0)·게이트 칸 [x] 11종 · MANUAL 21-9 자격·담당 교육(대상 표시·자격유지검사·정기적성검사) · CLAUDE.md EDU_QUAL · sw jw-shell-v460',
+    /기준: v460 \(2026-11-13\)\./.test(ft3) && ftv3.length > 0 && mF3.length === 0 && tlv3.length > 0 && scr3.length >= 1 && !scr3.some((l) => /PM/.test(l)) && GATE3.every((g) => gate3.some((l) => l.indexOf('`' + g + '`') > 0))
+    && m219_3.indexOf('자격·담당 교육') > 0 && m219_3.indexOf('자격유지검사') > 0 && m219_3.indexOf('정기적성검사') > 0 && cl3.indexOf('`EDU_QUAL`') > 0 && /SHELL_CACHE = 'jw-shell-v460'/.test(sw3),
+    JSON.stringify({ mF3, scr: scr3.length, gate: gate3.length }));
+} catch (e) { console.log('  (v460 검사 생략 — ' + e.message + ')'); fails++; }
 
 try {
   const fdir = join(ROOT, 'netlify', 'functions');

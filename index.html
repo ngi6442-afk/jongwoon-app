@@ -3132,6 +3132,14 @@
     <span class="fld-label">안전 › 체크 칸 기준</span>
     <label class="dg-check"><input type="checkbox" id="meOffice"> 사무직 (정기교육 반기 6시간·일반건강진단 2년 — 표시가 없으면 그 밖 근로자: 반기 12시간·1년)</label>
     <label class="dg-check"><input type="checkbox" id="meSupervisor"> 관리감독자 지정 (정기교육 연 16시간)</label>
+    <!-- v460(원장 C085): 자격·담당 교육 대상 표시 6칸 — 켠 사람만 안전 › 체크 칸 그 사람 줄 펼침에 그 교육·검사 줄이 나온다(회원 칸 quals) -->
+    <div style="font-size:12px;color:var(--sub);margin:6px 2px 2px;">자격·담당 교육 대상 — 켠 것만 안전 › 체크 칸 그 사람 줄 펼침에 줄이 나옵니다</div>
+    <label class="dg-check"><input type="checkbox" id="meQ_drv"> 운수종사자 (정기교육 매년 · 자격유지검사 65세부터)</label>
+    <label class="dg-check"><input type="checkbox" id="meQ_cm"> 건설기계조종사 (안전교육 3년 · 정기적성검사 10년, 65세부터 5년)</label>
+    <label class="dg-check"><input type="checkbox" id="meQ_wst"> 폐기물 처리 담당자 (교육 3년)</label>
+    <label class="dg-check"><input type="checkbox" id="meQ_env"> 환경기술인 (교육 3년)</label>
+    <label class="dg-check"><input type="checkbox" id="meQ_tech"> 기술요원 (교육 3년)</label>
+    <label class="dg-check"><input type="checkbox" id="meQ_elec"> 전기안전관리자 (법정교육 3년)</label>
     <span class="fld-label">소속 회사</span>
     <select id="meCorp"><option value="">(지정 안 함)</option><option value="env">종운환경</option><option value="con">종운건설</option></select>
     <label class="dg-check" id="meTestWrap"><input type="checkbox" id="meTestAcct"> 시험 계정 (안전 › 체크 칸 표·빠진 항목·합계에서 뺌 — 다른 화면은 그대로)</label>
@@ -16893,6 +16901,15 @@
     { k:"gen_med",   n:"일반건강진단",           months:12, hint:"사무직 2년마다·그 밖 1년마다(체크 칸 표는 회원 '사무직' 표식으로 — 표식이 없으면 1년). 날짜·실시 여부만 적고 결과는 넣지 않습니다" },
     { k:"ra_join",   n:"위험성평가 참여",         months:0,  hint:"위험성평가에 참여한 날 — 표에서는 표시만(판정 안 함). 아래 회차 표식(평가일·정기/수시/최초·부서/현장)을 함께 적습니다" },
     { k:"ra_share",  n:"위험성평가 결과 공유",    months:0,  hint:"위험성평가 결과·조치를 알린 날 — 표는 올해 정기·최초 회차(평가일 — 전사 또는 그 사람 부서) 뒤 기록이 있으면 ✓(회차가 없으면 올해 기록), 없으면 노랑 '기록 없음'(공유 기한은 지침 원문 확인 뒤). 아래 회차 표식을 함께 적습니다(신규·작업 변경자 작업 전 공유는 근거 확인 중)" },
+    // v460(원장 C085 — 체크 칸 2차): 자격·담당 교육 6종 + 검사 2종. 주기 = 인허가 의무 대장 문구(4·5·14·15·28·35·36·70행 — 원문 확정분). 검사 2종은 나이로 갈려 다음 예정을 자동으로 넣지 않는다
+    { k:"drv_edu",  n:"운수종사자 정기교육",         months:12,  hint:"매년 1회 이상 4시간(해당자 8시간) — 의무 대장 4행" },
+    { k:"drv_fit",  n:"운수종사자 자격유지검사",     months:0,   hint:"65세 이상 70세 미만 3년마다 · 70세 이상 1년마다(의무 대장 5행) — 나이로 갈려 다음 예정은 직접 넣습니다" },
+    { k:"cm_edu",   n:"건설기계조종사 안전교육",     months:36,  hint:"3년 주기(의무 대장 14행)" },
+    { k:"cm_fit",   n:"건설기계조종사 정기적성검사", months:0,   hint:"10년마다(65세 이상은 5년마다 — 의무 대장 15행) — 나이로 갈려 다음 예정은 직접 넣습니다" },
+    { k:"wst_edu",  n:"폐기물 처리 담당자 교육",     months:36,  hint:"최초 = 허가받은 날부터 1년 이내, 이후 3년마다(의무 대장 35행)" },
+    { k:"env_edu",  n:"환경기술인 교육",             months:36,  hint:"신규 = 임명된 날부터 1년 이내 1회 · 보수 = 신규교육을 받은 날 기준 3년마다(의무 대장 70행)" },
+    { k:"tech_edu", n:"기술요원 교육",               months:36,  hint:"유자격 기술요원 = 대상자가 된 날부터 1년 이내 최초, 이후 3년마다 · 소규모 특례 임명자는 6개월 이내 최초, 이후 1년마다(의무 대장 36행 — 표는 3년 기준, 특례면 다음 예정을 직접 고칩니다)" },
+    { k:"elec_edu", n:"전기안전관리자 법정교육",     months:36,  hint:"전기안전관리기술교육 3년마다 1회 이상 · 최초 선임자는 선임된 날부터 6개월 이내(의무 대장 28행)" },
     { k:"special_demo", n:"특별교육(해체·밀폐 등)", months:0, hint:"석면 밖 특별교육 대상 작업(별표5 — 해체·밀폐공간 등). 철거 현장의 특별교육 줄(해체 특별교육)이 이 기록을 봅니다 — 석면 현장은 '석면 특별교육' 기록" }
   ];
   var EDU_RA_TYPE = { regular: "정기", adhoc: "수시", initial: "최초" };   // v447 위험성평가 회차 표식 구분(ra.type)
@@ -17259,6 +17276,40 @@
   var EDU_CHK = "근거 확인 중", EDU_NOSITE = "판정 불가(현장 권한 없음)";
   var EDU_ASB_CAT = "석면 — 판정 밖";   // v450 검토: 진행 중 투입이 석면 현장뿐인 일용직의 교육 칸 고르기 글(대상 아님과 따로 — 펼침에서 '대상 아님' 줄로 접지 않음)
   var EDU_ITEM_COLS = ["reg", "hire", "spec", "basic", "gmed", "amed", "ra"];
+  // v460(원장 C085 — 체크 칸 2차): 자격·담당 교육 대상 표시(회원 칸 quals — 인사·직원 수정 창)별 항목. 열은 늘리지 않고 그 사람 줄 펼침에 줄 + 다음 할 일·빠진 항목 셈에만.
+  //   months = 주기(마지막 기록 + 개월) · age = 나이로 갈리는 주기 [[나이 이상, 개월] — 높은 나이 먼저], min = 그 나이 미만은 대상 아님 · 주기 문구 근거 = 인허가 의무 대장 행(row)
+  //   직원(회원)만 — 일용직·퇴사자·지운 회원은 줄 없음. 기록이 없으면 노랑 '기록 없음'(기한을 모름 — 빠진 항목에 셈) · 있으면 마지막 + 주기: 지남 빨강 · 30일 안 노랑 · ✓
+  var EDU_QUAL = [
+    { q: "drv", n: "운수종사자", items: [{ k: "drv_edu", months: 12, row: 4, b: "매년 1회 이상" }, { k: "drv_fit", age: [[70, 12], [65, 36]], min: 65, row: 5, b: "65세 이상 70세 미만 3년마다 · 70세 이상 1년마다" }] },
+    { q: "cm", n: "건설기계조종사", items: [{ k: "cm_edu", months: 36, row: 14, b: "3년 주기" }, { k: "cm_fit", months: 120, age: [[65, 60]], row: 15, b: "10년마다(65세 이상은 5년마다)" }] },
+    { q: "wst", n: "폐기물 처리 담당자", items: [{ k: "wst_edu", months: 36, row: 35, b: "최초 허가받은 날부터 1년 이내, 이후 3년마다" }] },
+    { q: "env", n: "환경기술인", items: [{ k: "env_edu", months: 36, row: 70, b: "신규 임명 1년 이내, 보수 3년마다" }] },
+    { q: "tech", n: "기술요원", items: [{ k: "tech_edu", months: 36, row: 36, b: "3년마다(소규모 특례 임명자는 1년마다 — 표는 3년 기준)" }] },
+    { q: "elec", n: "전기안전관리자", items: [{ k: "elec_edu", months: 36, row: 28, b: "3년마다 1회 이상" }] }
+  ];
+  // 만 나이(기준일 t) — 생년월일이 날짜 꼴이 아니면 -1
+  function eduAge(birth, t){ var a; if (!isDate(birth) || !isDate(t)) return -1; a = Number(t.slice(0, 4)) - Number(birth.slice(0, 4)); if (t.slice(5) < birth.slice(5)) a--; return a; }
+  // 한 사람의 자격·담당 줄 [{ k, lab, it }] — 대상 표시가 켜진 재직 직원만
+  function eduQualItems(p, recs){
+    var m = p.m, out = [], qs = (m && Array.isArray(m.quals)) ? m.quals : [], t = todayStr();
+    if (p.ptype !== "member" || p.grp === "gone" || !m || !qs.length) return out;
+    EDU_QUAL.forEach(function(q){
+      if (qs.indexOf(q.q) < 0) return;
+      q.items.forEach(function(x){
+        var rec = eduLastOf(recs, [x.k]), lab = eduKindLabel(x.k), basis = q.n + " 표시 — " + x.b + "(인허가 의무 대장 " + x.row + "행)", mon = x.months || 0, age, i, it;
+        if (x.age){
+          age = eduAge(m.birth, t);
+          if (age < 0){ out.push({ k: x.k, lab: lab, it: eduGreyIt(x.k, EDU_CHK, EDU_CHK, basis + " · 생년월일이 없거나 볼 수 없어 주기를 정하지 못함(인사·직원에 생년월일 — 관리자만 봄)", rec) }); return; }
+          if (x.min && age < x.min){ out.push({ k: x.k, lab: lab, it: eduNone(x.k, basis + " · 만 " + age + "세 — " + x.min + "세 미만이라 대상 아님", rec) }); return; }
+          for (i = 0; i < x.age.length; i++){ if (age >= x.age[i][0]){ mon = x.age[i][1]; break; } }
+          basis += " · 만 " + age + "세 = " + (mon % 12 === 0 ? (mon / 12) + "년" : mon + "개월") + "마다";
+        }
+        it = rec ? eduCycle(x.k, rec, mon, basis) : eduIt({ t: "기록 없음", cls: "vs-warn", tgt: true, miss: true, cat: "기록 없음", kind: x.k, basis: basis + " — 기록 없음" });
+        out.push({ k: x.k, lab: lab, it: it });
+      });
+    });
+    return out;
+  }
   var EDU_ITEM_H = { reg: "정기교육", hire: "채용 시", spec: "특별교육", basic: "건설 기초", gmed: "일반건진", amed: "석면 건진", ra: "위험성평가" };
   var EDU_GREY = "color:#9AA09C;";
   // 회사 단위 감면 — 안전 설정에 감면 칸이 아직 없어 늘 없음(위 설명). 감면 시간은 원문(산안법 시행규칙 별표4 비고) 확인 뒤 이 함수에서만
@@ -17461,6 +17512,7 @@
       : eduNone("ra_join", "올해 투입 없음", jn);
     x.ranew = raT ? eduGreyIt("ra_share", EDU_CHK, EDU_CHK, "신규·작업 변경자 작업 전 공유 — 고용노동부 고시 전부개정(11/4 시행)이 법제처에 오르기 전까지 근거 확인 중") : eduNone("ra_share", "올해 투입 없음");
     // 빠진 항목 · 다음 할 일 후보(빠짐 또는 30일 안) — 지남(음수)이 맨 앞, '기록 없음'(기한 모름)은 0일로, 열 순서로 동률 가름
+    x.q = eduQualItems(p, recs);   // v460 자격·담당 교육·검사 줄(대상 표시가 켜진 직원만 — 펼침 줄 · 아래 빠진 항목·다음 할 일 셈)
     var out = { c: c, x: x, miss: 0, over: false, soon: false, asb: asbAct.length > 0, cand: [] };
     EDU_ITEM_COLS.forEach(function(k, i){
       var it = c[k];
@@ -17469,6 +17521,13 @@
       if (it.dd != null && it.dd < 0 && it.miss) out.over = true;
       else if (it.dd != null && it.dd <= EDU_SOON && it.tgt) out.soon = true;
       if (it.miss || (it.tgt && it.dd != null && it.dd <= EDU_SOON)) out.cand.push({ k: k, it: it, o: it.dd != null ? it.dd : 0, i: i });
+    });
+    x.q.forEach(function(e, i){   // v460 — 열 항목과 같은 셈(빠짐 · 지남 · 30일 안 · 다음 할 일 후보 — 열 항목 뒤 차례)
+      var it = e.it;
+      if (it.miss) out.miss++;
+      if (it.dd != null && it.dd < 0 && it.miss) out.over = true;
+      else if (it.dd != null && it.dd <= EDU_SOON && it.tgt) out.soon = true;
+      if (it.miss || (it.tgt && it.dd != null && it.dd <= EDU_SOON)) out.cand.push({ k: "q:" + e.k, lab: e.lab, it: it, o: it.dd != null ? it.dd : 0, i: 100 + i });
     });
     out.cand.sort(function(a1, b1){ return (a1.o - b1.o) || (a1.i - b1.i); });
     return out;
@@ -17528,7 +17587,7 @@
   // 새 기록을 넣을 수 있는 사람 — 재직 회원(시험 계정 빼고) · 명부에 있는 지우지 않은 일용직(이름을 볼 수 있을 때만 — 옛 창의 대상 고르기와 같은 범위)
   function eduCanAdd(p){ return !!p && p.grp !== "gone" && (p.ptype === "member" ? (!!p.m && !memberRetired(p.m) && p.m.test_acct !== true) : (!!p.w && p.w.del !== 1)); }
   // 다음 할 일 — 가장 급한 항목 + '외 n'
-  function eduNextOf(p){ var c = p.st.cand; if (!c.length) return null; return { k: c[0].k, it: c[0].it, t: EDU_ITEM_H[c[0].k] + " " + c[0].it.t + (c.length > 1 ? " 외 " + (c.length - 1) : ""), o: c[0].o }; }
+  function eduNextOf(p){ var c = p.st.cand; if (!c.length) return null; return { k: c[0].k, it: c[0].it, t: (c[0].lab || EDU_ITEM_H[c[0].k]) + " " + c[0].it.t + (c.length > 1 ? " 외 " + (c.length - 1) : ""), o: c[0].o }; }
   function eduSheetVal(r, k){
     var nx;
     if (k === "name") return r.name;
@@ -17593,7 +17652,7 @@
       [sup ? "정기교육(관리감독자)" : "정기교육(근로자)", c.reg], ["채용 시 교육", c.hire], ["작업내용 변경 시 교육", x.change], ["특별교육(해체·밀폐 등 — 석면 밖)", c.spec],
       ["건설업 기초안전보건교육", c.basic], ["일반건강진단", c.gmed], ["석면 건강진단(배치전·특수)", c.amed],
       ["위험성평가 결과 공유", c.ra], ["위험성평가 참여(표시만)", x.join], ["신규·작업 변경자 작업 전 공유", x.ranew]
-    ];
+    ].concat((x.q || []).map(function(e){ return [e.lab, e.it]; }));   // v460 자격·담당 교육·검사 줄(대상 표시가 켜진 직원만)
   }
   function eduSheetDetail(r, ctx){
     var can = canDo("safety") && eduCanAdd(r), rows = eduDetRows(r), na = [], body = "", hist, h;
@@ -28579,6 +28638,7 @@
     document.getElementById("meEmp").value = m ? (m.emp_type||"정규직") : "정규직";
     document.getElementById("meOffice").checked = !!(m && m.office === true);   // v447 회원 칸 4개(안전 › 체크 칸 기준)
     document.getElementById("meSupervisor").checked = !!(m && m.supervisor === true);
+    EDU_QUAL.forEach(function(q){ var el = document.getElementById("meQ_" + q.q); if (el) el.checked = !!(m && Array.isArray(m.quals) && m.quals.indexOf(q.q) >= 0); });   // v460 자격·담당 교육 대상 표시
     document.getElementById("meCorp").value = (m && (m.corp === "env" || m.corp === "con")) ? m.corp : "";
     document.getElementById("meTestAcct").checked = !!(m && m.test_acct === true);
     document.getElementById("meTestWrap").style.display = isAdmin() ? "" : "none";   // 시험 계정 표식은 관리자만
@@ -28686,7 +28746,8 @@
       loa_days: loaRaw === "" ? 0 : Number(loaRaw),
       leave_date: document.getElementById("meLeave").value || "",
       annual_paid: document.getElementById("mePaidAnnual").checked,
-      office: document.getElementById("meOffice").checked, supervisor: document.getElementById("meSupervisor").checked,   // v447 회원 칸(서버는 켜짐만 저장 — 꺼짐은 칸째 지움)
+      office: document.getElementById("meOffice").checked, supervisor: document.getElementById("meSupervisor").checked,
+      quals: EDU_QUAL.filter(function(q){ var el = document.getElementById("meQ_" + q.q); return !!(el && el.checked); }).map(function(q){ return q.q; }),   // v460(서버는 허용 키만 저장 — 하나도 없으면 칸째 지움)   // v447 회원 칸(서버는 켜짐만 저장 — 꺼짐은 칸째 지움)
       corp: document.getElementById("meCorp").value || "" };
     if (isAdmin()) payload.test_acct = document.getElementById("meTestAcct").checked;   // v447 시험 계정 표식은 관리자만 보냄(서버도 관리자만 받음)
     // 관리자·개발자 지정과 아이디는 개발자만 보낸다(서버 DEV_ONLY). v328: 관리자가 만든 일반 직책 회원은

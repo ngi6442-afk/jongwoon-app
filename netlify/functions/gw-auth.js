@@ -88,6 +88,7 @@ function normUid(uid) { return cleanText(uid).toLowerCase(); }
 // 영문소문자·숫자·._- 만 4~20자. 한글 금지 — 이름 형태를 아이디로 못 잡게 해 이름 색인 가로채기를 원천 차단.
 function validUid(uid) { return /^[a-z0-9._-]{4,20}$/.test(normUid(uid)); }
 function genId() { return 'u' + crypto.randomBytes(5).toString('hex'); }
+const QUAL_KEYS = ['drv', 'cm', 'wst', 'env', 'tech', 'elec'];   // v460 자격·담당 교육 대상 표시(앱 EDU_QUAL과 같은 키·순서)
 function safeMember(m) { if (!m) return null; const { pin_salt, pin_hash, ...s } = m; return s; }
 // 일반 직책(v328, PM 9/8 "대표/관리자/개발자 제외한 다른 직책 등록 가능하게") — 권한 상승이 없는 직책만.
 // 이 직책의 회원 등록·직책 변경은 관리자(비개발자)도 할 수 있다. 관리자·대표·개발자 지정은 종전대로 개발자만.
@@ -238,7 +239,7 @@ async function handleMemberList(st, event, R) {
   const members = (await listMembers(st)).map(function (m) {
     if (c.member.admin || m.id === c.member.id) return safeMember(m);
     const o = { id: m.id, name: m.name, role: m.role, rank: m.rank, dept: m.dept, seq: m.seq, admin: m.admin, dev: m.dev, tier: m.tier, on_loa: m.on_loa, del: m.del, retired: retired(m) };
-    if (seeSafety) { o.office = m.office; o.supervisor = m.supervisor; o.corp = m.corp; o.test_acct = m.test_acct; }
+    if (seeSafety) { o.office = m.office; o.supervisor = m.supervisor; o.corp = m.corp; o.test_acct = m.test_acct; o.quals = m.quals; }   // v460 quals(자격·담당 교육 대상 표시)
     return o;   // v447 회원 칸 4개(사무직·관리감독자 지정·소속 회사·시험 계정) — 안전 › 체크 칸 표를 안전 담당(비관리자)이 그리는 데 쓰는 직무 구분 표식(인사정보·날짜 아님)   // tier·dev(v321)는 클라 tierOfMember 파생·표시용(인사정보 아님). retired(v329)는 퇴사 여부 파생 불리언 — 날짜(leave_date)는 여전히 숨기고, 비관리자 화면도 담당·공개범위에서 퇴사자를 걸러낼 수 있게 한다
   });
   return jr(200, { status: 'OK', members, request_id: R });
@@ -379,6 +380,8 @@ async function handleMemberUpsert(st, event, d, R) {
   //   관리감독자 지정(supervisor) = 정기교육 연 16시간 · 소속 회사(corp) = env 종운환경·con 종운건설 · 시험 계정(test_acct) = 체크 칸 표·빠진 항목·합계에서 뺌(다른 화면은 그대로)
   if (d.office !== undefined) { if (d.office === true) m.office = true; else delete m.office; }
   if (d.supervisor !== undefined) { if (d.supervisor === true) m.supervisor = true; else delete m.supervisor; }
+  // v460(원장 C085): 자격·담당 교육 대상 표시(quals — 운수종사자 drv · 건설기계조종사 cm · 폐기물 처리 담당자 wst · 환경기술인 env · 기술요원 tech · 전기안전관리자 elec) — 허용 키만 정해진 순서로, 하나도 없으면 칸째 지움(office와 같은 까닭)
+  if (d.quals !== undefined) { const q = Array.isArray(d.quals) ? QUAL_KEYS.filter(function (k) { return d.quals.indexOf(k) >= 0; }) : []; if (q.length) m.quals = q; else delete m.quals; }
   if (d.corp !== undefined) { const cp = String(d.corp || ''); if (cp) m.corp = cp; else delete m.corp; }   // 값 검사(400 BAD_CORP)는 위 — 어떤 칸도 바꾸기 전
   if (d.test_acct !== undefined) { if (d.test_acct === true) m.test_acct = true; else delete m.test_acct; }   // 관리자 검사도 위(어떤 칸도 바꾸기 전)
   m.perms = cleanPerms(forcedPerms || d.perms || m.perms);   // v328: 관리자 등록분은 서버 표 프리셋(클라 값 무시)
@@ -398,7 +401,7 @@ async function handleMemberUpsert(st, event, d, R) {
   // 감사 로그: 회원 필드 변경(이전값→새값). PIN은 값 미기록('변경'만), 해시·비밀값 제외.
   try {
     const f = {};
-    const AUD_FIELDS = ['name','uid','role','admin','dev','tier','rank','dept','annual_days','birth','hire_date','emp_type','annual_basis','loa_days','leave_date','annual_paid','annual_base','annual_base_date','seq','on_loa','loa_start','loa_end','office','supervisor','corp','test_acct'];   // v447 회원 칸 4개(사무직·관리감독자 지정·소속 회사·시험 계정)
+    const AUD_FIELDS = ['name','uid','role','admin','dev','tier','rank','dept','annual_days','birth','hire_date','emp_type','annual_basis','loa_days','leave_date','annual_paid','annual_base','annual_base_date','seq','on_loa','loa_start','loa_end','office','supervisor','corp','test_acct','quals'];   // v447 회원 칸 4개(사무직·관리감독자 지정·소속 회사·시험 계정)
     const b = before || {};
     for (const k of AUD_FIELDS) {
       const a = b[k], v = m[k];

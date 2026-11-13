@@ -5866,6 +5866,19 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
     const quiet84 = r84.code === 200 && auditMock.logs.slice(aud84b).reduce((a, l) => a.concat(l.ev || []), []).filter((e) => e.id === 'uw84').length === 1;
     T('84 v447 ①-2 필드별 복사·꺼짐: 다른 칸만 보낸 저장 = 네 칸 그대로 · false·빈 값 = 칸째 지움(false·"" 남지 않음) · 같은 꺼짐 다시 저장 = 감사 줄 0',
       keep84 && off84 && quiet84, JSON.stringify({ keep84, off84, quiet84, m: u84() }));
+    // ①-2b (v460 — 원장 C085) 자격·담당 교육 대상 표시 quals — 허용 키만 정해진 순서로 · 배열 아님·허용 키 0개 = 칸째 지움 · 보내지 않으면 그대로 · 감사 줄에 quals
+    const audQ84 = auditMock.logs.length;
+    r84 = await callA84({ action: 'member_upsert', id: 'uw84', quals: ['elec', 'drv', 'hack', 'drv', '__proto__'] }, tokAdm84);
+    const q1_84 = r84.code === 200 && JSON.stringify(u84().quals) === '["drv","elec"]';
+    const evQ84 = auditMock.logs.slice(audQ84).reduce((a, l) => a.concat(l.ev || []), []).filter((e) => e.id === 'uw84');
+    r84 = await callA84({ action: 'member_upsert', id: 'uw84', rank: '주임' }, tokAdm84);
+    const q2_84 = r84.code === 200 && JSON.stringify(u84().quals) === '["drv","elec"]';
+    r84 = await callA84({ action: 'member_upsert', id: 'uw84', quals: 'drv' }, tokAdm84);
+    const q3_84 = r84.code === 200 && !('quals' in u84());
+    r84 = await callA84({ action: 'member_upsert', id: 'uw84', quals: ['cm'] }, tokAdm84); r84 = await callA84({ action: 'member_upsert', id: 'uw84', quals: ['nope'] }, tokAdm84);
+    const q4_84 = r84.code === 200 && !('quals' in u84());
+    T('84 v460 quals(자격·담당 교육 대상 표시): 허용 키만 정해진 순서로 저장(["elec","drv","hack","drv","__proto__"] → ["drv","elec"]) · 감사 1줄 f에 quals · 다른 칸만 보낸 저장 = 그대로 · 배열 아님·허용 키 0개 = 칸째 지움',
+      q1_84 && q2_84 && q3_84 && q4_84 && evQ84.length === 1 && Array.isArray((evQ84[0].f || {}).quals), JSON.stringify({ q1_84, q2_84, q3_84, q4_84, ev: evQ84.length, m: u84() }));
     // ①-3 소속 회사 값 검사 — 표 밖 값·객체 = 400 BAD_CORP · 같은 요청의 다른 칸(이름 바꾸기 아님 — 직급·사무직)도 안 바뀜 · 이름 색인 그대로
     const before84 = JSON.stringify(u84());
     const bc1 = await callA84({ action: 'member_upsert', id: 'uw84', corp: 'abc', office: true, rank: '대리' }, tokAdm84);
@@ -5880,7 +5893,7 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
     const iChk84 = src84.indexOf("if (d.test_acct !== undefined && !c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });"), iCorp84 = src84.indexOf("error_code: 'BAD_CORP'"), iName84 = src84.indexOf('if (nameChange) { await blobSet(st, nameKey(m.name), null); m.name = name; }');
     T('84 v447 ①-4 시험 계정 표식은 관리자만: 비관리자(안전 수행) 저장 = 403 ADMIN_ONLY·표식 없음 그대로 · 서버 검사(관리자·BAD_CORP)는 이름 색인 지우기보다 앞 · AUD_FIELDS에 네 칸',
       t84.code === 403 && t84.body.error_code === 'ADMIN_ONLY' && !('test_acct' in u84()) && iChk84 > 0 && iCorp84 > 0 && iName84 > 0 && iChk84 < iName84 && iCorp84 < iName84
-      && /const AUD_FIELDS = \[[^\]]*'office','supervisor','corp','test_acct'\]/.test(src84), JSON.stringify({ code: t84.code, ec: t84.body.error_code, iChk84, iCorp84, iName84 }));
+      && /const AUD_FIELDS = \[[^\]]*'office','supervisor','corp','test_acct','quals'\]/.test(src84), JSON.stringify({ code: t84.code, ec: t84.body.error_code, iChk84, iCorp84, iName84 }));
     // ①-5 회원 목록 — 비관리자 투영에 네 칸은 요청자의 안전 권한이 숨김이 아닐 때만(안전 담당이 표를 그림 — v447 검토: 직무 구분도 최소 범위로), 날짜·인사정보(hire_date·birth·leave_date)는 여전히 없음
     //   안전 보기(ukv84) = 다른 회원 네 칸 · 안전 숨김(uo84 — 값 없음 = 기본 숨김)·안전 'hide' 명시(ukh84) = 다른 회원 네 칸 없음 · 본인은 종전대로 전체(uo84 office·corp)
     await callA84({ action: 'member_upsert', id: 'uw84', supervisor: true, test_acct: true }, tokAdm84);
