@@ -1591,7 +1591,7 @@ try {
     '어느 고리가 빠졌는지 node tools/promogen_check.mjs로 확인');
 } catch (e) { console.log('  (체크 10 2단계 검사 생략 — ' + e.message + ')'); fails++; }
 
-// ---- 체크 10 품질 고리 3단계(원천, PM 11/13 10:52 '2. 아니 원천 3단계 ㄱ · 3. ㅇㅇ' · 08:03 '이 골격을 정확하게 유지' — 판 번호는 합칠 때): 실행 검사는 tools/promoqlearn_check.mjs. 여기서는 배선·골격 불변만 ----
+// ---- v455 체크 10 품질 고리 3단계(원천, PM 11/13 10:52 '2. 아니 원천 3단계 ㄱ · 3. ㅇㅇ' · 08:03 '이 골격을 정확하게 유지' — 판 번호는 합칠 때): 실행 검사는 tools/promoqlearn_check.mjs. 여기서는 배선·골격 불변만 ----
 try {
   const rdF = (p, enc) => readFileSync(join(ROOT, 'netlify', 'functions', p), enc || 'utf8');
   const ql3 = rdF('_lib/promoqlearn.js'), qw3 = rdF('gw-promo-qlearn-background.js'), pl3 = rdF('_lib/promolearn.js'), lw3 = rdF('gw-promo-learn-background.js');
@@ -11256,10 +11256,23 @@ try {
   const GATE2 = ['uismoke', 'consheet_check', 'proctpl_check', 'settletest', 'servertest', 'rectest', 'promoqual_check', 'promogen_check'];
   const mF2 = FT2.filter((s) => ftv2.indexOf(s) < 0);
   T('v454 ② 문서: FEATURES 기준 v454 (2026-11-13)·v454 절 · TESTLIST v454 화면 칸 "[ ] (AI 시험 화면 대상" ≥ 1("PM" 낱말 0)·게이트 칸 [x] 8종 · MANUAL 28절 특별교육 줄(철거 = 해체 특별교육 · 준설 = 근거 확인 중)·21-9 특별교육 칸 대상(진행 중 철거 현장) · CLAUDE.md siteSpecKind(두 벌 — 서버와 같이) · sw jw-shell-v454',
-    /기준: v454 \(2026-11-13\)\./.test(ft2) && ftv2.length > 0 && mF2.length === 0 && tlv2.length > 0 && scr2.length >= 1 && !scr2.some((l) => /PM/.test(l)) && GATE2.every((g) => gate2.some((l) => l.indexOf('`' + g + '`') > 0))
-    && m28_2.indexOf('해체 특별교육') > 0 && m28_2.indexOf('근거 확인 중') > 0 && m219_2.indexOf('해체 특별교육') > 0 && cl2.indexOf('`siteSpecKind`') > 0 && /SHELL_CACHE = 'jw-shell-v454'/.test(sw2),
+    Number((ft2.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 454 && ftv2.length > 0 && mF2.length === 0 && tlv2.length > 0 && scr2.length >= 1 && !scr2.some((l) => /PM/.test(l)) && GATE2.every((g) => gate2.some((l) => l.indexOf('`' + g + '`') > 0))
+    && m28_2.indexOf('해체 특별교육') > 0 && m28_2.indexOf('근거 확인 중') > 0 && m219_2.indexOf('해체 특별교육') > 0 && cl2.indexOf('`siteSpecKind`') > 0 && Number((sw2.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 454,
     JSON.stringify({ mF2, scr: scr2.length, gate: gate2.length }));
 } catch (e) { console.log('  (v454 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ---- v455(11/13 — 체크 10 품질 고리 3단계 원천, 10 세션 구현·검토 수리를 v454 위에 얹음): 문서·판 번호만 — 동작 검사는 위 'v455 체크 10 3단계' 묶음과 tools/promoqlearn_check.mjs
+//   FEATURES 기준 v455 (2026-11-13) · FEATURES 절 '### v455 (11/13) — 체크 10 품질 고리 3단계' · TESTLIST 절 '## v455 — 체크 10 품질 고리 3단계' · 제목에 '판 번호는 합칠 때' 0 · sw jw-shell-v455
+//   다음 판은 기준 줄·sw 검사를 '이 판 이상'(숫자 비교)으로 푼다
+try {
+  const rd55 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const ft55 = rd55('FEATURES.md'), tl55 = rd55('TESTLIST.md'), sw55 = rd55('sw.js');
+  const h55f = ft55.indexOf('\n### v455 (11/13) — 체크 10 품질 고리 3단계'), h55t = tl55.indexOf('\n## v455 — 체크 10 품질 고리 3단계');
+  const left55 = [ft55, tl55].filter((s) => /3단계 — 품질 자동 학습\(원천\)[^\n]*판 번호는 합칠 때/.test(s)).length;
+  T('v455 문서: FEATURES 기준 v455 (2026-11-13) · FEATURES·TESTLIST 3단계 절 제목에 v455(합칠 때 문구 0) · sw jw-shell-v455',
+    /기준: v455 \(2026-11-13\)\./.test(ft55) && h55f > 0 && h55t > 0 && left55 === 0 && /SHELL_CACHE = 'jw-shell-v455'/.test(sw55),
+    JSON.stringify({ h55f, h55t, left55 }));
+} catch (e) { console.log('  (v455 검사 생략 — ' + e.message + ')'); fails++; }
 
 try {
   // 원장 T421(11/13): 옛 블록의 sw 판 번호 검사는 숫자 비교(>= 그 판) — '…|4\\d\\d)' 꼴 정규식은 v500에서 한꺼번에 실패하므로 다시 쓰지 않는다(판마다 옛 블록을 손보던 구조 해소)
