@@ -3483,7 +3483,7 @@
     bids = []; onbids = []; quotes = []; promoItems = []; clients = []; myTodos = []; members = []; apprItems = []; myApprItems = []; fam = []; edu = [];
     cliLoaded = false; cliDirty = {};   // v441 검토: 비운 거래처 대장은 '아직 못 읽음'(빈 목록을 저장하지 않게 — loadClients가 200에서 다시 켬)
     wkLoaded = false;   // v442: 일용직 명부도 '아직 못 읽음'으로(loadWorkers가 200에서 다시 켬 — 빈 명부 저장 막음)
-    asbDocConSt = {};   // v451: 계약 탭 노동부 신고 단계 줄이 건 읽기 상태(현장 대장·명부 — 다음 사람은 다시 한 번씩)
+    asbDocConSt = {}; asbDocConWho = null;   // v451: 계약 탭 노동부 신고 단계 줄이 건 읽기 상태(현장 대장·명부 — 다음 사람은 다시 한 번씩)
     wkPending = false; wkDirty = {}; wkEduSt = "";   // v442 검토: 저장 대기·이 기기에서 고친 줄 표시·③ 건강진단용 교육 기록 읽기 상태도 비움(다음 사람이 앞사람 표시로 합치거나 '읽음'으로 보지 않게)
     eduLoaded = false; eduPending = false; eduSel = {};   // v447: 비운 체크 칸 기록은 '아직 못 읽음'(loadEdu가 200에서 다시 켬 — 빈 기록 + 새 1건이 서버 col:edu를 덮지 않게) · 저장 대기·표 선택도 비움
     bidsLoaded = false; bidsSaveHeld = false;   // v443: 비운 공고 목록은 '아직 못 읽음'(loadBids가 200에서 다시 켬 — 빈 목록 + 수동 등록 1건 저장이 서버 일감 문서를 덮지 않게)
@@ -13865,7 +13865,7 @@
       }).join("") + '</div>';
     }
     h += csStageDocsHtml(c, p, i, key, can, fm);   // v401 건별 서류 체크리스트(stage.docs[]) · v427 묶음·패킷 항목·[생성]·AI↔직원 간극이 같은 줄에
-    if (typeof asbDocConLine === "function" && /노동부/.test(s.name) && !/완료/.test(s.name)) h += asbDocConLine(c);   // v451 노동부 신고 단계 — 연결 석면 현장 근로자의 신고 서류 3종(특별교육·검진 유효·건설 기초) 한 줄(@asb-doc)
+    if (typeof asbDocConLine === "function" && /노동부/.test(s.name) && !/완료|필증/.test(s.name)) h += asbDocConLine(c);   // v451 노동부 신고 단계 — 연결 석면 현장 근로자의 신고 서류 3종(특별교육·검진 유효·건설 기초) 한 줄(@asb-doc)
     if (c.type === "dredge" && /작업|공사\s*수행/.test(s.name)) h += csWorkLogHtml(c, can);
     var act = '';
     if (can){
@@ -15126,7 +15126,7 @@
   // v451(PM 11/13 08:31 ⓐⓑⓒ — 석면 현장 근로자 목록에 든 사람 = 노동부 신고건 참여자 · 신고 서류에 특별교육일지·특수건강검진표·건설업 기초교육 수료증 첨부):
   //   석면 현장(현장 대장 종류 석면) 투입 인원마다 신고 서류 3종을 그 현장 줄에서 본다 —
   //   ① 특별교육일지 = 석면 특별교육 기록(special — eduHasValidSpecial 한 판정 그대로: 현장 표·서버 site_edu_gap·현황 ③과 같음)
-  //   ② 특수건강검진표 = 배치전(pre_med)·특수(spec_med) 중 가장 최근 검진 — 유효기간은 받은 회사 명의로: 종운건설 1년 · 타회사 6개월(PM 설명 그대로),
+  //   ② 특수건강검진표 = 배치전(pre_med)·특수(spec_med) 기록 중 만료일이 가장 늦은 검진(asbMedPick) — 유효기간은 받은 회사 명의로: 종운건설 1년 · 타회사 6개월(PM 설명 그대로),
   //      명의를 모르면(기록에 org 없음) 6개월로 보수적으로 · 유효 = 기준일 ≤ 검진일 + 유효기간
   //   ③ 건설업 기초교육 수료증 = basic_con 기록(1회 — 일용직만 판정 · 직원은 기록만 보여 주고 판정 안 함)
   //   기준일(asbDocBase) = 종결이 아닌 석면 현장의 착수일과 오늘 중 늦은 날(착수일이 없거나 지났으면 오늘) — 신고·작업 시작 때 유효해야 한다. 종결 현장은 판정하지 않고 기록만.
@@ -15144,13 +15144,29 @@
   function asbMedOrg(rec){ var o = rec && rec.org; return (typeof o === "string" && Object.prototype.hasOwnProperty.call(ASB_MED_ORG, o)) ? o : ""; }
   function asbMedMonths(org){ return Object.prototype.hasOwnProperty.call(ASB_MED_MONTHS, org) ? ASB_MED_MONTHS[org] : ASB_MED_UNK; }
   function asbMedOrgTxt(org){ return Object.prototype.hasOwnProperty.call(ASB_MED_ORG, org) ? ASB_MED_ORG[org] : "명의 모름"; }
-  // 가장 최근 검진 — 그 사람의 지우지 않은 배치전·특수건강진단 기록 중 날짜 꼴(YYYY-MM-DD)이고 가장 늦은 1건(체크 칸 표 eduLastOf와 같은 식 · v442 wkExamDate가 이것을 읽는다)
-  function asbMedLatest(ptype, pid){
-    var best = null;
-    liveEdu().forEach(function(r){ if (r.ptype === ptype && r.pid === pid && (r.kind === "pre_med" || r.kind === "spec_med") && isDate(r.date) && (!best || r.date > best.date)) best = r; });
+  // 달 더하기(v451 검토) — 받는 달에 같은 날이 없으면 그 달 말일(08-31 + 6개월 = 02-28 · setMonth는 03-03으로 넘겨 만료 뒤 며칠을 '유효'로 봤다) · 날짜 꼴이지만 없는 날(13월·02-30)은 ""(기록 없음으로 봄)
+  function asbAddMonths(d, n){
+    var y, m, day, t;
+    if (!isDate(d)) return "";
+    y = Number(d.slice(0, 4)); m = Number(d.slice(5, 7)); day = Number(d.slice(8, 10));
+    if (m < 1 || m > 12 || day < 1 || day > new Date(y, m, 0).getDate()) return "";
+    t = (m - 1) + n; y += Math.floor(t / 12); m = t % 12;
+    return fmtDate(new Date(y, m, Math.min(day, new Date(y, m + 1, 0).getDate())));
+  }
+  function asbMedUntil(rec){ return rec ? asbAddMonths(rec.date, asbMedMonths(asbMedOrg(rec))) : ""; }
+  // 판정에 쓰는 검진 1건 — 배치전·특수건강진단 기록 중 만료일이 가장 늦은 것(유효한 검진표가 하나라도 있으면 유효 — 검토: 날짜만 보면 뒤에 받은 타회사 6개월 검진이 아직 유효한 종운건설 1년 검진을 가렸다),
+  //   만료일이 같으면 검진일이 늦은 것 · 날짜가 아니거나 없는 날인 기록은 뺀다. 현장 줄(asbMedLatest)·체크 칸(eduPersonStat — 그 사람 기록 목록)·석면해체계획서 ③(wkExamDate)이 같은 고르기
+  function asbMedPick(list){
+    var best = null, bu = "";
+    (list || []).forEach(function(r){
+      var u;
+      if (!r || (r.kind !== "pre_med" && r.kind !== "spec_med")) return;
+      u = asbMedUntil(r);
+      if (u && (!best || u > bu || (u === bu && r.date > best.date))){ best = r; bu = u; }
+    });
     return best;
   }
-  function asbMedUntil(rec){ var dt; if (!rec || !isDate(rec.date)) return ""; dt = new Date(rec.date + "T00:00:00"); dt.setMonth(dt.getMonth() + asbMedMonths(asbMedOrg(rec))); return fmtDate(dt); }   // 체크 칸 eduAddMonths와 같은 식(달 더하기)
+  function asbMedLatest(ptype, pid){ return asbMedPick(liveEdu().filter(function(r){ return r.ptype === ptype && r.pid === pid; })); }
   // 검진 한 건의 상태 — base(기준일)가 없으면 판정 안 함("rec" — 기록만)
   function asbMedOf(rec, base){
     var org = asbMedOrg(rec), until = asbMedUntil(rec);
@@ -15263,26 +15279,34 @@
       return;
     }
     if (act !== "add" || ASB_DOC_KINDS.indexOf(kind) < 0) return;
-    if (ptype === "member"){ m = findMember(pid); if (!m || memberRetired(m)){ alert("퇴사자·지운 회원에게는 새 기록을 넣지 않습니다."); return; } }
+    if (ptype === "member"){ m = findMember(pid); if (!m || m.del === 1 || m.test_acct === true || memberRetired(m)){ alert("퇴사자·지운 회원에게는 새 기록을 넣지 않습니다."); return; } }   // 체크 칸 eduCanAdd와 같은 기준
     else { w = (canSee("wk") && wkLoaded) ? findWk(pid) : null; if (!w || w.del === 1){ alert("지운 일용직·이름을 볼 수 없는 일용직에게는 새 기록을 넣지 않습니다."); return; } }
     openEdu(null, ptype, { ptype: ptype, pid: pid, kind: kind });
   }
   // 계약 탭 '노동부 신고' 단계 펼침 한 줄 — 연결 현장(계약 site_id → 현장 대장, 석면·종결 아님)의 같은 셈. 현장 권한이 없거나 연결 현장이 없으면 줄 없음.
   //   체크 칸 기록을 아직 안 읽었으면 한 번 읽고(wkEduEnsure — 세션에 한 번) 읽히면 계약 탭을 다시 그린다(읽기 실패는 다시 그리지 않음 — 되풀이 읽기 없음)
   //   계약 탭은 현장 대장·일용직 명부를 읽지 않은 채 열릴 수 있다(11/13 시험 화면 — 줄이 안 나옴) — 이 줄이 한 번씩만 읽기를 걸고(asbDocConLoad — 계약 쪽 읽기라 대장 읽기는 종전 규칙대로 보류된 계약 연결·종결 훅을 돌림: 훅 없이 읽기는 현황·체크 칸 두 곳뿐) 읽히면 계약 탭을 다시 그린다
-  var asbDocConSt = {};   // { asb, wk: "wait"|"ok"|"fail" } — 세션에 한 번씩(실패는 다시 걸지 않음) · 로그아웃·전환(clearSessionData)에서 비움
-  function asbDocConLoad(k, f){
+  var asbDocConSt = {}, asbDocConWho = null;   // { asb, wk: "wait"|"ok"|"fail" } — 보는 사람마다 한 번씩(실패는 다시 걸지 않음) · 로그아웃(clearSessionData)·보는 사람이 바뀔 때(asbDocConViewer — 로그인 창 '전환') 비움
+  function asbDocConViewer(){
+    var who = vsViewer();
+    if (asbDocConWho === who) return;
+    if (asbDocConWho !== null){ asbDocConSt = {}; if (wkEduSt === "fail") wkEduSt = ""; }   // 앞사람의 읽기 실패가 다음 사람 줄에 '읽지 못했습니다'로 남지 않게(읽는 중·읽음은 그대로)
+    asbDocConWho = who;
+  }
+  // done = 끝난 뒤 성공 여부를 따로 보는 함수(명부 읽기 loadWorkers는 성공·실패 모두 값 없이 끝남 — wkLoaded로 가름)
+  function asbDocConLoad(k, f, done){
     var p;
     if (asbDocConSt[k]) return;
     asbDocConSt[k] = "wait";
     p = f();
     if (!p || typeof p.then !== "function"){ asbDocConSt[k] = "fail"; return; }
-    p.then(function(ok){ asbDocConSt[k] = ok === false ? "fail" : "ok"; if (ok !== false && currentTab === "con" && typeof renderContracts === "function") renderContracts(); }, function(){ asbDocConSt[k] = "fail"; });
+    p.then(function(ok){ var good = done ? !!done() : ok !== false; asbDocConSt[k] = good ? "ok" : "fail"; if (good && currentTab === "con" && typeof renderContracts === "function") renderContracts(); }, function(){ asbDocConSt[k] = "fail"; });
   }
   function asbDocConLine(c){
     var r, s, g, bits = [], T = "<b>신고 근로자 서류</b> — ", tail;
     function line(html, warn){ return '<div class="hw-note" data-cs-moldoc="1" style="margin:6px 0;' + (warn ? "color:#8A5A00;" : "") + '">' + html + '</div>'; }
     if (!canSee("site") || !c || !c.site_id) return "";
+    asbDocConViewer();
     if (!asbLoaded){
       asbDocConLoad("asb", function(){ return loadAsb(); });
       return line(T + (asbDocConSt.asb === "fail" ? "현장 대장을 읽지 못했습니다 — 안전 › 현장 칸에서 확인합니다" : "확인 중"));
@@ -15290,7 +15314,7 @@
     r = findAsb(String(c.site_id));
     if (!r || r.del === 1 || siteKind(r) !== "asbestos" || r.status === "done") return "";
     tail = " · 안전 › 현장 칸 " + esc(siteLabel(r)) + " 줄에서 보고 넣습니다";
-    if (canSee("wk") && !wkLoaded) asbDocConLoad("wk", function(){ return loadWorkers(); });
+    if (canSee("wk") && !wkLoaded) asbDocConLoad("wk", function(){ return loadWorkers(); }, function(){ return wkLoaded; });
     s = asbDocSite(r);
     if (s.st === "nosafety") return s.any ? line(T + "검진·특별교육·건설 기초는 안전 권한에서 확인(건강진단 기록은 안전 권한만 봅니다)") : "";
     if (s.st === "wait"){
@@ -15310,7 +15334,7 @@
   function wkDocBase(c){ var r = (c && c.site_id) ? findAsb(String(c.site_id)) : null; return (r && r.del !== 1 && asbDocBase(r)) || todayStr(); }
   function wkDocMissing(ws, base){
     var out = [], ex = [], ns = [], nb = [];
-    if (!ws || !ws.length || !canSee("safety") || wkEduSt !== "ok") return out;
+    if (!ws || !ws.length || !canSee("safety") || !eduLoaded) return out;
     ws.forEach(function(w){
       var d = asbDocOf("worker", w.id, base), n = w.name || "";
       if (d.med.st === "exp") ex.push(n + "(만료 " + d.med.until + " · " + asbMedOrgTxt(d.med.org) + ")");
@@ -16616,7 +16640,7 @@
     { k:"super",     n:"정기교육(관리감독자)",   months:12, hint:"연간 16시간 이상(감면 없음 기준 — 체크 칸 표의 관리감독자 올해 진도) — 근로자와 달리 연 단위. 다음 예정은 그해 누적이 16시간에 못 미치면 그해 12-31, 채우면 다음 해 12-31" },
     { k:"manager",   n:"석면해체·제거관리자교육", months:0,  hint:"신규 18시간(이론10·실습8). 현행 고시에 보수교육 조항 없음 — 인력 교체 시 후임자만 이수" },
     { k:"pre_med",   n:"배치전건강진단",         months:0,  hint:"배치 전 실시. 다른 사업장에서 12개월 내 받았고 개인표를 내면 면제" },
-    { k:"spec_med",  n:"특수건강진단",           months:12, hint:"배치 후 12개월 이내 최초, 이후 12개월마다. 노출기준 초과 등에 해당하면 다음 회에 한해 6개월" },
+    { k:"spec_med",  n:"특수건강진단",           months:12, hint:"배치 후 12개월 이내 최초, 이후 12개월마다. 노출기준 초과 등에 해당하면 다음 회에 한해 6개월. 석면 신고 검진 유효기간(다음 예정 자동 계산)은 받은 회사 명의로 — 종운건설 12개월 · 타회사·명의 모름 6개월" },
     // v447(56 판 — 안전 › 체크 칸 사람별 표): 새 종류 7개. 행 모양은 그대로(ptype·pid·kind·date·hours·next·note) — 위험성평가 두 줄(ra_join·ra_share)만 회차 표식 ra{on 평가일·type 정기|수시|최초·unit 부서/현장}을 더 적는다.
     //   주기 없는 종류(months 0)는 다음 예정을 만들지 않는다. 일반건강진단은 사무직 24개월(eduAutoNext가 대상의 사무직 표식으로).
     { k:"hire",      n:"채용 시 교육",           months:0,  hint:"채용·투입 전 1회(일용근로자 1시간 이상 — 산안법 시행규칙 별표4). 건설업 기초안전보건교육 이수자는 체크 칸 표에서 '면제'로 봅니다. 직원은 근거 확인 중" },
@@ -16789,6 +16813,7 @@
       if (sum < need) return to;
       return k === "super" ? (y + 1) + "-12-31" : eduHalfEnd(date);
     }
+    if (k === "spec_med") return asbAddMonths(date, eduMonthsFor(k, p, org));   // v451 검토: 검진 만료일(asbMedUntil)과 같은 달 더하기(말일 맞춤)
     dt = new Date(date + "T00:00:00"); dt.setMonth(dt.getMonth() + eduMonthsFor(k, p, org));
     return fmtDate(dt);
   }
@@ -17062,7 +17087,7 @@
     return eduIt({ t: n < 0 ? "경과 " + (-n) + "일" : "D-" + n, cls: n < 0 ? "vs-dan" : (n <= EDU_SOON ? "vs-warn" : ""), grey: n > EDU_SOON, tgt: true, miss: true, dd: n, due: due, cat: n < 0 ? "기한 경과" : "기한 전", kind: kind, basis: basis });
   }
   // 주기 검진(일반·석면 특수) — 마지막 실시 + months: 지남 빨강(빠짐) · 30일 안 노랑(아직 유효 — 빠짐 아님) · 그 밖 ✓
-  //   v447 검토: dueAt = 기한을 따로 셀 때(석면 첫 특수건진 = 배치일 + 12개월 — 배치전 건진일이 아니라)
+  //   v447 검토: dueAt = 기한을 따로 셀 때(v451: 석면 건진 = 받은 회사 명의별 만료일 asbMedUntil — 종전 배치일 + 12개월은 없앰)
   function eduCycle(kind, rec, months, basis, dueAt){
     var nx = isDate(dueAt) ? dueAt : eduAddMonths(rec.date, months), n = vehDday(nx).diff;
     if (n < 0) return eduIt({ t: "경과 " + (-n) + "일", cls: "vs-dan", tgt: true, miss: true, dd: n, due: nx, cat: "기한 경과", last: rec, kind: kind, basis: basis });
@@ -17156,7 +17181,7 @@
     // 석면 건진 — 진행 중 석면 현장 투입자: 배치전·특수 기록이 없으면 기한 = 석면 현장 시작일 · 있으면 유효기간 = 받은 회사 명의로(종운건설 12 · 타회사·모름 6개월)
     //   v451(PM 11/13 08:31 ⓑ): 현장 칸 석면 줄 신고 서류와 한 판정(@asb-doc — asbMedUntil·asbDocBase) — 종전 '마지막 + 12개월·배치일 + 12개월 첫 회'(v447)는 명의별 유효기간으로 바꿈.
     //   만료일이 기준일(진행 중 석면 현장의 착수일과 오늘 중 늦은 날 — 여러 현장이면 가장 늦은 기준일: 어느 현장에서든 착수 전에 만료되면 그 현장 줄이 '만료')보다 앞이면 빠짐: 이미 지났으면 빨강 '경과 n일', 아직 안 지났으면 빨강 'D-n'(착수 전 만료) · 그 밖 30일 안 노랑 'D-n' · ✓
-    am = last(["pre_med", "spec_med"]);
+    am = asbMedPick(recs);   // v451 검토: 현장 줄과 같은 고르기(만료일이 가장 늦은 검진 — 없는 날짜 기록은 뺌)
     var amU = am ? asbMedUntil(am) : "", amBase = "", amN = amU ? vehDday(amU).diff : 0;
     asbAct.forEach(function(e){ var bs = asbDocBase(e.r); if (bs && bs > amBase) amBase = bs; });
     var amB = "석면 현장 투입(" + eduSitesTxt(asbAct) + ") — 검진 유효기간 " + (am ? asbMedOrgTxt(asbMedOrg(am)) + " " + asbMedMonths(asbMedOrg(am)) + "개월 · " : "") + ASB_MED_RULE + "(현장 칸 석면 줄 신고 서류와 같은 판정)";
