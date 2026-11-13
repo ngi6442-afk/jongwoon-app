@@ -20,7 +20,11 @@ async function appendAudit(entry) {
     const st = store(DATA);
     const key = auditKey();
     const r = await blobGet(st, key);
-    const doc = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data : { schema: 1, items: [] };
+    // 읽기 실패·깨진 값이면 쓰지 않는다(fail-closed) — 종전에는 이번 달 기록을 못 읽으면 빈 문서로 시작해 그 달 감사 기록 전체를 한 줄로 덮어썼다(P1 판29 검토 11/13 참고 줄).
+    //   이 한 줄은 못 남기고 false(기록물 액션은 audit:false로 드러남) · '없음'(실 blobs = ok·data null / 시험 = NOT_FOUND)만 새 문서로 시작.
+    if (!r.ok && r.code !== 'NOT_FOUND') return false;
+    if (r.ok && r.data != null && !(typeof r.data === 'object' && Array.isArray(r.data.items))) return false;
+    const doc = (r.ok && r.data) ? r.data : { schema: 1, items: [] };
     doc.items.push(entry);
     if (doc.items.length > MAX_PER_MONTH) doc.items = doc.items.slice(-MAX_PER_MONTH);
     const w = await blobSet(st, key, doc);

@@ -7787,4 +7787,44 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   } finally { reset29(); }
 }
 
+{ // ---- 감사 로그 덮어쓰기 막기(_lib/audit.js appendAudit — P1 판29 검토 11/13 참고 줄): 실 audit.js를 가짜 저장소 위에서 돌린다(이 파일의 다른 절은 auditMock).
+  //   이번 달 기록을 못 읽거나(읽기 실패) 값이 깨졌으면 쓰지 않고 false — 종전에는 빈 문서로 시작해 그 달 기록 전체를 한 줄로 덮어썼다. '없음'만 새 문서로 시작.
+  const rpA = require.resolve(join(FN, '_lib/audit.js')), keepA = require.cache[rpA], fgA = blobsMock.hooks.failGet, fsA = require('fs'), ModA = require('module');
+  const srcA = fsA.readFileSync(rpA, 'utf8');
+  const loadA = (src) => { const m = new ModA(rpA, null); m.filename = rpA; m.paths = ModA._nodeModulePaths(join(FN, '_lib')); m._compile(src, rpA); return m.exports; };
+  const keyOf = (A) => A.auditKey();
+  const chkA = async (A) => {
+    const k = keyOf(A), had = Object.prototype.hasOwnProperty.call(mem.gw_data, k), keep = mem.gw_data[k];
+    const out = {};
+    try {
+      mem.gw_data[k] = { schema: 1, items: [{ ts: 1, by: 'a' }, { ts: 2, by: 'b' }, { ts: 3, by: 'c' }] };
+      blobsMock.hooks.failGet = (x) => x === k;
+      out.readFail = (await A.appendAudit({ ts: 9, by: 'z' })) === false && mem.gw_data[k].items.length === 3;
+      blobsMock.hooks.failGet = (x) => (x === k ? 'STORAGE_PARSE_FAILED' : false);
+      out.parseFail = (await A.appendAudit({ ts: 9, by: 'z' })) === false && mem.gw_data[k].items.length === 3;
+      blobsMock.hooks.failGet = fgA;
+      mem.gw_data[k] = { schema: 1, items: 'x' };
+      out.broken = (await A.appendAudit({ ts: 9, by: 'z' })) === false && mem.gw_data[k].items === 'x';
+      mem.gw_data[k] = { schema: 1, items: [{ ts: 1, by: 'a' }] };
+      out.ok = (await A.appendAudit({ ts: 9, by: 'z' })) === true && mem.gw_data[k].items.length === 2 && mem.gw_data[k].items[1].by === 'z';
+      delete mem.gw_data[k];
+      out.fresh = (await A.appendAudit({ ts: 9, by: 'z' })) === true && mem.gw_data[k].items.length === 1;
+    } finally { blobsMock.hooks.failGet = fgA; if (had) mem.gw_data[k] = keep; else delete mem.gw_data[k]; }
+    return out;
+  };
+  try {
+    const R = await chkA(loadA(srcA));
+    T('감사 로그 덮어쓰기 막기: 이번 달 기록 읽기 실패·깨진 JSON·깨진 꼴이면 쓰지 않고 false(있던 3줄 그대로) · 정상은 뒤에 1줄 · 없음은 새 문서 1줄',
+      R.readFail && R.parseFail && R.broken && R.ok && R.fresh, JSON.stringify(R));
+    const MUTA = [["    if (!r.ok && r.code !== 'NOT_FOUND') return false;\n", '']];   // 깨진 꼴 검사 줄은 걷어도 items.push 예외 → false로 같은 결과라 결함 사본에 넣지 않음
+    const killA = [];
+    for (const [from, to] of MUTA) {
+      if (srcA.split(from).length !== 2) { killA.push('결함 자리 ' + srcA.split(from).length); continue; }
+      let bad; try { const r = await chkA(loadA(srcA.replace(from, to))); bad = !(r.readFail && r.parseFail && r.broken && r.ok && r.fresh); } catch (e) { bad = true; }
+      if (!bad) killA.push(from.trim().slice(0, 50) + ' 안 깨짐');
+    }
+    T('감사 로그 덮어쓰기 막기 결함 사본 ' + MUTA.length + '개(읽기 실패 검사 걷음 = 그 달 기록이 한 줄로 덮임) 실패', killA.length === 0, killA.join(' | '));
+  } finally { blobsMock.hooks.failGet = fgA; require.cache[rpA] = keepA; }
+}
+
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);
