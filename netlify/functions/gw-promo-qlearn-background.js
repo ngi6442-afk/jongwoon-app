@@ -103,7 +103,7 @@ exports.handler = async function (event, context) {
     const merged = QL.mergeQL(base, out, { now: Date.now(), tokens: tokens, sig: QL.basisSig(pq.data, lessons.rules), focus: focus, n: drafts.length });
     const w = await blobSet(st, QL.QLEARN_KEY, merged);
     if (!w.ok) { await release(w.code || 'QL_WRITE_FAILED', '', tokens); return; }
-    console.log('[품질 학습] 학습 — 규칙 ' + merged.rules.length + ' · 목표 ' + merged.focus.map(function (f) { return f.code; }).join(',') + ' · 초안 ' + drafts.length + '편 · 토큰 ' + tokens);
+    console.log('[품질 학습] 학습 — 규칙 ' + merged.rules.length + ' · 버림 ' + merged.dropped + ' · 목표 ' + merged.focus.map(function (f) { return f.code; }).join(',') + ' · 초안 ' + drafts.length + '편 · 토큰 ' + tokens);
   } catch (e) {
     try { await release('WORKER_THREW', (e && e.message) || String(e)); } catch (e2) {}
   }

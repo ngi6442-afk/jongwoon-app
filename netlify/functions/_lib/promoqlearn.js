@@ -55,7 +55,8 @@ if (CODES.some(function (c) { return !GOAL[c]; }) || Object.keys(GOAL).length !=
 //   C059 '공사명·장소 일반명 공개'는 PM 결정 전이라 기본값 불허. 게이트가 본보기 라벨·제목의 실명·지명이 여기 다 있는지 본다.
 const DENY = ['권민지', '방내리'];
 // 사람·직책·연락처·지시 무시 꼴(모델이 지시를 어긴 경우의 마지막 거름) — 품질 규칙은 글 쓰는 법만 말하므로 이런 낱말이 들 까닭이 없다
-const DENY_RE = /[가-힣]{2,4}\s?(대리|주임|과장|차장|부장|팀장|실장|소장|이사|대표)(님|에게|께|이|가|은|는|의|\s|$)|공일공|지시[를을]?\s?무시|규칙[을를]?\s?무시/;
+//   v455 재검토 N1(11/13): 직책 낱말 뒤 조사·공백까지 받으면 '과장 없이'·'대표 사진'·'대표 공정'·'소장 확인' 같은 보통 규칙을 버렸다 → 사람을 부르는 꼴(님·에게·께)만
+const DENY_RE = /[가-힣]{0,4}\s?(대리|주임|과장|차장|부장|팀장|실장|소장|이사|대표)(님|에게|께)|공일공|지시[를을]?\s?무시|규칙[을를]?\s?무시/;
 function h32(s) { let h = 2166136261; s = String(s || ''); for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0).toString(36); }
 function median(a) { const s = a.slice().sort(function (x, y) { return x - y; }); if (!s.length) return null; const h = s.length >> 1; return s.length % 2 ? s[h] : (s[h - 1] + s[h]) / 2; }
 function num(v) { return (v === null || v === undefined || v === '' || isNaN(Number(v))) ? null : Number(v); }
@@ -209,8 +210,9 @@ function normQRules(out, oldRules, now) {
 }
 function normQL(x) {
   const q = (x && typeof x === 'object') ? x : {};
-  const rules = (Array.isArray(q.rules) ? q.rules : []).filter(function (r) { return r && typeof r === 'object' && r.id && r.text; }).slice(0, MAX_QRULES).map(function (r) {
-    return { id: String(r.id).slice(0, 24), text: String(r.text).slice(0, QRULE_CHARS), item: CODES_ALL.indexOf(String(r.item)) >= 0 ? String(r.item) : 'ALL', n: Math.max(1, parseInt(r.n, 10) || 1), ts: Number(r.ts) || 0 };
+  // v455 재검토 N2(11/13): 저장된 규칙도 읽을 때 같은 거름(cleanRule)을 다시 지난다 — 거름이 나중에 촘촘해져도 옛 규칙이 생성·카드로 새지 않게
+  const rules = (Array.isArray(q.rules) ? q.rules : []).filter(function (r) { return r && typeof r === 'object' && r.id && r.text && cleanRule(r.text); }).slice(0, MAX_QRULES).map(function (r) {
+    return { id: String(r.id).slice(0, 24), text: cleanRule(r.text), item: CODES_ALL.indexOf(String(r.item)) >= 0 ? String(r.item) : 'ALL', n: Math.max(1, parseInt(r.n, 10) || 1), ts: Number(r.ts) || 0 };
   });
   const st = (q.stats && typeof q.stats === 'object') ? q.stats : {};
   return {
@@ -220,7 +222,7 @@ function normQL(x) {
     learned_at: Number(q.learned_at) || 0, basis_sig: String(q.basis_sig || ''), try_sig: String(q.try_sig || ''),
     tries: Math.max(0, Number(q.tries) || 0), lock_ts: Number(q.lock_ts) || 0,
     code: String(q.code || ''), detail: String(q.detail || '').slice(0, 160), fail_ts: Number(q.fail_ts) || 0,
-    n_drafts: Number(q.n_drafts) || 0,
+    n_drafts: Number(q.n_drafts) || 0, dropped: Number(q.dropped) || 0,
     stats: { calls: Number(st.calls) || 0, tokens: Number(st.tokens) || 0, fail_calls: Number(st.fail_calls) || 0, fail_tokens: Number(st.fail_tokens) || 0 },
     hist: (Array.isArray(q.hist) ? q.hist : []).slice(-HIST_MAX),
     updated_at: Number(q.updated_at) || 0,
@@ -237,13 +239,15 @@ function normFocus(f) {
 function mergeQL(base0, out, ctx) {
   const base = normQL(base0), now = Number(ctx.now) || Date.now(), tokens = Number(ctx.tokens) || 0;
   const rules = normQRules(out, base.rules, now);
+  // 버린 규칙 수(v455 재검토 N1 — 거름이 보통 규칙까지 버리는지 보이게): 글이 있는데 cleanRule이 비운 것
+  const dropped = (out && Array.isArray(out.rules) ? out.rules : []).filter(function (r) { return r && String(r.text || '').trim() && !cleanRule(r.text); }).length;
   const r = Object.assign({}, base, {
     ver: QL_VER, rules: rules, focus: (Array.isArray(ctx.focus) ? ctx.focus : []).map(normFocus).filter(Boolean).slice(0, FOCUS_N), summary: String((out && out.summary) || '').slice(0, 300),
     learned_at: now, basis_sig: String(ctx.sig || ''), try_sig: String(ctx.sig || ''), tries: 0, lock_ts: 0, code: '', detail: '', fail_ts: 0,
-    n_drafts: Number(ctx.n) || 0, updated_at: now,
+    n_drafts: Number(ctx.n) || 0, dropped: dropped, updated_at: now,
     stats: Object.assign({}, base.stats, { calls: base.stats.calls + 1, tokens: base.stats.tokens + tokens }),
   });
-  r.hist = base.hist.concat([{ at: now, n: Number(ctx.n) || 0, focus: r.focus.map(function (f) { return f.code; }), rules: rules.length, tokens: tokens }]).slice(-HIST_MAX);
+  r.hist = base.hist.concat([{ at: now, n: Number(ctx.n) || 0, focus: r.focus.map(function (f) { return f.code; }), rules: rules.length, dropped: dropped, tokens: tokens }]).slice(-HIST_MAX);
   return r;
 }
 
@@ -330,7 +334,7 @@ function cardOf(raw, now) {
   return {
     ver: ql.ver, off: ql.off, rules: ql.rules,
     focus: ql.focus.map(function (f) { const g = GOAL[f.code] || {}; return { code: f.code, label: ITEM_LABEL[f.code] || '', say: g.say || '', avg: f.avg, now: f.now, target: f.target, target2: f.target2, cmp: f.cmp, unit: f.unit, ex: f.ex, nodisp: !!f.nodisp, bound: !!f.bound, ruled: ql.rules.some(function (r) { return r.item === f.code; }) }; }),
-    summary: ql.summary, learned_at: ql.learned_at, n_drafts: ql.n_drafts,
+    summary: ql.summary, learned_at: ql.learned_at, n_drafts: ql.n_drafts, dropped: ql.dropped,
     code: ql.code, detail: ql.detail, tries: ql.tries, running: !!(ql.lock_ts && now - ql.lock_ts < LOCK_TTL_MS),
     stats: ql.stats, hist: ql.hist.slice(-8),
   };
