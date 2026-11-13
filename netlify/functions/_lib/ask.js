@@ -12,6 +12,7 @@
 //   입력의 77%가 고정비(도구 설명서 8개 + 규칙이 왕복마다 재전송)라 **프롬프트 캐싱**을 건다.
 const { store, blobGet } = require('./blobs');
 const DS = require('./docscope');
+const CLIBIZ = require('./clibiz');   // v456 거래처 사업자번호 칸 13자리 판정(원문·검색 제외)
 
 const DATA = 'gw_data';
 
@@ -125,10 +126,13 @@ const TOOLS = [
   { name: 'clients', col: 'clients',
     description: '거래처 조회. 상호·사업자번호·담당자·연락처·메모. **미수 금액은 돌려주지 않는다**(PM 결정 2026-09-10). q로 상호를 거른다.',
     schema: { type: 'object', properties: { q: { type: 'string' } } },
+    // v456(원장 C080): 사업자번호 칸의 13자리(주민·법인등록번호 꼴 — _lib/clibiz.js, 앱 cliBiz13과 같은 규칙)는 원문을 내지 않고 검색(q)에도 쓰지 않는다
+    //   (번호를 넣어 물어 맞는지 확인하는 길도 막음) — 사업자번호 칸은 '13자리(숨김)'만. 앱 표·검색 글과 같은 원칙(v441).
     run: async (a) => (await items('clients'))
+      .map((c) => (c && CLIBIZ.biz13(c.biz_no)) ? Object.assign({}, c, { biz_no: '', _b13: true }) : c)
       .filter((c) => hit(c, a.q, ['name', 'biz_no', 'contact', 'phone']))
       .slice(0, ROW_CAP)
-      .map((c) => ({ 상호: c.name, 사업자번호: c.biz_no, 담당자: c.contact, 연락처: c.phone, 메모: S(c.note).slice(0, 60) })) },
+      .map((c) => ({ 상호: c.name, 사업자번호: c._b13 ? '13자리(숨김)' : c.biz_no, 담당자: c.contact, 연락처: c.phone, 메모: S(c.note).slice(0, 60) })) },
 
   { name: 'documents', col: 'documents',
     description: '문서함 검색. 이 사람이 문서함 화면에서 볼 수 있는 문서만, 문서번호·제목·분류·상태를 돌려준다. **첨부 본문은 돌려주지 않는다.** q로 제목·번호를 거른다.',

@@ -15,6 +15,7 @@ const push = require('./_lib/push');
 const tier = require('./_lib/tier');   // 관리자 등급(v321) — retired 판정식 공용. 게이트는 push.tierCtx()(명시 tier·부트스트랩·퇴사 제외, 9/6 검증 S1)
 const BRIEF = require('./_lib/brief');   // v416 아침 음성 브리핑(체크 38 D1) — 설정·조회·기동(생성은 워커)
 const AR = require('./_lib/autorules');  // v417 자동 지시 서버 규칙 3건(카드 10) — 집계(autotask_facts)·완료 신호 공용
+const CLIBIZ = require('./_lib/clibiz');   // v456 거래처 사업자번호 칸 13자리 판정(앱 cliBiz13과 같은 규칙 — uismoke v456 대조)
 const SITEEDU = require('./_lib/siteedu');   // v433 현장 대장 '특별교육 미이수' 판정(앱 asbNoSpecial·eduHasValidSpecial과 같은 규칙 — uismoke v433 대조)
 
 const DATA = 'gw_data';
@@ -221,6 +222,24 @@ async function docRegisterApply(st, aps, by) {
   return { ok: true, applied: changed.length };
 }
 
+// v456(원장 C082 ①): 일용직 명부의 옛 건강진단 값(exam)을 볼 수 있는 사람 = 관리자 또는 안전 권한(permKey 'safety' 숨김 아님 — col:edu 읽기와 같은 키).
+//   그 밖 사람에게는 handleGet이 exam 칸을 빼고 내리고, handleSave가 서버 값을 이월한다(운영 exam 값 0건 — 11/13 · v442 앱은 이 칸을 고치지 않음).
+function wkExamSee(member) { return !!(member && (member.admin || permKey(member, 'safety') !== 'hide')); }
+// 현장 대장 id 목록 펴기(앱 asList와 같은 꼴) — 배열 · 문자열 ''·'[]' → [] · '['로 시작하면 JSON 배열 · 그 밖 쉼표 글. 원소는 글자로(빈 값 뺌)
+function asbIdList(v) {
+  let a = [];
+  if (Array.isArray(v)) a = v;
+  else if (typeof v === 'string') {
+    const s = v.trim();
+    if (s && s !== '[]') {
+      let p = null;
+      if (s.charAt(0) === '[') { try { p = JSON.parse(s); } catch (e) { p = null; } }
+      a = Array.isArray(p) ? p : s.split(',').map(function (x) { return x.trim(); });
+    }
+  }
+  return a.filter(function (x) { return x !== null && x !== undefined && x !== ''; }).map(function (x) { return String(x); });
+}
+
 async function handleGet(event, d, R) {
   const c = await currentMember(event);
   if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
@@ -245,6 +264,13 @@ async function handleGet(event, d, R) {
     doc = Object.assign({}, doc, { items: doc.items.map(function (v) {
       if (!v || (v.acq_price == null && v.nodoc_amt == null)) return v;
       const s = Object.assign({}, v); delete s.acq_price; delete s.nodoc_amt; return s;
+    }) });
+  }
+  // v456(원장 C082 ①) 명부 옛 건강진단 값(exam)은 안전 권한에게만 — 그 밖 사람에게는 칸째 뺀다(저장 때 서버 값 이월 — handleSave)
+  if (col === 'workers' && !wkExamSee(c.member) && Array.isArray(doc.items)) {
+    doc = Object.assign({}, doc, { items: doc.items.map(function (w) {
+      if (!w || typeof w !== 'object' || !Object.prototype.hasOwnProperty.call(w, 'exam')) return w;
+      const s = Object.assign({}, w); delete s.exam; return s;
     }) });
   }
   // 문서함(v314): 비관리자는 (문서 scope 또는 분류 기본값)에 맞고 '등재'된 문서만 — 01 법인 하드차단(2026-09-02)·'대기'·'반려'(등재 본인만)까지
@@ -310,11 +336,66 @@ async function handleSave(event, d, R) {
   try { const prev = await blobGet(store(DATA), colKey(col)); if (prev.ok) { if (prev.data) { prevDoc = prev.data; if (Array.isArray(prev.data.items)) oldItems = prev.data.items; } } else prevReadFailed = true; } catch (e) { prevReadFailed = true; }
   // 낙관적 락: 클라이언트가 로드했던 문서 시각(base)과 서버 현재가 다르면 409 → 프런트의 기존 충돌 병합 경로가 재조회·병합·재시도.
   // 종전엔 감지 자체가 없어 두 관리자 동시 저장 시 늦은 쪽이 앞선 수정을 통째로 덮었다. base 미전송(구버전 캐시)·첫 저장은 종전대로.
-  if (d.base !== undefined && prevDoc && prevDoc.updated_at && Number(d.base) !== Number(prevDoc.updated_at))
+  // v456(원장 C079): 저장된 문서의 updated_at이 유한한 숫자가 아니면(바깥 도구·스크립트가 글자 시각으로 쓴 경우 등) base 비교를 건너뛴다(종전 첫 저장처럼) —
+  //   종전엔 Number(글자) = NaN이라 어떤 base도 맞지 않아 매번 409 → 앱이 다시 읽기·병합·재시도를 끝없이 되풀이했다(시험 서버에서 몇 분에 요청 3,000건+).
+  //   아래 저장이 updated_at을 Date.now()(숫자)로 고쳐 쓰므로 다음 저장부터 낙관락이 다시 걸린다. 감사 줄은 아래 diffItems 그대로(값 고침은 따로 안 적음).
+  if (d.base !== undefined && prevDoc && prevDoc.updated_at && Number.isFinite(Number(prevDoc.updated_at)) && Number(d.base) !== Number(prevDoc.updated_at))
+    return jr(409, { status: 'CONFLICT', error_code: 'STALE_BASE', request_id: R });
+  // v456 검토: 숫자가 아닌 updated_at 앞에서도 base 0(목록 GET을 못 받고 캐시로 부팅한 기기 — 지시 v421·문서함 T502의 가드)은 409로 병합 경로에 보낸다
+  //   (건너뛰면 빈 목록 기기가 원장을 통째로 덮음). 서버 문서를 받은 기기는 base로 그 글자를 보내므로(Number = NaN) 되풀이 409는 없다.
+  if (d.base !== undefined && prevDoc && prevDoc.updated_at && !Number.isFinite(Number(prevDoc.updated_at)) && Number(d.base) === 0)
     return jr(409, { status: 'CONFLICT', error_code: 'STALE_BASE', request_id: R });
   const doc = Object.assign({}, d.doc, { updated_by: c.member.id, updated_at: Date.now() });
   // items형 컬렉션 정규화 — items가 배열이 아니면(콘솔 우회 등) 아래 재구성 가드들이 통째로 건너뛰어진다(리뷰 지적)
   if (col !== 'checklist' && !Array.isArray(doc.items)) doc.items = [];
+  // v456(원장 C080): 거래처 사업자번호 칸의 13자리(주민·법인등록번호 꼴 — _lib/clibiz.js, 앱 cliBiz13과 같은 규칙)는 '이번에 새로 들어오거나 바뀐 항목'만 400 CLI_BIZ13(저장 안 함 · 값은 응답에 없음).
+  //   v441 앱은 수정 창에서 이미 막는다 — 이 서버 벌은 v441 전 캐시 앱·콘솔 길. 서버에 이미 있던 13자리 값(운영 0건 — 11/10 사본)이 그대로 오는 줄은 막지 않는다(옛 값 하나가 모든 저장을 막지 않게).
+  //   직전 문서를 못 읽었으면(prevReadFailed) 모든 줄을 새 줄로 본다(더 닫힌 쪽).
+  if (col === 'clients') {
+    const oldCli = {}; oldItems.forEach(function (o) { if (o && o.id != null) oldCli[String(o.id)] = o; });
+    const biz13N = doc.items.filter(function (x) {
+      if (!x || typeof x !== 'object' || !CLIBIZ.biz13(x.biz_no)) return false;
+      const o = x.id != null ? oldCli[String(x.id)] : null;
+      return !o || String(o.biz_no == null ? '' : o.biz_no) !== String(x.biz_no == null ? '' : x.biz_no);
+    }).length;
+    if (biz13N) return jr(400, { status: 'REJECTED', error_code: 'CLI_BIZ13', n: biz13N, request_id: R });
+  }
+  // v456(원장 C082 ②): 현장 대장(asbestos) 저장 — 이번에 새로 들어온 투입 일용직 id(worker_ids)가 명부(col:workers)에 없으면 400 ORPHAN_WORKER(저장 안 함 · 수만).
+  //   옛 캐시 앱·콘솔이 명부에 없는 id를 넣던 길(v442 앱은 명부에서만 고름). 서버 대장 그 줄에 이미 있던 id는 명부에 없어도 막지 않는다(옛 데이터가 저장을 막지 않게 — 30년 보존 대장).
+  //   새 id가 있을 때만 명부를 읽는다 — 못 읽으면 500 WORKERS_READ_FAILED(빈 명부로 보고 거절하거나 통과시키지 않게). 직전 대장을 못 읽었으면 모든 id를 새 id로 본다.
+  //   id 모양은 앱 asList와 같게 편다(배열 · 문자열 "[]"·JSON 배열 글·쉼표 글 — v336 사고 꼴).
+  if (col === 'asbestos') {
+    const oldAsb = {}; oldItems.forEach(function (o) { if (o && o.id != null) oldAsb[String(o.id)] = o; });
+    const fresh = {};
+    doc.items.forEach(function (r) {
+      if (!r || typeof r !== 'object') return;
+      const o = r.id != null ? oldAsb[String(r.id)] : null, had = {};
+      asbIdList(o && o.worker_ids).forEach(function (i) { had[i] = 1; });
+      asbIdList(r.worker_ids).forEach(function (i) { if (!had[i]) fresh[i] = 1; });
+    });
+    const freshIds = Object.keys(fresh);
+    if (freshIds.length) {
+      const rw = await blobGet(store(DATA), colKey('workers'));
+      if (!rw.ok && rw.code !== 'NOT_FOUND') return jr(500, { status: 'ERROR', error_code: 'WORKERS_READ_FAILED', request_id: R });
+      const known = {}; ((rw.ok && rw.data && Array.isArray(rw.data.items)) ? rw.data.items : []).forEach(function (w) { if (w && w.id != null) known[String(w.id)] = 1; });
+      // v456 2차 검토: 고아 id 목록(ids — 앞 50개·각 40자)도 돌려준다 — 명부 저장이 사라진 기기(로그인 창 '전환'·권한이 바뀐 명부 저장 403)는 그 id를 대장 메모리에 남긴 채
+      //   어느 줄을 고쳐도 계속 400이었다(새로고침 전까지 못 풂). 앱은 두 번째 400에서 이 id만 대장에서 빼고 다시 저장한다. id는 'w…' 무작위 글(이름·번호 아님)이고 보낸 사람에게 되돌려 줄 뿐
+      const orphans = freshIds.filter(function (i) { return !known[i]; });
+      if (orphans.length) return jr(400, { status: 'REJECTED', error_code: 'ORPHAN_WORKER', n: orphans.length, ids: orphans.slice(0, 50).map(function (i) { return String(i).slice(0, 40); }), request_id: R });
+    }
+  }
+  // v456(원장 C082 ①): 명부 옛 건강진단 값(exam)은 안전 권한(wkExamSee)에게만 내린다(handleGet) — 그래서 그 밖 사람의 저장은 exam을 서버 값으로 이월한다(빠진 칸이 지워지지 않게 · 보낸 값은 버림).
+  //   직전 명부를 못 읽으면 이월 판단이 안 되므로 저장 거부(licenses duties와 같은 원칙 — fail-open이면 저장 한 번에 exam이 증발).
+  if (col === 'workers' && !wkExamSee(c.member)) {
+    if (prevReadFailed) return jr(500, { status: 'ERROR', error_code: 'PREV_READ_FAILED', request_id: R });
+    const oldWk = {}; oldItems.forEach(function (o) { if (o && o.id != null) oldWk[String(o.id)] = o; });
+    doc.items = doc.items.map(function (x) {
+      if (!x || typeof x !== 'object') return x;
+      const o = x.id != null ? oldWk[String(x.id)] : null, s = Object.assign({}, x);
+      if (o && Object.prototype.hasOwnProperty.call(o, 'exam')) s.exam = o.exam; else delete s.exam;
+      return s;
+    });
+  }
   // v380(검토 발견): 정리 전에 열려 있던 관리자 탭이 상태 하나만 바꿔 저장해도(409 병합 = 로컬 우선 합집합) 정리된 공고가 되살아나지 않게 서버가 다시 거른다
   if (col === 'bids' && Array.isArray(doc.items)) purgeExpiredBids(doc, bidsCutDate());
   // v444 부동산 — 설정 settings:onbid가 켜졌을 때만 같은 줄(기본 꺼짐 — 꺼져 있으면 아무것도 거르지 않음). 서버 문서에 있던 줄을 지우게 되면(켠 날 수집보다 저장이 먼저 오는 경우 등)
@@ -2399,7 +2480,7 @@ function learnAllowed(s, tpl) { const a = s.contract.allow[tpl]; return s.contra
 function learnDiffPublic(diff) {
   if (!diff) return null;
   const o = {};
-  ['ok', 'code', 'kind', 'compared', 'changed', 'uncomparable', 'ratio', 'n_draft', 'n_final', 'same', 'added', 'removed', 'outside_changed', 'refs_outside'].forEach(function (k) { if (diff[k] !== undefined) o[k] = diff[k]; });
+  ['ok', 'code', 'kind', 'compared', 'changed', 'uncomparable', 'blank_both', 'ratio', 'n_draft', 'n_final', 'same', 'added', 'removed', 'outside_changed', 'refs_outside'].forEach(function (k) { if (diff[k] !== undefined) o[k] = diff[k]; });
   o.refs_changed = Array.isArray(diff.refs_changed) ? diff.refs_changed : [];
   o.refs_uncomparable = Array.isArray(diff.refs_uncomparable) ? diff.refs_uncomparable : [];
   return o;
@@ -2503,7 +2584,7 @@ async function cdocLearnPair(st, member, ref, idx, item, ext, b64, orig, d) {
   try {
     const lk = T.lessons_key(tpl); const lr = await blobGet(st, lk);
     if (lr.ok || lr.code === 'NOT_FOUND') {   // 읽기 실패를 빈 창고로 보고 규칙·기준선·끔 표시를 덮어쓰지 않는다(v424 검토) — 이번 간극 1줄만 빠진다
-      const L = LN.pushGap(lr.ok ? lr.data : null, { pair: id, promo_id: ref.cid, ratio: gap.cell_ratio, score: gap.score, kind: kind, changed: diff ? diff.changed : 0, compared: diff ? diff.compared : 0, uncomparable: diff ? diff.uncomparable : 0, comparable: gap.comparable, late: pick.late ? 1 : 0 }, now);
+      const L = LN.pushGap(lr.ok ? lr.data : null, { pair: id, promo_id: ref.cid, ratio: gap.cell_ratio, score: gap.score, kind: kind, changed: diff ? diff.changed : 0, compared: diff ? diff.compared : 0, uncomparable: diff ? diff.uncomparable : 0, comparable: gap.comparable, late: pick.late ? 1 : 0, gv: LN.GAP_VER }, now);   // v456 검토(T427): 간극 식 판(xlsx_cell은 같은 판만 기준선·일몰에 — learn.numericGaps)
       LN.freezeBaseline(L, now);   // v412 첫 10건 평균 = 기준선(일몰 비교 축)
       await blobSet(st, lk, L);
     }
@@ -3683,15 +3764,15 @@ function pdfExtractText(buf) {
 // HWPX(zip+xml) 텍스트 — zlib inflate로 Contents/*.xml 태그 제거. HWP(구형 OLE)는 미지원.
 function hwpxExtractText(buf) {
   try {
-    const zlib = require('zlib');
     let s = '';
-    // 로컬 파일 헤더(PK\x03\x04) 순회 — Deflate(방법8)만 처리
+    // 로컬 파일 헤더(PK\x03\x04) 순회 — Deflate(방법8)만 처리(풀기는 docdiff zipBudget 한 곳)
     let i = 0;
     const sig = buf.indexOf(Buffer.from([0x50, 0x4b, 0x03, 0x04]));
     if (sig < 0) return '';
     // 간이 파서: 각 로컬헤더에서 압축크기·이름·데이터 오프셋 계산
-    let p = 0;
-    while (p + 30 <= buf.length) {
+    let p = 0, cnt = 0;
+    const bud = DD.zipBudget();   // v456 검토: 파일 하나에서 푸는 총량·항목 수 상한(docdiff zipEntries와 같은 예산 — 항목당 상한만이면 64MB 항목 여럿이 s에 계속 이어 붙었다)
+    while (p + 30 <= buf.length && cnt++ < DD.ZIP_ENTRIES_MAX && bud.left() > 0) {
       if (buf.readUInt32LE(p) !== 0x04034b50) break;
       const method = buf.readUInt16LE(p + 8);
       const compSize = buf.readUInt32LE(p + 18);
@@ -3702,8 +3783,8 @@ function hwpxExtractText(buf) {
       const data = buf.slice(dataStart, dataStart + compSize);
       if (/Contents\/.*\.xml$/i.test(name) || /section\d+\.xml$/i.test(name)) {
         try {
-          const xml = (method === 8 ? zlib.inflateRawSync(data) : data).toString('utf8');
-          s += ' ' + xml.replace(/<[^>]+>/g, ' ');
+          const raw = method === 8 ? bud.inflate(data) : bud.take(data);   // v456 C066 항목당 64MB(DD.ZIP_ENTRY_MAX) + 검토: 총량 예산(넘는 항목은 null — 건너뜀)
+          if (raw) s += ' ' + raw.toString('utf8').replace(/<[^>]+>/g, ' ');
         } catch (e) {}
       }
       p = dataStart + compSize;
@@ -3956,7 +4037,7 @@ function _bkCount(v) {
 //     · settings:autotask는 스위치를 live로 올리지 않는다(백업 live → 지금이 live가 아니면 dry · 감사 '스위치 live 복원 안 함').
 //     · 지금 값 일시 읽기 실패는 500(덮지 않음) · 깨진 지금 값(STORAGE_PARSE_FAILED)은 교체(감사 '깨진 지금 값 교체').
 //     · 재해 복원 모드 쓰기는 감사 op '재해복원' 1줄(키·건수 · 회원이면 바뀐 칸·지킨 칸 이름 — 값 없음 · 기록 키면 붙인 줄 수).
-//   그 밖 키(allbaro:xlsx:* 운반일지 엑셀 — logsheet_daily 봇 · tpl:*·proof:*·col:* 등)는 종전대로 관리자 세션 또는 봇 키 + confirm('백업복원' 1줄). push:keys는 늘 거부.
+//   그 밖 키(allbaro:xlsx:* 운반일지 엑셀 — logsheet_daily 봇 · tpl:*·proof:*·col:* 등)는 봇 키 + confirm('백업복원' 1줄) — v456(C107)부터 관리자 세션은 미리보기만(쓰기 403 BOT_KEY_ONLY). push:keys는 늘 거부.
 //   dry 미리보기는 누구에게나 — restore_only로 재해 복원 모드가 필요한 키인지 알려 주고, 이 갈래는 쓰기와 같은 판정을 돌려 preview.merge·preview.member·would_error(거절 코드)를 준다(쓰지 않음).
 //   호출처(v453 전수 — 앱 index.html에는 없음): appdata collectors/restore.py(재해 복원 --key/--confirm · --selftest 'restore:selftest') · collectors/logsheet_daily.py(allbaro:xlsx:<날>만) · tools/servertest.mjs.
 //     restore.py가 restore:true를 보내야 위 갈래 재해 복원이 열린다(appdata 쪽 수정 = v453 배포 전 조건 — TESTLIST v453).
@@ -4156,8 +4237,11 @@ async function handleBackupPut(event, d, R) {
   let plan = null;
   if (cls && !restore) plan = { status: 403, body: { status: 'FORBIDDEN', error_code: 'RESTORE_MODE_ONLY', restore_only: cls } };   // v453 관리자 세션·봇 키만으로는 못 씀
   else if (cls) plan = await backupRestorePlan(sn, key, cls, cur, d.data, preview);
-  if (d.dry) return jr(200, { status: 'OK', dry: true, store: sn, key: key, preview: preview, restore_only: !!cls, would_error: (plan && plan.status) ? plan.body.error_code : '', request_id: R });
+  // v456(원장 C107): 쓰기는 봇 키만 — 관리자 세션은 미리보기(dry)까지(그 밖 키 col:*·tpl:*·proof:* 등도 — 예: col:tasks를 통째로 덮으면 저장 경로의 서버 재구성(돈 상태 차단 등)을 건너뛰었다).
+  //   호출처 전수(v456): appdata restore.py·logsheet_daily.py = 봇 키 · 앱 index.html·도구 = 0 · servertest. 재해 복원 갈래 거절(RESTORE_MODE_ONLY)이 먼저(종전 응답 그대로), 그다음 BOT_KEY_ONLY.
+  if (d.dry) return jr(200, { status: 'OK', dry: true, store: sn, key: key, preview: preview, restore_only: !!cls, would_error: (plan && plan.status) ? plan.body.error_code : (bot ? '' : 'BOT_KEY_ONLY'), request_id: R });
   if (plan && plan.status === 403) return jr(403, Object.assign(plan.body, { request_id: R }));
+  if (!bot) return jr(403, { status: 'FORBIDDEN', error_code: 'BOT_KEY_ONLY', request_id: R });
   if (d.confirm !== true) return jr(400, { status: 'REJECTED', error_code: 'NEED_CONFIRM', preview: preview, request_id: R });
   if (plan && plan.status) return jr(plan.status, Object.assign(plan.body, { request_id: R }));
   const payload = plan ? plan.payload : d.data, note = plan ? plan.note : '';
@@ -4597,7 +4681,8 @@ async function docTrashPre(event, d, R) {
   const it = doc ? doc.items.find(function (x) { return x && x.id === id; }) : null;
   if (!it) return { res: jr(404, { status: 'REJECTED', error_code: 'NO_DOC', request_id: R }) };
   // 낙관락(handleSave STALE_BASE와 동일) — 목록을 본 뒤 남이 바꿨으면 세운다(클라는 재조회 뒤 다시)
-  if (d.base !== undefined && doc.updated_at && Number(d.base) !== Number(doc.updated_at)) return { res: jr(409, { status: 'CONFLICT', error_code: 'STALE_BASE', request_id: R }) };
+  if (d.base !== undefined && doc.updated_at && Number.isFinite(Number(doc.updated_at)) && Number(d.base) !== Number(doc.updated_at)) return { res: jr(409, { status: 'CONFLICT', error_code: 'STALE_BASE', request_id: R }) };   // v456(C079) 숫자가 아닌 updated_at은 비교 안 함(handleSave와 같음 — 아래 쓰기가 숫자로 고침)
+  if (d.base !== undefined && doc.updated_at && !Number.isFinite(Number(doc.updated_at)) && Number(d.base) === 0) return { res: jr(409, { status: 'CONFLICT', error_code: 'STALE_BASE', request_id: R }) };   // v456 검토: 그래도 base 0(목록을 못 받은 기기)은 409 — handleSave와 같음
   return { st: st, doc: doc, it: it, id: id, cid: cid, member: c.member };
 }
 async function handleDocRestore(event, d, R) {
@@ -4762,11 +4847,14 @@ function gzipOut(event, res) {
     return { statusCode: res.statusCode, headers: Object.assign({}, res.headers, { 'Content-Encoding': 'gzip', 'Vary': 'Accept-Encoding', 'X-GW-Raw-Bytes': String(raw.length) }), body: b64, isBase64Encoded: true };
   } catch (e) { console.log('[gzipOut] 실패 ' + String(e && e.message)); return res; }
 }
+// v456(원장 C066): 요청 본문 gzip 풀기 상한 — 로그인 확인보다 먼저 풀리므로 6MB 안의 압축 본문이 수백 MB로 풀려 그 호출이 메모리 초과로 죽던 길(데이터 손상·다른 요청 영향은 없었음).
+//   지금 가장 큰 정상 요청 = 일감 저장(풀린 크기 약 6.7MB) — 32MB면 다섯 배 여유. 넘으면 zlib이 ERR_BUFFER_TOO_LARGE를 던지고 handlerInner가 413 BODY_TOO_LARGE로 돌려준다(종전 400 INVALID_JSON으로 뭉뚱그림).
+const BODY_GZ_MAX = 32 * 1024 * 1024;
 function parseBody(event) {
   const h = (event && event.headers) || {};
   const enc = String(h['x-gw-enc'] || h['X-GW-Enc'] || '').toLowerCase();
   let txt = event.body || '';
-  if (enc === 'gzip') txt = zlib.gunzipSync(Buffer.from(txt, event.isBase64Encoded ? 'base64' : 'binary')).toString('utf8');
+  if (enc === 'gzip') txt = zlib.gunzipSync(Buffer.from(txt, event.isBase64Encoded ? 'base64' : 'binary'), { maxOutputLength: BODY_GZ_MAX }).toString('utf8');
   else if (event.isBase64Encoded) txt = Buffer.from(txt, 'base64').toString('utf8');
   return JSON.parse(txt || '{}');
 }
@@ -4780,7 +4868,10 @@ async function handlerInner(event) {
   if (event.httpMethod !== 'POST') return jr(405, { status: 'REJECTED', error_code: 'METHOD_NOT_ALLOWED', request_id: R });
   setupBlobContext(event);
   let d;
-  try { d = parseBody(event); } catch { return jr(400, { status: 'REJECTED', error_code: 'INVALID_JSON', request_id: R }); }
+  try { d = parseBody(event); } catch (e) {
+    if (e && e.code === 'ERR_BUFFER_TOO_LARGE') return jr(413, { status: 'REJECTED', error_code: 'BODY_TOO_LARGE', request_id: R });   // v456 C066 — 풀린 본문이 BODY_GZ_MAX를 넘음
+    return jr(400, { status: 'REJECTED', error_code: 'INVALID_JSON', request_id: R });
+  }
   try {
     // 비용 실측 결과 조회(임시, 2026-09-10) — 관리자 전용. 계측기를 지울 때 이 분기도 함께 지운다.
     if (d && d.action === 'meter') {

@@ -213,9 +213,39 @@ function buildContractPrompt(o) {
 }
 // 절대 금지 패턴(설계 §5 2층: 주민번호·연락처·계좌) — 마스킹하지 않고 걸리면 전송 중단(fail-closed). 호출부가 사유 코드만 남긴다(값 로그 금지).
 // 계좌 패턴은 마지막 묶음 5자리 이상(또는 4묶음) — 'YYYY-MM-DD' 날짜(4-2-2)는 잡지 않는다. 사업자번호(3-2-5)는 잡힌다(보수적 — 허용 사전에서 빼면 된다).
-const PII_RE = [/\d{6}\s*-\s*[1-4]\d{6}/, /01\d[\s-]?\d{3,4}[\s-]?\d{4}/, /\b\d{2,6}-\d{2,6}-\d{5,8}\b/, /\b\d{2,6}-\d{2,6}-\d{2,6}-\d{1,8}\b/];
+// v456(원장 C066 ②) 더한 꼴 — 앞 넷(PII_0~3)은 그대로 두고 뒤에 붙인다(사유 코드 번호 유지). 줄표 = '-'·유니코드 줄표(‐‑‒–—―)·빼기(−)·전각(－):
+//   PII_4 붙여 쓴 주민·외국인번호(생년월일 꼴 YYMMDD + 1~8 + 6자리 — 앞이 숫자·점이면 아님: 소수 자리) · PII_5 줄표 변형·외국인(5~8) 주민 꼴 ·
+//   PII_6 점·긴 줄표 구분 휴대전화 · PII_7 지역번호 전화(02·031~065·070 — 구분자 있을 때만, 괄호 허용) · PII_8 공백 구분 계좌(2~6 2~6 5~8) ·
+//   PII_9 구분자 없는 11자리 이상(계좌·카드 — 앞이 숫자·점이면 아님 · 2차 검토 전 11~14자리). 10자리 맨숫자는 넣지 않는다(10억 이상 금액·사업자번호가 걸리면 그 서류 학습이 통째로 멈춤 — fail-closed라 오탐 비용이 큼).
+//   쓰는 곳 5: gw-learn-background(모델 보내기 전 전체 차단 · 규칙·요약 거르기) · gw-data(박스 라벨·공사명) · boxjudge(라벨 정리). servertest 86이 잡힘·안 잡힘 양쪽을 고정.
+const PII_DASH = '[-\\u2010-\\u2015\\u2212\\uFF0D]';
+//   v456 검토: PII_4는 6자리와 7자리 사이 공백·점·빗금·밑줄 구분도 잡는다(생년월일 꼴 제약이 있어 오탐 적음) · PII_9는 영문자 뒤(아이디·파일 이름 시각 'F2026…')·
+//   ₩ 뒤·'원' 앞(쉼표 없는 금액)은 뺀다 · 검사 전 piiNorm이 전각 숫자를 반각으로·폭 없는 문자(U+200B~D·U+2060·U+FEFF)를 지운다(\d는 ASCII 숫자만 잡음).
+//   v456 2차 검토: 영문자 '바로 뒤'만 빠진다(밑줄·공백·한글 뒤는 그대로 잡음) — 대신 PII_9는 뒤에 파일 확장자(.jpg·.pdf·.xlsx 등)가 붙은 숫자(파일 이름 시각)를 뺀다 ·
+//   PII_9 위 상한을 없앴다(\d{11,} — 종전 {11,14}는 15자리 이상 이어진 숫자를 어느 위치에서도 못 잡아 카드 16자리·긴 가상계좌가 샜다) ·
+//   piiNorm이 가운뎃점(· ・ ∙ •)을 숫자 사이(앞뒤 띄어쓰기 포함)면 점 '.'으로(주민번호 PII_4·휴대전화 PII_6·지역번호 PII_7이 점을 받음), 그 밖은 공백으로 바꾼다
+//   (모두 점으로 바꾸면 '계좌·12345678901234'가 PII_9 앞 '.' 제외(소수 자리)에 걸려 샘).
+const PII_RE = [/\d{6}\s*-\s*[1-4]\d{6}/, /01\d[\s-]?\d{3,4}[\s-]?\d{4}/, /\b\d{2,6}-\d{2,6}-\d{5,8}\b/, /\b\d{2,6}-\d{2,6}-\d{2,6}-\d{1,8}\b/,
+  /(?<![\d.])\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])[\s./_]*[1-8]\d{6}(?!\d)/,
+  new RegExp('(?<!\\d)\\d{6}\\s*' + PII_DASH + '\\s*[1-8]\\d{6}(?!\\d)'),
+  new RegExp('(?<!\\d)01\\d\\s*(?:\\.|' + PII_DASH + ')\\s*\\d{3,4}\\s*(?:\\.|' + PII_DASH + ')\\s*\\d{4}(?!\\d)'),
+  new RegExp('(?<!\\d)\\(?0(?:2|[3-6][1-5]|70)(?:\\)\\s*|\\s*(?:\\.|' + PII_DASH + ')\\s*|\\s+)\\d{3,4}(?:\\s*(?:\\.|' + PII_DASH + ')\\s*|\\s+)\\d{4}(?!\\d)'),
+  /(?<![\d.,])\d{2,6} \d{2,6} \d{5,8}(?![\d,])/,
+  /(?<![\dA-Za-z.₩])\d{11,}(?!\d|\s*원|\.(?:jpe?g|png|gif|heic|pdf|xlsx?|hwpx?|docx?|zip)\b)/i];
+// v456: 회사 대표 전화·팩스(공개 번호 — 앱 양식 상수 CD_CO·XG_CO·JW_CO·JW_CON 등의 tel·fax와 같은 값, 숫자만)는 검사 전에 문자열 전체에서 그 번호만 공백으로 바꾼다(PII_7 꼴로 찾아 바꿈 — 다른 꼴 검사도 그 번호를 보지 않음) —
+//   착공계 등 앱이 만든 초안에 회사 주소·☎ 줄이 들어가 있어(허용 칸) 이것을 잡으면 그 양식 학습이 통째로 멈춘다(servertest 68 실제 초안). 개인 번호가 아님.
+//   앱 상수의 회사 번호를 바꾸거나 더하면 여기도(servertest 86이 index.html의 tel·fax 상수가 전부 여기 있는지 대조).
+const PII_OWN_TEL = { '0542911202': 1, '0542911204': 1, '0542911214': 1 };
+const PII_OWN_RE = new RegExp(PII_RE[7].source, 'g');
+// v456 검토: 검사 전 정규화 — 전각 숫자(０-９)는 반각으로, 폭 없는 문자는 지움(NFKC 전체는 쓰지 않음: ①·㎡ 같은 글자가 숫자로 바뀌어 fail-closed 오탐이 늘 수 있음).
+//   전각 줄표(－)·유니코드 줄표는 PII_DASH가 이미 받는다. JSON.stringify는 이 글자들을 \\u로 바꾸지 않는다(그대로 남음).
+function piiNorm(s) {
+  return String(s).replace(/[０-９]/g, function (ch) { return String.fromCharCode(ch.charCodeAt(0) - 0xFEE0); }).replace(/[​-‍⁠﻿]/g, '')
+    .replace(/(\d)\s*[·・∙•]\s*(?=\d)/g, '$1.').replace(/[·・∙•]/g, ' ');
+}
 function piiScan(obj) {
   let s; try { s = typeof obj === 'string' ? obj : JSON.stringify(obj); } catch (e) { return { ok: false, code: 'SERIALIZE' }; }
+  s = piiNorm(s).replace(PII_OWN_RE, function (m) { return PII_OWN_TEL[m.replace(/\D/g, '')] ? ' ' : m; });
   for (let i = 0; i < PII_RE.length; i++) { if (PII_RE[i].test(s)) return { ok: false, code: 'PII_' + i }; }
   return { ok: true, code: '' };
 }
@@ -248,7 +278,10 @@ function fieldDefaults(L0, allowRefs) {
 }
 
 // ---- v412 기준선·일몰(계약판 호출부만 부른다 — 블로그 lessons 불변) ----
-function numericGaps(L) { return (L.gaps || []).filter(function (x) { return x && typeof x.ratio === 'number'; }).slice().sort(function (a, b) { return (Number(a.ts) || 0) - (Number(b.ts) || 0); }); }
+// v456 검토(T427): 칸 비교(xlsx_cell) 간극의 분모 식이 v456에서 바뀌었다(빈칸↔빈칸 뺌) — 간극 줄에 식 판 gv를 붙이고, 기준선·일몰은 같은 판 간극만 쓴다
+//   (옛 식 간극이 기준선에 섞여 새 식 최근 평균과 비교되면 '개선 없음' 쪽으로 기움). 문단 비교·파일 대 파일 간극은 식이 그대로라 판과 상관없이 쓴다. 운영 lessons는 고쳐 쓰지 않는다.
+const GAP_VER = 2;
+function numericGaps(L) { return (L.gaps || []).filter(function (x) { return x && typeof x.ratio === 'number' && !(x.kind === 'xlsx_cell' && Number(x.gv) !== GAP_VER); }).slice().sort(function (a, b) { return (Number(a.ts) || 0) - (Number(b.ts) || 0); }); }
 function avgRatio(arr) { return arr.length ? arr.reduce(function (s2, x) { return s2 + x.ratio; }, 0) / arr.length : null; }
 // 기준선 동결(제자리 수정): 숫자 간극이 10건에 닿는 순간 첫 10건 평균을 L.baseline에 적는다. 이미 있으면 그대로(간극이 60건 넘어 잘려도 기준선은 남는다).
 function freezeBaseline(L, now) {
@@ -278,7 +311,7 @@ function sunsetCheck(L0, now) {
 
 module.exports = {
   freezeBaseline, sunsetCheck, SUNSET_DAYS, SUNSET_BASE_N, SUNSET_RECENT_N, SUNSET_MIN_AFTER,
-  CONTRACT_SYSTEM, CONTRACT_SCHEMA, buildContractPrompt, PII_RE, piiScan, kickWorker, fieldDefaults,
+  CONTRACT_SYSTEM, CONTRACT_SCHEMA, buildContractPrompt, PII_RE, PII_OWN_TEL, piiNorm, piiScan, kickWorker, fieldDefaults, GAP_VER,
   TYPES, MAX_RULES, RULE_CHARS, EXEMPLAR_CHARS, MAX_GAPS, MAX_TRIES, LOCK_TTL_MS, RUNNING_STALE_MS, RETRY_WAIT_MS, SCOPES4, RE_REC_ID,
   hash32, pairKey, newPairId, usageKey, ymOf,
   normRules, emptyLessons, normLessons, pushGap, mergeLessons, lessonLines, exemplarFor, gapSummary, pickPending, usageOk, usageAdd,

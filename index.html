@@ -3405,6 +3405,8 @@
   var DEVICE_KEY = "jw_device_id";
   var curMemberObj = null;
   var _colBase = {};   // 컬렉션별 낙관적 락 base(마지막으로 본 서버 문서의 updated_at)
+  var _col409 = {};    // v456(C079) 컬렉션별 연달아 받은 저장 409 수(200·그 밖 응답이면 0 — 3번째에서 멈춤, saveConflictStop)
+  var _col409t = {}, _COL409_MS = 30000;   // v456 검토: 마지막 409 시각 — 30초가 지나면 새 저장 줄기로 보고 다시 셈
   function deviceId(){
     try{ var d = localStorage.getItem(DEVICE_KEY); if(!d){ d = "d" + Math.random().toString(36).slice(2,10) + Date.now().toString(36); localStorage.setItem(DEVICE_KEY, d); } return d; }catch(e){ return "d0"; }
   }
@@ -3552,13 +3554,25 @@
     // v421: 지시 GET이 실패해 캐시로 부팅한 기기는 base가 없어 서버 잠금을 건너뛰고 문서를 통째로 덮었다(남의 완료·새 지시 소실) → tasks는 base 0으로 보내 409 병합 경로로.
     //   409 처리가 없는 컬렉션은 편집이 소리 없이 사라지므로 일괄 적용하지 않는다(clients는 v441 검토부터 대장을 못 읽었으면 저장 자체를 안 하고(cliLoaded) 409는 다시 읽어 합친 뒤 한 번 더 — cliSaveConflict).
     var saveBase = (col === "tasks" && _colBase[col] === undefined) ? 0 : _colBase[col];
+    // v456(원장 T502 — 헤드리스 재현: 문서함 GET 500 → 빈 목록 부팅 → 관리자 문서 1건 저장 = 서버 문서 3건이 새 1건으로 통째로 바뀜): documents도 지시(v421)와 같이
+    //   GET을 못 받은 기기는 base 0으로 보내 409 → saveDocuments의 기존 재조회·mergeDocs 병합·1회 재시도 경로로(서버 문서가 비어 있으면 409 없이 그대로 저장)
+    if (col === "documents" && _colBase[col] === undefined) saveBase = 0;
     return gwCall("gw-data", { action: "save", collection: col, doc: doc, base: saveBase }).then(function(res){
       if (res.status === 401){ onSessionInvalid(); return _ghResp(401, {}); }
       // 쓰기권한 없음: 서버가 이미 막았고 재시도해도 결과가 같아 200으로 흘린다(무한 재시도 방지). 단 v331부터 조용히 넘기지 않고 표시한다 —
       // 종전에는 화면상 저장된 것처럼 보여, 권한 없는 사람이 만진 값이 사라진 것을 아무도 몰랐다.
-      if (res.status === 403) return _ghResp(200, { content: { sha: "gw" }, write_denied: 1 });
-      if (res.status === 409) return _ghResp(409, {});   // 동시 저장 충돌 — 각 컬렉션의 기존 409 재조회·병합·재시도 경로로
-      if (res.status !== 200) return _ghResp(res.status, {});   // 저장 실패를 성공으로 위조하면 pending이 풀려 편집이 유실된다
+      if (res.status === 403){ _col409[col] = 0; return _ghResp(200, { content: { sha: "gw" }, write_denied: 1 }); }   // v456 검토: 거절도 저장 줄기 끝 — 연속 409 셈을 비움
+      if (res.status === 409){   // 동시 저장 충돌 — 각 컬렉션의 기존 409 재조회·병합·재시도 경로로
+        // v456(C079): 이 컬렉션이 연달아 3번째 409면 멈춤 — 412(SAVE_CONFLICT_STOP)로 돌려 호출부의 일반 실패 길(재시도 없음)로 · 알림 1번
+        //   v456 검토: 셈은 저장 줄기 단위 — 마지막 409에서 30초(_COL409_MS)가 지났으면 새로 센다(재시도 1번뿐인 문서함·거래처가 409 2번 뒤 포기하면 수가 남아,
+        //   몇 분 뒤 정상 동시 편집의 첫 409가 병합 없이 바로 멈추던 것)
+        var n409 = (Date.now() - (_col409t[col] || 0) < _COL409_MS) ? (_col409[col] || 0) : 0;
+        if (saveConflictStop(n409)){ _col409[col] = 0; return _ghResp(412, { error_code: "SAVE_CONFLICT_STOP" }); }
+        _col409[col] = n409 + 1; _col409t[col] = Date.now();
+        return _ghResp(409, {});
+      }
+      _col409[col] = 0;
+      if (res.status !== 200) return _ghResp(res.status, { error_code: (res.body && res.body.error_code) || "" });   // 저장 실패를 성공으로 위조하면 pending이 풀려 편집이 유실된다 · v456 거절 이유 코드는 넘김(거래처 CLI_BIZ13 안내)
       _colBase[col] = (res.body && res.body.updated_at) || Date.now();
       // register_warn(문서함 v314): 저장은 됐는데 등재 결재 카드 자동 상신이 실패한 건수 — saveDocuments가 직원에게 알린다(관리자 결재함 폴이 자동 복구)
       return _ghResp(200, { content: { sha: "gw" }, register_warn: (res.body && res.body.register_warn) || 0 });
@@ -3656,6 +3670,12 @@
     if (gwToastTimer) clearTimeout(gwToastTimer);
     gwToastTimer = setTimeout(function(){ el.className = "gw-toast"; gwToastTimer = null; }, ms || (warn ? 9000 : 4000));
   }
+  // v456(원장 C079 「덧대기」 — 원천은 서버 handleSave): 같은 저장이 연달아 409(낙관락 충돌)를 받으면 3번째에서 멈추고 '저장 충돌 — 새로고침' 알림(지금 토스트 그대로 — 새 화면 없음).
+  //   종전엔 저장 → 409 → 다시 읽기·병합 → 저장을 끝없이 되풀이할 수 있었다(서버 문서 updated_at이 숫자가 아닐 때 시험 서버에서 몇 분에 요청 3,000건+ · 다시 읽기 실패 뒤 곧바로 다시 저장하는 꼴).
+  //   n = 이 저장 줄기에서 이미 받은 409 수(첫 저장 0). 직접 저장 넷(일용직·현장 대장·체크 칸·가족친화)은 n을 넘기고, fetch 대역을 타는 컬렉션은 대역이 컬렉션별로 센다(_col409).
+  //   알림은 다음 차례에 띄운다(같은 차례의 저장 실패 안내 토스트가 이 글을 덮지 않게). 고친 내용은 화면(메모리)에 남고, 다음에 고치면 다시 3번까지 보낸다.
+  function saveConflictToast(){ setTimeout(function(){ gwToast("저장 충돌 — 새로고침해 주세요. 같은 저장이 연달아 충돌해 더 보내지 않았습니다(고친 내용은 아직 서버에 들어가지 않았습니다).", true); }, 0); }
+  function saveConflictStop(n){ if ((n || 0) + 1 < 3) return false; saveConflictToast(); return true; }
 
   // ── 저장 ↔ 화면 갱신 분리 (v336 — PM 2026-09-10 "저장됐으면 저장됐다고만 나오게, 갱신은 실패할 수 없게")
   // 9/9 석면 사고의 진짜 원인은 렌더 코드가 아니라 데이터 모양이었다. 9/2 일괄 입력분 130건이
@@ -9931,14 +9951,15 @@
     (local||[]).forEach(function(r){ if(r&&r.id&&wkDirty[r.id]&&!seen[r.id]){ seen[r.id]=1; out.push(r); } });
     return out;
   }
-  function doSaveWorkers(){
+  function doSaveWorkers(n){
     if(!wkLoaded) return Promise.resolve();   // v442: 못 읽은 명부는 보내지 않는다(위 wkLoaded — 고치는 길이 먼저 막고 알린다)
     var sent={}; Object.keys(wkDirty).forEach(function(id){ sent[id]=wkDirty[id]; });   // v442 검토: 이번에 보내는 고친 횟수 — 보내는 사이 또 고친 줄은 성공해도 표시를 남긴다(다음 저장이 보냄)
     return gwCall("gw-data",{action:"save",collection:"workers",doc:{schema:1,items:workers},base:wkBase}).then(function(res){
       if(res.status===409){
+        if(saveConflictStop(n)) return;   // v456(C079): 연달아 3번째 409면 멈춤·알림(대기·고친 줄 표시는 남김 — 다음에 고치면 다시 보냄)
         return gwCall("gw-data",{action:"get",collection:"workers"}).then(function(r2){
-          if(r2.status===200){ var doc=(r2.body&&r2.body.doc)||{}; workers=mergeWorkers(workers, Array.isArray(doc.items)?doc.items:[]); wkBase=doc.updated_at||0; wkLoaded=true; renderWorkers(); renderXgWorkers(); }
-          return doSaveWorkers();
+          if(r2.status===200){ var doc=(r2.body&&r2.body.doc)||{}; workers=mergeWorkers(workers, Array.isArray(doc.items)?doc.items:[]); wkBase=doc.updated_at||0; wkLoaded=true; renderWorkers(); renderXgWorkers(); return doSaveWorkers((n||0)+1); }
+          saveConflictToast();   // v456(C079): 다시 읽기 실패면 곧바로 다시 저장하지 않는다(종전엔 낡은 base로 바로 다시 보내 409 → 다시 읽기 실패를 끝없이 되풀이할 수 있었다)
         });
       }
       if(res.status===200){ wkBase=(res.body&&res.body.updated_at)||Date.now(); Object.keys(sent).forEach(function(id){ if(wkDirty[id]===sent[id]) delete wkDirty[id]; }); if(!wkSaveTimer) wkPending=false; }   // v442: 보내는 사이 또 고쳐 저장이 다시 잡혔으면(wkSaveTimer) 대기 표시를 남긴다
@@ -14977,12 +14998,13 @@
     }).catch(function(){});
   }
   function scheduleFamSave(){ famPending=true; if(famSaveTimer) clearTimeout(famSaveTimer); famSaveTimer=setTimeout(doSaveFam,1200); }
-  function doSaveFam(){
+  function doSaveFam(n){
     gwCall("gw-data",{action:"save",collection:"family",doc:{schema:1,items:fam},base:famBase}).then(function(res){
       if(res.status===409){   // 동시 저장 충돌 — 재조회·병합·재시도(휴가와 같은 규칙)
+        if(saveConflictStop(n)) return;   // v456(C079): 연달아 3번째 409면 멈춤·알림
         return gwCall("gw-data",{action:"get",collection:"family"}).then(function(r2){
-          if(r2.status===200){ var doc=(r2.body&&r2.body.doc)||{}; fam=mergeFam(fam,Array.isArray(doc.items)?doc.items:[]); famBase=doc.updated_at||0; }
-          return doSaveFam();
+          if(r2.status===200){ var doc=(r2.body&&r2.body.doc)||{}; fam=mergeFam(fam,Array.isArray(doc.items)?doc.items:[]); famBase=doc.updated_at||0; return doSaveFam((n||0)+1); }
+          saveConflictToast();   // v456(C079): 다시 읽기 실패면 곧바로 다시 저장하지 않음
         });
       }
       if(res.status===200){ famBase=(res.body&&res.body.updated_at)||Date.now(); famPending=false; }
@@ -15037,17 +15059,42 @@
       return true;
     }).catch(function(){ return false; });
   }
-  function scheduleAsbSave(){ asbPending=true; if(asbSaveTimer) clearTimeout(asbSaveTimer); asbSaveTimer=setTimeout(doSaveAsb,1200); }
+  function scheduleAsbSave(){ asbPending=true; if(asbSaveTimer) clearTimeout(asbSaveTimer); asbSaveTimer=setTimeout(asbSaveFire,1200); }
+  // v456 검토(C082 ② ↔ v445 현장 창 [+ 새 일용직] → [이 현장에 넣기]): 새로 등재한 사람의 명부 저장(1.2초 뒤)보다 현장 대장 저장이 먼저 서버에 닿으면
+  //   서버가 새 id를 명부 밖으로 보고 400 ORPHAN_WORKER — 「원천」 명부 저장이 잡혀 있으면(wkSaveTimer) 먼저 보내고 끝난 뒤 대장을 보낸다(asbWkFlush) ·
+  //   명부 저장이 이미 보내는 중이었으면 doSaveAsb의 400 갈래가 명부 저장을 끝낸 뒤 한 번만 다시 보낸다(asbOrphTry). 다시 보내도 400이면 그때 알림
+  var asbOrphTry = 0;
+  function asbWkFlush(){ if(wkSaveTimer){ clearTimeout(wkSaveTimer); wkSaveTimer=null; return doSaveWorkers(); } return Promise.resolve(); }
+  function asbSaveFire(){ asbOrphTry = 0; return asbWkFlush().then(function(){ return doSaveAsb(); }); }
+  // v456 2차 검토: 서버 400 ORPHAN_WORKER가 돌려준 고아 id 중 명부 저장 대기(wkPending + 이 기기 명부에 있음)가 아닌 것을 대장 줄에서 뺀다 — 돌려줌 = 뺀 id 수(0이면 그대로)
+  function asbOrphDrop(ids){
+    if(!Array.isArray(ids) || !ids.length) return 0;
+    var drop = {}, out = {}, k = 0;
+    ids.forEach(function(id){ id = String(id); for(var i=0;i<workers.length;i++){ if(wkPending && workers[i].id===id && workers[i].del!==1) return; } drop[id] = 1; });
+    asb.forEach(function(r){ var l = asList(r.worker_ids), keep = l.filter(function(i){ return !drop[String(i)]; }); if(keep.length !== l.length){ l.forEach(function(i){ if(drop[String(i)]) out[String(i)] = 1; }); r.worker_ids = keep; } });
+    for(var x in out){ if(out.hasOwnProperty(x)) k++; }
+    return k;
+  }
   // v335의 safeRender(개별 try/catch + 닫기 보장 + 실패 토스트)는 v336에서 걷어냈다 —
   // 덮는 층이 아니라 던지는 원인(asList)과 순서(afterSave)를 고쳤기 때문. 위 gwToast 아래 주석 참조.
-  function doSaveAsb(){
+  function doSaveAsb(n){
     var sent = canSee("safety") ? null : siteGapSigs(asb);   // v433: 지금 보내는 대장의 줄별 투입 인원 서명(gwCall이 이 자리에서 글로 굳힌다) — 200이면 서버가 판정할 대장이 바로 이것
     return gwCall("gw-data",{action:"save",collection:"asbestos",doc:{schema:1,items:asb},base:asbBase}).then(function(res){
       if(res.status===409){
+        if(saveConflictStop(n)) return;   // v456(C079): 연달아 3번째 409면 멈춤·알림
         return gwCall("gw-data",{action:"get",collection:"asbestos"}).then(function(r2){
-          if(r2.status===200){ var doc=(r2.body&&r2.body.doc)||{}; asb=mergeAsb(asb,Array.isArray(doc.items)?doc.items:[]); asb.forEach(normAsbRow); asbBase=doc.updated_at||0; }   // v336 적대검증: 409 병합도 입구다 — 여기서 안 고치면 문자열 "[]"가 서버로 되돌아간다
-          return doSaveAsb();
+          if(r2.status===200){ var doc=(r2.body&&r2.body.doc)||{}; asb=mergeAsb(asb,Array.isArray(doc.items)?doc.items:[]); asb.forEach(normAsbRow); asbBase=doc.updated_at||0; return doSaveAsb((n||0)+1); }   // v336 적대검증: 409 병합도 입구다 — 여기서 안 고치면 문자열 "[]"가 서버로 되돌아간다
+          saveConflictToast();   // v456(C079): 다시 읽기 실패면 곧바로 다시 저장하지 않음
         });
+      }
+      // v456(원장 C082 ②): 서버가 명부에 없는 새 투입 일용직 id를 거절(400 ORPHAN_WORKER — 옛 캐시 앱·콘솔 길) — 지금 토스트로 알림(대기는 남김 · 새로고침하면 서버 대장으로)
+      //   v456 검토: 첫 400은 명부 저장(보내는 중·실패해 대기 남음)을 끝낸 뒤 한 번만 다시 보냄(asbOrphTry — 현장 창에서 막 등재한 사람) · 다시 400이면 알림(새로고침 안내 없음 — 새로고침하면 이 대장 변경이 사라짐)
+      if(res.status===400&&res.body&&res.body.error_code==="ORPHAN_WORKER"){
+        if(!asbOrphTry){ asbOrphTry=1; return (wkPending ? doSaveWorkers() : Promise.resolve()).then(function(){ return doSaveAsb(n); }); }
+        //   v456 2차 검토: 두 번째 400 — 명부 저장이 아예 사라진 기기(로그인 창 '전환'이 명부 저장 대기를 버림·명부 저장 403)는 그 id가 대장 메모리에 남아 어느 줄을 고쳐도 계속 400이었다.
+        //   서버가 돌려준 고아 id(ids) 중 이 기기 명부에도 저장 대기로 남아 있지 않은 것만 대장에서 빼고 한 번 더 저장(asbOrphDrop) · 명부 저장이 실패해 대기로 남은 사람은 빼지 않음(다음 명부 저장 뒤 풀림)
+        if(asbOrphTry===1){ var gone=asbOrphDrop(res.body.ids); if(gone){ asbOrphTry=2; gwToast(gone+"명은 일용직 명부에 없어 현장 대장에서 뺐습니다 — 필요하면 일용직 명부에 다시 등록한 뒤 그 현장 [근로자 추가]에서 넣어 주세요.", true); if(typeof renderSites==="function") renderSites(); return doSaveAsb(n); } }
+        gwToast("현장 대장을 저장하지 못했습니다 — 넣은 일용직이 아직 서버 명부에 없습니다(일용직 명부 저장이 끝나지 않음).\n일용직 명부가 저장된 뒤 그 현장 [근로자 추가]에서 [이 현장에 넣기]를 다시 눌러 주세요.", true);
       }
       if(res.status===200){ asbBase=(res.body&&res.body.updated_at)||Date.now(); asbPending=false; if(!canSee("safety")) loadSiteEduGap(sent); }   // v433: 저장한 대장(보낸 서명)으로 특별교육 줄 다시 확인 — 응답 전에 또 고친 줄은 다음 저장 뒤까지 '확인 못 함'(화면 대장으로 서명하면 옛 이름이 확인된 것처럼 그려짐 — v433 검토)
     }).catch(function(){});
@@ -16725,13 +16772,14 @@
     }).catch(function(){ return false; });
   }
   function scheduleEduSave(){ eduPending=true; if(eduSaveTimer) clearTimeout(eduSaveTimer); eduSaveTimer=setTimeout(doSaveEdu,1200); }
-  function doSaveEdu(){
+  function doSaveEdu(n){
     if(!eduLoaded) return Promise.resolve();   // v447: 못 읽은 기록은 보내지 않는다(위 eduLoaded — 고치는 길이 먼저 막고 알린다)
     return gwCall("gw-data",{action:"save",collection:"edu",doc:{schema:1,items:edu},base:eduBase}).then(function(res){
       if(res.status===409){
+        if(saveConflictStop(n)) return;   // v456(C079): 연달아 3번째 409면 멈춤·알림
         return gwCall("gw-data",{action:"get",collection:"edu"}).then(function(r2){
-          if(r2.status===200){ var doc=(r2.body&&r2.body.doc)||{}; edu=mergeEdu(edu,Array.isArray(doc.items)?doc.items:[]); eduBase=doc.updated_at||0; }
-          return doSaveEdu();
+          if(r2.status===200){ var doc=(r2.body&&r2.body.doc)||{}; edu=mergeEdu(edu,Array.isArray(doc.items)?doc.items:[]); eduBase=doc.updated_at||0; return doSaveEdu((n||0)+1); }
+          saveConflictToast();   // v456(C079): 다시 읽기 실패면 곧바로 다시 저장하지 않음
         });
       }
       if(res.status===200){ eduBase=(res.body&&res.body.updated_at)||Date.now(); eduPending=false; }
@@ -22762,6 +22810,8 @@
     fetch(CLIENT_API, {method: "PUT", headers: Object.assign({"Content-Type":"application/json"}, ghHeaders()), body: JSON.stringify(payload)}).then(function(resp){
       if (resp.status === 401) return;
       if (resp.status === 409) return cliSaveConflict(retried);   // v441 검토: 종전엔 409를 소리 없이 삼켜 이 저장과 그 뒤 이 기기 저장이 새로고침 때까지 모두 버려졌다
+      // v456(원장 C080): 서버도 새로 바뀐 사업자번호 칸의 13자리(주민·법인등록번호 꼴)를 400 CLI_BIZ13으로 막는다(옛 캐시 앱·콘솔 길) — 지금 토스트로 같은 안내(저장 안 됨 · 고친 표시는 남김)
+      if (resp.status === 400) return resp.json().then(function(j){ if (j && j.error_code === "CLI_BIZ13") gwToast(CLI_BIZ13_MSG + "\n(이번 저장은 서버에 들어가지 않았습니다 — 그 거래처를 [수정]에서 고쳐 주세요.)", true); });
       return resp.json().then(function(json){ cliSha = json.content && json.content.sha; if (resp.ok) Object.keys(sent).forEach(function(id){ if (cliDirty[id] === sent[id]) delete cliDirty[id]; }); });
     }).catch(function(){});
   }
@@ -22803,7 +22853,9 @@
   // 사업자번호 칸의 13자리(주민·법인등록번호 꼴) — 전각 숫자는 반각으로 바꾸고 띄어쓰기·줄표(- ‐ ‑ ‒ – — ― − － ㅡ)를 뺀 뒤 숫자가 13자리 이상 이어지면 참(v441 검토: '숫자가 모두 13개'만 보던 것은
   //   사업자번호와 함께 적거나·한 자리 더 치거나·전각으로 적은 주민번호가 빠졌다). 입력은 막고(saveCliModal) 옛 값은 PC 표·펼침·검색 글·전역 검색 줄·옛 [상세 ›] 창에 원문을 그리지 않는다(수정 창 칸에만 — 지우라고).
   //   가린 번호('900101-1******')·10자리는 그대로 통과 · 사업자번호 둘을 띄어쓰기만으로 이으면 13자리 넘게 이어져 막힘(안내 글이 쉼표로 나누라고 함) · 예외(해시 고정·서버 — 원문 그대로): 폰 옛 목록 renderClientsLegacy · 물어보기 _lib/ask.js
-  function cliBiz13(s){ var t = String(s == null ? "" : s).replace(/[０-９]/g, function(ch){ return String.fromCharCode(ch.charCodeAt(0) - 0xFEE0); }).replace(/[\s\-‐-―−－ㅡ]/g, ""); return /\d{13}/.test(t); }
+  function cliBiz13(s){ var t = String(s == null ? "" : s).replace(/[０-９]/g, function(ch){ return String.fromCharCode(ch.charCodeAt(0) - 0xFEE0); }).replace(/[​-‍⁠]/g, "");
+    if (t.split(/[,\/]/).some(function(p){ return /\d{13}/.test(p.replace(/[\s\-‐-―−－ㅡ._·・∙•]/g, "")); })) return true;
+    return /(^|\D)\d{6}[\s\-‐-―−－ㅡ.\/_·・∙•]*\d{7}(?!\d)/.test(t); }   // v456 2차 검토: 쉼표·빗금 조각마다 13자리 + 6·7자리 꼴은 구분자(빗금 포함)를 건너 따로(서버 _lib/clibiz.js와 같은 규칙 — 빗금으로 나눈 사업자번호 둘은 통과)
   // 사업자번호 보이는 글(옛 [상세 ›] 창) — 개인 거래처 '개인(사업자 없음)' · 13자리는 빈 글(원문 숨김) · 그 밖 적은 그대로
   function cliBizShown(c){ if (!c) return ""; if (c.indiv) return "개인(사업자 없음)"; return cliBiz13(c.biz_no) ? "" : String(c.biz_no == null ? "" : c.biz_no).trim(); }
   // 사업자번호 검색 글(전역 검색 줄·hay, 표 검색 글 앞머리 — v441 검토): 개인 거래처·13자리는 빈 글. '개인(사업자 없음)'을 hay에 넣으면 '개인'·'사업자'로 찾은 개인 거래처를 폰에서 누를 때

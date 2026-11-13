@@ -3780,7 +3780,7 @@ try {
     && (html.match(/var siteEduGap\b[^;\n]*;/g) || []).join('|') === 'var siteEduGap;'
     && (htmlNC33.match(/site_edu_gap/g) || []).length === 1 && lg33.indexOf('gwCall("gw-data", { action: "site_edu_gap" })') > 0 && /if \(canSee\("safety"\) \|\| !canSee\("site"\)\) return;/.test(lg33) && !/liveAsb\(|liveSites\(\)\.forEach|asbPending/.test(lg33)
     && /renderSites\(\); renderCalendar\(\); renderWorkers\(\);[^\n]*\n\s*if \(!canSee\("safety"\)\) loadSiteEduGap\(siteGapSigs\(ri\)\);/.test(la33) && (la33.match(/loadSiteEduGap\(/g) || []).length === 1
-    && /function doSaveAsb\(\)\{\n\s*var sent = canSee\("safety"\) \? null : siteGapSigs\(asb\);[^\n]*\n\s*return gwCall\("gw-data",\{action:"save",collection:"asbestos",doc:\{schema:1,items:asb\},base:asbBase\}\)/.test(ds33)
+    && /function doSaveAsb\(n\)\{\n\s*var sent = canSee\("safety"\) \? null : siteGapSigs\(asb\);[^\n]*\n\s*return gwCall\("gw-data",\{action:"save",collection:"asbestos",doc:\{schema:1,items:asb\},base:asbBase\}\)/.test(ds33)
     && /if\(res\.status===200\)\{ asbBase=\(res\.body&&res\.body\.updated_at\)\|\|Date\.now\(\); asbPending=false; if\(!canSee\("safety"\)\) loadSiteEduGap\(sent\); \}/.test(ds33) && (ds33.match(/loadSiteEduGap\(/g) || []).length === 1
     && (htmlNC33.match(/loadSiteEduGap\(/g) || []).length === 3 && (htmlNC33.match(/siteGapSigs\(/g) || []).length === 3 && sfSec33.length > 1000 && !/siteEdu|site_edu_gap|siteGapSig/.test(sfSec33),
     JSON.stringify({ order: [iCm33, iDev33, iAcc33, iWk33, iRd33], awaits: (hNC33.match(/\bawait\b/g) || []).length, callers: (htmlNC33.match(/loadSiteEduGap\(/g) || []).length, sigs: (htmlNC33.match(/siteGapSigs\(/g) || []).length, gapStr: (htmlNC33.match(/site_edu_gap/g) || []).length }));
@@ -7230,7 +7230,8 @@ try {
   //   검토 반영(11/11): 고친 줄 표시(wkMarkDirty)·③ 교육 기록 읽기(wkEduEnsure)·현장 창(openSiteWorkers·swEmptyText·renderSwList·swPickIds·findAsb + 현장 탭 배선 IIFE — [+ 새 일용직] 실제 처리기)·applyPerms 일용직 줄(apWk)을 함께 싣는다
   //   (v445 검토: 현장 창 [이 현장에 넣기]는 그려진 상자(옛 swChecked — 없앰)가 아니라 창 안 선택 swSel로 저장(swPickIds) — 그 선택·안내 글 선언 두 줄도 싣는다. 실행 검사는 v445 묶음 ⑳)
   const REAL42 = ['esc', 'isDate', 'asList', 'liveAsb', 'wkBirth6', 'wkMarkDirty', 'mergeWorkers', 'doSaveWorkers', 'liveWorkers', 'sortedWorkers', 'loadWorkers', 'scheduleWorkersSave', 'wkLabel', 'wkKindCounts', 'wkAgoText', 'wkKindChips', 'wkMissing', 'findWk',
-    'renderWorkersLegacy', 'openWkModal', 'sheetRow', 'bindFold', 'liveEdu', 'eduLatest', 'pad', 'fmtDate', 'asbMedOrg', 'asbMedMonths', 'asbAddMonths', 'asbMedUntil', 'asbMedPick', 'asbMedLatest', 'wkExamDate', 'wkExamNote', 'wkExamMissing', 'wkEduEnsure', 'renderXgWorkers', 'xgBuildEdits', 'findAsb', 'openSiteWorkers', 'swEmptyText', 'renderSwList', 'swPickIds'];
+    'renderWorkersLegacy', 'openWkModal', 'sheetRow', 'bindFold', 'liveEdu', 'eduLatest', 'pad', 'fmtDate', 'asbMedOrg', 'asbMedMonths', 'asbAddMonths', 'asbMedUntil', 'asbMedPick', 'asbMedLatest', 'wkExamDate', 'wkExamNote', 'wkExamMissing', 'wkEduEnsure', 'renderXgWorkers', 'xgBuildEdits', 'findAsb', 'openSiteWorkers', 'swEmptyText', 'renderSwList', 'swPickIds',
+    'saveConflictToast', 'saveConflictStop'];   // v456(C079): doSaveWorkers의 409 갈래가 부르는 연속 충돌 멈춤(실행 검사는 v456 묶음)
   const VARS42 = ['  var workers=[], wkEditId=null', '  var wkLoaded=false, wkPending=false;', '  var WK_UNREAD_MSG=', '  var wkDirty={};', '  var WK_NO_ADD_MSG=', '  var wkEduSt = ', '  var ASB_MED_ORG = ', '  var ASB_MED_MONTHS = ', '  var swSiteId=null, swQ="";', '  var swSel=null;', '  var SW_NO_WK_MSG=', '  var WK_KIND_LABEL = ', '  var WK_KIND_ORDER = '].map((h) => line42(html, h));
   const iife42 = (() => { const k = html.indexOf('    if(!$("wkAddBtn")) return;'), s = html.lastIndexOf('  (function(){', k), e = html.indexOf('\n  })();', k); if (k < 0 || s < 0 || e < 0) throw new Error('일용직 창 배선 없음'); return html.slice(s, e + '\n  })();'.length); })();
   const siteIife42 = (() => { const k = html.indexOf('  // 현장 탭 배선(v347)'), s = html.indexOf('  (function(){', k), e = html.indexOf('\n  })();', k); if (k < 0 || s < 0 || e < 0 || html.slice(s, e).indexOf('swNewBtn') < 0) throw new Error('현장 탭 배선 없음'); return html.slice(s, e + '\n  })();'.length); })();
@@ -9456,12 +9457,15 @@ try {
     asbWorkerNames: '1b19314636ac3e991335bc6a1449a643e71b3af4771e52201097e5dd20627c2f', siteYear: '1809126db67bd12286c9fb8b49fbcf0ff3fb0c2b84aa76c48e1e1df6320359a2', sheetRow: 'f77f0201e4dee7c2179eec69c9503a423dd46ce569d4b76061847b29d0b26fc8',
     bindFold: '2e17be3f057f6b655fa35148f5297d965924e9b512d7fb3eb04b85640cd1c2bc', renderSiteFilter: 'e97f8fe38b3fd5a03059965f57755e56759cc40c7045814b5f34718bef78dd7a', siteLabel: '049362d010ea05ceeffb8696f4991ef0217d477609575e6b06b2c7f2fd0a7f8e',
     siteKind: '64c88120acef6e84df6790fd6d823260eecfaf65797395716fc915db9c6c0c68', liveSites: 'e00f9252efe93c334c686519f1045752b921aa980071aa9cf0ad9c7bc1ceb206', asbNotifyDue: '69a4a67bc06987e081064888bb7a94bf1dd41cb8010f5aa75cde6ff4f409059f',
-    asbKeepUntil: '18324fa514e86abd8f436ca1cf791a49d6b6b4129862614277fcd475d50c3b55', loadAsb: '82117c350e5ed2fe6c06fe9d34f8c396d60fa8f7ab948964596ea971529f2692', doSaveAsb: '356cbdcb8871cc8cc9e01d2c9d092ee37a32445e1a06639635cf7a4d1cbe5eec',
+    asbKeepUntil: '18324fa514e86abd8f436ca1cf791a49d6b6b4129862614277fcd475d50c3b55', loadAsb: '82117c350e5ed2fe6c06fe9d34f8c396d60fa8f7ab948964596ea971529f2692', doSaveAsb: 'c222ce0bd5f70b3534e319e55460b8b29c7c39ef05f25cf21359da6ad1960000',
     loadSiteEduGap: '206f6af42ee8808fafec26b2e8742dff16caf2dad025c86653e1de3b3b556591', openSiteWorkers: '87bac54bab4f204a3e6366c5bff4c8d881fba2a95a1c42d2b792843b6a68fba5', siteGapSig: '2fc2297595a63951b3285ed8b880a5374bd23826c649aa067ee1d02d9c1b8a0a',
     siteGapSigs: '57394ee9f4c0ce6313ce503e414ef906cbbc35594ff43f56bbf935bb35490724', renderSwList: '769c2fa77f6c4ba96c8697590a809712ef9a93d0599481d3a776a663ba40b635' };
   //   v445 검토: 현장 창 두 함수(openSiteWorkers·renderSwList)는 창 안 선택 swSel(검색으로 다시 그려도 체크 그대로·그려지지 않은 지정은 빠지지 않음 — 30년 보존 근로자 id)과
   //   일용직 숨김 이름 막음 때문에 고친 본문으로 다시 고정(v444 해시 39463582…·33d2e7a9… → 위 값 — 고친 동작은 ⑳이 실행으로 지킴) · 옛 본문과 나머지 17개는 v444 그대로
   //   v447 검토 2: siteEduLine은 has_edu 뜻(특별교육 기록 유무 — v447)에 맞춘 글 '특별교육 기록 없음 — 이수 여부 미확인'으로 고친 본문(70f53583… → c87cdd17… — 글 한 줄만, v433 ②가 실행으로 지킴)
+  //   v456(원장 C079·C082 ②): doSaveAsb는 연속 409 멈춤(n·saveConflictStop)·다시 읽기 실패 뒤 다시 저장 안 함(saveConflictToast)·400 ORPHAN_WORKER 알림을 더한 본문으로 다시 고정(356cbdcb… → be7d2128… — 고친 동작은 v456 묶음 ①이 실행으로 지킴)
+  //   v456 검토: 400 ORPHAN_WORKER 첫 번은 명부 저장을 끝낸 뒤 한 번만 다시 보냄(asbOrphTry)·알림 글에서 새로고침 안내 뺌 → 다시 고정(be7d2128… → 7495f882… — 고친 동작은 v456 묶음 ⑥이 실행으로 지킴)
+  //   v456 2차 검토: 두 번째 400 ORPHAN_WORKER에서 서버가 돌려준 고아 id만 대장에서 빼고 한 번 더 저장(asbOrphDrop) → 다시 고정(7495f882… → 930e3cae… — 고친 동작은 v456 묶음 ⑧이 실행으로 지킴)
   const hBad12 = Object.keys(HASH45).filter((n) => sha45(body45(n)) !== HASH45[n]);
   const m12 = miss45.length, X12 = mk45({ width: 375 }); X12.api.render();
   const l12a = [X12.host.getAttribute('data-vs-mode'), (X12.host._h.match(/class="item asb-item"/g) || []).length, X12.host._h.indexOf('data-vs-row') < 0, X12.env.host('siteFilterBar').style.display, X12.api.cur(), X12.env.host('siteHead').textContent].join('|');
@@ -11186,8 +11190,8 @@ try {
   // 2차 검토: 다음 R1 적용 확인 칸 = notify_get·assign_get 응답의 updated_by · doneif는 감사 '설정적용' 줄(되돌리기 없음) · base 필수
   const r1v51 = ops51.filter((l) => l.indexOf('notify_get·assign_get 응답의 updated_by') > 0 && l.indexOf("doneif는 감사 '설정적용' 줄로 확인") > 0 && l.indexOf('NEED_BASE') > 0).length === 1;
   T('v453 문서: FEATURES 기준 v453 (2026-11-13)·v453 절(키 이름 검사·backup_put 재해 복원 모드·회원 권한/신원 칸·del 되살리기·기록 키 붙이기만·restored 표식·clog 체인·알려진 한계·ingest 스위치·키 꼴 허용 목록·botKeyOk·settings_apply 2단·restore.py 배포 전 조건·수용 위험 그대로) · TESTLIST v453 운영 확인 칸 "[ ] (AI 운영 확인" ≥ 1("PM" 낱말 0)·첫 칸 배포 전 조건·거절 확인은 dry 먼저·게이트 칸 [x] 8종 · CLAUDE.md 보안 줄(쓰는 법 · 옛 이름 0) · sw jw-shell-v453 · 화면 변경 없음(index.html에 새 액션·코드 0)',
-    Number((ft51.match(/기준: v(\d+) /) || [0, 0])[1]) >= 453 && ftv51.length > 0 && mF51.length === 0 && tlv51.length > 0 && ops51.length >= 1 && !ops51.some((l) => /PM/.test(l)) && GATE51.every((g) => gate51.some((l) => l.indexOf('`' + g + '`') > 0))
-    && mC51.length === 0 && old51.length === 0 && pre51 && rej51 && r1v51 && Number((sw51.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 453 && ix51.length === 0,
+    Number((ft51.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 453 && ftv51.length > 0 && mF51.length === 0 && tlv51.length > 0 && ops51.length >= 1 && !ops51.some((l) => /PM/.test(l)) && GATE51.every((g) => gate51.some((l) => l.indexOf('`' + g + '`') > 0))
+    && mC51.length === 0 && old51.length === 0 && pre51 && rej51 && r1v51 && Number((sw51.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 453 && ix51.length === 0,   // v456: 기준 줄·sw는 이 판 이상(이 판 값은 v456 문서 검사)
     JSON.stringify({ mF51, mC51, old51, pre51, rej51, r1v51, ops: ops51.length, gate: gate51.length, ix51 }));
 } catch (e) { console.log('  (v453 검사 생략 — ' + e.message + ')'); fails++; }
 // ── v454(원장 C086 — PM 11/13 11:13 '추천대로'): 특별교육 대상 범위를 현장 종류별로 — 석면 = 석면 특별교육(special) · 철거 = 해체 특별교육(special_demo) · 준설 = 판정 안 함('근거 확인 중') ──
@@ -11270,9 +11274,244 @@ try {
   const h55f = ft55.indexOf('\n### v455 (11/13) — 체크 10 품질 고리 3단계'), h55t = tl55.indexOf('\n## v455 — 체크 10 품질 고리 3단계');
   const left55 = [ft55, tl55].filter((s) => /3단계 — 품질 자동 학습\(원천\)[^\n]*판 번호는 합칠 때/.test(s)).length;
   T('v455 문서: FEATURES 기준 v455 (2026-11-13) · FEATURES·TESTLIST 3단계 절 제목에 v455(합칠 때 문구 0) · sw jw-shell-v455',
-    /기준: v455 \(2026-11-13\)\./.test(ft55) && h55f > 0 && h55t > 0 && left55 === 0 && /SHELL_CACHE = 'jw-shell-v455'/.test(sw55),
+    Number((ft55.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 455 && h55f > 0 && h55t > 0 && left55 === 0 && Number((sw55.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 455,
     JSON.stringify({ h55f, h55t, left55 }));
 } catch (e) { console.log('  (v455 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ---- v456(11/13 — 서버·저장 안전 수리 묶음 · 원장 C066·C079·C080·C082·T502·C107·C108·T427): 서버 동작은 servertest 86(결함 사본 포함). 여기는 앱 쪽 —
+//   ① 연속 409 멈춤(실행 — 실제 doSaveWorkers·doSaveAsb·doSaveEdu·doSaveFam + saveConflictStop·saveConflictToast): 409가 이어지면 저장 3번째에서 멈추고 알림 1번 · 409 뒤 다시 읽기 실패면 곧바로 다시 저장 안 함 · 409 한 번 뒤 200 = 저장 2번·알림 0
+//   ② fetch 대역(실행 — 실제 window.fetch 덮어쓰기): 같은 컬렉션 409 연달아 3번째 = 412 SAVE_CONFLICT_STOP·알림 1 · 200이면 셈 0 · documents는 GET 전 base 0(T502 — 지시 v421과 같은 꼴)·GET 뒤 그 base · 거절 이유 코드 넘김
+//   ③ 거래처 13자리 앱·서버 두 벌(cliBiz13 ↔ _lib/clibiz.js biz13) 같은 표본 같은 결과 · saveClients 400 CLI_BIZ13 = 지금 토스트로 안내
+//   ④ 문서: FEATURES 기준 v456 (2026-11-13)·v456 절 · TESTLIST v456(운영 확인 칸 '[ ] (AI 운영 확인' ≥ 1 — 'PM' 낱말 0 · 게이트 칸 [x] 8종) · CLAUDE.md 보안 줄 v456 · sw jw-shell-v456
+//   결함 심기: 고친 자리를 되돌린 사본(메모리 — 멈춤 줄 걷음·다시 읽기 실패 뒤 옛 다시 저장·documents base 줄 걷음·대역 멈춤 걷음)에서는 실패해야 한다.
+try {
+  const fn54 = (src, name) => { const i = src.indexOf('  function ' + name + '('); if (i < 0) throw new Error('함수 없음: ' + name); let d = 0, st = false; for (let j = i; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i, j + 1); } } throw new Error('중괄호 짝 안 맞음: ' + name); };
+  const once54 = (src, from, to) => { if (src.split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 50)); return src.replace(from, () => to); };
+  const tick54 = () => new Promise((r) => setTimeout(r, 0));
+  // ① 직접 저장 넷 — 시험 gwCall: 시나리오 함수가 응답을 정함(저장 12번 넘으면 599로 끊음 — 결함 사본의 끝없는 되풀이를 시험이 멈춤)
+  const SAVE54 = { workers: 'doSaveWorkers', asbestos: 'doSaveAsb', edu: 'doSaveEdu', family: 'doSaveFam' };
+  const run54 = async (src, col, scen) => {
+    const env = { saves: 0, gets: 0, toasts: [], scen };
+    const body = [
+      'var workers=[], wkLoaded=true, wkDirty={}, wkBase=1, wkSaveTimer=null, wkPending=true; function mergeWorkers(a,b){ return b; } function renderWorkers(){} function renderXgWorkers(){} function loadWorkers(){}',
+      'var asb=[], asbBase=1, asbPending=true; function canSee(){ return true; } function siteGapSigs(){ return null; } function mergeAsb(a,b){ return b; } function normAsbRow(){} function loadSiteEduGap(){}',
+      'var edu=[], eduLoaded=true, eduBase=1, eduPending=true; function mergeEdu(a,b){ return b; } var fam=[], famBase=1, famPending=true; function mergeFam(a,b){ return b; }',
+      'function gwToast(m){ ENV.toasts.push(String(m)); }',
+      'function gwCall(fn, b){ if (b.action === "save"){ ENV.saves++; if (ENV.saves > 12) return Promise.resolve({ status: 599, body: {} }); return Promise.resolve(ENV.scen("save", ENV.saves)); } ENV.gets++; return Promise.resolve(ENV.scen("get", ENV.gets)); }',
+      fn54(src, 'saveConflictToast'), fn54(src, 'saveConflictStop'), fn54(src, SAVE54[col]),
+      'return ' + SAVE54[col] + ';'].join('\n');
+    const f = new Function('ENV', body)(env);
+    f();
+    for (let i = 0; i < 60; i++) await tick54();
+    return { saves: env.saves, gets: env.gets, toasts: env.toasts.length, conflict: env.toasts.filter((t) => t.indexOf('저장 충돌 — 새로고침') === 0).length };
+  };
+  const GET200 = { status: 200, body: { doc: { schema: 1, items: [], updated_at: 5 } } };
+  const SC54 = {
+    s1: (k) => (k === 'save' ? { status: 409, body: {} } : GET200),   // 409가 끝없이
+    s2: (k) => (k === 'save' ? { status: 409, body: {} } : { status: 500, body: {} }),   // 409 뒤 다시 읽기 실패
+    s3: (k, n) => (k === 'save' ? (n === 1 ? { status: 409, body: {} } : { status: 200, body: { updated_at: 9 } }) : GET200),   // 409 한 번 뒤 200
+  };
+  const want54 = { s1: { saves: 3, gets: 2, toasts: 1, conflict: 1 }, s2: { saves: 1, gets: 1, toasts: 1, conflict: 1 }, s3: { saves: 2, gets: 1, toasts: 0, conflict: 0 } };
+  const chk54 = async (src) => { const out = {}; for (const col of Object.keys(SAVE54)) { out[col] = {}; for (const s of Object.keys(SC54)) out[col][s] = await run54(src, col, SC54[s]); } return out; };
+  const okOf54 = (res) => Object.keys(res).every((col) => Object.keys(want54).every((s) => JSON.stringify(res[col][s]) === JSON.stringify(want54[s])));
+  const r54 = await chk54(html);
+  // 결함 사본: (가) 멈춤 줄 걷음(네 함수 모두) (나) 다시 읽기 실패 뒤 옛 '곧바로 다시 저장'(네 함수 모두)
+  const mutA54 = html.replace(/        if\(saveConflictStop\(n\)\) return;[^\n]*\n/g, '');
+  const mutB54 = Object.keys(SAVE54).sort((a, b) => html.indexOf('function ' + SAVE54[a] + '(') - html.indexOf('function ' + SAVE54[b] + '(')).reduce((s, col) => s.replace(/          saveConflictToast\(\);   \/\/ v456\(C079\): 다시 읽기 실패면[^\n]*\n/, '          return ' + SAVE54[col] + '();\n'), html);
+  const cntA54 = (html.match(/        if\(saveConflictStop\(n\)\) return;/g) || []).length, cntB54 = (html.match(/          saveConflictToast\(\);   \/\/ v456\(C079\): 다시 읽기 실패면/g) || []).length;
+  const mA54 = await chk54(mutA54), mB54 = await chk54(mutB54);
+  const killA54 = Object.keys(SAVE54).every((col) => mA54[col].s1.saves > 3), killB54 = Object.keys(SAVE54).every((col) => mB54[col].s2.saves > 1);
+  T('v456 ① 연속 409 멈춤(실행 — 실제 doSaveWorkers·doSaveAsb·doSaveEdu·doSaveFam): 409가 이어지면 저장 3번·다시 읽기 2번에서 멈추고 "저장 충돌 — 새로고침" 알림 1번 · 409 뒤 다시 읽기 실패 = 저장 1번·다시 저장 없음·알림 1번 · 409 한 번 뒤 200 = 저장 2번·알림 0 · 네 함수 모두 · 결함 사본(멈춤 줄 걷음 = 저장 12번까지 · 다시 읽기 실패 뒤 옛 다시 저장 = 되풀이) ✗',
+    okOf54(r54) && cntA54 === 4 && cntB54 === 4 && killA54 && killB54, JSON.stringify({ r54, cntA54, cntB54, killA54, killB54 }));
+
+  // ② fetch 대역 — 실제 window.fetch 덮어쓰기 원문을 떼어 시험 gwCall에 붙임
+  const wrap54 = (src) => { const a = '  window.fetch = function(url, opts){'; const i = src.indexOf(a); if (i < 0) throw new Error('fetch 대역 없음'); let d = 0, st = false; for (let j = i; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i, j + 2); } } throw new Error('대역 짝'); };
+  const runW54 = async (src) => {
+    const env = { q: [], sent: [], toasts: [] };
+    const body = [
+      'var window = {}; var _colBase = {}, _col409 = {}, _col409t = {}, _COL409_MS = 30000;',   // v456 검토: 마지막 409 시각(30초 지나면 새로 셈 — 시간 검사는 ⑤)
+      'function _rawFetch(){ throw new Error("raw"); } function onSessionInvalid(){} function gwToast(m){ ENV.toasts.push(String(m)); }',
+      'function gwCall(fn, b){ ENV.sent.push({ a: b.action, c: b.collection, base: b.base, has: Object.prototype.hasOwnProperty.call(b, "base") }); var r = ENV.q.shift() || { status: 599, body: {} }; return Promise.resolve(r); }',
+      fn54(src, 'b64DecodeUnicode'), fn54(src, 'b64EncodeUnicode'), fn54(src, '_ghResp'), fn54(src, 'emptyDoc'), fn54(src, '_urlCollection'), fn54(src, 'saveConflictToast'), fn54(src, 'saveConflictStop'),
+      wrap54(src), 'return window.fetch;'].join('\n');
+    const g = { btoa: (s) => Buffer.from(s, 'binary').toString('base64'), atob: (s) => Buffer.from(s, 'base64').toString('binary') };
+    const F = new Function('ENV', 'btoa', 'atob', body)(env, g.btoa, g.atob);
+    const put = (col) => F('https://api.github.com/repos/x/contents/data/' + col + '.json', { method: 'PUT', body: JSON.stringify({ content: Buffer.from(JSON.stringify({ schema: 1, items: [] })).toString('base64') }) });
+    const get = (col) => F('https://api.github.com/repos/x/contents/data/' + col + '.json', {});
+    const out = {};
+    env.q.push({ status: 409, body: {} }, { status: 409, body: {} }, { status: 409, body: {} }, { status: 200, body: { updated_at: 3 } }, { status: 409, body: {} });
+    const s = []; for (let i = 0; i < 5; i++) { const r = await put('vehicles'); s.push(r.status + (r.status === 412 ? ':' + (await r.json()).error_code : '')); }
+    await tick54(); await tick54();
+    out.seq = s.join(','); out.toasts = env.toasts.filter((t) => t.indexOf('저장 충돌 — 새로고침') === 0).length;
+    env.sent.length = 0;
+    env.q.push({ status: 200, body: { updated_at: 10 } }); await put('documents');
+    env.q.push({ status: 200, body: { doc: { schema: 1, items: [], updated_at: 77 } } }); await get('documents');
+    env.q.push({ status: 200, body: { updated_at: 78 } }); await put('documents');
+    env.q.push({ status: 200, body: { updated_at: 11 } }); await put('tasks');
+    env.q.push({ status: 200, body: { updated_at: 12 } }); await put('licenses');
+    out.bases = env.sent.filter((x) => x.a === 'save').map((x) => x.c + ':' + (x.has ? String(x.base) : '-')).join(',');
+    env.q.push({ status: 400, body: { status: 'REJECTED', error_code: 'CLI_BIZ13', n: 1 } }); const r4 = await put('clients'); out.err = r4.status + ':' + (await r4.json()).error_code;
+    return out;
+  };
+  const w54 = await runW54(html);
+  // 첫 PUT documents는 GET 전이라 0(T502) · 그 뒤 GET이 준 77 · 첫 tasks도 0(v421) · licenses는 GET 전 undefined(종전 — 409 처리가 컬렉션마다 달라 일괄 적용 안 함)
+  const wOk54 = w54.seq === '409,409,412:SAVE_CONFLICT_STOP,200,409' && w54.toasts === 1 && w54.bases === 'documents:0,documents:77,tasks:0,licenses:undefined' && w54.err === '400:CLI_BIZ13';
+  const wMutA = await runW54(once54(html, '    if (col === "documents" && _colBase[col] === undefined) saveBase = 0;\n', ''));
+  const wMutB = await runW54(once54(html, '        if (saveConflictStop(n409)){ _col409[col] = 0; return _ghResp(412, { error_code: "SAVE_CONFLICT_STOP" }); }\n', ''));
+  T('v456 ② fetch 대역(실행 — 실제 window.fetch 덮어쓰기): 같은 컬렉션 저장 409 연달아 3번째 = 412 SAVE_CONFLICT_STOP·"저장 충돌 — 새로고침" 알림 1번 · 200이면 셈 0(다음 409는 다시 409) · documents는 GET 전 base 0(T502)·GET 뒤 77 · tasks GET 전 0(v421 그대로) · 그 밖 컬렉션 종전 · 거절 이유 코드 넘김(400 CLI_BIZ13) · 결함 사본(documents base 줄 걷음 = 비어 감 · 대역 멈춤 걷음 = 409 계속) ✗',
+    wOk54 && wMutA.bases !== w54.bases && wMutB.seq !== w54.seq, JSON.stringify({ w54, mutA: wMutA.bases, mutB: wMutB.seq }));
+
+  // ③ 거래처 13자리 두 벌(앱 cliBiz13 ↔ 서버 _lib/clibiz.js biz13) — 같은 표본 같은 결과 · saveClients 400 CLI_BIZ13 = 안내 토스트(CLI_BIZ13_MSG)
+  const req54 = createRequire(import.meta.url);
+  const CB54 = req54(join(ROOT, 'netlify', 'functions', '_lib', 'clibiz.js'));
+  const appBiz54 = new Function(fn54(html, 'cliBiz13') + '\nreturn cliBiz13;')();
+  const SMP54 = ['9001011234567', '900101-1234567', '900101 1234567', '９００１０１－１２３４５６７', '900101‐1234567', '900101‑1234567', '900101‒1234567', '900101–1234567', '900101—1234567', '900101―1234567', '900101−1234567', '900101ㅡ1234567',
+    '900101-1******', '123-45-67890', '1234567890', '123-45-67890, 234-56-78901', '123-45-67890 234-56-78901', '12345678901234', '', null, undefined, ' 1111111111111 ', '111111111111', 'abc'];
+  const diff54 = SMP54.filter((s) => appBiz54(s) !== CB54.biz13(s)).length, hits54 = SMP54.filter((s) => CB54.biz13(s)).length;
+  const sc54 = fn54(html, 'saveClients'), msg54 = (html.match(/  var CLI_BIZ13_MSG = "[^"\n]*";/) || [''])[0];
+  const runC54 = async (st, code) => { const env = { toasts: [] }; const f = new Function('ENV', [msg54, 'var cliLoaded = true, cliDirty = { c1: 1 }, clients = [{ id: "c1" }], cliSha = null, CLIENT_API = "x";',
+    'function getToken(){ return "t"; } function ghHeaders(){ return {}; } function b64EncodeUnicode(s){ return s; } function cliSaveConflict(){ ENV.toasts.push("conflict"); } function gwToast(m){ ENV.toasts.push(String(m)); }',
+    'function fetch(){ return Promise.resolve({ status: ' + st + ', ok: ' + (st === 200) + ', json: function(){ return Promise.resolve({ error_code: "' + code + '", content: { sha: "gw" } }); } }); }', sc54, 'return saveClients;'].join('\n'))(env);
+    f(); for (let i = 0; i < 5; i++) await tick54(); return env.toasts; };
+  const c54a = await runC54(400, 'CLI_BIZ13'), c54b = await runC54(400, 'OTHER'), c54c = await runC54(200, '');
+  const msgOk54 = msg54.length > 30 && c54a.length === 1 && c54a[0].indexOf(JSON.parse(msg54.slice(msg54.indexOf('"'), msg54.lastIndexOf('"') + 1))) === 0 && c54b.length === 0 && c54c.length === 0;
+  T('v456 ③ 거래처 13자리 두 벌: 앱 cliBiz13 = 서버 _lib/clibiz.js biz13(표본 ' + SMP54.length + ' — 전각·줄표 9종·ㅡ·띄어쓰기·가린 번호·10자리·쉼표 둘·14자리·빈 값 · 다름 0 · 잡힘 ≥ 12) · saveClients 400 CLI_BIZ13 = 안내 토스트 1(CLI_BIZ13_MSG) · 다른 400·200 = 토스트 0',
+    diff54 === 0 && hits54 >= 12 && msgOk54, JSON.stringify({ diff54, hits54, c54a: c54a.length, c54b, c54c }));
+
+  // ---- v456 검토 반영(11/13) — ⑤ 대역 409 셈 = 저장 줄기 단위 ⑥ 현장 창 새 일용직 → 바로 넣기(ORPHAN_WORKER 경합) ⑦ 13자리 두 벌의 점·빗금·밑줄·폭 없는 문자 ----
+  // ⑤ fetch 대역(실행 — 시계 대역): 409 두 번 → 30초 넘게 지나 409 = 다시 409(새 줄기) → 409 → 3번째 412 · 409 두 번 → 403(쓰기 거절) → 409 = 409(셈 비움) · 결함 사본(시간 창 걷음·403 비움 걷음) ✗
+  const runT54 = async (src, plan) => {
+    const env = { q: [], toasts: [], t: 0 };
+    const body = [
+      'var window = {}; var _colBase = {}, _col409 = {}, _col409t = {}, _COL409_MS = 30000;',
+      'function _rawFetch(){ throw new Error("raw"); } function onSessionInvalid(){} function gwToast(m){ ENV.toasts.push(String(m)); }',
+      'function gwCall(fn, b){ var r = ENV.q.shift() || { status: 599, body: {} }; return Promise.resolve(r); }',
+      fn54(src, 'b64DecodeUnicode'), fn54(src, 'b64EncodeUnicode'), fn54(src, '_ghResp'), fn54(src, 'emptyDoc'), fn54(src, '_urlCollection'), fn54(src, 'saveConflictToast'), fn54(src, 'saveConflictStop'),
+      wrap54(src), 'return window.fetch;'].join('\n');
+    const F = new Function('ENV', 'btoa', 'atob', 'Date', body)(env, (s) => Buffer.from(s, 'binary').toString('base64'), (s) => Buffer.from(s, 'base64').toString('binary'), { now: () => env.t });
+    const put = () => F('https://api.github.com/repos/x/contents/data/vehicles.json', { method: 'PUT', body: JSON.stringify({ content: Buffer.from(JSON.stringify({ schema: 1, items: [] })).toString('base64') }) });
+    const s = [];
+    for (const [t, st] of plan) { env.t = t; env.q.push({ status: st, body: {} }); const r = await put(); s.push(r.status + (r.status === 412 ? ':' + (await r.json()).error_code : '') + (r.status === 200 && (await r.json()).write_denied ? ':wd' : '')); }
+    return s.join(',');
+  };
+  const PLAN54a = [[0, 409], [1000, 409], [40000, 409], [41000, 409], [42000, 409]], PLAN54b = [[0, 409], [1000, 409], [2000, 403], [3000, 409]];
+  const t54 = [await runT54(html, PLAN54a), await runT54(html, PLAN54b)];
+  const T_WIN54 = '        var n409 = (Date.now() - (_col409t[col] || 0) < _COL409_MS) ? (_col409[col] || 0) : 0;', T_403_54 = '      if (res.status === 403){ _col409[col] = 0; return';
+  const tM54 = [await runT54(once54(html, T_WIN54, '        var n409 = _col409[col] || 0;'), PLAN54a), await runT54(once54(html, T_403_54, '      if (res.status === 403){ return'), PLAN54b)];
+  T('v456 ⑤ 검토 — fetch 대역 연속 409 셈은 저장 줄기 단위(실행 — 시계 대역): 409·409 → 39초 뒤 409 = 409(새로 셈)·409·3번째 412 SAVE_CONFLICT_STOP · 409·409 → 403(쓰기 거절 = 셈 비움) → 409 = 409 · 결함 사본(30초 창 걷음 = 412 · 403 비움 걷음 = 412) ✗',
+    t54[0] === '409,409,409,409,412:SAVE_CONFLICT_STOP' && t54[1] === '409,409,200:wd,409' && tM54[0] !== t54[0] && tM54[1] !== t54[1], JSON.stringify({ t54, tM54 }));
+
+  // ⑥ 현장 창 [+ 새 일용직] → [이 현장에 넣기](실행 — 실제 scheduleWorkersSave·doSaveWorkers·mergeWorkers·scheduleAsbSave·asbWkFlush·asbSaveFire·doSaveAsb, 시험 서버 = 명부 id 집합·대장 고아 판정 C082 ②):
+  //   s1 명부 저장이 잡힌 채(타이머) 대장 저장이 먼저 불림 = 명부 저장 먼저 보냄 → 대장 200(요청 순서 workers,asbestos · 400 0 · 알림 0 · 명부 타이머는 지워져 두 번 안 보냄)
+  //   s2 명부 저장이 보내는 중(응답 대기) = 대장 400 → 명부 저장을 끝낸 뒤 한 번만 다시 보내 200(대장 저장 2 · 알림 0) · s3 명부 저장이 실패(500) = 대장 400 두 번 뒤 알림 1(되풀이 없음 · 새로고침 안내 없음)
+  //   결함 사본: 대장 타이머가 doSaveAsb를 바로 부름(원천 걷음 = s1 첫 요청 asbestos) · 400 다시 보내기 걷음(s2 알림 1) ✗
+  //   v456 2차 검토: 시험 서버가 고아 id 목록(ids)을 돌려준다(gw-data와 같은 꼴) · 대장 줄 펴기·고아 빼기(asList·asbOrphDrop)를 함께 싣는다 · s4 = 명부 저장이 사라진 기기(아래 ⑨)
+  const runO54 = async (src, mode) => {
+    const env = { log: [], toasts: [], timers: [], S: { wk: new Set(['w0']), wkAt: 1, asbAt: 1, hold: mode === 's2', held: null, fail: mode === 's3' } };
+    const lost = mode === 's4';   // 로그인 창 '전환'이 명부 저장 대기를 버린 뒤(명부 = 서버 것 · wN은 대장 메모리에만) 다른 줄 저장
+    const body = [
+      lost ? 'var workers=[{id:"w0"}], wkLoaded=true, wkDirty={}, wkBase=1, wkSaveTimer=null, wkPending=false; function renderWorkers(){} function renderXgWorkers(){} function loadWorkers(){}'
+        : 'var workers=[{id:"w0"},{id:"wN"}], wkLoaded=true, wkDirty={wN:1}, wkBase=1, wkSaveTimer=null, wkPending=false; function renderWorkers(){} function renderXgWorkers(){} function loadWorkers(){}',
+      'var asb=[{id:"a1",worker_ids:["w0","wN"]}' + (lost ? ',{id:"a2",worker_ids:["w0"],memo:"고침"}' : '') + '], asbBase=1, asbPending=false, asbSaveTimer=null; function canSee(){ return true; } function siteGapSigs(){ return null; } function mergeAsb(a,b){ return a; } function normAsbRow(){} function loadSiteEduGap(){}',
+      'function gwToast(m){ ENV.toasts.push(String(m)); }',
+      'function setTimeout(fn){ ENV.timers.push({ fn: fn, off: false }); return ENV.timers.length; } function clearTimeout(id){ if (id && ENV.timers[id - 1]) ENV.timers[id - 1].off = true; }',
+      'function gwCall(fn, b){ return ENV.call(b); }',
+      fn54(src, 'asList'), fn54(src, 'saveConflictToast'), fn54(src, 'saveConflictStop'), fn54(src, 'mergeWorkers'), fn54(src, 'doSaveWorkers'), fn54(src, 'scheduleWorkersSave'),
+      (src.match(/\n  var asbOrphTry = 0;\n/) || ['var asbOrphTry = 0;'])[0], fn54(src, 'scheduleAsbSave'), fn54(src, 'asbWkFlush'), fn54(src, 'asbSaveFire'), fn54(src, 'asbOrphDrop'), fn54(src, 'doSaveAsb'),
+      'return { schedW: scheduleWorkersSave, schedA: scheduleAsbSave, st: function(){ return { asbPending: asbPending, wkPending: wkPending, a1: asList(asb[0].worker_ids).join(",") }; } };'].join('\n');
+    const S = env.S;
+    env.call = (b) => {
+      if (b.collection === 'workers' && b.action === 'get') return Promise.resolve({ status: 200, body: { doc: { schema: 1, items: [...S.wk].map((id) => ({ id })), updated_at: S.wkAt } } });
+      if (b.collection === 'workers') {
+        env.log.push('workers');
+        const apply = () => { if (S.fail) return { status: 500, body: {} }; if (b.base !== S.wkAt) return { status: 409, body: {} }; b.doc.items.forEach((w) => S.wk.add(w.id)); S.wkAt++; return { status: 200, body: { updated_at: S.wkAt } }; };
+        if (S.hold && !S.held) return new Promise((r) => { S.held = () => r(apply()); });
+        return Promise.resolve(apply());
+      }
+      env.log.push('asbestos');
+      const ids = [].concat(...b.doc.items.map((r) => r.worker_ids || []));
+      const orphIds = [...new Set(ids.filter((id) => !S.wk.has(id)))];
+      if (orphIds.length) return Promise.resolve({ status: 400, body: { status: 'REJECTED', error_code: 'ORPHAN_WORKER', n: orphIds.length, ids: orphIds } });
+      return Promise.resolve({ status: 200, body: { updated_at: ++S.asbAt } });
+    };
+    const api = new Function('ENV', body)(env);
+    const drain = async () => { for (let i = 0; i < 80; i++) await tick54(); };
+    const fire = async (i) => { const t = env.timers[i]; if (t && !t.off) { t.off = true; t.fn(); } await drain(); };
+    if (lost) { api.schedA(); await fire(0); }   // s4: 명부 저장 대기 없음 — a2 줄만 고쳐 대장 저장
+    else {
+      api.schedW(); api.schedA();   // [+ 새 일용직] → [이 현장에 넣기]
+      if (mode === 's1') { await fire(1); await fire(0); }   // 대장 타이머가 먼저(명부 타이머는 그 사이 다시 잡힘 등)
+      else { await fire(0); await fire(1); if (S.held) { S.held(); await drain(); } }   // 명부 저장이 먼저 나갔으나 응답 전(s2) · 실패(s3)
+    }
+    const orph = env.toasts.filter((t) => t.indexOf('현장 대장을 저장하지 못했습니다') === 0);
+    const dropT = env.toasts.filter((t) => /^1명은 일용직 명부에 없어 현장 대장에서 뺐습니다/.test(t));
+    return { log: env.log.join(','), asbSaves: env.log.filter((x) => x === 'asbestos').length, toasts: env.toasts.length, orph: orph.length, drop: dropT.length, refresh: orph.some((t) => /새로고침/.test(t)), st: api.st() };
+  };
+  const o54 = { s1: await runO54(html, 's1'), s2: await runO54(html, 's2'), s3: await runO54(html, 's3') };
+  const oOk54 = o54.s1.log === 'workers,asbestos' && o54.s1.toasts === 0 && o54.s1.st.asbPending === false && o54.s1.st.wkPending === false
+    && o54.s2.asbSaves === 2 && o54.s2.toasts === 0 && o54.s2.st.asbPending === false && o54.s2.log.indexOf('asbestos') > 0
+    && o54.s3.asbSaves === 2 && o54.s3.orph === 1 && o54.s3.toasts === 1 && !o54.s3.refresh && o54.s3.st.asbPending === true;
+  const oM54 = [await runO54(once54(html, 'asbSaveTimer=setTimeout(asbSaveFire,1200);', 'asbSaveTimer=setTimeout(doSaveAsb,1200);'), 's1'),
+    await runO54(html.replace(/        if\(!asbOrphTry\)\{ asbOrphTry=1; return [^\n]*\n/, ''), 's2')];
+  T('v456 ⑥ 검토 — 현장 창 새 일용직 → 바로 넣기(실행 — 실제 명부·대장 저장 함수 + 시험 서버 고아 판정): 명부 저장이 잡힌 채 대장 저장 = 명부 먼저(workers,asbestos)·400 0·알림 0 · 명부 저장 응답 전 = 대장 400 → 명부 저장 끝낸 뒤 한 번 다시 = 200·알림 0 · 명부 저장 실패 = 대장 2번 뒤 알림 1(새로고침 안내 없음·대기 남김) · 결함 사본(원천 걷음 = 대장 먼저 · 다시 보내기 걷음 = 알림) ✗',
+    oOk54 && oM54[0].log.indexOf('asbestos') === 0 && (oM54[1].orph === 1 || oM54[1].asbSaves !== 2), JSON.stringify({ o54, oM54: oM54.map((x) => [x.log, x.orph]) }));
+
+  // ⑦ 13자리 두 벌 — 점·빗금·밑줄·폭 없는 문자로 나눈 꼴도 잡힘(앱 = 서버) · 쉼표로 나눈 사업자번호 둘은 통과 · 결함 사본(서버·앱 각각 옛 규칙) = 두 벌이 갈림 ✗
+  const SEP54 = ['900101.1234567', '900101/1234567', '900101_1234567', '900101​1234567', '900101⁠-1234567', '900101‌‍1234567'];
+  const sepOk54 = SEP54.every((s) => CB54.biz13(s) && appBiz54(s)) && !CB54.biz13('123-45-67890, 234-56-78901') && !appBiz54('123-45-67890, 234-56-78901') && !CB54.biz13('123.45.67890') && !appBiz54('123.45.67890');
+  const cbSrc54 = readFileSync(join(ROOT, 'netlify', 'functions', '_lib', 'clibiz.js'), 'utf8');
+  //   v456 2차 검토: 두 벌이 '쉼표·빗금 조각마다 13자리 + 6·7자리 꼴'로 바뀜 → 옛 규칙(v441 — 띄어쓰기·줄표만 뺌) 사본 = 폭 없는 문자 지우기 걷음 + 조각 문자 묶음에서 점·밑줄·가운뎃점 걷음 + 6·7자리 꼴 걷음(같은 강도)
+  const muts54 = (src, pairs) => pairs.reduce((s, [a, b]) => once54(s, a, b), src);
+  //   (폭 없는 문자·가운뎃점은 두 벌 소스에 글자째 — 자리는 fromCharCode로 만든다)
+  const ZW54 = String.fromCharCode(0x200B) + '-' + String.fromCharCode(0x200D, 0x2060), MD54 = '._' + String.fromCharCode(0xB7, 0x30FB, 0x2219, 0x2022);
+  const cbOld54 = new Function('module', muts54(cbSrc54, [["\n    .replace(/[" + ZW54 + "]/g, '');", '\n    ;'], [MD54 + "]/g, '')); }))", "]/g, '')); }))"], ['  return /(^|\\D)\\d{6}', '  return false && /(^|\\D)\\d{6}']]) + '\nreturn module.exports;')({ exports: {} });
+  const appOld54 = new Function(muts54(fn54(html, 'cliBiz13'), [['.replace(/[' + ZW54 + ']/g, "");', ';'], [MD54 + ']/g, "")); }))', ']/g, "")); }))'], ['    return /(^|\\D)\\d{6}', '    return false && /(^|\\D)\\d{6}']]) + '\nreturn cliBiz13;')();
+  T('v456 ⑦ 검토 — 거래처 13자리 두 벌: 점·빗금·밑줄·폭 없는 문자(U+200B~D·U+2060)로 나눈 13자리 ' + SEP54.length + '꼴 = 앱·서버 모두 잡힘 · 쉼표로 나눈 사업자번호 둘·점 구분 10자리 = 통과 · 결함 사본(서버 옛 규칙·앱 옛 규칙) = 새는 꼴 있음 ✗',
+    sepOk54 && SEP54.some((s) => !cbOld54.biz13(s)) && SEP54.some((s) => !appOld54(s)), JSON.stringify({ sepOk54, oldS: SEP54.filter((s) => !cbOld54.biz13(s)).length, oldA: SEP54.filter((s) => !appOld54(s)).length }));
+
+  // ---- v456 2차 검토(11/13) — ⑧ 명부 저장이 사라진 기기의 현장 대장 저장 ⑨ 13자리 두 벌: 빗금으로 나눈 사업자번호 둘 = 통과 · 가운뎃점 ----
+  // ⑧ s4(실행 — 위 ⑥ 하네스): 명부 = 서버 것(wN 없음·저장 대기 없음)인데 대장 메모리 a1에 wN이 남은 채 a2 줄만 고쳐 저장 = 400 → (대기 없음) 다시 400 → 서버가 돌려준 고아 id wN만 빼고 저장 200
+  //   (대장 저장 3·"1명은 … 뺐습니다" 알림 1·옛 "저장하지 못했습니다" 알림 0·대기 풀림·a1 = w0) · s3(명부 저장 실패 — 대기로 남은 사람)은 빼지 않음(a1 = w0,wN · 옛 알림 1)
+  //   결함 사본: 고아 빼기 줄 걷음(s4 = 옛 알림·대기 남음 — 지적의 '계속 막힘') · 명부 저장 대기 가드 걷음(s3 = 대기 중인 사람까지 뺌) ✗
+  const s4_54 = await runO54(html, 's4'), s3b54 = o54.s3;
+  const oDropLine54 = (html.match(/\n        if\(asbOrphTry===1\)\{ var gone=asbOrphDrop\(res\.body\.ids\);[^\n]*/) || [''])[0];
+  const s4M54 = await runO54(oDropLine54 ? html.replace(oDropLine54, () => '') : html + '\n__no_line__', 's4');
+  const s3M54 = await runO54(once54(html, 'for(var i=0;i<workers.length;i++){ if(wkPending && workers[i].id===id && workers[i].del!==1) return; } drop[id] = 1;', 'drop[id] = 1;'), 's3');
+  T('v456 ⑧ 2차 검토 — 명부 저장이 사라진 기기(로그인 창 전환·명부 저장 403)의 현장 대장 저장(실행 — 실제 doSaveAsb·asbOrphDrop + 시험 서버 고아 id 목록): 다른 줄 저장 = 400 → 다시 400 → 고아 id만 빼고 200(대장 저장 3·뺌 알림 1·막힘 알림 0·대기 풀림·그 줄 = w0) · 명부 저장 실패로 대기 중인 사람 = 빼지 않음 · 결함 사본(빼기 걷음 = 계속 막힘 · 대기 가드 걷음 = 대기 중인 사람 뺌) ✗',
+    !!oDropLine54 && s4_54.asbSaves === 3 && s4_54.drop === 1 && s4_54.orph === 0 && s4_54.st.asbPending === false && s4_54.st.a1 === 'w0'
+    && s3b54.st.a1 === 'w0,wN' && s3b54.drop === 0 && s4M54.orph === 1 && s4M54.st.asbPending === true && s3M54.st.a1 === 'w0',
+    JSON.stringify({ s4: s4_54, s3a1: s3b54.st.a1, s4M: [s4M54.orph, s4M54.st.asbPending], s3M: s3M54.st.a1 }));
+  // ⑨ 13자리 두 벌 — 빗금·점으로 나눈 사업자번호 둘 = 통과(1차 검토가 점·빗금을 글 전체에서 지워 20자리로 이어 막던 것) · 6·7자리 꼴은 빗금·가운뎃점을 건너도 잡힘 · 앱 = 서버
+  //   결함 사본: 빗금 나눔 걷음(빗금을 지우고 이음 = 사업자번호 둘 막힘) · 6·7자리 꼴 걷음(빗금으로 나눈 주민번호 샘) — 서버·앱 각각 ✗
+  const BIZ2_54 = [['123-45-67890/234-56-78901', false], ['123-45-67890 / 234-56-78901', false], ['1234567890/2345678901', false], ['123.45.67890/234.56.78901', false], ['123.45.67890', false], ['123-45-67890, 234-56-78901', false],
+    ['900101/1234567', true], ['900101 / 1234567', true], ['90.01.01-1234567', true], ['900101' + String.fromCharCode(0xB7) + '1234567', true], ['900101 ' + String.fromCharCode(0x30FB) + ' 1234567', true], ['1234567890 2345678901', true]];
+  const biz2Ok54 = (fS, fA) => BIZ2_54.filter(([s, w]) => fS(s) !== w || fA(s) !== w).length;
+  const cbM54 = (pairs) => new Function('module', muts54(cbSrc54, pairs) + '\nreturn module.exports;')({ exports: {} }).biz13;
+  const apM54 = (pairs) => new Function(muts54(fn54(html, 'cliBiz13'), pairs) + '\nreturn cliBiz13;')();
+  const b2 = biz2Ok54(CB54.biz13, appBiz54);
+  const b2M = [biz2Ok54(cbM54([['t.split(/[,\\/]/)', "t.replace(/\\//g, '').split(/[,]/)"]]), appBiz54), biz2Ok54(cbM54([['  return /(^|\\D)\\d{6}', '  return false && /(^|\\D)\\d{6}']]), appBiz54),
+    biz2Ok54(CB54.biz13, apM54([['t.split(/[,\\/]/)', 't.replace(/\\//g, "").split(/[,]/)']])), biz2Ok54(CB54.biz13, apM54([['    return /(^|\\D)\\d{6}', '    return false && /(^|\\D)\\d{6}']]))];
+  T('v456 ⑨ 2차 검토 — 거래처 13자리 두 벌: 빗금·점으로 나눈 사업자번호 둘·쉼표 둘·점 구분 10자리 = 통과 · 빗금·띄어 쓴 빗금·가운뎃점(· ・)으로 나눈 주민번호·점 생년월일 + 줄표·띄어쓰기로 이은 사업자번호 둘 = 잡힘 · 앱 = 서버(' + BIZ2_54.length + '표본 어긋남 0) · 결함 사본(서버·앱 각각 빗금 나눔 걷음·6·7자리 꼴 걷음) ✗',
+    b2 === 0 && b2M.every((x) => x > 0), JSON.stringify({ b2, b2M }));
+
+  // ④ 문서
+  const rd54 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const ft54 = rd54('FEATURES.md'), tl54 = rd54('TESTLIST.md'), cl54 = rd54('CLAUDE.md'), sw54 = rd54('sw.js');
+  const ftv54 = (() => { const i = ft54.indexOf('\n### v456 (11/13) — 서버·저장 안전'); if (i < 0) return ''; const j = ft54.indexOf('\n### ', i + 5); return ft54.slice(i, j < 0 ? ft54.length : j); })();
+  const tlv54 = (() => { const i = tl54.indexOf('\n## v456 — 서버·저장 안전'); if (i < 0) return ''; const j = tl54.indexOf('\n## ', i + 5); return tl54.slice(i, j < 0 ? tl54.length : j); })();
+  const cb54 = tlv54.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), ops54 = cb54.filter((l) => /^- \[ \] \(AI 운영 확인/.test(l)), gate54 = cb54.filter((l) => /^- \[x\] \(AI\) `/.test(l));
+  const FT54 = ['C066', 'C079', 'C080', 'C082', 'T502', 'C107', 'C108', 'T427', '`BODY_TOO_LARGE`', '`ZIP_ENTRY_MAX`', '`PII_OWN_TEL`', '`STALE_BASE`', '`saveConflictStop`', '`SAVE_CONFLICT_STOP`', '`CLI_BIZ13`', '`_lib/clibiz.js`',
+    '`ORPHAN_WORKER`', '`WORKERS_READ_FAILED`', '`wkExamSee`', '`BOT_KEY_ONLY`', '`_lib/keymatch.js`', '`blank_both`', 'servertest 86', 'uismoke v456', '헤드리스 재현', '새 화면 없음', '운영 데이터 변경 없음', '9/1 수용 위험 3종',
+    '`XLSX_CELLS_MAX`', '`TOO_MANY_CELLS`', '`asbOrphDrop`', 'servertest 88', '오프라인'];   // v456 2차 검토: 칸 상한·고아 빼기·88절·알려진 한계(대역 412 뒤 오프라인 표시)
+  const CL54 = ['**저장 안전(v456', '`BOT_KEY_ONLY`', '`saveConflictStop`', '`CLI_BIZ13`', '`ORPHAN_WORKER`', '`wkExamSee`', '`_lib/keymatch.js`', '`PII_OWN_TEL`',
+    '`zipBudget`', '`GAP_VER`', '`asbSaveFire`', '`piiNorm`', '`XLSX_CELLS_MAX`', 'inflateRawSync 직접 호출 금지'];   // v456 2차 검토: 규칙 줄이 고친 불변식을 적는지(총량 예산·식 판·대장 저장 순서·정규화·칸 상한)
+  const GATE54 = ['uismoke', 'consheet_check', 'proctpl_check', 'settletest', 'servertest', 'rectest', 'promoqual_check', 'promogen_check'];
+  const mF54 = FT54.filter((s) => ftv54.indexOf(s) < 0), mC54 = CL54.filter((s) => cl54.indexOf(s) < 0);
+  T('v456 ④ 문서: FEATURES 기준 v456 (2026-11-13)·v456 절(원장 8건·코드 이름·검사 이름) · TESTLIST v456 운영 확인 칸 "[ ] (AI 운영 확인" ≥ 1("PM" 낱말 0)·게이트 칸 [x] 8종 · CLAUDE.md 저장 안전 줄 · CLAUDE.md 보안 줄 "그 밖 키 … 종전대로" 0 · sw jw-shell-v456',
+    /기준: v456 \(2026-11-13\)\./.test(ft54) && ftv54.length > 0 && mF54.length === 0 && tlv54.length > 0 && ops54.length >= 1 && !ops54.some((l) => /PM/.test(l)) && GATE54.every((g) => gate54.some((l) => l.indexOf('`' + g + '`') > 0))
+    && mC54.length === 0 && cl54.indexOf('그 밖 키(allbaro:xlsx·tpl·proof·col 등)는 종전대로') < 0 && /SHELL_CACHE = 'jw-shell-v456'/.test(sw54),
+    JSON.stringify({ mF54, mC54, ops: ops54.length, gate: gate54.length }));
+} catch (e) { console.log('  (v456 검사 생략 — ' + e.message + ')'); fails++; }
 
 try {
   // 원장 T421(11/13): 옛 블록의 sw 판 번호 검사는 숫자 비교(>= 그 판) — '…|4\\d\\d)' 꼴 정규식은 v500에서 한꺼번에 실패하므로 다시 쓰지 않는다(판마다 옛 블록을 손보던 구조 해소)

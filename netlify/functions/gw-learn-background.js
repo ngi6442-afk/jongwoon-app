@@ -106,7 +106,7 @@ exports.handler = async function (event, context) {
     out.rules = out.rules.filter(function (r) { const s2 = String((r && r.text) || '') + ' ' + String((r && r.value) || ''); return LN.piiScan(s2).ok && CL.scrubPayload(s2, forbidden).ok && (!r.field || allow.map(function (a) { return String(a).toUpperCase(); }).indexOf(String(r.field).toUpperCase()) >= 0 || r.scope !== 'field_default'); });
     if (!LN.piiScan(String(out.summary || '')).ok) out.summary = '';
     const gap = pair.gap || {};
-    const merged = LN.mergeLessons(lessons, out, { rec_id: pair.cid, pair_id: pairId, ex_key: pair.tpl, ex_title: '', ex_excerpt: '', now: Date.now(), tokens: tokens, gap: { ratio: typeof gap.cell_ratio === 'number' ? gap.cell_ratio : null }, summary: out.summary, extra: { score: gap.score === undefined ? null : gap.score, kind: pair.kind || '', changed: rows.hidden_changed.length + rows.rows.filter(function (r) { return !r.same; }).length } }, T.scopes);
+    const merged = LN.mergeLessons(lessons, out, { rec_id: pair.cid, pair_id: pairId, ex_key: pair.tpl, ex_title: '', ex_excerpt: '', now: Date.now(), tokens: tokens, gap: { ratio: typeof gap.cell_ratio === 'number' ? gap.cell_ratio : null }, summary: out.summary, extra: { score: gap.score === undefined ? null : gap.score, kind: pair.kind || '', gv: (pair.diff && typeof pair.diff.blank_both === 'number') ? LN.GAP_VER : 1,   /* v456 검토(T427): 새 식 짝(diff에 blank_both)만 식 판 2 — 옛 짝은 1(기준선·일몰에서 빠짐) */ changed: rows.hidden_changed.length + rows.rows.filter(function (r) { return !r.same; }).length } }, T.scopes);
     LN.freezeBaseline(merged, Date.now());   // v412
     const w = await blobSet(st, lk, merged);
     if (!w.ok) { await finish('fail', w.code || 'LESSONS_WRITE_FAILED'); return; }

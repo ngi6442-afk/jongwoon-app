@@ -2071,6 +2071,9 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
 // (렌더가 던지지 않는지 자체는 uismoke 37에서 실제 소스를 뽑아 실행해 검증한다.)
 {
   const seedAsb = (items, at) => { mem.gw_data['col:asbestos'] = { schema: 1, items, updated_at: at }; };
+  // v456(C082 ②): 현장 대장 저장은 새로 들어온 worker_ids가 명부(col:workers)에 있어야 한다 — 이 절이 쓰는 w1을 명부에 둔다(명부 없는 고아 id 거절은 절 86)
+  const had38w = Object.prototype.hasOwnProperty.call(mem.gw_data, 'col:workers') ? mem.gw_data['col:workers'] : undefined;
+  mem.gw_data['col:workers'] = { schema: 1, items: [{ id: 'w1', name: '일용38' }], updated_at: 38 };
 
   // ① 사고 당시 모양 그대로 저장 → 서버는 손대지 않고 그대로 돌려준다(= 프런트가 반드시 교정해야 하는 이유)
   seedAsb([], 100);
@@ -2155,6 +2158,7 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   mem.gw_data['col:asbestos'] = asbBefore6;   // 원복(버전 링 스냅샷 ver:asbestos:*는 이 절 뒤에서 쓰지 않는다)
 
   delete mem.gw_data['col:asbestos'];
+  if (had38w === undefined) delete mem.gw_data['col:workers']; else mem.gw_data['col:workers'] = had38w;   // v456 명부 시드 원복
 }
 
 // ===== 39. 새 노선 추가 v351(PM 9/11 "R40 추가 및 드롭다운 가장 상단에 새 노선으로 추가 버튼") — 기본표 R40 · blob allbaro:routes_extra → 예비 행 40~49 ·
@@ -3718,15 +3722,16 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   const FINAL = xlsx('<c r="C7" t="s"><v>0</v></c><c r="C10" t="inlineStr"><is><t xml:space="preserve">포항 현장 </t></is></c><c r="E34"><v>12.5</v></c><c r="H10"><f>SUM(A1)</f><v>3</v></c><c r="C11" t="inlineStr"><is><t>a</t></is></c><c r="C12" t="inlineStr"><is><t>b</t></is></c><c r="A34" t="inlineStr"><is><t>다른 현장</t></is></c>', 'C11:D12', '<sst><si><t>시험 공사</t></si></sst>');
   const EDITS = [['C7', '시험 공사', 's'], ['C10', '포항 현장', 's'], ['E34', 12.5, 'n'], ['H10', '', 'b'], ['C12', '', 'b'], ['H8', '', 'b'], ['A34', '포항 현장', 's'], ['C7', '중복', 's']];
   const dx = DD.xlsxCellDiff(EDITS, FINAL);
-  T('59 docdiff xlsx 셀: 공유문자열·inlineStr·숫자·빈칸 비교(공백 정규화) · 수식·병합 비앵커=비교 불가 2 · 바뀐 셀 1(A34) · 중복 좌표 1회 · 값은 반환에 없음',
-    dx.ok && dx.compared === 5 && dx.changed === 1 && dx.uncomparable === 2 && dx.refs_changed.join() === 'A34' && dx.refs_uncomparable.sort().join() === 'C12,H10' && dx.ratio === 0.2 && JSON.stringify(dx).indexOf('포항') < 0 && JSON.stringify(dx).indexOf('시험 공사') < 0, JSON.stringify(dx));
+  // v456(T427): 초안 빈칸('b')·최종본 빈칸인 H8은 분모에서 뺀다(blank_both 1) — 종전 compared 5·ratio 0.2
+  T('59 docdiff xlsx 셀: 공유문자열·inlineStr·숫자·빈칸 비교(공백 정규화) · 수식·병합 비앵커=비교 불가 2 · 바뀐 셀 1(A34) · 빈칸↔빈칸 1(H8)은 분모 밖(v456 T427) · 중복 좌표 1회 · 값은 반환에 없음',
+    dx.ok && dx.compared === 4 && dx.changed === 1 && dx.uncomparable === 2 && dx.blank_both === 1 && dx.refs_changed.join() === 'A34' && dx.refs_uncomparable.sort().join() === 'C12,H10' && dx.ratio === 0.25 && JSON.stringify(dx).indexOf('포항') < 0 && JSON.stringify(dx).indexOf('시험 공사') < 0, JSON.stringify(dx));
   const docx = (paras) => mkZip([['[Content_Types].xml', '<Types/>'], ['word/document.xml', '<w:document><w:body>' + paras.map((p) => '<w:p><w:r><w:t>' + p + '</w:t></w:r></w:p>').join('') + '</w:body></w:document>']]);
   const dd = DD.docxParaDiff(docx(['제1조 목적', '제2조 기간', '제3조 금액']), docx(['제1조 목적', '제2조 공사 기간', '제3조 금액', '제4조 특약']));
   T('59 docdiff docx 문단: LCS 같은 문단 2 · 삭제 1 · 추가 2 · 본문 미반출', dd.ok && dd.same === 2 && dd.removed === 1 && dd.added === 2 && JSON.stringify(dd).indexOf('제1조') < 0, JSON.stringify(dd));
   const ld = DD.listDiff(['착공계', '예정공정표', '현장대리인계'], [{ t: '착공계' }, { t: '예정공정표', skip: true }, { t: '안전관리계획서' }]);
   const gs = DD.gapScore(dx, ld, 1), gnull = DD.gapScore({ ok: false }, null, 0);
-  T('59 listDiff·gapScore(D0): 추가 1·삭제 1·건너뜀 1 → delta 3 · score = 0.2 + 0.5·min(1,3/3) + 0.5·(1/5) = 0.8 · 비교 불가면 score null·comparable false',
-    ld.delta === 3 && ld.removed[0] === '현장대리인계' && gs.score === 0.8 && gs.comparable && gnull.score === null && !gnull.comparable, JSON.stringify([ld, gs]));
+  T('59 listDiff·gapScore(D0): 추가 1·삭제 1·건너뜀 1 → delta 3 · score = 0.25 + 0.5·min(1,3/3) + 0.5·(1/5) = 0.85(v456 T427 — 셀 비율 0.25) · 비교 불가면 score null·comparable false',
+    ld.delta === 3 && ld.removed[0] === '현장대리인계' && gs.score === 0.85 && gs.comparable && gnull.score === null && !gnull.comparable, JSON.stringify([ld, gs]));
   // ---- cdoc_put final 훅 e2e ----
   const CONW9 = { id: 'uconw9', name: '공무직원9', admin: false, perms: { con: 'do' }, dept: '운영부' };
   mem.gw_users['member:uconw9'] = CONW9; const tok9 = issueSession(CONW9).token;
@@ -3740,8 +3745,8 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   const pk = Object.keys(mem.gw_data).filter((k) => k.indexOf('learn:contract:in:') === 0);
   const pair = pk.length ? mem.gw_data[pk[0]] : null;
   const les = mem.gw_data['lessons:contract:asb_plan'];
-  T('59 final 훅: 짝 1건(tpl asb_plan·xlsx_cell·done_nomodel — 허용 사전 전 모델 호출 없음) · 응답 learn에 changed 1/compared 5 · 짝 블롭에 셀 값 없음 · lessons:contract:asb_plan gaps 1·calls 0',
-    r59.code === 200 && L9.ok && L9.status === 'done_nomodel' && L9.tpl === 'asb_plan' && L9.kind === 'xlsx_cell' && L9.changed === 1 && L9.compared === 5 && pk.length === 1 && pair && pair.draft_n === 1 && pair.final_n === 2 && pair.gap.score === 0.2
+  T('59 final 훅: 짝 1건(tpl asb_plan·xlsx_cell·done_nomodel — 허용 사전 전 모델 호출 없음) · 응답 learn에 changed 1/compared 4(v456 T427 빈칸↔빈칸 뺌) · 짝 블롭에 셀 값 없음 · lessons:contract:asb_plan gaps 1·calls 0',
+    r59.code === 200 && L9.ok && L9.status === 'done_nomodel' && L9.tpl === 'asb_plan' && L9.kind === 'xlsx_cell' && L9.changed === 1 && L9.compared === 4 && pk.length === 1 && pair && pair.draft_n === 1 && pair.final_n === 2 && pair.gap.score === 0.25
     && JSON.stringify(pair).indexOf('포항') < 0 && JSON.stringify(pair).indexOf('시험 공사') < 0 && les && les.gaps.length === 1 && les.stats.pairs === 1 && les.stats.calls === 0, JSON.stringify([r59.code, L9, pair && pair.status]));
   // 제외 유형(명단·검진) · 초안 없는 단계 · 초안 둘 → 미매칭(후보) · pair_tpl 지정 → 매칭
   r59 = await call({ action: 'cdoc_put', cid: 'c59', i: 2, doc_key: 'main.수령-1', kind: 'final', name: '근로자 명단.xlsx', data: b59(FINAL), pii: 1, allow_dup: true }, tok9, 'dev1'); const ex1 = r59.code === 200 && r59.body.learn && r59.body.learn.code === 'TYPE_EXCLUDED';
@@ -4184,7 +4189,7 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   const pk68 = Object.keys(mem.gw_data).filter((k) => k.indexOf('learn:contract:in:') === 0);
   const P68 = pk68.length ? mem.gw_data[pk68[0]] : null, Ls68 = mem.gw_data['lessons:contract:work_start'];
   T('68 실제 초안으로 짝: 저장 형식 시트별 객체 그대로 · kind xlsx_cell · 간극 null 아님(comparable·cell_ratio 숫자) · 바뀐 칸 2(공문!B14·직접시공 A18) · 짝 블롭에 값 없음 · lessons에 숫자 간극 1(기준선 재료)',
-    g0 && !Array.isArray(stored68.fill.edits) && Array.isArray(stored68.fill.edits['공문']) && r68.code === 200 && L68.ok && L68.kind === 'xlsx_cell' && L68.status === 'done_nomodel' && L68.gap && L68.gap.comparable === true && typeof L68.gap.cell_ratio === 'number' && L68.gap.cell_ratio > 0 && L68.changed === 2 && L68.compared === flat68.length && L68.uncomparable === 0 && P68 && P68.diff.refs_changed.slice().sort().join() === [A18, '공문!B14'].sort().join() && JSON.stringify(P68).indexOf('직원이') < 0 && Ls68 && Ls68.gaps.length === 1 && typeof Ls68.gaps[0].ratio === 'number', JSON.stringify([L68, P68 && P68.diff]).slice(0, 400));
+    g0 && !Array.isArray(stored68.fill.edits) && Array.isArray(stored68.fill.edits['공문']) && r68.code === 200 && L68.ok && L68.kind === 'xlsx_cell' && L68.status === 'done_nomodel' && L68.gap && L68.gap.comparable === true && typeof L68.gap.cell_ratio === 'number' && L68.gap.cell_ratio > 0 && L68.changed === 2 && P68 && L68.compared + P68.diff.blank_both === flat68.length && P68.diff.blank_both > 0 && L68.uncomparable === 0 && P68 && P68.diff.refs_changed.slice().sort().join() === [A18, '공문!B14'].sort().join() && JSON.stringify(P68).indexOf('직원이') < 0 && Ls68 && Ls68.gaps.length === 1 && typeof Ls68.gaps[0].ratio === 'number', JSON.stringify([L68, P68 && P68.diff]).slice(0, 400));
   // 워커 — NO_FILL로 죽지 않고 허용 칸 값이 시트!셀 좌표로 프롬프트에 → 규칙 → learn_defaults_get → 앱 주입 → 양식 채움
   const allow68 = flat68.map((e) => e[0]).filter((r) => r !== DS68 + '!D33');
   r68 = await call({ action: 'learn_settings_set', on: true, allow: { work_start: allow68 } }, tokA, 'dev1'); const w0 = r68.code === 200 && allow68.length > 30;
@@ -6364,6 +6369,392 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
     T('85 v453 ⑯ 로그인 키 이름(2차 검토 low): gw-auth login 이름 칸 "a/b"·"x%y"·"a#b?"·제어문자·백슬래시 = 401 INVALID_CREDENTIALS(종전 500 STORAGE_BAD_KEY) · 금지 글자 잠금 키 0 · 결함 사본(검사 줄 걷음) ✗',
       R85.N.ok && killed85('N'), JSON.stringify({ N: R85.N.info, mut: M85R.N }));
   } finally { reset85(); auditMock.curKey = ''; delete blobsMock.hooks.failGet; }
+}
+
+{ // ---- 86(v456) 서버·저장 안전 수리 묶음 — C066(요청 gzip·zip 항목 풀기 상한 · PII_RE 보강) · C079(숫자 아닌 updated_at) · C080(거래처 13자리 · 물어보기) ·
+  //   C082(명부 옛 건강진단 exam · 현장 대장 고아 일용직 id) · C107(backup_put 쓰기는 봇 키만) · C108(gw-cron-kick·gw-lawwatch 상수시간 비교) · T427(간극 분모 빈칸↔빈칸 · cellRows 병합 비앵커).
+  //   검사마다 고친 자리를 되돌린 사본(gw-data·docdiff·learn·ask — 소스 한 곳을 바꿔 같은 mock으로 메모리에서 컴파일, 파일은 쓰지 않음)에서는 실패해야 한다. 실패 글에 번호 값은 싣지 않는다(참·거짓·코드만).
+  const fs86 = require('fs'), Mod86 = require('module'), zlib86 = require('zlib');
+  const load86 = (file, src) => { const m = new Mod86(file); m.filename = file; m.paths = Mod86._nodeModulePaths(dirname(file)); m._compile(src, file); return m.exports; };
+  const F86 = { gwd: join(FN, 'gw-data.js'), dd: join(FN, '_lib/docdiff.js'), ln: join(FN, '_lib/learn.js'), ask: join(FN, '_lib/ask.js') };
+  const S86 = {}; Object.keys(F86).forEach((k) => { S86[k] = fs86.readFileSync(F86[k], 'utf8'); });
+  const mutSrc86 = (k, from, to) => { if (S86[k].split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 60)); return S86[k].replace(from, () => to); };
+  const mut86 = (k, from, to) => load86(F86[k], mutSrc86(k, from, to));
+  const caller86 = (mod) => async (body, tok, dev) => { const r = await mod.handler({ httpMethod: 'POST', headers: Object.assign({ authorization: tok ? 'Bearer ' + tok : '' }, dev ? { 'x-device-id': dev } : {}), body: JSON.stringify(body) }); return { code: r.statusCode, body: JSON.parse(r.body || '{}') }; };
+  const raw86 = async (mod, event) => { const r = await mod.handler(Object.assign({ httpMethod: 'POST' }, event)); return { code: r.statusCode, body: JSON.parse(r.body || '{}') }; };
+  const c86 = caller86(gwd);
+  const snap86 = JSON.stringify({ u: mem.gw_users, d: mem.gw_data });
+  const reset86 = () => { const s = JSON.parse(snap86); mem.gw_users = s.u; mem.gw_data = s.d; };
+  const SAFE86 = { id: 'us86', name: '안전86', admin: false, perms: { wk: 'do', safety: 'view' } }, WK86 = { id: 'uw86', name: '명부86', admin: false, perms: { wk: 'do' } };
+  const ADM86 = { id: 'ua86', name: '관리86', admin: true, perms: {}, tier: 'pm' };
+  const tS86 = issueSession(SAFE86).token, tW86 = issueSession(WK86).token, tA86 = issueSession(ADM86).token;
+  const seedU86 = () => { mem.gw_users['member:uadmin'] = JSON.parse(JSON.stringify(ADMIN)); mem.gw_users['member:us86'] = JSON.parse(JSON.stringify(SAFE86)); mem.gw_users['member:uw86'] = JSON.parse(JSON.stringify(WK86)); mem.gw_users['member:ua86'] = JSON.parse(JSON.stringify(ADM86)); mem.gw_users['device:dev1'] = { status: 'approved' }; };
+  // 작은 zip 작성기(저장 0·deflate 8 둘 다 — 항목: [이름, 원본 Buffer, deflate 여부])
+  const crcT86 = (() => { const t = new Int32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1); t[n] = c; } return t; })();
+  const crc86 = (b) => { let c = -1; for (let i = 0; i < b.length; i++) c = crcT86[(c ^ b[i]) & 0xFF] ^ (c >>> 8); return (c ^ -1) >>> 0; };
+  const zip86 = (entries) => { const locals = [], cds = []; let off = 0; for (const [name, raw, defl] of entries) { const nb = Buffer.from(name), db = defl ? zlib86.deflateRawSync(raw) : raw, crc = defl ? 0 : crc86(raw), mth = defl ? 8 : 0;
+    const lh = Buffer.alloc(30); lh.writeUInt32LE(0x04034b50, 0); lh.writeUInt16LE(20, 4); lh.writeUInt16LE(0, 6); lh.writeUInt16LE(mth, 8); lh.writeUInt32LE(0, 10); lh.writeUInt32LE(crc, 14); lh.writeUInt32LE(db.length, 18); lh.writeUInt32LE(raw.length, 22); lh.writeUInt16LE(nb.length, 26); lh.writeUInt16LE(0, 28);
+    const cd = Buffer.alloc(46); cd.writeUInt32LE(0x02014b50, 0); cd.writeUInt16LE(20, 4); cd.writeUInt16LE(20, 6); cd.writeUInt16LE(0, 8); cd.writeUInt16LE(mth, 10); cd.writeUInt32LE(0, 12); cd.writeUInt32LE(crc, 16); cd.writeUInt32LE(db.length, 20); cd.writeUInt32LE(raw.length, 24); cd.writeUInt16LE(nb.length, 28); cd.writeUInt16LE(0, 30); cd.writeUInt16LE(0, 32); cd.writeUInt16LE(0, 34); cd.writeUInt16LE(0, 36); cd.writeUInt32LE(0, 38); cd.writeUInt32LE(off, 42);
+    locals.push(lh, nb, db); cds.push(cd, nb); off += 30 + nb.length + db.length; }
+    const cdb = Buffer.concat(cds), eocd = Buffer.alloc(22); eocd.writeUInt32LE(0x06054b50, 0); eocd.writeUInt16LE(entries.length, 8); eocd.writeUInt16LE(entries.length, 10); eocd.writeUInt32LE(cdb.length, 12); eocd.writeUInt32LE(off, 16); return Buffer.concat([...locals, cdb, eocd]); };
+  const xlsx86 = (cells, merged) => zip86([['[Content_Types].xml', Buffer.from('<Types/>')], ['xl/workbook.xml', Buffer.from('<workbook><sheets><sheet name="s" sheetId="1" r:id="rId1"/></sheets></workbook>')], ['xl/_rels/workbook.xml.rels', Buffer.from('<Relationships><Relationship Id="rId1" Type="ws" Target="worksheets/sheet1.xml"/></Relationships>')],
+    ['xl/worksheets/sheet1.xml', Buffer.from('<worksheet><sheetData><row r="1">' + cells + '</row></sheetData>' + (merged ? '<mergeCells count="1"><mergeCell ref="' + merged + '"/></mergeCells>' : '') + '</worksheet>'), true]]);
+  const R86 = {}, MUT86 = {};
+  const chk86 = {
+    // ① C066 요청 gzip 상한: 풀면 40MB(공백) = 413 BODY_TOO_LARGE · 작은 gzip = 200 · 깨진 JSON = 400 INVALID_JSON
+    A: async (mod) => { reset86(); seedU86(); mem.gw_data['col:tasks'] = { schema: 1, items: [], updated_at: 1 };
+      const ev = (b) => ({ headers: { authorization: 'Bearer ' + tokA, 'x-gw-enc': 'gzip' }, body: b, isBase64Encoded: true });
+      const a1 = await raw86(mod, ev(zlib86.gzipSync(Buffer.alloc(40 * 1024 * 1024, 32)).toString('base64')));
+      const a2 = await raw86(mod, ev(zlib86.gzipSync(Buffer.from(JSON.stringify({ action: 'get', collection: 'tasks' }))).toString('base64')));
+      const a3 = await raw86(mod, { headers: {}, body: '{nope' });
+      return { ok: a1.code === 413 && a1.body.error_code === 'BODY_TOO_LARGE' && a2.code === 200 && a3.code === 400 && a3.body.error_code === 'INVALID_JSON', info: [a1.code, a1.body.error_code, a2.code, a3.code] };
+    },
+    // ③ C079 숫자 아닌 updated_at: 글자 시각 문서에 아무 base로 저장 = 200·updated_at 숫자로 · 그 뒤 낡은 base = 409(낙관락 다시 걸림) · 숫자 글자('1000')는 종전처럼 비교(999 = 409)
+    C: async (mod) => { reset86(); seedU86(); const c = caller86(mod);
+      mem.gw_data['col:vehicles'] = { schema: 1, items: [{ id: 'v86', no: '86가' }], updated_at: '2026-11-11T00:00:00Z' };
+      const r1 = await c({ action: 'save', collection: 'vehicles', base: 12345, doc: { schema: 1, items: [{ id: 'v86', no: '86나' }] } }, tokA);
+      const at = mem.gw_data['col:vehicles'].updated_at;
+      const r2 = await c({ action: 'save', collection: 'vehicles', base: 1, doc: { schema: 1, items: [] } }, tokA);
+      const r3 = await c({ action: 'save', collection: 'vehicles', base: at, doc: { schema: 1, items: [{ id: 'v86', no: '86다' }] } }, tokA);
+      mem.gw_data['col:vehicles'] = { schema: 1, items: [], updated_at: '1000' };
+      const r4 = await c({ action: 'save', collection: 'vehicles', base: 999, doc: { schema: 1, items: [] } }, tokA);
+      const r5 = await c({ action: 'save', collection: 'vehicles', base: 1000, doc: { schema: 1, items: [] } }, tokA);
+      return { ok: r1.code === 200 && typeof at === 'number' && Number.isFinite(at) && r2.code === 409 && r2.body.error_code === 'STALE_BASE' && r3.code === 200 && r4.code === 409 && r5.code === 200, info: [r1.code, typeof at, r2.code, r3.code, r4.code, r5.code] };
+    },
+    // ④ C080 거래처 13자리: 새 거래처(전각·줄표 섞임) = 400 CLI_BIZ13·저장 안 됨 · 서버에 있던 13자리 그대로 + 다른 줄 고침 = 200 · 있던 줄을 13자리로 바꿈 = 400 · 가린 번호·10자리·쉼표로 나눈 둘 = 200
+    D: async (mod) => { reset86(); seedU86(); const c = caller86(mod);
+      const OLD = '1111111111111', base0 = { schema: 1, items: [{ id: 'c1', name: '갑', biz_no: '1234567890' }, { id: 'c2', name: '을', biz_no: OLD }], updated_at: 860 };
+      mem.gw_data['col:clients'] = JSON.parse(JSON.stringify(base0)); const s0 = JSON.stringify(mem.gw_data['col:clients']);
+      const d1 = await c({ action: 'save', collection: 'clients', base: 860, doc: { schema: 1, items: base0.items.concat([{ id: 'c3', name: '병', biz_no: '９００１０１－１２３４５６７' }]) } }, tokA);
+      const same1 = JSON.stringify(mem.gw_data['col:clients']) === s0;
+      const d2 = await c({ action: 'save', collection: 'clients', base: 860, doc: { schema: 1, items: [{ id: 'c1', name: '갑2', biz_no: '1234567890' }, { id: 'c2', name: '을', biz_no: OLD }] } }, tokA);
+      const at2 = mem.gw_data['col:clients'].updated_at;
+      const d3 = await c({ action: 'save', collection: 'clients', base: at2, doc: { schema: 1, items: [{ id: 'c1', name: '갑2', biz_no: '900101 1234567' }, { id: 'c2', name: '을', biz_no: OLD }] } }, tokA);
+      const d4 = await c({ action: 'save', collection: 'clients', base: at2, doc: { schema: 1, items: [{ id: 'c1', name: '갑2', biz_no: '1234567890' }, { id: 'c2', name: '을', biz_no: OLD }, { id: 'c4', name: '정', biz_no: '900101-1******' }, { id: 'c5', name: '무', biz_no: '123-45-67890, 234-56-78901' }] } }, tokA);
+      return { ok: d1.code === 400 && d1.body.error_code === 'CLI_BIZ13' && d1.body.n === 1 && same1 && JSON.stringify(d1.body).indexOf('９') < 0 && d2.code === 200 && d3.code === 400 && d3.body.error_code === 'CLI_BIZ13' && d4.code === 200 && mem.gw_data['col:clients'].items.length === 4,
+        info: [d1.code, d1.body.error_code, same1, d2.code, d3.code, d4.code] };
+    },
+    // ⑤-1 C082 ① 명부 exam: 안전 권한 없는 일용직 수행자 읽기 = exam 칸 없음 · 안전 보기·관리자 = 있음 · 그 사람 저장 = exam 서버 값 이월(보낸 값 버림·새 줄 exam 없음) · 안전 권한자 저장 = 반영 · 직전 명부 못 읽으면 500 PREV_READ_FAILED
+    E: async (mod) => { reset86(); seedU86(); const c = caller86(mod);
+      mem.gw_data['col:workers'] = { schema: 1, items: [{ id: 'w86a', name: '가', exam: '2026-01-02' }, { id: 'w86b', name: '나' }], updated_at: 861 };
+      const g1 = await c({ action: 'get', collection: 'workers' }, tW86, 'dev1'), g2 = await c({ action: 'get', collection: 'workers' }, tS86, 'dev1'), g3 = await c({ action: 'get', collection: 'workers' }, tA86, 'dev1');
+      const noEx = g1.code === 200 && g1.body.doc.items.every((w) => !('exam' in w)) && g1.body.doc.items.length === 2;
+      const hasEx = g2.code === 200 && g2.body.doc.items[0].exam === '2026-01-02' && g3.code === 200 && g3.body.doc.items[0].exam === '2026-01-02';
+      const s1 = await c({ action: 'save', collection: 'workers', base: 861, doc: { schema: 1, items: [{ id: 'w86a', name: '가2' }, { id: 'w86b', name: '나', exam: '2020-01-01' }, { id: 'w86c', name: '다', exam: '' }] } }, tW86, 'dev1');
+      const it1 = mem.gw_data['col:workers'].items, at1 = mem.gw_data['col:workers'].updated_at;
+      const keep = s1.code === 200 && it1[0].name === '가2' && it1[0].exam === '2026-01-02' && !('exam' in it1[1]) && !('exam' in it1[2]);
+      const s2 = await c({ action: 'save', collection: 'workers', base: at1, doc: { schema: 1, items: [{ id: 'w86a', name: '가2', exam: '2026-03-03' }, { id: 'w86b', name: '나' }] } }, tS86, 'dev1');
+      const safeW = s2.code === 200 && mem.gw_data['col:workers'].items[0].exam === '2026-03-03';
+      blobsMock.hooks.failGet = (k) => k === 'col:workers';
+      const s3 = await c({ action: 'save', collection: 'workers', doc: { schema: 1, items: [] } }, tW86, 'dev1');
+      delete blobsMock.hooks.failGet;
+      return { ok: noEx && hasEx && keep && safeW && s3.code === 500 && s3.body.error_code === 'PREV_READ_FAILED' && mem.gw_data['col:workers'].items.length === 2, info: [noEx, hasEx, s1.code, keep, s2.code, safeW, s3.code, s3.body.error_code] };
+    },
+    // ⑤-2 C082 ② 현장 대장 고아 id: 그 줄에 이미 있던 명부 밖 id(wGone) + 새 명부 id = 200 · 새 명부 밖 id = 400 ORPHAN_WORKER(n 1·저장 안 됨) · 새 줄의 글자 "[...]" 모양도 같음 · 지운 일용직(del 1)은 명부에 있음 = 200 · 새 id가 있을 때 명부 못 읽음 = 500
+    F: async (mod) => { reset86(); seedU86(); const c = caller86(mod);
+      mem.gw_data['col:workers'] = { schema: 1, items: [{ id: 'w86a', name: '가' }, { id: 'w86d', name: '지운', del: 1 }], updated_at: 862 };
+      mem.gw_data['col:asbestos'] = { schema: 1, items: [{ id: 'a86', title: '옛 현장', worker_ids: ['wGone'] }], updated_at: 863 };
+      const f1 = await c({ action: 'save', collection: 'asbestos', base: 863, doc: { schema: 1, items: [{ id: 'a86', title: '옛 현장', worker_ids: ['wGone', 'w86a'] }] } }, tokA);
+      const at1 = mem.gw_data['col:asbestos'].updated_at, s1 = JSON.stringify(mem.gw_data['col:asbestos']);
+      const f2 = await c({ action: 'save', collection: 'asbestos', base: at1, doc: { schema: 1, items: [{ id: 'a86', title: '옛 현장', worker_ids: ['wGone', 'w86a', 'wNew'] }] } }, tokA);
+      const same2 = JSON.stringify(mem.gw_data['col:asbestos']) === s1;
+      const f3 = await c({ action: 'save', collection: 'asbestos', base: at1, doc: { schema: 1, items: [{ id: 'a86', title: '옛 현장', worker_ids: ['wGone', 'w86a'] }, { id: 'a87', title: '새 현장', worker_ids: '["wX"]' }] } }, tokA);
+      const f4 = await c({ action: 'save', collection: 'asbestos', base: at1, doc: { schema: 1, items: [{ id: 'a86', title: '옛 현장', worker_ids: ['wGone', 'w86a', 'w86d'] }] } }, tokA);
+      const at4 = mem.gw_data['col:asbestos'].updated_at;
+      blobsMock.hooks.failGet = (k) => k === 'col:workers';
+      const f5 = await c({ action: 'save', collection: 'asbestos', base: at4, doc: { schema: 1, items: [{ id: 'a86', title: '옛 현장', worker_ids: ['wGone', 'w86a', 'w86d', 'w86a2'] }] } }, tokA);
+      delete blobsMock.hooks.failGet;
+      return { ok: f1.code === 200 && f2.code === 400 && f2.body.error_code === 'ORPHAN_WORKER' && f2.body.n === 1 && same2 && f3.code === 400 && f3.body.error_code === 'ORPHAN_WORKER' && f4.code === 200 && f5.code === 500 && f5.body.error_code === 'WORKERS_READ_FAILED',
+        info: [f1.code, f2.code, f2.body.error_code, same2, f3.code, f4.code, f5.code, f5.body.error_code] };
+    },
+    // ⑥ C107 backup_put: 관리자 세션 col:tasks 쓰기 = 403 BOT_KEY_ONLY(그대로) · 관리자 dry = 200·would_error BOT_KEY_ONLY · 관리자 audit 키 = 종전 RESTORE_MODE_ONLY(먼저) · 봇 키 + confirm = 200
+    G: async (mod) => { reset86(); seedU86(); const c = caller86(mod);
+      mem.gw_data['col:tasks'] = { schema: 1, items: [{ id: 't86' }], updated_at: 864 }; const s0 = JSON.stringify(mem.gw_data['col:tasks']);
+      const b1 = await c({ action: 'backup_put', store: 'gw_data', key: 'col:tasks', data: { schema: 1, items: [] }, confirm: true }, tokA);
+      const same1 = JSON.stringify(mem.gw_data['col:tasks']) === s0;
+      const b2 = await c({ action: 'backup_put', store: 'gw_data', key: 'col:tasks', data: { schema: 1, items: [] }, dry: true }, tokA);
+      const b3 = await c({ action: 'backup_put', store: 'gw_data', key: 'audit:2026-11', data: { schema: 1, items: [] }, confirm: true }, tokA);
+      const b4 = await c({ action: 'backup_put', secret: 'test-ingest-key', store: 'gw_data', key: 'col:tasks', data: { schema: 1, items: [{ id: 't86b' }] }, confirm: true });
+      return { ok: b1.code === 403 && b1.body.error_code === 'BOT_KEY_ONLY' && same1 && b2.code === 200 && b2.body.dry === true && b2.body.would_error === 'BOT_KEY_ONLY' && b2.body.restore_only === false
+        && b3.code === 403 && b3.body.error_code === 'RESTORE_MODE_ONLY' && b4.code === 200 && mem.gw_data['col:tasks'].items[0].id === 't86b', info: [b1.code, b1.body.error_code, same1, b2.code, b2.body.would_error, b3.body.error_code, b4.code] };
+    },
+  };
+  const KILL86 = {
+    A: [['gwd', ', { maxOutputLength: BODY_GZ_MAX })', ')']],
+    C: [['gwd', "prevDoc.updated_at && Number.isFinite(Number(prevDoc.updated_at)) && Number(d.base)", "prevDoc.updated_at && Number(d.base)"]],
+    D: [['gwd', '    if (biz13N) return jr(400', '    if (false) return jr(400']],
+    E: [['gwd', "  if (col === 'workers' && !wkExamSee(c.member) && Array.isArray(doc.items)) {\n    doc = ", "  if (false) {\n    doc = "], ['gwd', "  if (col === 'workers' && !wkExamSee(c.member)) {", '  if (false) {']],
+    F: [['gwd', '      if (orphans.length) return jr(400', '      if (false) return jr(400']],   // v456 2차 검토: orphanN → orphans(고아 id 목록도 돌려줌 — 88 ③) · 같은 거절 줄 걷음
+    G: [['gwd', "  if (!bot) return jr(403, { status: 'FORBIDDEN', error_code: 'BOT_KEY_ONLY'", "  if (false) return jr(403, { status: 'FORBIDDEN', error_code: 'BOT_KEY_ONLY'"]],
+  };
+  try {
+    for (const k of Object.keys(chk86)) {
+      R86[k] = await chk86[k](gwd);
+      MUT86[k] = [];
+      for (const [f, a, b] of KILL86[k]) { const x = await chk86[k](mut86(f, a, b)); MUT86[k].push(x.ok); }
+    }
+    const killed86 = (k) => MUT86[k].length > 0 && MUT86[k].every((v) => v === false);
+    T('86 v456 ① C066 요청 gzip 풀기 상한: 풀면 40MB = 413 BODY_TOO_LARGE(종전 400 INVALID_JSON으로 뭉뚱그림) · 작은 gzip = 200 · 깨진 JSON = 400 INVALID_JSON · 결함 사본(maxOutputLength 걷음) ✗',
+      R86.A.ok && killed86('A'), JSON.stringify({ A: R86.A.info, mut: MUT86.A }));
+    // zip 항목 상한(docdiff zipEntries — 중앙 디렉터리 길): 풀면 70MB 항목 = null(비교 불가) · 작은 항목 = 그대로 · ZIP_ENTRY_MAX 64MB · 결함 사본(첫 inflate 상한 걷음) = 70MB 버퍼
+    const DD86 = require(F86.dd);
+    const bigZip = zip86([['big.xml', Buffer.alloc(70 * 1024 * 1024, 65), true], ['ok.xml', Buffer.from('<a>1</a>'), true]]);
+    // v456 검토: 풀기는 zipBudget.inflate 한 줄로 모임(항목 상한 = min(ZIP_ENTRY_MAX, 남은 총량 예산)) — 결함 사본은 그 줄의 상한을 걷는다(같은 강도)
+    const z1 = DD86.zipEntries(bigZip), zMut = mut86('dd', 'zlib.inflateRawSync(data, { maxOutputLength: cap })', 'zlib.inflateRawSync(data)').zipEntries(bigZip);
+    // 정적: netlify/functions 아래 동기 압축 풀기 호출은 전부 maxOutputLength를 함께(같은 줄) · gw-data hwpxExtractText는 DD.ZIP_ENTRY_MAX
+    const decomp86 = [];
+    const walk86 = (d) => fs86.readdirSync(d, { withFileTypes: true }).forEach((e) => { const p = join(d, e.name); if (e.isDirectory()) { if (e.name !== 'node_modules') walk86(p); } else if (/\.js$/.test(e.name)) { fs86.readFileSync(p, 'utf8').split('\n').forEach((l) => { if (/\b(?:inflateRawSync|gunzipSync|inflateSync|unzipSync|brotliDecompressSync)\(/.test(l)) decomp86.push([e.name, /maxOutputLength/.test(l)]); }); } });
+    walk86(FN);
+    T('86 v456 ① C066 zip 항목 상한: 풀면 70MB 항목 = null · 작은 항목 그대로 · ZIP_ENTRY_MAX = 64MB · 정적: 함수 폴더 동기 압축 풀기 ' + decomp86.length + '곳 전부 maxOutputLength · hwpxExtractText = DD.zipBudget(항목 64MB·총량 예산 — 87) · 결함 사본(상한 걷음) = 70MB 버퍼 ✗',
+      // v456 검토: 동기 풀기 자리는 4곳 → 2곳(docdiff zipBudget 한 곳 + 요청 gzip)으로 모임 — 전부 maxOutputLength는 그대로 · hwpxExtractText는 DD.zipBudget()(같은 예산)으로 풂(직접 inflate 0)
+      z1['big.xml'] === null && z1['ok.xml'] && z1['ok.xml'].toString() === '<a>1</a>' && DD86.ZIP_ENTRY_MAX === 64 * 1024 * 1024 && decomp86.length >= 2 && decomp86.every((x) => x[1])
+      && /const bud = DD\.zipBudget\(\);/.test(S86.gwd) && /method === 8 \? bud\.inflate\(data\) : bud\.take\(data\)/.test(S86.gwd) && !!zMut['big.xml'] && zMut['big.xml'].length === 70 * 1024 * 1024,
+      JSON.stringify({ big: z1['big.xml'] === null, decomp86, mut: !!zMut['big.xml'] }));
+    // ② C066 PII_RE 보강: 잡힘·안 잡힘 양쪽 고정(번호는 모두 시험용 꾸밈 값) · 회사 대표 전화·팩스(공개 번호)는 지역번호 꼴에서 뺌 · index.html 회사 tel·fax 상수 전부 PII_OWN_TEL에
+    const LN86 = require(F86.ln);
+    const HIT86 = ['9001011234567', '주민 9001015234567 끝', '900101-1234567', '900101 – 5234567', '900101－1234567', '010.1234.5678', '010—1234—5678', '010 1234 5678', '01012345678',
+      '02-123-4567', '054-123-4567', '(054) 123-4567', '070-1234-5678', '031.123.4567', '02 1234 5678', '110 123 456789', '1002 123 456789', '12345678901', '110123456789', '12345678901234', '054-291-1203'];
+    const PASS86 = ['계약일 2026-11-01 금액 12,500,000원 면적 45.75', '1234567890', '2026.11.13', '2026. 11. 13.', '0.14999994000000001', '1,234,567,890원', '2026-11-13 10:45', 'A1 B12 C123', '45 75 123', '20261113',
+      '공사기간 2026-11-01 ~ 2026-12-31', '포항시 남구 1234-5', '시트!A34', '45.123456789012', '2026 11 13 10', '단가 12 500', '☎ (054)291-1202', '054-291-1204', '054)291-1214', '경상북도 포항시 남구 정몽주로 823-10(청림동)   ☎ (054)291-1202'];
+    const pii86 = (L) => ({ miss: HIT86.filter((s) => L.piiScan(s).ok).length, fp: PASS86.filter((s) => !L.piiScan(s).ok).length });
+    const p86 = pii86(LN86);
+    const telC86 = [...readFileSyncFS86(join(ROOT, 'index.html')).matchAll(/(?:\btel|\bfax|"전화"|"팩스")\s*:\s*"([^"]+)"/g)].map((m) => m[1].replace(/\D/g, ''));
+    const telOk86 = telC86.length >= 5 && telC86.every((d) => LN86.PII_OWN_TEL[d] === 1);
+    // v456 검토: 11~14자리 꼴은 영문자·₩ 뒤·'원' 앞을 뺀 꼴(87절) — 결함 사본 첫째는 그 줄을 통째로 걷음(종전과 같은 강도)
+    //   v456 2차 검토: PII_9 줄이 \d{11,}·확장자 예외·i 표시로 바뀜(88절) — 결함 사본은 그 줄을 통째로 걷음(같은 강도)
+    const pMut86 = [pii86(mut86('ln', '  /(?<![\\dA-Za-z.₩])\\d{11,}(?!\\d|\\s*원|\\.(?:jpe?g|png|gif|heic|pdf|xlsx?|hwpx?|docx?|zip)\\b)/i];', '  ];')), pii86(mut86('ln', "PII_OWN_TEL[m.replace(/\\D/g, '')] ? ' ' : m", 'm')), pii86(mut86('ln', 'for (let i = 0; i < PII_RE.length; i++)', 'for (let i = 0; i < 4; i++)'))];   // 셋째 = 옛 꼴 넷만 보는 사본(종전 동작)
+    const sites86 = [(fs86.readFileSync(join(FN, 'gw-learn-background.js'), 'utf8').match(/LN\.piiScan\(/g) || []).length, (S86.gwd.match(/LN\.piiScan\(/g) || []).length, (fs86.readFileSync(join(FN, '_lib/boxjudge.js'), 'utf8').match(/LN\.piiScan\(/g) || []).length];
+    T('86 v456 ② C066 PII_RE: 붙여 쓴 주민·외국인번호·줄표 변형·점/긴 줄표/공백 휴대전화·지역번호 전화(구분자)·공백 계좌·구분자 없는 11~14자리 ' + HIT86.length + '꼴 잡힘 · 날짜·금액·10자리 맨숫자·소수·면적·셀 좌표·회사 대표 전화·팩스 ' + PASS86.length + '꼴 통과 · 옛 꼴 PII_0~3 그대로 · 앱 회사 tel·fax 상수 ' + telC86.length + '개 전부 예외 목록 · 쓰는 곳(학습 워커 3·gw-data 3·boxjudge 1) 그대로 · 결함 사본(11~14자리 걷음·회사 번호 예외 걷음·붙여 쓴 주민번호 걷음) ✗',
+      p86.miss === 0 && p86.fp === 0 && LN86.PII_RE.length === 10 && String(LN86.PII_RE[0]) === String(/\d{6}\s*-\s*[1-4]\d{6}/) && telOk86 && sites86[0] === 3 && sites86[1] >= 3 && sites86[2] >= 1
+      && pMut86[0].miss > 0 && pMut86[1].fp > 0 && pMut86[2].miss > 0, JSON.stringify({ p86, telOk86, tels: telC86.length, sites86, pMut86 }));
+    T('86 v456 ③ C079 숫자 아닌 updated_at: 글자 시각 문서에 아무 base로 저장 = 200·updated_at 숫자로 고쳐 씀 · 그 뒤 낡은 base = 409 STALE_BASE(낙관락 다시 걸림)·맞는 base = 200 · 숫자 글자 "1000"은 종전처럼 비교(999 = 409·1000 = 200) · 결함 사본(유한 숫자 검사 걷음 = 매번 409) ✗',
+      R86.C.ok && killed86('C'), JSON.stringify({ C: R86.C.info, mut: MUT86.C }));
+    // ④ 물어보기 clients 도구: 13자리는 사업자번호 '13자리(숨김)'·원문 0 · 그 번호로 물으면 0행 · 10자리 번호로는 찾힘 · 결함 사본(가림 걷음) ✗
+    const ASK86 = require(F86.ask);
+    mem.gw_data['col:clients'] = { schema: 1, items: [{ id: 'c1', name: '갑', biz_no: '1234567890' }, { id: 'c2', name: '을', biz_no: '1111111111111' }], updated_at: 1 };
+    const askChk86 = async (A) => { const q1 = await A.runTool('clients', {}, ADM86), q2 = await A.runTool('clients', { q: '1111111111111' }, ADM86), q3 = await A.runTool('clients', { q: '1234567890' }, ADM86);
+      const r2 = (q1.rows || []).find((x) => x.상호 === '을') || {};
+      return q1.count === 2 && r2.사업자번호 === '13자리(숨김)' && JSON.stringify(q1).indexOf('1111111111111') < 0 && q2.count === 0 && q3.count === 1; };
+    const ask86 = await askChk86(ASK86), askMut86 = await askChk86(mut86('ask', ".map((c) => (c && CLIBIZ.biz13(c.biz_no)) ? Object.assign({}, c, { biz_no: '', _b13: true }) : c)", ''));
+    const CB86 = require(join(FN, '_lib/clibiz.js'));
+    T('86 v456 ④ C080 거래처 13자리: 새 거래처(전각·전각 줄표) = 400 CLI_BIZ13(n 1·저장 안 됨·응답에 번호 없음) · 서버에 있던 13자리 그대로 + 다른 줄 고침 = 200(옛 값이 저장을 막지 않음) · 있던 줄을 13자리로 바꿈 = 400 · 가린 번호·10자리·쉼표로 나눈 둘 = 200 · 물어보기 clients = "13자리(숨김)"·그 번호로 물으면 0행 · 결함 사본(서버 거절 걷음·물어보기 가림 걷음) ✗',
+      R86.D.ok && killed86('D') && ask86 && !askMut86 && CB86.biz13('900101-1234567') && !CB86.biz13('900101-1******') && !CB86.biz13('123-45-67890'), JSON.stringify({ D: R86.D.info, mut: MUT86.D, ask86, askMut86 }));
+    T('86 v456 ⑤ C082 ① 명부 옛 건강진단 exam: 안전 권한 없는 일용직 수행자 읽기 = exam 칸 없음 · 안전 보기·관리자 = 있음 · 그 사람 저장 = exam 서버 값 이월(보낸 값 버림·새 줄 exam 없음) · 안전 권한자 저장 = 반영 · 직전 명부 못 읽음 = 500 PREV_READ_FAILED(쓰지 않음) · 결함 사본(읽기 빼기 걷음·저장 이월 걷음) ✗',
+      R86.E.ok && killed86('E'), JSON.stringify({ E: R86.E.info, mut: MUT86.E }));
+    T('86 v456 ⑤ C082 ② 현장 대장 고아 일용직 id: 그 줄에 있던 명부 밖 id + 새 명부 id = 200 · 새 명부 밖 id = 400 ORPHAN_WORKER(n 1·저장 안 됨) · 새 줄 글자 "[...]" 모양도 400 · 지운 일용직(명부에 있음) = 200 · 새 id 있는데 명부 못 읽음 = 500 WORKERS_READ_FAILED · 결함 사본(거절 걷음) ✗',
+      R86.F.ok && killed86('F'), JSON.stringify({ F: R86.F.info, mut: MUT86.F }));
+    T('86 v456 ⑥ C107 backup_put 쓰기는 봇 키만: 관리자 세션 col:tasks confirm = 403 BOT_KEY_ONLY(그대로) · 관리자 dry = 200·would_error BOT_KEY_ONLY · 관리자 audit 키 = 종전 RESTORE_MODE_ONLY 먼저 · 봇 키 + confirm = 200 · 결함 사본(관문 걷음) ✗',
+      R86.G.ok && killed86('G'), JSON.stringify({ G: R86.G.info, mut: MUT86.G }));
+    // 호출처 전수(정적): 앱 index.html에 backup_put 0 · appdata restore.py·logsheet_daily.py의 backup_put 본문은 전부 secret(봇 키)
+    const ixBp86 = (readFileSyncFS86(join(ROOT, 'index.html')).match(/backup_put/g) || []).length;
+    const ad86 = join(ROOT, '..', 'jongwoon-appdata', 'collectors');
+    // v456 검토: appdata 폴더가 없으면 통과로 세지 않고 '생략'으로 알림(종전엔 없어도 통과) · tools/*.mjs 쪽은 87
+    const adHas86 = fs86.existsSync(ad86);
+    const adOk86 = adHas86 && ['restore.py', 'logsheet_daily.py'].every((f) => { const t = fs86.readFileSync(join(ad86, f), 'utf8'); const bodies = t.split('\n').filter((l) => /"action": "backup_put"/.test(l)); return bodies.length >= 1 && bodies.every((l) => /"secret"/.test(l)); });
+    if (!adHas86) console.log('  (86 ⑥ appdata 호출처 정적 검사 생략 — ' + ad86 + ' 없음 · 앱 index.html backup_put ' + ixBp86 + ')');
+    else T('86 v456 ⑥ C107 호출처 전수(정적): 앱 index.html backup_put 0 · appdata restore.py·logsheet_daily.py backup_put 요청 줄 전부 봇 키(secret)', ixBp86 === 0 && adOk86, JSON.stringify({ ixBp86, adOk86 }));
+    // ⑦ C108 gw-cron-kick·gw-lawwatch 상수시간 비교 — 같은 길이 다른 키·다른 길이·env 비움 = 403 · 맞는 키 = 다음 검사로(cron-kick BAD_TARGET 400 · lawwatch NO_ALERTS 400) · 소스 '!==/=== secret' 0·_lib/keymatch botKeyOk · 공용 keyMatch = gw-data keyMatch 같은 결과
+    const kick86 = require(join(FN, 'gw-cron-kick.js')), lw86 = require(join(FN, 'gw-lawwatch.js')), KM86 = require(join(FN, '_lib/keymatch.js'));
+    const kc = async (key) => { const r = await kick86.handler({ body: JSON.stringify({ key: key, target: 'nope' }) }, {}); return r.statusCode; };
+    const lc = async (key, hdr) => { const r = await lw86.handler({ httpMethod: 'POST', headers: hdr ? { 'x-ingest-key': key } : {}, body: JSON.stringify(hdr ? {} : { key: key }) }); return r.statusCode; };
+    const savedK86 = process.env.BIDS_INGEST_KEY;
+    const kr = [await kc('test-ingest-kez'), await kc('short'), await kc(''), await kc(' test-ingest-key '), await lc('test-ingest-kez'), await lc('short', true), await lc('test-ingest-key', true), await lc('test-ingest-key')];
+    process.env.BIDS_INGEST_KEY = ''; const kr0 = [await kc(''), await lc('', true)]; process.env.BIDS_INGEST_KEY = savedK86;
+    const srcK86 = fs86.readFileSync(join(FN, 'gw-cron-kick.js'), 'utf8'), srcL86 = fs86.readFileSync(join(FN, 'gw-lawwatch.js'), 'utf8');
+    const stat86 = (s) => !/[!=]==\s*secret\b/.test(s) && /require\('\.\/_lib\/keymatch'\)/.test(s) && /botKeyOk\(/.test(s) && !/process\.env\.BIDS_INGEST_KEY/.test(s);
+    const gwKm86 = load86(F86.gwd, S86.gwd + '\nexports.__km86 = keyMatch;').__km86;
+    const KS86 = [['k', 'k'], [' k ', 'k'], ['k', ''], ['', ''], ['kk', 'k'], ['k', 'kk'], [null, 'k'], ['abc', 'abd']];
+    const same86 = KS86.every(([g, s]) => KM86.keyMatch(g, s) === gwKm86(g, s));
+    const oldK86 = srcK86.replace('  if (!botKeyOk(d.key))', "  const secret = (process.env.BIDS_INGEST_KEY || '').trim();\n  if (!secret || String(d.key || '').trim() !== secret)");
+    T('86 v456 ⑦ C108 gw-cron-kick·gw-lawwatch 상수시간 비교: 같은 길이 다른 키·다른 길이·빈 키 = 403 · 앞뒤 공백 키 = 통과(다음 검사 400) · 헤더 키 맞음 = 400 NO_ALERTS · env 비움 = 403 · 소스 "!==/=== secret" 0·_lib/keymatch botKeyOk·env 직접 읽기 0 · 공용 keyMatch = gw-data keyMatch(표본 8 같은 결과) · 결함 사본(옛 비교) = 정적 ✗',
+      JSON.stringify(kr) === JSON.stringify([403, 403, 403, 400, 403, 403, 400, 400]) && JSON.stringify(kr0) === '[403,403]' && stat86(srcK86) && stat86(srcL86) && same86 && !stat86(oldK86),
+      JSON.stringify({ kr, kr0, sK: stat86(srcK86), sL: stat86(srcL86), same86, old: stat86(oldK86) }));
+    // ⑧ T427 간극 분모·cellRows 병합 비앵커 · 짝 찾기 점수는 종전 식 그대로
+    const FIN86 = xlsx86('<c r="A1" t="inlineStr"><is><t>가</t></is></c><c r="A4" t="inlineStr"><is><t>고침</t></is></c><c r="C1" t="inlineStr"><is><t>앵커</t></is></c><c r="D1" t="inlineStr"><is><t>비앵커</t></is></c>', 'C1:D2');
+    const ED86 = [['A1', '가', 's'], ['A2', '', 'b'], ['A3', '', 's'], ['A4', '', 'b'], ['D1', 'x', 's'], ['C1', '앵커', 's']];
+    const t427 = (D) => { const x = D.xlsxCellDiff(ED86, FIN86), cr = D.cellRows(ED86, FIN86, ['A1', 'D1', 'C1']), ms = D.matchScore({ fill: { edits: ED86 } }, 'xlsx', 'xlsx', FIN86);
+      return { x: [x.compared, x.changed, x.blank_both, x.uncomparable, x.ratio], rows: cr.rows.map((r) => r.ref).join(), ms }; };
+    const tq = t427(DD86);
+    const tqM = [t427(mut86('dd', "    if ((ty === 'b' || normS(want) === '') && normS(f.v) === '') { blankBoth++; return; }\n", '')), t427(mut86('dd', " || inMergedNonAnchor(sr.ref, sh.merged)) return;   // v456(T427)", ') return;   // v456(T427)'))];
+    T('86 v456 ⑧ T427 간극: 초안 빈칸·최종본 빈칸 2칸(A2 b·A3 빈 값)은 분모 밖(blank_both 2) → 비교 3·바뀜 1(A4)·비교 불가 1(병합 비앵커 D1)·비율 0.333 · cellRows는 병합 비앵커 D1 뺌(A1·C1만) · 짝 찾기 점수 = 종전 식(빈칸↔빈칸 = 같은 칸) 1 − 1/5 = 0.8 · 결함 사본(빈칸 빼기 걷음 = 비율 0.2·cellRows 비앵커 걷음 = D1 들어감) ✗',
+      JSON.stringify(tq.x) === '[3,1,2,1,0.333]' && tq.rows === 'A1,C1' && tq.ms === 0.8 && JSON.stringify(tqM[0].x) !== JSON.stringify(tq.x) && tqM[1].rows !== 'A1,C1', JSON.stringify({ tq, tqM }));
+  } finally { reset86(); delete blobsMock.hooks.failGet; }
+  function readFileSyncFS86(p) { return fs86.readFileSync(p, 'utf8'); }
+}
+
+{ // ---- 87(v456 검토 반영 11/13) — ① zip 총량 예산·겹친 항목·항목 수(docdiff zipBudget·zipEntries · gw-data hwpxExtractText) ② PII 정규화(전각·폭 없는 문자)·주민번호 구분자·11~14자리 오탐(영문자·₩ 뒤·'원' 앞)
+  //   ③ 숫자 아닌 updated_at 앞 base 0 = 409(handleSave·휴지통) · 휴지통 글자 시각 = 비교 건너뜀 ④ 간극 식 판 gv(기준선·일몰은 같은 판 칸 비교 간극만) ⑤ 호출처·lawwatch 옛 비교 정적.
+  //   검사마다 고친 자리를 되돌린 사본(메모리 컴파일 — 파일은 쓰지 않음)에서는 실패해야 한다. 실패 글에 번호 값은 싣지 않는다.
+  const fs87 = require('fs'), Mod87 = require('module'), zlib87 = require('zlib');
+  const load87 = (file, src) => { const m = new Mod87(file); m.filename = file; m.paths = Mod87._nodeModulePaths(dirname(file)); m._compile(src, file); return m.exports; };
+  const F87 = { gwd: join(FN, 'gw-data.js'), dd: join(FN, '_lib/docdiff.js'), ln: join(FN, '_lib/learn.js') };
+  const S87 = {}; Object.keys(F87).forEach((k) => { S87[k] = fs87.readFileSync(F87[k], 'utf8'); });
+  const mut87 = (k, from, to, extra) => { if (S87[k].split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 60)); return load87(F87[k], S87[k].replace(from, () => to) + (extra || '')); };
+  const snap87 = JSON.stringify({ u: mem.gw_users, d: mem.gw_data });
+  const reset87 = () => { const s = JSON.parse(snap87); mem.gw_users = s.u; mem.gw_data = s.d; };
+  // zip 작성기 — 항목 [이름, 원본 Buffer|null, deflate, 로컬 헤더 재사용 번호(겹친 항목)]
+  const zip87 = (entries) => { const locals = [], cds = [], offs = []; let off = 0;
+    for (const [name, raw, defl, reuse] of entries) { const nb = Buffer.from(name); let lo, csz, usz, mth;
+      if (reuse !== undefined) { lo = offs[reuse][0]; csz = offs[reuse][1]; usz = offs[reuse][2]; mth = offs[reuse][3]; }
+      else { const db = defl ? zlib87.deflateRawSync(raw, { level: 9 }) : raw; mth = defl ? 8 : 0; csz = db.length; usz = raw.length; lo = off;
+        const lh = Buffer.alloc(30); lh.writeUInt32LE(0x04034b50, 0); lh.writeUInt16LE(20, 4); lh.writeUInt16LE(mth, 8); lh.writeUInt32LE(csz, 18); lh.writeUInt32LE(usz, 22); lh.writeUInt16LE(nb.length, 26);
+        locals.push(lh, nb, db); off += 30 + nb.length + db.length; }
+      offs.push([lo, csz, usz, mth]);
+      const cd = Buffer.alloc(46); cd.writeUInt32LE(0x02014b50, 0); cd.writeUInt16LE(20, 4); cd.writeUInt16LE(20, 6); cd.writeUInt16LE(mth, 10); cd.writeUInt32LE(csz, 20); cd.writeUInt32LE(usz, 24); cd.writeUInt16LE(nb.length, 28); cd.writeUInt32LE(lo, 42);
+      cds.push(cd, nb); }
+    const cdb = Buffer.concat(cds), eocd = Buffer.alloc(22); eocd.writeUInt32LE(0x06054b50, 0); eocd.writeUInt16LE(Math.min(entries.length, 65535), 8); eocd.writeUInt16LE(Math.min(entries.length, 65535), 10); eocd.writeUInt32LE(cdb.length, 12); eocd.writeUInt32LE(off, 16);
+    return Buffer.concat([...locals, cdb, eocd]); };
+  const MB87 = 1024 * 1024;
+  try {
+    // ① zip — (가) 겹친 항목: 60MB 로컬 1개를 중앙 디렉터리 20줄이 가리킴 = 푼 것 1개 (나) 서로 다른 16MB 항목 10개(풀면 160MB) = 총량 128MB 안에서 8개·나머지 null
+    //   (다) 저장 항목 2100개 = 2000개까지 (라) hwpxExtractText 16MB 섹션 10개 = 글 길이 ≤ 128MB · 결함 사본(겹침 막기 걷음·총량 걷음·항목 수 걷음·hwpx 직접 풀기) ✗
+    const DD87 = require(F87.dd);
+    const zA = zip87([['x0.xml', Buffer.alloc(60 * MB87, 65), true]].concat(Array.from({ length: 19 }, (_, i) => ['x' + (i + 1) + '.xml', null, true, 0])));
+    const zB = zip87(Array.from({ length: 10 }, (_, i) => ['b' + i + '.xml', Buffer.alloc(16 * MB87, 66 + i), true]));
+    const zC = zip87(Array.from({ length: 2100 }, (_, i) => ['c' + i + '.txt', Buffer.from('c'), false]));
+    const zH = zip87(Array.from({ length: 10 }, (_, i) => ['Contents/section' + i + '.xml', Buffer.alloc(16 * MB87, 72), true]));
+    const sumOf = (o) => Object.keys(o).reduce((s, k) => s + (o[k] ? o[k].length : 0), 0), liveOf = (o) => Object.keys(o).filter((k) => o[k]).length;
+    const zipChk = (D) => { const a = D.zipEntries(zA); const ra = [liveOf(a), sumOf(a)]; const b = D.zipEntries(zB); const rb = [liveOf(b), sumOf(b), Object.keys(b).length]; const c = D.zipEntries(zC); return { a: ra, b: rb, c: Object.keys(c).length }; };
+    const zr = zipChk(DD87);
+    const zOk = zr.a[0] === 1 && zr.a[1] === 60 * MB87 && zr.b[0] === 8 && zr.b[1] <= DD87.ZIP_TOTAL_MAX && zr.b[2] === 10 && zr.c === DD87.ZIP_ENTRIES_MAX && DD87.ZIP_TOTAL_MAX === 128 * MB87 && DD87.ZIP_ENTRIES_MAX === 2000;
+    const zM = [zipChk(mut87('dd', '!skip(name) && !seenLho[lho] && ', '!skip(name) && ')), zipChk(mut87('dd', 'const cap = Math.min(ZIP_ENTRY_MAX, ZIP_TOTAL_MAX - used);', 'const cap = ZIP_ENTRY_MAX;')),
+      zipChk(mut87('dd', 'const n = Math.min(buf.readUInt16LE(eocd + 10), ZIP_ENTRIES_MAX)', 'const n = buf.readUInt16LE(eocd + 10)'))];
+    const zKill = zM[0].a[0] > 1 && zM[1].b[0] === 10 && zM[2].c === 2100;
+    const hx = load87(F87.gwd, S87.gwd + '\nexports.__hx87 = hwpxExtractText;').__hx87(zH).length;
+    const hxM = mut87('gwd', 'method === 8 ? bud.inflate(data) : bud.take(data)', "method === 8 ? require('zlib').inflateRawSync(data, { maxOutputLength: DD.ZIP_ENTRY_MAX }) : data", '\nexports.__hx87 = hwpxExtractText;').__hx87(zH).length;
+    T('87 v456 검토 ① zip 총량 예산: 겹친 항목(60MB 로컬 1개 ← 중앙 디렉터리 20줄) = 1개만 풂 · 서로 다른 16MB 항목 10개 = 8개(128MB 안)·나머지 null · 저장 항목 2100개 = 2000개까지 · hwpxExtractText 16MB 섹션 10개 = 글 ≤ 128MB · 결함 사본(겹침 막기·총량·항목 수·hwpx 직접 풀기) ✗',
+      zOk && zKill && hx > 0 && hx <= 128 * MB87 + 64 && hxM > 128 * MB87, JSON.stringify({ zr, zM: zM.map((m) => [m.a[0], m.b[0], m.c]), hxMB: Math.round(hx / MB87), hxMMB: Math.round(hxM / MB87) }));
+    // ② PII — 새로 잡는 꼴(검토 6꼴 + ₩ 없는 계좌 등)·새로 통과하는 꼴(쉼표 없는 금액·영문자 뒤 아이디·파일 이름 시각·₩ 금액) · 결함 사본(정규화 걷음·주민번호 구분자 걷음·11~14자리 옛 꼴) ✗
+    const LN87 = require(F87.ln);
+    const HIT87 = ['900101 1234567', '900101.1234567', '900101/1234567', '900101_1234567', '900101​1234567', '９００１０１－１２３４５６７', '０１０－１２３４－５６７８', '010​1234​5678', '９００１０１１２３４５６７', '계좌 110123456789 입금'];
+    const PASS87 = ['계약금액 15000000000원', '계약금액 15000000000 원', '{"id":"d1731456789012"}', 'F202611131530.xlsx', '₩15000000000', '2026.11.13 10:45', '면적 1,234.5㎡ · ① 항목', '시트!A34 45.123456789012'];
+    const pii87 = (L) => ({ miss: HIT87.filter((s) => L.piiScan(s).ok).length, fp: PASS87.filter((s) => !L.piiScan(s).ok).length });
+    const p87 = pii87(LN87);
+    const pM87 = [pii87(mut87('ln', '  s = piiNorm(s).replace(PII_OWN_RE,', '  s = String(s).replace(PII_OWN_RE,')), pii87(mut87('ln', '(?:0[1-9]|[12]\\d|3[01])[\\s./_]*[1-8]\\d{6}(?!\\d)/,', '(?:0[1-9]|[12]\\d|3[01])[1-8]\\d{6}(?!\\d)/,')),
+      pii87(mut87('ln', '  /(?<![\\dA-Za-z.₩])\\d{11,}(?!\\d|\\s*원|\\.(?:jpe?g|png|gif|heic|pdf|xlsx?|hwpx?|docx?|zip)\\b)/i];', '  /(?<![\\d.])\\d{11,14}(?!\\d)/];'))];   // v456 2차 검토: 지금 줄(88절) → 옛 꼴
+    T('87 v456 검토 ② PII: 공백·점·빗금·밑줄·폭 없는 문자로 나눈 주민번호·전각 주민번호·전각 휴대전화·폭 없는 문자 휴대전화·계좌 ' + HIT87.length + '꼴 잡힘 · 쉼표 없는 금액(원·₩)·영문자 뒤 아이디·파일 이름 시각·①·㎡ ' + PASS87.length + '꼴 통과 · 결함 사본(정규화 걷음 = 전각 샘·주민번호 구분자 걷음 = 샘·11~14자리 옛 꼴 = 오탐) ✗',
+      p87.miss === 0 && p87.fp === 0 && pM87[0].miss > 0 && pM87[1].miss > 0 && pM87[2].fp > 0, JSON.stringify({ p87, pM87 }));
+    // ③ 숫자 아닌 updated_at — handleSave: base 0 = 409 · 글자 base = 200(숫자로 고침) · 휴지통(doc_restore): 글자 시각 + 글자 base = 200·숫자로 고침 · base 0 = 409 · 결함 사본(두 base 0 줄 걷음·휴지통 유한 검사 걷음) ✗
+    const chkC87 = async (mod) => { reset87(); const c = async (body) => { const r = await mod.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + tokA }, body: JSON.stringify(body) }); return { code: r.statusCode, body: JSON.parse(r.body || '{}') }; };
+      const TS = '2026-11-11T00:00:00Z';
+      mem.gw_data['col:vehicles'] = { schema: 1, items: [{ id: 'v87', no: '87가' }], updated_at: TS };
+      const s0 = await c({ action: 'save', collection: 'vehicles', base: 0, doc: { schema: 1, items: [] } }), kept = mem.gw_data['col:vehicles'].items.length === 1;
+      const s1 = await c({ action: 'save', collection: 'vehicles', base: TS, doc: { schema: 1, items: [{ id: 'v87', no: '87나' }] } }), num1 = typeof mem.gw_data['col:vehicles'].updated_at === 'number';
+      mem.gw_data['col:documents'] = { schema: 1, items: [{ id: 'd87', title: '휴지통 87', cat: '02-01', del: 1, deleted_at: new Date().toISOString(), deleted_by: { id: 'uadmin', name: '관리자' } }], updated_at: TS };
+      const t0 = await c({ action: 'doc_restore', id: 'd87', base: 0 }), still = mem.gw_data['col:documents'].items[0].del === 1;
+      const t1 = await c({ action: 'doc_restore', id: 'd87', base: TS }), num2 = typeof mem.gw_data['col:documents'].updated_at === 'number' && mem.gw_data['col:documents'].items[0].del === undefined;
+      return { ok: s0.code === 409 && s0.body.error_code === 'STALE_BASE' && kept && s1.code === 200 && num1 && t0.code === 409 && still && t1.code === 200 && num2, info: [s0.code, kept, s1.code, num1, t0.code, still, t1.code, num2] };
+    };
+    const rC87 = await chkC87(gwd);
+    const mC87 = [await chkC87(mut87('gwd', "  if (d.base !== undefined && prevDoc && prevDoc.updated_at && !Number.isFinite(Number(prevDoc.updated_at)) && Number(d.base) === 0)\n", '  if (false)\n')),
+      await chkC87(mut87('gwd', "  if (d.base !== undefined && doc.updated_at && !Number.isFinite(Number(doc.updated_at)) && Number(d.base) === 0) return", '  if (false) return')),
+      await chkC87(mut87('gwd', "  if (d.base !== undefined && doc.updated_at && Number.isFinite(Number(doc.updated_at)) && Number(d.base) !== Number(doc.updated_at)) return", '  if (d.base !== undefined && doc.updated_at && Number(d.base) !== Number(doc.updated_at)) return'))];
+    T('87 v456 검토 ③ 숫자 아닌 updated_at: 저장 base 0(GET 못 받은 기기) = 409 STALE_BASE·서버 문서 그대로 · 그 글자 base = 200·숫자로 고침 · 휴지통 복구 base 0 = 409·글자 base = 200·숫자로 고침 · 결함 사본(저장 base 0 줄 걷음·휴지통 base 0 줄 걷음·휴지통 유한 검사 걷음) ✗',
+      rC87.ok && mC87.every((m) => !m.ok), JSON.stringify({ C: rC87.info, mut: mC87.map((m) => m.info) }));
+    // ④ 간극 식 판 — 옛 칸 비교 간극(gv 없음) 10 + 새 9 = 기준선 없음 · 새 1 더 = 기준선(새 10건 평균) · 문단 비교 간극은 판 없이도 셈 · 정적: gw-data 짝 간극 gv·워커 gv · 결함 사본(판 거르기 걷음) ✗
+    const gapL87 = (L) => { const old = Array.from({ length: 10 }, (_, i) => ({ pair: 'o' + i, kind: 'xlsx_cell', ratio: 0.9, ts: 100 + i })); const nw = Array.from({ length: 9 }, (_, i) => ({ pair: 'n' + i, kind: 'xlsx_cell', ratio: 0.2, gv: L.GAP_VER, ts: 200 + i }));
+      const A = { gaps: old.concat(nw) }; L.freezeBaseline(A, 1000); const B = { gaps: old.concat(nw, [{ pair: 'n9', kind: 'xlsx_cell', ratio: 0.2, gv: L.GAP_VER, ts: 300 }]) }; L.freezeBaseline(B, 1000);
+      const H = { gaps: Array.from({ length: 10 }, (_, i) => ({ pair: 'h' + i, kind: 'hwpx_para', ratio: 0.5, ts: 100 + i })) }; L.freezeBaseline(H, 1000);
+      return [!A.baseline, B.baseline ? Math.round(B.baseline.avg * 1000) / 1000 : null, B.baseline ? B.baseline.pairs.indexOf('o0') : null, H.baseline ? H.baseline.n : 0]; };
+    const g87 = gapL87(LN87), gM87 = gapL87(mut87('ln', " && !(x.kind === 'xlsx_cell' && Number(x.gv) !== GAP_VER)", ''));
+    const wk87 = fs87.readFileSync(join(FN, 'gw-learn-background.js'), 'utf8');
+    const gStat87 = /comparable: gap\.comparable, late: pick\.late \? 1 : 0, gv: LN\.GAP_VER \}, now\);/.test(S87.gwd) && /gv: \(pair\.diff && typeof pair\.diff\.blank_both === 'number'\) \? LN\.GAP_VER : 1,/.test(wk87) && LN87.GAP_VER === 2;
+    T('87 v456 검토 ④ 간극 식 판(T427): 옛 칸 비교 간극 10 + 새 9 = 기준선 없음 · 새 10 = 기준선 0.2(옛 간극 빠짐) · 문단 비교 간극 10 = 판 없이 기준선 · gw-data 짝 간극 gv·워커 gv(diff에 blank_both면 2) · 결함 사본(판 거르기 걷음 = 옛 간극으로 기준선) ✗',
+      JSON.stringify(g87) === '[true,0.2,-1,10]' && gStat87 && JSON.stringify(gM87) !== JSON.stringify(g87), JSON.stringify({ g87, gM87, gStat87 }));
+    // ⑤ 호출처·옛 비교 정적: 앱 index.html backup_put 0 · tools/*.mjs 중 servertest·uismoke 밖 backup_put 0 · gw-lawwatch 옛 비교 사본은 정적 검사에서 ✗(86 ⑦은 cron-kick만 심었음)
+    const ixBp87 = (fs87.readFileSync(join(ROOT, 'index.html'), 'utf8').match(/backup_put/g) || []).length;
+    const toolBp87 = fs87.readdirSync(join(ROOT, 'tools')).filter((f) => /\.(mjs|js|py|ps1)$/.test(f) && f !== 'servertest.mjs' && f !== 'uismoke.mjs').filter((f) => /backup_put/.test(fs87.readFileSync(join(ROOT, 'tools', f), 'utf8')));
+    const stat87 = (s) => !/[!=]==\s*secret\b/.test(s) && /require\('\.\/_lib\/keymatch'\)/.test(s) && /botKeyOk\(/.test(s) && !/process\.env\.BIDS_INGEST_KEY/.test(s);
+    const srcL87 = fs87.readFileSync(join(FN, 'gw-lawwatch.js'), 'utf8');
+    if (srcL87.split('  if (!botKeyOk(got))').length !== 2) throw new Error('lawwatch 결함 자리 없음');
+    const oldL87 = srcL87.replace('  if (!botKeyOk(got))', "  const secret = (process.env.BIDS_INGEST_KEY || '').trim();\n  if (!secret || String(got).trim() !== secret)");
+    T('87 v456 검토 ⑤ 호출처·옛 비교 정적: 앱 index.html backup_put 0 · tools 폴더(servertest·uismoke 밖) backup_put 0 · gw-lawwatch 지금 = 상수시간 · lawwatch 옛 비교 사본 = 정적 ✗',
+      ixBp87 === 0 && toolBp87.length === 0 && stat87(srcL87) && !stat87(oldL87), JSON.stringify({ ixBp87, toolBp87, now: stat87(srcL87), old: stat87(oldL87) }));
+  } catch (e) { T('87 v456 검토 반영 묶음 실행', false, String(e && e.message)); } finally { reset87(); }
+}
+
+{ // ---- 88(v456 2차 검토 11/13) — ① docdiff: 같은 Buffer는 한 번만 풂(WeakMap)·통합 문서 칸 상한 XLSX_CELLS_MAX ② PII: 가운뎃점·15자리 이상·파일 이름 확장자 ③ 400 ORPHAN_WORKER 고아 id 목록
+  //   ④ 동기 압축 풀기 자리 고정(정적 — docdiff zipBudget 1곳·gw-data parseBody gunzip 1곳) ⑤ appdata autotask --selftest(폴더·python 있을 때).
+  //   검사마다 고친 자리를 되돌린 사본(메모리 컴파일 — 파일은 쓰지 않음)에서는 실패해야 한다. 실패 글에 번호 값은 싣지 않는다.
+  const fs88 = require('fs'), Mod88 = require('module'), zlib88 = require('zlib'), cp88 = require('child_process');
+  const load88 = (file, src) => { const m = new Mod88(file); m.filename = file; m.paths = Mod88._nodeModulePaths(dirname(file)); m._compile(src, file); return m.exports; };
+  const F88 = { gwd: join(FN, 'gw-data.js'), dd: join(FN, '_lib/docdiff.js'), ln: join(FN, '_lib/learn.js') };
+  const S88 = {}; Object.keys(F88).forEach((k) => { S88[k] = fs88.readFileSync(F88[k], 'utf8'); });
+  const mut88 = (k, from, to) => { if (S88[k].split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 60)); return load88(F88[k], S88[k].replace(from, () => to)); };
+  const snap88 = JSON.stringify({ u: mem.gw_users, d: mem.gw_data });
+  const reset88 = () => { const s = JSON.parse(snap88); mem.gw_users = s.u; mem.gw_data = s.d; };
+  const zip88 = (entries) => { const locals = [], cds = []; let off = 0;
+    for (const [name, raw] of entries) { const nb = Buffer.from(name), db = zlib88.deflateRawSync(raw, { level: 9 });
+      const lh = Buffer.alloc(30); lh.writeUInt32LE(0x04034b50, 0); lh.writeUInt16LE(20, 4); lh.writeUInt16LE(8, 8); lh.writeUInt32LE(db.length, 18); lh.writeUInt32LE(raw.length, 22); lh.writeUInt16LE(nb.length, 26);
+      const cd = Buffer.alloc(46); cd.writeUInt32LE(0x02014b50, 0); cd.writeUInt16LE(20, 4); cd.writeUInt16LE(20, 6); cd.writeUInt16LE(8, 10); cd.writeUInt32LE(db.length, 20); cd.writeUInt32LE(raw.length, 24); cd.writeUInt16LE(nb.length, 28); cd.writeUInt32LE(off, 42);
+      locals.push(lh, nb, db); cds.push(cd, nb); off += 30 + nb.length + db.length; }
+    const cdb = Buffer.concat(cds), eocd = Buffer.alloc(22); eocd.writeUInt32LE(0x06054b50, 0); eocd.writeUInt16LE(entries.length, 8); eocd.writeUInt16LE(entries.length, 10); eocd.writeUInt32LE(cdb.length, 12); eocd.writeUInt32LE(off, 16);
+    return Buffer.concat([...locals, cdb, eocd]); };
+  const xlsx88 = (sheet, shared) => zip88([['xl/workbook.xml', Buffer.from('<workbook><sheets><sheet name="S" r:id="rId1"/></sheets></workbook>')],
+    ['xl/_rels/workbook.xml.rels', Buffer.from('<Relationships><Relationship Id="rId1" Target="worksheets/sheet1.xml"/></Relationships>')], ['xl/worksheets/sheet1.xml', Buffer.from(sheet)]].concat(shared ? [['xl/sharedStrings.xml', Buffer.from(shared)]] : []));
+  try {
+    // ① (가) 같은 폭탄 최종본(같은 칸 20MB)으로 matchScore 12번 + xlsxCellDiff 1번 = 큰 풀기 1번(종전 13번) · hwpxParas 같은 Buffer 두 번 = 같은 결과 객체
+    //   (나) 서로 다른 칸 XLSX_CELLS_MAX개 = ok · 1개 더 = ok:false TOO_MANY_CELLS · 공유 문자열이 상한을 넘어도 TOO_MANY_CELLS · 결함 사본(메모 걷음 = 13번 · hwpx 메모 걷음 · 칸 세기 걷음 = ok) ✗
+    const cellA = '<c r="A1" t="inlineStr"><is><t>x</t></is></c>';
+    const bomb = xlsx88('<worksheet><sheetData><row r="1">' + cellA.repeat(Math.floor(20 * 1024 * 1024 / cellA.length)) + '</row></sheetData></worksheet>');
+    const recF = { fill: { edits: { S: [['A1', 'x', 's']] } } };
+    const bigCount = (D) => { const orig = zlib88.inflateRawSync; let n = 0; zlib88.inflateRawSync = function () { const r = orig.apply(this, arguments); if (r.length > 1024 * 1024) n++; return r; };
+      try { const fb = Buffer.from(bomb); for (let i = 0; i < 12; i++) D.matchScore(recF, 'xlsx', 'xlsx', fb); D.xlsxCellDiff([['S!A1', 'x', 's']], fb); } finally { zlib88.inflateRawSync = orig; } return n; };
+    const DD88 = require(F88.dd);
+    const n1 = bigCount(DD88), nM = bigCount(mut88('dd', 'function xlsxCells(buf) { return memoBuf(MEMO_XLSX, buf, xlsxCellsRaw); }', 'function xlsxCells(buf) { return xlsxCellsRaw(buf); }'));
+    const hz = zip88([['Contents/section0.xml', Buffer.from('<hp:p><hp:t>가</hp:t></hp:p>')]]);
+    const hSame = DD88.hwpxParas(hz) === DD88.hwpxParas(hz), hM = mut88('dd', 'function hwpxParas(buf) { return memoBuf(MEMO_HWPX, buf, hwpxParasRaw); }', 'function hwpxParas(buf) { return hwpxParasRaw(buf); }');
+    const hSameM = hM.hwpxParas(hz) === hM.hwpxParas(hz);
+    const cells = (n) => { const p = []; for (let i = 1; i <= n; i++) p.push('<c r="A' + i + '"><v>1</v></c>'); return '<worksheet><sheetData><row r="1">' + p.join('') + '</row></sheetData></worksheet>'; };
+    const MAXC = DD88.XLSX_CELLS_MAX, xOk = xlsx88(cells(MAXC)), xOver = xlsx88(cells(MAXC + 1));
+    const xSS = xlsx88(cells(1), '<sst>' + '<si><t>s</t></si>'.repeat(MAXC + 1) + '</sst>');
+    const capChk = (D) => { const a = D.xlsxCells(Buffer.from(xOk)), b = D.xlsxCells(Buffer.from(xOver)), c = D.xlsxCells(Buffer.from(xSS)); return [a.ok, b.ok ? 'ok' : b.code, c.ok ? 'ok' : c.code]; };
+    const cap = capChk(DD88), capM = capChk(mut88('dd', '    if (cnt && ++cnt.n > XLSX_CELLS_MAX) break;\n', ''));
+    T('88 v456 2차 검토 ① docdiff: 같은 폭탄 최종본으로 matchScore 12번 + xlsxCellDiff = 큰 풀기 1번(WeakMap) · hwpxParas 같은 Buffer = 같은 결과 · 통합 문서 칸 ' + MAXC + '개 = ok · 1개 더·공유 문자열 상한 넘음 = TOO_MANY_CELLS · 결함 사본(메모 걷음 = 13번 · hwpx 메모 걷음 · 칸 세기 걷음 = ok) ✗',
+      n1 === 1 && nM === 13 && hSame && !hSameM && MAXC === 200000 && JSON.stringify(cap) === '[true,"TOO_MANY_CELLS","TOO_MANY_CELLS"]' && capM[1] === 'ok', JSON.stringify({ n1, nM, hSame, hSameM, cap, capM }));
+    // ② PII(번호는 모두 시험용 꾸밈 값): 가운뎃점(· ・ ∙ •, 앞뒤 띄어쓰기 포함)으로 나눈 주민번호·휴대전화·지역번호 · 16자리·20자리 이어진 숫자 · 가운뎃점 뒤 계좌 = 잡힘
+    //   파일 이름 시각(밑줄·띄어쓰기·대문자 확장자 뒤) · 가운뎃점 날짜·소수 = 통과 · 결함 사본(가운뎃점 정규화 걷음·위 상한 {11,14}로 되돌림·확장자 예외 걷음) ✗
+    const MD88 = String.fromCharCode(0xB7, 0x30FB, 0x2219, 0x2022), dot = String.fromCharCode(0xB7), kdot = String.fromCharCode(0x30FB), bdot = String.fromCharCode(0x2219), blt = String.fromCharCode(0x2022);
+    const HIT88 = ['900101' + dot + '1234567', '900101 ' + kdot + ' 1234567', '010' + dot + '1234' + dot + '5678', '010 ' + bdot + ' 1234 ' + bdot + ' 5678', '054' + blt + '123' + blt + '4567', '카드 1234567812345678', '12345678901234567890', '계좌' + dot + '12345678901234'];
+    const PASS88 = ['사진_20261113153012.jpg', 'scan_202611131530.pdf', '현장 202611131530.JPG', '보고서_202611131530.hwpx', '안전 ' + dot + ' 품질 ' + dot + ' 2026' + dot + '11' + dot + '13', '45' + dot + '123456789012', '계약금액 1500000000000000원'];
+    const pii88 = (L) => ({ miss: HIT88.filter((s) => L.piiScan(s).ok).length, fp: PASS88.filter((s) => !L.piiScan(s).ok).length });
+    const p88 = pii88(require(F88.ln));
+    const pM88 = [pii88(mut88('ln', "\n    .replace(/(\\d)\\s*[" + MD88 + "]\\s*(?=\\d)/g, '$1.').replace(/[" + MD88 + "]/g, ' ');", ';')), pii88(mut88('ln', '\\d{11,}(?!\\d|', '\\d{11,14}(?!\\d|')),
+      pii88(mut88('ln', '|\\.(?:jpe?g|png|gif|heic|pdf|xlsx?|hwpx?|docx?|zip)\\b)/i];', ')/i];'))];
+    T('88 v456 2차 검토 ② PII: 가운뎃점(앞뒤 띄어쓰기 포함) 주민번호·휴대전화·지역번호 · 16·20자리 · 가운뎃점 뒤 계좌 ' + HIT88.length + '꼴 잡힘 · 밑줄·띄어쓰기·대문자 확장자 파일 이름 시각·가운뎃점 날짜·소수·원 금액 ' + PASS88.length + '꼴 통과 · 결함 사본(가운뎃점 정규화 걷음·위 상한 {11,14}·확장자 예외 걷음) ✗',
+      p88.miss === 0 && p88.fp === 0 && pM88[0].miss > 0 && pM88[1].miss > 0 && pM88[2].fp > 0, JSON.stringify({ p88, pM88 }));
+    // ③ 400 ORPHAN_WORKER = 새로 들어온 명부 밖 id 목록(ids)도 돌려줌(그 줄에 있던 명부 밖 id는 넣지 않음 · 저장 안 됨) · 결함 사본(목록 걷음) ✗
+    const chkO88 = async (mod) => { reset88(); const c = async (body) => { const r = await mod.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + tokA }, body: JSON.stringify(body) }); return { code: r.statusCode, body: JSON.parse(r.body || '{}') }; };
+      mem.gw_data['col:workers'] = { schema: 1, items: [{ id: 'w88' }], updated_at: 1 };
+      mem.gw_data['col:asbestos'] = { schema: 1, items: [{ id: 'a88', worker_ids: ['wOld88'] }], updated_at: 5 };
+      const r = await c({ action: 'save', collection: 'asbestos', base: 5, doc: { schema: 1, items: [{ id: 'a88', worker_ids: ['wOld88', 'w88', 'wX88', 'wY88'] }] } });
+      const kept = JSON.stringify(mem.gw_data['col:asbestos'].items[0].worker_ids) === '["wOld88"]';
+      return { ok: r.code === 400 && r.body.error_code === 'ORPHAN_WORKER' && r.body.n === 2 && JSON.stringify((r.body.ids || []).slice().sort()) === '["wX88","wY88"]' && kept, info: [r.code, r.body.error_code, r.body.n, r.body.ids, kept] }; };
+    const o88 = await chkO88(gwd), oM88 = await chkO88(mut88('gwd', ", ids: orphans.slice(0, 50).map(function (i) { return String(i).slice(0, 40); })", ''));
+    T('88 v456 2차 검토 ③ 400 ORPHAN_WORKER = 새로 들어온 명부 밖 id 목록(ids — 그 줄에 있던 명부 밖 id는 뺌)·n 2·저장 안 됨(앱이 두 번째 400에서 이 id만 대장에서 빼고 다시 저장 — uismoke v456 ⑧) · 결함 사본(목록 걷음) ✗',
+      o88.ok && !oM88.ok, JSON.stringify({ o88: o88.info, oM88: oM88.info }));
+    // ④ 정적: netlify/functions 아래 동기 압축 풀기 호출 = _lib/docdiff.js inflateRawSync 1곳(zipBudget.inflate) + gw-data.js gunzipSync 1곳(parseBody) 뿐 —
+    //   새 풀기는 DD.zipEntries·DD.zipBudget()으로만(항목당 상한만 건 직접 호출은 총량 예산을 비켜 감 — 87 ①의 hwpx 결함 꼴) · 결함 사본(gw-data에 항목당 상한 직접 풀기 1줄 더함) ✗
+    const sites88 = (extra) => { const out = [];
+      const walk = (d) => fs88.readdirSync(d, { withFileTypes: true }).forEach((e) => { const p = join(d, e.name); if (e.isDirectory()) { if (e.name !== 'node_modules') walk(p); } else if (/\.js$/.test(e.name)) {
+        const rel = p.slice(FN.length + 1).replace(/\\/g, '/'); const src = fs88.readFileSync(p, 'utf8') + (extra && extra[rel] ? extra[rel] : '');
+        src.split('\n').forEach((l) => { const m = /\b(inflateRawSync|gunzipSync|inflateSync|unzipSync|brotliDecompressSync|inflateRaw|gunzip|unzip)\(/.exec(l); if (m) out.push(rel + ':' + m[1]); }); } });
+      walk(FN); return out.sort(); };
+    const st88 = sites88(), stM88 = sites88({ 'gw-data.js': '\n    const raw2 = zlib.inflateRawSync(data, { maxOutputLength: DD.ZIP_ENTRY_MAX });' });
+    const pb88 = (() => { const i = S88.gwd.indexOf('function parseBody('), j = S88.gwd.indexOf('\n}', i); return i >= 0 ? S88.gwd.slice(i, j) : ''; })();
+    const fix88 = (L) => JSON.stringify(L) === JSON.stringify(['_lib/docdiff.js:inflateRawSync', 'gw-data.js:gunzipSync']);
+    T('88 v456 2차 검토 ④ 정적: 함수 폴더 동기·비동기 압축 풀기 호출 = _lib/docdiff.js inflateRawSync 1곳 + gw-data.js gunzipSync 1곳(parseBody 안)뿐 · 결함 사본(gw-data에 항목당 상한만 건 inflateRawSync 1줄) ✗',
+      fix88(st88) && /gunzipSync\(/.test(pb88) && !fix88(stM88), JSON.stringify({ st88, stM88 }));
+    // ⑤ appdata autotask --selftest(원장 C106 — 워크플로는 --dry-run·실행만 돌림): 형제 폴더 jongwoon-appdata·python이 있을 때만 rc 0·"selftest 통과"·결함 사본 줄 ✓ — 없으면 생략을 알림
+    const ad88 = join(ROOT, '..', 'jongwoon-appdata', 'collectors', 'autotask.py');
+    if (!fs88.existsSync(ad88)) console.log('  (88 ⑤ 생략 — jongwoon-appdata 폴더 없음)');
+    else {
+      const r = cp88.spawnSync('python', ['-I', '-X', 'utf8', ad88, '--selftest'], { encoding: 'utf8', timeout: 120000 });
+      if (r.error && r.error.code === 'ENOENT') console.log('  (88 ⑤ 생략 — python 없음)');
+      else T('88 v456 2차 검토 ⑤ appdata autotask.py --selftest(python -I -X utf8): rc 0 · "selftest 통과 (n/n)" · 결함 사본 줄 ✓ 포함',
+        r.status === 0 && /selftest 통과 \((\d+)\/\1\)/.test(r.stdout || '') && /✓ 결함 사본/.test(r.stdout || ''), JSON.stringify({ rc: r.status, tail: String(r.stdout || '').trim().split('\n').slice(-1)[0], err: String(r.stderr || '').slice(0, 200) }));
+    }
+  } catch (e) { T('88 v456 2차 검토 묶음 실행', false, String(e && e.message)); } finally { reset88(); }
 }
 
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

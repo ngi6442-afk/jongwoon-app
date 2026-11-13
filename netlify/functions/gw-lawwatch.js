@@ -5,6 +5,7 @@
 // 동작: 전문을 lawwatch:last 에 보관(추후 화면용) + 관리자 전원 푸시(알림함은 sendTo가 자동 기록).
 const push = require('./_lib/push');
 const { setupBlobContext, store, blobSet } = require('./_lib/blobs');
+const { botKeyOk } = require('./_lib/keymatch');
 
 const jr = (code, obj) => ({
   statusCode: code,
@@ -19,9 +20,9 @@ exports.handler = async (event) => {
   let d = {};
   try { d = JSON.parse(event.body || '{}'); } catch (e) { return jr(400, { status: 'BAD_JSON' }); }
 
-  const secret = (process.env.BIDS_INGEST_KEY || '').trim();
-  const got = String((event.headers && (event.headers['x-ingest-key'] || event.headers['X-Ingest-Key'])) || d.key || '').trim();
-  if (!secret || got !== secret) return jr(403, { status: 'FORBIDDEN', error_code: 'BAD_INGEST_KEY' });
+  // v456(원장 C108): 상수시간 비교(_lib/keymatch botKeyOk — gw-data와 같은 규칙, 종전 '!==')
+  const got = (event.headers && (event.headers['x-ingest-key'] || event.headers['X-Ingest-Key'])) || d.key || '';
+  if (!botKeyOk(got)) return jr(403, { status: 'FORBIDDEN', error_code: 'BAD_INGEST_KEY' });
 
   const alerts = Array.isArray(d.alerts) ? d.alerts.map((a) => String(a)).filter(Boolean) : [];
   if (!alerts.length) return jr(400, { status: 'NO_ALERTS' });
