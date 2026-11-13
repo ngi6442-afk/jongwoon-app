@@ -9122,7 +9122,7 @@ try {
     '정리 대상 1,403건 중 220건', '(가) 지운 패스 id를', '(나) 부동산은 신규만 정리', '(다) 그대로', "머리 글은 옛 본문과 같은 식 '총 n · 표시 a/b'", '`onPaint(M)`', '`vs-gsep`', '`kstDay`', "'(복구 전 자동보존)'", "법정 약칭 '광주특별시'", 'servertest 절 83', '켠 뒤 되돌리기(검토 반영 — 순서)'];
   const ops24 = cbOps17[0] || '', gate24 = cbGate17[0] || '';
   const TL24 = ['**재공고와 패스**', '(가) 지운 패스 id를 기억해', '(나) 부동산은 신규만 정리', '(다) 그대로', '`{action:"onbid_purge_set",on:false,', '`{action:"ver_list",collection:"onbid"}`', '`{action:"ver_restore",collection:"onbid",ts:…}`', "'(복구 전 자동보존)'"];
-  const MAN24 = ['<b>전남광주통합특별시</b>도 두 글자 줄임말이 없어 그대로 두며', '전체는 <span class="btn">전체</span> 버튼 숫자와 같습니다(용도 버튼을 켜면 그 용도 안에서)', '정리된 뒤에는 <b>신규</b>로 다시 들어옵니다'];
+  const MAN24 = ['<b>전남광주통합특별시</b>는 법정 약칭 <b>광주특별시</b>로 보이고', '전체는 <span class="btn">전체</span> 버튼 숫자와 같습니다(용도 버튼을 켜면 그 용도 안에서)', '정리된 뒤에는 <b>신규</b>로 다시 들어옵니다'];
   const CL24 = ['정의 옵션 `onPaint(M)`', '`vs-gsep`', '**재공고와 패스는 PM 결정 대기**', "'광주특별시'", '`kstDay`'];
   const doc24 = FT24.filter((s) => ftv17.indexOf(s) < 0).concat(TL24.filter((s) => ops24.indexOf(s) < 0).map((s) => 'TL ' + s), MAN24.filter((s) => man12_17.indexOf(s) < 0).map((s) => 'MAN ' + s), CL24.filter((s) => cl17.indexOf(s) < 0).map((s) => 'CL ' + s));
   T('v444 ㉔ 검토 문서: FEATURES v444 검토 반영 줄(10건·재공고와 패스 PM 결정 대기 + 실측 1,403/220 + 선택지 가·나·다·머리 총·표시·onPaint·vs-gsep·kstDay·복구 전 자동보존·법정 약칭·servertest 83)·되돌리기 순서 · TESTLIST 운영 칸(재공고 보고·선택지·끈 뒤 ver_list → ver_restore·복구 전 자동보존)·게이트 칸 "검토 반영 뒤" · MANUAL 12절(통합특별시·건수 글 전체·재공고 신규) · CLAUDE.md(onPaint·vs-gsep·재공고 PM 대기·광주특별시·kstDay)',
