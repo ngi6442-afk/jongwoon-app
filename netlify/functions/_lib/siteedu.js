@@ -7,7 +7,8 @@
 // 앱 index.html의 asbNoSpecial · eduHasValidSpecial(eduLatest) · asList · memberName(findMember) · dispName(isBossMember)과 **같은 규칙** — 바꾸면 동시에.
 //   uismoke v433 ①이 index.html에서 그 함수들을 뽑아 같은 표본(종결·삭제 대장 · 삭제 일용직 · special 아닌 기록 · 지운 기록 · 기록 여러 건 · 이름 같은 사람 ·
 //   대표 · 퇴사자 · 삭제 회원 · 토큰 · 문자열 칸)에서 이 함수와 같은 사람·같은 순서를 내는지 대조한다.
-//   - 대장: 지운 줄(del 1)·종결(status done) 빼고(앱 renderSites가 그리는 줄 + 종결이면 건너뜀) — 준설·철거 현장까지 검사(앱 지금 범위 그대로, 종류를 좁히면 화면이 바뀐다)
+//   - 대장: 지운 줄(del 1)·종결(status done) 빼고(앱 renderSites가 그리는 줄 + 종결이면 건너뜀) — v454(원장 C086): 현장 종류별 — 석면 = 석면 특별교육(special) · 철거 = 해체 특별교육(special_demo) · 준설 = 판정 안 함(빈 목록).
+//     돌려주는 kinds = 현장별 판정 종류. 그 종류 기록이 0건(has_edu·has_demo false)인 현장의 이름·수 비우기는 gw-data가 한다(앱은 '기록 없음'만 그림)
 //   - 유효한 특별교육 기록 = 지우지 않은 교육 기록 중 같은 대상(ptype member|worker)·같은 사람(pid)·종류 special이 1건이라도 있음
 //     (앱 eduHasValidSpecial = eduLatest(…, "special")가 null이 아님 — 이수일·다음 예정일은 보지 않는다)
 //   - 직원 이름 = 회원 명부(지운 회원 제외·퇴사자는 남김 — 앱이 받는 member_list와 같은 범위·순서)에서 id로 찾은 이름. 대표는 '대표님'(앱 dispName — 등급 판정은 tier.js),
@@ -65,28 +66,36 @@ function siteEduGaps(sites, eduItems, workers, members, opts) {
     if (name === '나종운') return '대표님';
     return name;
   }
-  function hasSpecial(ptype, pid) {
-    for (let i = 0; i < edu.length; i++) { const r = edu[i]; if (r.ptype === ptype && r.pid === pid && r.kind === 'special') return true; }
+  // v454(원장 C086): 현장 종류별 특별교육 종류 — 석면(종류 없음·모르는 값 = 석면: 앱 siteKind) = special · 철거 = special_demo(해체 특별교육) · 준설 = 판정 안 함(빈 목록)
+  function eduKindOf(r) { return r.kind === 'demolition' ? 'special_demo' : (r.kind === 'dredge' ? '' : 'special'); }
+  function hasKind(ptype, pid, kind) {
+    for (let i = 0; i < edu.length; i++) { const r = edu[i]; if (r.ptype === ptype && r.pid === pid && r.kind === kind) return true; }
     return false;
   }
+  const has = edu.some(function (r) { return typeof r === 'object' && r.kind === 'special'; });   // v447 특별교육 기록만(위 has_edu 설명)
+  const hasDemo = edu.some(function (r) { return typeof r === 'object' && r.kind === 'special_demo'; });   // v454 해체 특별교육 기록 유무(앱 eduAnyKind("special_demo"))
   function workerName(id) {
     for (let i = 0; i < wk.length; i++) { const w = wk[i]; if (w && w.id === id && w.del !== 1) return w.name || ''; }
     return '';
   }
-  const gaps = {}, wkN = {};
+  const gaps = {}, wkN = {}, kinds = {};
   (Array.isArray(sites) ? sites : []).forEach(function (r) {
     if (!r || typeof r !== 'object' || r.del === 1 || r.status === 'done' || r.id == null) return;
     const key = String(r.id);
     if (key === '__proto__' || hasOwn(gaps, key)) return;   // 같은 id 두 줄은 앞 줄만(대장 id는 하나씩 — 객체 원형 키는 받지 않는다)
     const out = [];
     let k = 0;
-    asList(r.member_ids).forEach(function (id) { if (!hasSpecial('member', id)) { const n = dispName(memberName(id)); if (n) out.push(n); } });
-    asList(r.worker_ids).forEach(function (id) { if (hasSpecial('worker', id)) return; const n = workerName(id); if (!n) return; if (wkNames) out.push(n); else k++; });
+    const kind = eduKindOf(r);
+    kinds[key] = kind;
+    if (kind) {   // 준설('')은 판정 안 함 — 빈 목록(앱 asbNoSpecial과 같은 답)
+      asList(r.member_ids).forEach(function (id) { if (!hasKind('member', id, kind)) { const n = dispName(memberName(id)); if (n) out.push(n); } });
+      asList(r.worker_ids).forEach(function (id) { if (hasKind('worker', id, kind)) return; const n = workerName(id); if (!n) return; if (wkNames) out.push(n); else k++; });
+    }
     gaps[key] = out;
     if (!wkNames) wkN[key] = k;
   });
-  const has = edu.some(function (r) { return typeof r === 'object' && r.kind === 'special'; });   // v447 특별교육 기록만(위 has_edu 설명)
-  return wkNames ? { has_edu: has, gaps: gaps } : { has_edu: has, gaps: gaps, wk_n: wkN };
+  // kinds = 현장별 판정 종류(special | special_demo | '') — 그 종류 기록이 0건인 현장의 이름·수 비우기는 부르는 쪽(gw-data handleSiteEduGap)이 has_edu·has_demo로 한다(이 함수는 앱과 같은 이름을 그대로)
+  return wkNames ? { has_edu: has, has_demo: hasDemo, gaps: gaps, kinds: kinds } : { has_edu: has, has_demo: hasDemo, gaps: gaps, kinds: kinds, wk_n: wkN };
 }
 
 module.exports = { asList, memberList, siteEduGaps };

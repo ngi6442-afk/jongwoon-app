@@ -280,7 +280,12 @@ async function handleSiteEduGap(event, d, R) {
   if (!Array.isArray(ms) || ms.unavailable) return jr(500, { status: 'ERROR', error_code: 'MEMBERS_UNAVAILABLE', request_id: R });
   const items = function (x) { return (x.data && Array.isArray(x.data.items)) ? x.data.items : []; };   // 없는 키(실 Blobs ok·data null — 운영 col:edu 지금 상태) = 0건
   const out = SITEEDU.siteEduGaps(items(ra), items(re), items(rw), ms, { workerNames: wkSee });
-  return jr(200, Object.assign({ status: 'OK', ok: true, has_edu: out.has_edu, gaps: out.has_edu ? out.gaps : {} }, wkSee ? {} : { wk_n: out.has_edu ? out.wk_n : {} }, { request_id: R }));
+  // v454(원장 C086): 현장 종류별 — 석면 = 석면 특별교육(has_edu) · 철거 = 해체 특별교육(has_demo) · 준설 = 판정 안 함. 그 종류 기록이 0건인 현장은 이름·수를 비운다
+  //   (앱은 '기록 없음 — 이수 여부 미확인'만 그림 — 전원을 미이수로 내보내지 않게. 종전엔 has_edu 하나로 통째 비웠다)
+  const liveKind = function (id) { const k = out.kinds[id]; return k === 'special' ? out.has_edu : (k === 'special_demo' ? out.has_demo : false); };
+  const gapsOut = {}, wkOut = {};
+  Object.keys(out.gaps).forEach(function (id) { const on = liveKind(id); gapsOut[id] = on ? out.gaps[id] : []; if (!wkSee) wkOut[id] = on ? out.wk_n[id] : 0; });
+  return jr(200, Object.assign({ status: 'OK', ok: true, has_edu: out.has_edu, has_demo: out.has_demo, gaps: gapsOut }, wkSee ? {} : { wk_n: wkOut }, { request_id: R }));
 }
 
 async function handleSave(event, d, R) {
