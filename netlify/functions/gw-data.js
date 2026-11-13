@@ -16,6 +16,7 @@ const tier = require('./_lib/tier');   // 관리자 등급(v321) — retired 판
 const BRIEF = require('./_lib/brief');   // v416 아침 음성 브리핑(체크 38 D1) — 설정·조회·기동(생성은 워커)
 const AR = require('./_lib/autorules');  // v417 자동 지시 서버 규칙 3건(카드 10) — 집계(autotask_facts)·완료 신호 공용
 const CLIBIZ = require('./_lib/clibiz');   // v456 거래처 사업자번호 칸 13자리 판정(앱 cliBiz13과 같은 규칙 — uismoke v456 대조)
+const DUTY = require('./_lib/duty');   // P1 판28 인허가 '이번 달' 회차 계산(앱 DUTY_SHARED 구간과 같은 본문 — uismoke P1 판28이 글자째 대조)
 const SITEEDU = require('./_lib/siteedu');   // v433 현장 대장 '특별교육 미이수' 판정(앱 asbNoSpecial·eduHasValidSpecial과 같은 규칙 — uismoke v433 대조)
 
 const DATA = 'gw_data';
@@ -467,6 +468,7 @@ async function handleSave(event, d, R) {
     if (prevReadFailed) return jr(500, { status: 'ERROR', error_code: 'PREV_READ_FAILED', request_id: R });
     const prevDuties = (prevDoc && Array.isArray(prevDoc.duties)) ? prevDoc.duties : [];
     if (!c.member.admin || !Array.isArray(doc.duties) || (doc.duties.length === 0 && prevDuties.length > 0)) doc.duties = prevDuties;
+    else licNarrowGuard(prevDuties, doc.duties);   // P1 판28: '이번 달' 단추 칸(완료 기록·정정·해당 없음)은 lic_duty_set으로만 — 관리자 통째 저장은 서버 값 이월
   }
   // 주기업무 공개범위·담당 보호(v331 — 2026-09-08 PM 실사고 '공개범위를 고치면 다시 롤백된다'):
   //  scopes·assignee는 앱에서 관리자만 편집한다(openCheckScope의 isAdmin 게이트 — 비관리자에겐 편집 UI 자체가 없다).
@@ -1925,6 +1927,252 @@ async function handleVehBgGet(event, d, R) {
   if (!s.on) return jr(200, { status: 'OK', on: false, why: s.why, request_id: R });
   const bg = s.bg;
   return jr(200, { status: 'OK', on: true, ver: bg.ver, rows: bg.rows.slice(0, 300), attr: (bg.attr && typeof bg.attr === 'object' && !Array.isArray(bg.attr)) ? bg.attr : null, request_id: R });
+}
+// ---- P1 판28(원장 T165·T179·T478 · 시안 판3 ② 'PM 11/13 18:14 45. 판3 ㄱ') 인허가 '이번 달' 탭 — 읽기 lic_month_get · 쓰기 lic_duty_set(단추 네 가지만) ----
+// 원천: 자동 회차 행 = 인허가 근거 승격본 bg:lic:law:v1(status 'promoted')의 auto 행(주기 칸 — duty.js sched 꼴 그대로) · 완료 기록·기준일 = col:licenses duties[no] · 허가일 = col:licenses items.
+//   계산 = _lib/duty.js dutyCur(앱 DUTY_SHARED 구간과 같은 본문). 이 탭은 의무 대장 문장·조문·주기 값을 바꾸지 않는다(읽어서 계산만).
+// lic_duty_set 권한(나머지 403 NO_WRITE · why로 갈래): 관리자 = 전부(종전 의무 대장 저장 길도 그대로) · 관리자 아님 = 인허가 수행(lic do) + 그 행의 담당 —
+//   배정표(settings:assign)에서 키 'lic:<허가증 id>:duty:<번호>'의 가장 긴 접두어(지금은 'lic:' 한 줄)의 담당 = 로그인 회원. 배정표를 못 읽으면 503 ASSIGN_UNAVAILABLE(fail-closed — 빈 표로 보지 않음),
+//   줄이 없으면 NOT_ASSIGN_TABLE · 다른 사람이면 NOT_ASSIGNEE. [해당 없음 되돌리기](na_undo)는 관리자만(403 ADMIN_ONLY).
+//   근거: 배정표는 관리자(assign_set)·봇 키(settings_apply)만 고치고 감사가 남는 서버 설정(v453 · 판2 veh_due_set과 같은 근거). 봇 키 쪽 한계도 판2 검토 S3과 같음.
+// 허용 칸만: 본문 키 action·no·op·base·v 밖 = 400 BAD_FIELD · v 안은 op별 표(LIC_OPS) 밖 = 400 BAD_FIELD — 그 밖 칸(문장·주기·확정·선행확인 등)은 이 길로 못 바꾼다.
+// 값: 날짜 = 'YYYY-MM-DD' 달력에 있는 날 2000~2099(BAD_DATE) · 제출한 날·기준일은 오늘(KST) 뒤 금지(BAD_FUTURE) · 사유 유형 6가지(BAD_REASON) · 글 길이(TOO_LONG) ·
+//   완료는 접수번호나 수령본 하나 필수(NEED_PROOF) · 수령본 = att_put kind 'lic'로 올린 파일(본인 것 — 관리자는 누구 것이든, BAD_ATT) · 해당 없음 사유 필수(NEED_REASON).
+// 낙관락: base = 그 행 updated_ts(없으면 0) — 다르거나 없으면 409 DUTY_STALE. 완료·정정은 그 회차(due = 계산 기한)가 지금 계산과 같아야(409 DUE_STALE).
+// 저장: 그 행만(문서 통째 받지 않음) · 직전 값 lic_prev 1판(완료 기록·정정·해당 없음·기준일) + 버전 링(verSnapshot) · 감사 1줄(col licenses). 행을 지우는 길은 없다.
+//   [해당 없음]은 na{on} 표식만(행·근거·완료 기록 그대로) — 관리자가 na_undo로 되돌림.
+// 알려진 한계(판2와 같음): 읽기 → base 검사 → 쓰기가 원자적이지 않다(쓰기 직전 다시 읽어 창만 좁힘 — 조건부 쓰기 없음).
+const LIC_BG_KEY = 'bg:lic:law:v1';
+const LIC_OPS = { done: ['due', 'done_at', 'ref', 'att', 'memo'], fix: ['due', 'to', 'reason', 'memo'], na: ['reason'], base: ['date', 'what', 'memo'], na_undo: ['reason'] };
+const LIC_TOP = { action: 1, no: 1, op: 1, base: 1, v: 1 };
+const LIC_FIX_REASONS = ['기산일 오류', '유예 누락', '공고 연장', '대행 계약', '기관 통지', '기타'];   // 업무별 설계 3-8 A6 '사유 유형 필수' 6가지(시안 그대로)
+const LIC_ATT_MIME = { pdf: 'application/pdf', jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png' };   // 수령본 확장자 → mime 고정(보낸 mime은 쓰지 않음 — 문서함 DOC_ATT_MIME과 같은 원칙)
+const LIC_NAR_FIELDS = ['runs', 'due_fix', 'na', 'lic_prev', 'nar_ts', 'base_what', 'base_by', 'base_at', 'base_memo'];   // lic_duty_set만 쓰는 칸
+function licDutyKey(no, licId) { return 'lic:' + (licId || '-') + ':duty:' + no; }
+function licKstToday() { return new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10); }
+// 관리자 통째 저장(save licenses)의 이월 — 단추 칸은 늘 서버 값(보낸 값은 버림). 기준일(base_date)은 관리자 선행확인 창도 쓰는 칸이라
+//   서버 줄에 단추 표식(nar_ts)이 있고 들어온 줄 표식이 다르면(= 단추 저장을 모르는 사본) 서버 값을 지킨다. 반환 = 지킨 기준일 수
+function licNarrowGuard(prevDuties, duties) {
+  const old = {}; (prevDuties || []).forEach(function (o) { if (o && o.no != null) old[String(o.no)] = o; });
+  let n = 0;
+  (duties || []).forEach(function (t) {
+    if (!t || typeof t !== 'object' || t.no == null) return;
+    const o = old[String(t.no)];
+    const stale = !!(o && o.nar_ts && t.nar_ts !== o.nar_ts);
+    LIC_NAR_FIELDS.forEach(function (f) { if (o && o[f] !== undefined) t[f] = o[f]; else delete t[f]; });
+    if (stale && String(t.base_date == null ? '' : t.base_date) !== String(o.base_date == null ? '' : o.base_date)) { if (o.base_date != null) t.base_date = o.base_date; else delete t.base_date; n++; }
+  });
+  return n;
+}
+async function licBgRead(st) {   // 승격본만 — 승격 전·없음 = 행 0(빈 탭) · 못 읽음 = ok false
+  try {
+    const r = await blobGet(st, LIC_BG_KEY);
+    if (!r.ok) return r.code === 'NOT_FOUND' ? { ok: true, ver: '', rows: [] } : { ok: false, code: r.code || 'STORAGE_READ_FAILED' };
+    const b = r.data;
+    if (!b || typeof b !== 'object' || b.status !== 'promoted' || !Array.isArray(b.rows)) return { ok: true, ver: '', rows: [] };
+    return { ok: true, ver: String(b.ver || ''), rows: b.rows.filter(function (x) { return x && typeof x === 'object' && x.auto === true && Number.isInteger(Number(x.no)); }) };
+  } catch (e) { return { ok: false, code: 'STORAGE_READ_FAILED' }; }
+}
+async function licAssignStrict(st) {   // 배정표 — 못 읽으면 ok false(빈 표로 보지 않음 · assignRead는 실패를 빈 표로 삼킨다)
+  try {
+    const r = await blobGet(st, ASSIGN_KEY);
+    if (r.ok) return { ok: true, rules: (r.data && r.data.rules && typeof r.data.rules === 'object') ? r.data.rules : {} };
+    return r.code === 'NOT_FOUND' ? { ok: true, rules: {} } : { ok: false };
+  } catch (e) { return { ok: false }; }
+}
+// 단추 권한(lic_duty_set·att_put kind 'lic' 공용) — 관리자 또는 (lic do + 그 행 배정 담당). 반환 null = 통과 · 아니면 jr 응답
+async function licDutyGate(st, member, br, R) {
+  if (member.admin) return null;
+  if (permOf(member, 'licenses') !== 'do') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_WRITE', why: 'NO_LIC_DO', request_id: R });
+  const as = await licAssignStrict(st);
+  if (!as.ok) return jr(503, { status: 'ERROR', error_code: 'ASSIGN_UNAVAILABLE', request_id: R });
+  const ar = assignFor(licDutyKey(Number(br.no), br.lic_id), as.rules);
+  if (!ar || !ar.who_id) return jr(403, { status: 'FORBIDDEN', error_code: 'NO_WRITE', why: 'NOT_ASSIGN_TABLE', request_id: R });
+  if (ar.who_id !== member.id) return jr(403, { status: 'FORBIDDEN', error_code: 'NO_WRITE', why: 'NOT_ASSIGNEE', request_id: R });
+  return null;
+}
+function licBgOut(x) {   // 앱에 내리는 칸 — 주기 칸 + 표시 글(이름·인허가·주기 문장·배지·법령 이름)
+  const ci = Array.isArray(x.cites) && x.cites[0] && typeof x.cites[0] === 'object' ? x.cites[0] : {};
+  const o = { no: Number(x.no), duty: String(x.duty || ''), lic: String(x.lic || ''), lic_id: String(x.lic_id || ''), unit: String(x.unit || ''), cycle: String(x.cycle || ''), badge: String(x.badge || ''), law: String(ci.law || '') };
+  ['type', 'every_n', 'every_unit', 'fixed_month', 'fixed_day', 'fixed2_month', 'fixed2_day', 'base', 'grace_days', 'auto', 'needs_manual_date'].forEach(function (k) { o[k] = x[k] === undefined ? null : x[k]; });
+  return o;
+}
+async function handleLicMonthGet(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (!(await deviceApproved(event, c.member))) return jr(403, { status: 'FORBIDDEN', error_code: 'DEVICE_NOT_APPROVED', request_id: R });
+  if (permOf(c.member, 'licenses') === 'hide') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_ACCESS', request_id: R });
+  const st = store(DATA);
+  const bg = await licBgRead(st);
+  if (!bg.ok) return jr(500, { status: 'ERROR', error_code: 'BG_READ_FAILED', request_id: R });
+  const as = await licAssignStrict(st);
+  const ms = as.ok ? await assignMembers() : null;
+  const gen = as.ok ? assignFor('lic:', as.rules) : null;   // 화면 안내 '담당 ○○(배정표)' — 행별 담당은 act로
+  const act = [];
+  bg.rows.forEach(function (x) {
+    const no = Number(x.no);
+    if (c.member.admin) { act.push(no); return; }
+    if (!as.ok || permOf(c.member, 'licenses') !== 'do') return;
+    const ar = assignFor(licDutyKey(no, x.lic_id), as.rules);
+    if (ar && ar.who_id === c.member.id) act.push(no);
+  });
+  return jr(200, { status: 'OK', ver: bg.ver, rows: bg.rows.map(licBgOut), act: act, assign_ok: as.ok, who: gen && gen.who_id ? { id: gen.who_id, name: (ms && ms[gen.who_id] && ms[gen.who_id].name) || '' } : null, today: licKstToday(), request_id: R });
+}
+function licDateOk(v) { return vehDueDate(v); }
+function licTextOk(v, n, need) {   // null = 틀림(꼴) · '' 허용(need 아니면) · 길이 넘침 = false
+  if (v === undefined || v === null) return need ? null : '';
+  if (typeof v !== 'string') return null;
+  const s = v.replace(/[\u0000-\u001f\u007f]/g, ' ').trim();
+  if (s.length > n) return false;
+  if (need && !s) return null;
+  return s;
+}
+async function handleLicDutySet(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (!(await deviceApproved(event, c.member))) return jr(403, { status: 'FORBIDDEN', error_code: 'DEVICE_NOT_APPROVED', request_id: R });
+  const op = String(d.op || '');
+  if (!hasOwn(LIC_OPS, op)) return jr(400, { status: 'REJECTED', error_code: 'BAD_OP', request_id: R });
+  const no = Number(d.no);
+  if (!Number.isInteger(no) || no < 1 || no > 9999) return jr(400, { status: 'REJECTED', error_code: 'BAD_NO', request_id: R });
+  if (op === 'na_undo' && !c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
+  const st = store(DATA);
+  const bg = await licBgRead(st);
+  if (!bg.ok) return jr(500, { status: 'ERROR', error_code: 'BG_READ_FAILED', request_id: R });
+  const br = bg.rows.find(function (x) { return Number(x.no) === no; });
+  if (!br) return jr(400, { status: 'REJECTED', error_code: 'NOT_AUTO', request_id: R });   // 승격본 자동 회차 행이 아님(사건형·상시·개인·차량 — 의무 대장에서만)
+  const gate = await licDutyGate(st, c.member, br, R);
+  if (gate) return gate;
+  // 허용 칸만
+  const badTop = Object.keys(d).filter(function (k) { return !hasOwn(LIC_TOP, k); });
+  const v = (d.v && typeof d.v === 'object' && !Array.isArray(d.v)) ? d.v : null;
+  if (badTop.length || !v) return jr(400, { status: 'REJECTED', error_code: 'BAD_FIELD', field: badTop.length ? String(badTop[0]).slice(0, 40) : 'v', request_id: R });
+  const badV = Object.keys(v).filter(function (k) { return LIC_OPS[op].indexOf(k) < 0; });
+  if (badV.length) return jr(400, { status: 'REJECTED', error_code: 'BAD_FIELD', field: String(badV[0]).slice(0, 40), request_id: R });
+  // 값 검사(꼴)
+  const today = licKstToday(), bad = function (code) { return jr(400, { status: 'REJECTED', error_code: code, request_id: R }); };
+  const val = {};
+  const txt = function (k, n, need) { const s = licTextOk(v[k], n, need); if (s === false) return 'TOO_LONG'; if (s === null) return need ? (k === 'reason' && op !== 'fix' ? 'NEED_REASON' : 'BAD_VALUE') : 'BAD_VALUE'; val[k] = s; return ''; };
+  let e = '';
+  if (op === 'done') {
+    if (!(val.due = licDateOk(v.due))) return bad('BAD_DATE');
+    if (!(val.done_at = licDateOk(v.done_at))) return bad('BAD_DATE');
+    if (val.done_at > today) return bad('BAD_FUTURE');
+    if ((e = txt('ref', 60, false)) || (e = txt('memo', 200, false))) return bad(e);
+    if (v.att !== undefined && v.att !== null && v.att !== '') { if (typeof v.att !== 'string' || !/^att_[a-f0-9]{16}$/.test(v.att)) return bad('BAD_ATT'); val.att = v.att; }
+    if (!val.ref && !val.att) return bad('NEED_PROOF');
+  } else if (op === 'fix') {
+    if (!(val.due = licDateOk(v.due)) || !(val.to = licDateOk(v.to))) return bad('BAD_DATE');
+    if (typeof v.reason !== 'string' || LIC_FIX_REASONS.indexOf(v.reason) < 0) return bad('BAD_REASON');
+    val.reason = v.reason;
+    if ((e = txt('memo', 200, false))) return bad(e);
+  } else if (op === 'na' || op === 'na_undo') {
+    if ((e = txt('reason', 200, op === 'na'))) return bad(e);
+  } else if (op === 'base') {
+    if (!(val.date = licDateOk(v.date))) return bad('BAD_DATE');
+    if (val.date > today) return bad('BAD_FUTURE');
+    if ((e = txt('what', 40, false)) || (e = txt('memo', 200, false))) return bad(e);
+  }
+  // 읽기 · 낙관락 · 상태
+  const rl = await blobGet(st, colKey('licenses'));
+  if (!rl.ok && rl.code !== 'NOT_FOUND') return jr(500, { status: 'ERROR', error_code: rl.code || 'STORAGE_READ_FAILED', request_id: R });
+  const doc = (rl.ok && rl.data && Array.isArray(rl.data.duties)) ? rl.data : null;
+  const row = doc ? doc.duties.find(function (x) { return x && Number(x.no) === no; }) : null;
+  if (!row) return jr(404, { status: 'NOT_FOUND', error_code: 'NO_DUTY', request_id: R });
+  const baseTs = Number(row.updated_ts || 0);
+  if (d.base === undefined || d.base === null || Number(d.base) !== baseTs) return jr(409, { status: 'CONFLICT', error_code: 'DUTY_STALE', cur: baseTs, request_id: R });
+  const lic = (Array.isArray(doc.items) ? doc.items : []).find(function (x) { return x && x.id === br.lic_id && x.del !== 1; }) || null;
+  const merged = Object.assign({}, row, { sched: br });
+  const isNa = !!(row.na && row.na.on);
+  if (op === 'na_undo') { if (!isNa) return bad('NO_CHANGE'); }
+  else if (isNa) return bad('IS_NA');
+  let cur = null;
+  if (op === 'done' || op === 'fix') {
+    cur = DUTY.dutyCur(merged, lic, today);
+    if (!cur || !cur.due) return bad('NO_DUE');   // 기준일 없음 — [기준일 입력]부터
+    if (val.due !== cur.orig) return jr(409, { status: 'CONFLICT', error_code: 'DUE_STALE', cur: cur.orig, request_id: R });
+    if (op === 'fix' && val.to === cur.due) return bad('NO_CHANGE');
+  }
+  if (op === 'base') {
+    if (String(row.base_date || '') === val.date) return bad('NO_CHANGE');
+    if (!c.member.admin) { const cb = DUTY.dutyCur(merged, lic, today); if (!(cb && cb.missing === 'base')) return bad('NOT_NEEDED'); }   // 담당은 기준일 없는 행만(시안 — 그 밖 행은 [기한 정정])
+  }
+  if (val.att) {
+    let fa = null; try { fa = await blobGet(store(FILES), val.att); } catch (e2) { fa = null; }
+    if (!fa || !fa.ok || !fa.data || fa.data.kind !== 'lic' || Number(fa.data.no) !== no || (!c.member.admin && fa.data.bid !== c.member.id)) return bad('BAD_ATT');
+  }
+  // 저장 — 버전 링 뒤 다시 읽어 그 사이 저장을 덮지 않게(판2 veh_due_set 검토 S2와 같은 꼴)
+  await verSnapshot('licenses', rl.data, c.member.name, false);
+  let wdoc = doc, wrow = row;
+  const rl2 = await blobGet(st, colKey('licenses'));
+  if (!rl2.ok) return jr(500, { status: 'ERROR', error_code: rl2.code || 'STORAGE_READ_FAILED', request_id: R });
+  if (Number((rl2.data && rl2.data.updated_at) || 0) !== Number(doc.updated_at || 0)) {
+    wdoc = (rl2.data && Array.isArray(rl2.data.duties)) ? rl2.data : null;
+    wrow = wdoc ? wdoc.duties.find(function (x) { return x && Number(x.no) === no; }) : null;
+    if (!wrow) return jr(404, { status: 'NOT_FOUND', error_code: 'NO_DUTY', request_id: R });
+    if (Number(wrow.updated_ts || 0) !== baseTs) return jr(409, { status: 'CONFLICT', error_code: 'DUTY_STALE', cur: Number(wrow.updated_ts || 0), request_id: R });
+  }
+  const now = Date.now(), me = c.member.id, cp = function (x) { return x === undefined ? undefined : JSON.parse(JSON.stringify(x)); };
+  const prev = { at: now, by: me, op: op, runs: cp(wrow.runs), due_fix: cp(wrow.due_fix), na: cp(wrow.na), base_date: wrow.base_date == null ? null : wrow.base_date, base_what: wrow.base_what == null ? null : wrow.base_what };
+  const nRuns = Array.isArray(wrow.runs) ? wrow.runs.length : 0;
+  const head = no + '. ' + String(br.duty || wrow.duty || '').slice(0, 40);
+  let ev;
+  if (op === 'done') {
+    const run = { due: cur.orig, done_at: val.done_at, by: me, by_name: c.member.name, ts: now };
+    if (val.ref) run.ref = val.ref;
+    if (val.att) run.att = val.att;
+    if (val.memo) run.memo = val.memo;
+    if (cur.fixed) run.due_fixed = cur.due;
+    wrow.runs = (Array.isArray(wrow.runs) ? wrow.runs.slice() : []).concat([run]);
+    ev = { op: '의무완료', id: 'duty:' + no, t: head + ' · ' + cur.orig + ' 회차 완료(제출 ' + val.done_at + (val.ref ? ' · 접수번호' : '') + (val.att ? ' · 수령본' : '') + ')', f: { runs: [nRuns + '건', (nRuns + 1) + '건'] } };
+  } else if (op === 'fix') {
+    const fm = (wrow.due_fix && typeof wrow.due_fix === 'object' && !Array.isArray(wrow.due_fix)) ? Object.assign({}, wrow.due_fix) : {};
+    fm[cur.orig] = { to: val.to, from: cur.due, days: DUTY.dutyDiffDays(val.to, cur.orig), reason: val.reason, memo: val.memo || '', by: me, by_name: c.member.name, at: now };
+    wrow.due_fix = fm;
+    ev = { op: '기한정정', id: 'duty:' + no, t: head + ' · ' + cur.orig + ' 회차 · ' + val.reason + ' · ' + fm[cur.orig].days + '일', f: { due: [cur.due, val.to] } };
+  } else if (op === 'na') {
+    wrow.na = { on: true, reason: val.reason, by: me, by_name: c.member.name, at: now };
+    ev = { op: '해당없음', id: 'duty:' + no, t: head + ' · ' + val.reason.slice(0, 80), f: { na: ['켜짐', '꺼짐'] } };
+  } else if (op === 'na_undo') {
+    wrow.na = { on: false, reason: val.reason || '', by: me, by_name: c.member.name, at: now };
+    ev = { op: '해당없음되돌림', id: 'duty:' + no, t: head, f: { na: ['꺼짐', '켜짐'] } };
+  } else {
+    wrow.base_date = val.date; wrow.base_what = val.what || ''; wrow.base_by = me; wrow.base_at = now;
+    if (val.memo) wrow.base_memo = val.memo; else delete wrow.base_memo;
+    ev = { op: '기준일', id: 'duty:' + no, t: head + (val.what ? ' · ' + val.what : ''), f: { base_date: [prev.base_date || '', val.date] } };
+  }
+  wrow.lic_prev = prev; wrow.nar_ts = now; wrow.updated = today; wrow.updated_ts = now;
+  wdoc.updated_by = me; wdoc.updated_at = now;
+  const w = await blobSet(st, colKey('licenses'), wdoc);
+  if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
+  let lau = false; try { lau = await appendAudit({ ts: now, by: c.member.name, bid: me, col: 'licenses', ev: [ev] }); } catch (e3) { lau = false; }
+  const out = { no: no };
+  ['runs', 'due_fix', 'na', 'base_date', 'base_what', 'base_by', 'base_at', 'base_memo', 'lic_prev', 'nar_ts', 'updated', 'updated_ts'].forEach(function (k) { if (wrow[k] !== undefined) out[k] = wrow[k]; });
+  return jr(200, { status: 'OK', duty: out, updated_at: now, audit: lau !== false, request_id: R });
+}
+// 수령본 올리기 — 계약 첨부와 같은 저장소·같은 액션(att_put)의 좁은 갈래(kind 'lic'). 권한 = 단추와 같은 licDutyGate(그 행 번호 no) · pdf·jpg·jpeg·png만 · 6MB(base64) · 지우는 길 없음(att_del 거절).
+async function handleLicAttPut(event, d, R, c) {
+  if (!(await deviceApproved(event, c.member))) return jr(403, { status: 'FORBIDDEN', error_code: 'DEVICE_NOT_APPROVED', request_id: R });
+  const no = Number(d.no);
+  if (!Number.isInteger(no) || no < 1 || no > 9999) return jr(400, { status: 'REJECTED', error_code: 'BAD_NO', request_id: R });
+  const st = store(DATA);
+  const bg = await licBgRead(st);
+  if (!bg.ok) return jr(500, { status: 'ERROR', error_code: 'BG_READ_FAILED', request_id: R });
+  const br = bg.rows.find(function (x) { return Number(x.no) === no; });
+  if (!br) return jr(400, { status: 'REJECTED', error_code: 'NOT_AUTO', request_id: R });
+  const gate = await licDutyGate(st, c.member, br, R);
+  if (gate) return gate;
+  const name = String(d.name || '').replace(/[\u0000-\u001f\u007f/\\]/g, '_').trim().slice(0, 120);
+  const ext = (name.toLowerCase().match(/\.([a-z0-9]{1,5})$/) || [])[1] || '';
+  if (!hasOwn(LIC_ATT_MIME, ext)) return jr(400, { status: 'REJECTED', error_code: 'BAD_EXT', request_id: R });
+  const b64 = typeof d.data === 'string' ? d.data : '';
+  if (!b64 || !/^[A-Za-z0-9+/=\r\n]+$/.test(b64)) return jr(400, { status: 'REJECTED', error_code: 'INVALID_FILE', request_id: R });
+  if (b64.length > DOC_ATT_MAX) return jr(413, { status: 'REJECTED', error_code: 'FILE_TOO_LARGE', request_id: R });
+  const id = 'att_' + crypto.randomBytes(8).toString('hex');
+  const w = await blobSet(store(FILES), id, { name: name, type: LIC_ATT_MIME[ext], kind: 'lic', no: no, data: b64, by: c.member.name, bid: c.member.id, ts: Date.now() });
+  if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
+  try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'files', ev: [{ op: '첨부등록', id: id, t: '인허가 ' + no + '행 수령본 · ' + name.slice(0, 50) }] }); } catch (e) {}
+  return jr(200, { status: 'OK', id: id, name: name, size: b64.length, request_id: R });
 }
 // ---- 배정표 settings:assign (v395 — 공통 기반 1 첫 시범. 업무별 최적화 설계 3-14 appr A1 · 착수 브리핑 A2) ----
 // 자동 지시(auto_key 접두어 veh:·lic:·cert:·rec:·bid:) → 담당 who_id. 기본표 = 빈 표: 배정 없는 접두어는 '담당 없음' 배지(관리자 폴백 금지).
@@ -4167,6 +4415,7 @@ async function handleGradeParse(event, d, R) {
 async function handleAttPut(event, d, R) {
   const c = await currentMember(event);
   if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (String(d.kind || '') === 'lic') return await handleLicAttPut(event, d, R, c);   // P1 판28 인허가 수령본 — 좁은 갈래(권한·확장자·크기는 그 함수)
   if (permOf(c.member, 'contracts') !== 'do' && permOf(c.member, 'promo') !== 'do') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_WRITE', request_id: R });
   const name = String(d.name || '').slice(0, 120);
   const b64 = String(d.data || '');
@@ -4652,6 +4901,15 @@ async function handleTplList(event, d, R) {
 async function handleAttGet(event, d, R) {
   const c = await currentMember(event);
   if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  // P1 판28: 인허가 수령본(kind 'lic')은 인허가를 볼 수 있는 사람(+ 기기 승인)에게 — 확장자로 고정한 mime. 그 밖 파일은 아래 종전 길 그대로
+  if (d.raw !== true && permOf(c.member, 'licenses') !== 'hide' && /^att_[a-f0-9]{16}$/.test(String(d.id || ''))) {
+    const lr = await blobGet(store(FILES), String(d.id));
+    if (lr.ok && lr.data && lr.data.kind === 'lic') {
+      if (!(await deviceApproved(event, c.member))) return jr(403, { status: 'FORBIDDEN', error_code: 'DEVICE_NOT_APPROVED', request_id: R });
+      const lx = (String(lr.data.name || '').toLowerCase().match(/\.([a-z0-9]{1,5})$/) || [])[1] || '';
+      return jr(200, { status: 'OK', name: lr.data.name, type: LIC_ATT_MIME[lx] || 'application/octet-stream', data: lr.data.data, request_id: R });
+    }
+  }
   // 입장: 계약 첨부 열람권 또는 홍보 열람권(v353 후속 — 홍보만 있는 회원도 검수 격자 사진을 봐야 한다)
   if (permOf(c.member, 'contracts') === 'hide' && permOf(c.member, 'promo') === 'hide') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_ACCESS', request_id: R });
   // att_ 프리픽스 강제 — 없으면 같은 스토어의 tpl:/proof: 키를 이 완화된 가드로 읽어 관리자 전용(proof_get/tpl_put) 우회가 된다
@@ -4668,6 +4926,7 @@ async function handleAttGet(event, d, R) {
   }
   const r = await blobGet(store(FILES), String(d.id || ''));
   if (!r.ok || !r.data) return jr(404, { status: 'REJECTED', error_code: 'NOT_FOUND', request_id: R });
+  if (r.data.kind === 'lic') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_ACCESS', request_id: R });   // P1 판28 인허가 수령본은 위 갈래(인허가 열람권)로만
   return jr(200, { status: 'OK', name: r.data.name, type: r.data.type, data: r.data.data, request_id: R });
 }
 
@@ -4678,7 +4937,8 @@ async function handleAttDel(event, d, R) {
   // att_ 프리픽스 강제 — 없으면 tpl:/proof:(proof:__index__ 포함)를 비관리자가 삭제할 수 있다(gw-parse-background와 동일 검사)
   if (String(d.id || '').indexOf('att_') !== 0) return jr(400, { status: 'REJECTED', error_code: 'BAD_ID', request_id: R });
   const am0 = await blobGet(store(FILES), String(d.id || ''));
-  if (am0.ok && am0.data && am0.data.taken) return jr(409, { status: 'CONFLICT', error_code: 'ALREADY_TAKEN', request_id: R });   // v423 서류함이 참조하는 조각은 여기서 지우지 않는다(서류함 보관·영구 삭제 경로로)
+  if (am0.ok && am0.data && am0.data.taken) return jr(409, { status: 'CONFLICT', error_code: 'ALREADY_TAKEN', request_id: R });
+  if (am0.ok && am0.data && am0.data.kind === 'lic') return jr(409, { status: 'CONFLICT', error_code: 'LIC_ATT_KEEP', request_id: R });   // P1 판28 인허가 수령본(완료 기록 근거)은 지우는 길 없음   // v423 서류함이 참조하는 조각은 여기서 지우지 않는다(서류함 보관·영구 삭제 경로로)
   if (am0.ok && am0.data && am0.data.parts) await BF.attDeleteParts(store(FILES), String(d.id || ''), am0.data);
   if (am0.ok && am0.data && am0.data.kind === 'box') await blobDelete(store(FILES), boxMarkKey(String(d.id || '')));
   await blobDelete(store(FILES), String(d.id || ''));
@@ -5384,6 +5644,8 @@ async function handlerInner(event) {
     if (d && d.action === 'save') return await handleSave(event, d, R);
     if (d && d.action === 'veh_due_set') return await handleVehDueSet(event, d, R);   // P1 판2 차량 지시 완료 창 새 만기일(차량 한 줄 한 칸)
     if (d && d.action === 'veh_bg_get') return await handleVehBgGet(event, d, R);   // P1 판27 차량 법령 근거(승격본만 — 아니면 on false)
+    if (d && d.action === 'lic_month_get') return await handleLicMonthGet(event, d, R);   // P1 판28 인허가 '이번 달' 탭 읽기(승격본 자동 회차 행·내가 누를 수 있는 행)
+    if (d && d.action === 'lic_duty_set') return await handleLicDutySet(event, d, R);   // P1 판28 '이번 달' 단추 네 가지(완료·기한 정정·해당 없음·기준일) + 관리자 해당 없음 되돌리기
     if (d && d.action === 'audit') return await handleAudit(event, d, R);
     if (d && d.action === 'ver_list') return await handleVerList(event, d, R);
     if (d && d.action === 'ver_get') return await handleVerGet(event, d, R);

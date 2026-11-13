@@ -61,6 +61,7 @@ exports.handler = async function (event, context) {
     if (!id || id.indexOf('att_') !== 0) return;
     const r = await blobGet(store(FILES), id);
     const isBox = d.box === 1 || d.box === true;
+    if (r.ok && r.data && r.data.kind === 'lic') return;   // P1 판28 인허가 수령본은 판독하지 않는다(판독 결과 parse:<id>는 계약 열람권으로 읽힌다)
     if (!r.ok || !r.data) {
       if (isBox) return;   // v423 이미 버렸거나 서류함으로 들어간 파일 — 판단 원본을 덮지 않는다
       await blobSet(store(FILES), 'parse:' + id, { ts: Date.now(), result: { error: 'NOT_FOUND' } });

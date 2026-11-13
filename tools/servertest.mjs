@@ -7959,4 +7959,227 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   } finally { resetP27(); }
 }
 
+{ // ---- P1 판28 인허가 '이번 달' 탭 — 읽기 lic_month_get · 쓰기 lic_duty_set(담당 단추 네 가지만) · 수령본 att_put kind 'lic' · 관리자 통째 저장 이월(licNarrowGuard) — 원장 T165·T179·T478.
+  //   날짜는 서버 오늘(KST)에 맞춰 만든다(1행 기준일 = 오늘 − 13개월 → 기한 = 기준일 + 12개월 = 지남). 계산 기대값은 같은 _lib/duty.js 산술(dutyAddMonths·dutyAddDays)로.
+  //   검사마다 결함을 심은 gw-data 사본(소스 한 곳을 바꿔 메모리에서 컴파일 — 파일은 쓰지 않음)에서는 실패해야 한다(판2 절과 같은 꼴).
+  const fs28 = require('fs'), Mod28 = require('module'), D28 = require(join(FN, '_lib', 'duty.js'));
+  const FILE28 = join(FN, 'gw-data.js'), SRC28 = fs28.readFileSync(FILE28, 'utf8');
+  const load28 = (file, src) => { const m = new Mod28(file); m.filename = file; m.paths = Mod28._nodeModulePaths(dirname(file)); m._compile(src, file); return m.exports; };
+  const mutOf28 = (src, from, to) => { if (src.split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 60)); return src.replace(from, () => to); };
+  const caller28 = (mod) => async (body, tok, dev) => { const r = await mod.handler({ httpMethod: 'POST', headers: Object.assign({ authorization: tok ? 'Bearer ' + tok : '' }, dev ? { 'x-device-id': dev } : {}), body: JSON.stringify(body) }); return { code: r.statusCode, body: JSON.parse(r.body || '{}') }; };
+  const snap28 = JSON.stringify({ u: mem.gw_users, d: mem.gw_data, f: mem.gw_files || {} });
+  const reset28 = () => { const s = JSON.parse(snap28); mem.gw_users = s.u; mem.gw_data = s.d; mem.gw_files = s.f; blobsMock.hooks.failGet = null; };
+  const MK28 = { id: 'u28k', name: '인허가담당28', admin: false, perms: { lic: 'do', tasks: 'do' } };   // 배정표 'lic:' 담당(김정아형 — 관리자 아님)
+  const MO28 = { id: 'u28o', name: '다른담당28', admin: false, perms: { lic: 'do' } };                 // 배정표 'lic:L2:duty:' 담당(남의 행)
+  const MV28 = { id: 'u28v', name: '보기28', admin: false, perms: { lic: 'view' } };
+  const MH28 = { id: 'u28h', name: '숨김28', admin: false, perms: { lic: 'hide', con: 'do' } };       // 인허가 숨김 · 계약 수행(계약 첨부 길은 열림)
+  const tK28 = issueSession(MK28).token, tO28 = issueSession(MO28).token, tV28 = issueSession(MV28).token, tH28 = issueSession(MH28).token;
+  const TODAY28 = new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);
+  const B1_28 = D28.dutyAddMonths(TODAY28, -13), DUE1_28 = D28.dutyAddMonths(B1_28, 12), PAST28 = D28.dutyAddMonths(TODAY28, -1), FUT28 = D28.dutyAddDays(TODAY28, 1);
+  const BG28 = () => ({ schema: 1, domain: 'lic', ver: 'v1-test', status: 'promoted', rows: [
+    { no: 1, auto: true, type: 'interval', base: 'manual', every_n: 12, every_unit: 'month', lic_id: 'L1', duty: '시험 의무 1', lic: '허가 1', cycle: '연 1회', badge: '', cites: [{ law: '시험법', mst: 1 }], law_text: '시험법 제1조' },
+    { no: 2, auto: true, type: 'interval', base: 'last_done', every_n: 6, every_unit: 'month', lic_id: 'L1', duty: '기준일 없는 행', lic: '허가 1', cycle: '반기 1회', badge: '근거 확인 필요', cites: [{ law: '시험법' }] },
+    { no: 3, auto: true, type: 'interval', base: 'manual', every_n: 12, every_unit: 'month', lic_id: 'L2', duty: '남의 행', lic: '허가 2', cycle: '연 1회', cites: [] },
+    { no: 4, auto: false, type: 'event', lic_id: 'L1', duty: '사건형', cycle: '사유 발생 시' }] });
+  const LIC28 = () => ({ schema: 1, items: [{ id: 'L1', name: '허가 1', issued: '2015-01-01', updated: '2026-10-01' }, { id: 'L2', name: '허가 2', updated: '2026-10-01' }],
+    duties: [{ no: 1, duty: '시험 의무 1', cycle: '연 1회', confirm: '확정', base_date: B1_28, updated: '2026-10-01', updated_ts: 100 }, { no: 2, duty: '기준일 없는 행', cycle: '반기 1회', confirm: '조건부', updated_ts: 200 },
+      { no: 3, duty: '남의 행', cycle: '연 1회', confirm: '확정', base_date: B1_28, updated_ts: 300 }, { no: 4, duty: '사건형', confirm: '확정', updated_ts: 400 }, { no: 5, duty: '옛 행(ts 없음)', confirm: '조건부' }],
+    updated_at: 9000, updated_by: 'x' });
+  const seed28 = (opt) => { reset28(); opt = opt || {};
+    Object.assign(mem.gw_users, { 'member:u28k': MK28, 'member:u28o': MO28, 'member:u28v': MV28, 'member:u28h': MH28, 'device:dev1': { status: 'approved' } });
+    mem.gw_data['col:licenses'] = LIC28();
+    mem.gw_data['bg:lic:law:v1'] = BG28();
+    if (opt.noAssign) delete mem.gw_data['settings:assign'];
+    else mem.gw_data['settings:assign'] = { schema: 1, rules: { 'lic:': { who_id: 'u28k' }, 'lic:L2:duty:': { who_id: 'u28o' } }, approver_id: '', prev: null, updated_at: 5, updated_by: 'x' };
+    Object.keys(mem.gw_data).filter((k) => k.indexOf('ver:licenses:') === 0 || k === 'veridx:licenses').forEach((k) => { delete mem.gw_data[k]; });
+    mem.gw_files = {};
+  };
+  const row28 = (no) => (mem.gw_data['col:licenses'].duties || []).find((x) => x.no === no);
+  const set28 = (c, tok, no, op, v, base, extra, dev) => c(Object.assign({ action: 'lic_duty_set', no: no, op: op, v: v }, base === undefined ? {} : { base: base }, extra || {}), tok, dev === undefined ? 'dev1' : dev);
+  const att28 = (c, tok, no, name, type, dev) => c({ action: 'att_put', kind: 'lic', no: no, name: name || '접수증.pdf', type: type || 'text/html', data: 'JVBERi0xLjQK' }, tok, dev === undefined ? 'dev1' : dev);
+  const code28 = (r) => r.code + (r.body.error_code ? '/' + r.body.error_code : '') + (r.body.why ? ':' + r.body.why : '');
+  // ① 거절 — 권한(로그인·기기·수행·담당·남의 행·배정표 없음/못 읽음)·허용 칸·값·낙관락·회차 · 문서·버전 링·감사 그대로
+  const chk28A = async (c) => { seed28(); const l0 = JSON.stringify(mem.gw_data['col:licenses']), a0 = auditMock.logs.length, got = [];
+    const D1 = { due: DUE1_28, done_at: TODAY28, ref: '접수-1' };
+    const exp = [[await set28(c, null, 1, 'done', D1, 100), '401'], [await set28(c, tK28, 1, 'done', D1, 100, null, ''), '403/DEVICE_NOT_APPROVED'],
+      [await set28(c, tV28, 1, 'done', D1, 100), '403/NO_WRITE:NO_LIC_DO'], [await set28(c, tH28, 1, 'done', D1, 100), '403/NO_WRITE:NO_LIC_DO'],
+      [await set28(c, tO28, 1, 'done', D1, 100), '403/NO_WRITE:NOT_ASSIGNEE'], [await set28(c, tK28, 3, 'done', D1, 300), '403/NO_WRITE:NOT_ASSIGNEE'],
+      [await set28(c, tK28, 4, 'na', { reason: 'x' }, 400), '400/NOT_AUTO'], [await set28(c, tK28, 99, 'na', { reason: 'x' }, 0), '400/NOT_AUTO'], [await set28(c, tK28, 1, 'delete', {}, 100), '400/BAD_OP'],
+      [await set28(c, tK28, 'x', 'na', { reason: 'x' }, 100), '400/BAD_NO'], [await set28(c, tK28, 1, 'na_undo', {}, 100), '403/ADMIN_ONLY'],
+      [await set28(c, tK28, 1, 'done', D1, 100, { doc: { duties: [] } }), '400/BAD_FIELD'], [await set28(c, tK28, 1, 'na', { reason: 'x', duty: '바꾼 이름' }, 100), '400/BAD_FIELD'],
+      [await set28(c, tK28, 1, 'done', Object.assign({ runs: [] }, D1), 100), '400/BAD_FIELD'], [await set28(c, tK28, 1, 'base', { date: PAST28, confirm: '확정' }, 100), '400/BAD_FIELD'], [await set28(c, tK28, 1, 'na', null, 100), '400/BAD_FIELD'],
+      [await set28(c, tK28, 1, 'done', Object.assign({}, D1, { done_at: '2026-02-30' }), 100), '400/BAD_DATE'], [await set28(c, tK28, 1, 'done', Object.assign({}, D1, { done_at: '20261101' }), 100), '400/BAD_DATE'],
+      [await set28(c, tK28, 1, 'done', Object.assign({}, D1, { done_at: 20261101 }), 100), '400/BAD_DATE'], [await set28(c, tK28, 1, 'done', Object.assign({}, D1, { done_at: '1999-12-31' }), 100), '400/BAD_DATE'],
+      [await set28(c, tK28, 1, 'done', Object.assign({}, D1, { done_at: FUT28 }), 100), '400/BAD_FUTURE'], [await set28(c, tK28, 2, 'base', { date: FUT28 }, 200), '400/BAD_FUTURE'],
+      [await set28(c, tK28, 1, 'done', { due: DUE1_28, done_at: TODAY28 }, 100), '400/NEED_PROOF'], [await set28(c, tK28, 1, 'done', Object.assign({}, D1, { ref: 'x'.repeat(61) }), 100), '400/TOO_LONG'],
+      [await set28(c, tK28, 1, 'fix', { due: DUE1_28, to: TODAY28, reason: '그냥' }, 100), '400/BAD_REASON'], [await set28(c, tK28, 1, 'na', { reason: '  ' }, 100), '400/NEED_REASON'],
+      [await set28(c, tK28, 1, 'done', Object.assign({}, D1, { att: 'att_0000000000000000' }), 100), '400/BAD_ATT'], [await set28(c, tK28, 1, 'done', Object.assign({}, D1, { att: '../x' }), 100), '400/BAD_ATT'],
+      [await set28(c, tK28, 1, 'done', D1, 101), '409/DUTY_STALE'], [await set28(c, tK28, 1, 'done', D1), '409/DUTY_STALE'], [await set28(c, tK28, 1, 'done', Object.assign({}, D1, { due: TODAY28 }), 100), '409/DUE_STALE'],
+      [await set28(c, tK28, 2, 'done', { due: TODAY28, done_at: TODAY28, ref: 'r' }, 200), '400/NO_DUE'], [await set28(c, tK28, 1, 'base', { date: PAST28 }, 100), '400/NOT_NEEDED'],
+      [await set28(c, tK28, 1, 'fix', { due: DUE1_28, to: DUE1_28, reason: '기타' }, 100), '400/NO_CHANGE']];
+    exp.forEach(([r, e], i) => { if (code28(r) !== e && !(e === '401' && r.code === 401)) got.push(i + ' ' + code28(r) + '≠' + e); });
+    const same = JSON.stringify(mem.gw_data['col:licenses']) === l0 && auditMock.logs.length === a0 && !Object.keys(mem.gw_data).some((k) => k.indexOf('ver:licenses:') === 0) && !Object.keys(mem.gw_files || {}).length;
+    seed28({ noAssign: true }); const rNo = await set28(c, tK28, 1, 'done', D1, 100); if (code28(rNo) !== '403/NO_WRITE:NOT_ASSIGN_TABLE') got.push('배정표 없음 ' + code28(rNo));
+    seed28(); blobsMock.hooks.failGet = (k) => k === 'settings:assign'; const rF = await set28(c, tK28, 1, 'done', D1, 100); const rFa = await set28(c, tokA, 1, 'na', { reason: '관리자는 배정표 안 봄' }, 100); blobsMock.hooks.failGet = null;
+    if (code28(rF) !== '503/ASSIGN_UNAVAILABLE') got.push('배정표 못 읽음 ' + code28(rF));
+    if (rFa.code !== 200) got.push('배정표 못 읽음 관리자 ' + code28(rFa));
+    seed28(); blobsMock.hooks.failGet = (k) => k === 'bg:lic:law:v1'; const rB = await set28(c, tK28, 1, 'done', D1, 100); blobsMock.hooks.failGet = null;
+    if (code28(rB) !== '500/BG_READ_FAILED') got.push('승격본 못 읽음 ' + code28(rB));
+    seed28(); mem.gw_data['bg:lic:law:v1'].status = 'draft'; const rDr = await set28(c, tK28, 1, 'done', D1, 100); if (code28(rDr) !== '400/NOT_AUTO') got.push('승격 전 ' + code28(rDr));
+    seed28(); blobsMock.hooks.failGet = (k) => k === 'col:licenses'; const rL = await set28(c, tK28, 1, 'done', D1, 100); blobsMock.hooks.failGet = null;
+    if (rL.code !== 500) got.push('인허가 못 읽음 ' + code28(rL));
+    return { ok: got.length === 0 && same, info: { got, same } };
+  };
+  // ② 담당 정상 저장 — 기준일(기준일 없는 행) → 같은 값 → 수령본 올림 → 완료(다음 회차로) → 기한 정정(그 회차만) → 해당 없음 → 해당 없음 행 거절 → 관리자 되돌림.
+  //   그 행만 · 다른 행·허가증·문장·주기 그대로 · 직전 값 lic_prev · updated_ts·nar_ts · 감사 1줄씩(col licenses · op) · 버전 링 · 행 수 그대로
+  const chk28B = async (c) => { seed28(); const a0 = auditMock.logs.length, got = [];
+    const keep = JSON.stringify([row28(3), row28(4), row28(5), mem.gw_data['col:licenses'].items]);
+    const r1 = await set28(c, tK28, 2, 'base', { date: PAST28, what: '직전 측정 완료일', memo: '측정 결과서' }, 200), w2 = JSON.parse(JSON.stringify(row28(2) || {}));
+    if (!(r1.code === 200 && w2.base_date === PAST28 && w2.base_what === '직전 측정 완료일' && w2.base_by === 'u28k' && w2.base_memo === '측정 결과서' && w2.lic_prev && w2.lic_prev.base_date === null && w2.lic_prev.op === 'base'
+      && w2.updated_ts === r1.body.updated_at && w2.nar_ts === r1.body.updated_at && w2.updated === TODAY28 && w2.duty === '기준일 없는 행' && w2.confirm === '조건부' && r1.body.duty.base_date === PAST28)) got.push('기준일 ' + JSON.stringify([r1.code, r1.body.error_code, w2]));
+    const r1b = await set28(c, tK28, 2, 'base', { date: PAST28 }, w2.updated_ts); if (code28(r1b) !== '400/NO_CHANGE') got.push('같은 값 ' + code28(r1b));
+    const up = await att28(c, tK28, 1); const fid = up.body.id, fdoc = (mem.gw_files || {})[fid] || {};
+    if (!(up.code === 200 && /^att_[a-f0-9]{16}$/.test(fid || '') && fdoc.kind === 'lic' && fdoc.no === 1 && fdoc.bid === 'u28k' && fdoc.type === 'application/pdf')) got.push('수령본 ' + JSON.stringify([up.code, up.body.error_code, fdoc.kind, fdoc.type]));
+    const r2 = await set28(c, tK28, 1, 'done', { due: DUE1_28, done_at: TODAY28, ref: '접수-1', att: fid, memo: '메모' }, 100), w1 = JSON.parse(JSON.stringify(row28(1) || {}));
+    const run = (w1.runs || [])[0] || {}, nx1 = D28.dutyCur(Object.assign({}, w1, { sched: BG28().rows[0] }), null, TODAY28);
+    if (!(r2.code === 200 && (w1.runs || []).length === 1 && run.due === DUE1_28 && run.done_at === TODAY28 && run.ref === '접수-1' && run.att === fid && run.by === 'u28k' && run.memo === '메모'
+      && w1.lic_prev && w1.lic_prev.runs === undefined && w1.lic_prev.op === 'done' && w1.base_date === B1_28 && nx1 && nx1.due === D28.dutyAddMonths(TODAY28, 12))) got.push('완료 ' + JSON.stringify([r2.code, r2.body.error_code, w1, nx1]));
+    const NEXT = D28.dutyAddMonths(TODAY28, 12), TO = D28.dutyAddDays(NEXT, 30);
+    const r3 = await set28(c, tK28, 1, 'fix', { due: NEXT, to: TO, reason: '공고 연장', memo: '공고 제2026-1호' }, w1.updated_ts), w1b = JSON.parse(JSON.stringify(row28(1) || {}));
+    const fx = (w1b.due_fix || {})[NEXT] || {}, nx2 = D28.dutyCur(Object.assign({}, w1b, { sched: BG28().rows[0] }), null, TODAY28);
+    if (!(r3.code === 200 && fx.to === TO && fx.days === 30 && fx.reason === '공고 연장' && fx.by === 'u28k' && nx2.due === TO && nx2.orig === NEXT && nx2.fixed === true
+      && JSON.stringify((w1b.lic_prev || {}).runs) === JSON.stringify(w1.runs) && w1b.lic_prev && w1b.lic_prev.due_fix === undefined)) got.push('정정 ' + JSON.stringify([r3.code, r3.body.error_code, w1b.due_fix, nx2]));
+    const r4 = await set28(c, tK28, 1, 'na', { reason: '대상 시설 없음' }, w1b.updated_ts), w1c = JSON.parse(JSON.stringify(row28(1) || {}));
+    if (!(r4.code === 200 && w1c.na && w1c.na.on === true && w1c.na.reason === '대상 시설 없음' && (w1c.runs || []).length === 1 && D28.dutyCur(Object.assign({}, w1c, { sched: BG28().rows[0] }), null, TODAY28) === null)) got.push('해당 없음 ' + JSON.stringify([r4.code, w1c.na]));
+    const r5 = await set28(c, tK28, 1, 'fix', { due: NEXT, to: TODAY28, reason: '기타' }, w1c.updated_ts); if (code28(r5) !== '400/IS_NA') got.push('해당 없음 행 정정 ' + code28(r5));
+    const r6 = await set28(c, tK28, 1, 'na', { reason: '또' }, w1c.updated_ts); if (code28(r6) !== '400/IS_NA') got.push('해당 없음 다시 ' + code28(r6));
+    const r7 = await set28(c, tokA, 1, 'na_undo', {}, w1c.updated_ts), w1d = JSON.parse(JSON.stringify(row28(1) || {}));
+    if (!(r7.code === 200 && w1d.na && w1d.na.on === false && (w1d.lic_prev || {}).na && w1d.lic_prev.na.on === true && w1d.lic_prev.na.reason === '대상 시설 없음' && D28.dutyCur(Object.assign({}, w1d, { sched: BG28().rows[0] }), null, TODAY28).due === TO)) got.push('되돌림 ' + JSON.stringify([r7.code, r7.body.error_code, w1d.na]));
+    const r8 = await set28(c, tokA, 1, 'na_undo', {}, w1d.updated_ts); if (code28(r8) !== '400/NO_CHANGE') got.push('되돌림 다시 ' + code28(r8));
+    const au = auditMock.logs.slice(a0), ops = au.map((x) => (x.ev[0] || {}).op + '@' + x.col).join(',');
+    const auOk = ops === '기준일@licenses,첨부등록@files,의무완료@licenses,기한정정@licenses,해당없음@licenses,해당없음되돌림@licenses'
+      && JSON.stringify(au[0].ev[0].f) === JSON.stringify({ base_date: ['', PAST28] }) && au[0].bid === 'u28k' && au[0].ev[0].id === 'duty:2'
+      && JSON.stringify(au[2].ev[0].f) === JSON.stringify({ runs: ['0건', '1건'] }) && JSON.stringify(au[3].ev[0].f) === JSON.stringify({ due: [NEXT, TO] }) && /공고 연장 · 30일/.test(au[3].ev[0].t);
+    if (!auOk) got.push('감사 ' + ops);
+    const vers = Object.keys(mem.gw_data).filter((k) => k.indexOf('ver:licenses:') === 0);
+    if (vers.length < 5) got.push('버전 링 ' + vers.length);
+    if (JSON.stringify([row28(3), row28(4), row28(5), mem.gw_data['col:licenses'].items]) !== keep || mem.gw_data['col:licenses'].duties.length !== 5) got.push('다른 행·허가증 바뀜');
+    return { ok: got.length === 0, info: got };
+  };
+  // ③ 관리자 종전 길 회귀 + 이월 — 관리자 통째 저장(save licenses)은 그대로 되고(문장·선행확인 고침 반영), 단추 칸(완료 기록·정정·해당 없음)은 서버 값 이월(보낸 값 버림),
+  //   단추 저장을 모르는 사본의 기준일은 서버 값 · 표식을 아는 사본의 기준일 고침은 반영 · 관리자 아님 저장 = duties 통째 서버 값(종전) · 관리자는 남의 행에도 단추 저장
+  const chk28C = async (c) => { seed28(); const got = [];
+    const stale = LIC28().duties;   // 단추 저장 전 사본
+    await set28(c, tK28, 2, 'base', { date: PAST28, what: '직전 측정 완료일' }, 200);
+    const rD = await set28(c, tK28, 1, 'done', { due: DUE1_28, done_at: TODAY28, ref: '접수-1' }, 100);
+    const ua = mem.gw_data['col:licenses'].updated_at, srv2 = JSON.parse(JSON.stringify(row28(2)));
+    const forged = stale.map((d) => Object.assign({}, d, d.no === 3 ? { precheck_answer: '관리자 답', runs: [{ due: '2020-01-01', done_at: '2020-01-01' }], na: { on: true } } : {}));
+    const rS = await c({ action: 'save', collection: 'licenses', doc: { schema: 1, items: LIC28().items, duties: forged }, base: ua }, tokA, 'dev1');
+    const s1 = row28(1), s2 = row28(2), s3 = row28(3);
+    if (!(rS.code === 200 && (s1.runs || []).length === 1 && s1.runs[0].ref === '접수-1' && s1.nar_ts && s2.base_date === PAST28 && s2.base_what === '직전 측정 완료일' && s3.precheck_answer === '관리자 답' && s3.runs === undefined && s3.na === undefined
+      && mem.gw_data['col:licenses'].duties.length === 5)) got.push('관리자 낡은 사본 ' + JSON.stringify([rS.code, rS.body.error_code, s1.runs, s2.base_date, s3]));
+    const ua2 = mem.gw_data['col:licenses'].updated_at, known = JSON.parse(JSON.stringify(mem.gw_data['col:licenses'].duties)).map((d) => d.no === 2 ? Object.assign(d, { base_date: TODAY28 }) : d);
+    const rS2 = await c({ action: 'save', collection: 'licenses', doc: { schema: 1, items: LIC28().items, duties: known }, base: ua2 }, tokA, 'dev1');
+    if (!(rS2.code === 200 && row28(2).base_date === TODAY28)) got.push('관리자 창 기준일 고침 ' + JSON.stringify([rS2.code, row28(2).base_date]));
+    const ua3 = mem.gw_data['col:licenses'].updated_at;
+    const rW = await c({ action: 'save', collection: 'licenses', doc: { schema: 1, items: LIC28().items, duties: [] }, base: ua3 }, tK28, 'dev1');
+    if (!(rW.code === 200 && (row28(1).runs || []).length === 1 && mem.gw_data['col:licenses'].duties.length === 5)) got.push('담당 통째 저장 ' + JSON.stringify([rW.code, rW.body.error_code]));
+    const rA = await set28(c, tokA, 3, 'done', { due: DUE1_28, done_at: TODAY28, ref: '관리자 접수' }, 300);
+    if (!(rA.code === 200 && (row28(3).runs || []).length === 1)) got.push('관리자 남의 행 ' + code28(rA));
+    return { ok: got.length === 0 && rD.code === 200 && srv2.base_date === PAST28, info: got };
+  };
+  // ④ 수령본 — att_put kind 'lic': 보기·숨김 403 · 남의 행 403 · 확장자 400 · 큰 파일 413 · mime 고정 / att_get: 인허가 보기 = 200(고정 mime) · 인허가 숨김 + 계약 수행 = 403 · att_del(계약 수행) = 409 LIC_ATT_KEEP(파일 그대로)
+  //   / 완료에 남의 파일(관리자가 올린 것)·다른 행 파일 = 400 BAD_ATT / 판독 백그라운드 = 인허가 파일 건너뜀
+  const chk28D = async (c) => { seed28(); const got = [];
+    const e = [[await att28(c, tV28, 1), '403/NO_WRITE:NO_LIC_DO'], [await att28(c, tH28, 1), '403/NO_WRITE:NO_LIC_DO'], [await att28(c, tK28, 3), '403/NO_WRITE:NOT_ASSIGNEE'],
+      [await att28(c, tK28, 1, 'x.html'), '400/BAD_EXT'], [await att28(c, tK28, 1, '접수증'), '400/BAD_EXT'], [await att28(c, tK28, 4), '400/NOT_AUTO'], [await att28(c, tK28, 1, null, null, ''), '403/DEVICE_NOT_APPROVED']];
+    e.forEach(([r, x], i) => { if (code28(r) !== x) got.push('올림' + i + ' ' + code28(r) + '≠' + x); });
+    const big = await c({ action: 'att_put', kind: 'lic', no: 1, name: 'a.pdf', data: 'A'.repeat(6 * 1024 * 1024 + 4) }, tK28, 'dev1'); if (big.code !== 413) got.push('큰 파일 ' + code28(big));
+    const ok = await att28(c, tK28, 1, '사진.JPG'), id = ok.body.id;
+    if (!(ok.code === 200 && mem.gw_files[id] && mem.gw_files[id].type === 'image/jpeg')) got.push('사진 ' + code28(ok));
+    const g1 = await c({ action: 'att_get', id: id }, tV28, 'dev1'), g2 = await c({ action: 'att_get', id: id }, tH28, 'dev1'), g3 = await c({ action: 'att_get', id: id, raw: true }, tH28, 'dev1');
+    if (!(g1.code === 200 && g1.body.type === 'image/jpeg' && g1.body.data === 'JVBERi0xLjQK')) got.push('보기 열기 ' + code28(g1));
+    if (code28(g2) !== '403/NO_ACCESS') got.push('숨김 열기 ' + code28(g2));
+    if (g3.code !== 403) got.push('숨김 원본 ' + code28(g3));
+    const dl = await c({ action: 'att_del', id: id }, tH28, 'dev1'); if (!(code28(dl) === '409/LIC_ATT_KEEP' && mem.gw_files[id])) got.push('지우기 ' + code28(dl));
+    const adm = await att28(c, tokA, 1), r1 = await set28(c, tK28, 1, 'done', { due: DUE1_28, done_at: TODAY28, att: adm.body.id }, 100);
+    if (code28(r1) !== '400/BAD_ATT') got.push('남의 파일 ' + code28(r1));
+    seed28(); mem.gw_data['bg:lic:law:v1'].rows[2].lic_id = 'L1';   // 3행도 내 담당으로 바꿔 3행 파일을 만든 뒤 1행 완료에 씀
+    const o3 = await att28(c, tK28, 3); const r2 = await set28(c, tK28, 1, 'done', { due: DUE1_28, done_at: TODAY28, att: o3.body.id }, 100);
+    if (!(o3.code === 200 && code28(r2) === '400/BAD_ATT')) got.push('다른 행 파일 ' + code28(o3) + ' ' + code28(r2));
+    const pb = fs28.readFileSync(join(FN, 'gw-parse-background.js'), 'utf8');
+    if (!/if \(r\.ok && r\.data && r\.data\.kind === 'lic'\) return;/.test(pb)) got.push('판독 건너뜀 없음');
+    return { ok: got.length === 0, info: got };
+  };
+  // ⑤ lic_month_get — 비로그인 401 · 기기 403 · 인허가 숨김 403 · 보기 = 행 3(자동 회차만)·누를 행 0 · 담당 = 1·2 · 남의 행 담당 = 3 · 관리자 = 셋 · 배정표 못 읽음 = 담당 0·관리자 셋 · 승격 전 = 행 0 · 조문 원문·인용 표는 내리지 않음
+  const chk28E = async (c) => { seed28(); const got = [];
+    const g = (tok, dev) => c({ action: 'lic_month_get' }, tok, dev === undefined ? 'dev1' : dev);
+    const a = await g(null), b = await g(tV28, ''), h = await g(tH28), v = await g(tV28), k = await g(tK28), o = await g(tO28), ad = await g(tokA);
+    if (a.code !== 401 || code28(b) !== '403/DEVICE_NOT_APPROVED' || code28(h) !== '403/NO_ACCESS') got.push('거절 ' + [a.code, code28(b), code28(h)]);
+    const nos = (r) => JSON.stringify((r.body.rows || []).map((x) => x.no)), act = (r) => JSON.stringify(r.body.act);
+    if (!(v.code === 200 && nos(v) === '[1,2,3]' && act(v) === '[]' && v.body.ver === 'v1-test' && v.body.who && v.body.who.id === 'u28k' && v.body.who.name === '인허가담당28')) got.push('보기 ' + JSON.stringify(v.body));
+    if (act(k) !== '[1,2]' || act(o) !== '[3]' || act(ad) !== '[1,2,3]') got.push('누를 행 ' + [act(k), act(o), act(ad)]);
+    const r0 = (v.body.rows || [])[0] || {};
+    if (!(r0.law === '시험법' && r0.cites === undefined && r0.law_text === undefined && r0.every_n === 12 && r0.base === 'manual' && r0.lic_id === 'L1')) got.push('칸 ' + JSON.stringify(r0));
+    blobsMock.hooks.failGet = (key) => key === 'settings:assign'; const kf = await g(tK28), af = await g(tokA); blobsMock.hooks.failGet = null;
+    if (!(kf.code === 200 && act(kf) === '[]' && kf.body.assign_ok === false && act(af) === '[1,2,3]')) got.push('배정표 못 읽음 ' + [act(kf), act(af)]);
+    mem.gw_data['bg:lic:law:v1'].status = 'draft'; const dr = await g(tK28); if (!(dr.code === 200 && nos(dr) === '[]')) got.push('승격 전 ' + nos(dr));
+    blobsMock.hooks.failGet = (key) => key === 'bg:lic:law:v1'; const bf = await g(tK28); blobsMock.hooks.failGet = null; if (code28(bf) !== '500/BG_READ_FAILED') got.push('승격본 못 읽음 ' + code28(bf));
+    return { ok: got.length === 0, info: got };
+  };
+  // ⑥ 크론·앱 같은 본문: gw-duty-cron plan이 dutyCur(해당 없음 건너뜀·정정 기한) · dutyCur는 해당 없음·정정 없는 행에서 dutyNext와 같음
+  const chk28F = () => { const sch = BG28().rows[0];   // 크론(gw-duty-cron — 아직 등록 안 됨)은 이 판에서 안 바꿈: dutyCur는 앱·서버 lic_duty_set만 씀
+    const base = { no: 1, duty: '시험', base_date: B1_28, sched: sch };
+    const c0 = D28.dutyCur(base, null, TODAY28), c1 = D28.dutyCur(Object.assign({}, base, { na: { on: true } }), null, TODAY28);
+    const c2 = D28.dutyCur(Object.assign({}, base, { due_fix: { [DUE1_28]: { to: D28.dutyAddDays(TODAY28, 5) } } }), null, TODAY28);
+    const p0 = [{ stage: D28.dutyStage(c0) }], p1 = c1 === null ? [] : [c1], p2 = [{ stage: D28.dutyStage(c2), due: c2.due, orig: c2.orig, fixed: c2.fixed }];
+    const same = JSON.stringify(D28.dutyNext(base, null, TODAY28)) === JSON.stringify((() => { const x = D28.dutyCur(base, null, TODAY28); delete x.orig; delete x.fixed; return x; })());
+    // 늦게 낸 회차(dutyStartIdx): 2/28 고정일의 2026 회차를 11/13에 냄 → 다음 2027-02-28(종전 '제출일에 가장 가까운 후보' 규칙이면 2028) · 허가일 5년(유예 90일) 2025-06-22 회차를 2026-11-13에 냄 → 2030-06-22 · 기한 전 이행 → 다음 해 그대로
+    const sF = { auto: true, type: 'fixed', fixed_month: 2, fixed_day: 0 }, sI = { auto: true, type: 'interval', base: 'issued', every_n: 5, every_unit: 'year', grace_days: 90 };
+    const late = [D28.dutyNext({ sched: sF, runs: [{ due: '2026-02-28', done_at: '2026-11-13' }] }, null, '2026-11-13').due, D28.dutyNext({ sched: sF, runs: [{ due: '2026-02-28', done_at: '2026-02-20' }] }, null, '2026-11-13').due,
+      D28.dutyNext({ sched: sI, runs: [{ due: '2025-06-22', done_at: '2026-11-13' }] }, { issued: '2015-03-24' }, '2026-11-13').due, D28.dutyNext({ sched: sI }, { issued: '2015-03-24' }, '2026-11-13').due];
+    const ok = p0.length === 1 && p0[0].stage === 'over' && p1.length === 0 && p2.length === 1 && p2[0].stage === 'd7' && p2[0].due === D28.dutyAddDays(TODAY28, 5) && p2[0].orig === DUE1_28 && p2[0].fixed === true && same
+      && JSON.stringify(late) === JSON.stringify(['2027-02-28', '2027-02-28', '2030-06-22', '2025-06-22']);
+    return { ok, info: [p0, p1, p2, same, late] };
+  };
+  try {
+    const gw28 = caller28(gwd), R28 = {};
+    R28.A = await chk28A(gw28); R28.B = await chk28B(gw28); R28.C = await chk28C(gw28); R28.D = await chk28D(gw28); R28.E = await chk28E(gw28); R28.F = chk28F();
+    // 결함 심기 — 검사를 하나씩 걷은 사본에서 해당 판정이 깨져야 한다
+    const MUT28 = { A: [["  if (ar.who_id !== member.id) return jr(403, { status: 'FORBIDDEN', error_code: 'NO_WRITE', why: 'NOT_ASSIGNEE', request_id: R });\n", ''],
+        ["  if (!as.ok) return jr(503, { status: 'ERROR', error_code: 'ASSIGN_UNAVAILABLE', request_id: R });\n  const ar = assignFor(licDutyKey", "  const ar = assignFor(licDutyKey"],
+        ["  if (permOf(member, 'licenses') !== 'do') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_WRITE', why: 'NO_LIC_DO', request_id: R });\n", ''],
+        ['  if (badTop.length || !v) return', '  if (false) return'], ['  if (badV.length) return', '  if (false) return'],
+        ["  if (d.base === undefined || d.base === null || Number(d.base) !== baseTs) return", '  if (false) return'], ["    if (val.done_at > today) return bad('BAD_FUTURE');\n", ''],
+        ["    if (val.due !== cur.orig) return jr(409,", '    if (false) return jr(409,'], ["    if (!val.ref && !val.att) return bad('NEED_PROOF');\n", ''],
+        ["  if (op === 'na_undo' && !c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });\n", '']],
+      B: [['  wrow.lic_prev = prev; wrow.nar_ts = now;', '  wrow.nar_ts = now;'], ["let lau = false; try { lau = await appendAudit({ ts: now, by: c.member.name, bid: me, col: 'licenses', ev: [ev] }); } catch (e3) { lau = false; }", 'let lau = false;'],
+        ["  else if (isNa) return bad('IS_NA');\n", '\n']],
+      C: [['    else licNarrowGuard(prevDuties, doc.duties);', '    else {}']],
+      D: [["  if (r.data.kind === 'lic') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_ACCESS', request_id: R });", ''], ["  if (am0.ok && am0.data && am0.data.kind === 'lic') return jr(409,", '  if (false) return jr(409,'],
+        ['  if (!hasOwn(LIC_ATT_MIME, ext)) return', '  if (false) return'], ["Number(fa.data.no) !== no || ", '']],
+      E: [["  if (permOf(c.member, 'licenses') === 'hide') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_ACCESS', request_id: R });\n  const st = store(DATA);\n  const bg = await licBgRead(st);\n  if (!bg.ok) return jr(500, { status: 'ERROR', error_code: 'BG_READ_FAILED', request_id: R });\n  const as =", "  const st = store(DATA);\n  const bg = await licBgRead(st);\n  if (!bg.ok) return jr(500, { status: 'ERROR', error_code: 'BG_READ_FAILED', request_id: R });\n  const as ="],
+        ["    if (!b || typeof b !== 'object' || b.status !== 'promoted' || !Array.isArray(b.rows))", "    if (!b || typeof b !== 'object' || !Array.isArray(b.rows))"]] };
+    const kill28 = [];
+    for (const n of Object.keys(MUT28)) for (const [from, to] of MUT28[n]) {
+      let k; try { const mod = load28(FILE28, mutOf28(SRC28, from, to)); k = !(await ({ A: chk28A, B: chk28B, C: chk28C, D: chk28D, E: chk28E })[n](caller28(mod))).ok; } catch (e) { k = 'err ' + e.message; }
+      if (k !== true) kill28.push(n + ':' + from.slice(0, 60) + (k === false ? ' 안 깨짐' : ' ' + k));
+    }
+    T('P1 판28 ① lic_duty_set 거절: 비로그인 401 · 기기 미승인 403 · 보기·숨김 403 NO_WRITE(NO_LIC_DO) · 담당 아님 403(NOT_ASSIGNEE) · 남의 행(배정표 lic:L2:duty:) 403(NOT_ASSIGNEE) · 자동 회차 아님·없는 행 400 NOT_AUTO · 모르는 op 400 · 번호 꼴 400 · 담당의 되돌리기 403 ADMIN_ONLY · 허용 밖 칸(본문 doc·v의 duty·runs·confirm·v 없음) 400 BAD_FIELD · 날짜 꼴(2/30·8자리·숫자·1999) 400 BAD_DATE · 내일 400 BAD_FUTURE · 접수번호·수령본 둘 다 없음 400 NEED_PROOF · 61자 400 TOO_LONG · 사유 유형 밖 400 BAD_REASON · 빈 사유 400 NEED_REASON · 없는·꼴 틀린 수령본 400 BAD_ATT · 낡은·빠진 base 409 DUTY_STALE · 다른 회차 409 DUE_STALE · 기준일 없는 행 완료 400 NO_DUE · 기준일 있는 행 기준일 400 NOT_NEEDED · 같은 기한 정정 400 NO_CHANGE · 배정표 없음 403(NOT_ASSIGN_TABLE) · 배정표 못 읽음 503 ASSIGN_UNAVAILABLE(관리자는 통과) · 승격본 못 읽음 500 · 승격 전 400 NOT_AUTO · 인허가 못 읽음 500 · 문서·버전 링·감사 그대로',
+      R28.A.ok, JSON.stringify(R28.A.info));
+    T('P1 판28 ② 담당 정상 저장(그 행만): 기준일 = base_date·무엇의 날짜·누가·메모·직전 값 lic_prev(base_date null)·updated_ts = nar_ts = 응답 시각 · 같은 기준일 400 NO_CHANGE · 수령본 att_put kind lic(본인·행 번호·mime 고정 application/pdf) · 완료 = runs 1건(계산 기한·제출일·접수번호·수령본·누가) → 다음 회차 = 오늘 + 12개월 · 기한 정정 = due_fix[계산 기한]{고친 기한·30일·공고 연장} → 표시 기한만 바뀜(orig 그대로) · lic_prev = 바로 앞 runs · 해당 없음 = na.on(완료 기록 그대로·회차 없음) → 정정·다시 해당 없음 400 IS_NA → 관리자 되돌림 = na.on false·lic_prev에 끈 사유 · 다시 되돌림 400 NO_CHANGE · 감사 6줄(기준일·첨부등록·의무완료 runs 0건→1건·기한정정 due [계산, 고친]·해당없음·해당없음되돌림) · 버전 링 5+ · 다른 행·허가증·행 수 그대로',
+      R28.B.ok, JSON.stringify(R28.B.info));
+    T('P1 판28 ③ 관리자 종전 길 회귀(save licenses): 단추 저장을 모르는 낡은 사본 = 200 · 관리자 선행확인 답 반영 · 단추 칸(완료 기록·기준일 무엇·해당 없음)은 서버 값(보낸 runs·na 버림) · 단추로 넣은 기준일 지킴 · 표식을 아는 사본의 기준일 고침은 반영 · 담당 통째 저장 = duties 서버 값(종전) · 관리자는 남의 행에도 단추 저장 · 행 수 5 그대로',
+      R28.C.ok, JSON.stringify(R28.C.info));
+    T('P1 판28 ④ 수령본(att_put kind lic 좁은 갈래): 보기·숨김 403 · 남의 행 403 · html·확장자 없음 400 BAD_EXT · 자동 회차 아님 400 · 기기 미승인 403 · 6MB 넘음 413 · 사진 mime 고정 image/jpeg / att_get 인허가 보기 200(고정 mime) · 인허가 숨김(계약 수행) 403 NO_ACCESS·원본 403 · att_del 409 LIC_ATT_KEEP(파일 그대로) · 완료에 관리자가 올린 파일·다른 행 파일 400 BAD_ATT · 판독 백그라운드 건너뜀',
+      R28.D.ok, JSON.stringify(R28.D.info));
+    T('P1 판28 ⑤ lic_month_get: 비로그인 401 · 기기 403 · 인허가 숨김 403 NO_ACCESS · 보기 = 자동 회차 3행·누를 행 0·담당 이름(배정표) · 담당 [1,2] · 남의 행 담당 [3] · 관리자 [1,2,3] · 조문 원문·인용 표 안 내림(법령 이름만) · 배정표 못 읽음 = 담당 0·관리자 셋 · 승격 전 = 0행 · 승격본 못 읽음 500',
+      R28.E.ok, JSON.stringify(R28.E.info));
+    T('P1 판28 ⑥ 같은 본문 dutyCur(지남 = over · 해당 없음 = 회차 없음 · 정정 기한 5일 뒤 = d7·orig 계산 기한) · 정정·해당 없음 없는 행은 dutyCur = dutyNext · 늦게 낸 회차는 그 회차 다음부터(2/28 회차를 11/13에 냄 → 2027-02-28 · 5년 주기 2025-06-22 회차 → 2030-06-22)',
+      R28.F.ok, JSON.stringify(R28.F.info));
+    T('P1 판28 ⑦ 결함 사본 ' + Object.keys(MUT28).reduce((s, k) => s + MUT28[k].length, 0) + '개(담당 검사·배정표 못 읽음·수행 권한·허용 칸 두 겹·낙관락·미래 날짜·회차 대조·증빙 필수·되돌리기 관리자·직전 값·감사·해당 없음 막음·관리자 저장 이월·수령본 열기 막음·지우기 막음·확장자·다른 행 파일·읽기 숨김·승격본만) 전부 깨짐',
+      kill28.length === 0, kill28.join(' | '));
+  } finally { reset28(); }
+}
+
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);
