@@ -596,6 +596,7 @@ async function handleSave(event, d, R) {
   // P1 판2 검토(S1): 지시 완료 창(veh_due_set)이 바꾼 만기일 보호 — 앱 vehDueMergeKeep와 같은 규칙(옛 캐시 앱·같은 날 로컬 우선 병합으로 올라온 낡은 사본의 마지막 문)
   let vehDueKept = 0;
   if (col === 'vehicles' && Array.isArray(doc.items)) vehDueKept = vehDueGuard(oldItems, doc.items);
+  if (col === 'vehicles' && Array.isArray(doc.items)) vehLogKeep(oldItems, doc.items);   // P1 판27 검토: 검사 갱신 기록 합집합(낡은 사본이 지우지 않게)
   // 차량 관리자 전용 필드 보존 — 비관리자는 값을 받은 적이 없으므로(get에서 제거) 저장 시 기존값 복원
   if (col === 'vehicles' && !c.member.admin && Array.isArray(doc.items)) {
     const oldById = {};
@@ -1868,7 +1869,7 @@ async function handleVehDueSet(event, d, R) {
   const now = Date.now(), today = new Date(now + 9 * 3600000).toISOString().slice(0, 10);
   wv[field] = date; wv.updated = today;
   wv.due_set = Object.assign({}, (wv.due_set && typeof wv.due_set === 'object') ? wv.due_set : {}); wv.due_set[field] = { prev: cur, at: now };   // 검토 S1: 낡은 사본 되돌림 보호 표식(vehDueGuard·앱 vehDueMergeKeep)
-  const lawLog = field === 'insp_due' ? vehLawLog(d.law, cur, date, today, c.member.id, 'task') : null;   // P1 판27: 법정 검사 제안이 켜진 앱이 보낸 제안 날짜와 확정 날짜(검사 칸만 · 표시 기록, 값 판정 없음)
+  const lawLog = (field === 'insp_due' && d.law && (await vehBgState(st)).on) ? vehLawLog(d.law, cur, date, today, c.member.id, 'task') : null;   // P1 판27: 법정 검사 제안이 켜진 앱이 보낸 제안 날짜와 확정 날짜(검사 칸만 · 승격일 때만 — 검토 반영, 못 읽으면 기록 안 함 · 표시 기록, 값 판정 없음)
   if (lawLog) wv.insp_log = (Array.isArray(wv.insp_log) ? wv.insp_log : []).concat([lawLog]).slice(-VEH_LOG_MAX);
   wdoc.updated_by = c.member.id; wdoc.updated_at = now;
   const w = await blobSet(st, colKey('vehicles'), wdoc);
@@ -1894,17 +1895,35 @@ function vehLawLog(law, prev, confirmed, today, by, src) {
   const days = p ? Math.round((Date.parse(confirmed + 'T00:00:00Z') - Date.parse(p + 'T00:00:00Z')) / 86400000) : null;
   return { at: today, prev: prev || '', confirmed: confirmed, proposed: p, rule: p ? rule : '', diff: days, by: String(by || '').slice(0, 40), src: src };
 }
-async function handleVehBgGet(event, d, R) {
-  const c = await currentMember(event);
-  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
-  if (!c.member.admin && permOf(c.member, 'vehicles') === 'hide') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_ACCESS', request_id: R });
-  const st = store(DATA);
+// 승격 판정 한 곳(읽기·기록 같이 씀): 근거 표 꼴 맞음 ∧ settings:veh.bg_ver = 그 판 ver. 어느 쪽이든 못 읽으면 on false(기록 안 함 — fail-closed)
+async function vehBgState(st) {
   let flag = null, bg = null;
   try { const rf = await blobGet(st, VEH_BG_KEYS.flag); if (rf.ok && rf.data && typeof rf.data === 'object') flag = rf.data; } catch (e) {}
   try { const rb = await blobGet(st, VEH_BG_KEYS.bg); if (rb.ok && rb.data) bg = rb.data; } catch (e) {}
   const ver = flag && typeof flag.bg_ver === 'string' ? flag.bg_ver : '';
-  if (!vehBgOk(bg)) return jr(200, { status: 'OK', on: false, why: bg ? 'BAD_BG' : 'NO_BG', request_id: R });
-  if (!ver || ver !== bg.ver) return jr(200, { status: 'OK', on: false, why: 'NOT_PROMOTED', request_id: R });
+  if (!vehBgOk(bg)) return { on: false, why: bg ? 'BAD_BG' : 'NO_BG' };
+  if (!ver || ver !== bg.ver) return { on: false, why: 'NOT_PROMOTED' };
+  return { on: true, bg: bg };
+}
+// P1 판27 검토: 차량 저장(save vehicles)이 서버 줄의 검사 갱신 기록을 지우지 않게 — 들어온 줄과 서버 줄의 insp_log 합집합(앱 mergeVeh와 같은 규칙 · vehDueGuard 바로 다음에 부름)
+function vehLogUnion(a, b) {
+  const seen = {}, out = [];
+  [].concat(Array.isArray(a) ? a : [], Array.isArray(b) ? b : []).forEach(function (e) { if (!e || typeof e !== 'object') return; const k = [e.at, e.confirmed, e.src].join('|'); if (seen[k]) return; seen[k] = 1; out.push(e); });
+  out.sort(function (p, q) { const x = String(p.at || ''), y = String(q.at || ''); return x < y ? -1 : (x > y ? 1 : 0); });
+  return out.slice(-VEH_LOG_MAX);
+}
+function vehLogKeep(oldItems, items) {
+  const oldById = {};
+  (oldItems || []).forEach(function (o) { if (o && o.id && Array.isArray(o.insp_log) && o.insp_log.length) oldById[o.id] = o; });
+  (items || []).forEach(function (t) { const o = (t && typeof t === 'object' && t.id) ? oldById[t.id] : null; if (o) t.insp_log = vehLogUnion(o.insp_log, t.insp_log); });
+}
+async function handleVehBgGet(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (!c.member.admin && permOf(c.member, 'vehicles') === 'hide') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_ACCESS', request_id: R });
+  const s = await vehBgState(store(DATA));
+  if (!s.on) return jr(200, { status: 'OK', on: false, why: s.why, request_id: R });
+  const bg = s.bg;
   return jr(200, { status: 'OK', on: true, ver: bg.ver, rows: bg.rows.slice(0, 300), attr: (bg.attr && typeof bg.attr === 'object' && !Array.isArray(bg.attr)) ? bg.attr : null, request_id: R });
 }
 // ---- 배정표 settings:assign (v395 — 공통 기반 1 첫 시범. 업무별 최적화 설계 3-14 appr A1 · 착수 브리핑 A2) ----

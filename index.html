@@ -5715,8 +5715,9 @@
     why = vehDueWhy(s);
     if (why){ vehDueErr(why); return; }
     if (isDate(q.cur) && s < q.cur && !confirm("지금 만기일(" + q.cur + ")보다 이른 날짜입니다. 그래도 " + s + "(으)로 바꿀까요?")) return;
+    var lawArg = null;
+    try { lawArg = (q.f === "insp_due" && typeof vehLawArg === "function") ? vehLawArg(q.vid, s) : null; } catch (e) { lawArg = null; }   // P1 판27 제안 날짜 기록(@veh-law — 승격일 때만, 아니면 요청 글 그대로 · 시험 상자는 이 구간만 떼어 돌림) · 검토: '처리 중' 켜기 전에, 예외면 제안 없이
     vehDueBusy = true;
-    var lawArg = (q.f === "insp_due" && typeof vehLawArg === "function") ? vehLawArg(q.vid, s) : null;   // P1 판27 제안 날짜 기록(@veh-law — 승격일 때만, 아니면 요청 글 그대로 · 시험 상자는 이 구간만 떼어 돌림)
     gwCall("gw-data", Object.assign({ action: "veh_due_set", task_id: q.id, date: s, base_due: q.cur }, lawArg ? { law: lawArg } : {})).then(function(res){
       var b, v, code;
       vehDueBusy = false;
@@ -9867,7 +9868,7 @@
     for (i = 0; i < VEH_COLS.length; i++){
       c = VEH_COLS[i]; q = f ? f[c.k] : ""; if (!q) continue;
       val = String(v[c.k] == null ? "" : v[c.k]);
-      if (c.k === "insurer") val = vehInsShow(val);   // P1 판26 보험사는 표에 보이는 글로 거름(저장 글 그대로)
+      if (c.k === "insurer"){ val = vehInsShow(val); q = vehInsShow(q); }   // P1 판26 보험사는 표에 보이는 글로 거름(저장 글 그대로 · 기기에 저장된 옛 거르기 값 'KB손해'도 표시 글로 — 검토 반영)
       if (c.f === "enum"){ if (val !== q) return false; }
       else if (c.f === "text"){ if (val.toLowerCase().indexOf(String(q).toLowerCase()) < 0) return false; }
     }
@@ -10088,7 +10089,7 @@
   var VEH_INS_SHOW = { "KB손해": "KB손해보험", "DB손해": "DB손해보험" };   // 시안 판3 ① 보험사 표시 맞춤 — 그 밖 글은 그대로
   var VEH_SIZE_DEF = ["경형", "소형", "중형", "대형", "피견인", "건설기계"];   // 근거 표 attr.size가 있으면 그것(승격 뒤)
   function vehInsShow(s){ var t = String(s == null ? "" : s).trim(); return Object.prototype.hasOwnProperty.call(VEH_INS_SHOW, t) ? VEH_INS_SHOW[t] : t; }
-  function vehLawOn(){ return !!(VEH_LAW.on && VEH_LAW.rows && VEH_LAW.rows.length); }
+  function vehLawOn(){ return !!(VEH_LAW.on && VEH_LAW.rows && VEH_LAW.rows.length); }   // rows = 쓸 수 있는 행(vehLawRowOk)만 — 하나도 없으면 꺼짐(검토 반영)
   function vehColsNow(){
     if (!vehLawOn()) return VEH_COLS;
     var out = [];
@@ -10098,13 +10099,16 @@
   function vehLawLoad(){
     if (VEH_LAW.busy || (VEH_LAW.at && Date.now() - VEH_LAW.at < 30 * 60000)) return;
     VEH_LAW.busy = true;
+    var was = vehLawOn() + "|" + VEH_LAW.ver;
+    var off = function(){ VEH_LAW.on = false; VEH_LAW.ver = ""; VEH_LAW.rows = []; VEH_LAW.attr = null; VEH_LAW.at = Date.now() - 29 * 60000; };   // 실패(403·500·꼴 틀림·네트워크) = 바로 끔 · 1분 뒤 다시(검토 반영 — 옛 근거 표로 켜져 있지 않게)
+    var done = function(){ VEH_LAW.busy = false; if (was !== vehLawOn() + "|" + VEH_LAW.ver) renderVehicles(); };
     gwCall("gw-data", { action: "veh_bg_get" }).then(function(res){
-      var b = res && res.body, was = vehLawOn() + "|" + VEH_LAW.ver;
-      VEH_LAW.busy = false;
-      if (!res || res.status !== 200 || !b){ VEH_LAW.at = Date.now() - 29 * 60000; return; }   // 실패·로그인 전 = 1분 뒤 다시
-      VEH_LAW.on = b.on === true && Array.isArray(b.rows); VEH_LAW.ver = VEH_LAW.on ? String(b.ver || "") : ""; VEH_LAW.rows = VEH_LAW.on ? b.rows : []; VEH_LAW.attr = VEH_LAW.on ? (b.attr || null) : null; VEH_LAW.at = Date.now();
-      if (was !== vehLawOn() + "|" + VEH_LAW.ver) renderVehicles();
-    }).catch(function(){ VEH_LAW.busy = false; VEH_LAW.at = Date.now() - 29 * 60000; });
+      var b = res && res.body, rows;
+      if (!res || res.status !== 200 || !b || typeof b !== "object"){ off(); done(); return; }
+      rows = (b.on === true && Array.isArray(b.rows)) ? b.rows.filter(vehLawRowOk) : [];
+      VEH_LAW.on = rows.length > 0; VEH_LAW.ver = VEH_LAW.on ? String(b.ver || "") : ""; VEH_LAW.rows = rows; VEH_LAW.attr = VEH_LAW.on && b.attr && typeof b.attr === "object" ? b.attr : null; VEH_LAW.at = Date.now();
+      done();
+    }).catch(function(){ off(); done(); });
   }
   function vehDayNum(s){ return Math.round(Date.parse(s + "T00:00:00Z") / 86400000); }
   function vehAddMonths(s, n){   // 달 더하기(말일 맞춤 — 1/31 + 1달 = 2/28·29)
@@ -10123,43 +10127,58 @@
     if (at.slice(5) < base.slice(5)) a--;
     return a;
   }
+  function vehRealDate(s){ var t; if (!isDate(s) || !/^(19|20)\d{2}-/.test(s)) return false; t = new Date(s + "T00:00:00Z"); return !isNaN(t.getTime()) && t.toISOString().slice(0, 10) === s; }   // 달력에 있는 날(1900~2099)만
   function vehLawMiss(v){   // 비어 있는 속성 이름(업무 말)
     var miss = [], ceq = v.size === "건설기계";
     if (!v.biz) miss.push("사업용 여부");
     if (!v.size) miss.push("규모");
-    if (!isDate(v.reg_date)) miss.push("최초등록일");
+    if (!v.reg_date) miss.push("최초등록일");
     if (ceq && !v.ceq_kind) miss.push("기종");
-    if (ceq && !/^(19|20)\d{2}$/.test(String(v.ceq_year || ""))) miss.push("연식");
+    if (ceq && !v.ceq_year) miss.push("연식");
     return miss;
   }
+  function vehLawBad(v, today){   // 값은 있는데 틀린 칸(검토 반영): 달력에 없는 날·미래 최초등록일·미래(또는 4자리 아닌) 연식·달력에 없는 검사 만기 → 제안 안 냄
+    var bad = [];
+    if (!vehRealDate(v.reg_date) || v.reg_date > today) bad.push("최초등록일");
+    if (v.size === "건설기계" && (!/^(19|20)\d{2}$/.test(String(v.ceq_year)) || +v.ceq_year > +today.slice(0, 4))) bad.push("연식");
+    if (v.insp_due && !vehRealDate(v.insp_due)) bad.push("검사 만기");
+    return bad;
+  }
+  function vehLawCite(r){ return (r && Array.isArray(r.cites) ? r.cites : []).map(function(c){ return c && typeof c === "object" ? [c.law, c.art || c.jo].filter(function(s){ return typeof s === "string" && s; }).join(" ") : ""; }).filter(Boolean).join(" · "); }
   // 순수 계산 — { st:"na" } 대상 아님(매각·말소예정·검사보류) / { st:"none", miss|why } 기준 없음 / { st:"ok", date, diff(운영부 날짜 − 제안, 날짜 없으면 null), rule }
-  //   만료일 줄: 최초등록일 → (첫 회 first_m 있으면 그것 + first_adj_days) → 앞 만료일 + 그때 차령에 맞는 행의 every_m … · 제안 = 그 줄에서 기준일(운영부 날짜, 없으면 오늘)에 가장 가까운 날(같으면 뒤 날)
+  //   만료일 줄: k회차 만료일 = 최초등록일 + 누적 개월(첫 회 first_m 있으면 그것, 그 뒤 회차마다 그때 차령에 맞는 행의 every_m을 더함)을 한 번에 더한 날(+ 첫 행 first_adj_days)
+  //   — 앞 회차 결과에 다시 더하지 않음(말일 밀림 방지, 검토 반영) · 법정 기산 방식(종전 만료일 다음 날부터 등)은 근거 표 승격 전 원문 대조(문서 초안 '승격 전 확인할 것')
+  //   제안 = 그 줄에서 기준일(운영부 날짜, 없으면 오늘)에 가장 가까운 날(같으면 뒤 날)
   function vehLawCalc(v, rows, today){
-    var miss, cls, ok, anchor, d, k = 0, best = null, bestAbs = Infinity, bestRule = "", r, i, n, g;
+    var miss, bad, cls, ok, anchor, d, prev, M = 0, adj = 0, k = 0, best = null, bestAbs = Infinity, bestRow = null, r, i, n, g;
     if (!v) return null;
     if (isGreyState(v)) return { st: "na" };
     miss = vehLawMiss(v);
     if (miss.length) return { st: "none", miss: miss };
+    bad = vehLawBad(v, today);
+    if (bad.length) return { st: "none", bad: bad };
     cls = v.size === "건설기계" ? "ceq" : "car";
     ok = (rows || []).filter(function(x){ return vehLawRowOk(x) && x.cls === cls; });
-    anchor = isDate(v.insp_due) ? v.insp_due : today;
-    d = v.reg_date;
+    anchor = v.insp_due ? v.insp_due : today;
+    prev = v.reg_date;
     for (g = 0; g < 600; g++){
       r = null;
       for (i = 0; i < ok.length; i++){
-        var x = ok[i], age = vehLawAge(x, v, d);
+        var x = ok[i], age = vehLawAge(x, v, prev);
         if (vehLawHas(x.biz, v.biz) && vehLawHas(x.size, v.size) && (cls !== "ceq" || vehLawHas(x.ceq_kind, v.ceq_kind)) && (x.age_min == null || age >= x.age_min) && (x.age_max == null || age < x.age_max)){ r = x; break; }
       }
       if (!r) break;
-      d = vehAddMonths(d, (k === 0 && r.first_m) ? r.first_m : r.every_m);
-      if (k === 0 && r.first_adj_days) d = vehAddDays(d, r.first_adj_days);
+      if (k === 0){ M = r.first_m || r.every_m; adj = r.first_adj_days || 0; } else M += r.every_m;
+      d = vehAddMonths(v.reg_date, M);
+      if (adj) d = vehAddDays(d, adj);
       k++;
       n = Math.abs(vehDayNum(anchor) - vehDayNum(d));
-      if (n <= bestAbs){ best = d; bestAbs = n; bestRule = r.id; }
+      if (n <= bestAbs){ best = d; bestAbs = n; bestRow = r; }
       if (d > anchor) break;
+      prev = d;
     }
     if (!best) return { st: "none", why: "rule" };
-    return { st: "ok", date: best, diff: isDate(v.insp_due) ? vehDayNum(v.insp_due) - vehDayNum(best) : null, rule: bestRule };
+    return { st: "ok", date: best, diff: v.insp_due ? vehDayNum(v.insp_due) - vehDayNum(best) : null, rule: bestRow.id, cite: vehLawCite(bestRow) };
   }
   function vehLawOf(v){ return vehLawOn() ? vehLawCalc(v, VEH_LAW.rows, todayStr()) : null; }
   function vehLawTag(r){ if (!r) return ""; if (r.st === "na") return "대상 아님"; if (r.st !== "ok") return "기준 없음"; return r.diff === null ? "제안만" : (r.diff === 0 ? "차이 0" : "차이 있음"); }
@@ -10168,9 +10187,10 @@
     var t, cls;
     if (!r) return "";
     if (r.st === "na"){ cls = "hold"; t = "대상 아님"; }
-    else if (r.st !== "ok"){ cls = "pre"; t = mode === "det" ? "법정 검사 제안 <b>기준 없음</b> — " + (r.miss ? "넣을 칸: " + esc(r.miss.join("·")) : "근거 표에 맞는 행 없음") :(mode === "modal" ? "법정 제안: 기준 없음 — " + (r.miss ? "속성 입력" : "근거 표에 맞는 행 없음") : "기준 없음 — 입력"); }
+    else if (r.st !== "ok" && r.bad){ cls = "pre"; t = (mode === "det" ? "법정 검사 제안 <b>기준 없음</b>" : (mode === "modal" ? "법정 제안: 기준 없음" : "기준 없음")) + " — " + esc(r.bad.join("·")) + " 확인"; }   // 검토 반영: 틀린 값
+    else if (r.st !== "ok"){ cls = "pre"; t = mode === "det" ?"법정 검사 제안 <b>기준 없음</b> — " + (r.miss ? "넣을 칸: " + esc(r.miss.join("·")) : "근거 표에 맞는 행 없음") :(mode === "modal" ? "법정 제안: 기준 없음 — " + (r.miss ? "속성 입력" : "근거 표에 맞는 행 없음") : "기준 없음 — 입력"); }
     else { cls = r.diff === 0 ? "ok" : "am"; t = (mode === "modal" ? "법정 제안: " : (mode === "det" ? "법정 검사 제안 " : "제안 ")) + (mode === "det" ? "<b>" + esc(r.date) + "</b>" : esc(r.date)) + " · " + (r.diff === null ? "운영부 날짜 없음" : vehLawDiffTxt(r.diff)); }
-    return '<span class="vl-b ' + cls + '" title="' + esc((r.rule ? "근거 행 " + r.rule + " · " : "") + "표시만 — 검사 만기는 넣은 날짜 그대로") + '">' + t + '</span>';
+    return '<span class="vl-b ' + cls + '" title="' + esc((r.cite ? "근거 " + r.cite + " · " : "") + "표시만 — 검사 만기는 넣은 날짜 그대로") + '">' + t + '</span>';
   }
   function vehLawSortVal(v){ var r = vehLawOf(v); if (!r) return 100002; if (r.st === "na") return 100001; if (r.st !== "ok") return 100000; return r.diff === null ? 99999 : Math.abs(r.diff); }
   function vehLawFoot(rows){
@@ -10182,7 +10202,7 @@
   // 갱신 기록 1줄 — 승격일 때만(아니면 null = 기록 안 함). 제안은 새 날짜를 기준일로 계산(그 회차의 법정 만료일)
   function vehLawLogEntry(v, prev, confirmed, src){
     var r;
-    if (!vehLawOn() || !v || !isDate(confirmed) || prev === confirmed) return null;
+    if (!vehLawOn() || !v || !vehRealDate(confirmed) || prev === confirmed) return null;
     r = vehLawCalc(Object.assign({}, v, { insp_due: confirmed }), VEH_LAW.rows, todayStr());
     if (!r || r.st === "na") return null;
     return { at: todayStr(), prev: prev || "", confirmed: confirmed, proposed: r.st === "ok" ? r.date : "", rule: r.st === "ok" ? r.rule : "", diff: r.st === "ok" ? r.diff : null, by: String((typeof myId === "function" && myId()) || "").slice(0, 40), src: src };
@@ -10214,6 +10234,17 @@
     g("vehRegDate").value = (v && isDate(v.reg_date)) ? v.reg_date : "";
     g("vehCeqKind").value = (v && v.ceq_kind) || ""; g("vehCeqYear").value = (v && v.ceq_year) || "";
     vehModalLawRefresh();
+    vehModalSnap = {}; VEH_MODAL_IDS.forEach(function(id){ vehModalSnap[id] = vehModalVal(id); });   // 연 순간의 창 값 — 저장 때 이와 같은 칸은 손대지 않음(검토 반영)
+  }
+  // 창을 연 순간 값과 같은 칸은 저장 때 손대지 않는다 — 옛 문서의 빈 운전자 키·없는 상세 키가 지워지거나 생기지 않고(감사 가짜 변경 0),
+  //   창이 열린 사이 동기화로 들어온 다른 칸 값을 창 값으로 되돌리지 않음. 사람이 바꾼 칸만 옮김(지운 칸은 키째).
+  var VEH_MODAL_IDS = ["vehNo", "vehKind", "vehInsp", "vehIns", "vehState", "vehInsurer", "vehNote", "vehAcq", "vehNodoc", "vehType", "vehOwn", "vehPermit", "vehDriver", "vehCo", "vehBiz", "vehSize", "vehRegDate", "vehCeqKind", "vehCeqYear"];
+  var vehModalSnap = {};
+  function vehModalVal(id){ var el = document.getElementById(id); return el ? String(el.value == null ? "" : el.value) : ""; }
+  function vehModalChanged(isNew){ return function(id){ return isNew || vehModalVal(id) !== vehModalSnap[id]; }; }
+  function vehModalDateWhy(ch){   // 바꾼 날짜 칸이 달력에 없으면 안내 글(저장 안 함)
+    var bad = [["vehInsp", "검사 만기"], ["vehIns", "보험 만기"], ["vehRegDate", "최초등록일"]].filter(function(p){ var s = vehModalVal(p[0]).trim(); return ch(p[0]) && s && !vehRealDate(s); });
+    return bad.length ? "달력에 없는 날짜입니다: " + bad.map(function(p){ return p[1]; }).join("·") : "";
   }
   function vehModalForm(){   // 창의 지금 값으로 만든 임시 줄(계산·안내용 — 저장 아님)
     var g = function(id){ var el = document.getElementById(id); return el ? String(el.value || "").trim() : ""; }, base = editingVehId ? findVeh(editingVehId) : null;
@@ -10226,13 +10257,12 @@
     el = document.getElementById("vehInsHint"); if (el){ el.textContent = (ins && ins !== f.insurer) ? "표에는 '" + ins + "'(으)로 보임 · 저장된 글은 그대로" : ""; el.style.display = (ins && ins !== f.insurer) ? "" : "none"; }
   }
   function vehSetOpt(v, k, val){ if (val) v[k] = val; else if (Object.prototype.hasOwnProperty.call(v, k)) delete v[k]; }   // 빈 칸은 키를 만들지 않음 · 지운 칸은 키째
-  function vehModalAttrSave(v){   // saveVehFromModal이 부름 — 속성 칸을 줄에 옮김(차량 지시·검사 날짜는 건드리지 않음)
-    var g = function(id){ var el = document.getElementById(id); return el ? String(el.value || "").trim() : ""; }, size = g("vehSize");
-    vehSetOpt(v, "type", g("vehType")); vehSetOpt(v, "own", g("vehOwn")); vehSetOpt(v, "permit", g("vehPermit")); vehSetOpt(v, "driver", g("vehDriver"));
-    vehSetOpt(v, "co", g("vehCo")); vehSetOpt(v, "biz", g("vehBiz")); vehSetOpt(v, "size", size);
-    vehSetOpt(v, "reg_date", isDate(g("vehRegDate")) ? g("vehRegDate") : "");
-    vehSetOpt(v, "ceq_kind", size === "건설기계" ? g("vehCeqKind") : (v.ceq_kind || ""));   // 건설기계가 아니면 칸이 잠겨 있으니 옛 값 그대로
-    vehSetOpt(v, "ceq_year", size === "건설기계" ? (/^(19|20)\d{2}$/.test(g("vehCeqYear")) ? g("vehCeqYear") : "") : (v.ceq_year || ""));
+  function vehModalAttrSave(v, ch){   // saveVehFromModal이 부름 — 바꾼 속성 칸만 줄에 옮김(차량 지시·검사 날짜는 건드리지 않음)
+    var g = function(id){ return vehModalVal(id).trim(); }, ceq = g("vehSize") === "건설기계";
+    [["type", "vehType"], ["own", "vehOwn"], ["permit", "vehPermit"], ["driver", "vehDriver"], ["co", "vehCo"], ["biz", "vehBiz"], ["size", "vehSize"]].forEach(function(p){ if (ch(p[1])) vehSetOpt(v, p[0], g(p[1])); });
+    if (ch("vehRegDate")) vehSetOpt(v, "reg_date", vehRealDate(g("vehRegDate")) ? g("vehRegDate") : "");
+    if (ceq && ch("vehCeqKind")) vehSetOpt(v, "ceq_kind", g("vehCeqKind"));   // 건설기계가 아니면 칸이 잠겨 있으니 옛 값 그대로
+    if (ceq && ch("vehCeqYear")) vehSetOpt(v, "ceq_year", /^(19|20)\d{2}$/.test(g("vehCeqYear")) ? g("vehCeqYear") : "");
   }
   // @veh-law-end
 
@@ -10321,6 +10351,13 @@
       m.due_set = Object.assign({}, (m.due_set && typeof m.due_set === "object") ? m.due_set : {}); m.due_set[f] = mk;
     });
   }
+  // P1 판27 검토: 검사 갱신 기록(insp_log) 합집합 — (at·confirmed·src)가 같으면 한 줄, at 순, 최근 12개. 서버 gw-data vehLogUnion과 같은 규칙
+  function vehLogUnion(a, b){
+    var seen = {}, out = [];
+    [].concat(Array.isArray(a) ? a : [], Array.isArray(b) ? b : []).forEach(function(e){ var k; if (!e || typeof e !== "object") return; k = [e.at, e.confirmed, e.src].join("|"); if (seen[k]) return; seen[k] = 1; out.push(e); });
+    out.sort(function(p, q){ var x = String(p.at || ""), y = String(q.at || ""); return x < y ? -1 : (x > y ? 1 : 0); });
+    return out.slice(-12);
+  }
   function mergeVeh(local, remote){
     var byId = {};
     (local || []).forEach(function(v){ if (v && v.id) byId[v.id] = v; });
@@ -10332,6 +10369,7 @@
         var w = (x.updated || "") > (cur.updated || "") ? x : cur;
         var m = Object.assign({}, (w===x?cur:x), w);
         vehDueMergeKeep(m, cur, x);   // P1 판2 검토(S1)
+        if (Array.isArray(cur.insp_log) || Array.isArray(x.insp_log)) m.insp_log = vehLogUnion(x.insp_log, cur.insp_log);   // P1 판27 검토: 검사 갱신 기록은 양쪽 합집합(같은 날 로컬 줄이 이겨도 서버 기록이 지워지지 않게 — 서버 vehLogKeep와 같은 규칙)
         if (cur.del === 1 || x.del === 1) m.del = mergeDel(cur, x);
         byId[x.id] = m;
       }
@@ -10385,23 +10423,25 @@
     var dupV = vehicles.filter(function(x){ return x && x.del !== 1 && x.id !== editingVehId && (x.no||"").trim() === no; });
     if (dupV.length){ alert("이미 등록된 차량번호입니다: " + no); return; }
     var v = editingVehId ? findVeh(editingVehId) : null;
-    var isNew = !v, inspPrev = v ? (v.insp_due || "") : "";
+    var isNew = !v, inspPrev = v ? (v.insp_due || "") : "", ch = vehModalChanged(isNew), why = vehModalDateWhy(ch);   // P1 판26 검토: 창을 연 순간과 같은 칸은 손대지 않음(@veh-law)
+    if (why){ alert(why); return; }   // 달력에 없는 날은 받지 않음
+    if (!isNew && !VEH_MODAL_IDS.some(ch)){ closeVehModal(); return; }   // 바꾼 칸 없음 = 저장 안 함(문서 그대로)
     if (!v){ v = { id: genId("v"), created: todayStr() }; vehicles.push(v); }
-    v.no = no;
-    v.kind = document.getElementById("vehKind").value.trim();
-    vehModalAttrSave(v);   // P1 판26 속성 칸(빈 칸은 키 안 만듦 — @veh-law)
-    v.insp_due = document.getElementById("vehInsp").value || null;
-    if (!isNew) vehLawLogPush(v, vehLawLogEntry(v, inspPrev, v.insp_due, "edit"));   // P1 판27 검사 만기를 바꾸면 제안·확정 날짜 기록(승격일 때만)
-    v.ins_due = document.getElementById("vehIns").value || null;
-    v.state = document.getElementById("vehState").value;
-    v.insurer = document.getElementById("vehInsurer").value.trim();
-    v.note = document.getElementById("vehNote").value.trim();
+    if (ch("vehNo")) v.no = no;
+    if (ch("vehKind")) v.kind = document.getElementById("vehKind").value.trim();
+    vehModalAttrSave(v, ch);   // P1 판26 속성 칸(바꾼 칸만 · 빈 칸은 키 안 만듦·지운 칸은 키째)
+    if (ch("vehInsp")) v.insp_due = document.getElementById("vehInsp").value || null;
+    if (ch("vehIns")) v.ins_due = document.getElementById("vehIns").value || null;
+    if (ch("vehState")) v.state = document.getElementById("vehState").value;
+    if (ch("vehInsurer")) v.insurer = document.getElementById("vehInsurer").value.trim();
+    if (ch("vehNote")) v.note = document.getElementById("vehNote").value.trim();
     if (isAdmin()){   // 관리자 전용 필드 — 비관리자 저장은 서버가 기존값 보존
       var acq = parseInt(String(document.getElementById("vehAcq").value).replace(/[^0-9]/g,""), 10);
       var nod = parseInt(String(document.getElementById("vehNodoc").value).replace(/[^0-9]/g,""), 10);
-      if (!isNaN(acq)) v.acq_price = acq; else delete v.acq_price;
-      if (!isNaN(nod)) v.nodoc_amt = nod; else delete v.nodoc_amt;
+      if (ch("vehAcq")){ if (!isNaN(acq)) v.acq_price = acq; else delete v.acq_price; }
+      if (ch("vehNodoc")){ if (!isNaN(nod)) v.nodoc_amt = nod; else delete v.nodoc_amt; }
     }
+    if (!isNew && ch("vehInsp")) vehLawLogPush(v, vehLawLogEntry(v, inspPrev, v.insp_due, "edit"));   // P1 판27 검사 만기를 바꾸면 제안·확정 날짜 기록(승격일 때만 · 상태 저장 뒤 — 검토 반영)
     v.updated = todayStr();
     closeVehModal();
     saveVehiclesCache(); renderVehicles(); renderDashboard(); scheduleVehSave();

@@ -7912,23 +7912,50 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
       && r5.code === 200 && L5.proposed === '' && L5.diff === null && L5.rule === '' && r6.code === 200 && L6.length === 12 && L6[11].diff === 0 && L6[0].confirmed === '2026-01-11';
     return { ok, info: { r1: r1.code, L1, n2, noLog, bad, L5, L6n: L6.length } };
   };
+  const chkC = async (c) => {   // 검토 반영 — 승격 아님·설정 못 읽음 + 제안 보냄 = 기록·law_log 없음(날짜 저장은 됨) · 낡은 사본 저장이 서버 기록을 지우지 않음(합집합)
+    const law = { proposed: '2027-10-25', rule: 't.car.1' }, out = {};
+    seedDue(); mem.gw_data['settings:veh'] = { bg_ver: 'test-0' };
+    const r1 = await c({ action: 'veh_due_set', task_id: 'k1', date: '2027-10-31', base_due: '2026-10-31', law }, tokW, 'dev1');
+    out.notProm = r1.code === 200 && vehW().insp_due === '2027-10-31' && !('insp_log' in vehW()) && !('law_log' in r1.body);
+    seedDue(); delete mem.gw_data['bg:veh:law:v1'];
+    const r2 = await c({ action: 'veh_due_set', task_id: 'k1', date: '2027-10-31', base_due: '2026-10-31', law }, tokW, 'dev1');
+    out.noBg = r2.code === 200 && !('insp_log' in vehW()) && !('law_log' in r2.body);
+    seedDue(); blobsMock.hooks.failGet = (k) => k === 'settings:veh';
+    let r3; try { r3 = await c({ action: 'veh_due_set', task_id: 'k1', date: '2027-10-31', base_due: '2026-10-31', law }, tokW, 'dev1'); } finally { blobsMock.hooks.failGet = null; }
+    out.readFail = r3.code === 200 && vehW().insp_due === '2027-10-31' && !('insp_log' in vehW()) && !('law_log' in r3.body);
+    // 낡은 사본: 기록 1줄이 생긴 뒤, 기록을 모르는 기기가 같은 차 메모를 고쳐 저장 → 기록 그대로 · 기기 쪽에만 있는 다른 기록 줄은 더해짐(같은 줄은 한 번)
+    seedDue(); await c({ action: 'veh_due_set', task_id: 'k1', date: '2027-10-31', base_due: '2026-10-31', law }, tokW, 'dev1');
+    const srvLog = JSON.parse(JSON.stringify(vehW().insp_log || []));
+    const stale = { id: 'w1', no: '11가1111', state: '운행', insp_due: '2027-10-31', ins_due: '2026-12-20', note: '메모', updated: '2026-11-13' };
+    const s1 = await c({ action: 'save', collection: 'vehicles', base: mem.gw_data['col:vehicles'].updated_at, doc: { schema: 1, items: [stale] } }, tokW, 'dev1');
+    const L1 = vehW().insp_log || [];
+    const other = { at: '2026-11-12', prev: '', confirmed: '2026-10-31', proposed: '', rule: '', diff: null, by: 'x', src: 'edit' };
+    const s2 = await c({ action: 'save', collection: 'vehicles', base: mem.gw_data['col:vehicles'].updated_at, doc: { schema: 1, items: [Object.assign({}, stale, { insp_log: [other, srvLog[0]] })] } }, tokW, 'dev1');
+    const L2 = vehW().insp_log || [];
+    out.stale = srvLog.length === 1 && s1.code === 200 && vehW().note === '메모' && JSON.stringify(L1) === JSON.stringify(srvLog) && s2.code === 200 && L2.length === 2 && L2[0].at === '2026-11-12' && JSON.stringify(L2[1]) === JSON.stringify(srvLog[0]);
+    return { ok: Object.keys(out).every((k) => out[k] === true), info: out };
+  };
   try {
-    const c0 = callerP27(gwd), RA = await chkA(c0), RB = await chkB(c0);
+    const c0 = callerP27(gwd), RA = await chkA(c0), RB = await chkB(c0), RC = await chkC(c0);
+    T('P1 판27 ④ 검토 반영: 승격 아님(다른 판)·근거 없음·설정 못 읽음 + 제안 보냄 = 날짜는 저장·기록과 law_log 없음 · 기록을 모르는 낡은 사본 저장 = 서버 기록 그대로(메모는 들어감) · 기기 쪽 다른 기록 줄은 더하고 같은 줄은 한 번(at 순)', RC.ok, JSON.stringify(RC.info));
     T('P1 판27 ① veh_bg_get: 비로그인 401 · 차량 숨김 403 · 근거 없음 = on false(NO_BG) · 꼴 틀림(rows 배열 아님) = BAD_BG · 스위치 없음·다른 판 = NOT_PROMOTED(행 안 보냄) · 승격(settings:veh.bg_ver = 판 ver) = on true·ver·행·attr — 보기 권한·관리자', RA.ok, RA.info);
     T('P1 판27 ② 지시 완료 창 기록(insp_log): 검사 지시 + 제안 2027-10-25 → {prev 2026-10-31·확정 2027-10-31·제안·차이 +6·근거 행·누가·task} 1줄 + 응답 law_log 같은 값 · 보험 지시 = 기록 안 함 · 제안 안 보냄 = 기록·law_log 없음(응답 vehicle 종전 꼴) · 없는 날 제안 = 저장은 되고 기록 없음 · 제안 "" = 비교 불가(차이 null) · 13번째 = 최근 12개', RB.ok, JSON.stringify(RB.info));
     const MUT = {
-      A: [["  if (!ver || ver !== bg.ver) return jr(200, { status: 'OK', on: false, why: 'NOT_PROMOTED', request_id: R });\n", ''],
+      A: [["  if (!ver || ver !== bg.ver) return { on: false, why: 'NOT_PROMOTED' };\n", ''],
         ["  if (!c.member.admin && permOf(c.member, 'vehicles') === 'hide') return jr(403,", '  if (false) return jr(403,'],
         ["x.schema === 1 && typeof x.ver === 'string' && x.ver.length >= 2 && Array.isArray(x.rows) && typeof x.sha === 'string' && x.sha.length >= 8); }\n// 갱신 기록", "x.schema === 1); }\n// 갱신 기록"]],
-      B: [["  const lawLog = field === 'insp_due' ? vehLawLog(", "  const lawLog = true ? vehLawLog("], ["  if (p !== '' && !vehDueDate(p)) return null;\n", ''], ['.concat([lawLog]).slice(-VEH_LOG_MAX);', '.concat([lawLog]);'],
-        ["lawLog ? { law_log: lawLog } : {}));", '{}));']]
+      B: [["(field === 'insp_due' && d.law && (await vehBgState(st)).on) ? vehLawLog(", "(d.law && (await vehBgState(st)).on) ? vehLawLog("],["  if (p !== '' && !vehDueDate(p)) return null;\n", ''], ['.concat([lawLog]).slice(-VEH_LOG_MAX);', '.concat([lawLog]);'],
+        ["lawLog ? { law_log: lawLog } : {}));", '{}));']],
+      C: [["(field === 'insp_due' && d.law && (await vehBgState(st)).on) ? vehLawLog(", "(field === 'insp_due' && d.law) ? vehLawLog("],   // 검토 1: 승격 안 봄
+        ["  if (col === 'vehicles' && Array.isArray(doc.items)) vehLogKeep(oldItems, doc.items);", ''],   // 검토 2: 서버 합집합 걷음
+        ["  [].concat(Array.isArray(a) ? a : [], Array.isArray(b) ? b : []).forEach(function (e) { if (!e || typeof e !== 'object') return; const k = [e.at, e.confirmed, e.src].join('|'); if (seen[k]) return;", "  [].concat(Array.isArray(a) ? a : [], Array.isArray(b) ? b : []).forEach(function (e) { if (!e || typeof e !== 'object') return; const k = [e.at, e.confirmed, e.src].join('|');"]]   // 같은 줄 두 번
     };
     const kill = [];
     for (const n of Object.keys(MUT)) for (const [from, to] of MUT[n]) {
-      let k; try { k = !(await ({ A: chkA, B: chkB })[n](callerP27(loadP27(mutP27(from, to))))).ok; } catch (e) { k = 'err ' + e.message; }
+      let k; try { k = !(await ({ A: chkA, B: chkB, C: chkC })[n](callerP27(loadP27(mutP27(from, to))))).ok; } catch (e) { k = 'err ' + e.message; }
       if (k !== true) kill.push(n + ':' + from.slice(0, 50) + (k === false ? ' 안 깨짐' : ' ' + k));
     }
-    T('P1 판27 ③ 결함 사본 ' + (MUT.A.length + MUT.B.length) + '개(승격 검사 걷음·숨김 403 걷음·근거 꼴 검사 느슨 · 보험 칸도 기록·제안 날짜 검사 걷음·12개 상한 걷음·응답 law_log 걷음) = 모두 ✗', kill.length === 0, kill.join(' | '));
+    T('P1 판27 ③ 결함 사본 ' + (MUT.A.length + MUT.B.length + MUT.C.length) + '개(승격 검사 걷음·숨김 403 걷음·근거 꼴 검사 느슨 · 보험 칸도 기록·제안 날짜 검사 걷음·12개 상한 걷음·응답 law_log 걷음 · 검토: 기록 때 승격 안 봄·저장 합집합 걷음·같은 기록 두 번) = 모두 ✗', kill.length === 0, kill.join(' | '));
   } finally { resetP27(); }
 }
 
