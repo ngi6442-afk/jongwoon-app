@@ -2104,10 +2104,10 @@ try {
   // ② 사이드바 순서·칸 수
   const nav28 = html.slice(html.indexOf('<nav class="tabbar" id="tabbar">'), html.indexOf('</nav>'));
   const tabs28 = [...nav28.matchAll(/data-tab="([\w-]+)"/g)].map((m) => m[1]);
-  const WANT28 = 'dash,tasks,rec,stmt,cli,hr,workers,progress,bid,con,quote,promo,cal,veh,hwakwan,allbaro,safety,lic,doc,ask,check,leave';   // 29 판②: 관리 › 기성·수금 다음 월말명세서(stmt)
+  const WANT28 = 'dash,tasks,rec,stmt,cli,hr,workers,progress,pmcon,bid,con,quote,promo,cal,veh,hwakwan,allbaro,safety,lic,doc,ask,check,leave';   // 29 판②: 관리 › 기성·수금 다음 월말명세서(stmt)
   const ia28 = tabs28.indexOf('allbaro');
-  T('v428 사이드바 21칸(관리자 22 → 21, 부동산 빠짐 — 29 판②에 관리 › 기성·수금 다음 월말명세서를 더해 22칸) 순서 그대로 · 업무 묶음 운반일지 → 안전 → 인허가(옛 현장 자리) · 안전 버튼 tabSafetyBtn = 처음엔 숨김(perm-hidden)·글자 "안전"',
-    tabs28.join(',') === WANT28 && tabs28.length === 22 && ia28 > 0 && tabs28[ia28 + 1] === 'safety' && tabs28[ia28 + 2] === 'lic'
+  T('v428 사이드바 21칸(관리자 22 → 21, 부동산 빠짐 — 29 판②에 관리 › 기성·수금 다음 월말명세서를 더해 22칸 · P1 판29 진척도 아래 PM 콘솔을 더해 23칸) 순서 그대로 · 업무 묶음 운반일지 → 안전 → 인허가(옛 현장 자리) · 안전 버튼 tabSafetyBtn = 처음엔 숨김(perm-hidden)·글자 "안전"',
+    tabs28.join(',') === WANT28 && tabs28.length === 23 && ia28 > 0 && tabs28[ia28 + 1] === 'safety' && tabs28[ia28 + 2] === 'lic'
     && /<button class="tab-btn perm-hidden" data-tab="safety" id="tabSafetyBtn">안전<\/button>/.test(nav28), tabs28.join(','));
 
   // ③ 칸 구조 — 현장 id 5개가 view-safety의 현장 칸 안 · 교육 칸 · 입찰 칸
@@ -2343,8 +2343,8 @@ try {
   const helpBad28 = G4_28.filter((g) => !grp28[g] || helpLn28(g) !== grp28[g].join(' / ')), manBad28 = G4_28.filter((g) => !grp28[g] || manLn28(g) !== grp28[g].join(' / '));
   const OLDMAN28 = ['온비드 물건은 부동산 탭에 따로 모입니다', '현장 탭에 <b>미이수</b>', '인사·직원 탭(직원 대상)과 인사·일용직 탭(일용직 대상) 아래에 있습니다', '<h2 id="s12">12. 부동산', '<h2 id="s28">28. 현장', '홍보 / 부동산', '운반일지 / 현장 /', '>부동산 (온비드)</a>', '>현장 — 석면·철거·준설 대장</a>'];
   const oldMan28 = OLDMAN28.filter((s) => man28.indexOf(s) >= 0);
-  T('v428 도움말·MANUAL 1절 4묶음 = 사이드바 라벨 그대로(관리 7(29 판② 월말명세서 더함 — 지시/기성·수금/월말명세서/…) · 수주 4 · 업무 7 · 개인 3 — 수주 입찰/계약/견적서/홍보 · 업무 …/운반일지/안전/인허가/문서함 · 개인 물어보기/내 업무/휴가) · 탭 안 칸 안내(입찰 = 공고/부동산, 안전 = 현장/교육·검진) · MANUAL 12·28·21-9절 새 자리 · 옛 위치 문장 0 · sw ≥ 428',
-    G4_28.map((g) => (grp28[g] || []).length).join(',') === '7,4,7,3' && grp28['관리'].slice(0, 3).join('/') === '지시/기성·수금/월말명세서' && grp28['수주'].join('/') === '입찰/계약/견적서/홍보' && grp28['업무'].join('/') === '캘린더/차량/화관법/운반일지/안전/인허가/문서함' && grp28['개인'].join('/') === '물어보기/내 업무/휴가'
+  T('v428 도움말·MANUAL 1절 4묶음 = 사이드바 라벨 그대로(관리 8(29 판② 월말명세서·P1 판29 PM 콘솔 더함 — 지시/기성·수금/월말명세서/…) · 수주 4 · 업무 7 · 개인 3 — 수주 입찰/계약/견적서/홍보 · 업무 …/운반일지/안전/인허가/문서함 · 개인 물어보기/내 업무/휴가) · 탭 안 칸 안내(입찰 = 공고/부동산, 안전 = 현장/교육·검진) · MANUAL 12·28·21-9절 새 자리 · 옛 위치 문장 0 · sw ≥ 428',
+    G4_28.map((g) => (grp28[g] || []).length).join(',') === '8,4,7,3' && grp28['관리'].slice(0, 3).join('/') === '지시/기성·수금/월말명세서' && grp28['수주'].join('/') === '입찰/계약/견적서/홍보' && grp28['업무'].join('/') === '캘린더/차량/화관법/운반일지/안전/인허가/문서함' && grp28['개인'].join('/') === '물어보기/내 업무/휴가'
     && helpBad28.length === 0 && manBad28.length === 0 && help28.indexOf('<b>입찰</b> = 공고 / 부동산, <b>안전</b> = 현황 / 현장 / 체크') > 0 && man1_28.indexOf('<b>입찰</b> = 공고 / 부동산, <b>안전</b> = 현황 / 현장 / 체크') > 0   // v432 안전 칸에 현황(맨 앞) · v447 칸 이름 교육·검진 → 체크
     && help28.indexOf('홍보 / 부동산') < 0 && help28.indexOf('운반일지 / 현장 /') < 0 && oldMan28.length === 0
     && man28.indexOf('<h2 id="s12">12. 입찰 › 부동산 (온비드)') > 0 && man28.indexOf('<h2 id="s28">28. 안전 › 현장 — 석면·철거·준설 대장') > 0 && man28.indexOf('<h3>21-9. 교육·건강진단 이력 (안전 › 체크)</h3>') > 0
@@ -3914,15 +3914,15 @@ try {
     fld: { id: 'k5', perms: { tasks: 'hide', veh: 'view', rec: 'hide', lic: 'hide', site: 'hide', check: 'do', con: 'hide', cli: 'hide', doc: 'view', wk: 'hide', quote: 'hide', promo: 'hide' } },   // 현장 8명(값 없음 = 기본 숨김)
     dmy: { id: 'k6', perms: { tasks: 'do', veh: 'do', rec: 'view', lic: 'view', site: 'do', check: 'do', con: 'hide', cli: 'view', doc: 'view', wk: 'do', quote: 'hide', promo: 'hide' } },   // 더미(값 없음)
   };
-  const WANT34 = { admin: [22, 22], kja: [15, 15], kmj: [14, 14], kmjS: [15, 15], jjw: [14, 14], kht: [12, 11], fld: [9, 8], dmy: [15, 14] };   // [4-1 흉내(v433), v434] — 29 판②: 관리자는 월말명세서까지 22(두 판 모두 — 흉내는 hw만 걷음), 그 밖 사람은 stmt 값이 없어 기본 숨김(칸 수 그대로)
+  const WANT34 = { admin: [23, 23], kja: [15, 15], kmj: [14, 14], kmjS: [15, 15], jjw: [14, 14], kht: [12, 11], fld: [9, 8], dmy: [15, 14] };   // [4-1 흉내(v433), v434] — 29 판②: 관리자는 월말명세서·PM 콘솔(P1 판29 — 관리자만)까지 23(두 판 모두 — 흉내는 hw만 걷음), 그 밖 사람은 stmt 값이 없어 기본 숨김(칸 수 그대로)
   const R34 = {}; Object.keys(P34).forEach((k) => { R34[k] = { a: runNav34(P34[k], REG41_34, AP41_34), b: runNav34(P34[k], REG42_34, AP42_34) }; });
   const diff34 = (r) => r.a.vis.filter((id) => r.b.vis.indexOf(id) < 0).concat(r.b.vis.filter((id) => r.a.vis.indexOf(id) < 0).map((id) => '+' + id));
   const okN34 = Object.keys(WANT34).every((k) => R34[k].a.vis.length === WANT34[k][0] && R34[k].b.vis.length === WANT34[k][1]);
   const okD34 = Object.keys(WANT34).every((k) => { const d = diff34(R34[k]); return WANT34[k][0] === WANT34[k][1] ? d.length === 0 : (d.length === 1 && d[0] === 'tabHwakwanBtn'); });
   const hwVis34 = Object.keys(P34).filter((k) => R34[k].b.vis.indexOf('tabHwakwanBtn') >= 0).join(',');
   const stVis34 = Object.keys(P34).filter((k) => R34[k].b.vis.indexOf('tabStmtBtn') >= 0).join(',');   // 29 판② 월말명세서 — 명부 저장값에 stmt가 없어(배포 직후 전원) 관리자만
-  T('v434 ⓑ 사람별 사이드바 칸 수(실제 nav 22칸(29 판② 월말명세서 더함)·permOf·applyPerms·applySafetyPerms 실행 — 11/9 명부 권한 + 11/10 hw 저장값): 관리자 22 · 김정아(수행) 15 · 권민지(보기) 14(안전 부여 뒤 15) · 정재욱(보기) 14 · 김호태(숨김) 12 → 11 · 현장 8명형(값 없음) 9 → 8 · 더미(값 없음) 15 → 14 — 4-1 흉내(두 표에 hw 없음·전용 줄 없음)와 비교해 바뀐 칸은 화관법 하나뿐(안전 탭 등 그대로) · 화관법이 보이는 사람 = 관리자·김정아·권민지·정재욱 · 월말명세서가 보이는 사람 = 관리자만(stmt 값 없음 = 기본 숨김) · 4-1 흉내에서도 getElementById(undefined) 0(applyPerms "MODULE_TAB 없는 키 건너뜀" 안전장치가 남아 있음) · 흉내가 실제로 전용 줄·두 표 hw를 지웠는지 · 홈에서 돌린 applyPerms는 홈 이동·화관법 다시 그림 0',
-    navEls34.filter((e) => e.cls.indexOf('tab-btn') >= 0).length === 22 && AP41_34 !== AP42_34 && REG41_34[1] !== REG42_34[1] && REG41_34[2] !== REG42_34[2]
+  T('v434 ⓑ 사람별 사이드바 칸 수(실제 nav 23칸(29 판② 월말명세서·P1 판29 PM 콘솔 더함)·permOf·applyPerms·applySafetyPerms 실행 — 11/9 명부 권한 + 11/10 hw 저장값): 관리자 23 · 김정아(수행) 15 · 권민지(보기) 14(안전 부여 뒤 15) · 정재욱(보기) 14 · 김호태(숨김) 12 → 11 · 현장 8명형(값 없음) 9 → 8 · 더미(값 없음) 15 → 14 — 4-1 흉내(두 표에 hw 없음·전용 줄 없음)와 비교해 바뀐 칸은 화관법 하나뿐(안전 탭 등 그대로) · 화관법이 보이는 사람 = 관리자·김정아·권민지·정재욱 · 월말명세서가 보이는 사람 = 관리자만(stmt 값 없음 = 기본 숨김) · 4-1 흉내에서도 getElementById(undefined) 0(applyPerms "MODULE_TAB 없는 키 건너뜀" 안전장치가 남아 있음) · 흉내가 실제로 전용 줄·두 표 hw를 지웠는지 · 홈에서 돌린 applyPerms는 홈 이동·화관법 다시 그림 0',
+    navEls34.filter((e) => e.cls.indexOf('tab-btn') >= 0).length === 23 && AP41_34 !== AP42_34 && REG41_34[1] !== REG42_34[1] && REG41_34[2] !== REG42_34[2]
     && okN34 && okD34 && hwVis34 === 'admin,kja,kmj,kmjS,jjw' && stVis34 === 'admin' && Object.keys(R34).every((k) => R34[k].b.log.length === 0 && R34[k].a.undef === 0 && R34[k].b.undef === 0),
     Object.keys(P34).map((k) => k + ' ' + R34[k].a.vis.length + '→' + R34[k].b.vis.length + (diff34(R34[k]).length ? '(' + diff34(R34[k]).join('·') + ')' : '')).join(' · '));
 
@@ -4906,7 +4906,7 @@ try {
   const WT38 = { 1024: 791, 1100: 867, 1280: 1011, 1366: 1097, 1440: 1171, 1536: 1267, 1600: 1331, 1920: 1428, 2560: 1428 };
   const WIDE38 = ['tasks', 'rec', 'cli', 'workers', 'bid', 'con', 'veh', 'safety', 'perm', 'stmt'];   // 명세 reading_width 9개 중 v438은 계약·차량·권한관리 · v439에 지시(#view-tasks) · v440에 기성(#view-rec) · v441에 거래처(#view-cli) · v442에 일용직(#view-workers) · v443에 입찰(#view-bid — 표로 바꾼 판) · v445에 안전(#view-safety — 56 판, 현장 칸 표) — 9개 다 · 29 판② 월말명세서(#view-stmt — 처음부터 표, 명세 9개 밖)
   const views38 = [...html.matchAll(/<(?:section|div) class="view(?: active)?" id="view-([a-z]+)">/g)].map((m) => m[1]);
-  const SECS38 = ['tasks', 'veh', 'hwakwan', 'allbaro', 'rec', 'stmt', 'cal', 'lic', 'bid', 'con', 'cli', 'doc', 'hr', 'progress', 'ask', 'safety', 'quote', 'promo', 'workers', 'perm', 'fam', 'leave'];   // 29 판②: 기성 화면 뒤 월말명세서 section
+  const SECS38 = ['tasks', 'veh', 'hwakwan', 'allbaro', 'rec', 'stmt', 'cal', 'lic', 'bid', 'con', 'cli', 'doc', 'hr', 'progress', 'pmcon', 'ask', 'safety', 'quote', 'promo', 'workers', 'perm', 'fam', 'leave'];   // 29 판②: 기성 화면 뒤 월말명세서 section
   const secs38 = [...html.matchAll(/<section class="view" id="view-([a-z]+)">/g)].map((m) => m[1]);
   const wBad38 = Object.keys(WT38).filter((w) => Math.abs(body38(+w) - WT38[w]) > 2);
   const vBad38 = [1366, 1920].map((w) => views38.filter((id) => viewW38(w, id) !== (WIDE38.indexOf(id) >= 0 ? body38(w) : 808)).join('/')).join('|') + '|' + views38.filter((id) => viewW38(1024, id) !== body38(1024)).join('/');
@@ -4914,7 +4914,7 @@ try {
     && decl38(1366, '#sfPaneNow', 'max-width') === '808px' && decl38(1920, '#sfPaneEdu', 'max-width') == null && decl38(1920, '#eduLead', 'max-width') === '808px' && decl38(1920, '#eduScopeLine', 'max-width') === '808px' && decl38(1920, '#sfPaneSite', 'max-width') == null;   // v447: 체크 칸(#sfPaneEdu)도 사람별 표라 넓힘 — 칸 머리 두 줄만 808   // v445: 안전 탭은 현장 칸(표)만 넓고 현황·교육·검진(옛 목록 — v446 사람별 표 판에서)은 808
   const phone38 = decl38(859, '#app', 'max-width') === '560px' && padLR38(decl38(859, '#app', 'padding')).join() === '16,16' && decl38(859, '.views>.view', 'max-width') == null && decl38(375, '.tabbar', 'width') == null && decl38(859, '.layout', 'gap') == null;
   T('v438 ① 화면 폭(head <style>을 읽어 계산 — 창 폭 − 스크롤바 17): 본문 = 명세 width_plan.table(±2px) 1024 791 · 1100 867 · 1280 1011 · 1366 1097 · 1440 1171 · 1536 1267 · 1600 1331 · 1920·2560 1428 · 넓히는 화면 id 10개(지시·기성·거래처·일용직·입찰·계약·차량·안전·권한관리·월말명세서 — v439에 지시·v440에 기성·v441에 거래처·v442에 일용직·v443에 입찰·v445에 안전·29 판②에 월말명세서를 더함)만 1366·1920에서 본문 폭, 그 밖 화면은 808 · 1024 창은 모두 본문 폭(791 < 808) · 권한관리는 권한 표(#permRoster)만 넓고 그 밖 카드·안전 현황(#sfPaneNow)·교육·검진(#sfPaneEdu — v446 전까지 옛 목록) 808(현장 칸 #sfPaneSite는 본문 폭) · 859px 이하 틀 그대로(#app 최대 560·여백 16, 간격·사이드바 폭·읽기 폭 규칙 없음) · section 태그 22개(29 판② 월말명세서 더함) class="view" 그대로(class 더하지 않음)',
-    wBad38.length === 0 && vBad38 === '||' && views38.length === 24 && perm38 && phone38 && JSON.stringify(secs38) === JSON.stringify(SECS38) && !/<section class="view [^"]*" id=/.test(html),   // 29 판②: 화면 24(월말명세서 더함)·넓히는 화면 10
+    wBad38.length === 0 && vBad38 === '||' && views38.length === 25 && perm38 && phone38 && JSON.stringify(secs38) === JSON.stringify(SECS38) && !/<section class="view [^"]*" id=/.test(html),   // 29 판②: 화면 25(월말명세서·PM 콘솔 더함)·넓히는 화면 10
     JSON.stringify({ body: Object.keys(WT38).map((w) => w + ':' + body38(+w)), viewBad: vBad38, views: views38.length, perm38, phone38, secs: secs38.length }));
 
   // ② 이후 — 부품 하네스
@@ -12895,6 +12895,130 @@ try {
   T('v462 문서·판 번호(정확 검사): FEATURES 기준 v462 (2026-11-13)·v462 절(C132·paAiRec·paMarkDone·setAiState·ALREADY·promoai:draft·0e1acad·sw v462)·"v458 뒤" 줄 0 · TESTLIST v462 화면 칸 "[ ] (AI 시험 화면 대상" ≥ 1("PM" 낱말 0)·게이트 칸 [x] 12종 · 서버 setAiState 덮기 막음 줄 · sw jw-shell-v462 · 결함 사본 5 ✗',
     r62.ok && M62.every((v) => v === false), JSON.stringify({ r: r62.info, mut: M62 }));
 } catch (e) { console.log('  (v462 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ---- P1 판29 PM 콘솔(시안 11/13 18:14 PM ㄱ · 착수설명서 판29 · 원장 T666) — 줄 7종·버튼 3종·PM 아닌 관리자에게 버튼 없음·기존 카드 그대로·판30·31이 붙을 한 곳 ----
+//   ① 배선(정적) ② 실행 — 실제 renderPmcon·pmconAct를 가짜 화면·가짜 gwCall로 돌림(PM · PM 아닌 관리자 · 누른 기록 못 읽음 · 보류 표시) ③ 누름 → 서버로 가는 본문
+//   ④ 기존 카드 함수 해시 그대로 ⑤ 점검 카드 한 곳(PMCON_CHECKS) ⑥ 폰 배치·입력 칸 없음·화면 글에 내부 키 이름 없음
+try {
+  const fnP = (name) => { const i = html.indexOf('function ' + name + '('); if (i < 0) throw new Error('함수 없음: ' + name); let d = 0, st = false; for (let j = i; j < html.length; j++) { const ch = html[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return html.slice(i, j + 1); } } throw new Error('중괄호 짝 안 맞음: ' + name); };
+  const stP = (re) => { const m = html.match(re); if (!m) throw new Error('문장 없음: ' + re); return m[0]; };
+  const gwdP = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-data.js'), 'utf8');
+  const secP = (() => { const i = html.indexOf('<section class="view" id="view-pmcon">'); return i < 0 ? '' : html.slice(i, html.indexOf('</section>', i)); })();
+  const permSecP = (() => { const i = html.indexOf('<section class="view" id="view-perm">'); return i < 0 ? '' : html.slice(i, html.indexOf('</section>', i)); })();
+  const KINDS_P = stP(/var PMCON_KINDS = \[[\s\S]*?\n  \];/);
+  const kindsP = [...KINDS_P.matchAll(/\{ kind: "(\w+)", label: "([^"]+)", grade: "(R\d)", get: "(\w+)", card: "(\w+)",/g)].map((m) => ({ kind: m[1], label: m[2], grade: m[3], get: m[4], card: m[5] }));
+  const svKindsP = [...((gwdP.match(/const PMCON_KINDS = \{([\s\S]*?)\n\};/) || ['', ''])[1]).matchAll(/^\s+(\w+): \{ label: '([^']+)', fn: (\w+),/gm)].map((m) => ({ kind: m[1], label: m[2], fn: m[3] }));
+  const FN_OF_GET = { assign_get: 'handleAssignSet', notify_get: 'handleNotifySet', doneif_get: 'handleDoneifSet', autotask_get: 'handleAutotaskSet', learn_pairs_get: 'handleLearnSettingsSet', brief_get: 'handleBriefSet', con_proc_get: 'handleConProcBgSet' };
+  const disp = (a) => new RegExp("if \\(d && d\\.action === '" + a + "'\\) return await \\w+\\(event, d, R\\);").test(gwdP);
+  const swP = fnP('switchTab'), apP = fnP('applyPerms');
+  // ① 배선
+  T('P1 판29 ① 배선: 사이드바 관리 묶음 진척도 바로 아래 PM 콘솔(처음 숨김 perm-hidden) · applyPerms = 관리자에게만 보임·관리자 아니면 홈 · switchTab = view-pmcon 켜기 + renderPmcon · 줄 7종 순서(배정표·알림 설정·완료 판정·자동 지시 규칙·계약 학습·브리핑 설정·근거 승격)·등급(R2 = 계약 학습·근거 승격) · 줄마다 조회 action이 서버에 있고 [카드 열기] 자리가 권한관리 화면 안 · 서버 PMCON_KINDS 같은 7종·같은 이름·부르는 기존 핸들러 = 그 카드의 저장 핸들러 · pmcon_get·pmcon_decide 디스패치 · 감사 라벨 pmcon',
+    /<button class="tab-btn perm-hidden" data-tab="progress" id="tabProgressBtn">진척도<\/button>\n\s*<button class="tab-btn perm-hidden" data-tab="pmcon" id="tabPmconBtn">PM 콘솔 <span class="tab-badge hide" id="pmconTabBadge">0<\/span><\/button>/.test(html)
+    && /var pcBtn = document\.getElementById\("tabPmconBtn"\);\s*if \(pcBtn\) pcBtn\.classList\.toggle\("perm-hidden", !adminUser\);/.test(apP) && apP.indexOf('if (currentTab === "pmcon" && !adminUser) switchTab("dash");') > 0
+    && swP.indexOf('document.getElementById("view-pmcon").classList.toggle("active", name === "pmcon");') > 0 && swP.indexOf('if (name === "pmcon") renderPmcon();') > 0
+    && kindsP.map((k) => k.kind).join(',') === 'assign,notify,doneif,autotask,learn,brief,bg' && kindsP.map((k) => k.label).join('/') === '배정표/알림 설정/완료 판정/자동 지시 규칙/계약 학습/브리핑 설정/근거 승격'
+    && kindsP.map((k) => k.grade).join('') === 'R1R1R1R1R2R1R2' && kindsP.every((k) => disp(k.get) && permSecP.indexOf('id="' + k.card + '"') >= 0 || (k.card === 'doneifRow' && html.indexOf('id="doneifRow"') > 0 && disp(k.get)))
+    && svKindsP.map((k) => k.kind).join(',') === kindsP.map((k) => k.kind).join(',') && svKindsP.every((k, i) => k.label === kindsP[i].label && k.fn === FN_OF_GET[kindsP[i].get])
+    && disp('pmcon_get') && disp('pmcon_decide') && /var AUDIT_COL_LABEL = \{[^}]*progress:"진척도", pmcon:"PM 콘솔",/.test(html),
+    JSON.stringify({ kinds: kindsP.map((k) => k.kind + ':' + k.get), sv: svKindsP.map((k) => k.kind + ':' + k.fn) }));
+  // ② 실행 — 가짜 화면
+  const mkEl = (id) => ({ id, innerHTML: '', textContent: '', style: {}, _cls: {}, addEventListener() {}, classList: { toggle(c, on) { this._o._cls[c] = on === undefined ? !this._o._cls[c] : !!on; }, contains(c) { return !!this._o._cls[c]; } } });
+  const runP = async (o) => {
+    const els = {}, calls = [], toasts = [];
+    const doc = { getElementById: (id) => { if (!els[id]) { els[id] = mkEl(id); els[id].classList._o = els[id]; } return els[id]; }, querySelectorAll: () => [] };
+    const gw = (fn, body) => { calls.push(JSON.parse(JSON.stringify(body))); const r = (o.res || {})[body.action]; return Promise.resolve(typeof r === 'function' ? r(body) : (r || { status: 500, body: { error_code: 'X' } })); };
+    const api = new Function('document', 'gwCall', '__toast', '__o', [
+      'function todayStr(){ return __o.today || "2026-11-20"; } function memberName(id){ return id === "u1" ? "정재욱" : ""; } function apprToastShow(m){ __toast.push(m); } function switchTab(n){ __o.sw = n; }',
+      'var confirm = function(){ return __o.confirm !== false; }, prompt = function(){ return __o.prompt === undefined ? "노무사 회신 뒤" : __o.prompt; }, alert = function(m){ __toast.push("alert:" + m); }, setTimeout = function(){};',
+      fnP('esc'), stP(/var ASSIGN_PREFIX_ORDER = \[[^\]]+\];/), stP(/var ASSIGN_PREFIX_TXT = \{[^}]+\};/), stP(/var NOTIFY_EVENT_ORDER = \[[^\]]+\];/), stP(/var AUTO_RULE_ORDER = \[[^\]]+\];/),
+      KINDS_P, stP(/var PMCON_PLAN = \{[^\n]+\};/), stP(/var PMCON_CHECKS = \[\];/), stP(/var PMCON_CHOICE_TXT = \{[^}]+\};/), stP(/var pmconState = null, pmconBusy = false, pmconSeq = 0, pmconLogAll = false;/),
+      ...['pmconMd', 'pmconPlan', 'pmconRowsAssign', 'pmconRowsNotify', 'pmconRowsDoneif', 'pmconRowsAutotask', 'pmconRowsLearn', 'pmconRowsBrief', 'pmconRowsBg', 'pmconDueTxt', 'renderPmcon', 'pmconLogRender', 'pmconChecksRender', 'pmconOpenCard', 'pmconAct'].map(fnP),
+      'if (__o.checks) PMCON_CHECKS = __o.checks;',
+      'return { render: renderPmcon, act: pmconAct, st: function(){ return pmconState; } };'].join('\n'))(doc, gw, toasts, o);
+    api.render(); for (let i = 0; i < 5; i++) await new Promise((r) => setTimeout(r, 0));
+    return { els, calls, toasts, api, o };
+  };
+  const RES_P = (canWrite, extra) => Object.assign({
+    pmcon_get: { status: 200, body: { log: [{ ts: Date.UTC(2026, 10, 13, 1, 49), name: '나경일', kind: 'notify', choice: 'ok', q: '자동 지시 생성 알림을 담당자 본인 1발로', val: '담당자 본인 1발', match: true, applied: true }], total: 1, folded: { n: 0 }, marks: {}, updated_at: 555, can_write: canWrite } },
+    assign_get: { status: 200, body: { rules: { 'veh:': { who_id: 'u1' } }, updated_at: 11 } },
+    notify_get: { status: 200, body: { events: { task_review: 'admins', due_digest: 'summary' }, meta: { task_review: { label: '완료 요청(승인 대기) 알림', options: { admins: '지시자, 없으면 관리자 전원(현행)', issuer_approver: '지시자 · 자동 지시는 배정 승인권자 1인' }, def: 'admins', rec: 'issuer_approver' }, due_digest: { label: '만기 임박 알림 방식', options: { each: 'e', summary: 's' }, def: 'each', rec: 'summary' } }, updated_at: 22 } },
+    doneif_get: { status: 200, body: { on: false, updated_at: 33 } },
+    autotask_get: { status: 200, body: { rules: { site_missing: 'off', veh_insp90: 'dry', wk_missing: 'dry' }, meta: { site_missing: { label: '현장 대장 미입력 월 1회' }, veh_insp90: { label: '차량 정기검사 지시 D-90' }, wk_missing: { label: '일용직 인적사항 미입력 월 1회' } }, updated_at: 44 } },
+    learn_pairs_get: { status: 200, body: { settings: { contract: { on: false, allow: { a: [], b: [] } }, updated_at: 55 } } },
+    brief_get: { status: 200, body: { values: { on: false }, updated_at: 66 } },
+    con_proc_get: { status: 200, body: { flag: { use_blob: true, bg_ver: 'v1-20261031', updated_at: 77 }, bg: { ver: 'v1-20261120', rows: [{ grade: '실측' }, { grade: '판' }] } } },
+  }, extra || {});
+  const rowsOf = (h) => [...h.matchAll(/data-pc-row="([^"]+)"/g)].map((m) => m[1]);
+  const cntOf = (h, s) => h.split(s).length - 1;
+  const visOf = (h) => h.replace(/<[^>]+>/g, ' ');
+  const pm = await runP({ res: RES_P(true) }), hPm = pm.els.pmconRows.innerHTML, idsPm = rowsOf(hPm);
+  const nonPm = await runP({ res: RES_P(false) }), hNo = nonPm.els.pmconRows.innerHTML;
+  const noLog = await runP({ res: RES_P(true, { pmcon_get: { status: 503, body: { error_code: 'PMCON_READ_FAILED' } } }) }), hNoLog = noLog.els.pmconRows.innerHTML;
+  const held = await runP({ res: RES_P(true, { pmcon_get: { status: 200, body: { log: [], total: 0, folded: { n: 0 }, marks: { 'doneif:on': { st: 'hold', ts: 1, why: '노무사 회신 뒤' } }, updated_at: 9, can_write: true } } }) });
+  const oneBad = await runP({ res: RES_P(true, { brief_get: { status: 500, body: {} } }) });
+  const kindsSeen = [...new Set(idsPm.map((s) => s.split(':')[0]))].join(',');
+  T('P1 판29 ② 실행(PM): 줄 7종 전부 줄이 됨(' + kindsSeen + ') · R2 줄이 먼저 · 줄마다 버튼 3종 [ㄱ]/[보류]/[기본값] · 추천이 없는 배정표 줄(담당 비어 있음 — 차량 말고 6행)은 [ㄱ] 닫힘 · 근거 승격 줄 = 무응답 적용일 11/25(수)·추천 승격 · 알림 설정 = 추천값과 다른 칸만(만기 임박은 이미 추천값이라 없음) · 자동 지시 규칙 = 꺼진 규칙만(연습 → 실제 줄은 예고 표에 없으면 없음) · 머리 글·사이드바 배지 = 정할 것 수 · 누른 기록 표 1줄(언제·무엇·어떻게·추천대로·되돌리기)',
+    kindsSeen.split(',').sort().join(',') === 'assign,autotask,bg,brief,doneif,learn,notify' && idsPm.length === 6 + 1 + 1 + 1 + 1 + 1 + 1 && /^bg:|^learn:/.test(idsPm[0]) && /^(bg|learn):/.test(idsPm[1])
+    && cntOf(hPm, 'data-pc-act="ok"') === idsPm.length && cntOf(hPm, 'data-pc-act="hold"') === idsPm.length && cntOf(hPm, 'data-pc-act="default"') === idsPm.length
+    && cntOf(hPm, 'class="b-ok" data-pc-act="ok" data-pc-id="assign:') === 6 && cntOf(hPm, 'data-pc-act="ok" data-pc-id="assign:') === 6 && (hPm.match(/data-pc-act="ok" data-pc-id="assign:[^"]+" disabled/g) || []).length === 6 && hPm.indexOf('data-pc-id="assign:veh"') < 0
+    && /data-pc-row="bg:v1-20261120"[\s\S]*?무응답 적용일 11\/25\(수\) — 승격 적용/.test(hPm) && idsPm.indexOf('notify:task_review:issuer_approver') >= 0 && !idsPm.some((x) => x.indexOf('notify:due_digest') === 0)
+    && idsPm.indexOf('autotask:site_missing:dry') >= 0 && !idsPm.some((x) => /:live$/.test(x)) && pm.els.pmconHead.textContent === '정할 것 12' && pm.els.pmconTabBadge.textContent === '12' && pm.els.pmconTabBadge._cls.hide === false
+    && /<th>언제<\/th><th>무엇<\/th><th>어떻게<\/th><th>추천대로<\/th><th>되돌리기<\/th>/.test(pm.els.pmconLog.innerHTML) && cntOf(pm.els.pmconLog.innerHTML, '<tr><td class="ts">') === 1 && pm.els.pmconChecksWrap.style.display === 'none',
+    JSON.stringify({ idsPm, head: pm.els.pmconHead.textContent }));
+  T('P1 판29 ② 실행(PM 아닌 관리자 · 누른 기록 못 읽음 · 보류 · 조회 하나 실패): PM 아닌 관리자 = 같은 줄 12개·버튼 0개·줄마다 "정하실 분: PM" · 누른 기록 못 읽음 = 버튼 0개·빨간 안내(오류 코드)·누름도 서버를 안 부름 · 보류 표시 줄 = 정할 것에서 빠지고 보류함에 [다시 열기] + 다시 열 조건 · 브리핑 조회만 실패 = 그 종류만 "불러오지 못함"·나머지 줄 그대로',
+    rowsOf(hNo).length === 12 && cntOf(hNo, 'data-pc-act=') === 0 && cntOf(hNo, '정하실 분: PM') === 12
+    && cntOf(hNoLog, 'data-pc-act=') === 0 && hNoLog.indexOf('누른 기록을 불러오지 못해 버튼을 열지 않았습니다 (PMCON_READ_FAILED)') > 0 && (noLog.api.act('ok', 'doneif:on'), noLog.calls.filter((b) => b.action === 'pmcon_decide').length === 0)
+    && rowsOf(held.els.pmconRows.innerHTML).indexOf('doneif:on') < 0 && rowsOf(held.els.pmconHold.innerHTML).join() === 'doneif:on' && cntOf(held.els.pmconHold.innerHTML, 'data-pc-act="reopen"') === 1 && held.els.pmconHold.innerHTML.indexOf('다시 열 조건: 노무사 회신 뒤') > 0 && held.els.pmconHoldCnt.textContent === '1'
+    && rowsOf(oneBad.els.pmconRows.innerHTML).length === 11 && oneBad.els.pmconRows.innerHTML.indexOf('불러오지 못함: 브리핑 설정') > 0,
+    JSON.stringify({ no: rowsOf(hNo).length, hold: rowsOf(held.els.pmconHold.innerHTML), bad: rowsOf(oneBad.els.pmconRows.innerHTML).length }));
+  // ③ 누름 → 서버 본문
+  const sent = (r) => r.calls.filter((b) => b.action === 'pmcon_decide');
+  const okR = await runP({ res: RES_P(true, { pmcon_decide: { status: 200, body: { applied: true } } }) });
+  okR.api.act('ok', 'notify:task_review:issuer_approver'); await new Promise((r) => setTimeout(r, 0));
+  const b1 = sent(okR)[0] || {};
+  const hdR = await runP({ res: RES_P(true, { pmcon_decide: { status: 200, body: { applied: false } } }) });
+  hdR.api.act('hold', 'brief:on'); await new Promise((r) => setTimeout(r, 0));
+  const b2 = sent(hdR)[0] || {};
+  const dfR = await runP({ res: RES_P(true, { pmcon_decide: { status: 200, body: {} } }) });
+  dfR.api.act('default', 'learn:on'); await new Promise((r) => setTimeout(r, 0)); dfR.api.act('default', 'bg:v1-20261120'); await new Promise((r) => setTimeout(r, 0));
+  const b3 = sent(dfR)[0] || {}, b4 = sent(dfR)[1] || {};
+  const noR = await runP({ res: RES_P(false) }); noR.api.act('ok', 'doneif:on');
+  const asR = await runP({ res: RES_P(true) }); asR.api.act('ok', 'assign:lic');
+  const cnR = await runP({ res: RES_P(true), confirm: false }); cnR.api.act('ok', 'doneif:on');
+  const prR = await runP({ res: RES_P(true), prompt: null }); prR.api.act('hold', 'doneif:on');
+  const stR = await runP({ res: RES_P(true, { pmcon_decide: { status: 409, body: { error_code: 'PMCON_STALE' } } }) });
+  stR.api.act('ok', 'doneif:on'); for (let i = 0; i < 4; i++) await new Promise((r) => setTimeout(r, 0));
+  T('P1 판29 ③ 누름 → 서버 본문(pmcon_decide 하나): [ㄱ] = 줄 id·종류·등급·추천값 args{event,value}·set_base(그 카드 조회의 updated_at 22)·base(누른 기록 555) · [보류] = 재개 조건(prompt)·args 없음 · [기본값] 무응답 기본 그대로(계약 학습) = args 없음·def_is_rec false · [기본값] 무응답 기본 승격(근거 승격 — 예고 표 11/25) = args{bg_ver}·def_is_rec true · PM 아님·추천 없는 줄·confirm 취소·prompt 취소 = 서버 안 부름 · 409 = 안내 + 다시 불러옴',
+    b1.choice === 'ok' && b1.kind === 'notify' && b1.row === 'notify:task_review:issuer_approver' && b1.grade === 'R1' && JSON.stringify(b1.args) === '{"event":"task_review","value":"issuer_approver"}' && b1.set_base === 22 && b1.base === 555
+    && b2.choice === 'hold' && b2.why === '노무사 회신 뒤' && b2.args === undefined && b2.row === 'brief:on'
+    && b3.choice === 'default' && b3.args === undefined && b3.def_is_rec === false && b3.row === 'learn:on' && b3.grade === 'R2'
+    && b4.choice === 'default' && JSON.stringify(b4.args) === '{"bg_ver":"v1-20261120"}' && b4.def_is_rec === true && b4.set_base === 77 && b4.due === '2026-11-25'
+    && sent(noR).length === 0 && sent(asR).length === 0 && sent(cnR).length === 0 && sent(prR).length === 0
+    && stR.toasts.some((t) => t.indexOf('다른 곳에서 방금 바뀌었습니다') === 0) && stR.calls.filter((b) => b.action === 'pmcon_get').length === 2,
+    JSON.stringify({ b1, b2: b2.choice, b3: [b3.choice, b3.def_is_rec], b4: [b4.def_is_rec, b4.args] }));
+  // ④ 기존 카드 그대로(함수 해시 — 판29 착수 전 v460 387b98e와 같음) + renderPermMgmt 카드 호출 그대로
+  const HASH29 = { renderPermMgmt: '9634640c8096104c', renderAssignCard: '0224820afb855ba0', assignSet: 'c4dd84fd50465303', renderNotifyCard: '732f47e42cc4be01', renderDoneifRow: '2b5840e3d2b0ce80', doneifSet: '154d942b3f411d9f', notifySet: '2bef31b5c054b599',
+    renderBriefCard: '593629d27006f18d', briefSet: 'e495abde62818c48', renderAutoRulesCard: '485ac6738f31e203', autoRulesSet: '52839ac6fbfb1105', renderConLearnCard: '3c2765291ce8e16f', renderConProcCard: 'a268c635c59e1787', conProcBgSet: 'd487c1839cb6ce91' };
+  const shaP = (s) => createHash('sha256').update(s).digest('hex').slice(0, 16);
+  const hBadP = Object.keys(HASH29).filter((n) => shaP(fnP(n).replace(/^function [\w$]+/, '').replace(/\r\n/g, '\n')) !== HASH29[n]);
+  T('P1 판29 ④ 기존 카드 그대로: 권한관리 카드 7종 그리기·저장 함수 ' + Object.keys(HASH29).length + '개 해시 = 판29 착수 전(v460) · 권한관리 화면 카드 자리 7개 그대로(assignCard·notifyCard·autoRulesCard·briefCard·conProcCard·conLearnCard + 완료 판정 줄 doneifRow) — 콘솔은 그 위의 목록(설정 편집기 새로 없음)',
+    hBadP.length === 0 && ['assignCard', 'notifyCard', 'autoRulesCard', 'briefCard', 'conProcCard', 'conLearnCard'].every((id) => cntOf(permSecP, 'id="' + id + '"') === 1) && cntOf(html, 'id="doneifRow"') === 1,
+    '바뀐 함수: ' + hBadP.join(', '));
+  // ⑤ 판30·31이 붙을 한 곳
+  const ckR = await runP({ res: RES_P(true), checks: [{ id: 'q30', title: '계약 서류 목록 — 분기 점검', render: (h) => { h.innerHTML = '<ul><li>표본 3건</li></ul>'; } }, { id: 'm31', title: '월 점검', render: () => { throw new Error('x'); } }] });
+  T('P1 판29 ⑤ 점검 카드가 붙을 한 곳: PMCON_CHECKS 선언 1곳(빈 목록)·글자 5번(선언 1·그리기 함수 3·화면 주석 1 — 다른 곳에서 손대지 않음) · 비면 점검 카드 묶음 숨김 · 줄을 더하면 묶음이 보이고 카드마다 render(host) 1번(제목·자리 id) · 한 카드가 터져도 그 카드만 안내',
+    cntOf(html, 'var PMCON_CHECKS = [];') === 1 && (html.match(/PMCON_CHECKS/g) || []).length === 5 && (fnP('pmconChecksRender').match(/PMCON_CHECKS/g) || []).length === 3 && secP.indexOf('id="pmconChecksWrap" style="display:none;"') > 0
+    && ckR.els.pmconChecksWrap.style.display === '' && ckR.els['pmconChk-q30'].innerHTML === '<ul><li>표본 3건</li></ul>' && ckR.els['pmconChk-m31'].innerHTML.indexOf('점검 카드를 그리지 못했습니다') > 0
+    && ckR.els.pmconChecks.innerHTML.indexOf('계약 서류 목록 — 분기 점검') > 0,
+    JSON.stringify({ n: (html.match(/PMCON_CHECKS/g) || []).length }));
+  // ⑥ 폰 배치·입력 칸·화면 글
+  const visP = visOf(hPm + pm.els.pmconLog.innerHTML + secP.replace(/<style>[\s\S]*?<\/style>/, '').replace(/<!--[\s\S]*?-->/g, ''));
+  const keyLeakP = (visP.match(/\b[a-z]+_[a-z_]+\b|\b(?:assign|notify|doneif|autotask|learn|brief|bg):/g) || []);
+  T('P1 판29 ⑥ 폰·글: 640px 이하에서 줄이 접히고(flex-wrap) 버튼 묶음이 아랫줄 전체 폭(flex-basis 100%) — 본문을 누르지 않음 · 콘솔 화면에 입력 칸 0(input·select·textarea — 보류 사유는 브라우저 입력 창) · 화면 글에 내부 키 이름(밑줄 이름·종류:값 꼴) 0 · "무응답 적용일이 지나도 저절로 적용되지 않습니다" 안내',
+    /@media \(max-width:640px\)\{\s*\.pc-row\{flex-wrap:wrap\}\s*\.pc-btns\{flex-basis:100%\}/.test(secP) && /\.pc-main\{flex:1 1 auto;min-width:0\}/.test(secP)
+    && !/<(input|select|textarea)\b/.test(secP) && !/<(input|select|textarea)\b/.test(hPm) && keyLeakP.length === 0 && secP.indexOf('<b>무응답 적용일이 지나도 저절로 적용되지 않습니다</b>') > 0,
+    '새는 글: ' + keyLeakP.slice(0, 8).join(', '));
+} catch (e) { console.log('  (P1 판29 검사 생략 — ' + e.message + ')'); fails++; }
 
 try {
   const fdir = join(ROOT, 'netlify', 'functions');

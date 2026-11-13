@@ -1445,6 +1445,7 @@
     <button class="tab-btn perm-hidden" data-tab="hr" id="tabHrBtn">인사·직원 <span class="tab-badge hide" id="hrTabBadge">0</span></button>
     <button class="tab-btn perm-hidden" data-tab="workers" id="tabWkBtn">인사·일용직</button>
     <button class="tab-btn perm-hidden" data-tab="progress" id="tabProgressBtn">진척도</button>
+    <button class="tab-btn perm-hidden" data-tab="pmcon" id="tabPmconBtn">PM 콘솔 <span class="tab-badge hide" id="pmconTabBadge">0</span></button>
     <div class="nav-divider"></div>
     <div class="nav-group">수주</div>
     <button class="tab-btn perm-hidden" data-tab="bid" id="tabBidBtn">입찰 <span class="tab-badge hide" id="bidTabBadge">0</span></button>
@@ -1898,6 +1899,49 @@
     <div style="font-size:13px;color:var(--sub);margin-bottom:6px;">실제 업무 질문 30개를 진짜 원장에 물려 돌리고 토큰을 잽니다. 읽기만 하며 아무것도 바꾸지 않습니다. 3~5분 걸립니다.</div>
     <button class="link-btn" id="meterRunBtn">▶ 30문항 실측 시작</button>
     <div class="card" id="meterOut" style="display:none;"></div>
+  </section>
+
+  <!-- P1 판29 PM 콘솔(시안 11/13 18:14 PM ㄱ · 착수설명서 판29 · 업무별 설계 3-17) — 권한관리 카드 7종의 '정할 것'만 모은 목록. 관리자에게 보이고 [ㄱ]/[보류]/[기본값] 저장은 PM만(서버 pmcon_decide).
+       값 바꾸기는 기존 카드와 같은 서버 길(기존 핸들러) — 콘솔은 그 위의 목록이고 설정 편집기를 새로 만들지 않는다. 누른 기록 = status:decide 한 곳. 점검 카드(판30·31)는 PMCON_CHECKS 한 곳에 줄을 더한다. -->
+  <section class="view" id="view-pmcon">
+    <style>
+      .pc-row{display:flex;gap:12px;align-items:flex-start;padding:10px 4px;border-bottom:1px solid var(--line)}
+      .pc-row:last-child{border-bottom:none}
+      .pc-main{flex:1 1 auto;min-width:0}
+      .pc-q{display:flex;gap:8px;align-items:flex-start;font-size:14px;font-weight:600;line-height:1.45}
+      .pc-q .g{flex:0 0 auto;font-size:11px;font-weight:700;border-radius:6px;padding:1px 6px;margin-top:2px}
+      .pc-q .g.r2{background:#F1EAFA;color:#6b4f95}
+      .pc-q .g.r1{background:#EAF3FA;color:#2b6c95}
+      .pc-meta{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12.5px;color:var(--sub);margin-top:4px}
+      .pc-meta .due{color:#a8651f;font-weight:600}
+      .pc-why{font-size:12.5px;color:var(--sub);margin-top:4px;line-height:1.5;overflow-wrap:anywhere}
+      .pc-btns{flex:0 0 auto;display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+      .pc-btns .b-ok{background:#1A9A6B;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-size:13px;font-weight:700;cursor:pointer}
+      .pc-btns .b-ok:disabled{opacity:.45;cursor:not-allowed}
+      .pc-btns .mini-btn{font-size:12.5px;padding:5px 11px;border-radius:8px;white-space:nowrap}
+      .pc-who{font-size:12px;color:var(--sub);white-space:nowrap}
+      .pc-none{font-size:12.5px;color:var(--sub);padding:8px 4px}
+      .pc-log{overflow-x:auto}
+      .pc-log table{border-collapse:collapse;width:100%;font-size:12.5px}
+      .pc-log th,.pc-log td{text-align:left;padding:5px 6px;border-bottom:1px solid var(--line);vertical-align:top}
+      .pc-log th{color:var(--sub);font-weight:600;white-space:nowrap}
+      .pc-log td.ts{white-space:nowrap}
+      @media (max-width:640px){
+        .pc-row{flex-wrap:wrap}
+        .pc-btns{flex-basis:100%}
+        .pc-log td.wide{min-width:150px}
+      }
+    </style>
+    <div class="dash-sec" style="margin-bottom:8px;display:flex;align-items:baseline;gap:10px;"><h2 style="flex:1;">PM 콘솔 <span class="cnt" id="pmconHead"></span></h2><button class="mini-btn" id="pmconReloadBtn" type="button">↻ 새로고침</button></div>
+    <div class="empty-line" style="margin-bottom:8px;">권한관리 카드의 '정할 것'만 모았습니다. 줄마다 등급(R1·R2)·추천값·무응답 적용일·되돌리기를 보여 줍니다. <b>무응답 적용일이 지나도 저절로 적용되지 않습니다</b> — 적용은 [ㄱ]·[기본값]을 누를 때만입니다. 설정 자체는 지금처럼 권한관리 카드에서도 바꿀 수 있고, 두 화면은 같은 서버 길로 고칩니다.</div>
+    <div class="dash-sec" style="margin:10px 0 6px;"><h2>정할 것 <span class="cnt" id="pmconRowsCnt"></span></h2></div>
+    <div class="card" id="pmconRows"><div class="loading">불러오는 중…</div></div>
+    <div class="dash-sec" style="margin:16px 0 6px;"><h2>누른 기록 <span class="cnt" id="pmconLogCnt"></span></h2></div>
+    <div class="card" id="pmconLog"><div class="loading">불러오는 중…</div></div>
+    <div class="dash-sec" style="margin:16px 0 6px;"><h2>보류함 <span class="cnt" id="pmconHoldCnt"></span></h2></div>
+    <div class="card" id="pmconHold"><div class="loading">불러오는 중…</div></div>
+    <div id="pmconChecksWrap" style="display:none;"><div class="dash-sec" style="margin:16px 0 6px;"><h2>점검 카드</h2></div><div id="pmconChecks"></div></div>
+    <button class="link-btn" id="pmconPermBtn" type="button" style="margin-top:12px;">설정 바꾸기는 권한관리 카드에서 — 권한관리 열기 ›</button>
   </section>
 
   <!-- 물어보기(v348) — 회사 원장을 근거로 답한다. 읽기 전용이고, 볼 수 있는 자료는 그 사람 권한 그대로다. -->
@@ -3227,7 +3271,7 @@
     <h3>도움말</h3>
     <p style="text-align:left;line-height:1.7;">
       · <b>홈</b>: 직원은 오늘 내 것(내게 온 지시·내 상신·주기 체크·내 할 일), 관리자는 만기·미수·결재를 한눈에, 대표는 결재함<br>
-      · <b>관리</b>: 지시 / 기성·수금 / 월말명세서 / 거래처 / 인사·직원 / 인사·일용직 / 진척도<br>
+      · <b>관리</b>: 지시 / 기성·수금 / 월말명세서 / 거래처 / 인사·직원 / 인사·일용직 / 진척도 / PM 콘솔<br>
       · <b>수주</b>: 입찰 / 계약 / 견적서 / 홍보<br>
       · <b>업무</b>: 캘린더 / 차량 / 화관법 / 운반일지 / 안전 / 인허가 / 문서함<br>
       · <b>개인</b>: 물어보기 / 내 업무(내게 온 지시·내 할 일·주기 체크) / 휴가<br>
@@ -6510,6 +6554,8 @@
     if (name === "allbaro") renderAllbaro();
     document.getElementById("view-progress").classList.toggle("active", name === "progress");
     if (name === "progress" && prevTab !== "progress") renderProgress();   // 재클릭은 no-op(iframe 재로드 방지) — 갱신은 새로고침 버튼
+    document.getElementById("view-pmcon").classList.toggle("active", name === "pmcon");
+    if (name === "pmcon") renderPmcon();   // P1 판29 PM 콘솔 — 관리자만(서버 pmcon_get도 강제)
 
     if (name === "cal"){ renderCalendar(); if (canSee("safety")) loadEdu(); }   // v430 교육·건강진단 다음 예정 = 안전 권한(종전엔 인허가·인사 탭을 거쳐야 읽혔다 — 교육을 안 보여 주는 화면의 읽기는 뺐다)
     if (name === "dash" && prevTab !== "dash") renderDashboard();   // 탭 "복귀" 시만 재렌더(타 탭 체류 중 폴 갱신 반영) — 재클릭은 종전대로 no-op(직원 홈 입력 중 유실 방지)
@@ -29173,6 +29219,9 @@
     var pgBtn = document.getElementById("tabProgressBtn");
     if (pgBtn) pgBtn.classList.toggle("perm-hidden", !adminUser);   // 진척도 — 관리자 전용(서버 gw-progress도 강제)
     if (currentTab === "progress" && !adminUser) switchTab("dash");
+    var pcBtn = document.getElementById("tabPmconBtn");
+    if (pcBtn) pcBtn.classList.toggle("perm-hidden", !adminUser);   // P1 판29 PM 콘솔 — 관리자에게 보임(버튼 저장은 PM만 — 서버 pmcon_decide PM_ONLY)
+    if (currentTab === "pmcon" && !adminUser) switchTab("dash");
     if (currentTab === "workers"){ if (!canSee("wk")) switchTab("dash"); else { renderWorkers(); loadAsb(); } }   // v442: 볼 수 있으면 다시 그린다 — 로그인 창 '전환'은 새로고침 없이 이 함수만 돌아, 앞사람 권한(현장 보기)으로 그린 일용직 표의 참여 열·칩이 남는다(화관법 줄과 같은 꼴) · 검토: 현장 대장도 읽는다(현장 권한 없는 앞사람은 대장을 못 받았다 — loadAsb는 현장 권한이 없으면 바로 돌아가고, 받으면 renderWorkers를 다시 부름. 받기 전에는 참여 칸 '확인 중')
     if (currentTab === "stmt" && !canSee("veh")) switchTab("dash");   // 29 판② 차량 숨김이면 명세서도 홈으로(서버 NO_VEH_ACCESS — 검토 반영)
     if (currentTab === "stmt" && canSee("stmt")) renderStmt();   // 29 판② — 숨김이면 위 일반 강제 이동(탭 이름 = 키)이 홈으로. 볼 수 있으면 다시 그린다: 로그인 창 '전환'은 새로고침 없이 이 함수만 돌아, 보는 사람이 바뀌면 renderStmt(stmtViewer)가 앞사람이 연 상세·고치던 줄을 비운다
@@ -29747,7 +29796,7 @@
 
   var MOD_LABEL = {tasks:"지시", veh:"차량", hw:"화관법", rec:"기성·수금", stmt:"월말명세서", lic:"인허가", safety:"안전", site:"현장", check:"주기 체크", con:"계약", cli:"거래처", doc:"문서함", bid:"입찰", wk:"일용직", quote:"견적서", promo:"홍보"};   // check 권한은 주기 체크리스트 영역만 제어(내게 온 지시·내 할 일은 전원) — 탭 이름(내 업무)과 구분 · hw = 화관법 탭(v431 열 · v434 탭 숨김·폐기물 제출 수행 검사)
   // ---- 감사 로그 뷰어(관리자 전용, 서버 기록 열람) ----
-  var AUDIT_COL_LABEL = {tasks:"지시", vehicles:"차량", receivables:"기성", licenses:"인허가", checklist:"업무", documents:"문서함", clients:"거래처", contracts:"계약", leaves:"휴가", family:"가족친화", member:"회원", login:"로그인", progress:"진척도", corp_reg:"법인 등기", stmt:"월말명세서", safety:"안전 설정"};   // v436 safety = 현황 ⑤ 안전 설정(settings:safety) 고침(uismoke v436 ⑧이 safety를 끝으로 대조) · 29 판② stmt = gw-stmt 감사(거래처 목록·저장·되돌리기·차량 별칭)
+  var AUDIT_COL_LABEL = {tasks:"지시", vehicles:"차량", receivables:"기성", licenses:"인허가", checklist:"업무", documents:"문서함", clients:"거래처", contracts:"계약", leaves:"휴가", family:"가족친화", member:"회원", login:"로그인", progress:"진척도", pmcon:"PM 콘솔", corp_reg:"법인 등기", stmt:"월말명세서", safety:"안전 설정"};   // v436 safety = 현황 ⑤ 안전 설정(settings:safety) 고침(uismoke v436 ⑧이 safety를 끝으로 대조) · 29 판② stmt = gw-stmt 감사(거래처 목록·저장·되돌리기·차량 별칭)
   var AUDIT_FIELD_LABEL = {status:"상태", title:"제목", who:"담당", who_id:"담당", due:"기한", amount:"금액", paid:"입금", del:"삭제", scope:"공개범위", stage:"단계", cancel_req:"취소요청", name:"이름", role:"직책", rank:"직급", dept:"부서", admin:"관리자", perms:"권한", hire_date:"입사일", leave_date:"퇴사일", seq:"연번", annual_base:"잔여연차기준", annual_base_date:"기준일", annual_days:"연차수동", loa_days:"휴직누적", on_loa:"휴직중", loa_start:"휴직시작", loa_end:"휴직종료", annual_paid:"연차수당포함", emp_type:"고용형태", birth:"생년월일", annual_basis:"연차기준", reason:"사유", approver:"승인자", done_by:"완료자", detail:"상세", recur:"반복", hl:"하이라이트", mismatch:"불일치", PIN:"PIN", tier:"관리자등급", deleted_at:"삭제일", deleted_by:"삭제자", restored_at:"복구일", restored_by:"복구자",
     "kosha.stage":"KOSHA 단계", "kosha.apply_no":"접수번호", "kosha.applied_on":"접수일", "kosha.review_on":"심사일", "kosha.decided_on":"인정일(결정일)", "kosha.expires_on":"만료일", "kosha.rate_year":"요율 연도", "kosha.checks":"사후점검", "headcount.env":"상시근로자 종운환경", "headcount.con":"상시근로자 종운건설"};   // v436 검토: 안전 설정 감사 줄의 바뀐 칸(f) — 서버 gw-data SAFETY_FIELD_LABEL과 같은 글(uismoke v436 ⑧이 대조), 없으면 감사 화면에 영어 경로(kosha.stage)가 그대로 나왔다
   var auditMonthCur = "";
@@ -30297,6 +30346,221 @@
       renderAlertsCard();
     }).catch(function(){ alertsSaving = false; alert("경보 라벨 저장 실패(네트워크)"); });
   }
+
+  // ---- P1 판29 PM 콘솔(시안 11/13 18:14 PM ㄱ · 착수설명서 판29 · 업무별 설계 3-17 · 원장 T666) ----
+  //   줄 7종 = 권한관리 카드 7종. 줄마다 기존 조회(…_get)에서 '정할 것'(지금 값 ≠ 추천값)을 뽑아 등급·추천값·무응답 적용일·되돌리기·[ㄱ]/[보류]/[기본값]을 보인다.
+  //   누르면 서버 pmcon_decide 하나 — 서버가 PM인지(명시 tier pm) 보고 기존 핸들러(카드와 같은 길·값 검사·낙관락·감사)를 부른 뒤 누른 기록(status:decide)에 1줄.
+  //   PM 판정은 서버 응답 can_write만 믿는다(화면이 짐작하지 않음). 무응답 적용일은 표시뿐 — 이 판에 자동 적용은 없다(누를 때만 적용).
+  //   설정 편집기는 새로 만들지 않는다: [카드 열기]는 원래 권한관리 카드로 간다.
+  var PMCON_KINDS = [   // 줄 7종 — 순서 = 시안(배정표·알림 설정·완료 판정·자동 지시 규칙·계약 학습·브리핑 설정·근거 승격)
+    { kind: "assign", label: "배정표", grade: "R1", get: "assign_get", card: "assignCard", revert: "배정표 [되돌리기] 1클릭", rows: pmconRowsAssign },
+    { kind: "notify", label: "알림 설정", grade: "R1", get: "notify_get", card: "notifyCard", revert: "알림 설정 [되돌리기] 1클릭", rows: pmconRowsNotify },
+    { kind: "doneif", label: "완료 판정", grade: "R1", get: "doneif_get", card: "doneifRow", revert: "완료 판정 [끔] 1클릭", rows: pmconRowsDoneif },
+    { kind: "autotask", label: "자동 지시 규칙", grade: "R1", get: "autotask_get", card: "autoRulesCard", revert: "규칙 스위치 [되돌리기] 1클릭", rows: pmconRowsAutotask },
+    { kind: "learn", label: "계약 학습", grade: "R2", get: "learn_pairs_get", card: "conLearnCard", revert: "계약 학습 [끄기] 1클릭", rows: pmconRowsLearn },
+    { kind: "brief", label: "브리핑 설정", grade: "R1", get: "brief_get", card: "briefCard", revert: "브리핑 설정 [되돌리기] 1클릭", rows: pmconRowsBrief },
+    { kind: "bg", label: "근거 승격", grade: "R2", get: "con_proc_get", card: "conProcCard", revert: "[배경 승격 해제] 1클릭", rows: pmconRowsBg }
+  ];
+  // 무응답 적용일 표 — 카드·설명서에 날짜가 적힌 줄만(줄 종류 → 날짜·무응답 기본값). 날짜가 2주 넘게 지나면 쓰지 않는다(옛 예고가 새 줄에 붙지 않게).
+  //   착수설명서 ④절 11/20 카드 ①: 계약 법령 기준표 새 판 = 무응답 기본 '승격'(11/25). 다른 줄은 예고가 오면 여기에 줄을 더한다.
+  var PMCON_PLAN = { bg: { due: "2026-11-25", def: "rec", note: "11/20 카드 ①" } };
+  // 점검 카드가 붙을 한 곳(판30 계약 서류 분기 점검 · 판31 월 점검) — 줄 꼴 { id: "영문", title: "제목", render: function(host){ … } }. 비어 있으면 '점검 카드' 묶음을 숨긴다.
+  var PMCON_CHECKS = [];
+  var PMCON_CHOICE_TXT = { ok: "ㄱ", "default": "기본값", hold: "보류", reopen: "다시 열기" };
+  var pmconState = null, pmconBusy = false, pmconSeq = 0, pmconLogAll = false;
+  function pmconMd(d){ var t = new Date(String(d) + "T00:00:00"); if (isNaN(t.getTime())) return String(d || ""); return (t.getMonth() + 1) + "/" + t.getDate() + "(" + "일월화수목금토".charAt(t.getDay()) + ")"; }
+  function pmconPlan(kind){
+    var p = PMCON_PLAN[kind]; if (!p || !p.due) return null;
+    var late = (new Date(todayStr() + "T00:00:00") - new Date(p.due + "T00:00:00")) / 86400000;
+    return late > 14 ? null : p;
+  }
+  function pmconRowsAssign(b){
+    var out = [], rules = b.rules || {}, ls = b.lessons || null;
+    ASSIGN_PREFIX_ORDER.forEach(function(p){
+      var r = rules[p] || {}, lx = (ls && ls.prefixes && ls.prefixes[p]) || null, nm = ASSIGN_PREFIX_TXT[p] || "자동 지시", key = p.replace(/:$/, "");
+      if (!r.who_id) out.push({ id: "assign:" + key, q: nm + " 담당이 비어 있습니다 — 담당을 정할까요?", recTxt: "", curTxt: "담당 없음", args: null, def: "keep",
+        why: "비어 있으면 지시 카드에 '담당 없음' 배지가 붙고 관리자에게 자동으로 가지 않습니다. 추천 담당이 아직 없어 [ㄱ]은 닫혀 있습니다 — 카드에서 고르세요.", setBase: b.updated_at || 0 });
+      else if (lx && lx.recard) out.push({ id: "assign:" + key + ":recard", q: nm + " 담당을 다시 정할까요? (이달 '내 것 아님' " + (lx.notmine || 0) + "건)", recTxt: "", curTxt: memberName(r.who_id) || "지금 담당", args: null, def: "keep",
+        why: "지금 담당 " + (memberName(r.who_id) || "(이름 모름)") + ". 다시 정할 사람은 카드에서 고릅니다.", setBase: b.updated_at || 0 });
+    });
+    return out;
+  }
+  function pmconRowsNotify(b){
+    var out = [], ev = b.events || {}, meta = b.meta || {};
+    NOTIFY_EVENT_ORDER.forEach(function(k){
+      var m = meta[k]; if (!m || !m.rec || ev[k] === m.rec) return;
+      var opt = m.options || {};
+      out.push({ id: "notify:" + k + ":" + m.rec, q: m.label + "을(를) '" + (opt[m.rec] || m.rec) + "'(으)로 바꿀까요?", recTxt: opt[m.rec] || m.rec, curTxt: opt[ev[k]] || ev[k] || "", args: { event: k, value: m.rec }, def: "rec",
+        why: "지금: " + (opt[ev[k]] || ev[k] || "-") + ".", setBase: b.updated_at || 0 });
+    });
+    return out;
+  }
+  function pmconRowsDoneif(b){
+    if (b.on) return [];
+    return [{ id: "doneif:on", q: "완료 신호가 오면 지시를 승인 대기로 자동으로 올릴까요?", recTxt: "켬", curTxt: "끔(점검만)", args: { on: true }, def: "rec",
+      why: "신호: 차량 검사·보험 만기 갱신 / 인허가 만료·교육 갱신 / 미수 입금. 올라온 건은 지시함 [오늘 승인 일괄]에서 승인합니다.", setBase: b.updated_at || 0 }];
+  }
+  function pmconRowsAutotask(b){
+    var out = [], rules = b.rules || {}, meta = b.meta || {}, plan = pmconPlan("autotask"), live = (plan && plan.live) || [];
+    AUTO_RULE_ORDER.forEach(function(k){
+      var m = meta[k] || { label: k }, cur = rules[k];
+      if (cur === "off") out.push({ id: "autotask:" + k + ":dry", q: m.label + " — 꺼진 규칙을 연습 모드(발행 0)로 되돌릴까요?", recTxt: "연습(발행 0)", curTxt: "꺼짐", args: { rule: k, mode: "dry" }, def: "rec",
+        why: "연습 모드는 매일 08:10에 수만 세고 지시를 만들지 않습니다.", setBase: b.updated_at || 0 });
+      else if (live.indexOf(k) >= 0 && cur !== "live") out.push({ id: "autotask:" + k + ":live", q: m.label + " — 연습에서 실제 발행으로 바꿀까요?", recTxt: "실제 발행", curTxt: cur === "dry" ? "연습(발행 0)" : String(cur || ""), args: { rule: k, mode: "live" }, def: "rec",
+        why: "바꾸면 다음 08:10 실행부터 실제 지시가 생깁니다." + (plan && plan.note ? " · " + plan.note : ""), setBase: b.updated_at || 0 });
+    });
+    return out;
+  }
+  function pmconRowsLearn(b){
+    var s = (b.settings && b.settings.contract) || {};
+    if (s.on) return [];
+    return [{ id: "learn:on", q: "계약 서류 학습을 켤까요?", recTxt: "켬", curTxt: "꺼짐", args: { on: true }, def: "keep",
+      why: "켜면 허용 양식 " + Object.keys(s.allow || {}).length + "종을 직원 수정본과 견줘 배웁니다(짝·간극은 꺼져 있어도 계속 잽니다).", setBase: (b.settings && b.settings.updated_at) || 0 }];
+  }
+  function pmconRowsBrief(b){
+    var v = b.values || {};
+    if (v.on) return [];
+    return [{ id: "brief:on", q: "아침 음성 브리핑을 매일 06:30에 만들까요?", recTxt: "켬", curTxt: "끔(글만)", args: { field: "on", value: true }, def: "rec",
+      why: "꺼져 있으면 글 카드만 남습니다. 이달 사용 상한을 넘으면 저절로 글 카드로 내려갑니다.", setBase: b.updated_at || 0 }];
+  }
+  function pmconRowsBg(b){
+    var f = b.flag || {}, bg = b.bg || null;
+    if (!bg || !bg.ver || f.bg_ver === bg.ver || !/^[A-Za-z0-9_.-]{2,40}$/.test(String(bg.ver))) return [];
+    var rows = bg.rows || [], sil = rows.filter(function(r){ return r && r.grade === "실측"; }).length;
+    return [{ id: "bg:" + bg.ver, q: "계약 법령 기준표 새 판(" + bg.ver + ")을 승격할까요? — 계약 기한을 이 판으로 계산합니다", recTxt: "승격", curTxt: f.bg_ver ? "승격본 " + f.bg_ver : "미승격(기한 엔진 꺼짐)",
+      args: { bg_ver: String(bg.ver) }, def: "keep", block: f.use_blob ? "" : "거울이 꺼져 있어 카드에서 거울을 먼저 켜야 승격할 수 있습니다",
+      why: "새 판 " + rows.length + "행(실측 " + sil + "). 지금 " + (f.bg_ver ? "승격본 " + f.bg_ver : "미승격") + ".", setBase: f.updated_at || 0 }];
+  }
+  function pmconDueTxt(r){
+    if (r.due) return "무응답 적용일 " + pmconMd(r.due) + " — " + (r.def === "rec" ? r.recTxt + " 적용" : "그대로");
+    return r.def === "rec" ? "무응답 적용일 — 예고 전" : "무응답이면 그대로(" + (r.curTxt || "지금 값") + ")";
+  }
+  function renderPmcon(){
+    var host = document.getElementById("pmconRows"); if (!host) return;
+    var seq = ++pmconSeq;
+    var soft = function(p){ return p.then(function(r){ return r; }, function(){ return { status: 0, body: null }; }); };
+    var calls = [soft(gwCall("gw-data", { action: "pmcon_get" }))].concat(PMCON_KINDS.map(function(k){ return soft(gwCall("gw-data", { action: k.get })); }));
+    Promise.all(calls).then(function(rs){
+      if (seq !== pmconSeq) return;   // 늦게 온 옛 응답은 버림
+      var g = rs[0], gOk = g.status === 200 && g.body && Array.isArray(g.body.log);
+      var marks = (gOk && g.body.marks) || {}, byId = {}, pend = [], held = [], none = [], bad = [];
+      PMCON_KINDS.forEach(function(k, i){
+        var res = rs[i + 1], list = [];
+        if (!(res.status === 200 && res.body)){ bad.push(k.label); return; }
+        try { list = k.rows(res.body) || []; } catch(e){ bad.push(k.label); return; }
+        var plan = pmconPlan(k.kind);
+        list.forEach(function(r){
+          r.kind = k.kind; r.grade = r.grade || k.grade; r.k = k;
+          if (plan){ r.due = plan.due; r.def = plan.def || r.def; }
+          byId[r.id] = r;
+          if (marks[r.id]) held.push(r); else pend.push(r);
+        });
+        if (!list.length) none.push(k.label);
+      });
+      pend.sort(function(a, b){ return (a.grade === b.grade ? 0 : (a.grade === "R2" ? -1 : 1)) || String(a.due || "9").localeCompare(String(b.due || "9")); });
+      var canWrite = !!(gOk && g.body.can_write);
+      pmconState = { byId: byId, base: gOk ? (Number(g.body.updated_at) || 0) : null, canWrite: canWrite, marks: marks };
+      var r2 = pend.filter(function(r){ return r.grade === "R2"; }).length;
+      var hd = document.getElementById("pmconHead"); if (hd) hd.textContent = "정할 것 " + pend.length + (held.length ? " · 보류 " + held.length : "");
+      var rc = document.getElementById("pmconRowsCnt"); if (rc) rc.textContent = pend.length + (pend.length ? " · R2 " + r2 + " · R1 " + (pend.length - r2) : "");
+      var bd = document.getElementById("pmconTabBadge"); if (bd){ bd.textContent = String(pend.length); bd.classList.toggle("hide", !pend.length); }
+      var btns = function(r, inHold){
+        if (!canWrite) return '<div class="pc-btns"><span class="pc-who">정하실 분: PM</span></div>';
+        var id = esc(r.id);
+        if (inHold) return '<div class="pc-btns"><button type="button" class="mini-btn" data-pc-act="reopen" data-pc-id="' + id + '">다시 열기</button></div>';
+        var okOff = !r.args || !!r.block, okTip = !r.args ? "추천값이 없어 카드에서 고릅니다" : (r.block || "");
+        return '<div class="pc-btns"><button type="button" class="b-ok" data-pc-act="ok" data-pc-id="' + id + '"' + (okOff ? ' disabled title="' + esc(okTip) + '"' : '') + '>ㄱ</button>'
+          + '<button type="button" class="mini-btn" data-pc-act="hold" data-pc-id="' + id + '">보류</button>'
+          + '<button type="button" class="mini-btn" data-pc-act="default" data-pc-id="' + id + '">기본값</button></div>';
+      };
+      var rowHtml = function(r, inHold){
+        var mk = marks[r.id];
+        return '<div class="pc-row" data-pc-row="' + esc(r.id) + '"><div class="pc-main">'
+          + '<div class="pc-q"><span class="g ' + (r.grade === "R2" ? "r2" : "r1") + '">' + esc(r.grade) + '</span><span>' + esc(r.q) + '</span></div>'
+          + '<div class="pc-meta"><span>' + esc(r.k.label) + '</span><span>추천 <b>' + esc(r.recTxt || "없음(카드에서 고름)") + '</b></span><span class="due">' + esc(inHold ? (mk.st === "hold" ? "보류 — 무응답 적용일 지움" : "그대로 두기로 함") : pmconDueTxt(r)) + '</span><span>되돌리기 ' + esc(r.k.revert) + '</span></div>'
+          + '<div class="pc-why">' + esc(r.why || "") + (inHold && mk.why ? ' · 다시 열 조건: ' + esc(mk.why) : '') + (r.block && !inHold ? ' · ' + esc(r.block) : '')
+          + ' <button type="button" class="link-btn" data-pc-open="' + esc(r.k.card) + '">카드 열기 ›</button></div>'
+          + '</div>' + btns(r, inHold) + '</div>';
+      };
+      var tail = (none.length ? '<div class="pc-none">정할 것 없음: ' + esc(none.join(" · ")) + '</div>' : '') + (bad.length ? '<div class="pc-none" style="color:#B00020;">불러오지 못함: ' + esc(bad.join(" · ")) + ' — 새로고침 후 다시 보세요</div>' : '');
+      host.innerHTML = (gOk ? '' : '<div class="pc-none" style="color:#B00020;">누른 기록을 불러오지 못해 버튼을 열지 않았습니다 (' + esc((g.body && g.body.error_code) || g.status) + ')</div>')
+        + (pend.length ? pend.map(function(r){ return rowHtml(r, false); }).join("") : '<div class="pc-none">지금 정하실 것이 없습니다.</div>') + tail;
+      var hh = document.getElementById("pmconHold"), hc = document.getElementById("pmconHoldCnt");
+      if (hc) hc.textContent = held.length ? String(held.length) : "";
+      if (hh) hh.innerHTML = held.length ? held.map(function(r){ return rowHtml(r, true); }).join("") : '<div class="pc-none">보류한 것이 없습니다.</div>';
+      pmconLogRender(gOk ? g.body : null);
+      pmconChecksRender();
+      Array.prototype.forEach.call(document.querySelectorAll("#view-pmcon [data-pc-act]"), function(b){ b.addEventListener("click", function(){ pmconAct(b.getAttribute("data-pc-act"), b.getAttribute("data-pc-id")); }); });
+      Array.prototype.forEach.call(document.querySelectorAll("#view-pmcon [data-pc-open]"), function(b){ b.addEventListener("click", function(){ pmconOpenCard(b.getAttribute("data-pc-open")); }); });
+    });
+  }
+  function pmconLogRender(b){
+    var host = document.getElementById("pmconLog"), cnt = document.getElementById("pmconLogCnt"); if (!host) return;
+    if (!b){ host.innerHTML = '<div class="pc-none">누른 기록을 불러오지 못했습니다.</div>'; if (cnt) cnt.textContent = ""; return; }
+    var log = b.log || [], kl = {}; PMCON_KINDS.forEach(function(k){ kl[k.kind] = k; });
+    if (cnt) cnt.textContent = log.length ? "최근 " + Math.min(log.length, pmconLogAll ? log.length : 8) + " / " + (b.total || log.length) : "";
+    if (!log.length){ host.innerHTML = '<div class="pc-none">아직 누른 기록이 없습니다 — [ㄱ]·[보류]·[기본값]을 누르면 여기에 쌓입니다.</div>'; return; }
+    var two = function(n){ return String(n).padStart(2, "0"); };
+    var rows = (pmconLogAll ? log : log.slice(0, 8)).map(function(x){
+      var t = new Date(Number(x.ts) || 0), k = kl[x.kind] || { label: "", revert: "" };
+      var ts = isNaN(t.getTime()) ? "" : two(t.getMonth() + 1) + "-" + two(t.getDate()) + " " + two(t.getHours()) + ":" + two(t.getMinutes());
+      var how = (x.name || "") + " · " + (PMCON_CHOICE_TXT[x.choice] || "") + (x.applied ? " · 적용" : "") + (x.why ? " — " + x.why : "");
+      return '<tr><td class="ts">' + esc(ts) + '</td><td class="wide">' + esc((k.label ? k.label + " · " : "") + (x.q || "")) + (x.val ? ' <span style="color:var(--sub);">(' + esc(x.val) + ')</span>' : '') + '</td><td>' + esc(how) + '</td><td>' + (x.match === true ? "예" : (x.match === false ? "아니오" : "—")) + '</td><td>' + esc(x.applied ? k.revert : "—") + '</td></tr>';
+    }).join("");
+    var fd = b.folded || {};
+    host.innerHTML = '<div class="pc-log"><table><thead><tr><th>언제</th><th>무엇</th><th>어떻게</th><th>추천대로</th><th>되돌리기</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
+      + (log.length > 8 ? '<button type="button" class="link-btn" id="pmconLogMore">' + (pmconLogAll ? "접기 ▴" : "더 보기 ▾") + '</button>' : '')
+      + (Number(fd.n) ? '<div class="pc-none">그 전 ' + Number(fd.n) + '줄은 상한(400줄)을 넘어 접었습니다.</div>' : '');
+    var mb = document.getElementById("pmconLogMore"); if (mb) mb.addEventListener("click", function(){ pmconLogAll = !pmconLogAll; pmconLogRender(b); });
+  }
+  function pmconChecksRender(){
+    var wrap = document.getElementById("pmconChecksWrap"), host = document.getElementById("pmconChecks"); if (!wrap || !host) return;
+    wrap.style.display = PMCON_CHECKS.length ? "" : "none";
+    host.innerHTML = PMCON_CHECKS.map(function(c){ return '<div class="card" style="margin-bottom:10px;" id="pmconChk-' + esc(c.id) + '"><div style="font-weight:600;font-size:13.5px;">' + esc(c.title) + '</div><div class="empty-line">불러오는 중…</div></div>'; }).join("");
+    PMCON_CHECKS.forEach(function(c){ var el = document.getElementById("pmconChk-" + c.id); try { c.render(el); } catch(e){ if (el) el.innerHTML = '<div class="pc-none">점검 카드를 그리지 못했습니다.</div>'; } });
+  }
+  function pmconOpenCard(id){
+    switchTab("perm");
+    setTimeout(function(){ var el = document.getElementById(id); if (el && el.scrollIntoView) el.scrollIntoView({ block: "start" }); }, 400);
+  }
+  function pmconAct(act, id){
+    if (pmconBusy || !pmconState || !pmconState.canWrite || pmconState.base === null) return;
+    var r = pmconState.byId[id]; if (!r) return;
+    var body = { action: "pmcon_decide", kind: r.kind, row: r.id, grade: r.grade, due: r.due || "", q: r.q, rec: r.recTxt || "", base: pmconState.base };
+    if (act === "ok"){
+      if (!r.args || r.block) return;
+      if (r.kind === "autotask" && r.args.mode === "live"){ if (!confirm("이 규칙을 실제 발행으로 바꾸면 다음 08:10 실행부터 실제 지시가 생깁니다. 계속할까요?")) return; }
+      else if (!confirm("[ㄱ] " + r.q + "\n추천값 '" + r.recTxt + "'을(를) 지금 적용합니다.")) return;
+      body.choice = "ok"; body.args = r.args; body.set_base = r.setBase; body.val = r.recTxt;
+    } else if (act === "default"){
+      var useRec = r.def === "rec" && r.args && !r.block;
+      if (!confirm("[기본값] " + r.q + "\n" + (useRec ? "무응답 기본값(추천값 '" + r.recTxt + "')을 지금 적용합니다." : "무응답 기본값은 '그대로'입니다 — 설정은 바꾸지 않고 기록만 남기고 이 줄을 보류함으로 옮깁니다."))) return;
+      body.choice = "default"; body.def_is_rec = !!useRec;
+      if (useRec){ body.args = r.args; body.set_base = r.setBase; body.val = r.recTxt; } else body.val = r.curTxt || "그대로";
+    } else if (act === "hold"){
+      var why = prompt("보류합니다(설정은 그대로). 다시 열 조건을 한 줄로 적어 주세요 — 비워도 됩니다.", "");
+      if (why === null) return;
+      body.choice = "hold"; body.why = String(why).trim().slice(0, 200);
+    } else if (act === "reopen"){
+      body.choice = "reopen";
+    } else return;
+    pmconBusy = true;
+    gwCall("gw-data", body).then(function(res){
+      pmconBusy = false;
+      if (res.status === 409){ apprToastShow("다른 곳에서 방금 바뀌었습니다 — 최신으로 다시 불러왔습니다"); renderPmcon(); return; }
+      if (res.status !== 200){
+        var applied = !!(res.body && res.body.applied);
+        if (!(res.body && res.body.error_code === "NO_CHANGE")) alert("저장 실패 (" + ((res.body && res.body.error_code) || res.status) + ")" + (applied ? " — 설정은 바뀌었고 누른 기록만 남지 못했습니다" : ""));
+        renderPmcon(); return;
+      }
+      apprToastShow((PMCON_CHOICE_TXT[body.choice] || "") + " — " + (res.body && res.body.applied ? "적용했습니다(되돌리기: " + r.k.revert + ")" : "기록했습니다"));
+      renderPmcon();
+    }).catch(function(){ pmconBusy = false; alert("저장 실패(네트워크) — 다시 시도해주세요."); });
+  }
+  (function(){
+    var rb = document.getElementById("pmconReloadBtn"); if (rb) rb.addEventListener("click", function(){ renderPmcon(); });
+    var pb = document.getElementById("pmconPermBtn"); if (pb) pb.addEventListener("click", function(){ switchTab("perm"); });
+  })();
 
   function pmCycle(id, mod, btn){
     var m = findMember(id); if (!m || m.admin) return;
