@@ -3492,6 +3492,27 @@
     abManual = { day: "", items: [], loaded: false, timer: null, saving: false, dirty: false, savedTs: 0, bad: 0, err: "", errBad: false, pendingRender: false };
     abLearnDone = {}; abLearnOpen = ""; abLearnNew = "";
   }
+  // v452(원장 C104 — 개인정보): 로그인 창 '전환'(로그아웃 없이 다른 사람으로 다시 로그인 — 새로고침 없음)과 세션 만료 뒤 다른 사람의 로그인은 clearSessionData를 거치지 않아
+  //   앞사람이 읽은 일용직 명부(workers)·체크 칸 기록(edu — 교육·건강진단)이 메모리에 남았다 — 일용직 권한이 없는 다음 사람에게 석면해체계획서 생성 창 투입 인력 목록(renderXgWorkers)·
+  //   안전 권한자의 특별교육 줄(asbNoSpecial)에 이름이 보일 수 있었다. 보는 사람이 바뀌면(afterLogin 맨 앞) 권한으로 읽는 이 두 원장을 비우고 '아직 못 읽음'으로 되돌린 뒤
+  //   (저장 대기·저장 타이머·고친 줄 표시·표 선택·생성 창 읽기 상태도), 새로 보는 사람에게 권한이 있으면 다시 읽는다 = 새로 로그인한 것과 같은 상태(그리는 쪽을 하나씩 거르지 않아도 됨).
+  //   두 원장만 비운다: 둘 다 '읽기 전 저장 막기'(wkLoaded·eduLoaded)가 있어 비운 배열이 서버를 덮지 않는다 — 그 가드가 없는 원장(지시·차량 등)은 여기서 비우지 않는다(afterLogin이 새로 읽어 덮음).
+  //   같은 사람의 재로그인(세션 만료 뒤)은 비우지 않는다(저장 대기 보존) · 첫 로그인(부팅)은 비울 것이 없다. 돌려줌 = 비웠으면 true
+  var sessViewerId = null;
+  function sessViewerSwap(){
+    var who = myId();
+    if (sessViewerId === who) return false;
+    if (sessViewerId === null){ sessViewerId = who; return false; }
+    sessViewerId = who;
+    if (wkSaveTimer){ clearTimeout(wkSaveTimer); wkSaveTimer = null; }
+    if (eduSaveTimer){ clearTimeout(eduSaveTimer); eduSaveTimer = null; }
+    workers = []; wkLoaded = false; wkPending = false; wkDirty = {}; wkBase = 0;
+    edu = []; eduLoaded = false; eduPending = false; eduBase = 0; eduSel = {}; wkEduSt = "";
+    renderXgWorkers();   // 생성 창 투입 인력 목록 자리에 남은 앞사람 명부 이름을 지움(창이 닫혀 있어도 자리에 글이 남음)
+    if (canSee("wk")) loadWorkers();
+    if (canSee("safety")) loadEdu();
+    return true;
+  }
   function gwLogoutCore(){
     try{ if (typeof abFlushManualSave === "function") abFlushManualSave(); }catch(e){}   // 밀린 운반일지 직접 추가 저장부터(요청은 이 시점 토큰으로 나간다)
     setGwToken(null); curMemberObj = null;
@@ -10318,7 +10339,7 @@
   // 생성 모달의 투입 인력 체크 리스트
   function renderXgWorkers(){
     var host=document.getElementById("xgWorkers"); if(!host) return;
-    var list=sortedWorkers();
+    var list=canSee("wk") ? sortedWorkers() : [];   // v452(C104): 일용직 권한이 없으면 명부 이름을 그리지 않는다(서버도 명부를 주지 않음 — 메모리에 남은 명부를 쓰지 않게)
     host.innerHTML = list.length
       ? '<span class="fld-label">투입 인력 선택 — 명단 4곳·인원수 자동 기입 (관리자 나종운 자동 포함)</span>'
         + list.map(function(w){ return '<label style="display:inline-flex;gap:4px;align-items:center;margin:2px 10px 2px 0;font-size:13px;"><input type="checkbox" data-xgw="'+w.id+'"> '+esc(w.name)+(w.role==="반장"?" (반장)":"")+'</label>'; }).join("")
@@ -15190,8 +15211,9 @@
   //   순서 = member_ids → worker_ids · 같은 사람 두 번은 한 번
   function asbDocPeople(r){
     var out = [], seen = {}, wkOk = canSee("wk") && wkLoaded;
-    function put(ptype, pid, name){ var k = ptype + ":" + pid; if (!name || seen[k]) return; seen[k] = 1; out.push({ ptype: ptype, pid: pid, name: name }); }
-    asList(r && r.member_ids).forEach(function(id){ put("member", id, dispName(memberName(id))); });
+    function put(ptype, pid, name, gone){ var k = ptype + ":" + pid; if (!name || seen[k]) return; seen[k] = 1; out.push({ ptype: ptype, pid: pid, name: name, gone: !!gone }); }
+    //   v452(C105): 퇴사자·지운 회원·시험 계정(체크 칸 표가 '기록만 남은 사람'으로 두거나 표에서 빼는 사람)은 gone — 줄은 남기되 판정하지 않고 기록만(셈·색·[+ 기록] 없음)
+    asList(r && r.member_ids).forEach(function(id){ var m = findMember(id); put("member", id, dispName(memberName(id)), !!m && (m.del === 1 || m.test_acct === true || memberRetired(m))); });
     if (wkOk) asList(r && r.worker_ids).forEach(function(id){ for (var i = 0; i < workers.length; i++){ if (workers[i].id === id && workers[i].del !== 1){ put("worker", id, workers[i].name || ""); break; } } });
     return out;
   }
@@ -15204,8 +15226,8 @@
     if (!eduLoaded) return { st: "wait" };
     base = asbDocBase(r);
     ppl = asbDocPeople(r);
-    ppl.forEach(function(p){ p.d = asbDocOf(p.ptype, p.pid, base); });
-    return { st: "ok", base: base, ppl: ppl, anon: (wkIds.length && !(canSee("wk") && wkLoaded)) ? wkIds.length : 0, wkWait: canSee("wk") && !wkLoaded };
+    ppl.forEach(function(p){ p.d = asbDocOf(p.ptype, p.pid, p.gone ? "" : base); });
+    return { st: "ok", base: base, ppl: ppl, act: ppl.filter(function(p){ return !p.gone; }).length, anon: (wkIds.length && !(canSee("wk") && wkLoaded)) ? wkIds.length : 0, wkWait: canSee("wk") && !wkLoaded };
   }
   function asbMedTxt(m){ return m.st === "none" ? "기록 없음" : ((m.st === "exp" ? "만료 " : "유효 ~") + m.until + " · " + asbMedOrgTxt(m.org) + " " + asbMedMonths(m.org) + "개월"); }
   // 빠진 서류 셈(현장 한 줄) — 세로표 줄·계약 단계 줄이 같이 씀
@@ -15213,6 +15235,7 @@
     var g = { sp: [], med: [], basic: [], wk: 0, unk: 0, soon: "" };
     s.ppl.forEach(function(p){
       var d = p.d;
+      if (p.gone) return;   // v452(C105)
       if (!d.sp.ok) g.sp.push(p);
       if (d.med.st !== "ok") g.med.push(p); else { if (!d.med.org) g.unk++; if (!g.soon || d.med.until < g.soon) g.soon = d.med.until; }
       if (p.ptype === "worker"){ g.wk++; if (!d.basic.ok) g.basic.push(p); }
@@ -15227,11 +15250,11 @@
     if (s.st === "na") return "";
     if (s.st === "nosafety") return s.any ? sheetRow("신고 서류", "검진·건설 기초는 안전 권한에서 확인 — 건강진단 기록은 안전 권한만 봅니다") : "";
     if (s.st === "wait") return (asbWorkerNames(r).length || asList(r.worker_ids).length) ? sheetRow("특수검진", "확인 중") : "";
-    if (!s.ppl.length && !s.anon) return "";
+    if (!s.act && !s.anon) return "";
     g = asbDocGaps(s);
     bt = " · 기준일 " + asbDocBaseTxt(s.base) + (s.anon ? " · 일용직 " + s.anon + "명은 " + (s.wkWait ? "명부를 읽은 뒤 판정" : "일용직 명부 권한이 없어 판정 못 함") : "");
     if (g.med.length) h += sheetRow("특수검진", '<b>확인 필요 ' + g.med.length + '명</b> — ' + esc(g.med.map(function(p){ return p.name + "(" + asbMedTxt(p.d.med) + ")"; }).join(", ") + bt) + ' (신고 전 유효한 검진표 필요)', "warn");
-    else if (s.ppl.length) h += sheetRow("특수검진", esc("유효 " + s.ppl.length + "명 — 가장 이른 만료 " + g.soon + (g.unk ? " · 명의 모름 " + g.unk + "명(6개월로 봄)" : "") + bt));
+    else if (s.act) h += sheetRow("특수검진", esc("유효 " + s.act + "명 — 가장 이른 만료 " + g.soon + (g.unk ? " · 명의 모름 " + g.unk + "명(6개월로 봄)" : "") + bt));
     else h += sheetRow("특수검진", esc(bt.slice(3)));
     if (g.basic.length) h += sheetRow("건설 기초", '<b>수료 기록 없음 ' + g.basic.length + '명</b> — ' + esc(g.basic.map(function(p){ return p.name; }).join(", ")) + ' (신고 서류: 수료증)', "warn");
     else if (g.wk) h += sheetRow("건설 기초", "수료 기록 있음 " + g.wk + "명");
@@ -15248,19 +15271,19 @@
     note = s.anon ? '<div class="vs-dsub" style="margin:6px 0 0;">일용직 ' + s.anon + '명은 ' + (s.wkWait ? "명부를 읽은 뒤 이름·기록이 보입니다" : "일용직 명부를 볼 권한이 없어 이름·기록을 보이지 않습니다") + '</div>' : "";
     if (!s.ppl.length) return note;
     s.ppl.forEach(function(p){
-      var d = p.d, sp = d.sp.rec, md = d.med, bc = d.basic.rec, grey = '<span style="color:#9AA09C;">-</span>', c1, c2, c3, k1 = "", k2 = "", k3 = "";
-      c1 = sp ? "✓ " + esc(sp.date || "") : (done ? grey : "기록 없음"); if (!done && !d.sp.ok) k1 = "vs-warn";
-      if (md.rec){ c2 = esc(md.rec.date + " · " + asbMedOrgTxt(md.org) + (done ? "" : " · " + (md.st === "exp" ? "만료 " : "유효 ~") + md.until)); if (md.st === "exp") k2 = "vs-dan"; }
-      else { c2 = done ? grey : "기록 없음"; if (!done) k2 = "vs-warn"; }
+      var d = p.d, sp = d.sp.rec, md = d.med, bc = d.basic.rec, grey = '<span style="color:#9AA09C;">-</span>', c1, c2, c3, k1 = "", k2 = "", k3 = "", off = done || p.gone;   // off = 판정 안 함(종결 현장 · v452 퇴사자·지운 회원·시험 계정) — 색 없이 기록만
+      c1 = sp ? "✓ " + esc(sp.date || "") : (off ? grey : "기록 없음"); if (!off && !d.sp.ok) k1 = "vs-warn";
+      if (md.rec){ c2 = esc(md.rec.date + " · " + asbMedOrgTxt(md.org) + (off ? "" : " · " + (md.st === "exp" ? "만료 " : "유효 ~") + md.until)); if (md.st === "exp") k2 = "vs-dan"; }
+      else { c2 = off ? grey : "기록 없음"; if (!off) k2 = "vs-warn"; }
       if (bc) c3 = "✓ " + esc(bc.date || "");
       else if (p.ptype === "member") c3 = '<span style="color:#9AA09C;" title="건설 일용근로자 교육 — 직원은 판정하지 않음">직원 — 판정 안 함</span>';
-      else { c3 = done ? grey : "기록 없음"; if (!done) k3 = "vs-warn"; }
-      if (can){
-        c1 += sp ? siteDocBtn("edit", p, sp.id) : siteDocBtn("add", p, "special");
-        c2 += (md.rec ? siteDocBtn("edit", p, md.rec.id) : "") + ((!md.rec || md.st === "exp") ? siteDocBtn("add", p, "spec_med") : "");
-        c3 += bc ? siteDocBtn("edit", p, bc.id) : siteDocBtn("add", p, "basic_con");
+      else { c3 = off ? grey : "기록 없음"; if (!off) k3 = "vs-warn"; }
+      if (can){   // 퇴사자·지운 회원·시험 계정에게는 [수정]만(새 기록은 넣지 않음 — siteDocAct도 막음)
+        c1 += sp ? siteDocBtn("edit", p, sp.id) : (p.gone ? "" : siteDocBtn("add", p, "special"));
+        c2 += (md.rec ? siteDocBtn("edit", p, md.rec.id) : "") + ((!p.gone && (!md.rec || md.st === "exp")) ? siteDocBtn("add", p, "spec_med") : "");
+        c3 += bc ? siteDocBtn("edit", p, bc.id) : (p.gone ? "" : siteDocBtn("add", p, "basic_con"));
       }
-      body += '<tr><td><b>' + esc(p.name) + '</b></td><td>' + (p.ptype === "member" ? "직원" : "일용직") + '</td><td class="' + k1 + '">' + c1 + '</td><td class="' + k2 + '">' + c2 + '</td><td class="' + k3 + '">' + c3 + '</td></tr>';
+      body += '<tr><td><b>' + esc(p.name) + '</b></td><td>' + (p.ptype === "member" ? (p.gone ? '직원 <span style="color:#9AA09C;" title="퇴사자·지운 회원·시험 계정 — 신고 서류 판정에서 뺌(기록만 · 체크 칸 표와 같은 쪽)">· 판정 안 함</span>' : "직원") : "일용직") + '</td><td class="' + k1 + '">' + c1 + '</td><td class="' + k2 + '">' + c2 + '</td><td class="' + k3 + '">' + c3 + '</td></tr>';
     });
     return '<div class="vs-dsub" style="margin:10px 0 0;font-weight:700;">신고 서류 — 근로자별 ' + s.ppl.length + '명 (특별교육일지 · 특수건강검진표 · 건설업 기초교육 수료증)</div>'
       + '<table class="edu-dt" data-site-doctb="' + esc(r.id) + '" style="max-width:760px;"><thead><tr><th>이름</th><th>구분</th><th>특별교육</th><th>특수건강검진</th><th>건설업 기초교육</th></tr></thead><tbody>' + body + '</tbody></table>'
@@ -15321,13 +15344,13 @@
       if (wkEduSt === "") wkEduEnsure(function(ok){ if (ok && currentTab === "con" && typeof renderContracts === "function") renderContracts(); });
       return line(T + (wkEduSt === "fail" ? "체크 칸 기록을 읽지 못했습니다" + tail : "확인 중"));
     }
-    if (!s.ppl.length && !s.anon) return line(T + "현장 대장에 투입 근로자가 아직 없습니다(안전 › 현장 칸 [근로자 추가])", true);
+    if (!s.act && !s.anon) return line(T + "현장 대장에 투입 근로자가 아직 없습니다(안전 › 현장 칸 [근로자 추가])", true);
     g = asbDocGaps(s);
     if (g.sp.length) bits.push("특별교육 기록 없음 " + g.sp.length + "명");
     if (g.med.length) bits.push("검진 확인 필요 " + g.med.length + "명(" + g.med.map(function(p){ return p.name + " " + (p.d.med.st === "none" ? "기록 없음" : "만료 " + p.d.med.until); }).join(", ") + ")");
     if (g.basic.length) bits.push("건설 기초 수료 기록 없음 " + g.basic.length + "명");
     if (s.anon) bits.push("일용직 " + s.anon + "명은 " + (s.wkWait ? "명부를 읽은 뒤" : "일용직 명부 권한이 없어 판정 못 함"));
-    return line(T + "투입 " + (s.ppl.length + s.anon) + "명 · " + (bits.length ? esc(bits.join(" · ")) : "3종 모두 있음(가장 이른 검진 만료 " + esc(g.soon) + ")") + " · 기준일 " + esc(asbDocBaseTxt(s.base)) + tail, bits.length > 0);
+    return line(T + "투입 " + (s.act + s.anon) + "명 · " + (bits.length ? esc(bits.join(" · ")) : "3종 모두 있음(가장 이른 검진 만료 " + esc(g.soon) + ")") + " · 기준일 " + esc(asbDocBaseTxt(s.base)) + tail, bits.length > 0);
   }
   // 석면해체계획서 생성 창 [생성] 확인요망 줄(③ 건강진단 '기록 없음' 줄 wkExamMissing 다음) — 고른 투입 인력의 검진 만료·특별교육·건설 기초(안전 권한 + 기록을 읽었을 때만 · 없으면 빈 배열)
   //   기준일 = 그 계약에 연결된 석면 현장의 기준일(없으면 오늘)
@@ -27114,6 +27137,7 @@
   // 로그인 성공 후: 권한 적용 + 데이터 로드 + (관리자면) 회원목록 로드
   function afterLogin(){
     askClear();   // v350: 세션 주인이 바뀌었을 수 있다 — 대화는 서버에 없고 화면에만 있으므로 여기서 비운다
+    sessViewerSwap();   // v452(C104): 보는 사람이 바뀌었으면 앞사람이 읽은 일용직 명부·체크 칸 기록을 비움(권한 적용·그리기 전에)
     applyPerms();
     doLoad(); loadTasks(); loadVehicles(); loadReceivables(); loadLicenses(); loadDocuments(); loadClients(); loadContracts(); loadMyTasks(); loadLeaves(); loadBids(); loadOnbid();
     loadMembers();   // 담당 배정 드롭다운용 — 관리자·직원 모두
