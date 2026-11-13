@@ -6865,6 +6865,67 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
     }
   } catch (e) { T('88 v456 2차 검토 묶음 실행', false, String(e && e.message)); } finally { reset88(); }
 }
+// ---- 89 v457 C078 ①⑤(PM 11/13 '추천대로'): 기성 숨김 직원에게 기성 연동 지시 빼기·저장 이월 / 비관리자 처리된 기성 지우기 막음 ----
+{
+  const keep86 = { t: mem.gw_data['col:tasks'], r: mem.gw_data['col:receivables'], u1: mem.gw_users['member:u86h'], u2: mem.gw_users['member:u86d'] };
+  const HID = { id: 'u86h', name: '기성숨김', admin: false, perms: { tasks: 'do', rec: 'hide' } }, RDO = { id: 'u86d', name: '기성수행', admin: false, perms: { tasks: 'do', rec: 'do' } };
+  mem.gw_users['member:u86h'] = HID; mem.gw_users['member:u86d'] = RDO;
+  const tH = issueSession(HID).token, tD = issueSession(RDO).token;
+  try {
+    // ① 지시 — t1 입금확인(rec_id, 전체공개) · t2 미수 45일 자동(auto_key rec:) · t3 일반 · t4 입금확인인데 담당 = 기성숨김 · t5 입금확인 공개범위에 기성숨김 · t6 입금확인 지시자 = 기성숨김 · t7 입금확인 전사(__all__)
+    mem.gw_data['col:tasks'] = { schema: 1, updated_at: 8601, items: [
+      { id: 't1', title: '입금확인: 갑 1,000원', rec_id: 'r1', scope: [], status: 'open' },
+      { id: 't2', title: '미수 확인: 갑', auto_key: 'rec:r1:over45', scope: [], status: 'open' },
+      { id: 't3', title: '일반 지시', scope: [], status: 'open' },
+      { id: 't4', title: '입금확인: 담당', rec_id: 'r2', who_id: 'u86h', scope: [], status: 'open' },
+      { id: 't5', title: '입금확인: 공개', rec_id: 'r3', scope: ['u86h'], status: 'open' },
+      { id: 't6', title: '입금확인: 지시자', rec_id: 'r4', from_id: 'u86h', scope: [], status: 'open' },
+      { id: 't7', title: '입금확인: 전사', rec_id: 'r5', who_id: '__all__', scope: [], status: 'open' }] };
+    const ids = (rr) => ((rr.body.doc && rr.body.doc.items) || []).map((t) => t.id).join(',');
+    const gH = await call({ action: 'get', collection: 'tasks' }, tH, 'dev1'), gD = await call({ action: 'get', collection: 'tasks' }, tD, 'dev1'), gA = await call({ action: 'get', collection: 'tasks' }, tokA);
+    T('89 v457 ① get tasks: 기성 숨김 = t1·t2(기성 연동·이름 없음) 빠짐(t3·t4 담당·t5 공개범위·t6 지시자·t7 전사 그대로) · 기성 수행 직원·관리자 = 7 그대로',
+      gH.code === 200 && ids(gH) === 't3,t4,t5,t6,t7' && ids(gD) === 't1,t2,t3,t4,t5,t6,t7' && ids(gA) === 't1,t2,t3,t4,t5,t6,t7', [ids(gH), ids(gD), ids(gA)].join(' / '));
+    // 저장: 받은 5개 중 t3 제목 고침 · t1 낡은 사본(제목 바꿈·del) 끼움 · 새 기성 연동 지시 t9 끼움 → t1·t2 서버 원본 이월, t9 버림, t3 고침 반영
+    const items = gH.body.doc.items.map((t) => (t.id === 't3' ? Object.assign({}, t, { title: '일반 지시(고침)' }) : t));
+    items.push({ id: 't1', title: '조작', rec_id: 'r1', scope: [], status: 'open', del: 1 }, { id: 't9', title: '입금확인: 새', rec_id: 'r9', scope: [], status: 'open' });
+    const sH = await call({ action: 'save', collection: 'tasks', base: 8601, doc: { schema: 1, items } }, tH, 'dev1');
+    const after = mem.gw_data['col:tasks'].items, f = (id) => after.find((t) => t.id === id);
+    T('89 v457 ① 기성 숨김 직원 저장: 빠진 t2 이월·낡은 사본 t1 = 서버 원본(제목·del 없음)·새 기성 연동 t9 버림·t3 고침 반영 · 합 7',
+      sH.code === 200 && f('t1') && f('t1').title === '입금확인: 갑 1,000원' && !f('t1').del && f('t2') && !f('t9') && f('t3').title === '일반 지시(고침)' && after.length === 7, sH.code + ' ' + after.map((t) => t.id).join(','));
+    // 결함 사본 — 서버 이월이 없으면 t2가 사라짐을 이 시험이 잡는지(같은 저장을 기성 수행 직원 꼴로 흉내: 이월 대상 아님)
+    mem.gw_data['col:tasks'].updated_at = 8602;
+    const sD = await call({ action: 'save', collection: 'tasks', base: mem.gw_data['col:tasks'].updated_at, doc: { schema: 1, items: items.filter((t) => t.id !== 't9' && t.id !== 't1') } }, tD, 'dev1');
+    T('89 v457 ① 대조: 기성 수행 직원이 같은 목록(t1·t2 없음)을 보내면 그대로 빠짐(이월은 기성 숨김 직원만 — 넓히지 않음)', sD.code === 200 && !mem.gw_data['col:tasks'].items.find((t) => t.id === 't2'), sD.code);
+    // ⑤ 기성 — p1 입금·p2 발행·p3 검수 ✓·n1 처리 전 · 비관리자: p1 del:1·p2 빼고 보냄·n1 del:1 → p1 del 없음·p2 이월·n1 지움 · 감사 '삭제 보호'
+    mem.gw_data['col:receivables'] = { schema: 1, updated_at: 8611, items: [
+      { id: 'p1', client: '갑', amount: 100, paid: '2026-11-01', invoice: false }, { id: 'p2', client: '을', amount: 200, paid: null, invoice: true },
+      { id: 'p3', client: '병', amount: 300, paid: null, invoice: false, reviewed: { by: '관리자', date: '2026-11-01' } }, { id: 'n1', client: '정', amount: 400, paid: null, invoice: false }] };
+    const sR = await call({ action: 'save', collection: 'receivables', base: 8611, doc: { schema: 1, items: [
+      { id: 'p1', client: '갑', amount: 100, paid: '2026-11-01', invoice: false, del: 1 }, { id: 'p3', client: '병', amount: 300, paid: null, invoice: false, reviewed: { by: '관리자', date: '2026-11-01' }, del: 1 },
+      { id: 'n1', client: '정', amount: 400, paid: null, invoice: false, del: 1 }] } }, tD, 'dev1');
+    const ri = mem.gw_data['col:receivables'].items, g = (id) => ri.find((x) => x.id === id);
+    T('89 v457 ⑤ 비관리자 기성 저장: 처리된 p1(입금)·p3(검수) del:1 = 지우지 않은 원본 · 빼고 보낸 p2(발행) = 서버 원본 이월 · 처리 전 n1 del:1 = 지움(종전)',
+      sR.code === 200 && g('p1') && !g('p1').del && g('p3') && !g('p3').del && g('p2') && g('p2').invoice === true && g('n1') && g('n1').del === 1 && ri.length === 4, sR.code + ' ' + JSON.stringify(ri.map((x) => x.id + ':' + (x.del || 0))));
+    mem.gw_data['col:receivables'].updated_at = 8612;
+    const sA = await call({ action: 'save', collection: 'receivables', base: 8612, doc: { schema: 1, items: [{ id: 'p1', client: '갑', amount: 100, paid: '2026-11-01', invoice: false, del: 1 }, { id: 'n1', client: '정', amount: 400, del: 1 }] } }, tokA);
+    const ra = mem.gw_data['col:receivables'].items;
+    T('89 v457 ⑤ 관리자는 그대로: 처리된 p1 del:1 = 지움 · 빠진 p2·p3 = 빠짐(관리자 저장은 종전)', sA.code === 200 && ra.find((x) => x.id === 'p1').del === 1 && !ra.find((x) => x.id === 'p2') && ra.length === 2, sA.code + ' ' + ra.map((x) => x.id).join(','));
+    // 직전 문서 못 읽음 = 비관리자 기성 저장·기성 숨김 직원 지시 저장 거부(PREV_READ_FAILED)
+    blobsMock.hooks = blobsMock.hooks || {};
+    const prevFG = blobsMock.hooks.failGet; blobsMock.hooks.failGet = (k) => k === 'col:receivables' || k === 'col:tasks';
+    let pr1, pr2;
+    try {
+      pr1 = await call({ action: 'save', collection: 'receivables', doc: { schema: 1, items: [] } }, tD, 'dev1');
+      pr2 = await call({ action: 'save', collection: 'tasks', doc: { schema: 1, items: [] } }, tH, 'dev1');
+    } finally { if (prevFG) blobsMock.hooks.failGet = prevFG; else delete blobsMock.hooks.failGet; }
+    T('89 v457 ①⑤ 직전 문서를 못 읽으면 저장 거부: 비관리자 기성 = 500 PREV_READ_FAILED · 기성 숨김 직원 지시 = 500 PREV_READ_FAILED',
+      pr1.code === 500 && pr1.body.error_code === 'PREV_READ_FAILED' && pr2.code === 500 && pr2.body.error_code === 'PREV_READ_FAILED', JSON.stringify([pr1.code, pr1.body.error_code, pr2.code, pr2.body.error_code]));
+  } finally {
+    mem.gw_data['col:tasks'] = keep86.t; mem.gw_data['col:receivables'] = keep86.r;
+    if (keep86.u1) mem.gw_users['member:u86h'] = keep86.u1; else delete mem.gw_users['member:u86h'];
+    if (keep86.u2) mem.gw_users['member:u86d'] = keep86.u2; else delete mem.gw_users['member:u86d'];
+  }
+}
 
 { // ---- 86(P1 판1) 법인 등기 날짜 settings:corp_reg + 입찰 투찰(응찰) 잠금(기본 꺼짐) — 원장 T462·T461·T388 · 업무별 설계 C6.
   //   corp_reg_get·corp_reg_set = 관리자만 · 값 검사(BAD_DATE·BAD_FUTURE·BAD_VALUE) · 낙관락 409 CORP_REG_STALE · NO_CHANGE · prev 1판 · 감사 1줄(col corp_reg).

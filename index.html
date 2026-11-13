@@ -1215,6 +1215,7 @@
   .rec-st.dup{background:#FBE7E3;color:#B0332A;}
   .rec-st.mm{background:#EAE2FB;color:#5B3FA6;}
   .rec-st.chg{background:#FEF3D8;color:#8A6410;}
+  .rec-st.neg{background:#FBE7E3;color:#B0332A;}   /* v454 C078 ③ 수정(-) */
   .rec-star{color:#C98A00;}
   .rec-neg{color:#B0332A;}   /* v440 검토: 홈택스 수정세금계산서 음수 금액(부호 '-' + 빨강 — 표 칸·합계 줄·펼침) */
   .mini-btn.rec-hbtn.on{background:#EAF3EF;color:var(--brand-dark);border-color:var(--brand);}
@@ -5845,7 +5846,7 @@
     if (!isAdmin() || !autoGenRan || !receivables.length) return;
     var today = todayStr(), made = 0;
     liveRec().forEach(function(r){
-      if (r.paid || !isDate(r.billed)) return;
+      if (r.paid || recIsCredit(r) || !isDate(r.billed)) return;   // v454 C078 ③: 수정(-) 줄은 미수 아님
       var ag = recAging(r.billed);
       if (!ag || ag.days < 45) return;
       var key = "rec:"+r.id+":over45";
@@ -25041,10 +25042,13 @@
   //   '광주시'는 넣지 않음(경기도 광주시와 겹침) — 원래 값
   //   v444 검토: 2026-07-01 출범한 '전남광주통합특별시'(법률 제21446호 — 법정 약칭은 '광주특별시', 두 글자 줄임말은 없음 · 운영 사본 30줄, 그 지역 새 물건은 이 이름으로 옴)도 넣지 않음 —
   //   두 글자를 지어내지 않고(추측 금지) 옛 '광주'·'전남'과 묶을지는 PM 확인 뒤(그 전엔 원래 값 = 시도 칸 말줄임 + title · 시도 거르기에 따로 한 줄)
+  //   → v454(PM 11/13 C083 ② 추천대로): 표시 = 법정 약칭 '광주특별시'(OB_SIDO) · 시도 거르기는 '광주특별시'·'광주'·'전남' 어느 쪽으로 골라도 걸림(시도 열 multi — obSidoFt)
   var OB_SIDO = { "서울특별시": "서울", "서울시": "서울", "서울": "서울", "부산광역시": "부산", "부산시": "부산", "부산": "부산", "대구광역시": "대구", "대구시": "대구", "대구": "대구",
     "인천광역시": "인천", "인천시": "인천", "인천": "인천", "광주광역시": "광주", "광주": "광주", "대전광역시": "대전", "대전시": "대전", "대전": "대전", "울산광역시": "울산", "울산시": "울산", "울산": "울산",
     "세종특별자치시": "세종", "세종시": "세종", "세종": "세종", "경기도": "경기", "경기": "경기", "강원특별자치도": "강원", "강원도": "강원", "강원": "강원", "충청북도": "충북", "충북": "충북", "충청남도": "충남", "충남": "충남",
-    "전북특별자치도": "전북", "전라북도": "전북", "전북": "전북", "전라남도": "전남", "전남": "전남", "경상북도": "경북", "경북": "경북", "경상남도": "경남", "경남": "경남", "제주특별자치도": "제주", "제주도": "제주", "제주": "제주" };
+    "전북특별자치도": "전북", "전라북도": "전북", "전북": "전북", "전라남도": "전남", "전남": "전남", "경상북도": "경북", "경북": "경북", "경상남도": "경남", "경남": "경남", "제주특별자치도": "제주", "제주도": "제주", "제주": "제주", "전남광주통합특별시": "광주특별시", "광주특별시": "광주특별시" };
+  var OB_SIDO_ALSO = { "광주특별시": ["광주", "전남"] };   // v454 C083 ②: 시도 거르기에서 이 값도 같이 걸리는 옛 줄임말(통합 전 두 시도)
+  function obSidoFt(r){ var s = obInfo(r).sido; return Object.prototype.hasOwnProperty.call(OB_SIDO_ALSO, s) ? [s].concat(OB_SIDO_ALSO[s]).join(VS_MULTI_SEP) : s; }
   var OB_ORG_RE = /\s*·\s*유찰\s*(\d+)\s*회\s*$/;   // org 끝 ' · 유찰N회'(수집기 onbid.py — 유찰 0이면 붙이지 않음)
   var OB_ST_ORDER = { "new": 0, "검토": 1, "참여": 2, "패스": 3 };   // 상태 칸 정렬(진행 순서)
   var OB_ST_TXT = { "new": "신규", "검토": "검토", "참여": "참여", "패스": "패스" };
@@ -25201,9 +25205,9 @@
         key: "jw_ob_sheet", host: "obList", unit: "건",
         empty: "조건에 맞는 물건이 없습니다.",
         cols: [
-          { k: "title", h: "물건(소재지)", f: "text", fill: 1, min: 280, pw: 50, b: 0, ft: function(r){ return obInfo(r).txt + " " + (r.title || ""); } },   // 신규만 굵게(칸 cls vs-b) · 거르기는 표시 글 + 주소 전문(명세 'text(주소 전문)' — '경북 포항'·'경상북도 포항' 둘 다, v444 검토)
+          { k: "title", h: "물건(소재지)", f: "text", fill: 1, min: 264, pw: 50, b: 0, ft: function(r){ return obInfo(r).txt + " " + (r.title || ""); } },   // 신규만 굵게(칸 cls vs-b) · 거르기는 표시 글 + 주소 전문(명세 'text(주소 전문)' — '경북 포항'·'경상북도 포항' 둘 다, v444 검토)
           { k: "kind", h: "용도", w: 76, f: "none", lv: 3 },   // 칩(용도 묶음)으로 거름
-          { k: "sido", h: "시도", w: 64, f: "enum", lv: 3 },   // 명세 76 → 64(실측 — 위 칸 폭 줄)
+          { k: "sido", h: "시도", w: 80, f: "enum", multi: 1, ft: obSidoFt, lv: 3 },   // 명세 76 → 64(실측 — 위 칸 폭 줄) → v454 80('광주특별시' 시험 화면 실측 scrollWidth 79 > 안 폭 63 — 물건 칸 최소 280 → 264로 단계 합 그대로) · v454 multi: 광주특별시 줄은 '광주'·'전남'으로도 걸림
           { k: "prop", h: "재산구분", w: 96, f: "enum", lv: 3 },   // 명세 72 → 96
           { k: "fail", h: "유찰", w: 56, f: "none", num: 1, lv: 2 },   // 명세 52 → 56
           { k: "appr", h: "감정가", w: 108, f: "none", num: 1, lv: 4 },
@@ -25368,10 +25372,10 @@
       o = outs["#" + k];
       if (!o){ o = outs["#" + k] = { id: "out:" + k, out: 1, key: k, name: raw, raws: {}, recs: [], recAll: 0, cons: [], bns: {}, biz: "" }; order.push(o); }
       o.raws["#" + raw] = (o.raws["#" + raw] || 0) + 1;
-      if (isRec){ o.recAll++; if (!it.paid) o.recs.push(it); b = cliDigits(it.client_num); if (b.length === 10) o.bns["#" + b] = 1; }
+      if (isRec){ o.recAll++; if (!it.paid && !recIsCredit(it)) o.recs.push(it); b = cliDigits(it.client_num); if (b.length === 10) o.bns["#" + b] = 1; }
       else o.cons.push(it);
     };
-    liveRec().forEach(function(r){ var c; if (!recVisible(r)) return; c = cliResolve(x, r.client, r.client_num); if (c){ if (!r.paid) (x.rec[c.id] = x.rec[c.id] || []).push(r); } else if (seeRec) addOut(r.client, r, true); });
+    liveRec().forEach(function(r){ var c; if (!recVisible(r)) return; c = cliResolve(x, r.client, r.client_num); if (c){ if (!r.paid && !recIsCredit(r)) (x.rec[c.id] = x.rec[c.id] || []).push(r); } else if (seeRec) addOut(r.client, r, true); });   // v454 C078 ③: 수정(-) 줄은 미수 아님
     liveContracts().forEach(function(k){ var c = cliResolve(x, k.client, ""); if (c) (x.con[c.id] = x.con[c.id] || []).push(k); else if (seeCon) addOut(k.client, k, false); });
     order.forEach(function(o){ var best = 0, bs = Object.keys(o.bns); Object.keys(o.raws).forEach(function(r){ if (o.raws[r] > best){ best = o.raws[r]; o.name = r.slice(1); } }); o.biz = bs.length === 1 ? bs[0].slice(1) : ""; x.outBy[o.id] = o; });
     x.out = order;
@@ -25386,7 +25390,7 @@
     x = cliLinkIdx();
     if (x.ids[cli.id]) return (x.rec[cli.id] || []).slice();
     bn = cliDigits(cli.biz_no); k = cliNameKey(cli.name);
-    return liveRec().filter(function(r){ var rb; if (r.paid || !recVisible(r)) return false; rb = cliDigits(r.client_num); if (bn && rb === bn) return true; if (bn.length === 10 && rb.length === 10) return false; return k !== "" && cliNameKey(r.client) === k; });   // 번호가 둘 다 10자리이고 다르면 상호가 같아도 아님(cliResolve와 같은 판정)
+    return liveRec().filter(function(r){ var rb; if (r.paid || recIsCredit(r) || !recVisible(r)) return false; rb = cliDigits(r.client_num); if (bn && rb === bn) return true; if (bn.length === 10 && rb.length === 10) return false; return k !== "" && cliNameKey(r.client) === k; });   // 번호가 둘 다 10자리이고 다르면 상호가 같아도 아님(cliResolve와 같은 판정)
   }
   function cliContracts(cli){
     var x, k;
@@ -26084,6 +26088,27 @@
     }
     return out;
   }
+  // v454(C078 ② PM 11/13 '추천대로'): 직접 등록한 청구를 나중에 홈택스로 불러오면 승인번호로만 맞춰 같은 건이 미수 두 줄이 됐다(거래처 글자·청구일이 달라 '중복 의심'에도 안 걸림) →
+  //   불러오기 미리보기의 '신규' 줄마다 같은 거래처(상호 열쇠 cliNameKey 또는 공급받는자 번호)·같은 금액·작성일과 청구일이 REC_MERGE_DAYS 안인 직접 등록 줄(승인번호 없음·지우지 않음·입금 전)을 찾아
+  //   '직접 등록 줄 있음'을 보이고, 사람이 [합치기]를 고른 줄만 새 줄 대신 그 직접 등록 줄에 홈택스 값을 얹는다(자동 아님). 한 직접 등록 줄은 한 신규 줄에만(가까운 날짜 먼저).
+  //   날짜 폭은 운영 기성이 0건(11/13)이라 실측 전 기본값 — 쓰기 시작하면 실측해 고칠 것
+  var REC_MERGE_DAYS = 31;
+  function recDayGap(a, b){ var x = Date.parse(String(a || "").slice(0, 10)), y = Date.parse(String(b || "").slice(0, 10)); return (isNaN(x) || isNaN(y)) ? null : Math.abs(Math.round((x - y) / 86400000)); }
+  function recMergeTwins(adds){
+    var direct = receivables.filter(function(r){ return r && r.del !== 1 && !r.nts && r.src !== "hometax" && !r.paid; }), used = {}, pairs = [];
+    adds.forEach(function(c, i){
+      var ck = cliNameKey(c.client), cn = cliDigits(c.client_num);
+      direct.forEach(function(r){
+        var g, rn = cliDigits(r.client_num);
+        if ((Number(r.amount) || 0) !== (Number(c.amount) || 0) || !c.amount) return;
+        if (!((ck && cliNameKey(r.client) === ck) || (cn.length === 10 && rn === cn))) return;
+        g = recDayGap(r.billed, c.billed); if (g == null || g > REC_MERGE_DAYS) return;
+        pairs.push({ i: i, r: r, g: g });
+      });
+    });
+    pairs.sort(function(a, b){ return a.g - b.g || a.i - b.i; });
+    pairs.forEach(function(p){ var c = adds[p.i]; if (c._twin || used[p.r.id]) return; c._twin = p.r.id; c._twinGap = p.g; used[p.r.id] = 1; });
+  }
   function recImportPlan(cands){
     var byNts={}; receivables.forEach(function(r){ if(r&&r.nts) byNts[r.nts]=r; });
     var plan={add:[],upd:[],cancel:[],dup:0,filedup:[]};
@@ -26099,6 +26124,8 @@
         if(changed) plan.upd.push(c); else plan.dup++;
       } else plan.add.push(c);
     });
+    plan.add.forEach(function(c){ delete c._twin; delete c._twinGap; delete c._merge; });
+    recMergeTwins(plan.add);   // v454 C078 ②
     return plan;
   }
   function recNewRec(c, today){
@@ -26131,12 +26158,28 @@
         if(!ex.co && coNew){ ex.co=coNew; ch=true; }
         else if(c.co && ex.co!==c.co){ ex.co=c.co; ch=true; }   // 파일이 명시한 공급자와 다르면 파일 기준으로 교정
         if(ch){ ex.updated=today; res.upd++; }
+      } else if(c._merge && recMergeInto(c, today)){ if(c.nts) byNts[c.nts]=findRec(c._merge); res.merge=(res.merge||0)+1;   // v454 C078 ② 사람이 고른 [합치기]
       } else {
         var it=recNewRec(c,today);
         receivables.push(it); if(c.nts) byNts[c.nts]=it; res.add++;
       }
     });
     return res;
+  }
+  // v454 C078 ②: 직접 등록 줄 r에 홈택스 계산서 c를 얹음 — 승인번호·문서번호·공급받는자 번호·공급가액·세액·영수/청구·작성일(청구일)·출처 홈택스, 거래처·내역은 계산서 글로(다시 불러와도 '갱신'이 안 생기게 —
+  //   달랐던 직접 등록 글은 메모 앞에 남김). 담당·공개범위·검수·연결 지시·계약 연동·★은 그대로, 발행 표시는 관리자 불러오기면 켬(신규 줄과 같은 규칙). 짝이 사라졌거나 바뀌었으면 false(새 줄로)
+  function recMergeInto(c, today){
+    var r = findRec(c._merge), keep = [];
+    if (!r || r.del === 1 || r.nts || r.paid || (Number(r.amount) || 0) !== (Number(c.amount) || 0)) return false;
+    if ((r.client || "") !== (c.client || "")) keep.push("거래처 " + (r.client || ""));
+    if ((r.desc || "") !== (c.desc || "") && r.desc) keep.push("내역 " + r.desc);
+    if (keep.length) r.note = "[직접 등록 때 " + keep.join(" · ") + "]" + (r.note ? " " + r.note : "");
+    r.nts = c.nts; r.docno = c.docno; r.client = c.client; r.client_num = c.client_num; r.desc = c.desc; r.supply = c.supply; r.tax = c.tax; r.purpose = c.purpose;
+    if (c.billed) r.billed = c.billed;
+    var impCo = document.getElementById("recImpCo"), co = c.co || ((impCo && impCo.value) || ""); if (co) r.co = co;
+    if (isAdmin()) r.invoice = true;
+    r.src = "hometax"; r.merged = { from: "direct", date: today }; r.updated = today; r.updated_ts = Date.now();
+    return true;
   }
   function handleRecImportFile(file){
     var msg=document.getElementById("recImpMsg");
@@ -26158,7 +26201,7 @@
     document.getElementById("recImpSummary").innerHTML="신규 <b>"+plan.add.length+"</b>건 · 갱신 <b>"+plan.upd.length+"</b>건 · 취소반영 <b>"+plan.cancel.length+"</b>건 · 이미있음 "+plan.dup+"건"+(fdup?" · <span style=\"color:#b0332a;\">중복 의심 <b>"+fdup+"</b>건</span>":"")+"<br>신규 미수 합계 <b>"+fmtAmount(addTotal)+"원</b>"+(fdup?"<br><span style=\"color:#b0332a;font-size:12px;\">※ 파일 안에 승인번호가 겹치는 행입니다. 그대로 추가한 뒤 목록 상단에 빨간 '중복 의심'으로 표시되니 확인 후 삭제하세요.</span>":"");
     function line(c,tag){ return '<div style="padding:4px 0;border-bottom:1px solid rgba(128,128,128,.12);">'+tag+" <b>"+impEsc(c.client)+"</b> · "+impEsc(c.desc||"")+" · "+fmtAmount(c.amount)+"원</div>"; }
     var html="";
-    plan.add.forEach(function(c){ html+=line(c,'<span style="color:#27ae60;">신규</span>'); });
+    plan.add.forEach(function(c, i){ var tw = c._twin ? findRec(c._twin) : null; html+=line(c,'<span style="color:#27ae60;">신규</span>') + (tw ? '<div class="rec-imp-twin" style="padding:2px 0 6px 12px;font-size:12px;color:#8A6410;">직접 등록 줄 있음 — ' + impEsc(tw.client || "") + ' · 청구일 ' + impEsc(tw.billed || "-") + ' · ' + fmtAmount(tw.amount) + '원(작성일과 ' + c._twinGap + '일 차) <label style="margin-left:6px;cursor:pointer;"><input type="checkbox" data-rec-merge="' + i + '"> 합치기</label> <span style="color:#9AA09C;">— 고르면 새 줄 대신 그 줄에 계산서 값을 얹습니다</span></div>' : ''); });   // v454 C078 ②
     plan.upd.forEach(function(c){ html+=line(c,'<span style="color:#e67e22;">갱신</span>'); });
     (plan.filedup||[]).forEach(function(c){ html+=line(c,'<span style="color:#b0332a;">중복의심</span>'); });
     plan.cancel.forEach(function(c){ html+=line(c,'<span style="color:#c0392b;">취소</span>'); });
@@ -26169,11 +26212,13 @@
   function confirmRecImport(){
     var bd=document.getElementById("recImpBackdrop");
     if(!pendingImport){ bd.classList.remove("show"); return; }
+    var addC = recImportPlan(pendingImport).add;   // v454 C078 ②: 미리보기와 같은 계획을 다시 세워 고른 [합치기]만 표시(창을 연 사이 바뀐 줄은 recMergeInto가 다시 봄)
+    var pvM = document.getElementById("recImpPreview"); Array.prototype.forEach.call((pvM && pvM.querySelectorAll) ? pvM.querySelectorAll("[data-rec-merge]") : [], function(el){ var c = addC[Number(el.getAttribute("data-rec-merge"))]; if (c && el.checked && c._twin) c._merge = c._twin; });
     var res=recImportApply(pendingImport);
     pendingImport=null; bd.classList.remove("show");
     saveRecCache(); renderReceivables(); renderDashboard(); scheduleRecSave();
     var msg=document.getElementById("recImpMsg");
-    if(msg){ msg.style.color=res.dup?"#b0332a":"#27ae60"; msg.textContent="반영 완료 — 신규 "+res.add+" · 갱신 "+res.upd+" · 취소 "+res.cancel+(res.dup?" · 중복 의심 "+res.dup+"건(상단 확인 후 삭제)":""); }
+    if(msg){ msg.style.color=res.dup?"#b0332a":"#27ae60"; msg.textContent="반영 완료 — 신규 "+res.add+" · 갱신 "+res.upd+" · 취소 "+res.cancel+(res.merge?" · 합침 "+res.merge:"")+(res.dup?" · 중복 의심 "+res.dup+"건(상단 확인 후 삭제)":""); }
   }
 
   // ---- 차량 보험사 일괄 대조 (차량보유 현황표 xlsx, 자차 시트) ----
@@ -26610,6 +26655,9 @@
     if (!recSearchTerm) return true;
     return ((r.client || "") + " " + (r.desc || "") + " " + (r.nts || "")).toLowerCase().indexOf(recSearchTerm) >= 0;
   }
+  // v454(C078 ③ PM 11/13 '추천대로'): 수정세금계산서(마이너스 금액) 줄 = 받을 돈이 아님 — 미수·경과(60·90일 칩·경과 칸·합계 최대 경과)·제목 미수 건수·거래처별 미수 집계·거래처 탭 미수·
+  //   미수 45일 자동 지시에서 뺌, 확인 칸에 '수정(-)'(확인 필요 칩) — 원 계산서와 상계할지는 관리부(나수진) 확인. 홈 미수 줄·폰 옛 목록(옛 본문)은 그대로
+  function recIsCredit(r){ return (Number(r && r.amount) || 0) < 0; }
   function unpaidReceivables(all){
     // all=true(대시보드): 기성 탭 검색어를 무시 — 검색 상태가 남아 홈 미수 합계·목록이 검색 결과로 오염되던 문제
     var u = liveRec().filter(function(r){ return !r.paid && recVisible(r) && (all || recMatchesSearch(r)); });
@@ -26674,7 +26722,7 @@
   var REC_SHEET_DEF = null, REC_SHEET_DUP = {}, recSheetCur = "", recPanel = "";
   var REC_DASH = '<span style="color:#9AA09C;">-</span>';
   var REC_ST_TXT = ["검수 대기", "검수 ✓", "발행", "입금"];
-  var REC_CHK_CLS = { "중복 의심": "dup", "불일치": "mm", "금액 바뀜": "chg" };
+  var REC_CHK_CLS = { "중복 의심": "dup", "불일치": "mm", "금액 바뀜": "chg", "수정(-)": "neg" };
   var REC_TASK_ST = { open: "진행", review: "승인 대기", hold: "보류", done: "완료" };
   var REC_PANELS = { add: ["recAddCard", "recAddOpen"], imp: ["recImportCard", "recImpOpen"], ab: ["recAbCard", "recAbOpen"] };
   var REC_UNINV_HT = "홈택스에서 불러온 발행 건입니다. 앱의 발행 표시만 지웁니다(홈택스 계산서는 그대로 — 관리자가 같은 목록을 다시 불러오면 발행 표시가 되살아나고, 홈택스에서 취소한 계산서는 다시 불러오면 '취소'로 반영됩니다). 계속할까요?";
@@ -26706,9 +26754,9 @@
     return '<span class="rec-st wait">검수 대기</span>';
   }
   // 경과(미수만) — 청구일부터 오늘까지 일수(recAging — 입금·날짜 없음·앞날 청구일은 -1)
-  function recSheetAge(r){ var ag = r.paid ? null : recAging(r.billed); return ag ? ag.days : -1; }
+  function recSheetAge(r){ var ag = (r.paid || recIsCredit(r)) ? null : recAging(r.billed); return ag ? ag.days : -1; }   // v454 C078 ③: 수정(-) 줄은 경과 없음
   // 확인 — 중복 의심 · 불일치(미수) · 금액 바뀜(입금 뒤 홈택스 금액이 바뀜 — recheck) 순, 칸에는 첫째(전부는 title)
-  function recSheetChk(r){ var a = []; if (recSheetDup(r)) a.push("중복 의심"); if (r.mismatch && !r.paid) a.push("불일치"); if (r.recheck) a.push("금액 바뀜"); return a; }
+  function recSheetChk(r){ var a = []; if (recSheetDup(r)) a.push("중복 의심"); if (r.mismatch && !r.paid) a.push("불일치"); if (r.recheck) a.push("금액 바뀜"); if (!r.paid && recIsCredit(r)) a.push("수정(-)"); return a; }   // v454 C078 ③ 수정(-) = 원 계산서와 상계 확인
   function recSheetCo(r){ return r.co === "env" ? "환경" : (r.co === "con" ? "건설" : "미지정"); }
   function recSheetWho(r){ return r.assignee ? (dispNameById(r.assignee) || "") : ""; }
   // 값(거르기·고르기 목록·정렬 기본) — 빈 값은 ""(정렬에서 방향과 상관없이 뒤)
@@ -26741,7 +26789,7 @@
     if (k === "co") return (r.co === "env" || r.co === "con") ? esc(recSheetCo(r)) : { html: '<span class="rec-st wait">미지정</span>', title: "회사(환경·건설)를 정하지 않음 — 펼침 [수정]에서" };
     if (k === "desc") return r.desc ? { html: esc(r.desc), title: r.desc } : REC_DASH;
     if (k === "billed") return isDate(r.billed) ? esc(r.billed) : REC_DASH;
-    if (k === "age"){ x = r.paid ? null : recAging(r.billed); return x ? { html: '<span class="rec-age ' + x.cls + '">' + x.days + '일</span>', title: "청구일 " + r.billed + " · 경과 " + x.days + "일" } : REC_DASH; }   // 미수만 일수 칩(30·60·90 색 — 옛 목록과 같은 rec-age)
+    if (k === "age"){ if (!r.paid && recIsCredit(r)) return { html: REC_DASH, title: "수정세금계산서(마이너스) — 미수·경과에서 뺌, 원 계산서와 상계할지는 관리부 확인" }; x = r.paid ? null : recAging(r.billed); return x ? { html: '<span class="rec-age ' + x.cls + '">' + x.days + '일</span>', title: "청구일 " + r.billed + " · 경과 " + x.days + "일" } : REC_DASH; }   // 미수만 일수 칩(30·60·90 색 — 옛 목록과 같은 rec-age)
     if (k === "amt") return recSheetNum(r.amount);
     if (k === "st") return recSheetStHtml(r);
     if (k === "chk"){ a = recSheetChk(r); return a.length ? { html: '<span class="rec-st ' + REC_CHK_CLS[a[0]] + '">' + esc(a[0]) + '</span>', title: a.join(" · ") } : REC_DASH; }
@@ -26985,7 +27033,7 @@
     }
     ["recSelBar", "recPaidList"].forEach(function(id){ var el = g(id); if (el) el.style.display = "none"; });
     recSheetPanels();
-    un = recSheetRows().filter(function(r){ return !r.paid; });
+    un = recSheetRows().filter(function(r){ return !r.paid && !recIsCredit(r); });   // v454 C078 ③: 수정(-) 줄은 미수 아님
     un.forEach(function(r){ sum += Number(r.amount) || 0; });
     if (head) head.textContent = "미수 " + un.length + "건" + (sum ? " · " + recSheetMoney(sum) + "원" : "");
     renderRecAging(un, true);   // 거래처별 미수 집계 — 보이는 미수 전부, 거래처 탭과 같은 잇기(v451 C081 ②)(표의 칩·검색과 무관 — 옛 목록은 검색어로 걸렀음)
@@ -27053,12 +27101,12 @@
       val: recSheetVal, sv: recSheetSv, cell: recSheetCell,
       rowCls: function(r){ return r.paid ? "grey" : ""; },
       chips: [{ g: "st", items: [
-        { k: "", h: "미수", tip: "입금 전 전부(처음 화면) — 청구일 오래된 순, 중복 의심이 맨 위·불일치가 맨 아래", test: function(r){ return !r.paid; } },
+        { k: "", h: "미수", tip: "입금 전 전부(처음 화면) — 청구일 오래된 순, 중복 의심이 맨 위·불일치가 맨 아래 · 수정세금계산서(마이너스)는 빼고 '확인 필요'·'전체'에", test: function(r){ return !r.paid && !recIsCredit(r); } },
         { k: "paid", h: "입금 완료", tip: "입금일 최근 먼저 — 자르지 않음", test: function(r){ return !!r.paid; }, sort: { k: "st", d: -1 } },
         { k: "rv", h: "검수 대기", pc: 1, tip: "발행 전 청구 중 관리부 검수 전", test: function(r){ return recSheetStKey(r) === 0; } },
         { k: "d60", h: "60일 넘음", pc: 1, tip: "청구 뒤 60일 이상 지난 미수", test: function(r){ return recSheetAge(r) >= 60; } },
         { k: "d90", h: "90일 넘음", warn: 1, tip: "청구 뒤 90일 이상 지난 미수", test: function(r){ return recSheetAge(r) >= 90; } },
-        { k: "chk", h: "확인 필요", tip: "중복 의심·금액 불일치·입금 뒤 금액 바뀜", test: function(r){ return recSheetChk(r).length > 0; } },
+        { k: "chk", h: "확인 필요", tip: "중복 의심·금액 불일치·입금 뒤 금액 바뀜·수정(-)(마이너스 계산서 — 상계 확인)", test: function(r){ return recSheetChk(r).length > 0; } },
         { k: "all", h: "전체", pc: 1 }
       ] }],
       sort: { k: "billed", d: 1 },
