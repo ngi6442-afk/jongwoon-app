@@ -74,4 +74,4 @@ function diffItems(oldItems, newItems, maxEv) {
   return ev;
 }
 
-module.exports = { appendAudit, auditKey, diffItems, short, DATA };
+module.exports = { appendAudit, auditKey, diffItems, short, DATA, MAX_PER_MONTH };   // v453 MAX_PER_MONTH — gw-data backup_put 감사 로그 붙이기 상한이 같은 값을 쓴다

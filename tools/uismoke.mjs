@@ -10716,6 +10716,7 @@ try {
 
   // ⑦ 문서 — FEATURES 기준 v450 (2026-11-13)·v450 절 · TESTLIST v450(화면 칸 '[ ] (AI 시험 화면 대상' ≥ 1 — 'PM' 0 · 게이트 칸 [x] 8종) · MANUAL 21-9(석면 교육은 현장 칸·석면 밖 특별교육) ·
   //   CLAUDE.md 안전 줄(체크 칸 특별교육 열 = special_demo · 현장 표·서버·현황 ③ = eduHasValidSpecial 한 판정 · 옛 문장 0) · sw jw-shell-v450
+  //   v453: 기준 줄·sw는 이 판 이상(숫자 비교 — 이 판 값은 v453 문서 검사)
   const ft7 = V.rd47('FEATURES.md'), tl7 = V.rd47('TESTLIST.md'), cl7 = V.rd47('CLAUDE.md'), sw7 = V.rd47('sw.js'), man7 = V.rd47('MANUAL.html');
   const ftv7 = (() => { const i = ft7.indexOf('\n### v450 (11/13)'); if (i < 0) return ''; const j = ft7.indexOf('\n### ', i + 5); return ft7.slice(i, j < 0 ? ft7.length : j); })();
   const tlv7 = (() => { const i = tl7.indexOf('\n## v450 '); if (i < 0) return ''; const j = tl7.indexOf('\n## ', i + 5); return tl7.slice(i, j < 0 ? tl7.length : j); })();
@@ -11116,11 +11117,46 @@ try {
   const FT3 = ['C104', 'C105', '`sessViewerSwap`', '`sessViewerId`', '`renderXgWorkers`', '`wkLoaded`', '`eduLoaded`', '판정 안 함', '서버 변경 없음', 'uismoke v452'];
   const GATE3 = ['uismoke', 'consheet_check', 'proctpl_check', 'settletest', 'servertest', 'rectest', 'promoqual_check', 'promogen_check'];
   const mF3 = FT3.filter((s) => ftv3.indexOf(s) < 0);
-  T('v452 ③ 문서: FEATURES 기준 v452 (2026-11-13)·v452 절 · TESTLIST v452 화면 칸 "[ ] (AI 시험 화면 대상" ≥ 1("PM" 낱말 0)·게이트 칸 [x] 8종 · MANUAL 28절 퇴사자 "판정 안 함" · CLAUDE.md sessViewerSwap · sw jw-shell-v452',
-    /기준: v452 \(2026-11-13\)\./.test(ft3) && ftv3.length > 0 && mF3.length === 0 && tlv3.length > 0 && scr3.length >= 1 && !scr3.some((l) => /PM/.test(l)) && GATE3.every((g) => gate3.some((l) => l.indexOf('`' + g + '`') > 0))
-    && m28_3.indexOf('판정 안 함') > 0 && cl3.indexOf('`sessViewerSwap`') > 0 && /SHELL_CACHE = 'jw-shell-v452'/.test(sw3),
+  T('v452 ③ 문서: FEATURES 기준 v452 이상·v452 절 · TESTLIST v452 화면 칸 "[ ] (AI 시험 화면 대상" ≥ 1("PM" 낱말 0)·게이트 칸 [x] 8종 · MANUAL 28절 퇴사자 "판정 안 함" · CLAUDE.md sessViewerSwap · sw jw-shell-v452 이상',
+    Number((ft3.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 452 && ftv3.length > 0 && mF3.length === 0 && tlv3.length > 0 && scr3.length >= 1 && !scr3.some((l) => /PM/.test(l)) && GATE3.every((g) => gate3.some((l) => l.indexOf('`' + g + '`') > 0))
+    && m28_3.indexOf('판정 안 함') > 0 && cl3.indexOf('`sessViewerSwap`') > 0 && Number((sw3.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 452,   // v453: 기준 줄·sw는 이 판 이상(이 판 값은 v453 문서 검사)
     JSON.stringify({ mF3, scr: scr3.length, gate: gate3.length }));
 } catch (e) { console.log('  (v452 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ---- v453(11/13 — 보안 재감사 ②③⑧ · 원장 C093·C094): 서버만(backup_put 재해 복원 모드 · autotask_ingest 서버 스위치 · 봇 키 상수시간 · settings_apply) — 동작 검사는 servertest 85(결함 사본 포함).
+//   여기는 문서·판 번호와 '화면 변경 없음': FEATURES 기준 v453 (2026-11-13)·v453 절(이름 고정) · TESTLIST v453(운영 확인 칸 '[ ] (AI 운영 확인' ≥ 1 — 'PM' 낱말 0 · 게이트 칸 [x] 8종) ·
+//   CLAUDE.md 보안 줄(backup_put 규칙·settings_apply 쓰는 법) · sw jw-shell-v453 · index.html에 settings_apply·RESTORE_MODE_ONLY·restore: true 0
+try {
+  const rd51 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const ft51 = rd51('FEATURES.md'), tl51 = rd51('TESTLIST.md'), cl51 = rd51('CLAUDE.md'), sw51 = rd51('sw.js');
+  // 절 찾기는 제목 글까지('— 보안') — 같은 판 번호를 쓰는 다른 갈래 절이 합쳐져도 이 절을 잡게(v453 검토)
+  const ftv51 = (() => { const i = ft51.indexOf('\n### v453 (11/13) — 보안'); if (i < 0) return ''; const j = ft51.indexOf('\n### ', i + 5); return ft51.slice(i, j < 0 ? ft51.length : j); })();
+  const tlv51 = (() => { const i = tl51.indexOf('\n## v453 — 보안'); if (i < 0) return ''; const j = tl51.indexOf('\n## ', i + 5); return tl51.slice(i, j < 0 ? tl51.length : j); })();
+  const cb51 = tlv51.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), ops51 = cb51.filter((l) => /^- \[ \] \(AI 운영 확인/.test(l)), gate51 = cb51.filter((l) => /^- \[x\] \(AI\) `/.test(l));
+  const FT51 = ['`backup_put`', 'RESTORE_MODE_ONLY', '`BACKUP_MEMBER_AUTH`', '`BACKUP_MEMBER_IDENT`', '`backupLogMerge`', 'AUDIT_FULL', '`autotaskRuleOf`', '`botKeyOk`', '`settings_apply`', "op '설정적용'", "op '재해복원'",
+    'collectors/restore.py', '"restore": true', 'C093', 'C094', '서버만', '화면 변경 없음', 'servertest 85', '9/1 수용 위험 3종',
+    '`badBlobKey`', '`BAD_KEY`', '`doclog:*`', '`clog:contract`', '`restored: <복원 시각>`', '`blocked_rules.unknown`', '`AUTOTASK_KEY_RE`', '`NEED_CONFIRM`', '`BAD_DRY`',
+    'v453 배포 전 조건', '알려진 한계', 'gw-cron-kick·gw-lawwatch는 아직',
+    // 2차 검토 반영(del 해제만·지난 퇴사일·LAST_PM · clog:appr·다시 잇기 · autotask live 낮춤 · 깨진 값 교체 · dry 판정 · settings_apply base·직접 읽기 · doneif 되돌리기 없음 · 로그인 401)
+    '**del은 해제만**', 'leave_date는 지금 값이 있으면 지금 값', '`LAST_PM`', '`clog:appr:*`', '`backupClogMerge`', '`rechained: <복원 시각>`', '스위치 live 복원 안 함', '`STORAGE_PARSE_FAILED`', '`would_error`',
+    '`NEED_BASE`', '`SETTINGS_READ_FAILED`', '**doneif는 되돌리기 없음**', '401 INVALID_CREDENTIALS', '**tier 없음**'];
+  const CL51 = ['**보안(v453', '`RESTORE_MODE_ONLY`', '`BACKUP_MEMBER_AUTH`', '`backupLogMerge`', '`badBlobKey`', '`BAD_KEY`', '`botKeyOk`', '`settings_apply`', "action:'settings_apply'", 'dry:true', 'confirm:true', 'audit:true', '앱 관리자 카드로', '`AUTOTASK_KEY_RE`',
+    'del은 해제만', '`LAST_PM`', '`backupClogMerge`', '`NEED_BASE`', 'doneif는 되돌리기 없음'];
+  const GATE51 = ['uismoke', 'consheet_check', 'proctpl_check', 'settletest', 'servertest', 'rectest', 'promoqual_check', 'promogen_check'];
+  const mF51 = FT51.filter((s) => ftv51.indexOf(s) < 0), mC51 = CL51.filter((s) => cl51.indexOf(s) < 0);
+  const old51 = ['`BACKUP_MEMBER_KEEP`', '`backupAuditMerge`', 'del은 백업 값', 'clog 해시 체인은 잇는 백업만', '`CLOG_DIVERGED`(갈라짐)'].filter((s) => ftv51.indexOf(s) >= 0 || cl51.indexOf(s) >= 0)   // 옛 이름·옛 규칙이 문서에 남지 않게
+    .concat(['관리자 카드 updated_by'].filter((s) => tlv51.indexOf(s) >= 0));   // 2차 검토: 관리자 카드는 updated_by를 그리지 않는다 — 확인은 notify_get·assign_get 응답으로
+  // 운영 확인 칸 순서(v453 검토): 첫 칸 = 배포 전 조건(restore.py) · 거절 확인 칸은 dry 먼저(restore_only 필드 없으면 중단)·confirm 요청 data는 지금 값 그대로
+  const pre51 = ops51.length > 0 && ops51[0].indexOf('배포 전 조건') > 0 && ops51[0].indexOf('"restore": true') > 0;
+  const rej51 = ops51.filter((l) => l.indexOf('① 먼저') > 0 && l.indexOf('restore_only 필드') > 0 && l.indexOf('지금 값 그대로') > 0 && l.indexOf('① 먼저') < l.indexOf('② 그 뒤')).length === 1;
+  const ix51 = ['settings_apply', 'RESTORE_MODE_ONLY', 'restore: true', 'badBlobKey', 'BAD_KEY', 'would_error', 'NEED_BASE'].filter((s) => html.indexOf(s) >= 0);
+  // 2차 검토: 다음 R1 적용 확인 칸 = notify_get·assign_get 응답의 updated_by · doneif는 감사 '설정적용' 줄(되돌리기 없음) · base 필수
+  const r1v51 = ops51.filter((l) => l.indexOf('notify_get·assign_get 응답의 updated_by') > 0 && l.indexOf("doneif는 감사 '설정적용' 줄로 확인") > 0 && l.indexOf('NEED_BASE') > 0).length === 1;
+  T('v453 문서: FEATURES 기준 v453 (2026-11-13)·v453 절(키 이름 검사·backup_put 재해 복원 모드·회원 권한/신원 칸·del 되살리기·기록 키 붙이기만·restored 표식·clog 체인·알려진 한계·ingest 스위치·키 꼴 허용 목록·botKeyOk·settings_apply 2단·restore.py 배포 전 조건·수용 위험 그대로) · TESTLIST v453 운영 확인 칸 "[ ] (AI 운영 확인" ≥ 1("PM" 낱말 0)·첫 칸 배포 전 조건·거절 확인은 dry 먼저·게이트 칸 [x] 8종 · CLAUDE.md 보안 줄(쓰는 법 · 옛 이름 0) · sw jw-shell-v453 · 화면 변경 없음(index.html에 새 액션·코드 0)',
+    /기준: v453 \(2026-11-13\)\./.test(ft51) && ftv51.length > 0 && mF51.length === 0 && tlv51.length > 0 && ops51.length >= 1 && !ops51.some((l) => /PM/.test(l)) && GATE51.every((g) => gate51.some((l) => l.indexOf('`' + g + '`') > 0))
+    && mC51.length === 0 && old51.length === 0 && pre51 && rej51 && r1v51 && /SHELL_CACHE = 'jw-shell-v453'/.test(sw51) && ix51.length === 0,
+    JSON.stringify({ mF51, mC51, old51, pre51, rej51, r1v51, ops: ops51.length, gate: gate51.length, ix51 }));
+} catch (e) { console.log('  (v453 검사 생략 — ' + e.message + ')'); fails++; }
 
 try {
   // 원장 T421(11/13): 옛 블록의 sw 판 번호 검사는 숫자 비교(>= 그 판) — '…|4\\d\\d)' 꼴 정규식은 v500에서 한꺼번에 실패하므로 다시 쓰지 않는다(판마다 옛 블록을 손보던 구조 해소)

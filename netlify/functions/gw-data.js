@@ -7,7 +7,8 @@ const crypto = require('crypto');
 const zlib = require('zlib');   // v378 큰 본문 gzip(응답·요청) — 10/8 실사고(col:bids 6.69MB > 동기 함수 한도 6MB)
 const { setupBlobContext, store, blobGet, blobSet, blobDelete, blobList } = require('./_lib/blobs');
 const { verifyToken, bearer } = require('./_lib/session');
-const { appendAudit, auditKey, diffItems } = require('./_lib/audit');
+const { appendAudit, auditKey, diffItems, MAX_PER_MONTH: AUDIT_MAX_PER_MONTH } = require('./_lib/audit');
+const { badBlobKey } = require('./_lib/blobkey');   // v453 Blobs 키 이름 검사(backup_get·backup_put 400 BAD_KEY — blobs.js도 같은 검사로 SDK 앞에서 막음)
 const AL = require('./_lib/apprlearn');   // v413 결재 학습 신호(clog:appr → lessons:appr, 모델 없음)
 const DONEIF = require('./_lib/doneif');   // v413 clogAppend(해시 체인) 재사용
 const push = require('./_lib/push');
@@ -638,8 +639,7 @@ async function saveBidsDoc(st, doc, by, added, updated, R) {
 //   조건부 쓰기가 없는 @netlify/blobs 8.2.0이라 다시 읽어 견줌 — 다시 읽은 뒤 쓰기까지의 짧은 틈은 남음)
 async function handleBidsIngest(event, d, R, attempt) {
   attempt = attempt || 1;
-  const secret = (process.env.BIDS_INGEST_KEY || '').trim();
-  if (!secret || String(d.key || '').trim() !== secret) return jr(403, { status: 'FORBIDDEN', error_code: 'BAD_INGEST_KEY', request_id: R });
+  if (!botKeyOk(d.key)) return jr(403, { status: 'FORBIDDEN', error_code: 'BAD_INGEST_KEY', request_id: R });   // v453 상수시간
   if (!Array.isArray(d.items)) return jr(400, { status: 'REJECTED', error_code: 'INVALID_ITEMS', request_id: R });
   const target = (d.col === 'onbid') ? 'onbid' : 'bids';
   const st = store(DATA);
@@ -738,9 +738,41 @@ async function handleBidsIngest(event, d, R, attempt) {
 // 정기업무 봇 ingest(autotask 크론 전용) — S1 단일 원천 이후 리포 tasks.json이 스테일 미러가 되어
 // 크론 생성 지시(만기·미수·증명서)가 앱에 도달하지 않던 사고(2026-08-04 발견)의 수리.
 // auto_key로 중복 방지 병합(앱 생성분과 동일 키 체계), hide_keys=자기정정(회색 차량 등) 숨김.
+// v453(보안 재감사 ② — 자동 지시 live 전 · 원장 C093): 서버도 규칙 스위치(settings:autotask)를 본다 — 종전엔 live 판정이 봇(autotask.py)에만 있어
+//   봇 버그 때 dry·off 규칙 항목이 실제 지시로 들어갔다. 새 규칙 3건의 키 꼴(autotaskRuleOf)이면 스위치가 'live'일 때만 만들고,
+//   아니면(dry·off·스위치 읽기 실패 = 기본 dry) 만들지 않고 blocked로 센다(다른 항목·hide_keys는 그대로 · 막힌 것이 있으면 감사 1줄). 기존 4규칙(D-30 차량·인허가·미수·증명서)은 스위치와 무관.
+//   키 꼴은 허용 목록(AUTOTASK_KEY_RE — 봇 collectors/autotask.py와 앱이 쓰는 7꼴, 날짜·월은 엄격, 끝 공백 없음)이다 — 어느 꼴에도 맞지 않는 auto_key는
+//   만들지 않고 blocked_rules.unknown으로 센다('site:missing-2026-11'·'wk:Missing:…'·'veh:X:insp:<날> '처럼 꼴만 살짝 바꿔 스위치를 비켜 가던 길 · v453 검토).
+//   (봇 키가 새면 이 판정만으로는 못 막는다 — 키를 가진 쪽은 맞는 꼴로 보낼 수 있다. 이 판정이 막는 것은 봇 버그·꼴 어긋남.)
+const AUTOTASK_ID = "[^:\\s\\x00-\\x1f\\x7f]{1,80}";   // 차량 id는 'v' + 번호판(한글 포함) — 콜론·공백·제어문자만 뺀다
+const AUTOTASK_DATE = '\\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\\d|3[01])';
+const AUTOTASK_MONTH = '\\d{4}-(?:0[1-9]|1[0-2])';
+const AUTOTASK_KEY_RE = {
+  veh: new RegExp('^veh:' + AUTOTASK_ID + ':(insp|ins):(' + AUTOTASK_DATE + ')$'),
+  lic: new RegExp('^lic:' + AUTOTASK_ID + ':(?:exp|edu):' + AUTOTASK_DATE + '$'),
+  rec: new RegExp('^rec:' + AUTOTASK_ID + ':over45$'),
+  cert: /^cert:c\d{1,6}$/,
+  site: new RegExp('^site:missing:' + AUTOTASK_MONTH + '$'),
+  wk: new RegExp('^wk:missing:' + AUTOTASK_MONTH + '$'),
+};
+// 돌려주는 값: 'site_missing'·'wk_missing'·'veh_insp90'(스위치 대상) · ''(기존 4규칙 — 스위치 무관) · 'unknown'(허용 목록 밖 — 늘 막음)
+function autotaskRuleOf(autoKey, today) {
+  const k = typeof autoKey === 'string' ? autoKey : '';
+  if (AUTOTASK_KEY_RE.site.test(k)) return 'site_missing';
+  if (AUTOTASK_KEY_RE.wk.test(k)) return 'wk_missing';
+  // veh:<id>:insp:<만료일>은 기존 D-30과 같은 키 꼴 — 만료일이 오늘(KST)부터 31일 이상이면 D-90 규칙(autorules VEH90_MIN · autotask.py DUE_WINDOW 30과 같은 경계)
+  const m = AUTOTASK_KEY_RE.veh.exec(k);
+  if (m) {
+    if (m[1] !== 'insp') return '';
+    const dd = AR.dayDiff(m[2], today);
+    if (dd === null) return 'unknown';
+    return dd >= AR.VEH90_MIN ? 'veh_insp90' : '';
+  }
+  if (AUTOTASK_KEY_RE.lic.test(k) || AUTOTASK_KEY_RE.rec.test(k) || AUTOTASK_KEY_RE.cert.test(k)) return '';
+  return 'unknown';
+}
 async function handleAutotaskIngest(event, d, R) {
-  const secret = (process.env.BIDS_INGEST_KEY || '').trim();
-  if (!secret || String(d.key || '').trim() !== secret) return jr(403, { status: 'FORBIDDEN', error_code: 'BAD_INGEST_KEY', request_id: R });
+  if (!botKeyOk(d.key)) return jr(403, { status: 'FORBIDDEN', error_code: 'BAD_INGEST_KEY', request_id: R });   // v453 상수시간
   const items = Array.isArray(d.items) ? d.items : [];
   const hideKeys = Array.isArray(d.hide_keys) ? d.hide_keys.map(String) : [];
   const st = store(DATA);
@@ -748,12 +780,16 @@ async function handleAutotaskIngest(event, d, R) {
   const doc = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data : { schema: 1, items: [] };
   await verSnapshot('tasks', doc, '정기봇', true);
   const today = new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);
+  const sw = await autotaskRead(st);   // v453 규칙 스위치 — 키 없음·읽기 실패면 기본 dry(막음)
   const have = {}, have0 = {};
   doc.items.forEach(function (t) { if (t && t.auto_key) { have[t.auto_key] = t; have0[t.auto_key] = 1; } });
-  let made = 0, fixed = 0;
+  let made = 0, fixed = 0, blocked = 0;
+  const blockedBy = {};
   for (const n of items.slice(0, 100)) {
     const k = String((n && n.auto_key) || '');
     if (!k || have[k]) continue;
+    const rule = autotaskRuleOf(k, today);
+    if (rule && (rule === 'unknown' || sw.rules[rule] !== 'live')) { blocked++; blockedBy[rule] = (blockedBy[rule] || 0) + 1; continue; }   // v453
     doc.items.push({ id: 't' + crypto.randomBytes(6).toString('hex'), title: String(n.title || '').slice(0, 120),
       detail: String(n.detail || '').slice(0, 500), who_id: '', who: '', scope: [],
       from: '자동', from_id: '', by: '자동', due: String(n.due || '').slice(0, 10), status: 'open',
@@ -773,13 +809,16 @@ async function handleAutotaskIngest(event, d, R) {
   const notifyItems = doc.items.filter(function (t) { return t && t.auto_key && t.who_id && (t.created === today && !have0[t.auto_key] || blankBefore[t.id]); });
   let notified = 0;
   if (notifyItems.length) notified = await notifyAutoCreated(st, notifyItems, '정기봇');
+  const blockTxt = blocked ? ' · 스위치 막음 ' + blocked + '(' + Object.keys(blockedBy).map(function (k) { return k + ' ' + blockedBy[k] + ' — ' + (k === 'unknown' ? '허용 꼴 밖' : sw.rules[k]); }).join(', ') + ')' : '';   // v453 규칙 이름·건수·스위치 값만(키·본문 없음)
   if (made || fixed || assigned) {
     doc.updated_by = '정기봇'; doc.updated_at = Date.now();
     const w = await blobSet(st, colKey('tasks'), doc);
     if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
-    try { await appendAudit({ ts: Date.now(), by: '정기봇', bid: 'bot', col: 'tasks', ev: [{ op: '정기업무', id: '', t: '신규 ' + made + ' · 정정 ' + fixed + (assigned ? ' · 배정 ' + assigned : '') }] }); } catch (e) {}
+    try { await appendAudit({ ts: Date.now(), by: '정기봇', bid: 'bot', col: 'tasks', ev: [{ op: '정기업무', id: '', t: '신규 ' + made + ' · 정정 ' + fixed + (assigned ? ' · 배정 ' + assigned : '') + blockTxt }] }); } catch (e) {}
+  } else if (blocked) {
+    try { await appendAudit({ ts: Date.now(), by: '정기봇', bid: 'bot', col: 'tasks', ev: [{ op: '정기업무', id: '', t: '신규 0' + blockTxt }] }); } catch (e) {}   // v453 쓴 것은 없어도 막힌 것은 남김
   }
-  return jr(200, { status: 'OK', made: made, fixed: fixed, assigned: assigned, notified: notified, request_id: R });
+  return jr(200, { status: 'OK', made: made, fixed: fixed, assigned: assigned, notified: notified, blocked: blocked, blocked_rules: blockedBy, request_id: R });
 }
 
 // 지금 수집(관리자 버튼) — 서버가 나라장터 API를 직접 조회해 병합. G2B_API_KEY(Netlify env) 필요. 10분 쿨다운.
@@ -1005,8 +1044,7 @@ async function handleBidsRefresh(event, d, R) {
 // 일감 비우기(관리자) — mode:'new'=미검토(new)만 제거(검토/참여/패스 보존), 'all'=전체 제거. 재수집용.
 async function handleBidsPurge(event, d, R) {
   // 관리자 세션 또는 수집봇 시크릿(BIDS_INGEST_KEY)로 허용 — 봇의 데이터 정비용
-  const secret = (process.env.BIDS_INGEST_KEY || '').trim();
-  const botOk = secret && String(d.key || '').trim() === secret;
+  const botOk = botKeyOk(d.key);   // v453 상수시간
   let c = { member: { id: 'bot', name: '수집봇' } };
   if (!botOk) {
     c = await currentMember(event);
@@ -1085,8 +1123,7 @@ async function handleOnbidPurgeSet(event, d, R) {
 
 // 일감 이력 export(수집봇) — 학습 필터용(패스 패턴). 경량 필드만 반환.
 async function handleBidsExport(event, d, R) {
-  const secret = (process.env.BIDS_INGEST_KEY || '').trim();
-  if (!secret || String(d.key || '').trim() !== secret) return jr(403, { status: 'FORBIDDEN', error_code: 'BAD_INGEST_KEY', request_id: R });
+  if (!botKeyOk(d.key)) return jr(403, { status: 'FORBIDDEN', error_code: 'BAD_INGEST_KEY', request_id: R });
   const r = await blobGet(store(DATA), colKey('bids'));
   const items = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data.items : [];
   const lite = items.map(function (it) { return { id: it.id, status: it.status, title: it.title, org: it.org, source: it.source, auto_pass: !!it.auto_pass, no: it.no || '', due: it.due || '', url: it.url || '' }; });
@@ -1096,8 +1133,7 @@ async function handleBidsExport(event, d, R) {
 // 개찰결과 수신(수집봇 전용) — 응찰 건의 낙찰/유찰 결과를 카드에 반영.
 // status는 현재 응찰(구 참여)일 때만 자동 변경 — 사람이 정한 다른 상태는 건드리지 않는다.
 async function handleBidsResults(event, d, R) {
-  const secret = (process.env.BIDS_INGEST_KEY || '').trim();
-  if (!secret || String(d.key || '').trim() !== secret) return jr(403, { status: 'FORBIDDEN', error_code: 'BAD_INGEST_KEY', request_id: R });
+  if (!botKeyOk(d.key)) return jr(403, { status: 'FORBIDDEN', error_code: 'BAD_INGEST_KEY', request_id: R });
   if (!Array.isArray(d.results)) return jr(400, { status: 'REJECTED', error_code: 'INVALID_RESULTS', request_id: R });
   const st = store(DATA);
   const r = await blobGet(st, colKey('bids'));
@@ -1157,8 +1193,7 @@ async function bidNotifyIds(st, tc) {
 }
 // 봇 알림(정기업무 크론 전용) — 공유 시크릿 인증. 관리자 접속과 무관하게 만기·미수 알림이 나가야 한다.
 async function handleBotNotify(event, d, R) {
-  const secret = (process.env.BIDS_INGEST_KEY || '').trim();
-  if (!secret || String(d.key || '').trim() !== secret) return jr(403, { status: 'FORBIDDEN', error_code: 'BAD_INGEST_KEY', request_id: R });
+  if (!botKeyOk(d.key)) return jr(403, { status: 'FORBIDDEN', error_code: 'BAD_INGEST_KEY', request_id: R });
   const title = String(d.title || '알림').slice(0, 60);
   const body = String(d.body || '').slice(0, 300);
   const tag = String(d.tag || 'bot-notify').slice(0, 30);
@@ -1197,6 +1232,9 @@ function keyMatch(given, secret) {   // 상수시간 비교(검토 발견 low) �
   const a = Buffer.from(String(given || '').trim(), 'utf8'), b = Buffer.from(String(secret || ''), 'utf8');
   return b.length > 0 && a.length === b.length && crypto.timingSafeEqual(a, b);
 }   // 10분 6건 — 홈페이지 쪽 IP 제한(5건/10분)을 뚫어도 PM 폰·알림함(push:log 100건 링)을 밀어내지 못하게
+// v453 봇 키(BIDS_INGEST_KEY) 비교 한 곳 — 상수시간(keyMatch: 길이가 다르면 거부, 같으면 timingSafeEqual) · env가 비면 늘 거부(기본 개방 금지).
+//   이 파일의 봇 경로(bids_ingest·autotask_ingest·bids_purge 봇 갈래·bids_export·bids_results·bot_notify·autotask_facts·autotask_dry_put·backup_*·settings_apply)는 전부 이것만 쓴다(종전 '!==' 비교 — 보안 재감사 ②).
+function botKeyOk(given) { return keyMatch(given, (process.env.BIDS_INGEST_KEY || '').trim()); }
 async function handleInquiryNotify(event, d, R) {
   const secret = (process.env.INQUIRY_PUSH_KEY || '').trim();
   if (!secret || !keyMatch(d.key, secret)) return jr(403, { status: 'FORBIDDEN', error_code: 'BAD_INQUIRY_KEY', request_id: R });
@@ -1752,6 +1790,95 @@ async function handleDoneifSet(event, d, R) {
   try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'tasks', ev: [{ op: '앱기준설정', id: '', t: '완료 신호 자동 전환 ' + (cur.on ? '켬' : '끔') + '→' + (d.on ? '켬' : '끔') }] }); } catch (e) {}
   return jr(200, { status: 'OK', on: d.on, updated_at: doc.updated_at, request_id: R });
 }
+// ---- v453 서버 설정 적용 settings_apply(봇 키 — 보안 재감사 ③ · 원장 C094) ----
+// R1 같은 서버 설정 변경을 넷리파이 CLI 직접 쓰기(앱 감사 로그 0줄 — 11/4·11/10·11/13 C025) 대신 이 길로 한다. 앞으로 R1 적용 스크립트는 이것만 쓴다(CLAUDE.md 보안 줄).
+//   대상 허용 목록 3종 notify·assign·doneif — 값 검사·저장 모양은 앱 관리자 카드 핸들러와 같다(notifyValid · ASSIGN_PREFIXES + 재직 명부 · boolean),
+//   prev 1판(앱 카드 [되돌리기]가 그대로 되돌림) · updated_at = 지금 · updated_by = 'bot:' + mark(회원 id가 아님 — 앱 밖 적용 표식) · applied_via 'settings_apply'.
+//   changes에 적지 않은 칸은 지금 값 그대로(3칸 고정 덮어쓰기 금지 — v437 검토 지적) · 지금과 같은 값만이면 400 NO_CHANGE · base가 다르면 409 SETTINGS_STALE(쓰기에는 base 필수 — 없으면 400 NEED_BASE) ·
+//   대상 키를 못 읽으면(읽기 실패·깨진 값) 503 SETTINGS_READ_FAILED(기본값 위에 얹어 쓰지 않음).
+//   감사 1줄 op '설정적용'(by '설정봇(<mark>)' · bid 'bot' · 칸 이름과 전→후 · ref) — 감사 쓰기가 실패하면 응답 audit:false(설정은 이미 바뀜 → 스크립트가 멈추고 사람이 확인).
+//   dry=true면 쓰지 않고 바뀔 칸만 돌려준다(봇 키라 notify_get 같은 관리자 조회를 못 쓰므로 미리보기 겸 base 얻기) · 쓰기는 confirm:true가 따로 있어야(없으면 400 NEED_CONFIRM) ·
+//   dry가 true·false·없음 밖의 값(1·'true' 등)이면 400 BAD_DRY(미리보기로 알고 보낸 요청이 실제로 쓰지 않게).
+//   자동 지시 스위치(settings:autotask)는 허용 목록 밖 — live 전환은 앱 관리자 카드로(누가 켰는지 회원으로 남게 · 재감사 ② 절차). 그 밖 settings:*도 이 길로 못 쓴다.
+const SETTINGS_APPLY_TARGETS = { notify: 1, assign: 1, doneif: 1 };
+const SETTINGS_APPLY_MARK = /^[a-z0-9][a-z0-9._-]{2,39}$/;
+async function handleSettingsApply(event, d, R) {
+  if (!botKeyOk(d.key)) return jr(403, { status: 'FORBIDDEN', error_code: 'BAD_INGEST_KEY', request_id: R });
+  const target = String(d.target || '');
+  if (!Object.prototype.hasOwnProperty.call(SETTINGS_APPLY_TARGETS, target)) return jr(400, { status: 'REJECTED', error_code: 'BAD_TARGET', request_id: R });
+  const mark = String(d.mark || '');
+  if (!SETTINGS_APPLY_MARK.test(mark)) return jr(400, { status: 'REJECTED', error_code: 'BAD_MARK', request_id: R });
+  // v453 검토: 미리보기·쓰기 2단(backup_put과 같은 꼴) — dry는 true·false·없음만(dry:1·'true'를 미리보기로 알고 보냈는데 실제로 쓰던 길) · 쓰기는 confirm:true 따로
+  if (d.dry !== undefined && d.dry !== true && d.dry !== false) return jr(400, { status: 'REJECTED', error_code: 'BAD_DRY', request_id: R });
+  const ch = d.changes;
+  if (!ch || typeof ch !== 'object' || Array.isArray(ch) || !Object.keys(ch).length) return jr(400, { status: 'REJECTED', error_code: 'BAD_CHANGES', request_id: R });
+  const ref = String(d.ref || '').replace(/[^0-9A-Za-z가-힣._\- ]/g, '').slice(0, 40);
+  const st = store(DATA), by = 'bot:' + mark, now = Date.now();
+  // v453 검토: 대상 키를 먼저 직접 읽는다 — notifyRead·assignRead·doneif 읽기는 블롭 읽기가 실패해도(없음이 아니라 읽기 실패·깨진 값) 기본값을 돌려주므로,
+  //   그 위에 changes만 얹어 쓰면 사람 눈 없는 봇 경로가 다른 칸의 운영 값을 기본값으로 되돌리고 prev에도 기본값을 남긴다 → 503 SETTINGS_READ_FAILED로 쓰지 않음(fail-closed).
+  //   (실 blobGet은 없음 = ok:true·data null · servertest mock은 없음 = NOT_FOUND — 둘 다 '없음'.) 깨진 설정은 재해 복원(backup_put)으로 고친 뒤 다시.
+  const pre = await blobGet(st, target === 'notify' ? NOTIFY_KEY : (target === 'assign' ? ASSIGN_KEY : DONEIF_KEY));
+  if (!pre.ok && pre.code !== 'NOT_FOUND') return jr(503, { status: 'ERROR', error_code: 'SETTINGS_READ_FAILED', request_id: R });
+  const own = function (o, k) { return Object.prototype.hasOwnProperty.call(o, k); };
+  const stale = function (u) { return d.base !== undefined && Number(d.base) !== Number(u || 0); };
+  let key, doc, curAt, ev = [], pub;
+  if (target === 'notify') {
+    const nf = await notifyRead(st);
+    if (stale(nf.updated_at)) return jr(409, { status: 'CONFLICT', error_code: 'SETTINGS_STALE', request_id: R });
+    const next = Object.assign({}, nf.events);
+    for (const k of Object.keys(ch)) {
+      const v = String(ch[k]);
+      if (!notifyValid(k, v)) return jr(400, { status: 'REJECTED', error_code: 'BAD_EVENT', field: String(k).slice(0, 40), request_id: R });
+      if (next[k] !== v) { ev.push({ id: k, t: NOTIFY_EVENTS[k].label + ' ' + (NOTIFY_EVENTS[k].options[next[k]] || next[k]) + '→' + NOTIFY_EVENTS[k].options[v] }); next[k] = v; }
+    }
+    key = NOTIFY_KEY; curAt = nf.updated_at;
+    doc = { schema: 1, events: next, prev: { events: nf.events, updated_at: nf.updated_at || 0, updated_by: nf.updated_by || '' }, updated_by: by, updated_at: now, applied_via: 'settings_apply' };
+    pub = { events: next };
+  } else if (target === 'assign') {
+    const a = await assignRead(st);
+    if (stale(a.updated_at)) return jr(409, { status: 'CONFLICT', error_code: 'SETTINGS_STALE', request_id: R });
+    const members = await assignMembers();
+    if (!members) return jr(503, { status: 'ERROR', error_code: 'MEMBERS_UNAVAILABLE', request_id: R });   // 명부 없이 쓰면 퇴사자·오타 id가 배정될 수 있다(assign_set과 같음)
+    const okId = function (id) { return id === '' || own(members, id); };
+    const nm = function (id) { return id ? ((members[id] || {}).name || id) : ''; };
+    const rules = JSON.parse(JSON.stringify(a.rules || {})); let apv = a.approver_id || '';
+    for (const k of Object.keys(ch)) {
+      const who = String(ch[k] == null ? '' : ch[k]).slice(0, 40);
+      if (!okId(who)) return jr(400, { status: 'REJECTED', error_code: 'BAD_MEMBER', field: String(k).slice(0, 40), request_id: R });
+      if (k === 'approver_id') {
+        if (who !== apv) { ev.push({ id: 'approver', t: '자동 지시 승인권자 ' + (nm(apv) || '관리자 전원') + '→' + (nm(who) || '관리자 전원') }); apv = who; }
+        continue;
+      }
+      if (!own(ASSIGN_PREFIXES, k)) return jr(400, { status: 'REJECTED', error_code: 'BAD_PREFIX', field: String(k).slice(0, 40), request_id: R });
+      const before = (rules[k] || {}).who_id || '';
+      if (before === who) continue;
+      if (who) rules[k] = { who_id: who }; else delete rules[k];
+      ev.push({ id: k, t: ASSIGN_PREFIXES[k] + ' ' + (nm(before) || '없음') + '→' + (nm(who) || '없음') });
+    }
+    key = ASSIGN_KEY; curAt = a.updated_at;
+    doc = { schema: 1, rules: rules, approver_id: apv, prev: { rules: a.rules || {}, approver_id: a.approver_id || '', updated_at: a.updated_at || 0, updated_by: a.updated_by || '' }, updated_by: by, updated_at: now, applied_via: 'settings_apply' };
+    pub = { rules: rules, approver_id: apv };
+  } else {   // doneif
+    if (Object.keys(ch).length !== 1 || !own(ch, 'on') || typeof ch.on !== 'boolean') return jr(400, { status: 'REJECTED', error_code: 'BAD_VALUE', request_id: R });
+    let cur = { on: false, updated_at: 0, updated_by: '' };
+    try { const r = await blobGet(st, DONEIF_KEY); if (r.ok && r.data) cur = { on: r.data.on === true, updated_at: r.data.updated_at || 0, updated_by: r.data.updated_by || '' }; } catch (e) {}
+    if (stale(cur.updated_at)) return jr(409, { status: 'CONFLICT', error_code: 'SETTINGS_STALE', request_id: R });
+    if (cur.on !== ch.on) ev.push({ id: 'on', t: '완료 신호 자동 전환 ' + (cur.on ? '켬' : '끔') + '→' + (ch.on ? '켬' : '끔') });
+    key = DONEIF_KEY; curAt = cur.updated_at;
+    doc = { schema: 1, on: ch.on, prev: { on: cur.on, updated_at: cur.updated_at, updated_by: cur.updated_by }, updated_by: by, updated_at: now, applied_via: 'settings_apply' };
+    pub = { on: ch.on };
+  }
+  if (!ev.length) return jr(400, { status: 'REJECTED', error_code: 'NO_CHANGE', updated_at: curAt || 0, request_id: R });
+  if (d.dry === true) return jr(200, { status: 'OK', dry: true, target: target, changes: ev, updated_at: curAt || 0, request_id: R });
+  if (d.confirm !== true) return jr(400, { status: 'REJECTED', error_code: 'NEED_CONFIRM', changes: ev, updated_at: curAt || 0, request_id: R });
+  // v453 검토: 쓰기에는 base 필수 — dry 응답의 updated_at을 base로 보내는 2단 꼴을 강제(같은 실패를 겪은 dry의 0을 그대로 보내도 위 직접 읽기가 먼저 막음)
+  if (d.base === undefined) return jr(400, { status: 'REJECTED', error_code: 'NEED_BASE', changes: ev, updated_at: curAt || 0, request_id: R });
+  const w = await blobSet(st, key, doc);
+  if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
+  let au = false;
+  try { au = await appendAudit({ ts: now, by: '설정봇(' + mark + ')', bid: 'bot', col: 'tasks', ev: ev.map(function (e) { return { op: '설정적용', id: target + ':' + e.id, t: e.t + ' · ' + mark + (ref ? ' · ' + ref : '') }; }) }) !== false; } catch (e) { au = false; }
+  return jr(200, Object.assign({ status: 'OK', target: target, changes: ev, updated_at: now, updated_by: by, audit: au, request_id: R }, pub));
+}
 // ---- 아침 음성 브리핑 settings:brief · 오늘 생성본 · 사용량(체크 38 D1, v416 — 브리핑 §3 D1 관리자 카드) ----
 // 관리자만(서버 강제). 생성은 워커(gw-brief-run-background, 내부 토큰 __brief__)가 하고 여기는 설정(기본값·prev 1판·되돌리기·감사로그·낙관락)·조회·기동·목소리 확인·mp3 꺼내기만.
 // 키 값은 어떤 응답에도 싣지 않는다 — env는 있음/없음만(brief_get.env).
@@ -1891,8 +2018,7 @@ async function autotaskFacts(st) {
     prev_open: { site: !!openKeys['site:missing:' + pm], wk: !!openKeys['wk:missing:' + pm] } };
 }
 async function handleAutotaskFacts(event, d, R) {
-  const secret = (process.env.BIDS_INGEST_KEY || '').trim();
-  if (!secret || String(d.key || '').trim() !== secret) return jr(403, { status: 'FORBIDDEN', error_code: 'BAD_INGEST_KEY', request_id: R });
+  if (!botKeyOk(d.key)) return jr(403, { status: 'FORBIDDEN', error_code: 'BAD_INGEST_KEY', request_id: R });
   const st = store(DATA);
   const f = await autotaskFacts(st);
   const pii = AR.piiScan(f);
@@ -1901,8 +2027,7 @@ async function handleAutotaskFacts(event, d, R) {
   return jr(200, Object.assign({ status: 'OK', request_id: R, rules: a.rules }, f));
 }
 async function handleAutotaskDryPut(event, d, R) {
-  const secret = (process.env.BIDS_INGEST_KEY || '').trim();
-  if (!secret || String(d.key || '').trim() !== secret) return jr(403, { status: 'FORBIDDEN', error_code: 'BAD_INGEST_KEY', request_id: R });
+  if (!botKeyOk(d.key)) return jr(403, { status: 'FORBIDDEN', error_code: 'BAD_INGEST_KEY', request_id: R });
   const dry = (d.dry && typeof d.dry === 'object') ? d.dry : null;
   if (!dry) return jr(400, { status: 'REJECTED', error_code: 'BAD_DRY', request_id: R });
   const pii = AR.piiScan(dry);
@@ -2078,9 +2203,11 @@ function conClogHash(prev, entry) { return crypto.createHash('sha256').update(pr
 function conClogChainOk(doc) { let prev = ''; for (const it of (doc.items || [])) { const e = Object.assign({}, it); delete e.h; delete e.p; if (it.p !== prev || conClogHash(prev, e) !== it.h) return false; prev = it.h; } return prev === (doc.head || ''); }
 async function conClogRead(st, key) {
   let doc = { schema: 1, items: [], head: '' };
-  try { const r = await blobGet(st, key || CON_CLOG_KEY); if (r.ok && r.data && Array.isArray(r.data.items)) doc = { schema: 1, items: r.data.items, head: r.data.head || '' }; } catch (e) {}
+  try { const r = await blobGet(st, key || CON_CLOG_KEY); if (r.ok && r.data && Array.isArray(r.data.items)) { doc = { schema: 1, items: r.data.items, head: r.data.head || '' }; if (Array.isArray(r.data.restored)) doc.restored = r.data.restored; } } catch (e) {}
   return doc;
 }
+// v453 검토: 재해 복원(backup_put)이 남긴 되살린 범위 restored[{ts,from,to,bk,added,rechained}]를 다음 기록 쓰기가 지우지 않게 — 쓰는 두 곳이 이것으로 문서를 만든다
+function conClogDoc(doc, extra) { return Object.assign({ schema: 1, items: doc.items, head: doc.head }, extra, Array.isArray(doc.restored) ? { restored: doc.restored } : {}); }
 // 재생: base 두 층 + clog → 유효 두 층(깊은 복사) + 편집 상태(카드의 '편집됨'·'삭제됨' 표시와 [복구] 버튼의 h)
 function conProcReplay(proc, list, clog) {
   const P = JSON.parse(JSON.stringify(proc)), L = JSON.parse(JSON.stringify(list));
@@ -2183,7 +2310,7 @@ async function handleConProcEdit(event, d, R) {
   if (brk) return bad('WOULD_BREAK', brk);
   const h = conClogHash(clog.head || '', entry);
   clog.items.push(Object.assign({ h: h, p: clog.head || '' }, entry)); clog.head = h;
-  const w = await blobSet(st, CON_CLOG_KEY, { schema: 1, items: clog.items, head: h, updated_at: Date.now(), updated_by: c.member.id });
+  const w = await blobSet(st, CON_CLOG_KEY, conClogDoc(clog, { updated_at: Date.now(), updated_by: c.member.id }));
   if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
   try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'contracts', ev: [{ op: '계약골조편집', id: h, t: t }] }); } catch (e) {}
   return jr(200, { status: 'OK', head: h, n: clog.items.length, edits: eff.state.applied, item: clog.items[clog.items.length - 1], request_id: R });
@@ -2202,7 +2329,7 @@ async function handleConClogAdd(event, d, R) {
   const entry = { ts: Date.now(), by: c.member.id, op: 'stage_docs', cid: cid, pipe: pipe, i: i, k: k, act: act };
   const h = conClogHash(doc.head || '', entry);
   doc.items.push(Object.assign({ h: h, p: doc.head || '' }, entry)); doc.head = h;
-  const w = await blobSet(st, key, { schema: 1, items: doc.items, head: h, updated_at: Date.now() });
+  const w = await blobSet(st, key, conClogDoc(doc, { updated_at: Date.now() }));
   if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
   return jr(200, { status: 'OK', key: key, n: doc.items.length, head: h, request_id: R });
 }
@@ -3044,7 +3171,7 @@ async function handleDocSettingsSet(event, d, R) {
 //     → 직전 읽기(실패 500 SETTINGS_READ_FAILED) → 낙관락(base가 저장된 updated_at과 다르면 409 SAFETY_STALE — base 없음도 409: 새 액션이라 base를 안 보내는 옛 앱이 없다)
 //     → 같은 값 400 NO_CHANGE(정규화한 값째 비교 — 감사용 납작한 글로 비교하면 사후점검 1건 'A / B'와 2건 A·B가 같은 글이 돼 고친 것이 막힌다, v436 검토)
 //     → 저장(prev = 직전 1판) → 감사 1줄(col safety · op 안전설정 · 바뀐 칸 f — 사후점검은 'n건 · 뺌 …' → 'm건 · 더함 …'). 이 키 이름을 쓰는 서버 코드는 이 두 핸들러뿐(uismoke v436 대조) —
-//     백업 내보내기·복원(backup_list·backup_get·backup_put)은 키 이름 없이 gw_data 키 전부를 다룬다(복원한 값도 safetyRead가 다시 검사해 깨졌으면 500).
+//     백업 내보내기·복원(backup_list·backup_get·backup_put)은 키 이름 없이 gw_data 키 전부를 다룬다(복원한 값도 safetyRead가 다시 검사해 깨졌으면 500 · v453부터 settings:*는 재해 복원 모드에서만 복원).
 //   알려진 한계(기존 settings:assign·notify·문서함 설정 핸들러와 같은 꼴): 읽기 → base 검사 → 쓰기가 원자적이지 않아, 두 관리자가 같은 base로 거의 동시에 저장하면 둘 다 200이고 마지막 쓰기가 이긴다
 //     (먼저 쓴 값은 prev에도 안 남고 감사 2줄로만 드러남 — @netlify/blobs 8.2.0에 조건부 쓰기가 없다. 원자화는 조건부 쓰기를 들일 때 settings 핸들러 전체를 함께).
 const SAFETY_KEY = 'settings:safety';
@@ -3754,8 +3881,7 @@ async function handleBidSheet(event, d, R) {
 // ---- 백업 내보내기 — appdata GitHub Actions(cron)가 서버 시크릿으로 호출, git에 스냅샷 보관 ----
 const BACKUP_STORES = { gw_data: 1, gw_users: 1, gw_files: 1 };
 function backupAuthed(d) {
-  const secret = (process.env.BIDS_INGEST_KEY || '').trim();
-  return !!secret && String(d.secret || '') === secret;
+  return botKeyOk(d.secret);   // v453 상수시간(종전 '===' — 앞뒤 공백은 다른 봇 경로처럼 걷음)
 }
 async function handleBackupList(event, d, R) {
   if (!backupAuthed(d)) return jr(403, { status: 'FORBIDDEN', error_code: 'BAD_SECRET', request_id: R });
@@ -3770,6 +3896,8 @@ async function handleBackupGet(event, d, R) {
   const sn = String(d.store || '');
   if (!BACKUP_STORES[sn]) return jr(400, { status: 'REJECTED', error_code: 'BAD_STORE', request_id: R });
   const key = String(d.key || '');
+  // v453 키 이름 검사 — 'x/../push:keys'·'../site:gw_users/member:<id>'가 SDK URL 정리로 민감키·다른 스토어로 접혀 아래 반출 차단·PIN 지우기를 비켜 가던 길(_lib/blobkey.js)
+  if (badBlobKey(key)) return jr(400, { status: 'REJECTED', error_code: 'BAD_KEY', request_id: R });
   // 민감키 반출 금지 — 백업 인증이 수집키(BIDS_INGEST_KEY) 겸용이라, 키 유출 = VAPID 개인키·PIN 해시 유출로 번지던 것 차단
   if (sn === 'gw_data' && key === 'push:keys') return jr(403, { status: 'FORBIDDEN', error_code: 'SENSITIVE_KEY', request_id: R });
   const r = await blobGet(store(sn), key);
@@ -3801,33 +3929,237 @@ function _bkCount(v) {
   if (Array.isArray(v.items)) return { kind: 'items', n: v.items.length };
   return { kind: 'object', n: Object.keys(v).length };
 }
+// v453(보안 재감사 ⑧ — 원장 C093 · 그룹웨어 규정 15조 '감사 로그 수정·삭제 금지'): 종전 backup_put은 관리자 세션·봇 키로 gw_users·gw_data 아무 키나 덮었다 —
+//   ① 회원 복원이 PIN·admin만 지켜 관리자가 자기 레코드에 dev:true·tier를 넣으면 개발자·boss가 됐고(gw-auth SELF_CHANGE_FORBIDDEN·DEV_ONLY 우회)
+//   ② 감사 로그 키(audit:YYYY-MM)를 통째로 덮을 수 있었고 ③ 전용 함수·감사가 있는 설정 키(settings:* — autotask·notify·assign·doneif 등)를 감사 없이 바꿀 수 있었다.
+//   지금: 이 갈래(gw_users 전부 · gw_data 기록 키 audit:*·doclog:*·reclog:*·clog:*(contract·appr) · gw_data settings:*)는 '재해 복원 모드'(봇 키 + restore:true + confirm)에서만 쓴다 —
+//     관리자 세션이나 봇 키만으로는 403 RESTORE_MODE_ONLY. 키 이름은 먼저 badBlobKey로 거른다(400 BAD_KEY — 'x/../settings:autotask' 같은 키가 SDK URL 정리로 접히던 길).
+//     · 회원(member:*): 지금 레코드가 있으면 권한 칸(BACKUP_MEMBER_AUTH — PIN 두 칸·admin·dev·tier·perms)은 늘 지금 값(없던 칸은 없게),
+//       신원 칸(BACKUP_MEMBER_IDENT — name·uid·role·dept)은 지금 값이 있으면 지금 값·없을 때만(부분 레코드) 백업 값, id는 지금 id 또는 키,
+//       leave_date는 지금 값이 있으면 지금 값·없을 때 백업 값은 오늘(KST) 이후만, del은 해제만(실수로 지운 회원 되살리기 — 감사 note 'del 해제' · 이름·uid 색인 name:·uid:도
+//       같은 묶음으로 복원해야 로그인된다) · 결과 명부 개발자 0·유효 pm 0이면 409 LAST_DEV·LAST_PM — 그래서 봇 키로도 재직 회원을 끄거나 권한을 올리지 못한다.
+//       지금 레코드가 있을 때 admin·dev·tier·perms는 올라가지 않는다(바꿀 것은 member_upsert로). 지금 레코드가 없으면 PIN 없음·admin·dev false·tier 없음·id는 키에서,
+//       perms는 백업 값(재해 복구에 필요 — 감사 note에 칸·값을 남김 · admin false라 PIN을 세우고 관리자를 켤 때 함께 본다).
+//     · 기록 키는 붙이기만(backupLogMerge): 지금 줄은 지우거나 고치지 않고 백업에만 있는 줄(restored 칸을 뺀 JSON이 같으면 같은 줄)을 더하며, 더한 줄마다 서버가 restored:<복원 시각>을 붙인다
+//       (되살린 줄을 진짜 기록과 구별 — 위조 줄도 이 표식을 벗지 못한다) · 합친 줄은 ts로 안정 정렬(내용·줄 수 그대로) · 미래 시각 줄·꼴이 틀린 줄은 400 ·
+//       합쳐서 월 상한(audit = _lib/audit.js MAX_PER_MONTH · doclog DOCLOG_MAX · reclog RECLOG_MAX)을 넘으면 400 AUDIT_FULL — 이번 달 감사 키(auditKey())는 이 핸들러가 뒤이어 쓰는
+//       '재해복원' 1줄 자리를 남긴다(상한 꽉 채우면 그 1줄이 가장 오래된 진짜 줄을 밀어내므로).
+//       알려진 한계: 읽기 → 병합 → 쓰기 사이에 앱의 appendAudit이 같은 달 키에 쓴 줄은 덮일 수 있다(appendAudit도 같은 읽고-쓰기 — 조건부 쓰기가 없는 SDK). 재해 복원은 앱 사용이 없는 때에.
+//     · clog:*(해시 체인 — clog:contract·clog:contract:YYYY-MM은 첫 줄 p '' 엄격, clog:appr:YYYY-MM은 상한에서 앞이 잘려 시작 p 허용 · 상한 CON_CLOG_MAX·CON_CLOG_MONTH_MAX·DONEIF.CLOG_MAX):
+//       백업 체인이 온전해야(아니면 400 CLOG_CHAIN_BAD) · 지금 체인 뒤를 잇는 백업이면 그 뒤 줄만 붙이고, 백업이 같거나 짧으면 400 CLOG_NOT_AHEAD,
+//       갈라졌거나 지금 체인이 깨졌으면 지금 줄을 버리지 않고 다시 잇는다(backupClogMerge — rechained 표식 · 문서 restored 범위 · 감사 from/to) · 상한 넘으면 400 CLOG_FULL.
+//     · settings:autotask는 스위치를 live로 올리지 않는다(백업 live → 지금이 live가 아니면 dry · 감사 '스위치 live 복원 안 함').
+//     · 지금 값 일시 읽기 실패는 500(덮지 않음) · 깨진 지금 값(STORAGE_PARSE_FAILED)은 교체(감사 '깨진 지금 값 교체').
+//     · 재해 복원 모드 쓰기는 감사 op '재해복원' 1줄(키·건수 · 회원이면 바뀐 칸·지킨 칸 이름 — 값 없음 · 기록 키면 붙인 줄 수).
+//   그 밖 키(allbaro:xlsx:* 운반일지 엑셀 — logsheet_daily 봇 · tpl:*·proof:*·col:* 등)는 종전대로 관리자 세션 또는 봇 키 + confirm('백업복원' 1줄). push:keys는 늘 거부.
+//   dry 미리보기는 누구에게나 — restore_only로 재해 복원 모드가 필요한 키인지 알려 주고, 이 갈래는 쓰기와 같은 판정을 돌려 preview.merge·preview.member·would_error(거절 코드)를 준다(쓰지 않음).
+//   호출처(v453 전수 — 앱 index.html에는 없음): appdata collectors/restore.py(재해 복원 --key/--confirm · --selftest 'restore:selftest') · collectors/logsheet_daily.py(allbaro:xlsx:<날>만) · tools/servertest.mjs.
+//     restore.py가 restore:true를 보내야 위 갈래 재해 복원이 열린다(appdata 쪽 수정 = v453 배포 전 조건 — TESTLIST v453).
+const BACKUP_MEMBER_AUTH = ['pin_salt', 'pin_hash', 'admin', 'dev', 'tier', 'perms'];
+const BACKUP_MEMBER_IDENT = ['name', 'uid', 'role', 'dept'];
+function backupRestoreClass(sn, key) {
+  if (sn === 'gw_users') return 'users';
+  if (sn !== 'gw_data') return '';
+  if (key.indexOf('audit:') === 0) return 'audit';
+  if (key.indexOf('doclog:') === 0) return 'doclog';
+  if (key.indexOf('reclog:') === 0) return 'reclog';
+  if (key.indexOf('clog:') === 0) return 'clog';   // v453 검토: 해시 체인 기록 전부(clog:contract* · 결재 학습 신호 clog:appr:YYYY-MM — 규약 clog:<domain>:<YYYY-MM>)
+  if (key.indexOf('settings:') === 0) return 'settings';
+  return '';
+}
+// clog 상한·시작 검사: clog:contract(앱이 상한에서 409로 멈춤 — 첫 줄 p '' 엄격) · clog:contract:YYYY-MM(같음) · 그 밖(clog:appr:* — DONEIF.clogAppend가 상한에서 앞을 잘라 첫 줄 p가 ''가 아닐 수 있음 → 시작 p 허용)
+function backupClogMax(key) { return key === CON_CLOG_KEY ? CON_CLOG_MAX : (key.indexOf(CON_CLOG_KEY + ':') === 0 ? CON_CLOG_MONTH_MAX : DONEIF.CLOG_MAX); }
+function backupClogStrict(key) { return key === CON_CLOG_KEY || key.indexOf(CON_CLOG_KEY + ':') === 0; }
+function backupClogChainOk(doc, strict) {
+  const its = doc.items || [];
+  if (strict) return conClogChainOk(doc);
+  let prev = its.length ? String(its[0].p == null ? '' : its[0].p) : '';
+  for (const it of its) { const e = Object.assign({}, it); delete e.h; delete e.p; if (it.p !== prev || conClogHash(prev, e) !== it.h) return false; prev = it.h; }
+  return prev === (doc.head || '');
+}
+function backupLogMax(cls) { return cls === 'audit' ? AUDIT_MAX_PER_MONTH : (cls === 'doclog' ? DOCLOG_MAX : RECLOG_MAX); }
+function backupLogLine(e) { if (!Object.prototype.hasOwnProperty.call(e, 'restored')) return JSON.stringify(e); const o = Object.assign({}, e); delete o.restored; return JSON.stringify(o); }
+// reserve = 이 키에 뒤이어 쓸 줄 수(이번 달 감사 키면 '재해복원' 1줄) · now = 되살린 줄에 붙일 restored 값
+function backupLogMerge(curDoc, bkDoc, max, reserve, now) {
+  const curOk = curDoc && typeof curDoc === 'object' && !Array.isArray(curDoc) && Array.isArray(curDoc.items);
+  const cur = curOk ? curDoc.items : [];
+  if (!bkDoc || typeof bkDoc !== 'object' || Array.isArray(bkDoc) || !Array.isArray(bkDoc.items)) return { err: 'BAD_AUDIT_DOC' };
+  const lim = Date.now() + 10 * 60000;   // 시계 차 10분까지
+  const seen = {}; cur.forEach(function (e) { if (e && typeof e === 'object') seen[backupLogLine(e)] = 1; });
+  const add = [];
+  for (const e of bkDoc.items) {
+    if (!e || typeof e !== 'object' || Array.isArray(e) || !Number.isFinite(Number(e.ts))) return { err: 'BAD_AUDIT_ITEM' };
+    if (Number(e.ts) > lim) return { err: 'AUDIT_FUTURE_TS' };
+    const s = backupLogLine(e); if (seen[s]) continue; seen[s] = 1; add.push(Object.assign({}, e, { restored: now }));
+  }
+  if (cur.length + add.length + (reserve || 0) > max) return { err: 'AUDIT_FULL' };
+  const tsOf = function (e) { return (e && Number.isFinite(Number(e.ts))) ? Number(e.ts) : 0; };
+  const items = add.concat(cur).sort(function (a, b) { return tsOf(a) - tsOf(b); });   // 안정 정렬 — 같은 시각이면 되살린 줄이 앞, 지금 줄끼리는 원래 순서
+  return { doc: Object.assign({ schema: 1 }, curOk ? curDoc : {}, { items: items }), added: add.length, kept: cur.length };
+}
+// v453 검토: 해시 체인 병합 — 지금 줄은 버리지 않는다.
+//   ① 지금 체인이 온전하고 지금 head가 백업 안에 있으면 그 뒤 백업 줄만 잇는다(백업 줄 그대로 — h가 appdata 백업 git 이력과 맞음) · 더할 줄이 없으면(백업 head가 지금 체인 안 = 백업이 같거나 짧음) 400 CLOG_NOT_AHEAD.
+//   ② 갈라졌거나(키를 잃은 뒤 앱이 ''부터 새 체인을 쌓은 경우 등) 지금 체인이 깨졌으면 다시 잇는다: 백업 체인 뒤에, 백업에 없는 지금 줄(h·p·rechained를 뺀 내용으로 비교)을
+//      지금 순서대로 붙이고 p·h를 백업 head부터 다시 계산 — 다시 이은 줄에는 rechained:<복원 시각>(해시에 들어감), 되돌리기 줄(revert)의 of는 옛 h → 새 h로 고친다.
+//      키 없는 sha256 체인이라 서버가 다시 이어도 신뢰 수준은 같다(줄 위조는 봇 키 + 재해 복원 모드에서만 가능 — 아래 restored 범위·감사 from/to로 대조).
+//   문서에는 restored[{ts, from(지금 head), to(새 head), bk(백업 head), added, rechained}](최근 20) — 다음 기록 쓰기도 남긴다(conClogDoc·DONEIF.clogAppend).
+function backupClogMerge(curDoc, bkDoc, max, strict, now) {
+  const isObj = function (e) { return !!e && typeof e === 'object' && !Array.isArray(e); };
+  if (!isObj(bkDoc) || !Array.isArray(bkDoc.items)) return { err: 'BAD_CLOG_DOC' };
+  const bk = { items: bkDoc.items, head: String(bkDoc.head || '') };
+  if (!bk.items.every(isObj) || !backupClogChainOk(bk, strict)) return { err: 'CLOG_CHAIN_BAD' };
+  if (bk.items.length > max) return { err: 'CLOG_FULL' };
+  const curOk = isObj(curDoc) && Array.isArray(curDoc.items);
+  const curItems = curOk ? curDoc.items.filter(isObj) : [];
+  const cur = { items: curItems, head: curOk ? String(curDoc.head || '') : '' };
+  const curChain = curOk && curItems.length === curDoc.items.length && backupClogChainOk(cur, strict);
+  const base = Object.assign({ schema: 1 }, curOk ? curDoc : {});
+  const own = function (o, k) { return Object.prototype.hasOwnProperty.call(o, k); };
+  const done = function (items, head, added, kept, rechained, mode) {
+    if (items.length > max) return { err: 'CLOG_FULL' };
+    const rs = (Array.isArray(base.restored) ? base.restored : []).concat([{ ts: now, from: cur.head, to: head, bk: bk.head, added: added, rechained: rechained }]).slice(-20);
+    return { doc: Object.assign(base, { items: items, head: head, restored: rs }), added: added, kept: kept, rechained: rechained, mode: mode, from: cur.head, to: head };
+  };
+  if (!cur.items.length) return done(bk.items, bk.head, bk.items.length, 0, 0, curOk && curDoc.items.length ? 'broken' : 'empty');
+  if (curChain) {
+    const at = {}; bk.items.forEach(function (e, i) { at[e.h] = i; });
+    if (own(at, cur.head)) {
+      const add = bk.items.slice(at[cur.head] + 1);
+      if (!add.length) return { err: 'CLOG_NOT_AHEAD' };
+      return done(cur.items.concat(add), bk.head, add.length, cur.items.length, 0, 'extend');
+    }
+    if (!bk.items.length || cur.items.some(function (e) { return e.h === bk.head; })) return { err: 'CLOG_NOT_AHEAD' };   // 백업이 지금 체인의 앞부분
+  }
+  const line = function (e) { const o = Object.assign({}, e); delete o.h; delete o.p; delete o.rechained; return JSON.stringify(o); };
+  const inBk = {}; bk.items.forEach(function (e) { inBk[line(e)] = e.h; });
+  const remap = {}, extra = [];
+  cur.items.forEach(function (e) { const s = line(e); if (own(inBk, s)) { if (typeof e.h === 'string') remap[e.h] = inBk[s]; } else extra.push(e); });
+  const items = bk.items.slice(); let head = bk.head;
+  extra.forEach(function (e) {
+    const o = Object.assign({}, e), oldH = o.h; delete o.h; delete o.p;
+    if (typeof o.of === 'string' && own(remap, o.of)) o.of = remap[o.of];
+    o.rechained = now;
+    const h = conClogHash(head, o);
+    items.push(Object.assign({ h: h, p: head }, o));
+    if (typeof oldH === 'string') remap[oldH] = h;
+    head = h;
+  });
+  return done(items, head, bk.items.length - (cur.items.length - extra.length), cur.items.length, extra.length, curChain ? 'diverged' : 'broken');
+}
+// v453 검토: 재해 복원으로 settings:autotask를 쓸 때 스위치를 지금보다 live로 올리지 않는다(백업 값이 live인 규칙은 지금이 live가 아니면 dry로) — 복원 뒤 live는 앱 관리자 카드로 다시 켠다(누가 켰는지 회원으로).
+//   지금 값을 못 읽으면 기본 dry로 본다(올리지 않는 쪽).
+function backupAutotaskClamp(curData, payload) {
+  const isObj = function (o) { return !!o && typeof o === 'object' && !Array.isArray(o); };
+  if (!isObj(payload) || !isObj(payload.rules)) return { payload: payload, lowered: [] };
+  const now = autotaskDefaults();
+  if (isObj(curData) && isObj(curData.rules)) Object.keys(curData.rules).forEach(function (k) { if (autotaskValid(k, curData.rules[k])) now[k] = curData.rules[k]; });
+  const rules = Object.assign({}, payload.rules), lowered = [];
+  Object.keys(rules).forEach(function (k) { if (rules[k] === 'live' && now[k] !== 'live') { rules[k] = 'dry'; lowered.push(k); } });
+  return { payload: Object.assign({}, payload, { rules: rules }), lowered: lowered };
+}
+// 재해 복원 모드 쓰기 계획 — {payload, note} 또는 {status, body}(거절). dry와 쓰기가 같은 것을 쓴다. preview에 merge·member를 얹는다(값 없음).
+async function backupRestorePlan(sn, key, cls, cur, data, preview) {
+  const now = Date.now();
+  const isObj = function (o) { return !!o && typeof o === 'object' && !Array.isArray(o); };
+  const isMember = cls === 'users' && key.indexOf('member:') === 0;
+  // v453 검토: 지금 값 읽기 — 일시 읽기 실패(STORAGE_READ_FAILED 등)만 500으로 막는다(지금 줄·PIN을 '없음'으로 보고 덮지 않게).
+  //   깨진 JSON(STORAGE_PARSE_FAILED)은 '깨진 지금 값'으로 보고 교체한다(재해 복구의 가장 흔한 경우 — 회원은 지금 레코드 없음 규칙, 기록 키는 지금 줄 0, 감사 note '깨진 지금 값 교체').
+  //   지금 값을 병합·칸 지키기에 쓰지 않는 키(settings:* — autotask는 못 읽으면 기본 dry로 보고 올리지 않음 · gw_users의 member 밖 name:·uid:·device:·lock:)는 이 검사를 건너뛴다.
+  //   (실 blobGet은 없음 = ok:true·data null · servertest mock은 없음 = NOT_FOUND — 둘 다 '없음'.)
+  const corrupt = !cur.ok && cur.code === 'STORAGE_PARSE_FAILED';
+  const needCur = isMember || cls === 'audit' || cls === 'doclog' || cls === 'reclog' || cls === 'clog';
+  if (needCur && !cur.ok && !corrupt && cur.code !== 'NOT_FOUND') return { status: 500, body: { status: 'ERROR', error_code: cur.code || 'STORAGE_READ_FAILED' } };
+  const curData = cur.ok ? cur.data : null;
+  let payload = data, note = corrupt ? ' · 깨진 지금 값 교체' : '';
+  if (isMember && isObj(payload)) {
+    // 회원 복원이 권한 상승·회원 끄기 통로가 되지 않게(v453) — 지금 레코드가 있으면 권한 칸(BACKUP_MEMBER_AUTH)은 늘 지금 값(없던 칸은 없게),
+    // 신원 칸(BACKUP_MEMBER_IDENT)은 지금 값이 있으면 지금 값·없을 때만 백업 값(부분 레코드 고치기) · id = 지금 id 또는 키 ·
+    // v453 검토: del은 해제만(지금 del 1 + 백업에 del 없음 = 지운 회원 되살리기 — 재직 회원에게 del을 넣는 길은 없음) · leave_date는 지금 값이 있으면 지금 값,
+    //   없을 때 백업 값은 오늘(KST) 이후일 때만(지난 날짜 = 복원으로 퇴사 처리하는 길 — tier.retired와 같은 식) · 결과 명부에서 개발자·유효 pm이 0명이 되면 409 LAST_DEV·LAST_PM(gw-auth 회원 삭제·저장과 같은 판정).
+    // 없으면 PIN 없음·admin·dev false·tier 없음(개발자가 member_upsert·PIN 재설정으로 다시 세움) · perms는 백업 값(재해 복구에 필요 — 감사 note에 칸·값). 바뀐 칸·지킨 칸 이름만 감사에(값 없음 · PIN 칸은 이름도 안 적음).
+    payload = Object.assign({}, payload);
+    const prev = isObj(curData) ? curData : null;
+    const own = function (o, f) { return Object.prototype.hasOwnProperty.call(o, f); };
+    const has = function (o, f) { return own(o, f) && o[f] !== null && o[f] !== undefined; };
+    const kept = [];
+    if (prev) {
+      BACKUP_MEMBER_AUTH.forEach(function (f) {
+        if (f.indexOf('pin_') !== 0 && JSON.stringify(prev[f]) !== JSON.stringify(payload[f])) kept.push(f);
+        if (own(prev, f)) payload[f] = prev[f]; else delete payload[f];
+      });
+      BACKUP_MEMBER_IDENT.forEach(function (f) {
+        if (!has(prev, f)) return;   // 지금 값이 없을 때만 백업 값
+        if (JSON.stringify(prev[f]) !== JSON.stringify(payload[f])) kept.push(f);
+        payload[f] = prev[f];
+      });
+      if (has(prev, 'leave_date')) { if (JSON.stringify(prev.leave_date) !== JSON.stringify(payload.leave_date)) kept.push('leave_date'); payload.leave_date = prev.leave_date; }
+      else if (has(payload, 'leave_date') && tier.retired({ leave_date: payload.leave_date })) { kept.push('leave_date'); delete payload.leave_date; }   // 지난 퇴사일은 받지 않음
+      if (prev.del === 1) { if (payload.del !== 1) delete payload.del; }   // 해제만 받음
+      else { if (own(payload, 'del') && JSON.stringify(payload.del) !== JSON.stringify(prev.del)) kept.push('del'); if (own(prev, 'del')) payload.del = prev.del; else delete payload.del; }
+      const idNow = has(prev, 'id') ? prev.id : key.slice('member:'.length);
+      if (JSON.stringify(idNow) !== JSON.stringify(payload.id)) kept.push('id');
+      payload.id = idNow;
+      // 마지막 개발자·마지막 PM(gw-auth handleMemberDelete LAST_DEV · member_upsert S3 LAST_PM과 같은 판정) — 결과 명부로 다시 계산
+      const all = (await push.loadMembers()).filter(function (m) { return isObj(m); });
+      const after = all.filter(function (m) { return m.id !== idNow && m.id !== prev.id; }).concat([payload]);
+      const devN = function (ms) { return ms.filter(function (m) { return tier.active(m) && !!m.dev; }).length; };
+      if (devN(all) > 0 && devN(after) === 0) return { status: 409, body: { status: 'REJECTED', error_code: 'LAST_DEV' } };
+      if (tier.ctxOf(all).pmIds.length > 0 && tier.ctxOf(after).pmIds.length === 0) return { status: 409, body: { status: 'REJECTED', error_code: 'LAST_PM' } };
+      const changed = Object.keys(Object.assign({}, prev, payload)).filter(function (f) { return f.indexOf('pin_') !== 0 && JSON.stringify(prev[f]) !== JSON.stringify(payload[f]); });
+      preview.member = { changed: changed, kept: kept };
+      note += ' · 바뀐 칸 [' + changed.join(',').slice(0, 120) + '] · 지킨 칸 [' + kept.join(',') + ']' + (prev.del === 1 && payload.del !== 1 ? ' · del 해제' : '');
+    } else {
+      delete payload.pin_salt; delete payload.pin_hash; delete payload.tier; payload.admin = false; payload.dev = false; payload.id = key.slice('member:'.length);
+      const pk = isObj(payload.perms) ? Object.keys(payload.perms).map(function (k) { return String(k).slice(0, 12) + ':' + String(payload.perms[k]).slice(0, 4); }).join(',') : '';
+      preview.member = { created: true, perms: pk.slice(0, 160) };
+      note += ' · 새 회원 레코드(PIN 없음·admin·dev false·tier 없음)' + (pk ? ' · perms [' + pk.slice(0, 120) + ']' : '');
+    }
+  } else if (cls === 'audit' || cls === 'doclog' || cls === 'reclog') {
+    // v453 기록 키는 붙이기만 — 이번 달 감사 키면 뒤이어 쓸 '재해복원' 1줄 자리를 남긴다
+    const mg = backupLogMerge(curData, payload, backupLogMax(cls), (cls === 'audit' && key === auditKey()) ? 1 : 0, now);
+    if (mg.err) return { status: 400, body: { status: 'REJECTED', error_code: mg.err } };
+    payload = mg.doc; preview.merge = { added: mg.added, kept: mg.kept };
+    note += ' · 붙임 ' + mg.added + '줄 · 지금 줄 ' + mg.kept + ' 그대로';
+  } else if (cls === 'clog') {
+    const mg = backupClogMerge(curData, payload, backupClogMax(key), backupClogStrict(key), now);   // v453 해시 체인 — 잇기 · 갈라짐·깨짐은 다시 잇기(지금 줄 버리지 않음)
+    if (mg.err) return { status: 400, body: { status: 'REJECTED', error_code: mg.err } };
+    payload = mg.doc; preview.merge = { added: mg.added, kept: mg.kept, rechained: mg.rechained, mode: mg.mode };
+    note += ' · 체인 ' + mg.mode + ' · 백업 줄 ' + mg.added + ' · 지금 줄 ' + mg.kept + (mg.rechained ? ' · 다시 이음 ' + mg.rechained + '줄' : '') + ' · from ' + (mg.from || '-') + ' → to ' + (mg.to || '-');
+  } else if (cls === 'settings' && key === AUTOTASK_KEY) {
+    const cl = backupAutotaskClamp(curData, payload);
+    payload = cl.payload;
+    if (cl.lowered.length) { preview.autotask_lowered = cl.lowered; note += ' · 스위치 live 복원 안 함 [' + cl.lowered.join(',') + '] — 앱 카드로 다시 켬'; }
+  }
+  return { payload: payload, note: note };
+}
 async function handleBackupPut(event, d, R) {
-  let ok = backupAuthed(d);
+  const bot = backupAuthed(d);
+  let ok = bot;
   if (!ok) { const c = await currentMember(event); ok = c.ok && !!c.member.admin; }
   if (!ok) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_OR_SECRET_ONLY', request_id: R });
   const sn = String(d.store || '');
   if (!BACKUP_STORES[sn]) return jr(400, { status: 'REJECTED', error_code: 'BAD_STORE', request_id: R });
   const key = String(d.key || '');
   if (!key) return jr(400, { status: 'REJECTED', error_code: 'NO_KEY', request_id: R });
+  if (badBlobKey(key)) return jr(400, { status: 'REJECTED', error_code: 'BAD_KEY', request_id: R });   // v453 접두 검사를 비켜 가는 키(점 경로·백슬래시·%·제어문자·앞뒤 공백) — 아래 갈래 판정보다 먼저
   if (d.data === undefined || d.data === null) return jr(400, { status: 'REJECTED', error_code: 'NO_DATA', request_id: R });
   if (sn === 'gw_data' && key === 'push:keys') return jr(403, { status: 'FORBIDDEN', error_code: 'SENSITIVE_KEY', request_id: R });
+  const cls = backupRestoreClass(sn, key), restore = bot && d.restore === true;   // v453 재해 복원 모드 = 봇 키 + restore:true
   const cur = await blobGet(store(sn), key);
   const preview = { exists: !!cur.ok, current: _bkCount(cur.ok ? cur.data : null), restore: _bkCount(d.data) };
-  if (d.dry) return jr(200, { status: 'OK', dry: true, store: sn, key: key, preview: preview, request_id: R });
+  // v453 검토: 재해 복원 갈래는 dry에서도 쓰기와 같은 판정(관문·지금 값 읽기·병합·회원 칸·마지막 PM)을 돌려 preview.merge·preview.member·would_error로 미리 보여 준다(쓰지 않음)
+  let plan = null;
+  if (cls && !restore) plan = { status: 403, body: { status: 'FORBIDDEN', error_code: 'RESTORE_MODE_ONLY', restore_only: cls } };   // v453 관리자 세션·봇 키만으로는 못 씀
+  else if (cls) plan = await backupRestorePlan(sn, key, cls, cur, d.data, preview);
+  if (d.dry) return jr(200, { status: 'OK', dry: true, store: sn, key: key, preview: preview, restore_only: !!cls, would_error: (plan && plan.status) ? plan.body.error_code : '', request_id: R });
+  if (plan && plan.status === 403) return jr(403, Object.assign(plan.body, { request_id: R }));
   if (d.confirm !== true) return jr(400, { status: 'REJECTED', error_code: 'NEED_CONFIRM', preview: preview, request_id: R });
-  let payload = d.data;
-  if (sn === 'gw_users' && key.indexOf('member:') === 0 && payload && typeof payload === 'object' && !Array.isArray(payload)) {
-    // 회원 복원이 권한 상승 통로가 되지 않게 — PIN·admin은 백업본으로 못 덮는다.
-    // 기존 레코드 있으면 그 값 보존(복원 후에도 로그인 그대로), 없으면 admin 해제·PIN 없음(관리자가 member_upsert로 재설정)
-    payload = Object.assign({}, payload);
-    const prev = (cur.ok && cur.data && typeof cur.data === 'object' && !Array.isArray(cur.data)) ? cur.data : null;
-    if (prev) { payload.pin_salt = prev.pin_salt; payload.pin_hash = prev.pin_hash; payload.admin = prev.admin; }
-    else { delete payload.pin_salt; delete payload.pin_hash; payload.admin = false; }
-  }
+  if (plan && plan.status) return jr(plan.status, Object.assign(plan.body, { request_id: R }));
+  const payload = plan ? plan.payload : d.data, note = plan ? plan.note : '';
   const w = await blobSet(store(sn), key, payload);
   if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
-  try { await appendAudit({ ts: Date.now(), by: '복원', bid: 'restore', col: sn, ev: [{ op: '백업복원', id: key, t: JSON.stringify(preview).slice(0, 120) }] }); } catch (e) {}
-  return jr(200, { status: 'OK', store: sn, key: key, preview: preview, request_id: R });
+  try { await appendAudit({ ts: Date.now(), by: '복원', bid: 'restore', col: sn, ev: [{ op: restore ? '재해복원' : '백업복원', id: key, t: (JSON.stringify(preview).slice(0, 120) + note).slice(0, 300) }] }); } catch (e) {}
+  return jr(200, { status: 'OK', store: sn, key: key, preview: preview, restore: restore, request_id: R });
 }
 
 // ---- 서류 양식(템플릿) 보관 — 관리자 등록, 영구 보관. 생성 시 원본 복사라 오염 없음 ----
@@ -4463,6 +4795,7 @@ async function handlerInner(event) {
     if (d && d.action === 'ver_purge') return await handleVerPurge(event, d, R);
     if (d && d.action === 'bids_ingest') return await handleBidsIngest(event, d, R);
     if (d && d.action === 'autotask_ingest') return await handleAutotaskIngest(event, d, R);
+    if (d && d.action === 'settings_apply') return await handleSettingsApply(event, d, R);   // v453 봇 키 서버 설정 적용(R1 — CLI 직접 쓰기 대신, 감사 '설정적용')
     if (d && d.action === 'bot_notify') return await handleBotNotify(event, d, R);
     if (d && d.action === 'inquiry_notify') return await handleInquiryNotify(event, d, R);
     if (d && d.action === 'bids_refresh') return await handleBidsRefresh(event, d, R);

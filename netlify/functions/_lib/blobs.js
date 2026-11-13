@@ -4,6 +4,8 @@
 // event.blobs에서 수동으로 env 컨텍스트 세팅, strong consistency, raw get + 수동 JSON.parse
 // (없는 키는 throw 대신 null).
 const { getStore, setEnvironmentContext } = require('@netlify/blobs');
+// v453 키 이름 검사 — SDK가 키를 URL 경로에 날글자로 붙여 'x/../settings:autotask'가 settings:autotask로 접히던 길을 막는다(_lib/blobkey.js 머리말).
+const { badBlobKey } = require('./blobkey');
 
 function setupBlobContext(event) {
   try {
@@ -30,6 +32,7 @@ function store(name) {
 }
 
 async function blobGet(st, key) {
+  if (badBlobKey(key)) return { ok: false, code: 'STORAGE_BAD_KEY' };   // v453
   try {
     const raw = await st.get(key);
     if (raw === null || raw === undefined) return { ok: true, data: null };
@@ -44,6 +47,7 @@ async function blobGet(st, key) {
 }
 
 async function blobSet(st, key, val) {
+  if (badBlobKey(key)) return { ok: false, code: 'STORAGE_BAD_KEY' };   // v453
   try {
     await st.set(key, JSON.stringify(val));
     return { ok: true };
@@ -53,6 +57,7 @@ async function blobSet(st, key, val) {
 }
 
 async function blobDelete(st, key) {
+  if (badBlobKey(key)) return { ok: false, code: 'STORAGE_BAD_KEY' };   // v453
   try {
     await st.delete(key);
     return { ok: true };
@@ -70,4 +75,4 @@ async function blobList(st, prefix) {
   }
 }
 
-module.exports = { setupBlobContext, store, blobGet, blobSet, blobDelete, blobList };
+module.exports = { setupBlobContext, store, blobGet, blobSet, blobDelete, blobList, badBlobKey };

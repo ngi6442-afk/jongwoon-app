@@ -7,6 +7,7 @@
 // PIN은 scrypt 해시로만 저장(평문 저장 안 함). 세션은 HMAC 토큰.
 const crypto = require('crypto');
 const { setupBlobContext, store, blobGet, blobSet } = require('./_lib/blobs');
+const { badBlobKey } = require('./_lib/blobkey');   // v453 검토: 로그인 입력으로 만드는 조회 키(lock:·name:)가 키 이름 검사에 걸리면 저장소 오류(500)가 아니라 틀린 아이디·PIN(401)으로
 const { hashSecret, verifySecret } = require('./_lib/password');
 const { issueSession, verifyToken, bearer } = require('./_lib/session');
 const { appendAudit, short } = require('./_lib/audit');
@@ -162,6 +163,8 @@ async function handleLogin(st, d, R, event) {
   const ident = (d.uid || d.name || '').trim();
   const pin = (d.pin || '').trim();
   if (!ident || !pin) return GEN();
+  // v453 검토: '/'·'%'·'#'·'?'·제어문자 등이 섞인 입력(오타 포함)은 어떤 회원 색인과도 맞을 수 없다 — blobGet이 STORAGE_BAD_KEY로 500을 내던 것을 401로(PIN 검사 전 · 잠금 카운터 키도 못 씀)
+  if (badBlobKey(lockKey(ident)) || badBlobKey(nameKey(ident)) || badBlobKey(nameKeyRaw(ident))) return GEN();
   const name = ident;   // 잠금 카운터 키는 입력값 기준(아래 lockKey에서 사용)
   const now = Date.now();
   const lk = await blobGet(st, lockKey(name));
