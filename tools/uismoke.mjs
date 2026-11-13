@@ -13065,7 +13065,7 @@ try {
     const E = { vehicles: VEH_VL(), calls: [], rend: 0, gw: null, admin: false };
     const pre = [fnVL(src, 'esc'), fnVL(src, 'isDate'), fnVL(src, 'isGreyState'), fnVL(src, 'vehDday'), fnVL(src, 'vehDueCell'), cols, fnVL(src, 'vehColCls'), fnVL(src, 'vehSheetPass'), fnVL(src, 'vehEnumValues'),
       fnVL(src, 'vehDetailHtml'), fnVL(src, 'openVehModal'), fnVL(src, 'closeVehModal'), fnVL(src, 'saveVehFromModal'),
-      'var vehicles = E.vehicles, editingVehId = null, vehDetTab = "ov";', 'function todayStr(){ return "2026-11-13"; } function myId(){ return "u1"; } function canDo(m){ return true; } function isAdmin(){ return E.admin; }',
+      'var vehicles = E.vehicles, editingVehId = null, vehDetTab = "ov";', 'function todayStr(){ return "2026-11-13"; } function myId(){ return "u1"; } function canDo(m){ return true; } function canSee(m){ return m !== "stmt"; } function isAdmin(){ return E.admin; }',
       'function findVeh(id){ for (var i = 0; i < vehicles.length; i++){ if (vehicles[i].id === id) return vehicles[i]; } return null; } function liveVehicles(){ return vehicles.filter(function(v){ return v && v.del !== 1; }); }',
       'function genId(p){ return p + "new"; } function alert(m){ E.calls.push("alert:" + m); } function saveVehiclesCache(){} function renderVehicles(){ E.rend++; } function renderDashboard(){} function scheduleVehSave(){}',
       'function gwCall(fn, body){ E.calls.push(body.action); var r = typeof E.gw === "function" ? E.gw(body) : { status: 500, body: {} }; return { then: function(f){ f(r); return { catch: function(){} }; } }; }'].join('\n');
@@ -13202,7 +13202,7 @@ try {
     const ENV = { tasks: [{ id: 't1', title: '지시', auto_key: 'veh:V:insp:2026-11-20', who_id: 'u1', status: 'open', from: '자동', from_id: '' }], vehicles: [{ id: 'V', no: '11가1111', state: '운행', insp_due: '2026-11-20', updated: '2026-11-01' }], sent: [] };
     const pre = [fnVL(html, 'esc'), fnVL(html, 'isDate'), fnVL(html, 'toggleTaskDone'), 'var tasks = ENV.tasks, vehicles = ENV.vehicles;',
       'function findTask(id){ for (var i = 0; i < tasks.length; i++){ if (tasks[i].id === id) return tasks[i]; } return null; }', 'function findVeh(id){ for (var i = 0; i < vehicles.length; i++){ if (vehicles[i].id === id) return vehicles[i]; } return null; }',
-      'function canDo(m){ return true; } function canActTask(t){ return true; } function myId(){ return "u1"; } function myName(){ return "시험"; }',
+      'function canDo(m){ return true; } function canSee(m){ return m !== "stmt"; } function canActTask(t){ return true; } function myId(){ return "u1"; } function myName(){ return "시험"; }',
       'function todayStr(){ return "2026-11-13"; } function pushNotify(){} function saveTasksCache(){} function renderTasks(){} function renderSummary(){} function scheduleTasksSave(){}',
       'function saveVehiclesCache(){} function renderVehicles(){} function renderDashboard(){} function scheduleVehSave(){} function apprToastShow(m){} function confirm(m){ return true; }',
       lawArg === 'throw' ? 'function vehLawArg(vid, d){ throw new Error("계산 예외"); } function vehLawLogPush(v, e){ v.insp_log = [e]; }'
