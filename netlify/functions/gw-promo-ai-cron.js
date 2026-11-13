@@ -146,7 +146,13 @@ exports.handler = async function (event) {
   //    생성·복사·게시는 그대로(이 단계는 읽고 새 키 하나만 쓴다). 모듈은 여기서만 늦게 부른다 — 읽기·채점이 실패해도 ①~④ 결과는 그대로.
   let quality = null;
   try { quality = await require('./_lib/promoqual').sweep(st, doc, now); } catch (e) { quality = { error: (e && e.message) || 'ERR' }; }
+  // ⑥ 체크 10 품질 고리 3단계(원천, PM 11/13 '원천 3단계 ㄱ') — ⑤가 잰 새 초안 점수가 생기면 그날 한 번(첫 학습은 바로) 품질 학습 워커를 기동한다.
+  //    본보기 대비 모자란 항목 → 모델이 쓴 품질 규칙(promoai:qlearn) → 다음 생성. 골격(④ 편집 간극 학습)과 키·워커가 따로이고 골격 키는 읽기만 한다.
+  //    모듈은 여기서만 늦게 부른다 — 실패해도 ①~⑤ 결과는 그대로.
+  let qlearn = null;
+  try { qlearn = await require('./_lib/promoqlearn').kick(st, now); } catch (e) { qlearn = { error: (e && e.message) || 'ERR' }; }
   const out = { ok: true, at: new Date(now).toISOString(), applied: ap.applied, scanned: ap.scanned, candidates: cand0.length, started: started, failed: failed, remask: remask, learn: learn, quality: quality };
+  out.qlearn = qlearn;   // ⑥ 결과도 같은 로그 줄에(①~⑤ 칸은 그대로)
   console.log('[사진AI 크론] ' + JSON.stringify(out));
   return { statusCode: 200, body: JSON.stringify(out) };
 };

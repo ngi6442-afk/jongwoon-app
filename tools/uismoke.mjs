@@ -1587,6 +1587,23 @@ try {
     '어느 고리가 빠졌는지 node tools/promogen_check.mjs로 확인');
 } catch (e) { console.log('  (체크 10 2단계 검사 생략 — ' + e.message + ')'); fails++; }
 
+// ---- 체크 10 품질 고리 3단계(원천, PM 11/13 10:52 '2. 아니 원천 3단계 ㄱ · 3. ㅇㅇ' · 08:03 '이 골격을 정확하게 유지' — 판 번호는 합칠 때): 실행 검사는 tools/promoqlearn_check.mjs. 여기서는 배선·골격 불변만 ----
+try {
+  const rdF = (p, enc) => readFileSync(join(ROOT, 'netlify', 'functions', p), enc || 'utf8');
+  const ql3 = rdF('_lib/promoqlearn.js'), qw3 = rdF('gw-promo-qlearn-background.js'), pl3 = rdF('_lib/promolearn.js'), lw3 = rdF('gw-promo-learn-background.js');
+  const cr3 = rdF('gw-promo-ai-cron.js'), pai3 = rdF('_lib/promoai.js'), papi3 = rdF('gw-promo-ai.js'), wk3 = rdF('gw-promo-ai-run-background.js', 'latin1');
+  T('체크 10 3단계(원천): _lib/promoqlearn.js(promoai:qlearn · kick · decide · injectOf) · 워커 gw-promo-qlearn-background(내부 토큰·골격 키 안 씀) · 골격 파일(promolearn·학습 워커)은 품질 학습을 모름 · 크론 ⑥ try 안 늦은 require · buildPrompt [완성도 목표] = 직원 규칙 블록 아래·부딪히면 직원 쪽 · 생성 워커 주입·재조립 · pl_get qlearn·pl_set qoff · 카드 일치율 흐름·품질 학습 칸 · 게이트 tools/promoqlearn_check.mjs',
+    /QLEARN_KEY = 'promoai:qlearn'/.test(ql3) && /async function kick\(st, now\)/.test(ql3) && /function decide\(ql0, Q0, lessonsRules, now\)/.test(ql3) && /function injectOf\(raw, fmt\)/.test(ql3)
+    && /v\.payload\.mid !== '__promoai__'/.test(qw3) && !/blobSet\([^)]*LESSONS/.test(qw3) && !/qlearn|promoqlearn/.test(pl3) && !/qlearn|promoqlearn/.test(lw3)
+    && /try \{ qlearn = await require\('\.\/_lib\/promoqlearn'\)\.kick\(st, now\); \}/.test(cr3) && /out\.qlearn = qlearn;/.test(cr3) && !/^const .*require\('\.\/_lib\/promoqlearn'\)/m.test(cr3)
+    && pai3.indexOf('[직원이 고치는 패턴 — 자동 학습 ') > 0 && pai3.indexOf('[직원이 고치는 패턴 — 자동 학습 ') < pai3.indexOf('[완성도 목표 — 품질 자동 학습 ') && /부딪히면 직원 쪽을 따릅니다/.test(pai3) && !/promoqlearn/.test(pai3)
+    && /QL\.injectOf\(qr\.ok \? qr\.data : null, lib\)/.test(wk3) && /delete input\.qrules; delete input\.qfocus;/.test(wk3)
+    && /qlearn: qlearn, quality: quality, layout: layout, request_id: R/.test(papi3) && /\} else if \(typeof d\.qoff === 'boolean'\) \{/.test(papi3)
+    && /function promoMatchSeries\(pairs\)\{/.test(html) && /h \+= promoMatchHtml\(pairs\);/.test(html) && /function promoQLearnHtml\(q\)\{/.test(html) && /h \+= promoQLearnHtml\(res\.body\.qlearn\);/.test(html) && /send\(\{ qoff: b\.getAttribute\("data-pq-off"\) === "1" \}\)/.test(html)
+    && existsSync(join(ROOT, 'tools', 'promoqlearn_check.mjs')),
+    '어느 고리가 빠졌는지 node tools/promoqlearn_check.mjs로 확인');
+} catch (e) { console.log('  (체크 10 3단계 검사 생략 — ' + e.message + ')'); fails++; }
+
 
 // ---- v395(10/27 착수 브리핑 A2 · 공통 기반 1 첫 시범): 자동 지시 배정표 settings:assign — 접두어 앱↔서버 동률 · 카드·호출·배지·액션 배선 · sw ----
 try {

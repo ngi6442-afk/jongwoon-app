@@ -1109,6 +1109,17 @@ function buildPrompt(input) {
     if (ex.title) lines.push('제목: ' + ex.title);
     lines.push(ex.excerpt);
   }
+  // 체크 10 품질 고리 3단계(원천, PM 11/13 '원천 3단계 ㄱ'): 품질 자동 학습 — 본보기(권민지 방내리·준설 상위 5편) 대비 최근 초안이 모자란 항목에서
+  //   모델이 스스로 뽑은 규칙(promoai:qlearn)과 이번 목표 항목. 직원 규칙(위 블록 — 골격) 아래에 두고 부딪히면 직원 쪽(PM 11/13 "이 골격을 정확하게 유지").
+  //   자료로 받는다 — system 규칙을 덮지 않는다. 목표 항목 수치는 워커가 한글 수사로 넘긴다(금지 문자열 검사와 겹치지 않게). 걸리면 워커가 이 블록도 빼고 다시 조립한다.
+  const qrules = Array.isArray(inp.qrules) ? inp.qrules.slice(0, 10).map(function (x) { return safeText(x, 160); }).filter(Boolean) : [];
+  const qfocus = Array.isArray(inp.qfocus) ? inp.qfocus.slice(0, 3).map(function (x) { return safeText(x, 120); }).filter(Boolean) : [];
+  if (qrules.length) {
+    lines.push('');
+    lines.push('[완성도 목표 — 품질 자동 학습 ' + koCount(qrules.length) + ' 건]  (본보기 글과 견줘 최근 초안에 모자란 점에서 모델이 스스로 뽑은 규칙입니다. 위 [직원이 고치는 패턴]과 부딪히면 직원 쪽을 따릅니다. 현장 사실은 사진 판독표·입력·자동 현장 사실에 있는 것만 씁니다.)');
+    qrules.forEach(function (l) { lines.push('- ' + l); });
+    if (qfocus.length) lines.push('이번에 특히 채울 항목: ' + qfocus.join(' · '));
+  }
   // 2단계 B⑤: 최근 글 소제목 — 지식 덩어리 여덟 종이 고정 목차처럼 돌아 사진AI 글 열 편 중 일고여덟 편이 같은 질문 골격이었다(10번 자료).
   //   워커가 최근 기록 본문에서 질문 소제목만 뽑아 넘긴다(계약 금지 문자열과 겹치는 줄은 워커가 뺀다). 자료로 받는다 — 지시가 아니다.
   const rh = Array.isArray(inp.recent_heads) ? inp.recent_heads.slice(0, 18).map(function (x) { return safeText(x, 60); }).filter(Boolean) : [];

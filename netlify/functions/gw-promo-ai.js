@@ -122,8 +122,11 @@ async function handleLearnGet(st, c, d, R) {
   // 체크 10 품질 고리 1단계 — 크론 ⑤가 잰 점수(promoai:quality) 요약. 읽기만 하고, 모듈·읽기 실패는 카드의 이 칸만 비운다(null)
   let quality = null;
   try { const PQ = require('./_lib/promoqual'); const qr = await blobGet(st, PQ.QUAL_KEY); quality = PQ.summary(qr.ok ? qr.data : null); } catch (e) { quality = null; }
+  // 체크 10 품질 고리 3단계(원천) — 품질 자동 학습 상태(promoai:qlearn: 모델이 쓴 품질 규칙·이번 목표 항목·끄기). 읽기만, 실패하면 이 칸만 null
+  let qlearn = null;
+  try { const QL = require('./_lib/promoqlearn'); const qq = await blobGet(st, QL.QLEARN_KEY); qlearn = QL.cardOf(qq.ok ? qq.data : null, Date.now()); } catch (e) { qlearn = null; }
   return jr(200, { ok: true, lessons: { off: L.off, rules: L.rules, exemplars: Object.keys(L.exemplars).map(function (k) { const e = L.exemplars[k]; return { key: k, promo_id: String(e.promo_id || ''), title: String(e.title || ''), ts: Number(e.ts) || 0, chars: String(e.excerpt || '').length }; }), gaps: L.gaps.slice(-20), stats: L.stats, updated_at: L.updated_at, summary: PL.gapSummary(L) },
-    pairs: pairs.pairs, pairs_error: pairs.ok ? '' : pairs.code, quality: quality, layout: layout, request_id: R });
+    pairs: pairs.pairs, pairs_error: pairs.ok ? '' : pairs.code, qlearn: qlearn, quality: quality, layout: layout, request_id: R });
 }
 // v394 — 복사 출력이 읽는 포장 프로필(홍보 권한이면 누구나). 사람 승인 없음: 수집기가 올린 그대로.
 async function handleLayoutGet(st, c, d, R) {
@@ -178,6 +181,16 @@ async function handleLearnSet(st, c, d, R) {
     p.status = 'pending'; p.tries = 0; delete p.code; delete p.detail; p.ts = Date.now();
     const w = await blobSet(st, PL.pairKey(pid), p);
     if (!w.ok) return jr(500, { ok: false, code: w.code || 'PAIR_WRITE_FAILED', request_id: R });
+  } else if (typeof d.qoff === 'boolean') {
+    // 체크 10 품질 고리 3단계(원천) — 품질 자동 학습 끄기·켜기(PM 손은 이 스위치뿐). 골격 스위치(off — 편집 간극 학습)와 따로다.
+    const QL = require('./_lib/promoqlearn');
+    const qq = await blobGet(st, QL.QLEARN_KEY);
+    if (!qq.ok && qq.code !== 'NOT_FOUND') return jr(500, { ok: false, code: qq.code || 'QLEARN_READ_FAILED', request_id: R });
+    const q = QL.normQL(qq.ok ? qq.data : null);
+    q.off = d.qoff; q.updated_at = Date.now();
+    const w = await blobSet(st, QL.QLEARN_KEY, q);
+    if (!w.ok) return jr(500, { ok: false, code: w.code || 'QLEARN_WRITE_FAILED', request_id: R });
+    ev = '품질 학습 ' + (d.qoff ? '끔' : '켬');
   } else return jr(400, { ok: false, code: 'NO_CHANGE', request_id: R });
   try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'promo', ev: [{ op: '블로그학습', id: '-', t: ev.slice(0, 80) }] }); } catch (e) {}
   return await handleLearnGet(st, c, d, R);

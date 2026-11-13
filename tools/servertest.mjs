@@ -2487,7 +2487,7 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   // 크론 통합 — 인메모리 blob + fetch mock(워커 기동 202)
   const cron = require(join(FN, 'gw-promo-ai-cron.js'));
   const realFetch = global.fetch; const kicks = [];
-  global.fetch = async (url, o) => { kicks.push(JSON.parse(o.body)); return { ok: true, status: 202 }; };
+  global.fetch = async (url, o) => { if (/gw-promo-ai-run-background/.test(String(url))) kicks.push(JSON.parse(o.body)); return { ok: true, status: 202 }; };   // 생성 워커 기동만 센다(체크 10 3단계 크론 ⑥의 품질 학습 워커 기동은 따로 — tools/promoqlearn_check.mjs)
   try {
     mem.gw_data['col:promo'] = { schema: 1, items: [
       mk('p_old_done', { title: '예비', body: '예비' }),                          // 옛 워커 완료작이 job blob에만 있음 → 적용
@@ -3216,6 +3216,13 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   T('48 pl_set 끄기 → lessons.off true → lessonLines 빈 배열', rp.code === 200 && rp.body.lessons.off === true && PL.lessonLines(mem.gw_data['promoai:lessons']).length === 0);
   rp = await callP({ action: 'pl_set', off: false }, tokA);
   T('48 pl_set 켜기', rp.code === 200 && rp.body.lessons.off === false);
+  // 체크 10 품질 고리 3단계(원천) — pl_get qlearn 칸 · pl_set qoff(품질 자동 학습 끄기·켜기 — 골격 스위치 off와 따로). 나머지는 tools/promoqlearn_check.mjs
+  rp = await callP({ action: 'pl_set', qoff: true }, tokA);
+  T('48(체크 10 3단계) pl_set qoff 끄기 → promoai:qlearn off · 골격 lessons.off 그대로(false) · 감사로그 "품질 학습 끔" · pl_get qlearn.off', rp.code === 200 && rp.body.qlearn && rp.body.qlearn.off === true && mem.gw_data['promoai:qlearn'].off === true && rp.body.lessons.off === false && auditMock.logs.some((l) => l.col === 'promo' && l.ev[0].op === '블로그학습' && l.ev[0].t === '품질 학습 끔'), JSON.stringify(rp.body.qlearn));
+  rp = await callP({ action: 'pl_set', qoff: false }, tokW, 'dev1');
+  T('48(체크 10 3단계) pl_set qoff 비관리자 → 403', rp.code === 403);
+  rp = await callP({ action: 'pl_set', qoff: false }, tokA);
+  T('48(체크 10 3단계) pl_set qoff 켜기 → qlearn.off false · 규칙 없음(아직 학습 전)', rp.code === 200 && rp.body.qlearn.off === false && Array.isArray(rp.body.qlearn.rules) && rp.body.qlearn.rules.length === 0);
   mem.gw_data['promolearn:in:pl_aaaaaaaaaaa7'] = { schema: 1, id: 'pl_aaaaaaaaaaa7', promo_id: '', status: 'unmatched', tries: 0, ts: 300, final_title: '짝 없음', final_body: fin };
   rp = await callP({ action: 'pl_set', assign: { pair_id: 'pl_aaaaaaaaaaa7', promo_id: 'nope' } }, tokA);
   T('48 pl_set 짝 지정: 없는 기록 → 404', rp.code === 404 && rp.body.code === 'PROMO_NOT_FOUND');

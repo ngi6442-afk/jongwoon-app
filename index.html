@@ -20142,6 +20142,7 @@
       + '<span style="color:var(--sub);">학습 ' + (L.stats && L.stats.pairs || 0) + '편 · 규칙 ' + (L.rules||[]).length + ' · 예시 ' + (L.exemplars||[]).length + ' · 마지막 ' + (plFmtTs(L.updated_at) || "없음") + '</span></div>';
     h += '<div style="margin:2px 0 8px;">간극(초안→최종본이 바뀐 비율): 최근 5편 평균 <b>' + (sm.last5_avg===null||sm.last5_avg===undefined ? "—" : sm.last5_avg + "%") + '</b>'
       + (sm.prev5_avg!==null&&sm.prev5_avg!==undefined ? ' · 그 전 5편 ' + sm.prev5_avg + '%' + (sm.trend==="down" ? ' <span class="dday" style="background:#e3f3ea;color:#1f6b45;">줄어듦</span>' : sm.trend==="up" ? ' <span class="dday amber">늘어남</span>' : '') : '') + ' · 총 ' + (sm.n||0) + '편</div>';
+    h += promoMatchHtml(pairs);   // PM 11/13 'ㅇㅇ' — 골격 그대로: 글별 본문 일치율 흐름 + 100% 연속 경고(표시만)
     var rules = (L.rules||[]).slice().sort(function(a,b){ return (b.n||0)-(a.n||0); });
     h += '<div style="font-weight:600;margin:4px 0;">규칙 창고 ' + rules.length + '개 <span style="font-weight:400;color:var(--sub);">(모델이 쓴 문장 그대로 — 다음 글 생성에 그대로 들어감 · 틀린 것은 [삭제])</span></div>';
     h += rules.length ? rules.map(function(r){ return '<div style="display:flex;gap:6px;align-items:flex-start;padding:2px 0;border-bottom:1px solid var(--line);"><span class="scope-chip" style="flex:0 0 auto;">' + esc(PL_SCOPE_TXT[r.scope]||r.scope||"") + '</span><span style="flex:1;">' + esc(r.text||"") + ' <span style="color:var(--sub);">(근거 ' + (r.n||1) + '건)</span></span><button type="button" class="mini-btn" style="margin:0;font-size:11px;padding:1px 6px;" data-pl-del="' + esc(r.id) + '">삭제</button></div>'; }).join("") : '<div class="empty-line">아직 규칙이 없습니다 — 수정본 폴더에 파일이 들어오면 10분 안에 첫 학습이 돕니다.</div>';
@@ -20175,6 +20176,7 @@
         + lay.posts.map(function(p){ return '<tr><td style="padding:1px 6px;">' + esc(p.date||"") + '</td><td style="text-align:right;padding:1px 6px;">' + (p.paras||0) + '</td><td style="text-align:right;padding:1px 6px;">' + Math.round((p.center||0)*100) + '%</td><td style="text-align:right;padding:1px 6px;">' + (p.len_med||0) + '/' + (p.len_p90||0) + '</td><td style="text-align:right;padding:1px 6px;">' + (p.blank||0) + '</td><td style="text-align:right;padding:1px 6px;">' + (p.hr||0) + '</td><td style="text-align:right;padding:1px 6px;">' + Math.round((p.bold||0)*100) + '%</td></tr>'; }).join("") + '</table></div>';
     } else h += '<div class="empty-line">아직 측정된 게시글이 없습니다 (수집기 09:05·16:05).</div>';
     h += promoQualHtml(res.body.quality);   // 체크 10 품질 고리 1단계 — 표시만
+    h += promoQLearnHtml(res.body.qlearn);   // 체크 10 품질 고리 3단계(원천) — 품질 자동 학습(끄기 스위치만)
     h += '<div style="font-weight:600;margin:8px 0 4px;">비교 짝 ' + pairs.length + '건 <span style="font-weight:400;color:var(--sub);">(네이버 게시글 자동 + 폴더 수정본. "짝 없음"은 아래에서 기록을 골라 지정)</span></div>';
     var live = livePromo().slice().sort(function(a,b){ return (b.ts||0)-(a.ts||0); });
     h += pairs.length ? '<div style="overflow:auto;"><table style="font-size:12px;border-collapse:collapse;width:100%;"><tr><th style="text-align:left;padding:2px 6px;">파일·제목</th><th style="text-align:left;padding:2px 6px;">짝 기록</th><th style="text-align:left;padding:2px 6px;">상태</th><th style="text-align:left;padding:2px 6px;">간극</th><th></th></tr>'
@@ -20191,10 +20193,55 @@
     host.innerHTML = h;
     var send = function(chg){ if (promoLearnBusy) return; promoLearnBusy = true; gwCall("gw-promo-ai", Object.assign({ action: "pl_set" }, chg)).then(function(res){ promoLearnBusy = false; if (res.status !== 200){ alert("자동 학습 설정 실패 (" + ((res.body && res.body.code) || res.status) + ")"); return; } promoLearnDraw(host, res); apprToastShow("자동 학습 설정 반영"); }).catch(function(){ promoLearnBusy = false; alert("자동 학습 설정 실패(네트워크)"); }); };
     Array.prototype.forEach.call(host.querySelectorAll("[data-pl-off]"), function(b){ b.addEventListener("click", function(){ send({ off: b.getAttribute("data-pl-off") === "1" }); }); });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-pq-off]"), function(b){ b.addEventListener("click", function(){ send({ qoff: b.getAttribute("data-pq-off") === "1" }); }); });   // 3단계 품질 학습 끄기·켜기
     Array.prototype.forEach.call(host.querySelectorAll("[data-pl-del]"), function(b){ b.addEventListener("click", function(){ if (!confirm("이 규칙을 지울까요? 다음 학습에서 같은 차이가 또 보이면 다시 생길 수 있습니다.")) return; send({ del_rule: b.getAttribute("data-pl-del") }); }); });
     Array.prototype.forEach.call(host.querySelectorAll("[data-pl-clear]"), function(b){ b.addEventListener("click", function(){ send({ clear_exemplar: b.getAttribute("data-pl-clear") }); }); });
     Array.prototype.forEach.call(host.querySelectorAll("[data-pl-retry]"), function(b){ b.addEventListener("click", function(){ send({ retry: b.getAttribute("data-pl-retry") }); }); });
     Array.prototype.forEach.call(host.querySelectorAll("[data-pl-assign]"), function(s){ s.addEventListener("change", function(){ if (!s.value) return; send({ assign: { pair_id: s.getAttribute("data-pl-assign"), promo_id: s.value } }); }); });
+  }
+  // ---- PM 11/13 'ㅇㅇ'(08:03 골격 "에이전트 글1 → 직원 글1a(일치율) → 간극 학습") — 학습이 끝난 짝마다 본문 일치율 = 1 − 간극(편집거리 비율)을 게시일 순으로. 100%가 이어지면 경고 한 줄(표시만) ----
+  var PL_MON = "JanFebMarAprMayJunJulAugSepOctNovDec";
+  function promoMatchSeries(pairs){
+    var out = [];
+    (pairs||[]).forEach(function(p){
+      if (!p || p.status !== "done" || !p.gap || p.gap.ratio === null || p.gap.ratio === undefined || isNaN(Number(p.gap.ratio))) return;
+      var rec = p.promo_id ? promoFind(p.promo_id) : null;
+      var d = (rec && /^\d{4}-\d{2}-\d{2}/.test(String(rec.posted_at||""))) ? String(rec.posted_at).slice(0,10) : "";
+      if (!d){ var m = String(p.src_file||"").match(/(\d{1,2}) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{4})/); if (m) d = m[3] + "-" + String(PL_MON.indexOf(m[2])/3 + 1).padStart(2,"0") + "-" + String(m[1]).padStart(2,"0"); }
+      if (!d && p.ts){ var t = new Date(Number(p.ts)); if (!isNaN(t.getTime())) d = t.getFullYear() + "-" + String(t.getMonth()+1).padStart(2,"0") + "-" + String(t.getDate()).padStart(2,"0"); }
+      out.push({ date: d, match: Math.round((1 - Number(p.gap.ratio)) * 1000) / 10, src: String(p.draft_src||""), title: String(p.final_title||"") });
+    });
+    out.sort(function(a,b){ return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
+    var streak = 0; for (var i = out.length - 1; i >= 0 && out[i].match >= 99.5; i--) streak++;
+    return { list: out, streak: streak };
+  }
+  function promoMatchHtml(pairs){
+    var s = promoMatchSeries(pairs);
+    if (!s.list.length) return '';
+    var h = '<div style="margin:0 0 6px;">본문 일치율 흐름 <span style="color:var(--sub);">(직원 게시본이 모델 초안과 같은 비율 · 에이전트 글 → 직원 글 → 간극 학습, 게시일 순)</span>: '
+      + s.list.map(function(x){ return '<span style="white-space:nowrap;" title="' + esc(x.title + (x.src === "record" ? " — 생성 당시 초안이 없어 기록 본문과 비교" : "")) + '">' + esc(x.date ? x.date.slice(5).replace("-","/") : "—") + ' <b>' + x.match + '%</b></span>'; }).join(' → ') + '</div>';
+    if (s.streak >= 2) h += '<div style="margin:0 0 8px;"><span class="dday amber">직원 수정 없음 ' + s.streak + '편 연속(일치율 100%)</span> <span style="color:var(--sub);">— 이 고리에 배울 차이가 없습니다. 직원이 고쳐 쓴 글이 올라오면 그 차이부터 다시 배웁니다.</span></div>';
+    return h;
+  }
+  // ---- 체크 10 품질 고리 3단계(원천, PM 11/13 '원천 3단계 ㄱ') — 품질 자동 학습(promoai:qlearn → pl_get qlearn). 규칙은 모델이 쓴 것 · 사람 손은 끄기 스위치뿐 ----
+  function pqU(u){ return u === "퍼센트" ? "%" : (u === "개(문장 백 개당)" ? "" : (u||"")); }
+  function pqTarget(f){
+    if (!f || f.nodisp) return "";
+    var u = pqU(f.unit), n = function(x){ return (x===null||x===undefined||isNaN(Number(x))) ? "—" : String(x); };
+    var tgt = f.cmp === "range" ? n(f.target) + "~" + n(f.target2) + u : n(f.target) + u + (f.cmp === "le" ? " 이하" : " 이상");
+    return n(f.now) + u + " → " + tgt + (f.unit === "개(문장 백 개당)" ? "(문장 백 개당)" : "");
+  }
+  function promoQLearnHtml(q){
+    var h = '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:10px 0 4px;"><b>품질 자동 학습 — 본보기 대비 모자란 항목에서 모델이 배운 규칙</b>'
+      + (q ? '<button type="button" class="mini-btn" data-pq-off="' + (q.off ? "0" : "1") + '" style="margin:0;' + (q.off ? 'background:#FAF0E4;color:#a8651f;' : '') + '">' + (q.off ? "꺼짐 — 켜기" : "켜짐 — 끄기") + '</button>' : '')
+      + '<span style="color:var(--sub);">(3단계·원천: 다음 생성에 직원 규칙 아래로 들어감 · 부딪히면 직원 쪽 · 생성 뒤 다시 쓰기 없음)</span></div>';
+    if (!q) return h + '<div class="empty-line">품질 학습 현황을 읽지 못했습니다.</div>';
+    h += '<div style="color:var(--sub);font-size:12.5px;margin-bottom:3px;">' + (q.learned_at ? '마지막 학습 ' + plFmtTs(q.learned_at) + ' · 사진AI 초안 ' + (q.n_drafts||0) + '편 기준' : '아직 학습 전 — 점수가 매겨진 사진AI 초안이 있으면 10분 안에 첫 학습이 돕니다') + (q.running ? ' · <b>학습 중</b>' : '') + (q.code ? ' · <span class="dday red" title="' + esc(q.detail||"") + '">실패 ' + esc(q.code) + (q.tries ? ' (' + q.tries + '회)' : '') + '</span>' : '') + ' · 누적 ' + ((q.stats && q.stats.calls)||0) + '회</div>';
+    if (q.focus && q.focus.length) h += '<div style="margin:2px 0 4px;">이번 목표 항목: ' + q.focus.map(function(f){ return '<span class="scope-chip" style="margin:1px 3px 1px 0;" title="최근 초안 평균 ' + (f.avg===null||f.avg===undefined ? "—" : f.avg) + '점(0~2) · 본보기 ' + esc(f.ex===null||f.ex===undefined ? "—" : String(f.ex) + pqU(f.unit)) + '">' + esc(f.code + " " + (f.say || PQ_ITEM_TXT[f.code] || "") + (pqTarget(f) ? " " + pqTarget(f) : "")) + '</span>'; }).join("") + '</div>';
+    if (q.summary) h += '<div style="color:var(--sub);font-size:12.5px;margin-bottom:3px;">모델 판단: ' + esc(q.summary) + '</div>';
+    var rs = q.rules || [];
+    h += rs.length ? rs.map(function(r){ return '<div style="display:flex;gap:6px;align-items:flex-start;padding:2px 0;border-bottom:1px solid var(--line);"><span class="scope-chip" style="flex:0 0 auto;">' + esc(r.item === "ALL" ? "전체" : (r.item + " " + (PQ_ITEM_TXT[r.item]||""))) + '</span><span style="flex:1;">' + esc(r.text||"") + ' <span style="color:var(--sub);">(근거 ' + (r.n||1) + ')</span></span></div>'; }).join("") : '<div class="empty-line">아직 품질 규칙이 없습니다.</div>';
+    return h;
   }
   function promoFind(id){ return promoItems.filter(function(p){ return p&&p.id===id; })[0]||null; }
   function promoOpenDetail(id){
