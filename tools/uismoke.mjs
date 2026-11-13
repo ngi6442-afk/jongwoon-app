@@ -12070,7 +12070,7 @@ try {
     && /if \(currentTab === "stmt" && canSee\("stmt"\)\) renderStmt\(\);/.test(ap6) && /\bstmtReset\(\);/.test(cs6)
     && /if \(STMT\.bound \|\| !host\) return;\n\s*STMT\.bound = true;/.test(fnOf29s('stmtBindOnce')) && (ssb29.match(/addEventListener\("input"/g) || []).length === 2   // 29 판③: 상세 + 거래처 목록 고치기(둘 다 stmtBindOnce 안 — 한 번)
     && (fnOf29s('stmtBindOnce').match(/addEventListener\("input"/g) || []).length === 2
-    && clsOk6 && acts6.length === 10 && acts6.every((a) => srvActs6.indexOf(a) >= 0) && !/how: "vision"|"vision"/.test(ssb29.replace(/\/\/[^\n]*/g, '')),   // 29 판③: 동작 6 → 10(stmt_match·stmt_alias_set·stmt_alias_get·stmt_cfg_get·stmt_cfg_set 더함 — 서버에 다 있음)
+    && clsOk6 && acts6.length === 12 && acts6.every((a) => srvActs6.indexOf(a) >= 0) && !/how: "vision"|"vision"/.test(ssb29.replace(/\/\/[^\n]*/g, '')),   // 29 판③: 동작 6 → 10(stmt_match·stmt_alias_set·stmt_alias_get·stmt_cfg_get·stmt_cfg_set 더함 — 서버에 다 있음) · 29 판⑤: → 12(stmt_sent 전달함 표시·stmt_veh 차량 탭 칸)
     J({ acts6, btnCls6 }));
 
   // ⑦ 화면 결함 검토 반영(11/10 — 재현된 7건): 차량 칸 글을 쳤다 되돌리면 대조된 차량이 되살아남(change가 안 와도) · 저장 응답이 줄 객체를 갈아 끼워도 같은 줄 id로 찾음 ·
@@ -12460,10 +12460,273 @@ try {
     && ['stmtCfgBar', 'stmtCfg'].every((id) => (html.match(new RegExp('id="' + id + '"', 'g')) || []).length === 1)
     && !/table\.st-ed\.st-u\{min-width/.test(html) && /table\.st-ed td\.c-veh,table\.st-ed td\.c-use\{width:140px;\}/.test(html) && /table\.st-ed td\.c-veh,table\.st-ed td\.c-use\{width:170px;\}/.test(html)
     && /\(tool \? '' : '<th>차량<\/th>'\)/.test(er5) && /nc = 9 \+ \(vat \? 1 : 0\) \+ \(w \? 1 : 0\);/.test(er5)
-    && /\["stmtMonBar", "stmtStats", "stmtBoardMsg", "stmtBoard", "stmtCfgBar"\]/.test(rs5) && rs5.indexOf('if (ed){ stmtEdRender(); return; }') < rs5.indexOf('if (cf){ stmtCfgRender(); return; }') && /if \(STMT\.cfg && !canDo\("stmt"\)\)/.test(rs5)
+    && /\["stmtMonBar", "stmtStats", "stmtBoardMsg", "stmtOutBar", "stmtBoard", "stmtCfgBar"\]/.test(rs5) && rs5.indexOf('if (ed){ stmtEdRender(); return; }') < rs5.indexOf('if (cf){ stmtCfgRender(); return; }') && /if \(STMT\.cfg && !canDo\("stmt"\)\)/.test(rs5)
     && J(Object.keys(CF.api.USE_SHORT)) === J(Object.keys(CF.api.USE)) && J(Object.keys(CF.api.KIND_OPT)) === J([''].concat(Object.keys(CF.api.KIND))) && J(Object.keys(CF.api.KIND)) === J(SVt.KINDS),
     J({ cfgBtn5 }));
 } catch (e) { console.log('  (29 판③ 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ---- 29 판⑤(PM 11/12 23:41 '운반일지 보고, 결재 탭' · 11/13 '결재 없이') — 보고·결제 줄과 차량 탭 칸: index.html @stmt-sheet 구간을 가짜 서버로 돌린다
+//      ① 보고 글(500자·전월 대비·★·빠진 곳·부가세 추정·자르기)·결제 지시 글·묶음 나누기  ② 차량 → 사장님 보고 흐름(결재 목록·전월 → 확인 창 → stmt_sent → 결재 대기열 · 409·대기열 중복·열린 카드·취소·사람 바뀜·보고만 다시)
+//      ③ 작업용구 → 나수진 주임 결제 흐름(stmt_sent → 담당 지시·알림 · 담당 없음·지시 권한 없음·NOT_DONE·지시만 다시)  ④ 줄 그림(단추·꺼짐·상태 글·보기 권한)  ⑤ 차량 탭 칸(stmt_veh 한 번·종류 순서·이름·빠짐·캐시·다시 읽기·사람 바뀜) + 정적
+try {
+  const blkOf29u = (a, b) => { const i = html.indexOf(a), j = html.indexOf(b); if (i < 0 || j < i) throw new Error('구간 없음: ' + a); return html.slice(i, j); };
+  const fnOf29u = (name) => { const i = html.indexOf('function ' + name + '('); if (i < 0) throw new Error('함수 없음: ' + name); let d = 0, st = false; for (let j = i; j < html.length; j++) { const ch = html[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return html.slice(i, j + 1); } } throw new Error('중괄호 짝 안 맞음: ' + name); };
+  const ssb29u = blkOf29u('// @stmt-sheet-start', '// @stmt-sheet-end'), vsb29u = blkOf29u('// @vs-sheet-start', '// @vs-sheet-end');
+  const CF29u = [
+    { vk: 'v05', name: '대송IC주유소', group: 'veh', kind: 'fuel', basis: 'total', carry: false, active: true, hint: [] },
+    { vk: 'v06', name: '영남주유소', group: 'veh', kind: 'fuel', basis: 'total', carry: false, active: true, hint: [] },
+    { vk: 'v07', name: '가온상사', group: 'veh', kind: 'urea', basis: 'supply', carry: false, active: true, hint: [] },
+    { vk: 'v08', name: '포항모터스', group: 'veh', kind: '', basis: 'supply', carry: false, active: true, hint: [] },
+    { vk: 'v09', name: '꺼진정비', group: 'veh', kind: '', basis: 'supply', carry: false, active: false, hint: [] },
+    { vk: 'v10', name: '철탑종합공구상사', group: 'tool', kind: 'tool', basis: 'supply', carry: true, active: true, hint: [] },
+    { vk: 'v11', name: '오천공구', group: 'tool', kind: 'tool', basis: 'supply', carry: true, active: true, hint: [] },
+    { vk: 'v12', name: '드림오피스', group: 'tool', kind: 'tool', basis: 'supply', carry: false, active: true, hint: [] }];
+  const SM29u = (o) => Object.assign({ group: 'veh', status: 'done', rows: 3, bad: 0, issues: [], ok: true, total: 0, est: 0, inv: null, stated: null, bal: null, draft: false, at: 1, by: 'u1', veh: {}, sent: null }, o);
+  const VS29u = () => ({
+    v05: SM29u({ total: 1000000, at: 1001 }),
+    v06: SM29u({ status: 'sent', total: 500000, at: 1002, sent: { at: 1002, via: 'appr', by: 'u1' } }),
+    v07: SM29u({ status: 'doing', ok: false, bad: 1, total: 30000, at: 1003 }),
+    v10: SM29u({ group: 'tool', total: 220000, inv: 220000, bal: 120000, at: 1010 }),
+    v11: SM29u({ group: 'tool', status: 'sent', total: 50000, at: 1011, sent: { at: 1011, via: 'task', by: 'u1' } }) });
+  const PREV29u = { v05: SM29u({ status: 'sent', total: 800000 }), v06: SM29u({ total: 500000 }), v07: SM29u({ status: 'doing', ok: false, total: 1 }), v10: SM29u({ group: 'tool', status: 'sent', total: 100 }) };
+  const COV29u = () => [{ id: 'tcov', title: '앞서 만든 결제 지시', stmt_ref: 'stmt:2026-10:tool', stmt_vks: ['v11'], status: 'open', who: '나수진', created: '2026-11-10' }];
+  const OKM29u = (b) => ({ status: 200, body: { status: 'OK', ym: b.ym, vendors: b.ym === '2026-09' ? PREV29u : VS29u(), cfg: CF29u, idx_at: 5, cfg_at: 6 } });
+  const mk29u = (o) => {
+    o = o || {};
+    const el = { innerHTML: '', __h: undefined };
+    const env = { who: 'u1', perm: o.perm || 'do', tasksDo: o.tasksDo !== false, admin: !!o.admin, lt: 0, log: [], resp: o.resp || {}, toasts: [], alerts: [], confirms: [], ok: o.ok !== false, inval: 0, pend: o.pend || [], saved: 0, flush: 0,
+      members: o.members || [{ id: 'uns', name: '나수진' }, { id: 'u1', name: '권민지' }], tasks: o.tasks || COV29u(), agr: o.agr || { tasks: true }, gid: 0, tc: 0, ts: 0, rv: 0, el: el };
+    const api = new Function('__env', [
+      'var window = {}, localStorage = { getItem: function(){ return null; }, setItem: function(){} }, ResizeObserver = undefined, currentTab = "stmt";',
+      'var document = { getElementById: function(id){ return id === "stmtOutBar" ? __env.el : null; }, querySelector: function(){ return null; }, activeElement: null };',
+      'function confirm(m){ __env.confirms.push(m); return __env.ok; } function alert(m){ __env.alerts.push(m); }',
+      fnOf29u('esc'), fnOf29u('pad'), fnOf29u('isDate'),
+      'function myId(){ return __env.who; } function canDo(m){ return (m === "stmt" && __env.perm === "do") || (m === "tasks" && __env.tasksDo); } function canSee(m){ return m !== "stmt" || __env.perm !== "hide"; }',
+      'function findVeh(){ return null; } function liveVehicles(){ return []; } function findMember(){ return null; } function dispName(n){ return n; } function gwToast(t){ __env.toasts.push(t); } function onSessionInvalid(){ __env.inval++; }',
+      'function gwCall(fn, body){ __env.log.push(JSON.parse(JSON.stringify(body))); var r = __env.resp[body.action]; if (typeof r === "function") r = r(body); if (r instanceof Error) return Promise.reject(r); return Promise.resolve(r || { status: 500, body: {} }); }',
+      'var apprPendingCreates = __env.pend; function apprSavePending(){ __env.saved++; } function apprFlushCreates(){ __env.flush++; } function apprToastShow(m){ __env.toasts.push("A:" + m); }',
+      'function activeMembers(){ return __env.members; } function memberName(id){ var m = __env.members.filter(function(x){ return x.id === id; })[0]; return m ? m.name : ""; }',
+      'var tasks = __env.tasks, autoGenReady = __env.agr; function liveTasks(){ return tasks.filter(function(x){ return x && x.del !== 1; }); }',
+      'function genId(p){ return p + "id" + (++__env.gid); } function todayStr(){ return "2026-11-14"; } function getUser(){ return "권민지"; }',
+      'function saveTasksCache(){ __env.tc++; } function renderTasks(){} function renderSummary(){} function scheduleTasksSave(){ __env.ts++; }',
+      'var vehOpenId = null, vehDetTab = "ov"; function renderVehicles(){ __env.rv++; } function isAdmin(){ return __env.admin; } function loadTasks(){ __env.lt++; }',
+      vsb29u, ssb29u,
+      'return { STMT: STMT, stHtml: stmtStHtml, dropped: stmtApprDropped, apprLoad: stmtApprLoad, group: stmtOutGroup, rpt: stmtRptText, pay: stmtPayText, payer: stmtPayerId, md: stmtMd, apprTxt: stmtApprTxt, taskTxt: stmtPayTaskTxt, vResend: stmtVehResend, tOrph: stmtToolOrphans,',
+      '  bar: stmtOutBarRender, outVeh: stmtOutVeh, outTool: stmtOutTool, vh: stmtVhHtml, vhCache: function(){ return STMT_VH; }, reset: stmtReset, rowsOf: stmtBoardRows,',
+      '  setTab: function(x){ currentTab = x; }, setVeh: function(id, tb){ vehOpenId = id; vehDetTab = tb; } };'].join('\n'))(env);
+    api.STMT.ym = '2026-10'; api.STMT.month = { status: 'OK', ym: '2026-10', vendors: o.vendors || VS29u(), cfg: o.cfg || CF29u, idx_at: 5, cfg_at: 6 };
+    if (o.who !== undefined) api.STMT.who = o.who;
+    return { env, api };
+  };
+  const fl29u = async () => { for (let k = 0; k < 10; k++) await new Promise((r) => setTimeout(r, 0)); };
+  const J = (x) => JSON.stringify(x);
+  const RESP29u = (o) => Object.assign({ approvals_list: { status: 200, body: { status: 'OK', items: [] } }, stmt_month: OKM29u, stmt_reindex: { status: 200, body: { status: 'OK', vendors: {} } }, get: { status: 200, body: { status: 'OK', collection: 'tasks', doc: { schema: 1, items: [] } } }, stmt_sent: (b) => ({ status: 200, body: { status: 'OK', items: b.items.map((x) => ({ vk: x.vk, ok: true, at: 9999, idx: true })) } }) }, o || {});
+
+  // ① 글·묶음
+  const U = mk29u();
+  const gv = U.api.group('veh'), gt = U.api.group('tool');
+  const grp1 = [gv.done.map((r) => r.vk).join(), gv.sent.map((r) => r.vk).join(), gv.rest.map((r) => r.vk).join(), gt.done.map((r) => r.vk).join(), gt.sent.map((r) => r.vk).join(), gt.rest.map((r) => r.vk).join()];
+  const r1 = U.api.rpt('2026-10', gv, PREV29u), r1n = U.api.rpt('2026-10', gv, null);
+  const want1 = ['2026-10 차량 거래처 명세 확정 2곳 · 합계 1,500,000원(부가세 포함) · 전월 2곳 1,300,000원(+15%)', '· 대송IC주유소 1,000,000원(+25%) ★', '· 영남주유소 500,000원(±0%)',
+    '★ = 이번에 올리는 곳 1곳(앞서 올린 1곳과 합친 합계)', '빠진 곳 2곳: 가온상사(붉은 칸), 포항모터스(입력 대기)'].join('\n');
+  const onlyDone = { done: gv.done, sent: [], rest: [] }, r1d = U.api.rpt('2026-10', onlyDone, {});
+  const bigCf = [], bigVs = {};
+  for (let i = 10; i < 50; i++) { bigCf.push({ vk: 'v' + i, name: '아주긴이름의거래처주식회사' + i + '(포항지점)', group: 'veh', kind: 'fuel', basis: 'total', carry: false, active: true, hint: [] }); bigVs['v' + i] = SM29u({ total: 1000000 + i, est: i === 12 ? 2 : 0 }); }
+  const UB = mk29u({ cfg: bigCf, vendors: bigVs }), rB = UB.api.rpt('2026-10', UB.api.group('veh'), {});
+  const tot1 = Object.keys(bigVs).reduce((s, k) => s + bigVs[k].total, 0);
+  const p1 = U.api.pay('2026-10', gt.done.concat(gt.sent));
+  const vsN = VS29u(); vsN.v08 = SM29u({ status: 'done', ok: false, total: 7 }); const gN = mk29u({ vendors: vsN }).api.group('veh');
+  grp1.push(gN.done.map((r) => r.vk).join() + '/' + gN.rest.map((r) => r.vk).join());
+  const rN = mk29u({ vendors: vsN }).api.rpt('2026-10', gN, PREV29u);   // 확정인데 검산 안 맞음 = '검산 안 맞음'(종전 '확정'으로 보여 헷갈림)
+  const cfM = CF29u.filter((v) => v.group === 'tool').concat(['v21', 'v22', 'v23', 'v24', 'v25', 'v26', 'v27', 'v28'].map((vk) => ({ vk: vk, name: '거래처' + vk, group: 'veh', kind: '', basis: 'supply', carry: false, active: true, hint: [] }))).concat([CF29u[0]]);
+  const UM = mk29u({ cfg: cfM, vendors: { v05: SM29u({ total: 1000 }) } }), rM = UM.api.rpt('2026-10', UM.api.group('veh'), {});   // 확정인데 검산 안 맞음(드묾 — 거래처 기준을 바꾼 뒤 등) = 보고에 안 넣고 나머지로
+  T('29 판⑤ ① 보고·결제 글: 묶음 = 확정(검산 통과)·전달함·나머지(켜진 곳·문서 있는 곳 — 꺼진 곳 없음) · 보고 = 머리(확정 곳 수·합계·전월 합·대비) + 거래처마다 금액(전월 대비 · 이번에 올리는 곳 ★ — 앞서 올린 곳이 있을 때만) + ★ 풀이·빠진 곳(상태) · 전월 못 읽음 = 대비 빼고 한 줄 · 거래처 40곳 긴 이름 = 500자 안·"외 n곳 합"·머리·부가세 추정 줄 남김 · 제목 120자 안 · 결제 지시 글 = 거래처마다 명세·계산서·잔액',
+    J(grp1) === J(['v05', 'v06', 'v07,v08', 'v10', 'v11', 'v12', 'v05/v07,v08']) && r1.body === want1 && r1.title === '월말명세서 2026-10 차량 거래처 2곳' && r1.n === 2 && r1.tot === 1500000
+    && r1n.body.indexOf('전월') === r1n.body.indexOf('전월 명세를 읽지 못해 전월 대비는 뺐습니다') && /\n· 대송IC주유소 1,000,000원 ★\n/.test(r1n.body)
+    && r1d.body.indexOf('★') < 0 && /· 대송IC주유소 1,000,000원\(전월 없음\)/.test(r1d.body)
+    && rB.body.length <= 500 && /\n· 외 \d+곳 [\d,]+원\n/.test(rB.body) && rB.body.indexOf('2026-10 차량 거래처 명세 확정 40곳 · 합계 ' + tot1.toLocaleString('ko-KR') + '원') === 0 && /부가세를 비율로 셈한 줄 2줄 포함$/.test(rB.body) && rB.title.length <= 120
+    && /빠진 곳 2곳: 가온상사\(붉은 칸\), 포항모터스\(검산 안 맞음\)$/.test(rN.body) && /\n빠진 곳 8곳: 거래처v21\(입력 대기\), [^\n]*거래처v26\(입력 대기\) 외 2곳$/.test(rM.body)
+    && p1.title === '작업용구 결제 2026-10 — 철탑종합공구상사 외 1곳 270,000원' && p1.detail === ['월말명세서 2026-10 작업용구 확정분 — 결재 없이 결제(합계 270,000원, 부가세 포함)', '· 철탑종합공구상사 220,000원 · 계산서 220,000원 · 잔액 120,000원', '· 오천공구 50,000원', '명세·계산서: 월말명세서 탭 › 2026-10 › 작업용구 거래처'].join('\n'),
+    J({ grp1, r1: r1.body, r1n: r1n.body.slice(-60), rB: [rB.body.length, rB.body.slice(-120)], p1 }));
+
+  // ② 차량 → 사장님 보고
+  const A2 = mk29u({ resp: RESP29u() });
+  A2.api.outVeh(); const busy2 = A2.api.STMT.outBusy; await fl29u();
+  const acts2 = A2.env.log.map((b) => b.action + (b.ym ? ':' + b.ym : ''));
+  const sent2 = A2.env.log.find((b) => b.action === 'stmt_sent');
+  const pend2 = A2.env.pend.map((p) => [p.kind, p.ref, p.mid, /^c[0-9a-z]+$/.test(p.cid), p.title, p.body === want1]);
+  const B2 = mk29u({ resp: RESP29u({ stmt_sent: { status: 409, body: { status: 'CONFLICT', error_code: 'STMT_STALE', vk: 'v05' } } }) }); B2.api.outVeh(); await fl29u();
+  const C2 = mk29u({ resp: RESP29u(), pend: [{ mid: 'u1', ref: 'stmt:2026-10:veh', cid: 'cold' }] }); C2.api.outVeh(); await fl29u();
+  const D2 = mk29u({ resp: RESP29u({ approvals_list: { status: 200, body: { status: 'OK', items: [{ id: 'ap1', kind: '월말명세서', ref: 'stmt:2026-10:veh', status: '대기', created: '2026-11-13T01:00:00.000Z' }] } } }) }); D2.api.outVeh(); await fl29u();
+  const E2 = mk29u({ resp: RESP29u(), ok: false }); E2.api.outVeh(); await fl29u();
+  const F2 = mk29u({ resp: RESP29u(), who: 'u1' }); F2.api.outVeh(); F2.api.reset(); F2.api.STMT.who = 'u2'; F2.api.STMT.outBusy = true; await fl29u();   // 사람 바뀜 = 앱에선 stmtReset → 새 사람이 무언가 보내는 중(outBusy)이라고 두고, 앞사람 흐름이 그것을 안 건드리는지
+  const vsO = VS29u(); vsO.v05 = SM29u({ status: 'sent', total: 1000000, at: 1001, sent: { at: 1001, via: 'appr', by: 'u1' } });
+  const G2 = mk29u({ resp: RESP29u(), vendors: vsO }); G2.api.STMT.appr = { ym: '2026-10', items: [] }; G2.api.bar(); const barO = G2.env.el.innerHTML;
+  G2.api.outVeh(); await fl29u();
+  const H2 = mk29u({ resp: RESP29u({ approvals_list: { status: 200, body: { status: 'OK', items: [{ kind: '월말명세서', ref: 'stmt:2026-10:veh', status: '승인' }] } } }), vendors: vsO }); H2.api.STMT.appr = { ym: '2026-10', items: [] }; H2.api.outVeh(); await fl29u();
+  const I2 = mk29u({ resp: RESP29u({ approvals_list: { status: 500, body: {} } }) }); I2.api.outVeh(); await fl29u();
+  const L2 = mk29u({ resp: RESP29u({ stmt_sent: { status: 409, body: { status: 'CONFLICT', error_code: 'PARTIAL_WRITE', cause: 'STMT_STALE', vk: 'v01', items: [{ vk: 'v05', ok: true }], idx: false } } }) }); L2.api.outVeh(); await fl29u();
+  const M2 = mk29u({ resp: RESP29u({ stmt_sent: (b) => ({ status: 200, body: { status: 'OK', items: b.items.map((x) => ({ vk: x.vk, ok: true })), idx: false } }) }) }); M2.api.outVeh(); await fl29u();
+  const hold2 = {}; const N2 = mk29u({ who: 'u1', resp: RESP29u({ stmt_sent: (b) => { hold2.X.api.reset(); hold2.X.api.STMT.who = 'u2'; return { status: 200, body: { status: 'OK', items: [{ vk: 'v05', ok: true }], idx: true } }; } }) }); hold2.X = N2;
+  N2.api.outVeh(); await fl29u();
+  const vsX = VS29u(); vsX.v06 = SM29u({ status: 'sent', total: 500000, at: 1002, sent: { at: 1002, via: 'appr', by: 'uX' } });
+  const O2 = mk29u({ vendors: vsX }); O2.api.STMT.appr = { ym: '2026-10', items: [] }; const o2a = O2.api.vResend('2026-10', O2.api.group('veh'));
+  const O2b = mk29u({ vendors: vsX, admin: true }); O2b.api.STMT.appr = { ym: '2026-10', items: [] }; const o2b = O2b.api.vResend('2026-10', O2b.api.group('veh'));
+  const P2 = mk29u({ resp: RESP29u() }); P2.api.STMT.rpt['2026-10'] = true; P2.api.dropped('stmt:2026-10:veh'); const p2r = !!P2.api.STMT.rpt['2026-10']; await fl29u(); const p2l = P2.env.log.map((b) => b.action).join();
+  P2.api.dropped('ab:2026-10-01'); const p2n = P2.env.log.length;
+  const Q2 = mk29u({ resp: RESP29u({ approvals_list: { status: 200, body: { status: 'OK', items: [{ kind: '월말명세서', ref: 'stmt:2026-10:veh', status: '대기', created: '2026-11-13T01:00:00.000Z' }] } } }) }); Q2.api.STMT.rpt['2026-10'] = true; Q2.api.apprLoad('2026-10'); await fl29u();
+  // 반려된 보고 다시 올리기 · 이 세션에서 막 올린 달은 '보고 없음'으로 안 알림(결재 생성이 끝나기 전 달 다시 읽기)
+  const REJ2 = { kind: '월말명세서', ref: 'stmt:2026-10:veh', status: '반려', created: '2026-11-13T01:00:00.000Z', decided_at: '2026-11-13T02:00:00.000Z', reason: '포항모터스 빠짐' };
+  const J2 = mk29u({ resp: RESP29u({ approvals_list: { status: 200, body: { status: 'OK', items: [REJ2] } } }), vendors: vsO }); J2.api.STMT.appr = { ym: '2026-10', items: [REJ2] }; J2.api.bar(); const barJ = J2.env.el.innerHTML;
+  J2.api.outVeh(); await fl29u();
+  const vsJ = VS29u(); vsJ.v06 = SM29u({ status: 'sent', total: 500000, at: 1002, sent: { at: 1002, via: 'appr', by: 'u1' } });
+  const K2 = mk29u({ resp: RESP29u(), vendors: vsJ }); K2.api.STMT.appr = { ym: '2026-10', items: [Object.assign({}, REJ2, { created: '2026-11-12T01:00:00.000Z' }), Object.assign({}, REJ2, { status: '대기', created: '2026-11-13T05:00:00.000Z' })] };
+  const k2a = K2.api.vResend('2026-10', K2.api.group('veh'));
+  K2.api.STMT.appr = { ym: '2026-10', items: [] }; const k2b = K2.api.vResend('2026-10', K2.api.group('veh'));
+  K2.api.outVeh(); await fl29u(); const k2p = K2.env.pend.length; K2.env.pend.splice(0);   // 대기열이 다 보내진 뒤(결재 생성 끝 — 목록에는 아직 없음)를 흉내
+  K2.api.STMT.appr = { ym: '2026-10', items: [] }; K2.api.STMT.month.vendors = vsO; const k2c = K2.api.vResend('2026-10', K2.api.group('veh')); K2.api.bar(); const barK = K2.env.el.innerHTML;
+  T('29 판⑤ ② 차량 → 사장님 보고: 누르면 결재 목록·전월(9월) 읽고 확인 창(보고 글 그대로·"확정 1곳은 전달함") → stmt_sent(veh·appr·ref stmt:2026-10:veh·확정 곳만 base = 색인 at) → 결재 대기열 1건(kind 월말명세서·ref·내 id·cid·제목·본문)·영속·보냄·알림 → 달 다시 읽기 · 409 = 대기열 0·거래처 이름 붙은 까닭 · 같은 달 대기열 = 알림만(부르기 0) · 결재 대기 카드 = 확인 창에 "그 카드를 고칩니다" · 취소 = stmt_sent 0 · 기다리는 사이 사람 바뀜 = 아무것도 안 함 · 전달함인데 보고 없음 = 줄 붉은 안내·[보고 다시 올리기] → stmt_sent 없이 대기열 · 이미 확인된 보고가 있으면 다시 올리지 않음 · 결재 목록 못 읽음 = 안 올림 · 가장 늦은 보고가 반려 = [반려된 보고 다시 올리기]·안내 → 확인 창에 반려 까닭·새 카드(stmt_sent 없이) · 가장 늦은 카드가 대기면 다시 올리기 없음 · 이 세션에서 막 올린 달은 결재 생성 전 다시 읽어도 \'보고 없음\' 안 알림',
+    busy2 === true && J(acts2) === J(['approvals_list', 'stmt_month:2026-09', 'stmt_sent:2026-10', 'stmt_month:2026-10', 'approvals_list']) && A2.api.STMT.outBusy === false
+    && J(sent2) === J({ action: 'stmt_sent', ym: '2026-10', group: 'veh', via: 'appr', ref: 'stmt:2026-10:veh', items: [{ vk: 'v05', base: 1001 }] })
+    && A2.env.confirms.length === 1 && A2.env.confirms[0].indexOf(want1) > 0 && /확정 1곳은 '전달함'이 됩니다\. 올릴까요\?$/.test(A2.env.confirms[0])
+    && J(pend2) === J([['월말명세서', 'stmt:2026-10:veh', 'u1', true, '월말명세서 2026-10 차량 거래처 2곳', true]]) && A2.env.saved === 1 && A2.env.flush === 1 && A2.env.toasts.indexOf('A:대표 결재로 상신 — 월말명세서 2026-10 차량 거래처 2곳') >= 0
+    && B2.env.pend.length === 0 && B2.env.toasts.some((s) => /^올리지 못했습니다 — 대송IC주유소 — 그 사이 다른 곳에서 고쳐졌습니다/.test(s)) && B2.env.log.some((b) => b.action === 'stmt_month' && b.ym === '2026-10')
+    && C2.env.log.length === 0 && C2.env.alerts.length === 1 && C2.env.pend.length === 1
+    && D2.env.confirms.length === 1 && /결재 대기 중인 같은 달 보고가 있어 그 카드를 이 내용으로 고칩니다/.test(D2.env.confirms[0]) && D2.env.pend.length === 1
+    && E2.env.confirms.length === 1 && !E2.env.log.some((b) => b.action === 'stmt_sent') && E2.env.pend.length === 0 && E2.api.STMT.outBusy === false
+    && !F2.env.log.some((b) => b.action === 'stmt_sent') && F2.env.confirms.length === 0 && F2.env.pend.length === 0 && F2.api.STMT.outBusy === true
+    && /data-st-out="veh" title="[^"]*">보고 다시 올리기<\/button>/.test(barO) && /전달함인데 올린 보고가 없습니다/.test(barO)
+    && !G2.env.log.some((b) => b.action === 'stmt_sent') && G2.env.pend.length === 1 && /전달함 표시는 이미 돼 있어 보고만 다시 올립니다/.test(G2.env.confirms[0] || '')
+    && H2.env.pend.length === 0 && H2.env.confirms.length === 0 && H2.env.toasts.some((s) => /이 달 보고는 이미 있습니다/.test(s))
+    && I2.env.pend.length === 0 && !I2.env.log.some((b) => b.action === 'stmt_sent') && I2.env.toasts.some((s) => /결재 목록을 읽지 못해/.test(s))
+    && /data-st-out="veh" title="[^"]*">반려된 보고 다시 올리기<\/button><span class="st-no">보고가 반려됐습니다/.test(barJ) && /올린 보고: 반려 11\/13 — 포항모터스 빠짐/.test(barJ)
+    && J2.env.pend.length === 1 && !J2.env.log.some((b) => b.action === 'stmt_sent') && /앞서 올린 보고가 반려됐습니다\(포항모터스 빠짐\) — 새로 올립니다/.test(J2.env.confirms[0] || '')
+    && k2a === '' && k2b === 'none' && k2p === 1 && k2c === '' && barK.indexOf('전달함인데 올린 보고가 없습니다') < 0
+    && L2.env.pend.length === 0 && L2.env.toasts.some((s) => /^올리지 못했습니다 — 포항모터스|^올리지 못했습니다 — 일부 거래처만 전달함이 됐습니다/.test(s) || /일부 거래처만 전달함이 됐습니다/.test(s)) && J(L2.env.log.map((b) => b.action).slice(-3)) === J(['stmt_reindex', 'stmt_month', 'approvals_list'])
+    && M2.env.pend.length === 1 && J(M2.env.log.map((b) => b.action).slice(-3)) === J(['stmt_reindex', 'stmt_month', 'approvals_list'])
+    && N2.env.pend.length === 1 && N2.env.pend[0].mid === 'u1' && !N2.env.toasts.some((s) => /^A:/.test(s)) && !N2.api.STMT.rpt['2026-10'] && N2.api.STMT.outBusy === false && !N2.env.log.some((b) => b.action === 'stmt_month' && b.ym === '2026-10')
+    && o2a === '' && o2b === 'none' && p2r === false && p2l === 'approvals_list' && p2n === 1 && !Q2.api.STMT.rpt['2026-10'],
+    J({ acts2, sent2, pend2, toasts: A2.env.toasts, b2: B2.env.toasts, c2: [C2.env.log.length, C2.env.alerts], barO: barO.slice(0, 300), g2: [G2.env.log.map((b) => b.action), G2.env.pend.length], h2: H2.env.toasts, i2: I2.env.toasts,
+      barJ: barJ.slice(0, 400), j2: [J2.env.pend.length, J2.env.confirms[0] && J2.env.confirms[0].slice(-120)], k2: [k2a, k2b, k2p, k2c], l2: [L2.env.toasts, L2.env.log.map((b) => b.action)], m2: M2.env.log.map((b) => b.action), n2: [N2.env.pend.length, N2.env.toasts, N2.api.STMT.outBusy], o2: [o2a, o2b], p2: [p2r, p2l, p2n] }));
+
+  // ③ 작업용구 → 나수진 주임 결제(결재 없음)
+  const A3 = mk29u({ resp: RESP29u({ push_send: { status: 200, body: { status: 'OK', sent: 1 } } }) });
+  A3.api.outTool(); await fl29u();
+  const sent3 = A3.env.log.find((b) => b.action === 'stmt_sent'), push3 = A3.env.log.find((b) => b.action === 'push_send');
+  const task3 = A3.env.tasks.filter((x) => x.id !== 'tcov');
+  const t3 = task3[0] || {};
+  const B3 = mk29u({ resp: RESP29u(), members: [{ id: 'u1', name: '권민지' }] }); B3.api.outTool(); await fl29u();
+  const C3 = mk29u({ resp: RESP29u(), agr: { tasks: false } }); C3.api.outTool(); await fl29u();   // 서버 지시 목록을 받기 전 = 막음(판 표식 없이 저장 금지)
+  const C3b = mk29u({ resp: RESP29u(), tasksDo: false }); C3b.api.outTool(); await fl29u();   // 지시 숨김 회원(11/13 운영 백업 권민지 tasks 'hide')도 결제 지시는 만듦(모듈이 대신 — 기성 입금확인 지시 꼴)
+  const c3b = C3b.env.tasks.filter((x) => x.id !== 'tcov');
+  const D3 = mk29u({ resp: RESP29u({ stmt_sent: { status: 400, body: { status: 'REJECTED', error_code: 'NOT_DONE', vk: 'v10' } } }) }); D3.api.outTool(); await fl29u();
+  const vsT = VS29u(); vsT.v10 = SM29u({ group: 'tool', status: 'doing', ok: false, total: 1, at: 1010 });
+  const TX3 = [{ id: 'tx', title: '무관 지시', status: 'open' }];
+  const E3 = mk29u({ resp: RESP29u({ get: { status: 200, body: { status: 'OK', collection: 'tasks', doc: { schema: 1, items: TX3 } } } }), vendors: vsT, tasks: TX3.slice() }); E3.api.bar(); const barT = E3.env.el.innerHTML; E3.api.outTool(); await fl29u();
+  const e3 = E3.env.tasks.find((x) => x.stmt_ref) || {};
+  const H3 = mk29u({ resp: RESP29u({ get: { status: 200, body: { status: 'OK', collection: 'tasks', doc: { schema: 1, items: TX3.concat([{ id: 'tB', stmt_ref: 'stmt:2026-10:tool', stmt_vks: ['v11'], status: 'open' }]) } } } }), vendors: vsT, tasks: TX3.slice() });
+  H3.api.outTool(); await fl29u();
+  const J3 = mk29u({ resp: RESP29u({ get: { status: 500, body: {} } }), vendors: vsT, tasks: TX3.slice() }); J3.api.outTool(); await fl29u();
+  const hold3 = {}; const I3 = mk29u({ who: 'u1', resp: RESP29u({ stmt_sent: (b) => { hold3.X.api.reset(); hold3.X.api.STMT.who = 'u2'; return { status: 200, body: { status: 'OK', items: [{ vk: 'v10', ok: true }], idx: true } }; } }) }); hold3.X = I3;
+  I3.api.outTool(); await fl29u();
+  const F3 = mk29u({ resp: RESP29u(), vendors: vsT, tasks: [], agr: { tasks: false } }); const f3 = F3.api.tOrph('2026-10', F3.api.group('tool')).length;
+  const G3 = mk29u({ resp: RESP29u(), vendors: vsT, tasks: [{ id: 'tdel', stmt_ref: 'stmt:2026-10:tool', stmt_vks: ['v11'], del: 1 }] }); const g3 = G3.api.tOrph('2026-10', G3.api.group('tool')).length;
+  T('29 판⑤ ③ 작업용구 → 나수진 주임 결제(결재 없음): 확인 창("나수진 주임께 … 결제 지시"·"확정 1곳은 전달함") → stmt_sent(tool·task·ref = 새 지시 id·확정 곳만) → 지시 1건(담당 나수진·공개 범위 나수진만·지시자 칸 = 월말명세서·누른 사람 = from_id·by·stmt_ref·stmt_vks·제목·글·열림) 저장·알림 1발(담당) · 담당(재직 나수진) 없음 = 알림 창·부르기 0 · 서버 지시 목록을 받기 전 = 알림 창·부르기 0 · 지시 숨김 회원도 만듦 · NOT_DONE = 지시 0·까닭 · 전달함인데 지시 없음 = 줄 붉은 안내·[결제 지시 다시 만들기] → stmt_sent 없이 지시만 · 지시를 서버에서 못 받았으면 판정 안 함 · 지운 지시도 덮은 것으로',
+    J(sent3) === J({ action: 'stmt_sent', ym: '2026-10', group: 'tool', via: 'task', ref: 'tid1', items: [{ vk: 'v10', base: 1010 }] })
+    && A3.env.confirms.length === 1 && A3.env.confirms[0].indexOf('나수진 주임께 2026-10 작업용구 결제 지시를 보냅니다(결재 없음).') === 0 && /확정 1곳은 '전달함'이 됩니다\. 보낼까요\?$/.test(A3.env.confirms[0])
+    && task3.length === 1 && t3.id === 'tid1' && t3.who_id === 'uns' && t3.who === '나수진' && J(t3.scope) === J(['uns']) && t3.from_id === 'u1' && t3.from === '월말명세서' && t3.by === '권민지' && t3.status === 'open' && t3.due === ''
+    && t3.stmt_ref === 'stmt:2026-10:tool' && J(t3.stmt_vks) === J(['v10']) && t3.title === '작업용구 결제 2026-10 — 철탑종합공구상사 220,000원' && /^월말명세서 2026-10 작업용구 확정분/.test(t3.detail) && t3.created === '2026-11-14'
+    && A3.env.tc === 1 && A3.env.ts === 1 && !!push3 && push3.to === 'uns' && /^새 지시: 작업용구 결제 2026-10/.test(push3.title) && push3.tag === 'task-tid1' && push3.title === '새 지시: 작업용구 결제 2026-10 (1곳)' && A3.env.toasts.indexOf('나수진 주임께 결제 지시를 보냈습니다(1곳)') >= 0
+    && B3.env.log.length === 0 && /결제 담당\(나수진\)을 재직 회원에서 찾지 못했습니다/.test(B3.env.alerts[0] || '') && C3.env.log.length === 0 && /지시 목록을 아직 서버에서 받지 못했습니다/.test(C3.env.alerts[0] || '')
+    && C3b.env.alerts.length === 0 && c3b.length === 1 && c3b[0].who_id === 'uns' && C3b.env.log.some((b) => b.action === 'stmt_sent')
+    && D3.env.tasks.length === 1 && D3.env.toasts.some((s) => /^보내지 못했습니다 — 철탑종합공구상사 — 확정 상태가 아닙니다/.test(s))
+    && /data-st-out="tool" title="[^"]*">결제 지시 다시 만들기 \(1곳\)<\/button>/.test(barT) && /전달함인데 결제 지시가 없는 곳 1/.test(barT)
+    && !E3.env.log.some((b) => b.action === 'stmt_sent') && E3.env.log.some((b) => b.action === 'get' && b.collection === 'tasks') && E3.env.tasks.length === 2 && J(e3.stmt_vks) === J(['v11']) && /지시만 다시 만듭니다/.test(E3.env.confirms[0] || '')
+    && H3.env.tasks.length === 1 && H3.env.confirms.length === 0 && H3.env.lt === 1 && H3.env.toasts.some((s) => /결제 지시가 이미 있습니다\(다른 기기에서 만듦\)/.test(s))
+    && J3.env.tasks.length === 1 && J3.env.confirms.length === 0 && J3.env.toasts.some((s) => /지시 목록을 새로 받지 못해/.test(s)) && J3.api.STMT.outBusy === false
+    && I3.env.tasks.length === 1 && I3.api.STMT.outBusy === false && !I3.env.toasts.some((s) => /결제 지시를 보냈습니다/.test(s))
+    && f3 === 0 && g3 === 0,
+    J({ sent3, t3, push3, b3: B3.env.alerts, c3: C3.env.alerts, d3: D3.env.toasts, barT: barT.slice(-400), e3: [E3.env.log.map((b) => b.action), e3.stmt_vks], f3, g3, h3: [H3.env.tasks.length, H3.env.lt, H3.env.toasts], j3: J3.env.toasts, i3: [I3.env.tasks.length, I3.env.toasts] }));
+
+  // ④ 줄 그림
+  const R4 = mk29u({ resp: RESP29u() }); R4.api.bar(); const b4 = R4.env.el.innerHTML;
+  R4.api.STMT.appr = { ym: '2026-10', items: [{ status: '대기', created: '2026-11-13T01:00:00.000Z' }] }; R4.api.bar(); const b4w = R4.env.el.innerHTML;
+  const at4 = [R4.api.apprTxt('2026-10'), (R4.api.STMT.appr = { ym: '2026-10', items: [{ status: '대기', created: '2026-11-12T01:00:00.000Z' }, { status: '승인', created: '2026-11-13T01:00:00.000Z', decided_at: '2026-11-13T15:30:00.000Z' }] }, R4.api.apprTxt('2026-10')),
+    (R4.api.STMT.appr = { ym: '2026-10', items: [{ status: '반려', created: '2026-11-13T01:00:00.000Z', decided_at: '2026-11-14T00:10:00.000Z', reason: '포항모터스 빠짐' }] }, R4.api.apprTxt('2026-10')), R4.api.apprTxt('2026-09')];
+  const T4 = mk29u({ tasks: [{ id: 'ta', stmt_ref: 'stmt:2026-10:tool', stmt_vks: ['v11'], status: 'done', done_at: '2026-11-15', who: '나수진', created: '2026-11-14' }, { id: 'tb', stmt_ref: 'stmt:2026-10:tool', stmt_vks: ['v10'], status: 'open', who: '나수진', created: '2026-11-10' }] });
+  const tt4 = T4.api.taskTxt('2026-10');
+  const st4 = [T4.api.stHtml({ s: SM29u({ status: 'sent', sent: { at: Date.UTC(2026, 10, 12, 16, 30, 0), via: 'appr', by: 'u1' } }) }), T4.api.stHtml({ s: SM29u({ status: 'sent', sent: { at: 1, via: 'task' } }) }), T4.api.stHtml({ s: SM29u({ status: 'sent', sent: null }) })];   // 한국 시각 11/13 01:30
+  const V4 = mk29u({ perm: 'view' }); V4.api.bar(); const b4v = V4.env.el.innerHTML;
+  const N4 = mk29u({ members: [{ id: 'u1', name: '권민지' }] }); N4.api.bar(); const b4n = N4.env.el.innerHTML;
+  const K4 = mk29u(); K4.api.STMT.outBusy = true; K4.api.bar(); const b4k = K4.env.el.innerHTML;
+  const L4 = mk29u(); L4.api.STMT.ed = { vk: 'v05' }; L4.env.el.innerHTML = 'x'; L4.env.el.__h = 'x'; L4.api.bar(); const b4l = L4.env.el.innerHTML;
+  T('29 판⑤ ④ 보고·결제 줄: 두 줄(차량 → 사장님 보고 · 작업용구 → 나수진 주임 결제(결재 없음)) · 확정·전달·남은 곳 수 · [대표 결재 상신 (1곳)]·[결제 지시 (1곳)] 켜짐 · 올린 보고 상태(가장 늦게 올린 카드 — 대기 "11/13 상신"·확인(결재) 날짜는 한국 시각·반려 + 까닭 40자) · 다른 달 = 빈칸 · 결제 지시 상태(가장 늦은 지시 — 완료 날짜·담당·이 달 n건) · 보기 권한 = 단추 0 · 담당 없음 = 단추 꺼짐·붉은 안내 · 보내는 중 = 둘 다 꺼짐 · 상세를 열면 비움',
+    /^<div class="st-oline"><span class="st-oh">차량 거래처 → 사장님 보고<\/span><span>확정 <b>1<\/b> · 전달 <b>1<\/b> · 남은 <b>2<\/b>곳<\/span><button type="button" class="mini-btn" data-st-out="veh" title="[^"]+">대표 결재 상신 \(1곳\)<\/button><\/div>/.test(b4)
+    && /<span class="st-oh">작업용구 → 나수진 주임 결제\(결재 없음\)<\/span><span>확정 <b>1<\/b> · 전달 <b>1<\/b> · 남은 <b>1<\/b>곳<\/span><button type="button" class="mini-btn" data-st-out="tool" title="[^"]+">결제 지시 \(1곳\)<\/button><span class="st-mute">결제 지시: 진행 중 · 나수진<\/span><\/div>$/.test(b4)
+    && /<span class="st-mute">올린 보고: 결재 대기 · 11\/13 상신<\/span>/.test(b4w)
+    && J(at4) === J(['올린 보고: 결재 대기 · 11/13 상신', '올린 보고: 확인(결재) 11/14', '올린 보고: 반려 11/14 — 포항모터스 빠짐', ''])
+    && tt4 === '결제 지시: 완료 11/15 · 나수진 · 이 달 2건'
+    && st4[0] === '<span class="st-chip sent" title="전달 11/13 · 대표 결재 상신">전달함</span>' && /title="전달 1\/1 · 결제 지시"/.test(st4[1]) && st4[2] === '<span class="st-chip sent">전달함</span>'
+    && b4v.indexOf('data-st-out') < 0 && /확정 <b>1<\/b>/.test(b4v)
+    && /data-st-out="tool" disabled/.test(b4n) && /결제 담당\(나수진\)을 재직 회원에서 찾지 못했습니다/.test(b4n) && !/data-st-out="veh" disabled/.test(b4n)
+    && /data-st-out="veh" disabled/.test(b4k) && /data-st-out="tool" disabled/.test(b4k) && b4l === '',
+    J({ b4: b4.slice(0, 600), at4, tt4, b4v: b4v.slice(0, 200), b4n: b4n.slice(-300) }));
+
+  // ⑤ 차량 탭 칸
+  const VR5 = { status: 200, body: { status: 'OK', veh: 'v12가1111', months: [{ ym: '2026-10', kinds: { tire: [1, 100000], fuel: [3, 300000], zz: [1, 5] }, total: 400005, vendors: ['v05', 'v01'], pending: ['v07'] }, { ym: '2026-09', kinds: {}, total: 0, vendors: [], pending: ['v06'] }],
+    names: { v05: '대송IC주유소', v01: '스피드타이어' }, failed: ['2026-08'] } };
+  const A5 = mk29u({ resp: { stmt_veh: VR5 } }); A5.api.setTab('veh'); A5.api.setVeh('v12가1111', 'stmt'); A5.api.STMT.who = 'u1';
+  const h5a = A5.api.vh('v12가1111'); const call5 = J(A5.env.log); await fl29u();
+  const h5b = A5.api.vh('v12가1111'), h5c = A5.api.vh('v12가1111'); const n5 = A5.env.log.length, rv5 = A5.env.rv;
+  A5.api.vhCache()['v12가1111'].at = 0; const h5s = A5.api.vh('v12가1111'); const n5s = A5.env.log.length;   // 5분 지남 — 다시 읽는 동안 옛 표 그대로 + '다시 읽는 중'
+  await fl29u(); const h5t = A5.api.vh('v12가1111');
+  A5.env.who = 'u2'; A5.api.vh('v12가1111'); const n5w = A5.env.log.length;
+  const B5 = mk29u({ resp: { stmt_veh: { status: 403, body: { status: 'FORBIDDEN', error_code: 'NO_ACCESS' } } } }); B5.api.vh('v12가1111'); await fl29u(); const h5e = B5.api.vh('v12가1111');
+  const C5 = mk29u({ resp: { stmt_veh: { status: 200, body: { status: 'OK', months: [], names: {}, failed: [] } } } }); C5.api.vh('v1'); await fl29u(); const h5n = C5.api.vh('v1');
+  C5.api.reset(); const cache5 = Object.keys(C5.api.vhCache()).length;
+  T('29 판⑤ ⑤ 차량 탭 칸: 처음 = 불러오는 중·stmt_veh 한 번(veh·n 12) → 그 차량 상세가 열려 있으면 다시 그림 · 표 = 달·합계(확정 거래처 없으면 -)·종류별(주유 → 타이어 순서 = 종류표, 모르는 종류는 뒤)·거래처 이름(서버 names — 없으면 vk)·작성 중 n곳 빠짐 · 합계 줄·못 읽은 달 · 5분 안엔 다시 안 읽음 · 사람이 바뀌면 비우고 다시 읽음 · 오류 = 붉은 까닭 + [다시 읽기] · 이력 없음 = 안내 · stmtReset이 칸 캐시를 비움',
+    /불러오는 중/.test(h5a) && call5 === J([{ action: 'stmt_veh', veh: 'v12가1111', n: 12 }]) && rv5 === 1
+    && /<tr><td style="white-space:nowrap;">2026-10<\/td><td class="num">400,005<\/td><td>주유 3건 300,000 · 타이어 1건 100,000 · zz 1건 5<\/td><td>대송IC주유소, v01 <span class="st-mute">\(작성 중 1곳 빠짐\)<\/span><\/td><\/tr>/.test(h5b.replace('스피드타이어', 'v01'))
+    && h5b.indexOf('대송IC주유소, 스피드타이어') > 0 && /<tr><td style="white-space:nowrap;">2026-09<\/td><td class="num"><span style="color:#9AA09C;">-<\/span><\/td><td><span style="color:#9AA09C;">-<\/span><\/td><td> <span class="st-mute">\(작성 중 1곳 빠짐\)<\/span><\/td><\/tr>/.test(h5b)
+    && /<tfoot><tr><td><b>합계<\/b><\/td><td class="num"><b>400,005<\/b><\/td>/.test(h5b) && /못 읽은 달: 2026-08/.test(h5b) && h5c === h5b && n5 === 1 && n5s === 2 && h5s.indexOf('<tr><td style="white-space:nowrap;">2026-10</td>') > 0 && /다시 읽는 중…<\/div>$/.test(h5s) && h5t === h5b && n5w === 3
+    && /<span class="st-no">[^<]+<\/span> <button type="button" class="vs-chip" data-st-vreload="v12가1111">다시 읽기<\/button>/.test(h5e) && /최근 12달 월말명세서에 이 차량 줄이 없습니다/.test(h5n) && cache5 === 0,
+    J({ h5a, call5, rv5, h5b: h5b.slice(0, 700), n5, n5w, h5e, h5n }));
+
+  // ⑥ 정적 — 결재 종류 4곳·[확인(결재)]·대기열 403·차량 탭 칸 단추·연결·화면 자리·CSS·비우기·달 읽기 뒤 결재 상태
+  const vd6 = fnOf29u('vehDetailHtml'), bv6 = fnOf29u('bindVehSheet'), rc6 = fnOf29u('apprRenderCard'), fl6 = fnOf29u('apprFlushCreates'), rs6 = fnOf29u('stmtReset'), bo6 = fnOf29u('stmtBindOnce'), lm6 = fnOf29u('stmtLoadMonth');
+  T('29 판⑤ ⑥ 정적: 결재 종류 월말명세서 = 앱 4곳(이모지·폴백 ③·등급표 순서 지입료 다음·기안 화면 제외) · 결재 창 [확인(결재)] = 운반일지·월말명세서 · 대기열 403은 기기 승인 대기만 다시(권한 없음은 버리고 알림) · 차량 탭 상세 = 월말명세서 칸 단추(보기 권한자만)·권한 없으면 개요·칸 연결 stmt·[다시 읽기] · 화면 자리 #stmtOutBar 1개·CSS · stmtReset이 결재 상태·보내는 중·칸 캐시 비움 · 줄 누름은 한 번 연결 · 달 읽기 성공 뒤 결재 상태',
+    /"월말명세서":"📑"/.test(html) && /var APPR_GRADE_DEFAULTS_APP = \{ "운반일지":3, "지입료":3, "월말명세서":3,/.test(html) && /"지입료","월말명세서","휴가"/.test(html) && /var APPR_DRAFT_EXCLUDE = \[[^\]]*"월말명세서"\]/.test(html)
+    && /\(it\.kind === "운반일지" \|\| it\.kind === "월말명세서"\) \? "확인\(결재\)" : "승인"/.test(rc6)
+    && /res\.status === 403 && !\(res\.body && res\.body\.error_code && res\.body\.error_code !== "DEVICE_NOT_APPROVED"\)/.test(fl6) && fl6.indexOf('res.status === 403 ||') < 0
+    && /if \(String\(p\.ref \|\| ""\)\.indexOf\("stmt:"\) === 0 && typeof stmtApprDropped === "function"\)\{ try \{ stmtApprDropped\(p\.ref\); \} catch\(e\)\{\} \}/.test(fl6)
+    && /tb = \(vehDetTab === "stmt" && !canSee\("stmt"\)\) \? "ov" : vehDetTab;/.test(vd6) && /\(canSee\("stmt"\) \? '<button type="button" class="vs-stab' \+ \(tb === "stmt" \? ' on' : ''\) \+ '" data-vs-tab="stmt">월말명세서<\/button>' : ''\)/.test(vd6) && /if \(tb === "stmt"\) h \+= stmtVhHtml\(v\.id\);/.test(vd6)
+    && /vehDetTab = \(k === "hist" \|\| k === "stmt"\) \? k : "ov";/.test(bv6) && /\[data-st-vreload\]/.test(bv6)
+    && (html.match(/id="stmtOutBar"/g) || []).length === 1 && /<div id="stmtBoardMsg"><\/div>\n\s*<div class="st-outbar" id="stmtOutBar"><\/div>\n\s*<div class="card" id="stmtBoard">/.test(html) && /\.st-outbar:empty\{display:none;\}/.test(html) && /\.st-oline\{display:flex;/.test(html)
+    && /STMT\.appr = null; STMT\.aseq\+\+; STMT\.outBusy = false; STMT\.rpt = \{\}; STMT_VH = \{\};/.test(rs6) && /if \(ob\) ob\.addEventListener\("click"/.test(bo6) && (bo6.match(/stmtOutVeh\(\)/g) || []).length === 1
+    && /STMT\.month = res\.body; STMT\.err = ""; STMT\.errCode = ""; stmtApprLoad\(ym\);/.test(lm6) && (html.match(/function stmtVehHtml\(/g) || []).length === 1,
+    '');
+  // ⑦ 보내기 대기열(apprFlushCreates) 실제 동작 — 403 NO_WRITE = 버리고 알림·월말명세서면 버림 갈고리 · 403 DEVICE_NOT_APPROVED·코드 없음 = 남기고 '대기 중' · 200 = 빼고 다음 건 · 남의 것(mid)은 안 보냄
+  const runFlush = async (resps, pend) => {
+    const env = { pend: pend, alerts: [], toasts: [], dropped: [], calls: [], resps: resps.slice() };
+    const f = new Function('__env', ['var apprPendingCreates = __env.pend, apprFlushBusy = false;',
+      'function curMember(){ return { id: "u1" }; } function isAdmin(){ return false; } function apprRefresh(){} function apprSavePending(){}',
+      'function apprToastShow(m){ __env.toasts.push(m); } function alert(m){ __env.alerts.push(m); } function stmtApprDropped(r){ __env.dropped.push(r); }',
+      'function gwCall(fn, b){ __env.calls.push(b.kind + ":" + b.ref); var r = __env.resps.shift() || { status: 200, body: {} }; return Promise.resolve(r); }',
+      fnOf29u('apprFlushCreates'), 'return apprFlushCreates;'].join('\n'))(env);
+    f(); await fl29u(); return env;
+  };
+  const PI = (ref, mid) => ({ cid: 'c' + ref, mid: mid || 'u1', kind: '월말명세서', title: '월말명세서 2026-10', body: 'b', ref: ref });
+  const fw1 = await runFlush([{ status: 403, body: { status: 'FORBIDDEN', error_code: 'NO_WRITE' } }], [PI('stmt:2026-10:veh')]);
+  const fw2 = await runFlush([{ status: 403, body: { status: 'FORBIDDEN', error_code: 'DEVICE_NOT_APPROVED' } }], [PI('stmt:2026-10:veh')]);
+  const fw3 = await runFlush([{ status: 403, body: {} }], [PI('stmt:2026-10:veh')]);
+  const fw4 = await runFlush([{ status: 200, body: { status: 'OK', id: 'a1' } }, { status: 200, body: { status: 'OK', id: 'a2' } }], [PI('stmt:2026-10:veh', 'u9'), PI('stmt:2026-10:veh'), PI('ab:2026-10-01')]);
+  T('29 판⑤ ⑦ 보내기 대기열 실제 동작: 403 NO_WRITE = 버리고 알림 창·월말명세서 보고면 버림 갈고리(stmtApprDropped) · 403 기기 승인 대기·코드 없는 403 = 남기고 \'상신 대기 중\'(종전처럼 다시 시도) · 200 = 빼고 다음 건 직렬 · 남의 것(mid)은 안 보내고 남김',
+    fw1.pend.length === 0 && fw1.alerts.length === 1 && /대표 상신 실패/.test(fw1.alerts[0]) && J(fw1.dropped) === J(['stmt:2026-10:veh'])
+    && fw2.pend.length === 1 && fw2.alerts.length === 0 && fw2.toasts.some((s) => /상신 대기 중/.test(s)) && fw2.dropped.length === 0
+    && fw3.pend.length === 1 && fw3.alerts.length === 0 && fw3.dropped.length === 0
+    && J(fw4.calls) === J(['월말명세서:stmt:2026-10:veh', '월말명세서:ab:2026-10-01']) && fw4.pend.length === 1 && fw4.pend[0].mid === 'u9',
+    J({ fw1: [fw1.pend.length, fw1.alerts, fw1.dropped], fw2: [fw2.pend.length, fw2.toasts], fw3: [fw3.pend.length, fw3.toasts], fw4: [fw4.calls, fw4.pend.map((p) => p.mid)] }));
+} catch (e) { console.log('  (29 판⑤ 검사 생략 — ' + e.message + ')'); fails++; }
 
 try {
   // ---- v459(11/13 — P1 판1·2·4 · 판 번호 임시): 문서·판 번호 정확 검사. 다음 판은 이 검사를 숫자 비교(>= 456)로 풀고 새 판 정확 검사를 더할 것.

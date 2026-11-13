@@ -14,6 +14,8 @@
 // 받지 않는 것: 스캔·원본 파일 자체(이름·쪽 수·sha만 — 원본은 권민지 PC·종이, v2 §4), 사업자번호·계좌·전화·주민번호(piiScan 거절), 대표자·기사·작업자 이름(줄에 이름 칸 없음),
 //   차량 목록에 없는 차량 id(줄·차량 소계·별칭 모두 목록으로 확인 — 지운 차 id는 받음).
 // 비전 판독(D1)은 이 함수에 없다 — 켜는 판은 노무사 회신(원장 T464) 뒤 따로.
+// 29 판⑤(PM 11/12 23:41 '운반일지 보고, 결재 탭' · 11/13 '결재 없이'): stmt_sent = 확정 문서 여러 곳을 한꺼번에 '전달함'으로(전달 기록 sent{at,by,via,ref}).
+//   차량 거래처는 앱이 이 동작 뒤 결재 kind '월말명세서'(③ 대표 전결 — gw-data)를 올리고, 작업용구는 나수진 주임 담당 결제 지시를 만든다(결재 없음). 보고 글·지시 글은 앱이 월 색인 값으로 만든다.
 // 알려진 한계(gw-data settings 핸들러와 같은 꼴): 읽기 → 쓰기가 원자적이지 않다(@netlify/blobs 8.2.0 set에 조건부 쓰기 없음). 그래서 색인·간극 기록은 쓴 뒤 다시 읽어 확인하고(덧대기),
 //   어긋나면 응답 idx:false·gap:false로 알린다(앱이 stmt_reindex로 색인을 다시 만듦).
 const crypto = require('crypto');
@@ -172,6 +174,19 @@ async function idxPut(st, ym, vk, doc, chk) {
     return !!(back.ok && back.doc.vendors[vk] && back.doc.vendors[vk].at === doc.updated_at);
   } catch (e) { return false; }
 }
+// 여러 문서 색인 한 번에(29 판⑤ stmt_sent — 곳마다 읽기·쓰기·다시 읽기를 한 번으로) · 쓴 뒤 다시 읽어 내 줄(at)들이 남았는지 확인 — 어긋나면 false(앱이 stmt_reindex)
+async function idxPutMany(st, ym, list) {
+  try {
+    const ix = await idxRead(st, ym);
+    if (!ix.ok) return false;
+    list.forEach(function (x) { ix.doc.vendors[x.vk] = S.vendorSummary(x.doc, x.chk); });
+    ix.doc.updated_at = Date.now();
+    const w = await blobSet(st, idxKey(ym), ix.doc);
+    if (!w.ok) return false;
+    const back = await idxRead(st, ym);
+    return !!(back.ok && list.every(function (x) { return back.doc.vendors[x.vk] && back.doc.vendors[x.vk].at === x.doc.updated_at; }));
+  } catch (e) { return false; }
+}
 function ymVk(d, R) {
   if (typeof d.ym !== 'string' || !S.RE_YM.test(d.ym)) return { res: bad('BAD_YM', R) };
   if (typeof d.vk !== 'string' || !S.RE_VK.test(d.vk)) return { res: bad('BAD_VK', R) };
@@ -231,6 +246,11 @@ async function handleSave(st, c, d, R) {
   if (d.base === undefined || Number(d.base) !== cur.at) return stale(R);
   const wasFinal = !!(cur.doc && S.FINAL[cur.doc.status]);
   const status = (d.status === undefined || d.status === null) ? (cur.doc ? cur.doc.status : 'doing') : d.status;
+  // 29 판⑤ 검토: 전달함(sent) 문서는 [확정 풀기](status 'doing') 없이 줄·금액을 못 고친다 — 사장님 결재 카드·결제 지시에 간 금액과 문서가 말없이 어긋나지 않게(같은 판 다시 저장은 받음)
+  if (cur.doc && cur.doc.status === 'sent' && status === 'sent') {
+    const sig = function (o) { return JSON.stringify([o.rows, o.inv || null, (o.stated === undefined ? null : o.stated), o.carry || null, o.vsub || null, o.basis]); };
+    if (sig(cur.doc) !== sig({ rows: rows.rows, inv: inv.v, stated: stated, carry: carry.v, vsub: vsub.v, basis: basis })) return bad('SENT_LOCKED', R);
+  }
   let draft = cur.doc ? (cur.doc.draft || null) : null;
   if (draftIn) {
     if (S.FINAL[status] || wasFinal) return bad('DRAFT_ON_FINAL', R);
@@ -239,10 +259,12 @@ async function handleSave(st, c, d, R) {
     draft = { rows: draftIn, at: Date.now(), by: c.member.id, how: how };
   }
   const now = Math.max(Date.now(), cur.at + 1);
+  // 전달 기록(29 판⑤): 전달함으로 남는 동안만 이어 감 — 상세 [전달함](확정 판 그대로)으로 처음 전달하면 via 'manual'. 확정을 풀거나(doing) 확정으로 내리면 지움
+  const sent = status !== 'sent' ? null : ((cur.doc && cur.doc.status === 'sent' && cur.doc.sent) ? cur.doc.sent : { at: now, by: c.member.id, via: 'manual', ref: '' });
   const doc = { schema: 1, ym: k.ym, vk: k.vk, group: (cur.doc && cur.doc.group) || v.group, basis: basis, src: src.v, inv: inv.v, stated: stated, carry: carry.v, vsub: vsub.v, rows: rows.rows,
-    draft: draft, status: status, updated_at: now, updated_by: c.member.id,
+    draft: draft, status: status, sent: sent, updated_at: now, updated_by: c.member.id,
     prev: cur.doc ? { rows: cur.doc.rows, status: cur.doc.status, basis: cur.doc.basis, src: cur.doc.src || [], inv: cur.doc.inv || null, stated: (cur.doc.stated === undefined ? null : cur.doc.stated),
-      carry: cur.doc.carry || null, vsub: cur.doc.vsub || null, draft: cur.doc.draft || null, updated_at: cur.at, updated_by: String(cur.doc.updated_by || '') } : null };
+      carry: cur.doc.carry || null, vsub: cur.doc.vsub || null, draft: cur.doc.draft || null, sent: cur.doc.sent || null, updated_at: cur.at, updated_by: String(cur.doc.updated_by || '') } : null };
   const chk = S.checkDoc(doc, v);
   if (S.FINAL[status] && !chk.ok) return bad('NOT_BALANCED', R, { checks: chk });   // 검산 통과 전 확정·전달 금지(v2 §3-1)
   doc.checks = { ok: chk.ok, bad: chk.bad.length, issues: chk.issues };
@@ -295,6 +317,7 @@ async function handleRevert(st, c, d, R) {
     carry: p.carry || null, vsub: p.vsub || null, draft: (p.draft !== undefined ? p.draft : cur.doc.draft) || null, prev: null, updated_at: Math.max(Date.now(), cur.at + 1), updated_by: c.member.id });
   const chk = S.checkDoc(doc, v);
   if (!chk.ok && doc.status !== 'doing') doc.status = 'doing';
+  doc.sent = doc.status !== 'sent' ? null : (p.sent || { at: doc.updated_at, by: c.member.id, via: 'manual', ref: '' });   // 29 판⑤: 전달함을 되돌리면(→ 확정) 전달 기록도 지움
   doc.checks = { ok: chk.ok, bad: chk.bad.length, issues: chk.issues };
   const w = await blobSet(st, docKey(k.ym, k.vk), doc);
   if (!w.ok) return fail(w.code, R);
@@ -303,6 +326,67 @@ async function handleRevert(st, c, d, R) {
   if (S.FINAL[cur.doc.status] && !S.FINAL[doc.status]) gapOk = await clogPut(st, k.ym, { ts: Date.now(), by: c.member.id, op: 'reopen', vk: k.vk });
   await audit(c, '명세서되돌리기', docKey(k.ym, k.vk), v.name + ' ' + k.ym + ' 줄 ' + doc.rows.length + '건 · ' + doc.status);
   return jr(200, { status: 'OK', doc: doc, checks: chk, idx: idxOk, gap: gapOk, request_id: R });
+}
+// 29 판⑤ 전달함 표시(여러 곳 한꺼번에) — 확정(done)·검산 통과 문서를 'sent'로. 줄·금액은 그대로(상태·전달 기록만 바뀜).
+//   group veh = 앱이 이 뒤 결재 '월말명세서'를 올림(via 'appr', ref 'stmt:달:veh') / tool = 앱이 나수진 주임 담당 결제 지시를 만듦(via 'task', ref 지시 id)
+//   전부 맞아야 쓴다: 거래처가 그 묶음, 문서가 있고 확정·검산 통과, base(앱이 보고 글을 만든 판의 updated_at)가 지금과 같음 — 한 곳이라도 어긋나면 아무것도 안 씀(보고 글과 '전달함'이 어긋나지 않게)
+//   prev에 확정 판을 남긴다 — 상세 [되돌리기]가 '전달함'을 확정으로 되돌림.
+//   쓰기는 곳마다 직전에 다시 읽어 검사 때 판과 같은지 본다(조건부 쓰기가 없어 그 사이 다른 저장을 덮지 않게 창을 좁힘 — 덧대기) — 어긋나거나 쓰기 실패면 거기서 멈춤:
+//   하나도 못 썼으면 409 STMT_STALE·그 코드, 몇 곳 썼으면 PARTIAL_WRITE(cause·곳별 결과) — 앱은 달을 다시 읽고, 보고·지시가 빠진 전달함은 보고·결제 줄이 알려 다시 만든다. 색인은 끝에 한 번(idx)
+const SENT_VIA = { appr: '결재 상신', task: '결제 지시' };
+const SENT_MAX = 40;   // 거래처 목록 상한(cleanVendors 1~40곳)과 같게
+async function handleSent(st, c, d, R) {
+  if (typeof d.ym !== 'string' || !S.RE_YM.test(d.ym)) return bad('BAD_YM', R);
+  if (d.group !== 'veh' && d.group !== 'tool') return bad('BAD_GROUP', R);
+  if (!Object.prototype.hasOwnProperty.call(SENT_VIA, d.via) || (d.group === 'veh') !== (d.via === 'appr')) return bad('BAD_VIA', R);   // 차량 = 결재 상신 · 작업용구 = 결제 지시
+  // ref = 차량은 그 달 보고 결재 ref 그대로(gw-data approval_create의 'stmt:달:veh'), 작업용구는 앱이 만들 지시 id(genId('t') 꼴)
+  const ref = d.ref;
+  if (typeof ref !== 'string' || (d.group === 'veh' ? ref !== 'stmt:' + d.ym + ':veh' : !/^t[0-9a-z]{6,40}$/.test(ref))) return bad('BAD_REF', R);
+  if (!Array.isArray(d.items) || !d.items.length || d.items.length > SENT_MAX) return bad('BAD_ITEMS', R);
+  const seen = Object.create(null);
+  for (const it of d.items) {
+    if (!it || typeof it !== 'object' || Array.isArray(it) || typeof it.vk !== 'string' || !S.RE_VK.test(it.vk) || seen[it.vk] || typeof it.base !== 'number' || !isFinite(it.base)) return bad('BAD_ITEMS', R);
+    seen[it.vk] = 1;
+  }
+  const cfg = await cfgRead(st);
+  if (!cfg.ok) return fail(cfg.code, R);
+  const cur = [];
+  for (const it of d.items) {
+    const v = vendorOf(cfg, it.vk);
+    if (!v) return bad('UNKNOWN_VENDOR', R, { vk: it.vk });
+    const r = await docRead(st, d.ym, it.vk);
+    if (!r.ok) return fail('DOC_READ_FAILED', R);
+    if (!r.doc) return bad('NO_DOC', R, { vk: it.vk });
+    if ((r.doc.group || v.group) !== d.group) return bad('GROUP_MISMATCH', R, { vk: it.vk });
+    if (Number(it.base) !== r.at) return jr(409, { status: 'CONFLICT', error_code: 'STMT_STALE', vk: it.vk, request_id: R });
+    if (r.doc.status !== 'done') return bad('NOT_DONE', R, { vk: it.vk });
+    const chk = S.checkDoc(r.doc, v);
+    if (!chk.ok) return bad('NOT_BALANCED', R, { vk: it.vk });
+    cur.push({ vk: it.vk, v: v, doc: r.doc, at: r.at, chk: chk });
+  }
+  const out = [], done = [], t0 = Date.now();
+  let stop = null;
+  for (const x of cur) {
+    const r2 = await docRead(st, d.ym, x.vk);   // 쓰기 직전 다시 읽기 — 검사 뒤 다른 저장이 끼었으면 멈춤
+    if (!r2.ok) { stop = { vk: x.vk, code: 'DOC_READ_FAILED' }; break; }
+    if (!r2.doc || r2.at !== x.at || r2.doc.status !== 'done') { stop = { vk: x.vk, code: 'STMT_STALE' }; break; }
+    const p = r2.doc, now = Math.max(t0, x.at + 1);
+    const doc = Object.assign({}, p, { status: 'sent', sent: { at: now, by: c.member.id, via: d.via, ref: ref }, updated_at: now, updated_by: c.member.id,
+      checks: { ok: x.chk.ok, bad: x.chk.bad.length, issues: x.chk.issues },
+      prev: { rows: p.rows, status: p.status, basis: p.basis, src: p.src || [], inv: p.inv || null, stated: (p.stated === undefined ? null : p.stated),
+        carry: p.carry || null, vsub: p.vsub || null, draft: p.draft || null, sent: p.sent || null, updated_at: x.at, updated_by: String(p.updated_by || '') } });
+    const w = await blobSet(st, docKey(d.ym, x.vk), doc);
+    if (!w.ok) { stop = { vk: x.vk, code: w.code || 'STORAGE_WRITE_FAILED' }; break; }
+    out.push({ vk: x.vk, ok: true, at: now }); done.push({ vk: x.vk, v: x.v, doc: doc, chk: x.chk });
+  }
+  const idxOk = done.length ? await idxPutMany(st, d.ym, done) : null;
+  if (done.length) await audit(c, '명세서전달', 'stmt:' + d.ym + ':' + d.group, (d.group === 'veh' ? '차량' : '작업용구') + ' ' + d.ym + ' 전달함 ' + done.length + '/' + cur.length + '곳 · ' + SENT_VIA[d.via] + ' · '
+    + done.map(function (x) { return x.v.name; }).join('·').slice(0, 120));
+  if (stop) {
+    const stale = stop.code === 'STMT_STALE';
+    return jr(stale ? 409 : 500, { status: stale ? 'CONFLICT' : 'ERROR', error_code: done.length ? 'PARTIAL_WRITE' : stop.code, cause: stop.code, vk: stop.vk, items: out, idx: idxOk, request_id: R });
+  }
+  return jr(200, { status: 'OK', items: out, idx: idxOk, request_id: R });
 }
 // 그 달 문서 목록(접두어로 거르고 거래처 키 꼴만) — 모의 blobList는 접두어를 무시하므로 여기서도 거른다
 async function monthDocs(st, ym, cfg) {
@@ -346,7 +430,11 @@ async function handleVeh(st, c, d, R) {
   const yms = []; for (let i = 0; i < n; i++) yms.push(S.ymShift(to, -i));
   const reads = await Promise.all(yms.map(function (ym) { return idxRead(st, ym).then(function (x) { return { ym: ym, ok: x.ok, doc: x.doc }; }); }));
   const failed = reads.filter(function (x) { return !x.ok; }).map(function (x) { return x.ym; });
-  return jr(200, { status: 'OK', veh: d.veh, months: S.vehMonths(reads.filter(function (x) { return x.ok; }), d.veh), failed: failed, request_id: R });
+  const months = S.vehMonths(reads.filter(function (x) { return x.ok; }), d.veh);
+  // 29 판⑤ 차량 탭 칸에 거래처 이름(색인엔 vk만) — 목록 읽기 실패면 이름 없이(vk로 보임)
+  const cfg = await cfgRead(st), names = {};
+  if (cfg.ok) months.forEach(function (m) { m.vendors.concat(m.pending).forEach(function (vk) { const v = vendorOf(cfg, vk); if (v) names[vk] = v.name; }); });
+  return jr(200, { status: 'OK', veh: d.veh, months: months, names: names, failed: failed, request_id: R });
 }
 
 // ---- 차량 별칭 사전 ----
@@ -429,7 +517,7 @@ async function handleGap(st, c, d, R) {
 }
 
 const READ = { stmt_cfg_get: handleCfgGet, stmt_month: handleMonth, stmt_get: handleGet, stmt_veh: handleVeh, stmt_alias_get: handleAliasGet, stmt_gap: handleGap, stmt_match: handleMatch };
-const WRITE = { stmt_cfg_set: handleCfgSet, stmt_save: handleSave, stmt_revert: handleRevert, stmt_reindex: handleReindex, stmt_alias_set: handleAliasSet };
+const WRITE = { stmt_cfg_set: handleCfgSet, stmt_save: handleSave, stmt_revert: handleRevert, stmt_reindex: handleReindex, stmt_alias_set: handleAliasSet, stmt_sent: handleSent };
 async function handler(event) {
   const R = rid();
   if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: CORS, body: '' };

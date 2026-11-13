@@ -1295,6 +1295,12 @@
   .st-pick-f{font-size:11.5px;}
   .st-cfgbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:8px 0 0;font-size:12px;}
   .st-cfgbar:empty{display:none;}
+  /* 29 판⑤ 보고·결제 줄(월 보드 위) · 차량 탭 상세 월말명세서 칸 머리 */
+  .st-outbar{margin:0 0 8px;}
+  .st-outbar:empty{display:none;}
+  .st-oline{display:flex;gap:4px 10px;align-items:center;flex-wrap:wrap;font-size:12.5px;padding:3px 2px;}
+  .st-oh{font-weight:700;}
+  .st-vhd{font-size:12px;color:var(--sub);margin:2px 0 6px;}
   table.st-cfg{border-collapse:collapse;width:100%;font-size:13px;}
   table.st-cfg th{font-size:11.5px;color:var(--sub);font-weight:700;text-align:left;padding:6px 4px;border-bottom:1px solid var(--line);white-space:nowrap;}
   table.st-cfg td{padding:3px 4px;border-bottom:1px solid var(--line);vertical-align:middle;}
@@ -1718,6 +1724,7 @@
     <div class="dash-sec" id="stmtMonBar" style="margin-bottom:8px;"><h2><span class="st-mon">월말명세서 <button type="button" class="vs-chip" id="stmtPrev" aria-label="이전 달">◀</button><b id="stmtYm"></b><button type="button" class="vs-chip" id="stmtNext" aria-label="다음 달">▶</button> <span class="cnt" id="stmtHead"></span></span></h2></div>
     <div class="st-stats" id="stmtStats"></div>
     <div id="stmtBoardMsg"></div>
+    <div class="st-outbar" id="stmtOutBar"></div>
     <div class="card" id="stmtBoard"><div class="loading">불러오는 중…</div></div>
     <div class="st-cfgbar" id="stmtCfgBar"></div>
     <div id="stmtCfg" style="display:none;"></div>
@@ -4254,7 +4261,7 @@
   var apprGen = 0;                         // 세션 세대 — 닫힘/재열림 뒤 도착한 늦은 응답이 새 큐를 오염시키지 않게
   var APPR_KIND_EMOJI = { "지시":"📌", "운반일지":"📋", "사규":"📜", "지입료":"💳", "가족친화":"👨‍👩‍👧",
     "매뉴얼":"📖", "휴가":"🏖", "사직·휴직":"🚪", "계약 단계":"📝", "청구 검수":"🧾", "문서함 등재":"🗂",
-    "견적":"💰", "인허가 등재":"🏛", "조기퇴근":"🕔", "전결총정리":"🧮" };   // 서버 APPR_GRADE_DEFAULTS 키와 동일해야 등급표 화면·훅이 맞물린다
+    "견적":"💰", "인허가 등재":"🏛", "조기퇴근":"🕔", "월말명세서":"📑", "전결총정리":"🧮" };   // 서버 APPR_GRADE_DEFAULTS 키와 동일해야 등급표 화면·훅이 맞물린다
   // 대표 전용 건(9/3 PM: 운반일지 결재=대표, 다른 관리자는 알림함 확인만) — 서버 apprBossOnly·워커 to 스탬프와 3중 동일 규칙(to 우선, 구건은 종류로)
   function apprBossOnly(it){ return !!it && (it.to === "boss" || (it.to == null && it.kind === "운반일지")); }
   // ---- 결재 3차(업무별 등급, 명세 20260903): grade는 기안 시점 스냅샷. 없으면 구건=현행 ----
@@ -4417,11 +4424,11 @@
       else h += '<div style="margin-top:6px;font-size:12px;color:var(--sub);">승인 → 문서함에 등재 · 반려 → 올린 직원에게 사유 통지(재상신 가능)</div>';
     }
     document.getElementById("apprCard").innerHTML = h;
-    // 버튼 분기(명세 §8): ② 1단계=[승인→대표로/반려](보류 없음) · 전결총정리=[확인]만 · 운반일지=[확인(결재)] 라벨 · 그 외 현행
+    // 버튼 분기(명세 §8): ② 1단계=[승인→대표로/반려](보류 없음) · 전결총정리=[확인]만 · 운반일지·월말명세서(29 판⑤ — 보고 결재)=[확인(결재)] 라벨 · 그 외 현행
     var g = apprGradeOf(it), q = it.to || "pm";
     var isSum = it.kind === "전결총정리";
     var okBtn = document.getElementById("apprOkBtn"), noBtn = document.getElementById("apprNoBtn"), holdBtn = document.getElementById("apprHoldBtn");
-    if (okBtn) okBtn.textContent = isSum ? "확인" : (g === 2 && q === "pm" ? "승인 → 대표로" : (it.kind === "운반일지" ? "확인(결재)" : "승인"));
+    if (okBtn) okBtn.textContent = isSum ? "확인" : (g === 2 && q === "pm" ? "승인 → 대표로" : ((it.kind === "운반일지" || it.kind === "월말명세서") ? "확인(결재)" : "승인"));
     if (noBtn) noBtn.style.display = isSum ? "none" : "";
     if (holdBtn) holdBtn.style.display = (isSum || (g === 2 && q === "pm")) ? "none" : "";
   }
@@ -4545,13 +4552,14 @@
         apprPendingCreates.splice(idx, 1); apprSavePending();
         if (isAdmin()) apprRefresh();   // 관리자 본인 상신이면 뱃지 즉시 갱신
         apprFlushCreates();   // 다음 건 — 직렬
-      } else if (res.status >= 500 || res.status === 401 || res.status === 403 || res.status === 429){
+      } else if (res.status >= 500 || res.status === 401 || res.status === 429 || (res.status === 403 && !(res.body && res.body.error_code && res.body.error_code !== "DEVICE_NOT_APPROVED"))){   // 29 판⑤: 403은 기기 승인 대기(DEVICE_NOT_APPROVED·코드 없음)만 다시 시도 — 권한 없음(NO_WRITE 등)은 아래에서 버리고 알림(종전엔 영영 다시 보냄)
         // 일시 장애·세션 문제 — 버리면 영속화가 무의미해진다(리뷰 high). 큐 보존, 다음 트리거 때 재시도
         apprToastShow("상신 대기 중 — 잠시 후 자동 재시도됩니다");
       } else {
         // 400대 형식 오류만 재시도 무의미 — 버리고 알린다
         apprPendingCreates.splice(idx, 1); apprSavePending();
         if (String(p.ref || "").indexOf("con:") === 0 && typeof csApprDropped === "function"){ try { csApprDropped(p.ref, p.cid); } catch(e){} }   // v384: 계약 단계 상신이면 카드에 [상신] 다시
+        if (String(p.ref || "").indexOf("stmt:") === 0 && typeof stmtApprDropped === "function"){ try { stmtApprDropped(p.ref); } catch(e){} }   // 29 판⑤: 월말명세서 보고 — 보고·결제 줄이 '보고 없음'을 다시 알리게
         alert("대표 상신 실패: " + String(p.title || "").slice(0, 30) + " (" + ((res.body && res.body.error_code) || res.status) + ")");
         apprFlushCreates();
       }
@@ -4571,11 +4579,11 @@
   // 종류 = 등급표 kind 중 전용 경로가 있는 4종 제외(APPR_DRAFT_EXCLUDE — 서버 APPR_SELF_DECIDE_EXCLUDE와 동일 목록, uismoke 대조).
   // 기안자=비대표 관리자(PM) && ①이면 [전결 종결]=서버 self_decide(생성+승인 한 쓰기·큐에 안 뜸·푸시 없음) + [상신만] 보조.
   // 직원·②·③은 [상신](기존 라우팅: ① PM 큐·② PM 1단계·③ 대표 큐 — 상신 대기열 경유). 등급은 표시용 스냅샷(apprGradesLive) — 진짜 등급은 서버가 스탬프.
-  var APPR_DRAFT_EXCLUDE = ["지시","운반일지","문서함 등재","휴가","전결총정리"];   // 지시는 지시 탭 전용(담당 완료→승인, ref=지시 id) — 기안 화면 대상 아님(low8)
+  var APPR_DRAFT_EXCLUDE = ["지시","운반일지","문서함 등재","휴가","전결총정리","월말명세서"];   // 29 판⑤ 월말명세서 = 월말명세서 탭 월 보드 [대표 결재 상신] 전용   // 지시는 지시 탭 전용(담당 완료→승인, ref=지시 id) — 기안 화면 대상 아님(low8)
   var apprGradesLive = null;   // approvals_list 응답의 등급표(관리자·직원 공통)
   var apprDraftBusy = false, apprDraftCid = "";
   function apprDraftGrade(kind){ var g = apprGradesLive ? apprGradesLive[kind] : APPR_GRADE_DEFAULTS_APP[kind]; return (g === 1 || g === 2 || g === 3) ? g : 0; }
-  var APPR_GRADE_DEFAULTS_APP = { "운반일지":3, "지입료":3, "사직·휴직":2, "지시":1, "사규":1, "매뉴얼":1, "가족친화":1, "휴가":1, "계약 단계":1, "청구 검수":1, "문서함 등재":1, "견적":1, "인허가 등재":1, "조기퇴근":1 };   // 서버 표를 못 받았을 때의 표시 폴백(§2 확정표) — 서버가 최종
+  var APPR_GRADE_DEFAULTS_APP = { "운반일지":3, "지입료":3, "월말명세서":3, "사직·휴직":2, "지시":1, "사규":1, "매뉴얼":1, "가족친화":1, "휴가":1, "계약 단계":1, "청구 검수":1, "문서함 등재":1, "견적":1, "인허가 등재":1, "조기퇴근":1 };   // 서버 표를 못 받았을 때의 표시 폴백(§2 확정표) — 서버가 최종
   function apprDraftIsPm(){ return !!(curMemberObj && isPmMember(curMemberObj)); }   // 전결 종결 = tier pm만(v321 — 관리자 등급 admin은 [상신]만, 서버도 403 PM_ONLY)
   function apprDraftKinds(){
     var ks = APPR_GRADE_ORDER.slice();
@@ -8174,13 +8182,15 @@
     ALIAS_READ_FAILED: "별칭 사전을 읽지 못했습니다 — 잠시 뒤 다시 해 주세요.", ALIAS_INVALID: "별칭 사전 저장값이 깨져 있습니다 — 관리자 확인이 필요합니다.", NO_CHANGE: "바뀐 것이 없습니다.",
     VENDOR_REMOVED: "있던 거래처는 지울 수 없습니다 — '켬'을 끄면 보드에서 빠집니다.", GROUP_LOCKED: "있던 거래처의 묶음(차량·작업용구)은 바꿀 수 없습니다 — 새 거래처로 더해 주세요.", DUP_VK: "거래처 번호가 겹칩니다.",
     BAD_NAME: "거래처 이름이 비었거나 30자를 넘습니다.", BAD_HINT: "알아보는 낱말은 6개까지, 낱말마다 20자까지입니다.", BAD_VENDORS: "거래처는 1~40곳이어야 합니다.",
-    CFG_READ_FAILED: "거래처 목록을 읽지 못해 저장하지 않았습니다(덮어쓰지 않음) — 잠시 뒤 다시 해 주세요."
+    CFG_READ_FAILED: "거래처 목록을 읽지 못해 저장하지 않았습니다(덮어쓰지 않음) — 잠시 뒤 다시 해 주세요.",
+    SENT_LOCKED: "전달함 문서는 [확정 풀기]를 먼저 해야 고칠 수 있습니다(사장님 보고·결제 지시에 간 금액과 어긋나지 않게).",
+    PARTIAL_WRITE: "일부 거래처만 전달함이 됐습니다 — 달을 다시 읽었으니 남은 곳을 확인하고 다시 눌러 주세요(보고·지시가 빠진 곳은 보고·결제 줄이 알립니다)."
   };
   var STMT_RFIELDS = ["date", "vin", "item", "kind", "use", "qty", "unit", "amt", "vat", "note"];   // 줄 입력칸(data-f) — 이 밖의 이름은 무시
   var STMT_DPATHS = ["basis", "stated", "inv.date", "inv.supply", "inv.vat", "inv.total", "carry.prev", "carry.month", "carry.paid", "carry.bal"];   // 문서 입력칸(data-d)
   var STMT_DASH = '<span style="color:#9AA09C;">-</span>';
   var STMT_SHEET_DEF = null;
-  var STMT = { who: null, ym: "", month: null, loading: false, err: "", errCode: "", mseq: 0, eseq: 0, ed: null, cfg: null, cseq: 0, aliasAt: 0, open: {}, bound: false };   // cfg = 거래처 목록 고치기(29 판③ — 열려 있으면 보드 대신) · aliasAt = 별칭 사전 판(낙관락 base)
+  var STMT = { who: null, ym: "", month: null, loading: false, err: "", errCode: "", mseq: 0, eseq: 0, ed: null, cfg: null, cseq: 0, aliasAt: 0, open: {}, bound: false, appr: null, aseq: 0, outBusy: false, rpt: {} };   // cfg = 거래처 목록 고치기(29 판③ — 열려 있으면 보드 대신) · aliasAt = 별칭 사전 판(낙관락 base) · 29 판⑤ appr = 이 달 보고 결재(내가 볼 수 있는 것)·rpt = 이 세션에서 보고를 올린 달
 
   // ---- 검산 거울(서버 _lib/stmt.js와 같은 규칙 — uismoke 29 판②가 같은 표본으로 대조. 고치면 두 곳 다) ----
   function stmtDict(){ return Object.create(null); }   // 사람이 보낸 글(차량 id)을 열쇠로 쓰는 지도 — 원형 없는 객체('__proto__' 오염 막기, 서버 dict와 같음)
@@ -8564,8 +8574,9 @@
     if (k === "red") return '<span class="need-due" title="' + esc(stmtIssueTxt(s)) + '">붉은 ' + ((s.bad || 0) + (s.issues || []).length) + '</span>';
     if (k === "ready") return '<span class="review-chip" title="검산은 맞음 — 상세에서 [확정 저장]">확정 전 ✓</span>';
     if (k === "done") return '<span class="st-chip ok">✓ 확정</span>';
-    return '<span class="st-chip sent">전달함</span>';
+    return '<span class="st-chip sent"' + (s && s.sent && s.sent.at ? ' title="' + esc(stmtSentTip(s.sent)) + '"' : '') + '>전달함</span>';   // 29 판⑤ 언제·어떤 길로 전달했는지(색인 sent)
   }
+  function stmtSentTip(x){ var d = new Date((Number(x.at) || 0) + 9 * 3600000); return "전달 " + (d.getUTCMonth() + 1) + "/" + d.getUTCDate() + " · " + ({ appr: "대표 결재 상신", task: "결제 지시", manual: "상세 [전달함]" }[x.via] || "") + (x.by && stmtWhoTxt(x.by) ? " · " + stmtWhoTxt(x.by) : ""); }
   function stmtWhoTxt(id){ var m = id ? findMember(id) : null; return m && m.name ? dispName(m.name) : ""; }
   function stmtAtTxt(s){ var d = new Date(Number(s.at) || 0); if (!s.at || isNaN(d.getTime())) return ""; return pad(d.getMonth() + 1) + "-" + pad(d.getDate()) + " " + pad(d.getHours()) + ":" + pad(d.getMinutes()) + (stmtWhoTxt(s.by) ? " · " + stmtWhoTxt(s.by) : ""); }
   function stmtChkHtml(s){
@@ -8729,7 +8740,7 @@
       if (seq !== STMT.mseq) return;   // 그 사이 달·사람이 바뀌었으면 버림
       STMT.loading = false;
       if (res.status === 401){ STMT.err = "로그인이 풀렸습니다 — 다시 로그인해 주세요."; STMT.errCode = ""; stmtMonthDone(); onSessionInvalid(); return; }
-      if (res.status === 200 && res.body && res.body.status === "OK" && Array.isArray(res.body.cfg)){ STMT.month = res.body; STMT.err = ""; STMT.errCode = ""; }
+      if (res.status === 200 && res.body && res.body.status === "OK" && Array.isArray(res.body.cfg)){ STMT.month = res.body; STMT.err = ""; STMT.errCode = ""; stmtApprLoad(ym); }
       else { if (!STMT.ed) STMT.month = null; STMT.err = stmtErrText(res); STMT.errCode = (res.body && res.body.error_code) || ""; }   // 상세를 연 채면 앞서 읽은 달을 둠(다시 불러오기·보드 칸이 쓰는 거래처 목록)
       stmtMonthDone();
     }).catch(function(){
@@ -9363,8 +9374,286 @@
     var el = document.getElementById("stmtCfgBar"), h = (canDo("stmt") && STMT.month) ? '<button type="button" class="mini-btn" data-st-cfg="open">거래처 목록 고치기</button><span class="st-mute">새 거래처 더하기 · 끄기 · 이름 · 기본 종류 · 잔액형</span>' : "";
     if (el && el.__h !== h){ el.innerHTML = h; el.__h = h; }
   }
+  // ---- 29 판⑤ 산출(PM 11/12 23:41 '운반일지 보고, 결재 탭' · 11/13 '결재 없이') — 월 보드 위 '보고·결제' 줄 ----
+  //   차량 거래처 → 사장님 보고 = [대표 결재 상신](운반일지와 같은 길: 결재 kind '월말명세서' ③ 대표 전결 · ref 'stmt:달:veh' · 보내기 대기열 · 결재 대기 중이면 서버가 그 카드를 고친 판으로 흡수)
+  //   작업용구 → 나수진 주임 결제 = 결재 없이 담당 지시(권민지 원문 P13·P14 '사장님께 전달은 하지 않지만 … 최종결제 나주임님한테')
+  //   둘 다 먼저 서버 stmt_sent(확정 판 그대로 '전달함' — 글을 만든 판과 어긋나면 409로 아무것도 안 씀) → 성공하면 결재 대기열·지시. 응답을 놓쳐 '전달함'만 되고 보고·지시가 없으면
+  //   줄이 붉게 알리고 같은 버튼이 보고·지시만 다시 만든다(전달함 표시는 다시 안 함)
+  var STMT_PAYER = "나수진";   // 작업용구 결제 담당 — 재직 회원 이름으로 찾음(없으면 버튼 꺼짐·붉은 안내)
+  var STMT_OUT_MAX = 500;      // 결재 본문 한도(서버 apprCreateItem의 500자와 같음)
+  function stmtOutGroup(g){   // 묶음 줄 → done 확정(검산 통과) · sent 전달함 · rest 그 밖(켜진 곳·문서 있는 곳)
+    var o = { done: [], sent: [], rest: [] };
+    stmtBoardRows().forEach(function(r){
+      var k;
+      if (r.group !== g) return;
+      k = stmtRowSt(r);
+      if (k === "done" && r.s.ok) o.done.push(r); else if (k === "sent") o.sent.push(r); else o.rest.push(r);
+    });
+    return o;
+  }
+  function stmtByVk(a, b){ return a.vk < b.vk ? -1 : (a.vk > b.vk ? 1 : 0); }
+  function stmtPct(cur, prev){ var p; if (!(prev > 0)) return ""; p = Math.round((cur - prev) / prev * 100); return (p > 0 ? "+" : (p < 0 ? "−" : "±")) + Math.abs(p) + "%"; }
+  function stmtFin(s){ return !!(s && s.ok && (s.status === "done" || s.status === "sent")); }
+  // 사장님 보고 글(결재 본문 500자) — 확정·전달한 차량 거래처 전부(이번에 올리는 곳은 ★ — 앞서 올린 곳이 있을 때만) · 합계·전월 대비 · 빠진 곳 · 부가세 추정 줄
+  function stmtRptText(ym, g, prevVs){
+    var fin = g.done.concat(g.sent).sort(stmtByVk), tot = 0, est = 0, pt = 0, pn = 0, mark = g.sent.length > 0 && g.done.length > 0, head, lines, tail = [], miss = "", cut = 0, cutAmt = 0, body, pc;
+    fin.forEach(function(r){ tot += Number(r.s.total) || 0; est += Number(r.s.est) || 0; });
+    if (prevVs) Object.keys(prevVs).forEach(function(k){ var s = prevVs[k]; if (s && s.group === "veh" && stmtFin(s)){ pt += Number(s.total) || 0; pn++; } });
+    pc = stmtPct(tot, pt);
+    // 전월 = 전월 확정 차량 거래처 전부(곳 수를 같이 — 이번 달이 일부만 확정이면 대비가 작게 나오는 것을 읽는 사람이 알게) · 거래처 줄은 같은 곳끼리 대비
+    head = ym + " 차량 거래처 명세 확정 " + fin.length + "곳 · 합계 " + stmtNum(tot) + "원(부가세 포함)" + (pn ? " · 전월 " + pn + "곳 " + stmtNum(pt) + "원" + (pc ? "(" + pc + ")" : "") : "");
+    lines = fin.map(function(r){
+      var p = prevVs && Object.prototype.hasOwnProperty.call(prevVs, r.vk) ? prevVs[r.vk] : null, pv = stmtFin(p) ? (Number(p.total) || 0) : null, c = pv !== null ? stmtPct(Number(r.s.total) || 0, pv) : "";
+      return "· " + r.v.name + " " + stmtNum(r.s.total) + "원" + (pv === null ? (prevVs ? "(전월 없음)" : "") : (c ? "(" + c + ")" : "")) + (mark && g.done.indexOf(r) >= 0 ? " ★" : "");
+    });
+    if (est) tail.push("부가세를 비율로 셈한 줄 " + est + "줄 포함");
+    if (!prevVs) tail.push("전월 명세를 읽지 못해 전월 대비는 뺐습니다");
+    if (mark) tail.push("★ = 이번에 올리는 곳 " + g.done.length + "곳(앞서 올린 " + g.sent.length + "곳과 합친 합계)");
+    if (g.rest.length) miss = "빠진 곳 " + g.rest.length + "곳: " + g.rest.slice(0, 6).map(function(r){ var k = stmtRowSt(r); return r.v.name + "(" + ((k === "done" || k === "sent") ? "검산 안 맞음" : (STMT_ROWST[k] || "")) + ")"; }).join(", ") + (g.rest.length > 6 ? " 외 " + (g.rest.length - 6) + "곳" : "");
+    function build(){ return [head].concat(lines, cut ? ["· 외 " + cut + "곳 " + stmtNum(cutAmt) + "원"] : [], tail, miss ? [miss] : []).join("\n"); }
+    body = build();
+    while (body.length > STMT_OUT_MAX && lines.length > 1){ cut++; cutAmt += Number(fin[lines.length - 1].s.total) || 0; lines.pop(); body = build(); }
+    if (body.length > STMT_OUT_MAX && miss){ miss = "빠진 곳 " + g.rest.length + "곳"; body = build(); }   // 그래도 길면 빠진 곳은 수만(앞의 부가세·전월 안내 줄이 잘리지 않게)
+    if (body.length > STMT_OUT_MAX) body = body.slice(0, STMT_OUT_MAX - 1) + "…";
+    return { title: ("월말명세서 " + ym + " 차량 거래처 " + fin.length + "곳").slice(0, 120), body: body, tot: tot, n: fin.length };   // 제목엔 금액 없이(결재 요청 푸시 = 제목 — 잠금화면에 금액이 안 보이게, 금액은 본문)
+  }
+  // 나수진 주임 결제 지시 글 — 거래처마다 명세 합계·계산서·잔액(잔액형)
+  function stmtPayText(ym, rs){
+    var tot = 0, lines;
+    rs = rs.slice().sort(stmtByVk);
+    rs.forEach(function(r){ tot += Number(r.s.total) || 0; });
+    lines = rs.map(function(r){ var s = r.s; return "· " + r.v.name + " " + stmtNum(s.total) + "원" + (Number(s.est) ? "(부가세 추정 포함)" : "") + (s.inv !== null && s.inv !== undefined ? " · 계산서 " + stmtNum(s.inv) + "원" : "") + (s.bal !== null && s.bal !== undefined ? " · 잔액 " + stmtNum(s.bal) + "원" : ""); });
+    return { title: ("작업용구 결제 " + ym + " — " + rs[0].v.name + (rs.length > 1 ? " 외 " + (rs.length - 1) + "곳" : "") + " " + stmtNum(tot) + "원").slice(0, 120),
+      detail: ["월말명세서 " + ym + " 작업용구 확정분 — 결재 없이 결제(합계 " + stmtNum(tot) + "원, 부가세 포함)"].concat(lines, ["명세·계산서: 월말명세서 탭 › " + ym + " › 작업용구 거래처"]).join("\n"), tot: tot, n: rs.length };
+  }
+  function stmtPayerId(){ var ms = (typeof activeMembers === "function") ? activeMembers() : [], i; for (i = 0; i < ms.length; i++){ if (ms[i] && ms[i].name === STMT_PAYER) return ms[i].id; } return ""; }
+  function stmtMd(iso){ var t = Date.parse(iso || ""), d; if (!isFinite(t)) return ""; d = new Date(t + 9 * 3600000); return (d.getUTCMonth() + 1) + "/" + d.getUTCDate(); }
+  function stmtMdDay(s){ s = String(s || ""); return /^\d{4}-\d{2}-\d{2}$/.test(s) ? Number(s.slice(5, 7)) + "/" + Number(s.slice(8, 10)) : ""; }
+  // 이 달 보고 결재(내가 볼 수 있는 것 — 직원은 자기 상신만, 관리자는 전부) — 달을 읽을 때 한 번
+  function stmtApprLoad(ym){
+    var seq = ++STMT.aseq;
+    if (!canDo("stmt") || !ym) return;
+    gwCall("gw-data", { action: "approvals_list" }).then(function(res){
+      var ref = "stmt:" + ym + ":veh";
+      if (seq !== STMT.aseq || STMT.ym !== ym) return;
+      if (res.status === 200 && res.body && Array.isArray(res.body.items)){
+        STMT.appr = { ym: ym, items: res.body.items.filter(function(x){ return x && x.ref === ref && x.kind === "월말명세서"; }) };
+        if (STMT.appr.items.length) delete STMT.rpt[ym];   // 올린 보고가 목록에 보이면 '이 세션에서 올린 달' 표시는 할 일을 다 함(이후 반려 등은 목록으로 판정)
+      }
+      if (currentTab === "stmt") stmtOutBarRender();
+    }).catch(function(){});
+  }
+  // 보내기 대기열이 월말명세서 보고를 버렸을 때(4xx — 권한 없음 등 — apprFlushCreates) — '이 세션에서 올린 달' 표시를 지워 보고·결제 줄이 '보고 없음'을 다시 알리게
+  function stmtApprDropped(ref){
+    var m = /^stmt:(\d{4}-\d{2}):veh$/.exec(String(ref || ""));
+    if (!m) return;
+    delete STMT.rpt[m[1]];
+    if (currentTab === "stmt" && STMT.ym === m[1]) stmtApprLoad(m[1]);
+  }
+  function stmtApprLatest(items){ return (items || []).slice().sort(function(x, y){ return String(y.created || "").localeCompare(String(x.created || "")); })[0] || null; }   // 가장 늦게 올린 카드
+  function stmtApprTxt(ym){
+    var a = STMT.appr, it;
+    if (!a || a.ym !== ym || !a.items.length) return "";
+    it = stmtApprLatest(a.items);
+    if (it.status === "승인") return "올린 보고: 확인(결재) " + stmtMd(it.decided_at);
+    if (it.status === "반려") return "올린 보고: 반려 " + stmtMd(it.decided_at) + (it.reason ? " — " + String(it.reason).slice(0, 40) : "");
+    return "올린 보고: 결재 " + (it.status || "대기") + " · " + stmtMd(it.updated || it.created) + " 상신";
+  }
+  // 보고를 다시 올려야 하는 차량 묶음 — 결재 상신으로 전달함인 곳이 있는데 'none' 이 달 보고 결재가 없음(응답을 놓침) / 'rejected' 가장 늦은 보고가 반려됨 / '' 그 밖
+  //   대기열에 있는 달·이 세션에서 막 올린 달은 뺌(결재 생성이 끝나기 전에 달을 다시 읽어도 '보고 없음'으로 잘못 알리지 않게)
+  //   작업용구는 stmtToolOrphans — 지시로 전달함인데 그 곳을 담은 지시가 없음(지운 지시는 있는 것으로)
+  function stmtVehResend(ym, g){
+    var a = STMT.appr, ref = "stmt:" + ym + ":veh", lt;
+    if (!a || a.ym !== ym || STMT.rpt[ym]) return "";
+    if (apprPendingCreates.some(function(p){ return p && p.ref === ref; })) return "";
+    if (!g.sent.some(function(r){ return stmtMineSent(r, "appr"); })) return "";
+    if (!a.items.length) return "none";
+    lt = stmtApprLatest(a.items);
+    return (lt && lt.status === "반려") ? "rejected" : "";
+  }
+  // 내가 판정할 수 있는 전달함 — 관리자는 결재를 다 보므로 전부, 직원은 결재 목록에 자기 상신만 오므로 내가 전달한 곳만(남이 올린 보고를 '없음'으로 보고 또 올리지 않게)
+  function stmtMineSent(r, via){ var s = r && r.s && r.s.sent; return !!(s && s.via === via && (isAdmin() || s.by === myId())); }
+  function stmtToolOrphans(ym, g, list){
+    var ref = "stmt:" + ym + ":tool", cov = {};
+    if (!list){
+      if (!(typeof autoGenReady === "object" && autoGenReady && autoGenReady.tasks)) return [];   // 지시를 서버에서 아직 못 받았으면 판정 안 함
+      list = tasks;
+    }
+    if (!list.length) return [];   // 빈 목록(로그아웃 뒤 아직 못 받음 등)이면 판정 안 함
+    list.forEach(function(t){ if (t && t.stmt_ref === ref && Array.isArray(t.stmt_vks)) t.stmt_vks.forEach(function(k){ cov[k] = 1; }); });
+    return g.sent.filter(function(r){ return !!(r.s.sent && r.s.sent.via === "task") && !cov[r.vk]; });
+  }
+  function stmtPayTaskTxt(ym){
+    var ref = "stmt:" + ym + ":tool", ts = liveTasks().filter(function(t){ return t && t.stmt_ref === ref; }), t;
+    if (!ts.length) return "";
+    ts.sort(function(a, b){ return String(b.created || "").localeCompare(String(a.created || "")) || String(b.id).localeCompare(String(a.id)); });
+    t = ts[0];
+    return "결제 지시: " + (t.status === "done" ? "완료" + (stmtMdDay(t.done_at) ? " " + stmtMdDay(t.done_at) : "") : (t.status === "review" ? "완료 요청" : "진행 중")) + (t.who ? " · " + dispName(t.who) : "") + (ts.length > 1 ? " · 이 달 " + ts.length + "건" : "");
+  }
+  function stmtOutCnt(g){ return '<span>확정 <b>' + g.done.length + '</b> · 전달 <b>' + g.sent.length + '</b>' + (g.rest.length ? ' · 남은 <b>' + g.rest.length + '</b>곳' : '') + '</span>'; }
+  function stmtOutBarRender(){
+    var el = document.getElementById("stmtOutBar"), can, gv, gt, pid, ap, tk, vo, to, h;
+    if (!el) return;
+    if (!STMT.month || !canSee("stmt") || STMT.ed || STMT.cfg){ if (el.__h !== ""){ el.innerHTML = ""; el.__h = ""; } return; }
+    can = canDo("stmt"); gv = stmtOutGroup("veh"); gt = stmtOutGroup("tool"); pid = stmtPayerId(); ap = stmtApprTxt(STMT.ym); tk = stmtPayTaskTxt(STMT.ym);
+    vo = can ? stmtVehResend(STMT.ym, gv) : ""; to = can ? stmtToolOrphans(STMT.ym, gt) : [];
+    h = '<div class="st-oline"><span class="st-oh">차량 거래처 → 사장님 보고</span>' + stmtOutCnt(gv)
+      + (can ? '<button type="button" class="mini-btn" data-st-out="veh"' + (((gv.done.length || vo) && !STMT.outBusy) ? '' : ' disabled') + ' title="확정한 차량 거래처를 요약해 대표 결재(③ 대표 전결)로 올리고 그 곳들을 전달함으로 — 운반일지 [대표 결재 상신]과 같은 길">'
+        + (gv.done.length ? '대표 결재 상신 (' + gv.done.length + '곳)' : (vo === "rejected" ? '반려된 보고 다시 올리기' : (vo ? '보고 다시 올리기' : '대표 결재 상신'))) + '</button>' : '')
+      + (vo === "none" ? '<span class="st-no">전달함인데 올린 보고가 없습니다 — 보고만 다시 올립니다</span>' : (vo === "rejected" && !gv.done.length ? '<span class="st-no">보고가 반려됐습니다 — 고칠 거래처는 상세 [확정 풀기]로 고쳐 다시 확정한 뒤 올립니다</span>' : ''))
+      + (ap ? '<span class="st-mute">' + esc(ap) + '</span>' : '') + '</div>'
+      + '<div class="st-oline"><span class="st-oh">작업용구 → ' + esc(STMT_PAYER) + ' 주임 결제(결재 없음)</span>' + stmtOutCnt(gt)
+      + (can ? '<button type="button" class="mini-btn" data-st-out="tool"' + (((gt.done.length || to.length) && pid && !STMT.outBusy) ? '' : ' disabled') + ' title="결재 없이 ' + esc(STMT_PAYER) + ' 주임 담당 결제 지시를 만들고 그 곳들을 전달함으로">'
+        + (gt.done.length ? '결제 지시 (' + (gt.done.length + to.length) + '곳)' : (to.length ? '결제 지시 다시 만들기 (' + to.length + '곳)' : '결제 지시')) + '</button>' : '')
+      + (can && !pid ? '<span class="st-no">결제 담당(' + esc(STMT_PAYER) + ')을 재직 회원에서 찾지 못했습니다 — 관리자 확인</span>' : '')
+      + (to.length ? '<span class="st-no">전달함인데 결제 지시가 없는 곳 ' + to.length + ' — 지시만 다시 만듭니다</span>' : '')
+      + (tk ? '<span class="st-mute">' + esc(tk) + '</span>' : '') + '</div>';
+    if (el.__h !== h){ el.innerHTML = h; el.__h = h; }
+  }
+  function stmtOutErr(res){
+    var b = (res && res.body) || {}, code = b.error_code || "", nm = "";
+    if (b.vk && STMT.month && Array.isArray(STMT.month.cfg)) STMT.month.cfg.forEach(function(v){ if (v.vk === b.vk) nm = v.name + " — "; });
+    if (code === "STMT_STALE") return nm + "그 사이 다른 곳에서 고쳐졌습니다. 달을 다시 읽었으니 확인하고 다시 눌러 주세요.";
+    if (code === "NOT_DONE") return nm + "확정 상태가 아닙니다(그 사이 전달함이 됐거나 확정을 풀었음). 달을 다시 읽었습니다.";
+    return nm + stmtErrText(res);
+  }
+  function stmtOutItems(rs){ return rs.map(function(r){ return { vk: r.vk, base: Number(r.s.at) || 0 }; }); }
+  function stmtOutDone(){ STMT.outBusy = false; stmtOutBarRender(); }
+  function stmtOutAfter(res, ym, who){   // stmt_sent 응답 뒤 — 색인이 어긋났으면(idx:false — 서버가 쓴 뒤 다시 읽어 봄) 다시 만들고 달을 다시 읽음
+    var b = (res && res.body) || {};
+    if (STMT.who !== who) return;
+    if (b.idx === false) stmtReindex(ym, function(){ if (STMT.who === who) stmtLoadMonth(); });
+    else stmtLoadMonth();
+  }
+  function stmtOutVeh(){
+    var ym = STMT.ym, who = STMT.who, ref = "stmt:" + ym + ":veh", meId = myId(), g = stmtOutGroup("veh");
+    if (!canDo("stmt") || STMT.outBusy || !STMT.month || STMT.ed || STMT.cfg) return;
+    if (!g.done.length && !stmtVehResend(ym, g)){ gwToast("확정한 차량 거래처가 없습니다 — 상세에서 [확정 저장]부터 해 주세요", true); return; }
+    if (apprPendingCreates.some(function(p){ return p && p.mid === meId && p.ref === ref; })){ alert("이 달 차량 거래처 보고가 이미 전송 대기 중입니다(연결되면 자동 전송)."); return; }
+    STMT.outBusy = true; stmtOutBarRender();
+    Promise.all([gwCall("gw-data", { action: "approvals_list" }), gwCall("gw-stmt", { action: "stmt_month", ym: stmtYmShift(ym, -1) })]).then(function(rs){
+      var items = (rs[0].status === 200 && rs[0].body && Array.isArray(rs[0].body.items)) ? rs[0].body.items : null, mine = [], open = null, okd = null, lt, pv, txt;
+      if (STMT.who !== who) return;   // 기다리는 사이 사람이 바뀜 — 새 사람의 화면·진행 표시는 건드리지 않음(stmtReset이 비움)
+      if (STMT.ym !== ym || STMT.ed || STMT.cfg){ stmtOutDone(); return; }   // 달이 바뀌었거나 상세를 엶 — 아무것도 안 함
+      if (!items){ stmtOutDone(); gwToast("결재 목록을 읽지 못해 올리지 않았습니다 — 잠시 뒤 다시 눌러 주세요", true); return; }
+      items.forEach(function(x){ if (x && x.ref === ref && x.kind === "월말명세서"){ mine.push(x); if (x.status === "대기" || x.status === "보류") open = x; else if (x.status === "승인") okd = x; } });
+      lt = stmtApprLatest(mine);
+      pv = (rs[1].status === 200 && rs[1].body && rs[1].body.status === "OK" && rs[1].body.vendors && typeof rs[1].body.vendors === "object") ? rs[1].body.vendors : null;
+      g = stmtOutGroup("veh");   // 기다리는 사이 달을 다시 읽었을 수 있음 — 지금 보드 값으로
+      // 확정한 곳이 없으면 '보고만 다시'는 내가 결재 상신으로 전달한 곳이 있고 이 달 보고가 없거나 가장 늦은 보고가 반려일 때만(대기·확인된 보고를 두 번 올리지 않게)
+      if (!g.done.length && !(g.sent.some(function(r){ return stmtMineSent(r, "appr"); }) && (!lt || lt.status === "반려"))){ stmtOutDone(); gwToast("확정한 차량 거래처가 없습니다(이 달 보고는 이미 있습니다)", true); return; }
+      txt = stmtRptText(ym, g, pv);
+      if (!confirm("사장님께 " + ym + " 차량 거래처 보고를 대표 결재(③ 대표 전결)로 올립니다.\n\n" + txt.body + "\n\n"
+        + (open ? "※ 결재 대기 중인 같은 달 보고가 있어 그 카드를 이 내용으로 고칩니다.\n" : (lt && lt.status === "반려" ? "※ 앞서 올린 보고가 반려됐습니다" + (lt.reason ? "(" + String(lt.reason).slice(0, 60) + ")" : "") + " — 새로 올립니다.\n" : (okd ? "※ 이 달 보고는 이미 확인(결재)됐습니다 — 추가분으로 새로 올립니다.\n" : "")))
+        + (g.done.length ? "확정 " + g.done.length + "곳은 '전달함'이 됩니다. 올릴까요?" : "전달함 표시는 이미 돼 있어 보고만 다시 올립니다. 올릴까요?"))){ stmtOutDone(); return; }
+      function queue(){   // 누른 사람 이름(mid)으로 대기열에 — 사람이 바뀌었어도 넣음(그 사람이 다시 로그인하면 보냄)
+        apprPendingCreates.push({ cid: "c" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8), mid: meId, kind: "월말명세서", title: txt.title, body: txt.body, ref: ref });
+        apprSavePending(); apprFlushCreates();
+        if (STMT.who !== who) return;
+        STMT.rpt[ym] = true;   // 이 세션에서 올린 달 — 결재 생성이 끝나기 전에 달을 다시 읽어도 '보고 없음'으로 알리지 않게(목록에 보이거나 대기열이 버리면 지움)
+        apprToastShow("대표 결재로 상신 — 월말명세서 " + ym + " 차량 거래처 " + txt.n + "곳");
+      }
+      if (!g.done.length){ queue(); STMT.appr = null; stmtOutDone(); return; }   // 보고만 다시(전달함 표시는 이미 됨)
+      return gwCall("gw-stmt", { action: "stmt_sent", ym: ym, group: "veh", via: "appr", ref: ref, items: stmtOutItems(g.done) }).then(function(res){
+        var ok = res.status === 200 && res.body && res.body.status === "OK";
+        if (ok) queue();
+        if (STMT.who !== who) return;
+        STMT.outBusy = false;
+        if (res.status === 401){ stmtOutBarRender(); onSessionInvalid(); return; }
+        if (ok) STMT.appr = null; else gwToast("올리지 못했습니다 — " + stmtOutErr(res), true);
+        stmtOutAfter(res, ym, who);
+      });
+    }).catch(function(){ if (STMT.who !== who) return; stmtOutDone(); gwToast("네트워크 오류 — 달을 다시 읽습니다(전달함이 됐는데 보고가 없으면 줄이 붉게 알리고 다시 올릴 수 있습니다)", true); stmtLoadMonth(); });
+  }
+  // 결제 지시 — 기성 탭 입금확인 지시(createRecTask)처럼 모듈이 대신 만든다: 지시자 칸 = '월말명세서', 누른 사람 = from_id·by(지시 권한과 무관 — 11/13 운영 백업 실측 권민지 tasks 'hide').
+  //   서버 지시 쓰기는 인증 회원이면 받음(gw-data — UI 권한 구분) · 공개 범위 = 결제 담당만(관리자·지시자 from_id는 늘 봄 — 금액이 든 지시를 전체 공개로 두지 않게)
+  function stmtPayTask(tid, pid, ym, txt, rs){
+    var today = todayStr(), t = { id: tid, title: txt.title, detail: txt.detail, who_id: pid, who: memberName(pid), scope: [pid], from: "월말명세서", from_id: myId(), by: getUser(), due: "",
+      status: "open", done_at: null, done_by: null, created: today, updated: today, stmt_ref: "stmt:" + ym + ":tool", stmt_vks: rs.map(function(r){ return r.vk; }) };
+    tasks.push(t);
+    saveTasksCache(); renderTasks(); renderSummary(); scheduleTasksSave();
+    if (pid !== myId()) gwCall("gw-data", { action: "push_send", to: pid, title: "새 지시: 작업용구 결제 " + ym + " (" + rs.length + "곳)", body: "월말명세서 · " + getUser() + " — 결재 없이 결제", tag: "task-" + tid }).catch(function(){});
+    return t;
+  }
+  function stmtOutTool(){
+    var ym = STMT.ym, who = STMT.who, g = stmtOutGroup("tool"), orph = stmtToolOrphans(ym, g), pid = stmtPayerId();
+    if (!canDo("stmt") || STMT.outBusy || !STMT.month || STMT.ed || STMT.cfg) return;
+    if (!g.done.length && !orph.length){ gwToast("확정한 작업용구 거래처가 없습니다 — 상세에서 [확정 저장]부터 해 주세요", true); return; }
+    if (!pid){ alert("결제 담당(" + STMT_PAYER + ")을 재직 회원에서 찾지 못했습니다 — 관리자께 알려 주세요."); return; }
+    if (!(typeof autoGenReady === "object" && autoGenReady && autoGenReady.tasks)){ alert("지시 목록을 아직 서버에서 받지 못했습니다 — 잠시 뒤 다시 눌러 주세요."); return; }   // 받기 전 지시를 넣고 저장하면 판 표식(tasksSha) 없이 저장돼 남의 지시를 덮을 수 있음
+    if (!orph.length){ stmtOutToolGo(ym, who, g, [], pid); return; }
+    // 지시로 전달함인데 이 기기 지시 목록에 지시가 안 보이는 곳 — 목록이 낡았을 수 있어(다른 기기에서 만든 지시) 서버에서 새로 받아 다시 판정(결제 지시를 두 번 만들지 않게)
+    STMT.outBusy = true; stmtOutBarRender();
+    gwCall("gw-data", { action: "get", collection: "tasks" }).then(function(res){
+      var items = (res.status === 200 && res.body && res.body.doc && Array.isArray(res.body.doc.items)) ? res.body.doc.items : null, o2;
+      if (STMT.who !== who) return;
+      STMT.outBusy = false;
+      if (!items){ stmtOutBarRender(); gwToast("지시 목록을 새로 받지 못해 보내지 않았습니다 — 잠시 뒤 다시 눌러 주세요", true); return; }
+      g = stmtOutGroup("tool"); o2 = stmtToolOrphans(ym, g, items);
+      if (o2.length < orph.length && typeof loadTasks === "function") loadTasks();   // 이 기기 지시 목록이 낡았음 — 새로 받아 둠
+      if (!g.done.length && !o2.length){ stmtOutBarRender(); gwToast("결제 지시가 이미 있습니다(다른 기기에서 만듦) — 지시 목록을 새로 받습니다", true); return; }
+      stmtOutToolGo(ym, who, g, o2, pid);
+    }).catch(function(){ if (STMT.who !== who) return; STMT.outBusy = false; stmtOutBarRender(); gwToast("네트워크 오류 — 잠시 뒤 다시 눌러 주세요", true); });
+  }
+  function stmtOutToolGo(ym, who, g, orph, pid){
+    var rs = g.done.concat(orph), txt = stmtPayText(ym, rs), tid;
+    if (STMT.ym !== ym || STMT.ed || STMT.cfg){ stmtOutBarRender(); return; }
+    if (!confirm(memberName(pid) + " 주임께 " + ym + " 작업용구 결제 지시를 보냅니다(결재 없음).\n\n" + txt.title + "\n" + txt.detail + "\n\n"
+      + (g.done.length ? "확정 " + g.done.length + "곳은 '전달함'이 됩니다. 보낼까요?" : "전달함 표시는 이미 돼 있어 지시만 다시 만듭니다. 보낼까요?"))){ stmtOutBarRender(); return; }
+    tid = genId("t");
+    if (!g.done.length){ stmtPayTask(tid, pid, ym, txt, rs); gwToast(memberName(pid) + " 주임께 결제 지시를 다시 만들었습니다(" + rs.length + "곳)"); stmtOutBarRender(); return; }
+    STMT.outBusy = true; stmtOutBarRender();
+    gwCall("gw-stmt", { action: "stmt_sent", ym: ym, group: "tool", via: "task", ref: tid, items: stmtOutItems(g.done) }).then(function(res){
+      if (STMT.who !== who) return;   // 사람이 바뀜 — 지시는 안 만듦(누른 사람이 아니게 됨 — 전달함만 된 곳은 보고·결제 줄이 알려 다시 만듦)
+      STMT.outBusy = false;
+      if (res.status === 401){ stmtOutBarRender(); onSessionInvalid(); return; }
+      if (res.status === 200 && res.body && res.body.status === "OK"){ stmtPayTask(tid, pid, ym, txt, rs); gwToast(memberName(pid) + " 주임께 결제 지시를 보냈습니다(" + rs.length + "곳)"); }
+      else gwToast("보내지 못했습니다 — " + stmtOutErr(res), true);
+      stmtOutAfter(res, ym, who);
+    }).catch(function(){ if (STMT.who !== who) return; stmtOutDone(); gwToast("네트워크 오류 — 달을 다시 읽습니다(전달함이 됐는데 지시가 없으면 줄이 붉게 알리고 다시 만들 수 있습니다)", true); stmtLoadMonth(); });
+  }
+
+  // ---- 29 판⑤ ⓒ 차량 탭 상세 '월말명세서' 칸 — stmt_veh(월 색인만: 달별 종류 건수·부가세 포함 금액 · 확정·검산 통과 거래처만, 작성 중은 '빠짐' 곳 수) ----
+  var STMT_VH = {};   // 차량 id → { at, loading, err, months, failed, names } — 5분 안엔 다시 안 읽음(상세를 다시 그릴 때마다 부르지 않게) · 사람이 바뀌면 stmtReset이 비움
+  function stmtVhRedraw(id){ if (currentTab === "veh" && vehOpenId === id && vehDetTab === "stmt") renderVehicles(); }
+  function stmtVhLoad(id){
+    var prev = Object.prototype.hasOwnProperty.call(STMT_VH, id) ? STMT_VH[id] : null;   // 다시 읽는 동안 옛 표를 그대로(깜빡임 없이)
+    var c = STMT_VH[id] = { at: Date.now(), loading: true, err: "", months: prev ? prev.months : null, failed: prev ? prev.failed : [], names: prev ? prev.names : {} };
+    gwCall("gw-stmt", { action: "stmt_veh", veh: id, n: 12 }).then(function(res){
+      if (STMT_VH[id] !== c) return;   // 사람이 바뀌었거나 다시 읽음
+      c.loading = false; c.at = Date.now();
+      if (res.status === 401){ c.err = "로그인이 풀렸습니다 — 다시 로그인해 주세요."; onSessionInvalid(); }
+      else if (res.status === 200 && res.body && res.body.status === "OK" && Array.isArray(res.body.months)){ c.months = res.body.months; c.failed = res.body.failed || []; c.names = (res.body.names && typeof res.body.names === "object") ? res.body.names : {}; }
+      else c.err = stmtErrText(res);
+      stmtVhRedraw(id);
+    }).catch(function(){ if (STMT_VH[id] !== c) return; c.loading = false; c.at = Date.now(); c.err = "네트워크 오류"; stmtVhRedraw(id); });
+    return c;
+  }
+  function stmtVhHtml(id){
+    var c, h, tot = 0;
+    stmtViewer();   // 사람이 바뀌었으면 앞사람이 읽은 칸을 비움
+    c = Object.prototype.hasOwnProperty.call(STMT_VH, id) ? STMT_VH[id] : null;
+    if (!c || (!c.loading && Date.now() - (c.at || 0) > 300000)) c = stmtVhLoad(id);
+    if (!c.months) return '<div class="vs-empty">' + (c.err ? '<span class="st-no">' + esc(c.err) + '</span> <button type="button" class="vs-chip" data-st-vreload="' + esc(id) + '">다시 읽기</button>' : '월말명세서 이력을 불러오는 중…') + '</div>';
+    h = '<div class="st-vhd">월말명세서 — 확정·검산 통과 거래처의 이 차량 줄 합(부가세 포함) · 최근 12달</div>';
+    if (!c.months.length) return h + '<div class="vs-empty">최근 12달 월말명세서에 이 차량 줄이 없습니다.' + (c.loading ? ' (다시 읽는 중…)' : '') + '</div>';
+    h += '<table class="vs-hist"><thead><tr><th>달</th><th class="num">합계</th><th>종류별</th><th>거래처</th></tr></thead><tbody>';
+    c.months.forEach(function(m){
+      var kd = (m.kinds && typeof m.kinds === "object") ? m.kinds : {}, ks = Object.keys(STMT_KIND).filter(function(k){ return Object.prototype.hasOwnProperty.call(kd, k); }).concat(Object.keys(kd).filter(function(k){ return !Object.prototype.hasOwnProperty.call(STMT_KIND, k); }));
+      tot += Number(m.total) || 0;
+      h += '<tr><td style="white-space:nowrap;">' + esc(m.ym) + '</td><td class="num">' + ((m.vendors || []).length ? stmtNum(m.total) : STMT_DASH) + '</td><td>'
+        + (ks.length ? ks.map(function(k){ var p = kd[k] || [0, 0]; return esc(STMT_KIND[k] || k) + ' ' + p[0] + '건 ' + stmtNum(p[1]); }).join(' · ') : STMT_DASH) + '</td><td>'
+        + esc((m.vendors || []).map(function(vk){ return c.names[vk] || vk; }).join(", "))
+        + ((m.pending || []).length ? ' <span class="st-mute">(작성 중 ' + m.pending.length + '곳 빠짐)</span>' : '') + '</td></tr>';
+    });
+    h += '</tbody><tfoot><tr><td><b>합계</b></td><td class="num"><b>' + stmtNum(tot) + '</b></td><td colspan="2"></td></tr></tfoot></table>'
+      + ((c.failed || []).length ? '<div class="st-mute" style="font-size:12px;">못 읽은 달: ' + esc(c.failed.join(", ")) + '</div>' : '')
+      + (c.err ? '<div style="font-size:12px;"><span class="st-no">' + esc(c.err) + '</span> <button type="button" class="vs-chip" data-st-vreload="' + esc(id) + '">다시 읽기</button></div>' : (c.loading ? '<div class="st-mute" style="font-size:12px;">다시 읽는 중…</div>' : ''));
+    return h;
+  }
+
   function stmtBindOnce(){   // 자리(#stmtEditor·#stmtCfg·#stmtCfgBar·달 버튼)는 다시 그려도 그대로인 요소라 한 번만 건다
-    var host = document.getElementById("stmtEditor"), cfh = document.getElementById("stmtCfg"), cfb = document.getElementById("stmtCfgBar"), pv = document.getElementById("stmtPrev"), nx = document.getElementById("stmtNext");
+    var host = document.getElementById("stmtEditor"), cfh = document.getElementById("stmtCfg"), cfb = document.getElementById("stmtCfgBar"), ob = document.getElementById("stmtOutBar"), pv = document.getElementById("stmtPrev"), nx = document.getElementById("stmtNext");
     if (STMT.bound || !host) return;
     STMT.bound = true;
     host.addEventListener("input", stmtOnInput);
@@ -9373,11 +9662,12 @@
     host.addEventListener("focusout", stmtOnBlur);
     if (cfh){ cfh.addEventListener("input", stmtCfgOnInput); cfh.addEventListener("change", stmtCfgOnChange); cfh.addEventListener("click", stmtCfgOnClick); }
     if (cfb) cfb.addEventListener("click", function(e){ var el = e && e.target; while (el && el !== cfb && !(el.getAttribute && el.getAttribute("data-st-cfg") != null)) el = el.parentNode; if (el && el !== cfb && !el.disabled) stmtCfgOpen(); });
+    if (ob) ob.addEventListener("click", function(e){ var el = e && e.target; while (el && el !== ob && !(el.getAttribute && el.getAttribute("data-st-out") != null)) el = el.parentNode; if (!el || el === ob || el.disabled) return; if (el.getAttribute("data-st-out") === "veh") stmtOutVeh(); else stmtOutTool(); });   // 29 판⑤ 보고·결제 줄
     if (pv) pv.addEventListener("click", function(){ stmtMonth(-1); });
     if (nx) nx.addEventListener("click", function(){ stmtMonth(1); });
   }
   // 보는 사람이 바뀌면(로그인 창 '전환' — 새로고침 없음) 앞사람이 연 달·상세·고치던 줄·거래처 목록 고침을 비운다(vsSheetViewer와 같은 까닭) · 로그아웃(clearSessionData)도 같은 비우기
-  function stmtReset(){ STMT.mseq++; STMT.eseq++; STMT.cseq++; STMT.ym = ""; STMT.month = null; STMT.loading = false; STMT.err = ""; STMT.errCode = ""; STMT.ed = null; STMT.cfg = null; STMT.aliasAt = 0; STMT.open = {}; STMT.who = null; STMT_AQ = STMT_AQ.filter(function(o){ return o.busy; }); }   // 아직 안 보낸 별칭 저장은 버림(보내는 중인 것은 STMT.who로 다시 시도를 막음)
+  function stmtReset(){ STMT.mseq++; STMT.eseq++; STMT.cseq++; STMT.ym = ""; STMT.month = null; STMT.loading = false; STMT.err = ""; STMT.errCode = ""; STMT.ed = null; STMT.cfg = null; STMT.aliasAt = 0; STMT.open = {}; STMT.who = null; STMT_AQ = STMT_AQ.filter(function(o){ return o.busy; }); STMT.appr = null; STMT.aseq++; STMT.outBusy = false; STMT.rpt = {}; STMT_VH = {}; }   // 아직 안 보낸 별칭 저장은 버림(보내는 중인 것은 STMT.who로 다시 시도를 막음)
   function stmtViewer(){ var who = (typeof myId === "function") ? String(myId() || "") : ""; if (STMT.who === who) return; if (STMT.who !== null) stmtReset(); STMT.who = who; }
   // 탭 입구 — 월 보드(부품 갈래 함수) 또는 거래처 상세. 처음·사람이 바뀐 뒤엔 그 달을 읽는다(읽기 실패는 '다시 읽기'로만 — 저절로 되풀이하지 않음)
   function renderStmt(){
@@ -9389,14 +9679,14 @@
     if (ymEl) ymEl.textContent = STMT.ym;
     if (STMT.cfg && !canDo("stmt")){ STMT.cfg = null; STMT.cseq++; }   // 거래처 목록 고치기는 수행만
     ed = STMT.ed; cf = !ed && STMT.cfg;
-    ["stmtMonBar", "stmtStats", "stmtBoardMsg", "stmtBoard", "stmtCfgBar"].forEach(function(id){ var el = document.getElementById(id); if (el) el.style.display = (ed || cf) ? "none" : ""; });
+    ["stmtMonBar", "stmtStats", "stmtBoardMsg", "stmtOutBar", "stmtBoard", "stmtCfgBar"].forEach(function(id){ var el = document.getElementById(id); if (el) el.style.display = (ed || cf) ? "none" : ""; });
     edHost.style.display = ed ? "" : "none";
     if (cfHost){ cfHost.style.display = cf ? "" : "none"; if (!cf) cfHost.innerHTML = ""; }
     if (ed){ stmtEdRender(); return; }
     edHost.innerHTML = "";
     if (cf){ stmtCfgRender(); return; }
     if (!STMT.month && !STMT.loading && !STMT.err) stmtLoadMonth();
-    stmtRenderStats(); stmtRenderMsg(); stmtCfgBarRender();
+    stmtRenderStats(); stmtRenderMsg(); stmtCfgBarRender(); stmtOutBarRender();
     if (STMT.month) vsSheetRender(stmtSheetDef());
     else { board.removeAttribute("data-vs-mode"); board.innerHTML = STMT.err ? "" : '<div class="loading">불러오는 중…</div>'; }
   }
@@ -9515,7 +9805,7 @@
   // 상세 — PC는 행 아래 펼침, 폰은 표 아래 카드(#vehDetailCard). 하위 탭 개요/정비 이력. 편집은 기존 모달(수정·정비 이력) 그대로
   function vehDetailHtml(v){
     if (!v) return '<div class="vs-empty">목록에서 차량을 누르면 상세가 여기에 펼쳐집니다.</div>';
-    var grey = isGreyState(v), cost = 0, hist = (v.history || []).slice(), h, di, ds, kv;
+    var grey = isGreyState(v), cost = 0, hist = (v.history || []).slice(), h, di, ds, kv, tb;
     hist.forEach(function(x){ cost += Number(x.cost) || 0; });
     hist.sort(function(a, b){ return String(b.date || "").localeCompare(String(a.date || "")); });
     h = '<div class="vs-dh"><b>' + esc(v.no || "") + '</b>' +
@@ -9523,9 +9813,12 @@
       (v.state ? '<span class="own-badge" style="background:#EEF0EF;color:#444;">' + esc(v.state) + '</span>' : '') +
       '<span style="color:var(--sub);font-size:12.5px;">' + esc(v.type || "") + (v.kind ? ' · ' + esc(v.kind) : '') + '</span>' +
       '<button type="button" class="vs-chip" data-vs-close="1" style="margin-left:auto;">닫기 ▲</button></div>';
-    h += '<div class="vs-stabs"><button type="button" class="vs-stab' + (vehDetTab === "ov" ? ' on' : '') + '" data-vs-tab="ov">개요</button>' +
-      '<button type="button" class="vs-stab' + (vehDetTab === "hist" ? ' on' : '') + '" data-vs-tab="hist">정비 이력 (' + hist.length + ')</button></div>';
-    if (vehDetTab === "hist"){
+    tb = (vehDetTab === "stmt" && !canSee("stmt")) ? "ov" : vehDetTab;   // 29 판⑤ 월말명세서 칸은 월말명세서 보기 권한자만(그 밖이면 개요)
+    h += '<div class="vs-stabs"><button type="button" class="vs-stab' + (tb === "ov" ? ' on' : '') + '" data-vs-tab="ov">개요</button>' +
+      '<button type="button" class="vs-stab' + (tb === "hist" ? ' on' : '') + '" data-vs-tab="hist">정비 이력 (' + hist.length + ')</button>' +
+      (canSee("stmt") ? '<button type="button" class="vs-stab' + (tb === "stmt" ? ' on' : '') + '" data-vs-tab="stmt">월말명세서</button>' : '') + '</div>';
+    if (tb === "stmt") h += stmtVhHtml(v.id);
+    else if (tb === "hist"){
       h += hist.length ? '<table class="vs-hist"><thead><tr><th>일자</th><th>구분</th><th>내용</th><th class="num">비용</th><th>업체</th></tr></thead><tbody>' +
         hist.map(function(x){ return '<tr><td>' + esc(x.date || "") + '</td><td>' + esc(x.kind || "") + '</td><td>' + esc(x.content || "") + '</td><td class="num">' + (x.cost ? Number(x.cost).toLocaleString() : "") + '</td><td>' + esc(x.vendor || "") + '</td></tr>'; }).join("") +
         '</tbody><tfoot><tr><td colspan="3"><b>누적 수리비</b></td><td class="num"><b>' + cost.toLocaleString() + '</b></td><td></td></tr></tfoot></table>'
@@ -9628,7 +9921,8 @@
       bindSelBoxes(root);
       Array.prototype.forEach.call(root.querySelectorAll("[data-veh-edit]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); openVehModal(el.getAttribute("data-veh-edit")); }); });
       Array.prototype.forEach.call(root.querySelectorAll("[data-veh-hist]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); openVehHistory(el.getAttribute("data-veh-hist")); }); });
-      Array.prototype.forEach.call(root.querySelectorAll("[data-vs-tab]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); vehDetTab = el.getAttribute("data-vs-tab") === "hist" ? "hist" : "ov"; renderVehicles(); }); });
+      Array.prototype.forEach.call(root.querySelectorAll("[data-vs-tab]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); var k = el.getAttribute("data-vs-tab"); vehDetTab = (k === "hist" || k === "stmt") ? k : "ov"; renderVehicles(); }); });
+      Array.prototype.forEach.call(root.querySelectorAll("[data-st-vreload]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); var id = el.getAttribute("data-st-vreload"); if (Object.prototype.hasOwnProperty.call(STMT_VH, id)) delete STMT_VH[id]; renderVehicles(); }); });   // 29 판⑤ 차량 탭 월말명세서 칸 다시 읽기
       Array.prototype.forEach.call(root.querySelectorAll("[data-vs-close]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); vehOpenId = null; renderVehicles(); }); });
     });
     Array.prototype.forEach.call(host.querySelectorAll("tr.vs-r"), function(tr){
@@ -29634,7 +29928,7 @@
   }
   // ---- 결재 등급표(결재 3차, 명세 §2) — 종류 × 등급 칩(시안 표 ②). PM=admin만 변경(서버도 강제), 변경 감사로그. ----
   // 순서·표기는 §2 확정표. 키 문자열은 서버 APPR_GRADE_DEFAULTS와 동일해야 한다(uismoke가 대조).
-  var APPR_GRADE_ORDER = ["운반일지","지시","사규","매뉴얼","가족친화","지입료","휴가","사직·휴직","계약 단계","청구 검수","문서함 등재","견적","인허가 등재","조기퇴근"];
+  var APPR_GRADE_ORDER = ["운반일지","지시","사규","매뉴얼","가족친화","지입료","월말명세서","휴가","사직·휴직","계약 단계","청구 검수","문서함 등재","견적","인허가 등재","조기퇴근"];
   var APPR_GRADE_TXT = { 1:"①PM 전결", 2:"②결재라인", 3:"③대표 전결", 0:"현행(미정)" };
   var APPR_GRADE_ROUTE = { 1:"담당 → PM ✔ (종결) · 월간 총정리로 대표 확인", 2:"담당 → PM ✔ → 대표 ✔", 3:"담당 → 대표 ✔ · PM은 알림함 확인", 0:"현행(관리자 전원 목록 · 대표 상신 토글)" };
   var apprGradesTbl = null;

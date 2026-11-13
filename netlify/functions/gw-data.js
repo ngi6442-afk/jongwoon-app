@@ -1686,8 +1686,9 @@ function apprBossOnly(it) { return !!it && (it.to === 'boss' || (it.to == null &
 const APPR_GRADES_KEY = 'settings:approvals';
 // §2 배정표 — 9/3 PM 전량 확정(① 11종 · ② 사직·휴직 · ③ 운반일지·지입료). 기존 결재 종류 5종은 라이브 kind 문자열
 // 그대로, 나머지는 각 모듈에 결재 생성 훅이 붙을 때 이 키와 같은 kind로 상신해야 등급이 먹는다(§3.3).
+// 29 판⑤(PM 11/12 23:41 · 11/13): 월말명세서 = 차량 거래처 사장님 보고 — 운반일지와 같은 ③ 대표 전결(작업용구 거래처는 결재 없이 나수진 주임 담당 지시)
 const APPR_GRADE_DEFAULTS = {
-  '운반일지': 3, '지입료': 3,
+  '운반일지': 3, '지입료': 3, '월말명세서': 3,
   '사직·휴직': 2,
   '지시': 1, '사규': 1, '매뉴얼': 1, '가족친화': 1, '휴가': 1, '계약 단계': 1,
   '청구 검수': 1, '문서함 등재': 1, '견적': 1, '인허가 등재': 1, '조기퇴근': 1,
@@ -3735,8 +3736,8 @@ async function docRegisterReconcileCreate(st, apItems) {
   return made;
 }
 // 전결 종결이 불가한 종류(v315) — 각각 전용 경로가 있다: 운반일지(③·올바로 자동 기안), 문서함 등재(문서함 게이트 훅 — 문서 '등재'와 사규 '결재'는 별개 행위),
-// 휴가(휴가 모듈 승인·총정리 읽기 합산), 전결총정리(크론). 기안 화면(index APPR_DRAFT_EXCLUDE)과 같은 목록이어야 한다(uismoke 대조).
-const APPR_SELF_DECIDE_EXCLUDE = { '지시': 1, '운반일지': 1, '문서함 등재': 1, '휴가': 1, '전결총정리': 1 };   // 지시는 지시 탭 전용(담당 완료→승인 흐름·ref=지시 id) — 기안 화면·전결 대상 아님(low8)
+// 휴가(휴가 모듈 승인·총정리 읽기 합산), 전결총정리(크론), 월말명세서(29 판⑤ — 월말명세서 탭 월 보드 [대표 결재 상신]). 기안 화면(index APPR_DRAFT_EXCLUDE)과 같은 목록이어야 한다(uismoke 대조).
+const APPR_SELF_DECIDE_EXCLUDE = { '지시': 1, '운반일지': 1, '문서함 등재': 1, '휴가': 1, '전결총정리': 1, '월말명세서': 1 };   // 지시는 지시 탭 전용(담당 완료→승인 흐름·ref=지시 id) — 기안 화면·전결 대상 아님(low8)
 // 전결 거부 응답(v321 관리자 등급) — 관리자 등급(admin, 예: 관리부)은 403 PM_ONLY(권한 없음·클라는 [전결 종결] 버튼 자체를 숨긴다), 직원·대표는 종전 400 SELF_DECIDE_PM_ONLY(전결 대상 아님)
 function apprSelfDecideDeny(myTier, R) {   // myTier = push.tierCtx().tierOf(요청자) — 명시 tier 기준(9/6 검증 S1)
   if (myTier === 'admin') return jr(403, { status: 'FORBIDDEN', error_code: 'PM_ONLY', request_id: R });
@@ -3753,6 +3754,15 @@ async function handleApprovalCreate(event, d, R) {
   if (!title) return jr(400, { status: 'REJECTED', error_code: 'NO_TITLE', request_id: R });
   const kind0 = String(d.kind || '일반').slice(0, 20);
   if (kind0 === '전결총정리') return jr(400, { status: 'REJECTED', error_code: 'SYSTEM_KIND', request_id: R });   // 크론 전용 kind — 사용자 기안 불가(§3.3)
+  // 29 판⑤ 월말명세서 사장님 보고: 월말명세서 수행 권한자만(gw-stmt stmtPerm과 같은 규칙 — 관리자 수행 · perms.stmt · 값 없음 = 숨김) · ref는 'stmt:달:veh' 꼴만.
+  //   거꾸로 stmt: ref는 이 종류만 — 아래 정정 흡수(dupOpenRef)가 같은 ref의 열린 카드를 고쳐 쓰므로, 다른 종류가 그 ref로 사장님 보고 카드를 덮지 못하게
+  const refRaw = String(d.ref || '');
+  if (kind0 === '월말명세서') {
+    const sp = c.member.admin ? 'do' : ((c.member.perms && c.member.perms.stmt) || 'hide');
+    if (sp !== 'do') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_WRITE', request_id: R });
+    if (!c.member.admin && c.member.perms && c.member.perms.veh === 'hide') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_VEH_ACCESS', request_id: R });   // gw-stmt와 같은 규칙(차량 숨김이면 명세서 동작 전부 거절 — 보고 카드도)
+    if (!/^stmt:20\d{2}-(0[1-9]|1[0-2]):veh$/.test(refRaw)) return jr(400, { status: 'REJECTED', error_code: 'BAD_REF', request_id: R });   // 달 꼴 = _lib/stmt RE_YM
+  } else if (refRaw.indexOf('stmt:') === 0) return jr(400, { status: 'REJECTED', error_code: 'BAD_REF', request_id: R });
   // 전결 종결(v315, PM 9/4 "사규·가족친화 결재는 어딨노"): 기안자가 비대표 관리자(PM)이고 ① 등급이면 기안=결재 —
   // 카드 생성과 '승인' 기록을 한 번의 쓰기로(create+decide 두 번 왕복 금지, 결재 큐에 잠깐이라도 뜨지 않게).
   // 거부는 전부 400(클라가 [상신]으로 되돌리게): 비관리자·대표(대표는 기안 대상 아님) / ②·③·미정 등급 / 전용 경로가 있는 종류
@@ -3791,9 +3801,12 @@ async function apprCreateItem(st, member, o) {
   // body를 수기 포함본으로 고칠 통로를 없앤다(리뷰 med). 승인·반려 종결 건은 통과 → 재상신 경로 보존.
   // 비관리자는 목록에서 타인·시스템 상신을 못 보므로 클라 중복 검사만으론 못 막는다 — 여기가 최후 방어선
   const refIn = String(o.ref || '').slice(0, 60);
+  // 29 판⑤: 월말명세서 보고(ref stmt:달:veh)도 같은 길 — 결재 대기·보류 중에 늦게 온 거래처를 확정해 다시 올리면 새 카드가 아니라 그 카드를 고친 판으로(대표 결재함에 같은 달 카드 두 장 금지).
+  //   stmt:는 같은 종류(월말명세서)만 흡수(ab:는 종전 그대로)
   function dupOpenRef(items) {
-    if (refIn.indexOf('ab:') !== 0) return null;
-    return items.find(function (x) { return x && x.ref === refIn && (x.status === '대기' || x.status === '보류'); }) || null;
+    const isAb = refIn.indexOf('ab:') === 0, isStmt = refIn.indexOf('stmt:') === 0;
+    if (!isAb && !isStmt) return null;
+    return items.find(function (x) { return x && x.ref === refIn && (x.status === '대기' || x.status === '보류') && (isAb || x.kind === kind0); }) || null;
   }
   // 등급 스탬프(결재 3차 §4.3) — to·grade는 서버가 종류로 정한다(클라 값 불신). 기안 시점 스냅샷이라 이후 표 변경에 영향 없음.
   // 스냅샷 쓰기보다 앞에서 읽는다 — 전결 종결(v315)의 등급 거부가 복구 링에 빈 스냅샷을 남기지 않게
@@ -3810,7 +3823,7 @@ async function apprCreateItem(st, member, o) {
   if (selfDecide) {
     if (memberT !== 'pm') return (memberT === 'admin') ? { ok: false, code: 'PM_ONLY', http: 403 } : { ok: false, code: 'SELF_DECIDE_PM_ONLY', http: 400 };   // 전결 = tier pm만(v321)
     if (grade !== 1) return { ok: false, code: 'SELF_DECIDE_GRADE1_ONLY', http: 400 };
-    if (refIn.indexOf('ab:') === 0) return { ok: false, code: 'SELF_DECIDE_KIND', http: 400 };   // 운반일지 ref는 정정 흡수 경로(dupOpenRef) — 전결과 섞이지 않게
+    if (refIn.indexOf('ab:') === 0 || refIn.indexOf('stmt:') === 0) return { ok: false, code: 'SELF_DECIDE_KIND', http: 400 };   // 운반일지·월말명세서(29 판⑤) ref는 정정 흡수 경로(dupOpenRef) — 전결과 섞이지 않게
   }
   await verSnapshot('approvals', doc, member.name, false);   // 쓰기 전 시점 보존(복구 링 — 다른 컬렉션과 동일)
   // 레이스 창 축소: verSnapshot 왕복 사이 착지한 동시 결재/상신을 덮지 않게 쓰기 직전 신선본에 얹는다(3차=항목별 키 분리)

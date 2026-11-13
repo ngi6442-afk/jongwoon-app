@@ -7157,6 +7157,7 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
 }
 
 // 86 체크 29 월말명세서 1단계 판①(gw-stmt.js·_lib/stmt.js — 시안 v2, PM 11/10 18:13 '추천대로 ㄱ' · 11/10 독립 검토 2관점 34건 반영): 권한(관리자 수행 · perms.stmt do/view · 값 없으면 숨김 · 기기 승인 먼저 · 퇴사) /
+//    ⑯ 29 판⑤ — 전달함 표시 stmt_sent(묶음↔길·확정만·낡은 판 409·전부 아니면 안 씀·전달 기록·되돌리기) + 결재 kind '월말명세서'(③·정정 흡수·수행 권한·ref 꼴)
 //    거래처 목록(시드 12곳·낙관락·지우기·묶음 바꾸기 금지·NO_CHANGE) / 저장 정리(월 밖 날짜·개인정보 꼴·없는 거래처·없는 차량·낡은 base) · 서버 검산 · 확정·전달 막기(NOT_BALANCED) ·
 //    초안 짝(DRAFT_EXISTS·DRAFT_ON_FINAL)·확정 때·확정 뒤 고칠 때 간극 1줄·확정 풀 때 reopen(값 없음·해시 체인·깨진 기록은 안 덮음) · 월 색인(부가세 포함 한 기준)·다시 만들기(접두어) ·
 //    되돌리기(한 판·초안까지) · 차량 별칭(정규화·끝 4자리 감사) · 차량별 이력(확정분만) · 차량 대조(veh 권한) · 잔액형 4칸 · 읽기 실패면 덮지 않음 · 순수 규칙 경계(허용 오차·세 기준·소수 자릿수·객체 오염)
@@ -7454,6 +7455,134 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
       && g15a.code === 200 && pg15a.stmt === 'do' && s15a.code === 200 && g15b.code === 200 && pg15b.stmt === 'hide' && s15b.code === 403 && s15b.body.error_code === 'NO_ACCESS'
       && g15c.code === 200 && s15r.code === 200 && s15w.code === 403 && s15w.body.error_code === 'NO_WRITE',
       JSON.stringify({ a15: [a15.code, a15.body.checks && a15.body.checks.bad, a15.body.checks && a15.body.checks.issues], a15d: [a15d.code, a15d.body.error_code], a15e: a15e.code, a15c: [a15c.bad, a15c.sum_gross, a15c.est], g: [g15a.code, pg15a.stmt, s15a.code, g15b.code, pg15b.stmt, s15b.code, g15c.code, s15r.code, s15w.code] }));
+
+    // ⑯ 29 판⑤(PM 11/12 23:41 '운반일지 보고, 결재 탭' · 11/13 '결재 없이') — 전달함 표시 stmt_sent + 결재 kind '월말명세서'(③ 대표 전결)
+    //    stmt_sent: 보기 403 NO_WRITE · 묶음↔길 짝(veh = 결재 상신 · tool = 결제 지시) · 작성 중 섞임 NOT_DONE · 낡은 base 409 · 다른 묶음 GROUP_MISMATCH · 문서 없음 NO_DOC · 같은 곳 두 번 BAD_ITEMS · ref 꼴 BAD_REF —
+    //      실패면 아무것도 안 씀 · 성공 = 전부 sent·전달 기록(via·ref·by)·prev = 확정 판·줄 그대로 · 색인 요약 sent{at,via} · 감사 '명세서전달' 1줄 · 다시 보내면 NOT_DONE ·
+    //      [되돌리기] = 확정으로(전달 기록 지움) · 상세 [전달함](stmt_save sent) = via manual · 확정 풀기(doing) = 전달 기록 지움
+    //    결재 '월말명세서': grade 3·to boss · 열린 카드 있으면 정정 흡수(같은 id·카드 1장) · 월말명세서 수행 아닌 직원 403 NO_WRITE · ref 꼴(달·tool) 400 BAD_REF · 다른 종류의 stmt: ref 400 · 전결 400 · 승인 뒤 다시 = 새 카드
+    const R16 = (o) => Object.assign({ r: 'p1', date: '2026-09-03', veh: 'veh_a', vraw: '0001', item: '요소수', kind: 'urea', qty: '10', unit: '1000', amt: 10000, how: 'hand' }, o);
+    const T16 = (o) => Object.assign({ r: 't1', date: '2026-09-05', veh: '', vraw: '', item: '장갑', kind: 'tool', use: 'posco_cip', qty: '10', unit: '1000', amt: 10000, how: 'hand' }, o);
+    async function mk16(vk, rows, status) {
+      const a = await cs86({ action: 'stmt_save', ym: '2026-09', vk: vk, base: 0, rows: rows, stated: 10000 }, tokA);
+      if (!status || a.code !== 200) return a;
+      return cs86({ action: 'stmt_save', ym: '2026-09', vk: vk, base: a.body.doc.updated_at, status: status, rows: rows, stated: 10000 }, tokA);
+    }
+    const d16 = [await mk16('v07', [R16({})], 'done'), await mk16('v03', [R16({ kind: 'part', item: '필터' })], 'done'), await mk16('v06', [R16({ kind: 'fuel', item: '경유' })]), await mk16('v12', [T16({})], 'done')];
+    const at16 = (vk) => (mem.gw_data['stmt:2026-09:' + vk] || {}).updated_at;
+    const it16 = (vks) => vks.map((vk) => ({ vk: vk, base: at16(vk) }));
+    const VR16 = 'stmt:2026-09:veh';
+    const many16 = []; for (let i = 0; i < 41; i++) many16.push({ vk: 'v' + (100 + i), base: 0 });
+    const e16 = [
+      await cs86({ action: 'stmt_sent', ym: '2026-09', group: 'veh', via: 'appr', ref: VR16, items: it16(['v07']) }, tV86, 'dev1'),
+      await cs86({ action: 'stmt_sent', ym: '2026-09', group: 'veh', via: 'task', ref: VR16, items: it16(['v07']) }, tokA),
+      await cs86({ action: 'stmt_sent', ym: '2026-09', group: 'veh', via: 'appr', ref: VR16, items: it16(['v07', 'v06']) }, tokA),
+      await cs86({ action: 'stmt_sent', ym: '2026-09', group: 'veh', via: 'appr', ref: VR16, items: [{ vk: 'v07', base: at16('v07') - 1 }] }, tokA),
+      await cs86({ action: 'stmt_sent', ym: '2026-09', group: 'veh', via: 'appr', ref: VR16, items: it16(['v07', 'v12']) }, tokA),
+      await cs86({ action: 'stmt_sent', ym: '2026-09', group: 'veh', via: 'appr', ref: VR16, items: it16(['v07']).concat([{ vk: 'v08', base: 0 }]) }, tokA),
+      await cs86({ action: 'stmt_sent', ym: '2026-09', group: 'veh', via: 'appr', ref: VR16, items: it16(['v07', 'v07']) }, tokA),
+      await cs86({ action: 'stmt_sent', ym: '2026-09', group: 'veh', via: 'appr', ref: 'a b', items: it16(['v07']) }, tokA),
+      await cs86({ action: 'stmt_sent', ym: '2026-09', group: 'veh', via: 'appr', ref: 'stmt:2026-10:veh', items: it16(['v07']) }, tokA),   // 다른 달 ref
+      await cs86({ action: 'stmt_sent', ym: '2026-09', group: 'veh', via: 'appr', items: it16(['v07']) }, tokA),   // ref 없음
+      await cs86({ action: 'stmt_sent', ym: '2026-09', group: 'tool', via: 'task', ref: 'x', items: it16(['v12']) }, tokA),   // 지시 id 꼴 아님
+      await cs86({ action: 'stmt_sent', ym: '2026-09', group: 'veh', via: 'appr', ref: VR16, items: many16 }, tokA),   // 41곳 > 상한 40
+      await cs86({ action: 'stmt_sent', ym: '2026-09', group: 'veh', via: 'appr', ref: VR16, items: [{ vk: 'v07', base: String(at16('v07')) }] }, tokA)   // base 글자
+    ];
+    const want16 = ['403/NO_WRITE', '400/BAD_VIA', '400/NOT_DONE', '409/STMT_STALE', '400/GROUP_MISMATCH', '400/NO_DOC', '400/BAD_ITEMS', '400/BAD_REF', '400/BAD_REF', '400/BAD_REF', '400/BAD_REF', '400/BAD_ITEMS', '400/BAD_ITEMS'];
+    const ixBefore16 = JSON.stringify(mem.gw_data['stmtidx:2026-09'] || null), audBefore16 = auditMock.logs.filter((x) => x.col === 'stmt' && x.ev[0].op === '명세서전달').length;
+    const still16 = ['v07', 'v03', 'v12'].every((vk) => mem.gw_data['stmt:2026-09:' + vk].status === 'done' && !mem.gw_data['stmt:2026-09:' + vk].sent)
+      && JSON.stringify(mem.gw_data['stmtidx:2026-09'] || null) === ixBefore16 && auditMock.logs.filter((x) => x.col === 'stmt' && x.ev[0].op === '명세서전달').length === audBefore16;   // 색인·감사도 그대로
+    const aud16 = auditMock.logs.length, rows16 = JSON.stringify(mem.gw_data['stmt:2026-09:v07'].rows);
+    const s16 = await cs86({ action: 'stmt_sent', ym: '2026-09', group: 'veh', via: 'appr', ref: 'stmt:2026-09:veh', items: it16(['v07', 'v03']) }, tD86, 'dev1');
+    const doc16 = mem.gw_data['stmt:2026-09:v07'], ix16 = JSON.parse(JSON.stringify(mem.gw_data['stmtidx:2026-09'].vendors));
+    const aud16l = auditMock.logs.slice(aud16).filter((x) => x.col === 'stmt');
+    const again16 = await cs86({ action: 'stmt_sent', ym: '2026-09', group: 'veh', via: 'appr', ref: VR16, items: it16(['v07']) }, tokA);
+    // 전달함 문서는 확정 풀기 없이 못 고침(SENT_LOCKED) · 같은 판 다시 저장은 받고 전달 기록 그대로
+    const lk16 = await cs86({ action: 'stmt_save', ym: '2026-09', vk: 'v07', base: at16('v07'), rows: [R16({ amt: 20000, qty: '10', unit: '2000' })], stated: 20000 }, tokA);
+    const lk16s = await cs86({ action: 'stmt_save', ym: '2026-09', vk: 'v07', base: at16('v07'), status: 'sent', rows: [R16({ amt: 20000, qty: '10', unit: '2000' })], stated: 20000 }, tokA);
+    const sameSent16 = JSON.stringify(mem.gw_data['stmt:2026-09:v07'].sent);
+    const lk16ok = await cs86({ action: 'stmt_save', ym: '2026-09', vk: 'v07', base: at16('v07'), rows: [R16({})], stated: 10000 }, tokA);
+    const tool16 = await cs86({ action: 'stmt_sent', ym: '2026-09', group: 'tool', via: 'task', ref: 'tabc12345', items: it16(['v12']) }, tokA);
+    const tdoc16 = mem.gw_data['stmt:2026-09:v12'];
+    const rv16 = await cs86({ action: 'stmt_revert', ym: '2026-09', vk: 'v03', base: at16('v03') }, tokA);
+    const man16 = await cs86({ action: 'stmt_save', ym: '2026-09', vk: 'v03', base: at16('v03'), status: 'sent', rows: [R16({ kind: 'part', item: '필터' })], stated: 10000 }, tokA);
+    const op16 = await cs86({ action: 'stmt_save', ym: '2026-09', vk: 'v03', base: at16('v03'), status: 'doing', rows: [R16({ kind: 'part', item: '필터' })], stated: 10000 }, tokA);
+    const ix16b = mem.gw_data['stmtidx:2026-09'].vendors;
+    T('86 ⑯ 29 판⑤ stmt_sent: 보기 403 NO_WRITE · 차량은 결재 상신만(BAD_VIA) · 작성 중 섞임 NOT_DONE · 낡은 base 409 · 다른 묶음 GROUP_MISMATCH · 문서 없음 NO_DOC · 같은 곳 두 번 BAD_ITEMS · ref 꼴 BAD_REF — 실패 때 아무것도 안 씀 · 성공 = 두 곳 sent·전달 기록(appr·ref·수행 회원)·prev 확정 판·줄 그대로·색인 sent{at,via}·감사 1줄 · 다시 = NOT_DONE · 작업용구 = via task · 되돌리기 = 확정(기록 지움) · 상세 [전달함] = manual · 확정 풀기 = 기록 지움',
+      d16.every((x) => x.code === 200) && d16[0].body.doc.status === 'done' && d16[2].body.doc.status === 'doing' && d16[3].body.doc.status === 'done'
+      && JSON.stringify(e16.map((x) => x.code + '/' + x.body.error_code)) === JSON.stringify(want16) && e16[3].body.vk === 'v07' && still16
+      && s16.code === 200 && s16.body.items.length === 2 && s16.body.items.every((x) => x.ok)
+      && doc16.status === 'sent' && doc16.sent.via === 'appr' && doc16.sent.ref === 'stmt:2026-09:veh' && doc16.sent.by === 'udo86' && doc16.prev.status === 'done' && JSON.stringify(doc16.rows) === rows16
+      && ix16.v07.status === 'sent' && ix16.v07.sent && ix16.v07.sent.via === 'appr' && ix16.v07.sent.at === doc16.sent.at && ix16.v03.status === 'sent' && ix16.v06.sent === null
+      && aud16l.length === 1 && aud16l[0].ev[0].op === '명세서전달' && /전달함 2\/2곳 · 결재 상신/.test(aud16l[0].ev[0].t)
+      && again16.code === 400 && again16.body.error_code === 'NOT_DONE'
+      && lk16.code === 400 && lk16.body.error_code === 'SENT_LOCKED' && lk16s.code === 400 && lk16s.body.error_code === 'SENT_LOCKED'
+      && lk16ok.code === 200 && lk16ok.body.doc.status === 'sent' && JSON.stringify(lk16ok.body.doc.sent) === sameSent16 && s16.body.idx === true && ix16.v07.sent.by === 'udo86'
+      && tool16.code === 200 && tdoc16.status === 'sent' && tdoc16.sent.via === 'task' && tdoc16.sent.ref === 'tabc12345'
+      && rv16.code === 200 && rv16.body.doc.status === 'done' && rv16.body.doc.sent === null
+      && man16.code === 200 && man16.body.doc.status === 'sent' && man16.body.doc.sent.via === 'manual'
+      && op16.code === 200 && op16.body.doc.status === 'doing' && op16.body.doc.sent === null && ix16b.v03.sent === null,
+      JSON.stringify({ d: d16.map((x) => x.code + '/' + ((x.body.doc || {}).status || x.body.error_code)), e: e16.map((x) => x.code + '/' + x.body.error_code), s: [s16.code, s16.body.error_code, s16.body.items], ix: ix16.v07, aud: aud16l.map((x) => x.ev[0]), again: again16.body.error_code, tool: [tool16.code, tdoc16.sent], rv: [rv16.code, rv16.body.doc && rv16.body.doc.status], man: [man16.code, man16.body.doc && man16.body.doc.sent], op: [op16.code, op16.body.doc && op16.body.doc.sent] }).slice(0, 1500));
+    // 쓰기 도중 실패(PARTIAL_WRITE): ① 두 번째 곳 쓰기 실패 → 첫 곳만 전달함·색인 그 곳만·감사 '1/2곳' ② 검사 뒤 쓰기 직전에 두 번째 곳이 다른 저장으로 바뀜 → 409 PARTIAL_WRITE(cause STMT_STALE)·그 곳은 안 덮음
+    const mk16b = async (ym, vk, rows) => { const a = await cs86({ action: 'stmt_save', ym: ym, vk: vk, base: 0, rows: rows, stated: 10000 }, tokA); return cs86({ action: 'stmt_save', ym: ym, vk: vk, base: a.body.doc.updated_at, status: 'done', rows: rows, stated: 10000 }, tokA); };
+    const R16b = (ym) => R16({ date: ym + '-04', kind: 'part', item: '필터' });
+    await mk16b('2026-08', 'v02', [R16b('2026-08')]); await mk16b('2026-08', 'v03', [R16b('2026-08')]); await mk16b('2026-07', 'v02', [R16b('2026-07')]); await mk16b('2026-07', 'v03', [R16b('2026-07')]);
+    const at16b = (ym, vk) => mem.gw_data['stmt:' + ym + ':' + vk].updated_at;
+    const audP16 = auditMock.logs.length;
+    blobsMock.hooks.failSet = (k) => k === 'stmt:2026-08:v03';
+    const pw16 = await cs86({ action: 'stmt_sent', ym: '2026-08', group: 'veh', via: 'appr', ref: 'stmt:2026-08:veh', items: [{ vk: 'v02', base: at16b('2026-08', 'v02') }, { vk: 'v03', base: at16b('2026-08', 'v03') }] }, tokA);
+    blobsMock.hooks.failSet = null;
+    const pwAud16 = auditMock.logs.slice(audP16).filter((x) => x.col === 'stmt' && x.ev[0].op === '명세서전달');
+    let rd16 = 0; const bump16 = at16b('2026-07', 'v03');
+    blobsMock.hooks.beforeGet = (k) => { if (k === 'stmt:2026-07:v03' && ++rd16 === 2) mem.gw_data[k] = Object.assign({}, mem.gw_data[k], { updated_at: bump16 + 7, stated: 10000 }); };
+    const cc16 = await cs86({ action: 'stmt_sent', ym: '2026-07', group: 'veh', via: 'appr', ref: 'stmt:2026-07:veh', items: [{ vk: 'v02', base: at16b('2026-07', 'v02') }, { vk: 'v03', base: bump16 }] }, tokA);
+    blobsMock.hooks.beforeGet = null;
+    const ri16 = await cs86({ action: 'stmt_reindex', ym: '2026-09' }, tokA);
+    T('86 ⑯-3 29 판⑤ stmt_sent 쓰기 도중: ① 두 번째 곳 쓰기 실패 = 500 PARTIAL_WRITE(cause STORAGE_WRITE_FAILED·vk)·첫 곳만 전달함(색인도 그 곳만 sent·idx true)·감사 "1/2곳"(쓴 곳 이름만) ② 쓰기 직전 다시 읽기에서 그 곳이 바뀌었으면 = 409 PARTIAL_WRITE(cause STMT_STALE)·바뀐 곳은 안 덮음(확정·바뀐 판 그대로) ③ 색인 다시 만들기 = 전달 기록 요약(by 포함) 그대로',
+      pw16.code === 500 && pw16.body.error_code === 'PARTIAL_WRITE' && pw16.body.cause === 'STORAGE_WRITE_FAILED' && pw16.body.vk === 'v03' && pw16.body.items.length === 1 && pw16.body.idx === true
+      && mem.gw_data['stmt:2026-08:v02'].status === 'sent' && mem.gw_data['stmt:2026-08:v03'].status === 'done' && mem.gw_data['stmtidx:2026-08'].vendors.v02.status === 'sent' && mem.gw_data['stmtidx:2026-08'].vendors.v03.status === 'done'
+      && pwAud16.length === 1 && /전달함 1\/2곳/.test(pwAud16[0].ev[0].t) && pwAud16[0].ev[0].t.indexOf('신일상사') < 0
+      && cc16.code === 409 && cc16.body.error_code === 'PARTIAL_WRITE' && cc16.body.cause === 'STMT_STALE' && cc16.body.vk === 'v03' && rd16 === 2
+      && mem.gw_data['stmt:2026-07:v02'].status === 'sent' && mem.gw_data['stmt:2026-07:v03'].status === 'done' && mem.gw_data['stmt:2026-07:v03'].updated_at === bump16 + 7
+      && ri16.code === 200 && ri16.body.vendors.v07.sent && ri16.body.vendors.v07.sent.via === 'appr' && ri16.body.vendors.v07.sent.by === 'udo86',
+      JSON.stringify({ pw: [pw16.code, pw16.body.error_code, pw16.body.cause, pw16.body.vk, pw16.body.items, pw16.body.idx], pwAud: pwAud16.map((x) => x.ev[0].t), cc: [cc16.code, cc16.body.error_code, cc16.body.cause, cc16.body.vk, rd16], ri: ri16.body.vendors && ri16.body.vendors.v07 && ri16.body.vendors.v07.sent }));
+    const ap16 = mem.gw_data['col:approvals'] || (mem.gw_data['col:approvals'] = { schema: 1, items: [], updated_at: 0 });
+    const a16 = await call({ action: 'approval_create', kind: '월말명세서', title: '월말명세서 2026-09 차량 거래처', body: '본문1', ref: 'stmt:2026-09:veh', cid: 'c16a' }, tD86, 'dev1');
+    const it16a = mem.gw_data['col:approvals'].items.find((x) => x.id === a16.body.id);
+    const a16b = await call({ action: 'approval_create', kind: '월말명세서', title: '월말명세서 2026-09 차량 거래처(고침)', body: '본문2', ref: 'stmt:2026-09:veh', cid: 'c16b' }, tD86, 'dev1');
+    const n16 = mem.gw_data['col:approvals'].items.filter((x) => x.ref === 'stmt:2026-09:veh').length;
+    const it16b = mem.gw_data['col:approvals'].items.find((x) => x.id === a16.body.id);
+    const DNV86 = { id: 'udonv86', name: '수행차량숨김86', admin: false, perms: { stmt: 'do', veh: 'hide' } }; mem.gw_users['member:udonv86'] = DNV86;
+    const a16y = [
+      await call({ action: 'approval_create', kind: '월말명세서', title: 'x', ref: 'stmt:2026-09:veh' }, tV86, 'dev1'),   // 보기 = NO_WRITE
+      await call({ action: 'approval_create', kind: '월말명세서', title: 'x', ref: 'stmt:2026-09:veh' }, issueSession(DNV86).token, 'dev1'),   // 수행 + 차량 숨김 = NO_VEH_ACCESS
+      await call({ action: 'approval_create', kind: '월말명세서', title: 'x', ref: 'stmt:2026-09:veh' }, tRT86, 'dev1'),   // 퇴사 = 401
+      await call({ action: 'approval_create', kind: '월말명세서', title: 'x', ref: 'stmt:1999-09:veh' }, tD86, 'dev1')   // 달 꼴(20xx) = BAD_REF
+    ];
+    if (it16b) it16b.status = '보류';
+    const a16h = await call({ action: 'approval_create', kind: '월말명세서', title: '월말명세서 2026-09 차량 거래처(보류 뒤)', body: '본문h', ref: 'stmt:2026-09:veh', cid: 'c16h' }, tokA);   // 보류 카드도 흡수(관리자가 고침 → by 바뀜)
+    const hld16 = JSON.parse(JSON.stringify(mem.gw_data['col:approvals'].items.find((x) => x.id === a16.body.id) || null));   // 그 시점 사본(뒤에서 같은 카드를 '승인'으로 바꿈)
+    const a16x = [
+      await call({ action: 'approval_create', kind: '월말명세서', title: 'x', ref: 'stmt:2026-09:veh' }, tokW, 'dev1'),
+      await call({ action: 'approval_create', kind: '월말명세서', title: 'x', ref: 'stmt:2026-9:veh' }, tD86, 'dev1'),
+      await call({ action: 'approval_create', kind: '월말명세서', title: 'x', ref: 'stmt:2026-09:tool' }, tD86, 'dev1'),
+      await call({ action: 'approval_create', kind: '지입료', title: 'x', ref: 'stmt:2026-09:veh' }, tokA),
+      await call({ action: 'approval_create', kind: '월말명세서', title: 'x', ref: 'stmt:2026-09:veh', self_decide: 1 }, tokA)
+    ];
+    { const live16 = mem.gw_data['col:approvals'].items.find((x) => x.id === a16.body.id); if (live16) live16.status = '승인'; }   // 결재(decide) 길은 절 17~25가 본다 — 여기선 '승인 뒤 다시 올림'만(정정이 문서를 새로 써서 쥐고 있던 객체는 떨어짐 — 저장소 것을 다시 찾음)
+    const a16n = await call({ action: 'approval_create', kind: '월말명세서', title: '월말명세서 2026-09 추가', body: '본문3', ref: 'stmt:2026-09:veh', cid: 'c16n' }, tD86, 'dev1');
+    const it16n = mem.gw_data['col:approvals'].items.find((x) => x.id === a16n.body.id);
+    const gr16 = await call({ action: 'appr_grades_get' }, tokA);
+    T('86 ⑯-2 29 판⑤ 결재 월말명세서: 등급표 기본 ③ · 수행 직원 상신 = grade 3·to boss(대표 큐) · 열린 카드에 다시 올리면 정정 흡수(같은 id·updated·제목·본문 바뀜·카드 1장) · stmt 권한 없는 직원 403 NO_WRITE · ref 달 꼴·tool 400 BAD_REF · 다른 종류의 stmt: ref 400 BAD_REF · 전결 400 SELF_DECIDE_KIND · 승인 뒤 다시 = 새 카드',
+      gr16.code === 200 && gr16.body.grades['월말명세서'] === 3 && gr16.body.defaults['월말명세서'] === 3
+      && a16.code === 200 && it16a && it16a.kind === '월말명세서' && it16a.grade === 3 && it16a.to === 'boss' && it16a.by.id === 'udo86'
+      && a16b.code === 200 && a16b.body.id === a16.body.id && a16b.body.updated === true && n16 === 1 && it16b.title === '월말명세서 2026-09 차량 거래처(고침)' && it16b.body === '본문2'
+      && JSON.stringify(a16x.map((x) => x.code + '/' + x.body.error_code)) === JSON.stringify(['403/NO_WRITE', '400/BAD_REF', '400/BAD_REF', '400/BAD_REF', '400/SELF_DECIDE_KIND'])
+      && a16n.code === 200 && a16n.body.id !== a16.body.id && !a16n.body.updated && it16n && it16n.grade === 3 && it16n.status === '대기'
+      && JSON.stringify(a16y.map((x) => x.code + '/' + (x.body.error_code || ''))) === JSON.stringify(['403/NO_WRITE', '403/NO_VEH_ACCESS', '401/' + (a16y[2].body.error_code || ''), '400/BAD_REF']) && a16y[2].code === 401
+      && a16h.code === 200 && a16h.body.id === a16.body.id && a16h.body.updated === true && hld16.status === '보류' && hld16.body === '본문h' && hld16.by.id === 'uadmin',
+      JSON.stringify({ g: gr16.body.grades && gr16.body.grades['월말명세서'], a: [a16.code, it16a && [it16a.grade, it16a.to]], b: [a16b.code, a16b.body.updated, n16], x: a16x.map((x) => x.code + '/' + x.body.error_code), y: a16y.map((x) => x.code + '/' + x.body.error_code), h: [a16h.code, a16h.body.updated, hld16 && hld16.status, hld16 && hld16.by], n: [a16n.code, a16n.body.updated] }));
+    ap16.items = ap16.items.filter((x) => String(x.ref || '').indexOf('stmt:') !== 0);
   } finally {
     blobsMock.hooks.failGet = null;
     mem.gw_users = savedUsers86;

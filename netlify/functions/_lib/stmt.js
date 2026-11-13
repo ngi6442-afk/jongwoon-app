@@ -373,7 +373,8 @@ function gapCount(draftRows, rows) {
 function vendorSummary(doc, chk) {
   return { group: doc.group, status: doc.status, rows: (doc.rows || []).length, bad: chk.bad.length, issues: chk.issues.slice(0, 8), ok: chk.ok,
     total: chk.sum_gross, est: chk.est, inv: doc.inv ? doc.inv.total : null, stated: (doc.stated === null || doc.stated === undefined) ? null : doc.stated,
-    bal: doc.carry ? doc.carry.bal : null, draft: !!doc.draft, at: doc.updated_at, by: doc.updated_by, veh: chk.veh_kinds };
+    bal: doc.carry ? doc.carry.bal : null, draft: !!doc.draft, at: doc.updated_at, by: doc.updated_by, veh: chk.veh_kinds,
+    sent: (doc.status === 'sent' && doc.sent && typeof doc.sent === 'object') ? { at: Number(doc.sent.at) || 0, via: String(doc.sent.via || ''), by: String(doc.sent.by || '') } : null };   // 29 판⑤ 전달 기록(월 보드 상태 글 · 누가 전달 — 비관리자는 결재 목록에 자기 상신만 보여 '보고 없음' 판정을 자기가 전달한 곳으로 한정)
 }
 // 차량 하나의 달별 종류 합(색인 여러 달) → [{ ym, kinds:{kind:[n, gross]}, total, vendors:[vk], pending:[vk] }]
 // 합에는 확정(done·sent)이고 검산 통과인 거래처만 넣는다 — 작성 중·붉은 문서는 pending으로 이름만(11/10 검토 M5)
