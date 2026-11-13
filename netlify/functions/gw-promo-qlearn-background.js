@@ -14,7 +14,7 @@ const PL = require('./_lib/promolearn');
 
 const DATA = 'gw_data';
 const TIMEOUT_MS = 180000;
-const MAX_TOKENS = 4000;
+const MAX_TOKENS = 8000;          // 배포 전 검토 ops F1 — 생각+출력이 같은 상한 안에서 세어진다(골격 워커 6000보다 넉넉히). 잘리면 MAX_TOKENS로 따로 남긴다
 const EFFORT = 'medium';
 
 function loadLib() { try { return require('./_lib/promoai'); } catch (e) { return null; } }
@@ -34,17 +34,22 @@ exports.handler = async function (event, context) {
   let st = null;
   const scrub = makeScrub();
   // 실패·종료 — 다시 읽고 잠금만 풀거나 사유를 적는다(끄기 스위치·규칙은 그대로). 잔액 부족은 시도 횟수를 쓰지 않는다(2단계 E와 같은 규칙).
-  const release = async function (code, detail) {
+  //   배포 전 검토 gen F2: 다시 읽기가 오류면(키 없음은 ok·null) 쓰지 않는다 — 빈 기본값으로 끄기·규칙·이력을 덮지 않게(잠금은 15분 TTL로 풀린다).
+  //   ops F2: 응답을 받은 뒤 실패면 그 토큰을 stats.fail_calls·fail_tokens에, 실패는 함수 로그 한 줄로도 남긴다.
+  const release = async function (code, detail, tokens) {
     if (!st) return;
     try {
       const cur = await blobGet(st, QL.QLEARN_KEY);
-      const q = QL.normQL(cur.ok ? cur.data : null);
+      if (!cur.ok) { console.log('[품질 학습] 잠금 풀기 전 읽기 실패 ' + (cur.code || '') + ' — 쓰지 않음(15분 뒤 풀림)'); return; }
+      const q = QL.normQL(cur.data);
       q.lock_ts = 0; q.updated_at = Date.now();
       if (code) {
         const PJ = loadJob();
         const c = (PJ && typeof PJ.failCode === 'function') ? PJ.failCode(code, detail) : String(code);
         q.code = cut(c, 40); q.detail = cut(scrub(detail || ''), 160); q.fail_ts = Date.now();
         if (c === 'CREDIT_LOW') q.tries = Math.max(0, q.tries - 1);
+        if (tokens > 0) { q.stats.fail_calls += 1; q.stats.fail_tokens += tokens; }
+        console.log('[품질 학습] 실패 ' + c + (tokens > 0 ? ' · 토큰 ' + tokens : ''));
       }
       await blobSet(st, QL.QLEARN_KEY, q);
     } catch (e) {}
@@ -55,7 +60,8 @@ exports.handler = async function (event, context) {
     if (!v.ok || v.payload.mid !== '__promoai__') return;
     st = store(DATA);
     const qr = await blobGet(st, QL.QLEARN_KEY);
-    const q0 = QL.normQL(qr.ok ? qr.data : null);
+    if (!qr.ok) { console.log('[품질 학습] 시작 읽기 실패 ' + (qr.code || '') + ' — 모델 호출 안 함'); return; }   // 검토 gen F2(c)
+    const q0 = QL.normQL(qr.data);
     if (q0.off) { await release('', ''); return; }   // 기동 뒤 꺼졌으면 잠금만 푼다
     if (!process.env.GW_ANTHROPIC_KEY) { await release('ENV_MISSING'); return; }
     const lib = loadLib();
@@ -83,18 +89,21 @@ exports.handler = async function (event, context) {
     let json = null;
     try { json = await lib.callApi(process.env.GW_ANTHROPIC_KEY, body, TIMEOUT_MS); }
     catch (e) { await release((e && e.code) || 'API_FAILED', (e && (e.detail || e.message)) || ''); return; }
-    if (json && json.stop_reason === 'refusal') { await release('REFUSAL'); return; }
     const usage = (json && json.usage) || {};
     const tokens = (usage.input_tokens || 0) + (usage.output_tokens || 0) + (usage.cache_creation_input_tokens || 0) + (usage.cache_read_input_tokens || 0);
+    if (json && json.stop_reason === 'refusal') { await release('REFUSAL', '', tokens); return; }
+    if (json && json.stop_reason === 'max_tokens') { await release('MAX_TOKENS', '응답이 길이 상한(' + MAX_TOKENS + ')에 걸려 잘림', tokens); return; }   // 검토 ops F1 — PARSE_FAILED와 따로
     const out = parseOut(lib.responseText(json));
-    if (!out || !Array.isArray(out.rules)) { await release('PARSE_FAILED', '품질 규칙 JSON을 읽지 못했습니다'); return; }
+    if (!out || !Array.isArray(out.rules)) { await release('PARSE_FAILED', '품질 규칙 JSON을 읽지 못했습니다', tokens); return; }
 
-    // 쓰기 직전 다시 읽고 합친다 — 그새 바뀐 끄기 스위치를 덮지 않는다
+    // 쓰기 직전 다시 읽고 합친다 — 그새 바뀐 끄기 스위치를 덮지 않는다. 읽기 오류면 쓰지 않는다(검토 gen F2(a) — 빈 기본값에 합쳐 끄기·이력을 지우지 않게)
     const cur = await blobGet(st, QL.QLEARN_KEY);
-    const base = QL.normQL(cur.ok ? cur.data : null);
+    if (!cur.ok) { console.log('[품질 학습] 합치기 전 읽기 실패 ' + (cur.code || '') + ' — 이번 결과는 쓰지 않음(토큰 ' + tokens + ')'); return; }
+    const base = QL.normQL(cur.data);
     const merged = QL.mergeQL(base, out, { now: Date.now(), tokens: tokens, sig: QL.basisSig(pq.data, lessons.rules), focus: focus, n: drafts.length });
     const w = await blobSet(st, QL.QLEARN_KEY, merged);
-    if (!w.ok) { await release(w.code || 'QL_WRITE_FAILED'); return; }
+    if (!w.ok) { await release(w.code || 'QL_WRITE_FAILED', '', tokens); return; }
+    console.log('[품질 학습] 학습 — 규칙 ' + merged.rules.length + ' · 목표 ' + merged.focus.map(function (f) { return f.code; }).join(',') + ' · 초안 ' + drafts.length + '편 · 토큰 ' + tokens);
   } catch (e) {
     try { await release('WORKER_THREW', (e && e.message) || String(e)); } catch (e2) {}
   }

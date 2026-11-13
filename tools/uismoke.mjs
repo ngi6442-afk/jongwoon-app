@@ -1563,13 +1563,17 @@ try {
   const pq = readFileSync(join(ROOT, 'netlify', 'functions', '_lib', 'promoqual.js'), 'utf8');
   const cron = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-promo-ai-cron.js'), 'utf8');
   const papi = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-promo-ai.js'), 'utf8');
-  const gen = ['_lib/promoai.js', 'gw-promo-ai-run-background.js', 'gw-promo-learn-background.js', '_lib/promoai_job.js'].map((p) => readFileSync(join(ROOT, 'netlify', 'functions', p), 'utf8')).join('\n');
+  const rdG = (p) => readFileSync(join(ROOT, 'netlify', 'functions', p), 'utf8');
+  const genLib = rdG('_lib/promoai.js'), genWk = rdG('gw-promo-ai-run-background.js'), genLw = rdG('gw-promo-learn-background.js'), genJob = rdG('_lib/promoai_job.js');
+  const gen = [genLib, genWk, genLw, genJob].join('\n');
   const post = (html.match(/\/\/ @promo-post-start([\s\S]*?)\/\/ @promo-post-end/) || ['', ''])[1];
-  T('체크 10 품질 고리 1단계(측정만): _lib/promoqual.js(promoai:quality · sweep · summary · planFromBody) + promoqual_ex.json · 크론 ⑤ try 안 늦은 require · pl_get quality(try — 실패 null) · 카드 promoQualHtml(표시만) · 출력 무변(생성 라이브러리·생성 워커·학습 워커·작업 층·복사 구간에 promoqual 0) · 게이트 tools/promoqual_check.mjs',
+  // 3단계(원천, 11/13)부터 1단계 측정값이 목표 줄(한글 수사)로 생성에 들어간다 — 배포 전 검토 loop F6: '출력 무변'을 현실에 맞춤(1단계 모듈·점수는 생성에 0, 품질 학습은 생성 워커 injectOf 한 곳)
+  T('체크 10 품질 고리 1단계(측정): _lib/promoqual.js(promoai:quality · sweep · summary · planFromBody) + promoqual_ex.json · 크론 ⑤ try 안 늦은 require · pl_get quality(try — 실패 null) · 카드 promoQualHtml(표시만) · 생성 쪽에 1단계 모듈·점수 0(promoqual·score10 — 3단계 목표 줄만 생성 워커 injectOf 한 곳, 학습 워커·생성 라이브러리·작업 층은 promoqlearn 0) · 복사 구간 0 · 게이트 tools/promoqual_check.mjs',
     /QUAL_KEY = 'promoai:quality'/.test(pq) && /async function sweep\(st, doc, now\)/.test(pq) && /function summary\(raw\)/.test(pq) && /function planFromBody\(body, nImg, prof, tags\)/.test(pq) && existsSync(join(ROOT, 'netlify', 'functions', '_lib', 'promoqual_ex.json'))
     && /try \{ quality = await require\('\.\/_lib\/promoqual'\)\.sweep\(st, doc, now\); \}/.test(cron) && /quality: quality, layout: layout, request_id: R/.test(papi)
     && /function promoQualHtml\(q\)\{/.test(html) && /h \+= promoQualHtml\(res\.body\.quality\);/.test(html)
-    && !/promoqual/.test(gen) && !/promoqual|promoQual|quality/.test(post) && existsSync(join(ROOT, 'tools', 'promoqual_check.mjs')),
+    && !/promoqual/.test(gen) && !/score10/.test(gen) && !/promoqlearn/.test(genLib + genLw + genJob) && (genWk.match(/promoqlearn/g) || []).length === 1 && /QL\.injectOf\(qr\.ok \? qr\.data : null, lib\)/.test(genWk)
+    && !/promoqual|promoQual|quality/.test(post) && existsSync(join(ROOT, 'tools', 'promoqual_check.mjs')),
     '어느 고리가 빠졌는지 node tools/promoqual_check.mjs ⑥으로 확인');
 } catch (e) { console.log('  (체크 10 품질 고리 검사 생략 — ' + e.message + ')'); fails++; }
 
@@ -1598,6 +1602,9 @@ try {
     && /try \{ qlearn = await require\('\.\/_lib\/promoqlearn'\)\.kick\(st, now\); \}/.test(cr3) && /out\.qlearn = qlearn;/.test(cr3) && !/^const .*require\('\.\/_lib\/promoqlearn'\)/m.test(cr3)
     && pai3.indexOf('[직원이 고치는 패턴 — 자동 학습 ') > 0 && pai3.indexOf('[직원이 고치는 패턴 — 자동 학습 ') < pai3.indexOf('[완성도 목표 — 품질 자동 학습 ') && /부딪히면 직원 쪽을 따릅니다/.test(pai3) && !/promoqlearn/.test(pai3)
     && /QL\.injectOf\(qr\.ok \? qr\.data : null, lib\)/.test(wk3) && /delete input\.qrules; delete input\.qfocus;/.test(wk3)
+    // 배포 전 검토 반영(11/13): 금지 문자열이면 품질 자료 먼저(골격 되돌림 앞) · 실명·지명 거름 · 응답 상한 8000·MAX_TOKENS 따로 · 짝 시간순
+    && wk3.indexOf('if (!g1.ok && (input.qrules || input.qfocus))') > 0 && wk3.indexOf('if (!g1.ok && (input.qrules || input.qfocus))') < wk3.indexOf('if (!g1.ok && (input.exemplar || input.lessons')
+    && /const DENY = \[/.test(ql3) && /MAX_TOKENS = 8000/.test(qw3) && /stop_reason === 'max_tokens'/.test(qw3) && /pairs: out\.slice\(0, LEARN_LIST\)/.test(papi3)
     && /qlearn: qlearn, quality: quality, layout: layout, request_id: R/.test(papi3) && /\} else if \(typeof d\.qoff === 'boolean'\) \{/.test(papi3)
     && /function promoMatchSeries\(pairs\)\{/.test(html) && /h \+= promoMatchHtml\(pairs\);/.test(html) && /function promoQLearnHtml\(q\)\{/.test(html) && /h \+= promoQLearnHtml\(res\.body\.qlearn\);/.test(html) && /send\(\{ qoff: b\.getAttribute\("data-pq-off"\) === "1" \}\)/.test(html)
     && existsSync(join(ROOT, 'tools', 'promoqlearn_check.mjs')),

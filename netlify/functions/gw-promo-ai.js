@@ -100,17 +100,30 @@ async function learnPairs(st) {
   const { blobList } = require('./_lib/blobs');
   const l = await blobList(st, PL.PAIR_PREFIX);
   if (!l.ok) return { ok: false, code: l.code || 'LIST_FAILED', pairs: [] };
-  const keys = (l.keys || []).filter(function (k) { return k.indexOf(PL.PAIR_PREFIX) === 0; }).sort().slice(-LEARN_LIST);
+  // 체크 10 3단계 배포 전 검토(loop F2): 짝 id는 sha1 해시라 키 이름순으로 뒤 40건을 자르면 짝이 40건을 넘을 때 아무 글이나 빠진다
+  //   → 전부 읽어(8건씩 나눠) 시간순(ts — 마지막 상태 변경)으로 정렬한 뒤 최근 40건. 카드의 '본문 일치율 흐름'·비교 짝 표가 이 목록을 쓴다.
+  const keys = (l.keys || []).filter(function (k) { return k.indexOf(PL.PAIR_PREFIX) === 0; });
+  const nz = function (v) { return (v === null || v === undefined || v === '' || isNaN(Number(v))) ? null : Number(v); };
+  // 간극 칸은 숫자로만(같은 검토 sec S1 꼴 — 카드 비교 짝 표가 hr_d 등을 그대로 붙인다)
+  const gapOf = function (g) {
+    if (!g || typeof g !== 'object') return null;
+    const lay = (g.layout && typeof g.layout === 'object') ? g.layout : null;
+    return { ratio: nz(g.ratio), len_draft: nz(g.len_draft), len_final: nz(g.len_final), lines_d: nz(g.lines_d), heads_d: nz(g.heads_d), photos_d: nz(g.photos_d),
+      layout: lay ? { line_match: nz(lay.line_match), bold_d: nz(lay.bold_d), center_d: nz(lay.center_d), hr_d: nz(lay.hr_d), img_d: nz(lay.img_d), blank_d: nz(lay.blank_d), n_copy: nz(lay.n_copy), n_final: nz(lay.n_final) } : null };
+  };
   const out = [];
-  for (const k of keys) {
-    const r = await blobGet(st, k);
-    if (!r.ok || !r.data) continue;
-    const p = r.data;
-    out.push({ id: String(p.id || k.slice(PL.PAIR_PREFIX.length)), status: String(p.status || 'pending'), promo_id: String(p.promo_id || ''), final_title: String(p.final_title || '').slice(0, 80), src_file: String(p.src_file || '').slice(0, 80),
-      ts: Number(p.ts) || 0, tries: Number(p.tries) || 0, code: String(p.code || ''), detail: String(p.detail || '').slice(0, 160), gap: (p.gap && typeof p.gap === 'object') ? p.gap : null, match: (p.match && typeof p.match === 'object') ? { score: Number(p.match.score) || 0, title: String(p.match.title || '').slice(0, 60) } : null, draft_src: String(p.draft_src || ''), summary: String(p.summary || '').slice(0, 200), rules_n: Number(p.rules_n) || 0 });
+  for (let i = 0; i < keys.length; i += 8) {
+    const rs = await Promise.all(keys.slice(i, i + 8).map(function (k) { return blobGet(st, k).then(function (r) { return { k: k, r: r }; }); }));
+    rs.forEach(function (x) {
+      const r = x.r, k = x.k;
+      if (!r.ok || !r.data) return;
+      const p = r.data;
+      out.push({ id: String(p.id || k.slice(PL.PAIR_PREFIX.length)), status: String(p.status || 'pending'), promo_id: String(p.promo_id || ''), final_title: String(p.final_title || '').slice(0, 80), src_file: String(p.src_file || '').slice(0, 80),
+        ts: Number(p.ts) || 0, tries: Number(p.tries) || 0, code: String(p.code || ''), detail: String(p.detail || '').slice(0, 160), gap: gapOf(p.gap), match: (p.match && typeof p.match === 'object') ? { score: Number(p.match.score) || 0, title: String(p.match.title || '').slice(0, 60) } : null, draft_src: String(p.draft_src || ''), summary: String(p.summary || '').slice(0, 200), rules_n: Number(p.rules_n) || 0 });
+    });
   }
   out.sort(function (a, b) { return b.ts - a.ts; });
-  return { ok: true, pairs: out };
+  return { ok: true, pairs: out.slice(0, LEARN_LIST) };
 }
 async function handleLearnGet(st, c, d, R) {
   if (!c.member.admin) return jr(403, { ok: false, code: 'ADMIN_ONLY', request_id: R });

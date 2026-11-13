@@ -3223,6 +3223,15 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   T('48(체크 10 3단계) pl_set qoff 비관리자 → 403', rp.code === 403);
   rp = await callP({ action: 'pl_set', qoff: false }, tokA);
   T('48(체크 10 3단계) pl_set qoff 켜기 → qlearn.off false · 규칙 없음(아직 학습 전)', rp.code === 200 && rp.body.qlearn.off === false && Array.isArray(rp.body.qlearn.rules) && rp.body.qlearn.rules.length === 0);
+  // 체크 10 3단계 배포 전 검토(loop F2·sec S1): 짝이 40건을 넘어도 시간순 최근 40건(키 이름순 자르기 아님) · 간극 칸은 숫자로만
+  {
+    const added48 = [];
+    for (let i = 0; i < 41; i++) { const k = 'promolearn:in:pl_f' + String(i).padStart(11, '0'); mem.gw_data[k] = { id: k.slice(14), status: 'done', promo_id: 'x', ts: 1000 + i, gap: { ratio: 0.1 } }; added48.push(k); }
+    const kNew = 'promolearn:in:pl_000000000000'; mem.gw_data[kNew] = { id: 'pl_000000000000', status: 'done', promo_id: 'x', ts: Date.now() + 60000, gap: { ratio: 0, layout: { line_match: 0.9, hr_d: '<img src=x>' } } }; added48.push(kNew);
+    rp = await callP({ action: 'pl_get' }, tokA);
+    T('48(체크 10 3단계 검토) pl_get 짝: 40건 넘으면 시간순 최근 40건 — 키 이름순 맨 앞인 가장 새 짝이 맨 위 · 간극 칸 저장값은 숫자 아니면 null', rp.code === 200 && rp.body.pairs.length === 40 && rp.body.pairs[0].id === 'pl_000000000000' && rp.body.pairs[0].gap.ratio === 0 && rp.body.pairs[0].gap.layout.hr_d === null && rp.body.pairs[0].gap.layout.line_match === 0.9, JSON.stringify(rp.body.pairs && rp.body.pairs[0]));
+    added48.forEach((k) => { delete mem.gw_data[k]; });
+  }
   mem.gw_data['promolearn:in:pl_aaaaaaaaaaa7'] = { schema: 1, id: 'pl_aaaaaaaaaaa7', promo_id: '', status: 'unmatched', tries: 0, ts: 300, final_title: '짝 없음', final_body: fin };
   rp = await callP({ action: 'pl_set', assign: { pair_id: 'pl_aaaaaaaaaaa7', promo_id: 'nope' } }, tokA);
   T('48 pl_set 짝 지정: 없는 기록 → 404', rp.code === 404 && rp.body.code === 'PROMO_NOT_FOUND');

@@ -29,6 +29,8 @@ const ITEM_LABEL = {}; PQ.ITEMS.forEach(function (it) { ITEM_LABEL[it[0]] = it[2
 
 // 2점 기준 — 1단계 채점기(promoqual ITEMS)와 같은 문턱. say = 생성 목표 줄에 쓰는 이름, scale = 보여 줄 눈금(비율 ×100), num = 한글 수사 종류(sino 삼십오 / native 서른다섯)
 //   skip = 목표로 삼지 않는 항목(까닭), nodisp = 숫자 없이 이름만
+//   bound = 판독표만큼(배포 전 검토 loop F5 — 11/13): 현장·장비·동작·지형은 사진이 보여 주는 만큼만 있다. 개수·비율 목표를 생성에 주면 판독표에 없는 것을 지어내게 밀므로,
+//     생성 목표 줄에는 숫자 대신 '판독표를 빠짐없이 살려 쓰기'로만 넣는다(카드에는 숫자 그대로 보임).
 const GOAL = {
   C1: { m: 'img_burst', cmp: 'le', t: 2, unit: '장', say: '글 없이 이어진 사진', num: 'native' },
   C2: { m: 'chars_per_img', cmp: 'ge', t: 150, unit: '자', say: '사진 한 장당 글', num: 'sino' },
@@ -36,10 +38,10 @@ const GOAL = {
   C4: { m: 'title_len', cmp: 'range', t: 20, t2: 50, unit: '자', say: '제목 길이(고정 키워드 나열 아님)', num: 'sino' },
   C5: { m: 'heads', cmp: 'ge', t: 3, unit: '개', say: '소제목·목록·구분선·굵게(시각 리듬)', num: 'native', skip: '굵게·구분선 같은 포장은 기존 포장 학습(골격) 몫' },
   C6: { m: 'company', cmp: 'ge', t: 2, unit: '', say: '마무리(회사 신뢰 블록·문의 안내)', num: 'native', nodisp: true },
-  D1: { m: 'site_ratio', cmp: 'ge', t: 35, scale: 100, unit: '퍼센트', say: '현장 문장 비율', num: 'sino' },
-  D2: { m: 'equip_distinct', cmp: 'ge', t: 10, unit: '개', say: '장비·도구 이름', num: 'native' },
-  D3: { m: 'acts_distinct', cmp: 'ge', t: 15, unit: '개', say: '공정 동사', num: 'native' },
-  D4: { m: 'place_distinct', cmp: 'ge', t: 8, unit: '개', say: '장소·지형 낱말', num: 'native' },
+  D1: { m: 'site_ratio', cmp: 'ge', t: 35, scale: 100, unit: '퍼센트', say: '현장 문장 비율', num: 'sino', bound: '판독표 장면마다 이 현장에서 한 일을 한 문장 이상 — 판독표·입력에 없는 장면은 쓰지 않음' },
+  D2: { m: 'equip_distinct', cmp: 'ge', t: 10, unit: '개', say: '장비·도구 이름', num: 'native', bound: '판독표 장비 칸의 장비·도구를 빠짐없이 정확한 이름으로 — 판독표에 없는 장비는 쓰지 않음' },
+  D3: { m: 'acts_distinct', cmp: 'ge', t: 15, unit: '개', say: '공정 동사', num: 'native', bound: '판독표 행위 칸의 동작을 빠짐없이 살려 쓰기 — 판독표에 없는 동작은 쓰지 않음' },
+  D4: { m: 'place_distinct', cmp: 'ge', t: 8, unit: '개', say: '지형·시설 부위 일반 낱말(지명 아님)', num: 'native', bound: '판독표 장면에 보이는 지형·시설 부위를 일반 낱말로 — 지명·현장 이름은 쓰지 않음' },
   D5: { m: 'qty', cmp: 'ge', t: 3, unit: '개', say: '현장 수량(작업량·장비 대수·인원·시간)', num: 'native', skip: '현장 수량은 입력·판독표에 있을 때만 — 지어내지 않게 목표로 삼지 않음' },
   X1: { m: 'conn_per_sent', cmp: 'range', t: 90, t2: 120, scale: 100, unit: '개(문장 백 개당)', say: '연결어미', num: 'sino' },
   X2: { m: 'long_sent_ratio', cmp: 'range', t: 12, t2: 20, scale: 100, unit: '퍼센트', say: '예순 자 넘는 긴 문장 비율', num: 'sino' },
@@ -49,6 +51,11 @@ const GOAL = {
 };
 if (CODES.some(function (c) { return !GOAL[c]; }) || Object.keys(GOAL).length !== CODES.length) throw new Error('promoqlearn GOAL과 promoqual ITEMS 불일치');
 
+// 본보기 라벨·제목에 든 실명·지명(promoqual_ex.json e1 — 배포 전 검토 sec S3·loop F3): 학습 입력에 싣지 않고(원천), 이 낱말이 든 규칙은 버린다.
+//   C059 '공사명·장소 일반명 공개'는 PM 결정 전이라 기본값 불허. 게이트가 본보기 라벨·제목의 실명·지명이 여기 다 있는지 본다.
+const DENY = ['권민지', '방내리'];
+// 사람·직책·연락처·지시 무시 꼴(모델이 지시를 어긴 경우의 마지막 거름) — 품질 규칙은 글 쓰는 법만 말하므로 이런 낱말이 들 까닭이 없다
+const DENY_RE = /[가-힣]{2,4}\s?(대리|주임|과장|차장|부장|팀장|실장|소장|이사|대표)(님|에게|께|이|가|은|는|의|\s|$)|공일공|지시[를을]?\s?무시|규칙[을를]?\s?무시/;
 function h32(s) { let h = 2166136261; s = String(s || ''); for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0).toString(36); }
 function median(a) { const s = a.slice().sort(function (x, y) { return x - y; }); if (!s.length) return null; const h = s.length >> 1; return s.length % 2 ? s[h] : (s[h - 1] + s[h]) / 2; }
 function num(v) { return (v === null || v === undefined || v === '' || isNaN(Number(v))) ? null : Number(v); }
@@ -119,6 +126,9 @@ const QLEARN_SYSTEM = [
   '- [직원 규칙]은 직원이 실제로 고쳐 게시한 차이에서 배운 것입니다. 이것과 부딪히는 규칙은 쓰지 않고, 직원 규칙을 고치거나 되풀이하지 않습니다.',
   '- 줄 나누기·정렬·굵게·구분선 같은 포장은 앱이 복사할 때 따로 배워 붙이므로 규칙으로 만들지 않습니다.',
   '- 본보기 글의 문장·지역·현장 이름을 옮기라는 규칙은 쓰지 않습니다. 특징(서술 흐름·문장 구조·낱말 종류)만 씁니다.',
+  '- 사람 이름·직책, 현장·건물·마을·공사 이름을 쓰라는 규칙이나 그런 이름이 든 규칙은 쓰지 않습니다(공사명·장소 공개는 정해지지 않아 쓰지 않음).',
+  '- D1~D4(현장 문장·장비·공정 동사·지형 낱말) 규칙은 판독표의 장면·장비·행위 칸을 빠짐없이 살려 쓰라는 꼴로만 씁니다. 개수나 비율을 채우라고 하지 않습니다(사진에 없는 것을 지어내게 됨).',
+  '- [이번 목표] 항목이라도 직원 규칙과 부딪히면 그 항목 규칙은 쓰지 않고 넘어갑니다. 규칙을 쓴 항목만 다음 생성의 목표 줄에 들어갑니다.',
   '- 규칙에는 아라비아 숫자를 쓰지 않습니다. 정도는 말로 씁니다(예: "사진마다 한 문장 이상", "세 문장에 한 번꼴로").',
   '- item에는 그 규칙이 겨냥하는 항목 코드(C1~X5 중 하나, 여러 항목이면 ALL)를 넣습니다.',
   '- 기존 품질 규칙과 합칩니다: 같은 뜻이면 하나로 합치고 n(근거가 된 초안 수)을 더합니다. 이번 자료와 모순되면 이번 쪽으로 고칩니다. 겨냥한 항목이 이제 기준을 넘었으면 그 규칙은 빼도 됩니다.',
@@ -141,19 +151,20 @@ function buildQLearnPrompt(o) {
   const ex = PQ.EX || {}, dr = Array.isArray(ex.dredge) ? ex.dredge : [];
   const drMed = median(dr.map(function (e) { return num(e.score10); }).filter(function (v) { return v !== null; }));
   const L = [];
+  // 본보기 줄은 이름 없는 표기만(실명·지명은 학습 입력에 싣지 않는다 — DENY, C059 불허 기본값)
   L.push('[본보기] (문장은 주지 않고 잰 값만 줍니다)');
-  if (ex.top) L.push('- ' + String(ex.top.label || '방내리') + ' — 시범 ' + ex.top.score10 + '점(본보기 값은 이 글)');
-  if (dr.length) L.push('- 권민지 준설 상위 ' + dr.length + '편 — 중앙 ' + (drMed === null ? '—' : Math.round(drMed * 10) / 10) + '점');
+  if (ex.top) L.push('- 석면 현장서술형 본보기 한 편 — 시범 ' + ex.top.score10 + '점(본보기 값은 이 글)');
+  if (dr.length) L.push('- 준설 상위 ' + dr.length + '편 — 중앙 ' + (drMed === null ? '—' : Math.round(drMed * 10) / 10) + '점');
   L.push('');
   L.push('[항목별 — 최근 사진AI 초안 ' + (Number(o.n) || 0) + '편] (항목 · 평균 점수 0~2 · 초안 지금 값(중앙) · 본보기 값 · 2점 기준)');
   CODES.forEach(function (c) {
     const s = st[c] || {}, g = GOAL[c];
     const nowV = g.nodisp ? '—' : (s.now === null || s.now === undefined ? '—' : String(scaled(c, s.now)));
     const exV = g.nodisp ? '—' : (exValue(c) === null ? '—' : String(exValue(c)));
-    L.push('- ' + c + ' ' + ITEM_LABEL[c] + ': 평균 ' + (s.avg === null || s.avg === undefined ? '—' : s.avg) + ' · 지금 ' + nowV + ' · 본보기 ' + exV + ' · 기준 ' + critText(c) + (g.skip ? ' (목표 아님 — ' + g.skip + ')' : ''));
+    L.push('- ' + c + ' ' + g.say + ': 평균 ' + (s.avg === null || s.avg === undefined ? '—' : s.avg) + ' · 지금 ' + nowV + ' · 본보기 ' + exV + ' · 기준 ' + critText(c) + (g.skip ? ' (목표 아님 — ' + g.skip + ')' : '') + (g.bound ? ' (판독표만큼 — ' + g.bound + ')' : ''));
   });
   L.push('');
-  L.push('[이번 목표 — 부족 상위 ' + focus.length + '항목] ' + (focus.length ? focus.map(function (f) { return f.code + ' ' + ITEM_LABEL[f.code] + '(평균 ' + f.avg + ')'; }).join(', ') : '없음 — 모든 항목이 기준을 넘었습니다. 기존 규칙만 정리합니다.'));
+  L.push('[이번 목표 — 부족 상위 ' + focus.length + '항목] ' + (focus.length ? focus.map(function (f) { return f.code + ' ' + GOAL[f.code].say + '(평균 ' + f.avg + ')'; }).join(', ') : '없음 — 모든 항목이 기준을 넘었습니다. 기존 규칙만 정리합니다.'));
   L.push('');
   L.push('[직원 규칙 ' + lessons.length + '개 — 골격: 직원이 고쳐 게시한 차이에서 배운 규칙. 부딪히는 품질 규칙은 쓰지 않습니다]');
   if (!lessons.length) L.push('(없음)');
@@ -173,6 +184,7 @@ function cleanRule(t) {
   if (!s) return '';
   if (/[0-9]{3,}/.test(s)) return '';                 // 금액·번호 꼴은 버린다(생성 프롬프트의 금액 차단 검사와 겹치지 않게 — 숫자는 말로 쓰라고 지시)
   if (/https?:|www\.|@/i.test(s)) return '';
+  if (DENY.some(function (w) { return s.indexOf(w) >= 0; }) || DENY_RE.test(s)) return '';   // 실명·지명·직책·연락처·지시 무시 꼴(배포 전 검토 sec S3)
   return s.slice(0, QRULE_CHARS);
 }
 function normQRules(out, oldRules, now) {
@@ -203,26 +215,33 @@ function normQL(x) {
   const st = (q.stats && typeof q.stats === 'object') ? q.stats : {};
   return {
     schema: 1, ver: String(q.ver || ''), off: q.off === true, rules: rules,
-    focus: (Array.isArray(q.focus) ? q.focus : []).filter(function (f) { return f && GOAL[f.code]; }).slice(0, FOCUS_N),
+    focus: (Array.isArray(q.focus) ? q.focus : []).map(normFocus).filter(Boolean).slice(0, FOCUS_N),
     summary: String(q.summary || '').slice(0, 300),
     learned_at: Number(q.learned_at) || 0, basis_sig: String(q.basis_sig || ''), try_sig: String(q.try_sig || ''),
     tries: Math.max(0, Number(q.tries) || 0), lock_ts: Number(q.lock_ts) || 0,
     code: String(q.code || ''), detail: String(q.detail || '').slice(0, 160), fail_ts: Number(q.fail_ts) || 0,
     n_drafts: Number(q.n_drafts) || 0,
-    stats: { calls: Number(st.calls) || 0, tokens: Number(st.tokens) || 0 },
+    stats: { calls: Number(st.calls) || 0, tokens: Number(st.tokens) || 0, fail_calls: Number(st.fail_calls) || 0, fail_tokens: Number(st.fail_tokens) || 0 },
     hist: (Array.isArray(q.hist) ? q.hist : []).slice(-HIST_MAX),
     updated_at: Number(q.updated_at) || 0,
   };
+}
+// 저장된 목표 항목을 칸마다 다시 만든다(배포 전 검토 sec S1) — 기준·단위·수사 종류는 GOAL에서, 숫자 칸은 숫자 또는 null만. 화면·생성 둘 다 저장값을 믿지 않는다.
+function normFocus(f) {
+  const g = (f && typeof f === 'object') ? GOAL[f.code] : null;
+  if (!g) return null;
+  const r2 = function (v) { const x = num(v); return x === null ? null : Math.round(x * 100) / 100; };
+  return { code: String(f.code), avg: r2(f.avg), now: g.nodisp ? null : r2(f.now), target: g.t, target2: g.t2 || null, cmp: g.cmp, unit: g.unit, num: g.num, ex: g.nodisp ? null : r2(f.ex), nodisp: !!g.nodisp, bound: !!g.bound };
 }
 // 학습 결과 병합 — base는 쓰기 직전에 다시 읽은 값(끄기 스위치를 그대로 지킨다). ctx = { now, tokens, sig, focus, n }
 function mergeQL(base0, out, ctx) {
   const base = normQL(base0), now = Number(ctx.now) || Date.now(), tokens = Number(ctx.tokens) || 0;
   const rules = normQRules(out, base.rules, now);
   const r = Object.assign({}, base, {
-    ver: QL_VER, rules: rules, focus: (Array.isArray(ctx.focus) ? ctx.focus : []).slice(0, FOCUS_N), summary: String((out && out.summary) || '').slice(0, 300),
+    ver: QL_VER, rules: rules, focus: (Array.isArray(ctx.focus) ? ctx.focus : []).map(normFocus).filter(Boolean).slice(0, FOCUS_N), summary: String((out && out.summary) || '').slice(0, 300),
     learned_at: now, basis_sig: String(ctx.sig || ''), try_sig: String(ctx.sig || ''), tries: 0, lock_ts: 0, code: '', detail: '', fail_ts: 0,
     n_drafts: Number(ctx.n) || 0, updated_at: now,
-    stats: { calls: base.stats.calls + 1, tokens: base.stats.tokens + tokens },
+    stats: Object.assign({}, base.stats, { calls: base.stats.calls + 1, tokens: base.stats.tokens + tokens }),
   });
   r.hist = base.hist.concat([{ at: now, n: Number(ctx.n) || 0, focus: r.focus.map(function (f) { return f.code; }), rules: rules.length, tokens: tokens }]).slice(-HIST_MAX);
   return r;
@@ -265,7 +284,14 @@ async function kick(st, now) {
   const lessons = PL.normLessons(lr.ok ? lr.data : null);
   const d = decide(ql, q.data, lessons.rules, now);
   if (!d.kick) return { skipped: d.why };
-  const nq = markKick(ql, d.sig, now);
+  // 쓰기 직전 다시 읽기(배포 전 검토 ops F3·loop F8) — 점수·직원 규칙을 읽는 사이 PM이 끈 것·다른 기동·끝난 학습을 덮지 않는다
+  const re = await B.blobGet(st, QLEARN_KEY);
+  if (!re.ok) return { error: re.code || 'QL_READ_FAILED' };
+  const cur = normQL(re.data);
+  if (cur.off) return { skipped: 'off' };
+  if (cur.lock_ts && now - cur.lock_ts < LOCK_TTL_MS) return { skipped: 'running' };
+  if (cur.basis_sig === d.sig && !cur.code) return { skipped: 'same' };
+  const nq = markKick(cur, d.sig, now);
   const w = await B.blobSet(st, QLEARN_KEY, nq);
   if (!w.ok) return { error: w.code || 'QL_WRITE_FAILED' };
   const LN = require('./learn');
@@ -277,7 +303,8 @@ async function kick(st, now) {
 // ---- 생성 주입(순수) — 워커가 promoai 한글 수사 함수(koNum·koCount)를 넘긴다. 입력에 아라비아 숫자를 싣지 않는다(금지 문자열 검사와 겹치지 않게) ----
 function focusText(f, fmt) {
   const g = GOAL[f.code]; if (!g || g.skip) return '';
-  const k = function (v) { const n = Math.max(0, Math.round(Number(v) || 0)); return f.num === 'sino' ? fmt.koNum(n) : fmt.koCount(n); };
+  if (g.bound) return g.say + '(' + g.bound + ')';   // 판독표만큼 — 숫자 목표 없이(지어내기 방지)
+  const k = function (v) { const n = Math.max(0, Math.round(Number(v) || 0)); return g.num === 'sino' ? fmt.koNum(n) : fmt.koCount(n); };
   const u = g.unit ? ' ' + g.unit : '';
   if (f.nodisp || g.nodisp) return g.say;
   const tgt = f.cmp === 'range' ? k(f.target) + '~' + k(f.target2) + u : k(f.target) + u + (f.cmp === 'le' ? ' 이하' : ' 이상');
@@ -288,9 +315,11 @@ function injectOf(raw, fmt) {
   const ql = normQL(raw);
   if (ql.off || !ql.rules.length) return null;
   const F = (fmt && typeof fmt.koNum === 'function' && typeof fmt.koCount === 'function') ? fmt : null;
+  // 목표 줄은 모델이 규칙을 쓴 항목만(배포 전 검토 loop F1) — 코치가 직원 규칙과 부딪혀 규칙을 안 쓴 항목은 목표 줄에서도 빠진다
+  const ruled = Object.create(null); ql.rules.forEach(function (r) { ruled[r.item] = 1; });
   return {
     rules: ql.rules.map(function (r) { return r.text; }),
-    focus: F ? ql.focus.map(function (f) { return focusText(f, F); }).filter(function (s) { return s && !/[0-9]/.test(s); }) : [],
+    focus: F ? ql.focus.filter(function (f) { return ruled[f.code]; }).map(function (f) { return focusText(f, F); }).filter(function (s) { return s && !/[0-9]/.test(s); }) : [],
   };
 }
 
@@ -300,7 +329,7 @@ function cardOf(raw, now) {
   now = now || Date.now();
   return {
     ver: ql.ver, off: ql.off, rules: ql.rules,
-    focus: ql.focus.map(function (f) { const g = GOAL[f.code] || {}; return { code: f.code, label: ITEM_LABEL[f.code] || '', say: g.say || '', avg: f.avg, now: f.now, target: f.target, target2: f.target2, cmp: f.cmp, unit: f.unit, ex: f.ex, nodisp: !!f.nodisp }; }),
+    focus: ql.focus.map(function (f) { const g = GOAL[f.code] || {}; return { code: f.code, label: ITEM_LABEL[f.code] || '', say: g.say || '', avg: f.avg, now: f.now, target: f.target, target2: f.target2, cmp: f.cmp, unit: f.unit, ex: f.ex, nodisp: !!f.nodisp, bound: !!f.bound, ruled: ql.rules.some(function (r) { return r.item === f.code; }) }; }),
     summary: ql.summary, learned_at: ql.learned_at, n_drafts: ql.n_drafts,
     code: ql.code, detail: ql.detail, tries: ql.tries, running: !!(ql.lock_ts && now - ql.lock_ts < LOCK_TTL_MS),
     stats: ql.stats, hist: ql.hist.slice(-8),
@@ -308,10 +337,10 @@ function cardOf(raw, now) {
 }
 
 module.exports = {
-  QLEARN_KEY, QL_VER, MAX_QRULES, QRULE_CHARS, RECENT_N, FOCUS_N, LOCK_TTL_MS, RETRY_MS, CREDIT_WAIT_MS, MIN_GAP_MS, MAX_TRIES, HIST_MAX, CODES, GOAL,
+  QLEARN_KEY, QL_VER, MAX_QRULES, QRULE_CHARS, RECENT_N, FOCUS_N, LOCK_TTL_MS, RETRY_MS, CREDIT_WAIT_MS, MIN_GAP_MS, MAX_TRIES, HIST_MAX, CODES, GOAL, DENY, DENY_RE,
   recentDrafts, itemStats, focusOf, basisSig, exValue, critText,
   QLEARN_SYSTEM, QLEARN_SCHEMA, buildQLearnPrompt,
-  cleanRule, normQRules, normQL, mergeQL,
+  cleanRule, normQRules, normQL, normFocus, mergeQL,
   decide, markKick, kick,
   focusText, injectOf, cardOf,
 };
