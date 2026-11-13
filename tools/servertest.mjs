@@ -7827,4 +7827,109 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   } finally { blobsMock.hooks.failGet = fgA; require.cache[rpA] = keepA; }
 }
 
+{ // ---- P1 판26 차량 속성 칸(시안 판3 ①) — 서버는 차량 줄을 통째로 받으므로 새 칸(type·own·permit·driver·co·biz·size·reg_date·ceq_kind·ceq_year·insp_log)을 떨어뜨리지 않는지,
+  //   옛 문서(새 칸 없음)는 저장 뒤에도 새 칸이 생기지 않는지(회귀) · 비관리자 저장의 관리자 전용 금액 이월은 그대로인지.
+  const snapP26 = JSON.stringify({ u: mem.gw_users, d: mem.gw_data });
+  const resetP26 = () => { const s = JSON.parse(snapP26); mem.gw_users = s.u; mem.gw_data = s.d; };
+  try {
+    const NEWK = ['type', 'own', 'permit', 'driver', 'co', 'biz', 'size', 'reg_date', 'ceq_kind', 'ceq_year', 'insp_log'];
+    const OLD = { id: 'p26a', no: '90오6840', kind: '', insp_due: '2027-02-23', ins_due: '2027-09-23', state: '운행', insurer: 'KB손해', note: '검사시 적재함 필요없음', updated: '2026-11-01', acq_price: 12345 };
+    const NEWV = { id: 'p26b', no: '경북02모4315', type: '굴착기', own: '자차', permit: '굴착기', driver: '', co: '종운건설', biz: '사업용', size: '건설기계', reg_date: '2016-05-01', ceq_kind: '굴착기', ceq_year: '2015', insp_due: '2027-04-25', state: '운행',
+      insp_log: [{ at: '2026-11-13', prev: '2026-04-25', confirmed: '2027-04-25', proposed: '', rule: '', diff: null, by: 'uwork', src: 'edit' }], updated: '2026-11-13' };
+    mem.gw_data['col:vehicles'] = { schema: 1, items: [OLD, NEWV], updated_at: 26000, updated_by: 'x' };
+    // 직원(veh do · 비관리자)이 받은 문서 그대로 저장 — 금액은 받지 못했으므로 빼고 보냄(앱과 같음)
+    const g = await call({ action: 'get', collection: 'vehicles' }, tokW, 'dev1');
+    const got = (g.body.doc && g.body.doc.items) || [];
+    const sv = await call({ action: 'save', collection: 'vehicles', base: 26000, doc: { schema: 1, items: JSON.parse(JSON.stringify(got)) } }, tokW, 'dev1');
+    const after = mem.gw_data['col:vehicles'].items, a = after.find((x) => x.id === 'p26a'), b = after.find((x) => x.id === 'p26b');
+    const noNewOnOld = NEWK.every((k) => !Object.prototype.hasOwnProperty.call(a, k));
+    const keptNew = NEWK.every((k) => JSON.stringify(b[k]) === JSON.stringify(NEWV[k]));
+    T('P1 판26 ① 서버 저장이 새 칸을 떨어뜨리지 않음: 직원 읽기 = 새 칸 그대로 내려감(금액만 빠짐) · 같은 문서 저장 200 · 새 칸 11개(차종·소유·허가·운전자·시행 회사·사업용·규모·최초등록일·기종·연식·검사 갱신 기록) 그대로 · 옛 줄(새 칸 없음)은 저장 뒤에도 새 칸 0 · 보험사 저장 글 "KB손해" 그대로 · 관리자 전용 금액 이월(12345)',
+      g.code === 200 && got.length === 2 && !('acq_price' in got[0]) && got[1].biz === '사업용' && sv.code === 200 && keptNew && noNewOnOld && a.insurer === 'KB손해' && a.acq_price === 12345,
+      JSON.stringify({ g: g.code, sv: [sv.code, sv.body.error_code], keptNew, noNewOnOld, a }));
+    // 새 칸을 지운 저장(앱 vehSetOpt — 키째 지움)은 지운 채로 · 보기 권한 사람 읽기에도 새 칸이 그대로
+    const items2 = JSON.parse(JSON.stringify(mem.gw_data['col:vehicles'].items)).map((x) => { if (x.id === 'p26b') { delete x.permit; delete x.co; } return x; });
+    const sv2 = await call({ action: 'save', collection: 'vehicles', base: mem.gw_data['col:vehicles'].updated_at, doc: { schema: 1, items: items2 } }, tokA, 'dev1');
+    const b2 = mem.gw_data['col:vehicles'].items.find((x) => x.id === 'p26b');
+    const MV = { id: 'uview26', name: '보기26', admin: false, perms: { veh: 'view' } }; mem.gw_users['member:uview26'] = MV;
+    const gv = await call({ action: 'get', collection: 'vehicles' }, issueSession(MV).token, 'dev1');
+    const bv = ((gv.body.doc && gv.body.doc.items) || []).find((x) => x.id === 'p26b') || {};
+    T('P1 판26 ② 지운 칸은 지운 채로(허가·시행 회사 키 없음 · 나머지 그대로) · 차량 보기 권한 읽기 = 속성 칸 그대로(사업용·규모·최초등록일)',
+      sv2.code === 200 && !('permit' in b2) && !('co' in b2) && b2.size === '건설기계' && b2.reg_date === '2016-05-01' && gv.code === 200 && bv.biz === '사업용' && bv.size === '건설기계' && bv.reg_date === '2016-05-01',
+      JSON.stringify({ sv2: sv2.code, b2, gv: gv.code }));
+  } finally { resetP26(); }
+}
+
+{ // ---- P1 판27 차량 법정 검사 제안(시안 판3 ①) — veh_bg_get(승격본만 · 아니면 on false = 앱 종전 화면) · 지시 완료 창의 제안·확정 기록(insp_log).
+  //   근거 표·스위치는 시험 값(가짜 — 실제 법정 주기 아님). 결함 사본(gw-data 한 곳을 바꿔 메모리에서 컴파일)에서는 실패해야 한다.
+  const fsP27 = require('fs'), ModP27 = require('module');
+  const FILEP27 = join(FN, 'gw-data.js'), SRCP27 = fsP27.readFileSync(FILEP27, 'utf8');
+  const loadP27 = (src) => { const m = new ModP27(FILEP27); m.filename = FILEP27; m.paths = ModP27._nodeModulePaths(dirname(FILEP27)); m._compile(src, FILEP27); return m.exports; };
+  const mutP27 = (from, to) => { if (SRCP27.split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 60)); return SRCP27.replace(from, () => to); };
+  const callerP27 = (mod) => async (body, tok, dev) => { const r = await mod.handler({ httpMethod: 'POST', headers: Object.assign({ authorization: tok ? 'Bearer ' + tok : '' }, dev ? { 'x-device-id': dev } : {}), body: JSON.stringify(body) }); return { code: r.statusCode, body: JSON.parse(r.body || '{}') }; };
+  const snapP27 = JSON.stringify({ u: mem.gw_users, d: mem.gw_data });
+  const resetP27 = () => { const s = JSON.parse(snapP27); mem.gw_users = s.u; mem.gw_data = s.d; };
+  const MH = { id: 'uh27', name: '숨김27', admin: false, perms: { veh: 'hide' } }, MV = { id: 'uv27', name: '보기27', admin: false, perms: { veh: 'view' } };
+  const BG = () => ({ schema: 1, ver: 'test-1', sha: 'abcdef0123456789', rows: [{ id: 't.car.1', grade: '실측', cites: [{ law: '시험' }], cls: 'car', every_m: 12 }], attr: { size: ['대형'] } });
+  const seedP27 = (bg, flag) => { resetP27(); Object.assign(mem.gw_users, { 'member:uh27': MH, 'member:uv27': MV });
+    if (bg === undefined) delete mem.gw_data['bg:veh:law:v1']; else mem.gw_data['bg:veh:law:v1'] = bg;
+    if (flag === undefined) delete mem.gw_data['settings:veh']; else mem.gw_data['settings:veh'] = flag; };
+  const chkA = async (c) => {   // 읽기 — 거절·꺼짐 이유·승격
+    const tH = issueSession(MH).token, tV = issueSession(MV).token, out = [];
+    seedP27(); out.push((await c({ action: 'veh_bg_get' }, null)).code, (await c({ action: 'veh_bg_get' }, tH)).code);
+    const r0 = await c({ action: 'veh_bg_get' }, tV); out.push(r0.body.on + ':' + r0.body.why);
+    seedP27({ schema: 1, ver: 'x', rows: 'no', sha: 'abcdef0123456789' }, { bg_ver: 'x' }); const r1 = await c({ action: 'veh_bg_get' }, tV); out.push(r1.body.on + ':' + r1.body.why);
+    seedP27(BG()); const r2 = await c({ action: 'veh_bg_get' }, tV); out.push(r2.body.on + ':' + r2.body.why);
+    seedP27(BG(), { bg_ver: 'test-0' }); const r3 = await c({ action: 'veh_bg_get' }, tV); out.push(r3.body.on + ':' + r3.body.why);
+    seedP27(BG(), { bg_ver: 'test-1' }); const r4 = await c({ action: 'veh_bg_get' }, tV), r5 = await c({ action: 'veh_bg_get' }, tokA);
+    out.push(r4.body.on + ':' + r4.body.ver + ':' + (r4.body.rows || []).length + ':' + JSON.stringify(r4.body.attr), r5.body.on);
+    const off = [r0, r1, r2, r3].every((r) => r.code === 200 && r.body.on === false && !('rows' in r.body));
+    return { ok: off && out.join('|') === '401|403|false:NO_BG|false:BAD_BG|false:NOT_PROMOTED|false:NOT_PROMOTED|true:test-1:1:{"size":["대형"]}|true', info: out.join('|') };
+  };
+  const TK = (id, key, extra) => Object.assign({ id, title: '지시 ' + id, auto_key: key, who_id: 'uwork', who: '', status: 'open', from: '자동', due: '' }, extra || {});
+  const seedDue = () => { seedP27(BG(), { bg_ver: 'test-1' });
+    mem.gw_data['col:vehicles'] = { schema: 1, items: [{ id: 'w1', no: '11가1111', state: '운행', insp_due: '2026-10-31', ins_due: '2026-12-20', updated: '2026-10-01' }], updated_at: 27000, updated_by: 'x' };
+    mem.gw_data['col:tasks'] = { schema: 1, items: [TK('k1', 'veh:w1:insp:2026-10-31'), TK('k2', 'veh:w1:ins:2026-12-20'), TK('k3', 'veh:w1:insp:2026-10-31')], updated_at: 27100, updated_by: 'x' };
+    Object.keys(mem.gw_data).filter((k) => k.indexOf('ver:vehicles:') === 0 || k === 'veridx:vehicles').forEach((k) => { delete mem.gw_data[k]; }); };
+  const vehW = () => mem.gw_data['col:vehicles'].items[0];
+  const chkB = async (c) => {   // 기록 — 검사 칸만 · 제안 없음/틀림 = 기록 없음(저장은 그대로) · 기록 최근 12개
+    seedDue();
+    const r1 = await c({ action: 'veh_due_set', task_id: 'k1', date: '2027-10-31', base_due: '2026-10-31', law: { proposed: '2027-10-25', rule: 't.car.1' } }, tokW, 'dev1');
+    const L1 = JSON.parse(JSON.stringify(vehW().insp_log || null));
+    const r2 = await c({ action: 'veh_due_set', task_id: 'k2', date: '2027-12-20', base_due: '2026-12-20', law: { proposed: '2027-12-20', rule: 'x' } }, tokW, 'dev1');
+    const n2 = (vehW().insp_log || []).length;
+    seedDue(); const r3 = await c({ action: 'veh_due_set', task_id: 'k1', date: '2027-10-31', base_due: '2026-10-31' }, tokW, 'dev1');
+    const noLog = !('insp_log' in vehW()) && !('law_log' in r3.body) && JSON.stringify(r3.body.vehicle) === JSON.stringify({ id: 'w1', field: 'insp_due', value: '2027-10-31', prev: '2026-10-31', updated: r3.body.vehicle.updated });
+    seedDue(); const r4 = await c({ action: 'veh_due_set', task_id: 'k1', date: '2027-10-31', base_due: '2026-10-31', law: { proposed: '2027-02-30', rule: 'x' } }, tokW, 'dev1');
+    const bad = r4.code === 200 && vehW().insp_due === '2027-10-31' && !('insp_log' in vehW());
+    seedDue(); const r5 = await c({ action: 'veh_due_set', task_id: 'k1', date: '2027-10-31', base_due: '2026-10-31', law: { proposed: '', rule: 'x' } }, tokW, 'dev1');
+    const L5 = (vehW().insp_log || [])[0] || {};
+    seedDue(); vehW().insp_log = Array.from({ length: 12 }, (_, i) => ({ at: '2026-01-01', confirmed: '2026-01-' + String(i + 10), proposed: '', rule: '', diff: null, prev: '', by: 'x', src: 'edit' }));
+    const r6 = await c({ action: 'veh_due_set', task_id: 'k1', date: '2027-10-31', base_due: '2026-10-31', law: { proposed: '2027-10-31', rule: 't.car.1' } }, tokW, 'dev1');
+    const L6 = vehW().insp_log || [];
+    const ok = r1.code === 200 && L1 && L1.length === 1 && L1[0].prev === '2026-10-31' && L1[0].confirmed === '2027-10-31' && L1[0].proposed === '2027-10-25' && L1[0].diff === 6 && L1[0].rule === 't.car.1' && L1[0].by === 'uwork' && L1[0].src === 'task'
+      && JSON.stringify(r1.body.law_log) === JSON.stringify(L1[0]) && r2.code === 200 && n2 === 1 && !('law_log' in r2.body) && r3.code === 200 && noLog && bad
+      && r5.code === 200 && L5.proposed === '' && L5.diff === null && L5.rule === '' && r6.code === 200 && L6.length === 12 && L6[11].diff === 0 && L6[0].confirmed === '2026-01-11';
+    return { ok, info: { r1: r1.code, L1, n2, noLog, bad, L5, L6n: L6.length } };
+  };
+  try {
+    const c0 = callerP27(gwd), RA = await chkA(c0), RB = await chkB(c0);
+    T('P1 판27 ① veh_bg_get: 비로그인 401 · 차량 숨김 403 · 근거 없음 = on false(NO_BG) · 꼴 틀림(rows 배열 아님) = BAD_BG · 스위치 없음·다른 판 = NOT_PROMOTED(행 안 보냄) · 승격(settings:veh.bg_ver = 판 ver) = on true·ver·행·attr — 보기 권한·관리자', RA.ok, RA.info);
+    T('P1 판27 ② 지시 완료 창 기록(insp_log): 검사 지시 + 제안 2027-10-25 → {prev 2026-10-31·확정 2027-10-31·제안·차이 +6·근거 행·누가·task} 1줄 + 응답 law_log 같은 값 · 보험 지시 = 기록 안 함 · 제안 안 보냄 = 기록·law_log 없음(응답 vehicle 종전 꼴) · 없는 날 제안 = 저장은 되고 기록 없음 · 제안 "" = 비교 불가(차이 null) · 13번째 = 최근 12개', RB.ok, JSON.stringify(RB.info));
+    const MUT = {
+      A: [["  if (!ver || ver !== bg.ver) return jr(200, { status: 'OK', on: false, why: 'NOT_PROMOTED', request_id: R });\n", ''],
+        ["  if (!c.member.admin && permOf(c.member, 'vehicles') === 'hide') return jr(403,", '  if (false) return jr(403,'],
+        ["x.schema === 1 && typeof x.ver === 'string' && x.ver.length >= 2 && Array.isArray(x.rows) && typeof x.sha === 'string' && x.sha.length >= 8); }\n// 갱신 기록", "x.schema === 1); }\n// 갱신 기록"]],
+      B: [["  const lawLog = field === 'insp_due' ? vehLawLog(", "  const lawLog = true ? vehLawLog("], ["  if (p !== '' && !vehDueDate(p)) return null;\n", ''], ['.concat([lawLog]).slice(-VEH_LOG_MAX);', '.concat([lawLog]);'],
+        ["lawLog ? { law_log: lawLog } : {}));", '{}));']]
+    };
+    const kill = [];
+    for (const n of Object.keys(MUT)) for (const [from, to] of MUT[n]) {
+      let k; try { k = !(await ({ A: chkA, B: chkB })[n](callerP27(loadP27(mutP27(from, to))))).ok; } catch (e) { k = 'err ' + e.message; }
+      if (k !== true) kill.push(n + ':' + from.slice(0, 50) + (k === false ? ' 안 깨짐' : ' ' + k));
+    }
+    T('P1 판27 ③ 결함 사본 ' + (MUT.A.length + MUT.B.length) + '개(승격 검사 걷음·숨김 403 걷음·근거 꼴 검사 느슨 · 보험 칸도 기록·제안 날짜 검사 걷음·12개 상한 걷음·응답 law_log 걷음) = 모두 ✗', kill.length === 0, kill.join(' | '));
+  } finally { resetP27(); }
+}
+
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

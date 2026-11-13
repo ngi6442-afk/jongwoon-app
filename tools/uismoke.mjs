@@ -196,7 +196,7 @@ try {
     if (!cols370) throw new Error('VEH_COLS 없음');
     const api = new Function([
       'var todayStr = function(){ return "2026-09-22"; }; var esc = function(s){ return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); };',
-      cols370, fn370('isGreyState'), fn370('vehDday'), fn370('vehNearest'), fn370('vehDueCell'), fn370('vehNearInfo'), fn370('vehSortVal'), fn370('vehSheetSortRows'), fn370('vehSheetPass'), fn370('vehEnumValues'), fn370('vehColCls'),
+      cols370, fn370('isGreyState'), fn370('vehDday'), fn370('vehNearest'), fn370('vehDueCell'), fn370('vehNearInfo'), fn370('vehSortVal'), fn370('vehSheetSortRows'), fn370('vehSheetPass'), fn370('vehEnumValues'), fn370('vehColCls'), fn370('vehInsShow'), (idx.match(/var VEH_INS_SHOW = \{[^}]*\};/) || [''])[0],   // P1 판26 보험사 표시 맞춤(vehSheetPass·vehEnumValues가 부름)
       'return { VEH_COLS: VEH_COLS, vehDueCell: vehDueCell, vehNearInfo: vehNearInfo, vehSheetSortRows: vehSheetSortRows, vehSheetPass: vehSheetPass, vehEnumValues: vehEnumValues, vehColCls: vehColCls };'].join('\n'))();
     const V = [
       { id: 'a', no: '82수1111', type: '준설차', own: '직영', state: '운행', insp_due: '2026-09-10', ins_due: '2027-03-01', driver: '김호태', insurer: 'DB' },          // 검사 경과 12일
@@ -236,7 +236,7 @@ try {
   // ---- v374: PC 열 폭 끌기 수리(PM 10/1 "열간격 조정 안 됨") ----
   T('v374 차량 표 고정 배치: .vs width:1px(표 폭=열 폭 합) · 보이는 열만 colgroup(vehPhoneMode·visCols) · colspan=nVis 2곳 · 끌기 col은 열 키 · 경계 넘으면 다시 그리기 · 기본 열 폭(v375: 수리 전 실측 185/146/138) · matchMedia change',
     /\.vs\{border-collapse:separate;border-spacing:0;table-layout:fixed;width:1px;min-width:1160px;/.test(idx) && /function vehPhoneMode\(\)\{ try \{ return window\.matchMedia\("\(max-width:859px\)"\)\.matches; \}/.test(idx)
-    && /visCols = VEH_COLS\.filter\(function\(c\)\{ return phoneMode \? !c\.hs : !c\.ph; \}\), nVis = visCols\.length;/.test(idx) && (idx.match(/colspan="' \+ nVis \+ '"/g) || []).length === 2 && !/colspan="' \+ VEH_COLS\.length \+ '"/.test(idx)
+    && /var VC = vehColsNow\(\);/.test(idx) && /visCols = VC\.filter\(function\(c\)\{ return phoneMode \? !c\.hs : !c\.ph; \}\), nVis = visCols\.length;/.test(idx) && (idx.match(/colspan="' \+ nVis \+ '"/g) || []).length === 2 && !/colspan="' \+ VEH_COLS\.length \+ '"/.test(idx)
     && /col = host\.querySelector\("col\.vs-c-" \+ k\)/.test(idx) && !/cols = host\.querySelectorAll\("col"\)/.test(idx) && /window\.addEventListener\("resize", vehOnBreak\);/.test(idx) && /function vehOnBreak\(\)\{ var p = vehPhoneMode\(\); if \(vehLastPhone !== null && p !== vehLastPhone\)/.test(idx)
     && /h:"차번호",   w:185,/.test(idx) && /vehMql\.addEventListener\("change", vehOnBreak\)/.test(idx) && /h:"검사만기", w:146,/.test(idx) && /h:"보험만기", w:138,/.test(idx), '');
   // ---- v377: 종운환경 유한회사→주식회사 조직변경(PM 10/8) — 표시 문자열에 옛 법인격 잔존 금지, 매칭 정규화 목록은 유지 ----
@@ -11807,7 +11807,7 @@ try {
   const MUT_P2 = [['다시 지시 키 연결 걷음', '(?::re:\\d{4}-\\d{2})?$/;', '$/;'], ['승인 대기를 날짜 그대로에서 뺌', '(t.status !== "done" && t.status !== "review")) return false;', 't.status !== "done") return false;'],
     ['담당 갈래 날짜 칸 조건 걷음', ' && L.v[L.f] === L.due); }', '); }'], ['같은 날을 서버로', 'if (!s || s === q.cur){', 'if (!s){'], ['날짜 검사 걷음', '    if (why){ vehDueErr(why); return; }\n', ''],
     ['이른 날 확인 걷음', 'if (isDate(q.cur) && s < q.cur && !confirm(', 'if (false && !confirm('], ['거절에도 완료', '        return;\n      }\n      b = res.body.vehicle;', '        vehDueFinish(q.id); return;\n      }\n      b = res.body.vehicle;'],
-    ['로컬 줄 안 고침', 'if (v){ v[b.field] = b.value; v.updated = b.updated; saveVehiclesCache(); }', 'if (false){}'], ['base_due 안 보냄', ', base_due: q.cur })', ' })'],
+    ['로컬 줄 안 고침', 'if (v){ v[b.field] = b.value; v.updated = b.updated; saveVehiclesCache(); }', 'if (false){}'], ['base_due 안 보냄', ', base_due: q.cur }, lawArg', ' }, lawArg'],
     ['다시 지시 회색 걷음', ' || GREY.indexOf(String(v.state || "")) >= 0) return;', ') return;'], ['다시 지시 진행 중 검사 걷음', '        if (same.some(function(t){ return t.status !== "done"; })) return;\n', ''],
     ['권한 판정 걷음', '!vehDueCanWrite(t, L)', '!true'], ['차량 줄 표시 순서 뒤집음', '    if (seen.insp) out.push("정기검사");\n    if (seen.ins) out.push("보험");', '    if (seen.ins) out.push("보험");\n    if (seen.insp) out.push("정기검사");']];
   const killP2 = MUT_P2.map(([nm, a, b]) => { if (blkP2.split(a).length !== 2) return nm + ':글 없음'; let k; try { k = !okP2(evalP2(blkP2.replace(a, () => b))); } catch (e2) { k = false; } return k ? '' : nm + ':안 깨짐(또는 실행 오류)'; }).filter(Boolean);
@@ -13030,6 +13030,168 @@ try {
   const miss = readdirSync(fdir).filter((f) => /^gw-.*\.js$/.test(f)).filter((f) => { const t = readFileSync(join(fdir, f), 'utf8'); return /\b(store|blobGet|blobSet|blobList|blobDelete)\(/.test(t) && !/setupBlobContext\(/.test(t); });
   T('Blob 컨텍스트 전수: Blob을 쓰는 gw-*.js 전부 setupBlobContext 호출(누락 0)', miss.length === 0, '누락: ' + miss.join(', '));
 } catch (e) { console.log('  (Blob 컨텍스트 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ---- P1 판26·27 차량 수정 창 속성 칸 + 법정 검사 제안(시안 판3 ① · @veh-law 구간 실행) ----
+//   실제 openVehModal·saveVehFromModal·vehDetailHtml·vehSheetPass·vehEnumValues와 @veh-law 구간을 가짜 document 위에서 돌린다. 근거 표는 시험 값(가짜 — 실제 법정 주기 아님).
+//   결함 사본(index.html 한 곳을 바꿔 메모리에서 다시 돌림)에서는 기대가 깨져야 한다.
+try {
+  const fnVL = (src, name) => { const i = src.indexOf('function ' + name + '('); if (i < 0) throw new Error('함수 없음: ' + name); let d = 0, st = false; for (let j = i; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i, j + 1); } } throw new Error('함수 끝 없음: ' + name); };
+  const blkOf = (src, a, b) => { const i = src.indexOf(a), j = src.indexOf(b); if (i < 0 || j < i) throw new Error('구간 없음: ' + a); return src.slice(i, j); };
+  const ROWS_VL = [
+    { id: 't.car.a', grade: '실측', cites: [{ law: '시험' }], cls: 'car', biz: ['사업용'], size: ['대형'], age_max: 5, every_m: 12 },
+    { id: 't.car.b', grade: '실측', cites: [{ law: '시험' }], cls: 'car', biz: ['사업용'], size: ['대형'], age_min: 5, every_m: 6 },
+    { id: 't.car.c', grade: '확인 필요', cites: [{ law: '시험' }], cls: 'car', biz: ['비사업용'], every_m: 24 },
+    { id: 't.car.d', grade: '실측', cites: [], cls: 'car', biz: ['비사업용'], every_m: 24 },
+    { id: 't.car.e', grade: '실측', cites: [{ law: '시험' }], cls: 'car', size: ['소형'], first_m: 36, first_adj_days: -1, every_m: 24 },
+    { id: 't.ceq.a', grade: '실측', cites: [{ law: '시험' }], cls: 'ceq', ceq_kind: ['굴착기'], age_base: 'year', age_max: 20, every_m: 12 }];
+  const VEH_VL = () => [
+    { id: 'A', no: '90오6840', biz: '사업용', size: '대형', reg_date: '2020-03-10', insp_due: '2027-03-10', state: '운행', insurer: 'KB손해', updated: '2026-11-01' },
+    { id: 'B', no: '22나2222', biz: '사업용', size: '대형', reg_date: '2020-03-10', insp_due: '2027-03-22', state: '운행', insurer: 'KB손해보험' },
+    { id: 'C', no: '33다3333', biz: '사업용', size: '대형', insp_due: '2027-01-01', state: '운행', insurer: 'DB손해', permit: '폐이로더', own: '직영' },
+    { id: 'D', no: '44라4444', biz: '비사업용', size: '중형', reg_date: '2019-01-01', insp_due: '2027-01-01', state: '정비', insurer: '메리츠화재' },
+    { id: 'E', no: '55마5555', biz: '사업용', size: '대형', reg_date: '2020-03-10', insp_due: '2022-07-07', state: '매각' },
+    { id: 'F', no: '66바6666', biz: '비사업용', size: '소형', reg_date: '2024-01-31', insp_due: '2027-01-30', state: '운행' },
+    { id: 'G', no: '경북02모4315', biz: '사업용', size: '건설기계', ceq_kind: '굴착기', ceq_year: '2015', reg_date: '2016-05-01', state: '운행' },
+    { id: 'H', no: '88아8888', biz: '사업용', size: '건설기계', reg_date: '2016-05-01', state: '운행' },
+    { id: 'I', no: '99자9999', biz: '사업용', size: '건설기계', ceq_kind: '지게차', ceq_year: '2015', reg_date: '2016-05-01', state: '운행' },
+    { id: 'O', no: '81우 4802', kind: '', insp_due: '2026-09-28', ins_due: '2026-09-24', state: '운행', insurer: '현대해상', note: '', updated: '2026-10-01' }];   // 옛 문서(새 칸 없음)
+  const runVL = (src) => {
+    const blk = blkOf(src, '// @veh-law-start', '// @veh-law-end');
+    const cols = (src.match(/var VEH_COLS = \[[\s\S]*?\n  \];/) || [''])[0];
+    if (!cols) throw new Error('VEH_COLS 없음');
+    const els = {};
+    const el = (id) => { if (!els[id]) { const cls = new Set(); els[id] = { id, value: '', textContent: '', innerHTML: '', disabled: false, placeholder: '', style: {}, classList: { add: (c) => cls.add(c), remove: (c) => cls.delete(c), contains: (c) => cls.has(c) }, addEventListener() {}, focus() {} }; } return els[id]; };
+    const E = { vehicles: VEH_VL(), calls: [], rend: 0, gw: null, admin: false };
+    const pre = [fnVL(src, 'esc'), fnVL(src, 'isDate'), fnVL(src, 'isGreyState'), fnVL(src, 'vehDday'), fnVL(src, 'vehDueCell'), cols, fnVL(src, 'vehColCls'), fnVL(src, 'vehSheetPass'), fnVL(src, 'vehEnumValues'),
+      fnVL(src, 'vehDetailHtml'), fnVL(src, 'openVehModal'), fnVL(src, 'closeVehModal'), fnVL(src, 'saveVehFromModal'),
+      'var vehicles = E.vehicles, editingVehId = null, vehDetTab = "ov";', 'function todayStr(){ return "2026-11-13"; } function myId(){ return "u1"; } function canDo(m){ return true; } function isAdmin(){ return E.admin; }',
+      'function findVeh(id){ for (var i = 0; i < vehicles.length; i++){ if (vehicles[i].id === id) return vehicles[i]; } return null; } function liveVehicles(){ return vehicles.filter(function(v){ return v && v.del !== 1; }); }',
+      'function genId(p){ return p + "new"; } function alert(m){ E.calls.push("alert:" + m); } function saveVehiclesCache(){} function renderVehicles(){ E.rend++; } function renderDashboard(){} function scheduleVehSave(){}',
+      'function gwCall(fn, body){ E.calls.push(body.action); var r = typeof E.gw === "function" ? E.gw(body) : { status: 500, body: {} }; return { then: function(f){ f(r); return { catch: function(){} }; } }; }'].join('\n');
+    const api = new Function('E', 'document', pre + '\n' + blk + '\nreturn { VEH_LAW: VEH_LAW, VEH_COLS: VEH_COLS, cols: vehColsNow, calc: vehLawCalc, of: vehLawOf, tag: vehLawTag, badge: vehLawBadge, foot: vehLawFoot, add: vehAddMonths, logE: vehLawLogEntry, push: vehLawLogPush, arg: vehLawArg, load: vehLawLoad, ins: vehInsShow, pass: vehSheetPass, en: vehEnumValues, det: vehDetailHtml, open: openVehModal, save: saveVehFromModal, veh: findVeh, refresh: vehModalLawRefresh };')(E, { getElementById: el });
+    const R = {};
+    const fill = (id, vals) => { api.open(id); Object.keys(vals || {}).forEach((k) => { el(k).value = vals[k]; }); api.refresh(); };
+    const keysOf = (o) => Object.keys(o).sort().join(',');
+    // ── 판26 ② 옛 문서 열기·그대로 저장 = 새 칸 0·값 그대로(updated만)
+    const o0 = JSON.parse(JSON.stringify(api.veh('O')));
+    fill('O'); api.save(); const o1 = api.veh('O');
+    R.old = keysOf(o1) === keysOf(o0) && Object.keys(o0).every((k) => k === 'updated' || JSON.stringify(o1[k]) === JSON.stringify(o0[k])) && o1.updated === '2026-11-13' && el('vehCo').value === '' && /종운환경 \(기본값\)/.test(el('vehCo').innerHTML);
+    // ── 판26 ③ 목록 밖 저장 글 보존(소유 '직영'·허가 '폐이로더') · 속성 넣기 · 지운 칸 = 키째 · 건설기계 아니면 기종·연식 잠김·저장 안 함 · 연식 4자리만
+    fill('C');
+    R.keep = el('vehOwn').value === '직영' && /value="직영"/.test(el('vehOwn').innerHTML) && el('vehPermit').value === '폐이로더' && el('vehCeqKind').disabled === true && el('vehCeqYear').placeholder === '건설기계만';
+    Object.assign(el('vehPermit'), { value: '' }); el('vehRegDate').value = '2021-06-01'; el('vehCo').value = '종운건설'; el('vehCeqKind').value = '굴착기'; api.save();
+    const c1 = api.veh('C');
+    R.set = !('permit' in c1) && c1.own === '직영' && c1.reg_date === '2021-06-01' && c1.co === '종운건설' && !('ceq_kind' in c1) && c1.insurer === 'DB손해';
+    fill('H', { vehCeqKind: '굴착기', vehCeqYear: '15' }); const hDis = el('vehCeqKind').disabled; api.save(); const h1 = JSON.parse(JSON.stringify(api.veh('H')));
+    fill('H', { vehCeqYear: '2015' }); api.save(); const h2 = api.veh('H');
+    R.ceq = hDis === false && h1.ceq_kind === '굴착기' && !('ceq_year' in h1) && h2.ceq_year === '2015';
+    // ── 판26 ④ 보험사 표시만 맞춤
+    R.insShow = [api.ins('KB손해'), api.ins(' DB손해 '), api.ins('KB손해보험'), api.ins('메리츠화재'), api.ins('')].join(',') === 'KB손해보험,DB손해보험,KB손해보험,메리츠화재,';
+    const V = E.vehicles;
+    R.insPass = V.filter((v) => api.pass(v, { insurer: 'KB손해보험' }, '')).map((v) => v.id).join('') === 'AB' && api.en(V, 'insurer').join(',') === '메리츠화재,현대해상,DB손해보험,KB손해보험';
+    fill('A'); R.insHint = el('vehInsHint').style.display === '' && /'KB손해보험'/.test(el('vehInsHint').textContent);
+    fill('D'); R.insHint = R.insHint && el('vehInsHint').style.display === 'none';
+    R.insKept = api.veh('A').insurer === 'KB손해' && /\(저장 글 (&#39;|')KB손해(&#39;|')\)/.test(api.det(api.veh('A'))) && /시행 회사[\s\S]{0,80}종운환경[\s\S]{0,60}\(기본값\)/.test(api.det(api.veh('A')));
+    // ── 판27 ① 스위치 꺼짐 = 종전: 열 12·제안 없음·창 줄 숨김·기록 없음·지시 완료 창 제안 없음·law 거르기 무시·펼침 칩 없음
+    E.vehicles.splice(0, E.vehicles.length, ...VEH_VL());
+    const off = { cols: api.cols() === api.VEH_COLS && api.cols().length === 12, of: api.of(api.veh('A')) === null, arg: api.arg('A', '2028-03-10') === null };
+    fill('A', { vehInsp: '2028-03-10' }); off.hint = el('vehLawHint').style.display === 'none' && el('vehLawHint').innerHTML === ''; api.save();
+    off.log = !('insp_log' in api.veh('A')) && api.veh('A').insp_due === '2028-03-10';
+    off.pass = api.pass(api.veh('A'), { law: '기준 없음' }, '') === true; off.det = !/vl-due|법정 검사 제안/.test(api.det(api.veh('B')));
+    E.rend = 0; E.gw = () => ({ status: 200, body: { status: 'OK', on: false, why: 'NOT_PROMOTED' } }); api.load(); off.load = api.VEH_LAW.on === false && E.rend === 0 && api.cols().length === 12;
+    api.VEH_LAW.at = 0; E.gw = () => ({ status: 200, body: { status: 'OK', on: true, ver: 'v', rows: [] } }); api.load(); off.empty = api.cols().length === 12;
+    R.off = Object.keys(off).every((k) => off[k] === true); R.offInfo = off;
+    // ── 판27 ② 켜짐(근거 표 내려옴) — 다시 그림 1번·30분 안에 다시 안 부름
+    E.vehicles.splice(0, E.vehicles.length, ...VEH_VL()); E.rend = 0; api.VEH_LAW.at = 0; E.calls.length = 0;
+    E.gw = () => ({ status: 200, body: { status: 'OK', on: true, ver: 'test-1', rows: ROWS_VL, attr: { size: ['대형', '소형', '건설기계'] } } });
+    api.load(); api.load();
+    R.load = api.VEH_LAW.on === true && E.rend === 1 && E.calls.filter((x) => x === 'veh_bg_get').length === 1;
+    const before = JSON.stringify(E.vehicles);
+    const res = {}; E.vehicles.forEach((v) => { const r = api.of(v); res[v.id] = r ? [r.st, r.date || '', r.diff === undefined ? '' : String(r.diff), r.rule || (r.miss || []).join('·') || r.why || ''].join('/') : 'null'; });
+    R.calc = res; R.noWrite = JSON.stringify(E.vehicles) === before;
+    R.months = [api.add('2024-01-31', 1), api.add('2023-01-31', 1), api.add('2024-11-30', 3), api.add('2024-12-15', 1)].join(',');
+    // ── 판27 ③ 표 칸·거르기·합계·창 줄·펼침 칩
+    const cs = api.cols(), ii = cs.findIndex((c) => c.k === 'insp_due');
+    R.col = cs.length === 13 && cs[ii + 1].k === 'law' && cs[ii + 1].h === '법정 검사 제안' && cs[ii + 1].hs === 1 && api.VEH_COLS.length === 12;
+    R.foot = api.foot(E.vehicles);
+    R.lawPass = E.vehicles.filter((v) => api.pass(v, { law: '기준 없음' }, '')).map((v) => v.id).join('');
+    R.lawEn = api.en(E.vehicles, 'law').join(',');
+    R.badge = [api.badge(api.of(api.veh('A')), 'cell'), api.badge(api.of(api.veh('B')), 'cell'), api.badge(api.of(api.veh('C')), 'cell'), api.badge(api.of(api.veh('E')), 'cell'), api.badge(api.of(api.veh('C')), 'det'), api.badge(api.of(api.veh('C')), 'modal')]
+      .map((h) => h.replace(/ title="[^"]*"/, '')).join('\n');
+    fill('B'); R.hint = el('vehLawHint').style.display === '' && /법정 제안: 2027-03-10 · 차이 \+12일/.test(el('vehLawHint').innerHTML);
+    R.det = /vs-due vl-due[\s\S]*법정 검사 제안 <b>2027-03-10<\/b> · 차이 \+12일/.test(api.det(api.veh('B')));
+    // ── 판27 ④ 기록 — 검사 만기를 바꾸면 제안·확정 1줄(운영부 날짜 그대로 저장) · 안 바꾸면 없음 · 기준 없음 = 제안 "" · 대상 아님 = 없음 · 최근 12개 · 지시 완료 창 제안
+    fill('A', { vehInsp: '2028-03-10' }); api.save(); const la = JSON.parse(JSON.stringify(api.veh('A').insp_log || null));
+    fill('A'); api.save(); const la2 = (api.veh('A').insp_log || []).length;
+    fill('C', { vehInsp: '2027-06-30' }); api.save(); const lc = (api.veh('C').insp_log || [])[0] || {};
+    fill('E', { vehInsp: '2027-07-07' }); api.save(); const le = 'insp_log' in api.veh('E');
+    const x = { id: 'X' }; for (let i = 0; i < 13; i++) api.push(x, { n: i });
+    R.log = la && la.length === 1 && la[0].prev === '2027-03-10' && la[0].confirmed === '2028-03-10' && la[0].proposed === '2028-03-10' && la[0].diff === 0 && la[0].rule === 't.car.b' && la[0].src === 'edit' && la[0].by === 'u1' && la[0].at === '2026-11-13'
+      && api.veh('A').insp_due === '2028-03-10' && la2 === 1 && lc.proposed === '' && lc.diff === null && lc.confirmed === '2027-06-30' && le === false && x.insp_log.length === 12 && x.insp_log[0].n === 1;
+    R.logInfo = { la, la2, lc, le };
+    R.arg = JSON.stringify(api.arg('B', '2027-09-10'));
+    return R;
+  };
+  const EXP_CALC = { A: 'ok/2027-03-10/0/t.car.b', B: 'ok/2027-03-10/12/t.car.b', C: 'none///최초등록일', D: 'none///rule', E: 'na///', F: 'ok/2027-01-30/0/t.car.e', G: 'ok/2027-05-01/null/t.ceq.a', H: 'none///기종·연식', I: 'none///rule', O: 'none///사업용 여부·규모·최초등록일' };
+  const EXP_BADGE = ['<span class="vl-b ok">제안 2027-03-10 · 차이 0일</span>', '<span class="vl-b am">제안 2027-03-10 · 차이 +12일</span>', '<span class="vl-b pre">기준 없음 — 입력</span>', '<span class="vl-b hold">대상 아님</span>',
+    '<span class="vl-b pre">법정 검사 제안 <b>기준 없음</b> — 넣을 칸: 최초등록일</span>', '<span class="vl-b pre">법정 제안: 기준 없음 — 속성 입력</span>'].join('\n');
+  const ok26 = (R) => R.old && R.keep && R.set && R.ceq && R.insShow && R.insPass && R.insHint && R.insKept;
+  const ok27 = (R) => R.off && R.load && R.noWrite && JSON.stringify(R.calc) === JSON.stringify(EXP_CALC) && R.months === '2024-02-29,2023-02-28,2025-02-28,2025-01-15' && R.col
+    && R.foot === '차이 0 2 · 차이 있음 1 · 제안만 1 · 기준 없음 5 · 대상 아님 1' && R.lawPass === 'CDHIO' && R.lawEn === '기준 없음,대상 아님,제안만,차이 0,차이 있음' && R.badge === EXP_BADGE && R.hint && R.det && R.log
+    && R.arg === '{"proposed":"2027-09-10","rule":"t.car.b"}';
+  const realVL = runVL(html);
+  // 정적: 창 칸·이름·폰 16px·도움말·화면 글에 내부 키 이름 없음·옛 '종류/용도' 칸 이름 없음·배선
+  const modalVL = blkOf(html, '<div class="modal-backdrop" id="vehBackdrop">', '<div class="modal-backdrop" id="vehDueBackdrop">');
+  const textVL = modalVL.replace(/<[^>]*>/g, ' ') + ' ' + (html.match(/· 차량 속성\(차량 담당\)[^\n]*/) || [''])[0].replace(/<[^>]*>/g, ' ');
+  const idsVL = ['vehType', 'vehOwn', 'vehPermit', 'vehDriver', 'vehCo', 'vehBiz', 'vehSize', 'vehRegDate', 'vehCeqKind', 'vehCeqYear', 'vehLawHint', 'vehInsHint'];
+  const st26 = idsVL.every((id) => (html.match(new RegExp('id="' + id + '"', 'g')) || []).length === 1) && /placeholder="상세 \(예: 준설차, 선택\)"/.test(modalVL) && !/종류\/용도/.test(html)
+    && /<input type="date" id="vehRegDate">/.test(modalVL) && /id="vehCeqYear" inputmode="numeric" maxlength="4"/.test(modalVL)
+    && /@media \(max-width:859px\)\{\s*\.modal \.veh-attr input,\.modal \.veh-attr select\{font-size:16px;\}/.test(html)
+    && !/\b(biz|size|reg_date|ceq_kind|ceq_year|kind|type|own|permit|driver|insurer|co)\b/.test(textVL) && /차량 속성\(차량 담당\)/.test(textVL)
+    && /vehModalAttrFill\(v\);/.test(fnVL(html, 'openVehModal')) && /vehModalAttrSave\(v\);/.test(fnVL(html, 'saveVehFromModal'));
+  const st27 = /if \(d && d\.action === 'veh_bg_get'\) return await handleVehBgGet\(event, d, R\);/.test(readFileSync(join(ROOT, 'netlify', 'functions', 'gw-data.js'), 'utf8'))
+    && /vehLawLoad\(\);/.test(fnVL(html, 'renderVehicles')) && /VC = vehColsNow\(\);/.test(fnVL(html, 'vehSheetRowHtml')) && /\(vehLawOn\(\) \? '<span class="vs-due vl-due">'/.test(fnVL(html, 'vehDetailHtml'))
+    && !/\d+\s*(개월|년)/.test(blkOf(html, '// @veh-law-start', '// @veh-law-end').replace(/\/\/[^\n]*/g, ''));   // 구간 코드(주석 밖)에 주기 숫자 글 없음 — 수치는 근거 표에만
+  // 지시 완료 창(@veh-due 실제 vehDueOk) — 제안이 있으면 요청에 law · 응답 law_log를 로컬 줄에
+  const blkDue = blkOf(html, '// @veh-due-start', '// @veh-due-end');
+  const runDue = (lawArg) => {
+    const els = {}; ['vehDueBackdrop', 'vehDueTitle', 'vehDueCur', 'vehDueDate', 'vehDueErr'].forEach((id) => { const cls = new Set(); els[id] = { textContent: '', value: '', classList: { add: (c) => cls.add(c), remove: (c) => cls.delete(c), contains: (c) => cls.has(c) } }; });
+    const ENV = { tasks: [{ id: 't1', title: '지시', auto_key: 'veh:V:insp:2026-11-20', who_id: 'u1', status: 'open', from: '자동', from_id: '' }], vehicles: [{ id: 'V', no: '11가1111', state: '운행', insp_due: '2026-11-20', updated: '2026-11-01' }], sent: [] };
+    const pre = [fnVL(html, 'esc'), fnVL(html, 'isDate'), fnVL(html, 'toggleTaskDone'), 'var tasks = ENV.tasks, vehicles = ENV.vehicles;',
+      'function findTask(id){ for (var i = 0; i < tasks.length; i++){ if (tasks[i].id === id) return tasks[i]; } return null; }', 'function findVeh(id){ for (var i = 0; i < vehicles.length; i++){ if (vehicles[i].id === id) return vehicles[i]; } return null; }',
+      'function canDo(m){ return true; } function canActTask(t){ return true; } function myId(){ return "u1"; } function myName(){ return "시험"; }',
+      'function todayStr(){ return "2026-11-13"; } function pushNotify(){} function saveTasksCache(){} function renderTasks(){} function renderSummary(){} function scheduleTasksSave(){}',
+      'function saveVehiclesCache(){} function renderVehicles(){} function renderDashboard(){} function scheduleVehSave(){} function apprToastShow(m){} function confirm(m){ return true; }',
+      lawArg ? 'function vehLawArg(vid, d){ return { proposed: "2027-11-15", rule: "t.car.b" }; } function vehLawLogPush(v, e){ v.insp_log = (v.insp_log || []).concat([e]); }' : '',
+      'function syncP(v){ return { then: function(f){ return syncP(f ? f(v) : v); }, catch: function(){ return syncP(v); } }; }',
+      'function gwCall(fn, body){ ENV.sent.push(JSON.parse(JSON.stringify(body))); return syncP({ status: 200, body: Object.assign({ status: "OK", vehicle: { id: "V", field: "insp_due", value: body.date, prev: "2026-11-20", updated: "2026-11-13" }, updated_at: 1 }, body.law ? { law_log: { confirmed: body.date, proposed: body.law.proposed, diff: 5, src: "task" } } : {}) }); }'].join('\n');
+    const api = new Function('ENV', 'document', pre + '\n' + blkDue + '\nreturn { toggle: toggleTaskDone, ok: vehDueOk, veh: findVeh };')(ENV, { getElementById: (id) => els[id] || null });
+    api.toggle('t1'); els.vehDueDate.value = '2027-11-20'; api.ok();
+    return JSON.stringify([ENV.sent[0] && ENV.sent[0].law || null, api.veh('V').insp_log || null, api.veh('V').insp_due]);
+  };
+  const dueOn = runDue(true), dueOff = runDue(false);
+  const dueOk = dueOn === JSON.stringify([{ proposed: '2027-11-15', rule: 't.car.b' }, [{ confirmed: '2027-11-20', proposed: '2027-11-15', diff: 5, src: 'task' }], '2027-11-20']) && dueOff === JSON.stringify([null, null, '2027-11-20']);
+  // 결함 사본
+  const MUT_VL = [
+    ['27', '꺼짐에도 열 끼움', '    if (!vehLawOn()) return VEH_COLS;\n', ''],
+    ['27', '회색 상태 판정 걷음', '    if (isGreyState(v)) return { st: "na" };\n', ''],
+    ['27', '실측 행만 쓰기 걷음', ' && r.grade === "실측" && ', ' && '],
+    ['27', '조문 인용 검사 걷음', ' && Array.isArray(r.cites) && r.cites.length && ', ' && '],
+    ['27', '꺼짐에도 기록', '    if (!vehLawOn() || !v || !isDate(confirmed) || prev === confirmed) return null;', '    if (!v || !isDate(confirmed) || prev === confirmed) return null;'],
+    ['27', '가장 가까운 날 고르기 걷음', '      if (n <= bestAbs){', '      if (true){'],
+    ['27', '첫 회 주기 걷음', '(k === 0 && r.first_m) ? r.first_m : r.every_m', 'r.every_m'],
+    ['27', '기록 12개 상한 걷음', '.concat([e]).slice(-VEH_LOG_MAX);', '.concat([e]);'],
+    ['27', '운영부 날짜를 제안으로 덮음', '  function vehLawOf(v){ return vehLawOn() ? vehLawCalc(v, VEH_LAW.rows, todayStr()) : null; }', '  function vehLawOf(v){ var r = vehLawOn() ? vehLawCalc(v, VEH_LAW.rows, todayStr()) : null; if (r && r.date) v.insp_due = r.date; return r; }'],
+    ['26', '지운 칸 키 남김', ' else if (Object.prototype.hasOwnProperty.call(v, k)) delete v[k]; }', ' }'],
+    ['26', '빈 칸도 키 만듦', '  function vehSetOpt(v, k, val){ if (val) v[k] = val;', '  function vehSetOpt(v, k, val){ if (true) v[k] = val;'],
+    ['26', '저장 글 보존 걷음', '    if (!el) return;\n    if (cur && list.indexOf(cur) < 0) list.push(cur);\n', '    if (!el) return;\n'],
+    ['26', '보험사 표시 맞춤 걷음', 'return Object.prototype.hasOwnProperty.call(VEH_INS_SHOW, t) ? VEH_INS_SHOW[t] : t; }', 'return t; }']];
+  const killVL = MUT_VL.map(([w, nm, a, b]) => { if (html.split(a).length !== 2) return nm + ':글 없음'; let k; try { const R = runVL(html.replace(a, () => b)); k = !(w === '26' ? ok26(R) : ok27(R)); } catch (e2) { k = true; } return k ? '' : nm + ':안 깨짐'; }).filter(Boolean);
+  T('P1 판26 차량 수정 창 속성 칸(실행 — 실제 openVehModal·saveVehFromModal·@veh-law): ① 창 칸 12개(차종·소유·허가 종류·운전자·시행 회사·사업용 여부·규모·최초등록일·기종·연식·제안 줄·보험사 안내) · 칸 이름 "상세"(옛 "종류/용도" 없음) · 폰 새 칸 16px · 화면 글에 내부 키 이름 없음 · 도움말 1절 ② 옛 차량 문서 열기·그대로 저장 = 새 칸 0·값 그대로(시행 회사 "종운환경 (기본값)") ③ 목록 밖 저장 글 보존(소유 "직영"·허가 "폐이로더") · 넣은 칸 저장 · 지운 칸 키째 · 건설기계 아니면 기종·연식 잠김·저장 안 함 · 연식 4자리만 ④ 보험사 표시 맞춤(KB손해·DB손해 → …보험, 거르기·목록 표시 글, 창 안내, 펼침 "(저장 글 …)") · 저장 글 그대로 · 결함 사본(판26 4개) = 모두 ✗',
+    st26 && ok26(realVL) && killVL.filter((k) => /지운 칸|빈 칸|저장 글 보존|보험사 표시/.test(k)).length === 0, JSON.stringify({ st26, R: { old: realVL.old, keep: realVL.keep, set: realVL.set, ceq: realVL.ceq, insShow: realVL.insShow, insPass: realVL.insPass, insHint: realVL.insHint, insKept: realVL.insKept }, killVL }));
+  T('P1 판27 차량 법정 검사 제안(실행 — 시험 근거 표): ① 승격 아님(on false·행 0) = 열 12·제안 null·창 줄 숨김·기록 없음·완료 창 제안 없음·law 거르기 무시·펼침 칩 없음·다시 그림 0 ② 승격 = 근거 표 1번 읽고 다시 그림 1번 ③ 계산 10대(차이 0·+12·첫 회 주기와 날 보정·건설기계 연식 기산 = 제안만 · 속성 빔 = 기준 없음(빈 칸 이름) · 비실측·조문 없는 행 = 쓰지 않음(기준 없음) · 매각 = 대상 아님) · 운영부 날짜 안 덮음(입력 그대로) · 말일 맞춤 ④ 표 열 13(검사만기 다음·PC 전용) · 합계·거르기·뱃지 4꼴·창 줄·펼침 칩 ⑤ 기록: 검사 만기 바꿈 = {이전·확정·제안·차이 0·근거 행·edit} 1줄 · 안 바꿈 = 없음 · 기준 없음 = 제안 "" · 매각 = 없음 · 최근 12개 ⑥ 지시 완료 창: 제안 있으면 요청 law·응답 기록을 로컬 줄에 / 없으면 요청 종전 꼴 ⑦ 구간 코드에 주기 숫자 없음 · 결함 사본(판27 9개) = 모두 ✗',
+    st27 && ok27(realVL) && dueOk && killVL.length === 0, JSON.stringify({ st27, dueOk, dueOn, dueOff, off: realVL.offInfo, load: realVL.load, calc: realVL.calc, months: realVL.months, col: realVL.col, foot: realVL.foot, lawPass: realVL.lawPass, lawEn: realVL.lawEn, badge: realVL.badge, hint: realVL.hint, det: realVL.det, log: realVL.logInfo, arg: realVL.arg, killVL }));
+} catch (e) { console.log('  (P1 판26·27 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

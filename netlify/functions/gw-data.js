@@ -1868,12 +1868,44 @@ async function handleVehDueSet(event, d, R) {
   const now = Date.now(), today = new Date(now + 9 * 3600000).toISOString().slice(0, 10);
   wv[field] = date; wv.updated = today;
   wv.due_set = Object.assign({}, (wv.due_set && typeof wv.due_set === 'object') ? wv.due_set : {}); wv.due_set[field] = { prev: cur, at: now };   // 검토 S1: 낡은 사본 되돌림 보호 표식(vehDueGuard·앱 vehDueMergeKeep)
+  const lawLog = field === 'insp_due' ? vehLawLog(d.law, cur, date, today, c.member.id, 'task') : null;   // P1 판27: 법정 검사 제안이 켜진 앱이 보낸 제안 날짜와 확정 날짜(검사 칸만 · 표시 기록, 값 판정 없음)
+  if (lawLog) wv.insp_log = (Array.isArray(wv.insp_log) ? wv.insp_log : []).concat([lawLog]).slice(-VEH_LOG_MAX);
   wdoc.updated_by = c.member.id; wdoc.updated_at = now;
   const w = await blobSet(st, colKey('vehicles'), wdoc);
   if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
   const f = {}; f[field] = [cur, date];
   const au = await appendAudit({ ts: now, by: c.member.name, bid: c.member.id, col: 'vehicles', ev: [{ op: '수정', id: wv.id, t: String(wv.no || wv.id).slice(0, 40) + ' · 지시 완료 창(' + (vehDo ? '차량 수행' : '배정 담당') + ' · 지시 ' + t.id + ')', f: f }] });
-  return jr(200, { status: 'OK', vehicle: { id: wv.id, field: field, value: date, prev: cur, updated: today }, updated_at: now, audit: au !== false, request_id: R });
+  return jr(200, Object.assign({ status: 'OK', vehicle: { id: wv.id, field: field, value: date, prev: cur, updated: today }, updated_at: now, audit: au !== false, request_id: R }, lawLog ? { law_log: lawLog } : {}));   // P1 판27: 앱이 로컬 줄에도 같은 기록을 붙임(다음 통째 저장이 지우지 않게)
+}
+// ---- P1 판26·27(원장 T476·T451 · 시안 판3 ① · PM 11/13 18:14 '45. 판3 ㄱ') 차량 법정 검사 제안 ----
+//   근거 표 bg:veh:law:v1(차량 법령 근거 — 판13 초안·11/20 승격 카드 ②)은 settings:veh.bg_ver 가 그 판 ver 와 같을 때만 '승격'(계약 bg:contract:law:v1 · settings:contract.bg_ver 와 같은 꼴).
+//   승격 전·근거 없음·꼴 틀림 = on false → 앱은 제안 열·칩·기록을 그리지 않는다(종전 화면 그대로). 이 판은 읽기만 — 승격 스위치를 쓰는 길은 만들지 않았다(카드는 판 13·29 몫).
+//   제안 계산은 앱(vehLawCalc — 표시만, 운영부 날짜 덮지 않음). 서버는 근거 표를 내려 주고, 지시 완료 창(veh_due_set)이 받은 제안·확정 날짜를 차량 줄 insp_log 에 남기기만 한다.
+const VEH_BG_KEYS = { bg: 'bg:veh:law:v1', flag: 'settings:veh' };
+const VEH_LOG_MAX = 12;   // 차량 한 줄의 검사 갱신 기록(insp_log) 최근 12개 — 앱 VEH_LOG_MAX 와 같은 값
+function vehBgOk(x) { return !!(x && typeof x === 'object' && x.schema === 1 && typeof x.ver === 'string' && x.ver.length >= 2 && Array.isArray(x.rows) && typeof x.sha === 'string' && x.sha.length >= 8); }
+// 갱신 기록 1줄 { at, prev, confirmed, proposed, rule, diff, by, src } — proposed '' = 그때 '기준 없음'(비교 불가 — 0으로 세지 않음). 꼴이 틀리면 null(기록 안 함 · 저장은 그대로)
+function vehLawLog(law, prev, confirmed, today, by, src) {
+  if (!law || typeof law !== 'object' || Array.isArray(law)) return null;
+  const p = law.proposed == null ? '' : law.proposed;
+  if (p !== '' && !vehDueDate(p)) return null;
+  const rule = typeof law.rule === 'string' ? law.rule : '';
+  if (rule.length > 60 || /[\u0000-\u001f\u007f]/.test(rule)) return null;
+  const days = p ? Math.round((Date.parse(confirmed + 'T00:00:00Z') - Date.parse(p + 'T00:00:00Z')) / 86400000) : null;
+  return { at: today, prev: prev || '', confirmed: confirmed, proposed: p, rule: p ? rule : '', diff: days, by: String(by || '').slice(0, 40), src: src };
+}
+async function handleVehBgGet(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (!c.member.admin && permOf(c.member, 'vehicles') === 'hide') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_ACCESS', request_id: R });
+  const st = store(DATA);
+  let flag = null, bg = null;
+  try { const rf = await blobGet(st, VEH_BG_KEYS.flag); if (rf.ok && rf.data && typeof rf.data === 'object') flag = rf.data; } catch (e) {}
+  try { const rb = await blobGet(st, VEH_BG_KEYS.bg); if (rb.ok && rb.data) bg = rb.data; } catch (e) {}
+  const ver = flag && typeof flag.bg_ver === 'string' ? flag.bg_ver : '';
+  if (!vehBgOk(bg)) return jr(200, { status: 'OK', on: false, why: bg ? 'BAD_BG' : 'NO_BG', request_id: R });
+  if (!ver || ver !== bg.ver) return jr(200, { status: 'OK', on: false, why: 'NOT_PROMOTED', request_id: R });
+  return jr(200, { status: 'OK', on: true, ver: bg.ver, rows: bg.rows.slice(0, 300), attr: (bg.attr && typeof bg.attr === 'object' && !Array.isArray(bg.attr)) ? bg.attr : null, request_id: R });
 }
 // ---- 배정표 settings:assign (v395 — 공통 기반 1 첫 시범. 업무별 최적화 설계 3-14 appr A1 · 착수 브리핑 A2) ----
 // 자동 지시(auto_key 접두어 veh:·lic:·cert:·rec:·bid:) → 담당 who_id. 기본표 = 빈 표: 배정 없는 접두어는 '담당 없음' 배지(관리자 폴백 금지).
@@ -5332,6 +5364,7 @@ async function handlerInner(event) {
     if (d && d.action === 'site_edu_gap') return await handleSiteEduGap(event, d, R);   // v433 현장 대장 특별교육 미이수(이름만 — 안전 권한 없는 현장 권한자용)
     if (d && d.action === 'save') return await handleSave(event, d, R);
     if (d && d.action === 'veh_due_set') return await handleVehDueSet(event, d, R);   // P1 판2 차량 지시 완료 창 새 만기일(차량 한 줄 한 칸)
+    if (d && d.action === 'veh_bg_get') return await handleVehBgGet(event, d, R);   // P1 판27 차량 법령 근거(승격본만 — 아니면 on false)
     if (d && d.action === 'audit') return await handleAudit(event, d, R);
     if (d && d.action === 'ver_list') return await handleVerList(event, d, R);
     if (d && d.action === 'ver_get') return await handleVerGet(event, d, R);
