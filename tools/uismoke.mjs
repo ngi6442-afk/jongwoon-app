@@ -151,7 +151,7 @@ try {
   T('제목 원형 사슬: 라이브러리 exports ↔ 워커 필수 목록(' + chain.join('·') + ')', chain.every((f) => new RegExp('\\b' + f + '\\b').test(expSeg) && needSeg.indexOf("'" + f + "'") >= 0),
     'exports 누락: ' + chain.filter((f) => !new RegExp('\\b' + f + '\\b').test(expSeg)).join(',') + ' / need 누락: ' + chain.filter((f) => needSeg.indexOf("'" + f + "'") < 0).join(','));
   T('워커가 이력 blob(promoai:hist:<기록id>)과 잡 blob title_type을 기록하고 input에 own_titles·seed·attempt를 배선', /promoai:hist:\$\{promoId\}/.test(wk) && /rec\.title_type = cleanStr\(r\.title_type/.test(wk) && /blobSet\(st, histKey\(promoId\)/.test(wk) && /own_titles: own/.test(wk) && /seed: promoId/.test(wk) && /attempt: attempt/.test(wk), '');
-  T('화면이 결과 tt를 저장(paResults.tt + p.ai.tt 3곳(v361 posted 갈래 포함))하고 사람이 제목을 바꾸면 라벨을 지움', /tt:String\(blob\.title_type\|\|r\.title_type\|\|""\)/.test(idx) && (idx.match(/ts:Date\.now\(\), tt:String\(r\.tt\|\|""\)/g) || []).length === 3 && /p\.ai\.tt=""/.test(idx), '');
+  T('화면이 결과 tt를 저장(paResults.tt + p.ai.tt — C132부터 paAiRec 한 곳 + 적용 3곳(v361 posted 갈래 포함))하고 사람이 제목을 바꾸면 라벨을 지움', /tt:String\(blob\.title_type\|\|r\.title_type\|\|""\)/.test(idx) && (idx.match(/ts:Date\.now\(\), tt:String\(r\.tt\|\|""\)/g) || []).length === 1 && (idx.match(/p\.ai=paAiRec\(r(, \{tags_only:1\})?\);/g) || []).length === 3 && /p\.ai\.tt=""/.test(idx), '');
   const libCodes = [...((lib.match(/var TITLE_TYPES = \[([\s\S]*?)\n\];/) || ['', ''])[1]).matchAll(/\{ code: '([A-Z])'/g)].map((m) => m[1]);
   const uiCodes = [...((idx.match(/var PA_TITLE_TYPE_NAMES=\{([^}]+)\}/) || ['', ''])[1]).matchAll(/([A-Z]):"/g)].map((m) => m[1]);
   T('제목 원형 코드 11종 라이브러리 = 화면 이름표(' + libCodes.join('') + ')', libCodes.length === 11 && libCodes.join('') === uiCodes.join(''), '라이브러리 ' + libCodes.join('') + ' / 화면 ' + uiCodes.join(''));
@@ -1376,7 +1376,7 @@ try {
     && /자동 재시도 끝/.test(api({ photos: ph, ai_st: { st: 'fail', tries: 4, code: 'TIMEOUT', ts: Date.now() } })), '');
   T('v361 게시 완료 카드: 태그 없으면 "태그 없이 게시됨 — 서버가 태그만 생성 중" · 태그만 채워지면 "(게시 뒤 태그만 생성…)" · paApplyToRecord는 posted면 제목·본문 안 바꿈',
     /태그 없이 게시됨/.test(api({ photos: ph, status: 'posted' })) && /게시 뒤 태그만 생성/.test(api({ photos: ph, status: 'posted', ai: { tags_only: 1 }, tags: ['a'] }))
-    && /if\(p\.status==="posted"\)\{\s*if\(r\.tags&&r\.tags\.length\)\{ p\.tags=r\.tags\.slice\(0,25\); p\.ai=\{[^}]*tags_only:1 \}; \}/.test(html), '');
+    && /if\(p\.status==="posted"\)\{\s*if\(r\.tags&&r\.tags\.length\)\{ p\.tags=r\.tags\.slice\(0,25\); p\.ai=paAiRec\(r, \{tags_only:1\}\); paMarkDone\(p, r\); \}/.test(html), '');
   T('v360 "사진AI 미생성" 문구가 앱에 없다 · 크론 등록(netlify.toml gw-promo-ai-cron */10) · 공용 층 존재',
     !/사진AI 미생성/.test(html) && /\[functions\."gw-promo-ai-cron"\]\s*\r?\n\s*schedule = "\*\/10 \* \* \* \*"/.test(readFileSync(join(ROOT, 'netlify.toml'), 'utf8'))
     && /PJ\.applyResult\(doc, promoId/.test(readFileSync(join(ROOT, 'netlify/functions/gw-promo-ai-run-background.js'), 'utf8')) && /PJ\.startJob\(st, \{ promoId/.test(readFileSync(join(ROOT, 'netlify/functions/gw-promo-ai.js'), 'utf8')), '');
@@ -1626,6 +1626,26 @@ try {
     && /json = await callApiStream\(apiKey, body, timeoutMs\);/.test(paiS) && existsSync(join(ROOT, 'tools', 'promostream_check.mjs')),
     '어느 고리가 빠졌는지 node tools/promostream_check.mjs로 확인');
 } catch (e) { console.log('  (체크 10 생성 스트리밍 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ---- C132 체크 10 — 브라우저가 사진AI 결과를 먼저 실을 때도 서버 applyResult와 같은 꼴(ai.pv·ai.by·ai_st done) — 11/13 장량동: 기록에 판 표식이 없고 생성 상태가 예전 실패로 남음(판 번호는 합칠 때) ----
+try {
+  const fn = (name) => { const i = html.indexOf('function ' + name + '('); if (i < 0) throw new Error('함수 없음: ' + name); let d = 0, st = false; for (let j = i; j < html.length; j++) { const ch = html[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return html.slice(i, j + 1); } } throw new Error(name); };
+  const mk = new Function('recs', 'paResults', [fn('paAiRec'), fn('paMarkDone'), fn('paApplyToRecord'),
+    'function promoFind(id){ return recs.filter(function(x){ return x.id===id; })[0]||null; } function promoStamp(p){ p.updated_ts=1; } function schedulePromoSave(){} function renderPromo(){}',
+    'return paApplyToRecord;'].join('\n'));
+  const res = { title: 'AI 제목', body: 'AI 본문', tags: ['a', 'b'], used_tokens: 97423, model: 'claude-sonnet-5', warn: [], applied: false, tt: 'L', pv: 'p2-20261110', job: 'pa_gen_x_1' };
+  const r1 = { id: 'p1', status: 'review', title: '예비', body: '예비 본문', ai_st: { st: 'fail', ts: 5, tries: 5, code: 'NETWORK', detail: 'fetch failed', job: 'pa_gen_old' } };
+  const r2 = { id: 'p2', status: 'posted', title: '게시 제목', body: '게시 본문', ai_st: { st: 'running', ts: 5, tries: 1, job: 'pa_gen_old2' } };
+  const pr = { p1: Object.assign({}, res), p2: Object.assign({}, res, { pv: '', job: 'pa_gen_y_2' }) };
+  const apply = mk([r1, r2], pr); apply('p1'); apply('p2');
+  T('C132 브라우저 적용: ai.pv·by=client·ai_st done(시도 횟수 그대로·잡 번호 새것·옛 code/detail 없음) · 게시 완료는 태그만(tags_only)·pv 없으면 칸 없음 · paFinish가 prompt_ver·잡 번호를 싣고 세 적용 자리 모두 paAiRec+paMarkDone',
+    r1.title === 'AI 제목' && r1.pre_ai.title === '예비' && r1.ai.pv === 'p2-20261110' && r1.ai.by === 'client' && r1.ai.tokens === 97423 && r1.ai.tt === 'L'
+    && r1.ai_st.st === 'done' && r1.ai_st.tries === 5 && r1.ai_st.job === 'pa_gen_x_1' && !('code' in r1.ai_st) && !('detail' in r1.ai_st)
+    && r2.title === '게시 제목' && r2.ai.tags_only === 1 && !('pv' in r2.ai) && r2.ai_st.st === 'done' && r2.ai_st.tries === 1 && r2.ai_st.job === 'pa_gen_y_2'
+    && /pv:String\(blob\.prompt_ver\|\|r\.prompt_ver\|\|""\)\.slice\(0,20\), job:String\(jobId\|\|""\)/.test(html) && /paFinish\(blob, promoId, jobId\)/.test(html)
+    && (html.match(/p\.ai=paAiRec\(r(, \{tags_only:1\})?\); paMarkDone\(p, r\);/g) || []).length === 3 && !/p\.ai=\{ model:r\.model/.test(html),
+    JSON.stringify({ a1: r1.ai, s1: r1.ai_st, a2: r2.ai, s2: r2.ai_st }));
+} catch (e) { console.log('  (C132 브라우저 적용 검사 생략 — ' + e.message + ')'); fails++; }
 
 
 // ---- v395(10/27 착수 브리핑 A2 · 공통 기반 1 첫 시범): 자동 지시 배정표 settings:assign — 접두어 앱↔서버 동률 · 카드·호출·배지·액션 배선 · sw ----

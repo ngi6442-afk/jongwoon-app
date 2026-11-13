@@ -23117,7 +23117,7 @@
         if(res.status===401){ paJob.polling=false; paRenderBtns(); onSessionInvalid(); return; }
         var blob=(res.status===200)? paJobBlob(res.body) : null;
         if(blob && (blob.status==="done" || blob.status==="fail")){
-          paJob.polling=false; paFinish(blob, promoId); paDrainAuto(); return;
+          paJob.polling=false; paFinish(blob, promoId, jobId); paDrainAuto(); return;
         }
         if(promoDetId===promoId){
           var sec=paJob.tries*2;
@@ -23129,7 +23129,7 @@
     }
     setTimeout(step, 2000);
   }
-  function paFinish(blob, promoId){
+  function paFinish(blob, promoId, jobId){
     var r=(blob && (blob.result || blob.results)) || blob || {};
     var title=String(r.title||""), body=String(r.body||"");
     if(blob && blob.status==="done" && title && body){
@@ -23139,7 +23139,8 @@
       var tkRaw=r.used_tokens||blob.used_tokens||0;
       var tk=(tkRaw&&typeof tkRaw==="object")? (tkRaw.total||((tkRaw.input||0)+(tkRaw.output||0))) : (tkRaw||0);
       // tt = 모델이 보고한 제목 원형 코드(v320) — 기록 p.ai.tt에 저장돼 서버 recentTitleInfo (b) 경로가 읽는다(주 경로 (a)는 서버 이력 blob)
-      paResults[promoId]={ title:title, body:body, tags:(Array.isArray(blob.tags)?blob.tags:(r.tags||[])), used_tokens:tk, model:r.model||blob.model||"", warn:wn, applied:false, tt:String(blob.title_type||r.title_type||"") };
+      paResults[promoId]={ title:title, body:body, tags:(Array.isArray(blob.tags)?blob.tags:(r.tags||[])), used_tokens:tk, model:r.model||blob.model||"", warn:wn, applied:false, tt:String(blob.title_type||r.title_type||""),
+        pv:String(blob.prompt_ver||r.prompt_ver||"").slice(0,20), job:String(jobId||"") };
       paRenderBtns();
       // 화면이 그 기록을 열고 있으면 입력칸에 채우고, 아니면 기록 자체에 싣는다
       // (PM 확정 8/14: 검수는 앱이 아니라 게시 직전 화면에서 — 사람 조작 없이 초안이 완성돼 있어야 한다).
@@ -23152,6 +23153,19 @@
     paRenderBtns();
     if(promoDetId===promoId) paStat(paFailText(code, detail), true);
   }
+  // C132(11/13 장량동): 브라우저가 먼저 실으면 서버 applyResult는 ALREADY로 빠진다 — 서버와 같은 꼴로 ai(판 표식 pv·넣은 쪽 by)와 ai_st done을 여기서 쓴다.
+  function paAiRec(r, extra){
+    var a={ model:r.model||"", tokens:r.used_tokens||0, ts:Date.now(), tt:String(r.tt||""), by:"client" };
+    if(r.pv) a.pv=String(r.pv).slice(0,20);
+    if(extra) for(var k in extra) a[k]=extra[k];
+    return a;
+  }
+  function paMarkDone(p, r){   // 서버 setAiState('done')와 같은 꼴 — 시도 횟수는 그대로, 잡 번호만 바꿈
+    var prev=(p.ai_st&&typeof p.ai_st==="object")? p.ai_st : {};
+    var o={ st:"done", ts:Date.now(), tries:Number(prev.tries)||0 };
+    if(r&&r.job) o.job=String(r.job);
+    p.ai_st=o;
+  }
   function paApply(promoId){
     var p=promoFind(promoId), r=paResults[promoId];
     if(!p || !r) return;
@@ -23161,7 +23175,7 @@
     // 자동 경로(paApplyToRecord)와 같게 기록에도 싣는다 — 이전 초안은 pre_ai·paUndo가 들고 있고 [되돌리기]가 복구한다.
     if(!p.pre_ai) p.pre_ai={ title:String(p.title||""), body:String(p.body||"") };
     p.title=r.title; p.body=r.body;
-    p.ai={ model:r.model||"", tokens:r.used_tokens||0, ts:Date.now(), tt:String(r.tt||"") };
+    p.ai=paAiRec(r); paMarkDone(p, r);
     if(r.tags&&r.tags.length) p.tags=r.tags.slice(0,25);
     tEl.value=r.title; bEl.value=r.body;
     r.applied=true;
@@ -23180,12 +23194,12 @@
     if(!p || !r || r.applied) return;
     // v361: 게시 완료 글은 네이버에 이미 올라간 글 — 제목·본문은 안 바꾸고 태그만 채운다(서버 applyResult와 같은 규칙)
     if(p.status==="posted"){
-      if(r.tags&&r.tags.length){ p.tags=r.tags.slice(0,25); p.ai={ model:r.model||"", tokens:r.used_tokens||0, ts:Date.now(), tt:String(r.tt||""), tags_only:1 }; }
+      if(r.tags&&r.tags.length){ p.tags=r.tags.slice(0,25); p.ai=paAiRec(r, {tags_only:1}); paMarkDone(p, r); }
       r.applied=true; promoStamp(p); schedulePromoSave(); renderPromo(); return;
     }
     if(!p.pre_ai) p.pre_ai={ title:String(p.title||""), body:String(p.body||"") };
     p.title=r.title; p.body=r.body;
-    p.ai={ model:r.model||"", tokens:r.used_tokens||0, ts:Date.now(), tt:String(r.tt||"") };
+    p.ai=paAiRec(r); paMarkDone(p, r);
     if(r.tags&&r.tags.length) p.tags=r.tags.slice(0,25);
     r.applied=true;
     promoStamp(p); schedulePromoSave(); renderPromo();
