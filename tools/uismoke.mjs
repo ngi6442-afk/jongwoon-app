@@ -1838,7 +1838,7 @@ try {
     && /if \(!isSkip && !isDone && \(s\.due_badge \|\| s\.due_src\)\) meta \+=/.test(html) && /CON_PROC_SRC\.flag = b\.flag \|\| null; conDueClear\(\);/.test(html) && /try \{ conDueUse\(b\); \} catch\(e\)\{ conDueClear\(\); \}/.test(html));
   T('v404 카드·서버: 관리자 카드 배경 행·data-conproc-bg 버튼·conProcBgSet · gw-data con_proc_bg_set 분기·handleConProcBgSet·4층 키·BG_MISSING·flag_set이 bg_ver 보존 · sw ≥ 404',
     html.indexOf('["배경 bg:law(D2)"') > 0 && html.indexOf('data-conproc-bg=') > 0 && html.indexOf('function conProcBgSet(ver, base)') > 0
-    && /action === 'con_proc_bg_set'/.test(gwd4) && /async function handleConProcBgSet/.test(gwd4) && /map: 'map:contract:v1', bg: 'bg:contract:law:v1'/.test(gwd4) && /BG_MISSING/.test(gwd4) && /bg_ver: cur\.bg_ver \|\| '', annual_override: cur\.annual_override \|\| \{\}, updated_by: c\.member\.id/.test(gwd4)
+    && /action === 'con_proc_bg_set'/.test(gwd4) && /async function handleConProcBgSet/.test(gwd4) && /map: 'map:contract:v1', bg: 'bg:contract:law:v1'/.test(gwd4) && /BG_MISSING/.test(gwd4) && /bg_ver: cur\.bg_ver \|\| '', annual_override: cur\.annual_override \|\| \{\} \}, conFlagKeep\(cur\), \{ updated_by: c\.member\.id/.test(gwd4)
     && Number((swv4.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 404);
 } catch (e) { console.log('  (v404 검사 생략 — ' + e.message + ')'); fails++; }
 
@@ -1848,7 +1848,7 @@ try {
   const lwpy = join(ROOT, '..', 'jongwoon-appdata', 'collectors', 'lawwatch', 'lawwatch.py');
   const py5 = existsSync(lwpy) ? readFileSync(lwpy, 'utf8') : '';
   T('v405 lawwatch 연동: gw-lawwatch bg_recheck 보관 · gw-data lawwatch 동봉(heavy) · 엔진 CON_BG.recheck·배지 \'재확인 필요(개정 감지)\' · 카드 개정 감지 · appdata ③ 계약 배경 검사(bg_recheck 동봉) · sw ≥ 405',
-    /bg_recheck: bgRecheck/.test(lw5) && /lawwatch: lawwatch, clog: clogOut/.test(gwd5) && /CON_BG\.recheck = rk;/.test(html) && html.indexOf('"재확인 필요(개정 감지)"') > 0 && html.indexOf('개정 감지 \' + b.lawwatch.bg_recheck.length') > 0
+    /bg_recheck: bgRecheck/.test(lw5) && /lawwatch: lawwatch, clog: clogOut/.test(gwd5) && /CON_BG\.recheck = rk;/.test(html) && html.indexOf('"재확인 필요(개정 감지)"') > 0 && html.indexOf('개정 감지 \' + nl + \'행(') > 0
     && (!py5 || (/③ 계약 배경\(bg:law\) 재확인 감시/.test(py5) && /'bg_recheck': bg_recheck/.test(py5))) && Number((swv5.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 405);
 } catch (e) { console.log('  (v405 검사 생략 — ' + e.message + ')'); fails++; }
 
@@ -2857,7 +2857,7 @@ try {
     'function findMember(id){ for (var i = 0; i < members.length; i++){ if (members[i].id === id) return members[i]; } return null; }',
     'function setTimeout(f, ms){ __timers.push({ f: f, ms: ms }); return __timers.length; } function clearTimeout(t){ if (__timers[t - 1]) __timers[t - 1].f = null; }',
     'function gwCall(fn, body){ __sent.push({ fn: fn, body: JSON.parse(JSON.stringify(body)) }); return { then: function(){ return { catch: function(){} }; } }; }',
-    'function renderApprGrades(){} function renderAssignCard(){} function renderNotifyCard(){} function renderAlertsCard(){} function renderConProcCard(){} function renderConLearnCard(){} function renderBriefCard(){} function renderAutoRulesCard(){} function renderDocSettings(){} function saveUsersCache(){} function render(){}',
+    'function renderApprGrades(){} function renderAssignCard(){} function renderNotifyCard(){} function renderAlertsCard(){} function renderConProcCard(){} function renderConLearnCard(){} function renderBriefCard(){} function renderAutoRulesCard(){} function renderDocSettings(){} function renderCorpRegCard(){} function saveUsersCache(){} function render(){}',
     MOD_STMT31, stmt31(/var PERM_CLOSED = \{[^}]+\};/), stmt31(/var MOD_LABEL = \{[^}]+\};/), stmt31(/var PERM_ORDER = \[[^\]]+\];/), stmt31(/var PM_TXT = \{[^}]+\};/), stmt31(/var PM_NEXT = \{[^}]+\};/),
     fn31('pmVal'), fn31('permModList'), fn31('renderPermMgmt'), fn31('pmCycle'), fn31('pmSave'),
     'return { render: function(){ renderPermMgmt(); return __D.permRoster.innerHTML; }, click: function(id, mod){ var b = { className: "", textContent: "" }; pmCycle(id, mod, b); return b.className + "|" + b.textContent; }, member: findMember };'].join('\n'))(D31, JSON.parse(JSON.stringify(mem31)), timers31, sent31, stat31);
@@ -5452,7 +5452,7 @@ try {
     'function renderSummary(){ ENV.log.push("summary"); } function renderDashboard(){ ENV.log.push("dash"); } function renderMyTasks(){ ENV.log.push("mytasks"); } function updateTaskBadge(){ ENV.log.push("badge"); } function bindCalHandlers(){}',
     'function openTaskModal(id){ if (!canDo("tasks")) return; ENV.log.push("edit:" + id); } function openStageDoc(pid, sn){ ENV.log.push("doc:" + pid + ":" + sn); } function taskNotMine(id){ ENV.log.push("notmine:" + id); }',
     'function findVeh(){ return null; } function findRec(){ return null; } function removeRecTask(){}'].join('\n');
-  const SRC39 = [PRE39].concat(REAL39.map((n) => fn39(html, n)), VARS39, [blk39, tsb39,
+  const SRC39 = [PRE39].concat(REAL39.map((n) => fn39(html, n)), VARS39, [blk39, tsb39, blkOf39('// @veh-due-start', '// @veh-due-end'),   // P1 판2: toggleTaskDone 첫머리 vehDueAsk·지시 내용 칸 vehDueKept(차량 없음 = 종전 그대로)
     'return { render: renderTasks, def: taskSheetDef, vs: vsSheetRender, inst: vsInst, filter: vsSheetFilter, setQ: vsSheetSetQ, check: vsSheetCheckDef, minW: vsSheetMinW, cols: vsSheetCols, legacy: renderTasksLegacy, act: taskSheetAct, del: taskSheetDelete, fromGs: taskSheetFromGs, sText: taskSheetSearchText,'
     + ' tasks: function(){ return tasks; }, sel: function(){ return selSets; }, delSel: function(){ return delSelSets; }, setShowDel: function(v){ showDeletedTasks = v; }, setShowAuto: function(v){ showTaskAuto = v; } };']).join('\n');
   const mk39 = (o) => {
@@ -7885,14 +7885,15 @@ try {
     'function openBidCalc(pre){ ENV.log.push("calc:" + JSON.stringify(pre)); }',
     'function liveContracts(){ return contracts.filter(function(c){ return c && c.del !== 1; }); }',
     'var navigator = { clipboard: { writeText: function(t){ ENV.log.push("copy:" + t); return Promise.resolve(); } } };'].join('\n');
-  const SRC43 = [PRE43].concat(VARS43, ['bids = ENV.bids; bidsAwards = ENV.awards; bidsHealth = ENV.health; bidsLoaded = ENV.loaded !== false; bidsLoadErr = ENV.loadErr || null;'], REAL43.map((n) => fn43(html, n)), [blk43, bsb43,
+  const SRC43 = [PRE43].concat(VARS43, ['bids = ENV.bids; bidsAwards = ENV.awards; bidsHealth = ENV.health; bidsLoaded = ENV.loaded !== false; bidsLoadErr = ENV.loadErr || null;'], REAL43.map((n) => fn43(html, n)), [blk43, bsb43, blkOf43('// @corp-reg-start', '// @corp-reg-end'),   // P1 판1: renderBids 끝 bidCorpGateMark(잠금 꺼짐·못 읽음 = 아무것도 안 함)
+   
     'if (ENV.count){ var __bme = bidMethodEff; bidMethodEff = function(b){ ENV.nME++; return __bme(b); }; }',   // ⑯ 줄 판정 횟수 세기(낙찰방법 실효값 — 줄 판정 bidInfo가 한 번 그림에 줄마다 2번: 자기 + bidLwltState 안)
     'return { render: renderBids, legacy: renderBidsLegacy, def: bidSheetDef, inst: vsInst, vs: vsSheetRender, check: vsSheetCheckDef, minW: vsSheetMinW, cols: vsSheetCols, budget: VS_STAGE_BUDGET, reveal: vsSheetReveal,'
     + ' bids: function(){ return bids; }, setBids: function(b){ bids = b; }, setHealth: function(h){ bidsHealth = h; }, setLoadErr: function(e){ bidsLoadErr = e; }, loaded: function(){ return bidsLoaded; }, held: function(){ return bidsSaveHeld; }, pending: function(){ return bidsPending; },'
     + ' setFilter: function(f){ bidStatusFilter = f; }, setExp: function(o){ bidExpanded = o; }, term: function(){ return bidSearchTerm; }, setTerm: function(t){ bidSearchTerm = t; }, info: bidInfo, act: bidSheetAct, pairs: bidSheetPairs, cur: function(){ return bidSheetCur; },'
     + ' load: loadBids, save: doSaveBids, sched: scheduleBidsSave, timer: function(){ return bidsSaveTimer; }, setStatus: setBidStatus, undo: undoBidStatus, addOpen: openBidAdd, addSave: saveBidAdd, fromGs: bidSheetFromGs, homeRow: bidSheetHomeRow, showNew: bidSheetShowNew,'
     + ' unread: BID_UNREAD_MSG, head: bidSheetHead, banner: bidSheetBanner, sText: bidSheetSearchText, tab: function(){ return currentTab; }, KIND: BID_KIND_TXT,'
-    + ' loading: function(){ return bidsLoading; }, farMsg: BID_NEW_FAR_MSG, allTip: BID_ALL_T, listRule: bidListRule };']).join('\n');
+    + ' loading: function(){ return bidsLoading; }, farMsg: BID_NEW_FAR_MSG, allTip: BID_ALL_T, listRule: bidListRule, corp: corpRegApply };']).join('\n');
   // 작은 DOM — 선택자는 태그·#id·.class·[속성]·[속성="값"]을 붙여 쓴 것까지(v442와 같은 꼴)
   const match43 = (el, sel) => {
     const re = /(#[\w-]+)|(\.[\w-]+)|(\[[\w-]+(?:="(?:[^"\\]|\\.)*")?\])|([a-zA-Z][\w-]*)/g; let m, at = 0;
@@ -7934,6 +7935,7 @@ try {
       el.selectionStart = el.tagName === 'INPUT' ? el.value.length : null;
       el.setSelectionRange = (a) => { el.selectionStart = a; };
       el.scrollIntoView = () => { env.log.push('into:' + (el.getAttribute('data-vs-row') || el.getAttribute('data-vs-detcard') || '')); };
+      el.insertAdjacentHTML = (pos, h) => { el.adj = (el.adj || '') + pos + '|' + h; };   // P1 판1 검토 — 투찰 잠금 배지(bidCorpGateMark)가 [투찰] 앞에 붙이는 글
       return el;
     };
     env.mkEl = mkEl;
@@ -7969,7 +7971,7 @@ try {
     const ctF = (id) => { env.timers.forEach((t) => { if (t.id === id) t.done = true; }); };
     function RO(cb) { this.observe = (t) => { env.ro.push(t); }; }
     class FD extends Date { static now() { return env.now; } }
-    const api = new Function('window', 'document', 'localStorage', 'setTimeout', 'clearTimeout', 'ResizeObserver', 'ENV', 'Date', SRC43)(win, doc, ls, stF, ctF, RO, env, FD);
+    const api = new Function('window', 'document', 'localStorage', 'setTimeout', 'clearTimeout', 'ResizeObserver', 'ENV', 'Date', o.src || SRC43)(win, doc, ls, stF, ctF, RO, env, FD);   // o.src = 결함 사본(P1 판1 검토 — 펼침 길 배지)
     env.breakAll = () => { env.mql.slice().forEach((f) => f({})); };
     env.tick = (ms) => { env.now += ms; let t; while ((t = env.timers.filter((x) => !x.done && x.at <= env.now).sort((a, b) => a.at - b.at)[0])) { t.done = true; t.f(); } };
     env.type = (v, comp) => { const q = env.host('bidSearch'); q.value = v; (q.L.input || []).slice().forEach((f) => f({ target: q, isComposing: !!comp })); };
@@ -8160,6 +8162,30 @@ try {
       'mini-btn appr-btn:낙찰,mini-btn:유찰,mini-btn:↩,mini-btn:원문↗,mini-btn:🧮 이 공고로 계산', 'mini-btn:검토,mini-btn:패스', true, 'mini-btn:검토,mini-btn:패스,mini-btn:원문↗,mini-btn:🧮 이 공고로 계산', 21,   // b1 입찰정보 = 17 + 기관 4 모두 값 있음
       'mini-btn:↩,mini-btn appr-btn:계약 시작,mini-btn:원문↗,mini-btn:🧮 이 공고로 계산', '개찰결과*|입찰정보|금액·투찰|공고서 (0)', true, 'mini-btn:원문↗,mini-btn:🧮 이 공고로 계산']) && noMiss43(m7),
     JSON.stringify({ s7, miss: miss43.slice(m7) }));
+
+  // P1 판1 검토(P1-1): PC 표 펼침 길의 투찰 잠금 배지 — 잠김(켜짐 · 나라장터 완료일 빔)이면 줄을 눌러 펼친(vsSheetToggle → vsSheetRenderKeep — renderBids를 거치지 않음) 펼침 맨 위 [투찰]에
+  //   배지·흐림 · 하위 탭 누름·닫고 다시 펼침·창 폭 단계 바뀜(1366 → 1100)도 · 투찰 줄(b6)의 [낙찰]·[유찰]에는 없음 · 잠금 꺼짐 = 배지 0 · 결함 사본(표 정의 onPaint 걷음 — 고치기 전 코드) = 펼침에 배지 없음
+  const gate43 = (src) => {
+    const X = mk43({ src }), out = [], m0 = miss43.length;
+    X.api.corp({ settings: { reg_on: '2026-09-29', biz_fix_on: '', g2b_on: '', gate: true }, updated_at: 1 });
+    X.api.render();
+    const mk = () => X.host.els.filter((e) => e.getAttribute('data-bid-act') === 'st' && e.getAttribute('data-bid-v') === '응찰')
+      .map((e) => (e.getAttribute('data-corp-gate') === '1' && e.style.opacity === '.5' && /^beforebegin\|<span class="need-chip" data-corp-gate-badge="1"[^>]*>투찰 잠금<\/span> $/.test(e.adj || '') ? 'B' : '-')).join('');
+    const adjN = () => X.host.els.filter((e) => e.adj).length;
+    openRow43(X, 'b3'); out.push(mk(), adjN());
+    press43(X, 'data-bid-tab', 'money'); out.push(mk());
+    openRow43(X, 'b3'); out.push(mk()); openRow43(X, 'b3'); out.push(mk());
+    openRow43(X, 'b6'); out.push(mk(), adjN());
+    openRow43(X, 'b3'); X.env.width = 1100; X.env.breakAll(); out.push(mk());
+    const Xo = mk43({ src }); Xo.api.render(); openRow43(Xo, 'b3'); out.push(Xo.host.els.filter((e) => e.adj).length);
+    return { out, miss: miss43.length - m0 };
+  };
+  const gateCut43 = '        onPaint: function(){ bidCorpGateMark(); }';
+  const gateReal43 = gate43(), gateMut43 = SRC43.split(gateCut43).length === 2 ? gate43(SRC43.replace(gateCut43, '        onPaint: null')) : { out: ['결함 자리 없음'] };
+  const GATE43 = JSON.stringify(['B', 1, 'B', '', 'B', '', 0, 'B', 0]);
+  T('P1 판1 검토 — PC 표 펼침 길 투찰 잠금 배지(실행 — 실제 vsSheetToggle·하위 탭·창 폭 단계): 잠김이면 펼친 검토 공고의 [투찰]에 "투찰 잠금" 배지 1개·흐림 · 하위 탭 누름 뒤·닫고 다시 펼침·1366 → 1100 단계 바뀜 뒤에도 · 투찰 줄 [낙찰]·[유찰] = 배지 0 · 잠금 꺼짐 = 배지 0 · 결함 사본(표 정의 onPaint 걷음) = 펼침에 배지 없음',
+    JSON.stringify(gateReal43.out) === GATE43 && gateReal43.miss === 0 && JSON.stringify(gateMut43.out) !== GATE43 && gateMut43.out[0] === '-',
+    JSON.stringify({ real: gateReal43, mut: gateMut43 }));
 
   // ⑧ 상태 버튼(펼침 맨 위·관리자만) 누름 길: b2 [검토] = 상태 검토·저장 예약·홈 다시 그림·같은 줄 펼친 채(전체 칩)·버튼 줄 [투찰][패스][↩] · 바로(0ms)·499ms 뒤 같은 자리 [투찰] = 버림(검토 그대로) → 0.6초 뒤 = 투찰 ·
   //   더블클릭 둘째 누름(detail 2) 버림 · [↩] = 확인 창 → 검토 · 흉내: 지금 상태에서 못 가는 단계(b5 신규에 '낙찰')·비관리자·지운 공고 = 아무것도 안 함 · b6 [낙찰] = 계약 시작 창 · 낙찰 b7 [계약 시작] = 계약 시작 창 ·
@@ -8502,7 +8528,8 @@ try {
     'function openBidCalc(pre){ ENV.log.push("calc:" + JSON.stringify(pre)); }',
     'function liveContracts(){ return contracts.filter(function(c){ return c && c.del !== 1; }); }',
     'var navigator = { clipboard: { writeText: function(t){ ENV.log.push("copy:" + t); return Promise.resolve(); } } };'].join('\n');
-  const SRC44 = [PRE44].concat(VARS44, ['bids = ENV.bids; bidsAwards = null; bidsHealth = null; bidsLoaded = true; bidsLoadErr = null; onbids = ENV.obs; onbidSha = ENV.sha;'], REAL44.map((n) => fn44(html, n)), [blk44, bsb44, osb44,
+  const SRC44 = [PRE44].concat(VARS44, ['bids = ENV.bids; bidsAwards = null; bidsHealth = null; bidsLoaded = true; bidsLoadErr = null; onbids = ENV.obs; onbidSha = ENV.sha;'], REAL44.map((n) => fn44(html, n)), [blk44, bsb44, osb44, blkOf44('// @corp-reg-start', '// @corp-reg-end'),   // P1 판1(위 v443과 같음)
+   
     'return { render: renderOnbid, legacy: renderOnbidLegacy, def: obSheetDef, inst: vsInst, vs: vsSheetRender, check: vsSheetCheckDef, minW: vsSheetMinW, cols: vsSheetCols, budget: VS_STAGE_BUDGET,'
     + ' obs: function(){ return onbids; }, setObs: function(o){ onbids = o; }, setSha: function(s){ onbidSha = s; }, setFilter: function(st, kd){ obStatusFilter = st; obKindFilter = kd; }, setShow: function(n){ obShow = n; }, term: function(){ return obSearchTerm; },'
     + ' info: obInfo, sido: obSidoOf, pct: obPct, eok: obEok, act: obSheetAct, cur: function(){ return obSheetCur; }, load: loadOnbid, save: doSaveOnbid, sched: scheduleOnbidSave, timer: function(){ return onbidSaveTimer; }, pending: function(){ return onbidPending; },'
@@ -11543,10 +11570,334 @@ try {
   const ft58 = rd58('FEATURES.md'), tl58 = rd58('TESTLIST.md'), sw58 = rd58('sw.js');
   const left58 = [ft58, tl58].filter((s) => /스트리밍 수리[^\n]*판 번호는 합칠 때/.test(s)).length;
   T('v458 문서: FEATURES 기준 v458 (2026-11-13) · FEATURES·TESTLIST 스트리밍 수리 절 제목에 v458(합칠 때 문구 0) · sw jw-shell-v458 · 게이트 promostream_check 있음',
-    /기준: v458 \(2026-11-13\)\./.test(ft58) && ft58.indexOf('\n### v458 (11/13) — 체크 10 — 사진AI 생성 스트리밍 수리') > 0 && tl58.indexOf('\n## v458 — 체크 10 — 사진AI 생성 스트리밍 수리') > 0
-    && left58 === 0 && /SHELL_CACHE = 'jw-shell-v458'/.test(sw58) && existsSync(join(ROOT, 'tools', 'promostream_check.mjs')),
+    Number((ft58.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 458 && ft58.indexOf('\n### v458 (11/13) — 체크 10 — 사진AI 생성 스트리밍 수리') > 0 && tl58.indexOf('\n## v458 — 체크 10 — 사진AI 생성 스트리밍 수리') > 0
+    && left58 === 0 && Number((sw58.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 458 && existsSync(join(ROOT, 'tools', 'promostream_check.mjs')),
     JSON.stringify({ left58 }));
 } catch (e) { console.log('  (v458 검사 생략 — ' + e.message + ')'); fails++; }
+
+try {
+  // P1 판1(원장 T462·T461·T388 · 설계 C6) 법인 등기 날짜 settings:corp_reg + 입찰 투찰 잠금(기본 꺼짐) — 앱 @corp-reg 구간을 작은 DOM에서 실행.
+  //   날짜는 고정(오늘 = 2026-11-13 흉내 · 지난 2026-09-29 · 미래 2026-11-14·2099-12-31). 결함 사본(구간 글을 바꾼 것)마다 같은 판정이 깨지는지까지 본다.
+  const blkP1 = (() => { const i = html.indexOf('// @corp-reg-start'), j = html.indexOf('// @corp-reg-end'); if (i < 0 || j < i) throw new Error('@corp-reg 구간 없음'); return html.slice(i, j); })();
+  const fnP1 = (src, name) => { const i = src.indexOf('function ' + name + '('); if (i < 0) throw new Error('함수 없음: ' + name); let d = 0, st = false; for (let j = i; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i, j + 1); } } throw new Error('함수 끝 없음: ' + name); };
+  const gwdP1 = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-data.js'), 'utf8');
+  const svrP1 = new Function(fnP1(gwdP1, 'safetyDate') + '\n' + "const CORP_REG_DATES = ['reg_on', 'biz_fix_on', 'g2b_on'];\n" + fnP1(gwdP1, 'corpRegClean') + '\n' + fnP1(gwdP1, 'corpRegLock') + '\nreturn { clean: corpRegClean, lock: corpRegLock };')();
+  // 작은 DOM: 입찰 목록(#bidList) 버튼 넷 — 폰 옛 [투찰](data-bid-st 응찰)·옛 [낙찰]·PC 표 [투찰](data-bid-act st · data-bid-v 응찰)·PC [패스]
+  const mkElP1 = (attrs, parent) => { const a = Object.assign({}, attrs); const el = { a, style: {}, before: [], listeners: [], parentNode: parent || null, value: a.value || '', checked: !!a.checked,
+    getAttribute: (k) => (Object.prototype.hasOwnProperty.call(a, k) ? a[k] : null), setAttribute: (k, v) => { a[k] = String(v); },
+    insertAdjacentHTML: (pos, h) => { el.before.push(pos + '|' + h); }, addEventListener: (t, f, cap) => { el.listeners.push({ t, f, cap: !!cap }); } }; return el; };
+  const runP1 = (blk, env) => {
+    const host = mkElP1({ id: 'bidList' }), card = mkElP1({ id: 'corpRegCard' });
+    const btns = [mkElP1({ 'data-bid-st': '응찰', 'data-bid-id': 'k1' }, host), mkElP1({ 'data-bid-st': '낙찰', 'data-bid-id': 'k2' }, host), mkElP1({ 'data-bid-act': 'st', 'data-bid-v': '응찰', 'data-bid-id': 'k3' }, host), mkElP1({ 'data-bid-act': 'st', 'data-bid-v': '패스', 'data-bid-id': 'k4' }, host)];
+    const inner = mkElP1({}, btns[2]);   // PC [투찰] 안 글자 노드(누름은 안쪽에서 올라옴)
+    host.querySelectorAll = (sel) => { const m = /^\[([\w-]+)="([^"]*)"\]$/.exec(sel); if (!m) throw new Error('시험 DOM이 모르는 선택자: ' + sel); return btns.filter((b) => b.getAttribute(m[1]) === m[2]); };
+    const inputs = {};
+    const E = { log: [], calls: [], renders: 0, saves: 0, host, btns, inner, card, inputs };
+    const doc = { getElementById: (id) => (id === 'bidList' ? host : id === 'corpRegCard' ? card : (inputs[id] || null)) };
+    const pre = [fnP1(html, 'esc'), fnP1(html, 'bidSt'),
+      'var bids = ENV.bids || [];', 'function findBid(id){ for (var i = 0; i < bids.length; i++){ if (bids[i].id === id) return bids[i]; } return null; }',
+      'function todayStr(){ return "2026-11-13"; }', 'function isAdmin(){ return ENV.admin !== false; }', 'function fmtDate(d){ return "2026-11-13"; }', 'function memberName(id){ return id === "u86n" ? "나수진" : ""; }',
+      'function alert(m){ E.log.push("alert:" + m); }', 'function apprToastShow(m){ E.log.push("toast:" + m); }', 'function renderBids(){ E.renders++; }', 'function renderDashboard(){}', 'function scheduleBidsSave(){ E.saves++; }',
+      'var bidsPending = true;', 'function syncP(v){ return { then: function(f){ return syncP(f ? f(v) : v); }, catch: function(){ return syncP(v); } }; }',   // 동기 thenable(차례대로 바로 실행)
+      'function gwCall(fn, body){ E.calls.push(JSON.parse(JSON.stringify(body))); return syncP(ENV.resp || { status: 200, body: {} }); }'].join('\n');
+    const api = new Function('ENV', 'E', 'document', pre + '\n' + blk + '\nreturn { lockOf: corpRegLockOf, why: corpRegDateWhy, apply: corpRegApply, blocks: bidCorpGateBlocks, mark: bidCorpGateMark, revert: bidCorpGateRevert, draw: corpRegDraw, save: corpRegSave, bids: function(){ return bids; } };')(env, E, doc);
+    return { api, E };
+  };
+  const SET_P1 = (o) => ({ settings: Object.assign({ reg_on: '', biz_fix_on: '', g2b_on: '', gate: false }, o), updated_at: 777, updated_by: 'u86n' });
+  const evalP1 = (blk) => {
+    const out = {};
+    // ① 같은 규칙 — 앱 corpRegLockOf = 서버 corpRegLock(표본 8) · 날짜 한 칸 판정 앱 corpRegDateWhy = 서버 corpRegClean(오늘 2026-11-13 · 표본 9)
+    const { api } = runP1(blk, {});
+    const LS = [null, { gate: false }, { gate: true }, { gate: true, g2b_on: '2026-10-07' }, { gate: true, reg_on: '2026-09-29', g2b_on: '2026-09-01' }, { gate: true, reg_on: '2026-09-29', g2b_on: '2026-09-29' }, { gate: false, reg_on: '2026-09-29', g2b_on: '2026-09-01' }, { gate: 'true', g2b_on: '' }];
+    out.lockApp = LS.map((v) => api.lockOf(v)); out.lockSvr = LS.map((v) => svrP1.lock(v));
+    const DS = ['', '2026-09-29', '2026-11-13', '2026-11-14', '2099-12-31', '2026-02-30', '20260929', '2026-9-29', '2026-13-01'];
+    out.dateApp = DS.map((s) => api.why(s, '2026-11-13') === ''); out.dateSvr = DS.map((s) => !!svrP1.clean({ reg_on: s, biz_fix_on: '', g2b_on: '', gate: false }, '2026-11-13').v);
+    // ② 꺼짐·못 읽음 = 아무것도 안 함(배지 0·배선 0) · 잠김 = 응찰 버튼 둘(폰·PC)에만 배지·흐리게·title + #bidList 붙잡기 배선 1개(capture)
+    const off = runP1(blk, {}); off.api.mark(); off.api.apply(SET_P1({ gate: false })); off.api.mark();
+    out.offTouched = off.E.btns.some((b) => b.before.length || b.getAttribute('data-corp-gate')) || off.E.host.listeners.length > 0;
+    const on = runP1(blk, {}); on.api.apply(SET_P1({ gate: true, reg_on: '2026-09-29' })); on.api.mark(); on.api.mark();   // 두 번 칠해도 배지 1개
+    out.onBadges = on.E.btns.map((b) => b.before.length + (b.before[0] && /^beforebegin\|<span class="need-chip"[^>]*>투찰 잠금<\/span> $/.test(b.before[0]) ? 'b' : '') + (b.style.opacity === '.5' ? 'o' : '')).join(',');
+    out.onWire = on.E.host.listeners.length === 1 && on.E.host.listeners[0].cap === true && on.E.host.listeners[0].t === 'click';
+    // ③ 누름 — 잠김: 폰 [투찰]·PC [투찰] 안쪽 글자 = 막음(전파 멈춤·기본 막음·안내 1번) · [낙찰]·[패스] = 그대로 / 완료일을 넣어 열리면 같은 배선이 막지 않음
+    const click = (E, el) => { let sp = 0, pd = 0; if (!E.host.listeners[0]) return 'none'; E.host.listeners[0].f({ target: el, stopPropagation: () => { sp++; }, preventDefault: () => { pd++; } }); return sp + '' + pd; };
+    out.clickLocked = [click(on.E, on.E.btns[0]), click(on.E, on.E.inner), click(on.E, on.E.btns[1]), click(on.E, on.E.btns[3])].join(',');
+    out.alertN = on.E.log.filter((l) => l.indexOf('alert:투찰 잠금') === 0).length;
+    on.api.apply(SET_P1({ gate: true, reg_on: '2026-09-29', g2b_on: '2026-10-07' }));
+    out.clickOpen = click(on.E, on.E.btns[0]);
+    // ④ 서버 거절 되돌리기 — blocked k1(from 검토)·k9(from "" — 새 줄) → 둘 다 응찰 아님(k1 검토·k9 검토) · 이미 다른 상태 k2는 손대지 않음 · 다시 저장 1번 · 안내 1번
+    const rv = runP1(blk, { bids: [{ id: 'k1', status: '응찰' }, { id: 'k2', status: '낙찰' }, { id: 'k9', status: '응찰' }] });
+    rv.api.revert({ error_code: 'GATE_CORP_REG', why: 'G2B_EMPTY', blocked: [{ id: 'k1', from: '검토' }, { id: 'k2', from: '검토' }, { id: 'k9', from: '' }] });
+    out.revert = rv.api.bids().map((b) => b.id + ':' + b.status).join(',') + '|' + rv.E.saves + '|' + rv.E.log.filter((l) => l.indexOf('alert:') === 0).length;
+    // ⑤ 카드 — 세 칸 빔 = '입력 대기' 1줄 + 등본 안내 1줄 · 날짜 3칸(type=date · max 오늘) · 잠금 칸 · 값이 있으면 '입력 대기' 없음 · 알림·지시 호출 없음
+    const cd = runP1(blk, {}); cd.api.apply(SET_P1({})); cd.api.draw(); const h0 = cd.E.card.innerHTML || '';
+    cd.api.apply(SET_P1({ reg_on: '2026-09-29' })); cd.api.draw(); const h1 = cd.E.card.innerHTML || '';
+    out.card = [(h0.match(/입력 대기/g) || []).length, (h0.match(/등본은 앱에 올리지 않고 사무실 문서함에 보관\(문서관리규정\)/g) || []).length, (h0.match(/<input type="date" id="corpRegIn_(reg_on|biz_fix_on|g2b_on)"[^>]* max="2026-11-13"/g) || []).length,
+      (h0.match(/id="corpRegGate"/g) || []).length, (h1.match(/입력 대기/g) || []).length, /value="2026-09-29"/.test(h1) ? 1 : 0,
+      (h0.match(/켜기 전: 관리자 기기를 모두 새로고침해 새 판으로\(옛 판 앱은 이 거절을 알리지 않고 저장된 것처럼 보임\)/g) || []).length].join(',');   // 검토 P1-2: 잠금 칸 설명에 켜기 전 확인 1줄
+    // ⑥ 저장 — 미래(2026-11-14)·없는 날 = 안내만(서버 호출 0) · 바른 값 = corp_reg_set 1번(세 날짜·gate·base 777) · 빈칸 = 지우기('')
+    const sv = runP1(blk, { resp: { status: 200, body: SET_P1({ reg_on: '2026-09-29', g2b_on: '' , gate: true }) } }); sv.api.apply(SET_P1({}));
+    const IN = (v) => { ['reg_on', 'biz_fix_on', 'g2b_on'].forEach((k) => { sv.E.inputs['corpRegIn_' + k] = { value: v[k] || '' }; }); sv.E.inputs.corpRegGate = { checked: !!v.gate }; };
+    IN({ reg_on: '2026-11-14' }); sv.api.save(); IN({ g2b_on: '2026-02-30' }); sv.api.save(); const n0 = sv.E.calls.length;
+    IN({ reg_on: '2026-09-29', biz_fix_on: '', g2b_on: '', gate: true }); sv.api.save();
+    out.save = n0 + '|' + JSON.stringify(sv.E.calls) + '|' + sv.E.log.filter((l) => l.indexOf('alert:') === 0).length + '|' + (sv.api.blocks() ? 'locked' : 'open');
+    // ⑦ 관리자 아님 = 읽기·그리기 없음(잠금 '모름' — 배지 없음)
+    const na = runP1(blk, { admin: false }); na.api.save();
+    out.nonAdmin = na.E.calls.length + '|' + na.E.log.filter((l) => /관리자만/.test(l)).length;
+    return out;
+  };
+  const okP1 = (o) => JSON.stringify(o.lockApp) === JSON.stringify(o.lockSvr) && JSON.stringify(o.lockApp) === JSON.stringify(['', '', 'G2B_EMPTY', '', 'G2B_BEFORE_REG', '', '', ''])
+    && JSON.stringify(o.dateApp) === JSON.stringify(o.dateSvr) && JSON.stringify(o.dateApp) === JSON.stringify([true, true, true, false, false, false, false, false, false])
+    && o.offTouched === false && o.onBadges === '1bo,0,1bo,0' && o.onWire === true && o.clickLocked === '11,11,00,00' && o.alertN === 2 && o.clickOpen === '00'
+    && o.revert === 'k1:검토,k2:낙찰,k9:검토|1|1' && o.card === '1,1,3,1,0,1,1'
+    && o.save === '0|[{"action":"corp_reg_set","base":777,"reg_on":"2026-09-29","biz_fix_on":"","g2b_on":"","gate":true}]|2|locked' && o.nonAdmin === '0|1';
+  const realP1 = evalP1(blkP1);
+  // 결함 사본 — 구간 글 한 곳씩 바꿈: 각 사본에서 위 판정이 깨져야 함
+  const MUT_P1 = [['완료일<접수일 갈래 걷음', '    if (v.reg_on && v.g2b_on < v.reg_on) return "G2B_BEFORE_REG";\n', ''], ['미래 날짜 검사 걷음', '    if (today && s > today) return "오늘 뒤 날짜는 넣을 수 없습니다";\n', ''],
+    ['스위치 무시', '    if (!v || v.gate !== true) return "";', '    if (!v) return "";'], ['배지 안 칠함', '    if (!host || !host.querySelectorAll || !bidCorpGateBlocks()) return;', '    return;'],
+    ['누름 안 막음', '      if (e.stopPropagation) e.stopPropagation();\n      if (e.preventDefault) e.preventDefault();\n', ''], ['되돌리기 안 함', '      b.status = (x.from && x.from !== "응찰" && x.from !== "참여") ? x.from : "검토"; b.updated = todayStr(); n++;', '      n++;'],
+    ['입력 대기 줄 없음', '    if (empty) rows +=', '    if (false) rows +='], ['켜기 전 안내 걷음(검토 P1-2)', "esc(CORP_REG_GATE_OLD) + ' · 지금 '", "' · 지금 '"], ['관리자 검사 걷음', '    if (!isAdmin()){ alert("법인 등기 날짜는 관리자만 고칩니다."); return; }\n', '']];
+  const killP1 = MUT_P1.map(([nm, a, b]) => { if (blkP1.split(a).length !== 2) return nm + ':글 없음'; let k; try { k = !okP1(evalP1(blkP1.replace(a, b))); } catch (e) { k = false; } return k ? '' : nm + ':안 깨짐(또는 실행 오류)'; }).filter(Boolean);   // 실행 오류는 깨짐으로 치지 않음(판정이 값으로 깨져야)
+  // 배선(정적): 카드 자리(권한관리 문서함 설정 아래)·renderPermMgmt가 renderCorpRegCard 부름·afterLogin이 corpRegLoad 부름·renderBids 끝 bidCorpGateMark·doSaveBids 400 GATE_CORP_REG → bidCorpGateRevert·저장 심이 그 몸체를 넘김·감사 화면 라벨
+  const wireP1 = /<div class="card" id="docSettingsCard">[^\n]*\n\s*\n\s*<div class="dash-sec"[^>]*><h2>법인 등기 날짜<\/h2><\/div>\n\s*<div class="card" id="corpRegCard">/.test(html)
+    && /renderDocSettings\(\);[^\n]*\n\s*renderCorpRegCard\(\);/.test(fnP1(html, 'renderPermMgmt')) && /loadOnbid\(\);\n\s*corpRegLoad\(\);/.test(fnP1(html, 'afterLogin'))
+    && /vsSheetRender\(bidSheetDef\(\)\);\n\s*bidCorpGateMark\(\);[^\n]*\n\s*\}$/.test(fnP1(html, 'renderBids'))
+    && /if\(resp\.status===400&&json&&json\.error_code==="GATE_CORP_REG"\)\{ bidCorpGateRevert\(json\); return; \}/.test(fnP1(html, 'doSaveBids'))
+    && /if \(res\.status === 400 && res\.body && res\.body\.error_code === "GATE_CORP_REG"\) return _ghResp\(400, res\.body\);/.test(html)
+    && /var AUDIT_COL_LABEL = \{[^}]*corp_reg:"법인 등기"/.test(html)
+    && /if \(d && d\.action === 'corp_reg_get'\) return await handleCorpRegGet\(event, d, R\);/.test(gwdP1) && /if \(d && d\.action === 'corp_reg_set'\) return await handleCorpRegSet\(event, d, R\);/.test(gwdP1)
+    && /if \(col === 'bids'\) \{\n\s*const gq = await corpRegGate\(store\(DATA\), oldItems, doc\.items, prevReadFailed, R\);/.test(gwdP1)
+    && !/(notify|push\.|sendTo|autotask|createTask|tasks\.push)/.test(blkP1);   // 이 판은 알림·지시를 만들지 않는다
+  T('P1 판1 법인 등기 날짜·투찰 잠금(@corp-reg 실행): ① 잠금 판정 앱 corpRegLockOf = 서버 corpRegLock(표본 8 — 꺼짐·완료일 빔·완료일<접수일·같은 날·gate 글자 "true") · 날짜 한 칸 앱 = 서버(오늘 2026-11-13 · 미래·없는 날·꼴 틀림 거절, 빈칸 통과) · ② 꺼짐·못 읽음 = 배지·배선 0 · 잠김 = 응찰 버튼(폰 data-bid-st·PC data-bid-v)에만 "투찰 잠금" 배지 1개·흐리게(두 번 칠해도 1개) · #bidList 붙잡기 배선 1개 · ③ 잠김 누름(폰·PC 안쪽 글자) = 막음·안내 / 낙찰·패스 = 그대로 / 완료일을 넣어 열리면 안 막음 · ④ 서버 거절 = blocked 줄만 검토로·다시 저장 1번 · ⑤ 카드 = 세 칸 빔이면 "입력 대기" 1줄·등본 안내 1줄·날짜 3칸(max 오늘)·잠금 칸 · ⑥ 저장 = 미래·없는 날 안내만(호출 0) · 바른 값 corp_reg_set 1번(base·빈칸 = 지우기) · ⑦ 관리자 아님 = 호출 0 · 배선(카드 자리·renderPermMgmt·afterLogin·renderBids 끝·doSaveBids 400·저장 심·감사 라벨·서버 액션 2·공고 저장 관문) · 알림·지시 호출 0 · 결함 사본 ' + MUT_P1.length + '개 전부 깨짐',
+    okP1(realP1) && killP1.length === 0 && wireP1, JSON.stringify({ realP1, killP1, wireP1 }));
+} catch (e) { console.log('  (P1 판1 검사 생략 — ' + e.message + ')'); fails++; }
+
+try {
+  // P1 판2(원장 T693·T364) 차량 지시 완료 때 새 만기일 · '날짜 그대로'(계산) · 다시 지시 — 앱 @veh-due 구간 + 실제 toggleTaskDone을 작은 DOM에서 실행.
+  //   날짜는 고정(오늘 = 2026-11-13 흉내 · 만료 2026-10-31·2026-12-20). 다시 지시 규칙은 서버 _lib/autorules vehRedo와 같은 표본에서 대조. 결함 사본(구간 글을 바꾼 것)마다 판정이 깨지는지까지 본다.
+  const blkP2 = (() => { const i = html.indexOf('// @veh-due-start'), j = html.indexOf('// @veh-due-end'); if (i < 0 || j < i || html.indexOf('// @veh-due-start', i + 1) >= 0) throw new Error('@veh-due 구간 없음·둘'); return html.slice(i, j); })();
+  const fnP2 = (src, name) => { const i = src.indexOf('function ' + name + '('); if (i < 0) throw new Error('함수 없음: ' + name); let d = 0, st = false; for (let j = i; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i, j + 1); } } throw new Error('함수 끝 없음: ' + name); };
+  const AR_P2 = createRequire(import.meta.url)(join(ROOT, 'netlify', 'functions', '_lib', 'autorules.js'));
+  const gwdP2 = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-data.js'), 'utf8');
+  const mkElP2 = () => { const cls = new Set(); return { textContent: '', value: '', classList: { add: (c) => cls.add(c), remove: (c) => cls.delete(c), contains: (c) => cls.has(c) } }; };
+  const VID_P2 = 'v경북12가3456';
+  const runP2 = (blk, env) => {
+    const els = {}; ['vehDueBackdrop', 'vehDueTitle', 'vehDueCur', 'vehDueDate', 'vehDueErr'].forEach((id) => { els[id] = mkElP2(); });
+    const E = { calls: [], log: [], saves: 0, vsaves: 0, vrend: 0, els };
+    const doc = { getElementById: (id) => els[id] || null };
+    const pre = [fnP2(html, 'esc'), fnP2(html, 'isDate'), fnP2(html, 'toggleTaskDone'),
+      'var tasks = ENV.tasks, vehicles = ENV.vehicles;', 'function findTask(id){ for (var i = 0; i < tasks.length; i++){ if (tasks[i].id === id) return tasks[i]; } return null; }',
+      'function findVeh(id){ for (var i = 0; i < vehicles.length; i++){ if (vehicles[i].id === id) return vehicles[i]; } return null; }',
+      'function canDo(m){ return m === "veh" ? ENV.vehDo !== false : true; } function canActTask(t){ return ENV.canAct !== false; } function myId(){ return ENV.me || "u1"; } function myName(){ return "시험"; }',
+      'function todayStr(){ return "2026-11-13"; } function pushNotify(){ E.log.push("push"); } function saveTasksCache(){} function renderTasks(){} function renderSummary(){} function scheduleTasksSave(){ E.saves++; }',
+      'function saveVehiclesCache(){ E.vsaves++; } function renderVehicles(){ E.vrend++; } function renderDashboard(){} function scheduleVehSave(){ E.log.push("vehsave"); }',
+      'function apprToastShow(m){ E.log.push("toast:" + m); } function confirm(m){ E.log.push("confirm:" + m); return ENV.confirmAns !== false; }',
+      'function syncP(v){ return { then: function(f){ return syncP(f ? f(v) : v); }, catch: function(){ return syncP(v); } }; }',
+      'function gwCall(fn, body){ E.calls.push(JSON.parse(JSON.stringify(body))); return syncP(typeof ENV.resp === "function" ? ENV.resp(body) : (ENV.resp || { status: 500, body: {} })); }'].join('\n');
+    const api = new Function('ENV', 'E', 'document', pre + '\n' + blk + '\nreturn { link: vehTaskLink, kept: vehDueKept, rowKept: vehRowKept, chip: vehKeptChip, redo: vehRedoItems, toggle: toggleTaskDone, ok: vehDueOk, close: vehDueClose, task: findTask, veh: findVeh };')(env, E, doc);
+    return { api, E };
+  };
+  const VEHS_P2 = () => [{ id: 'v1', no: '11가1111', state: '운행', insp_due: '2026-10-31', ins_due: '2026-12-20', updated: '2026-10-01' },
+    { id: VID_P2, no: '경북12가3456', state: '운행', insp_due: '2026-09-30', ins_due: '2027-01-05' }, { id: 'vdel', no: '00가0000', del: 1, insp_due: '2026-10-01' }];
+  const TK_P2 = (id, key, who, status, extra) => Object.assign({ id, title: '지시 ' + id, auto_key: key, who_id: who || '', status: status || 'open', from: '자동', from_id: '' }, extra || {});
+  const TASKS_P2 = () => [TK_P2('t1', 'veh:v1:insp:2026-10-31', 'u9'), TK_P2('t2', 'veh:v1:ins:2026-12-20', 'u1'), TK_P2('t3', undefined, 'u9', 'open', { from: '관리자' }),
+    TK_P2('t4', 'veh:v1:insp:2026-10-31', 'u9', 'done'), TK_P2('t5', 'veh:' + VID_P2 + ':insp:2026-09-30', 'u9', 'review'), TK_P2('t6', 'veh:v1:insp:2026-09-01', 'u1'),
+    TK_P2('t7', 'veh:v1:insp:2026-10-31:re:2026-11', 'u9', 'done'), TK_P2('t8', 'veh:vdel:insp:2026-10-01', 'u9', 'done'), TK_P2('t9', 'veh:v1:ins:2026-12-20', 'u9', 'done', { del: 1 }),
+    TK_P2('t10', 'veh:v1:ins:2026-12-20', 'u9', 'done')];
+  // 다시 지시 표본(서버 시험 87 ④와 같은 꼴 — 오늘 2026-11-13)
+  const RV_P2 = [{ id: 'A', no: '11가1111', state: '운행', insp_due: '2026-10-31', ins_due: '2027-03-01' }, { id: 'B', no: '22나2222', state: '운행', insp_due: '2027-01-01', ins_due: '2026-11-01' },
+    { id: 'C', no: '33다3333', state: '매각', insp_due: '2026-10-01' }, { id: 'D', no: '44라4444', state: '운행', insp_due: '2026-10-02' }, { id: 'E', no: '55마5555', state: '운행', insp_due: '2026-11-20' },
+    { id: 'F', no: '66바6666', state: '운행', insp_due: '2026-10-03' }, { id: 'G', no: '', state: '정비', insp_due: '2026-09-04' }, { id: 'H', no: '88아8888', state: '운행', insp_due: '2026-10-05' },
+    { id: 'I', no: '99자9999', state: '운행', insp_due: '2026-10-06', del: 1 }, { id: 'J', no: '10차1010', state: '운행', ins_due: '2026-10-07' }, { id: 'K', no: '12카1212', state: '운행', insp_due: '2026-11-12' },
+    { id: 'L', no: '13타1313', state: '운행', insp_due: '2026-11-13' }, { id: 'M', no: '14파1414', state: '검사보류', ins_due: '2026-10-08' }];
+  const RT_P2 = [{ auto_key: 'veh:A:insp:2026-10-31', status: 'done' }, { auto_key: 'veh:B:ins:2026-11-01', status: 'done' }, { auto_key: 'veh:B:ins:2026-11-01:re:2026-10', status: 'open' },
+    { auto_key: 'veh:C:insp:2026-10-01', status: 'done' }, { auto_key: 'veh:E:insp:2026-11-20', status: 'done' }, { auto_key: 'veh:F:insp:2026-10-03', status: 'done' }, { auto_key: 'veh:F:insp:2026-10-03:re:2026-11', status: 'open', del: 1 },
+    { auto_key: 'veh:G:insp:2026-09-04', status: 'done' }, { auto_key: 'veh:G:insp:2026-09-04:re:2026-10', status: 'done' }, { auto_key: 'veh:H:insp:2026-10-05', status: 'review' },
+    { auto_key: 'veh:I:insp:2026-10-06', status: 'done' }, { auto_key: 'veh:J:ins:2026-10-07', status: 'done', del: 1 }, { auto_key: 'veh:K:insp:2026-11-12', status: 'done' }, { auto_key: 'veh:L:insp:2026-11-13', status: 'done' },
+    { auto_key: 'veh:M:ins:2026-10-08', status: 'done' }];
+  const evalP2 = (blk) => {
+    const out = {};
+    const base = () => runP2(blk, { tasks: TASKS_P2(), vehicles: VEHS_P2() });
+    // ① 연결 — 키 꼴(한글 번호판 id·다시 지시 :re: 키) → 차량·칸 · 사람 지시·꼴 틀림·지운 차 = null
+    const b1 = base(), L = (k) => { const x = b1.api.link({ auto_key: k }); return x ? x.vid + '|' + x.f + '|' + x.due + '|' + x.label : null; };
+    out.link = [L('veh:v1:insp:2026-10-31'), L('veh:' + VID_P2 + ':ins:2026-09-30'), L('veh:v1:insp:2026-10-31:re:2026-11'), L(undefined), L('veh:v1:insp:2026-10-31 '), L('veh:v1:insp:'), L('lic:v1:exp:2026-10-31'), L('veh:vdel:insp:2026-10-01'), L('veh:vNone:insp:2026-10-31'), L('veh:v1:insp:2026-10-31:re:2026-11-01')];
+    // ② '날짜 그대로'(계산) — 완료·승인 대기 + 그 칸 = 지시 만료일 · 진행·지운 지시·바뀐 칸·지운 차 = 아님 · 차량 줄 = 정기검사·보험 순 · 표시 1개(need-chip)
+    out.kept = b1.api.task ? TASKS_P2().map((t) => b1.api.kept(b1.api.task(t.id)) ? 1 : 0).join('') : '';
+    out.row = b1.api.rowKept(b1.api.veh('v1')).join('·') + '|' + b1.api.rowKept(b1.api.veh(VID_P2)).join('·');
+    out.chip = [b1.api.chip(['정기검사', '보험']), b1.api.chip([])];
+    // ③ 다시 지시 = 서버 vehRedo(같은 표본 · 오늘 2026-11-13) · 키·제목·기한·안내 글자째
+    const app = b1.api.redo(JSON.parse(JSON.stringify(RV_P2)), JSON.parse(JSON.stringify(RT_P2)), '2026-11-13').map((n) => [n.auto_key, n.title, n.due, n.detail].join('|'));
+    const svr = AR_P2.vehRedo(JSON.parse(JSON.stringify(RV_P2)), JSON.parse(JSON.stringify(RT_P2)), '2026-11-13').map((n) => [n.auto_key, n.title, n.due, n.detail].join('|'));
+    out.redoSame = JSON.stringify(app) === JSON.stringify(svr); out.redoKeys = app.map((x) => x.split('|')[0]);
+    // ④ 완료 창 — 차량 수행: 진행 차량 지시 누름 = 창(제목 차번호·정기검사 · 지금 만기일) · 상태 그대로 · 저장 0
+    const c = runP2(blk, { tasks: TASKS_P2(), vehicles: VEHS_P2() });
+    c.api.toggle('t1');
+    out.open1 = [c.E.els.vehDueBackdrop.classList.contains('show') ? 1 : 0, c.E.els.vehDueTitle.textContent, /지금 만기일 2026-10-31/.test(c.E.els.vehDueCur.textContent) ? 1 : 0, c.api.task('t1').status, c.E.saves].join('|');
+    // 비우고 [완료] = 창 닫힘·승인 대기·서버 호출 0
+    c.E.els.vehDueDate.value = ''; c.api.ok();
+    out.blank = [c.E.els.vehDueBackdrop.classList.contains('show') ? 1 : 0, c.api.task('t1').status, c.E.calls.length, c.E.saves, c.api.veh('v1').insp_due].join('|');
+    // 다시 열기(t2 보험) — 없는 날 = 안내·호출 0·진행 그대로 / 같은 날 = 호출 0·완료 /
+    c.api.toggle('t2'); c.E.els.vehDueDate.value = '2026-02-30'; c.api.ok();
+    out.bad = [c.E.els.vehDueErr.textContent, c.E.calls.length, c.api.task('t2').status, c.E.els.vehDueBackdrop.classList.contains('show') ? 1 : 0].join('|');
+    c.E.els.vehDueDate.value = '2026-12-20'; c.api.ok();
+    out.same = [c.E.calls.length, c.api.task('t2').status].join('|');
+    // 새 날짜 = veh_due_set 1번(task_id·date·base_due) → 200이면 그 줄 그 칸만 고치고 완료·차량 표 다시 그림 · 이른 날 = 확인 문구(아니오 = 호출 0)
+    const d = runP2(blk, { tasks: TASKS_P2(), vehicles: VEHS_P2(), resp: (b) => ({ status: 200, body: { vehicle: { id: 'v1', field: 'insp_due', value: b.date, prev: '2026-10-31', updated: '2026-11-13' } } }) });
+    d.api.toggle('t1'); d.E.els.vehDueDate.value = '2026-01-01'; d.api.ok();   // 확인 = 예(기본) → 호출
+    out.early = [d.E.log.filter((l) => /^confirm:지금 만기일\(2026-10-31\)보다 이른 날짜/.test(l)).length, d.E.calls.length].join('|');
+    const d2 = runP2(blk, { tasks: TASKS_P2(), vehicles: VEHS_P2(), confirmAns: false, resp: { status: 200, body: {} } });
+    d2.api.toggle('t1'); d2.E.els.vehDueDate.value = '2026-01-01'; d2.api.ok();
+    out.earlyNo = [d2.E.calls.length, d2.api.task('t1').status].join('|');
+    const d3 = runP2(blk, { tasks: TASKS_P2(), vehicles: VEHS_P2(), resp: (b) => ({ status: 200, body: { vehicle: { id: 'v1', field: 'insp_due', value: b.date, prev: '2026-10-31', updated: '2026-11-13' } } }) });
+    d3.api.toggle('t1'); d3.E.els.vehDueDate.value = '2027-10-31'; d3.api.ok();
+    const v3 = d3.api.veh('v1');
+    out.saved = [JSON.stringify(d3.E.calls), v3.insp_due, v3.ins_due, v3.updated, d3.api.task('t1').status, d3.E.vsaves, d3.E.vrend, d3.E.els.vehDueBackdrop.classList.contains('show') ? 1 : 0, d3.E.log.filter((l) => l === 'vehsave').length].join('|');
+    // 서버 거절(403 NO_WRITE·409) = 완료 안 함·창 그대로·안내 / 네트워크 실패도
+    const d4 = runP2(blk, { tasks: TASKS_P2(), vehicles: VEHS_P2(), resp: { status: 403, body: { error_code: 'NO_WRITE', why: 'NOT_ASSIGN_TABLE' } } });
+    d4.api.toggle('t1'); d4.E.els.vehDueDate.value = '2027-10-31'; d4.api.ok();
+    out.denied = [d4.api.task('t1').status, d4.E.els.vehDueBackdrop.classList.contains('show') ? 1 : 0, /권한이 없습니다/.test(d4.E.els.vehDueErr.textContent) ? 1 : 0, d4.api.veh('v1').insp_due].join('|');
+    // 창이 뜨지 않는 길 — 사람이 만든 지시·완료 되돌리기·차량 보기인 비담당·담당이지만 차량 칸이 이미 바뀐 지시 = 종전 완료(바로 승인 대기) / 차량 보기인 담당 + 칸 = 지시 만료일 = 창
+    const e = runP2(blk, { tasks: TASKS_P2(), vehicles: VEHS_P2(), vehDo: false, me: 'u1' });
+    e.api.toggle('t3'); const s3 = e.api.task('t3').status + (e.E.els.vehDueBackdrop.classList.contains('show') ? '+창' : '');
+    e.api.toggle('t1'); const s1 = e.api.task('t1').status + (e.E.els.vehDueBackdrop.classList.contains('show') ? '+창' : '');
+    e.api.toggle('t6'); const s6 = e.api.task('t6').status + (e.E.els.vehDueBackdrop.classList.contains('show') ? '+창' : '');
+    e.api.toggle('t2'); const s2 = e.api.task('t2').status + (e.E.els.vehDueBackdrop.classList.contains('show') ? '+창' : '');
+    const f = runP2(blk, { tasks: TASKS_P2(), vehicles: VEHS_P2() }); f.api.toggle('t4'); const s4 = f.api.task('t4').status + (f.E.els.vehDueBackdrop.classList.contains('show') ? '+창' : '');
+    out.paths = [s3, s1, s6, s2, s4].join(',');
+    return out;
+  };
+  const okP2 = (o) => JSON.stringify(o.link) === JSON.stringify(['v1|insp_due|2026-10-31|정기검사', VID_P2 + '|ins_due|2026-09-30|보험', 'v1|insp_due|2026-10-31|정기검사', null, null, null, null, null, null, null])
+    && o.kept === '0001101001' && o.row === '정기검사·보험|정기검사' && /^<span class="need-chip" title="정기검사·보험 지시는 완료됐지만 차량 만기일이 그대로입니다[^"]*">날짜 그대로<\/span>$/.test(o.chip[0]) && o.chip[1] === ''
+    && o.redoSame === true && JSON.stringify(o.redoKeys) === JSON.stringify(['veh:A:insp:2026-10-31:re:2026-11', 'veh:G:insp:2026-09-04:re:2026-11', 'veh:K:insp:2026-11-12:re:2026-11'])
+    && o.open1 === '1|완료 — 11가1111 정기검사 만기일|1|open|0' && o.blank === '0|review|0|1|2026-10-31'
+    && o.bad === '달력에 없는 날짜입니다.|0|open|1' && o.same === '0|review' && o.early === '1|1' && o.earlyNo === '0|open'
+    && o.saved === '[{"action":"veh_due_set","task_id":"t1","date":"2027-10-31","base_due":"2026-10-31"}]|2027-10-31|2026-12-20|2026-11-13|review|1|1|0|0'
+    && o.denied === 'open|1|1|2026-10-31' && o.paths === 'review,review,review,open+창,open';
+  // ※ paths 넷째(t2): 차량 보기 + 담당(u1) + 보험 칸 = 지시 만료일 → 창 / 다섯째: 완료(t4) 누름 = 되돌리기(open) — 창 없음
+  const realP2 = evalP2(blkP2);
+  const MUT_P2 = [['다시 지시 키 연결 걷음', '(?::re:\\d{4}-\\d{2})?$/;', '$/;'], ['승인 대기를 날짜 그대로에서 뺌', '(t.status !== "done" && t.status !== "review")) return false;', 't.status !== "done") return false;'],
+    ['담당 갈래 날짜 칸 조건 걷음', ' && L.v[L.f] === L.due); }', '); }'], ['같은 날을 서버로', 'if (!s || s === q.cur){', 'if (!s){'], ['날짜 검사 걷음', '    if (why){ vehDueErr(why); return; }\n', ''],
+    ['이른 날 확인 걷음', 'if (isDate(q.cur) && s < q.cur && !confirm(', 'if (false && !confirm('], ['거절에도 완료', '        return;\n      }\n      b = res.body.vehicle;', '        vehDueFinish(q.id); return;\n      }\n      b = res.body.vehicle;'],
+    ['로컬 줄 안 고침', 'if (v){ v[b.field] = b.value; v.updated = b.updated; saveVehiclesCache(); }', 'if (false){}'], ['base_due 안 보냄', ', base_due: q.cur })', ' })'],
+    ['다시 지시 회색 걷음', ' || GREY.indexOf(String(v.state || "")) >= 0) return;', ') return;'], ['다시 지시 진행 중 검사 걷음', '        if (same.some(function(t){ return t.status !== "done"; })) return;\n', ''],
+    ['권한 판정 걷음', '!vehDueCanWrite(t, L)', '!true'], ['차량 줄 표시 순서 뒤집음', '    if (seen.insp) out.push("정기검사");\n    if (seen.ins) out.push("보험");', '    if (seen.ins) out.push("보험");\n    if (seen.insp) out.push("정기검사");']];
+  const killP2 = MUT_P2.map(([nm, a, b]) => { if (blkP2.split(a).length !== 2) return nm + ':글 없음'; let k; try { k = !okP2(evalP2(blkP2.replace(a, () => b))); } catch (e2) { k = false; } return k ? '' : nm + ':안 깨짐(또는 실행 오류)'; }).filter(Boolean);
+  // 배선(정적): toggleTaskDone 첫머리(canActTask 다음) vehDueAsk · runAutoTaskGen 차량 D-30 다음 vehRedoItems · 지시 표 '지시 내용' 칸 vehDueKept · 차량 표 차번호 칸 vehRowKept ·
+  //   창 HTML(날짜 칸 type=date 1개)·버튼 배선 · 서버 액션 veh_due_set · ingest 갈래 AR.vehRedo · 구간에 차량 문서 통째 저장(scheduleVehSave·doSaveVeh)·알림 0
+  const wireP2 = /if \(!canActTask\(t\)\) return;\n\s*if \(t\.status !== "done" && t\.status !== "review" && vehDueAsk\(t\)\) return;/.test(fnP2(html, 'toggleTaskDone'))
+    && /mk\("veh:"\+v\.id\+":ins:"\+v\.ins_due, [^\n]*\n\s*\}\);\n\s*vehRedoItems\(vehicles, tasks, today\)\.forEach\(function\(n\)\{ mk\(n\.auto_key, n\.title, n\.due, n\.detail\); \}\);/.test(fnP2(html, 'runAutoTaskGen'))
+    && /if \(k === "t"\) return \{ html: \(vehDueKept\(t\) \? vehKeptChip\(\[vehTaskLink\(t\)\.label\]\) \+ " " : ""\) \+ esc\(t\.title/.test(fnP2(html, 'taskSheetCell'))
+    && /if \(c\.k === "no"\)\{ val = vehRowKept\(v\);/.test(fnP2(html, 'vehSheetRowHtml'))
+    && (html.match(/id="vehDueBackdrop"/g) || []).length === 1 && (html.match(/<input type="date" id="vehDueDate">/g) || []).length === 1
+    && /getElementById\("vehDueOkBtn"\)\.addEventListener\("click", vehDueOk\);/.test(html) && /getElementById\("vehDueCancel"\)\.addEventListener\("click", vehDueClose\);/.test(html)
+    && /if \(d && d\.action === 'veh_due_set'\) return await handleVehDueSet\(event, d, R\);/.test(gwdP2) && /AR\.vehRedo\(rvh\.data\.items, doc\.items, today\)/.test(gwdP2)
+    && !/scheduleVehSave|doSaveVeh|pushNotify/.test(blkP2);
+  T('P1 판2 차량 지시 완료 새 만기일·날짜 그대로·다시 지시(@veh-due 실행 + 실제 toggleTaskDone): ① 키 → 차량·칸(한글 번호판 id·다시 지시 :re: 키) · 사람 지시·끝 공백·날짜 빠짐·인허가·지운 차·없는 차·월 뒤 일 = 연결 없음 · ② 날짜 그대로 = 완료·승인 대기 + 그 칸 = 지시 만료일(진행·지운 지시·지운 차 아님) · 차량 줄 "정기검사·보험" · 표시 need-chip 1개 · ③ 다시 지시 앱 = 서버 vehRedo(표본 13대 · 키·제목·기한·안내 글자째) · ④ 차량 수행이 진행 지시 누름 = 창(차번호·정기검사·지금 만기일)·상태 그대로 · 비움 = 승인 대기·호출 0 · 없는 날 = 안내·호출 0 · 같은 날 = 호출 0·완료 · 이른 날 = 확인 문구(아니오 = 호출 0) · 새 날 = veh_due_set 1번(task_id·date·base_due) 200 → 그 칸만·updated·완료·차량 표 다시 그림·문서 통째 저장 0 · 거절 = 완료 안 함·창 그대로·안내 · ⑤ 창 없는 길: 사람 지시·차량 보기 비담당·칸이 바뀐 지시 담당 = 종전대로 승인 대기 · 차량 보기 담당 + 칸 = 만료일 = 창 · 완료 되돌리기 = 창 없음 · 배선(toggleTaskDone 첫머리·runAutoTaskGen·지시 표 칸·차량 표 칸·창 HTML·버튼·서버 액션·ingest 갈래 · 구간에 차량 문서 저장·알림 0) · 결함 사본 ' + MUT_P2.length + '개 전부 깨짐',
+    okP2(realP2) && killP2.length === 0 && wireP2, JSON.stringify({ realP2, killP2, wireP2 }));
+} catch (e) { console.log('  (P1 판2 검사 생략 — ' + e.message + ')'); fails++; }
+
+try {   // ---- P1 판2 검토(S1): 지시 완료 창이 바꾼 만기일 — 같은 날 로컬 우선 병합(mergeVeh)이 옛 날짜로 되돌리지 않음 · 앱 vehDueMergeKeep = 서버 vehDueGuard(같은 표본 같은 결과)
+  //   표본(날짜 고정): 서버 줄 V = insp_due 2027-10-31·표식 {insp_due: {prev 2026-10-31, at 1794500000000}}·updated 2026-11-13 / 기기 A 메모리 V = 오늘 다른 칸을 고친 줄(updated 2026-11-13)
+  //   ① A 줄이 바꾸기 전 날짜·표식 없음 = 새 만기일·표식 이어 감·A의 다른 칸(메모) 그대로 ② A가 그 칸을 다른 날짜로 고침 = A 값 ③ A가 표식을 알고(같은 at) 되돌림 = A 값 ④ 표식 없는 서버 줄 = 종전(같은 날 로컬 우선)
+  //   ⑤ 보험 칸 표식만 = 검사 칸은 종전 · 다른 차 W(서버 updated 어제)는 종전대로 로컬 · 결함 사본(mergeVeh에서 vehDueMergeKeep 부름 걷음 = 고치기 전 코드 · prev 대조 걷음 · 표식 at 대조 걷음) = ✗
+  const fnS1 = (src, name) => { const i = src.indexOf('function ' + name + '('); if (i < 0) throw new Error('함수 없음: ' + name); let d = 0, st = false; for (let j = i; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i, j + 1); } } throw new Error('중괄호 짝 안 맞음: ' + name); };
+  const gwdS1 = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-data.js'), 'utf8');
+  const appS1 = (src) => new Function(['mTime', 'mergeDel', 'vehDueMergeKeep', 'mergeVeh'].map((n) => fnS1(src, n)).join('\n') + '\nreturn mergeVeh;')();
+  const svrS1 = new Function(fnS1(gwdS1, 'vehDueGuard') + '\nreturn vehDueGuard;')();
+  const MK_S1 = { prev: '2026-10-31', at: 1794500000000 };
+  const remS1 = (ds) => [{ id: 'V', no: '11가1111', insp_due: '2027-10-31', ins_due: '2026-12-20', note: '', updated: '2026-11-13', due_set: ds }, { id: 'W', no: '22나2222', insp_due: '2027-03-01', note: '', updated: '2026-11-12' }];
+  const locS1 = (insp, ds) => [Object.assign({ id: 'V', no: '11가1111', insp_due: insp, ins_due: '2026-12-20', note: '오전 고침', updated: '2026-11-13' }, ds ? { due_set: ds } : {}), { id: 'W', no: '22나2222', insp_due: '2027-03-01', note: 'W 메모', updated: '2026-11-13' }];
+  const CASES_S1 = [['①', '2026-10-31', null, { insp_due: MK_S1 }], ['②', '2028-01-01', null, { insp_due: MK_S1 }], ['③', '2026-10-31', { insp_due: MK_S1 }, { insp_due: MK_S1 }], ['④', '2026-10-31', null, undefined], ['⑤', '2026-10-31', null, { ins_due: { prev: '2025-12-20', at: 1794500000001 } }]];
+  const runS1 = (mv) => CASES_S1.map(([nm, insp, lds, rds]) => { const out = mv(locS1(insp, lds), remS1(rds)); const v = out.find((x) => x.id === 'V'), w = out.find((x) => x.id === 'W');
+    return nm + ':' + v.insp_due + '/' + v.note + '/' + ((v.due_set && v.due_set.insp_due && v.due_set.insp_due.at) || '-') + '/' + w.note; });
+  const svrRunS1 = () => CASES_S1.map(([nm, insp, lds, rds]) => { const items = locS1(insp, lds); svrS1(remS1(rds), items); return nm + ':' + items[0].insp_due; });
+  const EXP_S1 = ['①:2027-10-31/오전 고침/1794500000000/W 메모', '②:2028-01-01/오전 고침/1794500000000/W 메모', '③:2026-10-31/오전 고침/1794500000000/W 메모', '④:2026-10-31/오전 고침/-/W 메모', '⑤:2026-10-31/오전 고침/-/W 메모'];
+  const realS1 = runS1(appS1(html)), svrOutS1 = svrRunS1();
+  const sameS1 = JSON.stringify(svrOutS1) === JSON.stringify(realS1.map((s) => s.split('/')[0]));
+  const MUT_S1 = [['부름 걷음(고치기 전)', '        vehDueMergeKeep(m, cur, x);', '        ;'], ['prev 대조 걷음', 'if (nz(local[f]) === nz(mk.prev) && nz(remote[f]) !== nz(local[f])) m[f] = remote[f];', 'if (nz(remote[f]) !== nz(local[f])) m[f] = remote[f];'],
+    ['표식 at 대조 걷음', '|| (lm && lm.at === mk.at)) return;', ') return;']];
+  const killS1 = MUT_S1.map(([nm, a, b]) => { if (html.split(a).length !== 2) return nm + ':글 없음'; let k; try { k = JSON.stringify(runS1(appS1(html.replace(a, b)))) !== JSON.stringify(EXP_S1); } catch (e) { k = false; } return k ? '' : nm + ':안 깨짐'; }).filter(Boolean);
+  T('P1 판2 검토(S1) 같은 날 병합의 만기일 보호(실행 — 실제 mergeVeh·vehDueMergeKeep · 서버 vehDueGuard 대조): ① 기기 줄이 바꾸기 전 날짜·표식 모름 = 새 만기일 2027-10-31·표식 이어 감·기기 메모 그대로 ② 기기가 다른 날짜로 고침 = 기기 값 ③ 표식을 알고 되돌림 = 기기 값 ④ 표식 없는 서버 줄 = 종전(로컬 우선) ⑤ 보험 칸 표식만 = 검사 칸 종전 · 다른 차 W = 로컬 그대로 · 서버 vehDueGuard = 같은 만기일 결과 · 결함 사본 ' + MUT_S1.length + '개(부름 걷음 = 고치기 전 코드 · prev 대조 걷음 · 표식 at 대조 걷음) 전부 깨짐',
+    JSON.stringify(realS1) === JSON.stringify(EXP_S1) && sameS1 && killS1.length === 0, JSON.stringify({ realS1, svrOutS1, killS1 }));
+} catch (e) { console.log('  (P1 판2 검토 S1 검사 생략 — ' + e.message + ')'); fails++; }
+
+try {   // ---- P1 판2 검토 2회차(R2-1): 완료 창을 쓴 그 기기도 서버와 같은 표식을 받는다 — 새로고침 없이 그 칸을 바꾸기 전 날짜로 되돌린 사람 편집이 병합·서버 보호에서 유지
+  //   표본(날짜 고정): 차량 V insp_due 2026-11-20 · 지시 t1 veh:V:insp:2026-11-20 · 완료 창 2026-12-01 → 서버 응답(updated_at 1794600000000 = 서버 표식 at) ·
+  //   그 기기가 차량 수정 창으로 2026-11-20 되돌림(updated 2026-11-13) · 서버 줄 = 12-01 + 표식 {prev 11-20, at 1794600000000}
+  //   ① 실제 vehDueOk 뒤 로컬 줄 표식 = {prev 2026-11-20, at 1794600000000} ② 앱 mergeVeh(409 뒤 병합) = 11-20 ③ 서버 vehDueGuard = 11-20·보호 0칸 · 결함 사본(로컬 표식 넣기 걷음 = 고치기 전 코드) = ✗
+  const fnR21 = (src, name) => { const i = src.indexOf('function ' + name + '('); if (i < 0) throw new Error('함수 없음: ' + name); let d = 0, st = false; for (let j = i; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i, j + 1); } } throw new Error('함수 끝 없음: ' + name); };
+  const blkR21 = (() => { const i = html.indexOf('// @veh-due-start'), j = html.indexOf('// @veh-due-end'); if (i < 0 || j < i) throw new Error('@veh-due 구간 없음'); return html.slice(i, j); })();
+  const gwdR21 = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-data.js'), 'utf8');
+  const svrR21 = new Function(fnR21(gwdR21, 'vehDueGuard') + '\nreturn vehDueGuard;')();
+  const AT_R21 = 1794600000000;
+  const runR21 = (src) => {
+    const blk = (() => { const i = src.indexOf('// @veh-due-start'), j = src.indexOf('// @veh-due-end'); return src.slice(i, j); })();
+    const els = {}; ['vehDueBackdrop', 'vehDueTitle', 'vehDueCur', 'vehDueDate', 'vehDueErr'].forEach((id) => { const cls = new Set(); els[id] = { textContent: '', value: '', classList: { add: (c) => cls.add(c), remove: (c) => cls.delete(c), contains: (c) => cls.has(c) } }; });
+    const ENV = { tasks: [{ id: 't1', title: '지시 t1', auto_key: 'veh:V:insp:2026-11-20', who_id: 'u1', status: 'open', from: '자동', from_id: '' }],
+      vehicles: [{ id: 'V', no: '11가1111', state: '운행', insp_due: '2026-11-20', ins_due: '2027-01-05', note: '', updated: '2026-11-01' }] };
+    const pre = [fnR21(src, 'esc'), fnR21(src, 'isDate'), fnR21(src, 'toggleTaskDone'),
+      'var tasks = ENV.tasks, vehicles = ENV.vehicles;', 'function findTask(id){ for (var i = 0; i < tasks.length; i++){ if (tasks[i].id === id) return tasks[i]; } return null; }',
+      'function findVeh(id){ for (var i = 0; i < vehicles.length; i++){ if (vehicles[i].id === id) return vehicles[i]; } return null; }',
+      'function canDo(m){ return true; } function canActTask(t){ return true; } function myId(){ return "u1"; } function myName(){ return "시험"; }',
+      'function todayStr(){ return "2026-11-13"; } function pushNotify(){} function saveTasksCache(){} function renderTasks(){} function renderSummary(){} function scheduleTasksSave(){}',
+      'function saveVehiclesCache(){} function renderVehicles(){} function renderDashboard(){} function scheduleVehSave(){}',
+      'function apprToastShow(m){} function confirm(m){ return true; }',
+      'function syncP(v){ return { then: function(f){ return syncP(f ? f(v) : v); }, catch: function(){ return syncP(v); } }; }',
+      'function gwCall(fn, body){ return syncP({ status: 200, body: { status: "OK", vehicle: { id: "V", field: "insp_due", value: body.date, prev: "2026-11-20", updated: "2026-11-13" }, updated_at: ' + AT_R21 + ' } }); }'].join('\n');
+    const api = new Function('ENV', 'document', pre + '\n' + blk + '\nreturn { toggle: toggleTaskDone, ok: vehDueOk, veh: findVeh };')(ENV, { getElementById: (id) => els[id] || null });
+    api.toggle('t1'); els.vehDueDate.value = '2026-12-01'; api.ok();
+    const v = api.veh('V'), mk = JSON.stringify((v.due_set && v.due_set.insp_due) || null), after = v.insp_due;
+    // 같은 기기에서 차량 수정 창으로 되돌림(saveVehFromModal 꼴 — 같은 객체·updated 오늘)
+    v.insp_due = '2026-11-20'; v.updated = '2026-11-13';
+    const remote = () => [{ id: 'V', no: '11가1111', state: '운행', insp_due: '2026-12-01', ins_due: '2027-01-05', note: '', updated: '2026-11-13', due_set: { insp_due: { prev: '2026-11-20', at: AT_R21 } } }];
+    const mv = new Function(['mTime', 'mergeDel', 'vehDueMergeKeep', 'mergeVeh'].map((n) => fnR21(src, n)).join('\n') + '\nreturn mergeVeh;')();
+    const merged = mv([JSON.parse(JSON.stringify(v))], remote()).find((x) => x.id === 'V').insp_due;
+    const items = [JSON.parse(JSON.stringify(v))], n = svrR21(remote(), items);
+    return [after, mk, merged, items[0].insp_due, n].join('|');
+  };
+  const EXP_R21 = '2026-12-01|{"prev":"2026-11-20","at":' + AT_R21 + '}|2026-11-20|2026-11-20|0';
+  const realR21 = runR21(html);
+  const MUT_R21 = [['로컬 표식 넣기 걷음(고치기 전)', 'if (v && res.body.updated_at){ v.due_set', 'if (false && res.body.updated_at){ v.due_set'], ['표식 at을 다른 값으로', 'at: res.body.updated_at }; saveVehiclesCache(); }', 'at: 1 }; saveVehiclesCache(); }']];
+  const killR21 = MUT_R21.map(([nm, a, b]) => { if (blkR21.split(a).length !== 2) return nm + ':글 없음'; let k; try { k = runR21(html.replace(a, () => b)) !== EXP_R21; } catch (e2) { k = false; } return k ? '' : nm + ':안 깨짐'; }).filter(Boolean);
+  T('P1 판2 검토 2회차(R2-1) 완료 창을 쓴 기기의 표식(실행 — 실제 vehDueOk·toggleTaskDone · mergeVeh·vehDueMergeKeep · 서버 vehDueGuard): ① 로컬 줄 표식 = {prev 2026-11-20, at = 응답 updated_at} ② 그 기기가 차량 수정으로 2026-11-20 되돌림 → 앱 병합 = 2026-11-20(사람 편집 유지) ③ 서버 보호 = 2026-11-20·0칸 · 결함 사본 ' + MUT_R21.length + '개(표식 넣기 걷음 = 고치기 전 코드 · at 다름) 전부 깨짐',
+    realR21 === EXP_R21 && killR21.length === 0, JSON.stringify({ realR21, killR21 }));
+} catch (e) { console.log('  (P1 판2 검토 2회차 R2-1 검사 생략 — ' + e.message + ')'); fails++; }
+
+try {   // ---- P1 판4: 계약 법령 기준표 — 개정 감지 행은 감지 MST = 지금 행 MST일 때만 보류(새 판에서 MST를 고친 행은 풀림) · 관리 카드 '확인일만 바뀐 판' 줄·자동 이월 스위치 버튼(con_proc_bg_set bg_auto)
+  const fnP4 = (src, name) => { const i = src.indexOf('function ' + name + '('); if (i < 0) throw new Error('함수 없음: ' + name); let d = 0, st = false; for (let j = i; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i, j + 1); } } throw new Error('함수 끝 없음: ' + name); };
+  const fxP4 = JSON.parse(readFileSync(join(ROOT, 'tools', 'bg_law_carry_fixture.json'), 'utf8'));
+  const mkP4 = (src) => new Function([
+    'var CON_MAP = { ok:false, scen:{}, added:{}, upper:[], sha:"" }, CON_BG = { ver:"", rows:{}, pending:{}, recheck:{}, n:0, sha:"" };',
+    'function isDate(v){ return typeof v === "string" && /^\\d{4}-\\d{2}-\\d{2}$/.test(v); }',
+    fnP4(src, 'conIsArr'), fnP4(src, 'conBgRecheckLive'), fnP4(src, 'conDueClear'), fnP4(src, 'conDueUse'),
+    'return { use: function(b){ conDueUse(b); return CON_BG; }, live: conBgRecheckLive };'].join('\n'))();
+  const runP4 = (api) => {
+    const map = { schema: 1, proc_ver: 'v1', scen: {} };
+    const lw = { date: '2026-11-16', bg_recheck: [{ id: 'law.waste.r.18', law: '폐기물관리법 시행규칙', mst: 290881 }, { id: 'law.waste.17.1', law: '폐기물관리법', mst: 284397 }, { id: 'law.waste.r.60.1', law: '폐기물관리법 시행규칙' }] };   // 셋째 = mst 없는 옛 기록
+    const flagOld = { bg_ver: 'v1-20261031' }, flagNov = { bg_ver: 'v1-20261113' };
+    const a = api.use({ map: map, bg: JSON.parse(JSON.stringify(fxP4.old)), flag: flagOld, lawwatch: lw });
+    const oldHold = !!a.pending['law.waste.r.18'] && !a.rows['law.waste.r.18'] && !!a.pending['law.waste.17.1'] && !!a.pending['law.waste.r.60.1'] && !!a.rows['law.lgcl.d.42'] && Object.keys(a.recheck).length === 3;
+    const b = api.use({ map: map, bg: JSON.parse(JSON.stringify(fxP4.nov)), flag: flagNov, lawwatch: lw });
+    const novFree = !!b.rows['law.waste.r.18'] && !b.pending['law.waste.r.18'] && !!b.rows['law.waste.17.1'] && !!b.pending['law.waste.r.60.1'] && !b.rows['law.waste.r.60.1'] && Object.keys(b.recheck).length === 1 && !!b.rows['law.ordin.pohang.d21'];
+    const c = api.use({ map: map, bg: JSON.parse(JSON.stringify(fxP4.nov)), flag: flagOld, lawwatch: lw });   // 미승격 = 엔진 꺼짐(종전 그대로)
+    const off = c.ver === '' && Object.keys(c.rows).length === 0;
+    const cnt = Object.keys(api.live({ bg: fxP4.nov, lawwatch: lw })).length === 1 && Object.keys(api.live({ bg: fxP4.old, lawwatch: lw })).length === 3 && Object.keys(api.live({ bg: fxP4.old, lawwatch: {} })).length === 0;
+    return { oldHold, novFree, off, cnt };
+  };
+  const realP4 = runP4(mkP4(html)), okP4 = (o) => o.oldHold && o.novFree && o.off && o.cnt;
+  const MUT_P4 = [
+    ['MST 대조 걷음', 'if (r && x.mst && r.mst && Number(x.mst) !== Number(r.mst)) return; rk[x.id] = 1;', 'rk[x.id] = 1;'],
+    ['엔진이 MST 대조 안 씀', 'var rk = conBgRecheckLive(b); CON_BG.recheck = rk;', 'var rk = {}; ((b.lawwatch || {}).bg_recheck || []).forEach(function(x){ if (x && x.id) rk[x.id] = 1; }); CON_BG.recheck = rk;'],
+    ['mst 없는 옛 기록 풀어 버림', 'if (r && x.mst && r.mst && Number(x.mst) !== Number(r.mst)) return;', 'if (r && (!x.mst || Number(x.mst) !== Number(r.mst))) return;'],
+  ];
+  const killP4 = MUT_P4.filter((m) => { if (html.indexOf(m[1]) < 0) return true; return okP4(runP4(mkP4(html.replace(m[1], m[2])))); }).map((m) => m[0]);
+  const gwdP4 = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-data.js'), 'utf8');
+  const wireP4 = html.indexOf('["확인일만 바뀐 판", (f.bg_auto ? "<b>자동 이월 켜짐</b>"') > 0 && html.indexOf('data-conproc-bgauto="') > 0
+    && /conProcBgAutoSet\(el\.getAttribute\("data-conproc-bgauto"\) === "1"/.test(html) && /gwCall\("gw-data", \{ action: "con_proc_bg_set", bg_auto: !!on, base: base \}\)/.test(fnP4(html, 'conProcBgAutoSet'))
+    && html.indexOf('" · 마지막 자동 이월 "') > 0 && /try \{ const cf = await conBgAutoCarry\(st, flag, L\.bg\); if \(cf\) flag = cf; \} catch \(e\) \{\}/.test(fnP4(gwdP4, 'handleConProcGet'))
+    && /delete o\.checked;/.test(fnP4(gwdP4, 'conBgFp'));
+  T('P1 판4 계약 기준표 개정 감지 MST 대조(고정물 운영 판·11월 판 실행): 11/16 감지(옛 MST 290881·284397 + mst 없는 옛 기록) → 운영 판 3행 보류·그대로 행 실측 · 11월 판 승격 뒤 MST 고친 2행 풀림·mst 없는 기록 1행만 보류·새 실측 조례 행 사용 · 미승격 = 엔진 꺼짐 · 카드 개정 감지 수 = 살아 있는 행 · 관리 카드 \'확인일만 바뀐 판\' 줄(켜짐/꺼짐·기준 지문·마지막 자동 이월)·스위치 버튼 → con_proc_bg_set bg_auto · 서버 조회 때 conBgAutoCarry·지문 checked 뺌 · 결함 사본 ' + MUT_P4.length + '개 전부 깨짐',
+    okP4(realP4) && killP4.length === 0 && wireP4, JSON.stringify({ realP4, killP4, wireP4 }));
+} catch (e) { console.log('  (P1 판4 검사 생략 — ' + e.message + ')'); fails++; }
 
 try {
   // 원장 T421(11/13): 옛 블록의 sw 판 번호 검사는 숫자 비교(>= 그 판) — '…|4\\d\\d)' 꼴 정규식은 v500에서 한꺼번에 실패하므로 다시 쓰지 않는다(판마다 옛 블록을 손보던 구조 해소)
@@ -11557,6 +11908,33 @@ try {
   const seed421 = [re421.test('&& /jw-shell-' + 'v(39[4-9]|4\\d\\d)/.test(swv)'), re421.test('Number((swv.match(/jw-shell-' + 'v(\\d+)/) || [0, 0])[1]) >= 394')];
   T('T421 판 번호 검사 = 숫자 비교(옛 블록의 판 번호 정규식 갈래 꼴 0 — v500에서 한꺼번에 깨지지 않게 · 숫자 꺼내기 꼴만) · 결함 심기: 옛 꼴 표본 잡힘·숫자 꼴 안 잡힘', old421.length === 0 && seed421[0] === true && seed421[1] === false, JSON.stringify({ old: old421.map((l) => l.trim().slice(0, 80)), seed421 }));
 } catch (e) { console.log('  (T421 검사 생략 — ' + e.message + ')'); fails++; }
+
+try {
+  // ---- v459(11/13 — P1 판1·2·4 · 판 번호 임시): 문서·판 번호 정확 검사. 다음 판은 이 검사를 숫자 비교(>= 456)로 풀고 새 판 정확 검사를 더할 것.
+  //   FEATURES 기준 v459 (2026-11-13)·v459 절(판1·판2·R2-1 표식·판4) · TESTLIST v459 절(사람 확인 칸 '누가: 무엇' · AI 칸 · 게이트 칸 [x] 8종) · CLAUDE.md P1 줄 · sw jw-shell-v459
+  //   결함 심기: 기준 줄 v455 · sw v455 · TESTLIST 절 없음 · CLAUDE 줄 없음 · FEATURES 절에서 R2-1 낱말 걷음 = 각각 ✗
+  const rd56 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const chk56 = (ft, tl, cl, sw) => {
+    const sec = (s, h, nx) => { const i = s.indexOf(h); if (i < 0) return ''; const j = s.indexOf(nx, i + 5); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = sec(ft, '\n### v459 (11/13) — P1 판1·2·4', '\n### '), tlv = sec(tl, '\n## v459 — P1 판1·2·4', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^- \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l));
+    const who = cb.filter((l) => /^- \[ \] (나수진|정재욱|PM): /.test(l));
+    const FT = ['settings:corp_reg', 'GATE_CORP_REG', 'corpRegLockOf', 'corpRegLock', 'veh_due_set', 'VEH_DUE_STALE', '날짜 그대로', 'vehRedo', ':re:<YYYY-MM>', '`due_set{칸: {prev, at}}`', 'R2-1', 'bg_fp', 'bg_auto', 'con_proc_get', '판 번호 v459은 임시'];
+    const GATE = ['uismoke', 'consheet_check', 'proctpl_check', 'settletest', 'servertest', 'rectest', 'promoqual_check', 'promogen_check'];
+    return [/기준: v459 \(2026-11-13\)\./.test(ft), /SHELL_CACHE = 'jw-shell-v459'/.test(sw), ftv.length > 0 && FT.every((s) => ftv.indexOf(s) >= 0),
+      tlv.length > 0 && GATE.every((g) => gate.some((l) => l.indexOf('`' + g + '`') > 0)) && who.length >= 3, cl.indexOf('**P1 판1·2·4(v459') >= 0 && cl.indexOf('`vehDueMergeKeep`') >= 0];
+  };
+  const ft56 = rd56('FEATURES.md'), tl56 = rd56('TESTLIST.md'), cl56 = rd56('CLAUDE.md'), sw56 = rd56('sw.js');
+  const real56 = chk56(ft56, tl56, cl56, sw56);
+  const MUT56 = [['기준 줄 v455', () => chk56(ft56.replace('기준: v459 (2026-11-13).', '기준: v455 (2026-11-13).'), tl56, cl56, sw56)],
+    ['sw v455', () => chk56(ft56, tl56, cl56, sw56.replace("'jw-shell-v459'", "'jw-shell-v455'"))],
+    ['TESTLIST 절 없음', () => chk56(ft56, tl56.replace('\n## v459 — P1 판1·2·4', '\n## v4xx — 다른 것'), cl56, sw56)],
+    ['CLAUDE 줄 없음', () => chk56(ft56, tl56, cl56.replace('**P1 판1·2·4(v459', '**P1(v4xx'), sw56)],
+    ['FEATURES R2-1 걷음', () => chk56(ft56.split('R2-1').join('R2-x'), tl56, cl56, sw56)]];
+  const kill56 = MUT56.filter(([, f]) => f().every(Boolean)).map(([n]) => n);
+  T('v459 문서·판 번호(P1 판1·2·4 — 정확 검사): FEATURES 기준 v459 (2026-11-13) · sw jw-shell-v459 · FEATURES v459 절(corp_reg·GATE_CORP_REG·두 벌 판정·veh_due_set·날짜 그대로·다시 지시 :re:·due_set 표식·R2-1·bg_fp·bg_auto·임시 판 번호) · TESTLIST v459 절(사람 확인 칸 "누가: 무엇" ≥ 3 · 게이트 칸 [x] 8종) · CLAUDE.md P1 줄 · 결함 사본 ' + MUT56.length + '개 전부 깨짐',
+    real56.every(Boolean) && kill56.length === 0, JSON.stringify({ real56, kill56 }));
+} catch (e) { console.log('  (v459 문서 검사 생략 — ' + e.message + ')'); fails++; }
 
 try {
   const fdir = join(ROOT, 'netlify', 'functions');

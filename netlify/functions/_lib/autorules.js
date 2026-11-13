@@ -87,6 +87,37 @@ function wkMissing(workerRows, asbRows, sinceYear) {
 
 // 월 키 — KST 날짜 기준(브리핑 3-1: 러너 UTC 날짜로 세면 08:10 정시 기동 때 전날·월초엔 전월)
 function monthKeyOf(today) { return String(today).slice(0, 7); }
+
+// ---- P1 판2(원장 T693·T364): 차량 만기 '다시 지시' — 기존 D-30 차량 규칙(veh:<id>:<insp|ins>:<만료일>, 스위치 무관)에 더한 갈래 ----
+// 만료일이 오늘보다 앞(지남)인데 그 만료일 키의 지시가 이미 완료(done)되어 같은 키로는 다시 생기지 않는 차 → 키 끝에 ':re:<YYYY-MM>'(달마다 한 번) 붙여 새 지시.
+// 조건: 회색 3종 제외 · 같은 만료일 키(원 키 + ':re:' 키들, 지운 것 제외) 중 완료가 1건 이상 · 진행·보류·승인 대기 0건 · 이번 달 다시 키가 없음(지운 것 포함 — 지웠으면 다음 달).
+// 앱 index.html vehRedoItems와 같은 규칙(uismoke P1 판2가 같은 표본에서 대조). 반환 [{auto_key, id, kind, due, days, title, detail}] — 이름·연락처 없음(차번호는 기존 D-30 제목과 같음).
+const VEH_DUE_KIND = { insp: { f: 'insp_due', label: '정기검사' }, ins: { f: 'ins_due', label: '보험' } };
+function vehRedo(vehRows, taskRows, today) {
+  const vt = live(taskRows).filter(function (t) { return typeof t.auto_key === 'string' && t.auto_key.indexOf('veh:') === 0; });
+  const anyKey = {}; asList(taskRows).forEach(function (t) { if (t && typeof t.auto_key === 'string') anyKey[t.auto_key] = 1; });
+  const out = [];
+  live(vehRows).forEach(function (v) {
+    if (GREY.indexOf(String(v.state || '')) >= 0) return;
+    ['insp', 'ins'].forEach(function (kind) {
+      const cur = v[VEH_DUE_KIND[kind].f];
+      if (!isDate(cur)) return;
+      const dd = dayDiff(cur, today);
+      if (dd === null || dd >= 0) return;   // 지난 것만
+      const base = 'veh:' + v.id + ':' + kind + ':' + cur;
+      const same = vt.filter(function (t) { return t.auto_key === base || t.auto_key.indexOf(base + ':re:') === 0; });
+      if (!same.some(function (t) { return t.status === 'done'; })) return;
+      if (same.some(function (t) { return t.status !== 'done'; })) return;
+      const key = base + ':re:' + monthKeyOf(today);
+      if (anyKey[key]) return;
+      const lb = VEH_DUE_KIND[kind].label;
+      out.push({ auto_key: key, id: v.id, kind: kind, due: cur, days: dd,
+        title: (String(v.no || '') || '차량') + ' ' + lb + ' 갱신 — 다시(완료 뒤 만기일 그대로)',
+        detail: '지난 지시는 완료됐지만 차량 ' + lb + ' 만기일이 ' + cur + ' 그대로입니다. 갱신했으면 완료할 때 새 만기일을 넣어 주세요.' });
+    });
+  });
+  return out;
+}
 function siteKey(today) { return 'site:missing:' + monthKeyOf(today); }
 function wkKey(today) { return 'wk:missing:' + monthKeyOf(today); }
 
@@ -98,4 +129,4 @@ function piiScan(obj) {
   return '';
 }
 
-module.exports = { GREY, VEH90_MIN, VEH90_MAX, WK_SINCE_YEAR, live, isDate, dayDiff, siteMissing, veh90, birth6, wkMissing, monthKeyOf, siteKey, wkKey, piiScan };
+module.exports = { GREY, VEH90_MIN, VEH90_MAX, WK_SINCE_YEAR, live, isDate, dayDiff, siteMissing, veh90, birth6, wkMissing, monthKeyOf, siteKey, wkKey, piiScan, VEH_DUE_KIND, vehRedo };

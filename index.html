@@ -1892,6 +1892,9 @@
     <!-- 문서함 설정(v314) — 분류별 기본 공개범위(초기 전부 비공개=관리자만 — 공개할 분류만 열기) + 등재 결재 게이트. 관리자 전용·감사로그·낙관락(등급표와 같은 결) -->
     <div class="dash-sec" style="margin:16px 0 8px;"><h2>문서함 설정</h2></div>
     <div class="card" id="docSettingsCard"><div class="loading">불러오는 중…</div></div>
+
+    <div class="dash-sec" style="margin:16px 0 8px;"><h2>법인 등기 날짜</h2></div>
+    <div class="card" id="corpRegCard"><div class="loading">불러오는 중…</div></div>
   </section>
 
   <!-- 가족친화인증 실적 (인사 하위 · 관리자 전용) — 혁신⑧ 확정사양(2026-08-19): 관리자 대장 4종 기록 + 분기 리포트. 연차 소진율은 휴가 데이터 자동 집계 -->
@@ -2982,6 +2985,19 @@
   </div>
 </div>
 
+<!-- P1 판2(원장 T693·T364 — 시안 없음): 차량 검사·보험 자동 지시를 완료할 때 새 만기일 칸 1개(비우면 '날짜 그대로'로 완료). 동작은 @veh-due 구간(vehDueAsk·vehDueOk) -->
+<div class="modal-backdrop" id="vehDueBackdrop">
+  <div class="modal" style="max-width:440px;">
+    <h3 id="vehDueTitle">완료 — 새 만기일</h3>
+    <p id="vehDueCur" style="margin-bottom:8px;"></p>
+    <span class="fld-label">새 만기일 (갱신했으면 넣기 · 비워 두면 날짜 그대로 완료)</span>
+    <input type="date" id="vehDueDate">
+    <div class="err" id="vehDueErr"></div>
+    <button class="primary" id="vehDueOkBtn">완료</button>
+    <button class="secondary" id="vehDueCancel">취소</button>
+  </div>
+</div>
+
 <div class="modal-backdrop" id="memberBackdrop">
   <div class="modal">
     <h3>사용자 로그인</h3>
@@ -3572,6 +3588,7 @@
         return _ghResp(409, {});
       }
       _col409[col] = 0;
+      if (res.status === 400 && res.body && res.body.error_code === "GATE_CORP_REG") return _ghResp(400, res.body);   // P1 판1 투찰 잠금 — 막힌 줄(blocked)을 doSaveBids가 되돌림
       if (res.status !== 200) return _ghResp(res.status, { error_code: (res.body && res.body.error_code) || "" });   // 저장 실패를 성공으로 위조하면 pending이 풀려 편집이 유실된다 · v456 거절 이유 코드는 넘김(거래처 CLI_BIZ13 안내)
       _colBase[col] = (res.body && res.body.updated_at) || Date.now();
       // register_warn(문서함 v314): 저장은 됐는데 등재 결재 카드 자동 상신이 실패한 건수 — saveDocuments가 직원에게 알린다(관리자 결재함 폴이 자동 복구)
@@ -4853,7 +4870,7 @@
   }
   function taskSheetCell(t, c, ctx){
     var k = c.k, x, s;
-    if (k === "t") return { html: esc(t.title || "(제목 없음)"), title: t.title || "" };
+    if (k === "t") return { html: (vehDueKept(t) ? vehKeptChip([vehTaskLink(t).label]) + " " : "") + esc(t.title || "(제목 없음)"), title: t.title || "" };   // P1 판2 '날짜 그대로'(@veh-due — 계산)
     if (k === "kind"){ x = taskSheetKind(t); return { html: x.auto ? '<span class="review-chip">자동</span>' + (x.h ? " " + esc(x.h) : "") : esc(x.h), title: x.tip || "" }; }
     if (k === "stage"){
       if (!t.proc_id) return TASK_DASH;
@@ -5311,6 +5328,7 @@
     var t = findTask(id);
     if (!t) return;
     if (!canActTask(t)) return;
+    if (t.status !== "done" && t.status !== "review" && vehDueAsk(t)) return;   // P1 판2: 차량 연결 자동 지시는 완료 창(새 만기일 칸)부터 — 창의 [완료]가 다시 부른다(@veh-due 구간)
     if (t.status === "done"){                 // 완료 되돌리기 → 열림
       t.status = "open"; t.done_at = null; t.done_by = null; t.approved_by = null; t.approved_at = null;
     } else if (t.status === "review"){        // 완료요청 취소 → 열림
@@ -5354,6 +5372,116 @@
       from:t.from||"", from_id:t.from_id||"", by:t.by||t.from||"", due:next, status:"open", done_at:null, done_by:null,
       recur:t.recur, recur_root:root, created:todayStr(), updated:todayStr() });
   }
+  // @veh-due-start
+  // P1 판2(원장 T693·T364 — 착수설명서 ②절 판2, 시안 없음): 차량 검사·보험 자동 지시(auto_key veh:<차량 id>:<insp|ins>:<만료일>[:re:<YYYY-MM>])와 차량 한 줄의 연결.
+  //   ① 완료 창 — toggleTaskDone(진행·보류 → 승인 대기)이 vehDueAsk를 먼저 부른다: 키가 살아 있는 차량을 가리키고 누른 사람이 차량 수행이거나(그 지시 담당 + 차량의 그 칸 = 지시 만료일) 창(새 만기일 칸 1개)을 열고 멈춤.
+  //      [완료] = 비움·같은 날 → 그대로 완료 / 날짜 → 서버 veh_due_set(차량 한 줄의 그 칸만 — 권한·감사·버전 링은 서버, 담당 갈래는 서버가 배정표 차량 담당인지도 봄) 200 뒤 그 줄만 고치고 완료. 지금 만기일보다 이른 날은 확인 문구. 거절이면 완료하지 않고 안내.
+  //      키가 아니거나(사람이 만든 지시) 차량이 없거나 날짜를 바꿀 수 없는 사람(지시 수행 권한만 있는 비담당 · 이미 날짜가 바뀐 칸의 담당)이면 창 없이 종전 완료.
+  //   ② '날짜 그대로' — 저장 칸 없이 계산: 완료(또는 승인 대기)된 차량 지시의 만료일 = 그 차량의 그 칸 지금 값. 지시 표 '지시 내용' 칸 앞·차량 표 차번호 칸 뒤에 작은 표시 1개.
+  //   ③ 다시 지시 — vehRedoItems(서버 _lib/autorules vehRedo와 같은 규칙): 만료일이 지났는데 그 만료일 지시가 완료된 채 날짜 그대로면 ':re:<YYYY-MM>' 키로 달마다 한 번(runAutoTaskGen — 기존 D-30 갈래, 스위치 무관).
+  var VEH_DUE_KIND = { insp: { f: "insp_due", label: "정기검사" }, ins: { f: "ins_due", label: "보험" } };
+  var VEH_TASK_RE = /^veh:([^:\s\x00-\x1f\x7f]{1,80}):(insp|ins):(\d{4}-\d{2}-\d{2})(?::re:\d{4}-\d{2})?$/;
+  var vehDueTask = null, vehDuePass = null, vehDueBusy = false;
+  function vehTaskLink(t){   // 지시 → { vid, kind, f, label, due, v } — 차량 자동 지시 키이고 그 차량이 살아 있을 때만, 아니면 null
+    var m = VEH_TASK_RE.exec(String((t && t.auto_key) || "")), v, k;
+    if (!m) return null;
+    v = findVeh(m[1]); if (!v || v.del === 1) return null;
+    k = VEH_DUE_KIND[m[2]];
+    return { vid: m[1], kind: m[2], f: k.f, label: k.label, due: m[3], v: v };
+  }
+  function vehDueKept(t){   // 완료·승인 대기인 차량 지시인데 그 차량의 그 칸이 지시 만료일 그대로(계산만)
+    if (!t || t.del === 1 || (t.status !== "done" && t.status !== "review")) return false;
+    var L = vehTaskLink(t);
+    return !!(L && L.v[L.f] === L.due);
+  }
+  function vehRowKept(v){   // 차량 한 줄 → 날짜 그대로인 칸 이름 목록(정기검사·보험 순)
+    var pre = "veh:" + (v && v.id) + ":", seen = {}, out = [];
+    tasks.forEach(function(t){ if (t && String(t.auto_key || "").indexOf(pre) === 0 && vehDueKept(t)) seen[VEH_TASK_RE.exec(t.auto_key)[2]] = 1; });
+    if (seen.insp) out.push("정기검사");
+    if (seen.ins) out.push("보험");
+    return out;
+  }
+  function vehKeptChip(names){ return names && names.length ? '<span class="need-chip" title="' + esc(names.join("·") + " 지시는 완료됐지만 차량 만기일이 그대로입니다 — 갱신했으면 차량 수정에서 새 만기일을 넣어 주세요") + '">날짜 그대로</span>' : ""; }
+  // ③ 다시 지시 — 서버 AR.vehRedo와 같은 규칙·같은 키·같은 제목(uismoke P1 판2가 같은 표본에서 대조)
+  function vehRedoItems(vehRows, taskRows, today){
+    var GREY = ["말소예정", "매각", "검사보류"], out = [], anyKey = {}, vt = [];
+    (taskRows || []).forEach(function(t){ if (t && typeof t.auto_key === "string"){ anyKey[t.auto_key] = 1; if (t.del !== 1 && t.auto_key.indexOf("veh:") === 0) vt.push(t); } });
+    (vehRows || []).forEach(function(v){
+      if (!v || v.del === 1 || GREY.indexOf(String(v.state || "")) >= 0) return;
+      ["insp", "ins"].forEach(function(kind){
+        var cur = v[VEH_DUE_KIND[kind].f], base, same, key, lb;
+        if (!isDate(cur) || !(cur < today)) return;   // 지난 것만
+        base = "veh:" + v.id + ":" + kind + ":" + cur;
+        same = vt.filter(function(t){ return t.auto_key === base || t.auto_key.indexOf(base + ":re:") === 0; });
+        if (!same.some(function(t){ return t.status === "done"; })) return;
+        if (same.some(function(t){ return t.status !== "done"; })) return;
+        key = base + ":re:" + String(today).slice(0, 7);
+        if (anyKey[key]) return;
+        lb = VEH_DUE_KIND[kind].label;
+        out.push({ auto_key: key, id: v.id, kind: kind, due: cur, title: (String(v.no || "") || "차량") + " " + lb + " 갱신 — 다시(완료 뒤 만기일 그대로)",
+          detail: "지난 지시는 완료됐지만 차량 " + lb + " 만기일이 " + cur + " 그대로입니다. 갱신했으면 완료할 때 새 만기일을 넣어 주세요." });
+      });
+    });
+    return out;
+  }
+  // ① 완료 창
+  function vehDueCanWrite(t, L){ return canDo("veh") || !!(t && L && t.who_id && t.who_id === myId() && L.v[L.f] === L.due); }   // 서버 veh_due_set 갈래: 차량 수행 · 또는 그 지시 담당 + 차량의 그 칸 = 지시 만료일(배정표 담당인지는 서버만 앎 — 아니면 NO_WRITE 안내)
+  function vehDueWhy(s){   // 넣은 날짜 → "" 또는 안내
+    var d;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return "날짜 꼴이 아닙니다(예: 2027-03-31).";
+    d = new Date(s + "T00:00:00Z");
+    if (isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== s) return "달력에 없는 날짜입니다.";
+    if (!/^20\d{2}-/.test(s)) return "2000~2099년 날짜만 넣을 수 있습니다.";
+    return "";
+  }
+  function vehDueErr(msg){ var el = document.getElementById("vehDueErr"); if (!el) return; el.textContent = msg || ""; if (msg) el.classList.add("show"); else el.classList.remove("show"); }
+  function vehDueAsk(t){
+    var L, g = function(id){ return document.getElementById(id); };
+    if (!t || vehDuePass === t.id) return false;
+    L = vehTaskLink(t);
+    if (!L || !vehDueCanWrite(t, L) || !g("vehDueBackdrop")) return false;
+    vehDueTask = { id: t.id, vid: L.vid, f: L.f, cur: L.v[L.f] || "" };
+    g("vehDueTitle").textContent = "완료 — " + (L.v.no || "차량") + " " + L.label + " 만기일";
+    g("vehDueCur").textContent = "지금 만기일 " + (vehDueTask.cur || "없음") + " · 갱신했으면 새 만기일을 넣고, 아직이면 비워 둔 채 완료하세요(차량 표에 '날짜 그대로'가 붙고, 만기가 지나면 담당에게 다시 지시가 갑니다).";
+    g("vehDueDate").value = "";
+    vehDueErr("");
+    g("vehDueBackdrop").classList.add("show");
+    return true;
+  }
+  function vehDueClose(){ var el = document.getElementById("vehDueBackdrop"); if (el) el.classList.remove("show"); vehDueTask = null; }
+  function vehDueFinish(id){ vehDuePass = id; try { toggleTaskDone(id); } finally { vehDuePass = null; } }
+  function vehDueOk(){
+    var q = vehDueTask, s, t, why;
+    if (!q || vehDueBusy) return;
+    s = String(document.getElementById("vehDueDate").value || "").trim();
+    t = findTask(q.id);
+    if (!t || t.del === 1 || t.status === "done" || t.status === "review"){ vehDueClose(); return; }
+    if (!s || s === q.cur){ vehDueClose(); vehDueFinish(q.id); return; }   // 비움·같은 날 = 날짜 그대로 완료(서버 쓰기 없음)
+    why = vehDueWhy(s);
+    if (why){ vehDueErr(why); return; }
+    if (isDate(q.cur) && s < q.cur && !confirm("지금 만기일(" + q.cur + ")보다 이른 날짜입니다. 그래도 " + s + "(으)로 바꿀까요?")) return;
+    vehDueBusy = true;
+    gwCall("gw-data", { action: "veh_due_set", task_id: q.id, date: s, base_due: q.cur }).then(function(res){
+      var b, v, code;
+      vehDueBusy = false;
+      if (!res || res.status !== 200 || !res.body || !res.body.vehicle){
+        code = (res && res.body && res.body.error_code) || (res ? res.status : "");
+        vehDueErr(code === "NO_WRITE" ? "차량 날짜를 바꿀 권한이 없습니다(차량 수행 권한 또는 배정표의 차량 담당만) — 칸을 비우고 [완료]하면 '날짜 그대로'로 끝납니다." : (code === "VEH_DUE_STALE" ? "그 사이 차량 만기일이 바뀌었습니다(지금 " + ((res.body && res.body.cur) || "없음") + ") — 창을 닫고 차량 표를 확인해 주세요."
+          : (code === "BAD_DATE" ? "달력에 없는 날짜입니다." : "저장하지 못했습니다(" + code + ") — 완료는 하지 않았습니다.")));
+        return;
+      }
+      b = res.body.vehicle; v = findVeh(b.id);
+      if (v){ v[b.field] = b.value; v.updated = b.updated; saveVehiclesCache(); }
+      // 검토 2회차(R2-1): 서버가 그 줄에 남긴 표식(due_set{칸: {prev, at = 응답 updated_at}})을 로컬 줄에도 — 이 기기에서 새로고침 없이 그 칸을 바꾸기 전 날짜로 되돌린 사람 편집을
+      //   병합(vehDueMergeKeep)·서버(vehDueGuard)가 낡은 사본으로 보고 서버 값으로 덮지 않게
+      if (v && res.body.updated_at){ v.due_set = Object.assign({}, (v.due_set && typeof v.due_set === "object") ? v.due_set : {}); v.due_set[b.field] = { prev: b.prev == null ? "" : b.prev, at: res.body.updated_at }; saveVehiclesCache(); }
+      vehDueClose(); vehDueFinish(q.id);
+      renderVehicles(); renderDashboard();
+      apprToastShow("차량 만기일을 " + b.value + "(으)로 바꾸고 완료 요청했습니다");
+    }).catch(function(){ vehDueBusy = false; vehDueErr("저장하지 못했습니다(네트워크) — 완료는 하지 않았습니다."); });
+  }
+  // @veh-due-end
+
   // 만기(차량 검사·보험, 인허가 만료·교육) → 지시 자동 생성. auto_key로 중복 방지.
   var autoGenRan = false;
   // 지시·차량·인허가 로드가 모두 끝난 뒤에만 자동생성 실행(로드 전 실행 시 중복 생성 방지)
@@ -5363,9 +5491,9 @@
     if (autoGenRan || !isAdmin()) return;
     autoGenRan = true;
     var today = todayStr(), created = 0;
-    function mk(key, title, due){
+    function mk(key, title, due, detail){
       if (tasks.some(function(t){ return t.auto_key===key; })) return;   // 완료·삭제 포함 전체 중복 검사
-      tasks.push({ id:genId("t"), title:title, detail:"", who_id:"", who:"", scope:[], from:"자동", from_id:"", by:"자동",
+      tasks.push({ id:genId("t"), title:title, detail:detail||"", who_id:"", who:"", scope:[], from:"자동", from_id:"", by:"자동",
         due:due||"", status:"open", done_at:null, done_by:null, auto_key:key, created:today, updated:today });
       created++;
     }
@@ -5374,6 +5502,7 @@
       if (isDate(v.insp_due) && vehDday(v.insp_due).diff<=30) mk("veh:"+v.id+":insp:"+v.insp_due, (v.no||"차량")+" 정기검사 갱신", v.insp_due);
       if (isDate(v.ins_due) && vehDday(v.ins_due).diff<=30) mk("veh:"+v.id+":ins:"+v.ins_due, (v.no||"차량")+" 보험 갱신", v.ins_due);
     });
+    vehRedoItems(vehicles, tasks, today).forEach(function(n){ mk(n.auto_key, n.title, n.due, n.detail); });   // P1 판2 다시 지시(만료 지남 + 그 만료일 지시 완료 + 날짜 그대로 → 달마다 한 번, @veh-due 구간 · 서버 정기봇과 같은 규칙)
     liveLic().forEach(function(l){
       if (isDate(l.expiry) && vehDday(l.expiry).diff<=30) mk("lic:"+l.id+":exp:"+l.expiry, (l.name||"인허가")+" 갱신", l.expiry);
       if (isDate(l.edu_due) && vehDday(l.edu_due).diff<=30) mk("lic:"+l.id+":edu:"+l.edu_due, (l.name||"인허가")+" 보수교육 이수", l.edu_due);
@@ -7134,6 +7263,9 @@
   document.getElementById("vehDelete").addEventListener("click", deleteVehFromModal);
   document.getElementById("vehCancel").addEventListener("click", closeVehModal);
   document.getElementById("vehBackdrop").addEventListener("click", function(e){ if (e.target === this) closeVehModal(); });
+  document.getElementById("vehDueOkBtn").addEventListener("click", vehDueOk);   // P1 판2 차량 지시 완료 창
+  document.getElementById("vehDueCancel").addEventListener("click", vehDueClose);
+  document.getElementById("vehDueBackdrop").addEventListener("click", function(e){ if (e.target === this) vehDueClose(); });
   document.getElementById("vehAddBtn").addEventListener("click", function(){ openVehModal(null); });
   document.getElementById("vehAddBtnTop").addEventListener("click", function(){ openVehModal(null); });
   document.getElementById("vehDeletedToggle").addEventListener("click", function(){ showDeletedVeh = !showDeletedVeh; renderVehicles(); });
@@ -7937,7 +8069,7 @@
     var grey = isGreyState(v), cells = "", i, c, cls, val, dc, near;
     for (i = 0; i < VEH_COLS.length; i++){
       c = VEH_COLS[i]; cls = vehColCls(c);
-      if (c.k === "no") cells += '<td class="vs-b" title="' + esc(v.no || "") + '">' + (sel ? selBoxHtml("veh", v.id, false) + ' ' : '') + esc(v.no || "") + '</td>';
+      if (c.k === "no"){ val = vehRowKept(v); cells += '<td class="vs-b" title="' + esc((v.no || "") + (val.length ? " · " + val.join("·") + " 날짜 그대로" : "")) + '">' + (sel ? selBoxHtml("veh", v.id, false) + ' ' : '') + esc(v.no || "") + (val.length ? ' ' + vehKeptChip(val) : '') + '</td>'; }   // P1 판2 '날짜 그대로'(@veh-due — 계산)
       else if (c.k === "due"){
         near = vehNearInfo(v);
         if (!near) cells += '<td class="' + cls + '"><span style="color:#9AA09C;">-</span></td>';
@@ -8178,6 +8310,19 @@
     if (vehSaveTimer) clearTimeout(vehSaveTimer);
     vehSaveTimer = setTimeout(function(){ vehSaveTimer = null; doSaveVeh(); }, 1500);
   }
+  // P1 판2 검토(S1): 지시 완료 창(서버 veh_due_set)이 바꾼 만기일은 서버 줄에 표식 due_set{칸: {prev, at}}을 남긴다. 같은 날 로컬 우선 병합(아래 mergeVeh)에서
+  //   로컬 줄이 그 표식을 모르고(at 다름·없음) 그 칸이 바꾸기 전 값(prev) 그대로면 서버 값을 따른다(오늘 그 차를 고친 기기가 새로고침 없이 다른 차를 저장해 409가 나도 새 만기일이 옛 날짜로 돌아가지 않게).
+  //   로컬이 그 칸을 다른 날짜로 고쳤으면 사람 편집이라 로컬 그대로. 서버 handleSave(vehicles) vehDueGuard가 같은 규칙으로 마지막 문(옛 캐시 앱 포함)
+  function vehDueMergeKeep(m, local, remote){
+    var rs = remote && remote.due_set, ls = (local && local.due_set) || {};
+    if (!rs || typeof rs !== "object") return;
+    ["insp_due", "ins_due"].forEach(function(f){
+      var mk = rs[f], lm = ls[f], nz = function(s){ return s == null ? "" : String(s); };
+      if (!mk || typeof mk !== "object" || (lm && lm.at === mk.at)) return;
+      if (nz(local[f]) === nz(mk.prev) && nz(remote[f]) !== nz(local[f])) m[f] = remote[f];
+      m.due_set = Object.assign({}, (m.due_set && typeof m.due_set === "object") ? m.due_set : {}); m.due_set[f] = mk;
+    });
+  }
   function mergeVeh(local, remote){
     var byId = {};
     (local || []).forEach(function(v){ if (v && v.id) byId[v.id] = v; });
@@ -8188,6 +8333,7 @@
       else {
         var w = (x.updated || "") > (cur.updated || "") ? x : cur;
         var m = Object.assign({}, (w===x?cur:x), w);
+        vehDueMergeKeep(m, cur, x);   // P1 판2 검토(S1)
         if (cur.del === 1 || x.del === 1) m.del = mergeDel(cur, x);
         byId[x.id] = m;
       }
@@ -11742,9 +11888,15 @@
     if (!(m && m.schema === 1 && m.proc_ver === "v1" && m.scen && typeof m.scen === "object")) return;
     CON_MAP.scen = m.scen; CON_MAP.added = m.added || {}; CON_MAP.upper = m.upper || []; CON_MAP.sha = m.sha || ""; CON_MAP.ok = true;
     if (!(g && g.schema === 1 && g.ver && conIsArr(g.rows) && f.bg_ver && f.bg_ver === g.ver)) return;
-    var lw = b.lawwatch || {}, rk = {}; (conIsArr(lw.bg_recheck) ? lw.bg_recheck : []).forEach(function(x){ if (x && x.id) rk[x.id] = 1; }); CON_BG.recheck = rk;   // v405: lawwatch 개정 감지 행
+    var rk = conBgRecheckLive(b); CON_BG.recheck = rk;   // v405: lawwatch 개정 감지 행 · P1 판4: 감지 때 MST와 지금 행 MST가 같은 행만(새 판에서 MST를 고친 행은 풀림)
     g.rows.forEach(function(r){ if (!r || !r.id) return; if (rk[r.id]){ CON_BG.pending[r.id] = r; return; } if (r.grade === "실측" && r.mst && isDate(r.eff) && isDate(r.checked)) CON_BG.rows[r.id] = r; else CON_BG.pending[r.id] = r; });
     CON_BG.ver = g.ver; CON_BG.n = g.rows.length; CON_BG.sha = g.sha || "";
+  }
+  function conBgRecheckLive(b){   // P1 판4: lawwatch bg_recheck 가운데 지금 판 행에 아직 해당하는 것만 {id:1}. 감지 MST(옛 판)와 지금 행 MST가 다르면 = 새 판에서 고친 행 → 제외(mst 없는 옛 기록은 그대로 해당)
+    var g = (b && b.bg) || {}, lw = (b && b.lawwatch) || {}, byId = {}, rk = {};
+    (conIsArr(g.rows) ? g.rows : []).forEach(function(r){ if (r && r.id) byId[r.id] = r; });
+    (conIsArr(lw.bg_recheck) ? lw.bg_recheck : []).forEach(function(x){ if (!x || !x.id) return; var r = byId[x.id]; if (r && x.mst && r.mst && Number(x.mst) !== Number(r.mst)) return; rk[x.id] = 1; });
+    return rk;
   }
   function conDueOn(){ return CON_PROC_SRC.mode === "blob" && CON_MAP.ok && !!CON_BG.ver; }
   function conMapRow(c, s){
@@ -13364,7 +13516,8 @@
         ["거울", has ? ("proc " + esc(String(b.proc.base_sha || b.proc.sha)) + " · list " + esc(String(b.list.base_sha || b.list.sha)) + " · 생성 " + esc(String(b.proc.built_at || "").replace("T", " ").slice(0, 16)) + (clog.applied ? ' · <b>편집 ' + clog.applied + '건</b> 재생' : ' · 편집 0')) : "없음 — appdata collectors/contract_mirror.py --push 로 만듭니다"],
         ["거울 ↔ 상수", has ? (same === true ? "같음(diff 0)" : (same === false ? "다름 — 켜면 거울이 우선" : "비교 전")) : "—"],
         ["신설 제안(카드 9)", has ? (esc(String(((b.proc.added || {}).stages || []).length)) + "단계 · " + esc(String(((b.list.added || {}).lists || []).length)) + "목록 · 활성 " + CON_PROC_SRC.added_active + "건 · 이 기기 적용 " + CON_PROC_SRC.added_applied + "건 · " + esc(String((b.proc.added || {}).status || "")) + (on ? "" : " — 거울 꺼짐: 적용 0(켜면 활성 항목만 새 계약부터)") + ((CON_PROC_SRC.added_bad || []).length ? ' · <span style="color:#B00020;">제외·표시 ' + CON_PROC_SRC.added_bad.map(function(x){ return esc(x.id) + " " + esc(x.why); }).join(" / ") + '</span>' : '')) : "—"],
-        ["배경 bg:law(D2)", (b.bg ? ("판 " + esc(String(b.bg.ver || "")) + " · 행 " + esc(String((b.bg.rows || []).length)) + " · 실측 " + esc(String((b.bg.rows || []).filter(function(r){ return r && r.grade === "실측"; }).length)) + (f.bg_ver === b.bg.ver ? " · <b>승격됨 — 기한 엔진 켜짐</b>" : " · 미승격(기한 엔진 꺼짐)")) : "없음 — 기한 엔진 꺼짐") + (b.map ? " · 매핑 " + esc(String(b.map.sha || "")) : " · 매핑 없음") + (f.annual_override && Object.keys(f.annual_override).length ? " · 연 1회 override " + esc(Object.keys(f.annual_override).join(",")) : "") + ck + ((b.lawwatch && b.lawwatch.bg_recheck && b.lawwatch.bg_recheck.length) ? ' · <b style="color:#c00;">개정 감지 ' + b.lawwatch.bg_recheck.length + '행(' + esc(String(b.lawwatch.date || '')) + ') — 그 행은 기한 보류</b>' : "")],   // v404·v405
+        ["배경 bg:law(D2)", (b.bg ? ("판 " + esc(String(b.bg.ver || "")) + " · 행 " + esc(String((b.bg.rows || []).length)) + " · 실측 " + esc(String((b.bg.rows || []).filter(function(r){ return r && r.grade === "실측"; }).length)) + (f.bg_ver === b.bg.ver ? " · <b>승격됨 — 기한 엔진 켜짐</b>" : " · 미승격(기한 엔진 꺼짐)")) : "없음 — 기한 엔진 꺼짐") + (b.map ? " · 매핑 " + esc(String(b.map.sha || "")) : " · 매핑 없음") + (f.annual_override && Object.keys(f.annual_override).length ? " · 연 1회 override " + esc(Object.keys(f.annual_override).join(",")) : "") + ck + ((b.lawwatch && b.lawwatch.bg_recheck && b.lawwatch.bg_recheck.length) ? (function(){ var nl = Object.keys(conBgRecheckLive(b)).length, nt = b.lawwatch.bg_recheck.length; return nl ? ' · <b style="color:#c00;">개정 감지 ' + nl + '행(' + esc(String(b.lawwatch.date || '')) + ') — 그 행은 기한 보류</b>' + (nt > nl ? ' · 새 판에서 고친 ' + (nt - nl) + '행 풀림' : '') : ' · 개정 감지 ' + nt + '행(' + esc(String(b.lawwatch.date || '')) + ') 모두 새 판에서 고침 — 보류 없음'; })() : "")],   // v404·v405 · P1 판4 MST 대조
+        ["확인일만 바뀐 판", (f.bg_auto ? "<b>자동 이월 켜짐</b>" : "자동 이월 꺼짐(승격 때만 엔진 켜짐)") + " · 기준 지문 " + (f.bg_fp ? esc(String(f.bg_fp)) + (f.bg_ver ? "(" + esc(String(f.bg_ver)) + ")" : "") : "없음 — 다음 승격 때 기록") + (f.bg_carry && f.bg_carry.to ? " · 마지막 자동 이월 " + esc(String(f.bg_carry.from || "")) + "→" + esc(String(f.bg_carry.to)) + (f.bg_carry.at ? "(" + esc(new Date(f.bg_carry.at + 9 * 3600000).toISOString().slice(0, 16).replace("T", " ")) + ")" : "") : "")],   // P1 판4
         ["마지막 변경", f.updated_at ? (esc(memberName(f.updated_by) || f.updated_by || "") + " · " + esc(new Date(f.updated_at + 9 * 3600000).toISOString().slice(0, 16).replace("T", " "))) : "없음"]
       ].map(function(r){ return '<div style="display:flex;gap:8px;padding:5px 2px;border-bottom:1px solid var(--line);font-size:13px;"><span style="min-width:120px;color:var(--sub);">' + r[0] + '</span><span style="overflow-wrap:anywhere;min-width:0;">' + r[1] + '</span></div>'; }).join("");
       var pv = ""; if (has){ try { pv = conAddedPreviewHtml(b); } catch(e){ pv = '<div class="empty-line" style="margin-top:6px;">카드 9 미리보기 실패 — 데이터 형식을 확인해 주세요(거울 스위치는 그대로 쓸 수 있습니다).</div>'; } }   // v402 R6: 미리보기 예외가 스위치 버튼을 지우지 않게
@@ -13372,11 +13525,13 @@
         + '<button type="button" style="' + apprGradeChipCss(on ? 1 : 3, true) + '" data-conproc-set="' + (on ? "0" : "1") + '" data-base="' + (f.updated_at || 0) + '"' + ((!on && !has) ? ' disabled' : '') + '>' + (on ? "거울 끄기 — 코드 상수로 되돌리기" : "거울 켜기") + '</button>'
         + ((b.bg && f.bg_ver !== b.bg.ver) ? '<button type="button" style="' + apprGradeChipCss(3, true) + '" data-conproc-bg="' + esc(String(b.bg.ver)) + '" data-base="' + (f.updated_at || 0) + '"' + (on ? '' : ' disabled') + '>배경 승격 — 기한 엔진 켜기(' + esc(String(b.bg.ver)) + ')</button>' : '')
         + ((b.bg && f.bg_ver && f.bg_ver === b.bg.ver) ? '<button type="button" style="' + apprGradeChipCss(1, true) + '" data-conproc-bg="" data-base="' + (f.updated_at || 0) + '">배경 승격 해제 — 기한 엔진 끄기</button>' : '')   // v404 R2 카드 '승격' 버튼(관리자)
+        + (b.bg ? '<button type="button" style="' + apprGradeChipCss(f.bg_auto ? 1 : 3, true) + '" data-conproc-bgauto="' + (f.bg_auto ? "0" : "1") + '" data-base="' + (f.updated_at || 0) + '">' + (f.bg_auto ? "확인일만 바뀐 판 자동 이월 끄기" : "확인일만 바뀐 판 자동 이월 켜기") + '</button>' : '')   // P1 판4 스위치(기본 꺼짐)
         + (f.prev ? '<span class="empty-line">이전 값: ' + (f.prev.use_blob ? "켬" : "끔") + '</span>' : '') + '</div>';
       host.innerHTML = rows + btn + '<div class="empty-line" style="margin-top:6px;">계약 단계 목록·서류 목록·입력 칸·패킷·시행 회사 상수 7종의 원천을 바꾸는 스위치입니다(계약 D1). 기본은 코드 상수. 켜면 다음 로그인·새로고침부터 거울(편집 재생분 포함)을 읽고, 거울이 깨져 있으면 자동으로 상수로 돌아갑니다. 단계 이름은 어느 쪽이든 PM 원문 그대로입니다.</div>'
         + pv + (has ? conProcEditHtml(b) : '');
       Array.prototype.forEach.call(host.querySelectorAll("[data-conproc-set]"), function(el){ el.addEventListener("click", function(){ conProcFlagSet(el.getAttribute("data-conproc-set") === "1", Number(el.getAttribute("data-base") || 0)); }); });
       Array.prototype.forEach.call(host.querySelectorAll("[data-conproc-bg]"), function(el){ el.addEventListener("click", function(){ conProcBgSet(el.getAttribute("data-conproc-bg") || "", Number(el.getAttribute("data-base") || 0)); }); });   // v404
+      Array.prototype.forEach.call(host.querySelectorAll("[data-conproc-bgauto]"), function(el){ el.addEventListener("click", function(){ conProcBgAutoSet(el.getAttribute("data-conproc-bgauto") === "1", Number(el.getAttribute("data-base") || 0)); }); });   // P1 판4
       if (has) conProcBindEdit(host, b);
     }).catch(function(){ host.innerHTML = '<div class="empty-line">거울 상태를 불러오지 못했습니다(네트워크).</div>'; });
   }
@@ -13388,6 +13543,15 @@
       apprToastShow(ver ? "배경 " + ver + " 승격 — 새로고침부터 새 계약의 단계 기한을 법령 근거로 채웁니다" : "배경 승격 해제 — 새로고침부터 기한 엔진이 꺼집니다");
       renderConProcCard();
     }).catch(function(){ conProcSaving = false; alert("배경 승격 저장 실패(네트워크)"); });
+  }
+  function conProcBgAutoSet(on, base){   // P1 판4 확인일만 바뀐 판 자동 이월 스위치 — 저장은 con_proc_bg_set(관리자·감사·prev)
+    if (conProcSaving) return; conProcSaving = true;
+    gwCall("gw-data", { action: "con_proc_bg_set", bg_auto: !!on, base: base }).then(function(res){
+      conProcSaving = false;
+      if (res.status !== 200){ alert("자동 이월 저장 실패 (" + ((res.body && res.body.error_code) || res.status) + ")"); return; }
+      apprToastShow(on ? "확인일만 바뀐 판 자동 이월 켜짐 — 행·내용이 승격본과 같고 확인일만 바뀐 판은 승격 없이 기한 엔진을 켭니다" : "자동 이월 꺼짐 — 새 판은 [배경 승격] 때만 엔진이 켜집니다");
+      renderConProcCard();
+    }).catch(function(){ conProcSaving = false; alert("자동 이월 저장 실패(네트워크)"); });
   }
   function conProcFlagSet(on, base){
     if (conProcSaving) return; conProcSaving = true;
@@ -17833,7 +17997,7 @@
     fetch(BIDS_API,{method:"PUT",headers:Object.assign({"Content-Type":"application/json"},ghHeaders()),body:JSON.stringify(payload)}).then(function(resp){
       if(resp.status===401) return;
       if(resp.status===409||resp.status===422){ return fetch(BIDS_API,{headers:ghHeaders()}).then(function(r){return r.status===404?null:r.json();}).then(function(j){ if(j){var up={};try{up=JSON.parse(b64DecodeUnicode(j.content))||{};}catch(e){} bids=mergeBidsLocal(bids,up.items||[]); if(up.health) bidsHealth=up.health; if(up.awards) bidsAwards=up.awards; bidsSha=j.sha;} return doSaveBids(); }); }
-      return resp.json().then(function(json){ bidsSha=json.content&&json.content.sha; bidsPending=false; });
+      return resp.json().then(function(json){ if(resp.status===400&&json&&json.error_code==="GATE_CORP_REG"){ bidCorpGateRevert(json); return; } bidsSha=json.content&&json.content.sha; bidsPending=false; });   // P1 판1: 투찰 잠금 거절은 그 줄만 되돌려 다시 저장(@corp-reg)
     }).catch(function(){});
   }
   function bidNewCount(){ return liveBids().filter(function(b){ return b.status==="new" && !bidExpired(b); }).length; }
@@ -22001,6 +22165,156 @@
     var badge=document.getElementById("bidTabBadge");
     if(badge){ var n=bidNewCount(); badge.textContent=n; badge.classList.toggle("hide",n===0||!isAdmin()); badge.classList.toggle("red",n>0); }
   }
+  // @corp-reg-start — P1 판1(원장 T462·T461·T388 · 업무별 설계 C6 corp_reg): 법인 등기 날짜 3칸(권한관리 › 법인 등기 날짜 카드) + 입찰 투찰(응찰) 잠금(기본 꺼짐).
+  //   설정 settings:corp_reg — 서버 gw-data corp_reg_get(관리자만)·corp_reg_set(관리자만 · 값 검사 400 BAD_DATE·BAD_FUTURE·BAD_VALUE · 낙관락 409 CORP_REG_STALE · 같은 값 400 NO_CHANGE · prev 1판 · 감사 1줄 col corp_reg).
+  //   잠금 판정 corpRegLockOf = 서버 corpRegLock과 같은 규칙(uismoke 대조): 스위치가 켜져 있고 ① 나라장터 변경등록 완료일이 비었거나 ② 그 날이 등기 접수일보다 이를 때(다음 변경)만 잠김.
+  //   잠기면 입찰 탭의 [투찰] 버튼(폰 옛 목록 data-bid-st · PC 표 펼침 data-bid-v) 앞에 '투찰 잠금' 배지를 칠하고(renderBids 끝 bidCorpGateMark + PC 표는 부품 그린 뒤 훅 onPaint — 펼침·닫기·하위 탭·창 폭 단계 다시 그리기도 · 옛 그리기 본문·setBidStatus는 손대지 않음),
+  //   누르면 #bidList 붙잡기(capture) 배선이 막고 안내한다. 서버도 공고 저장에서 응찰로 바꾼 줄을 400 GATE_CORP_REG로 거절 → doSaveBids가 그 줄만 되돌리고 다시 저장(bidCorpGateRevert).
+  //   꺼져 있거나(기본) 설정을 못 읽었으면 화면은 종전 그대로(서버가 마지막 문 — 설정을 못 읽으면 응찰로 바꾼 저장만 503).
+  var corpReg = null, corpRegOk = false, corpRegBase = 0, corpRegBy = "", corpRegSaving = false;   // 받은 값({reg_on,biz_fix_on,g2b_on,gate} — 저장값 없으면 null) · 읽음 · 낙관락 토큰(updated_at) · 마지막으로 고친 사람 id · 저장 중
+  var CORP_REG_F = [["reg_on", "조직변경 등기 접수일"], ["biz_fix_on", "사업자등록 정정일"], ["g2b_on", "나라장터 변경등록 완료일"]];
+  var CORP_REG_NOTE = "등본은 앱에 올리지 않고 사무실 문서함에 보관(문서관리규정)";
+  var CORP_REG_WAIT = "입력 대기";
+  // P1 판1 검토(P1-2): 옛 캐시 앱(v453 이하)의 공고 저장은 400 GATE_CORP_REG를 저장 성공으로 넘겨(옛 저장 심이 몸체를 버리고 옛 doSaveBids가 상태를 안 봄) 그 기기 고침이 알림 없이 서버에 안 간다 —
+  //   서버 응답으로는 옛 앱에 알릴 길이 없어(몸체를 안 읽음) 켜기 전 확인을 카드 잠금 칸 설명에 둔다
+  var CORP_REG_GATE_OLD = "켜기 전: 관리자 기기를 모두 새로고침해 새 판으로(옛 판 앱은 이 거절을 알리지 않고 저장된 것처럼 보임)";
+  var BID_CORP_GATE_MSG = "투찰 잠금 — 나라장터 변경등록 완료일이 아직 없거나 등기 접수일보다 이릅니다(권한관리 › 법인 등기 날짜). 완료일을 넣거나 잠금을 끄면 투찰로 바꿀 수 있습니다.";
+  var CORP_REG_LOCK_TXT = { G2B_EMPTY: "나라장터 변경등록 완료일 없음", G2B_BEFORE_REG: "나라장터 변경등록 완료일이 등기 접수일보다 이름" };
+  var CORP_REG_ERR = { BAD_DATE: "날짜가 맞지 않습니다", BAD_FUTURE: "오늘 뒤 날짜는 넣을 수 없습니다", BAD_VALUE: "보낸 값의 모양이 맞지 않습니다", ADMIN_ONLY: "관리자만 고칠 수 있습니다",
+    SETTINGS_READ_FAILED: "저장된 값을 읽지 못했습니다 — 잠시 뒤 다시 저장해 주세요" };
+  // 날짜 한 칸 검사 — "" = 통과(빈칸은 지우기) · 아니면 안내 글
+  function corpRegDateWhy(s, today){
+    if (!s) return "";
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return "날짜 꼴(YYYY-MM-DD)이 아닙니다";
+    var t = new Date(s + "T00:00:00Z");
+    if (isNaN(t.getTime()) || t.toISOString().slice(0, 10) !== s) return "달력에 없는 날짜입니다";
+    if (today && s > today) return "오늘 뒤 날짜는 넣을 수 없습니다";
+    return "";
+  }
+  function corpRegLockOf(v){
+    if (!v || v.gate !== true) return "";
+    if (!v.g2b_on) return "G2B_EMPTY";
+    if (v.reg_on && v.g2b_on < v.reg_on) return "G2B_BEFORE_REG";
+    return "";
+  }
+  function bidCorpGateBlocks(){ return !!(corpRegOk && corpRegLockOf(corpReg)); }
+  function corpRegApply(b){
+    corpReg = (b && b.settings && typeof b.settings === "object") ? b.settings : null;
+    corpRegBase = Number(b && b.updated_at) || 0;
+    corpRegBy = String((b && b.updated_by) || "");
+    corpRegOk = true;
+  }
+  // 읽기 — 로그인 뒤(afterLogin)·카드 그리기. 관리자가 아니면 읽지 않고 '모름'(잠금 표시 없음 — 입찰은 관리자 전용)
+  function corpRegLoad(){
+    var was = bidCorpGateBlocks();
+    corpRegOk = false; corpReg = null;
+    if (!isAdmin()) return Promise.resolve(false);
+    return gwCall("gw-data", { action: "corp_reg_get" }).then(function(res){
+      if (res.status !== 200 || !res.body) return false;
+      corpRegApply(res.body);
+      return true;
+    }).catch(function(){ return false; }).then(function(ok){ if (was !== bidCorpGateBlocks()) renderBids(); return ok; });
+  }
+  // 입찰 줄 표시 — renderBids 끝에서. 잠겼을 때만 [투찰] 버튼 앞에 배지·흐리게·안내 글(title) + 붙잡기 배선 1회
+  function bidCorpGateMark(){
+    var host = document.getElementById("bidList");
+    if (!host || !host.querySelectorAll || !bidCorpGateBlocks()) return;
+    bidCorpGateWire(host);
+    [host.querySelectorAll('[data-bid-st="응찰"]'), host.querySelectorAll('[data-bid-v="응찰"]')].forEach(function(L){
+      Array.prototype.forEach.call(L, function(btn){
+        if (btn.getAttribute("data-corp-gate")) return;
+        btn.setAttribute("data-corp-gate", "1");
+        btn.setAttribute("title", BID_CORP_GATE_MSG);
+        btn.style.opacity = ".5";
+        btn.insertAdjacentHTML("beforebegin", '<span class="need-chip" data-corp-gate-badge="1" title="' + esc(BID_CORP_GATE_MSG) + '">투찰 잠금</span> ');
+      });
+    });
+  }
+  function bidCorpGateHit(el, host){
+    while (el && el !== host){
+      if (el.getAttribute && (el.getAttribute("data-bid-st") === "응찰" || (el.getAttribute("data-bid-act") === "st" && el.getAttribute("data-bid-v") === "응찰"))) return true;
+      el = el.parentNode;
+    }
+    return false;
+  }
+  function bidCorpGateWire(host){
+    if (host.getAttribute("data-corp-gate-wired")) return;
+    host.setAttribute("data-corp-gate-wired", "1");
+    host.addEventListener("click", function(e){
+      if (!bidCorpGateBlocks() || !bidCorpGateHit(e && e.target, host)) return;
+      if (e.stopPropagation) e.stopPropagation();
+      if (e.preventDefault) e.preventDefault();
+      alert(BID_CORP_GATE_MSG);
+    }, true);
+  }
+  // 서버 거절(400 GATE_CORP_REG) — 막힌 줄만 앞 상태로 되돌리고(나머지 고침은 그대로) 다시 저장. 잠김을 알았으니 표시도 켬
+  function bidCorpGateRevert(j){
+    var n = 0;
+    ((j && j.blocked) || []).forEach(function(x){
+      var b = x && findBid(x.id);
+      if (!b || bidSt(b) !== "응찰") return;
+      b.status = (x.from && x.from !== "응찰" && x.from !== "참여") ? x.from : "검토"; b.updated = todayStr(); n++;
+    });
+    alert(BID_CORP_GATE_MSG + (n ? "\n(" + n + "건을 투찰 전 상태로 되돌렸습니다)" : ""));
+    renderBids(); renderDashboard();
+    if (n) scheduleBidsSave();   // 되돌린 뒤 나머지 고침은 다시 저장(되돌린 줄은 더 이상 응찰 전환이 아니라 같은 거절이 되풀이되지 않음)
+    corpRegLoad();   // 서버가 잠겼다고 했으니 설정을 다시 읽어 배지를 칠함(바뀌었으면 renderBids)
+  }
+  // 권한관리 카드 — 읽고 그림(관리자만 — 권한관리 화면 자체가 관리자 전용)
+  function renderCorpRegCard(){
+    var host = document.getElementById("corpRegCard"); if (!host) return;
+    if (!isAdmin()){ host.innerHTML = '<div class="empty-line">관리자만 봅니다.</div>'; return; }
+    var was = bidCorpGateBlocks();
+    gwCall("gw-data", { action: "corp_reg_get" }).then(function(res){
+      if (res.status !== 200 || !res.body){ corpRegOk = false; host.innerHTML = '<div class="empty-line">법인 등기 날짜를 불러오지 못했습니다 (' + esc((res.body && res.body.error_code) || res.status) + ') — 새로고침 후 다시 시도해주세요.</div>'; return; }
+      corpRegApply(res.body); corpRegDraw();
+      if (was !== bidCorpGateBlocks()) renderBids();
+    }).catch(function(){ host.innerHTML = '<div class="empty-line">법인 등기 날짜를 불러오지 못했습니다(네트워크).</div>'; });
+  }
+  function corpRegDraw(){
+    var host = document.getElementById("corpRegCard"); if (!host) return;
+    var v = corpReg || { reg_on: "", biz_fix_on: "", g2b_on: "", gate: false }, today = todayStr();
+    var rowCss = 'display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:7px 2px;border-bottom:1px solid var(--line);';
+    var empty = !v.reg_on && !v.biz_fix_on && !v.g2b_on, lock = corpRegLockOf(v);
+    var rows = CORP_REG_F.map(function(f){
+      return '<div style="' + rowCss + '"><label for="corpRegIn_' + f[0] + '" style="min-width:178px;font-size:13px;font-weight:600;">' + esc(f[1]) + '</label>'
+        + '<input type="date" id="corpRegIn_' + f[0] + '" data-corp-reg="' + f[0] + '" max="' + esc(today) + '" value="' + esc(v[f[0]] || "") + '"></div>';
+    }).join("");
+    rows += '<div class="empty-line" style="margin-top:6px;">' + esc(CORP_REG_NOTE) + '</div>';
+    if (empty) rows += '<div class="empty-line" id="corpRegWait" style="margin-top:2px;"><span class="need-chip">' + esc(CORP_REG_WAIT) + '</span> 세 날짜가 아직 비어 있습니다 — 빈칸으로 저장하면 그 날짜를 지웁니다.</div>';
+    rows += '<div style="' + rowCss + 'padding-top:9px;border-bottom:0;"><label style="font-size:13px;font-weight:600;"><input type="checkbox" id="corpRegGate"' + (v.gate === true ? " checked" : "") + '> 입찰 투찰 잠금</label>'
+      + '<span style="flex:1 1 100%;font-size:11.5px;color:var(--sub);padding-left:2px;">켜면 나라장터 변경등록 완료일이 비었거나 등기 접수일보다 이를 때 공고를 투찰로 바꾸지 못합니다(서버가 거절 · 기본 꺼짐) · ' + esc(CORP_REG_GATE_OLD) + ' · 지금 '
+      + (v.gate === true ? (lock ? '<b>잠김</b> — ' + esc(CORP_REG_LOCK_TXT[lock]) : '켜짐 — 열림') : '꺼짐') + '</span></div>';
+    rows += '<div style="display:flex;align-items:center;gap:8px;margin-top:6px;"><button type="button" class="mini-btn" id="corpRegSaveBtn">저장</button><span style="font-size:11.5px;color:var(--sub);">'
+      + (corpRegBase ? '마지막 저장 ' + esc(fmtDate(new Date(corpRegBase))) + ' · ' + esc(memberName(corpRegBy) || corpRegBy) + ' · 감사 로그에 기록' : '아직 저장 안 함 · 저장은 감사 로그에 기록') + '</span></div>';
+    host.innerHTML = rows;
+    var sb = document.getElementById("corpRegSaveBtn"); if (sb) sb.addEventListener("click", corpRegSave);
+  }
+  function corpRegSave(){
+    if (!isAdmin()){ alert("법인 등기 날짜는 관리자만 고칩니다."); return; }
+    if (corpRegSaving) return;
+    var today = todayStr(), body = { action: "corp_reg_set", base: corpRegBase }, bad = "";
+    CORP_REG_F.forEach(function(f){
+      var el = document.getElementById("corpRegIn_" + f[0]), s = el ? String(el.value || "").trim() : "", why = corpRegDateWhy(s, today);
+      if (why && !bad) bad = f[1] + " — " + why;
+      body[f[0]] = s;
+    });
+    var g = document.getElementById("corpRegGate"); body.gate = !!(g && g.checked);
+    if (bad){ alert(bad); return; }
+    corpRegSaving = true;
+    var was = bidCorpGateBlocks();
+    return gwCall("gw-data", body).then(function(res){
+      corpRegSaving = false;
+      var code = (res.body && res.body.error_code) || res.status;
+      if (res.status === 409){ apprToastShow("다른 곳에서 먼저 고쳤습니다 — 새로 읽었습니다"); renderCorpRegCard(); return; }
+      if (code === "NO_CHANGE"){ apprToastShow("바뀐 값이 없습니다"); return; }
+      if (res.status !== 200 || !res.body){ alert("법인 등기 날짜 저장 실패 — " + (CORP_REG_ERR[code] || code)); return; }
+      corpRegApply(res.body); corpRegDraw();
+      apprToastShow("법인 등기 날짜 저장");
+      if (was !== bidCorpGateBlocks()) renderBids();
+    }).catch(function(){ corpRegSaving = false; alert("법인 등기 날짜 저장 실패(네트워크) — 다시 시도해주세요."); });
+  }
+  // @corp-reg-end
   // @bid-sheet-start
   // v443(45-1 여섯째 판 — 명세 09_조사_문서/표형탭_시안_자료_20261110/엑셀형탭_명세_20261110.json sections[key=bids] · 단계지시_v443_입찰공고.json · PM 11/10 15:56 결정 ② 행 끝 처리 버튼은 지시 표에만 —
   //   입찰 공고의 상태 버튼(검토·투찰·패스 등)은 펼침 맨 위 · 입찰은 관리자 3명만(서버 ADMIN_ONLY)):
@@ -22326,7 +22640,8 @@
         page: 150,   // 150줄씩 + [150건 더 보기](명세 — 917줄을 한 번에 그리지 않음)
         phone: "legacy",   // 퀴즈 2번 답이 '폰도 새 표'면 이 한 줄만 "sheet"
         legacy: renderBidsLegacy,   // 옛 그리기 본문(입구 renderBids를 넘기면 부품 재진입 가드로 폰 화면이 빈다 — v438)
-        onMode: bidSheetMode
+        onMode: bidSheetMode,
+        onPaint: function(){ bidCorpGateMark(); }   // P1 판1 검토: 표를 그린 뒤마다 투찰 잠금 배지(펼침·닫기·하위 탭·창 폭 단계는 renderBids를 거치지 않음 — 잠겼을 때만, 위 @corp-reg 구간)
       };
     }
     d.none = bidsLoadErr ? "불러오기 실패 — 위 안내의 [다시 불러오기]" : (bidsLoaded ? "수집된 공고가 없습니다. (평일 아침 자동 수집)" : "공고를 불러오는 중입니다 — 계속 비어 있으면 새로고침해 주세요.");   // 못 읽은 목록을 '없음'으로 보이지 않게(v441·v442와 같음)
@@ -22337,6 +22652,7 @@
     if (!document.getElementById("bidList")) return;
     BID_INFO = null;
     vsSheetRender(bidSheetDef());
+    bidCorpGateMark();   // P1 판1 투찰 잠금 배지(잠겼을 때만 — 꺼짐·못 읽음이면 아무것도 안 함, 위 @corp-reg 구간)
   }
   // 다른 화면에서 공고로 오는 길(이어받기 — 부품 입구는 이 구간에서만): 전역 검색 = 칩·거르기를 이번만 풀고 검색어 + 누른 그 공고 열기(지남·패스 건이면 그 칩으로) · 홈 투찰 카드 = 탭 이동 + 그 공고 열기 ·
   //   새 수동 등록 = 기억된 칩·거르기·검색어에 가리면 그때만 열기(vsSheetReveal 셋째 인자 onlyHidden — v443 검토: 가리지 않았는데 150줄 밖이면(마감 없는 공고는 마감순 맨 뒤)
@@ -27254,6 +27570,7 @@
     sessViewerSwap();   // v452(C104): 보는 사람이 바뀌었으면 앞사람이 읽은 일용직 명부·체크 칸 기록을 비움(권한 적용·그리기 전에)
     applyPerms();
     doLoad(); loadTasks(); loadVehicles(); loadReceivables(); loadLicenses(); loadDocuments(); loadClients(); loadContracts(); loadMyTasks(); loadLeaves(); loadBids(); loadOnbid();
+    corpRegLoad();   // P1 판1 법인 등기 날짜·투찰 잠금(settings:corp_reg — 관리자만 읽음, 아니면 '모름'으로 비움)
     loadMembers();   // 담당 배정 드롭다운용 — 관리자·직원 모두
     conProcLoad();   // v400: 계약 골조·목록 거울 — settings:contract.use_blob 가 켜져 있을 때만 상수 7종을 제자리 덮어쓰기(검증 실패·네트워크 실패 = 상수 유지)
     apprInit();      // 결재함(C안): 뱃지 즉시 갱신 + 5분 주기 폴링(관리자만 실제 조회)
@@ -27637,7 +27954,7 @@
 
   var MOD_LABEL = {tasks:"지시", veh:"차량", hw:"화관법", rec:"기성·수금", lic:"인허가", safety:"안전", site:"현장", check:"주기 체크", con:"계약", cli:"거래처", doc:"문서함", bid:"입찰", wk:"일용직", quote:"견적서", promo:"홍보"};   // check 권한은 주기 체크리스트 영역만 제어(내게 온 지시·내 할 일은 전원) — 탭 이름(내 업무)과 구분 · hw = 화관법 탭(v431 열 · v434 탭 숨김·폐기물 제출 수행 검사)
   // ---- 감사 로그 뷰어(관리자 전용, 서버 기록 열람) ----
-  var AUDIT_COL_LABEL = {tasks:"지시", vehicles:"차량", receivables:"기성", licenses:"인허가", checklist:"업무", documents:"문서함", clients:"거래처", contracts:"계약", leaves:"휴가", family:"가족친화", member:"회원", login:"로그인", progress:"진척도", safety:"안전 설정"};   // v436 safety = 현황 ⑤ 안전 설정(settings:safety) 고침
+  var AUDIT_COL_LABEL = {tasks:"지시", vehicles:"차량", receivables:"기성", licenses:"인허가", checklist:"업무", documents:"문서함", clients:"거래처", contracts:"계약", leaves:"휴가", family:"가족친화", member:"회원", login:"로그인", progress:"진척도", corp_reg:"법인 등기", safety:"안전 설정"};   // v436 safety = 현황 ⑤ 안전 설정(settings:safety) 고침
   var AUDIT_FIELD_LABEL = {status:"상태", title:"제목", who:"담당", who_id:"담당", due:"기한", amount:"금액", paid:"입금", del:"삭제", scope:"공개범위", stage:"단계", cancel_req:"취소요청", name:"이름", role:"직책", rank:"직급", dept:"부서", admin:"관리자", perms:"권한", hire_date:"입사일", leave_date:"퇴사일", seq:"연번", annual_base:"잔여연차기준", annual_base_date:"기준일", annual_days:"연차수동", loa_days:"휴직누적", on_loa:"휴직중", loa_start:"휴직시작", loa_end:"휴직종료", annual_paid:"연차수당포함", emp_type:"고용형태", birth:"생년월일", annual_basis:"연차기준", reason:"사유", approver:"승인자", done_by:"완료자", detail:"상세", recur:"반복", hl:"하이라이트", mismatch:"불일치", PIN:"PIN", tier:"관리자등급", deleted_at:"삭제일", deleted_by:"삭제자", restored_at:"복구일", restored_by:"복구자",
     "kosha.stage":"KOSHA 단계", "kosha.apply_no":"접수번호", "kosha.applied_on":"접수일", "kosha.review_on":"심사일", "kosha.decided_on":"인정일(결정일)", "kosha.expires_on":"만료일", "kosha.rate_year":"요율 연도", "kosha.checks":"사후점검", "headcount.env":"상시근로자 종운환경", "headcount.con":"상시근로자 종운건설"};   // v436 검토: 안전 설정 감사 줄의 바뀐 칸(f) — 서버 gw-data SAFETY_FIELD_LABEL과 같은 글(uismoke v436 ⑧이 대조), 없으면 감사 화면에 영어 경로(kosha.stage)가 그대로 나왔다
   var auditMonthCur = "";
@@ -27741,6 +28058,7 @@
     renderBriefCard();    // 아침 음성 브리핑(v416, 체크 38 D1) — 카드 자리는 알림 설정 아래(HTML 순서), 호출은 맨 뒤(uismoke v399 배선 검사 유지)
     renderAutoRulesCard(); // 자동 지시 규칙 스위치(v417, 카드 10) — 카드 자리는 배정표 아래
     renderDocSettings();   // 문서함 설정(v314) — 등급표 아래
+    renderCorpRegCard();   // P1 판1 법인 등기 날짜·투찰 잠금(settings:corp_reg) — 문서함 설정 아래
   }
   // ---- 문서함 설정(v314) — 분류별 기본 공개범위 칩 + 등재 결재 게이트. 등급표 카드와 같은 결(칩·낙관락 base·토스트·감사로그). 관리자만(서버도 강제) ----
   var DOC_GATE_TXT = { staff: "직원 등재 시 PM 승인", none: "결재 없이 즉시 등재" };

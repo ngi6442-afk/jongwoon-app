@@ -396,6 +396,14 @@ async function handleSave(event, d, R) {
       return s;
     });
   }
+  // P1 판1 투찰 잠금(settings:corp_reg gate — 기본 꺼짐): 응찰로 바꾼 줄이 없으면 설정도 읽지 않음(종전과 같음) · 켜져 있고 잠겼으면 저장 통째 거절(400 GATE_CORP_REG + blocked — 앱이 그 줄만 되돌려 다시 저장)
+  if (col === 'bids') {
+    const gq = await corpRegGate(store(DATA), oldItems, doc.items, prevReadFailed, R);
+    if (gq) {
+      if (gq.body.error_code === 'GATE_CORP_REG') { try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'bids', ev: [{ op: '투찰잠금', id: gq.body.blocked.map(function (x) { return x.id; }).join(',').slice(0, 200), t: '투찰 전환 ' + gq.body.blocked.length + '건 거절(' + gq.body.why + ')' }] }); } catch (e) {} }
+      return jr(gq.http, gq.body);
+    }
+  }
   // v380(검토 발견): 정리 전에 열려 있던 관리자 탭이 상태 하나만 바꿔 저장해도(409 병합 = 로컬 우선 합집합) 정리된 공고가 되살아나지 않게 서버가 다시 거른다
   if (col === 'bids' && Array.isArray(doc.items)) purgeExpiredBids(doc, bidsCutDate());
   // v444 부동산 — 설정 settings:onbid가 켜졌을 때만 같은 줄(기본 꺼짐 — 꺼져 있으면 아무것도 거르지 않음). 서버 문서에 있던 줄을 지우게 되면(켠 날 수집보다 저장이 먼저 오는 경우 등)
@@ -584,6 +592,9 @@ async function handleSave(event, d, R) {
       return s;
     });
   }
+  // P1 판2 검토(S1): 지시 완료 창(veh_due_set)이 바꾼 만기일 보호 — 앱 vehDueMergeKeep와 같은 규칙(옛 캐시 앱·같은 날 로컬 우선 병합으로 올라온 낡은 사본의 마지막 문)
+  let vehDueKept = 0;
+  if (col === 'vehicles' && Array.isArray(doc.items)) vehDueKept = vehDueGuard(oldItems, doc.items);
   // 차량 관리자 전용 필드 보존 — 비관리자는 값을 받은 적이 없으므로(get에서 제거) 저장 시 기존값 복원
   if (col === 'vehicles' && !c.member.admin && Array.isArray(doc.items)) {
     const oldById = {};
@@ -617,6 +628,7 @@ async function handleSave(event, d, R) {
       ev = diffItems(oldItems, Array.isArray(doc.items) ? doc.items : []);
     }
     if (obPurged) ev.push({ op: '정리', id: '', t: '부동산 정리 ' + obPurged + '건(마감 ' + BIDS_KEEP_DAYS + '일 경과 신규·패스 — 저장 때)' });   // v444
+    if (vehDueKept) ev.push({ op: '만기일 보호', id: '-', t: '낡은 사본이 지시 완료 창 만기일 ' + vehDueKept + '칸을 바꾸기 전 날짜로 되돌리려 해 서버 값을 지켰습니다 — 그 사람의 앱 화면이 낡은 사본입니다' });   // P1 판2 검토(S1)
     if (ev.length) await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: col, ev: ev });
   } catch (e) {}
   // 문서함 등재 결재 훅(v314): 비관리자의 '대기' 문서마다 결재함에 '문서함 등재' 카드를 서버가 대신 기안(by=등재한 직원, ref 'doc:'+id, cid 멱등).
@@ -883,6 +895,23 @@ async function handleAutotaskIngest(event, d, R) {
     have[k] = doc.items[doc.items.length - 1];
     made++;
   }
+  // P1 판2(원장 T693·T364): 차량 만기 '다시 지시' — 기존 D-30 차량 규칙(스위치 무관)의 갈래. 봇이 보낸 항목이 아니라 서버가 지금 차량·지시로 센다(_lib/autorules vehRedo — 앱 runAutoTaskGen과 같은 규칙).
+  //   만료일이 지났는데 그 만료일 지시가 완료된 채 날짜가 그대로인 차 → 'veh:<id>:<insp|ins>:<만료일>:re:<YYYY-MM>'(달마다 한 번). 담당은 아래 배정표 채움(veh: 접두어)·알림은 기존 길 그대로. 차량을 못 읽으면 건너뜀.
+  //   검토 P1-4: 이 갈래는 봇이 ingest를 부를 때만 돈다 — 지금 봇(appdata collectors/autotask.py)은 새 항목도 숨길 키도 없으면 ingest를 부르지 않으므로 매일 돈다는 보장이 없다.
+  //     주 경로는 관리자 앱 접속(runAutoTaskGen — 세션 1회), 이 갈래는 보조. 봇이 매일 부르게 하는 것은 appdata 쪽 일(이 판 밖).
+  let redo = 0;
+  try {
+    const rvh = await blobGet(st, colKey('vehicles'));
+    if (rvh.ok && rvh.data && Array.isArray(rvh.data.items)) {
+      AR.vehRedo(rvh.data.items, doc.items, today).forEach(function (n) {
+        if (have[n.auto_key]) return;
+        doc.items.push({ id: 't' + crypto.randomBytes(6).toString('hex'), title: String(n.title).slice(0, 120), detail: String(n.detail).slice(0, 500), who_id: '', who: '', scope: [],
+          from: '자동', from_id: '', by: '자동', due: n.due, status: 'open', done_at: null, done_by: null, auto_key: n.auto_key, created: today, updated: today });
+        have[n.auto_key] = doc.items[doc.items.length - 1];
+        made++; redo++;
+      });
+    }
+  } catch (e) {}
   hideKeys.slice(0, 200).forEach(function (k) {
     const t = have[k];
     if (t && t.del !== 1) { t.del = 1; t.updated = today; fixed++; }
@@ -900,11 +929,11 @@ async function handleAutotaskIngest(event, d, R) {
     doc.updated_by = '정기봇'; doc.updated_at = Date.now();
     const w = await blobSet(st, colKey('tasks'), doc);
     if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
-    try { await appendAudit({ ts: Date.now(), by: '정기봇', bid: 'bot', col: 'tasks', ev: [{ op: '정기업무', id: '', t: '신규 ' + made + ' · 정정 ' + fixed + (assigned ? ' · 배정 ' + assigned : '') + blockTxt }] }); } catch (e) {}
+    try { await appendAudit({ ts: Date.now(), by: '정기봇', bid: 'bot', col: 'tasks', ev: [{ op: '정기업무', id: '', t: '신규 ' + made + (redo ? '(차량 다시 지시 ' + redo + ')' : '') + ' · 정정 ' + fixed + (assigned ? ' · 배정 ' + assigned : '') + blockTxt }] }); } catch (e) {}
   } else if (blocked) {
     try { await appendAudit({ ts: Date.now(), by: '정기봇', bid: 'bot', col: 'tasks', ev: [{ op: '정기업무', id: '', t: '신규 0' + blockTxt }] }); } catch (e) {}   // v453 쓴 것은 없어도 막힌 것은 남김
   }
-  return jr(200, { status: 'OK', made: made, fixed: fixed, assigned: assigned, notified: notified, blocked: blocked, blocked_rules: blockedBy, request_id: R });
+  return jr(200, { status: 'OK', made: made, redo: redo, fixed: fixed, assigned: assigned, notified: notified, blocked: blocked, blocked_rules: blockedBy, request_id: R });
 }
 
 // 지금 수집(관리자 버튼) — 서버가 나라장터 API를 직접 조회해 병합. G2B_API_KEY(Netlify env) 필요. 10분 쿨다운.
@@ -1205,6 +1234,113 @@ async function handleOnbidPurgeSet(event, d, R) {
   if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
   try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'onbid', ev: [{ op: '정리설정', id: '', t: '부동산 마감 ' + BIDS_KEEP_DAYS + '일 정리 ' + (curOn ? '켬' : '끔') + '→' + (d.on ? '켬' : '끔') }] }); } catch (e) {}
   return jr(200, { status: 'OK', on: d.on, updated_at: doc.updated_at, request_id: R });
+}
+
+// ---- 법인 등기 날짜 settings:corp_reg(P1 판1 — 원장 T462·T461·T388 · 업무별 설계 C6 corp_reg) ----
+// 값 = { reg_on(조직변경 등기 접수일), biz_fix_on(사업자등록 정정일), g2b_on(나라장터 변경등록 완료일) — YYYY-MM-DD 또는 빈칸, gate(입찰 투찰 잠금 스위치 — 참·거짓, 기본 꺼짐) }
+//   + updated_at·updated_by·prev(직전 1판). 등본 파일은 앱에 올리지 않는다(사무실 문서함 — 문서관리규정). 입력은 나수진(관리자) — 앱 관리자는 전 탭 수행이라 관리자만으로 묶는다.
+//   읽기 corp_reg_get = 로그인 → 기기 승인(403 DEVICE_NOT_APPROVED) → 관리자만(403 ADMIN_ONLY — 입찰도 관리자 전용). 저장값이 없으면 settings null·updated_at 0.
+//   쓰기 corp_reg_set = 로그인 → 관리자만(403 ADMIN_ONLY) → 값 검사(400 BAD_DATE — 달력에 없는 날·꼴 틀림 · BAD_FUTURE — 오늘(KST) 뒤 · BAD_VALUE — gate가 참·거짓이 아님)
+//     → 직전 읽기(실패 500 SETTINGS_READ_FAILED) → 낙관락(base가 저장된 updated_at과 다르면 409 CORP_REG_STALE — base 없음도 409) → 같은 값 400 NO_CHANGE
+//     → 저장(prev = 직전 1판) → 감사 1줄(col corp_reg · op 법인등기 · 바뀐 칸 f). 빈칸으로 보내면 그 날짜를 지운다.
+//   투찰 잠금(공고 저장 save bids — corpRegGate): gate가 켜져 있고 잠김(corpRegLock — 나라장터 변경등록 완료일이 비었거나 등기 접수일보다 이름)일 때만,
+//     응찰(구 참여)·낙찰·유찰이 아니던 줄(또는 서버에 없던 줄)을 응찰로 바꿔 올린 저장을 400 GATE_CORP_REG(+ blocked [{id, from}] · why)로 거절하고 감사 1줄(col bids · op 투찰잠금).
+//     낙찰·유찰 → 응찰 되돌리기와 이미 응찰인 줄은 막지 않는다. 바꾼 줄이 없으면 설정을 읽지도 않는다(꺼짐·키 없음 = 종전과 같음 — servertest 86 회귀).
+//     바꾼 줄이 있는데 설정을 못 읽으면 503 CORP_REG_READ_FAILED(모르면 열지 않음), 잠긴 채 직전 공고 문서를 못 읽었으면 500 PREV_READ_FAILED.
+//   알려진 한계(기존 settings 핸들러와 같은 꼴): 읽기 → base 검사 → 쓰기가 원자적이지 않다(동시 저장은 마지막 쓰기가 이김).
+const CORP_REG_KEY = 'settings:corp_reg';
+const CORP_REG_DATES = ['reg_on', 'biz_fix_on', 'g2b_on'];
+const CORP_REG_LABEL = { reg_on: '조직변경 등기 접수일', biz_fix_on: '사업자등록 정정일', g2b_on: '나라장터 변경등록 완료일', gate: '투찰 잠금' };
+function kstDayNow() { return new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10); }
+// 요청 몸체(또는 저장값) → { v } | { code }. today가 오면 그 날 뒤 날짜는 BAD_FUTURE(저장값 읽기는 today 없이)
+function corpRegClean(d, today) {
+  if (!d || typeof d !== 'object' || Array.isArray(d)) return { code: 'BAD_VALUE' };
+  const v = {};
+  for (const k of CORP_REG_DATES) {
+    const dv = safetyDate(d[k]);
+    if (dv === null) return { code: 'BAD_DATE' };
+    if (dv && today && dv > today) return { code: 'BAD_FUTURE' };
+    v[k] = dv;
+  }
+  if (d.gate === undefined && !today) v.gate = false;   // 저장값에 칸이 없으면 꺼짐
+  else if (typeof d.gate !== 'boolean') return { code: 'BAD_VALUE' };
+  else v.gate = d.gate;
+  return { v: v };
+}
+// { ok, doc|null, v|null, at, by } — 없는 키(실 Blobs ok·data null · mock NOT_FOUND) = 입력 전 · 읽기 실패·모양이 깨진 저장값 = ok:false
+async function corpRegRead(st) {
+  const r = await blobGet(st, CORP_REG_KEY);
+  if (!r.ok && r.code === 'NOT_FOUND') return { ok: true, doc: null, v: null, at: 0, by: '' };
+  if (!r.ok) return { ok: false, code: r.code || 'STORAGE_READ_FAILED' };
+  if (r.data === null || r.data === undefined) return { ok: true, doc: null, v: null, at: 0, by: '' };
+  const c = corpRegClean(r.data, '');
+  if (!c.v) return { ok: false, code: 'SETTINGS_INVALID' };
+  return { ok: true, doc: r.data, v: c.v, at: Number(r.data.updated_at) || 0, by: String(r.data.updated_by || '') };
+}
+// 잠김 이유 — '' = 안 잠김(스위치 꺼짐 포함) · G2B_EMPTY = 완료일 빔 · G2B_BEFORE_REG = 완료일이 등기 접수일보다 이름(다음 변경). 앱 corpRegLockOf와 같은 규칙(uismoke 대조)
+function corpRegLock(v) {
+  if (!v || v.gate !== true) return '';
+  if (!v.g2b_on) return 'G2B_EMPTY';
+  if (v.reg_on && v.g2b_on < v.reg_on) return 'G2B_BEFORE_REG';
+  return '';
+}
+function corpRegOut(s, R) {
+  const p = s.doc && s.doc.prev;
+  return jr(200, { status: 'OK', settings: s.v, updated_at: s.at, updated_by: s.by, lock: corpRegLock(s.v), prev: p ? { updated_at: Number(p.updated_at) || 0, updated_by: String(p.updated_by || '') } : null, request_id: R });
+}
+const BID_GATE_KEEP = { '응찰': 1, '참여': 1, '낙찰': 1, '유찰': 1 };   // 이 상태에서 응찰로 오는 것은 새 투찰이 아님(되돌리기·그대로)
+function bidGateTurns(oldItems, items) {
+  const old = {};
+  (oldItems || []).forEach(function (o) { if (o && o.id) old[o.id] = o; });
+  return (items || []).filter(function (t) {
+    if (!t || t.del === 1 || (t.status !== '응찰' && t.status !== '참여')) return false;
+    const o = old[t.id];
+    return !(o && o.del !== 1 && BID_GATE_KEEP[o.status]);
+  }).map(function (t) { const o = old[t.id]; return { id: String(t.id || ''), from: o ? String(o.status || 'new') : '' }; });
+}
+// 공고 저장의 투찰 잠금 — null = 통과 · { http, body } = 거절
+async function corpRegGate(st, oldItems, items, prevReadFailed, R) {
+  const turns = bidGateTurns(oldItems, items);
+  if (!turns.length) return null;
+  const s = await corpRegRead(st);
+  if (!s.ok) return { http: 503, body: { status: 'ERROR', error_code: 'CORP_REG_READ_FAILED', request_id: R } };
+  const why = corpRegLock(s.v);
+  if (!why) return null;
+  if (prevReadFailed) return { http: 500, body: { status: 'ERROR', error_code: 'PREV_READ_FAILED', request_id: R } };
+  return { http: 400, body: { status: 'REJECTED', error_code: 'GATE_CORP_REG', why: why, blocked: turns, request_id: R } };
+}
+async function handleCorpRegGet(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (!(await deviceApproved(event, c.member))) return jr(403, { status: 'FORBIDDEN', error_code: 'DEVICE_NOT_APPROVED', request_id: R });
+  if (!c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
+  const s = await corpRegRead(store(DATA));
+  if (!s.ok) return jr(500, { status: 'ERROR', error_code: s.code, request_id: R });
+  return corpRegOut(s, R);
+}
+async function handleCorpRegSet(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (!c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
+  const nv = corpRegClean(d, kstDayNow());
+  if (!nv.v) return jr(400, { status: 'REJECTED', error_code: nv.code, request_id: R });
+  const st = store(DATA);
+  const cur = await corpRegRead(st);
+  if (!cur.ok) return jr(500, { status: 'ERROR', error_code: 'SETTINGS_READ_FAILED', request_id: R });   // 읽기 실패 위에 쓰면 저장돼 있던 값이 사라진다 — 거부
+  if (d.base === undefined || Number(d.base) !== cur.at) return jr(409, { status: 'CONFLICT', error_code: 'CORP_REG_STALE', request_id: R });
+  const was = cur.v || { reg_on: '', biz_fix_on: '', g2b_on: '', gate: false };
+  if (cur.v && JSON.stringify(cur.v) === JSON.stringify(nv.v)) return jr(400, { status: 'REJECTED', error_code: 'NO_CHANGE', request_id: R });
+  const chg = {};
+  CORP_REG_DATES.forEach(function (k) { if (was[k] !== nv.v[k]) chg[k] = [was[k], nv.v[k]]; });
+  if (was.gate !== nv.v.gate) chg.gate = [was.gate ? '켬' : '끔', nv.v.gate ? '켬' : '끔'];
+  if (!cur.v && !Object.keys(chg).length) chg.gate = ['(입력 전)', '끔'];   // 처음 저장이 빈 값 그대로여도 감사 1줄은 남김
+  const doc = Object.assign({ schema: 1 }, nv.v, { prev: cur.doc ? Object.assign({}, cur.v, { updated_at: cur.at, updated_by: cur.by }) : null,
+    updated_by: c.member.id, updated_at: Math.max(Date.now(), cur.at + 1) });   // 같은 ms 두 저장도 낙관락 토큰이 달라지게
+  const w = await blobSet(st, CORP_REG_KEY, doc);
+  if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
+  const t = Object.keys(chg).map(function (k) { return CORP_REG_LABEL[k] + ' ' + (chg[k][0] || '—') + '→' + (chg[k][1] || '—'); }).join(' · ').slice(0, 300);
+  try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'corp_reg', ev: [{ op: '법인등기', id: CORP_REG_KEY, t: t, f: chg }] }); } catch (e) {}
+  return corpRegOut({ doc: doc, v: nv.v, at: doc.updated_at, by: doc.updated_by }, R);
 }
 
 // 일감 이력 export(수집봇) — 학습 필터용(패스 패턴). 경량 필드만 반환.
@@ -1637,6 +1773,105 @@ async function handleTaskNotmine(event, d, R) {
   try { await appendAudit({ ts: now, by: c.member.name, bid: c.member.id, col: 'tasks', ev: [{ op: '내것아님', id: t.id, t: String(t.title || '').slice(0, 80) }] }); } catch (e) {}
   const px = (L && L.prefixes && L.prefixes[p]) ? L.prefixes[p] : null;
   return jr(200, { status: 'OK', updated_at: doc.updated_at, task: { id: t.id, who_id: '', who: '', who_by: 'notmine', notmine: t.notmine, updated: today }, signal: px ? { prefix: p, notmine: px.notmine, who_n: px.notmine_who_n, recard: px.recard } : null, request_id: R });
+}
+// ---- P1 판2(원장 T693·T364) 차량 지시 완료 창의 새 만기일 → 차량 한 줄의 한 칸만 고침(veh_due_set) ----
+// 권한(둘 중 하나 — 나머지는 403 NO_WRITE, why로 갈래):
+//   ① 차량 수행(permOf vehicles = do · 관리자 포함) — 그 지시 키가 가리키는 차량의 그 칸.
+//   ② 지시 담당 — 세 조건 모두: 그 지시의 who_id = 로그인 회원 · 배정표(settings:assign)의 그 키 담당(가장 긴 접두어 — 지금 'veh:')도 그 회원 · 차량의 그 칸 지금 값 = 지시 키의 만료일
+//      (그 지시가 다루는 그 날짜 칸 하나 — 다른 칸·다른 날짜로 이미 바뀐 칸은 못 고침).
+//   근거: 지시 컬렉션 저장(save tasks)은 로그인 회원 누구나 되는 길이라(화면 canActTask만 — 서버 하드 보안 아님) who_id만 믿으면 아무나 자기를 담당으로 적고 차량 날짜를 고칠 수 있다.
+//     배정표는 관리자(assign_set)와 봇 키(settings_apply target assign — v453, 감사 '설정적용' 1줄·updated_by 'bot:<표식>')만 고치고 감사가 남는 서버 설정이라 '담당'의 근거로 쓴다(why NOT_ASSIGNEE · NOT_ASSIGN_TABLE · DATE_MOVED). 배정표를 못 읽으면 빈 표 = ② 거절(fail-closed).
+//     검토 S3: 봇 키를 가진 쪽(appdata 스크립트·Actions 비밀값)은 veh: 담당을 아무 재직 회원으로 바꿔 그 회원이 ② 갈래로 차량 만기일을 고치게 할 수 있다 — 봇 키는 신뢰 경계 안이라 받아들임.
+//       막으려면 settings_apply assign에서 veh: 접두어를 빼거나 ② 갈래가 배정표 updated_by 'bot:'를 거절(정책 결정 — PM).
+//   일반 저장(save vehicles)은 종전대로 veh do만 — 담당자에게 차량 문서 통째 쓰기를 열지 않고, 이 액션은 칸을 지시 키에서만 정한다(값으로 받지 않음).
+//   알려진 한계: 배정표 차량 담당은 지시 줄을 손으로 꾸며(키를 다른 차·지금 날짜로) 다른 차의 같은 칸도 바꿀 수 있다 — 차량 갱신 담당의 몫 안이고 감사·버전 링에 남는다.
+// 거절: 401 · 403 DEVICE_NOT_APPROVED · 404 NO_TASK(없음·지움) · 400 NOT_VEH_TASK(차량 자동 지시 키 꼴 아님 — 사람이 만든 지시) · 400 TASK_DONE · 403 NO_WRITE ·
+//   400 BAD_DATE(달력에 없는 날·꼴 틀림·2000~2099 밖) · 404 NO_VEHICLE · 409 VEH_DUE_STALE(base_due가 지금 값과 다름 — 그 사이 누가 고침) · 400 NO_CHANGE(같은 날).
+// 저장: 차량 문서를 읽어 그 줄의 그 칸·updated만 바꿔 씀(줄 단위 — 문서 통째 받지 않음) · 직전 문서 버전 링(verSnapshot) · 감사 1줄(col vehicles · op 수정 · f {칸: [이전, 새]} — 저장 감사와 같은 꼴, 되돌리기용 이전 값).
+//   날짜를 지금보다 앞으로 넣는 것은 막지 않는다(앱이 확인 문구) · 차량 updated_at이 바뀌므로 다른 탭의 다음 차량 저장은 409 → 기존 병합 길.
+//   검토 S1: 그 병합은 같은 날이면 로컬 줄이 이기므로(mergeVeh) 그 줄에 표식 due_set{칸: {prev, at}}을 남기고, 앱 vehDueMergeKeep·서버 vehDueGuard(save vehicles)가 표식을 모르는 사본의 '바꾸기 전 날짜'를 걸러 서버 값을 지킨다.
+//   검토 S2: 버전 링 스냅샷 뒤 쓰기 직전 차량 문서를 다시 읽어, 그 사이 일반 저장이 끝났으면 새 문서에 적용(그 칸이 바뀌었으면 409).
+const VEH_TASK_KEY_RE = new RegExp('^veh:(' + AUTOTASK_ID + '):(insp|ins):(' + AUTOTASK_DATE + ')(?::re:' + AUTOTASK_MONTH + ')?$');
+// 검토 S1: 차량 저장(save vehicles)의 만기일 보호. veh_due_set은 그 줄에 표식 due_set{칸: {prev: 바꾸기 전 값, at: ms}}을 남긴다.
+//   들어온 줄이 서버 줄의 표식을 모르고(at 다름·없음) 그 칸이 prev 그대로면(= 바꾸기 전 사본) 서버 값을 지킨다 · 다른 값이면 사람 편집이라 받음 · 표식은 늘 서버 것을 이어 감.
+//   앱 mergeVeh의 vehDueMergeKeep와 같은 규칙(uismoke P1 판2 검토 대조). 알려진 한계: 낡은 사본으로 일부러 prev 날짜로 되돌리면 지켜진다(새로고침 뒤 고치면 됨). 반환 = 지킨 칸 수
+function vehDueGuard(oldItems, items) {
+  const oldById = {};
+  (oldItems || []).forEach(function (o) { if (o && o.id && o.due_set && typeof o.due_set === 'object') oldById[o.id] = o; });
+  const nz = function (s) { return s == null ? '' : String(s); };
+  let n = 0;
+  (items || []).forEach(function (t) {
+    const o = (t && typeof t === 'object' && t.id) ? oldById[t.id] : null;
+    if (!o) return;
+    const ds = (t.due_set && typeof t.due_set === 'object') ? Object.assign({}, t.due_set) : {};
+    ['insp_due', 'ins_due'].forEach(function (f) {
+      const mk = o.due_set[f], tm = ds[f];
+      if (!mk || typeof mk !== 'object' || (tm && tm.at === mk.at)) return;
+      if (nz(t[f]) === nz(mk.prev) && nz(o[f]) !== nz(t[f])) { t[f] = o[f]; n++; }
+      ds[f] = mk;
+    });
+    t.due_set = ds;
+  });
+  return n;
+}
+function vehDueDate(v) {   // 'YYYY-MM-DD'(달력에 있음 · 2000~2099) → 그 글 · 아니면 null
+  if (typeof v !== 'string' || !/^20\d{2}-\d{2}-\d{2}$/.test(v)) return null;
+  const t = new Date(v + 'T00:00:00Z');
+  return (!isNaN(t.getTime()) && t.toISOString().slice(0, 10) === v) ? v : null;
+}
+async function handleVehDueSet(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (!(await deviceApproved(event, c.member))) return jr(403, { status: 'FORBIDDEN', error_code: 'DEVICE_NOT_APPROVED', request_id: R });
+  const id = String(d.task_id || '').slice(0, 60); if (!id) return jr(400, { status: 'REJECTED', error_code: 'BAD_ID', request_id: R });
+  const st = store(DATA);
+  const rt = await blobGet(st, colKey('tasks'));
+  if (!rt.ok && rt.code !== 'NOT_FOUND') return jr(500, { status: 'ERROR', error_code: rt.code || 'STORAGE_READ_FAILED', request_id: R });
+  const t = (rt.ok && rt.data && Array.isArray(rt.data.items)) ? rt.data.items.find(function (x) { return x && x.id === id && x.del !== 1; }) : null;
+  if (!t) return jr(404, { status: 'NOT_FOUND', error_code: 'NO_TASK', request_id: R });
+  const m = VEH_TASK_KEY_RE.exec(String(t.auto_key || ''));
+  if (!m) return jr(400, { status: 'REJECTED', error_code: 'NOT_VEH_TASK', request_id: R });
+  if (t.status === 'done') return jr(400, { status: 'REJECTED', error_code: 'TASK_DONE', request_id: R });
+  const vehDo = permOf(c.member, 'vehicles') === 'do';
+  if (!vehDo) {
+    if (!(t.who_id && t.who_id === c.member.id)) return jr(403, { status: 'FORBIDDEN', error_code: 'NO_WRITE', why: 'NOT_ASSIGNEE', request_id: R });
+    const ar = assignFor(t.auto_key, (await assignRead(st)).rules);
+    if (!(ar && ar.who_id === c.member.id)) return jr(403, { status: 'FORBIDDEN', error_code: 'NO_WRITE', why: 'NOT_ASSIGN_TABLE', request_id: R });
+  }
+  const date = vehDueDate(d.date);
+  if (!date) return jr(400, { status: 'REJECTED', error_code: 'BAD_DATE', request_id: R });
+  const vid = m[1], field = AR.VEH_DUE_KIND[m[2]].f;
+  const rv = await blobGet(st, colKey('vehicles'));
+  if (!rv.ok && rv.code !== 'NOT_FOUND') return jr(500, { status: 'ERROR', error_code: rv.code || 'STORAGE_READ_FAILED', request_id: R });
+  const doc = (rv.ok && rv.data && Array.isArray(rv.data.items)) ? rv.data : null;
+  const v = doc ? doc.items.find(function (x) { return x && x.id === vid && x.del !== 1; }) : null;
+  if (!v) return jr(404, { status: 'NOT_FOUND', error_code: 'NO_VEHICLE', request_id: R });
+  const cur = v[field] == null ? '' : String(v[field]);
+  if (!vehDo && cur !== m[3]) return jr(403, { status: 'FORBIDDEN', error_code: 'NO_WRITE', why: 'DATE_MOVED', cur: cur, request_id: R });   // 담당 갈래는 그 지시의 그 날짜 칸만
+  if (d.base_due !== undefined && String(d.base_due == null ? '' : d.base_due) !== cur) return jr(409, { status: 'CONFLICT', error_code: 'VEH_DUE_STALE', cur: cur, request_id: R });
+  if (cur === date) return jr(400, { status: 'REJECTED', error_code: 'NO_CHANGE', request_id: R });
+  await verSnapshot('vehicles', rv.data, c.member.name, false);
+  // 검토 S2: 스냅샷(블롭 읽기·쓰기 여러 번) 사이에 끝난 일반 차량 저장을 덮지 않게 쓰기 직전 다시 읽는다 — 문서가 바뀌었으면 새 문서의 그 줄에 적용(그 칸이 그 사이 바뀌었으면 409 · 줄이 없어졌으면 404).
+  //   조건부 쓰기가 없어 다시 읽기와 쓰기 사이 창은 남는다(handleSave와 같은 알려진 한계 — 창만 좁힘)
+  let wdoc = doc, wv = v;
+  const rv2 = await blobGet(st, colKey('vehicles'));
+  if (!rv2.ok) return jr(500, { status: 'ERROR', error_code: rv2.code || 'STORAGE_READ_FAILED', request_id: R });
+  if (Number((rv2.data && rv2.data.updated_at) || 0) !== Number(doc.updated_at || 0)) {
+    wdoc = (rv2.data && Array.isArray(rv2.data.items)) ? rv2.data : null;
+    wv = wdoc ? wdoc.items.find(function (x) { return x && x.id === vid && x.del !== 1; }) : null;
+    if (!wv) return jr(404, { status: 'NOT_FOUND', error_code: 'NO_VEHICLE', request_id: R });
+    const cur2 = wv[field] == null ? '' : String(wv[field]);
+    if (cur2 !== cur) return jr(409, { status: 'CONFLICT', error_code: 'VEH_DUE_STALE', cur: cur2, request_id: R });
+  }
+  const now = Date.now(), today = new Date(now + 9 * 3600000).toISOString().slice(0, 10);
+  wv[field] = date; wv.updated = today;
+  wv.due_set = Object.assign({}, (wv.due_set && typeof wv.due_set === 'object') ? wv.due_set : {}); wv.due_set[field] = { prev: cur, at: now };   // 검토 S1: 낡은 사본 되돌림 보호 표식(vehDueGuard·앱 vehDueMergeKeep)
+  wdoc.updated_by = c.member.id; wdoc.updated_at = now;
+  const w = await blobSet(st, colKey('vehicles'), wdoc);
+  if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
+  const f = {}; f[field] = [cur, date];
+  const au = await appendAudit({ ts: now, by: c.member.name, bid: c.member.id, col: 'vehicles', ev: [{ op: '수정', id: wv.id, t: String(wv.no || wv.id).slice(0, 40) + ' · 지시 완료 창(' + (vehDo ? '차량 수행' : '배정 담당') + ' · 지시 ' + t.id + ')', f: f }] });
+  return jr(200, { status: 'OK', vehicle: { id: wv.id, field: field, value: date, prev: cur, updated: today }, updated_at: now, audit: au !== false, request_id: R });
 }
 // ---- 배정표 settings:assign (v395 — 공통 기반 1 첫 시범. 업무별 최적화 설계 3-14 appr A1 · 착수 브리핑 A2) ----
 // 자동 지시(auto_key 접두어 veh:·lic:·cert:·rec:·bid:) → 담당 who_id. 기본표 = 빈 표: 배정 없는 접두어는 '담당 없음' 배지(관리자 폴백 금지).
@@ -2214,9 +2449,41 @@ function conProcMapOk(x) { return !!(x && typeof x === 'object' && x.schema === 
 function conProcBgOk(x) { return !!(x && typeof x === 'object' && x.schema === 1 && typeof x.ver === 'string' && x.ver.length >= 2 && Array.isArray(x.rows) && typeof x.sha === 'string' && x.sha.length >= 8); }
 function conProcLayerOk(x, layer) { return !!(x && typeof x === 'object' && x.proc_ver === 'v1' && x.layer === layer && x.consts && typeof x.consts === 'object' && typeof x.sha === 'string' && x.sha.length >= 8); }
 async function conProcReadFlag(st) {
-  let flag = { use_blob: false, updated_at: 0, updated_by: '', prev: null, bg_ver: '', annual_override: {} };
-  try { const r = await blobGet(st, CON_PROC_KEYS.flag); if (r.ok && r.data) flag = { use_blob: r.data.use_blob === true, updated_at: r.data.updated_at || 0, updated_by: r.data.updated_by || '', prev: r.data.prev || null, bg_ver: typeof r.data.bg_ver === 'string' ? r.data.bg_ver : '', annual_override: (r.data.annual_override && typeof r.data.annual_override === 'object') ? r.data.annual_override : {} }; } catch (e) {}   // v404: bg_ver(배경 승격본 판)·annual_override(연 1회 기한 override)
+  let flag = { use_blob: false, updated_at: 0, updated_by: '', prev: null, bg_ver: '', annual_override: {}, bg_fp: '', bg_auto: false, bg_carry: null, bg_chk: '' };
+  try { const r = await blobGet(st, CON_PROC_KEYS.flag); if (r.ok && r.data) flag = { use_blob: r.data.use_blob === true, updated_at: r.data.updated_at || 0, updated_by: r.data.updated_by || '', prev: r.data.prev || null, bg_ver: typeof r.data.bg_ver === 'string' ? r.data.bg_ver : '', annual_override: (r.data.annual_override && typeof r.data.annual_override === 'object') ? r.data.annual_override : {}, bg_fp: typeof r.data.bg_fp === 'string' ? r.data.bg_fp : '', bg_auto: r.data.bg_auto === true, bg_carry: (r.data.bg_carry && typeof r.data.bg_carry === 'object') ? r.data.bg_carry : null, bg_chk: typeof r.data.bg_chk === 'string' ? r.data.bg_chk : '' }; } catch (e) {}   // v404: bg_ver(배경 승격본 판)·annual_override(연 1회 기한 override) · P1 판4: bg_fp(승격본의 확인일 뺀 지문)·bg_auto(자동 이월 스위치, 기본 꺼짐)·bg_carry(마지막 자동 이월) · 검토 P1-3: bg_chk(승격본 행 확인일 중 가장 늦은 날)
   return flag;
+}
+// P1 판4 — 계약 법령 기준표(bg:contract:law:v1) '확인일만 바뀐 판' 판정. 지문 = 행마다 checked 칸만 뺀 나머지 전부(행 id 순 정렬, 키 정렬 JSON)의 sha256 앞 16자.
+//      판 메타(ver·built_at·source·sha·n_*)는 지문 밖. 행 수·행 id·나머지 모든 칸(law·art·mst·eff·days·base·kind·text·grade·note·referenced …)이 같아야 같은 지문. 판정은 서버 이 한 곳(앱·gw-lawwatch에는 없음).
+function conBgCanon(v) { if (Array.isArray(v)) return '[' + v.map(conBgCanon).join(',') + ']'; if (v && typeof v === 'object') return '{' + Object.keys(v).sort().map((k) => JSON.stringify(k) + ':' + conBgCanon(v[k])).join(',') + '}'; return JSON.stringify(v === undefined ? null : v); }
+function conBgFp(bg) {
+  if (!conProcBgOk(bg)) return '';
+  const rows = bg.rows.map((r) => { const o = Object.assign({}, r); delete o.checked; return o; }).sort((a, b) => (String(a.id) < String(b.id) ? -1 : (String(a.id) > String(b.id) ? 1 : 0)));
+  return crypto.createHash('sha256').update(conBgCanon(rows)).digest('hex').slice(0, 16);
+}
+// 검토 P1-3: 판 행 확인일(checked)의 가장 이른 날·가장 늦은 날 — 날짜 꼴이 아닌 행이 하나라도 있으면 lo ''(이월 안 함)
+function conBgChk(bg) {
+  if (!conProcBgOk(bg) || !bg.rows.length) return { lo: '', hi: '' };
+  let lo = null, hi = '';
+  bg.rows.forEach(function (r) { const c = (r && typeof r.checked === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(r.checked)) ? r.checked : ''; if (lo === null || c < lo) lo = c; if (c > hi) hi = c; });
+  return { lo: lo || '', hi: hi };
+}
+function conFlagKeep(cur) { return { bg_fp: cur.bg_fp || '', bg_auto: cur.bg_auto === true, bg_carry: cur.bg_carry || null, bg_chk: cur.bg_chk || '' }; }   // 스위치·승격 저장이 판4 칸을 지우지 않게
+// 자동 이월: 스위치 켜짐 ∧ 승격본 있음(bg_ver) ∧ 기준 지문 있음 ∧ 올라온 판 ver 가 다름 ∧ 지문 같음 ∧ 올라온 판 행 확인일이 모두 기준 확인일(bg_chk) 뒤(검토 P1-3) → 승격 없이 bg_ver 를 새 판으로(감사 1줄·bg_carry). 해제(bg_ver '') 상태에선 하지 않음.
+async function conBgAutoCarry(st, flag, bg) {
+  if (!flag || !flag.bg_auto || !flag.bg_ver || !flag.bg_fp || !conProcBgOk(bg) || bg.ver === flag.bg_ver) return null;
+  if (!/^[A-Za-z0-9_.-]{2,40}$/.test(bg.ver) || conBgFp(bg) !== flag.bg_fp) return null;
+  // 검토 P1-3: 새 판이어야 함 — 올라온 판의 모든 행 확인일이 승격본(또는 마지막 이월본)의 가장 늦은 확인일보다 뒤일 때만(옛 판을 다시 올리면 같은 지문이어도 이월 안 함 · 기준 날짜가 없으면 이월 안 함)
+  const ck = conBgChk(bg);
+  if (!flag.bg_chk || !ck.lo || !(ck.lo > flag.bg_chk)) return null;
+  const cur = await conProcReadFlag(st);   // 쓰기 직전 다시 읽음(동시 조회 두 번째는 여기서 멈춤)
+  if (!cur.bg_auto || cur.bg_ver !== flag.bg_ver || cur.bg_fp !== flag.bg_fp || cur.bg_chk !== flag.bg_chk) return null;
+  const now = Date.now();
+  const doc = { schema: 1, use_blob: cur.use_blob, prev: { use_blob: cur.use_blob, updated_at: cur.updated_at, updated_by: cur.updated_by, bg_ver: cur.bg_ver || '', bg_fp: cur.bg_fp || '', bg_chk: cur.bg_chk || '' }, bg_ver: bg.ver, annual_override: cur.annual_override || {}, bg_fp: cur.bg_fp, bg_auto: true, bg_carry: { from: cur.bg_ver, to: bg.ver, at: now }, bg_chk: ck.hi, updated_by: 'auto-carry', updated_at: now };
+  const w = await blobSet(st, CON_PROC_KEYS.flag, doc);
+  if (!w.ok) return null;
+  try { await appendAudit({ ts: now, by: '자동 이월', bid: '__system__', col: 'contracts', ev: [{ op: '계약배경', id: '', t: '확인일만 바뀐 판 자동 이월 ' + cur.bg_ver + '→' + bg.ver + ' (지문 ' + cur.bg_fp + ' · 확인일 ' + cur.bg_chk + '→' + ck.hi + ')' }] }); } catch (e) {}
+  return { use_blob: doc.use_blob, updated_at: now, updated_by: doc.updated_by, prev: doc.prev, bg_ver: doc.bg_ver, annual_override: doc.annual_override, bg_fp: doc.bg_fp, bg_auto: true, bg_carry: doc.bg_carry, bg_chk: doc.bg_chk };
 }
 async function conProcReadLayers(st) {
   let proc = null, list = null;
@@ -2237,7 +2504,7 @@ async function handleConProcFlagSet(event, d, R) {
   if (d.base !== undefined && Number(d.base) !== Number(cur.updated_at || 0)) return jr(409, { status: 'CONFLICT', error_code: 'CON_PROC_STALE', request_id: R });
   if (cur.use_blob === d.use_blob) return jr(400, { status: 'REJECTED', error_code: 'NO_CHANGE', request_id: R });
   if (d.use_blob) { const L = await conProcReadLayers(st); if (!L.proc || !L.list) return jr(409, { status: 'CONFLICT', error_code: 'MIRROR_MISSING', request_id: R }); }
-  const doc = { schema: 1, use_blob: d.use_blob, prev: { use_blob: cur.use_blob, updated_at: cur.updated_at, updated_by: cur.updated_by, bg_ver: cur.bg_ver || '' }, bg_ver: cur.bg_ver || '', annual_override: cur.annual_override || {}, updated_by: c.member.id, updated_at: Date.now() };   // v404: 스위치 토글이 bg_ver·override를 지우지 않음(prev에도 기록 — 검토 N5)
+  const doc = Object.assign({ schema: 1, use_blob: d.use_blob, prev: { use_blob: cur.use_blob, updated_at: cur.updated_at, updated_by: cur.updated_by, bg_ver: cur.bg_ver || '' }, bg_ver: cur.bg_ver || '', annual_override: cur.annual_override || {} }, conFlagKeep(cur), { updated_by: c.member.id, updated_at: Date.now() });   // v404: 스위치 토글이 bg_ver·override를 지우지 않음(prev에도 기록 — 검토 N5) · 판4 칸도 보존
   const w = await blobSet(st, CON_PROC_KEYS.flag, doc);
   if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
   try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'contracts', ev: [{ op: '계약골조', id: '', t: '골조·목록 거울 ' + (cur.use_blob ? '켬' : '끔') + '→' + (d.use_blob ? '켬' : '끔') }] }); } catch (e) {}
@@ -2252,13 +2519,27 @@ async function handleConProcBgSet(event, d, R) {
   const st = store(DATA);
   const cur = await conProcReadFlag(st);
   if (d.base !== undefined && Number(d.base) !== Number(cur.updated_at || 0)) return jr(409, { status: 'CONFLICT', error_code: 'CON_PROC_STALE', request_id: R });
-  const doc = { schema: 1, use_blob: cur.use_blob, prev: { use_blob: cur.use_blob, updated_at: cur.updated_at, updated_by: cur.updated_by, bg_ver: cur.bg_ver || '' }, bg_ver: cur.bg_ver || '', annual_override: Object.assign({}, cur.annual_override || {}), updated_by: c.member.id, updated_at: Date.now() };
+  const doc = Object.assign({ schema: 1, use_blob: cur.use_blob, prev: { use_blob: cur.use_blob, updated_at: cur.updated_at, updated_by: cur.updated_by, bg_ver: cur.bg_ver || '', bg_fp: cur.bg_fp || '', bg_auto: cur.bg_auto === true, bg_chk: cur.bg_chk || '' }, bg_ver: cur.bg_ver || '', annual_override: Object.assign({}, cur.annual_override || {}) }, conFlagKeep(cur), { updated_by: c.member.id, updated_at: Date.now() });
   const changed = [];
+  let Lbg = null;
   if (d.bg_ver !== undefined) {
     const v = String(d.bg_ver || '');
     if (v && !/^[A-Za-z0-9_.-]{2,40}$/.test(v)) return jr(400, { status: 'REJECTED', error_code: 'BAD_VALUE', request_id: R });
-    if (v) { const L = await conProcReadLayers(st); if (!L.bg || L.bg.ver !== v) return jr(409, { status: 'CONFLICT', error_code: 'BG_MISSING', request_id: R }); }
-    if (v !== (cur.bg_ver || '')) { doc.bg_ver = v; changed.push('배경 ' + (cur.bg_ver || '없음') + '→' + (v || '없음')); }
+    if (v) { const L = await conProcReadLayers(st); if (!L.bg || L.bg.ver !== v) return jr(409, { status: 'CONFLICT', error_code: 'BG_MISSING', request_id: R }); Lbg = L.bg; }
+    if (v !== (cur.bg_ver || '')) {
+      doc.bg_ver = v; changed.push('배경 ' + (cur.bg_ver || '없음') + '→' + (v || '없음'));
+      doc.bg_fp = v ? conBgFp(Lbg) : ''; doc.bg_carry = null;   // P1 판4: 승격 = 그 판의 확인일 뺀 지문을 비교 기준으로 · 해제 = 기준도 비움(자동 이월 안 함)
+      doc.bg_chk = v ? conBgChk(Lbg).hi : '';   // 검토 P1-3: 승격본의 가장 늦은 확인일 — 이월은 이보다 뒤에 확인한 판만
+      if (v) changed.push('기준 지문 ' + doc.bg_fp);
+    }
+  }
+  if (d.bg_auto !== undefined) {   // P1 판4: 확인일만 바뀐 판 자동 이월 스위치(기본 꺼짐, 관리자)
+    if (typeof d.bg_auto !== 'boolean') return jr(400, { status: 'REJECTED', error_code: 'BAD_VALUE', request_id: R });
+    if (d.bg_auto !== (cur.bg_auto === true)) { doc.bg_auto = d.bg_auto; changed.push('확인일만 바뀐 판 자동 이월 ' + (cur.bg_auto ? '켬' : '끔') + '→' + (d.bg_auto ? '켬' : '끔')); }
+    if (d.bg_auto && doc.bg_ver && !doc.bg_fp) {   // 판4 이전에 승격된 판(지문 없음): 올라온 판이 승격본 그대로면 지금 지문을 기준으로
+      if (!Lbg) { const L = await conProcReadLayers(st); Lbg = L.bg; }
+      if (Lbg && Lbg.ver === doc.bg_ver) { doc.bg_fp = conBgFp(Lbg); doc.bg_chk = conBgChk(Lbg).hi; if (doc.bg_fp) changed.push('기준 지문 ' + doc.bg_fp + '(승격본 ' + doc.bg_ver + ')'); }
+    }
   }
   if (d.annual_override && typeof d.annual_override === 'object') {
     for (const k of Object.keys(d.annual_override)) {
@@ -2274,7 +2555,7 @@ async function handleConProcBgSet(event, d, R) {
   const w = await blobSet(st, CON_PROC_KEYS.flag, doc);
   if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
   try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'contracts', ev: [{ op: '계약배경', id: '', t: changed.join(' · ') }] }); } catch (e) {}
-  return jr(200, { status: 'OK', bg_ver: doc.bg_ver, annual_override: doc.annual_override, updated_at: doc.updated_at, request_id: R });
+  return jr(200, { status: 'OK', bg_ver: doc.bg_ver, annual_override: doc.annual_override, bg_fp: doc.bg_fp, bg_auto: doc.bg_auto, updated_at: doc.updated_at, request_id: R });
 }
 // ---- 계약 골조·목록 편집 기록 clog:contract (v401 — 계약 D1 3일차). 거울 두 층(contract_mirror.py 출력)은 그대로 두고, 관리자 편집을 append-only 해시 체인 clog:contract 에 쌓아
 //      읽을 때마다 base 위에 재생(replay)한 "유효 층"을 돌려준다 — --push/--verify 는 base 만 보므로 편집이 지워지지도, 변환 diff 0 게이트가 깨지지도 않는다. 앱 로더(conProcLoad)는 유효 층을 받는다.
@@ -2328,8 +2609,9 @@ async function handleConProcGet(event, d, R) {
   const c = await currentMember(event);
   if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
   const st = store(DATA);
-  const flag = await conProcReadFlag(st);
+  let flag = await conProcReadFlag(st);
   const L = await conProcReadLayers(st);
+  try { const cf = await conBgAutoCarry(st, flag, L.bg); if (cf) flag = cf; } catch (e) {}   // P1 판4: 확인일만 바뀐 판이면 승격 없이 이월(스위치 켜짐일 때만)
   const clog = await conClogRead(st);
   let proc = L.proc, list = L.list, state = null;
   if (proc && list) { const eff = conProcReplay(proc, list, clog); proc = eff.proc; list = eff.list; state = eff.state; }
@@ -4884,6 +5166,7 @@ async function handlerInner(event) {
     if (d && d.action === 'get') return await handleGet(event, d, R);
     if (d && d.action === 'site_edu_gap') return await handleSiteEduGap(event, d, R);   // v433 현장 대장 특별교육 미이수(이름만 — 안전 권한 없는 현장 권한자용)
     if (d && d.action === 'save') return await handleSave(event, d, R);
+    if (d && d.action === 'veh_due_set') return await handleVehDueSet(event, d, R);   // P1 판2 차량 지시 완료 창 새 만기일(차량 한 줄 한 칸)
     if (d && d.action === 'audit') return await handleAudit(event, d, R);
     if (d && d.action === 'ver_list') return await handleVerList(event, d, R);
     if (d && d.action === 'ver_get') return await handleVerGet(event, d, R);
@@ -4982,6 +5265,8 @@ async function handlerInner(event) {
     if (d && d.action === 'doc_settings_set') return await handleDocSettingsSet(event, d, R);
     if (d && d.action === 'safety_settings_get') return await handleSafetySettingsGet(event, d, R);   // v436 안전 설정(현황 ⑤ 인정·평가·회사 구분) — 안전 권한 읽기
     if (d && d.action === 'safety_settings_set') return await handleSafetySettingsSet(event, d, R);   // v436 관리자만
+    if (d && d.action === 'corp_reg_get') return await handleCorpRegGet(event, d, R);   // P1 판1 법인 등기 날짜·투찰 잠금(settings:corp_reg) — 관리자만
+    if (d && d.action === 'corp_reg_set') return await handleCorpRegSet(event, d, R);
     if (d && d.action === 'doc_att_put') return await handleDocAttPut(event, d, R);
     if (d && d.action === 'doc_att_get') return await handleDocAttGet(event, d, R);
     if (d && d.action === 'doc_att_del') return await handleDocAttDel(event, d, R);

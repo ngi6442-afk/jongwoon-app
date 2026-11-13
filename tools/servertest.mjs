@@ -3601,6 +3601,98 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   }
 }
 
+{ // ---- P1 판4 계약 법령 기준표 '확인일만 바뀐 판' 자동 이월(스위치 기본 꺼짐) — 고정물 tools/bg_law_carry_fixture.json(운영 v1-20261031 · 11월 초안 v1-20261113에서 5행) ----
+  const fx = JSON.parse(require('fs').readFileSync(join(ROOT, 'tools', 'bg_law_carry_fixture.json'), 'utf8'));
+  const cp = (o) => JSON.parse(JSON.stringify(o));
+  const chkOnly = (src, ver) => { const g = cp(src); g.ver = ver; g.sha = 'chk' + ver.replace(/[^0-9]/g, '').padEnd(13, '0'); g.built_at = '2026-12-01T09:00:00+09:00'; g.source = 'bg_law_draft.json(DRF 재확인 2026-12-01)'; g.rows.forEach((r) => { r.checked = '2026-12-01'; }); g.rows.reverse(); return g; };   // 확인일·판 메타·행 순서만 바뀐 판
+  const reset = () => { delete mem.gw_data['settings:contract']; delete mem.gw_data['bg:contract:law:v1']; delete mem.gw_data['lawwatch:last']; };
+  reset();
+  mem.gw_data['bg:contract:law:v1'] = cp(fx.old);
+  let r = await call({ action: 'con_proc_get' }, tokA);
+  const def = r.code === 200 && r.body.flag.bg_auto === false && r.body.flag.bg_fp === '' && r.body.flag.bg_carry === null;
+  r = await call({ action: 'con_proc_bg_set', bg_ver: 'v1-20261031' }, tokA);
+  const fp0 = mem.gw_data['settings:contract'].bg_fp;
+  const prom = r.code === 200 && typeof fp0 === 'string' && /^[0-9a-f]{16}$/.test(fp0) && r.body.bg_fp === fp0 && mem.gw_data['settings:contract'].bg_auto === false;
+  // 스위치 꺼짐(기본): 확인일만 바뀐 판이 올라와도 이월 없음
+  mem.gw_data['bg:contract:law:v1'] = chkOnly(fx.old, 'v1-20261201');
+  let au = auditMock.logs.length;
+  r = await call({ action: 'con_proc_get' }, tokA);
+  const offNo = r.code === 200 && r.body.flag.bg_ver === 'v1-20261031' && mem.gw_data['settings:contract'].bg_ver === 'v1-20261031' && auditMock.logs.length === au;
+  T('P1 판4 기본: 스위치 꺼짐·지문 없음 → 승격 때 확인일 뺀 지문 기록(16자) · 꺼짐이면 확인일만 바뀐 판도 이월 없음(bg_ver 그대로·감사 0)', def && prom && offNo);
+  // 스위치 켜기(감사·prev)
+  au = auditMock.logs.length;
+  r = await call({ action: 'con_proc_bg_set', bg_auto: true, base: mem.gw_data['settings:contract'].updated_at }, tokA);
+  const on = r.code === 200 && r.body.bg_auto === true && mem.gw_data['settings:contract'].bg_auto === true && mem.gw_data['settings:contract'].prev.bg_auto === false && mem.gw_data['settings:contract'].bg_fp === fp0 && auditMock.logs.length === au + 1 && /자동 이월 끔→켬/.test(auditMock.logs[au].ev[0].t);
+  r = await call({ action: 'con_proc_bg_set', bg_auto: 'yes' }, tokA); const badT = r.code === 400;
+  r = await call({ action: 'con_proc_bg_set', bg_auto: true }, tokW, 'dev1'); const staff = r.code === 403;
+  r = await call({ action: 'con_proc_bg_set', bg_auto: true }, tokA); const same = r.code === 400 && r.body.error_code === 'NO_CHANGE';
+  T('P1 판4 스위치: 관리자 켜기 200(감사 1줄 끔→켬 · prev.bg_auto false · 지문 유지) · 형식 400 · 직원 403 · 같은 값 NO_CHANGE', on && badT && staff && same);
+  // 켜짐 + 11월 실제 판(판만 바뀜·인용 번호·새 실측) → 이월 안 됨
+  mem.gw_data['bg:contract:law:v1'] = cp(fx.nov);
+  au = auditMock.logs.length;
+  r = await call({ action: 'con_proc_get' }, tokA);
+  const novNo = r.code === 200 && r.body.flag.bg_ver === 'v1-20261031' && r.body.flag.bg_carry === null && auditMock.logs.length === au;
+  // 칸 종류별: 고정물 11월 판의 바뀐 칸을 하나씩만 옛 판에 얹은 판 — 어느 하나라도 이월 안 됨
+  const one = (fn) => { const g = chkOnly(fx.old, 'v1-20261202'); fn(g.rows); return g; };
+  const variants = {
+    mst: one((rs) => { rs.find((x) => x.id === 'law.waste.r.18').mst = 291947; }),
+    eff: one((rs) => { rs.find((x) => x.id === 'law.waste.r.18').eff = '2026-11-12'; }),
+    note: one((rs) => { rs.find((x) => x.id === 'law.waste.r.60.1').note += ' · 인용 번호만 바뀜'; }),
+    grade: one((rs) => { rs.find((x) => x.id === 'law.ordin.pohang.d21').grade = '실측'; }),
+    days: one((rs) => { rs.find((x) => x.id === 'law.waste.r.18').days = 1; }),
+    rowAdd: one((rs) => { rs.push({ id: 'law.new.1', law: '새 법', art: '제1조', mst: 1, eff: '2026-12-01', checked: '2026-12-01', grade: '실측' }); }),
+    rowDel: one((rs) => { rs.pop(); }),
+    idRen: one((rs) => { rs[0].id = rs[0].id + 'x'; }),
+  };
+  const kept = [];
+  for (const k of Object.keys(variants)) { mem.gw_data['bg:contract:law:v1'] = variants[k]; r = await call({ action: 'con_proc_get' }, tokA); if (!(r.code === 200 && r.body.flag.bg_ver === 'v1-20261031')) kept.push(k); }
+  T('P1 판4 11월 실제 판(그대로 1·판만 바뀜 2·인용 번호 1·새 실측 1) → 이월 안 됨(bg_ver v1-20261031 그대로·감사 0) · 칸 하나만 바뀐 판 8종(mst·eff·note·grade·days·행 추가·행 삭제·id)도 전부 안 됨', novNo && kept.length === 0, '이월된 것: ' + kept.join(','));
+  // 켜짐 + 확인일만 바뀐 판(판 메타·행 순서 포함) → 이월: bg_ver 새 판·bg_carry·감사 1줄 · 다시 조회해도 감사 그대로
+  mem.gw_data['bg:contract:law:v1'] = chkOnly(fx.old, 'v1-20261201');
+  au = auditMock.logs.length;
+  r = await call({ action: 'con_proc_get' }, tokW, 'dev1');
+  const st1 = mem.gw_data['settings:contract'];
+  const carried = r.code === 200 && r.body.flag.bg_ver === 'v1-20261201' && st1.bg_ver === 'v1-20261201' && st1.bg_fp === fp0 && st1.bg_carry && st1.bg_carry.from === 'v1-20261031' && st1.bg_carry.to === 'v1-20261201' && st1.prev.bg_ver === 'v1-20261031' && st1.updated_by === 'auto-carry'
+    && auditMock.logs.length === au + 1 && auditMock.logs[au].ev[0].op === '계약배경' && /확인일만 바뀐 판 자동 이월 v1-20261031→v1-20261201/.test(auditMock.logs[au].ev[0].t) && auditMock.logs[au].by === '자동 이월';
+  r = await call({ action: 'con_proc_get' }, tokA);
+  const once = r.code === 200 && r.body.flag.bg_ver === 'v1-20261201' && auditMock.logs.length === au + 1;
+  // 이월 뒤 스위치 토글(거울 켜기)도 판4 칸 보존
+  mem.gw_data['settings:contract'].use_blob = true;   // 거울 층 없이 토글하려고 켜진 상태에서 끄기(켜기는 MIRROR_MISSING)
+  r = await call({ action: 'con_proc_flag_set', use_blob: false }, tokA);
+  const keep = r.code === 200 && mem.gw_data['settings:contract'].use_blob === false && mem.gw_data['settings:contract'].bg_fp === fp0 && mem.gw_data['settings:contract'].bg_auto === true && mem.gw_data['settings:contract'].bg_carry && mem.gw_data['settings:contract'].bg_carry.to === 'v1-20261201';
+  T('P1 판4 켜짐 + 확인일만 바뀐 판(판 메타·행 순서 포함) → 승격 없이 이월(직원 조회로도 · bg_ver·bg_carry·prev·감사 \'자동 이월\' 1줄) · 다시 조회 감사 그대로 · 거울 스위치 토글이 지문·스위치·이월 기록 보존', carried && once && keep);
+  // 검토 P1-3: 새 판만 이월 — 기준 확인일 bg_chk(승격 때 2026-10-31 → 이월 뒤 2026-12-01) · 옛 판 다시 올림(같은 지문 · 확인일 10-31)·같은 확인일 다른 판(12-01)·한 행만 옛 확인일(11-30) = 이월 안 함(bg_ver·감사 그대로) · 모든 행 뒤(12-15) = 이월(bg_chk 12-15 · 감사 확인일 12-01→12-15)
+  const chk0 = st1.bg_chk === '2026-12-01' && st1.prev.bg_chk === '2026-10-31';
+  const reup = cp(fx.old); reup.ver = 'v1-20261130';
+  const sameDay = chkOnly(fx.old, 'v1-20261205');
+  const mixed = chkOnly(fx.old, 'v1-20261210'); mixed.rows.forEach((x) => { x.checked = '2026-12-10'; }); mixed.rows[3].checked = '2026-11-30';
+  const wrongCarry = [];   // 이월되면 안 되는데 이월된 판
+  au = auditMock.logs.length;
+  for (const [nm, g] of [['옛 판', reup], ['같은 확인일', sameDay], ['한 행 옛 확인일', mixed]]) { mem.gw_data['bg:contract:law:v1'] = g; r = await call({ action: 'con_proc_get' }, tokA); if (!(r.code === 200 && r.body.flag.bg_ver === 'v1-20261201' && mem.gw_data['settings:contract'].bg_ver === 'v1-20261201')) wrongCarry.push(nm); }
+  const noAud = auditMock.logs.length === au;
+  const newer = chkOnly(fx.old, 'v1-20261215'); newer.rows.forEach((x) => { x.checked = '2026-12-15'; });
+  mem.gw_data['bg:contract:law:v1'] = newer;
+  r = await call({ action: 'con_proc_get' }, tokA);
+  const st2 = mem.gw_data['settings:contract'];
+  const fwd = r.code === 200 && r.body.flag.bg_ver === 'v1-20261215' && st2.bg_ver === 'v1-20261215' && st2.bg_chk === '2026-12-15' && st2.prev.bg_chk === '2026-12-01' && st2.bg_carry.from === 'v1-20261201'
+    && auditMock.logs.length === au + 1 && /확인일 2026-12-01→2026-12-15/.test(auditMock.logs[au].ev[0].t);
+  T('P1 판4 검토(P1-3) 새 판만 이월: 기준 확인일 승격 10-31 → 이월 뒤 12-01(prev 10-31) · 옛 판 다시 올림(같은 지문·확인일 10-31)·같은 확인일 다른 판·한 행만 옛 확인일 = 이월 안 함(bg_ver v1-20261201 그대로·감사 0) · 모든 행 12-15 = 이월(bg_chk 12-15·prev 12-01·감사 "확인일 2026-12-01→2026-12-15")',
+    chk0 && wrongCarry.length === 0 && noAud && fwd, JSON.stringify({ chk0, wrongCarry, noAud, fwd, flag: { ver: st2.bg_ver, chk: st2.bg_chk } }));
+  // 해제(bg_ver '') 상태에선 켜져 있어도 이월 없음 · 해제 = 기준 지문 비움
+  r = await call({ action: 'con_proc_bg_set', bg_ver: '' }, tokA);
+  const offFp = r.code === 200 && mem.gw_data['settings:contract'].bg_fp === '' && mem.gw_data['settings:contract'].bg_ver === '';
+  mem.gw_data['bg:contract:law:v1'] = chkOnly(fx.old, 'v1-20261203');
+  r = await call({ action: 'con_proc_get' }, tokA);
+  const unNo = r.code === 200 && r.body.flag.bg_ver === '';
+  // 판4 이전 승격(지문 없음) + 켜기 = 지금 올라온 판이 승격본 그대로면 그 지문을 기준으로
+  mem.gw_data['settings:contract'] = { schema: 1, use_blob: true, prev: null, bg_ver: 'v1-20261031', annual_override: {}, updated_by: 'u0', updated_at: 5 };
+  mem.gw_data['bg:contract:law:v1'] = cp(fx.old);
+  r = await call({ action: 'con_proc_bg_set', bg_auto: true, base: 5 }, tokA);
+  const legacy = r.code === 200 && mem.gw_data['settings:contract'].bg_fp === fp0 && mem.gw_data['settings:contract'].bg_auto === true;
+  T('P1 판4 승격 해제 → 지문 비움·켜져 있어도 이월 없음 · 판4 이전 승격본(지문 없음)에서 켜기 → 올라온 판이 승격본이면 같은 지문 기록', offFp && unNo && legacy);
+  reset();
+}
+
 { // ---- 58(v406) 계약 서류함 cdoc(D3 1일차) — 권한·검증·표준 파일명·중복 노출·버전/현재 포인터·초안 3판·pii 열람·reclog·소프트 삭제/복구/영구 삭제 게이트·문서함 RECORD_NOT_FOR_GIT ----
   const CONW = { id: 'uconw', name: '공무직원', admin: false, perms: { con: 'do' }, dept: '운영부' };
   const CONV = { id: 'uconv', name: '열람직원', admin: false, perms: { con: 'view' }, dept: '운영부' };
@@ -6755,6 +6847,299 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
         r.status === 0 && /selftest 통과 \((\d+)\/\1\)/.test(r.stdout || '') && /✓ 결함 사본/.test(r.stdout || ''), JSON.stringify({ rc: r.status, tail: String(r.stdout || '').trim().split('\n').slice(-1)[0], err: String(r.stderr || '').slice(0, 200) }));
     }
   } catch (e) { T('88 v456 2차 검토 묶음 실행', false, String(e && e.message)); } finally { reset88(); }
+}
+
+{ // ---- 86(P1 판1) 법인 등기 날짜 settings:corp_reg + 입찰 투찰(응찰) 잠금(기본 꺼짐) — 원장 T462·T461·T388 · 업무별 설계 C6.
+  //   corp_reg_get·corp_reg_set = 관리자만 · 값 검사(BAD_DATE·BAD_FUTURE·BAD_VALUE) · 낙관락 409 CORP_REG_STALE · NO_CHANGE · prev 1판 · 감사 1줄(col corp_reg).
+  //   공고 저장(save bids): 꺼짐·키 없음 = 종전 그대로(회귀) · 켜짐 + 잠김 = 응찰로 바꾼 줄 400 GATE_CORP_REG(blocked·why·저장 0·감사 투찰잠금) · 되돌리기·이미 응찰은 통과 · 설정 못 읽음 = 응찰 전환만 503.
+  //   날짜는 고정: 지난 날 2026-09-29·2026-10-07(오늘보다 앞) · 미래 2099-12-31(오늘보다 뒤) — 오늘 날짜 값에 기대지 않음.
+  const savedUsers86 = JSON.parse(JSON.stringify(mem.gw_users));
+  const KEY86 = 'settings:corp_reg', BK86 = 'col:bids';
+  const had86 = { s: mem.gw_data[KEY86], b: mem.gw_data[BK86] };
+  delete mem.gw_data[KEY86]; delete mem.gw_data[BK86];
+  mem.gw_users['device:dev1'] = { status: 'approved' };
+  mem.gw_users['member:u86n'] = { id: 'u86n', name: '나수진형86', role: '관리자', admin: true, perms: {} };
+  const tN86 = issueSession(mem.gw_users['member:u86n']).token;
+  const get86 = (tok, dev) => call({ action: 'corp_reg_get' }, tok, dev);
+  const set86 = (body, tok, dev) => call(Object.assign({ action: 'corp_reg_set' }, body), tok, dev);
+  const aud86 = (col) => auditMock.logs.filter((l) => l.col === col);
+  const V86 = (o) => Object.assign({ reg_on: '', biz_fix_on: '', g2b_on: '', gate: false }, o || {});
+  const B86 = (id, status, extra) => Object.assign({ id, title: '공고 ' + id, org: '시험시', due: '', status, updated: '2026-11-13' }, extra || {});
+  const seedBids86 = (items) => { mem.gw_data[BK86] = { schema: 1, items: JSON.parse(JSON.stringify(items)), updated_at: 5000 }; };
+  const saveBids86 = (items) => call({ action: 'save', collection: 'bids', doc: { schema: 1, items }, base: 5000 }, tokA);
+  const stOf86 = (id) => { const x = ((mem.gw_data[BK86] || {}).items || []).find((t) => t.id === id); return x ? x.status : '(없음)'; };
+  try {
+    // ① 권한 — 관리자 아님 403 ADMIN_ONLY(읽기·쓰기) · 비로그인 401 · 관리자 읽기(키 없음) = settings null·lock ''
+    const g0 = await get86(tokA), gW = await get86(tokW, 'dev1'), sW = await set86(Object.assign({ base: 0 }, V86({ reg_on: '2026-09-29' })), tokW, 'dev1'), gNo = await get86(null);
+    T('86 P1 판1 ① 권한: 관리자 읽기(키 없음) = 200 settings null·updated_at 0·lock ""·prev null · 직원 읽기·쓰기 = 403 ADMIN_ONLY · 비로그인 401 · 저장 0',
+      g0.code === 200 && g0.body.settings === null && g0.body.updated_at === 0 && g0.body.lock === '' && g0.body.prev === null
+      && gW.code === 403 && gW.body.error_code === 'ADMIN_ONLY' && sW.code === 403 && sW.body.error_code === 'ADMIN_ONLY' && gNo.code === 401 && !(KEY86 in mem.gw_data),
+      JSON.stringify([g0, gW.code, sW.code, gNo.code]));
+
+    // ② 값 검사 → 400 이유 코드 · 저장 0·감사 0
+    const a0 = aud86('corp_reg').length;
+    const BAD86 = [['BAD_DATE', { reg_on: '2026-02-30' }], ['BAD_DATE', { g2b_on: '20261007' }], ['BAD_DATE', { biz_fix_on: 20261001 }], ['BAD_FUTURE', { g2b_on: '2099-12-31' }], ['BAD_VALUE', { gate: 'true' }], ['BAD_VALUE', { gate: 1 }]];
+    const bad86 = [];
+    for (const [code, o] of BAD86) { const r = await set86(Object.assign({ base: 0 }, V86(o)), tokA); if (!(r.code === 400 && r.body.error_code === code)) bad86.push(code + '→' + r.code + '/' + r.body.error_code); }
+    const noGate = await set86({ base: 0, reg_on: '2026-09-29', biz_fix_on: '', g2b_on: '' }, tokA);
+    T('86 P1 판1 ② 값 검사: 없는 날(2/30)·꼴 틀림(8자리·숫자) = 400 BAD_DATE · 미래 2099-12-31 = 400 BAD_FUTURE · gate "true"·1·빠짐 = 400 BAD_VALUE · 저장 0·감사 0',
+      bad86.length === 0 && noGate.code === 400 && noGate.body.error_code === 'BAD_VALUE' && !(KEY86 in mem.gw_data) && aud86('corp_reg').length === a0, JSON.stringify({ bad86, noGate: noGate.body.error_code }));
+
+    // ③ 저장 1(base 0) — 알려진 칸만 · prev null · 감사 1줄 · base 없음·낡은 base 409 · 같은 값 NO_CHANGE
+    const w1 = await set86(Object.assign({ base: 0, junk: 'x' }, V86({ reg_on: '2026-09-29' })), tN86);
+    const s1 = JSON.parse(JSON.stringify(mem.gw_data[KEY86] || null)), au1 = aud86('corp_reg').slice(a0);
+    const noBase = await set86(V86({ reg_on: '2026-09-29', biz_fix_on: '2026-10-01' }), tokA), stale = await set86(Object.assign({ base: 1 }, V86({ reg_on: '2026-09-29', biz_fix_on: '2026-10-01' })), tokA);
+    const same = await set86(Object.assign({ base: w1.body.updated_at }, V86({ reg_on: '2026-09-29' })), tokA);
+    T('86 P1 판1 ③ 저장 1(나수진형 관리자 · base 0): 200 · 저장값 = 세 날짜·gate 꺼짐만(모르는 칸 junk 버림) · schema 1 · prev null · updated_by u86n · 감사 1줄(col corp_reg · op 법인등기 · f 조직변경 등기 접수일 ""→2026-09-29) · base 없음·낡은 base = 409 CORP_REG_STALE · 같은 값 = 400 NO_CHANGE · 감사 그대로 1줄',
+      w1.code === 200 && JSON.stringify(w1.body.settings) === JSON.stringify(V86({ reg_on: '2026-09-29' })) && w1.body.lock === '' && !!s1 && s1.schema === 1 && s1.prev === null && s1.updated_by === 'u86n' && s1.junk === undefined && s1.gate === false
+      && au1.length === 1 && au1[0].ev[0].op === '법인등기' && au1[0].ev[0].id === KEY86 && JSON.stringify(au1[0].ev[0].f) === JSON.stringify({ reg_on: ['', '2026-09-29'] })
+      && noBase.code === 409 && noBase.body.error_code === 'CORP_REG_STALE' && stale.code === 409 && stale.body.error_code === 'CORP_REG_STALE' && same.code === 400 && same.body.error_code === 'NO_CHANGE' && aud86('corp_reg').length === a0 + 1,
+      JSON.stringify({ w1: w1.body, s1, au: au1.map((x) => x.ev), noBase: noBase.code, stale: stale.code, same: same.body.error_code }));
+
+    // ④ 저장 2 — 잠금 켬(완료일 빔) · prev = 저장 1 · lock G2B_EMPTY · 감사 f = 바뀐 칸만
+    const w2 = await set86(Object.assign({ base: w1.body.updated_at }, V86({ reg_on: '2026-09-29', biz_fix_on: '2026-10-01', gate: true })), tokA);
+    const s2 = JSON.parse(JSON.stringify(mem.gw_data[KEY86] || null)), au2 = aud86('corp_reg').slice(a0);
+    T('86 P1 판1 ④ 저장 2(잠금 켬 · 완료일 빔): 200 · lock G2B_EMPTY · prev = 저장 1 한 판(세 날짜·gate·updated_at·updated_by) · 응답 prev = 날·사람만 · 감사 +1(f 사업자등록 정정일·투찰 잠금 끔→켬)',
+      w2.code === 200 && w2.body.lock === 'G2B_EMPTY' && w2.body.updated_at > w1.body.updated_at && !!s2 && s2.gate === true
+      && JSON.stringify(s2.prev) === JSON.stringify(Object.assign(V86({ reg_on: '2026-09-29' }), { updated_at: s1.updated_at, updated_by: 'u86n' })) && JSON.stringify(w2.body.prev) === JSON.stringify({ updated_at: s1.updated_at, updated_by: 'u86n' })
+      && au2.length === 2 && JSON.stringify(au2[1].ev[0].f) === JSON.stringify({ biz_fix_on: ['', '2026-10-01'], gate: ['끔', '켬'] }),
+      JSON.stringify({ w2: w2.body, prev: s2 && s2.prev, f: au2[1] && au2[1].ev[0].f }));
+
+    // ⑤ 잠김(완료일 빔) — 검토→응찰·새 줄 응찰 = 400 GATE_CORP_REG(blocked·why) · 저장 0 · 감사 투찰잠금 1줄 / 이미 응찰·낙찰→응찰 되돌리기·참여 그대로·다른 고침 = 200
+    seedBids86([B86('k1', '검토'), B86('k2', '응찰'), B86('k3', '낙찰'), B86('k4', '참여'), B86('k5', 'new')]);
+    const snap5 = JSON.stringify(mem.gw_data[BK86]), ab0 = aud86('bids').length;
+    const r5a = await saveBids86([B86('k1', '응찰'), B86('k2', '응찰'), B86('k3', '낙찰'), B86('k4', '참여'), B86('k5', 'new'), B86('k6', '응찰')]);
+    const kept5 = JSON.stringify(mem.gw_data[BK86]) === snap5, ab5 = aud86('bids').slice(ab0);
+    const r5b = await saveBids86([B86('k1', '검토', { title: '고친 제목' }), B86('k2', '응찰'), B86('k3', '응찰'), B86('k4', '참여'), B86('k5', '패스')]);
+    T('86 P1 판1 ⑤ 잠김(켬 · 완료일 빔): 검토→응찰(k1)·새 줄 응찰(k6) = 400 GATE_CORP_REG · why G2B_EMPTY · blocked [{k1, from 검토}, {k6, from ""}](이미 응찰 k2·참여 k4는 안 듦) · 공고 문서 그대로 · 감사 1줄(col bids · op 투찰잠금 · id k1,k6) / 다음 저장(응찰 전환 없음 · 낙찰→응찰 되돌리기 k3 · 제목 고침 · 패스) = 200 · k3 응찰·k1 검토',
+      r5a.code === 400 && r5a.body.error_code === 'GATE_CORP_REG' && r5a.body.why === 'G2B_EMPTY' && JSON.stringify(r5a.body.blocked) === JSON.stringify([{ id: 'k1', from: '검토' }, { id: 'k6', from: '' }])
+      && kept5 && ab5.length === 1 && ab5[0].ev[0].op === '투찰잠금' && ab5[0].ev[0].id === 'k1,k6'
+      && r5b.code === 200 && stOf86('k3') === '응찰' && stOf86('k1') === '검토' && stOf86('k5') === '패스',
+      JSON.stringify({ r5a: [r5a.code, r5a.body], kept5, ab5: ab5.map((x) => x.ev), r5b: r5b.code, k3: stOf86('k3') }));
+
+    // ⑥ 완료일이 등기 접수일보다 이름 = 잠김 G2B_BEFORE_REG · 완료일 ≥ 접수일 = 열림(200·응찰 저장)
+    const w6 = await set86(Object.assign({ base: mem.gw_data[KEY86].updated_at }, V86({ reg_on: '2026-09-29', biz_fix_on: '2026-10-01', g2b_on: '2026-09-01', gate: true })), tokA);
+    seedBids86([B86('k1', '검토')]);
+    const r6a = await saveBids86([B86('k1', '응찰')]);
+    const w6b = await set86(Object.assign({ base: mem.gw_data[KEY86].updated_at }, V86({ reg_on: '2026-09-29', biz_fix_on: '2026-10-01', g2b_on: '2026-10-07', gate: true })), tokA);
+    const r6b = await saveBids86([B86('k1', '응찰')]);
+    T('86 P1 판1 ⑥ 완료일 2026-09-01 < 접수일 2026-09-29(다음 변경) = lock G2B_BEFORE_REG · 응찰 전환 400 GATE_CORP_REG(why G2B_BEFORE_REG) / 완료일 2026-10-07 = lock "" · 같은 전환 200(k1 응찰)',
+      w6.code === 200 && w6.body.lock === 'G2B_BEFORE_REG' && r6a.code === 400 && r6a.body.why === 'G2B_BEFORE_REG' && w6b.code === 200 && w6b.body.lock === '' && r6b.code === 200 && stOf86('k1') === '응찰',
+      JSON.stringify([w6.body.lock, r6a.code, r6a.body.why, w6b.body.lock, r6b.code]));
+
+    // ⑦ 회귀 — 꺼짐(완료일 빔이어도)·키 없음 = 종전과 같음(200 · 응찰 저장) · 빈칸 저장으로 날짜 지우기
+    const w7 = await set86(Object.assign({ base: mem.gw_data[KEY86].updated_at }, V86({ reg_on: '2026-09-29', gate: false })), tokA);
+    seedBids86([B86('k1', '검토')]);
+    const r7a = await saveBids86([B86('k1', '응찰')]);
+    delete mem.gw_data[KEY86];
+    seedBids86([B86('k1', '검토')]);
+    const r7b = await saveBids86([B86('k1', '응찰')]);
+    T('86 P1 판1 ⑦ 회귀(꺼짐 = 지금 동작): 빈칸 저장으로 정정일·완료일 지움(200 · 저장값 빈칸 · lock "") · 꺼짐 + 완료일 빔 = 검토→응찰 200(응찰 저장) · 키 없음 = 200(응찰 저장)',
+      w7.code === 200 && w7.body.settings.biz_fix_on === '' && w7.body.settings.g2b_on === '' && w7.body.lock === '' && r7a.code === 200 && r7b.code === 200 && stOf86('k1') === '응찰',
+      JSON.stringify([w7.code, w7.body.settings, r7a.code, r7b.code]));
+
+    // ⑧ 설정을 못 읽으면 — 응찰 전환이 있는 저장만 503 CORP_REG_READ_FAILED(공고 그대로) · 전환 없는 저장은 설정을 읽지 않고 200 · 쓰기 읽기 실패 = 500 SETTINGS_READ_FAILED
+    seedBids86([B86('k1', '검토'), B86('k2', '응찰')]);
+    blobsMock.hooks.failGet = (k) => k === KEY86;
+    const r8a = await saveBids86([B86('k1', '응찰'), B86('k2', '응찰')]);
+    const st8a = stOf86('k1');
+    const r8b = await saveBids86([B86('k1', '검토', { title: '고침' }), B86('k2', '응찰')]);
+    const r8c = await set86(Object.assign({ base: 0 }, V86({ reg_on: '2026-09-29' })), tokA), r8d = await get86(tokA);
+    delete blobsMock.hooks.failGet;
+    T('86 P1 판1 ⑧ 설정 읽기 실패: 응찰 전환 저장 = 503 CORP_REG_READ_FAILED(k1 검토 그대로) · 전환 없는 저장 = 200(설정 안 읽음 — 종전과 같음) · corp_reg_set = 500 SETTINGS_READ_FAILED · corp_reg_get = 500',
+      r8a.code === 503 && r8a.body.error_code === 'CORP_REG_READ_FAILED' && st8a === '검토' && r8b.code === 200 && r8c.code === 500 && r8c.body.error_code === 'SETTINGS_READ_FAILED' && r8d.code === 500,
+      JSON.stringify([r8a.code, r8a.body.error_code, st8a, r8b.code, r8c.code, r8d.code]));
+  } finally {
+    delete blobsMock.hooks.failGet;
+    mem.gw_users = savedUsers86;
+    if (had86.s === undefined) delete mem.gw_data[KEY86]; else mem.gw_data[KEY86] = had86.s;
+    if (had86.b === undefined) delete mem.gw_data[BK86]; else mem.gw_data[BK86] = had86.b;
+  }
+}
+
+{ // ---- 87(P1 판2) 차량 지시 완료 창의 새 만기일(veh_due_set) + 차량 만기 '다시 지시'(autorules vehRedo · autotask_ingest 갈래) — 원장 T693·T364.
+  //   veh_due_set 권한 = 차량 수행(관리자 포함) · 또는 (그 지시 담당 + 배정표 차량 담당 + 차량의 그 칸 = 지시 만료일) — 나머지 403 NO_WRITE(why) · 값 검사 · 낙관(base_due) · 그 줄 그 칸만 · 버전 링 · 감사.
+  //   날짜는 고정(만료 2026-10-31·2026-12-20·2020-01-31 · 다시 지시 규칙 표본의 오늘 = 2026-11-13). ingest는 서버 오늘(KST)을 쓰므로 만료일을 2020년으로 둬 늘 '지남'.
+  //   검사마다 결함을 심은 gw-data·autorules 사본(소스 한 곳을 바꿔 메모리에서 컴파일 — 파일은 쓰지 않음)에서는 실패해야 한다.
+  const fs87 = require('fs'), Mod87 = require('module');
+  const FILE87 = join(FN, 'gw-data.js'), SRC87 = fs87.readFileSync(FILE87, 'utf8');
+  const ARF87 = join(FN, '_lib', 'autorules.js'), ARSRC87 = fs87.readFileSync(ARF87, 'utf8');
+  const load87 = (file, src) => { const m = new Mod87(file); m.filename = file; m.paths = Mod87._nodeModulePaths(dirname(file)); m._compile(src, file); return m.exports; };
+  const mutOf87 = (src, from, to) => { if (src.split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 60)); return src.replace(from, () => to); };
+  const caller87 = (mod) => async (body, tok, dev) => { const r = await mod.handler({ httpMethod: 'POST', headers: Object.assign({ authorization: tok ? 'Bearer ' + tok : '' }, dev ? { 'x-device-id': dev } : {}), body: JSON.stringify(body) }); return { code: r.statusCode, body: JSON.parse(r.body || '{}') }; };
+  const snap87 = JSON.stringify({ u: mem.gw_users, d: mem.gw_data });
+  const reset87 = () => { const s = JSON.parse(snap87); mem.gw_users = s.u; mem.gw_data = s.d; };
+  const MA87 = { id: 'u87a', name: '차량담당87', admin: false, perms: { tasks: 'do', veh: 'view' } };   // 배정표 차량 담당(차량 보기)
+  const MB87 = { id: 'u87b', name: '다른담당87', admin: false, perms: { tasks: 'do', veh: 'view' } };   // 지시 담당이지만 배정표 밖
+  const MC87 = { id: 'u87c', name: '남87', admin: false, perms: { tasks: 'view', veh: 'hide' } };
+  const tA87 = issueSession(MA87).token, tB87 = issueSession(MB87).token, tC87 = issueSession(MC87).token;
+  const VID2 = 'v경북12가3456';   // 차량 id = 'v' + 번호판(한글 포함)
+  const V87 = () => [{ id: 'v1', no: '11가1111', type: '덤프', own: '지입', state: '운행', insp_due: '2026-10-31', ins_due: '2026-12-20', insurer: '시험보험', note: '', updated: '2026-10-01' },
+    { id: VID2, no: '경북12가3456', state: '운행', insp_due: '2026-09-30', ins_due: '2027-01-05', updated: '2026-10-01' }];
+  const TK87 = (id, key, who, status, extra) => Object.assign({ id, title: '지시 ' + id, auto_key: key, who_id: who || '', who: '', status: status || 'open', from: '자동', due: '' }, extra || {});
+  const T87 = () => [TK87('t1', 'veh:v1:insp:2026-10-31', 'u87a'), TK87('t2', 'veh:v1:ins:2026-12-20', 'u87a'), TK87('t3', undefined, 'u87a', 'open', { from: '관리자' }),
+    TK87('t4', 'veh:v1:insp:2026-10-31', 'u87a', 'done'), TK87('t5', 'veh:' + VID2 + ':insp:2026-09-30', 'u87b'), TK87('t6', 'veh:v1:insp:2026-09-01', 'u87a'),
+    TK87('t7', 'veh:v1:insp:2026-10-31:re:2026-11', 'u87a'), TK87('t8', 'veh:vNone:insp:2026-10-31', 'u87a'), TK87('t9', 'veh:v1:insp:2026-10-31', 'u87a', 'open', { del: 1 }), TK87('t10', 'veh:v1:ins:2026-12-20', 'u87b')];
+  const seed87 = (opt) => { reset87();
+    Object.assign(mem.gw_users, { 'member:u87a': MA87, 'member:u87b': MB87, 'member:u87c': MC87, 'device:dev1': { status: 'approved' } });
+    mem.gw_data['col:vehicles'] = { schema: 1, items: V87(), updated_at: 7000, updated_by: 'x' };
+    mem.gw_data['col:tasks'] = { schema: 1, items: T87(), updated_at: 7100, updated_by: 'x' };
+    delete mem.gw_data['settings:autotask'];
+    if (!opt || !opt.noAssign) mem.gw_data['settings:assign'] = { schema: 1, rules: { 'veh:': { who_id: 'u87a' } }, approver_id: '', prev: null, updated_at: 5, updated_by: 'x' }; else delete mem.gw_data['settings:assign'];
+    Object.keys(mem.gw_data).filter((k) => k.indexOf('ver:vehicles:') === 0 || k === 'veridx:vehicles').forEach((k) => { delete mem.gw_data[k]; });
+  };
+  const vehOf87 = (id) => (mem.gw_data['col:vehicles'].items || []).find((v) => v.id === id);
+  const set87 = (c, tok, task, date, base, dev) => c(Object.assign({ action: 'veh_due_set', task_id: task, date: date }, base === undefined ? {} : { base_due: base }), tok, dev === undefined ? 'dev1' : dev);
+  const KST87 = new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);
+  // ① 거절 — 권한·지시 꼴·값·낙관·같은 값: 차량 문서·버전 링·감사 그대로
+  const chk87A = async (c) => { seed87(); const v0 = JSON.stringify(mem.gw_data['col:vehicles']), a0 = auditMock.logs.length, got = [];
+    const exp = [[await set87(c, null, 't1', '2027-10-31'), 401, ''], [await set87(c, tA87, 't1', '2027-10-31', undefined, ''), 403, 'DEVICE_NOT_APPROVED'],
+      [await set87(c, tA87, 't9', '2027-10-31'), 404, 'NO_TASK'], [await set87(c, tA87, 'tZZ', '2027-10-31'), 404, 'NO_TASK'], [await set87(c, tokA, 't3', '2027-10-31'), 400, 'NOT_VEH_TASK'],
+      [await set87(c, tokA, 't4', '2027-10-31'), 400, 'TASK_DONE'], [await set87(c, tC87, 't1', '2027-10-31'), 403, 'NO_WRITE:NOT_ASSIGNEE'], [await set87(c, tB87, 't1', '2027-10-31'), 403, 'NO_WRITE:NOT_ASSIGNEE'],
+      [await set87(c, tB87, 't5', '2026-12-31'), 403, 'NO_WRITE:NOT_ASSIGN_TABLE'], [await set87(c, tB87, 't10', '2027-12-20'), 403, 'NO_WRITE:NOT_ASSIGN_TABLE'], [await set87(c, tA87, 't6', '2027-09-01'), 403, 'NO_WRITE:DATE_MOVED'],
+      [await set87(c, tA87, 't1', '2026-02-30'), 400, 'BAD_DATE'], [await set87(c, tA87, 't1', '20271031'), 400, 'BAD_DATE'], [await set87(c, tA87, 't1', '1999-12-31'), 400, 'BAD_DATE'], [await set87(c, tA87, 't1', 20271031), 400, 'BAD_DATE'], [await set87(c, tA87, 't1', ''), 400, 'BAD_DATE'],
+      [await set87(c, tokA, 't8', '2027-10-31'), 404, 'NO_VEHICLE'], [await set87(c, tokA, 't1', '2027-10-31', '2026-01-01'), 409, 'VEH_DUE_STALE'], [await set87(c, tA87, 't1', '2026-10-31', '2026-10-31'), 400, 'NO_CHANGE']];
+    exp.forEach(([r, code, ec], i) => { const e = r.body.error_code ? r.body.error_code + (r.body.why ? ':' + r.body.why : '') : ''; if (r.code !== code || (ec && e !== ec)) got.push(i + ' ' + r.code + '/' + e); });
+    seed87({ noAssign: true }); const rNo = await set87(c, tA87, 't1', '2027-10-31');
+    if (!(rNo.code === 403 && rNo.body.why === 'NOT_ASSIGN_TABLE')) got.push('배정표 없음 ' + rNo.code + '/' + rNo.body.why);
+    const same = JSON.stringify(mem.gw_data['col:vehicles']) === v0 && !Object.keys(mem.gw_data).some((k) => k.indexOf('ver:vehicles:') === 0) && auditMock.logs.length === a0;
+    return { ok: got.length === 0 && same, info: { got, same } };
+  };
+  // ② 담당 갈래 저장 — 그 줄 그 칸만 · 다른 칸·다른 줄·다른 값 그대로 · updated 오늘(KST) · updated_by · 버전 링 1 · 감사 1줄(col vehicles · op 수정 · f 그 칸 [이전, 새]) · 보험 지시는 ins_due만
+  const chk87B = async (c) => { seed87(); const a0 = auditMock.logs.length;
+    const r1 = await set87(c, tA87, 't1', '2027-10-31', '2026-10-31'); const v1 = JSON.parse(JSON.stringify(vehOf87('v1'))), au = auditMock.logs.slice(a0), vers = Object.keys(mem.gw_data).filter((k) => k.indexOf('ver:vehicles:') === 0);
+    const ua1 = mem.gw_data['col:vehicles'].updated_at, ub1 = mem.gw_data['col:vehicles'].updated_by;   // 검토 반영: r2가 같은 ms에 끝나야만 맞던 대조(시각 의존) — r1 바로 뒤 값으로
+    const verDoc = vers.length ? mem.gw_data[vers[0]].doc : null;
+    const r2 = await set87(c, tA87, 't2', '2027-12-20', '2026-12-20'); const v1b = vehOf87('v1');
+    const r3 = await set87(c, tA87, 't7', '2027-11-30', '2027-10-31');   // 다시 지시 키(:re:) — 차량 칸이 이미 2027-10-31로 바뀜 = 담당 갈래 거절
+    const ok = r1.code === 200 && JSON.stringify(r1.body.vehicle) === JSON.stringify({ id: 'v1', field: 'insp_due', value: '2027-10-31', prev: '2026-10-31', updated: KST87 })
+      && v1.insp_due === '2027-10-31' && v1.ins_due === '2026-12-20' && v1.no === '11가1111' && v1.own === '지입' && v1.insurer === '시험보험' && v1.updated === KST87
+      && JSON.stringify(vehOf87(VID2)) === JSON.stringify(V87()[1]) && ub1 === 'u87a' && ua1 === r1.body.updated_at
+      && vers.length >= 1 && verDoc && verDoc.items[0].insp_due === '2026-10-31'
+      && au.length === 1 && au[0].col === 'vehicles' && au[0].bid === 'u87a' && au[0].ev[0].op === '수정' && au[0].ev[0].id === 'v1' && JSON.stringify(au[0].ev[0].f) === JSON.stringify({ insp_due: ['2026-10-31', '2027-10-31'] }) && /배정 담당/.test(au[0].ev[0].t)
+      && r2.code === 200 && r2.body.vehicle.field === 'ins_due' && v1b.ins_due === '2027-12-20' && v1b.insp_due === '2027-10-31'
+      && r3.code === 403 && r3.body.why === 'DATE_MOVED';
+    return { ok, info: { r1: r1.body, v1, au: au.map((x) => x.ev), vers: vers.length, r2: r2.code, r3: [r3.code, r3.body.why] } };
+  };
+  // ③ 차량 수행 갈래 — 담당 아니어도(직원 veh do · 관리자) 그 지시의 그 칸 · 칸이 이미 바뀐 지시(:re: 키)도 · 지금보다 이른 날도 서버는 받음(앱이 확인 문구)
+  const chk87C = async (c) => { seed87();
+    const r1 = await set87(c, tokW, 't5', '2027-09-30', '2026-09-30', 'dev1'), r2 = await set87(c, tokA, 't6', '2026-08-01', '2026-10-31');
+    const ok = r1.code === 200 && vehOf87(VID2).insp_due === '2027-09-30' && r2.code === 200 && vehOf87('v1').insp_due === '2026-08-01' && vehOf87('v1').ins_due === '2026-12-20';
+    return { ok, info: [r1.code, r1.body.error_code, r2.code, r2.body.error_code] };
+  };
+  // ④ 규칙 vehRedo(오늘 2026-11-13 고정) — 지남 + 그 만료일 지시 완료 + 진행 0 + 이번 달 다시 키 없음 → ':re:2026-11'(제목·기한) · 회색·지난 지시 없음·안 지남·진행 중 다시 지시·승인 대기·이번 달 키 있음(지운 것도)·지운 차·지운 지시만 = 없음
+  const VR87 = [{ id: 'A', no: '11가1111', state: '운행', insp_due: '2026-10-31', ins_due: '2027-03-01' }, { id: 'B', no: '22나2222', state: '운행', insp_due: '2027-01-01', ins_due: '2026-11-01' },
+    { id: 'C', no: '33다3333', state: '매각', insp_due: '2026-10-01' }, { id: 'D', no: '44라4444', state: '운행', insp_due: '2026-10-02' }, { id: 'E', no: '55마5555', state: '운행', insp_due: '2026-11-20' },
+    { id: 'F', no: '66바6666', state: '운행', insp_due: '2026-10-03' }, { id: 'G', no: '', state: '정비', insp_due: '2026-09-04' }, { id: 'H', no: '88아8888', state: '운행', insp_due: '2026-10-05' },
+    { id: 'I', no: '99자9999', state: '운행', insp_due: '2026-10-06', del: 1 }, { id: 'J', no: '10차1010', state: '운행', ins_due: '2026-10-07' }, { id: 'K', no: '12카1212', state: '운행', insp_due: '2026-11-12' },
+    { id: 'L', no: '13타1313', state: '운행', insp_due: '2026-11-13' }];
+  const VT87 = [{ auto_key: 'veh:A:insp:2026-10-31', status: 'done' }, { auto_key: 'veh:B:ins:2026-11-01', status: 'done' }, { auto_key: 'veh:B:ins:2026-11-01:re:2026-10', status: 'open' },
+    { auto_key: 'veh:C:insp:2026-10-01', status: 'done' }, { auto_key: 'veh:E:insp:2026-11-20', status: 'done' }, { auto_key: 'veh:F:insp:2026-10-03', status: 'done' }, { auto_key: 'veh:F:insp:2026-10-03:re:2026-11', status: 'open', del: 1 },
+    { auto_key: 'veh:G:insp:2026-09-04', status: 'done' }, { auto_key: 'veh:G:insp:2026-09-04:re:2026-10', status: 'done' }, { auto_key: 'veh:H:insp:2026-10-05', status: 'review' },
+    { auto_key: 'veh:I:insp:2026-10-06', status: 'done' }, { auto_key: 'veh:J:ins:2026-10-07', status: 'done', del: 1 }, { auto_key: 'veh:K:insp:2026-11-12', status: 'done' }, { auto_key: 'veh:L:insp:2026-11-13', status: 'done' }];
+  const chk87D = (ar) => { const out = ar.vehRedo(JSON.parse(JSON.stringify(VR87)), JSON.parse(JSON.stringify(VT87)), '2026-11-13');
+    const keys = out.map((n) => n.auto_key);
+    const a = out.find((n) => n.id === 'A') || {}, g = out.find((n) => n.id === 'G') || {};
+    const ok = JSON.stringify(keys) === JSON.stringify(['veh:A:insp:2026-10-31:re:2026-11', 'veh:G:insp:2026-09-04:re:2026-11', 'veh:K:insp:2026-11-12:re:2026-11'])
+      && a.title === '11가1111 정기검사 갱신 — 다시(완료 뒤 만기일 그대로)' && a.due === '2026-10-31' && a.kind === 'insp' && a.days === -13 && /2026-10-31 그대로/.test(a.detail) && g.title === '차량 정기검사 갱신 — 다시(완료 뒤 만기일 그대로)'
+      && ar.vehRedo([], VT87, '2026-11-13').length === 0 && ar.vehRedo(VR87, null, '2026-11-13').length === 0;
+    return { ok, info: keys };
+  };
+  // ⑤ autotask_ingest 갈래 — 봇 항목 없이도 서버가 차량·지시로 세어 다시 지시 1건(담당 = 배정표 · who_by assign · 기한 = 만료일) · 스위치 없음(dry)이어도 만듦(D-30 차량 규칙과 같이 스위치 무관) · 다시 부르면 0 · 감사 '차량 다시 지시 1'
+  const chk87E = async (c) => { seed87();
+    mem.gw_data['col:vehicles'].items.push({ id: 'r1', no: '77사7777', state: '운행', insp_due: '2020-01-31', ins_due: '2099-01-01', updated: '2026-10-01' }, { id: 'r2', no: '78사7878', state: '검사보류', insp_due: '2020-02-29', updated: '2026-10-01' });
+    mem.gw_data['col:tasks'].items.push(TK87('tr1', 'veh:r1:insp:2020-01-31', 'u87a', 'done'), TK87('tr2', 'veh:r2:insp:2020-02-29', 'u87a', 'done'));
+    const a0 = auditMock.logs.length;
+    const r1 = await c({ action: 'autotask_ingest', key: 'test-ingest-key', items: [] });
+    const nw = mem.gw_data['col:tasks'].items.filter((t) => /:re:/.test(t.auto_key || '') && t.id !== 't7');
+    const r2 = await c({ action: 'autotask_ingest', key: 'test-ingest-key', items: [] });
+    const nw2 = mem.gw_data['col:tasks'].items.filter((t) => /:re:/.test(t.auto_key || '') && t.id !== 't7');
+    const x = nw[0] || {}, ym = KST87.slice(0, 7), lastT = (auditMock.logs.slice(a0)[0] || { ev: [{}] }).ev[0].t || '';
+    const ok = r1.code === 200 && r1.body.redo === 1 && r1.body.made === 1 && nw.length === 1 && x.auto_key === 'veh:r1:insp:2020-01-31:re:' + ym && x.who_id === 'u87a' && x.who_by === 'assign' && x.status === 'open' && x.due === '2020-01-31'
+      && x.from === '자동' && /77사7777 정기검사 갱신 — 다시/.test(x.title) && /차량 다시 지시 1/.test(lastT) && r2.code === 200 && r2.body.redo === 0 && nw2.length === 1;
+    return { ok, info: { r1: r1.body, nw: nw.map((t) => [t.auto_key, t.who_id, t.who_by, t.due]), r2: r2.body, lastT } };
+  };
+  // ⑦ 검토 S1 — 만기일 보호(save vehicles vehDueGuard): veh_due_set 뒤 그 표식을 모르는 낡은 사본(v1 insp_due 2026-10-31·표식 없음 + 다른 차 메모 고침 — 같은 날 로컬 우선 병합·옛 캐시 앱이 올리는 꼴)을
+  //   관리자가 저장 = v1 insp_due 2027-10-31 그대로·표식 이어 감·다른 차 고침 들어감·감사 '만기일 보호' · 표식을 아는 사본(같은 at)이 바꾸기 전 날짜로 되돌림 = 받음 ·
+  //   표식 모르는 사본이 다른 날짜(2026-12-31)로 고침 = 받음(사람 편집) · 표식 = {prev 2026-10-31, at 응답 updated_at}
+  const save87 = (c, items) => c({ action: 'save', collection: 'vehicles', doc: { schema: 1, items: items }, base: mem.gw_data['col:vehicles'].updated_at }, tokA, 'dev1');
+  const chk87F = async (c) => { seed87();
+    const r1 = await set87(c, tA87, 't1', '2027-10-31', '2026-10-31');
+    const mk = ((vehOf87('v1') || {}).due_set || {}).insp_due || null;
+    const stale = V87(); stale[1].note = '새 메모';
+    const a0 = auditMock.logs.length;
+    const s1 = await save87(c, stale);
+    const v1a = JSON.parse(JSON.stringify(vehOf87('v1'))), n2 = (vehOf87(VID2) || {}).note, ops = auditMock.logs.slice(a0).map((x) => x.ev.map((e) => e.op).join('+')).join('|');
+    const known = JSON.parse(JSON.stringify(mem.gw_data['col:vehicles'].items)); known[0].insp_due = '2026-10-31';
+    const s2 = await save87(c, known); const back = vehOf87('v1').insp_due;
+    seed87(); await set87(c, tA87, 't1', '2027-10-31', '2026-10-31');
+    const edit = V87(); edit[0].insp_due = '2026-12-31';
+    const s3 = await save87(c, edit); const ed = vehOf87('v1').insp_due;
+    const ok = r1.code === 200 && !!mk && mk.prev === '2026-10-31' && mk.at === r1.body.updated_at
+      && s1.code === 200 && v1a.insp_due === '2027-10-31' && v1a.due_set && v1a.due_set.insp_due && v1a.due_set.insp_due.at === mk.at && n2 === '새 메모' && /만기일 보호/.test(ops)
+      && s2.code === 200 && back === '2026-10-31' && s3.code === 200 && ed === '2026-12-31';
+    return { ok, info: { r1: r1.code, mk, s1: s1.code, v1: [v1a.insp_due, v1a.due_set], n2, ops, s2: s2.code, back, s3: s3.code, ed } };
+  };
+  // ⑧ 검토 S2 — 쓰기 직전 다시 읽기: 버전 링 스냅샷 중(veridx 쓰기 직전)에 다른 일반 저장이 끝남(다른 차 메모 · updated_at 바뀜) → 그 고침 그대로 + 새 만기일 ·
+  //   그 사이 같은 칸이 바뀜 → 409 VEH_DUE_STALE·그 값 그대로
+  const race87 = async (c, fn) => { let fired = 0; blobsMock.hooks.beforeSet = async (k) => { if (k === 'veridx:vehicles' && !fired) { fired = 1; fn(mem.gw_data['col:vehicles']); } };
+    try { return Object.assign(await set87(c, tA87, 't1', '2027-10-31', '2026-10-31'), { fired }); } finally { blobsMock.hooks.beforeSet = null; } };
+  const chk87G = async (c) => {
+    seed87(); const r1 = await race87(c, (d) => { d.items[1].note = '동시 저장'; d.updated_at = 7777; d.updated_by = 'uadmin'; });
+    const g1 = [vehOf87('v1').insp_due, vehOf87(VID2).note];
+    seed87(); const r2 = await race87(c, (d) => { d.items[0].insp_due = '2027-01-01'; d.updated_at = 7778; });
+    const g2 = vehOf87('v1').insp_due;
+    const ok = r1.fired === 1 && r1.code === 200 && g1[0] === '2027-10-31' && g1[1] === '동시 저장' && r2.fired === 1 && r2.code === 409 && r2.body.error_code === 'VEH_DUE_STALE' && g2 === '2027-01-01';
+    return { ok, info: { r1: [r1.code, r1.fired], g1, r2: [r2.code, r2.body.error_code], g2 } };
+  };
+  try {
+    const gw87 = caller87(gwd), R87 = {};
+    for (const [n, f] of [['A', chk87A], ['B', chk87B], ['C', chk87C], ['E', chk87E], ['F', chk87F], ['G', chk87G]]) R87[n] = await f(gw87);
+    R87.D = chk87D(require(ARF87));
+    const MUT87 = {
+      A: [["    if (!(t.who_id && t.who_id === c.member.id)) return jr(403, { status: 'FORBIDDEN', error_code: 'NO_WRITE', why: 'NOT_ASSIGNEE', request_id: R });\n", ''],
+        ["    if (!(ar && ar.who_id === c.member.id)) return jr(403,", '    if (false) return jr(403,'],
+        ["  if (!vehDo && cur !== m[3]) return jr(403,", '  if (false) return jr(403,'],
+        ["error_code: 'NOT_VEH_TASK', request_id: R });\n  if (t.status === 'done') return jr(400, { status: 'REJECTED', error_code: 'TASK_DONE', request_id: R });\n", "error_code: 'NOT_VEH_TASK', request_id: R });\n"],
+        ["  if (typeof v !== 'string' || !/^20\\d{2}-\\d{2}-\\d{2}$/.test(v)) return null;", "  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(String(v))) return null;"]],
+      B: [['const vid = m[1], field = AR.VEH_DUE_KIND[m[2]].f;', "const vid = m[1], field = 'insp_due';"], ['  wv[field] = date; wv.updated = today;', '  wv[field] = date;'],
+        ['const f = {}; f[field] = [cur, date];', 'const f = {}; f[field] = [date, date];'], ["  await verSnapshot('vehicles', rv.data, c.member.name, false);\n", '']],
+      C: [["  const vehDo = permOf(c.member, 'vehicles') === 'do';", "  const vehDo = !!c.member.admin;"]],
+      E: [['      AR.vehRedo(rvh.data.items, doc.items, today).forEach(function (n) {', '      [].forEach(function (n) {'], ["by: '자동', due: n.due, status: 'open'", "by: '자동', due: today, status: 'open'"]],
+      F: [["  if (col === 'vehicles' && Array.isArray(doc.items)) vehDueKept = vehDueGuard(oldItems, doc.items);\n", ''],   // 검토 S1 — 고치기 전 코드(보호 없음)
+        ["      if (!mk || typeof mk !== 'object' || (tm && tm.at === mk.at)) return;", "      if (!mk || typeof mk !== 'object') return;"],   // 표식을 아는 사본의 되돌림까지 막음
+        ["      if (nz(t[f]) === nz(mk.prev) && nz(o[f]) !== nz(t[f])) { t[f] = o[f]; n++; }", "      if (nz(o[f]) !== nz(t[f])) { t[f] = o[f]; n++; }"],   // 사람 편집(다른 날짜)까지 막음
+        ["wv.due_set[field] = { prev: cur, at: now };", ''],   // 표식 안 남김
+        ["    if (vehDueKept) ev.push({ op: '만기일 보호'", "    if (false) ev.push({ op: '만기일 보호'"]],
+      G: [["  if (Number((rv2.data && rv2.data.updated_at) || 0) !== Number(doc.updated_at || 0)) {", '  if (false) {'],   // 검토 S2 — 고치기 전 코드(다시 읽은 문서를 안 씀)
+        ["    if (cur2 !== cur) return jr(409, { status: 'CONFLICT', error_code: 'VEH_DUE_STALE', cur: cur2, request_id: R });\n", '']],
+    };
+    const AMUT87 = [['    if (GREY.indexOf(String(v.state || \'\')) >= 0) return;\n    [\'insp\'', "    ['insp'"], ["      if (dd === null || dd >= 0) return;   // 지난 것만", '      if (dd === null || dd > 0) return;'],
+      ["      if (same.some(function (t) { return t.status !== 'done'; })) return;\n", ''], ['      if (anyKey[key]) return;\n', ''], ["  const vt = live(taskRows).filter(", "  const vt = asList(taskRows).filter("],
+      ["      if (!same.some(function (t) { return t.status === 'done'; })) return;\n", '']];
+    const kill87 = [];
+    for (const n of Object.keys(MUT87)) for (const [from, to] of MUT87[n]) {
+      let k; try { const mod = load87(FILE87, mutOf87(SRC87, from, to)); k = !(await ({ A: chk87A, B: chk87B, C: chk87C, E: chk87E, F: chk87F, G: chk87G })[n](caller87(mod))).ok; } catch (e) { k = 'err ' + e.message; }
+      if (k !== true) kill87.push(n + ':' + from.slice(0, 50) + (k === false ? ' 안 깨짐' : ' ' + k));
+    }
+    for (const [from, to] of AMUT87) { let k; try { k = !chk87D(load87(ARF87, mutOf87(ARSRC87, from, to))).ok; } catch (e) { k = 'err ' + e.message; } if (k !== true) kill87.push('D:' + from.slice(0, 50) + (k === false ? ' 안 깨짐' : ' ' + k)); }
+    T('87 P1 판2 ① veh_due_set 거절: 비로그인 401 · 기기 미승인 403 · 지운·없는 지시 404 NO_TASK · 사람이 만든 지시 400 NOT_VEH_TASK · 완료 400 TASK_DONE · 차량 숨김·보기 비담당 403 NO_WRITE(NOT_ASSIGNEE) · 지시 담당이지만 배정표 밖(검사·보험) 403(NOT_ASSIGN_TABLE) · 배정표 없음 403(NOT_ASSIGN_TABLE) · 차량 칸이 지시 만료일과 다름 403(DATE_MOVED) · 2/30·8자리·1999·숫자·빈칸 400 BAD_DATE · 차량 없음 404 · 낡은 base_due 409 VEH_DUE_STALE · 같은 날 400 NO_CHANGE · 차량 문서·버전 링·감사 그대로',
+      R87.A.ok, JSON.stringify(R87.A.info));
+    T('87 P1 판2 ② 배정표 차량 담당(차량 보기) 저장: 검사 지시 = insp_due만 2026-10-31→2027-10-31(보험·차번호·소유·보험사·다른 차 그대로 · updated 오늘 KST · updated_by u87a · 응답 vehicle{id,field,value,prev,updated}) · 버전 링 = 바꾸기 전 문서 · 감사 1줄(col vehicles · op 수정 · f insp_due [이전, 새] · 배정 담당) · 보험 지시 = ins_due만 · 칸이 이미 바뀐 다시 지시(:re:) = 403 DATE_MOVED',
+      R87.B.ok, JSON.stringify(R87.B.info));
+    T('87 P1 판2 ③ 차량 수행 갈래: 직원(veh do · 담당 아님) = 그 지시 칸 200 · 관리자 = 칸이 이미 바뀐 지시도·지금보다 이른 날(2026-08-01)도 200(확인 문구는 앱) · 그 칸만',
+      R87.C.ok, JSON.stringify(R87.C.info));
+    T('87 P1 판2 ④ 다시 지시 규칙 vehRedo(오늘 2026-11-13 고정): 지남 + 그 만료일 지시 완료 + 진행 0 + 이번 달 키 없음 = A·G(지난달 다시 지시도 완료)·K(어제 만료) → ":re:2026-11"(제목 "<차번호> 정기검사 갱신 — 다시(완료 뒤 만기일 그대로)"·차번호 없음 "차량" · 기한 = 만료일 · days −13) / 진행 중 다시 지시(B)·회색(C)·지시 없음(D)·안 지남(E)·이번 달 키 있음(지운 것 F)·승인 대기(H)·지운 차(I)·지운 지시만(J)·오늘 만료(L — 아직 안 지남) = 없음 · 빈 차량·지시 없음 = 0건',
+      R87.D.ok, JSON.stringify(R87.D.info));
+    T('87 P1 판2 ⑤ autotask_ingest 갈래: 봇 항목 0이어도 서버가 센 다시 지시 1건(veh:r1:insp:2020-01-31:re:<이번 달 KST> · 담당 = 배정표 u87a · who_by assign · 열림 · 기한 2020-01-31 · from 자동) · 검사보류(회색) 차 제외 · 스위치 없음(dry)이어도 만듦(D-30 차량 규칙과 같이 스위치 무관) · 응답 redo 1·made 1 · 감사 "차량 다시 지시 1" · 다시 부르면 redo 0·겹침 없음',
+      R87.E.ok, JSON.stringify(R87.E.info));
+    T('87 P1 판2 ⑦ 검토 S1 만기일 보호(save vehicles): veh_due_set 표식 {prev 2026-10-31, at = 응답 updated_at} · 표식 모르는 낡은 사본(insp_due 바꾸기 전 날짜 + 다른 차 메모) 저장 = 새 만기일 2027-10-31 그대로·표식 이어 감·다른 차 고침 들어감·감사 "만기일 보호" · 표식 아는 사본의 되돌림 = 받음 · 표식 모르는 사본의 다른 날짜(2026-12-31) = 받음',
+      R87.F.ok, JSON.stringify(R87.F.info));
+    T('87 P1 판2 ⑧ 검토 S2 쓰기 직전 다시 읽기: 버전 링 스냅샷 중 끝난 다른 차 저장(메모 · updated_at 바뀜) = 그 고침 그대로 + 새 만기일 · 그 사이 같은 칸이 바뀜 = 409 VEH_DUE_STALE·그 값 그대로',
+      R87.G.ok, JSON.stringify(R87.G.info));
+    T('87 P1 판2 ⑥ 결함 사본 ' + (Object.keys(MUT87).reduce((s, k) => s + MUT87[k].length, 0) + AMUT87.length) + '개(담당 검사·배정표 검사·날짜 칸 검사·완료 거절·날짜 꼴 느슨 · 칸 고정 insp·updated 안 씀·감사 이전 값·버전 링 걷음 · 차량 수행을 관리자만 · ingest 갈래 걷음·겹침 검사 걷음 · 규칙: 회색·지남 경계·진행 중·이번 달 키·지운 지시·완료 조건 · 검토 S1: 보호 걷음·표식 무시·사람 편집도 막음·표식 안 남김·감사 걷음 · S2: 다시 읽기 걷음·409 걷음) = 모두 ✗',
+      kill87.length === 0, kill87.join(' | '));
+  } finally { reset87(); }
 }
 
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);
