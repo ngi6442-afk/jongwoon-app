@@ -108,6 +108,35 @@ try {
     T('⑥ 머리 전 NETWORK(ECONNRESET)는 한 번 재시도해 성공(호출 2) · 잘림 = TRUNCATED(재시도 안 함 — 호출 1) · 본문 중간 끊김 = NETWORK 재시도 안 함(호출 1 — 15분 상한 보호)',
       g2.ok === true && g3.ok === false && g3.code === 'TRUNCATED' && g4.ok === false && g4.code === 'NETWORK' && calls.length === 1, JSON.stringify([g2.ok, g3.code, g4.code, g4.detail]));
   }
+  // ⑧ 빈 본문(종운환경3 11/13 질문) — 머리만 오고 0바이트로 닫힘 = NETWORK·재시도 안 함(생성 함수 호출 1) · 끝까지 왔는데 글이 비었음 = 응답 그대로 돌려주고
+  //   생성 함수가 PARSE_FAILED(종전 규칙대로 한 번 더 — 호출 2, 비스트리밍 때와 같음) · 이벤트 스트림이 아닌 200 빈 본문 = PARSE·재시도 가능(callApi와 같음)
+  {
+    const photos = [{ media_type: 'image/jpeg', data: 'A'.repeat(200) }, { media_type: 'image/jpeg', data: 'B'.repeat(200) }];
+    const input = { region: '포항 장량동', facility: '우수받이', problem: '침전물', photoCount: 2, shot_at: '2026-10-20 10:00', post_date: '2026-11-13' };
+    useFetch(() => sseResponse('', 7));
+    let e1 = null; try { await CL.callApiStream(KEY, {}, 5000); } catch (e) { e1 = e; }
+    useFetch(() => sseResponse('', 7));
+    const g1 = await PA.generateDraft(KEY, photos, input); const n1 = calls.length;
+    const emptyText = [
+      ['message_start', { type: 'message_start', message: { id: 'msg_2', type: 'message', model: 'claude-sonnet-5', usage: { input_tokens: 900, output_tokens: 1 } } }],
+      ['content_block_start', { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } }],
+      ['content_block_stop', { type: 'content_block_stop', index: 0 }],
+      ['message_delta', { type: 'message_delta', delta: { stop_reason: 'end_turn', stop_sequence: null }, usage: { output_tokens: 3 } }],
+      ['message_stop', { type: 'message_stop' }],
+    ];
+    useFetch(() => sseResponse(sse(emptyText), 9));
+    const r2 = await CL.callApiStream(KEY, {}, 5000);
+    useFetch(() => sseResponse(sse(emptyText), 9));
+    const g2 = await PA.generateDraft(KEY, photos, input); const n2 = calls.length;
+    const blank = () => new Response('', { status: 200, headers: { 'content-type': 'application/json' } });
+    useFetch(blank); let e3 = null; try { await CL.callApiStream(KEY, {}, 5000); } catch (e) { e3 = e; }
+    useFetch(blank); let e4 = null; try { await CL.callApi(KEY, {}, 5000); } catch (e) { e4 = e; }
+    T('⑧ 빈 본문: 머리만 오고 0바이트 = NETWORK·재시도 안 함(생성 함수 호출 1) · 끝까지 왔는데 글 없음 = 응답 그대로(글 "") → 생성 함수 PARSE_FAILED(종전 규칙 한 번 더 — 호출 2) · 이벤트 스트림 아닌 200 빈 본문 = PARSE·재시도 가능(callApi와 같음)',
+      e1 && e1.code === 'NETWORK' && e1.retryable === false && /끝 표시 없이/.test(e1.detail) && g1.ok === false && g1.code === 'NETWORK' && n1 === 1
+      && CL.responseText(r2) === '' && r2.stop_reason === 'end_turn' && g2.ok === false && g2.code === 'PARSE_FAILED' && n2 === 2
+      && e3 && e3.code === 'PARSE' && e3.retryable === true && e4 && e4.code === 'PARSE' && e4.retryable === true,
+      JSON.stringify([e1 && [e1.code, e1.retryable], g1.code, n1, g2.code, n2, e3 && [e3.code, e3.retryable], e4 && [e4.code, e4.retryable]]));
+  }
   // ⑦ 배선(정적) — 생성만 스트리밍, 학습 워커들은 짧아 종전 callApi · promoai 재수출
   {
     const pai = fs.readFileSync(join(FN, '_lib/promoai.js'), 'utf8');

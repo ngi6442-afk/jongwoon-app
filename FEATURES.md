@@ -964,6 +964,7 @@ PM 지시 "문서함 일단 다 올리고 등재결재랑 공개범위 만들어
 - 배포 뒤: 장량동 기록(prmwe7jp78a2t90)은 자동 재시도가 끝나 카드에서 [다시]를 한 번 눌러야 한다.
 - 게이트 `tools/promostream_check.mjs`(신설 9 — SSE 모으기(한글이 조각 경계에 걸려도)·CRLF · JSON 응답·상태 코드 · fetch failed 원인 코드 · 상한 TIMEOUT·끝 표시 없음 · 오류 이벤트·max_tokens · generateDraft 스트리밍·재시도·잘림·중간 끊김 · 배선) · uismoke '체크 10 생성 스트리밍' 묶음.
 - (v458 뒤 — 판 번호는 합칠 때) C132 브라우저 적용 = 서버 applyResult와 같은 꼴: 카드를 연 화면이 사진AI 결과를 먼저 실으면(paApply·paApplyToRecord — 서버는 ai가 있으면 ALREADY로 빠짐) 기록 ai에 프롬프트 판 pv·넣은 쪽 by(client)가 없고 생성 상태 ai_st가 예전 실패로 남던 것(11/13 장량동 — 서버 setAiState를 거치지 않음) → paAiRec(ai 한 곳: model·tokens·ts·tt·by·pv)·paMarkDone(ai_st done — 시도 횟수 그대로·잡 번호 새것) · paFinish가 잡 prompt_ver·잡 번호를 받음. 품질 점수의 판 비교는 서버 초안 보존본(promoai:draft)의 pv를 읽어 원래 영향 없음 — 기록 표식·상태만 맞춤. 이미 그렇게 남은 운영 기록은 손대지 않음.
+- (v458 뒤 — 판 번호는 합칠 때) 빈 본문 시험 ⑧(코드 변경 없음 — 종운환경3 11/13 질문): 머리만 오고 0바이트로 닫힘 = NETWORK '스트림이 끝 표시 없이 끊김'·재시도 안 함 · 끝까지 왔는데 글이 비었음 = 응답 그대로 → generateDraft PARSE_FAILED(종전 규칙대로 한 번 더, 비스트리밍 때와 같음) · 이벤트 스트림이 아닌 200 빈 본문 = PARSE·재시도 가능(callApi와 같음) → promostream_check 10.
 
 ### v395 (10/27) — 자동 지시 배정표 settings:assign (공통 기반 1 첫 시범 · 착수 브리핑 A2, PM 10/27 "착수 ㄱ")
 - 배경: 변경안 0 실측(10/27) 자동 지시 61건 중 담당 공란 33건(54%). 공란의 뜻이 "관리자 전원"이던 것을 끊고(관리자 폴백 금지), 접두어별 담당을 설정값으로 둔다.

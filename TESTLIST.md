@@ -1062,6 +1062,7 @@
 
 ## v458 — 체크 10 — 사진AI 생성 스트리밍 수리(10 세션 11/13 53bf63b·cc156a3 — v455 배포 뒤 확인에서 찾음)
 - [x] `node tools/promostream_check.mjs` 통과(9 — SSE 모으기·CRLF · JSON 응답·상태 코드 · fetch failed 원인 코드 · 상한 TIMEOUT·끝 표시 없음 · 오류 이벤트·max_tokens · generateDraft 스트리밍·재시도·잘림·중간 끊김 · 배선). — ✓ AI 11/13
+- [x] (AI, v458 뒤 — 판 번호는 합칠 때) 빈 본문 시험 ⑧ 더함(코드 변경 없음): 머리만 오고 0바이트 = NETWORK 재시도 안 함 · 끝까지 왔는데 글 없음 = PARSE_FAILED(종전 규칙 한 번 더) · 이벤트 스트림 아닌 200 빈 본문 = PARSE(callApi와 같음) → `node tools/promostream_check.mjs` 10 — ✓ AI 11/13
 - [ ] 배포 뒤: 장량동 기록(prmwe7jp78a2t90) 카드에서 [다시] → 10분 안에 초안(판독표·p2) · 잡 로그에 실패 없음 · 걸린 시간이 5분을 넘어도 끊기지 않는지(잡 시작 → done).
 - [ ] 다음 사진AI 생성들이 NETWORK 'fetch failed' 없이 끝나는지(며칠) · 실패가 나면 사유에 원인 코드(예 UND_ERR_…)가 붙는지.
 - [x] (AI) v455 재검토 낮음 N1(직책 거름 = 님·에게·께만, 버린 규칙 수 dropped·로그)·N2(저장된 규칙도 읽을 때 cleanRule) 반영 뒤 `node tools/promoqlearn_check.mjs` 44 — ✓ AI 11/13
