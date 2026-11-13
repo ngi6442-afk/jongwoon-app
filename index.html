@@ -621,6 +621,23 @@
   .duty-badge.ok{background:#E3F2E9;color:#0F5132;}
   .duty-badge.pre{background:#FBF3DF;color:#7a5b12;}
   .duty-badge.unit{background:#E3EFF9;color:#1B5A8A;}
+  /* P1 판28 인허가 '이번 달' 탭(시안 판3 ②) — 묶음 머리는 의무 대장 .duty-group, 줄은 .item/.task-ctrl 그대로(640px 밑 버튼은 v254 규칙으로 아랫줄 — 본문을 누르지 않음).
+     폰에서는 인허가 이름 칸·0인 묶음 셈을 뺀다(시안 380px). 창 입력은 16px(iOS 확대 방지 — .modal input 14px를 이 창만 덮음) */
+  .lm-item .item-title{font-size:13.5px;line-height:1.35;}
+  .lm-item .item-meta{flex-wrap:wrap;}
+  .lm-fixed{color:#7a5b12;font-weight:700;}
+  .lm-hd-ph{display:none;}
+  .lm-drop{display:block;border:1.5px dashed var(--line);border-radius:10px;padding:12px;text-align:center;font-size:13px;color:var(--sub);margin-bottom:10px;cursor:pointer;}
+  .lm-drop small{display:block;font-size:11.5px;margin-top:2px;}
+  .lm-hint{font-size:12px;color:var(--sub);margin:-4px 2px 10px;line-height:1.5;}
+  #lmBackdrop input, #lmBackdrop select{font-size:16px;}
+  #lmBackdrop select{width:100%;padding:12px;border-radius:10px;border:1px solid var(--line);margin-bottom:10px;background:#fff;color:inherit;}
+  .duty-att{font-size:12px;color:var(--brand-dark);text-decoration:underline;margin-left:4px;}
+  @media (max-width:640px){
+    .lm-item .lm-lic{display:none;}
+    .lm-hd-pc{display:none;}
+    .lm-hd-ph{display:inline;}
+  }
 
   /* 차량 */
   .own-badge{display:inline-block;font-size:11px;padding:1px 7px;border-radius:999px;font-weight:700;}
@@ -1779,12 +1796,12 @@
   </section>
 
   <section class="view" id="view-lic">
-    <!-- 3층 구조 1차(시안_인허가3층_20260901 승인): ①허가증=현행 그대로 ②의무 대장=등재표 ③이번 달 안내.
-         회차 인스턴스 자동생성·persons 명부는 2차 — renderLicMonth 위 TODO 참조. -->
+    <!-- 3층 구조 1차(시안_인허가3층_20260901 승인): ①허가증=현행 그대로 ②의무 대장=등재표 ③이번 달 = P1 판28부터 기한 목록(시안 판3 ② — @lic-month 구간).
+         persons 명부(개인 행)·차량 행은 의무 대장에만 — renderLicMonth 위 TODO 참조. -->
     <div class="lsub-bar" id="licSubBar">
       <button class="lsub-btn active" data-lsub="cert">허가증 <span data-lsub-cnt="cert"></span></button>
       <button class="lsub-btn" data-lsub="duty">의무 대장 <span data-lsub-cnt="duty"></span></button>
-      <button class="lsub-btn" data-lsub="month">이번 달</button>
+      <button class="lsub-btn" data-lsub="month">이번 달 <span data-lsub-cnt="month"></span></button>
     </div>
 
     <div id="licLayerCert">
@@ -1819,7 +1836,8 @@
     </div>
 
     <div id="licLayerMonth" style="display:none;">
-      <div class="dash-sec" style="margin-bottom:8px;"><h2>이번 달</h2></div>
+      <div class="dash-sec" style="margin-bottom:8px;"><h2>이번 달 <span class="cnt" id="licMonthHead"></span></h2></div>
+      <div class="sfn-note" id="licMonthNote" style="display:none;"></div>
       <div class="card" id="licMonthPane"></div>
     </div>
   </section>
@@ -3224,6 +3242,45 @@
     <button class="primary" id="vehSave">저장</button>
     <button class="danger" id="vehDelete">삭제</button>
     <button class="secondary" id="vehCancel">취소</button>
+  </div>
+</div>
+
+<!-- P1 판28 인허가 '이번 달' 단추 창(시안 판3 ② 창 4종 — 완료+수령 올리기·기한 정정·해당 없음·기준일). 동작은 @lic-month 구간(lmOpen·lmSave) · 저장은 서버 lic_duty_set(그 행만) -->
+<div class="modal-backdrop" id="lmBackdrop">
+  <div class="modal" style="max-width:440px;">
+    <h3 id="lmTitle">이번 달</h3>
+    <p id="lmDesc"></p>
+    <div id="lmDone">
+      <span class="fld-label">제출한 날</span>
+      <input type="date" id="lmDoneAt">
+      <span class="fld-label">접수번호</span>
+      <input type="text" id="lmRef" maxlength="60" placeholder="올바로 접수번호 등" autocomplete="off">
+      <span class="fld-label">수령본</span>
+      <label class="lm-drop" for="lmFile"><span id="lmFileName">접수증·확인서 넣기</span><small>pdf · 사진</small></label>
+      <input type="file" id="lmFile" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" style="display:none;">
+    </div>
+    <div id="lmFix">
+      <span class="fld-label">고친 기한</span>
+      <input type="date" id="lmFixTo">
+      <span class="fld-label">사유 유형(꼭 고름)</span>
+      <select id="lmFixReason"></select>
+      <div class="lm-hint">기산일 오류 · 유예 누락 · 공고 연장 · 대행 계약 · 기관 통지 · 기타</div>
+    </div>
+    <div id="lmNa">
+      <span class="fld-label">사유(꼭 적음)</span>
+      <input type="text" id="lmNaReason" maxlength="200" placeholder="예: 검사 대상 시설 없음 — 일반 재활용시설만 보유" autocomplete="off">
+    </div>
+    <div id="lmBase">
+      <span class="fld-label">기준일</span>
+      <input type="date" id="lmBaseDate">
+      <span class="fld-label">무엇의 날짜인가</span>
+      <select id="lmBaseWhat"></select>
+    </div>
+    <input type="text" id="lmMemo" maxlength="200" placeholder="메모 (선택)" autocomplete="off">
+    <div class="err" id="lmErr"></div>
+    <button class="primary" id="lmOkBtn">저장</button>
+    <div class="lm-hint" id="lmHint" style="text-align:center;margin:8px 0 0;"></div>
+    <button class="secondary" id="lmCancel">취소</button>
   </div>
 </div>
 
@@ -7281,6 +7338,11 @@
   document.getElementById("dutySearch").addEventListener("input", function(){ dutyQ = this.value.trim(); renderDuties(); });
   document.getElementById("dutyPreSave").addEventListener("click", saveDutyFromModal);
   document.getElementById("dutyPreCancel").addEventListener("click", closeDutyModal);
+  // P1 판28 인허가 '이번 달' 단추 창(@lic-month 구간)
+  document.getElementById("lmOkBtn").addEventListener("click", lmSave);
+  document.getElementById("lmCancel").addEventListener("click", lmClose);
+  document.getElementById("lmFile").addEventListener("change", lmFilePicked);
+  document.getElementById("lmDoneAt").addEventListener("input", lmHintNext);
   // asbAddBtn은 v350에서 제거(현장 탭 [+ 현장 추가]가 대신한다)
   document.getElementById("asbSave").addEventListener("click", saveAsb);
   document.getElementById("asbDelete").addEventListener("click", deleteAsb);
@@ -27261,6 +27323,141 @@
     saveLicCache(); renderLicenses(); renderDashboard(); scheduleLicSave();
   }
 
+  // P1 판28 인허가 회차 계산 — 서버 netlify/functions/_lib/duty.js의 DUTY_SHARED 구간과 글자째 같은 본문(ES5 · 들여쓰기도 그대로 — uismoke P1 판28이 대조. 한쪽만 고치지 말 것)
+// ==== DUTY_SHARED_BEGIN ====
+function dutyPad2(n){ return (n < 10 ? "0" : "") + n; }
+function dutyParse(iso){
+  var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || ""));
+  if (!m) return null;
+  return { y: +m[1], m: +m[2], d: +m[3] };
+}
+function dutyLastDay(y, m){ return new Date(y, m, 0).getDate(); }   // m = 1~12
+function dutyMake(y, m, d){
+  while (m > 12){ m -= 12; y += 1; }
+  while (m < 1){ m += 12; y -= 1; }
+  var last = dutyLastDay(y, m);
+  if (d < 1 || d > last) d = last;   // 0 = 말일, 31일이 없는 달은 말일로
+  return y + "-" + dutyPad2(m) + "-" + dutyPad2(d);
+}
+function dutyAddMonths(iso, n){
+  var p = dutyParse(iso); if (!p) return "";
+  return dutyMake(p.y, p.m + n, p.d);
+}
+function dutyAddDays(iso, n){
+  var p = dutyParse(iso); if (!p) return "";
+  var t = new Date(Date.UTC(p.y, p.m - 1, p.d) + n * 86400000);
+  return t.getUTCFullYear() + "-" + dutyPad2(t.getUTCMonth() + 1) + "-" + dutyPad2(t.getUTCDate());
+}
+function dutyDiffDays(a, b){   // a - b (일)
+  var pa = dutyParse(a), pb = dutyParse(b); if (!pa || !pb) return 0;
+  return Math.round((Date.UTC(pa.y, pa.m - 1, pa.d) - Date.UTC(pb.y, pb.m - 1, pb.d)) / 86400000);
+}
+function dutyPeriodMonths(s){
+  var n = Number(s && s.every_n) || 0;
+  if (n <= 0) return 0;
+  return (s.every_unit === "year") ? n * 12 : n;
+}
+// 직전 이행 기준 — runs 중 가장 늦은 done_at, 없으면 base_date
+function dutyAnchor(d){
+  var best = "";
+  var runs = (d && d.runs && d.runs.length) ? d.runs : [];
+  for (var i = 0; i < runs.length; i++){ var r = runs[i]; if (r && dutyParse(r.done_at) && r.done_at > best) best = r.done_at; }
+  if (best) return best;
+  return (d && dutyParse(d.base_date)) ? d.base_date : "";
+}
+function dutyDoneSet(d){
+  var set = {}, runs = (d && d.runs && d.runs.length) ? d.runs : [];
+  for (var i = 0; i < runs.length; i++){ if (runs[i] && runs[i].due) set[runs[i].due] = true; }
+  return set;
+}
+// 후보 기한 목록에서 기준일(직전 이행일)이 채운 회차 = 기준일에 가장 가까운 후보(마감 전 이행·마감 뒤 늦은 이행 모두 그 회차로 본다).
+//   예: 매년 3/31 — 2026-03-20 이행 → 2026-03-31 회차 완료 → 다음 2027-03-31 / 2026-04-05(늦은 이행)도 2026 회차.
+function dutyFilledIdx(cands, anchor){
+  var best = -1, bestGap = 1e9;
+  for (var i = 0; i < cands.length; i++){
+    var gap = Math.abs(dutyDiffDays(cands[i], anchor));
+    if (gap < bestGap){ bestGap = gap; best = i; }
+  }
+  return best;
+}
+// 다음 회차를 찾기 시작할 후보 자리(고정일·허가일 주기) — 완료 기록(runs[].due)이 후보에 있으면 가장 늦은 완료 회차 다음(P1 판28: 기한을 한참 넘겨 낸 회차가
+//   제출일에 더 가까운 다음 회차까지 채운 것으로 보이지 않게 — 예: 2026-02-28 회차를 2026-11-13에 냄 → 다음 2027-02-28), 없으면 기준일에 가장 가까운 후보 다음, 둘 다 없으면 -1
+function dutyStartIdx(cands, done, anchor){
+  var k, last = -1;
+  for (k = 0; k < cands.length; k++){ if (done[cands[k]]) last = k; }
+  if (last >= 0) return last + 1;
+  if (anchor) return dutyFilledIdx(cands, anchor) + 1;
+  return -1;
+}
+// d = 의무 행, lic = 붙는 허가증({issued}) 또는 null, today = 'YYYY-MM-DD'
+function dutyNext(d, lic, today){
+  var s = d && d.sched;
+  if (!s || !s.auto) return null;
+  var done = dutyDoneSet(d), anchor = dutyAnchor(d), grace = Number(s.grace_days) || 0, k, j, due, cands = [], start = 0;
+  var out = { due: "", days: 0, overdue: false, kind: s.type, anchor: anchor, missing: null };
+  if (s.type === "fixed"){
+    // 매년 1~2개 고정일(fixed_month/day, 선택 fixed2_month/day — 예: 반기 보고 7/31·익년 1/31). 말일 = day 0.
+    var dates = [], mo = Number(s.fixed_month) || 0, dy = Number(s.fixed_day), mo2 = Number(s.fixed2_month) || 0, dy2 = Number(s.fixed2_day);
+    if (mo < 1 || mo > 12){ out.missing = "sched"; return out; }
+    dates.push([mo, isNaN(dy) ? 0 : dy]);
+    if (mo2 >= 1 && mo2 <= 12) dates.push([mo2, isNaN(dy2) ? 0 : dy2]);
+    var y0 = dutyParse(anchor) ? dutyParse(anchor).y : dutyParse(today).y;
+    for (k = -1; k < 6; k++){ for (j = 0; j < dates.length; j++) cands.push(dutyMake(y0 + k, dates[j][0], dates[j][1])); }
+    cands.sort();
+    start = dutyStartIdx(cands, done, anchor);
+    if (start < 0){   // 기준 없음: 올해분부터 — 지난해 회차·한 주기(12/날짜 수 개월) 넘게 지난 회차는 안 보인다
+      start = 0;
+      var ty = dutyParse(today).y, gapM = Math.round(12 / dates.length);
+      while (start < cands.length && (dutyParse(cands[start]).y < ty || dutyAddMonths(cands[start], gapM) <= today)) start++;
+    }
+  } else if (s.type === "interval"){
+    var per = dutyPeriodMonths(s);
+    if (!per){ out.missing = "sched"; return out; }
+    if (s.base === "issued"){
+      var issued = (lic && dutyParse(lic.issued)) ? lic.issued : "";
+      if (!issued){ out.missing = "lic"; return out; }
+      for (k = 1; k <= 120; k++){
+        due = dutyAddMonths(issued, per * k);
+        cands.push(grace ? dutyAddDays(due, grace) : due);
+      }
+      start = dutyStartIdx(cands, done, anchor);
+      if (start < 0){ start = 0; while (start < cands.length && dutyAddMonths(cands[start], per) <= today) start++; }   // 기준 없음: 한 주기 넘게 지난 회차는 안 보인다
+    } else {   // last_done · manual — 직전 이행일(runs) 또는 사람이 넣은 기준일부터 한 주기
+      if (!anchor){ out.missing = "base"; return out; }
+      due = dutyAddMonths(anchor, per);
+      if (grace) due = dutyAddDays(due, grace);
+      for (k = 0; k < 6; k++){ cands.push(due); due = dutyAddMonths(due, per); }
+    }
+  } else {
+    return null;   // event·always·na — 자동 회차 없음
+  }
+  for (k = start; k < cands.length; k++){ if (!done[cands[k]]){ out.due = cands[k]; break; } }   // 완료 처리된 회차는 건너뛴다
+  if (!out.due){ out.missing = "range"; return out; }
+  out.days = dutyDiffDays(out.due, today);
+  out.overdue = out.days < 0;
+  return out;
+}
+// 이번 회차(P1 판28) — dutyNext에 그 행의 [해당 없음]·[기한 정정]을 얹는다. 해당 없음(d.na.on) = null(자동 회차 끔 — 행·근거·완료 기록은 그대로).
+//   기한 정정은 그 회차만(d.due_fix[계산 기한] = { to, … } — 주기 값은 안 바꿈). 결과 = dutyNext 결과 + orig(계산 기한 — 완료 기록 runs[].due에 넣는 값) · fixed(정정됨).
+function dutyCur(d, lic, today){
+  if (d && d.na && d.na.on) return null;
+  var nx = dutyNext(d, lic, today);
+  if (!nx || !nx.due) return nx;
+  nx.orig = nx.due; nx.fixed = false;
+  var fm = (d && d.due_fix && typeof d.due_fix === "object") ? d.due_fix : null;
+  var fx = (fm && Object.prototype.hasOwnProperty.call(fm, nx.due)) ? fm[nx.due] : null;
+  if (fx && dutyParse(fx.to)){ nx.due = fx.to; nx.fixed = true; nx.days = dutyDiffDays(nx.due, today); nx.overdue = nx.days < 0; }
+  return nx;
+}
+// 알림 단계 — 'over'(지남, 매일) · 'd7'(7일 이내 1회) · 'd30'(30일 이내 1회) · ''
+function dutyStage(nx){
+  if (!nx || !nx.due) return "";
+  if (nx.days < 0) return "over";
+  if (nx.days <= 7) return "d7";
+  if (nx.days <= 30) return "d30";
+  return "";
+}
+// ==== DUTY_SHARED_END ====
   // ---- 인허가 3층: ②의무 대장 + ③이번 달 (1차 — 시안_인허가3층_20260901) ----
   function liveDuties(){ return duties.slice().sort(function(a, b){ return (a.no || 0) - (b.no || 0); }); }
   function findDuty(no){ for (var i=0;i<duties.length;i++){ if (duties[i].no === no) return duties[i]; } return null; }
@@ -27293,7 +27490,7 @@
     document.getElementById("licLayerDuty").style.display = (name === "duty") ? "" : "none";
     document.getElementById("licLayerMonth").style.display = (name === "month") ? "" : "none";
     if (name === "duty") renderDuties();
-    if (name === "month") renderLicMonth();
+    if (name === "month"){ if (licMonth.st !== "loading") licMonth.st = ""; renderLicMonth(); }   // P1 판28 — 칸을 열 때마다 서버에서 근거표·누를 수 있는 행을 다시 읽음(@lic-month)
   }
   function updateLicSubCnt(){
     var bar = document.getElementById("licSubBar"); if (!bar) return;
@@ -27373,17 +27570,18 @@
       if (d.precheck_answer) parts.push("<b>선행확인 답</b>  " + esc(d.precheck_answer));
       if (d.base_date) parts.push("<b>기준일</b>  " + esc(d.base_date));
       if (d.confirmed_by) parts.push("<b>확정 전환</b>  " + esc(d.confirmed_by) + " · " + esc(d.confirmed_at || ""));
+      parts = parts.concat(lmDutyDetail(d));   // P1 판28 이번 달 단추 칸(완료 기록·정정·해당 없음·기준일 무엇)
       detail = '<div class="task-detail" style="margin-top:5px;">' + parts.join("<br>") + '</div>';
     }
     var canPre = isAdmin() && (d.confirm === "조건부" || d.precheck_answer || d.confirmed_by);   // 등재·확정은 관리자 전용(서버도 차단) — 사람이 확정한 행은 재열람·회수 가능해야 막다른 길이 없다
     return '<div class="item duty-item" data-duty-no="' + d.no + '">' +
         '<div class="item-body">' +
           '<div class="item-title">' + d.no + '. ' + esc(d.duty) + '</div>' +
-          '<div class="item-meta" style="margin-top:2px;">' + dutyBadges(d) + '</div>' +
+          '<div class="item-meta" style="margin-top:2px;">' + dutyBadges(d) + (d.na && d.na.on ? ' <span class="duty-badge pre">해당 없음 — 자동 회차 끔</span>' : '') + '</div>' +
           '<div class="duty-sum">' + esc(d.cycle || "") + (d.basis ? " — " + esc(d.basis) : "") + '</div>' +
           detail +
         '</div>' +
-        (canPre ? '<div class="task-ctrl"><button class="mini-btn" data-duty-pre="' + d.no + '">선행확인 입력</button></div>' : '') +
+        ((canPre || (isAdmin() && d.na && d.na.on)) ? '<div class="task-ctrl">' + (canPre ? '<button class="mini-btn" data-duty-pre="' + d.no + '">선행확인 입력</button>' : '') + ((isAdmin() && d.na && d.na.on) ? '<button class="mini-btn" data-duty-naoff="' + d.no + '">해당 없음 되돌리기</button>' : '') + '</div>' : '') +
       '</div>';
   }
 
@@ -27433,6 +27631,12 @@
         e.stopPropagation();
         openDutyModal(parseInt(el.getAttribute("data-duty-pre"), 10));
       });
+    });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-duty-naoff]"), function(el){   // P1 판28 관리자 해당 없음 되돌리기(@lic-month lmNaUndo)
+      el.addEventListener("click", function(e){ e.stopPropagation(); lmNaUndo(parseInt(el.getAttribute("data-duty-naoff"), 10)); });
+    });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-duty-att]"), function(el){   // P1 판28 완료 기록 수령본 보기(@lic-month lmAttOpen)
+      el.addEventListener("click", function(e){ e.preventDefault(); e.stopPropagation(); lmAttOpen(el.getAttribute("data-duty-att")); });
     });
   }
 
@@ -27514,22 +27718,289 @@
     saveLicCache(); renderDuties(); scheduleLicSave();
   }
 
-  // TODO(2차): 의무 × 대상(허가증·차량·persons) 회차 인스턴스 자동 생성 → 캘린더·D-30 지시 발행(시안 ③층).
-  // TODO(2차): persons 명부 신설(지입차주·조종사·석면 근로자 — 생년월일·배치일) 후 [개인단위] 행 연결(인사 탭 하위).
+  // TODO: 담당 자동 지시(판 20 — duty-cron 가동)·persons 명부 신설 뒤 [개인단위] 행 연결(인사 탭 하위) — 이번 달 탭은 자동 회차 행만(개인·차량·사건형·상시는 의무 대장).
   // TODO(3차): [차량단위] 행은 차량탭이 만기 원장 — 여기선 참조만(중복 대장 금지, 시안 단계 계획).
+  // @lic-month-start — P1 판28 인허가 '이번 달' 탭(원장 T165·T179·T478 · 시안 판3 ② — PM 11/13 18:14 '45. 판3 ㄱ').
+  //   원천 = 서버 lic_month_get(인허가 근거 승격본의 자동 회차 행 + 내가 누를 수 있는 행 act) + 인허가 문서(duties 완료 기록·기준일·정정·해당 없음 · items 허가일).
+  //   계산 = DUTY_SHARED 구간 dutyCur(서버 _lib/duty.js와 글자째 같은 본문 — uismoke P1 판28 대조). 묶음 = 지남 · 7일 안 · 30일 안 · 기준일 없음(dutyStage).
+  //   쓰기 = 서버 lic_duty_set(그 행만 — 완료·기한 정정·해당 없음·기준일, 관리자는 해당 없음 되돌리기) · 수령본 = att_put kind 'lic'. 이 구간은 인허가 문서 통째 저장(scheduleLicSave)을 부르지 않는다.
+  //   단추는 서버가 준 act(관리자 또는 인허가 수행 + 배정표 담당)일 때만 그린다 — 보기 권한은 view-lic readonly CSS로도 숨는다.
+  var licMonth = { st: "", rows: null, ver: "", act: {}, who: null, vid: "", seq: 0, err: "" };
+  var LM_BASE_WHAT = { 16: "직전 평가 결과 통지일", 22: "직전 측정 완료일", 25: "직전 검사일", 29: "직전 점검확인서 일자", 34: "직접 입력(최초 기산일)", 38: "보험 시작일(직전 갱신일)", 39: "직전 정기검사일", 65: "직전 측정일", 71: "직전 부과기간 완료일", 85: "보험 시작일" };   // 시안 판3 ② '기준:' 글 그대로(행 번호) — 없는 행은 lmBaseWhat 꼴
+  var LM_FIX_REASONS = ["기산일 오류", "유예 누락", "공고 연장", "대행 계약", "기관 통지", "기타"];   // 서버 LIC_FIX_REASONS와 같은 6가지(업무별 설계 3-8 A6)
+  var LM_ATT_EXT = { pdf: 1, jpg: 1, jpeg: 1, png: 1 };   // 서버 LIC_ATT_MIME 키와 같음
+  var LM_OP_LABEL = { done: "완료", fix: "기한 정정", na: "해당 없음", base: "기준일" };
+  var lmCur = null, lmBusy = false;
+  function lmBaseWhat(r){ return LM_BASE_WHAT[r.no] || (r.base === "manual" ? "직접 입력" : "직전 이행일"); }
+  function lmJosa(s, a, b){ var t = String(s || "").replace(/\)$/, "").replace(/\([^()]*$/, ""), c = t.charCodeAt(t.length - 1); return s + ((c >= 0xAC00 && c <= 0xD7A3 && (c - 0xAC00) % 28) ? a : b); }
+  function lmMD(iso){ var p = dutyParse(iso); return p ? (p.m + "/" + p.d) : ""; }
+  function lmRow(no){ var rs = licMonth.rows || []; for (var i = 0; i < rs.length; i++){ if (rs[i] && rs[i].no === no) return rs[i]; } return null; }
+  function lmLicOf(id){ if (!id) return null; for (var i = 0; i < licenses.length; i++){ var l = licenses[i]; if (l && l.id === id && l.del !== 1) return l; } return null; }
+  function lmNext(r, d, today){ return dutyCur(Object.assign({}, d, { sched: r }), lmLicOf(r.lic_id), today); }
+  function lmLoad(){
+    var seq = ++licMonth.seq;
+    licMonth.st = "loading"; licMonth.vid = myId(); licMonth.err = "";
+    return gwCall("gw-data", { action: "lic_month_get" }).then(function(res){
+      if (seq !== licMonth.seq) return;
+      if (!res || res.status !== 200 || !res.body || !Array.isArray(res.body.rows)){ licMonth.st = "err"; licMonth.err = String((res && res.body && res.body.error_code) || (res ? res.status : "")); renderLicMonth(); return; }
+      var act = {}; (res.body.act || []).forEach(function(n){ act[n] = 1; });
+      licMonth.rows = res.body.rows; licMonth.ver = String(res.body.ver || ""); licMonth.act = act; licMonth.who = res.body.who || null; licMonth.st = "ok";
+      renderLicMonth();
+    }).catch(function(){ if (seq !== licMonth.seq) return; licMonth.st = "err"; licMonth.err = "네트워크"; renderLicMonth(); });
+  }
+  function lmGroups(today){
+    var g = { over: [], d7: [], d30: [], base: [], later: [], na: [] };
+    (licMonth.rows || []).forEach(function(r){
+      var d = findDuty(r.no); if (!d) return;
+      if (d.na && d.na.on){ g.na.push({ r: r, d: d, nx: null }); return; }
+      var nx = lmNext(r, d, today), it = { r: r, d: d, nx: nx };
+      if (!nx || !nx.due){ g.base.push(it); return; }   // 기준일 없음(missing base) · 허가일 없음(lic) · 계산 못 함(sched·range)
+      var s = dutyStage(nx);
+      (s === "over" ? g.over : (s === "d7" ? g.d7 : (s === "d30" ? g.d30 : g.later))).push(it);
+    });
+    var byDays = function(a, b){ return (a.nx.days - b.nx.days) || (a.r.no - b.r.no); };
+    g.over.sort(byDays); g.d7.sort(byDays); g.d30.sort(byDays); g.later.sort(byDays);
+    g.base.sort(function(a, b){ return a.r.no - b.r.no; });
+    return g;
+  }
+  function lmSum(r){
+    var lic = lmLicOf(r.lic_id), cyc = String(r.cycle || "").split("(")[0].trim(), extra = "";
+    if (r.type === "interval" && r.base === "issued" && lic && isDate(lic.issued)) extra = " — 허가일 " + lic.issued + " 기준" + (Number(r.grace_days) ? " + 유예 " + Number(r.grace_days) + "일" : "");
+    return cyc + extra + (r.law ? " · " + r.law : "");
+  }
+  function lmBtn(op, no, label){ return '<button type="button" class="mini-btn" data-lm-op="' + op + '" data-lm-no="' + no + '">' + label + '</button>'; }
+  function lmRowHtml(it, grp){
+    var r = it.r, nx = it.nx, meta = [], btn = [], miss = nx ? nx.missing : "sched";
+    if (grp === "base"){
+      meta.push('<span class="duty-badge pre">' + (miss === "base" ? "기준일 없음 — 입력" : (miss === "lic" ? "허가일 없음 — 허가증에서 입력" : "기한 계산 못 함 — 의무 대장 확인")) + '</span>');
+      if (miss === "base") meta.push('<span>기준: ' + esc(lmBaseWhat(r)) + '</span>');
+    } else {
+      meta.push('<span class="dday ' + (grp === "over" ? "red" : "orange") + '">' + (nx.days < 0 ? "지남 " + (-nx.days) + "일" : (nx.days === 0 ? "오늘" : "D-" + nx.days)) + '</span>');
+      meta.push('<span>기한 ' + esc(nx.due) + '</span>');
+      if (nx.fixed) meta.push('<span class="lm-fixed">정정됨(계산 ' + esc(nx.orig) + ')</span>');
+    }
+    if (r.lic) meta.push('<span class="lm-lic">' + esc(r.lic) + '</span>');
+    if (r.badge) meta.push('<span class="duty-badge pre">' + esc(r.badge) + '</span>');
+    if (licMonth.act[r.no]){
+      if (grp === "base"){ if (miss === "base") btn.push(lmBtn("base", r.no, "기준일 입력")); }
+      else { btn.push(lmBtn("done", r.no, "완료+수령 올리기")); btn.push(lmBtn("fix", r.no, "기한 정정")); }
+      btn.push(lmBtn("na", r.no, "해당 없음"));
+    }
+    return '<div class="item lm-item" data-lm-row="' + r.no + '"><div class="item-body"><div class="item-title">' + r.no + '. ' + esc(r.duty) + '</div>' +
+      '<div class="item-meta">' + meta.join("") + '</div><div class="duty-sum">' + esc(lmSum(r)) + '</div></div>' +
+      (btn.length ? '<div class="task-ctrl">' + btn.join("") + '</div>' : '') + '</div>';
+  }
+  function lmGroupHtml(label, list, grp, badge, empty){
+    var h = '<div class="duty-group" data-lm-grp="' + grp + '">' + label + ' ' + badge + '</div>';
+    if (!list.length) return h + '<div class="empty-line">' + esc(empty || "없음") + '</div>';
+    return h + list.map(function(it){ return lmRowHtml(it, grp); }).join("");
+  }
+  function lmCnt(t){ var bar = document.getElementById("licSubBar"), c = bar ? bar.querySelector('[data-lsub-cnt="month"]') : null; if (c) c.textContent = t; }
   function renderLicMonth(){
     var host = document.getElementById("licMonthPane"); if (!host) return;
-    var all = liveDuties();
-    var cf = all.filter(function(d){ return d.confirm === "확정"; }).length;
-    var vh = all.filter(function(d){ return d.unit === "차량"; }).length;
-    var pp = all.filter(function(d){ return d.unit === "개인"; }).length;
-    host.innerHTML =
-      '<div class="lic-nodate" style="margin:12px 12px 4px;">이번 달 할 일(회차 인스턴스) 자동생성은 <b>2차</b> 범위입니다 — 지금은 ②의무 대장을 채우는 단계.</div>' +
-      (all.length
-        ? '<div style="padding:8px 14px 14px;font-size:13.5px;">확정도: <b>확정 ' + cf + '</b> · 조건부 ' + (all.length - cf) + ' / 총 ' + all.length +
-          '<div style="font-size:12px;color:var(--sub);margin-top:5px;line-height:1.6;">조건부 행은 의무 대장의 "선행확인 입력"으로 확정 전환하세요 — 확정이 쌓이면 2차(자동생성)로 넘어갑니다.<br>차량단위 ' + vh + '건·개인단위 ' + pp + '건은 2차에서 차량탭·명부와 연결됩니다.</div></div>'
-        : '<div class="empty-line">의무 대장이 비어 있습니다 — 먼저 ②층에서 등재표를 불러오세요.</div>');
+    var head = document.getElementById("licMonthHead"), note = document.getElementById("licMonthNote");
+    if (licMonth.st && licMonth.vid !== myId()){ licMonth.seq++; licMonth.st = ""; licMonth.rows = null; licMonth.act = {}; licMonth.who = null; }   // 로그인 '전환' — 앞사람이 누를 수 있던 행으로 그리지 않게
+    if (!host.getAttribute("data-lm-wired")){ host.setAttribute("data-lm-wired", "1"); host.addEventListener("click", lmClick); }
+    if (head) head.innerHTML = ""; if (note){ note.style.display = "none"; note.textContent = ""; }
+    if (!duties.length){ lmCnt(""); host.innerHTML = '<div class="empty-line">의무 대장이 비어 있습니다 — 먼저 의무 대장에서 등재표를 불러오세요.</div>'; return; }
+    if (!licMonth.st) lmLoad();
+    if (licMonth.st !== "ok"){
+      host.innerHTML = licMonth.st === "err" ? '<div class="empty-line">기한 근거표를 읽지 못했습니다(' + esc(licMonth.err) + ') — 칸을 다시 열면 다시 읽습니다.</div>' : '<div class="loading">불러오는 중…</div>';
+      return;
+    }
+    var today = todayStr(), g = lmGroups(today), n = g.over.length + g.d7.length + g.d30.length + g.base.length;
+    if (!(licMonth.rows || []).length){ lmCnt(""); host.innerHTML = '<div class="empty-line">자동 회차 행이 없습니다 — 인허가 근거표가 승격되면 여기에 기한이 나옵니다.</div>'; return; }
+    lmCnt(String(n));
+    var parts = [["지남", g.over.length], ["7일 안", g.d7.length], ["30일 안", g.d30.length], ["기준일 없음", g.base.length]];
+    if (head) head.innerHTML = '<span class="lm-hd-pc">' + parts.map(function(p){ return p[0] + " " + p[1]; }).join(" · ") + '</span><span class="lm-hd-ph">' + (parts.filter(function(p){ return p[1]; }).map(function(p){ return p[0] + " " + p[1]; }).join(" · ") || "없음") + '</span>';
+    var autoNo = {}; (licMonth.rows || []).forEach(function(r){ autoNo[r.no] = 1; });
+    var rest = liveDuties().filter(function(d){ return !autoNo[d.no]; }), unitN = rest.filter(function(d){ return d.unit === "개인" || d.unit === "차량"; }).length;
+    if (note){
+      note.textContent = "자동 회차 " + licMonth.rows.length + "행(인허가 근거 승격본 " + (licMonth.ver || "-") + ")의 다음 기한 — " + lmMD(today) + " 계산" +
+        (licMonth.who && licMonth.who.name ? " · 담당 " + licMonth.who.name + "(배정표)" : " · 담당 없음(배정표)") + ". 자동 회차가 아닌 " + rest.length + "행(개인·차량 " + unitN + " · 사건형·상시·해당없음 " + (rest.length - unitN) + ")은 의무 대장에서 봅니다." +
+        (g.na.length ? " 해당 없음으로 끈 " + g.na.length + "행도 의무 대장에서 봅니다(관리자가 되돌림)." : "");
+      note.style.display = "";
+    }
+    var nx30 = g.later[0], empty30 = nx30 ? "없음 — 다음으로 들어올 행: " + nx30.r.no + ". " + nx30.r.duty + " " + nx30.nx.due + "(" + lmMD(dutyAddDays(nx30.nx.due, -30)) + "부터 이 묶음)" : "없음";
+    host.innerHTML = lmGroupHtml("지남", g.over, "over", '<span class="dday red">' + g.over.length + '</span>') +
+      lmGroupHtml("7일 안", g.d7, "d7", '<span class="dday">' + g.d7.length + '</span>') +
+      lmGroupHtml("30일 안", g.d30, "d30", '<span class="dday">' + g.d30.length + '</span>', empty30) +
+      lmGroupHtml("기준일 없음", g.base, "base", '<span class="duty-badge pre">' + g.base.length + '</span>');
   }
+  function lmClick(e){
+    var b = e.target && e.target.closest ? e.target.closest("[data-lm-op]") : null;
+    if (!b) return;
+    lmOpen(b.getAttribute("data-lm-op"), parseInt(b.getAttribute("data-lm-no"), 10));
+  }
+  function lmShow(id, on){ var el = document.getElementById(id); if (el) el.style.display = on ? "" : "none"; }
+  function lmErr(msg){ var el = document.getElementById("lmErr"); if (!el) return; el.textContent = msg || ""; if (msg) el.classList.add("show"); else el.classList.remove("show"); }
+  function lmOpen(op, no){
+    var g = function(id){ return document.getElementById(id); };
+    if (!LM_OP_LABEL[op] || !licMonth.act[no]) return;
+    var r = lmRow(no), d = findDuty(no); if (!r || !d || (d.na && d.na.on)) return;
+    var today = todayStr(), nx = lmNext(r, d, today);
+    if ((op === "done" || op === "fix") && !(nx && nx.due)) return;
+    if (op === "base" && !(nx && nx.missing === "base")) return;
+    lmCur = { op: op, no: no, base: Number(d.updated_ts || 0), due: (nx && nx.orig) || "", cur: (nx && nx.due) || "" };
+    var short = String(r.duty || "").split("(")[0].trim(), per = Number(r.every_n) ? (r.every_n + (r.every_unit === "year" ? "년" : "개월")) : "";
+    g("lmTitle").textContent = no + ". " + short + " — " + LM_OP_LABEL[op];
+    var desc = "";
+    if (op === "done") desc = lmCur.cur + " 회차를 닫습니다. 접수번호나 수령본 가운데 하나가 있어야 저장됩니다.";
+    else if (op === "fix"){
+      var lic = lmLicOf(r.lic_id), why = (r.type === "interval" && r.base === "issued" && lic && isDate(lic.issued)) ? "(허가일 " + lic.issued + " + " + per + (Number(r.grace_days) ? " + 유예 " + Number(r.grace_days) + "일" : "") + ")" : "";
+      desc ="계산된 기한 " + lmCur.due + why + (nx.fixed ? "(지금 " + lmCur.cur + "로 정정됨)" : "") + "를 이 회차만 고칩니다. 주기 값은 바꾸지 않습니다.";
+    }
+    else if (op === "na") desc = "이 회사에 해당하지 않으면 이 행의 자동 회차를 끕니다. 의무 대장 행과 근거는 남고, 관리자가 되돌릴 수 있습니다.";
+    else desc = lmJosa(lmBaseWhat(r), "을", "를") + " 넣으면 다음 기한" + (per ? "(" + per + " 뒤)" : "") + "을 계산해 날짜 묶음으로 옮깁니다.";
+    g("lmDesc").textContent = desc;
+    lmShow("lmDone", op === "done"); lmShow("lmFix", op === "fix"); lmShow("lmNa", op === "na"); lmShow("lmBase", op === "base"); lmShow("lmMemo", op !== "na");
+    g("lmDoneAt").value = ""; g("lmRef").value = ""; g("lmFile").value = ""; g("lmFileName").textContent = "접수증·확인서 넣기";
+    g("lmFixTo").value = ""; g("lmNaReason").value = ""; g("lmBaseDate").value = ""; g("lmMemo").value = "";
+    g("lmDoneAt").max = today; g("lmBaseDate").max = today;
+    g("lmFixReason").innerHTML = '<option value="">고르기</option>' + LM_FIX_REASONS.map(function(x){ return '<option value="' + esc(x) + '">' + esc(x) + '</option>'; }).join("");
+    g("lmBaseWhat").innerHTML = '<option value="' + esc(lmBaseWhat(r)) + '">' + esc(lmBaseWhat(r)) + '</option><option value="그 밖(메모에 적음)">그 밖(메모에 적음)</option>';
+    g("lmOkBtn").textContent = LM_OP_LABEL[op] + " 저장";
+    lmErr(""); lmHintNext();
+    g("lmBackdrop").classList.add("show");
+  }
+  function lmClose(){ var el = document.getElementById("lmBackdrop"); if (el) el.classList.remove("show"); lmCur = null; }
+  function lmHintNext(){
+    var el = document.getElementById("lmHint"), q = lmCur; if (!el) return;
+    el.textContent = "";
+    if (!q || q.op !== "done") return;
+    var r = lmRow(q.no), d = findDuty(q.no), at = String(document.getElementById("lmDoneAt").value || "") || todayStr();
+    if (!r || !d || !dutyParse(at)) return;
+    var sim = Object.assign({}, d, { runs: (Array.isArray(d.runs) ? d.runs : []).concat([{ due: q.due, done_at: at }]) }), nx = lmNext(r, sim, todayStr());
+    if (nx && nx.due) el.textContent = "저장하면 다음 회차 " + nx.due + "로 넘어갑니다";
+  }
+  function lmFilePicked(){
+    var f = document.getElementById("lmFile").files, n = document.getElementById("lmFileName");
+    if (n) n.textContent = (f && f[0]) ? f[0].name : "접수증·확인서 넣기";
+  }
+  function lmDateWhy(s){
+    var d;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return "날짜를 넣어 주세요.";
+    d = new Date(s + "T00:00:00Z");
+    if (isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== s) return "달력에 없는 날짜입니다.";
+    if (!/^20\d{2}-/.test(s)) return "2000~2099년 날짜만 넣을 수 있습니다.";
+    return "";
+  }
+  var LM_ERR = { NO_WRITE: "저장할 권한이 없습니다(인허가 수행 + 배정표 담당만).", ADMIN_ONLY: "관리자만 할 수 있습니다.", ASSIGN_UNAVAILABLE: "배정표를 읽지 못해 저장하지 않았습니다 — 잠시 뒤 다시 해 주세요.",
+    DUTY_STALE: "그 사이 이 행이 바뀌었습니다 — 목록을 새로 읽었으니 다시 열어 주세요.", DUE_STALE: "그 사이 회차가 바뀌었습니다 — 목록을 새로 읽었으니 다시 열어 주세요.",
+    BAD_DATE: "달력에 없는 날짜입니다.", BAD_FUTURE: "오늘보다 뒤 날짜는 넣을 수 없습니다.", NEED_PROOF: "접수번호나 수령본 가운데 하나를 넣어 주세요.", BAD_REASON: "사유 유형을 골라 주세요.",
+    NEED_REASON: "사유를 적어 주세요.", TOO_LONG: "글이 너무 깁니다.", IS_NA: "이미 해당 없음으로 끈 행입니다.", NO_CHANGE: "바뀐 것이 없습니다.", NO_DUE: "기준일이 없어 회차가 없습니다 — [기준일 입력]부터 해 주세요.",
+    NOT_NEEDED: "기준일이 이미 있는 행입니다 — 기한이 다르면 [기한 정정]으로.", BAD_ATT: "수령본을 다시 올려 주세요.", BAD_EXT: "pdf·jpg·png만 올릴 수 있습니다.", FILE_TOO_LARGE: "파일이 큽니다(6MB까지).",
+    NOT_AUTO: "자동 회차 행이 아닙니다 — 의무 대장에서 봅니다.", BG_READ_FAILED: "기한 근거표를 읽지 못했습니다 — 잠시 뒤 다시 해 주세요." };
+  function lmErrMsg(code){ return LM_ERR[code] || ("저장하지 못했습니다(" + code + ")."); }
+  function lmSave(){
+    var q = lmCur, g = function(id){ return document.getElementById(id); }, v = {}, f = null, why, today = todayStr(), memo;
+    if (!q || lmBusy) return;
+    memo = String(g("lmMemo").value || "").trim();
+    if (q.op === "done"){
+      v.due = q.due; v.done_at = String(g("lmDoneAt").value || "").trim();
+      if ((why = lmDateWhy(v.done_at))) return lmErr(why);
+      if (v.done_at > today) return lmErr("제출한 날은 오늘보다 뒤일 수 없습니다.");
+      var ref = String(g("lmRef").value || "").trim(); if (ref) v.ref = ref;
+      f = (g("lmFile").files && g("lmFile").files[0]) || null;
+      if (!ref && !f) return lmErr("접수번호나 수령본 가운데 하나를 넣어 주세요.");
+      if (f && !LM_ATT_EXT[((String(f.name || "").toLowerCase().match(/\.([a-z0-9]{1,5})$/) || [])[1] || "")]) return lmErr("pdf·jpg·png만 올릴 수 있습니다.");
+      if (memo) v.memo = memo;
+    } else if (q.op === "fix"){
+      v.due = q.due; v.to = String(g("lmFixTo").value || "").trim(); v.reason = String(g("lmFixReason").value || "");
+      if ((why = lmDateWhy(v.to))) return lmErr(why);
+      if (v.to === q.cur) return lmErr("지금 기한과 같은 날짜입니다.");
+      if (LM_FIX_REASONS.indexOf(v.reason) < 0) return lmErr("사유 유형을 골라 주세요.");
+      if (memo) v.memo = memo;
+    } else if (q.op === "na"){
+      v.reason = String(g("lmNaReason").value || "").trim();
+      if (!v.reason) return lmErr("사유를 적어 주세요.");
+    } else if (q.op === "base"){
+      v.date = String(g("lmBaseDate").value || "").trim();
+      if ((why = lmDateWhy(v.date))) return lmErr(why);
+      if (v.date > today) return lmErr("기준일은 오늘보다 뒤일 수 없습니다.");
+      v.what = String(g("lmBaseWhat").value || "");
+      if (memo) v.memo = memo;
+    } else return;
+    lmBusy = true; lmErr("");
+    if (!f){ lmPost(q, v); return; }
+    lmUpload(q, f).then(function(id){ v.att = id; lmPost(q, v); }).catch(function(e){ lmBusy = false; lmErr(e && e.message === "BIG" ? lmErrMsg("FILE_TOO_LARGE") : ("수령본을 올리지 못했습니다(" + ((e && e.message) || "") + ") — 저장하지 않았습니다.")); });
+  }
+  function lmReadB64(f){ return new Promise(function(res, rej){ var fr = new FileReader(); fr.onload = function(){ var s = String(fr.result || ""); res(s.slice(s.indexOf(",") + 1)); }; fr.onerror = function(){ rej(new Error("read")); }; fr.readAsDataURL(f); }); }
+  function lmUpload(q, f){   // 사진은 promoResize(긴 변 1600 · jpeg)로 줄여 올림 — 폰 사진이 6MB(base64)를 넘지 않게
+    var ext = (String(f.name || "").toLowerCase().match(/\.([a-z0-9]{1,5})$/) || [])[1] || "";
+    var p = ext === "pdf" ? lmReadB64(f).then(function(b){ return { b64: b, name: f.name }; }) : promoResize(f).then(function(x){ return { b64: x.b64, name: String(f.name || "photo").replace(/\.[A-Za-z0-9]+$/, "") + ".jpg" }; });
+    return p.then(function(x){
+      if (x.b64.length > 6 * 1024 * 1024) throw new Error("BIG");
+      return gwCall("gw-data", { action: "att_put", kind: "lic", no: q.no, name: x.name, data: x.b64 }).then(function(res){
+        if (!res || res.status !== 200 || !res.body || !res.body.id) throw new Error(String((res && res.body && res.body.error_code) || (res ? res.status : "")));
+        return res.body.id;
+      });
+    });
+  }
+  var LM_KEYS = ["runs", "due_fix", "na", "base_date", "base_what", "base_by", "base_at", "base_memo", "lic_prev", "nar_ts", "updated", "updated_ts"];   // 서버 lic_duty_set 응답 duty 칸(그 행의 단추 칸 + updated)
+  function lmApply(no, b){
+    var d = findDuty(no); if (!d || !b) return;
+    LM_KEYS.forEach(function(k){ if (b[k] !== undefined) d[k] = b[k]; else delete d[k]; });
+    saveLicCache();
+  }
+  function lmPost(q, v){
+    gwCall("gw-data", { action: "lic_duty_set", no: q.no, op: q.op, base: q.base, v: v }).then(function(res){
+      var code, r, d, nx;
+      lmBusy = false;
+      if (!res || res.status !== 200 || !res.body || !res.body.duty){
+        code = String((res && res.body && res.body.error_code) || (res ? res.status : ""));
+        lmErr(lmErrMsg(code));
+        if (code === "DUTY_STALE" || code === "DUE_STALE"){ lmClose(); loadLicenses(); apprToastShow(lmErrMsg(code)); }
+        return;
+      }
+      lmApply(q.no, res.body.duty);
+      lmClose(); renderLicMonth(); renderDuties();
+      r = lmRow(q.no); d = findDuty(q.no); nx = (r && d) ? lmNext(r, d, todayStr()) : null;
+      apprToastShow(q.op === "done" ? ("완료 기록을 남겼습니다" + (nx && nx.due ? " — 다음 회차 " + nx.due : "")) : (q.op === "fix" ? ("이 회차 기한을 " + v.to + "로 고쳤습니다") : (q.op === "na" ? "자동 회차를 껐습니다(관리자가 되돌림)" : "기준일을 넣었습니다")));
+    }).catch(function(){ lmBusy = false; lmErr("저장하지 못했습니다(네트워크)."); });
+  }
+  // 의무 대장 행 펼침(관리자) — [해당 없음 되돌리기]. 서버 lic_duty_set op na_undo(관리자만)
+  function lmNaUndo(no){
+    var d = findDuty(no); if (!isAdmin() || !d || !(d.na && d.na.on) || lmBusy) return;
+    if (!confirm(no + ". " + (d.duty || "") + "\n해당 없음을 되돌려 자동 회차를 다시 켤까요?")) return;
+    lmBusy = true;
+    gwCall("gw-data", { action: "lic_duty_set", no: no, op: "na_undo", base: Number(d.updated_ts || 0), v: {} }).then(function(res){
+      lmBusy = false;
+      if (!res || res.status !== 200 || !res.body || !res.body.duty){ var code = String((res && res.body && res.body.error_code) || (res ? res.status : "")); alert(lmErrMsg(code)); if (code === "DUTY_STALE") loadLicenses(); return; }
+      lmApply(no, res.body.duty); renderDuties(); renderLicMonth(); apprToastShow("해당 없음을 되돌렸습니다");
+    }).catch(function(){ lmBusy = false; alert("저장하지 못했습니다(네트워크)."); });
+  }
+  // 의무 대장 행 펼침 — 완료 기록의 수령본 열기(서버 att_get — 인허가 열람권 · mime은 확장자 고정표로만)
+  function lmAttOpen(id){
+    if (!/^att_[a-f0-9]{16}$/.test(String(id || ""))) return;
+    gwCall("gw-data", { action: "att_get", id: id }).then(function(res){
+      if (!res || res.status !== 200 || !res.body || !res.body.data){ alert("수령본을 열 수 없습니다(" + ((res && res.body && res.body.error_code) || (res ? res.status : "")) + ")"); return; }
+      var name = String(res.body.name || "수령본"), ext = (name.toLowerCase().match(/\.([a-z0-9]{1,5})$/) || [])[1] || "";
+      var mime = ext === "pdf" ? "application/pdf" : (ext === "png" ? "image/png" : ((ext === "jpg" || ext === "jpeg") ? "image/jpeg" : "application/octet-stream"));
+      var bin = atob(res.body.data), u8 = new Uint8Array(bin.length);
+      for (var i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+      var url = URL.createObjectURL(new Blob([u8], { type: mime })), a = document.createElement("a");
+      a.href = url; a.target = "_blank"; a.rel = "noopener"; if (mime === "application/octet-stream") a.download = name;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(function(){ URL.revokeObjectURL(url); }, 60000);
+    }).catch(function(){ alert("수령본을 열 수 없습니다(네트워크)"); });
+  }
+  // 의무 대장 행 펼침 글(단추 칸 — 완료 기록·기한 정정·해당 없음·기준일 무엇) · dutyRowHtml이 부른다
+  function lmDutyDetail(d){
+    var parts = [], runs = Array.isArray(d.runs) ? d.runs : [];
+    if (d.na && d.na.on) parts.push("<b>해당 없음(자동 회차 끔)</b>  " + esc(d.na.reason || "") + " · " + esc(d.na.by_name || "") + " · " + esc(fmtDate(new Date(Number(d.na.at) || 0))));
+    runs.slice(-3).reverse().forEach(function(x){
+      if (!x) return;
+      parts.push("<b>완료</b>  " + esc(x.due || "") + " 회차 · 제출 " + esc(x.done_at || "") + (x.ref ? " · 접수번호 " + esc(x.ref) : "") + (x.by_name ? " · " + esc(x.by_name) : "") +
+        (x.att && /^att_[a-f0-9]{16}$/.test(x.att) ? ' <a href="#" class="duty-att" data-duty-att="' + x.att + '">수령본 보기</a>' : ""));
+    });
+    if (runs.length > 3) parts.push("<b>완료</b>  그 전 " + (runs.length - 3) + "건");
+    var fm = (d.due_fix && typeof d.due_fix === "object") ? d.due_fix : {};
+    Object.keys(fm).sort().slice(-3).forEach(function(k){ var x = fm[k] || {}; parts.push("<b>기한 정정</b>  " + esc(k) + " → " + esc(x.to || "") + " · " + esc(x.reason || "") + (x.days != null ? " · " + esc(String(x.days)) + "일" : "") + (x.memo ? " · " + esc(x.memo) : "")); });
+    if (d.base_what) parts.push("<b>기준일 무엇</b>  " + esc(d.base_what) + (d.base_memo ? " · " + esc(d.base_memo) : ""));
+    return parts;
+  }
+  // @lic-month-end
 
   // ---- 캘린더 .ics (기기 기본 캘린더 알람 연동) ----
   function icsEscape(s){

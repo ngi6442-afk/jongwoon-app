@@ -13025,6 +13025,157 @@ try {
     '새는 글: ' + keyLeakP.slice(0, 8).join(', '));
 } catch (e) { console.log('  (P1 판29 검사 생략 — ' + e.message + ')'); fails++; }
 
+try {   // ---- P1 판28 인허가 '이번 달' 탭(시안 판3 ② — PM 11/13 18:14 ㄱ) — 앱 @lic-month 구간 + DUTY_SHARED 구간 + 의무 대장 행 그리기(dutyRowHtml)를 작은 DOM에서 실행.
+  //   표본 = tools/lic_month_fixture.json(운영 11/13 17:15 백업의 승격본 자동 회차 19행을 서버 lic_month_get이 내리는 칸 그대로 + 1행 허가일) + data/duties_seed.json 98행. 오늘 = 2026-11-13 고정.
+  //   기대값 = 시안 판3 ② 그림(지남 8행 순서·일수 · 기준일 없음 10행 · 빈 30일 묶음 '다음으로 들어올 행' · 폰 머리 0 묶음 뺌). 결함 사본(구간 글을 바꾼 것)마다 판정이 깨지는지까지 본다.
+  const one28 = (src, a, b) => { const i = src.indexOf(a), j = src.indexOf(b); if (i < 0 || j < i || src.indexOf(a, i + 1) >= 0) throw new Error(a + ' 구간 없음·둘'); return src.slice(i, j); };
+  const blk28 = one28(html, '// @lic-month-start', '// @lic-month-end');
+  const SB = '// ==== DUTY_SHARED_BEGIN ====', SE = '// ==== DUTY_SHARED_END ====';
+  const appSh28 = one28(html, SB, SE) + SE, libSrc28 = readFileSync(join(ROOT, 'netlify', 'functions', '_lib', 'duty.js'), 'utf8'), libSh28 = one28(libSrc28, SB, SE) + SE;
+  const fn28 = (src, name) => { const i = src.indexOf('function ' + name + '('); if (i < 0 || src.indexOf('function ' + name + '(', i + 1) >= 0) throw new Error('함수 없음·둘: ' + name); let d = 0, st = false; for (let j = i; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i, j + 1); } } throw new Error('함수 끝 없음: ' + name); };
+  const FX28 = JSON.parse(readFileSync(join(ROOT, 'tools', 'lic_month_fixture.json'), 'utf8'));
+  const SEED28 = JSON.parse(readFileSync(join(ROOT, 'data', 'duties_seed.json'), 'utf8')).items;
+  const mkEl28 = (id) => { const cls = new Set(), at = {}, ev = {}; const el = { id, innerHTML: '', textContent: '', value: '', max: '', files: null, style: {}, ev,
+    classList: { add: (c) => cls.add(c), remove: (c) => cls.delete(c), contains: (c) => cls.has(c) }, getAttribute: (k) => (k in at ? at[k] : null), setAttribute: (k, v) => { at[k] = String(v); },
+    addEventListener: (t, f) => { (ev[t] = ev[t] || []).push(f); } }; return el; };
+  const run28 = (env, blk) => {
+    const els = {}; const doc = { getElementById: (id) => { if (!els[id]) els[id] = mkEl28(id); return els[id]; } };
+    const cnt = mkEl28('cnt'); doc.getElementById('licSubBar').querySelector = (q) => (q === '[data-lsub-cnt="month"]' ? cnt : null);
+    const E = { calls: [], log: [], cache: 0, rd: 0, els, cnt };
+    const pre = [fn28(html, 'esc'), fn28(html, 'isDate'), fn28(html, 'findDuty'), fn28(html, 'liveDuties'), fn28(html, 'dutyBadges'), fn28(html, 'dutyRowHtml'), shUse28,
+      'var duties = ENV.duties, licenses = ENV.licenses;',
+      'function myId(){ return ENV.me || "u1"; } function isAdmin(){ return !!ENV.admin; } function todayStr(){ return ENV.today || "2026-11-13"; } function fmtDate(d){ return d.toISOString().slice(0, 10); }',
+      'function saveLicCache(){ E.cache++; } function renderDuties(){ E.rd++; } function loadLicenses(){ E.log.push("load"); } function scheduleLicSave(){ E.log.push("FULLSAVE"); } function doSaveLic(){ E.log.push("FULLSAVE"); }',
+      'function apprToastShow(m){ E.log.push("toast:" + m); } function confirm(m){ E.log.push("confirm:" + m); return ENV.confirmAns !== false; } function alert(m){ E.log.push("alert:" + m); } function promoResize(){ throw new Error("사진 줄이기 부르면 안 됨"); }',
+      'function syncP(v){ return { then: function(f){ return syncP(f ? f(v) : v); }, catch: function(){ return syncP(v); } }; }',
+      'function gwCall(fn, body){ E.calls.push(JSON.parse(JSON.stringify(body))); return syncP(typeof ENV.resp === "function" ? ENV.resp(body) : (ENV.resp || { status: 500, body: {} })); }'].join('\n');
+    const api = new Function('ENV', 'E', 'document', pre + '\n' + blk + '\nreturn { render: renderLicMonth, open: lmOpen, save: lmSave, close: lmClose, undo: lmNaUndo, row: dutyRowHtml, groups: lmGroups, lm: function(){ return licMonth; }, cur: function(){ return lmCur; } };')(env, E, doc);
+    return { api, E, el: (id) => doc.getElementById(id) };
+  };
+  const duties28 = () => JSON.parse(JSON.stringify(SEED28));
+  const lics28 = () => [{ id: 'lseed07', name: '화물', issued: FX28.issued.lseed07 }];
+  const month28 = (act) => (body) => body.action === 'lic_month_get' ? { status: 200, body: { status: 'OK', ver: FX28.ver, rows: JSON.parse(JSON.stringify(FX28.rows)), act: act, who: { id: 'uk', name: '김정아' } } } : { status: 500, body: {} };
+  const ALL28 = FX28.rows.map((r) => r.no);
+  const grp28 = (h) => { const out = {}; let cur = null; h.split(/(?=<div class="duty-group" data-lm-grp=")|(?=<div class="item lm-item" data-lm-row=")|(?=<div class="empty-line">)/).forEach((p) => { let m; if ((m = /^<div class="duty-group" data-lm-grp="(\w+)"/.exec(p))) { cur = m[1]; out[cur] = []; } else if ((m = /^<div class="item lm-item" data-lm-row="(\d+)"/.exec(p)) && cur) out[cur].push(+m[1]); else if ((m = /^<div class="empty-line">([^<]*)/.exec(p)) && cur) out[cur].push('빈:' + m[1]); }); return out; };
+  const rowOf28 = (h, no) => { const i = h.indexOf('data-lm-row="' + no + '"'); if (i < 0) return ''; const j = h.indexOf('<div class="item lm-item"', i + 5), k = h.indexOf('<div class="duty-group"', i + 5); const e = [j, k].filter((x) => x > 0); return h.slice(i, e.length ? Math.min.apply(null, e) : h.length); };
+  const ops28 = (h) => [...h.matchAll(/data-lm-op="(\w+)" data-lm-no="(\d+)"/g)].map((m) => m[1] + m[2]);
+  const strip28 = (s) => s.replace(/<[^>]+>/g, '');
+  // ① 같은 본문: 앱 DUTY_SHARED = 서버 _lib/duty.js 글자째 · 앱에 한 벌 · 구간에 문서 통째 저장 0
+  let shUse28 = appSh28;   // 실행에 쓰는 같은 본문(결함 사본 때만 바꿈)
+  const same28 = appSh28 === libSh28 && html.split(SB).length === 2 && !/\b(scheduleLicSave|doSaveLic)\(|LIC_API/.test(blk28) && /dutyCur\(/.test(blk28);
+  const chk28 = (blk) => { const got = [];
+    // ② 관리자형(누를 행 19) — 시안 판3 ② 그림 그대로
+    const A = run28({ duties: duties28(), licenses: lics28(), admin: true, resp: month28(ALL28) }, blk); A.api.render();
+    const h = A.el('licMonthPane').innerHTML, g = grp28(h);
+    const over = [1, 44, 47, 37, 76, 2, 66, 54], base = [16, 22, 25, 29, 34, 38, 39, 65, 71, 85];
+    if (JSON.stringify(g.over) !== JSON.stringify(over) || JSON.stringify(g.base) !== JSON.stringify(base) || JSON.stringify(g.d7) !== JSON.stringify(['빈:없음'])
+      || JSON.stringify(g.d30) !== JSON.stringify(['빈:없음 — 다음으로 들어올 행: 3. 직접운송의무 및 최소운송의무(통합 1항목) 2026-12-31(12/1부터 이 묶음)'])) got.push('묶음 ' + JSON.stringify(g));
+    const days = over.map((n) => (/지남 (\d+)일/.exec(rowOf28(h, n)) || [])[1]).join(',');
+    if (days !== '509,271,271,258,258,227,105,74') got.push('일수 ' + days);
+    const r1 = strip28(rowOf28(h, 1)), r44 = strip28(rowOf28(h, 44)), r22 = strip28(rowOf28(h, 22));
+    if (!(r1.indexOf('>1. 허가기준에 관한 사항 신고(5년 주기신고)지남 509일') > 0 && r1.indexOf('기한 2025-06-22') > 0 && r1.indexOf('화물자동차 운송사업 허가(확인요)') > 0 && r1.indexOf('5년마다 — 허가일 2015-03-24 기준 + 유예 90일 · 화물자동차 운수사업법') > 0)) got.push('1행 ' + r1);
+    if (r44.indexOf('연 1회 — 매년 2월 15일까지 · 건설산업기본법') < 0) got.push('44행 ' + r44);
+    if (!(r22.indexOf('기준일 없음 — 입력') > 0 && r22.indexOf('기준: 직전 측정 완료일') > 0 && r22.indexOf('반기 1회 이상 · 산업안전보건법') > 0)) got.push('22행 ' + r22);
+    if (![2, 54, 16].every((n) => rowOf28(h, n).indexOf('<span class="duty-badge pre">근거 확인 필요</span>') > 0) || rowOf28(h, 37).indexOf('근거 확인 필요') >= 0) got.push('근거 배지');
+    const ops = ops28(h), expOps = over.map((n) => ['done' + n, 'fix' + n, 'na' + n]).concat(base.map((n) => ['base' + n, 'na' + n])).reduce((a, b) => a.concat(b), []);
+    if (JSON.stringify(ops) !== JSON.stringify(expOps)) got.push('단추 ' + ops.length + ' ' + ops.slice(0, 6));
+    if (!/>완료\+수령 올리기</.test(h) || !/>기한 정정</.test(h) || !/>해당 없음</.test(h) || !/>기준일 입력</.test(h)) got.push('단추 글');
+    const hd = A.el('licMonthHead').innerHTML;
+    if (hd !== '<span class="lm-hd-pc">지남 8 · 7일 안 0 · 30일 안 0 · 기준일 없음 10</span><span class="lm-hd-ph">지남 8 · 기준일 없음 10</span>') got.push('머리 ' + hd);
+    if (A.E.cnt.textContent !== '18') got.push('칩 ' + A.E.cnt.textContent);
+    const nt = A.el('licMonthNote').textContent;
+    if (!(nt.indexOf('자동 회차 19행(인허가 근거 승격본 v1-20261106)의 다음 기한 — 11/13 계산 · 담당 김정아(배정표). 자동 회차가 아닌 79행(') === 0 && A.el('licMonthNote').style.display === '')) got.push('안내 ' + nt);
+    if (A.E.calls.length !== 1 || A.E.calls[0].action !== 'lic_month_get' || A.E.log.indexOf('FULLSAVE') >= 0) got.push('호출 ' + JSON.stringify(A.E.calls));
+    // ③ 권한 없는 사람(보기·담당 아님 — 서버 act 빈 배열) = 같은 행·단추 0 · 내 행만(act [37]) = 37행 단추 셋만
+    const V = run28({ duties: duties28(), licenses: lics28(), resp: month28([]) }, blk); V.api.render(); const hv = V.el('licMonthPane').innerHTML;
+    if (ops28(hv).length !== 0 || JSON.stringify(grp28(hv)) !== JSON.stringify(g)) got.push('보기 ' + ops28(hv).length);
+    V.api.open('done', 37); if (V.el('lmBackdrop').classList.contains('show')) got.push('보기 창 열림');
+    const O = run28({ duties: duties28(), licenses: lics28(), resp: month28([37]) }, blk); O.api.render();
+    if (JSON.stringify(ops28(O.el('licMonthPane').innerHTML)) !== JSON.stringify(['done37', 'fix37', 'na37'])) got.push('내 행만 ' + ops28(O.el('licMonthPane').innerHTML));
+    // ④ 옛 문서: 완료 기록·기준일·정정 칸 없는 seed 행(②가 그것) · 허가일 없는 옛 허가증 = 1행이 기준일 없음 묶음('허가일 없음' · 기준일 단추 없음 · 해당 없음만) · 대장 빈 = 안내 · 근거표 0행 = 안내 · 서버 거절 = 안내(다시 열면 다시 읽음)
+    const L = run28({ duties: duties28(), licenses: [{ id: 'lseed07', name: '화물' }], admin: true, resp: month28(ALL28) }, blk); L.api.render(); const hl = L.el('licMonthPane').innerHTML, gl = grp28(hl);
+    if (!(gl.base[0] === 1 && rowOf28(hl, 1).indexOf('허가일 없음 — 허가증에서 입력') > 0 && JSON.stringify(ops28(rowOf28(hl, 1))) === JSON.stringify(['na1']) && gl.over.indexOf(1) < 0)) got.push('허가일 없음 ' + JSON.stringify(gl.base));
+    const Z = run28({ duties: [], licenses: [], admin: true, resp: month28(ALL28) }, blk); Z.api.render();
+    if (Z.el('licMonthPane').innerHTML.indexOf('의무 대장이 비어 있습니다') < 0 || Z.E.calls.length) got.push('빈 대장');
+    const N = run28({ duties: duties28(), licenses: lics28(), admin: true, resp: (b) => ({ status: 200, body: { status: 'OK', ver: '', rows: [], act: [] } }) }, blk); N.api.render();
+    if (N.el('licMonthPane').innerHTML.indexOf('자동 회차 행이 없습니다') < 0) got.push('0행');
+    const F = run28({ duties: duties28(), licenses: lics28(), admin: true, resp: { status: 403, body: { error_code: 'NO_ACCESS' } } }, blk); F.api.render();
+    if (F.el('licMonthPane').innerHTML.indexOf('기한 근거표를 읽지 못했습니다(NO_ACCESS)') < 0) got.push('거절 ' + F.el('licMonthPane').innerHTML);
+    const old = duties28().find((d) => d.no === 37), rowOld = A.api.row(old, true);
+    if (!(rowOld.indexOf('37. ') > 0 && rowOld.indexOf('해당 없음') < 0 && rowOld.indexOf('data-duty-naoff') < 0)) got.push('옛 의무 대장 행');
+    // ⑤ 창 네 가지(시안 문구) — 완료 창 다음 회차 안내 2027-02-28(늦게 낸 회차) · 정정 창 계산 설명 · 기준일 창 '직전 측정 완료일을 … 6개월 뒤'
+    A.api.open('done', 37); const tD = A.el('lmTitle').textContent, dD = A.el('lmDesc').textContent, hD = A.el('lmHint').textContent;
+    if (!(A.el('lmBackdrop').classList.contains('show') && tD === '37. 폐기물 처리 실적보고서 제출 — 완료' && dD === '2026-02-28 회차를 닫습니다. 접수번호나 수령본 가운데 하나가 있어야 저장됩니다.' && hD === '저장하면 다음 회차 2027-02-28로 넘어갑니다'
+      && A.el('lmDone').style.display === '' && A.el('lmFix').style.display === 'none' && A.el('lmNa').style.display === 'none' && A.el('lmBase').style.display === 'none' && A.el('lmOkBtn').textContent === '완료 저장' && A.el('lmDoneAt').max === '2026-11-13')) got.push('완료 창 ' + [tD, dD, hD]);
+    A.api.open('fix', 1); const dF = A.el('lmDesc').textContent;
+    if (!(A.el('lmTitle').textContent === '1. 허가기준에 관한 사항 신고 — 기한 정정' && dF === '계산된 기한 2025-06-22(허가일 2015-03-24 + 5년 + 유예 90일)를 이 회차만 고칩니다. 주기 값은 바꾸지 않습니다.' && (A.el('lmFixReason').innerHTML.match(/<option/g) || []).length === 7)) got.push('정정 창 ' + dF);
+    A.api.open('na', 39); if (!(A.el('lmTitle').textContent === '39. 폐기물처리시설 정기검사 — 해당 없음' && A.el('lmMemo').style.display === 'none' && A.el('lmNa').style.display === '')) got.push('해당 없음 창 ' + A.el('lmTitle').textContent);
+    A.api.open('base', 22); if (!(A.el('lmTitle').textContent === '22. 석면 분진 작업환경측정 — 기준일' && A.el('lmDesc').textContent === '직전 측정 완료일을 넣으면 다음 기한(6개월 뒤)을 계산해 날짜 묶음으로 옮깁니다.' && A.el('lmBaseWhat').innerHTML.indexOf('직전 측정 완료일') > 0)) got.push('기준일 창 ' + A.el('lmDesc').textContent);
+    A.api.close(); A.api.open('base', 37); A.api.open('done', 22);   // 날짜 묶음에 기준일·기준일 없음 행에 완료 = 안 열림
+    if (A.api.cur()) got.push('엉뚱한 창 열림');
+    // ⑥ 저장: 완료(접수번호만) = lic_duty_set 1번(no·op·base = 행 updated_ts·v{due 계산 기한·done_at·ref}) → 응답 칸만 그 행에 · 다시 그림(37행은 다음 회차 2027-02-28이라 묶음에서 빠짐) · 통째 저장 0
+    //   값 거절(빈 제출일·내일·증빙 없음·사유 유형 안 고름·같은 기한) = 호출 0 · 서버 거절 DUTY_STALE = 다시 읽기(loadLicenses)·창 닫음
+    const dS = duties28(); dS.find((d) => d.no === 37).updated_ts = 321;   // 낙관락 base = 그 행 updated_ts
+    const S = run28({ duties: dS, licenses: lics28(), admin: false, resp: (b) => b.action === 'lic_month_get' ? month28([37, 22])(b) : { status: 200, body: { status: 'OK', duty: { no: 37, runs: [{ due: '2026-02-28', done_at: '2026-11-10', ref: 'A-1', by: 'uk' }], updated: '2026-11-13', updated_ts: 777, nar_ts: 777, lic_prev: { op: 'done' } }, updated_at: 777 } } }, blk);
+    S.api.render(); const seedTs = 321;
+    S.api.open('done', 37); S.el('lmDoneAt').value = ''; S.api.save(); const e1 = S.el('lmErr').textContent;
+    S.el('lmDoneAt').value = '2026-11-14'; S.api.save(); const e2 = S.el('lmErr').textContent;
+    S.el('lmDoneAt').value = '2026-11-10'; S.api.save(); const e3 = S.el('lmErr').textContent;
+    const c0 = S.E.calls.length;
+    S.el('lmRef').value = 'A-1'; S.api.save();
+    const call = S.E.calls[c0] || {}, d37 = S.api.groups('2026-11-13');
+    const after = S.el('licMonthPane').innerHTML;
+    if (!(e1 === '날짜를 넣어 주세요.' && e2 === '제출한 날은 오늘보다 뒤일 수 없습니다.' && e3 === '접수번호나 수령본 가운데 하나를 넣어 주세요.' && c0 === 1
+      && JSON.stringify(call) === JSON.stringify({ action: 'lic_duty_set', no: 37, op: 'done', base: seedTs, v: { due: '2026-02-28', done_at: '2026-11-10', ref: 'A-1' } })
+      && grp28(after).over.indexOf(37) < 0 && S.E.log.indexOf('FULLSAVE') < 0 && S.E.cache === 1 && S.E.rd === 1 && !S.el('lmBackdrop').classList.contains('show') && S.E.log.some((x) => x === 'toast:완료 기록을 남겼습니다 — 다음 회차 2027-02-28'))) got.push('완료 저장 ' + JSON.stringify([e1, e2, e3, c0, call, grp28(after).over, S.E.log]));
+    S.api.open('base', 22); S.el('lmBaseDate').value = '2026-08-01'; S.el('lmBaseWhat').value = '직전 측정 완료일';
+    const c1 = S.E.calls.length; S.api.save(); const callB = S.E.calls[c1] || {};
+    if (!(callB.op === 'base' && JSON.stringify(callB.v) === JSON.stringify({ date: '2026-08-01', what: '직전 측정 완료일' }))) got.push('기준일 저장 ' + JSON.stringify(callB));
+    const X = run28({ duties: duties28(), licenses: lics28(), resp: (b) => b.action === 'lic_month_get' ? month28([1])(b) : { status: 409, body: { error_code: 'DUTY_STALE' } } }, blk); X.api.render();
+    X.api.open('fix', 1); X.el('lmFixTo').value = '2025-06-22'; X.el('lmFixReason').value = '공고 연장'; X.api.save(); const eS = X.el('lmErr').textContent;
+    X.el('lmFixTo').value = '2025-07-22'; X.el('lmFixReason').value = ''; X.api.save(); const eR = X.el('lmErr').textContent; const cX = X.E.calls.length;
+    X.el('lmFixReason').value = '공고 연장'; X.api.save();
+    if (!(eS === '지금 기한과 같은 날짜입니다.' && eR === '사유 유형을 골라 주세요.' && cX === 1 && X.E.calls.length === 2 && X.E.log.indexOf('load') >= 0 && !X.el('lmBackdrop').classList.contains('show'))) got.push('정정 거절 ' + JSON.stringify([eS, eR, cX, X.E.log]));
+    // ⑦ 해당 없음 행: 이번 달 목록에서 빠짐(안내 'n행도 의무 대장에서') · 의무 대장 행 = 배지 + 관리자만 [해당 없음 되돌리기] → na_undo 1번(base = 행 updated_ts)
+    const nd = duties28(); const t39 = nd.find((d) => d.no === 39); t39.na = { on: true, reason: '시설 없음', by_name: '김정아', at: Date.UTC(2026, 10, 12) }; t39.updated_ts = 555;
+    const Q = run28({ duties: nd, licenses: lics28(), admin: true, resp: (b) => b.action === 'lic_month_get' ? month28(ALL28)(b) : { status: 200, body: { status: 'OK', duty: { no: 39, na: { on: false }, updated_ts: 556 } } } }, blk); Q.api.render();
+    const gq = grp28(Q.el('licMonthPane').innerHTML), rq = Q.api.row(t39, true);
+    if (!(gq.base.indexOf(39) < 0 && Q.el('licMonthNote').textContent.indexOf('해당 없음으로 끈 1행도 의무 대장에서 봅니다(관리자가 되돌림).') > 0 && Q.E.cnt.textContent === '17'
+      && rq.indexOf('해당 없음 — 자동 회차 끔') > 0 && rq.indexOf('data-duty-naoff="39"') > 0 && rq.indexOf('<b>해당 없음(자동 회차 끔)</b>  시설 없음 · 김정아 · 2026-11-12') > 0)) got.push('해당 없음 행 ' + JSON.stringify(gq.base));
+    Q.api.undo(39); const cu = Q.E.calls[Q.E.calls.length - 1] || {};
+    if (!(cu.op === 'na_undo' && cu.base === 555 && cu.no === 39 && t39.na.on === false && t39.updated_ts === 556)) got.push('되돌리기 ' + JSON.stringify(cu));
+    const W = run28({ duties: nd, licenses: lics28(), admin: false, resp: month28([]) }, blk); W.api.render();
+    if (W.api.row(t39, true).indexOf('data-duty-naoff') >= 0) got.push('비관리자 되돌리기 단추');
+    // ⑧ 로그인 '전환' — 앞사람 act로 그리지 않음(다시 읽음)
+    let nP = 0; const ENVP = { duties: duties28(), licenses: lics28(), admin: true, me: 'ua', resp: (b) => month28(nP++ ? [] : ALL28)(b) };
+    const P = run28(ENVP, blk); P.api.render(); const b1 = ops28(P.el('licMonthPane').innerHTML).length;
+    ENVP.me = 'ub'; ENVP.admin = false; P.api.render(); const b2 = ops28(P.el('licMonthPane').innerHTML).length;
+    if (!(b1 === 44 && b2 === 0 && P.E.calls.length === 2)) got.push('전환 ' + [b1, b2, P.E.calls.length]);
+    return got;
+  };
+  const got28 = chk28(blk28);
+  // ⑨ 정적 배선: 칸 칩 셈 자리 · 머리·안내 자리 · 창 HTML·버튼 배선 4 · 칸 열 때 다시 읽기 · 의무 대장 펼침 배선 2 · 서버 액션 이름 · 창 입력 16px · 폰 640px 규칙 · view-lic 보기 권한 readonly
+  const wire28 = /<button class="lsub-btn" data-lsub="month">이번 달 <span data-lsub-cnt="month"><\/span><\/button>/.test(html) && /id="licMonthHead"/.test(html) && /id="licMonthNote"/.test(html)
+    && ['lmOkBtn").addEventListener("click", lmSave)', 'lmCancel").addEventListener("click", lmClose)', 'lmFile").addEventListener("change", lmFilePicked)', 'lmDoneAt").addEventListener("input", lmHintNext)'].every((w) => html.indexOf(w) > 0)
+    && html.indexOf('if (name === "month"){ if (licMonth.st !== "loading") licMonth.st = ""; renderLicMonth(); }') > 0 && /lmNaUndo\(parseInt\(el\.getAttribute\("data-duty-naoff"\), 10\)\)/.test(html) && /lmAttOpen\(el\.getAttribute\("data-duty-att"\)\)/.test(html)
+    && /#lmBackdrop input, #lmBackdrop select\{font-size:16px;\}/.test(html) && /lic:"view-lic"/.test(html) && /\.view\.readonly \.mini-btn,/.test(html)
+    && /if \(d && d\.action === 'lic_month_get'\) return await handleLicMonthGet\(event, d, R\);/.test(gwd) && /if \(d && d\.action === 'lic_duty_set'\) return await handleLicDutySet\(event, d, R\);/.test(gwd)
+    && /gwCall\("gw-data", \{ action: "lic_duty_set", no: q\.no, op: q\.op, base: q\.base, v: v \}\)/.test(blk28) && /action: "att_put", kind: "lic", no: q\.no/.test(blk28);
+  // 결함 사본 — 구간 글을 바꾸면 위 판정이 깨져야 한다
+  const MUT28U = [['if (licMonth.act[r.no]){', 'if (true){'], ['(s === "over" ? g.over', '(s === "d7" ? g.over'], ['lmMD(dutyAddDays(nx30.nx.due, -30))', 'lmMD(nx30.nx.due)'], ['!LM_OP_LABEL[op] || !licMonth.act[no]', '!LM_OP_LABEL[op]'],
+    ['if (!ref && !f) return lmErr(', 'if (false) return lmErr('], ['if (v.done_at > today) return lmErr(', 'if (false) return lmErr('], ['base: q.base, v: v }', 'base: 0, v: v }'], ['if (d.na && d.na.on){ g.na.push(', 'if (false){ g.na.push('],
+    ['parts.filter(function(p){ return p[1]; })', 'parts.filter(function(p){ return true; })'], ['cyc = String(r.cycle || "").split("(")[0].trim()', 'cyc = String(r.cycle || "")'],
+    ['if (op === "base" && !(nx && nx.missing === "base")) return;', ''], ['LM_KEYS.forEach(function(k){ if (b[k] !== undefined) d[k] = b[k]; else delete d[k]; });', ''], ['if (code === "DUTY_STALE" || code === "DUE_STALE"){', 'if (false){'],
+    ['if (licMonth.st && licMonth.vid !== myId()){', 'if (false){']];
+  const kill28u = [];
+  MUT28U.forEach(([from, to]) => { if (blk28.split(from).length !== 2) { kill28u.push('자리 ' + from.slice(0, 40)); return; } let k; try { k = chk28(blk28.replace(from, () => to)).length > 0; } catch (e) { k = true; } if (!k) kill28u.push(from.slice(0, 50) + ' 안 깨짐'); });
+  // 같은 본문 결함: 앱 쪽 한 글자만 바꿔도 대조가 깨짐 · 서버 늦은 회차 규칙(dutyStartIdx)을 걷으면 완료 창 다음 회차가 2028로 바뀌어 깨짐
+  const shMut = (appSh28.replace('if (last >= 0) return last + 1;', 'if (false) return last + 1;')) !== libSh28;
+  let shKill = false; try { shUse28 = appSh28.replace('if (last >= 0) return last + 1;', 'if (false) return last + 1;'); shKill = chk28(blk28).length > 0; } catch (e) { shKill = true; } finally { shUse28 = appSh28; }
+  T('P1 판28 인허가 이번 달 탭(@lic-month 실행 — 운영 승격본 19행·의무 대장 98행 표본 · 오늘 2026-11-13): ① 앱 DUTY_SHARED = 서버 _lib/duty.js 글자째(한 벌 · 구간에 문서 통째 저장 0) · ② 네 묶음 = 지남 8(1·44·47·37·76·2·66·54 · 509~74일) · 7일 안 "없음" · 30일 안 "없음 — 다음으로 들어올 행: 3. … 2026-12-31(12/1부터 이 묶음)" · 기준일 없음 10(16·22·25·29·34·38·39·65·71·85 — "기준: 직전 측정 완료일") · 1행 요약 "5년마다 — 허가일 2015-03-24 기준 + 유예 90일 · 화물자동차 운수사업법" · 근거 확인 필요 배지 2·16·54 · 단추 네 가지(날짜 묶음 완료+수령 올리기·기한 정정·해당 없음 / 기준일 없음 기준일 입력·해당 없음 — 44개) · 머리 PC "지남 8 · 7일 안 0 · 30일 안 0 · 기준일 없음 10"·폰 "지남 8 · 기준일 없음 10" · 칩 18 · 안내 "자동 회차 19행(… v1-20261106)… 담당 김정아(배정표). 자동 회차가 아닌 79행" · ③ 권한 없는 사람(act 0) = 같은 행·단추 0·창 안 열림 · 내 행만 = 그 행 단추 셋 · ④ 옛 문서(완료 기록 칸 없는 seed 행) 열림 · 허가일 없는 허가증 = 1행 "허가일 없음"(해당 없음 단추만) · 빈 대장·0행·서버 거절 안내 · 옛 의무 대장 행 그대로 · ⑤ 창 네 가지 시안 문구(완료 "2026-02-28 회차를 닫습니다…"·"다음 회차 2027-02-28" / 정정 "계산된 기한 2025-06-22(허가일 2015-03-24 + 5년 + 유예 90일)를…" / 해당 없음 메모 칸 없음 / 기준일 "직전 측정 완료일을 … (6개월 뒤)") · 엉뚱한 창 안 열림 · ⑥ 저장 값 거절(빈·내일·증빙 없음·같은 기한·사유 유형) = 호출 0 · 완료 = lic_duty_set 1번(no·op·base·v{due·done_at·ref}) → 응답 칸만 그 행에·목록에서 빠짐·통째 저장 0 · 기준일 = v{date·what} · DUTY_STALE = 다시 읽기·창 닫음 · ⑦ 해당 없음 행 = 목록에서 빠짐(칩 17·안내) · 의무 대장 배지·관리자만 [해당 없음 되돌리기] → na_undo(base) · ⑧ 로그인 전환 = 다시 읽어 뒷사람 권한으로(단추 44 → 0) · ⑨ 배선(칩 셈·머리·안내·창 버튼 4·칸 열 때 다시 읽기·의무 대장 펼침 2·서버 액션 2·창 입력 16px·view-lic readonly) · 결함 사본 ' + MUT28U.length + '개 + 같은 본문 결함 2 전부 깨짐',
+    same28 && got28.length === 0 && wire28 && kill28u.length === 0 && shMut && shKill, JSON.stringify({ same28, got28, wire28, kill28u, shMut, shKill }));
+} catch (e) { console.log('  (P1 판28 검사 생략 — ' + e.message + ')'); fails++; }
+
 try {
   const fdir = join(ROOT, 'netlify', 'functions');
   const miss = readdirSync(fdir).filter((f) => /^gw-.*\.js$/.test(f)).filter((f) => { const t = readFileSync(join(fdir, f), 'utf8'); return /\b(store|blobGet|blobSet|blobList|blobDelete)\(/.test(t) && !/setupBlobContext\(/.test(t); });
