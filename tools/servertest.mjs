@@ -7595,4 +7595,162 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   }
 }
 
+{ // ---- P1 판29 PM 콘솔 — 누른 기록 status:decide(pmcon_get·pmcon_decide) — 착수설명서 판29 · 업무별 설계 3-17 self_decide · 원장 T666.
+  //   읽기 = 로그인 → 기기 승인 → 관리자 · 쓰기 = + PM(명시 tier pm, 명부 못 읽으면 503) · 값 검사 400 · 기록 읽기 실패 503(fail-closed) · 낙관락 409 PMCON_STALE ·
+  //   값 바꾸기는 기존 핸들러(notify_set·doneif_set·autotask_set …) 그대로 — updated_by = 누른 회원 · 거절은 그 응답 그대로·기록 0 · 기록 상한 접기 · 감사 1줄(col pmcon).
+  //   검사마다 결함을 심은 gw-data 사본(소스 한 곳을 바꿔 메모리에서 컴파일 — 파일은 쓰지 않음)에서는 실패해야 한다.
+  const fs29 = require('fs'), Mod29 = require('module');
+  const FILE29 = join(FN, 'gw-data.js'), SRC29 = fs29.readFileSync(FILE29, 'utf8');
+  const load29 = (src) => { const m = new Mod29(FILE29); m.filename = FILE29; m.paths = Mod29._nodeModulePaths(dirname(FILE29)); m._compile(src, FILE29); return m.exports; };
+  const mutOf29 = (from, to) => { if (SRC29.split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 60)); return SRC29.replace(from, () => to); };
+  const caller29 = (mod) => async (body, tok, dev) => { const r = await mod.handler({ httpMethod: 'POST', headers: Object.assign({ authorization: tok ? 'Bearer ' + tok : '' }, dev ? { 'x-device-id': dev } : {}), body: JSON.stringify(body) }); return { code: r.statusCode, body: JSON.parse(r.body || '{}') }; };
+  const snap29 = JSON.stringify({ u: mem.gw_users, d: mem.gw_data });
+  const tierCtx0 = pushMock.tierCtx;
+  const reset29 = () => { const s = JSON.parse(snap29); mem.gw_users = s.u; mem.gw_data = s.d; blobsMock.hooks.failGet = null; blobsMock.hooks.failSet = null; pushMock.tierCtx = tierCtx0; };
+  const K29 = 'status:decide';
+  const MN29 = { id: 'u29n', name: '관리부29', role: '관리자', admin: true, perms: {} };   // 명시 tier 없음 = admin 등급(PM 아님)
+  const tN29 = issueSession(MN29).token;
+  const seed29 = () => {
+    reset29();
+    mem.gw_users['member:u29n'] = JSON.parse(JSON.stringify(MN29));
+    mem.gw_users['device:dev1'] = { status: 'approved' };
+    for (const k of [K29, 'settings:notify', 'settings:doneif', 'settings:autotask']) delete mem.gw_data[k];
+  };
+  const aud29 = () => auditMock.logs.filter((l) => l.col === 'pmcon');
+  const okBody29 = (o) => Object.assign({ action: 'pmcon_decide', kind: 'notify', row: 'notify:task_review:issuer_approver', choice: 'ok', grade: 'R1', due: '', q: '완료 요청 알림을 승인권자 1인으로', rec: '지시자 · 자동 지시는 배정 승인권자 1인',
+    args: { event: 'task_review', value: 'issuer_approver' }, set_base: 0, base: 0 }, o || {});
+  const chk29 = async (cl) => {
+    const P = {}, I = {};
+    // A 권한 — 비로그인 401 · 직원 미승인 기기 403 DEVICE_NOT_APPROVED · 직원(승인 기기) 403 ADMIN_ONLY · PM 아닌 관리자: 읽기 200 can_write false · 쓰기 403 PM_ONLY · 저장 0
+    seed29();
+    const a1 = await cl({ action: 'pmcon_get' }, null), a2 = await cl({ action: 'pmcon_decide' }, null), a3 = await cl({ action: 'pmcon_get' }, tokW, 'devX'), a4 = await cl(okBody29(), tokW, 'devX');
+    const a5 = await cl({ action: 'pmcon_get' }, tokW, 'dev1'), a6 = await cl(okBody29(), tokW, 'dev1'), a7 = await cl({ action: 'pmcon_get' }, tN29), a8 = await cl(okBody29(), tN29), a9 = await cl({ action: 'pmcon_get' }, tokA);
+    P.A = a1.code === 401 && a2.code === 401 && a3.code === 403 && a3.body.error_code === 'DEVICE_NOT_APPROVED' && a4.code === 403 && a4.body.error_code === 'DEVICE_NOT_APPROVED'
+      && a5.code === 403 && a5.body.error_code === 'ADMIN_ONLY' && a6.code === 403 && a6.body.error_code === 'ADMIN_ONLY'
+      && a7.code === 200 && a7.body.can_write === false && a7.body.pm_present === true && Array.isArray(a7.body.log) && a7.body.log.length === 0 && a7.body.updated_at === 0
+      && a8.code === 403 && a8.body.error_code === 'PM_ONLY' && a9.code === 200 && a9.body.can_write === true
+      && !(K29 in mem.gw_data) && !('settings:notify' in mem.gw_data) && aud29().length === 0;
+    I.A = [a1.code, a2.code, a3.body.error_code, a4.body.error_code, a5.body.error_code, a6.body.error_code, a7.code, a7.body.can_write, a8.body.error_code, a9.body.can_write];
+    // B 값 검사 400 — 저장 0·감사 0·설정 그대로
+    seed29(); const au0 = auditMock.logs.length;
+    const bad = [
+      ['BAD_KIND', { kind: 'perm' }], ['BAD_CHOICE', { choice: 'yes' }], ['BAD_ROW', { row: 'doneif:on' }], ['BAD_ROW', { row: 'notify:a b' }], ['BAD_GRADE', { grade: 'R3' }], ['BAD_DUE', { due: '11/25' }],
+      ['BAD_ARGS', { args: { event: 'task_review', value: 'issuer_approver', who: 'x' } }], ['BAD_ARGS', { args: { event: 'task_review', value: 3 } }], ['BAD_ARGS', { args: null }],
+      ['BAD_ARGS', { choice: 'hold', why: '나중에' }], ['NEED_SET_BASE', { set_base: '0' }], ['BAD_WHY', { why: 'x'.repeat(201) }], ['BAD_ARGS', { kind: 'doneif', row: 'doneif:on', args: { on: 'true' } }]];
+    const br = [];
+    for (const [code, o] of bad) { const r = await cl(okBody29(o), tokA); if (!(r.code === 400 && r.body.error_code === code)) br.push(code + '→' + r.code + '/' + r.body.error_code); }
+    P.B = br.length === 0 && !(K29 in mem.gw_data) && !('settings:notify' in mem.gw_data) && auditMock.logs.length === au0;
+    I.B = br;
+    // C 정상 ㄱ — 기존 notify_set이 값을 바꿈(updated_by = 누른 회원 uadmin · 그 핸들러의 감사 '알림변경') + 누른 기록 1줄(추천대로 예·적용) + 감사 1줄(col pmcon)
+    seed29(); const au1 = auditMock.logs.length;
+    const c1 = await cl(okBody29(), tokA);
+    const nf = mem.gw_data['settings:notify'] || {}, sd = mem.gw_data[K29] || {}, newAu = auditMock.logs.slice(au1);
+    const c2 = await cl({ action: 'pmcon_get' }, tN29);
+    P.C = c1.code === 200 && c1.body.applied === true && c1.body.audit === true && nf.events && nf.events.task_review === 'issuer_approver' && nf.updated_by === 'uadmin'
+      && Array.isArray(sd.log) && sd.log.length === 1 && sd.log[0].choice === 'ok' && sd.log[0].match === true && sd.log[0].applied === true && sd.log[0].by === 'uadmin' && sd.log[0].row === 'notify:task_review:issuer_approver' && sd.updated_at > 0
+      && newAu.some((l) => l.col === 'tasks' && l.bid === 'uadmin' && l.ev[0].op === '알림변경') && newAu.filter((l) => l.col === 'pmcon').length === 1
+      && newAu.filter((l) => l.col === 'pmcon')[0].ev[0].op === 'PM콘솔' && newAu.filter((l) => l.col === 'pmcon')[0].bid === 'uadmin'
+      && c2.code === 200 && c2.body.log.length === 1 && c2.body.updated_at === sd.updated_at;
+    I.C = [c1.code, c1.body.error_code, nf.events && nf.events.task_review, nf.updated_by, sd.log && sd.log.length, newAu.map((l) => l.col + ':' + l.ev[0].op).join(',')];
+    // D 낙관락 — 기록 base 낡음·없음 = 409 PMCON_STALE(설정 그대로) · 설정 set_base 낡음 = 기존 핸들러 409 NOTIFY_STALE 그대로·기록 0
+    const tok1 = sd.updated_at || 0, nfAt = nf.updated_at || 0;
+    const d1 = await cl(okBody29({ row: 'notify:due_digest:summary', args: { event: 'due_digest', value: 'summary' }, set_base: nfAt, base: tok1 - 1 }), tokA);
+    const d2 = await cl(okBody29({ row: 'notify:due_digest:summary', args: { event: 'due_digest', value: 'summary' }, set_base: nfAt, base: undefined }), tokA);
+    const d3 = await cl(okBody29({ row: 'notify:due_digest:summary', args: { event: 'due_digest', value: 'summary' }, set_base: nfAt - 5, base: tok1 }), tokA);
+    const nf2 = mem.gw_data['settings:notify'] || {}, sd2 = mem.gw_data[K29] || {};
+    P.D = d1.code === 409 && d1.body.error_code === 'PMCON_STALE' && d2.code === 409 && d2.body.error_code === 'PMCON_STALE' && d3.code === 409 && d3.body.error_code === 'NOTIFY_STALE'
+      && nf2.events.due_digest === 'each' && sd2.log.length === 1 && sd2.updated_at === tok1;
+    I.D = [d1.body.error_code, d2.body.error_code, d3.body.error_code, nf2.events && nf2.events.due_digest, sd2.log && sd2.log.length];
+    // E 보류·다시 열기·기본값(그대로)·기본값(값 적용) — 보류/그대로는 설정을 안 바꾸고 표시(marks)만 · 다시 열기 = 표시 지움 · 기본값 + 값 = doneif_set 켬
+    const e1 = await cl({ action: 'pmcon_decide', kind: 'bg', row: 'bg:v1-20261120', choice: 'hold', grade: 'R2', due: '2026-11-25', q: '계약 법령 기준표 새 판 승격', why: '노무사 회신 뒤', base: tok1 }, tokA);
+    const e2 = await cl({ action: 'pmcon_decide', kind: 'bg', row: 'bg:v1-20261120', choice: 'reopen', grade: 'R2', base: e1.body.updated_at }, tokA);
+    const e3 = await cl({ action: 'pmcon_decide', kind: 'learn', row: 'learn:on', choice: 'default', grade: 'R2', q: '계약 서류 학습', def_is_rec: false, base: e2.body.updated_at }, tokA);
+    const e4 = await cl({ action: 'pmcon_decide', kind: 'doneif', row: 'doneif:on', choice: 'default', grade: 'R1', def_is_rec: true, args: { on: true }, set_base: 0, base: e3.body.updated_at }, tokA);
+    const sd3 = mem.gw_data[K29] || {}, di = mem.gw_data['settings:doneif'] || {};
+    P.E = e1.code === 200 && e1.body.applied === false && e1.body.marks['bg:v1-20261120'] && e1.body.marks['bg:v1-20261120'].st === 'hold' && e1.body.marks['bg:v1-20261120'].why === '노무사 회신 뒤'
+      && e2.code === 200 && !e2.body.marks['bg:v1-20261120'] && e3.code === 200 && e3.body.applied === false && e3.body.marks['learn:on'].st === 'keep'
+      && e4.code === 200 && e4.body.applied === true && di.on === true && di.updated_by === 'uadmin' && !e4.body.marks['doneif:on']
+      && sd3.log.length === 5 && sd3.log.map((x) => x.choice).join(',') === 'ok,hold,reopen,default,default' && sd3.log[3].match === false && sd3.log[4].match === true && !('settings:contract' in mem.gw_data && false);
+    I.E = [e1.code, e1.body.error_code, e2.code, e3.code, e4.code, e4.body.error_code, di.on, sd3.log && sd3.log.length];
+    // F 자동 지시 규칙 live — 콘솔로 눌러도 settings:autotask updated_by = 회원 id(봇 표식 아님) · 감사 '자동지시규칙' by 회원
+    const auF = auditMock.logs.length;
+    const f1 = await cl({ action: 'pmcon_decide', kind: 'autotask', row: 'autotask:veh_insp90:live', choice: 'ok', grade: 'R1', due: '2026-11-23', args: { rule: 'veh_insp90', mode: 'live' }, set_base: 0, base: e4.body.updated_at }, tokA);
+    const at = mem.gw_data['settings:autotask'] || {};
+    P.F = f1.code === 200 && at.rules && at.rules.veh_insp90 === 'live' && at.updated_by === 'uadmin' && String(at.updated_by).indexOf('bot') < 0
+      && auditMock.logs.slice(auF).some((l) => l.bid === 'uadmin' && l.ev[0].op === '자동지시규칙');
+    I.F = [f1.code, f1.body.error_code, at.rules && at.rules.veh_insp90, at.updated_by];
+    // G 상한 — 기록 400줄이 차 있으면 1줄 더해도 400 · 넘친 1줄은 folded(n 1·처음/끝 시각) · 표시 60개 상한(가장 오래된 것부터)
+    seed29();
+    const many = []; for (let i = 0; i < 400; i++) many.push({ ts: 1000 + i, by: 'uadmin', row: 'notify:x' + i, kind: 'notify', choice: 'hold' });
+    const mk = {}; for (let i = 0; i < 60; i++) mk['notify:m' + i] = { st: 'hold', ts: 2000 + i, by: 'uadmin', why: '' };
+    mem.gw_data[K29] = { schema: 1, log: many, folded: { n: 0, from: 0, to: 0 }, marks: mk, updated_at: 777, updated_by: 'uadmin' };
+    const g1 = await cl({ action: 'pmcon_decide', kind: 'notify', row: 'notify:new', choice: 'hold', grade: 'R1', base: 777 }, tokA);
+    const sd4 = mem.gw_data[K29] || {};
+    const g2 = await cl({ action: 'pmcon_get' }, tokA);
+    P.G = g1.code === 200 && sd4.log.length === 400 && sd4.folded.n === 1 && sd4.folded.from === 1000 && sd4.folded.to === 1000 && sd4.log[0].ts === 1001 && sd4.log[399].row === 'notify:new'
+      && Object.keys(sd4.marks).length === 60 && !sd4.marks['notify:m0'] && sd4.marks['notify:new'] && sd4.marks['notify:m59']
+      && g2.code === 200 && g2.body.log.length === 200 && g2.body.log[0].row === 'notify:new' && g2.body.total === 400 && g2.body.folded.n === 1;
+    I.G = [g1.code, g1.body.error_code, sd4.log && sd4.log.length, sd4.folded && sd4.folded.n, Object.keys(sd4.marks || {}).length, g2.body.log && g2.body.log.length];
+    // H 실패 닫힘 — 기록 읽기 실패·깨진 값 = 읽기·쓰기 503 PMCON_READ_FAILED(설정 그대로 · 기존 핸들러 안 부름) · 명부 못 읽음 = 쓰기 503 MEMBERS_UNAVAILABLE·읽기 can_write false ·
+    //     기록 쓰기 실패 = 500 PMCON_WRITE_FAILED + applied true(설정은 이미 바뀜 — 숨기지 않음)
+    seed29();
+    blobsMock.hooks.failGet = (k) => k === K29;
+    const h1 = await cl({ action: 'pmcon_get' }, tokA), h2 = await cl(okBody29(), tokA);
+    blobsMock.hooks.failGet = null;
+    const nfH = mem.gw_data['settings:notify'];
+    mem.gw_data[K29] = { schema: 1, log: 'x', marks: {} };
+    const h3 = await cl({ action: 'pmcon_get' }, tokA), h4 = await cl(okBody29(), tokA);
+    delete mem.gw_data[K29];
+    pushMock.tierCtx = async () => Object.assign(tierLib.ctxOf(membersOf()), { unavailable: true });
+    const h5 = await cl(okBody29(), tokA), h6 = await cl({ action: 'pmcon_get' }, tokA);
+    pushMock.tierCtx = tierCtx0;
+    blobsMock.hooks.failSet = (k) => k === K29;
+    const h7 = await cl(okBody29(), tokA);
+    blobsMock.hooks.failSet = null;
+    const nfH2 = mem.gw_data['settings:notify'] || {};
+    P.H = h1.code === 503 && h1.body.error_code === 'PMCON_READ_FAILED' && h2.code === 503 && h2.body.error_code === 'PMCON_READ_FAILED' && nfH === undefined
+      && h3.code === 503 && h3.body.error_code === 'PMCON_READ_FAILED' && h4.code === 503 && h4.body.error_code === 'PMCON_READ_FAILED'
+      && h5.code === 503 && h5.body.error_code === 'MEMBERS_UNAVAILABLE' && h6.code === 200 && h6.body.can_write === false && h6.body.pm_known === false
+      && h7.code === 500 && h7.body.error_code === 'PMCON_WRITE_FAILED' && h7.body.applied === true && nfH2.events && nfH2.events.task_review === 'issuer_approver' && !(K29 in mem.gw_data);
+    I.H = [h1.body.error_code, h2.body.error_code, nfH === undefined, h3.body.error_code, h4.body.error_code, h5.body.error_code, h6.body.can_write, h7.code, h7.body.error_code, h7.body.applied];
+    reset29();
+    return { ok: Object.keys(P).every((k) => P[k]), P, I };
+  };
+  try {
+    const R29 = await chk29(caller29(gwd));
+    T('P1 판29 ① 권한: 비로그인 401(읽기·쓰기) · 직원 미승인 기기 403 DEVICE_NOT_APPROVED · 직원(승인 기기) 403 ADMIN_ONLY · PM 아닌 관리자 읽기 200(can_write false·pm_present) · 쓰기 403 PM_ONLY · PM 읽기 can_write true · 저장·감사 0', R29.P.A, JSON.stringify(R29.I.A));
+    T('P1 판29 ② 값 검사 400 13종(BAD_KIND·BAD_CHOICE·BAD_ROW 2·BAD_GRADE R3·BAD_DUE·BAD_ARGS 6(모르는 칸·꼴·ㄱ에 값 없음·보류에 값·완료 판정 글자)·NEED_SET_BASE·BAD_WHY) · 기록·설정·감사 0', R29.P.B, JSON.stringify(R29.I.B));
+    T('P1 판29 ③ 정상 ㄱ: 기존 notify_set이 값을 바꿈(task_review → 승인권자 · updated_by uadmin · 감사 알림변경 by 회원) + 누른 기록 1줄(ㄱ·추천대로·적용·줄 id) + 감사 1줄(col pmcon · op PM콘솔) · PM 아닌 관리자 읽기에 그 기록', R29.P.C, JSON.stringify(R29.I.C));
+    T('P1 판29 ④ 낙관락: 기록 base 낡음·없음 = 409 PMCON_STALE(설정 그대로) · 설정 set_base 낡음 = 기존 핸들러 409 NOTIFY_STALE 그대로 · 기록 0', R29.P.D, JSON.stringify(R29.I.D));
+    T('P1 판29 ⑤ 보류(표시 hold·재개 조건)·다시 열기(표시 지움)·기본값 그대로(표시 keep·설정 안 바뀜·추천대로 아님)·기본값 + 값(doneif_set 켬·updated_by 회원) · 기록 5줄 순서', R29.P.E, JSON.stringify(R29.I.E));
+    T('P1 판29 ⑥ 자동 지시 규칙 live를 콘솔로: settings:autotask updated_by = 회원 id(봇 표식 아님) · 감사 자동지시규칙 by 회원', R29.P.F, JSON.stringify(R29.I.F));
+    T('P1 판29 ⑦ 상한: 기록 400줄 + 1 = 400(가장 오래된 1줄 접힘 folded n 1·시각) · 표시 60개 상한(가장 오래된 표시 버림) · 읽기 응답 최근 200줄·최근 것부터·total 400', R29.P.G, JSON.stringify(R29.I.G));
+    T('P1 판29 ⑧ 실패 닫힘: 기록 읽기 실패·깨진 값 = 읽기·쓰기 503 PMCON_READ_FAILED(기존 핸들러 안 부름·설정 그대로) · 명부 못 읽음 = 쓰기 503 MEMBERS_UNAVAILABLE·읽기 can_write false · 기록 쓰기 실패 = 500 PMCON_WRITE_FAILED + applied true', R29.P.H, JSON.stringify(R29.I.H));
+    const MUT29 = [
+      ["    if (!isPm) return { res: jr(403, { status: 'FORBIDDEN', error_code: 'PM_ONLY', request_id: R }) };\n", ''],
+      ["  if (!(await deviceApproved(event, c.member))) return { res: jr(403, { status: 'FORBIDDEN', error_code: 'DEVICE_NOT_APPROVED', request_id: R }) };\n", ''],
+      ["  if (!c.member.admin) return { res: jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R }) };\n  let tc = null;", '  let tc = null;'],
+      ["    if (!known) return { res: jr(503, { status: 'ERROR', error_code: 'MEMBERS_UNAVAILABLE', request_id: R }) };", "    if (!known) {}"],
+      ["  if (!r.ok) return r.code === 'NOT_FOUND' ? { ok: true, doc: pmconEmpty() } : { ok: false, code: r.code || 'STORAGE_READ_FAILED' };", "  if (!r.ok) return { ok: true, doc: pmconEmpty() };"],
+      ["  if (!x || typeof x !== 'object' || !Array.isArray(x.log) ||", "  if (!x || typeof x !== 'object' ||"],
+      ["  if (d.base === undefined || Number(d.base) !== Number(s0.doc.updated_at || 0)) return", "  if (d.base !== undefined && Number(d.base) !== Number(s0.doc.updated_at || 0)) return"],
+      ["    if (!inner || inner.statusCode !== 200) return inner;", '    if (false) return inner;'],
+      ["    if (typeof d.set_base !== 'number' || !isFinite(d.set_base)) return", "    if (false) return"],
+      ["  if (ks.length !== Object.keys(spec).length || ks.some(", "  if (ks.some(() => false) && ks.some("],
+      ["  if (grade !== 'R1' && grade !== 'R2') return", "  if (!grade) return"],
+      ["  pmconFold(doc);\n", ''],
+      ["  try { pmAu = await appendAudit({ ts: now, by: c.member.name, bid: c.member.id, col: 'pmcon',", "  try { pmAu = true || await appendAudit({ ts: now, by: c.member.name, bid: c.member.id, col: 'pmcon',"],
+      ["  if (choice === 'hold') doc.marks[row] = { st: 'hold',", "  if (false) doc.marks[row] = { st: 'hold',"],
+      ["  if (!w.ok) return jr(500, { status: 'ERROR', error_code: 'PMCON_WRITE_FAILED', applied: !!applied, request_id: R });", "  if (!w.ok) return jr(200, { status: 'OK', applied: !!applied, request_id: R });"],
+      ["  const log = s.doc.log.slice(-PMCON_GET_MAX).reverse();", '  const log = s.doc.log.slice(0, PMCON_GET_MAX);'],
+    ];
+    const kill29 = [];
+    for (const [from, to] of MUT29) {
+      let k; try { k = !(await chk29(caller29(load29(mutOf29(from, to))))).ok; } catch (e) { k = 'err ' + e.message; }
+      if (k !== true) kill29.push(from.trim().slice(0, 60) + (k === false ? ' 안 깨짐' : ' ' + k));
+    }
+    T('P1 판29 ⑨ 결함 사본 ' + MUT29.length + '개(PM 검사·기기 검사·관리자 검사·명부 못 읽음·읽기 실패를 빈 기록으로·깨진 값·base 없음 통과·기존 핸들러 거절 무시·set_base 없음·모르는 칸·등급 R3·접기 걷음·감사 걷음·보류 표시 걷음·쓰기 실패 숨김·읽기 순서) 전부 위 검사에서 걸림', kill29.length === 0, kill29.join(' | '));
+  } finally { reset29(); }
+}
+
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

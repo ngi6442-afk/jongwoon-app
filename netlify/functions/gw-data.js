@@ -5118,6 +5118,135 @@ async function handleVerRestore(event, d, R) {
   return jr(200, { status: 'OK', updated_at: doc.updated_at, request_id: R });
 }
 
+// ---- P1 판29 PM 콘솔 — 누른 기록 status:decide (착수설명서 판29 · 업무별 설계 3-17 self_decide · 시안 11/13 18:14 PM ㄱ) ----
+// 콘솔은 권한관리 카드 7종(배정표·알림 설정·완료 판정·자동 지시 규칙·계약 학습·브리핑 설정·근거 승격)의 '정할 것'을 한 화면에 모은 목록이고,
+// 값을 바꾸는 일은 **기존 핸들러를 그대로 부른다**(값 검사·낙관락(set_base)·prev 1판·감사 줄·updated_by = 누른 회원 — 콘솔이 봇 표식으로 대신 쓰지 않음).
+// 이 블록이 더하는 것은 '누른 기록' 한 곳뿐: status:decide = { schema, log:[기록], folded:{n,from,to}, marks:{줄 id:{st hold|keep, ts, by, why}}, updated_at, updated_by }.
+//   읽기 pmcon_get = 로그인 → 기기 승인 → 관리자(읽기) · 쓰기 pmcon_decide = 로그인 → 기기 승인 → 관리자 → PM(명시 tier pm — _lib/tier.js, 결재 전결과 같은 판정·명부 못 읽으면 503)
+//   → 값 검사 400 → 기록 읽기(실패 = 503 PMCON_READ_FAILED, 기본값 위에 쓰지 않음) → 낙관락 409 PMCON_STALE(base 필수) → 기존 핸들러(실패면 그 응답 그대로·기록 0) → 기록 1줄 → 감사 1줄(col pmcon).
+//   자동 적용(무응답이면 추천값)은 이 판에 없다 — 무응답 적용일·추천값은 화면 표시뿐이고 적용은 사람이 누를 때만(스위치·크론 신설 없음).
+//   상한: 기록 PMCON_LOG_MAX줄 — 넘치면 오래된 것부터 접어 folded(건수·처음·끝 시각)만 남김 · 표시 marks PMCON_MARK_MAX개(오래된 것부터 버림).
+const PMCON_KEY = 'status:decide';
+const PMCON_LOG_MAX = 400, PMCON_MARK_MAX = 60, PMCON_GET_MAX = 200;
+const PMCON_KINDS = {   // 줄 종류 → 부르는 기존 핸들러 · 넘기는 칸(그 밖의 칸은 400 BAD_ARGS) · 칸 꼴
+  assign: { label: '배정표', fn: handleAssignSet, args: { prefix: 's', who_id: 's' } },
+  notify: { label: '알림 설정', fn: handleNotifySet, args: { event: 's', value: 's' } },
+  doneif: { label: '완료 판정', fn: handleDoneifSet, args: { on: 'b' } },
+  autotask: { label: '자동 지시 규칙', fn: handleAutotaskSet, args: { rule: 's', mode: 's' } },
+  learn: { label: '계약 학습', fn: handleLearnSettingsSet, args: { on: 'b' } },
+  brief: { label: '브리핑 설정', fn: handleBriefSet, args: { field: 's', value: 'sb' } },
+  bg: { label: '근거 승격', fn: handleConProcBgSet, args: { bg_ver: 's' } },
+};
+const PMCON_CHOICES = { ok: 'ㄱ', 'default': '기본값', hold: '보류', reopen: '다시 열기' };
+const PMCON_ROW = /^[a-z]{2,10}:[0-9A-Za-z_.:-]{0,80}$/;
+const PMCON_DATE = /^20\d{2}-\d{2}-\d{2}$/;
+function pmconEmpty() { return { schema: 1, log: [], folded: { n: 0, from: 0, to: 0 }, marks: {}, updated_at: 0, updated_by: '' }; }
+async function pmconRead(st) {   // { ok, doc } — 없음 = 빈 기록 · 읽기 실패·깨진 값 = ok false(그 위에 쓰지 않음)
+  const r = await blobGet(st, PMCON_KEY);
+  if (!r.ok) return r.code === 'NOT_FOUND' ? { ok: true, doc: pmconEmpty() } : { ok: false, code: r.code || 'STORAGE_READ_FAILED' };
+  if (r.data === null || r.data === undefined) return { ok: true, doc: pmconEmpty() };   // 실 blobs.js의 '없음'
+  const x = r.data;
+  if (!x || typeof x !== 'object' || !Array.isArray(x.log) || (x.marks && (typeof x.marks !== 'object' || Array.isArray(x.marks)))) return { ok: false, code: 'PMCON_BAD_DOC' };
+  return { ok: true, doc: Object.assign(pmconEmpty(), x, { folded: Object.assign({ n: 0, from: 0, to: 0 }, x.folded || {}), marks: Object.assign({}, x.marks || {}) }) };
+}
+function pmconFold(doc) {   // 상한 넘친 오래된 기록을 접음(지우는 대신 건수·기간)
+  const over = doc.log.length - PMCON_LOG_MAX;
+  if (over > 0) {
+    const gone = doc.log.splice(0, over);
+    doc.folded = { n: (Number(doc.folded.n) || 0) + gone.length, from: Number(doc.folded.from) || Number(gone[0].ts) || 0, to: Number(gone[gone.length - 1].ts) || 0 };
+  }
+  const ks = Object.keys(doc.marks);
+  if (ks.length > PMCON_MARK_MAX) ks.sort(function (a, b) { return (Number(doc.marks[a].ts) || 0) - (Number(doc.marks[b].ts) || 0); }).slice(0, ks.length - PMCON_MARK_MAX).forEach(function (k) { delete doc.marks[k]; });
+}
+function pmconTxt(v, n) { return String(v == null ? '' : v).replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, n); }
+function pmconArgs(kind, a) {   // 넘길 칸만 꼴 검사 — 값 자체(허용 선택지·재직 명부·판 존재)는 기존 핸들러가 본다. null = 거절
+  const spec = PMCON_KINDS[kind].args;
+  if (!a || typeof a !== 'object' || Array.isArray(a)) return null;
+  const ks = Object.keys(a);
+  if (ks.length !== Object.keys(spec).length || ks.some(function (k) { return !Object.prototype.hasOwnProperty.call(spec, k); })) return null;
+  const out = {};
+  for (const k of ks) {
+    const t = spec[k], v = a[k];
+    if (t === 'b') { if (typeof v !== 'boolean') return null; }
+    else if (t === 'sb') { if (typeof v !== 'boolean' && (typeof v !== 'string' || v.length > 60)) return null; }
+    else if (typeof v !== 'string' || v.length > 60) return null;
+    out[k] = v;
+  }
+  return out;
+}
+async function pmconGate(event, R, write) {   // 로그인 → 기기 승인 → 관리자 → (쓰기) PM. { c, isPm } 또는 { res }
+  const c = await currentMember(event);
+  if (!c.ok) return { res: jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R }) };
+  if (!(await deviceApproved(event, c.member))) return { res: jr(403, { status: 'FORBIDDEN', error_code: 'DEVICE_NOT_APPROVED', request_id: R }) };
+  if (!c.member.admin) return { res: jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R }) };
+  let tc = null; try { tc = await push.tierCtx(); } catch (e) { tc = null; }
+  const known = !!(tc && !tc.unavailable);
+  const isPm = known && tc.tierOf(c.member) === 'pm';
+  if (write) {
+    if (!known) return { res: jr(503, { status: 'ERROR', error_code: 'MEMBERS_UNAVAILABLE', request_id: R }) };   // 명부 없이는 PM인지 모름 — 쓰지 않음
+    if (!isPm) return { res: jr(403, { status: 'FORBIDDEN', error_code: 'PM_ONLY', request_id: R }) };
+  }
+  return { c: c, isPm: isPm, known: known, pmN: known ? tc.pmIds.length : 0 };
+}
+async function handlePmconGet(event, d, R) {
+  const g = await pmconGate(event, R, false); if (g.res) return g.res;
+  const s = await pmconRead(store(DATA));
+  if (!s.ok) return jr(503, { status: 'ERROR', error_code: 'PMCON_READ_FAILED', request_id: R });
+  const log = s.doc.log.slice(-PMCON_GET_MAX).reverse();   // 최근 것부터
+  return jr(200, { status: 'OK', log: log, total: s.doc.log.length, folded: s.doc.folded, marks: s.doc.marks, updated_at: Number(s.doc.updated_at) || 0,
+    can_write: g.isPm, pm_known: g.known, pm_present: g.pmN > 0, request_id: R });
+}
+async function handlePmconDecide(event, d, R) {
+  const g = await pmconGate(event, R, true); if (g.res) return g.res; const c = g.c;
+  const kind = String(d.kind || ''), choice = String(d.choice || ''), row = String(d.row || '');
+  if (!Object.prototype.hasOwnProperty.call(PMCON_KINDS, kind)) return jr(400, { status: 'REJECTED', error_code: 'BAD_KIND', request_id: R });
+  if (!Object.prototype.hasOwnProperty.call(PMCON_CHOICES, choice)) return jr(400, { status: 'REJECTED', error_code: 'BAD_CHOICE', request_id: R });
+  if (!PMCON_ROW.test(row) || row.indexOf(kind + ':') !== 0) return jr(400, { status: 'REJECTED', error_code: 'BAD_ROW', request_id: R });
+  const grade = String(d.grade || '');
+  if (grade !== 'R1' && grade !== 'R2') return jr(400, { status: 'REJECTED', error_code: 'BAD_GRADE', request_id: R });
+  const due = d.due === undefined || d.due === null ? '' : String(d.due);
+  if (due && !PMCON_DATE.test(due)) return jr(400, { status: 'REJECTED', error_code: 'BAD_DUE', request_id: R });
+  if (d.why !== undefined && (typeof d.why !== 'string' || d.why.length > 200)) return jr(400, { status: 'REJECTED', error_code: 'BAD_WHY', request_id: R });
+  // 고칠 값: ㄱ = 반드시 있음 · 기본값 = 있거나(그 값 적용) 없음(무응답 기본값이 '그대로' — 기록만) · 보류·다시 열기 = 없음(설정을 바꾸지 않음)
+  const hasArgs = d.args !== undefined && d.args !== null;
+  if ((choice === 'ok' && !hasArgs) || ((choice === 'hold' || choice === 'reopen') && hasArgs)) return jr(400, { status: 'REJECTED', error_code: 'BAD_ARGS', request_id: R });
+  let args = null;
+  if (hasArgs) {
+    args = pmconArgs(kind, d.args);
+    if (!args) return jr(400, { status: 'REJECTED', error_code: 'BAD_ARGS', request_id: R });
+    if (typeof d.set_base !== 'number' || !isFinite(d.set_base)) return jr(400, { status: 'REJECTED', error_code: 'NEED_SET_BASE', request_id: R });   // 기존 핸들러는 base가 없으면 낙관락을 건너뛴다 — 콘솔 길은 늘 싣게
+  }
+  const st = store(DATA);
+  const s0 = await pmconRead(st);
+  if (!s0.ok) return jr(503, { status: 'ERROR', error_code: 'PMCON_READ_FAILED', request_id: R });
+  if (d.base === undefined || Number(d.base) !== Number(s0.doc.updated_at || 0)) return jr(409, { status: 'CONFLICT', error_code: 'PMCON_STALE', request_id: R });
+  let applied = null;
+  if (args) {   // 기존 핸들러 그대로 — 같은 요청(같은 회원·기기)으로 부르므로 updated_by·감사 줄이 누른 회원으로 남는다
+    const inner = await PMCON_KINDS[kind].fn(event, Object.assign({}, args, { base: d.set_base }), R);
+    if (!inner || inner.statusCode !== 200) return inner;   // 거절(값 검사 400·낙관락 409·권한 403 …)은 그 응답 그대로 — 기록 0
+    applied = { kind: kind, args: args };
+  }
+  const now = Date.now();
+  const rec = { ts: now, by: c.member.id, name: pmconTxt(c.member.name, 20), row: row, kind: kind, choice: choice, grade: grade, due: due,
+    q: pmconTxt(d.q, 160), rec: pmconTxt(d.rec, 80), val: pmconTxt(d.val, 80), match: choice === 'ok' ? true : (choice === 'default' ? d.def_is_rec === true : null),
+    why: pmconTxt(d.why, 200), applied: !!applied, via: 'console' };
+  // 쓰기 직전 다시 읽기 — 기존 핸들러를 부르는 사이 다른 기록이 들어왔으면 그 위에 덧붙인다(기록은 덧붙이기만 하므로 합쳐도 잃는 것 없음)
+  const s1 = await pmconRead(st);
+  if (!s1.ok) return jr(500, { status: 'ERROR', error_code: 'PMCON_WRITE_FAILED', applied: !!applied, request_id: R });
+  const doc = s1.doc;
+  doc.log.push(rec);
+  if (choice === 'hold') doc.marks[row] = { st: 'hold', ts: now, by: c.member.id, why: rec.why };
+  else if (choice === 'default' && !applied) doc.marks[row] = { st: 'keep', ts: now, by: c.member.id, why: rec.why };
+  else delete doc.marks[row];   // ㄱ·값 적용·다시 열기 = 표시 지움
+  pmconFold(doc);
+  doc.schema = 1; doc.updated_by = c.member.id; doc.updated_at = Math.max(now, (Number(s1.doc.updated_at) || 0) + 1);   // 같은 ms 두 기록도 낙관락 토큰이 달라지게
+  const w = await blobSet(st, PMCON_KEY, doc);
+  if (!w.ok) return jr(500, { status: 'ERROR', error_code: 'PMCON_WRITE_FAILED', applied: !!applied, request_id: R });
+  let pmAu = false;
+  try { pmAu = await appendAudit({ ts: now, by: c.member.name, bid: c.member.id, col: 'pmcon', ev: [{ op: 'PM콘솔', id: row, t: PMCON_KINDS[kind].label + ' · ' + PMCON_CHOICES[choice] + (applied ? ' · 적용' : '') + ' · ' + grade + (rec.q ? ' · ' + rec.q.slice(0, 80) : '') }] }) !== false; } catch (e) { pmAu = false; }
+  return jr(200, { status: 'OK', record: rec, applied: !!applied, marks: doc.marks, updated_at: doc.updated_at, audit: pmAu, request_id: R });
+}
+
 // v378 큰 본문 양방향 gzip(2026-10-08 실사고): col:bids가 9/11 3.94MB(2,462건)에서 10/8 07:52 분할 전송 수신 뒤 6.69MB(3,953건)로 자라
 // Netlify 동기 함수 응답 한도 6MB(6,291,456B)를 넘자 get이 실패했고, 앱은 그 실패를 삼켜 "수집된 공고가 없습니다"로 보였다(PM "기존거 다 날라갔나").
 // 저장(save) 본문도 같은 6MB 요청 한도라 상태 변경이 조용히 유실될 자리였다.
@@ -5281,6 +5410,8 @@ async function handlerInner(event) {
     if (d && d.action === 'safety_settings_set') return await handleSafetySettingsSet(event, d, R);   // v436 관리자만
     if (d && d.action === 'corp_reg_get') return await handleCorpRegGet(event, d, R);   // P1 판1 법인 등기 날짜·투찰 잠금(settings:corp_reg) — 관리자만
     if (d && d.action === 'corp_reg_set') return await handleCorpRegSet(event, d, R);
+    if (d && d.action === 'pmcon_get') return await handlePmconGet(event, d, R);   // P1 판29 PM 콘솔 누른 기록(status:decide) — 관리자 읽기
+    if (d && d.action === 'pmcon_decide') return await handlePmconDecide(event, d, R);   // P1 판29 [ㄱ]/[보류]/[기본값] — PM만 · 값 바꾸기는 기존 핸들러
     if (d && d.action === 'doc_att_put') return await handleDocAttPut(event, d, R);
     if (d && d.action === 'doc_att_get') return await handleDocAttGet(event, d, R);
     if (d && d.action === 'doc_att_del') return await handleDocAttDel(event, d, R);
