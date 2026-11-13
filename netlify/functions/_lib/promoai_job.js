@@ -56,6 +56,8 @@ function pickPhotoIds(rec) {
 // 기록의 자동 생성 상태 — 카드가 읽어 말로 보여준다. running은 시도 횟수를 올린다(재시도 간격·상한의 기준).
 function setAiState(rec, st, extra, now) {
   const prev = (rec && rec.ai_st && typeof rec.ai_st === 'object') ? rec.ai_st : {};
+  // C132(11/13 prmwe7mn02k90wz): 초안(ai)이 이미 실린 기록은 뒤늦은 시도의 실패·진행 상태로 덮지 않는다 — 상태는 그 초안을 만든 done 그대로(재생성 결과는 applyResult·화면 적용이 done으로 씀)
+  if (rec && rec.ai && st !== 'done') return prev;
   const tries = Number(prev.tries) || 0;
   const o = { st: st, ts: now || Date.now(), tries: st === 'running' ? tries + 1 : tries };
   if (extra && extra.job) o.job = String(extra.job);

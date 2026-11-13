@@ -1062,13 +1062,10 @@
 
 ## v458 — 체크 10 — 사진AI 생성 스트리밍 수리(10 세션 11/13 53bf63b·cc156a3 — v455 배포 뒤 확인에서 찾음)
 - [x] `node tools/promostream_check.mjs` 통과(9 — SSE 모으기·CRLF · JSON 응답·상태 코드 · fetch failed 원인 코드 · 상한 TIMEOUT·끝 표시 없음 · 오류 이벤트·max_tokens · generateDraft 스트리밍·재시도·잘림·중간 끊김 · 배선). — ✓ AI 11/13
-- [x] (AI, v458 뒤 — 판 번호는 합칠 때) 빈 본문 시험 ⑧ 더함(코드 변경 없음): 머리만 오고 0바이트 = NETWORK 재시도 안 함 · 끝까지 왔는데 글 없음 = PARSE_FAILED(종전 규칙 한 번 더) · 이벤트 스트림 아닌 200 빈 본문 = PARSE(callApi와 같음) → `node tools/promostream_check.mjs` 10 — ✓ AI 11/13
 - [ ] 배포 뒤: 장량동 기록(prmwe7jp78a2t90) 카드에서 [다시] → 10분 안에 초안(판독표·p2) · 잡 로그에 실패 없음 · 걸린 시간이 5분을 넘어도 끊기지 않는지(잡 시작 → done).
 - [ ] 다음 사진AI 생성들이 NETWORK 'fetch failed' 없이 끝나는지(며칠) · 실패가 나면 사유에 원인 코드(예 UND_ERR_…)가 붙는지.
 - [x] (AI) v455 재검토 낮음 N1(직책 거름 = 님·에게·께만, 버린 규칙 수 dropped·로그)·N2(저장된 규칙도 읽을 때 cleanRule) 반영 뒤 `node tools/promoqlearn_check.mjs` 44 — ✓ AI 11/13
 - [ ] 다음 품질 학습 함수 로그 '[품질 학습] 학습 — 규칙 n · 버림 m …'에서 m이 0 또는 실명·숫자 규칙만인지(보통 규칙이 버려지지 않는지).
-- [x] (AI · v458 뒤 — 판 번호는 합칠 때) C132 `uismoke` 새 묶음(실제 paAiRec·paMarkDone·paApplyToRecord: 검토 기록 = ai.pv·by client·ai_st done(시도 5 그대로·새 잡 번호·옛 code/detail 없음) · 게시 완료 = 태그만·pv 없으면 칸 없음 · paFinish prompt_ver·잡 번호 · 적용 세 자리 모두 공용 함수) + 태그 원형 tt 검사 새 꼴.
-- [ ] 다음 사진AI 생성(카드를 연 채 또는 목록 화면에서 끝남) 뒤 그 기록 ai에 pv·by가 있고 ai_st가 done인지.
 
 ## v447 — 56 판 1차: 안전 › '교육·검진' 칸 이름을 '체크'로 + PC는 사람별 엑셀형 표(앱·서버 — PM 11/12 17:59 '체크로' · 56은 45와 따로 · ⑨ 자격·담당 교육 6종은 2차 v448 · 위험성평가 열 lv3(1366 창) · 칸 폭 운영 백업 11/12 17:17 사본 실측 · 폰은 C063 '계획대로(나·나)' = phone:"legacy" 지금 목록 그대로)
 - [x] (AI 시험 화면 대상, PC 1366·1920·1100 창 — 기기마다 앱을 완전히 닫고 다시 열기 · 관리자 계정, 운영 백업 사본) 안전 탭 칩 줄 '현황 | 현장 | 체크' · 체크 칸 머리 '체크'·'회사가 사람마다 챙길 법정 교육·검진·위험성평가 공유·참여'·범위 줄 · 사람별 표: 펴진 줄 = 재직 직원(시험 계정 표식 빼고) + 2025년 이후·진행 현장 일용직 · 묶음 '그 밖 일용직'(접힘)·'기록만 남은 사람' · 머리 '총 n명 (접힘 m명)' · 1366 열 10(이름·다음 할 일·빠진 항목·정기교육·채용 시·특별교육·건설 기초·일반건진·석면 건진·위험성평가 — 위험성평가 보임)·1920 열 12(구분·소속·최근 더함) · 1100 = 1366에서 일반건진·위험성평가 빠짐 · 칸 글 잘림 없음(근거 확인 중·경과 n일·✓ 연-월·12/12시간) · 가로 넘침 0(1366·1920) — 11/12 ~20:24 시험 서버(box.localhost, 운영 백업 11/12 17:17 사본 — 직원 19·일용직 155·교육 기록 0건에서 시험 기록은 메모리에만 넣고 끝나면 서버째 지움) 확인분(관리자): 칩 줄 '현황 | 현장 | 체크' · 칸 머리 두 줄 · 머리 '총 172명 (접힘 125명)' · 1366 = 본문 1,099·열 10(위험성평가 보임) · 1920 = 1,428·열 12 · 1100 = 869·열 8(일반건진·위험성평가 빠짐) · 가로 넘침 0 · ★일반건진 82px에서 대표 줄 '근거 확인 중'(글 71.3px + 칸 여백 16)이 잘려 90으로 고침(단계 합 742/956/1,180 — uismoke ① 폭 ≥ 88 고정) → 다시 잰 잘림은 이름 칸(줄임표+title)뿐 · 시험 기록 뒤 묶음 '그 밖 일용직'·'기록만 남은 사람' 둘 다
@@ -1177,4 +1174,12 @@
 - [ ] (AI 시험 화면 대상 — 운영 배포 뒤 v461 index.html 덧입힘) 관리자 계정으로 관리 › 월말명세서 탭이 보이고 10월 월 보드가 빈 채로 열리는지 · 권한 없는 직원 계정에 탭이 없는지
 - [ ] (관리자) 권한관리 '월말명세서' 열 — 권민지 칸 1번(숨김 → 수행) · 나수진 주임은 관리자라 자동 수행(C084)
 - [ ] (권민지) 11월분(12/1~5) 차량 거래처 확정 → [대표 결재 상신] → 대표 [확인(결재)] · 작업용구 [결제 지시] → 나수진 주임 결제 뒤 지시 완료 · 처음 보는 번호 한 번 고르기 → 다음 달 자동으로 찾는지
+- [x] (AI) `uismoke` · `consheet_check` · `proctpl_check` · `settletest` · `servertest` · `rectest` · `promoqual_check` · `promogen_check` · `promoqlearn_check` · `promostream_check` · `promo_wrap_check` · `promo_post_check` 전부 통과 + node --check(함수·_lib·sw) — 숫자는 커밋 메시지
+
+## v462 — 체크 10 C132 사진AI 적용 상태 맞춤(화면 적용 = 서버와 같은 꼴 · 초안 있는 기록은 실패·진행 상태로 안 덮음) + 생성 스트리밍 빈 본문 시험 ⑧ (운영 데이터 변경 없음)
+- [x] (AI) C132 `uismoke` 새 묶음(실제 paAiRec·paMarkDone·paApplyToRecord: 검토 기록 = ai.pv·by client·ai_st done(시도 5 그대로·새 잡 번호·옛 code/detail 없음) · 게시 완료 = 태그만·pv 없으면 칸 없음 · paFinish prompt_ver·잡 번호 · 적용 세 자리 모두 공용 함수) + 태그 원형 tt 검사 새 꼴.
+- [x] (AI) C132 `servertest` setAiState 새 줄: 초안 있는 기록 fail·running = 상태 done·잡 그대로 · done은 씀 · 초안 없는 기록은 종전대로.
+- [x] (AI) 빈 본문 시험 ⑧ 더함(코드 변경 없음): 머리만 오고 0바이트 = NETWORK 재시도 안 함 · 끝까지 왔는데 글 없음 = PARSE_FAILED(종전 규칙 한 번 더) · 이벤트 스트림 아닌 200 빈 본문 = PARSE(callApi와 같음) → `node tools/promostream_check.mjs` 10 — ✓ AI 11/13
+- [ ] (AI 시험 화면 대상 — 운영 배포 뒤 읽기 전용) 다음 사진AI 생성(카드를 연 채 또는 목록 화면에서 끝남)이 끝난 기록의 ai에 pv·by가 있고 ai_st가 done인지 · 그 뒤 실패한 시도가 있어도 상태가 done으로 남는지.
+- [ ] (AI 시험 화면 대상 — 운영 배포 뒤 읽기 전용) 5분 넘게 걸린 사진AI 생성이 나오면 끊기지 않고 끝났는지(C124 이어 보기).
 - [x] (AI) `uismoke` · `consheet_check` · `proctpl_check` · `settletest` · `servertest` · `rectest` · `promoqual_check` · `promogen_check` · `promoqlearn_check` · `promostream_check` · `promo_wrap_check` · `promo_post_check` 전부 통과 + node --check(함수·_lib·sw) — 숫자는 커밋 메시지

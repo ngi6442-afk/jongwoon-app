@@ -1,6 +1,6 @@
 # 종운 그룹웨어 — 기능 대장 (사용자 매뉴얼 원천)
 
-> 살아있는 문서. 기능 추가·변경 시 이 파일을 함께 갱신한다. 기준: v461 (2026-11-13).
+> 살아있는 문서. 기능 추가·변경 시 이 파일을 함께 갱신한다. 기준: v462 (2026-11-13).
 > 세부 변경 이력은 git 커밋 메시지(한글) 참조.
 
 ## 1. 전체 구조
@@ -743,6 +743,15 @@ PM 지시 "문서함 일단 다 올리고 등재결재랑 공개범위 만들어
 - 남은 실험 1: `<hr>`을 네이버 에디터가 붙여넣기에서 구분선 모듈로 받는지(권민지 임시저장 글 1회). 안 받으면 PROMO_HR를 빈 줄로 바꾼다.
 - sw v394.
 
+### v462 (11/13) — 체크 10 C132 사진AI 적용 상태 맞춤(화면 적용 = 서버와 같은 꼴 · 초안 있는 기록은 실패·진행 상태로 안 덮음) + 생성 스트리밍 빈 본문 시험 ⑧ (원장 C132 — 11/13 장량동 [다시] 뒤 확인에서 찾음 · 운영 데이터 변경 없음)
+
+- 증상(운영 실측 11/13): 장량동 [다시] 생성(18:02~18:06, p2·판독표 20)이 정상으로 끝났는데 기록 ai에 프롬프트 판 pv·넣은 쪽 by가 없고 생성 상태 ai_st가 예전 실패(fail·NETWORK·시도 5)로 남음 — 화면이 결과를 먼저 실으면 서버 applyResult는 ai가 있어 ALREADY로 빠진다. 같은 꼴 4건(장량동·제내리 2·게시 완료 1). 또 1건(prmwe7mn02k90wz)은 서버가 초안을 실은 뒤 뒤늦은 시도의 NETWORK 실패가 상태만 덮음.
+- 화면(원천): C132 브라우저 적용 = 서버 applyResult와 같은 꼴: 카드를 연 화면이 사진AI 결과를 먼저 실으면(paApply·paApplyToRecord — 서버는 ai가 있으면 ALREADY로 빠짐) 기록 ai에 프롬프트 판 pv·넣은 쪽 by(client)가 없고 생성 상태 ai_st가 예전 실패로 남던 것(11/13 장량동 — 서버 setAiState를 거치지 않음) → paAiRec(ai 한 곳: model·tokens·ts·tt·by·pv)·paMarkDone(ai_st done — 시도 횟수 그대로·잡 번호 새것) · paFinish가 잡 prompt_ver·잡 번호를 받음. 품질 점수의 판 비교는 서버 초안 보존본(promoai:draft)의 pv를 읽어 원래 영향 없음 — 기록 표식·상태만 맞춤. 이미 그렇게 남은 운영 기록은 손대지 않음.
+- 서버(원천): `_lib/promoai_job.js` `setAiState` 한 자리 — 초안(ai)이 이미 실린 기록은 fail·running으로 덮지 않음(그 초안을 만든 done 그대로, done은 씀) · 워커 finish·시작·크론 실패가 모두 이 함수를 거침. 초안 없는 기록은 종전대로(시도 횟수·잔액 부족 규칙 그대로 — pickCandidates는 ai 있는 기록을 원래 안 고름).
+- 시험(v458 뒤 커밋 0e1acad를 이 판에): 빈 본문 시험 ⑧(코드 변경 없음 — 종운환경3 11/13 질문): 머리만 오고 0바이트로 닫힘 = NETWORK '스트림이 끝 표시 없이 끊김'·재시도 안 함 · 끝까지 왔는데 글이 비었음 = 응답 그대로 → generateDraft PARSE_FAILED(종전 규칙대로 한 번 더, 비스트리밍 때와 같음) · 이벤트 스트림이 아닌 200 빈 본문 = PARSE·재시도 가능(callApi와 같음) → promostream_check 10.
+- 이미 그렇게 남은 운영 기록 5건은 손대지 않음(카드는 ai가 있으면 ai_st를 읽지 않아 화면 영향 없음). 품질 점수의 판 비교는 서버 초안 보존본 promoai:draft의 pv를 읽어 원래 영향 없음.
+- 검사: uismoke C132 실행 묶음(실제 paAiRec·paMarkDone·paApplyToRecord) · servertest C132 setAiState · promostream ⑧(10) · 태그 tt·v361 검사 새 꼴. sw v462.
+
 ### v461 (11/13) — 체크 29 월말명세서 1단계(판①~③·⑤): 관리 › 월말명세서 탭 — 저장·검산·차량 대조 · 월 보드·거래처 상세 · 차량 고르기·용도 칩·거래처 목록 · 사장님 보고(대표 결재 상신)·나수진 주임 결제 지시 · 차량 탭 '월말명세서' 칸 (원장 C055·C065·C073·C084 — PM 11/10 18:13 '추천대로 ㄱ' · 11/12 '운반일지 보고, 결재 탭' · 11/13 10:55 '결재 없이' · 18:14 '29. ㄱ') — 시안 https://claude.ai/artifact/C5PG9u9Zz1DC6HwKLgrBZd
 
 - **무엇**: 권민지 '명세표 정리'(거래처 12곳 월말 명세서 확인 → 사장님·나주임 전달 → 정리 파일)를 앱으로 옮기는 1단계. 비전 판독(D1)·읽기(판④ — PDF 글자층·htm·홈택스 매입 xlsx)는 없음(권민지 자료 C053·PM 결정 뒤).
@@ -963,8 +972,6 @@ PM 지시 "문서함 일단 다 올리고 등재결재랑 공개범위 만들어
 - 수리(원천): `_lib/claude.js` `callApiStream` — stream:true(SSE)로 받아 머리가 곧바로 오고 토큰·ping이 이어져 300초 제한에 안 걸림, 전체 상한은 그대로(본문을 다 받을 때까지 타이머 유지) · 이벤트(message_start·content_block_delta text_delta·message_delta·message_stop·ping·error)를 비스트리밍 응답과 같은 모양으로 모음(생각 블록 버림, 사용량 합침) · 이벤트 스트림이 아니면 JSON 그대로(상태 코드 규칙은 `statusError` 한 곳 — callApi와 공용) · 머리 받기 전 끊김 = NETWORK 재시도 1회(종전), 머리 받은 뒤 끊김·끝 표시 없음 = 재시도 안 함(15분 백그라운드 상한 보호 — 서버 재시도 규칙이 나중에) · 스트림 오류 이벤트 = SERVER(글이 오기 전만 재시도). `generateDraft`만 스트리밍으로 — 학습 워커들(편집 간극·품질·계약)은 짧아 종전 `callApi`. 'fetch failed'에는 원인 코드를 붙임(`errDetail` — 예 'fetch failed (UND_ERR_HEADERS_TIMEOUT)').
 - 배포 뒤: 장량동 기록(prmwe7jp78a2t90)은 자동 재시도가 끝나 카드에서 [다시]를 한 번 눌러야 한다.
 - 게이트 `tools/promostream_check.mjs`(신설 9 — SSE 모으기(한글이 조각 경계에 걸려도)·CRLF · JSON 응답·상태 코드 · fetch failed 원인 코드 · 상한 TIMEOUT·끝 표시 없음 · 오류 이벤트·max_tokens · generateDraft 스트리밍·재시도·잘림·중간 끊김 · 배선) · uismoke '체크 10 생성 스트리밍' 묶음.
-- (v458 뒤 — 판 번호는 합칠 때) C132 브라우저 적용 = 서버 applyResult와 같은 꼴: 카드를 연 화면이 사진AI 결과를 먼저 실으면(paApply·paApplyToRecord — 서버는 ai가 있으면 ALREADY로 빠짐) 기록 ai에 프롬프트 판 pv·넣은 쪽 by(client)가 없고 생성 상태 ai_st가 예전 실패로 남던 것(11/13 장량동 — 서버 setAiState를 거치지 않음) → paAiRec(ai 한 곳: model·tokens·ts·tt·by·pv)·paMarkDone(ai_st done — 시도 횟수 그대로·잡 번호 새것) · paFinish가 잡 prompt_ver·잡 번호를 받음. 품질 점수의 판 비교는 서버 초안 보존본(promoai:draft)의 pv를 읽어 원래 영향 없음 — 기록 표식·상태만 맞춤. 이미 그렇게 남은 운영 기록은 손대지 않음.
-- (v458 뒤 — 판 번호는 합칠 때) 빈 본문 시험 ⑧(코드 변경 없음 — 종운환경3 11/13 질문): 머리만 오고 0바이트로 닫힘 = NETWORK '스트림이 끝 표시 없이 끊김'·재시도 안 함 · 끝까지 왔는데 글이 비었음 = 응답 그대로 → generateDraft PARSE_FAILED(종전 규칙대로 한 번 더, 비스트리밍 때와 같음) · 이벤트 스트림이 아닌 200 빈 본문 = PARSE·재시도 가능(callApi와 같음) → promostream_check 10.
 
 ### v395 (10/27) — 자동 지시 배정표 settings:assign (공통 기반 1 첫 시범 · 착수 브리핑 A2, PM 10/27 "착수 ㄱ")
 - 배경: 변경안 0 실측(10/27) 자동 지시 61건 중 담당 공란 33건(54%). 공란의 뜻이 "관리자 전원"이던 것을 끊고(관리자 폴백 금지), 접두어별 담당을 설정값으로 둔다.

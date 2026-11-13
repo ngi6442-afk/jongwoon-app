@@ -12853,15 +12853,15 @@ try {
     const FT = ['C084', 'stmt_sent', 'SENT_LOCKED', 'NO_VEH_ACCESS', "'월말명세서' ③ 대표 전결", '결재 없이', 'stmt_match', 'NOT_BALANCED', 'servertest 89', 'uismoke 29 판'];
     const GATE = ['uismoke', 'consheet_check', 'proctpl_check', 'settletest', 'servertest', 'rectest', 'promoqual_check', 'promogen_check', 'promoqlearn_check', 'promostream_check', 'promo_wrap_check', 'promo_post_check'];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
-    const ok = /기준: v461 \(2026-11-13\)\./.test(ft) && ftv.length > 0 && mF.length === 0 && tlv.length > 0 && scr.some((l) => /^- \[ \]/.test(l)) && !scr.some((l) => /PM/.test(l)) && !cb.some((l) => /^- \[ \] \(PM/.test(l))
+    const ok = Number((ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 461 && ftv.length > 0 && mF.length === 0 && tlv.length > 0 && scr.some((l) => /^- \[ \]/.test(l)) && !scr.some((l) => /PM/.test(l)) && !cb.some((l) => /^- \[ \] \(PM/.test(l))
       && GATE.every((g) => gate.some((l) => l.indexOf('`' + g + '`') > 0))
       && m91.indexOf('대표 결재 상신') > 0 && m91.indexOf('결제 지시') > 0 && m91.indexOf('전달함') > 0 && m91.indexOf('차량 탭') > 0 && /stmt = 월말명세서 열/.test(man)
-      && cl.indexOf('`// @stmt-sheet-start ~ end`') > 0 && cl.indexOf('`stmt_sent`') > 0 && /SHELL_CACHE = 'jw-shell-v461'/.test(sw);
+      && cl.indexOf('`// @stmt-sheet-start ~ end`') > 0 && cl.indexOf('`stmt_sent`') > 0 && Number((sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 461;   // v462: 기준 줄·sw는 이 판 이상(이 판 값은 v462 문서 검사)
     return { ok, info: { mF, scr: scr.length, gate: gate.length, m91: m91.length } };
   };
   const r61 = chk61(ft61, tl61, cl61, sw61, man61);
-  const M61 = [chk61(ft61.replace('기준: v461 (2026-11-13).', '기준: v460 (2026-11-13).'), tl61, cl61, sw61, man61).ok,
-    chk61(ft61, tl61, cl61, sw61.replace("'jw-shell-v461'", "'jw-shell-v460'"), man61).ok,
+  const M61 = [chk61(ft61.replace(/기준: v\d+ \(/, '기준: v460 ('), tl61, cl61, sw61, man61).ok,
+    chk61(ft61, tl61, cl61, sw61.replace(/'jw-shell-v\d+'/, "'jw-shell-v460'"), man61).ok,
     chk61(ft61.split('SENT_LOCKED').join('SENT_LOCK'), tl61, cl61, sw61, man61).ok,
     chk61(ft61, tl61.replace('`promostream_check`', 'promostream_check'), cl61, sw61, man61).ok,
     chk61(ft61, tl61, cl61, sw61, man61.replace('<h3 id="s9-1">9-1. 월말명세서', '<h3>9-1. 월말')).ok,
@@ -12869,6 +12869,32 @@ try {
   T('v461 문서·판 번호(정확 검사): FEATURES 기준 v461 (2026-11-13)·v461 절(C084·stmt_sent·SENT_LOCKED·NO_VEH_ACCESS·③ 대표 전결·결재 없이·stmt_match·NOT_BALANCED·servertest 89·uismoke 29 판) · TESTLIST v461 화면 칸 "[ ] (AI 시험 화면 대상" ≥ 1("PM" 낱말 0 · PM 몫 칸 0)·게이트 칸 [x] 12종 · MANUAL 9-1 월말명세서(대표 결재 상신·결제 지시·전달함·차량 탭)·21-3 stmt 열 · CLAUDE.md @stmt-sheet·stmt_sent · sw jw-shell-v461 · 결함 사본 6개(기준 줄·sw·낱말·게이트·9-1 머리·CLAUDE) = 모두 ✗',
     r61.ok && M61.every((v) => v === false), JSON.stringify({ r: r61.info, mut: M61 }));
 } catch (e) { console.log('  (v461 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v462(체크 10 C132 — 사진AI 적용 상태 맞춤 + 생성 스트리밍 빈 본문 시험 ⑧): 문서·판 번호 정확 검사(동작 검사는 C132 묶음 · servertest C132 · promostream ⑧)
+try {
+  const rd62 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const ft62 = rd62('FEATURES.md'), tl62 = rd62('TESTLIST.md'), sw62 = rd62('sw.js'), pj62 = rd62('netlify/functions/_lib/promoai_job.js');
+  const chk62 = (ft, tl, sw, pj) => {
+    const ftv = (() => { const i = ft.indexOf('\n### v462 (11/13)'); if (i < 0) return ''; const j = ft.indexOf('\n### ', i + 5); return ft.slice(i, j < 0 ? ft.length : j); })();
+    const tlv = (() => { const i = tl.indexOf('\n## v462 '); if (i < 0) return ''; const j = tl.indexOf('\n## ', i + 5); return tl.slice(i, j < 0 ? tl.length : j); })();
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI 시험 화면 대상/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l));
+    const FT = ['C132', 'paAiRec', 'paMarkDone', 'setAiState', 'ALREADY', 'promoai:draft', '0e1acad', 'sw v462'];
+    const GATE = ['uismoke', 'consheet_check', 'proctpl_check', 'settletest', 'servertest', 'rectest', 'promoqual_check', 'promogen_check', 'promoqlearn_check', 'promostream_check', 'promo_wrap_check', 'promo_post_check'];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const ok = /기준: v462 \(2026-11-13\)\./.test(ft) && ftv.length > 0 && mF.length === 0 && tlv.length > 0 && scr.some((l) => /^- \[ \]/.test(l)) && !scr.some((l) => /PM/.test(l)) && !cb.some((l) => /^- \[ \] \(PM/.test(l))
+      && GATE.every((g) => gate.some((l) => l.indexOf('`' + g + '`') > 0)) && ft.indexOf('(v458 뒤 — 판 번호는 합칠 때)') < 0 && tl.indexOf('v458 뒤 — 판 번호는 합칠 때') < 0
+      && /if \(rec && rec\.ai && st !== 'done'\) return prev;/.test(pj) && /SHELL_CACHE = 'jw-shell-v462'/.test(sw);
+    return { ok, info: { mF, scr: scr.length, gate: gate.length } };
+  };
+  const r62 = chk62(ft62, tl62, sw62, pj62);
+  const M62 = [chk62(ft62.replace('기준: v462 (2026-11-13).', '기준: v461 (2026-11-13).'), tl62, sw62, pj62).ok,
+    chk62(ft62, tl62, sw62.replace("'jw-shell-v462'", "'jw-shell-v461'"), pj62).ok,
+    chk62(ft62.split('paMarkDone').join('paMark'), tl62, sw62, pj62).ok,
+    chk62(ft62, (() => { const k = tl62.lastIndexOf('`promostream_check`'); return tl62.slice(0, k) + 'promostream_check' + tl62.slice(k + 19); })(), sw62, pj62).ok,
+    chk62(ft62, tl62, sw62, pj62.replace("if (rec && rec.ai && st !== 'done') return prev;", '')).ok];
+  T('v462 문서·판 번호(정확 검사): FEATURES 기준 v462 (2026-11-13)·v462 절(C132·paAiRec·paMarkDone·setAiState·ALREADY·promoai:draft·0e1acad·sw v462)·"v458 뒤" 줄 0 · TESTLIST v462 화면 칸 "[ ] (AI 시험 화면 대상" ≥ 1("PM" 낱말 0)·게이트 칸 [x] 12종 · 서버 setAiState 덮기 막음 줄 · sw jw-shell-v462 · 결함 사본 5 ✗',
+    r62.ok && M62.every((v) => v === false), JSON.stringify({ r: r62.info, mut: M62 }));
+} catch (e) { console.log('  (v462 검사 생략 — ' + e.message + ')'); fails++; }
 
 try {
   const fdir = join(ROOT, 'netlify', 'functions');
