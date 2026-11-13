@@ -12881,16 +12881,16 @@ try {
     const FT = ['C132', 'paAiRec', 'paMarkDone', 'setAiState', 'ALREADY', 'promoai:draft', '0e1acad', 'sw v462'];
     const GATE = ['uismoke', 'consheet_check', 'proctpl_check', 'settletest', 'servertest', 'rectest', 'promoqual_check', 'promogen_check', 'promoqlearn_check', 'promostream_check', 'promo_wrap_check', 'promo_post_check'];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
-    const ok = /기준: v462 \(2026-11-13\)\./.test(ft) && ftv.length > 0 && mF.length === 0 && tlv.length > 0 && scr.some((l) => /^- \[ \]/.test(l)) && !scr.some((l) => /PM/.test(l)) && !cb.some((l) => /^- \[ \] \(PM/.test(l))
+    const ok = Number((ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 462 && ftv.length > 0 && mF.length === 0 && tlv.length > 0 && scr.some((l) => /^- \[ \]/.test(l)) && !scr.some((l) => /PM/.test(l)) && !cb.some((l) => /^- \[ \] \(PM/.test(l))
       && GATE.every((g) => gate.some((l) => l.indexOf('`' + g + '`') > 0)) && ft.indexOf('(v458 뒤 — 판 번호는 합칠 때)') < 0 && tl.indexOf('v458 뒤 — 판 번호는 합칠 때') < 0
-      && /if \(rec && rec\.ai && st !== 'done'\) return prev;/.test(pj) && /SHELL_CACHE = 'jw-shell-v462'/.test(sw);
+      && /if \(rec && rec\.ai && st !== 'done'\) return prev;/.test(pj) && Number((sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 462;   // v463: 기준 줄·sw는 이 판 이상(이 판 값은 v463 문서 검사)
     return { ok, info: { mF, scr: scr.length, gate: gate.length } };
   };
   const r62 = chk62(ft62, tl62, sw62, pj62);
-  const M62 = [chk62(ft62.replace('기준: v462 (2026-11-13).', '기준: v461 (2026-11-13).'), tl62, sw62, pj62).ok,
-    chk62(ft62, tl62, sw62.replace("'jw-shell-v462'", "'jw-shell-v461'"), pj62).ok,
+  const M62 = [chk62(ft62.replace(/기준: v\d+ \(/, '기준: v461 ('), tl62, sw62, pj62).ok,
+    chk62(ft62, tl62, sw62.replace(/'jw-shell-v\d+'/, "'jw-shell-v461'"), pj62).ok,
     chk62(ft62.split('paMarkDone').join('paMark'), tl62, sw62, pj62).ok,
-    chk62(ft62, (() => { const k = tl62.lastIndexOf('`promostream_check`'); return tl62.slice(0, k) + 'promostream_check' + tl62.slice(k + 19); })(), sw62, pj62).ok,
+    chk62(ft62, (() => { const e = tl62.indexOf('\n## v463 '); const k = tl62.lastIndexOf('`promostream_check`', e < 0 ? tl62.length : e); return tl62.slice(0, k) + 'promostream_check' + tl62.slice(k + 19); })(), sw62, pj62).ok,
     chk62(ft62, tl62, sw62, pj62.replace("if (rec && rec.ai && st !== 'done') return prev;", '')).ok];
   T('v462 문서·판 번호(정확 검사): FEATURES 기준 v462 (2026-11-13)·v462 절(C132·paAiRec·paMarkDone·setAiState·ALREADY·promoai:draft·0e1acad·sw v462)·"v458 뒤" 줄 0 · TESTLIST v462 화면 칸 "[ ] (AI 시험 화면 대상" ≥ 1("PM" 낱말 0)·게이트 칸 [x] 12종 · 서버 setAiState 덮기 막음 줄 · sw jw-shell-v462 · 결함 사본 5 ✗',
     r62.ok && M62.every((v) => v === false), JSON.stringify({ r: r62.info, mut: M62 }));
@@ -13419,6 +13419,45 @@ try {
   T('P1 판27 차량 법정 검사 제안(실행 — 시험 근거 표): ① 승격 아님(on false·행 0) = 열 12·제안 null·창 줄 숨김·기록 없음·완료 창 제안 없음·law 거르기 무시·펼침 칩 없음·다시 그림 0 ② 승격 = 근거 표 1번 읽고 다시 그림 1번 ③ 계산 10대(차이 0·+12·첫 회 주기와 날 보정·건설기계 연식 기산 = 제안만 · 속성 빔 = 기준 없음(빈 칸 이름) · 비실측·조문 없는 행 = 쓰지 않음(기준 없음) · 매각 = 대상 아님) · 운영부 날짜 안 덮음(입력 그대로) · 말일 맞춤 ④ 표 열 13(검사만기 다음·PC 전용) · 합계·거르기·뱃지 4꼴·창 줄·펼침 칩 ⑤ 기록: 검사 만기 바꿈 = {이전·확정·제안·차이 0·근거 행·edit} 1줄 · 안 바꿈 = 없음 · 기준 없음 = 제안 "" · 매각 = 없음 · 최근 12개 ⑥ 지시 완료 창: 제안 있으면 요청 law·응답 기록을 로컬 줄에 / 없으면 요청 종전 꼴 ⑦ 구간 코드에 주기 숫자 없음 ⑧ 검토 반영: 상태·검사 만기 함께 바꿈(→ 매각) = 기록 없음 · 말일·윤년 = 최초등록일에서 누적 개월(2023-08-31 + 24개월 = 2025-08-31 · 2/29 → 평년 2/28·윤년 2/29) · 틀린 최초등록일·검사 만기·미래 최초등록일·미래 연식 = "기준 없음 — <칸> 확인" · 칩 마우스 글 = 조문 이름 · 켜진 뒤 500·403·꼴 틀림·승격 해제·쓸 행 없음 = 바로 끔(다시 그림 1) · 실제 mergeVeh = 같은 날 로컬이 이겨도 서버 기록 유지·합집합 at 순 · 완료 창 제안 계산 예외 = 제안 없이 저장(멈춤 없음) · 결함 사본(판27 ' + n27 + '개) = 모두 ✗',
     st27 && ok27(realVL) && dueOk && killVL.length === 0, JSON.stringify({ st27, dueOk, dueOn, dueOff, dueThrow, stateLog: realVL.stateLog, monthEnd: realVL.monthEnd, badVal: realVL.badVal, badBadge: realVL.badBadge, title: realVL.title, failOff: realVL.failOff, merge: realVL.merge, off: realVL.offInfo, load: realVL.load, calc: realVL.calc, months: realVL.months, col: realVL.col, foot: realVL.foot, lawPass: realVL.lawPass, lawEn: realVL.lawEn, badge: realVL.badge, hint: realVL.hint, det: realVL.det, log: realVL.logInfo, arg: realVL.arg, killVL }));
 } catch (e) { console.log('  (P1 판26·27 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v463(Phase 1 판26·27·28·29 + 감사 로그 덮어쓰기 막기 — 원장 T476·T451·T165·T179·T478·T666): 문서·판 번호 정확 검사(동작 검사는 'P1 판26'~'P1 판29' 묶음 · servertest 같은 이름 절)
+try {
+  const rd63 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D63 = { ft: rd63('FEATURES.md'), tl: rd63('TESTLIST.md'), cl: rd63('CLAUDE.md'), sw: rd63('sw.js'), man: rd63('MANUAL.html'), html: rd63('index.html'), au: rd63('netlify/functions/_lib/audit.js') };
+  const chk63 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v463 (11/13)', '\n### '), tlv = cut(d.tl, '\n## v463 ', '\n## ');
+    const m161 = cut(d.man, '<h3 id="s16-1">16-1. 차량 속성 넣기', '<!-- 17 -->'), m341 = cut(d.man, '<h3 id="s34-1">34-1. 이번 달', '<!-- 35 -->'), m2171 = cut(d.man, '<h3 id="s21-7-1">21-7-1. PM 콘솔', '<h3>21-8.');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI 시험 화면 대상/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l));
+    const FT = ['T476', 'T451', 'T165', 'T179', 'T478', 'T666', 'C130', '판26 차량 수정 창 속성 칸', '판27 법정 검사 만기 제안', "판28 인허가 '이번 달' 탭", '판29 PM 콘솔', '감사 로그 덮어쓰기 막기', 'vehModalSnap', 'vehLawCalc', 'insp_log', 'veh_bg_get', 'lic_month_get', 'lic_duty_set', 'LIC_ATT_KEEP', 'BAD_RANGE', 'licNarrowGuard', 'dutyCur', 'pmcon_decide', 'PMCON_MARKS_FULL', 'status:decide', '자동 적용 없음', 'appendAudit', 'fail-closed', '승격 전 확인할 것', '알려진 한계', '정한 값', "'P1 판28' 8항목", 'sw v463'];
+    const GATE = ['uismoke', 'consheet_check', 'proctpl_check', 'settletest', 'servertest', 'rectest', 'promoqual_check', 'promogen_check', 'promoqlearn_check', 'promostream_check', 'promo_wrap_check', 'promo_post_check'];
+    const SECT = ["'P1 판26'", "'P1 판27'", "'P1 판28'", "'P1 판29'", "'감사 로그 덮어쓰기 막기'"];
+    const CL = ['**P1 판26·27(v463', '**P1 판28(v463', '**PM 콘솔(v463', '**감사 로그 덮어쓰기 막기(v463)**'];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const ok = /기준: v463 \(2026-11-13\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0
+      && tlv.length > 0 && cb.length === 32 && scr.length === 26 && gate.length === 6 && cb.every((l) => /^- \[x\] \(AI\) /.test(l) || /^- \[ \] \(AI 시험 화면 대상/.test(l)) && !scr.some((l) => /PM/.test(l)) && !cb.some((l) => /^- \[ \] \(PM/.test(l))
+      && GATE.every((g) => gate.some((l) => l.indexOf('`' + g + '`') > 0)) && SECT.every((s) => tlv.indexOf(s) > 0)
+      && m161.indexOf('법정 검사 제안') > 0 && m161.indexOf('시행 회사') > 0 && m161.indexOf('대상 아님') > 0
+      && ['완료+수령 올리기', '기한 정정', '해당 없음', '기준일 입력'].every((b) => m341.indexOf(b) > 0) && d.man.indexOf('이번 달 칸은 아직 할 일을 자동으로 만들지 않고') < 0
+      && m2171.indexOf('정하실 분: PM') > 0 && m2171.indexOf('저절로 적용되지 않습니다') > 0
+      && CL.every((c) => d.cl.indexOf(c) > 0) && d.html.indexOf('보험사는 표에서 이름만 맞춰 보입니다(저장된 글은 그대로). 📖 사용 안내 16-1절') > 0
+      && /if \(!r\.ok && r\.code !== 'NOT_FOUND'\) return false;/.test(d.au) && /SHELL_CACHE = 'jw-shell-v463'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, scr: scr.length, gate: gate.length, m161: m161.length, m341: m341.length, m2171: m2171.length } };
+  };
+  const r63 = chk63(D63);
+  const mu63 = (k, f) => chk63(Object.assign({}, D63, { [k]: f(D63[k]) })).ok;
+  const M63 = [mu63('ft', (s) => s.replace('기준: v463 (2026-11-13).', '기준: v462 (2026-11-13).')),
+    mu63('sw', (s) => s.replace("'jw-shell-v463'", "'jw-shell-v462'")),
+    mu63('ft', (s) => s.split('PMCON_MARKS_FULL').join('PMCON_MARKS')),
+    mu63('tl', (s) => s.replace('- [ ] (AI 시험 화면 대상 — 판29) 직원 계정에는', '- [ ] (PM) 직원 계정에는')),
+    mu63('tl', (s) => { const k = s.lastIndexOf('`promostream_check`'); return s.slice(0, k) + 'promostream_check' + s.slice(k + 19); }),
+    mu63('man', (s) => s.replace('<h3 id="s34-1">', '<h3>')),
+    mu63('cl', (s) => s.replace('**PM 콘솔(v463', '**PM 콘솔(')),
+    mu63('html', (s) => s.replace(' 📖 사용 안내 16-1절<br>', '<br>')),
+    mu63('au', (s) => s.replace("if (!r.ok && r.code !== 'NOT_FOUND') return false;", ''))];
+  T('v463 문서·판 번호(정확 검사): FEATURES 기준 v463 (2026-11-13)·v463 절(원장 T476·T451·T165·T179·T478·T666·C130 · 든 것 ①~⑤ · 판26 vehModalSnap · 판27 vehLawCalc·insp_log·veh_bg_get · 판28 lic_month_get·lic_duty_set·LIC_ATT_KEEP·BAD_RANGE·licNarrowGuard·dutyCur · 판29 pmcon_decide·PMCON_MARKS_FULL·status:decide·자동 적용 없음 · appendAudit fail-closed · 승격 전 확인할 것·알려진 한계·정한 값 · servertest P1 판28 8항목 · sw v463) · TESTLIST v463 칸 32(화면 "[ ] (AI 시험 화면 대상" 26 — "PM" 낱말 0 · 게이트 [x] 6 · 사람·PM 몫 칸 0)·게이트 12종·servertest 절 이름 5 · MANUAL 16-1·34-1(단추 4)·21-7-1 PM 콘솔 · 17절 옛 "아직 할 일을 자동으로 만들지 않고" 0 · CLAUDE.md 줄 4 · 도움말 차량 속성 줄 16-1절 · audit.js 읽기 실패 막음 줄 · sw jw-shell-v463 · 결함 사본 ' + M63.length + '개 = 모두 ✗',
+    r63.ok && M63.every((v) => v === false), JSON.stringify({ r: r63.info, mut: M63 }));
+} catch (e) { console.log('  (v463 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
