@@ -11508,10 +11508,23 @@ try {
   const GATE54 = ['uismoke', 'consheet_check', 'proctpl_check', 'settletest', 'servertest', 'rectest', 'promoqual_check', 'promogen_check'];
   const mF54 = FT54.filter((s) => ftv54.indexOf(s) < 0), mC54 = CL54.filter((s) => cl54.indexOf(s) < 0);
   T('v456 ④ 문서: FEATURES 기준 v456 (2026-11-13)·v456 절(원장 8건·코드 이름·검사 이름) · TESTLIST v456 운영 확인 칸 "[ ] (AI 운영 확인" ≥ 1("PM" 낱말 0)·게이트 칸 [x] 8종 · CLAUDE.md 저장 안전 줄 · CLAUDE.md 보안 줄 "그 밖 키 … 종전대로" 0 · sw jw-shell-v456',
-    /기준: v456 \(2026-11-13\)\./.test(ft54) && ftv54.length > 0 && mF54.length === 0 && tlv54.length > 0 && ops54.length >= 1 && !ops54.some((l) => /PM/.test(l)) && GATE54.every((g) => gate54.some((l) => l.indexOf('`' + g + '`') > 0))
-    && mC54.length === 0 && cl54.indexOf('그 밖 키(allbaro:xlsx·tpl·proof·col 등)는 종전대로') < 0 && /SHELL_CACHE = 'jw-shell-v456'/.test(sw54),
+    Number((ft54.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 456 && ftv54.length > 0 && mF54.length === 0 && tlv54.length > 0 && ops54.length >= 1 && !ops54.some((l) => /PM/.test(l)) && GATE54.every((g) => gate54.some((l) => l.indexOf('`' + g + '`') > 0))
+    && mC54.length === 0 && cl54.indexOf('그 밖 키(allbaro:xlsx·tpl·proof·col 등)는 종전대로') < 0 && Number((sw54.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 456,
     JSON.stringify({ mF54, mC54, ops: ops54.length, gate: gate54.length }));
 } catch (e) { console.log('  (v456 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ---- v457(11/13 — 경보 라벨 카드 감시 목록에 네 항목, Phase 1 판6 감시 지도와 맞춤): 목록 대조는 위 v399 묶음(지도 = 앱). 여기는 문서·판 번호와 새 네 항목 이름표
+//   다음 판은 기준 줄·sw 검사를 '이 판 이상'(숫자 비교)으로 푼다
+try {
+  const rd57 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const ft57 = rd57('FEATURES.md'), tl57 = rd57('TESTLIST.md'), sw57 = rd57('sw.js');
+  const ids57 = ['gw-brief-cron', 'backup.yml', 'weekly.yml', 'lawwatch.yml'];
+  const lst57 = (html.match(/var ALERT_WATCH_IDS = \[([^\]]+)\]/) || ['', ''])[1], txt57 = (html.match(/var ALERT_WATCH_TXT = \{([^\n]+)\};/) || ['', ''])[1];
+  const miss57 = ids57.filter((id) => lst57.indexOf('"' + id + '"') < 0 || txt57.indexOf('"' + id + '":"') < 0);
+  T('v457 문서·목록: FEATURES 기준 v457 (2026-11-13)·v457 절 · TESTLIST v457 절 · sw jw-shell-v457 · 경보 라벨 목록·이름표에 아침 브리핑·백업·주간 요약·법령 감시',
+    /기준: v457 \(2026-11-13\)\./.test(ft57) && ft57.indexOf('\n### v457 (11/13) — 경보 라벨 카드') > 0 && tl57.indexOf('\n## v457 — 경보 라벨 카드') > 0 && /SHELL_CACHE = 'jw-shell-v457'/.test(sw57) && miss57.length === 0,
+    JSON.stringify({ miss57 }));
+} catch (e) { console.log('  (v457 검사 생략 — ' + e.message + ')'); fails++; }
 
 try {
   // 원장 T421(11/13): 옛 블록의 sw 판 번호 검사는 숫자 비교(>= 그 판) — '…|4\\d\\d)' 꼴 정규식은 v500에서 한꺼번에 실패하므로 다시 쓰지 않는다(판마다 옛 블록을 손보던 구조 해소)

@@ -1119,6 +1119,10 @@
 - [ ] (AI 운영 확인) 배포 뒤 site_edu_gap 응답에 has_demo가 있고 kinds가 없음(안전 권한 없는 현장 수행 계정으로 현장 칸을 열어 특별교육 줄이 그려지는지 — 운영은 진행 현장 투입 0명이라 줄 없음이 정상)
 - [x] (AI) `uismoke`(647 — 기준선 645 + v454 묶음 2: ① 현장 종류별 특별교육(실제 siteEduLine·asbNoSpecial ↔ 서버 siteedu) + 결함 사본 5 · ② 문서 — 기존 검사 고침: v432·v433 ①·①-2·③ · v445 ⑫ 해시 · v447 ⑦·⑮ · v450 ③ · v453 문서 이 판 이상) · `consheet_check`(264) · `proctpl_check`(4) · `settletest`(10) · `servertest`(1087 — 기준선 1086 + 78절 종류별 비우기 1 · 78·84 기대값을 새 범위로) · `rectest` · `promoqual_check`(48) · `promogen_check`(23) 전부 통과
 
+## v457 — 경보 라벨 카드 감시 목록에 네 항목(아침 브리핑·앱 데이터 백업·주간 요약·법령 감시 — Phase 1 판6 감시 지도와 맞춤)
+- [ ] (AI 시험 화면 대상) 권한관리 › 경보 라벨 카드에 새 줄 넷(아침 브리핑 생성·앱 데이터 백업·주간 요약·법령 감시)이 보이고 등급 바꾸기·끄기가 저장됨
+- [x] (AI) `uismoke` 전 항목(v399 지도 대조 통과 — 고치기 전 1건 실패) · 나머지 게이트 10종 통과
+
 ## v456 — 서버·저장 안전 수리 묶음(원장 C066·C079·C080·C082·T502·C107·C108·T427 · 새 화면 없음 · 운영 데이터 변경 없음 · 알림은 지금 토스트 그대로)
 - [ ] (AI 운영 확인 — 배포 뒤 첫 평일) 일감 수집 저장(bids_ingest — 가장 큰 gzip 요청)·운반일지·문서함 저장이 종전처럼 200(413 BODY_TOO_LARGE 0 — 함수 로그) · 계약 서류 넣기(hwpx 판독·학습 짝)가 종전처럼 돎(err:log에 새 오류 0).
 - [ ] (AI 운영 확인 — 배포 뒤) gw-cron-kick(appdata cron_backup 08:20 회차)·gw-lawwatch(주간 경보) 호출이 종전처럼 200·잘못된 키 403 · appdata logsheet_daily(allbaro:xlsx backup_put — 봇 키)가 종전처럼 200 · 관리자 세션 backup_put 쓰기 = 403 BOT_KEY_ONLY(거절만 보는 요청은 dry로 먼저).

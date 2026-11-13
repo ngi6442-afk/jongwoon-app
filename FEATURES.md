@@ -1,6 +1,6 @@
 # 종운 그룹웨어 — 기능 대장 (사용자 매뉴얼 원천)
 
-> 살아있는 문서. 기능 추가·변경 시 이 파일을 함께 갱신한다. 기준: v456 (2026-11-13).
+> 살아있는 문서. 기능 추가·변경 시 이 파일을 함께 갱신한다. 기준: v457 (2026-11-13).
 > 세부 변경 이력은 git 커밋 메시지(한글) 참조.
 
 ## 1. 전체 구조
@@ -742,6 +742,12 @@ PM 지시 "문서함 일단 다 올리고 등재결재랑 공개범위 만들어
 - 게이트 `tools/promo_post_check.mjs`(신설): index의 `// @promo-post-start ~ end`를 떼어 node에서 돌림 — 프로필 없음/ok/문턱 아래 3경로 + 낱말 보존. servertest 48(v394) 6항(layoutGap·pl_layout·copy_save).
 - 남은 실험 1: `<hr>`을 네이버 에디터가 붙여넣기에서 구분선 모듈로 받는지(권민지 임시저장 글 1회). 안 받으면 PROMO_HR를 빈 줄로 바꾼다.
 - sw v394.
+
+### v457 (11/13) — 경보 라벨 카드 감시 목록에 네 항목(아침 브리핑·앱 데이터 백업·주간 요약·법령 감시)
+- 배경: Phase 1 판6(appdata 5517e3c, 11/13)이 감시 지도 cron_map에 gw-brief-cron·backup.yml·weekly.yml·lawwatch.yml을 watch=true로 넣었는데 앱 `ALERT_WATCH_IDS`·`ALERT_WATCH_TXT`에는 없어, 관리자가 권한관리 › 경보 라벨 카드에서 새 경보의 등급(주의·경보)·끄기(7일)를 정할 수 없었고 uismoke v399(지도 = 앱 목록 대조)가 실패했다.
+- 고침(원천): 두 목록에 네 항목과 이름표를 더함. 서버 `alerts_set`은 id를 목록으로 묶지 않아 서버 변경 없음. 화면 = 카드에 줄 넷이 늘어남(새 화면 없음).
+- 검사: uismoke v399(지도 대조) · v457 문서. 감시 지도를 바꾸는 판은 앱 목록을 같은 날 맞춘다.
+- sw v457.
 
 ### v456 (11/13) — 서버·저장 안전 수리 묶음(PM 결정 없이 할 수 있는 것 — 원장 C066·C079·C080·C082·T502·C107·C108·T427 · 새 화면 없음 · 운영 데이터 변경 없음 · 알림은 지금 토스트 그대로)
 - **요청 본문·zip 풀기 상한(C066 ①)**: gw-data `parseBody`가 로그인 확인보다 먼저 gzip을 상한 없이 풀어 6MB 안 압축 본문이 수백 MB로 풀리면 그 호출이 메모리 초과로 죽었다(데이터 손상·다른 요청 영향은 없었음) → `BODY_GZ_MAX` 32MB(지금 가장 큰 정상 요청 = 일감 저장 약 6.7MB), 넘으면 413 `BODY_TOO_LARGE`(종전 400 INVALID_JSON으로 뭉뚱그림). 서류 처리 `hwpxExtractText`·`_lib/docdiff.js` `zipEntries`의 inflateRawSync도 항목당 `ZIP_ENTRY_MAX` 64MB(넘는 항목은 깨진 항목과 같은 '비교 불가'). 함수 폴더의 동기 압축 풀기 4곳 전부 상한(servertest 86 정적 검사). **검토 반영**: 항목당 상한만으로는 겹친 zip(중앙 디렉터리 여러 줄이 같은 로컬 헤더를 가리킴 — 60KB 파일이 이름만 다른 64MB 버퍼 수십 개로 풀림)·64MB 항목 여럿(hwpxExtractText가 글에 계속 이어 붙임)을 못 막아 → `_lib/docdiff.js` `zipBudget`(파일 하나에 총량 `ZIP_TOTAL_MAX` 128MB·항목 수 `ZIP_ENTRIES_MAX` 2000, 넘친 항목은 상한만큼 쓴 것으로 셈)을 zipEntries·hwpxExtractText가 같이 쓰고, zipEntries는 이미 푼 로컬 헤더를 다시 가리키는 줄을 건너뛴다. 동기 풀기 자리는 2곳(zipBudget 한 줄·요청 gzip)으로 모임(servertest 87).
