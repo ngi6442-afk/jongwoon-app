@@ -463,12 +463,13 @@ async function handleSave(event, d, R) {
   if (col === 'leaves' && Array.isArray(doc.items)) { try { await notifyLeaves(store(DATA), oldItems, doc.items, c.member); } catch (e) {} }
   // 인허가 3층(2026-09-02): duties(의무 대장)는 ①구버전 클라·구형 캐시가 모르는 필드라 빠지거나 비어 오면
   // 저장 한 번에 95행+확정 이력이 통째로 증발한다(리뷰 high) — 서버가 원본을 이월. ②등재·확정 전환은 관리자 전용.
+  let licKept = [];   // P1 판28 검토 2: 관리자 통째 저장에서 담당 단추 기준일을 지킨 행 번호(응답 lic_kept)
   if (col === 'licenses') {
     // 직전 문서를 못 읽으면 이월 판단 자체가 불가 — fail-open이면 원 결함(증발)이 그대로 재발하므로 licenses만 저장 거부(리뷰 med)
     if (prevReadFailed) return jr(500, { status: 'ERROR', error_code: 'PREV_READ_FAILED', request_id: R });
     const prevDuties = (prevDoc && Array.isArray(prevDoc.duties)) ? prevDoc.duties : [];
     if (!c.member.admin || !Array.isArray(doc.duties) || (doc.duties.length === 0 && prevDuties.length > 0)) doc.duties = prevDuties;
-    else licNarrowGuard(prevDuties, doc.duties);   // P1 판28: '이번 달' 단추 칸(완료 기록·정정·해당 없음)은 lic_duty_set으로만 — 관리자 통째 저장은 서버 값 이월
+    else licKept = licNarrowGuard(prevDuties, doc.duties);   // P1 판28: '이번 달' 단추 칸(완료 기록·정정·해당 없음)은 lic_duty_set으로만 — 관리자 통째 저장은 서버 값 이월
   }
   // 주기업무 공개범위·담당 보호(v331 — 2026-09-08 PM 실사고 '공개범위를 고치면 다시 롤백된다'):
   //  scopes·assignee는 앱에서 관리자만 편집한다(openCheckScope의 isAdmin 게이트 — 비관리자에겐 편집 UI 자체가 없다).
@@ -659,6 +660,7 @@ async function handleSave(event, d, R) {
   }
   const okOut = { status: 'OK', updated_at: doc.updated_at, request_id: R };
   if (regWarn) okOut.register_warn = regWarn;
+  if (licKept.length) okOut.lic_kept = licKept;
   return jr(200, okOut);
 }
 
@@ -1951,18 +1953,20 @@ const LIC_NAR_FIELDS = ['runs', 'due_fix', 'na', 'lic_prev', 'nar_ts', 'base_wha
 function licDutyKey(no, licId) { return 'lic:' + (licId || '-') + ':duty:' + no; }
 function licKstToday() { return new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10); }
 // 관리자 통째 저장(save licenses)의 이월 — 단추 칸은 늘 서버 값(보낸 값은 버림). 기준일(base_date)은 관리자 선행확인 창도 쓰는 칸이라
-//   서버 줄에 단추 표식(nar_ts)이 있고 들어온 줄 표식이 다르면(= 단추 저장을 모르는 사본) 서버 값을 지킨다. 반환 = 지킨 기준일 수
+//   서버 줄에 단추 표식(nar_ts)이 있고 들어온 줄 표식이 다르면(= 단추 저장을 모르는 사본) 서버 값을 지킨다. 반환 = 기준일을 지킨 행 번호 목록(저장 응답 lic_kept — 앱이 다시 읽고 알림, 검토 2)
+//   행 updated_ts는 서버 값과 들어온 값 중 큰 쪽(낡은 사본이 행 시각을 되돌려 다음 단추 저장의 낙관락·병합 순서를 흐리지 않게 — 검토 5)
 function licNarrowGuard(prevDuties, duties) {
   const old = {}; (prevDuties || []).forEach(function (o) { if (o && o.no != null) old[String(o.no)] = o; });
-  let n = 0;
+  const kept = [];
   (duties || []).forEach(function (t) {
     if (!t || typeof t !== 'object' || t.no == null) return;
     const o = old[String(t.no)];
     const stale = !!(o && o.nar_ts && t.nar_ts !== o.nar_ts);
     LIC_NAR_FIELDS.forEach(function (f) { if (o && o[f] !== undefined) t[f] = o[f]; else delete t[f]; });
-    if (stale && String(t.base_date == null ? '' : t.base_date) !== String(o.base_date == null ? '' : o.base_date)) { if (o.base_date != null) t.base_date = o.base_date; else delete t.base_date; n++; }
+    if (stale && String(t.base_date == null ? '' : t.base_date) !== String(o.base_date == null ? '' : o.base_date)) { if (o.base_date != null) t.base_date = o.base_date; else delete t.base_date; kept.push(Number(t.no)); }
+    if (o && Number(o.updated_ts) > 0 && !(Number(t.updated_ts) >= Number(o.updated_ts))) t.updated_ts = Number(o.updated_ts);
   });
-  return n;
+  return kept;
 }
 async function licBgRead(st) {   // 승격본만 — 승격 전·없음 = 행 0(빈 탭) · 못 읽음 = ok false
   try {
@@ -2092,6 +2096,10 @@ async function handleLicDutySet(event, d, R) {
     if (!cur || !cur.due) return bad('NO_DUE');   // 기준일 없음 — [기준일 입력]부터
     if (val.due !== cur.orig) return jr(409, { status: 'CONFLICT', error_code: 'DUE_STALE', cur: cur.orig, request_id: R });
     if (op === 'fix' && val.to === cur.due) return bad('NO_CHANGE');
+    // 검토 3(조정 담당이 정한 안전 기본값): 정정 날짜 = 계산 기한 앞뒤 1년 안 · 제출일 = 그 회차 기한 1년 전 이후(오늘 뒤는 위 BAD_FUTURE)
+    //   — 2099로 정정해 행이 탭에서 사라지거나, 2000년 제출일로 다음 회차가 2001년이 되는 것을 막음(앱 lmRangeWhy와 같은 값)
+    if (op === 'fix' && (val.to < DUTY.dutyAddMonths(cur.orig, -12) || val.to > DUTY.dutyAddMonths(cur.orig, 12))) return jr(400, { status: 'REJECTED', error_code: 'BAD_RANGE', from: DUTY.dutyAddMonths(cur.orig, -12), to: DUTY.dutyAddMonths(cur.orig, 12), request_id: R });
+    if (op === 'done' && val.done_at < DUTY.dutyAddMonths(cur.orig, -12)) return jr(400, { status: 'REJECTED', error_code: 'BAD_RANGE', from: DUTY.dutyAddMonths(cur.orig, -12), to: today, request_id: R });
   }
   if (op === 'base') {
     if (String(row.base_date || '') === val.date) return bad('NO_CHANGE');
@@ -2150,6 +2158,18 @@ async function handleLicDutySet(event, d, R) {
   ['runs', 'due_fix', 'na', 'base_date', 'base_what', 'base_by', 'base_at', 'base_memo', 'lic_prev', 'nar_ts', 'updated', 'updated_ts'].forEach(function (k) { if (wrow[k] !== undefined) out[k] = wrow[k]; });
   return jr(200, { status: 'OK', duty: out, updated_at: now, audit: lau !== false, request_id: R });
 }
+// 수령본 내용 검사(검토 6) — 파일 앞머리(PDF '%PDF-' · JPEG FF D8 FF · PNG 89 50 4E 47 0D 0A 1A 0A)가 확장자와 맞고, 풀어낸 크기가 LIC_ATT_MIN 바이트 이상
+const LIC_ATT_MIN = 100;
+function licAttMagicOk(ext, b64) {
+  let head, size;
+  try { const s = String(b64).replace(/[\r\n]/g, ''); head = Buffer.from(s.slice(0, 24), 'base64'); size = Math.floor(s.length * 3 / 4) - (s.endsWith('==') ? 2 : (s.endsWith('=') ? 1 : 0)); } catch (e) { return false; }
+  if (!(size >= LIC_ATT_MIN)) return false;
+  const h = function (arr) { return arr.every(function (b, i) { return head[i] === b; }); };
+  if (ext === 'pdf') return h([0x25, 0x50, 0x44, 0x46, 0x2d]);
+  if (ext === 'jpg' || ext === 'jpeg') return h([0xff, 0xd8, 0xff]);
+  if (ext === 'png') return h([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  return false;
+}
 // 수령본 올리기 — 계약 첨부와 같은 저장소·같은 액션(att_put)의 좁은 갈래(kind 'lic'). 권한 = 단추와 같은 licDutyGate(그 행 번호 no) · pdf·jpg·jpeg·png만 · 6MB(base64) · 지우는 길 없음(att_del 거절).
 async function handleLicAttPut(event, d, R, c) {
   if (!(await deviceApproved(event, c.member))) return jr(403, { status: 'FORBIDDEN', error_code: 'DEVICE_NOT_APPROVED', request_id: R });
@@ -2168,6 +2188,7 @@ async function handleLicAttPut(event, d, R, c) {
   const b64 = typeof d.data === 'string' ? d.data : '';
   if (!b64 || !/^[A-Za-z0-9+/=\r\n]+$/.test(b64)) return jr(400, { status: 'REJECTED', error_code: 'INVALID_FILE', request_id: R });
   if (b64.length > DOC_ATT_MAX) return jr(413, { status: 'REJECTED', error_code: 'FILE_TOO_LARGE', request_id: R });
+  if (!licAttMagicOk(ext, b64)) return jr(400, { status: 'REJECTED', error_code: 'BAD_FILE', request_id: R });   // 검토 6: 앞머리가 확장자와 맞고 최소 크기 이상만
   const id = 'att_' + crypto.randomBytes(8).toString('hex');
   const w = await blobSet(store(FILES), id, { name: name, type: LIC_ATT_MIME[ext], kind: 'lic', no: no, data: b64, by: c.member.name, bid: c.member.id, ts: Date.now() });
   if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
@@ -4441,6 +4462,7 @@ async function handleAttParse(event, d, R) {
   if (id.indexOf('att_') !== 0) return jr(400, { status: 'REJECTED', error_code: 'BAD_ID', request_id: R });
   const r = await blobGet(store(FILES), id);
   if (!r.ok || !r.data) return jr(404, { status: 'REJECTED', error_code: 'NOT_FOUND', request_id: R });
+  if (r.data.kind === 'lic') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_ACCESS', request_id: R });   // P1 판28 검토 1: 인허가 수령본은 판독하지 않는다(판독 결과가 계약 권한으로 읽힘)
   let parsed = null;
   try { parsed = await parseAttachment(r.data); } catch (e) { parsed = { error: 'PARSE_FAILED' }; }
   await blobSet(store(FILES), 'parse:' + id, { ts: Date.now(), result: parsed });
@@ -4452,6 +4474,10 @@ async function handleAttParseStatus(event, d, R) {
   const c = await currentMember(event);
   if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
   if (permOf(c.member, 'contracts') === 'hide') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_ACCESS', request_id: R });
+  if (/^att_[a-f0-9]{16}$/i.test(String(d.id || ''))) {   // P1 판28 검토 1: 인허가 수령본 id면 판독 결과(옛 캐시 포함)를 내주지 않는다
+    const fr = await blobGet(store(FILES), String(d.id));
+    if (fr.ok && fr.data && fr.data.kind === 'lic') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_ACCESS', request_id: R });
+  }
   const r = await blobGet(store(FILES), 'parse:' + String(d.id || ''));
   if (!r.ok || !r.data) return jr(200, { status: 'PENDING', request_id: R });
   if (r.data.bid && r.data.bid !== c.member.id && !c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'NOT_OWNER', request_id: R });   // v423 넣기 박스 판독값은 올린 사람·관리자만

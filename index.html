@@ -3903,7 +3903,7 @@
       if (res.status !== 200) return _ghResp(res.status, { error_code: (res.body && res.body.error_code) || "" });   // 저장 실패를 성공으로 위조하면 pending이 풀려 편집이 유실된다 · v456 거절 이유 코드는 넘김(거래처 CLI_BIZ13 안내)
       _colBase[col] = (res.body && res.body.updated_at) || Date.now();
       // register_warn(문서함 v314): 저장은 됐는데 등재 결재 카드 자동 상신이 실패한 건수 — saveDocuments가 직원에게 알린다(관리자 결재함 폴이 자동 복구)
-      return _ghResp(200, { content: { sha: "gw" }, register_warn: (res.body && res.body.register_warn) || 0 });
+      return _ghResp(200, { content: { sha: "gw" }, register_warn: (res.body && res.body.register_warn) || 0, lic_kept: (res.body && Array.isArray(res.body.lic_kept)) ? res.body.lic_kept : null });   // P1 판28 검토 2: 인허가 저장에서 서버가 담당 단추 기준일을 지킨 행
     });
   };
 
@@ -27166,7 +27166,7 @@
       if (resp.status === 401){ clearToken(); showTokenScreen(true); return; }
       if (resp.status === 409 || resp.status === 422){ return resolveLicConflictAndRetry(); }
       if (!resp.ok) throw new Error("HTTP " + resp.status);
-      return resp.json().then(function(json){ licSha = json.content && json.content.sha; setOffline(false); saveLicCache(); licPending = false; });
+      return resp.json().then(function(json){ licSha = json.content && json.content.sha; setOffline(false); saveLicCache(); licPending = false; if (json.lic_kept && json.lic_kept.length) lmKeptNotice(json.lic_kept); });
     }).catch(function(){ setOffline(true); });
   }
   function resolveLicConflictAndRetry(){
@@ -27402,6 +27402,8 @@ function dutyNext(d, lic, today){
     dates.push([mo, isNaN(dy) ? 0 : dy]);
     if (mo2 >= 1 && mo2 <= 12) dates.push([mo2, isNaN(dy2) ? 0 : dy2]);
     var y0 = dutyParse(anchor) ? dutyParse(anchor).y : dutyParse(today).y;
+    var lastDue = ""; for (k in done){ if (done.hasOwnProperty(k) && dutyParse(k) && k > lastDue) lastDue = k; }
+    if (lastDue && dutyParse(lastDue).y < y0) y0 = dutyParse(lastDue).y;   // P1 판28 검토 4: 후보 시작 연도 = 가장 늦은 완료 회차 연도와 제출일 연도 중 이른 쪽 — 몇 해 늦게 낸 회차도 후보 안에 들어 그다음 회차부터(여러 회차를 건너뛰지 않게)
     for (k = -1; k < 6; k++){ for (j = 0; j < dates.length; j++) cands.push(dutyMake(y0 + k, dates[j][0], dates[j][1])); }
     cands.sort();
     start = dutyStartIdx(cands, done, anchor);
@@ -27805,7 +27807,7 @@ function dutyStage(nx){
     if (!duties.length){ lmCnt(""); host.innerHTML = '<div class="empty-line">의무 대장이 비어 있습니다 — 먼저 의무 대장에서 등재표를 불러오세요.</div>'; return; }
     if (!licMonth.st) lmLoad();
     if (licMonth.st !== "ok"){
-      host.innerHTML = licMonth.st === "err" ? '<div class="empty-line">기한 근거표를 읽지 못했습니다(' + esc(licMonth.err) + ') — 칸을 다시 열면 다시 읽습니다.</div>' : '<div class="loading">불러오는 중…</div>';
+      host.innerHTML = licMonth.st === "err" ? '<div class="empty-line">기한 근거표를 읽지 못했습니다 — ' + esc(LM_ERR[licMonth.err] ? LM_ERR[licMonth.err] : "칸을 다시 열면 다시 읽습니다.") + '</div>' : '<div class="loading">불러오는 중…</div>';
       return;
     }
     var today = todayStr(), g = lmGroups(today), n = g.over.length + g.d7.length + g.d30.length + g.base.length;
@@ -27816,7 +27818,7 @@ function dutyStage(nx){
     var autoNo = {}; (licMonth.rows || []).forEach(function(r){ autoNo[r.no] = 1; });
     var rest = liveDuties().filter(function(d){ return !autoNo[d.no]; }), unitN = rest.filter(function(d){ return d.unit === "개인" || d.unit === "차량"; }).length;
     if (note){
-      note.textContent = "자동 회차 " + licMonth.rows.length + "행(인허가 근거 승격본 " + (licMonth.ver || "-") + ")의 다음 기한 — " + lmMD(today) + " 계산" +
+      note.textContent = "자동 회차 " + licMonth.rows.length + "행의 다음 기한 — " + lmMD(today) + " 계산" +
         (licMonth.who && licMonth.who.name ? " · 담당 " + licMonth.who.name + "(배정표)" : " · 담당 없음(배정표)") + ". 자동 회차가 아닌 " + rest.length + "행(개인·차량 " + unitN + " · 사건형·상시·해당없음 " + (rest.length - unitN) + ")은 의무 대장에서 봅니다." +
         (g.na.length ? " 해당 없음으로 끈 " + g.na.length + "행도 의무 대장에서 봅니다(관리자가 되돌림)." : "");
       note.style.display = "";
@@ -27890,8 +27892,12 @@ function dutyStage(nx){
     BAD_DATE: "달력에 없는 날짜입니다.", BAD_FUTURE: "오늘보다 뒤 날짜는 넣을 수 없습니다.", NEED_PROOF: "접수번호나 수령본 가운데 하나를 넣어 주세요.", BAD_REASON: "사유 유형을 골라 주세요.",
     NEED_REASON: "사유를 적어 주세요.", TOO_LONG: "글이 너무 깁니다.", IS_NA: "이미 해당 없음으로 끈 행입니다.", NO_CHANGE: "바뀐 것이 없습니다.", NO_DUE: "기준일이 없어 회차가 없습니다 — [기준일 입력]부터 해 주세요.",
     NOT_NEEDED: "기준일이 이미 있는 행입니다 — 기한이 다르면 [기한 정정]으로.", BAD_ATT: "수령본을 다시 올려 주세요.", BAD_EXT: "pdf·jpg·png만 올릴 수 있습니다.", FILE_TOO_LARGE: "파일이 큽니다(6MB까지).",
-    NOT_AUTO: "자동 회차 행이 아닙니다 — 의무 대장에서 봅니다.", BG_READ_FAILED: "기한 근거표를 읽지 못했습니다 — 잠시 뒤 다시 해 주세요." };
-  function lmErrMsg(code){ return LM_ERR[code] || ("저장하지 못했습니다(" + code + ")."); }
+    NOT_AUTO: "자동 회차 행이 아닙니다 — 의무 대장에서 봅니다.", BG_READ_FAILED: "기한 근거표를 읽지 못했습니다 — 잠시 뒤 다시 해 주세요.",
+    NO_DUTY: "의무 대장에 이 행이 없습니다 — 화면을 새로 읽어 주세요.", DEVICE_NOT_APPROVED: "이 기기는 아직 승인되지 않았습니다 — 관리자에게 기기 승인을 요청해 주세요.", NO_ACCESS: "인허가를 볼 권한이 없습니다.",
+    BAD_RANGE: "넣을 수 있는 날짜 범위 밖입니다(기한 정정은 계산 기한 앞뒤 1년, 제출한 날은 회차 기한 1년 전부터 오늘까지).", BAD_FILE: "파일 내용이 pdf·jpg·png가 아니거나 너무 작습니다 — 접수증을 다시 골라 주세요.",
+    INVALID_FILE: "파일을 읽지 못했습니다 — 다시 골라 주세요.", BAD_FIELD: "앱이 낡았습니다 — 새로고침한 뒤 다시 해 주세요.", BAD_OP: "앱이 낡았습니다 — 새로고침한 뒤 다시 해 주세요.", BAD_NO: "앱이 낡았습니다 — 새로고침한 뒤 다시 해 주세요.",
+    BAD_VALUE: "넣은 값의 꼴이 맞지 않습니다.", UNAUTHORIZED: "로그인이 끝났습니다 — 다시 로그인해 주세요.", "401": "로그인이 끝났습니다 — 다시 로그인해 주세요." };
+  function lmErrMsg(code){ return LM_ERR[code] || "저장하지 못했습니다 — 잠시 뒤 다시 해 주세요. 계속되면 관리자에게 알려 주세요."; }   // 검토 7: 모르는 코드는 일반 문구(내부 코드를 화면에 내지 않음)
   function lmSave(){
     var q = lmCur, g = function(id){ return document.getElementById(id); }, v = {}, f = null, why, today = todayStr(), memo;
     if (!q || lmBusy) return;
@@ -27900,6 +27906,7 @@ function dutyStage(nx){
       v.due = q.due; v.done_at = String(g("lmDoneAt").value || "").trim();
       if ((why = lmDateWhy(v.done_at))) return lmErr(why);
       if (v.done_at > today) return lmErr("제출한 날은 오늘보다 뒤일 수 없습니다.");
+      if (v.done_at < dutyAddMonths(q.due, -12)) return lmErr("제출한 날은 이 회차 기한(" + q.due + ")의 1년 전(" + dutyAddMonths(q.due, -12) + ")부터 넣을 수 있습니다.");
       var ref = String(g("lmRef").value || "").trim(); if (ref) v.ref = ref;
       f = (g("lmFile").files && g("lmFile").files[0]) || null;
       if (!ref && !f) return lmErr("접수번호나 수령본 가운데 하나를 넣어 주세요.");
@@ -27909,6 +27916,7 @@ function dutyStage(nx){
       v.due = q.due; v.to = String(g("lmFixTo").value || "").trim(); v.reason = String(g("lmFixReason").value || "");
       if ((why = lmDateWhy(v.to))) return lmErr(why);
       if (v.to === q.cur) return lmErr("지금 기한과 같은 날짜입니다.");
+      if (v.to < dutyAddMonths(q.due, -12) || v.to > dutyAddMonths(q.due, 12)) return lmErr("고친 기한은 계산된 기한(" + q.due + ") 앞뒤 1년 안(" + dutyAddMonths(q.due, -12) + " ~ " + dutyAddMonths(q.due, 12) + ")만 넣을 수 있습니다.");
       if (LM_FIX_REASONS.indexOf(v.reason) < 0) return lmErr("사유 유형을 골라 주세요.");
       if (memo) v.memo = memo;
     } else if (q.op === "na"){
@@ -27923,7 +27931,7 @@ function dutyStage(nx){
     } else return;
     lmBusy = true; lmErr("");
     if (!f){ lmPost(q, v); return; }
-    lmUpload(q, f).then(function(id){ v.att = id; lmPost(q, v); }).catch(function(e){ lmBusy = false; lmErr(e && e.message === "BIG" ? lmErrMsg("FILE_TOO_LARGE") : ("수령본을 올리지 못했습니다(" + ((e && e.message) || "") + ") — 저장하지 않았습니다.")); });
+    lmUpload(q, f).then(function(id){ v.att = id; lmPost(q, v); }).catch(function(e){ lmBusy = false; var em = e && e.message === "BIG" ? "FILE_TOO_LARGE" : ((e && e.message) || ""); lmErr("수령본을 올리지 못해 저장하지 않았습니다 — " + (LM_ERR[em] ? LM_ERR[em] : "잠시 뒤 다시 해 주세요.")); });
   }
   function lmReadB64(f){ return new Promise(function(res, rej){ var fr = new FileReader(); fr.onload = function(){ var s = String(fr.result || ""); res(s.slice(s.indexOf(",") + 1)); }; fr.onerror = function(){ rej(new Error("read")); }; fr.readAsDataURL(f); }); }
   function lmUpload(q, f){   // 사진은 promoResize(긴 변 1600 · jpeg)로 줄여 올림 — 폰 사진이 6MB(base64)를 넘지 않게
@@ -27974,7 +27982,7 @@ function dutyStage(nx){
   function lmAttOpen(id){
     if (!/^att_[a-f0-9]{16}$/.test(String(id || ""))) return;
     gwCall("gw-data", { action: "att_get", id: id }).then(function(res){
-      if (!res || res.status !== 200 || !res.body || !res.body.data){ alert("수령본을 열 수 없습니다(" + ((res && res.body && res.body.error_code) || (res ? res.status : "")) + ")"); return; }
+      if (!res || res.status !== 200 || !res.body || !res.body.data){ var ec = String((res && res.body && res.body.error_code) || ""); alert("수령본을 열 수 없습니다 — " + (ec === "NO_ACCESS" ? "볼 권한이 없습니다." : (LM_ERR[ec] && ec !== "NO_ACCESS" ? LM_ERR[ec] : "잠시 뒤 다시 해 주세요."))); return; }
       var name = String(res.body.name || "수령본"), ext = (name.toLowerCase().match(/\.([a-z0-9]{1,5})$/) || [])[1] || "";
       var mime = ext === "pdf" ? "application/pdf" : (ext === "png" ? "image/png" : ((ext === "jpg" || ext === "jpeg") ? "image/jpeg" : "application/octet-stream"));
       var bin = atob(res.body.data), u8 = new Uint8Array(bin.length);
@@ -27983,7 +27991,7 @@ function dutyStage(nx){
       a.href = url; a.target = "_blank"; a.rel = "noopener"; if (mime === "application/octet-stream") a.download = name;
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
       setTimeout(function(){ URL.revokeObjectURL(url); }, 60000);
-    }).catch(function(){ alert("수령본을 열 수 없습니다(네트워크)"); });
+    }).catch(function(){ alert("수령본을 열 수 없습니다 — 인터넷 연결을 확인해 주세요."); });
   }
   // 의무 대장 행 펼침 글(단추 칸 — 완료 기록·기한 정정·해당 없음·기준일 무엇) · dutyRowHtml이 부른다
   function lmDutyDetail(d){
@@ -27999,6 +28007,13 @@ function dutyStage(nx){
     Object.keys(fm).sort().slice(-3).forEach(function(k){ var x = fm[k] || {}; parts.push("<b>기한 정정</b>  " + esc(k) + " → " + esc(x.to || "") + " · " + esc(x.reason || "") + (x.days != null ? " · " + esc(String(x.days)) + "일" : "") + (x.memo ? " · " + esc(x.memo) : "")); });
     if (d.base_what) parts.push("<b>기준일 무엇</b>  " + esc(d.base_what) + (d.base_memo ? " · " + esc(d.base_memo) : ""));
     return parts;
+  }
+  // 관리자 통째 저장에서 서버가 담당 단추 기준일을 지킨 행(검토 2) — 인허가를 다시 읽고 한 줄 알림(조용히 화면과 서버가 갈리지 않게)
+  function lmKeptNotice(nos){
+    var list = (nos || []).filter(function(n){ return typeof n === "number"; });
+    if (!list.length) return;
+    loadLicenses();
+    alert("담당이 단추로 넣은 값이 있어 " + list.join("·") + "행은 그 값을 지켰습니다(기준일). 다시 읽었으니, 그래도 바꾸려면 의무 대장 [선행확인 입력]에서 같은 단추로 한 번 더 저장해 주세요(이제 담당 값을 본 뒤라 반영됩니다).");
   }
   // @lic-month-end
 

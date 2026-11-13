@@ -7996,7 +7996,11 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   };
   const row28 = (no) => (mem.gw_data['col:licenses'].duties || []).find((x) => x.no === no);
   const set28 = (c, tok, no, op, v, base, extra, dev) => c(Object.assign({ action: 'lic_duty_set', no: no, op: op, v: v }, base === undefined ? {} : { base: base }, extra || {}), tok, dev === undefined ? 'dev1' : dev);
-  const att28 = (c, tok, no, name, type, dev) => c({ action: 'att_put', kind: 'lic', no: no, name: name || '접수증.pdf', type: type || 'text/html', data: 'JVBERi0xLjQK' }, tok, dev === undefined ? 'dev1' : dev);
+  // 검토 6: 수령본은 앞머리(확장자와 맞음) + 100바이트 이상만 — 표본 파일 셋(pdf·jpg·png)
+  const PDF28 = Buffer.concat([Buffer.from('%PDF-1.4\n'), Buffer.alloc(120, 0x20)]).toString('base64'), JPG28 = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(120, 1)]).toString('base64');
+  const PNG28 = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(120, 2)]).toString('base64');
+  const body28 = (name) => { const e = (String(name).toLowerCase().match(/\.([a-z]+)$/) || [])[1]; return e === 'png' ? PNG28 : ((e === 'jpg' || e === 'jpeg') ? JPG28 : PDF28); };
+  const att28 = (c, tok, no, name, type, dev, data) => c({ action: 'att_put', kind: 'lic', no: no, name: name || '접수증.pdf', type: type || 'text/html', data: data || body28(name || '접수증.pdf') }, tok, dev === undefined ? 'dev1' : dev);
   const code28 = (r) => r.code + (r.body.error_code ? '/' + r.body.error_code : '') + (r.body.why ? ':' + r.body.why : '');
   // ① 거절 — 권한(로그인·기기·수행·담당·남의 행·배정표 없음/못 읽음)·허용 칸·값·낙관락·회차 · 문서·버전 링·감사 그대로
   const chk28A = async (c) => { seed28(); const l0 = JSON.stringify(mem.gw_data['col:licenses']), a0 = auditMock.logs.length, got = [];
@@ -8016,7 +8020,11 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
       [await set28(c, tK28, 1, 'done', Object.assign({}, D1, { att: 'att_0000000000000000' }), 100), '400/BAD_ATT'], [await set28(c, tK28, 1, 'done', Object.assign({}, D1, { att: '../x' }), 100), '400/BAD_ATT'],
       [await set28(c, tK28, 1, 'done', D1, 101), '409/DUTY_STALE'], [await set28(c, tK28, 1, 'done', D1), '409/DUTY_STALE'], [await set28(c, tK28, 1, 'done', Object.assign({}, D1, { due: TODAY28 }), 100), '409/DUE_STALE'],
       [await set28(c, tK28, 2, 'done', { due: TODAY28, done_at: TODAY28, ref: 'r' }, 200), '400/NO_DUE'], [await set28(c, tK28, 1, 'base', { date: PAST28 }, 100), '400/NOT_NEEDED'],
-      [await set28(c, tK28, 1, 'fix', { due: DUE1_28, to: DUE1_28, reason: '기타' }, 100), '400/NO_CHANGE']];
+      [await set28(c, tK28, 1, 'fix', { due: DUE1_28, to: DUE1_28, reason: '기타' }, 100), '400/NO_CHANGE'],
+      // 검토 3: 정정 = 계산 기한 앞뒤 1년 밖(2099-12-31 · +1년+1일 · −1년−1일) · 제출일 = 회차 기한 1년 전보다 앞(2000-01-01 · −1년−1일) = 400 BAD_RANGE
+      [await set28(c, tK28, 1, 'fix', { due: DUE1_28, to: '2099-12-31', reason: '기타' }, 100), '400/BAD_RANGE'], [await set28(c, tK28, 1, 'fix', { due: DUE1_28, to: D28.dutyAddDays(D28.dutyAddMonths(DUE1_28, 12), 1), reason: '기타' }, 100), '400/BAD_RANGE'],
+      [await set28(c, tK28, 1, 'fix', { due: DUE1_28, to: D28.dutyAddDays(D28.dutyAddMonths(DUE1_28, -12), -1), reason: '기타' }, 100), '400/BAD_RANGE'],
+      [await set28(c, tK28, 1, 'done', Object.assign({}, D1, { done_at: '2000-01-01' }), 100), '400/BAD_RANGE'], [await set28(c, tK28, 1, 'done', Object.assign({}, D1, { done_at: D28.dutyAddDays(D28.dutyAddMonths(DUE1_28, -12), -1) }), 100), '400/BAD_RANGE']];
     exp.forEach(([r, e], i) => { if (code28(r) !== e && !(e === '401' && r.code === 401)) got.push(i + ' ' + code28(r) + '≠' + e); });
     const same = JSON.stringify(mem.gw_data['col:licenses']) === l0 && auditMock.logs.length === a0 && !Object.keys(mem.gw_data).some((k) => k.indexOf('ver:licenses:') === 0) && !Object.keys(mem.gw_files || {}).length;
     seed28({ noAssign: true }); const rNo = await set28(c, tK28, 1, 'done', D1, 100); if (code28(rNo) !== '403/NO_WRITE:NOT_ASSIGN_TABLE') got.push('배정표 없음 ' + code28(rNo));
@@ -8078,9 +8086,12 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
     const s1 = row28(1), s2 = row28(2), s3 = row28(3);
     if (!(rS.code === 200 && (s1.runs || []).length === 1 && s1.runs[0].ref === '접수-1' && s1.nar_ts && s2.base_date === PAST28 && s2.base_what === '직전 측정 완료일' && s3.precheck_answer === '관리자 답' && s3.runs === undefined && s3.na === undefined
       && mem.gw_data['col:licenses'].duties.length === 5)) got.push('관리자 낡은 사본 ' + JSON.stringify([rS.code, rS.body.error_code, s1.runs, s2.base_date, s3]));
+    // 검토 2: 지킨 기준일 행 번호를 응답에(lic_kept [2] — 1행은 기준일이 같아 안 듦) · 검토 5: 낡은 사본(행 updated_ts 100·200)이 행 시각을 되돌리지 않음(서버 값 그대로)
+    if (JSON.stringify(rS.body.lic_kept) !== '[2]') got.push('lic_kept ' + JSON.stringify(rS.body.lic_kept));
+    if (!(s2.updated_ts === srv2.updated_ts && s1.updated_ts > 100 && s3.updated_ts === 300)) got.push('행 시각 ' + JSON.stringify([s1.updated_ts, s2.updated_ts, srv2.updated_ts, s3.updated_ts]));
     const ua2 = mem.gw_data['col:licenses'].updated_at, known = JSON.parse(JSON.stringify(mem.gw_data['col:licenses'].duties)).map((d) => d.no === 2 ? Object.assign(d, { base_date: TODAY28 }) : d);
     const rS2 = await c({ action: 'save', collection: 'licenses', doc: { schema: 1, items: LIC28().items, duties: known }, base: ua2 }, tokA, 'dev1');
-    if (!(rS2.code === 200 && row28(2).base_date === TODAY28)) got.push('관리자 창 기준일 고침 ' + JSON.stringify([rS2.code, row28(2).base_date]));
+    if (!(rS2.code === 200 && row28(2).base_date === TODAY28 && rS2.body.lic_kept === undefined)) got.push('관리자 창 기준일 고침 ' + JSON.stringify([rS2.code, row28(2).base_date]));
     const ua3 = mem.gw_data['col:licenses'].updated_at;
     const rW = await c({ action: 'save', collection: 'licenses', doc: { schema: 1, items: LIC28().items, duties: [] }, base: ua3 }, tK28, 'dev1');
     if (!(rW.code === 200 && (row28(1).runs || []).length === 1 && mem.gw_data['col:licenses'].duties.length === 5)) got.push('담당 통째 저장 ' + JSON.stringify([rW.code, rW.body.error_code]));
@@ -8098,7 +8109,11 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
     const ok = await att28(c, tK28, 1, '사진.JPG'), id = ok.body.id;
     if (!(ok.code === 200 && mem.gw_files[id] && mem.gw_files[id].type === 'image/jpeg')) got.push('사진 ' + code28(ok));
     const g1 = await c({ action: 'att_get', id: id }, tV28, 'dev1'), g2 = await c({ action: 'att_get', id: id }, tH28, 'dev1'), g3 = await c({ action: 'att_get', id: id, raw: true }, tH28, 'dev1');
-    if (!(g1.code === 200 && g1.body.type === 'image/jpeg' && g1.body.data === 'JVBERi0xLjQK')) got.push('보기 열기 ' + code28(g1));
+    if (!(g1.code === 200 && g1.body.type === 'image/jpeg' && g1.body.data === JPG28)) got.push('보기 열기 ' + code28(g1));
+    // 검토 6: 내용 검사 — pdf 이름에 jpg 내용·jpg 이름에 pdf 내용·png 이름에 pdf 내용·9바이트 pdf = 400 BAD_FILE · png 정상 = 200
+    const bf = [await att28(c, tK28, 1, 'a.pdf', null, undefined, JPG28), await att28(c, tK28, 1, 'a.jpg', null, undefined, PDF28), await att28(c, tK28, 1, 'a.png', null, undefined, PDF28), await att28(c, tK28, 1, 'a.pdf', null, undefined, 'JVBERi0xLjQK')].map(code28);
+    const pn = await att28(c, tK28, 1, '확인서.png');
+    if (bf.join(',') !== '400/BAD_FILE,400/BAD_FILE,400/BAD_FILE,400/BAD_FILE' || !(pn.code === 200 && mem.gw_files[pn.body.id].type === 'image/png')) got.push('내용 검사 ' + bf + ' ' + code28(pn));
     if (code28(g2) !== '403/NO_ACCESS') got.push('숨김 열기 ' + code28(g2));
     if (g3.code !== 403) got.push('숨김 원본 ' + code28(g3));
     const dl = await c({ action: 'att_del', id: id }, tH28, 'dev1'); if (!(code28(dl) === '409/LIC_ATT_KEEP' && mem.gw_files[id])) got.push('지우기 ' + code28(dl));
@@ -8127,8 +8142,9 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
     blobsMock.hooks.failGet = (key) => key === 'bg:lic:law:v1'; const bf = await g(tK28); blobsMock.hooks.failGet = null; if (code28(bf) !== '500/BG_READ_FAILED') got.push('승격본 못 읽음 ' + code28(bf));
     return { ok: got.length === 0, info: got };
   };
-  // ⑥ 크론·앱 같은 본문: gw-duty-cron plan이 dutyCur(해당 없음 건너뜀·정정 기한) · dutyCur는 해당 없음·정정 없는 행에서 dutyNext와 같음
-  const chk28F = () => { const sch = BG28().rows[0];   // 크론(gw-duty-cron — 아직 등록 안 됨)은 이 판에서 안 바꿈: dutyCur는 앱·서버 lic_duty_set만 씀
+  // ⑥ 회차 계산 본문(_lib/duty.js — 앱 DUTY_SHARED와 같은 글): dutyCur(해당 없음 = 회차 없음 · 정정 기한) · 정정·해당 없음 없는 행은 dutyCur = dutyNext · 늦게 낸 회차(dutyStartIdx·후보 시작 연도)
+  //   크론(gw-duty-cron — 아직 등록 안 됨)은 이 판에서 안 바꿈(dutyNext 그대로) — 이 항목은 크론을 부르지 않는다. D = 시험할 duty 모듈(결함 사본이면 깨져야 함)
+  const chk28F = (D28) => { const sch = BG28().rows[0];
     const base = { no: 1, duty: '시험', base_date: B1_28, sched: sch };
     const c0 = D28.dutyCur(base, null, TODAY28), c1 = D28.dutyCur(Object.assign({}, base, { na: { on: true } }), null, TODAY28);
     const c2 = D28.dutyCur(Object.assign({}, base, { due_fix: { [DUE1_28]: { to: D28.dutyAddDays(TODAY28, 5) } } }), null, TODAY28);
@@ -8137,14 +8153,31 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
     // 늦게 낸 회차(dutyStartIdx): 2/28 고정일의 2026 회차를 11/13에 냄 → 다음 2027-02-28(종전 '제출일에 가장 가까운 후보' 규칙이면 2028) · 허가일 5년(유예 90일) 2025-06-22 회차를 2026-11-13에 냄 → 2030-06-22 · 기한 전 이행 → 다음 해 그대로
     const sF = { auto: true, type: 'fixed', fixed_month: 2, fixed_day: 0 }, sI = { auto: true, type: 'interval', base: 'issued', every_n: 5, every_unit: 'year', grace_days: 90 };
     const late = [D28.dutyNext({ sched: sF, runs: [{ due: '2026-02-28', done_at: '2026-11-13' }] }, null, '2026-11-13').due, D28.dutyNext({ sched: sF, runs: [{ due: '2026-02-28', done_at: '2026-02-20' }] }, null, '2026-11-13').due,
-      D28.dutyNext({ sched: sI, runs: [{ due: '2025-06-22', done_at: '2026-11-13' }] }, { issued: '2015-03-24' }, '2026-11-13').due, D28.dutyNext({ sched: sI }, { issued: '2015-03-24' }, '2026-11-13').due];
+      D28.dutyNext({ sched: sI, runs: [{ due: '2025-06-22', done_at: '2026-11-13' }] }, { issued: '2015-03-24' }, '2026-11-13').due, D28.dutyNext({ sched: sI }, { issued: '2015-03-24' }, '2026-11-13').due,
+      // 검토 4: 몇 해 늦게 낸 고정일 회차(2023-02-28 회차를 2026-11-13에) → 그다음 2024-02-29(말일) · 옛 완료(2020)와 늦은 완료(2026)가 같이 있으면 가장 늦은 완료 기준 2027-02-28
+      D28.dutyNext({ sched: sF, runs: [{ due: '2023-02-28', done_at: '2026-11-13' }] }, null, '2026-11-13').due,
+      D28.dutyNext({ sched: sF, runs: [{ due: '2020-02-29', done_at: '2020-02-20' }, { due: '2026-02-28', done_at: '2026-11-13' }] }, null, '2026-11-13').due];
     const ok = p0.length === 1 && p0[0].stage === 'over' && p1.length === 0 && p2.length === 1 && p2[0].stage === 'd7' && p2[0].due === D28.dutyAddDays(TODAY28, 5) && p2[0].orig === DUE1_28 && p2[0].fixed === true && same
-      && JSON.stringify(late) === JSON.stringify(['2027-02-28', '2027-02-28', '2030-06-22', '2025-06-22']);
+      && JSON.stringify(late) === JSON.stringify(['2027-02-28', '2027-02-28', '2030-06-22', '2025-06-22', '2024-02-29', '2027-02-28']);
     return { ok, info: [p0, p1, p2, same, late] };
+  };
+  // ⑧ 검토 1: 동기 판독 att_parse·판독 결과 att_parse_status가 인허가 수령본을 막음(실제 호출) — 인허가 숨김 + 계약 수행(MH)·관리자 모두 403 NO_ACCESS · 미리 있던 판독 캐시 parse:<id>도 안 내줌 · 판독 캐시 새로 안 생김
+  //   그 밖 첨부(kind contract)의 판독 결과 조회는 종전 그대로 200
+  const chk28G = async (c) => { seed28(); const got = [];
+    const up = await att28(c, tK28, 1), id = up.body.id;
+    const p1 = await c({ action: 'att_parse', id: id }, tH28, 'dev1'), p2 = await c({ action: 'att_parse', id: id }, tokA, 'dev1'), p3 = await c({ action: 'att_parse', id: id }, tH28, '');
+    if ([p1, p2, p3].map(code28).join(',') !== '403/NO_ACCESS,403/NO_ACCESS,403/NO_ACCESS' || mem.gw_files['parse:' + id]) got.push('판독 ' + [p1, p2, p3].map(code28));
+    mem.gw_files['parse:' + id] = { ts: 1, result: { text: '비밀' } };   // 이 판 전에 생겼을 수 있는 캐시
+    const s1 = await c({ action: 'att_parse_status', id: id }, tH28, 'dev1'), s2 = await c({ action: 'att_parse_status', id: id }, tokA, 'dev1');
+    if (code28(s1) !== '403/NO_ACCESS' || code28(s2) !== '403/NO_ACCESS' || JSON.stringify(s1.body).indexOf('비밀') >= 0) got.push('판독 결과 ' + [code28(s1), code28(s2)]);
+    mem.gw_files.att_00000000000000aa = { name: 'c.pdf', kind: 'contract', data: PDF28 }; mem.gw_files['parse:att_00000000000000aa'] = { ts: 1, result: { ok: 1 } };
+    const s3 = await c({ action: 'att_parse_status', id: 'att_00000000000000aa' }, tH28, 'dev1');
+    if (!(s3.code === 200 && s3.body.parsed && s3.body.parsed.ok === 1)) got.push('계약 첨부 판독 결과 ' + code28(s3));
+    return { ok: got.length === 0, info: got };
   };
   try {
     const gw28 = caller28(gwd), R28 = {};
-    R28.A = await chk28A(gw28); R28.B = await chk28B(gw28); R28.C = await chk28C(gw28); R28.D = await chk28D(gw28); R28.E = await chk28E(gw28); R28.F = chk28F();
+    R28.A = await chk28A(gw28); R28.B = await chk28B(gw28); R28.C = await chk28C(gw28); R28.D = await chk28D(gw28); R28.E = await chk28E(gw28); R28.F = chk28F(D28); R28.G = await chk28G(gw28);
     // 결함 심기 — 검사를 하나씩 걷은 사본에서 해당 판정이 깨져야 한다
     const MUT28 = { A: [["  if (ar.who_id !== member.id) return jr(403, { status: 'FORBIDDEN', error_code: 'NO_WRITE', why: 'NOT_ASSIGNEE', request_id: R });\n", ''],
         ["  if (!as.ok) return jr(503, { status: 'ERROR', error_code: 'ASSIGN_UNAVAILABLE', request_id: R });\n  const ar = assignFor(licDutyKey", "  const ar = assignFor(licDutyKey"],
@@ -8155,29 +8188,40 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
         ["  if (op === 'na_undo' && !c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });\n", '']],
       B: [['  wrow.lic_prev = prev; wrow.nar_ts = now;', '  wrow.nar_ts = now;'], ["let lau = false; try { lau = await appendAudit({ ts: now, by: c.member.name, bid: me, col: 'licenses', ev: [ev] }); } catch (e3) { lau = false; }", 'let lau = false;'],
         ["  else if (isNa) return bad('IS_NA');\n", '\n']],
-      C: [['    else licNarrowGuard(prevDuties, doc.duties);', '    else {}']],
-      D: [["  if (r.data.kind === 'lic') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_ACCESS', request_id: R });", ''], ["  if (am0.ok && am0.data && am0.data.kind === 'lic') return jr(409,", '  if (false) return jr(409,'],
-        ['  if (!hasOwn(LIC_ATT_MIME, ext)) return', '  if (false) return'], ["Number(fa.data.no) !== no || ", '']],
+      C: [['    else licKept = licNarrowGuard(prevDuties, doc.duties);', '    else {}'], ['kept.push(Number(t.no)); }', '}'], ['  if (licKept.length) okOut.lic_kept = licKept;\n', ''],
+        ['    if (o && Number(o.updated_ts) > 0 && !(Number(t.updated_ts) >= Number(o.updated_ts))) t.updated_ts = Number(o.updated_ts);\n', '']],
+      D: [["  if (r.data.kind === 'lic') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_ACCESS', request_id: R });   // P1 판28 인허가 수령본은 위 갈래", '  // 걷음'], ["  if (am0.ok && am0.data && am0.data.kind === 'lic') return jr(409,", '  if (false) return jr(409,'],
+        ['  if (!hasOwn(LIC_ATT_MIME, ext)) return', '  if (false) return'], ["Number(fa.data.no) !== no || ", ''], ['  if (!licAttMagicOk(ext, b64)) return', '  if (false) return'], ['  if (!(size >= LIC_ATT_MIN)) return false;', '']],
+      A2: [["    if (op === 'fix' && (val.to < DUTY.dutyAddMonths(cur.orig, -12) || val.to > DUTY.dutyAddMonths(cur.orig, 12))) return", "    if (false) return"], ["    if (op === 'done' && val.done_at < DUTY.dutyAddMonths(cur.orig, -12)) return", '    if (false) return']],
+      G: [["  if (r.data.kind === 'lic') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_ACCESS', request_id: R });   // P1 판28 검토 1", '  // 걷음'],
+        ["    if (fr.ok && fr.data && fr.data.kind === 'lic') return", '    if (false) return']],
       E: [["  if (permOf(c.member, 'licenses') === 'hide') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_ACCESS', request_id: R });\n  const st = store(DATA);\n  const bg = await licBgRead(st);\n  if (!bg.ok) return jr(500, { status: 'ERROR', error_code: 'BG_READ_FAILED', request_id: R });\n  const as =", "  const st = store(DATA);\n  const bg = await licBgRead(st);\n  if (!bg.ok) return jr(500, { status: 'ERROR', error_code: 'BG_READ_FAILED', request_id: R });\n  const as ="],
         ["    if (!b || typeof b !== 'object' || b.status !== 'promoted' || !Array.isArray(b.rows))", "    if (!b || typeof b !== 'object' || !Array.isArray(b.rows))"]] };
     const kill28 = [];
     for (const n of Object.keys(MUT28)) for (const [from, to] of MUT28[n]) {
-      let k; try { const mod = load28(FILE28, mutOf28(SRC28, from, to)); k = !(await ({ A: chk28A, B: chk28B, C: chk28C, D: chk28D, E: chk28E })[n](caller28(mod))).ok; } catch (e) { k = 'err ' + e.message; }
+      let k; try { const mod = load28(FILE28, mutOf28(SRC28, from, to)); k = !(await ({ A: chk28A, A2: chk28A, B: chk28B, C: chk28C, D: chk28D, E: chk28E, G: chk28G })[n](caller28(mod))).ok; } catch (e) { k = 'err ' + e.message; }
       if (k !== true) kill28.push(n + ':' + from.slice(0, 60) + (k === false ? ' 안 깨짐' : ' ' + k));
     }
-    T('P1 판28 ① lic_duty_set 거절: 비로그인 401 · 기기 미승인 403 · 보기·숨김 403 NO_WRITE(NO_LIC_DO) · 담당 아님 403(NOT_ASSIGNEE) · 남의 행(배정표 lic:L2:duty:) 403(NOT_ASSIGNEE) · 자동 회차 아님·없는 행 400 NOT_AUTO · 모르는 op 400 · 번호 꼴 400 · 담당의 되돌리기 403 ADMIN_ONLY · 허용 밖 칸(본문 doc·v의 duty·runs·confirm·v 없음) 400 BAD_FIELD · 날짜 꼴(2/30·8자리·숫자·1999) 400 BAD_DATE · 내일 400 BAD_FUTURE · 접수번호·수령본 둘 다 없음 400 NEED_PROOF · 61자 400 TOO_LONG · 사유 유형 밖 400 BAD_REASON · 빈 사유 400 NEED_REASON · 없는·꼴 틀린 수령본 400 BAD_ATT · 낡은·빠진 base 409 DUTY_STALE · 다른 회차 409 DUE_STALE · 기준일 없는 행 완료 400 NO_DUE · 기준일 있는 행 기준일 400 NOT_NEEDED · 같은 기한 정정 400 NO_CHANGE · 배정표 없음 403(NOT_ASSIGN_TABLE) · 배정표 못 읽음 503 ASSIGN_UNAVAILABLE(관리자는 통과) · 승격본 못 읽음 500 · 승격 전 400 NOT_AUTO · 인허가 못 읽음 500 · 문서·버전 링·감사 그대로',
+    // 회차 계산 본문 결함(_lib/duty.js 사본) — 늦게 낸 회차 규칙 둘·정정·해당 없음
+    const DFILE28 = join(FN, '_lib', 'duty.js'), DSRC28 = fs28.readFileSync(DFILE28, 'utf8');
+    const DMUT28 = [['  if (last >= 0) return last + 1;', '  if (false) return last + 1;'], ['    if (lastDue && dutyParse(lastDue).y < y0) y0 = dutyParse(lastDue).y;', ''],
+      ['  if (d && d.na && d.na.on) return null;', ''], ['  if (fx && dutyParse(fx.to)){', '  if (false){']];
+    for (const [from, to] of DMUT28) { let k; try { k = !chk28F(load28(DFILE28, mutOf28(DSRC28, from, to))).ok; } catch (e) { k = 'err ' + e.message; } if (k !== true) kill28.push('F:' + from.slice(0, 60) + (k === false ? ' 안 깨짐' : ' ' + k)); }
+    T('P1 판28 ① lic_duty_set 거절: 비로그인 401 · 기기 미승인 403 · 보기·숨김 403 NO_WRITE(NO_LIC_DO) · 담당 아님 403(NOT_ASSIGNEE) · 남의 행(배정표 lic:L2:duty:) 403(NOT_ASSIGNEE) · 자동 회차 아님·없는 행 400 NOT_AUTO · 모르는 op 400 · 번호 꼴 400 · 담당의 되돌리기 403 ADMIN_ONLY · 허용 밖 칸(본문 doc·v의 duty·runs·confirm·v 없음) 400 BAD_FIELD · 날짜 꼴(2/30·8자리·숫자·1999) 400 BAD_DATE · 내일 400 BAD_FUTURE · 접수번호·수령본 둘 다 없음 400 NEED_PROOF · 61자 400 TOO_LONG · 사유 유형 밖 400 BAD_REASON · 빈 사유 400 NEED_REASON · 없는·꼴 틀린 수령본 400 BAD_ATT · 낡은·빠진 base 409 DUTY_STALE · 다른 회차 409 DUE_STALE · 기준일 없는 행 완료 400 NO_DUE · 기준일 있는 행 기준일 400 NOT_NEEDED · 같은 기한 정정 400 NO_CHANGE · 검토 3 날짜 범위 400 BAD_RANGE(정정 2099-12-31·계산 기한 ±1년+1일 · 제출일 2000-01-01·회차 기한 1년 전−1일) · 배정표 없음 403(NOT_ASSIGN_TABLE) · 배정표 못 읽음 503 ASSIGN_UNAVAILABLE(관리자는 통과) · 승격본 못 읽음 500 · 승격 전 400 NOT_AUTO · 인허가 못 읽음 500 · 문서·버전 링·감사 그대로',
       R28.A.ok, JSON.stringify(R28.A.info));
     T('P1 판28 ② 담당 정상 저장(그 행만): 기준일 = base_date·무엇의 날짜·누가·메모·직전 값 lic_prev(base_date null)·updated_ts = nar_ts = 응답 시각 · 같은 기준일 400 NO_CHANGE · 수령본 att_put kind lic(본인·행 번호·mime 고정 application/pdf) · 완료 = runs 1건(계산 기한·제출일·접수번호·수령본·누가) → 다음 회차 = 오늘 + 12개월 · 기한 정정 = due_fix[계산 기한]{고친 기한·30일·공고 연장} → 표시 기한만 바뀜(orig 그대로) · lic_prev = 바로 앞 runs · 해당 없음 = na.on(완료 기록 그대로·회차 없음) → 정정·다시 해당 없음 400 IS_NA → 관리자 되돌림 = na.on false·lic_prev에 끈 사유 · 다시 되돌림 400 NO_CHANGE · 감사 6줄(기준일·첨부등록·의무완료 runs 0건→1건·기한정정 due [계산, 고친]·해당없음·해당없음되돌림) · 버전 링 5+ · 다른 행·허가증·행 수 그대로',
       R28.B.ok, JSON.stringify(R28.B.info));
-    T('P1 판28 ③ 관리자 종전 길 회귀(save licenses): 단추 저장을 모르는 낡은 사본 = 200 · 관리자 선행확인 답 반영 · 단추 칸(완료 기록·기준일 무엇·해당 없음)은 서버 값(보낸 runs·na 버림) · 단추로 넣은 기준일 지킴 · 표식을 아는 사본의 기준일 고침은 반영 · 담당 통째 저장 = duties 서버 값(종전) · 관리자는 남의 행에도 단추 저장 · 행 수 5 그대로',
+    T('P1 판28 ③ 관리자 종전 길 회귀(save licenses): 단추 저장을 모르는 낡은 사본 = 200 · 관리자 선행확인 답 반영 · 단추 칸(완료 기록·기준일 무엇·해당 없음)은 서버 값(보낸 runs·na 버림) · 단추로 넣은 기준일 지킴 · 표식을 아는 사본의 기준일 고침은 반영 · 담당 통째 저장 = duties 서버 값(종전) · 관리자는 남의 행에도 단추 저장 · 행 수 5 그대로 · 검토 2 응답 lic_kept [2](지킨 기준일 행 — 표식 아는 저장은 없음) · 검토 5 낡은 사본이 행 updated_ts를 되돌리지 않음(큰 쪽)',
       R28.C.ok, JSON.stringify(R28.C.info));
-    T('P1 판28 ④ 수령본(att_put kind lic 좁은 갈래): 보기·숨김 403 · 남의 행 403 · html·확장자 없음 400 BAD_EXT · 자동 회차 아님 400 · 기기 미승인 403 · 6MB 넘음 413 · 사진 mime 고정 image/jpeg / att_get 인허가 보기 200(고정 mime) · 인허가 숨김(계약 수행) 403 NO_ACCESS·원본 403 · att_del 409 LIC_ATT_KEEP(파일 그대로) · 완료에 관리자가 올린 파일·다른 행 파일 400 BAD_ATT · 판독 백그라운드 건너뜀',
+    T('P1 판28 ④ 수령본(att_put kind lic 좁은 갈래): 보기·숨김 403 · 남의 행 403 · html·확장자 없음 400 BAD_EXT · 자동 회차 아님 400 · 기기 미승인 403 · 6MB 넘음 413 · 사진 mime 고정 image/jpeg / att_get 인허가 보기 200(고정 mime) · 인허가 숨김(계약 수행) 403 NO_ACCESS·원본 403 · att_del 409 LIC_ATT_KEEP(파일 그대로) · 완료에 관리자가 올린 파일·다른 행 파일 400 BAD_ATT · 판독 백그라운드 건너뜀 · 검토 6 내용 검사(확장자와 다른 앞머리 3종·9바이트 pdf = 400 BAD_FILE · png 정상 200)',
       R28.D.ok, JSON.stringify(R28.D.info));
     T('P1 판28 ⑤ lic_month_get: 비로그인 401 · 기기 403 · 인허가 숨김 403 NO_ACCESS · 보기 = 자동 회차 3행·누를 행 0·담당 이름(배정표) · 담당 [1,2] · 남의 행 담당 [3] · 관리자 [1,2,3] · 조문 원문·인용 표 안 내림(법령 이름만) · 배정표 못 읽음 = 담당 0·관리자 셋 · 승격 전 = 0행 · 승격본 못 읽음 500',
       R28.E.ok, JSON.stringify(R28.E.info));
-    T('P1 판28 ⑥ 같은 본문 dutyCur(지남 = over · 해당 없음 = 회차 없음 · 정정 기한 5일 뒤 = d7·orig 계산 기한) · 정정·해당 없음 없는 행은 dutyCur = dutyNext · 늦게 낸 회차는 그 회차 다음부터(2/28 회차를 11/13에 냄 → 2027-02-28 · 5년 주기 2025-06-22 회차 → 2030-06-22)',
+    T('P1 판28 ⑥ 같은 본문 dutyCur(지남 = over · 해당 없음 = 회차 없음 · 정정 기한 5일 뒤 = d7·orig 계산 기한) · 정정·해당 없음 없는 행은 dutyCur = dutyNext · 늦게 낸 회차는 그 회차 다음부터(2/28 회차를 11/13에 냄 → 2027-02-28 · 5년 주기 2025-06-22 회차 → 2030-06-22 · 검토 4: 2023 회차를 2026에 냄 → 2024-02-29 · 옛 완료와 섞여도 가장 늦은 완료 기준) — 크론은 부르지 않음(이 판에서 안 바꿈)',
       R28.F.ok, JSON.stringify(R28.F.info));
-    T('P1 판28 ⑦ 결함 사본 ' + Object.keys(MUT28).reduce((s, k) => s + MUT28[k].length, 0) + '개(담당 검사·배정표 못 읽음·수행 권한·허용 칸 두 겹·낙관락·미래 날짜·회차 대조·증빙 필수·되돌리기 관리자·직전 값·감사·해당 없음 막음·관리자 저장 이월·수령본 열기 막음·지우기 막음·확장자·다른 행 파일·읽기 숨김·승격본만) 전부 깨짐',
+    T('P1 판28 ⑧ 검토 1 판독 막음(실제 호출): att_parse 인허가 수령본 = 인허가 숨김·계약 수행·관리자·미승인 기기 모두 403 NO_ACCESS(판독 캐시 안 생김) · att_parse_status = 403(미리 있던 캐시도 안 내줌) · 계약 첨부 판독 결과는 종전 200',
+      R28.G.ok, JSON.stringify(R28.G.info));
+    T('P1 판28 ⑦ 결함 사본 ' + (Object.keys(MUT28).reduce((s, k) => s + MUT28[k].length, 0) + DMUT28.length) + '개(담당 검사·배정표 못 읽음·수행 권한·허용 칸 두 겹·낙관락·미래 날짜·회차 대조·증빙 필수·되돌리기 관리자·직전 값·감사·해당 없음 막음·관리자 저장 이월·지킨 행 응답 3·행 시각·수령본 열기 막음·지우기 막음·확장자·내용 검사 2·다른 행 파일·읽기 숨김·승격본만·날짜 범위 2·판독 막음 2·회차 계산 4) 전부 깨짐',
       kill28.length === 0, kill28.join(' | '));
   } finally { reset28(); }
 }

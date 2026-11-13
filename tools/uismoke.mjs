@@ -13049,7 +13049,7 @@ try {   // ---- P1 판28 인허가 '이번 달' 탭(시안 판3 ② — PM 11/13
       'function apprToastShow(m){ E.log.push("toast:" + m); } function confirm(m){ E.log.push("confirm:" + m); return ENV.confirmAns !== false; } function alert(m){ E.log.push("alert:" + m); } function promoResize(){ throw new Error("사진 줄이기 부르면 안 됨"); }',
       'function syncP(v){ return { then: function(f){ return syncP(f ? f(v) : v); }, catch: function(){ return syncP(v); } }; }',
       'function gwCall(fn, body){ E.calls.push(JSON.parse(JSON.stringify(body))); return syncP(typeof ENV.resp === "function" ? ENV.resp(body) : (ENV.resp || { status: 500, body: {} })); }'].join('\n');
-    const api = new Function('ENV', 'E', 'document', pre + '\n' + blk + '\nreturn { render: renderLicMonth, open: lmOpen, save: lmSave, close: lmClose, undo: lmNaUndo, row: dutyRowHtml, groups: lmGroups, lm: function(){ return licMonth; }, cur: function(){ return lmCur; } };')(env, E, doc);
+    const api = new Function('ENV', 'E', 'document', pre + '\n' + blk + '\nreturn { render: renderLicMonth, open: lmOpen, save: lmSave, close: lmClose, undo: lmNaUndo, row: dutyRowHtml, groups: lmGroups, lm: function(){ return licMonth; }, cur: function(){ return lmCur; }, kept: lmKeptNotice };')(env, E, doc);
     return { api, E, el: (id) => doc.getElementById(id) };
   };
   const duties28 = () => JSON.parse(JSON.stringify(SEED28));
@@ -13084,7 +13084,7 @@ try {   // ---- P1 판28 인허가 '이번 달' 탭(시안 판3 ② — PM 11/13
     if (hd !== '<span class="lm-hd-pc">지남 8 · 7일 안 0 · 30일 안 0 · 기준일 없음 10</span><span class="lm-hd-ph">지남 8 · 기준일 없음 10</span>') got.push('머리 ' + hd);
     if (A.E.cnt.textContent !== '18') got.push('칩 ' + A.E.cnt.textContent);
     const nt = A.el('licMonthNote').textContent;
-    if (!(nt.indexOf('자동 회차 19행(인허가 근거 승격본 v1-20261106)의 다음 기한 — 11/13 계산 · 담당 김정아(배정표). 자동 회차가 아닌 79행(') === 0 && A.el('licMonthNote').style.display === '')) got.push('안내 ' + nt);
+    if (!(nt.indexOf('자동 회차 19행의 다음 기한 — 11/13 계산 · 담당 김정아(배정표). 자동 회차가 아닌 79행(') === 0 && !/v1-|승격본/.test(nt) && A.el('licMonthNote').style.display === '')) got.push('안내 ' + nt);   // 검토 7: 판 이름은 화면에 안 냄
     if (A.E.calls.length !== 1 || A.E.calls[0].action !== 'lic_month_get' || A.E.log.indexOf('FULLSAVE') >= 0) got.push('호출 ' + JSON.stringify(A.E.calls));
     // ③ 권한 없는 사람(보기·담당 아님 — 서버 act 빈 배열) = 같은 행·단추 0 · 내 행만(act [37]) = 37행 단추 셋만
     const V = run28({ duties: duties28(), licenses: lics28(), resp: month28([]) }, blk); V.api.render(); const hv = V.el('licMonthPane').innerHTML;
@@ -13100,7 +13100,7 @@ try {   // ---- P1 판28 인허가 '이번 달' 탭(시안 판3 ② — PM 11/13
     const N = run28({ duties: duties28(), licenses: lics28(), admin: true, resp: (b) => ({ status: 200, body: { status: 'OK', ver: '', rows: [], act: [] } }) }, blk); N.api.render();
     if (N.el('licMonthPane').innerHTML.indexOf('자동 회차 행이 없습니다') < 0) got.push('0행');
     const F = run28({ duties: duties28(), licenses: lics28(), admin: true, resp: { status: 403, body: { error_code: 'NO_ACCESS' } } }, blk); F.api.render();
-    if (F.el('licMonthPane').innerHTML.indexOf('기한 근거표를 읽지 못했습니다(NO_ACCESS)') < 0) got.push('거절 ' + F.el('licMonthPane').innerHTML);
+    if (F.el('licMonthPane').innerHTML.indexOf('기한 근거표를 읽지 못했습니다 — 인허가를 볼 권한이 없습니다.') < 0 || /NO_ACCESS/.test(F.el('licMonthPane').innerHTML)) got.push('거절 ' + F.el('licMonthPane').innerHTML);
     const old = duties28().find((d) => d.no === 37), rowOld = A.api.row(old, true);
     if (!(rowOld.indexOf('37. ') > 0 && rowOld.indexOf('해당 없음') < 0 && rowOld.indexOf('data-duty-naoff') < 0)) got.push('옛 의무 대장 행');
     // ⑤ 창 네 가지(시안 문구) — 완료 창 다음 회차 안내 2027-02-28(늦게 낸 회차) · 정정 창 계산 설명 · 기준일 창 '직전 측정 완료일을 … 6개월 뒤'
@@ -13136,6 +13136,19 @@ try {   // ---- P1 판28 인허가 '이번 달' 탭(시안 판3 ② — PM 11/13
     X.el('lmFixTo').value = '2025-07-22'; X.el('lmFixReason').value = ''; X.api.save(); const eR = X.el('lmErr').textContent; const cX = X.E.calls.length;
     X.el('lmFixReason').value = '공고 연장'; X.api.save();
     if (!(eS === '지금 기한과 같은 날짜입니다.' && eR === '사유 유형을 골라 주세요.' && cX === 1 && X.E.calls.length === 2 && X.E.log.indexOf('load') >= 0 && !X.el('lmBackdrop').classList.contains('show'))) got.push('정정 거절 ' + JSON.stringify([eS, eR, cX, X.E.log]));
+    // 검토 3: 날짜 범위(서버와 같은 값) — 정정 = 계산 기한 앞뒤 1년 밖 · 제출일 = 회차 기한 1년 전보다 앞 → 안내만(호출 0)
+    //   검토 7: 서버 거절 코드는 업무 말로(NO_DUTY·DEVICE_NOT_APPROVED·NO_WRITE) · 모르는 코드는 일반 문구(코드 글자 안 보임)
+    let rc = 'NO_DUTY'; const RG = run28({ duties: duties28(), licenses: lics28(), resp: (b) => b.action === 'lic_month_get' ? month28([1, 37])(b) : { status: 400, body: { error_code: rc } } }, blk); RG.api.render();
+    RG.api.open('fix', 1); RG.el('lmFixReason').value = '기타'; RG.el('lmFixTo').value = '2099-12-31'; RG.api.save(); const eG1 = RG.el('lmErr').textContent;
+    RG.el('lmFixTo').value = '2026-06-23'; RG.api.save(); const eG2 = RG.el('lmErr').textContent; const cG = RG.E.calls.length;
+    RG.el('lmFixTo').value = '2026-06-22'; RG.api.save(); const eG3 = RG.el('lmErr').textContent;   // 경계(+1년) = 보냄 → 서버 NO_DUTY
+    RG.api.open('done', 37); RG.el('lmRef').value = 'r'; RG.el('lmDoneAt').value = '2025-02-27'; RG.api.save(); const eG4 = RG.el('lmErr').textContent; const cG2 = RG.E.calls.length;
+    const msgs = ['DEVICE_NOT_APPROVED', 'NO_WRITE', 'WEIRD_CODE_X'].map((x) => { rc = x; RG.el('lmDoneAt').value = '2025-02-28'; RG.api.save(); return RG.el('lmErr').textContent; });
+    if (!(eG1.indexOf('앞뒤 1년 안(2024-06-22 ~ 2026-06-22)') > 0 && eG2 === eG1 && cG === 1 && eG3 === '의무 대장에 이 행이 없습니다 — 화면을 새로 읽어 주세요.' && eG4.indexOf('1년 전(2025-02-28)부터') > 0 && cG2 === 2
+      && msgs[0].indexOf('기기 승인') > 0 && msgs[1].indexOf('권한이 없습니다') > 0 && msgs[2] === '저장하지 못했습니다 — 잠시 뒤 다시 해 주세요. 계속되면 관리자에게 알려 주세요.' && !msgs.concat([eG3]).some((m) => /[A-Z_]{4,}/.test(m)))) got.push('범위·문구 ' + JSON.stringify([eG1, eG2, cG, eG3, eG4, cG2, msgs]));
+    // 검토 2: 관리자 통째 저장 응답 lic_kept → 인허가 다시 읽기 + 한 줄 알림(행 번호·바꾸는 길)
+    const KN = run28({ duties: duties28(), licenses: lics28(), admin: true, resp: month28(ALL28) }, blk); KN.api.kept([2, 22]);
+    if (!(KN.E.log.indexOf('load') >= 0 && KN.E.log.some((x) => x.indexOf('alert:담당이 단추로 넣은 값이 있어 2·22행은 그 값을 지켰습니다') === 0 && x.indexOf('[선행확인 입력]') > 0))) got.push('지킨 행 알림 ' + JSON.stringify(KN.E.log));
     // ⑦ 해당 없음 행: 이번 달 목록에서 빠짐(안내 'n행도 의무 대장에서') · 의무 대장 행 = 배지 + 관리자만 [해당 없음 되돌리기] → na_undo 1번(base = 행 updated_ts)
     const nd = duties28(); const t39 = nd.find((d) => d.no === 39); t39.na = { on: true, reason: '시설 없음', by_name: '김정아', at: Date.UTC(2026, 10, 12) }; t39.updated_ts = 555;
     const Q = run28({ duties: nd, licenses: lics28(), admin: true, resp: (b) => b.action === 'lic_month_get' ? month28(ALL28)(b) : { status: 200, body: { status: 'OK', duty: { no: 39, na: { on: false }, updated_ts: 556 } } } }, blk); Q.api.render();
@@ -13160,19 +13173,26 @@ try {   // ---- P1 판28 인허가 '이번 달' 탭(시안 판3 ② — PM 11/13
     && html.indexOf('if (name === "month"){ if (licMonth.st !== "loading") licMonth.st = ""; renderLicMonth(); }') > 0 && /lmNaUndo\(parseInt\(el\.getAttribute\("data-duty-naoff"\), 10\)\)/.test(html) && /lmAttOpen\(el\.getAttribute\("data-duty-att"\)\)/.test(html)
     && /#lmBackdrop input, #lmBackdrop select\{font-size:16px;\}/.test(html) && /lic:"view-lic"/.test(html) && /\.view\.readonly \.mini-btn,/.test(html)
     && /if \(d && d\.action === 'lic_month_get'\) return await handleLicMonthGet\(event, d, R\);/.test(gwd) && /if \(d && d\.action === 'lic_duty_set'\) return await handleLicDutySet\(event, d, R\);/.test(gwd)
-    && /gwCall\("gw-data", \{ action: "lic_duty_set", no: q\.no, op: q\.op, base: q\.base, v: v \}\)/.test(blk28) && /action: "att_put", kind: "lic", no: q\.no/.test(blk28);
+    && /gwCall\("gw-data", \{ action: "lic_duty_set", no: q\.no, op: q\.op, base: q\.base, v: v \}\)/.test(blk28) && /action: "att_put", kind: "lic", no: q\.no/.test(blk28)
+    // 검토 2 배선: 저장 가로채기가 서버 lic_kept를 넘기고 doSaveLic 200 길이 lmKeptNotice를 부름
+    && html.indexOf('lic_kept: (res.body && Array.isArray(res.body.lic_kept)) ? res.body.lic_kept : null') > 0 && html.indexOf('licPending = false; if (json.lic_kept && json.lic_kept.length) lmKeptNotice(json.lic_kept); });') > 0;
   // 결함 사본 — 구간 글을 바꾸면 위 판정이 깨져야 한다
   const MUT28U = [['if (licMonth.act[r.no]){', 'if (true){'], ['(s === "over" ? g.over', '(s === "d7" ? g.over'], ['lmMD(dutyAddDays(nx30.nx.due, -30))', 'lmMD(nx30.nx.due)'], ['!LM_OP_LABEL[op] || !licMonth.act[no]', '!LM_OP_LABEL[op]'],
     ['if (!ref && !f) return lmErr(', 'if (false) return lmErr('], ['if (v.done_at > today) return lmErr(', 'if (false) return lmErr('], ['base: q.base, v: v }', 'base: 0, v: v }'], ['if (d.na && d.na.on){ g.na.push(', 'if (false){ g.na.push('],
     ['parts.filter(function(p){ return p[1]; })', 'parts.filter(function(p){ return true; })'], ['cyc = String(r.cycle || "").split("(")[0].trim()', 'cyc = String(r.cycle || "")'],
     ['if (op === "base" && !(nx && nx.missing === "base")) return;', ''], ['LM_KEYS.forEach(function(k){ if (b[k] !== undefined) d[k] = b[k]; else delete d[k]; });', ''], ['if (code === "DUTY_STALE" || code === "DUE_STALE"){', 'if (false){'],
-    ['if (licMonth.st && licMonth.vid !== myId()){', 'if (false){']];
+    ['if (licMonth.st && licMonth.vid !== myId()){', 'if (false){'],
+    // 검토 2·3·7
+    ['if (v.done_at < dutyAddMonths(q.due, -12)) return lmErr(', 'if (false) return lmErr('], ['if (v.to < dutyAddMonths(q.due, -12) || v.to > dutyAddMonths(q.due, 12)) return lmErr(', 'if (false) return lmErr('],
+    ['return LM_ERR[code] || "저장하지 못했습니다 — 잠시 뒤 다시 해 주세요. 계속되면 관리자에게 알려 주세요.";', 'return LM_ERR[code] || ("저장하지 못했습니다(" + code + ").");'],
+    ['NO_DUTY: "의무 대장에 이 행이 없습니다 — 화면을 새로 읽어 주세요.", ', ''], ['    loadLicenses();\n    alert("담당이 단추로', '    alert("담당이 단추로'],
+    ['"자동 회차 " + licMonth.rows.length + "행의 다음 기한 — "', '"자동 회차 " + licMonth.rows.length + "행(승격본 " + licMonth.ver + ")의 다음 기한 — "']];
   const kill28u = [];
   MUT28U.forEach(([from, to]) => { if (blk28.split(from).length !== 2) { kill28u.push('자리 ' + from.slice(0, 40)); return; } let k; try { k = chk28(blk28.replace(from, () => to)).length > 0; } catch (e) { k = true; } if (!k) kill28u.push(from.slice(0, 50) + ' 안 깨짐'); });
   // 같은 본문 결함: 앱 쪽 한 글자만 바꿔도 대조가 깨짐 · 서버 늦은 회차 규칙(dutyStartIdx)을 걷으면 완료 창 다음 회차가 2028로 바뀌어 깨짐
   const shMut = (appSh28.replace('if (last >= 0) return last + 1;', 'if (false) return last + 1;')) !== libSh28;
   let shKill = false; try { shUse28 = appSh28.replace('if (last >= 0) return last + 1;', 'if (false) return last + 1;'); shKill = chk28(blk28).length > 0; } catch (e) { shKill = true; } finally { shUse28 = appSh28; }
-  T('P1 판28 인허가 이번 달 탭(@lic-month 실행 — 운영 승격본 19행·의무 대장 98행 표본 · 오늘 2026-11-13): ① 앱 DUTY_SHARED = 서버 _lib/duty.js 글자째(한 벌 · 구간에 문서 통째 저장 0) · ② 네 묶음 = 지남 8(1·44·47·37·76·2·66·54 · 509~74일) · 7일 안 "없음" · 30일 안 "없음 — 다음으로 들어올 행: 3. … 2026-12-31(12/1부터 이 묶음)" · 기준일 없음 10(16·22·25·29·34·38·39·65·71·85 — "기준: 직전 측정 완료일") · 1행 요약 "5년마다 — 허가일 2015-03-24 기준 + 유예 90일 · 화물자동차 운수사업법" · 근거 확인 필요 배지 2·16·54 · 단추 네 가지(날짜 묶음 완료+수령 올리기·기한 정정·해당 없음 / 기준일 없음 기준일 입력·해당 없음 — 44개) · 머리 PC "지남 8 · 7일 안 0 · 30일 안 0 · 기준일 없음 10"·폰 "지남 8 · 기준일 없음 10" · 칩 18 · 안내 "자동 회차 19행(… v1-20261106)… 담당 김정아(배정표). 자동 회차가 아닌 79행" · ③ 권한 없는 사람(act 0) = 같은 행·단추 0·창 안 열림 · 내 행만 = 그 행 단추 셋 · ④ 옛 문서(완료 기록 칸 없는 seed 행) 열림 · 허가일 없는 허가증 = 1행 "허가일 없음"(해당 없음 단추만) · 빈 대장·0행·서버 거절 안내 · 옛 의무 대장 행 그대로 · ⑤ 창 네 가지 시안 문구(완료 "2026-02-28 회차를 닫습니다…"·"다음 회차 2027-02-28" / 정정 "계산된 기한 2025-06-22(허가일 2015-03-24 + 5년 + 유예 90일)를…" / 해당 없음 메모 칸 없음 / 기준일 "직전 측정 완료일을 … (6개월 뒤)") · 엉뚱한 창 안 열림 · ⑥ 저장 값 거절(빈·내일·증빙 없음·같은 기한·사유 유형) = 호출 0 · 완료 = lic_duty_set 1번(no·op·base·v{due·done_at·ref}) → 응답 칸만 그 행에·목록에서 빠짐·통째 저장 0 · 기준일 = v{date·what} · DUTY_STALE = 다시 읽기·창 닫음 · ⑦ 해당 없음 행 = 목록에서 빠짐(칩 17·안내) · 의무 대장 배지·관리자만 [해당 없음 되돌리기] → na_undo(base) · ⑧ 로그인 전환 = 다시 읽어 뒷사람 권한으로(단추 44 → 0) · ⑨ 배선(칩 셈·머리·안내·창 버튼 4·칸 열 때 다시 읽기·의무 대장 펼침 2·서버 액션 2·창 입력 16px·view-lic readonly) · 결함 사본 ' + MUT28U.length + '개 + 같은 본문 결함 2 전부 깨짐',
+  T('P1 판28 인허가 이번 달 탭(@lic-month 실행 — 운영 승격본 19행·의무 대장 98행 표본 · 오늘 2026-11-13): ① 앱 DUTY_SHARED = 서버 _lib/duty.js 글자째(한 벌 · 구간에 문서 통째 저장 0) · ② 네 묶음 = 지남 8(1·44·47·37·76·2·66·54 · 509~74일) · 7일 안 "없음" · 30일 안 "없음 — 다음으로 들어올 행: 3. … 2026-12-31(12/1부터 이 묶음)" · 기준일 없음 10(16·22·25·29·34·38·39·65·71·85 — "기준: 직전 측정 완료일") · 1행 요약 "5년마다 — 허가일 2015-03-24 기준 + 유예 90일 · 화물자동차 운수사업법" · 근거 확인 필요 배지 2·16·54 · 단추 네 가지(날짜 묶음 완료+수령 올리기·기한 정정·해당 없음 / 기준일 없음 기준일 입력·해당 없음 — 44개) · 머리 PC "지남 8 · 7일 안 0 · 30일 안 0 · 기준일 없음 10"·폰 "지남 8 · 기준일 없음 10" · 칩 18 · 안내 "자동 회차 19행(… v1-20261106)… 담당 김정아(배정표). 자동 회차가 아닌 79행" · ③ 권한 없는 사람(act 0) = 같은 행·단추 0·창 안 열림 · 내 행만 = 그 행 단추 셋 · ④ 옛 문서(완료 기록 칸 없는 seed 행) 열림 · 허가일 없는 허가증 = 1행 "허가일 없음"(해당 없음 단추만) · 빈 대장·0행·서버 거절 안내 · 옛 의무 대장 행 그대로 · ⑤ 창 네 가지 시안 문구(완료 "2026-02-28 회차를 닫습니다…"·"다음 회차 2027-02-28" / 정정 "계산된 기한 2025-06-22(허가일 2015-03-24 + 5년 + 유예 90일)를…" / 해당 없음 메모 칸 없음 / 기준일 "직전 측정 완료일을 … (6개월 뒤)") · 엉뚱한 창 안 열림 · ⑥ 저장 값 거절(빈·내일·증빙 없음·같은 기한·사유 유형) = 호출 0 · 완료 = lic_duty_set 1번(no·op·base·v{due·done_at·ref}) → 응답 칸만 그 행에·목록에서 빠짐·통째 저장 0 · 기준일 = v{date·what} · DUTY_STALE = 다시 읽기·창 닫음 · ⑦ 해당 없음 행 = 목록에서 빠짐(칩 17·안내) · 의무 대장 배지·관리자만 [해당 없음 되돌리기] → na_undo(base) · ⑧ 로그인 전환 = 다시 읽어 뒷사람 권한으로(단추 44 → 0) · ⑨ 배선(칩 셈·머리·안내·창 버튼 4·칸 열 때 다시 읽기·의무 대장 펼침 2·서버 액션 2·창 입력 16px·view-lic readonly·저장 응답 lic_kept 길) · 검토 3 날짜 범위(정정 앞뒤 1년·제출일 회차 1년 전부터 — 경계는 보냄) · 검토 7 오류 문구 업무 말(NO_DUTY·기기·권한 · 모르는 코드 일반 문구 · 화면에 대문자 코드 0 · 안내 줄 판 이름 0) · 검토 2 지킨 행 알림(다시 읽기 + 행 번호 + [선행확인 입력]) · 결함 사본 ' + MUT28U.length + '개 + 같은 본문 결함 2 전부 깨짐',
     same28 && got28.length === 0 && wire28 && kill28u.length === 0 && shMut && shKill, JSON.stringify({ same28, got28, wire28, kill28u, shMut, shKill }));
 } catch (e) { console.log('  (P1 판28 검사 생략 — ' + e.message + ')'); fails++; }
 

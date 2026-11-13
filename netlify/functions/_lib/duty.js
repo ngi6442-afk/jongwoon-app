@@ -89,6 +89,8 @@ function dutyNext(d, lic, today){
     dates.push([mo, isNaN(dy) ? 0 : dy]);
     if (mo2 >= 1 && mo2 <= 12) dates.push([mo2, isNaN(dy2) ? 0 : dy2]);
     var y0 = dutyParse(anchor) ? dutyParse(anchor).y : dutyParse(today).y;
+    var lastDue = ""; for (k in done){ if (done.hasOwnProperty(k) && dutyParse(k) && k > lastDue) lastDue = k; }
+    if (lastDue && dutyParse(lastDue).y < y0) y0 = dutyParse(lastDue).y;   // P1 판28 검토 4: 후보 시작 연도 = 가장 늦은 완료 회차 연도와 제출일 연도 중 이른 쪽 — 몇 해 늦게 낸 회차도 후보 안에 들어 그다음 회차부터(여러 회차를 건너뛰지 않게)
     for (k = -1; k < 6; k++){ for (j = 0; j < dates.length; j++) cands.push(dutyMake(y0 + k, dates[j][0], dates[j][1])); }
     cands.sort();
     start = dutyStartIdx(cands, done, anchor);
