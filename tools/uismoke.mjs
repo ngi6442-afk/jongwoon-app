@@ -1611,7 +1611,7 @@ try {
     '어느 고리가 빠졌는지 node tools/promoqlearn_check.mjs로 확인');
 } catch (e) { console.log('  (체크 10 3단계 검사 생략 — ' + e.message + ')'); fails++; }
 
-// ---- 체크 10 — 사진AI 생성 스트리밍 수리(11/13 v455 배포 뒤 확인: 5분 넘는 생성이 Node fetch 응답 머리 300초 제한에 끊김 — 판 번호는 합칠 때): 실행 검사는 tools/promostream_check.mjs ----
+// ---- v458 체크 10 — 사진AI 생성 스트리밍 수리(11/13 v455 배포 뒤 확인: 5분 넘는 생성이 Node fetch 응답 머리 300초 제한에 끊김 — 판 번호는 합칠 때): 실행 검사는 tools/promostream_check.mjs ----
 try {
   const clS = readFileSync(join(ROOT, 'netlify', 'functions', '_lib', 'claude.js'), 'utf8');
   const paiS = readFileSync(join(ROOT, 'netlify', 'functions', '_lib', 'promoai.js'), 'utf8');
@@ -11532,9 +11532,21 @@ try {
   const lst57 = (html.match(/var ALERT_WATCH_IDS = \[([^\]]+)\]/) || ['', ''])[1], txt57 = (html.match(/var ALERT_WATCH_TXT = \{([^\n]+)\};/) || ['', ''])[1];
   const miss57 = ids57.filter((id) => lst57.indexOf('"' + id + '"') < 0 || txt57.indexOf('"' + id + '":"') < 0);
   T('v457 문서·목록: FEATURES 기준 v457 (2026-11-13)·v457 절 · TESTLIST v457 절 · sw jw-shell-v457 · 경보 라벨 목록·이름표에 아침 브리핑·백업·주간 요약·법령 감시',
-    /기준: v457 \(2026-11-13\)\./.test(ft57) && ft57.indexOf('\n### v457 (11/13) — 경보 라벨 카드') > 0 && tl57.indexOf('\n## v457 — 경보 라벨 카드') > 0 && /SHELL_CACHE = 'jw-shell-v457'/.test(sw57) && miss57.length === 0,
+    Number((ft57.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 457 && ft57.indexOf('\n### v457 (11/13) — 경보 라벨 카드') > 0 && tl57.indexOf('\n## v457 — 경보 라벨 카드') > 0 && Number((sw57.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 457 && miss57.length === 0,
     JSON.stringify({ miss57 }));
 } catch (e) { console.log('  (v457 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ---- v458(11/13 — 체크 10 사진AI 생성 스트리밍 수리 + v455 재검토 낮음 N1·N2, 10 세션 53bf63b·cc156a3을 v457 위에): 문서·판 번호만 — 동작 검사는 tools/promostream_check.mjs·promoqlearn_check.mjs
+//   다음 판은 기준 줄·sw 검사를 '이 판 이상'(숫자 비교)으로 푼다
+try {
+  const rd58 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const ft58 = rd58('FEATURES.md'), tl58 = rd58('TESTLIST.md'), sw58 = rd58('sw.js');
+  const left58 = [ft58, tl58].filter((s) => /스트리밍 수리[^\n]*판 번호는 합칠 때/.test(s)).length;
+  T('v458 문서: FEATURES 기준 v458 (2026-11-13) · FEATURES·TESTLIST 스트리밍 수리 절 제목에 v458(합칠 때 문구 0) · sw jw-shell-v458 · 게이트 promostream_check 있음',
+    /기준: v458 \(2026-11-13\)\./.test(ft58) && ft58.indexOf('\n### v458 (11/13) — 체크 10 — 사진AI 생성 스트리밍 수리') > 0 && tl58.indexOf('\n## v458 — 체크 10 — 사진AI 생성 스트리밍 수리') > 0
+    && left58 === 0 && /SHELL_CACHE = 'jw-shell-v458'/.test(sw58) && existsSync(join(ROOT, 'tools', 'promostream_check.mjs')),
+    JSON.stringify({ left58 }));
+} catch (e) { console.log('  (v458 검사 생략 — ' + e.message + ')'); fails++; }
 
 try {
   // 원장 T421(11/13): 옛 블록의 sw 판 번호 검사는 숫자 비교(>= 그 판) — '…|4\\d\\d)' 꼴 정규식은 v500에서 한꺼번에 실패하므로 다시 쓰지 않는다(판마다 옛 블록을 손보던 구조 해소)
