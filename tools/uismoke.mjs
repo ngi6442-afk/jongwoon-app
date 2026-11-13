@@ -6619,6 +6619,9 @@ try {
     JSON.stringify(a51) === JSON.stringify(['거래처 4곳 · 합계 15,660원 (금액 큰 순)', '가나건설:1:8,000원|(주)가나건설:3:7,000원|신규상사:4:650원|-:1:10원', '거래처별 미수 집계 (4곳)'])
     && b51[1].split('|').length === 7 && b51[2] === '거래처별 미수 집계 (7곳)' && /가나건설:2:9,000원/.test(b51[1]) && /가나 건설:1:2,000원/.test(b51[1]) && /사아:1:4,000원/.test(b51[1]),
     JSON.stringify({ a51, b51 }));
+  // v451 화면 시험(11/13)에서 찾은 것: 입찰 손 [낙찰](setBidStatus) 창 제목 = '계약 시작'(openConStart가 '직접 생성'으로 바꾼 뒤 — bidToContract·낙찰 자동 열기와 같게)
+  const sbs51 = fn40(html, 'setBidStatus'), oc51 = sbs51.indexOf('openConStart();'), h351 = sbs51.indexOf('textContent="계약 시작"');
+  T('v451 입찰 [낙찰] 창 제목 "계약 시작"(openConStart 뒤에 다시 씀)', oc51 > 0 && h351 > oc51, JSON.stringify({ oc51, h351 }));
 } catch (e) { console.log('  (v440 검사 생략 — ' + e.message + ')'); fails++; }
 
 // ---- v441(11/11 — 45-1 넷째 판: 관리 › 거래처 탭을 엑셀형 표로 · PM 11/10 15:56 결정 ④ 계약·기성에는 있는데 대장에 없는 이름을 표 아래 묶음으로 모아 [대장에 추가](상호만 채운 새 거래처) —
@@ -8277,7 +8280,8 @@ try {
   //   375 실행 = 옛 카드 8장(data-bid-exp)·표 글 0·옛 상태 칩 줄 보임(전체 10 — 옛 셈 그대로)·배너 자리 숨김·안내 '노란 카드' 글·검색칸 안내 글 옛것·자리 legacy → 1366(경계 넘김) = 표·옛 칩 줄 숨김·'지역 확인' 안내 글·검색칸 안내 '공고번호·매칭어' →
   //   검색칸에 글이 있는 채 다시 375 = 옛 검색어(bidSearchTerm)를 칸 글로 맞춰 그 카드만(b1) · 표 글 0
   const LEG_SHA43 = '2a2b480c568054054f85190ea783adbc82af5da6c8cbe55d15286a2eea07eabe';
-  const KEEP43 = { setBidStatus: '325451b311d96180', undoBidStatus: 'a0592bc2abc9338c', bidToContract: '7f77a881c76b9641', runBidQualGen: '8b8ee537a4b76f77', runAwardAutoCon: '3c350982dd62e7c8', setBidLayer: '2866e6652936072a', renderBidStats: '285dfecb73473e6c', openBidCalc: '325b37a902ebd518' };
+  const KEEP43 = { setBidStatus: '3a708caf9731424a',   // v451: [낙찰] 창 제목 한 줄 더함(화면 시험에서 찾은 결함 — v451 검사)
+    undoBidStatus: 'a0592bc2abc9338c', bidToContract: '7f77a881c76b9641', runBidQualGen: '8b8ee537a4b76f77', runAwardAutoCon: '3c350982dd62e7c8', setBidLayer: '2866e6652936072a', renderBidStats: '285dfecb73473e6c', openBidCalc: '325b37a902ebd518' };
   const keepBad9 = Object.keys(KEEP43).filter((n) => sha43(body43(n)).slice(0, 16) !== KEEP43[n]);
   const X9 = mk43({ width: 375 }); X9.api.render(); const g9 = (id) => X9.env.host(id);
   const p9 = [(X9.host._h.match(/data-bid-exp=/g) || []).length, X9.host._h.indexOf('data-vs-row') < 0, g9('bidFilterBar').style.display, /data-bid-filter="all">전체 10<\/button>/.test(g9('bidFilterBar').innerHTML), g9('bidBanner').style.display, g9('bidGuideCard').style.display, g9('bidGuideSheet').style.display, g9('bidSearch').placeholder, X9.host.getAttribute('data-vs-mode')];
