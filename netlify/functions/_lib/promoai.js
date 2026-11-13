@@ -30,6 +30,7 @@ const CL = require('./claude');
 const API_URL = CL.API_URL;
 const API_VERSION = CL.API_VERSION;
 const ApiError = CL.ApiError, callApi = CL.callApi, responseText = CL.responseText, scrubPayload = CL.scrubPayload;
+const callApiStream = CL.callApiStream;   // 사진AI 초안 생성만 스트리밍(11/13 — 5분 넘는 생성이 Node fetch 응답 머리 300초 제한에 끊기던 것)
 // 모델은 계약서 지정값. 이미지 입력 지원 + 비용·품질 균형.
 const MODEL = 'claude-sonnet-5';
 // 프롬프트 판 — 잡·초안·기록(ai.pv)에 남겨 품질 점수(promoai:quality)를 판별로 비교한다. 되돌리기 = 이 판을 만든 커밋을 되돌린다.
@@ -1480,7 +1481,7 @@ async function generateDraft(apiKey, photos, input, opts) {
   for (let attempt = 0; attempt <= RETRIES; attempt++) {
     let json;
     try {
-      json = await callApi(apiKey, body, timeoutMs);
+      json = await callApiStream(apiKey, body, timeoutMs);   // 스트리밍(머리가 곧바로 와 300초 제한에 안 걸림) — 모양은 callApi 응답과 같다
     } catch (e) {
       last = { ok: false, code: e.code || 'ERROR', detail: e.detail || String(e.message || e) };
       if (e.retryable && attempt < RETRIES) continue;
@@ -1560,5 +1561,5 @@ module.exports = {
   recentTitleCandidates, histLabel, recentTitleInfo, ownTitleInfo,
   pickTitleType, titlePlanLines, titleWarnings,
   // 네트워크(테스트 금지 — 리뷰로만 검증)
-  generateDraft, callApi,
+  generateDraft, callApi, callApiStream,
 };

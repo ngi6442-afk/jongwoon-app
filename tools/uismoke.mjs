@@ -1611,6 +1611,16 @@ try {
     '어느 고리가 빠졌는지 node tools/promoqlearn_check.mjs로 확인');
 } catch (e) { console.log('  (체크 10 3단계 검사 생략 — ' + e.message + ')'); fails++; }
 
+// ---- 체크 10 — 사진AI 생성 스트리밍 수리(11/13 v455 배포 뒤 확인: 5분 넘는 생성이 Node fetch 응답 머리 300초 제한에 끊김 — 판 번호는 합칠 때): 실행 검사는 tools/promostream_check.mjs ----
+try {
+  const clS = readFileSync(join(ROOT, 'netlify', 'functions', '_lib', 'claude.js'), 'utf8');
+  const paiS = readFileSync(join(ROOT, 'netlify', 'functions', '_lib', 'promoai.js'), 'utf8');
+  T('체크 10 생성 스트리밍: claude.js callApiStream(stream:true·SSE 모으기 readSse·상태 코드 statusError 공용·fetch failed 원인 코드 errDetail) · generateDraft가 사용(학습 워커는 callApi 그대로) · 게이트 tools/promostream_check.mjs',
+    /async function callApiStream\(apiKey, body, timeoutMs\)/.test(clS) && /Object\.assign\(\{\}, body, \{ stream: true \}\)/.test(clS) && /async function readSse\(stream, isAbort\)/.test(clS) && /function statusError\(status, text\)/.test(clS) && /function errDetail\(e\)/.test(clS)
+    && /json = await callApiStream\(apiKey, body, timeoutMs\);/.test(paiS) && existsSync(join(ROOT, 'tools', 'promostream_check.mjs')),
+    '어느 고리가 빠졌는지 node tools/promostream_check.mjs로 확인');
+} catch (e) { console.log('  (체크 10 생성 스트리밍 검사 생략 — ' + e.message + ')'); fails++; }
+
 
 // ---- v395(10/27 착수 브리핑 A2 · 공통 기반 1 첫 시범): 자동 지시 배정표 settings:assign — 접두어 앱↔서버 동률 · 카드·호출·배지·액션 배선 · sw ----
 try {
