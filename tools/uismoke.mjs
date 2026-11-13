@@ -12907,7 +12907,7 @@ try {
   const permSecP = (() => { const i = html.indexOf('<section class="view" id="view-perm">'); return i < 0 ? '' : html.slice(i, html.indexOf('</section>', i)); })();
   const KINDS_P = stP(/var PMCON_KINDS = \[[\s\S]*?\n  \];/);
   const kindsP = [...KINDS_P.matchAll(/\{ kind: "(\w+)", label: "([^"]+)", grade: "(R\d)", get: "(\w+)", card: "(\w+)",/g)].map((m) => ({ kind: m[1], label: m[2], grade: m[3], get: m[4], card: m[5] }));
-  const svKindsP = [...((gwdP.match(/const PMCON_KINDS = \{([\s\S]*?)\n\};/) || ['', ''])[1]).matchAll(/^\s+(\w+): \{ label: '([^']+)', fn: (\w+),/gm)].map((m) => ({ kind: m[1], label: m[2], fn: m[3] }));
+  const svKindsP = [...((gwdP.match(/const PMCON_KINDS = \{([\s\S]*?)\n\};/) || ['', ''])[1]).matchAll(/^\s+(\w+): \{ label: '([^']+)', grade: '(R\d)', fn: (\w+),/gm)].map((m) => ({ kind: m[1], label: m[2], grade: m[3], fn: m[4] }));
   const FN_OF_GET = { assign_get: 'handleAssignSet', notify_get: 'handleNotifySet', doneif_get: 'handleDoneifSet', autotask_get: 'handleAutotaskSet', learn_pairs_get: 'handleLearnSettingsSet', brief_get: 'handleBriefSet', con_proc_get: 'handleConProcBgSet' };
   const disp = (a) => new RegExp("if \\(d && d\\.action === '" + a + "'\\) return await \\w+\\(event, d, R\\);").test(gwdP);
   const swP = fnP('switchTab'), apP = fnP('applyPerms');
@@ -12918,7 +12918,7 @@ try {
     && swP.indexOf('document.getElementById("view-pmcon").classList.toggle("active", name === "pmcon");') > 0 && swP.indexOf('if (name === "pmcon") renderPmcon();') > 0
     && kindsP.map((k) => k.kind).join(',') === 'assign,notify,doneif,autotask,learn,brief,bg' && kindsP.map((k) => k.label).join('/') === '배정표/알림 설정/완료 판정/자동 지시 규칙/계약 학습/브리핑 설정/근거 승격'
     && kindsP.map((k) => k.grade).join('') === 'R1R1R1R1R2R1R2' && kindsP.every((k) => disp(k.get) && permSecP.indexOf('id="' + k.card + '"') >= 0 || (k.card === 'doneifRow' && html.indexOf('id="doneifRow"') > 0 && disp(k.get)))
-    && svKindsP.map((k) => k.kind).join(',') === kindsP.map((k) => k.kind).join(',') && svKindsP.every((k, i) => k.label === kindsP[i].label && k.fn === FN_OF_GET[kindsP[i].get])
+    && svKindsP.map((k) => k.kind).join(',') === kindsP.map((k) => k.kind).join(',') && svKindsP.every((k, i) => k.label === kindsP[i].label && k.grade === kindsP[i].grade && k.fn === FN_OF_GET[kindsP[i].get])
     && disp('pmcon_get') && disp('pmcon_decide') && /var AUDIT_COL_LABEL = \{[^}]*progress:"진척도", pmcon:"PM 콘솔",/.test(html),
     JSON.stringify({ kinds: kindsP.map((k) => k.kind + ':' + k.get), sv: svKindsP.map((k) => k.kind + ':' + k.fn) }));
   // ② 실행 — 가짜 화면
@@ -12986,15 +12986,20 @@ try {
   const asR = await runP({ res: RES_P(true) }); asR.api.act('ok', 'assign:lic');
   const cnR = await runP({ res: RES_P(true), confirm: false }); cnR.api.act('ok', 'doneif:on');
   const prR = await runP({ res: RES_P(true), prompt: null }); prR.api.act('hold', 'doneif:on');
+  const fuR = await runP({ res: RES_P(true, { pmcon_decide: { status: 400, body: { error_code: 'PMCON_MARKS_FULL', max: 60 } } }) });
+  fuR.api.act('hold', 'doneif:on'); for (let i = 0; i < 4; i++) await new Promise((r) => setTimeout(r, 0));
+  const lvR = await runP({ res: RES_P(true, { brief_get: { status: 500, body: {} }, pmcon_decide: { status: 200, body: {} } }) }); lvR.api.act('hold', 'doneif:on');
   const stR = await runP({ res: RES_P(true, { pmcon_decide: { status: 409, body: { error_code: 'PMCON_STALE' } } }) });
   stR.api.act('ok', 'doneif:on'); for (let i = 0; i < 4; i++) await new Promise((r) => setTimeout(r, 0));
-  T('P1 판29 ③ 누름 → 서버 본문(pmcon_decide 하나): [ㄱ] = 줄 id·종류·등급·추천값 args{event,value}·set_base(그 카드 조회의 updated_at 22)·base(누른 기록 555) · [보류] = 재개 조건(prompt)·args 없음 · [기본값] 무응답 기본 그대로(계약 학습) = args 없음·def_is_rec false · [기본값] 무응답 기본 승격(근거 승격 — 예고 표 11/25) = args{bg_ver}·def_is_rec true · PM 아님·추천 없는 줄·confirm 취소·prompt 취소 = 서버 안 부름 · 409 = 안내 + 다시 불러옴',
+  T('P1 판29 ③ 누름 → 서버 본문(pmcon_decide 하나): [ㄱ] = 줄 id·종류·등급·추천값 args{event,value}·set_base(그 카드 조회의 updated_at 22)·base(누른 기록 555) · [보류] = 재개 조건(prompt)·args 없음 · [기본값] 무응답 기본 그대로(계약 학습) = args 없음·def_is_rec false · [기본값] 무응답 기본 승격(근거 승격 — 예고 표 11/25) = args{bg_ver}·def_is_rec true · PM 아님·추천 없는 줄·confirm 취소·prompt 취소 = 서버 안 부름 · 409 = 안내 + 다시 불러옴 · (검토 11/13) 본문 live = 지금 그린 줄 id 전부(12) · 조회 하나라도 실패면 live 안 보냄 · 400 PMCON_MARKS_FULL = "보류함이 가득 찼습니다(60개)" 안내',
     b1.choice === 'ok' && b1.kind === 'notify' && b1.row === 'notify:task_review:issuer_approver' && b1.grade === 'R1' && JSON.stringify(b1.args) === '{"event":"task_review","value":"issuer_approver"}' && b1.set_base === 22 && b1.base === 555
     && b2.choice === 'hold' && b2.why === '노무사 회신 뒤' && b2.args === undefined && b2.row === 'brief:on'
     && b3.choice === 'default' && b3.args === undefined && b3.def_is_rec === false && b3.row === 'learn:on' && b3.grade === 'R2'
     && b4.choice === 'default' && JSON.stringify(b4.args) === '{"bg_ver":"v1-20261120"}' && b4.def_is_rec === true && b4.set_base === 77 && b4.due === '2026-11-25'
     && sent(noR).length === 0 && sent(asR).length === 0 && sent(cnR).length === 0 && sent(prR).length === 0
-    && stR.toasts.some((t) => t.indexOf('다른 곳에서 방금 바뀌었습니다') === 0) && stR.calls.filter((b) => b.action === 'pmcon_get').length === 2,
+    && stR.toasts.some((t) => t.indexOf('다른 곳에서 방금 바뀌었습니다') === 0) && stR.calls.filter((b) => b.action === 'pmcon_get').length === 2
+    && Array.isArray(b1.live) && b1.live.length === 12 && b1.live.indexOf('notify:task_review:issuer_approver') >= 0 && Array.isArray(b2.live) && b2.live.length === 12
+    && (sent(lvR)[0] || {}).choice === 'hold' && (sent(lvR)[0] || {}).live === undefined && fuR.toasts.some((t) => t.indexOf('alert:보류함이 가득 찼습니다(60개)') === 0),
     JSON.stringify({ b1, b2: b2.choice, b3: [b3.choice, b3.def_is_rec], b4: [b4.def_is_rec, b4.args] }));
   // ④ 기존 카드 그대로(함수 해시 — 판29 착수 전 v460 387b98e와 같음) + renderPermMgmt 카드 호출 그대로
   const HASH29 = { renderPermMgmt: '9634640c8096104c', renderAssignCard: '0224820afb855ba0', assignSet: 'c4dd84fd50465303', renderNotifyCard: '732f47e42cc4be01', renderDoneifRow: '2b5840e3d2b0ce80', doneifSet: '154d942b3f411d9f', notifySet: '2bef31b5c054b599',

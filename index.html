@@ -30459,7 +30459,7 @@
       });
       pend.sort(function(a, b){ return (a.grade === b.grade ? 0 : (a.grade === "R2" ? -1 : 1)) || String(a.due || "9").localeCompare(String(b.due || "9")); });
       var canWrite = !!(gOk && g.body.can_write);
-      pmconState = { byId: byId, base: gOk ? (Number(g.body.updated_at) || 0) : null, canWrite: canWrite, marks: marks };
+      pmconState = { byId: byId, base: gOk ? (Number(g.body.updated_at) || 0) : null, canWrite: canWrite, marks: marks, live: bad.length ? null : Object.keys(byId) };   // live = 지금 그린 줄 전부(보류함 자리 낼 때 화면에 없는 표시부터 버림) — 조회 하나라도 실패면 보내지 않음
       var r2 = pend.filter(function(r){ return r.grade === "R2"; }).length;
       var hd = document.getElementById("pmconHead"); if (hd) hd.textContent = "정할 것 " + pend.length + (held.length ? " · 보류 " + held.length : "");
       var rc = document.getElementById("pmconRowsCnt"); if (rc) rc.textContent = pend.length + (pend.length ? " · R2 " + r2 + " · R1 " + (pend.length - r2) : "");
@@ -30527,6 +30527,7 @@
     if (pmconBusy || !pmconState || !pmconState.canWrite || pmconState.base === null) return;
     var r = pmconState.byId[id]; if (!r) return;
     var body = { action: "pmcon_decide", kind: r.kind, row: r.id, grade: r.grade, due: r.due || "", q: r.q, rec: r.recTxt || "", base: pmconState.base };
+    if (pmconState.live) body.live = pmconState.live;
     if (act === "ok"){
       if (!r.args || r.block) return;
       if (r.kind === "autotask" && r.args.mode === "live"){ if (!confirm("이 규칙을 실제 발행으로 바꾸면 다음 08:10 실행부터 실제 지시가 생깁니다. 계속할까요?")) return; }
@@ -30550,7 +30551,8 @@
       if (res.status === 409){ apprToastShow("다른 곳에서 방금 바뀌었습니다 — 최신으로 다시 불러왔습니다"); renderPmcon(); return; }
       if (res.status !== 200){
         var applied = !!(res.body && res.body.applied);
-        if (!(res.body && res.body.error_code === "NO_CHANGE")) alert("저장 실패 (" + ((res.body && res.body.error_code) || res.status) + ")" + (applied ? " — 설정은 바뀌었고 누른 기록만 남지 못했습니다" : ""));
+        if (res.body && res.body.error_code === "PMCON_MARKS_FULL") alert("보류함이 가득 찼습니다(" + (res.body.max || 60) + "개) — 보류함에서 [다시 열기]로 비운 뒤 다시 눌러 주세요.");
+        else if (!(res.body && res.body.error_code === "NO_CHANGE")) alert("저장 실패 (" + ((res.body && res.body.error_code) || res.status) + ")" + (applied ? " — 설정은 바뀌었고 누른 기록만 남지 못했습니다" : ""));
         renderPmcon(); return;
       }
       apprToastShow((PMCON_CHOICE_TXT[body.choice] || "") + " — " + (res.body && res.body.applied ? "적용했습니다(되돌리기: " + r.k.revert + ")" : "기록했습니다"));

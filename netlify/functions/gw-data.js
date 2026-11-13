@@ -5128,14 +5128,16 @@ async function handleVerRestore(event, d, R) {
 //   상한: 기록 PMCON_LOG_MAX줄 — 넘치면 오래된 것부터 접어 folded(건수·처음·끝 시각)만 남김 · 표시 marks PMCON_MARK_MAX개(오래된 것부터 버림).
 const PMCON_KEY = 'status:decide';
 const PMCON_LOG_MAX = 400, PMCON_MARK_MAX = 60, PMCON_GET_MAX = 200;
-const PMCON_KINDS = {   // 줄 종류 → 부르는 기존 핸들러 · 넘기는 칸(그 밖의 칸은 400 BAD_ARGS) · 칸 꼴
-  assign: { label: '배정표', fn: handleAssignSet, args: { prefix: 's', who_id: 's' } },
-  notify: { label: '알림 설정', fn: handleNotifySet, args: { event: 's', value: 's' } },
-  doneif: { label: '완료 판정', fn: handleDoneifSet, args: { on: 'b' } },
-  autotask: { label: '자동 지시 규칙', fn: handleAutotaskSet, args: { rule: 's', mode: 's' } },
-  learn: { label: '계약 학습', fn: handleLearnSettingsSet, args: { on: 'b' } },
-  brief: { label: '브리핑 설정', fn: handleBriefSet, args: { field: 's', value: 'sb' } },
-  bg: { label: '근거 승격', fn: handleConProcBgSet, args: { bg_ver: 's' } },
+const PMCON_KINDS = {   // 줄 종류 → 등급(서버 표 — 보낸 등급이 다르면 400 BAD_GRADE) · 부르는 기존 핸들러 · 넘기는 칸(그 밖의 칸은 400 BAD_ARGS) · 칸 꼴 · 값에서 줄 id 다시 만들기
+  // 판29 검토(11/13): 줄 id(row)를 서버가 kind·args에서 다시 만들어 보낸 row와 다르면 400 BAD_ROW — 한 줄을 눌러 다른 설정이 바뀌고 기록이 엉뚱한 줄로 남지 않게.
+  //   켬·끔 칸은 참·거짓만(글자 'true'는 기존 핸들러에서 끔으로 읽힘 — 브리핑은 콘솔이 켬·끔 칸(on)만 다룬다, 다른 칸은 400 BAD_ARGS).
+  assign: { label: '배정표', grade: 'R1', fn: handleAssignSet, args: { prefix: 's', who_id: 's' }, row: function (a) { return 'assign:' + a.prefix.replace(/:$/, ''); } },
+  notify: { label: '알림 설정', grade: 'R1', fn: handleNotifySet, args: { event: 's', value: 's' }, row: function (a) { return 'notify:' + a.event + ':' + a.value; } },
+  doneif: { label: '완료 판정', grade: 'R1', fn: handleDoneifSet, args: { on: 'b' }, row: function (a) { return 'doneif:' + (a.on ? 'on' : 'off'); } },
+  autotask: { label: '자동 지시 규칙', grade: 'R1', fn: handleAutotaskSet, args: { rule: 's', mode: 's' }, row: function (a) { return 'autotask:' + a.rule + ':' + a.mode; } },
+  learn: { label: '계약 학습', grade: 'R2', fn: handleLearnSettingsSet, args: { on: 'b' }, row: function (a) { return 'learn:' + (a.on ? 'on' : 'off'); } },
+  brief: { label: '브리핑 설정', grade: 'R1', fn: handleBriefSet, args: { field: 'on', value: 'b' }, row: function (a) { return 'brief:' + (a.value ? 'on' : 'off'); } },
+  bg: { label: '근거 승격', grade: 'R2', fn: handleConProcBgSet, args: { bg_ver: 's' }, row: function (a) { return 'bg:' + a.bg_ver; } },
 };
 const PMCON_CHOICES = { ok: 'ㄱ', 'default': '기본값', hold: '보류', reopen: '다시 열기' };
 const PMCON_ROW = /^[a-z]{2,10}:[0-9A-Za-z_.:-]{0,80}$/;
@@ -5155,8 +5157,20 @@ function pmconFold(doc) {   // 상한 넘친 오래된 기록을 접음(지우�
     const gone = doc.log.splice(0, over);
     doc.folded = { n: (Number(doc.folded.n) || 0) + gone.length, from: Number(doc.folded.from) || Number(gone[0].ts) || 0, to: Number(gone[gone.length - 1].ts) || 0 };
   }
+}
+// 판29 검토(11/13): 표시(보류·그대로)를 더할 자리 — 60개가 차면 지금 화면에 줄이 없는 표시(live 목록 밖)부터 오래된 순으로 버리고,
+//   그래도 차면 false(새 표시를 400 PMCON_MARKS_FULL로 거절 — 가장 오래된 보류가 말없이 풀려 '정할 것'으로 돌아오지 않게).
+//   live = 화면이 지금 그린 줄 id 전부(정할 것 + 보류함). 화면이 조회 하나라도 못 읽었으면 live를 보내지 않는다 → 아무것도 버리지 않음.
+function pmconMarkRoom(doc, row, live) {
+  if (Object.prototype.hasOwnProperty.call(doc.marks, row)) return true;
   const ks = Object.keys(doc.marks);
-  if (ks.length > PMCON_MARK_MAX) ks.sort(function (a, b) { return (Number(doc.marks[a].ts) || 0) - (Number(doc.marks[b].ts) || 0); }).slice(0, ks.length - PMCON_MARK_MAX).forEach(function (k) { delete doc.marks[k]; });
+  if (ks.length < PMCON_MARK_MAX) return true;
+  if (!live) return false;
+  const gone = ks.filter(function (k) { return !live[k]; }).sort(function (a, b) { return (Number(doc.marks[a].ts) || 0) - (Number(doc.marks[b].ts) || 0); });
+  const need = ks.length - PMCON_MARK_MAX + 1;
+  if (gone.length < need) return false;
+  gone.slice(0, need).forEach(function (k) { delete doc.marks[k]; });
+  return true;
 }
 function pmconTxt(v, n) { return String(v == null ? '' : v).replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, n); }
 function pmconArgs(kind, a) {   // 넘길 칸만 꼴 검사 — 값 자체(허용 선택지·재직 명부·판 존재)는 기존 핸들러가 본다. null = 거절
@@ -5168,7 +5182,7 @@ function pmconArgs(kind, a) {   // 넘길 칸만 꼴 검사 — 값 자체(허�
   for (const k of ks) {
     const t = spec[k], v = a[k];
     if (t === 'b') { if (typeof v !== 'boolean') return null; }
-    else if (t === 'sb') { if (typeof v !== 'boolean' && (typeof v !== 'string' || v.length > 60)) return null; }
+    else if (t !== 's') { if (v !== t) return null; }   // 고정 글자 칸(브리핑 field = 'on'만)
     else if (typeof v !== 'string' || v.length > 60) return null;
     out[k] = v;
   }
@@ -5203,17 +5217,23 @@ async function handlePmconDecide(event, d, R) {
   if (!Object.prototype.hasOwnProperty.call(PMCON_CHOICES, choice)) return jr(400, { status: 'REJECTED', error_code: 'BAD_CHOICE', request_id: R });
   if (!PMCON_ROW.test(row) || row.indexOf(kind + ':') !== 0) return jr(400, { status: 'REJECTED', error_code: 'BAD_ROW', request_id: R });
   const grade = String(d.grade || '');
-  if (grade !== 'R1' && grade !== 'R2') return jr(400, { status: 'REJECTED', error_code: 'BAD_GRADE', request_id: R });
+  if (grade !== PMCON_KINDS[kind].grade) return jr(400, { status: 'REJECTED', error_code: 'BAD_GRADE', request_id: R });
   const due = d.due === undefined || d.due === null ? '' : String(d.due);
   if (due && !PMCON_DATE.test(due)) return jr(400, { status: 'REJECTED', error_code: 'BAD_DUE', request_id: R });
   if (d.why !== undefined && (typeof d.why !== 'string' || d.why.length > 200)) return jr(400, { status: 'REJECTED', error_code: 'BAD_WHY', request_id: R });
   // 고칠 값: ㄱ = 반드시 있음 · 기본값 = 있거나(그 값 적용) 없음(무응답 기본값이 '그대로' — 기록만) · 보류·다시 열기 = 없음(설정을 바꾸지 않음)
   const hasArgs = d.args !== undefined && d.args !== null;
+  let live = null;   // 화면이 지금 그린 줄 id(표시 자리 낼 때만 씀)
+  if (d.live !== undefined) {
+    if (!Array.isArray(d.live) || d.live.length > 300 || d.live.some(function (x) { return typeof x !== 'string' || !PMCON_ROW.test(x); })) return jr(400, { status: 'REJECTED', error_code: 'BAD_LIVE', request_id: R });
+    live = {}; d.live.forEach(function (x) { live[x] = 1; });
+  }
   if ((choice === 'ok' && !hasArgs) || ((choice === 'hold' || choice === 'reopen') && hasArgs)) return jr(400, { status: 'REJECTED', error_code: 'BAD_ARGS', request_id: R });
   let args = null;
   if (hasArgs) {
     args = pmconArgs(kind, d.args);
     if (!args) return jr(400, { status: 'REJECTED', error_code: 'BAD_ARGS', request_id: R });
+    if (PMCON_KINDS[kind].row(args) !== row) return jr(400, { status: 'REJECTED', error_code: 'BAD_ROW', request_id: R });   // 누른 줄과 바꾸는 값이 다름
     if (typeof d.set_base !== 'number' || !isFinite(d.set_base)) return jr(400, { status: 'REJECTED', error_code: 'NEED_SET_BASE', request_id: R });   // 기존 핸들러는 base가 없으면 낙관락을 건너뛴다 — 콘솔 길은 늘 싣게
   }
   const st = store(DATA);
@@ -5228,12 +5248,14 @@ async function handlePmconDecide(event, d, R) {
   }
   const now = Date.now();
   const rec = { ts: now, by: c.member.id, name: pmconTxt(c.member.name, 20), row: row, kind: kind, choice: choice, grade: grade, due: due,
-    q: pmconTxt(d.q, 160), rec: pmconTxt(d.rec, 80), val: pmconTxt(d.val, 80), match: choice === 'ok' ? true : (choice === 'default' ? d.def_is_rec === true : null),
+    q: pmconTxt(d.q, 160), rec: pmconTxt(d.rec, 80), val: pmconTxt(d.val, 80), match: choice === 'ok' ? !!applied : (choice === 'default' ? (d.def_is_rec === true && !!applied) : null),   // '추천대로'는 실제 적용과 묶어서만 참
     why: pmconTxt(d.why, 200), applied: !!applied, via: 'console' };
   // 쓰기 직전 다시 읽기 — 기존 핸들러를 부르는 사이 다른 기록이 들어왔으면 그 위에 덧붙인다(기록은 덧붙이기만 하므로 합쳐도 잃는 것 없음)
   const s1 = await pmconRead(st);
   if (!s1.ok) return jr(500, { status: 'ERROR', error_code: 'PMCON_WRITE_FAILED', applied: !!applied, request_id: R });
   const doc = s1.doc;
+  const addMark = choice === 'hold' || (choice === 'default' && !applied);
+  if (addMark && !pmconMarkRoom(doc, row, live)) return jr(400, { status: 'REJECTED', error_code: 'PMCON_MARKS_FULL', max: PMCON_MARK_MAX, request_id: R });   // 값 바꾸기 없는 선택만 여기 옴(기존 핸들러 안 부름)
   doc.log.push(rec);
   if (choice === 'hold') doc.marks[row] = { st: 'hold', ts: now, by: c.member.id, why: rec.why };
   else if (choice === 'default' && !applied) doc.marks[row] = { st: 'keep', ts: now, by: c.member.id, why: rec.why };
