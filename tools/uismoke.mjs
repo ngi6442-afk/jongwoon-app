@@ -13037,7 +13037,7 @@ try {
       'function saveTasksCache(){} function renderTasks(){} function renderSummary(){} function scheduleTasksSave(){} var vehOpenId = null, vehDetTab = "ov"; function renderVehicles(){} function isAdmin(){ return false; } function loadTasks(){}',
       vsb6, src || ssb6,
       'stmtEdRender = function(){}; stmtEdRefresh = function(){}; stmtVehMatch = function(i){ __env.vm.push(i); }; stmtLoadMonth = function(){}; renderStmt = function(){ __env.rs++; };',
-      'return { STMT: STMT, load: stmtEdLoad, save: stmtEdSave, files: stmtDropFiles, html: stmtDropHtml, render: stmtDropRender, setVk: stmtDropSetVk, auto: stmtDropAuto, chip: stmtDropChip, missing: stmtDropMissing, edInner: stmtDropEdInner, rows: stmtBoardRows };'].join('\n'))(env);
+      'return { STMT: STMT, load: stmtEdLoad, save: stmtEdSave, files: stmtDropFiles, html: stmtDropHtml, render: stmtDropRender, setVk: stmtDropSetVk, auto: stmtDropAuto, chip: stmtDropChip, missing: stmtDropMissing, edInner: stmtDropEdInner, rows: stmtBoardRows, kick: stmtDropKick, dload: stmtDropLoad, err: stmtReadErr };'].join('\n'))(env);
     api.STMT.ym = '2026-10';
     api.STMT.month = { status: 'OK', ym: '2026-10', cfg: CFG6, vendors: {} };
     api.STMT.drop = { ym: '2026-10', ok: true, list: (o.list || []).slice() };
@@ -13078,6 +13078,17 @@ try {
   T('29 판⑥ ② 거래처 고르기 = stmt_drop_set(ym·id·vk) → 줄 바뀜(포항 v08·읽는 중) → 배경 판독 1번 · 다시 그림',
     set2 && set2.body.ym === '2026-10' && set2.body.id === 'c'.repeat(24) && set2.body.vk === 'v08' && U2.api.STMT.drop.list[0].vk === 'v08' && bg2.length === 1 && bg2[0].body.id === 'k'.repeat(24) && U2.env.rs >= 1,
     J6({ set2: set2 && set2.body, bg2: bg2.length, rs: U2.env.rs }));
+  // ②-2 독립 검토 반영(med3): AI 판독은 한 번에 3개까지 — 5개가 읽는 중이면 3개만 부르고, 목록에서 2개가 끝나면 나머지 2개 · 같은 job 두 번 안 부름 · AI 일시 오류 문구
+  const L22 = ['1', '2', '3', '4', '5'].map((k) => E6(k, { state: 'reading', job: k.repeat(24), src: 'vision', n: 0 }));
+  const U22 = mk6({ list: L22, resp: { stmt_drop_list: () => ({ status: 200, body: { status: 'OK', list: U22.api.STMT.drop.list.map((x, i) => i < 2 ? Object.assign({}, x, { state: 'read', job: '' }) : x) } }) } });
+  L22.forEach((x) => U22.api.kick(x)); U22.api.kick(L22[0]);
+  const bgA22 = U22.env.log.filter((x) => x.fn === 'gw-stmt-read-background').map((x) => x.body.id[0]);
+  U22.api.dload('2026-10'); await fl6();
+  const bgB22 = U22.env.log.filter((x) => x.fn === 'gw-stmt-read-background').map((x) => x.body.id[0]);
+  const e22 = U22.api.err(null, 'CLAUDE_RATE_LIMIT');
+  T('29 판⑥ ②-2 AI 판독 3개씩: 읽는 중 5개 = 배경 판독 3번(1·2·3 — 같은 job 다시 넣어도 안 부름) · 목록에서 2개 끝남 = 남은 4·5 부름(모두 5번) · AI 일시 오류 = 다시 읽히라는 안내',
+    J6(bgA22) === J6(['1', '2', '3']) && J6(bgB22) === J6(['1', '2', '3', '4', '5']) && /잠시 실패/.test(e22),
+    J6({ bgA22, bgB22, e22 }));
   // ③ 상세 자동 채우기 — 명세 파일(엑셀·글자 PDF 먼저) → 계산서 · 채운 원본·다른 거래처 뺌 → 저장 drop_ids → 채움 표시
   const RS3 = { ok: true, src: 'pdf', rows: [{ date: '2026-10-02', vraw: '6441', item: '요소수', kind: 'urea', qty: 13, unit: 1500, amt: 17727, vat: 1773, note: '', how: 'pdf' }], warn: [] };
   const RI3 = { ok: true, src: 'nts', rows: [{ date: '2026-10-31', vraw: '', item: '요소수 외', kind: 'urea', qty: null, unit: null, amt: 17727, vat: 1773, note: '', how: 'file' }], inv: { date: '2026-10-31', supply: 17727, vat: 1773, total: 19500 }, warn: [] };

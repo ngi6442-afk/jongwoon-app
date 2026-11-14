@@ -9126,8 +9126,8 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
       await cs91({ action: 'stmt_drop', ym: '2026-10', vk: 'v99', name: 'a.xls', b64: b64('sinil_fake.xls') }, tD, 'dev1'),
       await cs91({ action: 'stmt_drop', ym: '2026-10', name: 'a.xls', b64: '' }, tD, 'dev1'),
       await cs91({ action: 'stmt_drop_get', ym: '2026-10', id: '../x' }, tD, 'dev1')];
-    T('91 ① 첨부 권한·입력: 넣기 보기 403 NO_WRITE · 차량 숨김 403 · 목록은 보기도 200 · 원본 열기는 수행만(보기 403) · 없는 거래처 400 · 빈 파일 400 EMPTY_FILE · 꼴 틀린 id 400',
-      p1[0].code === 403 && p1[0].body.error_code === 'NO_WRITE' && p1[1].code === 403 && p1[2].code === 200 && Array.isArray(p1[2].body.list) && p1[3].code === 403
+    T('91 ① 첨부 권한·입력: 넣기 보기 403 NO_WRITE · 차량 숨김 403 · 목록도 수행만(보기 403 — 파일 이름, 검토 low5) · 원본 열기는 수행만(보기 403) · 없는 거래처 400 · 빈 파일 400 EMPTY_FILE · 꼴 틀린 id 400',
+      p1[0].code === 403 && p1[0].body.error_code === 'NO_WRITE' && p1[1].code === 403 && p1[2].code === 403 && p1[3].code === 403
       && p1[4].body.error_code === 'UNKNOWN_VENDOR' && p1[5].body.error_code === 'EMPTY_FILE' && p1[6].code === 400 && dropKeys91().length === 0,
       p1.map((x) => x.code + '/' + (x.body.error_code || '')).join(' '));
     // ② 파일 이름으로 거래처 찾음 → 바로 읽음 · 원본 남김 · 같은 파일 다시 = dup(새 줄·새 원본 없음) · 감사(파일 이름 없음)
@@ -9185,6 +9185,28 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
     T('91 ⑤ 거래처 찾기: 이름 대송·오천·철탑·현대상용 = v05·v11·v10·v09 · 종운환경·경영박사·NTS·두 곳 묶음 = 못 찾음 · 꺼진 거래처 = 못 찾음 · 내용(엑셀 상호) = v03 content · 글 전체 짧은 낱말(오천·영남) 무시·오천공구 = v11',
       J91a(nm5) === J91a(['v05', 'v11', 'v10', 'v09', '', '', '', '']) && off5 === '' && ct5 && ct5.vk === 'v03' && ct5.how === 'content' && J91a(tx5) === J91a(['', 'v11']),
       JSON.stringify({ nm5, off5, ct5, tx5 }));
+    // ⑦ 독립 검토 반영(11/14): 같은 파일이 못 읽음이면 다시 읽음(again) · 거래처 없음 파일을 상세(거래처 지정)에서 다시 넣으면 그 거래처로 읽음 · 파일 이름 번호 꼴 가림 · 멈춤 판정 = 맡긴 시각 · 목록 줄 먼저(원본 쓰기 실패 = 줄도 지움)
+    const txt7 = Buffer.from('그냥 글 파일 ' + Date.now()).toString('base64');
+    const f7a = await cs91({ action: 'stmt_drop', ym: '2026-10', vk: 'v07', name: '가온 메모.txt', b64: txt7 }, tD, 'dev1');
+    const f7b = await cs91({ action: 'stmt_drop', ym: '2026-10', vk: 'v07', name: '가온 메모.txt', b64: txt7 }, tD, 'dev1');
+    const jpg7 = (await img.getBuffer('image/jpeg', { quality: 55 })).toString('base64');
+    const n7a = await cs91({ action: 'stmt_drop', ym: '2026-10', name: '스캔 010-1234-5678 900101-1234567.jpg', b64: jpg7 }, tD, 'dev1');
+    const n7b = await cs91({ action: 'stmt_drop', ym: '2026-10', vk: 'v08', name: '다시.jpg', b64: jpg7 }, tD, 'dev1');
+    const n7c = await cs91({ action: 'stmt_drop', ym: '2026-10', name: '또.jpg', b64: jpg7 }, tD, 'dev1');
+    const id7 = (n7b.body.entry || {}).id || '', e7 = mem.gw_data['stmtdrop:2026-10:' + id7];
+    if (e7) { e7.at = Date.now() - 2 * 3600000; e7.at_read = Date.now() - 60000; }
+    const l7 = await cs91({ action: 'stmt_drop_list', ym: '2026-10' }, tD, 'dev1');
+    const st7 = ((l7.body.list || []).filter((x) => x.id === id7)[0] || {}).state;
+    const keys7 = Object.keys(mem.gw_data).length, fs0 = blobsMock.hooks.failSet;
+    blobsMock.hooks.failSet = (k) => String(k).indexOf('stmtfile:') === 0;
+    const w7 = await cs91({ action: 'stmt_drop', ym: '2026-10', vk: 'v07', name: 'w.xml', b64: b64('a_tax3.xml') }, tD, 'dev1');
+    blobsMock.hooks.failSet = fs0;
+    T('91 ⑦ 검토 반영: 같은 파일 못 읽음 = 다시 읽음(again·fail 그대로·줄 1개) · 거래처 없음 파일을 거래처 지정해 다시 넣음 = 그 거래처(v08)·읽는 중·같은 id · 그 뒤 같은 파일 = 건너뜀 · 파일 이름 전화·주민 꼴 가림 · 넣은 지 2시간·맡긴 지 1분 = 읽는 중(실패 아님) · 원본 쓰기 실패 = 500·목록 줄도 지움',
+      f7a.body.entry.state === 'fail' && f7b.code === 200 && f7b.body.again === true && f7b.body.entry.id === f7a.body.entry.id && f7b.body.entry.state === 'fail'
+      && n7a.body.entry.state === 'novendor' && n7b.body.again === true && n7b.body.entry.id === n7a.body.entry.id && n7b.body.entry.vk === 'v08' && n7b.body.entry.state === 'reading' && n7c.body.dup === true
+      && n7a.body.entry.name.indexOf('1234-5678') < 0 && n7a.body.entry.name.indexOf('1234567') < 0 && /^스캔 /.test(n7a.body.entry.name)
+      && st7 === 'reading' && w7.code === 500 && Object.keys(mem.gw_data).length === keys7,
+      JSON.stringify([f7a.body.entry.state, f7b.body.again, n7a.body.entry.name, n7b.body.entry && [n7b.body.entry.vk, n7b.body.entry.state], n7c.body.dup, st7, w7.code, Object.keys(mem.gw_data).length - keys7]));
     // ⑥ 결함 사본 — 같은 파일 막기 걷음 · 배경 판독의 줄 고침 걷음 · 저장 채움 표시의 거래처 확인 걷음 · 지우기 넣은 사람 검사 걷음 = 시험이 잡는지
     const Mod91 = require('module');
     const ssrc = fs91.readFileSync(join(FN, 'gw-stmt.js'), 'utf8'), bsrc = fs91.readFileSync(bp91, 'utf8');
@@ -9193,7 +9215,8 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
     const mut = [];
     const cut = (src, a) => { if (src.indexOf(a) < 0) throw new Error('결함 사본 기준 없음: ' + a.slice(0, 50)); return src.split(a).join(''); };
     {
-      const G = loadAs(join(FN, 'gw-stmt.js'), cut(ssrc, "if (same) return jr(200, { status: 'OK', dup: true, entry: dropMeta(same), request_id: R });"));
+      if (ssrc.indexOf('  if (same) {\n') < 0) throw new Error('결함 사본 기준 없음: if (same)');
+      const G = loadAs(join(FN, 'gw-stmt.js'), ssrc.split('  if (same) {\n').join('  if (false) {\n'));
       await callG(G, { action: 'stmt_drop', ym: '2026-10', name: 'x.xml', b64: b64('a_tax1.xml') }, tD);
       const r = await callG(G, { action: 'stmt_drop', ym: '2026-10', name: 'x.xml', b64: b64('a_tax1.xml') }, tD);
       mut.push(r.body.dup ? '못 잡음' : '잡힘');

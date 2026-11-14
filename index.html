@@ -9429,7 +9429,7 @@
   }
   function stmtReadShow(ed){ if (STMT.ed !== ed) return; stmtSetHtml("stmtReadMsg", stmtReadMsgHtml(ed)); var b = document.getElementById("stmtReadBox"); if (b) b.classList.toggle("busy", !!(ed.read && ed.read.busy)); }
   function stmtReadPick(){ var ed = STMT.ed, f = document.getElementById("stmtReadFile"); if (!ed || !stmtEdW(ed) || (ed.read && ed.read.busy) || ed.saving) return; if (f){ f.value = ""; f.click(); } }
-  function stmtReadErr(res, code){ var b = (res && res.body) || {}; code = code || b.error_code || ""; return (STMT_READ_ERR[code] || STMT_ERR[code] || (code ? "읽지 못했습니다(" + code + ")" : "읽지 못했습니다")) + (b.why ? " — " + b.why : ""); }
+  function stmtReadErr(res, code){ var b = (res && res.body) || {}; code = code || b.error_code || ""; return (STMT_READ_ERR[code] || STMT_ERR[code] || (/^(CLAUDE_|NETWORK|API_)/.test(code) ? "AI 판독이 잠시 실패했습니다 — 거래처를 다시 골라(또는 같은 파일을 다시 넣어) 다시 읽혀 주세요" : "") || (code ? "읽지 못했습니다(" + code + ")" : "읽지 못했습니다")) + (b.why ? " — " + b.why : ""); }
   function stmtReadFile(file){
     var ed = STMT.ed, fr, seq;
     if (!ed || !file || !stmtEdW(ed) || ed.saving || (ed.read && ed.read.busy)) return;
@@ -9456,7 +9456,7 @@
         if (x.state === "fail"){ ed.read = { msg: stmtReadErr(null, x.code) + (b.why ? " — " + b.why : ""), bad: true }; stmtReadShow(ed); return; }
         if (x.state !== "reading" || !x.job){ ed.read = { msg: "이미 넣은 파일입니다", bad: true }; stmtReadShow(ed); return; }
         ed.read = { busy: true, msg: "AI가 읽는 중… (보통 1~3분)", t0: Date.now(), job: x.job, drop: x.id }; stmtReadShow(ed);
-        if (!b.dup) stmtDropKick(x);   // 202 — 결과는 상태로 받음
+        stmtDropKick(x);   // 202 — 결과는 상태로 받음(같은 job은 한 번만)
         setTimeout(function(){ stmtReadPoll(ed, seq, x.job, file.name); }, STMT_READ_POLL);
       }).catch(function(){ if (STMT.ed !== ed || ed.readSeq !== seq) return; ed.read = { msg: "네트워크 오류 — 다시 넣어 주세요", bad: true }; stmtReadShow(ed); });
     };
@@ -9601,7 +9601,7 @@
       if (seq !== STMT.dseq || STMT.ym !== ym) return;
       if (res.status === 200 && b.status === "OK" && Array.isArray(b.list)) STMT.drop = { ym: ym, ok: true, list: b.list };
       else if (!stmtDropMine()) STMT.drop = { ym: ym, ok: false, list: [], msg: "첨부 원본 목록을 읽지 못했습니다(" + ((b && b.error_code) || res.status) + ")" };
-      stmtDropRefresh(sig !== stmtDropSig()); stmtDropPollLater(ym);
+      stmtDropRefresh(sig !== stmtDropSig()); stmtDropPump(); stmtDropPollLater(ym);
       if (then) then();
     }).catch(function(){ if (seq === STMT.dseq && then) then(); });
   }
@@ -9617,7 +9617,15 @@
     for (i = 0; i < d.list.length; i++) if (d.list[i].id === x.id){ d.list[i] = x; return; }
     d.list.push(x);
   }
-  function stmtDropKick(x){ if (x && x.state === "reading" && x.job) gwCall("gw-stmt-read-background", { id: x.job }).then(function(){}, function(){}); }   // 202 — 결과는 목록으로 받음
+  // AI 판독 부르기 — 한 번에 3개까지(스캔 수십 개를 한꺼번에 넣어도 AI 요청 한도에 걸리지 않게 — 검토 med3) · 끝나면(목록 다시 읽기) 다음 것 · 같은 job은 한 번만
+  var STMT_DROP_AI_MAX = 3;
+  function stmtDropKick(x){ if (!x || x.state !== "reading" || !x.job) return; STMT.kicked = STMT.kicked || {}; STMT.kq = STMT.kq || []; if (STMT.kicked[x.job] || STMT.kq.indexOf(x.job) >= 0) return; STMT.kq.push(x.job); stmtDropPump(); }
+  function stmtDropPump(){
+    var d = stmtDropMine(), run = 0, reading = {}, j;
+    STMT.kicked = STMT.kicked || {}; STMT.kq = STMT.kq || [];
+    if (d) d.list.forEach(function(x){ if (x.state === "reading" && x.job){ reading[x.job] = 1; if (STMT.kicked[x.job]) run++; } });
+    while (run < STMT_DROP_AI_MAX && STMT.kq.length){ j = STMT.kq.shift(); if (d && !reading[j]) continue; STMT.kicked[j] = 1; run++; gwCall("gw-stmt-read-background", { id: j }).then(function(){}, function(){}); }   // 202 — 결과는 목록으로 받음
+  }
   // 여러 파일 — 차례로 하나씩(서버·배경 판독에 한꺼번에 몰리지 않게)
   function stmtDropFiles(files){
     var arr = Array.prototype.slice.call(files || []), q = STMT.dq;
@@ -9643,7 +9651,7 @@
         var b = res.body || {};
         if (STMT.dq !== q) return;
         if (res.status === 401){ q.busy = false; q.errs.push("로그인이 풀렸습니다 — 다시 로그인한 뒤 남은 " + (q.files.length - q.i) + "개를 넣어 주세요"); stmtDropRender(); onSessionInvalid(); return; }
-        if (res.status === 200 && b.status === "OK" && b.entry){ stmtDropPut(q.ym, b.entry); if (b.dup) q.dup++; else { q.done++; stmtDropKick(b.entry); } }
+        if (res.status === 200 && b.status === "OK" && b.entry){ stmtDropPut(q.ym, b.entry); if (b.dup) q.dup++; else q.done++; stmtDropKick(b.entry); }   // 같은 파일이 읽는 중이면 판독을 다시 부름(넣은 사람이 창을 닫아 못 불렀을 때 — 검토 low4 · 같은 job은 한 번만)
         else q.errs.push(nm.slice(0, 40) + " — " + stmtReadErr(res));
         q.i++; stmtDropNext(q);
       }).catch(function(){ if (STMT.dq !== q) return; q.errs.push(nm.slice(0, 40) + " — 네트워크 오류(다시 넣어 주세요)"); q.i++; stmtDropNext(q); });
@@ -10203,7 +10211,7 @@
     if (nx) nx.addEventListener("click", function(){ stmtMonth(1); });
   }
   // 보는 사람이 바뀌면(로그인 창 '전환' — 새로고침 없음) 앞사람이 연 달·상세·고치던 줄·거래처 목록 고침을 비운다(vsSheetViewer와 같은 까닭) · 로그아웃(clearSessionData)도 같은 비우기
-  function stmtReset(){ STMT.drop = null; STMT.dq = null; STMT.dseq = (STMT.dseq || 0) + 1; STMT.mseq++; STMT.eseq++; STMT.cseq++; STMT.ym = ""; STMT.month = null; STMT.loading = false; STMT.err = ""; STMT.errCode = ""; STMT.ed = null; STMT.cfg = null; STMT.aliasAt = 0; STMT.open = {}; STMT.who = null; STMT_AQ = STMT_AQ.filter(function(o){ return o.busy; }); STMT.appr = null; STMT.aseq++; STMT.outBusy = false; STMT.rpt = {}; STMT_VH = {}; }   // 아직 안 보낸 별칭 저장은 버림(보내는 중인 것은 STMT.who로 다시 시도를 막음)
+  function stmtReset(){ STMT.drop = null; STMT.dq = null; STMT.kq = []; STMT.kicked = {}; STMT.dseq = (STMT.dseq || 0) + 1; STMT.mseq++; STMT.eseq++; STMT.cseq++; STMT.ym = ""; STMT.month = null; STMT.loading = false; STMT.err = ""; STMT.errCode = ""; STMT.ed = null; STMT.cfg = null; STMT.aliasAt = 0; STMT.open = {}; STMT.who = null; STMT_AQ = STMT_AQ.filter(function(o){ return o.busy; }); STMT.appr = null; STMT.aseq++; STMT.outBusy = false; STMT.rpt = {}; STMT_VH = {}; }   // 아직 안 보낸 별칭 저장은 버림(보내는 중인 것은 STMT.who로 다시 시도를 막음)
   function stmtViewer(){ var who = (typeof myId === "function") ? String(myId() || "") : ""; if (STMT.who === who) return; if (STMT.who !== null) stmtReset(); STMT.who = who; }
   // 탭 입구 — 월 보드(부품 갈래 함수) 또는 거래처 상세. 처음·사람이 바뀐 뒤엔 그 달을 읽는다(읽기 실패는 '다시 읽기'로만 — 저절로 되풀이하지 않음)
   function renderStmt(){

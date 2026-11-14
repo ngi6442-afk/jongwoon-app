@@ -593,12 +593,12 @@ async function handleReadStatus(st, c, d, R) {
 // stmt_drop {ym, name, b64, vk?} — vk 없으면 파일 이름·내용으로 거래처를 찾고, 못 찾으면 novendor(사람이 stmt_drop_set으로 고름). 거래처가 정해지면 판④와 같은 길로 읽는다
 //   (글자 파일 = 바로 결과 · 그림·스캔 = 배경 판독 job — stmtsrc:<job>은 원본 대신 file 키만 들고, 배경 함수가 이 줄을 read·fail로 고침). 같은 달에 같은 파일(sha)은 다시 받지 않는다(dup).
 const DROP_MAX = 60;   // 한 달 원본 수 상한(거래처 12곳 × 계산서·명세·잔액 확인서 넉넉히)
-const STALE_READ = 20 * 60 * 1000;   // 배경 판독이 20분 넘게 안 끝나면 실패로 보임(배경 함수 15분 상한)
+const STALE_READ = 60 * 60 * 1000;   // 배경 판독이 맡긴 뒤 60분 넘게 안 끝나면 실패로 보임(배경 함수 15분 상한 · 앱이 판독을 3개씩 차례로 불러 대기가 있음 — 검토 med3)
 function dropKey(ym, id) { return 'stmtdrop:' + ym + ':' + id; }
 function fileKey(id) { return 'stmtfile:' + id; }
-function dropName(s) { return String(s == null ? '' : s).split(/[\\/]/).pop().replace(/\d{10,}/g, '…').replace(/[\u0000-\u001f]/g, '').slice(0, 120); }
+function dropName(s) { return String(s == null ? '' : s).split(/[\\/]/).pop().replace(/\d[\d .\-·_]{7,}\d/g, function (m) { return m.replace(/\D/g, '').length >= 9 ? '…' : m; }).replace(/[\u0000-\u001f]/g, '').slice(0, 120); }   // 전화·주민·계좌 꼴(구분자 포함 9자리↑) — 검토 low5
 function dropMeta(e) {   // 목록에 내는 칸(결과 줄은 stmt_drop_get으로만)
-  const st = (e.state === 'reading' && Date.now() - (Number(e.at) || 0) > STALE_READ) ? 'fail' : e.state;
+  const st = (e.state === 'reading' && Date.now() - (Number(e.at_read || e.at) || 0) > STALE_READ) ? 'fail' : e.state;   // 맡긴 시각 기준(넣은 시각이 아니라 — 검토 med1)
   return { id: e.id, name: e.name, size: e.size, kind: e.kind, vk: e.vk || '', how: e.how || '', state: st, code: st === 'fail' ? (e.code || 'READ_STALE') : (e.code || ''), job: e.job || '', n: e.n || 0, src: e.src || '', warn: (e.warn || 0), by: e.by, at: e.at, applied: e.applied || 0 };
 }
 async function dropList(st, ym) {
@@ -641,13 +641,27 @@ async function handleDrop(st, c, d, R) {
   const cur = await dropList(st, d.ym);
   if (!cur.ok) return fail(cur.code, R);
   const same = cur.list.filter(function (x) { return x.sha === sha; })[0];
-  if (same) return jr(200, { status: 'OK', dup: true, entry: dropMeta(same), request_id: R });
+  if (same) {
+    // 같은 파일 — 못 읽음(일시 오류)·거래처 없음(상세에서 거래처를 정해 다시 넣음)이면 그 줄을 다시 읽고, 아니면 건너뜀(검토 low6·7)
+    const rv = (same.state === 'novendor' && fixed) ? fixed : ((same.state === 'fail' && same.vk) ? vendorOf(cfg, fixed ? fixed.vk : same.vk) : null);
+    if (!rv) return jr(200, { status: 'OK', dup: true, entry: dropMeta(same), request_id: R });
+    let e2 = same; e2.vk = rv.vk; if (fixed) e2.how = 'fixed';
+    e2 = await dropRead(e2, buf, rv, c);
+    const w2 = await blobSet(st, dropKey(d.ym, e2.id), e2);
+    if (!w2.ok) return fail(w2.code || 'STORAGE_WRITE_FAILED', R);
+    if (e2.state === 'reading') await readSweep();
+    await audit(c, '명세서원본', d.ym + ':' + e2.vk, '다시 읽음 · ' + e2.state);
+    return jr(200, { status: 'OK', again: true, entry: dropMeta(e2), result: e2.state === 'read' ? e2.result : null, why: e2.why || '', request_id: R });
+  }
   if (cur.list.length >= DROP_MAX) return bad('DROP_FULL', R);
   const id = crypto.randomBytes(12).toString('hex');
   const kind = RD.sniff(buf, name) || 'etc';
-  const fw = await blobSet(store(FILES), fileKey(id), { ym: d.ym, name: name, size: buf.length, kind: kind, by: c.member.id, at: Date.now(), data: d.b64.replace(/\s+/g, '') });
-  if (!fw.ok) return fail(fw.code || 'STORAGE_WRITE_FAILED', R);
   let e = { id: id, ym: d.ym, name: name, size: buf.length, kind: kind, sha: sha, vk: '', how: '', state: 'novendor', by: c.member.id, at: Date.now() };
+  // 목록 줄 먼저(검토 med2 — 원본만 쓰고 함수가 끝나면 목록에 안 보여 지울 길이 없던 것) → 원본 → 거래처·읽기 → 줄 고침
+  const w0 = await blobSet(st, dropKey(d.ym, id), e);
+  if (!w0.ok) return fail(w0.code || 'STORAGE_WRITE_FAILED', R);
+  const fw = await blobSet(store(FILES), fileKey(id), { ym: d.ym, name: name, size: buf.length, kind: kind, by: c.member.id, at: Date.now(), data: d.b64.replace(/\s+/g, '') });
+  if (!fw.ok) { await blobDelete(st, dropKey(d.ym, id)); return fail(fw.code || 'STORAGE_WRITE_FAILED', R); }
   let v = fixed;
   if (fixed) { e.vk = fixed.vk; e.how = 'fixed'; }
   else {
@@ -656,8 +670,8 @@ async function handleDrop(st, c, d, R) {
   }
   if (v) e = await dropRead(e, buf, v, c);
   const w = await blobSet(st, dropKey(d.ym, id), e);
-  if (!w.ok) { await blobDelete(store(FILES), fileKey(id)); return fail(w.code || 'STORAGE_WRITE_FAILED', R); }
-  await readSweep();
+  if (!w.ok) return fail(w.code || 'STORAGE_WRITE_FAILED', R);   // 줄(거래처 없음)·원본은 남음 — 화면에서 고르기·지우기
+  if (e.state === 'reading') await readSweep();   // 청소는 AI 판독 맡길 때만(검토 med2 — 넣기마다 돌면 느려짐)
   await audit(c, '명세서원본', d.ym + ':' + (e.vk || '?'), e.kind + ' ' + e.state + (e.n ? ' ' + e.n + '줄' : ''));   // 파일 이름은 남기지 않음
   return jr(200, { status: 'OK', entry: dropMeta(e), result: e.state === 'read' ? e.result : null, why: e.why || '', request_id: R });
 }
@@ -726,10 +740,10 @@ async function handleDropDel(st, c, d, R) {   // 잘못 넣은 파일 — 넣은
   return jr(200, { status: 'OK', request_id: R });
 }
 
-const READ = { stmt_cfg_get: handleCfgGet, stmt_month: handleMonth, stmt_get: handleGet, stmt_veh: handleVeh, stmt_alias_get: handleAliasGet, stmt_gap: handleGap, stmt_match: handleMatch, stmt_read_status: handleReadStatus, stmt_drop_list: handleDropList };
-// stmt_drop_get·stmt_drop_file은 읽기지만 수행 권한만(원본·읽은 줄 원문) — WRITE 표에 둔다
+const READ = { stmt_cfg_get: handleCfgGet, stmt_month: handleMonth, stmt_get: handleGet, stmt_veh: handleVeh, stmt_alias_get: handleAliasGet, stmt_gap: handleGap, stmt_match: handleMatch, stmt_read_status: handleReadStatus };
+// stmt_drop_list·stmt_drop_get·stmt_drop_file은 읽기지만 수행 권한만(파일 이름·원본·읽은 줄 원문 — 검토 low5) — WRITE 표에 둔다
 const WRITE = { stmt_cfg_set: handleCfgSet, stmt_save: handleSave, stmt_revert: handleRevert, stmt_reindex: handleReindex, stmt_alias_set: handleAliasSet, stmt_sent: handleSent, stmt_read: handleRead,
-  stmt_drop: handleDrop, stmt_drop_get: handleDropGet, stmt_drop_set: handleDropSet, stmt_drop_file: handleDropFile, stmt_drop_del: handleDropDel };
+  stmt_drop: handleDrop, stmt_drop_list: handleDropList, stmt_drop_get: handleDropGet, stmt_drop_set: handleDropSet, stmt_drop_file: handleDropFile, stmt_drop_del: handleDropDel };
 async function handler(event) {
   const R = rid();
   if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: CORS, body: '' };
