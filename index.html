@@ -2807,6 +2807,7 @@
   <div class="modal">
     <h3 id="dutyModalTitle">선행확인 입력</h3>
     <div id="dutyModalQ" class="task-detail" style="margin:0 2px 10px;"></div>
+    <div id="dutyModalRk" class="task-detail" style="margin:0 2px 10px;display:none;"></div>
     <span class="fld-label">선행확인 답 (확인한 실물 값·판정)</span>
     <input type="text" id="dutyPreAns" placeholder="예: 허가일자 2013-09-04, 일반화물" autocomplete="off">
     <span class="fld-label">기준일 (기산점이 되는 날짜)</span>
@@ -28101,7 +28102,10 @@ function dutyStage(nx){
   //   원천 = 서버 lic_recheck_get(감지된 법령 목록 [{name, date}] — lawwatch:last law_changed + 옛 꼴 경보 글). 못 읽음·감지 없음 = 표시 없음. 10분 지나면 칸을 다시 그릴 때 다시 읽음.
   //   맞춤 = 행 law 칸 글(licRkParse): 법령 이름(약칭 표 LIC_RK_ABBR·빈칸·가운뎃점 무시) 뒤 '시행령/시행규칙'으로 단계를 가름 · 이름 없이 쓴 '법·영·규칙'은 같은 칸의 앞 법령, 칸 첫머리면 앞 행(번호 순)의 첫 법령을 이어받음.
   //     개정이 시행령·시행규칙이면 그 단계를 인용한 행만 · 본법이면 그 법의 모든 단계 인용 행(넘치는 쪽) · 어느 법인지 모르는 '법·영·규칙'(이어받을 법령 없음)은 모든 법령에 맞춤(넘치는 쪽).
-  //   풀림 = 행 확정 날짜(confirmed_at — 관리자 [선행확인 입력] 창에서 확정으로 저장한 날)가 감지 날짜보다 뒤. 같은 법령이 다시 개정되면 새 감지 날짜로 다시 붙음.
+  //   풀림 = 행 확정 날짜(confirmed_at)가 감지 날짜와 같거나 뒤. 같은 법령이 다시 개정되면 새 감지 날짜로 다시 붙음.
+  //     confirmed_at을 찍는 길 = 관리자 창(openDutyModal — 표시 행은 버튼 글 '근거 재확인'·등재표 확정 행도 버튼): 조건부 → 확정 전환(종전) · 이미 확정인 행을 표시가 붙은 채 저장
+  //     (사람 확정 행 = confirmed_at·confirmed_by 새로 · 등재표 확정 행 = confirmed_at + recheck_by — confirmed_by를 비워 둬 강등 불가·답 필수·버튼 숨김이 종전 그대로).
+  //     담당의 좁은 저장('이번 달' 단추 네 가지)·관리자 아닌 통째 저장은 이 칸을 못 바꿈(서버) — 표시는 관리자만 풂.
   var licRk = { st: "", changed: [], seq: 0, vid: "", at: 0 };
   var LIC_RK_ABBR = { "산안법":"산업안전보건법", "건폐법":"건설폐기물의재활용촉진에관한법률", "건산법":"건설산업기본법", "화관법":"화학물질관리법", "화물자동차법":"화물자동차운수사업법", "지방계약법":"지방자치단체를당사자로하는계약에관한법률", "국가계약법":"국가를당사자로하는계약에관한법률", "대기법":"대기환경보전법", "소음진동법":"소음진동관리법", "폐관법":"폐기물관리법" };
   var LIC_RK_STOP = { "모법":1, "본법":1, "방법":1, "불법":1, "위법":1, "적법":1, "편법":1 };
@@ -28134,7 +28138,7 @@ function dutyStage(nx){
     (Array.isArray(list) ? list.slice() : []).filter(function(d){ return d && d.no != null; }).sort(function(a, b){ return (a.no || 0) - (b.no || 0); }).forEach(function(d){
       var p = licRkParse(d.law, carry, known); if (p.first) carry = p.first;
       var hit = ch.filter(function(c){
-        if (isDate(d.confirmed_at) && d.confirmed_at > c.date) return false;   // 감지 뒤에 사람이 다시 확인(확정 저장) = 풀림
+        if (isDate(d.confirmed_at) && d.confirmed_at >= c.date) return false;   // 감지 날 또는 그 뒤에 사람이 다시 확인(확정·근거 재확인 저장) = 풀림 — 그 뒤 새 감지(날짜 > 확인 날짜)면 다시 붙음
         return p.refs.some(function(r){ return (r.base === c.base || r.base === "*") && (c.lv === "법" || r.lv === c.lv); });
       });
       if (!hit.length) return;
@@ -28155,6 +28159,7 @@ function dutyStage(nx){
     if (!licRk.st || (licRk.st !== "loading" && Date.now() - licRk.at > 600000)) licRkLoad();
     return licRk.st === "ok" ? licRkMarks(duties, licRk.changed) : {};
   }
+  function licRkFor(no){ return licRk.st === "ok" ? (licRkMarks(duties, licRk.changed)[no] || null) : null; }   // 창 열 때 그 행의 표시(읽기는 안 부름)
   function licRkBadge(rk){ return rk ? ' <span class="duty-badge pre" title="' + esc("법령 개정 감지 " + rk.date + " — " + rk.laws.join(", ")) + '">근거 재확인 필요</span>' : ""; }
   // @lic-recheck-end
   function dutyRowHtml(d, open, rk){
@@ -28168,10 +28173,11 @@ function dutyStage(nx){
       if (d.precheck_answer) parts.push("<b>선행확인 답</b>  " + esc(d.precheck_answer));
       if (d.base_date) parts.push("<b>기준일</b>  " + esc(d.base_date));
       if (d.confirmed_by) parts.push("<b>확정 전환</b>  " + esc(d.confirmed_by) + " · " + esc(d.confirmed_at || ""));
+      if (d.recheck_by && !d.confirmed_by) parts.push("<b>근거 다시 확인</b>  " + esc(d.recheck_by) + " · " + esc(d.confirmed_at || ""));   // P1 판7 등재표 확정 행의 재확인 저장
       parts = parts.concat(lmDutyDetail(d));   // P1 판28 이번 달 단추 칸(완료 기록·정정·해당 없음·기준일 무엇)
       detail = '<div class="task-detail" style="margin-top:5px;">' + parts.join("<br>") + '</div>';
     }
-    var canPre = isAdmin() && (d.confirm === "조건부" || d.precheck_answer || d.confirmed_by);   // 등재·확정은 관리자 전용(서버도 차단) — 사람이 확정한 행은 재열람·회수 가능해야 막다른 길이 없다
+    var canPre = isAdmin() && (d.confirm === "조건부" || d.precheck_answer || d.confirmed_by || !!rk);   // 등재·확정은 관리자 전용(서버도 차단) — 사람이 확정한 행은 재열람·회수 가능해야 막다른 길이 없다 · P1 판7 '근거 재확인 필요' 행은 등재표 확정 행도(표시를 풀 길)
     return '<div class="item duty-item" data-duty-no="' + d.no + '">' +
         '<div class="item-body">' +
           '<div class="item-title">' + d.no + '. ' + esc(d.duty) + '</div>' +
@@ -28179,7 +28185,7 @@ function dutyStage(nx){
           '<div class="duty-sum">' + esc(d.cycle || "") + (d.basis ? " — " + esc(d.basis) : "") + '</div>' +
           detail +
         '</div>' +
-        ((canPre || (isAdmin() && d.na && d.na.on)) ? '<div class="task-ctrl">' + (canPre ? '<button class="mini-btn" data-duty-pre="' + d.no + '">선행확인 입력</button>' : '') + ((isAdmin() && d.na && d.na.on) ? '<button class="mini-btn" data-duty-naoff="' + d.no + '">해당 없음 되돌리기</button>' : '') + '</div>' : '') +
+        ((canPre || (isAdmin() && d.na && d.na.on)) ? '<div class="task-ctrl">' + (canPre ? '<button class="mini-btn" data-duty-pre="' + d.no + '">' + (rk ? '근거 재확인' : '선행확인 입력') + '</button>' : '') + ((isAdmin() && d.na && d.na.on) ? '<button class="mini-btn" data-duty-naoff="' + d.no + '">해당 없음 되돌리기</button>' : '') + '</div>' : '') +
       '</div>';
   }
 
@@ -28281,7 +28287,7 @@ function dutyStage(nx){
     }).catch(function(){ alert("시드 파일을 불러오지 못했습니다 (data/duties_seed.json)."); });
   }
 
-  var editingDutyNo = null;
+  var editingDutyNo = null, editingDutyRk = null;
   function openDutyModal(no){
     if (!isAdmin()) return;
     var d = findDuty(no); if (!d) return;
@@ -28293,17 +28299,22 @@ function dutyStage(nx){
     document.getElementById("dutyPreAns").value = d.precheck_answer || "";
     document.getElementById("dutyBaseDate").value = isDate(d.base_date) ? d.base_date : "";
     document.getElementById("dutyConfirmChk").checked = d.confirm === "확정";
+    editingDutyRk = licRkFor(no);   // P1 판7 — 창을 연 때의 '근거 재확인 필요' 표시(저장이 표시를 풀지 정함)
+    var rkEl = document.getElementById("dutyModalRk");
+    rkEl.textContent = editingDutyRk ? ("근거 재확인: " + editingDutyRk.laws.join(", ") + " 개정 감지 " + editingDutyRk.date + " — 조문을 다시 확인한 뒤 저장하면 표시가 풀립니다" + (d.confirm === "확정" ? "." : "(확정으로 전환해 저장).")) : "";
+    rkEl.style.display = editingDutyRk ? "" : "none";
     document.getElementById("dutyBackdrop").classList.add("show");
   }
-  function closeDutyModal(){ document.getElementById("dutyBackdrop").classList.remove("show"); editingDutyNo = null; }
+  function closeDutyModal(){ document.getElementById("dutyBackdrop").classList.remove("show"); editingDutyNo = null; editingDutyRk = null; }
   function saveDutyFromModal(){
     if (editingDutyNo == null) return;
     var d = findDuty(editingDutyNo); if (!d){ closeDutyModal(); return; }
     var ans = document.getElementById("dutyPreAns").value.trim();
     var bd = document.getElementById("dutyBaseDate").value;
     var toConfirm = document.getElementById("dutyConfirmChk").checked;
+    var rkSeed = !!(editingDutyRk && d.confirm === "확정" && !d.confirmed_by);   // P1 판7 등재표 확정 행의 근거 재확인 저장 — 답·기준일 없이도(주기·기준일 칸은 그대로)
     // 답·기준일 없는 확정 금지 — 전환뿐 아니라 확정 유지 저장에서도(답만 지우고 저장하면 근거 없는 확정이 남는다)
-    if (toConfirm && (!ans || !bd)){ alert("확정 상태는 선행확인 답과 기준일을 모두 채워야 합니다.\n답을 비우려면 확정 체크를 해제하세요."); return; }
+    if (toConfirm && (!ans || !bd) && !rkSeed){ alert("확정 상태는 선행확인 답과 기준일을 모두 채워야 합니다.\n답을 비우려면 확정 체크를 해제하세요."); return; }
     d.precheck_answer = ans;
     d.base_date = bd || null;
     if (toConfirm && d.confirm !== "확정"){
@@ -28311,6 +28322,10 @@ function dutyStage(nx){
     } else if (!toConfirm && d.confirmed_by){
       // 사람이 전환한 확정만 회수 가능 — 등재표 원본이 확정인 행은 체크 해제로 강등되지 않는다
       d.confirm = "조건부"; d.confirmed_by = ""; d.confirmed_at = "";
+    } else if (editingDutyRk && d.confirm === "확정"){
+      // P1 판7 이미 확정인 행을 '근거 재확인 필요' 표시가 붙은 채 저장 = 근거 다시 확인 → 확인 날짜를 오늘로(표시 풀림). 표시 없는 행은 이 갈래에 안 옴(종전 그대로)
+      if (d.confirmed_by){ d.confirmed_by = getUser(); d.confirmed_at = todayStr(); }
+      else { d.confirmed_at = todayStr(); d.recheck_by = getUser(); }   // 등재표 확정 행 — confirmed_by를 비워 둬 강등 막음·버튼 숨김·답 필수 규칙이 종전 그대로
     }
     d.updated = todayStr(); d.updated_ts = Date.now();
     closeDutyModal();

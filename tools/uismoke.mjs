@@ -14691,9 +14691,12 @@ try {
     if (JSON.stringify(m([{ no: 1, law: '규칙 제1조' }], ['아무법 시행규칙'])) !== '[1]' || JSON.stringify(m([{ no: 1, law: '규칙 제1조' }], ['아무법 시행령'])) !== '[]') got.push('모르는 법령');
     // 번호 순 이어받기(배열 순서와 무관)
     if (JSON.stringify(m(DU7().reverse(), ['가짜환경법 시행규칙'])) !== '[1,4]') got.push('번호 순');
-    // 풀림: 확정 날짜 > 감지 날짜만 · 같은 날·앞 날 = 그대로
+    // 풀림: 확정 날짜 ≥ 감지 날짜(같은 날 포함 — 오케스트레이터 ③) · 앞 날·날짜 아님 = 그대로
     const rel = (ca) => m(DU7().map((d) => (d.no === 4 ? Object.assign({}, d, { confirmed_at: ca, confirmed_by: '가짜' }) : d)), ['가짜환경법 시행규칙']);
-    if (JSON.stringify(rel('2026-11-10')) !== '[1]' || JSON.stringify(rel(D7)) !== '[1,4]' || JSON.stringify(rel('2026-11-08')) !== '[1,4]' || JSON.stringify(rel('어제')) !== '[1,4]') got.push('풀림 ' + [rel('2026-11-10'), rel(D7), rel('2026-11-08')].join('/'));
+    if (JSON.stringify(rel('2026-11-10')) !== '[1]' || JSON.stringify(rel(D7)) !== '[1]' || JSON.stringify(rel('2026-11-08')) !== '[1,4]' || JSON.stringify(rel('어제')) !== '[1,4]') got.push('풀림 ' + [rel('2026-11-10'), rel(D7), rel('2026-11-08')].join('/'));
+    // 같은 날 확인 뒤 같은 법령 새 감지(날짜 > 확인 날짜) = 다시 붙음
+    const again = X.marks(DU7().map((d) => (d.no === 4 ? Object.assign({}, d, { confirmed_at: D7 }) : d)), [{ name: '가짜환경법 시행규칙', date: '2026-11-20' }]);
+    if (!(again[4] && again[4].date === '2026-11-20')) got.push('다시 붙음 ' + JSON.stringify(again[4]));
     // 두 번 감지: 사이에 확인한 행은 뒤 감지만 · 날짜 = 가장 늦은 감지
     const two = X.marks(DU7().map((d) => (d.no === 4 ? Object.assign({}, d, { confirmed_at: '2026-11-20' }) : d)), [{ name: '가짜환경법 시행규칙', date: D7 }, { name: '가짜환경법', date: '2026-12-01' }]);
     if (!(JSON.stringify(two[4]) === JSON.stringify({ laws: ['가짜환경법'], date: '2026-12-01' }) && JSON.stringify(two[1]) === JSON.stringify({ laws: ['가짜환경법 시행규칙', '가짜환경법'], date: '2026-12-01' }) && JSON.stringify(two[2]) === JSON.stringify({ laws: ['가짜환경법'], date: '2026-12-01' }))) got.push('두 번 ' + JSON.stringify(two));
@@ -14719,7 +14722,7 @@ try {
     return { ok: got.length === 0, info: got };
   };
   const r7A = chk7A(BLK7), r7B = chk7B(BLK7);
-  T('P1 판7 ① 맞춤(실행 — 실제 licRkMarks): 시행규칙 개정 = 규칙 인용 행만(본법·영만 인용 행 없음) · 시행령 = 영 인용 행 · 본법 = 그 법 모든 단계 · 약칭(산안법·건폐법) · 가운뎃점(소음·진동 ↔ 소음ㆍ진동) · 여러 낱말 이름(…에 관한 법률·띄어 쓴 이름) · 이름 없는 법·영·규칙 = 같은 칸 앞 법령 → 앞 행(번호 순) 첫 법령 · 다른 법령 뒤 영은 그 법령 것 · "같은 법 시행령"·"(모법 …)" · 이어받을 법령 없음 = 붙임(단계는 가름) · 감지 없음·꼴 틀린 목록 = 없음 · 확인(확정) 날짜 > 감지 날짜만 풀림(같은 날·앞 날·날짜 아님 = 그대로) · 두 번 감지 = 사이 확인 행은 뒤 감지만·날짜 = 가장 늦은 감지 · 입력 안 바뀜',
+  T('P1 판7 ① 맞춤(실행 — 실제 licRkMarks): 시행규칙 개정 = 규칙 인용 행만(본법·영만 인용 행 없음) · 시행령 = 영 인용 행 · 본법 = 그 법 모든 단계 · 약칭(산안법·건폐법) · 가운뎃점(소음·진동 ↔ 소음ㆍ진동) · 여러 낱말 이름(…에 관한 법률·띄어 쓴 이름) · 이름 없는 법·영·규칙 = 같은 칸 앞 법령 → 앞 행(번호 순) 첫 법령 · 다른 법령 뒤 영은 그 법령 것 · "같은 법 시행령"·"(모법 …)" · 이어받을 법령 없음 = 붙임(단계는 가름) · 감지 없음·꼴 틀린 목록 = 없음 · 확인 날짜 ≥ 감지 날짜면 풀림(같은 날 풀림 · 앞 날·날짜 아님 = 그대로) · 같은 날 확인 뒤 새 감지 = 다시 붙음 · 두 번 감지 = 사이 확인 행은 뒤 감지만·날짜 = 가장 늦은 감지 · 입력 안 바뀜',
     r7A.ok, JSON.stringify(r7A.info));
   T('P1 판7 ② 읽기(실행 — 실제 licRkNow·licRkLoad): 정상 = gw-data lic_recheck_get 1번·표·의무 대장 다시 그림 · 10분 안 다시 안 읽음(10분 넘으면 다시) · 500·네트워크·꼴 틀림·200 아닌 응답 = 빈 표(표시 없음)·되풀이 호출 0 · 로그인 전환 = 앞사람 목록 버리고 다시 읽음 · 이번 달 칸 = licMonth.rk 채우고 그 칸만 다시 그림 · 다른 탭이면 그리지 않음',
     r7B.ok, JSON.stringify(r7B.info));
@@ -14742,13 +14745,81 @@ try {
     const c0 = R(d, false), c1 = R(d, false, rk), o0 = R(d, true), o1 = R(d, true, rk);
     const BADGE = ' <span class="duty-badge pre" title="법령 개정 감지 2026-11-09 — 가짜환경법 시행규칙, &lt;b&gt;&quot;x">근거 재확인 필요</span>';
     if (c0.indexOf('근거 재확인') >= 0 || o0.indexOf('근거 재확인') >= 0) got.push('표시 없는데 글');
-    if (c1 !== c0.replace('</span></div><div class="duty-sum">', '</span>' + BADGE + '</div><div class="duty-sum">')) got.push('배지 ' + c1);
+    // 조건부 행: 배지 하나 + 버튼 글만 '근거 재확인'(버튼 수 그대로)
+    if (c1 !== c0.replace('</span></div><div class="duty-sum">', '</span>' + BADGE + '</div><div class="duty-sum">').replace('>선행확인 입력</button>', '>근거 재확인</button>')) got.push('배지 ' + c1);
     if (o1.indexOf('<b>근거 재확인</b>  가짜환경법 시행규칙, &lt;b&gt;&quot;x 개정 감지(2026-11-09) — 조문을 다시 확인해 주세요. 기한 계산은 그대로입니다.') < 0 || o1.indexOf('<b>"x') >= 0) got.push('펼침 ' + o1);
     if ((c1.match(/<button/g) || []).length !== (c0.match(/<button/g) || []).length || (o1.match(/<button/g) || []).length !== (o0.match(/<button/g) || []).length) got.push('버튼 수');
+    // 버튼 경계(오케스트레이터 ①②): 등재표 확정 행 = 표시 없으면 버튼 없음(종전) · 표시 있으면 관리자에게 [근거 재확인] · 사람 확정 행 표시 없음 = [선행확인 입력](종전) · 관리자 아님 = 표시 있어도 버튼 없음
+    const seed = { no: 9, lic: '가짜', duty: '등재 확정', cycle: '연 1회', law: '규칙 제1조', confirm: '확정' }, hum = Object.assign({}, seed, { confirmed_by: '가짜A', confirmed_at: '2026-10-01', precheck_answer: '답' });
+    const btn = (h) => (h.match(/data-duty-pre="9">([^<]*)<\/button>/) || [0, ''])[1];
+    if (!(btn(R(seed, false)) === '' && R(seed, false).indexOf('<button') < 0 && btn(R(seed, false, rk)) === '근거 재확인' && btn(R(hum, false)) === '선행확인 입력' && btn(R(hum, false, rk)) === '근거 재확인'
+      && rowFn({ admin: false })(seed, false, rk).indexOf('<button') < 0 && rowFn({ admin: false })(d, false, rk).indexOf('<button') < 0)) got.push('버튼 경계 ' + [btn(R(seed, false)), btn(R(seed, false, rk)), btn(R(hum, false)), btn(R(hum, false, rk))]);
+    // 등재표 확정 행의 재확인 기록 줄(confirmed_by 없음일 때만)
+    const rb = R(Object.assign({}, seed, { recheck_by: '<관리>', confirmed_at: '2026-11-14' }), true), rb2 = R(Object.assign({}, hum, { recheck_by: '옛' }), true);
+    if (!(rb.indexOf('<b>근거 다시 확인</b>  &lt;관리&gt; · 2026-11-14') > 0 && rb2.indexOf('근거 다시 확인') < 0 && rb2.indexOf('<b>확정 전환</b>  가짜A · 2026-10-01') > 0)) got.push('재확인 기록 줄');
     return { ok: got.length === 0, info: got };
   };
   const r7D = chk7D(ROW7);
-  T('P1 판7 ④ 그리기(실행 — 실제 dutyRowHtml): 표시 = 확정/조건부 배지 뒤 작은 배지 하나(duty-badge pre "근거 재확인 필요", 제목 = 감지 날짜·법령 — 이스케이프) · 펼침 = "근거 재확인" 줄(기한 계산 그대로 안내) · 표시 없으면 종전 글 그대로 · 버튼 수 그대로(새 버튼 0)', r7D.ok, JSON.stringify(r7D.info));
+  T('P1 판7 ④ 그리기(실행 — 실제 dutyRowHtml): 표시 = 확정/조건부 배지 뒤 작은 배지 하나(duty-badge pre "근거 재확인 필요", 제목 = 감지 날짜·법령 — 이스케이프) · 펼침 = "근거 재확인" 줄(기한 계산 그대로 안내) · 표시 없으면 종전 글 그대로 · 조건부 행 버튼 수 그대로·글만 [근거 재확인] · 버튼 경계: 등재표 확정 행은 표시 있을 때만 관리자에게 [근거 재확인](표시 없으면 버튼 없음 — 종전) · 사람 확정 행 표시 없음 = [선행확인 입력] · 관리자 아님 = 버튼 없음 · 재확인 기록 줄(등재표 확정 행만)', r7D.ok, JSON.stringify(r7D.info));
+  // ⑦ 창(실행 — 실제 openDutyModal·saveDutyFromModal + @lic-recheck 구간): 표시 풀 길과 표시 없는 행 종전 그대로
+  const mkM7 = (src, env) => { const els = {}; const doc = { getElementById: (id) => els[id] || (els[id] = { id, textContent: '', value: '', checked: false, style: {}, cl: {}, classList: { add(c) { this.o[c] = 1; }, remove(c) { delete this.o[c]; }, o: {} } }) };
+    const E = { log: [] }; const blk = one7p(src, '// @lic-recheck-start', '// @lic-recheck-end');
+    const code = [fn7p(src, 'isDate'), fn7p(src, 'esc'), fn7p(src, 'findDuty'), 'var duties = ENV.duties, currentTab = "lic", licLayer = "duty", licMonth = {};',
+      'function myId(){ return "u1"; } function isAdmin(){ return ENV.admin !== false; } function getUser(){ return "관리자7"; } function todayStr(){ return "2026-11-14"; } function saveLicCache(){} function renderDuties(){} function renderLicMonth(){} function scheduleLicSave(){ E.log.push("save"); } function alert(m){ E.log.push("alert:" + m); } function gwCall(){ throw new Error("읽기 부르면 안 됨"); }',
+      blk, 'var editingDutyNo = null, editingDutyRk = null;', fn7p(src, 'openDutyModal'), fn7p(src, 'closeDutyModal'), fn7p(src, 'saveDutyFromModal'),
+      'licRk.st = "ok"; licRk.vid = "u1"; licRk.changed = ENV.changed;', 'return { open: openDutyModal, save: saveDutyFromModal, marks: function(){ return licRkMarks(duties, licRk.changed); }, set: function(c){ licRk.changed = c; } };'].join('\n');
+    return { api: new Function('ENV', 'E', 'document', code)(env, E, doc), E, el: (id) => doc.getElementById(id) }; };
+  const ROWS7M = () => [{ no: 1, duty: '등재 확정', law: '가짜환경법 제1조, 규칙 제2조', confirm: '확정', base_date: '2025-03-01' }, { no: 2, duty: '등재 확정 표시 없음', law: '다른법 제1조', confirm: '확정' },
+    { no: 3, duty: '사람 확정', law: '가짜환경법 시행규칙 제3조', confirm: '확정', confirmed_by: '가짜A', confirmed_at: '2026-10-01', precheck_answer: '답', base_date: '2026-01-01' },
+    { no: 4, duty: '사람 확정 표시 없음', law: '다른법 제4조', confirm: '확정', confirmed_by: '가짜B', confirmed_at: '2026-10-01', precheck_answer: '답', base_date: '2026-01-01' },
+    { no: 5, duty: '조건부', law: '가짜환경법 시행규칙 제5조', confirm: '조건부' }];
+  const CH7M = [{ name: '가짜환경법 시행규칙', date: D7 }];
+  const chk7M = (src) => { const got = [];
+    // A 등재표 확정 + 표시: 창 한 줄 · 답·기준일 없이 저장 · confirmed_at 오늘 · recheck_by · confirmed_by 비움 그대로 · 기준일 그대로 · 표시 풀림
+    let env = { duties: ROWS7M(), changed: CH7M }, M = mkM7(src, env); M.api.open(1);
+    const rkLine = M.el('dutyModalRk');
+    if (!(rkLine.style.display === '' && rkLine.textContent === '근거 재확인: 가짜환경법 시행규칙 개정 감지 2026-11-09 — 조문을 다시 확인한 뒤 저장하면 표시가 풀립니다.' && M.el('dutyBaseDate').value === '2025-03-01')) got.push('A 창 ' + JSON.stringify([rkLine.style.display, rkLine.textContent]));
+    M.api.save(); let d1 = env.duties[0];
+    if (!(JSON.stringify(M.E.log) === '["save"]' && d1.confirmed_at === '2026-11-14' && d1.recheck_by === '관리자7' && !d1.confirmed_by && d1.confirm === '확정' && d1.base_date === '2025-03-01' && !M.api.marks()[1])) got.push('A 저장 ' + JSON.stringify([M.E.log, d1]));
+    // A2 같은 법령 새 감지(확인 날짜 뒤) = 다시 붙고 다시 풀 수 있음
+    M.api.set([{ name: '가짜환경법 시행규칙', date: '2026-11-20' }]); if (!M.api.marks()[1]) got.push('A2 다시 붙음');
+    // B 등재표 확정 + 표시 없음 = 종전 그대로(창 줄 숨김 · 답·기준일 없는 확정 저장 막힘 · 확인 날짜 안 생김)
+    env = { duties: ROWS7M(), changed: CH7M }; M = mkM7(src, env); M.api.open(2);
+    const b0 = JSON.stringify(env.duties[1]);
+    if (M.el('dutyModalRk').style.display !== 'none') got.push('B 창 줄');
+    M.api.save(); if (!(M.E.log.length === 1 && M.E.log[0].indexOf('alert:확정 상태는 선행확인 답과 기준일을 모두 채워야 합니다.') === 0 && JSON.stringify(env.duties[1]) === b0)) got.push('B 저장 ' + JSON.stringify(M.E.log));
+    // C 사람 확정 + 표시 = confirmed_at·confirmed_by 새로
+    env = { duties: ROWS7M(), changed: CH7M }; M = mkM7(src, env); M.api.open(3); M.api.save();
+    if (!(env.duties[2].confirmed_by === '관리자7' && env.duties[2].confirmed_at === '2026-11-14' && !env.duties[2].recheck_by && !M.api.marks()[3])) got.push('C ' + JSON.stringify(env.duties[2]));
+    // D 사람 확정 + 표시 없음 = 확인 날짜·확인자 그대로(종전)
+    env = { duties: ROWS7M(), changed: CH7M }; M = mkM7(src, env); M.api.open(4); M.api.save();
+    if (!(env.duties[3].confirmed_by === '가짜B' && env.duties[3].confirmed_at === '2026-10-01' && JSON.stringify(M.E.log) === '["save"]')) got.push('D ' + JSON.stringify(env.duties[3]));
+    // E 조건부 + 표시: 확정 전환 없이 저장 = 표시 그대로 · 답·기준일·확정 전환 = 풀림(종전 확정 전환 길)
+    env = { duties: ROWS7M(), changed: CH7M }; M = mkM7(src, env); M.api.open(5);
+    if (M.el('dutyModalRk').textContent.indexOf('(확정으로 전환해 저장).') < 0) got.push('E 창 줄');
+    M.api.save(); if (!(env.duties[4].confirm === '조건부' && !env.duties[4].confirmed_at && M.api.marks()[5])) got.push('E1 ' + JSON.stringify(env.duties[4]));
+    M.api.open(5); M.el('dutyPreAns').value = '확인값'; M.el('dutyBaseDate').value = '2026-11-01'; M.el('dutyConfirmChk').checked = true; M.api.save();
+    if (!(env.duties[4].confirm === '확정' && env.duties[4].confirmed_at === '2026-11-14' && env.duties[4].confirmed_by === '관리자7' && !M.api.marks()[5])) got.push('E2 ' + JSON.stringify(env.duties[4]));
+    // F 사람 확정 + 표시 + 확정 해제 = 조건부로(종전) · 확인 날짜 비움 · 표시 그대로
+    env = { duties: ROWS7M(), changed: CH7M }; M = mkM7(src, env); M.api.open(3); M.el('dutyConfirmChk').checked = false; M.api.save();
+    if (!(env.duties[2].confirm === '조건부' && env.duties[2].confirmed_by === '' && env.duties[2].confirmed_at === '' && M.api.marks()[3])) got.push('F ' + JSON.stringify(env.duties[2]));
+    // G 관리자 아님 = 창 안 열림·저장 0
+    env = { duties: ROWS7M(), changed: CH7M, admin: false }; M = mkM7(src, env); M.api.open(1); M.api.save();
+    if (!(M.E.log.length === 0 && !env.duties[0].confirmed_at && !M.el('dutyBackdrop').classList.o.show)) got.push('G');
+    // H 감지 날 바로 확인 = 풀림(같은 날)
+    env = { duties: ROWS7M(), changed: [{ name: '가짜환경법 시행규칙', date: '2026-11-14' }] }; M = mkM7(src, env); M.api.open(1); M.api.save(); if (M.api.marks()[1]) got.push('H 같은 날');
+    return { ok: got.length === 0, info: got };
+  };
+  const r7M = chk7M(html);
+  const mutH7 = (a, b) => { if (html.split(a).length !== 2) throw new Error('결함 자리 없음·둘: ' + a.slice(0, 50)); return html.replace(a, () => b); };
+  const rowOf7 = (src) => new Function('ENV', [fn7p(src, 'esc'), fn7p(src, 'isDate'), fn7p(src, 'dutyBadges'), fn7p(src, 'dutyRowHtml'), 'function isAdmin(){ return !!ENV.admin; } function lmDutyDetail(){ return []; }', one7p(src, '// @lic-recheck-start', '// @lic-recheck-end').replace(/^[\s\S]*?(?=  function licRkBadge)/, ''), 'return dutyRowHtml;'].join('\n'));
+  const MU7M = [['d.confirmed_by || !!rk);', 'd.confirmed_by);'], ["(rk ? '근거 재확인' : '선행확인 입력')", "'선행확인 입력'"], ['(!ans || !bd) && !rkSeed){', '(!ans || !bd)){'],
+    ['} else if (editingDutyRk && d.confirm === "확정"){', '} else if (d.confirm === "확정"){'], ['else { d.confirmed_at = todayStr(); d.recheck_by = getUser(); }', 'else { d.confirmed_at = todayStr(); d.confirmed_by = getUser(); }'],
+    ['editingDutyRk = licRkFor(no);', 'editingDutyRk = null;'], ['rkEl.style.display = editingDutyRk ? "" : "none";', 'rkEl.style.display = "none";'], ['if (d.confirmed_by){ d.confirmed_by = getUser(); d.confirmed_at = todayStr(); }', 'if (d.confirmed_by){ d.confirmed_at = todayStr(); }'],
+    ['var rkSeed = !!(editingDutyRk && d.confirm === "확정" && !d.confirmed_by);', 'var rkSeed = !!(d.confirm === "확정" && !d.confirmed_by);'], ['if (d.recheck_by && !d.confirmed_by) parts.push(', 'if (d.recheck_by) parts.push(']];
+  const kill7M = MU7M.map(([a, b]) => { try { const s = mutH7(a, b); return !(chk7M(s).ok && chk7D(rowOf7(s)).ok); } catch (e) { return /결함 자리/.test(e.message) ? 'err ' + e.message : true; } });
+  T('P1 판7 ⑦ 창(실행 — 실제 openDutyModal·saveDutyFromModal): 표시 행 = 창에 "근거 재확인: 법령 개정 감지 날짜" 한 줄 · 등재표 확정 행 = 답·기준일 없이 저장 → 확인 날짜 오늘·재확인자 기록·confirmed_by 비움·기준일 그대로·표시 풀림 · 새 감지 = 다시 붙음 · 사람 확정 행 = confirmed_at·confirmed_by 새로 · 표시 없는 행 = 종전 그대로(등재표 확정 = 답 없는 저장 막힘·확인 날짜 안 생김 / 사람 확정 = 확인 날짜·확인자 그대로) · 조건부 = 확정 전환해야 풀림 · 확정 해제 = 조건부(표시 남음) · 관리자 아님 = 창 안 열림 · 감지 날 확인 = 풀림 · 결함 사본 ' + MU7M.length + '개 = 모두 ✗',
+    r7M.ok && kill7M.every((v) => v === true), JSON.stringify({ r: r7M.info, kill: kill7M.map((v, i) => (v === true ? 1 : MU7M[i][0].slice(0, 40) + ':' + v)) }));
   // ⑤ 배선(정적)
   const rD7 = fn7p(html, 'renderDuties'), sL7 = fn7p(html, 'setLicLayer'), lR7 = fn7p(lmBlk7, 'lmRowHtml'), sv7 = fn7p(html, 'saveDutyFromModal');
   const wire7 = /if \(d && d\.action === 'lic_recheck_get'\) return await handleLicRecheckGet\(event, d, R\);/.test(gwd7) && gwd7.split("action === 'lic_recheck_get'").length === 2
@@ -14769,8 +14840,8 @@ try {
     ['(c.lv === "법" || r.lv === c.lv)', 'true'],
     ['if (lv === "법" && (nx === "시행령" || nx === "시행규칙")){ lv = nx === "시행령" ? "영" : "규칙"; i++; }', ''],
     ['lv = nx === "시행령" ? "영" : (nx === "시행규칙" ? "규칙" : "법"); if (lv !== "법") i++;', 'lv = "법";'],
-    ['if (isDate(d.confirmed_at) && d.confirmed_at > c.date) return false;', ''],
-    ['d.confirmed_at > c.date', 'd.confirmed_at >= c.date'],
+    ['if (isDate(d.confirmed_at) && d.confirmed_at >= c.date) return false;', ''],
+    ['d.confirmed_at >= c.date', 'd.confirmed_at > c.date'],
     ['nm = named(i) || LIC_RK_ABBR[x] || x;', 'nm = named(i) || x;'],
     ['if (p.first) carry = p.first;', ''],
     ['.sort(function(a, b){ return (a.no || 0) - (b.no || 0); })', ''],
@@ -14787,7 +14858,7 @@ try {
     ['if (currentTab === "lic"){', 'if (true){']];
   const kill7 = MU7.map(([a, b]) => { if (BLK7.split(a).length !== 2) return 'err 자리 ' + a.slice(0, 50); const mb = BLK7.replace(a, () => b).replace('function licRkNow(){', 'var OKR = [{ name: "가짜환경법 시행규칙", date: "2026-11-09" }];\n  function licRkNow(){');
     try { const ra = chk7A(mb).ok, rb = chk7B(mb).ok, rd = chk7D(new Function('ENV', [fn7p(html, 'esc'), fn7p(html, 'isDate'), fn7p(html, 'dutyBadges'), fn7p(html, 'dutyRowHtml'), 'function isAdmin(){ return !!ENV.admin; } function lmDutyDetail(){ return []; }', mb.replace(/^[\s\S]*?(?=  function licRkBadge)/, ''), 'return dutyRowHtml;'].join('\n'))).ok; return !(ra && rb && rd); } catch (e) { return true; } });
-  T('P1 판7 ⑥ 결함 사본 ' + MU7.length + '개(단계 가름 없음·법 시행령 낱말·법령 뒤 단계 낱말·풀림 없음·같은 날 풀림·약칭·이어받기·번호 순·가운뎃점·여러 낱말 이름·모르는 법령 뺌·모르는 법령 맞춤·날짜 없는 감지·10분 묶음·로그인 전환·읽기 실패를 표로·200 아닌 응답·제목 이스케이프·다른 탭 그림) = 모두 ✗',
+  T('P1 판7 ⑥ 결함 사본 ' + MU7.length + '개(단계 가름 없음·법 시행령 낱말·법령 뒤 단계 낱말·풀림 없음·같은 날 안 풀림·약칭·이어받기·번호 순·가운뎃점·여러 낱말 이름·모르는 법령 뺌·모르는 법령 맞춤·날짜 없는 감지·10분 묶음·로그인 전환·읽기 실패를 표로·200 아닌 응답·제목 이스케이프·다른 탭 그림) = 모두 ✗',
     kill7.every((v) => v === true), JSON.stringify(kill7.map((v, i) => (v === true ? 1 : MU7[i][0].slice(0, 40) + ':' + v))));
 } catch (e) { console.log('  ✗ P1 판7 검사 실행 — ' + e.message); fails++; }
 

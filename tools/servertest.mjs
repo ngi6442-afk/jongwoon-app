@@ -10001,7 +10001,8 @@ function J91a(x) { return JSON.stringify(x); }
     return { ok: got.length === 0, info: got };
   };
   const MV7 = { id: 'u7v', name: '보기7', admin: false, perms: { lic: 'view' } }, MH7 = { id: 'u7h', name: '숨김7', admin: false, perms: { lic: 'hide', con: 'do' } };
-  const tV7 = issueSession(MV7).token, tH7 = issueSession(MH7).token;
+  const MN7 = { id: 'u7n', name: '권한없음7', admin: false, perms: { tasks: 'do' } }, MD7 = { id: 'u7d', name: '수행7', admin: false, perms: { lic: 'do' } }, MR7 = { id: 'u7r', name: '퇴사7', admin: false, perms: { lic: 'view' }, leave_date: '2020-01-01' };
+  const tV7 = issueSession(MV7).token, tH7 = issueSession(MH7).token, tN7 = issueSession(MN7).token, tD7 = issueSession(MD7).token, tR7 = issueSession(MR7).token;
   const call7 = (mod) => async (tok, dev) => { const r = await mod.handler({ httpMethod: 'POST', headers: Object.assign({ authorization: tok ? 'Bearer ' + tok : '' }, dev ? { 'x-device-id': dev } : {}), body: JSON.stringify({ action: 'lic_recheck_get' }) }); return { code: r.statusCode, body: JSON.parse(r.body || '{}') }; };
   const chk7G = async (gd) => { const got = []; reset7(); const g = call7(gd);
     Object.assign(mem.gw_users, { 'member:u7v': MV7, 'member:u7h': MH7, 'device:dev1': { status: 'approved' } });
@@ -10017,6 +10018,32 @@ function J91a(x) { return JSON.stringify(x); }
     mem.gw_data['lawwatch:last'] = JSON.parse(JSON.stringify(OLD7));
     blobsMock.hooks.failGet = (k) => k === 'lawwatch:last'; const f = await g(tV7, 'dev1'); blobsMock.hooks.failGet = null;
     if (cd(f) !== '500/LAWWATCH_READ_FAILED') got.push('못 읽음 ' + cd(f));
+    // 권한 경계(오케스트레이터 ④): 인허가 키 없음(lic 기본 숨김) = 403 · 인허가 수행 = 200 · 퇴사 계정 = 401 · 같은 계정의 col:licenses 읽기(get)와 같은 판정
+    Object.assign(mem.gw_users, { 'member:u7n': MN7, 'member:u7d': MD7, 'member:u7r': MR7 });
+    mem.gw_data['col:licenses'] = { schema: 1, items: [], duties: [], updated_at: 1, updated_by: 'x' };
+    const nn = await g(tN7, 'dev1'), dd = await g(tD7, 'dev1'), rr = await g(tR7, 'dev1');
+    const gl = async (tok) => cd(await (async () => { const x = await gd.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + tok, 'x-device-id': 'dev1' }, body: JSON.stringify({ action: 'get', collection: 'licenses' }) }); return { code: x.statusCode, body: JSON.parse(x.body || '{}') }; })());
+    const same = [[tN7, nn], [tH7, h], [tV7, v], [tD7, dd]];
+    const sameOk = []; for (const [tk, rx] of same) sameOk.push((await gl(tk)).split('/')[0] === String(rx.code));
+    if (!(cd(nn) === '403/NO_ACCESS' && dd.code === 200 && rr.code === 401 && sameOk.every(Boolean))) got.push('권한 경계 ' + JSON.stringify([cd(nn), cd(dd), cd(rr), sameOk]));
+    return { ok: got.length === 0, info: got };
+  };
+  // ⑤ 서버 저장 경계(오케스트레이터 ⑤): 표시를 푸는 칸(confirmed_at·confirmed_by·recheck_by)은 관리자 통째 저장만 바꿈 —
+  //   관리자 아닌 수행·담당의 통째 저장 = duties 서버 값 · 담당 좁은 저장(lic_duty_set)에 그 칸 = 400 BAD_FIELD(본문·v 둘 다) · 관리자 통째 저장 = 반영
+  const chk7S = async (gd) => { const got = []; reset7(); const c = async (body, tok) => { const x = await gd.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + tok, 'x-device-id': 'dev1' }, body: JSON.stringify(body) }); return { code: x.statusCode, body: JSON.parse(x.body || '{}') }; };
+    Object.assign(mem.gw_users, { 'member:u7d': MD7, 'device:dev1': { status: 'approved' } });
+    mem.gw_data['bg:lic:law:v1'] = { schema: 1, domain: 'lic', ver: 'v1-t7', status: 'promoted', rows: [{ no: 1, auto: true, type: 'interval', base: 'manual', every_n: 12, every_unit: 'month', lic_id: 'L1', duty: '가짜 의무', cycle: '연 1회', cites: [] }] };
+    mem.gw_data['settings:assign'] = { schema: 1, rules: { 'lic:': { who_id: 'u7d' } }, approver_id: '', prev: null, updated_at: 5, updated_by: 'x' };
+    mem.gw_data['col:licenses'] = { schema: 1, items: [{ id: 'L1', name: '가짜 허가', updated: '2026-10-01' }], duties: [{ no: 1, duty: '가짜 의무', cycle: '연 1회', confirm: '확정', law: '가짜환경법 시행규칙 제1조', updated_ts: 100 }], updated_at: 9000, updated_by: 'x' };
+    const row = () => mem.gw_data['col:licenses'].duties[0];
+    const STAMP = { confirmed_at: TD7, confirmed_by: '가짜 담당', recheck_by: '가짜 담당' };
+    const w1 = await c({ action: 'save', collection: 'licenses', base: 9000, doc: { schema: 1, items: mem.gw_data['col:licenses'].items, duties: [Object.assign({}, row(), STAMP)] } }, tD7);
+    if (!(w1.code === 200 && row().confirmed_at === undefined && row().confirmed_by === undefined && row().recheck_by === undefined)) got.push('담당 통째 저장 ' + JSON.stringify([w1.code, w1.body.error_code, row()]));
+    const s1 = await c({ action: 'lic_duty_set', no: 1, op: 'na', base: 100, v: { reason: '가짜', confirmed_at: TD7 } }, tD7), s2 = await c({ action: 'lic_duty_set', no: 1, op: 'na', base: 100, v: { reason: '가짜' }, confirmed_at: TD7 }, tD7);
+    if (!(s1.code === 400 && s1.body.error_code === 'BAD_FIELD' && s2.code === 400 && s2.body.error_code === 'BAD_FIELD' && row().confirmed_at === undefined)) got.push('좁은 저장 ' + JSON.stringify([s1.code, s1.body.error_code, s2.code, s2.body.error_code]));
+    const ua = mem.gw_data['col:licenses'].updated_at;
+    const a1 = await c({ action: 'save', collection: 'licenses', base: ua, doc: { schema: 1, items: mem.gw_data['col:licenses'].items, duties: [Object.assign({}, row(), { confirmed_at: TD7, recheck_by: '관리자' })] } }, tokA);
+    if (!(a1.code === 200 && row().confirmed_at === TD7 && row().recheck_by === '관리자')) got.push('관리자 저장 ' + JSON.stringify([a1.code, a1.body.error_code, row()]));
     return { ok: got.length === 0, info: got };
   };
   const chk7C = (LC) => { const got = [];
@@ -10031,9 +10058,10 @@ function J91a(x) { return JSON.stringify(x); }
     return { ok: got.length === 0, info: got };
   };
   try {
-    const R7 = { L: await chk7L(require(FLW7)), G: await chk7G(gwd), C: chk7C(require(FLC7)) };
+    const R7 = { L: await chk7L(require(FLW7)), G: await chk7G(gwd), C: chk7C(require(FLC7)), S: await chk7S(gwd) };
+    T('P1 판7 ⑤ 서버 저장 경계: 관리자 아닌 인허가 수행의 통째 저장 = 의무 대장 서버 값(확인 날짜·확인자·재확인자 칸 안 바뀜) · 담당 좁은 저장(lic_duty_set)에 confirmed_at = 400 BAD_FIELD(v 안·본문 둘 다) · 관리자 통째 저장 = 반영 — 표시는 관리자만 풂', R7.S.ok, JSON.stringify(R7.S.info));
     T('P1 판7 ① gw-lawwatch law_changed 쌓기: 옛 꼴 앞 판(경보 글만)의 감지분 이어받음 · 수집기 law_changed 합침(늦은 날짜 순·mst 보관) · 같은 법령(빈칸·가운뎃점 달라도) = 한 줄·늦은 날짜 · 옛 수집기 경보 글도 뽑음 · 앞 판 못 읽음 = 이번 회차만 200 · 날짜 없음·꼴 틀림 = 오늘(KST) · 푸시 제목·본문·태그 종전 그대로(선임 1건·개정 1건)', R7.L.ok, JSON.stringify(R7.L.info));
-    T('P1 판7 ② lic_recheck_get: 비로그인 401 · 미승인 기기 403 · 인허가 숨김(계약 수행) 403 NO_ACCESS · 보기·관리자 200 = 감지 목록 이름·날짜만(경보 글·MST·bg_recheck 안 내림 — 칸 4개) · 옛 꼴 경보 글도 목록에 · 쓰기 0 · 감시 기록 없음 = 빈 목록 · 못 읽음 500 LAWWATCH_READ_FAILED', R7.G.ok, JSON.stringify(R7.G.info));
+    T('P1 판7 ② lic_recheck_get: 비로그인 401 · 미승인 기기 403 · 인허가 숨김(계약 수행) 403 NO_ACCESS · 보기·관리자 200 = 감지 목록 이름·날짜만(경보 글·MST·bg_recheck 안 내림 — 칸 4개) · 옛 꼴 경보 글도 목록에 · 쓰기 0 · 감시 기록 없음 = 빈 목록 · 못 읽음 500 LAWWATCH_READ_FAILED · 권한 경계: 인허가 키 없는 계정(기본 숨김) 403 · 인허가 수행 200 · 퇴사 계정 401 · 네 계정 모두 col:licenses 읽기(get)와 같은 판정', R7.G.ok, JSON.stringify(R7.G.info));
     T('P1 판7 ③ _lib/lawchg: 이름 빈칸·가운뎃점 무시 같은 법령 = 늦은 날짜 하나 · 2년 넘은 감지 뺌(경계 안쪽은 남김) · 오늘 뒤 날짜 = 오늘 · 이름 없음·없는 날짜 뺌 · 늦은 날짜 순 · 최대 300 · 경보 글은 [법령 개정 감지]만 · 날짜 못 정하면 뺌', R7.C.ok, JSON.stringify(R7.C.info));
     const MUT7 = [
       ['L', "    try { const pr = await blobGet(store('gw_data'), 'lawwatch:last'); if (pr && pr.ok) prevLw = pr.data; } catch (e) {}\n", ''],
@@ -10044,6 +10072,8 @@ function J91a(x) { return JSON.stringify(x); }
       ['G', "  if (!r.ok && r.code !== 'NOT_FOUND') return jr(500, { status: 'ERROR', error_code: 'LAWWATCH_READ_FAILED', request_id: R });\n", ''],
       ['G', 'changed: list.map(function (x) { return { name: x.name, date: x.date }; })', 'changed: list'],
       ['G', "  if (!(await deviceApproved(event, c.member))) return jr(403, { status: 'FORBIDDEN', error_code: 'DEVICE_NOT_APPROVED', request_id: R });\n  if (permOf(c.member, 'licenses') === 'hide') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_ACCESS', request_id: R });\n  let r;", "  if (permOf(c.member, 'licenses') === 'hide') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_ACCESS', request_id: R });\n  let r;"],
+      ['S', '    if (!c.member.admin || !Array.isArray(doc.duties) || (doc.duties.length === 0 && prevDuties.length > 0)) doc.duties = prevDuties;', '    if (!Array.isArray(doc.duties) || (doc.duties.length === 0 && prevDuties.length > 0)) doc.duties = prevDuties;'],
+      ['S', '  const badV = Object.keys(v).filter(function (k) { return LIC_OPS[op].indexOf(k) < 0; });', '  const badV = [];'],
       ['C', "function nameKey(s) { return String(s || '').replace(/[\\s·ㆍ・‧∙]/g, ''); }", "function nameKey(s) { return String(s || ''); }"],
       ['C', '      if (c.date > td) c.date = td;\n', ''],
       ['C', '      if (c.date < cut) return;\n', ''],
@@ -10059,11 +10089,12 @@ function J91a(x) { return JSON.stringify(x); }
       try {
         if (k === 'L') ok = (await chk7L(load7(FLW7, mut7(SLW7, from, to)))).ok;
         else if (k === 'G') ok = (await chk7G(load7(FGD7, mut7(SGD7, from, to)))).ok;
+        else if (k === 'S') ok = (await chk7S(load7(FGD7, mut7(SGD7, from, to)))).ok;
         else { const LCm = load7(FLC7, mut7(SLC7, from, to)); const a = chk7C(LCm).ok; ok = a; }
       } catch (e) { ok = 'err ' + e.message; }
       if (ok !== false) kill7.push(k + ':' + from.trim().slice(0, 60) + (ok === true ? ' 안 깨짐' : ' ' + ok));
     }
-    T('P1 판7 ④ 결함 사본 ' + MUT7.length + '개(앞 판 안 읽음·앞 판 안 합침·보관 안 함·앞 판 못 읽으면 던짐 · 숨김 통과·못 읽음을 빈 목록·MST까지 내림·기기 통과 · 이름 정규화·미래 날짜·2년·같은 법령 늦은 날짜·최대·경보 글 안 뽑음·다른 경보도 뽑음·없는 날짜·날짜 못 정함) = 모두 ✗', kill7.length === 0, kill7.join(' | '));
+    T('P1 판7 ④ 결함 사본 ' + MUT7.length + '개(앞 판 안 읽음·앞 판 안 합침·보관 안 함·앞 판 못 읽으면 던짐 · 숨김 통과·못 읽음을 빈 목록·MST까지 내림·기기 통과 · 관리자 아닌 통째 저장 이월·좁은 저장 허용 칸 · 이름 정규화·미래 날짜·2년·같은 법령 늦은 날짜·최대·경보 글 안 뽑음·다른 경보도 뽑음·없는 날짜·날짜 못 정함) = 모두 ✗', kill7.length === 0, kill7.join(' | '));
   } catch (e) { T('P1 판7 검사 실행', false, String(e && e.stack || e).slice(0, 400)); }
   finally { reset7(); process.env.BIDS_INGEST_KEY = savedKey7; }
 }
