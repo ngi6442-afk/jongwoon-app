@@ -14488,7 +14488,7 @@ try {
   const chk70 = (d) => {
     const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
     const ftv = cut(d.ft, '\n### v472 (11/14)', '\n### '), tlv = cut(d.tl, '\n## v472 ', '\n## ');
-    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[ \] \(AI 시험 화면 대상/.test(l));
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI 시험 화면 대상/.test(l));   // v475: 화면 칸 2개를 시험 서버 확인 뒤 [x]로 닫음 — 칸 수는 그대로 셈
     const FT = ['`hrEmpCorpChips`', '`MEMBER_CORP`', '`both`', '`emp_type`', '지입차주', '(고르지 않음)', '고용형태 없음', '원장 C150'];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
     const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 472 /* v473: 기준 줄·sw = 이 판 이상 */ && ftv.length > 0 && mF.length === 0 && cb.length === 5 && gate.length === 3 && scr.length === 2 && !cb.some((l) => /\(PM/.test(l))
@@ -14556,8 +14556,8 @@ try {
     const FT = ['`stmt_drop`', '`stmt_drop_list`', '`stmt_drop_get`', '`stmt_drop_file`', '`stmt_drop_set`', '`stmt_drop_del`', '`drop_ids`', '`stmtfile:<id>`', '`stmtdrop:<ym>:<id>`', '`guessVendor`', 'servertest 91', "'29 판⑥'", '18개 자동'];
     const GATE = ['uismoke', 'consheet_check', 'proctpl_check', 'settletest', 'servertest', 'rectest', 'promoqual_check', 'promogen_check', 'promoqlearn_check', 'promostream_check', 'promo_wrap_check', 'promo_post_check', 'stmtread_a_check', 'stmtread_b_check', 'stmtread_c_check', 'stmtread_d_check'];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
-    const ok = /기준: v474 \(2026-11-14\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && scr.length >= 3 && !cb.some((l) => /\(PM/.test(l))
-      && GATE.every((g) => gate.some((l) => l.indexOf('`' + g + '`') > 0)) && /SHELL_CACHE = 'jw-shell-v474'/.test(d.sw)
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 474 && ftv.length > 0 && mF.length === 0 && scr.length >= 3 && !cb.some((l) => /\(PM/.test(l))
+      && GATE.every((g) => gate.some((l) => l.indexOf('`' + g + '`') > 0)) && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 474   // v475: 기준 줄·sw = 이 판 이상
       && /<b>원본 한꺼번에 넣기·첨부 원본<\/b> \(2026-11 v474\)/.test(d.man) && d.man.indexOf('상세를 닫으면 결과는 버려집니다') < 0 && /월말명세서 원본 첨부·한꺼번에 넣기\(v474 — 29 판⑥\)/.test(d.cl);
     return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
   };
@@ -14894,6 +14894,43 @@ try {
   T('P1 판7 ⑥ 결함 사본 ' + MU7.length + '개(단계 가름 없음·법 시행령 낱말·법령 뒤 단계 낱말·풀림 없음·같은 날 안 풀림·약칭·이어받기·번호 순·가운뎃점·여러 낱말 이름·모르는 법령 뺌·모르는 법령 맞춤·날짜 없는 감지·10분 묶음·로그인 전환·읽기 실패를 표로·200 아닌 응답·제목 이스케이프·다른 탭 그림) = 모두 ✗',
     kill7.every((v) => v === true), JSON.stringify(kill7.map((v, i) => (v === true ? 1 : MU7[i][0].slice(0, 40) + ':' + v))));
 } catch (e) { console.log('  ✗ P1 판7 검사 실행 — ' + e.message); fails++; }
+
+// ── v475(Phase 1 판7·10·11·19 + 홈 [완료] 수리 C156 — PM 11/14 19:28 "다음"): C156 정적 검사 + 문서·판 번호 정확 검사 — 다음 판은 기준 줄·sw를 '475 이상'으로 풀 것
+try {
+  const rd475 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const chkC156 = (h) => {
+    const seg = (h.match(/function toggleTaskDone\(id\)\{[\s\S]*?\n  \}/) || [''])[0];
+    const iSave = seg.lastIndexOf('scheduleTasksSave();'), iDash = seg.indexOf('if (typeof currentTab !== "undefined" && currentTab === "dash"){ try { renderDashboard(); } catch (e) {} }');
+    return seg.length > 0 && iSave > 0 && iDash > iSave && (seg.match(/renderDashboard\(\)/g) || []).length === 1;
+  };
+  const MC = [chkC156(html.replace('if (typeof currentTab !== "undefined" && currentTab === "dash"){ try { renderDashboard(); } catch (e) {} }', '')),
+    chkC156(html.replace('if (typeof currentTab !== "undefined" && currentTab === "dash"){ try { renderDashboard(); } catch (e) {} }', 'renderDashboard();')),
+    chkC156(html.replace('    scheduleTasksSave();\n    // 원장 C156', '    // 원장 C156'))];
+  T('v475 C156 홈 [완료] 뒤 다시 그리기: toggleTaskDone이 저장 예약 뒤에 · 홈 탭일 때만 · 예외를 삼키고 홈을 다시 그림 · 결함 사본 ' + MC.length + '개 = 모두 ✗',
+    chkC156(html) && MC.every((v) => v === false), JSON.stringify({ ok: chkC156(html), mut: MC }));
+
+  const D475 = { ft: rd475('FEATURES.md'), tl: rd475('TESTLIST.md'), sw: rd475('sw.js'), man: rd475('MANUAL.html'), cl: rd475('CLAUDE.md') };
+  const chk475 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v475 (11/14)', '\n### '), tlv = cut(d.tl, '\n## v475 ', '\n## '), t72 = cut(d.tl, '\n## v472 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI 시험 화면 대상/.test(l));
+    const FT = ['`licRkMarks`', '`lic_recheck_get`', '`_lib/lawchg.js`', '`recheck_by`', '`conChgEff`', '`appr.snap`', '`bareRange`', '`retryBody`', '`len_fail`', '`certSignal`', '`proof:__index__`', '`toggleTaskDone`', '원장 C155', 'C156', '기한 계산은 그대로', '자동 완료 없음'];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const MAN = ['<b>승인된 변경 금액·종료일</b>', '<b>증명서 3종</b>', '<b>근거 재확인 필요</b>', '<span class="btn">근거 재확인</span> (2026-11 v475)'];
+    const ok = /기준: v475 \(2026-11-14\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 8 && gate.length === 3 && scr.length === 5 && !cb.some((l) => /\(PM/.test(l))
+      && (t72.match(/^- \[ \] /gm) || []).length === 0
+      && MAN.every((s) => d.man.indexOf(s) > 0) && !/licRk|conChgEff|appr\.snap|certSignal|proof:__index__|recheck_by/.test(MAN.map((s) => cut(d.man, s, '</li>')).join(' '))
+      && d.cl.indexOf('**P1 판7·10·11·19(v475') > 0 && d.cl.indexOf('`conChgEff`') > 0
+      && /SHELL_CACHE = 'jw-shell-v475'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
+  };
+  const r475 = chk475(D475);
+  const mu475 = (k, f) => chk475(Object.assign({}, D475, { [k]: f(D475[k]) })).ok;
+  const M475 = [mu475('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v474 (')), mu475('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v474'")),
+    mu475('ft', (s) => s.split('`appr.snap`').join('appr.snap')), mu475('man', (s) => s.replace('<b>증명서 3종</b>', '증명서 3종')), mu475('cl', (s) => s.replace('**P1 판7·10·11·19(v475', 'P1 판7·10·11·19('))];
+  T('v475 문서·판 번호(정확 검사): FEATURES 기준 v475 (2026-11-14)·v475 절 · TESTLIST v475 칸 8(화면 5 · 게이트 [x] 3)·v472 빈 칸 0 · MANUAL 변경계약·증명서 3종·근거 재확인(내부 이름 0) · CLAUDE.md 줄 · sw jw-shell-v475 · 결함 사본 ' + M475.length + '개 = 모두 ✗',
+    r475.ok && M475.every((v) => v === false), JSON.stringify({ r: r475.info, mut: M475 }));
+} catch (e) { console.log('  (v475 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
