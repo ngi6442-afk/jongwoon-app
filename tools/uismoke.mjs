@@ -8601,7 +8601,7 @@ try {
   const MAN_PINS23 = ["'보이는 n건 / 전체 m건'의 전체는 <b>전체</b> 버튼 숫자와 같고, <span class=\"btn\">지남</span>을 누르면 '지남 m건'으로 바뀝니다", '상태 칸 머리로 정렬해 두었으면 그 공고가 새 자리로 옮겨 가며 화면도 따라갑니다',
     '가리지 않았는데 150줄 밖이면(마감이 없으면 맨 뒤) 화면 아래에 알림만 나옵니다'];
   const CL_PINS23 = ['v443 검토 반영(부품): 정의 옵션 `total(r)`', '`vsSheetReveal(def, id, onlyHidden)` 셋째 인자', '펼친 행은 더보기 한도 밖이어도 이번 그림만', '`BID_ALL_T`', '`BID_NEW_FAR_MSG`', '`bidSheetFollow`', '`bidsLoading`', '`#bidStatsWrap`'];
-  const rv23 = cbScr17.filter((l) => /^- \[ \] \(AI 시험 화면 대상 — 검토 반영\(11\/11\)/.test(l)), RV_PINS23 = ["'/ 지남 n건'", '공고문에 적격심사 아님이 명시돼', '표 150줄 그대로·펼침 없음·화면 아래 알림 한 줄', '화면이 그 줄로 따라감', '칩이 붙지 않음', '통계 표 폭'];
+  const rv23 = cbScr17.filter((l) => /^- \[[ x]\] \(AI 시험 화면 대상 — 검토 반영\(11\/11\)/.test(l)) /* 11/14: 화면 시험으로 닫힌 칸([x])도 셈 */, RV_PINS23 = ["'/ 지남 n건'", '공고문에 적격심사 아님이 명시돼', '표 150줄 그대로·펼침 없음·화면 아래 알림 한 줄', '화면이 그 줄로 따라감', '칩이 붙지 않음', '통계 표 폭'];
   const doc23 = FT_PINS23.filter((s) => ft23.indexOf(s) < 0).concat(MAN_PINS23.filter((s) => man11_17.indexOf(s) < 0).map((s) => 'MAN ' + s), CL_PINS23.filter((s) => cl17.indexOf(s) < 0).map((s) => 'CL ' + s),
     rv23.length === 1 ? RV_PINS23.filter((s) => rv23[0].indexOf(s) < 0).map((s) => 'TL ' + s) : ['TL 검토 칸 ' + rv23.length]);
   const gate23 = cbGate17.length === 1 && /검토 반영 뒤\(11\/11/.test(cbGate17[0]) && ['`consheet_check`', '`proctpl_check`', '`settletest`', '`servertest`', '결함 심기'].every((g) => cbGate17[0].lastIndexOf(g) > cbGate17[0].indexOf('검토 반영 뒤(11/11'));
