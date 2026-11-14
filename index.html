@@ -28026,6 +28026,7 @@ function dutyStage(nx){
     document.getElementById("licLayerDuty").style.display = (name === "duty") ? "" : "none";
     document.getElementById("licLayerMonth").style.display = (name === "month") ? "" : "none";
     if (name === "duty") renderDuties();
+    if (name === "month") licMonth.rk = licRkNow();   // P1 판7 '근거 재확인 필요' 표(lmRowHtml 배지 — 기한·묶음은 안 봄)
     if (name === "month"){ if (licMonth.st !== "loading") licMonth.st = ""; renderLicMonth(); }   // P1 판28 — 칸을 열 때마다 서버에서 근거표·누를 수 있는 행을 다시 읽음(@lic-month)
   }
   function updateLicSubCnt(){
@@ -28096,12 +28097,73 @@ function dutyStage(nx){
       : '<span class="duty-badge pre">조건부 · 선행확인 필요</span>';
     return h;
   }
-  function dutyRowHtml(d, open){
+  // @lic-recheck-start — P1 판7(원장 C102) 법령 개정 감지 → 의무 대장 행에 '근거 재확인 필요' 배지(표시만 — 기한 계산·이번 달 회차는 그대로, 계산 입력 아님).
+  //   원천 = 서버 lic_recheck_get(감지된 법령 목록 [{name, date}] — lawwatch:last law_changed + 옛 꼴 경보 글). 못 읽음·감지 없음 = 표시 없음. 10분 지나면 칸을 다시 그릴 때 다시 읽음.
+  //   맞춤 = 행 law 칸 글(licRkParse): 법령 이름(약칭 표 LIC_RK_ABBR·빈칸·가운뎃점 무시) 뒤 '시행령/시행규칙'으로 단계를 가름 · 이름 없이 쓴 '법·영·규칙'은 같은 칸의 앞 법령, 칸 첫머리면 앞 행(번호 순)의 첫 법령을 이어받음.
+  //     개정이 시행령·시행규칙이면 그 단계를 인용한 행만 · 본법이면 그 법의 모든 단계 인용 행(넘치는 쪽) · 어느 법인지 모르는 '법·영·규칙'(이어받을 법령 없음)은 모든 법령에 맞춤(넘치는 쪽).
+  //   풀림 = 행 확정 날짜(confirmed_at — 관리자 [선행확인 입력] 창에서 확정으로 저장한 날)가 감지 날짜보다 뒤. 같은 법령이 다시 개정되면 새 감지 날짜로 다시 붙음.
+  var licRk = { st: "", changed: [], seq: 0, vid: "", at: 0 };
+  var LIC_RK_ABBR = { "산안법":"산업안전보건법", "건폐법":"건설폐기물의재활용촉진에관한법률", "건산법":"건설산업기본법", "화관법":"화학물질관리법", "화물자동차법":"화물자동차운수사업법", "지방계약법":"지방자치단체를당사자로하는계약에관한법률", "국가계약법":"국가를당사자로하는계약에관한법률", "대기법":"대기환경보전법", "소음진동법":"소음진동관리법", "폐관법":"폐기물관리법" };
+  var LIC_RK_STOP = { "모법":1, "본법":1, "방법":1, "불법":1, "위법":1, "적법":1, "편법":1 };
+  function licRkNorm(s){ return String(s == null ? "" : s).replace(/[\s·ㆍ・‧∙]/g, ""); }
+  function licRkSplit(name){ var n = licRkNorm(name), m = n.match(/^(.+?)(시행령|시행규칙)$/), b = m ? m[1] : n; return { base: LIC_RK_ABBR[b] || b, lv: m ? (m[2] === "시행령" ? "영" : "규칙") : "법" }; }
+  function licRkParse(text, carry, known){   // → { refs: [{base, lv('법'|'영'|'규칙')}], first: 이 칸의 첫 법령(다음 행이 이어받음) }
+    var w = String(text == null ? "" : text).match(/[가-힣]+/g) || [], refs = [], cur = carry || "", first = "", i, x, nm, nx, lv;
+    var named = function(i){ for (var k = Math.min(6, i); k >= 1; k--){ var c = w.slice(i - k, i + 1).join(""); if (known[c]) return c; if (LIC_RK_ABBR[c]) return LIC_RK_ABBR[c]; } return ""; };   // 여러 낱말 이름(화물자동차 운수사업법·…에 관한 법률)
+    for (i = 0; i < w.length; i++){
+      x = w[i]; nx = w[i + 1] || "";
+      if (x === "규칙" && (nm = named(i))){ refs.push({ base: nm, lv: "법" }); cur = nm; if (!first) first = nm; continue; }   // '…에 관한 규칙' 자체가 법령 이름인 경우(감시 목록에 있을 때)
+      if (x === "법" || x === "동법" || x === "영" || x === "규칙"){
+        lv = x === "영" ? "영" : (x === "규칙" ? "규칙" : "법");
+        if (lv === "법" && (nx === "시행령" || nx === "시행규칙")){ lv = nx === "시행령" ? "영" : "규칙"; i++; }
+        refs.push({ base: cur || "*", lv: lv }); continue;
+      }
+      if (/(법|법률)$/.test(x) && x.length > 1 && !LIC_RK_STOP[x]){   // 'OO법'·'…에 관한 법률'(낱말 '법률' 하나 — 앞 낱말과 이어 이름을 찾음)
+        nm = named(i) || LIC_RK_ABBR[x] || x;
+        lv = nx === "시행령" ? "영" : (nx === "시행규칙" ? "규칙" : "법"); if (lv !== "법") i++;
+        refs.push({ base: nm, lv: lv }); cur = nm; if (!first) first = nm;
+      }
+    }
+    return { refs: refs, first: first };
+  }
+  function licRkMarks(list, changed){   // → { 행 번호: { laws: [감지 법령 이름], date: 가장 늦은 감지 날짜 } } — 입력(duties·목록)은 바꾸지 않는다
+    var out = {}, ch = [], known = {}, carry = "";
+    (Array.isArray(changed) ? changed : []).forEach(function(c){ if (!c || !c.name || !isDate(c.date)) return; var s = licRkSplit(c.name); ch.push({ name: String(c.name), base: s.base, lv: s.lv, date: c.date }); known[s.base] = 1; });
+    if (!ch.length) return out;
+    Object.keys(LIC_RK_ABBR).forEach(function(k){ known[LIC_RK_ABBR[k]] = 1; });
+    (Array.isArray(list) ? list.slice() : []).filter(function(d){ return d && d.no != null; }).sort(function(a, b){ return (a.no || 0) - (b.no || 0); }).forEach(function(d){
+      var p = licRkParse(d.law, carry, known); if (p.first) carry = p.first;
+      var hit = ch.filter(function(c){
+        if (isDate(d.confirmed_at) && d.confirmed_at > c.date) return false;   // 감지 뒤에 사람이 다시 확인(확정 저장) = 풀림
+        return p.refs.some(function(r){ return (r.base === c.base || r.base === "*") && (c.lv === "법" || r.lv === c.lv); });
+      });
+      if (!hit.length) return;
+      var laws = [];
+      hit.forEach(function(c){ if (laws.indexOf(c.name) < 0) laws.push(c.name); });
+      out[d.no] = { laws: laws, date: hit.reduce(function(a, c){ return c.date > a ? c.date : a; }, "") };
+    });
+    return out;
+  }
+  function licRkLoad(){
+    var seq = ++licRk.seq;
+    licRk.st = "loading"; licRk.vid = myId();
+    var done = function(ok, list){ if (seq !== licRk.seq) return; licRk.st = ok ? "ok" : "err"; licRk.changed = ok ? list : []; licRk.at = Date.now(); if (currentTab === "lic"){ if (licLayer === "duty") renderDuties(); else if (licLayer === "month"){ licMonth.rk = licRkNow(); renderLicMonth(); } } };
+    return gwCall("gw-data", { action: "lic_recheck_get" }).then(function(res){ var ok = !!(res && res.status === 200 && res.body && Array.isArray(res.body.changed)); done(ok, ok ? res.body.changed : []); }).catch(function(){ done(false, []); });
+  }
+  function licRkNow(){   // 칸을 그릴 때 — 지금 쓸 표시 표(읽는 중·못 읽음 = 빈 표). 로그인 전환이면 앞사람 목록을 버림
+    if (licRk.vid !== myId()){ licRk.seq++; licRk.st = ""; licRk.changed = []; licRk.at = 0; }
+    if (!licRk.st || (licRk.st !== "loading" && Date.now() - licRk.at > 600000)) licRkLoad();
+    return licRk.st === "ok" ? licRkMarks(duties, licRk.changed) : {};
+  }
+  function licRkBadge(rk){ return rk ? ' <span class="duty-badge pre" title="' + esc("법령 개정 감지 " + rk.date + " — " + rk.laws.join(", ")) + '">근거 재확인 필요</span>' : ""; }
+  // @lic-recheck-end
+  function dutyRowHtml(d, open, rk){
     var detail = "";
     if (open){
       var parts = [];
       if (d.basis) parts.push("<b>기산점·마감</b>  " + esc(d.basis));
       if (d.law) parts.push("<b>근거</b>  " + esc(d.law));
+      if (rk) parts.push("<b>근거 재확인</b>  " + esc(rk.laws.join(", ")) + " 개정 감지(" + esc(rk.date) + ") — 조문을 다시 확인해 주세요. 기한 계산은 그대로입니다.");   // P1 판7
       if (d.precheck) parts.push("<b>선행 확인</b>  " + esc(d.precheck));
       if (d.precheck_answer) parts.push("<b>선행확인 답</b>  " + esc(d.precheck_answer));
       if (d.base_date) parts.push("<b>기준일</b>  " + esc(d.base_date));
@@ -28113,7 +28175,7 @@ function dutyStage(nx){
     return '<div class="item duty-item" data-duty-no="' + d.no + '">' +
         '<div class="item-body">' +
           '<div class="item-title">' + d.no + '. ' + esc(d.duty) + '</div>' +
-          '<div class="item-meta" style="margin-top:2px;">' + dutyBadges(d) + (d.na && d.na.on ? ' <span class="duty-badge pre">해당 없음 — 자동 회차 끔</span>' : '') + '</div>' +
+          '<div class="item-meta" style="margin-top:2px;">' + dutyBadges(d) + (d.na && d.na.on ? ' <span class="duty-badge pre">해당 없음 — 자동 회차 끔</span>' : '') + (rk ? licRkBadge(rk) : '') + '</div>' +
           '<div class="duty-sum">' + esc(d.cycle || "") + (d.basis ? " — " + esc(d.basis) : "") + '</div>' +
           detail +
         '</div>' +
@@ -28138,6 +28200,7 @@ function dutyStage(nx){
       if (sb) sb.addEventListener("click", seedDuties);
       return;
     }
+    var rkm = licRkNow();   // P1 판7 '근거 재확인 필요' 표 — 검색과 무관하게 전 행으로 맞춤(앞 행 이어받기)
     var q = (dutyQ || "").toLowerCase();
     var list = !q ? all : all.filter(function(d){
       return ((d.duty || "") + " " + (d.lic || "")).toLowerCase().indexOf(q) >= 0;
@@ -28151,7 +28214,7 @@ function dutyStage(nx){
     });
     order.forEach(function(k){
       html += '<div class="duty-group">' + esc(k) + ' <span style="color:var(--sub);font-weight:600;">' + groups[k].length + '</span></div>';
-      groups[k].forEach(function(d){ html += dutyRowHtml(d, !!dutyOpen[d.no]); });
+      groups[k].forEach(function(d){ html += dutyRowHtml(d, !!dutyOpen[d.no], rkm[d.no]); });
     });
     host.innerHTML = html || '<div class="empty-line">검색 결과가 없습니다.</div>';
     Array.prototype.forEach.call(host.querySelectorAll("[data-duty-no]"), function(el){
@@ -28317,6 +28380,8 @@ function dutyStage(nx){
     }
     if (r.lic) meta.push('<span class="lm-lic">' + esc(r.lic) + '</span>');
     if (r.badge) meta.push('<span class="duty-badge pre">' + esc(r.badge) + '</span>');
+    var rkx = licMonth.rk && licMonth.rk[r.no];   // P1 판7 '근거 재확인 필요' 표(칸 열 때·감지 목록을 받은 뒤 @lic-recheck 구간이 채움) — 기한·묶음(lmGroups)은 이 표를 보지 않고 배지만
+    if (rkx) meta.push(licRkBadge(rkx).slice(1));
     if (licMonth.act[r.no]){
       if (grp === "base"){ if (miss === "base") btn.push(lmBtn("base", r.no, "기준일 입력")); }
       else { btn.push(lmBtn("done", r.no, "완료+수령 올리기")); btn.push(lmBtn("fix", r.no, "기한 정정")); }

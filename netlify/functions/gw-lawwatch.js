@@ -3,9 +3,11 @@
 // 법령 워치 알림 수신 — appdata의 lawwatch.py(주간 크론)가 개정·선임 경보를 POST한다.
 // 인증: 수집봇 공유 시크릿(BIDS_INGEST_KEY, gw-data ingest와 동일 계열) — 헤더 x-ingest-key 또는 body.key.
 // 동작: 전문을 lawwatch:last 에 보관(추후 화면용) + 관리자 전원 푸시(알림함은 sendTo가 자동 기록).
+//   P1 판7: lawwatch:last.law_changed = 법령 개정 감지 누적 목록(_lib/lawchg — 앞 판과 합침). 푸시 제목·본문·받는 사람은 종전 그대로.
 const push = require('./_lib/push');
-const { setupBlobContext, store, blobSet } = require('./_lib/blobs');
+const { setupBlobContext, store, blobGet, blobSet } = require('./_lib/blobs');
 const { botKeyOk } = require('./_lib/keymatch');
+const LAWCHG = require('./_lib/lawchg');   // P1 판7(원장 C102) 법령 개정 감지 목록(law_changed) 쌓기 — 인허가 의무 대장 '근거 재확인 필요' 표시 재료
 
 const jr = (code, obj) => ({
   statusCode: code,
@@ -29,8 +31,13 @@ exports.handler = async (event) => {
 
   try {
     const bgRecheck = Array.isArray(d.bg_recheck) ? d.bg_recheck.slice(0, 100).map((x) => ({ id: String((x && x.id) || '').slice(0, 40), law: String((x && x.law) || '').slice(0, 60), mst: Number(x && x.mst) || 0 })).filter((x) => x.id) : [];   // v405 D2: 계약 배경 재확인 행
+    // P1 판7: 감지 목록은 회차마다 덮지 않고 쌓는다 — 앞 판(law_changed + 옛 꼴 경보 글) + 이번 회차(수집기 law_changed, 없으면 경보 글). 앞 판을 못 읽으면 이번 회차만(경보 보관은 그대로).
+    let prevLw = null;
+    try { const pr = await blobGet(store('gw_data'), 'lawwatch:last'); if (pr && pr.ok) prevLw = pr.data; } catch (e) {}
+    const today = LAWCHG.kstToday();
+    const lawChanged = LAWCHG.merge([LAWCHG.fromDoc(prevLw), LAWCHG.fromDoc({ date: LAWCHG.isDay(d.date) ? d.date : today, alerts: alerts, law_changed: d.law_changed })], today);
     await blobSet(store('gw_data'), 'lawwatch:last', {
-      schema: 1, date: String(d.date || ''), alerts: alerts.slice(0, 50), bg_recheck: bgRecheck, ts: Date.now(),
+      schema: 1, date: String(d.date || ''), alerts: alerts.slice(0, 50), bg_recheck: bgRecheck, law_changed: lawChanged, ts: Date.now(),
     });
   } catch (e) {}
 

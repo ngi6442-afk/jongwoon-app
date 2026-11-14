@@ -2085,6 +2085,22 @@ async function handleLicMonthGet(event, d, R) {
   });
   return jr(200, { status: 'OK', ver: bg.ver, rows: bg.rows.map(licBgOut), act: act, assign_ok: as.ok, who: gen && gen.who_id ? { id: gen.who_id, name: (ms && ms[gen.who_id] && ms[gen.who_id].name) || '' } : null, today: licKstToday(), request_id: R });
 }
+// ---- P1 판7(원장 C102) 법령 개정 감지 → 인허가 의무 대장 '근거 재확인 필요' 표시 — 읽기 lic_recheck_get(쓰기 없음) ----
+// 내리는 것 = 감지된 법령 목록 [{name, date}]만(lawwatch:last law_changed + 옛 꼴 경보 글 — _lib/lawchg). 경보 글·계약 bg_recheck·MST는 내리지 않는다.
+// 행 맞춤(law 칸 글 — 본법/시행령/시행규칙·약칭·생략된 '법·영·규칙'은 앞 행 법령 이어받기)·풀림(행 확정 날짜 > 감지 날짜)은 앱 licRkMarks.
+// 권한 = lic_month_get과 같음(로그인·승인 기기·인허가 숨김 아님). 감시 기록 없음 = 빈 목록 · 못 읽음 = 500 LAWWATCH_READ_FAILED(앱은 표시 없음).
+const LAWCHG = require('./_lib/lawchg');
+async function handleLicRecheckGet(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (!(await deviceApproved(event, c.member))) return jr(403, { status: 'FORBIDDEN', error_code: 'DEVICE_NOT_APPROVED', request_id: R });
+  if (permOf(c.member, 'licenses') === 'hide') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_ACCESS', request_id: R });
+  let r;
+  try { r = await blobGet(store(DATA), 'lawwatch:last'); } catch (e) { r = { ok: false, code: 'STORAGE_READ_FAILED' }; }
+  if (!r.ok && r.code !== 'NOT_FOUND') return jr(500, { status: 'ERROR', error_code: 'LAWWATCH_READ_FAILED', request_id: R });
+  const list = r.ok ? LAWCHG.merge([LAWCHG.fromDoc(r.data)], licKstToday()) : [];
+  return jr(200, { status: 'OK', date: r.ok && r.data && LAWCHG.isDay(r.data.date) ? r.data.date : '', changed: list.map(function (x) { return { name: x.name, date: x.date }; }), request_id: R });
+}
 function licDateOk(v) { return vehDueDate(v); }
 function licTextOk(v, n, need) {   // null = 틀림(꼴) · '' 허용(need 아니면) · 길이 넘침 = false
   if (v === undefined || v === null) return need ? null : '';
@@ -5757,6 +5773,7 @@ async function handlerInner(event) {
     if (d && d.action === 'veh_bg_get') return await handleVehBgGet(event, d, R);   // P1 판27 차량 법령 근거(승격본만 — 아니면 on false)
     if (d && d.action === 'lic_month_get') return await handleLicMonthGet(event, d, R);   // P1 판28 인허가 '이번 달' 탭 읽기(승격본 자동 회차 행·내가 누를 수 있는 행)
     if (d && d.action === 'lic_duty_set') return await handleLicDutySet(event, d, R);   // P1 판28 '이번 달' 단추 네 가지(완료·기한 정정·해당 없음·기준일) + 관리자 해당 없음 되돌리기
+    if (d && d.action === 'lic_recheck_get') return await handleLicRecheckGet(event, d, R);   // P1 판7 법령 개정 감지 목록(의무 대장 '근거 재확인 필요' 표시 재료 — 읽기만)
     if (d && d.action === 'audit') return await handleAudit(event, d, R);
     if (d && d.action === 'ver_list') return await handleVerList(event, d, R);
     if (d && d.action === 'ver_get') return await handleVerGet(event, d, R);

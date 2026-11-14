@@ -9957,4 +9957,115 @@ function J91a(x) { return JSON.stringify(x); }
   finally { mem.gw_data = JSON.parse(snapP19); mem.gw_files = JSON.parse(snapF19); pushMock.sendTo = send0P19; blobsMock.hooks.beforeSet = null; blobsMock.hooks.beforeGet = null; blobsMock.hooks.failGet = null; }
 }
 
+{ // ---- P1 판7(원장 C102) 법령 개정 감지 → 인허가 의무 대장 '근거 재확인 필요' 표시 재료 — gw-lawwatch law_changed 쌓기 · gw-data lic_recheck_get(읽기만) · _lib/lawchg.
+  //   ① gw-lawwatch: 옛 꼴(경보 글만) 앞 판 감지분 이어받기 · 수집기 law_changed 합치기(같은 법령 = 늦은 날짜 하나) · 옛 수집기(경보 글만)도 뽑음 · 앞 판 못 읽음 = 이번 회차만(200) · 푸시 제목·본문·받는 사람 종전 그대로
+  //   ② lic_recheck_get: 비로그인 401 · 기기 403 · 인허가 숨김 403 · 보기 200(이름·날짜만 — 경보 글·MST·bg_recheck 안 내림) · 감시 기록 없음 = 빈 목록 · 못 읽음 500 · 쓰기 0
+  //   ③ _lib/lawchg: 이름 빈칸·가운뎃점 무시 같은 법령 · 날짜 꼴 · 2년 넘은 감지 뺌 · 오늘 뒤 날짜 = 오늘 · 늦은 날짜 순 · 최대 건수 · ④ 결함 사본 = 모두 ✗
+  const fs7 = require('fs'), Mod7 = require('module');
+  const load7 = (file, src) => { const m = new Mod7(file); m.filename = file; m.paths = Mod7._nodeModulePaths(dirname(file)); m._compile(src, file); return m.exports; };
+  const mut7 = (src, from, to) => { if (src.split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 60)); return src.replace(from, () => to); };
+  const FLW7 = join(FN, 'gw-lawwatch.js'), SLW7 = fs7.readFileSync(FLW7, 'utf8'), FGD7 = join(FN, 'gw-data.js'), SGD7 = fs7.readFileSync(FGD7, 'utf8'), FLC7 = join(FN, '_lib', 'lawchg.js'), SLC7 = fs7.readFileSync(FLC7, 'utf8');
+  const snap7 = JSON.stringify({ u: mem.gw_users, d: mem.gw_data });
+  const reset7 = () => { const s = JSON.parse(snap7); mem.gw_users = s.u; mem.gw_data = s.d; blobsMock.hooks.failGet = null; };
+  const savedKey7 = process.env.BIDS_INGEST_KEY;
+  const ev7 = (body) => ({ httpMethod: 'POST', headers: { 'x-ingest-key': 'test-ingest-key' }, body: JSON.stringify(body) });
+  const TD7 = new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);
+  const dAgo7 = (n) => new Date(Date.parse(TD7 + 'T00:00:00Z') - n * 86400000).toISOString().slice(0, 10);
+  const OLD7 = { schema: 1, date: dAgo7(5), alerts: ['[법령 개정 감지] 가짜환경법 시행규칙: 00056 (20260831 공포, 시행 20260918) → 00067 (20261104 공포, 시행 20261104) — 영향 문서는 법령인용_인덱스.md 참조', '[선임 의무] 가짜 선임'], bg_recheck: [], ts: 1 };
+  const chk7L = async (lw) => { try { return await chk7L0(lw); } catch (e) { return { ok: false, info: ['예외 ' + e.message] }; } finally { blobsMock.hooks.failGet = null; process.env.BIDS_INGEST_KEY = savedKey7; } };
+  const chk7L0 = async (lw) => { const got = []; reset7(); process.env.BIDS_INGEST_KEY = 'test-ingest-key';
+    // (가) 옛 꼴 앞 판 + 이번 회차 선임 경보만 → 앞 판 감지분 이어받음 · 푸시 제목 종전
+    mem.gw_data['lawwatch:last'] = JSON.parse(JSON.stringify(OLD7));
+    const pc = pushMock.calls.length;
+    let r = await lw.handler(ev7({ source: 'lawwatch', date: TD7, alerts: ['[선임 의무] 가짜 선임 2'], bg_recheck: [] })); let L = mem.gw_data['lawwatch:last'];
+    if (!(r.statusCode === 200 && L && JSON.stringify(L.law_changed) === JSON.stringify([{ name: '가짜환경법 시행규칙', date: dAgo7(5) }]) && L.alerts.length === 1 && L.date === TD7)) got.push('이어받기 ' + JSON.stringify(L));
+    if (!(pushMock.calls.length === pc + 1 && pushMock.calls[pc].title === '법령 워치 — 선임 1건' && pushMock.calls[pc].body === '[선임 의무] 가짜 선임 2' && pushMock.calls[pc].tag === 'lawwatch')) got.push('푸시 ' + JSON.stringify(pushMock.calls[pc]));
+    // (나) 수집기 law_changed + 경보 글 → 합침(같은 법령 하나 · 늦은 날짜 순 · mst 보관)
+    r = await lw.handler(ev7({ source: 'lawwatch', date: TD7, alerts: ['[법령 개정 감지] 가짜안전법: 1 → 2 — x'], bg_recheck: [], law_changed: [{ name: '가짜안전법', date: TD7, mst: 5, prev_mst: 4 }] })); L = mem.gw_data['lawwatch:last'];
+    if (JSON.stringify(L.law_changed) !== JSON.stringify([{ name: '가짜안전법', date: TD7, mst: 5, prev_mst: 4 }, { name: '가짜환경법 시행규칙', date: dAgo7(5) }])) got.push('합침 ' + JSON.stringify(L.law_changed));
+    if (pushMock.calls[pushMock.calls.length - 1].title !== '법령 워치 — 개정 1건') got.push('제목 개정');
+    // (다) 같은 법령 다시 개정(띄어쓰기·가운뎃점 다른 이름) = 한 줄 · 늦은 날짜 · 옛 수집기(경보 글만)
+    const P7 = mem.gw_data['lawwatch:last'] || {}; P7.law_changed = (Array.isArray(P7.law_changed) ? P7.law_changed : []).concat([{ name: '소음ㆍ진동관리법 시행규칙', date: dAgo7(30) }]); mem.gw_data['lawwatch:last'] = P7;
+    r = await lw.handler(ev7({ source: 'lawwatch', date: TD7, alerts: ['[법령 개정 감지] 소음·진동관리법  시행규칙: a → b'] })); L = mem.gw_data['lawwatch:last'] || {};
+    const sv = (L.law_changed || []).filter((x) => /진동/.test(x.name));
+    if (!(sv.length === 1 && sv[0].date === TD7 && (L.law_changed || []).length === 3)) got.push('같은 법령 ' + JSON.stringify(L.law_changed));
+    // (라) 앞 판 못 읽음 = 이번 회차만 보관(200 · 경보 보관 그대로)
+    blobsMock.hooks.failGet = (k) => k === 'lawwatch:last';
+    r = await lw.handler(ev7({ source: 'lawwatch', date: TD7, alerts: ['[법령 개정 감지] 가짜새법: 1 → 2'] })); blobsMock.hooks.failGet = null; L = mem.gw_data['lawwatch:last'];
+    if (!(r.statusCode === 200 && JSON.stringify(L.law_changed) === JSON.stringify([{ name: '가짜새법', date: TD7 }]) && L.alerts.length === 1)) got.push('못 읽음 ' + JSON.stringify(L));
+    // (마) date 없는 본문 = 오늘(KST) · 꼴 틀린 law_changed 줄 무시
+    delete mem.gw_data['lawwatch:last'];
+    r = await lw.handler(ev7({ alerts: ['[법령 개정 감지] 가짜날짜법: 1 → 2'], law_changed: [null, { name: '' }, { name: '가짜꼴법', date: '2026-02-30' }, 'x'] })); L = mem.gw_data['lawwatch:last'];
+    if (JSON.stringify((L.law_changed || []).map((x) => x.name + '@' + x.date).sort()) !== JSON.stringify(['가짜꼴법@' + TD7, '가짜날짜법@' + TD7])) got.push('날짜 ' + JSON.stringify(L.law_changed));
+    process.env.BIDS_INGEST_KEY = savedKey7;
+    return { ok: got.length === 0, info: got };
+  };
+  const MV7 = { id: 'u7v', name: '보기7', admin: false, perms: { lic: 'view' } }, MH7 = { id: 'u7h', name: '숨김7', admin: false, perms: { lic: 'hide', con: 'do' } };
+  const tV7 = issueSession(MV7).token, tH7 = issueSession(MH7).token;
+  const call7 = (mod) => async (tok, dev) => { const r = await mod.handler({ httpMethod: 'POST', headers: Object.assign({ authorization: tok ? 'Bearer ' + tok : '' }, dev ? { 'x-device-id': dev } : {}), body: JSON.stringify({ action: 'lic_recheck_get' }) }); return { code: r.statusCode, body: JSON.parse(r.body || '{}') }; };
+  const chk7G = async (gd) => { const got = []; reset7(); const g = call7(gd);
+    Object.assign(mem.gw_users, { 'member:u7v': MV7, 'member:u7h': MH7, 'device:dev1': { status: 'approved' } });
+    mem.gw_data['lawwatch:last'] = Object.assign(JSON.parse(JSON.stringify(OLD7)), { bg_recheck: [{ id: 'b1', law: '가짜법', mst: 9 }], law_changed: [{ name: '가짜안전법', date: dAgo7(1), mst: 5, prev_mst: 4 }] });
+    const before = JSON.stringify(mem.gw_data);
+    const a = await g(null, 'dev1'), b = await g(tV7, ''), h = await g(tH7, 'dev1'), v = await g(tV7, 'dev1'), ad = await g(tokA, 'dev1');
+    const cd = (x) => x.code + (x.body.error_code ? '/' + x.body.error_code : '');
+    if (a.code !== 401 || cd(b) !== '403/DEVICE_NOT_APPROVED' || cd(h) !== '403/NO_ACCESS') got.push('거절 ' + [cd(a), cd(b), cd(h)]);
+    const want = [{ name: '가짜안전법', date: dAgo7(1) }, { name: '가짜환경법 시행규칙', date: dAgo7(5) }];
+    if (!(v.code === 200 && JSON.stringify(v.body.changed) === JSON.stringify(want) && v.body.date === dAgo7(5) && Object.keys(v.body).sort().join() === 'changed,date,request_id,status' && ad.code === 200 && JSON.stringify(ad.body.changed) === JSON.stringify(want))) got.push('보기 ' + JSON.stringify(v.body));
+    if (JSON.stringify(mem.gw_data) !== before) got.push('쓰기 생김');
+    delete mem.gw_data['lawwatch:last']; const n = await g(tV7, 'dev1'); if (!(n.code === 200 && JSON.stringify(n.body.changed) === '[]' && n.body.date === '')) got.push('없음 ' + JSON.stringify(n.body));
+    mem.gw_data['lawwatch:last'] = JSON.parse(JSON.stringify(OLD7));
+    blobsMock.hooks.failGet = (k) => k === 'lawwatch:last'; const f = await g(tV7, 'dev1'); blobsMock.hooks.failGet = null;
+    if (cd(f) !== '500/LAWWATCH_READ_FAILED') got.push('못 읽음 ' + cd(f));
+    return { ok: got.length === 0, info: got };
+  };
+  const chk7C = (LC) => { const got = [];
+    const m = LC.merge([[{ name: '가짜 법  시행규칙', date: '2026-11-01' }, { name: '가짜법 시행규칙', date: '2026-11-09', mst: 3 }, { name: '가짜·법', date: '2026-10-01' }, { name: '가짜ㆍ법', date: '2026-10-05' }],
+      [{ name: '옛법', date: '2024-11-08' }, { name: '덜옛법', date: '2024-11-10' }, { name: '미래법', date: '2026-12-31' }, { name: '', date: '2026-11-01' }, { name: '꼴법', date: '2026-11-31' }, null]], '2026-11-09');
+    if (JSON.stringify(m) !== JSON.stringify([{ name: '가짜법 시행규칙', date: '2026-11-09', mst: 3 }, { name: '미래법', date: '2026-11-09' }, { name: '가짜ㆍ법', date: '2026-10-05' }, { name: '덜옛법', date: '2024-11-10' }])) got.push('합침 ' + JSON.stringify(m));
+    const big = []; for (let i = 0; i < 400; i++) big.push({ name: '법' + i, date: '2026-11-0' + (1 + (i % 9)) });
+    if (LC.merge([big], '2026-11-09').length !== 300) got.push('최대');
+    const f = LC.fromDoc({ date: '2026-11-09', alerts: ['[법령 개정 감지] 가짜법: a → b', '[포털 변동 감지] 가짜 포털: x', '[계약 배경 재확인] 개정 감지 1행', 7], law_changed: [{ name: '가짜령', mst: '12' }] });
+    if (JSON.stringify(f) !== JSON.stringify([{ name: '가짜령', date: '2026-11-09', mst: 12 }, { name: '가짜법', date: '2026-11-09' }])) got.push('뽑기 ' + JSON.stringify(f));
+    if (LC.fromDoc(null).length || LC.fromDoc({ alerts: ['[법령 개정 감지] 날짜없는법: a'] }).length) got.push('빈 문서·날짜 없음');
+    return { ok: got.length === 0, info: got };
+  };
+  try {
+    const R7 = { L: await chk7L(require(FLW7)), G: await chk7G(gwd), C: chk7C(require(FLC7)) };
+    T('P1 판7 ① gw-lawwatch law_changed 쌓기: 옛 꼴 앞 판(경보 글만)의 감지분 이어받음 · 수집기 law_changed 합침(늦은 날짜 순·mst 보관) · 같은 법령(빈칸·가운뎃점 달라도) = 한 줄·늦은 날짜 · 옛 수집기 경보 글도 뽑음 · 앞 판 못 읽음 = 이번 회차만 200 · 날짜 없음·꼴 틀림 = 오늘(KST) · 푸시 제목·본문·태그 종전 그대로(선임 1건·개정 1건)', R7.L.ok, JSON.stringify(R7.L.info));
+    T('P1 판7 ② lic_recheck_get: 비로그인 401 · 미승인 기기 403 · 인허가 숨김(계약 수행) 403 NO_ACCESS · 보기·관리자 200 = 감지 목록 이름·날짜만(경보 글·MST·bg_recheck 안 내림 — 칸 4개) · 옛 꼴 경보 글도 목록에 · 쓰기 0 · 감시 기록 없음 = 빈 목록 · 못 읽음 500 LAWWATCH_READ_FAILED', R7.G.ok, JSON.stringify(R7.G.info));
+    T('P1 판7 ③ _lib/lawchg: 이름 빈칸·가운뎃점 무시 같은 법령 = 늦은 날짜 하나 · 2년 넘은 감지 뺌(경계 안쪽은 남김) · 오늘 뒤 날짜 = 오늘 · 이름 없음·없는 날짜 뺌 · 늦은 날짜 순 · 최대 300 · 경보 글은 [법령 개정 감지]만 · 날짜 못 정하면 뺌', R7.C.ok, JSON.stringify(R7.C.info));
+    const MUT7 = [
+      ['L', "    try { const pr = await blobGet(store('gw_data'), 'lawwatch:last'); if (pr && pr.ok) prevLw = pr.data; } catch (e) {}\n", ''],
+      ['L', "    const lawChanged = LAWCHG.merge([LAWCHG.fromDoc(prevLw), LAWCHG.fromDoc({ date: LAWCHG.isDay(d.date) ? d.date : today, alerts: alerts, law_changed: d.law_changed })], today);", "    const lawChanged = LAWCHG.merge([LAWCHG.fromDoc({ date: d.date, alerts: [], law_changed: d.law_changed })], today);"],
+      ['L', 'law_changed: lawChanged, ts: Date.now()', 'ts: Date.now()'],
+      ['L', "try { const pr = await blobGet(store('gw_data'), 'lawwatch:last'); if (pr && pr.ok) prevLw = pr.data; } catch (e) {}", "const pr = await blobGet(store('gw_data'), 'lawwatch:last'); if (!pr.ok) throw new Error('x'); prevLw = pr.data;"],
+      ['G', "  if (permOf(c.member, 'licenses') === 'hide') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_ACCESS', request_id: R });\n  let r;", '  let r;'],
+      ['G', "  if (!r.ok && r.code !== 'NOT_FOUND') return jr(500, { status: 'ERROR', error_code: 'LAWWATCH_READ_FAILED', request_id: R });\n", ''],
+      ['G', 'changed: list.map(function (x) { return { name: x.name, date: x.date }; })', 'changed: list'],
+      ['G', "  if (!(await deviceApproved(event, c.member))) return jr(403, { status: 'FORBIDDEN', error_code: 'DEVICE_NOT_APPROVED', request_id: R });\n  if (permOf(c.member, 'licenses') === 'hide') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_ACCESS', request_id: R });\n  let r;", "  if (permOf(c.member, 'licenses') === 'hide') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_ACCESS', request_id: R });\n  let r;"],
+      ['C', "function nameKey(s) { return String(s || '').replace(/[\\s·ㆍ・‧∙]/g, ''); }", "function nameKey(s) { return String(s || ''); }"],
+      ['C', '      if (c.date > td) c.date = td;\n', ''],
+      ['C', '      if (c.date < cut) return;\n', ''],
+      ['C', '      if (!o || c.date > o.date || (c.date === o.date && !o.mst && c.mst)) by[k] = c;', '      if (!o) by[k] = c;'],
+      ['C', '    .slice(0, MAX);', ';'],
+      ['C', "  (Array.isArray(doc.alerts) ? doc.alerts.slice(0, 200) : []).forEach(function (a) { const m = String(a || '').match(ALERT_RE); if (m) { const c = clean({ name: m[1] }, dflt); if (c) out.push(c); } });\n", ''],
+      ['C', "const ALERT_RE = /^\\[법령 개정 감지\\] (.+?): /;", "const ALERT_RE = /^\\[[^\\]]+\\] (.+?): /;"],
+      ['C', "  return !isNaN(t) && new Date(t).toISOString().slice(0, 10) === v;", '  return !isNaN(t);'],
+      ['C', "  const date = isDay(x.date) ? x.date : (isDay(dflt) ? dflt : '');", "  const date = isDay(x.date) ? x.date : (isDay(dflt) ? dflt : kstToday());"]];
+    const kill7 = [];
+    for (const [k, from, to] of MUT7) {
+      let ok;
+      try {
+        if (k === 'L') ok = (await chk7L(load7(FLW7, mut7(SLW7, from, to)))).ok;
+        else if (k === 'G') ok = (await chk7G(load7(FGD7, mut7(SGD7, from, to)))).ok;
+        else { const LCm = load7(FLC7, mut7(SLC7, from, to)); const a = chk7C(LCm).ok; ok = a; }
+      } catch (e) { ok = 'err ' + e.message; }
+      if (ok !== false) kill7.push(k + ':' + from.trim().slice(0, 60) + (ok === true ? ' 안 깨짐' : ' ' + ok));
+    }
+    T('P1 판7 ④ 결함 사본 ' + MUT7.length + '개(앞 판 안 읽음·앞 판 안 합침·보관 안 함·앞 판 못 읽으면 던짐 · 숨김 통과·못 읽음을 빈 목록·MST까지 내림·기기 통과 · 이름 정규화·미래 날짜·2년·같은 법령 늦은 날짜·최대·경보 글 안 뽑음·다른 경보도 뽑음·없는 날짜·날짜 못 정함) = 모두 ✗', kill7.length === 0, kill7.join(' | '));
+  } catch (e) { T('P1 판7 검사 실행', false, String(e && e.stack || e).slice(0, 400)); }
+  finally { reset7(); process.env.BIDS_INGEST_KEY = savedKey7; }
+}
+
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

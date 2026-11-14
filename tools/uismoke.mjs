@@ -14654,5 +14654,142 @@ try {
     r10.ok && M10.every((v) => v === false) && thrown10.length === 0, JSON.stringify({ r: r10.info, mut: M10, thrown: thrown10 }));
 } catch (e) { console.log('  (판10 검사 생략 — ' + e.message + ')'); fails++; }
 
+// ---- P1 판7 법령 개정 감지 → 인허가 의무 대장 '근거 재확인 필요' 표시(원장 C102 · 착수설명서 7번 줄 — 시안 없음, 배지 하나) — 실제 @lic-recheck 구간 실행
+//   ① 맞춤(licRkMarks): 본법/시행령/시행규칙 가르기 · 약칭 · 가운뎃점 · 여러 낱말 이름 · 앞 행 이어받기 · 다른 법령 뒤 '영' · 이어받을 법령 없음 = 붙임 · 감지 없음 · 확인 뒤 풀림(같은 날 = 안 풀림) · 두 번 감지 · 입력 안 바뀜
+//   ② 읽기(licRkNow): 정상 = 표 · 500·네트워크·꼴 틀림 = 빈 표(표시 없음) · 10분 안 다시 안 읽음 · 로그인 전환 = 앞사람 목록 버리고 다시 읽음 · 받은 뒤 그 칸 다시 그림
+//   ③ 기한 계산 무관: 같은 의무 대장으로 DUTY_SHARED dutyCur 값이 표시 있음·없음에서 같음 + 계산 구간·lmGroups에 이 표 참조 0
+//   ④ 그리기(dutyRowHtml): 배지(duty-badge pre)·펼침 줄 · 표시 없으면 종전 글 그대로 · 버튼 수 그대로 · 제목 이스케이프
+//   ⑤ 배선(정적) · ⑥ 결함 사본 = 모두 ✗
+try {
+  const one7p = (src, a, b) => { const i = src.indexOf(a), j = src.indexOf(b); if (i < 0 || j < i || src.indexOf(a, i + 1) >= 0) throw new Error(a + ' 구간 없음·둘'); return src.slice(i, j); };
+  const fn7p = (src, name) => { const i = src.indexOf('function ' + name + '('); if (i < 0 || src.indexOf('function ' + name + '(', i + 1) >= 0) throw new Error('함수 없음·둘: ' + name); let d = 0, st = false; for (let j = i; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i, j + 1); } } throw new Error('함수 끝 없음: ' + name); };
+  const BLK7 = one7p(html, '// @lic-recheck-start', '// @lic-recheck-end');
+  const gwd7 = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-data.js'), 'utf8'), lw7 = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-lawwatch.js'), 'utf8'), lc7 = readFileSync(join(ROOT, 'netlify', 'functions', '_lib', 'lawchg.js'), 'utf8');
+  const PRE7 = [fn7p(html, 'isDate'), fn7p(html, 'esc'),
+    'var duties = ENV.duties, currentTab = ENV.tab || "lic", licLayer = ENV.layer || "duty", licMonth = {};',
+    'function myId(){ return ENV.me; } function renderDuties(){ E.rd++; } function renderLicMonth(){ E.rm++; }',
+    'function syncP(v){ return { then: function(f){ return syncP(f ? f(v) : v); }, catch: function(){ return syncP(v); } }; }',
+    'function rejP(){ return { then: function(){ return rejP(); }, catch: function(g){ g(new Error("net")); return syncP(); } }; }',
+    'function gwCall(fn, body){ E.calls.push(fn + ":" + body.action); var r = typeof ENV.resp === "function" ? ENV.resp(body) : ENV.resp; return r === "reject" ? rejP() : syncP(r || { status: 500, body: {} }); }'].join('\n');
+  const mk7p = (blk, env) => { const E = { calls: [], rd: 0, rm: 0, t: 1000000 }; const FD = { now: () => E.t };
+    const api = new Function('ENV', 'E', 'Date', PRE7 + '\n' + blk + '\nreturn { marks: licRkMarks, now: licRkNow, badge: licRkBadge, rk: function(){ return licRk; }, lm: function(){ return licMonth; } };')(env, E, FD); return { api, E }; };
+  const D7 = '2026-11-09';
+  const DU7 = () => [
+    { no: 1, lic: '가짜 허가 A', law: '가짜환경법 제10조, 규칙 제5조' }, { no: 2, lic: '가짜 허가 A', law: '법 제11조, 영 제3조' }, { no: 3, lic: '가짜 허가 A', law: '가짜환경법 제12조' },
+    { no: 4, lic: '가짜 허가 A', law: '규칙 제7조제1항' }, { no: 5, lic: '가짜 허가 B', law: '산안법 제121조제2항, 규칙 제180조' }, { no: 6, lic: '가짜 허가 C', law: '소음·진동관리법 제22조제1항, 규칙 제21조' },
+    { no: 7, lic: '가짜 허가 C', law: '법 제22조제2항' }, { no: 8, lic: '가짜 허가 D', law: '가짜운수 사업법 제3조, 영 제3조 / 다른관리법 시행규칙 제74조' },
+    { no: 9, lic: '가짜 허가 E', law: '건설폐기물의 재활용촉진에 관한 법률 제21조' }, { no: 10, lic: '가짜 허가 E', law: '건폐법 제22조, 규칙 제13조' }, { no: 11, lic: '가짜 허가 F', law: '(모법 법 제25조) 같은 법 시행령 제4조' }];
+  const chk7A = (blk) => {
+    const X = mk7p(blk, { duties: [], me: 'u1' }).api, got = [];
+    const m = (list, names, date) => Object.keys(X.marks(list, names.map((n) => ({ name: n, date: date || D7 })))).map(Number);
+    const exp = [[['가짜환경법 시행규칙'], [1, 4]], [['가짜환경법 시행령'], [2]], [['가짜환경법'], [1, 2, 3, 4]], [['산업안전보건법 시행규칙'], [5]], [['산업안전보건법'], [5]], [['산안법 시행규칙'], [5]],
+      [['소음ㆍ진동관리법 시행규칙'], [6]], [['소음ㆍ진동관리법'], [6, 7]], [['가짜운수 사업법 시행령'], [8]], [['다른관리법 시행령'], []], [['다른관리법 시행규칙'], [8]],
+      [['건설폐기물의 재활용촉진에 관한 법률'], [9, 10, 11]], [['건설폐기물의 재활용촉진에 관한 법률 시행규칙'], [10]], [['건설폐기물의 재활용촉진에 관한 법률 시행령'], [11]], [['없는법 시행규칙'], []], [[], []]];
+    exp.forEach(([ns, want]) => { const g = m(DU7(), ns); if (JSON.stringify(g) !== JSON.stringify(want)) got.push(ns.join('+') + ' ' + JSON.stringify(g)); });
+    if (Object.keys(X.marks(DU7(), [{ name: '가짜환경법 시행규칙' }, { name: '가짜환경법', date: '2026-13-01x' }, null])).length || Object.keys(X.marks(DU7(), null)).length || Object.keys(X.marks(null, [{ name: '가짜환경법', date: D7 }])).length) got.push('꼴 틀린 목록');
+    // 이어받을 법령이 없는 '규칙' = 어느 법령인지 모름 → 붙임(넘치는 쪽) · 단계는 가름
+    if (JSON.stringify(m([{ no: 1, law: '규칙 제1조' }], ['아무법 시행규칙'])) !== '[1]' || JSON.stringify(m([{ no: 1, law: '규칙 제1조' }], ['아무법 시행령'])) !== '[]') got.push('모르는 법령');
+    // 번호 순 이어받기(배열 순서와 무관)
+    if (JSON.stringify(m(DU7().reverse(), ['가짜환경법 시행규칙'])) !== '[1,4]') got.push('번호 순');
+    // 풀림: 확정 날짜 > 감지 날짜만 · 같은 날·앞 날 = 그대로
+    const rel = (ca) => m(DU7().map((d) => (d.no === 4 ? Object.assign({}, d, { confirmed_at: ca, confirmed_by: '가짜' }) : d)), ['가짜환경법 시행규칙']);
+    if (JSON.stringify(rel('2026-11-10')) !== '[1]' || JSON.stringify(rel(D7)) !== '[1,4]' || JSON.stringify(rel('2026-11-08')) !== '[1,4]' || JSON.stringify(rel('어제')) !== '[1,4]') got.push('풀림 ' + [rel('2026-11-10'), rel(D7), rel('2026-11-08')].join('/'));
+    // 두 번 감지: 사이에 확인한 행은 뒤 감지만 · 날짜 = 가장 늦은 감지
+    const two = X.marks(DU7().map((d) => (d.no === 4 ? Object.assign({}, d, { confirmed_at: '2026-11-20' }) : d)), [{ name: '가짜환경법 시행규칙', date: D7 }, { name: '가짜환경법', date: '2026-12-01' }]);
+    if (!(JSON.stringify(two[4]) === JSON.stringify({ laws: ['가짜환경법'], date: '2026-12-01' }) && JSON.stringify(two[1]) === JSON.stringify({ laws: ['가짜환경법 시행규칙', '가짜환경법'], date: '2026-12-01' }) && JSON.stringify(two[2]) === JSON.stringify({ laws: ['가짜환경법'], date: '2026-12-01' }))) got.push('두 번 ' + JSON.stringify(two));
+    // 입력 안 바뀜
+    const du = DU7(), ch = [{ name: '가짜환경법', date: D7 }], b0 = JSON.stringify([du, ch]); X.marks(du, ch); if (JSON.stringify([du, ch]) !== b0) got.push('입력 바뀜');
+    return { ok: got.length === 0, info: got };
+  };
+  const OKR7 = { status: 200, body: { status: 'OK', changed: [{ name: '가짜환경법 시행규칙', date: D7 }] } };
+  const chk7B = (blk) => { const got = [];
+    const A = mk7p(blk, { duties: DU7(), me: 'u1', resp: OKR7 });
+    const a1 = A.api.now(); if (JSON.stringify(Object.keys(a1).map(Number)) !== '[1,4]' || A.E.calls.join() !== 'gw-data:lic_recheck_get' || A.E.rd !== 1) got.push('정상 ' + JSON.stringify([a1, A.E]));
+    A.api.now(); A.E.t += 600000; A.api.now(); if (A.E.calls.length !== 1) got.push('10분 안 ' + A.E.calls.length);
+    A.E.t += 1; A.api.now(); if (A.E.calls.length !== 2) got.push('10분 뒤 ' + A.E.calls.length);
+    const B = mk7p(blk, { duties: DU7(), me: 'u1', resp: { status: 500, body: { error_code: 'LAWWATCH_READ_FAILED' } } }); const b1 = B.api.now(), b2 = B.api.now();
+    if (Object.keys(b1).length || Object.keys(b2).length || B.api.rk().st !== 'err' || B.E.calls.length !== 1) got.push('500 ' + JSON.stringify([b1, B.E.calls]));
+    const C = mk7p(blk, { duties: DU7(), me: 'u1', resp: 'reject' }); const c1 = C.api.now(); if (Object.keys(c1).length || C.api.rk().st !== 'err' || C.api.now() && C.E.calls.length !== 1) got.push('네트워크 ' + C.E.calls.length);
+    const F = mk7p(blk, { duties: DU7(), me: 'u1', resp: { status: 200, body: { changed: 'x' } } }); if (Object.keys(F.api.now()).length || F.api.rk().st !== 'err') got.push('꼴 틀림');
+    const F2 = mk7p(blk, { duties: DU7(), me: 'u1', resp: { status: 403, body: { status: 'FORBIDDEN', changed: OKR7.body.changed } } }); if (Object.keys(F2.api.now()).length || F2.api.rk().st !== 'err') got.push('200 아님');
+    const env = { duties: DU7(), me: 'u1', resp: OKR7 }, S = mk7p(blk, env); S.api.now(); env.me = 'u2'; env.resp = { status: 200, body: { changed: [] } }; const s2 = S.api.now();
+    if (S.E.calls.length !== 2 || Object.keys(s2).length || S.api.rk().vid !== 'u2') got.push('전환 ' + JSON.stringify([S.E.calls, s2]));
+    const M = mk7p(blk, { duties: DU7(), me: 'u1', resp: OKR7, layer: 'month' }); M.api.now(); if (!(M.E.rm === 1 && M.E.rd === 0 && M.api.lm().rk && M.api.lm().rk[4])) got.push('이번 달 다시 그림 ' + JSON.stringify([M.E.rm, M.api.lm()]));
+    const O = mk7p(blk, { duties: DU7(), me: 'u1', resp: OKR7, tab: 'tasks' }); O.api.now(); if (O.E.rd + O.E.rm !== 0) got.push('다른 탭에서 그림');
+    return { ok: got.length === 0, info: got };
+  };
+  const r7A = chk7A(BLK7), r7B = chk7B(BLK7);
+  T('P1 판7 ① 맞춤(실행 — 실제 licRkMarks): 시행규칙 개정 = 규칙 인용 행만(본법·영만 인용 행 없음) · 시행령 = 영 인용 행 · 본법 = 그 법 모든 단계 · 약칭(산안법·건폐법) · 가운뎃점(소음·진동 ↔ 소음ㆍ진동) · 여러 낱말 이름(…에 관한 법률·띄어 쓴 이름) · 이름 없는 법·영·규칙 = 같은 칸 앞 법령 → 앞 행(번호 순) 첫 법령 · 다른 법령 뒤 영은 그 법령 것 · "같은 법 시행령"·"(모법 …)" · 이어받을 법령 없음 = 붙임(단계는 가름) · 감지 없음·꼴 틀린 목록 = 없음 · 확인(확정) 날짜 > 감지 날짜만 풀림(같은 날·앞 날·날짜 아님 = 그대로) · 두 번 감지 = 사이 확인 행은 뒤 감지만·날짜 = 가장 늦은 감지 · 입력 안 바뀜',
+    r7A.ok, JSON.stringify(r7A.info));
+  T('P1 판7 ② 읽기(실행 — 실제 licRkNow·licRkLoad): 정상 = gw-data lic_recheck_get 1번·표·의무 대장 다시 그림 · 10분 안 다시 안 읽음(10분 넘으면 다시) · 500·네트워크·꼴 틀림·200 아닌 응답 = 빈 표(표시 없음)·되풀이 호출 0 · 로그인 전환 = 앞사람 목록 버리고 다시 읽음 · 이번 달 칸 = licMonth.rk 채우고 그 칸만 다시 그림 · 다른 탭이면 그리지 않음',
+    r7B.ok, JSON.stringify(r7B.info));
+  // ③ 기한 계산 무관 — 같은 의무 대장으로 DUTY_SHARED dutyCur 값이 표시 있음·없음에서 같음(표는 계산 입력이 아님) + 계산 구간·lmGroups·lmNext에 이 표 참조 0
+  const SB7 = '// ==== DUTY_SHARED_BEGIN ====', SE7 = '// ==== DUTY_SHARED_END ====', SH7 = one7p(html, SB7, SE7);
+  const DC7 = new Function(SH7 + '\nreturn dutyCur;')();
+  const SCH7 = { auto: true, type: 'interval', base: 'manual', every_n: 12, every_unit: 'month' };
+  const cur7 = (list) => list.map((d) => JSON.stringify(DC7(Object.assign({}, d, { sched: SCH7 }), null, '2026-11-14')));
+  const du7 = DU7().map((d, i) => Object.assign(d, { base_date: '2025-' + String(1 + (i % 12)).padStart(2, '0') + '-15' }));
+  const before7 = cur7(du7), mk7 = mk7p(BLK7, { duties: du7, me: 'u1', resp: OKR7 }), marks7 = mk7.api.now(), after7 = cur7(du7);
+  const lmBlk7 = one7p(html, '// @lic-month-start', '// @lic-month-end'), lR7a = fn7p(lmBlk7, 'lmRowHtml');
+  const ok7C = Object.keys(marks7).length === 2 && JSON.stringify(before7) === JSON.stringify(after7) && before7.every((s) => /"due":"\d{4}-\d{2}-\d{2}"/.test(s))
+    && !/licRk|\.rk\b/.test(SH7) && !/licRk|\.rk\b/.test(fn7p(lmBlk7, 'lmGroups')) && !/licRk|\.rk\b/.test(fn7p(lmBlk7, 'lmNext')) && !/licRk/.test(readFileSync(join(ROOT, 'netlify', 'functions', '_lib', 'duty.js'), 'utf8'))
+    && (lmBlk7.match(/licMonth\.rk/g) || []).length === 2 && lR7a.indexOf('licMonth.rk') > 0 && !/licRkNow|licRkLoad|licRkMarks/.test(lmBlk7);
+  T('P1 판7 ③ 기한 계산 무관: 의무 대장 11행 dutyCur(실제 DUTY_SHARED) 값이 표시(2행) 붙은 뒤에도 같음 · 계산 구간(DUTY_SHARED·_lib/duty.js)·lmGroups·lmNext에 표 참조 0 · @lic-month 구간은 lmRowHtml의 licMonth.rk 읽기 한 줄뿐(읽기·맞춤 호출 0)', ok7C, JSON.stringify({ n: Object.keys(marks7), before7: before7.slice(0, 2), after7: after7.slice(0, 2) }));
+  // ④ 그리기 — 실제 dutyRowHtml(배지·펼침 줄) · 표시 없으면 종전 그대로 · 버튼 수 그대로 · 이스케이프
+  const ROW7 = new Function('ENV', [fn7p(html, 'esc'), fn7p(html, 'isDate'), fn7p(html, 'dutyBadges'), fn7p(html, 'dutyRowHtml'), 'function isAdmin(){ return !!ENV.admin; } function lmDutyDetail(){ return []; }', BLK7.replace(/^[\s\S]*?(?=  function licRkBadge)/, ''), 'return dutyRowHtml;'].join('\n'));
+  const chk7D = (rowFn) => { const got = [], R = rowFn({ admin: true }), d = { no: 4, lic: '가짜', duty: '가짜 의무', cycle: '연 1회', basis: '기산', law: '규칙 제7조', confirm: '조건부' };
+    const rk = { laws: ['가짜환경법 시행규칙', '<b>"x'], date: D7 };
+    const c0 = R(d, false), c1 = R(d, false, rk), o0 = R(d, true), o1 = R(d, true, rk);
+    const BADGE = ' <span class="duty-badge pre" title="법령 개정 감지 2026-11-09 — 가짜환경법 시행규칙, &lt;b&gt;&quot;x">근거 재확인 필요</span>';
+    if (c0.indexOf('근거 재확인') >= 0 || o0.indexOf('근거 재확인') >= 0) got.push('표시 없는데 글');
+    if (c1 !== c0.replace('</span></div><div class="duty-sum">', '</span>' + BADGE + '</div><div class="duty-sum">')) got.push('배지 ' + c1);
+    if (o1.indexOf('<b>근거 재확인</b>  가짜환경법 시행규칙, &lt;b&gt;&quot;x 개정 감지(2026-11-09) — 조문을 다시 확인해 주세요. 기한 계산은 그대로입니다.') < 0 || o1.indexOf('<b>"x') >= 0) got.push('펼침 ' + o1);
+    if ((c1.match(/<button/g) || []).length !== (c0.match(/<button/g) || []).length || (o1.match(/<button/g) || []).length !== (o0.match(/<button/g) || []).length) got.push('버튼 수');
+    return { ok: got.length === 0, info: got };
+  };
+  const r7D = chk7D(ROW7);
+  T('P1 판7 ④ 그리기(실행 — 실제 dutyRowHtml): 표시 = 확정/조건부 배지 뒤 작은 배지 하나(duty-badge pre "근거 재확인 필요", 제목 = 감지 날짜·법령 — 이스케이프) · 펼침 = "근거 재확인" 줄(기한 계산 그대로 안내) · 표시 없으면 종전 글 그대로 · 버튼 수 그대로(새 버튼 0)', r7D.ok, JSON.stringify(r7D.info));
+  // ⑤ 배선(정적)
+  const rD7 = fn7p(html, 'renderDuties'), sL7 = fn7p(html, 'setLicLayer'), lR7 = fn7p(lmBlk7, 'lmRowHtml'), sv7 = fn7p(html, 'saveDutyFromModal');
+  const wire7 = /if \(d && d\.action === 'lic_recheck_get'\) return await handleLicRecheckGet\(event, d, R\);/.test(gwd7) && gwd7.split("action === 'lic_recheck_get'").length === 2
+    && /\n    var rkm = licRkNow\(\);/.test(rD7) && rD7.indexOf('dutyRowHtml(d, !!dutyOpen[d.no], rkm[d.no])') > 0 && rD7.indexOf('var rkm = licRkNow();') > rD7.indexOf('if (!all.length){')
+    && sL7.indexOf('if (name === "month") licMonth.rk = licRkNow();') > 0 && sL7.indexOf('if (name === "month") licMonth.rk = licRkNow();') < sL7.indexOf('renderLicMonth();')
+    && lR7.indexOf('var rkx = licMonth.rk && licMonth.rk[r.no];') > 0 && lR7.indexOf('if (rkx) meta.push(licRkBadge(rkx).slice(1));') > 0
+    && (html.match(/licRkNow\(\)/g) || []).length === 4 && html.split('function licRkMarks(').length === 2
+    && sv7.indexOf('d.confirm = "확정"; d.confirmed_by = getUser(); d.confirmed_at = todayStr();') > 0
+    && !/<button|scheduleLicSave|doSaveLic|LIC_API|localStorage|settings:notify|lic_duty_set/.test(BLK7)
+    && /\.duty-badge\.pre\{background:#FBF3DF;color:#7a5b12;\}/.test(html) && /\.item-meta\{\n    font-size:12px;\n    color:var\(--sub\);\n    margin-top:3px;\n    display:flex;\n    flex-wrap:wrap;/.test(html)
+    // 경보 푸시 문구·받는 사람 그대로 · 알림 설정 문서 손대지 않음 · 감지 목록 공용 조각
+    && lw7.indexOf("const autoTitle = '법령 워치 — ' + (nLaw ? '개정 ' + nLaw + '건' : '')") > 0 && lw7.indexOf("const r = await push.sendTo(ids, { title, body, url: './', tag: 'lawwatch' }, { ctx: tcL2 });") > 0 && lw7.indexOf('const ids = tcL2.adminIds;') > 0
+    && !/settings:notify/.test(lw7 + lc7) && lw7.indexOf('law_changed: lawChanged') > 0 && /require\('\.\/_lib\/lawchg'\)/.test(lw7) && /require\('\.\/_lib\/lawchg'\)/.test(gwd7);
+  T('P1 판7 ⑤ 배선(정적): 서버 lic_recheck_get 1곳 · 의무 대장 그리기 = 빈 대장 뒤 licRkNow → dutyRowHtml 셋째 인자 · 이번 달 칸 = setLicLayer가 licMonth.rk 채운 뒤 그림 · lmRowHtml 배지 · licRkNow 글 4곳(정의 + 의무 대장 그리기·이번 달 칸 열기·받은 뒤 이번 달) · 풀림 길 = 종전 확정 저장(confirmed_at) 그대로 · 구간에 버튼·통째 저장·기기 저장·알림 설정·단추 저장 0 · 폰 줄 넘김(item-meta flex-wrap) · gw-lawwatch 푸시 제목·본문·받는 사람(관리자) 그대로·law_changed 보관 · 알림 설정 문서 0',
+    wire7, '');
+  // ⑥ 결함 사본 — 구간 글을 하나씩 바꾸면 ①·②·④ 판정이 깨져야 한다
+  const MU7 = [
+    ['(c.lv === "법" || r.lv === c.lv)', 'true'],
+    ['if (lv === "법" && (nx === "시행령" || nx === "시행규칙")){ lv = nx === "시행령" ? "영" : "규칙"; i++; }', ''],
+    ['lv = nx === "시행령" ? "영" : (nx === "시행규칙" ? "규칙" : "법"); if (lv !== "법") i++;', 'lv = "법";'],
+    ['if (isDate(d.confirmed_at) && d.confirmed_at > c.date) return false;', ''],
+    ['d.confirmed_at > c.date', 'd.confirmed_at >= c.date'],
+    ['nm = named(i) || LIC_RK_ABBR[x] || x;', 'nm = named(i) || x;'],
+    ['if (p.first) carry = p.first;', ''],
+    ['.sort(function(a, b){ return (a.no || 0) - (b.no || 0); })', ''],
+    ['replace(/[\\s·ㆍ・‧∙]/g, "")', 'replace(/[\\s]/g, "")'],
+    ['for (var k = Math.min(6, i); k >= 1; k--)', 'for (var k = 0; k >= 1; k--)'],
+    ['refs.push({ base: cur || "*", lv: lv });', 'if (cur) refs.push({ base: cur, lv: lv });'],
+    ['(r.base === c.base || r.base === "*")', '(r.base === c.base)'],
+    ['if (!c || !c.name || !isDate(c.date)) return;', 'if (!c || !c.name) return;'],
+    ['licRk.at = Date.now();', ''],
+    ['if (licRk.vid !== myId()){ licRk.seq++; licRk.st = ""; licRk.changed = []; licRk.at = 0; }', ''],
+    ['return licRk.st === "ok" ? licRkMarks(duties, licRk.changed) : {};', 'return licRkMarks(duties, ENV.resp && ENV.resp.body && Array.isArray(ENV.resp.body.changed) ? ENV.resp.body.changed : OKR);'],
+    ['var ok = !!(res && res.status === 200 && res.body && Array.isArray(res.body.changed));', 'var ok = !!(res && res.body && Array.isArray(res.body.changed));'],
+    ['esc("법령 개정 감지 " + rk.date + " — " + rk.laws.join(", "))', '"법령 개정 감지 " + rk.date + " — " + rk.laws.join(", ")'],
+    ['if (currentTab === "lic"){', 'if (true){']];
+  const kill7 = MU7.map(([a, b]) => { if (BLK7.split(a).length !== 2) return 'err 자리 ' + a.slice(0, 50); const mb = BLK7.replace(a, () => b).replace('function licRkNow(){', 'var OKR = [{ name: "가짜환경법 시행규칙", date: "2026-11-09" }];\n  function licRkNow(){');
+    try { const ra = chk7A(mb).ok, rb = chk7B(mb).ok, rd = chk7D(new Function('ENV', [fn7p(html, 'esc'), fn7p(html, 'isDate'), fn7p(html, 'dutyBadges'), fn7p(html, 'dutyRowHtml'), 'function isAdmin(){ return !!ENV.admin; } function lmDutyDetail(){ return []; }', mb.replace(/^[\s\S]*?(?=  function licRkBadge)/, ''), 'return dutyRowHtml;'].join('\n'))).ok; return !(ra && rb && rd); } catch (e) { return true; } });
+  T('P1 판7 ⑥ 결함 사본 ' + MU7.length + '개(단계 가름 없음·법 시행령 낱말·법령 뒤 단계 낱말·풀림 없음·같은 날 풀림·약칭·이어받기·번호 순·가운뎃점·여러 낱말 이름·모르는 법령 뺌·모르는 법령 맞춤·날짜 없는 감지·10분 묶음·로그인 전환·읽기 실패를 표로·200 아닌 응답·제목 이스케이프·다른 탭 그림) = 모두 ✗',
+    kill7.every((v) => v === true), JSON.stringify(kill7.map((v, i) => (v === true ? 1 : MU7[i][0].slice(0, 40) + ':' + v))));
+} catch (e) { console.log('  ✗ P1 판7 검사 실행 — ' + e.message); fails++; }
+
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
