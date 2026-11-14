@@ -13414,6 +13414,29 @@ try {   // ---- P1 판28 인허가 '이번 달' 탭(시안 판3 ② — PM 11/13
 } catch (e) { console.log('  (P1 판28 검사 생략 — ' + e.message + ')'); fails++; }
 
 
+// ── v467(체크 29 판④ 원본 읽기 — PM 11/14 '빠지는거 없이' · AI 판독 '배포 때 바로 켬'): 문서·판 번호 정확 검사(동작 검사는 '29 판④' · servertest 90 · tools/stmtread_[a-d]_check.mjs) — 다음 판은 기준 줄·sw를 '466 이상'으로
+try {
+  const rd67 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D67 = { ft: rd67('FEATURES.md'), tl: rd67('TESTLIST.md'), sw: rd67('sw.js'), man: rd67('MANUAL.html'), cl: rd67('CLAUDE.md'), pj: rd67('package.json') };
+  const chk67 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v467 (11/14)', '\n### '), tlv = cut(d.tl, '\n## v467 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI 시험 화면 대상/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l));
+    const FT = ['`stmt_read`', '`stmt_read_status`', '`gw-stmt-read-background`', '`_lib/stmtnts.js`', '`_lib/taxxml.js`', '`_lib/xlsbiff.js`', '`_lib/stmtsinil.js`', '`pdfjs-dist` 4.7.76', '`_lib/stmtvision.js`', '계산서 쪽은 빼고', '개인정보 칸 흰색 가림', '출력 걸러내기', '`claude-opus-5-5`', '공급가 + 세액', 'servertest 90'];
+    const GATE = ['uismoke', 'consheet_check', 'proctpl_check', 'settletest', 'servertest', 'rectest', 'promoqual_check', 'promogen_check', 'promoqlearn_check', 'promostream_check', 'promo_wrap_check', 'promo_post_check', 'stmtread_a_check', 'stmtread_b_check', 'stmtread_c_check', 'stmtread_d_check'];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const ok = /기준: v467 \(2026-11-14\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && tlv.length > 0 && scr.some((l) => /^- \[ \]/.test(l)) && !scr.some((l) => /PM/.test(l)) && !cb.some((l) => /^- \[ \] \(PM/.test(l))
+      && GATE.every((g) => gate.some((l) => l.indexOf('`' + g + '`') > 0)) && d.man.indexOf('<b>📎 원본 넣기</b>') > 0 && d.man.indexOf('단가가 부가세 포함인 명세는 공급가 + 세액') > 0
+      && d.cl.indexOf('**월말명세서 원본 읽기(v467') > 0 && /"pdfjs-dist": "4\.7\.76"/.test(d.pj) && /SHELL_CACHE = 'jw-shell-v467'/.test(d.sw);
+    return { ok, info: { mF, scr: scr.length, gate: gate.length } };
+  };
+  const r67 = chk67(D67), mu67 = (k, f) => chk67(Object.assign({}, D67, { [k]: f(D67[k]) })).ok;
+  const M67 = [mu67('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v466 (')), mu67('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v466'")), mu67('ft', (s) => s.split('계산서 쪽은 빼고').join('계산서 쪽도')),
+    mu67('pj', (s) => s.replace('"pdfjs-dist": "4.7.76"', '"pdfjs-dist": "^4.9.0"')), mu67('tl', (s) => s.split('`stmtread_d_check`').join('stmtread_d_check')), mu67('man', (s) => s.replace('<b>📎 원본 넣기</b>', '원본 넣기')), mu67('cl', (s) => s.replace('**월말명세서 원본 읽기(v467', '**원본 읽기(v4xx'))];
+  T('v467 문서·판 번호(정확 검사): FEATURES 기준 v467 (2026-11-14)·v467 절(stmt_read·상태·배경 함수·부품 6·pdfjs-dist 4.7.76·계산서 쪽 빼기·가림·걸러내기·모델·검산 규칙·servertest 90) · TESTLIST v467(화면 칸 [ ] ≥ 1 · PM 낱말 0 · 게이트 [x] 12종 + stmtread 4종) · MANUAL 원본 넣기·검산 문구 · CLAUDE.md 원본 읽기 줄 · package.json pdfjs-dist 4.7.76 고정 · sw jw-shell-v467 · 결함 사본 ' + M67.length + '개 = 모두 ✗',
+    r67.ok && M67.every((v) => v === false), JSON.stringify({ r: r67.info, mut: M67 }));
+} catch (e) { console.log('  (v467 검사 생략 — ' + e.message + ')'); fails++; }
+
 try {
   const fdir = join(ROOT, 'netlify', 'functions');
   const miss = readdirSync(fdir).filter((f) => /^gw-.*\.js$/.test(f)).filter((f) => { const t = readFileSync(join(fdir, f), 'utf8'); return /\b(store|blobGet|blobSet|blobList|blobDelete)\(/.test(t) && !/setupBlobContext\(/.test(t); });
@@ -14020,8 +14043,8 @@ try {
     const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l));
     const FT = ['`unpaidReceivables(all)`', '`recIsCredit`', 'width:auto', 'C078 ⑥·C063', '`cat`', '[나대지]'];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
-    const ok = /기준: v466 \(2026-11-14\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 3 && gate.length === 2 && !cb.some((l) => /\(PM/.test(l))
-      && (t64.match(/^- \[x\] \(AI 시험 화면 대상/gm) || []).length === 7 && (t64.match(/^- \[ \] /gm) || []).length === 0 && /SHELL_CACHE = 'jw-shell-v466'/.test(d.sw);
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 466 && ftv.length > 0 && mF.length === 0 && cb.length === 3 && gate.length === 2 && !cb.some((l) => /\(PM/.test(l))
+      && (t64.match(/^- \[x\] \(AI 시험 화면 대상/gm) || []).length === 7 && (t64.match(/^- \[ \] /gm) || []).length === 0 && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 466;   // v467: 이 판 이상(이 판 값은 v467 문서 검사)
     return { ok, info: { mF, cb: cb.length, gate: gate.length } };
   };
   const r66 = chk66(D66);

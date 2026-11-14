@@ -1256,3 +1256,10 @@
 - [ ] (AI 시험 화면 대상 — 운영 배포 뒤 읽기 전용) 관리자 홈 KPI '미수 n건'·홈 기성 카드 '미수 n'이 기성 표 제목 '미수 n건'과 같다(운영 기성 0건이면 0 = 0)
 - [x] (AI) `uismoke` 'v466 C078 ③ 홈 미수'(실행 — 홈 = 수정(-) 뺌 · 폰 옛 목록 = 그대로 · 결함 사본 = 다시 듦) · 'v466 C078 ② [합치기] 체크 상자 폭' · v464 문서 검사 화면 칸 [x]도 셈 · v465 문서 검사를 이 판 이상으로 풂 — ✓ AI 11/14
 - [x] (AI) `uismoke` · `consheet_check` · `proctpl_check` · `settletest` · `servertest` · `rectest` · `promoqual_check` · `promogen_check` · `promoqlearn_check` · `promostream_check` · `promo_wrap_check` · `promo_post_check` 전부 통과 — ✓ AI 11/14
+
+## v467 — 체크 29 월말명세서 판④: 원본 넣기(글자 파일 바로 · 그림·스캔·팩스 AI 판독 켬 · 개인정보 칸 가림 + 출력 걸러냄 · 검산 규칙 단가 부가세 포함)
+- [x] (AI 시험 화면 대상 — 29 작업 폴더 index.html + 실제 gw-stmt·gw-stmt-read-background, 회원은 운영 백업 사본 읽기만, 가짜 차량·가짜 시험 자료, Claude는 가짜 응답) 권민지 운영 권한 사본 + 월말명세서 수행: 가온 상세에 그림 PDF 끌어다 놓기 → 'AI가 읽는 중' → 줄 2개·명세 합계 채움·계산서 쪽 뺐다는 안내 → [저장] → 서버 문서에 초안(how vision 2)·넣은 파일 표시 · 고친 칸 0 / 앱이 채운 칸 18 · 현대상용 상세에 보안 계산서 HTML → 계산서 칸·줄 3·'다른 거래처' 경고 · 폰 411 넘침 0 — 11/14 확인
+- [x] (AI 시험 화면 대상 — 10월 실물 스캔 8곳을 판독 직전 그림으로 만들어 눈으로 확인) 계산서 쪽 8곳 모두 뺌 · 포항모터스·현대상용 차량번호 줄 남고 소유자·공급자·작성자 칸 가림 · 가온 공급자 칸·입금계좌 · 영남 이름 열 · 스피드 공급자 칸 · 철탑 머리 작은 줄(표 머리줄은 남김) · 신일 대표·전화 — 11/14 확인(그림은 확인 뒤 지움)
+- [ ] (AI 시험 화면 대상 — 운영 배포 뒤) 실제 Claude 판독 1건(10월 가온 스캔)으로 줄 수·합계가 명세표와 맞는지 · 사용량 usage:stmt 기록
+- [ ] (권민지) 10월분 거래처 상세에 메일 원본(수양 PDF·오천 PDF·신일 xls·보안 계산서 HTML 3개)과 스캔(가온·대송·영남·포항모터스·현대상용·스피드·철탑)을 넣어 줄이 채워지는지 · 고친 칸 수
+- [x] (AI) `uismoke` · `consheet_check` · `proctpl_check` · `settletest` · `servertest` · `rectest` · `promoqual_check` · `promogen_check` · `promoqlearn_check` · `promostream_check` · `promo_wrap_check` · `promo_post_check` 전부 통과 + 새 시험 `stmtread_a_check` · `stmtread_b_check` · `stmtread_c_check` · `stmtread_d_check` + node --check — 숫자는 커밋 메시지
