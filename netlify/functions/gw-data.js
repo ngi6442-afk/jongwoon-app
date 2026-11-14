@@ -2086,19 +2086,19 @@ async function handleLicMonthGet(event, d, R) {
   return jr(200, { status: 'OK', ver: bg.ver, rows: bg.rows.map(licBgOut), act: act, assign_ok: as.ok, who: gen && gen.who_id ? { id: gen.who_id, name: (ms && ms[gen.who_id] && ms[gen.who_id].name) || '' } : null, today: licKstToday(), request_id: R });
 }
 // ---- P1 판7(원장 C102) 법령 개정 감지 → 인허가 의무 대장 '근거 재확인 필요' 표시 — 읽기 lic_recheck_get(쓰기 없음) ----
-// 내리는 것 = 감지된 법령 목록 [{name, date}]만(lawwatch:last law_changed + 옛 꼴 경보 글 — _lib/lawchg). 경보 글·계약 bg_recheck·MST는 내리지 않는다.
-// 행 맞춤(law 칸 글 — 본법/시행령/시행규칙·약칭·생략된 '법·영·규칙'은 앞 행 법령 이어받기)·풀림(행 확정 날짜 > 감지 날짜)은 앱 licRkMarks.
-// 권한 = lic_month_get과 같음(로그인·승인 기기·인허가 숨김 아님). 감시 기록 없음 = 빈 목록 · 못 읽음 = 500 LAWWATCH_READ_FAILED(앱은 표시 없음).
+// 내리는 것 = 감지된 법령 목록 [{name, date}]만(별도 키 lawwatch:changed + lawwatch:last 경보 글 — _lib/lawchg). 경보 글·계약 bg_recheck·MST는 내리지 않는다.
+// 행 맞춤(law 칸 글 — 본법/시행령/시행규칙·약칭·생략된 '법·영·규칙'은 앞 행 법령 이어받기)·풀림(max(확정 날짜, 재확인 날짜) ≥ 감지 날짜)은 앱 licRkMarks.
+// 권한 = col:licenses 읽기(get)·lic_month_get과 같음(로그인·재직·승인 기기·인허가 숨김 아님 — lic는 기본 숨김). 감시 기록 없음 = 빈 목록 · 못 읽음 = 500 LAWWATCH_READ_FAILED(앱은 직전 목록 유지).
 const LAWCHG = require('./_lib/lawchg');
 async function handleLicRecheckGet(event, d, R) {
   const c = await currentMember(event);
   if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
   if (!(await deviceApproved(event, c.member))) return jr(403, { status: 'FORBIDDEN', error_code: 'DEVICE_NOT_APPROVED', request_id: R });
   if (permOf(c.member, 'licenses') === 'hide') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_ACCESS', request_id: R });
-  let r;
-  try { r = await blobGet(store(DATA), 'lawwatch:last'); } catch (e) { r = { ok: false, code: 'STORAGE_READ_FAILED' }; }
-  if (!r.ok && r.code !== 'NOT_FOUND') return jr(500, { status: 'ERROR', error_code: 'LAWWATCH_READ_FAILED', request_id: R });
-  const list = r.ok ? LAWCHG.merge([LAWCHG.fromDoc(r.data)], licKstToday()) : [];
+  const rd = async function (k) { try { return await blobGet(store(DATA), k); } catch (e) { return { ok: false, code: 'STORAGE_READ_FAILED' }; } };
+  const rc = await rd(LAWCHG.CHANGED_KEY), r = await rd('lawwatch:last');   // 별도 키(누적) + 지금 lawwatch:last 경보 글(별도 키 쓰기를 못 한 회차분)
+  if ((!rc.ok && rc.code !== 'NOT_FOUND') || (!r.ok && r.code !== 'NOT_FOUND')) return jr(500, { status: 'ERROR', error_code: 'LAWWATCH_READ_FAILED', request_id: R });   // 하나라도 못 읽음 = 앱은 직전 목록 유지
+  const list = LAWCHG.merge([LAWCHG.itemsOf(rc.ok ? rc.data : null), r.ok ? LAWCHG.fromDoc({ date: r.data && r.data.date, alerts: r.data && r.data.alerts }) : []], licKstToday());
   return jr(200, { status: 'OK', date: r.ok && r.data && LAWCHG.isDay(r.data.date) ? r.data.date : '', changed: list.map(function (x) { return { name: x.name, date: x.date }; }), request_id: R });
 }
 function licDateOk(v) { return vehDueDate(v); }

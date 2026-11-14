@@ -1,11 +1,14 @@
 'use strict';
 
 // P1 판7(원장 C102) 법령 개정 감지 목록 — gw-lawwatch(쌓기)·gw-data lic_recheck_get(읽기) 공용.
-//   원천 = lawwatch:last 의 law_changed [{name, date, mst, prev_mst}](수집기 lawwatch.py가 보내고 gw-lawwatch가 회차마다 앞 판과 합쳐 쌓음)
-//        + 옛 꼴(law_changed 없는 판): 경보 글 '[법령 개정 감지] 이름: …'에서 이름, 날짜 = 그 회차 date(11/9 감지분이 이 꼴).
+//   저장 = 별도 키 CHANGED_KEY('lawwatch:changed' {schema, items:[{name, date, mst, prev_mst}], ts}) — lawwatch:last(경보 전문·bg_recheck)와 나눔.
+//     gw-lawwatch는 이 키 읽기에 성공했을 때만(없음 = 빈 목록) 합쳐 씀 · 못 읽으면 안 씀(누적을 덮지 않음) · 바뀐 것이 없으면 안 씀(adwatch 등 감지 없는 회차).
+//   원천 = 수집기 POST law_changed + 경보 글 '[법령 개정 감지] 이름: …'(날짜 = 그 회차 date — 11/9 감지분·이 키 쓰기를 못 한 회차가 lawwatch:last에 남은 꼴).
+//     gw-lawwatch는 덮기 전 앞 판 lawwatch:last의 경보 글 감지분도 주워 담고, lic_recheck_get은 이 키 + 지금 lawwatch:last 경보 글을 합쳐 내린다.
 //   같은 법령은 가장 늦은 감지 날짜 하나만 · 2년(KEEP_DAYS) 넘은 감지는 뺌 · 최대 MAX건.
 //   맞춤(의무 대장 행 law 칸)·풀림(행 확인 날짜 > 감지 날짜)은 앱 licRkMarks — 이 목록은 표시 재료일 뿐 기한 계산 입력이 아니다.
 const ALERT_RE = /^\[법령 개정 감지\] (.+?): /;
+const CHANGED_KEY = 'lawwatch:changed';
 const KEEP_DAYS = 730;
 const MAX = 300;
 
@@ -54,4 +57,9 @@ function merge(lists, today) {
     .slice(0, MAX);
 }
 
-module.exports = { fromDoc, merge, isDay, kstToday, nameKey, ALERT_RE, KEEP_DAYS, MAX };
+// 별도 키 문서 → 목록(꼴 틀림 = 빈 목록)
+function itemsOf(doc) { return (doc && typeof doc === 'object' && Array.isArray(doc.items)) ? doc.items : []; }
+// 두 목록이 같은 내용인지(합친 결과가 저장본과 같으면 쓰지 않음)
+function sameList(a, b) { return JSON.stringify(a || []) === JSON.stringify(b || []); }
+
+module.exports = { fromDoc, merge, itemsOf, sameList, isDay, kstToday, nameKey, ALERT_RE, CHANGED_KEY, KEEP_DAYS, MAX };

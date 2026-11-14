@@ -28100,20 +28100,22 @@ function dutyStage(nx){
     return h;
   }
   // @lic-recheck-start — P1 판7(원장 C102) 법령 개정 감지 → 의무 대장 행에 '근거 재확인 필요' 배지(표시만 — 기한 계산·이번 달 회차는 그대로, 계산 입력 아님).
-  //   원천 = 서버 lic_recheck_get(감지된 법령 목록 [{name, date}] — lawwatch:last law_changed + 옛 꼴 경보 글). 못 읽음·감지 없음 = 표시 없음. 10분 지나면 칸을 다시 그릴 때 다시 읽음.
-  //   맞춤 = 행 law 칸 글(licRkParse): 법령 이름(약칭 표 LIC_RK_ABBR·빈칸·가운뎃점 무시) 뒤 '시행령/시행규칙'으로 단계를 가름 · 이름 없이 쓴 '법·영·규칙'은 같은 칸의 앞 법령, 칸 첫머리면 앞 행(번호 순)의 첫 법령을 이어받음.
+  //   원천 = 서버 lic_recheck_get(감지된 법령 목록 [{name, date}] — 별도 키 lawwatch:changed + lawwatch:last 경보 글). 감지 없음 = 표시 없음. 10분 지나면 칸을 다시 그릴 때 다시 읽음 —
+  //     읽는 중·읽기 실패 때는 직전에 받은 목록으로 계속 맞춤(처음부터 못 읽었으면 표시 없음) · 다른 사람으로 로그인하면 앞사람 목록을 버림.
+  //   맞춤 = 행 law 칸 글(licRkParse): 법령 이름(약칭 표 LIC_RK_ABBR·빈칸·가운뎃점 무시 · 'OO법시행규칙'처럼 붙여 써도) 뒤 '시행령/시행규칙'으로 단계를 가름 ·
+  //     이름 없이 쓴 '법·영·규칙'·단독 '시행령·시행규칙'은 같은 칸의 앞 법령, 칸 첫머리면 앞 행(번호 순)의 첫 법령을 이어받음.
   //     개정이 시행령·시행규칙이면 그 단계를 인용한 행만 · 본법이면 그 법의 모든 단계 인용 행(넘치는 쪽) · 어느 법인지 모르는 '법·영·규칙'(이어받을 법령 없음)은 모든 법령에 맞춤(넘치는 쪽).
-  //   풀림 = 행 확정 날짜(confirmed_at)가 감지 날짜와 같거나 뒤. 같은 법령이 다시 개정되면 새 감지 날짜로 다시 붙음.
-  //     confirmed_at을 찍는 길 = 관리자 창(openDutyModal — 표시 행은 버튼 글 '근거 재확인'·등재표 확정 행도 버튼): 조건부 → 확정 전환(종전) · 이미 확정인 행을 표시가 붙은 채 저장
-  //     (사람 확정 행 = confirmed_at·confirmed_by 새로 · 등재표 확정 행 = confirmed_at + recheck_by — confirmed_by를 비워 둬 강등 불가·답 필수·버튼 숨김이 종전 그대로).
+  //   풀림 = max(확정 날짜 confirmed_at, 재확인 날짜 recheck_at) ≥ 감지 날짜. 같은 법령이 그 뒤 다시 개정되면 새 감지 날짜로 다시 붙음.
+  //     recheck_at·recheck_by를 찍는 길 = 관리자 창(openDutyModal — 표시 행은 버튼 글 '근거 재확인'·등재표 확정 행도 버튼)에서 표시가 붙은 행을 저장(확정·조건부 무관 — confirm·confirmed_* 안 건드림).
   //     담당의 좁은 저장('이번 달' 단추 네 가지)·관리자 아닌 통째 저장은 이 칸을 못 바꿈(서버) — 표시는 관리자만 풂.
-  var licRk = { st: "", changed: [], seq: 0, vid: "", at: 0 };
+  var licRk = { st: "", changed: [], has: false, seq: 0, vid: "", at: 0 };
   var LIC_RK_ABBR = { "산안법":"산업안전보건법", "건폐법":"건설폐기물의재활용촉진에관한법률", "건산법":"건설산업기본법", "화관법":"화학물질관리법", "화물자동차법":"화물자동차운수사업법", "지방계약법":"지방자치단체를당사자로하는계약에관한법률", "국가계약법":"국가를당사자로하는계약에관한법률", "대기법":"대기환경보전법", "소음진동법":"소음진동관리법", "폐관법":"폐기물관리법" };
   var LIC_RK_STOP = { "모법":1, "본법":1, "방법":1, "불법":1, "위법":1, "적법":1, "편법":1 };
   function licRkNorm(s){ return String(s == null ? "" : s).replace(/[\s·ㆍ・‧∙]/g, ""); }
   function licRkSplit(name){ var n = licRkNorm(name), m = n.match(/^(.+?)(시행령|시행규칙)$/), b = m ? m[1] : n; return { base: LIC_RK_ABBR[b] || b, lv: m ? (m[2] === "시행령" ? "영" : "규칙") : "법" }; }
   function licRkParse(text, carry, known){   // → { refs: [{base, lv('법'|'영'|'규칙')}], first: 이 칸의 첫 법령(다음 행이 이어받음) }
-    var w = String(text == null ? "" : text).match(/[가-힣]+/g) || [], refs = [], cur = carry || "", first = "", i, x, nm, nx, lv;
+    var w = [], refs = [], cur = carry || "", first = "", i, x, nm, nx, lv;
+    (String(text == null ? "" : text).match(/[가-힣]+/g) || []).forEach(function(t){ var m = t.match(/^(.+(?:법|법률))(시행령|시행규칙)$/); if (m){ w.push(m[1]); w.push(m[2]); } else w.push(t); });   // 'OO법시행규칙' 붙여 쓴 꼴 = 'OO법 시행규칙'
     var named = function(i){ for (var k = Math.min(6, i); k >= 1; k--){ var c = w.slice(i - k, i + 1).join(""); if (known[c]) return c; if (LIC_RK_ABBR[c]) return LIC_RK_ABBR[c]; } return ""; };   // 여러 낱말 이름(화물자동차 운수사업법·…에 관한 법률)
     for (i = 0; i < w.length; i++){
       x = w[i]; nx = w[i + 1] || "";
@@ -28123,6 +28125,7 @@ function dutyStage(nx){
         if (lv === "법" && (nx === "시행령" || nx === "시행규칙")){ lv = nx === "시행령" ? "영" : "규칙"; i++; }
         refs.push({ base: cur || "*", lv: lv }); continue;
       }
+      if (x === "시행령" || x === "시행규칙"){ refs.push({ base: cur || "*", lv: x === "시행령" ? "영" : "규칙" }); continue; }   // 앞에 '법·영' 없이 단독으로 쓴 단계 = 직전 법령의 그 단계(넘치는 쪽)
       if (/(법|법률)$/.test(x) && x.length > 1 && !LIC_RK_STOP[x]){   // 'OO법'·'…에 관한 법률'(낱말 '법률' 하나 — 앞 낱말과 이어 이름을 찾음)
         nm = named(i) || LIC_RK_ABBR[x] || x;
         lv = nx === "시행령" ? "영" : (nx === "시행규칙" ? "규칙" : "법"); if (lv !== "법") i++;
@@ -28138,8 +28141,9 @@ function dutyStage(nx){
     Object.keys(LIC_RK_ABBR).forEach(function(k){ known[LIC_RK_ABBR[k]] = 1; });
     (Array.isArray(list) ? list.slice() : []).filter(function(d){ return d && d.no != null; }).sort(function(a, b){ return (a.no || 0) - (b.no || 0); }).forEach(function(d){
       var p = licRkParse(d.law, carry, known); if (p.first) carry = p.first;
+      var ck = [d.confirmed_at, d.recheck_at].filter(isDate).sort().pop() || "";   // 확정·재확인 중 늦은 날짜
       var hit = ch.filter(function(c){
-        if (isDate(d.confirmed_at) && d.confirmed_at >= c.date) return false;   // 감지 날 또는 그 뒤에 사람이 다시 확인(확정·근거 재확인 저장) = 풀림 — 그 뒤 새 감지(날짜 > 확인 날짜)면 다시 붙음
+        if (ck && ck >= c.date) return false;   // 감지 날 또는 그 뒤에 사람이 다시 확인 = 풀림 — 그 뒤 새 감지(날짜 > 확인 날짜)면 다시 붙음
         return p.refs.some(function(r){ return (r.base === c.base || r.base === "*") && (c.lv === "법" || r.lv === c.lv); });
       });
       if (!hit.length) return;
@@ -28152,15 +28156,15 @@ function dutyStage(nx){
   function licRkLoad(){
     var seq = ++licRk.seq;
     licRk.st = "loading"; licRk.vid = myId();
-    var done = function(ok, list){ if (seq !== licRk.seq) return; licRk.st = ok ? "ok" : "err"; licRk.changed = ok ? list : []; licRk.at = Date.now(); if (currentTab === "lic"){ if (licLayer === "duty") renderDuties(); else if (licLayer === "month"){ licMonth.rk = licRkNow(); renderLicMonth(); } } };
+    var done = function(ok, list){ if (seq !== licRk.seq) return; licRk.st = ok ? "ok" : "err"; if (ok){ licRk.changed = list; licRk.has = true; } licRk.at = Date.now(); if (currentTab === "lic"){ if (licLayer === "duty") renderDuties(); else if (licLayer === "month"){ licMonth.rk = licRkNow(); renderLicMonth(); } } };
     return gwCall("gw-data", { action: "lic_recheck_get" }).then(function(res){ var ok = !!(res && res.status === 200 && res.body && Array.isArray(res.body.changed)); done(ok, ok ? res.body.changed : []); }).catch(function(){ done(false, []); });
   }
-  function licRkNow(){   // 칸을 그릴 때 — 지금 쓸 표시 표(읽는 중·못 읽음 = 빈 표). 로그인 전환이면 앞사람 목록을 버림
-    if (licRk.vid !== myId()){ licRk.seq++; licRk.st = ""; licRk.changed = []; licRk.at = 0; }
+  function licRkNow(){   // 칸을 그릴 때 — 지금 쓸 표시 표(읽는 중·못 읽음 = 직전에 받은 목록 · 한 번도 못 받았으면 빈 표). 로그인 전환이면 앞사람 목록을 버림
+    if (licRk.vid !== myId()){ licRk.seq++; licRk.st = ""; licRk.changed = []; licRk.has = false; licRk.at = 0; }
     if (!licRk.st || (licRk.st !== "loading" && Date.now() - licRk.at > 600000)) licRkLoad();
-    return licRk.st === "ok" ? licRkMarks(duties, licRk.changed) : {};
+    return licRk.has ? licRkMarks(duties, licRk.changed) : {};
   }
-  function licRkFor(no){ return licRk.st === "ok" ? (licRkMarks(duties, licRk.changed)[no] || null) : null; }   // 창 열 때 그 행의 표시(읽기는 안 부름)
+  function licRkFor(no){ return licRk.has ? (licRkMarks(duties, licRk.changed)[no] || null) : null; }   // 창 열 때 그 행의 표시(읽기는 안 부름)
   function licRkBadge(rk){ return rk ? ' <span class="duty-badge pre" title="' + esc("법령 개정 감지 " + rk.date + " — " + rk.laws.join(", ")) + '">근거 재확인 필요</span>' : ""; }
   // @lic-recheck-end
   function dutyRowHtml(d, open, rk){
@@ -28174,7 +28178,7 @@ function dutyStage(nx){
       if (d.precheck_answer) parts.push("<b>선행확인 답</b>  " + esc(d.precheck_answer));
       if (d.base_date) parts.push("<b>기준일</b>  " + esc(d.base_date));
       if (d.confirmed_by) parts.push("<b>확정 전환</b>  " + esc(d.confirmed_by) + " · " + esc(d.confirmed_at || ""));
-      if (d.recheck_by && !d.confirmed_by) parts.push("<b>근거 다시 확인</b>  " + esc(d.recheck_by) + " · " + esc(d.confirmed_at || ""));   // P1 판7 등재표 확정 행의 재확인 저장
+      if (d.recheck_by) parts.push("<b>근거 다시 확인</b>  " + esc(d.recheck_by) + " · " + esc(d.recheck_at || ""));   // P1 판7 [근거 재확인] 저장 기록(재확인 칸)
       parts = parts.concat(lmDutyDetail(d));   // P1 판28 이번 달 단추 칸(완료 기록·정정·해당 없음·기준일 무엇)
       detail = '<div class="task-detail" style="margin-top:5px;">' + parts.join("<br>") + '</div>';
     }
@@ -28302,7 +28306,7 @@ function dutyStage(nx){
     document.getElementById("dutyConfirmChk").checked = d.confirm === "확정";
     editingDutyRk = licRkFor(no);   // P1 판7 — 창을 연 때의 '근거 재확인 필요' 표시(저장이 표시를 풀지 정함)
     var rkEl = document.getElementById("dutyModalRk");
-    rkEl.textContent = editingDutyRk ? ("근거 재확인: " + editingDutyRk.laws.join(", ") + " 개정 감지 " + editingDutyRk.date + " — 조문을 다시 확인한 뒤 저장하면 표시가 풀립니다" + (d.confirm === "확정" ? "." : "(확정으로 전환해 저장).")) : "";
+    rkEl.textContent = editingDutyRk ? ("근거 재확인: " + editingDutyRk.laws.join(", ") + " 개정 감지 " + editingDutyRk.date + " — 조문을 다시 확인한 뒤 저장하면 표시가 풀립니다.") : "";
     rkEl.style.display = editingDutyRk ? "" : "none";
     document.getElementById("dutyBackdrop").classList.add("show");
   }
@@ -28313,7 +28317,7 @@ function dutyStage(nx){
     var ans = document.getElementById("dutyPreAns").value.trim();
     var bd = document.getElementById("dutyBaseDate").value;
     var toConfirm = document.getElementById("dutyConfirmChk").checked;
-    var rkSeed = !!(editingDutyRk && d.confirm === "확정" && !d.confirmed_by);   // P1 판7 등재표 확정 행의 근거 재확인 저장 — 답·기준일 없이도(주기·기준일 칸은 그대로)
+    var rkSeed = !!(editingDutyRk && d.confirm === "확정" && !d.confirmed_by);   // P1 판7 등재표 확정 행의 근거 재확인 저장 — 답·기준일 없이도(주기·기준일 칸은 그대로 · 조건부 행은 확정 전환을 안 하면 원래 답 필수가 아님)
     // 답·기준일 없는 확정 금지 — 전환뿐 아니라 확정 유지 저장에서도(답만 지우고 저장하면 근거 없는 확정이 남는다)
     if (toConfirm && (!ans || !bd) && !rkSeed){ alert("확정 상태는 선행확인 답과 기준일을 모두 채워야 합니다.\n답을 비우려면 확정 체크를 해제하세요."); return; }
     d.precheck_answer = ans;
@@ -28323,11 +28327,8 @@ function dutyStage(nx){
     } else if (!toConfirm && d.confirmed_by){
       // 사람이 전환한 확정만 회수 가능 — 등재표 원본이 확정인 행은 체크 해제로 강등되지 않는다
       d.confirm = "조건부"; d.confirmed_by = ""; d.confirmed_at = "";
-    } else if (editingDutyRk && d.confirm === "확정"){
-      // P1 판7 이미 확정인 행을 '근거 재확인 필요' 표시가 붙은 채 저장 = 근거 다시 확인 → 확인 날짜를 오늘로(표시 풀림). 표시 없는 행은 이 갈래에 안 옴(종전 그대로)
-      if (d.confirmed_by){ d.confirmed_by = getUser(); d.confirmed_at = todayStr(); }
-      else { d.confirmed_at = todayStr(); d.recheck_by = getUser(); }   // 등재표 확정 행 — confirmed_by를 비워 둬 강등 막음·버튼 숨김·답 필수 규칙이 종전 그대로
     }
+    if (editingDutyRk){ d.recheck_at = todayStr(); d.recheck_by = getUser(); }   // P1 판7 '근거 재확인 필요' 행을 저장 = 근거 다시 확인(확정·조건부 무관 · confirm·confirmed_* 안 건드림) — 표시 없는 행은 종전 그대로
     d.updated = todayStr(); d.updated_ts = Date.now();
     closeDutyModal();
     saveLicCache(); renderDuties(); scheduleLicSave();
