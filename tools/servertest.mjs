@@ -9791,4 +9791,119 @@ function J91a(x) { return JSON.stringify(x); }
   }
 }
 
+{ // ---- P1 판19 지시 완료 자동 판정 — 증명서 올림 신호(착수설명서 판19 55행 · 원장 T359 · 업무별 설계 3-14 appr A3ⓑ 'cert 증명서 3종 docatt 업로드').
+  //   cert:c<n>(20일 주기 '증명서 갱신 발급 — 납세·지방세·4대보험 완납증명') 열린 지시 + 문서함 첨부 메타 files[{n,name,size,mime,ts,by}]에 3종 pdf가 그 회차 안에 다 올라오면 → 기존 신호와 같은 '승인 대기(review)·앱 기준'.
+  //   넘기지 않는 쪽: 읽기 실패 · 2종만 · 지시 전 첨부 · 지운 문서/대기 문서 · 회차 겹침 · 한 이름 두 종류 · 사진 · 열람용 · 깨진 메타 · 미래 시각 · 만든 날 없음. 결함 사본(lib 11곳 · 크론 1곳)은 실패해야 한다. 자료는 가짜.
+  const fsP19 = require('fs'), ModP19 = require('module');
+  const FILEP19 = join(FN, '_lib/doneif.js'), SRCP19 = fsP19.readFileSync(FILEP19, 'utf8');
+  const FILEC19 = join(FN, 'gw-doneif-cron.js'), SRCC19 = fsP19.readFileSync(FILEC19, 'utf8');
+  const loadP19 = (file, src) => { const m = new ModP19(file); m.filename = file; m.paths = ModP19._nodeModulePaths(dirname(file)); m._compile(src, file); return m.exports; };
+  const mutP19 = (src, from, to) => { if (src.split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 60)); return src.replace(from, () => to); };
+  const K19 = (day, hm) => Date.parse(day + 'T' + (hm || '10:00') + ':00+09:00');
+  const NOW19 = K19('2026-11-25', '12:00');
+  const f19 = (n, name, day, hm, extra) => Object.assign({ n: n, name: name, size: 1000, mime: 'application/pdf', ts: K19(day, hm), by: { id: 'u_fake1', name: '가짜1' } }, extra || {});
+  const NAT = '납세증명서_가짜.pdf', LOC = '지방세 납세증명서_가짜.pdf', SOC = '4대사회보험료 완납증명서_가짜.pdf';
+  const doc19 = (id, files, extra) => Object.assign({ id: id, title: '증명서 가짜 ' + id, no: '', cat: '10-06', status: '등재', files: files, att_seq: files.length }, extra || {});
+  const t19 = (id, cyc, created, extra) => Object.assign({ id: id, title: '증명서 갱신 발급 — 납세·지방세·4대보험 완납증명', auto_key: 'cert:c' + cyc, status: 'open', from: '자동', who_id: '', created: created }, extra || {});
+  // c15 회차 시작 = 2026-01-01 + 15×20일 = 2026-10-28(KST) · c16 = 2026-11-17
+  const chk19 = (D) => {
+    const pl = (tasks, docs) => D.plan(tasks, { __rows: { documents: docs }, __now: NOW19 });
+    const ids = (p) => p.candidates.map((c) => c.id).join(',');
+    const three = (day, hm) => [f19(1, NAT, day, hm), f19(2, LOC, day, hm), f19(3, SOC, day, hm)];
+    const r = {};
+    const pOk = pl([t19('a', 15, '2026-10-28')], [doc19('d1', three('2026-11-01'))]);
+    r.catch = ids(pOk) === 'a' && /^cert\.c15 국세·지방세·4대보험$/.test(pOk.candidates[0].why);
+    r.split = ids(pl([t19('a', 15, '2026-10-28')], [doc19('d1', [f19(1, NAT, '2026-11-01')]), doc19('d2', [f19(1, LOC, '2026-11-02'), f19(2, SOC, '2026-11-03')])])) === 'a';   // 여러 문서에 나눠 올림도 셈
+    const p2 = pl([t19('a', 15, '2026-10-28')], [doc19('d1', three('2026-11-01').slice(0, 2))]);
+    r.two = p2.candidates.length === 0 && D.signalFor(t19('a', 15, '2026-10-28'), { __rows: { documents: [doc19('d1', three('2026-11-01').slice(0, 2))] }, __certOpen: D.certOpenList([t19('a', 15, '2026-10-28')]), __now: NOW19 }).why === 'cert.missing 4대보험';
+    r.edgeIn = ids(pl([t19('a', 15, '2026-10-28')], [doc19('d1', three('2026-10-28', '00:00'))])) === 'a';   // 회차 첫날 0시 정각 = 셈
+    const before = three('2026-10-28', '00:00'); before[2] = Object.assign({}, before[2], { ts: before[2].ts - 1 });
+    r.edgeOut = pl([t19('a', 15, '2026-10-28')], [doc19('d1', before)]).candidates.length === 0;   // 1밀리초 앞 = 지난 회차 몫
+    r.readFail = pl([t19('a', 15, '2026-10-28')], null).candidates.length === 0 && D.signalFor(t19('a', 15, '2026-10-28'), { __rows: {}, __certOpen: D.certOpenList([t19('a', 15, '2026-10-28')]) }).why === 'no_docs';
+    r.delDoc = pl([t19('a', 15, '2026-10-28')], [doc19('d1', three('2026-11-01'), { del: 1 })]).candidates.length === 0;
+    r.pendDoc = pl([t19('a', 15, '2026-10-28')], [doc19('d1', three('2026-11-01'), { status: '대기' })]).candidates.length === 0 && pl([t19('a', 15, '2026-10-28')], [doc19('d1', three('2026-11-01'), { status: '반려' })]).candidates.length === 0;
+    r.early = pl([t19('a', 15, '2026-11-02')], [doc19('d1', three('2026-11-01'))]).candidates.length === 0;   // 지시(11-02 생성)보다 먼저 올린 첨부 — 회차 안이어도 안 셈
+    r.overlap = pl([t19('a', 15, '2026-10-28'), t19('b', 16, '2026-11-17')], [doc19('d1', three('2026-11-20'))]).candidates.length === 0;   // 두 회차가 다 열려 있으면 뒤 회차 기간 첨부는 아무 지시에도 안 셈
+    r.overlapOld = ids(pl([t19('a', 15, '2026-10-28'), t19('b', 16, '2026-11-17')], [doc19('d1', three('2026-11-01'))])) === 'a';   // 앞 회차 기간 첨부는 앞 회차만
+    r.twoKinds = pl([t19('a', 15, '2026-10-28')], [doc19('d1', [f19(1, '지방세 납세증명 및 4대보험 완납증명.pdf', '2026-11-01'), f19(2, NAT, '2026-11-01'), f19(3, SOC, '2026-11-01')])]).candidates.length === 0;   // 합본 한 파일(지방세+4대보험)은 지방세 몫으로도 안 셈
+    r.image = pl([t19('a', 15, '2026-10-28')], [doc19('d1', [f19(1, NAT, '2026-11-01'), f19(2, LOC, '2026-11-01'), f19(3, '4대사회보험료 완납증명서_스캔.jpg', '2026-11-01', '10:00', { mime: 'image/jpeg' })])]).candidates.length === 0;
+    r.view = pl([t19('a', 15, '2026-10-28')], [doc19('d1', [f19(1, NAT, '2026-11-01'), f19(2, LOC, '2026-11-01'), f19(3, SOC, '2026-11-01', '10:00', { view: 1, src_n: 1 })])]).candidates.length === 0;
+    const bad = three('2026-11-01'); bad[0] = Object.assign({}, bad[0], { ts: String(bad[0].ts) });
+    const bad2 = three('2026-11-01'); bad2[1] = Object.assign({}, bad2[1]); delete bad2[1].by;
+    r.broken = pl([t19('a', 15, '2026-10-28')], [doc19('d1', bad)]).candidates.length === 0 && pl([t19('a', 15, '2026-10-28')], [doc19('d1', bad2)]).candidates.length === 0 && pl([t19('a', 15, '2026-10-28')], [null, 'x', doc19('d1', [null, 7])]).candidates.length === 0;
+    r.future = pl([t19('a', 15, '2026-10-28')], [doc19('d1', three('2026-11-26', '12:00'))]).candidates.length === 0;
+    r.noCreated = pl([t19('a', 15, '')], [doc19('d1', three('2026-11-01'))]).candidates.length === 0 && pl([t19('a', 15, '11/01')], [doc19('d1', three('2026-11-01'))]).candidates.length === 0;
+    r.notEligible = pl([t19('a', 15, '2026-10-28', { doneif_off: 1 }), t19('b', 15, '2026-10-28', { status: 'review', done_by: '가짜2' }), t19('c', 15, '2026-10-28', { del: 1 })], [doc19('d1', three('2026-11-01'))]).candidates.length === 0;
+    r.keys = D.parseKey('cert:c15').dom === 'cert' && D.parseKey('cert:c15').cyc === 15 && !D.parseKey('cert:c') && !D.parseKey('cert:c1x') && !D.parseKey('cert:c15:x') && D.certKindOf('지방세 납세증명서.PDF') === 'loc' && D.certKindOf('사회보험 완납 증명서.pdf') === 'soc' && D.certKindOf('국세완납증명.pdf') === 'nat' && D.certKindOf('납세증명서.hwp') === '' && D.certKindOf('법인 인감증명서.pdf') === '';
+    r.others = D.plan([{ id: 'v', auto_key: 'veh:v1:insp:2026-11-20', status: 'open' }, t19('a', 15, '2026-10-28')], { vehicles: { v1: { id: 'v1', insp_due: '2026-12-20' } }, __rows: { documents: [] } }).candidates.map((c) => c.id).join(',') === 'v';   // 기존 신호는 그대로
+    return r;
+  };
+  const allOk19 = (r) => Object.keys(r).every((k) => r[k] === true);
+  const r19 = chk19(require(FILEP19));
+  T('P1 판19 ① 신호 잡힘: 열린 cert:c15 + 회차 안 문서함 첨부 pdf 3종(국세 납세·지방세 납세·4대보험 완납) → 후보 · why "cert.c15 국세·지방세·4대보험"(파일 이름 안 나감) · 여러 문서에 나눠 올려도 셈',
+    r19.catch && r19.split, JSON.stringify(r19));
+  T('P1 판19 ② 경계: 2종만 = 없음(why cert.missing 4대보험) · 회차 첫날 0시 정각 = 셈 · 1밀리초 앞 = 안 셈 · 만든 날 뒤 첨부만 · 미래 시각(서버 +10분 초과) = 안 셈',
+    r19.two && r19.edgeIn && r19.edgeOut && r19.early && r19.future, JSON.stringify(r19));
+  T('P1 판19 ③ 읽기 실패: 문서함 null = 신호 없음(no_docs) · 지운 문서·대기·반려 문서 = 안 셈 · 사진(jpg 스캔)·열람용 변환본(view 1) = 안 셈',
+    r19.readFail && r19.delDoc && r19.pendDoc && r19.image && r19.view, JSON.stringify(r19));
+  T('P1 판19 ④ 중복 맞춤: 두 회차 다 열림 → 뒤 회차 기간 첨부는 아무 데도 안 셈 · 앞 회차 기간 첨부는 앞 회차만 · 한 이름이 두 종류에 걸림 = 안 셈 · 깨진 메타(ts 글자·by 없음·null 항목) = 안 셈 · 만든 날 없음/날짜 아님 = 없음 · 반려(doneif_off)·사람 review·삭제 지시 = 대상 아님 · 키 꼴 · 기존 차량 신호 그대로',
+    r19.overlap && r19.overlapOld && r19.twoKinds && r19.broken && r19.noCreated && r19.notEligible && r19.keys && r19.others, JSON.stringify(r19));
+  // 크론(실 모듈): 켬 → review·앱 기준·done_src · 문서함 안 씀 · settings:notify 안 읽고 안 씀 · 기존 승인권자 1발만 / 문서함 읽기 실패 → 쓰기 0
+  const snapP19 = JSON.stringify(mem.gw_data); const send0P19 = pushMock.sendTo;
+  try {
+    const cron19 = require(FILEC19);
+    const runCron19 = async (C, failDocs) => {
+      mem.gw_data['col:tasks'] = { schema: 1, items: [t19('tc', 15, '2026-10-28'), { id: 't_man', title: '사람 지시', status: 'open' }] };
+      mem.gw_data['col:documents'] = { schema: 1, items: [doc19('dd', three19('2026-11-01'))] };
+      mem.gw_data['settings:doneif'] = { schema: 1, on: true, updated_at: 1 };
+      ['it:doneif:last', 'settings:assign', 'settings:notify'].forEach((k) => { delete mem.gw_data[k]; });
+      Object.keys(mem.gw_data).filter((k) => /^(clog:appr:|ver:tasks:appbase:)/.test(k)).forEach((k) => { delete mem.gw_data[k]; });
+      const docsBefore = JSON.stringify(mem.gw_data['col:documents']);
+      const sets = [], gets = []; const sent = [];
+      pushMock.sendTo = async (ids, p) => { sent.push({ ids: ids.slice(), tag: p && p.tag }); return { sent: ids.length, removed: 0 }; };
+      blobsMock.hooks.beforeSet = (k) => { sets.push(String(k)); };
+      blobsMock.hooks.beforeGet = (k) => { gets.push(String(k)); };
+      blobsMock.hooks.failGet = failDocs ? ((k) => k === 'col:documents') : null;
+      let out;
+      try { out = await C.run(blobsMock.store('gw_data'), NOW19); }
+      finally { blobsMock.hooks.beforeSet = null; blobsMock.hooks.beforeGet = null; blobsMock.hooks.failGet = null; pushMock.sendTo = send0P19; }
+      const tc = mem.gw_data['col:tasks'].items.find((t) => t.id === 'tc');
+      return { out, tc, sets, gets, sent, docsSame: JSON.stringify(mem.gw_data['col:documents']) === docsBefore };
+    };
+    const three19 = (day) => [f19(1, NAT, day), f19(2, LOC, day), f19(3, SOC, day)];
+    const okRun = (x) => x.out.ok && x.out.moved === 1 && x.tc.status === 'review' && x.tc.done_by === '앱 기준' && /^doneif:cert\.c15 /.test(x.tc.done_src || '') && x.docsSame && x.sets.indexOf('col:documents') < 0
+      && x.sets.indexOf('settings:notify') < 0 && x.gets.indexOf('settings:notify') < 0 && x.sent.length === 1 && /^task-appbase-/.test(x.sent[0].tag || '');
+    const failRun = (x) => x.out.ok && x.out.moved === 0 && (x.out.candidates || []).length === 0 && x.tc.status === 'open' && x.sets.filter((k) => k !== 'it:doneif:last').length === 0 && x.sent.length === 0;
+    const a19 = await runCron19(cron19, false), b19 = await runCron19(cron19, true);
+    T('P1 판19 ⑤ 크론(켬): 3종 다 올림 → 승인 대기(review)·done_by 앱 기준·done_src doneif:cert.c15 · 문서함 쓰기 0·불변 · settings:notify 읽기·쓰기 0 · 알림은 기존 승인권자 1발(task-appbase)만 / 문서함 읽기 실패 → 후보 0·전환 0·쓰기는 점검 기록(it:doneif:last)뿐·알림 0',
+      okRun(a19) && failRun(b19), JSON.stringify({ a: [a19.out.moved, a19.tc.status, a19.tc.done_src, a19.sets, a19.sent], b: [b19.out.moved, b19.tc.status, b19.sets, b19.sent] }).slice(0, 500));
+    // 결함 사본 — 넘기지 않게 닫은 자리를 하나씩 풀면 위 검사 중 하나가 깨져야 한다(파일은 쓰지 않고 메모리에서 컴파일)
+    const MUTL19 = [
+      ["if (hits.length !== 1 || hits[0].id !== task.id) return;", 'if (!hits.length) return;'],
+      ["if (!/\\.pdf$/i.test(s)) return '';", ''],
+      ["return hit.length === 1 ? hit[0].k : '';", "return hit.length ? hit[0].k : '';"],
+      ["if (!Array.isArray(docs)) return { ok: false, why: 'no_docs' };", "if (!Array.isArray(docs)) return { ok: true, why: 'x' };"],
+      ['d.del === 1 || ', ''],
+      ['|| f.view === 1', ''],
+      ["if (d.status && d.status !== '등재') return;", ''],
+      ['Math.max(CERT_EPOCH_MS + k.cyc * CERT_CYCLE_MS, c0)', 'CERT_EPOCH_MS + k.cyc * CERT_CYCLE_MS'],
+      ['if (miss.length) return', 'if (miss.length === CERT_KINDS.length) return'],
+      ['if (now && ts > now + 600000) return;', ''],
+      ["typeof ts !== 'number' || !isFinite(ts) || ts <= 0 || ", ''],
+    ];
+    const killP19 = [];
+    for (const [from, to] of MUTL19) {
+      let k; try { k = !allOk19(chk19(loadP19(FILEP19, mutP19(SRCP19, from, to)))); } catch (e) { k = 'err ' + e.message; }
+      if (k !== true) killP19.push('lib:' + from.slice(0, 50) + (k === false ? ' 안 깨짐' : ' ' + k));
+    }
+    try {
+      const Cm2 = loadP19(FILEC19, mutP19(SRCC19, "if (col === 'documents') {", 'if (false) {'));
+      if (okRun(await runCron19(Cm2, false))) killP19.push('cron:documents 분기 지움 안 깨짐');
+    } catch (e) { killP19.push('cron err ' + e.message); }
+    T('P1 판19 ⑥ 결함 사본 ' + (MUTL19.length + 1) + '개(회차 겹침·사진·두 종류 이름·읽기 실패·지운 문서·열람용·대기 문서·지시 전 첨부·3종 중 일부·미래 시각·깨진 ts · 크론 문서함 분기) 전부 검사에 걸림',
+      killP19.length === 0, killP19.join(' | '));
+  } catch (e) { T('P1 판19 검사 실행', false, String(e && e.stack || e).slice(0, 400)); }
+  finally { mem.gw_data = JSON.parse(snapP19); pushMock.sendTo = send0P19; blobsMock.hooks.beforeSet = null; blobsMock.hooks.beforeGet = null; blobsMock.hooks.failGet = null; }
+}
+
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

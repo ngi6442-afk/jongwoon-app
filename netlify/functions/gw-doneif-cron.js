@@ -21,10 +21,14 @@ async function run(st, nowMs) {
   // 필요한 레코드 컬렉션만 읽는다(자격 있는 자동 지시의 접두어 기준)
   const need = {};
   tdoc.items.forEach(function (t) { if (!D.eligible(t)) return; const k = D.parseKey(t.auto_key); if (k) need[k.col] = true; });
-  const recs = { __rows: {} };
+  const recs = { __rows: {}, __now: nowMs };
   if (need.workers) need.asbestos = true;   // v417 카드 10: wk 월 지시 신호는 명부+대장(참여 범위) 둘 다 본다
   for (const col of Object.keys(need)) {
     const r = await blobGet(st, 'col:' + col);
+    if (col === 'documents') {   // P1 판19 증명서 신호: 문서함은 열린 증명서 지시가 있을 때만 읽고, 읽기 실패·없음·깨진 꼴은 빈 배열이 아니라 null(= 신호 없음)
+      recs.__rows.documents = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data.items : null;
+      continue;
+    }
     const items = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data.items : [];
     if (col === 'asbestos' || col === 'workers') recs.__rows[col] = items;   // v417: 집계형 신호(site·wk)는 원본 배열
     else recs[col] = D.byId(items);
