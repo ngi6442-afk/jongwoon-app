@@ -24,7 +24,7 @@ function parseKey(k) {   // 'veh:<id>:insp:<due>' · 'veh:<id>:ins:<due>' · 'li
 }
 
 // ---- 증명서 3종 올림 신호(P1 판19 · T359) ----
-// 지시: cert:c<n> = 20일 주기 '증명서 갱신 발급 — 납세·지방세·4대보험 완납증명'(index.html runAutoTaskGen — 기준일 2026-01-01, n = 지난 일수/20, 기한 = 다음 회차 첫날).
+// 지시: cert:c<n> = 20일 주기 '증명서 갱신 발급 — 납세·지방세·4대보험 완납증명'(index.html runAutoTaskGen — 기준일 2026-01-01, n = 지난 일수/20, 기한 = 그 회차 마지막 날 — 앱이 다음 회차 첫날 KST 0시를 toISOString으로 적어 하루 당겨짐, 예 c15 기한 2026-11-16).
 // 3종 = 국세 납세증명(홈택스) · 지방세 납세증명(위택스) · 4대(사회)보험 완납증명(정부24) — 같은 지시 detail · FEATURES.md '증명서 갱신 루틴' · 업무별 설계 3-14 appr A3ⓑ.
 // 원천: 지시 본문이 올리라는 '적격심사 증빙 보관함'(gw_files proof:<이름> + 색인 proof:__index__) — 문서함은 기한 있는 실물 증빙을 받지 않는다(9/4 규칙, 오케스트레이터 11/14 결정).
 //   크론은 색인 한 개만 읽는다(파일 본문 안 읽음): {names:[이름], meta:{이름:{ts 서버 올린 시각, file 원래 이름, by_id}}} — meta는 판19부터 proof_put이 남긴다(시각 없는 옛 항목은 안 셈, 이행 없음).
@@ -40,9 +40,10 @@ const CERT_KINDS = [   // 이름 판정 — 한 파일이 정확히 한 종류�
   { k: 'soc', label: '4대보험', ok: function (s) { return /(4대|사회)\s*(사회\s*)?보험/.test(s) && /완납/.test(s) && /증명/.test(s); } },
 ];
 function kstDayStartMs(day) { return isDate(day) ? Date.parse(day + 'T00:00:00+09:00') : NaN; }
+const CERT_NOT_RE = /안내|신청|방법|양식|서식|불가|견본|샘플|예시|과세/;   // 판19 검토: 안내문·신청서·빈 양식·과세증명(세목별 과세 포함 — 납세증명 아님)은 어느 종류로도 안 셈
 function certKindOf(name) {
   const s = String(name || '');
-  if (!/\.pdf$/i.test(s)) return '';
+  if (!/\.pdf$/i.test(s) || CERT_NOT_RE.test(s)) return '';
   const hit = CERT_KINDS.filter(function (c) { return c.ok(s); });
   return hit.length === 1 ? hit[0].k : '';
 }
@@ -85,7 +86,8 @@ function certSignal(task, k, recs) {
   });
   const miss = CERT_KINDS.filter(function (c) { return !have[c.k]; });
   if (miss.length) return { ok: false, why: 'cert.missing ' + miss.map(function (c) { return c.label; }).join('·') };
-  return { ok: true, why: 'cert.c' + k.cyc + ' ' + CERT_KINDS.map(function (c) { return c.label; }).join('·') };
+  // 승인자 화면(권한관리 카드 후보 요약)은 why의 첫 낱말만 보여 준다 — '파일 이름 기준'임이 거기서도 보이게 첫 낱말에 붙인다(파일 이름 자체는 안 넣음, done_src 60자 안)
+  return { ok: true, why: 'cert.c' + k.cyc + '·이름기준 ' + CERT_KINDS.map(function (c) { return c.label; }).join('·') };
 }
 
 function eligible(t) {

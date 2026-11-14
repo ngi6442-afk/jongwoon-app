@@ -9824,7 +9824,7 @@ function J91a(x) { return JSON.stringify(x); }
     const A = () => [t19('a', 15, '2026-10-28')];
     const r = {};
     const pOk = pl(A(), idx19(three('2026-11-01')));
-    r.catch = ids(pOk) === 'a' && /^cert\.c15 국세·지방세·4대보험$/.test(pOk.candidates[0].why);
+    r.catch = ids(pOk) === 'a' && /^cert\.c15·이름기준 국세·지방세·4대보험$/.test(pOk.candidates[0].why);
     r.split = ids(pl(A(), idx19([f19(NAT, '2026-11-01'), f19(LOC, '2026-11-02'), f19(SOC, '2026-11-03')], ['적격_등기부.pdf']))) === 'a';   // 날을 나눠 올림·다른 증빙(메타 없음)이 섞여도 셈
     r.two = pl(A(), idx19(three('2026-11-01').slice(0, 2))).candidates.length === 0 && D.signalFor(t19('a', 15, '2026-10-28'), { __rows: { proof: idx19(three('2026-11-01').slice(0, 2)) }, __certOpen: D.certOpenList(A()), __now: NOW19 }).why === 'cert.missing 4대보험';
     r.edgeIn = ids(pl(A(), idx19(three('2026-10-28', '00:00')))) === 'a';   // 회차 첫날 0시 정각 = 셈
@@ -9849,12 +9849,19 @@ function J91a(x) { return JSON.stringify(x); }
     r.noCreated = pl([t19('a', 15, '')], idx19(three('2026-11-01'))).candidates.length === 0 && pl([t19('a', 15, '11/01')], idx19(three('2026-11-01'))).candidates.length === 0;
     r.notEligible = pl([t19('a', 15, '2026-10-28', { doneif_off: 1 }), t19('b', 15, '2026-10-28', { status: 'review', done_by: '가짜2' }), t19('c', 15, '2026-10-28', { del: 1 })], idx19(three('2026-11-01'))).candidates.length === 0;
     r.keys = D.parseKey('cert:c15').dom === 'cert' && D.parseKey('cert:c15').col === 'proof' && D.parseKey('cert:c15').cyc === 15 && !D.parseKey('cert:c') && !D.parseKey('cert:c1x') && !D.parseKey('cert:c15:x') && D.certKindOf('지방세 납세증명서.PDF') === 'loc' && D.certKindOf('사회보험 완납 증명서.pdf') === 'soc' && D.certKindOf('국세완납증명.pdf') === 'nat' && D.certKindOf('납세증명서.hwp') === '' && D.certKindOf('법인 인감증명서.pdf') === '';
+    // 판19 검토 ①: 안내문·신청서·양식·불가 안내·과세증명은 어느 종류도 아님 · 원래 걸러지던 이름도 그대로 · 바른 이름은 그대로 셈
+    const notCert = ['납세증명 신청 안내.pdf', '납세증명서 발급 신청서.pdf', '미납 국세 납세증명 불가 안내.pdf', '지방세 납세증명 신청 안내.pdf', '지방세 세목별 과세(납세)증명서.pdf', '4대보험 완납증명 신청방법.pdf',
+      '지방세 과세증명서.pdf', '납세증명서 양식.pdf', '4대보험 완납증명서 견본.pdf', '납세증명서 서식.pdf', '지방세 납세증명서 샘플.pdf', '4대보험 완납증명 예시.pdf',
+      '4대보험 가입자명부.pdf', '납세사실증명.pdf', '국민연금·건강보험료 완납증명.pdf', '20261101.pdf', '2026-11-01 스캔.pdf'];
+    const yesCert = [['납세증명서_20261101.pdf', 'nat'], ['국세 완납증명서.pdf', 'nat'], ['지방세 납세증명서(전체).pdf', 'loc'], ['지방세완납증명서.pdf', 'loc'], ['4대사회보험료 완납증명서.pdf', 'soc'], ['사회보험완납증명서.pdf', 'soc']];
+    r.names = notCert.every((n) => D.certKindOf(n) === '') && yesCert.every((p) => D.certKindOf(p[0]) === p[1]);
+    r.namesPlan = pl(A(), idx19([f19('지방세 세목별 과세(납세)증명서.pdf', '2026-11-01'), f19(NAT, '2026-11-01'), f19('4대보험 완납증명 신청방법.pdf', '2026-11-01')])).candidates.length === 0;
     r.others = D.plan([{ id: 'v', auto_key: 'veh:v1:insp:2026-11-20', status: 'open' }, t19('a', 15, '2026-10-28')], { vehicles: { v1: { id: 'v1', insp_due: '2026-12-20' } }, __rows: { proof: { names: [], meta: {} } } }).candidates.map((c) => c.id).join(',') === 'v';   // 기존 신호는 그대로
     return r;
   };
   const allOk19 = (r) => Object.keys(r).every((k) => r[k] === true);
   const r19 = chk19(require(FILEP19));
-  T('P1 판19 ① 신호 잡힘: 열린 cert:c15 + 회차 안 증빙 보관함 색인 pdf 3종(국세 납세·지방세 납세·4대보험 완납) → 후보 · why "cert.c15 국세·지방세·4대보험"(파일 이름 안 나감) · 날을 나눠 올림·다른 증빙 섞임도 셈',
+  T('P1 판19 ① 신호 잡힘: 열린 cert:c15 + 회차 안 증빙 보관함 색인 pdf 3종(국세 납세·지방세 납세·4대보험 완납) → 후보 · why "cert.c15·이름기준 국세·지방세·4대보험"(파일 이름 안 나감 · 카드 요약에 첫 낱말 "cert.c15·이름기준") · 날을 나눠 올림·다른 증빙 섞임도 셈',
     r19.catch && r19.split, JSON.stringify(r19));
   T('P1 판19 ② 경계: 2종만 = 없음(why cert.missing 4대보험) · 회차 첫날 0시 정각 = 셈 · 1밀리초 앞 = 안 셈 · 만든 날 뒤 올림만 · 미래 시각(서버 +10분 초과) = 안 셈',
     r19.two && r19.edgeIn && r19.edgeOut && r19.early && r19.future, JSON.stringify(r19));
@@ -9862,6 +9869,8 @@ function J91a(x) { return JSON.stringify(x); }
     r19.readFail && r19.deleted && r19.oldNoMeta && r19.image, JSON.stringify(r19));
   T('P1 판19 ④ 중복 맞춤: 두 회차 다 열림 → 뒤 회차 기간 항목은 아무 데도 안 셈 · 앞 회차 기간 항목은 앞 회차만 · 한 이름이 두 종류에 걸림 = 안 셈 · 깨진 메타(ts 글자·by_id 없음·file 없음·null/숫자 이름·meta 배열) = 안 셈 · 만든 날 없음/날짜 아님 = 없음 · 반려(doneif_off)·사람 review·삭제 지시 = 대상 아님 · 키 꼴 · 기존 차량 신호 그대로',
     r19.overlap && r19.overlapOld && r19.twoKinds && r19.broken && r19.noCreated && r19.notEligible && r19.keys && r19.others, JSON.stringify(r19));
+  T('P1 판19 ④-2 이름 오탐(검토): 안내·신청·방법·양식·서식·불가·견본·샘플·예시·과세증명(세목별 과세 포함) 이름 12개 = 어느 종류도 아님 · 원래 걸러지던 가입자명부·납세사실증명·국민연금/건강보험료·날짜만 이름 5개 그대로 · 바른 이름 6개는 제 종류 · 섞여 올라와도 후보 없음',
+    r19.names && r19.namesPlan, JSON.stringify(r19));
   // 크론(실 모듈): 켬 → review·앱 기준·done_src · 보관함은 색인만 읽고(파일 본문 키 안 읽음) 안 씀 · 문서함 안 읽음 · settings:notify 안 읽고 안 씀 · 기존 승인권자 1발만 / 색인 읽기 실패 → 쓰기 0
   const snapP19 = JSON.stringify(mem.gw_data), snapF19 = JSON.stringify(mem.gw_files || {}); const send0P19 = pushMock.sendTo;
   try {
@@ -9890,39 +9899,57 @@ function J91a(x) { return JSON.stringify(x); }
     const three19 = (day) => [f19(NAT, day), f19(LOC, day), f19(SOC, day)];
     const readOnly = (x) => x.filesSame && x.sets.every((k) => k.indexOf('proof:') !== 0) && x.gets.filter((k) => k.indexOf('proof:') === 0).join() === 'proof:__index__' && x.gets.indexOf('col:documents') < 0
       && x.sets.indexOf('settings:notify') < 0 && x.gets.indexOf('settings:notify') < 0;
-    const okRun = (x) => x.out.ok && x.out.moved === 1 && x.tc.status === 'review' && x.tc.done_by === '앱 기준' && /^doneif:cert\.c15 /.test(x.tc.done_src || '') && readOnly(x) && x.sent.length === 1 && /^task-appbase-/.test(x.sent[0].tag || '');
+    const okRun = (x) => x.out.ok && x.out.moved === 1 && x.tc.status === 'review' && x.tc.done_by === '앱 기준' && /^doneif:cert\.c15·이름기준 국세·지방세·4대보험$/.test(x.tc.done_src || '') && readOnly(x) && x.sent.length === 1 && /^task-appbase-/.test(x.sent[0].tag || '');
     const failRun = (x) => x.out.ok && x.out.moved === 0 && (x.out.candidates || []).length === 0 && x.tc.status === 'open' && x.sets.filter((k) => k !== 'it:doneif:last').length === 0 && x.sent.length === 0 && x.filesSame;
     const a19 = await runCron19(cron19, false), b19 = await runCron19(cron19, true), c19 = await runCron19(cron19, false, true);
     const dryOk = c19.out.ok && c19.out.on === false && (c19.out.candidates || []).length === 1 && c19.out.moved === 0 && c19.tc.status === 'open' && c19.sets.join() === 'it:doneif:last' && c19.sent.length === 0;
     T('P1 판19 ⑤ 크론: 켬 + 3종 다 올림 → 승인 대기(review)·done_by 앱 기준·done_src doneif:cert.c15 · 보관함은 색인 1개만 읽고(파일 본문 키 0) 안 씀 · 문서함 안 읽음 · settings:notify 읽기·쓰기 0 · 알림은 기존 승인권자 1발(task-appbase)만 / 색인 읽기 실패 → 후보 0·전환 0·쓰기는 점검 기록뿐·알림 0 / 끔 → 후보 1·계획만 기록',
       okRun(a19) && failRun(b19) && dryOk, JSON.stringify({ a: [a19.out.moved, a19.tc.status, a19.tc.done_src, a19.sets, a19.gets.filter((k) => /proof|documents/.test(k)), a19.sent], b: [b19.out.moved, b19.tc.status, b19.sets, b19.sent], c: [c19.out.on, (c19.out.candidates || []).length, c19.sets] }).slice(0, 600));
     // 보관함 저장 핸들러: 관리자 proof_put = 색인 meta {ts 서버 시각·file 원래 이름·by_id} · 옛 항목(메타 없음)은 그대로 두고 이행하지 않음 · 같은 이름 다시 올림 = ts 갱신 · proof_del = names·meta 둘 다 빠짐 · 직원 proof_put = 403(권한 그대로)
-    {
+    const storeChk19 = async (G) => {
+      const cl = async (body, tok, dev) => { const rr = await G.handler({ httpMethod: 'POST', headers: Object.assign({ authorization: tok ? 'Bearer ' + tok : '' }, dev ? { 'x-device-id': dev } : {}), body: JSON.stringify(body) }); return { code: rr.statusCode, body: JSON.parse(rr.body || '{}') }; };
       mem.gw_files = mem.gw_files || {};
-      mem.gw_files['proof:__index__'] = { names: ['옛_등기부.pdf'] }; mem.gw_files['proof:옛_등기부.pdf'] = { name: '옛 등기부.pdf', data: 'JVBERi0=', by: '가짜1', ts: 1 };
+      Object.keys(mem.gw_files).filter((k) => k.indexOf('proof:') === 0).forEach((k) => { delete mem.gw_files[k]; });
+      mem.gw_files['proof:__index__'] = { names: ['옛_등기부.pdf'], meta: { '유령.pdf': { ts: 5, file: '유령 납세증명서.pdf', by_id: 'u_fake9' } } };   // 옛 항목(시각 없음) + names에 없는 meta(지운 뒤 남은 꼴)
+      mem.gw_files['proof:옛_등기부.pdf'] = { name: '옛 등기부.pdf', data: 'JVBERi0=', by: '가짜1', ts: 1 };
       const t0 = Date.now();
-      let h = await call({ action: 'proof_put', name: '지방세 납세증명서_가짜.pdf', data: 'JVBERi0=' }, tokA);
+      let h = await cl({ action: 'proof_put', name: '지방세 납세증명서_가짜.pdf', data: 'JVBERi0=', ts: 1 }, tokA);   // 요청의 ts는 무시돼야 한다
       const i1 = JSON.parse(JSON.stringify(mem.gw_files['proof:__index__'] || {}));
       const m1 = (i1.meta || {})['지방세_납세증명서_가짜.pdf'] || {};
-      const put1 = h.code === 200 && i1.names.join() === '옛_등기부.pdf,지방세_납세증명서_가짜.pdf' && typeof m1.ts === 'number' && m1.ts >= t0 && m1.ts <= Date.now() && m1.file === '지방세 납세증명서_가짜.pdf' && m1.by_id === ADMIN.id && !('옛_등기부.pdf' in i1.meta);
+      const put1 = h.code === 200 && (i1.names || []).join() === '옛_등기부.pdf,지방세_납세증명서_가짜.pdf' && typeof m1.ts === 'number' && m1.ts >= t0 && m1.ts <= Date.now() && m1.file === '지방세 납세증명서_가짜.pdf' && m1.by_id === ADMIN.id
+        && !('옛_등기부.pdf' in (i1.meta || {})) && !('유령.pdf' in (i1.meta || {}));
       await new Promise((res) => setTimeout(res, 3));
-      h = await call({ action: 'proof_put', name: '지방세 납세증명서_가짜.pdf', data: 'JVBERi0=' }, tokA);
+      h = await cl({ action: 'proof_put', name: '지방세 납세증명서_가짜.pdf', data: 'JVBERi0=' }, tokA);
       const i2 = mem.gw_files['proof:__index__'] || {};
-      const put2 = h.code === 200 && i2.names.length === 2 && i2.meta['지방세_납세증명서_가짜.pdf'].ts > m1.ts;
-      h = await call({ action: 'proof_put', name: '납세증명서_가짜.pdf', data: 'JVBERi0=' }, tokW, 'dev1');
-      const put3 = h.code === 403 && (mem.gw_files['proof:__index__'].names.length === 2);
-      h = await call({ action: 'proof_del', name: '지방세 납세증명서_가짜.pdf' }, tokA);
+      const put2 = h.code === 200 && (i2.names || []).length === 2 && ((i2.meta || {})['지방세_납세증명서_가짜.pdf'] || {}).ts > m1.ts;
+      h = await cl({ action: 'proof_put', name: '납세증명서_가짜.pdf', data: 'JVBERi0=' }, tokW, 'dev1');
+      const put3 = h.code === 403 && ((mem.gw_files['proof:__index__'] || {}).names || []).length === 2;
+      h = await cl({ action: 'proof_del', name: '지방세 납세증명서_가짜.pdf' }, tokA);
       const i3 = mem.gw_files['proof:__index__'] || {};
-      const del1 = h.code === 200 && i3.names.join() === '옛_등기부.pdf' && i3.meta && !('지방세_납세증명서_가짜.pdf' in i3.meta) && !mem.gw_files['proof:지방세_납세증명서_가짜.pdf'];
-      h = await call({ action: 'proof_list' }, tokA);
+      const del1 = h.code === 200 && (i3.names || []).join() === '옛_등기부.pdf' && !!i3.meta && !('지방세_납세증명서_가짜.pdf' in i3.meta) && !mem.gw_files['proof:지방세_납세증명서_가짜.pdf'];
+      h = await cl({ action: 'proof_list' }, tokA);
       const list1 = h.code === 200 && h.body.items.length === 1 && h.body.items[0].name === '옛_등기부.pdf';
-      T('P1 판19 ⑥ 보관함 저장: 관리자 proof_put → 색인 meta {ts 서버 시각·file 원래 이름·by_id} · 옛 항목은 meta 없이 그대로(이행 없음) · 같은 이름 다시 = ts 갱신 · 직원 proof_put = 403·색인 그대로 · proof_del = names·meta·파일 빠짐 · proof_list 그대로',
-        put1 && put2 && put3 && del1 && list1, JSON.stringify({ put1, put2, put3, del1, list1, i1 }).slice(0, 400));
+      return { put1, put2, put3, del1, list1 };
+    };
+    const sc19 = await storeChk19(gwd);
+    T('P1 판19 ⑥ 보관함 저장: 관리자 proof_put → 색인 meta {ts 서버 시각(요청 ts 무시)·file 원래 이름·by_id} · 옛 항목은 meta 없이 그대로(이행 없음) · names에 없는 meta는 안 남김 · 같은 이름 다시 = ts 갱신 · 직원 proof_put = 403·색인 그대로 · proof_del = names·meta·파일 빠짐 · proof_list 그대로',
+      allOk19(sc19), JSON.stringify(sc19));
+    // gw-data 결함 사본 3개 — 올린 시각을 요청 값에서 받음 · 지울 때 meta 안 뺌 · names에 없는 meta 남김
+    const FILEG19 = join(FN, 'gw-data.js'), SRCG19 = fsP19.readFileSync(FILEG19, 'utf8');
+    const MUTG19 = [
+      ['meta[name] = { ts: now,', 'meta[name] = { ts: Number(d.ts) || now,'],
+      ['const meta = {}; list.forEach', 'const meta = om; list.forEach'],
+      ["meta[n] = om[n]; });\n  meta[name] = { ts: now,", "meta[n] = om[n]; }); Object.assign(meta, om);\n  meta[name] = { ts: now,"],
+    ];
+    const killG19 = [];
+    for (const [from, to] of MUTG19) {
+      let k; try { k = !allOk19(await storeChk19(loadP19(FILEG19, mutP19(SRCG19, from, to)))); } catch (e) { k = 'err ' + e.message; }
+      if (k !== true) killG19.push('gw-data:' + from.slice(0, 40) + (k === false ? ' 안 깨짐' : ' ' + k));
     }
     // 결함 사본 — 넘기지 않게 닫은 자리를 하나씩 풀면 위 검사 중 하나가 깨져야 한다(파일은 쓰지 않고 메모리에서 컴파일)
     const MUTL19 = [
       ["if (hits.length !== 1 || hits[0].id !== task.id) return;", 'if (!hits.length) return;'],
-      ["if (!/\\.pdf$/i.test(s)) return '';", ''],
+      ["if (!/\\.pdf$/i.test(s) || CERT_NOT_RE", 'if (CERT_NOT_RE'],   // pdf 검사 걷음
       ["return hit.length === 1 ? hit[0].k : '';", "return hit.length ? hit[0].k : '';"],
       ["if (!idx || typeof idx !== 'object' || !Array.isArray(idx.names)) return { ok: false, why: 'no_proof' };", "if (!idx || typeof idx !== 'object' || !Array.isArray(idx.names)) return { ok: true, why: 'x' };"],
       ['idx.names.forEach(function (n) {', 'Object.keys(meta).forEach(function (n) {'],   // 지운 항목(meta만 남음)도 셈
@@ -9931,6 +9958,7 @@ function J91a(x) { return JSON.stringify(x); }
       ['if (now && ts > now + 600000) return;', ''],
       ["typeof ts !== 'number' || !isFinite(ts) || ts <= 0 || ", ''],
       ["typeof m.by_id !== 'string' || !m.by_id", 'false'],
+      ["if (!/\\.pdf$/i.test(s) || CERT_NOT_RE.test(s)) return '';", "if (!/\\.pdf$/i.test(s)) return '';"],   // 안내·신청·과세 거름 걷음
     ];
     const killP19 = [];
     for (const [from, to] of MUTL19) {
@@ -9951,8 +9979,8 @@ function J91a(x) { return JSON.stringify(x); }
       } catch (e) { killP19.push('cron err ' + e.message); }
     }
     delete globalThis.__mem19;
-    T('P1 판19 ⑦ 결함 사본 ' + (MUTL19.length + MUTC19.length) + '개(회차 겹침·사진·두 종류 이름·읽기 실패·지운 항목·지시 전 올림·3종 중 일부·미래 시각·깨진 ts·by_id 없음 · 크론 색인 분기·읽기 실패 메움) 전부 검사에 걸림',
-      killP19.length === 0, killP19.join(' | '));
+    T('P1 판19 ⑦ 결함 사본 ' + (MUTL19.length + MUTC19.length + MUTG19.length) + '개(회차 겹침·사진·두 종류 이름·읽기 실패·지운 항목·지시 전 올림·3종 중 일부·미래 시각·깨진 ts·by_id 없음·안내/신청/과세 거름 · 크론 색인 분기·읽기 실패 메움 · gw-data 요청 시각·지울 때 meta 남김·names 밖 meta 남김) 전부 검사에 걸림',
+      killP19.length === 0 && killG19.length === 0, killP19.concat(killG19).join(' | '));
   } catch (e) { T('P1 판19 검사 실행', false, String(e && e.stack || e).slice(0, 400)); }
   finally { mem.gw_data = JSON.parse(snapP19); mem.gw_files = JSON.parse(snapF19); pushMock.sendTo = send0P19; blobsMock.hooks.beforeSet = null; blobsMock.hooks.beforeGet = null; blobsMock.hooks.failGet = null; }
 }
