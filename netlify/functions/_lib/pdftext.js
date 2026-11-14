@@ -128,9 +128,10 @@ async function pdfPageImages(buf, maxPages, opt) {
   try {
     return await withTimeout((async function () {
       doc = await task.promise;
-      if (doc.numPages > maxPages) return { ok: false, code: 'TOO_MANY_PAGES' };
+      if (doc.numPages > maxPages && !opt.truncate) return { ok: false, code: 'TOO_MANY_PAGES' };
+      const last = Math.min(doc.numPages, maxPages), more = doc.numPages - last;   // opt.truncate = 앞 maxPages쪽만 읽고 남은 쪽 수를 알림(29 판④ 검토 — AI 판독은 통째로 실패하지 않게)
       const pages = [];
-      for (let p = 1; p <= doc.numPages; p++) {
+      for (let p = 1; p <= last; p++) {
         const pg = await doc.getPage(p);
         const tc = await pg.getTextContent();
         const text = tc.items.map(function (it) { return it.str || ''; }).join(' ').replace(/\s+/g, ' ').trim();
@@ -151,7 +152,7 @@ async function pdfPageImages(buf, maxPages, opt) {
         pages.push(data ? { w: best.width, h: best.height, data: data, text: text } : { w: 0, h: 0, data: null, text: text });
         if (pg.cleanup) pg.cleanup();
       }
-      return { ok: true, pages: pages };
+      return { ok: true, pages: pages, more: more };
     })(), opt.ms || IMG.ms);
   } catch (e) {
     if (e && e.code === 'PDF_TIMEOUT') return { ok: false, code: 'PDF_TIMEOUT' };

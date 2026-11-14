@@ -8,7 +8,7 @@ const S = require('./stmt');
 const { callApiStream, responseText, ApiError } = require('./claude');
 
 const MODEL = function () { return (process.env.CLAUDE_STMT_MODEL || 'claude-opus-5-5').trim(); };
-const MAX_SIDE = 1600, JPEG_Q = 80, MAX_PAGES = 24, TIMEOUT_MS = 280000;
+const MAX_SIDE = 1600, JPEG_Q = 80, MAX_PAGES = 20, TIMEOUT_MS = 280000, MAX_TOKENS = 32000;   // 쪽 20(검토 med: 여러 쪽 고해상도 스캔 메모리) · 출력 32000(긴 명세 잘림)
 
 // ---- 가림 칸(쪽 비율 [x0, y0, x1, y1]) — 10월 스캔 실측(29 자료 원본형식_20261114.md · 11/14 눈금 그림), 위치 흔들림 ±2%를 넉넉히 덮음
 // all: 모든 쪽 머리·바닥 띠(인쇄 시각·내려받기 경로(PC 계정 이름)·메일 주소 URL(로그인 키 든 것 포함))
@@ -54,27 +54,48 @@ function isInvoicePage(stats, text) {
 }
 
 // ---- 쪽 그림 준비: pages = [{ w, h, data(RGBA Uint8Array|Buffer), text }] → { images:[{buf, w, h, i}], skipped:[{i, why}] }
-async function prepareImages(vk, pages) {
+// opts.photo = 사진(구도가 제각각) — 거래처별 가림 칸·머리 띠를 칠하지 않는다(실제 명세 줄을 덮을 수 있음 — 11/14 검토 med). 출력 걸러내기만.
+// 쪽을 처리하면 그 쪽 RGBA를 놓아 메모리를 줄인다(pages[i].data = null — 검토 med: 여러 쪽 고해상도 스캔).
+async function prepareImages(vk, pages, opts) {
   const { Jimp } = require('jimp');
+  const photo = !!(opts && opts.photo);
   const images = [], skipped = [];
-  for (let i = 0; i < pages.length && images.length < MAX_PAGES; i++) {
+  for (let i = 0; i < pages.length; i++) {
     const p = pages[i];
+    if (images.length >= MAX_PAGES) { skipped.push({ i: i, why: 'too_many' }); if (p) p.data = null; continue; }
     if (!p || !p.w || !p.h || !p.data) { skipped.push({ i: i, why: 'empty' }); continue; }
     const rgba = Buffer.from(p.data.buffer ? Buffer.from(p.data.buffer, p.data.byteOffset, p.data.byteLength) : p.data);   // 사본에 칠함
-    if (isInvoicePage(colorStats(rgba, p.w, p.h), p.text)) { skipped.push({ i: i, why: 'invoice' }); continue; }
-    paintWhite(rgba, p.w, p.h, maskRects(vk, i, p.w, p.h));
+    p.data = null;
+    if (!photo && isInvoicePage(colorStats(rgba, p.w, p.h), p.text)) { skipped.push({ i: i, why: 'invoice' }); continue; }
+    if (!photo) paintWhite(rgba, p.w, p.h, maskRects(vk, i, p.w, p.h));
     const img = new Jimp({ width: p.w, height: p.h, data: rgba });
     const sc = Math.min(1, MAX_SIDE / Math.max(p.w, p.h));
     if (sc < 1) img.resize({ w: Math.round(p.w * sc), h: Math.round(p.h * sc) });
     images.push({ buf: await img.getBuffer('image/jpeg', { quality: JPEG_Q }), w: img.bitmap.width, h: img.bitmap.height, i: i });
   }
-  if (pages.length > MAX_PAGES) skipped.push({ i: MAX_PAGES, why: 'too_many' });
   return { images: images, skipped: skipped };
 }
-// 사진(jpg·png) 한 장 → pages 꼴
+// 사진(jpg·png) 한 장 → pages 꼴 · 화소 상한(4000만 — 검토 low: 큰 PNG 하나로 배경 함수가 메모리 부족으로 죽음)
+const PHOTO_MAX_PX = 40000000;
+function imageDims(buf) {
+  if (buf.length > 24 && buf.readUInt32BE(0) === 0x89504e47) return { w: buf.readUInt32BE(16), h: buf.readUInt32BE(20) };
+  if (buf[0] === 0xff && buf[1] === 0xd8) {
+    let o = 2;
+    while (o + 9 < buf.length) {
+      if (buf[o] !== 0xff) { o++; continue; }
+      const m = buf[o + 1], len = buf.readUInt16BE(o + 2);
+      if (m >= 0xc0 && m <= 0xcf && m !== 0xc4 && m !== 0xc8 && m !== 0xcc) return { w: buf.readUInt16BE(o + 7), h: buf.readUInt16BE(o + 5) };
+      o += 2 + len;
+    }
+  }
+  return null;
+}
 async function pagesFromImage(buf) {
+  const d = imageDims(buf);
+  if (d && d.w * d.h > PHOTO_MAX_PX) throw Object.assign(new Error('IMAGE_TOO_LARGE'), { code: 'IMAGE_TOO_LARGE' });
   const { Jimp } = require('jimp');
   const img = await Jimp.read(buf);
+  if (img.bitmap.width * img.bitmap.height > PHOTO_MAX_PX) throw Object.assign(new Error('IMAGE_TOO_LARGE'), { code: 'IMAGE_TOO_LARGE' });
   return [{ w: img.bitmap.width, h: img.bitmap.height, data: Buffer.from(img.bitmap.data), text: '' }];
 }
 
@@ -99,13 +120,17 @@ function buildPrompt(vendor, ym) {
 }
 
 // ---- 출력 걸러내기(서버 몫 — 지시를 어겨도 저장 전에 빠짐)
-const SCRUB_RE = [/\d{6}\s*[-.·–—]?\s*[1-4]\d{6}/g, /0\d{1,2}[\s).·–—-]{0,2}\d{3,4}[\s.·–—-]\d{4}/g, /\b\d{3}-\d{2}-\d{5}\b/g, /\b\d{2,6}[-\s]\d{2,6}[-\s]\d{2,8}(?:[-\s]\d{1,8})?\b/g, /\d{10,}/g, /[\w.+-]+@[\w-]+\.[\w.-]+/g];
-const INVIS_RE = new RegExp('[\u200b-\u200f\u2028\u2029\ufeff]', 'g');
-function scrubText(s, names, max) {
-  let t = String(s == null ? '' : s).replace(/[\x00-\x1f\x7f]/g, ' ').replace(INVIS_RE, ' ');
+// 11/14 검토 med: 종전 규칙이 날짜(2026-10-31)·띄어 쓴 수량·단가·금액(10 1500 15000)을 계좌로 보고 지웠다 → 구분자를 좁힘(계좌는 줄표 묶음 숫자 10자리 이상만)
+const SCRUB_RE = [/\d{6}\s*[-.·–—]\s*[1-4]\d{6}/g, /\b0\d{1,2}[).·–—-]\s?\d{3,4}[.·–—-]\d{4}\b/g, /(?:^|[^\d])\(0\d{1,2}\)\s?\d{3,4}[.·–—-]\d{4}\b/g, /\b01[016789][\s.·–—-]?\d{3,4}[\s.·–—-]?\d{4}\b/g, /\b\d{3}-\d{2}-\d{5}\b/g, /\d{10,}/g, /[\w.+-]+@[\w-]+\.[\w.-]+/g];
+const ACCT_RE = /\b\d{2,6}(?:-\d{1,8}){2,3}\b/g;
+const INVIS_RE = new RegExp('[' + String.fromCharCode(0x200b) + '-' + String.fromCharCode(0x200f) + String.fromCharCode(0x2028) + String.fromCharCode(0x2029) + String.fromCharCode(0xfeff) + ']', 'g');
+// keepLines = 줄바꿈을 살림(모르는 HTML을 글로 보낼 때 — 표 줄 구분이 사라지지 않게)
+function scrubText(s, names, max, keepLines) {
+  let t = String(s == null ? '' : s).replace(keepLines ? /[\x00-\x09\x0b-\x1f\x7f]/g : /[\x00-\x1f\x7f]/g, ' ').replace(INVIS_RE, ' ');
   SCRUB_RE.forEach(function (re) { t = t.replace(re, ' '); });
+  t = t.replace(ACCT_RE, function (m) { return m.replace(/\D/g, '').length >= 10 ? ' ' : m; });
   (names || []).forEach(function (n) { if (n && n.length >= 2) t = t.split(n).join(' '); });
-  t = t.replace(/\s+/g, ' ').trim();
+  t = keepLines ? t.split('\n').map(function (l) { return l.replace(/[ \t]+/g, ' ').trim(); }).filter(Boolean).join('\n') : t.replace(/\s+/g, ' ').trim();
   return t.slice(0, max);
 }
 function num(v, frac) {
@@ -145,7 +170,7 @@ function toResult(json, opts) {
     if (!item && String(x.item == null ? '' : x.item).trim()) note = ('확인 필요(품목 글 지움) ' + note).trim().slice(0, S.LIMIT.note);   // 걸러내기가 품목을 통째로 지웠으면 사람이 보게
     const row = { date: date, vraw: vrawOf(x.vraw), item: item, kind: vendor.kind || '', qty: num(x.qty, true), unit: num(x.unit, true), amt: num(x.amt, false), vat: num(x.vat, false), note: note, how: 'vision' };
     if (!row.item && row.amt === null && row.qty === null) { dropped++; return; }
-    if (S.piiScan([row.item, row.note, row.vraw])) { row.item = ''; row.note = '확인 필요(개인정보 꼴 지움)'; }
+    if (S.piiScan([row.item, row.note, row.vraw])) { row.item = ''; row.vraw = ''; row.note = '확인 필요(개인정보 꼴 지움)'; }
     rows.push(row);
   });
   if (other) warn.push('다른 달 줄 ' + other + '개는 뺐습니다');
@@ -176,8 +201,9 @@ async function readVision(images, vendor, ym, names) {
   const content = images.map(function (im) { return { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: im.buf.toString('base64') } }; });
   content.push({ type: 'text', text: buildPrompt(vendor, ym) });
   let res;
-  try { res = await callApiStream(key, { model: MODEL(), max_tokens: 16000, messages: [{ role: 'user', content: content }] }, TIMEOUT_MS); }
+  try { res = await callApiStream(key, { model: MODEL(), max_tokens: MAX_TOKENS, messages: [{ role: 'user', content: content }] }, TIMEOUT_MS); }
   catch (e) { return { ok: false, code: (e instanceof ApiError) ? ('CLAUDE_' + e.code) : 'CLAUDE_FAILED', retry: !!(e && e.retryable) }; }
+  if (res && res.stop_reason === 'max_tokens') return { ok: false, code: 'TOO_LONG' };   // 긴 명세가 잘림(검토 med) — 쪽을 나눠 넣게
   const json = parseJson(responseText(res));
   if (!json) return { ok: false, code: 'NO_JSON' };
   const u = res.usage || {};
@@ -191,8 +217,9 @@ async function readText(txt, vendor, ym, names) {
   if (!String(txt || '').trim()) return { ok: false, code: 'NO_TEXT' };
   const prompt = buildPrompt(vendor, ym).replace('이 그림들은', '아래 글은').replace(' 흰 칸은 가린 자리다.', ' 표 칸은 " | "로 나눴다.');
   let res;
-  try { res = await callApiStream(key, { model: MODEL(), max_tokens: 16000, messages: [{ role: 'user', content: [{ type: 'text', text: prompt + '\n\n---\n' + txt }] }] }, TIMEOUT_MS); }
+  try { res = await callApiStream(key, { model: MODEL(), max_tokens: MAX_TOKENS, messages: [{ role: 'user', content: [{ type: 'text', text: prompt + '\n\n---\n' + txt }] }] }, TIMEOUT_MS); }
   catch (e) { return { ok: false, code: (e instanceof ApiError) ? ('CLAUDE_' + e.code) : 'CLAUDE_FAILED', retry: !!(e && e.retryable) }; }
+  if (res && res.stop_reason === 'max_tokens') return { ok: false, code: 'TOO_LONG' };   // 긴 명세가 잘림(검토 med) — 쪽을 나눠 넣게
   const json = parseJson(responseText(res));
   if (!json) return { ok: false, code: 'NO_JSON' };
   const u = res.usage || {};

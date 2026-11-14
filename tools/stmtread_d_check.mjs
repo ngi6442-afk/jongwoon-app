@@ -119,7 +119,7 @@ const RD = require(join(LIB, 'stmtread.js'));
   const load = (src) => { const m = new Mod(join(LIB, 'stmtvision.js'), null); m.filename = join(LIB, 'stmtvision.js'); m.paths = Mod._nodeModulePaths(LIB); m._compile(src, m.filename); return m.exports; };
   const muts = [
     ['가림 칸 안 칠함', srcV.replace('rgba[p] = 255; rgba[p + 1] = 255;', 'rgba[p] = rgba[p]; rgba[p + 1] = 255;')],
-    ['계산서 쪽 안 뺌', srcV.replace("if (isInvoicePage(colorStats(rgba, p.w, p.h), p.text)) { skipped.push({ i: i, why: 'invoice' }); continue; }", '')],
+    ['계산서 쪽 안 뺌', srcV.replace("if (!photo && isInvoicePage(colorStats(rgba, p.w, p.h), p.text)) { skipped.push({ i: i, why: 'invoice' }); continue; }", '')],
     ['다른 달 줄 안 뺌', srcV.replace("if (date && date.slice(0, 7) !== ym) { other++; return; }", '')],
     ['회원 이름 안 지움', srcV.replace("(names || []).forEach(function (n) { if (n && n.length >= 2) t = t.split(n).join(' '); });", '')]
   ];
@@ -138,6 +138,27 @@ const RD = require(join(LIB, 'stmtread.js'));
     results.push(name + ':' + (caught ? '잡힘' : '못 잡음'));
   }
   T('⑥ 결함 사본 4개(가림 안 칠함·계산서 쪽 안 뺌·다른 달 줄 안 뺌·회원 이름 안 지움) = 모두 잡힘', results.every((x) => /잡힘$/.test(x)), results.join(' | '));
+}
+// ---- ⑦ 11/14 검토 반영: 걸러내기가 날짜·띄어 쓴 숫자·규격을 살림 · 줄바꿈 살림(글 판독) · 사진은 가림 없음 · 쪽 상한 알림 · 응답 잘림 = TOO_LONG · 그림 없는 글자 PDF = 글로 판독
+{
+  const keep = ['2026-10-31', '10 1500 15000', '1500000 150000', '295 80 22.5', '1,234,567', 'S501소 95*35*16'].map((s) => V.scrubText(s, [], 80));
+  const gone = ['010-1234-5678', '010 1234 5678', '054-292-0144', '110-068-387914', '351-0964-8067-13', '506-81-48535', '880101-1234567', 'a@b.co'].map((s) => V.scrubText(s, [], 80));
+  const ml = V.scrubText('일자 | 품목\n2026-10-31 | 오일\n담당 010-9999-8888', [], 200, true);
+  T('⑦ 걸러내기: 날짜·띄어 쓴 수량·단가·금액·쉼표 금액·규격 = 그대로 · 전화(휴대·지역)·계좌(줄표 10자리 이상)·사업자번호·주민번호·메일 = 지움 · 글 판독은 줄바꿈 살림',
+    keep.every((x, i) => x === ['2026-10-31', '10 1500 15000', '1500000 150000', '295 80 22.5', '1,234,567', 'S501소 95*35*16'][i]) && gone.every((x) => x === '') && ml === '일자 | 품목\n2026-10-31 | 오일\n담당', JSON.stringify({ keep, gone, ml }));
+  const W = 100, H = 100, d = Buffer.alloc(W * H * 4); for (let p = 0; p < d.length; p += 4) { d[p] = 0; d[p + 1] = 0; d[p + 2] = 0; d[p + 3] = 255; }
+  const inv = Buffer.alloc(W * H * 4, 255); for (let y = 5; y < 60; y++) for (let x = 2; x < 98; x++) if (x % 4 === 0) { const p = (y * W + x) * 4; if (x < 50) { inv[p] = 230; inv[p + 1] = 50; inv[p + 2] = 80; } else { inv[p] = 30; inv[p + 1] = 80; inv[p + 2] = 210; } }
+  const ph = await V.prepareImages('v07', [{ w: W, h: H, data: Buffer.from(inv), text: '' }], { photo: true });
+  const many = await V.prepareImages('v05', Array.from({ length: 23 }, () => ({ w: 20, h: 20, data: Buffer.alloc(1600, 0), text: '' })));
+  T('⑦ 사진 = 계산서 판정·가림 칸 없이 1장 그대로 · 쪽 23 = 20장만·나머지 3 too_many · 처리한 쪽 RGBA는 놓음', ph.images.length === 1 && ph.skipped.length === 0 && many.images.length === 20 && many.skipped.filter((x) => x.why === 'too_many').length === 3,
+    JSON.stringify({ ph: [ph.images.length, ph.skipped], many: [many.images.length, many.skipped.length] }));
+  fake.reply = '{"rows":[{"date":"10/1","item":"a"'; const lastStop = { v: 'max_tokens' };
+  const cp = require.resolve(join(LIB, 'claude.js')), prevFn = require.cache[cp].exports.callApiStream;
+  require.cache[cp].exports.callApiStream = async function (k, body) { fake.last = body; return { content: [{ type: 'text', text: fake.reply }], stop_reason: lastStop.v, usage: {} }; };
+  const V2 = (() => { delete require.cache[require.resolve(join(LIB, 'stmtvision.js'))]; return require(join(LIB, 'stmtvision.js')); })();
+  const tl = await V2.readVision([{ buf: Buffer.from([0xff, 0xd8]), w: 1, h: 1, i: 0 }], { name: 'x' }, '2026-10', []);
+  require.cache[cp].exports.callApiStream = prevFn;
+  T('⑦ 응답이 max_tokens로 잘림 = TOO_LONG(NO_JSON 아님 — 쪽을 나눠 넣으라는 안내로)', !tl.ok && tl.code === 'TOO_LONG', JSON.stringify(tl));
 }
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n원본 읽기(나누기·AI 판독) 시험 전 항목 통과 (' + pass + ')');
 process.exit(fail ? 1 : 0);

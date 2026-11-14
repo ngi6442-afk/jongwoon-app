@@ -12870,25 +12870,49 @@ try {
     J4({ c: U1.env.confirms.length, rows: e1.rows.map((x) => [x.vin, x.qty, x.amt, x.how]), inv: e1.inv, st: e1.stated, b: e1.basis, src: e1.src, vm: U1.env.vm, msg: e1.read && e1.read.msg }));
   // ② 지금 줄이 있으면 확인 · 계산서 칸이 이미 있으면 안 덮음
   const doc2 = { status: 'doing', updated_at: 5, rows: [{ r: 'h1', date: '2026-10-01', vraw: '', item: '손으로 넣은 줄', kind: 'urea', qty: 1, qd: 0, unit: 10, ud: 0, amt: 10, vat: 1, how: 'hand', note: '' }], inv: { date: '', supply: 5, vat: 0, total: 5 } };
+  const RV4 = Object.assign({}, R4, { src: 'vision', inv: null, carry: { prev: 9, month: 9, paid: 0, bal: 18 } });
   const U2 = mk4({ doc: doc2, ok: false }), e2 = U2.api.STMT.ed;
-  U2.api.apply(e2, R4, 'x.html');
-  const kept2 = e2.rows.length === 1 && e2.rows[0].item === '손으로 넣은 줄' && !e2.draftNew;
+  U2.api.apply(e2, RV4, 'x.jpg');
+  const kept2 = e2.rows.length === 1 && e2.rows[0].item === '손으로 넣은 줄' && !e2.draftNew && e2.carry.prev === '9';
   const U3 = mk4({ doc: doc2, ok: true }), e3 = U3.api.STMT.ed;
-  U3.api.apply(e3, R4, 'x.html');
-  T('29 판④ ② 지금 줄 1개 있음 → 확인 창("지금 줄 1개를 읽은 줄 2개로") · 취소 = 그대로·초안 없음 · 확인 = 바꿈 · 계산서 칸이 이미 있으면 안 덮음(5 그대로)',
-    U2.env.confirms.length === 1 && /지금 줄 1개를 읽은 줄 2개로/.test(U2.env.confirms[0]) && kept2 && e3.rows.length === 2 && e3.draftNew === true && e3.inv.total === '5',
-    J4({ c: U2.env.confirms, kept2, n3: e3.rows.length, inv3: e3.inv }));
+  U3.api.apply(e3, Object.assign({}, R4, { carry: null, sum: null }), 'x.html');   // 보안 계산서(nts) — 줄이 있으면 확인 창 없이 줄은 두고 계산서 칸만(이미 5 → 안 덮음)
+  const U3b = mk4({ doc: { status: 'doing', updated_at: 5, rows: doc2.rows }, ok: true }), e3b = U3b.api.STMT.ed;
+  U3b.api.apply(e3b, R4, 'x.html');
+  const U3c = mk4({ doc: doc2, ok: true }), e3c = U3c.api.STMT.ed;
+  U3c.api.apply(e3c, RV4, 'x.jpg');
+  T('29 판④ ② 지금 줄 1개 + AI 판독 결과 → 확인 창("지금 줄 1개를 읽은 줄 2개로") · 취소 = 줄 그대로·초안 없음·빈 잔액 칸은 채움 · 확인 = 바꿈 · 보안 계산서 결과 = 확인 창 없이 줄 그대로("계산서 품목 줄은 넣지 않았습니다")·빈 계산서 칸만 채움 · 계산서 칸이 이미 있으면 "바꾼 것이 없습니다"',
+    U2.env.confirms.length === 1 && /지금 줄 1개를 읽은 줄 2개로/.test(U2.env.confirms[0]) && kept2 && e3c.rows.length === 2 && e3c.draftNew === true
+    && U3.env.confirms.length === 0 && e3.rows.length === 1 && e3.inv.total === '5' && /바꾼 것이 없습니다/.test(e3.read.msg)
+    && U3b.env.confirms.length === 0 && e3b.rows.length === 1 && e3b.inv.total === '30,000' && e3b.read.warn.some((w) => /계산서 품목 줄은 넣지 않았습니다/.test(w)),
+    J4({ c: U2.env.confirms, kept2, n3c: e3c.rows.length, c3: U3.env.confirms.length, m3: e3.read && e3.read.msg, inv3b: e3b.inv, w3b: e3b.read && e3b.read.warn }));
+  // ②-2 확정 풀기 중인 문서 = 초안 안 보냄(서버 DRAFT_ON_FINAL) · 초안 = 읽은 그대로(사람이 고친 금액은 초안에 없음 · 자동 대조 차량은 넣음)
+  const U2b = mk4({ doc: { status: 'done', updated_at: 7, rows: doc2.rows, inv: doc2.inv } }), e2b = U2b.api.STMT.ed;
+  e2b.reopen = true;
+  U2b.api.apply(e2b, RV4, 'x.jpg');
+  const re2b = e2b.rows.length === 2 && e2b.draftNew === false;
   // ③ 저장 — 초안 같이 · 확정 = 작성 중 먼저 → 이어서 확정
   const U4 = mk4({ resp: { stmt_save: (b) => ({ status: 200, body: { status: 'OK', doc: { status: b.status, updated_at: 10 + b.status.length, rows: b.rows.map((x) => Object.assign({ qd: 0, ud: 0 }, x, { qty: Number(x.qty) || null, unit: Number(x.unit) || null })), draft: b.draft_rows ? { rows: b.draft_rows } : null, inv: b.inv, carry: b.carry, stated: b.stated }, checks: { ok: true } } }) } });
   const e4 = U4.api.STMT.ed;
   U4.api.apply(e4, Object.assign({}, R4, { carry: null, basis: null, inv: null, sum: null }), 'g.html');
   e4.rows.push(Object.assign({}, e4.rows[0], { r: 'hz', item: '사람이 더한 줄', how: 'hand', vin: '' }));
+  e4.rows[0].veh = '_common';            // 자동 대조가 찾은 차(번호 글 그대로) → 초안에 들어감
+  e4.rows[1].amt = '9,999';              // 첫 저장 전에 사람이 고친 금액 → 초안에는 읽은 값(9545)
   U4.api.save('doing');
   await fl4();
   const s1 = U4.env.log.filter((x) => x.body.action === 'stmt_save');
-  T('29 판④ ③ 첫 저장 = 초안(draft_rows) 같이 — 읽은 줄 2개만(사람이 더한 줄 빼고)·redraft 없음 · 저장 뒤 초안 표시 지움',
-    s1.length === 1 && Array.isArray(s1[0].body.draft_rows) && s1[0].body.draft_rows.length === 2 && s1[0].body.draft_rows.every((x) => x.item === '요소수') && !s1[0].body.redraft && s1[0].body.rows.length === 3 && U4.api.STMT.ed.draftNew === false,
-    J4(s1.map((x) => ({ st: x.body.status, d: (x.body.draft_rows || []).length, rd: x.body.redraft, n: x.body.rows.length }))));
+  const dr1 = (s1[0] && s1[0].body.draft_rows) || [];
+  T('29 판④ ③ 첫 저장 = 초안(draft_rows) 같이 — 읽은 줄 2개만(사람이 더한 줄 빼고)·redraft 없음 · 초안 = 읽은 그대로(사람이 고친 금액 9,999 아닌 9545)·자동 대조 차량은 넣음 · 저장 뒤 초안 표시 지움 · ②-2 확정 풀기 중 문서에 읽음 = 줄은 바꾸되 초안 안 보냄',
+    s1.length === 1 && dr1.length === 2 && dr1.every((x) => x.item === '요소수') && dr1[0].veh === '_common' && dr1[1].amt === 9545 && !s1[0].body.redraft && s1[0].body.rows.length === 3 && U4.api.STMT.ed.draftNew === false && re2b,
+    J4({ s: s1.map((x) => ({ st: x.body.status, d: (x.body.draft_rows || []).length, rd: x.body.redraft, n: x.body.rows.length })), dr1, re2b }));
+  // ③-2 401 뒤 '이어서 확정' 예약이 남지 않음(검토 med) — 확정 저장 → 401 → 다시 [저장(작성 중)] → 성공해도 확정 저장 안 나감
+  let n401 = 0;
+  const U4b = mk4({ resp: { stmt_save: (b) => (++n401 === 1 ? { status: 401, body: { status: 'UNAUTHORIZED' } } : U4.env.resp.stmt_save(b)) } }), e4b = U4b.api.STMT.ed;
+  U4b.api.apply(e4b, Object.assign({}, R4, { carry: null, basis: null }), 'g.html');
+  e4b.rows.forEach((x) => { x.veh = '_common'; });
+  U4b.api.save('done'); await fl4();
+  U4b.api.save('doing'); await fl4(); await fl4();
+  const s4b = U4b.env.log.filter((x) => x.body.action === 'stmt_save').map((x) => x.body.status);
+  T('29 판④ ③-2 확정 저장이 401로 실패한 뒤 [저장(작성 중)] = 작성 중 1번만(이어서 확정 안 나감)', J4(s4b) === J4(['doing', 'doing']) && !e4b.afterDraft, J4({ s4b, ad: e4b.afterDraft }));
   const U5 = mk4({ doc: { status: 'doing', updated_at: 3, rows: [], draft: { rows: [{ r: 'h1' }] } }, resp: U4.env.resp });
   const e5 = U5.api.STMT.ed;
   U5.api.apply(e5, Object.assign({}, R4, { carry: null, basis: null }), 'g.html');

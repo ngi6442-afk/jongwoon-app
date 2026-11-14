@@ -8969,7 +8969,7 @@
     ed.draft = d ? (d.draft || null) : null;
     ed.hasPrev = !!(d && d.prev);
     ed.dirty = false; ed.saving = false; ed.stale = false; ed.vsubSig = null; ed.editN = 0; ed.saveN = 0; ed.pick = null;
-    ed.draftNew = false; ed.readRids = null;   // 29 판④ 읽은 줄 초안(다음 저장에 draft_rows로) — 저장된 판을 받으면 비움 · 판독 중(ed.read)은 그대로 둠(응답이 seq로 이 상세인지 봄)
+    ed.draftNew = false; ed.readRids = null; ed.readDraft = null;   // 29 판④ 읽은 줄 초안(다음 저장에 draft_rows로) — 저장된 판을 받으면 비움 · 판독 중(ed.read)은 그대로 둠(응답이 seq로 이 상세인지 봄)
     if (ed.prevUse === undefined && ed.group === "tool" && canDo("stmt")) stmtPrevUseLoad(ed);   // 29 판③ 용도 기본값 — 상세를 연 뒤 한 번(저장 뒤 다시 채울 때는 안 읽음)
   }
   function stmtOpen(vk, again){   // again = 상세의 [다시 불러오기] — 보드 행 확인 없이(달 읽기가 실패해 보드가 비어도 열림 — 거래처는 서버가 확인)
@@ -9210,9 +9210,9 @@
     // 29 판④ 읽은 줄이 있으면 첫 저장에 초안(draft_rows — 그때까지 자동 대조한 차량 포함)을 같이 · 서버는 확정 요청에 초안을 안 받으므로(DRAFT_ON_FINAL) 작성 중으로 먼저 저장한 뒤 이어서 확정
     if (ed.draftNew && status !== "doing"){ ed.afterDraft = status; status = "doing"; }
     body = { action: "stmt_save", ym: ed.ym, vk: ed.vk, base: ed.base, basis: ed.basis, status: status, rows: p.rows, inv: p.inv, stated: p.stated, carry: p.carry, vsub: p.vsub, src: ed.src };
-    if (ed.draftNew && ed.readRids){ body.draft_rows = p.rows.filter(function(x){ return ed.readRids[x.r] === 1; }); if (ed.draft) body.redraft = true; }
+    if (ed.draftNew && ed.readDraft){ body.draft_rows = stmtReadDraft(ed); if (ed.draft) body.redraft = true; }
     ed.saving = true; ed.saveN = ed.editN || 0; ed.msg = "저장 중…"; ed.msgBad = false; stmtEdRefresh();
-    gwCall("gw-stmt", body).then(function(res){ stmtEdDone(ed, res, p, "저장했습니다"); }).catch(function(){ if (STMT.ed !== ed) return; ed.saving = false; ed.msg = "네트워크 오류 — 저장되지 않았습니다."; ed.msgBad = true; stmtEdRefresh(); });
+    gwCall("gw-stmt", body).then(function(res){ stmtEdDone(ed, res, p, "저장했습니다"); }).catch(function(){ if (STMT.ed !== ed) return; ed.saving = false; ed.afterDraft = null; ed.msg = "네트워크 오류 — 저장되지 않았습니다."; ed.msgBad = true; stmtEdRefresh(); });
   }
   // 저장·되돌리기 응답 — 성공이면 서버 판으로 다시 채움(서버가 다시 센 검산·상태), 실패면 고친 내용을 그대로 두고 까닭만.
   //   저장이 오가는 사이에 칸을 또 고쳤으면(editN이 늘었으면) 줄은 화면 것을 두고 저장 번호(base)·상태·직전 판 유무만 받는다 — 다시 채우면 방금 친 글이 말없이 사라짐(11/10 자체 점검)
@@ -9220,7 +9220,7 @@
     var b = res.body || {}, code = b.error_code || "", at;
     if (STMT.ed !== ed) return;
     ed.saving = false;
-    if (res.status === 401){ ed.msg = "로그인이 풀려 처리하지 않았습니다 — 다시 로그인한 뒤 다시 눌러 주세요(고친 내용은 화면에 남아 있습니다)."; ed.msgBad = true; stmtEdRefresh(); onSessionInvalid(); return; }
+    if (res.status === 401){ ed.afterDraft = null; ed.msg = "로그인이 풀려 처리하지 않았습니다 — 다시 로그인한 뒤 다시 눌러 주세요(고친 내용은 화면에 남아 있습니다)."; ed.msgBad = true; stmtEdRefresh(); onSessionInvalid(); return; }
     if (res.status === 200 && b.status === "OK" && b.doc && p && (ed.editN || 0) !== ed.saveN){
       ed.doc = b.doc; ed.base = Number(b.doc.updated_at) || ed.base; ed.status = b.doc.status; ed.reopen = false; ed.hasPrev = !!b.doc.prev; ed.draft = b.doc.draft || null; ed.dirty = true;
       ed.draftNew = false; ed.afterDraft = null;   // 29 판④ 초안은 저장됨 — 이어서 확정은 화면 줄이 바뀌었으니 사람이 다시 누름
@@ -9399,6 +9399,7 @@
   var STMT_READ_MAX = 4300000, STMT_READ_POLL = 5000, STMT_READ_WAIT = 480000;
   var STMT_READ_SRC = { nts: "nts", xml: "xml", xls: "xls", pdf: "pdf", vision: "vision" };
   var STMT_READ_ERR = { EMPTY_FILE: "빈 파일입니다 — 메일에서 다시 내려받아 넣어 주세요", FILE_TOO_LARGE: "파일이 너무 큽니다(4MB까지) — 쪽을 나눠 넣어 주세요", UNSUPPORTED_TYPE: "읽을 수 없는 파일 꼴입니다(PDF·그림·엑셀·계산서 HTML·XML)", UNKNOWN_LAYOUT: "아직 모르는 양식입니다", NO_KEY: "우리 회사 사업자번호로 열리지 않는 계산서입니다",
+    NO_PAGES: "읽을 쪽이 없습니다(빈 쪽·그림 없는 쪽)", TOO_LONG: "명세가 길어 AI가 다 읽지 못했습니다 — 쪽을 나눠 넣어 주세요", IMAGE_TOO_LARGE: "사진이 너무 큽니다 — 크기를 줄여 넣어 주세요", PDF_PASSWORD: "암호 걸린 PDF입니다", PDF_TIMEOUT: "PDF를 읽는 데 너무 오래 걸립니다 — 쪽을 나눠 넣어 주세요", PDF_BAD: "PDF를 열지 못했습니다", DRAFT_ON_FINAL: "확정했던 명세라 읽은 초안은 저장하지 않았습니다",
     ONLY_INVOICE: "계산서 쪽만 있어 AI에 보내지 않았습니다 — 계산서는 보안 계산서 HTML을 넣거나 손으로 넣어 주세요", NO_API_KEY: "AI 판독 설정이 없습니다(관리자 확인)", NO_JSON: "AI 판독 결과를 읽지 못했습니다 — 다시 넣어 주세요", READ_FAILED: "읽지 못했습니다" };
   function stmtReadBoxHtml(ed){
     var r = ed.read || {};
@@ -9458,40 +9459,53 @@
     }).catch(function(){ if (STMT.ed !== ed || ed.readSeq !== seq) return; setTimeout(function(){ stmtReadPoll(ed, seq, job, name); }, STMT_READ_POLL * 2); });
   }
   // 읽은 결과 → 편집 줄 · 계산서·잔액·명세 합계는 비어 있을 때만 채움 · 줄 금액 기준(부가세 포함/공급가)은 결과가 알려 주면 바꿈 · 넣은 파일 표시(src) · 차량 번호는 차례로 대조
+  //   11/14 검토 반영: 계산서(보안 HTML·XML)를 줄이 있는 상세에 넣으면 줄은 그대로 두고 계산서 칸만(안내 순서 'AI 줄 → 계산서 HTML') · 확인 창 취소 = 줄은 두고 빈 칸만 채움 ·
+  //   초안은 '읽은 그대로'(ed.readDraft — 첫 저장 전에 사람이 고친 값이 초안에 섞이지 않게) · 한 번이라도 확정된 문서(확정 풀기 중)는 초안을 보내지 않음(서버 DRAFT_ON_FINAL)
   function stmtReadApply(ed, r, name){
-    var rows = (r && Array.isArray(r.rows)) ? r.rows : [], keep, warn = (r && Array.isArray(r.warn)) ? r.warn.slice(0, 8) : [], n = 0, vins = [], filled = [];
+    var rows = (r && Array.isArray(r.rows)) ? r.rows : [], keep, warn = (r && Array.isArray(r.warn)) ? r.warn.slice(0, 8) : [], n = 0, vins = [], filled = [], inv = r && (r.src === "nts" || r.src === "xml"), swap;
     if (STMT.ed !== ed) return;
     if (!stmtEdW(ed)){ ed.read = { msg: "지금은 고칠 수 없는 상태라 넣지 않았습니다", bad: true }; stmtReadShow(ed); return; }
-    if (!rows.length && !(r && (r.inv || r.carry))){ ed.read = { msg: "읽은 줄이 없습니다", bad: true, warn: warn }; stmtReadShow(ed); return; }
+    if (!rows.length && !(r && (r.inv || r.carry || r.sum))){ ed.read = { msg: "읽은 줄이 없습니다", bad: true, warn: warn }; stmtReadShow(ed); return; }
     keep = ed.rows.filter(function(e){ return !stmtEdEmpty(e); });
-    if (rows.length && keep.length && !confirm("지금 줄 " + keep.length + "개를 읽은 줄 " + rows.length + "개로 바꿀까요?\n(취소하면 지금 줄을 그대로 둡니다)")){ ed.read = { msg: "넣지 않았습니다", bad: true, warn: warn }; stmtReadShow(ed); return; }
-    if (rows.length){
-      ed.pick = null; ed.rows = []; ed.ridN = 0; ed.readRids = {};
+    swap = rows.length > 0 && (!keep.length || (!inv && confirm("지금 줄 " + keep.length + "개를 읽은 줄 " + rows.length + "개로 바꿀까요?\n(취소하면 지금 줄은 두고 빈 계산서·잔액 칸만 채웁니다)")));
+    if (swap){
+      ed.pick = null; ed.rows = []; ed.ridN = 0; ed.readRids = {}; ed.readDraft = [];
       rows.forEach(function(x){
         var e = stmtNewRow(ed);
         e.date = x.date ? stmtDateOut(x.date) : ""; e.vin = x.vraw || ""; e.item = x.item || ""; e.kind = x.kind || e.kind; e.use = x.use || "";
         e.qty = x.qty == null ? "" : String(x.qty); e.unit = x.unit == null ? "" : String(x.unit); e.amt = x.amt == null ? "" : stmtNum(x.amt); e.vat = x.vat == null ? "" : stmtNum(x.vat);
         e.note = x.note || ""; e.how = x.how || "file";
         ed.rows.push(e); ed.readRids[e.r] = 1; if (e.vin) vins.push(ed.rows.length - 1);
+        ed.readDraft.push({ r: e.r, date: x.date || "", veh: "", vraw: e.vin, item: e.item, kind: e.kind, use: e.use, qty: x.qty == null ? null : String(x.qty), unit: x.unit == null ? null : String(x.unit),
+          amt: x.amt == null ? null : x.amt, vat: x.vat == null ? null : x.vat, tire: null, how: e.how, note: e.note });
       });
-      ed.draftNew = true; n = rows.length;
-    }
-    if (r.basis === "total" || r.basis === "supply"){ if (ed.basis !== r.basis){ ed.basis = r.basis; filled.push("줄 금액 기준 " + (r.basis === "total" ? "부가세 포함" : "공급가 + 세액")); } }
+      ed.draftNew = !stmtFinal(ed.status); n = rows.length;
+    } else if (rows.length) warn.unshift(inv ? "지금 줄이 있어 계산서 품목 줄은 넣지 않았습니다(계산서 칸만)" : "지금 줄을 그대로 두었습니다");
+    if (r.basis === "total" || r.basis === "supply"){ if (swap && ed.basis !== r.basis){ ed.basis = r.basis; filled.push("줄 금액 기준 " + (r.basis === "total" ? "부가세 포함" : "공급가 + 세액")); } }
     if (r.inv && stmtAllEmpty(ed.inv, ["date", "supply", "vat", "total"])){ ed.inv = { date: r.inv.date || "", supply: stmtNum(r.inv.supply), vat: stmtNum(r.inv.vat), total: stmtNum(r.inv.total) }; filled.push("계산서"); }
     if (r.carry && stmtAllEmpty(ed.carry, ["prev", "month", "paid", "bal"])){ ed.carry = { prev: stmtNum(r.carry.prev), month: stmtNum(r.carry.month), paid: stmtNum(r.carry.paid), bal: stmtNum(r.carry.bal) }; filled.push("잔액 4칸"); }
     if (r.sum && r.sum.total != null && String(ed.stated == null ? "" : ed.stated).trim() === ""){ ed.stated = stmtNum(r.sum.total); filled.push("명세 합계"); }
+    if (!swap && !filled.length){ ed.read = { msg: "바꾼 것이 없습니다", bad: true, warn: warn }; stmtReadShow(ed); return; }
     if (STMT_READ_SRC[r.src]){ ed.src = (ed.src || []).filter(function(s){ return s && s.name !== String(name || "").slice(0, 80); }).concat([{ kind: STMT_READ_SRC[r.src], name: String(name || "").replace(/\d{10,}/g, "…").slice(0, 80), pages: 0 }]).slice(-10); }
     ed.dirty = true; ed.editN = (ed.editN || 0) + 1;
-    ed.read = { msg: (n ? "읽은 줄 " + n + "개" : "줄 없음") + (filled.length ? " · " + filled.join("·") + " 채움" : "") + (r.src === "vision" ? " — AI 판독이라 숫자를 한 번씩 확인해 주세요" : "") + " · [저장(작성 중)]을 눌러야 저장됩니다", warn: warn };
+    ed.read = { msg: (n ? "읽은 줄 " + n + "개" : "줄은 그대로") + (filled.length ? " · " + filled.join("·") + " 채움" : "") + (r.src === "vision" && n ? " — AI 판독이라 숫자를 한 번씩 확인해 주세요" : "") + " · [저장(작성 중)]을 눌러야 저장됩니다", warn: warn };
     stmtEdRender();
     vins.forEach(function(i, k){ setTimeout(function(){ if (STMT.ed === ed && ed.rows[i] && !ed.rows[i].veh) stmtVehMatch(i); }, 120 * k); });   // 차례로(서버에 한꺼번에 몰리지 않게)
   }
+  // 초안 줄 — 읽은 그대로 + 자동 대조로 찾은 차량(번호 글을 사람이 안 고친 줄만). 사람이 고친 값은 초안에 들어가지 않는다(간극 = 사람 손)
+  function stmtReadDraft(ed){
+    var cur = {};
+    ed.rows.forEach(function(e){ if (e.r) cur[e.r] = e; });
+    return (ed.readDraft || []).map(function(d){ var e = cur[d.r], o = {}, k; for (k in d) if (Object.prototype.hasOwnProperty.call(d, k)) o[k] = d[k]; if (e && e.veh && String(e.vin || "").trim() === String(d.vraw || "").trim()) o.veh = e.veh; return o; });
+  }
+  // 끌어다 놓기 — 상세 어디에 놓아도 브라우저가 파일을 열어 앱을 벗어나지 않게(고칠 수 없는 상태라도 막음 — 검토 low)
   function stmtReadDrop(e){
     var ed = STMT.ed, dt = e && e.dataTransfer, box = document.getElementById("stmtReadBox");
+    if (e.type === "dragover" || e.type === "dragenter" || e.type === "drop"){ if (e.preventDefault) e.preventDefault(); }
     if (!ed || !stmtEdW(ed)) return;
-    if (e.type === "dragover" || e.type === "dragenter"){ e.preventDefault(); if (box) box.classList.add("over"); return; }
+    if (e.type === "dragover" || e.type === "dragenter"){ if (box) box.classList.add("over"); return; }
     if (e.type === "dragleave"){ if (box) box.classList.remove("over"); return; }
-    if (e.type === "drop"){ e.preventDefault(); if (box) box.classList.remove("over"); if (dt && dt.files && dt.files.length) stmtReadFile(dt.files[0]); }
+    if (e.type === "drop"){ if (box) box.classList.remove("over"); if (dt && dt.files && dt.files.length) stmtReadFile(dt.files[0]); }
   }
   // ---- 거래처 목록 고치기(29 판③ — 수행만, 월 보드 아래 단추) — 서버 stmt_cfg_get·stmt_cfg_set(낙관락 base = 목록 저장 시각 · 있던 거래처 지우기 금지 VENDOR_REMOVED ·
   //   묶음 바꾸기 금지 GROUP_LOCKED · 같은 판 NO_CHANGE · 이름·낱말 개인정보 꼴 거절). 새 거래처 = 지금 번호 중 가장 큰 것 + 1(있던 거래처는 지울 수 없어 늘 새 번호 — 지난 달 문서 키가 가리키는 번호를 다시 쓰지 않음)

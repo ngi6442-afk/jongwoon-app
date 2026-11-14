@@ -106,23 +106,34 @@ function htmlText(buf) {
 // AI 판독(배경 함수) — mode pdf|image|html → { ok, result, skipped, usage } | { ok:false, code }
 async function readByAi(buf, mode, ctx) {
   const V = require('./stmtvision');
-  if (mode === 'html') {
-    const txt = V.scrubText(htmlText(buf), ctx.names || [], 60000);
-    const r = await V.readText(txt, ctx.vendor || {}, ctx.ym, ctx.names || []);
+  const textRead = async function (txt) {   // 글로 판독 — 줄바꿈 살린 채 개인정보 꼴·회원 이름을 먼저 지움(11/14 검토 med)
+    const r = await V.readText(V.scrubText(txt, ctx.names || [], 60000, true), ctx.vendor || {}, ctx.ym, ctx.names || []);
     if (!r.ok) return r;
     return { ok: true, result: finish(r.result, ctx), usage: r.usage, skipped: [] };
-  }
-  let pages;
-  if (mode === 'image') pages = await V.pagesFromImage(buf);
-  else if (mode === 'pdf') { const P = require('./pdftext'); const pi = await P.pdfPageImages(buf, V.MAX_PAGES + 4); if (!pi.ok) return { ok: false, code: pi.code || 'PDF_IMAGES_FAILED' }; pages = pi.pages; }
-  else return { ok: false, code: 'BAD_MODE' };
-  const prep = await V.prepareImages(ctx.vk, pages);
+  };
+  if (mode === 'html') return await textRead(htmlText(buf));
+  let pages, more = 0;
+  if (mode === 'image') {
+    try { pages = await V.pagesFromImage(buf); } catch (e) { return { ok: false, code: (e && e.code) || 'IMAGE_FAILED' }; }
+  } else if (mode === 'pdf') {
+    const P = require('./pdftext');
+    const pi = await P.pdfPageImages(buf, V.MAX_PAGES, { truncate: true });
+    if (!pi.ok) return { ok: false, code: pi.code || 'PDF_IMAGES_FAILED' };
+    pages = pi.pages;
+    more = Number(pi.more) || 0;   // 상한 뒤 못 읽은 쪽 수(경고로)
+    // 그림이 없는 글자 PDF(모르는 양식) = 그림 대신 글로 판독(종전엔 빈 쪽으로 NO_PAGES — 11/14 검토 med)
+    const txt = pages.map(function (p) { return p ? String(p.text || '') : ''; }).join('\n');
+    if (!pages.some(function (p) { return p && p.w && p.data; }) && txt.replace(/\s+/g, '').length > 20) return await textRead(txt);
+  } else return { ok: false, code: 'BAD_MODE' };
+  const prep = await V.prepareImages(ctx.vk, pages, { photo: mode === 'image' });
   if (!prep.images.length) return { ok: false, code: prep.skipped.some(function (x) { return x.why === 'invoice'; }) ? 'ONLY_INVOICE' : 'NO_PAGES' };
   const r = await V.readVision(prep.images, ctx.vendor || {}, ctx.ym, ctx.names || []);
   if (!r.ok) return r;
   const res = finish(r.result, ctx);
-  const inv = prep.skipped.filter(function (x) { return x.why === 'invoice'; }).length;
-  if (inv) res.warn.push('계산서 쪽 ' + inv + '장은 AI에 보내지 않았습니다(계산서 합계는 보안 계산서 HTML을 넣거나 손으로)');
+  const cnt = function (w) { return prep.skipped.filter(function (x) { return x.why === w; }).length; };
+  if (cnt('invoice')) res.warn.push('계산서 쪽 ' + cnt('invoice') + '장은 AI에 보내지 않았습니다(계산서 합계는 보안 계산서 HTML을 넣거나 손으로)');
+  if (cnt('too_many') + more) res.warn.push('쪽이 많아 ' + V.MAX_PAGES + '쪽까지만 읽었습니다 — 나머지 ' + (cnt('too_many') + more) + '쪽은 따로 넣어 주세요');
+  if (cnt('empty')) res.warn.push('그림이 없는 쪽 ' + cnt('empty') + '장은 읽지 않았습니다');
   return { ok: true, result: res, usage: r.usage, skipped: prep.skipped };
 }
 
