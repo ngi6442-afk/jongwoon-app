@@ -1459,6 +1459,7 @@ async function handleBotNotify(event, d, R) {
   const title = String(d.title || '알림').slice(0, 60);
   const body = String(d.body || '').slice(0, 300);
   const tag = String(d.tag || 'bot-notify').slice(0, 30);
+  await MCHK.noteAlert(title);   // P1 판31 월 점검 '경보 수' 재료 — ⚠ 제목 봇 경보를 그달 수에 1(실패는 삼킴 · 발송과 무관)
   // 반환값은 실제 발송 결과(sent=성공한 기기 수). 관리자 수와 혼동하면 안 된다(과거 오보 원인).
   try {
     const tcN = await push.tierCtx();   // 스캔 1회 — adminIds와 sendTo 활성 필터 공용
@@ -4737,7 +4738,11 @@ function backupLogMerge(curDoc, bkDoc, max, reserve, now) {
   if (cur.length + add.length + (reserve || 0) > max) return { err: 'AUDIT_FULL' };
   const tsOf = function (e) { return (e && Number.isFinite(Number(e.ts))) ? Number(e.ts) : 0; };
   const items = add.concat(cur).sort(function (a, b) { return tsOf(a) - tsOf(b); });   // 안정 정렬 — 같은 시각이면 되살린 줄이 앞, 지금 줄끼리는 원래 순서
-  return { doc: Object.assign({ schema: 1 }, curOk ? curDoc : {}, { items: items }), added: add.length, kept: cur.length };
+  const out = Object.assign({ schema: 1 }, curOk ? curDoc : {}, { items: items });
+  // P1 판31 감사 조각: 머리(audit:YYYY-MM)의 parts(조각 수)는 지금 값과 백업 값 중 큰 쪽 — 머리를 잃은 뒤 복원해도 뒤 조각(audit:YYYY-MM:n)을 읽는 길이 끊기지 않게(조각 수 상한 60)
+  const pN = Math.max(Math.floor(Number(curOk && curDoc.parts)) || 0, Math.floor(Number(bkDoc.parts)) || 0);
+  if (pN >= 2) out.parts = Math.min(pN, 60);
+  return { doc: out, added: add.length, kept: cur.length };
 }
 // v453 검토: 해시 체인 병합 — 지금 줄은 버리지 않는다.
 //   ① 지금 체인이 온전하고 지금 head가 백업 안에 있으면 그 뒤 백업 줄만 잇는다(백업 줄 그대로 — h가 appdata 백업 git 이력과 맞음) · 더할 줄이 없으면(백업 head가 지금 체인 안 = 백업이 같거나 짧음) 400 CLOG_NOT_AHEAD.
@@ -5421,10 +5426,11 @@ async function handleAudit(event, d, R) {
   const c = await currentMember(event);
   if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
   if (!c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
-  const key = auditKey(d.month);
-  const r = await blobGet(store(DATA), key);
-  const doc = (r.ok && r.data) ? r.data : { schema: 1, items: [] };
-  return jr(200, { status: 'OK', month: key.slice(6), doc: doc, request_id: R });
+  // P1 판31 감사 기록 월 상한 분할: 그달 조각(audit:YYYY-MM · audit:YYYY-MM:n)을 _lib/audit.js readMonth 한 곳이 이어 붙여 읽는다(달 꼴이 아니면 이번 달 — 종전 auditKey와 같음) —
+  //   하나라도 못 읽으면 503(종전에는 못 읽으면 빈 달로 보여 '기록 없음'처럼 보였다). 화면은 doc.items 그대로.
+  const rm = await require('./_lib/audit').readMonth(d.month);
+  if (!rm.ok) return jr(503, { status: 'ERROR', error_code: 'AUDIT_READ_FAILED', request_id: R });
+  return jr(200, { status: 'OK', month: rm.month, doc: { schema: 1, items: rm.items, parts: rm.parts, missing: rm.missing }, request_id: R });
 }
 
 // ---- 시점 복구(관리자 전용): 버전 목록 / 미리보기 카운트 / 되돌리기 ----
@@ -5642,6 +5648,19 @@ async function handlePmconDecide(event, d, R) {
 // P1 판30 계약 서류 목록 분기 점검(PM 콘솔 점검 카드) — 계산·핸들러는 _lib/conchk.js 한 곳. 읽기 = pmconGate(관리자) · [확인] = pmconGate(PM) + 누른 기록 1줄(row conchk:<분기>)
 const CONCHK = require('./_lib/conchk').handlers({ gate: pmconGate, read: pmconRead, fold: pmconFold, key: PMCON_KEY, store: function () { return store(DATA); }, blobGet, blobSet, blobList, appendAudit, LN, colKey, jr });
 
+// ---- P1 판31 월 점검(착수설명서 판31 · 시안 판3 ③ 806~819) — 계산·문서·[확인]은 _lib/mchk.js 한 곳, 여기는 관문·봇 키·누른 기록 연결만 ----
+//   열람 mchk_get = 판29 pmconGate 읽기(로그인 → 기기 승인 → 관리자) · [확인] mchk_ack = pmconGate 쓰기(+ 명시 tier pm · 명부 못 읽으면 503) — 누른 기록은 status:decide에 1줄(판29 기록 꼴·pmconRead/pmconFold 그대로)
+//   다시 돌리기 mchk_run = 봇 키만(시험·복구 — 화면 단추 없음 · force면 다시 계산하고 [확인]을 풂). 크론 = gw-mchk-cron(매일 07:00 KST 기동 · KST 1~3일만 · 달마다 문서 1개)
+const MCHK = require('./_lib/mchk');
+const MCHK_LOG = { key: PMCON_KEY, read: pmconRead, fold: pmconFold };
+async function handleMchkGet(event, d, R) { const g = await pmconGate(event, R, false); if (g.res) return g.res; const o = await MCHK.get(d, g.isPm); return jr(o.code, Object.assign(o.body, { request_id: R })); }
+async function handleMchkAck(event, d, R) { const g = await pmconGate(event, R, true); if (g.res) return g.res; const o = await MCHK.ack(d, g.c.member, MCHK_LOG); return jr(o.code, Object.assign(o.body, { request_id: R })); }
+async function handleMchkRun(event, d, R) {
+  if (!botKeyOk(d.key)) return jr(403, { status: 'FORBIDDEN', error_code: 'BAD_INGEST_KEY', request_id: R });
+  const o = await MCHK.run(Date.now(), { period: d.period === undefined ? '' : String(d.period), force: d.force === true, by: 'bot' });
+  return jr(o.ok ? 200 : (o.code === 'BAD_PERIOD' ? 400 : 500), Object.assign({ status: o.ok ? 'OK' : 'ERROR' }, o, { request_id: R }));
+}
+
 // v378 큰 본문 양방향 gzip(2026-10-08 실사고): col:bids가 9/11 3.94MB(2,462건)에서 10/8 07:52 분할 전송 수신 뒤 6.69MB(3,953건)로 자라
 // Netlify 동기 함수 응답 한도 6MB(6,291,456B)를 넘자 get이 실패했고, 앱은 그 실패를 삼켜 "수집된 공고가 없습니다"로 보였다(PM "기존거 다 날라갔나").
 // 저장(save) 본문도 같은 6MB 요청 한도라 상태 변경이 조용히 유실될 자리였다.
@@ -5812,6 +5831,9 @@ async function handlerInner(event) {
     if (d && d.action === 'pmcon_decide') return await handlePmconDecide(event, d, R);   // P1 판29 [ㄱ]/[보류]/[기본값] — PM만 · 값 바꾸기는 기존 핸들러
     if (d && d.action === 'conchk_get') return await CONCHK.get(event, d, R);   // P1 판30 계약 서류 분기 점검 카드 — 관리자 읽기
     if (d && d.action === 'conchk_confirm') return await CONCHK.confirm(event, d, R);   // P1 판30 [확인] 분기 1회 — PM만 · 누른 기록 1줄
+    if (d && d.action === 'mchk_get') return await handleMchkGet(event, d, R);   // P1 판31 월 점검 열람 — 관리자
+    if (d && d.action === 'mchk_ack') return await handleMchkAck(event, d, R);   // P1 판31 월 점검 [확인] — PM만(판29 판정)
+    if (d && d.action === 'mchk_run') return await handleMchkRun(event, d, R);   // P1 판31 월 점검 다시 돌리기 — 봇 키만(시험·복구)
     if (d && d.action === 'doc_att_put') return await handleDocAttPut(event, d, R);
     if (d && d.action === 'doc_att_get') return await handleDocAttGet(event, d, R);
     if (d && d.action === 'doc_att_del') return await handleDocAttDel(event, d, R);

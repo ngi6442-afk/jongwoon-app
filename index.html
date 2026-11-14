@@ -30629,7 +30629,7 @@ function dutyStage(nx){
 
   var MOD_LABEL = {tasks:"지시", veh:"차량", hw:"화관법", rec:"기성·수금", stmt:"월말명세서", lic:"인허가", safety:"안전", site:"현장", check:"주기 체크", con:"계약", cli:"거래처", doc:"문서함", bid:"입찰", wk:"일용직", quote:"견적서", promo:"홍보"};   // check 권한은 주기 체크리스트 영역만 제어(내게 온 지시·내 할 일은 전원) — 탭 이름(내 업무)과 구분 · hw = 화관법 탭(v431 열 · v434 탭 숨김·폐기물 제출 수행 검사)
   // ---- 감사 로그 뷰어(관리자 전용, 서버 기록 열람) ----
-  var AUDIT_COL_LABEL = {tasks:"지시", vehicles:"차량", receivables:"기성", licenses:"인허가", checklist:"업무", documents:"문서함", clients:"거래처", contracts:"계약", leaves:"휴가", family:"가족친화", member:"회원", login:"로그인", progress:"진척도", pmcon:"PM 콘솔", corp_reg:"법인 등기", stmt:"월말명세서", safety:"안전 설정"};   // v436 safety = 현황 ⑤ 안전 설정(settings:safety) 고침(uismoke v436 ⑧이 safety를 끝으로 대조) · 29 판② stmt = gw-stmt 감사(거래처 목록·저장·되돌리기·차량 별칭)
+  var AUDIT_COL_LABEL = {tasks:"지시", vehicles:"차량", receivables:"기성", licenses:"인허가", checklist:"업무", documents:"문서함", clients:"거래처", contracts:"계약", leaves:"휴가", family:"가족친화", member:"회원", login:"로그인", progress:"진척도", pmcon:"PM 콘솔", mchk:"월 점검", corp_reg:"법인 등기", stmt:"월말명세서", safety:"안전 설정"};   // v436 safety = 현황 ⑤ 안전 설정(settings:safety) 고침(uismoke v436 ⑧이 safety를 끝으로 대조) · 29 판② stmt = gw-stmt 감사(거래처 목록·저장·되돌리기·차량 별칭)
   var AUDIT_FIELD_LABEL = {status:"상태", title:"제목", who:"담당", who_id:"담당", due:"기한", amount:"금액", paid:"입금", del:"삭제", scope:"공개범위", stage:"단계", cancel_req:"취소요청", name:"이름", role:"직책", rank:"직급", dept:"부서", admin:"관리자", perms:"권한", hire_date:"입사일", leave_date:"퇴사일", seq:"연번", annual_base:"잔여연차기준", annual_base_date:"기준일", annual_days:"연차수동", loa_days:"휴직누적", on_loa:"휴직중", loa_start:"휴직시작", loa_end:"휴직종료", annual_paid:"연차수당포함", emp_type:"고용형태", birth:"생년월일", annual_basis:"연차기준", reason:"사유", approver:"승인자", done_by:"완료자", detail:"상세", recur:"반복", hl:"하이라이트", mismatch:"불일치", PIN:"PIN", tier:"관리자등급", deleted_at:"삭제일", deleted_by:"삭제자", restored_at:"복구일", restored_by:"복구자",
     "kosha.stage":"KOSHA 단계", "kosha.apply_no":"접수번호", "kosha.applied_on":"접수일", "kosha.review_on":"심사일", "kosha.decided_on":"인정일(결정일)", "kosha.expires_on":"만료일", "kosha.rate_year":"요율 연도", "kosha.checks":"사후점검", "headcount.env":"상시근로자 종운환경", "headcount.con":"상시근로자 종운건설"};   // v436 검토: 안전 설정 감사 줄의 바뀐 칸(f) — 서버 gw-data SAFETY_FIELD_LABEL과 같은 글(uismoke v436 ⑧이 대조), 없으면 감사 화면에 영어 경로(kosha.stage)가 그대로 나왔다
   var auditMonthCur = "";
@@ -31199,7 +31199,7 @@ function dutyStage(nx){
   var PMCON_PLAN = { bg: { due: "2026-11-25", def: "rec", note: "11/20 카드 ①" } };
   // 점검 카드가 붙을 한 곳(판30 계약 서류 분기 점검 · 판31 월 점검) — 줄 꼴 { id: "영문", title: "제목", render: function(host){ … } }. 비어 있으면 '점검 카드' 묶음을 숨긴다.
   var PMCON_CHECKS = [];
-  var PMCON_CHOICE_TXT = { ok: "ㄱ", "default": "기본값", hold: "보류", reopen: "다시 열기" };
+  var PMCON_CHOICE_TXT = { ok: "ㄱ", "default": "기본값", hold: "보류", reopen: "다시 열기", ack: "확인" };   // ack = P1 판31 월 점검 [확인](누른 기록 같은 표)
   var pmconState = null, pmconBusy = false, pmconSeq = 0, pmconLogAll = false;
   function pmconMd(d){ var t = new Date(String(d) + "T00:00:00"); if (isNaN(t.getTime())) return String(d || ""); return (t.getMonth() + 1) + "/" + t.getDate() + "(" + "일월화수목금토".charAt(t.getDay()) + ")"; }
   function pmconPlan(kind){
@@ -31407,7 +31407,75 @@ function dutyStage(nx){
     wrap.style.display = PMCON_CHECKS.length ? "" : "none";
     host.innerHTML = PMCON_CHECKS.map(function(c){ return '<div class="card" style="margin-bottom:10px;" id="pmconChk-' + esc(c.id) + '"><div style="font-weight:600;font-size:13.5px;">' + esc(c.title) + '</div><div class="empty-line">불러오는 중…</div></div>'; }).join("");
     PMCON_CHECKS.forEach(function(c){ var el = document.getElementById("pmconChk-" + c.id); try { c.render(el); } catch(e){ if (el) el.innerHTML = '<div class="pc-none">점검 카드를 그리지 못했습니다.</div>'; } });
+    if (typeof pmconChecksSync === "function") pmconChecksSync();   // P1 판31: 그리는 사이 스스로 숨은 카드가 있으면 묶음 제목까지
   }
+  // P1 판31 — 점검 카드는 비동기로 스스로 숨을 수 있다(월 점검: 어긋남·확인 못 함 0 · PM [확인]한 달). 보이는 카드가 0이면 '점검 카드' 묶음 제목까지 숨긴다.
+  //   카드가 숨거나 다시 보일 때마다 부른다(판30 카드는 typeof pmconChecksSync === "function"으로 확인하고 부름). 카드 목록이 아니라 화면에 그려진 카드 자리를 센다.
+  function pmconChecksSync(){
+    var wrap = document.getElementById("pmconChecksWrap"), host = document.getElementById("pmconChecks"); if (!wrap || !host) return;
+    var n = 0; Array.prototype.forEach.call(host.children || [], function(el){ if (!(el.style && el.style.display === "none")) n++; });
+    wrap.style.display = n ? "" : "none";
+  }
+  // ---- P1 판31 월 점검 카드(시안 판3 ③ 806~819 · 착수설명서 판31 · 원장 T476) — 서버 mchk_get 하나를 읽어 어긋남·확인 못 함 항목만 줄로 보인다.
+  //   맞은 항목·기준 없음(숫자만 기록) 항목은 카드에 줄로 나오지 않고 서버 기록(그달 점검 문서)에만 남는다. 어긋남·확인 못 함이 0이거나 PM이 [확인]한 달이면 카드를 숨긴다(pmconChecksSync).
+  //   [확인] = PM만(서버 응답 can_ack만 믿음 · mchk_ack — 누른 기록 1줄·감사 1줄) · [처리 지시] = 지시 탭 등록 칸에 어긋난 항목 글을 채워 여는 것까지(지시 등록은 사람이 — 자동 생성 없음).
+  //   새 푸시 알림 없음(전산 운영 책임자가 PM이라 손이 늘지 않게 — 카드만).
+  var MCHK_BADGE = { bad: "background:#FDECEC;color:#B00020;", unknown: "background:#EEF0F2;color:#555;" };
+  function mchkShown(doc){
+    if (!doc || !Array.isArray(doc.items) || doc.ack) return [];
+    return doc.items.filter(function(x){ return x && (x.st === "bad" || x.st === "unknown"); });
+  }
+  function mchkTitle(doc, show){
+    var t = new Date(Number(doc.at) || 0), nb = show.filter(function(x){ return x.st === "bad"; }).length, nu = show.length - nb;
+    var when = isNaN(t.getTime()) ? "" : (t.getMonth() + 1) + "월 " + t.getDate() + "일 ";
+    return when + "월 점검 — " + (nb ? "어긋남 " + nb + "건" : "") + (nb && nu ? " · " : "") + (nu ? "확인 못 함 " + nu + "건" : "");
+  }
+  function mchkCardHtml(doc, canAck, show){
+    var nb = show.filter(function(x){ return x.st === "bad"; }).length, nu = show.length - nb;
+    var bdg = function(st, txt){ return '<span style="' + MCHK_BADGE[st] + 'font-size:11px;font-weight:700;border-radius:6px;padding:1px 6px;margin-left:6px;white-space:nowrap;">' + esc(txt) + '</span>'; };
+    var okL = doc.items.filter(function(x){ return x && x.st === "ok"; }).map(function(x){ return x.label; });
+    var noneL = doc.items.filter(function(x){ return x && x.st === "none"; }).map(function(x){ return x.label + " " + ((x.lines || [])[0] || ""); });
+    var li = show.map(function(x){
+      return '<li style="margin:3px 0;"><b>' + esc(x.label) + '</b>' + (x.st === "unknown" ? bdg("unknown", "확인 못 함") : "") + ' — ' + esc((x.lines || []).join(" · ")) + '</li>';
+    }).join("");
+    var mute = (okL.length ? '맞은 ' + okL.length + '항목(' + okL.join(" · ") + ')은 카드에 나오지 않고 기록에만 남습니다.' : '') + (noneL.length ? (okL.length ? ' ' : '') + '기준 없는 ' + noneL.length + '항목은 숫자만 기록합니다(' + noneL.join(" · ") + ').' : '');
+    var period = String(doc.period || ""), pm = Number(period.slice(5, 7));
+    return '<div style="font-weight:600;font-size:13.5px;display:flex;flex-wrap:wrap;align-items:center;gap:2px;"><span>' + esc(mchkTitle(doc, show)) + '</span>' + (nb ? bdg("bad", "어긋남 " + nb) : "") + (nu ? bdg("unknown", "확인 못 함 " + nu) : "") + '</div>'
+      + '<ul style="margin:6px 0 0;padding-left:18px;font-size:13px;line-height:1.5;">' + li + (mute ? '<li style="margin:3px 0;color:var(--sub);">' + esc(mute) + '</li>' : '') + '</ul>'
+      + '<div class="pc-none" style="padding:4px 0 0;">' + esc((pm ? pm + "월분" : period) + " · 항목별 기준과 근거는 기록에 함께 남습니다") + '</div>'
+      + '<div class="pc-btns" style="justify-content:flex-start;margin-top:8px;">' + (canAck ? '<button type="button" class="b-ok" data-mchk="ack">확인</button>' : '<span class="pc-who">확인하실 분: PM</span>')
+      + (canDo("tasks") ? '<button type="button" class="mini-btn" data-mchk="order">처리 지시</button>' : '') + '</div>';
+  }
+  function mchkRender(host){
+    if (!host) return;
+    gwCall("gw-data", { action: "mchk_get" }).then(function(res){
+      if (res.status !== 200 || !res.body){ host.style.display = ""; host.innerHTML = '<div style="font-weight:600;font-size:13.5px;">월 점검</div><div class="pc-none" style="color:#B00020;">월 점검을 불러오지 못했습니다 (' + esc((res.body && res.body.error_code) || res.status) + ')</div>'; pmconChecksSync(); return; }
+      var doc = res.body.doc, show = mchkShown(doc);
+      if (!show.length){ host.style.display = "none"; host.innerHTML = ""; pmconChecksSync(); return; }
+      host.style.display = "";
+      host.innerHTML = mchkCardHtml(doc, !!res.body.can_ack, show);
+      Array.prototype.forEach.call(host.querySelectorAll ? host.querySelectorAll("[data-mchk]") : [], function(b){
+        b.addEventListener("click", function(){ if (b.getAttribute("data-mchk") === "ack") mchkAck(doc, show); else mchkOrder(doc, show); });
+      });
+      pmconChecksSync();
+    }).catch(function(){ host.style.display = ""; host.innerHTML = '<div style="font-weight:600;font-size:13.5px;">월 점검</div><div class="pc-none" style="color:#B00020;">월 점검을 불러오지 못했습니다(네트워크)</div>'; pmconChecksSync(); });
+  }
+  function mchkAck(doc, show){
+    if (!confirm("[확인] " + mchkTitle(doc, show) + "\n확인하면 이 달 카드가 사라지고 누른 기록에 1줄 남습니다.")) return;
+    gwCall("gw-data", { action: "mchk_ack", period: doc.period, base: doc.updated_at }).then(function(res){
+      if (res.status === 200){ apprToastShow("월 점검 확인 — 누른 기록에 남겼습니다"); renderPmcon(); return; }
+      if (res.status === 409){ apprToastShow("월 점검이 방금 바뀌었습니다 — 최신으로 다시 불러왔습니다"); renderPmcon(); return; }
+      alert("월 점검 확인 실패 (" + ((res.body && res.body.error_code) || res.status) + ")"); renderPmcon();
+    }).catch(function(){ alert("월 점검 확인 실패(네트워크) — 다시 시도해주세요."); });
+  }
+  function mchkOrder(doc, show){
+    if (!canDo("tasks")) return;
+    var pm = Number(String(doc.period || "").slice(5, 7));
+    var txt = ("월 점검 " + (pm ? pm + "월분" : doc.period) + " — " + show.map(function(x){ return x.label + (x.st === "unknown" ? "(확인 못 함)" : "") + ": " + ((x.lines || [])[0] || ""); }).join(" / ")).slice(0, 200);
+    switchTab("tasks");
+    setTimeout(function(){ var t = document.getElementById("taskTitle"); if (t){ t.value = txt; try { t.focus(); } catch(e){} } }, 0);
+  }
+  PMCON_CHECKS.push({ id: "mchk", title: "월 점검", render: mchkRender });
   function pmconOpenCard(id){
     switchTab("perm");
     setTimeout(function(){ var el = document.getElementById(id); if (el && el.scrollIntoView) el.scrollIntoView({ block: "start" }); }, 400);

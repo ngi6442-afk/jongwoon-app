@@ -8477,4 +8477,261 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   } finally { reset30(); require.cache[rpC30] = keepC30; }
 }
 
+{ // ---- P1 판31 월 점검 자동 대조 + 감사 기록 월 상한 분할(착수설명서 판31 · 시안 판3 ③ 806~819 · PM 11/14 11:27 "45. 판 30,31ㄱ" · 원장 T476).
+  //   ① 항목 판정 — 맞음(good)·어긋남(bad)·확인 못 함(unknown) 표본 셋을 저장소에 깔고 _lib/mchk.js run(크론과 같은 길)을 돌림 ② 권한(mchk_get 관리자 · mchk_ack PM만 — 판29 관문)
+  //   ③ [확인] = 점검 문서 ack + 누른 기록(status:decide) 1줄 + 감사 1줄 · 낙관락·두 번·없음·기록 못 읽음·기록 못 씀(되돌림) ④ 크론 두 번 = 한 달 문서 1개 · 1~3일 밖 건너뜀 · 봇 키 다시 돌리기(force는 [확인]을 풂)
+  //   ⑤ 감사 분할(실 audit.js를 가짜 저장소 위에서): 줄 상한·크기 상한 경계에서 새 조각 · 경계에서 빠지는 줄 0 · 조각 못 읽음 = 쓰지 않음 · 조각 빠짐 = 새로 이어 감 · 조각 수 상한 = false
+  //   ⑥ 읽는 쪽이 조각을 다 읽음 — 감사 화면(audit action)·월 점검·백업 복원(머리 parts 보존) · 못 읽으면 503 ⑦ 결함 사본(mchk·audit·gw-data 소스 한 곳씩 바꿔 메모리에서 컴파일)이 위 검사에서 실제로 깨짐
+  const fs31 = require('fs'), Mod31 = require('module');
+  const LIB31 = join(FN, '_lib'), PM31 = join(LIB31, 'mchk.js'), PA31 = join(LIB31, 'audit.js'), PG31 = join(FN, 'gw-data.js');
+  const SM31 = fs31.readFileSync(PM31, 'utf8'), SA31 = fs31.readFileSync(PA31, 'utf8'), SG31 = fs31.readFileSync(PG31, 'utf8');
+  const comp31 = (file, src) => { const m = new Mod31(file, null); m.filename = file; m.paths = Mod31._nodeModulePaths(dirname(file)); m._compile(src, file); return m.exports; };
+  const mut31 = (src, pairs) => { let s = src; for (const [from, to] of pairs) { if (s.split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 60)); s = s.replace(from, () => to); } return s; };
+  const cl31 = (mod) => async (body, tok, dev) => { const r = await mod.handler({ httpMethod: 'POST', headers: Object.assign({ authorization: tok ? 'Bearer ' + tok : '' }, dev ? { 'x-device-id': dev } : {}), body: JSON.stringify(body) }); let b = {}; try { b = JSON.parse(r.isBase64Encoded ? require('zlib').gunzipSync(Buffer.from(r.body, 'base64')).toString('utf8') : (r.body || '{}')); } catch (e) {} return { code: r.statusCode, body: b }; };
+  const rpM31 = require.resolve(PM31), keepM31 = require.cache[rpM31];
+  const snap31 = JSON.stringify({ u: mem.gw_users, d: mem.gw_data });
+  const lm0 = pushMock.loadMembers, rm0 = auditMock.readMonth;
+  const reset31 = () => { const s = JSON.parse(snap31); mem.gw_users = s.u; mem.gw_data = s.d; blobsMock.hooks.failGet = null; blobsMock.hooks.failSet = null; pushMock.loadMembers = lm0; };
+  const H31 = 3600000, D31 = 24 * H31;
+  const T31 = (m, d, hU) => Date.UTC(2026, m - 1, d, hU === undefined ? 1 : hU, 0);   // UTC 시각(KST = +9)
+  const NOW31 = Date.UTC(2026, 9, 31, 22, 0);   // KST 2026-11-01 07:00 = 크론 기동 시각
+  const S31 = Date.UTC(2026, 9, 1) - 9 * H31;   // KST 10월 시작
+  const MN31 = { id: 'u31n', name: '관리부31', role: '관리자', admin: true, perms: {} };   // 명시 tier 없음 = PM 아님
+  const tN31 = issueSession(MN31).token;
+  const lg31 = (ts, bid, by, via) => ({ ts, by, bid, col: 'login', ev: [{ op: '로그인', id: bid, t: by + '(' + via + ')' }] });
+  const pc31 = (ts, bid, by, f) => ({ ts, by, bid, col: 'member', ev: [{ op: '수정', id: 'u31a', t: '직원A', f }] });
+  const good31 = () => {
+    mem.gw_users = { 'member:uadmin': JSON.parse(JSON.stringify(ADMIN)), 'member:uwork': JSON.parse(JSON.stringify(WORKER)), 'member:u31n': JSON.parse(JSON.stringify(MN31)),
+      'member:u31dev': { id: 'u31dev', name: '개발31', admin: true, dev: true, perms: {} }, 'member:u31a': { id: 'u31a', name: '직원A', admin: false, perms: {} },
+      'member:u31r': { id: 'u31r', name: '퇴사1', admin: false, perms: {}, leave_date: '2026-10-10' }, 'member:u31r2': { id: 'u31r2', name: '퇴사2', admin: false, perms: {}, leave_date: '2026-10-20' },
+      'device:dev1': { status: 'approved' }, 'device:d31a': { id: 'd31a', status: 'approved', member_id: 'u31a', created: NOW31 - 30 * D31 }, 'device:d31p': { id: 'd31p', status: 'pending', member_id: 'u31a', created: NOW31 - 2 * D31 },
+      'lock:x31': { fails: 2 }, 'lock:y31': { fails: 0, until: T31(10, 15) } };
+    mem.gw_data = {
+      'audit:2026-10': { schema: 1, parts: 2, items: [lg31(T31(10, 3), 'u31a', '직원A', '아이디'), lg31(T31(10, 20, 10), 'u31r2', '퇴사2', '아이디'), pc31(T31(10, 6), 'uadmin', '관리자', { tier: ['', 'admin'] })] },
+      'audit:2026-10:2': { schema: 1, part: 2, items: [pc31(T31(10, 25), 'u31dev', '개발31', { perms: ['a', 'b'] }), { ts: T31(10, 26), by: '관리부31', bid: 'u31n', col: 'member', ev: [{ op: '수정', id: 'u31a', t: '직원A', f: { dept: ['a', 'b'] } }] }] },
+      'push:subs': { schema: 1, members: { u31a: [{ sub: {} }, { sub: {} }], uadmin: [{ sub: {} }] } },
+      'ask:usage': { month: { '2026-10': 1000 } }, 'promoai:usage': { months: { '2026-10': { calls: 499 } } }, 'promomask:usage': { months: { '2026-10': { calls: 10 } } },
+      'brief:usage:2026-10': { azure_chars: 100, claude_tokens: 100 }, 'usage:learn:contract:2026-10': { calls: 199 }, 'usage:box:2026-10': { calls: 42 },
+      'it:cron:files_backup:last': { ts: NOW31 - 10 * H31, ok: true }, 'mchk:alerts:2026-10': { schema: 1, n: 3, since: S31 + 60000, by: {} }, 'push:log': { schema: 1, items: [] } };
+  };
+  const bad31 = () => {
+    good31();
+    const a = mem.gw_data['audit:2026-10'].items, b = mem.gw_data['audit:2026-10:2'].items;
+    a.push(lg31(T31(10, 8), 'u31a', '직원A', '이름')); a.push(lg31(T31(10, 12), 'u31r', '퇴사1', '아이디'));
+    b.push(pc31(T31(10, 27), 'u31n', '관리부31', { perms: ['x', 'y'] }));
+    mem.gw_users['device:d31o'] = { id: 'd31o', status: 'pending', member_id: 'u31a', created: NOW31 - 8 * D31 };
+    mem.gw_users['device:d31r'] = { id: 'd31r', status: 'approved', member_id: 'u31r', created: NOW31 - 90 * D31 };
+    mem.gw_data['push:subs'].members.u31a = Array.from({ length: 6 }, () => ({ sub: {} })); mem.gw_data['push:subs'].members.u31r = [{ sub: {} }];
+    mem.gw_data['promoai:usage'].months['2026-10'].calls = 500;
+    mem.gw_data['it:cron:files_backup:last'] = { ts: NOW31 - 100 * H31, ok: true };
+  };
+  const st31 = (doc) => { const o = {}; (doc && doc.items || []).forEach((x) => { o[x.id] = x.st; }); return o; };
+  const mDocs31 = () => Object.keys(mem.gw_data).filter((k) => /^mchk:\d{4}-\d{2}$/.test(k));
+  // A = audit.js 모듈(실 또는 결함) · M = mchk.js 모듈 · cl = gw-data 호출기(그 사본이 쥔 mchk)
+  const chk31 = async (G) => {
+    const P = {}, I = {};
+    auditMock.readMonth = G.A.readMonth;   // gw-data 감사 화면·월 점검이 부르는 조각 합쳐 읽기 = 이 검사의 audit.js
+    try {
+      // ① 항목 판정 — good / bad / unknown
+      reset31(); good31();
+      const rg = await G.M.run(NOW31, { by: 'cron' }); const dg = mem.gw_data['mchk:2026-10'] || {}; const sg = st31(dg);
+      reset31(); bad31();
+      const rb = await G.M.run(NOW31, { by: 'cron' }); const db = mem.gw_data['mchk:2026-10'] || {}; const sb = st31(db);
+      reset31(); good31();
+      delete mem.gw_data['mchk:alerts:2026-10']; mem.gw_data['push:log'] = { schema: 1, items: [{ ts: S31 + 5 * D31, title: '⚠ 입찰 감시 경보' }] };
+      blobsMock.hooks.failGet = (k) => k === 'audit:2026-10:2' || k === 'push:subs' || k === 'usage:learn:contract:2026-10';
+      pushMock.loadMembers = async () => { const a = membersOf(); a.unavailable = true; return a; };
+      const ru = await G.M.run(NOW31, { by: 'cron' }); blobsMock.hooks.failGet = null; pushMock.loadMembers = lm0;
+      const du = mem.gw_data['mchk:2026-10'] || {}; const su = st31(du);
+      reset31(); good31(); delete mem.gw_data['mchk:alerts:2026-10'];
+      mem.gw_data['push:log'] = { schema: 1, items: [{ ts: S31 - D31, title: '⚠ 크론 백업 발사' }, { ts: S31 + D31, title: '⚠ 입찰 감시 경보' }, { ts: S31 + 2 * D31, title: '결재 요청' }, { ts: S31 + 3 * D31, title: '⚠ 조달청 개찰 API 이상' }] };
+      await G.M.run(NOW31, { by: 'cron' }); const dp = mem.gw_data['mchk:2026-10'] || {}; const ap = (dp.items || []).find((x) => x.id === 'alerts') || {};
+      const ORDER = 'login,lock,retired,perm,device,subs,usage,backup,alerts';
+      P.A = rg.ok && (dg.items || []).map((x) => x.id).join(',') === ORDER && JSON.stringify(sg) === JSON.stringify({ login: 'ok', lock: 'none', retired: 'ok', perm: 'ok', device: 'ok', subs: 'ok', usage: 'ok', backup: 'unknown', alerts: 'none' })
+        && JSON.stringify(dg.counts) === '{"ok":6,"bad":0,"unknown":1,"none":2}' && dg.period === '2026-10' && dg.ack === null && (dg.items || []).every((x) => x.rule && x.basis && Array.isArray(x.lines))
+        && ((dg.items || []).find((x) => x.id === 'perm') || {}).n.changes === 2 && ((dg.items || []).find((x) => x.id === 'lock') || {}).n.locked === 1 && ((dg.items || []).find((x) => x.id === 'alerts') || {}).n.alerts === 3
+        && rb.ok && JSON.stringify(sb) === JSON.stringify({ login: 'bad', lock: 'none', retired: 'bad', perm: 'bad', device: 'bad', subs: 'bad', usage: 'bad', backup: 'bad', alerts: 'none' }) && db.counts.bad === 7
+        && ((db.items || []).find((x) => x.id === 'device') || {}).n.pending_old === 1 && ((db.items || []).find((x) => x.id === 'device') || {}).n.gone_approved === 1 && ((db.items || []).find((x) => x.id === 'subs') || {}).n.over === 1
+        && ru.ok && JSON.stringify(su) === JSON.stringify({ login: 'unknown', lock: 'none', retired: 'unknown', perm: 'unknown', device: 'unknown', subs: 'unknown', usage: 'unknown', backup: 'unknown', alerts: 'unknown' })
+        && ap.st === 'none' && ap.n.alerts === 2 && ap.n.src === 'push_log';
+      I.A = { sg, sb, su, ap: [ap.st, ap.n && ap.n.alerts], rg: rg.code || rg.skipped || 'ok', c: dg.counts };
+      // ② 권한 — 비로그인 401 · 직원 403 ADMIN_ONLY · PM 아닌 관리자 열람 200 can_ack false · [확인] 403 PM_ONLY · PM 열람 can_ack true · 명부 못 읽음 [확인] 503
+      reset31(); good31(); await G.M.run(NOW31, { by: 'cron' });
+      const doc0 = JSON.stringify(mem.gw_data['mchk:2026-10']), dec0 = 'status:decide' in mem.gw_data;
+      const b1 = await G.cl({ action: 'mchk_get', period: '2026-10' }, null), b2 = await G.cl({ action: 'mchk_get', period: '2026-10' }, tokW, 'dev1'), b3 = await G.cl({ action: 'mchk_get', period: '2026-10' }, tN31);
+      const b4 = await G.cl({ action: 'mchk_ack', period: '2026-10', base: mem.gw_data['mchk:2026-10'].updated_at }, tN31), b5 = await G.cl({ action: 'mchk_get', period: '2026-10' }, tokA);
+      const b6 = await G.cl({ action: 'mchk_ack', period: '2026-10', base: mem.gw_data['mchk:2026-10'].updated_at }, tokW, 'dev1'), b7 = await G.cl({ action: 'mchk_get', period: '2026-13' }, tokA), b8 = await G.cl({ action: 'mchk_get', period: '2026-08' }, tokA);
+      P.B = b1.code === 401 && b2.code === 403 && b2.body.error_code === 'ADMIN_ONLY' && b3.code === 200 && b3.body.can_ack === false && b3.body.doc && b3.body.doc.period === '2026-10'
+        && b4.code === 403 && b4.body.error_code === 'PM_ONLY' && b5.code === 200 && b5.body.can_ack === true && b6.code === 403 && b7.code === 400 && b7.body.error_code === 'BAD_PERIOD' && b8.code === 200 && b8.body.doc === null
+        && JSON.stringify(mem.gw_data['mchk:2026-10']) === doc0 && ('status:decide' in mem.gw_data) === dec0;
+      I.B = [b1.code, b2.body.error_code, b3.code, b3.body.can_ack, b4.body.error_code, b5.body.can_ack, b6.body.error_code, b7.body.error_code, b8.body.doc];
+      // ③ [확인] — 낡은 base 409 · 맞는 base 200(ack·누른 기록 1줄·감사 1줄) · 두 번 400 MCHK_ACKED · 없는 달 404 · 기록 못 읽음 503(아무것도 안 씀) · 기록 못 씀 500(ack 되돌림)
+      const up0 = mem.gw_data['mchk:2026-10'].updated_at, au0 = auditMock.logs.length;
+      const c1 = await G.cl({ action: 'mchk_ack', period: '2026-10', base: up0 - 1 }, tokA);
+      const c1b = await G.cl({ action: 'mchk_ack', period: '2026-10' }, tokA);
+      blobsMock.hooks.failGet = (k) => k === 'status:decide';
+      const c2 = await G.cl({ action: 'mchk_ack', period: '2026-10', base: up0 }, tokA); blobsMock.hooks.failGet = null;
+      const ackAfterFail = mem.gw_data['mchk:2026-10'].ack;
+      blobsMock.hooks.failSet = (k) => k === 'status:decide';
+      const c3 = await G.cl({ action: 'mchk_ack', period: '2026-10', base: up0 }, tokA); blobsMock.hooks.failSet = null;
+      const ackAfterW = mem.gw_data['mchk:2026-10'].ack, upAfterW = mem.gw_data['mchk:2026-10'].updated_at;
+      const c4 = await G.cl({ action: 'mchk_ack', period: '2026-10', base: up0 }, tokA);
+      const dd = mem.gw_data['status:decide'] || {}, last = (dd.log || [])[(dd.log || []).length - 1] || {}, aNew = auditMock.logs.slice(au0).filter((l) => l.col === 'mchk');
+      const c5 = await G.cl({ action: 'mchk_ack', period: '2026-10', base: mem.gw_data['mchk:2026-10'].updated_at }, tokA), c6 = await G.cl({ action: 'mchk_ack', period: '2026-09', base: 0 }, tokA);
+      const c7 = await G.cl({ action: 'pmcon_get' }, tokA), c8 = await G.cl({ action: 'mchk_get', period: '2026-10' }, tokA);
+      P.C = c1.code === 409 && c1.body.error_code === 'MCHK_STALE' && c1b.code === 409 && c2.code === 503 && c2.body.error_code === 'PMCON_READ_FAILED' && ackAfterFail === null
+        && c3.code === 500 && c3.body.error_code === 'PMCON_WRITE_FAILED' && ackAfterW === null && upAfterW === up0
+        && c4.code === 200 && c4.body.ack && c4.body.ack.by === 'uadmin' && mem.gw_data['mchk:2026-10'].ack.by === 'uadmin' && (dd.log || []).length === 1 && last.kind === 'mchk' && last.choice === 'ack' && last.row === 'mchk:2026-10' && last.by === 'uadmin'
+        && /^10월 월 점검 확인 — 어긋남 0 · 확인 못 함 1$/.test(last.q) && dd.updated_at > 0 && aNew.length === 1 && aNew[0].ev[0].op === '월점검확인' && aNew[0].bid === 'uadmin'
+        && c5.code === 400 && c5.body.error_code === 'MCHK_ACKED' && c6.code === 404 && c6.body.error_code === 'MCHK_NONE' && c7.code === 200 && c7.body.log[0].kind === 'mchk' && c8.body.doc.ack && (mem.gw_data['status:decide'].log || []).length === 1;
+      I.C = [c1.body.error_code, c2.body.error_code, ackAfterFail, c3.body.error_code, ackAfterW, c4.code, c4.body.error_code, (dd.log || []).length, last.q, aNew.length, c5.body.error_code, c6.body.error_code];
+      // ④ 크론 두 번 = 문서 1개 · 1~3일 밖 = 건너뜀 · 봇 키 다시 돌리기
+      reset31(); good31(); const auD = auditMock.logs.length;
+      const d0 = await G.M.run(Date.UTC(2026, 10, 3, 22, 0), { by: 'cron' });   // KST 11-04 = 창 밖
+      const d1 = await G.M.runMonthly(NOW31), at1 = (mem.gw_data['mchk:2026-10'] || {}).at;
+      const d2 = await G.M.runMonthly(NOW31 + H31), d3 = await G.M.runMonthly(Date.UTC(2026, 10, 2, 22, 0));
+      const nDocs = mDocs31(), audD = auditMock.logs.slice(auD).filter((l) => l.col === 'mchk' && l.ev[0].op === '월점검');
+      const e1 = await G.cl({ action: 'mchk_run', key: 'nope', period: '2026-10' }, null), e2 = await G.cl({ action: 'mchk_run', key: 'test-ingest-key', period: '2026-10' }, null);
+      mem.gw_data['mchk:2026-10'].ack = { ts: 1, by: 'uadmin', name: '관리자' };
+      const e3 = await G.cl({ action: 'mchk_run', key: 'test-ingest-key', period: '2026-10', force: true }, null), e4 = await G.cl({ action: 'mchk_run', key: 'test-ingest-key', period: '2026-13' }, null);
+      const e5 = await G.cl({ action: 'mchk_run', key: 'test-ingest-key', period: kstYm31(Date.now()) }, null);
+      const dR = mem.gw_data['mchk:2026-10'] || {};
+      P.D = d0.ok && d0.skipped === 'not-first-days' && d1.ok && d1.period === '2026-10' && d2.skipped === 'exists' && d3.skipped === 'exists' && nDocs.length === 1 && nDocs[0] === 'mchk:2026-10' && audD.length === 1
+        && e1.code === 403 && e2.code === 200 && e2.body.skipped === 'exists' && e3.code === 200 && e3.body.rerun === 1 && dR.ack === null && dR.prev_ack && dR.prev_ack.by === 'uadmin' && dR.rerun === 1 && dR.at !== at1
+        && e4.code === 400 && e4.body.code === 'BAD_PERIOD' && e5.code === 400 && mDocs31().length === 1;
+      I.D = [d0.skipped, d1.period, d2.skipped, d3.skipped, nDocs, audD.length, e1.code, e2.body.skipped, e3.body.rerun, dR.ack, e4.body.code, e5.code];
+      // ⑤ 감사 분할 — 실 audit.js(이 검사의 A): 줄 상한 경계 · 크기 상한 경계 · 경계에서 빠지는 줄 0 · 조각 못 읽음 · 조각 빠짐 · 조각 수 상한
+      reset31(); mem.gw_data = {};
+      const K = G.A.auditKey(), cap = G.A.PART_MAX_ITEMS;
+      mem.gw_data[K] = { schema: 1, items: Array.from({ length: cap - 2 }, (_, i) => ({ ts: i + 1, by: 'a' })) };
+      const okSeq = []; for (let i = cap - 1; i <= cap + 2; i++) okSeq.push(await G.A.appendAudit({ ts: i, by: 'a' }));
+      const cp31 = (k) => JSON.parse(JSON.stringify(mem.gw_data[k] || {}));   // 그 순간 값(뒤에서 같은 문서를 또 고치므로)
+      const h1 = cp31(K), p2 = cp31(K + ':2');
+      const rm1 = await G.A.readMonth(K.slice(6));
+      const seqOk = rm1.ok && rm1.items.length === cap + 2 && rm1.items.every((x, i) => x.ts === i + 1);
+      const big = 'x'.repeat(300000);
+      const Kb = K + ':3'; mem.gw_data[K] = Object.assign(mem.gw_data[K], { parts: 3 }); mem.gw_data[Kb] = { schema: 1, part: 3, items: [{ ts: 1, t: big }, { ts: 2, t: big }, { ts: 3, t: big }] };
+      const bOk = await G.A.appendAudit({ ts: 4, t: 'x'.repeat(150000) });
+      const h2 = cp31(K), p4 = cp31(K + ':4');
+      const before5 = JSON.stringify(mem.gw_data);
+      blobsMock.hooks.failGet = (k) => k === K + ':4';
+      const fOk = await G.A.appendAudit({ ts: 5, by: 'z' }); const rmF = await G.A.readMonth(K.slice(6)); blobsMock.hooks.failGet = null;
+      const keptF = JSON.stringify(mem.gw_data) === before5;
+      mem.gw_data[K].parts = 5;   // 머리는 5라는데 조각 5가 아직 없음(머리를 올린 뒤 멈춘 자리)
+      const gOk = await G.A.appendAudit({ ts: 6, by: 'g' }); const p5 = cp31(K + ':5'); const p4b = cp31(K + ':4');
+      mem.gw_data[K].parts = G.A.PART_MAX; mem.gw_data[K + ':' + G.A.PART_MAX] = { schema: 1, items: Array.from({ length: cap }, (_, i) => ({ ts: i })) };
+      const before6 = JSON.stringify(mem.gw_data); const xOk = await G.A.appendAudit({ ts: 7, by: 'x' }); const keptX = JSON.stringify(mem.gw_data) === before6;
+      P.E = okSeq.every((x) => x === true) && (h1.items || []).length === cap && h1.parts === 2 && (p2.items || []).length === 2 && p2.items[0].ts === cap + 1 && seqOk
+        && bOk === true && h2.parts === 4 && (mem.gw_data[Kb].items || []).length === 3 && (p4.items || []).length === 1 && p4.items[0].ts === 4
+        && fOk === false && keptF && rmF.ok === false && gOk === true && (p5.items || []).length === 1 && p5.items[0].by === 'g' && (p4b.items || []).length === 1
+        && xOk === false && keptX && G.A.PART_MAX_BYTES === 1000000 && cap === 4000 && G.A.MAX_PER_MONTH === 8000;
+      I.E = { okSeq, head: (h1.items || []).length, parts: h1.parts, p2: (p2.items || []).length, seqOk, bOk, parts2: h2.parts, p4: (p4.items || []).length, fOk, keptF, rmF: rmF.ok, gOk, p5: (p5.items || []).length, xOk, keptX };
+      // ⑥ 읽는 쪽 — 감사 화면(audit action)이 조각을 이어 붙임 · 조각 못 읽음 = 503 · 없는 달 = 빈 목록 · 월 점검이 뒤 조각의 줄을 셈(① perm changes 2 — 하나는 조각 2) · 백업 복원 머리 parts 보존
+      reset31(); mem.gw_data = { 'audit:2026-08': { schema: 1, parts: 3, items: [{ ts: 1, by: 'a', col: 'x', ev: [] }] }, 'audit:2026-08:2': { schema: 1, items: [{ ts: 2, by: 'b', col: 'x', ev: [] }] }, 'audit:2026-08:3': { schema: 1, items: [{ ts: 3, by: 'c', col: 'x', ev: [] }] } };
+      const f1 = await G.cl({ action: 'audit', month: '2026-08' }, tokA);
+      blobsMock.hooks.failGet = (k) => k === 'audit:2026-08:3'; const f2 = await G.cl({ action: 'audit', month: '2026-08' }, tokA); blobsMock.hooks.failGet = null;
+      const f3 = await G.cl({ action: 'audit', month: '2026-03' }, tokA), f4 = await G.cl({ action: 'audit', month: '2026-08' }, tokW);
+      delete mem.gw_data['audit:2026-08'];
+      const f5 = await G.cl({ action: 'backup_put', secret: 'test-ingest-key', restore: true, store: 'gw_data', key: 'audit:2026-08', data: { schema: 1, parts: 3, items: [{ ts: 1, by: 'a', col: 'x', ev: [] }] }, confirm: true });
+      const hd5 = mem.gw_data['audit:2026-08'] || {};
+      const f6 = await G.cl({ action: 'audit', month: '2026-08' }, tokA);
+      const f7 = await G.cl({ action: 'backup_put', secret: 'test-ingest-key', restore: true, store: 'gw_data', key: 'audit:2026-08', data: { schema: 1, items: [{ ts: 9, by: 'z', col: 'x', ev: [] }] }, confirm: true });
+      const hd7 = mem.gw_data['audit:2026-08'] || {};
+      P.F = f1.code === 200 && f1.body.doc.items.map((x) => x.by).join('') === 'abc' && f1.body.doc.parts === 3 && f2.code === 503 && f2.body.error_code === 'AUDIT_READ_FAILED'
+        && f3.code === 200 && f3.body.doc.items.length === 0 && f4.code === 403 && f5.code === 200 && hd5.parts === 3 && f6.body.doc.items.map((x) => x.by).join('') === 'abc'
+        && f7.code === 200 && hd7.parts === 3 && hd7.items.length === 2;
+      I.F = [f1.code, f1.body.doc && f1.body.doc.items.length, f2.code, f2.body.error_code, f3.code, f4.code, f5.code, f5.body.error_code, hd5.parts, f6.body.doc && f6.body.doc.items.length, f7.code, hd7.parts];
+      // ⑦ 경보 수 재료 — bot_notify가 ⚠ 제목만 그달 수에 1(실패해도 발송 그대로)
+      reset31(); mem.gw_data = {};
+      const g1 = await G.cl({ action: 'bot_notify', key: 'test-ingest-key', title: '⚠ 입찰 감시 경보', body: 'x', tag: 'watch-입찰-2026-11-01' }, null);
+      await G.cl({ action: 'bot_notify', key: 'test-ingest-key', title: '감시 정상 (주간 생존 신호)', body: 'x', tag: 'watch-weekly' }, null);
+      await G.cl({ action: 'bot_notify', key: 'test-ingest-key', title: '⚠ 입찰 감시 경보', body: 'x', tag: 'watch-입찰-2026-11-02' }, null);
+      const ak = Object.keys(mem.gw_data).filter((k) => k.indexOf('mchk:alerts:') === 0), adoc = ak.length ? mem.gw_data[ak[0]] : {};
+      blobsMock.hooks.failGet = (k) => k.indexOf('mchk:alerts:') === 0;
+      const g2 = await G.cl({ action: 'bot_notify', key: 'test-ingest-key', title: '⚠ 크론 백업 발사', body: 'x', tag: 'cron' }, null); blobsMock.hooks.failGet = null;
+      P.G = g1.code === 200 && ak.length === 1 && ak[0] === 'mchk:alerts:' + kstYm31(Date.now()) && adoc.n === 2 && adoc.by['⚠ 입찰 감시 경보'] === 2 && g2.code === 200 && mem.gw_data[ak[0]].n === 2;
+      I.G = [g1.code, ak, adoc.n, g2.code];
+    } finally { reset31(); auditMock.readMonth = rm0; }
+    return { ok: Object.keys(P).every((k) => P[k]), P, I };
+  };
+  function kstYm31(ms) { return new Date(ms + 9 * 3600000).toISOString().slice(0, 7); }
+  try {
+    const realA = comp31(PA31, SA31), realM = require(PM31);
+    const R31 = await chk31({ A: realA, M: realM, cl: cl31(gwd) });
+    T('P1 판31 ① 항목 9개 판정(순서 로그인·잠금·퇴사자 접속·권한 변경·대기 기기·구독·사용량·백업 연속일·경보 수): 맞음 표본 = 맞음 6·확인 못 함 1(매일 백업 — 앱 저장소 밖)·기준 없음 2(잠금·경보 수 — 숫자만) · 항목마다 기준·근거·줄 · 권한 변경 2건(하나는 감사 조각 2) · 어긋남 표본 = 7(이름 로그인·퇴사일 뒤 로그인·개발자 아닌 권한 변경·대기 8일·퇴사자 승인 기기·기기 6대·퇴사자 구독·상한 500/500·첨부 백업 100시간) · 확인 못 함 표본(감사 조각·구독·사용량 못 읽음·명부 못 읽음·경보 기록 부족) = 8 · 알림함이 그달을 덮으면 ⚠ 제목 수(2)',
+      R31.P.A, JSON.stringify(R31.I.A));
+    T('P1 판31 ② 권한: 열람 mchk_get 비로그인 401 · 직원 403 ADMIN_ONLY · PM 아닌 관리자 200(can_ack false) · PM 200(can_ack true) · [확인] PM 아닌 관리자 403 PM_ONLY · 직원 403 · 달 꼴 400 BAD_PERIOD · 없는 달 doc null · 점검 문서·누른 기록 그대로',
+      R31.P.B, JSON.stringify(R31.I.B));
+    T('P1 판31 ③ [확인]: 낡은·빠진 base 409 MCHK_STALE · 누른 기록 못 읽음 503(ack 안 씀) · 누른 기록 못 씀 500 PMCON_WRITE_FAILED(ack 되돌림·updated_at 그대로) · 정상 200 = 점검 문서 ack(누른 사람) + status:decide 1줄(kind mchk·choice ack·줄 mchk:2026-10·"10월 월 점검 확인 — 어긋남 0 · 확인 못 함 1") + 감사 1줄(월점검확인) · 두 번 400 MCHK_ACKED · 없는 달 404 · pmcon_get에 그 줄',
+      R31.P.C, JSON.stringify(R31.I.C));
+    T('P1 판31 ④ 크론: KST 4일 = 건너뜀(문서 0) · 1일 기동 = 10월 문서 · 같은 날·이튿날 다시 = 건너뜀(exists) → 한 달 문서 1개·감사 월점검 1줄 · 봇 키 mchk_run: 틀린 키 403 · 있으면 건너뜀 · force = 다시 계산(rerun 1·[확인] 풂·prev_ack) · 달 꼴·이번 달 400',
+      R31.P.D, JSON.stringify(R31.I.D));
+    T('P1 판31 ⑤ 감사 분할(실 audit.js): 줄 상한 4000 경계 — 3998 + 4줄 = 머리 4000·parts 2·조각 2에 2줄 · 이어 읽으면 4002줄 ts 1..4002 차례(빠짐 0) · 크기 상한 1,000,000바이트 경계 — 30만×3 + 15만 = 조각 4로 · 조각 못 읽음 = false·저장소 그대로·readMonth ok false · 머리만 올라간 빈 자리 = 조각 5 새로(조각 4 그대로) · 조각 60개 가득 = false·그대로 · 백업 병합 상한 8000 그대로',
+      R31.P.E, JSON.stringify(R31.I.E));
+    T('P1 판31 ⑥ 읽는 쪽: 감사 화면(audit action) = 조각 1·2·3을 차례로(abc·parts 3) · 조각 하나 못 읽음 = 503 AUDIT_READ_FAILED(일부만 보이지 않음) · 없는 달 = 빈 목록 · 직원 403 · 재해 복원으로 머리를 되살려도 parts 3(뒤 조각까지 다시 읽힘) · 지금 머리 parts가 있으면 백업에 없어도 그대로',
+      R31.P.F, JSON.stringify(R31.I.F));
+    T('P1 판31 ⑦ 경보 수 재료: bot_notify가 ⚠ 제목만 그달 수에 1(주간 생존 신호 안 셈 · 제목별 수) · 그달 수를 못 읽으면 더하지 않고 발송은 200 그대로',
+      R31.P.G, JSON.stringify(R31.I.G));
+    // ⑧ 결함 사본 — 한 곳씩 바꾼 사본에서 위 검사가 실제로 깨지는지
+    const runMut = async (kind, pairs) => {
+      if (kind === 'M') {
+        const Mx = comp31(PM31, mut31(SM31, pairs));
+        require.cache[rpM31] = { id: rpM31, filename: rpM31, loaded: true, exports: Mx };
+        try { const gx = comp31(PG31, SG31); return await chk31({ A: realA, M: Mx, cl: cl31(gx) }); } finally { require.cache[rpM31] = keepM31; }
+      }
+      if (kind === 'A') return await chk31({ A: comp31(PA31, mut31(SA31, pairs)), M: realM, cl: cl31(gwd) });
+      return await chk31({ A: realA, M: realM, cl: cl31(comp31(PG31, mut31(SG31, pairs))) });
+    };
+    const MUT31 = [
+      ['M', [["return e && e.op === '로그인' && /\\(이름\\)$/.test(String(e.t || ''));", "return false;"]]],
+      ['M', [["kstDay(num(x.ts)) > String(mb.leave_date)", "kstDay(num(x.ts)) >= String(mb.leave_date)"]]],
+      ['M', [["const okSys = !sys.length || !!(actor && actor.dev);", "const okSys = true;"]]],
+      ['M', [["nowMs - num(v.created) > DEVICE_PENDING_DAYS * D", "nowMs - num(v.created) > 0"]]],
+      ['M', [["v.status === 'approved' && v.member_id && gone(v.member_id)", "false"]]],
+      ['M', [["return cnt(id) > SUBS_PER_MEMBER;", "return cnt(id) > 99;"]]],
+      ['M', [["return r.cap > 0 && r.used >= r.cap;", "return r.cap > 0 && r.used > r.cap;"]]],
+      ['M', [["else if (ageH > FILES_BACKUP_H) {", "else if (ageH > 9999) {"]]],
+      ['M', [["const logs = m.audit && m.audit.ok ? m.audit.items.filter(isObj) : null;", "const logs = m.audit && m.audit.ok ? m.audit.items.filter(isObj) : [];"]]],
+      ['M', [["m.members = (ms && !ms.unavailable) ? ms.filter(isObj) : null;", "m.members = (ms || []).filter(isObj);"]]],
+      ['M', [["if (isObj(cur.data) && opts.force !== true) return { ok: true, skipped: 'exists', period: period };", ""], ["if (isObj(again.data) && opts.force !== true) return { ok: true, skipped: 'exists', period: period };", ""]]],
+      ['M', [["if (day < 1 || day > 3) return { ok: true, skipped: 'not-first-days' };", ""]]],
+      ['M', [["if (d.base === undefined || num(d.base) !== num(doc.updated_at)) return", "if (false) return"]]],
+      ['M', [["if (isObj(doc.ack)) return { code: 400,", "if (false) return { code: 400,"]]],
+      ['M', [["  if (!lr.ok) return { code: 503,", "  if (false) return { code: 503,"]]],
+      ['M', [["{ try { await blobSet(st, key, before); } catch (e) {} return", "{ return"]]],
+      ['M', [["  ldoc.log.push({ ts: now,", "  [].push({ ts: now,"]]],
+      ['M', [["doc.prev_ack = again.data.ack || null;", "doc.prev_ack = again.data.ack || null; doc.ack = again.data.ack || null;"]]],
+      ['M', [["if (t.charAt(0) !== '⚠') return false;", ""]]],
+      ['M', [["const plCovers = !!(pl && pl.length && num(pl[0].ts) <= b.s);", "const plCovers = !!(pl && pl.length);"]]],
+      ['A', [["function auditFull(doc, entry) { return doc.items.length > 0 &&", "function auditFull(doc, entry) { return false &&"]]],
+      ['A', [["(doc.items.length >= PART_MAX_ITEMS ||", "(doc.items.length > PART_MAX_ITEMS ||"]]],
+      ['A', [["      if (!pr.ok && pr.code !== 'NOT_FOUND') return false;\n", ""]]],
+      ['A', [["      if (n >= PART_MAX) return false;\n", ""]]],
+      ['A', [["      const hw = await blobSet(st, key, doc);\n      if (!(hw && hw.ok)) return false;\n", ""]]],
+      ['A', [["  for (let i = 2; i <= n; i++) {", "  for (let i = 2; i < n; i++) {"]]],
+      ['A', [["    if (!pr.ok && pr.code !== 'NOT_FOUND') return { ok: false, code: pr.code || 'STORAGE_READ_FAILED' };", "    if (!pr.ok && pr.code !== 'NOT_FOUND') continue;"]]],
+      ['G', [["  if (!rm.ok) return jr(503, { status: 'ERROR', error_code: 'AUDIT_READ_FAILED', request_id: R });", ""]]],
+      ['G', [["  if (pN >= 2) out.parts = Math.min(pN, 60);", ""]]],
+      ['G', [["async function handleMchkGet(event, d, R) { const g = await pmconGate(event, R, false);", "async function handleMchkGet(event, d, R) { const g = await pmconGate(event, R, false); g.res = null;"]]],
+      ['G', [["async function handleMchkAck(event, d, R) { const g = await pmconGate(event, R, true);", "async function handleMchkAck(event, d, R) { const g = await pmconGate(event, R, false);"]]],
+      ['G', [["  if (!botKeyOk(d.key)) return jr(403, { status: 'FORBIDDEN', error_code: 'BAD_INGEST_KEY', request_id: R });\n  const o = await MCHK.run(", "  const o = await MCHK.run("]]],
+      ['G', [["  await MCHK.noteAlert(title);", ""]]],
+    ];
+    const kill31 = [];
+    for (const [kind, pairs] of MUT31) {
+      let k; try { k = !(await runMut(kind, pairs)).ok; } catch (e) { k = 'err ' + e.message; }
+      if (k !== true) kill31.push(kind + ':' + pairs[0][0].trim().slice(0, 60) + (k === false ? ' 안 깨짐' : ' ' + k));
+    }
+    // 사용량 상한 표 = 원본 상수(한쪽만 고치면 여기서 걸림)
+    const rd31 = (p) => fs31.readFileSync(join(FN, p), 'utf8');
+    const capOk = /const MONTH_TOKENS = Number\(process\.env\.GW_ASK_MONTH_TOKENS \|\| 12000000\);/.test(rd31('gw-ask.js')) && /const MONTH_CALL_CAP = 500;/.test(rd31('_lib/promoai_job.js')) && /const MONTH_CALL_CAP = 1000;/.test(rd31('gw-promo-mask.js'))
+      && /const CAP_AZURE_CHARS = 400000;/.test(rd31('_lib/brief.js')) && /const CAP_CLAUDE_TOKENS = 1000000;/.test(rd31('_lib/brief.js')) && require(join(LIB31, 'learn.js')).TYPES.contract.monthly_cap === 200
+      && JSON.stringify(realM.USAGE_CAPS.map((c) => c.cap)) === '[12000000,500,1000,400000,1000000,200]' && /\.slice\(-5\);   \/\/ 기기 5개까지/.test(SG31) && realM.SUBS_PER_MEMBER === 5 && realM.DEVICE_PENDING_DAYS === 7 && realM.FILES_BACKUP_H === 96;
+    T('P1 판31 ⑧ 상한·기준 = 원본 값(물어보기 1,200만 토큰·블로그 AI 500·사진 가리기 1000·브리핑 40만 자·100만 토큰·계약 학습 200 · 구독 5대(push_sub) · 대기 7일 · 첨부 백업 96시간)', capOk, '');
+    T('P1 판31 ⑨ 결함 사본 ' + MUT31.length + '개(mchk 20 — 이름 로그인·퇴사일 경계·개발자 검사·대기 7일·퇴사자 기기·5대·상한 경계·96시간·감사 못 읽음을 빈 목록으로·명부 못 읽음 무시·두 번 쓰기·1~3일 창·낙관락·두 번 확인·기록 못 읽음·ack 되돌림·누른 기록 줄·force가 확인 남김·⚠만 셈·알림함 덮음 · audit 7 — 줄 상한·경계 하나 어긋남·조각 못 읽음·조각 수 상한·머리 먼저·조각 덜 읽음·못 읽은 조각 건너뜀 · gw-data 6 — 503·parts 보존·열람 관문·확인 PM 관문·봇 키·경보 연결) 전부 위 검사에서 걸림',
+      kill31.length === 0, kill31.join(' | '));
+  } catch (e) { T('P1 판31 검사 실행', false, String(e && e.stack || e).slice(0, 400)); }
+  finally { reset31(); auditMock.readMonth = rm0; require.cache[rpM31] = keepM31; }
+}
+
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

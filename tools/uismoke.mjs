@@ -13072,8 +13072,8 @@ try {
     '바뀐 함수: ' + hBadP.join(', '));
   // ⑤ 판30·31이 붙을 한 곳
   const ckR = await runP({ res: RES_P(true), checks: [{ id: 'q30', title: '계약 서류 목록 — 분기 점검', render: (h) => { h.innerHTML = '<ul><li>표본 3건</li></ul>'; } }, { id: 'm31', title: '월 점검', render: () => { throw new Error('x'); } }] });
-  T('P1 판29 ⑤ 점검 카드가 붙을 한 곳: PMCON_CHECKS 선언 1곳(빈 목록)·글자 5번(선언 1·그리기 함수 3·화면 주석 1 — 다른 곳에서 손대지 않음) · 비면 점검 카드 묶음 숨김 · 줄을 더하면 묶음이 보이고 카드마다 render(host) 1번(제목·자리 id) · 한 카드가 터져도 그 카드만 안내',
-    cntOf(html, 'var PMCON_CHECKS = [];') === 1 && (html.match(/PMCON_CHECKS(?!\.push\()/g) || []).length === 5 && (fnP('pmconChecksRender').match(/PMCON_CHECKS/g) || []).length === 3 && secP.indexOf('id="pmconChecksWrap" style="display:none;"') > 0
+  T('P1 판29 ⑤ 점검 카드가 붙을 한 곳: PMCON_CHECKS 선언 1곳(빈 목록)·글자 5번(선언 1·그리기 함수 3·화면 주석 1 — 판30·31 카드는 PMCON_CHECKS.push(…) 줄로만 붙고 그 밖에서 손대지 않음) · 비면 점검 카드 묶음 숨김 · 줄을 더하면 묶음이 보이고 카드마다 render(host) 1번(제목·자리 id) · 한 카드가 터져도 그 카드만 안내',
+    cntOf(html, 'var PMCON_CHECKS = [];') === 1 && (html.match(/PMCON_CHECKS(?!\.push\(\{ id: ")/g) || []).length === 5 && (fnP('pmconChecksRender').match(/PMCON_CHECKS/g) || []).length === 3 && secP.indexOf('id="pmconChecksWrap" style="display:none;"') > 0
     && ckR.els.pmconChecksWrap.style.display === '' && ckR.els['pmconChk-q30'].innerHTML === '<ul><li>표본 3건</li></ul>' && ckR.els['pmconChk-m31'].innerHTML.indexOf('점검 카드를 그리지 못했습니다') > 0
     && ckR.els.pmconChecks.innerHTML.indexOf('계약 서류 목록 — 분기 점검') > 0,
     JSON.stringify({ n: (html.match(/PMCON_CHECKS/g) || []).length }));
@@ -13664,6 +13664,122 @@ try {
   T('P1 판30 ④ 결함 사본 ' + MUTQ.length + '개(표본 작음 안내 늘 보임·비율 늘 적음·PM 아니어도 버튼·제안 숨김·제안 이름 이스케이프 걷음·줄 이스케이프 걷음·누름 PM·확인 검사 걷음·확인함 무시·제안 단추 다른 카드로 · 검토 11/14: 확인한 사람 이름 이스케이프 걷음·제안 단계 이름 이스케이프 걷음·그리기 예외 삼킴 걷음) = 모두 ✗',
     killQ.length === 0, killQ.join(' | '));
 } catch (e) { console.log('  (P1 판30 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ---- P1 판31 월 점검 카드(시안 판3 ③ 806~819 · 착수설명서 판31 · PM 11/14 11:27 "45. 판 30,31ㄱ") — PM 콘솔 점검 카드 자리(PMCON_CHECKS)에 붙는 카드 1장 + pmconChecksSync ----
+//   ① 배선(정적) ② 실행 — 실제 pmconChecksRender·pmconChecksSync·mchk* 함수를 가짜 화면·가짜 gwCall로 돌림(어긋남·확인 못 함만 줄 · 0이면 카드 없음 · [확인]한 달 없음 · PM 아닌 관리자 버튼 없음 · 불러오기 실패 보임)
+//   ③ 누름 — [확인] = mchk_ack(달·base) 하나 · [처리 지시] = 지시 탭 등록 칸에 글만(지시를 만들지 않음) ④ 묶음 제목 = 보이는 카드 수(판30 카드와 함께) ⑤ 결함 사본이 실제로 깨짐
+try {
+  const fn31 = (src, name) => { const i = src.indexOf('function ' + name + '('); if (i < 0) throw new Error('함수 없음: ' + name); let d = 0, st = false; for (let j = i; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i, j + 1); } } throw new Error('중괄호 짝: ' + name); };
+  const st31 = (src, re) => { const m = src.match(re); if (!m) throw new Error('문장 없음: ' + re); return m[0]; };
+  const gwd31 = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-data.js'), 'utf8'), lib31 = readFileSync(join(ROOT, 'netlify', 'functions', '_lib', 'mchk.js'), 'utf8');
+  const cron31 = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-mchk-cron.js'), 'utf8'), toml31 = readFileSync(join(ROOT, 'netlify.toml'), 'utf8');
+  const PUSH31 = 'PMCON_CHECKS.push({ id: "mchk", title: "월 점검", render: mchkRender });';
+  // ① 배선
+  const iPush = html.indexOf(PUSH31), iOpen = html.indexOf('function pmconOpenCard(id){'), iSync = html.indexOf('function pmconChecksSync(){'), iRen = html.indexOf('function pmconChecksRender(){');
+  T('P1 판31 ① 배선: 카드 1장 = PMCON_CHECKS.push 1줄(id mchk)·카드 덩어리는 pmconOpenCard 바로 위(판30 자리 pmconChecksRender 위와 겹치지 않음) · pmconChecksSync 1곳(pmconChecksRender 뒤)·그리기 끝에 typeof로 부름 · 서버 mchk_get·mchk_ack·mchk_run 디스패치 · 크론 gw-mchk-cron(netlify.toml "0 22 * * *"·시작·끝 흔적) · 감사 라벨 mchk "월 점검" · 누른 기록 글 ack "확인" · 새 푸시 0(mchk.js·크론에 sendTo 없음)',
+    html.split(PUSH31).length === 2 && iRen > 0 && iRen < iSync && iSync < iPush && iPush < iOpen && /\n  PMCON_CHECKS\.push\(\{ id: "mchk", title: "월 점검", render: mchkRender \}\);\n  function pmconOpenCard\(id\)\{/.test(html)
+    && html.split('function pmconChecksSync(){').length === 2 && /if \(typeof pmconChecksSync === "function"\) pmconChecksSync\(\);/.test(fn31(html, 'pmconChecksRender'))
+    && ['mchk_get', 'mchk_ack', 'mchk_run'].every((a) => new RegExp("if \\(d && d\\.action === '" + a + "'\\) return await handleMchk\\w+\\(event, d, R\\);").test(gwd31))
+    && /\[functions\."gw-mchk-cron"\]\s*\r?\n\s*schedule = "0 22 \* \* \*"/.test(toml31) && /await stamp\('gw-mchk-cron', \{ state: 'start' \}\)/.test(cron31) && /await stamp\('gw-mchk-cron', \{ state: 'end'/.test(cron31)
+    && /var AUDIT_COL_LABEL = \{[^}]*pmcon:"PM 콘솔", mchk:"월 점검",/.test(html) && /var PMCON_CHOICE_TXT = \{[^}]*ack: "확인" \};/.test(html) && !/sendTo|push_send/.test(lib31 + cron31),
+    JSON.stringify({ iRen, iSync, iPush, iOpen }));
+  // ② 실행 — 가짜 화면(카드 자리 파싱 · data-mchk 버튼)
+  const run31 = async (o, srcHtml) => {
+    const H = srcHtml || html, els = {}, calls = [], log = [];
+    const mk = (id) => {
+      const e = { id, _html: '', style: {}, children: [], value: '', _btn: [], focus() {}, addEventListener() {} };
+      Object.defineProperty(e, 'innerHTML', { get() { return e._html; }, set(v) { e._html = String(v);
+        if (id === 'pmconChecks') e.children = [...e._html.matchAll(/id="(pmconChk-[^"]+)"/g)].map((m) => { const c = mk(m[1]); els[m[1]] = c; return c; });
+        e._btn = [...e._html.matchAll(/data-mchk="(\w+)"/g)].map((m) => ({ a: m[1], h: null, getAttribute() { return this.a; }, addEventListener(t, f) { this.h = f; } })); } });
+      e.querySelectorAll = () => e._btn;
+      return e;
+    };
+    const doc = { getElementById: (id) => { if (!els[id]) els[id] = mk(id); return els[id]; } };
+    const gw = (fn, body) => { calls.push(JSON.parse(JSON.stringify(body))); const r = (o.res || {})[body.action]; return r === 'net' ? Promise.reject(new Error('net')) : Promise.resolve(typeof r === 'function' ? r(body) : (r || { status: 500, body: { error_code: 'X' } })); };
+    const api = new Function('document', 'gwCall', '__log', '__o', [
+      'function canDo(m){ return __o.canTasks !== false; } function apprToastShow(m){ __log.push("toast:" + m); } function renderPmcon(){ __log.push("renderPmcon"); } function switchTab(n){ __log.push("tab:" + n); }',
+      'var confirm = function(){ return __o.confirm !== false; }, alert = function(m){ __log.push("alert:" + m); }, setTimeout = function(f){ f(); };',
+      fn31(H, 'esc'), st31(H, /var PMCON_CHECKS = \[\];/), st31(H, /var MCHK_BADGE = \{[^\n]+\};/),
+      ...['pmconChecksRender', 'pmconChecksSync', 'mchkShown', 'mchkTitle', 'mchkCardHtml', 'mchkRender', 'mchkAck', 'mchkOrder'].map((n) => fn31(H, n)),
+      'if (__o.other) PMCON_CHECKS.push(__o.other);', st31(H, /PMCON_CHECKS\.push\(\{ id: "mchk"[^\n]+\);/),
+      'return { render: pmconChecksRender, sync: pmconChecksSync };'].join('\n'))(doc, gw, log, o);
+    doc.getElementById('pmconChecksWrap').style.display = 'none';
+    api.render(); for (let i = 0; i < 6; i++) await new Promise((r) => setTimeout(r, 0));
+    const card = els['pmconChk-mchk'] || mk('x');
+    return { els, calls, log, api, card, wrap: els.pmconChecksWrap, vis: card.innerHTML.replace(/<[^>]+>/g, ' ') };
+  };
+  const IT = (id, label, st, line) => ({ id, label, st, rule: 'r', basis: 'b', lines: [line], n: {} });
+  const DOC = (over) => Object.assign({ schema: 1, period: '2026-10', at: new Date(2026, 10, 1, 7, 0).getTime(), by: 'cron', ack: null, updated_at: 1793001600000, items: [
+    IT('login', '로그인', 'ok', '로그인 123건 · 14명 · 모두 아이디'), IT('lock', '잠금', 'none', '그달 잠금 0건(남은 기록 기준) · 실패가 쌓인 아이디 8개'), IT('retired', '퇴사자 접속', 'ok', '퇴사일 뒤 로그인 0건'),
+    IT('perm', '권한 변경', 'ok', '권한 변경 1건 — 모두 정해진 사람'), IT('device', '대기 기기', 'ok', '기기 24대'), IT('subs', '구독', 'ok', '알림 받는 회원 5명 · 기기 5대'), IT('usage', '사용량', 'ok', '상한 닿은 것 없음'),
+    IT('backup', '백업 연속일', 'bad', '첨부 백업 마지막 흔적 120시간 전 — 96시간 넘음'), IT('alerts', '경보 수', 'unknown', '그달 전체 경보 기록이 없습니다 — 센 것은 알림함 최근 100건 중 4건')] }, over || {});
+  const OKDOC = DOC({ items: DOC().items.map((x) => Object.assign({}, x, { st: x.st === 'bad' || x.st === 'unknown' ? 'ok' : x.st })) });
+  const RES = (doc, canAck) => ({ mchk_get: { status: 200, body: { status: 'OK', period: '2026-10', doc, can_ack: canAck } } });
+  const pmR = await run31({ res: RES(DOC(), true) }), noR = await run31({ res: RES(DOC(), false) });
+  const okR = await run31({ res: RES(OKDOC, true) }), ackR = await run31({ res: RES(DOC({ ack: { ts: 1, by: 'uadmin', name: '나경일' } }), true) }), nulR = await run31({ res: RES(null, true) });
+  const errR = await run31({ res: { mchk_get: { status: 503, body: { error_code: 'MCHK_READ_FAILED' } } } }), netR = await run31({ res: { mchk_get: 'net' } });
+  const li = (r) => (r.card.innerHTML.match(/<li /g) || []).length;
+  T('P1 판31 ② 카드(실행): 어긋남 1·확인 못 함 1 = 제목 "11월 1일 월 점검 — 어긋남 1건 · 확인 못 함 1건"·배지 둘 · 줄 = 그 둘만(+ 맞은·기준 없는 항목은 기록에만이라는 한 줄) · 맞은 6항목 이름은 그 한 줄에만 · "10월분" · PM = [확인]·[처리 지시] · PM 아닌 관리자 = "확인하실 분: PM"·[처리 지시] · 묶음 제목 보임 · 맞음·기준 없음만인 달 / [확인]한 달 / 문서 없는 달 = 카드·묶음 제목 숨김 · 불러오기 실패·네트워크 = 카드에 빨간 안내(숨기지 않음)',
+    pmR.card.style.display === '' && pmR.wrap.style.display === '' && pmR.vis.indexOf('11월 1일 월 점검 — 어긋남 1건 · 확인 못 함 1건') >= 0 && li(pmR) === 3 && pmR.vis.indexOf('백업 연속일') > 0 && pmR.vis.indexOf('경보 수') > 0
+    && /맞은 6항목\(로그인 · 퇴사자 접속 · 권한 변경 · 대기 기기 · 구독 · 사용량\)은 카드에 나오지 않고 기록에만 남습니다/.test(pmR.vis) && pmR.vis.indexOf('10월분') >= 0 && pmR.vis.indexOf('모두 아이디') < 0
+    && pmR.card._btn.map((b) => b.a).join() === 'ack,order' && noR.card._btn.map((b) => b.a).join() === 'order' && noR.vis.indexOf('확인하실 분: PM') >= 0
+    && okR.card.style.display === 'none' && okR.wrap.style.display === 'none' && ackR.card.style.display === 'none' && ackR.wrap.style.display === 'none' && nulR.wrap.style.display === 'none'
+    && errR.card.style.display === '' && errR.wrap.style.display === '' && errR.vis.indexOf('월 점검을 불러오지 못했습니다 (MCHK_READ_FAILED)') >= 0 && netR.vis.indexOf('네트워크') >= 0,
+    JSON.stringify({ vis: pmR.vis.slice(0, 160), li: li(pmR), btn: pmR.card._btn.map((b) => b.a), ok: okR.wrap.style.display, ack: ackR.wrap.style.display }));
+  // ③ 누름
+  const clickA = await run31({ res: Object.assign(RES(DOC(), true), { mchk_ack: { status: 200, body: { status: 'OK' } } }) });
+  clickA.card._btn.find((b) => b.a === 'ack').h(); for (let i = 0; i < 4; i++) await new Promise((r) => setTimeout(r, 0));
+  const sentA = clickA.calls.filter((b) => b.action === 'mchk_ack');
+  const cancelA = await run31({ res: RES(DOC(), true), confirm: false }); cancelA.card._btn.find((b) => b.a === 'ack').h();
+  const staleA = await run31({ res: Object.assign(RES(DOC(), true), { mchk_ack: { status: 409, body: { error_code: 'MCHK_STALE' } } }) });
+  staleA.card._btn.find((b) => b.a === 'ack').h(); for (let i = 0; i < 4; i++) await new Promise((r) => setTimeout(r, 0));
+  const ordR = await run31({ res: RES(DOC(), true) }); ordR.card._btn.find((b) => b.a === 'order').h();
+  const title = ordR.els.taskTitle ? ordR.els.taskTitle.value : '';
+  T('P1 판31 ③ 누름: [확인] = mchk_ack 하나(달 2026-10·base = 문서 updated_at) → 안내 + 콘솔 다시 그림 · 확인 창 취소 = 서버 안 부름 · 409 = "방금 바뀌었습니다" + 다시 그림 · [처리 지시] = 지시 탭으로 + 등록 칸(taskTitle)에 "월 점검 10월분 — 백업 연속일: … / 경보 수(확인 못 함): …"(200자 안) · 지시를 만들지 않음(서버 호출 = 열람 1번뿐)',
+    sentA.length === 1 && sentA[0].period === '2026-10' && sentA[0].base === 1793001600000 && clickA.log.indexOf('renderPmcon') >= 0 && clickA.log.some((x) => x.indexOf('toast:월 점검 확인') === 0)
+    && cancelA.calls.filter((b) => b.action === 'mchk_ack').length === 0 && staleA.log.some((x) => x.indexOf('toast:월 점검이 방금 바뀌었습니다') === 0) && staleA.log.indexOf('renderPmcon') >= 0
+    && ordR.log.indexOf('tab:tasks') >= 0 && /^월 점검 10월분 — 백업 연속일: 첨부 백업 마지막 흔적 120시간 전 — 96시간 넘음 \/ 경보 수\(확인 못 함\): 그달 전체/.test(title) && title.length <= 200
+    && ordR.calls.length === 1 && ordR.calls[0].action === 'mchk_get',
+    JSON.stringify({ sentA, title, ord: ordR.calls.map((c) => c.action) }));
+  // ④ 묶음 제목 = 보이는 카드 수 — 판30 카드(다른 id)가 보이면 월 점검이 숨어도 묶음은 남음 · 둘 다 숨으면 묶음도 숨음
+  const other = (hide) => ({ id: 'q30', title: '계약 서류 목록', render: (h) => { if (hide) h.style.display = 'none'; else h.innerHTML = '<ul><li>표본 3건</li></ul>'; } });
+  const two1 = await run31({ res: RES(OKDOC, true), other: other(false) }), two2 = await run31({ res: RES(OKDOC, true), other: other(true) }), two3 = await run31({ res: RES(DOC(), true), other: other(true) });
+  T('P1 판31 ④ 묶음 제목(pmconChecksSync — 그려진 카드 자리를 셈): 판30 카드 보임 + 월 점검 숨음 = 묶음 보임 · 둘 다 숨음 = 묶음 숨음 · 판30 숨음 + 월 점검 보임 = 묶음 보임',
+    two1.wrap.style.display === '' && two1.card.style.display === 'none' && two2.wrap.style.display === 'none' && two3.wrap.style.display === '',
+    JSON.stringify([two1.wrap.style.display, two2.wrap.style.display, two3.wrap.style.display]));
+  // ⑤ 결함 사본
+  const MUT31 = [
+    ['return x && (x.st === "bad" || x.st === "unknown");', 'return x && x.st !== "none";'],
+    ['if (!doc || !Array.isArray(doc.items) || doc.ack) return [];', 'if (!doc || !Array.isArray(doc.items)) return [];'],
+    ['if (!show.length){ host.style.display = "none"; host.innerHTML = ""; pmconChecksSync(); return; }', 'if (!show.length){ host.style.display = "none"; host.innerHTML = ""; return; }'],
+    ['if (!(el.style && el.style.display === "none")) n++;', 'n++;'],
+    ["(canAck ? '<button type=\"button\" class=\"b-ok\" data-mchk=\"ack\">확인</button>'", "(true ? '<button type=\"button\" class=\"b-ok\" data-mchk=\"ack\">확인</button>'"],
+    ['gwCall("gw-data", { action: "mchk_ack", period: doc.period, base: doc.updated_at })', 'gwCall("gw-data", { action: "mchk_ack", period: doc.period })'],
+    ['if (!confirm("[확인] " + mchkTitle(doc, show)', 'if (false && !confirm("[확인] " + mchkTitle(doc, show)'],
+    ['if (t){ t.value = txt;', 'if (t){ t.value = "";'],
+  ];   // 그리기 끝의 pmconChecksSync 부름은 월 점검 카드가 응답 뒤 스스로 다시 세므로 이 카드만으로는 드러나지 않음(판30 카드가 붙으면 그쪽 검사 몫) — 결함 사본에 넣지 않음
+  const kill31 = [];
+  for (const [from, to] of MUT31) {
+    if (html.split(from).length !== 2) { kill31.push('자리 ' + html.split(from).length + ': ' + from.slice(0, 40)); continue; }
+    const Hx = html.replace(from, () => to);
+    let broken = false;
+    try {
+      const a = await run31({ res: RES(DOC(), false) }, Hx), b = await run31({ res: RES(OKDOC, true) }, Hx), c = await run31({ res: RES(DOC({ ack: { ts: 1 } }), true) }, Hx);
+      const d = await run31({ res: Object.assign(RES(DOC(), true), { mchk_ack: { status: 200, body: {} } }), confirm: false }, Hx); d.card._btn.find((x) => x.a === 'ack').h(); for (let i = 0; i < 3; i++) await new Promise((r) => setTimeout(r, 0));
+      const e = await run31({ res: Object.assign(RES(DOC(), true), { mchk_ack: { status: 200, body: {} } }) }, Hx); e.card._btn.find((x) => x.a === 'ack').h(); for (let i = 0; i < 3; i++) await new Promise((r) => setTimeout(r, 0));
+      const f = await run31({ res: RES(DOC(), true) }, Hx); f.card._btn.find((x) => x.a === 'order').h();
+      const g = await run31({ res: RES(OKDOC, true), other: other(true) }, Hx);
+      const ea = e.calls.filter((x) => x.action === 'mchk_ack');
+      broken = !(li(a) === 3 && a.card._btn.map((x) => x.a).join() === 'order' && b.wrap.style.display === 'none' && c.card.style.display === 'none' && d.calls.filter((x) => x.action === 'mchk_ack').length === 0
+        && ea.length === 1 && ea[0].base === 1793001600000 && f.els.taskTitle && f.els.taskTitle.value.indexOf('월 점검 10월분') === 0 && g.wrap.style.display === 'none');
+    } catch (err) { broken = true; }
+    if (!broken) kill31.push(from.slice(0, 50) + ' 안 깨짐');
+  }
+  T('P1 판31 ⑤ 결함 사본 ' + MUT31.length + '개(맞은 항목도 줄 · [확인]한 달 보임 · 숨을 때 묶음 안 셈 · 숨은 카드도 셈 · PM 아닌데 [확인] · base 없이 확인 · 확인 창 건너뜀 · 처리 지시 글 비움) 전부 위 검사에서 깨짐', kill31.length === 0, kill31.join(' | '));
+  // ⑥ 화면 글 — 내부 키 이름·밑줄 이름 0 · 입력 칸 0
+  const leak31 = (pmR.vis.match(/\b[a-z]+_[a-z_]+\b|\bmchk\b|\b(?:ok|bad|unknown|none)\b/g) || []);
+  T('P1 판31 ⑥ 화면 글: 카드에 내부 키 이름(mchk·밑줄 이름·ok/bad 같은 상태 글자) 0 · 입력 칸 0', leak31.length === 0 && !/<(input|select|textarea)\b/.test(pmR.card.innerHTML), '새는 글: ' + leak31.join(','));
+} catch (e) { console.log('  (P1 판31 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

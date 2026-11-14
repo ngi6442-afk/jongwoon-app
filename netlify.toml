@@ -45,6 +45,11 @@
 [functions."gw-brief-cron"]
   schedule = "30 21 * * *"
 
+# P1 판31 월 점검 자동 대조 — UTC 22:00 = KST 07:00 매일 기동, 함수 내부에서 KST 1~3일에만 전달(前月) 9항목을 대조해 'mchk:YYYY-MM' 1개(있으면 건너뜀).
+# 매월 1일 KST를 cron 5필드 한 줄로 못 써서 gw-appr-cron과 같은 꼴. 결과는 PM 콘솔 카드(어긋남·확인 못 함이 있을 때만) — 푸시 없음. 수동 = gw-data mchk_run(봇 키).
+[functions."gw-mchk-cron"]
+  schedule = "0 22 * * *"
+
 # 예정(등재만 — appdata data/cron_map.json): gw-digest-0730(30 22 UTC = KST 07:30, 지시 요약 전용 — 지금은 gw-todo-cron 08:00에 통합 v396).
 
 # 정적 파일은 그대로 서빙, /.netlify/functions/* 는 서버리스 함수로.
