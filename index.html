@@ -989,6 +989,7 @@
   .view.readonly .link-btn{display:none !important;}
   .view.readonly .mini-btn[data-doc-att-open]{display:inline-block !important;}   /* v369: 문서함 첨부 [열기]는 열람(보기) 권한의 통로 — 서버 doc_att_get이 docVisible로 판정하므로 화면에서 지우지 않는다(PM 9/22 "직원들이 뽑을 수가 없다") */
   .view.readonly .mini-btn[data-go-tab]{display:inline-block !important;}   /* v428: 옮긴 화면으로 가는 길 안내 버튼은 아무것도 바꾸지 않으므로 보기 권한 화면에서도 남긴다 — 갈 곳을 못 보는 사람에게는 applySafetyPerms가 감싼 쪽을 숨긴다(이 !important는 버튼 자신의 인라인 display를 이기므로 버튼이 아니라 감싸개로: 인허가 석면 안내는 버튼 감싸개 asbMovedGo만 — 글 줄은 510ed20처럼 남김, 인사 두 화면 교육 안내는 줄째) */
+  .view.readonly .link-btn[data-cli-detail]{display:block !important;}   /* v467(11/14 화면 시험): 폰 거래처 [상세 ›]는 읽기 창(openCliDetail — 미수·계약·문서는 canSee로 거르고 [거래처 정보 수정]은 canDo("cli")일 때만) — 보기 권한 직원에게 이 줄이 숨겨 상세를 못 열었다 */
   .view.readonly #hwRefreshBtn{display:inline-block !important;}   /* v434: 화관법 보기 권한(권민지·정재욱)도 제품 자동 현황을 다시 읽는다 — ↻ 새로고침은 hw_status 읽기뿐(서버도 보기 허용). ▶ 지금 실행(hwRunNowBtn)은 예외에 넣지 않는다(관리자·개발자만) */
   /* v428 안전 탭 칸(.sf-pane) — 보기 권한 readonly는 바깥 view-safety가 아니라 칸에만 건다(MODULE_VIEW.site=sfPaneSite·v430 safety=sfPaneEdu). 바깥에 걸면 칸 칩·다른 칸 버튼까지 숨는다 */
   .sf-pane.readonly .add-row,
@@ -25642,7 +25643,7 @@
         + '</button>'
         + '<div class="asb-bd" id="cliBd-' + esc(c.id) + '" style="display:none;">'
         +   '<div class="jw-sheet-wrap"><table class="jw-sheet">'
-        +   sheetRow("사업자번호", c.biz_no ? '<span class="num">' + esc(c.biz_no) + '</span>' : "—")
+        +   sheetRow("사업자번호", cliBizKind(c) === "id13" ? cliBizHtml(c) + ' <span class="vs-dsub">' + esc(cliBizTitle(c)) + '</span>' : (c.indiv ? esc(cliBizTxt(c)) : (c.biz_no ? '<span class="num">' + esc(c.biz_no) + '</span>' : "—")))   // v467(11/14 화면 시험): 폰 펼침 표가 13자리(주민·법인등록번호 꼴) 원문을 그렸다 — PC 표·[상세 ›]처럼 '13자리(숨김)'만(원문은 수정 창에만) · 개인 거래처 표시
         +   sheetRow("담당자", esc(c.contact || "—"))
         +   sheetRow("연락처", c.phone ? '<span class="num">' + esc(c.phone) + '</span>' : "—")
         +   (seeRec ? sheetRow("미수", unSum ? '<b class="num">' + esc(unSum) + '</b>' : "없음", unSum ? "warn" : "") : "")
