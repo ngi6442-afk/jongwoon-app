@@ -26207,7 +26207,7 @@
     document.getElementById("recImpSummary").innerHTML="신규 <b>"+plan.add.length+"</b>건 · 갱신 <b>"+plan.upd.length+"</b>건 · 취소반영 <b>"+plan.cancel.length+"</b>건 · 이미있음 "+plan.dup+"건"+(fdup?" · <span style=\"color:#b0332a;\">중복 의심 <b>"+fdup+"</b>건</span>":"")+"<br>신규 미수 합계 <b>"+fmtAmount(addTotal)+"원</b>"+(fdup?"<br><span style=\"color:#b0332a;font-size:12px;\">※ 파일 안에 승인번호가 겹치는 행입니다. 그대로 추가한 뒤 목록 상단에 빨간 '중복 의심'으로 표시되니 확인 후 삭제하세요.</span>":"");
     function line(c,tag){ return '<div style="padding:4px 0;border-bottom:1px solid rgba(128,128,128,.12);">'+tag+" <b>"+impEsc(c.client)+"</b> · "+impEsc(c.desc||"")+" · "+fmtAmount(c.amount)+"원</div>"; }
     var html="";
-    plan.add.forEach(function(c, i){ var tw = c._twin ? findRec(c._twin) : null; html+=line(c,'<span style="color:#27ae60;">신규</span>') + (tw ? '<div class="rec-imp-twin" style="padding:2px 0 6px 12px;font-size:12px;color:#8A6410;">직접 등록 줄 있음 — ' + impEsc(tw.client || "") + ' · 청구일 ' + impEsc(tw.billed || "-") + ' · ' + fmtAmount(tw.amount) + '원(작성일과 ' + c._twinGap + '일 차) <label style="margin-left:6px;cursor:pointer;"><input type="checkbox" data-rec-merge="' + i + '"> 합치기</label> <span style="color:#9AA09C;">— 고르면 새 줄 대신 그 줄에 계산서 값을 얹습니다</span></div>' : ''); });   // v464 C078 ②
+    plan.add.forEach(function(c, i){ var tw = c._twin ? findRec(c._twin) : null; html+=line(c,'<span style="color:#27ae60;">신규</span>') + (tw ? '<div class="rec-imp-twin" style="padding:2px 0 6px 12px;font-size:12px;color:#8A6410;">직접 등록 줄 있음 — ' + impEsc(tw.client || "") + ' · 청구일 ' + impEsc(tw.billed || "-") + ' · ' + fmtAmount(tw.amount) + '원(작성일과 ' + c._twinGap + '일 차) <label style="margin-left:6px;cursor:pointer;"><input type="checkbox" data-rec-merge="' + i + '" style="width:auto;margin:0 3px 0 0;vertical-align:-2px;"> 합치기</label> <span style="color:#9AA09C;">— 고르면 새 줄 대신 그 줄에 계산서 값을 얹습니다</span></div>' : ''); });   // v464 C078 ②
     plan.upd.forEach(function(c){ html+=line(c,'<span style="color:#e67e22;">갱신</span>'); });
     (plan.filedup||[]).forEach(function(c){ html+=line(c,'<span style="color:#b0332a;">중복의심</span>'); });
     plan.cancel.forEach(function(c){ html+=line(c,'<span style="color:#c0392b;">취소</span>'); });
@@ -26666,7 +26666,9 @@
   function recIsCredit(r){ return (Number(r && r.amount) || 0) < 0; }
   function unpaidReceivables(all){
     // all=true(대시보드): 기성 탭 검색어를 무시 — 검색 상태가 남아 홈 미수 합계·목록이 검색 결과로 오염되던 문제
-    var u = liveRec().filter(function(r){ return !r.paid && recVisible(r) && (all || recMatchesSearch(r)); });
+    // v466(C078 ③ 화면 시험 11/14): 홈(all=true — 관리자 KPI·대표 조망 타일·홈 기성 카드)도 수정(-) 줄은 미수가 아니다(표·거래처 탭과 같게).
+    //   폰 옛 목록(all 없음)은 C078 ⑥·C063대로 그대로 — 수정(-) 줄이 옛 목록에서 사라지지 않게
+    var u = liveRec().filter(function(r){ return !r.paid && !(all && recIsCredit(r)) && recVisible(r) && (all || recMatchesSearch(r)); });
     u.sort(function(a, b){ var ad = a.billed || "9999-99-99", bd = b.billed || "9999-99-99"; return ad < bd ? -1 : (ad > bd ? 1 : 0); });
     return u;
   }

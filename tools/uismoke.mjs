@@ -6644,6 +6644,16 @@ try {
   T('v464 C078 ③ 수정(-) 줄 = 미수 아님: ' + JSON.stringify(s54c), s54c[0] === 'u1' && s54c[1] === '미수 1건 · 330,000원' && s54c[2] === 'u1' && s54c[3] === 'u1' && s54c[4] === 'c1' && /c1/.test(s54c[5]) && /u1/.test(s54c[5]) && s54c[7] === 1 && /^거래처 1곳/.test(s54c[8]), JSON.stringify(s54c));
   const og54 = fn40(html, 'recOverdueGen');
   T('v464 C078 ③ 미수 45일 자동 지시는 수정(-) 줄을 건너뜀(recOverdueGen 첫 거름에 recIsCredit)', og54.indexOf('if (r.paid || recIsCredit(r) || !isDate(r.billed)) return;') > 0, og54.slice(0, 200));
+  // v466(11/14 화면 시험에서 찾은 것): 홈(관리자 KPI·대표 조망 타일·홈 기성 카드 = unpaidReceivables(true))이 수정(-) 줄을 미수로 셌다('미수 3' · '330,000원 청구 12일 경과' — 부호도 빠짐)
+  //   → all=true일 때만 수정(-) 줄을 뺌 · 폰 옛 목록(all 없음)은 C078 ⑥·C063대로 그대로 · 결함 사본(거름 걷음) = 홈에 수정(-) 줄이 다시 들어옴
+  const upSrc66 = fn40(html, 'unpaidReceivables');
+  const up66 = (src) => new Function('liveRec', 'recVisible', 'recMatchesSearch', 'recIsCredit', src + '\nreturn unpaidReceivables;')(
+    () => [{ id: 'c', amount: -110000, billed: '2026-07-01' }, { id: 'u', amount: 330000, billed: '2026-07-02' }, { id: 'p', amount: 50000, billed: '2026-07-03', paid: '2026-07-10' }],
+    () => true, () => true, (r) => (Number(r && r.amount) || 0) < 0);
+  const s66 = [up66(upSrc66)(true).map((r) => r.id).join(','), up66(upSrc66)().map((r) => r.id).join(','), up66(upSrc66.replace('!(all && recIsCredit(r)) && ', ''))(true).map((r) => r.id).join(',')];
+  T('v466 C078 ③ 홈 미수(unpaidReceivables(true)) = 수정(-) 줄 뺌 · 폰 옛 목록(인자 없음) = 그대로 · 결함 사본 = 다시 듦: ' + JSON.stringify(s66), JSON.stringify(s66) === JSON.stringify(['u', 'c,u', 'c,u']), JSON.stringify(s66));
+  // v466(11/14 화면 시험): 불러오기 미리보기 [합치기] 체크 상자가 전역 input 폭(100%)을 받아 326px로 혼자 한 줄을 차지하고 미리보기 칸이 가로로 넘쳤다 → 폭 auto
+  T('v466 C078 ② [합치기] 체크 상자 폭 auto(미리보기 가로 넘침 막음)', html.indexOf('<input type="checkbox" data-rec-merge="\' + i + \'" style="width:auto;') > 0);
   // v464 화면 시험(11/13)에서 찾은 것: 입찰 손 [낙찰](setBidStatus) 창 제목 = '계약 시작'(openConStart가 '직접 생성'으로 바꾼 뒤 — bidToContract·낙찰 자동 열기와 같게)
   const sbs51 = fn40(html, 'setBidStatus'), oc51 = sbs51.indexOf('openConStart();'), h351 = sbs51.indexOf('textContent="계약 시작"');
   T('v464 입찰 [낙찰] 창 제목 "계약 시작"(openConStart 뒤에 다시 씀)', oc51 > 0 && h351 > oc51, JSON.stringify({ oc51, h351 }));
@@ -13527,7 +13537,7 @@ try {
   const chk64 = (d) => {
     const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
     const ftv = cut(d.ft, '\n### v464 (11/14)', '\n### '), tlv = cut(d.tl, '\n## v464 ', '\n## ');
-    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), scr = cb.filter((l) => /^- \[ \] \(AI 시험 화면 대상/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l));
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI 시험 화면 대상/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l));   // v466: 화면 칸은 11/14 시험 서버 확인으로 [x] — 닫힌 칸도 셈
     const FT = ['C081', 'C078', 'C083', '`cliSheetDocs`', '`CLI_DOC_MINKEY`', '`recAgingKey`', '`recIsCredit`', '`recMergeTwins`', '`recMergeInto`', '`REC_MERGE_DAYS`', '`taskRecHiddenFor`', 'PREV_READ_FAILED', "'삭제 보호'", '`OB_SIDO_ALSO`', '`obSidoFt`', "'계약 시작'", 'C114'];
     const GATE = ['uismoke', 'consheet_check', 'proctpl_check', 'settletest', 'servertest', 'rectest', 'promoqual_check', 'promogen_check', 'promoqlearn_check', 'promostream_check', 'promo_wrap_check', 'promo_post_check'];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
@@ -13543,7 +13553,7 @@ try {
   const M64 = [mu64('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v463 (')),
     mu64('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v463'")),
     mu64('ft', (s) => s.split('`recMergeTwins`').join('recMergeTwins')),
-    mu64('tl', (s) => s.replace('- [ ] (AI 시험 화면 대상 — 입찰)', '- [ ] (PM 확인 — 입찰)')),
+    mu64('tl', (s) => s.replace('- [x] (AI 시험 화면 대상 — 입찰)', '- [ ] (PM 확인 — 입찰)')),
     mu64('tl', (s) => { const e = s.indexOf('\n## v465 '); const k = s.lastIndexOf('`promostream_check`', e < 0 ? s.length : e); return s.slice(0, k) + 'promostream_check' + s.slice(k + 19); }),
     mu64('st', (s) => s.replace('// ---- 89 v464 C078 ①⑤', '// ---- 89 C078 ①⑤'))];
   T('v464 문서·판 번호(정확 검사): FEATURES 기준 v464 (2026-11-14)·v464 절(C081·C078·C083 · 함수 이름 · C114) · TESTLIST v464 칸 10(화면 7 · 게이트 [x] 3 — 12종 · PM 칸 0) · servertest 절 89 v464 · MANUAL 광주특별시·수정(-) · sw jw-shell-v464 · 결함 사본 ' + M64.length + '개 = 모두 ✗',
@@ -13825,12 +13835,12 @@ try {
     const GATE = ['uismoke', 'consheet_check', 'proctpl_check', 'settletest', 'servertest', 'rectest', 'promoqual_check', 'promogen_check', 'promoqlearn_check', 'promostream_check', 'promo_wrap_check', 'promo_post_check'];
     const CL = ['**P1 판30 계약 서류 분기 점검 카드(v465', '**P1 판31 월 점검(v465', '**감사 기록 월 상한 분할(v465)**', '**조각을 넘길 때 머리를 다시 쓰지 말 것**', '`ev.pfill`', '`ev.tauto`', '`mchk:since`', '`prev_acks`'];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
-    const ok = /기준: v465 \(2026-11-14\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 465 && ftv.length > 0 && mF.length === 0   // v466: 기준 줄·sw는 이 판 이상(이 판 값은 v466 문서 검사)
       && tlv.length > 0 && cb.length === 19 && scr.length === 15 && gate.length === 4 && cb.every((l) => /^- \[x\] \(AI\) /.test(l) || /^- \[ \] \(AI 시험 화면 대상/.test(l)) && !cb.some((l) => /PM/.test(l))
       && GATE.every((g) => gate.some((l) => l.indexOf('`' + g + '`') > 0)) && ["'P1 판30' 7항목", "'P1 판31' 13항목", "결함 사본 73", "'P1 판30' 5", "'P1 판31' 7", "'감사 기록 조각 1개 없음", "'월 점검 기록 없음 — 크론 확인'"].every((s) => tlv.indexOf(s) > 0)
       && ['점검 카드', '계약 서류 목록 — 분기 점검', '목록에 넣자는 제안', '서류 목록 편집 열기', '월 점검', '처리 지시', '새 알림(푸시)은 가지 않습니다', '<b>확인 못 함</b>은', '<b>월 점검 기록 없음 — 크론 확인</b>', '승인을 푼 때부터 7일'].every((s) => m2171.indexOf(s) > 0)
       && m213.indexOf('잘리지 않습니다') > 0 && m213.indexOf('<b>감사 기록 조각 n개 없음</b>') > 0 && m214.indexOf('월 점검') > 0 && !/mchk|conchk|audit:/.test(m2171 + m213 + m214)
-      && CL.every((c) => d.cl.indexOf(c) > 0) && /SHELL_CACHE = 'jw-shell-v465'/.test(d.sw);
+      && CL.every((c) => d.cl.indexOf(c) > 0) && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 465;
     return { ok, info: { mF, cb: cb.length, scr: scr.length, gate: gate.length, m2171: m2171.length, m213: m213.length, m214: m214.length } };
   };
   const r65 = chk65(D65);
@@ -13839,7 +13849,7 @@ try {
     mu65('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v464'")),
     mu65('ft', (s) => s.split('`mchk:backup:since`').join('mchk:backup:since')),
     mu65('tl', (s) => s.replace('- [ ] (AI 시험 화면 대상 — 판31) [처리 지시]', '- [ ] (PM 확인 — 판31) [처리 지시]')),
-    mu65('tl', (s) => { const k = s.lastIndexOf('`promostream_check`'); return s.slice(0, k) + 'promostream_check' + s.slice(k + 19); }),
+    mu65('tl', (s) => { const e = s.indexOf('\n## v466 '); const k = s.lastIndexOf('`promostream_check`', e < 0 ? s.length : e); return s.slice(0, k) + 'promostream_check' + s.slice(k + 19); }),
     mu65('man', (s) => s.split('점검 카드').join('점검 칸')),
     mu65('man', (s) => s.replace('<b>한 달 기록이 많아도 잘리지 않습니다</b>', '<b>한 달 기록이 많아도</b>')),
     mu65('man', (s) => s.replace('누른 기록에 한 줄 남습니다. <span class="btn">처리 지시</span>', '누른 기록(mchk)에 한 줄 남습니다. <span class="btn">처리 지시</span>')),
@@ -13852,6 +13862,28 @@ try {
   T('v465 문서·판 번호(정확 검사): FEATURES 기준 v465 (2026-11-14)·v465 절(원장 · 판30 conchk · 판31 mchk 액션·크론·재료 키 · 감사 조각 · C128 · 근거 실측 · 판31 보안 검토 반영 — 조각 키 목록·ev.pfill·ev.tauto·mchk:since·prev_acks) · TESTLIST v465 칸 19(화면 15 · 게이트 [x] 4 — 12종 · P1 판31 13항목·7 · PM 낱말 0) · MANUAL 21-7-1 점검 카드 두 장·확인 못 함 뜻·크론 못 돈 달·21-3 조각·조각 n개 없음·21-4 백업 흔적(내부 키 이름 0) · CLAUDE.md 줄 3 + 머리 다시 쓰지 말 것 · sw jw-shell-v465 · 결함 사본 ' + M65.length + '개 = 모두 ✗',
     r65.ok && M65.every((v) => v === false), JSON.stringify({ r: r65.info, mut: M65 }));
 } catch (e) { console.log('  (v465 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v466(45-1 화면 시험 11/14 — 홈 미수 수정(-) 줄 · [합치기] 체크 상자 폭): 문서·판 번호 정확 검사 — 다음 판은 기준 줄·sw를 '466 이상'으로 풀 것
+try {
+  const rd66 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D66 = { ft: rd66('FEATURES.md'), tl: rd66('TESTLIST.md'), sw: rd66('sw.js') };
+  const chk66 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v466 (11/14)', '\n### '), tlv = cut(d.tl, '\n## v466 ', '\n## '), t64 = cut(d.tl, '\n## v464 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l));
+    const FT = ['`unpaidReceivables(all)`', '`recIsCredit`', 'width:auto', 'C078 ⑥·C063', '`cat`', '[나대지]'];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const ok = /기준: v466 \(2026-11-14\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 3 && gate.length === 2 && !cb.some((l) => /\(PM/.test(l))
+      && (t64.match(/^- \[x\] \(AI 시험 화면 대상/gm) || []).length === 7 && (t64.match(/^- \[ \] /gm) || []).length === 0 && /SHELL_CACHE = 'jw-shell-v466'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length } };
+  };
+  const r66 = chk66(D66);
+  const mu66 = (k, f) => chk66(Object.assign({}, D66, { [k]: f(D66[k]) })).ok;
+  const M66 = [mu66('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v465 (')), mu66('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v465'")),
+    mu66('ft', (s) => s.split('`unpaidReceivables(all)`').join('unpaidReceivables')), mu66('tl', (s) => s.replace('- [x] (AI 시험 화면 대상 — 입찰)', '- [ ] (AI 시험 화면 대상 — 입찰)'))];
+  T('v466 문서·판 번호(정확 검사): FEATURES 기준 v466 (2026-11-14)·v466 절 · TESTLIST v466 칸 3(게이트 [x] 2) · v464 화면 칸 7개 [x]·빈 칸 0 · sw jw-shell-v466 · 결함 사본 ' + M66.length + '개 = 모두 ✗',
+    r66.ok && M66.every((v) => v === false), JSON.stringify({ r: r66.info, mut: M66 }));
+} catch (e) { console.log('  (v466 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
