@@ -15616,9 +15616,9 @@
   function csNum(x){ return Number(String(x == null ? "" : x).replace(/[^0-9]/g, "")) || 0; }
   function csChgLastAmt(c){ var v = 0; (c.pipes || []).forEach(function(p){ (p.stages || []).forEach(function(x){ if (x.aw === "amt" && x.status === "done" && csNum((x.vals || {}).chg_amt)) v = csNum(x.vals.chg_amt); }); }); return v; }
   function csChgLastEnd(c){ var v = ""; (c.pipes || []).forEach(function(p){ (p.stages || []).forEach(function(x){ if (x.aw === "amt" && x.status === "done" && (x.vals || {}).chg_end) v = x.vals.chg_end; }); }); return v; }   // v418 카드 9: 직전 완료 차수의 변경 후 종료일(csChgLastAmt와 같은 모양)
-  // 판10(T423) 지금 유효한 계약 금액·종료일 — 한 곳. 변경계약 차수(aw "amt") 중 완료(done)됐고 결재가 '승인'인 것(결재 없이 끝난 차수 = 금액·기간 그대로인 변경)만, 칸마다 뒤 차수 값. 승인 전·반려·취소·건너뜀 차수는 무시. 원계약 값(contract_info)은 읽기만 — 저장 꼴 그대로
-  function conChgDate(v){ var t = String(v == null ? "" : v).trim().replace(/[.\/]/g, "-").replace(/-$/, ""), m = t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/); if (!m) return ""; t = m[1] + "-" + ("0" + m[2]).slice(-2) + "-" + ("0" + m[3]).slice(-2); return isNaN(Date.parse(t + "T00:00:00")) ? "" : t; }   // 2026.12.31 · 2026-1-5 → ISO, 날짜가 아니면 ""(원계약 값 유지)
-  function conChgEff(c){ var r = { amt: 0, end: "", amtR: 0, endR: 0 };((c && c.pipes) || []).forEach(function(p){ ((p && p.stages) || []).forEach(function(x){ if (!x || x.aw !== "amt" || x.status !== "done" || (x.appr && x.appr.status !== "승인")) return; var v = x.vals || {}, a = csNum(v.chg_amt), e = conChgDate(v.chg_end); if (a){ r.amt = a; r.amtR = Number(x.round) || 0; } if (e){ r.end = e; r.endR = Number(x.round) || 0; } }); }); return r; }   // amtR·endR = 그 값을 낸 차수(0 = 차수 번호 없음 — 본 줄 고정 대안)
+  // 판10(T423) 지금 유효한 계약 금액·종료일 — 한 곳. 변경계약 차수(aw "amt") 중 완료(done)됐고 결재가 '승인'이며 상신 때 사본(appr.snap)이 있는 것만, 그 사본 값으로(입력 칸 vals는 읽지 않음 — 판10 검토 ①), 칸마다 뒤 차수 값. 승인 전·반려·취소·건너뜀·결재 없이 끝난 차수(= 금액·기간 그대로인 변경)·사본 없는 옛 승인 차수는 무시. 원계약 값(contract_info)은 읽기만
+  function conChgDate(v){ var t = String(v == null ? "" : v).trim().replace(/[.\/]/g, "-").replace(/-$/, ""), m = t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/), y, mo, d, x; if (!m) return ""; y = Number(m[1]); mo = Number(m[2]); d = Number(m[3]); if (y < 1900) return ""; x = new Date(Date.UTC(y, mo - 1, d)); if (x.getUTCFullYear() !== y || x.getUTCMonth() !== mo - 1 || x.getUTCDate() !== d) return ""; return m[1] + "-" + ("0" + mo).slice(-2) + "-" + ("0" + d).slice(-2); }   // 2026.12.31 · 2026-1-5 → ISO, 달력에 없는 날(2026-02-30)·1900년 전·날짜가 아니면 ""(원계약 값 유지)
+  function conChgEff(c){ var r = { amt: 0, end: "", amtR: 0, endR: 0 }; ((c && c.pipes) || []).forEach(function(p){ ((p && p.stages) || []).forEach(function(x){ if (!x || x.aw !== "amt" || x.status !== "done" || !x.appr || x.appr.status !== "승인" || !x.appr.snap || typeof x.appr.snap !== "object") return; var v = x.appr.snap, a = csNum(v.chg_amt), e = conChgDate(v.chg_end); if (a){ r.amt = a; r.amtR = Number(x.round) || 0; } if (e){ r.end = e; r.endR = Number(x.round) || 0; } }); }); return r; }   // amtR·endR = 그 값을 낸 차수(0 = 차수 번호 없음 — 본 줄 고정 대안)
   function conEffAmt(c){ return conChgEff(c).amt || conAmt(c); }   // 유효 계약액 — 승인된 마지막 변경 금액, 없으면 원계약(conAmt: 계약서 금액 → 낙찰액). 정산액은 넣지 않음(돈 값 자리는 그대로 conAmt·conAmtEff)
   function conEffEnd(c){ return conChgEff(c).end || ((c && c.contract_info) || {}).d3 || ""; }   // 유효 종료일 — 승인된 마지막 변경 종료일, 없으면 원계약 준공일(d3)
   function csChgBase(c){ return Number(((c && c.contract_info) || {}).amount) || 0; }   // v402 검토 2: 계약서 금액만(낙찰액 폴백·정산액 제외 — 기기마다 판정이 달라지지 않게)
@@ -15656,6 +15656,7 @@
       body: (s.aw === "amt" ? csChgApprBody(c, s) : "") + (csTitle(c) ? "공사명 " + csTitle(c) + " · " : "") + (amt ? "금액 " + fmtAmount(amt) + "원 · " : "") + (c.who ? "담당 " + dispName(c.who) + " · " : "") + csPub(c) + " " + csKind(c), ref: csApprRef(c, p, i) });
     apprSavePending(); apprFlushCreates();
     s.appr = { cid: cid, kind: kind, at: new Date().toISOString(), by: myName() || "", by_id: myId(), status: "대기" };
+    if (s.aw === "amt"){ var sv = s.vals || {}; s.appr.snap = { chg_amt: sv.chg_amt == null ? "" : sv.chg_amt, chg_end: sv.chg_end == null ? "" : sv.chg_end }; }   // 판10 검토 ①: 상신 때 금액·종료일 사본 — 유효 값(conChgEff)은 승인된 차수의 이 사본만 읽는다(상신 뒤·승인 뒤 입력 칸을 고쳐도 새지 않게, 재상신 = 새 사본)
     var t = s.task_id ? findTask(s.task_id) : null;
     if (t && t.status !== "done"){ t.status = "review"; t.done_at = todayStr(); t.done_by = "결재함 상신(" + kind + ")"; t.updated = todayStr(); saveTasksCache(); scheduleTasksSave(); renderTasks(); }
     c.updated = todayStr(); scheduleContractSave();
@@ -16762,10 +16763,10 @@
   function csOverviewHtml(c){
     var ci = c.contract_info || {}, bi = c.bldg_info, amt = conEffAmt(c), kv;   // 판10: 유효 계약액·종료일(승인된 변경 차수 → 원계약). 바뀌었을 때만 원계약 값을 괄호로 — 변경 없는 계약은 글자 그대로
     var ce = conChgEff(c), amt0 = conAmt(c), end = conEffEnd(c), chgR = function(n){ return "변경" + (n ? " " + n + "차" : "") + " 승인 · 원계약 "; };
-    var amtNote = (ce.amt && ce.amt !== amt0) ? " (" + chgR(ce.amtR) + (amt0 ? fmtAmount(amt0) + "원" : "미기재") + ")" : "", endNote = (ce.end && ce.end !== ci.d3) ? " (" + chgR(ce.endR) + (ci.d3 || "미기재") + ")" : "";
+    var amtNote = (ce.amt && ce.amt !== amt0) ? " (" + chgR(ce.amtR) + (amt0 ? fmtAmount(amt0) + "원" : "미기재") + ")" : "", endNote = (ce.end && ce.end !== (conChgDate(ci.d3) || ci.d3)) ? " (" + chgR(ce.endR) + (ci.d3 || "미기재") + ")" : "";
     kv = [["종류", csKind(c) + ((c.label && c.label !== csKind(c)) ? ' (' + c.label + ')' : '')], ["사급/관급", csPub(c) + (c.docType === "public" ? " · 공문서" : " · 사문서")],
       ["발주처", c.client], ["현장", c.site], ["공사명", csTitle(c)], ["시작", c.start], ["계약일", ci.d1], ["착공", ci.d2], ["준공 예정", end ? end + endNote : end],
-      ["계약액", amt ? fmtAmount(amt) + "원" + amtNote : (c.amount_tbd ? "미정(견적 전, " + c.amount_tbd + " 시작)" : "")],["정산액", c.settle_amount ? fmtAmount(c.settle_amount) + "원" : ""], ["계약보증", ci.guarantee ? fmtAmount(ci.guarantee) + "원" : ""], ["담당", c.who ? dispName(c.who) : ""],
+      ["계약액", amt ? fmtAmount(amt) + "원" + amtNote : (c.amount_tbd ? "미정(견적 전, " + c.amount_tbd + " 시작)" : "")], ["정산액", c.settle_amount ? fmtAmount(c.settle_amount) + "원" : ""], ["계약보증", ci.guarantee ? fmtAmount(ci.guarantee) + "원" : ""], ["담당", c.who ? dispName(c.who) : ""],
       ["입찰", c.bid_id ? (ci.from || c.bid_id) : ""],
       ["건축물대장", bi ? ((bi.site || "") + " · " + (bi.total_floor || 0) + "㎡ · " + (bi.dongs || 0) + "동" + (bi.auto ? " (자동)" : "")) : (conNeedsBldg(c) ? "필요 — [대장]으로 조회" : "")],
       ["등록", c.created], ["상태", c.status === "done" ? "완료" : "진행 중"]];

@@ -14576,25 +14576,32 @@ try {
   const fn10 = (src, name) => { const i = src.indexOf('  function ' + name + '('); if (i < 0) throw new Error('함수 없음: ' + name); let d = 0, st = false; for (let j = i; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i, j + 1); } } throw new Error(name); };
   const OLD10 = [['amt = conEffAmt(c), kv;', 'amt = conAmt(c), kv;'], ['["준공 예정", end ? end + endNote : end]', '["준공 예정", ci.d3]'], ['fmtAmount(amt) + "원" + amtNote :', 'fmtAmount(amt) + "원" :'],
     ['var d = conEffEnd(c), dd;', 'var d = csEnd(c), dd;'], ['if (k === "amount") return csListAmt(c) || 0;', 'if (k === "amount") return conAmtEff(c) || 0;'], ['if (key === "fin"){ var fe = conEffEnd(c); return isDate(fe) ? fe : ""; }', 'if (key === "fin") return isDate(ci.d3) ? ci.d3 : "";']];
-  const FNS10 = ['isDate', 'csNum', 'conAmt', 'conAmtEff', 'conChgDate', 'conChgEff', 'conEffAmt', 'conEffEnd', 'csEnd', 'csListAmt', 'csEndCell', 'csVal', 'csOverviewHtml', 'conStageVal', 'conBaseDate'];
+  const FNS10 = ['isDate', 'csNum', 'conAmt', 'conAmtEff', 'conChgDate', 'conChgEff', 'conEffAmt', 'conEffEnd', 'csEnd', 'csListAmt', 'csEndCell', 'csVal', 'csOverviewHtml', 'conStageVal', 'conBaseDate',
+    'csChgBase', 'csChgAmtMoved', 'csChgTermMoved', 'csChgAmtChanged', 'csChgApprBody', 'csApprKindOf', 'csStageLabel', 'csApprRef', 'csApprSubmit'];   // 검토 ①: 상신(실제 csApprSubmit)이 사본을 남기는지까지
   const STUB10 = 'function esc(s){ return String(s == null ? "" : s).replace(/[&<>"\']/g, function(ch){ return "&#" + ch.charCodeAt(0) + ";"; }); } function fmtAmount(n){ return Number(n).toLocaleString("en-US"); } function dispName(n){ return n; }'
     + ' function conBidAmt(c){ return (c && c._bid) || 0; } function csKind(c){ return c.type || ""; } function csPub(c){ return c.docType === "public" ? "관급" : "사급"; } function csTitle(c){ return c.title || ""; } function conNeedsBldg(){ return false; } function findAsb(){ return null; }'
-    + ' function vehDday(d){ var diff = Math.round((new Date(d + "T00:00:00") - new Date("2026-11-14T00:00:00")) / 86400000); return { diff: diff, text: diff < 0 ? "D+" + (-diff) : "D-" + diff }; }';
-  const mk10 = (src) => new Function(STUB10 + FNS10.map((f) => fn10(src, f)).join('\n') + ' return { conChgEff: conChgEff, conEffAmt: conEffAmt, conEffEnd: conEffEnd, csListAmt: csListAmt, csEndCell: csEndCell, csVal: csVal, ov: csOverviewHtml, base: conBaseDate };')();
+    + ' function vehDday(d){ var diff = Math.round((new Date(d + "T00:00:00") - new Date("2026-11-14T00:00:00")) / 86400000); return { diff: diff, text: diff < 0 ? "D+" + (-diff) : "D-" + diff }; }'
+    + ' function csApprKind(){ return ""; } var apprPendingCreates = []; function apprSavePending(){} function apprFlushCreates(){} function myName(){ return "검사"; } function myId(){ return "m1"; } function findTask(){ return null; } function todayStr(){ return "2026-11-14"; }'
+    + ' function scheduleContractSave(){} function saveTasksCache(){} function scheduleTasksSave(){} function renderTasks(){}';
+  const mk10 = (src) => new Function(STUB10 + FNS10.map((f) => fn10(src, f)).join('\n') + ' return { conChgDate: conChgDate, conChgEff: conChgEff, conEffAmt: conEffAmt, conEffEnd: conEffEnd, csListAmt: csListAmt, csEndCell: csEndCell, csVal: csVal, ov: csOverviewHtml, base: conBaseDate, submit: csApprSubmit, creates: apprPendingCreates };')();
   const oldSrc10 = () => { let s = html; for (const [a, b] of OLD10) { if (s.split(a).length !== 2) throw new Error('되돌릴 자리 없음: ' + a.slice(0, 40)); s = s.replace(a, () => b); } return s; };
   const OLDAPI10 = mk10(oldSrc10());
   // 가짜 계약 — 변경 차수 없음 / 승인 전·반려·취소·건너뜀 차수만 있음(모두 원계약 그대로여야)
   const ci10 = (o) => Object.assign({ title: '가짜공사', amount: 100000000, d1: '2026-03-01', d2: '2026-03-10', d3: '2026-12-31' }, o || {});
   const chg10 = (st, o) => Object.assign({ name: '변경계약', aid: 'change_contract', aw: 'amt', ak: '계약 단계', status: 'pending', task_id: null, done_at: null, round: 1, vals: {} }, st, o || {});
+  const ap10 = (status, amt, end) => ({ cid: 'cx', kind: '계약 단계', status, snap: { chg_amt: amt == null ? '' : amt, chg_end: end == null ? '' : end } });   // 상신 때 사본이 있는 결재
   const SAME10 = [
     { id: 'n1', type: 'dredge', status: 'active', contract_info: ci10(), pipes: [{ key: 'main', cur: 1, stages: [{ name: '계약', status: 'done' }, { name: '공사', status: 'open' }] }] },
     { id: 'n2', type: 'dredge', status: 'active', settle_amount: 90000000, contract_info: ci10({ d3: '2026-11-20' }) },
     { id: 'n3', type: 'demolition', status: 'done', contract_info: ci10({ amount: 0, d3: '' }), _bid: 55000000 },
     { id: 'n4', type: 'asbestos', status: 'active', contract_info: null, amount_tbd: '2026-11-01' },
     { id: 'n5', type: 'dredge', status: 'active', contract_info: ci10({ d3: '2026-10-01' }), pipes: [{ key: 'main', cur: 0, stages: [] }, { key: 'chg', cur: 0, stages: [
-      chg10({ status: 'open', vals: { chg_amt: '120,000,000', chg_end: '2027-03-31' }, appr: { status: '대기' } }), chg10({ status: 'done', round: 2, vals: { chg_amt: 130000000, chg_end: '2027-04-30' }, appr: { status: '반려' } }),
-      chg10({ status: 'done', round: 3, vals: { chg_amt: 140000000, chg_end: '2027-05-31' }, appr: { status: '취소' } }), chg10({ status: 'skipped', round: 4, vals: { chg_amt: 150000000, chg_end: '2027-06-30' } }),
-      chg10({ status: 'done', round: 5, vals: {} })] }] },
+      chg10({ status: 'open', vals: { chg_amt: '120,000,000', chg_end: '2027-03-31' }, appr: ap10('대기', '120,000,000', '2027-03-31') }), chg10({ status: 'done', round: 2, vals: { chg_amt: 130000000, chg_end: '2027-04-30' }, appr: ap10('반려', 130000000, '2027-04-30') }),
+      chg10({ status: 'done', round: 3, vals: { chg_amt: 140000000, chg_end: '2027-05-31' }, appr: ap10('취소', 140000000, '2027-05-31') }), chg10({ status: 'skipped', round: 4, vals: { chg_amt: 150000000, chg_end: '2027-06-30' } }),
+      chg10({ status: 'done', round: 5, vals: { chg_amt: 170000000, chg_end: '2027-07-31' } }),   // C: 결재 없이 끝난 차수를 완료 뒤 고침 — 무시
+      chg10({ status: 'done', round: 6, vals: { chg_amt: 180000000, chg_end: '2027-08-31' }, appr: { cid: 'old', status: '승인' } }),   // 사본 없는 옛 승인 차수 — 무시
+      chg10({ status: 'open', round: 7, vals: { chg_amt: 190000000, chg_end: '2027-09-30' }, appr: ap10('승인', 190000000, '2027-09-30') }),   // 승인됐지만 아직 완료 전(본 줄 잠금 등) — 무시
+      chg10({ status: 'done', round: 8, vals: {}, appr: ap10('승인', '', '2026-02-30') })] }] },   // 달력에 없는 종료일 사본 — 원계약 유지
     { id: 'n6', type: 'dredge', status: 'active', contract_info: ci10(), pipes: [{ key: 'main', cur: 0, stages: [{ name: '준공', status: 'open', vals: { fin_date: '2026-12-01' } }] }] }];
   // 백업 실자료(있으면 읽기만 — 값은 출력하지 않음): 운영 계약 전부가 종전 식과 같은지
   const bk10 = [join(ROOT, '..', 'jongwoon-appdata', 'data', 'backup'), 'C:/Users/user/jongwoon/jongwoon-appdata/data/backup'].find((p) => existsSync(join(p, 'gw', 'manifest.json')));
@@ -14612,8 +14619,9 @@ try {
     info.same = { fake: SAME10.length, diffF, diffL, real: REAL10.length, realChg, diffR };
     // ② 승인된 차수: 1차 승인(금액+종료일, 2027.3.31 표기) → 2차 반려(무시) → 3차 승인(종료일만) → 4차 진행 중(무시)
     const c2 = { id: 'g1', type: 'dredge', status: 'active', contract_info: ci10(), pipes: [{ key: 'main', cur: 2, stages: [{ name: '계약', status: 'done' }, { name: '공사', status: 'done' }, { name: '준공', status: 'open' }] }, { key: 'chg', cur: 3, stages: [
-      chg10({ status: 'done', round: 1, vals: { chg_amt: '120,000,000', chg_end: '2027.3.31' }, appr: { status: '승인' } }), chg10({ status: 'done', round: 2, vals: { chg_amt: 999000000, chg_end: '2030-01-01' }, appr: { status: '반려' } }),
-      chg10({ status: 'done', round: 3, vals: { chg_end: '2027-06-30' }, appr: { status: '승인' } }), chg10({ status: 'open', round: 4, vals: { chg_amt: 777000000, chg_end: '2031-01-01' }, appr: { status: '대기' } })] }] };
+      chg10({ status: 'done', round: 1, vals: { chg_amt: 555000000, chg_end: '2029-01-01' }, appr: ap10('승인', '120,000,000', '2027.3.31') }),   // A: 승인 뒤 입력 칸을 555,000,000·2029-01-01로 고침 — 유효 값은 사본 그대로
+      chg10({ status: 'done', round: 2, vals: { chg_amt: 999000000, chg_end: '2030-01-01' }, appr: ap10('반려', 999000000, '2030-01-01') }),
+      chg10({ status: 'done', round: 3, vals: { chg_end: '2027-06-30' }, appr: ap10('승인', '', '2027-06-30') }), chg10({ status: 'open', round: 4, vals: { chg_amt: 777000000, chg_end: '2031-01-01' }, appr: ap10('대기', 777000000, '2031-01-01') })] }] };
     const before = JSON.stringify(c2), e2 = A.conChgEff(c2), ov2 = A.ov(c2);
     info.eff = { e2, amt: A.conEffAmt(c2), end: A.conEffEnd(c2), list: A.csListAmt(c2), sortA: A.csVal(c2, 'amount'), endCell: A.csEndCell(c2).html, fin: A.base('fin', c2, null) };
     const okEff = e2.amt === 120000000 && e2.end === '2027-06-30' && e2.amtR === 1 && e2.endR === 3 && A.conEffAmt(c2) === 120000000 && A.conEffEnd(c2) === '2027-06-30' && A.csListAmt(c2) === 120000000 && A.csVal(c2, 'amount') === 120000000
@@ -14621,26 +14629,51 @@ try {
       && ov2.indexOf('120,000,000원 (변경 1차 승인 · 원계약 100,000,000원)') > 0 && ov2.indexOf('2027-06-30 (변경 3차 승인 · 원계약 2026-12-31)') > 0 && JSON.stringify(c2) === before;
     // ③ 정산액 우선은 목록에서 그대로 · 개요 계약액은 유효 계약액(정산액 칸은 따로) · 본 줄 고정 대안(차수 번호 없음) · 지난 원계약 종료일이 변경으로 연장되면 '경과' 표시가 사라짐
     const c3 = Object.assign(JSON.parse(before), { settle_amount: 115000000 });
-    const c4 = { id: 'g2', type: 'dredge', status: 'active', contract_info: ci10({ d3: '2026-10-31' }), pipes: [{ key: 'main', cur: 3, stages: [{ name: '계약', status: 'done' }, chg10({ status: 'done', round: undefined, vals: { chg_amt: 0, chg_end: '2027-01-31' }, appr: { status: '승인' } }), { name: '준공', status: 'open' }] }] };
+    const c4 = { id: 'g2', type: 'dredge', status: 'active', contract_info: ci10({ d3: '2026-10-31' }), pipes: [{ key: 'main', cur: 3, stages: [{ name: '계약', status: 'done' }, chg10({ status: 'done', round: undefined, vals: { chg_amt: 0, chg_end: '2027-01-31' }, appr: ap10('승인', 0, '2027-01-31') }), { name: '준공', status: 'open' }] }] };
     const old4 = OLDAPI10.csEndCell(c4).cls, ov4 = A.ov(c4);
     info.more = { list3: A.csListAmt(c3), ov3amt: /120,000,000원 \(변경 1차/.test(A.ov(c3)), cell4: A.csEndCell(c4).html, old4, ov4end: ov4.indexOf('2027-01-31 (변경 승인 · 원계약 2026-10-31)') > 0 };
     const okMore = A.csListAmt(c3) === 115000000 && A.csVal(c3, 'amount') === 115000000 && /120,000,000원 \(변경 1차 승인/.test(A.ov(c3)) && /115,000,000원/.test(A.ov(c3))
       && old4 === 'vs-dan' && A.csEndCell(c4).cls === '' && /^2027-01-31 /.test(A.csEndCell(c4).html) && info.more.ov4end && A.conEffAmt(c4) === 100000000 && ov4.indexOf('(변경') === ov4.lastIndexOf('(변경')
-      && A.conEffEnd({ contract_info: ci10(), pipes: [{ key: 'chg', stages: [chg10({ status: 'done', vals: { chg_end: '미정' }, appr: { status: '승인' } })] }] }) === '2026-12-31'   // 날짜가 아닌 종료일은 원계약 유지
-      && A.conEffAmt({ contract_info: ci10(), pipes: [{ key: 'chg', stages: [chg10({ status: 'done', round: 1, vals: { chg_amt: 110000000 }, appr: { status: '승인' } }), chg10({ status: 'done', round: 2, vals: { chg_amt: '125,000,000' }, appr: { status: '승인' } })] }] }) === 125000000;   // 승인 두 번 = 마지막 차수
+      && A.conEffEnd({ contract_info: ci10(), pipes: [{ key: 'chg', stages: [chg10({ status: 'done', vals: { chg_end: '미정' }, appr: ap10('승인', '', '미정') })] }] }) === '2026-12-31'   // 날짜가 아닌 종료일은 원계약 유지
+      && A.conEffAmt({ contract_info: ci10(), pipes: [{ key: 'chg', stages: [chg10({ status: 'done', round: 1, vals: { chg_amt: 110000000 }, appr: ap10('승인', 110000000) }), chg10({ status: 'done', round: 2, vals: { chg_amt: '125,000,000' }, appr: ap10('승인', '125,000,000') })] }] }) === 125000000;   // 승인 두 번 = 마지막 차수
+    // ⑤ 검토 ② 달력: 없는 날·1900년 전은 "" · 윤일·점 표기는 통과 · 원계약 d3가 점 표기(2027.1.31)이고 변경 종료일이 같은 날이면 괄호 없음
+    const DT10 = { '2026-02-30': '', '2026-04-31': '', '0000-01-01': '', '1899-12-31': '', '2026-13-01': '', '2028-02-29': '2028-02-29', '2026.1.5': '2026-01-05', '2027/03/31': '2027-03-31' };
+    const badDt = Object.keys(DT10).filter((k) => A.conChgDate(k) !== DT10[k]);
+    const c6 = { id: 'g6', type: 'dredge', status: 'active', contract_info: ci10({ d3: '2027.1.31' }), pipes: [{ key: 'chg', stages: [chg10({ status: 'done', appr: ap10('승인', '', '2027-01-31') })] }] };
+    const okDate = !badDt.length && A.ov(c6).indexOf('(변경') < 0 && A.ov(c6).indexOf('2027-01-31') > 0;
+    // ⑥ 검토 ① 실제 상신(csApprSubmit): 상신 때 사본 · B 대기 중 입력 칸을 고쳐도 승인되면 사본 값 · 승인 뒤 고쳐도 그대로 · 반려 뒤 고쳐 재상신 = 새 사본
+    const sB = chg10({ status: 'open', amt0: 100000000, eff0: 100000000, term0: '2026-12-31', vals: { chg_amt: 130000000, chg_end: '2027-02-28' } }), cB = { id: 'gB', type: 'dredge', status: 'active', contract_info: ci10(), pipes: [{ key: 'main', cur: 0, stages: [] }, { key: 'chg', cur: 0, stages: [sB] }] };
+    const subB = A.submit(cB, cB.pipes[1], 0), snapB = JSON.stringify((sB.appr || {}).snap || null);
+    sB.vals.chg_amt = 160000000; const effWait = A.conEffAmt(cB);   // 대기 중 고침 — 아직 원계약
+    sB.appr.status = '승인'; sB.status = 'done'; const effB = [A.conEffAmt(cB), A.conEffEnd(cB)];
+    sB.vals.chg_end = '2030-12-31'; const effB2 = A.conEffEnd(cB);   // 승인 뒤 고침
+    const sR = chg10({ status: 'open', round: 2, amt0: 130000000, eff0: 100000000, term0: '2027-02-28', vals: { chg_amt: 140000000 } }); cB.pipes[1].stages.push(sR);
+    const subR1 = A.submit(cB, cB.pipes[1], 1); sR.appr.status = '반려'; sR.vals.chg_amt = 150000000; const subR2 = A.submit(cB, cB.pipes[1], 1); sR.appr.status = '승인'; sR.status = 'done';
+    info.submit = { subB, snapB, effWait, effB, effB2, subR1, subR2, snapR: sR.appr && sR.appr.snap, effR: A.conEffAmt(cB), body: (A.creates[A.creates.length - 1] || {}).body };
+    const okSubmit = subB === true && snapB === JSON.stringify({ chg_amt: 130000000, chg_end: '2027-02-28' }) && effWait === 100000000 && effB[0] === 130000000 && effB[1] === '2027-02-28' && effB2 === '2027-02-28'
+      && subR1 === true && subR2 === true && sR.appr.snap.chg_amt === 150000000 && A.conEffAmt(cB) === 150000000 && A.conEffEnd(cB) === '2027-02-28';
+    info.dates = { badDt, ov6: A.ov(c6).indexOf('(변경') };
     // ④ 호출처: 목록 금액 칸·합계·정렬 = csListAmt, 준공 칸 = conEffEnd, 기산일 fin = conEffEnd · 시트 구간에 conAmtEff(c) 호출 0 · 돈 값 자리 3곳(결재 본문·실적 초안·기성 등록)은 conAmtEff 그대로 · 변경계약 기준 굳힘(term0)은 csEnd(원계약) 그대로
     const sh = src.slice(src.indexOf('// @con-sheet-start'), src.indexOf('  function renderContracts(){')) + fn10(src, 'renderContracts');   // 시트 구간 + 목록 그리기(합계 줄)
     const okWire = src.indexOf('amt = csListAmt(c); cells +=') > 0 && src.indexOf('sumAmt += csListAmt(c) || 0;') > 0 && src.indexOf('if (k === "amount") return csListAmt(c) || 0;') > 0 && src.indexOf('var d = conEffEnd(c), dd;') > 0
       && !/conAmtEff\(c\)/.test(sh.replace(/\/\/[^\n]*/g, '')) && src.indexOf('var cid = "c" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8), amt = conAmtEff(c);') > 0 && src.indexOf('var r = findAsb(c.site_id), amt = conAmtEff(c);') > 0
       && src.indexOf('var amt=conAmtEff(c);   // v382 정산액') > 0 && /if\(s\.aw==="amt" && s\.term0==null\) s\.term0 = csChgLastEnd\(c\)\|\|csEnd\(c\);/.test(src) && /function csEnd\(c\)\{ return \(\(c\.contract_info \|\| \{\}\)\.d3\) \|\| ""; \}/.test(src);
-    info.ok = { same: !diffF.length && !diffL.length && !diffR, okEff, okMore, okWire };
-    return { ok: !diffF.length && !diffL.length && !diffR && okEff && okMore && okWire, info };
+    info.ok = { same: !diffF.length && !diffL.length && !diffR, okEff, okMore, okWire, okDate, okSubmit };
+    return { ok: !diffF.length && !diffL.length && !diffR && okEff && okMore && okWire && okDate && okSubmit, info };
   };
   const r10 = chk10(html);
   const mut10 = (a, b) => { if (html.split(a).length !== 2) throw new Error('결함 심을 자리 없음: ' + a.slice(0, 50)); return html.replace(a, () => b); };
   const thrown10 = []; const safe10 = (f) => { try { return f(); } catch (e) { thrown10.push(e.message); return { ok: false }; } };   // 결함 사본이 예외로 ✗가 되면 '잡았다'가 아니다 — 예외 0을 함께 단언
+  const GUARD10 = '!x.appr || x.appr.status !== "승인" || !x.appr.snap || typeof x.appr.snap !== "object") return; var v = x.appr.snap, a';
   const M10 = [
-    mut10(' || (x.appr && x.appr.status !== "승인")) return;', ') return;'),   // 반려·취소 차수도 셈
+    mut10(' || !x.appr || x.appr.status !== "승인" ||', ' || !x.appr ||'),   // 반려·취소·대기 차수(사본 있음)도 셈
+    mut10(GUARD10, '(x.appr && x.appr.status !== "승인")) return; var v = (x.appr && x.appr.snap) || x.vals || {}, a'),   // C: 결재 없이 끝난 차수·사본 없는 옛 승인을 입력 칸으로 셈(검토 전 판)
+    mut10(GUARD10, '!x.appr || x.appr.status !== "승인") return; var v = x.appr.snap || x.vals || {}, a'),   // 사본 없는 옛 승인 차수를 입력 칸으로 셈
+    mut10('var v = x.appr.snap, a', 'var v = x.vals || {}, a'),   // A·B: 사본 대신 입력 칸을 읽음
+    mut10('if (s.aw === "amt"){ var sv = s.vals || {}; s.appr.snap = {', 'if (false){ var sv = s.vals || {}; s.appr.snap = {'),   // 상신 때 사본을 안 남김
+    mut10('if (x.getUTCFullYear() !== y || x.getUTCMonth() !== mo - 1 || x.getUTCDate() !== d) return "";', ''),   // 검토 ②: 달력에 없는 날 통과
+    mut10('if (y < 1900) return "";', ''),   // 1900년 전 통과
+    mut10('ce.end !== (conChgDate(ci.d3) || ci.d3)', 'ce.end !== ci.d3'),   // 원계약 점 표기 = 같은 날인데 괄호
     mut10('x.aw !== "amt" || x.status !== "done" ||', 'x.aw !== "amt" ||'),   // 승인 전(진행 중) 차수도 셈
     mut10('if (a){ r.amt = a; r.amtR', 'if (a && !r.amt){ r.amt = a; r.amtR'),   // 마지막이 아니라 첫 승인 차수
     mut10('function conEffAmt(c){ return conChgEff(c).amt || conAmt(c); }', 'function conEffAmt(c){ return conAmt(c); }'),
@@ -14650,7 +14683,7 @@ try {
     mut10('sumAmt += csListAmt(c) || 0;', 'sumAmt += conAmtEff(c) || 0;'), mut10('amt = csListAmt(c); cells +=', 'amt = conAmtEff(c); cells +='),
     mut10('var cid = "c" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8), amt = conAmtEff(c);', 'var cid = "c" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8), amt = csListAmt(c);'),   // 돈 값 자리를 건드림
     mut10('var amt=conAmtEff(c);   // v382 정산액', 'var amt=csListAmt(c);   // v382 정산액')].map((s) => safe10(() => chk10(s)).ok);
-  T('판10 변경계약 유효 금액·종료일(실행 — 실제 conChgEff·conEffAmt·conEffEnd·csListAmt·csEndCell·csVal·csOverviewHtml·conBaseDate): 승인된 마지막 차수(칸마다 — 금액 1차·종료일 3차)·반려·취소·대기·건너뜀 무시·2027.3.31 표기 정규화·날짜 아닌 값은 원계약 · 개요는 바뀐 때만 원계약 괄호 · 목록 정산액 우선 그대로 · 기산일 fin = 유효 종료일 · 원계약 값 안 바뀜 · 변경 없는 계약 ' + SAME10.length + '건 + 운영 백업 ' + REAL10.length + '건이 종전 식(원문 되돌림)과 같음 · 돈 값 자리 3곳 conAmtEff 그대로 · 결함 사본 ' + M10.length + '개 = 모두 ✗',
+  T('판10 변경계약 유효 금액·종료일(실행 — 실제 conChgEff·conEffAmt·conEffEnd·csListAmt·csEndCell·csVal·csOverviewHtml·conBaseDate·csApprSubmit): 승인된 마지막 차수의 상신 때 사본(appr.snap)만(칸마다 — 금액 1차·종료일 3차)·승인 뒤 입력 칸 고침(A)·대기 중 고침(B — 승인되면 사본 값)·반려 뒤 재상신 = 새 사본·결재 없이 끝난 차수(C)·사본 없는 옛 승인·승인됐지만 완료 전·반려·취소·대기·건너뜀 무시·2027.3.31 표기 정규화·달력에 없는 날(2026-02-30·2026-04-31·0000-01-01·1899-12-31)·날짜 아닌 값은 원계약·원계약 점 표기와 같은 날이면 괄호 없음 · 개요는 바뀐 때만 원계약 괄호 · 목록 정산액 우선 그대로 · 기산일 fin = 유효 종료일 · 원계약 값 안 바뀜 · 변경 없는 계약 ' + SAME10.length + '건 + 운영 백업 ' + REAL10.length + '건이 종전 식(원문 되돌림)과 같음 · 돈 값 자리 3곳 conAmtEff 그대로 · 결함 사본 ' + M10.length + '개 = 모두 ✗',
     r10.ok && M10.every((v) => v === false) && thrown10.length === 0, JSON.stringify({ r: r10.info, mut: M10, thrown: thrown10 }));
 } catch (e) { console.log('  (판10 검사 생략 — ' + e.message + ')'); fails++; }
 
