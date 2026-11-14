@@ -5371,7 +5371,7 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   const set80 = (body, tok, dev) => call(Object.assign({ action: 'safety_settings_set' }, body), tok, dev);
   const aud80 = () => auditMock.logs.filter((l) => l.col === 'safety');
   const K80 = (o) => Object.assign({ stage: 'none', apply_no: '', applied_on: '', review_on: '', decided_on: '', expires_on: '', rate_year: '', checks: [] }, o || {});
-  const V80 = (k, h) => ({ kosha: K80(k), headcount: Object.assign({ env: '', con: '' }, h || {}) });
+  const V80 = (k, h, r) => ({ kosha: K80(k), headcount: Object.assign({ env: '', con: '' }, h || {}), reduce: Object.assign({ env: [], con: [] }, r || {}) });   // v476 감면 연도 칸(기본 빈 목록)
   mem.gw_data[KEY80] = null;   // 운영 지금 상태(키 없음)
   const audit0_80 = aud80().length;
 
@@ -5410,7 +5410,7 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   const st2_80 = JSON.parse(JSON.stringify(mem.gw_data[KEY80] || null)), au2_80 = aud80().slice(audit0_80);
   T('80 v436 관리자 저장 2(다른 관리자 · base = 저장 1의 updated_at): 200 · 인원 숫자 글 "20" → 20 · 0명 그대로 · prev = 저장 1 한 판(kosha·headcount·updated_at·updated_by — prev 안의 prev 없음, 응답 prev = 날·사람만) · updated_at이 커짐 · 감사 +1줄(바뀐 칸만 — 접수번호·접수일은 같아 빠짐)',
     w2_80.code === 200 && w2_80.body.updated_by === 'u80adm' && w2_80.body.updated_at > w1_80.body.updated_at && !!st2_80 && JSON.stringify(st2_80.headcount) === '{"env":20,"con":0}' && st2_80.kosha.stage === 'certified' && st2_80.kosha.checks.length === 1 && st2_80.kosha.checks[0].note === '공단 사후점검 적합'
-    && JSON.stringify(st2_80.prev) === JSON.stringify({ kosha: st1_80.kosha, headcount: st1_80.headcount, updated_at: st1_80.updated_at, updated_by: 'uadmin' }) && JSON.stringify(w2_80.body.prev) === JSON.stringify({ updated_at: st1_80.updated_at, updated_by: 'uadmin' })
+    && JSON.stringify(st2_80.prev) === JSON.stringify({ kosha: st1_80.kosha, headcount: st1_80.headcount, reduce: { env: [], con: [] }, updated_at: st1_80.updated_at, updated_by: 'uadmin' }) && JSON.stringify(w2_80.body.prev) === JSON.stringify({ updated_at: st1_80.updated_at, updated_by: 'uadmin' })
     && au2_80.length === 2 && Object.keys(au2_80[1].ev[0].f).join(',') === 'kosha.stage,kosha.review_on,kosha.decided_on,kosha.expires_on,kosha.rate_year,kosha.checks,headcount.env,headcount.con' && au2_80[1].by === '관리자80',
     JSON.stringify({ w2: [w2_80.code, w2_80.body.error_code], prev: st2_80 && st2_80.prev, f: au2_80[1] && au2_80[1].ev[0].f }));
 
@@ -5490,6 +5490,31 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
     && c6_80.code === 400 && c6_80.body.error_code === 'NO_CHANGE' && aud80().length === audC5n80 && JSON.stringify(mem.gw_data[KEY80]) === snapC5_80,
     JSON.stringify({ c: [c1_80, c2_80, c3_80, c4_80, c5_80, c6_80].map((x) => x.code + '/' + (x.body.error_code || '')), f2: cAu2_80 && cAu2_80.ev[0].f, f4: cAu4_80 && cAu4_80.ev[0].f, f5: cAu5_80 && cAu5_80.ev[0].f }));
 
+  // ⑪ (v476) 근로자 정기교육 감면 적용 연도 reduce — 새로 시작(키 없음 = base 0)
+  //   저장 = 네 자리 연도 글 목록(숫자도 글로 · 같은 해 한 번 · 오름차순) · 감사 칸 reduce.env · 잘못된 값 400 BAD_REDUCE(저장·감사 0) · reduce 없는 요청(옛 앱) = 저장돼 있던 연도 그대로 · v475까지의 저장값(reduce 없음) = 읽기 200·빈 목록
+  mem.gw_data[KEY80] = null;
+  const r1_80 = await set80(Object.assign({ base: 0 }, V80({ stage: 'none' }, { env: 18, con: 4 }, { env: [2027, '2026', '2026'], con: [] })), tokA), rSt1_80 = JSON.parse(JSON.stringify(mem.gw_data[KEY80] || null)), rAu1_80 = aud80().slice(-1)[0];
+  const rAudN80 = aud80().length, rSnap80 = JSON.stringify(mem.gw_data[KEY80]);
+  const rBad80 = [];
+  for (const b of [{ env: ['26'], con: [] }, { env: ['1999'], con: [] }, { env: '2026', con: [] }, { env: [], con: Array.from({ length: 11 }, (_, i) => String(2020 + i)) }, [], 'x', { env: [null], con: [] }]) {
+    const x = await set80(Object.assign({ base: r1_80.body.updated_at }, V80({ stage: 'none' }, { env: 18, con: 4 }), { reduce: b }), tokA); rBad80.push(x.code + '/' + (x.body.error_code || ''));
+  }
+  const rBadKeep80 = aud80().length === rAudN80 && JSON.stringify(mem.gw_data[KEY80]) === rSnap80;
+  const oldBody80 = V80({ stage: 'none' }, { env: 19, con: 4 }); delete oldBody80.reduce;   // 옛 앱 = reduce 칸을 안 보냄
+  const r2_80 = await set80(Object.assign({ base: r1_80.body.updated_at }, oldBody80), tokA), rSt2_80 = JSON.parse(JSON.stringify(mem.gw_data[KEY80] || null)), rAu2_80 = aud80().slice(-1)[0];
+  const r3_80 = await set80(Object.assign({ base: r2_80.body.updated_at }, V80({ stage: 'none' }, { env: 19, con: 4 }, { env: [], con: ['2027'] })), tokA), rAu3_80 = aud80().slice(-1)[0], rSt3_80 = JSON.parse(JSON.stringify(mem.gw_data[KEY80] || null));
+  const r4_80 = await set80(Object.assign({ base: r3_80.body.updated_at }, V80({ stage: 'none' }, { env: 19, con: 4 }, { env: [], con: ['2027'] })), tokA);
+  mem.gw_data[KEY80] = { schema: 1, kosha: K80({ stage: 'none' }), headcount: { env: 18, con: 4 }, prev: null, updated_at: 77, updated_by: 'uadmin' };   // v475까지의 저장값(reduce 없음)
+  const rOld80 = await get80(tokA);
+  T('80 v476 정기교육 감면 연도(reduce): 저장 200 = 연도 글 목록(2027·"2026"·"2026" → ["2026","2027"])·응답 settings.reduce 같음·감사 f reduce.env ["", "2026, 2027"] · 잘못된 값 7종(두 자리·1999·목록 아님·11개·배열·글·null) = 400 BAD_REDUCE·저장·감사 그대로 · reduce 없는 요청(옛 앱 — 인원만 고침) = 200·감면 연도 그대로·prev에 reduce·감사 f는 인원만 · 비우고 다른 회사에 넣기 = 감사 두 칸 · 같은 값 = NO_CHANGE · reduce 없는 옛 저장값 = 읽기 200·빈 목록',
+    r1_80.code === 200 && JSON.stringify(rSt1_80.reduce) === '{"env":["2026","2027"],"con":[]}' && JSON.stringify(r1_80.body.settings.reduce) === '{"env":["2026","2027"],"con":[]}' && !!rAu1_80 && JSON.stringify(rAu1_80.ev[0].f['reduce.env']) === '["","2026, 2027"]' && rAu1_80.ev[0].f['reduce.con'] === undefined
+    && /정기교육 감면 연도 종운환경 —→2026, 2027/.test(rAu1_80.ev[0].t)
+    && rBad80.length === 7 && rBad80.every((x) => x === '400/BAD_REDUCE') && rBadKeep80
+    && r2_80.code === 200 && JSON.stringify(rSt2_80.reduce) === '{"env":["2026","2027"],"con":[]}' && rSt2_80.headcount.env === 19 && JSON.stringify(rSt2_80.prev.reduce) === '{"env":["2026","2027"],"con":[]}' && JSON.stringify(Object.keys(rAu2_80.ev[0].f)) === '["headcount.env"]'
+    && r3_80.code === 200 && JSON.stringify(rSt3_80.reduce) === '{"env":[],"con":["2027"]}' && JSON.stringify(rAu3_80.ev[0].f) === JSON.stringify({ 'reduce.env': ['2026, 2027', ''], 'reduce.con': ['', '2027'] })
+    && r4_80.code === 400 && r4_80.body.error_code === 'NO_CHANGE'
+    && rOld80.code === 200 && JSON.stringify(rOld80.body.settings.reduce) === '{"env":[],"con":[]}' && rOld80.body.updated_at === 77,
+    JSON.stringify({ r: [r1_80, r2_80, r3_80, r4_80, rOld80].map((x) => x.code + '/' + (x.body.error_code || '')), bad: rBad80, keep: rBadKeep80, st1: rSt1_80 && rSt1_80.reduce, f1: rAu1_80 && rAu1_80.ev[0].f, f2: rAu2_80 && rAu2_80.ev[0].f, f3: rAu3_80 && rAu3_80.ev[0].f }));
   mem.gw_users = savedUsers80;
   if (had80 === undefined) delete mem.gw_data[KEY80]; else mem.gw_data[KEY80] = had80;
 }

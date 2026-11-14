@@ -2944,6 +2944,12 @@
       <input type="text" id="sfSetHeadEnv" placeholder="종운환경 (명)" inputmode="numeric" maxlength="3" autocomplete="off" style="flex:1 1 0;min-width:0;">
       <input type="text" id="sfSetHeadCon" placeholder="종운건설 (명)" inputmode="numeric" maxlength="3" autocomplete="off" style="flex:1 1 0;min-width:0;">
     </div>
+    <span class="fld-label">근로자 정기교육 감면 적용 연도 (전년도에 산업재해가 없었던 해 — 그 해 기준 시간이 절반 · 쉼표로 여러 해)</span>
+    <div style="display:flex;gap:8px;">
+      <input type="text" id="sfSetRedEnv" placeholder="종운환경 (예: 2026)" maxlength="60" autocomplete="off" style="flex:1 1 0;min-width:0;">
+      <input type="text" id="sfSetRedCon" placeholder="종운건설 (예: 2026)" maxlength="60" autocomplete="off" style="flex:1 1 0;min-width:0;">
+    </div>
+    <div class="empty-line" style="margin:-2px 2px 8px;">산업안전보건법 시행규칙 제27조① — 다음 연도에 한정해 근로자 정기교육 시간의 50% 범위 면제. 관리감독자 16시간은 그대로 둡니다.</div>
     <button class="primary" id="sfSetSave">저장</button>
     <button class="secondary" id="sfSetCancel">취소</button>
   </div>
@@ -19092,6 +19098,20 @@
   }
   // 서류함 읽기 상태 — 기다림은 그 계약의 읽기를 시작한 틱(sfNowCdocT0, 현황을 열 때 읽은 계약은 0)부터 센다
   function sfNowCdocSt(c){ var e = (typeof CDOC !== "undefined" && CDOC) ? CDOC[c.id] : null; if (e && e.loaded) return "ok"; if (e && e.err && !e.busy) return "fail"; return (sfNowTicks - (sfNowCdocT0[c.id] || 0)) >= SF_NOW_TICK_MAX ? "fail" : "wait"; }
+  // v476 공사금액 문턱(PM 11/14 'ㄱ 시작' — 법제처 원문 11/14 확인) — 철거·석면 계약(건설공사)의 계약금액 칸 기준. 준설·폐기물은 공사 계약인지 계약마다 달라 판정하지 않는다(꼬리말).
+  //   2천만원 이상 = 산업안전보건관리비 고시 적용(건설업 산업안전보건관리비 계상 및 사용기준 제2025-11호 제3조 — 총공사금액) · 4천만원 이상 = 매월 사용명세서·종료 뒤 1년 보존(산안법 시행규칙 제89조② · 고시 제10조)
+  //   · 1억원 이상 120억원 미만 = 기술지도 계약(산안법 제73조 · 시행령 제59조 — 공사기간 1개월 미만 등 제외, 체결은 발주자·자기공사자, 착공 전날까지). 계약금액이 없으면 판정 안 함
+  var SF_NOW_AMT = { fee: 20000000, stmt: 40000000, guide: 100000000, guideMax: 12000000000 };
+  function sfNowConThr(c){
+    if (!c || (c.type !== "asbestos" && c.type !== "demolition")) return "";
+    var a = Number((c.contract_info && c.contract_info.amount) || 0), out = [];
+    if (!(a > 0)) return "공사금액 문턱: 계약금액 없음(판정 안 함)";
+    if (a < SF_NOW_AMT.fee) return "공사금액 문턱: 2천만원 미만 — 안전관리비 고시 적용 밖";
+    out.push("안전관리비 계상(2천만↑)");
+    if (a >= SF_NOW_AMT.stmt) out.push("사용명세서 매월(4천만↑)");
+    if (a >= SF_NOW_AMT.guide && a < SF_NOW_AMT.guideMax) out.push("기술지도 계약(1억↑ · 1개월 미만 공사 제외)");
+    return "공사금액 문턱: " + out.join(" · ");
+  }
   function sfNowCons(){
     var T = "④ 계약 안전 서류", st = sfNowColSt("contracts", contracts.length > 0), src = "진행 중 계약 · 누르면 그 계약의 단계·서류";
     if (st !== "ok") return { h: sfNowBlock("con", T, "", src, sfNowWaitRow("계약", "계약 목록", st, true), ""), pend: st === "wait" };
@@ -19106,15 +19126,16 @@
       var nm = [c.client, csSiteText(c)].filter(Boolean).join(" · ") || c.label || "(계약)", cs = sfNowCdocSt(c), go = "con:" + c.id;
       if (cs === "wait"){ pend = true; rows.push(sfNowRow(csKind(c), nm, keys.map(function(x){ return x.s; }).join(" · ") + " — 서류함 확인 중", "확인 중", "", go)); return; }
       if (cs === "fail"){ rows.push(sfNowRow(csKind(c), nm, "계약 서류함을 불러오지 못함 — 계약 단계·서류에서 직접 확인", "확인 실패", "bad", go)); return; }
-      var docs = null, nT = 0, nD = 0;
+      var docs = null, nT = 0, nD = 0, thr = sfNowConThr(c);
       try { docs = sfNowConDocs(c); } catch(e){ docs = null; }
       if (!docs){ rows.push(sfNowRow(csKind(c), nm, "이 계약의 단계·서류를 읽지 못함 — 계약 단계·서류에서 직접 확인", "확인 실패", "bad", go)); return; }   // 한 건이 블록 전체를 막지 않게
       docs.forEach(function(d){ if (d.st === "done" || d.st === "todo"){ nT++; if (d.st === "done") nD++; } });
       if (nD < nT) miss++;
-      rows.push(sfNowRow(csKind(c), nm, docs.map(function(d){ return d.s + " " + (d.st === "done" ? "✓" : (d.st === "na" ? "해당없음" : (d.st === "todo" ? "✗" : "-"))); }).join(" · ") + " · 단계·서류 ›", nT ? nD + "/" + nT : "해당없음", !nT ? "" : (nD === nT ? "ok" : "am"), go));
+      rows.push(sfNowRow(csKind(c), nm, docs.map(function(d){ return d.s + " " + (d.st === "done" ? "✓" : (d.st === "na" ? "해당없음" : (d.st === "todo" ? "✗" : "-"))); }).join(" · ") + (thr ? " · " + thr : "") + " · 단계·서류 ›", nT ? nD + "/" + nT : "해당없음", !nT ? "" : (nD === nT ? "ok" : "am"), go));
     });
     var body = rows.join("") || sfNowEmpty(act.length ? "진행 중 계약에 걸리는 안전 서류가 없습니다." : "진행 중인 계약이 없습니다.");
-    var foot = "실물 양식은 아직 준설만 들어와 있습니다 — 그 밖의 종류는 양식이 없어 ✗로 남습니다(v427 판정 그대로)." + (none ? " 안전 서류 줄이 없는 진행 계약 " + none + "건(사급 등)은 뺐습니다." : "");
+    var foot = "실물 양식은 아직 준설만 들어와 있습니다 — 그 밖의 종류는 양식이 없어 ✗로 남습니다(v427 판정 그대로)." + (none ? " 안전 서류 줄이 없는 진행 계약 " + none + "건(사급 등)은 뺐습니다." : "")
+      + " 공사금액 문턱(철거·석면 계약의 계약금액 기준): 2천만원 이상 산업안전보건관리비 계상(고시 제2025-11호 제3조) · 4천만원 이상 매월 사용명세서·종료 뒤 1년 보존(산업안전보건법 시행규칙 제89조②) · 1억원 이상 120억원 미만 기술지도 계약(시행령 제59조 — 공사기간 1개월 미만 제외, 체결은 발주자·착공 전날까지). 준설은 공사 계약일 때 같은 문턱입니다.";
     return { h: sfNowBlock("con", T, rows.length ? "진행 " + rows.length + "건" + (miss ? " · 빠짐 " + miss : "") : "", src, body, esc(foot)), pend: pend };
   }
   // ⑤ 인정·평가(v436 — 메뉴 56 7단계 · PM 11/10 ⓐ '안전 설정 따로': KOSHA 인정은 인허가 행이 아니라 안전 설정 settings:safety — 현황을 열 때 sfNowLoad("set", loadSafetySet)로 읽는다)
@@ -19200,7 +19221,7 @@
   }
   // 회사 구분(v436) — 안전 설정의 회사별 상시근로자 수 두 칸이 다 있을 때만 현황 맨 위에(처음엔 꺼짐 — 한 칸이라도 비면 블록째 없음).
   //   문턱 배지 = 시안 법령 표에서 원문 '확인'된 사람 수 문턱만: 상시 5명(중대재해처벌법 제3조 · 산업안전보건법 제29조 정기교육 — 특별교육은 5명 미만에도) ·
-  //   20명(산업안전보건법 시행령 제24조 — 폐기물 수집·운반업 20~49명 안전보건관리담당자, 종운환경만). 공사금액 문턱은 아직(원문 확인 뒤) · 회사로 거르기 = v471 회사 칩
+  //   20명(산업안전보건법 시행령 제24조 — 폐기물 수집·운반업 20~49명 안전보건관리담당자, 종운환경만). 공사금액 문턱 = v476 ④ 계약 안전 서류 줄(sfNowConThr) · 회사로 거르기 = v471 회사 칩
   var SF_NOW_CORP = [{ k: "env", n: "종운환경", t20: true }, { k: "con", n: "종운건설", t20: false }];
   function sfNowHeadN(v){ return typeof v === "number" && v >= 0 && v <= 999 && v % 1 === 0; }
   function sfNowHeadOn(){ var h = sfSet && sfSet.headcount; return !!(h && sfNowHeadN(h.env) && sfNowHeadN(h.con)); }
@@ -19216,9 +19237,11 @@
         else if (n >= 20){ pills.push(sfNowPill("20명↑ 담당자 선임", "am")); meta.push("안전보건관리담당자 선임 대상(폐기물 수집·운반업 20~49명)"); }
         else meta.push("안전보건관리담당자는 20명부터(폐기물 수집·운반업)");
       }
+      var ry = (sfSet.reduce && Array.isArray(sfSet.reduce[c.k])) ? sfSet.reduce[c.k] : [], ty = todayStr().slice(0, 4);
+      if (ry.indexOf(ty) >= 0) meta.push(ty + "년 근로자 정기교육 감면 적용(전년 무재해 — 기준의 절반)");   // v476
       return sfNowRowP(c.n, esc("상시근로자 " + n + "명"), meta.join(" · "), pills, "");
     });
-    return { h: sfNowBlock("corp", "회사 구분", "", "안전 설정의 회사별 상시근로자 수", rows.join(""), esc("문턱 = 상시 5명(중대재해처벌법 제3조 · 산업안전보건법 제29조 정기교육 — 특별교육은 5명 미만에도 적용) · 20명(산업안전보건법 시행령 제24조 — 폐기물 수집·운반업 20~49명 안전보건관리담당자, 종운환경). 공사금액 문턱은 아직 없습니다.")), pend: false };
+    return { h: sfNowBlock("corp", "회사 구분", "", "안전 설정의 회사별 상시근로자 수", rows.join(""), esc("문턱 = 상시 5명(중대재해처벌법 제3조 · 산업안전보건법 제29조 정기교육 — 특별교육은 5명 미만에도 적용) · 20명(산업안전보건법 시행령 제24조 — 폐기물 수집·운반업 20~49명 안전보건관리담당자, 종운환경). 공사금액 문턱은 ④ 계약 안전 서류 줄에 있습니다.")), pend: false };
   }
   // ⑥ 확인 필요 — 조문과 해당 여부만 + 문서함 06 안전보건 바로가기(문서함 권한)
   function sfNowConfirm(see){
@@ -19322,11 +19345,12 @@
   //   현황 구간(@safety-now)은 저장·서버 호출 0이라 읽기 로더·창·저장을 여기 둔다. 서버 gw-data safety_settings_get(안전 권한 — 숨김 403)·safety_settings_set(관리자만 — 값 검사 400·낙관락 409·prev 1판·감사 1줄).
   //   KOSHA 위험성평가 인정은 인허가 목록(licenses)에 행으로 넣지 않는다 — 인허가 화면·자동 지시·캘린더·검색·브리핑은 무변.
   var sfSet = null, sfSetBase = 0, sfSetDay = "", sfSetBy = "", sfSetSaving = false;   // 받은 값({ kosha, headcount } — 저장값이 없으면 null) · 낙관락 토큰(저장된 updated_at) · 마지막으로 고친 날·사람 id · 저장 중(연타 방지)
+  var sfSetGot = false;   // v476 안전 설정을 한 번이라도 받았는가(체크 칸이 감면 연도를 읽으려고 — 현황을 안 거치고 체크 칸부터 열어도 1번 읽는다)
   var SF_SET_STAGES = ["none", "applied", "review", "certified"];
   var SF_SET_NO_WRITE = "안전 설정은 관리자만 고칩니다(현황은 읽기 전용).";
   var SF_SET_STALE = "다른 곳에서 먼저 고쳤습니다 — 새로 읽었습니다";
   var SF_SET_ERR = { BAD_VALUE: "보낸 값의 모양이 맞지 않습니다", BAD_STAGE: "인정 단계가 맞지 않습니다", BAD_TEXT: "접수번호는 40자까지입니다", BAD_DATE: "날짜가 맞지 않습니다",
-    BAD_YEAR: "요율 반영 연도는 네 자리입니다", BAD_CHECKS: "사후점검 이력(10건까지, 줄마다 날짜)이 맞지 않습니다", BAD_HEADCOUNT: "상시근로자 수는 0~999 정수입니다",
+    BAD_YEAR: "요율 반영 연도는 네 자리입니다", BAD_CHECKS: "사후점검 이력(10건까지, 줄마다 날짜)이 맞지 않습니다", BAD_HEADCOUNT: "상시근로자 수는 0~999 정수입니다", BAD_REDUCE: "감면 적용 연도는 네 자리 연도(회사마다 10개까지)입니다",
     ADMIN_ONLY: "관리자만 고칠 수 있습니다", SETTINGS_READ_FAILED: "저장된 값을 읽지 못했습니다 — 잠시 뒤 다시 저장해 주세요" };
   // 읽기 — 현황을 열 때 sfNowOpen이 sfNowLoad("set", loadSafetySet)로 부른다(결과 true/false). 안전 권한이 없으면 부르지 않음(서버도 숨김 403 NO_ACCESS)
   function loadSafetySet(){
@@ -19343,6 +19367,7 @@
     sfSetBase = Number(b.updated_at) || 0;
     sfSetDay = sfSetBase ? fmtDate(new Date(sfSetBase)) : "";
     sfSetBy = String(b.updated_by || "");
+    sfSetGot = true;
   }
   // [고치기] — 현황 ⑤ 버튼(관리자에게만 그려짐, #sfNowHost 위임 배선). 창을 지금 값으로 채워 연다
   function sfSetOpen(){
@@ -19358,6 +19383,8 @@
     put("sfSetApplyNo", k.apply_no); put("sfSetApplied", k.applied_on); put("sfSetReview", k.review_on); put("sfSetDecided", k.decided_on); put("sfSetExpires", k.expires_on); put("sfSetRateYear", k.rate_year);
     put("sfSetChecks", (Array.isArray(k.checks) ? k.checks : []).map(function(c){ return (c && c.date ? c.date : "") + (c && c.note ? " " + c.note : ""); }).join("\n"));
     put("sfSetHeadEnv", h.env); put("sfSetHeadCon", h.con);
+    var rd = (v && v.reduce) || {};
+    put("sfSetRedEnv", (Array.isArray(rd.env) ? rd.env : []).join(", ")); put("sfSetRedCon", (Array.isArray(rd.con) ? rd.con : []).join(", "));
     document.getElementById("sfSetStamp").textContent = sfSetBase ? "마지막 고침 " + sfSetDay : "아직 저장한 적 없음 — 현황에는 '미인정(입력 전)'";
   }
   function sfSetDateOk(s){ if (!isDate(s)) return false; var t = new Date(s + "T00:00:00"); return !isNaN(t.getTime()) && fmtDate(t) === s; }
@@ -19381,7 +19408,11 @@
     var hn = function(s){ return s === "" ? "" : (/^\d{1,3}$/.test(s) ? Number(s) : null); };
     var env = hn(g("sfSetHeadEnv")), con = hn(g("sfSetHeadCon"));
     if (env === null || con === null) return { err: "상시근로자 수는 0~999 사이 정수로 넣거나 비워 두세요." };
-    return { v: { kosha: k, headcount: { env: env, con: con } } };
+    // v476 감면 연도 — 쉼표·공백으로 나눈 네 자리 연도(2000~2100), 회사마다 10개까지 · 같은 해는 한 번 · 오름차순(서버 safetyYears와 같은 규칙)
+    var yn = function(s){ var a = s.split(/[\s,]+/).filter(Boolean), o = [], j; for (j = 0; j < a.length; j++){ if (!/^\d{4}$/.test(a[j]) || Number(a[j]) < 2000 || Number(a[j]) > 2100) return null; if (o.indexOf(a[j]) < 0) o.push(a[j]); } return o.length > 10 ? null : o.sort(); };
+    var re = yn(g("sfSetRedEnv")), rc = yn(g("sfSetRedCon"));
+    if (re === null || rc === null) return { err: "감면 적용 연도는 네 자리 연도를 쉼표로 나눠 넣거나 비워 두세요(예: 2026, 2027 — 10개까지)." };
+    return { v: { kosha: k, headcount: { env: env, con: con }, reduce: { env: re, con: rc } } };
   }
   // 저장 — 관리자만(서버도 ADMIN_ONLY) · 받은 때의 updated_at을 base로(낙관락). 409 = 다른 관리자·다른 기기가 먼저 고침 → 새로 읽어 창을 새 값으로 채우고 알린다(사람이 새 값을 보고 다시 결정)
   function sfSetSave(){
@@ -19390,10 +19421,10 @@
     var f = sfSetRead();
     if (f.err){ alert(f.err); return; }
     sfSetSaving = true;
-    gwCall("gw-data", { action: "safety_settings_set", base: sfSetBase, kosha: f.v.kosha, headcount: f.v.headcount }).then(function(res){
+    gwCall("gw-data", { action: "safety_settings_set", base: sfSetBase, kosha: f.v.kosha, headcount: f.v.headcount, reduce: f.v.reduce }).then(function(res){
       sfSetSaving = false;
       var code = (res.body && res.body.error_code) || "";
-      if (res.status === 200 && res.body){ sfSetApply(res.body); sfSetClose(); gwToast("저장했습니다"); sfNowRefresh(); return; }
+      if (res.status === 200 && res.body){ sfSetApply(res.body); sfSetClose(); gwToast("저장했습니다"); sfNowRefresh(); return; }   // 감면 연도는 체크 칸을 다음에 열 때 반영(현황에서만 고침)
       if (res.status === 400 && code === "NO_CHANGE"){ sfSetClose(); gwToast("바뀐 것이 없습니다"); return; }
       if (res.status === 409){
         var p = loadSafetySet();
@@ -19594,7 +19625,7 @@
     y = Number(date.slice(0, 4)); m = Number(date.slice(5, 7));
     if (k === "regular" || k === "super"){
       mm = ptype === "member" ? findMember(pid) : null;
-      need = k === "super" ? 16 : ((mm && mm.office === true) ? 6 : 12);
+      need = k === "super" ? 16 : eduRegNeed(mm, y);   // v476 감면 해는 절반
       from = k === "super" ? y + "-01-01" : y + (m <= 6 ? "-01-01" : "-07-01"); to = k === "super" ? y + "-12-31" : y + (m <= 6 ? "-06-30" : "-12-31");
       sum = eduHoursNum(hours);
       liveEdu().forEach(function(r){ if (r.id !== exceptId && r.kind === k && r.ptype === ptype && String(r.pid) === pid && isDate(r.date) && r.date >= from && r.date <= to) sum += eduHoursNum(r.hours); });
@@ -19777,8 +19808,8 @@
   //   위험성평가 칸 = 결과 공유만 판정(직원 — 그 사람에게 걸리는 올해 정기·최초 회차(eduRaOnFor — 전사·그 부서)가 있으면 그 뒤 ra_share가 없을 때, 회차가 없으면 올해 ra_share가 없을 때 노랑 '기록 없음' — 빨강은 공유 기한 근거 확인 뒤, v447 검토 2)
   //   · 참여(ra_join)는 '· 참여' 표시만 · 올해 투입 일용직의 공유는 '신규·작업 변경자 작업 전 공유'라
   //   고용노동부 11/4 고시 전부개정이 법제처에 오르기 전까지 '근거 확인 중'(회색).
-  //   정기교육 = 감면 없음 기준(사무직 반기 6 · 그 밖 12 · 관리감독자 연 16시간 — 회원 '사무직'·'관리감독자 지정' 표식, 표식이 없으면 12). 회사 단위 감면(상시근로자 수·감면 적용 연도·전년 무재해)은
-  //   안전 설정(settings:safety — v436 저장 형식 kosha·headcount)에 칸이 아직 없어 늘 '감면 없음'(eduReduce — 칸이 생기면 이 한 곳에서 읽는다).
+  //   정기교육 = 감면 없음 기준(사무직 반기 6 · 그 밖 12 · 관리감독자 연 16시간 — 회원 '사무직'·'관리감독자 지정' 표식, 표식이 없으면 12). 회사 단위 감면(전년 무재해 — v476)은
+  //   안전 설정(settings:safety)의 감면 적용 연도(reduce)를 eduReduceOn 한 곳에서 읽는다 — 그 해 근로자 정기교육 기준이 절반(관리감독자는 그대로).
   // 열 12(명세 순서): 이름(굵게 · 선택 체크) · 구분 · 소속·최근 · 다음 할 일(기본 ▲ · 남는 폭) · 빠진 항목 · 정기교육 · 채용 시 · 특별교육 · 건설 기초 · 일반건진 · 석면 건진 · 위험성평가.
   //   ★위험성평가 열은 1366 창(1280~1599 단계)에서도 보이게 lv3(명세 lv4 → PM 11/10 19:10 '층 나눔' 구현 메모) — 단계 합 규칙(860 ≤ 742 · 1280 ≤ 962 · 1600 ≤ 1,282)을 지키려고
   //   구분·소속·최근을 lv4로 내림(명세 lv3 — 구분은 칩·펼침 머리로도 보임).
@@ -19838,8 +19869,17 @@
   }
   var EDU_ITEM_H = { reg: "정기교육", hire: "채용 시", spec: "특별교육", basic: "건설 기초", gmed: "일반건진", amed: "석면 건진", ra: "위험성평가" };
   var EDU_GREY = "color:#9AA09C;";
-  // 회사 단위 감면 — 안전 설정에 감면 칸이 아직 없어 늘 없음(위 설명). 감면 시간은 원문(산안법 시행규칙 별표4 비고) 확인 뒤 이 함수에서만
-  function eduReduce(){ return null; }
+  // v476 회사 단위 감면(PM 11/14 '산업재해 미발생으로 감면') — 산업안전보건법 시행규칙 제27조①(현행 2026-08-01 원문 11/14 확인): 전년도에 산업재해가 없었던 사업장은
+  //   근로자 정기교육을 그 다음 연도에 한정해 별표 4 기준 시간의 100분의 50 범위에서 면제. 안전 설정 reduce = { env: [연도], con: [연도] }(그 해에 감면 적용 — 관리자가 해마다 넣음).
+  //   y 해에 이 직원의 근로자 정기교육 기준이 절반인가 — 소속 회사(회원 corp) env·con은 그 회사 목록, 두 회사 중복 재적·지정 안 함은 두 회사 모두 그 해일 때만(덜 깎는 쪽).
+  //   관리감독자 16시간은 깎지 않는다(조문은 '근로자 정기교육'으로만 적음 — 관리감독자 포함 여부는 따로 확인 전) · 일용직은 정기교육 판정 자체가 없음. 감면 시간은 이 함수에서만
+  function eduReduceOn(m, y){
+    var rd = (typeof sfSet !== "undefined" && sfSet && sfSet.reduce) || null, c = m && m.corp;
+    var has = function(k){ return !!rd && Array.isArray(rd[k]) && rd[k].indexOf(String(y)) >= 0; };
+    if (!rd || !m) return false;
+    return c === "env" ? has("env") : (c === "con" ? has("con") : (has("env") && has("con")));
+  }
+  function eduRegNeed(m, y){ return ((m && m.office === true) ? EDU_STD.office : EDU_STD.other) * (eduReduceOn(m, y) ? 0.5 : 1); }   // 근로자 정기교육 반기 기준 시간(사무직 6 · 그 밖 12 — 감면 해는 3 · 6)
   function eduYm(d){ return isDate(d) ? d.slice(0, 7) : ""; }
   function eduAddMonths(d, n){ var dt = new Date(d + "T00:00:00"); dt.setMonth(dt.getMonth() + n); return fmtDate(dt); }
   function eduSiteStart(r){ var s = siteTermPart(r && r.start); return isDate(s) ? s : ""; }
@@ -19944,9 +19984,10 @@
     else if (jiip) c.reg = eduNone("regular", JIIP_B, last(["regular", "super"]));
     else if (boss) c.reg = eduGreyIt(sup ? "super" : "regular", EDU_CHK, EDU_CHK, BOSS_B, last(["regular", "super"]));
     else {
-      kind = sup ? "super" : "regular"; from = sup ? cx.y + "-01-01" : cx.half.start; to = sup ? cx.y + "-12-31" : cx.half.end; need = sup ? EDU_STD.super : (off ? EDU_STD.office : EDU_STD.other);
+      kind = sup ? "super" : "regular"; from = sup ? cx.y + "-01-01" : cx.half.start; to = sup ? cx.y + "-12-31" : cx.half.end; need = sup ? EDU_STD.super : eduRegNeed(m, cx.y);
+      var red = !sup && eduReduceOn(m, cx.y), needP = sup ? EDU_STD.super : eduRegNeed(m, String(cx.prev.start).slice(0, 4));   // v476 감면(이번 반기 = 올해 · 직전 반기 = 그 반기의 해)
       a = eduHoursSum(recs, kind, from, to); n = vehDday(to).diff;
-      tip = (sup ? "관리감독자 정기교육 " + cx.y + "년" : "정기교육 " + cx.half.label) + " " + a + "시간 / 기준 " + need + "시간(" + (sup ? "관리감독자 연 16" : (off ? "사무직 반기 6" : "그 밖 근로자 반기 12 — 사무직 표시가 없으면 12")) + " · 감면 없음 기준) · 기한 " + to;
+      tip = (sup ? "관리감독자 정기교육 " + cx.y + "년" : "정기교육 " + cx.half.label) + " " + a + "시간 / 기준 " + need + "시간(" + (sup ? "관리감독자 연 16" : (off ? "사무직 반기 6" : "그 밖 근로자 반기 12 — 사무직 표시가 없으면 12")) + (red ? " · " + cx.y + "년 무재해 감면 적용 — 기준의 절반(산업안전보건법 시행규칙 제27조①)" : " · 감면 없음 기준") + ") · 기한 " + to;
       // v447 검토 2: 직전 반기(관리감독자는 작년)에 그 종류 기록이 1건 이상 있는데(그때 재직이 확실) 합이 기준 미만이면 빨강 '경과 n일'(기한 = 그 반기(해) 말일) — 현황 ③·캘린더(저장된 next)와 같은 사람을 경과로.
       //   직전 반기 기록 0건은 입사일 없이 가를 수 없어 판정 안 함(입사일 기준은 따로 정할 몫)
       pf = sup ? (Number(cx.y) - 1) + "-01-01" : cx.prev.start; pt = sup ? (Number(cx.y) - 1) + "-12-31" : cx.prev.end; pl = sup ? (Number(cx.y) - 1) + "년" : cx.prev.label;
@@ -19954,9 +19995,9 @@
       // v448(11/12 운영 기록 옮긴 뒤 시험 화면): 그 반기(관리감독자는 그해) 중간 입사(인사 입사일 > 그 기간 시작)는 기준 시간을 다 채울 기간이 없어 —
       //   반기 일부 근무의 기준(비례 여부)은 법 원문 확인 전이라 빨강을 내지 않고 이번 반기 진도만(근거 글에 남김). 예: 3/16 입사 상반기 8/12시간이 '경과 135일'로 나오던 것
       var hd = (mem && m && isDate(m.hire_date)) ? m.hire_date : "", partPrev = !!(hd && hd > pf);
-      if (pn && pa < need && partPrev) tip += " · 지난 " + pl + " " + pa + "/" + need + "시간은 입사(" + hd + ") 뒤 일부 기간이라 미달 판정 안 함(근거 확인 중)";
-      if (pn && pa < need && !partPrev) c.reg = eduIt({ t: "경과 " + (-vehDday(pt).diff) + "일", cls: "vs-dan", tgt: true, miss: true, dd: vehDday(pt).diff, due: pt, cat: "기한 경과", kind: kind, last: last([kind], pf),
-          basis: "지난 " + pl + " " + pa + "/" + need + "시간 — 기준 미달(그 기간 기록 " + pn + "건 · 기한 " + pt + " 경과) · 이번 " + tip });
+      if (pn && pa < needP && partPrev) tip += " · 지난 " + pl + " " + pa + "/" + needP + "시간은 입사(" + hd + ") 뒤 일부 기간이라 미달 판정 안 함(근거 확인 중)";
+      if (pn && pa < needP && !partPrev) c.reg = eduIt({ t: "경과 " + (-vehDday(pt).diff) + "일", cls: "vs-dan", tgt: true, miss: true, dd: vehDday(pt).diff, due: pt, cat: "기한 경과", kind: kind, last: last([kind], pf),
+          basis: "지난 " + pl + " " + pa + "/" + needP + "시간 — 기준 미달(그 기간 기록 " + pn + "건 · 기한 " + pt + " 경과) · 이번 " + tip });
       else c.reg = a >= need ? eduIt({ t: "✓ " + a + "/" + need + "시간", tgt: true, cat: "✓ 이수", kind: kind, basis: tip, last: last([kind], from) })
         : eduIt({ t: a + "/" + need + "시간", cls: n <= EDU_SOON ? "vs-warn" : "", tgt: true, miss: true, dd: n, due: to, cat: "진행 중", kind: kind, basis: tip, last: last([kind], from) });
     }
@@ -28069,6 +28110,7 @@ function dutyStage(nx){
     if (name === "site" && siteId) siteSheetGo(siteId);   // v445 캘린더 현장 일정 → 그린 뒤 PC 표면 그 줄을 펼치고 굴림(가린 칩·거르기·묶음만 이번에 풂) · 폰 옛 목록은 아무것도 안 함(칸만 — 종전)
     if (name === "edu"){
       renderEdu(); loadEdu();
+      if (typeof sfSetGot !== "undefined" && !sfSetGot && typeof loadSafetySet === "function"){ var ssp = loadSafetySet(); if (ssp && typeof ssp.then === "function") ssp.then(function(ok){ if (ok && currentTab === "safety" && safetyLayer === "edu") renderEdu(); }); }   // v476 정기교육 감면 연도(안전 설정) — 받은 뒤 한 번 더 그림
       // 일용직 이름은 명부에서 — 명부가 교육 기록보다 늦게 오면 일용직 줄이 '(삭제된 일용직)'으로 남는다(loadWorkers는 renderEdu를 부르지 않음).
       //   명부가 온 뒤 아직 이 칸이면 한 번 더 그린다(v428 검토: 캘린더 교육 예정 → 일용직 목록 길에서 바로 드러나던 경합. 공용 loadWorkers는 그대로)
       if (canSee("wk")){ var wkp = loadWorkers(); if (wkp && typeof wkp.then === "function") wkp.then(function(){ if (currentTab === "safety" && safetyLayer === "edu") renderEdu(); }); }

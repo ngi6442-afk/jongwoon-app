@@ -4652,7 +4652,7 @@ try {
   const xstamp1 = x1.el('sfSetStamp').textContent, xshow1 = x1.shown();
   x1.el('sfSetHeadEnv').value = '20'; x1.el('sfSetChecks').value = '2025-03-01 적합\n\n  2026-03-02   \n'; x1.api.save();
   const xc1 = x1.calls(), xs1b = x1.api.st();
-  const WANT1_36 = { action: 'safety_settings_set', base: T1_36, kosha: { stage: 'certified', apply_no: 'K-1', applied_on: '2023-10-01', review_on: '2023-11-01', decided_on: '2024-01-09', expires_on: '2027-01-08', rate_year: '2025', checks: [{ date: '2025-03-01', note: '적합' }, { date: '2026-03-02', note: '' }] }, headcount: { env: 20, con: 4 } };
+  const WANT1_36 = { action: 'safety_settings_set', base: T1_36, kosha: { stage: 'certified', apply_no: 'K-1', applied_on: '2023-10-01', review_on: '2023-11-01', decided_on: '2024-01-09', expires_on: '2027-01-08', rate_year: '2025', checks: [{ date: '2025-03-01', note: '적합' }, { date: '2026-03-02', note: '' }] }, headcount: { env: 20, con: 4 }, reduce: { env: [], con: [] } };   // v476 감면 연도 칸(빈 목록)
   const x2 = runSet36({ admin: true, resp: [G1_36, { status: 409, body: { status: 'CONFLICT', error_code: 'SAFETY_STALE' } }, { status: 200, body: { status: 'OK', settings: S3_36, updated_at: T3_36, updated_by: 'a3' } }] });
   x2.api.load(); x2.api.open(); x2.el('sfSetHeadEnv').value = '25'; x2.api.save();
   const x3 = runSet36({ admin: true, resp: [G1_36, { status: 409, body: { error_code: 'SAFETY_STALE' } }, { status: 500, body: {} }] }); x3.api.load(); x3.api.open(); x3.api.save();
@@ -4751,7 +4751,7 @@ try {
   const hG36 = fn36(gd36, 'handleSafetySettingsGet'), hS36 = fn36(gd36, 'handleSafetySettingsSet'), sR36 = fn36(gd36, 'safetyRead'), pK36 = fn36(gd36, 'permKey');
   const ix36 = (s, t) => s.indexOf(t);
   const ordG36 = [ix36(hG36, 'await currentMember(event)'), ix36(hG36, "error_code: 'DEVICE_NOT_APPROVED'"), ix36(hG36, "if (permKey(c.member, 'safety') === 'hide') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_ACCESS', request_id: R });"), ix36(hG36, 'await safetyRead(store(DATA))')];
-  const ordS36 = [ix36(hS36, 'await currentMember(event)'), ix36(hS36, "if (!c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });"), ix36(hS36, 'const nv = safetyClean(d);'), ix36(hS36, 'const cur = await safetyRead(st);'),
+  const ordS36 = [ix36(hS36, 'await currentMember(event)'), ix36(hS36, "if (!c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });"), ix36(hS36, 'const nv0 = safetyClean(d);'), ix36(hS36, 'const cur = await safetyRead(st);'),
     ix36(hS36, "if (d.base === undefined || Number(d.base) !== cur.at) return jr(409, { status: 'CONFLICT', error_code: 'SAFETY_STALE', request_id: R });"), ix36(hS36, "error_code: 'NO_CHANGE'"), ix36(hS36, 'await blobSet(st, SAFETY_KEY, doc)'), ix36(hS36, "col: 'safety', ev: [{ op: '안전설정'")];
   const inc36 = (a) => a.every((v, i) => v > 0 && (i === 0 || v > a[i - 1]));
   const srvStages36 = (gd36.match(/const SAFETY_STAGES = \[([^\]]+)\];/) || ['', ''])[1].replace(/\s/g, ''), appStages36 = (html.match(/var SF_SET_STAGES = \[([^\]]+)\];/) || ['', ''])[1].replace(/\s/g, '').replace(/"/g, "'");
@@ -14945,11 +14945,11 @@ try {
     const FT = ['`licRkMarks`', '`lic_recheck_get`', '`_lib/lawchg.js`', '`recheck_by`', '`conChgEff`', '`appr.snap`', '`bareRange`', '`retryBody`', '`len_fail`', '`certSignal`', '`proof:__index__`', '`toggleTaskDone`', '원장 C155', 'C156', '기한 계산은 그대로', '자동 완료 없음'];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
     const MAN = ['<b>승인된 변경 금액·종료일</b>', '<b>증명서 3종</b>', '<b>근거 재확인 필요</b>', '<span class="btn">근거 재확인</span> (2026-11 v475)'];
-    const ok = /기준: v475 \(2026-11-14\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 8 && gate.length === 3 && scr.length === 5 && !cb.some((l) => /\(PM/.test(l))
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 475 /* v476: 기준 줄·sw = 이 판 이상 */ && ftv.length > 0 && mF.length === 0 && cb.length === 8 && gate.length === 3 && scr.length === 5 && !cb.some((l) => /\(PM/.test(l))
       && (t72.match(/^- \[ \] /gm) || []).length === 0
       && MAN.every((s) => d.man.indexOf(s) > 0) && !/licRk|conChgEff|appr\.snap|certSignal|proof:__index__|recheck_by/.test(MAN.map((s) => cut(d.man, s, '</li>')).join(' '))
       && d.cl.indexOf('**P1 판7·10·11·19(v475') > 0 && d.cl.indexOf('`conChgEff`') > 0
-      && /SHELL_CACHE = 'jw-shell-v475'/.test(d.sw);
+      && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 475;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
   };
   const r475 = chk475(D475);
@@ -14959,6 +14959,103 @@ try {
   T('v475 문서·판 번호(정확 검사): FEATURES 기준 v475 (2026-11-14)·v475 절 · TESTLIST v475 칸 8(화면 5 · 게이트 [x] 3)·v472 빈 칸 0 · MANUAL 변경계약·증명서 3종·근거 재확인(내부 이름 0) · CLAUDE.md 줄 · sw jw-shell-v475 · 결함 사본 ' + M475.length + '개 = 모두 ✗',
     r475.ok && M475.every((v) => v === false), JSON.stringify({ r: r475.info, mut: M475 }));
 } catch (e) { console.log('  (v475 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v476(안전 — 근로자 정기교육 무재해 감면 · ④ 계약 공사금액 문턱, PM 11/14 'ㄱ 시작' · 법제처 원문 11/14 확인): 실행 검사 + 문서·판 번호 정확 검사 — 다음 판은 기준 줄·sw를 '476 이상'으로 풀 것
+try {
+  if (!V48 || !V51) throw new Error('v447·v451 시험 틀 없음');
+  const V = V48, W = V51;
+  const mut76 = (a, b) => { if (V.cnt47(html, a) !== 1) throw new Error('결함 심을 자리 없음: ' + a.slice(0, 50)); return html.replace(a, () => b); };
+  // ① 감면(실행 — 실제 eduPersonStat·eduNextFor): 오늘 2026-11-12(2026 하반기). 안전 설정 감면 연도 = 종운환경 2026 · 종운건설 없음
+  //   a1 종운환경·그 밖 6시간 · a2 종운환경·사무직 3시간 · a3 두 회사 중복 재적 6시간 · a4 소속 없음 6시간 · a5 종운건설 6시간 · a6 종운환경 관리감독자 8시간 · a7 종운환경 기록 없음
+  const MEM76 = () => [{ id: 'm0', name: '관리자', admin: true }, { id: 'a1', name: '환경하나', dept: '운영부', corp: 'env' }, { id: 'a2', name: '환경사무', dept: '관리부', corp: 'env', office: true },
+    { id: 'a3', name: '중복재적', dept: '운영부', corp: 'both' }, { id: 'a4', name: '소속없음', dept: '운영부' }, { id: 'a5', name: '건설하나', dept: '운영부', corp: 'con' },
+    { id: 'a6', name: '환경감독', dept: '운영부', corp: 'env', supervisor: true }, { id: 'a7', name: '환경새로', dept: '운영부', corp: 'env' }];
+  const E76 = (pid, kind, h) => ({ id: 'e' + pid, ptype: 'member', pid, kind, date: '2026-08-01', hours: h, next: '', note: '' });
+  const EDU76 = () => [E76('a1', 'regular', 6), E76('a2', 'regular', 3), E76('a3', 'regular', 6), E76('a4', 'regular', 6), E76('a5', 'regular', 6), E76('a6', 'super', 8)];
+  const run76 = (src, set) => {
+    const X = V.mk47({ src, members: MEM76(), workers: [], asb: [], edu: EDU76(), extra: ['var sfSet = ' + JSON.stringify(set) + ';'] }); X.api.render();
+    const c = (id) => { const p = X.api.find('member:' + id); return p ? p.st.c.reg.t + (p.st.c.reg.miss ? '!' : '') : null; };
+    return { c: ['a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7'].map(c).join('|'), b1: X.api.find('member:a1').st.c.reg.basis, b6: X.api.find('member:a6').st.c.reg.basis,
+      nx: [X.api.nextFor('regular', 'member:a7', '2026-08-01', 6, null), X.api.nextFor('regular', 'member:a7', '2026-08-01', 5, null), X.api.nextFor('regular', 'member:a7', '2027-02-01', 6, null), X.api.nextFor('super', 'member:a6', '2026-09-01', 0, null)].join(',') };
+  };
+  const SET76 = { kosha: { stage: 'none' }, headcount: { env: '', con: '' }, reduce: { env: ['2026'], con: [] } };
+  const WANT76 = '✓ 6/6시간|✓ 3/3시간|6/12시간!|6/12시간!|6/12시간!|8/16시간!|0/6시간!';
+  const chk76 = (src) => {
+    const on = run76(src, SET76), off = run76(src, null), noKey = run76(src, { kosha: { stage: 'none' }, headcount: { env: '', con: '' } }), y27 = run76(src, Object.assign({}, SET76, { reduce: { env: ['2027'], con: ['2027'] } })),
+      both = run76(src, Object.assign({}, SET76, { reduce: { env: ['2026'], con: ['2026'] } }));
+    const OFF = '6/12시간!|3/6시간!|6/12시간!|6/12시간!|6/12시간!|8/16시간!|0/12시간!';
+    const ok = on.c === WANT76 && off.c === OFF && noKey.c === OFF && y27.c === OFF && both.c === '✓ 6/6시간|✓ 3/3시간|✓ 6/6시간|✓ 6/6시간|✓ 6/6시간|8/16시간!|0/6시간!'
+      && /2026년 무재해 감면 적용 — 기준의 절반\(산업안전보건법 시행규칙 제27조①\)/.test(on.b1) && /감면 없음 기준/.test(off.b1) && /감면 없음 기준/.test(on.b6) && !/무재해 감면/.test(on.b6)
+      && on.nx === '2027-06-30,2026-12-31,2027-06-30,2026-12-31' && off.nx === '2026-12-31,2026-12-31,2027-06-30,2026-12-31';   // 감면 해 6시간 = 그 반기 채움(다음 반기 말일) · 5시간 = 미달 · 2027년 기록은 감면 해 아님(12 미달 → 그 반기 말일 06-30) · 관리감독자 그대로
+    return { ok, info: { on: on.c, off: off.c, both: both.c, nx: on.nx, nxOff: off.nx } };
+  };
+  const r76 = chk76(html);
+  const m76 = [mut76('    if (!rd || !m) return false;\n    return c === "env" ? has("env")', '    return false;\n    return c === "env" ? has("env")'), mut76('(has("env") && has("con")));\n  }\n  function eduRegNeed', '(has("env") || has("con")));\n  }\n  function eduRegNeed'),
+    mut76('* (eduReduceOn(m, y) ? 0.5 : 1); }', '* (eduReduceOn(m, y) ? 1 : 1); }'), mut76('need = sup ? EDU_STD.super : eduRegNeed(m, cx.y);', 'need = eduRegNeed(m, cx.y);'),
+    mut76('need = k === "super" ? 16 : eduRegNeed(mm, y);', 'need = k === "super" ? 16 : ((mm && mm.office === true) ? 6 : 12);'), mut76('rd[k].indexOf(String(y)) >= 0; };', 'rd[k].length > 0; };')].map((s) => W.safe51(() => chk76(s)).ok);
+  T('v476 ① 근로자 정기교육 무재해 감면(실행 — 실제 eduPersonStat·eduNextFor): 안전 설정 감면 연도 종운환경 2026 = 종운환경 직원 기준 절반(그 밖 6/6 ✓ · 사무직 3/3 ✓ · 기록 없음 0/6) · 두 회사 중복 재적·소속 없음은 두 회사 모두 그 해일 때만 · 종운건설·관리감독자 16시간은 그대로 · 설정 없음·감면 칸 없음(옛 저장값)·다른 해 = 감면 없음 · 근거 글에 조문 · 다음 예정(감면 해 6시간 = 다음 반기 말일 · 2027년 기록은 감면 아님) · 결함 사본 ' + m76.length + '개 = 모두 ✗',
+    r76.ok && m76.every((v) => v === false), JSON.stringify({ r: r76.info, mut: m76 }));
+
+  // ② 현황 ④ 계약 공사금액 문턱(실행 — 실제 @safety-now): 철거·석면 계약만 · 계약금액 칸 기준
+  if (!SFNOW32) throw new Error('v432 현황 시험 틀 없음');
+  const { run32, base32, blk32 } = SFNOW32;
+  const CON76 = () => [['k1', 'demolition', 19999999], ['k2', 'demolition', 20000000], ['k3', 'asbestos', 40000000], ['k4', 'demolition', 100000000], ['k5', 'demolition', 12000000000], ['k6', 'demolition', 0], ['k7', 'dredge', 500000000], ['k8', 'demolition', 39999999], ['k9', 'asbestos', 11999999999]]
+    .map((x, i) => Object.assign({ id: x[0], type: x[1], docType: 'public', status: 'run', client: '발주' + x[0], start: '2026-10-' + (10 + i), pipes: [] }, x[1] === 'asbestos' ? { elems: { asb: 1 } } : {}, x[2] ? { contract_info: { amount: x[2] } } : {}));
+  const run76b = (mutF) => {
+    const cdoc = {}; CON76().forEach((c) => { cdoc[c.id] = { loaded: true, busy: false, err: '' }; });
+    const o = base32({ contracts: CON76(), cdoc, flows: {} }); if (mutF) o.mut = mutF;
+    const R = run32(o), b = blk32(R.out, 'con');
+    const meta = (id) => { const m = new RegExp('발주' + id + '</div><div class="item-meta">([^<]*)</div>').exec(b); return m ? ((/공사금액 문턱: [^›]*?(?= · 단계·서류 ›)/.exec(m[1]) || ['(없음)'])[0]) : null; };
+    return { m: ['k1', 'k2', 'k3', 'k4', 'k5', 'k6', 'k7', 'k8', 'k9'].map(meta), foot: /공사금액 문턱\(철거·석면 계약의 계약금액 기준\): 2천만원 이상 산업안전보건관리비 계상\(고시 제2025-11호 제3조\) · 4천만원 이상 매월 사용명세서·종료 뒤 1년 보존\(산업안전보건법 시행규칙 제89조②\) · 1억원 이상 120억원 미만 기술지도 계약\(시행령 제59조/.test(b) };
+  };
+  const A = '안전관리비 계상(2천만↑)', B = '사용명세서 매월(4천만↑)', C = '기술지도 계약(1억↑ · 1개월 미만 공사 제외)', P = '공사금액 문턱: ';
+  const WANT76b = [P + '2천만원 미만 — 안전관리비 고시 적용 밖', P + A, P + A + ' · ' + B, P + A + ' · ' + B + ' · ' + C, P + A + ' · ' + B, P + '계약금액 없음(판정 안 함)', '(없음)', P + A, P + A + ' · ' + B + ' · ' + C];
+  const chk76b = (mutF) => { const r = run76b(mutF); return { ok: JSON.stringify(r.m) === JSON.stringify(WANT76b) && r.foot, info: r }; };
+  const r76b = chk76b(null);
+  const sm76 = (a, b) => (s) => { if (s.split(a).length !== 2) throw new Error('결함 심을 자리 없음: ' + a.slice(0, 40)); return s.replace(a, () => b); };
+  const m76b = [sm76('fee: 20000000,', 'fee: 20000001,'), sm76('stmt: 40000000,', 'stmt: 50000000,'), sm76('guide: 100000000,', 'guide: 100000001,'), sm76('a < SF_NOW_AMT.guideMax', 'a <= SF_NOW_AMT.guideMax'),
+    sm76('(c.type !== "asbestos" && c.type !== "demolition")) return "";', '(c.type === "waste")) return "";'), sm76('(thr ? " · " + thr : "")', '""'), sm76('guideMax: 12000000000 };', 'guideMax: 5000000000 };')].map((f) => W.safe51(() => chk76b(f)).ok);
+  T('v476 ② 현황 ④ 공사금액 문턱(실행 — 실제 sfNowCons·sfNowConThr): 철거·석면 계약의 계약금액 — 19,999,999 = "2천만원 미만 — 고시 적용 밖" · 2천만 = 안전관리비 계상 · 39,999,999 = 계상만 · 4천만 = + 사용명세서 매월 · 1억 = + 기술지도 계약 · 11,999,999,999 = 기술지도까지 · 120억 = 기술지도 없음 · 금액 없음 = "판정 안 함" · 준설 계약 = 문턱 글 없음 · 꼬리말에 조문 · 결함 사본 ' + m76b.length + '개 = 모두 ✗',
+    r76b.ok && m76b.every((v) => v === false), JSON.stringify({ r: r76b.info, mut: m76b }));
+
+  // ③ 정적 — 창 칸·저장 요청·체크 칸 읽기 1번·서버 감면 칸(옛 앱 요청은 저장값 그대로) + 창 읽기 함수 실행
+  const gd76 = readFileSync(join(ROOT, 'netlify/functions/gw-data.js'), 'utf8');
+  const st76 = (h, g) => /id="sfSetRedEnv"/.test(h) && /id="sfSetRedCon"/.test(h) && /headcount: f\.v\.headcount, reduce: f\.v\.reduce \}\)/.test(h) && /sfSetBy = String\(b\.updated_by \|\| ""\);\n    sfSetGot = true;/.test(h)
+    && /if \(typeof sfSetGot !== "undefined" && !sfSetGot && typeof loadSafetySet === "function"\)\{ var ssp = loadSafetySet\(\); if \(ssp && typeof ssp\.then === "function"\) ssp\.then\(function\(ok\)\{ if \(ok && currentTab === "safety" && safetyLayer === "edu"\) renderEdu\(\); \}\); \}/.test(h)
+    && !/function eduReduce\(\)/.test(h) && /BAD_REDUCE: "감면 적용 연도는/.test(h)
+    && /function safetyYears\(v\) \{/.test(g) && /if \(re === null \|\| rc === null\) return \{ code: 'BAD_REDUCE' \};/.test(g)
+    && /const nv = \(d\.reduce === undefined && cur\.v\) \? \{ v: Object\.assign\(\{\}, nv0\.v, \{ reduce: cur\.v\.reduce \}\) \} : nv0;/.test(g)
+    && /reduce: nv\.v\.reduce, prev: cur\.doc \? \{ kosha: cur\.v\.kosha, headcount: cur\.v\.headcount, reduce: cur\.v\.reduce,/.test(g) && /'reduce\.env': '정기교육 감면 연도 종운환경', 'reduce\.con': '정기교육 감면 연도 종운건설'/.test(g);
+  const rdF76 = (vals) => {
+    const els = {}; const el = (id) => els[id] || (els[id] = { value: '' });
+    Object.assign(el('sfSetStage'), { value: 'none' }); Object.keys(vals).forEach((k) => { el(k).value = vals[k]; });
+    return new Function('document', 'var SF_SET_STAGES = ["none", "applied", "review", "certified"];\n' + V.fn47(html, 'pad') + '\n' + V.fn47(html, 'fmtDate') + '\n' + V.fn47(html, 'isDate') + '\n' + V.fn47(html, 'sfSetDateOk') + '\n' + V.fn47(html, 'sfSetRead') + '\nreturn sfSetRead();')({ getElementById: el });
+  };
+  const f1 = rdF76({ sfSetRedEnv: ' 2027, 2026 2026 ', sfSetRedCon: '' }), f2 = rdF76({ sfSetRedEnv: '26' }), f3 = rdF76({ sfSetRedCon: '2026,2027,2028,2029,2030,2031,2032,2033,2034,2035,2036' }), f4 = rdF76({ sfSetRedEnv: '1999' });
+  const rd76ok = !!f1.v && JSON.stringify(f1.v.reduce) === '{"env":["2026","2027"],"con":[]}' && !!f2.err && !!f3.err && !!f4.err && /감면 적용 연도/.test(f2.err);
+  const M76s = [st76(html.replace('reduce: f.v.reduce })', '})'), gd76), st76(html.replace('    sfSetGot = true;\n', ''), gd76), st76(html, gd76.replace('const nv = (d.reduce === undefined && cur.v) ?', 'const nv = (false) ?')), st76(html, gd76.replace(", reduce: cur.v.reduce, updated_at: cur.at", ", updated_at: cur.at"))];
+  T('v476 ③ 안전 설정 감면 연도 칸(정적 + 창 읽기 실행 — 서버 실행은 servertest 80 v476): 창 두 칸 · 저장 요청에 reduce · 받으면 sfSetGot · 체크 칸을 열 때 안전 설정을 아직 안 받았으면 1번 읽고 다시 그림 · 창 읽기 " 2027, 2026 2026 " → ["2026","2027"] · 두 자리·1999·11개 = 알림 · 서버 safetyYears·BAD_REDUCE·옛 앱 요청(reduce 없음)은 저장값 그대로·prev에 reduce·감사 칸 이름 · 결함 사본 ' + M76s.length + '개 = 모두 ✗',
+    st76(html, gd76) && rd76ok && M76s.every((v) => v === false), JSON.stringify({ st: st76(html, gd76), rd: [f1.v && f1.v.reduce, f2.err, f3.err, f4.err], mut: M76s }));
+
+  // ④ 문서·판 번호(정확 검사)
+  const rd76 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D76 = { ft: rd76('FEATURES.md'), tl: rd76('TESTLIST.md'), sw: rd76('sw.js'), mn: rd76('MANUAL.html') };
+  const chkD76 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v476 (11/14)', '\n### '), tlv = cut(d.tl, '\n## v476 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l));
+    const GATE = ['uismoke', 'consheet_check', 'proctpl_check', 'settletest', 'servertest', 'rectest', 'promoqual_check', 'promogen_check', 'promoqlearn_check', 'promostream_check', 'promo_wrap_check', 'promo_post_check'];
+    const mF = ['`eduReduceOn`', '`eduRegNeed`', '`sfNowConThr`', '`reduce`', '`BAD_REDUCE`', '제27조①', '제89조②', '제59조', '제2025-11호', '관리감독자'].filter((x) => ftv.indexOf(x) < 0);
+    const ok = /기준: v476 \(2026-11-14\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length >= 3 && !cb.some((l) => /\(PM/.test(l))
+      && GATE.every((g) => gate.some((l) => l.indexOf('`' + g + '`') > 0)) && /SHELL_CACHE = 'jw-shell-v476'/.test(d.sw)
+      && d.mn.indexOf('<b>무재해 감면</b>') > 0 && d.mn.indexOf('<b>공사금액 문턱</b>') > 0 && !/eduReduceOn|sfNowConThr|BAD_REDUCE/.test(d.mn);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length } };
+  };
+  const rD76 = chkD76(D76), muD76 = (k, f) => chkD76(Object.assign({}, D76, { [k]: f(D76[k]) })).ok;
+  const MD76 = [muD76('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v475 (')), muD76('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v475'")), muD76('mn', (s) => s.replace('<b>무재해 감면</b>', '무재해 감면')), muD76('mn', (s) => s.replace('<b>공사금액 문턱</b>', '공사금액 문턱')), muD76('ft', (s) => s.split('`sfNowConThr`').join('sfNowConThr'))];
+  T('v476 ④ 문서·판 번호(정확 검사): FEATURES 기준 v476 (2026-11-14)·v476 절(함수·조문) · TESTLIST v476 게이트 [x] 12종·PM 칸 0 · MANUAL 무재해 감면·공사금액 문턱(내부 이름 0) · sw jw-shell-v476 · 결함 사본 ' + MD76.length + '개 = 모두 ✗',
+    rD76.ok && MD76.every((v) => v === false), JSON.stringify({ r: rD76.info, mut: MD76 }));
+} catch (e) { console.log('  (v476 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

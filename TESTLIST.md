@@ -1325,3 +1325,8 @@
 - [x] (AI) `servertest` 'P1 판7'(감지 누적·읽기 권한 경계·서버 저장 경계·결함 사본) · 'P1 판11'(재요청 1회·다른 이유 0·상한 0·기록에 길이·방향만·재요청 금칙·결함 사본) · 'P1 판19'(3종·회차·지움·옛 항목·이름 거름·크론은 색인만·보관함 저장·결함 사본) — ✓ AI 11/14
 - [x] (AI) `uismoke` 'P1 판7'(맞춤·읽기·기한 계산값 무관·그리기·배선·창 실행·결함 사본) · '판10'(승인 사본만·승인 뒤 고침·대기 중 고침·결재 없는 완료 차수·달력에 없는 날·변경 없는 계약 종전과 같음·결함 사본 23) · 'v475 C156'(저장 예약 뒤 다시 그리기) · v474 문서 검사를 이 판 이상으로 풀고 v475 문서·판 번호 정확 검사 — ✓ AI 11/14
 - [x] (AI) `uismoke` · `consheet_check` · `proctpl_check` · `settletest` · `servertest` · `rectest` · `promoqual_check` · `promogen_check` · `promoqlearn_check` · `promostream_check` · `promo_wrap_check` · `promo_post_check` · 원본 읽기 검사 4종(stmtread a·b·c·d) 전부 통과 + node --check(함수·_lib·sw) — 숫자는 커밋 메시지
+
+## v476 — 안전: 근로자 정기교육 무재해 감면 · 현황 ④ 공사금액 문턱(앱 + 서버 안전 설정 한 칸 · 운영 데이터 변경 없음 · 새 화면 없음)
+- [ ] (관리자) 안전 › 현황 ⑤ [고치기] → '근로자 정기교육 감면 적용 연도'에 그 회사의 감면 해(전년도에 산업재해가 없었던 해의 다음 해 — 예: 2026)를 넣고 저장 → 안전 › 체크 칸을 다시 열면 그 회사 직원 정기교육 칸의 기준이 절반(사무직 3 · 그 밖 6시간)으로 바뀌는지
+- [ ] (AI 시험 화면 대상) 감면 연도 저장 → 체크 칸 정기교육 칸·근거 글 · 현황 ④ 철거·석면 계약 줄의 공사금액 문턱 글(PC·375px)
+- [x] (AI) `uismoke` · `consheet_check` · `proctpl_check` · `settletest` · `servertest` · `rectest` · `promoqual_check` · `promogen_check` · `promoqlearn_check` · `promostream_check` · `promo_wrap_check` · `promo_post_check` 전부 통과 + node --check(gw-data·sw) — 숫자는 커밋 메시지

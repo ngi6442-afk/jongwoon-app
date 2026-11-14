@@ -3933,7 +3933,8 @@ async function handleDocSettingsSet(event, d, R) {
 // 안전 › 현황 ⑤ 인정·평가·회사 구분이 읽는 값 한 벌. KOSHA 위험성평가 인정은 인허가 목록(col:licenses)에 행으로 넣지 않는다 — 인허가 행을 읽는 앱·서버 소비처(자동 지시·캘린더·검색·브리핑·물어보기·크론)는 무변.
 //   값 = { kosha: { stage: none(미인정)·applied(접수)·review(심사)·certified(인정), apply_no(접수번호 40자), applied_on·review_on·decided_on·expires_on(YYYY-MM-DD 또는 빈칸),
 //                   rate_year(요율 반영 연도 네 자리 또는 빈칸), checks: [{ date(필수), note(100자) }](사후점검 이력, 10건 상한) },
-//          headcount: { env, con }(회사별 상시근로자 수 — 정수 0~999 또는 빈칸, 둘 다 있어야 현황 회사 구분이 켜짐) } + updated_at·updated_by·prev(직전 1판).
+//          headcount: { env, con }(회사별 상시근로자 수 — 정수 0~999 또는 빈칸, 둘 다 있어야 현황 회사 구분이 켜짐),
+//          reduce: { env: [연도], con: [연도] }(v476 근로자 정기교육 감면 적용 연도 — 없으면 빈 목록, 400 BAD_REDUCE · 요청에 없으면 저장값 그대로) } + updated_at·updated_by·prev(직전 1판).
 //   읽기 safety_settings_get = 로그인 → 기기 승인(403 DEVICE_NOT_APPROVED) → 관리자 또는 안전 권한(permKey 'safety' — 현황 칸·col:edu와 같은 키)이 숨김이 아니면 200, 숨김이면 403 NO_ACCESS.
 //     저장값이 없으면 settings null·updated_at 0. 읽기 실패·모양이 깨진 저장값은 500(빈 값으로 '미인정(입력 전)'을 그리지 않게).
 //   쓰기 safety_settings_set = 로그인 → 관리자만(403 ADMIN_ONLY — 안전 수행도 거절, 현황은 읽기 전용) → 값 검사(400 BAD_VALUE·BAD_STAGE·BAD_TEXT·BAD_DATE·BAD_YEAR·BAD_CHECKS·BAD_HEADCOUNT)
@@ -3949,7 +3950,8 @@ const SAFETY_STAGE_LABEL = { none: '미인정', applied: '접수', review: '심�
 const SAFETY_DATES = ['applied_on', 'review_on', 'decided_on', 'expires_on'];
 const SAFETY_LIMIT = { apply_no: 40, note: 100, checks: 10, head: 999 };
 const SAFETY_FIELD_LABEL = { 'kosha.stage': 'KOSHA 단계', 'kosha.apply_no': '접수번호', 'kosha.applied_on': '접수일', 'kosha.review_on': '심사일', 'kosha.decided_on': '인정일(결정일)', 'kosha.expires_on': '만료일',
-  'kosha.rate_year': '요율 연도', 'kosha.checks': '사후점검', 'headcount.env': '상시근로자 종운환경', 'headcount.con': '상시근로자 종운건설' };
+  'kosha.rate_year': '요율 연도', 'kosha.checks': '사후점검', 'headcount.env': '상시근로자 종운환경', 'headcount.con': '상시근로자 종운건설',
+  'reduce.env': '정기교육 감면 연도 종운환경', 'reduce.con': '정기교육 감면 연도 종운건설' };
 // 키 이름으로 권한 — permOf는 컬렉션 이름을 받는다(COL에 없는 'safety'를 넘기면 기본 '보기'가 돼 숨김이 새어 나간다). 규칙은 permOf와 같다(관리자 do · perms[키] · 값 없으면 기본 숨김 표 PERM_CLOSED)
 function permKey(member, key) {
   if (member.admin) return 'do';
@@ -3980,6 +3982,15 @@ function safetyYear(v) {   // 요율 반영 연도 — 네 자리(2000~2100) 또
   const y = Number(s);
   return (y >= 2000 && y <= 2100) ? s : null;
 }
+// v476 근로자 정기교육 감면 적용 연도(산업안전보건법 시행규칙 제27조① — 전년 무재해면 그 다음 연도 50% 범위 면제) — 네 자리 연도 글 목록(2000~2100 · 10개까지 · 같은 해 한 번 · 오름차순).
+//   없음(undefined·null — v475까지의 저장값·옛 앱 요청) = 빈 목록 · 목록이 아니거나 연도가 아니면 null
+function safetyYears(v) {
+  if (v === undefined || v === null) return [];
+  if (!Array.isArray(v) || v.length > 10) return null;
+  const out = [];
+  for (const x of v) { const y = safetyYear(x); if (!y) return null; if (out.indexOf(y) < 0) out.push(y); }
+  return out.sort();
+}
 // 요청 몸체(또는 저장값) → { v } | { code } — 알려진 칸만 다시 만든다(모르는 칸은 버림)
 function safetyClean(d) {
   const k = d && d.kosha, h = d && d.headcount;
@@ -4004,7 +4015,11 @@ function safetyClean(d) {
   }
   const env = safetyHead(h.env), con = safetyHead(h.con);
   if (env === null || con === null) return { code: 'BAD_HEADCOUNT' };
-  return { v: { kosha: kosha, headcount: { env: env, con: con } } };
+  const r = (d.reduce === undefined || d.reduce === null) ? {} : d.reduce;   // v476 — 없으면 두 회사 빈 목록
+  if (typeof r !== 'object' || Array.isArray(r)) return { code: 'BAD_REDUCE' };
+  const re = safetyYears(r.env), rc = safetyYears(r.con);
+  if (re === null || rc === null) return { code: 'BAD_REDUCE' };
+  return { v: { kosha: kosha, headcount: { env: env, con: con }, reduce: { env: re, con: rc } } };
 }
 // { ok, doc|null, v|null, at, by } — 읽기 실패·모양이 깨진 저장값은 ok:false(빈 값으로 덮거나 '입력 전'으로 그리지 않게). 없는 키(실 Blobs ok·data null) = 입력 전
 async function safetyRead(st) {
@@ -4030,7 +4045,8 @@ function safetyFlat(v) {   // 감사 줄 비교용 납작한 글 — 저장값�
   return { 'kosha.stage': v ? (SAFETY_STAGE_LABEL[k.stage] || '') : '(입력 전)', 'kosha.apply_no': k.apply_no || '', 'kosha.applied_on': k.applied_on || '', 'kosha.review_on': k.review_on || '',
     'kosha.decided_on': k.decided_on || '', 'kosha.expires_on': k.expires_on || '', 'kosha.rate_year': k.rate_year || '',
     'kosha.checks': safetyCheckLines(v).length + '건',
-    'headcount.env': (h.env === '' || h.env === undefined) ? '' : String(h.env), 'headcount.con': (h.con === '' || h.con === undefined) ? '' : String(h.con) };
+    'headcount.env': (h.env === '' || h.env === undefined) ? '' : String(h.env), 'headcount.con': (h.con === '' || h.con === undefined) ? '' : String(h.con),
+    'reduce.env': ((v && v.reduce && v.reduce.env) || []).join(', '), 'reduce.con': ((v && v.reduce && v.reduce.con) || []).join(', ') };
 }
 // { 칸: [이전, 새] } — 감사 로그 ev.f 규약(값 80자 절단). 사후점검은 줄 목록으로 비교: 'n건 · 뺌 …' → 'm건 · 더함 …'(같은 줄 여럿은 개수까지 — 다중 집합 차이),
 //   뺀 줄·더한 줄이 없으면 '순서만 바뀜'. 이어 붙인 한 글을 80자에서 자르면 긴 이력의 뒤쪽 줄을 고쳐도 이전·새 값이 같게 찍혔다(v436 검토)
@@ -4062,15 +4078,17 @@ async function handleSafetySettingsSet(event, d, R) {
   const c = await currentMember(event);
   if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
   if (!c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });   // 안전 수행(권민지)도 거절 — 현황은 읽기 전용, 고치기는 관리자
-  const nv = safetyClean(d);
-  if (!nv.v) return jr(400, { status: 'REJECTED', error_code: nv.code, request_id: R });
+  const nv0 = safetyClean(d);
+  if (!nv0.v) return jr(400, { status: 'REJECTED', error_code: nv0.code, request_id: R });
   const st = store(DATA);
   const cur = await safetyRead(st);
   if (!cur.ok) return jr(500, { status: 'ERROR', error_code: 'SETTINGS_READ_FAILED', request_id: R });   // 읽기 실패 위에 쓰면 저장돼 있던 값이 사라진다 — 거부
+  // v476: 감면 연도 칸을 모르는 옛 앱(캐시된 v475 이전)의 저장은 reduce를 안 보낸다 — 저장돼 있던 감면 연도를 지우지 않게 그대로 둔다
+  const nv = (d.reduce === undefined && cur.v) ? { v: Object.assign({}, nv0.v, { reduce: cur.v.reduce }) } : nv0;
   if (d.base === undefined || Number(d.base) !== cur.at) return jr(409, { status: 'CONFLICT', error_code: 'SAFETY_STALE', request_id: R });
   if (cur.v && JSON.stringify(cur.v) === JSON.stringify(nv.v)) return jr(400, { status: 'REJECTED', error_code: 'NO_CHANGE', request_id: R });   // 정규화한 값째(safetyClean이 칸 순서를 고정) — 감사 글은 판정에 안 씀
   const chg = safetyDiff(cur.v, nv.v);
-  const doc = { schema: 1, kosha: nv.v.kosha, headcount: nv.v.headcount, prev: cur.doc ? { kosha: cur.v.kosha, headcount: cur.v.headcount, updated_at: cur.at, updated_by: cur.by } : null,
+  const doc = { schema: 1, kosha: nv.v.kosha, headcount: nv.v.headcount, reduce: nv.v.reduce, prev: cur.doc ? { kosha: cur.v.kosha, headcount: cur.v.headcount, reduce: cur.v.reduce, updated_at: cur.at, updated_by: cur.by } : null,
     updated_by: c.member.id, updated_at: Math.max(Date.now(), cur.at + 1) };   // 같은 ms 두 저장도 낙관락 토큰이 달라지게
   const w = await blobSet(st, SAFETY_KEY, doc);
   if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
