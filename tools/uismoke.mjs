@@ -3216,11 +3216,11 @@ try {
       fn32('liveLic'), fn32('licVisible'), fn32('liveContracts'), fn32('csPkWhen'), fn32('csPkIk'), fn32('csTitle'), fn32('csSiteText'), fn32('csKind'), fn32('findProc'),
       'var currentTab = "safety", safetyLayer = "now";',
       'var sfSet = __o.set === undefined ? null : __o.set, sfSetDay = __o.setDay || "", sfSetBy = __o.setBy || "";', stmt32(html, /var QUAL_DEF=\{[\s\S]*?\} \};/),   // v436 ⑤ — 안전 설정 상태(구간 밖 @safety-set 선언)·적격 계수(앱 등급 글)
-      sec32,
+      (o.mut ? o.mut(sec32) : sec32),   // v471: 결함 사본(회사 칩 판정을 일부러 망가뜨린 구간)
       'sfNowSt.edu = __o.st.edu; sfNowSt.asb = __o.st.asb; sfNowSt.set = (__o.st.set === undefined ? "ok" : __o.st.set); sfNowTicks = __o.ticks || 0;',
       'return { render: function(){ renderSafetyNow(); return __D.sfNowHost.innerHTML; }, setTicks: function(n){ sfNowTicks = n; }, max: function(){ return SF_NOW_TICK_MAX; }, eduDue: sfNowEduDue, homeRow: sfNowHomeEduRow, ck: function(){ return CURRENT_KEYS; },',
       '  runTimers: function(n){ var k = 0; while (__cbs.length && k < n){ var t = __cbs.shift(); t.f(); k++; } return k; }, pending: function(){ return __cbs.length; }, ticks: function(){ return sfNowTicks; }, html: function(){ return __D.sfNowHost.innerHTML; },',
-      '  setCons: function(cs){ contracts = cs; _colBase.contracts = 1; }, cdocSet: function(id, p){ var e = CDOC[id] || (CDOC[id] = {}); for (var k in p) e[k] = p[k]; }, setWorkers: function(w){ workers = w; } };'].join('\n'))(o, D, timers, calls);
+      '  setCons: function(cs){ contracts = cs; _colBase.contracts = 1; }, cdocSet: function(id, p){ var e = CDOC[id] || (CDOC[id] = {}); for (var k in p) e[k] = p[k]; }, setWorkers: function(w){ workers = w; }, setCo: function(v){ sfNowCo = v; } };'].join('\n'))(o, D, timers, calls);
     return { out: api.render(), head: head.textContent, timers, calls, api };
   };
   function __o_dutyFn32(o) { return o.dutyThrow ? 'function liveDuties(){ throw new Error("깨진 의무 대장"); }' : fn32('liveDuties'); }
@@ -3270,7 +3270,8 @@ try {
   //   v436: ⑤ 자리 안내('7단계에서 채움')가 7단계 줄 셋으로 바뀌었다 — 버튼은 문서함 바로가기 + 관리자 ⑤ [고치기](data-sfn-set — 이동 data-sfn-go 아님) 2개(줄 내용은 v436 묶음 ①~⑥)
   T('v432 ④ 관리자형 ⑤⑥·통째: ⑤ 인정·평가 = v436 줄 셋(KOSHA · 석면 · 등록 — 이 표본은 의무 대장 17·18행 없음)·"7단계에서 채움" 0 · ⑥ 확인 필요 6줄(하도급·밀폐·폭염·장비·지입·작업 — 조문만, 누를 곳 없음) + 문서함 › 06 안전보건 열기 · 화면 전체에 완료 버튼·체크·입력 칸 0(버튼은 문서함 바로가기 1개 + v436 ⑤ [고치기] 1개 — 관리자) · 줄 이동 대상 전부 알려진 자리 · 읽는 중(석면 계약 서류함)이라 1초 뒤 다시 그림 1번',
     rowIds32(blk32(A32.out, 'eval')).join(',') === 'KOSHA,석면,등록' && A32.out.indexOf('7단계에서 채움') < 0 && rowIds32(aCf32).join(',') === '하도급,밀폐,폭염,장비,지입,작업' && (aCf32.match(/data-sfn-go=/g) || []).length === 1 && aCf32.indexOf('data-sfn-go="doc06">문서함 › 06 안전보건 열기 ›</button>') > 0
-    && (A32.out.match(/<button/g) || []).length === 2 && (blk32(A32.out, 'eval').match(/<button type="button" class="sfn-go" data-sfn-set="1">고치기<\/button>/g) || []).length === 1 && !/<input|<select|<textarea|type="checkbox"|data-cs-|data-chk-|완료<\/button>/.test(A32.out)
+    && (A32.out.match(/<button/g) || []).length === 5 && (A32.out.match(/<button type="button" class="lsub-btn(?: active)?" data-sfn-co="(?:|env|con)">/g) || []).length === 3   /* v471: 맨 위 회사 칩 3개(거르기만 — 완료·입력 아님) + 종전 2개 */
+    && (blk32(A32.out, 'eval').match(/<button type="button" class="sfn-go" data-sfn-set="1">고치기<\/button>/g) || []).length === 1 && !/<input|<select|<textarea|type="checkbox"|data-cs-|data-chk-|완료<\/button>/.test(A32.out)
     && gos32(A32.out).length > 20 && gos32(A32.out).every(goOk32) && A32.timers.join(',') === '1000',
     JSON.stringify({ gos: gos32(A32.out).filter((g) => !goOk32(g)), timers: A32.timers }));
 
@@ -3324,12 +3325,46 @@ try {
   const rRun4_32 = R32.api.runTimers(400), rEnd32 = blk32(R32.api.html(), 'con');
   T('v432 ④-3 다시 그림 타이머(실행 — 콜백을 실제로 돌림): 기다림 = 틱 ' + Q32.api.ticks() + '번에서 멈춤(교육 "불러오지 못함"·석면 계약 "확인 실패", 남은 타이머 0) · 다시 그림 중 로더 0번·서류함 읽기는 첫 그림 1번(force 없음)·칸 갈아끼우기는 글이 바뀐 2번뿐 / 늦게 온 계약 = 도착 틱에 서류함 4건 1번씩 · 100번째 틱에도 "확인 중"·받은 계약은 1/2 · 141번째 틱에 "확인 실패" 3건으로 끝 · 로더 0번',
     qRun32 === 90 && Q32.api.ticks() === 90 && Q32.api.pending() === 0 && /체크 칸 기록[\s\S]{0,140}불러오지 못함/.test(blk32(qOut32, 'due')) && (blk32(qOut32, 'con').match(/<span class="sfn-pill bad">확인 실패<\/span>/g) || []).length === 3 && blk32(qOut32, 'con').indexOf('확인 중') < 0
-    && Q32.calls.load.length === 0 && Q32.calls.cdoc.join(',') === 'c2' && Q32.calls.qsa === 4   // 91번 그렸어도 칸을 갈아끼운 것은 글이 바뀐 2번(처음·90번째)뿐
+    && Q32.calls.load.length === 0 && Q32.calls.cdoc.join(',') === 'c2' && Q32.calls.qsa === 6   // 91번 그렸어도 칸을 갈아끼운 것은 글이 바뀐 2번(처음·90번째)뿐 — 한 번에 찾기 3번(이동 줄·v471 회사 칩·펼침)
     && /계약 목록[\s\S]{0,100}불러오는 중…/.test(r0_32) && rRun1_32 === 50 && rCdoc0_32 === '' && rRun2_32 === 9 && rCdoc1_32 === 'c2,c1,c5,c6'
     && rRun3_32 === 40 && rT100_32 === 99 && (r100_32.match(/<span class="sfn-pill">확인 중<\/span>/g) || []).length === 3 && r100_32.indexOf('<span class="sfn-pill am">1/2</span>') > 0
     && R32.api.ticks() === 141 && R32.api.pending() === 0 && (rEnd32.match(/<span class="sfn-pill bad">확인 실패<\/span>/g) || []).length === 3 && rEnd32.indexOf('확인 중') < 0 && rEnd32.indexOf('1/2') > 0
     && R32.calls.cdoc.join(',') === 'c2,c1,c5,c6' && R32.calls.load.length === 0 && rRun4_32 === 42,
     JSON.stringify({ q: [qRun32, Q32.api.ticks(), Q32.api.pending(), Q32.calls.load, Q32.calls.cdoc], r: [rRun1_32, rCdoc0_32, rRun2_32, rCdoc1_32, rRun3_32, rT100_32, rRun4_32, R32.api.ticks(), R32.api.pending(), R32.calls.load] }));
+  // v471 회사 칩(원장 C031): 실제 현황 구간을 돌려 칩 값마다 ③ 기한·④ 계약 안전 서류·회사 구분 줄이 두 회사 규칙으로 걸러지는지 본다(결함 사본 4)
+  //   표본 = 기본 표본 + 회원 소속(k2: 없음 → con → both) · 일용직 w1은 석면 현장 s1 투입(= 종운건설) · 의무 16행 글에 (종운건설) · 4·32·62행은 회사 글 없음 · 계약 c1·c6 준설(환경)·c2 석면·c5 철거(건설)
+  {
+    const memCo = (corp) => mem32.map((m) => (m.id === 'k2' && corp ? Object.assign({}, m, { corp }) : m));
+    const view = (co, over) => { const r = run32(base32(Object.assign({ set: { headcount: { env: 18, con: 3 } } }, over || {}))); r.api.setCo(co); const out = r.api.render(); return { out, due: blk32(out, 'due'), con: blk32(out, 'con'), corp: blk32(out, 'corp'), order: order32(out) }; };
+    const dutyIds = (s) => rowIds32(s).filter((x) => /행$/.test(x)).join(',');
+    const judge = (over) => {
+      const all = view('', over), env = view('env', over), con = view('con', over);
+      const kCon = view('con', Object.assign({}, over || {}, { members: memCo('con') })), kEnvHid = view('env', Object.assign({}, over || {}, { members: memCo('con') })), kBothE = view('env', Object.assign({}, over || {}, { members: memCo('both') })), kBothC = view('con', Object.assign({}, over || {}, { members: memCo('both') }));
+      return [
+        all.order === env.order && all.order === con.order && all.order.indexOf('corp,check,jcb,due,con,eval,confirm') === 0,   // 블록은 그대로(①②⑤⑥ 포함)
+        rowIds32(all.con).join(',') === '석면,준설,철거,준설' && rowIds32(env.con).join(',') === '준설,준설' && rowIds32(con.con).join(',') === '석면,철거',
+        all.due.indexOf('남성초 석면') > 0 && env.due.indexOf('남성초 석면') < 0 && con.due.indexOf('남성초 석면') > 0 && env.due.indexOf('경계 예정 지남') < 0 && con.due.indexOf('경계 예정 지남') > 0,
+        all.due.indexOf('김일용') > 0 && env.due.indexOf('김일용') < 0 && con.due.indexOf('김일용') > 0,   // 일용직 = 투입 현장 종류(석면 → 종운건설)
+        env.due.indexOf('권민지형 · ') > 0 && con.due.indexOf('권민지형 · ') > 0,   // 소속 회사 없음 = 두 칩에 다
+        kCon.due.indexOf('권민지형 · ') > 0 && kEnvHid.due.indexOf('권민지형 · ') < 0,   // 소속 종운건설 = 환경 칩에서 빠짐
+        kBothE.due.indexOf('권민지형 · ') > 0 && kBothC.due.indexOf('권민지형 · ') > 0,   // 두 회사 중복 재적 = 양쪽
+        dutyIds(all.due) === '4행,16행,32행,62행' && dutyIds(env.due) === '4행,32행,62행' && dutyIds(con.due) === '4행,16행,32행,62행',
+        all.corp.indexOf('종운환경') > 0 && all.corp.indexOf('종운건설') > 0 && env.corp.indexOf('상시근로자 18명') > 0 && env.corp.indexOf('상시근로자 3명') < 0 && con.corp.indexOf('상시근로자 3명') > 0 && con.corp.indexOf('상시근로자 18명') < 0,
+        /class="lsub-btn active" data-sfn-co=""/.test(all.out) && /class="lsub-btn active" data-sfn-co="env"/.test(env.out) && /class="lsub-btn active" data-sfn-co="con"/.test(con.out) && (env.out.match(/lsub-btn active/g) || []).length === 1
+          && all.out.indexOf('만 봅니다') < 0 && env.out.indexOf('종운환경만 봅니다') > 0 && con.out.indexOf('종운건설만 봅니다') > 0 && all.out.indexOf('회사로 거르기는 아직') < 0,
+      ];
+    };
+    const ok70 = judge();
+    const muts = [
+      ['칩을 골라도 거르지 않음', (s) => s.replace('function sfNowCoHit(co){ return !sfNowCo || !co || co === "both" || co === sfNowCo; }', 'function sfNowCoHit(co){ return true; }')],
+      ['두 회사 규칙이 뒤집힘', (s) => s.replace('return (k === "asbestos" || k === "demolition") ? "con" : "env";', 'return (k === "asbestos" || k === "demolition") ? "env" : "con";')],
+      ['중복 재적(both)을 못 읽음', (s) => s.replace('(c === "env" || c === "con" || c === "both") ? c : ""', '(c === "env" || c === "con") ? c : "x"')],
+      ['일용직을 현장으로 나누지 않음', (s) => s.replace('return r.ptype === "worker" ? sfNowWorkerCo(r.pid) : sfNowMemberCo(r.pid);', 'return r.ptype === "worker" ? "" : sfNowMemberCo(r.pid);')],
+    ];
+    const mutRes = muts.map(([n, f]) => { const changed = f(sec32) !== sec32; let bad = false; try { bad = judge({ mut: f }).some((x) => !x); } catch (e) { bad = false; } return [n, changed && bad]; });
+    T('v471 ① 현황 회사 칩(실행 — 실제 현황 구간): 전체·종운환경·종운건설 칩 3개(고른 것 1개만 active)·고르면 안내 줄 · ④ 계약 = 준설 2건 / 석면·철거 2건 · ③ 현장 = 석면 현장은 종운건설에만 · 일용직 = 투입 현장 종류 · 직원 = 소속 회사(없음 = 두 칩 · 종운건설 = 환경 칩에서 빠짐 · 두 회사 = 양쪽) · 의무 대장 = 글에 (종운건설)인 16행은 환경 칩에서 빠지고 회사 글 없는 행은 그대로 · 회사 구분 줄 = 그 회사만 · 블록 순서·①②⑤⑥ 그대로 · 결함 사본 4개 전부 잡힘',
+      ok70.every(Boolean) && mutRes.every((x) => x[1]), JSON.stringify({ ok: ok70.map((x) => (x ? 1 : 0)).join(''), mut: mutRes }));
+  }
   // ④-4 (v432 검토) 다른 날짜 갈래 — 상반기·월요일(2027-03-08): h* 알약 "6월"·② 머리 "2027 상반기"·w1 "오늘"·y1 (상반기) "6월"·y3 (1월) 지남 · 기한 달(2026-12-02): y4 (12월)·h* "이번 달"·w1 지남(화요일 뒤)
   const D1_32 = run32(base32({}, '2027-03-08')), D2_32 = run32(base32({}, '2026-12-02'));
   const d1c32 = blk32(D1_32.out, 'check'), d1j32 = blk32(D1_32.out, 'jcb'), d2c32 = blk32(D2_32.out, 'check'), d2j32 = blk32(D2_32.out, 'jcb');
@@ -14233,17 +14268,42 @@ try {
     const FT = ['`blog_urls`', '`promoParseUrls`', '`promoSetUrls`', '`promoUrlsBtn`', 'promo_learn_ingest.py', '`blog_set_ingest`', 'superseded', '12000'];
     const GATE = ['uismoke', 'consheet_check', 'proctpl_check', 'settletest', 'servertest', 'rectest', 'promoqual_check', 'promogen_check', 'promoqlearn_check', 'promostream_check', 'promo_wrap_check', 'promo_post_check'];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
-    const ok = /기준: v470 \(2026-11-14\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && scr.length >= 1 && !cb.some((l) => /\(PM/.test(l))
-      && GATE.every((g) => gate.some((l) => l.indexOf('`' + g + '`') > 0)) && /SHELL_CACHE = 'jw-shell-v470'/.test(d.sw);
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 470 && ftv.length > 0 && mF.length === 0 && scr.length >= 1   /* v471: 기준 줄·sw = 이 판 이상 */ && !cb.some((l) => /\(PM/.test(l))
+      && GATE.every((g) => gate.some((l) => l.indexOf('`' + g + '`') > 0)) && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 470;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
   };
   const r70 = chk70(D70);
   const mu70 = (k, f) => chk70(Object.assign({}, D70, { [k]: f(D70[k]) })).ok;
   const M70 = [mu70('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v469 (')), mu70('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v469'")),
-    mu70('ft', (s) => s.split('`blog_set_ingest`').join('blog_set_ingest')), mu70('tl', (s) => { const k = s.lastIndexOf('`promostream_check`'); return s.slice(0, k) + 'promostream_check' + s.slice(k + 19); })];
+    mu70('ft', (s) => s.split('`blog_set_ingest`').join('blog_set_ingest')), mu70('tl', (s) => { const k = s.indexOf('`promostream_check`', s.indexOf('\n## v470 ')); return s.slice(0, k) + 'promostream_check' + s.slice(k + 19); })];
   T('v470 ③ 문서·판 번호(정확 검사): FEATURES 기준 v470 (2026-11-14)·v470 절(blog_urls·promoParseUrls·promoSetUrls·promoUrlsBtn·수집기 blog_set_ingest·superseded·12000) · TESTLIST v470 화면 칸 [ ] ≥ 1·PM 칸 0·게이트 [x] 12종 · sw jw-shell-v470 · 결함 사본 ' + M70.length + '개 = 모두 ✗',
     r70.ok && M70.every((v) => v === false), JSON.stringify({ r: r70.info, mut: M70 }));
 } catch (e) { console.log('  (v470 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v471(안전 › 현황 회사 칩 — 원장 C031): 문서·판 번호 정확 검사 — 다음 판은 기준 줄·sw를 '471 이상'으로 풀 것
+try {
+  const rd71 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D71 = { ft: rd71('FEATURES.md'), tl: rd71('TESTLIST.md'), sw: rd71('sw.js'), mn: rd71('MANUAL.html'), cl: rd71('CLAUDE.md'), ix: rd71('index.html') };
+  const chk71 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v471 (11/14)', '\n### '), tlv = cut(d.tl, '\n## v471 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[ \] \(AI 시험 화면 대상/.test(l));
+    const FT = ['`sfNowCo`', '`sfNowCoHit`', '`sfNowSiteCo`', '`sfNowConCo`', '`sfNowMemberCo`', '`sfNowWorkerCo`', '`sfNowDutyCo`', '`both`', '공사금액 문턱'];
+    const GATE = ['uismoke', 'consheet_check', 'proctpl_check', 'settletest', 'servertest', 'rectest', 'promoqual_check', 'promogen_check', 'promoqlearn_check', 'promostream_check', 'promo_wrap_check', 'promo_post_check'];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const ok = /기준: v471 \(2026-11-14\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && scr.length >= 1 && !cb.some((l) => /\(PM/.test(l))
+      && GATE.every((g) => gate.some((l) => l.indexOf('`' + g + '`') > 0)) && /SHELL_CACHE = 'jw-shell-v471'/.test(d.sw)
+      && d.mn.indexOf('<b>회사 칩(맨 위 — 2026-11 v471)</b>') > 0 && d.mn.indexOf('회사로 거르기는 아직') < 0 && d.ix.indexOf('회사로 거르기는 아직') < 0
+      && d.cl.indexOf('**현황 회사 칩**(v471') > 0 && d.cl.indexOf('`sfNowCoHit`') > 0;
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
+  };
+  const r71 = chk71(D71);
+  const mu71 = (k, f) => chk71(Object.assign({}, D71, { [k]: f(D71[k]) })).ok;
+  const M71 = [mu71('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v470 (')), mu71('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v470'")),
+    mu71('ft', (s) => s.split('`sfNowCoHit`').join('sfNowCoHit')), mu71('mn', (s) => s.replace('회사 칩(맨 위 — 2026-11 v471)', '회사 칩')), mu71('cl', (s) => s.replace('**현황 회사 칩**(v471', '현황 회사 칩'))];
+  T('v471 ② 문서·판 번호(정확 검사): FEATURES 기준 v471 (2026-11-14)·v471 절(판정 함수 7·both·공사금액 문턱은 다음) · TESTLIST v471 화면 칸 [ ] ≥ 1·PM 칸 0·게이트 [x] 12종 · MANUAL 28-1 회사 칩·옛 "회사로 거르기는 아직" 0(앱·MANUAL) · CLAUDE.md 현황 회사 칩 줄 · sw jw-shell-v471 · 결함 사본 ' + M71.length + '개 = 모두 ✗',
+    r71.ok && M71.every((v) => v === false), JSON.stringify({ r: r71.info, mut: M71 }));
+} catch (e) { console.log('  (v471 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

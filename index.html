@@ -18709,6 +18709,35 @@
       '<div class="task-ctrl"><span class="dday' + (x.dd.cls ? ' ' + x.dd.cls : '') + '">' + x.dd.text + '</span></div>' +
     '</div>';
   }
+  // v471 회사 칩(원장 C031 — 승인 시안의 '전체·종운환경·종운건설', PM 11/14 브리핑 답): 현황 맨 위 칩으로 ③ 기한·④ 계약 안전 서류·회사 구분 줄을 회사로 거른다(화면 안 상태만 — 저장 0).
+  //   판정 = 두 회사 규칙(석면·철거 = 종운건설 · 준설·그 밖 = 종운환경): 현장 = 종류 · 계약 = 종류 · 직원 = 회원 소속 회사(corp — "both" = 두 회사 중복 재적) · 일용직 = 투입된 현장 종류(PM 11/14 'ㅇㅇ')
+  //   · 의무 대장 = 줄 글의 회사, 없으면 이어지는 인허가 행의 회사. 회사를 못 정한 줄("")과 두 회사("both")는 어느 칩에서도 보인다(빠뜨리지 않게). ①②⑤⑥은 회사 구분이 없어 그대로.
+  var sfNowCo = "", SF_NOW_CO = [["", "전체"], ["env", "종운환경"], ["con", "종운건설"]];
+  function sfNowCoHit(co){ return !sfNowCo || !co || co === "both" || co === sfNowCo; }
+  function sfNowKindCo(k){ return (k === "asbestos" || k === "demolition") ? "con" : "env"; }
+  function sfNowSiteCo(r){ return sfNowKindCo(siteKind(r)); }
+  function sfNowConCo(c){ return sfNowKindCo(c && c.type); }
+  function sfNowMemberCo(id){ var m = findMember(id), c = m && m.corp; return (c === "env" || c === "con" || c === "both") ? c : ""; }
+  function sfNowWorkerCo(id){
+    var e = false, c = false, key = String(id);
+    liveSites().forEach(function(r){
+      var ids = (r && Array.isArray(r.worker_ids)) ? r.worker_ids : [], hit = false;
+      ids.forEach(function(x){ if (String(x) === key) hit = true; });
+      if (hit){ if (sfNowSiteCo(r) === "con") c = true; else e = true; }
+    });
+    return (e && c) ? "both" : (c ? "con" : (e ? "env" : ""));
+  }
+  function sfNowEduCo(r){ return r.ptype === "worker" ? sfNowWorkerCo(r.pid) : sfNowMemberCo(r.pid); }
+  function sfNowDutyCo(d){
+    var m = String((d && d.lic) || "").match(/종운건설|종운환경/), o = {};
+    if (m) return m[0] === "종운건설" ? "con" : "env";
+    sfNowDutyLics(d).forEach(function(l){ if (l.org === "종운건설") o.con = 1; else if (l.org === "종운환경") o.env = 1; });
+    return (o.con && o.env) ? "both" : (o.con ? "con" : (o.env ? "env" : ""));
+  }
+  function sfNowCoBar(){
+    return '<div class="lsub-bar">' + SF_NOW_CO.map(function(x){ return '<button type="button" class="lsub-btn' + (sfNowCo === x[0] ? ' active' : '') + '" data-sfn-co="' + x[0] + '">' + x[1] + '</button>'; }).join("") + '</div>' +
+      (sfNowCo ? '<div class="sfn-note">' + esc((sfNowCo === "con" ? "종운건설" : "종운환경") + "만 봅니다 — ③ 기한·④ 계약 안전 서류·회사 구분 줄을 거릅니다(석면·철거 = 종운건설 · 준설·그 밖 = 종운환경). 소속 회사를 정하지 않은 직원과 현장에 들어간 적 없는 일용직은 두 칩에 다 나옵니다. ①②⑤⑥은 회사 구분 없이 그대로입니다.") + '</div>' : '');
+  }
   function sfNowLicKey(s){ return String(s || "").replace(/\([^)]*\)/g, "").replace(/[\s·ㆍ]/g, "").replace(/(등록|허가|신고)$/, ""); }
   // 의무 대장 행 → 이름이 이어지는 인허가 행들('석면해체·제거업 등록(종운건설)' ↔ '석면해체·제거업'). 없으면 빈 배열.
   //   v432 검토: 의무 줄 글에 회사(종운건설·종운환경)가 있으면 이름이 맞는 행 가운데 그 회사(l.org) 행을 고른다 — 같은 업종이 두 회사에 따로 등록돼도 다른 회사 행의 공개범위로 판정하지 않게
@@ -18725,8 +18754,8 @@
     var st = sfNowColSt("licenses", licRemoteOk || duties.length > 0);
     if (st !== "ok") return { h: sfNowWaitRow("의무", "인허가 의무 대장", st, true), pend: st === "wait" };
     var by = {}, rows = [], nc = 0;
-    liveDuties().forEach(function(d){ if (d && d.no != null) by[d.no] = d; });
-    if (!Object.keys(by).length) return { h: sfNowRow("의무", "인허가 의무 대장이 비어 있습니다", "인허가 › 의무 대장에서 등재표를 불러오면 여기에 주기가 보입니다", "비어 있음", "", "duty"), pend: false };
+    liveDuties().forEach(function(d){ if (d && d.no != null && sfNowCoHit(sfNowDutyCo(d))) by[d.no] = d; });   // v471 회사 칩
+    if (!Object.keys(by).length) return sfNowCo ? { h: "", pend: false } : { h: sfNowRow("의무", "인허가 의무 대장이 비어 있습니다", "인허가 › 의무 대장에서 등재표를 불러오면 여기에 주기가 보입니다", "비어 있음", "", "duty"), pend: false };
     SF_NOW_DUTY.cycle.forEach(function(no){ var d = by[no]; if (!d || !sfNowDutyVisible(d)) return; nc++; rows.push(sfNowRow(no + "행", d.duty || "", [d.lic, d.cycle].filter(Boolean).join(" · "), "주기 문구", "", "duty")); });
     SF_NOW_DUTY.event.forEach(function(no){ var d = by[no]; if (!d || !sfNowDutyVisible(d)) return; rows.push(sfNowRow(no + "행", d.duty || "", [d.lic, d.cycle].filter(Boolean).join(" · ") + " — 산안법 중대재해 보고와 따로 판정", "따로 판정", "", "duty")); });
     SF_NOW_DUTY.na.forEach(function(no){ var d = by[no]; if (!d || !sfNowDutyVisible(d)) return; rows.push(sfNowRow(no + "행", d.duty || "", (d.lic ? d.lic + " · " : "") + "차량만 보유한 운반업은 비대상(보관·저장·상하차 설비를 두면 다시 판정)", "해당 없음", "", "duty")); });
@@ -18745,6 +18774,7 @@
       if (as === "ok"){
         var bad = 0;
         liveSites().forEach(function(r){ try {
+          if (!sfNowCoHit(sfNowSiteCo(r))) return;   // v471 회사 칩
           var k = siteKind(r), nm = siteLabel(r) + " · " + (r.title || "(공사명 없음)"), due, dd, ns, keep;
           if (k === "asbestos" && r.status !== "done"){
             due = asbNotifyDue(r);
@@ -18767,7 +18797,7 @@
     src.push("안전 › 체크");
     if (es === "ok"){
       if (!liveEdu().length) notes.push(sfNowRow("교육", "체크 칸 다음 예정", "첫 입력 전에는 계산할 날짜가 없습니다", "기록 없음", "", "edu:member"));
-      else sfNowEduDue(30).forEach(function(x){ var r = x.r, w = r.ptype === "worker"; dated.push({ d: x.dd.diff, h: sfNowRow("교육", sfNowEduName(r) + " · " + eduKindLabel(r.kind), "다음 예정 " + r.next + " · " + (w ? "일용직" : "직원"), x.dd.diff < 0 ? "기한 경과" : x.dd.text, x.dd.diff < 0 ? "bad" : (x.dd.diff <= 7 ? "am" : ""), w ? "edu:worker" : "edu:member") }); });
+      else sfNowEduDue(30).forEach(function(x){ var r = x.r, w = r.ptype === "worker"; if (!sfNowCoHit(sfNowEduCo(r))) return; dated.push({ d: x.dd.diff, h: sfNowRow("교육", sfNowEduName(r) + " · " + eduKindLabel(r.kind), "다음 예정 " + r.next + " · " + (w ? "일용직" : "직원"), x.dd.diff < 0 ? "기한 경과" : x.dd.text, x.dd.diff < 0 ? "bad" : (x.dd.diff <= 7 ? "am" : ""), w ? "edu:worker" : "edu:member") }); });
     } else { notes.push(sfNowWaitRow("교육", "체크 칸 기록", es)); if (es === "wait") pend = true; }
     var duty = { h: "", pend: false };
     if (see.lic){ src.push("인허가 의무 대장"); duty = sfNowDutyPart(); if (duty.pend) pend = true; }
@@ -18807,7 +18837,7 @@
   function sfNowCons(){
     var T = "④ 계약 안전 서류", st = sfNowColSt("contracts", contracts.length > 0), src = "진행 중 계약 · 누르면 그 계약의 단계·서류";
     if (st !== "ok") return { h: sfNowBlock("con", T, "", src, sfNowWaitRow("계약", "계약 목록", st, true), ""), pend: st === "wait" };
-    var act = liveContracts().filter(function(c){ return c.status !== "done"; }), rows = [], none = 0, miss = 0, pend = false;
+    var act = liveContracts().filter(function(c){ return c.status !== "done" && sfNowCoHit(sfNowConCo(c)); }), rows = [], none = 0, miss = 0, pend = false;   // v471 회사 칩
     act.sort(function(a, b){ return String(b.start || "").localeCompare(String(a.start || "")); });
     act.forEach(function(c){
       var keys = sfNowConKeys(c);
@@ -18912,7 +18942,7 @@
   }
   // 회사 구분(v436) — 안전 설정의 회사별 상시근로자 수 두 칸이 다 있을 때만 현황 맨 위에(처음엔 꺼짐 — 한 칸이라도 비면 블록째 없음).
   //   문턱 배지 = 시안 법령 표에서 원문 '확인'된 사람 수 문턱만: 상시 5명(중대재해처벌법 제3조 · 산업안전보건법 제29조 정기교육 — 특별교육은 5명 미만에도) ·
-  //   20명(산업안전보건법 시행령 제24조 — 폐기물 수집·운반업 20~49명 안전보건관리담당자, 종운환경만). 공사금액 문턱·회사로 거르기는 아직(블록별 회사 판정이 정해지지 않음)
+  //   20명(산업안전보건법 시행령 제24조 — 폐기물 수집·운반업 20~49명 안전보건관리담당자, 종운환경만). 공사금액 문턱은 아직(원문 확인 뒤) · 회사로 거르기 = v471 회사 칩
   var SF_NOW_CORP = [{ k: "env", n: "종운환경", t20: true }, { k: "con", n: "종운건설", t20: false }];
   function sfNowHeadN(v){ return typeof v === "number" && v >= 0 && v <= 999 && v % 1 === 0; }
   function sfNowHeadOn(){ var h = sfSet && sfSet.headcount; return !!(h && sfNowHeadN(h.env) && sfNowHeadN(h.con)); }
@@ -18920,7 +18950,7 @@
     if (sfNowLd(sfNowSt.set) !== "ok" || !sfNowHeadOn()) return null;
     var h = sfSet.headcount;
     //   알약은 짧게(폰 375px에서 본문 폭을 덜 먹게 — 알약은 줄바꿈 없음), 문턱의 뜻·조문은 메타 줄
-    var rows = SF_NOW_CORP.map(function(c){
+    var rows = SF_NOW_CORP.filter(function(c){ return sfNowCoHit(c.k); }).map(function(c){
       var n = h[c.k], pills = [n >= 5 ? sfNowPill("5명↑ 중처법 적용", "am") : sfNowPill("5명 미만", "")];
       var meta = [n >= 5 ? "중대재해처벌법·정기교육 적용(상시 5명 이상)" : "중대재해처벌법·정기교육 제외(상시 5명 미만 — 특별교육은 적용)"];
       if (c.t20){
@@ -18930,7 +18960,7 @@
       }
       return sfNowRowP(c.n, esc("상시근로자 " + n + "명"), meta.join(" · "), pills, "");
     });
-    return { h: sfNowBlock("corp", "회사 구분", "", "안전 설정의 회사별 상시근로자 수", rows.join(""), esc("문턱 = 상시 5명(중대재해처벌법 제3조 · 산업안전보건법 제29조 정기교육 — 특별교육은 5명 미만에도 적용) · 20명(산업안전보건법 시행령 제24조 — 폐기물 수집·운반업 20~49명 안전보건관리담당자, 종운환경). 공사금액 문턱과 회사로 거르기는 아직 없습니다.")), pend: false };
+    return { h: sfNowBlock("corp", "회사 구분", "", "안전 설정의 회사별 상시근로자 수", rows.join(""), esc("문턱 = 상시 5명(중대재해처벌법 제3조 · 산업안전보건법 제29조 정기교육 — 특별교육은 5명 미만에도 적용) · 20명(산업안전보건법 시행령 제24조 — 폐기물 수집·운반업 20~49명 안전보건관리담당자, 종운환경). 공사금액 문턱은 아직 없습니다.")), pend: false };
   }
   // ⑥ 확인 필요 — 조문과 해당 여부만 + 문서함 06 안전보건 바로가기(문서함 권한)
   function sfNowConfirm(see){
@@ -19012,12 +19042,15 @@
     add(sfNowTry("confirm", "⑥ 확인 필요", function(){ return sfNowConfirm(see); }));
     var head = document.getElementById("sfNowHead");
     if (head) head.textContent = todayStr() + " 기준";
-    var html = out.join("");
+    var html = sfNowCoBar() + out.join("");   // v471 회사 칩 — 맨 위
     if (html !== sfNowLastHtml){   // v432 검토: 기다리는 동안 매초 다시 그려도 글이 같으면 칸을 갈아끼우지 않는다(누르던 줄·포커스가 날아가지 않게)
       host.innerHTML = html; sfNowLastHtml = html;
       Array.prototype.forEach.call(host.querySelectorAll("[data-sfn-go]"), function(el){
         el.addEventListener("click", function(){ sfNowGo(el.getAttribute("data-sfn-go")); });
         if (el.tagName !== "BUTTON") el.addEventListener("keydown", function(e){ if (e.key === "Enter" || e.key === " "){ e.preventDefault(); sfNowGo(el.getAttribute("data-sfn-go")); } });
+      });
+      Array.prototype.forEach.call(host.querySelectorAll("[data-sfn-co]"), function(el){
+        el.addEventListener("click", function(){ sfNowCo = el.getAttribute("data-sfn-co") || ""; renderSafetyNow(); });
       });
       Array.prototype.forEach.call(host.querySelectorAll("details[data-sfn-fold]"), function(el){
         el.addEventListener("toggle", function(){ sfNowFold[el.getAttribute("data-sfn-fold")] = !!el.open; });

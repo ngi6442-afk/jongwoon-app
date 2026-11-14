@@ -1291,3 +1291,8 @@
 - [ ] (AI 시험 화면 대상 — 운영 배포 뒤 운영 사본 덧입힌 시험 화면, 홍보 수행 권한) 게시 완료 창에 주소 두 개 → 기록 blog_url 첫 주소·blog_urls 둘 · [🔗 나눠 올린 글 주소]로 하나로 고치면 blog_urls 지워짐 · 형식 틀린 주소는 저장 안 됨.
 - [ ] (권민지) 다음에 한 기록을 두 편으로 나눠 올리면 게시 완료 창에 두 주소를 순서대로 넣기(이미 게시 완료한 기록은 [🔗 나눠 올린 글 주소]) → 그다음 수집(09:05·16:05) 로그에 '나눠 올린 글 짝 … 2편' 한 줄.
 - [x] (AI) `uismoke` · `consheet_check` · `proctpl_check` · `settletest` · `servertest` · `rectest` · `promoqual_check` · `promogen_check` · `promoqlearn_check` · `promostream_check` · `promo_wrap_check` · `promo_post_check` 전부 통과 + node --check(함수·_lib·sw) — 숫자는 커밋 메시지
+
+## v471 — 안전 › 현황 회사 칩: 전체·종운환경·종운건설로 ③ 기한·④ 계약 안전 서류·회사 구분 줄 거르기(원장 C031 · 앱만 · 운영 데이터 변경 없음 · 새 화면 없음)
+- [ ] (AI 시험 화면 대상) 현황 맨 위 칩 3개 · 종운건설 = 석면·철거 현장·계약만, 종운환경 = 준설·그 밖 · 소속 회사를 정하지 않은 직원은 두 칩에 다 · 고른 칩 아래 안내 줄 · ①②⑤⑥ 그대로 · 375px에서 칩 한 줄 — 실행 검사는 uismoke v471 ①(실제 현황 구간 · 결함 사본 4)
+- [ ] (나수진 또는 관리자) 안전 설정(현황 ⑤ [고치기])에 회사별 상시근로자 수 두 칸 넣기 — 넣어야 맨 위 회사 구분 줄이 켜짐(고용 형태·중복 재적 표시 기능이 나온 뒤)
+- [x] (AI) `uismoke` · `consheet_check` · `proctpl_check` · `settletest` · `servertest` · `rectest` · `promoqual_check` · `promogen_check` · `promoqlearn_check` · `promostream_check` · `promo_wrap_check` · `promo_post_check` 전부 통과 + node --check(sw) — 숫자는 커밋 메시지
