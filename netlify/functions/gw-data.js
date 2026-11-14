@@ -5640,7 +5640,7 @@ async function handlePmconDecide(event, d, R) {
   return jr(200, { status: 'OK', record: rec, applied: !!applied, marks: doc.marks, updated_at: doc.updated_at, audit: pmAu, request_id: R });
 }
 // P1 판30 계약 서류 목록 분기 점검(PM 콘솔 점검 카드) — 계산·핸들러는 _lib/conchk.js 한 곳. 읽기 = pmconGate(관리자) · [확인] = pmconGate(PM) + 누른 기록 1줄(row conchk:<분기>)
-const CONCHK = require('./_lib/conchk').handlers({ gate: pmconGate, read: pmconRead, fold: pmconFold, key: PMCON_KEY, store: function () { return store(DATA); }, blobGet, blobSet, blobList, appendAudit, learnSettings, LN, colKey, jr });
+const CONCHK = require('./_lib/conchk').handlers({ gate: pmconGate, read: pmconRead, fold: pmconFold, key: PMCON_KEY, store: function () { return store(DATA); }, blobGet, blobSet, blobList, appendAudit, LN, colKey, jr });
 
 // v378 큰 본문 양방향 gzip(2026-10-08 실사고): col:bids가 9/11 3.94MB(2,462건)에서 10/8 07:52 분할 전송 수신 뒤 6.69MB(3,953건)로 자라
 // Netlify 동기 함수 응답 한도 6MB(6,291,456B)를 넘자 get이 실패했고, 앱은 그 실패를 삼켜 "수집된 공고가 없습니다"로 보였다(PM "기존거 다 날라갔나").

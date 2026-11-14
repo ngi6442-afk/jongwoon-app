@@ -31381,7 +31381,7 @@ function dutyStage(nx){
     gwCall("gw-data", { action: "conchk_get" }).then(function(res){
       var b = res && res.body;
       if (!(res && res.status === 200 && b && b.log && b.live)){ fail((b && b.error_code) || (res && res.status) || "?"); return; }
-      el.innerHTML = conchkHtml(b);
+      try { el.innerHTML = conchkHtml(b); } catch(e){ fail("그리기 오류"); return; }   // 검토 11/14 ④: 그리다 터져도 '불러오는 중…'에 멈추지 않게
       var ok = document.getElementById("conchkOkBtn"); if (ok) ok.addEventListener("click", function(){ conchkConfirm(b); });
       var lb = document.getElementById("conchkListBtn"); if (lb) lb.addEventListener("click", function(){ pmconOpenCard("conProcCard"); });
     }, function(){ fail("네트워크"); });
@@ -31401,6 +31401,7 @@ function dutyStage(nx){
     }).catch(function(){ conchkBusy = false; alert("확인 저장 실패(네트워크) — 다시 시도해주세요."); });
   }
   PMCON_CHECKS.push({ id: "conchk", title: "계약 서류 목록 — 분기 점검", render: conchkRender });
+  // @pmcon-conchk-end
   function pmconChecksRender(){
     var wrap = document.getElementById("pmconChecksWrap"), host = document.getElementById("pmconChecks"); if (!wrap || !host) return;
     wrap.style.display = PMCON_CHECKS.length ? "" : "none";

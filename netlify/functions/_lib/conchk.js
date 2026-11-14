@@ -19,7 +19,8 @@ const STAGE_ACTS = { done: 1, undo: 1, na: 1, add: 1, del: 1 };
 const TYPE_TXT = { dredge: '준설', asbestos: '석면', demolition: '철거', waste: '폐기물', lic_change: '인허가 변경' };
 const MONTH_RE = /^clog:contract:(\d{4}-\d{2})$/;
 
-function kstYm(ts) { return new Date(Number(ts) + 9 * 3600000).toISOString().slice(0, 7); }
+// 검토 11/14 ③: 아주 큰·깨진 시각(1e20·NaN)은 Date가 'Invalid time value'로 터진다 — '' (분기 밖)로 돌려 그 줄만 빠지게
+function kstYm(ts) { const t = Number(ts); if (!isFinite(t) || Math.abs(t) > 8.64e15 - 9 * 3600000) return ''; return new Date(t + 9 * 3600000).toISOString().slice(0, 7); }
 // KST 달력 분기 — key '2026-Q4' · 그 분기 달 셋 · 지금 달
 function quarterOf(ts) {
   const ym = kstYm(ts), y = Number(ym.slice(0, 4)), m = Number(ym.slice(5, 7)), q = Math.floor((m - 1) / 3) + 1;
@@ -100,6 +101,7 @@ function summarize(o) {
   const grp = {};
   Object.keys(adds).forEach(function (t) {
     const a = adds[t], at = docAt(byId, a.cid, a.pipe, a.i, a.k);
+    if (!byId[a.cid] || byId[a.cid].del === 1) return;   // 검토 11/14 ①: 지운 계약은 제안 재료가 아님(종결 계약은 셈 — 그 분기에 실제로 더한 것)
     if (!at || !at.name) return;   // 지금 계약에 없는 서류(뒤에 지움·계약 사라짐)는 제안 재료가 아님
     const key = normName(at.name); if (!key) return;
     const g = grp[key] || (grp[key] = { name: at.name, c: {}, p: {}, stages: {} });
@@ -149,23 +151,34 @@ async function loadSummary(D, st, now) {
   // 학습 — 못 읽으면 그 칸만 null('불러오지 못함'), 카드 전체를 막지 않음
   let learn = { pairs: null, allow: null, sunset_off: null };
   try { const lp = await D.blobList(st, D.LN.TYPES.contract.pair_prefix); if (lp.ok) learn.pairs = (lp.keys || []).filter(function (k) { return String(k).indexOf(D.LN.TYPES.contract.pair_prefix) === 0; }).length; } catch (e) {}
-  try { const s = await D.learnSettings(st); learn.allow = (s && s.contract && s.contract.allow) || {}; } catch (e) {}
+  // 검토 11/14 ②: 설정은 키를 직접 읽는다(gw-data learnSettings는 읽기 실패를 삼켜 빈 허용 = '0양식 0칸'으로 보였음) — 실패·깨짐 = null('?') · 없음 = 빈 허용
+  try {
+    const sr = await D.blobGet(st, D.LN.TYPES.contract.settings_key);
+    if (sr.ok || sr.code === 'NOT_FOUND') {
+      const sd = sr.ok && sr.data ? sr.data : {};
+      const al = sd && typeof sd === 'object' && sd.contract && typeof sd.contract === 'object' ? sd.contract.allow : undefined;
+      if (al === undefined || al === null) learn.allow = {};
+      else if (typeof al === 'object' && !Array.isArray(al)) learn.allow = al;
+    }
+  } catch (e) {}
   try {
     const ll = await D.blobList(st, 'lessons:contract:');
     if (ll.ok) {
-      let off = 0;
+      let off = 0, bad = false;
       for (const k of (ll.keys || [])) {
         if (String(k).indexOf('lessons:contract:') !== 0) continue;
-        const r = await D.blobGet(st, k); const L = D.LN.normLessons(r.ok ? r.data : null);
+        const r = await D.blobGet(st, k);
+        if (!r.ok && r.code !== 'NOT_FOUND') { bad = true; break; }   // 하나라도 못 읽으면 수를 모름('?') — 0으로 보이지 않게
+        const L = D.LN.normLessons(r.ok ? r.data : null);
         if (L && L.off && L.sunset) off++;
       }
-      learn.sunset_off = off;
+      if (!bad) learn.sunset_off = off;
     }
   } catch (e) {}
   return { ok: true, sum: summarize({ contracts: contracts, months: months, month_keys: mkeys, first_ym: mkeys[0] || '', now: now, learn: learn }) };
 }
 
-// gw-data 연결: D = { gate(pmconGate), read(pmconRead), fold(pmconFold), key(PMCON_KEY), store(), blobGet, blobSet, blobList, appendAudit, learnSettings, LN, colKey, jr }
+// gw-data 연결: D = { gate(pmconGate), read(pmconRead), fold(pmconFold), key(PMCON_KEY), store(), blobGet, blobSet, blobList, appendAudit, LN, colKey, jr }
 function handlers(D) {
   const rowOf = function (q) { return 'conchk:' + q; };
   const checkedOf = function (doc, q) {

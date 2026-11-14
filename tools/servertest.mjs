@@ -8295,7 +8295,7 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   const FILE30 = join(FN, 'gw-data.js'), SRC30 = fs30.readFileSync(FILE30, 'utf8');
   const rpC30 = require.resolve(join(FN, '_lib/conchk.js')), keepC30 = require.cache[rpC30], SRCC30 = fs30.readFileSync(rpC30, 'utf8');
   const compile30 = (file, src) => { const m = new Mod30(file); m.filename = file; m.paths = Mod30._nodeModulePaths(dirname(file)); m._compile(src, file); m.loaded = true; return m; };
-  const gwOf30 = (csrc) => { require.cache[rpC30] = compile30(rpC30, csrc); try { return compile30(FILE30, SRC30).exports; } finally { require.cache[rpC30] = keepC30; } };
+  const gwOf30 = (csrc) => { const cm = compile30(rpC30, csrc); require.cache[rpC30] = cm; try { const g = compile30(FILE30, SRC30).exports; g.__c30 = cm.exports; return g; } finally { require.cache[rpC30] = keepC30; } };
   const caller30 = (mod) => async (body, tok, dev) => { const r = await mod.handler({ httpMethod: 'POST', headers: Object.assign({ authorization: tok ? 'Bearer ' + tok : '' }, dev ? { 'x-device-id': dev } : {}), body: JSON.stringify(body) }); return { code: r.statusCode, body: JSON.parse(r.body || '{}') }; };
   const C30 = require(rpC30);
   const snap30 = JSON.stringify({ u: mem.gw_users, d: mem.gw_data });
@@ -8315,7 +8315,8 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
     if (evs) mem.gw_data[CK30] = { schema: 1, items: evs, head: '' };
   };
   const aud30 = () => auditMock.logs.filter((l) => l.col === 'pmcon');
-  const chk30 = async (cl) => {
+  const chk30 = async (cl, Cx) => {
+    Cx = Cx || C30;
     const P = {}, I = {};
     // A 권한 — 비로그인 401 · 직원 미승인 기기·승인 기기 403 · PM 아닌 관리자 읽기 200 can_write false · [확인] 403 PM_ONLY · 저장·감사 0
     seed30([con30('cA')], [ev30('cA', '작성:1', 'na')]);
@@ -8329,7 +8330,7 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
     I.A = [a1.code, a2.code, a3.body.error_code, a4.body.error_code, a5.body.error_code, a6.code, a6.body.can_write, a7.body.error_code, a8.body.can_write];
     // B 표본 작음 = 비율 없음 · 숫자(진행 계약·단계 서류 끝/남음·기록 완료/되돌림/건너뜀·계약·직원) · 해시 같은 줄은 한 번 · 건너뜀 내역(단계·서류 이름) · 지운 계약은 진행에서 빠짐
     const evB = [ev30('cA', '작성:1', 'na'), ev30('cA', '작성:2', 'na'), ev30('cB', '작성:0', 'done', 'uwork'), ev30('cB', '작성:0', 'undo', 'uwork'), ev30('cX', '작성:0', 'na')];
-    seed30([con30('cA'), con30('cB'), con30('cX', [], { del: 1 })], evB.concat([Object.assign({}, evB[0])]));
+    seed30([con30('cA'), con30('cB'), con30('cX', [], { del: 1 }), con30('cD', [], { status: 'done' })], evB.concat([Object.assign({}, evB[0])]));   // 검토 11/14: 종결 계약(cD)은 진행에서 빠짐
     const b1 = await cl({ action: 'conchk_get' }, tokA), bb = b1.body || {};
     // 표본 10 이상 = 비율(목록을 바꾼 사건 / 기록 수)
     const evL = []; for (let i = 0; i < 11; i++) evL.push(ev30('cA', '작성:1', i % 2 ? 'undo' : 'na')); for (let i = 0; i < 5; i++) evL.push(ev30('cB', '작성:2', 'na'));
@@ -8397,6 +8398,36 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
       && e4.code === 503 && e4.body.error_code === 'PMCON_READ_FAILED' && e5.code === 503 && e5.body.error_code === 'PMCON_READ_FAILED' && e5keep
       && e6.code === 500 && e6.body.error_code === 'CONCHK_WRITE_FAILED' && !(K30 in mem.gw_data) && aud30().length === auE;
     I.E = [e1.body.error_code, e2.body.error_code, e3.body.error_code, e4.body.error_code, e5.body.error_code, e5keep, e6.code, e6.body.error_code];
+    // F 검토 11/14 — ① 지운 계약 두 곳에서 두 사람이 같은 서류를 더함 = 제안 0(진행 0) · 종결 계약 두 곳 = 제안 1(그 분기에 실제로 더한 것)
+    const fA = add('cA', 'add:a1', 'uadmin'), fB = add('cB', 'add:b1', 'uwork');
+    seed30([con30('cA', [fA.c], { del: 1 }), con30('cB', [fB.c], { del: 1 })], [fA.e, fB.e]);
+    const f1 = await cl({ action: 'conchk_get' }, tokA);
+    seed30([con30('cA', [fA.c], { status: 'done' }), con30('cB', [fB.c], { status: 'done' })], [fA.e, fB.e]);
+    const f2 = await cl({ action: 'conchk_get' }, tokA);
+    //   ② 학습 설정·학습 기록 읽기 실패 = '?'(null — 0으로 안 보임) · 정상 = 허용 양식·칸 수
+    seed30([con30('cA')], [ev30('cA', '작성:1', 'na')]);
+    mem.gw_data['settings:learn'] = { contract: { on: true, allow: { t1: ['A1', 'B2'], t2: ['C3'] } } };
+    mem.gw_data['lessons:contract:t1'] = { off: true, sunset: { ts: 1, by: 'auto' }, rules: [] };
+    const f3 = await cl({ action: 'conchk_get' }, tokA);
+    blobsMock.hooks.failGet = (k) => k === 'settings:learn' || k === 'lessons:contract:t1';
+    const f4 = await cl({ action: 'conchk_get' }, tokA);
+    blobsMock.hooks.failGet = null;
+    //   ③ 아주 큰·깨진 시각(1e20·글자) 줄 = 그 줄만 빼고 200
+    seed30([con30('cA')], [ev30('cA', '작성:1', 'na'), Object.assign(ev30('cA', '작성:2', 'na'), { ts: 1e20 }), Object.assign(ev30('cA', '작성:0', 'done'), { ts: 'x' })]);
+    const f5 = await cl({ action: 'conchk_get' }, tokA);
+    //   ④ 지난 분기 확인 줄이 있어도 이번 분기는 확인 전(checked null)·[확인] 200
+    seed30([con30('cA')], [ev30('cA', '작성:1', 'na')]);
+    mem.gw_data[K30] = { schema: 1, log: [{ ts: 7, by: 'uadmin', name: '관리자', row: 'conchk:2020-Q1', kind: 'conchk', choice: 'ok' }], folded: { n: 0, from: 0, to: 0 }, marks: {}, updated_at: 7, updated_by: 'uadmin' };
+    const f6 = await cl({ action: 'conchk_get' }, tokA), f7 = await cl({ action: 'conchk_confirm', quarter: QT30.key }, tokA);
+    //   ⑤ 분기 = 한국 시간: 12/31 23:59 KST = 그해 4분기 · 1/1 00:00 KST = 다음 해 1분기(UTC로 세면 둘 다 4분기)
+    const q1 = Cx.quarterOf(Date.UTC(2026, 11, 31, 14, 59)), q2 = Cx.quarterOf(Date.UTC(2026, 11, 31, 15, 0)), q3 = Cx.quarterOf(Date.UTC(2026, 2, 31, 15, 0));
+    P.F = f1.code === 200 && f1.body.suggest.length === 0 && f1.body.live.n === 0 && f2.code === 200 && f2.body.suggest.length === 1
+      && f3.code === 200 && f3.body.learn.tpls === 2 && f3.body.learn.cells === 3 && f3.body.learn.sunset_off === 1
+      && f4.code === 200 && f4.body.learn.tpls === null && f4.body.learn.cells === null && f4.body.learn.sunset_off === null
+      && f5.code === 200 && f5.body.log.n === 1 && f5.body.log.skip === 1
+      && f6.code === 200 && f6.body.checked === null && f7.code === 200 && (mem.gw_data[K30] || {}).log.length === 2
+      && q1.key === '2026-Q4' && q2.key === '2027-Q1' && q2.months[0] === '2027-01' && q3.key === '2026-Q2';
+    I.F = [f1.body.suggest && f1.body.suggest.length, f2.body.suggest && f2.body.suggest.length, JSON.stringify(f3.body.learn), JSON.stringify(f4.body.learn), f5.code, f5.body.log && f5.body.log.n, f6.body.checked, f7.code, f7.body.error_code, q1.key, q2.key, q3.key];
     reset30();
     return { ok: Object.keys(P).every((k) => P[k]), P, I };
   };
@@ -8407,6 +8438,7 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
     T('P1 판30 ③ 목록에 넣자는 제안: 같은 서류 2건·1명 = 없음 · 1건·2명 = 없음 · 2건·2명(이름 공백 무시) = 1(계약 2·사람 2) · 2건·2명이지만 한쪽을 뒤에 뺌 = 없음(뺌 1·표본 3) · 계약 상태엔 남았어도 기록에 뺌이 있으면 없음', R30.P.C, JSON.stringify(R30.I.C));
     T('P1 판30 ④ [확인] 분기 1회: 다른 분기 400 BAD_QUARTER · PM 200 = 누른 기록(status:decide)에 1줄(row conchk:분기 · kind conchk · 적용 아님) — 있던 줄·보류 표시 그대로 · 감사 1줄(col pmcon) · 다시 누름 409 CONCHK_DONE(기록 그대로) · 읽기 checked(PM 아닌 관리자에게도) · 판29 pmcon_get에 그 줄(total 2·updated_at 같음)', R30.P.D, JSON.stringify(R30.I.D));
     T('P1 판30 ⑤ 실패 닫힘: 달 기록 읽기 실패·깨진 꼴 = 읽기·[확인] 503 CONCHK_READ_FAILED(0건으로 안 보임·기록 0) · 누른 기록 깨짐 = 503 PMCON_READ_FAILED(덮어쓰지 않음) · 기록 쓰기 실패 = 500 CONCHK_WRITE_FAILED(감사 0)', R30.P.E, JSON.stringify(R30.I.E));
+    T('P1 판30 ⑦ 검토 11/14: 지운 계약 두 곳·두 사람 = 제안 0(진행 0)·종결 계약 두 곳 = 제안 1 · 종결 계약은 진행에서 빠짐(②) · 학습 설정·기록 읽기 실패 = 허용 양식·칸·일몰 수 null("?" — 0 아님)·정상 = 2양식 3칸·일몰 1 · 깨진 시각(1e20·글자) 줄 = 그 줄만 빼고 200 · 지난 분기 확인 줄이 있어도 이번 분기 checked null·[확인] 200 · 분기 = 한국 시간(12/31 23:59 KST = 4분기 · 1/1 00:00 KST = 다음 해 1분기 · 4/1 00:00 KST = 2분기)', R30.P.F, JSON.stringify(R30.I.F));
     const MUT30 = [
       ['    const g = await D.gate(event, R, false); if (g.res) return g.res;\n', '    const g = await D.gate(event, R, false);\n'],
       ['    const g = await D.gate(event, R, true); if (g.res) return g.res; const c = g.c;', '    const g = await D.gate(event, R, false); if (g.res) return g.res; const c = g.c;'],
@@ -8424,15 +8456,23 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
       ["    if (!w.ok) return D.jr(500, { status: 'ERROR', error_code: 'CONCHK_WRITE_FAILED', request_id: R });", '    if (false) return null;'],
       ['    try { au = await D.appendAudit(', '    try { au = true || await D.appendAudit('],
       ["{ return c.del !== 1 && c.status !== 'done'; });", '{ return true; });'],
+      // 검토 11/14
+      ["{ return c.del !== 1 && c.status !== 'done'; });", '{ return c.del !== 1; });'],
+      ['    if (!byId[a.cid] || byId[a.cid].del === 1) return;', '    if (!byId[a.cid]) return;'],
+      ["    if (sr.ok || sr.code === 'NOT_FOUND') {", '    if (true) {'],
+      ['{ bad = true; break; }', '{ continue; }'],
+      ["if (!isFinite(t) || Math.abs(t) > 8.64e15 - 9 * 3600000) return ''; ", ''],
+      ['return x && x.row === rowOf(q); });', "return x && String(x.row).indexOf('conchk:') === 0; });"],
+      ['const ym = kstYm(ts), y =', 'const ym = new Date(Number(ts)).toISOString().slice(0, 7), y ='],
     ];
     const kill30 = [];
     for (const [from, to] of MUT30) {
       if (SRCC30.split(from).length !== 2) { kill30.push('결함 자리가 한 곳이 아님: ' + from.trim().slice(0, 50)); continue; }
-      let k; try { k = !(await chk30(caller30(gwOf30(SRCC30.replace(from, () => to))))).ok; } catch (e) { k = 'err ' + e.message; }
+      let k; try { const g30 = gwOf30(SRCC30.replace(from, () => to)); k = !(await chk30(caller30(g30), g30.__c30)).ok; } catch (e) { k = 'err ' + e.message; }
       if (k !== true) kill30.push(from.trim().slice(0, 60) + (k === false ? ' 안 깨짐' : ' ' + k));
     }
-    let base30; try { base30 = (await chk30(caller30(gwOf30(SRCC30)))).ok; } catch (e) { base30 = 'err ' + e.message; }
-    T('P1 판30 ⑥ 결함 사본 ' + MUT30.length + '개(읽기 관리자 검사·[확인] PM 검사·표본 작음 판정·비율 숨김·제안 2건 그리고 2명·제안 사람 기준·뺀 서류 제외·해시 중복·달 기록 읽기 실패·깨진 꼴·분기 1회·분기 대조·누른 기록 깨짐 덮어씀·쓰기 실패 숨김·감사 걷음·지운 계약 진행에 셈) 전부 위 검사에서 걸림 · 고치지 않은 사본은 통과',
+    let base30; try { const g30 = gwOf30(SRCC30); base30 = (await chk30(caller30(g30), g30.__c30)).ok; } catch (e) { base30 = 'err ' + e.message; }
+    T('P1 판30 ⑥ 결함 사본 ' + MUT30.length + '개(읽기 관리자 검사·[확인] PM 검사·표본 작음 판정·비율 숨김·제안 2건 그리고 2명·제안 사람 기준·뺀 서류 제외·해시 중복·달 기록 읽기 실패·깨진 꼴·분기 1회·분기 대조·누른 기록 깨짐 덮어씀·쓰기 실패 숨김·감사 걷음·지운 계약 진행에 셈 · 검토 11/14: 종결 계약 진행에 셈·지운 계약 제안에 셈·설정 읽기 실패 삼킴·학습 기록 읽기 실패 삼킴·깨진 시각 가드 걷음·확인함을 아무 분기 줄로·분기를 UTC로) 전부 위 검사에서 걸림 · 고치지 않은 사본은 통과',
       kill30.length === 0 && base30 === true, kill30.join(' | ') + (base30 === true ? '' : ' · 원본 사본 ' + base30));
   } finally { reset30(); require.cache[rpC30] = keepC30; }
 }
