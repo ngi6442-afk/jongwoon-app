@@ -1284,3 +1284,10 @@
 - [ ] (AI 시험 화면 대상 — 운영 배포 뒤 읽기 전용) 운영 앱 폰(375) 거래처 탭 — 사업자번호 칸에 13자리 값이 있는 거래처가 있으면 펼침 표 '13자리(숨김)'(없으면 해당 없음) · 보기 권한 직원 계정이면 [상세 ›]가 보인다
 - [x] (AI) `uismoke` 'v469 폰 거래처 펼침 사업자번호'(실행 — 13자리 원문 0·숨김·개인·10자리 · 보기 권한 CSS [상세 ›]만) · v441 ⑪ 옛 본문 해시 새 값(사업자번호 줄만) · v468 문서 검사를 이 판 이상으로 풂 — ✓ AI 11/14
 - [x] (AI) `uismoke` · `consheet_check` · `proctpl_check` · `settletest` · `servertest` · `rectest` · `promoqual_check` · `promogen_check` · `promoqlearn_check` · `promostream_check` · `promo_wrap_check` · `promo_post_check` · 원본 읽기 검사 4종(stmtread a·b·c·d) 전부 통과 — ✓ AI 11/14
+
+## v470 — 체크 10 나눠 올린 글 학습: 블로그 주소 여러 개(blog_urls) + 수집기 주소 짝·여러 편 이어 붙이기 (운영 데이터 변경 없음)
+- [x] (AI) `uismoke` v470 ① 주소 해석(실제 promoParseUrls·promoSetUrls — 나눔·순서·중복·형식·5개 상한·한 편으로 고치면 blog_urls 지움) ② 배선(버튼·두 창·기본값) ③ 문서 정확(결함 사본 4).
+- [x] (AI) 수집기 가짜 시험 9 통과(주소→글 번호 · 두 편 = 짝 하나·주소 순서·편 사이 구분선 · 포장 편마다 · 한 편 주소 짝 · 게시 전 기록은 제목 짝 없음 · 두 번째 회차 0 · 대기 중 한 편 짝 대체 · 학습된 한 편이면 건너뜀 · 본문 실패면 다음 회차) + 운영 자료 DRY 종전과 같음.
+- [ ] (AI 시험 화면 대상 — 운영 배포 뒤 운영 사본 덧입힌 시험 화면, 홍보 수행 권한) 게시 완료 창에 주소 두 개 → 기록 blog_url 첫 주소·blog_urls 둘 · [🔗 나눠 올린 글 주소]로 하나로 고치면 blog_urls 지워짐 · 형식 틀린 주소는 저장 안 됨.
+- [ ] (권민지) 다음에 한 기록을 두 편으로 나눠 올리면 게시 완료 창에 두 주소를 순서대로 넣기(이미 게시 완료한 기록은 [🔗 나눠 올린 글 주소]) → 그다음 수집(09:05·16:05) 로그에 '나눠 올린 글 짝 … 2편' 한 줄.
+- [x] (AI) `uismoke` · `consheet_check` · `proctpl_check` · `settletest` · `servertest` · `rectest` · `promoqual_check` · `promogen_check` · `promoqlearn_check` · `promostream_check` · `promo_wrap_check` · `promo_post_check` 전부 통과 + node --check(함수·_lib·sw) — 숫자는 커밋 메시지

@@ -14196,8 +14196,8 @@ try {
     const FT = ['`cliBizKind`', '`.view.readonly`', '`data-cli-detail`', '`data-cli-edit`', 'v441 ⑪'];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
     const open45 = ['(AI 시험 화면 대상 — 검토 반영(11/11), 시험 서버 실제 계정, 시험 거래처는', '(AI 시험 화면 대상 — 시험 서버 실제 계정, 시험 공고는'].filter((h) => d.tl.indexOf('- [x] ' + h) < 0);
-    const ok = /기준: v469 \(2026-11-14\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 3 && gate.length === 2 && !cb.some((l) => /\(PM/.test(l))
-      && open45.length === 0 && (t66.match(/^- \[ \] /gm) || []).length === 0 && /SHELL_CACHE = 'jw-shell-v469'/.test(d.sw);
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 469 && ftv.length > 0 && mF.length === 0 && cb.length === 3 && gate.length === 2 && !cb.some((l) => /\(PM/.test(l))
+      && open45.length === 0 && (t66.match(/^- \[ \] /gm) || []).length === 0 && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 469;   // v470: 기준 줄·sw는 이 판 이상(이 판 값은 v470 문서 검사)
     return { ok, info: { mF, cb: cb.length, gate: gate.length, open45: open45.length } };
   };
   const r69 = chk69(D69);
@@ -14207,6 +14207,43 @@ try {
   T('v469 문서·판 번호(정확 검사): FEATURES 기준 v469 (2026-11-14)·v469 절 · TESTLIST v469 칸 3(게이트 [x] 2) · 45-1 거래처·입찰 화면 칸 [x] · v466 빈 칸 0 · sw jw-shell-v469 · 결함 사본 ' + M69.length + '개 = 모두 ✗',
     r69.ok && M69.every((v) => v === false), JSON.stringify({ r: r69.info, mut: M69 }));
 } catch (e) { console.log('  (v469 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v470(체크 10 — 나눠 올린 글 주소 여러 개, PM 11/14 "두개로 나눠서 올라간거는 어떻게 학습할건데"): 실행 검사 + 문서·판 번호 정확 검사 — 다음 판은 기준 줄·sw를 '470 이상'으로 풀 것
+try {
+  const fn70 = (name) => { const i = html.indexOf('function ' + name + '('); if (i < 0) throw new Error('함수 없음: ' + name); let d = 0, st = false; for (let j = i; j < html.length; j++) { const ch = html[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return html.slice(i, j + 1); } } throw new Error(name); };
+  const api70 = new Function([fn70('promoParseUrls'), fn70('promoSetUrls'), 'return { parse: promoParseUrls, set: promoSetUrls };'].join('\n'))();
+  const A = 'https://blog.naver.com/jongwoon1204/224472711331', B = 'https://m.blog.naver.com/PostView.naver?blogId=jongwoon1204&logNo=224472642734';
+  const p1 = api70.parse(' ' + A + '  ,\n' + B + ' ' + A + ' '), p2 = api70.parse(A + ' blog.naver.com/x'), p3 = api70.parse(''), p4 = api70.parse([1, 2, 3, 4, 5, 6].map((n) => A + n).join(' '));
+  const r1 = {}; api70.set(r1, p1.list); const r2 = { blog_url: 'x', blog_urls: [A, B] }; api70.set(r2, [B]); const r3 = { blog_url: A, blog_urls: [A, B] }; api70.set(r3, []);
+  T('v470 ① 주소 해석(실행 — 실제 promoParseUrls·promoSetUrls): 띄어쓰기·쉼표·줄바꿈으로 나눔·순서 그대로·중복 빠짐 · http 아닌 조각 = bad · 빈 칸 = 0개 · 6개째부터 뺌(over) · 두 편 = blog_url 첫 주소 + blog_urls 둘 · 한 편으로 고치면 blog_urls 지움 · 빈 목록 = 그대로',
+    JSON.stringify(p1.list) === JSON.stringify([A, B]) && p1.bad.length === 0 && p2.bad.length === 1 && p2.list.length === 1 && p3.list.length === 0 && p3.bad.length === 0 && p4.list.length === 5 && p4.over === true
+    && r1.blog_url === A && JSON.stringify(r1.blog_urls) === JSON.stringify([A, B]) && r2.blog_url === B && !('blog_urls' in r2) && r3.blog_url === A && r3.blog_urls.length === 2,
+    JSON.stringify({ p1, p2, p4: p4.list.length, r1, r2, r3 }));
+  T('v470 ② 화면 배선: [🔗 나눠 올린 글 주소] 버튼(게시 완료·promo 수행만 보임) · 게시 완료 창과 주소 버튼 둘 다 promoParseUrls → promoSetUrls · 게시 완료 창 기본값 = 기존 주소 모두(blog_urls 지워지지 않게) · 첫 주소가 바뀌면 갤러리·지도 다시 보냄',
+    /id="promoUrlsBtn" style="display:none;"/.test(html) && /getElementById\("promoUrlsBtn"\)\.style\.display=\(canDo\("promo"\)&&st==="posted"\)\?"":"none";/.test(html)
+    && (html.match(/var pu=promoParseUrls\(u\);/g) || []).length === 2 && (html.match(/promoSetUrls\(p, pu\.list\);/g) || []).length === 2
+    && /\(Array\.isArray\(p\.blog_urls\)&&p\.blog_urls\.length\)\? p\.blog_urls\.join\(" "\) : \(p\.blog_url\|\|""\)\);/.test(html) && /if\(p\.blog_url!==first0\)\{ galWait=p\.id; mapWait=true; \}/.test(html)
+    && !/p\.status="posted"; if\(u\) p\.blog_url=u;/.test(html), '');
+  const rd70 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D70 = { ft: rd70('FEATURES.md'), tl: rd70('TESTLIST.md'), sw: rd70('sw.js') };
+  const chk70 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v470 (11/14)', '\n### '), tlv = cut(d.tl, '\n## v470 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[ \] \(AI 시험 화면 대상/.test(l));
+    const FT = ['`blog_urls`', '`promoParseUrls`', '`promoSetUrls`', '`promoUrlsBtn`', 'promo_learn_ingest.py', '`blog_set_ingest`', 'superseded', '12000'];
+    const GATE = ['uismoke', 'consheet_check', 'proctpl_check', 'settletest', 'servertest', 'rectest', 'promoqual_check', 'promogen_check', 'promoqlearn_check', 'promostream_check', 'promo_wrap_check', 'promo_post_check'];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const ok = /기준: v470 \(2026-11-14\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && scr.length >= 1 && !cb.some((l) => /\(PM/.test(l))
+      && GATE.every((g) => gate.some((l) => l.indexOf('`' + g + '`') > 0)) && /SHELL_CACHE = 'jw-shell-v470'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
+  };
+  const r70 = chk70(D70);
+  const mu70 = (k, f) => chk70(Object.assign({}, D70, { [k]: f(D70[k]) })).ok;
+  const M70 = [mu70('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v469 (')), mu70('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v469'")),
+    mu70('ft', (s) => s.split('`blog_set_ingest`').join('blog_set_ingest')), mu70('tl', (s) => { const k = s.lastIndexOf('`promostream_check`'); return s.slice(0, k) + 'promostream_check' + s.slice(k + 19); })];
+  T('v470 ③ 문서·판 번호(정확 검사): FEATURES 기준 v470 (2026-11-14)·v470 절(blog_urls·promoParseUrls·promoSetUrls·promoUrlsBtn·수집기 blog_set_ingest·superseded·12000) · TESTLIST v470 화면 칸 [ ] ≥ 1·PM 칸 0·게이트 [x] 12종 · sw jw-shell-v470 · 결함 사본 ' + M70.length + '개 = 모두 ✗',
+    r70.ok && M70.every((v) => v === false), JSON.stringify({ r: r70.info, mut: M70 }));
+} catch (e) { console.log('  (v470 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
