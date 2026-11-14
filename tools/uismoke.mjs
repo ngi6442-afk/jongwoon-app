@@ -7162,7 +7162,7 @@ try {
     '**폰(859px 이하)은 지금 화면 그대로**', '`renderClientsLegacy`', '`#view-cli`', '**칸 폭(실측)**', '694 / 1280 962 / 1600 1,282', '지시·기성·거래처 3개'];
   const CL_PINS41 = ['**거래처 표(v441 — 45-1 넷째 판)**', '`// @cli-sheet-start ~ end`', '`renderClientsLegacy`', '`cliSheetDef`', '`cliNameKey`', '`cliLinkIdx`', '`cliSheetAddOut`', '`CLI_BIZ13_MSG`', '`CLI_ACT_GAP`', 'v441에 거래처 `#view-cli`', "'지시·기성·거래처 3개'"];
   const tcb17 = tlv17.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l));
-  const cbScr17 = tcb17.filter((l) => /^- \[[ x]\] \(AI 시험 화면 대상[,) —]/.test(l)), cbGate17 = tcb17.filter((l) => /^- \[x\] \(AI\) `uismoke`\(/.test(l));
+  const cbScr17 = tcb17.filter((l) => /^- \[[ x]\] \((AI 시험 화면 대상[,) —]|실기 — )/.test(l)) /* 11/14 원장 C147: 실기 칸으로 돌린 화면 칸도 셈 */, cbGate17 = tcb17.filter((l) => /^- \[x\] \(AI\) `uismoke`\(/.test(l));
   const man10 = (() => { const i = man17.indexOf('<h2 id="s10">'), j = man17.indexOf('<h2 id="s11">'); return i < 0 || j < i ? '' : man17.slice(i, j); })();
   const man35 = (() => { const i = man17.indexOf('<h2 id="s35">'); return i < 0 ? '' : man17.slice(i, man17.indexOf('</div>', i)); })();
   const MAN10_PINS41 = ['<b>PC(넓은 화면) — 표</b> (2026-11 v441)', "<b>'(주)'·'주식회사'·띄어쓰기를 빼고</b>", '<b>미입력</b>', '<b>개인(사업자 없음)</b>', '<b>13자리(숨김)</b>', '<b>주민등록번호 같은 13자리 번호는 사업자번호 칸에 넣을 수 없습니다</b>',
@@ -8500,7 +8500,7 @@ try {
     '낙찰방법 116 → **148**', '지역 76 → **104**', '추정가격 108 → **112**', '투찰 하한 124 → **112**', '마감 112 → **92**', '발주기관 128 → **124**', '722 / 958 / 1,062', '10.6ms', '계약 탭 \'연결\'의 입찰 줄은 지금 글뿐이라'];
   const CL_PINS43 = ['**입찰 공고 표(v443 — 45-1 여섯째 판)**', '`// @bid-sheet-start ~ end`', '`renderBidsLegacy`', '`bidSheetPairs`', '`BID_ACT_GAP`', '`bidsLoaded`', '`bidsSaveHeld`', '`BID_UNREAD_MSG`', '`bidListRule`', 'v443에 입찰 `#view-bid`', "'지시·기성·거래처·일용직·입찰 5개'", 'v443 정의 옵션 `search.el`', '`vsSheetExtQ`', 'v443부터 PC 공고 칸은 엑셀형 표'];
   const tcb17 = tlv17.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l));
-  const cbScr17 = tcb17.filter((l) => /^- \[[ x]\] \(AI 시험 화면 대상[,) —]/.test(l)), cbGate17 = tcb17.filter((l) => /^- \[x\] \(AI\) `uismoke`\(/.test(l));
+  const cbScr17 = tcb17.filter((l) => /^- \[[ x]\] \((AI 시험 화면 대상[,) —]|실기 — )/.test(l)) /* 11/14 원장 C147: 실기 칸으로 돌린 화면 칸도 셈 */, cbGate17 = tcb17.filter((l) => /^- \[x\] \(AI\) `uismoke`\(/.test(l));
   const man11_17 = (() => { const i = man17.indexOf('<h2 id="s11">'), j = man17.indexOf('<h2 id="s12">'); return i < 0 || j < i ? '' : man17.slice(i, j); })();
   const MAN_PINS43 = ['<p><b>PC(넓은 화면) — 표</b> (2026-11 v443)', '<span class="btn">지역 확인</span> · <span class="btn">방법 불일치</span> · <span class="btn">하한율 미판독</span>', '공고가 줄어든 것이 아닙니다', '노란 <b>지역 확인</b> 표시', '<b>≥ 금액</b>',
     '다른 공고의 통계로 채우지 않습니다', '<span class="btn">150건 더 보기</span>', '<b>공고번호·매칭어</b>', '"공고를 불러오는 중입니다"', '<p><b>휴대폰 — 카드</b> (예전 모양 그대로)', "'참고(산정 미사용)' 같은 안내 글은 예전 카드 펼침과 같습니다"];
@@ -9081,7 +9081,7 @@ try {
   const MAN_PINS44 = ['<p><b>PC(넓은 화면) — 표</b> (2026-11 v444)', "'경북'·'서울'처럼 두 글자로 줄여", '저장된 원문은 바뀌지 않습니다', '<b>최저/감정</b>은 최저가를 감정가로 나눈 비율(%)', '함께 걸립니다(예: 신규 + 토지 = 신규인 토지만)', '<span class="btn">150건 더 보기</span>',
     "<b>'경북' 같은 줄임말·재산구분·용도·물건관리번호</b>", '공고 칸과 부동산 칸의 버튼·검색어·펼친 줄은 따로 기억됩니다', '<p><b>휴대폰 — 카드</b> (예전 모양 그대로)', '<p><b>정리 규칙</b> (2026-11 v444)', '마감이 14일 넘게 지난 <b>신규·패스</b> 물건은 서버가 매일 정리합니다', '<b>검토·참여</b>로 표시한 물건은 남습니다', '이 정리는 지울 건수를 먼저 세어 보고한 뒤 켭니다'];
   const tcb17 = tlv17.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l));
-  const cbScr17 = tcb17.filter((l) => /^- \[[ x]\] \(AI 시험 화면 대상[,) —]/.test(l)), cbOps17 = tcb17.filter((l) => /^- \[[ x]\] \(종운환경3 운영[ —]/.test(l)), cbGate17 = tcb17.filter((l) => /^- \[x\] \(AI\) `uismoke`\(/.test(l));
+  const cbScr17 = tcb17.filter((l) => /^- \[[ x]\] \((AI 시험 화면 대상[,) —]|실기 — )/.test(l)) /* 11/14 원장 C147: 실기 칸으로 돌린 화면 칸도 셈 */, cbOps17 = tcb17.filter((l) => /^- \[[ x]\] \(종운환경3 운영[ —]/.test(l)), cbGate17 = tcb17.filter((l) => /^- \[x\] \(AI\) `uismoke`\(/.test(l));
   const doc17 = FT_PINS44.filter((s) => ftv17.indexOf(s) < 0).concat(CL_PINS44.filter((s) => cl17.indexOf(s) < 0).map((s) => 'CL ' + s), MAN_PINS44.filter((s) => man12_17.indexOf(s) < 0).map((s) => 'MAN ' + s));
   T('v444 ⑰ 문서: FEATURES 기준 ≥ v444·v444 절(구간·시도 줄임말·OB_SIDO·광주시 뺌·대응표 밖 원래 값·org 떼기 OB_ORG_RE·부품 안 넓힘·하위 탭 없음·OB_ACT_GAP·obSheetFollow·search.el·못 읽은 부동산 확인만·renderOnbidLegacy·서버 정리 기본 꺼짐·settings:onbid·onbid_purge(dry만)·onbid_purge_set·같은 판정 한 벌·실측 칩 수 1,161/2,001·정리 건수 1,802·칸 폭 다섯(64·96·56·88·92)·단계 합 714 / 950 / 1,058·속도 35.8ms·탭 6개 — 문장 고정)·§6 보관 기간 줄·자리 글 GATES_V444·DEFECTS_V444 0 · TESTLIST v444 체크 칸 = 화면 칸 4개 "[ ] (AI 시험 화면 대상"(PM 0) + 운영 칸 1개 "[ ] (종운환경3 운영"(onbid_purge dry → PM께 보고 → onbid_purge_set on true) + 게이트 칸 1개 "[x] (AI) `uismoke`"(consheet_check·proctpl_check·settletest·servertest·결함 심기) · PM 몫 칸 0 · MANUAL 12절 PC 표 단락(줄임말·원문 그대로·최저/감정·AND·150건 더 보기·검색 글·칸 따로)·휴대폰 카드·정리 규칙 · CLAUDE.md 입찰 부동산 표 줄·M7 줄·부품 줄 탭 6개 · sw ≥ 444',
     Number((ft17.match(/기준: v(\d+) /) || [0, 0])[1]) >= 444 && ftv17.length > 0 && doc17.length === 0 && ftv17.indexOf('GATES_V444') < 0 && ft17.indexOf('부동산(온비드)도 같은 규칙이지만 서버 설정 `settings:onbid`로 켜야 돈다(v444 — 기본 꺼짐') > 0
