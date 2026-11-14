@@ -8940,4 +8940,140 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   finally { reset31(); auditMock.readMonth = rm0; require.cache[rpM31] = keepM31; }
 }
 
+// 90 체크 29 월말명세서 판④ 원본 읽기(PM 11/14 '빠지는거 없이' · AI 판독 '배포 때 바로 켬'): gw-stmt stmt_read(수행만·차량 숨김 막음·파일 상한·없는 거래처) · 글자로 읽히는 것 바로(보안 계산서 HTML·옛 엑셀·글자 PDF — 가짜 시험 자료)
+//    · 그림은 원본을 gw_files stmtsrc:<id>에 맡기고 job → gw-stmt-read-background(가짜 Claude) → stmtread:<id>·원본 지움·사용량·감사 → stmt_read_status(맡긴 사람만·없는 job 404) · 저장은 하지 않음(stmt:* 그대로)
+{
+  const fs90 = require('fs');
+  const FX90 = join(FN, '..', '..', 'tools', 'fixtures', 'stmt29');
+  const gws90 = require(join(FN, 'gw-stmt.js'));
+  async function cs90(body, tok, dev) {
+    const r = await gws90.handler({ httpMethod: 'POST', headers: Object.assign({ authorization: tok ? 'Bearer ' + tok : '' }, dev ? { 'x-device-id': dev } : {}), body: JSON.stringify(body) });
+    return { code: r.statusCode, body: JSON.parse(r.body || '{}') };
+  }
+  const envBn90 = process.env.STMT_CORP_BN, envKey90 = process.env.ANTHROPIC_API_KEY;
+  process.env.STMT_CORP_BN = '0000000001,0000000002'; process.env.ANTHROPIC_API_KEY = 'test-not-real';
+  const cp90 = require.resolve(join(FN, '_lib/claude.js')), vp90 = require.resolve(join(FN, '_lib/stmtvision.js')), bp90 = require.resolve(join(FN, 'gw-stmt-read-background.js'));
+  const realC90 = require(cp90), savedC90 = require.cache[cp90];
+  const fakeC90 = { reply: '', calls: 0, last: null };
+  require.cache[cp90] = { id: cp90, filename: cp90, loaded: true, exports: Object.assign({}, realC90, { callApiStream: async function (k, body) { fakeC90.calls++; fakeC90.last = body; return { content: [{ type: 'text', text: fakeC90.reply }], usage: { input_tokens: 100, output_tokens: 20 } }; } }) };
+  delete require.cache[vp90]; delete require.cache[bp90];
+  const bg90 = require(bp90);
+  const keepStmt90 = Object.keys(mem.gw_data).filter((k) => /^(stmt:|stmtidx:)/.test(k)).length;
+  const savedU90 = Object.assign({}, mem.gw_users), aud90 = auditMock.logs.length;
+  try {
+    const D90 = { id: 'udo90', name: '수행90', admin: false, perms: { stmt: 'do' } }, V90 = { id: 'uview90', name: '보기90', admin: false, perms: { stmt: 'view' } };
+    const H90 = { id: 'uhide90', name: '차량숨김90', admin: false, perms: { stmt: 'do', veh: 'hide' } }, O90 = { id: 'uoth90', name: '다른수행90', admin: false, perms: { stmt: 'do' } };
+    [D90, V90, H90, O90].forEach((m) => { mem.gw_users['member:' + m.id] = m; });
+    mem.gw_users['device:dev1'] = { status: 'approved' };
+    const tD90 = issueSession(D90).token, tV90 = issueSession(V90).token, tH90 = issueSession(H90).token, tO90 = issueSession(O90).token;
+    const b64 = (f) => fs90.readFileSync(join(FX90, f)).toString('base64');
+    // ① 권한·입력
+    const p90 = [await cs90({ action: 'stmt_read', ym: '2026-10', vk: 'v09', name: 'a.html', b64: b64('a_nts_seed.html') }, tV90, 'dev1'),
+      await cs90({ action: 'stmt_read', ym: '2026-10', vk: 'v09', name: 'a.html', b64: b64('a_nts_seed.html') }, tH90, 'dev1'),
+      await cs90({ action: 'stmt_read', ym: '2026-10', vk: 'v99', name: 'a.html', b64: b64('a_nts_seed.html') }, tD90, 'dev1'),
+      await cs90({ action: 'stmt_read', ym: '2026-13', vk: 'v09', name: 'a.html', b64: b64('a_nts_seed.html') }, tD90, 'dev1'),
+      await cs90({ action: 'stmt_read', ym: '2026-10', vk: 'v09', name: 'big.pdf', b64: Buffer.alloc(4300001, 65).toString('base64') }, tD90, 'dev1'),
+      await cs90({ action: 'stmt_read', ym: '2026-10', vk: 'v09', name: 'x.txt', b64: Buffer.from('그냥 글').toString('base64') }, tD90, 'dev1'),
+      await cs90({ action: 'stmt_read', ym: '2026-10', vk: 'v09', name: 'x.xlsx', b64: Buffer.from('504b030414000000' + '00'.repeat(30), 'hex').toString('base64') }, tD90, 'dev1')];
+    T('90 ① 원본 읽기 권한·입력: 보기 403 NO_WRITE · 차량 숨김 403 NO_VEH_ACCESS · 없는 거래처 400 UNKNOWN_VENDOR · 달 꼴 400 BAD_REQUEST · 4.3MB 넘음 400 FILE_TOO_LARGE · 글 파일 400 UNSUPPORTED_TYPE · xlsx 400 UNKNOWN_LAYOUT(까닭 글)',
+      p90[0].code === 403 && p90[0].body.error_code === 'NO_WRITE' && p90[1].code === 403 && p90[1].body.error_code === 'NO_VEH_ACCESS' && p90[2].body.error_code === 'UNKNOWN_VENDOR'
+      && p90[3].body.error_code === 'BAD_REQUEST' && p90[4].body.error_code === 'FILE_TOO_LARGE' && p90[5].body.error_code === 'UNSUPPORTED_TYPE' && p90[6].body.error_code === 'UNKNOWN_LAYOUT' && !!p90[6].body.why,
+      p90.map((x) => x.code + '/' + (x.body.error_code || '')).join(' '));
+    // ② 글자로 읽히는 것 바로 — 보안 계산서 HTML(받는 쪽 1번) · 옛 엑셀(신일) · 글자 PDF(수양) · 다른 회사 받는 쪽(2번) 경고 · 저장 안 함 · 감사 '명세서읽기'(꼴·줄 수만)
+    const r1 = await cs90({ action: 'stmt_read', ym: '2026-10', vk: 'v09', name: 'NTS_eTaxInvoice.html', b64: b64('a_nts_seed.html') }, tD90, 'dev1');
+    const r2 = await cs90({ action: 'stmt_read', ym: '2026-10', vk: 'v03', name: '종운환경.xls', b64: b64('sinil_fake.xls') }, tD90, 'dev1');
+    const r3 = await cs90({ action: 'stmt_read', ym: '2026-10', vk: 'v02', name: '거래명세서.pdf', b64: b64('suyang_fake.pdf') }, tD90, 'dev1');
+    const r4 = await cs90({ action: 'stmt_read', ym: '2026-10', vk: 'v01', name: 'n.html', b64: b64('a_nts_aes.html') }, tD90, 'dev1');
+    const au90 = auditMock.logs.slice(aud90).filter((l) => l.col === 'stmt' && l.ev[0].op === '명세서읽기');
+    T('90 ② 글자로 읽힘 → 바로 결과(done): 보안 계산서 HTML src nts·계산서 합계·받는 쪽 번호 안 냄 · 신일 엑셀 src xls·how xlsx 줄 · 수양 PDF src pdf 줄 · 받는 쪽 2번(다른 회사) 계산서 = 경고 · stmt:* 문서 그대로(저장 안 함) · 감사 4줄(파일 이름 없음)',
+      r1.code === 200 && r1.body.done === true && r1.body.result.src === 'nts' && !!r1.body.result.inv && !('buyer_bn' in r1.body.result) && JSON.stringify(r1.body).indexOf('0000000001') < 0
+      && r2.code === 200 && r2.body.result.src === 'xls' && r2.body.result.rows.length > 0 && r2.body.result.rows.every((x) => x.how === 'xlsx')
+      && r3.code === 200 && r3.body.result.src === 'pdf' && r3.body.result.rows.length > 0
+      && r4.code === 200 && r4.body.result.warn.some((w) => /우리 회사가 아닌|다른 회사/.test(w))
+      && Object.keys(mem.gw_data).filter((k) => /^(stmt:|stmtidx:)/.test(k)).length === keepStmt90 && au90.length === 4 && au90.every((l) => l.ev[0].t.indexOf('.html') < 0 && l.ev[0].t.indexOf('.xls') < 0),
+      JSON.stringify([r1.code, r1.body.done, r2.code, (r2.body.result || {}).src, r3.code, (r3.body.result || {}).src, r4.code, au90.length]));
+    // ③ 그림 → 맡김 · 배경 판독(가짜 Claude) · 결과 받기 · 원본 지움 · 사용량 · 감사 · 맡긴 사람만 · 다른 사람 배경 호출은 아무것도 안 함
+    const { Jimp: J90 } = require('jimp');
+    const img90 = new J90({ width: 120, height: 170, color: 0xffffffff });
+    for (let y = 40; y < 150; y += 10) for (let x = 10; x < 110; x++) img90.setPixelColor(0x000000ff, x, y);
+    const jpg90 = await img90.getBuffer('image/jpeg', { quality: 80 });
+    mem.gw_files['stmtsrc:' + 'b'.repeat(24)] = { bid: 'udo90', at: Date.now() - 31 * 60000, data: 'QQ==' };   // 앱이 배경 판독을 부르기 전에 닫혀 남은 원본(30분 넘음)
+    mem.gw_files['stmtsrc:' + 'c'.repeat(24)] = { bid: 'udo90', at: Date.now() - 60000, data: 'QQ==' };        // 아직 판독 중일 수 있는 원본(1분)
+    mem.gw_files['stmtread:' + 'd'.repeat(24)] = { bid: 'udo90', ts: Date.now() - 8 * 86400000, ok: true, result: { rows: [] } };   // 8일 지난 결과
+    const q1 = await cs90({ action: 'stmt_read', ym: '2026-10', vk: 'v07', name: '가온.jpg', b64: jpg90.toString('base64') }, tD90, 'dev1');
+    const sweep90 = [!mem.gw_files['stmtsrc:' + 'b'.repeat(24)], !!mem.gw_files['stmtsrc:' + 'c'.repeat(24)], !mem.gw_files['stmtread:' + 'd'.repeat(24)]];
+    delete mem.gw_files['stmtsrc:' + 'c'.repeat(24)];
+    T('90 ③-0 남은 원본 청소: 새로 맡길 때 30분 넘은 원본 지움 · 1분 된 원본은 둠 · 7일 넘은 결과 지움', sweep90.every(Boolean), JSON.stringify(sweep90));
+    const job90 = q1.body.job || '';
+    const src90 = mem.gw_files['stmtsrc:' + job90];
+    const pend90 = await cs90({ action: 'stmt_read_status', job: job90 }, tD90, 'dev1');
+    const oth90 = await cs90({ action: 'stmt_read_status', job: job90 }, tO90, 'dev1');
+    fakeC90.reply = JSON.stringify({ rows: [{ date: '10/2', vraw: '6441호', item: '요소수 홍길동', qty: 13, unit: 1500, amt: 17727, vat: 1773, note: '010-1111-2222' }, { date: '9/30', vraw: '5474', item: '요소수', qty: 1, unit: 1500, amt: 1364, vat: 136, note: '' }], sum: { supply: 17727, vat: 1773, total: 19500 }, carry: null });
+    mem.gw_users['member:uhong90'] = { id: 'uhong90', name: '홍길동', admin: false, perms: {} };
+    await bg90.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + tO90, 'x-device-id': 'dev1' }, body: JSON.stringify({ id: job90 }) });
+    const afterOther90 = { src: !!mem.gw_files['stmtsrc:' + job90], res: !!mem.gw_files['stmtread:' + job90], calls: fakeC90.calls };
+    await bg90.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + tD90, 'x-device-id': 'dev1' }, body: JSON.stringify({ id: job90 }) });
+    const done90 = await cs90({ action: 'stmt_read_status', job: job90 }, tD90, 'dev1');
+    const rows90 = (done90.body.result || {}).rows || [];
+    const use90 = mem.gw_data['usage:stmt:2026-10'] || {};
+    const aud90b = auditMock.logs.slice(aud90).filter((l) => l.col === 'stmt' && l.ev[0].op === '명세서판독');
+    const none90 = await cs90({ action: 'stmt_read_status', job: 'f'.repeat(24) }, tD90, 'dev1');
+    const badJ90 = await cs90({ action: 'stmt_read_status', job: '../x' }, tD90, 'dev1');
+    T('90 ③ 그림 → AI 판독: stmt_read = done false·job(24자)·원본 맡김(bid·ym·vk) · 판독 전 상태 = 기다림·다른 사람 403 NOT_OWNER · 다른 사람이 배경 호출 = 아무것도 안 함(원본 그대로·Claude 0) · 맡긴 사람 배경 호출 → 결과 · 원본 지움 · 그림 1장 보냄',
+      q1.code === 200 && q1.body.done === false && /^[a-f0-9]{24}$/.test(job90) && !!src90 && src90.bid === 'udo90' && src90.ym === '2026-10' && src90.vk === 'v07'
+      && pend90.code === 200 && pend90.body.done === false && oth90.code === 403 && oth90.body.error_code === 'NOT_OWNER'
+      && afterOther90.src && !afterOther90.res && afterOther90.calls === 0
+      && done90.code === 200 && done90.body.done === true && done90.body.ok === true && !mem.gw_files['stmtsrc:' + job90] && fakeC90.calls === 1
+      && (fakeC90.last.messages[0].content.filter((c) => c.type === 'image').length === 1),
+      JSON.stringify([q1.code, q1.body.done, pend90.body.done, oth90.code, afterOther90, done90.code, done90.body.ok, fakeC90.calls]));
+    T('90 ③-2 판독 결과 걸러내기·기록: 9월 줄 뺌(경고) · 회원 이름(홍길동)·전화 지움 · 6441호 → 6441 · how vision · 종류 = 가온 기본(urea) · 사용량 usage:stmt:2026-10 calls 1·in 100 · 감사 명세서판독 "AI 판독 1줄" · 없는 job 404 NO_JOB · 꼴 틀린 job 400',
+      rows90.length === 1 && rows90[0].item === '요소수' && rows90[0].note === '' && rows90[0].vraw === '6441' && rows90[0].how === 'vision' && rows90[0].kind === 'urea'
+      && done90.body.result.warn.some((w) => /밖 줄 1개|다른 달 줄 1개/.test(w)) && JSON.stringify(done90.body).indexOf('홍길동') < 0 && JSON.stringify(done90.body).indexOf('1111-2222') < 0
+      && use90.calls === 1 && use90.in === 100 && aud90b.length === 1 && /AI 판독 1줄/.test(aud90b[0].ev[0].t) && none90.code === 404 && none90.body.error_code === 'NO_JOB' && badJ90.code === 400,
+      JSON.stringify({ rows90, warn: (done90.body.result || {}).warn, use90, aud: aud90b.map((l) => l.ev[0].t) }));
+    // ④ 결함 사본 — 맡긴 사람 검사 걷음(다른 사람이 배경 호출로 요금을 씀) · 원본 지우기 걷음 · 상태 맡긴 사람 검사 걷음 = 시험이 잡는지(메모리 컴파일)
+    const Mod90 = require('module');
+    const bsrc90 = fs90.readFileSync(bp90, 'utf8'), ssrc90 = fs90.readFileSync(join(FN, 'gw-stmt.js'), 'utf8');
+    const loadAs90 = (p, src) => { const m = new Mod90(p, null); m.filename = p; m.paths = Mod90._nodeModulePaths(dirname(p)); m._compile(src, p); return m.exports; };
+    const mut90 = [];
+    {
+      const B = loadAs90(bp90, bsrc90.replace("if (src.data.bid !== m.id && !m.admin) return;", ''));
+      const q = await cs90({ action: 'stmt_read', ym: '2026-10', vk: 'v07', name: 'g.jpg', b64: jpg90.toString('base64') }, tD90, 'dev1');
+      const before = fakeC90.calls;
+      await B.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + tO90, 'x-device-id': 'dev1' }, body: JSON.stringify({ id: q.body.job }) });
+      mut90.push(fakeC90.calls > before ? '잡힘' : '못 잡음');   // 다른 사람이 판독을 돌렸으면 ③의 '다른 사람 배경 호출 = Claude 0' 단언이 깨짐
+    }
+    {
+      const B = loadAs90(bp90, bsrc90.replace("await blobDelete(store(FILES), 'stmtsrc:' + id);", ''));
+      const q = await cs90({ action: 'stmt_read', ym: '2026-10', vk: 'v07', name: 'g.jpg', b64: jpg90.toString('base64') }, tD90, 'dev1');
+      await B.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + tD90, 'x-device-id': 'dev1' }, body: JSON.stringify({ id: q.body.job }) });
+      mut90.push(mem.gw_files['stmtsrc:' + q.body.job] ? '잡힘' : '못 잡음');
+    }
+    {
+      const G = loadAs90(join(FN, 'gw-stmt.js'), ssrc90.split("if (r.data.bid !== c.member.id && !c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'NOT_OWNER', request_id: R });").join(''));
+      const q = await cs90({ action: 'stmt_read', ym: '2026-10', vk: 'v07', name: 'g.jpg', b64: jpg90.toString('base64') }, tD90, 'dev1');
+      await bg90.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + tD90, 'x-device-id': 'dev1' }, body: JSON.stringify({ id: q.body.job }) });
+      const r = await G.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + tO90, 'x-device-id': 'dev1' }, body: JSON.stringify({ action: 'stmt_read_status', job: q.body.job }) });
+      mut90.push(r.statusCode === 200 ? '잡힘' : '못 잡음');
+    }
+    T('90 ④ 결함 사본 3개(배경 함수 맡긴 사람 검사 걷음 · 원본 지우기 걷음 · 결과 받기 맡긴 사람 검사 걷음) = 모두 다른 결과(시험이 잡음)', mut90.every((x) => x === '잡힘'), mut90.join(' | '));
+    // ⑤ 검산 규칙(11/14 실물 — 가온 요소수·오천 상품상세는 단가가 부가세 포함): 수량×단가 = 공급가 또는 (세액 칸 있으면) 공급가 + 세액
+    const S90 = require(join(FN, '_lib/stmt.js')), JS90 = (x) => JSON.stringify(x);
+    const ri90 = (o) => S90.rowIssues(Object.assign({ kind: 'urea', veh: 'veh_a', qd: 0, ud: 0 }, o), 'veh').indexOf('calc') >= 0;
+    const c90 = [ri90({ qty: 13, unit: 1500, amt: 17727, vat: 1773 }), ri90({ qty: 13, unit: 1500, amt: 19500, vat: null }), ri90({ qty: 13, unit: 1364, amt: 17727, vat: 1773 }),
+      ri90({ qty: 13, unit: 1500, amt: 17727, vat: null }), ri90({ qty: 13, unit: 1500, amt: 17000, vat: 1773 })];
+    T('90 ⑤ 검산 규칙: 단가 부가세 포함(13×1,500 = 17,727 + 1,773) 통과 · 공급가 = 수량×단가 통과 · 단가 공급가 기준(13×1,364 ≈ 17,727 — 반올림 차 5원은 붉음 그대로) · 세액 칸 없이 공급가만 = 붉음 · 어긋난 공급가 = 붉음',
+      JS90(c90) === JS90([false, false, true, true, true]), JS90(c90));
+  } finally {
+    Object.keys(mem.gw_files || {}).forEach((k) => { if (/^stmt(src|read):/.test(k)) delete mem.gw_files[k]; });
+    delete mem.gw_data['usage:stmt:2026-10'];
+    Object.keys(mem.gw_users).forEach((k) => { if (!(k in savedU90)) delete mem.gw_users[k]; });
+    Object.keys(savedU90).forEach((k) => { mem.gw_users[k] = savedU90[k]; });
+    if (savedC90) require.cache[cp90] = savedC90; else delete require.cache[cp90];
+    delete require.cache[vp90]; delete require.cache[bp90];
+    if (envBn90 === undefined) delete process.env.STMT_CORP_BN; else process.env.STMT_CORP_BN = envBn90;
+    if (envKey90 === undefined) delete process.env.ANTHROPIC_API_KEY; else process.env.ANTHROPIC_API_KEY = envKey90;
+  }
+}
+
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

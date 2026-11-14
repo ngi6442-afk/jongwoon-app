@@ -20,15 +20,17 @@
 //   어긋나면 응답 idx:false·gap:false로 알린다(앱이 stmt_reindex로 색인을 다시 만듦).
 const crypto = require('crypto');
 const zlib = require('zlib');
-const { setupBlobContext, store, blobGet, blobSet, blobList } = require('./_lib/blobs');
+const { setupBlobContext, store, blobGet, blobSet, blobList, blobDelete } = require('./_lib/blobs');
 const { verifyToken, bearer } = require('./_lib/session');
 const { appendAudit } = require('./_lib/audit');
 const tier = require('./_lib/tier');
 const DONEIF = require('./_lib/doneif');   // clogAppend(해시 체인) 재사용
 const S = require('./_lib/stmt');
 
+const RD = require('./_lib/stmtread');   // 29 판④ 원본 읽기
 const DATA = 'gw_data';
 const USERS = 'gw_users';
+const FILES = 'gw_files';   // 29 판④ 판독 맡긴 원본(stmtsrc:<id> — 판독 뒤 지움)·결과(stmtread:<id>)
 const CFG_KEY = 'stmt:cfg';
 const ALIAS_KEY = 'stmt:alias:veh';
 const VEH_KEY = 'col:vehicles';
@@ -516,8 +518,68 @@ async function handleGap(st, c, d, R) {
   return jr(200, { status: 'OK', ym: d.ym, vendors: vendors, n: items.length, chain_ok: chain, request_id: R });
 }
 
-const READ = { stmt_cfg_get: handleCfgGet, stmt_month: handleMonth, stmt_get: handleGet, stmt_veh: handleVeh, stmt_alias_get: handleAliasGet, stmt_gap: handleGap, stmt_match: handleMatch };
-const WRITE = { stmt_cfg_set: handleCfgSet, stmt_save: handleSave, stmt_revert: handleRevert, stmt_reindex: handleReindex, stmt_alias_set: handleAliasSet, stmt_sent: handleSent };
+// ---- 29 판④ 원본 읽기(PM 11/14 '빠지는거 없이' · AI 판독 '배포 때 바로 켬') ----
+// stmt_read {ym, vk, name, b64}: 파일 꼴을 알아보고 글자로 읽히는 것(국세청 보안 계산서 HTML·표준 XML·옛 엑셀·글자 PDF)은 바로 공통 꼴 결과를,
+//   그림·스캔·모르는 HTML은 원본을 gw_files stmtsrc:<id>에 잠깐 맡기고 {job}을 준다 — 앱이 gw-stmt-read-background {id}를 부르고 stmt_read_status로 받는다(판독 뒤 원본은 지움).
+//   저장은 하지 않는다 — 앱이 결과 줄을 초안(draft_rows)으로 stmt_save한다(사람이 보고 확정). 파일 이름·내용은 감사·로그에 남기지 않는다(꼴·줄 수만).
+const READ_MAX = 4300000;   // 원본 바이트 상한(동기 함수 요청 6MB — base64 4/3배 + 다른 칸)
+const RE_JOB = /^[a-f0-9]{24}$/;
+const SRC_TTL = 30 * 60 * 1000, RES_TTL = 7 * 86400000;
+// 맡긴 원본이 남는 길(앱이 배경 판독을 부르기 전에 닫힘·배경 함수 실패) — 새로 맡길 때 30분 넘은 원본·7일 넘은 결과를 지운다. 실패해도 읽기는 막지 않음.
+async function readSweep() {
+  try {
+    const st = store(FILES), now = Date.now();
+    const l = await blobList(st, 'stmtsrc:'), r = await blobList(st, 'stmtread:');
+    const pick = (x, pre) => ((x.ok && x.keys) || []).filter(function (k) { return String(k).indexOf(pre) === 0; }).slice(0, 50);   // 접두어로 한 번 더(목록 구현이 접두어를 무시해도 다른 키를 안 지움)
+    for (const k of pick(l, 'stmtsrc:')) { const g = await blobGet(st, k); if (g.ok && g.data && now - (Number(g.data.at) || 0) > SRC_TTL) await blobDelete(st, k); }
+    for (const k of pick(r, 'stmtread:')) { const g = await blobGet(st, k); if (g.ok && g.data && now - (Number(g.data.ts) || 0) > RES_TTL) await blobDelete(st, k); }
+  } catch (e) { /* 청소 실패는 읽기를 막지 않는다 */ }
+}
+async function handleRead(st, c, d, R) {
+  if (!S.RE_YM.test(String(d.ym || '')) || !S.RE_VK.test(String(d.vk || ''))) return bad('BAD_REQUEST', R);
+  const cfg = await cfgRead(st);
+  if (!cfg.ok) return fail(cfg.code, R);
+  const vendor = vendorOf(cfg, d.vk);
+  if (!vendor) return bad('UNKNOWN_VENDOR', R);
+  const name = typeof d.name === 'string' ? d.name.slice(0, 120) : '';
+  if (typeof d.b64 !== 'string' || !d.b64) return bad('EMPTY_FILE', R);
+  if (d.b64.length > Math.ceil(READ_MAX * 4 / 3) + 8) return bad('FILE_TOO_LARGE', R);
+  const buf = Buffer.from(d.b64, 'base64');
+  if (!buf.length) return bad('EMPTY_FILE', R);
+  if (buf.length > READ_MAX) return bad('FILE_TOO_LARGE', R);
+  const ctx = { ym: d.ym, vk: d.vk, vendor: { name: vendor.name, kind: vendor.kind, group: vendor.group, hint: vendor.hint } };
+  let r;
+  try { r = await RD.readFile(buf, name, ctx); } catch (e) { r = { ok: false, code: 'READ_FAILED' }; }
+  if (!r.ok) return bad(r.code || 'READ_FAILED', R, r.why ? { why: String(r.why).slice(0, 120) } : null);
+  if (!r.ai) {
+    await audit(c, '명세서읽기', d.ym + ':' + d.vk, (r.result.src || '') + ' ' + r.result.rows.length + '줄');
+    return jr(200, { status: 'OK', done: true, result: r.result, request_id: R });
+  }
+  await readSweep();
+  const id = crypto.randomBytes(12).toString('hex');
+  const w = await blobSet(store(FILES), 'stmtsrc:' + id, { bid: c.member.id, ym: d.ym, vk: d.vk, mode: r.ai, vendor: ctx.vendor, at: Date.now(), data: buf.toString('base64') });
+  if (!w.ok) return fail(w.code || 'STORAGE_WRITE_FAILED', R);
+  return jr(200, { status: 'OK', done: false, job: id, mode: r.ai, request_id: R });
+}
+async function handleReadStatus(st, c, d, R) {
+  const id = String(d.job || '');
+  if (!RE_JOB.test(id)) return bad('BAD_REQUEST', R);
+  const r = await getOpt(store(FILES), 'stmtread:' + id);
+  if (!r.ok) return fail(r.code, R);
+  if (r.data) {
+    if (r.data.bid !== c.member.id && !c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'NOT_OWNER', request_id: R });
+    if (!r.data.ok) return jr(200, { status: 'OK', done: true, ok: false, code: r.data.code, request_id: R });
+    return jr(200, { status: 'OK', done: true, ok: true, result: r.data.result, skipped: r.data.skipped || [], request_id: R });
+  }
+  const s = await getOpt(store(FILES), 'stmtsrc:' + id);
+  if (!s.ok) return fail(s.code, R);
+  if (!s.data) return jr(404, { status: 'NOT_FOUND', error_code: 'NO_JOB', request_id: R });
+  if (s.data.bid !== c.member.id && !c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'NOT_OWNER', request_id: R });
+  return jr(200, { status: 'OK', done: false, age: Date.now() - (Number(s.data.at) || 0), request_id: R });
+}
+
+const READ = { stmt_cfg_get: handleCfgGet, stmt_month: handleMonth, stmt_get: handleGet, stmt_veh: handleVeh, stmt_alias_get: handleAliasGet, stmt_gap: handleGap, stmt_match: handleMatch, stmt_read_status: handleReadStatus };
+const WRITE = { stmt_cfg_set: handleCfgSet, stmt_save: handleSave, stmt_revert: handleRevert, stmt_reindex: handleReindex, stmt_alias_set: handleAliasSet, stmt_sent: handleSent, stmt_read: handleRead };
 async function handler(event) {
   const R = rid();
   if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: CORS, body: '' };

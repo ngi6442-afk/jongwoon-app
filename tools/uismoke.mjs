@@ -12153,7 +12153,7 @@ try {
   const btnCls6 = [...ssb29.matchAll(/<button type="button" class="([^"]+)" data-st-(act|open)=["\\]*"?([\w-]*)/g)].map((m) => m[1] + '|' + m[2] + '|' + m[3]);
   const writeActs6 = ['add', 'save', 'done', 'sent', 'reopen', 'revert', 'del', 'pick', 'repick'], readActs6 = ['back', 'reload', 'pickx'];   // 29 판③: [고르기 ▾](별칭 저장 — 바꾸는 단추)·고르기 칸 [닫기](읽기 토글)
   const clsOk6 = btnCls6.length >= 10 && btnCls6.every((s) => { const p = s.split('|'); if (p[1] === 'open') return p[0] === 'vs-chip'; if (writeActs6.indexOf(p[2]) >= 0) return /\bmini-btn\b/.test(p[0]); if (readActs6.indexOf(p[2]) >= 0) return p[0] === 'vs-chip'; return true; });
-  T('29 판② ⑥ 정적: 사이드바 관리 › 기성·수금 바로 다음 월말명세서 버튼(처음 숨김) · 화면 section 1개(보드·상세·달 ◀▶ 자리) · switchTab 숨김이면 홈(currentTab 정하기 전)·화면 토글·stmtEnter · applyPerms 볼 수 있으면 다시 그림(보는 사람 바뀜) · 로그아웃 clearSessionData → stmtReset · 상세 배선은 한 번(STMT.bound) · 바꾸는 버튼 mini-btn·읽기 토글([열기]·[‹ 월 보드]·[다시 불러오기]) vs-chip · 앱이 부르는 동작 ' + acts6.join('·') + ' 모두 gw-stmt에 있음 · 앱은 줄을 "vision"으로 만들지 않음(D1 꺼짐)',
+  T('29 판② ⑥ 정적: 사이드바 관리 › 기성·수금 바로 다음 월말명세서 버튼(처음 숨김) · 화면 section 1개(보드·상세·달 ◀▶ 자리) · switchTab 숨김이면 홈(currentTab 정하기 전)·화면 토글·stmtEnter · applyPerms 볼 수 있으면 다시 그림(보는 사람 바뀜) · 로그아웃 clearSessionData → stmtReset · 상세 배선은 한 번(STMT.bound) · 바꾸는 버튼 mini-btn·읽기 토글([열기]·[‹ 월 보드]·[다시 불러오기]) vs-chip · 앱이 부르는 동작 ' + acts6.join('·') + ' 모두 gw-stmt에 있음 · 앱은 줄의 how를 스스로 "vision"으로 정하지 않음(서버 판독 결과의 how만 옮김 — 29 판④ PM 11/14 AI 판독 켬)',
     /<button class="tab-btn" data-tab="rec" id="tabRecBtn">기성·수금<\/button>\n\s*<button class="tab-btn perm-hidden" data-tab="stmt" id="tabStmtBtn">월말명세서<\/button>/.test(nav6)
     && (html.match(/<section class="view" id="view-stmt">/g) || []).length === 1 && ['stmtBoard', 'stmtEditor', 'stmtPrev', 'stmtNext', 'stmtStats', 'stmtBoardMsg', 'stmtMonBar', 'stmtYm'].every((id) => (html.match(new RegExp('id="' + id + '"', 'g')) || []).length === 1)
     && /if \(name === "stmt" && !canSee\("stmt"\)\) name = "dash";/.test(sw6) && /getElementById\("view-stmt"\)\.classList\.toggle\("active", name === "stmt"\);/.test(sw6) && /if \(name === "stmt"\) stmtEnter\(\);/.test(sw6)
@@ -12161,7 +12161,7 @@ try {
     && /if \(currentTab === "stmt" && canSee\("stmt"\)\) renderStmt\(\);/.test(ap6) && /\bstmtReset\(\);/.test(cs6)
     && /if \(STMT\.bound \|\| !host\) return;\n\s*STMT\.bound = true;/.test(fnOf29s('stmtBindOnce')) && (ssb29.match(/addEventListener\("input"/g) || []).length === 2   // 29 판③: 상세 + 거래처 목록 고치기(둘 다 stmtBindOnce 안 — 한 번)
     && (fnOf29s('stmtBindOnce').match(/addEventListener\("input"/g) || []).length === 2
-    && clsOk6 && acts6.length === 12 && acts6.every((a) => srvActs6.indexOf(a) >= 0) && !/how: "vision"|"vision"/.test(ssb29.replace(/\/\/[^\n]*/g, '')),   // 29 판③: 동작 6 → 10(stmt_match·stmt_alias_set·stmt_alias_get·stmt_cfg_get·stmt_cfg_set 더함 — 서버에 다 있음) · 29 판⑤: → 12(stmt_sent 전달함 표시·stmt_veh 차량 탭 칸)
+    && clsOk6 && acts6.length === 14 && acts6.every((a) => srvActs6.indexOf(a) >= 0) && !/how: "vision"|how = "vision"/.test(ssb29.replace(/\/\/[^\n]*/g, '')),   // 29 판④: 동작 12 → 14(stmt_read·stmt_read_status) · 'vision' 낱말은 넣은 파일 표시 꼴 표(STMT_READ_SRC)에만   // 29 판③: 동작 6 → 10(stmt_match·stmt_alias_set·stmt_alias_get·stmt_cfg_get·stmt_cfg_set 더함 — 서버에 다 있음) · 29 판⑤: → 12(stmt_sent 전달함 표시·stmt_veh 차량 탭 칸)
     J({ acts6, btnCls6 }));
 
   // ⑦ 화면 결함 검토 반영(11/10 — 재현된 7건): 차량 칸 글을 쳤다 되돌리면 대조된 차량이 되살아남(change가 안 와도) · 저장 응답이 줄 객체를 갈아 끼워도 같은 줄 id로 찾음 ·
@@ -12819,6 +12819,128 @@ try {
     J({ fw1: [fw1.pend.length, fw1.alerts, fw1.dropped], fw2: [fw2.pend.length, fw2.toasts], fw3: [fw3.pend.length, fw3.toasts], fw4: [fw4.calls, fw4.pend.map((p) => p.mid)] }));
 } catch (e) { console.log('  (29 판⑤ 검사 생략 — ' + e.message + ')'); fails++; }
 
+// ---- 29 판④(PM 11/14 '빠지는거 없이' · AI 판독 '배포 때 바로 켬') — 거래처 상세 [원본 넣기]: index.html @stmt-sheet 구간을 가짜 서버·가짜 FileReader로 돌린다
+//      ① 읽은 결과 채우기(빈 상세 = 확인 없이 · 계산서·잔액·명세 합계는 빈 칸만 · 줄 금액 기준 · 넣은 파일 표시 · 차량 대조 차례로)  ② 지금 줄이 있으면 확인 창(취소 = 그대로)
+//      ③ 저장: 첫 저장에 초안(draft_rows — 읽은 줄 id만·redraft) · 확정을 누르면 작성 중으로 먼저 저장한 뒤 이어서 확정  ④ 파일 넣기 흐름(바로 결과·AI 판독 job → 배경 호출 → 상태 기다림 → 채움 · 4.3MB 상한 · 오류 글)  ⑤ 정적 배선
+try {
+  const blk4 = (a, b) => { const i = html.indexOf(a), j = html.indexOf(b); if (i < 0 || j < i) throw new Error('구간 없음: ' + a); return html.slice(i, j); };
+  const fn4 = (name) => { const i = html.indexOf('function ' + name + '('); if (i < 0) throw new Error('함수 없음: ' + name); let d = 0, st = false; for (let j = i; j < html.length; j++) { const ch = html[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return html.slice(i, j + 1); } } throw new Error('중괄호 짝 안 맞음: ' + name); };
+  const ssb4 = blk4('// @stmt-sheet-start', '// @stmt-sheet-end'), vsb4 = blk4('// @vs-sheet-start', '// @vs-sheet-end');
+  const VEN4 = { vk: 'v07', name: '가온상사', group: 'veh', kind: 'urea', basis: 'supply', carry: false, active: true, hint: [] };
+  const mk4 = (o) => {
+    o = o || {};
+    const env = { perm: o.perm || 'do', log: [], resp: o.resp || {}, confirms: [], ok: o.ok !== false, timers: [], render: 0, vm: [], inval: 0, els: {} };
+    const api = new Function('__env', [
+      'var window = {}, localStorage = { getItem: function(){ return null; }, setItem: function(){} }, ResizeObserver = undefined, currentTab = "stmt";',
+      'var document = { getElementById: function(id){ return __env.els[id] || null; }, querySelector: function(){ return null; }, querySelectorAll: function(){ return []; }, activeElement: null };',
+      'function setTimeout(f, ms){ __env.timers.push({ f: f, ms: ms }); return __env.timers.length; }',
+      'function FileReader(){ var me = this; this.readAsDataURL = function(f){ me.result = "data:application/octet-stream;base64," + f.b64; if (f.fail) me.onerror(); else me.onload(); }; }',
+      'function confirm(m){ __env.confirms.push(m); return __env.ok; } function alert(m){}',
+      fn4('esc'), fn4('pad'), fn4('isDate'),
+      'function myId(){ return "u1"; } function canDo(m){ return m === "stmt" && __env.perm === "do"; } function canSee(m){ return true; }',
+      'function findVeh(){ return null; } function liveVehicles(){ return []; } function findMember(){ return null; } function dispName(n){ return n; } function gwToast(){} function onSessionInvalid(){ __env.inval++; }',
+      'function gwCall(fn, body){ __env.log.push({ fn: fn, body: JSON.parse(JSON.stringify(body)) }); var k = fn === "gw-stmt" ? body.action : fn, r = __env.resp[k]; if (typeof r === "function") r = r(body); if (r instanceof Error) return Promise.reject(r); return Promise.resolve(r || { status: 200, body: { status: "OK" } }); }',
+      'var apprPendingCreates = []; function apprSavePending(){} function apprFlushCreates(){} function apprToastShow(){} function activeMembers(){ return []; } function memberName(){ return ""; }',
+      'var tasks = [], autoGenReady = {}; function liveTasks(){ return []; } function genId(p){ return p + "1"; } function todayStr(){ return "2026-11-14"; } function getUser(){ return "권민지"; }',
+      'function saveTasksCache(){} function renderTasks(){} function renderSummary(){} function scheduleTasksSave(){} var vehOpenId = null, vehDetTab = "ov"; function renderVehicles(){} function isAdmin(){ return false; } function loadTasks(){}',
+      vsb4, ssb4,
+      'stmtEdRender = function(){ __env.render++; }; stmtEdRefresh = function(){}; stmtVehMatch = function(i){ __env.vm.push(i); }; stmtLoadMonth = function(){};',
+      'return { STMT: STMT, load: stmtEdLoad, apply: stmtReadApply, save: stmtEdSave, file: stmtReadFile, box: stmtReadBoxHtml, empty: stmtEdEmpty };'].join('\n'))(env);
+    api.STMT.ym = '2026-10';
+    api.STMT.ed = { ym: '2026-10', vk: 'v07', loading: true, err: '', msg: '', vendor: null, rows: [] };
+    api.load({ vendor: o.vendor || VEN4, doc: o.doc || null });
+    return { env, api };
+  };
+  const J4 = (x) => JSON.stringify(x);
+  const fl4 = async () => { for (let k = 0; k < 12; k++) await new Promise((r) => setTimeout(r, 0)); };
+  const runT4 = async (env, n) => { for (let k = 0; k < (n || 20) && env.timers.length; k++) { const t = env.timers.shift(); t.f(); await fl4(); } };
+  const R4 = { ok: true, src: 'nts', vendor: { name: '가온 상사' }, rows: [
+      { date: '2026-10-02', vraw: '6441', item: '요소수', kind: 'urea', qty: 13, unit: 1500, amt: 17727, vat: 1773, note: '', how: 'file' },
+      { date: '2026-10-06', vraw: '', item: '요소수', kind: 'urea', qty: 7, unit: 1500, amt: 9545, vat: 955, note: '', how: 'file' }],
+    inv: { date: '2026-10-31', supply: 27272, vat: 2728, total: 30000 }, carry: { prev: 1, month: 2, paid: 3, bal: 0 }, sum: { supply: 27272, vat: 2728, total: 30000 }, basis: 'total', warn: ['경고 하나'] };
+
+  // ① 빈 상세에 채우기
+  const U1 = mk4(), e1 = U1.api.STMT.ed;
+  U1.api.apply(e1, R4, '가온 계산서.html');
+  await runT4(U1.env);
+  T('29 판④ ① 읽은 결과 채우기(빈 상세): 확인 창 없음 · 줄 2(일자 글·차량 글·품목·수량·단가·금액·세액·how file) · 읽은 줄 id 표시·초안 표시 · 계산서·잔액 4칸·명세 합계 채움 · 줄 금액 기준 부가세 포함으로 · 넣은 파일 표시(nts·이름) · 차량 글 있는 줄만 대조(1번) · 고침 표시 · 안내 글에 줄 수·채운 칸·경고',
+    U1.env.confirms.length === 0 && e1.rows.length === 2 && e1.rows[0].vin === '6441' && e1.rows[0].item === '요소수' && e1.rows[0].qty === '13' && e1.rows[0].amt === '17,727' && e1.rows[0].vat === '1,773' && e1.rows[0].how === 'file'
+    && e1.draftNew === true && Object.keys(e1.readRids).length === 2 && e1.inv.total === '30,000' && e1.carry.prev === '1' && e1.stated === '30,000' && e1.basis === 'total'
+    && e1.src.length === 1 && e1.src[0].kind === 'nts' && e1.src[0].name === '가온 계산서.html' && J4(U1.env.vm) === '[0]' && e1.dirty === true && /읽은 줄 2개/.test(e1.read.msg) && /계산서/.test(e1.read.msg) && e1.read.warn[0] === '경고 하나',
+    J4({ c: U1.env.confirms.length, rows: e1.rows.map((x) => [x.vin, x.qty, x.amt, x.how]), inv: e1.inv, st: e1.stated, b: e1.basis, src: e1.src, vm: U1.env.vm, msg: e1.read && e1.read.msg }));
+  // ② 지금 줄이 있으면 확인 · 계산서 칸이 이미 있으면 안 덮음
+  const doc2 = { status: 'doing', updated_at: 5, rows: [{ r: 'h1', date: '2026-10-01', vraw: '', item: '손으로 넣은 줄', kind: 'urea', qty: 1, qd: 0, unit: 10, ud: 0, amt: 10, vat: 1, how: 'hand', note: '' }], inv: { date: '', supply: 5, vat: 0, total: 5 } };
+  const U2 = mk4({ doc: doc2, ok: false }), e2 = U2.api.STMT.ed;
+  U2.api.apply(e2, R4, 'x.html');
+  const kept2 = e2.rows.length === 1 && e2.rows[0].item === '손으로 넣은 줄' && !e2.draftNew;
+  const U3 = mk4({ doc: doc2, ok: true }), e3 = U3.api.STMT.ed;
+  U3.api.apply(e3, R4, 'x.html');
+  T('29 판④ ② 지금 줄 1개 있음 → 확인 창("지금 줄 1개를 읽은 줄 2개로") · 취소 = 그대로·초안 없음 · 확인 = 바꿈 · 계산서 칸이 이미 있으면 안 덮음(5 그대로)',
+    U2.env.confirms.length === 1 && /지금 줄 1개를 읽은 줄 2개로/.test(U2.env.confirms[0]) && kept2 && e3.rows.length === 2 && e3.draftNew === true && e3.inv.total === '5',
+    J4({ c: U2.env.confirms, kept2, n3: e3.rows.length, inv3: e3.inv }));
+  // ③ 저장 — 초안 같이 · 확정 = 작성 중 먼저 → 이어서 확정
+  const U4 = mk4({ resp: { stmt_save: (b) => ({ status: 200, body: { status: 'OK', doc: { status: b.status, updated_at: 10 + b.status.length, rows: b.rows.map((x) => Object.assign({ qd: 0, ud: 0 }, x, { qty: Number(x.qty) || null, unit: Number(x.unit) || null })), draft: b.draft_rows ? { rows: b.draft_rows } : null, inv: b.inv, carry: b.carry, stated: b.stated }, checks: { ok: true } } }) } });
+  const e4 = U4.api.STMT.ed;
+  U4.api.apply(e4, Object.assign({}, R4, { carry: null, basis: null, inv: null, sum: null }), 'g.html');
+  e4.rows.push(Object.assign({}, e4.rows[0], { r: 'hz', item: '사람이 더한 줄', how: 'hand', vin: '' }));
+  U4.api.save('doing');
+  await fl4();
+  const s1 = U4.env.log.filter((x) => x.body.action === 'stmt_save');
+  T('29 판④ ③ 첫 저장 = 초안(draft_rows) 같이 — 읽은 줄 2개만(사람이 더한 줄 빼고)·redraft 없음 · 저장 뒤 초안 표시 지움',
+    s1.length === 1 && Array.isArray(s1[0].body.draft_rows) && s1[0].body.draft_rows.length === 2 && s1[0].body.draft_rows.every((x) => x.item === '요소수') && !s1[0].body.redraft && s1[0].body.rows.length === 3 && U4.api.STMT.ed.draftNew === false,
+    J4(s1.map((x) => ({ st: x.body.status, d: (x.body.draft_rows || []).length, rd: x.body.redraft, n: x.body.rows.length }))));
+  const U5 = mk4({ doc: { status: 'doing', updated_at: 3, rows: [], draft: { rows: [{ r: 'h1' }] } }, resp: U4.env.resp });
+  const e5 = U5.api.STMT.ed;
+  U5.api.apply(e5, Object.assign({}, R4, { carry: null, basis: null }), 'g.html');
+  e5.rows.forEach((x) => { x.veh = '_common'; });   // 차량 거래처 줄은 차량이 있어야 검산 통과(확정 가능) — 대조가 끝난 꼴
+  U5.api.save('done');
+  await fl4(); await fl4();
+  const s5 = U5.env.log.filter((x) => x.body.action === 'stmt_save').map((x) => ({ st: x.body.status, d: x.body.draft_rows ? x.body.draft_rows.length : -1, rd: !!x.body.redraft }));
+  T('29 판④ ③ 읽은 뒤 바로 [확정 저장] = 작성 중(초안·redraft — 앞 초안 있음)으로 먼저 저장 → 이어서 확정(초안 없이) — 서버 DRAFT_ON_FINAL 피함',
+    s5.length === 2 && s5[0].st === 'doing' && s5[0].d === 2 && s5[0].rd === true && s5[1].st === 'done' && s5[1].d === -1, J4({ s5, msg: e5.msg, rows: e5.rows.map((x) => [x.date, x.vin, x.veh, x.kind, x.amt, x.vat]), inv: e5.inv }));
+  // ④ 파일 넣기 흐름
+  const RES4 = { status: 200, body: { status: 'OK', done: true, result: R4 } };
+  const U6 = mk4({ resp: { stmt_read: RES4 } }), e6 = U6.api.STMT.ed;
+  U6.api.file({ name: '가온.html', size: 1000, b64: 'QUJD' });
+  await fl4();
+  const rq6 = U6.env.log.filter((x) => x.body.action === 'stmt_read')[0];
+  let polls7 = 0;
+  const U7 = mk4({ resp: { stmt_read: { status: 200, body: { status: 'OK', done: false, job: 'a'.repeat(24), mode: 'image' } },
+    stmt_read_status: () => (++polls7 < 2 ? { status: 200, body: { status: 'OK', done: false } } : { status: 200, body: { status: 'OK', done: true, ok: true, result: Object.assign({}, R4, { src: 'vision', rows: R4.rows.map((x) => Object.assign({}, x, { how: 'vision' })) }) } }) } });
+  const e7 = U7.api.STMT.ed;
+  U7.api.file({ name: '사진.jpg', size: 2000, b64: 'QUJD' });
+  await fl4();
+  const busy7 = !!(e7.read && e7.read.busy && /AI가 읽는 중/.test(e7.read.msg));
+  await runT4(U7.env, 6);
+  const bg7 = U7.env.log.filter((x) => x.fn === 'gw-stmt-read-background');
+  const U8 = mk4(), e8 = U8.api.STMT.ed;
+  U8.api.file({ name: 'big.pdf', size: 4300001, b64: '' });
+  const U9 = mk4({ resp: { stmt_read: { status: 400, body: { status: 'REJECTED', error_code: 'UNKNOWN_LAYOUT', why: '아직 모르는 엑셀(xlsx) 양식입니다' } } } }), e9 = U9.api.STMT.ed;
+  U9.api.file({ name: 'a.xlsx', size: 10, b64: 'QQ==' });
+  await fl4();
+  const U10 = mk4({ perm: 'view' }), e10 = U10.api.STMT.ed;
+  U10.api.file({ name: 'a.html', size: 10, b64: 'QQ==' });
+  T('29 판④ ④ 파일 넣기: 바로 결과 = stmt_read(ym·vk·이름·b64) → 채움 · 그림 = job → 배경 함수 1번(id) → 상태 기다림(2번째에 결과) → 채움(how vision·AI 안내) · 4.3MB 넘음 = 서버 안 부름·안내 · 서버 거절 = 까닭 글(UNKNOWN_LAYOUT + why) · 보기 권한 = 아무것도 안 함',
+    rq6 && rq6.body.ym === '2026-10' && rq6.body.vk === 'v07' && rq6.body.name === '가온.html' && rq6.body.b64 === 'QUJD' && e6.rows.length === 2
+    && busy7 && bg7.length === 1 && bg7[0].body.id === 'a'.repeat(24) && polls7 === 2 && e7.rows.length === 2 && e7.rows[0].how === 'vision' && /AI 판독/.test(e7.read.msg)
+    && U8.env.log.length === 0 && e8.read.bad && /4MB/.test(e8.read.msg) && e9.read.bad && /모르는 양식/.test(e9.read.msg) && /xlsx/.test(e9.read.msg) && U10.env.log.length === 0 && !e10.read,
+    J4({ rq6: rq6 && rq6.body.action, n6: e6.rows.length, busy7, bg7: bg7.length, polls7, n7: e7.rows.length, m8: e8.read, m9: e9.read, l10: U10.env.log.length }));
+  // ⑤ 정적 — 상자는 수행 판에만 · 배선(누름·change·끌어다 놓기) · 상한 = 서버 READ_MAX · 서버 동작 이름 · 저장 실패면 이어서 확정 안 함
+  // ⑤-0 검산 거울(11/14 실물 — 단가가 부가세 포함인 명세): 앱 stmtRowIssues = 서버 rowIssues(같은 표본 5개)
+  const ri4 = new Function(fn4('stmtCalcTol') + fn4('stmtRowIssues') + 'return stmtRowIssues;')();
+  const Ssrv4 = createRequire(import.meta.url)(join(ROOT, 'netlify', 'functions', '_lib', 'stmt.js'));
+  const smp4 = [{ qty: 13, unit: 1500, amt: 17727, vat: 1773 }, { qty: 13, unit: 1500, amt: 19500, vat: null }, { qty: 13, unit: 1364, amt: 17727, vat: 1773 }, { qty: 13, unit: 1500, amt: 17727, vat: null }, { qty: 13, unit: 1500, amt: 17000, vat: 1773 }]
+    .map((o) => Object.assign({ kind: 'urea', veh: 'v1', qd: 0, ud: 0 }, o));
+  const app4 = smp4.map((x) => ri4(x, 'veh').indexOf('calc') >= 0), srv4 = smp4.map((x) => Ssrv4.rowIssues(x, 'veh').indexOf('calc') >= 0);
+  T('29 판④ ⑤-0 검산 거울: 단가 부가세 포함(수량×단가 = 공급가 + 세액) 통과 · 표본 5개 앱 = 서버 = [통과·통과·붉음·붉음·붉음]', J4(app4) === J4(srv4) && J4(app4) === J4([false, false, true, true, true]), J4({ app4, srv4 }));
+  const sv4 = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-stmt.js'), 'utf8');
+  const rd4 = fn4('stmtEdRender'), bd4 = fn4('stmtBindOnce'), oc4 = fn4('stmtOnClick'), dn4 = fn4('stmtEdDone');
+  T('29 판④ ⑤ 정적: 상세 그림에 "if (w) h += stmtReadBoxHtml(ed)" · 묶기 = change(#stmtReadFile)·dragenter·dragover·dragleave·drop · 누름 readpick(상자만) · 앱 상한 4300000 = 서버 READ_MAX · 서버 stmt_read(WRITE)·stmt_read_status(READ) · 저장 실패면 afterDraft 지움 · 상자 글에 accept 6꼴',
+    /if \(w\) h \+= stmtReadBoxHtml\(ed\);/.test(rd4) && /t\.id === "stmtReadFile"/.test(bd4) && /\["dragenter", "dragover", "dragleave", "drop"\]/.test(bd4) && /act === "readpick"/.test(oc4)
+    && /var STMT_READ_MAX = 4300000/.test(ssb4) && /const READ_MAX = 4300000;/.test(sv4) && /stmt_read: handleRead/.test(sv4) && /stmt_read_status: handleReadStatus/.test(sv4)
+    && /ed\.afterDraft = null;\s*\n\s*stmtEdRefresh\(\);\s*\n\s*\}/.test(dn4) && /accept="\.html,\.htm,\.xml,\.pdf,\.xls,\.xlsx,\.jpg,\.jpeg,\.png"/.test(U1.api.box(e1)));
+} catch (e) { console.log('  (29 판④ 검사 생략 — ' + e.message + ')'); fails++; }
+
 try {
   // ---- v459(11/13 — P1 판1·2·4 · 판 번호 임시): 문서·판 번호 정확 검사. 다음 판은 이 검사를 숫자 비교(>= 456)로 풀고 새 판 정확 검사를 더할 것.
   //   FEATURES 기준 v459 (2026-11-13)·v459 절(판1·판2·R2-1 표식·판4) · TESTLIST v459 절(사람 확인 칸 '누가: 무엇' · AI 칸 · 게이트 칸 [x] 8종) · CLAUDE.md P1 줄 · sw jw-shell-v459
@@ -13266,6 +13388,7 @@ try {   // ---- P1 판28 인허가 '이번 달' 탭(시안 판3 ② — PM 11/13
   T('P1 판28 인허가 이번 달 탭(@lic-month 실행 — 운영 승격본 19행·의무 대장 98행 표본 · 오늘 2026-11-13): ① 앱 DUTY_SHARED = 서버 _lib/duty.js 글자째(한 벌 · 구간에 문서 통째 저장 0) · ② 네 묶음 = 지남 8(1·44·47·37·76·2·66·54 · 509~74일) · 7일 안 "없음" · 30일 안 "없음 — 다음으로 들어올 행: 3. … 2026-12-31(12/1부터 이 묶음)" · 기준일 없음 10(16·22·25·29·34·38·39·65·71·85 — "기준: 직전 측정 완료일") · 1행 요약 "5년마다 — 허가일 2015-03-24 기준 + 유예 90일 · 화물자동차 운수사업법" · 근거 확인 필요 배지 2·16·54 · 단추 네 가지(날짜 묶음 완료+수령 올리기·기한 정정·해당 없음 / 기준일 없음 기준일 입력·해당 없음 — 44개) · 머리 PC "지남 8 · 7일 안 0 · 30일 안 0 · 기준일 없음 10"·폰 "지남 8 · 기준일 없음 10" · 칩 18 · 안내 "자동 회차 19행(… v1-20261106)… 담당 김정아(배정표). 자동 회차가 아닌 79행" · ③ 권한 없는 사람(act 0) = 같은 행·단추 0·창 안 열림 · 내 행만 = 그 행 단추 셋 · ④ 옛 문서(완료 기록 칸 없는 seed 행) 열림 · 허가일 없는 허가증 = 1행 "허가일 없음"(해당 없음 단추만) · 빈 대장·0행·서버 거절 안내 · 옛 의무 대장 행 그대로 · ⑤ 창 네 가지 시안 문구(완료 "2026-02-28 회차를 닫습니다…"·"다음 회차 2027-02-28" / 정정 "계산된 기한 2025-06-22(허가일 2015-03-24 + 5년 + 유예 90일)를…" / 해당 없음 메모 칸 없음 / 기준일 "직전 측정 완료일을 … (6개월 뒤)") · 엉뚱한 창 안 열림 · ⑥ 저장 값 거절(빈·내일·증빙 없음·같은 기한·사유 유형) = 호출 0 · 완료 = lic_duty_set 1번(no·op·base·v{due·done_at·ref}) → 응답 칸만 그 행에·목록에서 빠짐·통째 저장 0 · 기준일 = v{date·what} · DUTY_STALE = 다시 읽기·창 닫음 · ⑦ 해당 없음 행 = 목록에서 빠짐(칩 17·안내) · 의무 대장 배지·관리자만 [해당 없음 되돌리기] → na_undo(base) · ⑧ 로그인 전환 = 다시 읽어 뒷사람 권한으로(단추 44 → 0) · ⑨ 배선(칩 셈·머리·안내·창 버튼 4·칸 열 때 다시 읽기·의무 대장 펼침 2·서버 액션 2·창 입력 16px·view-lic readonly·저장 응답 lic_kept 길) · 검토 3 날짜 범위(정정 앞뒤 1년·제출일 회차 1년 전부터 — 경계는 보냄) · 검토 7 오류 문구 업무 말(NO_DUTY·기기·권한 · 모르는 코드 일반 문구 · 화면에 대문자 코드 0 · 안내 줄 판 이름 0) · 검토 2 지킨 행 알림(다시 읽기 + 행 번호 + [선행확인 입력]) · 결함 사본 ' + MUT28U.length + '개 + 같은 본문 결함 2 전부 깨짐',
     same28 && got28.length === 0 && wire28 && kill28u.length === 0 && shMut && shKill, JSON.stringify({ same28, got28, wire28, kill28u, shMut, shKill }));
 } catch (e) { console.log('  (P1 판28 검사 생략 — ' + e.message + ')'); fails++; }
+
 
 try {
   const fdir = join(ROOT, 'netlify', 'functions');

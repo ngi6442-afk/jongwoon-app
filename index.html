@@ -1344,6 +1344,10 @@
   /* 29 판⑤ 보고·결제 줄(월 보드 위) · 차량 탭 상세 월말명세서 칸 머리 */
   .st-outbar{margin:0 0 8px;}
   .st-outbar:empty{display:none;}
+  .st-read{border:1.5px dashed #9fb3c8;background:#f7fafc;padding:10px 12px;margin-bottom:8px;cursor:pointer;font-size:13px;line-height:1.5;}
+  .st-read.over{border-color:#2b6cb0;background:#ebf4ff;}
+  .st-read.busy{cursor:progress;opacity:.85;}
+  .st-read .st-rw{display:block;margin-top:4px;}
   .st-oline{display:flex;gap:4px 10px;align-items:center;flex-wrap:wrap;font-size:12.5px;padding:3px 2px;}
   .st-oh{font-weight:700;}
   .st-vhd{font-size:12px;color:var(--sub);margin:2px 0 6px;}
@@ -8396,7 +8400,8 @@
   function stmtRowIssues(x, group){
     var out = [];
     if (typeof x.amt !== "number") out.push("amt");
-    else if (typeof x.qty === "number" && typeof x.unit === "number" && Math.abs(Math.round(Math.abs(x.qty * x.unit)) - Math.abs(x.amt)) > stmtCalcTol(x)) out.push("calc");
+    else if (typeof x.qty === "number" && typeof x.unit === "number" && Math.abs(Math.round(Math.abs(x.qty * x.unit)) - Math.abs(x.amt)) > stmtCalcTol(x)
+      && !(typeof x.vat === "number" && Math.abs(Math.round(Math.abs(x.qty * x.unit)) - Math.abs(x.amt + x.vat)) <= stmtCalcTol(x))) out.push("calc");   // 29 판④ 서버 rowIssues 거울 — 단가가 부가세 포함인 명세(가온·오천)는 수량×단가 = 공급가 + 세액
     if (!x.kind) out.push("kind");
     if (group === "veh" && !x.veh) out.push("veh");
     if (group === "tool" && !x.use) out.push("use");
@@ -8964,6 +8969,7 @@
     ed.draft = d ? (d.draft || null) : null;
     ed.hasPrev = !!(d && d.prev);
     ed.dirty = false; ed.saving = false; ed.stale = false; ed.vsubSig = null; ed.editN = 0; ed.saveN = 0; ed.pick = null;
+    ed.draftNew = false; ed.readRids = null;   // 29 판④ 읽은 줄 초안(다음 저장에 draft_rows로) — 저장된 판을 받으면 비움 · 판독 중(ed.read)은 그대로 둠(응답이 seq로 이 상세인지 봄)
     if (ed.prevUse === undefined && ed.group === "tool" && canDo("stmt")) stmtPrevUseLoad(ed);   // 29 판③ 용도 기본값 — 상세를 연 뒤 한 번(저장 뒤 다시 채울 때는 안 읽음)
   }
   function stmtOpen(vk, again){   // again = 상세의 [다시 불러오기] — 보드 행 확인 없이(달 읽기가 실패해 보드가 비어도 열림 — 거래처는 서버가 확인)
@@ -9093,6 +9099,7 @@
     w = stmtEdW(ed); tool = ed.group === "tool"; vat = ed.basis !== "total"; v = ed.vendor || {};
     carry = !!(v.carry || !stmtAllEmpty(ed.carry, ["prev", "month", "paid", "bal"]));
     h += '<div class="st-msg" id="stmtEdMsg"></div><div class="st-ck" id="stmtCk"></div>';
+    if (w) h += stmtReadBoxHtml(ed);   // 29 판④ 원본 넣기
     h += '<div class="card st-fields">'
       + '<div class="grp">' + (w ? '<label>줄 금액 기준<select data-d="basis"><option value="total"' + (ed.basis === "total" ? " selected" : "") + '>부가세 포함(주유 판매내역 등)</option><option value="supply"' + (ed.basis !== "total" ? " selected" : "") + '>공급가 + 세액</option></select></label>'
         : '<label>줄 금액 기준<b>' + (ed.basis === "total" ? "부가세 포함" : "공급가 + 세액") + '</b></label>') + '</div>'
@@ -9200,7 +9207,10 @@
     p = stmtEdCollect(ed);
     if (p.errs.length){ ed.msg = "형식이 맞지 않는 칸이 있어 저장하지 않았습니다 — " + p.errs.join(" · "); ed.msgBad = true; stmtEdRefresh(); return; }
     if (stmtFinal(status) && !p.chk.ok){ ed.msg = "검산이 맞지 않아 확정할 수 없습니다 — 붉은 칸을 먼저 맞춰 주세요."; ed.msgBad = true; stmtEdRefresh(); return; }
+    // 29 판④ 읽은 줄이 있으면 첫 저장에 초안(draft_rows — 그때까지 자동 대조한 차량 포함)을 같이 · 서버는 확정 요청에 초안을 안 받으므로(DRAFT_ON_FINAL) 작성 중으로 먼저 저장한 뒤 이어서 확정
+    if (ed.draftNew && status !== "doing"){ ed.afterDraft = status; status = "doing"; }
     body = { action: "stmt_save", ym: ed.ym, vk: ed.vk, base: ed.base, basis: ed.basis, status: status, rows: p.rows, inv: p.inv, stated: p.stated, carry: p.carry, vsub: p.vsub, src: ed.src };
+    if (ed.draftNew && ed.readRids){ body.draft_rows = p.rows.filter(function(x){ return ed.readRids[x.r] === 1; }); if (ed.draft) body.redraft = true; }
     ed.saving = true; ed.saveN = ed.editN || 0; ed.msg = "저장 중…"; ed.msgBad = false; stmtEdRefresh();
     gwCall("gw-stmt", body).then(function(res){ stmtEdDone(ed, res, p, "저장했습니다"); }).catch(function(){ if (STMT.ed !== ed) return; ed.saving = false; ed.msg = "네트워크 오류 — 저장되지 않았습니다."; ed.msgBad = true; stmtEdRefresh(); });
   }
@@ -9213,6 +9223,7 @@
     if (res.status === 401){ ed.msg = "로그인이 풀려 처리하지 않았습니다 — 다시 로그인한 뒤 다시 눌러 주세요(고친 내용은 화면에 남아 있습니다)."; ed.msgBad = true; stmtEdRefresh(); onSessionInvalid(); return; }
     if (res.status === 200 && b.status === "OK" && b.doc && p && (ed.editN || 0) !== ed.saveN){
       ed.doc = b.doc; ed.base = Number(b.doc.updated_at) || ed.base; ed.status = b.doc.status; ed.reopen = false; ed.hasPrev = !!b.doc.prev; ed.draft = b.doc.draft || null; ed.dirty = true;
+      ed.draftNew = false; ed.afterDraft = null;   // 29 판④ 초안은 저장됨 — 이어서 확정은 화면 줄이 바뀌었으니 사람이 다시 누름
       ed.msg = okTxt + " — " + (STMT_ST[b.doc.status] || "") + " · 저장하는 사이에 고친 칸이 있어 그 칸은 아직 저장 전입니다"; ed.msgBad = true;
       if (b.idx === false) stmtReindex(ed.ym, null);
       stmtEdRender(); return;
@@ -9221,10 +9232,12 @@
       stmtEdLoad({ vendor: ed.vendor, doc: b.doc });
       ed.msg = okTxt + " — " + (STMT_ST[b.doc.status] || "") + (b.checks && b.checks.ok ? " · 검산 통과" : "") + (b.gap === false ? " · 간극 기록을 남기지 못했습니다(관리자 확인)" : ""); ed.msgBad = b.gap === false;
       if (b.idx === false) stmtReindex(ed.ym, null);   // 월 색인이 어긋났으면 다시 만듦(문서 저장은 끝난 일)
-      stmtEdRender(); return;
+      stmtEdRender();
+      if (ed.afterDraft){ var nx = ed.afterDraft; ed.afterDraft = null; if (STMT.ed === ed) stmtEdSave(nx); }   // 29 판④ 초안을 작성 중으로 먼저 저장했으면 이어서 확정
+      return;
     }
     at = (p && typeof b.at === "number" && p.idx[b.at] != null) ? " (" + (p.idx[b.at] + 1) + "번 줄)" : "";
-    ed.msg = stmtErrText(res) + at; ed.msgBad = true; ed.stale = code === "STMT_STALE";
+    ed.msg = stmtErrText(res) + at; ed.msgBad = true; ed.stale = code === "STMT_STALE"; ed.afterDraft = null;
     stmtEdRefresh();
   }
   function stmtEdRevert(){
@@ -9364,6 +9377,7 @@
     if (act === "reload"){ if (!ed.saving && (!ed.dirty || confirm("최신 판을 다시 불러올까요?\n(지금 화면의 고친 내용은 사라집니다)"))) stmtOpen(ed.vk, true); return; }
     if (act === "pickx"){ ed.pick = null; stmtEdRender(); return; }
     if (!canDo("stmt") || ed.saving) return;
+    if (act === "readpick"){ if (el.id === "stmtReadBox") stmtReadPick(); return; }   // 29 판④ 원본 넣기(안쪽 글을 눌러도 상자로 올라옴)
     if ((act === "pick" || act === "repick") && stmtEdW(ed)){ stmtPickOpen(Number(el.getAttribute("data-i")), act === "repick"); return; }
     if (act === "add" && stmtEdW(ed)){
       ed.rows.push(stmtNewRow(ed)); ed.dirty = true; ed.editN = (ed.editN || 0) + 1; stmtEdRender();
@@ -9378,6 +9392,106 @@
     else if (act === "sent"){ if (ed.status === "done" && !ed.dirty && !ed.reopen && confirm("사장님·나주임께 전달한 것으로 표시할까요?")) stmtEdSave("sent"); }
     else if (act === "reopen"){ if (stmtFinal(ed.status) && confirm("확정을 풀고 고칩니다.\n[저장(작성 중)]을 누르면 확정이 풀리고, [확정 저장]을 누르면 고친 판으로 다시 확정됩니다.")){ ed.reopen = true; stmtEdRender(); } }
     else if (act === "revert") stmtEdRevert();
+  }
+  // ---- 29 판④ 원본 넣기(PM 11/14 '빠지는거 없이' · AI 판독 '배포 때 바로 켬') — 거래처 상세에서 파일을 끌어다 놓거나 고르면 서버 stmt_read가 읽어 공통 꼴 줄을 준다.
+  //   글자로 읽히는 것(국세청 보안 계산서 HTML·표준 XML·옛 엑셀·글자 PDF)은 바로, 그림·스캔·모르는 HTML은 job → gw-stmt-read-background → stmt_read_status를 5초마다(최대 8분).
+  //   읽은 줄은 편집 줄로 채우고(지금 줄이 있으면 확인 창) 다음 저장에 초안(draft_rows)으로 같이 보낸다 — 사람이 보고 고친 만큼이 간극(판① 짝). 파일은 서버에 남지 않는다.
+  var STMT_READ_MAX = 4300000, STMT_READ_POLL = 5000, STMT_READ_WAIT = 480000;
+  var STMT_READ_SRC = { nts: "nts", xml: "xml", xls: "xls", pdf: "pdf", vision: "vision" };
+  var STMT_READ_ERR = { EMPTY_FILE: "빈 파일입니다 — 메일에서 다시 내려받아 넣어 주세요", FILE_TOO_LARGE: "파일이 너무 큽니다(4MB까지) — 쪽을 나눠 넣어 주세요", UNSUPPORTED_TYPE: "읽을 수 없는 파일 꼴입니다(PDF·그림·엑셀·계산서 HTML·XML)", UNKNOWN_LAYOUT: "아직 모르는 양식입니다", NO_KEY: "우리 회사 사업자번호로 열리지 않는 계산서입니다",
+    ONLY_INVOICE: "계산서 쪽만 있어 AI에 보내지 않았습니다 — 계산서는 보안 계산서 HTML을 넣거나 손으로 넣어 주세요", NO_API_KEY: "AI 판독 설정이 없습니다(관리자 확인)", NO_JSON: "AI 판독 결과를 읽지 못했습니다 — 다시 넣어 주세요", READ_FAILED: "읽지 못했습니다" };
+  function stmtReadBoxHtml(ed){
+    var r = ed.read || {};
+    return '<div class="card st-read' + (r.busy ? ' busy' : '') + '" id="stmtReadBox" data-st-act="readpick" title="거래처가 보낸 파일을 여기로 끌어다 놓거나 눌러서 고르세요">📎 <b>원본 넣기</b> — 거래처가 보낸 파일을 끌어다 놓거나 눌러서 고르세요 '
+      + '<span class="st-mute">(계산서 HTML·XML · PDF · 엑셀 · 사진·스캔 — 글자로 안 되는 것은 AI가 읽습니다)</span><span class="st-rw" id="stmtReadMsg">' + stmtReadMsgHtml(ed) + '</span>'
+      + '<input type="file" id="stmtReadFile" style="display:none" accept=".html,.htm,.xml,.pdf,.xls,.xlsx,.jpg,.jpeg,.png"></div>';
+  }
+  function stmtReadMsgHtml(ed){
+    var r = ed.read || {}, h = "";
+    if (r.msg) h += '<span class="' + (r.bad ? "st-no" : (r.busy ? "st-mute" : "st-ok")) + '">' + esc(r.msg) + '</span>';
+    if (r.warn && r.warn.length) h += '<br>' + r.warn.map(function(t){ return '<span class="st-no">⚠ ' + esc(t) + '</span>'; }).join('<br>');
+    return h;
+  }
+  function stmtReadShow(ed){ if (STMT.ed !== ed) return; stmtSetHtml("stmtReadMsg", stmtReadMsgHtml(ed)); var b = document.getElementById("stmtReadBox"); if (b) b.classList.toggle("busy", !!(ed.read && ed.read.busy)); }
+  function stmtReadPick(){ var ed = STMT.ed, f = document.getElementById("stmtReadFile"); if (!ed || !stmtEdW(ed) || (ed.read && ed.read.busy) || ed.saving) return; if (f){ f.value = ""; f.click(); } }
+  function stmtReadErr(res, code){ var b = (res && res.body) || {}; code = code || b.error_code || ""; return (STMT_READ_ERR[code] || STMT_ERR[code] || (code ? "읽지 못했습니다(" + code + ")" : "읽지 못했습니다")) + (b.why ? " — " + b.why : ""); }
+  function stmtReadFile(file){
+    var ed = STMT.ed, fr, seq;
+    if (!ed || !file || !stmtEdW(ed) || ed.saving || (ed.read && ed.read.busy)) return;
+    if (!file.size){ ed.read = { msg: STMT_READ_ERR.EMPTY_FILE, bad: true }; stmtReadShow(ed); return; }
+    if (file.size > STMT_READ_MAX){ ed.read = { msg: STMT_READ_ERR.FILE_TOO_LARGE, bad: true }; stmtReadShow(ed); return; }
+    seq = ed.readSeq = (ed.readSeq || 0) + 1;
+    ed.read = { busy: true, msg: "읽는 중… (" + String(file.name || "").slice(0, 40) + ")" }; stmtReadShow(ed);
+    fr = new FileReader();
+    fr.onerror = function(){ if (STMT.ed !== ed || ed.readSeq !== seq) return; ed.read = { msg: "파일을 열지 못했습니다", bad: true }; stmtReadShow(ed); };
+    fr.onload = function(){
+      var s = String(fr.result || ""), b64 = s.slice(s.indexOf(",") + 1);
+      if (STMT.ed !== ed || ed.readSeq !== seq) return;
+      gwCall("gw-stmt", { action: "stmt_read", ym: ed.ym, vk: ed.vk, name: String(file.name || "").slice(0, 120), b64: b64 }).then(function(res){
+        var b = res.body || {};
+        if (STMT.ed !== ed || ed.readSeq !== seq) return;
+        if (res.status === 401){ ed.read = { msg: "로그인이 풀렸습니다 — 다시 로그인한 뒤 넣어 주세요", bad: true }; stmtReadShow(ed); onSessionInvalid(); return; }
+        if (res.status !== 200 || b.status !== "OK"){ ed.read = { msg: stmtReadErr(res), bad: true }; stmtReadShow(ed); return; }
+        if (b.done){ stmtReadApply(ed, b.result, file.name); return; }
+        ed.read = { busy: true, msg: "AI가 읽는 중… (보통 1~3분)", t0: Date.now(), job: b.job }; stmtReadShow(ed);
+        gwCall("gw-stmt-read-background", { id: b.job }).then(function(){}, function(){});   // 202 — 결과는 상태로 받음
+        setTimeout(function(){ stmtReadPoll(ed, seq, b.job, file.name); }, STMT_READ_POLL);
+      }).catch(function(){ if (STMT.ed !== ed || ed.readSeq !== seq) return; ed.read = { msg: "네트워크 오류 — 다시 넣어 주세요", bad: true }; stmtReadShow(ed); });
+    };
+    fr.readAsDataURL(file);
+  }
+  function stmtReadPoll(ed, seq, job, name){
+    if (STMT.ed !== ed || ed.readSeq !== seq || !ed.read || !ed.read.busy) return;
+    gwCall("gw-stmt", { action: "stmt_read_status", job: job }).then(function(res){
+      var b = res.body || {}, sec;
+      if (STMT.ed !== ed || ed.readSeq !== seq) return;
+      if (res.status === 200 && b.status === "OK" && b.done){
+        if (b.ok) stmtReadApply(ed, b.result, name);
+        else { ed.read = { msg: stmtReadErr(null, b.code), bad: true }; stmtReadShow(ed); }
+        return;
+      }
+      if (res.status === 401){ ed.read = { msg: "로그인이 풀렸습니다 — 다시 로그인한 뒤 넣어 주세요", bad: true }; stmtReadShow(ed); onSessionInvalid(); return; }
+      if (res.status !== 200 && res.status < 500){ ed.read = { msg: stmtReadErr(res), bad: true }; stmtReadShow(ed); return; }
+      if (Date.now() - ed.read.t0 > STMT_READ_WAIT){ ed.read = { msg: "AI 판독이 너무 오래 걸립니다 — 잠시 뒤 다시 넣어 주세요", bad: true }; stmtReadShow(ed); return; }
+      sec = Math.round((Date.now() - ed.read.t0) / 1000); ed.read.msg = "AI가 읽는 중… " + sec + "초"; stmtReadShow(ed);
+      setTimeout(function(){ stmtReadPoll(ed, seq, job, name); }, STMT_READ_POLL);
+    }).catch(function(){ if (STMT.ed !== ed || ed.readSeq !== seq) return; setTimeout(function(){ stmtReadPoll(ed, seq, job, name); }, STMT_READ_POLL * 2); });
+  }
+  // 읽은 결과 → 편집 줄 · 계산서·잔액·명세 합계는 비어 있을 때만 채움 · 줄 금액 기준(부가세 포함/공급가)은 결과가 알려 주면 바꿈 · 넣은 파일 표시(src) · 차량 번호는 차례로 대조
+  function stmtReadApply(ed, r, name){
+    var rows = (r && Array.isArray(r.rows)) ? r.rows : [], keep, warn = (r && Array.isArray(r.warn)) ? r.warn.slice(0, 8) : [], n = 0, vins = [], filled = [];
+    if (STMT.ed !== ed) return;
+    if (!stmtEdW(ed)){ ed.read = { msg: "지금은 고칠 수 없는 상태라 넣지 않았습니다", bad: true }; stmtReadShow(ed); return; }
+    if (!rows.length && !(r && (r.inv || r.carry))){ ed.read = { msg: "읽은 줄이 없습니다", bad: true, warn: warn }; stmtReadShow(ed); return; }
+    keep = ed.rows.filter(function(e){ return !stmtEdEmpty(e); });
+    if (rows.length && keep.length && !confirm("지금 줄 " + keep.length + "개를 읽은 줄 " + rows.length + "개로 바꿀까요?\n(취소하면 지금 줄을 그대로 둡니다)")){ ed.read = { msg: "넣지 않았습니다", bad: true, warn: warn }; stmtReadShow(ed); return; }
+    if (rows.length){
+      ed.pick = null; ed.rows = []; ed.ridN = 0; ed.readRids = {};
+      rows.forEach(function(x){
+        var e = stmtNewRow(ed);
+        e.date = x.date ? stmtDateOut(x.date) : ""; e.vin = x.vraw || ""; e.item = x.item || ""; e.kind = x.kind || e.kind; e.use = x.use || "";
+        e.qty = x.qty == null ? "" : String(x.qty); e.unit = x.unit == null ? "" : String(x.unit); e.amt = x.amt == null ? "" : stmtNum(x.amt); e.vat = x.vat == null ? "" : stmtNum(x.vat);
+        e.note = x.note || ""; e.how = x.how || "file";
+        ed.rows.push(e); ed.readRids[e.r] = 1; if (e.vin) vins.push(ed.rows.length - 1);
+      });
+      ed.draftNew = true; n = rows.length;
+    }
+    if (r.basis === "total" || r.basis === "supply"){ if (ed.basis !== r.basis){ ed.basis = r.basis; filled.push("줄 금액 기준 " + (r.basis === "total" ? "부가세 포함" : "공급가 + 세액")); } }
+    if (r.inv && stmtAllEmpty(ed.inv, ["date", "supply", "vat", "total"])){ ed.inv = { date: r.inv.date || "", supply: stmtNum(r.inv.supply), vat: stmtNum(r.inv.vat), total: stmtNum(r.inv.total) }; filled.push("계산서"); }
+    if (r.carry && stmtAllEmpty(ed.carry, ["prev", "month", "paid", "bal"])){ ed.carry = { prev: stmtNum(r.carry.prev), month: stmtNum(r.carry.month), paid: stmtNum(r.carry.paid), bal: stmtNum(r.carry.bal) }; filled.push("잔액 4칸"); }
+    if (r.sum && r.sum.total != null && String(ed.stated == null ? "" : ed.stated).trim() === ""){ ed.stated = stmtNum(r.sum.total); filled.push("명세 합계"); }
+    if (STMT_READ_SRC[r.src]){ ed.src = (ed.src || []).filter(function(s){ return s && s.name !== String(name || "").slice(0, 80); }).concat([{ kind: STMT_READ_SRC[r.src], name: String(name || "").replace(/\d{10,}/g, "…").slice(0, 80), pages: 0 }]).slice(-10); }
+    ed.dirty = true; ed.editN = (ed.editN || 0) + 1;
+    ed.read = { msg: (n ? "읽은 줄 " + n + "개" : "줄 없음") + (filled.length ? " · " + filled.join("·") + " 채움" : "") + (r.src === "vision" ? " — AI 판독이라 숫자를 한 번씩 확인해 주세요" : "") + " · [저장(작성 중)]을 눌러야 저장됩니다", warn: warn };
+    stmtEdRender();
+    vins.forEach(function(i, k){ setTimeout(function(){ if (STMT.ed === ed && ed.rows[i] && !ed.rows[i].veh) stmtVehMatch(i); }, 120 * k); });   // 차례로(서버에 한꺼번에 몰리지 않게)
+  }
+  function stmtReadDrop(e){
+    var ed = STMT.ed, dt = e && e.dataTransfer, box = document.getElementById("stmtReadBox");
+    if (!ed || !stmtEdW(ed)) return;
+    if (e.type === "dragover" || e.type === "dragenter"){ e.preventDefault(); if (box) box.classList.add("over"); return; }
+    if (e.type === "dragleave"){ if (box) box.classList.remove("over"); return; }
+    if (e.type === "drop"){ e.preventDefault(); if (box) box.classList.remove("over"); if (dt && dt.files && dt.files.length) stmtReadFile(dt.files[0]); }
   }
   // ---- 거래처 목록 고치기(29 판③ — 수행만, 월 보드 아래 단추) — 서버 stmt_cfg_get·stmt_cfg_set(낙관락 base = 목록 저장 시각 · 있던 거래처 지우기 금지 VENDOR_REMOVED ·
   //   묶음 바꾸기 금지 GROUP_LOCKED · 같은 판 NO_CHANGE · 이름·낱말 개인정보 꼴 거절). 새 거래처 = 지금 번호 중 가장 큰 것 + 1(있던 거래처는 지울 수 없어 늘 새 번호 — 지난 달 문서 키가 가리키는 번호를 다시 쓰지 않음)
@@ -9827,6 +9941,8 @@
     host.addEventListener("change", stmtOnChange);
     host.addEventListener("click", stmtOnClick);
     host.addEventListener("focusout", stmtOnBlur);
+    host.addEventListener("change", function(e){ var t = e && e.target; if (t && t.id === "stmtReadFile" && t.files && t.files[0]) stmtReadFile(t.files[0]); });   // 29 판④ 원본 넣기
+    ["dragenter", "dragover", "dragleave", "drop"].forEach(function(n){ host.addEventListener(n, stmtReadDrop); });
     if (cfh){ cfh.addEventListener("input", stmtCfgOnInput); cfh.addEventListener("change", stmtCfgOnChange); cfh.addEventListener("click", stmtCfgOnClick); }
     if (cfb) cfb.addEventListener("click", function(e){ var el = e && e.target; while (el && el !== cfb && !(el.getAttribute && el.getAttribute("data-st-cfg") != null)) el = el.parentNode; if (el && el !== cfb && !el.disabled) stmtCfgOpen(); });
     if (ob) ob.addEventListener("click", function(e){ var el = e && e.target; while (el && el !== ob && !(el.getAttribute && el.getAttribute("data-st-out") != null)) el = el.parentNode; if (!el || el === ob || el.disabled) return; if (el.getAttribute("data-st-out") === "veh") stmtOutVeh(); else stmtOutTool(); });   // 29 판⑤ 보고·결제 줄

@@ -27,7 +27,7 @@ const USE_LABEL = { posco_cip: '포스코 CIP', posco_ep: '포스코 EP더스트
 const TIRE_ACTS = ['puncture', 'used', 'new', ''];   // 펑크 수리 · 중고 교체 · 신품 교체 · 모름
 const TIRE_ACT_LABEL = { puncture: '펑크 수리', used: '중고 교체', new: '신품 교체', '': '' };
 const HOWS = ['ocr', 'file', 'xlsx', 'hand', 'vision'];   // 줄을 채운 길 — 스캐너 OCR 글자층 · 원본 파일(htm) · 엑셀 · 사람 입력 · 비전(D1 꺼짐 — 켜기 전엔 앱이 쓰지 않음)
-const SRC_KINDS = ['scan', 'htm', 'xlsx', 'hand', 'vision'];
+const SRC_KINDS = ['scan', 'htm', 'xlsx', 'hand', 'vision', 'nts', 'xml', 'xls', 'pdf'];   // 29 판④: 국세청 보안 계산서 HTML·표준 XML·옛 엑셀·글자 PDF 더함
 const BASES = ['total', 'supply'];   // 줄 금액이 부가세 포함(주유소 판매내역 등)인지, 공급가(+세액 칸)인지
 const STATUSES = ['doing', 'done', 'sent'];   // 작성 중 · 확정(검산 통과) · 전달함
 const FINAL = { done: 1, sent: 1 };
@@ -273,7 +273,12 @@ function amtOf(x) { return typeof x.amt === 'number' ? x.amt : 0; }   // 금액 
 function rowIssues(x, group) {
   const out = [];
   if (typeof x.amt !== 'number') out.push('amt');
-  else if (typeof x.qty === 'number' && typeof x.unit === 'number' && Math.abs(Math.round(Math.abs(x.qty * x.unit)) - Math.abs(x.amt)) > calcTol(x)) out.push('calc');
+  else if (typeof x.qty === 'number' && typeof x.unit === 'number') {
+    // 29 판④(11/14 실물): 단가가 부가세 포함인 명세(가온 요소수 단가 1,500 → 공급가 17,727 + 세액 1,773 · 오천 상품상세)는 수량×단가 = 공급가 + 세액 — 세액 칸이 있으면 그것도 통과
+    const q = Math.round(Math.abs(x.qty * x.unit)), t = calcTol(x);
+    const okAmt = Math.abs(q - Math.abs(x.amt)) <= t, okGross = typeof x.vat === 'number' && Math.abs(q - Math.abs(x.amt + x.vat)) <= t;
+    if (!okAmt && !okGross) out.push('calc');
+  }
   if (!x.kind) out.push('kind');
   if (group === 'veh' && !x.veh) out.push('veh');
   if (group === 'tool' && !x.use) out.push('use');
