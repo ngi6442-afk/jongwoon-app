@@ -13809,7 +13809,8 @@ try {
 } catch (e) { console.log('  (P1 판31 검사 생략 — ' + e.message + ')'); fails++; }
 
 // ── v465(Phase 1 판30·31 — PM 11/14 11:27 "45. 판 30,31ㄱ" · 원장 C130·T476·T422 · C138 ② · C128 ②): 문서·판 번호 정확 검사(동작 검사는 'P1 판30'·'P1 판31' · servertest 'P1 판30'·'P1 판31') — 다음 판은 기준 줄·sw를 '465 이상'으로 풀 것
-//   FEATURES v465 절의 '배포 전 검토 반영' 줄은 검토 반영 커밋이 채우므로 글자를 보지 않는다.
+//   FEATURES v465 절의 '배포 전 검토 반영' 줄 글자는 보지 않는다. 판31 보안 검토 반영(6be5629)에 맞춰: 조각 키 목록·ev.pfill·ev.tauto·mchk:since·prev_acks·OVERDUE_DAY ·
+//   TESTLIST 칸 19(화면 15 · 게이트 4)·'P1 판31' 13항목·uismoke 'P1 판31' 7 · MANUAL 조각 n개 없음·월 점검 기록 없음·확인 못 함 뜻 · CLAUDE.md 머리 다시 쓰지 말 것·prev_acks.
 try {
   const rd65 = (p) => readFileSync(join(ROOT, p), 'utf8');
   const D65 = { ft: rd65('FEATURES.md'), tl: rd65('TESTLIST.md'), sw: rd65('sw.js'), man: rd65('MANUAL.html'), cl: rd65('CLAUDE.md') };
@@ -13819,15 +13820,16 @@ try {
     const m2171 = cut(d.man, '<h3 id="s21-7-1">', '<h3'), m213 = cut(d.man, '<h3>21-3. 감사로그</h3>', '<h3'), m214 = cut(d.man, '<h3>21-4. 백업</h3>', '<h3');
     const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), scr = cb.filter((l) => /^- \[ \] \(AI 시험 화면 대상/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l));
     const FT = ['C130', 'T476', 'T422', 'C138 ②', 'C128 ②', '`conchk_get`', '`conchk_confirm`', '`CONCHK_DONE`', '@pmcon-conchk-end', '`SMALL_N`', '`mchk_get`', '`mchk_ack`', '`mchk_run`', '`gw-mchk-cron`', '`0 22 * * *`',
-      '`mchk:backup:YYYY-MM`', '`mchk:backup:since`', '`mchk:alerts:YYYY-MM`', '`mchk:alerts:since`', '`readMonth(month)`', '`audit:YYYY-MM:n`', '`PART_MAX`', '`.veh-no-w`', '8f1229b', '1,696줄·382,546바이트'];
+      '`mchk:backup:YYYY-MM`', '`mchk:backup:since`', '`mchk:alerts:YYYY-MM`', '`mchk:alerts:since`', '`readMonth(month)`', '`audit:YYYY-MM:n`', '`PART_MAX`', '`.veh-no-w`', '8f1229b', '1,696줄·382,546바이트',
+      '`auditListParts`', '머리를 다시 쓰지 않는다', '`ev.pfill`', '`ev.tauto`', '`mchk:since`', '`OVERDUE_DAY`', '`prev_acks`', '123 → 124건', '`backup_put`'];
     const GATE = ['uismoke', 'consheet_check', 'proctpl_check', 'settletest', 'servertest', 'rectest', 'promoqual_check', 'promogen_check', 'promoqlearn_check', 'promostream_check', 'promo_wrap_check', 'promo_post_check'];
-    const CL = ['**P1 판30 계약 서류 분기 점검 카드(v465', '**P1 판31 월 점검(v465', '**감사 기록 월 상한 분할(v465)**'];
+    const CL = ['**P1 판30 계약 서류 분기 점검 카드(v465', '**P1 판31 월 점검(v465', '**감사 기록 월 상한 분할(v465)**', '**조각을 넘길 때 머리를 다시 쓰지 말 것**', '`ev.pfill`', '`ev.tauto`', '`mchk:since`', '`prev_acks`'];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
     const ok = /기준: v465 \(2026-11-14\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0
-      && tlv.length > 0 && cb.length === 17 && scr.length === 13 && gate.length === 4 && cb.every((l) => /^- \[x\] \(AI\) /.test(l) || /^- \[ \] \(AI 시험 화면 대상/.test(l)) && !cb.some((l) => /PM/.test(l))
-      && GATE.every((g) => gate.some((l) => l.indexOf('`' + g + '`') > 0)) && ["'P1 판30' 7항목", "'P1 판31' 10항목", "'P1 판30' 5", "'P1 판31' 6"].every((s) => tlv.indexOf(s) > 0)
-      && ['점검 카드', '계약 서류 목록 — 분기 점검', '목록에 넣자는 제안', '서류 목록 편집 열기', '월 점검', '처리 지시', '새 알림(푸시)은 가지 않습니다'].every((s) => m2171.indexOf(s) > 0)
-      && m213.indexOf('잘리지 않습니다') > 0 && m214.indexOf('월 점검') > 0 && !/mchk|conchk|audit:/.test(m2171 + m213 + m214)
+      && tlv.length > 0 && cb.length === 19 && scr.length === 15 && gate.length === 4 && cb.every((l) => /^- \[x\] \(AI\) /.test(l) || /^- \[ \] \(AI 시험 화면 대상/.test(l)) && !cb.some((l) => /PM/.test(l))
+      && GATE.every((g) => gate.some((l) => l.indexOf('`' + g + '`') > 0)) && ["'P1 판30' 7항목", "'P1 판31' 13항목", "결함 사본 73", "'P1 판30' 5", "'P1 판31' 7", "'감사 기록 조각 1개 없음", "'월 점검 기록 없음 — 크론 확인'"].every((s) => tlv.indexOf(s) > 0)
+      && ['점검 카드', '계약 서류 목록 — 분기 점검', '목록에 넣자는 제안', '서류 목록 편집 열기', '월 점검', '처리 지시', '새 알림(푸시)은 가지 않습니다', '<b>확인 못 함</b>은', '<b>월 점검 기록 없음 — 크론 확인</b>', '승인을 푼 때부터 7일'].every((s) => m2171.indexOf(s) > 0)
+      && m213.indexOf('잘리지 않습니다') > 0 && m213.indexOf('<b>감사 기록 조각 n개 없음</b>') > 0 && m214.indexOf('월 점검') > 0 && !/mchk|conchk|audit:/.test(m2171 + m213 + m214)
       && CL.every((c) => d.cl.indexOf(c) > 0) && /SHELL_CACHE = 'jw-shell-v465'/.test(d.sw);
     return { ok, info: { mF, cb: cb.length, scr: scr.length, gate: gate.length, m2171: m2171.length, m213: m213.length, m214: m214.length } };
   };
@@ -13838,11 +13840,16 @@ try {
     mu65('ft', (s) => s.split('`mchk:backup:since`').join('mchk:backup:since')),
     mu65('tl', (s) => s.replace('- [ ] (AI 시험 화면 대상 — 판31) [처리 지시]', '- [ ] (PM 확인 — 판31) [처리 지시]')),
     mu65('tl', (s) => { const k = s.lastIndexOf('`promostream_check`'); return s.slice(0, k) + 'promostream_check' + s.slice(k + 19); }),
-    mu65('man', (s) => s.replace('<b>점검 카드</b> (2026-11 v465)', '<b>점검</b> (2026-11 v465)').replace('<b>월 점검</b> — 매월', '<b>월 확인</b> — 매월')),
+    mu65('man', (s) => s.split('점검 카드').join('점검 칸')),
     mu65('man', (s) => s.replace('<b>한 달 기록이 많아도 잘리지 않습니다</b>', '<b>한 달 기록이 많아도</b>')),
     mu65('man', (s) => s.replace('누른 기록에 한 줄 남습니다. <span class="btn">처리 지시</span>', '누른 기록(mchk)에 한 줄 남습니다. <span class="btn">처리 지시</span>')),
-    mu65('cl', (s) => s.replace('**P1 판31 월 점검(v465', '**P1 판31(v4xx'))];
-  T('v465 문서·판 번호(정확 검사): FEATURES 기준 v465 (2026-11-14)·v465 절(원장 · 판30 conchk · 판31 mchk 액션·크론·재료 키 · 감사 조각 · C128 · 근거 실측) · TESTLIST v465 칸 17(화면 13 · 게이트 [x] 4 — 12종 · PM 낱말 0) · MANUAL 21-7-1 점검 카드 두 장·21-3 조각·21-4 백업 흔적(내부 키 이름 0) · CLAUDE.md 줄 3 · sw jw-shell-v465 · 결함 사본 ' + M65.length + '개 = 모두 ✗',
+    mu65('cl', (s) => s.replace('**P1 판31 월 점검(v465', '**P1 판31(v4xx')),
+    mu65('ft', (s) => s.split('머리를 다시 쓰지 않는다').join('머리를 다시 쓴다')),
+    mu65('tl', (s) => s.replace("'P1 판31' 13항목", "'P1 판31' 10항목")),
+    mu65('tl', (s) => s.replace('- [ ] (AI 시험 화면 대상 — 판31 검토 11/14', '- [x] (AI 시험 화면 대상 — 판31 검토 11/14')),
+    mu65('man', (s) => s.replace('<b>월 점검 기록 없음 — 크론 확인</b>', '월 점검 기록 없음')),
+    mu65('cl', (s) => s.replace('**조각을 넘길 때 머리를 다시 쓰지 말 것**', '조각을 넘길 때 머리 parts를 올린다'))];
+  T('v465 문서·판 번호(정확 검사): FEATURES 기준 v465 (2026-11-14)·v465 절(원장 · 판30 conchk · 판31 mchk 액션·크론·재료 키 · 감사 조각 · C128 · 근거 실측 · 판31 보안 검토 반영 — 조각 키 목록·ev.pfill·ev.tauto·mchk:since·prev_acks) · TESTLIST v465 칸 19(화면 15 · 게이트 [x] 4 — 12종 · P1 판31 13항목·7 · PM 낱말 0) · MANUAL 21-7-1 점검 카드 두 장·확인 못 함 뜻·크론 못 돈 달·21-3 조각·조각 n개 없음·21-4 백업 흔적(내부 키 이름 0) · CLAUDE.md 줄 3 + 머리 다시 쓰지 말 것 · sw jw-shell-v465 · 결함 사본 ' + M65.length + '개 = 모두 ✗',
     r65.ok && M65.every((v) => v === false), JSON.stringify({ r: r65.info, mut: M65 }));
 } catch (e) { console.log('  (v465 검사 생략 — ' + e.message + ')'); fails++; }
 
