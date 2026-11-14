@@ -14358,7 +14358,7 @@ try {
     mu68('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v467'")),
     mu68('ft', (s) => s.split('`push.readSubs`').join('push.readSubs')),
     mu68('tl', (s) => s.replace('- [ ] (AI 시험 화면 대상 — 판22 검토 반영) 표시가 붙은 기기에서 [승인]', '- [ ] (PM 확인 — 판22) 표시가 붙은 기기에서 [승인]')),
-    mu68('tl', (s) => { const k = s.lastIndexOf('`stmtread_d_check`'); return s.slice(0, k) + 'stmtread_d_check' + s.slice(k + 18); }),
+    mu68('tl', (s) => { const e = s.indexOf('\n## v469 '); const k = s.lastIndexOf('`stmtread_d_check`', e < 0 ? s.length : e); return s.slice(0, k) + 'stmtread_d_check' + s.slice(k + 18); }),
     mu68('man', (s) => s.replace('새 기기로 처음 로그인하면 기기 승인을 맡은 분', '승인 요청은 자동으로 가지 않습니다. 새 기기로 처음 로그인하면 기기 승인을 맡은 분')),
     mu68('man', (s) => s.replace('<b>퇴사 다음 날 자동 정리</b>', '퇴사 다음 날 자동 정리')),
     mu68('man', (s) => s.replace('<b>퇴사일 칸</b>은 달력에 있는 날짜', '<b>퇴사일 칸</b>(leave_date)은 달력에 있는 날짜')),
@@ -14535,8 +14535,8 @@ try {
     const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l));
     const GATE = ['uismoke', 'consheet_check', 'proctpl_check', 'settletest', 'servertest', 'rectest', 'promoqual_check', 'promogen_check', 'promoqlearn_check', 'promostream_check', 'promo_wrap_check', 'promo_post_check'];
     const mF = ['`emp_type`', '`jiip`', '`eduNone`', '덤프트럭'].filter((x) => ftv.indexOf(x) < 0);
-    const ok = /기준: v473 \(2026-11-14\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length >= 2 && !cb.some((l) => /\(PM/.test(l))
-      && GATE.every((g) => gate.some((l) => l.indexOf('`' + g + '`') > 0)) && /SHELL_CACHE = 'jw-shell-v473'/.test(d.sw) && d.mn.indexOf('<b>지입차주</b>는 우리 직원이 아니라') > 0;
+    const ok = Number((/기준: v(\d+) \(/.exec(d.ft) || [])[1]) >= 473 && ftv.length > 0 && mF.length === 0 && cb.length >= 2 && !cb.some((l) => /\(PM/.test(l))
+      && GATE.every((g) => gate.some((l) => l.indexOf('`' + g + '`') > 0)) && Number((/SHELL_CACHE = 'jw-shell-v(\d+)'/.exec(d.sw) || [])[1]) >= 473 && d.mn.indexOf('<b>지입차주</b>는 우리 직원이 아니라') > 0;
     return { ok, info: { mF, cb: cb.length, gate: gate.length } };
   };
   const rD73 = chkD73(D73), muD73 = (k, f) => chkD73(Object.assign({}, D73, { [k]: f(D73[k]) })).ok;
@@ -14544,6 +14544,31 @@ try {
   T('v473 ② 문서·판 번호(정확 검사): FEATURES 기준 v473 (2026-11-14)·v473 절 · TESTLIST v473 게이트 [x] 12종·PM 칸 0 · MANUAL 21-9 지입차주 줄 · sw jw-shell-v473 · 결함 사본 ' + MD73.length + '개 = 모두 ✗',
     rD73.ok && MD73.every((v) => v === false), JSON.stringify({ r: rD73.info, mut: MD73 }));
 } catch (e) { console.log('  (v473 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v474(체크 29 판⑥ 원본 첨부·한꺼번에 넣기 — PM 11/14 '10월거는 전체 pdf파일로 첨부' · '드래그해서 넣는거 아니었냐' · ㄱ): 문서·판 번호 정확 검사(동작 검사는 '29 판⑥' · servertest 91) — 다음 판은 기준 줄·sw를 '471 이상'으로 풀 것
+try {
+  const rd71 = (f) => readFileSync(join(ROOT, f), 'utf8');
+  const D71 = { ft: rd71('FEATURES.md'), tl: rd71('TESTLIST.md'), sw: rd71('sw.js'), man: rd71('MANUAL.html'), cl: rd71('CLAUDE.md') };
+  const chk71 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v474 (11/14)', '\n### '), tlv = cut(d.tl, '\n## v474 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI 시험 화면 대상/.test(l));
+    const FT = ['`stmt_drop`', '`stmt_drop_list`', '`stmt_drop_get`', '`stmt_drop_file`', '`stmt_drop_set`', '`stmt_drop_del`', '`drop_ids`', '`stmtfile:<id>`', '`stmtdrop:<ym>:<id>`', '`guessVendor`', 'servertest 91', "'29 판⑥'", '18개 자동'];
+    const GATE = ['uismoke', 'consheet_check', 'proctpl_check', 'settletest', 'servertest', 'rectest', 'promoqual_check', 'promogen_check', 'promoqlearn_check', 'promostream_check', 'promo_wrap_check', 'promo_post_check', 'stmtread_a_check', 'stmtread_b_check', 'stmtread_c_check', 'stmtread_d_check'];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const ok = /기준: v474 \(2026-11-14\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && scr.length >= 3 && !cb.some((l) => /\(PM/.test(l))
+      && GATE.every((g) => gate.some((l) => l.indexOf('`' + g + '`') > 0)) && /SHELL_CACHE = 'jw-shell-v474'/.test(d.sw)
+      && /<b>원본 한꺼번에 넣기·첨부 원본<\/b> \(2026-11 v474\)/.test(d.man) && d.man.indexOf('상세를 닫으면 결과는 버려집니다') < 0 && /월말명세서 원본 첨부·한꺼번에 넣기\(v474 — 29 판⑥\)/.test(d.cl);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
+  };
+  const r71 = chk71(D71);
+  const mu71 = (k, f) => chk71(Object.assign({}, D71, { [k]: f(D71[k]) })).ok;
+  const M71 = [mu71('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v473 (')), mu71('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v473'")),
+    mu71('ft', (s) => s.split('`guessVendor`').join('guessVendor')), mu71('tl', (s) => { const k = s.lastIndexOf('`stmtread_d_check`'); return s.slice(0, k) + 'stmtread_d_check' + s.slice(k + 18); }),
+    mu71('man', (s) => s.split('원본 한꺼번에 넣기·첨부 원본').join('원본 한꺼번에')), mu71('cl', (s) => s.split('(v474 — 29 판⑥)').join('(29 판⑥)'))];
+  T('v474 문서·판 번호(정확 검사): FEATURES 기준 v474 (2026-11-14)·v474 절(stmt_drop 6동작·drop_ids·stmtfile·stmtdrop·guessVendor·servertest 91·29 판⑥·실측 18개) · TESTLIST v474(화면 칸 ≥ 3 · PM 낱말 0 · 게이트 [x] 16종) · MANUAL 원본 한꺼번에 넣기·첨부 원본(옛 "결과는 버려집니다" 없음) · CLAUDE.md 판⑥ 줄 · sw jw-shell-v474 · 결함 사본 ' + M71.length + '개 = 모두 ✗',
+    r71.ok && M71.every((x) => x === false), JSON.stringify({ info: r71.info, M71 }));
+} catch (e) { console.log('  (v474 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

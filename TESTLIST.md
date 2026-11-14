@@ -1307,3 +1307,11 @@
 ## v473 — 안전 › 체크 칸: 지입차주는 근로자 의무 칸 '대상 아님'(앱만 · 운영 데이터 변경 없음 · 새 화면 없음)
 - [ ] (나수진 또는 관리자) 인사·직원에서 고용형태가 빈 현장직 8명의 고용형태 고르기(지입차주·정규직 등) → 지입차주는 체크 칸 정기교육·일반건진 등 칸이 '—'로 바뀌고 빠진 항목에서 빠짐 · 화물 지입차주는 운수종사자 표시도 켜기(덤프트럭은 켜지 않음)
 - [x] (AI) `uismoke` · `consheet_check` · `proctpl_check` · `settletest` · `servertest` · `rectest` · `promoqual_check` · `promogen_check` · `promoqlearn_check` · `promostream_check` · `promo_wrap_check` · `promo_post_check` 전부 통과 + node --check(sw) — 숫자는 커밋 메시지
+
+## v474 — 체크 29 월말명세서 판⑥: 원본 첨부·한꺼번에 넣기(월 목록 상자 · 거래처 자동 찾기 · 원본 남김 · 원본 없음 표시 · 상세 자동 채움)
+- [x] (AI 시험 화면 대상 — 시험 서버: 작업 폴더 index.html + 실제 gw-stmt·배경 함수 · 회원은 운영 백업 사본 읽기만 · 가짜 차량 · Claude 가짜 응답 · 받는 쪽 사업자번호 가짜) 권민지 권한 사본으로 10월 실물 원본 20개를 월 목록 상자에 한꺼번에 놓기 = 20개 넣음 · 읽음 14 · 첨부만 1(덕천 계산서 스캔) · 거래처 고르기 5(보안 계산서 3 = 시험 서버 번호가 가짜라 못 엶 · 경영박사 2 = 11월 철탑 스캔) · 원본 없는 거래처 1(드림오피스) — ✓ AI 11/14
+- [x] (AI 시험 화면 대상 — 같은 시험 서버) 수양개발 상세를 열면 글자 PDF 3줄로 자동 채움(같은 거래처 스캔보다 먼저) · '첨부 원본 2개' 목록 · 경영박사 하나를 철탑으로 고르면 다시 읽어 '읽음' · 철탑 📎2 · 폰 375 가로 넘침 0 — ✓ AI 11/14
+- [ ] (AI 시험 화면 대상 — 운영 배포 뒤) 보안 계산서 3개(스피드·현대상용·덕천)가 운영에서 거래처 자동으로 잡히는지(로컬 실측 11/14 — 운영 번호로 열림) · 실제 AI 판독 1건 줄 수·합계
+- [ ] (권민지) 10월분 원본을 월 목록 상자에 모두 넣기 → 거래처마다 상세를 열어 채워진 줄을 확인하고 [저장] · 거래처를 못 찾은 파일은 고르기(경영박사메일 2개는 11월 철탑분 — 11월에 넣거나 지우기)
+- [x] (AI) `servertest` 91 7항목 · `uismoke` '29 판⑥' 7항목 · 옛 판 정확 검사 풂(판②④·판②⑥·판③⑤·판⑤②⑥·판④④ stmt_drop 흐름) · v473 문서 검사를 이 판 이상으로 풀고 v474 문서·판 번호 정확 검사(결함 사본) — ✓ AI 11/14
+- [x] (AI) `uismoke` · `consheet_check` · `proctpl_check` · `settletest` · `servertest` · `rectest` · `promoqual_check` · `promogen_check` · `promoqlearn_check` · `promostream_check` · `promo_wrap_check` · `promo_post_check` · `stmtread_a_check` · `stmtread_b_check` · `stmtread_c_check` · `stmtread_d_check` 전부 통과 + node --check(함수·_lib·sw) — ✓ AI 11/14
