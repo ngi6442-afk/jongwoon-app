@@ -25,7 +25,7 @@ const blobsMock = {
   async blobGet(st, k) { if (badBlobKey(k)) return { ok: false, code: 'STORAGE_BAD_KEY' }; const fg = blobsMock.hooks.failGet && blobsMock.hooks.failGet(k); if (fg) return { ok: false, code: typeof fg === 'string' ? fg : 'STORAGE_READ_FAILED' }; /* v453 검토: failGet이 글자를 돌려주면 그 코드(예: 'STORAGE_PARSE_FAILED' — 실 blobs.js의 깨진 JSON) */ if (blobsMock.hooks.beforeGet) await blobsMock.hooks.beforeGet(k); const s = mem[st] || {}; return (k in s) ? { ok: true, data: JSON.parse(JSON.stringify(s[k])) } : { ok: false, code: 'NOT_FOUND' }; },   // 실 Blobs처럼 get마다 새 객체(JSON 파싱) — 핸들러가 저장 전 객체를 손대도 mem에 반영되지 않는다(9/6: 거부 응답 뒤 "저장 없음" 검증의 전제)
   async blobSet(st, k, v) { if (badBlobKey(k)) return { ok: false, code: 'STORAGE_BAD_KEY' }; if (blobsMock.hooks.failSet && blobsMock.hooks.failSet(k)) return { ok: false, code: 'STORAGE_WRITE_FAILED' }; if (blobsMock.hooks.beforeSet) await blobsMock.hooks.beforeSet(k); mem[st] = mem[st] || {}; if (v === null) delete mem[st][k]; else mem[st][k] = JSON.parse(JSON.stringify(v)); return { ok: true }; },
   async blobDelete(st, k) { if (badBlobKey(k)) return { ok: false, code: 'STORAGE_BAD_KEY' }; if (mem[st]) delete mem[st][k]; return { ok: true }; },
-  async blobList(st) { return { ok: true, keys: Object.keys(mem[st] || {}) }; },
+  async blobList(st) { if (blobsMock.hooks.failList) return { ok: false, code: 'STORAGE_LIST_FAILED' }; return { ok: true, keys: Object.keys(mem[st] || {}) }; },   // failList = P1 판31 검토(감사 조각 목록 못 읽음)
 };
 const tierLib = require(join(FN, '_lib/tier.js'));   // 관리자 등급(v321) — 실 판정 모듈(의존성 없음). push mock의 isBoss·pmIds·bossIds가 실 push.js와 같은 축을 타게
 const membersOf = () => Object.keys(mem.gw_users || {}).filter((k) => k.indexOf('member:') === 0).map((k) => mem.gw_users[k]);
@@ -8491,7 +8491,7 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   const rpM31 = require.resolve(PM31), keepM31 = require.cache[rpM31];
   const snap31 = JSON.stringify({ u: mem.gw_users, d: mem.gw_data });
   const lm0 = pushMock.loadMembers, rm0 = auditMock.readMonth;
-  const reset31 = () => { const s = JSON.parse(snap31); mem.gw_users = s.u; mem.gw_data = s.d; blobsMock.hooks.failGet = null; blobsMock.hooks.failSet = null; pushMock.loadMembers = lm0; };
+  const reset31 = () => { const s = JSON.parse(snap31); mem.gw_users = s.u; mem.gw_data = s.d; blobsMock.hooks.failGet = null; blobsMock.hooks.failSet = null; blobsMock.hooks.failList = false; pushMock.loadMembers = lm0; };
   const H31 = 3600000, D31 = 24 * H31;
   const T31 = (m, d, hU) => Date.UTC(2026, m - 1, d, hU === undefined ? 1 : hU, 0);   // UTC 시각(KST = +9)
   const NOW31 = Date.UTC(2026, 9, 31, 22, 0);   // KST 2026-11-01 07:00 = 크론 기동 시각
@@ -8594,14 +8594,24 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
       const d2 = await G.M.runMonthly(NOW31 + H31), d3 = await G.M.runMonthly(Date.UTC(2026, 10, 2, 22, 0));
       const nDocs = mDocs31(), audD = auditMock.logs.slice(auD).filter((l) => l.col === 'mchk' && l.ev[0].op === '월점검');
       const e1 = await G.cl({ action: 'mchk_run', key: 'nope', period: '2026-10' }, null), e2 = await G.cl({ action: 'mchk_run', key: 'test-ingest-key', period: '2026-10' }, null);
-      mem.gw_data['mchk:2026-10'].ack = { ts: 1, by: 'uadmin', name: '관리자' };
+      mem.gw_data['mchk:2026-10'].ack = { ts: Date.UTC(2026, 10, 2, 0, 30), by: 'uadmin', name: '관리자' };
+      const auE = auditMock.logs.length; delete mem.gw_data['status:decide'];
       const e3 = await G.cl({ action: 'mchk_run', key: 'test-ingest-key', period: '2026-10', force: true }, null), e4 = await G.cl({ action: 'mchk_run', key: 'test-ingest-key', period: '2026-13' }, null);
       const e5 = await G.cl({ action: 'mchk_run', key: 'test-ingest-key', period: kstYm31(Date.now()) }, null);
-      const dR = mem.gw_data['mchk:2026-10'] || {};
+      const dR = JSON.parse(JSON.stringify(mem.gw_data['mchk:2026-10'] || {})), aE = auditMock.logs.slice(auE).filter((l) => l.col === 'mchk'), dlE = ((mem.gw_data['status:decide'] || {}).log || []);
+      // 두 번째 force — 풀린 확인이 목록으로 쌓임(직전 1개만 남기지 않음) · 감사 쓰기 실패 = 응답 audit:false
+      mem.gw_data['mchk:2026-10'].ack = { ts: Date.UTC(2026, 10, 3, 0, 0), by: 'uadmin', name: '관리자' };
+      const apOld = auditMock.appendAudit; auditMock.appendAudit = async () => false;
+      const e6 = await G.cl({ action: 'mchk_run', key: 'test-ingest-key', period: '2026-10', force: true }, null);
+      auditMock.appendAudit = apOld;
+      const dR2 = mem.gw_data['mchk:2026-10'] || {};
       P.D = d0.ok && d0.skipped === 'not-first-days' && d1.ok && d1.period === '2026-10' && d2.skipped === 'exists' && d3.skipped === 'exists' && nDocs.length === 1 && nDocs[0] === 'mchk:2026-10' && audD.length === 1
-        && e1.code === 403 && e2.code === 200 && e2.body.skipped === 'exists' && e3.code === 200 && e3.body.rerun === 1 && dR.ack === null && dR.prev_ack && dR.prev_ack.by === 'uadmin' && dR.rerun === 1 && dR.at !== at1
+        && e1.code === 403 && e2.code === 200 && e2.body.skipped === 'exists' && e3.code === 200 && e3.body.rerun === 1 && e3.body.audit === true && e3.body.decide === true && dR.ack === null
+        && Array.isArray(dR.prev_acks) && dR.prev_acks.length === 1 && dR.prev_acks[0].by === 'uadmin' && dR.prev_acks[0].undone > 0 && dR.rerun === 1 && dR.at !== at1
+        && aE.length === 1 && /확인 풂\(관리자 11\/2 09:30\)$/.test(aE[0].ev[0].t) && dlE.length === 1 && dlE[0].choice === 'rerun' && dlE[0].kind === 'mchk' && /다시 계산 — 확인 풂\(관리자 11\/2 09:30\)/.test(dlE[0].q)
+        && e6.code === 200 && e6.body.audit === false && Array.isArray(dR2.prev_acks) && dR2.prev_acks.length === 2 && dR2.rerun === 2
         && e4.code === 400 && e4.body.code === 'BAD_PERIOD' && e5.code === 400 && mDocs31().length === 1;
-      I.D = [d0.skipped, d1.period, d2.skipped, d3.skipped, nDocs, audD.length, e1.code, e2.body.skipped, e3.body.rerun, dR.ack, e4.body.code, e5.code];
+      I.D = [d0.skipped, d1.period, d2.skipped, d3.skipped, nDocs, audD.length, e1.code, e2.body.skipped, e3.body.rerun, e3.body.audit, e3.body.decide, dR.ack, aE.map((l) => l.ev[0].t), dlE.map((x) => x.q), e6.body.audit, (dR2.prev_acks || []).length, e4.body.code, e5.code];
       // ⑤ 감사 분할 — 실 audit.js(이 검사의 A): 줄 상한 경계 · 크기 상한 경계 · 경계에서 빠지는 줄 0 · 조각 못 읽음 · 조각 빠짐 · 조각 수 상한
       reset31(); mem.gw_data = {};
       const K = G.A.auditKey(), cap = G.A.PART_MAX_ITEMS;
@@ -8623,11 +8633,45 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
       const gOk = await G.A.appendAudit({ ts: 6, by: 'g' }); const p5 = cp31(K + ':5'); const p4b = cp31(K + ':4');
       mem.gw_data[K].parts = G.A.PART_MAX; mem.gw_data[K + ':' + G.A.PART_MAX] = { schema: 1, items: Array.from({ length: cap }, (_, i) => ({ ts: i })) };
       const before6 = JSON.stringify(mem.gw_data); const xOk = await G.A.appendAudit({ ts: 7, by: 'x' }); const keptX = JSON.stringify(mem.gw_data) === before6;
-      P.E = okSeq.every((x) => x === true) && (h1.items || []).length === cap && h1.parts === 2 && (p2.items || []).length === 2 && p2.items[0].ts === cap + 1 && seqOk
-        && bOk === true && h2.parts === 4 && (mem.gw_data[Kb].items || []).length === 3 && (p4.items || []).length === 1 && p4.items[0].ts === 4
+      P.E = okSeq.every((x) => x === true) && (h1.items || []).length === cap && (p2.items || []).length === 2 && p2.items[0].ts === cap + 1 && seqOk
+        && bOk === true && (mem.gw_data[Kb].items || []).length === 3 && (p4.items || []).length === 1 && p4.items[0].ts === 4
         && fOk === false && keptF && rmF.ok === false && gOk === true && (p5.items || []).length === 1 && p5.items[0].by === 'g' && (p4b.items || []).length === 1
         && xOk === false && keptX && G.A.PART_MAX_BYTES === 1000000 && cap === 4000 && G.A.MAX_PER_MONTH === 8000;
       I.E = { okSeq, head: (h1.items || []).length, parts: h1.parts, p2: (p2.items || []).length, seqOk, bOk, parts2: h2.parts, p4: (p4.items || []).length, fOk, keptF, rmF: rmF.ok, gOk, p5: (p5.items || []).length, xOk, keptX };
+      // ⑤-2(검토 11/14 막음 1 — 재현 R1·R2·R3 꼴): 성공으로 답한 줄이 나중에 지워지는 길 0
+      //   R1 동시 두 요청(한쪽은 머리가 차서 조각 2로 · 한쪽은 머리에 붙임 — 머리를 다시 써 parts가 없어도) = 둘 다 true·이어 읽으면 둘 다 있음
+      //   R2 그 뒤 줄이 이어져도 조각 2를 빈 조각으로 덮지 않음(조각 2에 이어 씀) · R3 머리를 잃고 다시 찬 달 = 남은 조각 2·3 그대로, 새 줄은 마지막 조각(3)에
+      //   조각을 읽어 '없음'일 때만 새로 · 다음 조각이 이미 있으면 거기에 이어 씀 · 깨진 조각 = 읽기 실패(일부만 보이지 않음) · 목록 못 읽음 = 쓰기 false·읽기 실패
+      reset31(); mem.gw_data = {};
+      const ln = (i, pad) => ({ ts: i, by: 'u', bid: 'b', col: 'x', ev: [{ op: 'o', id: String(i), t: pad ? 'y'.repeat(pad) : '' }] });
+      mem.gw_data[K] = { schema: 1, items: Array.from({ length: 2000 }, (_, i) => ln(i + 1, 400)) };
+      const room = G.A.PART_MAX_BYTES - Buffer.byteLength(JSON.stringify(mem.gw_data[K]));
+      const bgO = blobsMock.hooks.beforeGet; blobsMock.hooks.beforeGet = async () => { await new Promise((r) => setImmediate(r)); await new Promise((r) => setImmediate(r)); };
+      let rqa, rqb;
+      try { [rqa, rqb] = await Promise.all([G.A.appendAudit(ln(90001, room + 100)), G.A.appendAudit(ln(90002, 10))]); } finally { blobsMock.hooks.beforeGet = bgO; }
+      const rmR1 = await G.A.readMonth(K.slice(6));
+      const r1 = rqa === true && rqb === true && rmR1.ok && rmR1.items.some((x) => x.ts === 90001) && rmR1.items.some((x) => x.ts === 90002);
+      let rr = true; for (let i = 0; i < 40; i++) rr = (await G.A.appendAudit(ln(100000 + i, 400))) && rr;
+      const rmR2 = await G.A.readMonth(K.slice(6)), p2R = cp31(K + ':2');
+      const r2 = rr && rmR2.ok && rmR2.items.some((x) => x.ts === 90001) && (p2R.items || []).some((x) => x.ts === 90001) && rmR2.items.filter((x) => x.ts >= 100000).length === 40;
+      mem.gw_data = {};
+      mem.gw_data[K + ':2'] = { schema: 1, part: 2, items: [ln(2001), ln(2002)] }; mem.gw_data[K + ':3'] = { schema: 1, part: 3, items: [ln(3001)] };
+      mem.gw_data[K] = { schema: 1, items: Array.from({ length: cap }, (_, i) => ln(i + 1)) };
+      const r3a = await G.A.appendAudit(ln(5555));
+      const r3 = r3a === true && JSON.stringify(cp31(K + ':2').items.map((x) => x.ts)) === '[2001,2002]' && JSON.stringify(cp31(K + ':3').items.map((x) => x.ts)) === '[3001,5555]' && (await G.A.readMonth(K.slice(6))).items.length === cap + 4;
+      mem.gw_data = { [K]: { schema: 1, items: Array.from({ length: cap }, (_, i) => ln(i + 1)) }, [K + ':2']: { schema: 1, items: [ln(7001)] } };
+      const r4a = await G.A.appendAudit(ln(7002));   // 머리 parts 없음 + 조각 2 있음 → 조각 2에 이어 씀
+      const r4 = r4a === true && JSON.stringify(cp31(K + ':2').items.map((x) => x.ts)) === '[7001,7002]' && cp31(K).items.length === cap;
+      mem.gw_data = { 'audit:2026-07': { schema: 1, items: [ln(1)] }, 'audit:2026-07:2': { schema: 1, items: 'x' } };
+      const r5m = await G.A.readMonth('2026-07');
+      mem.gw_data = { 'audit:2026-06:2': { schema: 1, items: [ln(2)] }, 'audit:2026-06:3': { schema: 1, items: [ln(3)] } };   // 머리를 잃은 달
+      const r6m = await G.A.readMonth('2026-06');
+      blobsMock.hooks.failList = true;
+      mem.gw_data = { [K]: { schema: 1, items: [ln(1)] } };
+      let r7w, r7m; try { r7w = await G.A.appendAudit(ln(2)); r7m = await G.A.readMonth(K.slice(6)); } finally { blobsMock.hooks.failList = false; }
+      const r7 = r7w === false && cp31(K).items.length === 1 && r7m.ok === false;
+      P.E2 = r1 && r2 && r3 && r4 && r5m.ok === false && r6m.ok === true && r6m.items.map((x) => x.ts).join() === '2,3' && r6m.missing === 1 && r7;
+      I.E2 = { r1: [rqa, rqb, rmR1.items.length], r2: [rr, (p2R.items || []).length], r3, r4, r5: r5m.ok, r6: [r6m.ok, r6m.items.length, r6m.missing], r7 };
       // ⑥ 읽는 쪽 — 감사 화면(audit action)이 조각을 이어 붙임 · 조각 못 읽음 = 503 · 없는 달 = 빈 목록 · 월 점검이 뒤 조각의 줄을 셈(① perm changes 2 — 하나는 조각 2) · 백업 복원 머리 parts 보존
       reset31(); mem.gw_data = { 'audit:2026-08': { schema: 1, parts: 3, items: [{ ts: 1, by: 'a', col: 'x', ev: [] }] }, 'audit:2026-08:2': { schema: 1, items: [{ ts: 2, by: 'b', col: 'x', ev: [] }] }, 'audit:2026-08:3': { schema: 1, items: [{ ts: 3, by: 'c', col: 'x', ev: [] }] } };
       const f1 = await G.cl({ action: 'audit', month: '2026-08' }, tokA);
@@ -8683,6 +8727,84 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
         && card0(k5) && k5.b.st === 'none' && /기록 전/.test(k5.b.lines[0]) && k5.a.st === 'none' && k5.a.n.src === 'partial' && k5.a.n.partial === 1
         && s1.code === 200 && v1 === 'partial' && s2.code === 200 && v2 === 'full' && v3 === 'full' && runs() === 3 && s6.code === 403 && !!(sinceB && sinceB.ts > 0) && stB.state === 'end';
       I.H = { k0: [k0.c, k0.b.lines], k1: [k1.b.st, k1.b.lines], k2: [k2.b.lines, k2.a.lines], k3: k3.b.lines, k4: [k4.b.n.missing, k4.a.lines], k5: [k5.c, k5.b.lines, k5.a.n], stamp: [s1.code, v1, v2, v3, runs(), s6.code, !!sinceB] };
+      // ⑪(검토 11/14 ②~⑧ — 재현 J1~J8 꼴) 판정 보강
+      const MB = [{ id: 'pm', name: 'PM', admin: true, dev: true, tier: 'pm', perms: {} }, { id: 'adm', name: '관리부', admin: true, tier: 'admin', perms: {} }, { id: 'devx', name: '개발자', admin: true, dev: true, tier: 'admin', perms: {} },
+        { id: 'w1', name: '직원', admin: false, perms: {} }, { id: 'r1', name: '퇴사', admin: false, perms: {}, leave_date: '2026-10-10' }];
+      const BM = () => ({ audit: { ok: true, items: [], missing: 0 }, members: MB.slice(), devices: [], locks: [], subs: {}, usage: { 'ask:usage': {}, 'promoai:usage': {}, 'promomask:usage': {}, 'brief:usage:2026-10': {}, 'usage:learn:contract:2026-10': {}, 'usage:box:2026-10': {} },
+        filesStamp: { ts: NOW31 - H31, ok: true }, alertDoc: 'none', alertSince: 'none', backupDoc: 'none', backupSince: 'none', pushLog: [] });
+      const J = (m, id) => { const x = G.M.judge('2026-10', NOW31, m).find((i) => i.id === id) || {}; return x; };
+      const mod = (mm, ed) => { ed(mm); return mm; };
+      const lgJ = (ts, bid, by, via) => ({ ts, by, bid, col: 'login', ev: [{ op: '로그인', id: bid, t: by + '(' + via + ')' }] });
+      const edJ = (bid, f, extra) => ({ ts: T31(10, 15), by: bid, bid, col: 'member', ev: [Object.assign({ op: '수정', id: 'w1', t: '직원', f }, extra || {})] });
+      // J1 조각 빠짐 = 감사 재료 3항목 확인 못 함
+      const j1m = mod(BM(), (m) => { m.audit = { ok: true, items: [lgJ(T31(10, 3), 'w1', '직원', '아이디')], missing: 1 }; });
+      const j1 = ['login', 'retired', 'perm'].every((id) => J(j1m, id).st === 'unknown' && /조각 1개/.test(J(j1m, id).lines[0]));
+      // J3·J3b 자동 정리는 변경 아님 · 진짜 변경은 그대로
+      const j3 = J(mod(BM(), (m) => { m.audit.items = [edJ('adm', { annual_days: ['15', '16'], perms: ['mchk:-,hw:-', 'mchk:view,hw:hide'] })]; }), 'perm');
+      const j3m = J(mod(BM(), (m) => { m.audit.items = [edJ('adm', { perms: ['tasks:-', 'tasks:view'] }, { pfill: 'tasks' })]; }), 'perm');
+      const j3r = J(mod(BM(), (m) => { m.audit.items = [edJ('adm', { perms: ['hw:-,stmt:-', 'hw:do,stmt:hide'] })]; }), 'perm');
+      const j3rm = J(mod(BM(), (m) => { m.audit.items = [edJ('adm', { perms: ['hw:-,stmt:-', 'hw:do,stmt:hide'] }, { pfill: 'stmt' })]; }), 'perm');
+      const j3b = J(mod(BM(), (m) => { m.audit.items = [edJ('devx', { admin: ['true', 'false'], tier: ['admin', ''] })]; }), 'perm');
+      const j3bt = J(mod(BM(), (m) => { m.audit.items = [edJ('devx', { admin: ['true', 'false'], tier: ['admin', ''] }, { tauto: 1 })]; }), 'perm');
+      const j3t = J(mod(BM(), (m) => { m.audit.items = [edJ('adm', { tier: ['', 'admin'] })]; }), 'perm');
+      // J4 승인 해제(최근 updated)·퇴사자 대기 기기 = 어긋남 아님 · 처음부터 9일 대기 = 어긋남
+      const j4 = J(mod(BM(), (m) => { m.devices = [{ key: 'device:a', v: { status: 'pending', member_id: 'w1', created: NOW31 - 200 * D31, updated: NOW31 - D31 } }, { key: 'device:r', v: { status: 'pending', member_id: 'r1', created: NOW31 - 300 * D31, updated: NOW31 - 20 * D31 } }]; }), 'device');
+      const j4b = J(mod(BM(), (m) => { m.devices = [{ key: 'device:n', v: { status: 'pending', member_id: 'w1', created: NOW31 - 9 * D31 } }]; }), 'device');
+      // J8 꼴 다른 줄(ev 배열 아님·null·숫자·ts 글자) = 거름 · 항목 예외 = 그 항목만 확인 못 함
+      const j8 = J(mod(BM(), (m) => { m.audit.items = [{ ts: String(T31(10, 5)), by: 'x', bid: 'w1', col: 'login', ev: { op: '로그인' } }, null, 5, lgJ(T31(10, 6), 'w1', '직원', '아이디')]; }), 'login');
+      let j8gOk = false;
+      try { const j8g = G.M.judge('2026-10', NOW31, mod(BM(), (m) => { m.locks = [{ key: 'lock:x', v: null }]; })); j8gOk = (j8g.find((x) => x.id === 'lock') || {}).st === 'unknown' && (j8g.find((x) => x.id === 'login') || {}).st === 'ok' && j8g.length === 9; } catch (e) { j8gOk = false; }
+      // J2 KST 달 경계 — KST 10-01 02:00 이름 로그인(UTC 9월 키) = 10월 점검에 듦 · KST 11-01 03:00(UTC 10월 키) = 10월 점검 밖
+      reset31(); good31(); mem.gw_data['audit:2026-09'] = { schema: 1, items: [lgJ(Date.UTC(2026, 8, 30, 17, 0), 'u31a', '직원A', '이름')] };
+      await G.M.run(NOW31, { by: 'cron' }); const j2a = ((mem.gw_data['mchk:2026-10'] || {}).items || []).find((x) => x.id === 'login') || { n: {} };
+      reset31(); good31(); mem.gw_data['audit:2026-10'].items.push(lgJ(Date.UTC(2026, 9, 31, 18, 0), 'u31a', '직원A', '이름'));
+      await G.M.run(NOW31, { by: 'cron' }); const j2b = ((mem.gw_data['mchk:2026-10'] || {}).items || []).find((x) => x.id === 'login') || { n: {} };
+      // ⑧ 1일에 읽기 실패로 확인 못 함 → 2일 크론이 다시 계산 · [확인]한 문서·봇 키(달 지정)는 다시 안 함
+      reset31(); good31(); blobsMock.hooks.failGet = (k) => k === 'push:subs';
+      const q1 = await G.M.run(NOW31, { by: 'cron' }); blobsMock.hooks.failGet = null;
+      const q1u = ((mem.gw_data['mchk:2026-10'] || {}).counts || {}).unknown;
+      const q2 = await G.M.run(NOW31 + D31, { by: 'cron' }); const dq = mem.gw_data['mchk:2026-10'] || {};
+      reset31(); good31(); blobsMock.hooks.failGet = (k) => k === 'push:subs'; await G.M.run(NOW31, { by: 'cron' }); blobsMock.hooks.failGet = null;
+      mem.gw_data['mchk:2026-10'].ack = { ts: 1, by: 'uadmin', name: '관리자' };
+      const q3 = await G.M.run(NOW31 + D31, { by: 'cron' });
+      delete mem.gw_data['mchk:2026-10'].ack; const q4 = await G.M.run(NOW31 + D31, { period: '2026-10', by: 'bot' });
+      const q5 = await G.M.run(NOW31 + 3 * D31, { by: 'cron' });   // KST 4일 = 창 밖
+      // ⑤ 크론이 못 돈 달 — 크론이 그달 1일 전부터 돌았는데 5일까지 전달 문서 없음 = overdue · 4일·크론이 그달 안에 처음 돈 경우·문서 있음 = 아님
+      reset31(); mem.gw_data = {};
+      await G.M.run(Date.UTC(2026, 9, 9, 22, 0), { by: 'cron' });   // KST 10-10(창 밖) — 처음 돈 시각 표시만
+      const ov5 = await G.M.get({}, true, Date.UTC(2026, 10, 4, 22, 0)), ov4 = await G.M.get({}, true, Date.UTC(2026, 10, 3, 22, 0));
+      mem.gw_data['mchk:since'] = { ts: Date.UTC(2026, 10, 2, 0, 0) };
+      const ovN = await G.M.get({}, true, Date.UTC(2026, 10, 4, 22, 0));
+      mem.gw_data['mchk:since'] = { ts: Date.UTC(2026, 9, 9, 22, 0) }; mem.gw_data['mchk:2026-10'] = { schema: 1, period: '2026-10', items: [], updated_at: 1 };
+      const ovD = await G.M.get({}, true, Date.UTC(2026, 10, 4, 22, 0));
+      P.J = j1 && j3.st === 'ok' && j3.n.changes === 0 && j3m.st === 'ok' && j3r.st === 'bad' && j3rm.st === 'bad' && j3b.st === 'ok' && j3b.n.changes === 1 && j3bt.st === 'ok' && j3t.st === 'bad'
+        && j4.st === 'ok' && j4.n.pending_old === 0 && j4b.st === 'bad' && j4b.n.pending_old === 1 && j8.st === 'ok' && j8.n.logins === 1 && j8gOk
+        && j2a.st === 'bad' && j2a.n.by_name === 1 && j2b.st === 'ok'
+        && q1.ok && q1u === 1 && q2.ok && q2.rerun === 1 && dq.redo === 'unknown' && dq.counts.unknown === 0 && q3.skipped === 'exists' && q4.skipped === 'exists' && q5.skipped === 'not-first-days'
+        && ov5.body.overdue === true && ov4.body.overdue === false && ovN.body.overdue === false && ovD.body.overdue === false;
+      I.J = { j1, j3: [j3.st, j3m.st, j3r.st, j3rm.st, j3b.st, j3bt.st, j3t.st], j4: [j4.st, j4b.st], j8: [j8.st, j8.n && j8.n.logins, j8gOk], j2: [j2a.st, j2b.st], q: [q1u, q2.rerun, dq.redo, q3.skipped, q4.skipped, q5.skipped], ov: [ov5.body.overdue, ov4.body.overdue, ovN.body.overdue, ovD.body.overdue] };
+      // ② gw-auth 감사 표시(실 gw-auth): 개발자 아닌 관리자의 인사 저장 = f.perms 글 그대로 + ev.pfill(채운 칸) · 개발자 권한 변경 = pfill 없음 · 관리자 해제 = ev.tauto · 그 줄들로 판정 = 맞음(변경 2)
+      reset31();
+      const gwa31 = G.U || require(join(FN, 'gw-auth.js'));
+      const callA31 = async (body, tok) => { const x = await gwa31.handler({ httpMethod: 'POST', headers: { authorization: tok ? 'Bearer ' + tok : '' }, body: JSON.stringify(body) }); return { code: x.statusCode, body: JSON.parse(x.body || '{}') }; };
+      Object.assign(mem.gw_users, { 'member:u31dv': { id: 'u31dv', name: '개발31', role: '관리자', admin: true, dev: true, perms: {} }, 'member:u31nd': { id: 'u31nd', name: '관리31', role: '관리자', admin: true, perms: {} },
+        'member:u31t': { id: 'u31t', name: '대상31', role: '직원', admin: false, perms: { hw: 'view' } }, 'member:u31m': { id: 'u31m', name: '관리해제31', role: '관리자', admin: true, tier: 'admin', perms: {} } });
+      const tDv = issueSession(mem.gw_users['member:u31dv']).token, tNd = issueSession(mem.gw_users['member:u31nd']).token;
+      const L0 = auditMock.logs.length;
+      const ga = await callA31({ action: 'member_upsert', id: 'u31t', rank: '대리' }, tNd);
+      const gb = await callA31({ action: 'member_upsert', id: 'u31t', perms: Object.assign({}, mem.gw_users['member:u31t'].perms, { hw: 'do' }) }, tDv);
+      const gc = await callA31({ action: 'member_upsert', id: 'u31m', admin: false }, tDv);
+      mem.gw_users['member:u31u'] = { id: 'u31u', name: '빈권한31', role: '직원', admin: false, perms: {} };
+      const gd = await callA31({ action: 'member_upsert', id: 'u31u', perms: { stmt: 'do' } }, tDv);   // 없음 → 기본값 아닌 값(stmt do) = 채움 아님
+      const ed = ((auditMock.logs.slice(L0).find((l) => l.col === 'member' && l.ev && l.ev[0] && l.ev[0].id === 'u31u')) || { ev: [{}] }).ev[0];
+      const AL = auditMock.logs.slice(L0).filter((l) => l.col === 'member' && l.ev && l.ev[0] && l.ev[0].op === '수정');
+      const ea = (AL.find((l) => l.ev[0].id === 'u31t' && l.ev[0].f && l.ev[0].f.rank) || { ev: [{}] }).ev[0], eb = (AL.find((l) => l.ev[0].id === 'u31t' && l.ev[0].f && !l.ev[0].f.rank) || { ev: [{}] }).ev[0], ec = (AL.find((l) => l.ev[0].id === 'u31m') || { ev: [{}] }).ev[0];
+      const gm = membersOf();
+      const gj = G.M.judge(kstYm31(Date.now()), Date.now(), Object.assign(BM(), { members: gm, audit: { ok: true, items: auditMock.logs.slice(L0).map((l) => Object.assign({ ts: Date.now() }, l)), missing: 0 } })).find((x) => x.id === 'perm') || { n: {} };
+      P.K = ga.code === 200 && gb.code === 200 && gc.code === 200 && ea.f && Array.isArray(ea.f.perms) && /tasks:-/.test(ea.f.perms[0]) && typeof ea.pfill === 'string' && ea.pfill.split(',').indexOf('hw') < 0 && ea.pfill.split(',').indexOf('tasks') >= 0
+        && eb.f && JSON.stringify(eb.f.perms) === '["hw:view","hw:do"]' && eb.pfill === undefined && ec.f && ec.f.tier && ec.tauto === 1 && gj.st === 'ok' && gj.n.changes === 3
+        && gd.code === 200 && ed.f && /stmt:-/.test(ed.f.perms[0]) && /stmt:do/.test(ed.f.perms[1]) && typeof ed.pfill === 'string' && ed.pfill.split(',').indexOf('stmt') < 0 && ed.pfill.split(',').indexOf('tasks') >= 0;
+      I.K = { codes: [ga.code, ga.body.error_code, gb.code, gb.body.error_code, gc.code, gc.body.error_code, gd.code, gd.body.error_code], ea: [ea.f && ea.f.perms, ea.pfill], eb: [eb.f && eb.f.perms, eb.pfill], ec: [ec.f && Object.keys(ec.f), ec.tauto], ed: [ed.f && ed.f.perms, ed.pfill], gj: [gj.st, gj.n] };
     } finally { reset31(); auditMock.readMonth = rm0; }
     return { ok: Object.keys(P).every((k) => P[k]), P, I };
   };
@@ -8714,13 +8836,14 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
         try { const gx = comp31(PG31, SG31); return await chk31({ A: realA, M: Mx, cl: cl31(gx) }); } finally { require.cache[rpM31] = keepM31; }
       }
       if (kind === 'A') return await chk31({ A: comp31(PA31, mut31(SA31, pairs)), M: realM, cl: cl31(gwd) });
+      if (kind === 'U') { const PU31 = join(FN, 'gw-auth.js'); return await chk31({ A: realA, M: realM, cl: cl31(gwd), U: comp31(PU31, mut31(fs31.readFileSync(PU31, 'utf8'), pairs)) }); }
       return await chk31({ A: realA, M: realM, cl: cl31(comp31(PG31, mut31(SG31, pairs))) });
     };
     const MUT31 = [
       ['M', [["return e && e.op === '로그인' && /\\(이름\\)$/.test(String(e.t || ''));", "return false;"]]],
       ['M', [["kstDay(num(x.ts)) > String(mb.leave_date)", "kstDay(num(x.ts)) >= String(mb.leave_date)"]]],
       ['M', [["const okSys = !sys.length || !!(actor && actor.dev);", "const okSys = true;"]]],
-      ['M', [["nowMs - num(v.created) > DEVICE_PENDING_DAYS * D", "nowMs - num(v.created) > 0"]]],
+      ['M', [["nowMs - t0 > DEVICE_PENDING_DAYS * D", "nowMs - t0 > 0"]]],
       ['M', [["v.status === 'approved' && v.member_id && gone(v.member_id)", "false"]]],
       ['M', [["return cnt(id) > SUBS_PER_MEMBER;", "return cnt(id) > 99;"]]],
       ['M', [["return r.cap > 0 && r.used >= r.cap;", "return r.cap > 0 && r.used > r.cap;"]]],
@@ -8738,23 +8861,22 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
       ['M', [["if (ad === null || asn === null) out.push(", "if (false) out.push("]]],
       ['G', [["  if (fn === 'backup') await MCHK.noteBackup(d.ok === true, d.partial === true);", ""]]],
       ['G', [["const BACKUP_STAMP_FN = { files_backup: 1, backup: 1 };", "const BACKUP_STAMP_FN = { files_backup: 1 };"]]],
-      ['M', [["const logs = m.audit && m.audit.ok ? m.audit.items.filter(isObj) : null;", "const logs = m.audit && m.audit.ok ? m.audit.items.filter(isObj) : [];"]]],
+      ['M', [["return isObj(x) && Array.isArray(x.ev); }) : null;", "return isObj(x) && Array.isArray(x.ev); }) : [];"]]],
       ['M', [["m.members = (ms && !ms.unavailable) ? ms.filter(isObj) : null;", "m.members = (ms || []).filter(isObj);"]]],
-      ['M', [["if (isObj(cur.data) && opts.force !== true) return { ok: true, skipped: 'exists', period: period };", ""], ["if (isObj(again.data) && opts.force !== true) return { ok: true, skipped: 'exists', period: period };", ""]]],
+      ['M', [["if (isObj(cur.data) && !redo(cur.data)) return { ok: true, skipped: 'exists', period: period };", ""], ["if (isObj(again.data) && !redo(again.data)) return { ok: true, skipped: 'exists', period: period };", ""]]],
       ['M', [["if (day < 1 || day > 3) return { ok: true, skipped: 'not-first-days' };", ""]]],
       ['M', [["if (d.base === undefined || num(d.base) !== num(doc.updated_at)) return", "if (false) return"]]],
       ['M', [["if (isObj(doc.ack)) return { code: 400,", "if (false) return { code: 400,"]]],
       ['M', [["  if (!lr.ok) return { code: 503,", "  if (false) return { code: 503,"]]],
       ['M', [["{ try { await blobSet(st, key, before); } catch (e) {} return", "{ return"]]],
       ['M', [["  ldoc.log.push({ ts: now,", "  [].push({ ts: now,"]]],
-      ['M', [["doc.prev_ack = again.data.ack || null;", "doc.prev_ack = again.data.ack || null; doc.ack = again.data.ack || null;"]]],
+      ['M', [["doc.prev_acks = doc.prev_acks.slice(-20);", "doc.prev_acks = doc.prev_acks.slice(-20); doc.ack = again.data.ack || null;"]]],
       ['M', [["if (t.charAt(0) !== '⚠') return false;", ""]]],
       ['M', [["const plCovers = !!(pl && pl.length && num(pl[0].ts) <= b.s);", "const plCovers = !!(pl && pl.length);"]]],
       ['A', [["function auditFull(doc, entry) { return doc.items.length > 0 &&", "function auditFull(doc, entry) { return false &&"]]],
       ['A', [["(doc.items.length >= PART_MAX_ITEMS ||", "(doc.items.length > PART_MAX_ITEMS ||"]]],
-      ['A', [["      if (!pr.ok && pr.code !== 'NOT_FOUND') return false;\n", ""]]],
-      ['A', [["      if (n >= PART_MAX) return false;\n", ""]]],
-      ['A', [["      const hw = await blobSet(st, key, doc);\n      if (!(hw && hw.ok)) return false;\n", ""]]],
+      ['A', [["  if (!pr.ok && pr.code !== 'NOT_FOUND') return null;\n", ""]]],
+      ['A', [["if (n >= PART_MAX) return false;", "if (false) return false;"]]],
       ['A', [["  for (let i = 2; i <= n; i++) {", "  for (let i = 2; i < n; i++) {"]]],
       ['A', [["    if (!pr.ok && pr.code !== 'NOT_FOUND') return { ok: false, code: pr.code || 'STORAGE_READ_FAILED' };", "    if (!pr.ok && pr.code !== 'NOT_FOUND') continue;"]]],
       ['G', [["  if (!rm.ok) return jr(503, { status: 'ERROR', error_code: 'AUDIT_READ_FAILED', request_id: R });", ""]]],
@@ -8763,6 +8885,36 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
       ['G', [["async function handleMchkAck(event, d, R) { const g = await pmconGate(event, R, true);", "async function handleMchkAck(event, d, R) { const g = await pmconGate(event, R, false);"]]],
       ['G', [["  if (!botKeyOk(d.key)) return jr(403, { status: 'FORBIDDEN', error_code: 'BAD_INGEST_KEY', request_id: R });\n  const o = await MCHK.run(", "  const o = await MCHK.run("]]],
       ['G', [["  await MCHK.noteAlert(title);", ""]]],
+      // 검토 11/14 막음 1 — 감사 조각
+      ['A', [["let n = Math.max(auditParts(doc), ls.length ? ls[ls.length - 1] : 1), cur = doc;", "let n = auditParts(doc), cur = doc;"]]],
+      ['A', [["  if (pr.ok && pr.data != null) return auditDocOk(pr.data) ? pr.data : null;\n", ""]]],
+      ['A', [["const n = Math.max(hasHead ? auditParts(r.data) : 1, ls.length ? ls[ls.length - 1] : 1);", "const n = hasHead ? auditParts(r.data) : 1;"]]],
+      ['A', [["    if (!auditDocOk(pr.data)) return { ok: false, code: 'AUDIT_BAD_DOC' };\n    items = items.concat(pr.data.items);", "    items = items.concat(pr.data.items);"]]],
+      ['A', [["    const ls = await auditListParts(st, key);\n    if (!ls) return false;", "    const ls = (await auditListParts(st, key)) || [];"]]],
+      ['A', [["  const ls = await auditListParts(st, head);\n  if (!ls) return { ok: false, code: 'STORAGE_LIST_FAILED' };", "  const ls = (await auditListParts(st, head)) || [];"]]],
+      // 검토 11/14 ②~⑧ — 판정
+      ['M', [["const auditMiss = m.audit && m.audit.ok ? num(m.audit.missing) : 0;", "const auditMiss = 0;"]]],
+      ['M', [["const a1 = await AUDIT.readMonth(prevYm(period)), a2", "const a1 = { ok: true, items: [] }, a2"]]],
+      ['M', [["return !(ov === '-' && nv === (PERM_CLOSED[k] ? 'hide' : 'view'));", "return true;"]]],
+      ['M', [["if (fill) return fill.indexOf(k) < 0;", "if (fill) return true;"]]],
+      ['M', [["return !(Array.isArray(a) && String(a[1]) === 'false' && Array.isArray(t) && String(t[1] == null ? '' : t[1]) === '');", "return true;"]]],
+      ['M', [["const t0 = num(v.updated) || num(v.created);", "const t0 = num(v.created);"]]],
+      ['M', [[" && !(m.members && v.member_id && gone(v.member_id));", ";"]]],
+      ['M', [["return isObj(x) && Array.isArray(x.ev); })", "return isObj(x); })"]]],
+      ['M', [["try { fn(); } catch (e) { out.length = n0; out.push(item(id, 'unknown', ['판정 중 오류 — 재료 꼴 확인 필요'])); }", "fn();"]]],
+      ['M', [["(cronAuto && d.by === 'cron' && !isObj(d.ack) && num((d.counts || {}).unknown) > 0)", "false"]]],
+      ['M', [["d.by === 'cron' && !isObj(d.ack) && num(", "d.by === 'cron' && num("]]],
+      ['M', [["num(s.data.ts) <= bounds(kstYm(now)).s", "true"]]],
+      ['M', [["Number(kstDay(now).slice(8, 10)) >= OVERDUE_DAY", "true"]]],
+      ['M', [["if (opts.by === 'cron') await sinceMark(st, RUN_SINCE, nowMs);", ""]]],
+      ['M', [["const unTxt = unacked ?", "const unTxt = false ?"]]],
+      ['M', [["(Array.isArray(again.data.prev_acks) ? again.data.prev_acks : (isObj(again.data.prev_ack) ? [again.data.prev_ack] : [])).slice()", "[]"]]],
+      ['M', [["counts: c, rerun: doc.rerun || 0, audit: au };", "counts: c, rerun: doc.rerun || 0, audit: true };"]]],
+      ['M', [["if (unacked && opts.log) {", "if (false) {"]]],
+      ['G', [["force: d.force === true, by: 'bot', log: MCHK_LOG });", "force: d.force === true, by: 'bot' });"]]],
+      ['U', [["if (typeof pfill !== 'undefined' && pfill.length && f.perms) ev0.pfill = pfill.join(',');", ""]]],
+      ['U', [["if (tauto && f.tier) ev0.tauto = 1;", ""]]],
+      ['U', [["return !Object.prototype.hasOwnProperty.call(bp, k) && bn[k] === ap[k];", "return !Object.prototype.hasOwnProperty.call(bp, k);"]]],
     ];
     const kill31 = [];
     for (const [kind, pairs] of MUT31) {
@@ -8773,9 +8925,16 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
     const rd31 = (p) => fs31.readFileSync(join(FN, p), 'utf8');
     const capOk = /const MONTH_TOKENS = Number\(process\.env\.GW_ASK_MONTH_TOKENS \|\| 12000000\);/.test(rd31('gw-ask.js')) && /const MONTH_CALL_CAP = 500;/.test(rd31('_lib/promoai_job.js')) && /const MONTH_CALL_CAP = 1000;/.test(rd31('gw-promo-mask.js'))
       && /const CAP_AZURE_CHARS = 400000;/.test(rd31('_lib/brief.js')) && /const CAP_CLAUDE_TOKENS = 1000000;/.test(rd31('_lib/brief.js')) && require(join(LIB31, 'learn.js')).TYPES.contract.monthly_cap === 200
-      && JSON.stringify(realM.USAGE_CAPS.map((c) => c.cap)) === '[12000000,500,1000,400000,1000000,200]' && /\.slice\(-5\);   \/\/ 기기 5개까지/.test(SG31) && realM.SUBS_PER_MEMBER === 5 && realM.DEVICE_PENDING_DAYS === 7 && realM.FILES_BACKUP_H === 96;
+      && JSON.stringify(realM.USAGE_CAPS.map((c) => c.cap)) === '[12000000,500,1000,400000,1000000,200]' && /\.slice\(-5\);   \/\/ 기기 5개까지/.test(SG31) && realM.SUBS_PER_MEMBER === 5 && realM.DEVICE_PENDING_DAYS === 7 && realM.FILES_BACKUP_H === 96
+      && JSON.stringify(Object.keys(realM.PERM_CLOSED).sort()) === JSON.stringify([...((rd31('gw-auth.js').match(/const CLOSED_DEFAULT = \{([^}]*)\}/) || ['', ''])[1]).matchAll(/(\w+):\s*1/g)].map((x) => x[1]).sort());   // 검토 11/14 ② 권한 칸 기본값 = gw-auth CLOSED_DEFAULT
+    T('P1 판31 ⑤-2 감사 분할 막음(검토 11/14 — 재현 R1·R2·R3 꼴): 동시 두 요청(한쪽 조각 넘김·한쪽 머리에 붙임) = 둘 다 true·둘 다 읽힘 · 그 뒤 40줄 = 조각 2에 이어 씀(빈 조각으로 덮지 않음) · 머리를 잃고 다시 찬 달 = 조각 2 [2001,2002] 그대로·새 줄은 조각 3 · 머리 parts 없이 조각 2 있음 = 조각 2에 이어 씀 · 깨진 조각 = 읽기 실패 · 머리 없는 달 = 남은 조각 읽음(빠짐 1) · 조각 목록 못 읽음 = 쓰기 false(그대로)·읽기 실패',
+      R31.P.E2, JSON.stringify(R31.I.E2));
+    T('P1 판31 ⑪ 판정 보강(검토 11/14 — 재현 J1~J8 꼴): 감사 조각 빠짐 = 로그인·퇴사자·권한 변경 확인 못 함("조각 1개") · 권한 칸 자동 채움(옛 줄 "-"→기본값·새 줄 pfill)·관리자 해제 때 지운 등급(옛 줄·tauto) = 변경 아님 · 진짜 권한 변경·등급 변경(개발자·PM 아님) = 어긋남 · 승인 해제한 기기(최근)·퇴사자 대기 기기 = 아님 · 9일 대기 = 어긋남 · 꼴 다른 줄 거름 · 항목 예외 = 그 항목만 확인 못 함 · KST 1일 02:00 줄(UTC 전달 키) = 그달에 듦 · KST 다음 달 1일 03:00 줄 = 밖 · 1일 읽기 실패 확인 못 함 → 2일 다시 계산(redo unknown) · [확인]한 문서·봇 키 달 지정·4일 = 안 함 · 크론이 못 돈 달 = 5일부터 overdue(4일·크론 첫 달·문서 있음 = 아님)',
+      R31.P.J, JSON.stringify(R31.I.J));
+    T('P1 판31 ⑫ gw-auth 감사 표시(실 gw-auth — 저장 값·권한 판정 무변): 개발자 아닌 관리자의 인사 저장 = f.perms 글 그대로("tasks:-" 포함) + ev.pfill(채운 칸 — hw 없음) · 개발자 권한 변경 hw view→do = pfill 없음 · 관리자 해제 = f.tier + ev.tauto 1 · 그 줄들로 월 점검 = 권한 변경 맞음(변경 2)',
+      R31.P.K, JSON.stringify(R31.I.K));
     T('P1 판31 ⑧ 상한·기준 = 원본 값(물어보기 1,200만 토큰·블로그 AI 500·사진 가리기 1000·브리핑 40만 자·100만 토큰·계약 학습 200 · 구독 5대(push_sub) · 대기 7일 · 첨부 백업 96시간)', capOk, '');
-    T('P1 판31 ⑨ 결함 사본 ' + MUT31.length + '개(11/14 원천 수리 14 — 빠진 날·부분·시작일·시작 전·흔적 못 읽음·full 우선·실패 안 셈·시작 표시 둘·경보 0건·경보 못 읽음·흔적 연결·fn 허용 · mchk 20 — 이름 로그인·퇴사일 경계·개발자 검사·대기 7일·퇴사자 기기·5대·상한 경계·96시간·감사 못 읽음을 빈 목록으로·명부 못 읽음 무시·두 번 쓰기·1~3일 창·낙관락·두 번 확인·기록 못 읽음·ack 되돌림·누른 기록 줄·force가 확인 남김·⚠만 셈·알림함 덮음 · audit 7 — 줄 상한·경계 하나 어긋남·조각 못 읽음·조각 수 상한·머리 먼저·조각 덜 읽음·못 읽은 조각 건너뜀 · gw-data 6 — 503·parts 보존·열람 관문·확인 PM 관문·봇 키·경보 연결) 전부 위 검사에서 걸림',
+    T('P1 판31 ⑨ 결함 사본 ' + MUT31.length + '개(11/14 보안 검토 반영 28 —조각 목록 쓰기·읽기·읽고 만들기·깨진 조각·목록 실패 둘·조각 빠짐·KST 전달 키·권한 자동 채움 둘·등급 자동 지움·대기 시작·퇴사자 대기·꼴 다른 줄·항목 예외·다시 계산 둘·overdue 셋·크론 시작 표시·확인 풂 감사·풀린 확인 목록·audit:false·누른 기록 줄 둘·gw-auth pfill 둘·tauto · 11/14 원천 수리 14 — 빠진 날·부분·시작일·시작 전·흔적 못 읽음·full 우선·실패 안 셈·시작 표시 둘·경보 0건·경보 못 읽음·흔적 연결·fn 허용 · mchk 20 — 이름 로그인·퇴사일 경계·개발자 검사·대기 7일·퇴사자 기기·5대·상한 경계·96시간·감사 못 읽음을 빈 목록으로·명부 못 읽음 무시·두 번 쓰기·1~3일 창·낙관락·두 번 확인·기록 못 읽음·ack 되돌림·누른 기록 줄·force가 확인 남김·⚠만 셈·알림함 덮음 · audit 7 — 줄 상한·경계 하나 어긋남·조각 못 읽음·조각 수 상한·머리 먼저·조각 덜 읽음·못 읽은 조각 건너뜀 · gw-data 6 — 503·parts 보존·열람 관문·확인 PM 관문·봇 키·경보 연결) 전부 위 검사에서 걸림',
       kill31.length === 0, kill31.join(' | '));
   } catch (e) { T('P1 판31 검사 실행', false, String(e && e.stack || e).slice(0, 400)); }
   finally { reset31(); auditMock.readMonth = rm0; require.cache[rpM31] = keepM31; }

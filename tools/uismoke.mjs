@@ -13681,7 +13681,7 @@ try {
     && html.split('function pmconChecksSync(){').length === 2 && /if \(typeof pmconChecksSync === "function"\) pmconChecksSync\(\);/.test(fn31(html, 'pmconChecksRender'))
     && ['mchk_get', 'mchk_ack', 'mchk_run'].every((a) => new RegExp("if \\(d && d\\.action === '" + a + "'\\) return await handleMchk\\w+\\(event, d, R\\);").test(gwd31))
     && /\[functions\."gw-mchk-cron"\]\s*\r?\n\s*schedule = "0 22 \* \* \*"/.test(toml31) && /await stamp\('gw-mchk-cron', \{ state: 'start' \}\)/.test(cron31) && /await stamp\('gw-mchk-cron', \{ state: 'end'/.test(cron31)
-    && /var AUDIT_COL_LABEL = \{[^}]*pmcon:"PM 콘솔", mchk:"월 점검",/.test(html) && /var PMCON_CHOICE_TXT = \{[^}]*ack: "확인" \};/.test(html) && !/sendTo|push_send/.test(lib31 + cron31),
+    && /var AUDIT_COL_LABEL = \{[^}]*pmcon:"PM 콘솔", mchk:"월 점검",/.test(html) && /var PMCON_CHOICE_TXT = \{[^}]*ack: "확인", rerun: "다시 계산" \};/.test(html) && !/sendTo|push_send/.test(lib31 + cron31),
     JSON.stringify({ iRen, iSync, iPush, iOpen }));
   // ② 실행 — 가짜 화면(카드 자리 파싱 · data-mchk 버튼)
   const run31 = async (o, srcHtml) => {
@@ -13779,6 +13779,33 @@ try {
   // ⑥ 화면 글 — 내부 키 이름·밑줄 이름 0 · 입력 칸 0
   const leak31 = (pmR.vis.match(/\b[a-z]+_[a-z_]+\b|\bmchk\b|\b(?:ok|bad|unknown|none)\b/g) || []);
   T('P1 판31 ⑥ 화면 글: 카드에 내부 키 이름(mchk·밑줄 이름·ok/bad 같은 상태 글자) 0 · 입력 칸 0', leak31.length === 0 && !/<(input|select|textarea)\b/.test(pmR.card.innerHTML), '새는 글: ' + leak31.join(','));
+  // ⑦(보안 검토 11/14 ⑤·⑨) 카드 줄 이스케이프 · 지시 권한 없으면 [처리 지시] 없음 · 크론이 못 돈 달 = "월 점검 기록 없음 — 크론 확인" 한 줄([확인]·[처리 지시] 없음) · 감사 화면 조각 빠짐 안내 · 결함 사본
+  const EVIL = DOC({ items: DOC().items.map((x) => (x.id === 'backup' ? Object.assign({}, x, { label: '백업<img src=x onerror=1>', lines: ['<b>빠진 날</b> & "따옴표"'] }) : x)) });
+  const chk7 = async (H) => {
+    const e = await run31({ res: RES(EVIL, true) }, H), nt = await run31({ res: RES(DOC(), true), canTasks: false }, H);
+    const ov = await run31({ res: { mchk_get: { status: 200, body: { status: 'OK', period: '2026-10', doc: null, can_ack: true, overdue: true } } } }, H);
+    const nov = await run31({ res: { mchk_get: { status: 200, body: { status: 'OK', period: '2026-10', doc: null, can_ack: true, overdue: false } } } }, H);
+    return { esc: e.card.innerHTML.indexOf('<img') < 0 && e.card.innerHTML.indexOf('&lt;img') >= 0 && e.card.innerHTML.indexOf('<b>빠진 날</b>') < 0 && e.card.innerHTML.indexOf('&lt;b&gt;빠진 날') >= 0,
+      noTask: nt.card._btn.map((b) => b.a).join() === 'ack',
+      ov: ov.card.style.display === '' && ov.wrap.style.display === '' && ov.vis.indexOf('월 점검 기록 없음 — 크론 확인') >= 0 && ov.vis.indexOf('10월분') >= 0 && ov.card._btn.length === 0,
+      nov: nov.card.style.display === 'none' && nov.wrap.style.display === 'none' };
+  };
+  const r7 = await chk7(html);
+  const auF = fn31(html, 'renderAudit');
+  const auOk = /var auMiss = Number\(res\.body && res\.body\.doc && res\.body\.doc\.missing\) \|\| 0;/.test(auF) && /감사 기록 조각 ' \+ auMiss \+ '개 없음/.test(auF) && /body\.innerHTML = auMissHtml \+ html;/.test(auF);
+  const MUT7 = [
+    [`'<li style="margin:3px 0;"><b>' + esc(x.label) + '</b>' + (x.st === "unknown" ? bdg("unknown", "확인 못 함") : "") + ' — ' + esc((x.lines || []).join(" · "))`, `'<li style="margin:3px 0;"><b>' + x.label + '</b>' + (x.st === "unknown" ? bdg("unknown", "확인 못 함") : "") + ' — ' + (x.lines || []).join(" · ")`],
+    [`+ (canDo("tasks") ? '<button type="button" class="mini-btn" data-mchk="order">처리 지시</button>' : '')`, `+ '<button type="button" class="mini-btn" data-mchk="order">처리 지시</button>'`],
+    ['if (!doc && res.body.overdue){', 'if (false){'],
+  ];
+  const k7 = [];
+  for (const [from, to] of MUT7) {
+    if (html.split(from).length !== 2) { k7.push('자리 ' + html.split(from).length + ': ' + from.slice(0, 40)); continue; }
+    let r; try { r = await chk7(html.replace(from, () => to)); } catch (e) { r = null; }
+    if (r && r.esc && r.noTask && r.ov && r.nov) k7.push(from.slice(0, 50) + ' 안 깨짐');
+  }
+  T('P1 판31 ⑦ 보안 검토(11/14): 카드 줄 이스케이프(이름·줄 글에 꺾쇠·따옴표) · 지시 권한 없으면 [처리 지시] 없음([확인]만) · 크론이 못 돈 달(서버 overdue) = 카드 "월 점검 기록 없음 — 크론 확인"·"10월분"·단추 0 · overdue 아님 = 카드·묶음 숨김 · 감사 화면 조각 빠짐 안내(renderAudit) · 결함 사본 ' + MUT7.length + '개(이스케이프 걷음·처리 지시 권한 걷음·overdue 걷음) 전부 깨짐',
+    r7.esc && r7.noTask && r7.ov && r7.nov && auOk && k7.length === 0, JSON.stringify({ r7, auOk, k7 }));
 } catch (e) { console.log('  (P1 판31 검사 생략 — ' + e.message + ')'); fails++; }
 
 // ── v465(Phase 1 판30·31 — PM 11/14 11:27 "45. 판 30,31ㄱ" · 원장 C130·T476·T422 · C138 ② · C128 ②): 문서·판 번호 정확 검사(동작 검사는 'P1 판30'·'P1 판31' · servertest 'P1 판30'·'P1 판31') — 다음 판은 기준 줄·sw를 '465 이상'으로 풀 것

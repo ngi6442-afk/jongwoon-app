@@ -30653,7 +30653,9 @@ function dutyStage(nx){
     gwCall("gw-data", { action: "audit", month: auditMonthCur }).then(function(res){
       if (res.status !== 200){ body.innerHTML = '<div class="empty-line">불러오기 실패 (' + res.status + ')</div>'; return; }
       var items = (res.body && res.body.doc && res.body.doc.items) || [];
-      if (!items.length){ body.innerHTML = '<div class="empty-line">이 달의 기록이 없습니다.</div>'; return; }
+      var auMiss = Number(res.body && res.body.doc && res.body.doc.missing) || 0;   // P1 판31(검토 11/14 ④): 감사 기록 조각이 빠진 달 — 일부만 보인다는 안내
+      var auMissHtml = auMiss ? '<div class="empty-line" style="color:#B00020;">감사 기록 조각 ' + auMiss + '개 없음 — 이 달 기록 일부를 읽지 못했습니다.</div>' : '';
+      if (!items.length){ body.innerHTML = auMissHtml + '<div class="empty-line">이 달의 기록이 없습니다.</div>'; return; }
       var html = items.slice().reverse().map(function(a){
         var dt = new Date(a.ts);
         var when = (dt.getMonth()+1) + "/" + dt.getDate() + " " + ("0"+dt.getHours()).slice(-2) + ":" + ("0"+dt.getMinutes()).slice(-2);
@@ -30674,7 +30676,7 @@ function dutyStage(nx){
           '<div class="item-meta" style="margin-bottom:2px;"><span>' + when + '</span><span class="author-chip">' + esc(dispName(a.by||"")) + '</span><span class="scope-chip">' + esc(colNm) + '</span></div>' +
           '<div style="font-size:13px;">' + evs + '</div></div></div>';
       }).join("");
-      body.innerHTML = html;
+      body.innerHTML = auMissHtml + html;
     }).catch(function(){ body.innerHTML = '<div class="empty-line">통신 오류</div>'; });
   }
   // 권한관리(별도 화면) — 매트릭스 표(S2-C, PM 지시): 셀 클릭마다 수행→보기→숨김 순환, 사람 단위 디바운스 자동 저장.
@@ -31199,7 +31201,7 @@ function dutyStage(nx){
   var PMCON_PLAN = { bg: { due: "2026-11-25", def: "rec", note: "11/20 카드 ①" } };
   // 점검 카드가 붙을 한 곳(판30 계약 서류 분기 점검 · 판31 월 점검) — 줄 꼴 { id: "영문", title: "제목", render: function(host){ … } }. 비어 있으면 '점검 카드' 묶음을 숨긴다.
   var PMCON_CHECKS = [];
-  var PMCON_CHOICE_TXT = { ok: "ㄱ", "default": "기본값", hold: "보류", reopen: "다시 열기", ack: "확인" };   // ack = P1 판31 월 점검 [확인](누른 기록 같은 표)
+  var PMCON_CHOICE_TXT = { ok: "ㄱ", "default": "기본값", hold: "보류", reopen: "다시 열기", ack: "확인", rerun: "다시 계산" };   // ack = P1 판31 월 점검 [확인] · rerun = 봇 키 다시 계산이 [확인]을 풂(누른 기록 같은 표)
   var pmconState = null, pmconBusy = false, pmconSeq = 0, pmconLogAll = false;
   function pmconMd(d){ var t = new Date(String(d) + "T00:00:00"); if (isNaN(t.getTime())) return String(d || ""); return (t.getMonth() + 1) + "/" + t.getDate() + "(" + "일월화수목금토".charAt(t.getDay()) + ")"; }
   function pmconPlan(kind){
@@ -31451,6 +31453,12 @@ function dutyStage(nx){
     gwCall("gw-data", { action: "mchk_get" }).then(function(res){
       if (res.status !== 200 || !res.body){ host.style.display = ""; host.innerHTML = '<div style="font-weight:600;font-size:13.5px;">월 점검</div><div class="pc-none" style="color:#B00020;">월 점검을 불러오지 못했습니다 (' + esc((res.body && res.body.error_code) || res.status) + ')</div>'; pmconChecksSync(); return; }
       var doc = res.body.doc, show = mchkShown(doc);
+      if (!doc && res.body.overdue){   // 검토 11/14 ⑤: 전달 문서가 5일이 되도록 없음(크론이 못 돈 달) — 한 줄만, [확인] 없음
+        host.style.display = "";
+        var pmo = Number(String(res.body.period || "").slice(5, 7));
+        host.innerHTML = '<div style="font-weight:600;font-size:13.5px;">월 점검 기록 없음 — 크론 확인</div><div class="pc-none" style="color:#B00020;padding:4px 0 0;">' + esc((pmo ? pmo + "월분" : String(res.body.period || "")) + " 월 점검 문서가 아직 없습니다(매월 1~3일 자동). 자동 작업 감시에서 월 점검 크론을 확인해 주세요.") + '</div>';
+        pmconChecksSync(); return;
+      }
       if (!show.length){ host.style.display = "none"; host.innerHTML = ""; pmconChecksSync(); return; }
       host.style.display = "";
       host.innerHTML = mchkCardHtml(doc, !!res.body.can_ack, show);

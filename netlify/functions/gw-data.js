@@ -5659,7 +5659,7 @@ async function handleMchkGet(event, d, R) { const g = await pmconGate(event, R, 
 async function handleMchkAck(event, d, R) { const g = await pmconGate(event, R, true); if (g.res) return g.res; const o = await MCHK.ack(d, g.c.member, MCHK_LOG); return jr(o.code, Object.assign(o.body, { request_id: R })); }
 async function handleMchkRun(event, d, R) {
   if (!botKeyOk(d.key)) return jr(403, { status: 'FORBIDDEN', error_code: 'BAD_INGEST_KEY', request_id: R });
-  const o = await MCHK.run(Date.now(), { period: d.period === undefined ? '' : String(d.period), force: d.force === true, by: 'bot' });
+  const o = await MCHK.run(Date.now(), { period: d.period === undefined ? '' : String(d.period), force: d.force === true, by: 'bot', log: MCHK_LOG });   // log = force가 [확인]을 풀면 누른 기록에 1줄(검토 11/14 ⑦)
   return jr(o.ok ? 200 : (o.code === 'BAD_PERIOD' ? 400 : 500), Object.assign({ status: o.ok ? 'OK' : 'ERROR' }, o, { request_id: R }));
 }
 

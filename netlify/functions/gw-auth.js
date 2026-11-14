@@ -416,11 +416,19 @@ async function handleMemberUpsert(st, event, d, R) {
       const pk = Object.keys(ap).concat(Object.keys(bp).filter(function (k) { return !Object.prototype.hasOwnProperty.call(ap, k); }));
       const ch = pk.filter(function (k) { return bp[k] !== ap[k]; });
       if (ch.length) f.perms = [ch.map(function (k) { return k + ':' + (bp[k] || '-'); }).join(','), ch.map(function (k) { return k + ':' + (ap[k] || '-'); }).join(',')];
+      // P1 판31(검토 11/14 ②): 전 값을 같은 정리 함수(cleanPerms)로 맞춘 뒤 비교해 '없음 → 기본값'(저장 때 정리가 채운 칸)을 가려 ev.pfill에 표시 —
+      //   감사 글(f.perms)은 그대로(v430·v431 '굳음' 기록 — servertest 76·77) · 저장 값·권한 판정 무변. 월 점검 '권한 변경'은 이 칸을 변경으로 세지 않는다
+      const bn = cleanPerms(bp);
+      var pfill = ch.filter(function (k) { return !Object.prototype.hasOwnProperty.call(bp, k) && bn[k] === ap[k]; });
     }
+    // 관리자 해제 때 서버가 지운 등급 칸(위 '!m.admin && m.tier → 지움')은 ev.tauto로 표시(f.tier 글은 그대로 — 유효 등급 변화는 '등급변경' 줄이 따로 남김)
+    const tauto = !!(before && before.admin && !m.admin && before.tier && !m.tier && d.tier === undefined);
     if (d.pin) f.PIN = ['', '변경'];
     if (!before || Object.keys(f).length) {
-      await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'member',
-        ev: [{ op: (before ? '수정' : '추가'), id: m.id, t: m.name, f: (Object.keys(f).length ? f : undefined) }] });
+      const ev0 = { op: (before ? '수정' : '추가'), id: m.id, t: m.name, f: (Object.keys(f).length ? f : undefined) };
+      if (typeof pfill !== 'undefined' && pfill.length && f.perms) ev0.pfill = pfill.join(',');
+      if (tauto && f.tier) ev0.tauto = 1;
+      await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'member', ev: [ev0] });
     }
     // 등급 변경은 별도 행(v321·S6) — **유효 등급**(명시·부트스트랩 파생·퇴사 반영)이 바뀐 모든 저장에 전·후를 남긴다(tier 필드만 본 f.tier는 '관리자 해제→등급 없음'·'퇴사→없음'·파생 전환을 못 보여준다)
     const tierBefore = before ? tcBefore.tierOf(before) : '';

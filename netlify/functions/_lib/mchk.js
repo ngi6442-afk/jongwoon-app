@@ -15,6 +15,10 @@ const ALERT_PREFIX = 'mchk:alerts:'; // 'mchk:alerts:YYYY-MM' = 그달 봇 경�
 const ALERT_SINCE = 'mchk:alerts:since';   // 경보를 세기 시작한 시각(처음 한 번) — 경보가 없던 달(문서 없음)을 '0건'으로 읽는 근거
 const BACKUP_PREFIX = 'mchk:backup:';      // 'mchk:backup:YYYY-MM' = 그달 매일 백업이 끝난 날(KST) { days: { 'DD': 'full'|'partial' } } — gw-data backup_stamp(fn 'backup')가 noteBackup으로 더함
 const BACKUP_SINCE = 'mchk:backup:since';  // 백업 흔적을 받기 시작한 시각(처음 한 번) — 그 앞 날은 빠진 날로 치지 않는다
+const RUN_SINCE = 'mchk:since';            // 검토 11/14 ⑤: 크론이 처음 돈 시각 — 이 시각 뒤에 시작한 달인데 5일이 되도록 문서가 없으면 카드에 '기록 없음 — 크론 확인'
+const OVERDUE_DAY = 5;                     // 1~3일 창 + 하루 여유 — 이 날(KST)부터 전달 문서가 없으면 크론이 못 돈 달
+// 권한 칸 기본값(값이 없을 때) — gw-auth CLOSED_DEFAULT와 같은 집합(servertest가 대조) · 감사 줄의 '없음 → 기본값'(저장 때 정리가 채운 칸)을 권한 변경으로 세지 않는 데 쓴다(옛 줄 — 새 줄은 gw-auth가 ev.pfill로 표시)
+const PERM_CLOSED = { quote: 1, promo: 1, hr: 1, lic: 1, site: 1, safety: 1, hw: 1, stmt: 1 };
 const H = 3600000, D = 24 * H;
 const DEVICE_PENDING_DAYS = 7;      // 판22 '대기 7일'(착수설명서 58행 — 새 기기 승인 대기 7일 넘으면 다시 알림)
 const SUBS_PER_MEMBER = 5;          // 그룹웨어 운영권한관리규정(JW-11-01-003) 제14조① '회원당 5대 이내' · gw-data handlePushSub slice(-5)
@@ -72,7 +76,9 @@ async function listVals(st, prefix) {   // 접두어 키 전부의 값(지워진
 async function gather(period) {
   const sd = store(DATA), su = store(USERS);
   const m = {};
-  m.audit = await AUDIT.readMonth(period);
+  // 검토 11/14 ③: 감사 키는 서버(UTC) 달이고 점검은 KST 달 — KST 1일 00:00~08:59 줄은 전달 키에 있으므로 전달·그달 키를 함께 읽어 judge가 KST 경계로 거른다(키 체계는 그대로)
+  const a1 = await AUDIT.readMonth(prevYm(period)), a2 = await AUDIT.readMonth(period);
+  m.audit = (a1 && a1.ok && a2 && a2.ok) ? { ok: true, items: (a1.items || []).concat(a2.items || []), missing: num(a1.missing) + num(a2.missing) } : { ok: false };
   const ms = await PUSH.loadMembers();
   m.members = (ms && !ms.unavailable) ? ms.filter(isObj) : null;
   m.devices = await listVals(su, 'device:');
@@ -97,44 +103,73 @@ async function gather(period) {
 }
 
 // ---- 항목 판정(순수 — servertest가 재료를 직접 넣어 돌린다) ----
+// 검토 11/14 ②: 감사 줄의 권한 칸 변경이 '진짜 변경'인가 — 저장 때 정리(cleanPerms)가 채운 '없음 → 기본값'은 뺀다(새 줄 = gw-auth가 남긴 ev.pfill · 옛 줄 = 같은 규칙으로 '-' → 기본값)
+function permReal(e) {
+  const p = e.f.perms;
+  if (!Array.isArray(p)) return true;
+  const fill = typeof e.pfill === 'string' ? e.pfill.split(',') : null;
+  const olds = String(p[0] == null ? '' : p[0]).split(','), news = String(p[1] == null ? '' : p[1]).split(',');
+  return news.some(function (s, i) {
+    const k = s.split(':')[0], nv = s.split(':')[1], ov = String(olds[i] || '').split(':')[1];
+    if (fill) return fill.indexOf(k) < 0;
+    return !(ov === '-' && nv === (PERM_CLOSED[k] ? 'hide' : 'view'));
+  });
+}
+// 등급 칸 변경이 '진짜 변경'인가 — 관리자 해제 때 서버가 등급 칸을 지운 것(새 줄 ev.tauto · 옛 줄 = admin true→false와 함께 tier → 빈 값)은 뺀다
+function tierReal(e) {
+  if (e.tauto) return false;
+  const a = e.f.admin, t = e.f.tier;
+  return !(Array.isArray(a) && String(a[1]) === 'false' && Array.isArray(t) && String(t[1] == null ? '' : t[1]) === '');
+}
 function judge(period, nowMs, m) {
   const b = bounds(period), out = [];
-  const logs = m.audit && m.audit.ok ? m.audit.items.filter(isObj) : null;
-  const byId = {}; (m.members || []).forEach(function (x) { if (x.id) byId[x.id] = x; });
+  // 검토 11/14 ⑤: 항목마다 예외를 잡아 그 항목만 '확인 못 함'(꼴 다른 재료 하나에 판정 전체가 멈추고 카드가 숨던 것)
+  const guard = function (id, fn) { const n0 = out.length; try { fn(); } catch (e) { out.length = n0; out.push(item(id, 'unknown', ['판정 중 오류 — 재료 꼴 확인 필요'])); } };
+  // 검토 11/14 ④: 감사 조각이 빠졌으면(missing) 감사 재료 항목은 다 읽지 못한 것 — '확인 못 함' · ⑤ ev가 배열이 아닌 줄은 거름
+  const auditMiss = m.audit && m.audit.ok ? num(m.audit.missing) : 0;
+  const logs = m.audit && m.audit.ok && !auditMiss && Array.isArray(m.audit.items) ? m.audit.items.filter(function (x) { return isObj(x) && Array.isArray(x.ev); }) : null;
+  const auditWhy = auditMiss ? '감사 기록 조각 ' + auditMiss + '개가 없어 다 읽지 못했습니다' : '감사 기록을 읽지 못했습니다';
+  const byId = {}; (m.members || []).forEach(function (x) { if (isObj(x) && x.id) byId[x.id] = x; });
   const gone = function (id) { const x = byId[id]; return !x || x.del === 1 || tier.retired(x); };
-  const logins = logs ? logs.filter(function (x) { return x.col === 'login' && (x.ev || []).some(function (e) { return e && e.op === '로그인'; }) && num(x.ts) >= b.s && num(x.ts) < b.e; }) : null;
+  let logins = null;
+  try { logins = logs ? logs.filter(function (x) { return x.col === 'login' && x.ev.some(function (e) { return e && e.op === '로그인'; }) && num(x.ts) >= b.s && num(x.ts) < b.e; }) : null; } catch (e) { logins = null; }
   // 1 로그인 — 이름 경로 0건
-  if (!logins) out.push(item('login', 'unknown', ['감사 기록을 읽지 못했습니다']));
-  else {
-    const byName = logins.filter(function (x) { return (x.ev || []).some(function (e) { return e && e.op === '로그인' && /\(이름\)$/.test(String(e.t || '')); }); });
+  guard('login', function () {
+    if (!logins) { out.push(item('login', 'unknown', [auditWhy])); return; }
+    const byName = logins.filter(function (x) { return x.ev.some(function (e) { return e && e.op === '로그인' && /\(이름\)$/.test(String(e.t || '')); }); });
     const ppl = {}; logins.forEach(function (x) { ppl[x.bid || x.by] = 1; });
     out.push(item('login', byName.length ? 'bad' : 'ok', byName.length ? ['이름으로 로그인 ' + byName.length + '건 — 아이디로만 들어오게 되어 있습니다'] : ['로그인 ' + logins.length + '건 · ' + Object.keys(ppl).length + '명 · 모두 아이디'], { logins: logins.length, people: Object.keys(ppl).length, by_name: byName.length }));
-  }
+  });
   // 2 잠금 — 기준 없음(숫자만). 잠금 기록은 성공 로그인 때 지워지므로 '남아 있는 기록' 기준
-  if (!m.locks) out.push(item('lock', 'unknown', ['잠금 기록을 읽지 못했습니다']));
-  else {
+  guard('lock', function () {
+    if (!m.locks) { out.push(item('lock', 'unknown', ['잠금 기록을 읽지 못했습니다'])); return; }
     const inM = m.locks.filter(function (x) { return num(x.v.until) >= b.s && num(x.v.until) < b.e + 15 * 60000; }).length;
     const failing = m.locks.filter(function (x) { return num(x.v.fails) > 0; }).length;
     out.push(item('lock', 'none', ['그달 잠금 ' + inM + '건(남은 기록 기준) · 실패가 쌓인 아이디 ' + failing + '개'], { locked: inM, failing: failing, keys: m.locks.length }));
-  }
+  });
   // 3 퇴사자 접속 — 로그인한 날(KST)이 퇴사일보다 뒤
-  if (!logins || !m.members) out.push(item('retired', 'unknown', [!logins ? '감사 기록을 읽지 못했습니다' : '회원 명부를 읽지 못했습니다']));
-  else {
+  guard('retired', function () {
+    if (!logins || !m.members) { out.push(item('retired', 'unknown', [!logins ? auditWhy : '회원 명부를 읽지 못했습니다'])); return; }
     const late = logins.filter(function (x) { const mb = byId[x.bid]; return mb && mb.leave_date && kstDay(num(x.ts)) > String(mb.leave_date); });
     const names = {}; late.forEach(function (x) { names[String(x.by || '')] = 1; });
     out.push(item('retired', late.length ? 'bad' : 'ok', late.length ? ['퇴사일 뒤 로그인 ' + late.length + '건 — ' + Object.keys(names).slice(0, 3).join(', ')] : ['퇴사일 뒤 로그인 0건'], { late: late.length }));
-  }
+  });
   // 4 권한 변경 — 회원 '수정' 줄의 perms·admin·dev(개발자만) · tier(대표·PM만). 변경자 판정은 점검 시각의 명부(지금 개발자·등급)
-  if (!logs || !m.members) out.push(item('perm', 'unknown', [!logs ? '감사 기록을 읽지 못했습니다' : '회원 명부를 읽지 못했습니다']));
-  else {
+  //   저장 때 정리가 채운 권한 칸(없음 → 기본값)·관리자 해제 때 서버가 지운 등급 칸은 변경으로 세지 않는다(permReal·tierReal)
+  guard('perm', function () {
+    if (!logs || !m.members) { out.push(item('perm', 'unknown', [!logs ? auditWhy : '회원 명부를 읽지 못했습니다'])); return; }
     const ctx = tier.ctxOf(m.members);
     let n = 0; const bad = [];
     logs.forEach(function (x) {
       if (x.col !== 'member' || num(x.ts) < b.s || num(x.ts) >= b.e) return;
-      (x.ev || []).forEach(function (e) {
-        if (!e || e.op !== '수정' || !isObj(e.f)) return;
-        const sys = ['perms', 'admin', 'dev'].filter(function (k) { return Object.prototype.hasOwnProperty.call(e.f, k); });
-        const tr = Object.prototype.hasOwnProperty.call(e.f, 'tier');
+      x.ev.forEach(function (e) {
+        if (!isObj(e) || e.op !== '수정' || !isObj(e.f)) return;
+        const own = function (k) { return Object.prototype.hasOwnProperty.call(e.f, k); };
+        const sys = [];
+        if (own('perms') && permReal(e)) sys.push('perms');
+        if (own('admin')) sys.push('admin');
+        if (own('dev')) sys.push('dev');
+        const tr = own('tier') && tierReal(e);
         if (!sys.length && !tr) return;
         n++;
         const actor = byId[x.bid];
@@ -144,23 +179,27 @@ function judge(period, nowMs, m) {
       });
     });
     out.push(item('perm', bad.length ? 'bad' : 'ok', bad.length ? ['개발자·대표·PM이 아닌 사람의 권한 변경 ' + bad.length + '건 — ' + bad.slice(0, 2).join(' · ')] : ['권한 변경 ' + n + '건 — 모두 정해진 사람'], { changes: n, bad: bad.length }));
-  }
-  // 5 대기 기기 — 점검 시각 기준(지금 상태)
+  });
+  // 5 대기 기기 — 점검 시각 기준(지금 상태). 대기 시작 = 마지막 상태 바꾼 시각(승인 해제면 그때 — updated) 없으면 만든 시각 · 퇴사·삭제 회원의 대기 기기는 뺀다(판22가 퇴사 다음 날 대기로 돌림)
+  guard('device', function () {
   if (!m.devices) out.push(item('device', 'unknown', ['기기 목록을 읽지 못했습니다']));
   else {
     const ds = m.devices.map(function (x) { return x.v; });
     const pend = ds.filter(function (v) { return v.status !== 'approved'; });
-    const old = pend.filter(function (v) { return num(v.created) > 0 && nowMs - num(v.created) > DEVICE_PENDING_DAYS * D; });
+    const old = pend.filter(function (v) { const t0 = num(v.updated) || num(v.created); return t0 > 0 && nowMs - t0 > DEVICE_PENDING_DAYS * D && !(m.members && v.member_id && gone(v.member_id)); });
     const goneApproved = m.members ? ds.filter(function (v) { return v.status === 'approved' && v.member_id && gone(v.member_id); }) : null;
     const lines = [];
     if (old.length) lines.push('승인 대기 ' + DEVICE_PENDING_DAYS + '일 넘은 기기 ' + old.length + '대');
     if (goneApproved && goneApproved.length) lines.push('퇴사·삭제 회원의 승인된 기기 ' + goneApproved.length + '대');
     const st = (old.length || (goneApproved && goneApproved.length)) ? 'bad' : (goneApproved ? 'ok' : 'unknown');
     if (st === 'unknown') lines.push('회원 명부를 읽지 못해 퇴사자 기기를 대조하지 못했습니다');
-    if (st === 'ok') lines.push('기기 ' + ds.length + '대 · 승인 ' + (ds.length - pend.length) + ' · 대기 ' + pend.length + '(7일 안)');
+    const exG = m.members ? pend.filter(function (v) { return v.member_id && gone(v.member_id); }).length : 0;
+    if (st === 'ok') lines.push('기기 ' + ds.length + '대 · 승인 ' + (ds.length - pend.length) + ' · 대기 ' + pend.length + (exG ? '(퇴사·삭제 회원 ' + exG + '대 뺌 · 나머지 7일 안)' : '(7일 안)'));
     out.push(item('device', st, lines, { devices: ds.length, pending: pend.length, pending_old: old.length, gone_approved: goneApproved ? goneApproved.length : null }));
   }
+  });
   // 6 구독 — 점검 시각 기준
+  guard('subs', function () {
   if (!m.subs) out.push(item('subs', 'unknown', ['알림 구독 목록을 읽지 못했습니다']));
   else {
     const ids = Object.keys(m.subs);
@@ -175,8 +214,9 @@ function judge(period, nowMs, m) {
     if (st === 'ok') lines.push('알림 받는 회원 ' + ids.length + '명 · 기기 ' + ids.reduce(function (s, id) { return s + cnt(id); }, 0) + '대');
     out.push(item('subs', st, lines, { members: ids.length, over: over.length, gone: goneS ? goneS.length : null }));
   }
+  });
   // 7 사용량 — 그달 사용이 월 상한에 닿았는가
-  {
+  guard('usage', function () {
     const u = m.usage || {}, rows = [], miss = [];
     const pick = function (k, f) { if (!u[k]) { miss.push(k); return null; } try { return num(f(u[k])); } catch (e) { return 0; } };
     const cap = {}; USAGE_CAPS.forEach(function (c) { cap[c.id] = c; });
@@ -195,12 +235,12 @@ function judge(period, nowMs, m) {
     if (st === 'ok') lines.push('상한 닿은 것 없음 — ' + rows.map(function (r) { return r.label + ' ' + Math.round(100 * r.used / r.cap) + '%'; }).join(' · ') + (box !== null ? ' · 넣기 박스 ' + box + '회(상한 없음)' : ''));
     const nn = {}; rows.forEach(function (r) { nn[r.id] = r.used; }); if (box !== null) nn.box = box;
     out.push(item('usage', st, lines, nn));
-  }
+  });
   // 8 백업 연속일 — 매일 백업(appdata backup.py, KST 05:30)이 끝날 때마다 backup_stamp(fn 'backup')로 남긴 그달 날짜 목록(mchk:backup:YYYY-MM)을 본다.
   //   기록 시작(mchk:backup:since — 없으면 그달 문서의 since)보다 앞 날은 빠진 날로 치지 않는다(첫 달은 'n일부터 기록') · 그달 전체가 시작 전이면 판정하지 않음(기준 없음 — 숫자 없음).
   //   부분 백업(실패 키 있음 — 판5) 날은 어긋남. 확인 못 함은 흔적 문서를 못 읽었을 때만.
   //   첨부 백업(PC)은 흔적 스탬프(마지막 1개)로 점검 시각 기준 96시간·실패만 본다 — 걸리면 어긋남.
-  {
+  guard('backup', function () {
     const lines = [], nn = { missing: null, partial: null, from: null, files_age_h: null };
     let st, filesBad = false, filesUnk = false;
     const bd = m.backupDoc, bsn = m.backupSince;
@@ -233,10 +273,10 @@ function judge(period, nowMs, m) {
     if (filesBad) st = 'bad';
     else if (filesUnk && st !== 'bad') st = 'unknown';
     out.push(item('backup', st, lines, nn));
-  }
+  });
   // 9 경보 수 — 기준 없음(숫자만 — 카드에 줄로 안 나옴). 재료: 그달 봇 경보 수(noteAlert) · 세기 시작(mchk:alerts:since) 뒤 문서 없는 달 = 0건 ·
   //   첫 달은 'n일부터 셈' · 세기 전 달은 알림함(최근 100건 고리)이 그달을 덮으면 ⚠ 제목 수, 아니면 센 만큼만 '세기 전'으로 적는다. 확인 못 함은 기록을 못 읽었을 때만.
-  {
+  guard('alerts', function () {
     const ad = m.alertDoc, asn = m.alertSince;
     const pl = m.pushLog;
     const plCount = pl ? pl.filter(function (x) { return isObj(x) && num(x.ts) >= b.s && num(x.ts) < b.e && String(x.title || '').charAt(0) === '⚠'; }).length : null;
@@ -249,7 +289,7 @@ function judge(period, nowMs, m) {
     }
     else if (plCovers) out.push(item('alerts', 'none', ['경보 ' + plCount + '건(알림함 기준)'], { alerts: plCount, src: 'push_log' }));
     else out.push(item('alerts', 'none', ['경보 세기 전 — 알림함 최근 100건 중 ' + (plCount === null ? '?' : plCount) + '건'], { alerts: null, src: 'partial', partial: plCount }));
-  }
+  });
   return out;
 }
 function counts(items) { const c = { ok: 0, bad: 0, unknown: 0, none: 0 }; items.forEach(function (x) { c[x.st] = (c[x.st] || 0) + 1; }); return c; }
@@ -264,27 +304,59 @@ async function compute(period, nowMs, by) {
 async function run(nowMs, opts) {
   opts = opts || {};
   let period = opts.period;
-  if (period === undefined || period === null || period === '') {
+  const st = store(DATA);
+  const cronAuto = period === undefined || period === null || period === '';
+  if (cronAuto) {
+    if (opts.by === 'cron') await sinceMark(st, RUN_SINCE, nowMs);   // 검토 11/14 ⑤: 크론이 처음 돈 시각(처음 한 번) — '크론이 못 돈 달' 판정의 시작점
     const day = Number(kstDay(nowMs).slice(8, 10));
     if (day < 1 || day > 3) return { ok: true, skipped: 'not-first-days' };   // 1일 기동이 빠져도(스케줄 미발화·일시 오류) 3일까지 잡는다 — 문서가 있으면 건너뛰므로 두 번 돌아도 1개
     period = prevYm(kstYm(nowMs));
   }
   if (!ymOk(period) || period >= kstYm(nowMs)) return { ok: false, code: 'BAD_PERIOD' };   // 끝난 달만
-  const st = store(DATA), key = DOC_PREFIX + period;
+  const key = DOC_PREFIX + period;
+  // 다시 계산할 문서인가 — 봇 키 force · 또는 검토 11/14 ⑧ 크론이 1~3일 창 안에서: 크론이 쓴 문서 · [확인] 전 · 확인 못 함(읽기 실패)이 있음
+  const redo = function (d) { return opts.force === true || (cronAuto && d.by === 'cron' && !isObj(d.ack) && num((d.counts || {}).unknown) > 0); };
   const cur = await getOr(st, key, null);
   if (!cur.ok) return { ok: false, code: 'MCHK_READ_FAILED' };
-  if (isObj(cur.data) && opts.force !== true) return { ok: true, skipped: 'exists', period: period };
+  if (isObj(cur.data) && !redo(cur.data)) return { ok: true, skipped: 'exists', period: period };
   const doc = await compute(period, nowMs, opts.by);
   // 쓰기 직전 다시 읽기 — 그사이 다른 기동이 썼으면 건너뜀(한 달 문서 1개)
   const again = await getOr(st, key, null);
   if (!again.ok) return { ok: false, code: 'MCHK_READ_FAILED' };
-  if (isObj(again.data) && opts.force !== true) return { ok: true, skipped: 'exists', period: period };
-  if (isObj(again.data)) { doc.rerun = num(again.data.rerun) + 1; doc.prev_ack = again.data.ack || null; doc.updated_at = Math.max(nowMs, num(again.data.updated_at) + 1); }
+  if (isObj(again.data) && !redo(again.data)) return { ok: true, skipped: 'exists', period: period };
+  let unacked = null;
+  if (isObj(again.data)) {
+    doc.rerun = num(again.data.rerun) + 1; doc.redo = opts.force === true ? 'force' : 'unknown';
+    // 검토 11/14 ⑦: force가 [확인]을 풀면 풀린 확인을 목록으로 쌓는다(직전 1개만 남기지 않음 — 최근 20)
+    doc.prev_acks = (Array.isArray(again.data.prev_acks) ? again.data.prev_acks : (isObj(again.data.prev_ack) ? [again.data.prev_ack] : [])).slice();
+    if (isObj(again.data.ack)) { unacked = again.data.ack; doc.prev_acks.push(Object.assign({}, unacked, { undone: nowMs, by_run: opts.by || 'bot' })); }
+    doc.prev_acks = doc.prev_acks.slice(-20);
+    doc.updated_at = Math.max(nowMs, num(again.data.updated_at) + 1);
+  }
   const w = await blobSet(st, key, doc);
   if (!w || !w.ok) return { ok: false, code: 'MCHK_WRITE_FAILED' };
   const c = doc.counts;
-  try { await AUDIT.appendAudit({ ts: nowMs, by: opts.by === 'bot' ? '월점검봇' : '자동', bid: '__system__', col: 'mchk', ev: [{ op: doc.rerun ? '월점검다시' : '월점검', id: key, t: period + ' 어긋남 ' + c.bad + ' · 확인 못 함 ' + c.unknown + ' · 맞음 ' + c.ok + ' · 기준 없음 ' + c.none }] }); } catch (e) {}
-  return { ok: true, period: period, counts: c, rerun: doc.rerun || 0 };
+  const when = function (ms) { const s = new Date(num(ms) + 9 * H).toISOString(); return Number(s.slice(5, 7)) + '/' + Number(s.slice(8, 10)) + ' ' + s.slice(11, 16); };
+  const unTxt = unacked ? ' · 확인 풂(' + String(unacked.name || unacked.by || '?').slice(0, 20) + ' ' + when(unacked.ts) + ')' : '';
+  let au = false;
+  try { au = (await AUDIT.appendAudit({ ts: nowMs, by: opts.by === 'bot' ? '월점검봇' : '자동', bid: '__system__', col: 'mchk', ev: [{ op: doc.rerun ? '월점검다시' : '월점검', id: key, t: period + ' 어긋남 ' + c.bad + ' · 확인 못 함 ' + c.unknown + ' · 맞음 ' + c.ok + ' · 기준 없음 ' + c.none + (doc.redo === 'unknown' ? ' · 확인 못 함 다시 계산' : '') + unTxt }] })) !== false; } catch (e) { au = false; }
+  // 풀린 [확인]은 누른 기록(status:decide)에도 1줄 — 판29 기록 꼴(log = gw-data가 넘긴 pmconRead·pmconFold) · 실패는 응답 decide:false
+  let dec = null;
+  if (unacked && opts.log) {
+    dec = false;
+    try {
+      const lr = await opts.log.read(st);
+      if (lr.ok) {
+        const ld = lr.doc;
+        ld.log.push({ ts: nowMs, by: 'bot', name: '월점검봇', row: 'mchk:' + period, kind: 'mchk', choice: 'rerun', grade: '', due: '', q: Number(period.slice(5, 7)) + '월 월 점검 다시 계산 — 확인 풂(' + String(unacked.name || '').slice(0, 20) + ' ' + when(unacked.ts) + ')', rec: '', val: '', match: null, why: '', applied: false, via: 'mchk' });
+        opts.log.fold(ld); ld.schema = 1; ld.updated_by = 'bot'; ld.updated_at = Math.max(nowMs, num(ld.updated_at) + 1);
+        const lw = await blobSet(st, opts.log.key, ld); dec = !!(lw && lw.ok);
+      }
+    } catch (e) { dec = false; }
+  }
+  const res = { ok: true, period: period, counts: c, rerun: doc.rerun || 0, audit: au };
+  if (unacked) { res.unacked = { by: unacked.by, ts: unacked.ts }; if (dec !== null) res.decide = dec; }
+  return res;
 }
 const runMonthly = function (nowMs) { return run(nowMs, { by: 'cron' }); };
 
@@ -296,9 +368,18 @@ function periodOf(d, nowMs) {
 async function get(d, canAck, nowMs) {
   const period = periodOf(d, nowMs || Date.now());
   if (!period) return { code: 400, body: { status: 'REJECTED', error_code: 'BAD_PERIOD' } };
-  const r = await getOr(store(DATA), DOC_PREFIX + period, null);
+  const st = store(DATA), now = nowMs || Date.now();
+  const r = await getOr(st, DOC_PREFIX + period, null);
   if (!r.ok) return { code: 503, body: { status: 'ERROR', error_code: 'MCHK_READ_FAILED' } };
-  return { code: 200, body: { status: 'OK', period: period, doc: isObj(r.data) ? r.data : null, can_ack: !!canAck } };
+  const doc = isObj(r.data) ? r.data : null;
+  // 검토 11/14 ⑤: 문서가 없는 전달인데 크론이 그달 1일 전부터 돌고 있었고(mchk:since) KST 5일이 지났으면 '크론이 못 돈 달' — 카드에 한 줄
+  //   크론이 그달 안에 처음 돈 경우(배포 첫 달 — 그 전달 문서가 원래 없음)는 뜨지 않는다
+  let overdue = false;
+  if (!doc && period === prevYm(kstYm(now)) && Number(kstDay(now).slice(8, 10)) >= OVERDUE_DAY) {
+    const s = await getOr(st, RUN_SINCE, null);
+    overdue = !!(s.ok && isObj(s.data) && num(s.data.ts) && num(s.data.ts) <= bounds(kstYm(now)).s);
+  }
+  return { code: 200, body: { status: 'OK', period: period, doc: doc, can_ack: !!canAck, overdue: overdue } };
 }
 // [확인] — PM 관문은 gw-data(판29 pmconGate 쓰기 = 명시 tier pm · 명부 못 읽으면 503)가 먼저 본다. log = { key, read, fold } = 판29 누른 기록(status:decide) 꼴 그대로.
 //   순서: 점검 문서 읽기(없음 404·낡은 base 409·이미 확인 400) → 누른 기록 읽기(실패 503 — 아무것도 안 씀) → 점검 문서에 ack → 누른 기록 1줄(실패면 ack 되돌리고 500) → 감사 1줄
@@ -375,4 +456,4 @@ async function noteBackup(ok, partial, nowMs) {
   } catch (e) { return false; }
 }
 
-module.exports = { ITEMS, USAGE_CAPS, DEVICE_PENDING_DAYS, SUBS_PER_MEMBER, FILES_BACKUP_H, DOC_PREFIX, ALERT_PREFIX, ALERT_SINCE, BACKUP_PREFIX, BACKUP_SINCE, kstYm, prevYm, bounds, gather, judge, counts, compute, run, runMonthly, get, ack, noteAlert, noteBackup };
+module.exports = { ITEMS, USAGE_CAPS, DEVICE_PENDING_DAYS, SUBS_PER_MEMBER, FILES_BACKUP_H, DOC_PREFIX, ALERT_PREFIX, ALERT_SINCE, BACKUP_PREFIX, BACKUP_SINCE, RUN_SINCE, OVERDUE_DAY, PERM_CLOSED, permReal, tierReal, kstYm, prevYm, bounds, gather, judge, counts, compute, run, runMonthly, get, ack, noteAlert, noteBackup };

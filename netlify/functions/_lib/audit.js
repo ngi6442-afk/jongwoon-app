@@ -3,12 +3,13 @@
 // 감사 로그(audit trail) — 서버측에서만 기록(클라이언트 직접 쓰기 불가 → 위변조 방지).
 // 월별 블롭 audit:YYYY-MM (gw_data 스토어). 항목: {ts,by,bid,col,ev:[{op,id,t,f?}]}
 // ev.f = {필드: [이전값, 새값]} (값은 문자열화·80자 절단, PIN 등 비밀값은 기록 안 함)
-const { store, blobGet, blobSet } = require('./blobs');
+const { store, blobGet, blobSet, blobList } = require('./blobs');
 
 const DATA = 'gw_data';
 const MAX_PER_MONTH = 8000;   // 한 키(조각) 줄 상한 — 백업 복원 병합(gw-data backupLogMerge)이 이 값을 넘기면 400 AUDIT_FULL. P1 판31부터 appendAudit는 잘라 내지 않고 아래 조각 상한에서 새 조각으로 넘긴다
 // P1 판31 감사 기록 월 상한 분할(원장 T476) — 한 달 문서가 상한에 닿으면 같은 달 안에서 다음 조각으로 나눠 담는다(종전: 8000줄을 넘으면 오래된 줄부터 잘림 = 기록이 빠짐).
-//   조각 1 = 'audit:YYYY-MM'(종전 키 그대로 — 머리. 조각이 둘 이상이면 머리에 parts:n) · 조각 n(≥2) = 'audit:YYYY-MM:n'.
+//   조각 1 = 'audit:YYYY-MM'(종전 키 그대로 — 머리) · 조각 n(≥2) = 'audit:YYYY-MM:n'. 조각은 쓰는 쪽·읽는 쪽 모두 키 목록(접두어 'audit:YYYY-MM:')으로 찾는다
+//   (검토 11/14 — 머리 parts는 옛 문서·복원 병합 호환으로만 읽고 새로 쓰지 않음: 머리를 다시 쓰면 그사이 머리에 붙은 줄을 지울 수 있어서).
 //   상한 근거(운영 백업 11/13 20:15 실측): 10월 1,696줄·382,546바이트(줄당 225) · 11월 1~13일 1,284줄·295,798바이트(줄당 230 — 한 달 약 70만 바이트 예상) · 가장 긴 줄 5,847바이트.
 //   넷리파이 함수 요청·응답 6MB(6,291,456) — 백업 내보내기(backup_get)는 키 하나씩, 감사 화면(audit)은 그달 조각을 합쳐 1MB 넘으면 gzip(gw-data gzipOut)으로 낸다.
 //   한 조각 = 1,000,000바이트·4,000줄 — 응답 한도의 1/6이라 압축 없이도 backup_get이 넉넉하고, 4,000줄은 MAX_PER_MONTH(복원 병합 상한 8000)의 절반이라 복원 줄을 더해도 거절되지 않는다.
@@ -41,28 +42,41 @@ async function appendAudit(entry) {
     if (!r.ok && r.code !== 'NOT_FOUND') return false;
     if (r.ok && r.data != null && !(typeof r.data === 'object' && Array.isArray(r.data.items))) return false;
     const doc = (r.ok && r.data) ? r.data : { schema: 1, items: [] };
-    // P1 판31: 머리의 parts가 마지막 조각 — 그 조각도 '못 읽음·깨짐 = 쓰지 않음'(없음 = 머리가 먼저 parts를 올리고 조각 쓰기 전에 멈춘 자리 → 빈 조각으로 시작)
-    let n = auditParts(doc), cur = doc;
-    if (n > 1) {
-      const pr = await blobGet(st, auditPartKey(key, n));
-      if (!pr.ok && pr.code !== 'NOT_FOUND') return false;
-      if (pr.ok && pr.data != null && !auditDocOk(pr.data)) return false;
-      cur = (pr.ok && pr.data) ? pr.data : { schema: 1, part: n, items: [] };
-    }
-    if (auditFull(cur, entry)) {
-      // 다음 조각으로 — 머리의 parts를 먼저 올린다(머리 쓰기 실패 = 이 줄 false · 조각 쓰기 전에 멈춰도 다음 줄이 빈 조각으로 이어 감 — 줄이 덮이지 않음)
-      if (n >= PART_MAX) return false;
+    // P1 판31(검토 11/14 막음 1): 마지막 조각 = 머리 parts와 '실제 있는 조각 키'(접두어 목록) 중 큰 번호 — 동시 요청이 머리를 다시 써 parts가 지워졌거나
+    //   머리를 잃은 뒤에도 남아 있는 조각을 놓치지 않는다(목록 읽기 실패 = 쓰지 않음). 조각은 읽어서 '없음'일 때만 새로 만들고(읽기 실패·깨짐 = 쓰지 않음),
+    //   줄이 있으면 그 조각에 이어 쓴다 — 성공으로 답한 줄이 든 조각을 빈 조각으로 덮는 길 0.
+    const ls = await auditListParts(st, key);
+    if (!ls) return false;
+    let n = Math.max(auditParts(doc), ls.length ? ls[ls.length - 1] : 1), cur = doc;
+    if (n > 1) { cur = await auditPartRead(st, key, n); if (!cur) return false; }
+    while (auditFull(cur, entry)) {
+      if (n >= PART_MAX) return false;   // 조각 수 상한 — 잘라 내지 않고 이 줄 false
       n += 1;
-      doc.parts = n;
-      const hw = await blobSet(st, key, doc);
-      if (!(hw && hw.ok)) return false;
-      cur = { schema: 1, part: n, items: [] };
+      cur = await auditPartRead(st, key, n);   // 다음 조각도 읽어서 — 다른 요청이 먼저 만들었으면 거기에 이어 씀
+      if (!cur) return false;
     }
     cur.items.push(entry);
+    // 조각을 넘길 때 머리는 다시 쓰지 않는다(검토 11/14) — 머리를 다시 쓰면 그사이 다른 요청이 머리에 붙인 줄을 지울 수 있다. 조각은 쓰는 쪽·읽는 쪽 모두 키 목록으로 찾는다
+    //   (머리 parts는 옛 문서·재해 복원 병합과의 호환으로만 읽음). 남는 경합: 같은 조각에 두 요청이 동시에 쓰면 한 줄이 빠질 수 있음(조건부 쓰기 부품 없음 — 종전과 같음)
     const w = await blobSet(st, auditPartKey(key, n), cur);
     if (w && w.ok) return true;   // v406
     return false;   // v406: 기록물 액션이 감사 실패를 응답에 가시화(audit:false) — 삼키는 것은 그대로
   } catch (e) { return false; }
+}
+// 이 달 머리 뒤 조각 번호(실제 있는 키 — 오름차순) · 목록 읽기 실패 = null
+async function auditListParts(st, head) {
+  const l = await blobList(st, head + ':');
+  if (!l || !l.ok) return null;
+  const re = new RegExp('^' + head.replace(/[-:]/g, '\\$&') + ':(\\d{1,3})$'), out = [];
+  (l.keys || []).forEach(function (k) { const m = re.exec(k); if (m) { const v = Number(m[1]); if (v >= 2 && v <= PART_MAX) out.push(v); } });
+  return out.sort(function (a, b) { return a - b; });
+}
+// 조각 n 읽기 — 있으면 그 문서 · '없음'이면 새 빈 조각 · 읽기 실패·깨짐 = null(쓰지 않음)
+async function auditPartRead(st, head, n) {
+  const pr = await blobGet(st, auditPartKey(head, n));
+  if (!pr.ok && pr.code !== 'NOT_FOUND') return null;
+  if (pr.ok && pr.data != null) return auditDocOk(pr.data) ? pr.data : null;
+  return { schema: 1, part: n, items: [] };
 }
 
 // P1 판31: 한 달 감사 기록 전부(조각을 차례로 이어 붙임) — 감사 화면(gw-data audit)·월 점검(_lib/mchk.js)이 읽는 한 곳.
@@ -72,10 +86,14 @@ async function readMonth(month) {
   const st = store(DATA);
   const r = await blobGet(st, head);
   if (!r.ok && r.code !== 'NOT_FOUND') return { ok: false, code: r.code || 'STORAGE_READ_FAILED' };
-  if (!r.ok || r.data == null) return { ok: true, month: mon, items: [], parts: 0, missing: 0 };
-  if (!auditDocOk(r.data)) return { ok: false, code: 'AUDIT_BAD_DOC' };
-  const n = auditParts(r.data);
-  let items = r.data.items.slice(), missing = 0;
+  const hasHead = r.ok && r.data != null;
+  if (hasHead && !auditDocOk(r.data)) return { ok: false, code: 'AUDIT_BAD_DOC' };
+  // 검토 11/14: 머리 parts만 믿지 않고 실제 있는 조각 키(접두어 목록)까지 — 목록 못 읽음 = 실패 · 머리가 없어도 남은 조각은 읽음
+  const ls = await auditListParts(st, head);
+  if (!ls) return { ok: false, code: 'STORAGE_LIST_FAILED' };
+  const n = Math.max(hasHead ? auditParts(r.data) : 1, ls.length ? ls[ls.length - 1] : 1);
+  if (!hasHead && n === 1) return { ok: true, month: mon, items: [], parts: 0, missing: 0 };
+  let items = hasHead ? r.data.items.slice() : [], missing = hasHead ? 0 : 1;   // 머리가 없는데 조각이 있으면 머리 1개 빠짐
   for (let i = 2; i <= n; i++) {
     const pr = await blobGet(st, auditPartKey(head, i));
     if (!pr.ok && pr.code !== 'NOT_FOUND') return { ok: false, code: pr.code || 'STORAGE_READ_FAILED' };
