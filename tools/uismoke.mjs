@@ -5936,7 +5936,7 @@ try {
   const VARS40 = ['  var showRecAging = ', '  var recSearchTerm = ', '  var recSort = ', '  var REC_SORTS = ', '  var pendingImport = ', '  var editingRecId = ', '  var REC_MERGE_DAYS = '].map((h) => line40(html, h));
   const PRE40 = [
     'var receivables = ENV.recs, tasks = ENV.tasks, contracts = ENV.procs, members = ENV.members, vehicles = [];',
-    'var clients = ENV.clients, CLI_LINK = null;',   // v451 C081 ②: 거래처별 미수 집계가 거래처 탭 잇기(cliLinkIdx)를 씀
+    'var clients = ENV.clients, CLI_LINK = null;',   // v464 C081 ②: 거래처별 미수 집계가 거래처 탭 잇기(cliLinkIdx)를 씀
     'var showDeletedRec = false, showRecPaid = false;',
     'var selSets = { tasks:{}, veh:{}, rec:{} }, delSelSets = { tasks:{}, veh:{}, rec:{} };',
     'function todayStr(){ return "2026-11-10"; }',
@@ -6512,15 +6512,15 @@ try {
   const recs26 = () => [R040({ id: 'n1', client: '수정상사', desc: '수정', co: 'env', amount: -1100000, supply: -1000000, tax: -100000, billed: '2026-10-01', invoice: true, src: 'hometax', nts: 'M-1' }),
     R040({ id: 'p1', client: '정상상사', desc: '정상', co: 'env', amount: 3300000, supply: 3000000, tax: 300000, billed: '2026-10-02', invoice: true, src: 'hometax', nts: 'M-2' }),
     R040({ id: 'p2', client: '작은상사', desc: '작은', co: 'env', amount: 550000, supply: 500000, tax: 50000, billed: '2026-09-30', invoice: true, src: 'hometax', nts: 'M-3' })];
-  const X26 = mk40({ width: 1920, recs: recs26(), tasks: [] }); X26.api.render(); const ca26 = X26.host.querySelector('[data-vs-chip="st|all"]'); ca26.fire('click', { target: ca26 });   // v454 C078 ③: 수정(-) 줄은 미수 칩에서 빠져 '전체' 칩에서 봄
+  const X26 = mk40({ width: 1920, recs: recs26(), tasks: [] }); X26.api.render(); const ca26 = X26.host.querySelector('[data-vs-chip="st|all"]'); ca26.fire('click', { target: ca26 });   // v464 C078 ③: 수정(-) 줄은 미수 칩에서 빠져 '전체' 칩에서 봄
   const h26 = () => X26.host._h, NG26 = (s) => '<span class="rec-neg">' + s + '</span>';
   const s26 = [cells40(h26(), 'n1')[5][1], cells40(h26(), 'n1')[10][1], cells40(h26(), 'n1')[11][1], cells40(h26(), 'p1')[5][1], foot40(h26()), X26.env.host('recTopHead').textContent, order40(h26())];
   openRow40(X26, 'n1'); s26.push(kvVal40(h26(), '금액'), kvVal40(h26(), '공급가액 · 세액'));
   const so26 = X26.host.querySelector('[data-vs-sort="amt"]'); so26.fire('click', { target: so26 }); s26.push(order40(h26()));
   X26.api.setQ(X26.api.def(), '수정상사'); s26.push(foot40(h26())); X26.api.setQ(X26.api.def(), '-1,100,000'); s26.push(order40(h26()));
   const X26n = mk40({ recs: [recs26()[0]], tasks: [] }); X26n.api.render(); s26.push(X26n.env.host('recTopHead').textContent);
-  const F26 = '<span title="미수 최대 경과 41일">최대 41일</span>', F26n = '';   // v454 C078 ③: 수정(-) 줄은 경과 없음(합계 줄 최대 경과 빈칸)
-  T('v440 ㉖ 음수 금액(검토 반영 — 수정세금계산서): 1920 n1 금액 -1,100,000·공급가액 -1,000,000·세액 -100,000(빨강 .rec-neg) · 양수 3,300,000 그대로 · 합계 줄 2,750,000·2,500,000·250,000(부호 있는 합 = 칸 글 합 — 전체 칩) · 제목 "미수 2건 · 3,850,000원"(v454 C078 ③: 수정(-) 줄은 미수 아님·확인 칸 수정(-)) · 펼침 금액 "-1,100,000원"·공급가액 · 세액 "-1,000,000 · -100,000" · 금액 ▲ = n1,p2,p1 · 수정상사만 = 합계 줄 -1,100,000·-1,000,000·-100,000 · 검색 "-1,100,000" = n1 · 음수만 = 제목 "미수 0건"(v454) · CSS .rec-neg',
+  const F26 = '<span title="미수 최대 경과 41일">최대 41일</span>', F26n = '';   // v464 C078 ③: 수정(-) 줄은 경과 없음(합계 줄 최대 경과 빈칸)
+  T('v440 ㉖ 음수 금액(검토 반영 — 수정세금계산서): 1920 n1 금액 -1,100,000·공급가액 -1,000,000·세액 -100,000(빨강 .rec-neg) · 양수 3,300,000 그대로 · 합계 줄 2,750,000·2,500,000·250,000(부호 있는 합 = 칸 글 합 — 전체 칩) · 제목 "미수 2건 · 3,850,000원"(v464 C078 ③: 수정(-) 줄은 미수 아님·확인 칸 수정(-)) · 펼침 금액 "-1,100,000원"·공급가액 · 세액 "-1,000,000 · -100,000" · 금액 ▲ = n1,p2,p1 · 수정상사만 = 합계 줄 -1,100,000·-1,000,000·-100,000 · 검색 "-1,100,000" = n1 · 음수만 = 제목 "미수 0건"(v464) · CSS .rec-neg',
     JSON.stringify(s26) === JSON.stringify([NG26('-1,100,000'), NG26('-1,000,000'), NG26('-100,000'), '3,300,000', '합계 3건|||' + F26 + '||2,750,000|검수 대기 0|확인 1|||2,500,000|250,000', '미수 2건 · 3,850,000원', 'p2,n1,p1',
       NG26('-1,100,000') + '원', NG26('-1,000,000') + ' · ' + NG26('-100,000'), 'n1,p2,p1', '합계 1건|||' + F26n + '||' + NG26('-1,100,000') + '|검수 대기 0|확인 1|||' + NG26('-1,000,000') + '|' + NG26('-100,000'), 'n1', '미수 0건'])
     && /\.rec-neg\{color:#B0332A;\}/.test(html),
@@ -6604,7 +6604,7 @@ try {
     FT_REV40.every((s) => ftv23.indexOf(s) > 0) && MAN_REV40.every((s) => man9.indexOf(s) > 0) && CL_REV40.every((s) => cl23.indexOf(s) > 0)
     && rv32.length === 1 && ['기성 숨김', '옮깁니다', '마이너스', '입금된 줄', '[삭제] 없음', '[+ 청구 등록]', '1366으로 넓히면', "'불일치'"].every((s) => rv32[0].indexOf(s) > 0) && cbGate23.length === 1 && cbGate23[0].indexOf('검토 반영') > 0,
     JSON.stringify({ ft: FT_REV40.filter((s) => ftv23.indexOf(s) < 0), man: MAN_REV40.filter((s) => man9.indexOf(s) < 0), cl: CL_REV40.filter((s) => cl23.indexOf(s) < 0), rv: rv32.length, gate: cbGate23.length && cbGate23[0].indexOf('검토 반영') }));
-  // ---- v451(11/13 — C081 ② R1, 11/11 예고): PC 표 갈래의 거래처별 미수 집계 = 거래처 탭과 같은 잇기(cliResolve — 공급받는자 번호 먼저, 없으면 상호 열쇠 · 두 10자리 번호가 다르면 안 붙임)
+  // ---- v464(11/13 — C081 ② R1, 11/11 예고): PC 표 갈래의 거래처별 미수 집계 = 거래처 탭과 같은 잇기(cliResolve — 공급받는자 번호 먼저, 없으면 상호 열쇠 · 두 10자리 번호가 다르면 안 붙임)
   //   대장 c1 (주)가나건설 123-45-67890 · c2 가나건설(같은 열쇠 — 대장 순서 첫 c1에만) · 미수: '가나건설'·'가나 건설'·이름 '사아'인데 번호 1234567890(번호 먼저 → c1) · '가나건설' 번호 999-99-99999(10자리 다름 → 안 붙임, 대장 밖)
   //   · '(주)신규상사'·'신규상사'·'신규 상사'(대장 밖 열쇠 한 묶음 — 이름 = 많이 쓴 표기) · 거래처 빈 칸('-') · 입금된 줄·지운 줄 빼고
   //   → 1366(표): "(주)가나건설" 3건 · "가나건설"(대장 밖 — 번호 다름) 1건 · "신규상사" 3건 · "-" 1건 = 4곳 · 375(폰 옛 목록) = 종전 글자째 묶음('가나건설'·'가나 건설'·'사아'·'(주)신규상사'·'신규상사'·'신규 상사'·'-' — 번호 다른 '가나건설'은 같은 글자에 합쳐짐) 7곳
@@ -6616,11 +6616,11 @@ try {
   const agg51 = (w) => { const X = mk40({ width: w, recs: RC51(), clients: CL51 }); X.api.render(); const h = X.env.host('recAgingSummary')._h;
     return [(/rec-agg-cap">([^<]*)</.exec(h) || ['', ''])[1], [...h.matchAll(/<b>([^<]*)<\/b>[\s\S]*?class="cnt2">(\d+)건<\/span><\/div><div class="amt">([^<]*)<\/div>/g)].map((m) => m[1] + ':' + m[2] + ':' + m[3]).join('|'), X.env.host('recAgingToggle').textContent]; };
   const a51 = agg51(1366), b51 = agg51(375);
-  T('v451 C081 ② 거래처별 미수 집계 = 거래처 탭 잇기(PC 표): ' + JSON.stringify(a51) + ' · 폰 옛 목록 = 글자째 그대로 ' + JSON.stringify(b51),
+  T('v464 C081 ② 거래처별 미수 집계 = 거래처 탭 잇기(PC 표): ' + JSON.stringify(a51) + ' · 폰 옛 목록 = 글자째 그대로 ' + JSON.stringify(b51),
     JSON.stringify(a51) === JSON.stringify(['거래처 4곳 · 합계 15,660원 (금액 큰 순)', '가나건설:1:8,000원|(주)가나건설:3:7,000원|신규상사:4:650원|-:1:10원', '거래처별 미수 집계 (4곳)'])
     && b51[1].split('|').length === 7 && b51[2] === '거래처별 미수 집계 (7곳)' && /가나건설:2:9,000원/.test(b51[1]) && /가나 건설:1:2,000원/.test(b51[1]) && /사아:1:4,000원/.test(b51[1]),
     JSON.stringify({ a51, b51 }));
-  // ---- v454(11/13 — PM C078 '추천대로') ② 홈택스 불러오기의 직접 등록 짝·[합치기] / ③ 수정(-) 줄은 미수 아님
+  // ---- v464(11/13 — PM C078 '추천대로') ② 홈택스 불러오기의 직접 등록 짝·[합치기] / ③ 수정(-) 줄은 미수 아님
   //   ② 직접 등록 d1 '(주)짝상사' 110,000 청구 10-05 · d2 같은 거래처 110,000 청구 08-01(작성일과 61일 — 폭 31 밖) · d3 다른 금액 · 홈택스 h1 '짝상사' 110,000 작성 10-20 · h2 '짝상사' 110,000 작성 10-21(d1은 h1에만 — 가까운 날짜)
   //   → 계획: h1._twin d1(15일)·h2 짝 없음 · 고르지 않고 반영 = 새 줄 2(d1 그대로) · 고르고 반영 = d1에 승인번호·작성일·출처 홈택스·메모 '[직접 등록 때 거래처 (주)짝상사 · 내역 직접 내역]'·담당 그대로, 새 줄 1(h2) · 다시 불러오기 = 이미있음 2(갱신 0)
   const RC54 = () => [R040({ id: 'd1', client: '(주)짝상사', desc: '직접 내역', amount: 110000, billed: '2026-10-05', assignee: 'm2' }), R040({ id: 'd2', client: '짝상사', amount: 110000, billed: '2026-08-01' }),
@@ -6633,7 +6633,7 @@ try {
   const M54 = mk40({ recs: RC54(), tasks: [] }), hc54 = HC54(); M54.api.impPlan(hc54); hc54[0]._merge = hc54[0]._twin; const r54m = M54.api.impApply(hc54), d154 = M54.api.recs().find((r) => r.id === 'd1');
   s54a.push(M54.api.recs().length + ':' + r54m.add + ':' + r54m.merge, [d154.nts, d154.billed, d154.src, d154.client, d154.desc, d154.supply, d154.assignee, d154.invoice, d154.note].join('|'));
   const again54 = M54.api.impPlan(HC54()); s54a.push(again54.add.length + ':' + again54.upd.length + ':' + again54.dup);
-  T('v454 C078 ② 홈택스 불러오기 직접 등록 짝·[합치기](사람이 고른 줄만): ' + JSON.stringify(s54a),
+  T('v464 C078 ② 홈택스 불러오기 직접 등록 짝·[합치기](사람이 고른 줄만): ' + JSON.stringify(s54a),
     JSON.stringify(s54a) === JSON.stringify(['H-1:d1:15,H-2:-:-', '5:2:0:', '4:1:1', 'H-1|2026-10-20|hometax|짝상사|10월 운반|100000|m2|true|[직접 등록 때 거래처 (주)짝상사 · 내역 직접 내역]', '0:0:2']), JSON.stringify(s54a));
   //   ③ 수정(-) 줄 c1 -110,000(입금 전) · 보통 미수 u1 · 미수 칩 = u1만·60일·90일 칩에 c1 없음·경과 칸 '-'(title)·확인 칸 '수정(-)'·'확인 필요' 칩에 c1 · 제목 '미수 1건' · 거래처별 미수 집계 1곳 · 미수 45일 자동 지시 c1 없음
   const RC54c = () => [R040({ id: 'c1', client: '수정상사', amount: -110000, billed: '2026-07-01', invoice: true, src: 'hometax', nts: 'C-1' }), R040({ id: 'u1', client: '보통상사', amount: 330000, billed: '2026-07-02' })];
@@ -6641,12 +6641,12 @@ try {
   const chip54 = (k) => { const b = C54.host.querySelector('[data-vs-chip="st|' + k + '"]'); b.fire('click', { target: b }); return order40(hC54()); };
   const s54c = [order40(hC54()), C54.env.host('recTopHead').textContent, chip54('d60'), chip54('d90'), chip54('chk'), chip54('all')];
   s54c.push(cells40(hC54(), 'c1')[3] ? JSON.stringify(cells40(hC54(), 'c1').slice(3, 4)) : '?', (hC54().match(/rec-st neg">수정\(-\)</g) || []).length, (/rec-agg-cap">([^<]*)</.exec(C54.env.host('recAgingSummary')._h) || ['', ''])[1]);
-  T('v454 C078 ③ 수정(-) 줄 = 미수 아님: ' + JSON.stringify(s54c), s54c[0] === 'u1' && s54c[1] === '미수 1건 · 330,000원' && s54c[2] === 'u1' && s54c[3] === 'u1' && s54c[4] === 'c1' && /c1/.test(s54c[5]) && /u1/.test(s54c[5]) && s54c[7] === 1 && /^거래처 1곳/.test(s54c[8]), JSON.stringify(s54c));
+  T('v464 C078 ③ 수정(-) 줄 = 미수 아님: ' + JSON.stringify(s54c), s54c[0] === 'u1' && s54c[1] === '미수 1건 · 330,000원' && s54c[2] === 'u1' && s54c[3] === 'u1' && s54c[4] === 'c1' && /c1/.test(s54c[5]) && /u1/.test(s54c[5]) && s54c[7] === 1 && /^거래처 1곳/.test(s54c[8]), JSON.stringify(s54c));
   const og54 = fn40(html, 'recOverdueGen');
-  T('v454 C078 ③ 미수 45일 자동 지시는 수정(-) 줄을 건너뜀(recOverdueGen 첫 거름에 recIsCredit)', og54.indexOf('if (r.paid || recIsCredit(r) || !isDate(r.billed)) return;') > 0, og54.slice(0, 200));
-  // v451 화면 시험(11/13)에서 찾은 것: 입찰 손 [낙찰](setBidStatus) 창 제목 = '계약 시작'(openConStart가 '직접 생성'으로 바꾼 뒤 — bidToContract·낙찰 자동 열기와 같게)
+  T('v464 C078 ③ 미수 45일 자동 지시는 수정(-) 줄을 건너뜀(recOverdueGen 첫 거름에 recIsCredit)', og54.indexOf('if (r.paid || recIsCredit(r) || !isDate(r.billed)) return;') > 0, og54.slice(0, 200));
+  // v464 화면 시험(11/13)에서 찾은 것: 입찰 손 [낙찰](setBidStatus) 창 제목 = '계약 시작'(openConStart가 '직접 생성'으로 바꾼 뒤 — bidToContract·낙찰 자동 열기와 같게)
   const sbs51 = fn40(html, 'setBidStatus'), oc51 = sbs51.indexOf('openConStart();'), h351 = sbs51.indexOf('textContent="계약 시작"');
-  T('v451 입찰 [낙찰] 창 제목 "계약 시작"(openConStart 뒤에 다시 씀)', oc51 > 0 && h351 > oc51, JSON.stringify({ oc51, h351 }));
+  T('v464 입찰 [낙찰] 창 제목 "계약 시작"(openConStart 뒤에 다시 씀)', oc51 > 0 && h351 > oc51, JSON.stringify({ oc51, h351 }));
 } catch (e) { console.log('  (v440 검사 생략 — ' + e.message + ')' + String(e.stack).split(/\n/).slice(1, 3).join(' ')); fails++; }
 
 // ---- v441(11/11 — 45-1 넷째 판: 관리 › 거래처 탭을 엑셀형 표로 · PM 11/10 15:56 결정 ④ 계약·기성에는 있는데 대장에 없는 이름을 표 아래 묶음으로 모아 [대장에 추가](상호만 채운 새 거래처) —
@@ -6859,7 +6859,7 @@ try {
   const view2 = (u) => { const X = mk41({ width: 1920, user: u }); X.api.render(); const h0 = X.host._h; openRow41(X, 'c1'); const h = X.host._h; return { heads: heads41(h0), chips: chips41(h0), tabs: tabs41(h), acts: acts41(h), grp: /data-vs-grp="out"/.test(h0), n: cnt41(h0), kv: kvKeys41(h) }; };
   const v2 = { A: view2(U41.A), C: view2(U41.C), D: view2(U41.D), E: view2(U41.E) };
   const KV41 = '사업자번호·담당자·연락처·이메일·주소·처리업소·메모·등록일·고친 날', KVv41 = '사업자번호·담당자·연락처·처리업소·메모·등록일·고친 날';
-  T('v441 ② 권한별 열·칩·하위 탭: 관리자 열 name…addr 10 · 칩 전체·미수 있음·계약 진행 중·처리업소·정보 비어 있음 · c1 하위 탭 개요*·미수 (3)·계약 (2)·관련 문서 (1)(v451 열쇠) · 버튼 수정·삭제 · 묶음 있음 "보이는 6곳 / 전체 6곳"(검토 — 대장 줄만, 묶음 4곳은 머리에) / 직원C(기성 보기·계약 숨김) = 열 7(계약·이메일·주소 없음)·칩 4(계약 진행 중 없음)·탭 개요·미수·관련 문서·버튼 0·묶음 없음 "6곳"·개요에 이메일·주소 없음 / 직원D(기성·계약 숨김·거래처 수행) = 열 8(미수·계약 없음, 이메일·주소 있음)·칩 3·탭 줄 없음·버튼 수정·삭제·묶음 없음 / 직원E(기성 숨김·계약 보기) = 열 7(미수·이메일·주소 없음)·칩 전체·계약 진행 중·처리업소·정보 비어 있음·탭 개요·계약 (2)',
+  T('v441 ② 권한별 열·칩·하위 탭: 관리자 열 name…addr 10 · 칩 전체·미수 있음·계약 진행 중·처리업소·정보 비어 있음 · c1 하위 탭 개요*·미수 (3)·계약 (2)·관련 문서 (1)(v464 열쇠) · 버튼 수정·삭제 · 묶음 있음 "보이는 6곳 / 전체 6곳"(검토 — 대장 줄만, 묶음 4곳은 머리에) / 직원C(기성 보기·계약 숨김) = 열 7(계약·이메일·주소 없음)·칩 4(계약 진행 중 없음)·탭 개요·미수·관련 문서·버튼 0·묶음 없음 "6곳"·개요에 이메일·주소 없음 / 직원D(기성·계약 숨김·거래처 수행) = 열 8(미수·계약 없음, 이메일·주소 있음)·칩 3·탭 줄 없음·버튼 수정·삭제·묶음 없음 / 직원E(기성 숨김·계약 보기) = 열 7(미수·이메일·주소 없음)·칩 전체·계약 진행 중·처리업소·정보 비어 있음·탭 개요·계약 (2)',
     v2.A.heads === 'name,biz,contact,phone,unpaid,con,proc,note,email,addr' && v2.A.chips === ':전체|unpaid:미수 있음|con:계약 진행 중|proc:처리업소|blank:정보 비어 있음' && v2.A.tabs === '개요*|미수 (3)|계약 (2)|관련 문서 (1)' && v2.A.acts === 'edit,del' && v2.A.grp && v2.A.n === '보이는 6곳 / 전체 6곳' && v2.A.kv === KV41
     && v2.C.heads === 'name,biz,contact,phone,unpaid,proc,note' && v2.C.chips === ':전체|unpaid:미수 있음|proc:처리업소|blank:정보 비어 있음' && v2.C.tabs === '개요*|미수 (3)|관련 문서 (1)' && v2.C.acts === '' && !v2.C.grp && v2.C.n === '보이는 6곳 / 전체 6곳' && v2.C.kv === KVv41
     && v2.D.heads === 'name,biz,contact,phone,proc,note,email,addr' && v2.D.chips === ':전체|proc:처리업소|blank:정보 비어 있음' && v2.D.tabs === '' && v2.D.acts === 'edit,del' && !v2.D.grp && v2.D.kv === KV41
@@ -6985,7 +6985,7 @@ try {
     JSON.stringify(s8) === JSON.stringify([0, 1, 1, '2026-11-10', 1, -1, 0, 1, true, 0, 1]) && dm8 && noMiss41(m8), JSON.stringify({ s8, dm8, miss: miss41.slice(m8) }));
 
   // ⑨ 펼침 하위 탭·계약 줄: c1 개요(키·값·같은 상호 1곳 더 안내) → 미수 (3) 탭 = 청구일 순 r3,r2,r1(경과 칩)·합 '8,500,000원 · 3건' → 계약 (2) 탭 = k1(진행)·k2(완료) 줄(누를 수 있음) → k1 누름 = 계약 탭 이동·
-  //   그 계약 펼침(개요)·계약 표 '완료' 칩·거래처 거르기가 k1을 거르면 이번만 풂 · 다른 줄(c5)을 펼치면 개요부터 · c5 관련 문서 (0)(v451 C081 ①: 2자 상호는 찾지 않음 — 빈 안내에 그 말) · 직원D(계약 숨김) 계약 이동 = false
+  //   그 계약 펼침(개요)·계약 표 '완료' 칩·거래처 거르기가 k1을 거르면 이번만 풂 · 다른 줄(c5)을 펼치면 개요부터 · c5 관련 문서 (0)(v464 C081 ①: 2자 상호는 찾지 않음 — 빈 안내에 그 말) · 직원D(계약 숨김) 계약 이동 = false
   const m9 = miss41.length;
   const X9 = mk41({ conChip: 'done' }); X9.api.render(); openRow41(X9, 'c1'); const h9a = X9.host._h;
   const s9 = [tabs41(h9a), /같은 상호\(또는 사업자번호\)의 거래처가 대장에 1곳 더 있습니다/.test(h9a), kvVal41(h9a, '사업자번호'), kvVal41(h9a, '처리업소')];
@@ -6997,7 +6997,7 @@ try {
   openRow41(X9, 'c5'); const h9d = X9.host._h; s9.push(tabs41(h9d)); press41(X9, 'data-cli-tab', 'doc'); const h9e = X9.host._h;
   s9.push(tabs41(h9e), [...h9e.matchAll(/<tr><td>(JW-[\d-]+)<\/td><td>([^<]*)<\/td><\/tr>/g)].map((m) => m[1] + ' ' + m[2]).join('|'), /관련 문서 없음 — 상호가 짧아\(2자 이하\) 관련 문서를 찾지 않습니다 — 문서함에서 직접 찾아보세요/.test(h9e));
   const Z9 = mk41({ user: U41.D }); s9.push(Z9.api.goCon('k1'), Z9.env.log.some((l) => /^tab:/.test(l)));
-  T('v441 ⑨ 펼침 하위 탭·계약 줄: c1 개요* · 같은 상호 1곳 더 안내 · 사업자번호 123-45-67890 · 처리업소 아니오 → 미수 (3)* = r3 08-01 경과 101일 age90 · r2 09-01 70일 age60 · r1 10-20 21일 age0 · 금액 2,000,000·1,000,000·5,500,000 · 합 8,500,000원 · 3건 → 계약 (2)* = k1 ○○동 철거 진행 2026-09-01 · k2 석면철거 완료 2026-03-02 → k1 누름 = 계약 탭·conOpenId k1·개요·완료 칩 풂·그 줄로 굴림 · c5 펼침 = 개요부터 → 관련 문서 (0) = 2자 상호는 찾지 않음 안내(v451 C081 ①) · 직원D(계약 숨김) 이동 = false·탭 이동 0',
+  T('v441 ⑨ 펼침 하위 탭·계약 줄: c1 개요* · 같은 상호 1곳 더 안내 · 사업자번호 123-45-67890 · 처리업소 아니오 → 미수 (3)* = r3 08-01 경과 101일 age90 · r2 09-01 70일 age60 · r1 10-20 21일 age0 · 금액 2,000,000·1,000,000·5,500,000 · 합 8,500,000원 · 3건 → 계약 (2)* = k1 ○○동 철거 진행 2026-09-01 · k2 석면철거 완료 2026-03-02 → k1 누름 = 계약 탭·conOpenId k1·개요·완료 칩 풂·그 줄로 굴림 · c5 펼침 = 개요부터 → 관련 문서 (0) = 2자 상호는 찾지 않음 안내(v464 C081 ①) · 직원D(계약 숨김) 이동 = false·탭 이동 0',
     JSON.stringify(s9) === JSON.stringify(['개요*|미수 (3)|계약 (2)|관련 문서 (1)', true, '123-45-67890', '아니오',
       '개요|미수 (3)*|계약 (2)|관련 문서 (1)', '2026-08-01:번호로 이어짐:age90:101:2,000,000|2026-09-01:9월 철거:age60:70:1,000,000|2026-10-20:10월 철거:age0:21:5,500,000', true,
       '개요|미수 (3)|계약 (2)*|관련 문서 (1)', 'k1:○○동 철거:review:진행:2026-09-01|k2:석면철거:from:완료:2026-03-02',
@@ -7093,7 +7093,7 @@ try {
   const h16 = X16.host._h, c16 = cg16(h16), f16 = foot41(h16);
   openRow41(X16, 'c1'); const dc16 = [/<div class="vs-detcard" data-vs-detcard="c1">/.test(X16.host._h), X16.host._h.indexOf('<tr class="vs-det">') < 0, tabs41(X16.host._h)];
   const X16d = mk41({ width: 375, user: U41.D }), d16d = Object.assign({}, X16d.api.def(), { phone: 'sheet' }); X16d.api.vs(d16d); const c16d = cg16(X16d.host._h);
-  T('v441 ⑯ 폰 sheet 준비: 정의 검사 통과 · 열 3 = name --pw 38%·phone 36%·unpaid 26% · 직원D(미수 없음) = 52%·48% · 합계 "합계 6곳||9,200,000원 · 4건" · 줄 누름 = 표 아래 상세 카드(표 안 펼침 없음)·하위 탭 개요*·미수 (3)·계약 (2)·관련 문서 (1)(v451 열쇠)',
+  T('v441 ⑯ 폰 sheet 준비: 정의 검사 통과 · 열 3 = name --pw 38%·phone 36%·unpaid 26% · 직원D(미수 없음) = 52%·48% · 합계 "합계 6곳||9,200,000원 · 4건" · 줄 누름 = 표 아래 상세 카드(표 안 펼침 없음)·하위 탭 개요*·미수 (3)·계약 (2)·관련 문서 (1)(v464 열쇠)',
     X16.api.check(d16).length === 0 && c16 === 'name=--pw:38%;,phone=--pw:36%;,unpaid=--pw:26%;' && c16d === 'name=--pw:52%;,phone=--pw:48%;' && f16 === '합계 6곳||<span title="미수 9,200,000원 · 4건">9,200,000원 · 4건</span>'   // 폰 sheet 준비 합계는 건수까지(11/11 PC만 금액만으로 바꿈)
     && JSON.stringify(dc16) === JSON.stringify([true, true, '개요*|미수 (3)|계약 (2)|관련 문서 (1)']) && noMiss41(m16),
     JSON.stringify({ c16, c16d, f16, dc16, miss: miss41.slice(m16) }));
@@ -7243,7 +7243,7 @@ try {
   openRow41(X21, 'c5'); press41(X21, 'data-cli-tab', 'doc'); const h21b = X21.host._h;
   const tip21 = (h) => (/data-cli-tab="doc" title="([^"]*)"/.exec(h) || ['', ''])[1];
   const s21 = [tip21(h21a), /<div class="vs-empty">관련 문서 없음 — 상호가 짧아\(2자 이하\) 관련 문서를 찾지 않습니다 — 문서함에서 직접 찾아보세요<\/div>/.test(h21b), tip21(h21b),
-    /<div class="vs-dsub" style="margin:0 0 4px;">문서함 제목·분류에 상호가 들어간 문서 — &#39;\(주\)&#39;·&#39;㈜&#39;·&#39;주식회사&#39;·띄어쓰기는 무시합니다<\/div><table class="vs-hist">.*JW-04-01-001/.test(h21a)];   // v451 C081 ①: c1 = 열쇠 '가나건설' 1건(표 첫 줄 안내) · c5 사아 = 2자라 찾지 않음(빈 안내)
+    /<div class="vs-dsub" style="margin:0 0 4px;">문서함 제목·분류에 상호가 들어간 문서 — &#39;\(주\)&#39;·&#39;㈜&#39;·&#39;주식회사&#39;·띄어쓰기는 무시합니다<\/div><table class="vs-hist">.*JW-04-01-001/.test(h21a)];   // v464 C081 ①: c1 = 열쇠 '가나건설' 1건(표 첫 줄 안내) · c5 사아 = 2자라 찾지 않음(빈 안내)
   const P21 = mk41({ width: 375 }), HP21 = (id) => P21.env.host(id); P21.api.render(); P21.api.detail('c4'); const b21a = HP21('cliDetailBody')._h; P21.api.detail('c3'); const b21b = HP21('cliDetailBody')._h; P21.api.detail('c5'); const b21c = HP21('cliDetailBody')._h;
   const Q21 = mk41({ width: 375, user: U41.D }); Q21.api.render(); Q21.api.detail('c5'); const b21d = Q21.env.host('cliDetailBody')._h;   // c5 사아 = 계약 k5·관련 문서 2건이 메모리에 있는 거래처
   s21.push(b21a.indexOf('9001011234567') < 0 && /13자리\(숨김\)/.test(b21a), /<div class="crm-info">개인\(사업자 없음\)<\/div>/.test(b21b), /계약 <span>1건<\/span>/.test(b21c) && /관련 문서 <span>2건<\/span>/.test(b21c), /crm-h">계약 /.test(b21d) || /관련 문서/.test(b21d));
@@ -7253,13 +7253,13 @@ try {
   s21.push([hy21('c1'), hy21('c3'), hy21('c4'), hy21('c5')].join('|'), H21.api.sText(cl41(H21, 'c3')).indexOf('개인(사업자 없음)') > 0 && H21.api.sText(cl41(H21, 'c3')).indexOf('개인고객 ' + hy21('c3') + ' ') === 0);
   const tsb21 = blkOf41('// @task-sheet-start', '// @task-sheet-end'), rsb21 = blkOf41('// @rec-sheet-start', '// @rec-sheet-end');
   s21.push(!/\bcount\s*:/.test(tsb21) && !/\bcount\s*:/.test(rsb21) && /\bcount: function\(r\)\{ return !r\.out; \},/.test(csb41), X1.api.check(Object.assign({}, d1, { count: 1 })).indexOf('count') >= 0 && X1.api.check(d1).indexOf('count') < 0);
-  T('v441 ㉑ 검토 — 관련 문서 찾는 법·옛 상세 창·탭 이동·검색 글·건수: 관련 문서 탭 title·첫 줄 안내(v451 C081 ①: c1 "제목·분류에 상호 … 무시" · c5 2자 "찾지 않습니다" 빈 안내) · 옛 [상세 ›] = 13자리 원문 0("13자리(숨김)")·개인 "개인(사업자 없음)"·관리자 c5 계약 1·관련 문서 2·계약 숨김 직원D = 계약·관련 문서 절 0 · 탭에 다시 옴: 폰 = 그대로·PC = 표·처음 = 옛 목록 · hay c1 원문·c3 개인 빈 글·c4 13자리 빈 글·c5 원문 · 표 검색 글 뒤쪽 "개인(사업자 없음)" · count는 거래처 정의만(정의 검사)',
+  T('v441 ㉑ 검토 — 관련 문서 찾는 법·옛 상세 창·탭 이동·검색 글·건수: 관련 문서 탭 title·첫 줄 안내(v464 C081 ①: c1 "제목·분류에 상호 … 무시" · c5 2자 "찾지 않습니다" 빈 안내) · 옛 [상세 ›] = 13자리 원문 0("13자리(숨김)")·개인 "개인(사업자 없음)"·관리자 c5 계약 1·관련 문서 2·계약 숨김 직원D = 계약·관련 문서 절 0 · 탭에 다시 옴: 폰 = 그대로·PC = 표·처음 = 옛 목록 · hay c1 원문·c3 개인 빈 글·c4 13자리 빈 글·c5 원문 · 표 검색 글 뒤쪽 "개인(사업자 없음)" · count는 거래처 정의만(정의 검사)',
     JSON.stringify(s21) === JSON.stringify(["문서함 제목·분류에 상호가 들어간 문서 — &#39;(주)&#39;·&#39;㈜&#39;·&#39;주식회사&#39;·띄어쓰기는 무시합니다", true,
       "상호가 짧아(2자 이하) 관련 문서를 찾지 않습니다 — 문서함에서 직접 찾아보세요", true,
       true, true, true, false, 'kept', 'sheet', 'legacy', '123-45-67890|||2223344444', true, true, true]) && noMiss41(m21),
     JSON.stringify({ s21, miss: miss41.slice(m21) }));
 
-  // v451(11/13 — C081 ① R1, 11/11 예고): PC 표 펼침 '관련 문서' = 상호 열쇠(cliNameKey) 3자 이상이 제목 열쇠 또는 분류 열쇠 안에 있는 문서(지운 문서 빼고)
+  // v464(11/13 — C081 ① R1, 11/11 예고): PC 표 펼침 '관련 문서' = 상호 열쇠(cliNameKey) 3자 이상이 제목 열쇠 또는 분류 열쇠 안에 있는 문서(지운 문서 빼고)
   //   c1 (주)가나건설(열쇠 '가나건설') = '가나 건설(주) 견적'·'주식회사 가나건설 계약'·분류 '가나건설' 3건 · 제목 '가나' 0 · 제목 끝+분류 앞 경계('…가나' + '건설…')로는 안 잡힘 · 지운 문서 0
   //   c5 사아(2자) = 0 · 탭 title = 짧은 상호 안내 · 폰 옛 [상세 ›] 창(cliRelatedDocs)은 종전 글자째 그대로('사아' 부분 일치 3건)
   const m51 = miss41.length;
@@ -7270,7 +7270,7 @@ try {
   openRow41(X51, 'c5'); const h51b = X51.host._h;
   const P51 = mk41({ width: 375, docs: DOCS51.map((d) => Object.assign({}, d)) }); P51.api.render(); P51.api.detail('c5'); const b51 = P51.env.host('cliDetailBody')._h;
   const s51 = [tabs41(h51a), [...h51a.matchAll(/<tr><td>(JW-\d)<\/td>/g)].map((m) => m[1]).join(','), tabs41(h51b), (/data-cli-tab="doc" title="([^"]*)"/.exec(h51b) || ['', ''])[1], (/관련 문서 <span>(\d+)건/.exec(b51) || ['', ''])[1]];
-  T('v451 C081 ① 관련 문서 = 상호 열쇠 3자 이상(PC 표 펼침): ' + JSON.stringify(s51),
+  T('v464 C081 ① 관련 문서 = 상호 열쇠 3자 이상(PC 표 펼침): ' + JSON.stringify(s51),
     JSON.stringify(s51) === JSON.stringify(['개요|미수 (3)|계약 (2)|관련 문서 (3)*', 'JW-1,JW-2,JW-3', '개요*|미수 (1)|계약 (1)|관련 문서 (0)', '상호가 짧아(2자 이하) 관련 문서를 찾지 않습니다 — 문서함에서 직접 찾아보세요', '3']) && noMiss41(m51),
     JSON.stringify({ s51, miss: miss41.slice(m51) }));
 
@@ -8305,7 +8305,7 @@ try {
   //   375 실행 = 옛 카드 8장(data-bid-exp)·표 글 0·옛 상태 칩 줄 보임(전체 10 — 옛 셈 그대로)·배너 자리 숨김·안내 '노란 카드' 글·검색칸 안내 글 옛것·자리 legacy → 1366(경계 넘김) = 표·옛 칩 줄 숨김·'지역 확인' 안내 글·검색칸 안내 '공고번호·매칭어' →
   //   검색칸에 글이 있는 채 다시 375 = 옛 검색어(bidSearchTerm)를 칸 글로 맞춰 그 카드만(b1) · 표 글 0
   const LEG_SHA43 = '2a2b480c568054054f85190ea783adbc82af5da6c8cbe55d15286a2eea07eabe';
-  const KEEP43 = { setBidStatus: '3a708caf9731424a',   // v451: [낙찰] 창 제목 한 줄 더함(화면 시험에서 찾은 결함 — v451 검사)
+  const KEEP43 = { setBidStatus: '436448555876bd4e',   // v464: [낙찰] 창 제목 한 줄 더함(화면 시험에서 찾은 결함 — v464 검사)
     undoBidStatus: 'a0592bc2abc9338c', bidToContract: '7f77a881c76b9641', runBidQualGen: '8b8ee537a4b76f77', runAwardAutoCon: '3c350982dd62e7c8', setBidLayer: '2866e6652936072a', renderBidStats: '285dfecb73473e6c', openBidCalc: '325b37a902ebd518' };
   const keepBad9 = Object.keys(KEEP43).filter((n) => sha43(body43(n)).slice(0, 16) !== KEEP43[n]);
   const X9 = mk43({ width: 375 }); X9.api.render(); const g9 = (id) => X9.env.host(id);
@@ -8766,9 +8766,9 @@ try {
   const SIDO2 = { '서울특별시': '서울', '서울시': '서울', '부산광역시': '부산', '대구광역시': '대구', '대구': '대구', '인천광역시': '인천', '인천시': '인천', '광주광역시': '광주', '대전광역시': '대전', '울산광역시': '울산', '세종특별자치시': '세종', '세종시': '세종',
     '경기도': '경기', '강원특별자치도': '강원', '강원도': '강원', '충청북도': '충북', '충청남도': '충남', '충남': '충남', '전북특별자치도': '전북', '전라북도': '전북', '전라남도': '전남', '경상북도': '경북', '경상남도': '경남', '경남': '경남', '제주특별자치도': '제주', '제주도': '제주',
     '세종틍별자치시': '세종틍별자치시', '아산': '아산', '제주시': '제주시', '광주시': '광주시', 'constructor': 'constructor', '': '',
-    '전남광주통합특별시': '광주특별시', '광주특별시': '광주특별시' };   // v454(PM 11/13 C083 ② 추천대로): 7/1 출범 통합특별시 → 법정 약칭 '광주특별시'(v444는 대응표 밖이었음)
+    '전남광주통합특별시': '광주특별시', '광주특별시': '광주특별시' };   // v464(PM 11/13 C083 ② 추천대로): 7/1 출범 통합특별시 → 법정 약칭 '광주특별시'(v444는 대응표 밖이었음)
   const sidoBad2 = Object.keys(SIDO2).filter((k) => X2.api.sido(k) !== SIDO2[k]);
-  const std2 = ['서울', '부산', '대구', '인천', '광주', '대전', '울산', '세종', '경기', '강원', '충북', '충남', '전북', '전남', '경북', '경남', '제주'].every((s) => Object.values(X2.api.sidoMap).indexOf(s) >= 0) && new Set(Object.values(X2.api.sidoMap)).size === 18;   // v454: 17 + 광주특별시
+  const std2 = ['서울', '부산', '대구', '인천', '광주', '대전', '울산', '세종', '경기', '강원', '충북', '충남', '전북', '전남', '경북', '경남', '제주'].every((s) => Object.values(X2.api.sidoMap).indexOf(s) >= 0) && new Set(Object.values(X2.api.sidoMap)).size === 18;   // v464: 17 + 광주특별시
   X2.api.render(); const h2 = X2.host._h;
   const s2 = [cells44(h2, 'o1')[0], cells44(h2, 'o9')[0][1], cells44(h2, 'o4')[0][1], cells44(h2, 'o8')[0][1], cells44(h2, 'o1')[2], cells44(h2, 'o4')[2], cells44(h2, 'o1')[3][1], cells44(h2, 'o1')[4], cells44(h2, 'o2')[4], cells44(h2, 'o2')[3][1],
     cells44(h2, 'o1')[6][1], cells44(h2, 'o2')[6][1], cells44(h2, 'o3')[6][1], cells44(h2, 'o4')[6][1], cells44(h2, 'o9')[6][1]];
@@ -9099,7 +9099,7 @@ try {
   s22.push(selS22('광주'), selS22('광주특별시'), selS22('전남')); selS22('');
   const map22 = X22.api.sido('전남광주통합특별시') === '광주특별시' && X22.api.sido('광주특별시') === '광주특별시' && X22.api.sido('광주광역시') === '광주' && X22.api.sido('전라남도') === '전남';
   const hostL22 = [X18, X19, X20, X20m, X20e, X21, X22].some((X) => X.env.log.some((l) => /^host-listener:(obList|bidList):/.test(l)));
-  T('v444 ㉒ → v454(PM 11/13 C083 ② 추천대로) "전남광주통합특별시" = 법정 약칭 "광주특별시": 물건 칸 "광주특별시 북구 …" · 시도 칸 "광주특별시"(title 원장 값) · 옛 광주광역시 줄은 "광주" · 시도 고르기 목록에 광주특별시·광주·전남 · "광주" = 두 줄(옛 광주 + 광주특별시) · "광주특별시" = 그 줄만 · "전남" = 광주특별시 줄 · 대응표 광주특별시·광주·전남 · 검토 묶음 시험 틀 자리 리스너 0',
+  T('v444 ㉒ → v464(PM 11/13 C083 ② 추천대로) "전남광주통합특별시" = 법정 약칭 "광주특별시": 물건 칸 "광주특별시 북구 …" · 시도 칸 "광주특별시"(title 원장 값) · 옛 광주광역시 줄은 "광주" · 시도 고르기 목록에 광주특별시·광주·전남 · "광주" = 두 줄(옛 광주 + 광주특별시) · "광주특별시" = 그 줄만 · "전남" = 광주특별시 줄 · 대응표 광주특별시·광주·전남 · 검토 묶음 시험 틀 자리 리스너 0',
     JSON.stringify(s22) === JSON.stringify(['광주특별시 북구 차동 11', [' class="vs-hs vs-l3" title="전남광주통합특별시"', '광주특별시'], '광주 북구 카동 12', '광주', ';경기;경북;광주;광주특별시;서울;세종틍별자치시;아산;전남;제주시;충남;', 'o11,o12', 'o11', 'o11'])
     && map22 && !hostL22 && noMiss44(m22), JSON.stringify({ s22, map22, hostL22, miss: miss44.slice(m22) }));
 
@@ -12826,7 +12826,7 @@ try {
   };
   const ft56 = rd56('FEATURES.md'), tl56 = rd56('TESTLIST.md'), cl56 = rd56('CLAUDE.md'), sw56 = rd56('sw.js');
   const real56 = chk56(ft56, tl56, cl56, sw56);
-  const MUT56 = [['기준 줄 v455', () => chk56(ft56.replace(/기준: v\d+ \(2026-11-13\)\./, '기준: v455 (2026-11-13).'), tl56, cl56, sw56)],
+  const MUT56 = [['기준 줄 v455', () => chk56(ft56.replace(/기준: v\d+ \(/, '기준: v455 ('), tl56, cl56, sw56)],   // v464: 기준 날짜가 바뀌어도 결함이 심기게(날짜 뺌)
     ['sw v455', () => chk56(ft56, tl56, cl56, sw56.replace(/'jw-shell-v\d+'/, "'jw-shell-v455'"))],
     ['TESTLIST 절 없음', () => chk56(ft56, tl56.replace('\n## v459 — P1 판1·2·4', '\n## v4xx — 다른 것'), cl56, sw56)],
     ['CLAUDE 줄 없음', () => chk56(ft56, tl56, cl56.replace('**P1 판1·2·4(v459', '**P1(v4xx'), sw56)],
@@ -13495,23 +13495,23 @@ try {
     const SECT = ["'P1 판26'", "'P1 판27'", "'P1 판28'", "'P1 판29'", "'감사 로그 덮어쓰기 막기'"];
     const CL = ['**P1 판26·27(v463', '**P1 판28(v463', '**PM 콘솔(v463', '**감사 로그 덮어쓰기 막기(v463)**'];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
-    const ok = /기준: v463 \(2026-11-13\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 463 && ftv.length > 0 && mF.length === 0   // v464: 기준 줄·sw는 이 판 이상(이 판 값은 v464 문서 검사)
       && tlv.length > 0 && cb.length === 32 && scr.length === 26 && gate.length === 6 && cb.every((l) => /^- \[x\] \(AI\) /.test(l) || /^- \[ \] \(AI 시험 화면 대상/.test(l)) && !scr.some((l) => /PM/.test(l)) && !cb.some((l) => /^- \[ \] \(PM/.test(l))
       && GATE.every((g) => gate.some((l) => l.indexOf('`' + g + '`') > 0)) && SECT.every((s) => tlv.indexOf(s) > 0)
       && m161.indexOf('법정 검사 제안') > 0 && m161.indexOf('시행 회사') > 0 && m161.indexOf('대상 아님') > 0
       && ['완료+수령 올리기', '기한 정정', '해당 없음', '기준일 입력'].every((b) => m341.indexOf(b) > 0) && d.man.indexOf('이번 달 칸은 아직 할 일을 자동으로 만들지 않고') < 0
       && m2171.indexOf('정하실 분: PM') > 0 && m2171.indexOf('저절로 적용되지 않습니다') > 0
       && CL.every((c) => d.cl.indexOf(c) > 0) && d.html.indexOf('보험사는 표에서 이름만 맞춰 보입니다(저장된 글은 그대로). 📖 사용 안내 16-1절') > 0
-      && /if \(!r\.ok && r\.code !== 'NOT_FOUND'\) return false;/.test(d.au) && /SHELL_CACHE = 'jw-shell-v463'/.test(d.sw);
+      && /if \(!r\.ok && r\.code !== 'NOT_FOUND'\) return false;/.test(d.au) && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 463;
     return { ok, info: { mF, cb: cb.length, scr: scr.length, gate: gate.length, m161: m161.length, m341: m341.length, m2171: m2171.length } };
   };
   const r63 = chk63(D63);
   const mu63 = (k, f) => chk63(Object.assign({}, D63, { [k]: f(D63[k]) })).ok;
-  const M63 = [mu63('ft', (s) => s.replace('기준: v463 (2026-11-13).', '기준: v462 (2026-11-13).')),
-    mu63('sw', (s) => s.replace("'jw-shell-v463'", "'jw-shell-v462'")),
+  const M63 = [mu63('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v462 (')),
+    mu63('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v462'")),
     mu63('ft', (s) => s.split('PMCON_MARKS_FULL').join('PMCON_MARKS')),
     mu63('tl', (s) => s.replace('- [ ] (AI 시험 화면 대상 — 판29) 직원 계정에는', '- [ ] (PM) 직원 계정에는')),
-    mu63('tl', (s) => { const k = s.lastIndexOf('`promostream_check`'); return s.slice(0, k) + 'promostream_check' + s.slice(k + 19); }),
+    mu63('tl', (s) => { const e = s.indexOf('\n## v464 '); const k = s.lastIndexOf('`promostream_check`', e < 0 ? s.length : e); return s.slice(0, k) + 'promostream_check' + s.slice(k + 19); }),
     mu63('man', (s) => s.replace('<h3 id="s34-1">', '<h3>')),
     mu63('cl', (s) => s.replace('**PM 콘솔(v463', '**PM 콘솔(')),
     mu63('html', (s) => s.replace(' 📖 사용 안내 16-1절<br>', '<br>')),
@@ -13519,6 +13519,36 @@ try {
   T('v463 문서·판 번호(정확 검사): FEATURES 기준 v463 (2026-11-13)·v463 절(원장 T476·T451·T165·T179·T478·T666·C130 · 든 것 ①~⑤ · 판26 vehModalSnap · 판27 vehLawCalc·insp_log·veh_bg_get · 판28 lic_month_get·lic_duty_set·LIC_ATT_KEEP·BAD_RANGE·licNarrowGuard·dutyCur · 판29 pmcon_decide·PMCON_MARKS_FULL·status:decide·자동 적용 없음 · appendAudit fail-closed · 승격 전 확인할 것·알려진 한계·정한 값 · servertest P1 판28 8항목 · sw v463) · TESTLIST v463 칸 32(화면 "[ ] (AI 시험 화면 대상" 26 — "PM" 낱말 0 · 게이트 [x] 6 · 사람·PM 몫 칸 0)·게이트 12종·servertest 절 이름 5 · MANUAL 16-1·34-1(단추 4)·21-7-1 PM 콘솔 · 17절 옛 "아직 할 일을 자동으로 만들지 않고" 0 · CLAUDE.md 줄 4 · 도움말 차량 속성 줄 16-1절 · audit.js 읽기 실패 막음 줄 · sw jw-shell-v463 · 결함 사본 ' + M63.length + '개 = 모두 ✗',
     r63.ok && M63.every((v) => v === false), JSON.stringify({ r: r63.info, mut: M63 }));
 } catch (e) { console.log('  (v463 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v464(45-1 — C081 R1 11/14 적용 · C078 ①②③⑤ · C083 ②): 문서·판 번호 정확 검사(동작 검사는 'v464 C081'·'v464 C078'·'v464 입찰' · servertest '89 v464') — 다음 판은 기준 줄·sw를 '464 이상'으로 풀 것
+try {
+  const rd64 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D64 = { ft: rd64('FEATURES.md'), tl: rd64('TESTLIST.md'), sw: rd64('sw.js'), man: rd64('MANUAL.html'), st: rd64('tools/servertest.mjs') };
+  const chk64 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v464 (11/14)', '\n### '), tlv = cut(d.tl, '\n## v464 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), scr = cb.filter((l) => /^- \[ \] \(AI 시험 화면 대상/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l));
+    const FT = ['C081', 'C078', 'C083', '`cliSheetDocs`', '`CLI_DOC_MINKEY`', '`recAgingKey`', '`recIsCredit`', '`recMergeTwins`', '`recMergeInto`', '`REC_MERGE_DAYS`', '`taskRecHiddenFor`', 'PREV_READ_FAILED', "'삭제 보호'", '`OB_SIDO_ALSO`', '`obSidoFt`', "'계약 시작'", 'C114'];
+    const GATE = ['uismoke', 'consheet_check', 'proctpl_check', 'settletest', 'servertest', 'rectest', 'promoqual_check', 'promogen_check', 'promoqlearn_check', 'promostream_check', 'promo_wrap_check', 'promo_post_check'];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const ok = /기준: v464 \(2026-11-14\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0
+      && tlv.length > 0 && scr.length === 7 && gate.length === 3 && cb.length === 10 && !cb.some((l) => /\(PM/.test(l))
+      && GATE.every((g) => gate.some((l) => l.indexOf('`' + g + '`') > 0)) && tlv.indexOf("'89 v464 C078 ①⑤'") > 0
+      && d.st.indexOf("// ---- 89 v464 C078 ①⑤") >= 0 && d.man.indexOf('광주특별시') > 0 && d.man.indexOf('수정(-)') > 0
+      && /SHELL_CACHE = 'jw-shell-v464'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, scr: scr.length, gate: gate.length } };
+  };
+  const r64 = chk64(D64);
+  const mu64 = (k, f) => chk64(Object.assign({}, D64, { [k]: f(D64[k]) })).ok;
+  const M64 = [mu64('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v463 (')),
+    mu64('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v463'")),
+    mu64('ft', (s) => s.split('`recMergeTwins`').join('recMergeTwins')),
+    mu64('tl', (s) => s.replace('- [ ] (AI 시험 화면 대상 — 입찰)', '- [ ] (PM 확인 — 입찰)')),
+    mu64('tl', (s) => { const k = s.lastIndexOf('`promostream_check`'); return s.slice(0, k) + 'promostream_check' + s.slice(k + 19); }),
+    mu64('st', (s) => s.replace('// ---- 89 v464 C078 ①⑤', '// ---- 89 C078 ①⑤'))];
+  T('v464 문서·판 번호(정확 검사): FEATURES 기준 v464 (2026-11-14)·v464 절(C081·C078·C083 · 함수 이름 · C114) · TESTLIST v464 칸 10(화면 7 · 게이트 [x] 3 — 12종 · PM 칸 0) · servertest 절 89 v464 · MANUAL 광주특별시·수정(-) · sw jw-shell-v464 · 결함 사본 ' + M64.length + '개 = 모두 ✗',
+    r64.ok && M64.every((v) => v === false), JSON.stringify({ r: r64.info, mut: M64 }));
+} catch (e) { console.log('  (v464 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

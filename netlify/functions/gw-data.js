@@ -59,7 +59,7 @@ function permOf(member, col) {
   const key = COL[col];
   return (member.perms && member.perms[key]) || (PERM_CLOSED[key] ? 'hide' : 'view');
 }
-// v454(C078 ① PM 11/13 '추천대로'): 기성 연동 지시(입금확인 rec_id · 미수 45일 자동 auto_key 'rec:<기성 id>:…' — 제목에 거래처·금액)는 기성 숨김 직원에게 서버가 내려 주지 않는다.
+// v464(C078 ① PM 11/13 '추천대로'): 기성 연동 지시(입금확인 rec_id · 미수 45일 자동 auto_key 'rec:<기성 id>:…' — 제목에 거래처·금액)는 기성 숨김 직원에게 서버가 내려 주지 않는다.
 //   담당(본인·전사 __all__)·공개범위에 이름·지시자(from_id·from)인 사람은 그대로(앱 taskVisible·taskForMe와 같은 줄 — 넓히지 않고 좁히기만).
 //   그 직원이 지시를 저장하면 빠진 지시는 서버 원본 이월(지워지지 않게), 낡은 사본에 남은 같은 id도 서버 원본으로.
 function taskRecHiddenFor(member, t) {
@@ -293,7 +293,7 @@ async function handleGet(event, d, R) {
     const ds = await docSettings(store(DATA));
     doc = Object.assign({}, doc, { items: doc.items.filter(function (it) { return docVisible(c.member, it, ds); }) });
   }
-  if (col === 'tasks' && !c.member.admin && Array.isArray(doc.items)) {   // v454 C078 ①: 기성 숨김 직원에게 기성 연동 지시 빼고
+  if (col === 'tasks' && !c.member.admin && Array.isArray(doc.items)) {   // v464 C078 ①: 기성 숨김 직원에게 기성 연동 지시 빼고
     doc = Object.assign({}, doc, { items: doc.items.filter(function (t) { return !taskRecHiddenFor(c.member, t); }) });
   }
   return jr(200, { status: 'OK', collection: col, doc, can_write: p === 'do', request_id: R });
@@ -434,7 +434,7 @@ async function handleSave(event, d, R) {
   }
   // v395 배정표(기반 1·9): 자동 지시의 서버 배정 who_id(who_by 'assign')는 클라 사본이 공란으로 올려도 이월 + 남은 공란은 배정표로 채움
   if (col === 'tasks' && !c.member.admin && Array.isArray(doc.items) && permOf(c.member, 'receivables') === 'hide') {
-    // v454 C078 ①: 이 직원은 기성 연동 지시를 받지 않았다 — 빠진 지시는 서버 원본 이월, 사본에 남은 같은 id(받기 전 캐시)도 서버 원본으로. 못 읽었으면 지시가 지워질 수 있어 저장 거부
+    // v464 C078 ①: 이 직원은 기성 연동 지시를 받지 않았다 — 빠진 지시는 서버 원본 이월, 사본에 남은 같은 id(받기 전 캐시)도 서버 원본으로. 못 읽었으면 지시가 지워질 수 있어 저장 거부
     if (prevReadFailed) return jr(500, { status: 'ERROR', error_code: 'PREV_READ_FAILED', request_id: R });
     const hidOld = {}; oldItems.forEach(function (o) { if (o && o.id && taskRecHiddenFor(c.member, o)) hidOld[o.id] = o; });
     const seenT = {};
@@ -610,7 +610,7 @@ async function handleSave(event, d, R) {
   // 분장 근거(용어집 v1): 공무는 청구 등록·수정까지, 상태 전환은 관리부. 화면 숨김은 안내일 뿐, 여기가 하드 차단(콘솔 우회 무력화)
   let recDelKept = 0;
   if (col === 'receivables' && !c.member.admin && Array.isArray(doc.items)) {
-    // v454(C078 ⑤ PM 11/13 '추천대로'): 처리된 줄(입금·발행·검수 — recProcessed) 지우기도 관리자만 — 앱 펼침 [삭제]·선택 삭제가 막는 것(v440 recSheetDelOk)을 서버도.
+    // v464(C078 ⑤ PM 11/13 '추천대로'): 처리된 줄(입금·발행·검수 — recProcessed) 지우기도 관리자만 — 앱 펼침 [삭제]·선택 삭제가 막는 것(v440 recSheetDelOk)을 서버도.
     //   비관리자 저장이 처리된 줄에 del:1을 붙이면 지우지 않은 원본 상태로, 처리된 줄을 빼고 보내면 서버 원본을 이월(좁히기만 — 거부 아님, 같은 저장의 다른 고침은 반영)
     //   직전 문서를 못 읽으면 처리 여부를 판정할 수 없어 저장 거부(documents·licenses와 같은 원칙 — fail-open이면 지우기가 그대로 통과)
     if (prevReadFailed) return jr(500, { status: 'ERROR', error_code: 'PREV_READ_FAILED', request_id: R });
@@ -665,7 +665,7 @@ async function handleSave(event, d, R) {
     } else {
       ev = diffItems(oldItems, Array.isArray(doc.items) ? doc.items : []);
     }
-    if (recDelKept) ev.push({ op: '삭제 보호', id: '-', t: '비관리자 저장이 처리된(입금·발행·검수) 기성 ' + recDelKept + '건을 지우려 해 서버가 원본을 남겼습니다(v454 — 지우기는 관리자만)' });
+    if (recDelKept) ev.push({ op: '삭제 보호', id: '-', t: '비관리자 저장이 처리된(입금·발행·검수) 기성 ' + recDelKept + '건을 지우려 해 서버가 원본을 남겼습니다(v464 — 지우기는 관리자만)' });
     if (obPurged) ev.push({ op: '정리', id: '', t: '부동산 정리 ' + obPurged + '건(마감 ' + BIDS_KEEP_DAYS + '일 경과 신규·패스 — 저장 때)' });   // v444
     if (vehDueKept) ev.push({ op: '만기일 보호', id: '-', t: '낡은 사본이 지시 완료 창 만기일 ' + vehDueKept + '칸을 바꾸기 전 날짜로 되돌리려 해 서버 값을 지켰습니다 — 그 사람의 앱 화면이 낡은 사본입니다' });   // P1 판2 검토(S1)
     if (ev.length) await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: col, ev: ev });
