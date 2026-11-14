@@ -1303,3 +1303,7 @@
 - [x] (AI) `servertest` '84 v472'(소속 회사 both 저장·빈 값 = 칸째 지움 · 고용형태 지입차주 저장 · 회원 목록 안전 보기 = both·지입차주만 · 계약직·안전 숨김 = 없음) — ✓ AI 11/14
 - [x] (AI) `uismoke` 'v472'(선택지 · 불러오기(빈 값 그대로·both) · 직원 줄 표시 3종 실행 · 서버 허용 값·회원 목록 · 결함 사본 9) · v471 문서 검사를 이 판 이상으로 풀고 v472 문서·판 번호 정확 검사(결함 사본 4) — ✓ AI 11/14
 - [x] (AI) `uismoke` · `consheet_check` · `proctpl_check` · `settletest` · `servertest` · `rectest` · `promoqual_check` · `promogen_check` · `promoqlearn_check` · `promostream_check` · `promo_wrap_check` · `promo_post_check` · 원본 읽기 검사 4종(stmtread a·b·c·d) 전부 통과 + node --check(함수·_lib·sw) — 숫자는 커밋 메시지
+
+## v473 — 안전 › 체크 칸: 지입차주는 근로자 의무 칸 '대상 아님'(앱만 · 운영 데이터 변경 없음 · 새 화면 없음)
+- [ ] (나수진 또는 관리자) 인사·직원에서 고용형태가 빈 현장직 8명의 고용형태 고르기(지입차주·정규직 등) → 지입차주는 체크 칸 정기교육·일반건진 등 칸이 '—'로 바뀌고 빠진 항목에서 빠짐 · 화물 지입차주는 운수종사자 표시도 켜기(덤프트럭은 켜지 않음)
+- [x] (AI) `uismoke` · `consheet_check` · `proctpl_check` · `settletest` · `servertest` · `rectest` · `promoqual_check` · `promogen_check` · `promoqlearn_check` · `promostream_check` · `promo_wrap_check` · `promo_post_check` 전부 통과 + node --check(sw) — 숫자는 커밋 메시지

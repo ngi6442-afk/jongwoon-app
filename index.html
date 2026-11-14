@@ -19679,9 +19679,13 @@
     // v447 검토 2: 대표(사업주 — isBossMember)는 근로자 의무 칸(정기교육·채용 시·일반건진·위험성평가 공유)을 '근거 확인 중'(회색 — 빠진 항목·합계 분모 밖)으로.
     //   특별교육(v450부터 석면 밖)·석면 건진은 현장 투입 판정이라 그대로. 등기임원(PM 등) 근로자성은 사람마다 달라 판정하지 않음
     var boss = !!(mem && m && !gone && isBossMember(m)), BOSS_B = "사업주(대표) — 근로자 의무 대상 여부 근거 확인 중(근로자 대상 의무라 빠진 항목으로 세지 않음)";
+    // v473(PM 11/14 18:48 '라임팀 우리 직원 아님' · 고용형태 '지입차주' — v472 회원 칸 emp_type): 지입차주는 우리 근로자가 아니라 근로자 의무 칸(정기교육·채용 시·일반건진·위험성평가 공유)을 '—'(대상 아님 — 빠진 항목·합계 분모 밖)으로.
+    //   운수종사자 교육은 종전대로 대상 표시(quals drv)를 켠 사람만(덤프트럭 지입차주는 운수종사자가 아님 — PM) · 현장 투입 판정(특별교육·석면 건진)은 그대로
+    var jiip = !!(mem && m && !gone && m.emp_type === "지입차주"), JIIP_B = "지입차주 — 우리 직원이 아니라 근로자 의무 대상 아님(인사·직원 고용형태) · 화물 운수종사자면 대상 표시를 켜면 아래에 교육 줄";
     // 정기교육 — 직원: 관리감독자 지정이면 올해 super 시간 / 16, 아니면 이번 반기 regular 시간 / (사무직 6 · 그 밖 12) · 일용직: 근거 확인 중
     if (gone) c.reg = eduNone(sup ? "super" : "regular", "기록만 남은 사람 — 판정 안 함", last(["regular", "super"]));
     else if (!mem) c.reg = eduGreyIt("regular", EDU_CHK, EDU_CHK, "일용직 — 정기교육 대상 여부 근거 확인 중(현장 투입 때 채용 시·특별교육·건설 기초로 봄)", last(["regular"]));
+    else if (jiip) c.reg = eduNone("regular", JIIP_B, last(["regular", "super"]));
     else if (boss) c.reg = eduGreyIt(sup ? "super" : "regular", EDU_CHK, EDU_CHK, BOSS_B, last(["regular", "super"]));
     else {
       kind = sup ? "super" : "regular"; from = sup ? cx.y + "-01-01" : cx.half.start; to = sup ? cx.y + "-12-31" : cx.half.end; need = sup ? EDU_STD.super : (off ? EDU_STD.office : EDU_STD.other);
@@ -19703,6 +19707,7 @@
     // 채용 시 — 직원: 근거 확인 중 · 일용직: 건설 기초 이수자 면제 · 기록 있으면 ✓ · 진행 현장 투입이면 기한 = 가장 이른 시작일
     h = last(["hire"]); b = last(["basic_con"]);
     if (gone) c.hire = eduNone("hire", "기록만 남은 사람 — 판정 안 함", h);
+    else if (jiip) c.hire = eduNone("hire", JIIP_B, h);
     else if (mem) c.hire = eduGreyIt("hire", EDU_CHK, EDU_CHK, "직원 — 채용 시 교육 대상·기한 근거 확인 중(입사일 기준 판정은 원문 확인 뒤)", h);
     else if (aOnly) c.hire = siteGate("hire", h) || asbNone("hire", h);   // v450
     else {
@@ -19744,6 +19749,7 @@
     // 일반건진 — 직원(사무직 2년·그 밖 1년, 표시 없으면 1년) · 일용직 대상 아님
     g = last(["gen_med"]);
     if (gone || !mem) c.gmed = eduNone("gen_med", mem ? "기록만 남은 사람 — 판정 안 함" : "일용직 — 상시 근로자 검진이라 대상 아님", g);
+    else if (jiip) c.gmed = eduNone("gen_med", JIIP_B, g);
     else if (boss) c.gmed = eduGreyIt("gen_med", EDU_CHK, EDU_CHK, BOSS_B, g);   // v447 검토 2
     else c.gmed = g ? eduCycle("gen_med", g, off ? 24 : 12, (off ? "사무직 2년" : "그 밖 1년(사무직 표시가 없으면 1년)") + "마다 — 근사: 마지막 실시 + " + (off ? 24 : 12) + "개월(시행규칙 제197조 '1년(사무직 2년)에 1회 이상'의 연 단위 해석은 원문 확인 중)")
       : eduIt({ t: "기록 없음", cls: "vs-warn", tgt: true, miss: true, cat: "기록 없음", kind: "gen_med", basis: (off ? "사무직 2년" : "그 밖 1년(사무직 표시가 없으면 1년)") + "마다 — 기록 없음" });
@@ -19768,6 +19774,7 @@
     var RA_SRC = "위험성평가 지침(고시) — 11/4 전부개정 원문 확인 중", raOn = mem ? eduRaOnFor(cx, m) : "", shR = raOn ? recs.filter(function(r){ return r.kind === "ra_share" && ((r.ra && typeof r.ra === "object" && isDate(r.ra.on) && r.ra.on >= raOn) || (isDate(r.date) && r.date >= raOn)); })[0] || null : null;
     if (!raT) c.ra = eduNone("ra_share", gone ? "기록만 남은 사람 — 판정 안 함" : "올해 투입 없음(일용직)", sh);
     else if (!mem) c.ra = eduGreyIt("ra_share", EDU_CHK, EDU_CHK, "올해 투입 일용직 — 신규·작업 변경자 작업 전 공유는 고용노동부 고시 전부개정(11/4)이 법제처에 오르기 전까지 근거 확인 중", sh);
+    else if (jiip) c.ra = eduNone("ra_share", JIIP_B, sh);
     else if (boss) c.ra = eduGreyIt("ra_share", EDU_CHK, EDU_CHK, BOSS_B, sh);
     else if (raOn) c.ra = shR ? eduOk("ra_share", shR, "직원 — " + cx.y + "년 회차(평가 " + raOn + ") 결과 공유 · " + RA_SRC) : eduIt({ t: "기록 없음", cls: "vs-warn", tgt: true, miss: true, cat: "기록 없음", kind: "ra_share", basis: "직원 — " + cx.y + "년 회차(평가 " + raOn + ") 뒤 결과 공유 기록 없음(공유 기한은 지침 원문 확인 뒤 — 빨강 안 냄) · " + RA_SRC });
     else c.ra = sh ? eduOk("ra_share", sh, "직원 — " + cx.y + "년 결과 공유(올해 정기·최초 회차 표식 없음) · " + RA_SRC) : eduIt({ t: "기록 없음", cls: "vs-warn", tgt: true, miss: true, cat: "기록 없음", kind: "ra_share", basis: "직원 — " + cx.y + "년 위험성평가 회차·결과 공유 기록 없음(회차 = 위험성평가 줄의 회차 표식 정기·최초) · " + RA_SRC });

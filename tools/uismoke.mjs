@@ -14344,9 +14344,9 @@ try {
     const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[ \] \(AI 시험 화면 대상/.test(l));
     const FT = ['`hrEmpCorpChips`', '`MEMBER_CORP`', '`both`', '`emp_type`', '지입차주', '(고르지 않음)', '고용형태 없음', '원장 C150'];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
-    const ok = /기준: v472 \(2026-11-14\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 5 && gate.length === 3 && scr.length === 2 && !cb.some((l) => /\(PM/.test(l))
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 472 /* v473: 기준 줄·sw = 이 판 이상 */ && ftv.length > 0 && mF.length === 0 && cb.length === 5 && gate.length === 3 && scr.length === 2 && !cb.some((l) => /\(PM/.test(l))
       && d.man.indexOf('<b>지입차주</b>') > 0 && d.man.indexOf('<b>두 회사 중복 재적</b>') > 0 && d.man.indexOf('2026-11 v472') > 0 && !/emp_type|MEMBER_CORP|hrEmpCorpChips/.test(cut(d.man, '<b>지입차주</b>', '</li>'))
-      && /SHELL_CACHE = 'jw-shell-v472'/.test(d.sw);
+      && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 472;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
   };
   const r70 = chk70(D70);
@@ -14356,6 +14356,47 @@ try {
   T('v472 문서·판 번호(정확 검사): FEATURES 기준 v472 (2026-11-14)·v472 절 · TESTLIST v472 칸 5(화면 2 · 게이트 [x] 3) · MANUAL 지입차주·두 회사 중복 재적(내부 키 이름 0) · sw jw-shell-v472 · 결함 사본 ' + M70.length + '개 = 모두 ✗',
     r70.ok && M70.every((v) => v === false), JSON.stringify({ r: r70.info, mut: M70 }));
 } catch (e) { console.log('  (v472 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v473(안전 › 체크 칸 — 지입차주는 근로자 의무 칸 '대상 아님', PM 11/14 18:48): 실행 검사 + 문서·판 번호 정확 검사 — 다음 판은 기준 줄·sw를 '473 이상'으로 풀 것
+try {
+  if (!V48 || !V51) throw new Error('v447·v451 시험 틀 없음');
+  const V = V48, W = V51;
+  const mut73 = (a, b) => { if (V.cnt47(html, a) !== 1) throw new Error('결함 심을 자리 없음: ' + a.slice(0, 50)); return html.replace(a, () => b); };
+  // j1 지입차주(표시 없음) · j2 지입차주 + 운수종사자 표시 · e1 같은 처지의 직원(비교) · j3 지입차주 퇴사자
+  const MEM73 = () => [{ id: 'm0', name: '관리자', admin: true }, { id: 'j1', name: '지입하나', dept: '라임팀', emp_type: '지입차주' }, { id: 'j2', name: '지입둘', dept: '폐기물팀', emp_type: '지입차주', quals: ['drv'], birth: '1976-03-03' },
+    { id: 'e1', name: '직원하나', dept: '폐기물팀', emp_type: '정규직' }, { id: 'j3', name: '지입퇴사', dept: '라임팀', emp_type: '지입차주', retired: true }];
+  const chk73 = (src) => {
+    const X = V.mk47({ src, members: MEM73(), workers: [], asb: [], edu: [{ id: 'a', ptype: 'member', pid: 'j1', kind: 'regular', date: '2026-08-01', hours: '4', next: '', note: '' }] }); X.api.render();
+    const c = (id) => { const p = X.api.find(id); return p ? ['reg', 'hire', 'gmed', 'ra'].map((k) => p.st.c[k].t + (p.st.c[k].miss ? '!' : '') + (p.st.c[k].tgt ? '+' : '')).join('|') : null; };
+    const p1 = X.api.find('member:j1'), p2 = X.api.find('member:j2'), pe = X.api.find('member:e1');
+    const info = { j1: c('member:j1'), j2: c('member:j2'), e1: c('member:e1'), miss: [p1.st.miss, p2.st.miss, pe.st.miss], q2: p2.st.x.q.map((e) => e.k + ':' + e.it.t), b: p1.st.c.gmed.basis };
+    const ok = info.j1 === '✓ 2026-08|—|—|—' && info.j2 === '—|—|—|—' && p1.st.miss === 0 && p2.st.miss === 1 && JSON.stringify(info.q2) === JSON.stringify(['drv_edu:기록 없음', 'drv_fit:—'])
+      && /기록 없음!\+$/.test(info.e1) && info.e1.split('|')[2] === '기록 없음!+' && pe.st.miss >= 2 && /^지입차주 — 우리 직원이 아니라 근로자 의무 대상 아님/.test(info.b)
+      && p1.st.c.reg.cat === '✓ 기록(대상 아님)' && p1.st.c.gmed.cat === '대상 아님';
+    return { ok, info };
+  };
+  const r73 = chk73(html);
+  const m73 = [mut73('var jiip = !!(mem && m && !gone && m.emp_type === "지입차주"),', 'var jiip = false,'), mut73('    else if (jiip) c.gmed = eduNone("gen_med", JIIP_B, g);\n', ''), mut73('    else if (jiip) c.reg = eduNone("regular", JIIP_B, last(["regular", "super"]));\n', ''),
+    mut73('    else if (jiip) c.ra = eduNone("ra_share", JIIP_B, sh);\n', ''), mut73('    else if (jiip) c.hire = eduNone("hire", JIIP_B, h);\n', '')].map((s) => W.safe51(() => chk73(s)).ok);
+  T('v473 ① 지입차주(실행 — 실제 eduPersonStat): 고용형태 지입차주 = 정기교육·채용 시·일반건진·위험성평가 칸 "—"(대상 아님 — 기록이 있으면 ✓ 기록(대상 아님))·빠진 항목 0 · 운수종사자 표시를 켠 지입차주만 정기교육 줄(기록 없음 = 빠진 항목 1)·자격유지검사 65세 미만 "—" · 같은 처지 직원은 종전대로 기록 없음(빠짐) · 결함 사본 5개(지입차주 안 봄·칸마다 갈래 뺌) = 모두 ✗',
+    r73.ok && m73.every((v) => v === false), JSON.stringify({ r: r73.info, mut: m73 }));
+  const rd73 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D73 = { ft: rd73('FEATURES.md'), tl: rd73('TESTLIST.md'), sw: rd73('sw.js'), mn: rd73('MANUAL.html') };
+  const chkD73 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v473 (11/14)', '\n### '), tlv = cut(d.tl, '\n## v473 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l));
+    const GATE = ['uismoke', 'consheet_check', 'proctpl_check', 'settletest', 'servertest', 'rectest', 'promoqual_check', 'promogen_check', 'promoqlearn_check', 'promostream_check', 'promo_wrap_check', 'promo_post_check'];
+    const mF = ['`emp_type`', '`jiip`', '`eduNone`', '덤프트럭'].filter((x) => ftv.indexOf(x) < 0);
+    const ok = /기준: v473 \(2026-11-14\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length >= 2 && !cb.some((l) => /\(PM/.test(l))
+      && GATE.every((g) => gate.some((l) => l.indexOf('`' + g + '`') > 0)) && /SHELL_CACHE = 'jw-shell-v473'/.test(d.sw) && d.mn.indexOf('<b>지입차주</b>는 우리 직원이 아니라') > 0;
+    return { ok, info: { mF, cb: cb.length, gate: gate.length } };
+  };
+  const rD73 = chkD73(D73), muD73 = (k, f) => chkD73(Object.assign({}, D73, { [k]: f(D73[k]) })).ok;
+  const MD73 = [muD73('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v472 (')), muD73('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v472'")), muD73('mn', (s) => s.replace('<b>지입차주</b>는 우리 직원이 아니라', '지입차주는')), muD73('ft', (s) => s.split('`jiip`').join('jiip'))];
+  T('v473 ② 문서·판 번호(정확 검사): FEATURES 기준 v473 (2026-11-14)·v473 절 · TESTLIST v473 게이트 [x] 12종·PM 칸 0 · MANUAL 21-9 지입차주 줄 · sw jw-shell-v473 · 결함 사본 ' + MD73.length + '개 = 모두 ✗',
+    rD73.ok && MD73.every((v) => v === false), JSON.stringify({ r: rD73.info, mut: MD73 }));
+} catch (e) { console.log('  (v473 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

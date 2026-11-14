@@ -1,4 +1,4 @@
-const SHELL_CACHE = 'jw-shell-v472';
+const SHELL_CACHE = 'jw-shell-v473';
 const SHELL_FILES = [
   './',
   './index.html',
