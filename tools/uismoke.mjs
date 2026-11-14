@@ -12163,7 +12163,7 @@ try {
   T('29 판② ④ 월 보드: vsSheetCheckDef 통과(key jw_stmt_sheet·단계별 열 합 한도 안·폰 legacy = 카드) · 행 13 = 시드 12 + 꺼졌어도 문서 있는 v14(꺼졌고 문서 없는 v13 빠짐 · v14는 grey) · 두 묶음 차량 9 → 용구 4, 거래처 목록 순서 · 상태 v02 전달·v05 확정·v06 붉은 칸(금액 빈칸)·v10 확정 전(검산 맞음)·v14 확정 전 · 칩 건수 전체 13·입력 대기 8·붉은 1·확정 전 2·확정 1·전달 1 · 칸 글 ✓ 검산 통과·붉은 n·입력 대기·잔액형 · [열기] 13개 모두 vs-chip(보기 권한도 엶) · 합계 줄 "합계 13곳 · 입력 5" · 폰 카드 = 두 묶음 머리·카드 13',
     J(ck4) === '[]' && def4.key === 'jw_stmt_sheet' && def4.host === 'stmtBoard' && def4.phone === 'legacy' && typeof def4.legacy === 'function'
     && flat4 === '#veh,v01,v02,v03,v04,v05,v06,v07,v08,v09,#tool,v10,v11,v12,v14' && st4 === 'v02:sent,v05:done,v06:red,v10:ready,v14:ready'
-    && J(cn4) === '[[13,8,1,2,1,1]]' && (H4.match(/data-st-open="v\d+"/g) || []).length === 13 && (H4.match(/<button type="button" class="vs-chip" data-st-open=/g) || []).length === 13
+    && J(cn4[0].slice(0, 6)) === '[13,8,1,2,1,1]' && (H4.match(/data-st-open="v\d+"/g) || []).length === 13 && (H4.match(/<button type="button" class="vs-chip" data-st-open=/g) || []).length === 13
     && H4.indexOf('✓ 검산 통과') > 0 && /<span class="need-due"[^>]*>붉은 1<\/span>/.test(H4) && H4.indexOf('잔액형') > 0 && /class="vs-r grey[^"]*" data-vs-row="v14"/.test(H4) && H4.indexOf('합계 13곳 · 입력 5') > 0
     && (cardsH.match(/class="st-pgrp"/g) || []).length === 2 && (cardsH.match(/class="st-pc"/g) || []).length === 13,
     J({ ck4, flat4, st4, cn4 }));
@@ -12205,7 +12205,7 @@ try {
     && /if \(currentTab === "stmt" && canSee\("stmt"\)\) renderStmt\(\);/.test(ap6) && /\bstmtReset\(\);/.test(cs6)
     && /if \(STMT\.bound \|\| !host\) return;\n\s*STMT\.bound = true;/.test(fnOf29s('stmtBindOnce')) && (ssb29.match(/addEventListener\("input"/g) || []).length === 2   // 29 판③: 상세 + 거래처 목록 고치기(둘 다 stmtBindOnce 안 — 한 번)
     && (fnOf29s('stmtBindOnce').match(/addEventListener\("input"/g) || []).length === 2
-    && clsOk6 && acts6.length === 14 && acts6.every((a) => srvActs6.indexOf(a) >= 0) && !/how: "vision"|how = "vision"/.test(ssb29.replace(/\/\/[^\n]*/g, '')),   // 29 판④: 동작 12 → 14(stmt_read·stmt_read_status) · 'vision' 낱말은 넣은 파일 표시 꼴 표(STMT_READ_SRC)에만   // 29 판③: 동작 6 → 10(stmt_match·stmt_alias_set·stmt_alias_get·stmt_cfg_get·stmt_cfg_set 더함 — 서버에 다 있음) · 29 판⑤: → 12(stmt_sent 전달함 표시·stmt_veh 차량 탭 칸)
+    && clsOk6 && acts6.length >= 14 && acts6.every((a) => srvActs6.indexOf(a) >= 0) && !/how: "vision"|how = "vision"/.test(ssb29.replace(/\/\/[^\n]*/g, '')),   // 29 판④: 동작 12 → 14(stmt_read·stmt_read_status) · 'vision' 낱말은 넣은 파일 표시 꼴 표(STMT_READ_SRC)에만   // 29 판③: 동작 6 → 10(stmt_match·stmt_alias_set·stmt_alias_get·stmt_cfg_get·stmt_cfg_set 더함 — 서버에 다 있음) · 29 판⑤: → 12(stmt_sent 전달함 표시·stmt_veh 차량 탭 칸)
     J({ acts6, btnCls6 }));
 
   // ⑦ 화면 결함 검토 반영(11/10 — 재현된 7건): 차량 칸 글을 쳤다 되돌리면 대조된 차량이 되살아남(change가 안 와도) · 저장 응답이 줄 객체를 갈아 끼워도 같은 줄 id로 찾음 ·
@@ -12595,7 +12595,7 @@ try {
     && ['stmtCfgBar', 'stmtCfg'].every((id) => (html.match(new RegExp('id="' + id + '"', 'g')) || []).length === 1)
     && !/table\.st-ed\.st-u\{min-width/.test(html) && /table\.st-ed td\.c-veh,table\.st-ed td\.c-use\{width:140px;\}/.test(html) && /table\.st-ed td\.c-veh,table\.st-ed td\.c-use\{width:170px;\}/.test(html)
     && /\(tool \? '' : '<th>차량<\/th>'\)/.test(er5) && /nc = 9 \+ \(vat \? 1 : 0\) \+ \(w \? 1 : 0\);/.test(er5)
-    && /\["stmtMonBar", "stmtStats", "stmtBoardMsg", "stmtOutBar", "stmtBoard", "stmtCfgBar"\]/.test(rs5) && rs5.indexOf('if (ed){ stmtEdRender(); return; }') < rs5.indexOf('if (cf){ stmtCfgRender(); return; }') && /if \(STMT\.cfg && !canDo\("stmt"\)\)/.test(rs5)
+    && /\["stmtMonBar", "stmtStats", "stmtBoardMsg", (?:"stmtDrop", )?"stmtOutBar", "stmtBoard", "stmtCfgBar"\]/.test(rs5) && rs5.indexOf('if (ed){ stmtEdRender(); return; }') < rs5.indexOf('if (cf){ stmtCfgRender(); return; }') && /if \(STMT\.cfg && !canDo\("stmt"\)\)/.test(rs5)
     && J(Object.keys(CF.api.USE_SHORT)) === J(Object.keys(CF.api.USE)) && J(Object.keys(CF.api.KIND_OPT)) === J([''].concat(Object.keys(CF.api.KIND))) && J(Object.keys(CF.api.KIND)) === J(SVt.KINDS),
     J({ cfgBtn5 }));
 } catch (e) { console.log('  (29 판③ 검사 생략 — ' + e.message + ')'); fails++; }
@@ -12721,7 +12721,7 @@ try {
   K2.api.outVeh(); await fl29u(); const k2p = K2.env.pend.length; K2.env.pend.splice(0);   // 대기열이 다 보내진 뒤(결재 생성 끝 — 목록에는 아직 없음)를 흉내
   K2.api.STMT.appr = { ym: '2026-10', items: [] }; K2.api.STMT.month.vendors = vsO; const k2c = K2.api.vResend('2026-10', K2.api.group('veh')); K2.api.bar(); const barK = K2.env.el.innerHTML;
   T('29 판⑤ ② 차량 → 사장님 보고: 누르면 결재 목록·전월(9월) 읽고 확인 창(보고 글 그대로·"확정 1곳은 전달함") → stmt_sent(veh·appr·ref stmt:2026-10:veh·확정 곳만 base = 색인 at) → 결재 대기열 1건(kind 월말명세서·ref·내 id·cid·제목·본문)·영속·보냄·알림 → 달 다시 읽기 · 409 = 대기열 0·거래처 이름 붙은 까닭 · 같은 달 대기열 = 알림만(부르기 0) · 결재 대기 카드 = 확인 창에 "그 카드를 고칩니다" · 취소 = stmt_sent 0 · 기다리는 사이 사람 바뀜 = 아무것도 안 함 · 전달함인데 보고 없음 = 줄 붉은 안내·[보고 다시 올리기] → stmt_sent 없이 대기열 · 이미 확인된 보고가 있으면 다시 올리지 않음 · 결재 목록 못 읽음 = 안 올림 · 가장 늦은 보고가 반려 = [반려된 보고 다시 올리기]·안내 → 확인 창에 반려 까닭·새 카드(stmt_sent 없이) · 가장 늦은 카드가 대기면 다시 올리기 없음 · 이 세션에서 막 올린 달은 결재 생성 전 다시 읽어도 \'보고 없음\' 안 알림',
-    busy2 === true && J(acts2) === J(['approvals_list', 'stmt_month:2026-09', 'stmt_sent:2026-10', 'stmt_month:2026-10', 'approvals_list']) && A2.api.STMT.outBusy === false
+    busy2 === true && J(acts2.filter((a) => !/^stmt_drop_list/.test(a))) === J(['approvals_list', 'stmt_month:2026-09', 'stmt_sent:2026-10', 'stmt_month:2026-10', 'approvals_list']) && A2.api.STMT.outBusy === false
     && J(sent2) === J({ action: 'stmt_sent', ym: '2026-10', group: 'veh', via: 'appr', ref: 'stmt:2026-10:veh', items: [{ vk: 'v05', base: 1001 }] })
     && A2.env.confirms.length === 1 && A2.env.confirms[0].indexOf(want1) > 0 && /확정 1곳은 '전달함'이 됩니다\. 올릴까요\?$/.test(A2.env.confirms[0])
     && J(pend2) === J([['월말명세서', 'stmt:2026-10:veh', 'u1', true, '월말명세서 2026-10 차량 거래처 2곳', true]]) && A2.env.saved === 1 && A2.env.flush === 1 && A2.env.toasts.indexOf('A:대표 결재로 상신 — 월말명세서 2026-10 차량 거래처 2곳') >= 0
@@ -12737,8 +12737,8 @@ try {
     && /data-st-out="veh" title="[^"]*">반려된 보고 다시 올리기<\/button><span class="st-no">보고가 반려됐습니다/.test(barJ) && /올린 보고: 반려 11\/13 — 포항모터스 빠짐/.test(barJ)
     && J2.env.pend.length === 1 && !J2.env.log.some((b) => b.action === 'stmt_sent') && /앞서 올린 보고가 반려됐습니다\(포항모터스 빠짐\) — 새로 올립니다/.test(J2.env.confirms[0] || '')
     && k2a === '' && k2b === 'none' && k2p === 1 && k2c === '' && barK.indexOf('전달함인데 올린 보고가 없습니다') < 0
-    && L2.env.pend.length === 0 && L2.env.toasts.some((s) => /^올리지 못했습니다 — 포항모터스|^올리지 못했습니다 — 일부 거래처만 전달함이 됐습니다/.test(s) || /일부 거래처만 전달함이 됐습니다/.test(s)) && J(L2.env.log.map((b) => b.action).slice(-3)) === J(['stmt_reindex', 'stmt_month', 'approvals_list'])
-    && M2.env.pend.length === 1 && J(M2.env.log.map((b) => b.action).slice(-3)) === J(['stmt_reindex', 'stmt_month', 'approvals_list'])
+    && L2.env.pend.length === 0 && L2.env.toasts.some((s) => /^올리지 못했습니다 — 포항모터스|^올리지 못했습니다 — 일부 거래처만 전달함이 됐습니다/.test(s) || /일부 거래처만 전달함이 됐습니다/.test(s)) && J(L2.env.log.map((b) => b.action).filter((a) => a !== 'stmt_drop_list').slice(-3)) === J(['stmt_reindex', 'stmt_month', 'approvals_list'])
+    && M2.env.pend.length === 1 && J(M2.env.log.map((b) => b.action).filter((a) => a !== 'stmt_drop_list').slice(-3)) === J(['stmt_reindex', 'stmt_month', 'approvals_list'])
     && N2.env.pend.length === 1 && N2.env.pend[0].mid === 'u1' && !N2.env.toasts.some((s) => /^A:/.test(s)) && !N2.api.STMT.rpt['2026-10'] && N2.api.STMT.outBusy === false && !N2.env.log.some((b) => b.action === 'stmt_month' && b.ym === '2026-10')
     && o2a === '' && o2b === 'none' && p2r === false && p2l === 'approvals_list' && p2n === 1 && !Q2.api.STMT.rpt['2026-10'],
     J({ acts2, sent2, pend2, toasts: A2.env.toasts, b2: B2.env.toasts, c2: [C2.env.log.length, C2.env.alerts], barO: barO.slice(0, 300), g2: [G2.env.log.map((b) => b.action), G2.env.pend.length], h2: H2.env.toasts, i2: I2.env.toasts,
@@ -12836,9 +12836,9 @@ try {
     && /if \(String\(p\.ref \|\| ""\)\.indexOf\("stmt:"\) === 0 && typeof stmtApprDropped === "function"\)\{ try \{ stmtApprDropped\(p\.ref\); \} catch\(e\)\{\} \}/.test(fl6)
     && /tb = \(vehDetTab === "stmt" && !canSee\("stmt"\)\) \? "ov" : vehDetTab;/.test(vd6) && /\(canSee\("stmt"\) \? '<button type="button" class="vs-stab' \+ \(tb === "stmt" \? ' on' : ''\) \+ '" data-vs-tab="stmt">월말명세서<\/button>' : ''\)/.test(vd6) && /if \(tb === "stmt"\) h \+= stmtVhHtml\(v\.id\);/.test(vd6)
     && /vehDetTab = \(k === "hist" \|\| k === "stmt"\) \? k : "ov";/.test(bv6) && /\[data-st-vreload\]/.test(bv6)
-    && (html.match(/id="stmtOutBar"/g) || []).length === 1 && /<div id="stmtBoardMsg"><\/div>\n\s*<div class="st-outbar" id="stmtOutBar"><\/div>\n\s*<div class="card" id="stmtBoard">/.test(html) && /\.st-outbar:empty\{display:none;\}/.test(html) && /\.st-oline\{display:flex;/.test(html)
+    && (html.match(/id="stmtOutBar"/g) || []).length === 1 && /<div id="stmtBoardMsg"><\/div>\n\s*(<div id="stmtDrop"><\/div>\n\s*)?<div class="st-outbar" id="stmtOutBar"><\/div>\n\s*<div class="card" id="stmtBoard">/.test(html) && /\.st-outbar:empty\{display:none;\}/.test(html) && /\.st-oline\{display:flex;/.test(html)
     && /STMT\.appr = null; STMT\.aseq\+\+; STMT\.outBusy = false; STMT\.rpt = \{\}; STMT_VH = \{\};/.test(rs6) && /if \(ob\) ob\.addEventListener\("click"/.test(bo6) && (bo6.match(/stmtOutVeh\(\)/g) || []).length === 1
-    && /STMT\.month = res\.body; STMT\.err = ""; STMT\.errCode = ""; stmtApprLoad\(ym\);/.test(lm6) && (html.match(/function stmtVehHtml\(/g) || []).length === 1,
+    && /STMT\.month = res\.body; STMT\.err = ""; STMT\.errCode = ""; stmtApprLoad\(ym\);( stmtDropLoad\(ym\);)?/.test(lm6) && (html.match(/function stmtVehHtml\(/g) || []).length === 1,
     '');
   // ⑦ 보내기 대기열(apprFlushCreates) 실제 동작 — 403 NO_WRITE = 버리고 알림·월말명세서면 버림 갈고리 · 403 DEVICE_NOT_APPROVED·코드 없음 = 남기고 '대기 중' · 200 = 빼고 다음 건 · 남의 것(mid)은 안 보냄
   const runFlush = async (resps, pend) => {
@@ -12967,13 +12967,13 @@ try {
   T('29 판④ ③ 읽은 뒤 바로 [확정 저장] = 작성 중(초안·redraft — 앞 초안 있음)으로 먼저 저장 → 이어서 확정(초안 없이) — 서버 DRAFT_ON_FINAL 피함',
     s5.length === 2 && s5[0].st === 'doing' && s5[0].d === 2 && s5[0].rd === true && s5[1].st === 'done' && s5[1].d === -1, J4({ s5, msg: e5.msg, rows: e5.rows.map((x) => [x.date, x.vin, x.veh, x.kind, x.amt, x.vat]), inv: e5.inv }));
   // ④ 파일 넣기 흐름
-  const RES4 = { status: 200, body: { status: 'OK', done: true, result: R4 } };
-  const U6 = mk4({ resp: { stmt_read: RES4 } }), e6 = U6.api.STMT.ed;
+  const RES4 = { status: 200, body: { status: 'OK', entry: { id: 'b'.repeat(24), vk: 'v07', state: 'read', n: 2 }, result: R4 } };   // 29 판⑥: 상세 넣기도 stmt_drop(첨부로 남김)
+  const U6 = mk4({ resp: { stmt_drop: RES4 } }), e6 = U6.api.STMT.ed;
   U6.api.file({ name: '가온.html', size: 1000, b64: 'QUJD' });
   await fl4();
-  const rq6 = U6.env.log.filter((x) => x.body.action === 'stmt_read')[0];
+  const rq6 = U6.env.log.filter((x) => x.body.action === 'stmt_drop')[0];
   let polls7 = 0;
-  const U7 = mk4({ resp: { stmt_read: { status: 200, body: { status: 'OK', done: false, job: 'a'.repeat(24), mode: 'image' } },
+  const U7 = mk4({ resp: { stmt_drop: { status: 200, body: { status: 'OK', entry: { id: 'c'.repeat(24), vk: 'v07', state: 'reading', job: 'a'.repeat(24) } } },
     stmt_read_status: () => (++polls7 < 2 ? { status: 200, body: { status: 'OK', done: false } } : { status: 200, body: { status: 'OK', done: true, ok: true, result: Object.assign({}, R4, { src: 'vision', rows: R4.rows.map((x) => Object.assign({}, x, { how: 'vision' })) }) } }) } });
   const e7 = U7.api.STMT.ed;
   U7.api.file({ name: '사진.jpg', size: 2000, b64: 'QUJD' });
@@ -12983,13 +12983,13 @@ try {
   const bg7 = U7.env.log.filter((x) => x.fn === 'gw-stmt-read-background');
   const U8 = mk4(), e8 = U8.api.STMT.ed;
   U8.api.file({ name: 'big.pdf', size: 4300001, b64: '' });
-  const U9 = mk4({ resp: { stmt_read: { status: 400, body: { status: 'REJECTED', error_code: 'UNKNOWN_LAYOUT', why: '아직 모르는 엑셀(xlsx) 양식입니다' } } } }), e9 = U9.api.STMT.ed;
+  const U9 = mk4({ resp: { stmt_drop: { status: 200, body: { status: 'OK', entry: { id: 'd'.repeat(24), vk: 'v07', state: 'fail', code: 'UNKNOWN_LAYOUT' }, why: '아직 모르는 엑셀(xlsx) 양식입니다' } } } }), e9 = U9.api.STMT.ed;
   U9.api.file({ name: 'a.xlsx', size: 10, b64: 'QQ==' });
   await fl4();
   const U10 = mk4({ perm: 'view' }), e10 = U10.api.STMT.ed;
   U10.api.file({ name: 'a.html', size: 10, b64: 'QQ==' });
-  T('29 판④ ④ 파일 넣기: 바로 결과 = stmt_read(ym·vk·이름·b64) → 채움 · 그림 = job → 배경 함수 1번(id) → 상태 기다림(2번째에 결과) → 채움(how vision·AI 안내) · 4.3MB 넘음 = 서버 안 부름·안내 · 서버 거절 = 까닭 글(UNKNOWN_LAYOUT + why) · 보기 권한 = 아무것도 안 함',
-    rq6 && rq6.body.ym === '2026-10' && rq6.body.vk === 'v07' && rq6.body.name === '가온.html' && rq6.body.b64 === 'QUJD' && e6.rows.length === 2
+  T('29 판④ ④ 파일 넣기(29 판⑥부터 stmt_drop — 첨부로 남김): 바로 결과 = stmt_drop(ym·vk·이름·b64) → 채움 · 그림 = job → 배경 함수 1번(id) → 상태 기다림(2번째에 결과) → 채움(how vision·AI 안내) · 4.3MB 넘음 = 서버 안 부름·안내 · 서버 거절 = 까닭 글(UNKNOWN_LAYOUT + why) · 보기 권한 = 아무것도 안 함',
+    rq6 && rq6.body.ym === '2026-10' && rq6.body.vk === 'v07' && rq6.body.name === '가온.html' && rq6.body.b64 === 'QUJD' && e6.rows.length === 2 && J4(e6.dropIds) === J4(['b'.repeat(24)])
     && busy7 && bg7.length === 1 && bg7[0].body.id === 'a'.repeat(24) && polls7 === 2 && e7.rows.length === 2 && e7.rows[0].how === 'vision' && /AI 판독/.test(e7.read.msg)
     && U8.env.log.length === 0 && e8.read.bad && /4MB/.test(e8.read.msg) && e9.read.bad && /모르는 양식/.test(e9.read.msg) && /xlsx/.test(e9.read.msg) && U10.env.log.length === 0 && !e10.read,
     J4({ rq6: rq6 && rq6.body.action, n6: e6.rows.length, busy7, bg7: bg7.length, polls7, n7: e7.rows.length, m8: e8.read, m9: e9.read, l10: U10.env.log.length }));
@@ -13008,6 +13008,142 @@ try {
     && /var STMT_READ_MAX = 4300000/.test(ssb4) && /const READ_MAX = 4300000;/.test(sv4) && /stmt_read: handleRead/.test(sv4) && /stmt_read_status: handleReadStatus/.test(sv4)
     && /ed\.afterDraft = null;\s*\n\s*stmtEdRefresh\(\);\s*\n\s*\}/.test(dn4) && /accept="\.html,\.htm,\.xml,\.pdf,\.xls,\.xlsx,\.jpg,\.jpeg,\.png"/.test(U1.api.box(e1)));
 } catch (e) { console.log('  (29 판④ 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ---- 29 판⑥(PM 11/14 '10월거는 전체 pdf파일로 첨부' · '드래그해서 넣는거 아니었냐' · ㄱ) — 월 목록 원본 한꺼번에 넣기·첨부 원본: index.html @stmt-sheet 구간을 가짜 서버로 돌린다
+//      ① 여러 파일 = 하나씩 차례로 stmt_drop(이름·b64 · 거래처 안 보냄) · 4.3MB 넘음 = 안 보냄·까닭 · AI 판독 = 배경 1번 · 같은 파일 = 건너뜀 셈 · 끝나면 목록 다시 읽기 · 상자·손볼 파일·원본 없음 칩
+//      ② 거래처 고르기 = stmt_drop_set → 배경  ③ 상세 자동 채우기(빈 명세만 · 명세 파일 먼저 → 계산서 · 채운 원본 뺌) → 저장 drop_ids → 채움 표시  ④ 줄 있는 상세·확정 = 안 채움  ⑤ 정적 배선  ⑥ 결함 사본
+try {
+  const blk6 = (a, b) => { const i = html.indexOf(a), j = html.indexOf(b); if (i < 0 || j < i) throw new Error('구간 없음: ' + a); return html.slice(i, j); };
+  const fn6 = (name) => { const i = html.indexOf('function ' + name + '('); if (i < 0) throw new Error('함수 없음: ' + name); let d = 0, st = false; for (let j = i; j < html.length; j++) { const ch = html[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return html.slice(i, j + 1); } } throw new Error('중괄호 짝 안 맞음: ' + name); };
+  const ssb6 = blk6('// @stmt-sheet-start', '// @stmt-sheet-end'), vsb6 = blk6('// @vs-sheet-start', '// @vs-sheet-end');
+  const CFG6 = [{ vk: 'v07', name: '가온상사', group: 'veh', kind: 'urea', basis: 'supply', carry: false, active: true, hint: [] },
+    { vk: 'v08', name: '포항모터스', group: 'veh', kind: '', basis: 'supply', carry: false, active: true, hint: [] },
+    { vk: 'v13', name: '꺼진곳', group: 'veh', kind: '', basis: 'supply', carry: false, active: false, hint: [] }];
+  const mk6 = (o, src) => {
+    o = o || {};
+    const env = { log: [], resp: o.resp || {}, confirms: [], timers: [], rs: 0, vm: [], els: { stmtDrop: { innerHTML: '' }, stmtDropEd: { innerHTML: '' } }, opened: [] };
+    const api = new Function('__env', [
+      'var window = { open: function(){ __env.opened.push(1); return { location: {}, close: function(){} }; } }, localStorage = { getItem: function(){ return null; }, setItem: function(){} }, ResizeObserver = undefined, currentTab = "stmt";',
+      'var document = { getElementById: function(id){ return __env.els[id] || null; }, querySelector: function(){ return null; }, querySelectorAll: function(){ return []; }, activeElement: null };',
+      'function setTimeout(f, ms){ __env.timers.push({ f: f, ms: ms }); return __env.timers.length; }',
+      'function FileReader(){ var me = this; this.readAsDataURL = function(f){ me.result = "data:application/octet-stream;base64," + f.b64; if (f.fail) me.onerror(); else me.onload(); }; }',
+      'function confirm(m){ __env.confirms.push(m); return true; } function alert(m){}',
+      fn6('esc'), fn6('pad'), fn6('isDate'),
+      'function myId(){ return "u1"; } function canDo(m){ return m === "stmt"; } function canSee(m){ return true; }',
+      'function findVeh(){ return null; } function liveVehicles(){ return []; } function findMember(){ return null; } function dispName(n){ return n; } function gwToast(){} function onSessionInvalid(){}',
+      'function gwCall(fn, body){ __env.log.push({ fn: fn, body: JSON.parse(JSON.stringify(body)) }); var k = fn === "gw-stmt" ? body.action : fn, r = __env.resp[k]; if (typeof r === "function") r = r(body); return Promise.resolve(r || { status: 200, body: { status: "OK" } }); }',
+      'var apprPendingCreates = []; function apprSavePending(){} function apprFlushCreates(){} function apprToastShow(){} function activeMembers(){ return []; } function memberName(){ return ""; }',
+      'var tasks = [], autoGenReady = {}; function liveTasks(){ return []; } function genId(p){ return p + "1"; } function todayStr(){ return "2026-11-14"; } function getUser(){ return "권민지"; }',
+      'function saveTasksCache(){} function renderTasks(){} function renderSummary(){} function scheduleTasksSave(){} var vehOpenId = null, vehDetTab = "ov"; function renderVehicles(){} function isAdmin(){ return false; } function loadTasks(){}',
+      vsb6, src || ssb6,
+      'stmtEdRender = function(){}; stmtEdRefresh = function(){}; stmtVehMatch = function(i){ __env.vm.push(i); }; stmtLoadMonth = function(){}; renderStmt = function(){ __env.rs++; };',
+      'return { STMT: STMT, load: stmtEdLoad, save: stmtEdSave, files: stmtDropFiles, html: stmtDropHtml, render: stmtDropRender, setVk: stmtDropSetVk, auto: stmtDropAuto, chip: stmtDropChip, missing: stmtDropMissing, edInner: stmtDropEdInner, rows: stmtBoardRows };'].join('\n'))(env);
+    api.STMT.ym = '2026-10';
+    api.STMT.month = { status: 'OK', ym: '2026-10', cfg: CFG6, vendors: {} };
+    api.STMT.drop = { ym: '2026-10', ok: true, list: (o.list || []).slice() };
+    return { env, api };
+  };
+  const J6 = (x) => JSON.stringify(x);
+  const fl6 = async () => { for (let k = 0; k < 40; k++) await new Promise((r) => setTimeout(r, 0)); };
+  const E6 = (id, o) => Object.assign({ id: id.repeat(24).slice(0, 24), name: id + '.pdf', size: 2048, kind: 'pdf', vk: 'v07', how: 'name', state: 'read', code: '', job: '', n: 2, src: 'pdf', warn: 0, by: 'u1', at: 1, applied: 0 }, o);
+  // ① 여러 파일
+  let inflight6 = 0, maxIn6 = 0;
+  const dropResp6 = (b) => {
+    if (b.name === 'a.pdf') return { status: 200, body: { status: 'OK', entry: E6('a'), result: { rows: [] } } };
+    if (b.name === 'b.jpg') return { status: 200, body: { status: 'OK', entry: E6('b', { name: 'b.jpg', kind: 'image', state: 'reading', job: 'j'.repeat(24), src: 'vision', n: 0 }) } };
+    if (b.name === 'c.pdf') return { status: 200, body: { status: 'OK', entry: E6('c', { vk: '', how: '', state: 'novendor', n: 0, src: '' }) } };
+    if (b.name === 'd.pdf') return { status: 200, body: { status: 'OK', dup: true, entry: E6('a') } };
+    return { status: 400, body: { status: 'REJECTED', error_code: 'UNSUPPORTED_TYPE' } };
+  };
+  const slow6 = (b) => { inflight6++; maxIn6 = Math.max(maxIn6, inflight6); return new Promise((r) => setTimeout(() => { inflight6--; r(dropResp6(b)); }, 2)); };
+  const waitQ6 = async (api) => { for (let k = 0; k < 200 && !(api.STMT.dq && api.STMT.dq.busy === false); k++) await new Promise((r) => setTimeout(r, 5)); await fl6(); };
+  const U1 = mk6({ resp: { stmt_drop: slow6, stmt_drop_list: (b) => ({ status: 200, body: { status: 'OK', list: U1.api.STMT.drop.list } }) } });
+  U1.api.files([{ name: 'a.pdf', size: 10, b64: 'QQ==' }, { name: 'big.pdf', size: 4300001, b64: '' }, { name: 'b.jpg', size: 10, b64: 'Qg==' }, { name: 'c.pdf', size: 10, b64: 'Qw==' }, { name: 'd.pdf', size: 10, b64: 'QQ==' }, { name: 'x.txt', size: 10, b64: 'eA==' }]);
+  await waitQ6(U1.api);
+  const drops1 = U1.env.log.filter((x) => x.body.action === 'stmt_drop');
+  const bg1 = U1.env.log.filter((x) => x.fn === 'gw-stmt-read-background');
+  const q1 = U1.api.STMT.dq, h1 = U1.api.html();
+  const lastAct1 = U1.env.log.map((x) => x.body.action || x.fn).slice(-1)[0];
+  const chips1 = U1.api.rows().map((r) => r.vk + ':' + (/원본 없음/.test(U1.api.chip(r)) ? 'none' : (/📎(\d+)/.exec(U1.api.chip(r)) || [])[1] || ''));
+  T('29 판⑥ ① 여러 파일 한꺼번에: stmt_drop 5번(4.3MB 넘음 안 보냄) 차례로(동시 1)·거래처·ym 2026-10·이름·b64 · AI 판독만 배경 1번(job) · 넣음 3·건너뜀 1(같은 파일)·까닭 2(크기·모르는 꼴) · 끝나면 목록 다시 읽기 · 상자(여러 파일 input)·손볼 파일(거래처 고르기 칸·읽는 중) · 칩 가온 📎2(같은 파일은 한 번)·포항 원본 없음·꺼진 곳 줄 없음',
+    J6(drops1.map((x) => x.body.name)) === J6(['a.pdf', 'b.jpg', 'c.pdf', 'd.pdf', 'x.txt']) && drops1.every((x) => x.body.ym === '2026-10' && !('vk' in x.body) && !!x.body.b64) && maxIn6 === 1
+    && bg1.length === 1 && bg1[0].body.id === 'j'.repeat(24) && q1.busy === false && q1.done === 3 && q1.dup === 1 && q1.errs.length === 2 && /4MB/.test(q1.errs[0]) && /x\.txt/.test(q1.errs[1])
+    && lastAct1 === 'stmt_drop_list' && /원본 한꺼번에 넣기/.test(h1) && /<input type="file" id="stmtDropFile" multiple/.test(h1) && /data-st-dropvk="c{24}"/.test(h1) && /AI 읽는 중/.test(h1) && !/data-st-dropvk="a{24}"/.test(h1)
+    && /원본 없는 거래처 1곳/.test(h1) && J6(chips1) === J6(['v07:2', 'v08:none']),
+    J6({ names: drops1.map((x) => x.body.name), maxIn6, bg: bg1.length, q: { done: q1.done, dup: q1.dup, errs: q1.errs }, lastAct1, chips1 }));
+  // ② 거래처 고르기
+  const U2 = mk6({ list: [E6('c', { vk: '', state: 'novendor' })], resp: { stmt_drop_set: { status: 200, body: { status: 'OK', entry: E6('c', { vk: 'v08', how: 'pick', state: 'reading', job: 'k'.repeat(24) }) } } } });
+  U2.api.setVk('c'.repeat(24), 'v08'); await fl6();
+  const set2 = U2.env.log.filter((x) => x.body.action === 'stmt_drop_set')[0], bg2 = U2.env.log.filter((x) => x.fn === 'gw-stmt-read-background');
+  T('29 판⑥ ② 거래처 고르기 = stmt_drop_set(ym·id·vk) → 줄 바뀜(포항 v08·읽는 중) → 배경 판독 1번 · 다시 그림',
+    set2 && set2.body.ym === '2026-10' && set2.body.id === 'c'.repeat(24) && set2.body.vk === 'v08' && U2.api.STMT.drop.list[0].vk === 'v08' && bg2.length === 1 && bg2[0].body.id === 'k'.repeat(24) && U2.env.rs >= 1,
+    J6({ set2: set2 && set2.body, bg2: bg2.length, rs: U2.env.rs }));
+  // ③ 상세 자동 채우기 — 명세 파일(엑셀·글자 PDF 먼저) → 계산서 · 채운 원본·다른 거래처 뺌 → 저장 drop_ids → 채움 표시
+  const RS3 = { ok: true, src: 'pdf', rows: [{ date: '2026-10-02', vraw: '6441', item: '요소수', kind: 'urea', qty: 13, unit: 1500, amt: 17727, vat: 1773, note: '', how: 'pdf' }], warn: [] };
+  const RI3 = { ok: true, src: 'nts', rows: [{ date: '2026-10-31', vraw: '', item: '요소수 외', kind: 'urea', qty: null, unit: null, amt: 17727, vat: 1773, note: '', how: 'file' }], inv: { date: '2026-10-31', supply: 17727, vat: 1773, total: 19500 }, warn: [] };
+  const L3 = [E6('v', { src: 'vision', at: 9 }), E6('p', { src: 'pdf', at: 5 }), E6('n', { name: 'NTS.html', kind: 'nts', src: 'nts' }), E6('o', { src: 'pdf', applied: 7 }), E6('q', { vk: 'v08', src: 'pdf' })];
+  const get3 = (b) => ({ status: 200, body: { status: 'OK', entry: L3.find((x) => x.id === b.id), result: b.id === 'n'.repeat(24) ? RI3 : RS3 } });
+  const U3 = mk6({ list: L3, resp: { stmt_drop_get: get3, stmt_save: (b) => ({ status: 200, body: { status: 'OK', doc: { status: 'doing', updated_at: 5, rows: b.rows.map((x) => Object.assign({ qd: 0, ud: 0 }, x, { qty: Number(x.qty) || null, unit: Number(x.unit) || null })), inv: b.inv, stated: b.stated, carry: b.carry, draft: b.draft_rows ? { rows: b.draft_rows } : null }, checks: { ok: false } } }) } });
+  U3.api.STMT.ed = { ym: '2026-10', vk: 'v07', loading: true, err: '', msg: '', vendor: null, rows: [] };
+  U3.api.load({ vendor: CFG6[0], doc: null });
+  const ed3 = U3.api.STMT.ed;
+  U3.api.auto(ed3); await fl6(); await U3.env.timers.splice(0).filter((t) => t.ms === 50).forEach((t) => t.f()); await fl6();
+  const gets3 = U3.env.log.filter((x) => x.body.action === 'stmt_drop_get').map((x) => x.body.id[0]);
+  const fill3 = { rows: ed3.rows.length, item: ed3.rows[0] && ed3.rows[0].item, inv: ed3.inv.total, ids: ed3.dropIds.map((x) => x[0]) };
+  U3.api.save('doing'); await fl6();
+  const sv3 = U3.env.log.filter((x) => x.body.action === 'stmt_save')[0];
+  const ap3 = U3.api.STMT.drop.list.filter((x) => x.applied).map((x) => x.id[0]).sort();
+  const inner3 = U3.api.edInner(U3.api.STMT.ed);
+  T('29 판⑥ ③ 상세 자동 채우기: 빈 명세 = 글자 PDF(p — AI 판독 v보다 먼저) → 계산서(n) 차례로 stmt_drop_get 2번 · 채운 원본(o)·다른 거래처(q) 안 씀 · 줄 1개(요소수)·계산서 19,500 · 저장 drop_ids [p·n] → 첨부 목록 채움 표시(p·n·o) · 첨부 목록 = 이 거래처 4개·[채우기]·[열기]·[지우기]',
+    J6(gets3) === J6(['p', 'n']) && fill3.rows === 1 && fill3.item === '요소수' && fill3.inv === '19,500' && J6(fill3.ids) === J6(['p', 'n'])
+    && sv3 && J6((sv3.body.drop_ids || []).map((x) => x[0])) === J6(['p', 'n']) && J6(ap3) === J6(['n', 'o', 'p'])
+    && /첨부 원본 4개/.test(inner3) && (inner3.match(/data-st-drop="open"/g) || []).length === 4 && (inner3.match(/data-st-drop="del"/g) || []).length === 4,
+    J6({ gets3, fill3, drop_ids: sv3 && sv3.body.drop_ids, ap3 }));
+  // ④ 안 채우는 경우 — 줄 있는 상세 · 확정 문서 · 계산서만 넣은 상세
+  const U4 = mk6({ list: L3, resp: { stmt_drop_get: get3 } });
+  U4.api.STMT.ed = { ym: '2026-10', vk: 'v07', loading: true, err: '', msg: '', vendor: null, rows: [] };
+  U4.api.load({ vendor: CFG6[0], doc: { status: 'doing', updated_at: 3, rows: [{ r: 'a1', date: '2026-10-02', veh: '', vraw: '1', item: '사람 줄', kind: 'urea', qty: null, unit: null, amt: 10, vat: 1, how: 'hand' }] } });
+  U4.api.auto(U4.api.STMT.ed); await fl6();
+  const U4b = mk6({ list: L3, resp: { stmt_drop_get: get3 } });
+  U4b.api.STMT.ed = { ym: '2026-10', vk: 'v07', loading: true, err: '', msg: '', vendor: null, rows: [] };
+  U4b.api.load({ vendor: CFG6[0], doc: { status: 'done', updated_at: 3, rows: [] } });
+  U4b.api.auto(U4b.api.STMT.ed); await fl6();
+  T('29 판⑥ ④ 안 채움: 줄 있는 상세 = stmt_drop_get 0 · 확정 문서 = 0',
+    U4.env.log.filter((x) => x.body.action === 'stmt_drop_get').length === 0 && U4b.env.log.filter((x) => x.body.action === 'stmt_drop_get').length === 0,
+    J6([U4.env.log.length, U4b.env.log.length]));
+  // ⑤ 정적 배선
+  const bo5 = fn6('stmtBindOnce'), rs5 = fn6('renderStmt'), lm5 = fn6('stmtLoadMonth'), op5 = fn6('stmtDropOpen'), sv5 = fn6('stmtEdSave'), rf5 = fn6('stmtReadFile'), reset5 = fn6('stmtReset');
+  T('29 판⑥ ⑤ 정적: 화면 자리 #stmtDrop 1개(달 막대 아래·보고 막대 위) · 끌어다 놓기 = 탭 화면 전체(view-stmt) 4종 · 상자 클릭·바꿈 배선 · 그리기·숨김 목록 · 달 읽기 뒤 첨부 목록 · 원본 열기 = PDF·사진만 새 창(HTML·XML·엑셀은 내려받기) · 저장 drop_ids · 상세 넣기 = stmt_drop(stmt_read 안 씀) · 사람 바뀌면 비움 · 서버 동작 6개',
+    (html.match(/id="stmtDrop"/g) || []).length === 1 && /<div id="stmtBoardMsg"><\/div>\n\s*<div id="stmtDrop"><\/div>\n\s*<div class="st-outbar" id="stmtOutBar">/.test(html)
+    && /vw\.addEventListener\(n, stmtDropOnDrag\)/.test(bo5) && /dh\.addEventListener\("click", stmtDropOnClick\); dh\.addEventListener\("change", stmtDropOnChange\);/.test(bo5)
+    && /"stmtBoardMsg", "stmtDrop", "stmtOutBar"/.test(rs5) && /stmtDropRender\(\);/.test(rs5) && /stmtApprLoad\(ym\); stmtDropLoad\(ym\);/.test(lm5)
+    && /view = x\.kind === "pdf" \|\| x\.kind === "image";/.test(op5) && /a\.download = nm;/.test(op5) && /body\.drop_ids = ed\.dropIds\.slice\(0, 10\)/.test(sv5)
+    && /action: "stmt_drop", ym: ed\.ym, vk: ed\.vk/.test(rf5) && !/action: "stmt_read"/.test(rf5) && /STMT\.drop = null; STMT\.dq = null;/.test(reset5)
+    && ['stmt_drop_list', 'stmt_drop_set', 'stmt_drop_get', 'stmt_drop_del', 'stmt_drop_file'].every((a) => ssb6.indexOf('action: "' + a + '"') >= 0),
+    '');
+  // ⑥ 결함 사본 — 채운 원본 거르기 걷음(o가 또 채워짐) · 차례 걷음(다음 파일을 응답 전에 보냄) · HTML도 새 창(받은 HTML이 앱 주소에서 돎)
+  const mut6 = [];
+  {
+    const src = ssb6.replace('l = stmtDropOf(ed.vk).filter(function(x){ return x.state === "read" && !x.applied; });', 'l = stmtDropOf(ed.vk).filter(function(x){ return x.state === "read"; });');
+    if (src === ssb6) throw new Error('결함 사본 기준 없음 1');
+    const M = mk6({ list: [E6('o', { src: 'pdf', applied: 7 })], resp: { stmt_drop_get: get3 } }, src);
+    M.api.STMT.ed = { ym: '2026-10', vk: 'v07', loading: true, err: '', msg: '', vendor: null, rows: [] }; M.api.load({ vendor: CFG6[0], doc: null }); M.api.auto(M.api.STMT.ed); await fl6();
+    mut6.push(M.env.log.some((x) => x.body.action === 'stmt_drop_get') ? '잡힘' : '못 잡음');
+  }
+  {
+    const src = ssb6.replace('q.i++; stmtDropNext(q);\n      }).catch(', 'q.i++;\n      }).catch(').replace('fr.readAsDataURL(f);\n  }', 'fr.readAsDataURL(f); if (q.i + 1 < q.files.length){ q.i++; stmtDropNext(q); }\n  }');
+    if (src === ssb6) throw new Error('결함 사본 기준 없음 2');
+    inflight6 = 0; maxIn6 = 0;
+    const M = mk6({ resp: { stmt_drop: slow6, stmt_drop_list: { status: 200, body: { status: 'OK', list: [] } } } }, src);
+    M.api.files([{ name: 'a.pdf', size: 10, b64: 'QQ==' }, { name: 'c.pdf', size: 10, b64: 'Qw==' }]); await new Promise((r) => setTimeout(r, 40)); await fl6();
+    mut6.push(maxIn6 > 1 ? '잡힘' : '못 잡음');
+  }
+  {
+    const op = fn6('stmtDropOpen'), bad = op.replace('view = x.kind === "pdf" || x.kind === "image";', 'view = true;');
+    mut6.push(/view = x\.kind === "pdf" \|\| x\.kind === "image";/.test(bad) ? '못 잡음' : '잡힘');
+  }
+  T('29 판⑥ ⑥ 결함 사본 3개(채운 원본 거르기 걷음 · 차례로 보내기 걷음 · HTML도 새 창) = 모두 ✗(시험이 잡음)', mut6.every((x) => x === '잡힘'), mut6.join(' | '));
+} catch (e) { console.log('  (29 판⑥ 검사 생략 — ' + e.message + ')'); fails++; }
 
 try {
   // ---- v459(11/13 — P1 판1·2·4 · 판 번호 임시): 문서·판 번호 정확 검사. 다음 판은 이 검사를 숫자 비교(>= 456)로 풀고 새 판 정확 검사를 더할 것.

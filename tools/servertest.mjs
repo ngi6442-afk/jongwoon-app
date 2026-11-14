@@ -9089,6 +9089,148 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   }
 }
 
+// 91 체크 29 월말명세서 판⑥ 원본 첨부·한꺼번에 넣기(PM 11/14 '10월거는 전체 pdf파일로 첨부' · '드래그해서 넣는거 아니었냐' · ㄱ):
+//    stmt_drop(수행만 · 거래처 = 파일 이름 → 글자 내용 → 못 찾으면 novendor · 원본 gw_files stmtfile:<id> · 한 줄 gw_data stmtdrop:<ym>:<id> · 같은 파일 dup) · stmt_drop_list(보기도)
+//    · stmt_drop_set(거래처 고름 → 다시 읽음 · 그림 = job → 배경 판독이 줄을 read로) · stmt_save drop_ids → 채움 표시 · stmt_drop_file(수행만·원본 그대로) · stmt_drop_del(넣은 사람·관리자만)
+{
+  const fs91 = require('fs');
+  const FX91 = join(FN, '..', '..', 'tools', 'fixtures', 'stmt29');
+  const gws91 = require(join(FN, 'gw-stmt.js'));
+  async function cs91(body, tok, dev) {
+    const r = await gws91.handler({ httpMethod: 'POST', headers: Object.assign({ authorization: tok ? 'Bearer ' + tok : '' }, dev ? { 'x-device-id': dev } : {}), body: JSON.stringify(body) });
+    return { code: r.statusCode, body: JSON.parse(r.body || '{}') };
+  }
+  const envBn91 = process.env.STMT_CORP_BN, envKey91 = process.env.ANTHROPIC_API_KEY;
+  process.env.STMT_CORP_BN = '0000000001,0000000002'; process.env.ANTHROPIC_API_KEY = 'test-not-real';
+  const cp91 = require.resolve(join(FN, '_lib/claude.js')), vp91 = require.resolve(join(FN, '_lib/stmtvision.js')), bp91 = require.resolve(join(FN, 'gw-stmt-read-background.js'));
+  const realC91 = require(cp91), savedC91 = require.cache[cp91];
+  const fakeC91 = { reply: '', calls: 0 };
+  require.cache[cp91] = { id: cp91, filename: cp91, loaded: true, exports: Object.assign({}, realC91, { callApiStream: async function () { fakeC91.calls++; return { content: [{ type: 'text', text: fakeC91.reply }], usage: { input_tokens: 10, output_tokens: 5 } }; } }) };
+  delete require.cache[vp91]; delete require.cache[bp91];
+  const bg91 = require(bp91);
+  const savedU91 = Object.assign({}, mem.gw_users), aud91 = auditMock.logs.length;
+  const keep91 = {}; ['stmt:2026-10:v03', 'stmtidx:2026-10'].forEach((k) => { if (k in mem.gw_data) keep91[k] = mem.gw_data[k]; });
+  const dropKeys91 = () => Object.keys(mem.gw_data).filter((k) => k.indexOf('stmtdrop:2026-10:') === 0);
+  try {
+    const D91 = { id: 'udo91', name: '수행91', admin: false, perms: { stmt: 'do' } }, V91 = { id: 'uview91', name: '보기91', admin: false, perms: { stmt: 'view' } };
+    const O91 = { id: 'uoth91', name: '다른수행91', admin: false, perms: { stmt: 'do' } }, H91 = { id: 'uhide91', name: '차량숨김91', admin: false, perms: { stmt: 'do', veh: 'hide' } };
+    [D91, V91, O91, H91].forEach((m) => { mem.gw_users['member:' + m.id] = m; });
+    mem.gw_users['device:dev1'] = { status: 'approved' };
+    const tD = issueSession(D91).token, tV = issueSession(V91).token, tO = issueSession(O91).token, tH = issueSession(H91).token;
+    const b64 = (f) => fs91.readFileSync(join(FX91, f)).toString('base64');
+    // ① 권한
+    const p1 = [await cs91({ action: 'stmt_drop', ym: '2026-10', name: '신일상사-26.10.xls', b64: b64('sinil_fake.xls') }, tV, 'dev1'),
+      await cs91({ action: 'stmt_drop', ym: '2026-10', name: '신일상사-26.10.xls', b64: b64('sinil_fake.xls') }, tH, 'dev1'),
+      await cs91({ action: 'stmt_drop_list', ym: '2026-10' }, tV, 'dev1'),
+      await cs91({ action: 'stmt_drop_file', ym: '2026-10', id: 'a'.repeat(24) }, tV, 'dev1'),
+      await cs91({ action: 'stmt_drop', ym: '2026-10', vk: 'v99', name: 'a.xls', b64: b64('sinil_fake.xls') }, tD, 'dev1'),
+      await cs91({ action: 'stmt_drop', ym: '2026-10', name: 'a.xls', b64: '' }, tD, 'dev1'),
+      await cs91({ action: 'stmt_drop_get', ym: '2026-10', id: '../x' }, tD, 'dev1')];
+    T('91 ① 첨부 권한·입력: 넣기 보기 403 NO_WRITE · 차량 숨김 403 · 목록은 보기도 200 · 원본 열기는 수행만(보기 403) · 없는 거래처 400 · 빈 파일 400 EMPTY_FILE · 꼴 틀린 id 400',
+      p1[0].code === 403 && p1[0].body.error_code === 'NO_WRITE' && p1[1].code === 403 && p1[2].code === 200 && Array.isArray(p1[2].body.list) && p1[3].code === 403
+      && p1[4].body.error_code === 'UNKNOWN_VENDOR' && p1[5].body.error_code === 'EMPTY_FILE' && p1[6].code === 400 && dropKeys91().length === 0,
+      p1.map((x) => x.code + '/' + (x.body.error_code || '')).join(' '));
+    // ② 파일 이름으로 거래처 찾음 → 바로 읽음 · 원본 남김 · 같은 파일 다시 = dup(새 줄·새 원본 없음) · 감사(파일 이름 없음)
+    const r2 = await cs91({ action: 'stmt_drop', ym: '2026-10', name: '신일상사-26.10.xls', b64: b64('sinil_fake.xls') }, tD, 'dev1');
+    const id2 = (r2.body.entry || {}).id || '';
+    const f2 = mem.gw_files['stmtfile:' + id2] || {}, e2 = mem.gw_data['stmtdrop:2026-10:' + id2] || {};
+    const d2 = await cs91({ action: 'stmt_drop', ym: '2026-10', name: '다른이름.xls', b64: b64('sinil_fake.xls') }, tD, 'dev1');
+    const au2 = auditMock.logs.slice(aud91).filter((l) => l.col === 'stmt' && l.ev[0].op === '명세서원본');
+    T('91 ② 이름으로 거래처(신일 v03·how name) → 바로 읽음(state read·src xls·줄 수) · 원본 stmtfile 그대로(base64 같음)·한 줄 stmtdrop · 결과 함께 · 같은 파일 다시 = dup(같은 id·줄 1개·원본 1개) · 감사 1줄(파일 이름 없음)',
+      r2.code === 200 && r2.body.entry.vk === 'v03' && r2.body.entry.how === 'name' && r2.body.entry.state === 'read' && r2.body.entry.src === 'xls' && r2.body.entry.n > 0 && r2.body.result && r2.body.result.rows.length === r2.body.entry.n
+      && f2.data === b64('sinil_fake.xls') && f2.ym === '2026-10' && e2.vk === 'v03' && !('data' in e2)
+      && d2.code === 200 && d2.body.dup === true && d2.body.entry.id === id2 && dropKeys91().length === 1 && Object.keys(mem.gw_files).filter((k) => k.indexOf('stmtfile:') === 0).length === 1
+      && au2.length === 1 && au2[0].ev[0].t.indexOf('.xls') < 0 && au2[0].ev[0].t.indexOf('신일') < 0,
+      JSON.stringify([r2.code, r2.body.entry, d2.body.dup, dropKeys91().length, au2.map((l) => l.ev[0].t)]));
+    // ③ 거래처 못 찾음(이름·내용 없음 — 그림) → novendor · 판독 안 맡김 · 고름(v07) → job · 배경 판독(가짜 Claude) → 줄이 read·원본은 남음 · 목록에 보임
+    const { Jimp: J91 } = require('jimp');
+    const img = new J91({ width: 120, height: 170, color: 0xffffffff });
+    for (let y = 40; y < 150; y += 10) for (let x = 10; x < 110; x++) img.setPixelColor(0x000000ff, x, y);
+    const jpg = (await img.getBuffer('image/jpeg', { quality: 80 })).toString('base64');
+    const r3 = await cs91({ action: 'stmt_drop', ym: '2026-10', name: '경영박사메일_20261112.jpg', b64: jpg }, tD, 'dev1');
+    const id3 = (r3.body.entry || {}).id || '';
+    const srcBefore3 = Object.keys(mem.gw_files).filter((k) => k.indexOf('stmtsrc:') === 0).length;
+    const s3 = await cs91({ action: 'stmt_drop_set', ym: '2026-10', id: id3, vk: 'v07' }, tD, 'dev1');
+    const job3 = (s3.body.entry || {}).job || '', src3 = mem.gw_files['stmtsrc:' + job3] || {};
+    const calls3 = fakeC91.calls;
+    const again3 = await cs91({ action: 'stmt_drop_set', ym: '2026-10', id: id3, vk: 'v07' }, tD, 'dev1');
+    fakeC91.reply = JSON.stringify({ rows: [{ date: '10/2', vraw: '6441', item: '요소수', qty: 13, unit: 1500, amt: 17727, vat: 1773, note: '' }], sum: { supply: 17727, vat: 1773, total: 19500 } });
+    await bg91.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + tD, 'x-device-id': 'dev1' }, body: JSON.stringify({ id: job3 }) });
+    const e3 = mem.gw_data['stmtdrop:2026-10:' + id3] || {};
+    const l3 = await cs91({ action: 'stmt_drop_list', ym: '2026-10' }, tD, 'dev1');
+    const g3 = await cs91({ action: 'stmt_drop_get', ym: '2026-10', id: id3 }, tD, 'dev1');
+    T('91 ③ 거래처 못 찾음 = novendor(판독 안 맡김) · 고름 v07 = reading·job(맡긴 표는 원본 대신 첨부 키만) · 읽는 중 다시 고름 = 400 READING · 배경 판독 → 줄 read·1줄·src vision·job 비움 · 원본 stmtfile 남음 · 맡긴 표 지움 · 목록 2개(결과 줄 없음) · stmt_drop_get = 결과',
+      r3.code === 200 && r3.body.entry.state === 'novendor' && r3.body.entry.vk === '' && srcBefore3 === 0 && calls3 === 0
+      && s3.code === 200 && s3.body.entry.state === 'reading' && /^[a-f0-9]{24}$/.test(job3) && src3.file === 'stmtfile:' + id3 && !src3.data && src3.drop && src3.drop.id === id3
+      && again3.code === 400 && again3.body.error_code === 'READING'
+      && e3.state === 'read' && e3.n === 1 && e3.src === 'vision' && e3.job === '' && !!mem.gw_files['stmtfile:' + id3] && !mem.gw_files['stmtsrc:' + job3] && fakeC91.calls === 1
+      && l3.code === 200 && l3.body.list.length === 2 && l3.body.list.every((x) => !('result' in x) && !('sha' in x)) && g3.body.result && g3.body.result.rows.length === 1,
+      JSON.stringify([r3.body.entry, s3.body.entry, again3.body.error_code, { st: e3.state, n: e3.n, job: e3.job }, fakeC91.calls, (l3.body.list || []).length]));
+    // ④ 저장에 drop_ids → 그 거래처 줄만 채움 표시 · 다른 거래처 id는 그대로 · 원본 열기(수행 — 다른 수행자도) = 같은 base64 · 지우기: 다른 수행자 403 NOT_OWNER · 넣은 사람 = 원본·줄 지움
+    const sv4 = await cs91({ action: 'stmt_save', ym: '2026-10', vk: 'v03', base: (mem.gw_data['stmt:2026-10:v03'] || {}).updated_at || 0, rows: [], drop_ids: [id2, id3] }, tD, 'dev1');
+    const ap4 = [!!(mem.gw_data['stmtdrop:2026-10:' + id2] || {}).applied, !!(mem.gw_data['stmtdrop:2026-10:' + id3] || {}).applied];
+    const fo4 = await cs91({ action: 'stmt_drop_file', ym: '2026-10', id: id2 }, tO, 'dev1');
+    const dl4 = [await cs91({ action: 'stmt_drop_del', ym: '2026-10', id: id2 }, tO, 'dev1'), await cs91({ action: 'stmt_drop_del', ym: '2026-10', id: id2 }, tD, 'dev1')];
+    T('91 ④ 저장 drop_ids = 그 거래처(v03) 첨부만 채움 표시(v07 첨부는 안 함) · 원본 열기 = 같은 base64·이름 · 지우기 다른 수행자 403 NOT_OWNER · 넣은 사람 = 원본·줄 지움',
+      sv4.code === 200 && J91a(ap4) === J91a([true, false]) && fo4.code === 200 && fo4.body.b64 === b64('sinil_fake.xls') && fo4.body.name === '신일상사-26.10.xls'
+      && dl4[0].code === 403 && dl4[0].body.error_code === 'NOT_OWNER' && dl4[1].code === 200 && !mem.gw_files['stmtfile:' + id2] && !mem.gw_data['stmtdrop:2026-10:' + id2],
+      JSON.stringify([sv4.code, sv4.body.error_code, ap4, fo4.code, dl4.map((x) => x.code)]));
+    // ⑤ 거래처 찾기 단위 — 실물 10월 파일 이름 꼴 · 둘 걸리면 정하지 않음 · 꺼진 거래처 뺌 · 내용(공급자 상호) · 글 전체는 3자 이상 낱말만
+    const RD91 = require(join(FN, '_lib/stmtread.js')), S91 = require(join(FN, '_lib/stmt.js'));
+    const SV91 = S91.SEED_VENDORS.map((v) => Object.assign({ active: true }, v));
+    const nm5 = ['대송ic주유소-26.10.pdf', '오천공구-26.09, 10.pdf', '철탑종합상사-26.10.pdf', '현대상용서비스-26.10.pdf', '종운환경 10월분.pdf', '경영박사메일_20261112135032-u6Ffw.pdf', 'NTS_eTaxInvoice (1).html', '가온·영남 묶음.pdf'].map((n) => (RD91.matchVendor(n, SV91, 2) || {}).vk || '');
+    const off5 = (RD91.matchVendor('가온상사.pdf', SV91.map((v) => v.vk === 'v07' ? Object.assign({}, v, { active: false }) : v).filter((v) => v.active), 2) || {}).vk || '';
+    const ct5 = await RD91.guessVendor(fs91.readFileSync(join(FX91, 'sinil_fake.xls')), '종운환경.xls', SV91.map((v) => v.vk === 'v03' ? Object.assign({}, v, { hint: v.hint.concat(['가짜부품']) }) : v), '2026-10');
+    const tx5 = [(RD91.matchVendor('포항시 남구 오천읍 영남 어딘가 가짜', SV91, 3) || {}).vk || '', (RD91.matchVendor('공급자 오천공구 포항', SV91, 3) || {}).vk || ''];
+    T('91 ⑤ 거래처 찾기: 이름 대송·오천·철탑·현대상용 = v05·v11·v10·v09 · 종운환경·경영박사·NTS·두 곳 묶음 = 못 찾음 · 꺼진 거래처 = 못 찾음 · 내용(엑셀 상호) = v03 content · 글 전체 짧은 낱말(오천·영남) 무시·오천공구 = v11',
+      J91a(nm5) === J91a(['v05', 'v11', 'v10', 'v09', '', '', '', '']) && off5 === '' && ct5 && ct5.vk === 'v03' && ct5.how === 'content' && J91a(tx5) === J91a(['', 'v11']),
+      JSON.stringify({ nm5, off5, ct5, tx5 }));
+    // ⑥ 결함 사본 — 같은 파일 막기 걷음 · 배경 판독의 줄 고침 걷음 · 저장 채움 표시의 거래처 확인 걷음 · 지우기 넣은 사람 검사 걷음 = 시험이 잡는지
+    const Mod91 = require('module');
+    const ssrc = fs91.readFileSync(join(FN, 'gw-stmt.js'), 'utf8'), bsrc = fs91.readFileSync(bp91, 'utf8');
+    const loadAs = (p, src) => { const m = new Mod91(p, null); m.filename = p; m.paths = Mod91._nodeModulePaths(dirname(p)); m._compile(src, p); return m.exports; };
+    const callG = async (G, body, tok) => { const r = await G.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + tok, 'x-device-id': 'dev1' }, body: JSON.stringify(body) }); return { code: r.statusCode, body: JSON.parse(r.body || '{}') }; };
+    const mut = [];
+    const cut = (src, a) => { if (src.indexOf(a) < 0) throw new Error('결함 사본 기준 없음: ' + a.slice(0, 50)); return src.split(a).join(''); };
+    {
+      const G = loadAs(join(FN, 'gw-stmt.js'), cut(ssrc, "if (same) return jr(200, { status: 'OK', dup: true, entry: dropMeta(same), request_id: R });"));
+      await callG(G, { action: 'stmt_drop', ym: '2026-10', name: 'x.xml', b64: b64('a_tax1.xml') }, tD);
+      const r = await callG(G, { action: 'stmt_drop', ym: '2026-10', name: 'x.xml', b64: b64('a_tax1.xml') }, tD);
+      mut.push(r.body.dup ? '못 잡음' : '잡힘');
+    }
+    {
+      const B = loadAs(bp91, cut(bsrc, 'await blobSet(store(DATA), k, e);'));
+      const r = await cs91({ action: 'stmt_drop', ym: '2026-10', vk: 'v07', name: 'g2.jpg', b64: (await img.getBuffer('image/jpeg', { quality: 70 })).toString('base64') }, tD, 'dev1');
+      await B.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + tD, 'x-device-id': 'dev1' }, body: JSON.stringify({ id: r.body.entry.job }) });
+      mut.push((mem.gw_data['stmtdrop:2026-10:' + r.body.entry.id] || {}).state === 'read' ? '못 잡음' : '잡힘');
+    }
+    {
+      const G = loadAs(join(FN, 'gw-stmt.js'), cut(ssrc, ' && g.data.vk === k.vk'));
+      const ids = dropKeys91().map((k) => mem.gw_data[k]).filter((e) => e.vk === 'v07' && !e.applied).map((e) => e.id);
+      await callG(G, { action: 'stmt_save', ym: '2026-10', vk: 'v03', base: (mem.gw_data['stmt:2026-10:v03'] || {}).updated_at || 0, rows: [], drop_ids: ids }, tD);
+      mut.push(ids.length && ids.some((id) => (mem.gw_data['stmtdrop:2026-10:' + id] || {}).applied) ? '잡힘' : '못 잡음');
+    }
+    {
+      const G = loadAs(join(FN, 'gw-stmt.js'), cut(ssrc, "if (g.data.by !== c.member.id && !c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'NOT_OWNER', request_id: R });"));
+      const one = dropKeys91().map((k) => mem.gw_data[k])[0];
+      const r = await callG(G, { action: 'stmt_drop_del', ym: '2026-10', id: one.id }, tO);
+      mut.push(r.code === 200 ? '잡힘' : '못 잡음');
+    }
+    T('91 ⑥ 결함 사본 4개(같은 파일 막기 걷음 · 배경 판독 줄 고침 걷음 · 채움 표시 거래처 확인 걷음 · 지우기 넣은 사람 검사 걷음) = 모두 다른 결과(시험이 잡음)', mut.every((x) => x === '잡힘'), mut.join(' | '));
+  } finally {
+    Object.keys(mem.gw_files || {}).forEach((k) => { if (/^stmt(src|read|file):/.test(k)) delete mem.gw_files[k]; });
+    Object.keys(mem.gw_data || {}).forEach((k) => { if (/^stmtdrop:|^stmt:2026-10:v03$|^stmtidx:2026-10$|^usage:stmt:/.test(k)) delete mem.gw_data[k]; });
+    Object.keys(keep91).forEach((k) => { mem.gw_data[k] = keep91[k]; });
+    Object.keys(mem.gw_users).forEach((k) => { if (!(k in savedU91)) delete mem.gw_users[k]; });
+    Object.keys(savedU91).forEach((k) => { mem.gw_users[k] = savedU91[k]; });
+    if (savedC91) require.cache[cp91] = savedC91; else delete require.cache[cp91];
+    delete require.cache[vp91]; delete require.cache[bp91];
+    if (envBn91 === undefined) delete process.env.STMT_CORP_BN; else process.env.STMT_CORP_BN = envBn91;
+    if (envKey91 === undefined) delete process.env.ANTHROPIC_API_KEY; else process.env.ANTHROPIC_API_KEY = envKey91;
+  }
+}
+function J91a(x) { return JSON.stringify(x); }
+
 { // ---- P1 판22 기기·계정 자동 처리(착수설명서 판22 58행 · 업무별 설계 전산 S3 858행·S2 857행·기한 837행 · PM 11/14 13:26 "45. 판22 ㄱ" · 원장 C142·T476).
   //   ① 권한 — 회수·7일 처리를 부르는 HTTP 액션 없음(gw-auth·gw-data — 세션·봇 키 모두) · runDaily를 부르는 곳 = gw-mchk-cron 하나 · devauto는 settings: 키를 쓰지 않음
   //   ② 새 기기 알림 — 직원 새 기기(verify·login) = 개발자 1발(우선기기·by 자동) · 같은 기기 다시 = 0 · 관리자 기기 = 0 · 기기 읽기 실패 = 0 · 해제 뒤 대기 = 0 · 개발자 0명 = 관리자 전원

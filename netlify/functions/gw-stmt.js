@@ -11,7 +11,7 @@
 // 권한(키 stmt): 관리자 수행 · 회원 perms.stmt(do 수행 / view 보기) · 값 없으면 숨김. 29 판②에서 권한관리 레지스트리(앱 7곳·서버 기본 숨김 3곳·gw-auth MODULES·ROLE_OPEN_PERMS)에 올렸다 —
 //   gw-data 컬렉션이 없는 키라(화관법 hw와 같은 꼴) 강제는 이 함수뿐이다. 기본 숨김을 PERM_CLOSED에 기대지 않고 여기서도 정한다(값 없음·이상한 값 = 숨김).
 //   모든 동작이 차량(veh) 권한도 본다(29 판② — 줄·색인·별칭이 차량 목록 id = 'v'+등록 때 전체 번호를 담음) — gw-data permOf와 같은 규칙(관리자 do · perms.veh · 값 없으면 보기), 숨김이면 403 NO_VEH_ACCESS.
-// 받지 않는 것: 스캔·원본 파일 자체(이름·쪽 수·sha만 — 원본은 권민지 PC·종이, v2 §4), 사업자번호·계좌·전화·주민번호(piiScan 거절), 대표자·기사·작업자 이름(줄에 이름 칸 없음),
+// 받지 않는 것: (29 판⑥부터 원본 파일은 첨부로 남김 — PM 11/14 '전체 pdf파일로 첨부', 아래 stmt_drop) 사업자번호·계좌·전화·주민번호(piiScan 거절), 대표자·기사·작업자 이름(줄에 이름 칸 없음),
 //   차량 목록에 없는 차량 id(줄·차량 소계·별칭 모두 목록으로 확인 — 지운 차 id는 받음).
 // 비전 판독(D1)은 이 함수에 없다 — 켜는 판은 노무사 회신(원장 T464) 뒤 따로.
 // 29 판⑤(PM 11/12 23:41 '운반일지 보고, 결재 탭' · 11/13 '결재 없이'): stmt_sent = 확정 문서 여러 곳을 한꺼번에 '전달함'으로(전달 기록 sent{at,by,via,ref}).
@@ -282,6 +282,13 @@ async function handleSave(st, c, d, R) {
     gapOk = await clogPut(st, k.ym, { ts: Date.now(), by: c.member.id, op: 'reopen', vk: k.vk });
   }
   await audit(c, '명세서저장', docKey(k.ym, k.vk), v.name + ' ' + k.ym + ' 줄 ' + doc.rows.length + '건 · ' + status + (chk.ok ? ' · 검산 통과' : ' · 붉은 ' + (chk.bad.length + chk.issues.length)));
+  // 29 판⑥ 첨부 원본으로 채운 뒤 저장 = 그 원본에 '채움' 표시(다음에 상세를 열 때 다시 자동으로 채우지 않게) — 실패해도 저장은 끝난 일
+  if (Array.isArray(d.drop_ids)) {
+    for (const id of d.drop_ids.slice(0, 10)) {
+      if (!RE_JOB.test(String(id))) continue;
+      try { const g = await getOpt(st, dropKey(k.ym, id)); if (g.ok && g.data && g.data.vk === k.vk && !g.data.applied) { g.data.applied = now; await blobSet(st, dropKey(k.ym, id), g.data); } } catch (e) {}
+    }
+  }
   return jr(200, { status: 'OK', doc: doc, checks: chk, idx: idxOk, gap: gapOk, request_id: R });
 }
 // 간극 기록 한 줄 — 깨진 기록은 덮지 않고 false(손댄 흔적을 새 체인으로 지우지 않게) · 쓴 뒤 다시 읽어 내 줄이 남았는지 확인, 동시 확정으로 빠졌으면 한 번 다시 붙임
@@ -578,8 +585,151 @@ async function handleReadStatus(st, c, d, R) {
   return jr(200, { status: 'OK', done: false, age: Date.now() - (Number(s.data.at) || 0), request_id: R });
 }
 
-const READ = { stmt_cfg_get: handleCfgGet, stmt_month: handleMonth, stmt_get: handleGet, stmt_veh: handleVeh, stmt_alias_get: handleAliasGet, stmt_gap: handleGap, stmt_match: handleMatch, stmt_read_status: handleReadStatus };
-const WRITE = { stmt_cfg_set: handleCfgSet, stmt_save: handleSave, stmt_revert: handleRevert, stmt_reindex: handleReindex, stmt_alias_set: handleAliasSet, stmt_sent: handleSent, stmt_read: handleRead };
+// ---- 29 판⑥ 원본 첨부·한꺼번에 넣기(PM 11/14 18:2x '10월거는 전체 pdf파일로 첨부' · '드래그해서 넣는거 아니었냐' · ㄱ) ----
+// 판④는 원본을 읽고 지웠다(판① 원칙) — PM이 원본을 첨부로 남기라 해서 바꿈. 넣은 파일은 모두 남는다:
+//   gw_files stmtfile:<id>        원본 { ym, name, size, kind, by, at, data(base64) } — PC 첨부 백업(files_backup.py)에 들어감
+//   gw_data  stmtdrop:<ym>:<id>   목록 한 줄 { id, ym, name, size, kind, sha, vk, how(name·content·pick·fixed), state(novendor·reading·read·fail), code, job, n, src, result, by, at, applied }
+//     한 파일 = 한 키(동시에 여러 개를 넣고 배경 판독이 따로 끝나도 서로 덮지 않음)
+// stmt_drop {ym, name, b64, vk?} — vk 없으면 파일 이름·내용으로 거래처를 찾고, 못 찾으면 novendor(사람이 stmt_drop_set으로 고름). 거래처가 정해지면 판④와 같은 길로 읽는다
+//   (글자 파일 = 바로 결과 · 그림·스캔 = 배경 판독 job — stmtsrc:<job>은 원본 대신 file 키만 들고, 배경 함수가 이 줄을 read·fail로 고침). 같은 달에 같은 파일(sha)은 다시 받지 않는다(dup).
+const DROP_MAX = 60;   // 한 달 원본 수 상한(거래처 12곳 × 계산서·명세·잔액 확인서 넉넉히)
+const STALE_READ = 20 * 60 * 1000;   // 배경 판독이 20분 넘게 안 끝나면 실패로 보임(배경 함수 15분 상한)
+function dropKey(ym, id) { return 'stmtdrop:' + ym + ':' + id; }
+function fileKey(id) { return 'stmtfile:' + id; }
+function dropName(s) { return String(s == null ? '' : s).split(/[\\/]/).pop().replace(/\d{10,}/g, '…').replace(/[\u0000-\u001f]/g, '').slice(0, 120); }
+function dropMeta(e) {   // 목록에 내는 칸(결과 줄은 stmt_drop_get으로만)
+  const st = (e.state === 'reading' && Date.now() - (Number(e.at) || 0) > STALE_READ) ? 'fail' : e.state;
+  return { id: e.id, name: e.name, size: e.size, kind: e.kind, vk: e.vk || '', how: e.how || '', state: st, code: st === 'fail' ? (e.code || 'READ_STALE') : (e.code || ''), job: e.job || '', n: e.n || 0, src: e.src || '', warn: (e.warn || 0), by: e.by, at: e.at, applied: e.applied || 0 };
+}
+async function dropList(st, ym) {
+  const l = await blobList(st, 'stmtdrop:' + ym + ':');
+  if (!l.ok) return { ok: false, code: l.code || 'LIST_FAILED' };
+  const keys = (l.keys || []).filter(function (k) { return String(k).indexOf('stmtdrop:' + ym + ':') === 0; }).slice(0, DROP_MAX * 2);
+  const out = [];
+  for (const k of keys) { const g = await blobGet(st, k); if (g.ok && g.data && g.data.id) out.push(g.data); }
+  out.sort(function (a, b) { return (Number(a.at) || 0) - (Number(b.at) || 0); });
+  return { ok: true, list: out };
+}
+// 거래처가 정해진 줄을 읽는다(판④ readFile) — 줄을 고쳐 돌려줌(쓰기는 부르는 쪽)
+async function dropRead(e, buf, vendor, c) {
+  const ctx = { ym: e.ym, vk: e.vk, vendor: { name: vendor.name, kind: vendor.kind, group: vendor.group, hint: vendor.hint } };
+  let r;
+  try { r = await RD.readFile(buf, e.name, ctx); } catch (x) { r = { ok: false, code: 'READ_FAILED' }; }
+  e.result = null; e.n = 0; e.src = ''; e.job = ''; e.code = ''; e.warn = 0; e.applied = 0;
+  if (!r.ok) { e.state = 'fail'; e.code = r.code || 'READ_FAILED'; if (r.why) e.why = String(r.why).slice(0, 120); return e; }
+  if (!r.ai) { e.state = 'read'; e.result = r.result; e.n = r.result.rows.length; e.src = r.result.src || ''; e.warn = (r.result.warn || []).length; return e; }
+  const job = crypto.randomBytes(12).toString('hex');
+  const w = await blobSet(store(FILES), 'stmtsrc:' + job, { bid: c.member.id, ym: e.ym, vk: e.vk, mode: r.ai, vendor: ctx.vendor, at: Date.now(), file: fileKey(e.id), drop: { ym: e.ym, id: e.id } });
+  if (!w.ok) { e.state = 'fail'; e.code = 'STORAGE_WRITE_FAILED'; return e; }
+  e.state = 'reading'; e.job = job; e.at_read = Date.now(); e.src = 'vision';
+  return e;
+}
+async function handleDrop(st, c, d, R) {
+  if (!S.RE_YM.test(String(d.ym || ''))) return bad('BAD_REQUEST', R);
+  if (d.vk !== undefined && d.vk !== null && d.vk !== '' && !S.RE_VK.test(String(d.vk))) return bad('BAD_REQUEST', R);
+  const cfg = await cfgRead(st);
+  if (!cfg.ok) return fail(cfg.code, R);
+  const fixed = d.vk ? vendorOf(cfg, d.vk) : null;
+  if (d.vk && !fixed) return bad('UNKNOWN_VENDOR', R);
+  if (typeof d.b64 !== 'string' || !d.b64) return bad('EMPTY_FILE', R);
+  if (d.b64.length > Math.ceil(READ_MAX * 4 / 3) + 8) return bad('FILE_TOO_LARGE', R);
+  const buf = Buffer.from(d.b64, 'base64');
+  if (!buf.length) return bad('EMPTY_FILE', R);
+  if (buf.length > READ_MAX) return bad('FILE_TOO_LARGE', R);
+  const name = dropName(d.name) || '이름 없는 파일';
+  const sha = crypto.createHash('sha256').update(buf).digest('hex');
+  const cur = await dropList(st, d.ym);
+  if (!cur.ok) return fail(cur.code, R);
+  const same = cur.list.filter(function (x) { return x.sha === sha; })[0];
+  if (same) return jr(200, { status: 'OK', dup: true, entry: dropMeta(same), request_id: R });
+  if (cur.list.length >= DROP_MAX) return bad('DROP_FULL', R);
+  const id = crypto.randomBytes(12).toString('hex');
+  const kind = RD.sniff(buf, name) || 'etc';
+  const fw = await blobSet(store(FILES), fileKey(id), { ym: d.ym, name: name, size: buf.length, kind: kind, by: c.member.id, at: Date.now(), data: d.b64.replace(/\s+/g, '') });
+  if (!fw.ok) return fail(fw.code || 'STORAGE_WRITE_FAILED', R);
+  let e = { id: id, ym: d.ym, name: name, size: buf.length, kind: kind, sha: sha, vk: '', how: '', state: 'novendor', by: c.member.id, at: Date.now() };
+  let v = fixed;
+  if (fixed) { e.vk = fixed.vk; e.how = 'fixed'; }
+  else {
+    const g = await RD.guessVendor(buf, name, cfg.vendors, d.ym);
+    if (g) { v = vendorOf(cfg, g.vk); e.vk = g.vk; e.how = g.how; }
+  }
+  if (v) e = await dropRead(e, buf, v, c);
+  const w = await blobSet(st, dropKey(d.ym, id), e);
+  if (!w.ok) { await blobDelete(store(FILES), fileKey(id)); return fail(w.code || 'STORAGE_WRITE_FAILED', R); }
+  await readSweep();
+  await audit(c, '명세서원본', d.ym + ':' + (e.vk || '?'), e.kind + ' ' + e.state + (e.n ? ' ' + e.n + '줄' : ''));   // 파일 이름은 남기지 않음
+  return jr(200, { status: 'OK', entry: dropMeta(e), result: e.state === 'read' ? e.result : null, why: e.why || '', request_id: R });
+}
+function dropIdOk(d) { return S.RE_YM.test(String(d.ym || '')) && RE_JOB.test(String(d.id || '')); }
+async function handleDropList(st, c, d, R) {
+  if (!S.RE_YM.test(String(d.ym || ''))) return bad('BAD_REQUEST', R);
+  const l = await dropList(st, d.ym);
+  if (!l.ok) return fail(l.code, R);
+  return jr(200, { status: 'OK', list: l.list.map(dropMeta), request_id: R });
+}
+async function handleDropGet(st, c, d, R) {
+  if (!dropIdOk(d)) return bad('BAD_REQUEST', R);
+  const g = await getOpt(st, dropKey(d.ym, d.id));
+  if (!g.ok) return fail(g.code, R);
+  if (!g.data) return jr(404, { status: 'NOT_FOUND', error_code: 'NO_FILE', request_id: R });
+  return jr(200, { status: 'OK', entry: dropMeta(g.data), result: g.data.state === 'read' ? (g.data.result || null) : null, why: g.data.why || '', request_id: R });
+}
+// 거래처 고르기·바꾸기(다시 읽음) · 채운 표시(applied)
+async function handleDropSet(st, c, d, R) {
+  if (!dropIdOk(d)) return bad('BAD_REQUEST', R);
+  const g = await getOpt(st, dropKey(d.ym, d.id));
+  if (!g.ok) return fail(g.code, R);
+  if (!g.data) return jr(404, { status: 'NOT_FOUND', error_code: 'NO_FILE', request_id: R });
+  let e = g.data;
+  if (d.applied === true && d.vk === undefined) {
+    e.applied = Date.now();
+  } else {
+    if (!S.RE_VK.test(String(d.vk || ''))) return bad('BAD_REQUEST', R);
+    const cfg = await cfgRead(st);
+    if (!cfg.ok) return fail(cfg.code, R);
+    const v = vendorOf(cfg, d.vk);
+    if (!v) return bad('UNKNOWN_VENDOR', R);
+    if (e.state === 'reading' && Date.now() - (Number(e.at_read || e.at) || 0) < STALE_READ) return bad('READING', R);
+    const f = await getOpt(store(FILES), fileKey(e.id));
+    if (!f.ok) return fail(f.code, R);
+    if (!f.data || !f.data.data) return jr(404, { status: 'NOT_FOUND', error_code: 'NO_FILE', request_id: R });
+    e.vk = v.vk; e.how = 'pick';
+    e = await dropRead(e, Buffer.from(String(f.data.data), 'base64'), v, c);
+    await audit(c, '명세서원본', d.ym + ':' + v.vk, '거래처 고름 · ' + e.state);
+  }
+  const w = await blobSet(st, dropKey(d.ym, d.id), e);
+  if (!w.ok) return fail(w.code || 'STORAGE_WRITE_FAILED', R);
+  return jr(200, { status: 'OK', entry: dropMeta(e), result: e.state === 'read' ? e.result : null, why: e.why || '', request_id: R });
+}
+async function handleDropFile(st, c, d, R) {   // 원본 열기 — 수행 권한(원본엔 이름·전화가 그대로 있음)
+  if (!dropIdOk(d)) return bad('BAD_REQUEST', R);
+  const g = await getOpt(st, dropKey(d.ym, d.id));
+  if (!g.ok) return fail(g.code, R);
+  if (!g.data) return jr(404, { status: 'NOT_FOUND', error_code: 'NO_FILE', request_id: R });
+  const f = await getOpt(store(FILES), fileKey(d.id));
+  if (!f.ok) return fail(f.code, R);
+  if (!f.data || !f.data.data) return jr(404, { status: 'NOT_FOUND', error_code: 'NO_FILE', request_id: R });
+  return jr(200, { status: 'OK', name: g.data.name, kind: g.data.kind, b64: f.data.data, request_id: R });
+}
+async function handleDropDel(st, c, d, R) {   // 잘못 넣은 파일 — 넣은 사람·관리자만
+  if (!dropIdOk(d)) return bad('BAD_REQUEST', R);
+  const g = await getOpt(st, dropKey(d.ym, d.id));
+  if (!g.ok) return fail(g.code, R);
+  if (!g.data) return jr(200, { status: 'OK', gone: true, request_id: R });
+  if (g.data.by !== c.member.id && !c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'NOT_OWNER', request_id: R });
+  const a = await blobDelete(store(FILES), fileKey(d.id));
+  if (a && a.ok === false) return fail(a.code || 'STORAGE_DELETE_FAILED', R);
+  const b = await blobDelete(st, dropKey(d.ym, d.id));
+  if (b && b.ok === false) return fail(b.code || 'STORAGE_DELETE_FAILED', R);
+  await audit(c, '명세서원본', d.ym + ':' + (g.data.vk || '?'), '지움');
+  return jr(200, { status: 'OK', request_id: R });
+}
+
+const READ = { stmt_cfg_get: handleCfgGet, stmt_month: handleMonth, stmt_get: handleGet, stmt_veh: handleVeh, stmt_alias_get: handleAliasGet, stmt_gap: handleGap, stmt_match: handleMatch, stmt_read_status: handleReadStatus, stmt_drop_list: handleDropList };
+// stmt_drop_get·stmt_drop_file은 읽기지만 수행 권한만(원본·읽은 줄 원문) — WRITE 표에 둔다
+const WRITE = { stmt_cfg_set: handleCfgSet, stmt_save: handleSave, stmt_revert: handleRevert, stmt_reindex: handleReindex, stmt_alias_set: handleAliasSet, stmt_sent: handleSent, stmt_read: handleRead,
+  stmt_drop: handleDrop, stmt_drop_get: handleDropGet, stmt_drop_set: handleDropSet, stmt_drop_file: handleDropFile, stmt_drop_del: handleDropDel };
 async function handler(event) {
   const R = rid();
   if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: CORS, body: '' };

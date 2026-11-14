@@ -32,6 +32,7 @@ function sniff(buf, name) {
 function finish(res, ctx) {
   const out = Object.assign({ warn: [] }, res);
   out.warn = Array.isArray(res.warn) ? res.warn.slice(0, 20) : [];
+  ctx = ctx || {};
   const vn = String(res.vendor && res.vendor.name || '').replace(/\s+/g, '');
   const hints = (ctx.vendor && Array.isArray(ctx.vendor.hint) ? ctx.vendor.hint : []).concat(ctx.vendor && ctx.vendor.name ? [String(ctx.vendor.name).replace(/\(.*\)/, '')] : []);
   if (vn && hints.length && !hints.some(function (h) { const k = String(h || '').replace(/\s+/g, ''); return k && (vn.indexOf(k) >= 0 || k.indexOf(vn) >= 0); })) {
@@ -137,4 +138,39 @@ async function readByAi(buf, mode, ctx) {
   return { ok: true, result: res, usage: r.usage, skipped: prep.skipped };
 }
 
-module.exports = { CORP, corpList, sniff, finish, readFile, readByAi, htmlText };
+// ---- 29 판⑥ 거래처 찾기(PM 11/14 '목록에서 한꺼번에') — 파일 이름 → 글자로 읽히는 내용(공급자 상호) → PDF 글 전체 순. 한 곳만 걸릴 때만 정한다(둘 이상·없음 = null → 사람이 고름)
+//   그림·스캔은 내용을 보지 않는다(AI에 보내려면 거래처별 가림 칸이 먼저 정해져야 함 — 가림 없이 보내지 않게)
+function normKey(s) { return String(s == null ? '' : s).replace(/\(.*?\)/g, '').replace(/\.[A-Za-z0-9]{2,5}$/, '').replace(/[\s_\-.,()[\]]/g, '').toLowerCase(); }
+function vendorKeys(v, min) { return [v.name].concat(Array.isArray(v.hint) ? v.hint : []).map(normKey).filter(function (k) { return k.length >= min; }); }
+function matchVendor(t, vendors, min) {
+  const n = normKey(t);
+  if (!n) return null;
+  const hit = vendors.filter(function (v) { return vendorKeys(v, min).some(function (k) { return n.indexOf(k) >= 0; }); });
+  return hit.length === 1 ? hit[0] : null;
+}
+async function guessVendor(buf, name, vendors, ym) {
+  const act = (vendors || []).filter(function (v) { return v && v.active !== false; });
+  const byName = matchVendor(name, act, 2);
+  if (byName) return { vk: byName.vk, how: 'name' };
+  const kind = sniff(buf, name);
+  try {
+    if (kind === 'nts' || kind === 'xml' || kind === 'xls' || kind === 'pdf') {
+      const r = await readFile(buf, name, { ym: ym, vk: '', vendor: null });
+      const vn = r.ok && r.result && r.result.vendor && r.result.vendor.name;
+      const v = vn ? matchVendor(vn, act, 2) : null;
+      if (v) return { vk: v.vk, how: 'content' };
+      if (kind === 'pdf') {
+        const P = require('./pdftext');
+        const t = await P.pdfText(buf);
+        if (t.ok && !t.textless && Array.isArray(t.pages)) {
+          const txt = t.pages.map(function (p) { return (p.items || []).map(function (i) { return i.str; }).join(' '); }).join(' ');
+          const w = matchVendor(txt, act, 3);   // 글 전체는 주소·품목에 짧은 낱말(오천·영남)이 섞임 — 3자 이상 낱말만
+          if (w) return { vk: w.vk, how: 'content' };
+        }
+      }
+    }
+  } catch (e) { /* 못 찾으면 사람이 고름 */ }
+  return null;
+}
+
+module.exports = { CORP, corpList, sniff, finish, readFile, readByAi, htmlText, guessVendor, matchVendor, normKey };
