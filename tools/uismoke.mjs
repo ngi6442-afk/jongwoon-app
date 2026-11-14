@@ -13073,7 +13073,7 @@ try {
   // ⑤ 판30·31이 붙을 한 곳
   const ckR = await runP({ res: RES_P(true), checks: [{ id: 'q30', title: '계약 서류 목록 — 분기 점검', render: (h) => { h.innerHTML = '<ul><li>표본 3건</li></ul>'; } }, { id: 'm31', title: '월 점검', render: () => { throw new Error('x'); } }] });
   T('P1 판29 ⑤ 점검 카드가 붙을 한 곳: PMCON_CHECKS 선언 1곳(빈 목록)·글자 5번(선언 1·그리기 함수 3·화면 주석 1 — 다른 곳에서 손대지 않음) · 비면 점검 카드 묶음 숨김 · 줄을 더하면 묶음이 보이고 카드마다 render(host) 1번(제목·자리 id) · 한 카드가 터져도 그 카드만 안내',
-    cntOf(html, 'var PMCON_CHECKS = [];') === 1 && (html.match(/PMCON_CHECKS/g) || []).length === 5 && (fnP('pmconChecksRender').match(/PMCON_CHECKS/g) || []).length === 3 && secP.indexOf('id="pmconChecksWrap" style="display:none;"') > 0
+    cntOf(html, 'var PMCON_CHECKS = [];') === 1 && (html.match(/PMCON_CHECKS(?!\.push\()/g) || []).length === 5 && (fnP('pmconChecksRender').match(/PMCON_CHECKS/g) || []).length === 3 && secP.indexOf('id="pmconChecksWrap" style="display:none;"') > 0
     && ckR.els.pmconChecksWrap.style.display === '' && ckR.els['pmconChk-q30'].innerHTML === '<ul><li>표본 3건</li></ul>' && ckR.els['pmconChk-m31'].innerHTML.indexOf('점검 카드를 그리지 못했습니다') > 0
     && ckR.els.pmconChecks.innerHTML.indexOf('계약 서류 목록 — 분기 점검') > 0,
     JSON.stringify({ n: (html.match(/PMCON_CHECKS/g) || []).length }));
@@ -13549,6 +13549,112 @@ try {
   T('v464 문서·판 번호(정확 검사): FEATURES 기준 v464 (2026-11-14)·v464 절(C081·C078·C083 · 함수 이름 · C114) · TESTLIST v464 칸 10(화면 7 · 게이트 [x] 3 — 12종 · PM 칸 0) · servertest 절 89 v464 · MANUAL 광주특별시·수정(-) · sw jw-shell-v464 · 결함 사본 ' + M64.length + '개 = 모두 ✗',
     r64.ok && M64.every((v) => v === false), JSON.stringify({ r: r64.info, mut: M64 }));
 } catch (e) { console.log('  (v464 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ---- P1 판30 계약 서류 목록 분기 점검 카드(시안 판3 ③ 794~805줄 · 착수설명서 판30 · 원장 T422·T476) — PM 콘솔 점검 카드 1장 ----
+//   ① 배선(정적): 카드 덩어리 = pmconChecksRender 바로 위 한 곳 · 점검 카드 목록에 push 1줄 · 서버 디스패치 2개 · 서버 부르는 action은 conchk_get·conchk_confirm뿐(목록 편집 호출 0) · 입력 칸 0 · 제안 단추는 기존 편집 카드(conProcCard)로만
+//   ② 실행(실제 conchkHtml·conchkRender·conchkConfirm을 가짜 화면으로): 시안 줄 그대로 · 표본 작으면 비율 없음 · 제안 없음/있음 · PM 아님 = 버튼 없음 · 확인한 분기 = '확인함' · 읽기 실패 안내 · 글 이스케이프
+//   ③ 누름 → 서버 본문 · 결함 사본
+try {
+  const fnQ = (src, name) => { const i = src.indexOf('function ' + name + '('); if (i < 0) throw new Error('함수 없음: ' + name); let d = 0, st = false; for (let j = i; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i, j + 1); } } throw new Error('중괄호 짝 안 맞음: ' + name); };
+  const gwdQ = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-data.js'), 'utf8'), libQ = readFileSync(join(ROOT, 'netlify', 'functions', '_lib', 'conchk.js'), 'utf8');
+  const permSecQ = (() => { const i = html.indexOf('<section class="view" id="view-perm">'); return i < 0 ? '' : html.slice(i, html.indexOf('</section>', i)); })();
+  const blkOf = (src) => { const a = src.indexOf('  // ---- P1 판30 계약 서류 목록 분기 점검 카드'), b = src.indexOf('  function pmconChecksRender(){'); return a > 0 && b > a ? src.slice(a, b) : ''; };
+  const blkQ = blkOf(html);
+  const actsQ = [...blkQ.matchAll(/action: "(\w+)"/g)].map((m) => m[1]);
+  T('P1 판30 ① 배선: 카드 덩어리 = pmconChecksRender 바로 위 한 곳(그리기 함수는 고치지 않음) · 점검 카드 목록에 push 1줄(id conchk) · 서버 디스패치 conchk_get·conchk_confirm(계산은 _lib/conchk.js 한 곳 · gw-data 연결 1줄) · 카드가 부르는 action = conchk_get·conchk_confirm뿐(목록 편집 호출 0) · 입력 칸 0 · 제안 단추 = 권한관리 계약 골조·목록 편집 카드(conProcCard)로 가기만',
+    blkQ.length > 0 && (blkQ.match(/PMCON_CHECKS\.push\(\{ id: "conchk", title: "계약 서류 목록 — 분기 점검", render: conchkRender \}\);/g) || []).length === 1 && (html.match(/PMCON_CHECKS\.push\(/g) || []).length >= 1
+      && /if \(d && d\.action === 'conchk_get'\) return await CONCHK\.get\(event, d, R\);/.test(gwdQ) && /if \(d && d\.action === 'conchk_confirm'\) return await CONCHK\.confirm\(event, d, R\);/.test(gwdQ)
+      && (gwdQ.match(/require\('\.\/_lib\/conchk'\)/g) || []).length === 1 && /function summarize\(o\)/.test(libQ) && (gwdQ.match(/^.*(?:CONCHK|conchk).*$/gm) || []).length === 4
+      && actsQ.sort().join(',') === 'conchk_confirm,conchk_get' && !/con_proc_edit|docs_set|map_add|scheduleContractSave/.test(blkQ) && !/<(input|select|textarea)\b/.test(blkQ)
+      && /pmconOpenCard\("conProcCard"\)/.test(blkQ) && permSecQ.indexOf('id="conProcCard"') >= 0,
+    JSON.stringify({ blk: blkQ.length, acts: actsQ }));
+  // ② 실행 — 가짜 화면
+  const runQ = (src, o) => {
+    const els = {}, calls = [], toasts = [], st = { rp: 0, sw: '' };
+    const mk = (id) => ({ id, innerHTML: '', _on: null, addEventListener(ev, f) { this._on = f; } });
+    const doc = { getElementById: (id) => (els[id] || (els[id] = mk(id))) };
+    const gw = (fn, body) => { calls.push(JSON.parse(JSON.stringify(body))); const r = (o.res || {})[body.action]; return Promise.resolve(typeof r === 'function' ? r(body) : (r || { status: 500, body: { error_code: 'X' } })); };
+    const api = new Function('document', 'gwCall', '__t', '__o', '__st', [
+      'function apprToastShow(m){ __t.push(m); } function renderPmcon(){ __st.rp++; } function switchTab(n){ __st.sw = n; } var setTimeout = function(){};',
+      'var confirm = function(){ return __o.confirm !== false; }, alert = function(m){ __t.push("alert:" + m); };',
+      'var PMCON_CHECKS = [];', fnQ(src, 'esc'), 'function pmconOpenCard(id){ __st.open = id; switchTab("perm"); }', blkOf(src),
+      'return { html: conchkHtml, render: conchkRender, confirm: conchkConfirm, checks: PMCON_CHECKS };'].join('\n'))(doc, gw, toasts, o, st);
+    return { els, calls, toasts, st, api };
+  };
+  const B0 = { status: 'OK', quarter: '2026-Q4', round: 1, months: ['2026-10', '2026-11'], live: { n: 7, types: [{ t: '준설', n: 7 }], docs: { total: 120, done: 51, todo: 69, na: 0 } },
+    log: { n: 69, contracts: 8, people: 2, done: 57, undo: 9, skip: 3, add: 0, del: 0, delta: 3 }, skips: [{ stage: '계약', n: 3, contracts: 1, docs: ['계약구비서류', '계약이행통합서약서', '사용인감계'] }],
+    suggest: [], sample: 3, small: true, ratio: null, learn: { pairs: 15, tpls: 5, cells: 182, sunset_off: 0 }, rule: { small_n: 10, min_contracts: 2, min_people: 2 }, checked: null, can_write: true };
+  const bQ = (o) => Object.assign(JSON.parse(JSON.stringify(B0)), o || {});
+  const visQ = (h) => h.replace(/<[^>]+>/g, '').replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+  const tick = async () => { for (let i = 0; i < 4; i++) await new Promise((r) => setTimeout(r, 0)); };
+  const chkQ = async (src) => {
+    const P = {}, I = {};
+    const rS = runQ(src, { res: { conchk_get: { status: 200, body: bQ() } } });
+    const hostS = { innerHTML: '' }; rS.api.render(hostS); await tick();
+    const hS = hostS.innerHTML, vS = visQ(hS);
+    P.A = rS.api.checks.length === 1 && rS.api.checks[0].id === 'conchk' && rS.calls.length === 1 && rS.calls[0].action === 'conchk_get'
+      && vS.indexOf('계약 서류 목록 — 분기 점검 1회차') >= 0 && vS.indexOf('표본 3건') >= 0
+      && vS.indexOf('진행 계약 7건(모두 준설) · 단계 서류 120건 — 끝 51 · 남음 69') >= 0
+      && vS.indexOf('10~11월 서류 기록 69건(계약 8건 · 직원 2명): 완료 57 · 되돌림 9 · 건너뜀 3 · 직원이 더한 서류 0') >= 0
+      && vS.indexOf("건너뜀 3건은 한 계약의 '계약' 단계 3종 — 계약구비서류 · 계약이행통합서약서 · 사용인감계") >= 0
+      && hS.indexOf('<b>목록에 넣자는 제안: 없음</b> — 같은 서류를 2건·2명 이상 더한 기록 0') >= 0
+      && vS.indexOf('학습: 짝 15건 · 허용 5양식 182칸 · 일몰로 꺼진 양식 0') >= 0
+      && vS.indexOf('분기 1회 — 표본이 작아 비율은 적지 않습니다') >= 0 && vS.indexOf('%') < 0 && vS.indexOf('비율 ') < 0
+      && hS.indexOf('id="conchkOkBtn">확인</button>') > 0 && hS.indexOf('conchkListBtn') < 0 && vS.indexOf('정하실 분: PM') < 0;
+    I.A = vS.slice(0, 400);
+    // 표본 큼 = 비율 · 제안 있음 = 이름·건수 + 편집 카드로 가는 단추 · PM 아님 · 확인함 · 읽기 실패 · 이스케이프
+    const rB = runQ(src, { res: { conchk_get: { status: 200, body: bQ({ sample: 11, small: false, ratio: 69, suggest: [{ name: '폐기물 <위탁>계약서', contracts: 2, people: 2, stages: ['계약'] }], skips: [{ stage: '계약', n: 1, contracts: 1, docs: ['<img src=x>'] }], log: Object.assign({}, B0.log, { skip: 1 }) }) } } });
+    const hostB = { innerHTML: '' }; rB.api.render(hostB); await tick(); const hB = hostB.innerHTML, vB = visQ(hB);
+    rB.els.conchkListBtn && rB.els.conchkListBtn._on && rB.els.conchkListBtn._on();
+    const rN = runQ(src, { res: { conchk_get: { status: 200, body: bQ({ can_write: false }) } } }); const hostN = { innerHTML: '' }; rN.api.render(hostN); await tick();
+    const rC = runQ(src, { res: { conchk_get: { status: 200, body: bQ({ checked: { ts: new Date(2026, 10, 14, 11, 40).getTime(), name: '나경일', n: 1 } }) } } }); const hostC = { innerHTML: '' }; rC.api.render(hostC); await tick();
+    const rF = runQ(src, { res: { conchk_get: { status: 503, body: { error_code: 'CONCHK_READ_FAILED' } } } }); const hostF = { innerHTML: '' }; rF.api.render(hostF); await tick();
+    P.B = vB.indexOf('목록을 바꾼 비율 69%') >= 0 && vB.indexOf('표본이 작아') < 0 && vB.indexOf('표본 11건') >= 0
+      && hB.indexOf('<b>목록에 넣자는 제안 1</b> — 폐기물 &lt;위탁&gt;계약서(계약 2건 · 2명 · 계약 단계)') >= 0 && hB.indexOf('id="conchkListBtn"') > 0 && rB.st.open === 'conProcCard'
+      && hB.indexOf('<img') < 0 && hB.indexOf('&lt;img src=x&gt;') > 0 && hB.indexOf('<위탁>') < 0
+      && hostN.innerHTML.indexOf('정하실 분: PM') > 0 && hostN.innerHTML.indexOf('conchkOkBtn') < 0
+      && hostC.innerHTML.indexOf('확인함 · 11-14 나경일') > 0 && hostC.innerHTML.indexOf('conchkOkBtn') < 0
+      && hostF.innerHTML.indexOf('불러오지 못했습니다 (CONCHK_READ_FAILED)') > 0;
+    I.B = [vB.slice(0, 300), rB.st.sw, hostN.innerHTML.length, hostC.innerHTML.indexOf('확인함'), hostF.innerHTML.slice(0, 120)];
+    // ③ 누름 → 서버 본문(conchk_confirm · 그 분기) → 콘솔 다시 그림 · 취소·PM 아님·확인한 분기 = 서버 안 부름 · 409 CONCHK_DONE = 안내
+    const rO = runQ(src, { res: { conchk_confirm: { status: 200, body: { status: 'OK' } } } });
+    rO.api.confirm(bQ()); await tick();
+    const rX = runQ(src, { confirm: false, res: {} }); rX.api.confirm(bQ());
+    const rY = runQ(src, { res: {} }); rY.api.confirm(bQ({ can_write: false })); rY.api.confirm(bQ({ checked: { ts: 1 } }));
+    const rD = runQ(src, { res: { conchk_confirm: { status: 409, body: { error_code: 'CONCHK_DONE' } } } }); rD.api.confirm(bQ()); await tick();
+    const sentO = rO.calls.filter((b) => b.action === 'conchk_confirm');
+    P.C = sentO.length === 1 && JSON.stringify(sentO[0]) === '{"action":"conchk_confirm","quarter":"2026-Q4"}' && rO.st.rp === 1 && rO.toasts.some((t) => t.indexOf('확인 — 누른 기록에 남겼습니다') === 0)
+      && rX.calls.length === 0 && rY.calls.length === 0 && rD.toasts.some((t) => t === '이번 분기는 이미 확인했습니다') && rD.st.rp === 1;
+    I.C = [JSON.stringify(sentO), rO.st.rp, rX.calls.length, rY.calls.length, rD.toasts.join('|')];
+    return { ok: Object.keys(P).every((k) => P[k]), P, I };
+  };
+  const RQ = await chkQ(html);
+  T('P1 판30 ② 실행(PM · 표본 3 = 시안 794~805줄 숫자): 머리 "분기 점검 1회차"·배지 "표본 3건" · 진행 계약·단계 서류 끝/남음 · 10~11월 서류 기록(계약·직원): 완료·되돌림·건너뜀·직원이 더한 서류 · 건너뜀 내역(단계·서류 이름) · 목록에 넣자는 제안: 없음 · 학습 한 줄 · [확인] 분기 1회 — 표본이 작아 비율 없음(% 0) · 제안 단추 없음',
+    RQ.P.A, String(RQ.I.A));
+  T('P1 판30 ② 실행(표본 11 · 제안 · PM 아님 · 확인함 · 읽기 실패): 비율 69% · 제안 1(이름·계약 2건·2명·단계) + [서류 목록 편집 열기] = 권한관리로 · 이름·서류 글 이스케이프 · PM 아님 = "정하실 분: PM"·버튼 0 · 확인한 분기 = "확인함 · 11-14 나경일"·버튼 0 · 읽기 실패 = 오류 코드 안내',
+    RQ.P.B, JSON.stringify(RQ.I.B));
+  T('P1 판30 ③ 누름: [확인] = conchk_confirm{quarter 2026-Q4} 하나 → 콘솔 다시 그림 1번·안내 · confirm 취소·PM 아님·확인한 분기 = 서버 안 부름 · 409 CONCHK_DONE = "이번 분기는 이미 확인했습니다"',
+    RQ.P.C, JSON.stringify(RQ.I.C));
+  const MUTQ = [
+    ['(b.small ? " — 표본이 작아 비율은 적지 않습니다" : "")', '(" — 표본이 작아 비율은 적지 않습니다")'],
+    ['(b.ratio !== null && b.ratio !== undefined ? ', '(true ? '],
+    ["(b.can_write ? '<button", "(true ? '<button"],
+    ['li.push(sg.length ? "<b>', 'li.push(false ? "<b>'],
+    ['esc(s.name) + "(계약 "', 's.name + "(계약 "'],
+    ['li.map(function(x, i){ return "<li>" + (i === 3 ? x : esc(x)) + "</li>"; })', 'li.map(function(x, i){ return "<li>" + x + "</li>"; })'],
+    ['if (conchkBusy || !b || !b.can_write || b.checked) return;', 'if (conchkBusy || !b) return;'],
+    ['var act = ck ? ', 'var act = false ? '],
+    ['pmconOpenCard("conProcCard")', 'pmconOpenCard("conLearnCard")'],
+  ];
+  const killQ = [];
+  for (const [from, to] of MUTQ) {
+    if (html.split(from).length !== 2) { killQ.push('결함 자리가 한 곳이 아님: ' + from.slice(0, 50)); continue; }
+    let k; try { k = !(await chkQ(html.replace(from, () => to))).ok; } catch (e) { k = true; }
+    if (k !== true) killQ.push(from.slice(0, 60) + ' 안 깨짐');
+  }
+  T('P1 판30 ④ 결함 사본 ' + MUTQ.length + '개(표본 작음 안내 늘 보임·비율 늘 적음·PM 아니어도 버튼·제안 숨김·제안 이름 이스케이프 걷음·줄 이스케이프 걷음·누름 PM·확인 검사 걷음·확인함 무시·제안 단추 다른 카드로) = 모두 ✗',
+    killQ.length === 0, killQ.join(' | '));
+} catch (e) { console.log('  (P1 판30 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

@@ -5639,6 +5639,8 @@ async function handlePmconDecide(event, d, R) {
   try { pmAu = await appendAudit({ ts: now, by: c.member.name, bid: c.member.id, col: 'pmcon', ev: [{ op: 'PM콘솔', id: row, t: PMCON_KINDS[kind].label + ' · ' + PMCON_CHOICES[choice] + (applied ? ' · 적용' : '') + ' · ' + grade + (rec.q ? ' · ' + rec.q.slice(0, 80) : '') }] }) !== false; } catch (e) { pmAu = false; }
   return jr(200, { status: 'OK', record: rec, applied: !!applied, marks: doc.marks, updated_at: doc.updated_at, audit: pmAu, request_id: R });
 }
+// P1 판30 계약 서류 목록 분기 점검(PM 콘솔 점검 카드) — 계산·핸들러는 _lib/conchk.js 한 곳. 읽기 = pmconGate(관리자) · [확인] = pmconGate(PM) + 누른 기록 1줄(row conchk:<분기>)
+const CONCHK = require('./_lib/conchk').handlers({ gate: pmconGate, read: pmconRead, fold: pmconFold, key: PMCON_KEY, store: function () { return store(DATA); }, blobGet, blobSet, blobList, appendAudit, learnSettings, LN, colKey, jr });
 
 // v378 큰 본문 양방향 gzip(2026-10-08 실사고): col:bids가 9/11 3.94MB(2,462건)에서 10/8 07:52 분할 전송 수신 뒤 6.69MB(3,953건)로 자라
 // Netlify 동기 함수 응답 한도 6MB(6,291,456B)를 넘자 get이 실패했고, 앱은 그 실패를 삼켜 "수집된 공고가 없습니다"로 보였다(PM "기존거 다 날라갔나").
@@ -5808,6 +5810,8 @@ async function handlerInner(event) {
     if (d && d.action === 'corp_reg_set') return await handleCorpRegSet(event, d, R);
     if (d && d.action === 'pmcon_get') return await handlePmconGet(event, d, R);   // P1 판29 PM 콘솔 누른 기록(status:decide) — 관리자 읽기
     if (d && d.action === 'pmcon_decide') return await handlePmconDecide(event, d, R);   // P1 판29 [ㄱ]/[보류]/[기본값] — PM만 · 값 바꾸기는 기존 핸들러
+    if (d && d.action === 'conchk_get') return await CONCHK.get(event, d, R);   // P1 판30 계약 서류 분기 점검 카드 — 관리자 읽기
+    if (d && d.action === 'conchk_confirm') return await CONCHK.confirm(event, d, R);   // P1 판30 [확인] 분기 1회 — PM만 · 누른 기록 1줄
     if (d && d.action === 'doc_att_put') return await handleDocAttPut(event, d, R);
     if (d && d.action === 'doc_att_get') return await handleDocAttGet(event, d, R);
     if (d && d.action === 'doc_att_del') return await handleDocAttDel(event, d, R);

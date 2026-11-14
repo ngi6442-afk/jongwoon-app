@@ -8287,4 +8287,154 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   } finally { reset28(); }
 }
 
+{ // ---- P1 판30 계약 서류 목록 분기 점검(PM 콘솔 점검 카드 — conchk_get·conchk_confirm, 계산 _lib/conchk.js) — 착수설명서 판30 · 시안 판3 ③ · 원장 T422·T476.
+  //   읽기 = 판29 pmconGate(관리자) · [확인] = pmconGate(PM) + 판29 누른 기록(status:decide)에 1줄(row conchk:<분기>) · 분기 1회(다시 누름 409) · 표본(더함+뺌+건너뜀) 10 미만이면 비율 없음 ·
+  //   제안 = 같은 서류(이름, 공백 무시)를 계약 2건 이상 그리고 사람 2명 이상이 더했을 때만(뒤에 뺀 것·지금 계약에 없는 것 제외).
+  //   검사마다 결함을 심은 conchk.js 사본(메모리 컴파일 → require 캐시 바꿔 끼우고 gw-data를 새로 컴파일)에서는 실패해야 한다.
+  const fs30 = require('fs'), Mod30 = require('module');
+  const FILE30 = join(FN, 'gw-data.js'), SRC30 = fs30.readFileSync(FILE30, 'utf8');
+  const rpC30 = require.resolve(join(FN, '_lib/conchk.js')), keepC30 = require.cache[rpC30], SRCC30 = fs30.readFileSync(rpC30, 'utf8');
+  const compile30 = (file, src) => { const m = new Mod30(file); m.filename = file; m.paths = Mod30._nodeModulePaths(dirname(file)); m._compile(src, file); m.loaded = true; return m; };
+  const gwOf30 = (csrc) => { require.cache[rpC30] = compile30(rpC30, csrc); try { return compile30(FILE30, SRC30).exports; } finally { require.cache[rpC30] = keepC30; } };
+  const caller30 = (mod) => async (body, tok, dev) => { const r = await mod.handler({ httpMethod: 'POST', headers: Object.assign({ authorization: tok ? 'Bearer ' + tok : '' }, dev ? { 'x-device-id': dev } : {}), body: JSON.stringify(body) }); return { code: r.statusCode, body: JSON.parse(r.body || '{}') }; };
+  const C30 = require(rpC30);
+  const snap30 = JSON.stringify({ u: mem.gw_users, d: mem.gw_data });
+  const reset30 = () => { const s = JSON.parse(snap30); mem.gw_users = s.u; mem.gw_data = s.d; blobsMock.hooks.failGet = null; blobsMock.hooks.failSet = null; };
+  const K30 = 'status:decide', NOW30 = Date.now(), QT30 = C30.quarterOf(NOW30), YM30 = QT30.cur, CK30 = 'clog:contract:' + YM30;
+  const MN30 = { id: 'u30n', name: '관리부30', role: '관리자', admin: true, perms: {} };   // 명시 tier 없음 = PM 아님
+  const tN30 = issueSession(MN30).token;
+  const doc30 = (k, n, st, add) => Object.assign({ k: k, n: n, st: st || 'todo', at: '2026-11-01' }, add ? { add: 1 } : {});
+  const con30 = (id, docs, o) => Object.assign({ id: id, type: 'dredge', status: 'active', pipes: [{ key: 'main', stages: [{ name: '계약', docs: [doc30('작성:0', '계약서', 'done'), doc30('작성:1', '사용인감계'), doc30('작성:2', '계약구비서류')].concat(docs || []) }, { name: '착공', docs: [doc30('작성:0', '착공계')] }] }] }, o || {});
+  let n30 = 0;
+  const ev30 = (cid, k, act, by, i) => ({ ts: NOW30 - 60000 + (n30++), by: by || 'uadmin', op: 'stage_docs', cid: cid, pipe: 'main', i: i || 0, k: k, act: act, h: 'h30_' + n30, p: '' });
+  const seed30 = (cons, evs) => {
+    reset30();
+    mem.gw_users['member:u30n'] = JSON.parse(JSON.stringify(MN30));
+    mem.gw_data['col:contracts'] = { schema: 1, items: cons, updated_at: 1 };
+    for (const k of Object.keys(mem.gw_data)) if (k.indexOf('clog:contract:') === 0 || k === K30) delete mem.gw_data[k];
+    if (evs) mem.gw_data[CK30] = { schema: 1, items: evs, head: '' };
+  };
+  const aud30 = () => auditMock.logs.filter((l) => l.col === 'pmcon');
+  const chk30 = async (cl) => {
+    const P = {}, I = {};
+    // A 권한 — 비로그인 401 · 직원 미승인 기기·승인 기기 403 · PM 아닌 관리자 읽기 200 can_write false · [확인] 403 PM_ONLY · 저장·감사 0
+    seed30([con30('cA')], [ev30('cA', '작성:1', 'na')]);
+    const au0 = aud30().length;
+    const a1 = await cl({ action: 'conchk_get' }, null), a2 = await cl({ action: 'conchk_confirm', quarter: QT30.key }, null);
+    const a3 = await cl({ action: 'conchk_get' }, tokW, 'devX'), a4 = await cl({ action: 'conchk_get' }, tokW, 'dev1'), a5 = await cl({ action: 'conchk_confirm', quarter: QT30.key }, tokW, 'dev1');
+    const a6 = await cl({ action: 'conchk_get' }, tN30), a7 = await cl({ action: 'conchk_confirm', quarter: QT30.key }, tN30), a8 = await cl({ action: 'conchk_get' }, tokA);
+    P.A = a1.code === 401 && a2.code === 401 && a3.code === 403 && a3.body.error_code === 'DEVICE_NOT_APPROVED' && a4.code === 403 && a4.body.error_code === 'ADMIN_ONLY' && a5.code === 403 && a5.body.error_code === 'ADMIN_ONLY'
+      && a6.code === 200 && a6.body.can_write === false && a6.body.quarter === QT30.key && a6.body.checked === null && a7.code === 403 && a7.body.error_code === 'PM_ONLY'
+      && a8.code === 200 && a8.body.can_write === true && !(K30 in mem.gw_data) && aud30().length === au0;
+    I.A = [a1.code, a2.code, a3.body.error_code, a4.body.error_code, a5.body.error_code, a6.code, a6.body.can_write, a7.body.error_code, a8.body.can_write];
+    // B 표본 작음 = 비율 없음 · 숫자(진행 계약·단계 서류 끝/남음·기록 완료/되돌림/건너뜀·계약·직원) · 해시 같은 줄은 한 번 · 건너뜀 내역(단계·서류 이름) · 지운 계약은 진행에서 빠짐
+    const evB = [ev30('cA', '작성:1', 'na'), ev30('cA', '작성:2', 'na'), ev30('cB', '작성:0', 'done', 'uwork'), ev30('cB', '작성:0', 'undo', 'uwork'), ev30('cX', '작성:0', 'na')];
+    seed30([con30('cA'), con30('cB'), con30('cX', [], { del: 1 })], evB.concat([Object.assign({}, evB[0])]));
+    const b1 = await cl({ action: 'conchk_get' }, tokA), bb = b1.body || {};
+    // 표본 10 이상 = 비율(목록을 바꾼 사건 / 기록 수)
+    const evL = []; for (let i = 0; i < 11; i++) evL.push(ev30('cA', '작성:1', i % 2 ? 'undo' : 'na')); for (let i = 0; i < 5; i++) evL.push(ev30('cB', '작성:2', 'na'));
+    seed30([con30('cA'), con30('cB')], evL);
+    const b2 = await cl({ action: 'conchk_get' }, tokA), bl = b2.body || {};
+    P.B = b1.code === 200 && bb.small === true && bb.ratio === null && bb.sample === 3 && bb.log.n === 5 && bb.log.skip === 3 && bb.log.done === 1 && bb.log.undo === 1 && bb.log.contracts === 3 && bb.log.people === 2
+      && bb.live.n === 2 && bb.live.docs.total === 8 && bb.live.docs.done === 2 && bb.live.docs.todo === 6 && bb.live.types.length === 1 && bb.live.types[0].t === '준설'
+      && bb.skips.length === 1 && bb.skips[0].stage === '계약' && bb.skips[0].contracts === 2 && bb.skips[0].docs.join('|') === '사용인감계|계약구비서류|계약서' && bb.round === 1 && bb.months[1] === YM30
+      && b2.code === 200 && bl.small === false && bl.sample === 11 && bl.log.n === 16 && bl.ratio === Math.round(11 / 16 * 100);
+    I.B = [b1.code, bb.small, bb.ratio, bb.sample, bb.log && bb.log.n, bb.live && bb.live.n, bb.skips && JSON.stringify(bb.skips), bl.small, bl.sample, bl.ratio];
+    // C 제안 — 2건·1명 = 없음 · 1건·2명 = 없음 · 2건·2명(이름 공백 다름) = 있음 · 2건·2명이지만 한쪽을 뒤에 뺌(지금 계약에 없음) = 없음
+    const add = (cid, k, by, nm) => ({ c: doc30(k, nm || '폐기물 위탁계약서', 'todo', true), e: ev30(cid, k, 'add', by) });
+    const c1 = [add('cA', 'add:a1', 'uadmin'), add('cB', 'add:b1', 'uadmin')];
+    seed30([con30('cA', [c1[0].c]), con30('cB', [c1[1].c])], c1.map((x) => x.e));
+    const s1 = await cl({ action: 'conchk_get' }, tokA);
+    const c2 = [add('cA', 'add:a1', 'uadmin'), add('cA', 'add:a2', 'uwork')];
+    seed30([con30('cA', [c2[0].c, c2[1].c]), con30('cB')], c2.map((x) => x.e));
+    const s2 = await cl({ action: 'conchk_get' }, tokA);
+    const c3 = [add('cA', 'add:a1', 'uadmin'), add('cB', 'add:b1', 'uwork', '폐기물위탁 계약서')];
+    seed30([con30('cA', [c3[0].c]), con30('cB', [c3[1].c])], c3.map((x) => x.e));
+    const s3 = await cl({ action: 'conchk_get' }, tokA);
+    seed30([con30('cA', [c3[0].c]), con30('cB')], c3.map((x) => x.e).concat([ev30('cB', 'add:b1', 'del', 'uwork')]));
+    const s4 = await cl({ action: 'conchk_get' }, tokA);
+    seed30([con30('cA', [c3[0].c]), con30('cB', [c3[1].c])], c3.map((x) => x.e).concat([ev30('cB', 'add:b1', 'del', 'uwork')]));   // 계약 상태엔 남았어도(저장 엇갈림) 기록에 뺌이 있으면 제안 재료 아님
+    const s5 = await cl({ action: 'conchk_get' }, tokA);
+    P.C = s5.code === 200 && s5.body.suggest.length === 0 &&s1.code === 200 && s1.body.suggest.length === 0 && s1.body.log.add === 2 && s2.code === 200 && s2.body.suggest.length === 0
+      && s3.code === 200 && s3.body.suggest.length === 1 && s3.body.suggest[0].contracts === 2 && s3.body.suggest[0].people === 2 && s3.body.suggest[0].name === '폐기물 위탁계약서'
+      && s4.code === 200 && s4.body.suggest.length === 0 && s4.body.log.del === 1 && s4.body.sample === 3;
+    I.C = [s1.body.suggest && s1.body.suggest.length, s2.body.suggest && s2.body.suggest.length, s3.body.suggest && JSON.stringify(s3.body.suggest), s4.body.suggest && s4.body.suggest.length];
+    // D [확인] — 분기가 다르면 400 BAD_QUARTER · PM 정상 200(누른 기록 1줄 · 있던 줄 그대로 · 감사 1줄 col pmcon) · 다시 누름 409 CONCHK_DONE(그대로) · 읽기에 확인함 · 판29 읽기에 그 줄
+    seed30([con30('cA')], [ev30('cA', '작성:1', 'na')]);
+    mem.gw_data[K30] = { schema: 1, log: [{ ts: 5, by: 'uadmin', row: 'doneif:on', kind: 'doneif', choice: 'hold' }], folded: { n: 0, from: 0, to: 0 }, marks: { 'doneif:on': { st: 'hold', ts: 5 } }, updated_at: 5, updated_by: 'uadmin' };
+    const auD = aud30().length;
+    const d0 = await cl({ action: 'conchk_confirm', quarter: '2020-Q1' }, tokA);
+    const d1 = await cl({ action: 'conchk_confirm', quarter: QT30.key }, tokA);
+    const sdD = JSON.parse(JSON.stringify(mem.gw_data[K30] || {}));
+    const d2 = await cl({ action: 'conchk_confirm', quarter: QT30.key }, tokA);
+    const d3 = await cl({ action: 'conchk_get' }, tN30), d4 = await cl({ action: 'pmcon_get' }, tokA);
+    const sdD2 = mem.gw_data[K30] || {};
+    P.D = d0.code === 400 && d0.body.error_code === 'BAD_QUARTER' && d1.code === 200 && d1.body.audit === true
+      && sdD.log.length === 2 && sdD.log[0].row === 'doneif:on' && sdD.marks['doneif:on'] && sdD.log[1].row === 'conchk:' + QT30.key && sdD.log[1].kind === 'conchk' && sdD.log[1].by === 'uadmin' && sdD.log[1].applied === false && sdD.updated_at > 5
+      && aud30().length === auD + 1 && aud30()[aud30().length - 1].ev[0].id === 'conchk:' + QT30.key
+      && d2.code === 409 && d2.body.error_code === 'CONCHK_DONE' && sdD2.log.length === 2 && sdD2.updated_at === sdD.updated_at
+      && d3.code === 200 && d3.body.checked && d3.body.checked.ts === sdD.log[1].ts && d3.body.can_write === false
+      && d4.code === 200 && d4.body.total === 2 && d4.body.log[0].row === 'conchk:' + QT30.key && d4.body.updated_at === sdD.updated_at;
+    I.D = [d0.body.error_code, d1.code, d1.body.error_code, sdD.log && sdD.log.length, d2.code, d2.body.error_code, d3.body.checked, d4.body.total];
+    // E 실패 닫힘 — 달 기록 읽기 실패·깨진 꼴 = 읽기·[확인] 503 CONCHK_READ_FAILED(0건으로 보이지 않음·기록 0) · 누른 기록 깨짐 = 503 PMCON_READ_FAILED(덮어쓰지 않음) · 쓰기 실패 = 500
+    seed30([con30('cA')], [ev30('cA', '작성:1', 'na')]);
+    blobsMock.hooks.failGet = (k) => k === CK30;
+    const e1 = await cl({ action: 'conchk_get' }, tokA), e2 = await cl({ action: 'conchk_confirm', quarter: QT30.key }, tokA);
+    blobsMock.hooks.failGet = null;
+    mem.gw_data[CK30] = { schema: 1, items: 'x' };
+    const e3 = await cl({ action: 'conchk_get' }, tokA);
+    const e3w = !(K30 in mem.gw_data);
+    seed30([con30('cA')], [ev30('cA', '작성:1', 'na')]);
+    mem.gw_data[K30] = { schema: 1, log: 'x', marks: {} };
+    const e4 = await cl({ action: 'conchk_get' }, tokA), e5 = await cl({ action: 'conchk_confirm', quarter: QT30.key }, tokA);
+    const e5keep = mem.gw_data[K30] && mem.gw_data[K30].log === 'x';
+    delete mem.gw_data[K30];
+    blobsMock.hooks.failSet = (k) => k === K30;
+    const auE = aud30().length;
+    const e6 = await cl({ action: 'conchk_confirm', quarter: QT30.key }, tokA);
+    blobsMock.hooks.failSet = null;
+    P.E = e1.code === 503 && e1.body.error_code === 'CONCHK_READ_FAILED' && e2.code === 503 && e2.body.error_code === 'CONCHK_READ_FAILED' && e3.code === 503 && e3.body.error_code === 'CONCHK_READ_FAILED' && e3w
+      && e4.code === 503 && e4.body.error_code === 'PMCON_READ_FAILED' && e5.code === 503 && e5.body.error_code === 'PMCON_READ_FAILED' && e5keep
+      && e6.code === 500 && e6.body.error_code === 'CONCHK_WRITE_FAILED' && !(K30 in mem.gw_data) && aud30().length === auE;
+    I.E = [e1.body.error_code, e2.body.error_code, e3.body.error_code, e4.body.error_code, e5.body.error_code, e5keep, e6.code, e6.body.error_code];
+    reset30();
+    return { ok: Object.keys(P).every((k) => P[k]), P, I };
+  };
+  try {
+    const R30 = await chk30(caller30(gwd));
+    T('P1 판30 ① 권한: 비로그인 401 · 직원 403(미승인 기기 DEVICE_NOT_APPROVED · 승인 기기 ADMIN_ONLY — 읽기·[확인]) · PM 아닌 관리자 읽기 200(can_write false) · [확인] 403 PM_ONLY · 기록·감사 0', R30.P.A, JSON.stringify(R30.I.A));
+    T('P1 판30 ② 숫자: 표본(더함+뺌+건너뜀) 3 < 10 = 비율 없음(ratio null·small) · 기록 5(해시 같은 줄 한 번)·완료 1·되돌림 1·건너뜀 3·계약 3·직원 2 · 진행 계약 2(지운 계약 빠짐 · 모두 준설)·단계 서류 8(끝 2·남음 6) · 건너뜀 내역 = 계약 단계·계약 2건·서류 이름 3 · 표본 11 ≥ 10 = 비율 69%', R30.P.B, JSON.stringify(R30.I.B));
+    T('P1 판30 ③ 목록에 넣자는 제안: 같은 서류 2건·1명 = 없음 · 1건·2명 = 없음 · 2건·2명(이름 공백 무시) = 1(계약 2·사람 2) · 2건·2명이지만 한쪽을 뒤에 뺌 = 없음(뺌 1·표본 3) · 계약 상태엔 남았어도 기록에 뺌이 있으면 없음', R30.P.C, JSON.stringify(R30.I.C));
+    T('P1 판30 ④ [확인] 분기 1회: 다른 분기 400 BAD_QUARTER · PM 200 = 누른 기록(status:decide)에 1줄(row conchk:분기 · kind conchk · 적용 아님) — 있던 줄·보류 표시 그대로 · 감사 1줄(col pmcon) · 다시 누름 409 CONCHK_DONE(기록 그대로) · 읽기 checked(PM 아닌 관리자에게도) · 판29 pmcon_get에 그 줄(total 2·updated_at 같음)', R30.P.D, JSON.stringify(R30.I.D));
+    T('P1 판30 ⑤ 실패 닫힘: 달 기록 읽기 실패·깨진 꼴 = 읽기·[확인] 503 CONCHK_READ_FAILED(0건으로 안 보임·기록 0) · 누른 기록 깨짐 = 503 PMCON_READ_FAILED(덮어쓰지 않음) · 기록 쓰기 실패 = 500 CONCHK_WRITE_FAILED(감사 0)', R30.P.E, JSON.stringify(R30.I.E));
+    const MUT30 = [
+      ['    const g = await D.gate(event, R, false); if (g.res) return g.res;\n', '    const g = await D.gate(event, R, false);\n'],
+      ['    const g = await D.gate(event, R, true); if (g.res) return g.res; const c = g.c;', '    const g = await D.gate(event, R, false); if (g.res) return g.res; const c = g.c;'],
+      ['const sample = log.delta, small = sample < SMALL_N;', 'const sample = log.delta, small = false;'],
+      ['ratio: (small || !log.n) ? null :', 'ratio: (!log.n) ? null :'],
+      ['return g.contracts >= SUGGEST_MIN_C && g.people >= SUGGEST_MIN_P;', 'return g.contracts >= SUGGEST_MIN_C || g.people >= SUGGEST_MIN_P;'],
+      ['const SUGGEST_MIN_C = 2, SUGGEST_MIN_P = 2;', 'const SUGGEST_MIN_C = 2, SUGGEST_MIN_P = 1;'],
+      ["else if (e.act === 'del') { log.del++; delete adds[tup]; }", "else if (e.act === 'del') { log.del++; }"],
+      ['      if (e.h) { if (seen[e.h]) return; seen[e.h] = 1; }\n', ''],
+      ["    if (!r.ok) return { ok: false, code: 'CONCHK_READ_FAILED' };\n    if (r.data &&", '    if (r.data &&'],
+      ["    if (r.data && !Array.isArray(r.data.items)) return { ok: false, code: 'CONCHK_READ_FAILED' };", '    if (false) return null;'],
+      ['    if (done) return D.jr(409,', '    if (false) return D.jr(409,'],
+      ["    if (String((d && d.quarter) || '') !== qt.key) return", '    if (false) return'],
+      ["    if (!s1.ok) return D.jr(503, { status: 'ERROR', error_code: 'PMCON_READ_FAILED', request_id: R });", '    if (!s1.ok) s1.doc = { log: [], folded: { n: 0, from: 0, to: 0 }, marks: {} };'],
+      ["    if (!w.ok) return D.jr(500, { status: 'ERROR', error_code: 'CONCHK_WRITE_FAILED', request_id: R });", '    if (false) return null;'],
+      ['    try { au = await D.appendAudit(', '    try { au = true || await D.appendAudit('],
+      ["{ return c.del !== 1 && c.status !== 'done'; });", '{ return true; });'],
+    ];
+    const kill30 = [];
+    for (const [from, to] of MUT30) {
+      if (SRCC30.split(from).length !== 2) { kill30.push('결함 자리가 한 곳이 아님: ' + from.trim().slice(0, 50)); continue; }
+      let k; try { k = !(await chk30(caller30(gwOf30(SRCC30.replace(from, () => to))))).ok; } catch (e) { k = 'err ' + e.message; }
+      if (k !== true) kill30.push(from.trim().slice(0, 60) + (k === false ? ' 안 깨짐' : ' ' + k));
+    }
+    let base30; try { base30 = (await chk30(caller30(gwOf30(SRCC30)))).ok; } catch (e) { base30 = 'err ' + e.message; }
+    T('P1 판30 ⑥ 결함 사본 ' + MUT30.length + '개(읽기 관리자 검사·[확인] PM 검사·표본 작음 판정·비율 숨김·제안 2건 그리고 2명·제안 사람 기준·뺀 서류 제외·해시 중복·달 기록 읽기 실패·깨진 꼴·분기 1회·분기 대조·누른 기록 깨짐 덮어씀·쓰기 실패 숨김·감사 걷음·지운 계약 진행에 셈) 전부 위 검사에서 걸림 · 고치지 않은 사본은 통과',
+      kill30.length === 0 && base30 === true, kill30.join(' | ') + (base30 === true ? '' : ' · 원본 사본 ' + base30));
+  } finally { reset30(); require.cache[rpC30] = keepC30; }
+}
+
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

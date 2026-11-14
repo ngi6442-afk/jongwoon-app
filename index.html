@@ -31346,6 +31346,61 @@ function dutyStage(nx){
       + (Number(fd.n) ? '<div class="pc-none">그 전 ' + Number(fd.n) + '줄은 상한(400줄)을 넘어 접었습니다.</div>' : '');
     var mb = document.getElementById("pmconLogMore"); if (mb) mb.addEventListener("click", function(){ pmconLogAll = !pmconLogAll; pmconLogRender(b); });
   }
+  // ---- P1 판30 계약 서류 목록 분기 점검 카드(시안 판3 ③ 794~805줄 · 착수설명서 판30 · 원장 T422·T476 · PM 11/14 "45. 판 30,31ㄱ") ----
+  //   원천 = 서버 conchk_get(관리자 읽기 — 계산은 _lib/conchk.js 한 곳: 이번 분기 월 서류 기록 + 지금 계약의 단계 서류 + 계약 학습).
+  //   [확인] = conchk_confirm(PM만 · 분기 1회 · 판29 누른 기록에 한 줄) — 버튼은 서버 can_write일 때만, 이미 확인한 분기는 '확인함'.
+  //   '목록에 넣자는 제안'은 표시만 — 기본 서류 목록을 바꾸지 않고, 고치는 곳(권한관리 '계약 골조·목록 편집' = conProcCard)으로 가는 단추만 단다.
+  var conchkBusy = false;
+  function conchkHtml(b){
+    var L = b.live || {}, D = L.docs || {}, g = b.log || {}, ty = L.types || [], ln = b.learn || null;
+    var mo = function(ym){ return Number(String(ym || "").slice(5, 7)) || ""; };
+    var ms = b.months || [], mTxt = ms.length && mo(ms[0]) !== mo(ms[ms.length - 1]) ? mo(ms[0]) + "~" + mo(ms[ms.length - 1]) + "월" : mo(ms[ms.length - 1] || ms[0]) + "월";
+    var tyTxt = ty.length === 1 ? "모두 " + ty[0].t : ty.map(function(t){ return t.t + " " + t.n; }).join(" · ");
+    var li = [];
+    li.push("진행 계약 " + (L.n || 0) + "건" + (L.n && tyTxt ? "(" + tyTxt + ")" : "") + " · 단계 서류 " + (D.total || 0) + "건 — 끝 " + (D.done || 0) + " · 남음 " + (D.todo || 0) + (D.na ? " · 해당 없음 " + D.na : ""));
+    li.push(mTxt + " 서류 기록 " + (g.n || 0) + "건(계약 " + (g.contracts || 0) + "건 · 직원 " + (g.people || 0) + "명): 완료 " + (g.done || 0) + " · 되돌림 " + (g.undo || 0) + " · 건너뜀 " + (g.skip || 0) + " · 직원이 더한 서류 " + (g.add || 0)
+      + (g.del ? " · 더했다 뺀 서류 " + g.del : "") + (b.ratio !== null && b.ratio !== undefined ? " · 목록을 바꾼 비율 " + b.ratio + "%" : ""));
+    var sk = b.skips || [];
+    li.push(g.skip ? "건너뜀 " + g.skip + "건은 " + sk.map(function(s){ return (s.contracts === 1 ? "한 계약" : s.contracts + "개 계약") + "의 '" + s.stage + "' 단계 " + (s.docs || []).length + "종 — " + (s.docs || []).join(" · "); }).join(" / ") : "건너뜀 없음");
+    var sg = b.suggest || [], rule = b.rule || {}, cut = (rule.min_contracts || 2) + "건·" + (rule.min_people || 2) + "명";
+    li.push(sg.length ? "<b>목록에 넣자는 제안 " + sg.length + "</b> — " + sg.map(function(s){ return esc(s.name) + "(계약 " + s.contracts + "건 · " + s.people + "명" + ((s.stages || []).length ? " · " + esc(s.stages.join("·")) + " 단계" : "") + ")"; }).join(" · ")
+      + ' <button type="button" class="link-btn" id="conchkListBtn">서류 목록 편집 열기 ›</button>'
+      : "<b>목록에 넣자는 제안: 없음</b> — 같은 서류를 " + cut + " 이상 더한 기록 0");
+    var nv = function(v){ return v === null || v === undefined ? "?" : v; };
+    li.push(ln ? "학습: 짝 " + nv(ln.pairs) + "건 · 허용 " + nv(ln.tpls) + "양식 " + nv(ln.cells) + "칸 · 일몰로 꺼진 양식 " + nv(ln.sunset_off) + ([ln.pairs, ln.tpls, ln.sunset_off].some(function(v){ return v === null || v === undefined; }) ? " (? = 불러오지 못함)" : "") : "학습: 불러오지 못함");
+    var two = function(n){ return String(n).padStart(2, "0"); }, ck = b.checked, ckTxt = "";
+    if (ck){ var t = new Date(Number(ck.ts) || 0); ckTxt = "확인함" + (isNaN(t.getTime()) ? "" : " · " + two(t.getMonth() + 1) + "-" + two(t.getDate())) + (ck.name ? " " + ck.name : ""); }
+    var act = ck ? '<span class="pc-who">' + esc(ckTxt) + '</span>' : (b.can_write ? '<button type="button" class="b-ok" id="conchkOkBtn">확인</button>' : '<span class="pc-who">정하실 분: PM</span>');
+    return '<div class="pc-q" style="flex-wrap:wrap;"><span>계약 서류 목록 — 분기 점검 ' + esc(String(b.round || 1)) + '회차</span><span class="g" style="background:#FFF3E0;color:#a8651f;">표본 ' + esc(String(b.sample || 0)) + '건</span></div>'
+      + '<ul style="margin:6px 0 4px;padding-left:18px;font-size:12.5px;line-height:1.6;">' + li.map(function(x, i){ return "<li>" + (i === 3 ? x : esc(x)) + "</li>"; }).join("") + '</ul>'
+      + '<div class="pc-btns" style="justify-content:flex-start;">' + act + '<span class="pc-who">분기 1회' + (b.small ? " — 표본이 작아 비율은 적지 않습니다" : "") + '</span></div>';
+  }
+  function conchkRender(el){
+    if (!el) return;
+    var fail = function(code){ el.innerHTML = '<div class="pc-q"><span>계약 서류 목록 — 분기 점검</span></div><div class="pc-none" style="color:#B00020;">불러오지 못했습니다 (' + esc(String(code)) + ') — 새로고침 후 다시 보세요</div>'; };
+    gwCall("gw-data", { action: "conchk_get" }).then(function(res){
+      var b = res && res.body;
+      if (!(res && res.status === 200 && b && b.log && b.live)){ fail((b && b.error_code) || (res && res.status) || "?"); return; }
+      el.innerHTML = conchkHtml(b);
+      var ok = document.getElementById("conchkOkBtn"); if (ok) ok.addEventListener("click", function(){ conchkConfirm(b); });
+      var lb = document.getElementById("conchkListBtn"); if (lb) lb.addEventListener("click", function(){ pmconOpenCard("conProcCard"); });
+    }, function(){ fail("네트워크"); });
+  }
+  function conchkConfirm(b){
+    if (conchkBusy || !b || !b.can_write || b.checked) return;
+    if (!confirm("계약 서류 목록 분기 점검(" + (b.round || 1) + "회차)을 확인으로 기록합니다 — 분기에 1회입니다.")) return;
+    conchkBusy = true;
+    gwCall("gw-data", { action: "conchk_confirm", quarter: b.quarter }).then(function(res){
+      conchkBusy = false;
+      var code = res && res.body && res.body.error_code;
+      if (res && res.status === 200) apprToastShow("확인 — 누른 기록에 남겼습니다");
+      else if (code === "CONCHK_DONE") apprToastShow("이번 분기는 이미 확인했습니다");
+      else if (code === "BAD_QUARTER") apprToastShow("분기가 바뀌었습니다 — 새 분기로 다시 불러왔습니다");
+      else alert("확인 저장 실패 (" + (code || (res && res.status)) + ")");
+      renderPmcon();
+    }).catch(function(){ conchkBusy = false; alert("확인 저장 실패(네트워크) — 다시 시도해주세요."); });
+  }
+  PMCON_CHECKS.push({ id: "conchk", title: "계약 서류 목록 — 분기 점검", render: conchkRender });
   function pmconChecksRender(){
     var wrap = document.getElementById("pmconChecksWrap"), host = document.getElementById("pmconChecks"); if (!wrap || !host) return;
     wrap.style.display = PMCON_CHECKS.length ? "" : "none";
