@@ -5676,6 +5676,7 @@
     saveTasksCache();
     renderTasks();
     renderSummary();
+    if (typeof currentTab !== "undefined" && currentTab === "dash") renderDashboard();   // 원장 C156(11/14 45-1 화면 시험): 홈 '미완료 지시' 줄의 [완료] 뒤 그 줄이 남아, 다시 누르면 완료 요청이 취소됐다 — 홈에서 눌렀으면 홈 목록을 바로 다시 그린다
     scheduleTasksSave();
   }
   function approveTask(id){
