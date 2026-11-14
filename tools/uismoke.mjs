@@ -14055,5 +14055,53 @@ try {
     r66.ok && M66.every((v) => v === false), JSON.stringify({ r: r66.info, mut: M66 }));
 } catch (e) { console.log('  (v466 검사 생략 — ' + e.message + ')'); fails++; }
 
+// ---- P1 판22 기기 목록 표시 2종(착수설명서 판22 '기기 목록 표시 2종 — 시안 없음' · PM 11/14 13:26 "45. 판22 ㄱ") ----
+//   ① 배선(정적) — 인사·직원 탭 직원 카드 '등록 기기'(renderMemberDevices)와 기기 관리 창(showDevicesManage) 두 곳 모두 배지 뒤에 devAutoChips · 표시 함수에 서버 호출 0 · 7일 = 서버 devauto·mchk와 같은 값
+//   ② 실행 — 실제 devAutoChips를 가짜 명부로 돌림(승인 = 없음 · 퇴사 회수·삭제 회수 · 7일 경계 · 대기 시작 = 해제 시각 · 퇴사·삭제·없는 회원 = 없음 · 회원 없는 기기 · 글자 이스케이프) ③ 결함 사본이 실제로 깨짐
+try {
+  const fn22 = (src, name) => { const i = src.indexOf('function ' + name + '('); if (i < 0) throw new Error('함수 없음: ' + name); let d = 0, st = false; for (let j = i; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i, j + 1); } } throw new Error('중괄호 짝: ' + name); };
+  const da22 = readFileSync(join(ROOT, 'netlify', 'functions', '_lib', 'devauto.js'), 'utf8'), mc22 = readFileSync(join(ROOT, 'netlify', 'functions', '_lib', 'mchk.js'), 'utf8');
+  const F22 = fn22(html, 'devAutoChips');
+  const CALL22 = "' ' + badge + devAutoChips(dv) + self + '";
+  const okWire = html.split(CALL22).length === 3 && fn22(html, 'renderMemberDevices').indexOf(CALL22) > 0 && fn22(html, 'showDevicesManage').indexOf(CALL22) > 0 && html.split('devAutoChips(').length === 4
+    && /\n  var DEV_PENDING_DAYS = 7;\n  function devAutoChips\(dv, nowMs\)\{/.test(html) && !/gwCall|fetch|localStorage/.test(F22)
+    && /const PENDING_DAYS = 7;/.test(da22) && /const DEVICE_PENDING_DAYS = 7;/.test(mc22);
+  T('P1 판22 ① 배선: 직원 카드 등록 기기(renderMemberDevices)·기기 관리 창(showDevicesManage) 두 곳 = 배지 뒤 devAutoChips(dv) · 정의 1곳(DEV_PENDING_DAYS 7 바로 아래) · 표시 함수에 서버 호출·저장 0 · 7일 = 서버 devauto PENDING_DAYS·mchk DEVICE_PENDING_DAYS', okWire, '');
+  const D22u = 86400000, NOW22u = Date.UTC(2026, 10, 15, 0, 0);
+  const run22 = (src) => {
+    const mk = new Function('members', 'esc', 'memberRetired', 'var DEV_PENDING_DAYS = 7;\n' + src + '\nreturn devAutoChips;');
+    const ms = [{ id: 'w', name: '직원' }, { id: 'r', name: '퇴사', leave_date: '2026-11-01' }, { id: 'x', name: '삭제', del: 1 }];
+    const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const f = mk(ms, esc, (m) => !!(m && m.leave_date && String(m.leave_date) < '2026-11-15'));
+    const c = (dv) => f(dv, NOW22u);
+    const o = {
+      appr: c({ status: 'approved', member_id: 'w', created: NOW22u - 30 * D22u }),
+      appr_rev: c({ status: 'approved', member_id: 'r', auto_rev: { at: 1, why: 'retired', ld: '2026-11-01' } }),
+      rev: c({ status: 'pending', member_id: 'r', created: NOW22u - 90 * D22u, updated: NOW22u - 9 * D22u, auto_rev: { at: 1, why: 'retired', ld: '2026-11-01' } }),
+      del: c({ status: 'pending', member_id: 'x', auto_rev: { at: 1, why: 'deleted', ld: '' } }),
+      esc: c({ status: 'pending', member_id: 'r', auto_rev: { at: 1, why: 'retired', ld: '<b>"' } }),
+      d7: c({ status: 'pending', member_id: 'w', created: NOW22u - 7 * D22u }),
+      d7p: c({ status: 'pending', member_id: 'w', created: NOW22u - 7 * D22u - 1 }),
+      upd: c({ status: 'pending', member_id: 'w', created: NOW22u - 30 * D22u, updated: NOW22u - 2 * D22u }),
+      gone: c({ status: 'pending', member_id: 'r', created: NOW22u - 30 * D22u }),
+      gdel: c({ status: 'pending', member_id: 'zz', created: NOW22u - 30 * D22u }),
+      nomb: c({ status: 'pending', created: NOW22u - 30 * D22u }),
+      zero: c({ status: 'pending', member_id: 'w' }) };
+    const ok = o.appr === '' && o.appr_rev === ''
+      && o.rev === ' <span class="ref-chip" title="퇴사일 2026-11-01 다음 날 자동으로 대기로 돌림">퇴사 회수</span>'
+      && o.del === ' <span class="ref-chip" title="계정 삭제 뒤 자동으로 대기로 돌림">삭제 회수</span>'
+      && o.esc.indexOf('&lt;b&gt;&quot;') > 0 && o.esc.indexOf('<b>') < 0
+      && o.d7 === '' && o.d7p === ' <span class="mismatch-chip">7일 넘은 대기</span>' && o.upd === '' && o.gone === '' && o.gdel === '' && o.nomb === o.d7p && o.zero === '';
+    return { ok, o };
+  };
+  const r22 = run22(F22);
+  T('P1 판22 ② 표시(실행 — 실제 devAutoChips): 승인 기기 = 없음(회수 표시가 남아 있어도) · 자동 회수 = 회색 "퇴사 회수"(제목 "퇴사일 … 다음 날 자동으로 대기로 돌림")·"삭제 회수" · 7일 넘은 대기 = 빨강 · 정확히 7일 = 없음 · 대기 시작 = 해제 시각(updated) · 퇴사·삭제·없는 회원 기기 = 없음 · 회원 없는 기기 = 판정 · 시각 없음 = 없음 · 제목 글자 이스케이프',
+    r22.ok, JSON.stringify(r22.o));
+  const MU22 = [['now - t0 > DEV_PENDING_DAYS', 'now - t0 >= DEV_PENDING_DAYS'], ['Number(dv.updated) || Number(dv.created)', 'Number(dv.created)'], ['if (!mb || mb.del === 1 || memberRetired(mb)) return "";', ''],
+    ['if (!dv || dv.status === "approved") return "";', 'if (!dv) return "";'], ['esc(ar.why === "deleted"', '(ar.why === "deleted"'], ['(ar.why === "deleted" ? "삭제 회수" : "퇴사 회수")', '"퇴사 회수"']];
+  const kill22u = MU22.map(([a, b]) => { if (F22.split(a).length !== 2) return 'err 자리 ' + a; try { return run22(F22.replace(a, () => b)).ok === false; } catch (e) { return 'err ' + e.message; } });
+  T('P1 판22 ③ 결함 사본 ' + MU22.length + '개(7일 경계·해제 시각·퇴사자 기기 뺌·승인 기기 뺌·이스케이프·삭제 글) = 모두 ✗', kill22u.every((v) => v === true), JSON.stringify(kill22u));
+} catch (e) { console.log('  ✗ P1 판22 검사 실행 — ' + e.message); fails++; }
+
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

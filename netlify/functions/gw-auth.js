@@ -12,6 +12,7 @@ const { hashSecret, verifySecret } = require('./_lib/password');
 const { issueSession, verifyToken, bearer } = require('./_lib/session');
 const { appendAudit, short } = require('./_lib/audit');
 const tier = require('./_lib/tier');   // 관리자 등급(v321)
+const devauto = require('./_lib/devauto');   // P1 판22 새 기기 승인 대기 알림(개발자 1발) — 퇴사 회수·7일 체류는 gw-mchk-cron(HTTP 액션 없음)
 
 const USERS = 'gw_users';
 const MODULES = ['tasks', 'veh', 'rec', 'lic', 'site', 'check', 'con', 'cli', 'doc', 'wk', 'quote', 'promo', 'safety', 'hw', 'stmt'];   // 29 판② stmt=월말명세서(gw-data 컬렉션 없음 — 강제는 gw-stmt stmtPerm, 기본 숨김) · wk(일용직) 누락으로 cleanPerms가 매 저장마다 버려 숨김·수행 설정이 불가능했음(프런트 레지스트리와 일치 필수 — uismoke v430이 앱 MODULES와 순서까지 대조). quote=견적서·promo=홍보·safety=안전 › 교육·검진(v430)·hw=화관법(v431 메뉴 56 4-1 등록 — gw-data 컬렉션 없음 · v434 4-2부터 앱 탭 숨김·gw-hwakwan 폐기물 제출 수행 검사), 넷 다 기본 숨김 — 명시 부여만
@@ -35,10 +36,15 @@ async function registerDevice(st, event, member) {
   const now = Date.now();
   const dr = await blobGet(st, deviceKey(dv.id));
   const dev = (dr.ok && dr.data) ? dr.data : { id: dv.id, status: 'pending', created: now };
+  // P1 판22: 레코드가 정말 없을 때(읽기 실패가 아니라 '없음')만 새 기기 — 그 요청에서 한 번 개발자 알림(_lib/devauto.js). 승인·거절 판정은 종전 그대로
+  const fresh = (dr.ok && !dr.data) || (!dr.ok && dr.code === 'NOT_FOUND');
   if (dv.label) dev.label = dv.label;
   dev.member_name = member.name; dev.member_id = member.id; dev.last_seen = now;
   if (member.admin) dev.status = 'approved';
-  await blobSet(st, deviceKey(dv.id), dev);
+  const pendNote = fresh && dev.status === 'pending';
+  if (pendNote) dev.pend_note = now;
+  const w = await blobSet(st, deviceKey(dv.id), dev);
+  if (pendNote && w && w.ok) { try { await devauto.notifyNewPending(member, dev.label); } catch (e) {} }
   return dev.status;
 }
 

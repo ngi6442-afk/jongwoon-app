@@ -30484,6 +30484,22 @@ function dutyStage(nx){
     if (info) info.textContent = "이 기기: " + deviceLabel() + " · ID " + deviceId().slice(0, 12);
     document.getElementById("devicePendingBackdrop").classList.add("show");
   }
+  // P1 판22 기기 목록 표시 2종(시안 없음 — 기존 칩 모양): 대기 기기에만
+  //   '퇴사 회수'·'삭제 회수' = 서버(_lib/devauto.js)가 퇴사 다음 날·삭제 뒤 자동으로 대기로 돌린 기기(auto_rev — 레코드는 남김)
+  //   '7일 넘은 대기' = 대기 시작(승인을 푼 때 updated, 없으면 만든 때 created)부터 7일 넘음 · 퇴사·삭제·없는 회원의 기기는 뺌(서버 _lib/mchk.js·_lib/devauto.js와 같은 규칙)
+  var DEV_PENDING_DAYS = 7;
+  function devAutoChips(dv, nowMs){
+    if (!dv || dv.status === "approved") return "";
+    var ar = dv.auto_rev;
+    if (ar && typeof ar === "object") return ' <span class="ref-chip" title="' + esc(ar.why === "deleted" ? "계정 삭제 뒤 자동으로 대기로 돌림" : ("퇴사일 " + String(ar.ld || "") + " 다음 날 자동으로 대기로 돌림")) + '">' + (ar.why === "deleted" ? "삭제 회수" : "퇴사 회수") + '</span>';
+    if (dv.member_id){
+      var mb = (members || []).filter(function(x){ return x && x.id === dv.member_id; })[0];
+      if (!mb || mb.del === 1 || memberRetired(mb)) return "";
+    }
+    var t0 = Number(dv.updated) || Number(dv.created) || 0;
+    var now = nowMs || Date.now();
+    return (t0 > 0 && now - t0 > DEV_PENDING_DAYS * 86400000) ? ' <span class="mismatch-chip">7일 넘은 대기</span>' : "";
+  }
   function showDevicesManage(){
     if (!isAdmin()) return;
     document.getElementById("devicesBackdrop").classList.add("show");
@@ -30499,7 +30515,7 @@ function dutyStage(nx){
         var act = dv.status === "approved"
           ? '<button class="mini-btn" data-dev-revoke="' + esc(dv.id) + '">해제</button>'
           : '<button class="mini-btn appr-btn" data-dev-approve="' + esc(dv.id) + '">승인</button>';
-        return '<div class="item"><div class="item-body"><div class="item-title">' + esc(dv.label || dv.id) + ' ' + badge + self + '</div><div class="item-meta"><span class="author-chip">' + esc(dv.member_name || "-") + '</span><span>' + esc(String(dv.id).slice(0,12)) + '</span></div></div><div class="task-ctrl">' + act + '<button class="del-x" data-dev-del="' + esc(dv.id) + '">×</button></div></div>';
+        return '<div class="item"><div class="item-body"><div class="item-title">' + esc(dv.label || dv.id) + ' ' + badge + devAutoChips(dv) + self + '</div><div class="item-meta"><span class="author-chip">' + esc(dv.member_name || "-") + '</span><span>' + esc(String(dv.id).slice(0,12)) + '</span></div></div><div class="task-ctrl">' + act + '<button class="del-x" data-dev-del="' + esc(dv.id) + '">×</button></div></div>';
       }).join("");
       bindDeviceButtons(host);
     });
@@ -30528,7 +30544,7 @@ function dutyStage(nx){
         var act = dv.status === "approved"
           ? '<button class="mini-btn" data-mdev-revoke="' + esc(dv.id) + '">해제</button>'
           : '<button class="mini-btn appr-btn" data-mdev-approve="' + esc(dv.id) + '">승인</button>';
-        return '<div class="item"><div class="item-body"><div class="item-title">' + esc(dv.label || dv.id) + ' ' + badge + self + '</div><div class="item-meta"><span>' + esc(String(dv.id).slice(0,12)) + '</span></div></div><div class="task-ctrl">' + act + '<button class="del-x" data-mdev-del="' + esc(dv.id) + '">×</button></div></div>';
+        return '<div class="item"><div class="item-body"><div class="item-title">' + esc(dv.label || dv.id) + ' ' + badge + devAutoChips(dv) + self + '</div><div class="item-meta"><span>' + esc(String(dv.id).slice(0,12)) + '</span></div></div><div class="task-ctrl">' + act + '<button class="del-x" data-mdev-del="' + esc(dv.id) + '">×</button></div></div>';
       }).join("");
       function wire(attr, action){
         Array.prototype.forEach.call(host.querySelectorAll("[" + attr + "]"), function(el){
