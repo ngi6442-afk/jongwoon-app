@@ -13425,9 +13425,9 @@ try {
     const FT = ['`stmt_read`', '`stmt_read_status`', '`gw-stmt-read-background`', '`_lib/stmtnts.js`', '`_lib/taxxml.js`', '`_lib/xlsbiff.js`', '`_lib/stmtsinil.js`', '`pdfjs-dist` 4.7.76', '`_lib/stmtvision.js`', '계산서 쪽은 빼고', '개인정보 칸 흰색 가림', '출력 걸러내기', '`claude-opus-5-5`', '공급가 + 세액', 'servertest 90'];
     const GATE = ['uismoke', 'consheet_check', 'proctpl_check', 'settletest', 'servertest', 'rectest', 'promoqual_check', 'promogen_check', 'promoqlearn_check', 'promostream_check', 'promo_wrap_check', 'promo_post_check', 'stmtread_a_check', 'stmtread_b_check', 'stmtread_c_check', 'stmtread_d_check'];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
-    const ok = /기준: v467 \(2026-11-14\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && tlv.length > 0 && scr.some((l) => /^- \[ \]/.test(l)) && !scr.some((l) => /PM/.test(l)) && !cb.some((l) => /^- \[ \] \(PM/.test(l))
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 467 && ftv.length > 0 && mF.length === 0 && tlv.length > 0 && scr.some((l) => /^- \[ \]/.test(l)) && !scr.some((l) => /PM/.test(l)) && !cb.some((l) => /^- \[ \] \(PM/.test(l))   // v468: 기준 줄·sw는 이 판 이상(이 판 값은 v468 문서 검사)
       && GATE.every((g) => gate.some((l) => l.indexOf('`' + g + '`') > 0)) && d.man.indexOf('<b>📎 원본 넣기</b>') > 0 && d.man.indexOf('단가가 부가세 포함인 명세는 공급가 + 세액') > 0
-      && d.cl.indexOf('**월말명세서 원본 읽기(v467') > 0 && /"pdfjs-dist": "4\.7\.76"/.test(d.pj) && /SHELL_CACHE = 'jw-shell-v467'/.test(d.sw);
+      && d.cl.indexOf('**월말명세서 원본 읽기(v467') > 0 && /"pdfjs-dist": "4\.7\.76"/.test(d.pj) && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 467;
     return { ok, info: { mF, scr: scr.length, gate: gate.length } };
   };
   const r67 = chk67(D67), mu67 = (k, f) => chk67(Object.assign({}, D67, { [k]: f(D67[k]) })).ok;
@@ -14138,6 +14138,43 @@ try {
     kill22b.push(!(prOk(r.has.calls) === '["push_sub_mine:EP1"]' && prOk(r.fail.calls) === '["push_sub_mine:EP1","push_sub_mine:EP1"]' && r.denied.calls.length === 0)); }
   T('P1 판22 ⑤ 결함 사본 ' + MU22b.length + '개(있음에도 등록·같은 화면 되풀이·실패 뒤 다시 확인 안 함·권한 확인 걷음) = 모두 ✗', kill22b.every((v) => v === true), JSON.stringify(kill22b));
 } catch (e) { console.log('  ✗ P1 판22 검사 실행 — ' + e.message); fails++; }
+
+// ── v468(Phase 1 판22 기기·계정 자동 처리 — PM 11/14 13:26 "45. 판22 ㄱ" · 원장 C142·T476): 문서·판 번호 정확 검사(동작 검사는 'P1 판22' · servertest 'P1 판22') — 다음 판은 기준 줄·sw를 '468 이상'으로 풀 것
+try {
+  const rd68 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D68 = { ft: rd68('FEATURES.md'), tl: rd68('TESTLIST.md'), sw: rd68('sw.js'), man: rd68('MANUAL.html'), cl: rd68('CLAUDE.md') };
+  const chk68 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v468 (11/14)', '\n### '), tlv = cut(d.tl, '\n## v468 ', '\n## ');
+    const m1 = cut(d.man, '<h2 id="s1">', '<h2'), m218 = cut(d.man, '<h3>21-8. 직원 카드와 기기 승인</h3>', '<h3'), m25 = cut(d.man, '<h2 id="s25">', '<h2');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), scr = cb.filter((l) => /^- \[ \] \(AI 시험 화면 대상/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l));
+    const FT = ['C142', 'T476', '`notifyNewPending`', '`runDaily`', '`devauto:pend:<회원>`', '`pend_note`', '`CFG.sendCapMs`', '`CFG.runCapMs`', '`timeoutMs`', '`devauto:state.stale`', '`devauto:state.rev[회원]`', '`left`', '`subs_left`', '`auto_rev{at,why,ld}`',
+      '`devAutoChips`', '`device_approve`', '`push_sub_mine`', '`pushResync`', '`SUBS_READ_FAILED`', '`push.readSubs`', '`BAD_LEAVE_DATE`', '`settings:notify`', '배포 첫날 회수 0건', '0.2초 → 1.8초', 'a961b35', '909626c', '3a78afb', "'P1 판22' 14항목(결함 사본 44)"];
+    const GATE = ['uismoke', 'consheet_check', 'proctpl_check', 'settletest', 'servertest', 'rectest', 'promoqual_check', 'promogen_check', 'promoqlearn_check', 'promostream_check', 'promo_wrap_check', 'promo_post_check', 'stmtread_a_check', 'stmtread_b_check', 'stmtread_c_check', 'stmtread_d_check'];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const ok = /기준: v468 \(2026-11-14\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0
+      && tlv.length > 0 && cb.length === 14 && scr.length === 11 && gate.length === 3 && cb.every((l) => /^- \[x\] \(AI\) /.test(l) || /^- \[ \] \(AI 시험 화면 대상/.test(l)) && !cb.some((l) => /PM/.test(l))
+      && GATE.every((g) => gate.some((l) => l.indexOf('`' + g + '`') > 0)) && ["'P1 판22' 14항목", "'P1 판22' 5항목", "'7일 넘은 대기'", "'퇴사 회수'", "'삭제 회수'"].every((s) => tlv.indexOf(s) > 0)
+      && d.man.indexOf('승인 요청은 자동으로 가지 않습니다') < 0 && m1.indexOf('새 기기 승인 대기</b> 알림이 자동으로 갑니다') > 0 && m1.indexOf('2026-11 v468') > 0
+      && ['<b>퇴사 회수</b>', '<b>삭제 회수</b>', '<b>7일 넘은 대기</b>', '<b>퇴사 다음 날 자동 정리</b> (2026-11 v468)', '<b>퇴사일 칸</b>', '<b>다시 입사하면</b>', '저절로 다시 등록됩니다'].every((s) => m218.indexOf(s) > 0)
+      && m25.indexOf('승인 대기 알림이 자동으로 갔습니다') > 0 && !/devauto|auto_rev|pend_note|push_sub|leave_date|BAD_LEAVE/.test(m1 + m218 + m25)
+      && d.cl.indexOf('**P1 판22 기기·계정 자동 처리(v468') > 0 && d.cl.indexOf('`SUBS_READ_FAILED`') > 0 && /SHELL_CACHE = 'jw-shell-v468'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, scr: scr.length, gate: gate.length, m1: m1.length, m218: m218.length, m25: m25.length } };
+  };
+  const r68 = chk68(D68);
+  const mu68 = (k, f) => chk68(Object.assign({}, D68, { [k]: f(D68[k]) })).ok;
+  const M68 = [mu68('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v467 (')),
+    mu68('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v467'")),
+    mu68('ft', (s) => s.split('`push.readSubs`').join('push.readSubs')),
+    mu68('tl', (s) => s.replace('- [ ] (AI 시험 화면 대상 — 판22 검토 반영) 표시가 붙은 기기에서 [승인]', '- [ ] (PM 확인 — 판22) 표시가 붙은 기기에서 [승인]')),
+    mu68('tl', (s) => { const k = s.lastIndexOf('`stmtread_d_check`'); return s.slice(0, k) + 'stmtread_d_check' + s.slice(k + 18); }),
+    mu68('man', (s) => s.replace('새 기기로 처음 로그인하면 기기 승인을 맡은 분', '승인 요청은 자동으로 가지 않습니다. 새 기기로 처음 로그인하면 기기 승인을 맡은 분')),
+    mu68('man', (s) => s.replace('<b>퇴사 다음 날 자동 정리</b>', '퇴사 다음 날 자동 정리')),
+    mu68('man', (s) => s.replace('<b>퇴사일 칸</b>은 달력에 있는 날짜', '<b>퇴사일 칸</b>(leave_date)은 달력에 있는 날짜')),
+    mu68('cl', (s) => s.replace('**P1 판22 기기·계정 자동 처리(v468', '**P1 판22(v4xx'))];
+  T('v468 문서·판 번호(정확 검사): FEATURES 기준 v468 (2026-11-14)·v468 절(원장 C142·T476 · devauto 함수·표식 키·상한 · 구독 다시 맞춤·저장 닫힘 · 퇴사일 형식 · settings:notify 무변 · 운영 실측·알려진 한계 · 검토 a961b35 · 커밋 909626c·3a78afb) · TESTLIST v468 칸 14(화면 11 · 게이트 [x] 3 — 16종 · PM 낱말 0) · MANUAL 1절 자동 알림(옛 문장 없음)·21-8 표시 2종·퇴사 다음 날·퇴사일 칸·다시 입사·25절 안내(내부 키 이름 0) · CLAUDE.md 판22 줄 · sw jw-shell-v468 · 결함 사본 ' + M68.length + '개 = 모두 ✗',
+    r68.ok && M68.every((v) => v === false), JSON.stringify({ r: r68.info, mut: M68 }));
+} catch (e) { console.log('  (v468 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
