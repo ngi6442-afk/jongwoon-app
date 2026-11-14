@@ -163,10 +163,39 @@ function templateText(f) {
 }
 
 // 모델에 보내는 요청(자리표시만 — 숫자·금액·제목 0). 반환 body(callApi용).
-const SYSTEM = '너는 회사 그룹웨어의 아침 음성 브리핑 작가다. 입력은 항목 목록이고 항목마다 자리표시({{이름}})와 있음/없음 표시가 있다.\n'
+// 길이(P1 판11, 11/14): 검사(verifyFilled)는 '채운 뒤' 150~300자인데 종전 프롬프트는 "공백 포함 150~250자"라고만 해 모델이 자리표시({{appr_pm}} = 11자 → 채우면 "3" 1자)까지
+//   글자로 세면 채운 뒤 크게 줄었다(자리표시 17개 본보기: 자리표시 포함 382자 → 채운 뒤 243자, 자리표시 194자가 값 55자로). 11/8·9·11·12 LENGTH 4회의 원천으로 본다(원문 길이는 그때 안 남음 — 이번부터 남김).
+//   → 자리표시를 뺀 나머지 글만 세라고 하고, 그 범위를 '채울 값 길이 합'만큼 뺀 수로 준다(값 자체는 안 감 — 글자 수 하나뿐).
+const LEN_AIM = 225;                 // 채운 뒤 목표(150~300 가운데)
+function fillChars(f) {               // 있음 표시 자리표시를 채운 값의 글자 수 합(모델이 다 쓴다고 보고)
+  const fl = fillsOf(f);
+  return Object.keys(fl).reduce(function (n, k) { return n + (hasFlag(f, k) ? String(fl[k]).length : 0); }, 0);
+}
+function bareRange(f) {               // 자리표시를 뺀 본문 목표 범위(자)
+  const fc = fillChars(f);
+  const lo = Math.max(80, LEN_MIN + 20 - fc), hi = Math.max(lo + 40, LEN_MAX - 30 - fc);
+  return { lo: lo, hi: hi, fill: fc };
+}
+function systemOf(f) {
+  const r = bareRange(f);
+  return '너는 회사 그룹웨어의 아침 음성 브리핑 작가다. 입력은 항목 목록이고 항목마다 자리표시({{이름}})와 있음/없음 표시가 있다.\n'
   + '규칙: ① 숫자·금액·업체명·제목을 절대 쓰지 말고 반드시 자리표시 {{이름}}을 그대로 쓴다(값은 프로그램이 채운다). ② "한 건·세 곳·네 대" 같은 한글 수사도 쓰지 않는다. '
   + '③ 건수 자리표시 뒤에는 단위(건·대)를 붙이고, {{date}}·{{appr_amt}}·{{ab_ton}}·{{ab_day}}·{{appr_title}}에는 단위를 붙이지 않는다(들어 있음). 기간은 "한 달 안"처럼 숫자 없이 쓴다. ④ "없음" 항목은 짧게 없다고 하거나 생략한다. '
-  + '⑤ 자리표시는 주어진 것만, 각각 최대 1회. ⑥ 존댓말, 소리 내어 읽기 좋은 짧은 문장, 공백 포함 150~250자. ⑦ "좋은 아침입니다"로 시작하고 "이상입니다"로 끝낸다. ⑧ "그만"이라는 말은 쓰지 않는다. ⑨ 출력은 본문만.';
+  + '⑤ 자리표시는 주어진 것만, 각각 최대 1회. ⑥ 존댓말, 소리 내어 읽기 좋은 짧은 문장. 길이는 자리표시({{…}})를 뺀 나머지 글자만 공백 포함 ' + r.lo + '~' + r.hi + '자로 쓴다'
+  + '(자리표시는 채우면 값이 짧아진다 — 자리표시 이름 글자는 세지 않는다. 채운 뒤 전체가 ' + LEN_MIN + '~' + LEN_MAX + '자여야 한다). ⑦ "좋은 아침입니다"로 시작하고 "이상입니다"로 끝낸다. ⑧ "그만"이라는 말은 쓰지 않는다. ⑨ 출력은 본문만.';
+}
+// 길이 재요청(P1 판11) — 첫 글이 채운 뒤 길이(LENGTH)로만 떨어졌을 때 한 번. 첫 글(자리표시만 든 모델 글)을 assistant로 돌려주고 방향·목표를 적어 다시 쓰게 한다.
+function retryBody(f, raw, lenFail) {
+  const b = claudeBody(f);
+  const r = bareRange(f);
+  const short = lenFail.dir === 'short';
+  const need = Math.max(20, Math.abs(LEN_AIM - lenFail.n));
+  const ask = '방금 글은 자리표시를 채우면 ' + lenFail.n + '자라 기준 ' + LEN_MIN + '~' + LEN_MAX + '자보다 ' + (short ? '짧다' : '길다') + '. '
+    + '같은 규칙으로 다시 쓰되 ' + (short ? '더 길게' : '더 짧게') + ' 써라: 자리표시를 뺀 나머지 글을 지금보다 약 ' + need + '자 ' + (short ? '늘려' : '줄여') + ' '
+    + r.lo + '~' + r.hi + '자로 맞춘다' + (short ? '(없음 항목도 짧게 없다고 말해도 된다).' : '(없음 항목은 생략한다).') + ' 출력은 본문만.';
+  b.messages = [b.messages[0], { role: 'assistant', content: String(raw) }, { role: 'user', content: ask }];
+  return b;
+}
 function claudeBody(f) {
   const Y = function (k) { return hasFlag(f, k) ? '있음' : '없음'; };
   const lines = [
@@ -179,7 +208,7 @@ function claudeBody(f) {
     '- 인허가 만기가 한 달 안인 건 {{lic_30}} — ' + Y('lic_30'),
     '- 운반일지 {{ab_day}} 기준 운반 {{ab_cnt}}건·{{ab_ton}}·잠정 {{ab_prov}} — ' + Y('ab_cnt') + '(없음이면 "운반일지 수집 기록이 없다"고 한 문장)',
   ];
-  return { model: MODEL, max_tokens: MAX_TOKENS, system: SYSTEM, output_config: { effort: 'low' }, messages: [{ role: 'user', content: lines.join('\n') }] };
+  return { model: MODEL, max_tokens: MAX_TOKENS, system: systemOf(f), output_config: { effort: 'low' }, messages: [{ role: 'user', content: lines.join('\n') }] };
 }
 
 // 숫자 자기검증 — 채우기 전(모델 글)과 채운 뒤. 반환 {ok, code, text}.
@@ -213,7 +242,7 @@ function verifyFilled(text, f) {
   const allowed = Object.keys(fl).map(function (k) { return fl[k]; }).concat(ALLOWED_LITERALS).join(' | ');
   const groups = t.match(/\d[\d,.]*/g) || [];
   for (let i = 0; i < groups.length; i++) { if (allowed.indexOf(groups[i]) < 0) return { ok: false, code: 'NUMBER_NOT_IN_FACTS' }; }
-  if (t.length < LEN_MIN || t.length > LEN_MAX) return { ok: false, code: 'LENGTH' };
+  if (t.length < LEN_MIN || t.length > LEN_MAX) return { ok: false, code: 'LENGTH', len: t.length, dir: t.length < LEN_MIN ? 'short' : 'long' };   // 길이·방향만(글은 안 남김 — 제목·금액이 들어 있음)
   if (/그만/.test(t)) return { ok: false, code: 'STOP_WORD' };
   return { ok: true, code: '' };
 }
@@ -313,22 +342,52 @@ async function sentence(st, f, today, log) {
   const forb = f.forbidden.concat(f.appr_amt ? [String(f.appr_amt)] : []);
   const sc = scrubPayload(body, forb);
   if (!sc.ok) { log.push('[문장] scrub 걸림 → 템플릿'); return { mode: 'template', reason: 'SCRUB_HIT', text: templateText(f), tokens: 0 }; }
-  let json;
-  try { json = await callApi(apiKey, body, TIMEOUT_MS); }
-  catch (e) {
-    // detail은 API 오류 문구(키 값 없음 — claude.js가 상태·메시지만 담는다). 400은 요청 형태 문제라 문구가 있어야 고친다.
-    log.push('[문장] Claude 실패 ' + String((e && e.code) || e).slice(0, 40) + (e && e.detail ? ' — ' + String(e.detail).slice(0, 160) : '') + ' → 템플릿');
-    return { mode: 'template', reason: 'CLAUDE_' + String((e && e.code) || 'FAIL').slice(0, 20), text: templateText(f), tokens: 0 };
-  }
-  const tokens = usageTokens(json);
-  if (json.stop_reason !== 'end_turn') { log.push('[문장] stop_reason ' + json.stop_reason + ' → 템플릿'); return { mode: 'template', reason: 'STOP_' + String(json.stop_reason || '').slice(0, 20), text: templateText(f), tokens: tokens }; }
-  const raw = responseText(json);
-  const v1 = verifyModelText(raw, f);
-  if (!v1.ok) { log.push('[문장] 자기검증(채우기 전) ' + v1.code + ' → 템플릿'); return { mode: 'template', reason: 'VERIFY_' + v1.code, text: templateText(f), tokens: tokens }; }
-  const filled = fillText(raw, f);
-  const v2 = verifyFilled(filled, f);
-  if (!v2.ok) { log.push('[문장] 자기검증(채운 뒤) ' + v2.code + ' → 템플릿'); return { mode: 'template', reason: 'VERIFY_' + v2.code, text: templateText(f), tokens: tokens }; }
-  return { mode: 'claude', reason: '', text: filled, tokens: tokens };
+  const lenFail = [];   // 길이로 떨어진 회차마다 {n: 채운 뒤 자 수, dir: short|long} — 글은 남기지 않는다(P1 판11)
+  let retried = false;
+  const tpl = function (reason, tokens) { return { mode: 'template', reason: reason, text: templateText(f), tokens: tokens, retry: retried ? 1 : 0, len_fail: lenFail.slice() }; };
+  // 한 회차: 호출 → stop_reason → 채우기 전 검증 → 채움 → 채운 뒤 검증. 반환 {ok, text} 또는 {ok:false, reason, lenFail?, raw?}
+  const once = async function (b, tag) {
+    let json;
+    try { json = await callApi(apiKey, b, TIMEOUT_MS); }
+    catch (e) {
+      // detail은 API 오류 문구(키 값 없음 — claude.js가 상태·메시지만 담는다). 400은 요청 형태 문제라 문구가 있어야 고친다.
+      log.push('[문장' + tag + '] Claude 실패 ' + String((e && e.code) || e).slice(0, 40) + (e && e.detail ? ' — ' + String(e.detail).slice(0, 160) : '') + ' → 템플릿');
+      return { ok: false, reason: 'CLAUDE_' + String((e && e.code) || 'FAIL').slice(0, 20), tokens: 0 };
+    }
+    const tokens = usageTokens(json);
+    if (json.stop_reason !== 'end_turn') { log.push('[문장' + tag + '] stop_reason ' + json.stop_reason + ' → 템플릿'); return { ok: false, reason: 'STOP_' + String(json.stop_reason || '').slice(0, 20), tokens: tokens }; }
+    const raw = responseText(json);
+    const v1 = verifyModelText(raw, f);
+    if (!v1.ok) { log.push('[문장' + tag + '] 자기검증(채우기 전) ' + v1.code + ' → 템플릿'); return { ok: false, reason: 'VERIFY_' + v1.code, tokens: tokens }; }
+    const filled = fillText(raw, f);
+    const v2 = verifyFilled(filled, f);
+    if (!v2.ok) {
+      if (v2.code === 'LENGTH') {
+        const lf = { n: v2.len, dir: v2.dir };
+        lenFail.push(lf);
+        log.push('[문장' + tag + '] 자기검증(채운 뒤) LENGTH ' + (lf.dir === 'short' ? '짧음' : '김') + ' ' + lf.n + '자(기준 ' + LEN_MIN + '~' + LEN_MAX + ')');
+        return { ok: false, reason: 'VERIFY_LENGTH', tokens: tokens, lenFail: lf, raw: raw };
+      }
+      log.push('[문장' + tag + '] 자기검증(채운 뒤) ' + v2.code + ' → 템플릿');
+      return { ok: false, reason: 'VERIFY_' + v2.code, tokens: tokens };
+    }
+    return { ok: true, text: filled, tokens: tokens };
+  };
+  const a = await once(body, '');
+  if (a.ok) return { mode: 'claude', reason: '', text: a.text, tokens: a.tokens, retry: 0, len_fail: [] };
+  if (!a.lenFail) return tpl(a.reason, a.tokens);
+  // 길이로만 떨어졌을 때 한 번 다시 — 월 상한(CAP_CLAUDE_TOKENS) 안에서만(첫 호출 토큰까지 더해 넘으면 재요청 없이 템플릿). 상한 값은 그대로.
+  if ((usage.claude_tokens || 0) + a.tokens >= CAP_CLAUDE_TOKENS) { log.push('[문장] 월 상한 — 재요청 없이 템플릿'); return tpl('VERIFY_LENGTH', a.tokens); }
+  const rb = retryBody(f, a.raw, a.lenFail);
+  const sc2 = scrubPayload(rb, forb);
+  if (!sc2.ok) { log.push('[문장] 재요청 scrub 걸림 → 템플릿'); return tpl('VERIFY_LENGTH', a.tokens); }
+  retried = true;
+  log.push('[문장] 길이 재요청 1회(' + (a.lenFail.dir === 'short' ? '더 길게' : '더 짧게') + ')');
+  const b2 = await once(rb, ' 재요청');
+  const tok = a.tokens + (b2.tokens || 0);
+  if (b2.ok) return { mode: 'claude', reason: '', text: b2.text, tokens: tok, retry: 1, len_fail: lenFail.slice() };
+  if (b2.lenFail) log.push('[문장 재요청] 길이 또 벗어남 → 템플릿');
+  return tpl(b2.reason, tok);
 }
 
 // 목소리 목록 확인(brief:voices) — 없거나 30일 넘었으면 voices/list 1회(무료 GET). 브리핑 §3 D1 끝 조건 "voices/list에 선히 있음 — 없으면 중단·보고".
@@ -384,16 +443,16 @@ async function generate(st, opts) {
   const facts = { appr_pm: f.appr_pm, appr_boss: f.appr_boss, appr_amt: f.appr_amt, task_open: f.task_open, task_due: f.task_due, task_review: f.task_review, bid_soon: f.bid_soon, bid_new: f.bid_new,
     veh_30: f.veh_30, veh_over: f.veh_over, lic_30: f.lic_30, ab: f.ab ? { day: f.ab.day, cnt: f.ab.cnt, ton: f.ab.ton, prov: f.ab.prov, src_ts: f.ab.src_ts } : null };
   const doc = { schema: 1, date: today, ts: Date.now(), by: String(o.by || 'cron'), mode: sen.mode, reason: sen.reason, text: sen.text, len: sen.text.length, facts: facts, cols_missing: missing,
-    provider: vo.provider, voice: vo.voice, rate: s.values.rate, mp3: { ok: vo.ok, bytes: vo.bytes, chars: vo.chars, reason: vo.reason }, claude: { model: MODEL, tokens: sen.tokens }, ms: Date.now() - t0, log: log.slice(0, 20) };
+    provider: vo.provider, voice: vo.voice, rate: s.values.rate, mp3: { ok: vo.ok, bytes: vo.bytes, chars: vo.chars, reason: vo.reason }, claude: { model: MODEL, tokens: sen.tokens, retry: sen.retry || 0, len_fail: sen.len_fail || [] }, ms: Date.now() - t0, log: log.slice(0, 20) };
   const w = await blobSet(st, dayKey, doc);
   if (!w.ok) return { ok: false, code: w.code, doc: doc };
   if (vo.ok && vo.b64) { await blobSet(st, 'brief:mp3:' + today, { schema: 1, date: today, ts: doc.ts, fmt: 'audio/mpeg', bytes: vo.bytes, b64: vo.b64 }); }
   await usageAdd(st, today, { azure_chars: vo.ok ? vo.chars : 0, claude_tokens: sen.tokens, runs: 1 });
-  await logAppend(st, { ts: doc.ts, date: today, by: doc.by, mode: sen.mode, reason: sen.reason, len: doc.len, tokens: sen.tokens, chars: vo.ok ? vo.chars : 0, mp3: vo.ok, mp3_reason: vo.reason, ms: doc.ms });
+  await logAppend(st, { ts: doc.ts, date: today, by: doc.by, mode: sen.mode, reason: sen.reason, len: doc.len, tokens: sen.tokens, retry: sen.retry || 0, len_fail: sen.len_fail || [], chars: vo.ok ? vo.chars : 0, mp3: vo.ok, mp3_reason: vo.reason, ms: doc.ms });
   return { ok: true, doc: doc };
 }
 
 module.exports = { SETTINGS_KEY, PROVIDERS, RATES, CAP_AZURE_CHARS, CAP_CLAUDE_TOKENS, ADMIN_RUNS_PER_DAY, MODEL, LEN_MIN, LEN_MAX,
-  kstToday, kstDate, hhmm, dayDiff, shiftDay, prevWeekday, koDate, fmtWon, computeFacts, fillsOf, templateText, claudeBody, verifyModelText, fillText, verifyFilled, xmlEsc, ssmlOf,
+  kstToday, kstDate, hhmm, dayDiff, shiftDay, prevWeekday, koDate, fmtWon, computeFacts, fillsOf, templateText, claudeBody, retryBody, bareRange, fillChars, LEN_AIM, verifyModelText, fillText, verifyFilled, xmlEsc, ssmlOf,
   settingsDefaults, settingsValid, settingsNormalize, settingsRead, settingsPublic, azureEnv, azureVoices, azureTts, elevenTts, ensureVoices,
   usageRead, usageAdd, capState, logAppend, logRead, generate };

@@ -27,7 +27,7 @@ exports.handler = async function (event, context) {
     const r = await BRIEF.generate(st, { force: force, by: by });
     rec.status = r.ok ? 'done' : 'fail'; rec.ts = Date.now();
     rec.skipped = r.skipped || ''; rec.code = r.code || '';
-    if (r.doc) rec.summary = { date: r.doc.date, mode: r.doc.mode, reason: r.doc.reason, len: r.doc.len, mp3: !!(r.doc.mp3 && r.doc.mp3.ok), mp3_reason: (r.doc.mp3 && r.doc.mp3.reason) || '', ms: r.doc.ms || 0 };
+    if (r.doc) rec.summary = { date: r.doc.date, mode: r.doc.mode, reason: r.doc.reason, len: r.doc.len, retry: (r.doc.claude && r.doc.claude.retry) || 0, len_fail: (r.doc.claude && r.doc.claude.len_fail) || [], mp3: !!(r.doc.mp3 && r.doc.mp3.ok), mp3_reason: (r.doc.mp3 && r.doc.mp3.reason) || '', ms: r.doc.ms || 0 };
     await blobSet(st, 'brief:job:last', rec);
     if (by === 'cron') await stamp('gw-brief-cron', { state: 'end', ok: r.ok, note: (r.skipped ? 'skipped ' + r.skipped : (rec.summary ? (rec.summary.mode + (rec.summary.mp3 ? ' · mp3' : ' · mp3 없음(' + rec.summary.mp3_reason + ')')) : (r.code || ''))).slice(0, 80) });
   } catch (e) {

@@ -9679,4 +9679,116 @@ function J91a(x) { return JSON.stringify(x); }
   }
 }
 
+{ // ---- P1 판11 아침 브리핑 문장 길이 실패 수리(착수설명서 판11 · 원장 C101 — 11/8·9·11·12 LENGTH 4회) ----
+  //   ① 짧음 → 재요청 1회(프롬프트 '더 길게'·목표 범위) → 통과 ② 짧음 → 재요청도 길이 실패 → 템플릿(호출 2회뿐) ③ 김 → 재요청 프롬프트 '더 짧게'
+  //   ④ 다른 이유(숫자 DIGIT·stop_reason) = 재요청 0 ⑤ 월 상한(첫 호출 토큰까지 더해 넘음) = 재요청 0 ⑥ 기록(brief:log·brief:day)에 길이·방향만(모델 글 0)
+  //   ⑦ 프롬프트 길이 어긋남 원천: 자리표시 뺀 글 범위 · 종전 "150~250자" 없음 ⑧ 결함 사본(brief.js 한 곳씩 되돌림)이 위 검사에서 실제로 깨짐
+  //   실 Claude 호출 0 — global.fetch를 api.anthropic.com 가짜 응답으로(그 밖 주소는 throw), Azure 키는 지워 음성 0(AZURE_ENV_MISSING)
+  const fs11 = require('fs'), Mod11 = require('module');
+  const PB11 = join(FN, '_lib', 'brief.js'), SB11 = fs11.readFileSync(PB11, 'utf8');
+  const comp11 = (src) => { const m = new Mod11(PB11, null); m.filename = PB11; m.paths = Mod11._nodeModulePaths(dirname(PB11)); m._compile(src, PB11); return m.exports; };
+  const mut11 = (src, from, to) => { if (src.split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 60)); return src.replace(from, () => to); };
+  const realFetch11 = global.fetch, envK11 = process.env.GW_ANTHROPIC_KEY, envAK11 = process.env.AZURE_SPEECH_KEY, envAR11 = process.env.AZURE_SPEECH_REGION;
+  const snap11 = JSON.stringify(mem.gw_data);
+  let q11 = [], sent11 = [], other11 = 0;
+  const ok11 = (text, stop, tok) => ({ content: [{ type: 'text', text }], stop_reason: stop || 'end_turn', usage: { input_tokens: tok || 100, output_tokens: 50 } });
+  try {
+    process.env.GW_ANTHROPIC_KEY = 'test-key-p1n11'; delete process.env.AZURE_SPEECH_KEY; delete process.env.AZURE_SPEECH_REGION;
+    global.fetch = async (url, o) => {
+      if (/api\.anthropic\.com/.test(String(url))) { sent11.push(JSON.parse(o.body)); const r = q11.shift() || ok11('', 'max_tokens'); return { status: 200, ok: true, text: async () => JSON.stringify(r) }; }
+      other11++; throw new Error('바깥 호출 금지 ' + String(url).slice(0, 40));
+    };
+    const B0 = comp11(SB11);
+    const SHORT = '좋은 아침입니다. {{date}} 브리핑입니다. 오늘은 따로 챙길 일이 없습니다. 이상입니다.';
+    const GOOD = '좋은 아침입니다. {{date}} 브리핑입니다. 결재는 내 차례와 대표님 차례 모두 기다리는 건이 없습니다. 지시도 열린 것이 없고 오늘 기한이 된 것도 없습니다. 입찰은 검토 표시 중 사흘 안에 마감되는 공고가 없고 새로 들어온 공고도 없습니다. 차량 검사와 보험 만기가 한 달 안인 차량이 없고 인허가 만기도 없습니다. 운반일지는 어제 수집 기록이 없어 오늘은 빠집니다. 이상입니다.';
+    const LONG = GOOD.replace('이상입니다.', '') + '오늘도 현장 정리 정돈과 보호구 착용을 꼭 확인해 주시고 이동하실 때 안전 운전 부탁드립니다. 점심 뒤에는 사무실 문서 정리도 함께 살펴봐 주시면 좋겠습니다. 날씨가 쌀쌀하니 건강 관리에도 신경 써 주십시오. 이상입니다.';
+    const run11 = async (B, seq, pre) => {
+      Object.keys(mem.gw_data).forEach((k) => { if (/^(brief:|settings:brief|col:|allbaro:)/.test(k)) delete mem.gw_data[k]; });
+      if (pre) pre();
+      q11 = seq.slice(); sent11 = [];
+      const r = await B.generate(blobsMock.store('gw_data'), { force: true, by: 'test' });
+      const lg = (mem.gw_data['brief:log'] || { items: [] }).items.slice(-1)[0] || {};
+      return { r, doc: r.doc || {}, lg, sent: sent11.slice() };
+    };
+    const day11 = new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);
+    const chk11 = async (B) => {
+      const o = {};
+      const f0 = B.computeFacts({}, null, day11);
+      o.pre = B.verifyFilled(B.fillText(GOOD, f0), f0).ok && B.verifyFilled(B.fillText(SHORT, f0), f0).dir === 'short' && B.verifyFilled(B.fillText(LONG, f0), f0).dir === 'long' && B.verifyModelText(LONG, f0).ok;
+      // ① 짧음 → 재요청 → 통과
+      let x = await run11(B, [ok11(SHORT), ok11(GOOD)]);
+      const rq = x.sent[1] || { messages: [] }, ask1 = String((rq.messages[2] || {}).content || '');
+      o.a = x.doc.mode === 'claude' && x.sent.length === 2 && x.doc.claude.retry === 1 && x.doc.text === B.fillText(GOOD, f0)
+        && rq.messages.length === 3 && rq.messages[1].role === 'assistant' && rq.messages[1].content === SHORT && /더 길게/.test(ask1) && !/더 짧게/.test(ask1)
+        && ask1.indexOf(B.bareRange(f0).lo + '~' + B.bareRange(f0).hi + '자') >= 0 && ask1.indexOf(String(B.fillText(SHORT, f0).length) + '자') >= 0
+        && x.doc.claude.tokens === 300 && x.lg.retry === 1 && x.lg.len_fail.length === 1 && x.lg.len_fail[0].dir === 'short' && x.lg.len_fail[0].n === B.fillText(SHORT, f0).length;
+      // ② 짧음 → 재요청도 짧음 → 템플릿(호출 2회뿐 · 기록 2건)
+      x = await run11(B, [ok11(SHORT), ok11(SHORT), ok11(GOOD)]);
+      o.b = x.doc.mode === 'template' && x.doc.reason === 'VERIFY_LENGTH' && x.sent.length === 2 && x.doc.text === B.templateText(f0) && x.lg.retry === 1
+        && x.lg.len_fail.length === 2 && x.lg.len_fail.every((e) => e.dir === 'short' && e.n === B.fillText(SHORT, f0).length) && x.lg.tokens === 300;
+      // ③ 김 → 재요청 프롬프트 '더 짧게' → 통과
+      x = await run11(B, [ok11(LONG), ok11(GOOD)]);
+      const ask3 = String(((x.sent[1] || { messages: [] }).messages[2] || {}).content || '');
+      o.c = x.doc.mode === 'claude' && x.sent.length === 2 && /더 짧게/.test(ask3) && !/더 길게/.test(ask3) && /길다/.test(ask3) && x.lg.len_fail[0].dir === 'long' && x.lg.len_fail[0].n === B.fillText(LONG, f0).length;
+      // ④ 다른 이유 = 재요청 0(숫자 DIGIT · stop_reason max_tokens · 재요청 회차가 숫자로 떨어짐 = 그 이유로 템플릿)
+      x = await run11(B, [ok11('좋은 아침입니다. 결재 3건입니다. ' + GOOD), ok11(GOOD)]);
+      const d1 = x.doc.mode === 'template' && x.doc.reason === 'VERIFY_DIGIT' && x.sent.length === 1 && x.lg.retry === 0 && x.lg.len_fail.length === 0;
+      x = await run11(B, [ok11('', 'max_tokens'), ok11(GOOD)]);
+      const d2 = x.doc.reason === 'STOP_max_tokens' && x.sent.length === 1 && x.lg.retry === 0;
+      x = await run11(B, [ok11(SHORT), ok11('좋은 아침입니다. 결재 3건입니다. ' + GOOD), ok11(GOOD)]);
+      const d3 = x.doc.mode === 'template' && x.doc.reason === 'VERIFY_DIGIT' && x.sent.length === 2 && x.lg.retry === 1 && x.lg.len_fail.length === 1;
+      o.d = d1 && d2 && d3;
+      // ⑤ 월 상한 — 시작 땐 아래(상한 - 100), 첫 호출 150토큰 더하면 넘음 = 재요청 0 · 상한 값 그대로
+      x = await run11(B, [ok11(SHORT), ok11(GOOD)], () => { mem.gw_data['brief:usage:' + day11.slice(0, 7)] = { claude_tokens: B.CAP_CLAUDE_TOKENS - 100, azure_chars: 0, runs: 0 }; });
+      o.e = x.doc.mode === 'template' && x.doc.reason === 'VERIFY_LENGTH' && x.sent.length === 1 && x.lg.retry === 0 && x.lg.len_fail.length === 1 && B.CAP_CLAUDE_TOKENS === 1000000 && B.LEN_MIN === 150 && B.LEN_MAX === 300
+        && x.doc.log.some((l) => /월 상한/.test(l));
+      // ⑥ 기록에 모델 글 0 — 짧은 글·긴 글의 고유 문구가 brief:log·brief:day 기록(log·claude)·잡 요약 어디에도 없음, 길이 줄은 '짧음 n자'
+      x = await run11(B, [ok11(LONG), ok11(SHORT)]);
+      const rec = JSON.stringify({ lg: x.lg, log: x.doc.log, claude: x.doc.claude });
+      o.f = rec.indexOf('보호구') < 0 && rec.indexOf('따로 챙길') < 0 && x.doc.log.some((l) => /LENGTH 김 \d+자\(기준 150~300\)/.test(l)) && x.doc.log.some((l) => /LENGTH 짧음 \d+자/.test(l))
+        && x.lg.len_fail.map((e) => e.dir).join(',') === 'long,short' && Object.keys(x.lg.len_fail[0]).sort().join(',') === 'dir,n';
+      // ⑦ 프롬프트 원천 — 첫 요청 system에 '자리표시를 뺀 나머지 글자' 범위·채운 뒤 150~300 · 종전 "150~250자" 없음 · 범위 = 300 안에 들게(채울 값 합만큼 뺌)
+      const bd = B.claudeBody(f0), br = B.bareRange(f0);
+      o.g = /자리표시\(\{\{…\}\}\)를 뺀 나머지 글자만/.test(bd.system) && bd.system.indexOf(br.lo + '~' + br.hi + '자') >= 0 && bd.system.indexOf('150~300자') >= 0 && bd.system.indexOf('150~250자') < 0
+        && br.hi + br.fill <= 300 && br.lo + br.fill >= 150 && !/\d{3,}/.test(bd.messages[0].content) && other11 === 0;
+      o.ok = o.pre && o.a && o.b && o.c && o.d && o.e && o.f && o.g;
+      return o;
+    };
+    const R11 = await chk11(B0);
+    T('P1 판11 ① 짧음 → 재요청 1회(이전 글 assistant · "더 길게" · 자리표시 뺀 목표 범위 · 채운 뒤 n자) → 통과 · 토큰 두 호출 합 · 기록 retry 1·len_fail [{n, short}]', R11.pre && R11.a, JSON.stringify(R11));
+    T('P1 판11 ② 짧음 → 재요청도 짧음 → 템플릿(호출 2회뿐 · VERIFY_LENGTH · len_fail 2건)', R11.b, JSON.stringify(R11));
+    T('P1 판11 ③ 김 → 재요청 프롬프트 "더 짧게"·"길다"(더 길게 없음) → 통과 · 방향 long', R11.c, JSON.stringify(R11));
+    T('P1 판11 ④ 다른 이유 = 재요청 0(DIGIT·stop_reason max_tokens) · 재요청 회차가 다른 이유로 떨어지면 그 이유로 템플릿', R11.d, JSON.stringify(R11));
+    T('P1 판11 ⑤ 월 상한(첫 호출 토큰까지 더해 넘음) = 재요청 0 · 상한 100만·길이 150~300 그대로', R11.e, JSON.stringify(R11));
+    T('P1 판11 ⑥ 기록에 길이·방향만(n·dir 두 칸) — 모델 글 문구 0 · 로그 줄 "LENGTH 김/짧음 n자(기준 150~300)"', R11.f, JSON.stringify(R11));
+    T('P1 판11 ⑦ 프롬프트 길이 어긋남 원천: 자리표시 뺀 글 범위(채울 값 합만큼 뺀 수)·채운 뒤 150~300 · 종전 "150~250자" 없음 · 사용자 글 3자리 숫자 0 · 바깥 호출 0', R11.g, JSON.stringify(R11));
+    const MUT11 = [
+      ["  if (!a.lenFail) return tpl(a.reason, a.tokens);\n", "  return tpl(a.reason, a.tokens);\n"],                                                 // 재요청 없음(종전)
+      ["  if (!a.lenFail) return tpl(a.reason, a.tokens);\n", "  if (!a.raw && false) return tpl(a.reason, a.tokens);\n"],                             // 다른 이유도 재요청
+      ["if ((usage.claude_tokens || 0) + a.tokens >= CAP_CLAUDE_TOKENS)", "if (false)"],                                                                // 상한 무시
+      ["  const short = lenFail.dir === 'short';", "  const short = lenFail.dir !== 'short';"],                                                         // 방향 뒤집힘
+      ["return { ok: false, code: 'LENGTH', len: t.length,", "return { ok: false, code: 'LENGTH', len: 0,"],                                          // 길이 안 남김
+      ["        lenFail.push(lf);\n", ""],                                                                                                               // 기록 빠짐
+      ["  if (b2.ok) return { mode: 'claude',", "  if (b2.ok || b2.lenFail) return { mode: 'claude',"],                                               // 두 번째 실패도 통과
+      ["const b2 = await once(rb, ' 재요청');", "let b2 = await once(rb, ' 재요청'); if (b2.lenFail) b2 = await once(retryBody(f, b2.raw, b2.lenFail), ' 재요청2');"],   // 재요청 2회
+      ["b.messages = [b.messages[0], { role: 'assistant', content: String(raw) }, { role: 'user', content: ask }];", "b.messages = [b.messages[0]];"],   // 재요청에 방향 안 적음
+      ["system: systemOf(f), output_config", "system: '공백 포함 150~250자', output_config"],                                                           // 종전 프롬프트
+      ["log.push('[문장' + tag + '] 자기검증(채운 뒤) LENGTH ' + (lf.dir === 'short' ? '짧음' : '김') + ' ' + lf.n + '자(기준 ' + LEN_MIN + '~' + LEN_MAX + ')');", "log.push('[문장' + tag + '] LENGTH ' + raw);"],   // 원문을 기록에
+    ];
+    const kill11 = [];
+    for (const [from, to] of MUT11) {
+      let k, B;
+      try { B = comp11(mut11(SB11, from, to)); } catch (e) { kill11.push(from.trim().slice(0, 60) + ' 결함 자리 ' + e.message); continue; }   // 결함 자리를 못 찾음 = 검사 자체가 낡음(실패로 셈)
+      try { k = !(await chk11(B)).ok; } catch (e) { k = true; }   // 결함 사본이 검사 도중 터짐 = 깨짐으로 잡힘
+      if (k !== true) kill11.push(from.trim().slice(0, 60) + ' 안 깨짐');
+    }
+    T('P1 판11 ⑧ 결함 사본 ' + MUT11.length + '개(재요청 없음·다른 이유 재요청·상한 무시·방향 뒤집힘·길이 안 남김·기록 빠짐·두 번째 실패 통과·재요청 2회·방향 안 적음·종전 프롬프트·원문 기록)가 위 검사에서 깨짐', kill11.length === 0, kill11.join(' | '));
+  } catch (e) { T('P1 판11 검사 실행', false, String(e && e.stack || e).slice(0, 400)); }
+  finally {
+    global.fetch = realFetch11; mem.gw_data = JSON.parse(snap11);
+    if (envK11 === undefined) delete process.env.GW_ANTHROPIC_KEY; else process.env.GW_ANTHROPIC_KEY = envK11;
+    if (envAK11 !== undefined) process.env.AZURE_SPEECH_KEY = envAK11; if (envAR11 !== undefined) process.env.AZURE_SPEECH_REGION = envAR11;
+  }
+}
+
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);
