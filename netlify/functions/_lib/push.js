@@ -24,6 +24,16 @@ async function getSubs() {
   return (r.ok && r.data && r.data.members) ? r.data : { schema: 1, members: {} };
 }
 async function saveSubs(doc) { return blobSet(store(DATA), 'push:subs', doc); }
+// P1 판22 검토 11/14 ⑧: 구독을 **고쳐 쓰는** 길(push_sub·push_unsub·push_primary 지정)은 이것으로 읽는다 — 못 읽음(ok:false)과 없음(빈 문서)을 가른다.
+//   getSubs는 못 읽어도 빈 문서를 돌려줘, 그 위에 덧붙여 저장하면 전원 구독이 지워졌다(발송 쪽 getSubs는 그대로 — 못 읽으면 보낼 곳이 없을 뿐 저장하지 않음)
+async function readSubs() {
+  const r = await blobGet(store(DATA), 'push:subs');
+  if (!r.ok) return r.code === 'NOT_FOUND' ? { ok: true, doc: { schema: 1, members: {} } } : { ok: false, code: r.code || 'STORAGE_READ_FAILED' };
+  if (r.data == null) return { ok: true, doc: { schema: 1, members: {} } };
+  if (typeof r.data !== 'object' || Array.isArray(r.data) || (r.data.members != null && (typeof r.data.members !== 'object' || Array.isArray(r.data.members)))) return { ok: false, code: 'SUBS_BAD_DOC' };
+  if (!r.data.members) r.data.members = {};
+  return { ok: true, doc: r.data };
+}
 
 // 회원 전수 로드(원본 레코드 — 재직·삭제 여부는 tier.ctxOf가 거른다). 스캔 1회로 등급 컨텍스트를 만드는 재료.
 // **못 읽은 것과 없는 것은 다르다**: gw_users list가 한 번 튀면 종전엔 빈 명부를 돌려줘 sendTo의 활성 필터가
@@ -113,7 +123,8 @@ async function sendTo(memberIds, payload, opts) {
         try {
           // TTL 24시간(감시 2단계, 2026-08-19) — 1시간이던 시절엔 밤새 꺼둔 폰이 아침 경보를
           // 통째로 놓쳤다(09시 발송 → 10시 폐기). 기기가 하루 안에만 켜지면 경보가 닿는다.
-          await webpush.sendNotification(subs[i].sub, body, { TTL: 86400 });
+          // opts.timeoutMs(P1 판22 검토 11/14 ① — 판22 발송만 넘김): 푸시 서비스 요청 시간 상한. 안 넘기면 종전 그대로(다른 알림 동작 무변)
+          await webpush.sendNotification(subs[i].sub, body, (opts && opts.timeoutMs > 0) ? { TTL: 86400, timeout: opts.timeoutMs } : { TTL: 86400 });
           sent++; mSent++;
         } catch (e) {
           const sc = e && e.statusCode;
@@ -138,4 +149,4 @@ async function pmIds() { return (await tierCtx()).pmIds; }
 // ①·② 1단계 결재 요청 수신자 — tier pm이 없으면(1인 관리자=대표뿐 등) 관리자 전원 폴백(교착 방지 — PM 큐 게이트도 pm 0명이면 관리자 전원에게 열린다, 종전 유지)
 async function pmOrAdminIds() { const p = await pmIds(); return p.length ? p : await adminIds(); }
 
-module.exports = { getKeys, getSubs, saveSubs, sendTo, loadMembers, tierCtx, activeIdSet, adminIds, bossIds, bossOrAdminIds, pmIds, pmOrAdminIds };
+module.exports = { getKeys, getSubs, saveSubs, readSubs, sendTo, loadMembers, tierCtx, activeIdSet, adminIds, bossIds, bossOrAdminIds, pmIds, pmOrAdminIds };

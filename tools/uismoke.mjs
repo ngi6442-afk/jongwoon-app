@@ -14101,6 +14101,42 @@ try {
     ['if (!dv || dv.status === "approved") return "";', 'if (!dv) return "";'], ['esc(ar.why === "deleted"', '(ar.why === "deleted"'], ['(ar.why === "deleted" ? "삭제 회수" : "퇴사 회수")', '"퇴사 회수"']];
   const kill22u = MU22.map(([a, b]) => { if (F22.split(a).length !== 2) return 'err 자리 ' + a; try { return run22(F22.replace(a, () => b)).ok === false; } catch (e) { return 'err ' + e.message; } });
   T('P1 판22 ③ 결함 사본 ' + MU22.length + '개(7일 경계·해제 시각·퇴사자 기기 뺌·승인 기기 뺌·이스케이프·삭제 글) = 모두 ✗', kill22u.every((v) => v === true), JSON.stringify(kill22u));
+  // ④ 검토 11/14 ④: 로그인 뒤 구독 다시 맞춤(실행 — 실제 pushResync) · ⑨ 퇴사일 형식 안내 글
+  const PR22 = fn22(html, 'pushResync'), AL22 = fn22(html, 'afterLogin');
+  const runPR = async (src, o) => {
+    const calls = [];
+    const gw = (fn, body) => { calls.push(body.action + (body.endpoint ? ':' + body.endpoint : '') + (body.sub ? ':' + body.sub.endpoint : '')); const r = (o.res || {})[body.action]; return Promise.resolve(typeof r === 'function' ? r(body) : (r || { status: 500, body: {} })); };
+    const sub = o.sub === null ? null : { endpoint: o.sub || 'EP1', toJSON() { return { endpoint: o.sub || 'EP1', keys: {} }; } };
+    const f = new Function('gwCall', 'navigator', 'Notification', 'pushSupported', 'getToken', 'curMember', 'var pushResyncKey = "";\n' + src + '\nreturn pushResync;')(gw, { serviceWorker: { ready: Promise.resolve({ pushManager: { getSubscription: () => Promise.resolve(sub) } }) } }, { permission: o.perm || 'granted' }, () => true, () => (o.tok === false ? '' : 'T'), () => (o.me === null ? null : { id: o.me || 'u1' }));
+    const flush = () => new Promise((r) => setTimeout(r, 5));
+    f(); await flush(); await flush();
+    const n1 = calls.length;
+    for (const st of (o.again || [])) { if (st.me) o.me = st.me; f(); await flush(); await flush(); }
+    return { calls, n1 };
+  };
+  const ok200 = (has) => ({ status: 200, body: { status: 'OK', has, devices: has ? 1 : 0 } });
+  const pr = {
+    has: await runPR(PR22, { res: { push_sub_mine: ok200(true) }, again: [{}] }),
+    none: await runPR(PR22, { res: { push_sub_mine: ok200(false), push_sub: { status: 200, body: {} } }, again: [{}] }),
+    fail: await runPR(PR22, { res: { push_sub_mine: { status: 500, body: { error_code: 'SUBS_READ_FAILED' } } }, again: [{}] }),
+    subFail: await runPR(PR22, { res: { push_sub_mine: ok200(false), push_sub: { status: 500, body: {} } }, again: [{}] }),
+    nosub: await runPR(PR22, { sub: null, res: {} }),
+    denied: await runPR(PR22, { perm: 'denied', res: {} }),
+    nolog: await runPR(PR22, { tok: false, res: {} }),
+    swap: await runPR(PR22, { res: { push_sub_mine: ok200(true) }, again: [{ me: 'u2' }] }) };
+  const prOk = (r) => JSON.stringify(r);
+  const okPR = prOk(pr.has.calls) === '["push_sub_mine:EP1"]' && prOk(pr.none.calls) === '["push_sub_mine:EP1","push_sub:EP1"]' && prOk(pr.fail.calls) === '["push_sub_mine:EP1","push_sub_mine:EP1"]'
+    && prOk(pr.subFail.calls) === '["push_sub_mine:EP1","push_sub:EP1","push_sub_mine:EP1","push_sub:EP1"]' && pr.nosub.calls.length === 0 && pr.denied.calls.length === 0 && pr.nolog.calls.length === 0
+    && prOk(pr.swap.calls) === '["push_sub_mine:EP1","push_sub_mine:EP1"]';
+  const okWire4 = /\n    pushResync\(\);    \/\/ P1 판22 검토 11\/14 ④/.test(AL22) && html.split('pushResync();').length === 2 && html.split('function pushResync(){').length === 2 && !/alert|push_send|push_unsub|localStorage/.test(PR22)
+    && /e2\.textContent = "퇴사일은 달력에 있는 날짜\(YYYY-MM-DD\)로 넣거나 비워 주세요\.";/.test(html) && /else if \(ec === "BAD_LEAVE_DATE"\)/.test(html);
+  T('P1 판22 ④ 구독 다시 맞춤(검토 11/14 ④ — 실행 실제 pushResync): 서버에 있음 = 확인 1번만(쓰기 0) · 없음 = 확인 뒤 push_sub 1번 · 같은 화면 다시 = 0 · 확인 실패·등록 실패 = 다음 로그인 때 다시 · 브라우저 구독 없음·권한 없음·로그인 없음 = 0 · 사람이 바뀌면 다시 확인 · afterLogin 끝에서 부름 1곳 · 안내 창·시험 알림·해제 0 · 퇴사일 400 안내 글(BAD_LEAVE_DATE)',
+    okPR && okWire4, JSON.stringify({ pr: Object.fromEntries(Object.entries(pr).map(([k, v]) => [k, v.calls])), okWire4 }));
+  const MU22b = [['if(res.body.has !== false) return;', ''], ['if(pushResyncKey === key) return;', ''], ['if(res.status!==200 || !res.body){ pushResyncKey = ""; return; }', 'if(res.status!==200 || !res.body){ return; }'], ['Notification.permission !== "granted"', 'false']];
+  const kill22b = [];
+  for (const [a, b] of MU22b) { if (PR22.split(a).length !== 2) { kill22b.push('err 자리 ' + a); continue; } const r = { has: await runPR(PR22.replace(a, () => b), { res: { push_sub_mine: ok200(true) }, again: [{}] }), fail: await runPR(PR22.replace(a, () => b), { res: { push_sub_mine: { status: 500, body: {} } }, again: [{}] }), denied: await runPR(PR22.replace(a, () => b), { perm: 'denied', res: { push_sub_mine: ok200(true) } }) };
+    kill22b.push(!(prOk(r.has.calls) === '["push_sub_mine:EP1"]' && prOk(r.fail.calls) === '["push_sub_mine:EP1","push_sub_mine:EP1"]' && r.denied.calls.length === 0)); }
+  T('P1 판22 ⑤ 결함 사본 ' + MU22b.length + '개(있음에도 등록·같은 화면 되풀이·실패 뒤 다시 확인 안 함·권한 확인 걷음) = 모두 ✗', kill22b.every((v) => v === true), JSON.stringify(kill22b));
 } catch (e) { console.log('  ✗ P1 판22 검사 실행 — ' + e.message); fails++; }
 
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');

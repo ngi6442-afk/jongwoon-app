@@ -13,8 +13,9 @@ const DEVAUTO = require('./_lib/devauto');
 exports.handler = async function (event) {
   try { setupBlobContext(event); } catch (e) { return { statusCode: 500, body: JSON.stringify({ ok: false, code: 'NO_BLOB_CONTEXT' }) }; }
   await stamp('gw-mchk-cron', { state: 'start' });
+  // 검토 11/14 ②: 기기 처리 전체에 시간 상한(DEVAUTO.CFG.runCapMs 15초 — 발송은 그 안에서 3초씩) — 넘거나 멈춰도 월 점검은 돈다(순서는 그대로: 회수가 먼저라 1일 점검이 그날 아침 결과를 봄) · 흔적 ok:false
   let dv;
-  try { dv = await DEVAUTO.runDaily(Date.now()); } catch (e) { dv = { ok: false, code: 'EXCEPTION' }; }
+  try { const c = await DEVAUTO.withCap(DEVAUTO.runDaily(Date.now()), DEVAUTO.CFG.runCapMs); dv = c.done ? c.v : { ok: false, code: 'TIMEOUT' }; } catch (e) { dv = { ok: false, code: 'EXCEPTION' }; }
   let r;
   try { r = await MCHK.runMonthly(Date.now()); } catch (e) { r = { ok: false, code: 'EXCEPTION' }; }
   const dvNote = dv.ok ? ('기기 회수 ' + (dv.revoked_devices || 0) + '·구독 ' + (dv.revoked_subs || 0) + '·7일 ' + (dv.stale_new || 0)) : ('기기 처리 실패 ' + String(dv.code || 'WRITE')).slice(0, 30);

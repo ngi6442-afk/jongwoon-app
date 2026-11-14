@@ -9080,26 +9080,32 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   //   ① 권한 — 회수·7일 처리를 부르는 HTTP 액션 없음(gw-auth·gw-data — 세션·봇 키 모두) · runDaily를 부르는 곳 = gw-mchk-cron 하나 · devauto는 settings: 키를 쓰지 않음
   //   ② 새 기기 알림 — 직원 새 기기(verify·login) = 개발자 1발(우선기기·by 자동) · 같은 기기 다시 = 0 · 관리자 기기 = 0 · 기기 읽기 실패 = 0 · 해제 뒤 대기 = 0 · 개발자 0명 = 관리자 전원
   //   ③ 하루 처리 — 7일 경계(정확히 7일 = 아님) · 퇴사일 당일 그대로·다음 날 회수 · 한 번만(다시 승인한 기기 유지) · 퇴사일 고침 = 한 번 더 · 지움 = 표식 지움 · 형식 오류·미래 = 아무것도 · 삭제 회원 · 구독만 지우고 기기 레코드는 남음 · 감사 줄
-  //   ④ 읽기 실패 = 쓰기 0 ⑤ 쓰기 실패 = 표식 안 남김(다음 회차 다시)·표식 못 쓰면 7일 알림 안 보냄 ⑥ 크론(gw-mchk-cron 흔적) ⑦ 결함 사본(devauto·gw-auth·크론 소스 한 곳씩 바꿔 메모리에서 컴파일)이 위 검사에서 실제로 깨짐
+  //   ④ 읽기 실패 = 쓰기 0 ⑤ 쓰기 실패 = 기기 단위 진행(못 돌린 기기·구독만 다음 회차)·표식 못 쓰면 7일 알림 안 보냄 ⑥ 크론(gw-mchk-cron 흔적·시간 상한) ⑦ 결함 사본(devauto·gw-auth·gw-data·push·크론 소스 한 곳씩 바꿔 메모리에서 컴파일)이 위 검사에서 실제로 깨짐
+  //   검토 11/14 반영: 발송 3초 상한·24시간 묶음·못 보낸 기기 다음 날 1발·라벨 뺌 · 승인 때 auto_rev 지움 · 구독 다시 읽기·저장 닫힘·본인 구독 확인(push_sub_mine) · 퇴사일 400 · 없어진 회원 표식·삭제 회원 7일 제외·기기 저장 실패 때 알림 0
   const fs22 = require('fs'), Mod22 = require('module');
-  const PDA22 = join(FN, '_lib', 'devauto.js'), PGA22 = join(FN, 'gw-auth.js'), PCR22 = join(FN, 'gw-mchk-cron.js'), PMC22 = join(FN, '_lib', 'mchk.js');
-  const SDA22 = fs22.readFileSync(PDA22, 'utf8'), SGA22 = fs22.readFileSync(PGA22, 'utf8'), SCR22 = fs22.readFileSync(PCR22, 'utf8');
+  const PDA22 = join(FN, '_lib', 'devauto.js'), PGA22 = join(FN, 'gw-auth.js'), PCR22 = join(FN, 'gw-mchk-cron.js'), PMC22 = join(FN, '_lib', 'mchk.js'), PGD22 = join(FN, 'gw-data.js'), PPU22 = join(FN, '_lib', 'push.js');
+  const SDA22 = fs22.readFileSync(PDA22, 'utf8'), SGA22 = fs22.readFileSync(PGA22, 'utf8'), SCR22 = fs22.readFileSync(PCR22, 'utf8'), SGD22 = fs22.readFileSync(PGD22, 'utf8'), SPU22 = fs22.readFileSync(PPU22, 'utf8');
   const comp22 = (file, src) => { const m = new Mod22(file, null); m.filename = file; m.paths = Mod22._nodeModulePaths(dirname(file)); m._compile(src, file); return m.exports; };
   const mut22 = (src, from, to) => { if (src.split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 60)); return src.replace(from, () => to); };
   const rpDA22 = require.resolve(PDA22), rpMC22 = require.resolve(PMC22);
-  // gw-auth·크론은 컴파일 때 devauto를 require 캐시에서 받는다 — 결함 사본 devauto를 그 순간만 캐시에 얹고 되돌림. 크론의 월 점검은 가짜(이 절은 기기 처리만 봄)
-  const load22 = (srcDA, srcGA, srcCR) => {
-    const DA = comp22(PDA22, srcDA || SDA22);
+  let mchkCalls22 = 0;
+  // gw-auth·크론은 컴파일 때 devauto를 require 캐시에서 받는다 — 결함 사본 devauto를 그 순간만 캐시에 얹고 되돌림. 크론의 월 점검은 가짜(이 절은 기기 처리만 봄 — 불린 수만 셈)
+  //   push.js는 실 readSubs·saveSubs만 가짜 push에 얹어 쓴다(실 발송은 네트워크라 가짜 sendTo 그대로)
+  const load22 = (o) => {
+    o = o || {};
+    const DA = comp22(PDA22, o.DA || SDA22), PU = comp22(PPU22, o.PU || SPU22);
     const prevDA = require.cache[rpDA22], prevMC = require.cache[rpMC22];
     require.cache[rpDA22] = { id: rpDA22, filename: rpDA22, loaded: true, exports: DA };
-    require.cache[rpMC22] = { id: rpMC22, filename: rpMC22, loaded: true, exports: { runMonthly: async () => ({ ok: true, skipped: 'day' }) } };
-    try { return { DA, GA: comp22(PGA22, srcGA || SGA22), CR: comp22(PCR22, srcCR || SCR22) }; }
+    require.cache[rpMC22] = { id: rpMC22, filename: rpMC22, loaded: true, exports: { runMonthly: async () => { mchkCalls22++; return { ok: true, skipped: 'day' }; } } };
+    try { return { DA, PU, GA: comp22(PGA22, o.GA || SGA22), CR: comp22(PCR22, o.CR || SCR22), GD: comp22(PGD22, o.GD || SGD22) }; }
     finally { if (prevDA) require.cache[rpDA22] = prevDA; else delete require.cache[rpDA22]; if (prevMC) require.cache[rpMC22] = prevMC; else delete require.cache[rpMC22]; }
   };
   const snap22 = JSON.stringify({ u: mem.gw_users, d: mem.gw_data });
-  const sendTo0_22 = pushMock.sendTo, lm0_22 = pushMock.loadMembers;
+  const sendTo0_22 = pushMock.sendTo, lm0_22 = pushMock.loadMembers, rs0_22 = pushMock.readSubs, ss0_22 = pushMock.saveSubs;
   const sent22 = [];
-  pushMock.sendTo = async (ids, p, o) => { sent22.push({ ids: (ids || []).slice(), p: JSON.parse(JSON.stringify(p || {})), o: o ? { primaryOnly: o.primaryOnly, by: o.by } : null }); return { sent: (ids || []).length, removed: 0 }; };
+  let hang22 = false;   // 푸시 서비스 무응답 흉내(검토 11/14 ①②)
+  pushMock.sendTo = async (ids, p, o) => { sent22.push({ ids: (ids || []).slice(), p: JSON.parse(JSON.stringify(p || {})), o: o ? { primaryOnly: o.primaryOnly, by: o.by, timeoutMs: o.timeoutMs } : null }); if (hang22) return new Promise(() => {}); return { sent: (ids || []).length, removed: 0 }; };
+  const race22 = (p, ms) => Promise.race([p, new Promise((r) => setTimeout(() => r('RACE_TIMEOUT'), ms))]);
   const H22 = 3600000, D22 = 24 * H22;
   const NOW22 = Date.UTC(2026, 10, 14, 22, 0);   // KST 2026-11-15 07:00 = 크론 기동 시각
   const seed22 = () => {
@@ -9120,7 +9126,7 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
       'device:d22w': ap('d22w', 'u22w', '직원22'),
       'device:d22p7': pd('d22p7', 'u22w', '직원22', NOW22 - 7 * D22), 'device:d22p8': pd('d22p8', 'u22w', '직원22', NOW22 - 7 * D22 - 1),
       'device:d22pu': pd('d22pu', 'u22w', '직원22', NOW22 - 30 * D22, { updated: NOW22 - 2 * D22 }),
-      'device:d22o': pd('d22o', 'u22gone', '없는22', NOW22 - 30 * D22) };
+      'device:d22o': pd('d22o', 'u22gone', '없는22', NOW22 - 30 * D22), 'device:d22dp': pd('d22dp', 'u22d', '삭제22', NOW22 - 30 * D22) };   // d22dp = 삭제 회원의 30일 대기(7일 알림에서 빠져야 — 검토 11/14 ⑩)
     mem.gw_data = { 'push:subs': { schema: 1, members: { u22r: [{ sub: { endpoint: 'a' } }, { sub: { endpoint: 'b' } }], u22w: [{ sub: { endpoint: 'c' } }], u22t: [{ sub: { endpoint: 'e' } }], u22d: [{ sub: { endpoint: 'f' } }], u22b: [{ sub: { endpoint: 'g' } }] } } };
     sent22.length = 0;
   };
@@ -9132,13 +9138,16 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   const chk22 = async (G) => { const P = {}, I = {}; try { return await chk22in(G, P, I); } catch (e) { I.err = String(e && e.message || e).slice(0, 200); return { ok: false, P, I }; } };   // 결함 사본이 판정 중 예외를 내도 '깨짐'으로
   const chk22in = async (G, P, I) => {
     const ca = callA22(G.GA);
+    G.DA.CFG.sendCapMs = 60; G.DA.CFG.runCapMs = 300; hang22 = false;   // 상한은 줄여 씀(실제 3초·15초 — ⑧ 원본 값 검사)
+    pushMock.readSubs = G.PU.readSubs; pushMock.saveSubs = G.PU.saveSubs;
+    const cd = async (body, tok, dev) => { const r = await G.GD.handler({ httpMethod: 'POST', headers: Object.assign({ authorization: tok ? 'Bearer ' + tok : '' }, dev ? { 'x-device-id': dev } : {}), body: JSON.stringify(body) }); return { code: r.statusCode, body: JSON.parse(r.body || '{}') }; };
     // ① 권한
     seed22();
     const tAdm = issueSession(mem.gw_users['member:u22adm']).token, tDev = issueSession(mem.gw_users['member:u22dev']).token, tW = issueSession(mem.gw_users['member:u22w']).token;
     const before = JSON.stringify({ u: mem.gw_users, d: mem.gw_data });
     const rs = [], rd = [];
     for (const a of ['device_auto', 'devauto_run', 'device_reclaim', 'devauto']) { rs.push(await ca({ action: a }, tDev)); rs.push(await ca({ action: a, key: 'test-ingest-key' }, null)); rs.push(await ca({ action: a }, tW)); }
-    for (const a of ['devauto_run', 'device_reclaim']) { rd.push(await call({ action: a, key: 'test-ingest-key' }, null)); rd.push(await call({ action: a }, tDev)); }
+    for (const a of ['devauto_run', 'device_reclaim']) { rd.push(await cd({ action: a, key: 'test-ingest-key' }, null)); rd.push(await cd({ action: a }, tDev)); }
     const rw = await ca({ action: 'device_revoke', device: 'd22r1' }, tW);
     P.A = rs.every((x) => x.code === 400 && x.body.error_code === 'UNKNOWN_ACTION') && rd.every((x) => x.code !== 200) && rw.code === 403 && JSON.stringify({ u: mem.gw_users, d: mem.gw_data }) === before && sent22.length === 0;
     I.A = { rs: rs.map((x) => x.code), rd: rd.map((x) => x.code), rw: rw.code };
@@ -9146,8 +9155,9 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
     seed22();
     const b1 = await ca({ action: 'verify' }, tW, 'd22n1');
     const s1 = sent22.slice();
+    const pnN1a = dv22('d22n1').pend_note;
     const b2 = await ca({ action: 'verify' }, tW, 'd22n1');
-    const s2 = sent22.length;
+    const s2 = sent22.length, pnN1b = dv22('d22n1').pend_note;   // 있던 레코드 = 새 기기 아님 → 알림 빚도 새로 안 생김
     Object.assign(mem.gw_users['member:u22w'], { pin_salt: HP22.salt, pin_hash: HP22.hash }); mem.gw_users['name:직원22'] = 'u22w';
     const b3 = await ca({ action: 'login', name: '직원22', pin: '2468' }, null, 'd22n2');
     const s3 = sent22.slice(s2);
@@ -9156,25 +9166,106 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
     blobsMock.hooks.failGet = (k) => k === 'device:d22n4';
     const b5 = await ca({ action: 'verify' }, tW, 'd22n4');
     blobsMock.hooks.failGet = null;
-    const s5 = sent22.length;
+    const s5 = sent22.length, pnN4 = dv22('d22n4').pend_note;   // 읽기 실패 = 새 기기로 보지 않음(알림 빚 없음 — 덮어쓰는 기존 동작은 그대로)
     const b6 = await ca({ action: 'device_revoke', device: 'd22w' }, tDev);
     const b7 = await ca({ action: 'verify' }, tW, 'd22w');
-    const s7 = sent22.length;
+    const s7 = sent22.length, pnW = dv22('d22w').pend_note, pnN2 = dv22('d22n2').pend_note, pnN3 = dv22('d22n3').pend_note;
     const x1 = s1[0] || { p: {}, o: {} };
+    const mk1 = mem.gw_users['devauto:pend:u22w'] || {};
+    // 검토 11/14 ③: 라벨(폰22)을 싣지 않음 · 24시간 묶음 — 같은 회원의 둘째 새 기기(PIN 로그인)는 안 보내고 pend_note(다음 날 아침 1발)
     P.B = b1.code === 200 && b1.body.device_status === 'pending' && s1.length === 1 && JSON.stringify(x1.ids) === '["u22dev"]' && x1.p.title === '새 기기 승인 대기' && x1.p.tag === 'dev-pend-u22w'
-      && /^직원22 님 새 기기 \(폰22\) — 인사·직원 탭 직원 카드 › 등록 기기에서 승인$/.test(x1.p.body) && !!x1.o && x1.o.primaryOnly === true && x1.o.by === '자동'
-      && Number(dv22('d22n1').pend_note) > 0 && dv22('d22n1').status === 'pending'
-      && b2.code === 200 && b2.body.device_status === 'pending' && s2 === 1
-      && b3.code === 200 && b3.body.device_status === 'pending' && s3.length === 1 && s3[0].p.title === '새 기기 승인 대기'
-      && b4.code === 200 && b4.body.device_status === 'approved' && s4 === 2 && !('pend_note' in dv22('d22n3'))
-      && b5.code === 200 && s5 === 2
-      && b6.code === 200 && b7.code === 200 && b7.body.device_status === 'pending' && s7 === 2;
-    I.B = { b: [b1.code, b2.code, b3.code, b4.code, b5.code, b6.code, b7.code], s: [s1.length, s2, s3.length, s4, s5, s7], body: x1.p.body };
+      && x1.p.body === '직원22 님 새 기기 승인 대기' && !/폰22/.test(JSON.stringify(x1.p)) && !!x1.o && x1.o.primaryOnly === true && x1.o.by === '자동' && x1.o.timeoutMs === G.DA.CFG.sendCapMs
+      && pnN1a === undefined && Number(mk1.last) > 0
+      && b2.code === 200 && b2.body.device_status === 'pending' && s2 === 1 && pnN1b === undefined
+      && b3.code === 200 && b3.body.device_status === 'pending' && s3.length === 0 && Number(pnN2) > 0
+      && b4.code === 200 && b4.body.device_status === 'approved' && s4 === 1 && pnN3 === undefined
+      && b5.code === 200 && s5 === 1 && pnN4 === undefined
+      && b6.code === 200 && b7.code === 200 && b7.body.device_status === 'pending' && s7 === 1 && pnW === undefined;
+    I.B = { b: [b1.code, b2.code, b3.code, b4.code, b5.code, b6.code, b7.code], s: [s1.length, s2, s3.length, s4, s5, s7], body: x1.p.body, o: x1.o };
     seed22(); delete mem.gw_users['member:u22dev'].dev;
     await ca({ action: 'verify' }, tW, 'd22n5');
     P.B2 = sent22.length === 1 && JSON.stringify(sent22[0].ids.slice().sort()) === '["u22adm","u22dev"]';
-    // ③ 하루 처리
+    // 24시간 경계 · 표식 못 읽음 · 기기 저장 실패 · 푸시 무응답(상한) · 같은 세션 30번(기기 ID만 바꿈)
+    seed22(); mem.gw_users['devauto:pend:u22w'] = { last: Date.now() - D22 - 1000 };
+    await ca({ action: 'verify' }, tW, 'd22h1'); const h1 = sent22.length;
+    mem.gw_users['devauto:pend:u22w'] = { last: Date.now() - H22 };
+    await ca({ action: 'verify' }, tW, 'd22h2'); const h2 = sent22.length, pnH2 = dv22('d22h2').pend_note;
+    seed22(); blobsMock.hooks.failGet = (k) => k === 'devauto:pend:u22w';
+    const bk = await ca({ action: 'verify' }, tW, 'd22k1'); blobsMock.hooks.failGet = null; const hk = sent22.length, pnK1 = dv22('d22k1').pend_note;
+    seed22(); blobsMock.hooks.failSet = (k) => k === 'device:d22s1';
+    const bs = await ca({ action: 'verify' }, tW, 'd22s1'); blobsMock.hooks.failSet = null; const hs = sent22.length, mks = !!mem.gw_users['devauto:pend:u22w'];
+    seed22(); hang22 = true;
+    const t0h = Date.now();
+    const bh = await race22(ca({ action: 'verify' }, tW, 'd22g1'), 2000);
+    const msh = Date.now() - t0h; hang22 = false; const pnG1 = dv22('d22g1').pend_note;
     seed22();
+    for (let i = 0; i < 30; i++) await ca({ action: 'verify' }, tW, 'd22sp' + i);
+    const sp = sent22.length, spOwed = Object.keys(mem.gw_users).filter((k) => /^device:d22sp/.test(k) && Number(mem.gw_users[k].pend_note) > 0).length;
+    P.B3 = h1 === 1 && h2 === 1 && Number(pnH2) > 0
+      && bk.code === 200 && hk === 0 && Number(pnK1) > 0
+      && bs.code === 200 && hs === 0 && !mks
+      && bh !== 'RACE_TIMEOUT' && bh.code === 200 && bh.body.device_status === 'pending' && msh < 1500 && Number(pnG1) > 0
+      && sp === 1 && spOwed === 29;
+    I.B3 = { h1, h2, bk: bk.code, hk, bs: bs.code, hs, mks, bh: bh === 'RACE_TIMEOUT' ? bh : [bh.code, bh.body.device_status], msh, sp, spOwed, pn: [pnH2, pnK1, pnG1] };
+    // 다음 날 아침 1발(못 보낸 기기) — 한 통에 n대 · 보내기 전에 pend_note 지움(기기당 한 번) · 퇴사 회원·승인된 기기 뺌 · 못 지운 기기는 다음 회차
+    seed22();
+    Object.assign(mem.gw_users, { 'device:d22q1': { id: 'd22q1', status: 'pending', member_id: 'u22w', member_name: '직원22', created: NOW22 - H22, pend_note: NOW22 - H22 },
+      'device:d22q2': { id: 'd22q2', status: 'pending', member_id: 'u22w', member_name: '직원22', created: NOW22 - H22, pend_note: NOW22 - H22 },
+      'device:d22q3': { id: 'd22q3', status: 'pending', member_id: 'u22r', member_name: '퇴사22', created: NOW22 - H22, pend_note: NOW22 - H22 },
+      'device:d22q4': { id: 'd22q4', status: 'approved', member_id: 'u22w', member_name: '직원22', created: NOW22 - H22, pend_note: NOW22 - H22 } });
+    blobsMock.hooks.failSet = (k) => k === 'device:d22q2';
+    const o1 = await G.DA.runDaily(NOW22); blobsMock.hooks.failSet = null;
+    const O1 = sent22.filter((x) => /^dev-pend-day-/.test(x.p.tag));
+    const pnO1 = ['d22q1', 'd22q2', 'd22q3', 'd22q4'].map((x) => dv22(x).pend_note);
+    const o2 = await G.DA.runDaily(NOW22 + D22);
+    const O2 = sent22.filter((x) => /^dev-pend-day-/.test(x.p.tag)).slice(O1.length);
+    const o3 = await G.DA.runDaily(NOW22 + 2 * D22);
+    const O3 = sent22.filter((x) => /^dev-pend-day-/.test(x.p.tag)).slice(O1.length + O2.length);
+    P.O = o1.ok === false && O1.length === 1 && O1[0].p.title === '새 기기 승인 대기 1대' && O1[0].p.tag === 'dev-pend-day-2026-11-15' && JSON.stringify(O1[0].ids) === '["u22dev"]' && O1[0].o.timeoutMs === G.DA.CFG.sendCapMs
+      && pnO1[0] === undefined && Number(pnO1[1]) > 0 && Number(pnO1[2]) > 0 && Number(pnO1[3]) > 0
+      && o2.ok === true && O2.length === 1 && O2[0].p.title === '새 기기 승인 대기 1대' && !('pend_note' in dv22('d22q2')) && O3.length === 0 && o3.owed === 0;
+    I.O = { o1: [o1.ok, o1.owed], O1: O1.map((x) => [x.p.title, x.p.tag, x.ids, x.o]), O2: O2.map((x) => x.p.title), O3: O3.length, o2: o2.ok, o3: o3.owed, pn: ['d22q1', 'd22q2', 'd22q3', 'd22q4'].map((x) => dv22(x).pend_note) };
+    // 다시 승인 = auto_rev·pend_note 지움(검토 11/14 ⑤)
+    seed22(); await G.DA.runDaily(NOW22);
+    const hadRev = !!dv22('d22r1').auto_rev;
+    mem.gw_users['device:d22w'] = Object.assign(dv22('d22w'), { status: 'pending', pend_note: 5 });
+    const ap1 = await ca({ action: 'device_approve', device: 'd22r1' }, tDev), ap2 = await ca({ action: 'device_approve', device: 'd22w' }, tDev);
+    const rv1 = await ca({ action: 'device_revoke', device: 'd22r2' }, tDev);
+    P.D = hadRev && ap1.code === 200 && ap2.code === 200 && dv22('d22r1').status === 'approved' && !('auto_rev' in dv22('d22r1')) && !('pend_note' in dv22('d22w'))
+      && rv1.code === 200 && !!dv22('d22r2').auto_rev && dv22('d22r2').label === 'L-d22r2';
+    // 구독 저장 닫힘(검토 11/14 ⑧ — gw-data push_sub·push_unsub·push_primary 지정) · 본인 구독 확인 push_sub_mine(④)
+    seed22();
+    const subs0 = JSON.stringify(mem.gw_data['push:subs']);
+    blobsMock.hooks.failGet = (k) => k === 'push:subs';
+    const g1 = await cd({ action: 'push_sub', sub: { endpoint: 'new1', keys: {} } }, tW), g2 = await cd({ action: 'push_unsub', endpoint: 'c' }, tW), g3 = await cd({ action: 'push_primary', endpoint: 'c' }, tW), g4 = await cd({ action: 'push_sub_mine', endpoint: 'c' }, tW);
+    blobsMock.hooks.failGet = null;
+    const gSame = JSON.stringify(mem.gw_data['push:subs']) === subs0;
+    mem.gw_data['push:subs'] = { schema: 1, members: [] };
+    const g5 = await cd({ action: 'push_sub', sub: { endpoint: 'new1', keys: {} } }, tW);
+    const gBad = JSON.stringify(mem.gw_data['push:subs']) === '{"schema":1,"members":[]}';
+    seed22();
+    const m1 = await cd({ action: 'push_sub_mine', endpoint: 'c' }, tW), m2 = await cd({ action: 'push_sub_mine', endpoint: 'zz' }, tW), m3 = await cd({ action: 'push_sub_mine' }, tW), m4 = await cd({ action: 'push_sub_mine', endpoint: 'a' }, tW), m5 = await cd({ action: 'push_sub_mine' }, null);
+    const subsG1 = JSON.stringify(mem.gw_data['push:subs']);
+    const g6 = await cd({ action: 'push_sub', sub: { endpoint: 'new1', keys: {} } }, tW);
+    const after6 = mem.gw_data['push:subs'].members;
+    P.G = [g1, g2, g3, g4].every((x) => x.code === 500 && x.body.error_code === 'SUBS_READ_FAILED') && gSame && g5.code === 500 && gBad
+      && m1.code === 200 && m1.body.has === true && m1.body.devices === 1 && m2.code === 200 && m2.body.has === false && m3.body.has === true && m4.body.has === false && m5.code === 401
+      && JSON.stringify(Object.keys(m1.body).sort()) === '["devices","has","request_id","status"]' && subsG1 === subs0
+      && g6.code === 200 && after6.u22w.length === 2 && after6.u22r.length === 2 && !!after6.u22t;
+    I.G = { g: [g1, g2, g3, g4, g5, g6].map((x) => x.code + ':' + (x.body.error_code || '')), m: [m1, m2, m3, m4, m5].map((x) => x.code + ':' + x.body.has) };
+    // 퇴사일 형식(검토 11/14 ⑨) — 회원 저장 400 BAD_LEAVE_DATE·저장 0 · 빈 값·null·달력 날짜 = 200
+    seed22();
+    const bads = [' 2026-11-14', '2026-11-14 ', '2026-1-5', '2026-11-14T00:00', '2026.11.14', '2026-02-30', 20261114, '0000-00-00'];
+    const lr = [];
+    for (const v of bads) { const w0 = JSON.stringify(mem.gw_users['member:u22w']); const x = await ca({ action: 'member_upsert', id: 'u22w', leave_date: v }, tDev); lr.push([x.code, x.body.error_code, JSON.stringify(mem.gw_users['member:u22w']) === w0]); }
+    const l1 = await ca({ action: 'member_upsert', id: 'u22w', leave_date: '2026-11-30' }, tDev), lv1 = dv22 && mem.gw_users['member:u22w'].leave_date;
+    const l2 = await ca({ action: 'member_upsert', id: 'u22w', leave_date: '' }, tDev), lv2 = mem.gw_users['member:u22w'].leave_date;
+    const l3 = await ca({ action: 'member_upsert', id: 'u22w', leave_date: null }, tDev);
+    const l4 = await ca({ action: 'member_upsert', id: 'u22w', dept: '운영부' }, tDev);
+    P.L = lr.every((x) => x[0] === 400 && x[1] === 'BAD_LEAVE_DATE' && x[2] === true) && l1.code === 200 && lv1 === '2026-11-30' && l2.code === 200 && lv2 === '' && l3.code === 200 && l4.code === 200;
+    I.L = { lr, l: [l1.code, l2.code, l3.code, l4.code] };
+    // ③ 하루 처리 — 없어진 회원(u22ghost)의 지난 표식은 정리(검토 11/14 ⑩)
+    seed22(); mem.gw_users['devauto:state'] = { schema: 1, rev: { u22ghost: { tag: 'del', at: 1 } }, stale: {} };
     const nDev0 = Object.keys(mem.gw_users).filter((k) => k.indexOf('device:') === 0).length;
     let a0 = auditMock.logs.length;
     const r1 = await G.DA.runDaily(NOW22);
@@ -9191,7 +9282,8 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
       && L1.some((x) => x.ev[0].op === '기기승인취소' && x.ev[0].id === 'd22d' && /^삭제 회수\(자동\) — 삭제22$/.test(x.ev[0].t)) && L1.some((x) => x.ev[0].id === 'd22r1' && /^퇴사 회수\(자동\) — 퇴사22$/.test(x.ev[0].t))
       && S1.length === 1 && JSON.stringify(S1[0].ids) === '["u22dev"]' && S1[0].p.title === '승인 대기 7일 넘은 기기 1대' && S1[0].p.tag === 'dev-stale-2026-11-15' && /^직원22 — /.test(S1[0].p.body) && S1[0].o.primaryOnly === true && S1[0].o.by === '자동'
       && !!st1.rev && !!st1.rev.u22r && st1.rev.u22r.tag === 'leave:2026-11-14' && !!st1.rev.u22d && st1.rev.u22d.tag === 'del' && !st1.rev.u22t && !st1.rev.u22b && !st1.rev.u22f
-      && JSON.stringify(Object.keys(st1.stale || {})) === '["d22p8"]' && r1.revoked_devices === 3 && r1.revoked_subs === 3 && r1.stale_new === 1;
+      && JSON.stringify(Object.keys(st1.stale || {})) === '["d22p8"]' && r1.revoked_devices === 3 && r1.revoked_subs === 3 && r1.stale_new === 1
+      && !st1.rev.u22ghost && r1.cleared === 1 && !st1.rev.u22r.left && !st1.rev.u22r.subs_left && st1.rev.u22r.devices === 2 && st1.rev.u22r.subs === 2 && S1[0].o.timeoutMs === G.DA.CFG.sendCapMs;
     I.C1 = { r1, L1: L1.map((x) => x.ev[0].op + ':' + x.ev[0].id), S1: S1.map((x) => x.p.title), stale: Object.keys(st1.stale || {}), rev: Object.keys(st1.rev || {}) };
     // 같은 회차 다시(크론 두 번 기동) = 쓰기·감사·알림 0 — 같은 시각이어야 d22p7(정확히 7일)이 아직 경계 안
     let a1 = auditMock.logs.length; const sn1 = sent22.length, u1 = JSON.stringify(mem.gw_users), d1 = JSON.stringify(mem.gw_data);
@@ -9237,7 +9329,7 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
       const okc = r.ok === false && JSON.stringify(mem.gw_users) === u0 && JSON.stringify(mem.gw_data) === dd0 && auditMock.logs.length === aa0 && sent22.length === 0;
       I.E[nm] = [r.ok, r.code, okc]; if (!okc) P.E = false;
     }
-    // ⑤ 쓰기 실패 — 구독 저장 실패 = 기기는 대기로 됐어도 그 회원 표식 없음 → 다음 회차에 구독만 다시(감사 2줄)
+    // ⑤ 쓰기 실패 — 구독 저장 실패 = 기기는 대기로 됨·표식에 subs_left → 다음 회차에 구독만 다시(감사 2줄 · 기기 줄 0)
     seed22(); blobsMock.hooks.failSet = (k) => k === 'push:subs';
     const w1 = await G.DA.runDaily(NOW22);
     blobsMock.hooks.failSet = null;
@@ -9245,8 +9337,31 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
     a1 = auditMock.logs.length;
     const w2 = await G.DA.runDaily(NOW22 + H22);
     const LW2 = auditMock.logs.slice(a1);
-    P.W1 = w1.ok === false && dv22('d22r1').status === 'pending' && !(stW1.rev || {}).u22r && !(stW1.rev || {}).u22d && subsW1 === 'u22b,u22d,u22r,u22t,u22w'
-      && w2.ok === true && LW2.length === 2 && LW2.every((x) => x.ev[0].op === '구독회수') && st22().rev.u22r.tag === 'leave:2026-11-14' && !mem.gw_data['push:subs'].members.u22r;
+    P.W1 = w1.ok === false && dv22('d22r1').status === 'pending' && ((stW1.rev || {}).u22r || {}).subs_left === true && !((stW1.rev || {}).u22r || {}).left && ((stW1.rev || {}).u22d || {}).subs_left === true && subsW1 === 'u22b,u22d,u22r,u22t,u22w'
+      && w2.ok === true && LW2.length === 2 && LW2.every((x) => x.ev[0].op === '구독회수') && st22().rev.u22r.tag === 'leave:2026-11-14' && !st22().rev.u22r.subs_left && st22().rev.u22r.subs === 2 && !mem.gw_data['push:subs'].members.u22r;
+    // 기기 2대 중 1대 쓰기 실패(검토 11/14 ⑥) — 표식 left = 못 돌린 기기 → 다음 날 그 기기만(사이에 사람이 다시 승인한 d22r1은 그대로)
+    seed22(); blobsMock.hooks.failSet = (k) => k === 'device:d22r2';
+    const w5 = await G.DA.runDaily(NOW22); blobsMock.hooks.failSet = null;
+    const stW5 = JSON.parse(JSON.stringify(st22()));
+    const p5a = dv22('d22r1').status, p5b = dv22('d22r2').status;
+    Object.assign(mem.gw_users['device:d22r1'], { status: 'approved' });
+    a1 = auditMock.logs.length;
+    const w6 = await G.DA.runDaily(NOW22 + D22);
+    const LW6 = auditMock.logs.slice(a1).filter((x) => x.ev[0].op === '기기승인취소');
+    P.W3 = w5.ok === false && p5a === 'pending' && p5b === 'approved' && JSON.stringify((stW5.rev.u22r || {}).left) === '["d22r2"]' && stW5.rev.u22r.devices === 1
+      && w6.ok === true && dv22('d22r1').status === 'approved' && dv22('d22r2').status === 'pending' && LW6.length === 2 && LW6.some((x) => x.ev[0].id === 'd22r2') && !LW6.some((x) => x.ev[0].id === 'd22r1') && !st22().rev.u22r.left && st22().rev.u22r.devices === 2;
+    I.W3 = { w5: [w5.ok, p5a, p5b, stW5.rev.u22r], w6: [w6.ok, LW6.map((x) => x.ev[0].id), st22().rev.u22r] };
+    // 구독 경합(검토 11/14 ⑦) — 기기를 쓰는 사이 다른 직원이 구독 → 그 구독 그대로 · 다시 읽기 실패 = 구독 안 씀·subs_left
+    seed22(); let inj22 = false;
+    blobsMock.hooks.beforeSet = async (k) => { if (!inj22 && k.indexOf('device:') === 0) { inj22 = true; mem.gw_data['push:subs'].members.u22new = [{ sub: { endpoint: 'n' } }]; } };
+    try { await G.DA.runDaily(NOW22); } finally { blobsMock.hooks.beforeSet = null; }
+    const race1 = Object.keys(mem.gw_data['push:subs'].members).sort().join(',');
+    seed22(); let nsub22 = 0;
+    blobsMock.hooks.failGet = (k) => k === 'push:subs' && (++nsub22 === 2);
+    const w7 = await G.DA.runDaily(NOW22); blobsMock.hooks.failGet = null;
+    const race2 = Object.keys(mem.gw_data['push:subs'].members).sort().join(',');
+    P.W4 = race1 === 'u22b,u22new,u22t,u22w' && w7.ok === false && race2 === 'u22b,u22d,u22r,u22t,u22w' && st22().rev.u22r.subs_left === true && dv22('d22r1').status === 'pending';
+    I.W4 = { race1, race2, w7: w7.ok };
     // 표식 저장 실패 = 7일 알림 안 보냄(매일 반복 막음) → 다음 회차에 표식·알림 1번
     seed22(); blobsMock.hooks.failSet = (k) => k === 'devauto:state';
     const w3 = await G.DA.runDaily(NOW22);
@@ -9269,8 +9384,21 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
     blobsMock.hooks.failList = false;
     const stp2 = JSON.parse(JSON.stringify(mem.gw_data['it:cron:gw-mchk-cron:last'] || {}));
     P.K2 = k2.statusCode === 500 && stp2.ok === false && /기기 처리 실패 DEVICES_UNAVAILABLE/.test(String(stp2.note)) && JSON.stringify(mem.gw_users) === u0k && JSON.parse(k2.body).devauto.ok === false;
-    I.K = { k1: [k1.statusCode, stp.note], k2: [k2.statusCode, stp2.note] };
-    const keys = ['A', 'B', 'B2', 'C1', 'C2', 'C3', 'C4', 'C5', 'C6', 'E', 'W1', 'W2', 'K1', 'K2'];
+    // 7일 알림 푸시 무응답 = 발송 상한에서 끊고 월 점검은 돎·흔적 ok false(검토 11/14 ②) · 기기 처리 전체가 멈춤(명부 읽기 무응답) = 처리 상한에서 끊고 월 점검은 돎
+    seed22(); mem.gw_users['member:u22r'].leave_date = kd(Date.now() - 2 * D22);
+    mem.gw_users['device:d22k3'] = { id: 'd22k3', status: 'pending', member_id: 'u22w', member_name: '직원22', created: Date.now() - 10 * D22 };
+    hang22 = true; const mc0 = mchkCalls22;
+    const k3 = await race22(G.CR.handler({}), 2500); hang22 = false;
+    const stp3 = JSON.parse(JSON.stringify(mem.gw_data['it:cron:gw-mchk-cron:last'] || {}));
+    const b3k = k3 === 'RACE_TIMEOUT' ? {} : JSON.parse(k3.body).devauto || {};
+    P.K3 = k3 !== 'RACE_TIMEOUT' && k3.statusCode === 500 && mchkCalls22 === mc0 + 1 && stp3.ok === false && b3k.ok === false && b3k.timeouts === 1 && b3k.code !== 'TIMEOUT' && !!st22().stale && dv22('d22r1').status === 'pending';
+    seed22(); const mc1 = mchkCalls22;
+    pushMock.loadMembers = () => new Promise(() => {});
+    const k4 = await race22(G.CR.handler({}), 2500); pushMock.loadMembers = lm0_22;
+    const stp4 = JSON.parse(JSON.stringify(mem.gw_data['it:cron:gw-mchk-cron:last'] || {}));
+    P.K4 = k4 !== 'RACE_TIMEOUT' && k4.statusCode === 500 && mchkCalls22 === mc1 + 1 && stp4.ok === false && /기기 처리 실패 TIMEOUT/.test(String(stp4.note)) && JSON.parse(k4.body).devauto.code === 'TIMEOUT';
+    I.K = { k1: [k1.statusCode, stp.note], k2: [k2.statusCode, stp2.note], k3: k3 === 'RACE_TIMEOUT' ? k3 : [k3.statusCode, stp3.note, b3k], k4: k4 === 'RACE_TIMEOUT' ? k4 : [k4.statusCode, stp4.note] };
+    const keys = ['A', 'B', 'B2', 'B3', 'O', 'D', 'G', 'L', 'C1', 'C2', 'C3', 'C4', 'C5', 'C6', 'E', 'W1', 'W2', 'W3', 'W4', 'K1', 'K2', 'K3', 'K4'];
     return { ok: keys.every((k) => P[k] === true), P, I };
   };
   try {
@@ -9280,26 +9408,41 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
     const callers22 = fs22.readdirSync(FN).filter((f) => f.endsWith('.js') && /devauto/i.test(rd22(join(FN, f))) && /\.runDaily\(/.test(rd22(join(FN, f))));   // 화관법 _lib/icis.js의 같은 이름 runDaily는 별개
     const lib22 = fs22.readdirSync(join(FN, '_lib')).filter((f) => f.endsWith('.js') && f !== 'devauto.js' && /devauto/.test(rd22(join(FN, '_lib', f))));
     const use22 = SGA22.match(/devauto\.(?!js)\w+/g) || [];
-    const stOk22 = JSON.stringify(callers22) === '["gw-mchk-cron.js"]' && lib22.length === 0 && !/['"`]settings:/.test(SDA22) && JSON.stringify(use22) === '["devauto.notifyNewPending"]'
-      && !/devauto|runDaily/.test(rd22(join(FN, 'gw-data.js')) + rd22(join(FN, 'gw-cron-kick.js')) + rd22(join(ROOT, 'netlify.toml'))) && require(PDA22).PENDING_DAYS === 7 && require(PMC22).DEVICE_PENDING_DAYS === 7;
-    T('P1 판22 ① 권한: 회수·7일 처리를 부르는 액션 없음 — gw-auth device_auto·devauto_run·device_reclaim·devauto = 개발자 세션·봇 키·직원 모두 400 UNKNOWN_ACTION · gw-data 봇 키·세션 200 아님 · 직원 device_revoke 403 · 저장소·알림 그대로 · runDaily를 부르는 곳 gw-mchk-cron 하나 · gw-auth는 notifyNewPending 하나 · devauto에 settings: 키 0 · 대기 7일 = mchk 7일',
+    const realDA22 = comp22(PDA22, SDA22);
+    const stOk22 = JSON.stringify(callers22) === '["gw-mchk-cron.js"]' && lib22.length === 0 && !/['"`]settings:/.test(SDA22) && JSON.stringify(use22.slice().sort()) === '["devauto.notifyNewPending","devauto.validDate"]'
+      && !/devauto|runDaily/.test(rd22(join(FN, 'gw-data.js')) + rd22(join(FN, 'gw-cron-kick.js')) + rd22(join(ROOT, 'netlify.toml'))) && realDA22.PENDING_DAYS === 7 && require(PMC22).DEVICE_PENDING_DAYS === 7
+      && realDA22.CFG.sendCapMs === 3000 && realDA22.CFG.runCapMs === 15000   // 원본 상한 3초·15초(이 절은 줄여 씀)
+      && SPU22.split('(opts && opts.timeoutMs > 0) ? { TTL: 86400, timeout: opts.timeoutMs } : { TTL: 86400 }').length === 2 && (SPU22.match(/sendNotification\(/g) || []).length === 1   // 발송 상한은 넘긴 발송에만(다른 알림 종전)
+      && /if \(d && d\.action === 'push_sub_mine'\) return await handlePushSubMine\(event, d, R\);/.test(SGD22) && (SGD22.match(/await push\.getSubs\(\)/g) || []).length === 2 && (SGD22.match(/await push\.readSubs\(\)/g) || []).length === 4;   // 구독 고쳐 쓰는 세 길 + 확인은 readSubs(getSubs = 읽기만 하는 1478행 길 + 우선기기 조회 get)
+    T('P1 판22 ① 권한: 회수·7일 처리를 부르는 액션 없음 — gw-auth device_auto·devauto_run·device_reclaim·devauto = 개발자 세션·봇 키·직원 모두 400 UNKNOWN_ACTION · gw-data 봇 키·세션 200 아님 · 직원 device_revoke 403 · 저장소·알림 그대로 · runDaily를 부르는 곳 gw-mchk-cron 하나 · gw-auth는 notifyNewPending·validDate · devauto에 settings: 키 0 · 대기 7일 = mchk 7일 · 상한 원본 3초·15초 · 발송 timeout은 넘긴 발송에만 · push_sub_mine 디스패치 · 구독 고쳐 쓰는 길 = readSubs',
       R22.P.A && stOk22 && !R22.I.err, JSON.stringify({ A: R22.I.A, callers22, lib22, use22, err: R22.I.err }));
-    T('P1 판22 ② 새 기기 알림: 직원 새 기기 verify = 대기 + 개발자 1발("새 기기 승인 대기" · "직원22 님 새 기기 (폰22) — 인사·직원 탭 직원 카드 › 등록 기기에서 승인" · 태그 dev-pend-회원 · 우선기기 · by 자동)·레코드 pend_note · 같은 기기 다시 = 0 · PIN 로그인 새 기기 = 1발 · 관리자 새 기기 = 승인·0 · 기기 읽기 실패 = 0 · 해제 뒤 대기(있던 레코드) = 0 · 개발자 0명 = 관리자 전원',
+    T('P1 판22 ② 새 기기 알림: 직원 새 기기 verify = 대기 + 개발자 1발("새 기기 승인 대기" · 본문 "직원22 님 새 기기 승인 대기" — 라벨 없음 · 태그 dev-pend-회원 · 우선기기 · by 자동 · timeout 상한)·보냈으면 pend_note 없음 · 같은 기기 다시 = 0 · 같은 회원 24시간 안 둘째 새 기기(PIN 로그인) = 0·pend_note · 관리자 새 기기 = 승인·0 · 기기 읽기 실패 = 0 · 해제 뒤 대기 = 0 · 개발자 0명 = 관리자 전원',
       R22.P.B && R22.P.B2, JSON.stringify(R22.I.B));
+    T('P1 판22 ②-2 묶음·상한(검토 11/14 ①③): 24시간+1초 = 1발·1시간 = 0(pend_note) · 묶음 표식 못 읽음 = 0(pend_note) · 기기 저장 실패 = 0·표식 안 씀 · 푸시 무응답 = 상한에서 끊고 로그인 200 대기(1.5초 안)·pend_note · 같은 세션 기기 ID 30개 = 1발(나머지 29대 pend_note)',
+      R22.P.B3, JSON.stringify(R22.I.B3));
+    T('P1 판22 ②-3 다음 날 아침 1발: 못 보낸 기기 = 한 통 "새 기기 승인 대기 n대"(태그 dev-pend-day-날짜 · 개발자 · 상한) · 보내기 전에 pend_note 지움(다음 날 다시 0) · 퇴사 회원·승인된 기기 뺌 · pend_note 못 지운 기기는 이번에 빼고 다음 회차 1대',
+      R22.P.O, JSON.stringify(R22.I.O));
+    T('P1 판22 ②-4 다시 승인 = auto_rev·pend_note 지움(검토 11/14 ⑤) · 해제는 auto_rev 그대로 · 레코드 다른 칸 그대로', R22.P.D, '');
+    T('P1 판22 ②-5 구독(검토 11/14 ④⑧): 구독 못 읽음 = push_sub·push_unsub·push_primary 지정·push_sub_mine 모두 500 SUBS_READ_FAILED·구독 문서 그대로 · 꼴 틀린 문서 = 500·그대로 · push_sub_mine = 본인 endpoint 있음 true·없음 false·남의 endpoint false·비로그인 401·몸체 칸 4개(남의 구독 안 나감)·쓰기 0 · 정상 push_sub = 본인 칸에 더함·다른 회원 칸 그대로',
+      R22.P.G, JSON.stringify(R22.I.G));
+    T('P1 판22 ②-6 퇴사일 형식(검토 11/14 ⑨): 회원 저장 " 2026-11-14"·"2026-11-14 "·"2026-1-5"·"…T00:00"·"2026.11.14"·"2026-02-30"·숫자·"0000-00-00" = 400 BAD_LEAVE_DATE·레코드 그대로 · 달력 날짜·빈 값·null·퇴사일 없는 저장 = 200',
+      R22.P.L, JSON.stringify(R22.I.L));
     T('P1 판22 ③ 하루 처리: 퇴사 다음 날 승인 기기 2대·삭제 회원 1대 → 대기(auto_rev 이유·퇴사일 · 레코드·라벨·회원·만든 시각 그대로 · 기기 수 그대로) · 구독 2명(3대)만 지움(다른 회원 그대로) · 감사 5줄(by 자동·bot·login — 기기승인취소 3·구독회수 2) · 7일: 정확히 7일 = 아님·7일+1ms = 1대 알림(개발자 우선기기)·대기 시작 = 해제 시각·퇴사·없는 회원 대기 뺌 · 퇴사일 당일·미래·형식 오류(2026-02-30) = 그대로',
       R22.P.C1, JSON.stringify(R22.I.C1));
     T('P1 판22 ③-2 한 번만: 같은 날 다시 = 쓰기·감사·알림 0 · 다음 날 = 사람이 다시 승인한 기기 그대로·퇴사일 당일이던 회원 회수·7일 새 1대만 알림(이미 알린 기기 0) · 퇴사일 고침 = 그 날짜로 한 번 더 · 퇴사일 지움 = 표식 지움(회수한 기기는 대기 그대로) · 같은 날짜로 다시 퇴사 = 한 번 더 · 형식 오류 회원 끝까지 그대로',
       R22.P.C2 && R22.P.C3 && R22.P.C4 && R22.P.C5 && R22.P.C6, JSON.stringify({ C2: R22.P.C2, C2w: R22.I.C2, C3: R22.I.C3, C4: R22.P.C4, C5: R22.P.C5, C6: R22.P.C6 }));
     T('P1 판22 ④ 읽기 실패 = 쓰기 0: 기기 목록·기기 하나·깨진 기기 값·구독·표식·회원 명부(미가용)·구독 꼴 틀림 = ok false · 저장소·감사·알림 그대로',
       R22.P.E, JSON.stringify(R22.I.E));
-    T('P1 판22 ⑤ 쓰기 실패: 구독 저장 실패 = 그 회원 표식 없음 → 다음 회차 구독만 다시(감사 구독회수 2) · 표식 저장 실패 = 7일 알림 0 → 다음 회차 1번',
+    T('P1 판22 ⑤ 쓰기 실패: 구독 저장 실패 = 기기는 대기·표식 subs_left → 다음 회차 구독만 다시(감사 구독회수 2·기기 줄 0) · 표식 저장 실패 = 7일 알림 0 → 다음 회차 1번',
       R22.P.W1 && R22.P.W2, JSON.stringify(R22.I.W));
-    T('P1 판22 ⑥ 크론 gw-mchk-cron: 기동 = 기기 처리(퇴사 2일 전 회수·오늘·미래 그대로) + 흔적 끝 ok·"기기 회수 3·구독 3" · 기기 목록 못 읽음 = 500·흔적 ok false("기기 처리 실패 DEVICES_UNAVAILABLE" — watch 경보 길)·쓰기 0',
-      R22.P.K1 && R22.P.K2, JSON.stringify(R22.I.K));
+    T('P1 판22 ⑤-2 기기 단위 진행·구독 다시 읽기(검토 11/14 ⑥⑦): 기기 2대 중 1대 쓰기 실패 = 표식 left [그 기기] → 다음 날 그 기기만(사람이 다시 승인한 기기 그대로) · 회수 중 다른 직원 구독 = 그대로 남음 · 쓰기 직전 다시 읽기 실패 = 구독 안 씀·subs_left',
+      R22.P.W3 && R22.P.W4, JSON.stringify({ W3: R22.I.W3, W4: R22.I.W4 }));
+    T('P1 판22 ⑥ 크론 gw-mchk-cron: 기동 = 기기 처리(퇴사 2일 전 회수·오늘·미래 그대로) + 흔적 끝 ok·"기기 회수 3·구독 3" · 기기 목록 못 읽음 = 500·흔적 ok false("기기 처리 실패 DEVICES_UNAVAILABLE" — watch 경보 길)·쓰기 0 · 7일 알림 푸시 무응답 = 발송 상한(timeouts 1)·월 점검 돎·500·흔적 ok false · 기기 처리 전체 멈춤 = 처리 상한 TIMEOUT·월 점검 돎(검토 11/14 ②)',
+      R22.P.K1 && R22.P.K2 && R22.P.K3 && R22.P.K4, JSON.stringify(R22.I.K));
     const MUT22 = [
-      ['DA', "if (isObj(revPrev[id]) && revPrev[id].tag === tag) return;", ''],
+      ['DA', 'const prev = isObj(revPrev[id]) && revPrev[id].tag === tag ? revPrev[id] : null;', 'const prev = null;'],
       ['DA', 'nowMs - t0 > PENDING_DAYS * DAY_MS', 'nowMs - t0 >= PENDING_DAYS * DAY_MS'],
-      ['DA', 'if (stalePrev[d.id] !== t0) fresh.push(', 'fresh.push('],
+      ['DA', 'if (stalePrev[d.id] !== t0 && owedIds.indexOf(d.id) < 0) fresh.push(', 'fresh.push('],
       ['DA', "return ld < today ? 'leave:' + ld : null;", "return ld <= today ? 'leave:' + ld : null;"],
       ['DA', "return r.code === 'NOT_FOUND' ? { ok: true, data: dflt } : { ok: false };", 'return { ok: true, data: dflt };'],
       ['DA', 'if (!Array.isArray(ms) || ms.unavailable)', 'if (!Array.isArray(ms))'],
@@ -9309,31 +9452,52 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
       ['DA', "if (!validDate(ld)) return 'bad';", ''],
       ['DA', 'if (!tag) { if (revPrev[id]) clear.push(id); return; }', 'if (!tag) return;'],
       ['DA', 'return devs.length ? devs : (((ctx && ctx.adminIds) || []).slice());', 'return devs;'],
-      ['DA', 'if (d.member_id && gone(d.member_id)) return;', ''],
-      ['DA', 'if (p.fresh.length && stateOk)', 'if (p.fresh.length)'],
-      ['DA', 'if (r.okDev && (!r.hasSubs || subsOk))', 'if (r.okDev)'],
-      ['DA', 'subTargets.forEach(function (r) { delete g.subsDoc.members[r.id]; });', ''],
-      ['DA', '|| (sr.data.members != null && !isObj(sr.data.members))', ''],
+      ['DA', 'if (d.member_id && gone(d.member_id)) return;\n    const t0', 'const t0'],
+      ['DA', 'if (d.member_id && gone(d.member_id)) return;\n    owed.push', 'owed.push'],
+      ['DA', 'if (p.fresh.length && stateOk && to.length)', 'if (p.fresh.length && to.length)'],
+      ['DA', 'if (r.hasSubs && !subsOk) mk.subs_left = true;', ''],
+      ['DA', 'if (r.leftIds.length) mk.left = r.leftIds;', ''],
+      ['DA', 'delete doc.members[r.id];', ''],
+      ['DA', 'return isObj(doc) && (doc.members == null || isObj(doc.members));', 'return isObj(doc);'],
       ['DA', 'if (!same) {', 'if (true) {'],
       ['DA', "if (!r.ok) return { ok: false, code: 'DEVICES_UNAVAILABLE' };", 'if (!r.ok) continue;'],
+      ['DA', "const fr = await readOr(sd, 'push:subs', { schema: 1, members: {} });", 'const fr = { ok: true, data: { schema: 1, members: Object.assign({}, g.subs) } };'],
+      ['DA', 'Object.keys(revPrev).forEach(function (id) { if (!byId[id]) clear.push(id); });', ''],
+      ['DA', 'return !x || x.del === 1 || (!!x.leave_date', 'return !x || (!!x.leave_date'],
+      ['DA', 'const d = devById[o.id]; const rec = Object.assign({}, d); delete rec.__key; delete rec.pend_note;', 'const d = devById[o.id]; const rec = Object.assign({}, d); delete rec.__key;'],
+      ['DA', 'const c = await withCap(job, CFG.sendCapMs);', 'const c = { done: true, v: await job };'],
+      ['DA', "if (isObj(r.data) && num(r.data.last) > 0 && now - num(r.data.last) < DAY_MS) return { sent: false, why: 'bundled' };", ''],
+      ['DA', "if (!r.ok) return { sent: false, why: 'read' };", ''],
+      ['DA', 'const c = await withCap(push.sendTo(to, payload, { ctx: ctx, primaryOnly: true, by: BY, timeoutMs: CFG.sendCapMs }), CFG.sendCapMs);', 'const c = { done: true, v: await push.sendTo(to, payload, { ctx: ctx, primaryOnly: true, by: BY }) };'],
+      ['DA', "{ ctx: ctx, primaryOnly: true, by: BY, timeoutMs: CFG.sendCapMs });\n      return to.length;", "{ ctx: ctx, primaryOnly: true, by: BY });\n      return to.length;"],
+      ['DA', "body: nm + ' 님 새 기기 승인 대기'", "body: nm + ' 님 새 기기 (' + String((member && member.label) || '폰22') + ')'"],
       ['GA', "const fresh = (dr.ok && !dr.data) || (!dr.ok && dr.code === 'NOT_FOUND');", 'const fresh = true;'],
       ['GA', "const fresh = (dr.ok && !dr.data) || (!dr.ok && dr.code === 'NOT_FOUND');", 'const fresh = (dr.ok && !dr.data) || !dr.ok;'],
-      ['GA', 'if (pendNote && w && w.ok)', 'if (w && w.ok)'],
+      ['GA', 'if (pendNote && w && w.ok) {', 'if (pendNote) {'],
+      ['GA', 'if (nr && nr.sent) { delete dev.pend_note;', 'if (false) { delete dev.pend_note;'],
+      ['GA', "if (status === 'approved') { delete dev.auto_rev; delete dev.pend_note; }", ''],
+      ['GA', '&& !devauto.validDate(d.leave_date)) return', '&& false) return'],
+      ['GD', "  const sr = await push.readSubs();\n  if (!sr.ok) return jr(500, { status: 'ERROR', error_code: 'SUBS_READ_FAILED', request_id: R });\n  const doc = sr.doc;\n  const old", '  const doc = await push.getSubs();\n  const old'],
+      ['GD', "  if (!sr.ok) return jr(500, { status: 'ERROR', error_code: 'SUBS_READ_FAILED', request_id: R });\n  const mine = Array.isArray(", '  const mine = Array.isArray('],
+      ['GD', 'const has = ep ? mine.some(function (x) { return x && x.sub && x.sub.endpoint === ep; }) : mine.length > 0;', 'const has = mine.length > 0;'],
+      ['PU', "if (!r.ok) return r.code === 'NOT_FOUND' ? { ok: true, doc: { schema: 1, members: {} } } : { ok: false, code: r.code || 'STORAGE_READ_FAILED' };", 'if (!r.ok) return { ok: true, doc: { schema: 1, members: {} } };'],
       ['CR', 'ok: !!r.ok && !!dv.ok,', 'ok: !!r.ok,'],
-      ['CR', 'dv = await DEVAUTO.runDaily(Date.now());', 'dv = { ok: true };'],
+      ['CR', "const c = await DEVAUTO.withCap(DEVAUTO.runDaily(Date.now()), DEVAUTO.CFG.runCapMs); dv = c.done ? c.v : { ok: false, code: 'TIMEOUT' };", 'dv = { ok: true };'],
+      ['CR', 'DEVAUTO.withCap(DEVAUTO.runDaily(Date.now()), DEVAUTO.CFG.runCapMs)', 'DEVAUTO.runDaily(Date.now()).then(function (v) { return { done: true, v: v }; })'],
     ];
+    const SRC22 = { DA: SDA22, GA: SGA22, CR: SCR22, GD: SGD22, PU: SPU22 };
     const kill22 = [];
     for (const [kind, from, to] of MUT22) {
       let k;
-      try { const G = kind === 'DA' ? load22(mut22(SDA22, from, to)) : kind === 'GA' ? load22(null, mut22(SGA22, from, to)) : load22(null, null, mut22(SCR22, from, to)); k = !(await chk22(G)).ok; } catch (e) { k = 'err ' + e.message; }
+      try { const G = load22({ [kind]: mut22(SRC22[kind], from, to) }); k = !(await chk22(G)).ok; } catch (e) { k = 'err ' + e.message; }
       if (k !== true) kill22.push(kind + ':' + from.trim().slice(0, 60) + (k === false ? ' 안 깨짐' : ' ' + k));
     }
-    T('P1 판22 ⑦ 결함 사본 ' + MUT22.length + '개(한 번만 표식·7일 경계·7일 한 번·퇴사 당일·읽기 실패를 빈 값으로·명부 미가용·레코드 지움·감사 줄·누가 자동·형식 오류·표식 지움·개발자 0명 폴백·퇴사자 대기 뺌·표식 전 알림·구독 실패 표식·구독 안 지움·구독 꼴·같으면 안 씀·기기 하나 못 읽음 · gw-auth 새 기기 판정 둘·알림 조건 · 크론 흔적 ok·기기 처리 부름) = 모두 ✗',
+    T('P1 판22 ⑦ 결함 사본 ' + MUT22.length + '개(한 번만 표식·7일 경계·7일 한 번·퇴사 당일·읽기 실패를 빈 값으로·명부 미가용·레코드 지움·감사 줄·누가 자동·형식 오류·표식 지움·개발자 0명 폴백·7일 퇴사자 뺌·밀린 알림 퇴사자 뺌·표식 전 알림·구독 진행·기기 진행·구독 안 지움·구독 꼴·같으면 안 씀·기기 하나 못 읽음·구독 다시 읽기·없어진 회원 표식·7일 삭제 회원 뺌·밀린 알림 지움·발송 상한 둘·24시간 묶음·묶음 표식 못 읽음·timeout 인자·라벨 · gw-auth 새 기기 판정 둘·기기 저장 실패 때 알림·보낸 뒤 지움·승인 때 지움·퇴사일 400 · gw-data 구독 저장 닫힘·확인 닫힘·endpoint · push readSubs · 크론 흔적 ok·기기 처리 부름·처리 상한) = 모두 ✗',
       kill22.length === 0, kill22.join(' | '));
   } catch (e) { T('P1 판22 검사 실행', false, String(e && e.stack || e).slice(0, 400)); }
   finally {
-    const s = JSON.parse(snap22); mem.gw_users = s.u; mem.gw_data = s.d;
-    blobsMock.hooks.failGet = null; blobsMock.hooks.failSet = null; blobsMock.hooks.failList = false; pushMock.loadMembers = lm0_22; pushMock.sendTo = sendTo0_22;
+    const s = JSON.parse(snap22); mem.gw_users = s.u; mem.gw_data = s.d; hang22 = false;
+    blobsMock.hooks.failGet = null; blobsMock.hooks.failSet = null; blobsMock.hooks.failList = false; blobsMock.hooks.beforeSet = null; pushMock.loadMembers = lm0_22; pushMock.sendTo = sendTo0_22; pushMock.readSubs = rs0_22; pushMock.saveSubs = ss0_22;
   }
 }
 

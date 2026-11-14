@@ -1614,7 +1614,10 @@ async function handlePushSub(event, d, R) {
   if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
   const s = d.sub;
   if (!s || typeof s !== 'object' || !s.endpoint || String(s.endpoint).length > 1000) return jr(400, { status: 'REJECTED', error_code: 'INVALID_SUB', request_id: R });
-  const doc = await push.getSubs();
+  // P1 판22 검토 11/14 ⑧: 못 읽으면 쓰지 않음(종전엔 빈 문서에 덧붙여 저장 → 전원 구독이 지워질 수 있었다)
+  const sr = await push.readSubs();
+  if (!sr.ok) return jr(500, { status: 'ERROR', error_code: 'SUBS_READ_FAILED', request_id: R });
+  const doc = sr.doc;
   const old = doc.members[c.member.id] || [];
   // 같은 endpoint 재등록 시 primary(우선기기, 결재 2차) 보존 — filter로 지우고 다시 넣는 구조라 그냥 두면 지정이 소실된다
   const prev = old.find(function (x) { return x && x.sub && x.sub.endpoint === s.endpoint; });
@@ -1635,18 +1638,35 @@ async function handlePushUnsub(event, d, R) {
   const c = await currentMember(event);
   if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
   const ep = String(d.endpoint || '');
-  const doc = await push.getSubs();
+  const sr = await push.readSubs();   // P1 판22 검토 11/14 ⑧ — 못 읽으면 쓰지 않음
+  if (!sr.ok) return jr(500, { status: 'ERROR', error_code: 'SUBS_READ_FAILED', request_id: R });
+  const doc = sr.doc;
   const mine = (doc.members[c.member.id] || []).filter(function (x) { return x && x.sub && x.sub.endpoint !== ep; });
   if (mine.length) doc.members[c.member.id] = mine; else delete doc.members[c.member.id];
   await push.saveSubs(doc);
   return jr(200, { status: 'OK', request_id: R });
+}
+// P1 판22 검토 11/14 ④: 본인 구독 확인(읽기만) — 앱이 로그인 뒤 '브라우저엔 구독·허용이 있는데 서버엔 내 구독이 없음'일 때만 push_sub로 다시 등록하게(로그인마다 구독 문서를 쓰지 않음).
+//   로그인만(기기 승인 불필요 — push_sub와 같은 문) · 본인 칸만 봄 · 못 읽으면 500 SUBS_READ_FAILED(없다고 답하지 않음 — 앱은 다시 등록하지 않는다) · 남의 구독·endpoint는 내보내지 않음
+async function handlePushSubMine(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  const sr = await push.readSubs();
+  if (!sr.ok) return jr(500, { status: 'ERROR', error_code: 'SUBS_READ_FAILED', request_id: R });
+  const mine = Array.isArray(sr.doc.members[c.member.id]) ? sr.doc.members[c.member.id] : [];
+  const ep = String(d.endpoint || '');
+  const has = ep ? mine.some(function (x) { return x && x.sub && x.sub.endpoint === ep; }) : mine.length > 0;
+  return jr(200, { status: 'OK', has: has, devices: mine.length, request_id: R });
 }
 // 우선기기 1발(결재 2차, 배치도 결정 ③) — 본인 구독 중 endpoint 하나에 primary 표식, 나머지는 제거.
 // 같은 endpoint 재호출이면 해제(토글). d.get=1이면 조회만(클라가 부팅 시 버튼 문구를 그리는 용도).
 async function handlePushPrimary(event, d, R) {
   const c = await currentMember(event);
   if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
-  const doc = await push.getSubs();
+  // P1 판22 검토 11/14 ⑧: 지정(쓰기) 길은 못 읽으면 쓰지 않음 · 조회(get)는 종전 그대로
+  const sr = d.get ? null : await push.readSubs();
+  if (sr && !sr.ok) return jr(500, { status: 'ERROR', error_code: 'SUBS_READ_FAILED', request_id: R });
+  const doc = sr ? sr.doc : await push.getSubs();
   const mine = doc.members[c.member.id] || [];
   function curPrimary() {
     const p = mine.find(function (x) { return x && x.primary; });
@@ -5770,6 +5790,7 @@ async function handlerInner(event) {
     if (d && d.action === 'push_pubkey') return await handlePushPubkey(event, d, R);
     if (d && d.action === 'push_sub') return await handlePushSub(event, d, R);
     if (d && d.action === 'push_unsub') return await handlePushUnsub(event, d, R);
+    if (d && d.action === 'push_sub_mine') return await handlePushSubMine(event, d, R);
     if (d && d.action === 'push_primary') return await handlePushPrimary(event, d, R);
     if (d && d.action === 'push_send') return await handlePushSend(event, d, R);
     if (d && d.action === 'push_log') return await handlePushLog(event, d, R);

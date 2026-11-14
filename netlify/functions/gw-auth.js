@@ -42,9 +42,14 @@ async function registerDevice(st, event, member) {
   dev.member_name = member.name; dev.member_id = member.id; dev.last_seen = now;
   if (member.admin) dev.status = 'approved';
   const pendNote = fresh && dev.status === 'pending';
-  if (pendNote) dev.pend_note = now;
+  if (pendNote) dev.pend_note = now;   // 알림 빚(검토 11/14 ①③) — 이 요청에서 보내면 지우고, 못 보내면(24시간 묶음·3초 상한·표식 못 읽음) 남아 다음 날 아침 크론이 1발
   const w = await blobSet(st, deviceKey(dv.id), dev);
-  if (pendNote && w && w.ok) { try { await devauto.notifyNewPending(member, dev.label); } catch (e) {} }
+  if (pendNote && w && w.ok) {
+    try {
+      const nr = await devauto.notifyNewPending(member, now);
+      if (nr && nr.sent) { delete dev.pend_note; await blobSet(st, deviceKey(dv.id), dev); }
+    } catch (e) {}
+  }
   return dev.status;
 }
 
@@ -302,6 +307,8 @@ async function handleMemberUpsert(st, event, d, R) {
   //   (회원 저장 자체가 위 ADMIN_ONLY지만, 저장 문이 넓어져도 이 칸은 닫혀 있게 칸 앞에서 한 번 더)
   if (d.corp !== undefined && String(d.corp || '') !== '' && !Object.prototype.hasOwnProperty.call(MEMBER_CORP, String(d.corp))) return jr(400, { status: 'REJECTED', error_code: 'BAD_CORP', request_id: R });
   if (d.test_acct !== undefined && !c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
+  // P1 판22 검토 11/14 ⑨: 퇴사일은 빈 값 또는 달력에 있는 YYYY-MM-DD만(' 2026-11-14'·'2026-1-5'·'…T00:00'은 로그인 차단은 퇴사로 보는데 자동 회수는 형식 오류로 건너뛰던 어긋남) — 어떤 칸도 바꾸기 전에 400
+  if (d.leave_date !== undefined && d.leave_date !== null && d.leave_date !== '' && !devauto.validDate(d.leave_date)) return jr(400, { status: 'REJECTED', error_code: 'BAD_LEAVE_DATE', request_id: R });
   // 자기 계정의 role·name·dev·admin·tier 변경 금지(S1(b) — 개발자 예외 없음: 다른 개발자·대표가 바꾼다). 자기 등급 상승·이름 색인 탈취의 뿌리를 닫는다
   if (self) {
     const selfChange = nameChange || roleChange
@@ -561,6 +568,7 @@ async function handleDeviceSet(st, event, d, R, status) {
   const r = await blobGet(st, deviceKey(id));
   const dev = (r.ok && r.data) ? r.data : { id: id, created: Date.now() };
   dev.status = status; dev.updated = Date.now();
+  if (status === 'approved') { delete dev.auto_rev; delete dev.pend_note; }   // P1 판22 검토 11/14 ⑤: 다시 승인하면 '퇴사 회수' 표시·못 보낸 새 기기 알림 빚을 지움
   await blobSet(st, deviceKey(id), dev);
   try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'login', ev: [{ op: status === 'approved' ? '기기승인' : '기기승인취소', id: id.slice(0, 20), t: String(dev.label || dev.member_name || '') }] }); } catch (e) {}
   return jr(200, { status: 'OK', request_id: R });

@@ -30312,6 +30312,27 @@ function dutyStage(nx){
       }).catch(function(e){ alert("알림 켜기 실패: "+e); });
     });
   }
+  // P1 판22 검토 11/14 ④: 서버 구독이 지워졌는데(퇴사 회수 뒤 재입사·퇴사일 정정·되살림 · 구독 저장 실패) 브라우저에는 구독·허용이 남아 단추가 '켜짐'인 경우 —
+  //   로그인 뒤 읽기만 하는 확인(push_sub_mine, 본인 것만)을 거쳐 '없음'일 때만 push_sub로 다시 등록(로그인마다 구독 문서를 쓰지 않음). 못 읽음·실패 = 다시 등록하지 않고 다음 로그인 때 다시 확인
+  //   세션 주인·기기(endpoint)마다 한 번(같은 화면에서 되풀이 0) · 안내 창·시험 알림 없음(조용히)
+  var pushResyncKey = "";
+  function pushResync(){
+    try{
+      if(!pushSupported() || !getToken() || Notification.permission !== "granted") return;
+      var cm = curMember(); if(!cm) return;
+      navigator.serviceWorker.ready.then(function(reg){ return reg.pushManager.getSubscription(); }).then(function(s){
+        if(!s) return;
+        var key = cm.id + "|" + s.endpoint;
+        if(pushResyncKey === key) return;
+        pushResyncKey = key;
+        return gwCall("gw-data",{action:"push_sub_mine", endpoint:s.endpoint}).then(function(res){
+          if(res.status!==200 || !res.body){ pushResyncKey = ""; return; }
+          if(res.body.has !== false) return;
+          return gwCall("gw-data",{action:"push_sub", sub:s.toJSON()}).then(function(r2){ if(r2.status!==200) pushResyncKey = ""; });
+        });
+      }).catch(function(){ pushResyncKey = ""; });
+    }catch(e){}
+  }
   // 로그인 식별자 정리 — 서버 cleanText()와 같은 규칙(NFC 통일 + 제로폭문자 제거 + 공백 정리)
   function cleanIdent(s){
     return String(s == null ? "" : s)
@@ -30384,6 +30405,7 @@ function dutyStage(nx){
     if (currentTab === "progress") renderProgress();   // 진척도 탭에서 세션 만료→재로그인한 경우 화면 복구
     render();
     lockOnLogin();   // 화면 잠금: 잠금 PIN 미세팅이면 세팅 요구, 유휴 초과 부팅이면 즉시 잠금
+    pushResync();    // P1 판22 검토 11/14 ④: 브라우저 구독은 있는데 서버에 내 구독이 없으면 다시 등록(읽기 확인 뒤 없을 때만)
     // 만기 자동생성은 지시·차량·인허가 로드가 모두 끝난 뒤 markLoadedForAutoGen에서 실행(중복 방지)
   }
   function loadMembers(){
@@ -31895,6 +31917,7 @@ function dutyStage(nx){
         else if (ec === "ROLE_BOSS_ONLY") e2.textContent = "직책 '대표' 지정은 대표·개발자만 할 수 있습니다.";
         else if (ec === "LAST_PM") e2.textContent = "마지막 PM은 강등·관리자 해제·퇴사 처리할 수 없습니다 — 다른 관리자를 먼저 PM으로 지정하세요.";
         else if (ec === "TIER_NOT_ADMIN" || ec === "BAD_TIER") e2.textContent = "관리자 등급은 관리자 직책에만 지정할 수 있습니다.";
+        else if (ec === "BAD_LEAVE_DATE") e2.textContent = "퇴사일은 달력에 있는 날짜(YYYY-MM-DD)로 넣거나 비워 주세요.";   // P1 판22 검토 11/14 ⑨
         else e2.textContent = "저장 실패 (" + (ec || res.status) + ")";
         e2.classList.add("show"); return;
       }
