@@ -9751,7 +9751,14 @@ function J91a(x) { return JSON.stringify(x); }
       const bd = B.claudeBody(f0), br = B.bareRange(f0);
       o.g = /자리표시\(\{\{…\}\}\)를 뺀 나머지 글자만/.test(bd.system) && bd.system.indexOf(br.lo + '~' + br.hi + '자') >= 0 && bd.system.indexOf('150~300자') >= 0 && bd.system.indexOf('150~250자') < 0
         && br.hi + br.fill <= 300 && br.lo + br.fill >= 150 && !/\d{3,}/.test(bd.messages[0].content) && other11 === 0;
-      o.ok = o.pre && o.a && o.b && o.c && o.d && o.e && o.f && o.g;
+      // ⑨ 재요청 본문 금칙 검사(scrubPayload) — 대기 결재 제목(금칙어)이 든 짧은 글: 첫 요청 본문엔 제목 0(통과) → 재요청 본문엔 그 글이 assistant로 실림 = 재요청 없이 템플릿(호출 1회)
+      const TITLE11 = '포항 준설 계약 상신';
+      x = await run11(B, [ok11('좋은 아침입니다. ' + TITLE11 + ' 건이 기다립니다. 이상입니다.'), ok11(GOOD)], () => {
+        mem.gw_data['col:approvals'] = { items: [{ id: 'a11', status: '대기', to: 'pm', title: TITLE11, body: '금액 12,000,000원', created: '2026-11-13T01:00:00Z' }] };
+      });
+      o.h = x.doc.mode === 'template' && x.doc.reason === 'VERIFY_LENGTH' && x.sent.length === 1 && JSON.stringify(x.sent[0]).indexOf(TITLE11) < 0
+        && x.lg.retry === 0 && x.lg.len_fail.length === 1 && x.lg.len_fail[0].dir === 'short' && x.doc.log.some((l) => /재요청 scrub 걸림/.test(l));
+      o.ok = o.pre && o.a && o.b && o.c && o.d && o.e && o.f && o.g && o.h;
       return o;
     };
     const R11 = await chk11(B0);
@@ -9762,6 +9769,7 @@ function J91a(x) { return JSON.stringify(x); }
     T('P1 판11 ⑤ 월 상한(첫 호출 토큰까지 더해 넘음) = 재요청 0 · 상한 100만·길이 150~300 그대로', R11.e, JSON.stringify(R11));
     T('P1 판11 ⑥ 기록에 길이·방향만(n·dir 두 칸) — 모델 글 문구 0 · 로그 줄 "LENGTH 김/짧음 n자(기준 150~300)"', R11.f, JSON.stringify(R11));
     T('P1 판11 ⑦ 프롬프트 길이 어긋남 원천: 자리표시 뺀 글 범위(채울 값 합만큼 뺀 수)·채운 뒤 150~300 · 종전 "150~250자" 없음 · 사용자 글 3자리 숫자 0 · 바깥 호출 0', R11.g, JSON.stringify(R11));
+    T('P1 판11 ⑨ 재요청 본문 금칙 검사: 첫 글에 대기 결재 제목(금칙어) = 첫 요청 통과(제목 0) · 재요청 본문 scrub 걸림 → 재요청 없이 템플릿(호출 1회·retry 0·len_fail short 1건·로그 "재요청 scrub 걸림")', R11.h, JSON.stringify(R11));
     const MUT11 = [
       ["  if (!a.lenFail) return tpl(a.reason, a.tokens);\n", "  return tpl(a.reason, a.tokens);\n"],                                                 // 재요청 없음(종전)
       ["  if (!a.lenFail) return tpl(a.reason, a.tokens);\n", "  if (!a.raw && false) return tpl(a.reason, a.tokens);\n"],                             // 다른 이유도 재요청
@@ -9774,6 +9782,7 @@ function J91a(x) { return JSON.stringify(x); }
       ["b.messages = [b.messages[0], { role: 'assistant', content: String(raw) }, { role: 'user', content: ask }];", "b.messages = [b.messages[0]];"],   // 재요청에 방향 안 적음
       ["system: systemOf(f), output_config", "system: '공백 포함 150~250자', output_config"],                                                           // 종전 프롬프트
       ["log.push('[문장' + tag + '] 자기검증(채운 뒤) LENGTH ' + (lf.dir === 'short' ? '짧음' : '김') + ' ' + lf.n + '자(기준 ' + LEN_MIN + '~' + LEN_MAX + ')');", "log.push('[문장' + tag + '] LENGTH ' + raw);"],   // 원문을 기록에
+      ["  if (!sc2.ok) { log.push('[문장] 재요청 scrub 걸림 → 템플릿'); return tpl('VERIFY_LENGTH', a.tokens); }\n", ""],                              // 재요청 본문 금칙 검사 걷음
     ];
     const kill11 = [];
     for (const [from, to] of MUT11) {
@@ -9782,7 +9791,7 @@ function J91a(x) { return JSON.stringify(x); }
       try { k = !(await chk11(B)).ok; } catch (e) { k = true; }   // 결함 사본이 검사 도중 터짐 = 깨짐으로 잡힘
       if (k !== true) kill11.push(from.trim().slice(0, 60) + ' 안 깨짐');
     }
-    T('P1 판11 ⑧ 결함 사본 ' + MUT11.length + '개(재요청 없음·다른 이유 재요청·상한 무시·방향 뒤집힘·길이 안 남김·기록 빠짐·두 번째 실패 통과·재요청 2회·방향 안 적음·종전 프롬프트·원문 기록)가 위 검사에서 깨짐', kill11.length === 0, kill11.join(' | '));
+    T('P1 판11 ⑧ 결함 사본 ' + MUT11.length + '개(재요청 없음·다른 이유 재요청·상한 무시·방향 뒤집힘·길이 안 남김·기록 빠짐·두 번째 실패 통과·재요청 2회·방향 안 적음·종전 프롬프트·원문 기록·재요청 금칙 검사 걷음)가 위 검사에서 깨짐', kill11.length === 0, kill11.join(' | '));
   } catch (e) { T('P1 판11 검사 실행', false, String(e && e.stack || e).slice(0, 400)); }
   finally {
     global.fetch = realFetch11; mem.gw_data = JSON.parse(snap11);
