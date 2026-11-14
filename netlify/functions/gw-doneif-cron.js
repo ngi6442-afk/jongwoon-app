@@ -9,6 +9,7 @@ const D = require('./_lib/doneif');
 const { stamp } = require('./_lib/cronstamp');   // v398 실행 흔적 it:cron:<fn>:last
 
 const DATA = 'gw_data';
+const FILES = 'gw_files';   // P1 판19 증빙 보관함 색인(proof:__index__) — 읽기만
 function kstToday(ms) { return new Date(ms + 9 * 3600000).toISOString().slice(0, 10); }
 
 async function run(st, nowMs) {
@@ -24,11 +25,13 @@ async function run(st, nowMs) {
   const recs = { __rows: {}, __now: nowMs };
   if (need.workers) need.asbestos = true;   // v417 카드 10: wk 월 지시 신호는 명부+대장(참여 범위) 둘 다 본다
   for (const col of Object.keys(need)) {
-    const r = await blobGet(st, 'col:' + col);
-    if (col === 'documents') {   // P1 판19 증명서 신호: 문서함은 열린 증명서 지시가 있을 때만 읽고, 읽기 실패·없음·깨진 꼴은 빈 배열이 아니라 null(= 신호 없음)
-      recs.__rows.documents = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data.items : null;
+    if (col === 'proof') {   // P1 판19 증명서 신호: 열린 증명서 지시가 있을 때만 증빙 보관함 색인 하나를 읽는다(파일 본문 안 읽음). 읽기 실패·없음·깨진 꼴 = null(신호 없음)
+      let pr = null;
+      try { pr = await blobGet(store(FILES), 'proof:__index__'); } catch (e) { pr = null; }
+      recs.__rows.proof = (pr && pr.ok && pr.data && Array.isArray(pr.data.names)) ? pr.data : null;
       continue;
     }
+    const r = await blobGet(st, 'col:' + col);
     const items = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data.items : [];
     if (col === 'asbestos' || col === 'workers') recs.__rows[col] = items;   // v417: 집계형 신호(site·wk)는 원본 배열
     else recs[col] = D.byId(items);

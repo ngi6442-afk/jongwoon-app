@@ -1534,13 +1534,19 @@ async function handleProofPut(event, d, R) {
   const b64 = String(d.data || '');
   if (!name || name === '__index__' || !b64 || b64.length > ATT_MAX) return jr(400, { status: 'REJECTED', error_code: 'INVALID_FILE', request_id: R });   // __index__ 이름 충돌 시 색인 자기파괴 방지
   const st = store(FILES);
-  const w = await blobSet(st, 'proof:' + name, { name: String(d.name || '').slice(0, 120), data: b64, by: c.member.name, ts: Date.now() });
+  const now = Date.now();
+  const w = await blobSet(st, 'proof:' + name, { name: String(d.name || '').slice(0, 120), data: b64, by: c.member.name, ts: now });
   if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
   try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'files', ev: [{ op: '증빙등록', id: name.slice(0, 40), t: '' }] }); } catch (e) {}
   const idx = await blobGet(st, 'proof:__index__');
   const list = (idx.ok && idx.data && Array.isArray(idx.data.names)) ? idx.data.names : [];
   if (list.indexOf(name) < 0) list.push(name);
-  await blobSet(st, 'proof:__index__', { names: list });
+  // P1 판19: 색인에 올린 시각(서버)·원래 이름·올린 사람 id를 같이 남긴다 — 완료 신호 크론이 파일 본문 없이 색인 한 번만 읽고 판정(시각 없는 옛 항목은 신호로 안 셈, 옛 자료 이행 없음)
+  const meta = {};
+  const om = (idx.ok && idx.data && idx.data.meta && typeof idx.data.meta === 'object' && !Array.isArray(idx.data.meta)) ? idx.data.meta : {};
+  list.forEach(function (n) { if (hasOwn(om, n) && om[n] && typeof om[n] === 'object') meta[n] = om[n]; });
+  meta[name] = { ts: now, file: String(d.name || '').slice(0, 120), by_id: String(c.member.id || '') };
+  await blobSet(st, 'proof:__index__', { names: list, meta: meta });
   return jr(200, { status: 'OK', name: name, request_id: R });
 }
 async function handleProofList(event, d, R) {
@@ -1573,7 +1579,9 @@ async function handleProofDel(event, d, R) {
   await blobDelete(st, 'proof:' + name);
   const idx = await blobGet(st, 'proof:__index__');
   const list = ((idx.ok && idx.data && Array.isArray(idx.data.names)) ? idx.data.names : []).filter(function (n) { return n !== name; });
-  await blobSet(st, 'proof:__index__', { names: list });
+  const om = (idx.ok && idx.data && idx.data.meta && typeof idx.data.meta === 'object' && !Array.isArray(idx.data.meta)) ? idx.data.meta : {};
+  const meta = {}; list.forEach(function (n) { if (hasOwn(om, n) && om[n] && typeof om[n] === 'object') meta[n] = om[n]; });   // P1 판19: 지운 항목의 시각 메타도 같이 뺀다
+  await blobSet(st, 'proof:__index__', { names: list, meta: meta });
   try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'files', ev: [{ op: '증빙삭제', id: name.slice(0, 40), t: '' }] }); } catch (e) {}
   return jr(200, { status: 'OK', request_id: R });
 }

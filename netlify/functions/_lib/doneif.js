@@ -19,17 +19,19 @@ function parseKey(k) {   // 'veh:<id>:insp:<due>' · 'veh:<id>:ins:<due>' · 'li
   if (p[0] === 'rec' && p.length >= 3) return { dom: 'rec', col: 'receivables', id: p[1], kind: p[2] };
   if (p[0] === 'site' && p[1] === 'missing' && p.length >= 3) return { dom: 'site', col: 'asbestos', id: '', kind: 'missing', ym: p[2] };   // v417 카드 10
   if (p[0] === 'wk' && p[1] === 'missing' && p.length >= 3) return { dom: 'wk', col: 'workers', id: '', kind: 'missing', ym: p[2] };
-  if (p[0] === 'cert' && p.length === 2 && /^c\d{1,6}$/.test(p[1])) return { dom: 'cert', col: 'documents', id: '', kind: 'cycle', cyc: Number(p[1].slice(1)) };   // P1 판19 — 키 꼴은 gw-data AUTOTASK_KEY_RE.cert와 같다
+  if (p[0] === 'cert' && p.length === 2 && /^c\d{1,6}$/.test(p[1])) return { dom: 'cert', col: 'proof', id: '', kind: 'cycle', cyc: Number(p[1].slice(1)) };   // P1 판19 — 키 꼴은 gw-data AUTOTASK_KEY_RE.cert와 같다
   return null;
 }
 
 // ---- 증명서 3종 올림 신호(P1 판19 · T359) ----
 // 지시: cert:c<n> = 20일 주기 '증명서 갱신 발급 — 납세·지방세·4대보험 완납증명'(index.html runAutoTaskGen — 기준일 2026-01-01, n = 지난 일수/20, 기한 = 다음 회차 첫날).
 // 3종 = 국세 납세증명(홈택스) · 지방세 납세증명(위택스) · 4대(사회)보험 완납증명(정부24) — 같은 지시 detail · FEATURES.md '증명서 갱신 루틴' · 업무별 설계 3-14 appr A3ⓑ.
-// 원천: 문서함(col:documents) 항목의 첨부 메타 files[{n,name,size,mime,ts,by{id,name},view?}] — 증명서 종류를 적는 분류 칸이 없어(11/13 백업 실측) 파일 이름으로만 가른다.
-// 넘기지 않는 쪽으로 닫는 경우(사람이 [완료]): 문서함 읽기 실패 · 3종 중 하나라도 없음 · 지시 회차 시작(기준일 + n×20일)·지시 만든 날(created) 이전에 올린 첨부 ·
-//   지운 첨부(files에서 빠짐)·지운 문서(del=1)·등재 아닌 문서(대기·반려) · pdf 아닌 첨부(사진·스캔 그림 — 날인 스캔본 규칙) · 열람용 변환본(view=1) ·
-//   한 파일 이름이 두 종류 이상에 걸림 · 한 첨부가 열린 증명서 지시 둘 이상에 걸림(회차 겹침) · 칸이 깨진 메타(ts·name·by.id) · 지시 만든 날 칸이 날짜가 아님 · 미래 시각 첨부.
+// 원천: 지시 본문이 올리라는 '적격심사 증빙 보관함'(gw_files proof:<이름> + 색인 proof:__index__) — 문서함은 기한 있는 실물 증빙을 받지 않는다(9/4 규칙, 오케스트레이터 11/14 결정).
+//   크론은 색인 한 개만 읽는다(파일 본문 안 읽음): {names:[이름], meta:{이름:{ts 서버 올린 시각, file 원래 이름, by_id}}} — meta는 판19부터 proof_put이 남긴다(시각 없는 옛 항목은 안 셈, 이행 없음).
+//   보관함엔 종류별 자리·발급일·만료일 칸이 없어 종류는 원래 이름(file)으로만 가르고, 회차 판정은 올린 시각으로 한다.
+// 넘기지 않는 쪽으로 닫는 경우(사람이 [완료]): 색인 읽기 실패·없음·깨진 꼴 · 3종 중 하나라도 없음 · 회차 시작(기준일 + n×20일)·지시 만든 날(created) 이전에 올린 항목 ·
+//   지운 항목(names에서 빠짐 — meta만 남아도 안 셈) · 시각 메타 없는 옛 항목 · pdf 아닌 항목(사진·스캔 그림) · 한 이름이 두 종류 이상에 걸림 ·
+//   한 항목이 열린 증명서 지시 둘 이상에 걸림(회차 겹침) · 깨진 메타(ts·file·by_id) · 미래 시각(서버 +10분 초과) · 지시 만든 날 칸이 날짜가 아님.
 const CERT_EPOCH_MS = Date.parse('2026-01-01T00:00:00+09:00');   // 앱 생성기 기준일(KST 자정 — 앱은 기기 현지 시각, 운영 기기 = KST)
 const CERT_CYCLE_MS = 20 * 86400000;
 const CERT_KINDS = [   // 이름 판정 — 한 파일이 정확히 한 종류에만 맞아야 센다(라벨은 why·화면 후보 요약에 나감 — 파일 이름은 내보내지 않는다)
@@ -58,28 +60,28 @@ function certOpenList(tasks) {
   return out;
 }
 function certSignal(task, k, recs) {
-  const docs = recs && recs.__rows ? recs.__rows.documents : null;
-  if (!Array.isArray(docs)) return { ok: false, why: 'no_docs' };   // 읽기 실패·없음 = 신호 없음
+  const idx = recs && recs.__rows ? recs.__rows.proof : null;
+  if (!idx || typeof idx !== 'object' || !Array.isArray(idx.names)) return { ok: false, why: 'no_proof' };   // 읽기 실패·없음·깨진 꼴 = 신호 없음
+  const meta = (idx.meta && typeof idx.meta === 'object' && !Array.isArray(idx.meta)) ? idx.meta : {};
   const open = recs.__certOpen;
   if (!Array.isArray(open)) return { ok: false, why: 'cert.no_ctx' };
   const me = open.find(function (o) { return o && o.id === task.id; });
   if (!me) return { ok: false, why: 'cert.no_created' };
   const now = Number(recs.__now) || 0;
-  const have = {};
-  docs.forEach(function (d) {
-    if (!d || typeof d !== 'object' || d.del === 1 || d.deleted_at) return;
-    if (d.status && d.status !== '등재') return;
-    (Array.isArray(d.files) ? d.files : []).forEach(function (f) {
-      if (!f || typeof f !== 'object' || f.view === 1) return;
-      const ts = f.ts;
-      if (typeof ts !== 'number' || !isFinite(ts) || ts <= 0 || typeof f.name !== 'string' || !f.by || typeof f.by.id !== 'string' || !f.by.id) return;
-      if (now && ts > now + 600000) return;   // 서버 시각보다 10분 넘게 앞선 첨부 = 깨진 값
-      const kind = certKindOf(f.name);
-      if (!kind) return;
-      const hits = open.filter(function (o) { return ts >= o.start; });
-      if (hits.length !== 1 || hits[0].id !== task.id) return;   // 지시 전 첨부(0건)·회차 겹침(2건 이상)·다른 지시 몫
-      have[kind] = 1;
-    });
+  const have = {}, seen = {};
+  idx.names.forEach(function (n) {
+    if (typeof n !== 'string' || !n || seen[n] || !Object.prototype.hasOwnProperty.call(meta, n)) return;   // 지운 항목은 names에 없어 여기 안 옴 · 시각 메타 없는 옛 항목 = 안 셈
+    seen[n] = 1;
+    const m = meta[n];
+    if (!m || typeof m !== 'object') return;
+    const ts = m.ts;
+    if (typeof ts !== 'number' || !isFinite(ts) || ts <= 0 || typeof m.file !== 'string' || typeof m.by_id !== 'string' || !m.by_id) return;
+    if (now && ts > now + 600000) return;   // 서버 시각보다 10분 넘게 앞선 항목 = 깨진 값
+    const kind = certKindOf(m.file);
+    if (!kind) return;
+    const hits = open.filter(function (o) { return ts >= o.start; });
+    if (hits.length !== 1 || hits[0].id !== task.id) return;   // 지시 전 올림(0건)·회차 겹침(2건 이상)·다른 지시 몫
+    have[kind] = 1;
   });
   const miss = CERT_KINDS.filter(function (c) { return !have[c.k]; });
   if (miss.length) return { ok: false, why: 'cert.missing ' + miss.map(function (c) { return c.label; }).join('·') };
@@ -102,7 +104,7 @@ function signalFor(task, recs) {
     const n2 = AR.wkMissing(rows.workers, rows.asbestos).birth_blank;
     return n2 === 0 ? { ok: true, why: 'wk.birth_blank 0' } : { ok: false, why: 'wk.birth_blank ' + n2 };
   }
-  if (k.dom === 'cert') return certSignal(task, k, recs);   // P1 판19 — recs.__rows.documents(문서함 원본 배열, 읽기 실패 = null) · recs.__certOpen(plan이 싣는다)
+  if (k.dom === 'cert') return certSignal(task, k, recs);   // P1 판19 — recs.__rows.proof(증빙 보관함 색인, 읽기 실패 = null) · recs.__certOpen(plan이 싣는다)
   const rec = ((recs || {})[k.col] || {})[k.id];
   if (!rec) return { ok: false, why: 'no_record' };
   if (k.dom === 'veh' || k.dom === 'lic') {
