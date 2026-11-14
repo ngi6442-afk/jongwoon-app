@@ -5911,6 +5911,19 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
       ml84.code === 200 && mlo84.code === 200 && mlh84.code === 200 && w84.supervisor === true && w84.test_acct === true && w84.office === undefined && w84.corp === undefined && ov84.office === true && ov84.corp === 'env'
       && !('hire_date' in w84) && !('birth' in w84) && !('leave_date' in w84) && four84(wo84).length === 0 && four84(wh84).length === 0 && wo84.name === '직원84' && wh84.retired === false
       && o84.office === true && o84.corp === 'env', JSON.stringify({ w84, wo84, wh84, o84 }));
+    // ①-6 (v472 — PM 11/14 18:48 "일용직/지입차주 선택 기능 … 중복재적 표시도") 소속 회사 both(두 회사 중복 재적) = 저장 · 빈 값 = 칸째 지움 · 고용형태 '지입차주' 저장
+    //   회원 목록(비관리자): 안전 보기 = 다른 회원 corp both · emp_type은 '지입차주'일 때만 · 그 밖 값(계약직) = emp_type 키째 없음 · 안전 숨김 = 둘 다 없음
+    const e70 = u84().emp_type, tokV70 = issueSession(mem.gw_users['member:ukv84']).token, tokH70 = issueSession(mem.gw_users['member:ukh84']).token;
+    const pick70 = async (tok) => (((await callA84({ action: 'member_list' }, tok)).body.members || []).find((m) => m.id === 'uw84') || {});
+    const b70a = await callA84({ action: 'member_upsert', id: 'uw84', corp: 'both', emp_type: '지입차주' }, tokAdm84);
+    const u70a = JSON.parse(JSON.stringify(u84())), l70v = await pick70(tokV70), l70h = await pick70(tokH70);
+    const b70b = await callA84({ action: 'member_upsert', id: 'uw84', corp: '', emp_type: '계약직' }, tokAdm84);
+    const u70b = JSON.parse(JSON.stringify(u84())), l70c = await pick70(tokV70);
+    await callA84({ action: 'member_upsert', id: 'uw84', emp_type: e70 || '' }, tokAdm84);
+    T("84 v472 소속 회사 both·고용형태 지입차주: both 저장(400 아님) · 빈 값 = 칸째 지움 · 지입차주 저장 · 회원 목록 안전 보기 = corp both·emp_type '지입차주' · 계약직이면 emp_type 키째 없음 · 안전 숨김 = corp·emp_type 없음",
+      b70a.code === 200 && u70a.corp === 'both' && u70a.emp_type === '지입차주' && l70v.corp === 'both' && l70v.emp_type === '지입차주' && !('emp_type' in l70h) && !('corp' in l70h)
+      && b70b.code === 200 && !('corp' in u70b) && u70b.emp_type === '계약직' && !('emp_type' in l70c) && !('corp' in l70c),
+      JSON.stringify({ a: b70a.code, b: b70b.code, u70a: { corp: u70a.corp, e: u70a.emp_type }, l70v: { corp: l70v.corp, e: l70v.emp_type }, l70h: Object.keys(l70h), l70c: Object.keys(l70c) }));
 
     // ② col:edu 새 종류·회차 표식·숫자 시간 — 저장 그대로 · 409 · 병합은 앱 몫(서버는 base 낙관락)
     mem.gw_users['member:uw84'].perms = { safety: 'do' };

@@ -14291,8 +14291,8 @@ try {
     const FT = ['`sfNowCo`', '`sfNowCoHit`', '`sfNowSiteCo`', '`sfNowConCo`', '`sfNowMemberCo`', '`sfNowWorkerCo`', '`sfNowDutyCo`', '`both`', '공사금액 문턱'];
     const GATE = ['uismoke', 'consheet_check', 'proctpl_check', 'settletest', 'servertest', 'rectest', 'promoqual_check', 'promogen_check', 'promoqlearn_check', 'promostream_check', 'promo_wrap_check', 'promo_post_check'];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
-    const ok = /기준: v471 \(2026-11-14\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && scr.length >= 1 && !cb.some((l) => /\(PM/.test(l))
-      && GATE.every((g) => gate.some((l) => l.indexOf('`' + g + '`') > 0)) && /SHELL_CACHE = 'jw-shell-v471'/.test(d.sw)
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 471 && ftv.length > 0 && mF.length === 0 && scr.length >= 1 && !cb.some((l) => /\(PM/.test(l))
+      && GATE.every((g) => gate.some((l) => l.indexOf('`' + g + '`') > 0)) && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 471   // v472: 기준 줄·sw = 이 판 이상
       && d.mn.indexOf('<b>회사 칩(맨 위 — 2026-11 v471)</b>') > 0 && d.mn.indexOf('회사로 거르기는 아직') < 0 && d.ix.indexOf('회사로 거르기는 아직') < 0
       && d.cl.indexOf('**현황 회사 칩**(v471') > 0 && d.cl.indexOf('`sfNowCoHit`') > 0;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
@@ -14304,6 +14304,58 @@ try {
   T('v471 ② 문서·판 번호(정확 검사): FEATURES 기준 v471 (2026-11-14)·v471 절(판정 함수 7·both·공사금액 문턱은 다음) · TESTLIST v471 화면 칸 [ ] ≥ 1·PM 칸 0·게이트 [x] 12종 · MANUAL 28-1 회사 칩·옛 "회사로 거르기는 아직" 0(앱·MANUAL) · CLAUDE.md 현황 회사 칩 줄 · sw jw-shell-v471 · 결함 사본 ' + M71.length + '개 = 모두 ✗',
     r71.ok && M71.every((v) => v === false), JSON.stringify({ r: r71.info, mut: M71 }));
 } catch (e) { console.log('  (v471 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v472(PM 11/14 18:48 "일용직/지입차주 선택 기능 … 중복재적 표시도" — 인사·직원 창 고용형태 '지입차주'·'(고르지 않음)' · 소속 회사 '두 회사 중복 재적'(both) · 직원 줄 표시 3종)
+//   다음 판은 기준 줄·sw를 '472 이상'으로 풀 것
+try {
+  const rd70 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const auth70 = rd70('netlify/functions/gw-auth.js');
+  const chkUi70 = (h, a) => {
+    const emp = (h.match(/<select id="meEmp">([\s\S]*?)<\/select>/) || ['', ''])[1], corp = (h.match(/<select id="meCorp">([\s\S]*?)<\/select>/) || ['', ''])[1];
+    const seg = (h.match(/function hrEmpCorpChips\(m, isRet\)\{[\s\S]*?\n  \}/) || [''])[0], row = (h.match(/function hrRowHtml\(m, isRet\)\{[\s\S]*?\n  \}/) || [''])[0];
+    let run = [];
+    try {
+      const f = new Function('return (' + seg + ')')();
+      const a1 = f({ emp_type: '지입차주', corp: 'both' }, false), a2 = f({}, false), a3 = f({}, true), a4 = f({ emp_type: '정규직', corp: 'env' }, false), a5 = f({ emp_type: '지입차주' }, true), a6 = f(null, false);
+      run = [a1.indexOf('>지입차주<') > 0 && a1.indexOf('>중복 재적<') > 0 && a1.indexOf('고용형태 없음') < 0, a2.indexOf('>고용형태 없음<') > 0 && a2.indexOf('지입차주<') < 0 && a2.indexOf('중복 재적') < 0,
+        a3 === '', a4 === '', a5.indexOf('>지입차주<') > 0 && a5.indexOf('고용형태 없음') < 0, a6 === ''];
+    } catch (e) { run = [false, String(e.message)]; }
+    const st = [emp.indexOf('<option value="">(고르지 않음)</option><option value="정규직">') === 0, emp.indexOf('<option value="지입차주">') > 0, ['정규직', '계약직', '일용직', '아르바이트', '기타'].every((v) => emp.indexOf('<option value="' + v + '">' + v + '</option>') >= 0),
+      corp.indexOf('<option value="both">') > 0 && corp.indexOf('<option value="env">종운환경</option><option value="con">종운건설</option>') > 0,
+      h.indexOf('document.getElementById("meEmp").value = m ? (m.emp_type||"") : "정규직";') > 0, h.indexOf('(m.corp === "env" || m.corp === "con" || m.corp === "both")) ? m.corp : "";') > 0,
+      row.indexOf('chips += hrEmpCorpChips(m, isRet);') > 0,
+      /const MEMBER_CORP = \{ env: 1, con: 1, both: 1 \};/.test(a), a.indexOf("} if (seeSafety && m.emp_type === '지입차주') o.emp_type = '지입차주';") > 0 && !/o\.emp_type = m\.emp_type/.test(a)];
+    return { ok: run.length === 6 && run.every((v) => v === true) && st.every(Boolean), info: { run, st } };
+  };
+  const u70 = chkUi70(html, auth70);
+  const MU70 = [chkUi70(html.replace('<option value="지입차주">', '<option value="지입">'), auth70).ok, chkUi70(html.replace('<option value="both">', '<option value="two">'), auth70).ok,
+    chkUi70(html.replace('document.getElementById("meEmp").value = m ? (m.emp_type||"") : "정규직";', 'document.getElementById("meEmp").value = m ? (m.emp_type||"정규직") : "정규직";'), auth70).ok,
+    chkUi70(html.replace('if (m.corp === "both") s +=', 'if (m.corp === "env") s +='), auth70).ok, chkUi70(html.replace("if (!isRet && !e) s +=", "if (!e) s +="), auth70).ok,
+    chkUi70(html.replace('    chips += hrEmpCorpChips(m, isRet);', ''), auth70).ok, chkUi70(html, auth70.replace('con: 1, both: 1 }', 'con: 1 }')).ok,
+    chkUi70(html, auth70.replace("if (seeSafety && m.emp_type === '지입차주') o.emp_type = '지입차주';", 'if (seeSafety) o.emp_type = m.emp_type;')).ok,
+    chkUi70(html, auth70.replace("if (seeSafety && m.emp_type === '지입차주')", "if (m.emp_type === '지입차주')")).ok];
+  T("v472 고용형태 '지입차주'·'(고르지 않음)' · 소속 회사 both · 직원 줄 표시 3종(실행 — 지입차주·중복 재적·고용형태 없음(재직만)) · 빈 값은 정규직으로 안 바뀜 · 서버 MEMBER_CORP both·회원 목록 emp_type은 지입차주일 때만 · 결함 사본 " + MU70.length + '개 = 모두 ✗',
+    u70.ok && MU70.every((v) => v === false), JSON.stringify({ r: u70.info, mut: MU70 }));
+
+  const D70 = { ft: rd70('FEATURES.md'), tl: rd70('TESTLIST.md'), sw: rd70('sw.js'), man: rd70('MANUAL.html') };
+  const chk70 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v472 (11/14)', '\n### '), tlv = cut(d.tl, '\n## v472 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[ \] \(AI 시험 화면 대상/.test(l));
+    const FT = ['`hrEmpCorpChips`', '`MEMBER_CORP`', '`both`', '`emp_type`', '지입차주', '(고르지 않음)', '고용형태 없음', '원장 C150'];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const ok = /기준: v472 \(2026-11-14\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 5 && gate.length === 3 && scr.length === 2 && !cb.some((l) => /\(PM/.test(l))
+      && d.man.indexOf('<b>지입차주</b>') > 0 && d.man.indexOf('<b>두 회사 중복 재적</b>') > 0 && d.man.indexOf('2026-11 v472') > 0 && !/emp_type|MEMBER_CORP|hrEmpCorpChips/.test(cut(d.man, '<b>지입차주</b>', '</li>'))
+      && /SHELL_CACHE = 'jw-shell-v472'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
+  };
+  const r70 = chk70(D70);
+  const mu70 = (k, f) => chk70(Object.assign({}, D70, { [k]: f(D70[k]) })).ok;
+  const M70 = [mu70('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v471 (')), mu70('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v471'")),
+    mu70('ft', (s) => s.split('`hrEmpCorpChips`').join('hrEmpCorpChips')), mu70('man', (s) => s.replace('<b>두 회사 중복 재적</b>', '두 회사 중복 재적'))];
+  T('v472 문서·판 번호(정확 검사): FEATURES 기준 v472 (2026-11-14)·v472 절 · TESTLIST v472 칸 5(화면 2 · 게이트 [x] 3) · MANUAL 지입차주·두 회사 중복 재적(내부 키 이름 0) · sw jw-shell-v472 · 결함 사본 ' + M70.length + '개 = 모두 ✗',
+    r70.ok && M70.every((v) => v === false), JSON.stringify({ r: r70.info, mut: M70 }));
+} catch (e) { console.log('  (v472 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

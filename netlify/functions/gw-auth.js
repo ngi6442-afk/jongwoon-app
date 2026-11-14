@@ -105,7 +105,8 @@ function safeMember(m) { if (!m) return null; const { pin_salt, pin_hash, ...s }
 // 이 직책의 회원 등록·직책 변경은 관리자(비개발자)도 할 수 있다. 관리자·대표·개발자 지정은 종전대로 개발자만.
 const ROLE_OPEN = { '팀장': 1, '직원': 1, '현장직': 1 };
 // v447 회원 소속 회사(corp) — 안전 설정(gw-data 안전 설정 키) 회사별 상시근로자 수 두 키와 같은 값(env 종운환경 · con 종운건설). 그 밖 값은 400 BAD_CORP
-const MEMBER_CORP = { env: 1, con: 1 };
+//   v472(PM 11/14 18:48 "중복재적 표시도"): both = 두 회사 중복 재적(읽는 쪽은 '양쪽 회사에 다 나옴'으로 — 안전 현황 회사 칩)
+const MEMBER_CORP = { env: 1, con: 1, both: 1 };
 function roleOpen(r) { return Object.prototype.hasOwnProperty.call(ROLE_OPEN, String(r || '')); }
 // 일반 직책 기본 권한 — 앱 ROLE_PRESET과 같은 값(uismoke v430이 3직책 전부 대조, servertest가 직원 줄 대조). 관리자가 만든 회원의 perms는 클라 값이 아니라 이 표에서 온다(권한 상승 차단).
 //   v430 safety: 3직책 모두 숨김(PM 11/9 ② "권민지 1명" — 팀장도 숨김, 부여는 권한관리 표에서 한 분씩)
@@ -252,7 +253,7 @@ async function handleMemberList(st, event, R) {
   const members = (await listMembers(st)).map(function (m) {
     if (c.member.admin || m.id === c.member.id) return safeMember(m);
     const o = { id: m.id, name: m.name, role: m.role, rank: m.rank, dept: m.dept, seq: m.seq, admin: m.admin, dev: m.dev, tier: m.tier, on_loa: m.on_loa, del: m.del, retired: retired(m) };
-    if (seeSafety) { o.office = m.office; o.supervisor = m.supervisor; o.corp = m.corp; o.test_acct = m.test_acct; o.quals = m.quals; }   // v460 quals(자격·담당 교육 대상 표시)
+    if (seeSafety) { o.office = m.office; o.supervisor = m.supervisor; o.corp = m.corp; o.test_acct = m.test_acct; o.quals = m.quals; } if (seeSafety && m.emp_type === '지입차주') o.emp_type = '지입차주';   // v460 quals(자격·담당 교육 대상 표시) · v472: 고용형태는 '지입차주'(우리 직원 아님 — 직원 수·교육 대상에서 가르는 표식)일 때만 싣는다. 정규직·계약직 같은 그 밖 값은 종전대로 관리자·본인만
     return o;   // v447 회원 칸 4개(사무직·관리감독자 지정·소속 회사·시험 계정) — 안전 › 체크 칸 표를 안전 담당(비관리자)이 그리는 데 쓰는 직무 구분 표식(인사정보·날짜 아님)   // tier·dev(v321)는 클라 tierOfMember 파생·표시용(인사정보 아님). retired(v329)는 퇴사 여부 파생 불리언 — 날짜(leave_date)는 여전히 숨기고, 비관리자 화면도 담당·공개범위에서 퇴사자를 걸러낼 수 있게 한다
   });
   return jr(200, { status: 'OK', members, request_id: R });

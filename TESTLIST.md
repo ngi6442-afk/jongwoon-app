@@ -1296,3 +1296,10 @@
 - [ ] (AI 시험 화면 대상) 현황 맨 위 칩 3개 · 종운건설 = 석면·철거 현장·계약만, 종운환경 = 준설·그 밖 · 소속 회사를 정하지 않은 직원은 두 칩에 다 · 고른 칩 아래 안내 줄 · ①②⑤⑥ 그대로 · 375px에서 칩 한 줄 — 실행 검사는 uismoke v471 ①(실제 현황 구간 · 결함 사본 4)
 - [ ] (나수진 또는 관리자) 안전 설정(현황 ⑤ [고치기])에 회사별 상시근로자 수 두 칸 넣기 — 넣어야 맨 위 회사 구분 줄이 켜짐(고용 형태·중복 재적 표시 기능이 나온 뒤)
 - [x] (AI) `uismoke` · `consheet_check` · `proctpl_check` · `settletest` · `servertest` · `rectest` · `promoqual_check` · `promogen_check` · `promoqlearn_check` · `promostream_check` · `promo_wrap_check` · `promo_post_check` 전부 통과 + node --check(sw) — 숫자는 커밋 메시지
+
+## v472 — 인사·직원 창: 고용형태 '지입차주' 고르기 · 소속 회사 '두 회사 중복 재적' · 직원 줄 표시 3종 (운영 데이터 변경 없음)
+- [ ] (AI 시험 화면 대상 — 시험 서버, 관리자) 인사 › 직원: 고용형태가 빈 재직자 줄에 노란 '고용형태 없음' · 그 카드를 열면 고용형태 칸 '(고르지 않음)' · 다른 칸만 고쳐 저장해도 고용형태가 빈 채(정규직으로 안 바뀜) · '지입차주'를 골라 저장하면 줄에 '지입차주'·'고용형태 없음' 사라짐 · 새 직원 등록 창 기본 = 정규직 · 퇴사자 줄에는 '고용형태 없음' 없음
+- [ ] (AI 시험 화면 대상 — 시험 서버, 관리자 · 폰 375) 소속 회사 '종운환경·종운건설 (두 회사 중복 재적)'을 골라 저장 = 줄에 '중복 재적' · 다시 열면 그 값 그대로 · '(지정 안 함)'으로 되돌리면 표시 사라짐 · 폰 375에서 줄 표시가 이름 옆에서 넘치지 않음
+- [x] (AI) `servertest` '84 v472'(소속 회사 both 저장·빈 값 = 칸째 지움 · 고용형태 지입차주 저장 · 회원 목록 안전 보기 = both·지입차주만 · 계약직·안전 숨김 = 없음) — ✓ AI 11/14
+- [x] (AI) `uismoke` 'v472'(선택지 · 불러오기(빈 값 그대로·both) · 직원 줄 표시 3종 실행 · 서버 허용 값·회원 목록 · 결함 사본 9) · v471 문서 검사를 이 판 이상으로 풀고 v472 문서·판 번호 정확 검사(결함 사본 4) — ✓ AI 11/14
+- [x] (AI) `uismoke` · `consheet_check` · `proctpl_check` · `settletest` · `servertest` · `rectest` · `promoqual_check` · `promogen_check` · `promoqlearn_check` · `promostream_check` · `promo_wrap_check` · `promo_post_check` · 원본 읽기 검사 4종(stmtread a·b·c·d) 전부 통과 + node --check(함수·_lib·sw) — 숫자는 커밋 메시지

@@ -3440,7 +3440,8 @@
     <span class="fld-label">입사일</span>
     <input type="date" id="meHire">
     <span class="fld-label">고용형태</span>
-    <select id="meEmp"><option value="정규직">정규직</option><option value="계약직">계약직</option><option value="일용직">일용직</option><option value="아르바이트">아르바이트</option><option value="기타">기타</option></select>
+    <!-- v472(PM 11/14 18:48): '지입차주'(우리 직원 아님 — 라임팀 등) 고르기 · 저장된 값이 빈 회원은 '(고르지 않음)'으로 보인다(종전엔 빈 값이 '정규직'으로 보여 다른 칸만 고쳐 저장해도 정규직이 됐다) — 새 회원 기본은 정규직 그대로 -->
+    <select id="meEmp"><option value="">(고르지 않음)</option><option value="정규직">정규직</option><option value="계약직">계약직</option><option value="일용직">일용직</option><option value="지입차주">지입차주 (우리 직원 아님)</option><option value="아르바이트">아르바이트</option><option value="기타">기타</option></select>
     <!-- v447 안전 › 체크 칸(사람별 표)이 쓰는 회원 칸 4개 — 서버 gw-auth 회원 저장(필드별 복사·감사 기록). 시험 계정 표식은 관리자만(인사 카드 자체가 관리자 전용 — 서버도 칸 앞에서 다시 봄) -->
     <span class="fld-label">안전 › 체크 칸 기준</span>
     <label class="dg-check"><input type="checkbox" id="meOffice"> 사무직 (정기교육 반기 6시간·일반건강진단 2년 — 표시가 없으면 그 밖 근로자: 반기 12시간·1년)</label>
@@ -3454,7 +3455,8 @@
     <label class="dg-check"><input type="checkbox" id="meQ_tech"> 기술요원 (교육 3년)</label>
     <label class="dg-check"><input type="checkbox" id="meQ_elec"> 전기안전관리자 (법정교육 3년)</label>
     <span class="fld-label">소속 회사</span>
-    <select id="meCorp"><option value="">(지정 안 함)</option><option value="env">종운환경</option><option value="con">종운건설</option></select>
+    <select id="meCorp"><option value="">(지정 안 함)</option><option value="env">종운환경</option><option value="con">종운건설</option><option value="both">종운환경·종운건설 (두 회사 중복 재적)</option></select>   <!-- v472(PM 11/14 18:48): 두 회사 중복 재적 = both(서버 MEMBER_CORP와 같은 값) -->
+    <div style="font-size:12px;color:var(--sub);margin:-2px 2px 8px;">두 회사에 다 적을 둔 사람은 '두 회사 중복 재적'을 고릅니다 — 직원 목록에 '중복 재적' 표시가 붙습니다</div>
     <label class="dg-check" id="meTestWrap"><input type="checkbox" id="meTestAcct"> 시험 계정 (안전 › 체크 칸 표·빠진 항목·합계에서 뺌 — 다른 화면은 그대로)</label>
     <span class="fld-label">연차 부여 기준</span>
     <select id="meBasis"><option value="hire">입사일 기준</option><option value="fiscal">회계연도(1/1) 기준</option></select>
@@ -30717,8 +30719,18 @@ function dutyStage(nx){
     return ' <span class="'+cls+'"'+(st?' style="'+st+'"':'')+' title="기간제법 4조 — 입사 '+esc(m.hire_date)+' + 2년 = '+esc(r.conv)+'. 그 전에 계약 종료·정규직 전환·재계약 중 하나를 정해야 합니다(노무사 확인)">무기계약 전환 D-'+r.days+' ('+esc(r.conv)+')</span>';
   }
   // @ct-radar-end
+  // v472(PM 11/14 18:48 "일용직/지입차주 선택 기능 … 중복재적 표시도"): 인사 › 직원 줄 표시 3종 — 저장값만 읽는다(emp_type · corp)
+  //   '지입차주'(고용형태 = 지입차주 — 우리 직원 아님) · '중복 재적'(소속 회사 = both) · '고용형태 없음'(재직자인데 고용형태가 빈 값 — 나수진 님이 골라 넣을 줄, 퇴사자 줄에는 안 붙임)
+  function hrEmpCorpChips(m, isRet){
+    var s = "", e = m ? String(m.emp_type || "") : "";
+    if (!m) return s;
+    if (e === "지입차주") s += ' <span class="scope-chip" title="고용형태 = 지입차주 — 우리 직원 아님">지입차주</span>';
+    if (m.corp === "both") s += ' <span class="scope-chip" title="소속 회사 = 종운환경·종운건설 두 곳">중복 재적</span>';
+    if (!isRet && !e) s += ' <span class="need-chip" title="고용형태가 비어 있습니다 — 줄을 눌러 고용형태를 고르세요">고용형태 없음</span>';
+    return s;
+  }
   function hrRowHtml(m, isRet){
-    var nm = (typeof m.seq==="number" ? m.seq + ". " : "") + (isBossMember(m) ? (m.name + " (대표님)") : m.name);
+    var nm =(typeof m.seq==="number" ? m.seq + ". " : "") + (isBossMember(m) ? (m.name + " (대표님)") : m.name);
     var meta = [(isRet && m.dept) ? m.dept : "", m.role || "", m.rank || ""].filter(Boolean).join(" · ");   // 퇴사자는 부서 그룹을 벗어나므로 부서를 메타 앞머리에
     var hr = [];
     if(m.hire_date){ var si=serviceInfo(m, isRet ? m.leave_date : null); hr.push("입사 " + m.hire_date); if(si) hr.push("근속 " + (Math.floor(si.years*10)/10) + "년"); }
@@ -30738,7 +30750,8 @@ function dutyStage(nx){
     if(!isRet && m.leave_date) chips += ' <span class="review-chip">퇴사예정 ' + esc(m.leave_date) + '</span>';   // 미래 퇴사일 = 아직 재직 → 부서 그룹에 두고 칩으로만 구분
     if(m.on_loa) chips += ' <span class="scope-chip">' + (isRet ? "휴직 중 퇴사" : "휴직중") + esc((m.loa_start?" "+m.loa_start:"") + (m.loa_end?"~"+m.loa_end:"")) + '</span>';   // 퇴사자에게 현재형 '휴직중'은 그룹 안내(접근 차단 중)와 어긋난다
     chips += ctChipHtml(m, todayStr());   // v368 무기계약직 레이더(계약직만 칩이 붙는다)
-    var hrLine = '<div class="mrole" style="margin-top:1px;opacity:.9;">' + esc(hr.join(" · ")) + '</div>';
+    chips += hrEmpCorpChips(m, isRet);   // v472 지입차주·중복 재적·고용형태 없음
+    var hrLine ='<div class="mrole" style="margin-top:1px;opacity:.9;">' + esc(hr.join(" · ")) + '</div>';
     return '<div class="hr-item">' +
       '<div class="hr-head' + (hrOpenId === m.id ? ' open' : '') + '" data-hr-toggle="' + m.id + '">' +
         '<div class="minfo"><div class="mname">' + esc(nm) + ((m.admin && !isRet) ? ' 👑' + tierBadgeHtml(m) : '') + chips + '</div><div class="mrole">' + esc(meta) + '</div>' + hrLine + '</div>' +
@@ -31835,11 +31848,11 @@ function dutyStage(nx){
     meDeptFill(m ? (m.dept||"") : "");
     document.getElementById("meBirth").value = m ? (m.birth||"") : "";
     document.getElementById("meHire").value = m ? (m.hire_date||"") : "";
-    document.getElementById("meEmp").value = m ? (m.emp_type||"정규직") : "정규직";
+    document.getElementById("meEmp").value = m ? (m.emp_type||"") : "정규직";   // v472: 저장된 값이 비었으면 '(고르지 않음)' 그대로 보인다(종전엔 '정규직'으로 보여 저장하면 정규직이 됐다) · 새 회원은 정규직
     document.getElementById("meOffice").checked = !!(m && m.office === true);   // v447 회원 칸 4개(안전 › 체크 칸 기준)
     document.getElementById("meSupervisor").checked = !!(m && m.supervisor === true);
     EDU_QUAL.forEach(function(q){ var el = document.getElementById("meQ_" + q.q); if (el) el.checked = !!(m && Array.isArray(m.quals) && m.quals.indexOf(q.q) >= 0); });   // v460 자격·담당 교육 대상 표시
-    document.getElementById("meCorp").value = (m && (m.corp === "env" || m.corp === "con")) ? m.corp : "";
+    document.getElementById("meCorp").value = (m && (m.corp === "env" || m.corp === "con" || m.corp === "both")) ? m.corp : "";   // v472 both = 두 회사 중복 재적
     document.getElementById("meTestAcct").checked = !!(m && m.test_acct === true);
     document.getElementById("meTestWrap").style.display = isAdmin() ? "" : "none";   // 시험 계정 표식은 관리자만
     document.getElementById("meBasis").value = m ? (m.annual_basis||"hire") : "hire";
