@@ -8512,7 +8512,9 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
       'push:subs': { schema: 1, members: { u31a: [{ sub: {} }, { sub: {} }], uadmin: [{ sub: {} }] } },
       'ask:usage': { month: { '2026-10': 1000 } }, 'promoai:usage': { months: { '2026-10': { calls: 499 } } }, 'promomask:usage': { months: { '2026-10': { calls: 10 } } },
       'brief:usage:2026-10': { azure_chars: 100, claude_tokens: 100 }, 'usage:learn:contract:2026-10': { calls: 199 }, 'usage:box:2026-10': { calls: 42 },
-      'it:cron:files_backup:last': { ts: NOW31 - 10 * H31, ok: true }, 'mchk:alerts:2026-10': { schema: 1, n: 3, since: S31 + 60000, by: {} }, 'push:log': { schema: 1, items: [] } };
+      'it:cron:files_backup:last': { ts: NOW31 - 10 * H31, ok: true }, 'mchk:alerts:2026-10': { schema: 1, n: 3, since: S31 + 60000, by: {} }, 'push:log': { schema: 1, items: [] },
+      'mchk:backup:2026-10': { schema: 1, since: S31 - 40 * D31, days: Object.fromEntries(Array.from({ length: 31 }, (_, i) => [String(i + 1).padStart(2, '0'), 'full'])) },
+      'mchk:backup:since': { schema: 1, ts: S31 - 40 * D31 }, 'mchk:alerts:since': { schema: 1, ts: S31 - 40 * D31 } };
   };
   const bad31 = () => {
     good31();
@@ -8539,16 +8541,16 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
       const rb = await G.M.run(NOW31, { by: 'cron' }); const db = mem.gw_data['mchk:2026-10'] || {}; const sb = st31(db);
       reset31(); good31();
       delete mem.gw_data['mchk:alerts:2026-10']; mem.gw_data['push:log'] = { schema: 1, items: [{ ts: S31 + 5 * D31, title: '⚠ 입찰 감시 경보' }] };
-      blobsMock.hooks.failGet = (k) => k === 'audit:2026-10:2' || k === 'push:subs' || k === 'usage:learn:contract:2026-10';
+      blobsMock.hooks.failGet = (k) => k === 'audit:2026-10:2' || k === 'push:subs' || k === 'usage:learn:contract:2026-10' || k === 'mchk:backup:2026-10' || k === 'mchk:alerts:2026-10';
       pushMock.loadMembers = async () => { const a = membersOf(); a.unavailable = true; return a; };
       const ru = await G.M.run(NOW31, { by: 'cron' }); blobsMock.hooks.failGet = null; pushMock.loadMembers = lm0;
       const du = mem.gw_data['mchk:2026-10'] || {}; const su = st31(du);
-      reset31(); good31(); delete mem.gw_data['mchk:alerts:2026-10'];
+      reset31(); good31(); delete mem.gw_data['mchk:alerts:2026-10']; delete mem.gw_data['mchk:alerts:since'];
       mem.gw_data['push:log'] = { schema: 1, items: [{ ts: S31 - D31, title: '⚠ 크론 백업 발사' }, { ts: S31 + D31, title: '⚠ 입찰 감시 경보' }, { ts: S31 + 2 * D31, title: '결재 요청' }, { ts: S31 + 3 * D31, title: '⚠ 조달청 개찰 API 이상' }] };
       await G.M.run(NOW31, { by: 'cron' }); const dp = mem.gw_data['mchk:2026-10'] || {}; const ap = (dp.items || []).find((x) => x.id === 'alerts') || {};
       const ORDER = 'login,lock,retired,perm,device,subs,usage,backup,alerts';
-      P.A = rg.ok && (dg.items || []).map((x) => x.id).join(',') === ORDER && JSON.stringify(sg) === JSON.stringify({ login: 'ok', lock: 'none', retired: 'ok', perm: 'ok', device: 'ok', subs: 'ok', usage: 'ok', backup: 'unknown', alerts: 'none' })
-        && JSON.stringify(dg.counts) === '{"ok":6,"bad":0,"unknown":1,"none":2}' && dg.period === '2026-10' && dg.ack === null && (dg.items || []).every((x) => x.rule && x.basis && Array.isArray(x.lines))
+      P.A = rg.ok && (dg.items || []).map((x) => x.id).join(',') === ORDER && JSON.stringify(sg) === JSON.stringify({ login: 'ok', lock: 'none', retired: 'ok', perm: 'ok', device: 'ok', subs: 'ok', usage: 'ok', backup: 'ok', alerts: 'none' })
+        && JSON.stringify(dg.counts) === '{"ok":7,"bad":0,"unknown":0,"none":2}' && dg.period === '2026-10' && dg.ack === null && (dg.items || []).every((x) => x.rule && x.basis && Array.isArray(x.lines))
         && ((dg.items || []).find((x) => x.id === 'perm') || {}).n.changes === 2 && ((dg.items || []).find((x) => x.id === 'lock') || {}).n.locked === 1 && ((dg.items || []).find((x) => x.id === 'alerts') || {}).n.alerts === 3
         && rb.ok && JSON.stringify(sb) === JSON.stringify({ login: 'bad', lock: 'none', retired: 'bad', perm: 'bad', device: 'bad', subs: 'bad', usage: 'bad', backup: 'bad', alerts: 'none' }) && db.counts.bad === 7
         && ((db.items || []).find((x) => x.id === 'device') || {}).n.pending_old === 1 && ((db.items || []).find((x) => x.id === 'device') || {}).n.gone_approved === 1 && ((db.items || []).find((x) => x.id === 'subs') || {}).n.over === 1
@@ -8582,7 +8584,7 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
       P.C = c1.code === 409 && c1.body.error_code === 'MCHK_STALE' && c1b.code === 409 && c2.code === 503 && c2.body.error_code === 'PMCON_READ_FAILED' && ackAfterFail === null
         && c3.code === 500 && c3.body.error_code === 'PMCON_WRITE_FAILED' && ackAfterW === null && upAfterW === up0
         && c4.code === 200 && c4.body.ack && c4.body.ack.by === 'uadmin' && mem.gw_data['mchk:2026-10'].ack.by === 'uadmin' && (dd.log || []).length === 1 && last.kind === 'mchk' && last.choice === 'ack' && last.row === 'mchk:2026-10' && last.by === 'uadmin'
-        && /^10월 월 점검 확인 — 어긋남 0 · 확인 못 함 1$/.test(last.q) && dd.updated_at > 0 && aNew.length === 1 && aNew[0].ev[0].op === '월점검확인' && aNew[0].bid === 'uadmin'
+        && /^10월 월 점검 확인 — 어긋남 0 · 확인 못 함 0$/.test(last.q) && dd.updated_at > 0 && aNew.length === 1 && aNew[0].ev[0].op === '월점검확인' && aNew[0].bid === 'uadmin'
         && c5.code === 400 && c5.body.error_code === 'MCHK_ACKED' && c6.code === 404 && c6.body.error_code === 'MCHK_NONE' && c7.code === 200 && c7.body.log[0].kind === 'mchk' && c8.body.doc.ack && (mem.gw_data['status:decide'].log || []).length === 1;
       I.C = [c1.body.error_code, c2.body.error_code, ackAfterFail, c3.body.error_code, ackAfterW, c4.code, c4.body.error_code, (dd.log || []).length, last.q, aNew.length, c5.body.error_code, c6.body.error_code];
       // ④ 크론 두 번 = 문서 1개 · 1~3일 밖 = 건너뜀 · 봇 키 다시 돌리기
@@ -8649,8 +8651,38 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
       const ak = Object.keys(mem.gw_data).filter((k) => k.indexOf('mchk:alerts:') === 0), adoc = ak.length ? mem.gw_data[ak[0]] : {};
       blobsMock.hooks.failGet = (k) => k.indexOf('mchk:alerts:') === 0;
       const g2 = await G.cl({ action: 'bot_notify', key: 'test-ingest-key', title: '⚠ 크론 백업 발사', body: 'x', tag: 'cron' }, null); blobsMock.hooks.failGet = null;
-      P.G = g1.code === 200 && ak.length === 1 && ak[0] === 'mchk:alerts:' + kstYm31(Date.now()) && adoc.n === 2 && adoc.by['⚠ 입찰 감시 경보'] === 2 && g2.code === 200 && mem.gw_data[ak[0]].n === 2;
-      I.G = [g1.code, ak, adoc.n, g2.code];
+      const ask = Object.keys(mem.gw_data).filter((k) => /^mchk:alerts:\d{4}-\d{2}$/.test(k));
+      P.G = g1.code === 200 && ask.length === 1 && ask[0] === 'mchk:alerts:' + kstYm31(Date.now()) && adoc.n === 2 && adoc.by['⚠ 입찰 감시 경보'] === 2 && g2.code === 200 && mem.gw_data[ask[0]].n === 2
+        && !!(mem.gw_data['mchk:alerts:since'] && mem.gw_data['mchk:alerts:since'].ts > 0);
+      I.G = [g1.code, ask, adoc.n, g2.code, !!mem.gw_data['mchk:alerts:since']];
+      // ⑧(11/14 원천 수리) 백업 연속일·경보 수 — 정상 달 = 어긋남·확인 못 함 0(카드 없음) · 하루 빠짐 = 어긋남 1 · 첫 달은 기록 시작일부터("15일부터 기록") · 부분 백업 = 어긋남 ·
+      //   시작 뒤 문서 없는 달 = 전부 빠짐(백업)·0건(경보) · 시작 전 달 = 판정 안 함(기준 없음 — 카드 밖) · 경보 첫 달 "20일부터 셈" · 흔적 길(backup_stamp fn backup)
+      const bkRun = async (fx) => { reset31(); good31(); fx(); await G.M.run(NOW31, { by: 'cron' }); const d = mem.gw_data['mchk:2026-10'] || {}; const f = (id) => (d.items || []).find((x) => x.id === id) || { n: {}, lines: [] }; return { c: d.counts || {}, b: f('backup'), a: f('alerts') }; };
+      const k0 = await bkRun(() => {});
+      const k1 = await bkRun(() => { delete mem.gw_data['mchk:backup:2026-10'].days['18']; });
+      const T15 = Date.UTC(2026, 9, 15, 0, 0), T20 = Date.UTC(2026, 9, 20, 0, 0);
+      const k2 = await bkRun(() => { mem.gw_data['mchk:backup:since'] = { ts: T15 }; const dd = {}; for (let i = 15; i <= 31; i++) dd[String(i).padStart(2, '0')] = 'full'; mem.gw_data['mchk:backup:2026-10'] = { since: T15, days: dd }; mem.gw_data['mchk:alerts:since'] = { ts: T20 }; mem.gw_data['mchk:alerts:2026-10'] = { n: 2, since: T20, by: {} }; });
+      const k3 = await bkRun(() => { mem.gw_data['mchk:backup:2026-10'].days['20'] = 'partial'; });
+      const k4 = await bkRun(() => { delete mem.gw_data['mchk:backup:2026-10']; delete mem.gw_data['mchk:alerts:2026-10']; });
+      const k5 = await bkRun(() => { for (const k of ['mchk:backup:2026-10', 'mchk:backup:since', 'mchk:alerts:2026-10', 'mchk:alerts:since']) delete mem.gw_data[k]; mem.gw_data['push:log'] = { schema: 1, items: [{ ts: S31 + 20 * D31, title: '⚠ 입찰 감시 경보' }] }; });
+      const card0 = (k) => (k.c.bad || 0) + (k.c.unknown || 0) === 0;
+      reset31(); mem.gw_data = {};
+      const ymN = kstYm31(Date.now()), ddN = new Date(Date.now() + 9 * H31).toISOString().slice(8, 10), KB = 'mchk:backup:' + ymN, day = () => ((mem.gw_data[KB] || {}).days || {})[ddN], runs = () => (mem.gw_data[KB] || {}).runs;
+      const s1 = await G.cl({ action: 'backup_stamp', secret: 'test-ingest-key', fn: 'backup', ok: false, partial: true, note: '부분 1키' }, null); const v1 = day();
+      const s2 = await G.cl({ action: 'backup_stamp', secret: 'test-ingest-key', fn: 'backup', ok: true, note: '완료' }, null); const v2 = day();
+      await G.cl({ action: 'backup_stamp', secret: 'test-ingest-key', fn: 'backup', ok: false, partial: true }, null); const v3 = day();
+      await G.cl({ action: 'backup_stamp', secret: 'test-ingest-key', fn: 'backup', ok: false }, null);
+      await G.cl({ action: 'backup_stamp', secret: 'test-ingest-key', fn: 'files_backup', ok: true }, null);
+      const s6 = await G.cl({ action: 'backup_stamp', secret: 'nope', fn: 'backup', ok: true }, null);
+      const sinceB = mem.gw_data['mchk:backup:since'], stB = mem.gw_data['it:cron:backup:last'] || {};
+      P.H = card0(k0) && k0.b.st === 'ok' && k0.b.lines[0] === '매일 백업 31/31일'
+        && k1.b.st === 'bad' && k1.b.n.missing === 1 && k1.b.lines[0] === '매일 백업 빠진 날 1일(10/18)' && k1.c.bad === 1 && k1.c.unknown === 0
+        && card0(k2) && k2.b.st === 'ok' && k2.b.n.from === 15 && k2.b.lines.indexOf('15일부터 기록') >= 0 && k2.b.lines[0] === '매일 백업 17/17일' && k2.a.st === 'none' && k2.a.lines[0] === '경보 2건(20일부터 셈)'
+        && k3.b.st === 'bad' && k3.b.n.partial === 1 && k3.b.n.missing === 0 && /^부분 백업\(실패 키 있음\) 1일\(10\/20\)$/.test(k3.b.lines[0])
+        && k4.b.st === 'bad' && k4.b.n.missing === 31 && k4.a.st === 'none' && k4.a.lines[0] === '경보 0건' && k4.a.n.alerts === 0
+        && card0(k5) && k5.b.st === 'none' && /기록 전/.test(k5.b.lines[0]) && k5.a.st === 'none' && k5.a.n.src === 'partial' && k5.a.n.partial === 1
+        && s1.code === 200 && v1 === 'partial' && s2.code === 200 && v2 === 'full' && v3 === 'full' && runs() === 3 && s6.code === 403 && !!(sinceB && sinceB.ts > 0) && stB.state === 'end';
+      I.H = { k0: [k0.c, k0.b.lines], k1: [k1.b.st, k1.b.lines], k2: [k2.b.lines, k2.a.lines], k3: k3.b.lines, k4: [k4.b.n.missing, k4.a.lines], k5: [k5.c, k5.b.lines, k5.a.n], stamp: [s1.code, v1, v2, v3, runs(), s6.code, !!sinceB] };
     } finally { reset31(); auditMock.readMonth = rm0; }
     return { ok: Object.keys(P).every((k) => P[k]), P, I };
   };
@@ -8658,11 +8690,11 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   try {
     const realA = comp31(PA31, SA31), realM = require(PM31);
     const R31 = await chk31({ A: realA, M: realM, cl: cl31(gwd) });
-    T('P1 판31 ① 항목 9개 판정(순서 로그인·잠금·퇴사자 접속·권한 변경·대기 기기·구독·사용량·백업 연속일·경보 수): 맞음 표본 = 맞음 6·확인 못 함 1(매일 백업 — 앱 저장소 밖)·기준 없음 2(잠금·경보 수 — 숫자만) · 항목마다 기준·근거·줄 · 권한 변경 2건(하나는 감사 조각 2) · 어긋남 표본 = 7(이름 로그인·퇴사일 뒤 로그인·개발자 아닌 권한 변경·대기 8일·퇴사자 승인 기기·기기 6대·퇴사자 구독·상한 500/500·첨부 백업 100시간) · 확인 못 함 표본(감사 조각·구독·사용량 못 읽음·명부 못 읽음·경보 기록 부족) = 8 · 알림함이 그달을 덮으면 ⚠ 제목 수(2)',
+    T('P1 판31 ① 항목 9개 판정(순서 로그인·잠금·퇴사자 접속·권한 변경·대기 기기·구독·사용량·백업 연속일·경보 수): 맞음 표본 = 맞음 7(매일 백업 31/31일 포함)·확인 못 함 0·기준 없음 2(잠금·경보 수 — 숫자만) · 항목마다 기준·근거·줄 · 권한 변경 2건(하나는 감사 조각 2) · 어긋남 표본 = 7(이름 로그인·퇴사일 뒤 로그인·개발자 아닌 권한 변경·대기 8일·퇴사자 승인 기기·기기 6대·퇴사자 구독·상한 500/500·첨부 백업 100시간) · 확인 못 함 표본(감사 조각·구독·사용량·백업 흔적·경보 기록 못 읽음·명부 못 읽음) = 8 · 알림함이 그달을 덮으면 ⚠ 제목 수(2)',
       R31.P.A, JSON.stringify(R31.I.A));
     T('P1 판31 ② 권한: 열람 mchk_get 비로그인 401 · 직원 403 ADMIN_ONLY · PM 아닌 관리자 200(can_ack false) · PM 200(can_ack true) · [확인] PM 아닌 관리자 403 PM_ONLY · 직원 403 · 달 꼴 400 BAD_PERIOD · 없는 달 doc null · 점검 문서·누른 기록 그대로',
       R31.P.B, JSON.stringify(R31.I.B));
-    T('P1 판31 ③ [확인]: 낡은·빠진 base 409 MCHK_STALE · 누른 기록 못 읽음 503(ack 안 씀) · 누른 기록 못 씀 500 PMCON_WRITE_FAILED(ack 되돌림·updated_at 그대로) · 정상 200 = 점검 문서 ack(누른 사람) + status:decide 1줄(kind mchk·choice ack·줄 mchk:2026-10·"10월 월 점검 확인 — 어긋남 0 · 확인 못 함 1") + 감사 1줄(월점검확인) · 두 번 400 MCHK_ACKED · 없는 달 404 · pmcon_get에 그 줄',
+    T('P1 판31 ③ [확인]: 낡은·빠진 base 409 MCHK_STALE · 누른 기록 못 읽음 503(ack 안 씀) · 누른 기록 못 씀 500 PMCON_WRITE_FAILED(ack 되돌림·updated_at 그대로) · 정상 200 = 점검 문서 ack(누른 사람) + status:decide 1줄(kind mchk·choice ack·줄 mchk:2026-10·"10월 월 점검 확인 — 어긋남 0 · 확인 못 함 0") + 감사 1줄(월점검확인) · 두 번 400 MCHK_ACKED · 없는 달 404 · pmcon_get에 그 줄',
       R31.P.C, JSON.stringify(R31.I.C));
     T('P1 판31 ④ 크론: KST 4일 = 건너뜀(문서 0) · 1일 기동 = 10월 문서 · 같은 날·이튿날 다시 = 건너뜀(exists) → 한 달 문서 1개·감사 월점검 1줄 · 봇 키 mchk_run: 틀린 키 403 · 있으면 건너뜀 · force = 다시 계산(rerun 1·[확인] 풂·prev_ack) · 달 꼴·이번 달 400',
       R31.P.D, JSON.stringify(R31.I.D));
@@ -8670,8 +8702,10 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
       R31.P.E, JSON.stringify(R31.I.E));
     T('P1 판31 ⑥ 읽는 쪽: 감사 화면(audit action) = 조각 1·2·3을 차례로(abc·parts 3) · 조각 하나 못 읽음 = 503 AUDIT_READ_FAILED(일부만 보이지 않음) · 없는 달 = 빈 목록 · 직원 403 · 재해 복원으로 머리를 되살려도 parts 3(뒤 조각까지 다시 읽힘) · 지금 머리 parts가 있으면 백업에 없어도 그대로',
       R31.P.F, JSON.stringify(R31.I.F));
-    T('P1 판31 ⑦ 경보 수 재료: bot_notify가 ⚠ 제목만 그달 수에 1(주간 생존 신호 안 셈 · 제목별 수) · 그달 수를 못 읽으면 더하지 않고 발송은 200 그대로',
+    T('P1 판31 ⑦ 경보 수 재료: bot_notify가 ⚠ 제목만 그달 수에 1(주간 생존 신호 안 셈 · 제목별 수) · 처음 경보에 세기 시작 표시 · 그달 수를 못 읽으면 더하지 않고 발송은 200 그대로',
       R31.P.G, JSON.stringify(R31.I.G));
+    T('P1 판31 ⑩ 백업 연속일 원천(11/14): 정상 달 = 어긋남·확인 못 함 0(카드 없음)·"매일 백업 31/31일" · 하루 빠짐 = 어긋남 1("빠진 날 1일(10/18)") · 첫 달 = 기록 시작일부터("15일부터 기록"·17/17일 — 앞 날은 안 셈)·경보 "2건(20일부터 셈)" · 부분 백업 하루 = 어긋남 · 시작 뒤 문서 없는 달 = 31일 빠짐·경보 0건 · 시작 전 달 = 판정 안 함(카드 없음) · 흔적 길 backup_stamp fn backup: 부분 → partial · 완료 → full · 같은 날 부분이 와도 full · 실패(ok false)는 안 셈 · 첨부 백업 흔적은 그달 목록에 안 들어감 · 틀린 키 403 · 시작 표시',
+      R31.P.H, JSON.stringify(R31.I.H));
     // ⑧ 결함 사본 — 한 곳씩 바꾼 사본에서 위 검사가 실제로 깨지는지
     const runMut = async (kind, pairs) => {
       if (kind === 'M') {
@@ -8690,7 +8724,20 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
       ['M', [["v.status === 'approved' && v.member_id && gone(v.member_id)", "false"]]],
       ['M', [["return cnt(id) > SUBS_PER_MEMBER;", "return cnt(id) > 99;"]]],
       ['M', [["return r.cap > 0 && r.used >= r.cap;", "return r.cap > 0 && r.used > r.cap;"]]],
-      ['M', [["else if (ageH > FILES_BACKUP_H) {", "else if (ageH > 9999) {"]]],
+      ['M', [["else if (nn.files_age_h > FILES_BACKUP_H) {", "else if (nn.files_age_h > 9999) {"]]],
+      ['M', [["if (days[k] === 'full') continue; if (days[k] === 'partial') part.push(dd); else miss.push(dd);", "continue;"]]],
+      ['M', [["if (days[k] === 'partial') part.push(dd); else miss.push(dd);", "if (days[k] === 'partial') continue; else miss.push(dd);"]]],
+      ['M', [["const from = startTs <= b.s ? 1 : Number(kstDay(startTs).slice(8, 10));", "const from = 1;"]]],
+      ['M', [["else if (startTs === null || startTs >= b.e) { st = 'none';", "else if (false) { st = 'none';"]]],
+      ['M', [["if (bd === null || bsn === null) { st = 'unknown';", "if (false) { st = 'unknown';"]]],
+      ['M', [["doc.days[dd] = (doc.days[dd] === 'full' || (ok && !partial)) ? 'full' : 'partial';", "doc.days[dd] = (ok && !partial) ? 'full' : 'partial';"]]],
+      ['M', [["    if (!ok && !partial) return false;\n", ""]]],
+      ['M', [["if (!isObj(r.data)) await sinceMark(st, BACKUP_SINCE, now);", ""]]],
+      ['M', [["if (!isObj(r.data)) await sinceMark(st, ALERT_SINCE, now);", ""]]],
+      ['M', [["else if (start !== null && start < b.e) {", "else if (false) {"]]],
+      ['M', [["if (ad === null || asn === null) out.push(", "if (false) out.push("]]],
+      ['G', [["  if (fn === 'backup') await MCHK.noteBackup(d.ok === true, d.partial === true);", ""]]],
+      ['G', [["const BACKUP_STAMP_FN = { files_backup: 1, backup: 1 };", "const BACKUP_STAMP_FN = { files_backup: 1 };"]]],
       ['M', [["const logs = m.audit && m.audit.ok ? m.audit.items.filter(isObj) : null;", "const logs = m.audit && m.audit.ok ? m.audit.items.filter(isObj) : [];"]]],
       ['M', [["m.members = (ms && !ms.unavailable) ? ms.filter(isObj) : null;", "m.members = (ms || []).filter(isObj);"]]],
       ['M', [["if (isObj(cur.data) && opts.force !== true) return { ok: true, skipped: 'exists', period: period };", ""], ["if (isObj(again.data) && opts.force !== true) return { ok: true, skipped: 'exists', period: period };", ""]]],
@@ -8728,7 +8775,7 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
       && /const CAP_AZURE_CHARS = 400000;/.test(rd31('_lib/brief.js')) && /const CAP_CLAUDE_TOKENS = 1000000;/.test(rd31('_lib/brief.js')) && require(join(LIB31, 'learn.js')).TYPES.contract.monthly_cap === 200
       && JSON.stringify(realM.USAGE_CAPS.map((c) => c.cap)) === '[12000000,500,1000,400000,1000000,200]' && /\.slice\(-5\);   \/\/ 기기 5개까지/.test(SG31) && realM.SUBS_PER_MEMBER === 5 && realM.DEVICE_PENDING_DAYS === 7 && realM.FILES_BACKUP_H === 96;
     T('P1 판31 ⑧ 상한·기준 = 원본 값(물어보기 1,200만 토큰·블로그 AI 500·사진 가리기 1000·브리핑 40만 자·100만 토큰·계약 학습 200 · 구독 5대(push_sub) · 대기 7일 · 첨부 백업 96시간)', capOk, '');
-    T('P1 판31 ⑨ 결함 사본 ' + MUT31.length + '개(mchk 20 — 이름 로그인·퇴사일 경계·개발자 검사·대기 7일·퇴사자 기기·5대·상한 경계·96시간·감사 못 읽음을 빈 목록으로·명부 못 읽음 무시·두 번 쓰기·1~3일 창·낙관락·두 번 확인·기록 못 읽음·ack 되돌림·누른 기록 줄·force가 확인 남김·⚠만 셈·알림함 덮음 · audit 7 — 줄 상한·경계 하나 어긋남·조각 못 읽음·조각 수 상한·머리 먼저·조각 덜 읽음·못 읽은 조각 건너뜀 · gw-data 6 — 503·parts 보존·열람 관문·확인 PM 관문·봇 키·경보 연결) 전부 위 검사에서 걸림',
+    T('P1 판31 ⑨ 결함 사본 ' + MUT31.length + '개(11/14 원천 수리 14 — 빠진 날·부분·시작일·시작 전·흔적 못 읽음·full 우선·실패 안 셈·시작 표시 둘·경보 0건·경보 못 읽음·흔적 연결·fn 허용 · mchk 20 — 이름 로그인·퇴사일 경계·개발자 검사·대기 7일·퇴사자 기기·5대·상한 경계·96시간·감사 못 읽음을 빈 목록으로·명부 못 읽음 무시·두 번 쓰기·1~3일 창·낙관락·두 번 확인·기록 못 읽음·ack 되돌림·누른 기록 줄·force가 확인 남김·⚠만 셈·알림함 덮음 · audit 7 — 줄 상한·경계 하나 어긋남·조각 못 읽음·조각 수 상한·머리 먼저·조각 덜 읽음·못 읽은 조각 건너뜀 · gw-data 6 — 503·parts 보존·열람 관문·확인 PM 관문·봇 키·경보 연결) 전부 위 검사에서 걸림',
       kill31.length === 0, kill31.join(' | '));
   } catch (e) { T('P1 판31 검사 실행', false, String(e && e.stack || e).slice(0, 400)); }
   finally { reset31(); auditMock.readMonth = rm0; require.cache[rpM31] = keepM31; }

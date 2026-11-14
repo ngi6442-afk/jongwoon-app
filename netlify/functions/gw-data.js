@@ -4654,12 +4654,14 @@ async function handleBackupGet(event, d, R) {
 }
 
 // v426 PC 예약 작업 흔적 — 첨부 증분 백업(collectors/files_backup.py)이 끝나면 남긴다. watch.py가 cron_map 'stamp'로 신선도를 본다(PC가 꺼져 있어도 경보가 나게)
-const BACKUP_STAMP_FN = { files_backup: 1 };
+// P1 판31(11/14 원천 수리): fn 'backup' = 매일 앱 백업(appdata collectors/backup.py — GitHub Actions backup.yml)이 저장한 뒤 남기는 흔적 — 그날(KST)을 월 점검 '백업 연속일' 재료(mchk:backup:YYYY-MM)에 더한다(partial = 실패 키 있는 부분 백업)
+const BACKUP_STAMP_FN = { files_backup: 1, backup: 1 };
 async function handleBackupStamp(event, d, R) {
   if (!backupAuthed(d)) return jr(403, { status: 'FORBIDDEN', error_code: 'BAD_SECRET', request_id: R });
   const fn = String(d.fn || '');
   if (!BACKUP_STAMP_FN[fn]) return jr(400, { status: 'REJECTED', error_code: 'BAD_FN', request_id: R });
   await require('./_lib/cronstamp').stamp(fn, { state: 'end', ok: d.ok === true, note: String(d.note || '').slice(0, 120), n: Number(d.n) || 0, bytes: Number(d.bytes) || 0 });
+  if (fn === 'backup') await MCHK.noteBackup(d.ok === true, d.partial === true);   // P1 판31 월 점검 '백업 연속일' 재료(실패는 삼킴)
   return jr(200, { status: 'OK', request_id: R });
 }
 

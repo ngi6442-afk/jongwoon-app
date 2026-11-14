@@ -12,6 +12,9 @@ const tier = require('./tier');
 const DATA = 'gw_data', USERS = 'gw_users';
 const DOC_PREFIX = 'mchk:';          // 'mchk:YYYY-MM' = 그달 점검 문서
 const ALERT_PREFIX = 'mchk:alerts:'; // 'mchk:alerts:YYYY-MM' = 그달 봇 경보 수(gw-data bot_notify가 ⚠ 제목마다 1 — noteAlert)
+const ALERT_SINCE = 'mchk:alerts:since';   // 경보를 세기 시작한 시각(처음 한 번) — 경보가 없던 달(문서 없음)을 '0건'으로 읽는 근거
+const BACKUP_PREFIX = 'mchk:backup:';      // 'mchk:backup:YYYY-MM' = 그달 매일 백업이 끝난 날(KST) { days: { 'DD': 'full'|'partial' } } — gw-data backup_stamp(fn 'backup')가 noteBackup으로 더함
+const BACKUP_SINCE = 'mchk:backup:since';  // 백업 흔적을 받기 시작한 시각(처음 한 번) — 그 앞 날은 빠진 날로 치지 않는다
 const H = 3600000, D = 24 * H;
 const DEVICE_PENDING_DAYS = 7;      // 판22 '대기 7일'(착수설명서 58행 — 새 기기 승인 대기 7일 넘으면 다시 알림)
 const SUBS_PER_MEMBER = 5;          // 그룹웨어 운영권한관리규정(JW-11-01-003) 제14조① '회원당 5대 이내' · gw-data handlePushSub slice(-5)
@@ -33,7 +36,7 @@ const ITEMS = [   // 순서 = 착수설명서 판31 줄(로그인·잠금·퇴�
   { id: 'device', label: '대기 기기', rule: '승인 대기 ' + DEVICE_PENDING_DAYS + '일 넘은 기기 0 · 퇴사·삭제 회원의 승인된 기기 0', basis: '착수설명서 판22(대기 7일·퇴사 다음 날 대기로) · 그룹웨어 운영권한관리규정 제12조③' },
   { id: 'subs', label: '구독', rule: '회원당 알림 기기 ' + SUBS_PER_MEMBER + '대 이내 · 퇴사·삭제 회원 구독 0', basis: '그룹웨어 운영권한관리규정 제14조① · 착수설명서 판22(퇴사 다음 날 구독 회수) · gw-data push_sub' },
   { id: 'usage', label: '사용량', rule: '월 사용 상한에 닿은 기능 0', basis: '코드의 월 상한(물어보기·블로그 AI·사진 가리기·아침 브리핑·계약 학습)' },
-  { id: 'backup', label: '백업 연속일', rule: '매일 05:30 백업이 빠진 날 0 · 첨부 백업 마지막 흔적 ' + FILES_BACKUP_H + '시간 안', basis: '그룹웨어 운영권한관리규정 제17조① · appdata cron_map(backup.yml·JW 첨부백업 96시간)' },
+  { id: 'backup', label: '백업 연속일', rule: '매일 백업이 빠진 날 0 · 부분 백업(실패 키 있음) 0 · 첨부 백업 마지막 흔적 ' + FILES_BACKUP_H + '시간 안', basis: '그룹웨어 운영권한관리규정 제17조①(매일 05시 30분 전체 백업) · appdata .github/workflows/backup.yml cron "30 20 * * *"(KST 05:30 매일)·cron_map backup.yml · 첨부 = cron_map JW 첨부백업 96시간' },
   { id: 'alerts', label: '경보 수', rule: '기준 없음 — 숫자만 기록', basis: '자동화운영규정(JW-11-01-004) 제14조②(이상일 때만 알림)는 허용 건수를 두지 않음' },
 ];
 const ITEM_BY = {}; ITEMS.forEach(function (x) { ITEM_BY[x.id] = x; });
@@ -82,6 +85,12 @@ async function gather(period) {
   m.filesStamp = fs.ok ? (isObj(fs.data) ? fs.data : 'none') : null;
   const al = await getOr(sd, ALERT_PREFIX + period, null);
   m.alertDoc = al.ok ? (isObj(al.data) ? al.data : 'none') : null;
+  const as = await getOr(sd, ALERT_SINCE, null);
+  m.alertSince = as.ok ? (isObj(as.data) ? as.data : 'none') : null;
+  const bk = await getOr(sd, BACKUP_PREFIX + period, null);
+  m.backupDoc = bk.ok ? (isObj(bk.data) ? bk.data : 'none') : null;
+  const bs = await getOr(sd, BACKUP_SINCE, null);
+  m.backupSince = bs.ok ? (isObj(bs.data) ? bs.data : 'none') : null;
   const pl = await getOr(sd, 'push:log', { items: [] });
   m.pushLog = pl.ok && isObj(pl.data) && Array.isArray(pl.data.items) ? pl.data.items : null;
   return m;
@@ -187,33 +196,59 @@ function judge(period, nowMs, m) {
     const nn = {}; rows.forEach(function (r) { nn[r.id] = r.used; }); if (box !== null) nn.box = box;
     out.push(item('usage', st, lines, nn));
   }
-  // 8 백업 연속일 — 매일 백업(05:30)의 기록은 appdata(GitHub data/backup/gw/manifest.json)에 있고 앱 저장소에는 없다 → 확인 못 함.
-  //   첨부 백업(PC)은 흔적 스탬프가 앱 저장소에 있어(마지막 1개뿐) 점검 시각 기준 96시간·실패만 본다 — 걸리면 어긋남.
+  // 8 백업 연속일 — 매일 백업(appdata backup.py, KST 05:30)이 끝날 때마다 backup_stamp(fn 'backup')로 남긴 그달 날짜 목록(mchk:backup:YYYY-MM)을 본다.
+  //   기록 시작(mchk:backup:since — 없으면 그달 문서의 since)보다 앞 날은 빠진 날로 치지 않는다(첫 달은 'n일부터 기록') · 그달 전체가 시작 전이면 판정하지 않음(기준 없음 — 숫자 없음).
+  //   부분 백업(실패 키 있음 — 판5) 날은 어긋남. 확인 못 함은 흔적 문서를 못 읽었을 때만.
+  //   첨부 백업(PC)은 흔적 스탬프(마지막 1개)로 점검 시각 기준 96시간·실패만 본다 — 걸리면 어긋남.
   {
-    const fs = m.filesStamp, lines = ['매일 백업(05:30) 기록은 앱 저장소 밖(appdata)에 있어 서버가 대조하지 못했습니다'];
-    let st = 'unknown', ageH = null;
-    if (fs === null) lines.push('첨부 백업 흔적을 읽지 못했습니다');
+    const lines = [], nn = { missing: null, partial: null, from: null, files_age_h: null };
+    let st, filesBad = false, filesUnk = false;
+    const bd = m.backupDoc, bsn = m.backupSince;
+    const startTs = isObj(bsn) && num(bsn.ts) ? num(bsn.ts) : (isObj(bd) && num(bd.since) ? num(bd.since) : null);
+    if (bd === null || bsn === null) { st = 'unknown'; lines.push('매일 백업 흔적 기록을 읽지 못했습니다'); }
+    else if (startTs === null || startTs >= b.e) { st = 'none'; lines.push('매일 백업 흔적 기록 전 — 이 달은 판정하지 않음'); }
+    else {
+      const last = Number(new Date(b.e - 1 + 9 * H).toISOString().slice(8, 10));
+      const from = startTs <= b.s ? 1 : Number(kstDay(startTs).slice(8, 10));
+      const days = isObj(bd) && isObj(bd.days) ? bd.days : {};
+      const miss = [], part = [];
+      for (let dd = from; dd <= last; dd++) { const k = String(dd).padStart(2, '0'); if (days[k] === 'full') continue; if (days[k] === 'partial') part.push(dd); else miss.push(dd); }
+      const mo = Number(period.slice(5, 7)), dl = function (a) { return a.slice(0, 5).map(function (x) { return mo + '/' + x; }).join(', ') + (a.length > 5 ? ' 외 ' + (a.length - 5) + '일' : ''); };
+      if (miss.length) lines.push('매일 백업 빠진 날 ' + miss.length + '일(' + dl(miss) + ')');
+      if (part.length) lines.push('부분 백업(실패 키 있음) ' + part.length + '일(' + dl(part) + ')');
+      if (!miss.length && !part.length) lines.push('매일 백업 ' + (last - from + 1) + '/' + (last - from + 1) + '일');
+      if (from > 1) lines.push(from + '일부터 기록');
+      nn.missing = miss.length; nn.partial = part.length; nn.from = from;
+      st = (miss.length || part.length) ? 'bad' : 'ok';
+    }
+    const fs = m.filesStamp;
+    if (fs === null) { filesUnk = true; lines.push('첨부 백업 흔적을 읽지 못했습니다'); }
     else if (fs === 'none') lines.push('첨부 백업 흔적 없음');
     else {
-      ageH = Math.floor((nowMs - num(fs.ts)) / H);
-      if (fs.ok === false) { st = 'bad'; lines.unshift('첨부 백업 마지막 실행 실패(' + kstDay(num(fs.ts)) + ')'); }
-      else if (ageH > FILES_BACKUP_H) { st = 'bad'; lines.unshift('첨부 백업 마지막 흔적 ' + ageH + '시간 전 — ' + FILES_BACKUP_H + '시간 넘음'); }
-      else lines.push('첨부 백업 마지막 흔적 ' + ageH + '시간 전(' + FILES_BACKUP_H + '시간 안)');
+      nn.files_age_h = Math.floor((nowMs - num(fs.ts)) / H);
+      if (fs.ok === false) { filesBad = true; lines.unshift('첨부 백업 마지막 실행 실패(' + kstDay(num(fs.ts)) + ')'); }
+      else if (nn.files_age_h > FILES_BACKUP_H) { filesBad = true; lines.unshift('첨부 백업 마지막 흔적 ' + nn.files_age_h + '시간 전 — ' + FILES_BACKUP_H + '시간 넘음'); }
+      else lines.push('첨부 백업 마지막 흔적 ' + nn.files_age_h + '시간 전(' + FILES_BACKUP_H + '시간 안)');
     }
-    out.push(item('backup', st, lines, { files_age_h: ageH, daily: null }));
+    if (filesBad) st = 'bad';
+    else if (filesUnk && st !== 'bad') st = 'unknown';
+    out.push(item('backup', st, lines, nn));
   }
-  // 9 경보 수 — 기준 없음(숫자만). 재료: 그달 봇 경보 수(noteAlert — 그달 처음부터 셌을 때) → 아니면 알림함(최근 100건 고리)이 그달 전체를 덮을 때 ⚠ 제목 수 → 아니면 확인 못 함
+  // 9 경보 수 — 기준 없음(숫자만 — 카드에 줄로 안 나옴). 재료: 그달 봇 경보 수(noteAlert) · 세기 시작(mchk:alerts:since) 뒤 문서 없는 달 = 0건 ·
+  //   첫 달은 'n일부터 셈' · 세기 전 달은 알림함(최근 100건 고리)이 그달을 덮으면 ⚠ 제목 수, 아니면 센 만큼만 '세기 전'으로 적는다. 확인 못 함은 기록을 못 읽었을 때만.
   {
-    const ad = isObj(m.alertDoc) ? m.alertDoc : null;
+    const ad = m.alertDoc, asn = m.alertSince;
     const pl = m.pushLog;
     const plCount = pl ? pl.filter(function (x) { return isObj(x) && num(x.ts) >= b.s && num(x.ts) < b.e && String(x.title || '').charAt(0) === '⚠'; }).length : null;
     const plCovers = !!(pl && pl.length && num(pl[0].ts) <= b.s);
-    if (ad && num(ad.since) && num(ad.since) <= b.s + H) out.push(item('alerts', 'none', ['경보 ' + num(ad.n) + '건'], { alerts: num(ad.n), src: 'count' }));
-    else if (plCovers) out.push(item('alerts', 'none', ['경보 ' + plCount + '건(알림함 기준)'], { alerts: plCount, src: 'push_log' }));
-    else {
-      const part = ad ? num(ad.n) : plCount;
-      out.push(item('alerts', 'unknown', ['그달 전체 경보 기록이 없습니다 — 센 것은 ' + (ad ? kstDay(num(ad.since)) + '부터 ' : '알림함 최근 100건 중 ') + (part === null ? '?' : part) + '건'], { alerts: null, partial: part }));
+    const start = isObj(asn) && num(asn.ts) ? num(asn.ts) : (isObj(ad) && num(ad.since) ? num(ad.since) : null);
+    if (ad === null || asn === null) out.push(item('alerts', 'unknown', ['경보 기록을 읽지 못했습니다'], { alerts: null }));
+    else if (start !== null && start < b.e) {
+      const n = isObj(ad) ? num(ad.n) : 0, from = start <= b.s + H ? 1 : Number(kstDay(start).slice(8, 10));
+      out.push(item('alerts', 'none', ['경보 ' + n + '건' + (from > 1 ? '(' + from + '일부터 셈)' : '')], { alerts: n, src: 'count', from: from }));
     }
+    else if (plCovers) out.push(item('alerts', 'none', ['경보 ' + plCount + '건(알림함 기준)'], { alerts: plCount, src: 'push_log' }));
+    else out.push(item('alerts', 'none', ['경보 세기 전 — 알림함 최근 100건 중 ' + (plCount === null ? '?' : plCount) + '건'], { alerts: null, src: 'partial', partial: plCount }));
   }
   return out;
 }
@@ -314,8 +349,30 @@ async function noteAlert(title, nowMs) {
     if (Object.prototype.hasOwnProperty.call(doc.by, k) || Object.keys(doc.by).length < 30) doc.by[k] = num(doc.by[k]) + 1;
     doc.updated_at = now;
     const w = await blobSet(st, key, doc);
+    if (!isObj(r.data)) await sinceMark(st, ALERT_SINCE, now);   // 그달 첫 경보 = 세기 시작 표시가 없으면 남김(경보 없는 달을 0건으로 읽는 근거)
+    return !!(w && w.ok);
+  } catch (e) { return false; }
+}
+// 처음 한 번만 — 있거나 못 읽으면 건드리지 않음
+async function sinceMark(st, key, now) {
+  try { const s = await getOr(st, key, null); if (s.ok && !isObj(s.data)) await blobSet(st, key, { schema: 1, ts: now }); } catch (e) {}
+}
+// gw-data backup_stamp(fn 'backup' — appdata backup.py가 매일 백업을 저장한 뒤 봇 키로)가 부른다 — 그날(KST)을 그달 목록에 더함.
+//   ok + 부분 아님 = 'full' · partial = 'partial'(실패 키 있음) · 그 밖(ok false)은 더하지 않음(빠진 날) · 같은 날 'full'이 한 번이라도 있으면 'full'. 실패는 삼킨다(흔적이 백업을 막지 않음)
+async function noteBackup(ok, partial, nowMs) {
+  try {
+    if (!ok && !partial) return false;
+    const now = nowMs || Date.now(), st = store(DATA), key = BACKUP_PREFIX + kstYm(now), dd = kstDay(now).slice(8, 10);
+    const r = await getOr(st, key, null);
+    if (!r.ok) return false;
+    const doc = isObj(r.data) ? r.data : { schema: 1, since: now, days: {} };
+    if (!isObj(doc.days)) doc.days = {};
+    doc.days[dd] = (doc.days[dd] === 'full' || (ok && !partial)) ? 'full' : 'partial';
+    doc.runs = num(doc.runs) + 1; doc.updated_at = now;
+    const w = await blobSet(st, key, doc);
+    if (!isObj(r.data)) await sinceMark(st, BACKUP_SINCE, now);
     return !!(w && w.ok);
   } catch (e) { return false; }
 }
 
-module.exports = { ITEMS, USAGE_CAPS, DEVICE_PENDING_DAYS, SUBS_PER_MEMBER, FILES_BACKUP_H, DOC_PREFIX, ALERT_PREFIX, kstYm, prevYm, bounds, gather, judge, counts, compute, run, runMonthly, get, ack, noteAlert };
+module.exports = { ITEMS, USAGE_CAPS, DEVICE_PENDING_DAYS, SUBS_PER_MEMBER, FILES_BACKUP_H, DOC_PREFIX, ALERT_PREFIX, ALERT_SINCE, BACKUP_PREFIX, BACKUP_SINCE, kstYm, prevYm, bounds, gather, judge, counts, compute, run, runMonthly, get, ack, noteAlert, noteBackup };
