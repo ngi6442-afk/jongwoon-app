@@ -16,6 +16,7 @@ const tier = require('./_lib/tier');   // 관리자 등급(v321) — retired 판
 const BRIEF = require('./_lib/brief');   // v416 아침 음성 브리핑(체크 38 D1) — 설정·조회·기동(생성은 워커)
 const AR = require('./_lib/autorules');  // v417 자동 지시 서버 규칙 3건(카드 10) — 집계(autotask_facts)·완료 신호 공용
 const CLIBIZ = require('./_lib/clibiz');   // v456 거래처 사업자번호 칸 13자리 판정(앱 cliBiz13과 같은 규칙 — uismoke v456 대조)
+const CONAPPR = require('./_lib/conappr');   // P1 판24-③ 계약 단계 결재 서버 강제(앱 csApprKindOf와 같은 판정 — uismoke P1 판24 대조)
 const DUTY = require('./_lib/duty');   // P1 판28 인허가 '이번 달' 회차 계산(앱 DUTY_SHARED 구간과 같은 본문 — uismoke P1 판28이 글자째 대조)
 const SITEEDU = require('./_lib/siteedu');   // v433 현장 대장 '특별교육 미이수' 판정(앱 asbNoSpecial·eduHasValidSpecial과 같은 규칙 — uismoke v433 대조)
 
@@ -660,6 +661,22 @@ async function handleSave(event, d, R) {
       if (o.nodoc_amt != null) s.nodoc_amt = o.nodoc_amt;
       return s;
     });
+  }
+  // P1 판24-③ (원장 C095 · 옛 T424 — 재현됨): 계약 단계 결재 서버 강제 — 이번 저장에서 새로 '끝남'이 된 결재 대상 단계·새로 '승인'이 적힌 상신·같은 상신 번호의 사본 바뀜만 본다(_lib/conappr.js).
+  //   직전 서버 문서에 이미 있는 어긋남은 그대로 통과(운영 11/14 백업 실측 0건) · 결재함 '승인' 항목이 있으면 통과 · 거절은 저장 통째(400 CON_APPR_REQUIRED — 앱은 알림 뒤 서버 값을 다시 읽음).
+  //   직전 문서를 못 읽었으면 빈 문서로 보고 센다(더 닫힌 쪽 — 결재된 단계는 결재함 항목으로 통과). 결재함을 못 읽으면 500(통과시키지 않음)
+  if (col === 'contracts') {
+    const caRows = CONAPPR.scan(oldItems, doc.items);   // 직전을 못 읽었으면 oldItems = [](위 읽기) — 모든 결재 대상 끝남·승인을 결재함과 대조
+    if (caRows.length) {
+      const rdCa = await approvalsDoc(store(DATA));
+      if (!rdCa.ok) return jr(500, { status: 'ERROR', error_code: 'APPROVALS_READ_FAILED', request_id: R });
+      const caBad = CONAPPR.judge(caRows, rdCa.doc.items);
+      if (caBad.length) {
+        const caN = function (w) { return caBad.filter(function (x) { return x.why === w; }).length; };
+        try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'contracts', ev: [{ op: '결재 없는 단계 거절', id: caBad.map(function (x) { return x.cid + '|' + x.pipe + '|' + x.i; }).join(',').slice(0, 200), t: '계약 저장 거절 ' + caBad.length + '건(결재 없이 완료 ' + caN('STAGE_DONE') + ' · 결재함에 없는 승인 ' + caN('APPR_CLAIM') + ' · 상신 사본 바뀜 ' + caN('SNAP_CHANGED') + ')' }] }); } catch (e) {}
+        return jr(400, { status: 'REJECTED', error_code: 'CON_APPR_REQUIRED', n: caBad.length, rows: caBad.slice(0, 20), request_id: R });
+      }
+    }
   }
   await verSnapshot(col, prevDoc, c.member.name, false, obPurged > 0);   // 사람 저장은 매번 직전 상태 보존(시점 복구용) · v444 부동산 정리가 서버 줄을 지우는 저장은 VER_SKIP이어도 보존
   const w = await blobSet(store(DATA), colKey(col), doc);

@@ -11161,4 +11161,103 @@ function J91a(x) { return JSON.stringify(x); }
   finally { resetB24(); }
 }
 
+{ // ---- P1 판24-③ 계약 단계 결재 서버 강제(C095 · 옛 T424) — save contracts: 새로 끝난 결재 대상 단계·새 '승인' 표시·같은 상신 사본 바뀜 = 결재함 '승인' 항목이 없으면 400 CON_APPR_REQUIRED(저장 통째).
+  //   허용 사례(상신 → 승인 → 완료 · 상신 저장 · 금액 그대로인 변경계약 · 옛 계약 · 건너뜀 · 기존 어긋남 · 청구 검수 · 전결 · 재상신 · 옛 상신 번호 없음)와 거절 사례를 짝으로. 결함 사본 = gw-data·_lib/conappr 한 곳을 되돌려 메모리에서 컴파일
+  const fsC24 = require('fs'), ModC24 = require('module');
+  const loadC24 = (file, src) => { const m = new ModC24(file); m.filename = file; m.paths = ModC24._nodeModulePaths(dirname(file)); m._compile(src, file); return m.exports; };
+  const mutC24 = (src, from, to) => { if (src.split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 60)); return src.replace(from, () => to); };
+  const FDATAC = join(FN, 'gw-data.js'), SDATAC = fsC24.readFileSync(FDATAC, 'utf8'), FCA = join(FN, '_lib', 'conappr.js'), SCA = fsC24.readFileSync(FCA, 'utf8');
+  const callC24 = (mod) => async (body, tok, dev) => { const r = await mod.handler({ httpMethod: 'POST', headers: Object.assign({ authorization: tok ? 'Bearer ' + tok : '' }, dev ? { 'x-device-id': dev } : {}), body: JSON.stringify(body) }); return { code: r.statusCode, body: JSON.parse(r.body || '{}') }; };
+  const snapC24 = JSON.stringify({ u: mem.gw_users, d: mem.gw_data });
+  const resetC24 = () => { const s = JSON.parse(snapC24); mem.gw_users = s.u; mem.gw_data = s.d; blobsMock.hooks.failGet = null; blobsMock.hooks.failSet = null; };
+  const CWC = { id: 'ucwc24', name: '공무C24', admin: false, perms: { con: 'do' }, dept: '운영부' }, tCWC = issueSession(CWC).token;
+  const stg = (name, status, x) => Object.assign({ name, due: 'manual', status }, x || {});
+  const chgSt = (x) => stg('변경계약', 'open', Object.assign({ aid: 'change_contract', ak: '계약 단계', aw: 'amt', round: 1, amt0: 1000, eff0: 1000, term0: '2026-12-31', vals: { chg_amt: 1500, chg_end: '2027-03-31' } }, x || {}));
+  const K3 = () => ({ id: 'k3', scen: { type: 'dredge', pub: true, ver: 1 }, status: 'active', contract_info: { amount: 1000, d3: '2026-12-31' }, updated: '2026-11-15',
+    pipes: [{ key: 'main', cur: 1, stages: [stg('견적·수의계약', 'done'), stg('계약서 작성·날인', 'open'), stg('착공', 'pending'), stg('청구', 'pending')] }, { key: 'chg', cur: 0, stages: [chgSt()] }] });
+  const OLDK = () => ({ id: 'k3old', status: 'active', pipes: [{ key: 'main', cur: 0, stages: [stg('계약서', 'open'), stg('완료', 'pending')] }] });
+  const AP = (o) => Object.assign({ id: 'ap' + Math.random().toString(16).slice(2, 10), kind: '계약 단계', title: 't', ref: 'con:k3|main|1', cid: 'c1', status: '승인', by: { id: 'ucwc24', name: '공무C24' }, created: '2026-11-15T00:00:00Z' }, o || {});
+  const seedC = (items, aps) => { mem.gw_users['member:ucwc24'] = CWC; mem.gw_data['col:contracts'] = { schema: 1, items, updated_at: 21 }; mem.gw_data['col:approvals'] = { schema: 1, items: aps || [], updated_at: 5 }; };
+  const cp = (x) => JSON.parse(JSON.stringify(x));
+  const conSave = (c, items) => c({ action: 'save', collection: 'contracts', base: 21, doc: { schema: 1, items } }, tCWC, 'dev1');
+  const chkCon = async (mod) => {
+    const c = callC24(mod), D = {}, A = {};
+    const run = async (items0, aps, edit) => { seedC(items0, aps); const nd = cp(items0); edit(nd); const r = await conSave(c, nd); return { code: r.code, ec: r.body.error_code || '', rows: r.body.rows || [], saved: mem.gw_data['col:contracts'] }; };
+    // 거절
+    D.done = await run([K3()], [], (n) => { n[0].pipes[0].stages[1].status = 'done'; n[0].pipes[0].cur = 2; });
+    D.claim = await run([K3()], [], (n) => { n[0].pipes[1].stages[0].appr = { cid: 'cX', kind: '계약 단계', status: '승인', snap: { chg_amt: 1500, chg_end: '2027-03-31' } }; });
+    D.chgDone = await run([K3()], [], (n) => { n[0].pipes[1].stages[0].status = 'done'; n[0].pipes[1].stages[0].appr = { cid: 'c9', kind: '계약 단계', status: '대기' }; n[0].pipes[1].cur = 1; });
+    D.pend = await run([K3()], [AP({ status: '대기' })], (n) => { const s = n[0].pipes[0].stages[1]; s.appr = { cid: 'c1', kind: '계약 단계', status: '승인' }; s.status = 'done'; });
+    D.otherCid = await run([K3()], [AP({ cid: 'cOld' })], (n) => { const s = n[0].pipes[0].stages[1]; s.appr = { cid: 'cNew', kind: '계약 단계', status: '승인' }; s.status = 'done'; });
+    D.kind = await run([K3()], [AP({ kind: '일반' })], (n) => { const s = n[0].pipes[0].stages[1]; s.appr = { cid: 'c1', kind: '계약 단계', status: '승인' }; s.status = 'done'; });
+    { const k = K3(); k.pipes[1].stages[0].appr = { cid: 'cA', kind: '계약 단계', status: '승인', snap: { chg_amt: 1500, chg_end: '2027-03-31' } }; k.pipes[1].stages[0].status = 'done'; k.pipes[1].cur = 1;
+      D.snap = await run([k], [AP({ ref: 'con:k3|chg|0', cid: 'cA' })], (n) => { n[0].pipes[1].stages[0].appr.snap = { chg_amt: 9999, chg_end: '2027-03-31' }; }); }
+    D.newCon = await run([], [], (n) => { const k = K3(); k.id = 'k3new'; k.pipes[0].stages[1].status = 'done'; n.push(k); });
+    blobsMock.hooks.failGet = (k) => k === 'col:contracts' && D.__fg !== 1 ? (D.__fg = 1, 'STORAGE_READ_FAILED') : false;
+    D.prevFail = await run([K3()], [], (n) => { n[0].pipes[0].stages[1].status = 'done'; });
+    blobsMock.hooks.failGet = (k) => k === 'col:approvals';
+    D.apFail = await run([K3()], [], (n) => { n[0].pipes[0].stages[1].status = 'done'; });
+    blobsMock.hooks.failGet = null; delete D.__fg;
+    const den = Object.keys(D).filter((k) => k !== 'apFail').every((k) => D[k].code === 400 && D[k].ec === 'CON_APPR_REQUIRED' && D[k].saved.updated_at === 21) && D.apFail.code === 500 && D.apFail.ec === 'APPROVALS_READ_FAILED' && D.apFail.saved.updated_at === 21;
+    const why = { done: D.done.rows.map((r) => r.why).join(), claim: D.claim.rows.map((r) => r.why).join(), snap: D.snap.rows.map((r) => r.why).join(), rowKey: D.done.rows[0] && (D.done.rows[0].cid + '|' + D.done.rows[0].pipe + '|' + D.done.rows[0].i) };
+    const whyOk = why.done === 'STAGE_DONE' && why.claim === 'APPR_CLAIM' && why.snap === 'SNAP_CHANGED' && why.rowKey === 'k3|main|1';
+    // 허용
+    A.flow = await run([K3()], [AP()], (n) => { const s = n[0].pipes[0].stages[1]; s.appr = { cid: 'c1', kind: '계약 단계', status: '승인', decided_by: '관리자' }; s.status = 'done'; n[0].pipes[0].cur = 2; n[0].pipes[0].stages[2].status = 'open'; });
+    A.submit = await run([K3()], [], (n) => { n[0].pipes[1].stages[0].appr = { cid: 'c7', kind: '계약 단계', status: '대기', snap: { chg_amt: 1500, chg_end: '2027-03-31' } }; n[0].pipes[0].stages[1].appr = { cid: 'c8', kind: '계약 단계', status: '대기' }; });
+    A.chgSame = await run([K3()], [], (n) => { const s = n[0].pipes[1].stages[0]; s.vals = {}; s.status = 'done'; n[0].pipes[1].cur = 1; });
+    A.oldCon = await run([OLDK()], [], (n) => { n[0].pipes[0].stages[0].status = 'done'; n[0].pipes[0].cur = 1; });
+    A.skip = await run([K3()], [], (n) => { n[0].pipes[0].stages[1].status = 'skipped'; n[0].pipes[0].cur = 2; });
+    { const k = K3(); k.pipes[0].stages[1].status = 'done'; k.pipes[0].cur = 2;   // 기존 어긋남(결재 없이 끝남)이 서버에 이미 있음 → 다른 칸 고침은 통과
+      A.legacy = await run([k], [], (n) => { n[0].memo = '메모'; n[0].pipes[0].stages[2].vals = { x: 1 }; }); }
+    { const k = K3(); k.pipes[0].stages[1].status = 'done'; k.pipes[0].cur = 3; k.pipes[0].stages[2].status = 'done';
+      A.bill = await run([k], [AP({ kind: '청구 검수', ref: 'con:k3|main|3', cid: 'cb1' })], (n) => { const s = n[0].pipes[0].stages[3]; s.appr = { cid: 'cb1', kind: '청구 검수', status: '승인' }; s.status = 'done'; n[0].pipes[0].cur = 4; }); }
+    A.selfDec = await run([K3()], [AP({ self_decided: true, chain: [{ decision: '전결' }] })], (n) => { const s = n[0].pipes[0].stages[1]; s.appr = { cid: 'c1', kind: '계약 단계', status: '승인' }; s.status = 'done'; });
+    A.resub = await run([K3()], [AP({ cid: 'cR', status: '반려' })], (n) => { n[0].pipes[0].stages[1].appr = { cid: 'cR2', kind: '계약 단계', status: '대기' }; });
+    A.rejSave = await run([K3()], [AP({ cid: 'cR', status: '반려' })], (n) => { n[0].pipes[0].stages[1].appr = { cid: 'cR', kind: '계약 단계', status: '반려', reason: '서류 보완' }; });
+    A.noCid = await run([K3()], [AP({ cid: undefined })], (n) => { const s = n[0].pipes[0].stages[1]; s.appr = { kind: '계약 단계', status: '승인', at: '2026-11-15T00:00:00Z' }; s.status = 'done'; });
+    { const k = K3(); k.pipes[1].stages[0].appr = { cid: 'cA', kind: '계약 단계', status: '승인', snap: { chg_amt: 1500, chg_end: '2027-03-31' } }; k.pipes[1].stages[0].status = 'done'; k.pipes[1].cur = 1;
+      A.chgApplied = await run([K3()], [AP({ ref: 'con:k3|chg|0', cid: 'cA' })], (n) => { n[0].pipes[1] = cp(k.pipes[1]); });   // 승인된 변경계약 반영(판10 유효 금액·종료일 = 승인 사본)
+      A.resave = await run([k], [], (n) => { n[0].memo = '같은 승인본 다시 저장'; }); }
+    A.adminTask = await run([K3()], [], (n) => { n[0].pipes[0].stages[0].vals = { q: 1 }; n[0].pipes[0].stages[2].status = 'open'; });   // 결재 대상 아닌 단계 손질(관리자·지시자 완료와 같은 길)
+    const alw = Object.keys(A).every((k) => A[k].code === 200);
+    return { ok: den && whyOk && alw, info: { D: Object.fromEntries(Object.entries(D).map(([k, v]) => [k, v.code + ':' + v.ec])), why, A: Object.fromEntries(Object.entries(A).map(([k, v]) => [k, v.code + ':' + v.ec])) } };
+  };
+  try {
+    const au0 = auditMock.logs.length;
+    const R0 = await chkCon(gwd);
+    const auLines = auditMock.logs.slice(au0).filter((l) => l.col === 'contracts' && l.ev && l.ev[0] && l.ev[0].op === '결재 없는 단계 거절');
+    const auOk = auLines.length === 9 && /^계약 저장 거절 1건\(결재 없이 완료 1 · 결재함에 없는 승인 0 · 상신 사본 바뀜 0\)$/.test(auLines[0].ev[0].t) && auLines[0].ev[0].id === 'k3|main|1' && !/계약서|견적/.test(JSON.stringify(auLines));
+    T('P1 판24-③ ① 계약 단계 결재 서버 강제 — 거절(400 CON_APPR_REQUIRED·서버 문서 그대로): 결재 없이 계약서 단계 완료 · 결재함에 없는 승인 표시(변경계약) · 변경 금액 바뀐 변경계약 대기 중 완료 · 결재함 항목 대기인데 승인 표시 · 다른 상신 번호의 승인 · 종류 다른 승인 항목 · 승인 뒤 상신 사본(금액) 바꿔치기 · 새 계약에 결재 단계 완료로 · 직전 문서 못 읽음(빈 문서로 보고 대조) / 결재함 못 읽음 = 500 APPROVALS_READ_FAILED · 거절 이유 표식(STAGE_DONE·APPR_CLAIM·SNAP_CHANGED)·자리 k3|main|1 · 감사 "결재 없는 단계 거절" 9줄(자리만 — 단계 이름 없음)',
+      R0.ok && auOk, JSON.stringify({ info: R0.info, au: auLines.length, t: auLines[0] && auLines[0].ev[0].t }));
+    T('P1 판24-③ ② 허용(200 — 정상 흐름이 하나도 막히지 않음): 상신 → 결재함 승인 → 단계 완료·다음 단계 열림 · 상신(대기·사본) 저장 · 금액·기간 그대로인 변경계약 결재 없이 완료 · 시나리오 없는 옛 계약의 계약서 단계 완료 · 결재 단계 건너뜀 · 서버에 이미 있던 어긋남은 다른 칸 고침에 통과 · 청구 검수 승인 → 청구 완료 · PM 전결 승인 · 반려 뒤 재상신(새 번호 대기)·반려 표시 저장 · 상신 번호 없는 옛 상신(ref로 대조) · 승인된 변경계약 반영·같은 승인본 다시 저장 · 결재 대상 아닌 단계 손질',
+      R0.ok, JSON.stringify(R0.info.A));
+    // ③ 결함 사본 — gw-data 관문 걷음 / _lib/conappr 판정 한 곳씩
+    const RP = require.resolve(FCA), savedCA = require.cache[RP];
+    const withCA = async (caSrc, dataSrc) => {
+      const caMod = loadC24(FCA, caSrc); require.cache[RP] = { id: RP, filename: RP, loaded: true, exports: caMod };
+      try { return await chkCon(loadC24(FDATAC, dataSrc)); } finally { require.cache[RP] = savedCA; }
+    };
+    const MUTC = [
+      ['data', '    const caRows = CONAPPR.scan(oldItems, doc.items);', '    const caRows = [];'],
+      ['data', "      if (!rdCa.ok) return jr(500, { status: 'ERROR', error_code: 'APPROVALS_READ_FAILED', request_id: R });\n", "      if (!rdCa.ok) rdCa.doc = { items: [] };\n"],
+      ['ca', ' && (!cid || it.cid === cid) &&', ' &&'],
+      ['ca', ' && (!kind || it.kind === kind);', ';'],
+      ['ca', "return it && it.ref === ref && it.status === '승인' &&", 'return it && it.ref === ref &&'],
+      ['ca', "        if (a && oa && a.cid && String(oa.cid || '') === String(a.cid) && snapKey(oa) !== snapKey(a)) rows.push(", '        if (false) rows.push('],
+      ['ca', "  return (s.aw === 'amt' && !(chgAmtMoved(c, s) || chgTermMoved(s))) ? '' : String(s.ak);", '  return String(s.ak);'],
+      ['ca', 'scen = !!(c.scen || (o && o.scen));', 'scen = true;'],
+      ['ca', "if (s.status === 'done' && !(os && os.status === 'done') && kind)", "if (s.status === 'done' && kind)"],
+      ['ca', "if (a && a.status === '승인' && !(oa && oa.status === '승인' && String(oa.cid || '') === String(a.cid || '')))", 'if (false)'],
+    ];
+    const killC = [];
+    for (const [w, from, to] of MUTC) {
+      let k;
+      try { resetC24(); const r = w === 'data' ? await withCA(SCA, mutC24(SDATAC, from, to)) : await withCA(mutC24(SCA, from, to), SDATAC); k = !r.ok; } catch (e) { k = 'err ' + e.message; }
+      if (k !== true) killC.push(w + ':' + from.trim().slice(0, 50) + (k === false ? ' 안 깨짐' : ' ' + k));
+    }
+    T('P1 판24-③ ③ 결함 사본 ' + MUTC.length + '개(저장 관문 걷음·결재함 못 읽음 통과 · 상신 번호 대조·종류 대조·승인 상태 대조 걷음·사본 바뀜 검사 걷음·금액 그대로 변경계약도 결재 요구·옛 계약도 결재 요구·기존 어긋남도 거절·승인 표시 검사 걷음) = 모두 ✗', killC.length === 0, killC.join(' | '));
+  } catch (e) { T('P1 판24-③ 검사 실행', false, String(e && e.stack || e).slice(0, 400)); }
+  finally { resetC24(); }
+}
+
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

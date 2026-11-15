@@ -14320,6 +14320,7 @@
     }).catch(function(){});
   }
   var contractsPending=false;   // 저장 디바운스(1.4s) 사이 재로드가 편집을 덮지 않게 — bids/quotes와 동일 패턴
+  var CON_APPR_REJECT_MSG = "계약 저장이 거절됐습니다 — 결재(계약 단계·청구 검수)가 끝나지 않은 단계를 완료로 바꾸었거나, 결재함에서 승인되지 않은 상신을 승인으로 적은 변경이 들어 있습니다.\n서버에 저장된 값으로 다시 불러옵니다. 이 저장에 같이 고친 내용이 있으면 다시 입력해 주세요.\n결재 대상 단계는 단계 카드의 [상신] → 결재함 승인으로 넘어갑니다.";   // P1 판24-③
   function scheduleContractSave(){ contractsPending=true; if(contractSaveTimer) clearTimeout(contractSaveTimer); contractSaveTimer=setTimeout(doSaveContracts, 1400); }
   function mergeContracts(local, remote){
     var byId={}; (local||[]).forEach(function(c){ if(c&&c.id) byId[c.id]=c; });
@@ -14334,6 +14335,8 @@
     fetch(CONTRACT_API, {method:"PUT", headers:Object.assign({"Content-Type":"application/json"}, ghHeaders()), body:JSON.stringify(payload)}).then(function(resp){
       if(resp.status===401) return;
       if(resp.status===409||resp.status===422){ return fetch(CONTRACT_API,{headers:ghHeaders()}).then(function(r){return r.status===404?null:r.json();}).then(function(j){ if(j){ var up={}; try{up=JSON.parse(b64DecodeUnicode(j.content))||{};}catch(e){} contracts=mergeContracts(contracts, up.items||[]); contractSha=j.sha; } return doSaveContracts(); }); }
+      // P1 판24-③: 서버가 결재 없는 단계 완료·결재함에 없는 승인·상신 사본 바뀜을 거절(400 CON_APPR_REQUIRED) — 조용히 넘기지 않고 알린 뒤 서버 값으로 다시 읽는다(이 저장에 같이 들어간 다른 고침도 서버에 없음)
+      if(resp.status===400){ return resp.json().then(function(json){ var ec=(json&&json.error_code)||""; contractSha=json&&json.content&&json.content.sha; contractsPending=false; if(ec==="CON_APPR_REQUIRED"){ alert(CON_APPR_REJECT_MSG); loadContracts(); } }); }
       return resp.json().then(function(json){ contractSha=json.content&&json.content.sha; contractsPending=false; });
     }).catch(function(){});
   }
