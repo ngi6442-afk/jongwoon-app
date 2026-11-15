@@ -10916,6 +10916,7 @@
   function approvalInboxItems(){
     var out=[], me=getMemberId(), admin=isAdmin();
     liveLeaves().forEach(function(l){
+      if(admin && l.member_id!==me && leaveOfTest(l)) return;   // P1 판9 ④ 시험 계정 신청은 관리자 결재 대기에 넣지 않는다(본인 줄은 그대로)
       var nm=dispName(memberName(l.member_id))||l.member_name||"직원";
       if(l.type==="resign" || l.type==="loa"){
         var word=(l.type==="loa")?"휴직":"사직";
@@ -10925,7 +10926,7 @@
         else if(admin && l.status==="pending" && stg==="resign_req") out.push({tab:"leave",label:word+" 승인",sub:nm+" · "+when});
         else if(!admin && l.member_id===me && l.status==="pending" && stg==="interview_done") out.push({tab:"leave",label:word+" 본신청 하기",sub:"면담완료 — 본신청 대기"});
       } else {
-        if(admin && l.status==="pending") out.push({tab:"leave",label:"휴가 승인",sub:nm+" · "+leaveTypeLabel(l.type)+" "+(l.days||0)+"일"});
+        if(admin && l.status==="pending") out.push({tab:"leave",label:"휴가 승인",sub:nm+" · "+leaveTypeLabel(l.type)+" "+(l.days||0)+"일"+(leaveLate(l, Date.now(), todayStr())?" · 지연":"")});   // P1 판9 ② 지연 표시
         else if(admin && l.status==="approved" && l.cancel_req) out.push({tab:"leave",label:"휴가 취소 승인",sub:nm+" · "+(l.start||"")});
       }
     });
@@ -17444,6 +17445,35 @@
     var left = Math.max(0, Math.round((grant-used)*100)/100);
     return {grant:grant, used:Math.round(used*100)/100, scheduled:Math.round(scheduled*100)/100, expired:expired, left:left, period:per, mode:mode};
   }
+  // @leave-late-start
+  // P1 판9 ②: 휴가(연차·반차·병가 등 — 사직·휴직 면담 줄은 아님) 승인 대기가 신청 뒤 24시간을 넘으면 '지연' 칩. 표시만(새 알림 없음).
+  //   주말·공휴일을 빼지 않는 단순 24시간. 기준 = 신청 시각 applied_ts(이 판부터 새 신청에 기록). 그 전 신청은 날짜(applied)만 있어
+  //   신청일 끝(23:59)에 냈어도 24시간이 확실히 지난 날 — 신청일 + 2일부터 — 만 지연으로 본다(이르게 붙이지 않는다).
+  var LEAVE_LATE_MS = 24*3600000;
+  function leaveLate(l, nowMs, today){
+    if(!l || l.del===1 || l.status!=="pending" || l.type==="resign" || l.type==="loa") return false;
+    var t = l.applied_ts ? Date.parse(l.applied_ts) : NaN;
+    if(!isNaN(t)) return (nowMs - t) > LEAVE_LATE_MS;
+    var a=String(l.applied||""), d=String(today||"");
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(a) || !/^\d{4}-\d{2}-\d{2}$/.test(d)) return false;
+    return Math.round((Date.UTC(+d.slice(0,4),+d.slice(5,7)-1,+d.slice(8,10)) - Date.UTC(+a.slice(0,4),+a.slice(5,7)-1,+a.slice(8,10)))/86400000) >= 2;
+  }
+  function leaveLateChip(l, nowMs, today){ return leaveLate(l, nowMs, today) ? ' <span class="dup-chip" title="신청 뒤 24시간 넘게 승인 대기 중입니다(주말·공휴일도 그대로 셉니다)">지연</span>' : ''; }
+  // @leave-late-end
+  // @leave-end-note-start
+  // P1 판9 ③: 연차 사용기간(annualPeriod — annual_basis 입사일/회계연도 기준, [start, end) 반열린 구간) 마지막 날의 30일 전부터 본인 연차 자리에 안내 1줄.
+  //   정책 문구는 MANUAL 20절·인사 절과 같은 말(발생 뒤 1년 소멸·이월 없음 — "쓰지 않은 연차는 다음 기간으로 넘어가지 않습니다"). 남은 연차 0이면 '남은 n일' 없이.
+  var LEAVE_END_NOTE_DAYS = 30;
+  function leaveEndNote(per, left, today){
+    var re=/^\d{4}-\d{2}-\d{2}$/;
+    if(!per || !re.test(String(per.end||"")) || !re.test(String(today||""))) return "";
+    var e=Date.UTC(+per.end.slice(0,4),+per.end.slice(5,7)-1,+per.end.slice(8,10)) - 86400000;   // end = 다음 기간 첫날 → 마지막 날은 하루 전
+    var d=Math.round((e - Date.UTC(+today.slice(0,4),+today.slice(5,7)-1,+today.slice(8,10)))/86400000);
+    if(d<0 || d>LEAVE_END_NOTE_DAYS) return "";
+    var last=new Date(e);
+    return "연차 사용기간이 "+(last.getUTCMonth()+1)+"/"+last.getUTCDate()+"에 끝납니다"+(left>0 ? " — 남은 "+left+"일은 다음 기간으로 넘어가지 않습니다(이월 없음)" : "");
+  }
+  // @leave-end-note-end
   function renderLeaves(){
     var host=document.getElementById("leaveList"); if(!host) return;
     var me=getMemberId();
@@ -17460,15 +17490,18 @@
           if(r.scheduled) parts.push("예정 "+r.scheduled);
           if(r.mode!=="base" && r.expired) parts.push("지난 기간 소멸 "+r.expired);
           if(r.period) parts.push("사용기간 "+r.period.start+"~"+r.period.end);
-          mine.innerHTML='<div class="leave-bal">내 연차 <b>'+r.left+'</b>일 남음'+(r.scheduled?' <span class="lv-sched">예정 '+r.scheduled+'</span>':'')+' <span class="lv-sub">('+parts.join(" · ")+')</span></div>';
+          var endNote=leaveEndNote(r.period, r.left, todayStr());   // P1 판9 ③ 사용기간 끝 30일 전부터 1줄
+          mine.innerHTML='<div class="leave-bal">내 연차 <b>'+r.left+'</b>일 남음'+(r.scheduled?' <span class="lv-sched">예정 '+r.scheduled+'</span>':'')+' <span class="lv-sub">('+parts.join(" · ")+')</span></div>'
+            +(endNote?'<div class="leave-bal" id="leaveEndNote"><span class="lv-sub" style="margin-left:0;">'+esc(endNote)+'</span></div>':'');
         }
       } else mine.innerHTML='';
     }
     var all=liveLeaves();
-    var visible = isAdmin() ? all.slice() : all.filter(function(l){ return l.member_id===me; });
+    // P1 판9 ④ 관리자 목록·대기 수에서 시험 계정의 신청은 뺀다(내 신청은 내가 시험 계정이어도 그대로 보임)
+    var visible = isAdmin() ? all.filter(function(l){ return l.member_id===me || !leaveOfTest(l); }) : all.filter(function(l){ return l.member_id===me; });
     function prio(l){ return (l.status==="pending" || (l.status==="approved" && l.cancel_req)) ? 0 : 1; }
     visible.sort(function(a,b){ var ap=prio(a), bp=prio(b); if(ap!==bp) return ap-bp; return (b.start||"").localeCompare(a.start||""); });
-    var pend=all.filter(function(l){ return (isAdmin()||l.member_id===me) && (l.status==="pending" || (l.status==="approved" && l.cancel_req)); }).length;
+    var pend=visible.filter(function(l){ return (l.status==="pending" || (l.status==="approved" && l.cancel_req)); }).length;
     var head=document.getElementById("leaveHead"); if(head) head.textContent = pend ? (pend+"건 대기") : "";
     host.innerHTML = visible.length ? visible.map(leaveRowHtml).join("") : '<div class="empty-line">휴가 신청이 없습니다.</div>';
     bindLeaveHandlers(host);
@@ -17481,7 +17514,7 @@
     var cr = (l.status==="approved" && l.cancel_req);
     var chip = cr ? '<span class="review-chip">취소 요청중</span>'
       : (l.status==="approved" ? '<span class="from-chip">승인</span>'
-      : (l.status==="rejected" ? '<span class="dup-chip">반려</span>' : '<span class="review-chip">대기</span>'));
+      : (l.status==="rejected" ? '<span class="dup-chip">반려</span>' : '<span class="review-chip">대기</span>'+leaveLateChip(l, Date.now(), todayStr())));   // P1 판9 ② 24시간 넘은 대기 = 지연
     var me=getMemberId(), ctrl="";
     if(l.status==="pending" && isAdmin()) ctrl += '<button class="mini-btn appr-btn" data-lv-approve="'+l.id+'">승인</button><button class="mini-btn" data-lv-reject="'+l.id+'">반려</button>';
     if(l.status==="pending" && l.member_id===me) ctrl += '<button class="mini-btn" data-lv-cancel="'+l.id+'">철회</button>';  // 대기중 본인 철회(승인 불필요)
@@ -17640,7 +17673,7 @@
     if(isPartialLeave(type)) end=start;
     var days=leaveDays(type,start,end);
     var l={ id:genId("lv"), member_id:me, member_name:myName()||"", type:type, start:start, end:end, days:days,
-      reason:document.getElementById("lvReason").value.trim(), status:"pending", approver:"", applied:todayStr(), updated:todayStr() };
+      reason:document.getElementById("lvReason").value.trim(), status:"pending", approver:"", applied:todayStr(), applied_ts:new Date().toISOString(), updated:todayStr() };   // P1 판9 ② 신청 시각(지연 24시간 기준)
     leaves.push(l);
     scheduleLeavesSave();
     document.getElementById("leaveBackdrop").classList.remove("show");
@@ -20475,7 +20508,7 @@
   // 직원별 연차 소진율 — 평가연도 1/1 ~ 분기말 누적 사용 / 현재 부여량(leaveRemaining 재사용)
   function famAnnualRows(r){
     var y0=r.y+"-01-01", rows=[], tg=0, tu=0, paid=0;
-    liveMembers().forEach(function(m){
+    hrMembers().forEach(function(m){   // P1 판9 ④ 시험 계정 제외(전사 합계에도 안 듦)
       if(m.leave_date && m.leave_date < y0) return;              // 평가연도 이전 퇴사자 제외
       if(m.annual_paid){ paid++; return; }                       // 연차수당 포함 근로자 — 사용 불가라 소진율 대상 아님
       var grant=leaveRemaining(m.id).grant, used=0;
@@ -20524,7 +20557,7 @@
       +'<div class="card fam-scroll" style="padding:4px 12px;"><table class="fam-table"><tr><th>직원</th>';
     r.months.forEach(function(mo){ h+='<th class="c">'+parseInt(mo.slice(5),10)+'월</th>'; });
     h+='<th class="c">충족</th></tr>';
-    var mem=liveMembers().filter(function(m){ return !(m.leave_date && m.leave_date < r.start); });
+    var mem=hrMembers().filter(function(m){ return !(m.leave_date && m.leave_date < r.start); });   // P1 판9 ④ 시험 계정 제외
     mem.forEach(function(m){
       var got=0, cells="";
       r.months.forEach(function(mo){
@@ -20545,7 +20578,7 @@
     var sel=document.getElementById("famWho");
     if(sel){
       var cur=sel.value;
-      var mem=liveMembers().filter(function(m){ return !m.leave_date || m.leave_date>=todayStr(); });
+      var mem=hrMembers().filter(function(m){ return !m.leave_date || m.leave_date>=todayStr(); });   // P1 판9 ④ 시험 계정은 대상 직원 고르기에서 뺌
       sel.innerHTML='<option value="">대상 직원</option>'+mem.map(function(m){ return '<option value="'+esc(m.id)+'">'+esc(dispName(m.name))+(m.dept?" · "+esc(m.dept):"")+'</option>'; }).join("");
       if(cur) sel.value=cur;
     }
@@ -30458,6 +30491,13 @@ function dutyStage(nx){
   // 재직자만(v329) — 담당 배정·알림·공개범위·교육 대상처럼 "앞으로 일이 생기는" 목록 전용.
   // liveMembers()는 그대로 둔다: 인사·권한관리 화면이 퇴사자를 그려야 하고, 과거 지시·기성·계약의 담당자 이름 해석(findMember)이 여기 걸려 있다.
   function activeMembers(){ return liveMembers().filter(function(m){ return !memberRetired(m); }); }
+  // @hr-test-start
+  // P1 판9 ④: 시험 계정(v447 회원 카드 표식 — 관리자만 저장·관리자는 member_list 원본으로 받음)은 사람을 세거나 줄로 늘어놓고 관리하는 인사 자리에서 뺀다
+  //   (인사 명부·부서 수·총 인원 · 계약직 2년 레이더 · 가족친화 연차 소진율·조기퇴근 표 · 휴가 목록·대기 수·결재 대기함). 로그인·권한관리·회원 관리·기기·담당 드롭다운은 그대로(계정 자체가 필요한 곳).
+  function isTestMember(m){ return !!m && m.test_acct === true; }
+  function hrMembers(){ return liveMembers().filter(function(m){ return !isTestMember(m); }); }
+  function leaveOfTest(l){ return !!l && isTestMember(findMember(l.member_id)); }
+  // @hr-test-end
   function findMember(id){ for (var i=0;i<members.length;i++){ if (members[i].id === id) return members[i]; } return null; }
   // 자동로그인 기본 OFF: 세션 저장이 기본, "로그인 유지" 체크 시에만 localStorage 영구 저장.
   function getMemberId(){
@@ -31096,7 +31136,7 @@ function dutyStage(nx){
   // 인사 명부 한 줄. isRet=퇴사자 — 근속은 퇴사일에 정지(serviceInfo asOf)하고, 연차 잔여(오늘 기준으로 계속 굴러감)는 빼고 퇴직 연차수당만 남긴다.
   // @ct-radar-start
   // v368(PM 9/21 "무기계약직 레이더 탑재"): 계약직(기간제)의 2년 시계. 「기간제 및 단시간근로자 보호 등에 관한 법률」 제4조 — ① 사용자는 2년을 초과하지 않는 범위에서
-  //   기간제근로자를 사용할 수 있다(반복 갱신은 계속근로 총기간 합산) ② 2년을 초과해 사용하면 기간의 정함이 없는 근로계약을 체결한 근로자로 본다. 제4조①단서 5호: 55세 이상 고령자와
+  //   기간제근로자를 사용할 수 있다(반복 갱신은 계속근로 총기간 합산) ② 2년을 초과해 사용하면 기간의 정함이 없는 근로계약을 체결한 근로자로 본다. 제4조①단서 4호(「고령자고용촉진법」 제2조제1호의 고령자 — 55세 이상)와
   //   근로계약을 체결하는 경우는 예외. 앱에는 계약 갱신 이력이 없어 '계속근로 총기간 = 입사일부터'로 본다. 최종 판단은 노무사(안건 14건에 합류) — 칩은 레이더일 뿐 결정이 아니다.
   var CT_YEARS = 2, CT_EXEMPT_AGE = 55, CT_AMBER = 180, CT_RED = 90;
   function ctAddYears(d, y){ var m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(d||"")); if(!m) return ""; var yy=Number(m[1])+y, mm=m[2], dd=m[3]; if(mm==="02"&&dd==="29"){ var leap=(yy%4===0&&yy%100!==0)||yy%400===0; if(!leap) dd="28"; } return yy+"-"+mm+"-"+dd; }
@@ -31105,6 +31145,7 @@ function dutyStage(nx){
   // 재직 계약직 m → null(대상 아님) | {state:'exempt'|'unknown'|'due'|'over', conv, days, age, why}
   function ctRadar(m, today){
     if(!m || m.emp_type!=="계약직" || m.del===1) return null;
+    if(m.test_acct===true) return null;   // P1 판9 ④ 시험 계정은 인사 관리 대상 아님(서버 contractPlan과 같은 규칙)
     if(m.leave_date && String(m.leave_date) < String(today)) return null;   // 퇴사자
     if(!/^\d{4}-\d{2}-\d{2}$/.test(String(m.hire_date||""))) return { state:"unknown", why:"입사일 없음" };
     var conv=ctAddYears(m.hire_date, CT_YEARS), age=ctAgeAt(m.birth, m.hire_date);
@@ -31116,7 +31157,7 @@ function dutyStage(nx){
   function ctChipHtml(m, today){
     var r=ctRadar(m, today||todayStr()); if(!r) return "";
     var red='background:#FBE7E3;color:#B0332A;';
-    if(r.state==="exempt") return ' <span class="scope-chip" title="기간제법 4조①5호 — 근로계약 체결 시 55세 이상은 2년 제한 예외(입사 시 '+r.age+'세). 최종 판단은 노무사 확인">계약직 · 55세 이상 예외</span>';
+    if(r.state==="exempt") return ' <span class="scope-chip" title="기간제법 4조①4호 — 근로계약 체결 시 55세 이상은 2년 제한 예외(입사 시 '+r.age+'세). 최종 판단은 노무사 확인">계약직 · 55세 이상 예외</span>';
     if(r.state==="unknown") return ' <span class="review-chip" title="기간제법 4조 2년 시계를 세려면 입사일·생년월일이 필요합니다">계약직 · '+esc(r.why)+' — 판정 불가</span>';
     if(r.state==="over") return ' <span class="review-chip" style="'+red+'" title="기간제법 4조② — 2년을 초과해 사용하면 기간의 정함이 없는 근로계약으로 봅니다(전환일 '+esc(r.conv)+'). 노무사 확인 필요">무기계약 간주 — 2년 초과 '+(-r.days)+'일</span>';
     var cls = r.days<=CT_AMBER ? "review-chip" : "scope-chip", st = r.days<=CT_RED ? red : "";
@@ -31166,7 +31207,7 @@ function dutyStage(nx){
   }
   function drawHrRoster(reopenId){   // reopenId: 그리고 나서 되열 카드(저장 경로는 closeMemberEdit이 hrOpenId를 이미 비운다)
     var host = document.getElementById("hrRoster"); if (!host) return;
-    var mem = liveMembers();
+    var mem = hrMembers(), testN = liveMembers().length - mem.length;   // P1 판9 ④ 시험 계정은 명부·부서 수·총 인원에서 뺀다(수정은 회원 관리에서)
     // v329 퇴사직원 분류(PM 9/8): 재직(퇴사예정·휴직 포함)은 종전대로 부서 그룹, 퇴사자는 맨 아래 접이식 '퇴사자' 그룹으로 분리.
     // 판정은 memberRetired(m) 하나만 쓴다(서버 _lib/tier.js retired와 같은 식) — 인사 탭에 새 판정식을 만들지 않는다.
     var act = [], ret = [];
@@ -31206,13 +31247,13 @@ function dutyStage(nx){
     }
     hrOpenId = null;  // DOM 재생성으로 이전 패널 무효화 → 상태 초기화 후 재오픈
     host.innerHTML = html || '<div class="empty-line">직원이 없습니다.</div>';
-    var total = document.getElementById("hrTotal"); if (total) total.textContent = ret.length ? ("총 " + mem.length + "명 (재직 " + act.length + " · 퇴사 " + ret.length + ")") : ("총 " + act.length + "명");   // 권한관리(#permTotal '총 N명')와 같은 수 — 두 관리자 화면이 같은 명부에 다른 수를 말하지 않게
+    var total = document.getElementById("hrTotal"); if (total) total.textContent = ret.length ? ("총 " + mem.length + "명 (재직 " + act.length + " · 퇴사 " + ret.length + ")") : ("총 " + act.length + "명"); if (total && testN > 0) total.textContent += " · 시험 계정 " + testN + "명 제외";   // 권한관리(#permTotal '총 N명')와 같은 수 — 두 관리자 화면이 같은 명부에 다른 수를 말하지 않게
     var banner = document.getElementById("hrStartBanner"); if (banner) banner.style.display = (isAdmin() && !hrStarted()) ? "" : "none";
     Array.prototype.forEach.call(host.querySelectorAll("[data-hr-toggle]"), function(el){
       el.addEventListener("click", function(){ hrToggle(el.getAttribute("data-hr-toggle")); });
     });
     var retBtn = document.getElementById("hrRetToggle"); if (retBtn) retBtn.addEventListener("click", hrRetToggle);
-    if (reopen && findMember(reopen)) hrToggle(reopen);
+    if (reopen && findMember(reopen) && !isTestMember(findMember(reopen))) hrToggle(reopen);
   }
   function hrStarted(){ return liveMembers().some(function(m){ return !!m.annual_base_date; }); }
   function hrStartWork(){

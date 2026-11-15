@@ -50,7 +50,7 @@ function bodyOf(items) {
 }
 
 // ---- v368 무기계약직 레이더(PM 9/21) — 계약직 2년 시계(기간제법 4조). 앱 ctRadar와 같은 규칙. 단계: d90(1회)·d30(1회)·over(매일 1회)·unknown(생년월일 없음, 90일 이내 1회).
-//   55세 이상(계약 체결 시)은 제4조①5호 예외라 알리지 않는다. 수신자 = PM(tier pm), 없으면 관리자. 멱등 키 'ct:<id>:<전환일>:<단계>'는 duty:sent에 같이 둔다.
+//   55세 이상(계약 체결 시)은 제4조①4호(고령자) 예외라 알리지 않는다. 수신자 = PM(tier pm), 없으면 관리자. 멱등 키 'ct:<id>:<전환일>:<단계>'는 duty:sent에 같이 둔다.
 function ctAddYears(d, y) { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(d || '')); if (!m) return ''; const yy = Number(m[1]) + y; let dd = m[3]; if (m[2] === '02' && dd === '29') { const leap = (yy % 4 === 0 && yy % 100 !== 0) || yy % 400 === 0; if (!leap) dd = '28'; } return yy + '-' + m[2] + '-' + dd; }
 function ctAgeAt(birth, at) { const b = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(birth || '')), a = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(at || '')); if (!b || !a) return null; let age = Number(a[1]) - Number(b[1]); if (Number(a[2]) < Number(b[2]) || (Number(a[2]) === Number(b[2]) && Number(a[3]) < Number(b[3]))) age--; return age; }
 function ctDays(from, to) { const f = Date.UTC(+from.slice(0, 4), +from.slice(5, 7) - 1, +from.slice(8, 10)), t = Date.UTC(+to.slice(0, 4), +to.slice(5, 7) - 1, +to.slice(8, 10)); return Math.round((t - f) / 86400000); }
@@ -59,6 +59,7 @@ function contractPlan(members, sentDoc, today) {
   const items = [];
   (members || []).forEach(function (m) {
     if (!m || m.emp_type !== '계약직' || m.del === 1) return;
+    if (m.test_acct === true) return;   // P1 판9 ④ 시험 계정(v447 표식)은 인사 관리 대상이 아니다 — 앱 ctRadar와 같은 규칙(gw-todo-cron도 이 함수를 부른다)
     if (m.leave_date && String(m.leave_date) < today) return;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(String(m.hire_date || ''))) return;
     const conv = ctAddYears(m.hire_date, 2), days = ctDays(today, conv), age = ctAgeAt(m.birth, m.hire_date);
@@ -78,7 +79,7 @@ function contractPlan(members, sentDoc, today) {
 }
 function contractBody(items) {
   const line = function (x) { return x.stage === 'over' ? (x.name + ' 2년 초과 ' + (-x.days) + '일(' + x.conv + ')') : x.stage === 'unknown' ? (x.name + ' 생년월일 없음 — 판정 불가') : (x.name + ' D-' + x.days + '(' + x.conv + ')'); };
-  return { title: '무기계약 전환 시계 — ' + items.length + '명', body: (items.slice(0, 3).map(line).join(' / ') + (items.length > 3 ? ' 외 ' + (items.length - 3) + '명' : '') + ' · 인사·직원 탭 칩 · 기간제법 §4①(2년 초과=무기계약 간주)·§4①5호(55세 이상 예외) — 노무사 확인').slice(0, 200) };
+  return { title: '무기계약 전환 시계 — ' + items.length + '명', body: (items.slice(0, 3).map(line).join(' / ') + (items.length > 3 ? ' 외 ' + (items.length - 3) + '명' : '') + ' · 인사·직원 탭 칩 · 기간제법 §4①(2년 초과=무기계약 간주)·§4①4호(55세 이상 예외) — 노무사 확인').slice(0, 200) };
 }
 
 exports.handler = async function (event) {

@@ -15148,5 +15148,146 @@ try {
     rD79.ok && MD79.every((v) => v === false), JSON.stringify({ r: rD79.info, mut: MD79 }));
 } catch (e) { console.log('  (v479 검사 생략 — ' + e.message + ')'); fails++; }
 
+// ── P1 판9(인사 잔손질 ①~④ — ① 기간제법 제4조①4호 정정(법제처 원문 09_조사_문서/45_Phase1_자료_20261113/판9_기간제법4조_원문.txt) · ② 휴가 승인 지연 표시 · ③ 연차 사용기간 끝 안내 · ④ 시험 계정을 인사 집계에서 뺌):
+//    실제 함수를 꺼내 실행 + 고침을 되돌린 결함 사본은 떨어져야 한다. 서버 쪽(contractPlan·알림 글)은 servertest 'P1 판9'.
+try {
+  const f9 = (src, name) => { const i = src.indexOf('function ' + name + '('); if (i < 0) throw new Error('함수 없음: ' + name); let d = 0, st = false; for (let j = i; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i, j + 1); } } throw new Error('함수 끝 없음: ' + name); };
+  const b9 = (src, a, b) => { const i = src.indexOf(a), j = src.indexOf(b); if (i < 0 || j < i) throw new Error('구간 없음: ' + a); return src.slice(i, j); };
+  const c9 = (s, a) => s.split(a).length - 1;
+  const mu9 = (src, a, b) => { if (c9(src, a) !== 1) throw new Error('결함 심을 자리 없음(' + c9(src, a) + '): ' + a.slice(0, 60)); return src.replace(a, () => b); };
+  const NOW9 = Date.parse('2026-11-15T03:00:00Z'), TODAY9 = '2026-11-15';
+
+  // ① 조문 오기 — 레이더 구간·칩 글에 4조①4호, 이 예외를 가리키는 '5호' 0(다른 법의 5호·중처법 4조5호는 구간 밖) + ④ ctRadar 시험 계정 null
+  const chk9a = (h) => {
+    const ct = b9(h, '// @ct-radar-start', '// @ct-radar-end');
+    const api = new Function('todayStr', 'esc', ct + '\nreturn { ctRadar: ctRadar, ctChipHtml: ctChipHtml };')(() => TODAY9, (x) => String(x));
+    const ex = api.ctChipHtml({ emp_type: '계약직', hire_date: '2025-09-01', birth: '1964-08-07' }, '2026-09-21');
+    const due = { emp_type: '계약직', hire_date: '2025-12-29', birth: '1978-01-09' };
+    return { ok: /5호/.test(ct) === false && c9(ct, '제4조①단서 4호(「고령자고용촉진법」 제2조제1호의 고령자 — 55세 이상)') === 1 && /title="기간제법 4조①4호 — 근로계약 체결 시 55세 이상은 2년 제한 예외/.test(ex)
+        && api.ctRadar(due, '2026-09-21').state === 'due' && api.ctRadar(Object.assign({ test_acct: true }, due), '2026-09-21') === null && api.ctRadar(Object.assign({ test_acct: false }, due), '2026-09-21').state === 'due',
+      info: { ex, n5: (ct.match(/.{20}5호.{10}/g) || []) } };
+  };
+  const r9a = chk9a(html);
+  const M9a = [chk9a(mu9(html, 'title="기간제법 4조①4호 — 근로계약', 'title="기간제법 4조①5호 — 근로계약')).ok,
+    chk9a(mu9(html, '제4조①단서 4호(「고령자고용촉진법」 제2조제1호의 고령자 — 55세 이상)와', '제4조①단서 5호: 55세 이상 고령자와')).ok,
+    chk9a(mu9(html, '    if(m.test_acct===true) return null;   // P1 판9 ④', '    // P1 판9 ④')).ok];
+  T('P1 판9 ① 기간제법 제4조①4호(실행 — 실제 ctRadar·ctChipHtml): 예외 칩 title "4조①4호" · 레이더 구간 주석 4호(고령자고용촉진법 제2조제1호) · 구간 안 "5호" 0 · ④ 시험 계정 계약직 = 칩 없음(null) · 표식 false·없음 = 그대로 D-n · 결함 사본 ' + M9a.length + '개(칩 5호·주석 5호·시험 계정 줄 걷음) = 모두 ✗',
+    r9a.ok && M9a.every((v) => v === false), JSON.stringify({ r: r9a.info, mut: M9a }));
+
+  // ② 지연 표시(실행 — 실제 leaveLate·leaveLateChip·leaveRowHtml)
+  const mkLate9 = (h) => new Function(b9(h, '// @leave-late-start', '// @leave-late-end') + '\nreturn { leaveLate: leaveLate, leaveLateChip: leaveLateChip };')();
+  const iso9 = (ms) => new Date(ms).toISOString();
+  const chk9b = (h) => {
+    const L = mkLate9(h), H = 3600000;
+    const P = (o) => Object.assign({ id: 'lv1', member_id: 'u1', type: 'annual', status: 'pending', start: '2026-11-20', end: '2026-11-20', days: 1 }, o);
+    const cases = [
+      L.leaveLate(P({ applied_ts: iso9(NOW9 - 25 * H) }), NOW9, TODAY9) === true,
+      L.leaveLate(P({ applied_ts: iso9(NOW9 - 23 * H) }), NOW9, TODAY9) === false,
+      L.leaveLate(P({ applied_ts: iso9(NOW9 - 24 * H) }), NOW9, TODAY9) === false,                  // 딱 24시간 = 아직(넘어야 지연)
+      L.leaveLate(P({ applied_ts: iso9(NOW9 - 72 * H), status: 'approved' }), NOW9, TODAY9) === false,
+      L.leaveLate(P({ applied_ts: iso9(NOW9 - 72 * H), status: 'rejected' }), NOW9, TODAY9) === false,
+      L.leaveLate(P({ applied_ts: iso9(NOW9 - 72 * H), type: 'resign' }), NOW9, TODAY9) === false,
+      L.leaveLate(P({ applied_ts: iso9(NOW9 - 72 * H), type: 'loa' }), NOW9, TODAY9) === false,
+      L.leaveLate(P({ applied_ts: iso9(NOW9 - 72 * H), type: 'half_am' }), NOW9, TODAY9) === true,
+      L.leaveLate(P({ applied: '2026-11-13' }), NOW9, TODAY9) === true,                            // 옛 신청(날짜만) — 신청일 + 2일
+      L.leaveLate(P({ applied: '2026-11-14' }), NOW9, TODAY9) === false,                           // 신청일 + 1일 = 24시간이 안 됐을 수 있음
+      L.leaveLate(P({}), NOW9, TODAY9) === false,
+      L.leaveLate(P({ applied: '2026-11-01', applied_ts: iso9(NOW9 - 2 * H) }), NOW9, TODAY9) === false,   // 시각이 있으면 시각이 우선
+      /^ <span class="dup-chip" title="[^"<>]+">지연<\/span>$/.test(L.leaveLateChip(P({ applied: '2026-11-10' }), NOW9, TODAY9)) && L.leaveLateChip(P({ applied: '2026-11-15' }), NOW9, TODAY9) === ''];
+    // 줄 그리기(실제 leaveRowHtml — 승인하는 사람·신청자 같은 줄 함수)
+    const row = new Function('Date', b9(h, '// @leave-late-start', '// @leave-late-end') + '\nfunction dispName(x){return x;} function memberName(){return "직원A";} function leaveTypeLabel(t){return t==="annual"?"연차":t;} function esc(x){return String(x);} function isDate(s){return /^\\d{4}-\\d{2}-\\d{2}$/.test(String(s||""));} function todayStr(){return "' + TODAY9 + '";} function getMemberId(){return "u1";} function isAdmin(){return true;} function reqLineRowHtml(){return "REQ";}\n' + f9(h, 'leaveRowHtml') + '\nreturn leaveRowHtml;')(class extends Date { static now() { return NOW9; } });
+    const rLate = row(P({ applied_ts: iso9(NOW9 - 30 * 3600000) })), rNew = row(P({ applied_ts: iso9(NOW9 - 2 * 3600000) })), rApp = row(P({ applied_ts: iso9(NOW9 - 30 * 3600000), status: 'approved' }));
+    const rowOk = /<span class="review-chip">대기<\/span> <span class="dup-chip"[^>]*>지연<\/span>/.test(rLate) && !/지연/.test(rNew) && /review-chip">대기</.test(rNew) && !/지연/.test(rApp);
+    const wire = /applied:todayStr\(\), applied_ts:new Date\(\)\.toISOString\(\), updated:todayStr\(\) \};/.test(f9(h, 'saveLeaveApply'))
+      && /\+\(leaveLate\(l, Date\.now\(\), todayStr\(\)\)\?" · 지연":""\)\}\);/.test(f9(h, 'approvalInboxItems'));
+    return { ok: cases.every(Boolean) && rowOk && wire, info: { cases: cases.map((v) => v ? 1 : 0).join(''), rowOk, wire } };
+  };
+  const r9b = chk9b(html);
+  const M9b = [chk9b(mu9(html, 'return (nowMs - t) > LEAVE_LATE_MS;', 'return (nowMs - t) >= LEAVE_LATE_MS;')).ok,
+    chk9b(mu9(html, '/86400000) >= 2;\n  }', '/86400000) >= 1;\n  }')).ok,
+    chk9b(mu9(html, 'l.type==="resign" || l.type==="loa") return false;', 'false) return false;')).ok,
+    chk9b(mu9(html, "'<span class=\"review-chip\">대기</span>'+leaveLateChip(l, Date.now(), todayStr())));", "'<span class=\"review-chip\">대기</span>'));")).ok,
+    chk9b(mu9(html, 'applied:todayStr(), applied_ts:new Date().toISOString(), updated:todayStr() };', 'applied:todayStr(), updated:todayStr() };')).ok];
+  T('P1 판9 ② 휴가 승인 지연(실행 — 실제 leaveLate·leaveLateChip·leaveRowHtml): 신청 시각 25시간 = 지연 · 23시간·딱 24시간 = 아님 · 승인·반려·사직·휴직 줄 = 아님 · 반차 = 지연 · 옛 신청(날짜만) 신청일 + 2일 = 지연·+1일 = 아님 · 신청 시각 우선 · 칩 = 기존 dup-chip "지연" · 줄(대기 칩 뒤 지연 칩 — 승인하는 사람·신청자 같은 줄) · 새 신청에 신청 시각 · 결재 대기함 " · 지연" · 결함 사본 ' + M9b.length + '개 = 모두 ✗',
+    r9b.ok && M9b.every((v) => v === false), JSON.stringify({ r: r9b.info, mut: M9b }));
+
+  // ③ 연차 사용기간 끝 안내(실행 — 실제 leaveEndNote·annualPeriod)
+  const mn9 = readFileSync(join(ROOT, 'MANUAL.html'), 'utf8');
+  const chk9c = (h) => {
+    const N = new Function(b9(h, '// @leave-end-note-start', '// @leave-end-note-end') + '\nfunction isDate(s){return /^\\d{4}-\\d{2}-\\d{2}$/.test(String(s||""));} function todayStr(){return "' + TODAY9 + '";}\n' + f9(h, 'fmtYMD') + '\n' + f9(h, 'annualPeriod') + '\nreturn { note: leaveEndNote, per: annualPeriod };')();
+    const fy = { start: '2026-01-01', end: '2027-01-01' };
+    const hp = N.per({ hire_date: '2024-03-15' }, '2026-02-20'), fp = N.per({ hire_date: '2020-05-01', annual_basis: 'fiscal' }, '2026-12-05');
+    const cs = [
+      N.note(fy, 3.5, '2026-12-01') === '연차 사용기간이 12/31에 끝납니다 — 남은 3.5일은 다음 기간으로 넘어가지 않습니다(이월 없음)',
+      N.note(fy, 3.5, '2026-11-30') === '',                           // 31일 전
+      N.note(fy, 2, '2026-12-31') === '연차 사용기간이 12/31에 끝납니다 — 남은 2일은 다음 기간으로 넘어가지 않습니다(이월 없음)',   // 마지막 날
+      N.note(fy, 0, '2026-12-10') === '연차 사용기간이 12/31에 끝납니다',     // 남은 0 = 남은 n일 없이
+      N.note(fy, 3, '2027-01-01') === '',
+      N.note(null, 3, '2026-12-10') === '',
+      !!hp && hp.end === '2026-03-15' && N.note(hp, 5, '2026-02-12') === '연차 사용기간이 3/14에 끝납니다 — 남은 5일은 다음 기간으로 넘어가지 않습니다(이월 없음)' && N.note(hp, 5, '2026-02-11') === '',   // 입사일 기준
+      !!fp && fp.end === '2027-01-01' && /^연차 사용기간이 12\/31에 끝납니다/.test(N.note(fp, 1, '2026-12-05'))];   // 회계연도 기준
+    const rl = f9(h, 'renderLeaves');
+    const wire = /var endNote=leaveEndNote\(r\.period, r\.left, todayStr\(\)\);/.test(rl) && /\+\(endNote\?'<div class="leave-bal" id="leaveEndNote"><span class="lv-sub" style="margin-left:0;">'\+esc\(endNote\)\+'<\/span><\/div>':''\);/.test(rl)
+      && mn9.indexOf('쓰지 않은 연차는 다음 기간으로 넘어가지 않습니다') > 0 && mn9.indexOf('이월은 없습니다') > 0;   // 정책 문구 = MANUAL 문장 그대로(새 정책 말 없음)
+    return { ok: cs.every(Boolean) && wire, info: { cs: cs.map((v) => v ? 1 : 0).join(''), wire, hp, fp } };
+  };
+  const r9c = chk9c(html);
+  const M9c = [chk9c(mu9(html, 'if(d<0 || d>LEAVE_END_NOTE_DAYS) return "";', 'if(d<0 || d>LEAVE_END_NOTE_DAYS+1) return "";')).ok,
+    chk9c(mu9(html, '+per.end.slice(8,10)) - 86400000;   // end', '+per.end.slice(8,10));   // end')).ok,
+    chk9c(mu9(html, '(left>0 ? " — 남은 "', '(left>=0 ? " — 남은 "')).ok,
+    chk9c(mu9(html, "            +(endNote?'<div class=\"leave-bal\" id=\"leaveEndNote\">", "            +(false?'<div class=\"leave-bal\" id=\"leaveEndNote\">")).ok];
+  T('P1 판9 ③ 연차 사용기간 끝 안내(실행 — 실제 leaveEndNote·annualPeriod): 회계연도 끝 12/31 — 30일 전(12/01)·마지막 날 = 1줄 "연차 사용기간이 12/31에 끝납니다 — 남은 n일은 다음 기간으로 넘어가지 않습니다(이월 없음)" · 31일 전·다음 기간·기간 없음 = 없음 · 남은 0 = 앞 절만 · 입사일 기준 2024-03-15 입사 = 3/14 끝(02-12 보임·02-11 없음) · 본인 연차 자리 배선 · 정책 문구 = MANUAL 문장 · 결함 사본 ' + M9c.length + '개 = 모두 ✗',
+    r9c.ok && M9c.every((v) => v === false), JSON.stringify({ r: r9c.info, mut: M9c }));
+
+  // ④ 시험 계정 빼기(실행 — 실제 drawHrRoster·renderLeaves·approvalInboxItems·famAnnualRows + 화면 글에 내부 키 이름 0)
+  const MEM9 = () => [{ id: 'a0', name: '관리자', role: '관리자', dept: '관리부', admin: true, seq: 1 }, { id: 'e1', name: '직원하나', role: '직원', dept: '운영부', seq: 2 },
+    { id: 'e2', name: '직원둘', role: '직원', dept: '운영부', seq: 3 }, { id: 't1', name: '시험사본', role: '관리자', dept: '운영부', admin: true, test_acct: true, seq: 4 },
+    { id: 'r1', name: '퇴사자', role: '직원', dept: '운영부', leave_date: '2025-06-30', seq: 5 }, { id: 'x1', name: '지운', del: 1 }];
+  const LV9 = () => [{ id: 'l1', member_id: 'e1', type: 'annual', status: 'pending', start: '2026-11-20', end: '2026-11-20', days: 1, applied: '2026-11-15' },
+    { id: 'l2', member_id: 't1', type: 'annual', status: 'pending', start: '2026-11-21', end: '2026-11-21', days: 1, applied: '2026-11-15' },
+    { id: 'l3', member_id: 't1', type: 'resign', stage: 'resign_req', status: 'pending', start: '2026-12-31', end: '2026-12-31', days: 0 },
+    { id: 'l4', member_id: 'e2', type: 'annual', status: 'approved', start: '2026-03-02', end: '2026-03-03', days: 2 }];
+  const doc9 = () => { const els = {}; const el = (id) => els[id] || (els[id] = { id, innerHTML: '', textContent: '', style: {}, querySelectorAll: () => [], addEventListener() {} }); return { els, document: { getElementById: el } }; };
+  const COMMON9 = (h) => 'var members = MEMBERS, leaves = LEAVES;\n' + f9(h, 'liveMembers') + '\n' + b9(h, '// @hr-test-start', '// @hr-test-end') + '\n' + f9(h, 'findMember') + '\nfunction liveLeaves(){ return leaves.filter(function(l){ return l && l.del!==1; }); }\nfunction memberRetired(m){ return !!(m && m.leave_date && m.leave_date < "' + TODAY9 + '"); }\nfunction esc(x){ return String(x); } function todayStr(){ return "' + TODAY9 + '"; } function dispName(x){ return x; } function memberName(id){ var m=findMember(id); return m?m.name:""; } function leaveTypeLabel(t){ return t; } function isPartialLeave(){ return false; }\n';
+  const chk9d = (h) => {
+    // 인사 명부
+    const D = doc9();
+    const hrRun = new Function('MEMBERS', 'LEAVES', 'document', COMMON9(h) + 'var hrOpenId = null, hrRetOpen = false, DEPT_LIST = ["관리부","운영부"], ROLE_ORDER = ["대표","관리자","팀장","직원"]; var opened = [];\nfunction isAdmin(){ return true; } function hrStarted(){ return true; } function hrToggle(id){ opened.push(id); } function hrRetToggle(){}\nfunction hrRowHtml(m, isRet){ return "<row " + m.id + (isRet ? " ret" : "") + ">"; }\n' + f9(h, 'drawHrRoster') + '\ndrawHrRoster(ARG); return opened;'.replace('ARG', '"t1"'));
+    const opened = hrRun(MEM9(), LV9(), D.document);
+    const roster = D.els.hrRoster.innerHTML, total = D.els.hrTotal.textContent;
+    const hrOk = roster.indexOf('<row t1') < 0 && roster.indexOf('<row e1>') > 0 && roster.indexOf('<row r1 ret>') > 0 && /운영부 <span class="cnt">2<\/span>/.test(roster) && /관리부 <span class="cnt">1<\/span>/.test(roster)
+      && total === '총 4명 (재직 3 · 퇴사 1) · 시험 계정 1명 제외' && opened.length === 0;
+    const D0 = doc9(); hrRun(MEM9().filter((m) => !m.test_acct), LV9(), D0.document);
+    const hrOk0 = D0.els.hrTotal.textContent === '총 4명 (재직 3 · 퇴사 1)';
+    // 휴가 목록·대기 수(관리자 a0 / 시험 계정 본인 t1)
+    const lvRun = (me, admin) => { const D2 = doc9(); new Function('MEMBERS', 'LEAVES', 'document', COMMON9(h) + 'function getMemberId(){ return "' + me + '"; } function isAdmin(){ return ' + admin + '; } function computeAnnual(){ return 15; }\nfunction leaveRemaining(){ return { grant: 15, used: 2, scheduled: 0, expired: 0, left: 13, period: { start: "2026-01-01", end: "2027-01-01" }, mode: "calc" }; }\nfunction leaveRowHtml(l){ return "<lv " + l.id + ">"; } function bindLeaveHandlers(){} function updateApprovalBadges(){}\n' + b9(h, '// @leave-end-note-start', '// @leave-end-note-end') + '\n' + f9(h, 'renderLeaves') + '\nrenderLeaves();')(MEM9(), LV9(), D2.document); return D2.els; };
+    const A = lvRun('a0', true), Tt = lvRun('t1', true), E = lvRun('e1', false);
+    const lvOk = A.leaveList.innerHTML === '<lv l1><lv l4>' && A.leaveHead.textContent === '1건 대기'
+      && Tt.leaveList.innerHTML.indexOf('<lv l2>') >= 0 && Tt.leaveList.innerHTML.indexOf('<lv l3>') >= 0 && Tt.leaveList.innerHTML.indexOf('<lv l1>') >= 0 && Tt.leaveHead.textContent === '3건 대기'
+      && E.leaveList.innerHTML === '<lv l1>' && E.leaveHead.textContent === '1건 대기';
+    // 결재 대기함(관리자 a0 = 시험 계정 신청 2건 빠짐 / 시험 계정 본인 t1 = 본인 것 그대로)
+    const inbox = (me) => new Function('MEMBERS', 'LEAVES', COMMON9(h) + 'function getMemberId(){ return "' + me + '"; } function isAdmin(){ return true; } function liveTasks(){ return []; } function canApproveTask(){ return false; } function liveRec(){ return []; } function recVisible(){ return true; }\n' + b9(h, '// @leave-late-start', '// @leave-late-end') + '\n' + f9(h, 'approvalInboxItems') + '\nreturn approvalInboxItems();')(MEM9(), LV9());
+    const ia = inbox('a0'), it = inbox('t1');
+    const inOk = ia.length === 1 && ia[0].label === '휴가 승인' && ia[0].sub.indexOf('직원하나') === 0 && it.length === 3;
+    // 가족친화 연차 소진율(전사 합계)
+    const fam = new Function('MEMBERS', 'LEAVES', COMMON9(h) + 'function leaveRemaining(){ return { grant: 15 }; } function isAnnualUse(l){ return l.type==="annual"; } function famLeaveDays(l){ return l.days; }\n' + f9(h, 'famAnnualRows') + '\nreturn famAnnualRows({ y: 2026, end: "2026-12-31" });')(MEM9(), LV9());
+    const famOk = fam.rows.map((x) => x.m.id).join(',') === 'a0,e1,e2' && fam.tg === 45 && fam.tu === 2;
+    const famCh = /var mem=hrMembers\(\)\.filter\(function\(m\)\{ return !\(m\.leave_date && m\.leave_date < r\.start\); \}\);/.test(f9(h, 'renderFamReport')) && /var mem=hrMembers\(\)\.filter\(function\(m\)\{ return !m\.leave_date \|\| m\.leave_date>=todayStr\(\); \}\);/.test(f9(h, 'renderFam'));
+    // 화면 글에 내부 키 이름 없음(새로 넣은 글 — 총 인원 꼬리·지연 칩 title·안내 줄)
+    const noKey = !/test_acct|applied_ts/.test(total + rLateTxt9(h));
+    return { ok: hrOk && hrOk0 && lvOk && inOk && famOk && famCh && noKey, info: { hrOk, hrOk0, total, roster: roster.slice(0, 200), lvOk, A: [A.leaveList.innerHTML, A.leaveHead.textContent], T: [Tt.leaveList.innerHTML, Tt.leaveHead.textContent], E: [E.leaveList.innerHTML], inOk, ia, itN: it.length, famOk, fam: [fam.rows.map((x) => x.m.id), fam.tg, fam.tu], famCh, noKey } };
+  };
+  const rLateTxt9 = (h) => mkLate9(h).leaveLateChip({ status: 'pending', type: 'annual', applied: '2026-11-01' }, NOW9, TODAY9);
+  const r9d = chk9d(html);
+  const M9d = [chk9d(mu9(html, '    var mem = hrMembers(), testN = liveMembers().length - mem.length;', '    var mem = liveMembers(), testN = 0;')).ok,
+    chk9d(mu9(html, 'if (total && testN > 0) total.textContent += " · 시험 계정 " + testN + "명 제외";', '')).ok,
+    chk9d(mu9(html, 'all.filter(function(l){ return l.member_id===me || !leaveOfTest(l); })', 'all.slice()')).ok,
+    chk9d(mu9(html, '      if(admin && l.member_id!==me && leaveOfTest(l)) return;   // P1 판9 ④', '      // P1 판9 ④')).ok,
+    chk9d(mu9(html, '    hrMembers().forEach(function(m){   // P1 판9 ④ 시험 계정 제외(전사 합계에도 안 듦)', '    liveMembers().forEach(function(m){')).ok,
+    chk9d(mu9(html, 'function isTestMember(m){ return !!m && m.test_acct === true; }', 'function isTestMember(m){ return false; }')).ok];
+  T('P1 판9 ④ 시험 계정을 인사 집계에서 뺌(실행 — 실제 drawHrRoster·renderLeaves·approvalInboxItems·famAnnualRows): 인사 명부 줄·부서 수(운영부 2)·총 인원 "총 4명 (재직 3 · 퇴사 1) · 시험 계정 1명 제외"(없으면 꼬리 없음) · 저장 뒤 되열기 대상이 시험 계정이면 안 엶 · 관리자 휴가 목록·"n건 대기"·결재 대기함에서 시험 계정 신청 빠짐(시험 계정 본인 화면은 본인 신청 그대로) · 가족친화 연차 소진율 줄·전사 합계·조기퇴근 표·대상 고르기 · 화면 글 내부 키 이름 0 · 결함 사본 ' + M9d.length + '개 = 모두 ✗',
+    r9d.ok && M9d.every((v) => v === false), JSON.stringify({ r: r9d.info, mut: M9d }));
+} catch (e) { console.log('  (P1 판9 검사 생략 — ' + e.message + ')'); fails++; }
+
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

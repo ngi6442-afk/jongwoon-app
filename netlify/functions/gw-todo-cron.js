@@ -91,7 +91,7 @@ exports.handler = async function (event) {
     }
   } catch (e) { bidDigest = { error: String(e && e.message || e).slice(0, 80) }; }
   // v414 C3-1 무기계약직 레이더 이식 — gw-duty-cron(netlify.toml 미등록이라 안 돌던 크론)의 contractPlan을 08:00 여기서 돌린다. 멱등 키는 duty:sent 공유(toml 불변·duty 함수는 그대로).
-  //   수신 = PM(tier pm, 없으면 관리자) 우선기기 1발. 단계 d90·d30 각 1회, over 매일 1회, unknown(생년월일 없음) 1회. 근거 기간제법 §4①(2년 초과 → 무기계약 간주)·§4①5호(55세 이상 체결 예외) — 판정은 노무사.
+  //   수신 = PM(tier pm, 없으면 관리자) 우선기기 1발. 단계 d90·d30 각 1회, over 매일 1회, unknown(생년월일 없음) 1회. 근거 기간제법 §4①(2년 초과 → 무기계약 간주)·§4①4호(55세 이상 체결 예외) — 판정은 노무사.
   let radar = null;
   try {
     const DC = require('./gw-duty-cron');

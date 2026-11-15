@@ -10168,4 +10168,41 @@ function J91a(x) { return JSON.stringify(x); }
   finally { reset7(); process.env.BIDS_INGEST_KEY = savedKey7; }
 }
 
-console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);
+// ===== P1 판9(인사 잔손질) — ① 기간제법 제4조①4호(고령자) 정정 · ④ 계약직 2년 레이더(gw-duty-cron contractPlan — gw-todo-cron 08:00도 같은 함수)에서 시험 계정 빼기 =====
+//   원문: 09_조사_문서/45_Phase1_자료_20261113/판9_기간제법4조_원문.txt(법제처 DRF 현행본 MST 232201 · 시행 2021-05-18) — 4호 = 「고령자고용촉진법」 제2조제1호의 고령자와 근로계약 체결
+{
+  try {
+    const fsP9 = require('fs');
+    const SDC9 = fsP9.readFileSync(join(FN, 'gw-duty-cron.js'), 'utf8'), STC9 = fsP9.readFileSync(join(FN, 'gw-todo-cron.js'), 'utf8');
+    const req9 = createRequire(join(FN, 'gw-duty-cron.js'));
+    const load9 = (src) => { const mod = { exports: {} }; new Function('require', 'module', 'exports', '__dirname', '__filename', src)(req9, mod, mod.exports, FN, join(FN, 'gw-duty-cron.js')); return mod.exports; };
+    const mu9 = (src, a, b) => { if (src.split(a).length !== 2) throw new Error('결함 심을 자리 없음: ' + a.slice(0, 60)); return src.replace(a, () => b); };
+    const chk9 = (sdc, stc) => {
+      const dc = load9(sdc);
+      const M = [{ id: 'c_due', name: '계약하나', emp_type: '계약직', hire_date: '2025-12-29', birth: '1978-01-09' },
+        { id: 'c_test', name: '시험사본', emp_type: '계약직', hire_date: '2025-12-29', birth: '1978-01-09', test_acct: true },
+        { id: 'c_test_unk', name: '시험무생일', emp_type: '계약직', hire_date: '2026-09-17', test_acct: true },
+        { id: 'c_flag_off', name: '표식거짓', emp_type: '계약직', hire_date: '2025-12-29', birth: '1978-01-09', test_acct: false },
+        { id: 'c_old', name: '고령', emp_type: '계약직', hire_date: '2025-09-01', birth: '1964-08-07' }];
+      const it = dc.contractPlan(M, { keys: {} }, '2027-11-01');
+      const it2 = dc.contractPlan(M, { keys: {} }, '2028-07-01');
+      const cb = dc.contractBody([{ name: '계약하나', conv: '2027-12-29', days: 58, stage: 'd90' }]);
+      const ok = it.map((x) => x.id).sort().join(',') === 'c_due,c_flag_off' && !it2.some((x) => /^c_test/.test(x.id))
+        && /§4①4호\(55세 이상 예외\)/.test(cb.body) && !/5호/.test(cb.body) && cb.body.length <= 200
+        && !/①5호/.test(sdc) && /제4조①4호\(고령자\) 예외라 알리지 않는다/.test(sdc)
+        && !/①5호/.test(stc) && /§4①4호\(55세 이상 체결 예외\)/.test(stc)
+        && /const DC = require\('\.\/gw-duty-cron'\);/.test(stc) && /const ct = DC\.contractPlan\(ctx \? ctx\.members : \[\], sentDoc2, today\);/.test(stc)   // 08:00 크론도 같은 함수(시험 계정 뺌이 같이 걸림)
+        && /const ctItems = contractPlan\(ctx \? ctx\.members : \[\], sentDoc, today\);/.test(sdc);
+      return { ok, info: { it: it.map((x) => x.id + ':' + x.stage), it2: it2.map((x) => x.id + ':' + x.stage), body: cb.body } };
+    };
+    const r9 = chk9(SDC9, STC9);
+    const M9 = [chk9(mu9(SDC9, "    if (m.test_acct === true) return;   // P1 판9 ④", '    // P1 판9 ④'), STC9).ok,
+      chk9(mu9(SDC9, "·§4①4호(55세 이상 예외)", "·§4①5호(55세 이상 예외)"), STC9).ok,
+      chk9(mu9(SDC9, '은 제4조①4호(고령자) 예외라', '은 제4조①5호 예외라'), STC9).ok,
+      chk9(SDC9, mu9(STC9, '·§4①4호(55세 이상 체결 예외)', '·§4①5호(55세 이상 체결 예외)')).ok];
+    T('P1 판9 ①·④ 계약직 2년 레이더 서버(실행 — 실제 contractPlan·contractBody): 시험 계정 계약직(생년월일 있음·없음 둘 다) = 알림 대상 아님 · 표식 false = 그대로 d90 · 고령 예외 그대로 · 알림 글 "§4①4호(55세 이상 예외)"·"5호" 0·200자 이내 · duty·todo 주석 4호 · 08:00 gw-todo-cron이 같은 contractPlan을 부름 · 결함 사본 ' + M9.length + '개(시험 계정 줄 걷음·알림 글 5호·주석 5호 두 곳) = 모두 ✗',
+      r9.ok && M9.every((v) => v === false), JSON.stringify({ r: r9.info, mut: M9 }));
+  } catch (e) { T('P1 판9 검사 실행', false, String(e && e.stack || e).slice(0, 400)); }
+}
+
+console.log(fail ?'\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);
