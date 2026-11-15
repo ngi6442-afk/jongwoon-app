@@ -2949,7 +2949,7 @@
       <input type="text" id="sfSetRedEnv" placeholder="종운환경 (예: 2026)" maxlength="60" autocomplete="off" style="flex:1 1 0;min-width:0;">
       <input type="text" id="sfSetRedCon" placeholder="종운건설 (예: 2026)" maxlength="60" autocomplete="off" style="flex:1 1 0;min-width:0;">
     </div>
-    <div class="empty-line" style="margin:-2px 2px 8px;">산업안전보건법 시행규칙 제27조① — 다음 연도에 한정해 근로자 정기교육 시간의 50% 범위 면제. 관리감독자 16시간은 그대로 둡니다.</div>
+    <div class="empty-line" style="margin:-2px 2px 8px;">산업안전보건법 시행규칙 제27조① — 다음 연도에 한정해 근로자 정기교육 시간의 50% 범위 면제. 관리감독자 정기교육(연 16시간)도 절반(8시간)으로 봅니다.</div>
     <button class="primary" id="sfSetSave">저장</button>
     <button class="secondary" id="sfSetCancel">취소</button>
   </div>
@@ -19625,7 +19625,7 @@
     y = Number(date.slice(0, 4)); m = Number(date.slice(5, 7));
     if (k === "regular" || k === "super"){
       mm = ptype === "member" ? findMember(pid) : null;
-      need = k === "super" ? 16 : eduRegNeed(mm, y);   // v476 감면 해는 절반
+      need = eduRegNeed(mm, y, k === "super");   // v476 감면 해는 절반 · v477 관리감독자도(16 → 8)
       from = k === "super" ? y + "-01-01" : y + (m <= 6 ? "-01-01" : "-07-01"); to = k === "super" ? y + "-12-31" : y + (m <= 6 ? "-06-30" : "-12-31");
       sum = eduHoursNum(hours);
       liveEdu().forEach(function(r){ if (r.id !== exceptId && r.kind === k && r.ptype === ptype && String(r.pid) === pid && isDate(r.date) && r.date >= from && r.date <= to) sum += eduHoursNum(r.hours); });
@@ -19809,7 +19809,7 @@
   //   · 참여(ra_join)는 '· 참여' 표시만 · 올해 투입 일용직의 공유는 '신규·작업 변경자 작업 전 공유'라
   //   고용노동부 11/4 고시 전부개정이 법제처에 오르기 전까지 '근거 확인 중'(회색).
   //   정기교육 = 감면 없음 기준(사무직 반기 6 · 그 밖 12 · 관리감독자 연 16시간 — 회원 '사무직'·'관리감독자 지정' 표식, 표식이 없으면 12). 회사 단위 감면(전년 무재해 — v476)은
-  //   안전 설정(settings:safety)의 감면 적용 연도(reduce)를 eduReduceOn 한 곳에서 읽는다 — 그 해 근로자 정기교육 기준이 절반(관리감독자는 그대로).
+  //   안전 설정(settings:safety)의 감면 적용 연도(reduce)를 eduReduceOn 한 곳에서 읽는다 — 그 해 정기교육 기준이 절반(v477 관리감독자 연 16 → 8시간 포함).
   // 열 12(명세 순서): 이름(굵게 · 선택 체크) · 구분 · 소속·최근 · 다음 할 일(기본 ▲ · 남는 폭) · 빠진 항목 · 정기교육 · 채용 시 · 특별교육 · 건설 기초 · 일반건진 · 석면 건진 · 위험성평가.
   //   ★위험성평가 열은 1366 창(1280~1599 단계)에서도 보이게 lv3(명세 lv4 → PM 11/10 19:10 '층 나눔' 구현 메모) — 단계 합 규칙(860 ≤ 742 · 1280 ≤ 962 · 1600 ≤ 1,282)을 지키려고
   //   구분·소속·최근을 lv4로 내림(명세 lv3 — 구분은 칩·펼침 머리로도 보임).
@@ -19872,14 +19872,15 @@
   // v476 회사 단위 감면(PM 11/14 '산업재해 미발생으로 감면') — 산업안전보건법 시행규칙 제27조①(현행 2026-08-01 원문 11/14 확인): 전년도에 산업재해가 없었던 사업장은
   //   근로자 정기교육을 그 다음 연도에 한정해 별표 4 기준 시간의 100분의 50 범위에서 면제. 안전 설정 reduce = { env: [연도], con: [연도] }(그 해에 감면 적용 — 관리자가 해마다 넣음).
   //   y 해에 이 직원의 근로자 정기교육 기준이 절반인가 — 소속 회사(회원 corp) env·con은 그 회사 목록, 두 회사 중복 재적·지정 안 함은 두 회사 모두 그 해일 때만(덜 깎는 쪽).
-  //   관리감독자 16시간은 깎지 않는다(조문은 '근로자 정기교육'으로만 적음 — 관리감독자 포함 여부는 따로 확인 전) · 일용직은 정기교육 판정 자체가 없음. 감면 시간은 이 함수에서만
+  //   v477(PM 11/15 '니가 알지 않냐' — 조문으로 판단): 관리감독자 정기교육(연 16시간)도 절반 — 제27조①이 '법 제29조제1항에 따른 근로자 정기교육'으로 정의하고 같은 조 ②가 그 용어를
+  //   '(관리감독자의 지위에 있는 사람의 경우 해당 연도)의 근로자 정기교육'으로 써서 관리감독자 정기교육이 그 안에 든다. 일용직은 정기교육 판정 자체가 없음. 감면 시간은 이 함수에서만
   function eduReduceOn(m, y){
     var rd = (typeof sfSet !== "undefined" && sfSet && sfSet.reduce) || null, c = m && m.corp;
     var has = function(k){ return !!rd && Array.isArray(rd[k]) && rd[k].indexOf(String(y)) >= 0; };
     if (!rd || !m) return false;
     return c === "env" ? has("env") : (c === "con" ? has("con") : (has("env") && has("con")));
   }
-  function eduRegNeed(m, y){ return ((m && m.office === true) ? EDU_STD.office : EDU_STD.other) * (eduReduceOn(m, y) ? 0.5 : 1); }   // 근로자 정기교육 반기 기준 시간(사무직 6 · 그 밖 12 — 감면 해는 3 · 6)
+  function eduRegNeed(m, y, sup){ return (sup ? EDU_STD.super : ((m && m.office === true) ? EDU_STD.office : EDU_STD.other)) * (eduReduceOn(m, y) ? 0.5 : 1); }   // 정기교육 기준 시간(사무직 반기 6 · 그 밖 12 · 관리감독자 연 16 — 감면 해는 3 · 6 · 8)
   function eduYm(d){ return isDate(d) ? d.slice(0, 7) : ""; }
   function eduAddMonths(d, n){ var dt = new Date(d + "T00:00:00"); dt.setMonth(dt.getMonth() + n); return fmtDate(dt); }
   function eduSiteStart(r){ var s = siteTermPart(r && r.start); return isDate(s) ? s : ""; }
@@ -19984,8 +19985,8 @@
     else if (jiip) c.reg = eduNone("regular", JIIP_B, last(["regular", "super"]));
     else if (boss) c.reg = eduGreyIt(sup ? "super" : "regular", EDU_CHK, EDU_CHK, BOSS_B, last(["regular", "super"]));
     else {
-      kind = sup ? "super" : "regular"; from = sup ? cx.y + "-01-01" : cx.half.start; to = sup ? cx.y + "-12-31" : cx.half.end; need = sup ? EDU_STD.super : eduRegNeed(m, cx.y);
-      var red = !sup && eduReduceOn(m, cx.y), needP = sup ? EDU_STD.super : eduRegNeed(m, String(cx.prev.start).slice(0, 4));   // v476 감면(이번 반기 = 올해 · 직전 반기 = 그 반기의 해)
+      kind = sup ? "super" : "regular"; from = sup ? cx.y + "-01-01" : cx.half.start; to = sup ? cx.y + "-12-31" : cx.half.end; need = eduRegNeed(m, cx.y, sup);
+      var red = eduReduceOn(m, cx.y), needP = eduRegNeed(m, sup ? String(Number(cx.y) - 1) : String(cx.prev.start).slice(0, 4), sup);   // v476 감면(이번 반기 = 올해 · 직전 반기 = 그 반기의 해) · v477 관리감독자도(작년 = 작년 감면 여부)
       a = eduHoursSum(recs, kind, from, to); n = vehDday(to).diff;
       tip = (sup ? "관리감독자 정기교육 " + cx.y + "년" : "정기교육 " + cx.half.label) + " " + a + "시간 / 기준 " + need + "시간(" + (sup ? "관리감독자 연 16" : (off ? "사무직 반기 6" : "그 밖 근로자 반기 12 — 사무직 표시가 없으면 12")) + (red ? " · " + cx.y + "년 무재해 감면 적용 — 기준의 절반(산업안전보건법 시행규칙 제27조①)" : " · 감면 없음 기준") + ") · 기한 " + to;
       // v447 검토 2: 직전 반기(관리감독자는 작년)에 그 종류 기록이 1건 이상 있는데(그때 재직이 확실) 합이 기준 미만이면 빨강 '경과 n일'(기한 = 그 반기(해) 말일) — 현황 ③·캘린더(저장된 next)와 같은 사람을 경과로.

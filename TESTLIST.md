@@ -1330,3 +1330,8 @@
 - [ ] (관리자) 안전 › 현황 ⑤ [고치기] → '근로자 정기교육 감면 적용 연도'에 그 회사의 감면 해(전년도에 산업재해가 없었던 해의 다음 해 — 예: 2026)를 넣고 저장 → 안전 › 체크 칸을 다시 열면 그 회사 직원 정기교육 칸의 기준이 절반(사무직 3 · 그 밖 6시간)으로 바뀌는지
 - [ ] (AI 시험 화면 대상) 감면 연도 저장 → 체크 칸 정기교육 칸·근거 글 · 현황 ④ 철거·석면 계약 줄의 공사금액 문턱 글(PC·375px)
 - [x] (AI) `uismoke` · `consheet_check` · `proctpl_check` · `settletest` · `servertest` · `rectest` · `promoqual_check` · `promogen_check` · `promoqlearn_check` · `promostream_check` · `promo_wrap_check` · `promo_post_check` 전부 통과 + node --check(gw-data·sw) — 숫자는 커밋 메시지
+
+## v477 — 안전: 관리감독자 정기교육도 무재해 감면(연 16 → 8시간)(앱만 · 운영 데이터 변경 없음 · 새 화면 없음)
+- [ ] (관리자) 감면 적용 연도를 넣은 회사의 관리감독자 지정 직원 — 안전 › 체크 칸 정기교육 칸의 기준이 8시간으로 바뀌고 근거 글에 '무재해 감면 적용'이 나오는지
+- [ ] (AI 시험 화면 대상) 감면 연도 저장 → 관리감독자 정기교육 칸 n/8시간(PC·375px)
+- [x] (AI) `uismoke` · `consheet_check` · `proctpl_check` · `settletest` · `servertest` · `rectest` · `promoqual_check` · `promogen_check` · `promoqlearn_check` · `promostream_check` · `promo_wrap_check` · `promo_post_check` 전부 통과 + node --check(sw) — 숫자는 커밋 메시지

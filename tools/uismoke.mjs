@@ -14979,21 +14979,21 @@ try {
       nx: [X.api.nextFor('regular', 'member:a7', '2026-08-01', 6, null), X.api.nextFor('regular', 'member:a7', '2026-08-01', 5, null), X.api.nextFor('regular', 'member:a7', '2027-02-01', 6, null), X.api.nextFor('super', 'member:a6', '2026-09-01', 0, null)].join(',') };
   };
   const SET76 = { kosha: { stage: 'none' }, headcount: { env: '', con: '' }, reduce: { env: ['2026'], con: [] } };
-  const WANT76 = '✓ 6/6시간|✓ 3/3시간|6/12시간!|6/12시간!|6/12시간!|8/16시간!|0/6시간!';
+  const WANT76 = '✓ 6/6시간|✓ 3/3시간|6/12시간!|6/12시간!|6/12시간!|✓ 8/8시간|0/6시간!';   // v477 관리감독자도 절반(8/8)
   const chk76 = (src) => {
     const on = run76(src, SET76), off = run76(src, null), noKey = run76(src, { kosha: { stage: 'none' }, headcount: { env: '', con: '' } }), y27 = run76(src, Object.assign({}, SET76, { reduce: { env: ['2027'], con: ['2027'] } })),
       both = run76(src, Object.assign({}, SET76, { reduce: { env: ['2026'], con: ['2026'] } }));
     const OFF = '6/12시간!|3/6시간!|6/12시간!|6/12시간!|6/12시간!|8/16시간!|0/12시간!';
-    const ok = on.c === WANT76 && off.c === OFF && noKey.c === OFF && y27.c === OFF && both.c === '✓ 6/6시간|✓ 3/3시간|✓ 6/6시간|✓ 6/6시간|✓ 6/6시간|8/16시간!|0/6시간!'
-      && /2026년 무재해 감면 적용 — 기준의 절반\(산업안전보건법 시행규칙 제27조①\)/.test(on.b1) && /감면 없음 기준/.test(off.b1) && /감면 없음 기준/.test(on.b6) && !/무재해 감면/.test(on.b6)
-      && on.nx === '2027-06-30,2026-12-31,2027-06-30,2026-12-31' && off.nx === '2026-12-31,2026-12-31,2027-06-30,2026-12-31';   // 감면 해 6시간 = 그 반기 채움(다음 반기 말일) · 5시간 = 미달 · 2027년 기록은 감면 해 아님(12 미달 → 그 반기 말일 06-30) · 관리감독자 그대로
+    const ok = on.c === WANT76 && off.c === OFF && noKey.c === OFF && y27.c === OFF && both.c === '✓ 6/6시간|✓ 3/3시간|✓ 6/6시간|✓ 6/6시간|✓ 6/6시간|✓ 8/8시간|0/6시간!'
+      && /2026년 무재해 감면 적용 — 기준의 절반\(산업안전보건법 시행규칙 제27조①\)/.test(on.b1) && /감면 없음 기준/.test(off.b1) && /관리감독자 연 16 · 2026년 무재해 감면 적용 — 기준의 절반/.test(on.b6) && /감면 없음 기준/.test(off.b6) && !/무재해 감면/.test(off.b6)
+      && on.nx === '2027-06-30,2026-12-31,2027-06-30,2027-12-31' && off.nx === '2026-12-31,2026-12-31,2027-06-30,2026-12-31';   // 감면 해 6시간 = 그 반기 채움(다음 반기 말일) · 5시간 = 미달 · 2027년 기록은 감면 해 아님(12 미달 → 그 반기 말일 06-30) · v477 관리감독자 8시간(기록 8) = 감면 해는 채움(다음 해 말일) · 감면 없음은 그해 말일
     return { ok, info: { on: on.c, off: off.c, both: both.c, nx: on.nx, nxOff: off.nx } };
   };
   const r76 = chk76(html);
   const m76 = [mut76('    if (!rd || !m) return false;\n    return c === "env" ? has("env")', '    return false;\n    return c === "env" ? has("env")'), mut76('(has("env") && has("con")));\n  }\n  function eduRegNeed', '(has("env") || has("con")));\n  }\n  function eduRegNeed'),
-    mut76('* (eduReduceOn(m, y) ? 0.5 : 1); }', '* (eduReduceOn(m, y) ? 1 : 1); }'), mut76('need = sup ? EDU_STD.super : eduRegNeed(m, cx.y);', 'need = eduRegNeed(m, cx.y);'),
-    mut76('need = k === "super" ? 16 : eduRegNeed(mm, y);', 'need = k === "super" ? 16 : ((mm && mm.office === true) ? 6 : 12);'), mut76('rd[k].indexOf(String(y)) >= 0; };', 'rd[k].length > 0; };')].map((s) => W.safe51(() => chk76(s)).ok);
-  T('v476 ① 근로자 정기교육 무재해 감면(실행 — 실제 eduPersonStat·eduNextFor): 안전 설정 감면 연도 종운환경 2026 = 종운환경 직원 기준 절반(그 밖 6/6 ✓ · 사무직 3/3 ✓ · 기록 없음 0/6) · 두 회사 중복 재적·소속 없음은 두 회사 모두 그 해일 때만 · 종운건설·관리감독자 16시간은 그대로 · 설정 없음·감면 칸 없음(옛 저장값)·다른 해 = 감면 없음 · 근거 글에 조문 · 다음 예정(감면 해 6시간 = 다음 반기 말일 · 2027년 기록은 감면 아님) · 결함 사본 ' + m76.length + '개 = 모두 ✗',
+    mut76('* (eduReduceOn(m, y) ? 0.5 : 1); }', '* (eduReduceOn(m, y) ? 1 : 1); }'), mut76('need = eduRegNeed(m, cx.y, sup);', 'need = sup ? EDU_STD.super : eduRegNeed(m, cx.y);'),
+    mut76('need = eduRegNeed(mm, y, k === "super");', 'need = k === "super" ? 16 : eduRegNeed(mm, y);'), mut76('var red = eduReduceOn(m, cx.y), needP', 'var red = !sup && eduReduceOn(m, cx.y), needP'), mut76('rd[k].indexOf(String(y)) >= 0; };', 'rd[k].length > 0; };')].map((s) => W.safe51(() => chk76(s)).ok);
+  T('v476 ① 근로자 정기교육 무재해 감면(실행 — 실제 eduPersonStat·eduNextFor): 안전 설정 감면 연도 종운환경 2026 = 종운환경 직원 기준 절반(그 밖 6/6 ✓ · 사무직 3/3 ✓ · 기록 없음 0/6) · 두 회사 중복 재적·소속 없음은 두 회사 모두 그 해일 때만 · 종운건설은 그대로 · 관리감독자도 절반(8/8 ✓ — v477) · 설정 없음·감면 칸 없음(옛 저장값)·다른 해 = 감면 없음 · 근거 글에 조문 · 다음 예정(감면 해 6시간 = 다음 반기 말일 · 2027년 기록은 감면 아님) · 결함 사본 ' + m76.length + '개 = 모두 ✗',
     r76.ok && m76.every((v) => v === false), JSON.stringify({ r: r76.info, mut: m76 }));
 
   // ② 현황 ④ 계약 공사금액 문턱(실행 — 실제 @safety-now): 철거·석면 계약만 · 계약금액 칸 기준
@@ -15046,8 +15046,8 @@ try {
     const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l));
     const GATE = ['uismoke', 'consheet_check', 'proctpl_check', 'settletest', 'servertest', 'rectest', 'promoqual_check', 'promogen_check', 'promoqlearn_check', 'promostream_check', 'promo_wrap_check', 'promo_post_check'];
     const mF = ['`eduReduceOn`', '`eduRegNeed`', '`sfNowConThr`', '`reduce`', '`BAD_REDUCE`', '제27조①', '제89조②', '제59조', '제2025-11호', '관리감독자'].filter((x) => ftv.indexOf(x) < 0);
-    const ok = /기준: v476 \(2026-11-14\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length >= 3 && !cb.some((l) => /\(PM/.test(l))
-      && GATE.every((g) => gate.some((l) => l.indexOf('`' + g + '`') > 0)) && /SHELL_CACHE = 'jw-shell-v476'/.test(d.sw)
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 476 /* v477: 기준 줄·sw = 이 판 이상 */ && ftv.length > 0 && mF.length === 0 && cb.length >= 3 && !cb.some((l) => /\(PM/.test(l))
+      && GATE.every((g) => gate.some((l) => l.indexOf('`' + g + '`') > 0)) && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 476
       && d.mn.indexOf('<b>무재해 감면</b>') > 0 && d.mn.indexOf('<b>공사금액 문턱</b>') > 0 && !/eduReduceOn|sfNowConThr|BAD_REDUCE/.test(d.mn);
     return { ok, info: { mF, cb: cb.length, gate: gate.length } };
   };
@@ -15056,6 +15056,29 @@ try {
   T('v476 ④ 문서·판 번호(정확 검사): FEATURES 기준 v476 (2026-11-14)·v476 절(함수·조문) · TESTLIST v476 게이트 [x] 12종·PM 칸 0 · MANUAL 무재해 감면·공사금액 문턱(내부 이름 0) · sw jw-shell-v476 · 결함 사본 ' + MD76.length + '개 = 모두 ✗',
     rD76.ok && MD76.every((v) => v === false), JSON.stringify({ r: rD76.info, mut: MD76 }));
 } catch (e) { console.log('  (v476 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v477(안전 — 관리감독자 정기교육도 무재해 감면, PM 11/15 · 시행규칙 제27조①②): 실행 검사는 v476 ①(관리감독자 8/8) · 여기는 문서·판 번호 정확 검사 — 다음 판은 기준 줄·sw를 '477 이상'으로 풀 것
+try {
+  const rd77 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D77 = { ft: rd77('FEATURES.md'), tl: rd77('TESTLIST.md'), sw: rd77('sw.js'), mn: rd77('MANUAL.html') };
+  const chkD77 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v477 (11/15)', '\n### '), tlv = cut(d.tl, '\n## v477 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l));
+    const GATE = ['uismoke', 'consheet_check', 'proctpl_check', 'settletest', 'servertest', 'rectest', 'promoqual_check', 'promogen_check', 'promoqlearn_check', 'promostream_check', 'promo_wrap_check', 'promo_post_check'];
+    const mF = ['`eduRegNeed(m, y, sup)`', '`eduNextFor`', '제27조①', '제27조②', '제1호의2', '8시간'].filter((x) => ftv.indexOf(x) < 0);
+    const ok = /기준: v477 \(2026-11-15\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length >= 3 && !cb.some((l) => /\(PM/.test(l))
+      && GATE.every((g) => gate.some((l) => l.indexOf('`' + g + '`') > 0)) && /SHELL_CACHE = 'jw-shell-v477'/.test(d.sw)
+      && d.mn.indexOf('관리감독자 정기교육도 절반(연 8시간)') > 0 && d.mn.indexOf('관리감독자 16시간은 그대로') < 0 && !/eduRegNeed/.test(d.mn);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length } };
+  };
+  const rD77 = chkD77(D77), muD77 = (k, f) => chkD77(Object.assign({}, D77, { [k]: f(D77[k]) })).ok;
+  const MD77 = [muD77('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v476 (')), muD77('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v476'")), muD77('mn', (s) => s.replace('관리감독자 정기교육도 절반(연 8시간)', '관리감독자 16시간은 그대로')), muD77('ft', (s) => s.split('제27조②').join('제27조'))];
+  const st77 = /다음 연도에 한정해 근로자 정기교육 시간의 50% 범위 면제\. 관리감독자 정기교육\(연 16시간\)도 절반\(8시간\)으로 봅니다\./.test(html) && !/관리감독자 16시간은 그대로 둡니다/.test(html)
+    && /function eduRegNeed\(m, y, sup\)\{ return \(sup \? EDU_STD\.super : /.test(html);
+  T('v477 문서·판 번호(정확 검사) + 안전 설정 창 안내 글: FEATURES 기준 v477 (2026-11-15)·v477 절(함수·조문) · TESTLIST v477 게이트 [x] 12종·PM 칸 0 · MANUAL 관리감독자 절반(옛 문장 0·내부 이름 0) · sw jw-shell-v477 · 창 안내 글 · 결함 사본 ' + MD77.length + '개 = 모두 ✗',
+    rD77.ok && st77 && MD77.every((v) => v === false), JSON.stringify({ r: rD77.info, st: st77, mut: MD77 }));
+} catch (e) { console.log('  (v477 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
